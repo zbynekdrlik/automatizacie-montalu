@@ -50,10 +50,28 @@
 	</nav>
 {/if}
 
-<div class="wrap">
+{#if page.url.pathname === '/login'}
+	<!-- login je full-bleed (vlastný split layout) — bez .wrap -->
 	{@render children()}
-</div>
+	<footer class="app login-footer">
+		<span data-testid="version">v{data.version}</span>
+	</footer>
+{:else}
+	<div class="wrap">
+		{@render children()}
+	</div>
+	<footer class="app">
+		Montalu automatizácie · <span data-testid="version">v{data.version}</span>
+	</footer>
+{/if}
 
-<footer class="app">
-	Montalu automatizácie · <span data-testid="version">v{data.version}</span>
-</footer>
+<style>
+	.login-footer {
+		position: fixed;
+		bottom: 10px;
+		right: 16px;
+		padding: 0;
+		color: #94a3b8;
+		z-index: 5;
+	}
+</style>
