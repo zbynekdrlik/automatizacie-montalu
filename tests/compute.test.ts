@@ -15,11 +15,13 @@ const odpisByKod = (r: NonNullable<ReturnType<typeof computeFlat>>) => {
 };
 
 describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => {
+	// tyče sa počítajú reálnym balením (FFD, mieša dĺžky na jednu tyč) — čísla
+	// overené proti ručnému rozloženiu; nižšie než pôvodný súčet-po-dĺžkach
 	const cases: [string, number, number, boolean, Record<string, number>, { sirka: number; vyska: number } | null][] = [
-		['Robust|2K', 5000, 2000, false, { ZASP00014: 22.5, ZASP00002: 30, ZASP00010: 7.5 }, { sirka: 2374, vyska: 1795 }],
-		['Robust|3K', 5000, 2150, false, { ZASP00016: 22.5, ZASP00002: 30, ZASP00010: 15 }, { sirka: 1563, vyska: 1945 }],
-		['Robust|2x2K', 5000, 2100, false, { ZASP00014: 22.5, ZASP00002: 37.5, ZASP00010: 15, ZASP00006: 7.5 }, { sirka: 1135.25, vyska: 1895 }],
-		['Robust|2x3K', 5000, 2200, false, { ZASP00016: 22.5, ZASP00002: 45, ZASP00010: 22.5, ZASP00006: 7.5 }, { sirka: 737.912, vyska: 1995 }],
+		['Robust|2K', 5000, 2000, false, { ZASP00014: 15, ZASP00002: 22.5, ZASP00010: 7.5 }, { sirka: 2374, vyska: 1795 }],
+		['Robust|3K', 5000, 2150, false, { ZASP00016: 15, ZASP00002: 30, ZASP00010: 15 }, { sirka: 1563, vyska: 1945 }],
+		['Robust|2x2K', 5000, 2100, false, { ZASP00014: 15, ZASP00002: 30, ZASP00010: 15, ZASP00006: 7.5 }, { sirka: 1135.25, vyska: 1895 }],
+		['Robust|2x3K', 5000, 2200, false, { ZASP00016: 15, ZASP00002: 37.5, ZASP00010: 22.5, ZASP00006: 7.5 }, { sirka: 737.912, vyska: 1995 }],
 		['Slide|2K', 3500, 2200, false, { ZASP00097: 15, ZASP00088: 22.5, ZASP202410: 7.5, ZASP00091: 22.5 }, null],
 		['Slide|3K', 3500, 2001, false, { ZASP00100: 15, ZASP00088: 22.5, ZASP202410: 15 }, null],
 		// sklo-závislé profily (Redukcia 6mm) sa pri redukciaZero=true nulujú
@@ -41,6 +43,19 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 
 	it('neznámy systém/štýl vráti null', () => {
 		expect(computeFlat(cfg, 'Slide|2x2K', 3000, 2000, false)).toBeNull();
+	});
+
+	// nález užívateľa 2026-07-02: rámový profil 4×2000 + 4×2530 sa má vyrezať
+	// z 3 tyčí (2530+2530+2000 dvakrát + 2000+2000), nie 4 — reálne balenie FFD.
+	// Robust|2K 5000×2000 dáva presne tento profil rezov na ZASP00002.
+	it('rámový profil sa balí reálne (FFD) — 3 tyče, nie 4 (nález užívateľa)', () => {
+		const r = computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!;
+		const ram = r.material.find((m) => m.kod === 'ZASP00002')!;
+		// rezy: 4× (5000+22)/2−4 = 2507 (šírka) + 4× 1930−0 = 1930 (výška)
+		expect(ram.tyce).toBe(3);
+		expect(r.odpis.find((o) => o.kod === 'ZASP00002')!.metre).toBe(22.5);
+		// koľajnica 2× 5000 + 2× 2000 = 2 tyče (5000+2000 na jednu), nie 3
+		expect(r.material.find((m) => m.kod === 'ZASP00014')!.tyce).toBe(2);
 	});
 
 	it('počet skiel = N', () => {
@@ -79,7 +94,7 @@ describe('safeCompute — žiadny tichý fallback, chyba sa hlási', () => {
 	it('platný config počíta z tabuľky', () => {
 		const { r, err } = safeCompute(cfg, 'Robust|2K', 5000, 2000, false);
 		expect(err).toBeNull();
-		expect(r!.odpis.find((o) => o.kod === 'ZASP00014')!.metre).toBe(22.5);
+		expect(r!.odpis.find((o) => o.kod === 'ZASP00014')!.metre).toBe(15);
 	});
 
 	it('poškodený config vráti chybu, nie čísla', () => {

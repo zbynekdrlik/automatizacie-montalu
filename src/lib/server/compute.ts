@@ -87,6 +87,23 @@ function val(row: RezRow, S: number, V: number, N: number, useKerf: boolean): nu
 }
 
 /**
+ * Reálne balenie kusov do tyčí — First-Fit-Decreasing. Mieša rôzne dĺžky
+ * rezov toho istého profilu na jednu tyč (napr. 2530+2530+2000 z jednej 7500),
+ * ako sa reálne reže. Nahrádza pôvodný súčet-po-dĺžkach, ktorý každú dĺžku
+ * počítal na samostatnú tyč a preto nadhodnocoval počet tyčí (a odpis do Money).
+ */
+function ffdBars(pieces: number[]): number {
+	const rem: number[] = [];
+	for (const p of [...pieces].sort((a, b) => b - a)) {
+		let i = 0;
+		for (; i < rem.length; i++) if (rem[i] >= p) break;
+		if (i === rem.length) rem.push(BAR - p);
+		else rem[i] -= p;
+	}
+	return rem.length;
+}
+
+/**
  * Vypočíta nárezový plán. `redukciaZero` = true keď zvolené sklo nuluje
  * sklo-závislé profily (Redukcia 6mm pri Slide). Ktoré sklá to sú, určuje
  * tabuľka glass_types (stĺpec redukcia_zero) — nie natvrdo zadaný reťazec.
@@ -114,16 +131,18 @@ export function computeFlat(
 	const odpis: OdpisRow[] = [];
 	for (const kod of order) {
 		const rows = byKod[kod];
-		let sum = 0;
 		const rezy: { rozmer: number; ks: number }[] = [];
+		// všetky kusy tohto profilu (naprieč rez-riadkami S aj V) idú do jedného
+		// balenia — dĺžka pre balenie je bez prerezu (rovnaká ako v pôvodnom
+		// `per` výpočte); zobrazený rozmer je s prerezom
+		const pieces: number[] = [];
 		for (const r of rows) {
 			const t = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
 			const q = val(r, S, V, N, false);
-			const per = Math.floor(BAR / q);
-			sum += per > 0 && t > 0 ? t / per : 0;
+			for (let i = 0; i < t; i++) if (q > 0) pieces.push(q);
 			rezy.push({ rozmer: Math.round(val(r, S, V, N, true)), ks: t });
 		}
-		const tyce = Math.ceil(sum);
+		const tyce = ffdBars(pieces);
 		material.push({ kod, nazov: rows[0].nazov, rezy, tyce });
 		odpis.push({ kod, nazov: rows[0].nazov, metre: R((tyce * BAR) / 1000) });
 	}

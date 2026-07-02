@@ -16,7 +16,7 @@
 			styl: '2K',
 			s: '' as unknown as number,
 			v: '' as unknown as number,
-			sklo: data.skla[0] ?? '',
+			sklo: '',
 			otvaranie: 'P - L',
 			caka: false
 		}
@@ -24,6 +24,7 @@
 
 	let system = $state('Robust');
 	let styl = $state('2K');
+	let sklo = $state('');
 	$effect(() => {
 		system = form?.vstup?.system ?? 'Robust';
 		styl = form?.vstup?.styl ?? '2K';
@@ -31,6 +32,14 @@
 	let stylyPre = $derived(data.styly.filter((x) => x.system === system).map((x) => x.styl));
 	$effect(() => {
 		if (!stylyPre.includes(styl)) styl = stylyPre[0];
+	});
+	// sklá platné pre zvolený systém (jeho vlastné + spoločné ALL)
+	let sklaPre = $derived(
+		data.skla.filter((g) => g.system === system || g.system === 'ALL').map((g) => g.nazov)
+	);
+	$effect(() => {
+		const chcene = form?.vstup?.sklo;
+		sklo = chcene && sklaPre.includes(chcene) ? chcene : sklaPre[0];
 	});
 
 	let step = $derived(form?.step ?? 'form');
@@ -160,8 +169,8 @@
 			<div class="grid2">
 				<div class="field">
 					<label for="sklo">Sklo</label>
-					<select id="sklo" name="sklo" value={vstup.sklo}>
-						{#each data.skla as g (g)}<option>{g}</option>{/each}
+					<select id="sklo" name="sklo" bind:value={sklo}>
+						{#each sklaPre as g (g)}<option>{g}</option>{/each}
 					</select>
 				</div>
 				<div class="field">
