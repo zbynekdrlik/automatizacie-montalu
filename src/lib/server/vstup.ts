@@ -77,9 +77,12 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 		caka: form.get('caka') === '1'
 	};
 	let error: string | null = null;
+	const rawDlzka = parseFloat(String(form.get('dlzkaKolajnic') ?? '0').replace(',', '.'));
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
 	else if (!(vstup.pocetSekcii > 0)) error = 'Zadaj počet sekcií (väčší ako 0).';
+	else if (Number.isFinite(rawDlzka) && rawDlzka > 200000)
+		error = 'Dĺžka koľajníc mimo rozsahu (max 200 000 mm) — skontroluj zadanie.';
 	return { vstup, error };
 }

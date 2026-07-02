@@ -287,12 +287,24 @@ export function transform(text: string): TransformResult {
 					notes.push(`rez ${Math.round(p)} > ${mx} — kombinácia tyčí (žľab: spoj nad nohou skontrolovať)`);
 					const fm: Record<number, string> = {};
 					for (const b of avail) fm[b] = family[b].prp;
+					const minimal = minCoverCombo(p, avail);
+					let options = coverCombos(p, avail);
+					// extrémne dlhý rez (> ~3 tyče) — coverCombos nič neponúkne;
+					// minimal musí byť voliteľný vždy, inak stránka nemá čo zobraziť
+					if (!options.length)
+						options = [
+							{
+								bars: minimal.slice().sort((a, b) => b - a),
+								total: minimal.reduce((s, x) => s + x, 0),
+								cnt: minimal.length
+							}
+						];
 					comboCases.push({
 						code,
 						name: info.name,
 						cut: p,
-						minimal: minCoverCombo(p, avail),
-						options: coverCombos(p, avail),
+						minimal,
+						options,
 						familyMap: fm,
 						fieldLabel: `Profil ${code} ${info.name} — rez ${Math.round(p)} mm — kombinácia tyčí (podľa nohy)`
 					});
@@ -321,6 +333,9 @@ export function transform(text: string): TransformResult {
 	const out = CATALOG.map((c) => ({ prp: c.prp, name: c.name, qty: qtyByPrp[c.prp] || 0 }));
 	return { out, unresolved, trace, comboCases, qtyByPrp };
 }
+
+// numericky — lexikografický sort by pri tyči ≥10000 mm porovnával zle
+const sortedKey = (bars: number[]) => bars.slice().sort((a, b) => a - b).join('+');
 
 export const fmtBars = (dict: Record<number, number>): string => {
 	const ks = Object.keys(dict).map(Number).filter((b) => dict[b] > 0).sort((a, b) => a - b);
@@ -362,7 +377,7 @@ export function buildCopyBack(
 		r.comboCases.forEach((c, idx) => {
 			if (c.code !== code) return;
 			const chosen = choices.get(idx) ?? c.minimal;
-			if (chosen.slice().sort().join('+') === c.minimal.slice().sort().join('+')) return;
+			if (sortedKey(chosen) === sortedKey(c.minimal)) return;
 			for (const b of c.minimal) dict[b] = (dict[b] || 0) - 1;
 			for (const b of chosen) dict[b] = (dict[b] || 0) + 1;
 		});
@@ -383,7 +398,7 @@ export function applyCombos(
 	const q = { ...r.qtyByPrp };
 	r.comboCases.forEach((c, idx) => {
 		const bars = choices.get(idx) ?? c.minimal;
-		if (bars.slice().sort().join('+') === c.minimal.slice().sort().join('+')) return;
+		if (sortedKey(bars) === sortedKey(c.minimal)) return;
 		for (const b of c.minimal) {
 			const p = c.familyMap[b];
 			q[p] = Math.round(((q[p] || 0) - b / 1000) * 1000) / 1000;
@@ -396,11 +411,27 @@ export function applyCombos(
 	return q;
 }
 
-/** parsuje voľbu z radio hodnoty „4500+6000 mm (10.5 m)…" → [4500,6000]; inak minimal */
-export function parseChoice(value: string | undefined, minimal: number[]): number[] {
+/**
+ * Parsuje voľbu z radio hodnoty „4500+6000 mm (10.5 m)…" → [4500,6000].
+ * Voľba MUSÍ byť z ponúknutých kombinácií (options) — sfalšovaný/poškodený
+ * POST s neexistujúcimi tyčami by cez familyMap ticho vypustil materiál
+ * z Money odpisu (nález review). Neplatná voľba padá na minimal.
+ */
+export function parseChoice(
+	value: string | undefined,
+	minimal: number[],
+	options?: ComboOption[]
+): number[] {
 	if (value) {
 		const m = String(value).match(/^([0-9+]+)/);
-		if (m) return m[1].split('+').map(Number);
+		if (m) {
+			const bars = m[1].split('+').map(Number);
+			const key = sortedKey(bars);
+			const valid = options
+				? options.some((o) => sortedKey(o.bars) === key)
+				: bars.every((b) => Number.isFinite(b) && b > 0);
+			if (valid) return bars;
+		}
 	}
 	return minimal;
 }

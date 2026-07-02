@@ -40,7 +40,8 @@ function choicesFrom(form: FormData, r: ReturnType<typeof transform>) {
 	r.comboCases.forEach((c, i) => {
 		const value = String(form.get(`combo_${i}`) ?? '');
 		if (value) raw.set(i, value);
-		choices.set(i, parseChoice(value || undefined, c.minimal));
+		// voľba sa validuje proti PONÚKNUTÝM kombináciám — neplatná padá na minimal
+		choices.set(i, parseChoice(value || undefined, c.minimal, c.options));
 	});
 	return { choices, raw };
 }
@@ -95,6 +96,15 @@ export const actions: Actions = {
 		const vstup = parseVstup(form);
 		const { error, view: v } = view(vstup, form);
 		if (error) return { step: 'form' as const, error, vstup };
+
+		// posledná poistka pred zápisom do Money — nikdy záporné/nekonečné metre
+		if (v!.polozky.some((o) => o.qty < 0 || !Number.isFinite(o.qty)))
+			return {
+				step: 'nahlad' as const,
+				vstup,
+				v,
+				error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
+			};
 
 		const job: OdpisJob = {
 			modul: 'pergola',

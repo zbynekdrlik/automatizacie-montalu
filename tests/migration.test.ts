@@ -1,0 +1,125 @@
+// Migrácia v1 → v2 na PRODUKČNÝCH dátach: existujúce zasklenia odpisy si musia
+// zachovať dedup (HARD RULE: tá istá ZAK+OP sa nesmie do Money poslať druhýkrát
+// ani po migrácii schémy).
+import { describe, it, expect } from 'vitest';
+import Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-migr-test-'));
+const dbPath = path.join(tmpRoot, 'test.db');
+
+// 1. postav v1 DB presne ako ju vytvorila prvá verzia appky
+{
+	const v1 = new Database(dbPath);
+	v1.exec(`
+		CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')));
+		CREATE TABLE sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
+		CREATE TABLE cfg_sys (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL UNIQUE, n INTEGER NOT NULL, sklo_offset REAL NOT NULL);
+		CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL, dim TEXT NOT NULL, koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks REAL NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0);
+		CREATE TABLE glass_types (id INTEGER PRIMARY KEY, nazov TEXT NOT NULL UNIQUE, redukcia_zero INTEGER NOT NULL DEFAULT 0, poradie INTEGER NOT NULL DEFAULT 0);
+		CREATE TABLE cfg_audit (id INTEGER PRIMARY KEY, ts TEXT NOT NULL DEFAULT (datetime('now')), username TEXT NOT NULL, sys_styl TEXT NOT NULL, zmeny TEXT NOT NULL);
+		CREATE TABLE odpis_log (
+			id INTEGER PRIMARY KEY, zak TEXT NOT NULL, op TEXT NOT NULL, zakaznik TEXT NOT NULL,
+			system TEXT NOT NULL, styl TEXT NOT NULL, s REAL NOT NULL, v REAL NOT NULL,
+			sklo TEXT NOT NULL DEFAULT '', otvaranie TEXT NOT NULL DEFAULT '',
+			caka INTEGER NOT NULL DEFAULT 0, live INTEGER NOT NULL,
+			target TEXT NOT NULL, filename TEXT NOT NULL, content_hash TEXT NOT NULL DEFAULT '',
+			created_by TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			UNIQUE (zak, op, live)
+		);
+		CREATE TABLE problem_reports (id INTEGER PRIMARY KEY, ts TEXT NOT NULL DEFAULT (datetime('now')), username TEXT NOT NULL DEFAULT '', oblast TEXT NOT NULL DEFAULT '', popis TEXT NOT NULL);
+	`);
+	v1.prepare(
+		`INSERT INTO odpis_log (zak, op, zakaznik, system, styl, s, v, sklo, otvaranie, caka, live, target, filename, content_hash, created_by)
+		 VALUES ('ZAK-MIG-1', '01', 'Migrovaný', 'Robust', '2K', 2509, 1930, 'Izolačné sklo 4/16/4 mliečne', 'P - L', 0, 0, '/test/subor.xlsx', 'subor.xlsx', 'abcd1234', 'marek')`
+	).run();
+	v1.pragma('user_version = 1');
+	v1.close();
+}
+
+// 2. import appky nad v1 DB → migrate() zbehne pri importe
+process.env.DATABASE_PATH = dbPath;
+const { db } = await import('../src/lib/server/db');
+const { writeOdpis } = await import('../src/lib/server/money');
+
+describe('migrácia odpis_log v1 → v2', () => {
+	it('user_version = 2 a dáta prežili s modul=zasklenia + detail JSON', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(2);
+		const row = db
+			.prepare('SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?')
+			.get('ZAK-MIG-1') as Record<string, unknown>;
+		expect(row.modul).toBe('zasklenia');
+		expect(row.zakaznik).toBe('Migrovaný');
+		expect(row.content_hash).toBe('abcd1234');
+		const d = JSON.parse(String(row.detail));
+		expect(d.system).toBe('Robust');
+		expect(d.styl).toBe('2K');
+		expect(d.s).toBe(2509);
+	});
+
+	it('dedup migrovaného záznamu drží — tá istá ZAK+OP sa neodošle druhýkrát', async () => {
+		process.env.MONEY_LIVE = '0';
+		process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
+		const out = await writeOdpis({
+			modul: 'zasklenia',
+			zak: 'ZAK-MIG-1',
+			op: '01',
+			zakaznik: 'Migrovaný',
+			caka: false,
+			createdBy: 'vitest',
+			cakaSubdir: 'Robust',
+			filenameBase: 'ZAK-MIG-1 - OP01 - Migrovaný ZASKLENIA Robust 2K',
+			popis: '01 : Migrovaný',
+			polozky: [{ kod: 'ZASP00014', nazov: 'Koľajnica', qty: 15 }],
+			detail: {}
+		});
+		expect(out.status).toBe('duplicate');
+	});
+
+	it('iný modul tej istej ZAK+OP po migrácii prejde', async () => {
+		const out = await writeOdpis({
+			modul: 'bazen',
+			zak: 'ZAK-MIG-1',
+			op: '01',
+			zakaznik: 'Migrovaný',
+			caka: false,
+			createdBy: 'vitest',
+			cakaSubdir: 'Bazen',
+			filenameBase: 'ZAK-MIG-1 - OP01 - Migrovaný BAZEN',
+			popis: '01 Migrovaný',
+			polozky: [{ kod: 'BPP00091', nazov: '2-koľaj', qty: 4.6 }],
+			detail: {}
+		});
+		expect(out.status).toBe('written');
+	});
+
+	it('opakovaný beh migrácie je idempotentný (žiadny crash-loop)', () => {
+		// simulácia prerušenej migrácie: odpis_log2 ostal, verzia späť na 1
+		db.exec('CREATE TABLE odpis_log2 (id INTEGER PRIMARY KEY)');
+		db.pragma('user_version = 1');
+		// re-run migračného bloku (rovnaké SQL ako v db.ts)
+		expect(() =>
+			db.exec(`
+				BEGIN;
+				DROP TABLE IF EXISTS odpis_log2;
+				CREATE TABLE odpis_log2 (
+					id INTEGER PRIMARY KEY, modul TEXT NOT NULL, zak TEXT NOT NULL, op TEXT NOT NULL,
+					zakaznik TEXT NOT NULL, caka INTEGER NOT NULL DEFAULT 0, live INTEGER NOT NULL,
+					target TEXT NOT NULL, filename TEXT NOT NULL, content_hash TEXT NOT NULL DEFAULT '',
+					detail TEXT NOT NULL DEFAULT '{}', created_by TEXT NOT NULL DEFAULT '',
+					created_at TEXT NOT NULL DEFAULT (datetime('now')),
+					UNIQUE (modul, zak, op, live)
+				);
+				INSERT INTO odpis_log2 SELECT * FROM odpis_log;
+				DROP TABLE odpis_log;
+				ALTER TABLE odpis_log2 RENAME TO odpis_log;
+				PRAGMA user_version = 2;
+				COMMIT;
+			`)
+		).not.toThrow();
+		expect(db.pragma('user_version', { simple: true })).toBe(2);
+		expect((db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c).toBeGreaterThan(0);
+	});
+});
