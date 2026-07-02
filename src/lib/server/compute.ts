@@ -77,6 +77,8 @@ export interface ComputeResult {
 }
 
 export const BAR = 7500;
+/** hrúbka rezu pílového kotúča — každý rez na tyči odoberie tento materiál */
+export const KOTUC = 4;
 
 const R = (x: number) => Math.round(x * 1000) / 1000;
 
@@ -110,19 +112,22 @@ function val(row: RezRow, S: number, V: number, N: number, useKerf: boolean): nu
  * ako sa reálne reže. Nahrádza pôvodný súčet-po-dĺžkach, ktorý každú dĺžku
  * počítal na samostatnú tyč a preto nadhodnocoval počet tyčí (a odpis do Money).
  */
-/** FFD balenie so sledovaním, ktorý kus je na ktorej tyči (pre grafický rozpis). */
+/** FFD balenie so sledovaním, ktorý kus je na ktorej tyči (pre grafický rozpis).
+ *  Každý kus rezervuje svoju dĺžku + hrúbku kotúča (KOTUC) — reálny rez odoberie
+ *  4 mm. zvysok = skutočný odpad (offcut) po odrátaní kusov aj rezov. */
 function ffdPack(kusy: Kus[]): Tyc[] {
 	const bary: Tyc[] = [];
 	const rem: number[] = [];
 	for (const k of [...kusy].sort((a, b) => b.dlzka - a.dlzka)) {
+		const need = k.dlzka + KOTUC;
 		let i = 0;
-		for (; i < rem.length; i++) if (rem[i] >= k.dlzka) break;
+		for (; i < rem.length; i++) if (rem[i] >= need) break;
 		if (i === rem.length) {
-			bary.push({ kusy: [k], zvysok: BAR - k.dlzka });
-			rem.push(BAR - k.dlzka);
+			bary.push({ kusy: [k], zvysok: BAR - need });
+			rem.push(BAR - need);
 		} else {
 			bary[i].kusy.push(k);
-			rem[i] -= k.dlzka;
+			rem[i] -= need;
 			bary[i].zvysok = rem[i];
 		}
 	}
