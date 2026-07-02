@@ -66,5 +66,4 @@ live in local memory, never committed (per security-basics).
 ## Playbook router
 
 Load the matching skill BEFORE working on that area (don't re-derive):
-- (none yet — add `.claude/skills/<area>/SKILL.md` as procedures/gotchas accumulate,
-  per project-playbook-maintenance)
+- deploy / post-deploy E2E / LIVE flip → load `.claude/skills/deploy`
