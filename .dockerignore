@@ -1,0 +1,11 @@
+node_modules
+build
+.svelte-kit
+data
+*.db
+test-results
+playwright-report
+.git
+.github
+e2e
+tests

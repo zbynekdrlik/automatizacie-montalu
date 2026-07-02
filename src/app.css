@@ -1,0 +1,264 @@
+/* Spoločný vzhľad — svetlé karty, systémové písmo, čitateľné aj v tlači. */
+* {
+	box-sizing: border-box;
+}
+body {
+	margin: 0;
+	background: #f1f5f9;
+	color: #0f172a;
+	font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.wrap {
+	max-width: 860px;
+	margin: 0 auto;
+	padding: 20px 16px 40px;
+}
+.card {
+	background: #fff;
+	border-radius: 14px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	padding: 20px;
+	margin-bottom: 14px;
+}
+.sec {
+	font-size: 11px;
+	font-weight: 700;
+	color: #64748b;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	margin: 0 0 10px;
+}
+h1 {
+	font-size: 19px;
+	margin: 0;
+}
+.sub {
+	color: #64748b;
+	font-size: 12.5px;
+	margin: 4px 0 0;
+}
+.badge {
+	display: inline-block;
+	background: #eff6ff;
+	color: #1d4ed8;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 3px 10px;
+	border-radius: 999px;
+}
+.badge.test {
+	background: #fef3c7;
+	color: #b45309;
+}
+.badge.live {
+	background: #dcfce7;
+	color: #15803d;
+}
+table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+th {
+	text-align: left;
+	color: #64748b;
+	font-weight: 600;
+	font-size: 11px;
+	text-transform: uppercase;
+	border-bottom: 2px solid #e2e8f0;
+	padding: 6px 4px;
+}
+td {
+	padding: 7px 4px;
+	border-bottom: 1px solid #eef2f7;
+}
+td.c,
+th.c {
+	text-align: center;
+}
+label {
+	display: block;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: #334155;
+	margin: 0 0 4px;
+}
+input,
+select {
+	width: 100%;
+	padding: 10px 12px;
+	border: 1px solid #cbd5e1;
+	border-radius: 10px;
+	font-size: 15px;
+	background: #fff;
+	color: #0f172a;
+}
+input:focus,
+select:focus {
+	outline: 2px solid #2563eb;
+	border-color: #2563eb;
+}
+.grid2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+.grid3 {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: 12px;
+}
+@media (max-width: 640px) {
+	.grid2,
+	.grid3 {
+		grid-template-columns: 1fr;
+	}
+}
+.field {
+	margin-bottom: 12px;
+}
+.btn {
+	display: block;
+	width: 100%;
+	background: #2563eb;
+	color: #fff;
+	border: 0;
+	border-radius: 12px;
+	padding: 14px;
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+	text-align: center;
+	text-decoration: none;
+}
+.btn:hover {
+	background: #1d4ed8;
+}
+.btn.secondary {
+	background: #fff;
+	color: #2563eb;
+	border: 2px solid #2563eb;
+	padding: 12px;
+}
+.btn.secondary:hover {
+	background: #eff6ff;
+}
+.btn.danger {
+	background: #dc2626;
+}
+.btn + .btn {
+	margin-top: 10px;
+}
+.err {
+	background: #fef2f2;
+	border: 1px solid #fecaca;
+	color: #b91c1c;
+	border-radius: 10px;
+	padding: 12px 14px;
+	font-size: 14px;
+	margin-bottom: 14px;
+}
+.warn {
+	background: #fffbeb;
+	border: 1px solid #fde68a;
+	color: #92400e;
+	border-radius: 10px;
+	padding: 12px 14px;
+	font-size: 14px;
+	margin-bottom: 14px;
+}
+.okmsg {
+	background: #f0fdf4;
+	border: 1px solid #bbf7d0;
+	color: #15803d;
+	border-radius: 10px;
+	padding: 12px 14px;
+	font-size: 14px;
+	margin-bottom: 14px;
+}
+.row {
+	display: flex;
+	justify-content: space-between;
+	padding: 8px 2px;
+	border-bottom: 1px solid #e2e8f0;
+	font-size: 13px;
+}
+.row span {
+	color: #334155;
+}
+.row b {
+	white-space: nowrap;
+}
+.g {
+	display: flex;
+	gap: 24px;
+	flex-wrap: wrap;
+}
+.g div span {
+	color: #64748b;
+	font-size: 12px;
+	display: block;
+}
+.g div b {
+	display: block;
+	font-size: 16px;
+}
+nav.top {
+	background: #0f172a;
+	color: #e2e8f0;
+}
+nav.top .inner {
+	max-width: 860px;
+	margin: 0 auto;
+	padding: 10px 16px;
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	flex-wrap: wrap;
+}
+nav.top a {
+	color: #cbd5e1;
+	text-decoration: none;
+	font-size: 14px;
+	font-weight: 600;
+}
+nav.top a:hover,
+nav.top a.active {
+	color: #fff;
+}
+nav.top .brand {
+	font-weight: 800;
+	color: #fff;
+	font-size: 15px;
+}
+nav.top .spacer {
+	flex: 1;
+}
+nav.top .user {
+	font-size: 12.5px;
+	color: #94a3b8;
+}
+footer.app {
+	text-align: center;
+	color: #94a3b8;
+	font-size: 12px;
+	padding: 10px 0 24px;
+}
+@media print {
+	body {
+		background: #fff;
+	}
+	.card {
+		box-shadow: none;
+		border: 1px solid #e2e8f0;
+		page-break-inside: avoid;
+	}
+	nav.top,
+	footer.app,
+	.noprint {
+		display: none !important;
+	}
+	.wrap {
+		padding: 0;
+	}
+}

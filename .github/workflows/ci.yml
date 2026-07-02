@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version-check:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: dev verzia musí byť > main
+        run: |
+          DEV=$(node -p "require('./package.json').version")
+          git fetch origin main --depth 1
+          MAIN=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || echo 0.0.0)
+          echo "dev=$DEV main=$MAIN"
+          HIGHEST=$(printf '%s\n%s\n' "$MAIN" "$DEV" | sort -V | tail -1)
+          if [ "$DEV" = "$MAIN" ] || [ "$HIGHEST" != "$DEV" ]; then
+            echo "::error::package.json verzia na dev ($DEV) musí byť vyššia než na main ($MAIN)"
+            exit 1
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typová kontrola (svelte-check)
+        run: npm run check
+      - name: Unit testy (vitest — 1:1 vektory výpočtov + dedup)
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Playwright
+        run: npx playwright install --with-deps chromium
+      - name: E2E (reálny prehliadač, nula console errors)
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH kľúč
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 167.233.125.9 >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Rsync zdroj na VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key root@167.233.125.9 'mkdir -p /opt/automatizacie-montalu/src'
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude .git --exclude node_modules --exclude data \
+            ./ root@167.233.125.9:/opt/automatizacie-montalu/src/
+          scp -i ~/.ssh/deploy_key deploy/docker-compose.yml root@167.233.125.9:/opt/automatizacie-montalu/docker-compose.yml
+      - name: Build + up + verifikácia
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHA7=${GITHUB_SHA::7}
+          APP_VERSION="$VERSION ($SHA7)"
+          ssh -i ~/.ssh/deploy_key root@167.233.125.9 "
+            set -euo pipefail
+            cd /opt/automatizacie-montalu
+            APP_VERSION='$APP_VERSION' docker compose up -d --build
+            for i in \$(seq 1 20); do
+              sleep 3
+              H=\$(curl -s http://127.0.0.1:8090/health || true)
+              echo \"health: \$H\"
+              echo \"\$H\" | grep -q '\"ok\":true' && echo \"\$H\" | grep -qF '$SHA7' && exit 0
+            done
+            echo 'Health/verzia nesedí po deployi'; docker logs --tail 50 automatizacie-montalu; exit 1
+          "
