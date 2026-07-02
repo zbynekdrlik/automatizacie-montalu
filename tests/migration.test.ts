@@ -44,9 +44,9 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 const { writeOdpis } = await import('../src/lib/server/money');
 
-describe('migrácia odpis_log v1 → v2', () => {
-	it('user_version = 2 a dáta prežili s modul=zasklenia + detail JSON', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(2);
+describe('migrácia odpis_log v1 → v2/v3', () => {
+	it('user_version = 3 a dáta prežili s modul=zasklenia + detail JSON', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(3);
 		const row = db
 			.prepare('SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?')
 			.get('ZAK-MIG-1') as Record<string, unknown>;

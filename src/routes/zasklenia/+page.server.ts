@@ -3,7 +3,7 @@
 // poslaným číslam) a zapíše odpis s dedup ochranou.
 
 import type { Actions, PageServerLoad } from './$types';
-import { loadCfg, listSysStyly, listGlassTypes } from '$lib/server/db';
+import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
 import { safeCompute } from '$lib/server/compute';
 import {
 	writeOdpis,
@@ -34,9 +34,10 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 }
 
 function compute(vstup: Vstup) {
-	const glass = listGlassTypes();
-	const g = glass.find((x) => x.nazov === vstup.sklo);
-	if (!g) return { r: null, err: 'Vyber typ skla.' };
+	// sklo musí patriť k zvolenému systému (Robust = 4/16/4, Slide = 4/8/4) —
+	// nedá sa cez skriptovaný POST poslať cudzie sklo
+	const g = glassTypesForSystem(vstup.system).find((x) => x.nazov === vstup.sklo);
+	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém.' };
 	const cfg = loadCfg();
 	return safeCompute(cfg, vstup.system + '|' + vstup.styl, vstup.s, vstup.v, g.redukciaZero);
 }
@@ -47,7 +48,9 @@ export const load: PageServerLoad = async () => {
 	return {
 		systemy,
 		styly, // len existujúce kombinácie — neplatná voľba sa nedá odoslať
-		skla: listGlassTypes().map((g) => g.nazov),
+		// sklá s príslušnosťou k systému — klient ponúkne len platné pre zvolený
+		// systém (Robust = 4/16/4, Slide = 4/8/4)
+		skla: listGlassTypes().map((g) => ({ nazov: g.nazov, system: g.system })),
 		otvarania: OTVARANIA,
 		live: isLive()
 	};

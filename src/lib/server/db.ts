@@ -144,8 +144,39 @@ function migrate() {
 		`);
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 3) {
+		// v2 → v3: sklá majú systém (Robust = 4/16/4, Slide = 4/8/4) + Slide
+		// „4/8/4 číre" nuluje Redukciu 6mm. Sklá sú konfigurácia (nie user dáta),
+		// bezpečne ich preseedujeme na nový systémovo-rozlíšený set.
+		db.exec(`
+			BEGIN;
+			ALTER TABLE glass_types ADD COLUMN system TEXT NOT NULL DEFAULT 'ALL';
+			DELETE FROM glass_types;
+			PRAGMA user_version = 3;
+			COMMIT;
+		`);
+		seedGlass();
+	}
+
 	seedData();
 	seedUsers();
+}
+
+// Sklá podľa systému: Robust = izolačné 4/16/4, Slide = izolačné 4/8/4
+// (Slide „4/8/4 číre" nuluje Redukciu 6mm — sklozavislé profily sa nepočítajú),
+// kalené sklá platia pre oba systémy (system = 'ALL').
+function seedGlass() {
+	const ins = db.prepare(
+		'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES (?, ?, ?, ?)'
+	);
+	db.transaction(() => {
+		ins.run('Izolačné sklo 4/16/4 mliečne', 0, 10, 'Robust');
+		ins.run('Izolačné sklo 4/16/4 číre', 0, 20, 'Robust');
+		ins.run('Izolačné sklo 4/8/4 mliečne', 0, 10, 'Slide');
+		ins.run('Izolačné sklo 4/8/4 číre', 1, 20, 'Slide');
+		ins.run('Kalené 8mm', 0, 30, 'ALL');
+		ins.run('Kalené 10mm', 0, 40, 'ALL');
+	})();
 }
 
 function seedData() {
@@ -176,20 +207,7 @@ function seedData() {
 		})();
 	}
 	const glassCount = (db.prepare('SELECT COUNT(*) c FROM glass_types').get() as { c: number }).c;
-	if (glassCount === 0) {
-		// redukcia_zero = 0 všade: zachováva správanie overené 1:1 (Redukcia 6mm sa
-		// pri ponúkaných sklách nenuluje). Otvorená otázka pre Dominika/Mareka: má sa
-		// nulovať pri izolačných sklách? Ak áno, prepne sa v editore vzorcov.
-		const ins = db.prepare(
-			'INSERT INTO glass_types (nazov, redukcia_zero, poradie) VALUES (?, ?, ?)'
-		);
-		db.transaction(() => {
-			ins.run('Izolačné sklo 4/16/4 mliečne', 0, 10);
-			ins.run('Izolačné sklo 4/16/4 číre', 0, 20);
-			ins.run('Kalené 8mm', 0, 30);
-			ins.run('Kalené 10mm', 0, 40);
-		})();
-	}
+	if (glassCount === 0) seedGlass();
 }
 
 function seedUsers() {
@@ -246,11 +264,23 @@ export function listSysStyly(): { sysStyl: string; system: string; styl: string 
 	}));
 }
 
-export function listGlassTypes(): { nazov: string; redukciaZero: boolean }[] {
+export interface GlassType {
+	nazov: string;
+	redukciaZero: boolean;
+	system: string;
+}
+
+export function listGlassTypes(): GlassType[] {
 	return (db
-		.prepare('SELECT nazov, redukcia_zero FROM glass_types ORDER BY poradie')
-		.all() as { nazov: string; redukcia_zero: number }[]).map((r) => ({
+		.prepare('SELECT nazov, redukcia_zero, system FROM glass_types ORDER BY poradie')
+		.all() as { nazov: string; redukcia_zero: number; system: string }[]).map((r) => ({
 		nazov: r.nazov,
-		redukciaZero: !!r.redukcia_zero
+		redukciaZero: !!r.redukcia_zero,
+		system: r.system
 	}));
+}
+
+/** Sklá platné pre daný systém (jeho vlastné + spoločné 'ALL'). */
+export function glassTypesForSystem(system: string): GlassType[] {
+	return listGlassTypes().filter((g) => g.system === system || g.system === 'ALL');
 }
