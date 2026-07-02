@@ -1,7 +1,7 @@
 {
 	"name": "automatizacie-montalu",
 	"private": true,
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -27,6 +27,7 @@
 		"vitest": "^4.1.9"
 	},
 	"dependencies": {
+		"@fontsource-variable/archivo": "^5.2.8",
 		"better-sqlite3": "^12.11.1",
 		"exceljs": "^4.4.0"
 	}
