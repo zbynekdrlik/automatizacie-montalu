@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Nahlad2D from '$lib/components/Nahlad2D.svelte';
+	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 
 	let { data, form } = $props();
 
@@ -79,10 +80,11 @@
 	<div class="card">
 		<div class="sec">Zoznam materiálu — profily</div>
 		<table>
-			<thead><tr><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead>
+			<thead><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead>
 			<tbody>
 				{#each p.material as m (m.kod)}
 					<tr>
+						<td style="width:52px"><ProfilObrazok kod={m.kod} nazov={m.nazov} /></td>
 						<td>{m.nazov}</td>
 						<td class="c">{m.kod}</td>
 						<td>{m.rezy.filter((x) => x.ks > 0).map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ') || '—'}</td>
