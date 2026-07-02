@@ -11,6 +11,9 @@ export interface Vstup {
 	s: number;
 	v: number;
 	sklo: string;
+	/** voľné upresnenie zloženia skla (Stopsol, grey, dubová kôra…) — ide len
+	 *  na plán, vzorec ostáva podľa základného skla `sklo` */
+	skloPresne: string;
 	otvaranie: string;
 	caka: boolean;
 }
@@ -29,6 +32,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		s: num('s'),
 		v: num('v'),
 		sklo: String(form.get('sklo') ?? '').trim(),
+		skloPresne: String(form.get('skloPresne') ?? '').trim().slice(0, 120),
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
 		caka: form.get('caka') === '1'
 	};

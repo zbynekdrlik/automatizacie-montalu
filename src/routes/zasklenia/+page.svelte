@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Nahlad2D from '$lib/components/Nahlad2D.svelte';
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
+	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 
 	let { data, form } = $props();
 
@@ -17,6 +18,7 @@
 			s: '' as unknown as number,
 			v: '' as unknown as number,
 			sklo: '',
+			skloPresne: '',
 			otvaranie: 'P - L',
 			caka: false
 		}
@@ -57,6 +59,7 @@
 	<input type="hidden" name="s" value={vstup.s} />
 	<input type="hidden" name="v" value={vstup.v} />
 	<input type="hidden" name="sklo" value={vstup.sklo} />
+	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 {/snippet}
@@ -82,7 +85,7 @@
 			<div><span>Šírka</span><b data-testid="sklo-sirka">{fmtM(p.sklo.sirka)}</b></div>
 			<div><span>Výška</span><b data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
 			<div><span>Počet</span><b>{p.sklo.pocet} ks</b></div>
-			<div><span>Typ</span><b style="font-size:13px">{vstup.sklo}</b></div>
+			<div><span>Typ</span><b style="font-size:13px">{vstup.skloPresne || vstup.sklo}</b></div>
 		</div>
 	</div>
 
@@ -109,6 +112,14 @@
 		{#each p.odpis.filter((o) => o.metre > 0) as o (o.kod)}
 			<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.metre)} m</b></div>
 		{/each}
+	</div>
+
+	<div class="card">
+		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
+		<p class="sub" style="margin-bottom:14px">
+			Každá tyč (7500 mm) nakreslená v mierke s očíslovanými rezmi a odpadom na konci.
+		</p>
+		<RozpisRezov material={p.material} />
 	</div>
 {/snippet}
 
@@ -168,7 +179,7 @@
 			</div>
 			<div class="grid2">
 				<div class="field">
-					<label for="sklo">Sklo</label>
+					<label for="sklo">Sklo (základ — určuje vzorec)</label>
 					<select id="sklo" name="sklo" bind:value={sklo}>
 						{#each sklaPre as g (g)}<option>{g}</option>{/each}
 					</select>
@@ -179,6 +190,16 @@
 						{#each data.otvarania as o (o)}<option>{o}</option>{/each}
 					</select>
 				</div>
+			</div>
+			<div class="field">
+				<label for="skloPresne">Presné zloženie skla (nepovinné — nemení vzorec)</label>
+				<input
+					id="skloPresne"
+					name="skloPresne"
+					value={vstup.skloPresne}
+					maxlength="120"
+					placeholder="napr. Stopsol Classic Grey, dubová kôra…"
+				/>
 			</div>
 			<div class="field">
 				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
