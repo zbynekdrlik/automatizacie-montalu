@@ -5,6 +5,12 @@
 
 	let { data, children } = $props();
 
+	// marker pre E2E: hydratácia hotová — pred ním môže fill() na value-bound
+	// inputoch prehrať s hydratáciou, ktorá ich vráti na serverový stav
+	$effect(() => {
+		document.documentElement.dataset.hydrated = '1';
+	});
+
 	const links = [
 		{ href: '/pergola', label: 'Pergola' },
 		{ href: '/bazen', label: 'Bazén' },

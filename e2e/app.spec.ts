@@ -2,14 +2,14 @@
 // duplikát), editor vzorcov (zmena + návrat), verzia v pätičke. Každý test
 // vyžaduje NULA console errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated } from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
 
 test('login: zlé heslo zobrazí chybu, správne prihlási; verzia v pätičke', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
-	await page.goto('/login');
+	await goto(page, '/login');
 	await page.getByLabel('Meno').fill('e2e');
 	await page.getByLabel('Heslo').fill('zle-heslo');
 	await page.getByRole('button', { name: 'Prihlásiť' }).click();
@@ -23,7 +23,7 @@ test('login: zlé heslo zobrazí chybu, správne prihlási; verzia v pätičke',
 
 test('neprihlásený je presmerovaný na login', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
-	await page.goto('/zasklenia');
+	await goto(page, '/zasklenia');
 	await expect(page).toHaveURL(/\/login/);
 	expect(consoleMsgs).toEqual([]);
 });
@@ -67,6 +67,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 
 	// 3. nový plán → rovnaká ZAK+OP → duplikát, nič sa nezapíše
 	await page.getByRole('link', { name: /Nový nárezový plán/ }).click();
+	await waitHydrated(page);
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(RUN);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Test');
@@ -76,6 +77,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
 	await page.getByRole('link', { name: /Späť na formulár/ }).click();
+	await waitHydrated(page);
 	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue('');
 
 	// 4. iná OP tej istej ZAK prejde
@@ -116,7 +118,7 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
-	await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+	await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
 
 	const sklo = page.getByLabel('Sklo — konečné zmenšenie (mm)');
 	const povodna = await sklo.inputValue();
@@ -134,7 +136,7 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 		await expect(page.getByText(`${povodna} → ${Number(povodna) + 5}`)).toBeVisible();
 
 		// 3. hlavný formulár počíta s novou hodnotou (sklo užšie o 5)
-		await page.goto('/zasklenia');
+		await goto(page, '/zasklenia');
 		await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-CFG`);
 		await page.getByLabel('OP/OPDL číslo *').fill('01');
 		await page.getByLabel('Zákazník *').fill('E2E Test');
@@ -145,14 +147,14 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 	} finally {
 		// návrat na pôvodnú hodnotu VŽDY — aj po páde testu nesmie ostať
 		// zmenená konfigurácia (best effort, bez assertov)
-		await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+		await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
 		await sklo.fill(povodna);
 		await page.getByTestId('ulozit-vzorce').click();
 		await page.getByTestId('nastavenia-ulozene').waitFor();
 	}
 
 	// 4. história zmien obsahuje návrat
-	await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+	await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
 	await expect(page.getByText('História zmien')).toBeVisible();
 	await expect(
 		page.getByText(`Sklo — konečné zmenšenie: ${Number(povodna) + 5} → ${povodna}`).first()
