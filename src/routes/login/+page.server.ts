@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { login, SESSION_COOKIE } from '$lib/server/auth';
 
@@ -14,7 +14,9 @@ export const actions: Actions = {
 		const password = String(form.get('password') || '');
 		const token = login(username, password);
 		if (!token) {
-			return fail(401, { error: 'Nesprávne meno alebo heslo.', username });
+			// 200 render s chybou (nie fail(401)) — non-2xx na form POST loguje
+			// v prehliadači console error a porušuje zero-console-errors pravidlo
+			return { error: 'Nesprávne meno alebo heslo.', username };
 		}
 		cookies.set(SESSION_COOKIE, token, {
 			path: '/',

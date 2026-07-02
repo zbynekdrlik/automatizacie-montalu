@@ -1,6 +1,6 @@
 // Editor vzorcov: bounds validácia, transakčný zápis, audit trail a
 // old→new náhľad odpisu na kontrolných rozmeroch.
-import { fail } from '@sveltejs/kit';
+
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes } from '$lib/server/db';
 import { getEditableRows, saveCfgChanges, getAuditLog } from '$lib/server/cfg-editor';
@@ -48,7 +48,7 @@ export const actions: Actions = {
 			skloOffset,
 			glassRedukcia
 		});
-		if (error) return fail(400, { error, sysStyl });
+		if (error) return { error, sysStyl };
 
 		const po = safeCompute(loadCfg(), sysStyl, pS, pV, false);
 		return {

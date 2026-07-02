@@ -1,7 +1,7 @@
 // Zasklenia: dvojkrokový tok — (1) „nahlad" spočíta plán BEZ zápisu,
 // (2) „odoslat" prepočíta ZNOVA zo surových vstupov (nikdy never klientom
 // poslaným číslam) a zapíše odpis s dedup ochranou.
-import { fail } from '@sveltejs/kit';
+
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes } from '$lib/server/db';
 import { safeCompute } from '$lib/server/compute';
@@ -72,9 +72,9 @@ export const load: PageServerLoad = async () => {
 export const actions: Actions = {
 	nahlad: async ({ request }) => {
 		const { vstup, error } = parseVstup(await request.formData());
-		if (error) return fail(400, { step: 'form', error, vstup });
+		if (error) return { step: 'form' as const, error, vstup };
 		const { r, err } = compute(vstup);
-		if (err || !r) return fail(400, { step: 'form', error: err ?? 'Výpočet zlyhal.', vstup });
+		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		return {
 			step: 'nahlad',
 			vstup,
@@ -89,9 +89,9 @@ export const actions: Actions = {
 
 	odoslat: async ({ request, locals }) => {
 		const { vstup, error } = parseVstup(await request.formData());
-		if (error) return fail(400, { step: 'form', error, vstup });
+		if (error) return { step: 'form' as const, error, vstup };
 		const { r, err } = compute(vstup);
-		if (err || !r) return fail(400, { step: 'form', error: err ?? 'Výpočet zlyhal.', vstup });
+		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		try {
 			const outcome = await writeOdpis({
 				zak: vstup.zak,
@@ -104,21 +104,23 @@ export const actions: Actions = {
 				result: r
 			});
 			if (outcome.status === 'duplicate') {
-				return fail(409, {
-					step: 'duplikat',
+				// 200 render (nie fail(409)) — non-2xx na form POST loguje v prehliadači
+				// console error a porušuje zero-console-errors; blokovanie drží DB constraint
+				return {
+					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
 					vstup
-				});
+				};
 			}
 			return { step: 'hotovo', vstup, plan: r, outcome };
 		} catch (e) {
 			console.error('writeOdpis zlyhal:', e);
-			return fail(500, {
-				step: 'form',
+			return {
+				step: 'form' as const,
 				error:
 					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.',
 				vstup
-			});
+			};
 		}
 	}
 };
