@@ -31,19 +31,25 @@ function parseVstup(form: FormData): PergolaVstup {
 	};
 }
 
-function choicesFrom(form: FormData, r: ReturnType<typeof transform>): Map<string, number[]> {
-	const choices = new Map<string, number[]>();
+// voľby kombinácií kľúčované INDEXOM (dva kusy s rovnakým rezom majú rovnaký
+// label — index je jednoznačný); surové hodnoty sa vracajú na re-render, aby
+// zvolené rádiá nikdy „neodskočili" od zobrazeného rozpisu
+function choicesFrom(form: FormData, r: ReturnType<typeof transform>) {
+	const choices = new Map<number, number[]>();
+	const raw = new Map<number, string>();
 	r.comboCases.forEach((c, i) => {
-		choices.set(c.fieldLabel, parseChoice(String(form.get(`combo_${i}`) ?? '') || undefined, c.minimal));
+		const value = String(form.get(`combo_${i}`) ?? '');
+		if (value) raw.set(i, value);
+		choices.set(i, parseChoice(value || undefined, c.minimal));
 	});
-	return choices;
+	return { choices, raw };
 }
 
 function view(vstup: PergolaVstup, form?: FormData) {
 	const r = transform(vstup.cad);
-	const error = validatePergola(vstup.zak, vstup.op, vstup.cad, r);
+	const error = validatePergola(vstup.zak, vstup.op, vstup.zakaznik, vstup.cad, r);
 	if (error) return { error, r: null, view: null };
-	const choices = form ? choicesFrom(form, r) : new Map<string, number[]>();
+	const { choices, raw } = form ? choicesFrom(form, r) : { choices: new Map<number, number[]>(), raw: new Map<number, string>() };
 	const q = applyCombos(r, choices);
 	const copyBack = buildCopyBack(vstup.cad, r, choices);
 	const polozky = CATALOG.map((c) => ({ kod: c.prp, nazov: c.name, qty: q[c.prp] || 0 }));
@@ -58,11 +64,15 @@ function view(vstup: PergolaVstup, form?: FormData) {
 			totalBars: copyBack.totalBars,
 			cadLastCol: copyBack.lines.map((l) => l.barsStr).join('\n'),
 			longNotes,
-			kombinacie: r.comboCases.map((c, i) => ({
-				idx: i,
-				fieldLabel: c.fieldLabel,
-				options: c.options.map((o, oi) => comboOptionLabel(o, oi === 0))
-			}))
+			kombinacie: r.comboCases.map((c, i) => {
+				const options = c.options.map((o, oi) => comboOptionLabel(o, oi === 0));
+				return {
+					idx: i,
+					fieldLabel: c.fieldLabel,
+					options,
+					selected: raw.get(i) ?? options[0]
+				};
+			})
 		}
 	};
 }

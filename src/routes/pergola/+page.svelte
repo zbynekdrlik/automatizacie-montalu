@@ -122,9 +122,9 @@
 				{#each v.kombinacie as k (k.idx)}
 					<div class="field">
 						<label for="combo_{k.idx}">{k.fieldLabel}</label>
-						{#each k.options as opt, oi (opt)}
+						{#each k.options as opt (opt)}
 							<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0">
-								<input type="radio" name="combo_{k.idx}" value={opt} checked={oi === 0} style="width:auto" />
+								<input type="radio" name="combo_{k.idx}" value={opt} checked={opt === k.selected} style="width:auto" />
 								{opt}
 							</label>
 						{/each}

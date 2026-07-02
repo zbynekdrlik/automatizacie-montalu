@@ -167,13 +167,13 @@
 							<td class="c">{o.kod}</td>
 							<td>{o.nazov}</td>
 							<td class="c">
+								<!-- bez min/max — rozsahy stráži server (applyEdits), nech typo dostane
+								     zrozumiteľnú chybu namiesto tichého browser tooltipu -->
 								<input
 									name="qty_{o.kod}"
 									type="number"
-									min="0"
-									max="10000"
 									step="any"
-									value={o.qty}
+									value={(form && 'editVals' in form ? form.editVals?.[o.kod] : undefined) ?? o.qty}
 									aria-label="Množstvo {o.kod}"
 									style="padding:6px 8px;font-size:14px;text-align:center"
 								/>

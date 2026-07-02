@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	transform,
 	parseInput,
+	parseCad,
 	applyCombos,
 	buildCopyBack,
 	parseChoice,
@@ -101,16 +102,42 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 	it('neznámy CAD kód → unresolved + validácia ho hlási', () => {
 		const r = transform('99999 NEZNAMY PROFIL\t1\t2000');
 		expect(r.unresolved.length).toBe(1);
-		expect(validatePergola('Z', 'O', '99999 NEZNAMY PROFIL\t1\t2000', r)).toContain('Nenamapované');
+		expect(validatePergola('Z', 'O', 'Zak', '99999 NEZNAMY PROFIL\t1\t2000', r)).toContain('Nenamapované');
 	});
 
-	it('validácia: prázdny vstup / chýbajúce polia', () => {
+	it('validácia: prázdny vstup / chýbajúce polia (vrátane zákazníka)', () => {
 		const r = transform('');
-		expect(validatePergola('', 'O', '', r)).toContain('ZAK');
-		expect(validatePergola('Z', 'O', '', r)).toContain('prázdny');
+		expect(validatePergola('', 'O', 'Zak', '', r)).toContain('ZAK');
+		expect(validatePergola('Z', 'O', '', '', r)).toContain('ákazník');
+		expect(validatePergola('Z', 'O', 'Zak', '', r)).toContain('prázdny');
 		const ok = transform(BARTONICEK);
-		expect(validatePergola('Z', '', BARTONICEK, ok)).toContain('OP');
-		expect(validatePergola('Z', 'O', BARTONICEK, ok)).toBeNull();
+		expect(validatePergola('Z', '', 'Zak', BARTONICEK, ok)).toContain('OP');
+		expect(validatePergola('Z', 'O', 'Zak', BARTONICEK, ok)).toBeNull();
+	});
+
+	it('nerozpoznaný riadok NIE JE ticho zahodený — validácia ho vymenuje', () => {
+		const text = BARTONICEK + '\n18006 PRITLACNA LISTA\tO\t3894';
+		const { skipped } = parseCad(text);
+		expect(skipped.length).toBe(1);
+		const r = transform(text);
+		const err = validatePergola('Z', 'O', 'Zak', text, r);
+		expect(err).toContain('Nerozpoznané');
+		expect(err).toContain('18006');
+	});
+
+	it('duplicitné combo prípady: kľúčovanie indexom, labely rozlíšené (kus 1/2)', () => {
+		const text = '18021 ZLABOVY PROFIL 110 V2\t2\t9120';
+		const r = transform(text);
+		expect(r.comboCases.length).toBe(2);
+		expect(r.comboCases[0].fieldLabel).toContain('(kus 1)');
+		expect(r.comboCases[1].fieldLabel).toContain('(kus 2)');
+		// rôzne voľby pre každý kus sa aplikujú NEZÁVISLE
+		const q = applyCombos(r, new Map([[0, [7500, 4500]], [1, [4500, 6000]]]));
+		expect(q['PRP202524']).toBe(7.5); // jeden kus na 7500
+		expect(q['PRP202525']).toBe(6); // druhý kus drží 6000
+		expect(q['PRP202526']).toBe(9); // 2× 4500
+		const cb = buildCopyBack(text, r, new Map([[0, [7500, 4500]], [1, [4500, 6000]]]));
+		expect(cb.lines[0].barsStr).toBe('2(4,5m) 1(6m) 1(7,5m)');
 	});
 });
 
@@ -131,12 +158,12 @@ describe('kombinácie tyčí (žľab/kotviaci > 7500)', () => {
 
 	it('applyCombos: zmena voľby presunie metre medzi PRP kódmi', () => {
 		const { r } = got(STEPANOVSKY);
-		const zlab = r.comboCases.find((c) => c.code === '18021')!;
+		const zlabIdx = r.comboCases.findIndex((c) => c.code === '18021');
 		// default (minimal 4500+6000): PRP202526=4.5, PRP202525=6
 		const qDefault = applyCombos(r, new Map());
 		expect(qDefault['PRP202526']).toBe(4.5);
 		// voľba 7500+4500 → 7500-ka pribudne, 6000-ka zmizne
-		const q = applyCombos(r, new Map([[zlab.fieldLabel, [7500, 4500]]]));
+		const q = applyCombos(r, new Map([[zlabIdx, [7500, 4500]]]));
 		expect(q['PRP202524']).toBe(7.5);
 		expect(q['PRP202525'] || 0).toBe(0);
 		expect(q['PRP202526']).toBe(4.5);
@@ -162,10 +189,10 @@ describe('copy-back pre Solid Edge', () => {
 
 	it('combo voľba sa premietne do copy-backu', () => {
 		const r = transform(STEPANOVSKY);
-		const zlab = r.comboCases.find((c) => c.code === '18021')!;
+		const zlabIdx = r.comboCases.findIndex((c) => c.code === '18021');
 		const def = buildCopyBack(STEPANOVSKY, r, new Map());
 		expect(def.lines.find((l) => l.code === '18021')!.barsStr).toBe('1(4,5m) 1(6m)');
-		const alt = buildCopyBack(STEPANOVSKY, r, new Map([[zlab.fieldLabel, [7500, 4500]]]));
+		const alt = buildCopyBack(STEPANOVSKY, r, new Map([[zlabIdx, [7500, 4500]]]));
 		expect(alt.lines.find((l) => l.code === '18021')!.barsStr).toBe('1(4,5m) 1(7,5m)');
 	});
 

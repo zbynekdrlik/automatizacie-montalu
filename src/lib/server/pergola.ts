@@ -68,24 +68,39 @@ export interface CadRow {
 	cut_mm: number;
 }
 
-export function parseInput(text: string): CadRow[] {
+/**
+ * Parsuje CAD nárez. `skipped` = neprázdne riadky, ktoré sa nedali prečítať —
+ * volajúci ich MUSÍ ohlásiť (tichý výpadok riadku = chýbajúci materiál
+ * v Money odpise, nález review; n8n verzia ich zahadzovala potichu).
+ */
+export function parseCad(text: string): { rows: CadRow[]; skipped: string[] } {
 	const rows: CadRow[] = [];
+	const skipped: string[] = [];
 	for (const raw of String(text).split('\n')) {
 		const line = raw.replace('\r', '');
 		if (!line.trim()) continue;
 		let code: string, name: string, qty: string, cut: string;
 		if (line.includes('\t')) {
 			const p = line.split(/\t+/);
-			if (p.length < 3) continue;
+			if (p.length < 3) {
+				skipped.push(line.trim());
+				continue;
+			}
 			const mh = p[0].trim().match(/^(\d{3,6})\s+(.*)$/);
-			if (!mh) continue;
+			if (!mh) {
+				skipped.push(line.trim());
+				continue;
+			}
 			code = mh[1];
 			name = mh[2].trim();
 			qty = p[1];
 			cut = p[2];
 		} else {
 			const m = line.trim().match(/^(\d{3,6})\s+(.*?)\s+(\d+)\s+([\d.,]+)\s*$/);
-			if (!m) continue;
+			if (!m) {
+				skipped.push(line.trim());
+				continue;
+			}
 			code = m[1];
 			name = m[2].trim();
 			qty = m[3];
@@ -93,10 +108,17 @@ export function parseInput(text: string): CadRow[] {
 		}
 		const q = parseInt(String(parseFloat(qty)), 10);
 		const c = parseFloat(String(cut).replace(',', '.'));
-		if (!q || !c || q <= 0 || c <= 0) continue;
+		if (!q || !c || q <= 0 || c <= 0) {
+			skipped.push(line.trim());
+			continue;
+		}
 		rows.push({ code, name, qty: q, cut_mm: c });
 	}
-	return rows;
+	return { rows, skipped };
+}
+
+export function parseInput(text: string): CadRow[] {
+	return parseCad(text).rows;
 }
 
 function nearestHigher(cut: number, avail: number[]): number {
@@ -285,6 +307,17 @@ export function transform(text: string): TransformResult {
 		}
 		trace.push({ cad: code, name: info.name, base, bars: { ...barsUsed }, notes });
 	}
+	// duplicitné labely (dva kusy s rovnakým rezom) rozlíš — voľby sú kľúčované
+	// indexom, ale label vidí užívateľ a musí vedieť, ktorý kus vyberá
+	const labelCount: Record<string, number> = {};
+	for (const c of comboCases) labelCount[c.fieldLabel] = (labelCount[c.fieldLabel] || 0) + 1;
+	const labelSeen: Record<string, number> = {};
+	for (const c of comboCases) {
+		if (labelCount[c.fieldLabel] > 1) {
+			labelSeen[c.fieldLabel] = (labelSeen[c.fieldLabel] || 0) + 1;
+			c.fieldLabel += ` (kus ${labelSeen[c.fieldLabel]})`;
+		}
+	}
 	const out = CATALOG.map((c) => ({ prp: c.prp, name: c.name, qty: qtyByPrp[c.prp] || 0 }));
 	return { out, unresolved, trace, comboCases, qtyByPrp };
 }
@@ -303,11 +336,13 @@ export interface CadCopyLine {
 /**
  * Počty tyčí pre Solid Edge — jeden riadok na CAD kód, v poradí prvého
  * výskytu vo vstupe, s aplikovanými voľbami kombinácií.
+ * `choices` je kľúčované INDEXOM v r.comboCases — dva kusy s rovnakým rezom
+ * majú rovnaký label, index je jednoznačný (nález review).
  */
 export function buildCopyBack(
 	text: string,
 	r: TransformResult,
-	choices: Map<string, number[]>
+	choices: Map<number, number[]>
 ): { lines: CadCopyLine[]; totalBars: number } {
 	const inputRows = parseInput(text);
 	const seen: Record<string, 1> = {};
@@ -324,12 +359,13 @@ export function buildCopyBack(
 		const t = r.trace.find((x) => x.cad === code);
 		if (!t) continue;
 		const dict: Record<number, number> = { ...t.bars };
-		for (const c of r.comboCases.filter((c) => c.code === code)) {
-			const chosen = choices.get(c.fieldLabel) ?? c.minimal;
-			if (chosen.slice().sort().join('+') === c.minimal.slice().sort().join('+')) continue;
+		r.comboCases.forEach((c, idx) => {
+			if (c.code !== code) return;
+			const chosen = choices.get(idx) ?? c.minimal;
+			if (chosen.slice().sort().join('+') === c.minimal.slice().sort().join('+')) return;
 			for (const b of c.minimal) dict[b] = (dict[b] || 0) - 1;
 			for (const b of chosen) dict[b] = (dict[b] || 0) + 1;
-		}
+		});
 		totalBars += Object.values(dict).reduce((s, x) => s + x, 0);
 		lines.push({ code, name: t.name || t.base, barsStr: fmtBars(dict) });
 	}
@@ -338,16 +374,16 @@ export function buildCopyBack(
 
 /**
  * Aplikuje voľby kombinácií na Money množstvá (minimal → zvolená kombinácia).
- * Port prepocitaj_body.js.
+ * Port prepocitaj_body.js; `choices` kľúčované indexom v r.comboCases.
  */
 export function applyCombos(
 	r: TransformResult,
-	choices: Map<string, number[]>
+	choices: Map<number, number[]>
 ): Record<string, number> {
 	const q = { ...r.qtyByPrp };
-	for (const c of r.comboCases) {
-		const bars = choices.get(c.fieldLabel) ?? c.minimal;
-		if (bars.slice().sort().join('+') === c.minimal.slice().sort().join('+')) continue;
+	r.comboCases.forEach((c, idx) => {
+		const bars = choices.get(idx) ?? c.minimal;
+		if (bars.slice().sort().join('+') === c.minimal.slice().sort().join('+')) return;
 		for (const b of c.minimal) {
 			const p = c.familyMap[b];
 			q[p] = Math.round(((q[p] || 0) - b / 1000) * 1000) / 1000;
@@ -356,7 +392,7 @@ export function applyCombos(
 			const p = c.familyMap[b];
 			q[p] = Math.round(((q[p] || 0) + b / 1000) * 1000) / 1000;
 		}
-	}
+	});
 	return q;
 }
 
@@ -376,13 +412,22 @@ export function comboOptionLabel(o: ComboOption, isFirst: boolean): string {
 export function validatePergola(
 	zak: string,
 	op: string,
+	zakaznik: string,
 	text: string,
 	r: TransformResult
 ): string | null {
-	const parsed = parseInput(text).length;
+	const { rows, skipped } = parseCad(text);
 	const nonzero = r.out.filter((o) => o.qty > 0);
 	if (!zak) return 'Chýba číslo objednávky (ZAK).';
-	if (parsed === 0) return 'Vstup je prázdny alebo v zlom formáte. Očakávam riadky: KÓD NÁZOV KS REZ.';
+	if (!zakaznik) return 'Chýba zákazník.';
+	if (rows.length === 0)
+		return 'Vstup je prázdny alebo v zlom formáte. Očakávam riadky: KÓD NÁZOV KS REZ.';
+	if (skipped.length)
+		return (
+			'Nerozpoznané riadky (oprav vstup, inak by v odpise chýbal materiál): ' +
+			skipped.slice(0, 3).map((l) => `„${l.slice(0, 60)}"`).join(', ') +
+			(skipped.length > 3 ? ` a ďalšie ${skipped.length - 3}` : '')
+		);
 	if (r.unresolved.length)
 		return 'Nenamapované CAD kódy: ' + r.unresolved.map((u) => u.cad + ' ' + u.name).join(', ');
 	if (nonzero.length === 0) return 'Žiadne položky na výstup.';

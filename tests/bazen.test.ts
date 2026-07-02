@@ -125,7 +125,7 @@ describe('applyEdits — kontrola množstiev (opravy nálezov auditu)', () => {
 	});
 
 	it('podozrivo veľká hodnota sa odmietne', () => {
-		const { error } = applyEdits(out, new Map([['BPP00094', '99999']]));
+		const { error } = applyEdits(out, new Map([['BPP00094', '999999']]));
 		expect(error).toContain('veľké');
 	});
 

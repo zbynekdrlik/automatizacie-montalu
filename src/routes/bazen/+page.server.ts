@@ -63,10 +63,19 @@ export const actions: Actions = {
 		const { out, error: cErr } = computeBazen(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
 
-		const { finalOut, zmenene, error: eErr } = applyEdits(out, editsFrom(form));
-		if (eErr) return { step: 'kontrola' as const, vstup, out, error: eErr };
+		// pri každom re-renderi kontroly sa vracajú ODOSLANÉ hodnoty — užívateľove
+		// úpravy sa nesmú ticho stratiť a nahradiť auto-výpočtom (nález review)
+		const edits = editsFrom(form);
+		const editVals = Object.fromEntries(edits);
+		const kontrola = (err: string) =>
+			({ step: 'kontrola' as const, vstup, out, editVals, error: err });
+
+		const { finalOut, zmenene, error: eErr } = applyEdits(out, edits);
+		if (eErr) return kontrola(eErr);
+		if (finalOut.some((o) => o.qty < 0))
+			return kontrola('Rozpis obsahuje záporné množstvo — skontroluj zadanie (počty sekcií).');
 		if (finalOut.every((o) => o.qty <= 0))
-			return { step: 'kontrola' as const, vstup, out, error: 'Po úpravách neostala žiadna položka — skontroluj množstvá.' };
+			return kontrola('Po úpravách neostala žiadna položka — skontroluj množstvá.');
 
 		try {
 			const outcome = await writeOdpis(jobFor(vstup, finalOut, locals.user?.username ?? ''));
@@ -80,12 +89,9 @@ export const actions: Actions = {
 			return { step: 'hotovo' as const, vstup, finalOut, zmenene, outcome };
 		} catch (e) {
 			console.error('bazen writeOdpis zlyhal:', e);
-			return {
-				step: 'kontrola' as const,
-				vstup,
-				out,
-				error: 'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
-			};
+			return kontrola(
+				'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
+			);
 		}
 	}
 };

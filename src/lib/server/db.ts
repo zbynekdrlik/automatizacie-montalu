@@ -110,8 +110,12 @@ function migrate() {
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 2) {
 		// v1 → v2: odpis_log zovšeobecnený pre všetky moduly — dedup kľúč obsahuje
-		// modul (jedna ZAK môže mať legitímne pergolu AJ bazén AJ zasklenia)
+		// modul (jedna ZAK môže mať legitímne pergolu AJ bazén AJ zasklenia).
+		// ATOMICKY (BEGIN/COMMIT) + idempotentne (DROP IF EXISTS) — prerušená
+		// migrácia na produkčnej DB nesmie zanechať polovičný stav ani crash-loop.
 		db.exec(`
+			BEGIN;
+			DROP TABLE IF EXISTS odpis_log2;
 			CREATE TABLE odpis_log2 (
 				id INTEGER PRIMARY KEY,
 				modul TEXT NOT NULL,
@@ -135,8 +139,9 @@ function migrate() {
 				FROM odpis_log;
 			DROP TABLE odpis_log;
 			ALTER TABLE odpis_log2 RENAME TO odpis_log;
+			PRAGMA user_version = 2;
+			COMMIT;
 		`);
-		db.pragma('user_version = 2');
 	}
 
 	seedData();

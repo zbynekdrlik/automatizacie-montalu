@@ -52,25 +52,28 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 		if (!Number.isFinite(x)) return 0;
 		return Math.min(Math.max(x, 0), max);
 	};
+	// počty sú CELÉ čísla — zlomok sekcie (0.5) by v BOM vzorcoch vyrobil
+	// záporné množstvá, ktoré by prešli do Money (nález review)
+	const cnt = (k: string, max = 100) => Math.round(num(k, max));
 	const vstup: BazenVstup = {
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
 		model: String(form.get('model') ?? 'Premier / Exclusive').trim(),
 		kolaj: String(form.get('kolaj') ?? 'Jednokolaj').trim(),
-		pocetSekcii: num('pocetSekcii', 100),
-		pocetPriecok: num('pocetPriecok', 100),
+		pocetSekcii: cnt('pocetSekcii'),
+		pocetPriecok: cnt('pocetPriecok'),
 		dvere: form.get('dvere') === '1',
-		vs4500: num('vs4500', 100),
-		vs6000: num('vs6000', 100),
-		ss4500: num('ss4500', 100),
-		ss6000: num('ss6000', 100),
-		ms4500: num('ms4500', 100),
-		ms6000: num('ms6000', 100),
+		vs4500: cnt('vs4500'),
+		vs6000: cnt('vs6000'),
+		ss4500: cnt('ss4500'),
+		ss6000: cnt('ss6000'),
+		ms4500: cnt('ms4500'),
+		ms6000: cnt('ms6000'),
 		dlzkaKolajnic: num('dlzkaKolajnic', 200000),
-		prieckovy4300: num('prieckovy4300', 100),
-		prieckovy6000: num('prieckovy6000', 100),
-		vyklopneCelo: num('vyklopneCelo', 100),
+		prieckovy4300: cnt('prieckovy4300'),
+		prieckovy6000: cnt('prieckovy6000'),
+		vyklopneCelo: cnt('vyklopneCelo'),
 		caka: form.get('caka') === '1'
 	};
 	let error: string | null = null;

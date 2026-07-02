@@ -196,7 +196,7 @@ export function applyEdits(
 		const q = parseFloat(String(raw).replace(',', '.'));
 		if (!Number.isFinite(q)) return { finalOut: [], zmenene: [], error: `Neplatné množstvo „${raw}" pri ${o.kod} ${o.nazov}.` };
 		if (q < 0) return { finalOut: [], zmenene: [], error: `Záporné množstvo (${q}) pri ${o.kod} ${o.nazov} — do Money nesmie ísť.` };
-		if (q > 10000) return { finalOut: [], zmenene: [], error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.` };
+		if (q > 100000) return { finalOut: [], zmenene: [], error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.` };
 		const rq = R(q);
 		if (rq !== o.qty) zmenene.push(o.kod);
 		finalOut.push({ kod: o.kod, nazov: o.nazov, qty: rq });

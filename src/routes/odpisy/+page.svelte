@@ -39,7 +39,7 @@
 			</thead>
 			<tbody>
 				{#each data.odpisy as o (o.id)}
-					{@const d = JSON.parse(o.detail || '{}')}
+					{@const d = o.d}
 					<tr>
 						<td style="white-space:nowrap">{o.created_at}</td>
 						<td>{o.modul === 'zasklenia' ? 'Zasklenia' : o.modul === 'bazen' ? 'Bazén' : 'Pergola'}</td>
