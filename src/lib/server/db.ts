@@ -2,7 +2,7 @@
 // užívateľov a audit trail. better-sqlite3 = synchrónne transakcie a UNIQUE
 // constrainty (dedup je constraint v DB, nie kontrola v kóde).
 import Database from 'better-sqlite3';
-import { scryptSync, randomBytes } from 'node:crypto';
+import { scryptSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import seed from './cfg_seed.json';
@@ -25,8 +25,9 @@ export function hashPassword(password: string): string {
 export function verifyPassword(password: string, stored: string): boolean {
 	const [salt, hash] = stored.split(':');
 	if (!salt || !hash) return false;
-	const check = scryptSync(password, salt, 64).toString('hex');
-	return check === hash;
+	const check = scryptSync(password, salt, 64);
+	const expected = Buffer.from(hash, 'hex');
+	return check.length === expected.length && timingSafeEqual(check, expected);
 }
 
 function migrate() {

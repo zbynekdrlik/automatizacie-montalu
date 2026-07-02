@@ -2,7 +2,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { listOdpisy, releaseOdpis } from '$lib/server/money';
 
 export const load: PageServerLoad = async () => {
-	return { odpisy: listOdpisy(200) as Record<string, unknown>[] };
+	return { odpisy: listOdpisy(200) };
 };
 
 export const actions: Actions = {

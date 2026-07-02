@@ -49,3 +49,12 @@ export function getSessionUser(token: string | undefined): SessionUser | null {
 export function pruneSessions() {
 	db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
 }
+
+/**
+ * Open-redirect ochrana pre ?next= po prihlásení: len relatívna cesta v rámci
+ * appky. Blokuje '//evil' aj '/\evil' — prehliadače normalizujú '\' na '/'
+ * v Location hlavičke, takže '/\x' sa správa ako protokol-relatívne '//x'.
+ */
+export function safeNext(next: string | null): string {
+	return next && /^\/(?![/\\])/.test(next) ? next : '/zasklenia';
+}

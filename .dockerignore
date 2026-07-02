@@ -9,3 +9,4 @@ playwright-report
 .github
 e2e
 tests
+coverage

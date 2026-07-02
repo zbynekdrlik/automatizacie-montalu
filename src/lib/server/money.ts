@@ -10,6 +10,7 @@
 import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { db } from './db';
 import type { ComputeResult } from './compute';
 
@@ -17,6 +18,9 @@ import type { ComputeResult } from './compute';
 // prepnúť LIVE bez rebuildu (reštart kontajnera s novým env stačí).
 export const isLive = () => process.env.MONEY_LIVE === '1';
 const liveDir = () => process.env.MONEY_LIVE_DIR || '/data/dlv-import';
+// NA ODPIS je VNÚTRI dlv-import zámerne — Money watcher importuje LEN root
+// (nie rekurzívne). Overené produkciou: bazén/pergola n8n verzie tam roky
+// odkladajú čaká-súbory a Money ich neimportuje, kým ich Dominik nepresunie.
 const naOdpisDir = () => process.env.MONEY_NA_ODPIS_DIR || '/data/dlv-import/NA ODPIS';
 const testDir = () =>
 	process.env.MONEY_TEST_DIR ||
@@ -133,7 +137,7 @@ export async function writeOdpis(req: OdpisRequest): Promise<OdpisOutcome> {
 		// tmp súbor BEZ prípony .xlsx — Money watcher v live priečinku importuje
 		// *.xlsx a bodka na začiatku ho na Samba share neskryje; bez prípony ho
 		// watcher nevidí a rename v rovnakom adresári je atomický
-		const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}`);
+		const tmp = path.join(dir, `.tmp-${randomBytes(8).toString('hex')}`);
 		fs.writeFileSync(tmp, buf);
 		fs.renameSync(tmp, target);
 	} catch (e) {
@@ -145,12 +149,28 @@ export async function writeOdpis(req: OdpisRequest): Promise<OdpisOutcome> {
 	return { status: 'written', live: isLive(), target, filename };
 }
 
-export function listOdpisy(limit = 100) {
+export interface OdpisLogRow {
+	id: number;
+	zak: string;
+	op: string;
+	zakaznik: string;
+	system: string;
+	styl: string;
+	s: number;
+	v: number;
+	caka: number;
+	live: number;
+	filename: string;
+	created_by: string;
+	created_at: string;
+}
+
+export function listOdpisy(limit = 100): OdpisLogRow[] {
 	return db
 		.prepare(
 			'SELECT id, zak, op, zakaznik, system, styl, s, v, caka, live, filename, created_by, created_at FROM odpis_log ORDER BY id DESC LIMIT ?'
 		)
-		.all(limit);
+		.all(limit) as OdpisLogRow[];
 }
 
 /**
