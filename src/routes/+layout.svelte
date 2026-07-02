@@ -28,7 +28,7 @@
 {#if data.user}
 	<nav class="top">
 		<div class="inner">
-			<span class="brand">Montalu automatizácie</span>
+			<span class="brand">MONTALU</span>
 			{#each links as l (l.href)}
 				<a href={l.href} class:active={page.url.pathname === l.href}>{l.label}</a>
 			{/each}
