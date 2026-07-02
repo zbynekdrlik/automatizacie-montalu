@@ -55,7 +55,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('1128,5');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('1725');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	await expect(page.getByText('ZASP00014 · Koľajnica 2K Surový 7500 mm')).toBeVisible();
+	// profil je na viacerých miestach (materiál, odpis, rozpis rezov) — over odpis riadok
 	await expect(page.locator('.row', { hasText: 'ZASP00014' })).toContainText('15 m');
 
 	// 2. odoslanie (TEST režim)

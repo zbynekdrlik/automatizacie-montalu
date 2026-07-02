@@ -29,7 +29,16 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ${safe(r.system)} ${safe(r.styl)}`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
 		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
-		detail: { system: r.system, styl: r.styl, s: r.S, v: r.V, sklo: vstup.sklo, otvaranie: vstup.otvaranie }
+		detail: {
+			system: r.system,
+			styl: r.styl,
+			s: r.S,
+			v: r.V,
+			// zaznamenaj presné zloženie ak zadané, inak základné sklo
+			sklo: vstup.skloPresne || vstup.sklo,
+			skloZaklad: vstup.sklo,
+			otvaranie: vstup.otvaranie
+		}
 	};
 }
 

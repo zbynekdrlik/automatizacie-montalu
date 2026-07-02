@@ -58,6 +58,26 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(r.material.find((m) => m.kod === 'ZASP00014')!.tyce).toBe(2);
 	});
 
+	it('rozpis rezov na tyče — rozloženie kusov + odpad (pre grafický výstup)', () => {
+		const r = computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!;
+		const kolaj = r.material.find((m) => m.kod === 'ZASP00014')!;
+		// 2 tyče, každá s 2 kusmi (5000 + 2000), zvyšok 500 mm na tyč
+		expect(kolaj.bary.length).toBe(2);
+		expect(kolaj.tyce).toBe(2);
+		for (const tyc of kolaj.bary) {
+			expect(tyc.kusy.length).toBe(2);
+			const sucet = tyc.kusy.reduce((s, k) => s + k.dlzka, 0);
+			expect(sucet).toBeLessThanOrEqual(7500);
+			expect(tyc.zvysok).toBeGreaterThanOrEqual(0);
+		}
+		// odpad = 2 tyče × 7500 − spotreba; percento konzistentné
+		expect(kolaj.odpadMm).toBeGreaterThan(0);
+		expect(kolaj.odpadPct).toBeCloseTo((kolaj.odpadMm / (2 * 7500)) * 100, 1);
+		// všetky kusy zo všetkých tyčí = pôvodný počet kusov (2×5000 + 2×2000)
+		const vsetky = kolaj.bary.flatMap((b) => b.kusy);
+		expect(vsetky.length).toBe(4);
+	});
+
 	it('počet skiel = N', () => {
 		expect(computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!.sklo.pocet).toBe(2);
 		expect(computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!.sklo.pocet).toBe(6);

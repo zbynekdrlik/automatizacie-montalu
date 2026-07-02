@@ -33,11 +33,29 @@ export interface CfgGroup {
 
 export type Cfg = Record<string, CfgGroup>;
 
+export interface Kus {
+	/** finálna dĺžka rezu (zobrazená robotníkovi, s prerezom) */
+	rozmer: number;
+	/** dĺžka spotrebovaná na tyči (bez prerezu — podľa nej sa balí) */
+	dlzka: number;
+}
+
+export interface Tyc {
+	kusy: Kus[];
+	/** odpad na konci tejto tyče (mm) */
+	zvysok: number;
+}
+
 export interface MaterialRow {
 	kod: string;
 	nazov: string;
 	rezy: { rozmer: number; ks: number }[];
 	tyce: number;
+	/** rozloženie kusov na jednotlivé tyče (pre grafický rozpis rezov) */
+	bary: Tyc[];
+	/** celkový odpad (mm) a % z použitých tyčí */
+	odpadMm: number;
+	odpadPct: number;
 }
 
 export interface OdpisRow {
@@ -92,15 +110,25 @@ function val(row: RezRow, S: number, V: number, N: number, useKerf: boolean): nu
  * ako sa reálne reže. Nahrádza pôvodný súčet-po-dĺžkach, ktorý každú dĺžku
  * počítal na samostatnú tyč a preto nadhodnocoval počet tyčí (a odpis do Money).
  */
-function ffdBars(pieces: number[]): number {
+/** FFD balenie so sledovaním, ktorý kus je na ktorej tyči (pre grafický rozpis). */
+function ffdPack(kusy: Kus[]): Tyc[] {
+	const bary: Tyc[] = [];
 	const rem: number[] = [];
-	for (const p of [...pieces].sort((a, b) => b - a)) {
+	for (const k of [...kusy].sort((a, b) => b.dlzka - a.dlzka)) {
 		let i = 0;
-		for (; i < rem.length; i++) if (rem[i] >= p) break;
-		if (i === rem.length) rem.push(BAR - p);
-		else rem[i] -= p;
+		for (; i < rem.length; i++) if (rem[i] >= k.dlzka) break;
+		if (i === rem.length) {
+			bary.push({ kusy: [k], zvysok: BAR - k.dlzka });
+			rem.push(BAR - k.dlzka);
+		} else {
+			bary[i].kusy.push(k);
+			rem[i] -= k.dlzka;
+			bary[i].zvysok = rem[i];
+		}
 	}
-	return rem.length;
+	// v každej tyči zoraď kusy od najdlhšieho (ako v optimalizačnom výstupe)
+	for (const b of bary) b.kusy.sort((a, c) => c.dlzka - a.dlzka);
+	return bary;
 }
 
 /**
@@ -135,15 +163,18 @@ export function computeFlat(
 		// všetky kusy tohto profilu (naprieč rez-riadkami S aj V) idú do jedného
 		// balenia — dĺžka pre balenie je bez prerezu (rovnaká ako v pôvodnom
 		// `per` výpočte); zobrazený rozmer je s prerezom
-		const pieces: number[] = [];
+		const kusy: Kus[] = [];
 		for (const r of rows) {
 			const t = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
 			const q = val(r, S, V, N, false);
-			for (let i = 0; i < t; i++) if (q > 0) pieces.push(q);
+			for (let i = 0; i < t; i++) if (q > 0) kusy.push({ dlzka: q, rozmer: Math.round(val(r, S, V, N, true)) });
 			rezy.push({ rozmer: Math.round(val(r, S, V, N, true)), ks: t });
 		}
-		const tyce = ffdBars(pieces);
-		material.push({ kod, nazov: rows[0].nazov, rezy, tyce });
+		const bary = ffdPack(kusy);
+		const tyce = bary.length;
+		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
+		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * BAR)) * 1000) / 10 : 0;
+		material.push({ kod, nazov: rows[0].nazov, rezy, tyce, bary, odpadMm, odpadPct });
 		odpis.push({ kod, nazov: rows[0].nazov, metre: R((tyce * BAR) / 1000) });
 	}
 	const ss = g.sklo.s,
