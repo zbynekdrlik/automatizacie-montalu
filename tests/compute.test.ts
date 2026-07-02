@@ -67,8 +67,11 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		for (const tyc of kolaj.bary) {
 			expect(tyc.kusy.length).toBe(2);
 			const sucet = tyc.kusy.reduce((s, k) => s + k.dlzka, 0);
-			expect(sucet).toBeLessThanOrEqual(7500);
+			// kusy + 4mm kotúč na každý rez sa musia zmestiť do tyče
+			expect(sucet + 4 * tyc.kusy.length).toBeLessThanOrEqual(7500);
 			expect(tyc.zvysok).toBeGreaterThanOrEqual(0);
+			// zvyšok = tyč − kusy − rezy kotúčom
+			expect(tyc.zvysok).toBeCloseTo(7500 - sucet - 4 * tyc.kusy.length, 6);
 		}
 		// odpad = 2 tyče × 7500 − spotreba; percento konzistentné
 		expect(kolaj.odpadMm).toBeGreaterThan(0);

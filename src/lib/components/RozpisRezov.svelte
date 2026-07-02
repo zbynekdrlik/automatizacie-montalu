@@ -75,7 +75,7 @@
 				<div class="hd-txt">
 					<div class="nazov"><b>{m.kod}</b> · {m.nazov}</div>
 					<div class="stat">
-						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(bar)} mm · odpad
+						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(bar)} mm · kotúč 4 mm · odpad
 						<b>{fmt(m.odpadMm)} mm</b> ({fmt(m.odpadPct)} %) · rez {sikmy ? '45°' : 'rovný'}
 					</div>
 				</div>
