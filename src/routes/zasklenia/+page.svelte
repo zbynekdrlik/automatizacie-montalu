@@ -205,6 +205,7 @@
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
+		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<a class="btn secondary" href="/zasklenia">← Späť a upraviť</a>
 	</div>
 {:else if step === 'hotovo' && plan && form?.outcome}

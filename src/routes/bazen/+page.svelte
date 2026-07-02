@@ -185,14 +185,15 @@
 					{/each}
 				</tbody>
 			</table>
-			<div style="height:12px"></div>
-			<button class="btn" type="submit" data-testid="odoslat">
+			<div style="height:12px" class="noprint"></div>
+			<button class="btn noprint" type="submit" data-testid="odoslat">
 				{data.live
 					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS/Bazen)' : '✅ Odoslať odpis do Money')
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
-		<a class="btn secondary" href="/bazen">← Späť a upraviť zadanie</a>
+		<button class="btn secondary noprint" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<a class="btn secondary noprint" href="/bazen">← Späť a upraviť zadanie</a>
 	</div>
 {:else if step === 'hotovo' && form && 'finalOut' in form && form.finalOut && form.outcome}
 	<div class="card">
