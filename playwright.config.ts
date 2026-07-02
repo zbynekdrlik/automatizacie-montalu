@@ -8,6 +8,9 @@ export default defineConfig({
 	testDir: 'e2e',
 	globalSetup: './e2e/global-setup.ts',
 	timeout: 30000,
+	// cez SSH tunel na nasadenú appku sú odozvy pomalšie — default 5 s expect
+	// timeout intermitentne padal na login redirecte
+	expect: { timeout: process.env.BASE_URL ? 15000 : 5000 },
 	retries: 0,
 	// sériovo: editor test dočasne mení konfiguráciu vzorcov — paralelný beh
 	// by menil čísla ostatným testom (a tunel na nasadenú appku paralelu nezvláda)

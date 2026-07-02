@@ -1,7 +1,7 @@
 // E2E parity moduly: Bazén (kontrola množstiev), Pergola (CAD → Money + tyče
 // + kombinácie), Nahlásiť problém. Nula console errors všade.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated } from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
 
@@ -17,7 +17,7 @@ test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporn�
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
-	await page.goto('/bazen');
+	await goto(page, '/bazen');
 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-BAZ`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
@@ -26,6 +26,7 @@ test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporn�
 	await page.getByLabel('Počet priečok').fill('3');
 	await page.getByLabel('Celková dĺžka koľajníc (mm)').fill('10000');
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
 
 	// kontrola: 20 riadkov, auto-koľajnice 4.6/6.7 (1:1 vektor)
 	await expect(page.getByTestId('kontrola-tabulka')).toBeVisible();
@@ -46,7 +47,7 @@ test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporn�
 	await expect(page.locator('.row', { hasText: 'BPP00094' })).toContainText('✏️');
 
 	// duplikát
-	await page.goto('/bazen');
+	await goto(page, '/bazen');
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-BAZ`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Bazén');
@@ -63,7 +64,7 @@ test('pergola: CAD nárez → Money rozpis + tyče → odoslanie (1:1 Bartoníč
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
-	await page.goto('/pergola');
+	await goto(page, '/pergola');
 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PER`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
@@ -95,13 +96,14 @@ test('pergola: rez > 7500 ponúkne kombinácie a voľba zmení rozpis aj tyče',
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
-	await page.goto('/pergola');
+	await goto(page, '/pergola');
 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-KOM`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Kombinácia');
 	await page.getByLabel('Materiál (CAD nárez) *').fill('18021 ZLABOVY PROFIL 110 V2\t1\t9120');
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
 
 	// varovanie + combo výber s defaultom „najmenej odpadu" (4500+6000)
 	await expect(page.getByText('Dlhé profily')).toBeVisible();
@@ -122,12 +124,12 @@ test('pergola: rez > 7500 ponúkne kombinácie a voľba zmení rozpis aj tyče',
 test('nahlásiť problém: uloží a zobrazí hlásenie', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	await page.goto('/problem');
+	await goto(page, '/problem');
 	await page.getByLabel('Čoho sa to týka').selectOption('Bazén');
 	await page.getByLabel('Čo zle prebehlo? *').fill(`E2E hlásenie ${RUN}`);
 	await page.getByRole('button', { name: 'Odoslať hlásenie' }).click();
 	await expect(page.getByTestId('problem-ulozeny')).toBeVisible();
-	await page.goto('/problem');
+	await goto(page, '/problem');
 	await expect(page.getByText(`E2E hlásenie ${RUN}`)).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });
