@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
+
 	let { data, form } = $props();
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
@@ -160,10 +162,11 @@
 		<form method="POST" action="?/odoslat">
 			{@render hiddenVstup()}
 			<table data-testid="kontrola-tabulka">
-				<thead><tr><th>Kód</th><th>Položka</th><th class="c" style="width:140px">Množstvo (m)</th></tr></thead>
+				<thead><tr><th></th><th>Kód</th><th>Položka</th><th class="c" style="width:140px">Množstvo (m)</th></tr></thead>
 				<tbody>
 					{#each form.out as o (o.kod)}
 						<tr>
+							<td style="width:52px"><ProfilObrazok kod={o.kod} nazov={o.nazov} /></td>
 							<td class="c">{o.kod}</td>
 							<td>{o.nazov}</td>
 							<td class="c">
@@ -211,8 +214,9 @@
 	<div class="card">
 		<div class="sec">Money rozpis — {form.finalOut.filter((o) => o.qty > 0).length} položiek</div>
 		{#each form.finalOut.filter((o) => o.qty > 0) as o (o.kod)}
-			<div class="row">
-				<span>{o.kod} · {o.nazov}{form.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
+			<div class="row" style="align-items:center;gap:12px">
+				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
+				<span style="flex:1">{o.kod} · {o.nazov}{form.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
 				<b>{fmtM(o.qty)} m</b>
 			</div>
 		{/each}

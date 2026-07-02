@@ -1,4 +1,6 @@
 <script lang="ts">
+	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
+
 	let { data, form } = $props();
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
@@ -135,7 +137,11 @@
 
 			<div class="sec">Money rozpis — {v.nonzero.length} položiek</div>
 			{#each v.nonzero as o (o.kod)}
-				<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.qty)} m</b></div>
+				<div class="row" style="align-items:center;gap:12px">
+					<ProfilObrazok kod={o.kod} nazov={o.nazov} />
+					<span style="flex:1">{o.kod} · {o.nazov}</span>
+					<b>{fmtM(o.qty)} m</b>
+				</div>
 			{/each}
 
 			<div style="height:14px"></div>
@@ -177,7 +183,11 @@
 	<div class="card">
 		<div class="sec">Money rozpis — {v.nonzero.length} položiek</div>
 		{#each v.nonzero as o (o.kod)}
-			<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.qty)} m</b></div>
+			<div class="row" style="align-items:center;gap:12px">
+				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
+				<span style="flex:1">{o.kod} · {o.nazov}</span>
+				<b>{fmtM(o.qty)} m</b>
+			</div>
 		{/each}
 	</div>
 
