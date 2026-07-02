@@ -89,7 +89,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await expect(page.getByTestId('vysledok')).toContainText('OP02');
 
 	// 5. história odpisov obsahuje oba záznamy
-	await page.getByRole('link', { name: 'História odpisov' }).click();
+	await page.getByRole('link', { name: 'História', exact: true }).click();
 	await expect(page.getByTestId('odpisy-tabulka')).toContainText(RUN);
 	expect(consoleMsgs).toEqual([]);
 });
