@@ -26,3 +26,12 @@ Gotchy (stáli hodiny, nezabudni):
 ## LIVE prepnutie (LEN na pokyn užívateľa)
 
 `MONEY_LIVE=1` v `/opt/automatizacie-montalu/.env` + `docker compose up -d` (recreate). Od toho momentu ide odpis do `/data/dlv-import` (Money reálne importuje). Pred flipom: skontroluj, že v `odpis_log` nie sú TEST riadky s reálnymi číslami zákaziek (live stĺpec ich aj tak oddeľuje — dedup TEST riadky ostré zákazky NEblokujú).
+
+## E2E hydratačná pasca (stála polhodinu debugovania — nezabudni)
+
+`fill()`/`check()` PRED dokončenou hydratáciou Svelte stráca hodnoty value-bound
+inputov (hydratácia ich vráti na serverový stav). Cez pomalý SSH tunel sa JS
+načítava neskoro → padá to LEN proti nasadenej appke, v CI nikdy. Riešenie je
+zabudované: layout nastavuje `html[data-hydrated="1"]` a E2E používa
+`goto()`/`waitHydrated()` z `e2e/helpers.ts` po KAŽDOM full-page load
+(navigácia aj POST odpoveď) pred fill/check. Nový spec = použi tie helpery.
