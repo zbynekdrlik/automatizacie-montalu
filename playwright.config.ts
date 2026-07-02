@@ -9,9 +9,20 @@ export default defineConfig({
 	globalSetup: './e2e/global-setup.ts',
 	timeout: 30000,
 	retries: 0,
+	// sériovo: editor test dočasne mení konfiguráciu vzorcov — paralelný beh
+	// by menil čísla ostatným testom (a tunel na nasadenú appku paralelu nezvláda)
+	workers: 1,
 	use: {
 		baseURL,
-		screenshot: 'only-on-failure'
+		screenshot: 'only-on-failure',
+		// nasadená appka má PROTOCOL_HEADER/HOST_HEADER (za Caddy proxy) —
+		// pri priamom teste cez tunel ich musí posielať test, inak CSRF 403
+		extraHTTPHeaders: process.env.BASE_URL
+			? {
+					'x-forwarded-proto': new URL(baseURL).protocol.replace(':', ''),
+					'x-forwarded-host': new URL(baseURL).host
+				}
+			: {}
 	},
 	webServer: process.env.BASE_URL
 		? undefined
