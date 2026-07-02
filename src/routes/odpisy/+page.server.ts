@@ -2,7 +2,19 @@ import type { Actions, PageServerLoad } from './$types';
 import { listOdpisy, releaseOdpis } from '$lib/server/money';
 
 export const load: PageServerLoad = async () => {
-	return { odpisy: listOdpisy(200) };
+	// detail sa parsuje TU s ochranou — jeden pokazený riadok nesmie zhodiť
+	// celú históriu (a „Uvoľniť" je jediná cesta k oprave duplikátov)
+	return {
+		odpisy: listOdpisy(200).map((o) => {
+			let d: Record<string, unknown> = {};
+			try {
+				d = JSON.parse(o.detail || '{}');
+			} catch {
+				d = {};
+			}
+			return { ...o, d };
+		})
+	};
 };
 
 export const actions: Actions = {

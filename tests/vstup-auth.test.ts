@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { parseVstup } from '../src/lib/server/vstup';
+import { parseVstup, parseBazenVstup } from '../src/lib/server/vstup';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-vstup-test-'));
 process.env.DATABASE_PATH = path.join(tmpRoot, 'test.db');
@@ -53,6 +53,52 @@ describe('parseVstup — serverové rozsahy', () => {
 
 	it('neznáme otváranie sa odmietne', () => {
 		expect(parseVstup(fd({ otvaranie: 'hore' })).error).toContain('otváranie');
+	});
+});
+
+describe('parseBazenVstup — serverové parsovanie bazén formulára', () => {
+	function bfd(over: Record<string, string> = {}): FormData {
+		const base: Record<string, string> = {
+			zak: 'B-1',
+			op: '01',
+			zakaznik: 'Zákazník',
+			model: 'Premier / Exclusive',
+			kolaj: 'Jednokolaj',
+			pocetSekcii: '3',
+			pocetPriecok: '3',
+			dlzkaKolajnic: '10000'
+		};
+		const form = new FormData();
+		for (const [k, v] of Object.entries({ ...base, ...over })) form.set(k, v);
+		return form;
+	}
+
+	it('platný vstup prejde, checkboxy a čiarky fungujú', () => {
+		const form = bfd({ dlzkaKolajnic: '10000,5' });
+		form.set('dvere', '1');
+		form.set('caka', '1');
+		const { vstup, error } = parseBazenVstup(form);
+		expect(error).toBeNull();
+		expect(vstup.dlzkaKolajnic).toBe(10000.5);
+		expect(vstup.dvere).toBe(true);
+		expect(vstup.caka).toBe(true);
+	});
+
+	it('záporné a nečíselné počty sa orežú na 0 (a sekcie=0 padnú na validácii)', () => {
+		const { vstup, error } = parseBazenVstup(bfd({ pocetSekcii: '-5' }));
+		expect(vstup.pocetSekcii).toBe(0);
+		expect(error).toContain('sekcií');
+		expect(parseBazenVstup(bfd({ pocetSekcii: 'abc' })).error).toContain('sekcií');
+	});
+
+	it('chýbajúce povinné polia sa odmietnu', () => {
+		expect(parseBazenVstup(bfd({ zak: '' })).error).toContain('ZAK');
+		expect(parseBazenVstup(bfd({ op: '' })).error).toContain('OP');
+		expect(parseBazenVstup(bfd({ zakaznik: ' ' })).error).toContain('ákazník');
+	});
+
+	it('prehnané hodnoty sa orežú na maximum', () => {
+		expect(parseBazenVstup(bfd({ pocetSekcii: '99999' })).vstup.pocetSekcii).toBe(100);
 	});
 });
 
