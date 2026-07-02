@@ -1,8 +1,24 @@
-import adapter from '@sveltejs/adapter-auto';
+/// <reference types="vitest/config" />
+import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { execSync } from 'node:child_process';
+
+// verzia zobrazená v pätičke — git describe pri builde (post-deploy verifikácia
+// číta túto hodnotu z DOM a porovnáva s nasadeným commitom)
+let version = process.env.APP_VERSION || '';
+if (!version) {
+	try {
+		version = execSync('git describe --tags --always --dirty').toString().trim();
+	} catch {
+		version = 'dev';
+	}
+}
 
 export default defineConfig({
+	define: {
+		__APP_VERSION__: JSON.stringify(version)
+	},
 	plugins: [
 		sveltekit({
 			compilerOptions: {
@@ -10,11 +26,21 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-
-			// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
-			// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
-			// See https://svelte.dev/docs/kit/adapters for more information about adapters.
 			adapter: adapter()
 		})
-	]
+	],
+	test: {
+		include: ['tests/**/*.test.ts'],
+		coverage: {
+			provider: 'v8',
+			include: ['src/lib/server/**'],
+			// prah = namerané − 2 % (91,6 / 87,8 / 75,4 / 84) — len hore, nikdy dole
+			thresholds: {
+				lines: 89,
+				statements: 85,
+				branches: 73,
+				functions: 82
+			}
+		}
+	}
 });

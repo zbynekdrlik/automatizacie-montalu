@@ -21,3 +21,16 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# databáza a lokálne dáta
+data/
+*.db
+*.sqlite
+*.db-journal
+*.db-wal
+*.db-shm
+
+# playwright
+test-results/
+playwright-report/
+coverage/

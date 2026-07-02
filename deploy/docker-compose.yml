@@ -1,0 +1,35 @@
+# Nasadenie na VPS (167.233.125.9) do /opt/automatizacie-montalu.
+# Zdroj sa rsyncuje z CI do ./src; build beží na VPS (deploy z committed ref).
+# Mounty zdieľané s n8n: dlv-import (Money) + montalu (TEST priečinok).
+# Env (SEED_USERS, MONEY_LIVE) v /opt/automatizacie-montalu/.env — NIE v gite.
+# App je v sieti n8n_default, aby ju n8n Caddy vedel proxovať (app.montalu.cloud).
+services:
+  app:
+    build:
+      context: ./src
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    container_name: automatizacie-montalu
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8090:3000' # len localhost — verejne ide cez Caddy (TLS)
+    environment:
+      DATABASE_PATH: /data/app/app.db
+      MONEY_LIVE: ${MONEY_LIVE:-0}
+      SEED_USERS: ${SEED_USERS:-}
+      BODY_SIZE_LIMIT: 1M
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+    volumes:
+      - appdata:/data/app
+      - /opt/n8n/mounts/dlv-import:/data/dlv-import
+      - /opt/n8n/mounts/montalu:/data/montalu
+    networks:
+      - n8n_default
+
+volumes:
+  appdata:
+
+networks:
+  n8n_default:
+    external: true
