@@ -16,7 +16,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		(p) => event.url.pathname === p || event.url.pathname.startsWith(p + '/')
 	);
 	if (!isPublic && !event.locals.user) {
-		redirect(303, '/login?next=' + encodeURIComponent(event.url.pathname));
+		// pathname + search — deep link s parametrami (napr. ?sysStyl=…) sa po
+		// prihlásení nesmie stratiť, inak editor otvorí iný štýl než užívateľ čakal
+		redirect(303, '/login?next=' + encodeURIComponent(event.url.pathname + event.url.search));
 	}
 
 	return resolve(event);

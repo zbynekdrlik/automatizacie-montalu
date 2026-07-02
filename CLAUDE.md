@@ -28,15 +28,34 @@ the foundation gap below.
 
 ## Testing
 
-- Unit: **Vitest**. E2E: **Playwright** through the real browser (e2e-real-user-testing) —
-  every E2E asserts **zero console errors/warnings** (browser-console-zero-errors).
-- Both are dev-deps already; the `test` scripts + CI wiring are a foundation gap (below).
+- Unit: **Vitest** (`npm test` = `vitest run --coverage`, thresholds in `vite.config.ts` —
+  never lower them). The compute vectors in `tests/compute.test.ts` are CONTRACTUAL 1:1
+  ports of the verified Money odpis numbers — never change them without re-verifying
+  against real odpis Excels.
+- E2E: **Playwright** through the real browser — every E2E asserts **zero console
+  errors/warnings**. `BASE_URL=<deployed>` runs against a deployment (write tests
+  auto-skip when the target reports `live: true` on /health — test data must NEVER
+  reach the real Money import). Without BASE_URL it builds + runs a preview server.
 - Bug fixes: RED regression test committed BEFORE the fix (regression-test-first).
 
-## Foundation gaps (tracked as issues — address before/with feature work)
+## CI + deploy (foundation COMPLETE)
 
-- **No CI pipeline** (`.github/workflows` absent) — check/lint/test/build/coverage gates missing.
-- **No visible version label** on the UI (version-on-dashboard) + no E2E asserting its format.
+- `.github/workflows/ci.yml`: version-check (dev > main), svelte-check, vitest+coverage,
+  build, Playwright E2E; on main → deploy to VPS 167.233.125.9 (`/opt/automatizacie-montalu`,
+  docker compose build on the VPS from the rsynced ref, health+version verified).
+- Version label: footer `data-testid="version"` on every page, injected from
+  `APP_VERSION`/git describe at build; E2E asserts it.
+- Runtime env on the VPS: `/opt/automatizacie-montalu/.env` (SEED_USERS, MONEY_LIVE) —
+  NOT in git. `MONEY_LIVE=1` is the ONLY switch that lets writes reach the real Money
+  import; flipping it is the USER's call, never the agent's.
+
+## Money safety (the hard rules)
+
+- Nothing test-related may EVER reach the live Money import (`/data/dlv-import`).
+- Dedup = DB `UNIQUE(zak, op, live)` in `odpis_log` + claim-then-write with compensation
+  (`src/lib/server/money.ts`) — never weaken; the "Uvoľniť" action on /odpisy is the
+  only sanctioned release path.
+- Temp files in the watched import dir must never match `*.xlsx` (Money watcher races).
 
 ## Secrets
 

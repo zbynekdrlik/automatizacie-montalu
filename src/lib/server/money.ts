@@ -52,8 +52,10 @@ export function targetDirFor(system: string, caka: boolean): string {
 export function filenameFor(req: OdpisRequest): string {
 	const { zak, op, zakaznik, result } = req;
 	// OP je v názve súboru — dve OP tej istej zákazky sa NESMÚ navzájom prepísať
-	// (nález auditu: stratený odpis v čaká-priečinku).
-	return `${safe(zak)} - OP${safe(op)} - ${safe(zakaznik)} ZASKLENIA ${safe(result.system)} ${safe(result.styl)}.xlsx`;
+	// (nález auditu: stratený odpis v čaká-priečinku). contentHash na konci kryje
+	// kolíziu dvoch RÔZNYCH zákaziek, ktoré sanitizácia zloží na rovnaký názov
+	// (napr. „2026/12" aj „2026:12" → „2026_12") — hash počíta zo surovej ZAK.
+	return `${safe(zak)} - OP${safe(op)} - ${safe(zakaznik)} ZASKLENIA ${safe(result.system)} ${safe(result.styl)} [${contentHash(zak, result)}].xlsx`;
 }
 
 export function contentHash(zak: string, result: ComputeResult): string {
@@ -128,7 +130,10 @@ export async function writeOdpis(req: OdpisRequest): Promise<OdpisOutcome> {
 	try {
 		const buf = await buildXlsx(req);
 		fs.mkdirSync(dir, { recursive: true });
-		const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}-${filename}`);
+		// tmp súbor BEZ prípony .xlsx — Money watcher v live priečinku importuje
+		// *.xlsx a bodka na začiatku ho na Samba share neskryje; bez prípony ho
+		// watcher nevidí a rename v rovnakom adresári je atomický
+		const tmp = path.join(dir, `.tmp-${process.pid}-${Date.now()}`);
 		fs.writeFileSync(tmp, buf);
 		fs.renameSync(tmp, target);
 	} catch (e) {
@@ -143,7 +148,33 @@ export async function writeOdpis(req: OdpisRequest): Promise<OdpisOutcome> {
 export function listOdpisy(limit = 100) {
 	return db
 		.prepare(
-			'SELECT zak, op, zakaznik, system, styl, s, v, caka, live, filename, created_by, created_at FROM odpis_log ORDER BY id DESC LIMIT ?'
+			'SELECT id, zak, op, zakaznik, system, styl, s, v, caka, live, filename, created_by, created_at FROM odpis_log ORDER BY id DESC LIMIT ?'
 		)
 		.all(limit);
+}
+
+/**
+ * Uvoľní dedup kľúč (zmaže záznam) — jediná legitímna cesta, ako po oprave
+ * v Money poslať tú istú ZAK+OP znova. Uvoľnenie sa audituje.
+ */
+export function releaseOdpis(id: number, username: string): boolean {
+	const row = db
+		.prepare('SELECT zak, op, live, filename FROM odpis_log WHERE id = ?')
+		.get(id) as { zak: string; op: string; live: number; filename: string } | undefined;
+	if (!row) return false;
+	db.transaction(() => {
+		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(id);
+		db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+			username,
+			'odpis',
+			JSON.stringify([
+				{
+					pole: `Uvoľnený odpis ${row.zak} OP${row.op} (${row.live ? 'LIVE' : 'TEST'}) — ${row.filename}`,
+					stara: 1,
+					nova: 0
+				}
+			])
+		);
+	})();
+	return true;
 }

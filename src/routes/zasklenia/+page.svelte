@@ -187,11 +187,16 @@
 		</p>
 	</div>
 
+	{#if form?.warn}
+		<div class="warn" data-testid="plan-warn">⚠️ {form.warn}</div>
+	{/if}
+
 	{@render planKarty(plan)}
 
 	<div class="card noprint">
 		<form method="POST" action="?/odoslat">
 			{@render hiddenVstup()}
+			<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
 			<button class="btn" type="submit" data-testid="odoslat">
 				{data.live
 					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')

@@ -5,7 +5,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes } from '$lib/server/db';
 import { safeCompute } from '$lib/server/compute';
-import { writeOdpis, isLive, targetDirFor, filenameFor } from '$lib/server/money';
+import { writeOdpis, isLive, targetDirFor, filenameFor, contentHash } from '$lib/server/money';
 
 const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
@@ -76,9 +76,12 @@ export const actions: Actions = {
 		const { r, err } = compute(vstup);
 		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		return {
-			step: 'nahlad',
+			step: 'nahlad' as const,
 			vstup,
 			plan: r,
+			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
+			planHash: contentHash(vstup.zak, r),
+			warn: null as string | null,
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor({ ...vstup, createdBy: '', result: r }),
@@ -88,10 +91,30 @@ export const actions: Actions = {
 	},
 
 	odoslat: async ({ request, locals }) => {
-		const { vstup, error } = parseVstup(await request.formData());
+		const formData = await request.formData();
+		const { vstup, error } = parseVstup(formData);
 		if (error) return { step: 'form' as const, error, vstup };
 		const { r, err } = compute(vstup);
 		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+
+		// ak niekto medzi náhľadom a potvrdením zmenil vzorce (Nastavenia),
+		// prepočet už nesedí s tým, čo užívateľ videl → nezapisuj, ukáž nový náhľad
+		const potvrdene = String(formData.get('planHash') ?? '');
+		const aktualny = contentHash(vstup.zak, r);
+		if (potvrdene && potvrdene !== aktualny) {
+			return {
+				step: 'nahlad' as const,
+				vstup,
+				plan: r,
+				planHash: aktualny,
+				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				cielInfo: {
+					live: isLive(),
+					filename: filenameFor({ ...vstup, createdBy: '', result: r }),
+					dir: targetDirFor(r.system, vstup.caka)
+				}
+			};
+		}
 		try {
 			const outcome = await writeOdpis({
 				zak: vstup.zak,

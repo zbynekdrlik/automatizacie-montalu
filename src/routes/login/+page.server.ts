@@ -2,8 +2,14 @@ import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { login, SESSION_COOKIE } from '$lib/server/auth';
 
+// open-redirect ochrana: len relatívna cesta v rámci appky, nikdy externá URL
+function safeNext(url: URL): string {
+	const next = url.searchParams.get('next') ?? '';
+	return next.startsWith('/') && !next.startsWith('//') ? next : '/zasklenia';
+}
+
 export const load: PageServerLoad = async ({ locals, url }) => {
-	if (locals.user) redirect(303, url.searchParams.get('next') || '/zasklenia');
+	if (locals.user) redirect(303, safeNext(url));
 	return {};
 };
 
@@ -25,6 +31,6 @@ export const actions: Actions = {
 			secure: url.protocol === 'https:',
 			maxAge: 30 * 24 * 3600
 		});
-		redirect(303, url.searchParams.get('next') || '/zasklenia');
+		redirect(303, safeNext(url));
 	}
 };

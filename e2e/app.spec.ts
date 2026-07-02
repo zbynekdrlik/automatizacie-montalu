@@ -28,8 +28,17 @@ test('neprihlásený je presmerovaný na login', async ({ page }) => {
 	expect(consoleMsgs).toEqual([]);
 });
 
+/** TVRDÁ POISTKA: zápisové testy sa NIKDY nespúšťajú proti LIVE nasadeniu —
+ * testovací odpis nesmie skončiť v ostrom Money importe. */
+async function skipAkLive(page: import('@playwright/test').Page) {
+	const res = await page.request.get('/health');
+	const { live } = (await res.json()) as { live: boolean };
+	test.skip(live === true, 'LIVE nasadenie (MONEY_LIVE=1) — zápisové E2E preskočené');
+}
+
 test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
 	await loginAs(page);
 
 	// 1. formulár → náhľad (bez zápisu)
@@ -105,6 +114,7 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
 	await loginAs(page);
 	await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
 
@@ -115,31 +125,38 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 	await page.getByTestId('ulozit-vzorce').click();
 	await expect(page.getByTestId('nastavenia-ulozene')).toContainText('Žiadna hodnota sa nezmenila');
 
-	// 2. zmena skloOffset o +5 → uloží sa, preview ukáže starú → novú
-	await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
-	await sklo.fill(String(Number(povodna) + 5));
-	await page.getByTestId('ulozit-vzorce').click();
-	await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
-	await expect(page.getByText(`${povodna} → ${Number(povodna) + 5}`)).toBeVisible();
+	try {
+		// 2. zmena skloOffset o +5 → uloží sa, preview ukáže starú → novú
+		await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
+		await sklo.fill(String(Number(povodna) + 5));
+		await page.getByTestId('ulozit-vzorce').click();
+		await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
+		await expect(page.getByText(`${povodna} → ${Number(povodna) + 5}`)).toBeVisible();
 
-	// 3. hlavný formulár počíta s novou hodnotou (sklo užšie o 5)
-	await page.goto('/zasklenia');
-	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-CFG`);
-	await page.getByLabel('OP/OPDL číslo *').fill('01');
-	await page.getByLabel('Zákazník *').fill('E2E Test');
-	await page.getByLabel('Šírka (mm) *').fill('2509');
-	await page.getByLabel('Výška (mm) *').fill('1930');
-	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
-	await expect(page.getByTestId('sklo-sirka')).toHaveText('1123,5');
+		// 3. hlavný formulár počíta s novou hodnotou (sklo užšie o 5)
+		await page.goto('/zasklenia');
+		await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-CFG`);
+		await page.getByLabel('OP/OPDL číslo *').fill('01');
+		await page.getByLabel('Zákazník *').fill('E2E Test');
+		await page.getByLabel('Šírka (mm) *').fill('2509');
+		await page.getByLabel('Výška (mm) *').fill('1930');
+		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+		await expect(page.getByTestId('sklo-sirka')).toHaveText('1123,5');
+	} finally {
+		// návrat na pôvodnú hodnotu VŽDY — aj po páde testu nesmie ostať
+		// zmenená konfigurácia (best effort, bez assertov)
+		await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+		await sklo.fill(povodna);
+		await page.getByTestId('ulozit-vzorce').click();
+		await page.getByTestId('nastavenia-ulozene').waitFor();
+	}
 
-	// 4. návrat na pôvodnú hodnotu + overenie histórie zmien
-	await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
-	await sklo.fill(povodna);
-	await page.getByTestId('ulozit-vzorce').click();
-	await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
+	// 4. história zmien obsahuje návrat
 	await page.goto('/zasklenia/nastavenia?sysStyl=Robust%7C2K');
 	await expect(page.getByText('História zmien')).toBeVisible();
-	await expect(page.getByText(`Sklo — konečné zmenšenie: ${Number(povodna) + 5} → ${povodna}`).first()).toBeVisible();
+	await expect(
+		page.getByText(`Sklo — konečné zmenšenie: ${Number(povodna) + 5} → ${povodna}`).first()
+	).toBeVisible();
 
 	// 5. preklep mimo rozsahu sa odmietne (HTML5 max=500)
 	const invalid = await sklo.evaluate((el) => {

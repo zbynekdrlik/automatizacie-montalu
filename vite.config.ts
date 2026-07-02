@@ -30,6 +30,17 @@ export default defineConfig({
 		})
 	],
 	test: {
-		include: ['tests/**/*.test.ts']
+		include: ['tests/**/*.test.ts'],
+		coverage: {
+			provider: 'v8',
+			include: ['src/lib/server/**'],
+			// prah = namerané − 2 % (91,6 / 87,8 / 75,4 / 84) — len hore, nikdy dole
+			thresholds: {
+				lines: 89,
+				statements: 85,
+				branches: 73,
+				functions: 82
+			}
+		}
 	}
 });
