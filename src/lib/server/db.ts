@@ -83,23 +83,19 @@ function migrate() {
 			);
 			CREATE TABLE odpis_log (
 				id INTEGER PRIMARY KEY,
+				modul TEXT NOT NULL,
 				zak TEXT NOT NULL,
 				op TEXT NOT NULL,
 				zakaznik TEXT NOT NULL,
-				system TEXT NOT NULL,
-				styl TEXT NOT NULL,
-				s REAL NOT NULL,
-				v REAL NOT NULL,
-				sklo TEXT NOT NULL DEFAULT '',
-				otvaranie TEXT NOT NULL DEFAULT '',
 				caka INTEGER NOT NULL DEFAULT 0,
 				live INTEGER NOT NULL,
 				target TEXT NOT NULL,
 				filename TEXT NOT NULL,
 				content_hash TEXT NOT NULL DEFAULT '',
+				detail TEXT NOT NULL DEFAULT '{}',
 				created_by TEXT NOT NULL DEFAULT '',
 				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				UNIQUE (zak, op, live)
+				UNIQUE (modul, zak, op, live)
 			);
 			CREATE TABLE problem_reports (
 				id INTEGER PRIMARY KEY,
@@ -109,7 +105,38 @@ function migrate() {
 				popis TEXT NOT NULL
 			);
 		`);
-		db.pragma('user_version = 1');
+		db.pragma('user_version = 2');
+	}
+
+	if ((db.pragma('user_version', { simple: true }) as number) < 2) {
+		// v1 → v2: odpis_log zovšeobecnený pre všetky moduly — dedup kľúč obsahuje
+		// modul (jedna ZAK môže mať legitímne pergolu AJ bazén AJ zasklenia)
+		db.exec(`
+			CREATE TABLE odpis_log2 (
+				id INTEGER PRIMARY KEY,
+				modul TEXT NOT NULL,
+				zak TEXT NOT NULL,
+				op TEXT NOT NULL,
+				zakaznik TEXT NOT NULL,
+				caka INTEGER NOT NULL DEFAULT 0,
+				live INTEGER NOT NULL,
+				target TEXT NOT NULL,
+				filename TEXT NOT NULL,
+				content_hash TEXT NOT NULL DEFAULT '',
+				detail TEXT NOT NULL DEFAULT '{}',
+				created_by TEXT NOT NULL DEFAULT '',
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				UNIQUE (modul, zak, op, live)
+			);
+			INSERT INTO odpis_log2 (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at)
+				SELECT id, 'zasklenia', zak, op, zakaznik, caka, live, target, filename, content_hash,
+					json_object('system', system, 'styl', styl, 's', s, 'v', v, 'sklo', sklo, 'otvaranie', otvaranie),
+					created_by, created_at
+				FROM odpis_log;
+			DROP TABLE odpis_log;
+			ALTER TABLE odpis_log2 RENAME TO odpis_log;
+		`);
+		db.pragma('user_version = 2');
 	}
 
 	seedData();

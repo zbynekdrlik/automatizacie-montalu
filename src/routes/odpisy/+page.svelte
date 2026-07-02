@@ -27,11 +27,11 @@
 			<thead>
 				<tr>
 					<th>Kedy</th>
+					<th>Modul</th>
 					<th>ZAK</th>
 					<th>OP</th>
 					<th>Zákazník</th>
-					<th>Systém</th>
-					<th class="c">Rozmer</th>
+					<th>Detail</th>
 					<th class="c">Režim</th>
 					<th>Kto</th>
 					<th></th>
@@ -39,13 +39,18 @@
 			</thead>
 			<tbody>
 				{#each data.odpisy as o (o.id)}
+					{@const d = JSON.parse(o.detail || '{}')}
 					<tr>
 						<td style="white-space:nowrap">{o.created_at}</td>
+						<td>{o.modul === 'zasklenia' ? 'Zasklenia' : o.modul === 'bazen' ? 'Bazén' : 'Pergola'}</td>
 						<td><b>{o.zak}</b></td>
 						<td>{o.op}</td>
 						<td>{o.zakaznik}</td>
-						<td>{o.system} {o.styl}{o.caka ? ' ⏳' : ''}</td>
-						<td class="c">{o.s}×{o.v}</td>
+						<td
+							>{[d.system && `${d.system} ${d.styl}`, d.s && `${d.s}×${d.v}`, d.model, d.riadkov && `${d.riadkov} pol.`]
+								.filter(Boolean)
+								.join(' · ')}{o.caka ? ' ⏳' : ''}</td
+						>
 						<td class="c">{o.live ? '● LIVE' : '🧪 TEST'}</td>
 						<td>{o.created_by}</td>
 						<td class="c">

@@ -12,23 +12,27 @@ process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
 // import až PO nastavení env (db.ts číta DATABASE_PATH pri importe)
-const { writeOdpis } = await import('../src/lib/server/money');
+const { writeOdpis, safe } = await import('../src/lib/server/money');
 const { loadCfg } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');
+import type { OdpisJob } from '../src/lib/server/money';
 
-function makeReq(zak: string, op: string) {
+function makeReq(zak: string, op: string, modul: OdpisJob['modul'] = 'zasklenia'): OdpisJob {
 	const cfg = loadCfg();
 	const { r, err } = safeCompute(cfg, 'Robust|2K', 2509, 1930, false);
 	expect(err).toBeNull();
 	return {
+		modul,
 		zak,
 		op,
 		zakaznik: 'Test Zákazník',
-		sklo: 'Izolačné sklo 4/16/4 mliečne',
-		otvaranie: 'P - L',
 		caka: false,
 		createdBy: 'vitest',
-		result: r!
+		cakaSubdir: 'Robust',
+		filenameBase: `${safe(zak)} - OP${safe(op)} - Test Zákazník ZASKLENIA Robust 2K`,
+		popis: (op + ' : Test Zákazník').trim(),
+		polozky: r!.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+		detail: { system: 'Robust', styl: '2K', s: 2509, v: 1930 }
 	};
 }
 
@@ -78,6 +82,11 @@ describe('writeOdpis', () => {
 		expect(out.status).toBe('written');
 		const files = fs.readdirSync(process.env.MONEY_TEST_DIR!);
 		expect(files.filter((f) => f.includes('TEST-1')).length).toBe(2);
+	});
+
+	it('iný MODUL tej istej ZAK+OP prejde (pergola aj bazén aj zasklenia na jednej zákazke)', async () => {
+		const out = await writeOdpis(makeReq('TEST-1', '01', 'bazen'));
+		expect(out.status).toBe('written');
 	});
 
 	it('zlyhanie zápisu súboru uvoľní dedup kľúč (kompenzácia)', async () => {

@@ -6,9 +6,12 @@
 	let { data, children } = $props();
 
 	const links = [
+		{ href: '/pergola', label: 'Pergola' },
+		{ href: '/bazen', label: 'Bazén' },
 		{ href: '/zasklenia', label: 'Zasklenia' },
 		{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
-		{ href: '/odpisy', label: 'História odpisov' }
+		{ href: '/odpisy', label: 'História' },
+		{ href: '/problem', label: '⚠ Problém' }
 	];
 </script>
 

@@ -5,8 +5,33 @@
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes } from '$lib/server/db';
 import { safeCompute } from '$lib/server/compute';
-import { writeOdpis, isLive, targetDirFor, filenameFor, contentHash } from '$lib/server/money';
+import {
+	writeOdpis,
+	isLive,
+	targetDirFor,
+	filenameFor,
+	contentHash,
+	safe,
+	type OdpisJob
+} from '$lib/server/money';
+import type { ComputeResult } from '$lib/server/compute';
 import { parseVstup, OTVARANIA, type Vstup } from '$lib/server/vstup';
+
+function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
+	return {
+		modul: 'zasklenia',
+		zak: vstup.zak,
+		op: vstup.op,
+		zakaznik: vstup.zakaznik,
+		caka: vstup.caka,
+		createdBy,
+		cakaSubdir: r.system === 'Slide' ? 'Slide' : 'Robust',
+		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ${safe(r.system)} ${safe(r.styl)}`,
+		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
+		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+		detail: { system: r.system, styl: r.styl, s: r.S, v: r.V, sklo: vstup.sklo, otvaranie: vstup.otvaranie }
+	};
+}
 
 function compute(vstup: Vstup) {
 	const glass = listGlassTypes();
@@ -39,12 +64,12 @@ export const actions: Actions = {
 			vstup,
 			plan: r,
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
-			planHash: contentHash(vstup.zak, r),
+			planHash: contentHash(vstup.zak, jobFor(vstup, r, '').polozky),
 			warn: null as string | null,
 			cielInfo: {
 				live: isLive(),
-				filename: filenameFor({ ...vstup, createdBy: '', result: r }),
-				dir: targetDirFor(r.system, vstup.caka)
+				filename: filenameFor(jobFor(vstup, r, '')),
+				dir: targetDirFor(r.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
 			}
 		};
 	},
@@ -59,7 +84,8 @@ export const actions: Actions = {
 		// ak niekto medzi náhľadom a potvrdením zmenil vzorce (Nastavenia),
 		// prepočet už nesedí s tým, čo užívateľ videl → nezapisuj, ukáž nový náhľad
 		const potvrdene = String(formData.get('planHash') ?? '');
-		const aktualny = contentHash(vstup.zak, r);
+		const job = jobFor(vstup, r, locals.user?.username ?? '');
+		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
 			return {
 				step: 'nahlad' as const,
@@ -69,22 +95,13 @@ export const actions: Actions = {
 				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
 				cielInfo: {
 					live: isLive(),
-					filename: filenameFor({ ...vstup, createdBy: '', result: r }),
-					dir: targetDirFor(r.system, vstup.caka)
+					filename: filenameFor(job),
+					dir: targetDirFor(r.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
 				}
 			};
 		}
 		try {
-			const outcome = await writeOdpis({
-				zak: vstup.zak,
-				op: vstup.op,
-				zakaznik: vstup.zakaznik,
-				sklo: vstup.sklo,
-				otvaranie: vstup.otvaranie,
-				caka: vstup.caka,
-				createdBy: locals.user?.username ?? '',
-				result: r
-			});
+			const outcome = await writeOdpis(job);
 			if (outcome.status === 'duplicate') {
 				// 200 render (nie fail(409)) — non-2xx na form POST loguje v prehliadači
 				// console error a porušuje zero-console-errors; blokovanie drží DB constraint

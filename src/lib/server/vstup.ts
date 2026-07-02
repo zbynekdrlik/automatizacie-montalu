@@ -41,3 +41,42 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	else if (!OTVARANIA.includes(vstup.otvaranie)) error = 'Vyber otváranie.';
 	return { vstup, error };
 }
+
+// ---- Bazén ----
+
+import type { BazenVstup } from './bazen';
+
+export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: string | null } {
+	const num = (k: string, max = 1000) => {
+		const x = parseFloat(String(form.get(k) ?? '').replace(',', '.'));
+		if (!Number.isFinite(x)) return 0;
+		return Math.min(Math.max(x, 0), max);
+	};
+	const vstup: BazenVstup = {
+		zak: String(form.get('zak') ?? '').trim(),
+		op: String(form.get('op') ?? '').trim(),
+		zakaznik: String(form.get('zakaznik') ?? '').trim(),
+		model: String(form.get('model') ?? 'Premier / Exclusive').trim(),
+		kolaj: String(form.get('kolaj') ?? 'Jednokolaj').trim(),
+		pocetSekcii: num('pocetSekcii', 100),
+		pocetPriecok: num('pocetPriecok', 100),
+		dvere: form.get('dvere') === '1',
+		vs4500: num('vs4500', 100),
+		vs6000: num('vs6000', 100),
+		ss4500: num('ss4500', 100),
+		ss6000: num('ss6000', 100),
+		ms4500: num('ms4500', 100),
+		ms6000: num('ms6000', 100),
+		dlzkaKolajnic: num('dlzkaKolajnic', 200000),
+		prieckovy4300: num('prieckovy4300', 100),
+		prieckovy6000: num('prieckovy6000', 100),
+		vyklopneCelo: num('vyklopneCelo', 100),
+		caka: form.get('caka') === '1'
+	};
+	let error: string | null = null;
+	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
+	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
+	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
+	else if (!(vstup.pocetSekcii > 0)) error = 'Zadaj počet sekcií (väčší ako 0).';
+	return { vstup, error };
+}
