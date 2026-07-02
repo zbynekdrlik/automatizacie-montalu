@@ -65,13 +65,13 @@
 	>
 
 	<!-- vonkajší rám (koľajnice) -->
-	<rect x={M.left - 3} y={M.top - 3} width={W - M.left - M.right + 6} height={h + 6} fill="none" stroke="#475569" stroke-width="3" rx="2" />
+	<rect x={M.left - 3} y={M.top - 3} width={W - M.left - M.right + 6} height={h + 6} fill="none" stroke="#475569" stroke-width="1.5" rx="2" />
 
 	<!-- polia -->
 	{#each Array(N) as _, i (i)}
 		{@const x = M.left + i * panelW}
 		<!-- rám poľa -->
-		<rect x={x + 1} y={M.top + 1} width={panelW - 2} height={h - 2} fill="#e2e8f0" stroke="#64748b" stroke-width="1.5" />
+		<rect x={x + 1} y={M.top + 1} width={panelW - 2} height={h - 2} fill="#e2e8f0" stroke="#64748b" stroke-width="0.9" />
 		<!-- sklo -->
 		<rect
 			x={x + frame}
@@ -80,7 +80,7 @@
 			height={h - 2 * frame}
 			fill="#dbeafe"
 			stroke="#93c5fd"
-			stroke-width="1"
+			stroke-width="0.6"
 		/>
 		<!-- odlesk skla -->
 		<line
@@ -89,7 +89,7 @@
 			x2={x + frame + (panelW - 2 * frame) * 0.55}
 			y2={M.top + frame + (h - 2 * frame) * 0.15}
 			stroke="#bfdbfe"
-			stroke-width="5"
+			stroke-width="2.5"
 			stroke-linecap="round"
 			opacity="0.8"
 		/>
@@ -112,7 +112,7 @@
 				<path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
 			</marker>
 		</defs>
-		<line {x1} y1={y} {x2} y2={y} stroke="#2563eb" stroke-width="2" marker-end="url(#arr)" />
+		<line {x1} y1={y} {x2} y2={y} stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr)" />
 		<text x={(x1 + x2) / 2} y={y + 18} text-anchor="middle" font-size="12" fill="#2563eb" font-weight="600">otváranie {otvaranie}</text>
 	{:else if dir === 'OP'}
 		<text x={W / 2} y={M.top + h + 30} text-anchor="middle" font-size="12" fill="#2563eb" font-weight="600">{otvaranie}</text>

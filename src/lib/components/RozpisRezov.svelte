@@ -61,7 +61,7 @@
 	<defs>
 		<pattern id="odpad-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
 			<rect width="7" height="7" fill="#f1f5f9" />
-			<line x1="0" y1="0" x2="0" y2="7" stroke="#cbd5e1" stroke-width="3" />
+			<line x1="0" y1="0" x2="0" y2="7" stroke="#cbd5e1" stroke-width="1" />
 		</pattern>
 	</defs>
 </svg>
@@ -94,13 +94,13 @@
 							aria-label="Tyč {ti + 1}"
 						>
 							<!-- podklad celej tyče -->
-							<rect x="0" y="0" width={bar} height={H} fill="#f8fafc" stroke="#334155" stroke-width="6" vector-effect="non-scaling-stroke" />
+							<rect x="0" y="0" width={bar} height={H} fill="#f8fafc" stroke="#475569" stroke-width="1" vector-effect="non-scaling-stroke" />
 							{#each segs as seg (seg.body)}
 								<polygon
 									points={seg.body}
 									fill={seg.odpad ? 'url(#odpad-hatch)' : '#dbeafe'}
-									stroke="#334155"
-									stroke-width="6"
+									stroke="#475569"
+									stroke-width="1"
 									vector-effect="non-scaling-stroke"
 								/>
 							{/each}
