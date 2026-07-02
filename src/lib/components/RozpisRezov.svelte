@@ -23,7 +23,9 @@
 		skryLabel: boolean; // úzky segment → popis skry (aby sa nepretekal)
 	}
 
-	// jedna tyč → polygony rezov + odpad
+	// jedna tyč → polygony rezov + odpad.
+	// 45° rez: uhly idú DO VNÚTRA (ľavý zdola doprava, pravý zdola doľava) —
+	// kus je lichobežník užší hore (x±s na hornej hrane), ako pri spájaní rámu.
 	function segmenty(kusy: { rozmer: number; dlzka: number }[], zvysok: number, sikmy: boolean) {
 		const s = sikmy ? S : 0;
 		const segs: Seg[] = [];
@@ -31,7 +33,8 @@
 		for (const k of kusy) {
 			const x1 = x + k.dlzka;
 			segs.push({
-				body: `${x + s},0 ${x1 + s},0 ${x1},${H} ${x},${H}`,
+				// horná hrana zúžená z oboch strán o s (rezy do vnútra)
+				body: `${x + s},0 ${x1 - s},0 ${x1},${H} ${x},${H}`,
 				labelPct: ((x + x1) / 2 / bar) * 100,
 				text: fmt(k.rozmer),
 				odpad: false,
@@ -40,8 +43,9 @@
 			x = x1;
 		}
 		if (zvysok > 1) {
+			// odpad začína šikmým rezom posledného kusu (ak bol 45°)
 			segs.push({
-				body: `${x + s},0 ${bar},0 ${bar},${H} ${x},${H}`,
+				body: `${x - s},0 ${bar},0 ${bar},${H} ${x},${H}`,
 				labelPct: ((x + bar) / 2 / bar) * 100,
 				text: 'odpad ' + fmt(zvysok),
 				odpad: true,
@@ -89,6 +93,8 @@
 							role="img"
 							aria-label="Tyč {ti + 1}"
 						>
+							<!-- podklad celej tyče -->
+							<rect x="0" y="0" width={bar} height={H} fill="#f8fafc" stroke="#334155" stroke-width="6" vector-effect="non-scaling-stroke" />
 							{#each segs as seg (seg.body)}
 								<polygon
 									points={seg.body}
