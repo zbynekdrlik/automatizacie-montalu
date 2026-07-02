@@ -120,9 +120,9 @@
 			{@render hiddenVstup()}
 
 			{#if v.kombinacie.length}
-				<div class="sec">Výber kombinácií tyčí (podľa polohy nohy)</div>
+				<div class="sec noprint">Výber kombinácií tyčí (podľa polohy nohy)</div>
 				{#each v.kombinacie as k (k.idx)}
-					<div class="field">
+					<div class="field noprint">
 						<label for="combo_{k.idx}">{k.fieldLabel}</label>
 						{#each k.options as opt (opt)}
 							<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0">
@@ -132,7 +132,7 @@
 						{/each}
 					</div>
 				{/each}
-				<p class="sub" style="margin-bottom:14px">Zmena voľby prepočíta Money rozpis aj počty tyčí pri odoslaní.</p>
+				<p class="sub noprint" style="margin-bottom:14px">Zmena voľby prepočíta Money rozpis aj počty tyčí pri odoslaní.</p>
 			{/if}
 
 			<div class="sec">Money rozpis — {v.nonzero.length} položiek</div>
@@ -144,14 +144,15 @@
 				</div>
 			{/each}
 
-			<div style="height:14px"></div>
-			<button class="btn" type="submit" data-testid="odoslat">
+			<div style="height:14px" class="noprint"></div>
+			<button class="btn noprint" type="submit" data-testid="odoslat">
 				{data.live
 					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS/Pergola)' : '✅ Odoslať odpis do Money')
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
-		<a class="btn secondary" href="/pergola">← Späť a upraviť zadanie</a>
+		<button class="btn secondary noprint" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<a class="btn secondary noprint" href="/pergola">← Späť a upraviť zadanie</a>
 	</div>
 
 	{@render tyceKarta(false)}

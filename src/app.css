@@ -248,20 +248,75 @@ footer.app {
 	padding: 10px 0 24px;
 }
 @media print {
+	/* celý nárezový plán na JEDNU A4 — kompaktné rozostupy, menšie písmo */
+	@page {
+		size: A4 portrait;
+		margin: 8mm;
+	}
 	body {
 		background: #fff;
+		font-size: 11px;
+	}
+	.wrap {
+		padding: 0;
+		max-width: none;
 	}
 	.card {
 		box-shadow: none;
-		border: 1px solid #e2e8f0;
+		border: 1px solid #cbd5e1;
+		border-radius: 8px;
+		padding: 8px 12px;
+		margin-bottom: 6px;
 		page-break-inside: avoid;
+	}
+	h1 {
+		font-size: 15px;
+	}
+	.sub {
+		font-size: 10px;
+	}
+	.sec {
+		font-size: 10px;
+		margin-bottom: 5px;
+	}
+	.g div b {
+		font-size: 13px;
+	}
+	table {
+		font-size: 10.5px;
+	}
+	td {
+		padding: 3px 5px;
+	}
+	.row {
+		padding: 3px 2px;
+		font-size: 11px;
 	}
 	nav.top,
 	footer.app,
 	.noprint {
 		display: none !important;
 	}
-	.wrap {
-		padding: 0;
+	/* čelný pohľad je pekný, ale na tlači berie veľa miesta — zmenšíme,
+	   nech sa plán aj s rezmi profilov zmestí na jednu A4 */
+	[data-testid='nahlad-2d'] {
+		max-height: 62mm;
+		width: auto;
+		display: block;
+		margin: 0 auto;
+	}
+	/* rezy profilov v tabuľke ostávajú (kompaktné) */
+	.thumb {
+		width: 30px !important;
+		height: 30px !important;
+	}
+	/* číselné polia (bazén kontrola) v tlači ako čistý text, bez rámika */
+	input[type='number'] {
+		border: none !important;
+		padding: 0 !important;
+		font-size: 10.5px !important;
+		background: transparent;
+		-webkit-appearance: none;
+		appearance: none;
 	}
 }
