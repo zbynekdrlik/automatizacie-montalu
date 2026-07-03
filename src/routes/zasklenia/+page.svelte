@@ -45,6 +45,14 @@
 		otvaranie: string;
 	};
 
+	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
+	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.
+	let zakS = $state('');
+	let opS = $state('');
+	let zakaznikS = $state('');
+	let skloPresneS = $state('');
+	let poznamkaS = $state('');
+	let cakaS = $state(false);
 	let system = $state('Robust');
 	let styl = $state('2K');
 	let sklo = $state('');
@@ -53,6 +61,13 @@
 	let vyska = $state<number | string>('');
 	let posuvyExtra = $state<PosuvRow[]>([]);
 	$effect(() => {
+		const zd = form?.vstup ?? form?.multiVstup ?? null;
+		zakS = zd?.zak ?? '';
+		opS = zd?.op ?? '';
+		zakaznikS = zd?.zakaznik ?? '';
+		skloPresneS = form?.vstup?.skloPresne ?? '';
+		poznamkaS = zd?.poznamka ?? '';
+		cakaS = zd?.caka ?? false;
 		const p = prim();
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
@@ -292,15 +307,15 @@
 			<div class="grid3">
 				<div class="field">
 					<label for="zak">Číslo objednávky (ZAK) *</label>
-					<input id="zak" name="zak" value={vstup.zak} required />
+					<input id="zak" name="zak" bind:value={zakS} required />
 				</div>
 				<div class="field">
 					<label for="op">OP/OPDL číslo *</label>
-					<input id="op" name="op" value={vstup.op} required />
+					<input id="op" name="op" bind:value={opS} required />
 				</div>
 				<div class="field">
 					<label for="zakaznik">Zákazník *</label>
-					<input id="zakaznik" name="zakaznik" value={vstup.zakaznik} required />
+					<input id="zakaznik" name="zakaznik" bind:value={zakaznikS} required />
 				</div>
 			</div>
 			<div class="grid2">
@@ -347,7 +362,7 @@
 				<input
 					id="skloPresne"
 					name="skloPresne"
-					value={vstup.skloPresne}
+					bind:value={skloPresneS}
 					maxlength="120"
 					placeholder="napr. Stopsol Classic Grey, dubová kôra…"
 				/>
@@ -357,14 +372,14 @@
 				<input
 					id="poznamka"
 					name="poznamka"
-					value={vstup.poznamka}
+					bind:value={poznamkaS}
 					maxlength="300"
 					placeholder="napr. pozor na ľavé krídlo, dodať do piatku…"
 				/>
 			</div>
 			<div class="field">
 				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input type="checkbox" name="caka" value="1" checked={vstup.caka} style="width:auto" />
+					<input type="checkbox" name="caka" value="1" bind:checked={cakaS} style="width:auto" />
 					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
 				</label>
 			</div>

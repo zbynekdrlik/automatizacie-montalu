@@ -112,8 +112,9 @@ test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľ
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 
 	// súhrn posuvov + spoločný odpis + rozpis so značkami P1/P2
-	await expect(page.getByText('Posuv 1')).toBeVisible();
-	await expect(page.getByText('Posuv 2')).toBeVisible();
+	// (Posuv 1/2 je aj v tabuľke aj v náhľade → .first())
+	await expect(page.getByText('Posuv 1').first()).toBeVisible();
+	await expect(page.getByText('Posuv 2').first()).toBeVisible();
 	await expect(page.locator('.row', { hasText: 'ZASP00002' })).toBeVisible();
 	await expect(page.locator('.pbadge').first()).toBeVisible();
 	// je tam tlačidlo na odoslanie (ale my ho v teste NEklikáme)
