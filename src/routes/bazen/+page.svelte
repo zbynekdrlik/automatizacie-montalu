@@ -31,12 +31,14 @@
 
 	let step = $derived(form?.step ?? 'form');
 
+	// poradie kvôli grid3 rozloženiu: prvý riadok VS/SS/MS do 4500,
+	// druhý riadok to isté do 6000 (Dominik)
 	const cisla: [keyof typeof vstup, string][] = [
 		['vs4500', 'VS do 4500 (počet sekcií)'],
-		['vs6000', 'VS do 6000 (počet sekcií)'],
 		['ss4500', 'SS do 4500 (počet sekcií)'],
-		['ss6000', 'SS do 6000 (počet sekcií)'],
 		['ms4500', 'MS do 4500 (počet sekcií)'],
+		['vs6000', 'VS do 6000 (počet sekcií)'],
+		['ss6000', 'SS do 6000 (počet sekcií)'],
 		['ms6000', 'MS do 6000 (počet sekcií)'],
 		['prieckovy4300', 'Priečkový 4300 (počet)'],
 		['prieckovy6000', 'Priečkový 6000 (počet)'],
