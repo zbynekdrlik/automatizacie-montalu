@@ -3,6 +3,7 @@
 // zmluva s Money — NIKDY ich nemeniť bez overenia proti reálnym odpisom.
 import { describe, it, expect } from 'vitest';
 import { buildCFG, computeFlat, validSys, safeCompute, inBounds } from '../src/lib/server/compute';
+import { jeSikmyRez } from '../src/lib/cut';
 import type { SysRow, RezRow } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
 
@@ -20,14 +21,15 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	const cases: [string, number, number, boolean, Record<string, number>, { sirka: number; vyska: number } | null][] = [
 		['Robust|2K', 5000, 2000, false, { ZASP00014: 15, ZASP00002: 22.5, ZASP00010: 7.5 }, { sirka: 2374, vyska: 1795 }],
 		['Robust|3K', 5000, 2150, false, { ZASP00016: 15, ZASP00002: 30, ZASP00010: 15 }, { sirka: 1563, vyska: 1945 }],
-		['Robust|2x2K', 5000, 2100, false, { ZASP00014: 15, ZASP00002: 30, ZASP00010: 15, ZASP00006: 7.5 }, { sirka: 1135.25, vyska: 1895 }],
-		['Robust|2x3K', 5000, 2200, false, { ZASP00016: 15, ZASP00002: 37.5, ZASP00010: 22.5, ZASP00006: 7.5 }, { sirka: 737.912, vyska: 1995 }],
+		// sklo zaokrúhlené na celé mm (Dominik) — pôvodné 1135.25 / 737.912
+		['Robust|2x2K', 5000, 2100, false, { ZASP00014: 15, ZASP00002: 30, ZASP00010: 15, ZASP00006: 7.5 }, { sirka: 1135, vyska: 1895 }],
+		['Robust|2x3K', 5000, 2200, false, { ZASP00016: 15, ZASP00002: 37.5, ZASP00010: 22.5, ZASP00006: 7.5 }, { sirka: 738, vyska: 1995 }],
 		['Slide|2K', 3500, 2200, false, { ZASP00097: 15, ZASP00088: 22.5, ZASP202410: 7.5, ZASP00091: 22.5 }, null],
 		['Slide|3K', 3500, 2001, false, { ZASP00100: 15, ZASP00088: 22.5, ZASP202410: 15 }, null],
 		// sklo-závislé profily (Redukcia 6mm) sa pri redukciaZero=true nulujú
 		['Slide|2K', 3500, 2200, true, { ZASP00091: 0 }, null],
 		// živý E2E beh 2026-07-02 (TEST-AUDIT-9x7) — kotva na nasadené správanie
-		['Robust|2K', 2509, 1930, false, { ZASP00014: 15, ZASP00002: 15, ZASP00010: 7.5 }, { sirka: 1128.5, vyska: 1725 }]
+		['Robust|2K', 2509, 1930, false, { ZASP00014: 15, ZASP00002: 15, ZASP00010: 7.5 }, { sirka: 1129, vyska: 1725 }]
 	];
 
 	it.each(cases)('%s %d×%d (redukciaZero=%s)', (sysStyl, S, V, rz, expOdpis, expSklo) => {
@@ -84,6 +86,35 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	it('počet skiel = N', () => {
 		expect(computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!.sklo.pocet).toBe(2);
 		expect(computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!.sklo.pocet).toBe(6);
+	});
+
+	// Dominik: sklo objednávať na celé mm (904,578 → 905). Sklo nie je v Money odpise.
+	it('rozmery skla sú vždy celé čísla (zaokrúhlené na mm)', () => {
+		for (const [ss, S, V] of [
+			['Robust|2x2K', 5000, 2100],
+			['Robust|2x3K', 5000, 2200],
+			['Robust|2K', 2509, 1930],
+			['Slide|2K', 3500, 2200]
+		] as [string, number, number][]) {
+			const s = computeFlat(cfg, ss, S, V, false)!.sklo;
+			expect(Number.isInteger(s.sirka), `${ss} sirka=${s.sirka}`).toBe(true);
+			expect(Number.isInteger(s.vyska), `${ss} vyska=${s.vyska}`).toBe(true);
+		}
+	});
+});
+
+describe('jeSikmyRez — nosový a oponový profil sa režú rovno (90°), zvyšok 45°', () => {
+	// Dominik: „oponový profil sa reže na 90 stupňov ako nosový u oboch systémov"
+	it.each([
+		['Nosový profil Surový 7500 mm', false],
+		['Nosový profil Slide Surový 7500 mm', false],
+		['Oponový profil Surový 7500 mm', false],
+		['Rámový profil Surový 7500 mm', true],
+		['Rámový profil Slide Surový 7500 mm', true],
+		['Koľajnica 2K Surový 7500 mm', true],
+		['Redukcia 6mm Surový 7500 mm', true]
+	])('%s → šikmý=%s', (nazov, sikmy) => {
+		expect(jeSikmyRez(nazov)).toBe(sikmy);
 	});
 });
 

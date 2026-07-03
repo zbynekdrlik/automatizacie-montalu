@@ -247,6 +247,22 @@ footer.app {
 	font-size: 13.5px;
 	padding: 10px 0 24px;
 }
+/* poznámka na nárezovom pláne — hore vpravo, viditeľná aj v tlači */
+.poznamka-plan {
+	text-align: right;
+	font-weight: 600;
+	color: #334155;
+	font-size: 14px;
+	margin: 0 4px 10px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+.hint {
+	display: block;
+	margin-top: 4px;
+	font-size: 12px;
+	color: #64748b;
+}
 @media print {
 	/* celý nárezový plán na JEDNU A4 — kompaktné rozostupy, menšie písmo */
 	@page {

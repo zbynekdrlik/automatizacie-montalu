@@ -79,6 +79,8 @@ export interface ComputeResult {
 export const BAR = 7500;
 /** hrúbka rezu pílového kotúča — každý rez na tyči odoberie tento materiál */
 export const KOTUC = 4;
+// pravidlo uhla rezu (nosový/oponový = rovný 90°) žije v client-safe $lib/cut.ts,
+// aby ho mohol importovať aj klientský komponent RozpisRezov (server modul nesmie do klienta)
 
 const R = (x: number) => Math.round(x * 1000) / 1000;
 
@@ -195,8 +197,10 @@ export function computeFlat(
 		material,
 		odpis,
 		sklo: {
-			sirka: R(val(ss, S, V, N, true) - g.skloOffset),
-			vyska: R(val(sv, S, V, N, true) - g.skloOffset),
+			// sklo sa objednáva na CELÉ milimetre (Dominik: 904,578 → 905) — zaokrúhli
+			// na najbližší mm. Sklo NIE je v Money odpise, takže je to len rozmer na plán/objednávku.
+			sirka: Math.round(val(ss, S, V, N, true) - g.skloOffset),
+			vyska: Math.round(val(sv, S, V, N, true) - g.skloOffset),
 			pocet: N
 		}
 	};

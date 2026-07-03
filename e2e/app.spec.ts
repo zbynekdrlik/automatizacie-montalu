@@ -51,8 +51,8 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByLabel('Výška (mm) *').fill('1930');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
-	// overené hodnoty z 1:1 testov: sklo 1128,5 × 1725, odpis 15/15/7,5
-	await expect(page.getByTestId('sklo-sirka')).toHaveText('1128,5');
+	// overené hodnoty z 1:1 testov: sklo 1129 × 1725 (zaokrúhlené na celé mm), odpis 15/15/7,5
+	await expect(page.getByTestId('sklo-sirka')).toHaveText('1129');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('1725');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
 	// profil je na viacerých miestach (materiál, odpis, rozpis rezov) — over odpis riadok
@@ -143,7 +143,7 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 		await page.getByLabel('Šírka (mm) *').fill('2509');
 		await page.getByLabel('Výška (mm) *').fill('1930');
 		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
-		await expect(page.getByTestId('sklo-sirka')).toHaveText('1123,5');
+		await expect(page.getByTestId('sklo-sirka')).toHaveText('1124');
 	} finally {
 		// návrat na pôvodnú hodnotu VŽDY — aj po páde testu nesmie ostať
 		// zmenená konfigurácia (best effort, bez assertov)
