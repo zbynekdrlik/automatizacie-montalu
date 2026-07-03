@@ -122,6 +122,27 @@ test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľ
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('späť a upraviť: formulár si ZACHOVÁ hodnoty (nevynuluje sa)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page); // náhľad nezapisuje → bezpečné aj na LIVE
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-BACK`);
+	await page.getByLabel('OP/OPDL číslo *').fill('07');
+	await page.getByLabel('Zákazník *').fill('Späť Test');
+	await page.getByLabel('Šírka (mm) *').fill('2509');
+	await page.getByLabel('Výška (mm) *').fill('1930');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
+	// späť a upraviť → formulár musí byť predvyplnený (nie prázdny)
+	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue(`${RUN}-BACK`);
+	await expect(page.getByLabel('OP/OPDL číslo *')).toHaveValue('07');
+	await expect(page.getByLabel('Zákazník *')).toHaveValue('Späť Test');
+	await expect(page.getByLabel('Šírka (mm) *')).toHaveValue('2509');
+	await expect(page.getByLabel('Výška (mm) *')).toHaveValue('1930');
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('validácia: nezmyselné rozmery sa odmietnu', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);

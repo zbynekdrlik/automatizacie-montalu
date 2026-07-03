@@ -186,6 +186,18 @@ export const actions: Actions = {
 		}
 	},
 
+	// „← Späť a upraviť": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
+	// len echo vstupu) — inak by sa formulár vynuloval (nález Dominik).
+	upravit: async ({ request }) => {
+		const { vstup } = parseVstup(await request.formData());
+		return { step: 'form' as const, vstup };
+	},
+
+	upravitMulti: async ({ request }) => {
+		const { vstup } = parseMultiVstup(await request.formData());
+		return { step: 'form' as const, multiVstup: vstup };
+	},
+
 	// ---- Viac posuvov (zimná záhrada): spoločné balenie tyčí naprieč posuvmi ----
 	nahladMulti: async ({ request }) => {
 		const { vstup, error } = parseMultiVstup(await request.formData());
