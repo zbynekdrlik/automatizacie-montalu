@@ -451,7 +451,10 @@
 			</button>
 		</form>
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary" href="/zasklenia">← Späť a upraviť</a>
+		<form method="POST" action="?/upravit" style="display:inline">
+			{@render hiddenVstup()}
+			<button class="btn secondary" type="submit">← Späť a upraviť</button>
+		</form>
 	</div>
 {:else if step === 'hotovo' && plan && form?.outcome}
 	<div class="card">
@@ -502,7 +505,10 @@
 			</button>
 		</form>
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary" href="/zasklenia">← Späť a upraviť</a>
+		<form method="POST" action="?/upravitMulti" style="display:inline">
+			{@render hiddenMulti()}
+			<button class="btn secondary" type="submit">← Späť a upraviť</button>
+		</form>
 	</div>
 {:else if step === 'hotovoMulti' && multi && form?.outcome}
 	<div class="card">
