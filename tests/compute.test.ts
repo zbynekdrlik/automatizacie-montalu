@@ -193,6 +193,24 @@ describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', ()
 		expect(r).toBeNull();
 		expect(err).toContain('Posuv 1');
 	});
+
+	it('prázdny zoznam posuvov', () => {
+		expect(computeMulti(cfg, [])).toBeNull();
+		const { r, err } = safeComputeMulti(cfg, []);
+		expect(r).toBeNull();
+		expect(err).toContain('aspoň jeden posuv');
+	});
+
+	it('computeMulti s neznámym systémom vráti null', () => {
+		expect(computeMulti(cfg, [P(3000, 2000, 'Slide|2x2K')])).toBeNull();
+	});
+
+	it('safeComputeMulti: druhý posuv mimo rozsahu vzorcov', () => {
+		// prvý OK, druhý neznámy systém → chyba viazaná na Posuv 2
+		const { r, err } = safeComputeMulti(cfg, [P(5000, 2000), P(3000, 2000, 'Robust|2x9K')]);
+		expect(r).toBeNull();
+		expect(err).toContain('Posuv 2');
+	});
 });
 
 describe('jeSikmyRez — nosový a oponový profil sa režú rovno (90°), zvyšok 45°', () => {
