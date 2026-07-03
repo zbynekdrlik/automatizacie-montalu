@@ -143,6 +143,144 @@ test('späť a upraviť: formulár si ZACHOVÁ hodnoty (nevynuluje sa)', async (
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('zimná záhrada: „Späť a upraviť" zachová primárny aj extra posuv', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page); // upravitMulti nezapisuje → bezpečné aj na LIVE
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-MB`);
+	await page.getByLabel('OP/OPDL číslo *').fill('03');
+	await page.getByLabel('Zákazník *').fill('E2E Multi Späť');
+	await page.getByLabel('Šírka (mm) *').fill('5000');
+	await page.getByLabel('Výška (mm) *').fill('2000');
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps0-s').fill('2509');
+	await page.locator('#ps0-v').fill('1930');
+	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
+	await expect(page.getByTestId('odoslat-multi')).toBeVisible();
+
+	// „Späť a upraviť" → primárny sa obnoví z posuvy[0], extra z posuvy[1]
+	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue(`${RUN}-MB`);
+	await expect(page.getByLabel('OP/OPDL číslo *')).toHaveValue('03');
+	await expect(page.getByLabel('Zákazník *')).toHaveValue('E2E Multi Späť');
+	// primárny = #s/#v (getByLabel je nejednoznačný — extra posuv má rovnaký label)
+	await expect(page.locator('#s')).toHaveValue('5000');
+	await expect(page.locator('#v')).toHaveValue('2000');
+	await expect(page.locator('#ps0-s')).toHaveValue('2509');
+	await expect(page.locator('#ps0-v')).toHaveValue('1930');
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPresne/poznámka/čaká)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page); // náhľad nezapisuje → bezpečné aj na LIVE
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-ND`);
+	await page.getByLabel('OP/OPDL číslo *').fill('08');
+	await page.getByLabel('Zákazník *').fill('NeDefault');
+	await page.getByLabel('Systém').selectOption('Slide');
+	await page.getByLabel('Štýl').selectOption('3K');
+	await page
+		.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')
+		.fill('Stopsol Grey');
+	await page.getByLabel('Poznámka (zobrazí sa hore vpravo na pláne aj v tlači)').fill('Pozn X');
+	await page.getByLabel(/Čaká na materiál/).check();
+	await page.getByLabel('Šírka (mm) *').fill('2509');
+	await page.getByLabel('Výška (mm) *').fill('1930');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
+
+	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByLabel('Systém')).toHaveValue('Slide');
+	await expect(page.getByLabel('Štýl')).toHaveValue('3K');
+	await expect(
+		page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')
+	).toHaveValue('Stopsol Grey');
+	await expect(
+		page.getByLabel('Poznámka (zobrazí sa hore vpravo na pláne aj v tlači)')
+	).toHaveValue('Pozn X');
+	await expect(page.getByLabel(/Čaká na materiál/)).toBeChecked();
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('zimná záhrada: odoslanie viac-posuvového odpisu do Money + duplikát', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	const fillMulti = async () => {
+		await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-MO`);
+		await page.getByLabel('OP/OPDL číslo *').fill('01');
+		await page.getByLabel('Zákazník *').fill('E2E Multi Odoslať');
+		await page.getByLabel('Šírka (mm) *').fill('5000');
+		await page.getByLabel('Výška (mm) *').fill('2000');
+		await page.getByRole('button', { name: /Pridať posuv/ }).click();
+		await page.locator('#ps0-s').fill('2509');
+		await page.locator('#ps0-v').fill('1930');
+		await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
+	};
+	await fillMulti();
+	await page.getByTestId('odoslat-multi').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	await expect(page.getByTestId('vysledok')).toContainText(`${RUN}-MO`);
+
+	// rovnaká ZAK+OP znova → duplikát, nič sa nezapíše
+	await page.getByRole('link', { name: /Nový nárezový plán/ }).click();
+	await waitHydrated(page);
+	await fillMulti();
+	await page.getByTestId('odoslat-multi').click();
+	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('zimná záhrada: odobratie posuvu zachová správne indexy a prepne späť na jednoposuv', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-RM`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Odobrať');
+	await page.getByLabel('Šírka (mm) *').fill('5000');
+	await page.getByLabel('Výška (mm) *').fill('2000');
+	// dva extra posuvy: ps0 = 2509, ps1 = 3000
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps0-s').fill('2509');
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps1-s').fill('3000');
+	// tlačidlo ukazuje 3 posuvy (primárny + 2)
+	await expect(page.getByRole('button', { name: /Spočítať spoločný plán \(3 posuvy\)/ })).toBeVisible();
+
+	// odober PRVÝ extra (2509) → zostane ten s 3000 ako nový ps0 (nie 2509)
+	await page.getByRole('button', { name: /odobrať/ }).first().click();
+	await expect(page.locator('#ps0-s')).toHaveValue('3000');
+	await expect(page.getByRole('button', { name: /Spočítať spoločný plán \(2 posuvy\)/ })).toBeVisible();
+
+	// odober aj druhý → späť na jednoposuvový režim
+	await page.getByRole('button', { name: /odobrať/ }).first().click();
+	await expect(page.getByRole('button', { name: 'Spočítať nárezový plán' })).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('editor: dropdown „Systém · štýl" naviguje a načíta offsety správneho štýlu', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+	const sklo = page.getByLabel('Sklo — konečné zmenšenie (mm)');
+	const robustOff = await sklo.inputValue();
+
+	// prepnutie cez dropdown naviguje na iný štýl a načíta jeho offsety
+	await page.getByLabel('Systém · štýl').selectOption('Slide|2K');
+	await page.waitForURL(/sysStyl=Slide/);
+	await waitHydrated(page);
+	const slideOff = await sklo.inputValue();
+	expect(slideOff).not.toBe(robustOff); // Slide|2K má iný skloOffset než Robust|2K
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('validácia: nezmyselné rozmery sa odmietnu', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);

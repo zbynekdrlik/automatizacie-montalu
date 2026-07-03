@@ -195,7 +195,10 @@
 			</button>
 		</form>
 		<button class="btn secondary noprint" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary noprint" href="/bazen">← Späť a upraviť zadanie</a>
+		<form method="POST" action="?/upravit" style="display:inline">
+			{@render hiddenVstup()}
+			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
+		</form>
 	</div>
 {:else if step === 'hotovo' && form && 'finalOut' in form && form.finalOut && form.outcome}
 	<div class="card">

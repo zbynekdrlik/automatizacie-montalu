@@ -135,4 +135,13 @@ describe('applyEdits — kontrola množstiev (opravy nálezov auditu)', () => {
 		expect(byKod(finalOut)['BPP00094']).toBe(0);
 		expect(zmenene).toContain('BPP00094');
 	});
+
+	it('všetky množstvá vynulované → finalOut samé nuly (odoslať to odmietne)', () => {
+		const { out } = computeBazen(vstup());
+		const edits = new Map(out.map((o) => [o.kod, '0']));
+		const { finalOut, error } = applyEdits(out, edits);
+		expect(error).toBeFalsy();
+		// action `odoslat` na tomto stave vráti chybu „neostala žiadna položka"
+		expect(finalOut.every((o) => o.qty <= 0)).toBe(true);
+	});
 });

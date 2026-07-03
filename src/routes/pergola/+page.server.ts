@@ -91,6 +91,13 @@ export const actions: Actions = {
 		return { step: 'nahlad' as const, vstup, v, error: null as string | null };
 	},
 
+	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝM vstupom vrátane CAD
+	// nárezu (nekompútuje, len echo) — obyčajný <a href="/pergola"> by ho vynuloval.
+	upravit: async ({ request }) => {
+		const vstup = parseVstup(await request.formData());
+		return { step: 'form' as const, vstup };
+	},
+
 	odoslat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const vstup = parseVstup(form);
