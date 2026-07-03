@@ -172,7 +172,8 @@ test('pergola: nerozpoznaný CAD kód → chyba a vstup ostane vyplnený', async
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola');
-	const cad = 'XX999 NEZNAMY PROFIL\t2\t3000';
+	// kód musí byť 3–6 číslic (inak „zlý formát"); 99999 parsuje, ale nie je v CATALOG → nenamapované
+	const cad = '99999 NEZNAMY PROFIL\t2\t3000';
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PBAD`);
 	await page.getByLabel('OP/OPDL číslo *').fill('05');
 	await page.getByLabel('Zákazník *').fill('E2E Pergola Junk');

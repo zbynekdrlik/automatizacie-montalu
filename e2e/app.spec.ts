@@ -163,8 +163,9 @@ test('zimná záhrada: „Späť a upraviť" zachová primárny aj extra posuv',
 	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue(`${RUN}-MB`);
 	await expect(page.getByLabel('OP/OPDL číslo *')).toHaveValue('03');
 	await expect(page.getByLabel('Zákazník *')).toHaveValue('E2E Multi Späť');
-	await expect(page.getByLabel('Šírka (mm) *')).toHaveValue('5000');
-	await expect(page.getByLabel('Výška (mm) *')).toHaveValue('2000');
+	// primárny = #s/#v (getByLabel je nejednoznačný — extra posuv má rovnaký label)
+	await expect(page.locator('#s')).toHaveValue('5000');
+	await expect(page.locator('#v')).toHaveValue('2000');
 	await expect(page.locator('#ps0-s')).toHaveValue('2509');
 	await expect(page.locator('#ps0-v')).toHaveValue('1930');
 	expect(consoleMsgs).toEqual([]);
