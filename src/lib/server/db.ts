@@ -158,6 +158,40 @@ function migrate() {
 		seedGlass();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 4) {
+		// v3 → v4: pridaj systémy/štýly z cfg_seed, ktoré v DB ešte nie sú (Robust 4K +
+		// 2x4K). Existujúce štýly sa NEDOTÝKAJÚ (mohli byť ručne upravené v editore
+		// vzorcov). Idempotentné — pridá len chýbajúce sysStyl aj ich rez riadky.
+		const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');
+		const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
+		const insRez = db.prepare(
+			`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		);
+		db.transaction(() => {
+			for (const s of seed.sys) {
+				if (hasSys.get(s.sysStyl)) continue;
+				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+					insRez.run(
+						r.sysStyl,
+						r.poradie,
+						r.typ,
+						r.kod,
+						r.nazov,
+						r.dim,
+						r.koef,
+						r.offset,
+						r.delitN,
+						r.kerf,
+						r.pocetKs,
+						r.sklozavisle
+					);
+			}
+			db.pragma('user_version = 4');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }

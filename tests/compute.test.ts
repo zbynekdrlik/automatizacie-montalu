@@ -38,7 +38,14 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		// sklo-závislé profily (Redukcia 6mm) sa pri redukciaZero=true nulujú
 		['Slide|2K', 3500, 2200, true, { ZASP00091: 0 }, null],
 		// živý E2E beh 2026-07-02 (TEST-AUDIT-9x7) — kotva na nasadené správanie
-		['Robust|2K', 2509, 1930, false, { ZASP00014: 15, ZASP00002: 15, ZASP00010: 7.5 }, { sirka: 1129, vyska: 1725 }]
+		['Robust|2K', 2509, 1930, false, { ZASP00014: 15, ZASP00002: 15, ZASP00010: 7.5 }, { sirka: 1129, vyska: 1725 }],
+		// Robust 4K — nová koľajnica ZASP20254 (N=4). Sklo 1783×1795 potvrdzuje
+		// offset 170.28 (Excel formula E14=(B6+170.28)/4).
+		['Robust|4K', 7500, 2000, false, { ZASP20254: 22.5, ZASP00002: 45, ZASP00010: 15 }, { sirka: 1783, vyska: 1795 }],
+		// Robust 2x4K (opona, N=8). Sklo 852×1995 = Excel 851,72×1995 zaokrúhlené →
+		// offset 393.76 presný. Koľajnica/oponový/nosový = Excel počet tyčí (3/1/4);
+		// rámový 52.5 (7 tyčí) = FFD optimalizácia vs Excel-ov naivný počet 8 (menej odpadu).
+		['Robust|2x4K', 7500, 2200, false, { ZASP00002: 52.5, ZASP20254: 22.5, ZASP00006: 7.5, ZASP00010: 30 }, { sirka: 852, vyska: 1995 }]
 	];
 
 	it.each(cases)('%s %d×%d (redukciaZero=%s)', (sysStyl, S, V, rz, expOdpis, expSklo) => {
