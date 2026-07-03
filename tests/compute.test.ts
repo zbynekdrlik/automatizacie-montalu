@@ -60,7 +60,7 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	});
 
 	it('neznámy systém/štýl vráti null', () => {
-		expect(computeFlat(cfg, 'Slide|2x2K', 3000, 2000, false)).toBeNull();
+		expect(computeFlat(cfg, 'Slide|4K', 3000, 2000, false)).toBeNull();
 	});
 
 	// nález užívateľa 2026-07-02: rámový profil 4×2000 + 4×2530 sa má vyrezať
@@ -102,6 +102,23 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	it('počet skiel = N', () => {
 		expect(computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!.sklo.pocet).toBe(2);
 		expect(computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!.sklo.pocet).toBe(6);
+	});
+
+	// Slide opona (2x2K/2x3K Slide) — odvodené z Robust opony na Slide profily.
+	// Kľúč: má Redukciu 6mm (sklozavislé) navyše oproti Robust opone; oponový je
+	// generický ZASP00006; koľajnica je Slide (ZASP00097/ZASP00100).
+	it('Slide opona má správne profily + redukcia sa nuluje pri sklo bez redukcie', () => {
+		const r = computeFlat(cfg, 'Slide|2x2K', 3500, 2200, false)!;
+		const kods = r.odpis.map((o) => o.kod).sort();
+		expect(kods).toEqual(['ZASP00006', 'ZASP00088', 'ZASP00091', 'ZASP00097', 'ZASP202410'].sort());
+		expect(r.N).toBe(4);
+		// oponový profil je prítomný (1 tyč)
+		expect(r.odpis.find((o) => o.kod === 'ZASP00006')!.metre).toBe(7.5);
+		// redukcia (sklozavislé) sa nuluje keď sklo nuluje redukciu (Slide 4/8/4 číre)
+		const rz = computeFlat(cfg, 'Slide|2x2K', 3500, 2200, true)!;
+		expect(rz.odpis.find((o) => o.kod === 'ZASP00091')!.metre).toBe(0);
+		// 2x3K Slide používa koľajnicu 3K Slide (ZASP00100)
+		expect(computeFlat(cfg, 'Slide|2x3K', 3500, 2100, false)!.odpis.some((o) => o.kod === 'ZASP00100')).toBe(true);
 	});
 
 	// Dominik: sklo objednávať na celé mm (904,578 → 905). Sklo nie je v Money odpise.
@@ -196,7 +213,7 @@ describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', ()
 	});
 
 	it('safeComputeMulti odmietne neznámy systém posuvu', () => {
-		const { r, err } = safeComputeMulti(cfg, [{ sysStyl: 'Slide|2x2K', S: 3000, V: 2000, redukciaZero: false }]);
+		const { r, err } = safeComputeMulti(cfg, [{ sysStyl: 'Slide|4K', S: 3000, V: 2000, redukciaZero: false }]);
 		expect(r).toBeNull();
 		expect(err).toContain('Posuv 1');
 	});
@@ -209,7 +226,7 @@ describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', ()
 	});
 
 	it('computeMulti s neznámym systémom vráti null', () => {
-		expect(computeMulti(cfg, [P(3000, 2000, 'Slide|2x2K')])).toBeNull();
+		expect(computeMulti(cfg, [P(3000, 2000, 'Slide|4K')])).toBeNull();
 	});
 
 	it('safeComputeMulti: druhý posuv mimo rozsahu vzorcov', () => {
@@ -257,7 +274,7 @@ describe('validSys — ochrana proti poškodenej konfigurácii', () => {
 	});
 
 	it('neznámy sysStyl neprejde', () => {
-		expect(validSys(cfg, 'Slide|2x2K')).toBe(false);
+		expect(validSys(cfg, 'Slide|4K')).toBe(false);
 	});
 });
 
