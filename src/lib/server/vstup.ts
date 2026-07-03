@@ -49,6 +49,89 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	return { vstup, error };
 }
 
+// ---- Viac posuvov (zimná záhrada) ----
+
+export interface PosuvVstup {
+	system: string;
+	styl: string;
+	s: number;
+	v: number;
+	sklo: string;
+	otvaranie: string;
+}
+
+export interface MultiVstup {
+	zak: string;
+	op: string;
+	zakaznik: string;
+	poznamka: string;
+	caka: boolean;
+	posuvy: PosuvVstup[];
+}
+
+/** Parsuje objednávku s VIAC posuvmi. Zdieľané polia (zak/op/zákazník/poznámka/
+ *  čaká) sú ploché; posuvy prídu ako JSON pole v poli `posuvy`. Rovnaké rozsahové
+ *  strážne kontroly ako parseVstup, per posuv. */
+export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: string | null } {
+	const base = {
+		zak: String(form.get('zak') ?? '').trim(),
+		op: String(form.get('op') ?? '').trim(),
+		zakaznik: String(form.get('zakaznik') ?? '').trim(),
+		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
+		caka: form.get('caka') === '1'
+	};
+	let posuvyRaw: unknown;
+	try {
+		posuvyRaw = JSON.parse(String(form.get('posuvy') ?? '[]'));
+	} catch {
+		posuvyRaw = null;
+	}
+	const posuvy: PosuvVstup[] = [];
+	let error: string | null = null;
+	if (!base.zak) error = 'Chýba číslo objednávky (ZAK).';
+	else if (!base.op) error = 'Chýba OP/OPDL číslo.';
+	else if (!base.zakaznik) error = 'Chýba zákazník.';
+	else if (!Array.isArray(posuvyRaw) || posuvyRaw.length < 1) error = 'Zadaj aspoň jeden posuv.';
+	else if (posuvyRaw.length > 12) error = 'Priveľa posuvov (max 12).';
+	else {
+		for (let i = 0; i < posuvyRaw.length; i++) {
+			const p = (posuvyRaw[i] ?? {}) as Record<string, unknown>;
+			const s = parseFloat(String(p.s ?? '').replace(',', '.'));
+			const v = parseFloat(String(p.v ?? '').replace(',', '.'));
+			const posuv: PosuvVstup = {
+				system: String(p.system ?? '').trim(),
+				styl: String(p.styl ?? '').trim(),
+				s: Number.isFinite(s) ? s : 0,
+				v: Number.isFinite(v) ? v : 0,
+				sklo: String(p.sklo ?? '').trim(),
+				otvaranie: String(p.otvaranie ?? '').trim()
+			};
+			if (!posuv.system || !posuv.styl) {
+				error = `Posuv ${i + 1}: vyber systém a štýl.`;
+				break;
+			}
+			if (!(posuv.s >= 300 && posuv.s <= 20000)) {
+				error = `Posuv ${i + 1}: šírka musí byť 300–20000 mm.`;
+				break;
+			}
+			if (!(posuv.v >= 300 && posuv.v <= 20000)) {
+				error = `Posuv ${i + 1}: výška musí byť 300–20000 mm.`;
+				break;
+			}
+			if (!posuv.sklo) {
+				error = `Posuv ${i + 1}: vyber sklo.`;
+				break;
+			}
+			if (!OTVARANIA.includes(posuv.otvaranie)) {
+				error = `Posuv ${i + 1}: vyber otváranie.`;
+				break;
+			}
+			posuvy.push(posuv);
+		}
+	}
+	return { vstup: { ...base, posuvy }, error };
+}
+
 // ---- Bazén ----
 
 import type { BazenVstup } from './bazen';

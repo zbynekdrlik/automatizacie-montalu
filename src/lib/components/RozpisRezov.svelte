@@ -7,7 +7,11 @@
 	import { jeSikmyRez } from '$lib/cut';
 	import ProfilObrazok from './ProfilObrazok.svelte';
 
-	let { material, bar = 7500 }: { material: MaterialRow[]; bar?: number } = $props();
+	let {
+		material,
+		bar = 7500,
+		viacPosuvov = false
+	}: { material: MaterialRow[]; bar?: number; viacPosuvov?: boolean } = $props();
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 	// nosový AJ oponový profil sa režú rovno (90°), zvyšok na 45° (šikmý rez)
@@ -22,12 +26,17 @@
 		text: string;
 		odpad: boolean;
 		skryLabel: boolean; // úzky segment → popis skry (aby sa nepretekal)
+		posuv?: number; // z ktorého posuvu je kus (pri zimnej záhrade)
 	}
 
 	// jedna tyč → polygony rezov + odpad.
 	// 45° rez: uhly idú DO VNÚTRA (ľavý zdola doprava, pravý zdola doľava) —
 	// kus je lichobežník užší hore (x±s na hornej hrane), ako pri spájaní rámu.
-	function segmenty(kusy: { rozmer: number; dlzka: number }[], zvysok: number, sikmy: boolean) {
+	function segmenty(
+		kusy: { rozmer: number; dlzka: number; posuv?: number }[],
+		zvysok: number,
+		sikmy: boolean
+	) {
 		const s = sikmy ? S : 0;
 		const segs: Seg[] = [];
 		let x = 0;
@@ -39,7 +48,8 @@
 				labelPct: ((x + x1) / 2 / bar) * 100,
 				text: fmt(k.rozmer),
 				odpad: false,
-				skryLabel: (k.dlzka / bar) * 100 < 5
+				skryLabel: (k.dlzka / bar) * 100 < 5,
+				posuv: k.posuv
 			});
 			x = x1;
 		}
@@ -108,7 +118,9 @@
 						</svg>
 						{#each segs as seg (seg.body)}
 							{#if !seg.skryLabel}
-								<span class="lbl" class:odp={seg.odpad} style="left:{seg.labelPct}%">{seg.text}</span>
+								<span class="lbl" class:odp={seg.odpad} style="left:{seg.labelPct}%"
+									>{#if viacPosuvov && seg.posuv}<span class="pbadge">P{seg.posuv}</span> {/if}{seg.text}</span
+								>
 							{/if}
 						{/each}
 					</div>
@@ -199,6 +211,16 @@
 		color: #94a3b8;
 		font-weight: 400;
 		font-size: 11px;
+	}
+	.pbadge {
+		display: inline-block;
+		background: #1e3a8a;
+		color: #fff;
+		border-radius: 4px;
+		padding: 0 4px;
+		font-size: 10px;
+		font-weight: 700;
+		vertical-align: 1px;
 	}
 	.rezy {
 		width: auto;

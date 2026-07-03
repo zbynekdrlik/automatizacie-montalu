@@ -4,7 +4,7 @@
 
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
-import { safeCompute } from '$lib/server/compute';
+import { safeCompute, safeComputeMulti } from '$lib/server/compute';
 import {
 	writeOdpis,
 	isLive,
@@ -14,8 +14,8 @@ import {
 	safe,
 	type OdpisJob
 } from '$lib/server/money';
-import type { ComputeResult } from '$lib/server/compute';
-import { parseVstup, OTVARANIA, type Vstup } from '$lib/server/vstup';
+import type { ComputeResult, MultiResult, PosuvSpec } from '$lib/server/compute';
+import { parseVstup, parseMultiVstup, OTVARANIA, type Vstup, type MultiVstup } from '$lib/server/vstup';
 
 function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 	return {
@@ -50,6 +50,56 @@ function compute(vstup: Vstup) {
 	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém.' };
 	const cfg = loadCfg();
 	return safeCompute(cfg, vstup.system + '|' + vstup.styl, vstup.s, vstup.v, g.redukciaZero);
+}
+
+// ---- Viac posuvov (zimná záhrada) ----
+
+function computeMultiFrom(vstup: MultiVstup) {
+	const specs: PosuvSpec[] = [];
+	for (let i = 0; i < vstup.posuvy.length; i++) {
+		const p = vstup.posuvy[i];
+		const g = glassTypesForSystem(p.system).find((x) => x.nazov === p.sklo);
+		if (!g) return { r: null, err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém.` };
+		specs.push({
+			sysStyl: p.system + '|' + p.styl,
+			S: p.s,
+			V: p.v,
+			redukciaZero: g.redukciaZero,
+			otvaranie: p.otvaranie,
+			sklo: p.sklo
+		});
+	}
+	return safeComputeMulti(loadCfg(), specs);
+}
+
+function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): OdpisJob {
+	const sys0 = r.posuvy[0]?.system ?? 'Robust';
+	return {
+		modul: 'zasklenia',
+		zak: vstup.zak,
+		op: vstup.op,
+		zakaznik: vstup.zakaznik,
+		caka: vstup.caka,
+		createdBy,
+		cakaSubdir: sys0 === 'Slide' ? 'Slide' : 'Robust',
+		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ZIMNA ZAHRADA ${r.posuvy.length}x posuv`,
+		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
+		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+		detail: {
+			zimnaZahrada: true,
+			pocetPosuvov: r.posuvy.length,
+			poznamka: vstup.poznamka,
+			posuvy: r.posuvy.map((p, i) => ({
+				posuv: i + 1,
+				system: p.system,
+				styl: p.styl,
+				s: p.S,
+				v: p.V,
+				sklo: vstup.posuvy[i]?.sklo,
+				otvaranie: p.otvaranie
+			}))
+		}
+	};
 }
 
 export const load: PageServerLoad = async () => {
@@ -132,6 +182,72 @@ export const actions: Actions = {
 				error:
 					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.',
 				vstup
+			};
+		}
+	},
+
+	// ---- Viac posuvov (zimná záhrada): spoločné balenie tyčí naprieč posuvmi ----
+	nahladMulti: async ({ request }) => {
+		const { vstup, error } = parseMultiVstup(await request.formData());
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		const { r, err } = computeMultiFrom(vstup);
+		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+		const job = jobForMulti(vstup, r, '');
+		return {
+			step: 'nahladMulti' as const,
+			multiVstup: vstup,
+			multi: r,
+			planHash: contentHash(vstup.zak, job.polozky),
+			warn: null as string | null,
+			cielInfo: {
+				live: isLive(),
+				filename: filenameFor(job),
+				dir: targetDirFor(r.posuvy[0]?.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
+			}
+		};
+	},
+
+	odoslatMulti: async ({ request, locals }) => {
+		const formData = await request.formData();
+		const { vstup, error } = parseMultiVstup(formData);
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		const { r, err } = computeMultiFrom(vstup);
+		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+
+		const potvrdene = String(formData.get('planHash') ?? '');
+		const job = jobForMulti(vstup, r, locals.user?.username ?? '');
+		const aktualny = contentHash(vstup.zak, job.polozky);
+		if (potvrdene && potvrdene !== aktualny) {
+			return {
+				step: 'nahladMulti' as const,
+				multiVstup: vstup,
+				multi: r,
+				planHash: aktualny,
+				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				cielInfo: {
+					live: isLive(),
+					filename: filenameFor(job),
+					dir: targetDirFor(r.posuvy[0]?.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
+				}
+			};
+		}
+		try {
+			const outcome = await writeOdpis(job);
+			if (outcome.status === 'duplicate') {
+				return {
+					step: 'duplikat' as const,
+					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
+					multiVstup: vstup
+				};
+			}
+			return { step: 'hotovoMulti', multiVstup: vstup, multi: r, outcome };
+		} catch (e) {
+			console.error('writeOdpis (multi) zlyhal:', e);
+			return {
+				step: 'form' as const,
+				error:
+					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.',
+				multiVstup: vstup
 			};
 		}
 	}
