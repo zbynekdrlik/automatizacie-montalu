@@ -38,6 +38,8 @@ export interface Kus {
 	rozmer: number;
 	/** dĺžka spotrebovaná na tyči (bez prerezu — podľa nej sa balí) */
 	dlzka: number;
+	/** z ktorého posuvu kus pochádza (1-based) — len pri viac-posuvovom pláne */
+	posuv?: number;
 }
 
 export interface Tyc {
@@ -138,6 +140,50 @@ function ffdPack(kusy: Kus[]): Tyc[] {
 	return bary;
 }
 
+/** Rezy jedného profilu (naprieč rez-riadkami S aj V) pre jeden posuv — BEZ
+ *  balenia. `posuv` (1-based) sa vloží do každého kusu, aby ho vedel rozpis
+ *  označiť pri viac-posuvovom pláne. Zdieľané computeFlat aj computeMulti. */
+interface ProfilCuts {
+	kod: string;
+	nazov: string;
+	rezy: { rozmer: number; ks: number }[];
+	kusy: Kus[];
+}
+
+function profilCuts(
+	g: CfgGroup,
+	S: number,
+	V: number,
+	N: number,
+	redukciaZero: boolean,
+	posuv?: number
+): ProfilCuts[] {
+	const order: string[] = [];
+	const byKod: Record<string, RezRow[]> = {};
+	for (const r of g.rez) {
+		if (!byKod[r.kod]) {
+			byKod[r.kod] = [];
+			order.push(r.kod);
+		}
+		byKod[r.kod].push(r);
+	}
+	return order.map((kod) => {
+		const rows = byKod[kod];
+		const rezy: { rozmer: number; ks: number }[] = [];
+		// dĺžka pre balenie je bez prerezu; zobrazený rozmer je s prerezom
+		const kusy: Kus[] = [];
+		for (const r of rows) {
+			const t = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
+			const q = val(r, S, V, N, false);
+			const rozmer = Math.round(val(r, S, V, N, true));
+			for (let i = 0; i < t; i++)
+				if (q > 0) kusy.push(posuv ? { dlzka: q, rozmer, posuv } : { dlzka: q, rozmer });
+			rezy.push({ rozmer, ks: t });
+		}
+		return { kod, nazov: rows[0].nazov, rezy, kusy };
+	});
+}
+
 /**
  * Vypočíta nárezový plán. `redukciaZero` = true keď zvolené sklo nuluje
  * sklo-závislé profily (Redukcia 6mm pri Slide). Ktoré sklá to sú, určuje
@@ -153,36 +199,15 @@ export function computeFlat(
 	const g = cfg[sysStyl];
 	if (!g || !g.rez.length) return null;
 	const N = g.N;
-	const order: string[] = [];
-	const byKod: Record<string, RezRow[]> = {};
-	for (const r of g.rez) {
-		if (!byKod[r.kod]) {
-			byKod[r.kod] = [];
-			order.push(r.kod);
-		}
-		byKod[r.kod].push(r);
-	}
 	const material: MaterialRow[] = [];
 	const odpis: OdpisRow[] = [];
-	for (const kod of order) {
-		const rows = byKod[kod];
-		const rezy: { rozmer: number; ks: number }[] = [];
-		// všetky kusy tohto profilu (naprieč rez-riadkami S aj V) idú do jedného
-		// balenia — dĺžka pre balenie je bez prerezu (rovnaká ako v pôvodnom
-		// `per` výpočte); zobrazený rozmer je s prerezom
-		const kusy: Kus[] = [];
-		for (const r of rows) {
-			const t = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
-			const q = val(r, S, V, N, false);
-			for (let i = 0; i < t; i++) if (q > 0) kusy.push({ dlzka: q, rozmer: Math.round(val(r, S, V, N, true)) });
-			rezy.push({ rozmer: Math.round(val(r, S, V, N, true)), ks: t });
-		}
-		const bary = ffdPack(kusy);
+	for (const c of profilCuts(g, S, V, N, redukciaZero)) {
+		const bary = ffdPack(c.kusy);
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * BAR)) * 1000) / 10 : 0;
-		material.push({ kod, nazov: rows[0].nazov, rezy, tyce, bary, odpadMm, odpadPct });
-		odpis.push({ kod, nazov: rows[0].nazov, metre: R((tyce * BAR) / 1000) });
+		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct });
+		odpis.push({ kod: c.kod, nazov: c.nazov, metre: R((tyce * BAR) / 1000) });
 	}
 	const ss = g.sklo.s,
 		sv = g.sklo.v;
@@ -279,6 +304,120 @@ export function safeCompute(
 	const boundErr = inBounds(cfg, sysStyl);
 	if (boundErr) return { r: null, err: 'Konfigurácia mimo povolených rozsahov: ' + boundErr };
 	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero);
+	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
+		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
+	return { r, err: null };
+}
+
+// ---- Viac posuvov v jednej zákazke (zimná záhrada) ----
+
+/** jeden posuv v rámci objednávky */
+export interface PosuvSpec {
+	sysStyl: string;
+	S: number;
+	V: number;
+	redukciaZero: boolean;
+	/** len na plán/detail (nemení výpočet) */
+	otvaranie?: string;
+	sklo?: string;
+}
+
+export interface PosuvInfo {
+	system: string;
+	styl: string;
+	S: number;
+	V: number;
+	N: number;
+	m2: number;
+	sklo: { sirka: number; vyska: number; pocet: number };
+	otvaranie?: string;
+	skloNazov?: string;
+}
+
+export interface MultiResult {
+	posuvy: PosuvInfo[];
+	/** materiál ZLÚČENÝ naprieč posuvmi (zdieľané tyče) — kusy nesú `posuv` */
+	material: MaterialRow[];
+	odpis: OdpisRow[];
+	/** súčet plôch všetkých posuvov */
+	m2: number;
+}
+
+/**
+ * Nárezový plán pre VIAC posuvov naraz. Rezy toho istého profilu (podľa kódu) sa
+ * spoja naprieč VŠETKÝMI posuvmi do jedného FFD balenia → zdieľané tyče → menej
+ * odpadu a menší odpis do Money než keby sa každý posuv balil samostatne. Každý
+ * kus si nesie svoje číslo posuvu (pre rozpis). Sklo sa počíta per-posuv.
+ * Pre jeden posuv dáva IDENTICKÝ odpis/tyče ako computeFlat (overené testom).
+ */
+export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null {
+	if (!posuvy.length) return null;
+	const infos: PosuvInfo[] = [];
+	const order: string[] = [];
+	const pool: Record<string, { nazov: string; rezy: { rozmer: number; ks: number }[]; kusy: Kus[] }> = {};
+	for (let i = 0; i < posuvy.length; i++) {
+		const p = posuvy[i];
+		const g = cfg[p.sysStyl];
+		if (!g || !g.rez.length || !g.sklo.s || !g.sklo.v) return null;
+		const N = g.N;
+		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, i + 1)) {
+			if (!pool[c.kod]) {
+				pool[c.kod] = { nazov: c.nazov, rezy: [], kusy: [] };
+				order.push(c.kod);
+			}
+			pool[c.kod].kusy.push(...c.kusy);
+			for (const rz of c.rezy) {
+				const ex = pool[c.kod].rezy.find((x) => x.rozmer === rz.rozmer);
+				if (ex) ex.ks += rz.ks;
+				else pool[c.kod].rezy.push({ ...rz });
+			}
+		}
+		const ss = g.sklo.s,
+			sv = g.sklo.v;
+		infos.push({
+			system: p.sysStyl.split('|')[0],
+			styl: p.sysStyl.split('|')[1],
+			S: p.S,
+			V: p.V,
+			N,
+			m2: R((p.S * p.V) / 1e6),
+			sklo: {
+				sirka: Math.round(val(ss, p.S, p.V, N, true) - g.skloOffset),
+				vyska: Math.round(val(sv, p.S, p.V, N, true) - g.skloOffset),
+				pocet: N
+			},
+			otvaranie: p.otvaranie,
+			skloNazov: p.sklo
+		});
+	}
+	const material: MaterialRow[] = [];
+	const odpis: OdpisRow[] = [];
+	for (const kod of order) {
+		const pk = pool[kod];
+		const bary = ffdPack(pk.kusy);
+		const tyce = bary.length;
+		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
+		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * BAR)) * 1000) / 10 : 0;
+		pk.rezy.sort((a, b) => b.rozmer - a.rozmer);
+		material.push({ kod, nazov: pk.nazov, rezy: pk.rezy, tyce, bary, odpadMm, odpadPct });
+		odpis.push({ kod, nazov: pk.nazov, metre: R((tyce * BAR) / 1000) });
+	}
+	return { posuvy: infos, material, odpis, m2: R(infos.reduce((s, x) => s + x.m2, 0)) };
+}
+
+export function safeComputeMulti(
+	cfg: Cfg,
+	posuvy: PosuvSpec[]
+): { r: MultiResult | null; err: string | null } {
+	if (!posuvy.length) return { r: null, err: 'Zadaj aspoň jeden posuv.' };
+	for (let i = 0; i < posuvy.length; i++) {
+		const p = posuvy[i];
+		if (!validSys(cfg, p.sysStyl))
+			return { r: null, err: `Posuv ${i + 1}: konfigurácia systému je neúplná alebo chybná.` };
+		const boundErr = inBounds(cfg, p.sysStyl);
+		if (boundErr) return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
+	}
+	const r = computeMulti(cfg, posuvy);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
 	return { r, err: null };

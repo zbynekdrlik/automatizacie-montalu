@@ -96,6 +96,31 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľad)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page); // náhľad NEzapisuje → bezpečné aj na LIVE, žiadny skipAkLive
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-ZZ`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Zimná záhrada');
+	// primárny posuv (posuv 1)
+	await page.getByLabel('Šírka (mm) *').fill('5000');
+	await page.getByLabel('Výška (mm) *').fill('2000');
+	// pridaj druhý posuv a vyplň jeho rozmery (id ps0-*)
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps0-s').fill('2509');
+	await page.locator('#ps0-v').fill('1930');
+	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
+
+	// súhrn posuvov + spoločný odpis + rozpis so značkami P1/P2
+	await expect(page.getByText('Posuv 1')).toBeVisible();
+	await expect(page.getByText('Posuv 2')).toBeVisible();
+	await expect(page.locator('.row', { hasText: 'ZASP00002' })).toBeVisible();
+	await expect(page.locator('.pbadge').first()).toBeVisible();
+	// je tam tlačidlo na odoslanie (ale my ho v teste NEklikáme)
+	await expect(page.getByTestId('odoslat-multi')).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('validácia: nezmyselné rozmery sa odmietnu', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
