@@ -56,6 +56,13 @@ export const actions: Actions = {
 		return { step: 'kontrola' as const, vstup, out, error: null as string | null };
 	},
 
+	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
+	// len echo vstupu) — obyčajný <a href="/bazen"> by formulár vynuloval (trieda bugu Dominik).
+	upravit: async ({ request }) => {
+		const { vstup } = parseBazenVstup(await request.formData());
+		return { step: 'form' as const, vstup };
+	},
+
 	odoslat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const { vstup, error } = parseBazenVstup(form);

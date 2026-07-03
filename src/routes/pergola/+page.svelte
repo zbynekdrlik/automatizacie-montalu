@@ -152,7 +152,10 @@
 			</button>
 		</form>
 		<button class="btn secondary noprint" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary noprint" href="/pergola">← Späť a upraviť zadanie</a>
+		<form method="POST" action="?/upravit" style="display:inline">
+			{@render hiddenVstup()}
+			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
+		</form>
 	</div>
 
 	{@render tyceKarta(false)}
