@@ -39,6 +39,9 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
 		caka: form.get('caka') === '1'
 	};
+	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
+	// skriptovaný POST neobíde (otváranie je len na plán/náhľad, nemení výpočet)
+	if (vstup.styl.startsWith('2x')) vstup.otvaranie = 'Opona';
 	let error: string | null = null;
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
@@ -110,6 +113,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				error = `Posuv ${i + 1}: vyber systém a štýl.`;
 				break;
 			}
+			// 2x štýly sú vždy opona (serverové vynútenie, viď parseVstup)
+			if (posuv.styl.startsWith('2x')) posuv.otvaranie = 'Opona';
 			if (!(posuv.s >= 300 && posuv.s <= 20000)) {
 				error = `Posuv ${i + 1}: šírka musí byť 300–20000 mm.`;
 				break;

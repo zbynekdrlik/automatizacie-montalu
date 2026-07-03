@@ -360,6 +360,10 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		const g = cfg[p.sysStyl];
 		if (!g || !g.rez.length || !g.sklo.s || !g.sklo.v) return null;
 		const N = g.N;
+		// INVARIANT: profilové kódy (ZASP…) sú UNIKÁTNE naprieč systémami (Robust vs
+		// Slide majú odlišné kódy), takže spájanie po kóde nikdy nezmieša profily
+		// dvoch systémov na jednu tyč. Ak by konfigurácia niekedy dala ten istý kód
+		// dvom systémom s inou dĺžkou tyče, toto by bolo treba prehodnotiť.
 		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, i + 1)) {
 			if (!pool[c.kod]) {
 				pool[c.kod] = { nazov: c.nazov, rezy: [], kusy: [] };

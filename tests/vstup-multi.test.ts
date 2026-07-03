@@ -1,6 +1,6 @@
 // Validácia viac-posuvového vstupu (zimná záhrada) — každá strážna vetva.
 import { describe, it, expect } from 'vitest';
-import { parseMultiVstup } from '../src/lib/server/vstup';
+import { parseMultiVstup, parseVstup } from '../src/lib/server/vstup';
 
 function fd(fields: Record<string, string>): FormData {
 	const f = new FormData();
@@ -63,5 +63,35 @@ describe('parseMultiVstup — strážne kontroly viac-posuvového vstupu', () =>
 			fd({ ...base, poznamka: 'a'.repeat(400), posuvy: JSON.stringify([POSUV]) })
 		);
 		expect(vstup.poznamka.length).toBe(300);
+	});
+
+	// 2x štýl = opona: server vynúti Opona aj keď POST pošle iné otváranie
+	it('2x posuv s otváraním „P - L" sa serverovo prepíše na Opona', () => {
+		const { vstup, error } = parseMultiVstup(
+			fd({ ...base, posuvy: JSON.stringify([{ ...POSUV, styl: '2x2K', otvaranie: 'P - L' }]) })
+		);
+		expect(error).toBeNull();
+		expect(vstup.posuvy[0].otvaranie).toBe('Opona');
+	});
+});
+
+describe('parseVstup — 2x štýl vynúti Opona serverovo (jeden posuv)', () => {
+	it('Robust 2x3K + „L - P" → Opona', () => {
+		const f = new FormData();
+		for (const [k, v] of Object.entries({
+			zak: 'Z',
+			op: 'O',
+			zakaznik: 'T',
+			system: 'Robust',
+			styl: '2x3K',
+			s: '5000',
+			v: '2200',
+			sklo: 'X',
+			otvaranie: 'L - P'
+		}))
+			f.set(k, v);
+		const { vstup, error } = parseVstup(f);
+		expect(error).toBeNull();
+		expect(vstup.otvaranie).toBe('Opona');
 	});
 });
