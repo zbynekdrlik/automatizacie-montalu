@@ -4,13 +4,14 @@
 	// každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci.
 	// Rezy na 45° (zošikmená čiara) — pri zaskleniach všetko okrem nosového.
 	import type { MaterialRow } from '$lib/server/compute';
+	import { jeSikmyRez } from '$lib/cut';
 	import ProfilObrazok from './ProfilObrazok.svelte';
 
 	let { material, bar = 7500 }: { material: MaterialRow[]; bar?: number } = $props();
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
-	// nosový profil sa reže rovno (90°), zvyšok na 45° (šikmý rez)
-	const jeSikmy = (nazov: string) => !/nos[oó]v/i.test(nazov);
+	// nosový AJ oponový profil sa režú rovno (90°), zvyšok na 45° (šikmý rez)
+	const jeSikmy = jeSikmyRez;
 
 	const H = 100; // výška tyče v SVG jednotkách
 	const S = 250; // horizontálny sklon šikmého rezu (v mm-jednotkách viewBoxu)

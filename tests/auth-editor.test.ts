@@ -94,7 +94,7 @@ describe('editor vzorcov', () => {
 		// výpočet: skloOffset 135→140 posunie sklo o 5, offset rámu +3 o +1.5 na polovici
 		const r = safeCompute(loadCfg(), 'Robust|2K', 5000, 2000, false).r!;
 		expect(r.sklo.vyska).toBe(1790); // 1795 − 5
-		expect(r.sklo.sirka).toBe(2370.5); // 2374 − 5 + 3/2
+		expect(r.sklo.sirka).toBe(2371); // 2374 − 5 + 3/2 = 2370,5 → zaokrúhlené na celé mm
 
 		// návrat na pôvodné hodnoty
 		const back = saveCfgChanges({

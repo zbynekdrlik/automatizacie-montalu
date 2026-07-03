@@ -20,6 +20,7 @@
 			sklo: '',
 			skloPresne: '',
 			otvaranie: 'P - L',
+			poznamka: '',
 			caka: false
 		}
 	);
@@ -27,9 +28,18 @@
 	let system = $state('Robust');
 	let styl = $state('2K');
 	let sklo = $state('');
+	let otvaranie = $state('P - L');
 	$effect(() => {
 		system = form?.vstup?.system ?? 'Robust';
 		styl = form?.vstup?.styl ?? '2K';
+		otvaranie = form?.vstup?.otvaranie ?? 'P - L';
+	});
+	// 2x2K / 2x3K = opona (otváranie od stredu) → povoľ len „Opona" a nastav ju
+	let jeOpona = $derived(styl.startsWith('2x'));
+	let otvaraniaPre = $derived(jeOpona ? ['Opona'] : data.otvarania);
+	$effect(() => {
+		if (jeOpona) otvaranie = 'Opona';
+		else if (!otvaraniaPre.includes(otvaranie)) otvaranie = otvaraniaPre[0];
 	});
 	let stylyPre = $derived(data.styly.filter((x) => x.system === system).map((x) => x.styl));
 	$effect(() => {
@@ -61,10 +71,14 @@
 	<input type="hidden" name="sklo" value={vstup.sklo} />
 	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
+	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 {/snippet}
 
 {#snippet planKarty(p: NonNullable<typeof plan>)}
+	{#if vstup.poznamka}
+		<div class="poznamka-plan">📝 {vstup.poznamka}</div>
+	{/if}
 	<div class="card">
 		<div class="sec">Rozmery</div>
 		<div class="g">
@@ -186,9 +200,10 @@
 				</div>
 				<div class="field">
 					<label for="otvaranie">Otváranie</label>
-					<select id="otvaranie" name="otvaranie" value={vstup.otvaranie}>
-						{#each data.otvarania as o (o)}<option>{o}</option>{/each}
+					<select id="otvaranie" name="otvaranie" bind:value={otvaranie}>
+						{#each otvaraniaPre as o (o)}<option>{o}</option>{/each}
 					</select>
+					{#if jeOpona}<span class="hint">Pri 2× štýle je otváranie vždy opona (od stredu).</span>{/if}
 				</div>
 			</div>
 			<div class="field">
@@ -199,6 +214,16 @@
 					value={vstup.skloPresne}
 					maxlength="120"
 					placeholder="napr. Stopsol Classic Grey, dubová kôra…"
+				/>
+			</div>
+			<div class="field">
+				<label for="poznamka">Poznámka (zobrazí sa hore vpravo na pláne aj v tlači)</label>
+				<input
+					id="poznamka"
+					name="poznamka"
+					value={vstup.poznamka}
+					maxlength="300"
+					placeholder="napr. pozor na ľavé krídlo, dodať do piatku…"
 				/>
 			</div>
 			<div class="field">

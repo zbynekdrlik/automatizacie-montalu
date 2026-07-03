@@ -37,7 +37,8 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 			// zaznamenaj presné zloženie ak zadané, inak základné sklo
 			sklo: vstup.skloPresne || vstup.sklo,
 			skloZaklad: vstup.sklo,
-			otvaranie: vstup.otvaranie
+			otvaranie: vstup.otvaranie,
+			poznamka: vstup.poznamka
 		}
 	};
 }

@@ -15,6 +15,8 @@ export interface Vstup {
 	 *  na plán, vzorec ostáva podľa základného skla `sklo` */
 	skloPresne: string;
 	otvaranie: string;
+	/** voľná poznámka — zobrazí sa hore vpravo na nárezovom pláne (aj v tlači) */
+	poznamka: string;
 	caka: boolean;
 }
 
@@ -34,6 +36,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		sklo: String(form.get('sklo') ?? '').trim(),
 		skloPresne: String(form.get('skloPresne') ?? '').trim().slice(0, 120),
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
+		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
 		caka: form.get('caka') === '1'
 	};
 	let error: string | null = null;
