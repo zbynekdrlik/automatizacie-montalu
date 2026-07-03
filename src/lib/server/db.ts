@@ -158,10 +158,11 @@ function migrate() {
 		seedGlass();
 	}
 
-	if ((db.pragma('user_version', { simple: true }) as number) < 4) {
-		// v3 → v4: pridaj systémy/štýly z cfg_seed, ktoré v DB ešte nie sú (Robust 4K +
-		// 2x4K). Existujúce štýly sa NEDOTÝKAJÚ (mohli byť ručne upravené v editore
-		// vzorcov). Idempotentné — pridá len chýbajúce sysStyl aj ich rez riadky.
+	if ((db.pragma('user_version', { simple: true }) as number) < 5) {
+		// v3 → v5: pridaj systémy/štýly z cfg_seed, ktoré v DB ešte nie sú (v4: Robust
+		// 4K + 2x4K; v5: Slide opona 2x2K + 2x3K). Existujúce štýly sa NEDOTÝKAJÚ (mohli
+		// byť ručne upravené v editore vzorcov). Idempotentné — pridá len chýbajúce
+		// sysStyl aj ich rez riadky (bezpečne re-spustiteľné pri každom novom štýle).
 		const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');
 		const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
 		const insRez = db.prepare(
@@ -188,7 +189,7 @@ function migrate() {
 						r.sklozavisle
 					);
 			}
-			db.pragma('user_version = 4');
+			db.pragma('user_version = 5');
 		})();
 	}
 
