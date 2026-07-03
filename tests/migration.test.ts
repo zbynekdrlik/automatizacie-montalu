@@ -45,8 +45,8 @@ const { db } = await import('../src/lib/server/db');
 const { writeOdpis } = await import('../src/lib/server/money');
 
 describe('migrácia odpis_log v1 → v2/v3', () => {
-	it('user_version = 3 a dáta prežili s modul=zasklenia + detail JSON', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(3);
+	it('user_version = 4 a dáta prežili s modul=zasklenia + detail JSON', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(4);
 		const row = db
 			.prepare('SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?')
 			.get('ZAK-MIG-1') as Record<string, unknown>;
@@ -57,6 +57,10 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		expect(d.system).toBe('Robust');
 		expect(d.styl).toBe('2K');
 		expect(d.s).toBe(2509);
+		// v4: nové štýly Robust 4K + 2x4K sú v konfigurácii (nová koľajnica ZASP20254)
+		const styly = db.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl IN ('Robust|4K','Robust|2x4K')").all() as { sys_styl: string }[];
+		expect(styly.length).toBe(2);
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Robust|2x4K' AND kod='ZASP20254'").get()).toEqual({ c: 2 });
 	});
 
 	it('dedup migrovaného záznamu drží — tá istá ZAK+OP sa neodošle druhýkrát', async () => {
