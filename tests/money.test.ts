@@ -1,6 +1,6 @@
 // Integračné testy zápisu odpisu: dedup constraint, atomický zápis, kompenzácia
 // pri zlyhaní, formát xlsx (6 stĺpcov ako Money import očakáva).
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -12,8 +12,10 @@ process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
 // import až PO nastavení env (db.ts číta DATABASE_PATH pri importe)
-const { writeOdpis, safe } = await import('../src/lib/server/money');
-const { loadCfg } = await import('../src/lib/server/db');
+const { writeOdpis, safe, targetDirFor, contentHash, releaseOdpis, listOdpisy } = await import(
+	'../src/lib/server/money'
+);
+const { loadCfg, db } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');
 import type { OdpisJob } from '../src/lib/server/money';
 
@@ -112,5 +114,103 @@ describe('writeOdpis', () => {
 		const dupes = results.filter((r) => r.status === 'duplicate');
 		expect(written.length).toBe(1);
 		expect(dupes.length).toBe(2);
+	});
+});
+
+// targetDirFor rozhoduje, KAM sa odpis zapíše — Money-kritické smerovanie.
+// money.test.ts inak beží vždy caka:false → vetva if(caka) bola nepokrytá.
+describe('targetDirFor — smerovanie podľa LIVE + čaká', () => {
+	afterEach(() => {
+		process.env.MONEY_LIVE = '0';
+		delete process.env.MONEY_LIVE_DIR;
+		delete process.env.MONEY_NA_ODPIS_DIR;
+	});
+
+	it('TEST režim: všetko (aj čaká) ide do testDir — do Money NIKDY nič testovacie', () => {
+		process.env.MONEY_LIVE = '0';
+		expect(targetDirFor('Bazen', false)).toBe(process.env.MONEY_TEST_DIR);
+		expect(targetDirFor('Bazen', true)).toBe(process.env.MONEY_TEST_DIR);
+	});
+
+	it('LIVE + nečaká: priamo do live importu (dlv-import)', () => {
+		process.env.MONEY_LIVE = '1';
+		process.env.MONEY_LIVE_DIR = '/data/dlv-import';
+		expect(targetDirFor('Bazen', false)).toBe('/data/dlv-import');
+		expect(targetDirFor('Robust', false)).toBe('/data/dlv-import');
+	});
+
+	it('LIVE + čaká: do NA ODPIS/<subdir>, nie do live importu', () => {
+		process.env.MONEY_LIVE = '1';
+		process.env.MONEY_NA_ODPIS_DIR = '/data/dlv-import/NA ODPIS';
+		expect(targetDirFor('Bazen', true)).toBe(path.join('/data/dlv-import/NA ODPIS', 'Bazen'));
+		expect(targetDirFor('Pergola', true)).toBe(path.join('/data/dlv-import/NA ODPIS', 'Pergola'));
+		expect(targetDirFor('Slide', true)).toBe(path.join('/data/dlv-import/NA ODPIS', 'Slide'));
+	});
+});
+
+// contentHash = planHash strážca: zápis potvrdí len PRESNE to, čo užívateľ videl
+// v náhľade. Ak sa medzitým zmenia vzorce → iný hash → zápis sa zablokuje.
+describe('contentHash — planHash strážca', () => {
+	it('rovnaké položky v inom poradí = rovnaký hash', () => {
+		const a = contentHash('ZAK1', [
+			{ kod: 'X', nazov: '', qty: 5 },
+			{ kod: 'Y', nazov: '', qty: 3 }
+		]);
+		const b = contentHash('ZAK1', [
+			{ kod: 'Y', nazov: '', qty: 3 },
+			{ kod: 'X', nazov: '', qty: 5 }
+		]);
+		expect(a).toBe(b);
+	});
+
+	it('zmena množstva = INÝ hash (odpis by nesedel s náhľadom → zápis zablokovaný)', () => {
+		const a = contentHash('ZAK1', [{ kod: 'X', nazov: '', qty: 5 }]);
+		const b = contentHash('ZAK1', [{ kod: 'X', nazov: '', qty: 6 }]);
+		expect(a).not.toBe(b);
+	});
+
+	it('zmena ZAK = iný hash', () => {
+		const a = contentHash('ZAK1', [{ kod: 'X', nazov: '', qty: 5 }]);
+		const b = contentHash('ZAK2', [{ kod: 'X', nazov: '', qty: 5 }]);
+		expect(a).not.toBe(b);
+	});
+});
+
+// releaseOdpis = jediná legitímna cesta na re-odoslanie tej istej ZAK+OP.
+// Deštruktívne (maže dedup záznam) + auditované → bez testu nikdy.
+describe('releaseOdpis — uvoľnenie dedup kľúča', () => {
+	const auditCount = () =>
+		(db.prepare("SELECT COUNT(*) n FROM cfg_audit WHERE sys_styl = 'odpis'").get() as { n: number })
+			.n;
+
+	it('write → duplicate → release → audit → re-write prejde', async () => {
+		const w = await writeOdpis(makeReq('TEST-REL', '01'));
+		expect(w.status).toBe('written');
+		expect((await writeOdpis(makeReq('TEST-REL', '01'))).status).toBe('duplicate');
+
+		const row = listOdpisy(200).find((o) => o.zak === 'TEST-REL' && o.op === '01');
+		expect(row).toBeTruthy();
+
+		const before = auditCount();
+		expect(releaseOdpis(row!.id, 'tester')).toBe(true);
+
+		// (a) riadok zmizol z odpis_log
+		expect(listOdpisy(200).some((o) => o.id === row!.id)).toBe(false);
+		// (b) audit pribudol s textom o uvoľnení
+		expect(auditCount()).toBe(before + 1);
+		const audit = db
+			.prepare("SELECT zmeny FROM cfg_audit WHERE sys_styl = 'odpis' ORDER BY id DESC LIMIT 1")
+			.get() as { zmeny: string };
+		expect(audit.zmeny).toContain('Uvoľnený odpis');
+		expect(audit.zmeny).toContain('TEST-REL');
+		// (c) opätovný zápis tej istej ZAK+OP prejde
+		expect((await writeOdpis(makeReq('TEST-REL', '01'))).status).toBe('written');
+	});
+
+	it('neplatné id (0, neexistujúce) → false, žiadny audit záznam', () => {
+		const before = auditCount();
+		expect(releaseOdpis(0, 't')).toBe(false);
+		expect(releaseOdpis(999999, 't')).toBe(false);
+		expect(auditCount()).toBe(before);
 	});
 });

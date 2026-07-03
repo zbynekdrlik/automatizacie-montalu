@@ -121,6 +121,71 @@ test('pergola: rez > 7500 ponúkne kombinácie a voľba zmení rozpis aj tyče',
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('bazén: „Späť a upraviť zadanie" zachová zadanie (nevynuluje)', async ({ page }) => {
+	// spocitat/upravit NEzapisujú → bezpečné aj na LIVE (žiadny skipAkLive)
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/bazen');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-BSP`);
+	await page.getByLabel('OP/OPDL číslo *').fill('05');
+	await page.getByLabel('Zákazník *').fill('E2E Bazén Späť');
+	await page.getByLabel('Počet sekcií *').fill('3');
+	await page.getByLabel('Celková dĺžka koľajníc (mm)').fill('10000');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await expect(page.getByTestId('kontrola-tabulka')).toBeVisible();
+
+	// „Späť a upraviť zadanie" → formulár musí byť predvyplnený (nie prázdny)
+	await page.getByRole('button', { name: /Späť a upraviť zadanie/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue(`${RUN}-BSP`);
+	await expect(page.getByLabel('OP/OPDL číslo *')).toHaveValue('05');
+	await expect(page.getByLabel('Zákazník *')).toHaveValue('E2E Bazén Späť');
+	await expect(page.getByLabel('Počet sekcií *')).toHaveValue('3');
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('pergola: „Späť a upraviť zadanie" zachová ZAK + celý CAD nárez', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola');
+	const cad = [
+		'18004 PRIECKOVY PROFIL 105\t9\t3871',
+		'18006 PRITLACNA LISTA\t9\t3894',
+		'18016 PROFIL 110x43 V2\t2\t3812'
+	].join('\n');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PSP`);
+	await page.getByLabel('OP/OPDL číslo *').fill('05');
+	await page.getByLabel('Zákazník *').fill('E2E Pergola Späť');
+	await page.getByLabel('Materiál (CAD nárez) *').fill(cad);
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await expect(page.getByTestId('odoslat')).toBeVisible();
+
+	// „Späť a upraviť zadanie" → ZAK aj CAD textarea ostanú vyplnené
+	await page.getByRole('button', { name: /Späť a upraviť zadanie/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue(`${RUN}-PSP`);
+	await expect(page.getByLabel('Materiál (CAD nárez) *')).toHaveValue(cad);
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('pergola: nerozpoznaný CAD kód → chyba a vstup ostane vyplnený', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola');
+	const cad = 'XX999 NEZNAMY PROFIL\t2\t3000';
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PBAD`);
+	await page.getByLabel('OP/OPDL číslo *').fill('05');
+	await page.getByLabel('Zákazník *').fill('E2E Pergola Junk');
+	await page.getByLabel('Materiál (CAD nárez) *').fill(cad);
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+
+	// chyba o nenamapovanom kóde + zachovaný vstup (chybová vetva vracia vstup)
+	await expect(page.getByTestId('form-error')).toContainText('Nenamapované');
+	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue(`${RUN}-PBAD`);
+	await expect(page.getByLabel('Materiál (CAD nárez) *')).toHaveValue(cad);
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('nahlásiť problém: uloží a zobrazí hlásenie', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
