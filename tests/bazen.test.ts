@@ -53,7 +53,17 @@ describe('computeBazen — 1:1 s n8n verziou (Excel ground truth)', () => {
 		const g = byKod(out);
 		expect(g['BPP00094']).toBe(9.2); // 2×4.6
 		expect(g['BPP00050']).toBe(0);
-		expect(g['BPP00046']).toBeCloseTo(2 * 3 * 2.2, 9);
+		// kladkový (oba kolaje) = BPP202414 (nový kód, BPP00046 je 0 na sklade)
+		expect(g['BPP202414']).toBeCloseTo(2 * 3 * 2.2, 9);
+	});
+
+	it('kladkový profil = nový BPP202414, NIE starý 0-skladový BPP00046 (Money odpis nesmie zlyhať)', () => {
+		const { out } = computeBazen(vstup());
+		const kody = out.map((o) => o.kod);
+		expect(kody).toContain('BPP202414');
+		expect(kody).not.toContain('BPP00046');
+		// presný Money názov (import matchuje podľa kódu, názov musí sedieť s katalógom)
+		expect(out.find((o) => o.kod === 'BPP202414')!.nazov).toBe('Kladkový profil V2 Surový 4400 mm');
 	});
 
 	it('Star model premapuje čelné/krajné profily na STAR kódy', () => {
