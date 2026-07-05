@@ -68,7 +68,9 @@ const BOM: [string, string, (p: BomParams) => number][] = [
 	['BPP00068', 'Čelná nožička Surový 7500 mm', (p) => 2.4 + (p.pocetSekcii - 2) * 0.4 * 2],
 	['BPP00072', 'Krajná nožička Surová 7500 mm', (p) => 0.8 + (p.pocetSekcii - 2) * 0.8],
 	['BPP00087', 'Krycia lišta Surový 7500 mm', (p) => 2.4 + (p.pocetSekcii - 2) * 0.4 * 2 + (0.8 + (p.pocetSekcii - 2) * 0.8)],
-	['BPP00046', 'Kladkový profil Surový 4400 mm', (p) => p.pocetSekcii * 2.2 * p.jednokolaj + 2 * (p.pocetSekcii * 2.2 * p.dvojkolaj)],
+	// BPP00046 (starý „Kladkový profil") je 0 na sklade → Money odpis zlyhá.
+	// Dominik 2026-07-05: nahradiť za BPP202414 „Kladkový profil V2 Surový 4400 mm".
+	['BPP202414', 'Kladkový profil V2 Surový 4400 mm', (p) => p.pocetSekcii * 2.2 * p.jednokolaj + 2 * (p.pocetSekcii * 2.2 * p.dvojkolaj)],
 	['BPP00050', 'Kladkový profil jednokolaj Surový 4400 mm', (p) => p.pocetSekcii * 2.2 * p.jednokolaj],
 	['BPP00076', 'Priečkový profil Surový 4300 mm', (p) => p.prieckovy4300 * 4.3],
 	['BPP00079', 'Priečkový profil Surový 6000 mm', (p) => p.prieckovy6000 * 6],
