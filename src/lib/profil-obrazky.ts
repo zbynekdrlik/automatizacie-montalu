@@ -3,7 +3,7 @@
 // nie je, jednoducho nemá obrázok (UI ho vynechá). Nie je runtime závislosť na
 // Money — obrázky sú zabudované ako statické súbory.
 export const PROFIL_S_OBRAZKOM = new Set<string>([
-	'BPP00046', 'BPP00050', 'BPP00054', 'BPP00057', 'BPP00061', 'BPP00064',
+	'BPP202414', 'BPP00050', 'BPP00054', 'BPP00057', 'BPP00061', 'BPP00064',
 	'BPP00068', 'BPP00072', 'BPP00076', 'BPP00079', 'BPP00083', 'BPP00087',
 	'BPP00091', 'BPP00092', 'BPP00094', 'BPP00097', 'BPP202410', 'BPP202411',
 	'BPP202412', 'BPP20245', 'BPP20249', 'BPP20254', 'BPP20255', 'BPP20256',
