@@ -207,7 +207,7 @@
 	<div class="card">
 		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
 		<p class="sub" style="margin-bottom:14px">
-			Každá tyč (7500 mm) nakreslená v mierke s očíslovanými rezmi a odpadom na konci.
+			Každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci (dĺžka tyče je pri každom profile — Deluxe má kratšie: kladka/klzný 3600, 5K horná 6000 mm).
 		</p>
 		<RozpisRezov material={p.material} />
 	</div>
