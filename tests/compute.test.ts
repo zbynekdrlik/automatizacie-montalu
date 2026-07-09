@@ -136,7 +136,7 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	});
 });
 
-describe('Deluxe — per-profil dĺžka tyče (Money-kritické, over. proti 8 nárez. workbookom + LIVE Money 2026-07-09)', () => {
+describe('Deluxe — per-profil dĺžka tyče (Money-kritické, všetkých 10 štýlov over. proti nárez. workbookom + LIVE Money 2026-07-09)', () => {
 	// odpis = tyče × dĺžka tyče toho profilu. Kladka/klzný sú 3600mm články
 	// (ZASP2024xx — staré ZASP000417/00066 boli neplatné/0-sklad), 5K horná
 	// koľajnica 6000mm, zvyšok 7500. Prírez: 2K (S-26)/2+12, 3K …/3+12, 4K …/4+12,
@@ -147,7 +147,13 @@ describe('Deluxe — per-profil dĺžka tyče (Money-kritické, over. proti 8 n�
 		['Deluxe|2K', 5000, 2000, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 2498, vyska: 1914 }],
 		['Deluxe|3K', 3500, 2100, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP202417: 3.6, ZASP202425: 3.6, ZASP00021: 7.5 }, { sirka: 1168, vyska: 2014 }],
 		['Deluxe|4K', 6000, 2300, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1504, vyska: 2214 }],
-		['Deluxe|2x3K', 6000, 2200, { ZASP00081: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1005, vyska: 2114 }],
+		// 2x3K = dvojité 3K → spodná koľajnica je 3K (ZASP00030), nie 2K; workbook mal
+		// preklep ZASP00104 (over. proti Money 2026-07-09 + 3K single). Množstvo rovnaké.
+		['Deluxe|2x3K', 6000, 2200, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1005, vyska: 2114 }],
+		// 2x2K prírez = (S-35.5)/4+11 = 0.25·S+2.125; 2x4K = (S-35.5)/8+12 = 0.125·S+7.5625
+		// (workbook F43 — iná konštanta než jednoduché 2K/4K, preto pinnuté samostatne)
+		['Deluxe|2x2K', 4000, 2200, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1001, vyska: 2114 }],
+		['Deluxe|2x4K', 6400, 2400, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 806, vyska: 2314 }],
 		// 5K: horná koľajnica 6000mm (× 6.0), spodná 7500 (× 7.5); kladka/klzný 3600
 		['Deluxe|5K10', 4500, 2400, { ZASP202434: 6.0, ZASP202432: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 908, vyska: 2318 }],
 		// 5K6 = tá istá geometria, iba 6mm kladka/klzný (ZASP202416/424)
@@ -201,6 +207,40 @@ describe('Deluxe — per-profil dĺžka tyče (Money-kritické, over. proti 8 n�
 			expect(r!.odpis.every((o) => Number.isFinite(o.metre) && o.metre > 0), ss).toBe(true);
 			expect(r!.sklo.pocet, ss).toBe(r!.N);
 		}
+	});
+
+	it('rez dlhší než tyč (5K šírka > 6000mm horná koľajnica) zlyhá — Money sa NEpodhodnotí', () => {
+		// 5K horná koľajnica ZASP202434 je 6000mm tyč; šírka 6100 → rez 6100 mm sa
+		// fyzicky nedá vyrobiť. Bez guardu by FFD „zabalil" 6100 na 1 tyč (záporný
+		// odpad) a odpis by bol 6.0 namiesto ~12.0 → podhodnotenie do Money.
+		const { r, err } = safeCompute(cfg, 'Deluxe|5K10', 6100, 2400, false);
+		expect(r).toBeNull();
+		expect(err).toMatch(/dlhší než tyč/);
+		// bežná šírka 5900 (< 6000) prejde bez chyby
+		expect(safeCompute(cfg, 'Deluxe|5K10', 5900, 2400, false).err).toBeNull();
+		// aj cez computeMulti (zimná záhrada) sa oversize posuv odmietne
+		expect(safeComputeMulti(cfg, [{ sysStyl: 'Deluxe|5K10', S: 6100, V: 2400, redukciaZero: false }]).err).toMatch(
+			/dlhší než tyč/
+		);
+	});
+
+	it('MaterialRow nesie per-profil dĺžku tyče (pre grafický rozpis) — nie natvrdo 7500', () => {
+		const r = computeFlat(cfg, 'Deluxe|5K10', 4500, 2400, false)!;
+		const bar = (kod: string) => r.material.find((m) => m.kod === kod)!.barLen;
+		expect(bar('ZASP202434')).toBe(6000); // 5K horná koľajnica
+		expect(bar('ZASP202417')).toBe(3600); // kladka 10mm
+		expect(bar('ZASP202432')).toBe(7500); // 5K spodná koľajnica
+		const rr = computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!;
+		expect(rr.material[0].barLen).toBe(7500); // Robust ostáva 7500
+	});
+
+	it('dlzkaTyce mimo rozsahu (preklep 600 namiesto 6000) je odmietnutá inBounds — Money guard', () => {
+		const bad = seed.rez.map((r) => ({ ...r })) as RezRow[];
+		const row = bad.find((r) => r.sysStyl === 'Deluxe|5K10' && r.kod === 'ZASP202434')!;
+		row.dlzkaTyce = 600; // preklep: malo byť 6000
+		const badCfg = buildCFG(seed.sys as SysRow[], bad);
+		expect(inBounds(badCfg, 'Deluxe|5K10')).toMatch(/Dĺžka tyče/);
+		expect(safeCompute(badCfg, 'Deluxe|5K10', 4500, 2400, false).err).toMatch(/mimo povolených rozsahov/);
 	});
 });
 

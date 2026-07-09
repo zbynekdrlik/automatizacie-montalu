@@ -118,8 +118,9 @@ test('Deluxe: náhľad 5K10 — per-profil dĺžka tyče (6000/3600) v odpise', 
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
 	// Money-kritický odpis: 5K horná koľajnica ZASP202434 = 6000mm tyč → 6 m,
 	// kladka 10mm ZASP202417 = 3600mm tyč → 7,2 m (dôkaz per-profil dĺžky tyče)
-	await expect(page.locator('.row', { hasText: 'ZASP202434' })).toContainText('6 m');
-	await expect(page.locator('.row', { hasText: 'ZASP202417' })).toContainText('7,2 m');
+	// regex s hranicou (^|\D) — aby "6 m" nechytilo napr. "16 m" v inom stĺpci riadku
+	await expect(page.locator('.row', { hasText: 'ZASP202434' })).toContainText(/(^|\D)6 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP202417' })).toContainText(/(^|\D)7,2 m/);
 	expect(consoleMsgs).toEqual([]);
 });
 

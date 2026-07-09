@@ -242,6 +242,14 @@ function migrate() {
 					);
 			}
 			for (const g of DELUXE_GLASS) if (!hasGlass.get(g.nazov)) insGlass.run(g.nazov, 0, g.poradie, 'Deluxe');
+			// zosúlaď dĺžku tyče s cfg_seed pre VŠETKY riadky. v<5 seed beží skôr než
+			// existuje stĺpec dlzka_tyce, takže non-Deluxe riadky by inak dostali len
+			// ALTER default 7500 — ak by non-Deluxe profil niekedy potreboval ≠7500,
+			// tu sa to premietne (fresh aj upgrade rovnako). dlzka_tyce NIE je
+			// user-editovateľná, takže prepis neprepíše ručnú úpravu vzorca. Dnes no-op.
+			const updBar = db.prepare('UPDATE cfg_rez SET dlzka_tyce = ? WHERE sys_styl = ? AND poradie = ?');
+			for (const r of seed.rez)
+				updBar.run((r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500, r.sysStyl, r.poradie);
 			db.pragma('user_version = 6');
 		})();
 	}

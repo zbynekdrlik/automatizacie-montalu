@@ -83,6 +83,13 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		expect(nonDefault).toEqual({ c: 0 });
 		// Deluxe sklá (Float kalené) naseedované so systémom Deluxe
 		expect(db.prepare("SELECT COUNT(*) c FROM glass_types WHERE system='Deluxe'").get()).toEqual({ c: 2 });
+		// 2x3K spodná koľajnica = 3K (ZASP00030), nie 2K (workbook preklep ZASP00104 opravený)
+		expect(
+			db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND poradie=15 AND kod='ZASP00030'").get()
+		).toEqual({ c: 1 });
+		expect(
+			db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND kod='ZASP00104'").get()
+		).toEqual({ c: 0 });
 	});
 
 	it('dedup migrovaného záznamu drží — tá istá ZAK+OP sa neodošle druhýkrát', async () => {

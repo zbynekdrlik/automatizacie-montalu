@@ -62,6 +62,8 @@ export interface MaterialRow {
 	/** celkový odpad (mm) a % z použitých tyčí */
 	odpadMm: number;
 	odpadPct: number;
+	/** dĺžka tyče tohto profilu (mm) — pre grafický rozpis (mierka, hlavička) */
+	barLen: number;
 }
 
 export interface OdpisRow {
@@ -194,6 +196,31 @@ function profilCuts(
 }
 
 /**
+ * Kus dlhší než jeho tyč sa fyzicky NEDÁ vyrobiť (napr. 6500 mm rez z 6000 mm
+ * 5K hornej koľajnice). FFD by taký kus „zabalil" na jednu tyč so záporným
+ * odpadom → tyce=1 → odpis do Money PODHODNOTENÝ na polovicu. Preto to zachytíme
+ * a výpočet zlyhá s konkrétnou chybou (namiesto tichého zlého odpisu). Vráti
+ * správu pre prvý taký profil, inak null. Volá sa v safeCompute PRED zápisom.
+ */
+export function oversizeCut(
+	cfg: Cfg,
+	sysStyl: string,
+	S: number,
+	V: number,
+	redukciaZero: boolean
+): string | null {
+	const g = cfg[sysStyl];
+	if (!g) return null;
+	for (const c of profilCuts(g, S, V, g.N, redukciaZero)) {
+		for (const k of c.kusy) {
+			if (k.dlzka + KOTUC > c.barLen)
+				return `Rez ${Math.round(k.rozmer)} mm (${c.nazov}) je dlhší než tyč ${c.barLen} mm — tento rozmer sa z daného profilu nedá vyrobiť. Zmenši rozmer alebo zvoľ iný systém.`;
+		}
+	}
+	return null;
+}
+
+/**
  * Vypočíta nárezový plán. `redukciaZero` = true keď zvolené sklo nuluje
  * sklo-závislé profily (Redukcia 6mm pri Slide). Ktoré sklá to sú, určuje
  * tabuľka glass_types (stĺpec redukcia_zero) — nie natvrdo zadaný reťazec.
@@ -215,7 +242,7 @@ export function computeFlat(
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * c.barLen)) * 1000) / 10 : 0;
-		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct });
+		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen });
 		odpis.push({ kod: c.kod, nazov: c.nazov, metre: R((tyce * c.barLen) / 1000) });
 	}
 	const ss = g.sklo.s,
@@ -274,7 +301,10 @@ export const BOUNDS = {
 	koef: { min: 0.1, max: 10 },
 	kerf: { min: 0, max: 50 },
 	pocetKs: { min: 0, max: 100 },
-	N: { min: 1, max: 12 }
+	N: { min: 1, max: 12 },
+	// dĺžka tyče násobí odpis do Money (metre = tyče × dĺžka/1000) — preklep (600
+	// namiesto 6000, 75000 namiesto 7500) sa musí odmietnuť. Reálne: 3600/6000/7500.
+	dlzkaTyce: { min: 1000, max: 8000 }
 };
 
 export function inBounds(cfg: Cfg, ss: string): string | null {
@@ -293,6 +323,11 @@ export function inBounds(cfg: Cfg, ss: string): string | null {
 			return `Prerez ${r.kerf} (${r.nazov || r.kod}) mimo rozsahu.`;
 		if (r.pocetKs < BOUNDS.pocetKs.min || r.pocetKs > BOUNDS.pocetKs.max)
 			return `Počet ks ${r.pocetKs} (${r.nazov || r.kod}) mimo rozsahu.`;
+		if (
+			r.dlzkaTyce !== undefined &&
+			(r.dlzkaTyce < BOUNDS.dlzkaTyce.min || r.dlzkaTyce > BOUNDS.dlzkaTyce.max)
+		)
+			return `Dĺžka tyče ${r.dlzkaTyce} (${r.nazov || r.kod}) mimo rozsahu ${BOUNDS.dlzkaTyce.min}–${BOUNDS.dlzkaTyce.max} mm.`;
 	}
 	return null;
 }
@@ -312,6 +347,8 @@ export function safeCompute(
 	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
 	const boundErr = inBounds(cfg, sysStyl);
 	if (boundErr) return { r: null, err: 'Konfigurácia mimo povolených rozsahov: ' + boundErr };
+	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero);
+	if (overErr) return { r: null, err: overErr };
 	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
@@ -415,7 +452,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * pk.barLen)) * 1000) / 10 : 0;
 		pk.rezy.sort((a, b) => b.rozmer - a.rozmer);
-		material.push({ kod, nazov: pk.nazov, rezy: pk.rezy, tyce, bary, odpadMm, odpadPct });
+		material.push({ kod, nazov: pk.nazov, rezy: pk.rezy, tyce, bary, odpadMm, odpadPct, barLen: pk.barLen });
 		odpis.push({ kod, nazov: pk.nazov, metre: R((tyce * pk.barLen) / 1000) });
 	}
 	return { posuvy: infos, material, odpis, m2: R(infos.reduce((s, x) => s + x.m2, 0)) };
@@ -432,6 +469,8 @@ export function safeComputeMulti(
 			return { r: null, err: `Posuv ${i + 1}: konfigurácia systému je neúplná alebo chybná.` };
 		const boundErr = inBounds(cfg, p.sysStyl);
 		if (boundErr) return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
+		const overErr = oversizeCut(cfg, p.sysStyl, p.S, p.V, p.redukciaZero);
+		if (overErr) return { r: null, err: `Posuv ${i + 1}: ${overErr}` };
 	}
 	const r = computeMulti(cfg, posuvy);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
