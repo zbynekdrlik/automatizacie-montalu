@@ -96,6 +96,33 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	expect(consoleMsgs).toEqual([]);
 });
 
+// Deluxe (posuvná sklenená stena) — READ-ONLY náhľad (nič sa nezapisuje do Money).
+// Kľúč: per-profil dĺžka tyče beží end-to-end — 5K horná koľajnica je 6000mm tyč
+// (→ 6 m), kladka 10mm je 3600mm tyč (→ 7,2 m), nie natvrdo 7500.
+test('Deluxe: náhľad 5K10 — per-profil dĺžka tyče (6000/3600) v odpise', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-DLX`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Deluxe');
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await page.getByLabel('Štýl').selectOption('5K10');
+	await page.getByLabel('Šírka (mm) *').fill('4500');
+	await page.getByLabel('Výška (mm) *').fill('2400');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	// sklo (len plán, nie Money) — 908 × 2318
+	await expect(page.getByTestId('sklo-sirka')).toHaveText('908');
+	await expect(page.getByTestId('sklo-vyska')).toHaveText('2318');
+	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
+	// Money-kritický odpis: 5K horná koľajnica ZASP202434 = 6000mm tyč → 6 m,
+	// kladka 10mm ZASP202417 = 3600mm tyč → 7,2 m (dôkaz per-profil dĺžky tyče)
+	await expect(page.locator('.row', { hasText: 'ZASP202434' })).toContainText('6 m');
+	await expect(page.locator('.row', { hasText: 'ZASP202417' })).toContainText('7,2 m');
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľad)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page); // náhľad NEzapisuje → bezpečné aj na LIVE, žiadny skipAkLive

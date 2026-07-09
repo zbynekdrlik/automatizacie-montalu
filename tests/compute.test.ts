@@ -136,6 +136,74 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	});
 });
 
+describe('Deluxe — per-profil dĺžka tyče (Money-kritické, over. proti 8 nárez. workbookom + LIVE Money 2026-07-09)', () => {
+	// odpis = tyče × dĺžka tyče toho profilu. Kladka/klzný sú 3600mm články
+	// (ZASP2024xx — staré ZASP000417/00066 boli neplatné/0-sklad), 5K horná
+	// koľajnica 6000mm, zvyšok 7500. Prírez: 2K (S-26)/2+12, 3K …/3+12, 4K …/4+12,
+	// 2x* (S-26-9.5)/N+off, 5K (S+52)/5, 6K (S+65)/6; dorazové V-53 (malé)/V-10 (5K,6K).
+	// Excel bol nekonzistentný (odpis hárok fakturoval ×7.5 starým kódom) — appka
+	// ráta AJ fakturuje na skutočnú dĺžku článku. Sklo nie je v Money (len plán).
+	const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
+		['Deluxe|2K', 5000, 2000, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 2498, vyska: 1914 }],
+		['Deluxe|3K', 3500, 2100, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP202417: 3.6, ZASP202425: 3.6, ZASP00021: 7.5 }, { sirka: 1168, vyska: 2014 }],
+		['Deluxe|4K', 6000, 2300, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1504, vyska: 2214 }],
+		['Deluxe|2x3K', 6000, 2200, { ZASP00081: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1005, vyska: 2114 }],
+		// 5K: horná koľajnica 6000mm (× 6.0), spodná 7500 (× 7.5); kladka/klzný 3600
+		['Deluxe|5K10', 4500, 2400, { ZASP202434: 6.0, ZASP202432: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 908, vyska: 2318 }],
+		// 5K6 = tá istá geometria, iba 6mm kladka/klzný (ZASP202416/424)
+		['Deluxe|5K6', 4500, 2400, { ZASP202434: 6.0, ZASP202432: 7.5, ZASP202416: 7.2, ZASP202424: 7.2, ZASP00021: 7.5 }, { sirka: 908, vyska: 2318 }],
+		['Deluxe|6K6', 5000, 2500, { ZASP202411: 7.5, ZASP202437: 7.5, ZASP202416: 7.2, ZASP202424: 7.2, ZASP00021: 7.5 }, { sirka: 842, vyska: 2418 }],
+		['Deluxe|6K10', 5000, 2500, { ZASP202411: 7.5, ZASP202437: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 842, vyska: 2418 }]
+	];
+	it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
+		const r = computeFlat(cfg, sysStyl, S, V, false);
+		expect(r).not.toBeNull();
+		const got = odpisByKod(r!);
+		// presne 5 profilov v odpise (2 koľajnice + kladka + klzný + dorazové)
+		expect(r!.odpis.length, sysStyl).toBe(5);
+		for (const [kod, metre] of Object.entries(expOdpis)) expect(got[kod], `${sysStyl} ${kod}`).toBe(metre);
+		expect(r!.sklo.sirka, `${sysStyl} sklo.sirka`).toBe(expSklo.sirka);
+		expect(r!.sklo.vyska, `${sysStyl} sklo.vyska`).toBe(expSklo.vyska);
+	});
+
+	it('kladka/klzný sa počíta na 3600mm tyč, nie 7500 (odpis × 3.6 na tyč)', () => {
+		const r = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false)!;
+		const kladka = r.material.find((m) => m.kod === 'ZASP202417')!;
+		// 2 kusy 2499mm, každý na vlastnú 3600mm tyč (2×2503 > 3600) → 2 tyče × 3.6
+		expect(kladka.tyce).toBe(2);
+		expect(r.odpis.find((o) => o.kod === 'ZASP202417')!.metre).toBe(7.2);
+		// zvyšok na tyči = 3600 − 2499 − 4(kotúč) = 1097 → dôkaz, že sa balí na 3600, nie 7500
+		for (const t of kladka.bary) expect(t.zvysok).toBeCloseTo(3600 - 2499 - 4, 6);
+	});
+
+	it('5K horná koľajnica je 6000mm tyč (× 6.0), spodná 7500 (× 7.5)', () => {
+		const r = computeFlat(cfg, 'Deluxe|5K10', 4500, 2400, false)!;
+		expect(r.odpis.find((o) => o.kod === 'ZASP202434')!.metre).toBe(6.0);
+		expect(r.odpis.find((o) => o.kod === 'ZASP202432')!.metre).toBe(7.5);
+	});
+
+	it('Robust/Slide ostávajú na 7500mm tyč (default dlzkaTyce) — žiadna regresia', () => {
+		const r = computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!;
+		const kolaj = r.material.find((m) => m.kod === 'ZASP00014')!;
+		for (const t of kolaj.bary) {
+			const spotreba = t.kusy.reduce((s, k) => s + k.dlzka, 0) + 4 * t.kusy.length;
+			expect(t.zvysok).toBeCloseTo(7500 - spotreba, 6);
+		}
+	});
+
+	it('všetkých 10 Deluxe štýlov je platných a počíta 5 profilov bez chyby', () => {
+		for (const st of ['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K6', '5K10', '6K6', '6K10']) {
+			const ss = 'Deluxe|' + st;
+			expect(validSys(cfg, ss), ss).toBe(true);
+			const { r, err } = safeCompute(cfg, ss, 4000, 2200, false);
+			expect(err, ss).toBeNull();
+			expect(r!.odpis.length, ss).toBe(5);
+			expect(r!.odpis.every((o) => Number.isFinite(o.metre) && o.metre > 0), ss).toBe(true);
+			expect(r!.sklo.pocet, ss).toBe(r!.N);
+		}
+	});
+});
+
 describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', () => {
 	const P = (S: number, V: number, sysStyl = 'Robust|2K'): PosuvSpec => ({
 		sysStyl,
@@ -148,7 +216,10 @@ describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', ()
 		for (const [ss, S, V] of [
 			['Robust|2K', 5000, 2000],
 			['Robust|2x3K', 5000, 2200],
-			['Slide|3K', 3500, 2001]
+			['Slide|3K', 3500, 2001],
+			// Deluxe: per-profil dĺžka tyče (kladka 3600) musí prejsť aj cez computeMulti
+			['Deluxe|5K10', 4500, 2400],
+			['Deluxe|2K', 5000, 2000]
 		] as [string, number, number][]) {
 			const flat = computeFlat(cfg, ss, S, V, false)!;
 			const multi = computeMulti(cfg, [P(S, V, ss)])!;

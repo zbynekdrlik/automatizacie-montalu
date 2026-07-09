@@ -25,7 +25,7 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 		zakaznik: vstup.zakaznik,
 		caka: vstup.caka,
 		createdBy,
-		cakaSubdir: r.system === 'Slide' ? 'Slide' : 'Robust',
+		cakaSubdir: r.system,
 		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ${safe(r.system)} ${safe(r.styl)}`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
 		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
@@ -81,7 +81,7 @@ function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): Odpi
 		zakaznik: vstup.zakaznik,
 		caka: vstup.caka,
 		createdBy,
-		cakaSubdir: sys0 === 'Slide' ? 'Slide' : 'Robust',
+		cakaSubdir: sys0,
 		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ZIMNA ZAHRADA ${r.posuvy.length}x posuv`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
 		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
@@ -132,7 +132,7 @@ export const actions: Actions = {
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(jobFor(vstup, r, '')),
-				dir: targetDirFor(r.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
+				dir: targetDirFor(r.system, vstup.caka)
 			}
 		};
 	},
@@ -159,7 +159,7 @@ export const actions: Actions = {
 				cielInfo: {
 					live: isLive(),
 					filename: filenameFor(job),
-					dir: targetDirFor(r.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
+					dir: targetDirFor(r.system, vstup.caka)
 				}
 			};
 		}
@@ -214,7 +214,7 @@ export const actions: Actions = {
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(job),
-				dir: targetDirFor(r.posuvy[0]?.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
+				dir: targetDirFor((r.posuvy[0]?.system ?? 'Robust'), vstup.caka)
 			}
 		};
 	},
@@ -239,7 +239,7 @@ export const actions: Actions = {
 				cielInfo: {
 					live: isLive(),
 					filename: filenameFor(job),
-					dir: targetDirFor(r.posuvy[0]?.system === 'Slide' ? 'Slide' : 'Robust', vstup.caka)
+					dir: targetDirFor((r.posuvy[0]?.system ?? 'Robust'), vstup.caka)
 				}
 			};
 		}
