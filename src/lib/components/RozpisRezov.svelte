@@ -35,7 +35,8 @@
 	function segmenty(
 		kusy: { rozmer: number; dlzka: number; posuv?: number }[],
 		zvysok: number,
-		sikmy: boolean
+		sikmy: boolean,
+		bar: number
 	) {
 		const s = sikmy ? S : 0;
 		const segs: Seg[] = [];
@@ -80,32 +81,35 @@
 <div class="rozpis">
 	{#each material.filter((m) => m.tyce > 0) as m (m.kod)}
 		{@const sikmy = jeSikmy(m.nazov)}
+		<!-- dĺžka tyče je per-profil (Deluxe: kladka/klzný 3600, 5K horná koľajnica
+		     6000); staršie výsledky bez m.barLen padnú na fallback prop `bar` -->
+		{@const barLen = m.barLen ?? bar}
 		<div class="profil">
 			<div class="hd">
 				<ProfilObrazok kod={m.kod} nazov={m.nazov} velkost={48} />
 				<div class="hd-txt">
 					<div class="nazov"><b>{m.kod}</b> · {m.nazov}</div>
 					<div class="stat">
-						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(bar)} mm · kotúč 4 mm · odpad
+						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(barLen)} mm · kotúč 4 mm · odpad
 						<b>{fmt(m.odpadMm)} mm</b> ({fmt(m.odpadPct)} %) · rez {sikmy ? '45°' : 'rovný'}
 					</div>
 				</div>
 			</div>
 
 			{#each m.bary as tyc, ti (ti)}
-				{@const segs = segmenty(tyc.kusy, tyc.zvysok, sikmy)}
+				{@const segs = segmenty(tyc.kusy, tyc.zvysok, sikmy, barLen)}
 				<div class="tyc">
 					<div class="tyc-cislo">/{ti + 1}/</div>
 					<div class="tyc-telo">
 						<svg
 							class="bar-svg"
-							viewBox="0 0 {bar} {H}"
+							viewBox="0 0 {barLen} {H}"
 							preserveAspectRatio="none"
 							role="img"
 							aria-label="Tyč {ti + 1}"
 						>
 							<!-- podklad celej tyče -->
-							<rect x="0" y="0" width={bar} height={H} fill="#f8fafc" stroke="#475569" stroke-width="1" vector-effect="non-scaling-stroke" />
+							<rect x="0" y="0" width={barLen} height={H} fill="#f8fafc" stroke="#475569" stroke-width="1" vector-effect="non-scaling-stroke" />
 							{#each segs as seg (seg.body)}
 								<polygon
 									points={seg.body}

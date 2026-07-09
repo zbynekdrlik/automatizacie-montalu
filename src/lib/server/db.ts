@@ -65,7 +65,8 @@ function migrate() {
 				delit_n INTEGER NOT NULL DEFAULT 0,
 				kerf REAL NOT NULL DEFAULT 0,
 				pocet_ks REAL NOT NULL DEFAULT 0,
-				sklozavisle INTEGER NOT NULL DEFAULT 0
+				sklozavisle INTEGER NOT NULL DEFAULT 0,
+				dlzka_tyce REAL NOT NULL DEFAULT 7500
 			);
 			CREATE INDEX idx_cfg_rez_sys ON cfg_rez(sys_styl, poradie);
 			CREATE TABLE glass_types (
@@ -171,6 +172,8 @@ function migrate() {
 		);
 		db.transaction(() => {
 			for (const s of seed.sys) {
+				// Deluxe sa seeduje až v <6 (potrebuje stĺpec dlzka_tyce, ktorý tu ešte nemusí existovať)
+				if (s.sysStyl.startsWith('Deluxe')) continue;
 				if (hasSys.get(s.sysStyl)) continue;
 				insSys.run(s.sysStyl, s.N, s.skloOffset);
 				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
@@ -193,9 +196,74 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 6) {
+		// v5 → v6: Deluxe zasklenie (posuvná sklenená stena) — 10 štýlov + per-profil
+		// dĺžka tyče (kladka/klzný 3600, 5K horná koľajnica 6000; Money-kritické, lebo
+		// odpis = tyče × dĺžka tyče). Pridá stĺpec dlzka_tyce (existujúce Robust/Slide
+		// riadky → default 7500, nezmenené) a naseeduje Deluxe štýly aj ich sklá.
+		// Idempotentné: ALTER len ak stĺpec chýba, štýl/sklo len ak ešte nie sú.
+		const hasCol = (
+			db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]
+		).some((c) => c.name === 'dlzka_tyce');
+		// ALTER PRED prepare(insRez) — prepare validuje SQL proti aktuálnej schéme,
+		// takže stĺpec musí existovať skôr. Idempotentné cez hasCol; ak by seed
+		// transakcia nižšie zlyhala, re-run preskočí ALTER (hasCol) a doseeduje.
+		if (!hasCol) db.exec('ALTER TABLE cfg_rez ADD COLUMN dlzka_tyce REAL NOT NULL DEFAULT 7500');
+		const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');
+		const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
+		const insRez = db.prepare(
+			`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		);
+		const hasGlass = db.prepare('SELECT 1 FROM glass_types WHERE nazov = ?');
+		const insGlass = db.prepare(
+			'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES (?, ?, ?, ?)'
+		);
+		db.transaction(() => {
+			for (const s of seed.sys) {
+				if (!s.sysStyl.startsWith('Deluxe')) continue;
+				if (hasSys.get(s.sysStyl)) continue;
+				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+					insRez.run(
+						r.sysStyl,
+						r.poradie,
+						r.typ,
+						r.kod,
+						r.nazov,
+						r.dim,
+						r.koef,
+						r.offset,
+						r.delitN,
+						r.kerf,
+						r.pocetKs,
+						r.sklozavisle,
+						(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500
+					);
+			}
+			for (const g of DELUXE_GLASS) if (!hasGlass.get(g.nazov)) insGlass.run(g.nazov, 0, g.poradie, 'Deluxe');
+			// zosúlaď dĺžku tyče s cfg_seed pre VŠETKY riadky. v<5 seed beží skôr než
+			// existuje stĺpec dlzka_tyce, takže non-Deluxe riadky by inak dostali len
+			// ALTER default 7500 — ak by non-Deluxe profil niekedy potreboval ≠7500,
+			// tu sa to premietne (fresh aj upgrade rovnako). dlzka_tyce NIE je
+			// user-editovateľná, takže prepis neprepíše ručnú úpravu vzorca. Dnes no-op.
+			const updBar = db.prepare('UPDATE cfg_rez SET dlzka_tyce = ? WHERE sys_styl = ? AND poradie = ?');
+			for (const r of seed.rez)
+				updBar.run((r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500, r.sysStyl, r.poradie);
+			db.pragma('user_version = 6');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
+
+// Deluxe sklá (Float kalené) — len na plán/objednávku, NIE v Money odpise; žiadna
+// redukcia (redukcia_zero = 0). 6/10 mm zodpovedá priemeru kladky štýlu.
+const DELUXE_GLASS = [
+	{ nazov: 'Float kalené 6 mm', poradie: 10 },
+	{ nazov: 'Float kalené 10 mm', poradie: 20 }
+];
 
 // Sklá podľa systému: Robust = izolačné 4/16/4, Slide = izolačné 4/8/4
 // (Slide „4/8/4 číre" nuluje Redukciu 6mm — sklozavislé profily sa nepočítajú),
@@ -219,8 +287,8 @@ function seedData() {
 	if (sysCount === 0) {
 		const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
 		const insRez = db.prepare(
-			`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		);
 		db.transaction(() => {
 			for (const s of seed.sys) insSys.run(s.sysStyl, s.N, s.skloOffset);
@@ -237,7 +305,8 @@ function seedData() {
 					r.delitN,
 					r.kerf,
 					r.pocetKs,
-					r.sklozavisle
+					r.sklozavisle,
+					(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500
 				);
 		})();
 	}
@@ -270,7 +339,7 @@ export function loadCfg(): Cfg {
 	}[]).map<SysRow>((r) => ({ sysStyl: r.sys_styl, N: r.n, skloOffset: r.sklo_offset }));
 	const rez = (db
 		.prepare(
-			'SELECT sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle FROM cfg_rez ORDER BY sys_styl, poradie'
+			'SELECT sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce FROM cfg_rez ORDER BY sys_styl, poradie'
 		)
 		.all() as Record<string, unknown>[]).map<RezRow>((r) => ({
 		sysStyl: r.sys_styl as string,
@@ -284,7 +353,8 @@ export function loadCfg(): Cfg {
 		delitN: r.delit_n as 0 | 1,
 		kerf: r.kerf as number,
 		pocetKs: r.pocet_ks as number,
-		sklozavisle: r.sklozavisle as 0 | 1
+		sklozavisle: r.sklozavisle as 0 | 1,
+		dlzkaTyce: r.dlzka_tyce as number
 	}));
 	return buildCFG(sys, rez);
 }
