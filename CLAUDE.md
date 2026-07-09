@@ -67,3 +67,4 @@ live in local memory, never committed (per security-basics).
 
 Load the matching skill BEFORE working on that area (don't re-derive):
 - deploy / post-deploy E2E / LIVE flip → load `.claude/skills/deploy`
+- Money odpis / článkové kódy / nový systém-štýl / compute → load `.claude/skills/money-odpis`
