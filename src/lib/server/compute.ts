@@ -177,11 +177,12 @@ function profilCuts(
 ): ProfilCuts[] {
 	const order: string[] = [];
 	const byKod: Record<string, RezRow[]> = {};
+	const sh = Number(skloHrubka) || 0; // normalizuj (SQLite INTEGER, ale buď odolný voči '6')
 	for (const r of g.rez) {
 		// hrúbka-závislý riadok (Deluxe kladka/klzný pre 6mm alebo 10mm sklo) sa
 		// zahrnie LEN keď sedí zvolená hrúbka skla; 0 = platí vždy (Robust/Slide)
 		const rh = Number(r.skloHrubka) || 0;
-		if (rh !== 0 && rh !== skloHrubka) continue;
+		if (rh !== 0 && rh !== sh) continue;
 		if (!byKod[r.kod]) {
 			byKod[r.kod] = [];
 			order.push(r.kod);
@@ -232,6 +233,28 @@ export function oversizeCut(
 		}
 	}
 	return null;
+}
+
+/**
+ * Fail-loud guard: ak systém MÁ hrúbko-závislé profily (Deluxe kladka/klzný pre
+ * 6/10 mm), ale pre zvolenú hrúbku skla ani jeden nesedí, `profilCuts` by ticho
+ * VYNECHAL kladku aj klzný → odpis do Money podhodnotený o ~40 %. Namiesto tichého
+ * fallbacku (bar codebase: „chyba sa hlási nahlas") to zachytíme a výpočet zlyhá.
+ * Dnes nedosiahnuteľné cez UI (glassTypesForSystem púšťa pre Deluxe len sklá s
+ * hrúbkou 6/10), ale bráni tichej regresii, ak by tá záruka niekedy padla.
+ */
+export function missingHrubkaProfile(
+	cfg: Cfg,
+	sysStyl: string,
+	skloHrubka: number
+): string | null {
+	const g = cfg[sysStyl];
+	if (!g) return null;
+	const sh = Number(skloHrubka) || 0;
+	const hrubkaRows = g.rez.filter((r) => (Number(r.skloHrubka) || 0) !== 0);
+	if (!hrubkaRows.length) return null; // žiadne hrúbko-závislé profily (Robust/Slide) → OK
+	if (hrubkaRows.some((r) => (Number(r.skloHrubka) || 0) === sh)) return null;
+	return `Pre zvolenú hrúbku skla (${sh} mm) tento systém nemá kladka/klzný profil — vyber platné sklo (6 alebo 10 mm).`;
 }
 
 /**
@@ -366,6 +389,8 @@ export function safeCompute(
 	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
 	const boundErr = inBounds(cfg, sysStyl);
 	if (boundErr) return { r: null, err: 'Konfigurácia mimo povolených rozsahov: ' + boundErr };
+	const hrubkaErr = missingHrubkaProfile(cfg, sysStyl, skloHrubka);
+	if (hrubkaErr) return { r: null, err: hrubkaErr };
 	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
 	if (overErr) return { r: null, err: overErr };
 	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
@@ -497,6 +522,8 @@ export function safeComputeMulti(
 			return { r: null, err: `Posuv ${i + 1}: konfigurácia systému je neúplná alebo chybná.` };
 		const boundErr = inBounds(cfg, p.sysStyl);
 		if (boundErr) return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
+		const hrubkaErr = missingHrubkaProfile(cfg, p.sysStyl, p.skloHrubka ?? 0);
+		if (hrubkaErr) return { r: null, err: `Posuv ${i + 1}: ${hrubkaErr}` };
 		const overErr = oversizeCut(cfg, p.sysStyl, p.S, p.V, p.redukciaZero, p.skloHrubka ?? 0);
 		if (overErr) return { r: null, err: `Posuv ${i + 1}: ${overErr}` };
 	}

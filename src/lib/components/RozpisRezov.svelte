@@ -79,7 +79,9 @@
 
 <div class="rozpis">
 	{#each material.filter((m) => m.tyce > 0) as m (m.kod)}
-		{@const sikmy = m.sikmyRez}
+		<!-- m.sikmyRez rozhoduje server per profil; `?? true` je obranný fallback pre
+		     prípadné staré dáta bez tohto poľa (45° = historický default väčšiny profilov) -->
+		{@const sikmy = m.sikmyRez ?? true}
 		<!-- dĺžka tyče je per-profil (Deluxe: kladka/klzný 3600, 5K horná koľajnica
 		     6000); staršie výsledky bez m.barLen padnú na fallback prop `bar` -->
 		{@const barLen = m.barLen ?? bar}

@@ -9,7 +9,8 @@ import {
 	safeComputeMulti,
 	validSys,
 	safeCompute,
-	inBounds
+	inBounds,
+	missingHrubkaProfile
 } from '../src/lib/server/compute';
 import type { PosuvSpec } from '../src/lib/server/compute';
 import { jeSikmyRez } from '../src/lib/cut';
@@ -255,6 +256,25 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 				expect(r!.sklo.pocet, ss).toBe(r!.N);
 			}
 		}
+	});
+
+	it('fail-loud: Deluxe s neplatnou hrúbkou skla (0/8) zlyhá — NEpodhodnotí odpis', () => {
+		// bez zvolenej 6/10 hrúbky by profilCuts vynechal kladku+klzný → 3-profilový
+		// odpis s err=null (podhodnotenie ~40 % do Money). missingHrubkaProfile to zachytí.
+		for (const bad of [0, 8]) {
+			const { r, err } = safeCompute(cfg, 'Deluxe|2K', 5000, 2000, false, bad);
+			expect(r, `hrubka ${bad}`).toBeNull();
+			expect(err, `hrubka ${bad}`).toMatch(/hrúbku skla/);
+		}
+		// guard priamo: Deluxe blokuje 0/8, púšťa 6/10; Robust (bez hrúbko-závislých) nikdy
+		expect(missingHrubkaProfile(cfg, 'Deluxe|2K', 0)).toMatch(/hrúbku skla/);
+		expect(missingHrubkaProfile(cfg, 'Deluxe|2K', 6)).toBeNull();
+		expect(missingHrubkaProfile(cfg, 'Deluxe|2K', 10)).toBeNull();
+		expect(missingHrubkaProfile(cfg, 'Robust|2K', 0)).toBeNull();
+		// aj cez computeMulti (zimná záhrada)
+		expect(
+			safeComputeMulti(cfg, [{ sysStyl: 'Deluxe|2K', S: 5000, V: 2000, redukciaZero: false, skloHrubka: 0 }]).err
+		).toMatch(/hrúbku skla/);
 	});
 
 	it('rez dlhší než tyč (5K šírka > 6000mm horná koľajnica) zlyhá — Money sa NEpodhodnotí', () => {

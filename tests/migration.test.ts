@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import seed from '../src/lib/server/cfg_seed.json';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-migr-test-'));
 const dbPath = path.join(tmpRoot, 'test.db');
@@ -165,5 +166,70 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		).not.toThrow();
 		expect(db.pragma('user_version', { simple: true })).toBe(2);
 		expect((db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c).toBeGreaterThan(0);
+	});
+});
+
+describe('v6 → v7 upgrade (reálny prod path: DB s pôvodnými 10 Deluxe štýlmi)', () => {
+	// Hlavný test vyššie ide v1→…→v7 (fresh), takže v6 naseeduje rovno NOVÚ 8-štýlovú
+	// štruktúru. Produkčná DB je ale na v6 so STARÝMI 10 štýlmi (5K6/5K10/6K6/6K10) —
+	// tu overíme, že v7 ich zmaže a nahradí 8 novými + hrubka stĺpce. (v7 SQL je mirror
+	// db.ts, ako existujúci idempotencia-test pre v2; reálny v7 kód beží vo fresh teste.)
+	it('v7 zmaže staré 5K6/5K10/6K6/6K10, naseeduje 8 štýlov + hrubka stĺpce', () => {
+		const p = path.join(tmpRoot, 'v6-old.db');
+		const d = new Database(p);
+		d.exec(`
+			CREATE TABLE cfg_sys (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL UNIQUE, n INTEGER NOT NULL, sklo_offset REAL NOT NULL);
+			CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL, dim TEXT NOT NULL, koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks REAL NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500);
+			CREATE TABLE glass_types (id INTEGER PRIMARY KEY, nazov TEXT NOT NULL UNIQUE, redukcia_zero INTEGER NOT NULL DEFAULT 0, poradie INTEGER NOT NULL DEFAULT 0, system TEXT NOT NULL DEFAULT 'ALL');
+		`);
+		// STARÉ 10-štýlové Deluxe (+ Robust ako kontrola, že sa nedotkne)
+		for (const st of ['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K6', '5K10', '6K6', '6K10'])
+			d.prepare('INSERT INTO cfg_sys (sys_styl,n,sklo_offset) VALUES (?,?,0)').run('Deluxe|' + st, 5);
+		d.prepare('INSERT INTO cfg_sys (sys_styl,n,sklo_offset) VALUES (?,?,135)').run('Robust|2K', 2);
+		d.prepare("INSERT INTO cfg_rez (sys_styl,poradie,typ,kod,nazov,dim) VALUES ('Deluxe|5K10',20,'profil','ZASP202417','Kladka 10mm stará','S')").run();
+		d.prepare("INSERT INTO cfg_rez (sys_styl,poradie,typ,kod,nazov,dim) VALUES ('Robust|2K',10,'profil','ZASP00014','Koľajnica','S')").run();
+		d.prepare("INSERT INTO glass_types (nazov,redukcia_zero,poradie,system) VALUES ('Float kalené 6 mm',0,10,'Deluxe')").run();
+		d.prepare("INSERT INTO glass_types (nazov,redukcia_zero,poradie,system) VALUES ('Float kalené 10 mm',0,20,'Deluxe')").run();
+		d.pragma('user_version = 6');
+
+		// --- v7 migračný blok (mirror db.ts) ---
+		d.exec('ALTER TABLE cfg_rez ADD COLUMN sklo_hrubka INTEGER NOT NULL DEFAULT 0');
+		d.exec('ALTER TABLE glass_types ADD COLUMN hrubka INTEGER NOT NULL DEFAULT 0');
+		const insSys = d.prepare('INSERT INTO cfg_sys (sys_styl,n,sklo_offset) VALUES (?,?,?)');
+		const insRez = d.prepare(
+			`INSERT INTO cfg_rez (sys_styl,poradie,typ,kod,nazov,dim,koef,offset,delit_n,kerf,pocet_ks,sklozavisle,dlzka_tyce,sklo_hrubka) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+		);
+		d.transaction(() => {
+			d.prepare("DELETE FROM cfg_rez WHERE sys_styl LIKE 'Deluxe|%'").run();
+			d.prepare("DELETE FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").run();
+			for (const s of seed.sys) {
+				if (!s.sysStyl.startsWith('Deluxe')) continue;
+				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+					insRez.run(
+						r.sysStyl, r.poradie, r.typ, r.kod, r.nazov, r.dim, r.koef, r.offset,
+						r.delitN, r.kerf, r.pocetKs, r.sklozavisle,
+						(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500,
+						(r as { skloHrubka?: number }).skloHrubka ?? 0
+					);
+			}
+			d.prepare("UPDATE glass_types SET hrubka=6 WHERE nazov='Float kalené 6 mm'").run();
+			d.prepare("UPDATE glass_types SET hrubka=10 WHERE nazov='Float kalené 10 mm'").run();
+			d.pragma('user_version = 7');
+		})();
+
+		// staré delené štýly PREČ
+		expect(
+			d.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Deluxe|5K6','Deluxe|5K10','Deluxe|6K6','Deluxe|6K10')").get()
+		).toEqual({ c: 0 });
+		// 8 nových štýlov
+		expect((d.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").get() as { c: number }).c).toBe(8);
+		// sklo_hrubka nasadené (10mm kladka), glass hrubka nastavená
+		expect(d.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP202417'").get()).toEqual({ h: 10 });
+		expect(d.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 10 mm'").get()).toEqual({ h: 10 });
+		// Robust sa NEDOTKOL (dáta + default sklo_hrubka 0)
+		expect((d.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl='Robust|2K'").get() as { c: number }).c).toBe(1);
+		expect(d.prepare("SELECT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP00014'").get()).toEqual({ h: 0 });
+		d.close();
 	});
 });
