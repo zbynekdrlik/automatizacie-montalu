@@ -41,6 +41,27 @@ vzorcom `(S-a)/N + b` kde `+b` je MIMO delenia → `koef=1/N, offset=b-a/N, deli
 (delitN=1 by `+b` nevyjadril). Exaktné test-vektory over cross-checkom app-FFD == Excel
 ROUNDUP; každý ŽIVO-voliteľný štýl musí mať exaktný vektor (nie len smoke).
 
+## 3b. Atribút vyberá VARIANT článku (bez duplikovania štýlu) — `sklo_hrubka`
+
+Keď VLASTNOSŤ položky (nie štýl) vyberá iný Money kód pri IDENTICKEJ geometrii/množstve,
+NErob duplicitný štýl na každú hodnotu. Namiesto toho stĺpec-podmienka na `cfg_rez`:
+`sklo_hrubka` (0 = platí vždy, 6/10 = len pre tú hrúbku skla) + `glass_types.hrubka`.
+Deluxe: hrúbka SKLA (6/10 mm) vyberá kladkový+klzný profil — 6mm→`ZASP202416`/`ZASP202424`,
+10mm→`ZASP202417`/`ZASP202425` (všetko 3600mm tyč, ROVNAKÝ počet, líši sa LEN kód). Koľajnice/
+dorazové/sklo sú hrúbko-nezávislé (`sklo_hrubka=0`). `profilCuts` zahrnie riadok iff
+`sklo_hrubka===0 || sklo_hrubka===zvolenáHrúbka`. **Pasca:** ak systém MÁ hrúbko-závislé riadky
+ale žiaden nesadne na zvolenú hrúbku → tichý PODhodnotený odpis. `missingHrubkaProfile()` v
+`safeCompute`/`safeComputeMulti` to odmietne fail-loud PRED oversizeCut. Editor: ukáž len KANONICKÝ
+(6mm) riadok, edit zrkadli offset na 10mm dvojča (`baseRole` párovanie) + invariant že 6/10 majú
+rovnaký offset — inak by tá istá zákazka písala iné množstvo pre 6 vs 10.
+
+- **Deluxe reže VŠETKO na 90°** (rovný rez) — `sikmyRez=false` pre celý systém Deluxe (server:
+  `system !== 'Deluxe' && jeSikmyRez(nazov)`). Robust/Slide majú šikmé (45°) podľa profilu.
+- **JS regex gotcha:** `\b` za NEASCII znakom (napr. `Surov[ýy]\b`) nikdy nesadne — `ý` nie je `\w`,
+  hranica slova tam neexistuje. `baseRole` preto strip bez `\b`.
+- **Over KAŽDÝ rozmer nového systému, nie len vzorec:** rez uhol, obrázky profilov, model skla —
+  Dominik/Zbynek našli chyby práve v týchto „okolo-vzorca" veciach, nie v FFD matike.
+
 ## 4. Overenie na LIVE appke = len Spočítať / Späť, NIKDY Odoslať
 
 `MONEY_LIVE=1` → „✅ Odoslať odpis do Money" reálne zapíše. Náhľad (Spočítať) a Späť
