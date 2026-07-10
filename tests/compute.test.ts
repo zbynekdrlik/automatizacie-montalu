@@ -136,44 +136,90 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 	});
 });
 
-describe('Deluxe — per-profil dĺžka tyče (Money-kritické, všetkých 10 štýlov over. proti nárez. workbookom + LIVE Money 2026-07-09)', () => {
-	// odpis = tyče × dĺžka tyče toho profilu. Kladka/klzný sú 3600mm články
-	// (ZASP2024xx — staré ZASP000417/00066 boli neplatné/0-sklad), 5K horná
-	// koľajnica 6000mm, zvyšok 7500. Prírez: 2K (S-26)/2+12, 3K …/3+12, 4K …/4+12,
-	// 2x* (S-26-9.5)/N+off, 5K (S+52)/5, 6K (S+65)/6; dorazové V-53 (malé)/V-10 (5K,6K).
-	// Excel bol nekonzistentný (odpis hárok fakturoval ×7.5 starým kódom) — appka
-	// ráta AJ fakturuje na skutočnú dĺžku článku. Sklo nie je v Money (len plán).
-	const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
-		['Deluxe|2K', 5000, 2000, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 2498, vyska: 1914 }],
-		['Deluxe|3K', 3500, 2100, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP202417: 3.6, ZASP202425: 3.6, ZASP00021: 7.5 }, { sirka: 1168, vyska: 2014 }],
-		['Deluxe|4K', 6000, 2300, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1504, vyska: 2214 }],
-		// 2x3K = dvojité 3K → spodná koľajnica je 3K (ZASP00030), nie 2K; workbook mal
-		// preklep ZASP00104 (over. proti Money 2026-07-09 + 3K single). Množstvo rovnaké.
-		['Deluxe|2x3K', 6000, 2200, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1005, vyska: 2114 }],
+describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické, 8 štýlov over. proti nárez. workbookom + LIVE Money 2026-07-10)', () => {
+	// Dominik 2026-07-10: 6/10 NIE je štýl — je to vlastnosť SKLA. Každý z 8 štýlov
+	// (2K…6K) má dvojicu kladka/klzný pre 6mm (ZASP202416/424) aj 10mm (ZASP202417/425);
+	// zvolené sklo (Float kalené 6/10) vyberie tú správnu. Množstvo (metre) je pre 6 aj
+	// 10 IDENTICKÉ — mení sa LEN Money kód, aby nárezáky neboli duplicitné. odpis = tyče
+	// × dĺžka tyče: kladka/klzný 3600mm, 5K horná koľajnica 6000mm, zvyšok 7500. Sklo nie
+	// je v Money (len plán). Prírez a koľajnice over. proti workbookom + LIVE Money 2026-07-10.
+	// [styl, S, V, {koľajnice+dorazové: metre}, kladkaKlznyMetre, {sklo}]
+	const cases: [string, number, number, Record<string, number>, number, { sirka: number; vyska: number }][] = [
+		['Deluxe|2K', 5000, 2000, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 2498, vyska: 1914 }],
+		['Deluxe|3K', 3500, 2100, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP00021: 7.5 }, 3.6, { sirka: 1168, vyska: 2014 }],
+		['Deluxe|4K', 6000, 2300, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 1504, vyska: 2214 }],
+		// 2x3K = dvojité 3K → spodná koľajnica 3K (ZASP00030); workbook mal preklep ZASP00104
+		['Deluxe|2x3K', 6000, 2200, { ZASP00081: 7.5, ZASP00030: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 1005, vyska: 2114 }],
 		// 2x2K prírez = (S-35.5)/4+11 = 0.25·S+2.125; 2x4K = (S-35.5)/8+12 = 0.125·S+7.5625
-		// (workbook F43 — iná konštanta než jednoduché 2K/4K, preto pinnuté samostatne)
-		['Deluxe|2x2K', 4000, 2200, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 1001, vyska: 2114 }],
-		['Deluxe|2x4K', 6400, 2400, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 806, vyska: 2314 }],
+		['Deluxe|2x2K', 4000, 2200, { ZASP00078: 7.5, ZASP00104: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 1001, vyska: 2114 }],
+		['Deluxe|2x4K', 6400, 2400, { ZASP00084: 7.5, ZASP00033: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 806, vyska: 2314 }],
 		// 5K: horná koľajnica 6000mm (× 6.0), spodná 7500 (× 7.5); kladka/klzný 3600
-		['Deluxe|5K10', 4500, 2400, { ZASP202434: 6.0, ZASP202432: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 908, vyska: 2318 }],
-		// 5K6 = tá istá geometria, iba 6mm kladka/klzný (ZASP202416/424)
-		['Deluxe|5K6', 4500, 2400, { ZASP202434: 6.0, ZASP202432: 7.5, ZASP202416: 7.2, ZASP202424: 7.2, ZASP00021: 7.5 }, { sirka: 908, vyska: 2318 }],
-		['Deluxe|6K6', 5000, 2500, { ZASP202411: 7.5, ZASP202437: 7.5, ZASP202416: 7.2, ZASP202424: 7.2, ZASP00021: 7.5 }, { sirka: 842, vyska: 2418 }],
-		['Deluxe|6K10', 5000, 2500, { ZASP202411: 7.5, ZASP202437: 7.5, ZASP202417: 7.2, ZASP202425: 7.2, ZASP00021: 7.5 }, { sirka: 842, vyska: 2418 }]
+		['Deluxe|5K', 4500, 2400, { ZASP202434: 6.0, ZASP202432: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 908, vyska: 2318 }],
+		['Deluxe|6K', 5000, 2500, { ZASP202411: 7.5, ZASP202437: 7.5, ZASP00021: 7.5 }, 7.2, { sirka: 842, vyska: 2418 }]
 	];
-	it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
-		const r = computeFlat(cfg, sysStyl, S, V, false);
-		expect(r).not.toBeNull();
-		const got = odpisByKod(r!);
-		// presne 5 profilov v odpise (2 koľajnice + kladka + klzný + dorazové)
-		expect(r!.odpis.length, sysStyl).toBe(5);
-		for (const [kod, metre] of Object.entries(expOdpis)) expect(got[kod], `${sysStyl} ${kod}`).toBe(metre);
-		expect(r!.sklo.sirka, `${sysStyl} sklo.sirka`).toBe(expSklo.sirka);
-		expect(r!.sklo.vyska, `${sysStyl} sklo.vyska`).toBe(expSklo.vyska);
+	// hrúbka skla → [kladka kód, klzný kód]
+	const profilPreHrubku: Record<number, [string, string]> = {
+		6: ['ZASP202416', 'ZASP202424'],
+		10: ['ZASP202417', 'ZASP202425']
+	};
+	for (const [sysStyl, S, V, expFixed, kladkaMetre, expSklo] of cases) {
+		for (const hrubka of [6, 10] as const) {
+			it(`${sysStyl} ${S}×${V} · sklo ${hrubka}mm`, () => {
+				const r = computeFlat(cfg, sysStyl, S, V, false, hrubka);
+				expect(r).not.toBeNull();
+				const got = odpisByKod(r!);
+				const [kladka, klzny] = profilPreHrubku[hrubka];
+				const [inyKladka, inyKlzny] = profilPreHrubku[hrubka === 6 ? 10 : 6];
+				// presne 5 profilov: 2 koľajnice + kladka + klzný + dorazové
+				expect(r!.odpis.length, sysStyl).toBe(5);
+				// koľajnice + dorazové sú rovnaké pre obe hrúbky
+				for (const [kod, metre] of Object.entries(expFixed)) expect(got[kod], `${sysStyl} ${kod}`).toBe(metre);
+				// zvolená hrúbka → JEJ kladka/klzný s daným množstvom
+				expect(got[kladka], `${sysStyl} ${kladka}`).toBe(kladkaMetre);
+				expect(got[klzny], `${sysStyl} ${klzny}`).toBe(kladkaMetre);
+				// NIKDY profil druhej hrúbky (nárezák nesmie byť duplicitný pre 6/10)
+				expect(got[inyKladka], `${sysStyl} nesmie mať ${inyKladka}`).toBeUndefined();
+				expect(got[inyKlzny], `${sysStyl} nesmie mať ${inyKlzny}`).toBeUndefined();
+				// sklo (len plán) je rovnaké pre obe hrúbky
+				expect(r!.sklo.sirka, `${sysStyl} sklo.sirka`).toBe(expSklo.sirka);
+				expect(r!.sklo.vyska, `${sysStyl} sklo.vyska`).toBe(expSklo.vyska);
+			});
+		}
+	}
+
+	it('6mm a 10mm sklo dávajú ROVNAKÉ množstvo, líši sa LEN Money kód (Dominik)', () => {
+		// jadro požiadavky: nárezáky nesmú byť duplicitné pre 6/10 — metre identické
+		for (const st of ['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K', '6K']) {
+			const r6 = computeFlat(cfg, 'Deluxe|' + st, 4000, 2200, false, 6)!;
+			const r10 = computeFlat(cfg, 'Deluxe|' + st, 4000, 2200, false, 10)!;
+			const kl6 = r6.odpis.find((o) => o.kod === 'ZASP202416');
+			const kl10 = r10.odpis.find((o) => o.kod === 'ZASP202417');
+			expect(kl6, st + ' 6mm kladka').toBeDefined();
+			expect(kl10, st + ' 10mm kladka').toBeDefined();
+			expect(kl6!.metre, st + ' rovnaké množstvo kladka 6 vs 10').toBe(kl10!.metre);
+			// klzný tiež — 6mm ZASP202424 == 10mm ZASP202425
+			expect(r6.odpis.find((o) => o.kod === 'ZASP202424')!.metre).toBe(
+				r10.odpis.find((o) => o.kod === 'ZASP202425')!.metre
+			);
+		}
+	});
+
+	it('Deluxe sa reže na 90° (rovný) — každý profil sikmyRez=false (Zbynek)', () => {
+		const r = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false, 10)!;
+		expect(r.material.length).toBeGreaterThan(0);
+		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(false);
+	});
+
+	it('Robust/Slide: sikmyRez podľa profilu (nosový/oponový 90°, zvyšok 45°) — nezmenené', () => {
+		const r = computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!;
+		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(jeSikmyRez(m.nazov));
+		// Robust 2x3K má aj 45° (rámový/koľajnica) aj 90° (nosový/oponový)
+		expect(r.material.some((m) => m.sikmyRez)).toBe(true);
+		expect(r.material.some((m) => !m.sikmyRez)).toBe(true);
 	});
 
 	it('kladka/klzný sa počíta na 3600mm tyč, nie 7500 (odpis × 3.6 na tyč)', () => {
-		const r = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false)!;
+		const r = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false, 10)!;
 		const kladka = r.material.find((m) => m.kod === 'ZASP202417')!;
 		// 2 kusy 2499mm, každý na vlastnú 3600mm tyč (2×2503 > 3600) → 2 tyče × 3.6
 		expect(kladka.tyce).toBe(2);
@@ -183,7 +229,7 @@ describe('Deluxe — per-profil dĺžka tyče (Money-kritické, všetkých 10 š
 	});
 
 	it('5K horná koľajnica je 6000mm tyč (× 6.0), spodná 7500 (× 7.5)', () => {
-		const r = computeFlat(cfg, 'Deluxe|5K10', 4500, 2400, false)!;
+		const r = computeFlat(cfg, 'Deluxe|5K', 4500, 2400, false, 10)!;
 		expect(r.odpis.find((o) => o.kod === 'ZASP202434')!.metre).toBe(6.0);
 		expect(r.odpis.find((o) => o.kod === 'ZASP202432')!.metre).toBe(7.5);
 	});
@@ -197,15 +243,17 @@ describe('Deluxe — per-profil dĺžka tyče (Money-kritické, všetkých 10 š
 		}
 	});
 
-	it('všetkých 10 Deluxe štýlov je platných a počíta 5 profilov bez chyby', () => {
-		for (const st of ['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K6', '5K10', '6K6', '6K10']) {
+	it('všetkých 8 Deluxe štýlov je platných a počíta 5 profilov (pre 6 aj 10 mm)', () => {
+		for (const st of ['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K', '6K']) {
 			const ss = 'Deluxe|' + st;
 			expect(validSys(cfg, ss), ss).toBe(true);
-			const { r, err } = safeCompute(cfg, ss, 4000, 2200, false);
-			expect(err, ss).toBeNull();
-			expect(r!.odpis.length, ss).toBe(5);
-			expect(r!.odpis.every((o) => Number.isFinite(o.metre) && o.metre > 0), ss).toBe(true);
-			expect(r!.sklo.pocet, ss).toBe(r!.N);
+			for (const hrubka of [6, 10]) {
+				const { r, err } = safeCompute(cfg, ss, 4000, 2200, false, hrubka);
+				expect(err, `${ss} ${hrubka}mm`).toBeNull();
+				expect(r!.odpis.length, `${ss} ${hrubka}mm`).toBe(5);
+				expect(r!.odpis.every((o) => Number.isFinite(o.metre) && o.metre > 0), ss).toBe(true);
+				expect(r!.sklo.pocet, ss).toBe(r!.N);
+			}
 		}
 	});
 
@@ -213,19 +261,19 @@ describe('Deluxe — per-profil dĺžka tyče (Money-kritické, všetkých 10 š
 		// 5K horná koľajnica ZASP202434 je 6000mm tyč; šírka 6100 → rez 6100 mm sa
 		// fyzicky nedá vyrobiť. Bez guardu by FFD „zabalil" 6100 na 1 tyč (záporný
 		// odpad) a odpis by bol 6.0 namiesto ~12.0 → podhodnotenie do Money.
-		const { r, err } = safeCompute(cfg, 'Deluxe|5K10', 6100, 2400, false);
+		const { r, err } = safeCompute(cfg, 'Deluxe|5K', 6100, 2400, false, 10);
 		expect(r).toBeNull();
 		expect(err).toMatch(/dlhší než tyč/);
 		// bežná šírka 5900 (< 6000) prejde bez chyby
-		expect(safeCompute(cfg, 'Deluxe|5K10', 5900, 2400, false).err).toBeNull();
+		expect(safeCompute(cfg, 'Deluxe|5K', 5900, 2400, false, 10).err).toBeNull();
 		// aj cez computeMulti (zimná záhrada) sa oversize posuv odmietne
-		expect(safeComputeMulti(cfg, [{ sysStyl: 'Deluxe|5K10', S: 6100, V: 2400, redukciaZero: false }]).err).toMatch(
-			/dlhší než tyč/
-		);
+		expect(
+			safeComputeMulti(cfg, [{ sysStyl: 'Deluxe|5K', S: 6100, V: 2400, redukciaZero: false, skloHrubka: 10 }]).err
+		).toMatch(/dlhší než tyč/);
 	});
 
 	it('MaterialRow nesie per-profil dĺžku tyče (pre grafický rozpis) — nie natvrdo 7500', () => {
-		const r = computeFlat(cfg, 'Deluxe|5K10', 4500, 2400, false)!;
+		const r = computeFlat(cfg, 'Deluxe|5K', 4500, 2400, false, 10)!;
 		const bar = (kod: string) => r.material.find((m) => m.kod === kod)!.barLen;
 		expect(bar('ZASP202434')).toBe(6000); // 5K horná koľajnica
 		expect(bar('ZASP202417')).toBe(3600); // kladka 10mm
@@ -236,33 +284,35 @@ describe('Deluxe — per-profil dĺžka tyče (Money-kritické, všetkých 10 š
 
 	it('dlzkaTyce mimo rozsahu (preklep 600 namiesto 6000) je odmietnutá inBounds — Money guard', () => {
 		const bad = seed.rez.map((r) => ({ ...r })) as RezRow[];
-		const row = bad.find((r) => r.sysStyl === 'Deluxe|5K10' && r.kod === 'ZASP202434')!;
+		const row = bad.find((r) => r.sysStyl === 'Deluxe|5K' && r.kod === 'ZASP202434')!;
 		row.dlzkaTyce = 600; // preklep: malo byť 6000
 		const badCfg = buildCFG(seed.sys as SysRow[], bad);
-		expect(inBounds(badCfg, 'Deluxe|5K10')).toMatch(/Dĺžka tyče/);
-		expect(safeCompute(badCfg, 'Deluxe|5K10', 4500, 2400, false).err).toMatch(/mimo povolených rozsahov/);
+		expect(inBounds(badCfg, 'Deluxe|5K')).toMatch(/Dĺžka tyče/);
+		expect(safeCompute(badCfg, 'Deluxe|5K', 4500, 2400, false, 6).err).toMatch(/mimo povolených rozsahov/);
 	});
 });
 
 describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', () => {
-	const P = (S: number, V: number, sysStyl = 'Robust|2K'): PosuvSpec => ({
+	const P = (S: number, V: number, sysStyl = 'Robust|2K', skloHrubka = 0): PosuvSpec => ({
 		sysStyl,
 		S,
 		V,
-		redukciaZero: false
+		redukciaZero: false,
+		skloHrubka
 	});
 
 	it('JEDEN posuv dáva IDENTICKÝ odpis a tyče ako computeFlat (Money nezmenené)', () => {
-		for (const [ss, S, V] of [
-			['Robust|2K', 5000, 2000],
-			['Robust|2x3K', 5000, 2200],
-			['Slide|3K', 3500, 2001],
-			// Deluxe: per-profil dĺžka tyče (kladka 3600) musí prejsť aj cez computeMulti
-			['Deluxe|5K10', 4500, 2400],
-			['Deluxe|2K', 5000, 2000]
-		] as [string, number, number][]) {
-			const flat = computeFlat(cfg, ss, S, V, false)!;
-			const multi = computeMulti(cfg, [P(S, V, ss)])!;
+		for (const [ss, S, V, hrubka] of [
+			['Robust|2K', 5000, 2000, 0],
+			['Robust|2x3K', 5000, 2200, 0],
+			['Slide|3K', 3500, 2001, 0],
+			// Deluxe: per-profil dĺžka tyče (kladka 3600) + hrúbko-závislý kladka/klzný
+			// (10mm) musí prejsť rovnako aj cez computeMulti
+			['Deluxe|5K', 4500, 2400, 10],
+			['Deluxe|2K', 5000, 2000, 6]
+		] as [string, number, number, number][]) {
+			const flat = computeFlat(cfg, ss, S, V, false, hrubka)!;
+			const multi = computeMulti(cfg, [P(S, V, ss, hrubka)])!;
 			// odpis (Money) musí byť bit-identický
 			expect(multi.odpis).toEqual(flat.odpis);
 			// materiál: rovnaké kódy a rovnaký počet tyčí

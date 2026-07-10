@@ -45,8 +45,8 @@ const { db } = await import('../src/lib/server/db');
 const { writeOdpis } = await import('../src/lib/server/money');
 
 describe('migrácia odpis_log v1 → v2/v3', () => {
-	it('user_version = 6 a dáta prežili s modul=zasklenia + detail JSON', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(6);
+	it('user_version = 7 a dáta prežili s modul=zasklenia + detail JSON', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(7);
 		const row = db
 			.prepare('SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?')
 			.get('ZAK-MIG-1') as Record<string, unknown>;
@@ -65,31 +65,42 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Slide|2x2K' AND kod='ZASP00091' AND sklozavisle=1").get()).toEqual({ c: 2 });
 	});
 
-	it('v6: Deluxe — 10 štýlov, stĺpec dlzka_tyce + Money-kritické dĺžky tyčí', () => {
-		// všetkých 10 Deluxe štýlov naseedovaných
+	it('v7: Deluxe — 8 štýlov, hrúbka skla vyberá kladka/klzný (sklo_hrubka + glass_types.hrubka)', () => {
+		// v7 zlúčila 5K6/5K10/6K6/6K10 → 5K/6K: 8 základných štýlov (2K…6K), hrúbka
+		// skla (6/10) vyberá kladka/klzný profil — nie štýl (Dominik 2026-07-10).
 		const deluxe = db.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").all() as { sys_styl: string }[];
-		expect(deluxe.length).toBe(10);
-		// stĺpec dlzka_tyce existuje
+		expect(deluxe.length).toBe(8);
+		const styly = new Set(deluxe.map((d) => d.sys_styl.split('|')[1]));
+		expect(styly).toEqual(new Set(['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K', '6K']));
+		// staré delené štýly už NEEXISTUJÚ
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Deluxe|5K6','Deluxe|5K10','Deluxe|6K6','Deluxe|6K10')").get()).toEqual({ c: 0 });
+		// nové stĺpce existujú
 		const cols = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).map((c) => c.name);
 		expect(cols).toContain('dlzka_tyce');
-		// kladka/klzný 10mm = 3600mm tyč (Money-kritické — nie 7500)
-		expect(db.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202417'").get()).toEqual({ d: 3600 });
-		expect(db.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202425'").get()).toEqual({ d: 3600 });
-		// 6mm kladka/klzný = 3600, 5K horná koľajnica = 6000
-		expect(db.prepare("SELECT DISTINCT dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202416'").get()).toEqual({ d: 3600 });
-		expect(db.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K10' AND kod='ZASP202434'").get()).toEqual({ d: 6000 });
-		// migrované Robust/Slide riadky = default 7500 (žiadna regresia)
-		const nonDefault = db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl NOT LIKE 'Deluxe|%' AND dlzka_tyce <> 7500").get();
-		expect(nonDefault).toEqual({ c: 0 });
-		// Deluxe sklá (Float kalené) naseedované so systémom Deluxe
-		expect(db.prepare("SELECT COUNT(*) c FROM glass_types WHERE system='Deluxe'").get()).toEqual({ c: 2 });
-		// 2x3K spodná koľajnica = 3K (ZASP00030), nie 2K (workbook preklep ZASP00104 opravený)
-		expect(
-			db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND poradie=15 AND kod='ZASP00030'").get()
-		).toEqual({ c: 1 });
-		expect(
-			db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND kod='ZASP00104'").get()
-		).toEqual({ c: 0 });
+		expect(cols).toContain('sklo_hrubka');
+		const gcols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map((c) => c.name);
+		expect(gcols).toContain('hrubka');
+		// kladka/klzný sú hrúbko-závislé: 6mm → sklo_hrubka=6, 10mm → =10; oba 3600mm tyč
+		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202416'").get()).toEqual({ h: 6, d: 3600 });
+		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202424'").get()).toEqual({ h: 6, d: 3600 });
+		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202417'").get()).toEqual({ h: 10, d: 3600 });
+		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202425'").get()).toEqual({ h: 10, d: 3600 });
+		// každý Deluxe štýl má PRÁVE JEDNU 6mm + JEDNU 10mm kladku (nie napevno 10mm)
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND sklo_hrubka=6").get()).toEqual({ c: 2 }); // kladka+klzný 6mm
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND sklo_hrubka=10").get()).toEqual({ c: 2 }); // kladka+klzný 10mm
+		// koľajnice/dorazové/sklo = hrúbko-nezávislé (sklo_hrubka=0)
+		expect(db.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod IN ('ZASP00078','ZASP00104','ZASP00021')").all()).toEqual([{ h: 0 }]);
+		// 5K horná koľajnica = 6000mm tyč (Money-kritické)
+		expect(db.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202434'").get()).toEqual({ d: 6000 });
+		// migrované Robust/Slide riadky = default 7500 tyč + sklo_hrubka 0 (žiadna regresia)
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl NOT LIKE 'Deluxe|%' AND (dlzka_tyce <> 7500 OR sklo_hrubka <> 0)").get()).toEqual({ c: 0 });
+		// Deluxe sklá (Float kalené) majú hrúbku 6/10; Robust/Slide/ALL sklá = 0
+		expect(db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 6 mm'").get()).toEqual({ h: 6 });
+		expect(db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 10 mm'").get()).toEqual({ h: 10 });
+		expect(db.prepare("SELECT COUNT(*) c FROM glass_types WHERE system<>'Deluxe' AND hrubka<>0").get()).toEqual({ c: 0 });
+		// 2x3K spodná koľajnica = 3K (ZASP00030), workbook preklep ZASP00104 opravený
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND poradie=15 AND kod='ZASP00030'").get()).toEqual({ c: 1 });
+		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND kod='ZASP00104'").get()).toEqual({ c: 0 });
 	});
 
 	it('dedup migrovaného záznamu drží — tá istá ZAK+OP sa neodošle druhýkrát', async () => {

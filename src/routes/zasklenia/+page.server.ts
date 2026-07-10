@@ -49,7 +49,8 @@ function compute(vstup: Vstup) {
 	const g = glassTypesForSystem(vstup.system).find((x) => x.nazov === vstup.sklo);
 	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém.' };
 	const cfg = loadCfg();
-	return safeCompute(cfg, vstup.system + '|' + vstup.styl, vstup.s, vstup.v, g.redukciaZero);
+	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
+	return safeCompute(cfg, vstup.system + '|' + vstup.styl, vstup.s, vstup.v, g.redukciaZero, g.hrubka);
 }
 
 // ---- Viac posuvov (zimná záhrada) ----
@@ -65,6 +66,7 @@ function computeMultiFrom(vstup: MultiVstup) {
 			S: p.s,
 			V: p.v,
 			redukciaZero: g.redukciaZero,
+			skloHrubka: g.hrubka,
 			otvaranie: p.otvaranie,
 			sklo: p.sklo
 		});

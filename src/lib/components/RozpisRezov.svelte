@@ -4,7 +4,6 @@
 	// každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci.
 	// Rezy na 45° (zošikmená čiara) — pri zaskleniach všetko okrem nosového.
 	import type { MaterialRow } from '$lib/server/compute';
-	import { jeSikmyRez } from '$lib/cut';
 	import ProfilObrazok from './ProfilObrazok.svelte';
 
 	let {
@@ -14,8 +13,8 @@
 	}: { material: MaterialRow[]; bar?: number; viacPosuvov?: boolean } = $props();
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
-	// nosový AJ oponový profil sa režú rovno (90°), zvyšok na 45° (šikmý rez)
-	const jeSikmy = jeSikmyRez;
+	// uhol rezu (45° vs rovný 90°) rozhoduje server per profil (m.sikmyRez):
+	// Deluxe = všetko 90°; Robust/Slide = 90° nosový/oponový, zvyšok 45°
 
 	const H = 100; // výška tyče v SVG jednotkách
 	const S = 250; // horizontálny sklon šikmého rezu (v mm-jednotkách viewBoxu)
@@ -80,7 +79,7 @@
 
 <div class="rozpis">
 	{#each material.filter((m) => m.tyce > 0) as m (m.kod)}
-		{@const sikmy = jeSikmy(m.nazov)}
+		{@const sikmy = m.sikmyRez}
 		<!-- dĺžka tyče je per-profil (Deluxe: kladka/klzný 3600, 5K horná koľajnica
 		     6000); staršie výsledky bez m.barLen padnú na fallback prop `bar` -->
 		{@const barLen = m.barLen ?? bar}

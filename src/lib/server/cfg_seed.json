@@ -81,22 +81,12 @@
 			"skloOffset": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
 			"N": 5,
 			"skloOffset": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K10",
-			"N": 5,
-			"skloOffset": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K6",
-			"N": 6,
-			"skloOffset": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K10",
+			"sysStyl": "Deluxe|6K",
 			"N": 6,
 			"skloOffset": 0
 		}
@@ -1296,6 +1286,22 @@
 			"sysStyl": "Deluxe|2K",
 			"poradie": 20,
 			"typ": "profil",
+			"kod": "ZASP202416",
+			"nazov": "Kladkový profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.5,
+			"offset": -1.0,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 2,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2K",
+			"poradie": 21,
+			"typ": "profil",
 			"kod": "ZASP202417",
 			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
 			"dim": "S",
@@ -1305,11 +1311,28 @@
 			"kerf": 0,
 			"pocetKs": 2,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2K",
 			"poradie": 25,
+			"typ": "profil",
+			"kod": "ZASP202424",
+			"nazov": "Klzný profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.5,
+			"offset": -1.0,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 2,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -1320,7 +1343,8 @@
 			"kerf": 0,
 			"pocetKs": 2,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2K",
@@ -1396,6 +1420,22 @@
 			"sysStyl": "Deluxe|3K",
 			"poradie": 20,
 			"typ": "profil",
+			"kod": "ZASP202416",
+			"nazov": "Kladkový profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.3333333333333333,
+			"offset": 3.3333333333333335,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 3,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|3K",
+			"poradie": 21,
+			"typ": "profil",
 			"kod": "ZASP202417",
 			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
 			"dim": "S",
@@ -1405,11 +1445,28 @@
 			"kerf": 0,
 			"pocetKs": 3,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|3K",
 			"poradie": 25,
+			"typ": "profil",
+			"kod": "ZASP202424",
+			"nazov": "Klzný profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.3333333333333333,
+			"offset": 3.3333333333333335,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 3,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|3K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -1420,7 +1477,8 @@
 			"kerf": 0,
 			"pocetKs": 3,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|3K",
@@ -1496,6 +1554,22 @@
 			"sysStyl": "Deluxe|4K",
 			"poradie": 20,
 			"typ": "profil",
+			"kod": "ZASP202416",
+			"nazov": "Kladkový profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.25,
+			"offset": 5.5,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 4,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|4K",
+			"poradie": 21,
+			"typ": "profil",
 			"kod": "ZASP202417",
 			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
 			"dim": "S",
@@ -1505,11 +1579,28 @@
 			"kerf": 0,
 			"pocetKs": 4,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|4K",
 			"poradie": 25,
+			"typ": "profil",
+			"kod": "ZASP202424",
+			"nazov": "Klzný profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.25,
+			"offset": 5.5,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 4,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|4K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -1520,7 +1611,8 @@
 			"kerf": 0,
 			"pocetKs": 4,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|4K",
@@ -1596,6 +1688,22 @@
 			"sysStyl": "Deluxe|2x2K",
 			"poradie": 20,
 			"typ": "profil",
+			"kod": "ZASP202416",
+			"nazov": "Kladkový profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.25,
+			"offset": 2.125,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 4,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2x2K",
+			"poradie": 21,
+			"typ": "profil",
 			"kod": "ZASP202417",
 			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
 			"dim": "S",
@@ -1605,11 +1713,28 @@
 			"kerf": 0,
 			"pocetKs": 4,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2x2K",
 			"poradie": 25,
+			"typ": "profil",
+			"kod": "ZASP202424",
+			"nazov": "Klzný profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.25,
+			"offset": 2.125,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 4,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2x2K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -1620,7 +1745,8 @@
 			"kerf": 0,
 			"pocetKs": 4,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2x2K",
@@ -1696,6 +1822,22 @@
 			"sysStyl": "Deluxe|2x3K",
 			"poradie": 20,
 			"typ": "profil",
+			"kod": "ZASP202416",
+			"nazov": "Kladkový profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.16666666666666666,
+			"offset": 6.083333333333333,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 6,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2x3K",
+			"poradie": 21,
+			"typ": "profil",
 			"kod": "ZASP202417",
 			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
 			"dim": "S",
@@ -1705,11 +1847,28 @@
 			"kerf": 0,
 			"pocetKs": 6,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2x3K",
 			"poradie": 25,
+			"typ": "profil",
+			"kod": "ZASP202424",
+			"nazov": "Klzný profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.16666666666666666,
+			"offset": 6.083333333333333,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 6,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2x3K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -1720,7 +1879,8 @@
 			"kerf": 0,
 			"pocetKs": 6,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2x3K",
@@ -1796,6 +1956,22 @@
 			"sysStyl": "Deluxe|2x4K",
 			"poradie": 20,
 			"typ": "profil",
+			"kod": "ZASP202416",
+			"nazov": "Kladkový profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.125,
+			"offset": 7.5625,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 8,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2x4K",
+			"poradie": 21,
+			"typ": "profil",
 			"kod": "ZASP202417",
 			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
 			"dim": "S",
@@ -1805,11 +1981,28 @@
 			"kerf": 0,
 			"pocetKs": 8,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2x4K",
 			"poradie": 25,
+			"typ": "profil",
+			"kod": "ZASP202424",
+			"nazov": "Klzný profil 6 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.125,
+			"offset": 7.5625,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 8,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
+		},
+		{
+			"sysStyl": "Deluxe|2x4K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -1820,7 +2013,8 @@
 			"kerf": 0,
 			"pocetKs": 8,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
 			"sysStyl": "Deluxe|2x4K",
@@ -1865,7 +2059,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
 			"poradie": 10,
 			"typ": "profil",
 			"kod": "ZASP202434",
@@ -1880,7 +2074,7 @@
 			"dlzkaTyce": 6000
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
 			"poradie": 15,
 			"typ": "profil",
 			"kod": "ZASP202432",
@@ -1894,7 +2088,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
 			"poradie": 20,
 			"typ": "profil",
 			"kod": "ZASP202416",
@@ -1906,10 +2100,27 @@
 			"kerf": 0,
 			"pocetKs": 5,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
+			"poradie": 21,
+			"typ": "profil",
+			"kod": "ZASP202417",
+			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.2,
+			"offset": 10.4,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 5,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
+		},
+		{
+			"sysStyl": "Deluxe|5K",
 			"poradie": 25,
 			"typ": "profil",
 			"kod": "ZASP202424",
@@ -1921,10 +2132,27 @@
 			"kerf": 0,
 			"pocetKs": 5,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
+			"poradie": 26,
+			"typ": "profil",
+			"kod": "ZASP202425",
+			"nazov": "Klzný profil 10 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.2,
+			"offset": 10.4,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 5,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
+		},
+		{
+			"sysStyl": "Deluxe|5K",
 			"poradie": 30,
 			"typ": "profil",
 			"kod": "ZASP00021",
@@ -1938,7 +2166,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
 			"poradie": 90,
 			"typ": "sklo",
 			"kod": "",
@@ -1952,7 +2180,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K6",
+			"sysStyl": "Deluxe|5K",
 			"poradie": 91,
 			"typ": "sklo",
 			"kod": "",
@@ -1966,108 +2194,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 10,
-			"typ": "profil",
-			"kod": "ZASP202434",
-			"nazov": "Koľajnica horná 5K Surový 6000 mm",
-			"dim": "S",
-			"koef": 1,
-			"offset": 0,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 1,
-			"sklozavisle": 0,
-			"dlzkaTyce": 6000
-		},
-		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 15,
-			"typ": "profil",
-			"kod": "ZASP202432",
-			"nazov": "Koľajnica spodná 5K Surový 7500 mm",
-			"dim": "S",
-			"koef": 1,
-			"offset": 0,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 1,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 20,
-			"typ": "profil",
-			"kod": "ZASP202417",
-			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
-			"dim": "S",
-			"koef": 0.2,
-			"offset": 10.4,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 5,
-			"sklozavisle": 0,
-			"dlzkaTyce": 3600
-		},
-		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 25,
-			"typ": "profil",
-			"kod": "ZASP202425",
-			"nazov": "Klzný profil 10 mm Surový 3600 mm",
-			"dim": "S",
-			"koef": 0.2,
-			"offset": 10.4,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 5,
-			"sklozavisle": 0,
-			"dlzkaTyce": 3600
-		},
-		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 30,
-			"typ": "profil",
-			"kod": "ZASP00021",
-			"nazov": "Dorazový profil Surový 7500 mm",
-			"dim": "V",
-			"koef": 1,
-			"offset": -10,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 2,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 90,
-			"typ": "sklo",
-			"kod": "",
-			"nazov": "Sklo šírka",
-			"dim": "S",
-			"koef": 0.2,
-			"offset": 8.4,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 0,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|5K10",
-			"poradie": 91,
-			"typ": "sklo",
-			"kod": "",
-			"nazov": "Sklo výška",
-			"dim": "V",
-			"koef": 1,
-			"offset": -82,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 0,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K6",
+			"sysStyl": "Deluxe|6K",
 			"poradie": 10,
 			"typ": "profil",
 			"kod": "ZASP202411",
@@ -2081,7 +2208,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|6K6",
+			"sysStyl": "Deluxe|6K",
 			"poradie": 15,
 			"typ": "profil",
 			"kod": "ZASP202437",
@@ -2095,7 +2222,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|6K6",
+			"sysStyl": "Deluxe|6K",
 			"poradie": 20,
 			"typ": "profil",
 			"kod": "ZASP202416",
@@ -2107,10 +2234,27 @@
 			"kerf": 0,
 			"pocetKs": 6,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
 		},
 		{
-			"sysStyl": "Deluxe|6K6",
+			"sysStyl": "Deluxe|6K",
+			"poradie": 21,
+			"typ": "profil",
+			"kod": "ZASP202417",
+			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
+			"dim": "S",
+			"koef": 0.16666666666666666,
+			"offset": 10.833333333333334,
+			"delitN": 0,
+			"kerf": 0,
+			"pocetKs": 6,
+			"sklozavisle": 0,
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
+		},
+		{
+			"sysStyl": "Deluxe|6K",
 			"poradie": 25,
 			"typ": "profil",
 			"kod": "ZASP202424",
@@ -2122,96 +2266,12 @@
 			"kerf": 0,
 			"pocetKs": 6,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 6
 		},
 		{
-			"sysStyl": "Deluxe|6K6",
-			"poradie": 30,
-			"typ": "profil",
-			"kod": "ZASP00021",
-			"nazov": "Dorazový profil Surový 7500 mm",
-			"dim": "V",
-			"koef": 1,
-			"offset": -10,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 2,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K6",
-			"poradie": 90,
-			"typ": "sklo",
-			"kod": "",
-			"nazov": "Sklo šírka",
-			"dim": "S",
-			"koef": 0.16666666666666666,
-			"offset": 8.833333333333334,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 0,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K6",
-			"poradie": 91,
-			"typ": "sklo",
-			"kod": "",
-			"nazov": "Sklo výška",
-			"dim": "V",
-			"koef": 1,
-			"offset": -82,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 0,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K10",
-			"poradie": 10,
-			"typ": "profil",
-			"kod": "ZASP202411",
-			"nazov": "Koľajnica horná 6K Surový 7500 mm",
-			"dim": "S",
-			"koef": 1,
-			"offset": 0,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 1,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K10",
-			"poradie": 15,
-			"typ": "profil",
-			"kod": "ZASP202437",
-			"nazov": "Koľajnica spodná 6K Surový 7500 mm",
-			"dim": "S",
-			"koef": 1,
-			"offset": 0,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 1,
-			"sklozavisle": 0
-		},
-		{
-			"sysStyl": "Deluxe|6K10",
-			"poradie": 20,
-			"typ": "profil",
-			"kod": "ZASP202417",
-			"nazov": "Kladkový profil 10 mm Surový 3600 mm",
-			"dim": "S",
-			"koef": 0.16666666666666666,
-			"offset": 10.833333333333334,
-			"delitN": 0,
-			"kerf": 0,
-			"pocetKs": 6,
-			"sklozavisle": 0,
-			"dlzkaTyce": 3600
-		},
-		{
-			"sysStyl": "Deluxe|6K10",
-			"poradie": 25,
+			"sysStyl": "Deluxe|6K",
+			"poradie": 26,
 			"typ": "profil",
 			"kod": "ZASP202425",
 			"nazov": "Klzný profil 10 mm Surový 3600 mm",
@@ -2222,10 +2282,11 @@
 			"kerf": 0,
 			"pocetKs": 6,
 			"sklozavisle": 0,
-			"dlzkaTyce": 3600
+			"dlzkaTyce": 3600,
+			"skloHrubka": 10
 		},
 		{
-			"sysStyl": "Deluxe|6K10",
+			"sysStyl": "Deluxe|6K",
 			"poradie": 30,
 			"typ": "profil",
 			"kod": "ZASP00021",
@@ -2239,7 +2300,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|6K10",
+			"sysStyl": "Deluxe|6K",
 			"poradie": 90,
 			"typ": "sklo",
 			"kod": "",
@@ -2253,7 +2314,7 @@
 			"sklozavisle": 0
 		},
 		{
-			"sysStyl": "Deluxe|6K10",
+			"sysStyl": "Deluxe|6K",
 			"poradie": 91,
 			"typ": "sklo",
 			"kod": "",
