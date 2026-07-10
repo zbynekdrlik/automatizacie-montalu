@@ -23,7 +23,7 @@ export interface CfgZmena {
 const baseRole = (nazov: string) =>
 	nazov
 		.replace(/\s*\d+\s*mm/gi, '')
-		.replace(/\s*Surov[ýy]\b/gi, '')
+		.replace(/\s*Surov[ýy]/gi, '') // bez \b — ý nie je ASCII \w, hranica by nesadla
 		.replace(/\s+/g, ' ')
 		.trim();
 
