@@ -97,9 +97,10 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 });
 
 // Deluxe (posuvná sklenená stena) — READ-ONLY náhľad (nič sa nezapisuje do Money).
-// Kľúč: per-profil dĺžka tyče beží end-to-end — 5K horná koľajnica je 6000mm tyč
-// (→ 6 m), kladka 10mm je 3600mm tyč (→ 7,2 m), nie natvrdo 7500.
-test('Deluxe: náhľad 5K10 — per-profil dĺžka tyče (6000/3600) v odpise', async ({ page }) => {
+// Kľúč (Dominik 2026-07-10): HRÚBKA SKLA (6/10) vyberá kladka/klzný profil, nie štýl.
+// 10mm sklo → kladka ZASP202417; 6mm sklo → ZASP202416; množstvo rovnaké, líši sa LEN
+// kód. + per-profil dĺžka tyče: 5K horná koľajnica 6000mm (→ 6 m), kladka 3600mm (→ 7,2 m).
+test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + per-profil tyč', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
@@ -107,20 +108,32 @@ test('Deluxe: náhľad 5K10 — per-profil dĺžka tyče (6000/3600) v odpise', 
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Deluxe');
 	await page.getByLabel('Systém').selectOption('Deluxe');
-	await page.getByLabel('Štýl').selectOption('5K10');
+	await page.getByLabel('Štýl').selectOption('5K');
 	await page.getByLabel('Šírka (mm) *').fill('4500');
 	await page.getByLabel('Výška (mm) *').fill('2400');
-	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
-	// sklo (len plán, nie Money) — 908 × 2318
+	// --- 10mm sklo → kladka/klzný 10mm (ZASP202417/425) ---
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	// sklo (len plán, nie Money) — 908 × 2318, rovnaké pre 6 aj 10
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('908');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('2318');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	// Money-kritický odpis: 5K horná koľajnica ZASP202434 = 6000mm tyč → 6 m,
-	// kladka 10mm ZASP202417 = 3600mm tyč → 7,2 m (dôkaz per-profil dĺžky tyče)
-	// regex s hranicou (^|\D) — aby "6 m" nechytilo napr. "16 m" v inom stĺpci riadku
+	// 5K horná koľajnica ZASP202434 = 6000mm tyč → 6 m; kladka 10mm ZASP202417 → 7,2 m.
+	// (^|\D) hranica — aby "6 m" nechytilo napr. "16 m" v inom stĺpci riadku
 	await expect(page.locator('.row', { hasText: 'ZASP202434' })).toContainText(/(^|\D)6 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP202417' })).toContainText(/(^|\D)7,2 m/);
+	// 10mm sklo NESMIE ponúkať 6mm kladku
+	await expect(page.locator('.row', { hasText: 'ZASP202416' })).toHaveCount(0);
+
+	// --- prepni na 6mm sklo → kladka/klzný 6mm (ZASP202416/424), množstvo ROVNAKÉ ---
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	// teraz 6mm kladka ZASP202416 = 7,2 m (rovnaké množstvo ako 10mm — len iný kód)
+	await expect(page.locator('.row', { hasText: 'ZASP202416' })).toContainText(/(^|\D)7,2 m/);
+	// a 10mm kladka už NIE je v pláne
+	await expect(page.locator('.row', { hasText: 'ZASP202417' })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
 

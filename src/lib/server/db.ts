@@ -254,6 +254,61 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 7) {
+		// v6 → v7: Deluxe — HRÚBKA SKLA (6/10 mm) vyberá kladka/klzný profil, nie štýl.
+		// v6 mala 5K6/5K10/6K6/6K10 ako 4 štýly + malé typy napevno 10mm; Dominik
+		// (2026-07-10): 6/10 je vlastnosť SKLA, platí pre všetkých 8 štýlov (2K…6K),
+		// aby nárezáky neboli duplicitné 6/10. (Deluxe sa reže na 90° — rieši compute
+		// per profil cez system==='Deluxe'.) Pridá sklo_hrubka (cfg_rez: 0=vždy,
+		// 6/10=len pre danú hrúbku) a hrubka (glass_types). Deluxe je čerstvé (žiadne
+		// reálne odpisy) → bezpečne ZMAŽ všetky Deluxe cfg a re-seeduj 8 štýlov z
+		// cfg_seed. Robust/Slide sa NEDOTÝKA. Idempotentné cez PRAGMA + DELETE-then-seed.
+		const rezCols = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
+		if (!rezCols.includes('sklo_hrubka'))
+			db.exec('ALTER TABLE cfg_rez ADD COLUMN sklo_hrubka INTEGER NOT NULL DEFAULT 0');
+		const glassCols = (
+			db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]
+		).map((c) => c.name);
+		if (!glassCols.includes('hrubka'))
+			db.exec('ALTER TABLE glass_types ADD COLUMN hrubka INTEGER NOT NULL DEFAULT 0');
+		const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
+		const insRez = db.prepare(
+			`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		);
+		db.transaction(() => {
+			db.prepare("DELETE FROM cfg_rez WHERE sys_styl LIKE 'Deluxe|%'").run();
+			db.prepare("DELETE FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").run();
+			for (const s of seed.sys) {
+				if (!s.sysStyl.startsWith('Deluxe')) continue;
+				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+					insRez.run(
+						r.sysStyl,
+						r.poradie,
+						r.typ,
+						r.kod,
+						r.nazov,
+						r.dim,
+						r.koef,
+						r.offset,
+						r.delitN,
+						r.kerf,
+						r.pocetKs,
+						r.sklozavisle,
+						(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500,
+						(r as { skloHrubka?: number }).skloHrubka ?? 0
+					);
+			}
+			// Deluxe Float kalené: hrúbka skla vyberá profil (6 → kladka/klzný 6mm, 10 → 10mm)
+			db.prepare("UPDATE glass_types SET hrubka = 6 WHERE nazov = 'Float kalené 6 mm'").run();
+			db.prepare("UPDATE glass_types SET hrubka = 10 WHERE nazov = 'Float kalené 10 mm'").run();
+			db.pragma('user_version = 7');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
@@ -339,7 +394,7 @@ export function loadCfg(): Cfg {
 	}[]).map<SysRow>((r) => ({ sysStyl: r.sys_styl, N: r.n, skloOffset: r.sklo_offset }));
 	const rez = (db
 		.prepare(
-			'SELECT sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce FROM cfg_rez ORDER BY sys_styl, poradie'
+			'SELECT sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka FROM cfg_rez ORDER BY sys_styl, poradie'
 		)
 		.all() as Record<string, unknown>[]).map<RezRow>((r) => ({
 		sysStyl: r.sys_styl as string,
@@ -354,7 +409,8 @@ export function loadCfg(): Cfg {
 		kerf: r.kerf as number,
 		pocetKs: r.pocet_ks as number,
 		sklozavisle: r.sklozavisle as 0 | 1,
-		dlzkaTyce: r.dlzka_tyce as number
+		dlzkaTyce: r.dlzka_tyce as number,
+		skloHrubka: r.sklo_hrubka as number
 	}));
 	return buildCFG(sys, rez);
 }
@@ -373,19 +429,25 @@ export interface GlassType {
 	nazov: string;
 	redukciaZero: boolean;
 	system: string;
+	/** hrúbka skla (mm): Deluxe Float kalené = 6/10 (vyberá kladka/klzný profil); inak 0 */
+	hrubka: number;
 }
 
 export function listGlassTypes(): GlassType[] {
 	return (db
-		.prepare('SELECT nazov, redukcia_zero, system FROM glass_types ORDER BY poradie')
-		.all() as { nazov: string; redukcia_zero: number; system: string }[]).map((r) => ({
+		.prepare('SELECT nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
+		.all() as { nazov: string; redukcia_zero: number; system: string; hrubka: number }[]).map((r) => ({
 		nazov: r.nazov,
 		redukciaZero: !!r.redukcia_zero,
-		system: r.system
+		system: r.system,
+		hrubka: r.hrubka
 	}));
 }
 
-/** Sklá platné pre daný systém (jeho vlastné + spoločné 'ALL'). */
+/** Sklá platné pre daný systém. Deluxe: LEN vlastné (Float kalené 6/10, hrúbka
+ *  vyberá profil) — spoločné 'ALL' sklá (Kalené 8mm/10mm) nemajú Deluxe profil.
+ *  Robust/Slide: vlastné + spoločné 'ALL'. */
 export function glassTypesForSystem(system: string): GlassType[] {
+	if (system === 'Deluxe') return listGlassTypes().filter((g) => g.system === 'Deluxe');
 	return listGlassTypes().filter((g) => g.system === system || g.system === 'ALL');
 }

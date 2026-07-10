@@ -121,6 +121,60 @@ describe('editor vzorcov', () => {
 		expect(getAuditLog(50).length).toBe(before);
 	});
 
+	it('Deluxe: editor ukáže JEDEN kladka/klzný riadok a edit zrkadlí 6↔10 (Money množstvo rovnaké)', () => {
+		const e = getEditableRows('Deluxe|2K')!;
+		// 10mm dvojča je skryté; kanonický riadok je bez hrúbky v názve
+		expect(e.rows.some((r) => /10 mm/i.test(r.nazov))).toBe(false);
+		expect(e.rows.filter((r) => /kladkov/i.test(r.nazov)).length).toBe(1);
+		expect(e.rows.filter((r) => /klzn/i.test(r.nazov)).length).toBe(1);
+		const kladka = e.rows.find((r) => /kladkov/i.test(r.nazov))!;
+
+		const { error } = saveCfgChanges({
+			sysStyl: 'Deluxe|2K',
+			username: 'tester',
+			offsets: new Map([[kladka.id, kladka.offset + 2]]),
+			skloOffset: e.skloOffset
+		});
+		expect(error).toBeNull();
+
+		// OBE dvojčatá (6mm ZASP202416 + 10mm ZASP202417) dostali nový offset
+		const off = db
+			.prepare(`SELECT kod, offset FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND kod IN ('ZASP202416','ZASP202417')`)
+			.all() as { kod: string; offset: number }[];
+		expect(off.length).toBe(2);
+		expect(off.every((r) => r.offset === kladka.offset + 2)).toBe(true);
+
+		// compute 6mm a 10mm dá IDENTICKÉ množstvo aj po edite (invariant drží)
+		const r6 = safeCompute(loadCfg(), 'Deluxe|2K', 5000, 2000, false, 6).r!;
+		const r10 = safeCompute(loadCfg(), 'Deluxe|2K', 5000, 2000, false, 10).r!;
+		expect(r6.odpis.find((o) => o.kod === 'ZASP202416')!.metre).toBe(
+			r10.odpis.find((o) => o.kod === 'ZASP202417')!.metre
+		);
+
+		// návrat na pôvodný offset (obe dvojčatá späť)
+		saveCfgChanges({
+			sysStyl: 'Deluxe|2K',
+			username: 'tester',
+			offsets: new Map([[kladka.id, kladka.offset]]),
+			skloOffset: e.skloOffset
+		});
+		const back = db
+			.prepare(`SELECT offset FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND kod='ZASP202417'`)
+			.get() as { offset: number };
+		expect(back.offset).toBe(kladka.offset);
+	});
+
+	it('Deluxe: sklá = LEN Float kalené 6/10 (bez spoločných ALL skiel)', () => {
+		const deluxe = glassTypesForSystem('Deluxe').map((g) => g.nazov);
+		expect(deluxe).toEqual(['Float kalené 6 mm', 'Float kalené 10 mm']);
+		expect(deluxe.some((n) => /Kalené (8|10)mm/.test(n))).toBe(false);
+		// hrúbky sklá
+		const g6 = glassTypesForSystem('Deluxe').find((g) => g.nazov === 'Float kalené 6 mm')!;
+		const g10 = glassTypesForSystem('Deluxe').find((g) => g.nazov === 'Float kalené 10 mm')!;
+		expect(g6.hrubka).toBe(6);
+		expect(g10.hrubka).toBe(10);
+	});
+
 	it('sklá podľa systému: Robust = 4/16/4, Slide = 4/8/4 (+ Kalené oba)', () => {
 		const robust = glassTypesForSystem('Robust').map((g) => g.nazov);
 		const slide = glassTypesForSystem('Slide').map((g) => g.nazov);

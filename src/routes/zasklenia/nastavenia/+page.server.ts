@@ -36,10 +36,13 @@ export const actions: Actions = {
 		const glassRedukcia = new Map<string, boolean>();
 		for (const g of listGlassTypes()) glassRedukcia.set(g.nazov, form.get(`glass_${g.nazov}`) === '1');
 
-		// náhľad PRED zmenou na kontrolných rozmeroch
+		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je
+		// hrúbko-závislý (6/10) — bez zvolenej hrúbky by z náhľadu vypadol, tak zvoľ
+		// reprezentatívnu 6mm (odpis metre je pre 6 aj 10 rovnaký, líši sa len kód).
 		const pS = num(form.get('previewS')) || 5000;
 		const pV = num(form.get('previewV')) || 2000;
-		const pred = safeCompute(loadCfg(), sysStyl, pS, pV, false);
+		const previewHrubka = sysStyl.startsWith('Deluxe|') ? 6 : 0;
+		const pred = safeCompute(loadCfg(), sysStyl, pS, pV, false, previewHrubka);
 
 		const { zmeny, error } = saveCfgChanges({
 			sysStyl,
@@ -50,7 +53,7 @@ export const actions: Actions = {
 		});
 		if (error) return { error, sysStyl };
 
-		const po = safeCompute(loadCfg(), sysStyl, pS, pV, false);
+		const po = safeCompute(loadCfg(), sysStyl, pS, pV, false, previewHrubka);
 		return {
 			ulozene: true,
 			sysStyl,

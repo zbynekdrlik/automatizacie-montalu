@@ -32,8 +32,13 @@
 	const prim = () => form?.multiVstup?.posuvy?.[0] ?? form?.vstup ?? null;
 	const stylyForSystem = (sys: string) =>
 		data.styly.filter((x) => x.system === sys).map((x) => x.styl);
+	// Deluxe: LEN vlastné sklá (Float kalené 6/10 — hrúbka vyberá kladka/klzný profil);
+	// spoločné 'ALL' sklá nemajú Deluxe profil (musí sedieť so serverovým
+	// glassTypesForSystem, inak by formulár ponúkol sklo, ktoré server odmietne).
 	const sklaForSystem = (sys: string) =>
-		data.skla.filter((g) => g.system === sys || g.system === 'ALL').map((g) => g.nazov);
+		data.skla
+			.filter((g) => (sys === 'Deluxe' ? g.system === 'Deluxe' : g.system === sys || g.system === 'ALL'))
+			.map((g) => g.nazov);
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
 
 	type PosuvRow = {

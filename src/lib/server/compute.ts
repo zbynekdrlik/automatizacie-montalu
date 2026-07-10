@@ -2,6 +2,7 @@
 // Port 1:1 z n8n verzie (n8n/zasklenia/zasklenia_node_body_v2.js), overenej proti
 // pôvodným odpisovým Excelom (robust_slide.xlsm). Čísla sa NESMÚ zmeniť bez
 // zmeny testovacích vektorov v tests/compute.test.ts.
+import { jeSikmyRez } from '$lib/cut';
 
 export interface SysRow {
 	sysStyl: string;
@@ -26,6 +27,10 @@ export interface RezRow {
 	 *  ⇒ default BAR (7500). Deluxe má profily s inou dĺžkou (kladka/klzný 3600,
 	 *  5K horná koľajnica 6000) — Robust/Slide ostávajú na 7500. */
 	dlzkaTyce?: number;
+	/** hrúbka skla (mm), pre ktorú tento riadok platí: 0 = vždy; 6/10 = len keď je
+	 *  zvolené 6mm/10mm sklo. Deluxe: kladka/klzný má dva riadky (6mm ZASP202416/424,
+	 *  10mm ZASP202417/425) a sklo vyberá ten správny. Robust/Slide = 0 (vždy). */
+	skloHrubka?: number;
 }
 
 export interface CfgGroup {
@@ -64,6 +69,9 @@ export interface MaterialRow {
 	odpadPct: number;
 	/** dĺžka tyče tohto profilu (mm) — pre grafický rozpis (mierka, hlavička) */
 	barLen: number;
+	/** true = rez 45° (šikmý), false = rovný 90°. Deluxe = všetko 90° (Zbynek);
+	 *  Robust/Slide = 90° len nosový/oponový, zvyšok 45° (podľa názvu profilu). */
+	sikmyRez: boolean;
 }
 
 export interface OdpisRow {
@@ -164,11 +172,17 @@ function profilCuts(
 	V: number,
 	N: number,
 	redukciaZero: boolean,
+	skloHrubka: number,
 	posuv?: number
 ): ProfilCuts[] {
 	const order: string[] = [];
 	const byKod: Record<string, RezRow[]> = {};
+	const sh = Number(skloHrubka) || 0; // normalizuj (SQLite INTEGER, ale buď odolný voči '6')
 	for (const r of g.rez) {
+		// hrúbka-závislý riadok (Deluxe kladka/klzný pre 6mm alebo 10mm sklo) sa
+		// zahrnie LEN keď sedí zvolená hrúbka skla; 0 = platí vždy (Robust/Slide)
+		const rh = Number(r.skloHrubka) || 0;
+		if (rh !== 0 && rh !== sh) continue;
 		if (!byKod[r.kod]) {
 			byKod[r.kod] = [];
 			order.push(r.kod);
@@ -207,17 +221,40 @@ export function oversizeCut(
 	sysStyl: string,
 	S: number,
 	V: number,
-	redukciaZero: boolean
+	redukciaZero: boolean,
+	skloHrubka: number
 ): string | null {
 	const g = cfg[sysStyl];
 	if (!g) return null;
-	for (const c of profilCuts(g, S, V, g.N, redukciaZero)) {
+	for (const c of profilCuts(g, S, V, g.N, redukciaZero, skloHrubka)) {
 		for (const k of c.kusy) {
 			if (k.dlzka + KOTUC > c.barLen)
 				return `Rez ${Math.round(k.rozmer)} mm (${c.nazov}) je dlhší než tyč ${c.barLen} mm — tento rozmer sa z daného profilu nedá vyrobiť. Zmenši rozmer alebo zvoľ iný systém.`;
 		}
 	}
 	return null;
+}
+
+/**
+ * Fail-loud guard: ak systém MÁ hrúbko-závislé profily (Deluxe kladka/klzný pre
+ * 6/10 mm), ale pre zvolenú hrúbku skla ani jeden nesedí, `profilCuts` by ticho
+ * VYNECHAL kladku aj klzný → odpis do Money podhodnotený o ~40 %. Namiesto tichého
+ * fallbacku (bar codebase: „chyba sa hlási nahlas") to zachytíme a výpočet zlyhá.
+ * Dnes nedosiahnuteľné cez UI (glassTypesForSystem púšťa pre Deluxe len sklá s
+ * hrúbkou 6/10), ale bráni tichej regresii, ak by tá záruka niekedy padla.
+ */
+export function missingHrubkaProfile(
+	cfg: Cfg,
+	sysStyl: string,
+	skloHrubka: number
+): string | null {
+	const g = cfg[sysStyl];
+	if (!g) return null;
+	const sh = Number(skloHrubka) || 0;
+	const hrubkaRows = g.rez.filter((r) => (Number(r.skloHrubka) || 0) !== 0);
+	if (!hrubkaRows.length) return null; // žiadne hrúbko-závislé profily (Robust/Slide) → OK
+	if (hrubkaRows.some((r) => (Number(r.skloHrubka) || 0) === sh)) return null;
+	return `Pre zvolenú hrúbku skla (${sh} mm) tento systém nemá kladka/klzný profil — vyber platné sklo (6 alebo 10 mm).`;
 }
 
 /**
@@ -230,19 +267,23 @@ export function computeFlat(
 	sysStyl: string,
 	S: number,
 	V: number,
-	redukciaZero: boolean
+	redukciaZero: boolean,
+	skloHrubka = 0
 ): ComputeResult | null {
 	const g = cfg[sysStyl];
 	if (!g || !g.rez.length) return null;
 	const N = g.N;
+	const system = sysStyl.split('|')[0];
 	const material: MaterialRow[] = [];
 	const odpis: OdpisRow[] = [];
-	for (const c of profilCuts(g, S, V, N, redukciaZero)) {
+	for (const c of profilCuts(g, S, V, N, redukciaZero, skloHrubka)) {
 		const bary = ffdPack(c.kusy, c.barLen);
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * c.barLen)) * 1000) / 10 : 0;
-		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen });
+		// Deluxe = všetko rovný 90° rez; inak podľa názvu profilu (nosový/oponový 90°)
+		const sikmyRez = system !== 'Deluxe' && jeSikmyRez(c.nazov);
+		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen, sikmyRez });
 		odpis.push({ kod: c.kod, nazov: c.nazov, metre: R((tyce * c.barLen) / 1000) });
 	}
 	const ss = g.sklo.s,
@@ -342,14 +383,17 @@ export function safeCompute(
 	sysStyl: string,
 	S: number,
 	V: number,
-	redukciaZero: boolean
+	redukciaZero: boolean,
+	skloHrubka = 0
 ): { r: ComputeResult | null; err: string | null } {
 	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
 	const boundErr = inBounds(cfg, sysStyl);
 	if (boundErr) return { r: null, err: 'Konfigurácia mimo povolených rozsahov: ' + boundErr };
-	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero);
+	const hrubkaErr = missingHrubkaProfile(cfg, sysStyl, skloHrubka);
+	if (hrubkaErr) return { r: null, err: hrubkaErr };
+	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
 	if (overErr) return { r: null, err: overErr };
-	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero);
+	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
 	return { r, err: null };
@@ -363,6 +407,8 @@ export interface PosuvSpec {
 	S: number;
 	V: number;
 	redukciaZero: boolean;
+	/** hrúbka zvoleného skla (mm) — vyberá Deluxe kladka/klzný profil (6/10); 0 = n/a */
+	skloHrubka?: number;
 	/** len na plán/detail (nemení výpočet) */
 	otvaranie?: string;
 	sklo?: string;
@@ -402,20 +448,27 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 	const order: string[] = [];
 	const pool: Record<
 		string,
-		{ nazov: string; rezy: { rozmer: number; ks: number }[]; kusy: Kus[]; barLen: number }
+		{ nazov: string; rezy: { rozmer: number; ks: number }[]; kusy: Kus[]; barLen: number; sikmyRez: boolean }
 	> = {};
 	for (let i = 0; i < posuvy.length; i++) {
 		const p = posuvy[i];
 		const g = cfg[p.sysStyl];
 		if (!g || !g.rez.length || !g.sklo.s || !g.sklo.v) return null;
 		const N = g.N;
+		const system = p.sysStyl.split('|')[0];
 		// INVARIANT: profilové kódy (ZASP…) sú UNIKÁTNE naprieč systémami (Robust vs
 		// Slide majú odlišné kódy), takže spájanie po kóde nikdy nezmieša profily
 		// dvoch systémov na jednu tyč. Ak by konfigurácia niekedy dala ten istý kód
 		// dvom systémom s inou dĺžkou tyče, toto by bolo treba prehodnotiť.
-		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, i + 1)) {
+		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, p.skloHrubka ?? 0, i + 1)) {
 			if (!pool[c.kod]) {
-				pool[c.kod] = { nazov: c.nazov, rezy: [], kusy: [], barLen: c.barLen };
+				pool[c.kod] = {
+					nazov: c.nazov,
+					rezy: [],
+					kusy: [],
+					barLen: c.barLen,
+					sikmyRez: system !== 'Deluxe' && jeSikmyRez(c.nazov)
+				};
 				order.push(c.kod);
 			}
 			pool[c.kod].kusy.push(...c.kusy);
@@ -452,7 +505,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * pk.barLen)) * 1000) / 10 : 0;
 		pk.rezy.sort((a, b) => b.rozmer - a.rozmer);
-		material.push({ kod, nazov: pk.nazov, rezy: pk.rezy, tyce, bary, odpadMm, odpadPct, barLen: pk.barLen });
+		material.push({ kod, nazov: pk.nazov, rezy: pk.rezy, tyce, bary, odpadMm, odpadPct, barLen: pk.barLen, sikmyRez: pk.sikmyRez });
 		odpis.push({ kod, nazov: pk.nazov, metre: R((tyce * pk.barLen) / 1000) });
 	}
 	return { posuvy: infos, material, odpis, m2: R(infos.reduce((s, x) => s + x.m2, 0)) };
@@ -469,7 +522,9 @@ export function safeComputeMulti(
 			return { r: null, err: `Posuv ${i + 1}: konfigurácia systému je neúplná alebo chybná.` };
 		const boundErr = inBounds(cfg, p.sysStyl);
 		if (boundErr) return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
-		const overErr = oversizeCut(cfg, p.sysStyl, p.S, p.V, p.redukciaZero);
+		const hrubkaErr = missingHrubkaProfile(cfg, p.sysStyl, p.skloHrubka ?? 0);
+		if (hrubkaErr) return { r: null, err: `Posuv ${i + 1}: ${hrubkaErr}` };
+		const overErr = oversizeCut(cfg, p.sysStyl, p.S, p.V, p.redukciaZero, p.skloHrubka ?? 0);
 		if (overErr) return { r: null, err: `Posuv ${i + 1}: ${overErr}` };
 	}
 	const r = computeMulti(cfg, posuvy);
