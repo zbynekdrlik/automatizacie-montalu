@@ -309,6 +309,18 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 8) {
+		// v7 → v8: B2B veľkoobchodná rola. Aditívne — appka je v ostrom používaní,
+		// existujúci users → 'internal' (default), interný tok sa nemení. Feature je
+		// neaktívny, kým nevznikne prvý 'b2b' účet. Idempotentné cez PRAGMA + column check.
+		const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
+		if (!userCols.includes('role'))
+			db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'internal'");
+		db.pragma('user_version = 8');
+	}
+
 	seedData();
 	seedUsers();
 }
