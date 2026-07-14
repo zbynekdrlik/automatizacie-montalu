@@ -56,3 +56,16 @@ feature stays INERT until the first privileged account exists — so the deploy 
 no-op for existing users. Provision new restricted accounts via the internal-only
 `/pouzivatelia` admin page (`addUser`/`deleteB2BUser`), not env re-seed (seed only
 runs on an empty users table).
+
+## 5. Usernames match CASE-INSENSITIVELY (login + dup-check)
+
+Usernames are often **e-mails** (first B2B account: `obchod@phsplus.cz`). Phone/tablet
+keyboards auto-capitalize the first letter, so a user types `Obchod@…` for a stored
+`obchod@…`. SQLite's default BINARY collation made that a non-match → the account
+"couldn't log in" with the correct password (live bug, v0.5.22). Both the `login()`
+lookup and `addUser()` duplicate-check use `WHERE username = ? COLLATE NOCASE` so case
+never blocks a login and two case-only-different accounts can't coexist. `COLLATE
+NOCASE` is ASCII-only — fine for e-mail/ASCII handles; a non-ASCII (accented) username
+would not be case-folded. `login()` also `.trim()`s the username. Regression test:
+`tests/login-case-insensitive.test.ts` (RED→GREEN). Passwords stay case-SENSITIVE and
+untrimmed (only the name is normalized).
