@@ -456,10 +456,14 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		if (!g || !g.rez.length || !g.sklo.s || !g.sklo.v) return null;
 		const N = g.N;
 		const system = p.sysStyl.split('|')[0];
-		// INVARIANT: profilové kódy (ZASP…) sú UNIKÁTNE naprieč systémami (Robust vs
-		// Slide majú odlišné kódy), takže spájanie po kóde nikdy nezmieša profily
-		// dvoch systémov na jednu tyč. Ak by konfigurácia niekedy dala ten istý kód
-		// dvom systémom s inou dĺžkou tyče, toto by bolo treba prehodnotiť.
+		// INVARIANT: spájanie profilov po kóde na jednu tyč je bezpečné len ak KAŽDÝ
+		// výskyt daného kódu (aj naprieč systémami) používa ROVNAKÚ dĺžku tyče.
+		// Štandard + zdieľa 5 spodných koľajníc s Deluxe (ZASP00104/00030/00033/
+		// 202432/202437), vždy s rovnakou barLen (7500), takže odpis ostáva správny.
+		// Ak by konfigurácia niekedy dala ten istý kód dvom systémom s INOU dĺžkou
+		// tyče, toto treba prehodnotiť. Pozn.: príznak sikmyRez pooled riadku sa
+		// preberá z PRVÉHO posuvu — pri zmiešanej Deluxe+Štandard+ zákazke to môže
+		// zle označiť uhol rezu iba v KRESBE (odpis nie je dotknutý).
 		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, p.skloHrubka ?? 0, i + 1)) {
 			if (!pool[c.kod]) {
 				pool[c.kod] = {
