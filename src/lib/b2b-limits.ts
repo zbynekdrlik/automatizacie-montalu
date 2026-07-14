@@ -1,0 +1,72 @@
+// B2B rozmerové limity (len pre veľkoobchodných používateľov) — KLIENTSKY BEZPEČNÉ
+// (žiadny $lib/server import), aby to formulár mohol vyhodnotiť HNEĎ pri zadávaní.
+// Šírka na pole = S/N (Dominik: „2K 3000 → sklo 1500, treba 3K po 1000"). Interní
+// users tieto kontroly OBCHÁDZAJÚ (volá sa len keď isB2B). Výška NEblokuje, len
+// upozorní „bez záruky". Jediný zdroj pravdy — server re-exportuje z tohto modulu.
+
+// Ľahká reprezentácia štýlov (sysStyl + počet polí N). Klient ju postaví z
+// data.styly, server z cfg — obaja majú N per sysStyl.
+export type StyleN = { sysStyl: string; system: string; styl: string; N: number };
+
+export const B2B_LIMITS: Record<string, { minPanel: number; maxPanel: number; maxHeight: number }> = {
+	Deluxe: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
+	Slide: { minPanel: 800, maxPanel: 1300, maxHeight: 2500 },
+	Robust: { minPanel: 800, maxPanel: 1500, maxHeight: 2600 },
+	// Štandard +: ROVNAKÉ ako Deluxe (potvrdil Dominik 2026-07-14: „rovnako ako deluxe").
+	'Štandard +': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
+};
+
+// Rodina štýlu: dvojité (opona) začínajú „2x", ostatné sú jednoduché. Návrh štýlu
+// ostáva v tej istej rodine (jednoduché ↔ jednoduché, 2x ↔ 2x) — inak by sa zmenil
+// typ výrobku.
+function family(styl: string): '2x' | 'single' {
+	return styl.startsWith('2x') ? '2x' : 'single';
+}
+
+/** Štýly daného systému + rodiny, s N, zoradené vzostupne podľa N. */
+function familyStyles(styles: StyleN[], system: string, fam: '2x' | 'single'): { styl: string; N: number }[] {
+	return styles
+		.filter((s) => s.system === system && family(s.styl) === fam)
+		.map((s) => ({ styl: s.styl, N: s.N }))
+		.sort((a, b) => a.N - b.N);
+}
+
+/**
+ * Blok + poradí štýl. Vráti slovenskú chybu (nespočíta sa), alebo null keď S/N sedí
+ * do [minPanel, maxPanel] pre zvolený systém. `styles` = zoznam sysStyl+N (klient z
+ * data.styly, server z cfg).
+ */
+export function checkB2BWidth(styles: StyleN[], sysStyl: string, S: number): string | null {
+	const [system, styl] = sysStyl.split('|');
+	const lim = B2B_LIMITS[system];
+	if (!lim) return null; // neznámy systém → nelimituj (fail-open, biznis limity sú len pre pár systémov)
+	const g = styles.find((s) => s.sysStyl === sysStyl);
+	if (!g) return null;
+	const panel = S / g.N;
+	if (panel >= lim.minPanel && panel <= lim.maxPanel) return null;
+
+	// nájdi štýl v rovnakej rodine, kde S/N ∈ [min,max]; preferuj najmenšie N
+	const fam = family(styl);
+	const options = familyStyles(styles, system, fam);
+	const fit = options.find((o) => S / o.N >= lim.minPanel && S / o.N <= lim.maxPanel);
+	const per = Math.round(panel);
+	if (fit && fit.styl !== styl) {
+		const smer = panel > lim.maxPanel ? `nad ${lim.maxPanel}` : `pod ${lim.minPanel}`;
+		return `Pri šírke ${S} mm a štýle ${styl} by malo jedno sklo ${per} mm (${smer}). Zvoľ ${fit.styl}.`;
+	}
+	// žiadny štýl v rodine nesedí → mŕtva zóna medzi počtami polí
+	const ranges = options
+		.map((o) => `${o.styl} = ${Math.round(lim.minPanel * o.N)}–${Math.round(lim.maxPanel * o.N)} mm`)
+		.join(', ');
+	return `Šírka ${S} mm sa pri ${system} nedá rozdeliť na sklá v rozsahu ${lim.minPanel}–${lim.maxPanel} mm. Platné šírky: ${ranges}. Uprav šírku.`;
+}
+
+/** Výška NEblokuje — len warning „bez záruky" nad maxHeight. Vráti text alebo null. */
+export function checkB2BHeight(sysStyl: string, V: number): string | null {
+	const system = sysStyl.split('|')[0];
+	const lim = B2B_LIMITS[system];
+	if (!lim) return null;
+	if (V > lim.maxHeight)
+		return `⚠ Výška ${V} mm presahuje ${lim.maxHeight} mm — zasklenie BEZ ZÁRUKY.`;
+	return null;
+}

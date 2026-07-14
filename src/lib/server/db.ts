@@ -441,11 +441,21 @@ function seedUsers() {
 	const userCount = (db.prepare('SELECT COUNT(*) c FROM users').get() as { c: number }).c;
 	if (userCount === 0) {
 		const spec = process.env.SEED_USERS || '';
-		const ins = db.prepare('INSERT INTO users (username, pass_hash) VALUES (?, ?)');
+		const ins = db.prepare('INSERT INTO users (username, pass_hash, role) VALUES (?, ?, ?)');
 		for (const pair of spec.split(',').filter(Boolean)) {
 			const idx = pair.indexOf(':');
 			if (idx < 1) continue;
-			ins.run(pair.slice(0, idx).trim(), hashPassword(pair.slice(idx + 1)));
+			const username = pair.slice(0, idx).trim();
+			// voliteľná prípona „:b2b" / „:internal" určuje rolu; inak internal.
+			// (heslo môže obsahovať ':', preto match len na konci reťazca.)
+			let rest = pair.slice(idx + 1);
+			let role = 'internal';
+			const m = rest.match(/:(b2b|internal)$/);
+			if (m) {
+				role = m[1];
+				rest = rest.slice(0, -m[0].length);
+			}
+			ins.run(username, hashPassword(rest), role);
 		}
 	}
 }
@@ -483,13 +493,15 @@ export function loadCfg(): Cfg {
 	return buildCFG(sys, rez);
 }
 
-export function listSysStyly(): { sysStyl: string; system: string; styl: string }[] {
-	return (db.prepare('SELECT sys_styl FROM cfg_sys ORDER BY sys_styl').all() as {
+export function listSysStyly(): { sysStyl: string; system: string; styl: string; N: number }[] {
+	return (db.prepare('SELECT sys_styl, n FROM cfg_sys ORDER BY sys_styl').all() as {
 		sys_styl: string;
+		n: number;
 	}[]).map((r) => ({
 		sysStyl: r.sys_styl,
 		system: r.sys_styl.split('|')[0],
-		styl: r.sys_styl.split('|')[1]
+		styl: r.sys_styl.split('|')[1],
+		N: r.n
 	}));
 }
 

@@ -179,6 +179,26 @@ select:focus {
 	margin: 8px 0;
 	font-weight: 700;
 }
+/* b2b HNEĎ pri zadávaní (inline pod poľom): šírkový blok = červená, výškové
+   upozornenie = jantár. Renderuje sa LEN pre b2b účet (interní bez obmedzení). */
+.b2b-blok {
+	display: block;
+	margin-top: 5px;
+	color: #dc2626;
+	font-size: 13px;
+	font-weight: 600;
+}
+.b2b-upoz {
+	display: block;
+	margin-top: 5px;
+	color: #b45309;
+	font-size: 13px;
+	font-weight: 600;
+}
+.btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
 .okmsg {
 	background: #f0fdf4;
 	border: 1px solid #bbf7d0;
