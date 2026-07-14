@@ -480,7 +480,9 @@ export function addUser(
 	const u = username.trim();
 	if (!u) return { error: 'Meno účtu je povinné.' };
 	if (password.length < 6) return { error: 'Heslo musí mať aspoň 6 znakov.' };
-	const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(u);
+	// NOCASE: zabráň dvom účtom líšiacim sa len veľkosťou písmen (login je tiež
+	// case-insensitive) — inak by 'Obchod@…' aj 'obchod@…' koexistovali a mýlili.
+	const exists = db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(u);
 	if (exists) return { error: `Účet „${u}" už existuje.` };
 	db.prepare('INSERT INTO users (username, pass_hash, role) VALUES (?, ?, ?)').run(
 		u,
