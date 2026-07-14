@@ -2,6 +2,7 @@
 	import Nahlad2D from '$lib/components/Nahlad2D.svelte';
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
+	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 
 	let { data, form } = $props();
 
@@ -147,6 +148,44 @@
 	let plan = $derived(form && 'plan' in form ? form.plan : null);
 	let multi = $derived(form && 'multi' in form ? form.multi : null);
 	let multiVstup = $derived(form?.multiVstup ?? null);
+
+	// b2b HNEĎ pri zadávaní: šírka na sklo mimo limitu = blok (nedá sa vyrobiť),
+	// výška nad limit = nezáväzné upozornenie. LEN pre b2b (interní bez obmedzení).
+	// Server checkB2BWidth/checkB2BHeight ostáva (obrana do hĺbky). data.styly nesie N.
+	// dimOrNull vracia rozmer LEN v medziach poľa [300, 20000] mm — kým b2b user
+	// dopisuje šírku po číslici (3 → 30 → 300 → 3000), medzihodnoty pod 300 sa
+	// nevyhodnocujú, takže neblikne falošný ⛔; natívna min/max validácia + server
+	// stráženie odoslania platia ďalej.
+	const dimOrNull = (x: number | string): number | null => {
+		const n = typeof x === 'number' ? x : parseFloat(String(x));
+		return Number.isFinite(n) && n >= 300 && n <= 20000 ? n : null;
+	};
+	let b2bSirkaErr = $derived.by(() => {
+		if (!isB2B) return null;
+		const s = dimOrNull(sirka);
+		return s === null ? null : checkB2BWidth(data.styly, `${system}|${styl}`, s);
+	});
+	let b2bVyskaWarn = $derived.by(() => {
+		if (!isB2B) return null;
+		const v = dimOrNull(vyska);
+		return v === null ? null : checkB2BHeight(`${system}|${styl}`, v);
+	});
+	let posuvB2bErrs = $derived(
+		posuvyExtra.map((p) => {
+			if (!isB2B) return null;
+			const s = dimOrNull(p.s);
+			return s === null ? null : checkB2BWidth(data.styly, `${p.system}|${p.styl}`, s);
+		})
+	);
+	let posuvB2bWarns = $derived(
+		posuvyExtra.map((p) => {
+			if (!isB2B) return null;
+			const v = dimOrNull(p.v);
+			return v === null ? null : checkB2BHeight(`${p.system}|${p.styl}`, v);
+		})
+	);
+	// b2b nesmie spočítať pri šírkovej chybe (primárny alebo ktorýkoľvek posuv).
+	let b2bBlok = $derived(isB2B && (b2bSirkaErr !== null || posuvB2bErrs.some((e) => e !== null)));
 </script>
 
 <svelte:head><title>Zasklenia — nárezový plán</title></svelte:head>
@@ -351,11 +390,11 @@
 			<div class="grid2">
 				<div class="field">
 					<label for="s">Šírka (mm) *</label>
-					<input id="s" name="s" type="number" min="300" max="20000" step="any" bind:value={sirka} required />
+					<input id="s" name="s" type="number" min="300" max="20000" step="any" bind:value={sirka} required />{#if b2bSirkaErr}<span class="b2b-blok" data-testid="b2b-sirka-err"> ⛔ {b2bSirkaErr}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="v">Výška (mm) *</label>
-					<input id="v" name="v" type="number" min="300" max="20000" step="any" bind:value={vyska} required />
+					<input id="v" name="v" type="number" min="300" max="20000" step="any" bind:value={vyska} required />{#if b2bVyskaWarn}<span class="b2b-upoz" data-testid="b2b-vyska-warn"> {b2bVyskaWarn}</span>{/if}
 				</div>
 			</div>
 			<div class="grid2">
@@ -433,9 +472,9 @@
 					</div>
 					<div class="grid2">
 						<div class="field"><label for={`ps${i}-s`}>Šírka (mm) *</label>
-							<input id={`ps${i}-s`} type="number" min="300" max="20000" step="any" bind:value={p.s} required /></div>
+							<input id={`ps${i}-s`} type="number" min="300" max="20000" step="any" bind:value={p.s} required />{#if posuvB2bErrs[i]}<span class="b2b-blok" data-testid={`b2b-sirka-err-${i}`}> ⛔ {posuvB2bErrs[i]}</span>{/if}</div>
 						<div class="field"><label for={`ps${i}-v`}>Výška (mm) *</label>
-							<input id={`ps${i}-v`} type="number" min="300" max="20000" step="any" bind:value={p.v} required /></div>
+							<input id={`ps${i}-v`} type="number" min="300" max="20000" step="any" bind:value={p.v} required />{#if posuvB2bWarns[i]}<span class="b2b-upoz" data-testid={`b2b-vyska-warn-${i}`}> {posuvB2bWarns[i]}</span>{/if}</div>
 					</div>
 					<div class="grid2">
 						<div class="field"><label for={`ps${i}-sklo`}>Sklo</label>
@@ -450,7 +489,7 @@
 				</div>
 			{/each}
 			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv (zimná záhrada)</button>
-			<button class="btn" type="submit" formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'}>
+			<button class="btn" type="submit" formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'} disabled={b2bBlok} data-testid="spocitat">
 				{jeMulti ? `Spočítať spoločný plán (${posuvyExtra.length + 1} posuvy)` : 'Spočítať nárezový plán'}
 			</button>
 		</form>

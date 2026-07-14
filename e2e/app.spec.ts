@@ -461,7 +461,7 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 
 	// 4. Deluxe 2K @ 3000×2000 → šírka na sklo = 1500 mm (nad limit 1000) →
 	// šírkový blok, poradí 3K (Dominik: „2K 3000 → sklo 1500, treba 3K po 1000"),
-	// formulár ostáva na kroku 'form' → žiadny náhľad, žiadne Odoslať
+	// tlačidlo Spočítať sa HNEĎ zablokuje → žiadny náhľad, žiadne Odoslať
 	await goto(page, '/zasklenia');
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-B2B`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
@@ -470,14 +470,27 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
-	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
-	await expect(page.getByTestId('form-error')).toContainText('Zvoľ 3K');
+	// NOVÉ: šírkový blok je OKAMŽITÝ (client-side, pred „Spočítať") — hlásenie pod
+	// poľom + zablokované tlačidlo; žiadny náhľad, žiadne Odoslať.
+	await expect(page.getByTestId('b2b-sirka-err')).toContainText('Zvoľ 3K');
+	await expect(page.getByTestId('spocitat')).toBeDisabled();
 	await expect(page.getByTestId('sklo-sirka')).toHaveCount(0); // žiadny náhľad
 	await expect(page.getByTestId('odoslat')).toHaveCount(0);
+
+	// 4b. sub-min šírka (pod min poľa 300 mm) → dimOrNull ju nevyhodnotí, takže
+	// počas dopisovania (3 → 30 → 300 → 3000) neblikne falošný ⛔; potom späť na
+	// 3000 a blok sa opäť ukáže (stav pre krok 5).
+	await page.getByLabel('Šírka (mm) *').fill('200');
+	await expect(page.getByTestId('b2b-sirka-err')).toHaveCount(0);
+	await page.getByLabel('Šírka (mm) *').fill('3000');
+	await expect(page.getByTestId('b2b-sirka-err')).toContainText('Zvoľ 3K');
 
 	// 5. prepni na 3K (šírka na sklo = 1000 mm, v limite) → náhľad OK, tlačidlo
 	// Tlačiť je prítomné, Odoslať NIE (B2B nesmie zapisovať do Money)
 	await page.getByLabel('Štýl').selectOption('3K');
+	// oprava (3K, sklo 1000 mm v limite) → blok zmizne, tlačidlo sa odblokuje
+	await expect(page.getByTestId('b2b-sirka-err')).toHaveCount(0);
+	await expect(page.getByTestId('spocitat')).toBeEnabled();
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
 	await expect(page.getByRole('button', { name: /Tlačiť/ })).toBeVisible();
@@ -503,6 +516,22 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await row.getByRole('button', { name: 'Zmazať' }).click();
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
 	await expect(page.locator('tr', { hasText: b2bUser })).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// „iba b2b" — interný účet NEVIDÍ okamžitý šírkový limit a môže spočítať čokoľvek
+// (regresný strážca požiadavky: limity platia LEN pre b2b).
+test('interný účet: nadrozmerná šírka NEVIDÍ okamžitý b2b limit, Spočítať povolené', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page); // interný e2e
+	await goto(page, '/zasklenia');
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Šírka (mm) *').fill('3000'); // sklo 1500 mm > b2b limit 1000
+	await expect(page.getByTestId('b2b-sirka-err')).toHaveCount(0);
+	await expect(page.getByTestId('spocitat')).toBeEnabled();
 	expect(consoleMsgs).toEqual([]);
 });
 

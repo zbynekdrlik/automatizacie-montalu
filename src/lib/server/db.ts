@@ -483,13 +483,15 @@ export function loadCfg(): Cfg {
 	return buildCFG(sys, rez);
 }
 
-export function listSysStyly(): { sysStyl: string; system: string; styl: string }[] {
-	return (db.prepare('SELECT sys_styl FROM cfg_sys ORDER BY sys_styl').all() as {
+export function listSysStyly(): { sysStyl: string; system: string; styl: string; N: number }[] {
+	return (db.prepare('SELECT sys_styl, n FROM cfg_sys ORDER BY sys_styl').all() as {
 		sys_styl: string;
+		n: number;
 	}[]).map((r) => ({
 		sysStyl: r.sys_styl,
 		system: r.sys_styl.split('|')[0],
-		styl: r.sys_styl.split('|')[1]
+		styl: r.sys_styl.split('|')[1],
+		N: r.n
 	}));
 }
 
