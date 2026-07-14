@@ -69,3 +69,31 @@ NOCASE` is ASCII-only — fine for e-mail/ASCII handles; a non-ASCII (accented) 
 would not be case-folded. `login()` also `.trim()`s the username. Regression test:
 `tests/login-case-insensitive.test.ts` (RED→GREEN). Passwords stay case-SENSITIVE and
 untrimmed (only the name is normalized).
+
+## 6. b2b immediate (client-side) width block — pure logic in `$lib/`, gate on field bounds
+
+The b2b width limit blocks IMMEDIATELY on input (reactive `$derived` in
+`zasklenia/+page.svelte`) — the "Spočítať" button is `disabled={b2bBlok}` while the
+width is out of range, so a b2b user never reaches compute with an invalid width (v0.6.3).
+Two gotchas learned building it:
+
+- **Shared limit logic MUST live in `$lib/` (client-safe), not `$lib/server/`.** A
+  value-import of a `$lib/server/*` module into a `.svelte` component 500s. So the pure
+  checks live in `src/lib/b2b-limits.ts` (takes a plain `StyleN[]` = `{sysStyl,system,styl,N}[]`,
+  fed from `data.styly`); `src/lib/server/b2b-limits.ts` is a thin adapter that maps the
+  server `Cfg` → `StyleN[]` and re-exports, **preserving the original `checkB2BWidth(cfg,…)`
+  signature** so `+page.server.ts` and its tests are untouched. `data.styly[].N` and the
+  server's `cfg[sysStyl].N` are the SAME raw `cfg_sys.n` column → client and server block
+  decisions provably match.
+- **Gate the reactive check on the field's own `min`/`max`** (helper `dimOrNull` returns
+  the value only within `[300, 20000]` mm). Without it, a user typing a valid width
+  digit-by-digit (`3 → 30 → 300 → 3000`) sees a spurious ⛔ + disabled button flash on
+  every sub-min intermediate value (review 🔵, fixed in v0.6.3). Native `min`/`max`
+  validation + the server-side check still guard submit — the client block is UX only.
+- **This is client-side UX, NOT the security boundary.** The Money-write lock (§2) and the
+  server `checkB2BWidth` backstop in `nahlad`/`nahladMulti` remain authoritative: a b2b
+  user editing the DOM to re-enable the button still hits the server check. b2b-only gating
+  is airtight — every `$derived` early-returns `null` when `!isB2B`, and `b2bBlok = isB2B && …`,
+  so internal users are never affected. Regression guards: the b2b lifecycle E2E asserts the
+  immediate block + disabled button; an internal-negative E2E asserts internal users see no
+  block at the same oversized width.
