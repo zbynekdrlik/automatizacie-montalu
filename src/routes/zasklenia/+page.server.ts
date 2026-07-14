@@ -5,6 +5,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
 import { safeCompute, safeComputeMulti } from '$lib/server/compute';
+import { isB2B } from '$lib/server/auth';
 import {
 	writeOdpis,
 	isLive,
@@ -140,6 +141,11 @@ export const actions: Actions = {
 	},
 
 	odoslat: async ({ request, locals }) => {
+		// b2b nesmie zapisovať do Money — obrana do hĺbky, UI tlačidlo je skryté,
+		// ale skriptovaný POST musí byť odmietnutý aj tu (pred parsom/výpočtom/zápisom)
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemôže odpisovať do Money.' };
+		}
 		const formData = await request.formData();
 		const { vstup, error } = parseVstup(formData);
 		if (error) return { step: 'form' as const, error, vstup };
@@ -222,6 +228,10 @@ export const actions: Actions = {
 	},
 
 	odoslatMulti: async ({ request, locals }) => {
+		// b2b nesmie zapisovať do Money — obrana do hĺbky, viď odoslat vyššie
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemôže odpisovať do Money.' };
+		}
 		const formData = await request.formData();
 		const { vstup, error } = parseMultiVstup(formData);
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };

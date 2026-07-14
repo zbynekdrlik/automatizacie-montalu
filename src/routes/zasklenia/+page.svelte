@@ -5,6 +5,10 @@
 
 	let { data, form } = $props();
 
+	// b2b nesmie odpisovať do Money — server to aj tak odmietne (defense in depth),
+	// tu skrývame odoslat/odoslatMulti UI, aby to b2b účet ani neskúšal
+	const isB2B = $derived(data.user?.role === 'b2b');
+
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
 	// predvyplnenie: po chybe/náhľade sa vraciame k odoslaným hodnotám (jedno- aj
@@ -297,8 +301,8 @@
 	<div class="card">
 		<h1>Zasklenia — nárezový plán</h1>
 		<p class="sub">
-			Zadaj rozmery, ukážem nárezový plán s náhľadom. Odpis sa do Money odošle až po tvojom
-			potvrdení.
+			Zadaj rozmery, ukážem nárezový plán s náhľadom.
+			{#if !isB2B}Odpis sa do Money odošle až po tvojom potvrdení.{/if}
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
 	</div>
@@ -446,15 +450,17 @@
 	{@render planKarty(plan)}
 
 	<div class="card noprint">
-		<form method="POST" action="?/odoslat">
-			{@render hiddenVstup()}
-			<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
-			<button class="btn" type="submit" data-testid="odoslat">
-				{data.live
-					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')
-					: '🧪 Odoslať odpis (TEST priečinok)'}
-			</button>
-		</form>
+		{#if !isB2B}
+			<form method="POST" action="?/odoslat">
+				{@render hiddenVstup()}
+				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
+				<button class="btn" type="submit" data-testid="odoslat">
+					{data.live
+						? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')
+						: '🧪 Odoslať odpis (TEST priečinok)'}
+				</button>
+			</form>
+		{/if}
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hiddenVstup()}
@@ -500,15 +506,17 @@
 	{@render planKartyMulti(multi)}
 
 	<div class="card noprint">
-		<form method="POST" action="?/odoslatMulti">
-			{@render hiddenMulti()}
-			<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
-			<button class="btn" type="submit" data-testid="odoslat-multi">
-				{data.live
-					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')
-					: '🧪 Odoslať odpis (TEST priečinok)'}
-			</button>
-		</form>
+		{#if !isB2B}
+			<form method="POST" action="?/odoslatMulti">
+				{@render hiddenMulti()}
+				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
+				<button class="btn" type="submit" data-testid="odoslat-multi">
+					{data.live
+						? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')
+						: '🧪 Odoslať odpis (TEST priečinok)'}
+				</button>
+			</form>
+		{/if}
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravitMulti" style="display:inline">
 			{@render hiddenMulti()}
