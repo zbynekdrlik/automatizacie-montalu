@@ -73,3 +73,16 @@ describe('B2B_LIMITS', () => {
 		expect(B2B_LIMITS.Slide.maxPanel).toBe(1300);
 	});
 });
+
+describe('B2B_LIMITS pokrytie systémov (drift guard)', () => {
+	// checkB2BWidth/checkB2BHeight fail-open (return null = nelimituj) pre systém
+	// mimo B2B_LIMITS. Ak sa osadí 4. systém bez pridania limitu, b2b dostane
+	// NEOBMEDZENÉ rozmery na ňom — tento test to odchytí PRED nasadením.
+	it('každý osadený (seeded) systém má B2B_LIMITS položku', () => {
+		const seededSystems = [...new Set(Object.keys(cfg).map((k) => k.split('|')[0]))];
+		expect(seededSystems.length).toBeGreaterThan(0); // self-check: nesmie kontrolovať prázdnu množinu
+		for (const system of seededSystems) {
+			expect(Object.keys(B2B_LIMITS)).toContain(system);
+		}
+	});
+});
