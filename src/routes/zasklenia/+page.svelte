@@ -26,6 +26,7 @@
 			sklo: form?.vstup?.sklo ?? '',
 			skloPresne: form?.vstup?.skloPresne ?? '',
 			otvaranie: form?.vstup?.otvaranie ?? 'P - L',
+			vrtanieZamku: form?.vstup?.vrtanieZamku ?? 1050,
 			poznamka: zd?.poznamka ?? '',
 			caka: zd?.caka ?? false
 		};
@@ -68,6 +69,7 @@
 	let otvaranie = $state('P - L');
 	let sirka = $state<number | string>('');
 	let vyska = $state<number | string>('');
+	let vrtanieZamkuS = $state<number | string>(1050);
 	let posuvyExtra = $state<PosuvRow[]>([]);
 	$effect(() => {
 		const zd = form?.vstup ?? form?.multiVstup ?? null;
@@ -75,6 +77,7 @@
 		opS = zd?.op ?? '';
 		zakaznikS = zd?.zakaznik ?? '';
 		skloPresneS = form?.vstup?.skloPresne ?? '';
+		vrtanieZamkuS = form?.vstup?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
 		cakaS = zd?.caka ?? false;
 		const p = prim();
@@ -156,6 +159,7 @@
 	<input type="hidden" name="sklo" value={vstup.sklo} />
 	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
+	<input type="hidden" name="vrtanieZamku" value={vstup.vrtanieZamku} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 {/snippet}
@@ -175,7 +179,7 @@
 
 	<div class="card">
 		<div class="sec">Náhľad</div>
-		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} />
+		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} />
 	</div>
 
 	<div class="card">
@@ -257,7 +261,7 @@
 			{#each m.posuvy as pv, i (i)}
 				<div class="posuv-nahlad">
 					<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
-					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} />
+					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} />
 				</div>
 			{/each}
 		</div>
@@ -366,6 +370,20 @@
 					{#if jeOpona}<span class="hint">Pri 2× štýle je otváranie vždy opona (od stredu).</span>{/if}
 				</div>
 			</div>
+			{#if system === 'Deluxe'}
+				<div class="field">
+					<label for="vrtanieZamku">Výška vŕtania zámku (mm) — otvory ⌀46 na krajných sklách</label>
+					<input
+						id="vrtanieZamku"
+						name="vrtanieZamku"
+						type="number"
+						min="0"
+						max="20000"
+						step="any"
+						bind:value={vrtanieZamkuS}
+					/>
+				</div>
+			{/if}
 			<div class="field">
 				<label for="skloPresne">Presné zloženie skla (nepovinné — nemení vzorec)</label>
 				<input

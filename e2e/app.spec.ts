@@ -474,3 +474,54 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await expect(page.locator('tr', { hasText: b2bUser })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
+
+// Deluxe zámkové otvory D46 v náhľade (Dominik 2026-07-14) — READ-ONLY náhľad,
+// bezpečné aj na LIVE. ⌀46 na krajných sklách + KONFIGUROVATEĽNÁ výška vŕtania.
+test('Deluxe D46 zámok: náhľad kreslí otvory ⌀46 + zvolenú výšku vŕtania', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-D46`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E D46');
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await page.getByLabel('Štýl').selectOption('5K');
+	await page.getByLabel('Šírka (mm) *').fill('4500');
+	await page.getByLabel('Výška (mm) *').fill('2400');
+	// pole je LEN pri Deluxe — nastav vlastnú výšku vŕtania (nie default 1050)
+	await page.getByLabel(/Výška vŕtania zámku/).fill('1100');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	const svg = page.getByTestId('nahlad-2d');
+	await expect(svg).toBeVisible();
+	// 5K → dve krajné sklá → dva prerušované kruhy (vŕtané otvory)
+	await expect(svg.locator('circle[stroke-dasharray]')).toHaveCount(2);
+	// ⌀46 + zvolená výška vŕtania sú NAPÍSANÉ v náhľade
+	await expect(svg.getByText('⌀46').first()).toBeVisible();
+	await expect(svg.getByText('v 1100').first()).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
+});
+
+// Aditívnosť: iné systémy (Robust) nemajú pole výšky ani otvory — interný flow nezmenený.
+test('Robust: žiadne pole výšky vŕtania ani otvory D46 (D46 je len Deluxe)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Systém').selectOption('Robust');
+	// pole „Výška vŕtania zámku" sa pri Robuste NEzobrazuje
+	await expect(page.getByLabel(/Výška vŕtania zámku/)).toHaveCount(0);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-NODLX`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Robust');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Šírka (mm) *').fill('2000');
+	await page.getByLabel('Výška (mm) *').fill('2000');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	const svg = page.getByTestId('nahlad-2d');
+	await expect(svg).toBeVisible();
+	// žiadne prerušované kruhy (D46 otvory) pri Robuste
+	await expect(svg.locator('circle[stroke-dasharray]')).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});
