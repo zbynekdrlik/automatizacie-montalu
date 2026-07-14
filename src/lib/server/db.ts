@@ -441,21 +441,11 @@ function seedUsers() {
 	const userCount = (db.prepare('SELECT COUNT(*) c FROM users').get() as { c: number }).c;
 	if (userCount === 0) {
 		const spec = process.env.SEED_USERS || '';
-		const ins = db.prepare('INSERT INTO users (username, pass_hash, role) VALUES (?, ?, ?)');
+		const ins = db.prepare('INSERT INTO users (username, pass_hash) VALUES (?, ?)');
 		for (const pair of spec.split(',').filter(Boolean)) {
 			const idx = pair.indexOf(':');
 			if (idx < 1) continue;
-			const username = pair.slice(0, idx).trim();
-			// voliteľná prípona „:b2b" / „:internal" určuje rolu; inak internal.
-			// (heslo môže obsahovať ':', preto match len na konci reťazca.)
-			let rest = pair.slice(idx + 1);
-			let role = 'internal';
-			const m = rest.match(/:(b2b|internal)$/);
-			if (m) {
-				role = m[1];
-				rest = rest.slice(0, -m[0].length);
-			}
-			ins.run(username, hashPassword(rest), role);
+			ins.run(pair.slice(0, idx).trim(), hashPassword(pair.slice(idx + 1)));
 		}
 	}
 }

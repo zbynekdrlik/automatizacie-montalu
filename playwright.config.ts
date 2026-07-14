@@ -35,7 +35,7 @@ export default defineConfig({
 				reuseExistingServer: false,
 				env: {
 					DATABASE_PATH: './data/e2e.db',
-					SEED_USERS: 'e2e:e2e-heslo-123,e2eb2b:e2e-heslo-123:b2b',
+					SEED_USERS: 'e2e:e2e-heslo-123',
 					MONEY_LIVE: '0',
 					MONEY_TEST_DIR: './data/e2e-odpis-export'
 				}
