@@ -41,6 +41,28 @@ vzorcom `(S-a)/N + b` kde `+b` je MIMO delenia → `koef=1/N, offset=b-a/N, deli
 (delitN=1 by `+b` nevyjadril). Exaktné test-vektory over cross-checkom app-FFD == Excel
 ROUNDUP; každý ŽIVO-voliteľný štýl musí mať exaktný vektor (nie len smoke).
 
+**N-závislé vzorce → konštanty per štýl:** keďže každý `sysStyl` má FIXNÉ N, každý
+N-závislý člen sa poskladá do konštantného `offset` + `pocetKs` per štýl (napr. Štandard +
+prírez 2K −147.5 … 6K −247.5, `pocetKs=2N`). Nerob N-aritmetiku v engine.
+
+**Test OBIDVE migračné cesty:** nový systém sa na PRÁZDNEJ DB zoseeduje skorým `<5` blokom
+(default `dlzka_tyce=7500`), potom ho v6 `updBar` opraví z cfg_seed (napr. 3600) → fresh
+DB konverguje s cfg_seed; na PROD upgrade ceste ho pridá až `vN` blok s `hasSys` guardom
+(žiadny dupel). Maj test na OBE (`migration-vN.test.ts` = upgrade, `migration-fresh-db.test.ts`
+= fresh) — inak sa rozíde len jedna cesta a CI to nechytí.
+
+## 3c. Zdieľané Money kódy NAPRIEČ systémami — invariant pre pooling
+
+Do Štandard + boli systémy kódovo DISJUNKTNÉ; Štandard + je PRVÝ, čo zdieľa kódy s iným
+systémom (5 spodných koľajníc s Deluxe: `ZASP00104/00030/00033/202432/202437`).
+`computeMulti` pooluje profily **po kóde** naprieč posuvmi → pri pridaní systému, čo
+recykluje existujúci kód, platí INVARIANT: **každý výskyt toho istého kódu (aj v inom
+systéme) MUSÍ mať rovnakú `dlzkaTyce`** — inak sa zmiešaná multi-posuv zákazka zbalí na
+jednu tyč zle a odpis je nesprávny. (Štandard + zdieľané koľajnice = vždy 7500, OK.)
+Pasca navyše (len KRESBA, nie odpis): `sikmyRez` pooled riadku sa nastaví z PRVÉHO posuvu,
+takže v zmiešanej Deluxe+Štandard+ zákazke sa uhol rezu koľajnice môže nakresliť podľa
+druhého systému. Pri pridaní systému so zdieľaným kódom over dĺžku tyče zhodu + zváž uhol.
+
 ## 3b. Atribút vyberá VARIANT článku (bez duplikovania štýlu) — `sklo_hrubka`
 
 Keď VLASTNOSŤ položky (nie štýl) vyberá iný Money kód pri IDENTICKEJ geometrii/množstve,
