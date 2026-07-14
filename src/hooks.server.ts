@@ -1,7 +1,8 @@
 // Globálny auth guard: všetko okrem /login a /health vyžaduje prihlásenie.
 // Formuláre zapisujú do Money importu — verejný prístup bol nález auditu n8n verzie.
 import { redirect, type Handle } from '@sveltejs/kit';
-import { getSessionUser, pruneSessions, SESSION_COOKIE } from '$lib/server/auth';
+import { getSessionUser, isB2B, pruneSessions, SESSION_COOKIE } from '$lib/server/auth';
+import { b2bRedirectTarget } from '$lib/server/b2b-access';
 
 const PUBLIC_PATHS = ['/login', '/health'];
 
@@ -19,6 +20,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 		// pathname + search — deep link s parametrami (napr. ?sysStyl=…) sa po
 		// prihlásení nesmie stratiť, inak editor otvorí iný štýl než užívateľ čakal
 		redirect(303, '/login?next=' + encodeURIComponent(event.url.pathname + event.url.search));
+	}
+
+	// B2B smie len /zasklenia — presmeruj z ostatných stránok (denylist, assety prejdú).
+	if (isB2B(event.locals.user)) {
+		const target = b2bRedirectTarget(event.url.pathname);
+		if (target && event.url.pathname !== target) redirect(303, target);
 	}
 
 	return resolve(event);
