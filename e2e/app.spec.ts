@@ -477,6 +477,14 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await expect(page.getByTestId('sklo-sirka')).toHaveCount(0); // žiadny náhľad
 	await expect(page.getByTestId('odoslat')).toHaveCount(0);
 
+	// 4b. sub-min šírka (pod min poľa 300 mm) → dimOrNull ju nevyhodnotí, takže
+	// počas dopisovania (3 → 30 → 300 → 3000) neblikne falošný ⛔; potom späť na
+	// 3000 a blok sa opäť ukáže (stav pre krok 5).
+	await page.getByLabel('Šírka (mm) *').fill('200');
+	await expect(page.getByTestId('b2b-sirka-err')).toHaveCount(0);
+	await page.getByLabel('Šírka (mm) *').fill('3000');
+	await expect(page.getByTestId('b2b-sirka-err')).toContainText('Zvoľ 3K');
+
 	// 5. prepni na 3K (šírka na sklo = 1000 mm, v limite) → náhľad OK, tlačidlo
 	// Tlačiť je prítomné, Odoslať NIE (B2B nesmie zapisovať do Money)
 	await page.getByLabel('Štýl').selectOption('3K');
