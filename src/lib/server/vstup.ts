@@ -15,6 +15,9 @@ export interface Vstup {
 	 *  na plán, vzorec ostáva podľa základného skla `sklo` */
 	skloPresne: string;
 	otvaranie: string;
+	/** výška vŕtania zámku [mm od spodku skla] — len Deluxe (otvory D46 v náhľade),
+	 *  default 1050; do budúcna aj do objednávky skla */
+	vrtanieZamku: number;
 	/** voľná poznámka — zobrazí sa hore vpravo na nárezovom pláne (aj v tlači) */
 	poznamka: string;
 	caka: boolean;
@@ -36,6 +39,11 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		sklo: String(form.get('sklo') ?? '').trim(),
 		skloPresne: String(form.get('skloPresne') ?? '').trim().slice(0, 120),
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
+		// Deluxe zámok: kladná výška vŕtania, inak default 1050 (len na náhľad/tlač)
+		vrtanieZamku: (() => {
+			const x = num('vrtanieZamku');
+			return x > 0 && x <= 20000 ? x : 1050;
+		})(),
 		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
 		caka: form.get('caka') === '1'
 	};

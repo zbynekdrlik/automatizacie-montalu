@@ -7,7 +7,9 @@
 		N,
 		skloS,
 		skloV,
-		otvaranie = ''
+		otvaranie = '',
+		system = '',
+		vrtanieZamku = 1050
 	}: {
 		S: number;
 		V: number;
@@ -15,6 +17,10 @@
 		skloS: number;
 		skloV: number;
 		otvaranie?: string;
+		/** systém zasklenia — Deluxe kreslí zámkové otvory D46 na krajných sklách */
+		system?: string;
+		/** výška vŕtania zámku (mm od spodku skla) — len Deluxe; do náhľadu + tlače */
+		vrtanieZamku?: number;
 	} = $props();
 
 	const W = 760; // šírka kresby v px
@@ -31,6 +37,31 @@
 	);
 
 	const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
+
+	// Deluxe zámkové otvory D46: ⌀46 mm, 50 mm od kraja skla, na KRAJNÝCH sklách
+	// (ľavé pole pri ľavej hrane, pravé pole pri pravej). Výška vŕtania od spodku
+	// skla je konfigurovateľná (default 1050); diera sa v kresbe nemusí presne
+	// posúvať, hlavné je zobraziť + okótovať hodnotu (Dominik 2026-07-14).
+	const D_ZAMOK = 46; // priemer otvoru [mm]
+	const OKRAJ_ZAMOK = 50; // vzdialenosť stredu diery od kraja skla [mm]
+	let zamky = $derived.by(() => {
+		if (system !== 'Deluxe' || !(N >= 1)) return [];
+		const r = (D_ZAMOK / 2) * scale;
+		const glassTop = M.top + frame;
+		const glassBot = M.top + h - frame;
+		// stred vo výške vrtanieZamku od spodku, orezané aby kruh ostal v skle
+		const cyRaw = glassBot - vrtanieZamku * scale;
+		const cy = Math.max(glassTop + r + 4, Math.min(glassBot - r - 4, cyRaw));
+		const idxs = N === 1 ? [0] : [0, N - 1];
+		return idxs.map((i) => {
+			const left = i === 0;
+			const gx0 = M.left + i * panelW + frame;
+			const gx1 = M.left + i * panelW + panelW - frame;
+			const edgeX = left ? gx0 : gx1;
+			const cx = left ? gx0 + OKRAJ_ZAMOK * scale : gx1 - OKRAJ_ZAMOK * scale;
+			return { cx, cy, r, edgeX, left };
+		});
+	});
 </script>
 
 <svg
@@ -94,6 +125,23 @@
 			opacity="0.8"
 		/>
 		<text x={x + panelW / 2} y={M.top + 18} text-anchor="middle" font-size="11" fill="#64748b">{i + 1}</text>
+	{/each}
+
+	<!-- Deluxe zámkové otvory D46 na krajných sklách (⌀46, 50 mm od kraja, výška vŕtania) -->
+	{#each zamky as z (z.cx)}
+		{@const yDim = z.cy - z.r - 9}
+		<!-- otvor (prerušovaný kruh = vŕtaný otvor) -->
+		<circle cx={z.cx} cy={z.cy} r={z.r} fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="3 2" />
+		<!-- kóta 50 mm od kraja skla -->
+		<g stroke="#475569" stroke-width="0.8" fill="none">
+			<line x1={z.edgeX} y1={z.cy} x2={z.edgeX} y2={yDim - 3} />
+			<line x1={z.cx} y1={z.cy - z.r} x2={z.cx} y2={yDim - 3} />
+			<line x1={z.edgeX} y1={yDim} x2={z.cx} y2={yDim} />
+		</g>
+		<text x={(z.edgeX + z.cx) / 2} y={yDim - 2} text-anchor="middle" font-size="9" fill="#334155">{OKRAJ_ZAMOK}</text>
+		<!-- ⌀46 + výška vŕtania pod otvorom -->
+		<text x={z.cx} y={z.cy + z.r + 11} text-anchor="middle" font-size="9" fill="#334155" font-weight="600">⌀{D_ZAMOK}</text>
+		<text x={z.cx} y={z.cy + z.r + 21} text-anchor="middle" font-size="9" fill="#334155">v {fmt(vrtanieZamku)}</text>
 	{/each}
 
 	<!-- rozmer skla v prvom poli -->
