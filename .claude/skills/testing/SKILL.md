@@ -50,6 +50,16 @@ For a delete guarded by `confirm()`, override it before submitting: `window.conf
 a11y snapshot's "textbox" name often comes from a `<label>`, so `[placeholder="…"]`
 selectors miss (the inputs have empty `placeholder`).
 
+**Svelte reactive `<select>` race when driving via `browser_evaluate`:** a select whose
+options depend on another field (e.g. `#sklo` options are filtered by `#system` /
+`sklaForSystem`) will NOT accept a value you set in the SAME evaluate call right after
+changing its dependency — Svelte re-renders the options on the next microtask, so your
+native `value` setter runs against stale options and silently resolves to `''`. Fix: set
+the dependency (`#system`) in one `browser_evaluate` call, let the MCP round-trip settle
+the DOM, THEN set the dependent select (`#sklo`) in a SEPARATE call. Also read the ACTUAL
+option values first (`[...sel.options].map(o=>o.value)`) — the Deluxe glasses are `Float
+kalené 6 mm` / `Float kalené 10 mm`, not what a transient first read may show.
+
 **Money-safe verification rule:** on the live target NEVER click "Odoslať odpis do Money"
 (real Money write — irreversible, `MONEY_LIVE=1`). Compute-only (`Spočítať`/`Späť`) and
 the `/pouzivatelia` create+delete of a clearly-named throwaway B2B account are the

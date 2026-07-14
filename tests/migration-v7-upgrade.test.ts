@@ -44,8 +44,10 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 describe('reálny v6 → v7 upgrade (prod stav: 10 pôvodných Deluxe štýlov)', () => {
-	it('db.ts v7: user_version=8, staré 5K6/5K10/6K6/6K10 preč, 8 nových + hrubka, Robust nedotknutý', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(8);
+	it('db.ts v7: user_version=9 (po v8+v9), staré 5K6/5K10/6K6/6K10 preč, 8 nových + hrubka, Robust nedotknutý', () => {
+		// import db.ts spustí VŠETKY migrácie po v6 (v7 Deluxe + v8 role + v9 Štandard +),
+		// takže konečná verzia je 9, nie 8 — tento test overuje LEN v7 blok (Deluxe).
+		expect(db.pragma('user_version', { simple: true })).toBe(9);
 
 		// staré delené štýly zmazané
 		expect(

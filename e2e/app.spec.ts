@@ -137,6 +137,37 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 	expect(consoleMsgs).toEqual([]);
 });
 
+// Štandard + (basic/IZO/opona) — READ-ONLY náhľad (nič sa nezapisuje do Money).
+// 2K IZO @ S=3000 V=2400 je overené 1:1 proti REÁLNEMU Money odpisu
+// (docs/standard-plus-spec.md zdroj: "2K s U PLUS.xlsx"): rail horná ZASP00107,
+// spodná upsize ZASP00030 (o veľkosť väčšia), prírez ZASP202415, U profil ZASP202439
+// (vodorovný+zvislý spolu pod jedným kódom).
+test('Štandard + 2K IZO: náhľad — rail upsize + U profil (Money-overené 1:1)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-SPL`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Standard Plus');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2K IZO');
+	await page.getByLabel('Šírka (mm) *').fill('3000');
+	await page.getByLabel('Výška (mm) *').fill('2400');
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4.8.4');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	// sklo (len plán, nie Money) — 1415 × 2265
+	await expect(page.getByTestId('sklo-sirka')).toHaveText('1415');
+	await expect(page.getByTestId('sklo-vyska')).toHaveText('2265');
+	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
+	// (^|\D) hranica — aby napr. "7,5 m" nechytilo "17,5 m" v inom stĺpci
+	await expect(page.locator('.row', { hasText: 'ZASP00107' })).toContainText(/(^|\D)7,5 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toContainText(/(^|\D)7,5 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP202415' })).toContainText(/(^|\D)7,2 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP202439' })).toContainText(/(^|\D)21,6 m/);
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľad)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page); // náhľad NEzapisuje → bezpečné aj na LIVE, žiadny skipAkLive
