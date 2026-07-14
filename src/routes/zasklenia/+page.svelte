@@ -447,6 +447,10 @@
 		<div class="warn" data-testid="plan-warn">⚠️ {form.warn}</div>
 	{/if}
 
+	{#if form?.heightWarn}
+		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
+	{/if}
+
 	{@render planKarty(plan)}
 
 	<div class="card noprint">
@@ -502,6 +506,9 @@
 	</div>
 
 	{#if form?.warn}<div class="warn" data-testid="plan-warn">⚠️ {form.warn}</div>{/if}
+	{#if form?.heightWarn}
+		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
+	{/if}
 
 	{@render planKartyMulti(multi)}
 

@@ -6,6 +6,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
 import { safeCompute, safeComputeMulti } from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
+import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
 import {
 	writeOdpis,
 	isLive,
@@ -120,9 +121,21 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	nahlad: async ({ request }) => {
+	nahlad: async ({ request, locals }) => {
 		const { vstup, error } = parseVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
+
+		// b2b: šírka na sklo blokuje (nedá sa vyrobiť), výška NEblokuje — len
+		// upozorní „bez záruky" (Dominik). Interní users tieto limity NEVIDIA.
+		let heightWarn: string | undefined;
+		if (isB2B(locals.user)) {
+			const cfg = loadCfg();
+			const sysStyl = `${vstup.system}|${vstup.styl}`;
+			const wErr = checkB2BWidth(cfg, sysStyl, vstup.s);
+			if (wErr) return { step: 'form' as const, error: wErr, vstup };
+			heightWarn = checkB2BHeight(sysStyl, vstup.v) ?? undefined;
+		}
+
 		const { r, err } = compute(vstup);
 		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		return {
@@ -132,6 +145,7 @@ export const actions: Actions = {
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, jobFor(vstup, r, '').polozky),
 			warn: null as string | null,
+			heightWarn,
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(jobFor(vstup, r, '')),
@@ -207,9 +221,26 @@ export const actions: Actions = {
 	},
 
 	// ---- Viac posuvov (zimná záhrada): spoločné balenie tyčí naprieč posuvmi ----
-	nahladMulti: async ({ request }) => {
+	nahladMulti: async ({ request, locals }) => {
 		const { vstup, error } = parseMultiVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+
+		// b2b: per-posuv šírka blokuje celý náhľad na prvej chybe; výšky, ktoré
+		// presiahnu limit, sa zbierajú (bez duplicít) do jedného upozornenia.
+		let heightWarn: string | undefined;
+		if (isB2B(locals.user)) {
+			const cfg = loadCfg();
+			const warns: string[] = [];
+			for (const p of vstup.posuvy) {
+				const sysStyl = `${p.system}|${p.styl}`;
+				const wErr = checkB2BWidth(cfg, sysStyl, p.s);
+				if (wErr) return { step: 'form' as const, error: wErr, multiVstup: vstup };
+				const hW = checkB2BHeight(sysStyl, p.v);
+				if (hW) warns.push(hW);
+			}
+			heightWarn = warns.length ? [...new Set(warns)].join(' ') : undefined;
+		}
+
 		const { r, err } = computeMultiFrom(vstup);
 		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 		const job = jobForMulti(vstup, r, '');
@@ -219,6 +250,7 @@ export const actions: Actions = {
 			multi: r,
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
+			heightWarn,
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(job),

@@ -40,6 +40,12 @@ describe('checkB2BWidth', () => {
 		expect(err).toBeTruthy();
 		expect(err).toContain('2K');
 	});
+	it('neznámy systém (mimo B2B_LIMITS) → fail-open, nelimituje', () => {
+		expect(checkB2BWidth(cfg, 'Nieco|2K', 3000)).toBeNull();
+	});
+	it('chýbajúca cfg položka pre sysStyl → fail-open, nelimituje', () => {
+		expect(checkB2BWidth(cfg, 'Robust|Neexistuje', 3000)).toBeNull();
+	});
 });
 
 describe('checkB2BHeight', () => {
@@ -54,6 +60,9 @@ describe('checkB2BHeight', () => {
 	});
 	it('Robust 2700 → warning', () => {
 		expect(checkB2BHeight('Robust|2K', 2700)).toContain('BEZ ZÁRUKY');
+	});
+	it('neznámy systém (mimo B2B_LIMITS) → fail-open, nelimituje', () => {
+		expect(checkB2BHeight('Nieco|2K', 3000)).toBeNull();
 	});
 });
 

@@ -168,6 +168,17 @@ select:focus {
 	font-size: 15.5px;
 	margin-bottom: 14px;
 }
+/* b2b výška nad limit — NEblokuje, len upozorní „bez záruky". Zámerne mimo
+   .noprint — musí byť vidno aj na vytlačenom/PDF nárezovom pláne. */
+.warn-zaruka {
+	background: #fff3cd;
+	border: 2px solid #e0a800;
+	color: #7a5c00;
+	padding: 8px 12px;
+	border-radius: 6px;
+	margin: 8px 0;
+	font-weight: 700;
+}
 .okmsg {
 	background: #f0fdf4;
 	border: 1px solid #bbf7d0;
