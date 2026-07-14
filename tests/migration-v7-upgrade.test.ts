@@ -44,8 +44,8 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 describe('reálny v6 → v7 upgrade (prod stav: 10 pôvodných Deluxe štýlov)', () => {
-	it('db.ts v7: user_version=7, staré 5K6/5K10/6K6/6K10 preč, 8 nových + hrubka, Robust nedotknutý', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(7);
+	it('db.ts v7: user_version=8, staré 5K6/5K10/6K6/6K10 preč, 8 nových + hrubka, Robust nedotknutý', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(8);
 
 		// staré delené štýly zmazané
 		expect(

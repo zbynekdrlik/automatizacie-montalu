@@ -394,3 +394,83 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 	expect(invalid).toBe(true);
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blok/výškový warning), admin ho zmaže', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	page.on('dialog', (d) => d.accept()); // confirm() pri Zmazať
+
+	const b2bUser = `e2e-b2b-${Date.now().toString(36)}`;
+	const b2bPass = 'e2eheslo1';
+
+	// 1. interný vidí nav odkaz Používatelia a vytvorí B2B účet cez /pouzivatelia
+	await loginAs(page);
+	await expect(page.getByRole('link', { name: 'Používatelia' })).toBeVisible();
+	await goto(page, '/pouzivatelia');
+	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
+	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
+	await page.getByRole('button', { name: 'Pridať B2B účet' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	await expect(page.locator('tr', { hasText: b2bUser })).toContainText('B2B');
+
+	// 2. odhlásenie + prihlásenie ako čerstvo vytvorený B2B účet
+	await page.getByRole('button', { name: 'Odhlásiť' }).click();
+	await expect(page).toHaveURL(/\/login/);
+	await loginAs(page, b2bUser, b2bPass);
+
+	// 3. B2B: nav ukazuje len Zasklenia; /pergola aj /pouzivatelia presmerujú na /zasklenia
+	await expect(page.getByRole('link', { name: 'Zasklenia' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Pergola' })).toHaveCount(0);
+	await expect(page.getByRole('link', { name: 'Používatelia' })).toHaveCount(0);
+	await goto(page, '/pergola');
+	await expect(page).toHaveURL(/\/zasklenia/);
+	await goto(page, '/pouzivatelia');
+	await expect(page).toHaveURL(/\/zasklenia/);
+
+	// 4. Deluxe 2K @ 3000×2000 → šírka na sklo = 1500 mm (nad limit 1000) →
+	// šírkový blok, poradí 3K (Dominik: „2K 3000 → sklo 1500, treba 3K po 1000"),
+	// formulár ostáva na kroku 'form' → žiadny náhľad, žiadne Odoslať
+	await goto(page, '/zasklenia');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-B2B`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E B2B');
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Šírka (mm) *').fill('3000');
+	await page.getByLabel('Výška (mm) *').fill('2000');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('form-error')).toContainText('Zvoľ 3K');
+	await expect(page.getByTestId('sklo-sirka')).toHaveCount(0); // žiadny náhľad
+	await expect(page.getByTestId('odoslat')).toHaveCount(0);
+
+	// 5. prepni na 3K (šírka na sklo = 1000 mm, v limite) → náhľad OK, tlačidlo
+	// Tlačiť je prítomné, Odoslať NIE (B2B nesmie zapisovať do Money)
+	await page.getByLabel('Štýl').selectOption('3K');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
+	await expect(page.getByRole('button', { name: /Tlačiť/ })).toBeVisible();
+	await expect(page.getByTestId('odoslat')).toHaveCount(0);
+	await expect(page.getByTestId('height-warn')).toHaveCount(0);
+
+	// 6. rovnaký 3K, výška 2700 mm (nad Deluxe maxHeight 2500) → NEblokuje,
+	// len upozorní „BEZ ZÁRUKY" na náhľade
+	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
+	await waitHydrated(page);
+	await page.getByLabel('Výška (mm) *').fill('2700');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('height-warn')).toContainText('BEZ ZÁRUKY');
+	await expect(page.getByTestId('odoslat')).toHaveCount(0);
+
+	// 7. upratanie: odhlásenie B2B, prihlásenie interný, zmazanie throwaway účtu
+	await page.getByRole('button', { name: 'Odhlásiť' }).click();
+	await expect(page).toHaveURL(/\/login/);
+	await loginAs(page);
+	await goto(page, '/pouzivatelia');
+	const row = page.locator('tr', { hasText: b2bUser });
+	await expect(row).toBeVisible();
+	await row.getByRole('button', { name: 'Zmazať' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
+	await expect(page.locator('tr', { hasText: b2bUser })).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});

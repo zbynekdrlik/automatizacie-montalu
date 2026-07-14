@@ -11,14 +11,21 @@
 		document.documentElement.dataset.hydrated = '1';
 	});
 
-	const links = [
-		{ href: '/pergola', label: 'Pergola' },
-		{ href: '/bazen', label: 'Bazén' },
-		{ href: '/zasklenia', label: 'Zasklenia' },
-		{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
-		{ href: '/odpisy', label: 'História' },
-		{ href: '/problem', label: '⚠ Problém' }
-	];
+	// B2B vidí LEN Zasklenia — zvyšné odkazy (vrátane Vzorce/Nastavenia, ktoré sú
+	// mimo /zasklenia) sú interné. Používatelia je nový odkaz len pre interných.
+	const links = $derived(
+		data.user?.role === 'b2b'
+			? [{ href: '/zasklenia', label: 'Zasklenia' }]
+			: [
+					{ href: '/pergola', label: 'Pergola' },
+					{ href: '/bazen', label: 'Bazén' },
+					{ href: '/zasklenia', label: 'Zasklenia' },
+					{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
+					{ href: '/odpisy', label: 'História' },
+					{ href: '/problem', label: '⚠ Problém' },
+					{ href: '/pouzivatelia', label: 'Používatelia' }
+				]
+	);
 </script>
 
 <svelte:head>

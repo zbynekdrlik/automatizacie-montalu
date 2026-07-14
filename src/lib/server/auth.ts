@@ -6,9 +6,12 @@ import { db, verifyPassword } from './db';
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 dní — interný nástroj, dlhá session
 export const SESSION_COOKIE = 'am_session';
 
+export type UserRole = 'internal' | 'b2b';
+
 export interface SessionUser {
 	id: number;
 	username: string;
+	role: UserRole;
 }
 
 export function login(username: string, password: string): string | null {
@@ -33,16 +36,16 @@ export function getSessionUser(token: string | undefined): SessionUser | null {
 	if (!token) return null;
 	const row = db
 		.prepare(
-			`SELECT u.id, u.username, s.expires_at FROM sessions s
+			`SELECT u.id, u.username, u.role, s.expires_at FROM sessions s
 			 JOIN users u ON u.id = s.user_id WHERE s.token = ?`
 		)
-		.get(token) as { id: number; username: string; expires_at: number } | undefined;
+		.get(token) as { id: number; username: string; role: UserRole; expires_at: number } | undefined;
 	if (!row) return null;
 	if (row.expires_at < Date.now()) {
 		logout(token);
 		return null;
 	}
-	return { id: row.id, username: row.username };
+	return { id: row.id, username: row.username, role: row.role };
 }
 
 /** Priebežné čistenie expirovaných sessions (volané z hooks pri requestoch). */
@@ -57,4 +60,12 @@ export function pruneSessions() {
  */
 export function safeNext(next: string | null): string {
 	return next && /^\/(?![/\\])/.test(next) ? next : '/zasklenia';
+}
+
+export function isB2B(user: SessionUser | null): boolean {
+	return user?.role === 'b2b';
+}
+
+export function isInternal(user: SessionUser | null): boolean {
+	return !!user && user.role !== 'b2b';
 }
