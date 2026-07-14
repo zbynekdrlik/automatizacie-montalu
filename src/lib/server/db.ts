@@ -463,3 +463,38 @@ export function glassTypesForSystem(system: string): GlassType[] {
 	if (system === 'Deluxe') return listGlassTypes().filter((g) => g.system === 'Deluxe');
 	return listGlassTypes().filter((g) => g.system === system || g.system === 'ALL');
 }
+
+// ---- user-admin (B2B veľkoobchodné účty) ----
+
+export function listUsers() {
+	return db
+		.prepare('SELECT id, username, role, created_at FROM users ORDER BY role, username')
+		.all() as { id: number; username: string; role: string; created_at: string }[];
+}
+
+export function addUser(
+	username: string,
+	password: string,
+	role: 'internal' | 'b2b'
+): { error: string | null } {
+	const u = username.trim();
+	if (!u) return { error: 'Meno účtu je povinné.' };
+	if (password.length < 6) return { error: 'Heslo musí mať aspoň 6 znakov.' };
+	const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(u);
+	if (exists) return { error: `Účet „${u}" už existuje.` };
+	db.prepare('INSERT INTO users (username, pass_hash, role) VALUES (?, ?, ?)').run(
+		u,
+		hashPassword(password),
+		role
+	);
+	return { error: null };
+}
+
+/** Zmaže LEN b2b účet (interné účty nie — ochrana proti lockoutu). Sessions padnú cez CASCADE. */
+export function deleteB2BUser(id: number): { error: string | null } {
+	const row = db.prepare('SELECT role FROM users WHERE id = ?').get(id) as { role: string } | undefined;
+	if (!row) return { error: 'Účet neexistuje.' };
+	if (row.role !== 'b2b') return { error: 'Zmazať sa dajú len B2B účty.' };
+	db.prepare('DELETE FROM users WHERE id = ?').run(id);
+	return { error: null };
+}
