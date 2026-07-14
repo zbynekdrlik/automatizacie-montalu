@@ -15,8 +15,11 @@ export interface SessionUser {
 }
 
 export function login(username: string, password: string): string | null {
+	// COLLATE NOCASE: mená (najmä e-maily) sú case-insensitive — mobil kapitalizuje
+	// prvé písmeno, takže 'Obchod@…' sa musí prihlásiť na uložené 'obchod@…'.
+	// NOCASE je ASCII-only, čo pre e-mailové/ASCII mená stačí.
 	const user = db
-		.prepare('SELECT id, username, pass_hash FROM users WHERE username = ?')
+		.prepare('SELECT id, username, pass_hash FROM users WHERE username = ? COLLATE NOCASE')
 		.get(username.trim()) as { id: number; username: string; pass_hash: string } | undefined;
 	if (!user || !verifyPassword(password, user.pass_hash)) return null;
 	const token = randomBytes(32).toString('hex');
