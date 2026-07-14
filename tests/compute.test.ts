@@ -312,6 +312,165 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 	});
 });
 
+// Štandard + — nový systém (basic 2K…6K / IZO 2K IZO…6K IZO / opona 2x2K…2x4K).
+// Čísla NEZÁVISLE odvodené z docs/standard-plus-spec.md formúl (X(N)=27N+76,
+// d(N), gap 21.5/10.5, G=(W−gap−X)/N) + z REÁLNEHO odpisu overeného live v
+// Money (docs/standard-plus-spec.md zdroj: "2K s U PLUS.xlsx" — IZO 2K S=3000
+// V=2400 dáva PRESNE ZASP00107=7.5, ZASP00030=7.5, ZASP202415=7.2, ZASP20244=7.5,
+// ZASP00024=7.5, ZASP202419=7.5, ZASP202439=21.6 — tento test to potvrdzuje 1:1).
+describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti Money odpisu)', () => {
+	describe('BASIC (2K…6K) — S=3000 V=2400', () => {
+		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
+			['Štandard +|2K', 3000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5 }, { sirka: 1438, vyska: 2285 }],
+			['Štandard +|3K', 3000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 955, vyska: 2285 }],
+			['Štandard +|4K', 3000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 713, vyska: 2285 }],
+			['Štandard +|5K', 3000, 2400, { ZASP202433: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5 }, { sirka: 568, vyska: 2285 }],
+			['Štandard +|6K', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5 }, { sirka: 471, vyska: 2285 }],
+			// extra vektory (iné rozmery)
+			['Štandard +|2K', 4500, 2100, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 14.4, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5 }, { sirka: 2188, vyska: 1985 }],
+			['Štandard +|6K', 6500, 2600, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 14.4, ZASP20244: 7.5, ZASP00024: 37.5, ZASP202419: 7.5 }, { sirka: 1054, vyska: 2485 }]
+		];
+		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
+			const r = computeFlat(cfg, sysStyl, S, V, false);
+			expect(r).not.toBeNull();
+			const got = odpisByKod(r!);
+			for (const [kod, metre] of Object.entries(expOdpis)) expect(got[kod], `${sysStyl} ${kod}`).toBe(metre);
+			expect(r!.odpis.length, sysStyl).toBe(Object.keys(expOdpis).length);
+			expect(r!.sklo.sirka, sysStyl + ' sirka').toBe(expSklo.sirka);
+			expect(r!.sklo.vyska, sysStyl + ' vyska').toBe(expSklo.vyska);
+		});
+
+		it('overený anchor zo spec.md: 2K prírez kus (S=3000) = 1426,25 mm pred zaokrúhlením na rez', () => {
+			const r = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!;
+			const kus = r.material.find((m) => m.kod === 'ZASP202415')!.bary.flatMap((b) => b.kusy)[0];
+			expect(kus.rozmer).toBe(1426); // Math.round(1426.25) — rozmer je zaokrúhlený na celé mm
+		});
+	});
+
+	describe('IZO (2K IZO…6K IZO) — S=3000 V=2400 (+ extra 3K IZO 3600×2000)', () => {
+		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
+			['Štandard +|2K IZO', 3000, 2400, { ZASP00107: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1415, vyska: 2265 }],
+			['Štandard +|3K IZO', 3000, 2400, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 932, vyska: 2265 }],
+			['Štandard +|4K IZO', 3000, 2400, { ZASP00036: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 28.8 }, { sirka: 690, vyska: 2265 }],
+			['Štandard +|5K IZO', 3000, 2400, { ZASP202433: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5, ZASP202439: 36 }, { sirka: 545, vyska: 2265 }],
+			['Štandard +|6K IZO', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5, ZASP202439: 43.2 }, { sirka: 448, vyska: 2265 }],
+			['Štandard +|3K IZO', 3600, 2000, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1132, vyska: 1865 }]
+		];
+		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
+			const r = computeFlat(cfg, sysStyl, S, V, false);
+			expect(r).not.toBeNull();
+			const got = odpisByKod(r!);
+			for (const [kod, metre] of Object.entries(expOdpis)) expect(got[kod], `${sysStyl} ${kod}`).toBe(metre);
+			expect(r!.odpis.length, sysStyl).toBe(Object.keys(expOdpis).length);
+			expect(r!.sklo.sirka, sysStyl + ' sirka').toBe(expSklo.sirka);
+			expect(r!.sklo.vyska, sysStyl + ' vyska').toBe(expSklo.vyska);
+		});
+
+		it('IZO spodná koľajnica je "o veľkosť väčšia" než horná (Dominik) — 5K aj 6K IZO zdieľajú ZASP202437 (6K je už max)', () => {
+			expect(computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
+			expect(computeFlat(cfg, 'Štandard +|3K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP00033')).toBe(true);
+			expect(computeFlat(cfg, 'Štandard +|4K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP202432')).toBe(true);
+			expect(computeFlat(cfg, 'Štandard +|5K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP202437')).toBe(true);
+			expect(computeFlat(cfg, 'Štandard +|6K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP202437')).toBe(true);
+			// horná OSTÁVA rovnaká ako basic štýl (nie upsize)
+			expect(computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP00107')).toBe(true);
+		});
+
+		it('Rozširujúci U profil (ZASP202439) spája vodorovný aj zvislý kus pod JEDEN kód (odpis = kombinovaný)', () => {
+			const r = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!;
+			const u = r.material.find((m) => m.kod === 'ZASP202439')!;
+			// 4 vodorovné (2N) + 4 zvislé (2N) kusy = 8 kusov spolu, na 3600mm tyči
+			const kusy = u.bary.flatMap((b) => b.kusy);
+			expect(kusy.length).toBe(8);
+			expect(u.barLen).toBe(3600);
+		});
+
+		it('IZO sklo je MENŠIE než basic (šírka −9, výška −135 vs. basic −115) pri rovnakom rozmere', () => {
+			const basicR = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!;
+			const izoR = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!;
+			expect(izoR.sklo.sirka).toBeLessThan(basicR.sklo.sirka);
+			expect(izoR.sklo.vyska).toBeLessThan(basicR.sklo.vyska);
+		});
+	});
+
+	describe('OPONA (2x2K/2x3K/2x4K) — S=5000 V=2400 (+ extra 2x2K 6000×2200)', () => {
+		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
+			['Štandard +|2x2K', 5000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 1194, vyska: 2285 }],
+			['Štandard +|2x3K', 5000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 22.5, ZASP202419: 7.5 }, { sirka: 792, vyska: 2285 }],
+			['Štandard +|2x4K', 5000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 30, ZASP202419: 7.5 }, { sirka: 590, vyska: 2285 }],
+			['Štandard +|2x2K', 6000, 2200, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 14.4, ZASP20244: 15, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 1444, vyska: 2085 }]
+		];
+		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
+			const r = computeFlat(cfg, sysStyl, S, V, false);
+			expect(r).not.toBeNull();
+			const got = odpisByKod(r!);
+			for (const [kod, metre] of Object.entries(expOdpis)) expect(got[kod], `${sysStyl} ${kod}`).toBe(metre);
+			expect(r!.odpis.length, sysStyl).toBe(Object.keys(expOdpis).length);
+			expect(r!.sklo.sirka, sysStyl + ' sirka').toBe(expSklo.sirka);
+			expect(r!.sklo.vyska, sysStyl + ' vyska').toBe(expSklo.vyska);
+		});
+
+		it('opona rail kódy NIE sú upsized (rovnaké ako zodpovedajúci basic štýl)', () => {
+			const r2x = computeFlat(cfg, 'Štandard +|2x2K', 5000, 2400, false)!;
+			const r2 = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!;
+			const railyOpony = new Set(r2x.odpis.map((o) => o.kod));
+			const railyBasic = new Set(r2.odpis.map((o) => o.kod).filter((k) => k === 'ZASP00107' || k === 'ZASP00104'));
+			for (const k of railyBasic) expect(railyOpony.has(k), k).toBe(true);
+		});
+
+		it('opona N = 2× počet krídel na polovicu (2x2K→4, 2x3K→6, 2x4K→8) — sklo počet = N', () => {
+			expect(computeFlat(cfg, 'Štandard +|2x2K', 5000, 2400, false)!.N).toBe(4);
+			expect(computeFlat(cfg, 'Štandard +|2x2K', 5000, 2400, false)!.sklo.pocet).toBe(4);
+			expect(computeFlat(cfg, 'Štandard +|2x3K', 5000, 2400, false)!.N).toBe(6);
+			expect(computeFlat(cfg, 'Štandard +|2x4K', 5000, 2400, false)!.N).toBe(8);
+		});
+
+		it('centrálne kusy opony (K-M08039 stredová lišta, jokel) NIE sú v odpise (nie sú ZASP profily → nie v Money) — zámerne vynechané', () => {
+			const r = computeFlat(cfg, 'Štandard +|2x2K', 5000, 2400, false)!;
+			expect(r.odpis.some((o) => o.kod === 'K-M08039')).toBe(false);
+			expect(r.odpis.length).toBe(6);
+		});
+	});
+
+	describe('spoločné pre všetkých 13 štýlov', () => {
+		const vsetky = [
+			'2K', '3K', '4K', '5K', '6K',
+			'2K IZO', '3K IZO', '4K IZO', '5K IZO', '6K IZO',
+			'2x2K', '2x3K', '2x4K'
+		];
+
+		it('validSys + safeCompute prejde pre všetky štýly (S=3000/5000, V=2400)', () => {
+			for (const st of vsetky) {
+				const sysStyl = 'Štandard +|' + st;
+				expect(validSys(cfg, sysStyl), sysStyl).toBe(true);
+				const S = st.startsWith('2x') ? 5000 : 3000;
+				const { r, err } = safeCompute(cfg, sysStyl, S, 2400, false);
+				expect(err, sysStyl).toBeNull();
+				expect(r!.odpis.every((o) => Number.isFinite(o.metre) && o.metre > 0), sysStyl).toBe(true);
+				expect(r!.sklo.pocet, sysStyl).toBe(r!.N);
+			}
+		});
+
+		it('nosový profil (ZASP00024) sa reže na 90° (rovný), rám/koľajnica/kladka/dorazovka na 45° (name rule, žiadna zmena cut.ts)', () => {
+			const r = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!;
+			const nos = r.material.find((m) => m.kod === 'ZASP00024')!;
+			expect(nos.sikmyRez, nos.nazov).toBe(false); // 90°
+			for (const m of r.material.filter((m) => m.kod !== 'ZASP00024'))
+				expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(jeSikmyRez(m.nazov));
+			// aspoň jeden 45° profil existuje popri 90° nose
+			expect(r.material.some((m) => m.sikmyRez)).toBe(true);
+		});
+
+		it('kladkový prírez a IZO U-profil sa balia na 3600mm tyč, zvyšok (koľajnice/krajová/nos/dorazovka) na 7500mm', () => {
+			const r = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!;
+			expect(r.material.find((m) => m.kod === 'ZASP202415')!.barLen).toBe(3600);
+			expect(r.material.find((m) => m.kod === 'ZASP202439')!.barLen).toBe(3600);
+			expect(r.material.find((m) => m.kod === 'ZASP00107')!.barLen).toBe(7500);
+			expect(r.material.find((m) => m.kod === 'ZASP20244')!.barLen).toBe(7500);
+		});
+	});
+});
+
 describe('computeMulti — viac posuvov, zdieľané tyče (zimná záhrada)', () => {
 	const P = (S: number, V: number, sysStyl = 'Robust|2K', skloHrubka = 0): PosuvSpec => ({
 		sysStyl,

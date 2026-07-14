@@ -37,12 +37,15 @@
 	const prim = () => form?.multiVstup?.posuvy?.[0] ?? form?.vstup ?? null;
 	const stylyForSystem = (sys: string) =>
 		data.styly.filter((x) => x.system === sys).map((x) => x.styl);
-	// Deluxe: LEN vlastné sklá (Float kalené 6/10 — hrúbka vyberá kladka/klzný profil);
-	// spoločné 'ALL' sklá nemajú Deluxe profil (musí sedieť so serverovým
+	// Deluxe aj Štandard +: LEN vlastné sklá (Deluxe: Float kalené 6/10 — hrúbka
+	// vyberá kladka/klzný profil; Štandard +: Float 4/6/10 + Izolačné 4.8.4);
+	// spoločné 'ALL' sklá nemajú ich profil (musí sedieť so serverovým
 	// glassTypesForSystem, inak by formulár ponúkol sklo, ktoré server odmietne).
 	const sklaForSystem = (sys: string) =>
 		data.skla
-			.filter((g) => (sys === 'Deluxe' ? g.system === 'Deluxe' : g.system === sys || g.system === 'ALL'))
+			.filter((g) =>
+				sys === 'Deluxe' || sys === 'Štandard +' ? g.system === sys : g.system === sys || g.system === 'ALL'
+			)
 			.map((g) => g.nazov);
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
 

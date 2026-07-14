@@ -7,7 +7,13 @@ import type { Cfg } from './compute';
 export const B2B_LIMITS: Record<string, { minPanel: number; maxPanel: number; maxHeight: number }> = {
 	Deluxe: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
 	Slide: { minPanel: 800, maxPanel: 1300, maxHeight: 2500 },
-	Robust: { minPanel: 800, maxPanel: 1500, maxHeight: 2600 }
+	Robust: { minPanel: 800, maxPanel: 1500, maxHeight: 2600 },
+	// Štandard +: PLACEHOLDER — spec neurčuje b2b výrobné limity (mimo zadania tejto
+	// úlohy), hodnoty len kopírujú Robust (najbližšia konštrukcia — rámovaný
+	// posuv, štýly 2K…6K). Bez tohto riadku by b2b dostal NEOBMEDZENÉ rozmery na
+	// novom systéme (drift guard v b2b-limits.test.ts to odchytáva). Dominik/Zbynek
+	// by mali potvrdiť/upraviť skutočné výrobné limity.
+	'Štandard +': { minPanel: 800, maxPanel: 1500, maxHeight: 2600 }
 };
 
 // Rodina štýlu: dvojité (opona) začínajú „2x", ostatné sú jednoduché. Návrh štýlu
