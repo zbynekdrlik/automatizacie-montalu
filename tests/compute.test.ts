@@ -10,7 +10,8 @@ import {
 	validSys,
 	safeCompute,
 	inBounds,
-	missingHrubkaProfile
+	missingHrubkaProfile,
+	RAIL_UPSIZE
 } from '../src/lib/server/compute';
 import type { PosuvSpec } from '../src/lib/server/compute';
 import { jeSikmyRez, OVERLAP_MM } from '../src/lib/cut';
@@ -409,6 +410,41 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			const d = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false, 10, true)!;
 			expect(d.odpis.some((o) => o.kod === 'ZASP00104')).toBe(true);
 			expect(d.odpis.some((o) => o.kod === 'ZASP00030')).toBe(false);
+		});
+
+		// computeMulti (zimná záhrada) + prídavná koľajnica — Money-kritická cesta
+		// (swap PRED poolovaním). Najrizikovejšie: zmiešaná Deluxe+Štandard+ zákazka.
+		it('computeMulti + prídavná koľajnica: dva Štandard posuvy → obe spodné koľajnice o 1 väčšia', () => {
+			const r = computeMulti(cfg, [
+				{ sysStyl: 'Štandard +|2K', S: 3000, V: 2400, redukciaZero: false, pridavnaKolajnica: true },
+				{ sysStyl: 'Štandard +|3K', S: 3000, V: 2400, redukciaZero: false, pridavnaKolajnica: true }
+			])!;
+			// 2K → ZASP00030 (3K), 3K → ZASP00033 (4K); normálne (ZASP00104) NIE sú prítomné
+			expect(r.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
+			expect(r.odpis.some((o) => o.kod === 'ZASP00033')).toBe(true);
+			expect(r.odpis.some((o) => o.kod === 'ZASP00104')).toBe(false);
+		});
+
+		it('computeMulti mixed Deluxe+Štandard + prídavná koľajnica: Deluxe koľajnica OSTÁVA ZASP00104 (Money guard)', () => {
+			const r = computeMulti(cfg, [
+				{ sysStyl: 'Deluxe|2K', S: 5000, V: 2000, redukciaZero: false, skloHrubka: 10, pridavnaKolajnica: true },
+				{ sysStyl: 'Štandard +|2K', S: 3000, V: 2400, redukciaZero: false, pridavnaKolajnica: true }
+			])!;
+			// Deluxe posuv (system!=='Štandard +') → koľajnica NEZVÄČŠENÁ, ostáva ZASP00104
+			expect(r.odpis.some((o) => o.kod === 'ZASP00104')).toBe(true);
+			// Štandard posuv → zväčšená na ZASP00030 (samostatný pool entry)
+			expect(r.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
+		});
+
+		// drift-guard: názvy väčších koľajníc v RAIL_UPSIZE musia sedieť s Money katalógom
+		// v cfg_seed (inak by checkbox ukázal starý názov). Money-safe (kód sedí), ale
+		// stráži rozdvojenie zdroja pravdy (nález review 2026-07-15).
+		it('RAIL_UPSIZE názvy sedia s cfg_seed katalógom (per cieľový kód)', () => {
+			for (const [src, up] of Object.entries(RAIL_UPSIZE)) {
+				const seedRow = (seed.rez as RezRow[]).find((r) => r.kod === up.kod);
+				expect(seedRow, `${src}→${up.kod} musí existovať v cfg_seed`).toBeDefined();
+				expect(up.nazov, `${up.kod} názov`).toBe(seedRow!.nazov);
+			}
 		});
 
 		it('Rozširujúci U profil (ZASP202439) spája vodorovný aj zvislý kus pod JEDEN kód (odpis = kombinovaný)', () => {
