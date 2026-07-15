@@ -395,6 +395,23 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 12) {
+		// v11 → v12: Štandard + IZO spodná koľajnica späť na NORMÁLNU (Dominik 2026-07-15:
+		// veľkosť koľajnice NEurčuje IZO — o 1 väčšiu dá až nový checkbox „prídavná
+		// koľajnica"). IZO 2K/3K/4K/5K malo automaticky väčšiu → SET kód+názov spodnej
+		// koľajnice z (opraveného) cfg_seed per (sys_styl, poradie). MENÍ Money odpis
+		// IZO objednávok (kód spodnej koľajnice) — schválené Dominikom. Idempotentné.
+		const updRail = db.prepare(
+			'UPDATE cfg_rez SET kod = ?, nazov = ? WHERE sys_styl = ? AND poradie = ?'
+		);
+		db.transaction(() => {
+			for (const r of seed.rez)
+				if (/^Štandard \+\|\d+K IZO$/.test(r.sysStyl) && /spodná/i.test(r.nazov))
+					updRail.run(r.kod, r.nazov, r.sysStyl, r.poradie);
+			db.pragma('user_version = 12');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }

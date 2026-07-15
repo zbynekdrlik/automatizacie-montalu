@@ -52,7 +52,16 @@ function compute(vstup: Vstup) {
 	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém.' };
 	const cfg = loadCfg();
 	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
-	return safeCompute(cfg, vstup.system + '|' + vstup.styl, vstup.s, vstup.v, g.redukciaZero, g.hrubka);
+	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
+	return safeCompute(
+		cfg,
+		vstup.system + '|' + vstup.styl,
+		vstup.s,
+		vstup.v,
+		g.redukciaZero,
+		g.hrubka,
+		vstup.pridavnaKolajnica
+	);
 }
 
 // ---- Viac posuvov (zimná záhrada) ----
@@ -70,7 +79,9 @@ function computeMultiFrom(vstup: MultiVstup) {
 			redukciaZero: g.redukciaZero,
 			skloHrubka: g.hrubka,
 			otvaranie: p.otvaranie,
-			sklo: p.sklo
+			sklo: p.sklo,
+			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
+			pridavnaKolajnica: vstup.pridavnaKolajnica
 		});
 	}
 	return safeComputeMulti(loadCfg(), specs);

@@ -263,13 +263,35 @@ export function missingHrubkaProfile(
  * sklo-závislé profily (Redukcia 6mm pri Slide). Ktoré sklá to sú, určuje
  * tabuľka glass_types (stĺpec redukcia_zero) — nie natvrdo zadaný reťazec.
  */
+// „Prídavná koľajnica" (Dominik 2026-07-15): checkbox → spodná koľajnica o 1 veľkosť
+// vyššia. LEN Štandard + (tieto kódy zdieľa s Deluxe, preto sa swap GEJTUJE na systém).
+// Dĺžka tyče je rovnaká (7500 mm) → metre v odpise ostávajú, mení sa len KÓD + názov.
+// NEZÁVISLÉ od typu skla (IZO aj obyčajné — Dominik: „to že je IZO nie je podmienka").
+const RAIL_UPSIZE: Record<string, { kod: string; nazov: string }> = {
+	ZASP00104: { kod: 'ZASP00030', nazov: 'Koľajnica spodná 3K Surový 7500 mm' },
+	ZASP00030: { kod: 'ZASP00033', nazov: 'Koľajnica spodná 4K Surový 7500 mm' },
+	ZASP00033: { kod: 'ZASP202432', nazov: 'Koľajnica spodná 5K Surový 7500 mm' },
+	ZASP202432: { kod: 'ZASP202437', nazov: 'Koľajnica spodná 6K Surový 7500 mm' }
+	// 6K (ZASP202437) nemá +1 — 7K koľajnica neexistuje.
+};
+export function railUpsize(
+	system: string,
+	pridavna: boolean,
+	kod: string,
+	nazov: string
+): { kod: string; nazov: string } {
+	if (pridavna && system === 'Štandard +' && RAIL_UPSIZE[kod]) return RAIL_UPSIZE[kod];
+	return { kod, nazov };
+}
+
 export function computeFlat(
 	cfg: Cfg,
 	sysStyl: string,
 	S: number,
 	V: number,
 	redukciaZero: boolean,
-	skloHrubka = 0
+	skloHrubka = 0,
+	pridavnaKolajnica = false
 ): ComputeResult | null {
 	const g = cfg[sysStyl];
 	if (!g || !g.rez.length) return null;
@@ -284,8 +306,10 @@ export function computeFlat(
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * c.barLen)) * 1000) / 10 : 0;
 		// Deluxe + Štandard + = všetko rovný 90°; inak podľa názvu profilu (nosový/oponový 90°)
 		const sikmyRez = !systemRovnyRez(system) && jeSikmyRez(c.nazov);
-		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen, sikmyRez });
-		odpis.push({ kod: c.kod, nazov: c.nazov, metre: R((tyce * c.barLen) / 1000) });
+		// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +)
+		const up = railUpsize(system, pridavnaKolajnica, c.kod, c.nazov);
+		material.push({ kod: up.kod, nazov: up.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen, sikmyRez });
+		odpis.push({ kod: up.kod, nazov: up.nazov, metre: R((tyce * c.barLen) / 1000) });
 	}
 	const ss = g.sklo.s,
 		sv = g.sklo.v;
@@ -385,7 +409,8 @@ export function safeCompute(
 	S: number,
 	V: number,
 	redukciaZero: boolean,
-	skloHrubka = 0
+	skloHrubka = 0,
+	pridavnaKolajnica = false
 ): { r: ComputeResult | null; err: string | null } {
 	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
 	const boundErr = inBounds(cfg, sysStyl);
@@ -394,7 +419,7 @@ export function safeCompute(
 	if (hrubkaErr) return { r: null, err: hrubkaErr };
 	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
 	if (overErr) return { r: null, err: overErr };
-	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
+	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka, pridavnaKolajnica);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
 	return { r, err: null };
@@ -410,6 +435,8 @@ export interface PosuvSpec {
 	redukciaZero: boolean;
 	/** hrúbka zvoleného skla (mm) — vyberá Deluxe kladka/klzný profil (6/10); 0 = n/a */
 	skloHrubka?: number;
+	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
+	pridavnaKolajnica?: boolean;
 	/** len na plán/detail (nemení výpočet) */
 	otvaranie?: string;
 	sklo?: string;
@@ -466,21 +493,24 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		// preberá z PRVÉHO posuvu — pri zmiešanej Deluxe+Štandard+ zákazke to môže
 		// zle označiť uhol rezu iba v KRESBE (odpis nie je dotknutý).
 		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, p.skloHrubka ?? 0, i + 1)) {
-			if (!pool[c.kod]) {
-				pool[c.kod] = {
-					nazov: c.nazov,
+			// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +) — swap
+			// PRED poolovaním, aby sa metre pooli pod správnym (väčším) kódom.
+			const up = railUpsize(system, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
+			if (!pool[up.kod]) {
+				pool[up.kod] = {
+					nazov: up.nazov,
 					rezy: [],
 					kusy: [],
 					barLen: c.barLen,
 					sikmyRez: !systemRovnyRez(system) && jeSikmyRez(c.nazov)
 				};
-				order.push(c.kod);
+				order.push(up.kod);
 			}
-			pool[c.kod].kusy.push(...c.kusy);
+			pool[up.kod].kusy.push(...c.kusy);
 			for (const rz of c.rezy) {
-				const ex = pool[c.kod].rezy.find((x) => x.rozmer === rz.rozmer);
+				const ex = pool[up.kod].rezy.find((x) => x.rozmer === rz.rozmer);
 				if (ex) ex.ks += rz.ks;
-				else pool[c.kod].rezy.push({ ...rz });
+				else pool[up.kod].rezy.push({ ...rz });
 			}
 		}
 		const ss = g.sklo.s,

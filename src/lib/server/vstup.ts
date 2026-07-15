@@ -21,6 +21,8 @@ export interface Vstup {
 	/** voľná poznámka — zobrazí sa hore vpravo na nárezovom pláne (aj v tlači) */
 	poznamka: string;
 	caka: boolean;
+	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
+	pridavnaKolajnica: boolean;
 }
 
 export function parseVstup(form: FormData): { vstup: Vstup; error: string | null } {
@@ -45,7 +47,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 			return x > 0 && x <= 20000 ? x : 1050;
 		})(),
 		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
-		caka: form.get('caka') === '1'
+		caka: form.get('caka') === '1',
+		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
 	};
 	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
 	// skriptovaný POST neobíde (otváranie je len na plán/náhľad, nemení výpočet)
@@ -77,6 +80,8 @@ export interface MultiVstup {
 	zakaznik: string;
 	poznamka: string;
 	caka: boolean;
+	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
+	pridavnaKolajnica: boolean;
 	posuvy: PosuvVstup[];
 }
 
@@ -89,7 +94,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
 		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
-		caka: form.get('caka') === '1'
+		caka: form.get('caka') === '1',
+		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
 	};
 	let posuvyRaw: unknown;
 	try {
