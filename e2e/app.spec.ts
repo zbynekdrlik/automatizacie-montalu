@@ -555,7 +555,7 @@ test('kaskáda v reze: P-L kreslí N čiar (stupne), opona 2x kreslí 2×N/2 do 
 	await page.getByLabel('Výška (mm) *').fill('2200');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('kaskada')).toBeVisible();
-	await expect(page.getByTestId('kaskada').locator('line')).toHaveCount(3);
+	await expect(page.getByTestId('kaskada').locator('rect')).toHaveCount(3);
 
 	// Robust 2x2K (opona, otváranie auto) → kaskáda = 4 čiary (2 strany × 2)
 	await goto(page, '/zasklenia');
@@ -568,7 +568,7 @@ test('kaskáda v reze: P-L kreslí N čiar (stupne), opona 2x kreslí 2×N/2 do 
 	await page.getByLabel('Výška (mm) *').fill('2200');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('kaskada')).toBeVisible();
-	await expect(page.getByTestId('kaskada').locator('line')).toHaveCount(4);
+	await expect(page.getByTestId('kaskada').locator('rect')).toHaveCount(4);
 
 	expect(consoleMsgs).toEqual([]);
 });
