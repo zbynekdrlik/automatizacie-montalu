@@ -535,6 +535,44 @@ test('interný účet: nadrozmerná šírka NEVIDÍ okamžitý b2b limit, Spoč�
 	expect(consoleMsgs).toEqual([]);
 });
 
+// Kaskáda krídel v reze (Dominik 2026-07-14) — nahradila šípku+opona v náhľade.
+// P-L = N stupňov; opona (2x) = dve strany × N/2 do stredu. READ-ONLY náhľad.
+test('kaskáda v reze: P-L kreslí N čiar (stupne), opona 2x kreslí 2×N/2 do stredu', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	// Robust 3K P-L → kaskáda = 3 čiary
+	await goto(page, '/zasklenia');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-CASPL`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('Kaskada PL');
+	await page.getByLabel('Systém').selectOption('Robust');
+	await page.getByLabel('Štýl').selectOption('3K');
+	await page.getByLabel('Otváranie').selectOption('P - L');
+	await page.getByLabel('Šírka (mm) *').fill('4500');
+	await page.getByLabel('Výška (mm) *').fill('2200');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('kaskada')).toBeVisible();
+	await expect(page.getByTestId('kaskada').locator('line')).toHaveCount(3);
+
+	// Robust 2x2K (opona, otváranie auto) → kaskáda = 4 čiary (2 strany × 2)
+	await goto(page, '/zasklenia');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-CASOP`);
+	await page.getByLabel('OP/OPDL číslo *').fill('02');
+	await page.getByLabel('Zákazník *').fill('Kaskada opona');
+	await page.getByLabel('Systém').selectOption('Robust');
+	await page.getByLabel('Štýl').selectOption('2x2K');
+	await page.getByLabel('Šírka (mm) *').fill('5000');
+	await page.getByLabel('Výška (mm) *').fill('2200');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.getByTestId('kaskada')).toBeVisible();
+	await expect(page.getByTestId('kaskada').locator('line')).toHaveCount(4);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 // Deluxe zámkové otvory D46 v náhľade (Dominik 2026-07-14) — READ-ONLY náhľad,
 // bezpečné aj na LIVE. ⌀46 na krajných sklách + KONFIGUROVATEĽNÁ výška vŕtania.
 test('Deluxe D46 zámok: náhľad kreslí otvory ⌀46 + zvolenú výšku vŕtania', async ({ page }) => {

@@ -25,16 +25,53 @@
 
 	const W = 760; // šírka kresby v px
 	const M = { top: 46, right: 26, bottom: 64, left: 62 }; // miesto na kóty
+	const CAS_ROW = 10; // kaskáda: px na jedno krídlo (odsadenie do hĺbky)
 
 	let scale = $derived((W - M.left - M.right) / S);
 	let h = $derived(V * scale);
-	let totalH = $derived(h + M.top + M.bottom);
 	let panelW = $derived((S / N) * scale);
 	let frame = $derived(Math.max(4, Math.min(14, 45 * scale))); // vizuálna hrúbka rámu poľa
 
 	let dir = $derived(
 		otvaranie.replace(/\s/g, '') === 'P-L' ? 'PL' : otvaranie.replace(/\s/g, '') === 'L-P' ? 'LP' : otvaranie ? 'OP' : ''
 	);
+
+	// Kaskáda krídel v reze (pohľad z interiéru) — nahrádza šípku + nápis „opona".
+	// Každé krídlo = čiara; posuvné krídla sa kaskádovito odsadzujú v smere otvárania
+	// (P-L doprava, L-P doľava); opona (2x*) = dve zrkadlové kaskády do stredu.
+	// (Dominik 2026-07-14: „len čiary, kaskáda v reze".)
+	let casRows = $derived(dir === 'OP' ? Math.max(1, Math.round(N / 2)) : Math.max(1, N));
+	let casTop = $derived(M.top + h + 26);
+	let totalH = $derived(dir ? casTop + casRows * CAS_ROW + 20 : h + M.top + M.bottom);
+	let cascade = $derived.by(() => {
+		const empty: { x: number; y: number; w: number }[] = [];
+		if (!dir) return empty;
+		const fw = W - M.left - M.right;
+		const segs: { x: number; y: number; w: number }[] = [];
+		if (dir === 'OP') {
+			// opona: N/2 krídel na stranu, obe strany kaskádujú do stredu
+			const per = Math.max(1, Math.round(N / 2));
+			const hw = fw / 2;
+			const seg = hw / (per + 0.5);
+			const stepX = per > 1 ? (hw - seg - 5) / (per - 1) : 0;
+			for (let i = 0; i < per; i++) {
+				const y = casTop + i * CAS_ROW;
+				segs.push({ x: M.left + i * stepX, y, w: seg }); // ľavá strana → do stredu
+				segs.push({ x: W - M.right - seg - i * stepX, y, w: seg }); // pravá → do stredu
+			}
+		} else {
+			// P-L doprava (0 hore vľavo), L-P zrkadlovo doľava (0 hore vpravo)
+			const n = Math.max(1, N);
+			const seg = fw / (n + 0.5);
+			const stepX = n > 1 ? (fw - seg) / (n - 1) : 0;
+			for (let i = 0; i < n; i++) {
+				const y = casTop + i * CAS_ROW;
+				const x = dir === 'LP' ? W - M.right - seg - i * stepX : M.left + i * stepX;
+				segs.push({ x, y, w: seg });
+			}
+		}
+		return segs;
+	});
 
 	const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
 
@@ -150,19 +187,15 @@
 		>{fmt(skloS)} × {fmt(skloV)}</text
 	>
 
-	<!-- smer otvárania -->
-	{#if dir === 'PL' || dir === 'LP'}
-		{@const y = M.top + h + 26}
-		{@const x1 = dir === 'PL' ? W - M.right - 10 : M.left + 10}
-		{@const x2 = dir === 'PL' ? M.left + 10 : W - M.right - 10}
-		<defs>
-			<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-				<path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
-			</marker>
-		</defs>
-		<line {x1} y1={y} {x2} y2={y} stroke="#2563eb" stroke-width="1.5" marker-end="url(#arr)" />
-		<text x={(x1 + x2) / 2} y={y + 18} text-anchor="middle" font-size="12" fill="#2563eb" font-weight="600">otváranie {otvaranie}</text>
-	{:else if dir === 'OP'}
-		<text x={W / 2} y={M.top + h + 30} text-anchor="middle" font-size="12" fill="#2563eb" font-weight="600">{otvaranie}</text>
+	<!-- kaskáda krídel v reze (pohľad z interiéru) — nahrádza šípku smeru otvárania -->
+	{#if dir}
+		<text x={M.left} y={casTop - 9} font-size="10.5" fill="#64748b"
+			>rez — pohľad z interiéru{dir === 'OP' ? ' · opona (od stredu)' : dir === 'PL' ? ' · P-L' : ' · L-P'}</text
+		>
+		<g data-testid="kaskada" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round">
+			{#each cascade as c (`${c.x}-${c.y}`)}
+				<line x1={c.x} y1={c.y} x2={c.x + c.w} y2={c.y} />
+			{/each}
+		</g>
 	{/if}
 </svg>
