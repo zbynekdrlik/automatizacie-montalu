@@ -457,7 +457,8 @@
 					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
 				</label>
 			</div>
-			{#if system === 'Štandard +'}
+			<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje -->
+			{#if system === 'Štandard +' && !styl.startsWith('6K')}
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
 						<input
