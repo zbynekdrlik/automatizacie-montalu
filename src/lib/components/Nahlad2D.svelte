@@ -38,11 +38,15 @@
 		otvaranie.replace(/\s/g, '') === 'P-L' ? 'PL' : otvaranie.replace(/\s/g, '') === 'L-P' ? 'LP' : otvaranie ? 'OP' : ''
 	);
 
+	// Reálny presah susedných krídel (mm) per systém — Dominik 2026-07-14: Robust 70,
+	// Slide 50, Štandard + 40 (Deluxe zatiaľ odhad 50 — nepotvrdené). Kreslí sa v MIERKE
+	// okna, takže presah v náhľade zodpovedá skutočnému prekrytiu krídel.
+	const OVERLAP_MM: Record<string, number> = { Robust: 70, Slide: 50, 'Štandard +': 40, Deluxe: 50 };
+
 	// Kaskáda krídel v reze zhora (pôdorys, pohľad z interiéru) — nahrádza šípku +
-	// nápis „opona". Krídla = pruhy v RÁMČEKU cez celú šírku okna; kaskádovito sa
-	// odsadzujú v smere otvárania (P-L doprava, L-P doľava) a prekrývajú sa (posuv);
-	// opona (2x*) = dve zrkadlové kaskády stretávajúce sa v strede.
-	// (Dominik 2026-07-14: „na šírku okna, v rámčeku, poriadne rozlíšiť".)
+	// nápis „opona". Krídla = pruhy v RÁMČEKU cez celú šírku okna; každé krídlo má REÁLNU
+	// šírku a susedné sa prekrývajú o skutočný presah (mm→px v mierke okna). Kaskádujú
+	// v smere otvárania (P-L doprava, L-P doľava); opona (2x*) = dve strany do stredu.
 	let casRows = $derived(dir === 'OP' ? Math.max(1, Math.round(N / 2)) : Math.max(1, N));
 	let casTop = $derived(M.top + h + 36); // pod čelným pohľadom + miesto na titulok
 	let casFrameH = $derived(2 * CAS_PAD + (casRows - 1) * CAS_ROW + CAS_BAR);
@@ -50,20 +54,22 @@
 	let cascade = $derived.by(() => {
 		const empty: { x: number; y: number; w: number }[] = [];
 		if (!dir) return empty;
-		// pruhy sú zarovnané na ŠÍRKU OKNA (rámček = M.left..W-M.right), s malým
-		// vnútorným odsadením; každé krídlo je širšie ako krok → viditeľné prekrytie.
+		// pruhy zarovnané na ŠÍRKU OKNA (rámček); presah = reálny mm v mierke rámčeka.
 		const inset = 8;
 		const xL = M.left + inset;
 		const xR = W - M.right - inset;
 		const fw = xR - xL;
 		const y0 = casTop + CAS_PAD;
+		const casScale = fw / S; // px na mm cez rámček kaskády
+		const ov = (OVERLAP_MM[system] ?? 50) * casScale; // presah v px
 		const segs: { x: number; y: number; w: number }[] = [];
 		if (dir === 'OP') {
-			// opona: N/2 krídel na stranu, obe strany kaskádujú do stredu
+			// opona: N/2 krídel na stranu, obe strany kaskádujú do stredu s reálnym presahom
 			const per = Math.max(1, Math.round(N / 2));
-			const hw = fw / 2 - 6; // malá medzera v strede
-			const seg = Math.min(hw, (hw / per) * 1.35);
-			const stepX = per > 1 ? (hw - seg) / (per - 1) : 0;
+			const half = fw / 2 - 3; // malá medzera v strede
+			// per krídel cez pol šírky s presahom ov: panel = (half + (per-1)*ov)/per
+			const seg = Math.min(half, (half + (per - 1) * ov) / per);
+			const stepX = seg - ov;
 			for (let i = 0; i < per; i++) {
 				const y = y0 + i * CAS_ROW;
 				segs.push({ x: xL + i * stepX, y, w: seg }); // ľavá strana → do stredu
@@ -72,8 +78,9 @@
 		} else {
 			// P-L doprava (0 hore vľavo), L-P zrkadlovo doľava (0 hore vpravo)
 			const n = Math.max(1, N);
-			const seg = Math.min(fw, (fw / n) * 1.35); // širšie ako 1/N → prekrytie
-			const stepX = n > 1 ? (fw - seg) / (n - 1) : 0;
+			// n krídel cez celú šírku s presahom ov: panel = (fw + (n-1)*ov)/n
+			const seg = Math.min(fw, (fw + (n - 1) * ov) / n);
+			const stepX = seg - ov;
 			for (let i = 0; i < n; i++) {
 				const y = y0 + i * CAS_ROW;
 				const x = dir === 'LP' ? xR - seg - i * stepX : xL + i * stepX;
