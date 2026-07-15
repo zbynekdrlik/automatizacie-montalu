@@ -211,6 +211,12 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(false);
 	});
 
+	it('Štandard + sa reže na 90° (rovný) — každý profil sikmyRez=false (Dominik/Marek: „štandard reže všetko na 90")', () => {
+		const r = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!;
+		expect(r.material.length).toBeGreaterThan(0);
+		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(false);
+	});
+
 	it('Robust/Slide: sikmyRez podľa profilu (nosový/oponový 90°, zvyšok 45°) — nezmenené', () => {
 		const r = computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!;
 		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(jeSikmyRez(m.nazov));
