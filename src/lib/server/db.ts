@@ -380,6 +380,21 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 11) {
+		// v10 → v11: oprava NÁZVOV profilov Štandard + podľa Money katalógu (Dominik
+		// 2026-07-15: kód sedí, ale názov je domotaný — „Kladkový prírez", „Krajový
+		// profil", „X IZO (o veľkosť väčšia)"…). Názov je len zobrazenie na pláne —
+		// Money odpis matchuje na KÓD, takže Money-safe. Idempotentné: SET názov na
+		// hodnotu z (opraveného) cfg_seed per (sys_styl, poradie).
+		const updNaz = db.prepare('UPDATE cfg_rez SET nazov = ? WHERE sys_styl = ? AND poradie = ?');
+		db.transaction(() => {
+			for (const r of seed.rez)
+				if (r.sysStyl.startsWith('Štandard +') && r.typ === 'profil')
+					updNaz.run(r.nazov, r.sysStyl, r.poradie);
+			db.pragma('user_version = 11');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
