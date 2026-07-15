@@ -211,6 +211,12 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(false);
 	});
 
+	it('Štandard + sa reže na 90° (rovný) — každý profil sikmyRez=false (Dominik/Marek: „štandard reže všetko na 90")', () => {
+		const r = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!;
+		expect(r.material.length).toBeGreaterThan(0);
+		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(false);
+	});
+
 	it('Robust/Slide: sikmyRez podľa profilu (nosový/oponový 90°, zvyšok 45°) — nezmenené', () => {
 		const r = computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!;
 		for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(jeSikmyRez(m.nazov));
@@ -451,14 +457,11 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			}
 		});
 
-		it('nosový profil (ZASP00024) sa reže na 90° (rovný), rám/koľajnica/kladka/dorazovka na 45° (name rule, žiadna zmena cut.ts)', () => {
+		it('Štandard + sa reže CELÝ na 90° (rovný) — každý profil sikmyRez=false (Dominik/Marek: „štandard reže všetko na 90"; predtým rám/koľajnica 45°)', () => {
 			const r = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!;
-			const nos = r.material.find((m) => m.kod === 'ZASP00024')!;
-			expect(nos.sikmyRez, nos.nazov).toBe(false); // 90°
-			for (const m of r.material.filter((m) => m.kod !== 'ZASP00024'))
-				expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(jeSikmyRez(m.nazov));
-			// aspoň jeden 45° profil existuje popri 90° nose
-			expect(r.material.some((m) => m.sikmyRez)).toBe(true);
+			expect(r.material.length).toBeGreaterThan(0);
+			// vrátane nosového (ZASP00024) — celý systém rovno, ako Deluxe
+			for (const m of r.material) expect(m.sikmyRez, `${m.kod} ${m.nazov}`).toBe(false);
 		});
 
 		it('kladkový prírez a IZO U-profil sa balia na 3600mm tyč, zvyšok (koľajnice/krajová/nos/dorazovka) na 7500mm', () => {
