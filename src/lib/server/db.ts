@@ -365,6 +365,21 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 10) {
+		// v9 → v10: oprava šírky skla Štandard + (Dominik 2026-07-14: skla o 2 mm užšie).
+		// Do vzorca šírky skla vypadla +2 mm rezná rezerva (má byť G+14) → offset bol
+		// o 2N nižší. Sklo NIE je v Money odpise — mení sa len informatívny rozmer rezu.
+		// Idempotentné: SETuje offset na SPRÁVNU hodnotu z (opraveného) cfg_seed per
+		// (sys_styl, poradie), takže fresh DB (už správne nasedený) ostane, starý sa opraví.
+		const updOff = db.prepare('UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND poradie = ?');
+		db.transaction(() => {
+			for (const r of seed.rez)
+				if (r.sysStyl.startsWith('Štandard +') && r.nazov === 'Sklo šírka')
+					updOff.run(r.offset, r.sysStyl, r.poradie);
+			db.pragma('user_version = 10');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
