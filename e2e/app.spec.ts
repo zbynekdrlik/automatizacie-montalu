@@ -156,8 +156,8 @@ test('Štandard + 2K IZO: náhľad — rail upsize + U profil (Money-overené 1:
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4.8.4');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
-	// sklo (len plán, nie Money) — 1415 × 2265
-	await expect(page.getByTestId('sklo-sirka')).toHaveText('1415');
+	// sklo (len plán, nie Money) — 1417 × 2265 (šírka +2mm oprava, Dominik 2026-07-14)
+	await expect(page.getByTestId('sklo-sirka')).toHaveText('1417');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('2265');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
 	// (^|\D) hranica — aby napr. "7,5 m" nechytilo "17,5 m" v inom stĺpci
