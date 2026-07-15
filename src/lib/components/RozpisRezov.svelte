@@ -14,7 +14,7 @@
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 	// uhol rezu (45° vs rovný 90°) rozhoduje server per profil (m.sikmyRez):
-	// Deluxe = všetko 90°; Robust/Slide = 90° nosový/oponový, zvyšok 45°
+	// Deluxe + Štandard + = všetko 90°; Robust/Slide = 90° nosový/oponový, zvyšok 45°
 
 	const H = 100; // výška tyče v SVG jednotkách
 	const S = 250; // horizontálny sklon šikmého rezu (v mm-jednotkách viewBoxu)

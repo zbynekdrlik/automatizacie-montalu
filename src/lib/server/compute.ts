@@ -2,7 +2,7 @@
 // Port 1:1 z n8n verzie (n8n/zasklenia/zasklenia_node_body_v2.js), overenej proti
 // pôvodným odpisovým Excelom (robust_slide.xlsm). Čísla sa NESMÚ zmeniť bez
 // zmeny testovacích vektorov v tests/compute.test.ts.
-import { jeSikmyRez } from '$lib/cut';
+import { jeSikmyRez, systemRovnyRez } from '$lib/cut';
 
 export interface SysRow {
 	sysStyl: string;
@@ -69,8 +69,9 @@ export interface MaterialRow {
 	odpadPct: number;
 	/** dĺžka tyče tohto profilu (mm) — pre grafický rozpis (mierka, hlavička) */
 	barLen: number;
-	/** true = rez 45° (šikmý), false = rovný 90°. Deluxe = všetko 90° (Zbynek);
-	 *  Robust/Slide = 90° len nosový/oponový, zvyšok 45° (podľa názvu profilu). */
+	/** true = rez 45° (šikmý), false = rovný 90°. Deluxe + Štandard + = všetko 90°
+	 *  (Zbynek / Dominik+Marek); Robust/Slide = 90° len nosový/oponový, zvyšok 45°
+	 *  (podľa názvu profilu). Uhol je len na nákrese — Money odpis nemení. */
 	sikmyRez: boolean;
 }
 
@@ -281,8 +282,8 @@ export function computeFlat(
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * c.barLen)) * 1000) / 10 : 0;
-		// Deluxe = všetko rovný 90° rez; inak podľa názvu profilu (nosový/oponový 90°)
-		const sikmyRez = system !== 'Deluxe' && jeSikmyRez(c.nazov);
+		// Deluxe + Štandard + = všetko rovný 90°; inak podľa názvu profilu (nosový/oponový 90°)
+		const sikmyRez = !systemRovnyRez(system) && jeSikmyRez(c.nazov);
 		material.push({ kod: c.kod, nazov: c.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen, sikmyRez });
 		odpis.push({ kod: c.kod, nazov: c.nazov, metre: R((tyce * c.barLen) / 1000) });
 	}
@@ -471,7 +472,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 					rezy: [],
 					kusy: [],
 					barLen: c.barLen,
-					sikmyRez: system !== 'Deluxe' && jeSikmyRez(c.nazov)
+					sikmyRez: !systemRovnyRez(system) && jeSikmyRez(c.nazov)
 				};
 				order.push(c.kod);
 			}
