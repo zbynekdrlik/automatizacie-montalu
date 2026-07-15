@@ -138,11 +138,12 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 });
 
 // Štandard + (basic/IZO/opona) — READ-ONLY náhľad (nič sa nezapisuje do Money).
-// 2K IZO @ S=3000 V=2400 je overené 1:1 proti REÁLNEMU Money odpisu
-// (docs/standard-plus-spec.md zdroj: "2K s U PLUS.xlsx"): rail horná ZASP00107,
-// spodná upsize ZASP00030 (o veľkosť väčšia), prírez ZASP202415, U profil ZASP202439
-// (vodorovný+zvislý spolu pod jedným kódom).
-test('Štandard + 2K IZO: náhľad — rail upsize + U profil (Money-overené 1:1)', async ({ page }) => {
+// 2K IZO @ S=3000 V=2400 overené 1:1 proti Money odpisu (U profil ZASP202439 21,6 m).
+// Dominik 2026-07-15: veľkosť spodnej koľajnice NEurčuje IZO — IZO používa NORMÁLNU
+// (2K = ZASP00104); o 1 väčšiu (ZASP00030) dá až checkbox „prídavná koľajnica".
+test('Štandard + 2K IZO: normálna koľajnica + „prídavná koľajnica" checkbox → o 1 väčšia', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
@@ -156,15 +157,23 @@ test('Štandard + 2K IZO: náhľad — rail upsize + U profil (Money-overené 1:
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4.8.4');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
-	// sklo (len plán, nie Money) — 1417 × 2265 (šírka +2mm oprava, Dominik 2026-07-14)
+	// sklo (len plán, nie Money) — 1417 × 2265 (šírka +2mm oprava)
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('1417');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('2265');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	// (^|\D) hranica — aby napr. "7,5 m" nechytilo "17,5 m" v inom stĺpci
+	// IZO používa NORMÁLNU spodnú koľajnicu ZASP00104 (2K), NIE zväčšenú ZASP00030
 	await expect(page.locator('.row', { hasText: 'ZASP00107' })).toContainText(/(^|\D)7,5 m/);
-	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toContainText(/(^|\D)7,5 m/);
-	await expect(page.locator('.row', { hasText: 'ZASP202415' })).toContainText(/(^|\D)7,2 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP00104' })).toContainText(/(^|\D)7,5 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toHaveCount(0);
 	await expect(page.locator('.row', { hasText: 'ZASP202439' })).toContainText(/(^|\D)21,6 m/);
+
+	// zaklikni „prídavná koľajnica" → spodná o 1 väčšia (ZASP00030), metre rovnaké
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await page.getByLabel(/Prídavná koľajnica/).check();
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toContainText(/(^|\D)7,5 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP00104' })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
 

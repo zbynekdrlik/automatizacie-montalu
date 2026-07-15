@@ -364,12 +364,12 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 
 	describe('IZO (2K IZO…6K IZO) — S=3000 V=2400 (+ extra 3K IZO 3600×2000)', () => {
 		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
-			['Štandard +|2K IZO', 3000, 2400, { ZASP00107: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1417, vyska: 2265 }],
-			['Štandard +|3K IZO', 3000, 2400, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 934, vyska: 2265 }],
-			['Štandard +|4K IZO', 3000, 2400, { ZASP00036: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 28.8 }, { sirka: 692, vyska: 2265 }],
-			['Štandard +|5K IZO', 3000, 2400, { ZASP202433: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5, ZASP202439: 36 }, { sirka: 547, vyska: 2265 }],
+			['Štandard +|2K IZO', 3000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1417, vyska: 2265 }],
+			['Štandard +|3K IZO', 3000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 934, vyska: 2265 }],
+			['Štandard +|4K IZO', 3000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 28.8 }, { sirka: 692, vyska: 2265 }],
+			['Štandard +|5K IZO', 3000, 2400, { ZASP202433: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5, ZASP202439: 36 }, { sirka: 547, vyska: 2265 }],
 			['Štandard +|6K IZO', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5, ZASP202439: 43.2 }, { sirka: 450, vyska: 2265 }],
-			['Štandard +|3K IZO', 3600, 2000, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1134, vyska: 1865 }]
+			['Štandard +|3K IZO', 3600, 2000, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1134, vyska: 1865 }]
 		];
 		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
 			const r = computeFlat(cfg, sysStyl, S, V, false);
@@ -381,14 +381,34 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			expect(r!.sklo.vyska, sysStyl + ' vyska').toBe(expSklo.vyska);
 		});
 
-		it('IZO spodná koľajnica je "o veľkosť väčšia" než horná (Dominik) — 5K aj 6K IZO zdieľajú ZASP202437 (6K je už max)', () => {
-			expect(computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
-			expect(computeFlat(cfg, 'Štandard +|3K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP00033')).toBe(true);
-			expect(computeFlat(cfg, 'Štandard +|4K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP202432')).toBe(true);
-			expect(computeFlat(cfg, 'Štandard +|5K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP202437')).toBe(true);
-			expect(computeFlat(cfg, 'Štandard +|6K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP202437')).toBe(true);
-			// horná OSTÁVA rovnaká ako basic štýl (nie upsize)
-			expect(computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!.odpis.some((o) => o.kod === 'ZASP00107')).toBe(true);
+		// Dominik 2026-07-15: spodnú koľajnicu NEurčuje IZO — IZO používa NORMÁLNU
+		// koľajnicu (rovnakú ako basic). O 1 väčšiu dá až checkbox „prídavná koľajnica".
+		const spodna = (r: NonNullable<ReturnType<typeof computeFlat>>) =>
+			r.odpis.find((o) => /Koľajnica spodná/i.test(o.nazov))!.kod;
+		it('IZO používa NORMÁLNU spodnú koľajnicu (rovnakú ako basic), bez auto-zväčšenia', () => {
+			expect(spodna(computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!)).toBe('ZASP00104');
+			expect(spodna(computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!)).toBe('ZASP00104'); // basic = to isté
+			expect(spodna(computeFlat(cfg, 'Štandard +|4K IZO', 3000, 2400, false)!)).toBe('ZASP00033');
+		});
+
+		it('prídavná koľajnica → spodná o 1 väčšia (basic aj IZO aj opona), metre rovnaké', () => {
+			// basic 2K: ZASP00104 → ZASP00030 (3K)
+			const b = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false, 0, true)!;
+			expect(spodna(b)).toBe('ZASP00030');
+			expect(b.odpis.find((o) => o.kod === 'ZASP00030')!.metre).toBe(7.5); // metre nezmenené
+			// IZO 3K: ZASP00030 → ZASP00033 (4K)
+			expect(spodna(computeFlat(cfg, 'Štandard +|3K IZO', 3000, 2400, false, 0, true)!)).toBe('ZASP00033');
+			// opona 2x2K: ZASP00104 → ZASP00030 (3K)
+			expect(spodna(computeFlat(cfg, 'Štandard +|2x2K', 5000, 2400, false, 0, true)!)).toBe('ZASP00030');
+			// 6K nemá +1 (7K neexistuje) → ostáva 6K rail
+			expect(spodna(computeFlat(cfg, 'Štandard +|6K', 3000, 2400, false, 0, true)!)).toBe('ZASP202437');
+		});
+
+		it('prídavná koľajnica sa NEaplikuje mimo Štandard + (Deluxe zdieľa ZASP00104 — Money guard)', () => {
+			// Deluxe 2K spodná = ZASP00104; checkbox NESMIE zmeniť Deluxe odpis
+			const d = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false, 10, true)!;
+			expect(d.odpis.some((o) => o.kod === 'ZASP00104')).toBe(true);
+			expect(d.odpis.some((o) => o.kod === 'ZASP00030')).toBe(false);
 		});
 
 		it('Rozširujúci U profil (ZASP202439) spája vodorovný aj zvislý kus pod JEDEN kód (odpis = kombinovaný)', () => {

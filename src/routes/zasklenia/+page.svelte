@@ -29,7 +29,8 @@
 			otvaranie: form?.vstup?.otvaranie ?? 'P - L',
 			vrtanieZamku: form?.vstup?.vrtanieZamku ?? 1050,
 			poznamka: zd?.poznamka ?? '',
-			caka: zd?.caka ?? false
+			caka: zd?.caka ?? false,
+			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false
 		};
 	});
 
@@ -67,6 +68,7 @@
 	let skloPresneS = $state('');
 	let poznamkaS = $state('');
 	let cakaS = $state(false);
+	let pridavnaKolajnicaS = $state(false);
 	let system = $state('Robust');
 	let styl = $state('2K');
 	let sklo = $state('');
@@ -84,6 +86,7 @@
 		vrtanieZamkuS = form?.vstup?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
 		cakaS = zd?.caka ?? false;
+		pridavnaKolajnicaS = zd?.pridavnaKolajnica ?? false;
 		const p = prim();
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
@@ -204,6 +207,7 @@
 	<input type="hidden" name="vrtanieZamku" value={vstup.vrtanieZamku} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
+	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 {/snippet}
 
 {#snippet planKarty(p: NonNullable<typeof plan>)}
@@ -275,6 +279,7 @@
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 	<input type="hidden" name="posuvy" value={JSON.stringify(multiVstup?.posuvy ?? [])} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
+	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 {/snippet}
 
 {#snippet planKartyMulti(m: NonNullable<typeof multi>)}
@@ -452,6 +457,20 @@
 					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
 				</label>
 			</div>
+			{#if system === 'Štandard +'}
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+						<input
+							type="checkbox"
+							name="pridavnaKolajnica"
+							value="1"
+							bind:checked={pridavnaKolajnicaS}
+							style="width:auto"
+						/>
+						➕ Prídavná koľajnica (spodná koľajnica o veľkosť väčšia)
+					</label>
+				</div>
+			{/if}
 			<!-- Zimná záhrada: ďalšie posuvy sa zoptimalizujú do zdieľaných tyčí -->
 			<input type="hidden" name="posuvy" value={posuvyJSON} />
 			{#each posuvyExtra as p, i (i)}
