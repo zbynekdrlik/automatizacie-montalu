@@ -336,14 +336,14 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti Money odpisu)', () => {
 	describe('BASIC (2K…6K) — S=3000 V=2400', () => {
 		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
-			['Štandard +|2K', 3000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5 }, { sirka: 1438, vyska: 2285 }],
-			['Štandard +|3K', 3000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 955, vyska: 2285 }],
-			['Štandard +|4K', 3000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 713, vyska: 2285 }],
-			['Štandard +|5K', 3000, 2400, { ZASP202433: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5 }, { sirka: 568, vyska: 2285 }],
-			['Štandard +|6K', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5 }, { sirka: 471, vyska: 2285 }],
+			['Štandard +|2K', 3000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5 }, { sirka: 1440, vyska: 2285 }],
+			['Štandard +|3K', 3000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 957, vyska: 2285 }],
+			['Štandard +|4K', 3000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 715, vyska: 2285 }],
+			['Štandard +|5K', 3000, 2400, { ZASP202433: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5 }, { sirka: 570, vyska: 2285 }],
+			['Štandard +|6K', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5 }, { sirka: 473, vyska: 2285 }],
 			// extra vektory (iné rozmery)
-			['Štandard +|2K', 4500, 2100, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 14.4, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5 }, { sirka: 2188, vyska: 1985 }],
-			['Štandard +|6K', 6500, 2600, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 14.4, ZASP20244: 7.5, ZASP00024: 37.5, ZASP202419: 7.5 }, { sirka: 1054, vyska: 2485 }]
+			['Štandard +|2K', 4500, 2100, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 14.4, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5 }, { sirka: 2190, vyska: 1985 }],
+			['Štandard +|6K', 6500, 2600, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 14.4, ZASP20244: 7.5, ZASP00024: 37.5, ZASP202419: 7.5 }, { sirka: 1056, vyska: 2485 }]
 		];
 		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
 			const r = computeFlat(cfg, sysStyl, S, V, false);
@@ -364,12 +364,12 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 
 	describe('IZO (2K IZO…6K IZO) — S=3000 V=2400 (+ extra 3K IZO 3600×2000)', () => {
 		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
-			['Štandard +|2K IZO', 3000, 2400, { ZASP00107: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1415, vyska: 2265 }],
-			['Štandard +|3K IZO', 3000, 2400, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 932, vyska: 2265 }],
-			['Štandard +|4K IZO', 3000, 2400, { ZASP00036: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 28.8 }, { sirka: 690, vyska: 2265 }],
-			['Štandard +|5K IZO', 3000, 2400, { ZASP202433: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5, ZASP202439: 36 }, { sirka: 545, vyska: 2265 }],
-			['Štandard +|6K IZO', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5, ZASP202439: 43.2 }, { sirka: 448, vyska: 2265 }],
-			['Štandard +|3K IZO', 3600, 2000, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1132, vyska: 1865 }]
+			['Štandard +|2K IZO', 3000, 2400, { ZASP00107: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 7.5, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1417, vyska: 2265 }],
+			['Štandard +|3K IZO', 3000, 2400, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 934, vyska: 2265 }],
+			['Štandard +|4K IZO', 3000, 2400, { ZASP00036: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 28.8 }, { sirka: 692, vyska: 2265 }],
+			['Štandard +|5K IZO', 3000, 2400, { ZASP202433: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 22.5, ZASP202419: 7.5, ZASP202439: 36 }, { sirka: 547, vyska: 2265 }],
+			['Štandard +|6K IZO', 3000, 2400, { ZASP202438: 7.5, ZASP202437: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 30, ZASP202419: 7.5, ZASP202439: 43.2 }, { sirka: 450, vyska: 2265 }],
+			['Štandard +|3K IZO', 3600, 2000, { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP20244: 7.5, ZASP00024: 15, ZASP202419: 7.5, ZASP202439: 21.6 }, { sirka: 1134, vyska: 1865 }]
 		];
 		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
 			const r = computeFlat(cfg, sysStyl, S, V, false);
@@ -410,10 +410,10 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 
 	describe('OPONA (2x2K/2x3K/2x4K) — S=5000 V=2400 (+ extra 2x2K 6000×2200)', () => {
 		const cases: [string, number, number, Record<string, number>, { sirka: number; vyska: number }][] = [
-			['Štandard +|2x2K', 5000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 1194, vyska: 2285 }],
-			['Štandard +|2x3K', 5000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 22.5, ZASP202419: 7.5 }, { sirka: 792, vyska: 2285 }],
-			['Štandard +|2x4K', 5000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 30, ZASP202419: 7.5 }, { sirka: 590, vyska: 2285 }],
-			['Štandard +|2x2K', 6000, 2200, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 14.4, ZASP20244: 15, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 1444, vyska: 2085 }]
+			['Štandard +|2x2K', 5000, 2400, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 1196, vyska: 2285 }],
+			['Štandard +|2x3K', 5000, 2400, { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 22.5, ZASP202419: 7.5 }, { sirka: 794, vyska: 2285 }],
+			['Štandard +|2x4K', 5000, 2400, { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 10.8, ZASP20244: 15, ZASP00024: 30, ZASP202419: 7.5 }, { sirka: 592, vyska: 2285 }],
+			['Štandard +|2x2K', 6000, 2200, { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 14.4, ZASP20244: 15, ZASP00024: 15, ZASP202419: 7.5 }, { sirka: 1446, vyska: 2085 }]
 		];
 		it.each(cases)('%s %d×%d', (sysStyl, S, V, expOdpis, expSklo) => {
 			const r = computeFlat(cfg, sysStyl, S, V, false);
