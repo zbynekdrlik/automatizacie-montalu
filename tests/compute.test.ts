@@ -13,7 +13,7 @@ import {
 	missingHrubkaProfile
 } from '../src/lib/server/compute';
 import type { PosuvSpec } from '../src/lib/server/compute';
-import { jeSikmyRez } from '../src/lib/cut';
+import { jeSikmyRez, OVERLAP_MM } from '../src/lib/cut';
 import type { SysRow, RezRow } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
 
@@ -223,6 +223,15 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 		// Robust 2x3K má aj 45° (rámový/koľajnica) aj 90° (nosový/oponový)
 		expect(r.material.some((m) => m.sikmyRez)).toBe(true);
 		expect(r.material.some((m) => !m.sikmyRez)).toBe(true);
+	});
+
+	// drift-guard: KAŽDÝ systém musí mať reálny presah krídel (kaskáda ho kreslí v mierke).
+	// Nový/premenovaný systém bez hodnoty → kaskáda by ticho padla na default → chytí to test.
+	it('OVERLAP_MM má hodnotu presahu pre každý systém v cfg (kaskáda náhľadu)', () => {
+		const systemy = [...new Set((seed.sys as SysRow[]).map((s) => s.sysStyl.split('|')[0]))];
+		expect(systemy.length).toBeGreaterThan(0);
+		for (const system of systemy)
+			expect(Object.prototype.hasOwnProperty.call(OVERLAP_MM, system), system).toBe(true);
 	});
 
 	it('kladka/klzný sa počíta na 3600mm tyč, nie 7500 (odpis × 3.6 na tyč)', () => {

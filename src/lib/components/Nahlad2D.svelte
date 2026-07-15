@@ -1,6 +1,7 @@
 <script lang="ts">
 	// 2D náhľad zasklenia — čelný pohľad: N posuvných polí v ráme, kótovanie
-	// celkovej šírky/výšky a rozmeru skla, šípka smeru otvárania.
+	// celkovej šírky/výšky a rozmeru skla, kaskáda krídel v reze.
+	import { overlapMm } from '$lib/cut';
 	let {
 		S,
 		V,
@@ -38,10 +39,8 @@
 		otvaranie.replace(/\s/g, '') === 'P-L' ? 'PL' : otvaranie.replace(/\s/g, '') === 'L-P' ? 'LP' : otvaranie ? 'OP' : ''
 	);
 
-	// Reálny presah susedných krídel (mm) per systém — Dominik 2026-07-14: Robust 70,
-	// Slide 50, Štandard + 40 (Deluxe zatiaľ odhad 50 — nepotvrdené). Kreslí sa v MIERKE
-	// okna, takže presah v náhľade zodpovedá skutočnému prekrytiu krídel.
-	const OVERLAP_MM: Record<string, number> = { Robust: 70, Slide: 50, 'Štandard +': 40, Deluxe: 50 };
+	// Reálny presah susedných krídel (mm) per systém žije v $lib/cut.ts (overlapMm),
+	// spolu s drift-guard testom, že každý systém má hodnotu. Kreslí sa v MIERKE okna.
 
 	// Kaskáda krídel v reze zhora (pôdorys, pohľad z interiéru) — nahrádza šípku +
 	// nápis „opona". Krídla = pruhy v RÁMČEKU cez celú šírku okna; každé krídlo má REÁLNU
@@ -61,7 +60,7 @@
 		const fw = xR - xL;
 		const y0 = casTop + CAS_PAD;
 		const casScale = fw / S; // px na mm cez rámček kaskády
-		const ov = (OVERLAP_MM[system] ?? 50) * casScale; // presah v px
+		const ov = overlapMm(system) * casScale; // presah v px (reálny mm v mierke)
 		const segs: { x: number; y: number; w: number }[] = [];
 		if (dir === 'OP') {
 			// opona: N/2 krídel na stranu, obe strany kaskádujú do stredu s reálnym presahom
