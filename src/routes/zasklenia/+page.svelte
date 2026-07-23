@@ -29,6 +29,7 @@
 			otvaranie: form?.vstup?.otvaranie ?? 'P - L',
 			vrtanieZamku: form?.vstup?.vrtanieZamku ?? 1050,
 			poznamka: zd?.poznamka ?? '',
+			ral: zd?.ral ?? '',
 			caka: zd?.caka ?? false,
 			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false
 		};
@@ -67,6 +68,7 @@
 	let zakaznikS = $state('');
 	let skloPresneS = $state('');
 	let poznamkaS = $state('');
+	let ralS = $state('');
 	let cakaS = $state(false);
 	let pridavnaKolajnicaS = $state(false);
 	let system = $state('Robust');
@@ -85,6 +87,7 @@
 		skloPresneS = form?.vstup?.skloPresne ?? '';
 		vrtanieZamkuS = form?.vstup?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
+		ralS = zd?.ral ?? '';
 		cakaS = zd?.caka ?? false;
 		pridavnaKolajnicaS = zd?.pridavnaKolajnica ?? false;
 		const p = prim();
@@ -206,14 +209,35 @@
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
 	<input type="hidden" name="vrtanieZamku" value={vstup.vrtanieZamku} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
+	<input type="hidden" name="ral" value={vstup.ral} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 {/snippet}
 
-{#snippet planKarty(p: NonNullable<typeof plan>)}
-	{#if vstup.poznamka}
-		<div class="poznamka-plan">📝 {vstup.poznamka}</div>
+<!-- Poznámka (viacriadková, vľavo) + RAL (veľkým, vpravo) na nárezovom pláne aj
+     v tlači. Zdieľané pre jedno- aj viac-posuvový plán. Display-only — do Money
+     odpisu (.xlsx) NEJDE ani poznámka, ani RAL. -->
+{#snippet poznamkaRal()}
+	{#if vstup.poznamka || vstup.ral}
+		<div class="card poznamka-ral" data-testid="poznamka-ral">
+			{#if vstup.poznamka}
+				<div class="pr-note">
+					<div class="sec">Poznámka</div>
+					<div class="poznamka-plan">{vstup.poznamka}</div>
+				</div>
+			{/if}
+			{#if vstup.ral}
+				<div class="pr-ral">
+					<div class="sec">RAL</div>
+					<div class="ral-val" data-testid="ral-val">{vstup.ral}</div>
+				</div>
+			{/if}
+		</div>
 	{/if}
+{/snippet}
+
+{#snippet planKarty(p: NonNullable<typeof plan>)}
+	{@render poznamkaRal()}
 	<div class="card">
 		<div class="sec">Rozmery</div>
 		<div class="g">
@@ -277,13 +301,14 @@
 	<input type="hidden" name="op" value={vstup.op} />
 	<input type="hidden" name="zakaznik" value={vstup.zakaznik} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
+	<input type="hidden" name="ral" value={vstup.ral} />
 	<input type="hidden" name="posuvy" value={JSON.stringify(multiVstup?.posuvy ?? [])} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 {/snippet}
 
 {#snippet planKartyMulti(m: NonNullable<typeof multi>)}
-	{#if vstup.poznamka}<div class="poznamka-plan">📝 {vstup.poznamka}</div>{/if}
+	{@render poznamkaRal()}
 	<div class="card">
 		<div class="sec">Posuvy ({m.posuvy.length}) — spolu {fmtM(m.m2)} m²</div>
 		<table>
@@ -442,13 +467,25 @@
 				/>
 			</div>
 			<div class="field">
-				<label for="poznamka">Poznámka (zobrazí sa hore vpravo na pláne aj v tlači)</label>
-				<input
+				<label for="poznamka">Poznámka (viacriadková — vľavo na pláne aj v tlači, píš pod seba)</label>
+				<textarea
 					id="poznamka"
 					name="poznamka"
+					rows="4"
 					bind:value={poznamkaS}
 					maxlength="300"
-					placeholder="napr. pozor na ľavé krídlo, dodať do piatku…"
+					placeholder="napr. pozor na ľavé krídlo&#10;dodať do piatku&#10;montáž 5.8."
+					style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical"
+				></textarea>
+			</div>
+			<div class="field">
+				<label for="ral">RAL (farba) — zobrazí sa veľkým vpravo na pláne aj v tlači</label>
+				<input
+					id="ral"
+					name="ral"
+					bind:value={ralS}
+					maxlength="40"
+					placeholder="napr. 7016 / RAL 9005…"
 				/>
 			</div>
 			<div class="field">
@@ -559,7 +596,7 @@
 		</p>
 	</div>
 
-	<div class="okmsg" data-testid="vysledok">
+	<div class="okmsg noprint" data-testid="vysledok">
 		{#if !form.outcome.live}
 			🧪 TEST — do Money NEJDE (testovací priečinok): <b>{form.outcome.filename}</b>
 		{:else if vstup.caka}
@@ -616,7 +653,7 @@
 		<p class="sub"><span class="badge">Zimná záhrada · {multi.posuvy.length} posuvy</span></p>
 	</div>
 
-	<div class="okmsg" data-testid="vysledok">
+	<div class="okmsg noprint" data-testid="vysledok">
 		{#if !form.outcome.live}
 			🧪 TEST — do Money NEJDE (testovací priečinok): <b>{form.outcome.filename}</b>
 		{:else if vstup.caka}

@@ -18,8 +18,12 @@ export interface Vstup {
 	/** výška vŕtania zámku [mm od spodku skla] — len Deluxe (otvory D46 v náhľade),
 	 *  default 1050; do budúcna aj do objednávky skla */
 	vrtanieZamku: number;
-	/** voľná poznámka — zobrazí sa hore vpravo na nárezovom pláne (aj v tlači) */
+	/** voľná VIACRIADKOVÁ poznámka — zobrazí sa vľavo v rámčeku na nárezovom pláne
+	 *  (aj v tlači), riadky pod sebou (pre-wrap) */
 	poznamka: string;
+	/** RAL farba — samostatné pole, zobrazí sa VEĽKÝM písmom vpravo na pláne (aj
+	 *  v tlači). Len na plán/tlač — do Money odpisu NEJDE. */
+	ral: string;
 	caka: boolean;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica: boolean;
@@ -47,6 +51,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 			return x > 0 && x <= 20000 ? x : 1050;
 		})(),
 		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
+		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
 	};
@@ -79,6 +84,8 @@ export interface MultiVstup {
 	op: string;
 	zakaznik: string;
 	poznamka: string;
+	/** RAL farba — samostatné pole, veľkým na pláne/tlači; do Money NEJDE */
+	ral: string;
 	caka: boolean;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica: boolean;
@@ -94,6 +101,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
 		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
+		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
 	};

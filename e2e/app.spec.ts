@@ -96,6 +96,50 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	expect(consoleMsgs).toEqual([]);
 });
 
+// Poznámka (viacriadková, vľavo) + RAL (veľkým, vpravo) na nárezovom pláne aj v tlači;
+// Money „Odoslané… .xlsx" riadok sa v TLAČI NEZOBRAZUJE (na obrazovke ostáva). Dominik
+// 2026-07-23. Poznámka + RAL sú DISPLAY-only — do Money odpisu nejdú.
+test('nárezový plán: poznámka (pod seba) + RAL veľkým; Money box preč z tlače', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PR`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Poznámka');
+	await page.getByLabel('Systém').selectOption('Robust');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Šírka (mm) *').fill('2509');
+	await page.getByLabel('Výška (mm) *').fill('1930');
+	await page.getByLabel(/Poznámka/).fill('Pozor na ľavé krídlo\nDodať do piatku\nMontáž 5.8.');
+	await page.getByLabel(/RAL \(farba\)/).fill('7016');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	// poznámka + RAL box na pláne
+	await expect(page.getByTestId('poznamka-ral')).toBeVisible();
+	await expect(page.getByTestId('ral-val')).toHaveText('7016');
+	await expect(page.locator('.poznamka-plan')).toContainText('Pozor na ľavé krídlo');
+	await expect(page.locator('.poznamka-plan')).toContainText('Montáž 5.8.');
+
+	// v tlači poznámka + RAL ostáva
+	await page.emulateMedia({ media: 'print' });
+	await expect(page.getByTestId('poznamka-ral')).toBeVisible();
+	await expect(page.getByTestId('ral-val')).toBeVisible();
+	await page.emulateMedia({ media: 'screen' });
+
+	// odoslanie (TEST) → Money potvrdenie na obrazovke, ale NIE v tlači
+	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	await expect(page.getByTestId('vysledok')).toBeVisible();
+	await page.emulateMedia({ media: 'print' });
+	await expect(page.getByTestId('vysledok')).toBeHidden(); // Money box preč z tlače
+	await expect(page.getByTestId('poznamka-ral')).toBeVisible(); // poznámka+RAL ostáva
+	await page.emulateMedia({ media: 'screen' });
+	await expect(page.getByTestId('vysledok')).toBeVisible(); // na obrazovke stále je
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 // Deluxe (posuvná sklenená stena) — READ-ONLY náhľad (nič sa nezapisuje do Money).
 // Kľúč (Dominik 2026-07-10): HRÚBKA SKLA (6/10) vyberá kladka/klzný profil, nie štýl.
 // 10mm sklo → kladka ZASP202417; 6mm sklo → ZASP202416; množstvo rovnaké, líši sa LEN
@@ -265,7 +309,8 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await page
 		.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')
 		.fill('Stopsol Grey');
-	await page.getByLabel('Poznámka (zobrazí sa hore vpravo na pláne aj v tlači)').fill('Pozn X');
+	await page.getByLabel(/Poznámka/).fill('Pozn X');
+	await page.getByLabel(/RAL \(farba\)/).fill('7016');
 	await page.getByLabel(/Čaká na materiál/).check();
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
@@ -279,9 +324,8 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await expect(
 		page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')
 	).toHaveValue('Stopsol Grey');
-	await expect(
-		page.getByLabel('Poznámka (zobrazí sa hore vpravo na pláne aj v tlači)')
-	).toHaveValue('Pozn X');
+	await expect(page.getByLabel(/Poznámka/)).toHaveValue('Pozn X');
+	await expect(page.getByLabel(/RAL \(farba\)/)).toHaveValue('7016');
 	await expect(page.getByLabel(/Čaká na materiál/)).toBeChecked();
 	expect(consoleMsgs).toEqual([]);
 });
