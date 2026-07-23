@@ -217,15 +217,12 @@
 		font-weight: 400;
 		font-size: 11px;
 	}
+	/* P1/P2 značka pri reze — ČIERNA + medzera pred číslom (Dominik 2026-07-23:
+	   modrý badge s bielym textom bol v tlači zle čitateľný). */
 	.pbadge {
-		display: inline-block;
-		background: #1e3a8a;
-		color: #fff;
-		border-radius: 4px;
-		padding: 0 4px;
-		font-size: 10px;
+		color: #000;
 		font-weight: 700;
-		vertical-align: 1px;
+		margin-right: 8px;
 	}
 	.rezy {
 		width: auto;
