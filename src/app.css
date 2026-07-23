@@ -278,14 +278,48 @@ footer.app {
 	font-size: 13.5px;
 	padding: 10px 0 24px;
 }
-/* poznámka na nárezovom pláne — hore vpravo, viditeľná aj v tlači */
+/* poznámka + RAL na nárezovom pláne (aj v tlači): poznámka viacriadkovo vľavo
+   (píše sa pod seba), RAL veľkým písmom vpravo */
+.poznamka-ral {
+	display: flex;
+	gap: 22px;
+	align-items: stretch;
+}
+.poznamka-ral .pr-note {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.poznamka-ral .pr-ral {
+	flex: 0 0 auto;
+	border-left: 1px solid #e2e8f0;
+	padding-left: 22px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	text-align: center;
+}
+/* keď je RAL jediné (bez poznámky), zruš deliacu čiaru a zarovnaj vľavo */
+.poznamka-ral .pr-ral:first-child {
+	border-left: none;
+	padding-left: 0;
+	text-align: left;
+}
 .poznamka-plan {
-	text-align: right;
 	font-weight: 600;
 	color: #334155;
-	font-size: 14px;
-	margin: 0 4px 10px;
+	font-size: 15px;
+	margin: 0;
 	white-space: pre-wrap;
+	word-break: break-word;
+	line-height: 1.5;
+}
+.ral-val {
+	font-size: 40px;
+	font-weight: 800;
+	color: #0f172a;
+	line-height: 1.05;
+	margin-top: 2px;
+	/* dlhý RAL (max 40 znakov) radšej zalomiť ako pretiecť rámček */
 	word-break: break-word;
 }
 .hint {
@@ -376,6 +410,20 @@ footer.app {
 	.row {
 		padding: 3px 2px;
 		font-size: 11px;
+	}
+	/* poznámka + RAL kompaktne na A4 — RAL stále výrazne väčšie ako 11px telo */
+	.poznamka-ral {
+		gap: 14px;
+	}
+	.poznamka-ral .pr-ral {
+		padding-left: 14px;
+	}
+	.poznamka-plan {
+		font-size: 11px;
+		line-height: 1.35;
+	}
+	.ral-val {
+		font-size: 26px;
 	}
 	nav.top,
 	footer.app,

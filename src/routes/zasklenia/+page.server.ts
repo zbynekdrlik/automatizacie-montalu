@@ -40,7 +40,8 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 			sklo: vstup.skloPresne || vstup.sklo,
 			skloZaklad: vstup.sklo,
 			otvaranie: vstup.otvaranie,
-			poznamka: vstup.poznamka
+			poznamka: vstup.poznamka,
+			ral: vstup.ral
 		}
 	};
 }
@@ -104,6 +105,7 @@ function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): Odpi
 			zimnaZahrada: true,
 			pocetPosuvov: r.posuvy.length,
 			poznamka: vstup.poznamka,
+			ral: vstup.ral,
 			posuvy: r.posuvy.map((p, i) => ({
 				posuv: i + 1,
 				system: p.system,
