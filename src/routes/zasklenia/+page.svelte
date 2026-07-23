@@ -545,7 +545,7 @@
 					</div>
 				</div>
 			{/each}
-			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv (zimná záhrada)</button>
+			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>
 			<button class="btn" type="submit" formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'} disabled={b2bBlok} data-testid="spocitat">
 				{jeMulti ? `Spočítať spoločný plán (${posuvyExtra.length + 1} posuvy)` : 'Spočítať nárezový plán'}
 			</button>
@@ -553,7 +553,7 @@
 	</div>
 {:else if step === 'nahlad' && plan}
 	<div class="card">
-		<h1>Nárezový plán — {vstup.zak} · {vstup.zakaznik}</h1>
+		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge">Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
@@ -590,7 +590,7 @@
 	</div>
 {:else if step === 'hotovo' && plan && form?.outcome}
 	<div class="card">
-		<h1>Nárezový plán — {vstup.zak} · {vstup.zakaznik}</h1>
+		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge">Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span>
 		</p>
@@ -615,7 +615,7 @@
 	</div>
 {:else if step === 'nahladMulti' && multi}
 	<div class="card">
-		<h1>Nárezový plán — {vstup.zak} · {vstup.zakaznik}</h1>
+		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge">Zimná záhrada · {multi.posuvy.length} posuvy</span>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
@@ -649,7 +649,7 @@
 	</div>
 {:else if step === 'hotovoMulti' && multi && form?.outcome}
 	<div class="card">
-		<h1>Nárezový plán — {vstup.zak} · {vstup.zakaznik}</h1>
+		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub"><span class="badge">Zimná záhrada · {multi.posuvy.length} posuvy</span></p>
 	</div>
 
