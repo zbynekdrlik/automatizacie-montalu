@@ -77,7 +77,7 @@ const off = (sysStyl: string, poradie: number) =>
 
 describe('reálny v12 → v13: Slide opona geometria podľa Excelu', () => {
 	it('user_version = 13', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(13);
+		expect(db.pragma('user_version', { simple: true })).toBe(14);
 	});
 
 	it('KAŽDÝ opravený Slide opona offset sedí s cfg_seed', () => {
@@ -97,10 +97,10 @@ describe('reálny v12 → v13: Slide opona geometria podľa Excelu', () => {
 		expect(off('Slide|2x2K', 25)).toBe(-67);
 	});
 
-	it('rámový (Money-relevantný) sa NEDOTKNE + ostatné nemenené riadky', () => {
-		// rámový šírkový rez ostáva z-Robustu-odvodený (oprava čaká na Dominika)
-		expect(off('Slide|2x3K', 20)).toBe(127.47);
-		expect(off('Slide|2x2K', 20)).toBe(21);
+	it('rámový je (S−12)/N (v14) + ostatné nemenené riadky', () => {
+		// rámový šírkový rez opravený v migrácii v14 (viď migration-v14.test.ts)
+		expect(off('Slide|2x3K', 20)).toBe(-12);
+		expect(off('Slide|2x2K', 20)).toBe(-12);
 		// koľajnica offset 0, rámový V −65 — nemenené
 		expect(off('Slide|2x3K', 10)).toBe(0);
 		expect(off('Slide|2x3K', 21)).toBe(-65);
