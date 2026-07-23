@@ -51,6 +51,9 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByLabel('Výška (mm) *').fill('1930');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
+	// hlavička ukazuje OP/OPDL · zákazník (Dominik 2026-07-23: bez „Nárezový plán", OP nie ZAK)
+	await expect(page.locator('h1')).toContainText('01 · E2E Test');
+	await expect(page.locator('h1')).not.toContainText('Nárezový plán');
 	// overené hodnoty z 1:1 testov: sklo 1129 × 1725 (zaokrúhlené na celé mm), odpis 15/15/7,5
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('1129');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('1725');
