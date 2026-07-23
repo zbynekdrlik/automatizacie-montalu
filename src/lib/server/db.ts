@@ -412,6 +412,25 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 13) {
+		// v12 → v13: Slide opona (2x2K + 2x3K) — oprava GEOMETRIE podľa reálnych Excelov
+		// od Dominika (2026-07-23). Predtým bola odvodená z Robust opony (Money Slide
+		// oponu nemá) → sklo aj dĺžky rezov nesedeli. Opravené offsety: sklo šírka
+		// (2x3K 142,5 / 2x2K 40,6), sklo výška (V−67), rámový šírkový rez ((S−12)/N),
+		// nosový + oponový (V−67). KÓDY sa NEMENIA — Money katalóg potvrdil, že appka
+		// ich má správne (v Exceli bol preklep: ZASP00091=Redukcia, ZASP00097=2K koľaj).
+		// Počty tyčí do Money sa nemenia (offsety len presnia dĺžku rezu); sklo NIE je
+		// v Money odpise. Idempotentné: SET offset z (opraveného) cfg_seed per
+		// (sys_styl, poradie) — nezmenené riadky sa nastavia na rovnakú hodnotu (no-op).
+		const updOff = db.prepare('UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND poradie = ?');
+		db.transaction(() => {
+			for (const r of seed.rez)
+				if (r.sysStyl === 'Slide|2x2K' || r.sysStyl === 'Slide|2x3K')
+					updOff.run(r.offset, r.sysStyl, r.poradie);
+			db.pragma('user_version = 13');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }

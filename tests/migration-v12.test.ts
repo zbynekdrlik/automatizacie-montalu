@@ -75,8 +75,8 @@ const row = (sysStyl: string, poradie: number) =>
 		| undefined;
 
 describe('reálny v11 → v12: IZO spodná koľajnica späť na normálnu', () => {
-	it('user_version = 12', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(12);
+	it('user_version = 13 (finálna po všetkých migráciách)', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(13);
 	});
 
 	it('KAŽDÁ IZO spodná koľajnica je opravená na cfg_seed (normálna, nie zväčšená)', () => {
