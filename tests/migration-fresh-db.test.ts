@@ -20,7 +20,7 @@ const stdRez = seed.rez.filter((r) => r.sysStyl.startsWith('Štandard +'));
 
 describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_seed', () => {
 	it('user_version=9 po plnej migrácii od nuly', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(12);
+		expect(db.pragma('user_version', { simple: true })).toBe(13);
 	});
 
 	it('všetkých 13 Štandard + štýlov je zoseedovaných (bez duplicít z v9)', () => {

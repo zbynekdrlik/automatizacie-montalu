@@ -106,9 +106,10 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!.sklo.pocet).toBe(6);
 	});
 
-	// Slide opona (2x2K/2x3K Slide) — odvodené z Robust opony na Slide profily.
-	// Kľúč: má Redukciu 6mm (sklozavislé) navyše oproti Robust opone; oponový je
-	// generický ZASP00006; koľajnica je Slide (ZASP00097/ZASP00100).
+	// Slide opona (2x2K/2x3K Slide). KÓDY overené proti Money katalógu (2026-07-23):
+	// koľajnica ZASP00097 (2K) / ZASP00100 (3K), oponový generický ZASP00006, Redukcia
+	// 6mm ZASP00091 (sklozavislé). GEOMETRIA (sklo + dĺžky rezov) opravená podľa reálnych
+	// Excelov od Dominika — viď test nižšie; kódy sa NEMENILI (Excel ich mal preklepnuté).
 	it('Slide opona má správne profily + redukcia sa nuluje pri sklo bez redukcie', () => {
 		const r = computeFlat(cfg, 'Slide|2x2K', 3500, 2200, false)!;
 		const kods = r.odpis.map((o) => o.kod).sort();
@@ -121,6 +122,34 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(rz.odpis.find((o) => o.kod === 'ZASP00091')!.metre).toBe(0);
 		// 2x3K Slide používa koľajnicu 3K Slide (ZASP00100)
 		expect(computeFlat(cfg, 'Slide|2x3K', 3500, 2100, false)!.odpis.some((o) => o.kod === 'ZASP00100')).toBe(true);
+	});
+
+	// Slide opona — SKLO opravené podľa reálnych Excelov od Dominika (2026-07-23,
+	// ~/uploads/montalu-slide-opona/{2x2K,2x3K}_IZO.xlsx). Predtým odvodené z Robustu
+	// (127,47/21/−65) → sklo bolo o pár mm vedľa. Správne: šírka 2x3K (S+142,5)/6−83,
+	// 2x2K (S+40,6)/4−83; výška V−67−83. Nosový/oponový rez doladený na V−67 (−2 mm).
+	// MONEY-NEUTRÁLNE: odpis (kódy + metre) IDENTICKÝ pred/po (overené na celej mriežke
+	// S 3000–8000 × V 1800–2600); sklo NIE je v Money odpise, −2 mm nikdy nepreklopí
+	// počet tyčí. Rámový šírkový rez sa tu NEMENÍ — jeho oprava by menila ZASP00088
+	// billing, čaká na samostatné potvrdenie Dominikom.
+	it('Slide opona: sklo 1:1 podľa Excelu + Money odpis nezmenený (2026-07-23)', () => {
+		// 2x3K 6940×2200 → sklo 1097×2050 (Excel 2x3K IZO)
+		const a = computeFlat(cfg, 'Slide|2x3K', 6940, 2200, false)!;
+		expect(a.sklo.sirka).toBe(1097); // round((6940+142,5)/6 − 83)
+		expect(a.sklo.vyska).toBe(2050); // 2200 − 67 − 83
+		expect(a.sklo.pocet).toBe(6);
+		// 2x2K 4680×2200 → sklo 1097×2050
+		const b = computeFlat(cfg, 'Slide|2x2K', 4680, 2200, false)!;
+		expect(b.sklo.sirka).toBe(1097); // round((4680+40,6)/4 − 83)
+		expect(b.sklo.vyska).toBe(2050);
+		expect(b.sklo.pocet).toBe(4);
+		// Money odpis PIN (číre IZO, redukcia sa nuluje) — správne kódy + nezmenené metre
+		expect(odpisByKod(computeFlat(cfg, 'Slide|2x3K', 6940, 2200, true)!)).toMatchObject({
+			ZASP00100: 22.5, ZASP00088: 45, ZASP00006: 7.5, ZASP202410: 22.5
+		});
+		expect(odpisByKod(computeFlat(cfg, 'Slide|2x2K', 4680, 2200, true)!)).toMatchObject({
+			ZASP00097: 15, ZASP00088: 30, ZASP00006: 7.5, ZASP202410: 15
+		});
 	});
 
 	// Dominik: sklo objednávať na celé mm (904,578 → 905). Sklo nie je v Money odpise.
