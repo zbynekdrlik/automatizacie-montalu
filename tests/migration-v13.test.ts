@@ -1,8 +1,9 @@
-// Reálny prod upgrade path v12 → v13: Slide opona (2x2K + 2x3K) — oprava GEOMETRIE
-// (sklo + dĺžky rezov) podľa reálnych Excelov od Dominika (2026-07-23). Postav DB v
-// stave v12 so STARÝMI (z Robustu odvodenými) offsetmi, potom import db.ts spustí
-// SKUTOČNÝ v13 blok → over že offsety Slide opony vráti na hodnoty z cfg_seed.
-// KÓDY sa nemenia (tie boli správne); Money odpis (počty tyčí) sa nemení.
+// Reálny prod upgrade path v12 → v13: Slide opona (2x2K + 2x3K) — oprava SKLA + jemné
+// doladenie nosového/oponového rezu podľa reálnych Excelov od Dominika (2026-07-23).
+// Postav DB v stave v12 so STARÝMI (z Robustu odvodenými) offsetmi, potom import db.ts
+// spustí SKUTOČNÝ v13 blok → over že tie offsety Slide opony vráti na hodnoty z cfg_seed
+// a rámový (Money-relevantný, zatiaľ neopravený) NEDOTKNE. KÓDY sa nemenia; Money odpis
+// (počty tyčí + metre) sa nemení (viď compute.test „Money-neutrálne").
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -13,17 +14,16 @@ import seed from '../src/lib/server/cfg_seed.json';
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v13-test-'));
 const dbPath = path.join(tmpRoot, 'v12.db');
 
-// STARÉ offsety (pred opravou) pre Slide opona riadky, kľúč `sysStyl|poradie`.
+// STARÉ offsety (pred opravou) pre OPRAVOVANÉ Slide opona riadky, kľúč `sysStyl|poradie`.
+// Rámový (poradie 20) tu ZÁMERNE nie je — v tejto migrácii sa nemení (Money-relevantný).
 const OLD_OFF: Record<string, number> = {
-	'Slide|2x3K|20': 127.47, // rámový S
-	'Slide|2x3K|25': -65, // oponový V
-	'Slide|2x3K|30': -65, // nosový V
-	'Slide|2x3K|90': 127.47, // sklo šírka
-	'Slide|2x3K|91': -65, // sklo výška
-	'Slide|2x2K|20': 21,
+	'Slide|2x3K|25': -65, // oponový V → −67
+	'Slide|2x3K|30': -65, // nosový V → −67
+	'Slide|2x3K|90': 127.47, // sklo šírka → 142,5
+	'Slide|2x3K|91': -65, // sklo výška → −67
 	'Slide|2x2K|25': -65,
 	'Slide|2x2K|30': -65,
-	'Slide|2x2K|90': 21,
+	'Slide|2x2K|90': 21, // sklo šírka → 40,6
 	'Slide|2x2K|91': -65
 };
 
@@ -88,18 +88,22 @@ describe('reálny v12 → v13: Slide opona geometria podľa Excelu', () => {
 		}
 	});
 
-	it('konkrétne opravené hodnoty (sklo + rezy)', () => {
+	it('konkrétne opravené hodnoty (sklo + nosový/oponový)', () => {
 		expect(off('Slide|2x3K', 90)).toBe(142.5); // sklo šírka
 		expect(off('Slide|2x3K', 91)).toBe(-67); // sklo výška
-		expect(off('Slide|2x3K', 20)).toBe(-12); // rámový S rez
 		expect(off('Slide|2x3K', 30)).toBe(-67); // nosový V
+		expect(off('Slide|2x3K', 25)).toBe(-67); // oponový V
 		expect(off('Slide|2x2K', 90)).toBe(40.6); // sklo šírka
-		expect(off('Slide|2x2K', 20)).toBe(-12);
+		expect(off('Slide|2x2K', 25)).toBe(-67);
 	});
 
-	it('NEDOTKNE sa nemenených riadkov (koľajnica offset 0, rámový V −65)', () => {
-		expect(off('Slide|2x3K', 10)).toBe(0); // koľajnica S
-		expect(off('Slide|2x3K', 21)).toBe(-65); // rámový V (Excel rez V−65)
-		expect(off('Slide|2x2K', 11)).toBe(0); // koľajnica V
+	it('rámový (Money-relevantný) sa NEDOTKNE + ostatné nemenené riadky', () => {
+		// rámový šírkový rez ostáva z-Robustu-odvodený (oprava čaká na Dominika)
+		expect(off('Slide|2x3K', 20)).toBe(127.47);
+		expect(off('Slide|2x2K', 20)).toBe(21);
+		// koľajnica offset 0, rámový V −65 — nemenené
+		expect(off('Slide|2x3K', 10)).toBe(0);
+		expect(off('Slide|2x3K', 21)).toBe(-65);
+		expect(off('Slide|2x2K', 11)).toBe(0);
 	});
 });
