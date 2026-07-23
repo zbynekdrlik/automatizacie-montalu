@@ -44,6 +44,11 @@ describe('parseVstup: viacriadková poznámka (píše sa pod seba)', () => {
 		expect(vstup.poznamka).toBe(txt);
 		expect(vstup.poznamka.split('\n').length).toBe(3);
 	});
+	it('CRLF (\\r\\n) sa normalizuje na \\n — maxlength(300) sedí so serverovým slice', () => {
+		const { vstup } = parseVstup(fd({ ...base, poznamka: 'A\r\nB\r\nC' }));
+		expect(vstup.poznamka).toBe('A\nB\nC');
+		expect(vstup.poznamka).not.toContain('\r');
+	});
 });
 
 describe('parseMultiVstup: RAL + viacriadková poznámka', () => {

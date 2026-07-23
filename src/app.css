@@ -319,7 +319,8 @@ footer.app {
 	color: #0f172a;
 	line-height: 1.05;
 	margin-top: 2px;
-	white-space: nowrap;
+	/* dlhý RAL (max 40 znakov) radšej zalomiť ako pretiecť rámček */
+	word-break: break-word;
 }
 .hint {
 	display: block;

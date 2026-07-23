@@ -50,7 +50,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 			const x = num('vrtanieZamku');
 			return x > 0 && x <= 20000 ? x : 1050;
 		})(),
-		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
+		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300),
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
@@ -100,7 +100,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
-		poznamka: String(form.get('poznamka') ?? '').trim().slice(0, 300),
+		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300),
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
