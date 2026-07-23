@@ -433,6 +433,22 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 14) {
+		// v13 → v14: Slide opona rámový šírkový rez podľa reálneho Excelu od Dominika
+		// (potvrdené 2026-07-23): „dĺžka rezu" = (S−12)/N (offset −12), namiesto z-Robustu
+		// odvodeného (S+127,47)/6 resp. +21. MENÍ Money billing profilu ZASP00088 (rámový):
+		// na ~0,5 % (2x2K) resp. ~5,7 % (2x3K) rozmerov o 1–2 tyče MENEJ (kratší rez → menej
+		// tyčí). SCHVÁLENÉ Dominikom (appka predtým rámový mierne prebíjala). Idempotentné:
+		// SET offset z (opraveného) cfg_seed pre rámový (poradie 20) Slide 2x2K/2x3K.
+		const updOff = db.prepare('UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND poradie = ?');
+		db.transaction(() => {
+			for (const r of seed.rez)
+				if ((r.sysStyl === 'Slide|2x2K' || r.sysStyl === 'Slide|2x3K') && r.poradie === 20)
+					updOff.run(r.offset, r.sysStyl, r.poradie);
+			db.pragma('user_version = 14');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }

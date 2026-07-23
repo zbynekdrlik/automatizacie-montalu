@@ -124,15 +124,14 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(computeFlat(cfg, 'Slide|2x3K', 3500, 2100, false)!.odpis.some((o) => o.kod === 'ZASP00100')).toBe(true);
 	});
 
-	// Slide opona — SKLO opravené podľa reálnych Excelov od Dominika (2026-07-23,
-	// ~/uploads/montalu-slide-opona/{2x2K,2x3K}_IZO.xlsx). Predtým odvodené z Robustu
-	// (127,47/21/−65) → sklo bolo o pár mm vedľa. Správne: šírka 2x3K (S+142,5)/6−83,
-	// 2x2K (S+40,6)/4−83; výška V−67−83. Nosový/oponový rez doladený na V−67 (−2 mm).
-	// MONEY-NEUTRÁLNE: odpis (kódy + metre) IDENTICKÝ pred/po (overené na celej mriežke
-	// S 3000–8000 × V 1800–2600); sklo NIE je v Money odpise, −2 mm nikdy nepreklopí
-	// počet tyčí. Rámový šírkový rez sa tu NEMENÍ — jeho oprava by menila ZASP00088
-	// billing, čaká na samostatné potvrdenie Dominikom.
-	it('Slide opona: sklo 1:1 podľa Excelu + Money odpis nezmenený (2026-07-23)', () => {
+	// Slide opona — geometria opravená podľa reálnych Excelov od Dominika (2026-07-23,
+	// ~/uploads/montalu-slide-opona/{2x2K,2x3K}_IZO.xlsx). Predtým odvodené z Robustu.
+	// Sklo: šírka 2x3K (S+142,5)/6−83, 2x2K (S+40,6)/4−83; výška V−67−83 (display-only,
+	// NIE v Money). Rezy: nosový/oponový V−67; rámový „dĺžka rezu" (S−12)/N. Rámový (S−12)/N
+	// MENÍ Money billing ZASP00088 na ~0,5 % (2x2K) / ~5,7 % (2x3K) rozmerov (kratší rez →
+	// menej tyčí) — SCHVÁLENÉ Dominikom (appka predtým rámový prebíjala). Kódy (ZASP00100 3K
+	// koľaj, ZASP00006 oponový) overené v Money katalógu — správne, nemenené.
+	it('Slide opona: sklo + odpis podľa Excelu (2026-07-23)', () => {
 		// 2x3K 6940×2200 → sklo 1097×2050 (Excel 2x3K IZO)
 		const a = computeFlat(cfg, 'Slide|2x3K', 6940, 2200, false)!;
 		expect(a.sklo.sirka).toBe(1097); // round((6940+142,5)/6 − 83)
@@ -143,13 +142,16 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(b.sklo.sirka).toBe(1097); // round((4680+40,6)/4 − 83)
 		expect(b.sklo.vyska).toBe(2050);
 		expect(b.sklo.pocet).toBe(4);
-		// Money odpis PIN (číre IZO, redukcia sa nuluje) — správne kódy + nezmenené metre
+		// Money odpis PIN (číre IZO, redukcia sa nuluje) — správne kódy na stabilnom rozmere
 		expect(odpisByKod(computeFlat(cfg, 'Slide|2x3K', 6940, 2200, true)!)).toMatchObject({
 			ZASP00100: 22.5, ZASP00088: 45, ZASP00006: 7.5, ZASP202410: 22.5
 		});
 		expect(odpisByKod(computeFlat(cfg, 'Slide|2x2K', 4680, 2200, true)!)).toMatchObject({
 			ZASP00097: 15, ZASP00088: 30, ZASP00006: 7.5, ZASP202410: 15
 		});
+		// rámový (S−12)/N ZNÍŽI ZASP00088 na časti rozmerov (schválená Money zmena) — pin
+		expect(odpisByKod(computeFlat(cfg, 'Slide|2x3K', 3000, 2050, false)!).ZASP00088).toBe(30); // z-Robustu bolo 37,5
+		expect(odpisByKod(computeFlat(cfg, 'Slide|2x2K', 3050, 2050, false)!).ZASP00088).toBe(22.5); // bolo 30
 	});
 
 	// Dominik: sklo objednávať na celé mm (904,578 → 905). Sklo nie je v Money odpise.
