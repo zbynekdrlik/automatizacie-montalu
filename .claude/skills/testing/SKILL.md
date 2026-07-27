@@ -98,3 +98,8 @@ prípadne `not.toContainText('bez')` na odlíšenie variant „s FAB" / „bez F
 takže kóty, kovanie, zámky D46 aj kaskáda idú s ním automaticky. Keď pridávaš ďalší prvok nad
 okno, počítaj y od `M0.top` (pás) alebo od `M.top` (okno) — NIE od zmixovaných oboch, a over
 očami (screenshot `nahlad-2d`), či ti kóta šírky okna na `M.top-24` nekoliduje s novým pásom.
+
+**Po REVERTE mutácie prebuilduj.** Mutačná kontrola bez `BASE_URL` beží proti `build/`,
+takže po vrátení zdroja (`mv …bak`) treba `npm run build` — inak preview stále servíruje
+zmutovaný bundle a ďalší beh testuje niečo iné, než si myslíš (živý zásah 2026-07-27:
+zrkadlenie výkresu „nefungovalo", pritom bežala stará zmutovaná verzia).

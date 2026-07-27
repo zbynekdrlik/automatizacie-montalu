@@ -70,3 +70,4 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - Money odpis / článkové kódy / nový systém-štýl / compute → load `.claude/skills/money-odpis`
 - unit/E2E test runs, local Playwright verification → load `.claude/skills/testing`
 - roles / b2b / route gating / Money-write boundary / auth migration → load `.claude/skills/access-control`
+- pridávam NOVÚ stránku/route (exporty, b2b denylist, nav, `$effect` slučka) → load `.claude/skills/nova-stranka`

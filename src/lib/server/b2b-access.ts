@@ -3,6 +3,7 @@
 // nesadnú na denylist, takže prejdú.
 const B2B_FORBIDDEN_PREFIXES = [
 	'/pergola',
+	'/fix',
 	'/bazen',
 	'/odpisy',
 	'/problem',
