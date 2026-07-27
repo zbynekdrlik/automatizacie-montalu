@@ -563,6 +563,54 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 18) {
+		// v17 → v18: STARŠÍ systém „Štandard" (bez plus) — Patrik 2026-07-27: „a ešte máme
+		// štandard bez +". Dielňa ho stále vyrába, appka ho nepoznala. 12 štýlov: basic
+		// 2K/3K/4K, IZO (s „U") 2K/3K/4K, opona 2x2K/2x3K/2x4K a IZO opona 2x2K/2x3K/2x4K
+		// (kombo, ktoré Štandard + nemá). Vzorce odvodené z firemných nárezákov
+		// „Štandard starý" a Money kódy overené naživo read-only (2026-07-27).
+		//
+		// Rozdiely oproti Štandard +: iný rám (ZASP00018 namiesto ZASP20244) a dorazový
+		// profil (ZASP00021 namiesto ZASP202419), medzera pri dovieraní 13 mm a BEZ +2 mm
+		// reznej rezervy v príreze. Ostatné (koľajnice, kladkový, stredový rám, „U“ profil)
+		// sú tie isté kódy — pooling naprieč systémami rieši compute.
+		//
+		// Aditívne + idempotentné (hasSys guard), presne v9 vzor. Sklá sa NEseedujú: názvy
+		// v `glass_types` sú UNIQUE a Štandard aj Štandard + majú rovnaký katalóg skiel
+		// (Float 4/6/10 + Izolačné 4.8.4) → zdieľajú ho cez `glassTypesForSystem`.
+		const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');
+		const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
+		const insRez = db.prepare(
+			`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		);
+		db.transaction(() => {
+			for (const s of seed.sys) {
+				if (!s.sysStyl.startsWith('Štandard|')) continue;
+				if (hasSys.get(s.sysStyl)) continue;
+				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+					insRez.run(
+						r.sysStyl,
+						r.poradie,
+						r.typ,
+						r.kod,
+						r.nazov,
+						r.dim,
+						r.koef,
+						r.offset,
+						r.delitN,
+						r.kerf,
+						r.pocetKs,
+						r.sklozavisle,
+						(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500,
+						(r as { skloHrubka?: number }).skloHrubka ?? 0
+					);
+			}
+			db.pragma('user_version = 18');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
@@ -726,15 +774,21 @@ export function listGlassTypes(): GlassType[] {
 	}));
 }
 
+/** Starší „Štandard" (bez plus) má PRESNE ten istý katalóg skiel ako Štandard +
+ *  (Float 4/6/10 + Izolačné 4.8.4). `glass_types.nazov` je UNIQUE, takže tie isté
+ *  názvy nemôžu existovať dvakrát → oba systémy čítajú jeden katalóg. */
+const GLASS_SYSTEM_ALIAS: Record<string, string> = { 'Štandard': 'Štandard +' };
+
 /** Sklá platné pre daný systém. Deluxe: LEN vlastné (Float kalené 6/10, hrúbka
  *  vyberá profil) — spoločné 'ALL' sklá (Kalené 8mm/10mm) nemajú Deluxe profil.
- *  Štandard +: rovnako LEN vlastné (Float 4/6/10 + Izolačné 4.8.4) — spoločné
- *  'ALL' sklá nemajú Štandard + profil (rovnaký dôvod ako Deluxe).
+ *  Štandard + (a zdieľajúci ho Štandard): rovnako LEN vlastné (Float 4/6/10 +
+ *  Izolačné 4.8.4) — spoločné 'ALL' sklá nemajú Štandard profil (dôvod ako Deluxe).
  *  Robust/Slide: vlastné + spoločné 'ALL'. */
 export function glassTypesForSystem(system: string): GlassType[] {
-	if (system === 'Deluxe' || system === 'Štandard +')
-		return listGlassTypes().filter((g) => g.system === system);
-	return listGlassTypes().filter((g) => g.system === system || g.system === 'ALL');
+	const sys = GLASS_SYSTEM_ALIAS[system] ?? system;
+	if (sys === 'Deluxe' || sys === 'Štandard +')
+		return listGlassTypes().filter((g) => g.system === sys);
+	return listGlassTypes().filter((g) => g.system === sys || g.system === 'ALL');
 }
 
 // ---- user-admin (B2B veľkoobchodné účty) ----

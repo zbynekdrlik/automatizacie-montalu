@@ -13,7 +13,10 @@ export const B2B_LIMITS: Record<string, { minPanel: number; maxPanel: number; ma
 	Slide: { minPanel: 800, maxPanel: 1300, maxHeight: 2500 },
 	Robust: { minPanel: 800, maxPanel: 1500, maxHeight: 2600 },
 	// Štandard +: ROVNAKÉ ako Deluxe (potvrdil Dominik 2026-07-14: „rovnako ako deluxe").
-	'Štandard +': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
+	'Štandard +': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
+	// starší „Štandard" — zatiaľ rovnaké limity ako Štandard + (rovnaká rodina);
+	// reálne výrobné limity potvrdiť s Dominikom
+	'Štandard': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
 };
 
 // Rodina štýlu: dvojité (opona) začínajú „2x", ostatné sú jednoduché. Návrh štýlu

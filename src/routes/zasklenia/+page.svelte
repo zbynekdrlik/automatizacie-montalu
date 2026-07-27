@@ -5,7 +5,7 @@
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
-	import { stylyDoPonuky, sklaDoPonuky, sysStylPre } from '$lib/styl';
+	import { stylyDoPonuky, sklaDoPonuky, sysStylPre, skloVyberaIzo } from '$lib/styl';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 
@@ -59,17 +59,20 @@
 	// spoločné 'ALL' sklá nemajú ich profil (musí sedieť so serverovým
 	// glassTypesForSystem, inak by formulár ponúkol sklo, ktoré server odmietne).
 	// (a Štandard + opona nemá izolačnú skladbu → sklaDoPonuky ju odfiltruje)
+	// existencia nárezáka podľa data.styly (server má ten istý test nad cfg)
+	const existuje = (sysStyl: string) => data.styly.some((x) => x.sysStyl === sysStyl);
 	const sklaForSystem = (sys: string, styl: string) =>
 		sklaDoPonuky(
 			sys,
 			styl,
 			data.skla
 				.filter((g) =>
-					sys === 'Deluxe' || sys === 'Štandard +'
-						? g.system === sys
+					sys === 'Deluxe' || sys === 'Štandard +' || sys === 'Štandard'
+						? g.system === (sys === 'Štandard' ? 'Štandard +' : sys)
 						: g.system === sys || g.system === 'ALL'
 				)
-				.map((g) => g.nazov)
+				.map((g) => g.nazov),
+			existuje
 		);
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
 
@@ -174,8 +177,8 @@
 	});
 	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO)
 	let narezakHint = $derived.by(() => {
-		if (system !== 'Štandard +' || !sklo) return '';
-		const styl2 = sysStylPre(system, styl, sklo).split('|')[1];
+		if (!skloVyberaIzo(system) || !sklo) return '';
+		const styl2 = sysStylPre(system, styl, sklo, existuje).split('|')[1];
 		return `Podľa skla sa ťahá nárezák ${system} ${styl2}.`;
 	});
 	let stylyPre = $derived(stylyForSystem(system));
@@ -290,25 +293,25 @@
 	let b2bSirkaErr = $derived.by(() => {
 		if (!isB2B) return null;
 		const s = dimOrNull(sirka);
-		return s === null ? null : checkB2BWidth(data.styly, sysStylPre(system, styl, sklo), s);
+		return s === null ? null : checkB2BWidth(data.styly, sysStylPre(system, styl, sklo, existuje), s);
 	});
 	let b2bVyskaWarn = $derived.by(() => {
 		if (!isB2B) return null;
 		const v = dimOrNull(vyska);
-		return v === null ? null : checkB2BHeight(sysStylPre(system, styl, sklo), v);
+		return v === null ? null : checkB2BHeight(sysStylPre(system, styl, sklo, existuje), v);
 	});
 	let posuvB2bErrs = $derived(
 		posuvyExtra.map((p) => {
 			if (!isB2B) return null;
 			const s = dimOrNull(p.s);
-			return s === null ? null : checkB2BWidth(data.styly, sysStylPre(p.system, p.styl, p.sklo), s);
+			return s === null ? null : checkB2BWidth(data.styly, sysStylPre(p.system, p.styl, p.sklo, existuje), s);
 		})
 	);
 	let posuvB2bWarns = $derived(
 		posuvyExtra.map((p) => {
 			if (!isB2B) return null;
 			const v = dimOrNull(p.v);
-			return v === null ? null : checkB2BHeight(sysStylPre(p.system, p.styl, p.sklo), v);
+			return v === null ? null : checkB2BHeight(sysStylPre(p.system, p.styl, p.sklo, existuje), v);
 		})
 	);
 	// b2b nesmie spočítať pri šírkovej chybe (primárny alebo ktorýkoľvek posuv).
