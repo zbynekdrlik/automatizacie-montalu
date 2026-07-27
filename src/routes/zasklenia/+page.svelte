@@ -672,7 +672,6 @@
 			<KlinPolia
 				idPrefix="klin"
 				names={true}
-				sirkaPosuvu={sirka}
 				bind:on={klinS}
 				bind:dlzka={klinDlzkaS}
 				bind:sirka={klinSirkaS}
@@ -730,7 +729,6 @@
 					{/if}
 					<KlinPolia
 						idPrefix={`ps${i}-klin`}
-						sirkaPosuvu={p.s}
 						bind:on={p.klin}
 						bind:dlzka={p.klinDlzka}
 						bind:sirka={p.klinSirka}

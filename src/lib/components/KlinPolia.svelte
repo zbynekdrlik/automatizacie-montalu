@@ -7,7 +7,6 @@
 	let {
 		idPrefix = 'klin',
 		names = false,
-		sirkaPosuvu = '',
 		on = $bindable(false),
 		dlzka = $bindable(''),
 		sirka = $bindable(''),
@@ -19,8 +18,6 @@
 		idPrefix?: string;
 		/** true = polia sa posielajú aj ako name= (plochý formulár primárneho posuvu) */
 		names?: boolean;
-		/** šírka posuvu — predvolí sa ako dĺžka klina (klín beží po celej šírke) */
-		sirkaPosuvu?: number | string;
 		on?: boolean;
 		dlzka?: number | string;
 		sirka?: number | string;
@@ -30,10 +27,12 @@
 	} = $props();
 
 	const nm = (k: string) => (names ? k : undefined);
-	// pri zapnutí predvyplň dĺžku šírkou posuvu — klín zvyčajne beží po celej
-	// šírke posuvu, prepísať sa dá (kratší klín sa aj v náhľade kreslí kratší)
+	// Patrik 2026-07-27: „nechcem to úplne hronit, že automaticky šírka klinu podľa
+	// koľajnice, lebo nie vždy to je pravidlo… tiež nie je pravidlo, že dĺžka klinu
+	// musí byť na celú dĺžku posuvu" → NIČ sa neodvodzuje z posuvu ani z koľajnice,
+	// všetky štyri kóty zadáva dielňa ručne (polia sú `required`). Predvyplní sa len
+	// počet kusov, ktorý je takmer vždy 1.
 	function zapnute() {
-		if (on && !dlzka && sirkaPosuvu) dlzka = sirkaPosuvu;
 		if (on && !ks) ks = 1;
 	}
 </script>
@@ -54,6 +53,10 @@
 </div>
 {#if on}
 	<div class="klin-box" data-testid={`${idPrefix}-box`}>
+		<p class="klin-hint" data-testid={`${idPrefix}-hint`}>
+			Zadaj skutočné rozmery klina — <b>nemusí</b> byť po celej dĺžke posuvu ani mať šírku podľa
+			koľajnice.
+		</p>
 		<div class="grid2">
 			<div class="field">
 				<label for={`${idPrefix}-dlzka`}>Klín — dĺžka (mm) *</label>
@@ -65,6 +68,7 @@
 					max={KLIN_MAX_ROZMER}
 					step="any"
 					bind:value={dlzka}
+					required
 				/>
 			</div>
 			<div class="field">
@@ -77,12 +81,13 @@
 					max={KLIN_MAX_ROZMER}
 					step="any"
 					bind:value={sirka}
+					required
 				/>
 			</div>
 		</div>
 		<div class="grid3">
 			<div class="field">
-				<label for={`${idPrefix}-v1`}>Klín — výška 1 (mm)</label>
+				<label for={`${idPrefix}-v1`}>Klín — výška 1 (mm) *</label>
 				<input
 					id={`${idPrefix}-v1`}
 					name={nm('klinV1')}
@@ -91,10 +96,11 @@
 					max={KLIN_MAX_ROZMER}
 					step="any"
 					bind:value={v1}
+					required
 				/>
 			</div>
 			<div class="field">
-				<label for={`${idPrefix}-v2`}>Klín — výška 2 (mm)</label>
+				<label for={`${idPrefix}-v2`}>Klín — výška 2 (mm) *</label>
 				<input
 					id={`${idPrefix}-v2`}
 					name={nm('klinV2')}
@@ -103,6 +109,7 @@
 					max={KLIN_MAX_ROZMER}
 					step="any"
 					bind:value={v2}
+					required
 				/>
 			</div>
 			<div class="field">
@@ -122,6 +129,11 @@
 {/if}
 
 <style>
+	.klin-hint {
+		margin: 0 0 8px;
+		font-size: 12px;
+		color: #92400e;
+	}
 	.klin-box {
 		border: 1px solid #fcd34d;
 		background: #fffbeb;
