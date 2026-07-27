@@ -1,8 +1,15 @@
 // Parsovanie a serverová validácia vstupu zasklenia formulára — jediný
 // serverový strážca rozsahov (HTML5 min/max vie skriptovaný POST obísť).
 import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
+import { STANDARD, zakladnyStyl } from '$lib/styl';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
+
+/** Štandard +: štýl je LEN počet krídel; „ IZO" (starý formulár / bookmark) sa
+ *  zahodí — basic/IZO nárezák vyberá zvolené sklo (`sysStylPre`). */
+function normalizujStyl(system: string, styl: string): string {
+	return system === STANDARD ? zakladnyStyl(styl) : styl;
+}
 
 /** Kovanie krídla (kľučka) — LEN Robust (Patrik 2026-07-27). Display-only:
  *  vypíše sa do náhľadu posuvu a do detailu v histórii, do Money odpisu NEJDE.
@@ -110,7 +117,12 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
 		system: String(form.get('system') ?? '').trim(),
-		styl: String(form.get('styl') ?? '').trim(),
+		// Štandard +: štýl nesie LEN počet krídel — prípona „ IZO" zo starého
+		// formulára/bookmarku sa zahodí, basic/IZO nárezák vyberá SKLO ($lib/styl)
+		styl: normalizujStyl(
+			String(form.get('system') ?? '').trim(),
+			String(form.get('styl') ?? '').trim()
+		),
 		s: num('s'),
 		v: num('v'),
 		sklo: String(form.get('sklo') ?? '').trim(),
@@ -222,7 +234,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			});
 			const posuv: PosuvVstup = {
 				system: String(p.system ?? '').trim(),
-				styl: String(p.styl ?? '').trim(),
+				styl: normalizujStyl(String(p.system ?? '').trim(), String(p.styl ?? '').trim()),
 				s: Number.isFinite(s) ? s : 0,
 				v: Number.isFinite(v) ? v : 0,
 				sklo: String(p.sklo ?? '').trim(),

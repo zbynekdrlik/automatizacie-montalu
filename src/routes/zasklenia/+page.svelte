@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import Nahlad2D from '$lib/components/Nahlad2D.svelte';
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
+	import { stylyDoPonuky, sklaDoPonuky, sysStylPre } from '$lib/styl';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 
@@ -44,18 +46,31 @@
 	// primárny posuv (posuv 1) = ploché polia; ďalšie posuvy (zimná záhrada) v posuvyExtra.
 	// po chybe/náhľade obnov primárny z jednoposuvového ALEBO viacposuvového vstupu
 	const prim = () => form?.multiVstup?.posuvy?.[0] ?? form?.vstup ?? null;
+	// Štandard +: v ponuke sú LEN počty krídel (2K…6K, opona 2x…). Či sa ťahá basic
+	// alebo IZO nárezák, rozhoduje zvolené SKLO — Patrik 2026-07-27: „ako pri SLIDE,
+	// zvolím počet okien a podľa výberu skla mi určí, ktorý nárezák to bude ťahať".
 	const stylyForSystem = (sys: string) =>
-		data.styly.filter((x) => x.system === sys).map((x) => x.styl);
+		stylyDoPonuky(
+			sys,
+			data.styly.filter((x) => x.system === sys).map((x) => x.styl)
+		);
 	// Deluxe aj Štandard +: LEN vlastné sklá (Deluxe: Float kalené 6/10 — hrúbka
 	// vyberá kladka/klzný profil; Štandard +: Float 4/6/10 + Izolačné 4.8.4);
 	// spoločné 'ALL' sklá nemajú ich profil (musí sedieť so serverovým
 	// glassTypesForSystem, inak by formulár ponúkol sklo, ktoré server odmietne).
-	const sklaForSystem = (sys: string) =>
-		data.skla
-			.filter((g) =>
-				sys === 'Deluxe' || sys === 'Štandard +' ? g.system === sys : g.system === sys || g.system === 'ALL'
-			)
-			.map((g) => g.nazov);
+	// (a Štandard + opona nemá izolačnú skladbu → sklaDoPonuky ju odfiltruje)
+	const sklaForSystem = (sys: string, styl: string) =>
+		sklaDoPonuky(
+			sys,
+			styl,
+			data.skla
+				.filter((g) =>
+					sys === 'Deluxe' || sys === 'Štandard +'
+						? g.system === sys
+						: g.system === sys || g.system === 'ALL'
+				)
+				.map((g) => g.nazov)
+		);
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
 
 	type PosuvRow = {
@@ -157,16 +172,24 @@
 			kovaniePS = '';
 		}
 	});
+	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO)
+	let narezakHint = $derived.by(() => {
+		if (system !== 'Štandard +' || !sklo) return '';
+		const styl2 = sysStylPre(system, styl, sklo).split('|')[1];
+		return `Podľa skla sa ťahá nárezák ${system} ${styl2}.`;
+	});
 	let stylyPre = $derived(stylyForSystem(system));
 	$effect(() => {
 		if (!stylyPre.includes(styl)) styl = stylyPre[0];
 	});
-	// sklá platné pre zvolený systém (jeho vlastné + spoločné ALL)
-	let sklaPre = $derived(sklaForSystem(system));
+	// sklá platné pre zvolený systém A ŠTÝL (jeho vlastné + spoločné ALL)
+	let sklaPre = $derived(sklaForSystem(system, styl));
 	$effect(() => {
-		const chcene = prim()?.sklo;
-		// predvoľba = vždy ČÍRE sklo, ak ho systém má (Patrik); Money-neutrálne
-		sklo = chcene && sklaPre.includes(chcene) ? chcene : defaultSklo(sklaPre);
+		const zoznam = sklaPre;
+		// už zvolené sklo si drž, kým je v ponuke (zmena počtu krídel nesmie
+		// prepísať voľbu obsluhy); inak predvoľba = vždy ČÍRE, ak ho systém má
+		const chcene = untrack(() => sklo) || prim()?.sklo;
+		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam);
 	});
 
 	// viac-posuvový režim: aktívny keď je pridaný aspoň jeden ďalší posuv
@@ -213,7 +236,7 @@
 		const p = posuvyExtra[i];
 		const st = stylyForSystem(p.system);
 		if (!st.includes(p.styl)) p.styl = st[0];
-		const sk = sklaForSystem(p.system);
+		const sk = sklaForSystem(p.system, p.styl);
 		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk);
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0];
@@ -267,25 +290,25 @@
 	let b2bSirkaErr = $derived.by(() => {
 		if (!isB2B) return null;
 		const s = dimOrNull(sirka);
-		return s === null ? null : checkB2BWidth(data.styly, `${system}|${styl}`, s);
+		return s === null ? null : checkB2BWidth(data.styly, sysStylPre(system, styl, sklo), s);
 	});
 	let b2bVyskaWarn = $derived.by(() => {
 		if (!isB2B) return null;
 		const v = dimOrNull(vyska);
-		return v === null ? null : checkB2BHeight(`${system}|${styl}`, v);
+		return v === null ? null : checkB2BHeight(sysStylPre(system, styl, sklo), v);
 	});
 	let posuvB2bErrs = $derived(
 		posuvyExtra.map((p) => {
 			if (!isB2B) return null;
 			const s = dimOrNull(p.s);
-			return s === null ? null : checkB2BWidth(data.styly, `${p.system}|${p.styl}`, s);
+			return s === null ? null : checkB2BWidth(data.styly, sysStylPre(p.system, p.styl, p.sklo), s);
 		})
 	);
 	let posuvB2bWarns = $derived(
 		posuvyExtra.map((p) => {
 			if (!isB2B) return null;
 			const v = dimOrNull(p.v);
-			return v === null ? null : checkB2BHeight(`${p.system}|${p.styl}`, v);
+			return v === null ? null : checkB2BHeight(sysStylPre(p.system, p.styl, p.sklo), v);
 		})
 	);
 	// b2b nesmie spočítať pri šírkovej chybe (primárny alebo ktorýkoľvek posuv).
@@ -571,6 +594,7 @@
 					<select id="sklo" name="sklo" bind:value={sklo}>
 						{#each sklaPre as g (g)}<option>{g}</option>{/each}
 					</select>
+					{#if narezakHint}<span class="hint" data-testid="narezak-hint">{narezakHint}</span>{/if}
 				</div>
 				<div class="field">
 					<label for="otvaranie">Otváranie</label>
@@ -706,7 +730,7 @@
 					<div class="grid2">
 						<div class="field"><label for={`ps${i}-sklo`}>Sklo</label>
 							<select id={`ps${i}-sklo`} bind:value={p.sklo}>
-								{#each sklaForSystem(p.system) as g (g)}<option>{g}</option>{/each}
+								{#each sklaForSystem(p.system, p.styl) as g (g)}<option>{g}</option>{/each}
 							</select></div>
 						<div class="field"><label for={`ps${i}-otv`}>Otváranie</label>
 							<select id={`ps${i}-otv`} bind:value={p.otvaranie}>
@@ -748,7 +772,9 @@
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
-			<span class="badge">Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span>
+			<span class="badge" data-testid="plan-badge"
+				>Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span
+			>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
 		</p>
 	</div>
@@ -785,7 +811,9 @@
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
-			<span class="badge">Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span>
+			<span class="badge" data-testid="plan-badge"
+				>Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span
+			>
 		</p>
 	</div>
 
