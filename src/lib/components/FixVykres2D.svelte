@@ -34,6 +34,8 @@
 	 *  texty ostávajú čitateľné (nekreslíme cez SVG transform). */
 	const X = (mm: number) => (zrkadlo ? M.left + (r.S - mm) * scale : M.left + mm * scale);
 	const Y = (vyska: number) => base - vyska * scale;
+	/** výška konštrukcie v mieste `mm` od ľavého kraja */
+	const vyskaV = (mm: number) => r.V1 + ((r.V2 - r.V1) * mm) / r.S;
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
@@ -70,7 +72,71 @@
 	// hrana o 44·tg α VYŠŠIE, takže konštantné odsadenie by pri strmom sklone
 	// popisok znova posadilo na čiaru
 	let tupyOdsad = $derived(12 + 44 * Math.tan((r.alfa * Math.PI) / 180));
+
+
 	let yNizka = $derived(Y(Math.min(r.V1, r.V2)));
+
+	// ---- Rozmiestnenie popiskov bez prekryvov ----
+	// SVG nevie rozmiestňovať text sám: pri niektorých tvaroch si popisok uhla a
+	// dĺžka šikmej hrany krajného poľa sadli na seba (nález usera na screenshotoch).
+	// Šírku textu odhadneme z počtu znakov a dĺžku šikmej hrany posunieme POZDĹŽ
+	// hrany na prvé voľné miesto v rámci svojho poľa; keď sa nezmestí nikde,
+	// vyskočí o riadok vyššie.
+	const ZNAK = 6.1; // px na znak pri font-size 11
+	const sirkaTextu = (t: string) => t.length * ZNAK;
+	type Box = { x: number; y: number; w: number };
+	// Popisky dĺžok sú NATOČENÉ pozdĺž hrany, takže ich skutočná (osovo zarovnaná)
+	// výška rastie so sklonom: h ≈ font + šírka·sin α. Bez toho vyzerali dva
+	// popisky nad sebou oddelene, ale ich obdĺžniky sa prekrývali (chytil e2e test).
+	const vysBoxu = (w: number) => 13 + w * Math.sin((r.alfa * Math.PI) / 180);
+	const koliduje = (a: Box, b: Box) =>
+		Math.abs(a.x - b.x) < (a.w + b.w) / 2 + 7 &&
+		Math.abs(a.y - b.y) < (vysBoxu(a.w) + vysBoxu(b.w)) / 2 + 5;
+
+	// Popisky dĺžok sa natočia POZDĹŽ šikmej hrany (ako kóty v CAD) — inak dlhý
+	// text preteká cez šikmú čiaru a pri strmom sklone ju pretína.
+	let sklonTextu = $derived(
+		(r.V2 - r.V1 < 0 ? 1 : -1) * (zrkadlo ? -1 : 1) * r.alfa
+	);
+
+	let popisUhlov = $derived([
+		{ x: xVysoka + dovnutra * 52, y: yVysoka + ostryOdsad, w: sirkaTextu(fmt(r.uholOstry) + '°') },
+		{ x: xNizka - dovnutra * 44, y: yNizka - tupyOdsad, w: sirkaTextu(fmt(r.uholTupy) + '°') }
+	]);
+
+	/** popisky dĺžok šikmej hrany — jeden na pole, umiestnené tak, aby nekolidovali
+	 *  s popiskami uhlov ani medzi sebou */
+	let popisySikma = $derived.by(() => {
+		const hotove: Box[] = [...popisUhlov];
+		const out: { x: number; y: number; text: string }[] = [];
+		for (let i = 0; i < r.polia.length; i++) {
+			const p = r.polia[i];
+			const x0 = hranice[i];
+			const text = fmt(p.sikma);
+			const w = sirkaTextu(text);
+			// kandidáti: stred poľa, potom postupne bližšie ku krajom
+			let umiestneny: { x: number; y: number; text: string } | null = null;
+			for (const t of [0.5, 0.34, 0.66, 0.22, 0.78]) {
+				const mm = x0 + p.sirka * t;
+				const box = { x: X(mm), y: Y(vyskaV(mm)) - 10, w };
+				if (!hotove.some((h) => koliduje(box, h))) {
+					umiestneny = { x: box.x, y: box.y, text };
+					hotove.push(box);
+					break;
+				}
+			}
+			if (!umiestneny) {
+				// nikde sa nezmestil → o riadok vyššie nad stred poľa (výška riadku
+				// musí rátať s natočením, inak sa obdĺžniky stále dotýkajú)
+				const mm = x0 + p.sirka * 0.5;
+				const box = { x: X(mm), y: Y(vyskaV(mm)) - 12 - vysBoxu(w) - 6, w };
+				hotove.push(box);
+				umiestneny = { x: box.x, y: box.y, text };
+			}
+			out.push(umiestneny);
+		}
+		return out;
+	});
 </script>
 
 <svg
@@ -97,18 +163,22 @@
 			<line x1={X(x1)} y1={base} x2={X(x1)} y2={Y(p.vPravo)} stroke="#0f172a" stroke-width="1.6" />
 			<!-- výška na stĺpiku (vnútri konštrukcie, otočená) -->
 			<text
-				x={X(x1) - 5}
+				x={X(x1) - 9}
 				y={Y(p.vPravo / 2)}
 				text-anchor="middle"
 				font-size="11"
 				fill="#1d4ed8"
 				font-weight="600"
-				transform="rotate(-90 {X(x1) - 5} {Y(p.vPravo / 2)})">{fmt(p.vPravo)}</text
+				stroke="#fff"
+				stroke-width="3"
+				paint-order="stroke"
+				transform="rotate(-90 {X(x1) - 9} {Y(p.vPravo / 2)})">{fmt(p.vPravo)}</text
 			>
 		{/if}
 	{/each}
 
-	<!-- kóta ĽAVEJ krajnej výšky -->
+	<!-- kóta ĽAVEJ krajnej výšky (nulovú výšku nekótujeme — konštrukcia tam dobehla do ostra) -->
+	{#if r.V1 > 0}
 	<g stroke="#94a3b8" stroke-width="1" fill="none">
 		<line x1={X(0) + 26 * vonV1} y1={Y(r.V1)} x2={X(0) + 26 * vonV1} y2={base} />
 		<line x1={X(0) + 32 * vonV1} y1={Y(r.V1)} x2={X(0) + 20 * vonV1} y2={Y(r.V1)} />
@@ -124,8 +194,10 @@
 		transform="rotate(-90 {X(0) + 34 * vonV1} {(Y(r.V1) + base) / 2})"
 		data-testid="fix-v1">{fmt(r.V1)} mm</text
 	>
+	{/if}
 
 	<!-- kóta PRAVEJ krajnej výšky -->
+	{#if r.V2 > 0}
 	<g stroke="#94a3b8" stroke-width="1" fill="none">
 		<line x1={X(r.S) + 26 * vonV2} y1={Y(r.V2)} x2={X(r.S) + 26 * vonV2} y2={base} />
 		<line x1={X(r.S) + 20 * vonV2} y1={Y(r.V2)} x2={X(r.S) + 32 * vonV2} y2={Y(r.V2)} />
@@ -141,6 +213,7 @@
 		transform="rotate(-90 {X(r.S) + 34 * vonV2} {(Y(r.V2) + base) / 2})"
 		data-testid="fix-v2">{fmt(r.V2)} mm</text
 	>
+	{/if}
 
 	<!-- kóty šírok polí (nad spodnou hranou) + celková šírka pod ňou -->
 	{#each r.polia.length > 1 ? r.polia : [] as p, i (i)}
@@ -151,8 +224,15 @@
 			<line x1={xa} y1={base + 15} x2={xa} y2={base + 25} />
 			<line x1={xb} y1={base + 15} x2={xb} y2={base + 25} />
 		</g>
-		<text x={(xa + xb) / 2} y={base + 16} text-anchor="middle" font-size="11" fill="#334155"
-			>{fmt(p.sirka)}</text
+		<text
+			x={(xa + xb) / 2}
+			y={base + 16}
+			text-anchor="middle"
+			font-size="11"
+			fill="#334155"
+			stroke="#fff"
+			stroke-width="3"
+			paint-order="stroke">{fmt(p.sirka)}</text
 		>
 	{/each}
 	<g stroke="#475569" stroke-width="1" fill="none">
@@ -170,19 +250,20 @@
 		data-testid="fix-sirka">{fmt(r.S)} mm</text
 	>
 
-	<!-- šikmá hrana: dĺžky po poliach nad hranou + celková dĺžka úplne hore -->
-	{#each r.polia as p, i (i)}
-		{@const xa = X(hranice[i])}
-		{@const xb = X(hranice[i + 1])}
-		{@const ya = Y(p.vLavo)}
-		{@const yb = Y(p.vPravo)}
+	<!-- šikmá hrana: dĺžky po poliach (rozmiestnené bez prekryvov) -->
+	{#each popisySikma as p (p.text + p.x)}
 		<text
-			x={(xa + xb) / 2}
-			y={(ya + yb) / 2 - 8}
+			x={p.x}
+			y={p.y}
 			text-anchor="middle"
 			font-size="11"
 			fill="#b45309"
-			font-weight="600">{fmt(p.sikma)}</text
+			font-weight="600"
+			stroke="#fff"
+			stroke-width="3"
+			paint-order="stroke"
+			data-testid="fix-sikma-pole"
+			transform="rotate({sklonTextu} {p.x} {p.y})">{p.text}</text
 		>
 	{/each}
 	<text
@@ -197,23 +278,30 @@
 
 	<!-- uhol sklonu pri vyššej strane (ostrý uhol konštrukcie) -->
 	<text
-		x={xVysoka + dovnutra * 52}
-		y={yVysoka + ostryOdsad}
+		x={popisUhlov[0].x}
+		y={popisUhlov[0].y}
 		text-anchor="middle"
 		font-size="12"
 		font-weight="700"
 		fill="#0f766e"
+		stroke="#fff"
+		stroke-width="3"
+		paint-order="stroke"
 		data-testid="fix-uhol">{fmt(r.uholOstry)}°</text
 	>
 	<!-- Tupý uhol pri nižšej strane. Ide NAD šikmú hranu (mimo konštrukcie) — pri
 	     nízkej špičke (napr. 64,6 mm) je vnútri sotva pár pixelov a popisok by ležal
 	     na obryse; nad hranou je vždy voľno. -->
 	<text
-		x={xNizka - dovnutra * 44}
-		y={yNizka - tupyOdsad}
+		x={popisUhlov[1].x}
+		y={popisUhlov[1].y}
 		text-anchor="middle"
 		font-size="12"
 		font-weight="700"
-		fill="#0f766e">{fmt(r.uholTupy)}°</text
+		fill="#0f766e"
+		stroke="#fff"
+		stroke-width="3"
+		paint-order="stroke"
+		data-testid="fix-uhol-tupy">{fmt(r.uholTupy)}°</text
 	>
 </svg>
