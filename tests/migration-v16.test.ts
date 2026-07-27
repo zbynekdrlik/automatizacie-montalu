@@ -71,8 +71,8 @@ const row = (sysStyl: string, poradie: number) =>
 const off = (sysStyl: string, poradie: number) => row(sysStyl, poradie)?.offset;
 
 describe('reálny v15 → v16: Slide opona redukcia 6 mm = prírez − 72,4', () => {
-	it('user_version = 16', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(16);
+	it('user_version = 17', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(17);
 	});
 
 	it('redukcia šírka: offset = rámový − 72,4·N (2x3K −291,9 ; 2x2K −249,0)', () => {

@@ -69,8 +69,8 @@ const off = (sysStyl: string, poradie: number) =>
 		| undefined)?.offset;
 
 describe('reálny v13 → v14 (+v15): Slide opona rámový podľa Excelu', () => {
-	it('user_version = 16', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(16);
+	it('user_version = 17', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(17);
 	});
 
 	// v14 dala rámový na −12 (Excel stĺpec „dĺžka rezu"), v15 to opravila na stĺpec

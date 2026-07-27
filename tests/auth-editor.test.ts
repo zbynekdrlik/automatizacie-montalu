@@ -175,7 +175,7 @@ describe('editor vzorcov', () => {
 		expect(g10.hrubka).toBe(10);
 	});
 
-	it('sklá podľa systému: Robust = 4/16/4, Slide = 4/8/4 (+ Kalené oba)', () => {
+	it('sklá podľa systému: Robust = 4/16/4 + kalené, Slide = 4/8/4 + 6 mm sklá', () => {
 		const robust = glassTypesForSystem('Robust').map((g) => g.nazov);
 		const slide = glassTypesForSystem('Slide').map((g) => g.nazov);
 		expect(robust).toContain('Izolačné sklo 4/16/4 mliečne');
@@ -184,13 +184,24 @@ describe('editor vzorcov', () => {
 		expect(slide).toContain('Izolačné sklo 4/8/4 mliečne');
 		expect(slide).toContain('Izolačné sklo 4/8/4 číre');
 		expect(slide.some((n) => n.includes('4/16/4'))).toBe(false);
-		// kalené sú v oboch
+		// kalené 8/10 patria Robustu — do žiadnej Slide skladby sa nezmestia (Patrik, v17)
 		expect(robust).toContain('Kalené 8mm');
-		expect(slide).toContain('Kalené 8mm');
-		// Slide 4/8/4 číre nuluje Redukciu 6mm
+		expect(slide).not.toContain('Kalené 8mm');
+		expect(slide).not.toContain('Kalené 10mm');
+		// Slide 6 mm skladba = S redukciou (v17)
+		expect(slide).toContain('6mm číre');
+		expect(slide).toContain('6mm mliečne');
+		expect(slide).toContain('3.3.1');
+		for (const n of ['6mm číre', '6mm mliečne', '3.3.1'])
+			expect(glassTypesForSystem('Slide').find((g) => g.nazov === n)!.redukciaZero, n).toBe(false);
+		// 4/8/4 (skladba 16 mm) redukciu nuluje — obe varianty
 		expect(slide.length).toBeGreaterThan(0);
 		const cire = glassTypesForSystem('Slide').find((g) => g.nazov === 'Izolačné sklo 4/8/4 číre')!;
 		expect(cire.redukciaZero).toBe(true);
+		expect(
+			glassTypesForSystem('Slide').find((g) => g.nazov === 'Izolačné sklo 4/8/4 mliečne')!
+				.redukciaZero
+		).toBe(true);
 		// Slide 4/8/4 číre v compute vynuluje ZASP00091
 		const r = safeCompute(loadCfg(), 'Slide|2K', 3500, 2200, cire.redukciaZero).r!;
 		expect(r.odpis.find((o) => o.kod === 'ZASP00091')!.metre).toBe(0);
