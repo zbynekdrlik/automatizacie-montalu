@@ -64,3 +64,16 @@ kalené 6 mm` / `Float kalené 10 mm`, not what a transient first read may show.
 (real Money write — irreversible, `MONEY_LIVE=1`). Compute-only (`Spočítať`/`Späť`) and
 the `/pouzivatelia` create+delete of a clearly-named throwaway B2B account are the
 sanctioned live checks — the users table is not Money. Always delete the throwaway after.
+
+**Svelte prehltne medzeru okolo `{#if}` v texte — oddeľovač píš do VÝRAZU.** Zápis
+`{fmtSkloRozmer(s, v)}{#if nazov} · {nazov}{/if}` sa skompiluje bez medzery pred bodkou
+(naživo vyšlo `2115mm· Izolačné sklo …`). Reťazenie textu s podmienenou časťou rob
+výrazom: `{fmt(s, v) + (nazov ? ` · ${nazov}` : '')}`. Chytilo to len e2e s presným
+regexom na celý text bunky (`/^\d+mm × \d+mm · /`) — `toContainText` by to prepustilo,
+takže formátovacie požiadavky dielne testuj na CELÝ string, nie na podreťazec.
+
+**Text v SVG náhľade sa NEZALAMUJE sám.** Kovanie/popisky v `Nahlad2D.svelte` si lámu
+riadky vlastnou funkciou (`wrapKov`) podľa šírky poľa, takže jedna logická veta môže byť
+vo viacerých `<text>` prvkoch. Dôsledok pre e2e: `toContainText('bez FAB')` je krehké
+(fráza môže byť rozdelená na dva riadky) — testuj jednotlivé slová (`'bez'`, `'FAB'`),
+prípadne `not.toContainText('bez')` na odlíšenie variant „s FAB" / „bez FAB".
