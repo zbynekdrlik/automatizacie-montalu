@@ -7,6 +7,7 @@ import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib
 import { safeCompute, safeComputeMulti } from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
+import { sysStylPre, sklaDoPonuky } from '$lib/styl';
 import {
 	writeOdpis,
 	isLive,
@@ -58,17 +59,25 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 	};
 }
 
+/** Sklo musí patriť k systému AJ k štýlu (Štandard + opona nemá izolačnú skladbu). */
+function skloPre(system: string, styl: string, sklo: string) {
+	const platne = glassTypesForSystem(system);
+	const povolene = sklaDoPonuky(system, styl, platne.map((g) => g.nazov));
+	return povolene.includes(sklo) ? (platne.find((g) => g.nazov === sklo) ?? null) : null;
+}
+
 function compute(vstup: Vstup) {
 	// sklo musí patriť k zvolenému systému (Robust = 4/16/4, Slide = 4/8/4) —
 	// nedá sa cez skriptovaný POST poslať cudzie sklo
-	const g = glassTypesForSystem(vstup.system).find((x) => x.nazov === vstup.sklo);
-	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém.' };
+	const g = skloPre(vstup.system, vstup.styl, vstup.sklo);
+	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém a štýl.' };
 	const cfg = loadCfg();
 	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
 	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
+	// sysStylPre: v Štandard + vyberá basic/IZO nárezák ZVOLENÉ SKLO (Patrik)
 	return safeCompute(
 		cfg,
-		vstup.system + '|' + vstup.styl,
+		sysStylPre(vstup.system, vstup.styl, vstup.sklo),
 		vstup.s,
 		vstup.v,
 		g.redukciaZero,
@@ -83,10 +92,11 @@ function computeMultiFrom(vstup: MultiVstup) {
 	const specs: PosuvSpec[] = [];
 	for (let i = 0; i < vstup.posuvy.length; i++) {
 		const p = vstup.posuvy[i];
-		const g = glassTypesForSystem(p.system).find((x) => x.nazov === p.sklo);
-		if (!g) return { r: null, err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém.` };
+		const g = skloPre(p.system, p.styl, p.sklo);
+		if (!g)
+			return { r: null, err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.` };
 		specs.push({
-			sysStyl: p.system + '|' + p.styl,
+			sysStyl: sysStylPre(p.system, p.styl, p.sklo),
 			S: p.s,
 			V: p.v,
 			redukciaZero: g.redukciaZero,
@@ -163,7 +173,7 @@ export const actions: Actions = {
 		let heightWarn: string | undefined;
 		if (isB2B(locals.user)) {
 			const cfg = loadCfg();
-			const sysStyl = `${vstup.system}|${vstup.styl}`;
+			const sysStyl = sysStylPre(vstup.system, vstup.styl, vstup.sklo);
 			const wErr = checkB2BWidth(cfg, sysStyl, vstup.s);
 			if (wErr) return { step: 'form' as const, error: wErr, vstup };
 			heightWarn = checkB2BHeight(sysStyl, vstup.v) ?? undefined;
@@ -265,7 +275,7 @@ export const actions: Actions = {
 			const cfg = loadCfg();
 			const warns: string[] = [];
 			for (const p of vstup.posuvy) {
-				const sysStyl = `${p.system}|${p.styl}`;
+				const sysStyl = sysStylPre(p.system, p.styl, p.sklo);
 				const wErr = checkB2BWidth(cfg, sysStyl, p.s);
 				if (wErr) return { step: 'form' as const, error: wErr, multiVstup: vstup };
 				const hW = checkB2BHeight(sysStyl, p.v);

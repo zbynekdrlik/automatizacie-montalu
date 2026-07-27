@@ -190,7 +190,8 @@ test('Štandard + 2K IZO: normálna koľajnica + „prídavná koľajnica" check
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Standard Plus');
 	await page.getByLabel('Systém').selectOption('Štandard +');
-	await page.getByLabel('Štýl').selectOption('2K IZO');
+	// IZO nárezák vyberá SKLO (Patrik 2026-07-27) — štýl nesie len počet krídel
+	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4.8.4');
