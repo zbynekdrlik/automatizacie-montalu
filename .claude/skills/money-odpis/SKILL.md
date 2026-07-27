@@ -22,6 +22,45 @@ ssh -i ~/.ssh/slovnormal_odoo root@erp.montalu.cloud '/opt/montalu-sync/venv/bin
 0-sklad kód NEBLOKUJE odpis (napr. nosový ZASP00010) — dôležité je, že je to SPRÁVNY
 aktuálny článok, nie sklad.
 
+**Rovnaký NÁZOV profilu existuje vo viacerých systémoch — rozlišuj podľa `Model_UserData`.**
+Money má napr. DVA „Oponový profil surový 7500 mm": `ZASP00006` s `Model_UserData =
+'Zasklenie Robust'` (FINAL, 2021) a `ZASP20249` s `'Zasklenie Slide'` (Cortizo, 2024).
+Kontrola „kód existuje + názov sedí" to NEODHALÍ — Slide opona roky odpisovala robustový
+článok, lebo bola z Robustu odvodená (v15, 2026-07-27). Preto pri každom kóde vyber aj
+`Model_UserData` a over, že sedí so SYSTÉMOM, do ktorého kód dávaš:
+```sql
+SELECT Kod, Nazev, Model_UserData FROM Artikly_Artikl WHERE Nazev LIKE N'%Oponový%' AND Deleted=0
+```
+Pri odvodení nového štýlu z iného systému prejdi CELÝ jeho BOM a pre KAŽDÝ kód over model —
+odvodenie prenesie kódy zdrojového systému aj tam, kde cieľový má vlastný článok.
+
+## 1b. Excely od Dominika: „rozmer" ≠ „dĺžka rezu" — a referencia vs. ručná hodnota
+
+Nárezové Excely majú na TEN ISTÝ profil dva rôzne stĺpce a zámena je Money-chyba:
+
+| stĺpec | hlavička | čo to je | použi na |
+|---|---|---|---|
+| `E` | **rozmer** | dĺžka, ktorú dielňa REŽE | rez + náš `cfg_rez.offset` |
+| `Q` | dĺžka rezu | vstup do odpisových stĺpcov `P..V` (tyče) | NIČ — býva zastaraný |
+
+Príklad (Slide opona 2x3K): `E14 = (B6+142,5)/D10` vs `Q14 = (B6−12)/D10`; `E15 = C6−67`
+vs `Q15 = C6−65`. Migrácia v14 vzala `Q` → dielňa hlásila „reže sa 857, appka píše 831".
+
+**Ako poznať, ktorý stĺpec je aktuálny:** pozri, či je hodnota REFERENCIA alebo ručné
+číslo. Dominik pri úprave prepíše `E`; riadky, ktoré si `Q` berú referenciou (`Q18 = =E15`)
+sa doladia samé, riadky s ručne zadanou konštantou v `Q` (`=C6−65`) zostanú staré.
+**Referencia = aktuálne, ručná konštanta v odpisovom stĺpci = podozrenie na leftover.**
+Krížová kontrola: rámový `rozmer` musí vyjsť `sklo + skloOffset` (83) — ak to sedí so už
+overeným sklo vzorcom, čítaš správny stĺpec.
+
+Dump Excelu vždy DVAKRÁT — raz so vzorcami, raz s hodnotami:
+```python
+openpyxl.load_workbook(f, data_only=False)  # vzorce (vidno referencie vs konštanty)
+openpyxl.load_workbook(f, data_only=True)   # vypočítané hodnoty
+```
+A po oprave over 1:1 nielen dĺžky rezov, ale aj **počty tyčí** proti Excelu (stĺpec `V`) —
+to je jediné, čo priamo overí Money odpis.
+
 ## 2. Celé tyče + per-profil dĺžka → guard na kus dlhší než tyč
 
 Odpis = `tyče × dĺžka_tyče / 1000` (celé tyče, `compute.ts`). Dĺžka tyče je **per-profil**
