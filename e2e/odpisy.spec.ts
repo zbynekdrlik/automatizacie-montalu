@@ -2,15 +2,10 @@
 // (?next=) a predvyplnenie mena. Trieda navigačných/stavových bugov + Money-
 // kritické uvoľnenie. Nula console errors všade.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, E2E_USER, E2E_PASS } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated, skipAkLive, E2E_USER, E2E_PASS } from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
 
-async function skipAkLive(page: import('@playwright/test').Page) {
-	const res = await page.request.get('/health');
-	const { live } = (await res.json()) as { live: boolean };
-	test.skip(live === true, 'LIVE nasadenie (MONEY_LIVE=1) — zápisové E2E preskočené');
-}
 
 test('odpisy: uvoľnenie dovolí poslať tú istú ZAK+OP znova (celý UI tok)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);

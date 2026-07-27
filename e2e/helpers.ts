@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /** Zbiera console errors/warnings — každý test na konci overí, že je prázdne. */
 export function collectConsole(page: Page): string[] {
@@ -27,6 +27,14 @@ export async function waitHydrated(page: Page) {
 export async function goto(page: Page, path: string) {
 	await page.goto(path);
 	await waitHydrated(page);
+}
+
+/** TVRDÁ POISTKA: zápisové testy sa NIKDY nespúšťajú proti LIVE nasadeniu —
+ * testovací odpis nesmie skončiť v ostrom Money importe. */
+export async function skipAkLive(page: Page) {
+	const res = await page.request.get('/health');
+	const { live } = (await res.json()) as { live: boolean };
+	test.skip(live === true, 'LIVE nasadenie (MONEY_LIVE=1) — zápisové E2E preskočené');
 }
 
 export async function loginAs(page: Page, user = E2E_USER, pass = E2E_PASS) {

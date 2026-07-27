@@ -199,4 +199,30 @@ describe('copy-back pre Solid Edge', () => {
 	it('fmtBars formát', () => {
 		expect(fmtBars({ 4500: 1, 6000: 2, 7500: 0 })).toBe('1(4,5m) 2(6m)');
 	});
+
+	// „📋 Kopírovať počet tyčí" kopíruje POSLEDNÝ STĹPEC — jeden riadok na kód v
+	// poradí zobrazenej karty. Kontrakt je poradie + počet riadkov: keby sa
+	// rozišli, vložený stĺpec by v Solid Edge sadol na iné profily.
+	it('cadLastCol = barsStr riadky spojené \\n, presne v poradí copyLines', () => {
+		const r = transform(BARTONICEK);
+		const { lines } = buildCopyBack(BARTONICEK, r, new Map());
+		const cadLastCol = lines.map((l) => l.barsStr).join('\n');
+		expect(cadLastCol.split('\n').length).toBe(lines.length);
+		expect(cadLastCol).toBe(
+			[
+				'9(7,5m)', // 18004
+				'2(7,5m)', // 18005
+				'9(7,5m)', // 18006
+				'7(7,5m)', // 18007
+				'2(7,5m)', // 18008
+				'1(7,5m)', // 18013
+				'2(7,5m)', // 18016
+				'1(6m)', // 18019
+				'1(6m)' // 18021
+			].join('\n')
+		);
+		// prvý a posledný riadok stĺpca patria prvému a poslednému kódu karty
+		expect(cadLastCol.split('\n')[0]).toBe(lines[0].barsStr);
+		expect(cadLastCol.split('\n').at(-1)).toBe(lines.at(-1)!.barsStr);
+	});
 });

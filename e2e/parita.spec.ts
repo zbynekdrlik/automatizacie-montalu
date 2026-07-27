@@ -1,15 +1,10 @@
 // E2E parity moduly: Bazén (kontrola množstiev), Pergola (CAD → Money + tyče
 // + kombinácie), Nahlásiť problém. Nula console errors všade.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
 
-async function skipAkLive(page: import('@playwright/test').Page) {
-	const res = await page.request.get('/health');
-	const { live } = (await res.json()) as { live: boolean };
-	test.skip(live === true, 'LIVE nasadenie (MONEY_LIVE=1) — zápisové E2E preskočené');
-}
 
 test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporná úprava sa odmietne', async ({
 	page
