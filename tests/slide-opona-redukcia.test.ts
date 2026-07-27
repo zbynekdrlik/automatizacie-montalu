@@ -42,6 +42,10 @@ describe('Slide opona — redukcia 6 mm = prírez − 72,4 (obe dimenzie)', () =
 	});
 
 	it('rozdiel redukcia vs rámový je PRESNE 72,4 mm v oboch dimenziách a pre oba štýly', () => {
+		// `rezy[].rozmer` je zobrazená (zaokrúhlená) hodnota — na overenie desatinného
+		// rozdielu treba NEZAOKRÚHLENÉ dĺžky kusov, ktoré idú do balenia (`kusy[].dlzka`)
+		const dlzky = (m: { kusy: { dlzka: number }[] }) =>
+			[...new Set(m.kusy.map((k) => k.dlzka))].sort((a, b) => a - b);
 		for (const styl of ['2x2K', '2x3K']) {
 			for (const [S, V] of [
 				[5000, 2200],
@@ -49,13 +53,11 @@ describe('Slide opona — redukcia 6 mm = prírez − 72,4 (obe dimenzie)', () =
 				[6940, 2200]
 			]) {
 				const p = plan(styl, S, V);
-				const ram = p.material.find((m) => m.kod === 'ZASP00088')!;
-				const red = p.material.find((m) => m.kod === 'ZASP00091')!;
-				for (let i = 0; i < 2; i++)
-					expect(ram.rezy[i].rozmer - red.rezy[i].rozmer, `${styl} ${S}×${V} dim${i}`).toBeCloseTo(
-						72.4,
-						6
-					);
+				const ram = dlzky(p.material.find((m) => m.kod === 'ZASP00088')!);
+				const red = dlzky(p.material.find((m) => m.kod === 'ZASP00091')!);
+				expect(red.length, `${styl} ${S}×${V}`).toBe(ram.length);
+				for (let i = 0; i < ram.length; i++)
+					expect(ram[i] - red[i], `${styl} ${S}×${V} dim${i}`).toBeCloseTo(72.4, 6);
 			}
 		}
 	});
