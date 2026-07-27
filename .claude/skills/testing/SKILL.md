@@ -8,6 +8,12 @@ npx vitest run          # unit tests (or npm test for coverage)
 npx playwright test     # E2E — see the build gotcha below
 ```
 
+**NEPÚŠŤAJ `npx prettier --write`.** Repo nemá prettier ani ako dev-dependenciu, ani
+`.prettierrc` — `npx` stiahne čerstvý prettier s DEFAULTMI (2 medzery, dvojité úvodzovky)
+a prepíše celý súbor mimo štýlu repa (taby + jednoduché úvodzovky). Formátovanie nie je
+v CI gate, tak píš rovno v štýle okolitého kódu; ak sa to už stalo, súbor prepíš späť
+(nový súbor sa nedá `git checkout`-núť).
+
 ## E2E without `BASE_URL` needs a FRESH `npm run build` first — stale preview = false failures
 
 `playwright.config.ts`'s `webServer` (when `BASE_URL` is unset) runs `npm run preview`

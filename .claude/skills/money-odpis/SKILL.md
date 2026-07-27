@@ -96,6 +96,14 @@ DB konverguje s cfg_seed; na PROD upgrade ceste ho pridá až `vN` blok s `hasSy
 (žiadny dupel). Maj test na OBE (`migration-vN.test.ts` = upgrade, `migration-fresh-db.test.ts`
 = fresh) — inak sa rozíde len jedna cesta a CI to nechytí.
 
+**`sysStyl` NIE je vždy `system + '|' + styl`** — od v0.6.34 ho odvodzuje `sysStylPre()`
+v `src/lib/styl.ts` (jediný zdroj pravdy pre klienta AJ server): pri **Štandard +** nesie
+štýl len počet krídel a basic/IZO nárezák vyberá SKLO (`Izolačné …` → `N IZO`; opona `2x…`
+IZO variant nemá). Keď skladáš `sysStyl` na novom mieste (výpočet, b2b limit, filename),
+volaj `sysStylPre`, nikdy nelep reťazec ručne — inak sa tá cesta bude riadiť iným nárezákom
+než formulár ukazuje. Ponuky do formulára: `stylyDoPonuky` / `sklaDoPonuky` z toho istého
+modulu. Ostatné systémy sú 1:1, takže funkcia je bezpečná všade.
+
 ## 3c. Zdieľané Money kódy NAPRIEČ systémami — invariant pre pooling
 
 Do Štandard + boli systémy kódovo DISJUNKTNÉ; Štandard + je PRVÝ, čo zdieľa kódy s iným
