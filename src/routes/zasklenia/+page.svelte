@@ -3,6 +3,7 @@
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
+	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
 
 	let { data, form } = $props();
 
@@ -27,6 +28,8 @@
 			sklo: form?.vstup?.sklo ?? '',
 			skloPresne: form?.vstup?.skloPresne ?? '',
 			otvaranie: form?.vstup?.otvaranie ?? 'P - L',
+			kovanieL: form?.vstup?.kovanieL ?? '',
+			kovanieP: form?.vstup?.kovanieP ?? '',
 			vrtanieZamku: form?.vstup?.vrtanieZamku ?? 1050,
 			poznamka: zd?.poznamka ?? '',
 			ral: zd?.ral ?? '',
@@ -59,6 +62,8 @@
 		v: number | string;
 		sklo: string;
 		otvaranie: string;
+		kovanieL: string;
+		kovanieP: string;
 	};
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
@@ -75,6 +80,9 @@
 	let styl = $state('2K');
 	let sklo = $state('');
 	let otvaranie = $state('P - L');
+	// kovanie (kľučka) ľavej/pravej strany — len Robust, len na plán/náhľad
+	let kovanieLS = $state('');
+	let kovaniePS = $state('');
 	let sirka = $state<number | string>('');
 	let vyska = $state<number | string>('');
 	let vrtanieZamkuS = $state<number | string>(1050);
@@ -94,6 +102,8 @@
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
 		otvaranie = p?.otvaranie ?? 'P - L';
+		kovanieLS = p?.kovanieL ?? '';
+		kovaniePS = p?.kovanieP ?? '';
 		sirka = (p?.s as number | string) ?? '';
 		vyska = (p?.v as number | string) ?? '';
 		posuvyExtra = (form?.multiVstup?.posuvy ?? []).slice(1).map((x) => ({ ...x }));
@@ -105,6 +115,15 @@
 		if (jeOpona) otvaranie = 'Opona';
 		else if (!otvaraniaPre.includes(otvaranie)) otvaranie = otvaraniaPre[0];
 	});
+	// kovanie je zatiaľ len robustové — pri inom systéme voľbu zahoď (aj v JSON-e
+	// posuvov), nech sa na plán nedostane kovanie k systému, ktorý ho neponúka
+	let jeRobust = $derived(system === 'Robust');
+	$effect(() => {
+		if (!jeRobust) {
+			kovanieLS = '';
+			kovaniePS = '';
+		}
+	});
 	let stylyPre = $derived(stylyForSystem(system));
 	$effect(() => {
 		if (!stylyPre.includes(styl)) styl = stylyPre[0];
@@ -113,7 +132,8 @@
 	let sklaPre = $derived(sklaForSystem(system));
 	$effect(() => {
 		const chcene = prim()?.sklo;
-		sklo = chcene && sklaPre.includes(chcene) ? chcene : sklaPre[0];
+		// predvoľba = vždy ČÍRE sklo, ak ho systém má (Patrik); Money-neutrálne
+		sklo = chcene && sklaPre.includes(chcene) ? chcene : defaultSklo(sklaPre);
 	});
 
 	// viac-posuvový režim: aktívny keď je pridaný aspoň jeden ďalší posuv
@@ -121,14 +141,16 @@
 	// celý zoznam posuvov (primárny + ďalšie) → JSON pre multi submit
 	let posuvyJSON = $derived(
 		JSON.stringify([
-			{ system, styl, s: sirka, v: vyska, sklo, otvaranie },
+			{ system, styl, s: sirka, v: vyska, sklo, otvaranie, kovanieL: kovanieLS, kovanieP: kovaniePS },
 			...posuvyExtra.map((p) => ({
 				system: p.system,
 				styl: p.styl,
 				s: p.s,
 				v: p.v,
 				sklo: p.sklo,
-				otvaranie: p.otvaranie
+				otvaranie: p.otvaranie,
+				kovanieL: p.kovanieL,
+				kovanieP: p.kovanieP
 			}))
 		])
 	);
@@ -138,12 +160,19 @@
 		const st = stylyForSystem(p.system);
 		if (!st.includes(p.styl)) p.styl = st[0];
 		const sk = sklaForSystem(p.system);
-		if (!sk.includes(p.sklo)) p.sklo = sk[0];
+		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk);
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0];
+		if (p.system !== 'Robust') {
+			p.kovanieL = '';
+			p.kovanieP = '';
+		}
 	}
 	function addPosuv() {
-		posuvyExtra = [...posuvyExtra, { system, styl, s: '', v: '', sklo, otvaranie }];
+		posuvyExtra = [
+			...posuvyExtra,
+			{ system, styl, s: '', v: '', sklo, otvaranie, kovanieL: kovanieLS, kovanieP: kovaniePS }
+		];
 		fixPosuv(posuvyExtra.length - 1);
 	}
 	function removePosuv(i: number) {
@@ -207,6 +236,8 @@
 	<input type="hidden" name="sklo" value={vstup.sklo} />
 	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
+	<input type="hidden" name="kovanieL" value={vstup.kovanieL} />
+	<input type="hidden" name="kovanieP" value={vstup.kovanieP} />
 	<input type="hidden" name="vrtanieZamku" value={vstup.vrtanieZamku} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 	<input type="hidden" name="ral" value={vstup.ral} />
@@ -249,7 +280,7 @@
 
 	<div class="card">
 		<div class="sec">Náhľad</div>
-		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} />
+		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} />
 	</div>
 
 	<div class="card">
@@ -259,6 +290,7 @@
 			<div><span>Výška</span><b data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
 			<div><span>Počet</span><b>{p.sklo.pocet} ks</b></div>
 			<div><span>Typ</span><b style="font-size:13px">{vstup.skloPresne || vstup.sklo}</b></div>
+			<div><span>Rozmer (na objednávku skla)</span><b data-testid="sklo-rozmer">{fmtSkloRozmer(p.sklo.sirka, p.sklo.vyska)}</b></div>
 		</div>
 	</div>
 
@@ -319,7 +351,12 @@
 						<td class="c"><b>Posuv {i + 1}</b></td>
 						<td>{pv.system} {pv.styl}</td>
 						<td>{pv.S} × {pv.V} mm</td>
-						<td>{pv.sklo.sirka} × {pv.sklo.vyska}{#if pv.skloNazov} · {pv.skloNazov}{/if}</td>
+						<!-- oddeľovač je v BUNKE ako výraz — `{#if} · {/if}` by o medzeru pred
+						     bodkou prišlo pri kompilácii (zachytil e2e: „2115mm· Izolačné") -->
+						<td data-testid={`posuv-sklo-${i}`}
+							>{fmtSkloRozmer(pv.sklo.sirka, pv.sklo.vyska) +
+								(pv.skloNazov ? ` · ${pv.skloNazov}` : '')}</td
+						>
 						<td>{pv.otvaranie ?? ''}</td>
 					</tr>
 				{/each}
@@ -333,7 +370,7 @@
 			{#each m.posuvy as pv, i (i)}
 				<div class="posuv-nahlad">
 					<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
-					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} />
+					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} kovanieL={pv.kovanieL ?? ''} kovanieP={pv.kovanieP ?? ''} />
 				</div>
 			{/each}
 		</div>
@@ -442,6 +479,26 @@
 					{#if jeOpona}<span class="hint">Pri 2× štýle je otváranie vždy opona (od stredu).</span>{/if}
 				</div>
 			</div>
+			<!-- Kovanie (kľučka) — LEN Robust; ľavá aj pravá strana zvlášť, pri každom
+			     posuve sólo. Display-only: plán/náhľad + detail v histórii, Money NIE. -->
+			{#if jeRobust}
+				<div class="grid2">
+					<div class="field">
+						<label for="kovanieL">Kovanie — ľavá strana</label>
+						<select id="kovanieL" name="kovanieL" bind:value={kovanieLS}>
+							<option value="">—</option>
+							{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
+						</select>
+					</div>
+					<div class="field">
+						<label for="kovanieP">Kovanie — pravá strana</label>
+						<select id="kovanieP" name="kovanieP" bind:value={kovaniePS}>
+							<option value="">—</option>
+							{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
+						</select>
+					</div>
+				</div>
+			{/if}
 			{#if system === 'Deluxe'}
 				<div class="field">
 					<label for="vrtanieZamku">Výška vŕtania zámku (mm) — otvory ⌀46 na krajných sklách</label>
@@ -543,6 +600,20 @@
 								{#each otvaraniaForStyl(p.styl) as o (o)}<option>{o}</option>{/each}
 							</select></div>
 					</div>
+					{#if p.system === 'Robust'}
+						<div class="grid2">
+							<div class="field"><label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
+								<select id={`ps${i}-kovl`} bind:value={p.kovanieL}>
+									<option value="">—</option>
+									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
+								</select></div>
+							<div class="field"><label for={`ps${i}-kovp`}>Kovanie — pravá strana</label>
+								<select id={`ps${i}-kovp`} bind:value={p.kovanieP}>
+									<option value="">—</option>
+									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
+								</select></div>
+						</div>
+					{/if}
 				</div>
 			{/each}
 			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>

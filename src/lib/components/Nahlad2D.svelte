@@ -2,6 +2,7 @@
 	// 2D náhľad zasklenia — čelný pohľad: N posuvných polí v ráme, kótovanie
 	// celkovej šírky/výšky a rozmeru skla, kaskáda krídel v reze.
 	import { overlapMm } from '$lib/cut';
+	import { fmtSkloRozmer } from '$lib/sklo';
 	let {
 		S,
 		V,
@@ -10,7 +11,9 @@
 		skloV,
 		otvaranie = '',
 		system = '',
-		vrtanieZamku = 1050
+		vrtanieZamku = 1050,
+		kovanieL = '',
+		kovanieP = ''
 	}: {
 		S: number;
 		V: number;
@@ -22,6 +25,10 @@
 		system?: string;
 		/** výška vŕtania zámku (mm od spodku skla) — len Deluxe; do náhľadu + tlače */
 		vrtanieZamku?: number;
+		/** kovanie ĽAVEJ strany (kľučka) — vypíše sa do KRAJNÉHO ĽAVÉHO krídla */
+		kovanieL?: string;
+		/** kovanie PRAVEJ strany (kľučka) — vypíše sa do KRAJNÉHO PRAVÉHO krídla */
+		kovanieP?: string;
 	} = $props();
 
 	const W = 760; // šírka kresby v px
@@ -90,6 +97,59 @@
 	});
 
 	const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
+
+	// Kovanie krídla (kľučka) sa vypisuje DO krajných krídel — ľavé do prvého poľa,
+	// pravé do posledného (tak, ako to nakreslil Patrik 2026-07-27). SVG nevie
+	// zalamovať text, takže si ho zalomíme sami podľa šírky poľa.
+	const KOV_FONT = 12;
+	const KOV_LINE = 15;
+	function wrapKov(text: string, boxW: number): string[] {
+		const max = Math.max(8, Math.floor((boxW - 14) / (KOV_FONT * 0.52)));
+		const out: string[] = [];
+		let line = '';
+		for (const w of text.split(/\s+/).filter(Boolean)) {
+			if (!line) line = w;
+			else if (line.length + 1 + w.length <= max) line += ' ' + w;
+			else {
+				out.push(line);
+				line = w;
+			}
+		}
+		if (line) out.push(line);
+		return out;
+	}
+	// blok riadkov vycentrovaný na zadanú výšku (podiel výšky okna). Pri nízkom
+	// a širokom okne je h v px malé, takže blok clampneme, aby nepreliezol nápis
+	// s rozmerom skla (ten je na h/2 v prvom poli) ani rám poľa.
+	const kovBlok = (
+		text: string,
+		poleIdx: number,
+		podiel: number,
+		limit: { poslednyMax?: number; prvyMin?: number } = {}
+	) => {
+		const lines = wrapKov(text, panelW);
+		const blokH = (lines.length - 1) * KOV_LINE;
+		let y0 = M.top + h * podiel - blokH / 2;
+		if (limit.poslednyMax !== undefined) y0 = Math.min(y0, limit.poslednyMax - blokH);
+		if (limit.prvyMin !== undefined) y0 = Math.max(y0, limit.prvyMin);
+		y0 = Math.max(y0, M.top + frame + KOV_FONT); // ostaň v skle
+		return {
+			cx: M.left + poleIdx * panelW + panelW / 2,
+			lines: lines.map((t, i) => ({ t, y: y0 + i * KOV_LINE }))
+		};
+	};
+	// ľavé kovanie ide NAD rozmer skla (ten je v prvom poli), pravé na stred
+	// posledného poľa; pri jednom krídle sa pravé posunie POD rozmer skla
+	let kovL = $derived(
+		kovanieL ? kovBlok(kovanieL, 0, 0.34, { poslednyMax: M.top + h / 2 - 22 }) : null
+	);
+	let kovP = $derived(
+		kovanieP
+			? N > 1
+				? kovBlok(kovanieP, N - 1, 0.44)
+				: kovBlok(kovanieP, 0, 0.72, { prvyMin: M.top + h / 2 + 26 })
+			: null
+	);
 
 	// Deluxe zámkové otvory D46: ⌀46 mm, 50 mm od kraja skla, na KRAJNÝCH sklách
 	// (ľavé pole pri ľavej hrane, pravé pole pri pravej). Výška vŕtania od spodku
@@ -197,10 +257,32 @@
 		<text x={z.cx} y={z.cy + z.r + 21} text-anchor="middle" font-size="9" fill="#334155">v {fmt(vrtanieZamku)}</text>
 	{/each}
 
-	<!-- rozmer skla v prvom poli -->
+	<!-- kovanie (kľučka) v krajných krídlach — ľavé a pravé zvlášť -->
+	{#if kovL}
+		<g data-testid="kovanie-l">
+			{#each kovL.lines as ln (ln.y)}
+				<text x={kovL.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
+			{/each}
+		</g>
+	{/if}
+	{#if kovP}
+		<g data-testid="kovanie-p">
+			{#each kovP.lines as ln (ln.y)}
+				<text x={kovP.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
+			{/each}
+		</g>
+	{/if}
+
+	<!-- rozmer skla v prvom poli — s jednotkami hneď za číslom (kopíruje sa do objednávky skla) -->
 	<text x={M.left + panelW / 2} y={M.top + h / 2 - 8} text-anchor="middle" font-size="12" fill="#1d4ed8" font-weight="600">sklo</text>
-	<text x={M.left + panelW / 2} y={M.top + h / 2 + 9} text-anchor="middle" font-size="12" fill="#1d4ed8" font-weight="700"
-		>{fmt(skloS)} × {fmt(skloV)}</text
+	<text
+		x={M.left + panelW / 2}
+		y={M.top + h / 2 + 9}
+		text-anchor="middle"
+		font-size="12"
+		fill="#1d4ed8"
+		font-weight="700"
+		data-testid="nahlad-sklo-rozmer">{fmtSkloRozmer(skloS, skloV)}</text
 	>
 
 	<!-- kaskáda krídel v reze zhora (rámček cez šírku okna) — nahrádza šípku otvárania -->

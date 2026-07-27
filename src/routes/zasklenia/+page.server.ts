@@ -17,7 +17,14 @@ import {
 	type OdpisJob
 } from '$lib/server/money';
 import type { ComputeResult, MultiResult, PosuvSpec } from '$lib/server/compute';
-import { parseVstup, parseMultiVstup, OTVARANIA, type Vstup, type MultiVstup } from '$lib/server/vstup';
+import {
+	parseVstup,
+	parseMultiVstup,
+	OTVARANIA,
+	KOVANIA,
+	type Vstup,
+	type MultiVstup
+} from '$lib/server/vstup';
 
 function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 	return {
@@ -40,6 +47,9 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 			sklo: vstup.skloPresne || vstup.sklo,
 			skloZaklad: vstup.sklo,
 			otvaranie: vstup.otvaranie,
+			// kovanie (kľučky) — len záznam do histórie/plánu, do Money položiek nejde
+			kovanieL: vstup.kovanieL,
+			kovanieP: vstup.kovanieP,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral
 		}
@@ -81,6 +91,8 @@ function computeMultiFrom(vstup: MultiVstup) {
 			skloHrubka: g.hrubka,
 			otvaranie: p.otvaranie,
 			sklo: p.sklo,
+			kovanieL: p.kovanieL,
+			kovanieP: p.kovanieP,
 			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
 			pridavnaKolajnica: vstup.pridavnaKolajnica
 		});
@@ -113,7 +125,9 @@ function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): Odpi
 				s: p.S,
 				v: p.V,
 				sklo: vstup.posuvy[i]?.sklo,
-				otvaranie: p.otvaranie
+				otvaranie: p.otvaranie,
+				kovanieL: vstup.posuvy[i]?.kovanieL,
+				kovanieP: vstup.posuvy[i]?.kovanieP
 			}))
 		}
 	};
@@ -129,6 +143,8 @@ export const load: PageServerLoad = async () => {
 		// systém (Robust = 4/16/4, Slide = 4/8/4)
 		skla: listGlassTypes().map((g) => ({ nazov: g.nazov, system: g.system })),
 		otvarania: OTVARANIA,
+		// kovanie krídla — zoznam pre selecty (len Robust), display-only
+		kovania: KOVANIA,
 		live: isLive()
 	};
 };
