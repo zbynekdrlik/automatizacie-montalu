@@ -47,7 +47,7 @@ const { writeOdpis } = await import('../src/lib/server/money');
 describe('migrácia odpis_log v1 → v2/v3', () => {
 	it('user_version = 9 a dáta prežili s modul=zasklenia + detail JSON', () => {
 		// v1 DB prejde VŠETKÝMI migráciami po import db.ts (naposledy v9 Štandard +).
-		expect(db.pragma('user_version', { simple: true })).toBe(17);
+		expect(db.pragma('user_version', { simple: true })).toBe(18);
 		const row = db
 			.prepare('SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?')
 			.get('ZAK-MIG-1') as Record<string, unknown>;
@@ -94,13 +94,13 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		// 5K horná koľajnica = 6000mm tyč (Money-kritické)
 		expect(db.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202434'").get()).toEqual({ d: 6000 });
 		// migrované Robust/Slide riadky = default 7500 tyč + sklo_hrubka 0 (žiadna regresia).
-		// Štandard + (v9, pridaný neskôr) LEGITÍMNE má vlastné 3600mm-tyčové profily
-		// (kladkový prírez, IZO U profil) — vylúčený z tejto v7-scoped kontroly, ktorá
-		// overuje LEN Robust/Slide po Deluxe migrácii, nie Štandard +.
+		// Štandard + (v9) aj starší Štandard (v18) LEGITÍMNE majú vlastné 3600mm-tyčové
+		// profily (kladkový prírez, IZO U profil) — vylúčené z tejto v7-scoped kontroly,
+		// ktorá overuje LEN Robust/Slide po Deluxe migrácii.
 		expect(
 			db
 				.prepare(
-					"SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl NOT LIKE 'Deluxe|%' AND sys_styl NOT LIKE 'Štandard +|%' AND (dlzka_tyce <> 7500 OR sklo_hrubka <> 0)"
+					"SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl NOT LIKE 'Deluxe|%' AND sys_styl NOT LIKE 'Štandard%|%' AND (dlzka_tyce <> 7500 OR sklo_hrubka <> 0)"
 				)
 				.get()
 		).toEqual({ c: 0 });

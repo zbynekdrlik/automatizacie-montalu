@@ -66,7 +66,7 @@ const naz = (sysStyl: string, poradie: number) =>
 
 describe('reálny v10 → v11 upgrade: oprava názvov profilov Štandard +', () => {
 	it('user_version = 11', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(17);
+		expect(db.pragma('user_version', { simple: true })).toBe(18);
 	});
 
 	it('KAŽDÝ Štandard profil názov je opravený na cfg_seed (žiadne „OLD-")', () => {
