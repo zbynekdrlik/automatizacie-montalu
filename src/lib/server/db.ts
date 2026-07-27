@@ -491,6 +491,40 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 16) {
+		// v15 → v16: Slide opona — REDUKCIA 6 mm (ZASP00091) mala z-Robustu odvodenú
+		// geometriu (2x3K offset 127,47 / 2x2K 21, V−65), teda takmer rovnú rámovému
+		// profilu. Podklad od dielne (2026-07-27), oboje potvrdené:
+		//
+		//  - Pracovník poslal svoj Excel (2x3K 5000×2200, sklo 3.3.1 číre): redukcia
+		//    ZASP00091 má PRÁZDNY rozmer a rovnaké počty ako rámový (12 + 12 ks),
+		//    slovom: „robí sa aj zo 6 mm alebo 3.3.1, ale to sa reže priamo s rámovým
+		//    profilom v celku" — preto v jeho tabuľke rozmer nie je vypísaný.
+		//  - Dominik dal presné číslo: redukcia = „šírka prírezu mínus 72,4", a na
+		//    doplňujúcu otázku potvrdil, že −72,4 platí AJ NA VÝŠKU.
+		//
+		// Prepis do nášho vzorca (x = koef·DIM + offset, potom /N ak delitN):
+		//   S: (S + ramOffset)/N − 72,4  →  offset = ramOffset − 72,4·N
+		//      2x3K: 142,5 − 434,4 = −291,9 ; 2x2K: 40,6 − 289,6 = −249,0
+		//   V: (V − 67) − 72,4           →  offset = −139,4 (oba štýly)
+		// Počty kusov (pocetKs) sa NEMENIA — sú rovnaké ako rámový, ako v Exceli.
+		//
+		// Money: ZASP00091 je skutočný článok, takže odpis sa MENÍ — kratšie kusy →
+		// rovnako alebo MENEJ tyčí (nikdy viac). Meranie na mriežke nižšie v
+		// tests/slide-opona-redukcia.test.ts + PR. Redukcia sa počíta len pri skle,
+		// ktoré ju nenuluje (redukcia_zero = 0), takže IZO číre zákazky sú nedotknuté.
+		//
+		// Idempotentné: SET z (opraveného) cfg_seed per (sys_styl, poradie).
+		const updOff = db.prepare('UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND poradie = ?');
+		db.transaction(() => {
+			for (const r of seed.rez) {
+				if (r.sysStyl !== 'Slide|2x2K' && r.sysStyl !== 'Slide|2x3K') continue;
+				if (r.poradie === 40 || r.poradie === 41) updOff.run(r.offset, r.sysStyl, r.poradie);
+			}
+			db.pragma('user_version = 16');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
