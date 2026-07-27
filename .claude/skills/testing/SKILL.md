@@ -72,6 +72,21 @@ výrazom: `{fmt(s, v) + (nazov ? ` · ${nazov}` : '')}`. Chytilo to len e2e s pr
 regexom na celý text bunky (`/^\d+mm × \d+mm · /`) — `toContainText` by to prepustilo,
 takže formátovacie požiadavky dielne testuj na CELÝ string, nie na podreťazec.
 
+**`skipAkLive` je v `e2e/helpers.ts`** — každý ZÁPISOVÝ e2e test ho volá ako prvé
+(`import { skipAkLive } from './helpers'`). Nekopíruj si lokálnu verziu do spec súboru;
+kópie sa rozídu a jedna zabudnutá znamená testovací odpis v ostrom Money importe.
+
+**`getByLabel('Koľaj')` je NEJEDNOZNAČNÉ v bazéne** — matchne aj `Celková dĺžka
+koľajníc (mm)` (strict mode violation). Pri krátkych slovenských labeloch, ktoré sú
+podreťazcom iného labelu, píš `{ exact: true }`. To isté platí pre `Šírka (mm)` /
+`Výška (mm)` v editore vzorcov (kontrolné rozmery) a pre `Dvere`.
+
+**Mutačná kontrola: VŽDY over, že sa mutácia naozaj aplikovala.** Keď dokazuješ, že
+nový test dokáže padnúť (vyhodíš skrytý input a čakáš ✘), skript musí `assert` na
+existenciu nahradzovaného reťazca — jedna nesprávna tabulátorová úroveň znamená
+NULOVÚ zmenu súboru, testy prejdú a vyzerá to, akoby test nič nechytil (alebo horšie:
+akoby bol tautologický). Zelený beh po neaplikovanej mutácii nedokazuje nič.
+
 **Text v SVG náhľade sa NEZALAMUJE sám.** Kovanie/popisky v `Nahlad2D.svelte` si lámu
 riadky vlastnou funkciou (`wrapKov`) podľa šírky poľa, takže jedna logická veta môže byť
 vo viacerých `<text>` prvkoch. Dôsledok pre e2e: `toContainText('bez FAB')` je krehké

@@ -2,7 +2,7 @@
 // duplikát), editor vzorcov (zmena + návrat), verzia v pätičke. Každý test
 // vyžaduje NULA console errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
@@ -27,14 +27,6 @@ test('neprihlásený je presmerovaný na login', async ({ page }) => {
 	await expect(page).toHaveURL(/\/login/);
 	expect(consoleMsgs).toEqual([]);
 });
-
-/** TVRDÁ POISTKA: zápisové testy sa NIKDY nespúšťajú proti LIVE nasadeniu —
- * testovací odpis nesmie skončiť v ostrom Money importe. */
-async function skipAkLive(page: import('@playwright/test').Page) {
-	const res = await page.request.get('/health');
-	const { live } = (await res.json()) as { live: boolean };
-	test.skip(live === true, 'LIVE nasadenie (MONEY_LIVE=1) — zápisové E2E preskočené');
-}
 
 test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
