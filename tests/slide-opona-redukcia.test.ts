@@ -43,9 +43,9 @@ describe('Slide opona — redukcia 6 mm = prírez − 72,4 (obe dimenzie)', () =
 
 	it('rozdiel redukcia vs rámový je PRESNE 72,4 mm v oboch dimenziách a pre oba štýly', () => {
 		// `rezy[].rozmer` je zobrazená (zaokrúhlená) hodnota — na overenie desatinného
-		// rozdielu treba NEZAOKRÚHLENÉ dĺžky kusov, ktoré idú do balenia (`kusy[].dlzka`)
-		const dlzky = (m: { kusy: { dlzka: number }[] }) =>
-			[...new Set(m.kusy.map((k) => k.dlzka))].sort((a, b) => a - b);
+		// rozdielu treba NEZAOKRÚHLENÉ dĺžky kusov, ako reálne išli do balenia (bary → kusy)
+		const dlzky = (m: { bary: { kusy: { dlzka: number }[] }[] }) =>
+			[...new Set(m.bary.flatMap((b) => b.kusy.map((k) => k.dlzka)))].sort((a, b) => a - b);
 		for (const styl of ['2x2K', '2x3K']) {
 			for (const [S, V] of [
 				[5000, 2200],
