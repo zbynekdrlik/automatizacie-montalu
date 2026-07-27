@@ -3,6 +3,7 @@
 	// celkovej šírky/výšky a rozmeru skla, kaskáda krídel v reze.
 	import { overlapMm } from '$lib/cut';
 	import { fmtSkloRozmer } from '$lib/sklo';
+	import type { Klin } from '$lib/klin';
 	let {
 		S,
 		V,
@@ -13,7 +14,8 @@
 		system = '',
 		vrtanieZamku = 1050,
 		kovanieL = '',
-		kovanieP = ''
+		kovanieP = '',
+		klin = null
 	}: {
 		S: number;
 		V: number;
@@ -29,10 +31,20 @@
 		kovanieL?: string;
 		/** kovanie PRAVEJ strany (kľučka) — vypíše sa do KRAJNÉHO PRAVÉHO krídla */
 		kovanieP?: string;
+		/** klín nad posuvom (Patrik) — trapéz s kótami nad rámom; null = žiadny */
+		klin?: Klin | null;
 	} = $props();
 
 	const W = 760; // šírka kresby v px
-	const M = { top: 46, right: 26, bottom: 64, left: 62 }; // miesto na kóty
+	// Klín sa kreslí NAD okno — keď je zadaný, celý čelný pohľad sa posunie nižšie
+	// o vyhradený pás. M je preto derived (nie const), takže všetky kóty, kovanie,
+	// zámky aj kaskáda idú s ním bez ďalšej zmeny.
+	const KLIN_PAS = 96; // px vyhradených nad okno pre klín (kresba + kóty)
+	const KLIN_KRESBA = 46; // px výška NAJVYŠŠEJ strany klina v kresbe
+	const KLIN_BASE = 96; // y spodnej hrany klina (nad kótou šírky okna na M.top-24)
+	const KLIN_KOTA_Y = 24; // y kótovej línie dĺžky klina
+	const M0 = { top: 46, right: 26, bottom: 64, left: 62 }; // miesto na kóty
+	let M = $derived({ ...M0, top: M0.top + (klin ? KLIN_PAS : 0) });
 	const CAS_ROW = 14; // kaskáda: px na jedno krídlo (odsadenie do hĺbky/koľajnice)
 	const CAS_BAR = 6; // kaskáda: hrúbka pruhu krídla
 	const CAS_PAD = 12; // kaskáda: vnútorný okraj rámčeka
@@ -175,6 +187,34 @@
 			return { cx, cy, r, edgeX, left };
 		});
 	});
+
+	// Klín nad posuvom: trapéz s dlhou hornou hranou (dĺžka), ľavou výškou v1 a
+	// pravou v2. Dĺžka je v MIERKE okna (klín kratší ako okno je aj v kresbe
+	// kratší, zarovnaný vľavo); výšky sa škálujú na KLIN_KRESBA, aby bola kresba
+	// čitateľná aj pri nízkom kline — čísla v kótach sú vždy tie zadané.
+	let klinGeo = $derived.by(() => {
+		if (!klin) return null;
+		const maxV = Math.max(klin.v1, klin.v2, 1);
+		const w = Math.max(24, Math.min(W - M.left - M.right, klin.dlzka * scale));
+		const x0 = M.left;
+		const x1 = x0 + w;
+		const base = KLIN_BASE; // spodná hrana klina (nad kótou šírky okna)
+		return {
+			x0,
+			x1,
+			base,
+			y1: base - (klin.v1 / maxV) * KLIN_KRESBA,
+			y2: base - (klin.v2 / maxV) * KLIN_KRESBA,
+			body: [
+				[x0, base],
+				[x0, base - (klin.v1 / maxV) * KLIN_KRESBA],
+				[x1, base - (klin.v2 / maxV) * KLIN_KRESBA],
+				[x1, base]
+			]
+				.map(([x, y]) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`)
+				.join(' ')
+		};
+	});
 </script>
 
 <svg
@@ -184,6 +224,39 @@
 	aria-label="Náhľad zasklenia {S}×{V} mm, {N} polí"
 	data-testid="nahlad-2d"
 >
+	<!-- KLÍN nad posuvom (len keď je zadaný): trapéz + kóty dĺžky, oboch výšok,
+	     hĺbky a počtu kusov. Display-only prvok — do Money odpisu nevstupuje. -->
+	{#if klin && klinGeo}
+		<g data-testid="nahlad-klin">
+			<polygon points={klinGeo.body} fill="#fef3c7" stroke="#b45309" stroke-width="1.2" />
+			<!-- kóta dĺžky nad klinom -->
+			<g stroke="#b45309" stroke-width="0.9" fill="none">
+				<line x1={klinGeo.x0} y1={KLIN_KOTA_Y} x2={klinGeo.x1} y2={KLIN_KOTA_Y} />
+				<line x1={klinGeo.x0} y1={KLIN_KOTA_Y - 5} x2={klinGeo.x0} y2={KLIN_KOTA_Y + 5} />
+				<line x1={klinGeo.x1} y1={KLIN_KOTA_Y - 5} x2={klinGeo.x1} y2={KLIN_KOTA_Y + 5} />
+			</g>
+			<text
+				x={(klinGeo.x0 + klinGeo.x1) / 2}
+				y={KLIN_KOTA_Y - 6}
+				text-anchor="middle"
+				font-size="11"
+				fill="#92400e"
+				font-weight="600">klín — dĺžka {fmt(klin.dlzka)} mm</text
+			>
+			<!-- výšky na oboch stranách -->
+			<text x={klinGeo.x0 - 6} y={klinGeo.y1 - 4} text-anchor="start" font-size="10" fill="#92400e" font-weight="600"
+				>v1 {fmt(klin.v1)}</text
+			>
+			<text x={klinGeo.x1 - 2} y={klinGeo.y2 - 4} text-anchor="end" font-size="10" fill="#92400e" font-weight="600"
+				>v2 {fmt(klin.v2)}</text
+			>
+			<!-- hĺbka + počet kusov pod klinom -->
+			<text x={klinGeo.x0 + 4} y={klinGeo.base + 12} font-size="10" fill="#92400e"
+				>šírka (hĺbka) {fmt(klin.sirka)} mm · {klin.ks} ks</text
+			>
+		</g>
+	{/if}
+
 	<!-- kóta šírky hore -->
 	<g stroke="#94a3b8" stroke-width="1" fill="none">
 		<line x1={M.left} y1={M.top - 18} x2={W - M.right} y2={M.top - 18} />

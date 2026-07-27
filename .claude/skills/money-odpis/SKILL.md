@@ -144,3 +144,29 @@ inak overuješ nulu a myslíš si, že je to v poriadku.
 `MONEY_LIVE=1` → „✅ Odoslať odpis do Money" reálne zapíše. Náhľad (Spočítať) a Späť
 IBA rátajú, nič nezapíšu. Post-deploy over cez Playwright len náhľadom (čítaj odpis +
 rozpis), Odoslať NIKDY neklikaj.
+
+## 5. DISPLAY-ONLY prvky dielne (poznámka, RAL, kovanie, klín) — cesta a dôkaz neutrality
+
+Dielňa si pravidelne vyžiada prvok, ktorý „len nech je na pláne" (poznámka, RAL, kovanie
+kľučky, klín). Ich cesta je VŽDY tá istá a nikdy nesmie zabočiť do `polozky`:
+
+`formulár → parse*Vstup (validácia rozsahov na SERVERI) → vstup/PosuvVstup → náhľad +
+karta plánu (tlač) + jobFor(...).detail` — a **nikdy** `job.polozky` (to je Money .xlsx).
+Pri multi-posuve ide prvok cez `PosuvSpec` → `PosuvInfo` len ako prieťah (compute ho
+nečíta), aby ho mal náhľad posuvu.
+
+Dva povinné dôkazy, inak sa „display-only" nedá tvrdiť:
+- **unit:** `computeMulti` s prvkom a bez neho dá `toEqual` odpis AJ materiál
+  (`tests/vstup-klin.test.ts`, `tests/vstup-kovanie.test.ts`).
+- **e2e:** to isté zadanie spočítaj bez prvku, odčítaj riadky karty „Odpis (do Money)",
+  potom „← Späť a upraviť", zapni prvok, spočítaj znova a riadky musia byť IDENTICKÉ.
+  Toto chytí aj chybu, ktorú unit nechytí (napr. keby prvok menil `sysStyl`/voľbu).
+
+**Hidden round-trip:** každý nový display-only vstup MUSÍ ísť aj do snippetu `hiddenVstup`
+(pri multi do JSON-u `posuvy`), inak sa pri „Späť a upraviť" / „Odoslať" stratí a plán
+zrazu ukazuje niečo iné než formulár. Kryje to e2e „prežije Späť a upraviť".
+
+**Pozor na výhradu:** display-only stav môže šéf otočiť (kovanie: 2026-07-27 najprv
+„do Money nejde", o pár hodín „má ísť do Money" → čaká na katalógové kódy + počty ks).
+Preto drž prvok v `detail` (zapíše sa do histórie) — keď sa rozhodnutie otočí, dáta
+o minulých zákazkách existujú.

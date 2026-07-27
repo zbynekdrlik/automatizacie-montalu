@@ -92,3 +92,9 @@ riadky vlastnou funkciou (`wrapKov`) podľa šírky poľa, takže jedna logická
 vo viacerých `<text>` prvkoch. Dôsledok pre e2e: `toContainText('bez FAB')` je krehké
 (fráza môže byť rozdelená na dva riadky) — testuj jednotlivé slová (`'bez'`, `'FAB'`),
 prípadne `not.toContainText('bez')` na odlíšenie variant „s FAB" / „bez FAB".
+
+**`Nahlad2D` má `M.top` DERIVED, nie konštantu.** Klín (keď je zadaný) vyhradí nad okno pás
+`KLIN_PAS` px a celý čelný pohľad sa posunie nižšie — `M` je preto `$derived({ ...M0, top: … })`,
+takže kóty, kovanie, zámky D46 aj kaskáda idú s ním automaticky. Keď pridávaš ďalší prvok nad
+okno, počítaj y od `M0.top` (pás) alebo od `M.top` (okno) — NIE od zmixovaných oboch, a over
+očami (screenshot `nahlad-2d`), či ti kóta šírky okna na `M.top-24` nekoliduje s novým pásom.

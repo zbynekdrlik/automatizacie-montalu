@@ -3,6 +3,7 @@
 // pôvodným odpisovým Excelom (robust_slide.xlsm). Čísla sa NESMÚ zmeniť bez
 // zmeny testovacích vektorov v tests/compute.test.ts.
 import { jeSikmyRez, systemRovnyRez } from '$lib/cut';
+import type { Klin } from '$lib/klin';
 
 export interface SysRow {
 	sysStyl: string;
@@ -443,6 +444,8 @@ export interface PosuvSpec {
 	/** kovanie ľavej/pravej strany (kľučka) — len na plán/náhľad, len Robust */
 	kovanieL?: string;
 	kovanieP?: string;
+	/** klín nad posuvom — len na plán/náhľad, do Money odpisu NEJDE */
+	klin?: Klin | null;
 }
 
 export interface PosuvInfo {
@@ -457,6 +460,7 @@ export interface PosuvInfo {
 	skloNazov?: string;
 	kovanieL?: string;
 	kovanieP?: string;
+	klin?: Klin | null;
 }
 
 export interface MultiResult {
@@ -535,7 +539,8 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			otvaranie: p.otvaranie,
 			skloNazov: p.sklo,
 			kovanieL: p.kovanieL,
-			kovanieP: p.kovanieP
+			kovanieP: p.kovanieP,
+			klin: p.klin ?? null
 		});
 	}
 	const material: MaterialRow[] = [];
