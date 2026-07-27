@@ -47,12 +47,20 @@ test('zasklenia: „⏳ Čaká" prežije náhľad → odoslanie a zapíše sa do
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	// 3. história rozlíši oba záznamy — ⏳ len pri tom s čaká
+	// 3. história rozlíši oba záznamy — ⏳ len pri tom s čaká.
+	// Riadok sa hľadá podľa CELÝCH buniek (ZAK + OP): `hasText: '11'` by sadlo
+	// aj na časovú značku (13:41:11) a kontrolovalo by cudzí riadok.
 	await goto(page, '/odpisy');
-	const cakaRow = page.locator('tr', { hasText: `${RUN}-CAK` }).filter({ hasText: '11' });
-	const bezRow = page.locator('tr', { hasText: `${RUN}-CAK` }).filter({ hasText: '12' });
-	await expect(cakaRow).toContainText('⏳');
-	await expect(bezRow).not.toContainText('⏳');
+	const cell = (text: string) => page.locator('td', { hasText: new RegExp(`^${text}$`) });
+	const riadok = (op: string) =>
+		page
+			.locator('tbody tr')
+			.filter({ has: cell(`${RUN}-CAK`) })
+			.filter({ has: cell(op) });
+	await expect(riadok('11')).toHaveCount(1);
+	await expect(riadok('12')).toHaveCount(1);
+	await expect(riadok('11')).toContainText('⏳');
+	await expect(riadok('12')).not.toContainText('⏳');
 	expect(consoleMsgs).toEqual([]);
 });
 
