@@ -1,5 +1,7 @@
 // Parsovanie a serverová validácia vstupu zasklenia formulára — jediný
 // serverový strážca rozsahov (HTML5 min/max vie skriptovaný POST obísť).
+import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
+
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
 /** Kovanie krídla (kľučka) — LEN Robust (Patrik 2026-07-27). Display-only:
@@ -17,6 +19,52 @@ export const KOVANIA = [
 export function sanitizeKovanie(system: string, raw: unknown): string {
 	const v = String(raw ?? '').trim();
 	return system === 'Robust' && KOVANIA.includes(v) ? v : '';
+}
+
+/** Surové polia klina — z plochého formulára aj z JSON riadku posuvu (multi).
+ *  `on` je zapínač: '1' / true = klín je zapnutý. */
+export interface KlinRaw {
+	on: unknown;
+	dlzka: unknown;
+	sirka: unknown;
+	v1: unknown;
+	v2: unknown;
+	ks: unknown;
+}
+
+/**
+ * Klín (display-only prvok nad posuvom). Vypnutý zapínač → `null` a žiadna chyba
+ * (klín je nepovinný). Zapnutý → rozmery MUSIA byť v rozsahu; strážime to tu,
+ * pretože skriptovaný POST obíde HTML5 min/max. Aspoň jedna výška musí byť
+ * kladná (0 → 0 nie je klín); druhá smie byť 0 = klín dobehnutý do ostra.
+ */
+export function parseKlin(raw: KlinRaw): { klin: Klin | null; error: string | null } {
+	const on = raw.on === '1' || raw.on === true || raw.on === 'true';
+	if (!on) return { klin: null, error: null };
+	const n = (x: unknown) => {
+		const f = parseFloat(String(x ?? '').replace(',', '.'));
+		return Number.isFinite(f) ? f : 0;
+	};
+	const klin: Klin = {
+		dlzka: n(raw.dlzka),
+		sirka: n(raw.sirka),
+		v1: n(raw.v1),
+		v2: n(raw.v2),
+		// nevyplnený počet = 1 kus (dielňa zadáva ks len keď ich je viac);
+		// nezmyselná hodnota (0 po zaokrúhlení, záporná, > max) padne do validácie
+		ks: Math.round(n(raw.ks)) || 1
+	};
+	const rozmerOk = (x: number) => x > 0 && x <= KLIN_MAX_ROZMER;
+	const vyskaOk = (x: number) => x >= 0 && x <= KLIN_MAX_ROZMER;
+	let error: string | null = null;
+	if (!rozmerOk(klin.dlzka)) error = `Klín: dĺžka musí byť 1–${KLIN_MAX_ROZMER} mm.`;
+	else if (!rozmerOk(klin.sirka)) error = `Klín: šírka musí byť 1–${KLIN_MAX_ROZMER} mm.`;
+	else if (!vyskaOk(klin.v1) || !vyskaOk(klin.v2))
+		error = `Klín: výšky musia byť 0–${KLIN_MAX_ROZMER} mm.`;
+	else if (!(klin.v1 > 0 || klin.v2 > 0)) error = 'Klín: zadaj aspoň jednu výšku.';
+	else if (!(klin.ks >= 1 && klin.ks <= KLIN_MAX_KS))
+		error = `Klín: počet kusov musí byť 1–${KLIN_MAX_KS}.`;
+	return { klin, error };
 }
 
 export interface Vstup {
@@ -48,6 +96,8 @@ export interface Vstup {
 	caka: boolean;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica: boolean;
+	/** klín nad posuvom (Patrik) — display-only, do Money odpisu NEJDE; null = žiadny */
+	klin: Klin | null;
 }
 
 export function parseVstup(form: FormData): { vstup: Vstup; error: string | null } {
@@ -76,8 +126,18 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300),
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
-		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
+		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
+		klin: null
 	};
+	const k = parseKlin({
+		on: form.get('klin'),
+		dlzka: form.get('klinDlzka'),
+		sirka: form.get('klinSirka'),
+		v1: form.get('klinV1'),
+		v2: form.get('klinV2'),
+		ks: form.get('klinKs')
+	});
+	vstup.klin = k.klin;
 	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
 	// skriptovaný POST neobíde (otváranie je len na plán/náhľad, nemení výpočet)
 	if (vstup.styl.startsWith('2x')) vstup.otvaranie = 'Opona';
@@ -88,6 +148,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	else if (!(vstup.s >= 300 && vstup.s <= 20000)) error = 'Šírka musí byť 300–20000 mm.';
 	else if (!(vstup.v >= 300 && vstup.v <= 20000)) error = 'Výška musí byť 300–20000 mm.';
 	else if (!OTVARANIA.includes(vstup.otvaranie)) error = 'Vyber otváranie.';
+	else if (k.error) error = k.error;
 	return { vstup, error };
 }
 
@@ -103,6 +164,8 @@ export interface PosuvVstup {
 	/** kovanie ľavej/pravej strany TOHOTO posuvu (Patrik: „pri každom posuve sólo") */
 	kovanieL: string;
 	kovanieP: string;
+	/** klín nad TÝMTO posuvom — display-only, do Money odpisu NEJDE; null = žiadny */
+	klin: Klin | null;
 }
 
 export interface MultiVstup {
@@ -149,6 +212,14 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			const p = (posuvyRaw[i] ?? {}) as Record<string, unknown>;
 			const s = parseFloat(String(p.s ?? '').replace(',', '.'));
 			const v = parseFloat(String(p.v ?? '').replace(',', '.'));
+			const k = parseKlin({
+				on: p.klin,
+				dlzka: p.klinDlzka,
+				sirka: p.klinSirka,
+				v1: p.klinV1,
+				v2: p.klinV2,
+				ks: p.klinKs
+			});
 			const posuv: PosuvVstup = {
 				system: String(p.system ?? '').trim(),
 				styl: String(p.styl ?? '').trim(),
@@ -157,7 +228,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				sklo: String(p.sklo ?? '').trim(),
 				otvaranie: String(p.otvaranie ?? '').trim(),
 				kovanieL: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieL),
-				kovanieP: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieP)
+				kovanieP: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieP),
+				klin: k.klin
 			};
 			if (!posuv.system || !posuv.styl) {
 				error = `Posuv ${i + 1}: vyber systém a štýl.`;
@@ -179,6 +251,10 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			}
 			if (!OTVARANIA.includes(posuv.otvaranie)) {
 				error = `Posuv ${i + 1}: vyber otváranie.`;
+				break;
+			}
+			if (k.error) {
+				error = `Posuv ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
 				break;
 			}
 			posuvy.push(posuv);

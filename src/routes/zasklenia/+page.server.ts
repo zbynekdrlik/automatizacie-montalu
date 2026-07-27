@@ -51,7 +51,9 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 			kovanieL: vstup.kovanieL,
 			kovanieP: vstup.kovanieP,
 			poznamka: vstup.poznamka,
-			ral: vstup.ral
+			ral: vstup.ral,
+			// klín — len záznam do histórie/plánu, do Money položiek nejde
+			klin: vstup.klin
 		}
 	};
 }
@@ -93,6 +95,7 @@ function computeMultiFrom(vstup: MultiVstup) {
 			sklo: p.sklo,
 			kovanieL: p.kovanieL,
 			kovanieP: p.kovanieP,
+			klin: p.klin,
 			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
 			pridavnaKolajnica: vstup.pridavnaKolajnica
 		});
@@ -127,7 +130,8 @@ function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): Odpi
 				sklo: vstup.posuvy[i]?.sklo,
 				otvaranie: p.otvaranie,
 				kovanieL: vstup.posuvy[i]?.kovanieL,
-				kovanieP: vstup.posuvy[i]?.kovanieP
+				kovanieP: vstup.posuvy[i]?.kovanieP,
+				klin: vstup.posuvy[i]?.klin ?? null
 			}))
 		}
 	};

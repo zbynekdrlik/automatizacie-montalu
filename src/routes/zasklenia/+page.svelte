@@ -4,6 +4,8 @@
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
+	import { klinPopis, type Klin } from '$lib/klin';
+	import KlinPolia from '$lib/components/KlinPolia.svelte';
 
 	let { data, form } = $props();
 
@@ -34,7 +36,8 @@
 			poznamka: zd?.poznamka ?? '',
 			ral: zd?.ral ?? '',
 			caka: zd?.caka ?? false,
-			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false
+			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false,
+			klin: (form?.vstup?.klin ?? null) as Klin | null
 		};
 	});
 
@@ -64,6 +67,14 @@
 		otvaranie: string;
 		kovanieL: string;
 		kovanieP: string;
+		// klín TOHOTO posuvu — ploché polia (rovnaký tvar ako primárny posuv), do
+		// JSON-u idú tak, ako ich parsuje server (klin='1' + 4 rozmery + ks)
+		klin: boolean;
+		klinDlzka: number | string;
+		klinSirka: number | string;
+		klinV1: number | string;
+		klinV2: number | string;
+		klinKs: number | string;
 	};
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
@@ -86,6 +97,13 @@
 	let sirka = $state<number | string>('');
 	let vyska = $state<number | string>('');
 	let vrtanieZamkuS = $state<number | string>(1050);
+	// klín primárneho posuvu (Patrik 2026-07-27) — display-only, do Money nejde
+	let klinS = $state(false);
+	let klinDlzkaS = $state<number | string>('');
+	let klinSirkaS = $state<number | string>('');
+	let klinV1S = $state<number | string>('');
+	let klinV2S = $state<number | string>('');
+	let klinKsS = $state<number | string>(1);
 	let posuvyExtra = $state<PosuvRow[]>([]);
 	$effect(() => {
 		const zd = form?.vstup ?? form?.multiVstup ?? null;
@@ -98,6 +116,13 @@
 		ralS = zd?.ral ?? '';
 		cakaS = zd?.caka ?? false;
 		pridavnaKolajnicaS = zd?.pridavnaKolajnica ?? false;
+		const kl = (form?.vstup?.klin ?? null) as Klin | null;
+		klinS = !!kl;
+		klinDlzkaS = kl?.dlzka ?? '';
+		klinSirkaS = kl?.sirka ?? '';
+		klinV1S = kl?.v1 ?? '';
+		klinV2S = kl?.v2 ?? '';
+		klinKsS = kl?.ks ?? 1;
 		const p = prim();
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
@@ -106,7 +131,15 @@
 		kovaniePS = p?.kovanieP ?? '';
 		sirka = (p?.s as number | string) ?? '';
 		vyska = (p?.v as number | string) ?? '';
-		posuvyExtra = (form?.multiVstup?.posuvy ?? []).slice(1).map((x) => ({ ...x }));
+		posuvyExtra = (form?.multiVstup?.posuvy ?? []).slice(1).map((x) => ({
+			...x,
+			klin: !!x.klin,
+			klinDlzka: x.klin?.dlzka ?? '',
+			klinSirka: x.klin?.sirka ?? '',
+			klinV1: x.klin?.v1 ?? '',
+			klinV2: x.klin?.v2 ?? '',
+			klinKs: x.klin?.ks ?? 1
+		}));
 	});
 	// 2x2K / 2x3K = opona (otváranie od stredu) → povoľ len „Opona" a nastav ju
 	let jeOpona = $derived(styl.startsWith('2x'));
@@ -141,7 +174,22 @@
 	// celý zoznam posuvov (primárny + ďalšie) → JSON pre multi submit
 	let posuvyJSON = $derived(
 		JSON.stringify([
-			{ system, styl, s: sirka, v: vyska, sklo, otvaranie, kovanieL: kovanieLS, kovanieP: kovaniePS },
+			{
+				system,
+				styl,
+				s: sirka,
+				v: vyska,
+				sklo,
+				otvaranie,
+				kovanieL: kovanieLS,
+				kovanieP: kovaniePS,
+				klin: klinS ? '1' : '',
+				klinDlzka: klinDlzkaS,
+				klinSirka: klinSirkaS,
+				klinV1: klinV1S,
+				klinV2: klinV2S,
+				klinKs: klinKsS
+			},
 			...posuvyExtra.map((p) => ({
 				system: p.system,
 				styl: p.styl,
@@ -150,7 +198,13 @@
 				sklo: p.sklo,
 				otvaranie: p.otvaranie,
 				kovanieL: p.kovanieL,
-				kovanieP: p.kovanieP
+				kovanieP: p.kovanieP,
+				klin: p.klin ? '1' : '',
+				klinDlzka: p.klinDlzka,
+				klinSirka: p.klinSirka,
+				klinV1: p.klinV1,
+				klinV2: p.klinV2,
+				klinKs: p.klinKs
 			}))
 		])
 	);
@@ -171,7 +225,22 @@
 	function addPosuv() {
 		posuvyExtra = [
 			...posuvyExtra,
-			{ system, styl, s: '', v: '', sklo, otvaranie, kovanieL: kovanieLS, kovanieP: kovaniePS }
+			{
+				system,
+				styl,
+				s: '',
+				v: '',
+				sklo,
+				otvaranie,
+				kovanieL: kovanieLS,
+				kovanieP: kovaniePS,
+				klin: false,
+				klinDlzka: '',
+				klinSirka: '',
+				klinV1: '',
+				klinV2: '',
+				klinKs: 1
+			}
 		];
 		fixPosuv(posuvyExtra.length - 1);
 	}
@@ -243,6 +312,14 @@
 	<input type="hidden" name="ral" value={vstup.ral} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
+	{#if vstup.klin}
+		<input type="hidden" name="klin" value="1" />
+		<input type="hidden" name="klinDlzka" value={vstup.klin.dlzka} />
+		<input type="hidden" name="klinSirka" value={vstup.klin.sirka} />
+		<input type="hidden" name="klinV1" value={vstup.klin.v1} />
+		<input type="hidden" name="klinV2" value={vstup.klin.v2} />
+		<input type="hidden" name="klinKs" value={vstup.klin.ks} />
+	{/if}
 {/snippet}
 
 <!-- Poznámka (viacriadková, vľavo) + RAL (veľkým, vpravo) na nárezovom pláne aj
@@ -280,8 +357,21 @@
 
 	<div class="card">
 		<div class="sec">Náhľad</div>
-		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} />
+		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} klin={vstup.klin} />
 	</div>
+
+	{#if vstup.klin}
+		<div class="card" data-testid="klin-karta">
+			<div class="sec">Klín</div>
+			<div class="g">
+				<div><span>Dĺžka</span><b data-testid="klin-dlzka">{vstup.klin.dlzka} mm</b></div>
+				<div><span>Šírka (hĺbka)</span><b>{vstup.klin.sirka} mm</b></div>
+				<div><span>Výška 1</span><b>{vstup.klin.v1} mm</b></div>
+				<div><span>Výška 2</span><b>{vstup.klin.v2} mm</b></div>
+				<div><span>Počet</span><b>{vstup.klin.ks} ks</b></div>
+			</div>
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="sec">Sklo (mm)</div>
@@ -370,11 +460,22 @@
 			{#each m.posuvy as pv, i (i)}
 				<div class="posuv-nahlad">
 					<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
-					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} kovanieL={pv.kovanieL ?? ''} kovanieP={pv.kovanieP ?? ''} />
+					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} kovanieL={pv.kovanieL ?? ''} kovanieP={pv.kovanieP ?? ''} klin={pv.klin ?? null} />
 				</div>
 			{/each}
 		</div>
 	</div>
+
+	{#if m.posuvy.some((pv) => pv.klin)}
+		<div class="card" data-testid="klin-karta-multi">
+			<div class="sec">Klíny</div>
+			{#each m.posuvy as pv, i (i)}
+				{#if pv.klin}
+					<div class="row"><span>Posuv {i + 1}</span><b>{klinPopis(pv.klin)}</b></div>
+				{/if}
+			{/each}
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="sec">Zoznam materiálu — spoločný (naprieč posuvmi)</div>
@@ -566,6 +667,19 @@
 					</label>
 				</div>
 			{/if}
+			<!-- Klín nad posuvom (Patrik): zapínač + dĺžka/šírka/výška 1/výška 2 + ks.
+			     Display-only — kreslí sa v náhľade, do Money odpisu nevstupuje. -->
+			<KlinPolia
+				idPrefix="klin"
+				names={true}
+				sirkaPosuvu={sirka}
+				bind:on={klinS}
+				bind:dlzka={klinDlzkaS}
+				bind:sirka={klinSirkaS}
+				bind:v1={klinV1S}
+				bind:v2={klinV2S}
+				bind:ks={klinKsS}
+			/>
 			<!-- Zimná záhrada: ďalšie posuvy sa zoptimalizujú do zdieľaných tyčí -->
 			<input type="hidden" name="posuvy" value={posuvyJSON} />
 			{#each posuvyExtra as p, i (i)}
@@ -614,6 +728,16 @@
 								</select></div>
 						</div>
 					{/if}
+					<KlinPolia
+						idPrefix={`ps${i}-klin`}
+						sirkaPosuvu={p.s}
+						bind:on={p.klin}
+						bind:dlzka={p.klinDlzka}
+						bind:sirka={p.klinSirka}
+						bind:v1={p.klinV1}
+						bind:v2={p.klinV2}
+						bind:ks={p.klinKs}
+					/>
 				</div>
 			{/each}
 			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>
