@@ -440,6 +440,9 @@ export interface PosuvSpec {
 	/** len na plán/detail (nemení výpočet) */
 	otvaranie?: string;
 	sklo?: string;
+	/** kovanie ľavej/pravej strany (kľučka) — len na plán/náhľad, len Robust */
+	kovanieL?: string;
+	kovanieP?: string;
 }
 
 export interface PosuvInfo {
@@ -452,6 +455,8 @@ export interface PosuvInfo {
 	sklo: { sirka: number; vyska: number; pocet: number };
 	otvaranie?: string;
 	skloNazov?: string;
+	kovanieL?: string;
+	kovanieP?: string;
 }
 
 export interface MultiResult {
@@ -528,7 +533,9 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 				pocet: N
 			},
 			otvaranie: p.otvaranie,
-			skloNazov: p.sklo
+			skloNazov: p.sklo,
+			kovanieL: p.kovanieL,
+			kovanieP: p.kovanieP
 		});
 	}
 	const material: MaterialRow[] = [];

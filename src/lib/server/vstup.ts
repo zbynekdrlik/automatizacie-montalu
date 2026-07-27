@@ -2,6 +2,23 @@
 // serverový strážca rozsahov (HTML5 min/max vie skriptovaný POST obísť).
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
+/** Kovanie krídla (kľučka) — LEN Robust (Patrik 2026-07-27). Display-only:
+ *  vypíše sa do náhľadu posuvu a do detailu v histórii, do Money odpisu NEJDE.
+ *  Prázdna hodnota = nezadané (v selecte „—"), vtedy sa nič nekreslí. */
+export const KOVANIA = [
+	'Jednostranná kľučka z vnútra bez FAB',
+	'Obojstranná kľučka bez FAB',
+	'Jednostranná kľučka z vnútra s FAB',
+	'Obojstranná kľučka s FAB'
+];
+
+/** Kovanie je zatiaľ len robustové — pri inom systéme (a pri neznámej hodnote
+ *  zo skriptovaného POST-u) ho zahoď, nech sa na plán nedostane nezmysel. */
+export function sanitizeKovanie(system: string, raw: unknown): string {
+	const v = String(raw ?? '').trim();
+	return system === 'Robust' && KOVANIA.includes(v) ? v : '';
+}
+
 export interface Vstup {
 	zak: string;
 	op: string;
@@ -15,6 +32,10 @@ export interface Vstup {
 	 *  na plán, vzorec ostáva podľa základného skla `sklo` */
 	skloPresne: string;
 	otvaranie: string;
+	/** kovanie ĽAVEJ strany posuvu (kľučka) — len Robust, len na plán/náhľad */
+	kovanieL: string;
+	/** kovanie PRAVEJ strany posuvu (kľučka) — len Robust, len na plán/náhľad */
+	kovanieP: string;
 	/** výška vŕtania zámku [mm od spodku skla] — len Deluxe (otvory D46 v náhľade),
 	 *  default 1050; do budúcna aj do objednávky skla */
 	vrtanieZamku: number;
@@ -45,6 +66,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		sklo: String(form.get('sklo') ?? '').trim(),
 		skloPresne: String(form.get('skloPresne') ?? '').trim().slice(0, 120),
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
+		kovanieL: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieL')),
+		kovanieP: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieP')),
 		// Deluxe zámok: kladná výška vŕtania, inak default 1050 (len na náhľad/tlač)
 		vrtanieZamku: (() => {
 			const x = num('vrtanieZamku');
@@ -77,6 +100,9 @@ export interface PosuvVstup {
 	v: number;
 	sklo: string;
 	otvaranie: string;
+	/** kovanie ľavej/pravej strany TOHOTO posuvu (Patrik: „pri každom posuve sólo") */
+	kovanieL: string;
+	kovanieP: string;
 }
 
 export interface MultiVstup {
@@ -129,7 +155,9 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				s: Number.isFinite(s) ? s : 0,
 				v: Number.isFinite(v) ? v : 0,
 				sklo: String(p.sklo ?? '').trim(),
-				otvaranie: String(p.otvaranie ?? '').trim()
+				otvaranie: String(p.otvaranie ?? '').trim(),
+				kovanieL: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieL),
+				kovanieP: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieP)
 			};
 			if (!posuv.system || !posuv.styl) {
 				error = `Posuv ${i + 1}: vyber systém a štýl.`;
