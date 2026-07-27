@@ -106,17 +106,19 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(computeFlat(cfg, 'Robust|2x3K', 5000, 2200, false)!.sklo.pocet).toBe(6);
 	});
 
-	// Slide opona (2x2K/2x3K Slide). KÓDY overené proti Money katalógu (2026-07-23):
-	// koľajnica ZASP00097 (2K) / ZASP00100 (3K), oponový generický ZASP00006, Redukcia
-	// 6mm ZASP00091 (sklozavislé). GEOMETRIA (sklo + dĺžky rezov) opravená podľa reálnych
-	// Excelov od Dominika — viď test nižšie; kódy sa NEMENILI (Excel ich mal preklepnuté).
+	// Slide opona (2x2K/2x3K Slide). KÓDY overené proti Money katalógu: koľajnica
+	// ZASP00097 (2K) / ZASP00100 (3K), oponový ZASP20249 (Model_UserData „Zasklenie
+	// Slide"; NIE ZASP00006 — to je Model „Zasklenie Robust", pozostatok po odvodení
+	// Slide opony z Robustu, opravené 2026-07-27), Redukcia 6mm ZASP00091 (sklozavislé).
+	// Excel má v oponovom riadku ZASP00091 = podľa katalógu „Redukcia 6 mm" → preklep.
 	it('Slide opona má správne profily + redukcia sa nuluje pri sklo bez redukcie', () => {
 		const r = computeFlat(cfg, 'Slide|2x2K', 3500, 2200, false)!;
 		const kods = r.odpis.map((o) => o.kod).sort();
-		expect(kods).toEqual(['ZASP00006', 'ZASP00088', 'ZASP00091', 'ZASP00097', 'ZASP202410'].sort());
+		expect(kods).toEqual(['ZASP20249', 'ZASP00088', 'ZASP00091', 'ZASP00097', 'ZASP202410'].sort());
 		expect(r.N).toBe(4);
-		// oponový profil je prítomný (1 tyč)
-		expect(r.odpis.find((o) => o.kod === 'ZASP00006')!.metre).toBe(7.5);
+		// oponový profil je prítomný (1 tyč) a je to SLIDE článok, nie Robustový
+		expect(r.odpis.find((o) => o.kod === 'ZASP20249')!.metre).toBe(7.5);
+		expect(r.odpis.some((o) => o.kod === 'ZASP00006')).toBe(false);
 		// redukcia (sklozavislé) sa nuluje keď sklo nuluje redukciu (Slide 4/8/4 číre)
 		const rz = computeFlat(cfg, 'Slide|2x2K', 3500, 2200, true)!;
 		expect(rz.odpis.find((o) => o.kod === 'ZASP00091')!.metre).toBe(0);
@@ -124,14 +126,17 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(computeFlat(cfg, 'Slide|2x3K', 3500, 2100, false)!.odpis.some((o) => o.kod === 'ZASP00100')).toBe(true);
 	});
 
-	// Slide opona — geometria opravená podľa reálnych Excelov od Dominika (2026-07-23,
-	// ~/uploads/montalu-slide-opona/{2x2K,2x3K}_IZO.xlsx). Predtým odvodené z Robustu.
-	// Sklo: šírka 2x3K (S+142,5)/6−83, 2x2K (S+40,6)/4−83; výška V−67−83 (display-only,
-	// NIE v Money). Rezy: nosový/oponový V−67; rámový „dĺžka rezu" (S−12)/N. Rámový (S−12)/N
-	// MENÍ Money billing ZASP00088 na ~0,5 % (2x2K) / ~5,7 % (2x3K) rozmerov (kratší rez →
-	// menej tyčí) — SCHVÁLENÉ Dominikom (appka predtým rámový prebíjala). Kódy (ZASP00100 3K
-	// koľaj, ZASP00006 oponový) overené v Money katalógu — správne, nemenené.
-	it('Slide opona: sklo + odpis podľa Excelu (2026-07-23)', () => {
+	// Slide opona — geometria podľa reálnych Excelov od Dominika
+	// (~/uploads/montalu-slide-opona/{2x2K,2x3K}_IZO.xlsx). Predtým odvodené z Robustu.
+	// Excel má na ten istý profil DVA stĺpce: `E` „rozmer" = čo sa reálne reže, `Q`
+	// „dĺžka rezu" = zastaraný leftover v odpisových stĺpcoch. Platí `E` (potvrdil
+	// pracovník z dielne 2026-07-27: 2x3K 5000×2000 → 857 a 1933).
+	//   rámový  = (S+142,5)/6 resp. (S+40,6)/4 ; V−67
+	//   nosový + oponový = V−67
+	//   sklo    = rámový − 83 (skloOffset), display-only, NIE v Money odpise
+	// Rámový `E` (dlhší rez než `Q`) ZVYŠUJE Money billing ZASP00088 na 3,8 % rozmerov —
+	// čestná korekcia, appka po v14 rámový podúčtovala.
+	it('Slide opona: sklo + rezy + odpis podľa Excelu (stĺpec „rozmer")', () => {
 		// 2x3K 6940×2200 → sklo 1097×2050 (Excel 2x3K IZO)
 		const a = computeFlat(cfg, 'Slide|2x3K', 6940, 2200, false)!;
 		expect(a.sklo.sirka).toBe(1097); // round((6940+142,5)/6 − 83)
@@ -142,16 +147,31 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		expect(b.sklo.sirka).toBe(1097); // round((4680+40,6)/4 − 83)
 		expect(b.sklo.vyska).toBe(2050);
 		expect(b.sklo.pocet).toBe(4);
-		// Money odpis PIN (číre IZO, redukcia sa nuluje) — správne kódy na stabilnom rozmere
-		expect(odpisByKod(computeFlat(cfg, 'Slide|2x3K', 6940, 2200, true)!)).toMatchObject({
-			ZASP00100: 22.5, ZASP00088: 45, ZASP00006: 7.5, ZASP202410: 22.5
+		// DĹŽKY REZOV — presne to, čo pracovník číta z Excelu (2x3K 5000×2000)
+		const w = computeFlat(cfg, 'Slide|2x3K', 5000, 2000, true)!;
+		const ram = w.material.find((m) => m.kod === 'ZASP00088')!;
+		expect(ram.rezy.map((x) => Math.round(x.rozmer))).toEqual([857, 1933]);
+		expect(ram.rezy.map((x) => x.ks)).toEqual([12, 12]);
+		expect(Math.round(w.material.find((m) => m.kod === 'ZASP20249')!.rezy[0].rozmer)).toBe(1933);
+		expect(Math.round(w.material.find((m) => m.kod === 'ZASP202410')!.rezy[0].rozmer)).toBe(1933);
+		// Excelový rozmer 6940×2200: dĺžky rezov + POČTY TYČÍ 1:1 s Excelom
+		const e = computeFlat(cfg, 'Slide|2x3K', 6940, 2200, true)!;
+		const eram = e.material.find((m) => m.kod === 'ZASP00088')!;
+		expect(eram.rezy.map((x) => Math.round(x.rozmer))).toEqual([1180, 2133]); // Excel E14/E15
+		expect(eram.tyce).toBe(6); // Excel V14
+		expect(e.material.find((m) => m.kod === 'ZASP202410')!.tyce).toBe(3); // Excel V18
+		expect(e.material.find((m) => m.kod === 'ZASP20249')!.tyce).toBe(1); // Excel V19
+		expect(e.material.find((m) => m.kod === 'ZASP00100')!.tyce).toBe(3); // Excel V16
+		// Money odpis PIN (číre IZO, redukcia sa nuluje) — SLIDE oponový článok ZASP20249
+		expect(odpisByKod(e)).toMatchObject({
+			ZASP00100: 22.5, ZASP00088: 45, ZASP20249: 7.5, ZASP202410: 22.5
 		});
 		expect(odpisByKod(computeFlat(cfg, 'Slide|2x2K', 4680, 2200, true)!)).toMatchObject({
-			ZASP00097: 15, ZASP00088: 30, ZASP00006: 7.5, ZASP202410: 15
+			ZASP00097: 15, ZASP00088: 30, ZASP20249: 7.5, ZASP202410: 15
 		});
-		// rámový (S−12)/N ZNÍŽI ZASP00088 na časti rozmerov (schválená Money zmena) — pin
-		expect(odpisByKod(computeFlat(cfg, 'Slide|2x3K', 3000, 2050, false)!).ZASP00088).toBe(30); // z-Robustu bolo 37,5
-		expect(odpisByKod(computeFlat(cfg, 'Slide|2x2K', 3050, 2050, false)!).ZASP00088).toBe(22.5); // bolo 30
+		// rámový podľa `E` ZVÝŠI ZASP00088 na časti rozmerov — pin oboch štýlov
+		expect(odpisByKod(computeFlat(cfg, 'Slide|2x3K', 3000, 2050, false)!).ZASP00088).toBe(37.5); // `Q` dávalo 30
+		expect(odpisByKod(computeFlat(cfg, 'Slide|2x2K', 3050, 2050, false)!).ZASP00088).toBe(30); // `Q` dávalo 22,5
 	});
 
 	// Dominik: sklo objednávať na celé mm (904,578 → 905). Sklo nie je v Money odpise.
