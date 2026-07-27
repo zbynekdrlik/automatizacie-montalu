@@ -53,6 +53,12 @@ sa doladia samé, riadky s ručne zadanou konštantou v `Q` (`=C6−65`) zostan�
 Krížová kontrola: rámový `rozmer` musí vyjsť `sklo + skloOffset` (83) — ak to sedí so už
 overeným sklo vzorcom, čítaš správny stĺpec.
 
+**PRÁZDNY rozmer v Exceli ≠ profil sa nepočíta** — môže znamenať „reže sa spolu s iným
+profilom v celku". Slide opona: redukcia `ZASP00091` mala prázdny rozmer, ale plné počty
+(12 + 12 ks) aj počet tyčí, lebo sa reže s rámovým; presný vzorec („šírka prírezu mínus
+72,4", platí na šírku AJ výšku) dal až Dominik na dopyt (v16, 2026-07-27). Keď je stĺpec
+prázdny a počty nie sú nulové, VYPÝTAJ si vzorec — neodvádzaj ho z príbuzného profilu.
+
 Dump Excelu vždy DVAKRÁT — raz so vzorcami, raz s hodnotami:
 ```python
 openpyxl.load_workbook(f, data_only=False)  # vzorce (vidno referencie vs konštanty)
@@ -122,6 +128,16 @@ rovnaký offset — inak by tá istá zákazka písala iné množstvo pre 6 vs 1
   hranica slova tam neexistuje. `baseRole` preto strip bez `\b`.
 - **Over KAŽDÝ rozmer nového systému, nie len vzorec:** rez uhol, obrázky profilov, model skla —
   Dominik/Zbynek našli chyby práve v týchto „okolo-vzorca" veciach, nie v FFD matike.
+
+## 3d. OSTRÁ konfigurácia ≠ cfg_seed — dielňa si ju mení v editore vzorcov
+
+`cfg_seed.json` je len seed; ostrá DB je zdroj pravdy a **dielňa ju edituje sama**
+(`/zasklenia/nastavenia`). Pri overovaní „prečo mi ten profil vyšiel 0" NEČÍTAJ len seed —
+pozri ostrý stav a **História zmien** na tej stránke (audit `cfg_audit`). Živý prípad:
+redukcia 6 mm vychádzala 0 pri IZO skle, lebo `vyroba` si 2026-07-27 zaškrtla nulovanie
+pre všetky izolačné sklá (`redukcia_zero` 0→1) — v seede to tak nie je. Pri LIVE overení
+Money-relevantnej zmeny preto **vyber sklo/voľby tak, aby daný riadok bol naozaj aktívny**,
+inak overuješ nulu a myslíš si, že je to v poriadku.
 
 ## 4. Overenie na LIVE appke = len Spočítať / Späť, NIKDY Odoslať
 
