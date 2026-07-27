@@ -440,12 +440,54 @@ function migrate() {
 		// na ~0,5 % (2x2K) resp. ~5,7 % (2x3K) rozmerov o 1–2 tyče MENEJ (kratší rez → menej
 		// tyčí). SCHVÁLENÉ Dominikom (appka predtým rámový mierne prebíjala). Idempotentné:
 		// SET offset z (opraveného) cfg_seed pre rámový (poradie 20) Slide 2x2K/2x3K.
+		// ⚠️ TÁTO MIGRÁCIA BOLA POSTAVENÁ NA ZLOM STĹPCI EXCELU (`Q` „dĺžka rezu" namiesto
+		// `E` „rozmer") — opravuje ju v15 nižšie. Blok zostáva pre správnu postupnosť
+		// user_version na už nasadenej DB; v15 hodnoty prepíše.
 		const updOff = db.prepare('UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND poradie = ?');
 		db.transaction(() => {
 			for (const r of seed.rez)
 				if ((r.sysStyl === 'Slide|2x2K' || r.sysStyl === 'Slide|2x3K') && r.poradie === 20)
 					updOff.run(r.offset, r.sysStyl, r.poradie);
 			db.pragma('user_version = 14');
+		})();
+	}
+
+	if ((db.pragma('user_version', { simple: true }) as number) < 15) {
+		// v14 → v15: Slide opona — OPRAVA v14 + oponový kód. Dvojica nálezov od pracovníka
+		// z dielne (2026-07-27), oboje overené proti zdroju:
+		//
+		// 1) RÁMOVÝ REZ: Excel od Dominika má na ten istý profil DVA stĺpce — `E` „rozmer"
+		//    (čo sa reálne reže: (S+142,5)/N resp. (S+40,6)/N, V−67) a `Q` „dĺžka rezu"
+		//    (odpisové stĺpce: (S−12)/N, V−65). v14 vzala `Q`; dielňa reže podľa `E`
+		//    (pracovník: „5000×2000 → 857 a 1933, od vás 1935 a 831"). `Q` je v Exceli
+		//    zastaraný leftover — dôkaz: nosový riadok si `Q` berie referenciou z `E`
+		//    (=E15), rámový má v `Q` ručne zadané staré −65/−12. Rámový `E` = sklo + 83
+		//    (skloOffset), čo presne zodpovedá už overeným sklo offsetom z v13.
+		//    MENÍ Money billing ZASP00088 NAHOR: 3,8 % rozmerov (6218/162324 na mriežke
+		//    S 3000–8000 × V 1800–2600 × obe sklá × 2 štýly), vždy len nahor, max +15 m.
+		//    Je to čestná korekcia — reže sa dlhší kus, než na aký v14 počítala tyče, čiže
+		//    appka po v14 rámový PODúčtovala. Ruší zníženie zavedené vo v14.
+		//
+		// 2) OPONOVÝ KÓD: ZASP00006 → ZASP20249. Money katalóg: ZASP00006 = „Oponový profil
+		//    Surový", Model_UserData = **Zasklenie Robust** (dodávateľ FINAL, 2021);
+		//    ZASP20249 = „Oponový profil surový", Model_UserData = **Zasklenie Slide**
+		//    (Cortizo, 2024). Slide opona bola odvodená z Robustu, takže dosiaľ odpisovala
+		//    ROBUSTOVÝ článok. Množstvo (1 ks, V−67) sa nemení — mení sa len článok, na
+		//    ktorý ide odpis. (Excel má v tom riadku ZASP00091, čo je podľa katalógu
+		//    „Redukcia 6 mm" — preklep v Exceli; pracovník potvrdil ZASP20249.)
+		//
+		// Idempotentné: SET z (opraveného) cfg_seed per (sys_styl, poradie).
+		const updOff = db.prepare('UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND poradie = ?');
+		const updKod = db.prepare(
+			'UPDATE cfg_rez SET kod = ?, nazov = ? WHERE sys_styl = ? AND poradie = ?'
+		);
+		db.transaction(() => {
+			for (const r of seed.rez) {
+				if (r.sysStyl !== 'Slide|2x2K' && r.sysStyl !== 'Slide|2x3K') continue;
+				if (r.poradie === 20 || r.poradie === 21) updOff.run(r.offset, r.sysStyl, r.poradie);
+				if (r.poradie === 25) updKod.run(r.kod, r.nazov, r.sysStyl, r.poradie);
+			}
+			db.pragma('user_version = 15');
 		})();
 	}
 

@@ -68,20 +68,21 @@ const off = (sysStyl: string, poradie: number) =>
 		| { offset: number }
 		| undefined)?.offset;
 
-describe('reálny v13 → v14: Slide opona rámový (S−12)/N podľa Excelu', () => {
-	it('user_version = 14', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(14);
+describe('reálny v13 → v14 (+v15): Slide opona rámový podľa Excelu', () => {
+	it('user_version = 15', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(15);
 	});
 
-	it('rámový opravený zo STARÉHO na −12 (obe štýly)', () => {
-		expect(off('Slide|2x3K', 20)).toBe(-12); // bolo 127.47
-		expect(off('Slide|2x2K', 20)).toBe(-12); // bolo 21
+	// v14 dala rámový na −12 (Excel stĺpec „dĺžka rezu"), v15 to opravila na stĺpec
+	// „rozmer". Reťaz v14→v15 beží pri tomto importe naraz, takže koncový stav = v15.
+	it('rámový opravený zo STARÉHO na Excelov „rozmer" (obe štýly)', () => {
+		expect(off('Slide|2x3K', 20)).toBe(142.5); // 127.47 → (v14: −12) → 142.5
+		expect(off('Slide|2x2K', 20)).toBe(40.6); // 21 → (v14: −12) → 40.6
 	});
 
-	it('NEDOTKNE sklo, nosový/oponový (v13) ani koľajnicu/rámový-V', () => {
+	it('NEDOTKNE sklo/nosový (v13) ani koľajnicu', () => {
 		expect(off('Slide|2x3K', 90)).toBe(142.5); // sklo šírka (v13)
 		expect(off('Slide|2x3K', 30)).toBe(-67); // nosový (v13)
 		expect(off('Slide|2x3K', 10)).toBe(0); // koľajnica
-		expect(off('Slide|2x3K', 21)).toBe(-65); // rámový V (nemenené)
 	});
 });
