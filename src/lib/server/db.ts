@@ -525,6 +525,44 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 17) {
+		// v16 → v17: SLIDE SKLÁ podľa dielne (Patrik, 2026-07-27). Slide sa vyrába v dvoch
+		// skladbách a od toho závisí, či sa počíta Redukcia 6mm (ZASP00091 — sklozávislý
+		// profil, ktorý má LEN Slide):
+		//   • bez redukcie = štandardná skladba 4/8/4 (vojde čokoľvek s 16 mm skladbou)
+		//   • s redukciou  = čokoľvek s hrúbkou 6 mm (6 mm číre, 6 mm kalené, 3.3.1, 3.3.2)
+		// Patrik chce v zozname presne: „bez redukcie 4/8/4 číre + mliečne, s redukciou
+		// 6mm číre, 6mm mliečne a 3.3.1; na všetko ostatné použijem poznámku."
+		//
+		// Doteraz Slide nemal ŽIADNE 6 mm sklo (len 4/8/4 + kalené 8/10 zdedené cez
+		// system='ALL'), takže pre 3.3.1 zákazku nebolo čo správne vybrať: izolačné
+		// redukciu nulujú, kalené 8/10 ju síce počítali, ale to je nesprávny popis skla
+		// (a fyzicky sa 8/10 mm ani do jednej skladby nezmestí).
+		//
+		// Tri zmeny, všetky idempotentné:
+		//  1) pridaj Slide sklá 6mm číre / 6mm mliečne / 3.3.1 (redukcia_zero = 0)
+		//  2) 4/8/4 mliečne nuluje redukciu (na ostrej DB si to dielňa už zaškrtla sama
+		//     2026-07-27, tu sa to len zosúlaďuje, aby to platilo aj na čistej DB)
+		//  3) kalené 8/10 už NIE 'ALL' ale 'Robust' → zmiznú zo Slide, v Robuste zostávajú
+		//     (Robust žiadny sklozávislý profil nemá, takže sa mu odpis nemení)
+		// Money: existujúce zákazky sa nemenia (odpis závisí od štýlu a od `redukcia_zero`
+		// zvoleného skla). Na ostrej DB nie je ani jedna Slide zákazka s kaleným sklom
+		// (overené read-only pred nasadením), takže sa nič spätne nerozbije.
+		db.transaction(() => {
+			const ins = db.prepare(
+				'INSERT OR IGNORE INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES (?, ?, ?, ?)'
+			);
+			for (const g of SLIDE_GLASS_6MM) ins.run(g.nazov, 0, g.poradie, 'Slide');
+			db.prepare('UPDATE glass_types SET redukcia_zero = 1 WHERE nazov = ?').run(
+				'Izolačné sklo 4/8/4 mliečne'
+			);
+			db.prepare(
+				"UPDATE glass_types SET system = 'Robust' WHERE nazov IN ('Kalené 8mm', 'Kalené 10mm')"
+			).run();
+			db.pragma('user_version = 17');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
@@ -548,9 +586,22 @@ const STANDARD_GLASS = [
 	{ nazov: 'Izolačné sklo 4.8.4', poradie: 40 }
 ];
 
+// Slide 6 mm sklá — skladba S REDUKCIOU (Patrik, 2026-07-27): „ak je redukcia, vieme
+// tam dať čokoľvek o hrúbke 6 mm" (6 mm číre, 6 mm kalené, 3.3.1, 3.3.2). Do zoznamu
+// chcel presne tieto tri; ostatné 6 mm varianty rieši obchodník poznámkou. `hrubka`
+// zostáva 0 — používa ju len Deluxe na výber kladkového/klzného profilu, Slide žiadny
+// hrúbko-závislý profil nemá.
+const SLIDE_GLASS_6MM = [
+	{ nazov: '6mm číre', poradie: 30 },
+	{ nazov: '6mm mliečne', poradie: 40 },
+	{ nazov: '3.3.1', poradie: 50 }
+];
+
 // Sklá podľa systému: Robust = izolačné 4/16/4, Slide = izolačné 4/8/4
-// (Slide „4/8/4 číre" nuluje Redukciu 6mm — sklozavislé profily sa nepočítajú),
-// kalené sklá platia pre oba systémy (system = 'ALL').
+// (Slide 4/8/4 = skladba 16 mm BEZ redukcie → obe ju nulujú) + 6 mm sklá S redukciou.
+// Redukcia 6mm je sklozavislý profil, ktorý má LEN Slide, takže `redukcia_zero` na
+// sklách iných systémov je bez účinku. Kalené 8/10 patria k Robustu (do žiadnej Slide
+// skladby sa nezmestia — Patrik 2026-07-27).
 function seedGlass() {
 	const ins = db.prepare(
 		'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES (?, ?, ?, ?)'
@@ -558,10 +609,11 @@ function seedGlass() {
 	db.transaction(() => {
 		ins.run('Izolačné sklo 4/16/4 mliečne', 0, 10, 'Robust');
 		ins.run('Izolačné sklo 4/16/4 číre', 0, 20, 'Robust');
-		ins.run('Izolačné sklo 4/8/4 mliečne', 0, 10, 'Slide');
+		ins.run('Izolačné sklo 4/8/4 mliečne', 1, 10, 'Slide');
 		ins.run('Izolačné sklo 4/8/4 číre', 1, 20, 'Slide');
-		ins.run('Kalené 8mm', 0, 30, 'ALL');
-		ins.run('Kalené 10mm', 0, 40, 'ALL');
+		for (const g of SLIDE_GLASS_6MM) ins.run(g.nazov, 0, g.poradie, 'Slide');
+		ins.run('Kalené 8mm', 0, 30, 'Robust');
+		ins.run('Kalené 10mm', 0, 40, 'Robust');
 	})();
 }
 
