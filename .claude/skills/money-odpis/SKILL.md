@@ -104,6 +104,27 @@ volaj `sysStylPre`, nikdy nelep reťazec ručne — inak sa tá cesta bude riadi
 než formulár ukazuje. Ponuky do formulára: `stylyDoPonuky` / `sklaDoPonuky` z toho istého
 modulu. Ostatné systémy sú 1:1, takže funkcia je bezpečná všade.
 
+**Odvodenie vzorcov z firemných nárezákov (openpyxl, `data_only=False`):** odpisové súbory
+(`odpis - …/2k.xlsx`) sú len tenká vrstva `='[1]<hárok>'!$H$<r>*7.5` nad majstrovským zošitom —
+`H` je počet tyčí, násobok 7.5/3.6 je dĺžka tyče. Čo z toho vyplýva: **kódy, ktoré v odpisovom
+súbore nie sú, do Money nejdú** (aj keď sa režú — napr. kalkulačkové `11016`, `K-M…`), a
+**pooling** vidno na `H = ROUNDUP(U18+U21,0)` (dva riadky jedného kódu na spoločné tyče).
+V samotnom hárku čítaj blok „Zoznam materiálu" (kód/dĺžka/ks) + „Nápočet dĺžky" (konštanty
+`−13`, `−X`, počet sekcií) — z toho vypadne `koef/offset/delitN/pocetKs` priamo.
+
+**Pri opone daj `N = 2 × počet krídel jednej strany`** — potom `(S + offset)/N` vyjadrí
+`(S/2 − …)/n` s `koef = 1` a počet skiel vyjde 2n automaticky (tak to má Štandard + aj Štandard).
+
+**Nová migrácia rozbije `user_version` asserty v STARÝCH migračných testoch** — viaceré končia
+kontrolou „finálna verzia po všetkých migráciách". Po pridaní `vN+1` ich treba hromadne
+posunúť (`toBe(17)` → `toBe(18)`), inak padne ~14 testov naraz a vyzerá to ako regresia.
+
+**Appka reže FFD, zošit počíta po riadkoch — pri POOLOVANOM kóde sa to môže rozísť.** Zošit
+zaokrúhli využitie zvlášť za každý riadok a sčíta, appka zmieša kusy jedného kódu na tyč
+(napr. Štandard 3K IZO: 6 tyčí = 21,6 m namiesto excelovských 8 = 28,8 m, lebo 948 mm kus sa
+zmestí k 2239 mm). To je zámerné (odpisuje sa, čo sa naozaj poreže) a rovnaké vo všetkých
+systémoch — ale pri porovnávaní s Excelom to čakaj a povedz to dielni, nech to nevyzerá ako chyba.
+
 ## 3c. Zdieľané Money kódy NAPRIEČ systémami — invariant pre pooling
 
 Do Štandard + boli systémy kódovo DISJUNKTNÉ; Štandard + je PRVÝ, čo zdieľa kódy s iným
