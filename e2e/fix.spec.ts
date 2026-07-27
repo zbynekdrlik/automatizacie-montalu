@@ -133,6 +133,45 @@ test('„← Späť a upraviť" zachová celé zadanie vrátane šírok polí', 
 	expect(errs).toEqual([]);
 });
 
+test('popisky vo výkrese sa neprekrývajú ani pri 8 poliach', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-FIX-P', 'OP5');
+	// najhustejší prípad: 8 polí, plochý sklon → popisky dĺžok sú tesne pri sebe
+	await page.locator('#s').fill('6000');
+	await page.locator('#v1').fill('1500');
+	await page.locator('#v2').fill('300');
+	await page.selectOption('#pocet', '8');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// obdĺžniky popiskov dĺžok šikmej hrany + oboch uhlov sa nesmú pretínať
+	const boxy: { x: number; y: number; w: number; h: number; t: string }[] = [];
+	for (const loc of [
+		page.getByTestId('fix-sikma-pole'),
+		page.getByTestId('fix-uhol'),
+		page.getByTestId('fix-uhol-tupy')
+	]) {
+		const n = await loc.count();
+		for (let i = 0; i < n; i++) {
+			const b = await loc.nth(i).boundingBox();
+			const t = (await loc.nth(i).textContent()) ?? '';
+			if (b) boxy.push({ x: b.x, y: b.y, w: b.width, h: b.height, t });
+		}
+	}
+	expect(boxy.length).toBe(10); // 8 polí + ostrý + tupý uhol
+	for (let i = 0; i < boxy.length; i++)
+		for (let j = i + 1; j < boxy.length; j++) {
+			const a = boxy[i];
+			const b = boxy[j];
+			const prekryv =
+				a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+			expect(prekryv, `prekryv „${a.t}" × „${b.t}"`).toBe(false);
+		}
+
+	expect(errs).toEqual([]);
+});
+
 test('server odmietne nezmyselné zadanie aj po obídení HTML5 validácie', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
