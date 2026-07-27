@@ -80,8 +80,8 @@ const row = (sysStyl: string, poradie: number) =>
 const off = (sysStyl: string, poradie: number) => row(sysStyl, poradie)?.offset;
 
 describe('reálny v14 → v15: Slide opona rámový „rozmer" + oponový kód', () => {
-	it('user_version = 15', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(15);
+	it('user_version = 16', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(16);
 	});
 
 	it('rámový opravený na Excelov stĺpec „rozmer" (obe štýly, obe dimenzie)', () => {
@@ -114,8 +114,10 @@ describe('reálny v14 → v15: Slide opona rámový „rozmer" + oponový kód',
 		expect(off('Slide|2x3K', 91)).toBe(-67); // sklo výška (v13)
 		expect(off('Slide|2x3K', 30)).toBe(-67); // nosový (v13)
 		expect(off('Slide|2x3K', 10)).toBe(0); // koľajnica
-		expect(off('Slide|2x3K', 40)).toBe(127.47); // redukcia 6mm — bez Excelu, nemenená
-		expect(off('Slide|2x2K', 40)).toBe(21);
+		// redukcia 6mm: v15 sa jej NEDOTKLA — opravuje ju až v16 („prírez − 72,4“), a keďže
+		// import db.ts prejde celý rad migrácií, tu už vidíme v16 výsledok
+		expect(off('Slide|2x3K', 40)).toBe(-291.9);
+		expect(off('Slide|2x2K', 40)).toBe(-249);
 	});
 
 	it('Robust opona si ponecháva ZASP00006 (je to Robustový článok)', () => {
