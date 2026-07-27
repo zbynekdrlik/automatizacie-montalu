@@ -351,7 +351,12 @@
 						<td class="c"><b>Posuv {i + 1}</b></td>
 						<td>{pv.system} {pv.styl}</td>
 						<td>{pv.S} × {pv.V} mm</td>
-						<td data-testid={`posuv-sklo-${i}`}>{fmtSkloRozmer(pv.sklo.sirka, pv.sklo.vyska)}{#if pv.skloNazov} · {pv.skloNazov}{/if}</td>
+						<!-- oddeľovač je v BUNKE ako výraz — `{#if} · {/if}` by o medzeru pred
+						     bodkou prišlo pri kompilácii (zachytil e2e: „2115mm· Izolačné") -->
+						<td data-testid={`posuv-sklo-${i}`}
+							>{fmtSkloRozmer(pv.sklo.sirka, pv.sklo.vyska) +
+								(pv.skloNazov ? ` · ${pv.skloNazov}` : '')}</td
+						>
 						<td>{pv.otvaranie ?? ''}</td>
 					</tr>
 				{/each}
