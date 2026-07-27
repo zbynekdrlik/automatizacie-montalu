@@ -66,6 +66,10 @@
 	// popisok ostrého uhla musí ísť pod ŠIKMÚ hranu, nie pod vodorovnú — pri strmom
 	// sklone hrana v mieste popisku už klesla o 52·tg α (inak text leží na čiare)
 	let ostryOdsad = $derived(28 + 52 * Math.tan((r.alfa * Math.PI) / 180));
+	// to isté pre tupý uhol nad šikmou hranou: vo vzdialenosti 44 px dovnútra je
+	// hrana o 44·tg α VYŠŠIE, takže konštantné odsadenie by pri strmom sklone
+	// popisok znova posadilo na čiaru
+	let tupyOdsad = $derived(12 + 44 * Math.tan((r.alfa * Math.PI) / 180));
 	let yNizka = $derived(Y(Math.min(r.V1, r.V2)));
 </script>
 
@@ -201,10 +205,12 @@
 		fill="#0f766e"
 		data-testid="fix-uhol">{fmt(r.uholOstry)}°</text
 	>
-	<!-- tupý uhol pri nižšej strane -->
+	<!-- Tupý uhol pri nižšej strane. Ide NAD šikmú hranu (mimo konštrukcie) — pri
+	     nízkej špičke (napr. 64,6 mm) je vnútri sotva pár pixelov a popisok by ležal
+	     na obryse; nad hranou je vždy voľno. -->
 	<text
 		x={xNizka - dovnutra * 44}
-		y={yNizka + 22}
+		y={yNizka - tupyOdsad}
 		text-anchor="middle"
 		font-size="12"
 		font-weight="700"
