@@ -1,0 +1,309 @@
+<script lang="ts">
+	// Šikmý FIX — zadanie rozmerov → výkres konštrukcie na tlač. Do Money nejde nič.
+	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
+	import { rovnomernePolia, FIX_MAX_POLI, FIX_MAX } from '$lib/fix';
+
+	let { form } = $props();
+
+	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	/** políčka sú number|string (prázdny input = ''), počítame vždy cez toto */
+	const cislo = (x: number | string) => (typeof x === 'number' ? x : parseFloat(String(x)) || 0);
+
+	let step = $derived(form?.step ?? 'form');
+	let r = $derived(form && 'r' in form ? form.r : null);
+	let vstup = $derived({
+		zak: form?.vstup?.zak ?? '',
+		op: form?.vstup?.op ?? '',
+		zakaznik: form?.vstup?.zakaznik ?? '',
+		nazov: form?.vstup?.nazov ?? '',
+		s: form?.vstup?.s ?? 0,
+		v1: form?.vstup?.v1 ?? 0,
+		v2: form?.vstup?.v2 ?? 0,
+		polia: (form?.vstup?.polia ?? []) as number[],
+		zrkadlo: form?.vstup?.zrkadlo ?? false,
+		ral: form?.vstup?.ral ?? '',
+		sklo: form?.vstup?.sklo ?? '',
+		poznamka: form?.vstup?.poznamka ?? ''
+	});
+
+	// všetky editovateľné polia sú $state (bind) — jednosmerné value={} by sa pri
+	// re-renderi vymazali (pasca, ktorá už raz vynulovala formuláre v iných moduloch)
+	let zakS = $state('');
+	let opS = $state('');
+	let zakaznikS = $state('');
+	let nazovS = $state('');
+	let sirkaS = $state<number | string>('');
+	let v1S = $state<number | string>('');
+	let v2S = $state<number | string>('');
+	let zrkadloS = $state(false);
+	let ralS = $state('');
+	let skloS = $state('');
+	let poznamkaS = $state('');
+	let poliaS = $state<(number | string)[]>([]);
+	$effect(() => {
+		const v = form?.vstup ?? null;
+		zakS = v?.zak ?? '';
+		opS = v?.op ?? '';
+		zakaznikS = v?.zakaznik ?? '';
+		nazovS = v?.nazov ?? '';
+		sirkaS = v?.s || '';
+		v1S = v?.v1 || '';
+		v2S = v?.v2 || '';
+		zrkadloS = v?.zrkadlo ?? false;
+		ralS = v?.ral ?? '';
+		skloS = v?.sklo ?? '';
+		poznamkaS = v?.poznamka ?? '';
+		poliaS = (v?.polia ?? []).map((x: number) => x);
+	});
+
+	let pocetPoli = $derived(poliaS.length || 1);
+	let sirkaNum = $derived(cislo(sirkaS));
+	let sucetPoli = $derived(poliaS.reduce<number>((a, b) => a + cislo(b), 0));
+	let sedíSucet = $derived(!poliaS.length || Math.abs(sucetPoli - sirkaNum) <= 0.5);
+
+	function nastavPocet(n: number) {
+		const k = Math.max(1, Math.min(FIX_MAX_POLI, n));
+		poliaS = sirkaNum > 0 ? rovnomernePolia(sirkaNum, k) : Array.from({ length: k }, () => '');
+	}
+	function rozdelitRovnomerne() {
+		if (sirkaNum > 0) poliaS = rovnomernePolia(sirkaNum, pocetPoli);
+	}
+	// Jedno pole = celá šírka; drž ho v súlade so zadanou šírkou, nech užívateľ
+	// nemusí prepisovať dve políčka naraz. POZOR: efekt zapisuje to, čo aj číta —
+	// bez porovnania hodnoty by sa zacyklil (effect_update_depth_exceeded, chytené e2e).
+	$effect(() => {
+		if (poliaS.length === 1 && sirkaNum > 0 && cislo(poliaS[0]) !== sirkaNum)
+			poliaS = [sirkaNum];
+	});
+
+	let poliaJSON = $derived(JSON.stringify(poliaS.length ? poliaS : sirkaNum ? [sirkaNum] : []));
+</script>
+
+<svelte:head><title>Šikmý FIX — výkres konštrukcie</title></svelte:head>
+
+{#snippet hidden()}
+	<input type="hidden" name="zak" value={vstup.zak} />
+	<input type="hidden" name="op" value={vstup.op} />
+	<input type="hidden" name="zakaznik" value={vstup.zakaznik} />
+	<input type="hidden" name="nazov" value={vstup.nazov} />
+	<input type="hidden" name="s" value={vstup.s} />
+	<input type="hidden" name="v1" value={vstup.v1} />
+	<input type="hidden" name="v2" value={vstup.v2} />
+	<input type="hidden" name="polia" value={JSON.stringify(vstup.polia)} />
+	<input type="hidden" name="ral" value={vstup.ral} />
+	<input type="hidden" name="sklo" value={vstup.sklo} />
+	<input type="hidden" name="poznamka" value={vstup.poznamka} />
+	{#if vstup.zrkadlo}<input type="hidden" name="zrkadlo" value="1" />{/if}
+{/snippet}
+
+{#if step === 'form'}
+	<div class="card">
+		<h1>Šikmý FIX — výkres konštrukcie</h1>
+		<p class="sub">
+			Fixné zasklenie so šikmou hornou hranou (do boku pergoly). Zadaj šírku a obe výšky —
+			vykreslím konštrukciu s kótami a uhlami, dielňa reže podľa výkresu.
+			<b>Do Money sa neposiela nič</b> — tento modul len kreslí.
+		</p>
+	</div>
+
+	{#if form?.error}
+		<div class="err" data-testid="form-error">⚠️ {form.error}</div>
+	{/if}
+
+	<div class="card">
+		<form method="POST" action="?/vykres">
+			<div class="grid3">
+				<div class="field">
+					<label for="zak">Číslo objednávky (ZAK) *</label>
+					<input id="zak" name="zak" bind:value={zakS} required />
+				</div>
+				<div class="field">
+					<label for="op">OP/OPDL číslo *</label>
+					<input id="op" name="op" bind:value={opS} required />
+				</div>
+				<div class="field">
+					<label for="zakaznik">Zákazník *</label>
+					<input id="zakaznik" name="zakaznik" bind:value={zakaznikS} required />
+				</div>
+			</div>
+			<div class="field">
+				<label for="nazov">Názov kusu na výkrese (nepovinné)</label>
+				<input id="nazov" name="nazov" bind:value={nazovS} maxlength="60" placeholder="napr. FIX bok pergoly" />
+			</div>
+			<div class="grid3">
+				<div class="field">
+					<label for="s">Šírka (mm) *</label>
+					<input id="s" name="s" type="number" min="300" max={FIX_MAX} step="any" bind:value={sirkaS} required />
+				</div>
+				<div class="field">
+					<label for="v1">Výška vľavo (mm) *</label>
+					<input id="v1" name="v1" type="number" min="0" max={FIX_MAX} step="any" bind:value={v1S} required />
+				</div>
+				<div class="field">
+					<label for="v2">Výška vpravo (mm) *</label>
+					<input id="v2" name="v2" type="number" min="0" max={FIX_MAX} step="any" bind:value={v2S} required />
+				</div>
+			</div>
+
+			<!-- delenie na polia (stĺpiky) — ako L1/L2/L3 na výrobnom výkrese -->
+			<div class="field">
+				<label for="pocet">Počet polí (stĺpiky medzi nimi)</label>
+				<select
+					id="pocet"
+					value={pocetPoli}
+					onchange={(e) => nastavPocet(Number((e.currentTarget as HTMLSelectElement).value))}
+				>
+					{#each Array(FIX_MAX_POLI) as _, i (i)}<option value={i + 1}>{i + 1}</option>{/each}
+				</select>
+			</div>
+			{#if poliaS.length > 1}
+				<div class="polia-box" data-testid="polia-box">
+					<div class="grid3">
+						{#each poliaS as _, i (i)}
+							<div class="field">
+								<label for={`pole${i}`}>Šírka poľa {i + 1} (mm)</label>
+								<input
+									id={`pole${i}`}
+									type="number"
+									min="100"
+									max={FIX_MAX}
+									step="any"
+									bind:value={poliaS[i]}
+								/>
+							</div>
+						{/each}
+					</div>
+					<div class="row">
+						<span
+							>Súčet polí: <b data-testid="sucet-poli">{fmt(sucetPoli)} mm</b>
+							{#if !sedíSucet}<span class="nesedi"> ⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span>{/if}
+						</span>
+						<button type="button" class="btn secondary" onclick={rozdelitRovnomerne}
+							>Rozdeliť rovnomerne</button
+						>
+					</div>
+				</div>
+			{/if}
+
+			<div class="field">
+				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+					<input type="checkbox" name="zrkadlo" value="1" bind:checked={zrkadloS} style="width:auto" />
+					🔁 Zrkadlový kus (druhá strana pergoly)
+				</label>
+			</div>
+			<div class="grid2">
+				<div class="field">
+					<label for="ral">RAL (farba)</label>
+					<input id="ral" name="ral" bind:value={ralS} maxlength="40" placeholder="napr. 7016" />
+				</div>
+				<div class="field">
+					<label for="sklo">Sklo (voľný text)</label>
+					<input id="sklo" name="sklo" bind:value={skloS} maxlength="120" placeholder="napr. 4-8-4 IZO číre" />
+				</div>
+			</div>
+			<div class="field">
+				<label for="poznamka">Poznámka (viacriadková — ide aj do tlače)</label>
+				<textarea
+					id="poznamka"
+					name="poznamka"
+					rows="3"
+					bind:value={poznamkaS}
+					maxlength="300"
+					style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical"
+				></textarea>
+			</div>
+
+			<input type="hidden" name="polia" value={poliaJSON} />
+			<button class="btn" type="submit" disabled={!sedíSucet} data-testid="nakreslit"
+				>Nakresliť výkres</button
+			>
+		</form>
+	</div>
+{:else if step === 'vykres' && r}
+	<div class="card">
+		<h1>{vstup.op} · {vstup.zakaznik}</h1>
+		<p class="sub">
+			<span class="badge"
+				>Šikmý FIX{vstup.nazov ? ` · ${vstup.nazov}` : ''} · {r.polia.length}
+				{r.polia.length === 1 ? 'pole' : r.polia.length < 5 ? 'polia' : 'polí'}{vstup.zrkadlo
+					? ' · zrkadlový kus'
+					: ''}</span
+			>
+			<span class="badge">ZAK {vstup.zak}</span>
+		</p>
+	</div>
+
+	{#if vstup.poznamka || vstup.ral || vstup.sklo}
+		<div class="card" data-testid="fix-hlavicka">
+			{#if vstup.poznamka}<div class="row"><span>Poznámka</span><b style="white-space:pre-wrap">{vstup.poznamka}</b></div>{/if}
+			{#if vstup.ral}<div class="row"><span>RAL</span><b>{vstup.ral}</b></div>{/if}
+			{#if vstup.sklo}<div class="row"><span>Sklo</span><b>{vstup.sklo}</b></div>{/if}
+		</div>
+	{/if}
+
+	<div class="card">
+		<div class="sec">Výkres konštrukcie</div>
+		<FixVykres2D {r} zrkadlo={vstup.zrkadlo} oznacenie={vstup.zrkadlo ? 'P' : 'L'} />
+	</div>
+
+	<div class="card">
+		<div class="sec">Rozmery konštrukcie</div>
+		<div class="g">
+			<div><span>Šírka</span><b>{fmt(r.S)} mm</b></div>
+			<div><span>Výška vľavo</span><b>{fmt(r.V1)} mm</b></div>
+			<div><span>Výška vpravo</span><b>{fmt(r.V2)} mm</b></div>
+			<div><span>Sklon</span><b data-testid="uhol-sklonu">{fmt(r.alfa)}°</b></div>
+			<div><span>Šikmá hrana</span><b>{fmt(r.sikmaCelkom)} mm</b></div>
+			<div><span>Uhly konštrukcie</span><b>{fmt(r.uholOstry)}° / {fmt(r.uholTupy)}°</b></div>
+			<div><span>Plocha</span><b>{String(r.m2).replace('.', ',')} m²</b></div>
+		</div>
+	</div>
+
+	<div class="card">
+		<div class="sec">Polia</div>
+		<table data-testid="fix-tabulka">
+			<thead>
+				<tr><th>Pole</th><th>Šírka</th><th>Výška vľavo</th><th>Výška vpravo</th><th>Šikmá hrana</th><th class="c">Plocha</th></tr>
+			</thead>
+			<tbody>
+				{#each r.polia as p, i (i)}
+					<tr>
+						<td><b>{vstup.zrkadlo ? 'P' : 'L'}{r.V1 >= r.V2 ? i + 1 : r.polia.length - i}</b></td>
+						<td>{fmt(p.sirka)} mm</td>
+						<td>{fmt(p.vLavo)} mm</td>
+						<td>{fmt(p.vPravo)} mm</td>
+						<td>{fmt(p.sikma)} mm</td>
+						<td class="c">{String(p.m2).replace('.', ',')} m²</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+		<p class="sub" style="margin-top:10px">
+			Výšky sú VONKAJŠIE rozmery konštrukcie (na výrobnom výkrese sú kótované svetlé rozmery
+			skla, ktoré sú o hrúbku rámu menšie).
+		</p>
+	</div>
+
+	<div class="card noprint">
+		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<form method="POST" action="?/upravit" style="display:inline">
+			{@render hidden()}
+			<button class="btn secondary" type="submit">← Späť a upraviť</button>
+		</form>
+		<a class="btn secondary" href="/fix">➕ Nový výkres</a>
+	</div>
+{/if}
+
+<style>
+	.polia-box {
+		border: 1px solid #bfdbfe;
+		background: #f8fbff;
+		border-radius: 10px;
+		padding: 10px 12px 2px;
+		margin-bottom: 12px;
+	}
+	.nesedi {
+		color: #b91c1c;
+		font-weight: 600;
+	}
+</style>
