@@ -6,6 +6,7 @@
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
 	import { stylyDoPonuky, sklaDoPonuky, sysStylPre, skloVyberaIzo } from '$lib/styl';
+	import { popisMulti, posuvySlovom } from '$lib/popis';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 
@@ -767,7 +768,9 @@
 			{/each}
 			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>
 			<button class="btn" type="submit" formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'} disabled={b2bBlok} data-testid="spocitat">
-				{jeMulti ? `Spočítať spoločný plán (${posuvyExtra.length + 1} posuvy)` : 'Spočítať nárezový plán'}
+				{jeMulti
+					? `Spočítať spoločný plán (${posuvySlovom(posuvyExtra.length + 1)})`
+					: 'Spočítať nárezový plán'}
 			</button>
 		</form>
 	</div>
@@ -841,7 +844,7 @@
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
-			<span class="badge">Zimná záhrada · {multi.posuvy.length} posuvy</span>
+			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
 		</p>
 	</div>
@@ -874,7 +877,9 @@
 {:else if step === 'hotovoMulti' && multi && form?.outcome}
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
-		<p class="sub"><span class="badge">Zimná záhrada · {multi.posuvy.length} posuvy</span></p>
+		<p class="sub">
+			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>
+		</p>
 	</div>
 
 	<div class="okmsg noprint" data-testid="vysledok">
