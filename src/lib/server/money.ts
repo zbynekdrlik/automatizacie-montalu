@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { db } from './db';
+import type { MJ } from '$lib/komponenty';
 
 export type Modul = 'zasklenia' | 'bazen' | 'pergola';
 
@@ -21,6 +22,10 @@ export interface Polozka {
 	kod: string;
 	nazov: string;
 	qty: number;
+	/** jednotka v Money. CHÝBA ⇒ 'm' — profily (a celá história do v0.8.0) sú metrážové;
+	 *  'ks' majú kusové položky kovania (Dominik 2026-07-28). Money má MJ na karte zásoby,
+	 *  takže tu MUSÍ sedieť s ňou, inak sa naveze zlé množstvo. */
+	mj?: MJ;
 }
 
 export interface OdpisJob {
@@ -85,7 +90,9 @@ async function buildXlsx(job: OdpisJob): Promise<Buffer> {
 	const ws = wb.addWorksheet('Hárok2');
 	ws.addRow(['číslo zakázky', 'Kód položky', 'Název položky', 'Množství v m', 'MJ', 'Popis dokladu']);
 	job.polozky.forEach((o, i) => {
-		ws.addRow([job.zak, o.kod, o.nazov, o.qty, 'm', i === 0 ? job.popis : '']);
+		// hlavička stĺpca zostáva „Množství v m" (tak ju Money import očakáva) — skutočnú
+		// jednotku nesie stĺpec MJ, kde 'm' je default kvôli všetkým metrážovým položkám
+		ws.addRow([job.zak, o.kod, o.nazov, o.qty, o.mj ?? 'm', i === 0 ? job.popis : '']);
 	});
 	return Buffer.from(await wb.xlsx.writeBuffer());
 }

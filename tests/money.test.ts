@@ -71,6 +71,35 @@ describe('writeOdpis', () => {
 		expect(((ws.getRow(3).values as unknown[]).slice(1))[5] ?? '').toBe('');
 	});
 
+	// jednotka v xlsx: profily 'm' (default, ako doteraz), kovanie 'ks' (Dominik 2026-07-28).
+	// Money má MJ na karte zásoby — keby appka poslala 'm' na kusovú položku, naveze sa
+	// nesprávne množstvo, preto to má vlastný test.
+	it('MJ: bez `mj` zostáva "m" (spätná kompatibilita metrážových položiek)', async () => {
+		const out = await writeOdpis(makeReq('TEST-MJ-DEF', '01'));
+		const wb = new ExcelJS.Workbook();
+		await wb.xlsx.readFile(out.target);
+		const ws = wb.getWorksheet('Hárok2')!;
+		for (let i = 2; i <= ws.rowCount; i++)
+			expect((ws.getRow(i).values as unknown[]).slice(1)[4]).toBe('m');
+	});
+
+	it('MJ: kusová položka kovania sa zapíše ako "ks" a metrážová vedľa nej ako "m"', async () => {
+		const job = makeReq('TEST-MJ-KS', '01');
+		job.polozky = [
+			{ kod: 'ZASP00014', nazov: 'Koľajnica 2K Surový 7500 mm', qty: 15 },
+			{ kod: 'ZASK00027', nazov: 'Kladka RS ROBUST', qty: 4, mj: 'ks' },
+			{ kod: 'ZASK20242', nazov: 'Tesnenie zasklievacie 12', qty: 12.5, mj: 'm' }
+		];
+		const out = await writeOdpis(job);
+		const wb = new ExcelJS.Workbook();
+		await wb.xlsx.readFile(out.target);
+		const ws = wb.getWorksheet('Hárok2')!;
+		const mj = (r: number) => (ws.getRow(r).values as unknown[]).slice(1)[4];
+		const qty = (r: number) => (ws.getRow(r).values as unknown[]).slice(1)[3];
+		expect([mj(2), mj(3), mj(4)]).toEqual(['m', 'ks', 'm']);
+		expect([qty(2), qty(3), qty(4)]).toEqual([15, 4, 12.5]);
+	});
+
 	it('duplikát (rovnaká ZAK+OP) sa odmietne a druhý súbor nevznikne', async () => {
 		const before = fs.readdirSync(process.env.MONEY_TEST_DIR!).length;
 		const out = await writeOdpis(makeReq('TEST-1', '01'));
