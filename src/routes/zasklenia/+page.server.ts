@@ -4,7 +4,7 @@
 
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
-import { safeCompute, safeComputeMulti } from '$lib/server/compute';
+import { safeCompute, safeComputeMulti, systemyRucnaKolajnica } from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
 import { sysStylPre, sklaDoPonuky, type ExistujeSysStyl } from '$lib/styl';
@@ -54,7 +54,10 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
 			// klín — len záznam do histórie/plánu, do Money položiek nejde
-			klin: vstup.klin
+			klin: vstup.klin,
+			// ručne zadané koľajnice — MENIA odpis, preto do histórie (audit prečo
+			// sedí toľko metrov); null = počítané zo šírky
+			kolajnica: vstup.kolajnica
 		}
 	};
 }
@@ -90,7 +93,9 @@ function compute(vstup: Vstup) {
 		vstup.v,
 		g.redukciaZero,
 		g.hrubka,
-		vstup.pridavnaKolajnica
+		vstup.pridavnaKolajnica,
+		// ručná dĺžka koľajnice (Patrik): mení rez → mení metre v odpise
+		vstup.kolajnica ?? undefined
 	);
 }
 
@@ -116,7 +121,9 @@ function computeMultiFrom(vstup: MultiVstup) {
 			kovanieP: p.kovanieP,
 			klin: p.klin,
 			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
-			pridavnaKolajnica: vstup.pridavnaKolajnica
+			pridavnaKolajnica: vstup.pridavnaKolajnica,
+			// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
+			kolajnica: p.kolajnica ?? undefined
 		});
 	}
 	return safeComputeMulti(cfg, specs);
@@ -150,7 +157,8 @@ function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): Odpi
 				otvaranie: p.otvaranie,
 				kovanieL: vstup.posuvy[i]?.kovanieL,
 				kovanieP: vstup.posuvy[i]?.kovanieP,
-				klin: vstup.posuvy[i]?.klin ?? null
+				klin: vstup.posuvy[i]?.klin ?? null,
+				kolajnica: vstup.posuvy[i]?.kolajnica ?? null
 			}))
 		}
 	};
@@ -168,6 +176,9 @@ export const load: PageServerLoad = async () => {
 		otvarania: OTVARANIA,
 		// kovanie krídla — zoznam pre selecty (len Robust), display-only
 		kovania: KOVANIA,
+		// systémy, kde má zmysel ručná dĺžka koľajnice (majú hornú + spodnú zvlášť):
+		// Deluxe / Štandard + / Štandard. Robust a Slide majú jednu obvodovú (Patrik).
+		systemyKolajnica: systemyRucnaKolajnica(loadCfg()),
 		live: isLive()
 	};
 };

@@ -77,6 +77,32 @@ na 1 tyč so záporným odpadom → odpis podhodnotený na polovicu. `oversizeCu
 idú cez safeCompute, takže zlé číslo sa nedostane do Money. `dlzkaTyce` je aj v
 `BOUNDS`/`inBounds` (preklep 600/75000 sa odmietne).
 
+## 2b. Ručný ROZMER rezu od obsluhy (koľajnica) — MENÍ odpis, patrí do compute
+
+Dielňa občas reže profil na inú dĺžku než dá vzorec (Patrik 2026-07-28: horná koľajnica
+2690, spodná 2695 mm namiesto šírky). Vzor, ako to pridať bez rozbitia zvyšku:
+
+- **Prepíš dĺžku v `profilCuts`, nie v konfigurácii** — jedna vetva: ak riadok patrí danej
+  ROLE a hodnota je zadaná, použi ju miesto `val()`. Koľajnice majú `kerf = 0`, takže
+  rezaná dĺžka = balená dĺžka; pri profile s nenulovým prerezom by sa muselo rozhodnúť,
+  čo obsluha vlastne zadala (rez vs. spotreba na tyči).
+- **Rolu ber z NÁZVU profilu v cfg** (`Koľajnica horná …` / `Koľajnica spodná …`,
+  `$lib/kolajnica.ts`), a zoznam systémov, kde to má zmysel, DERIVUJ z konfigurácie
+  (`systemyRucnaKolajnica`) — nie natvrdo. Robust/Slide majú jednu obvodovú koľajnicu
+  (`Koľajnica 2K …`, riadky `S` aj `V`), takže „iná horná/spodná" tam nemá zmysel a
+  vypadne sama.
+- **PASCA (stála nás jeden beh):** `\b` za slovenským znakom NEFUNGUJE —
+  `/^Koľajnica\s+horná\b/` nikdy nesedí, pretože `á` nie je ASCII `\w`, takže sa za ním
+  hranica slova nevytvorí. Override sa potom ticho ignoruje (odpis vyzerá „správne", rez
+  je zlý). Použi `(\s|$)` a napíš regresný test nad všetkými názvami z `cfg_seed`.
+- **Pretlač to celou cestou:** `parse*` (validácia rozsahu — skriptovaný POST obíde HTML5)
+  → `PosuvSpec` → `oversizeCut` (aby dlhý ručný kus padol, nie podhodnotil odpis) →
+  `computeFlat`/`computeMulti` → hidden inputy potvrdzovacieho kroku → `job.detail`
+  (audit, prečo v odpise sedí toľko metrov).
+- **Dôkaz neutrality:** existujúca sada testov musí prejsť BEZ zmeny (prázdne pole =
+  pôvodný výpočet) a nový test musí ukázať prípad, kde sa metre naozaj zmenia — inak
+  netestuješ nič (dva posuvy 4000 mm: 2 tyče = 15 m → ručne 3600 mm = 1 tyč = 7,5 m).
+
 ## 3. Pridanie systému/štýlu (data-driven)
 
 Riadky do `src/lib/server/cfg_seed.json` (systém+štýl+BOM) + idempotentná migrácia

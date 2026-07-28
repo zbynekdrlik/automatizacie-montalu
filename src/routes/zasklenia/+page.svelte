@@ -7,6 +7,7 @@
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
 	import { stylyDoPonuky, sklaDoPonuky, sysStylPre, skloVyberaIzo } from '$lib/styl';
 	import { popisMulti, posuvySlovom } from '$lib/popis';
+	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 
@@ -40,7 +41,9 @@
 			ral: zd?.ral ?? '',
 			caka: zd?.caka ?? false,
 			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false,
-			klin: (form?.vstup?.klin ?? null) as Klin | null
+			klin: (form?.vstup?.klin ?? null) as Klin | null,
+			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
+			kolajnica: (form?.vstup?.kolajnica ?? null) as { horna?: number; spodna?: number } | null
 		};
 	});
 
@@ -94,6 +97,9 @@
 		klinV1: number | string;
 		klinV2: number | string;
 		klinKs: number | string;
+		// ručné dĺžky koľajníc TOHOTO posuvu — prázdne = počítaj zo šírky (mení odpis)
+		kolajnicaHorna: number | string;
+		kolajnicaSpodna: number | string;
 	};
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
@@ -123,6 +129,9 @@
 	let klinV1S = $state<number | string>('');
 	let klinV2S = $state<number | string>('');
 	let klinKsS = $state<number | string>(1);
+	// ručné dĺžky koľajníc primárneho posuvu (Patrik 2026-07-28) — MENIA Money odpis
+	let kolHS = $state<number | string>('');
+	let kolSS = $state<number | string>('');
 	let posuvyExtra = $state<PosuvRow[]>([]);
 	$effect(() => {
 		const zd = form?.vstup ?? form?.multiVstup ?? null;
@@ -142,6 +151,9 @@
 		klinV1S = kl?.v1 ?? '';
 		klinV2S = kl?.v2 ?? '';
 		klinKsS = kl?.ks ?? 1;
+		const kolP = (prim()?.kolajnica ?? null) as { horna?: number; spodna?: number } | null;
+		kolHS = kolP?.horna ?? '';
+		kolSS = kolP?.spodna ?? '';
 		const p = prim();
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
@@ -157,7 +169,9 @@
 			klinSirka: x.klin?.sirka ?? '',
 			klinV1: x.klin?.v1 ?? '',
 			klinV2: x.klin?.v2 ?? '',
-			klinKs: x.klin?.ks ?? 1
+			klinKs: x.klin?.ks ?? 1,
+			kolajnicaHorna: x.kolajnica?.horna ?? '',
+			kolajnicaSpodna: x.kolajnica?.spodna ?? ''
 		}));
 	});
 	// 2x2K / 2x3K = opona (otváranie od stredu) → povoľ len „Opona" a nastav ju
@@ -174,6 +188,16 @@
 		if (!jeRobust) {
 			kovanieLS = '';
 			kovaniePS = '';
+		}
+	});
+	// ručná dĺžka koľajnice má zmysel len tam, kde je horná a spodná ZVLÁŠŤ
+	// (Deluxe / Štandard + / Štandard); zoznam posiela server z konfigurácie
+	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
+	let maKolajnicu = $derived(kolajnicaPre(system));
+	$effect(() => {
+		if (!maKolajnicu) {
+			kolHS = '';
+			kolSS = '';
 		}
 	});
 	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO)
@@ -215,7 +239,9 @@
 				klinSirka: klinSirkaS,
 				klinV1: klinV1S,
 				klinV2: klinV2S,
-				klinKs: klinKsS
+				klinKs: klinKsS,
+				kolajnicaHorna: kolHS,
+				kolajnicaSpodna: kolSS
 			},
 			...posuvyExtra.map((p) => ({
 				system: p.system,
@@ -231,7 +257,9 @@
 				klinSirka: p.klinSirka,
 				klinV1: p.klinV1,
 				klinV2: p.klinV2,
-				klinKs: p.klinKs
+				klinKs: p.klinKs,
+				kolajnicaHorna: p.kolajnicaHorna,
+				kolajnicaSpodna: p.kolajnicaSpodna
 			}))
 		])
 	);
@@ -247,6 +275,10 @@
 		if (p.system !== 'Robust') {
 			p.kovanieL = '';
 			p.kovanieP = '';
+		}
+		if (!kolajnicaPre(p.system)) {
+			p.kolajnicaHorna = '';
+			p.kolajnicaSpodna = '';
 		}
 	}
 	function addPosuv() {
@@ -266,7 +298,9 @@
 				klinSirka: '',
 				klinV1: '',
 				klinV2: '',
-				klinKs: 1
+				klinKs: 1,
+				kolajnicaHorna: '',
+				kolajnicaSpodna: ''
 			}
 		];
 		fixPosuv(posuvyExtra.length - 1);
@@ -339,6 +373,12 @@
 	<input type="hidden" name="ral" value={vstup.ral} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
+	{#if vstup.kolajnica?.horna}
+		<input type="hidden" name="kolajnicaHorna" value={vstup.kolajnica.horna} />
+	{/if}
+	{#if vstup.kolajnica?.spodna}
+		<input type="hidden" name="kolajnicaSpodna" value={vstup.kolajnica.spodna} />
+	{/if}
 	{#if vstup.klin}
 		<input type="hidden" name="klin" value="1" />
 		<input type="hidden" name="klinDlzka" value={vstup.klin.dlzka} />
@@ -379,6 +419,18 @@
 			<div><span>Šírka</span><b>{p.S} mm</b></div>
 			<div><span>Výška</span><b>{p.V} mm</b></div>
 			<div><span>Plocha</span><b>{fmtM(p.m2)} m²</b></div>
+			{#if vstup.kolajnica?.horna}
+				<div>
+					<span>Koľajnica horná (ručne)</span>
+					<b data-testid="kolajnica-horna">{vstup.kolajnica.horna} mm</b>
+				</div>
+			{/if}
+			{#if vstup.kolajnica?.spodna}
+				<div>
+					<span>Koľajnica spodná (ručne)</span>
+					<b data-testid="kolajnica-spodna">{vstup.kolajnica.spodna} mm</b>
+				</div>
+			{/if}
 		</div>
 	</div>
 
@@ -467,7 +519,12 @@
 					<tr>
 						<td class="c"><b>Posuv {i + 1}</b></td>
 						<td>{pv.system} {pv.styl}</td>
-						<td>{pv.S} × {pv.V} mm</td>
+						<td
+							>{pv.S} × {pv.V} mm{#if popisRucnejKolajnice(pv.kolajnica)}<span
+									class="kol-rucne"
+									data-testid={`kolajnica-rucne-${i}`}>{popisRucnejKolajnice(pv.kolajnica)}</span
+								>{/if}</td
+						>
 						<!-- oddeľovač je v BUNKE ako výraz — `{#if} · {/if}` by o medzeru pred
 						     bodkou prišlo pri kompilácii (zachytil e2e: „2115mm· Izolačné") -->
 						<td data-testid={`posuv-sklo-${i}`}
@@ -695,6 +752,39 @@
 					</label>
 				</div>
 			{/if}
+			<!-- Ručná dĺžka koľajnice (Patrik 2026-07-28): dielňa občas reže hornú a spodnú
+			     inak než na šírku otvoru (napr. 2690 / 2695 mm). MENÍ Money odpis — prázdne
+			     pole = pôvodný výpočet zo šírky. Len systémy s oddelenou hornou/spodnou. -->
+			{#if maKolajnicu}
+				<div class="grid2" data-testid="kolajnica-polia">
+					<div class="field">
+						<label for="kolajnicaHorna">Koľajnica horná (mm) — prázdne = podľa šírky</label>
+						<input
+							id="kolajnicaHorna"
+							name="kolajnicaHorna"
+							type="number"
+							min={KOLAJNICA_MIN}
+							max={KOLAJNICA_MAX}
+							step="any"
+							bind:value={kolHS}
+							placeholder={String(sirka || '')}
+						/>
+					</div>
+					<div class="field">
+						<label for="kolajnicaSpodna">Koľajnica spodná (mm) — prázdne = podľa šírky</label>
+						<input
+							id="kolajnicaSpodna"
+							name="kolajnicaSpodna"
+							type="number"
+							min={KOLAJNICA_MIN}
+							max={KOLAJNICA_MAX}
+							step="any"
+							bind:value={kolSS}
+							placeholder={String(sirka || '')}
+						/>
+					</div>
+				</div>
+			{/if}
 			<!-- Klín nad posuvom (Patrik): zapínač + dĺžka/šírka/výška 1/výška 2 + ks.
 			     Display-only — kreslí sa v náhľade, do Money odpisu nevstupuje. -->
 			<KlinPolia
@@ -753,6 +843,14 @@
 									<option value="">—</option>
 									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
 								</select></div>
+						</div>
+					{/if}
+					{#if kolajnicaPre(p.system)}
+						<div class="grid2" data-testid={`kolajnica-polia-${i}`}>
+							<div class="field"><label for={`ps${i}-kolh`}>Koľajnica horná (mm) — prázdne = podľa šírky</label>
+								<input id={`ps${i}-kolh`} type="number" min={KOLAJNICA_MIN} max={KOLAJNICA_MAX} step="any" bind:value={p.kolajnicaHorna} placeholder={String(p.s || '')} /></div>
+							<div class="field"><label for={`ps${i}-kols`}>Koľajnica spodná (mm) — prázdne = podľa šírky</label>
+								<input id={`ps${i}-kols`} type="number" min={KOLAJNICA_MIN} max={KOLAJNICA_MAX} step="any" bind:value={p.kolajnicaSpodna} placeholder={String(p.s || '')} /></div>
 						</div>
 					{/if}
 					<KlinPolia

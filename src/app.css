@@ -188,6 +188,15 @@ select:focus {
 	font-size: 13px;
 	font-weight: 600;
 }
+/* ručne zadaná dĺžka koľajnice v tabuľke posuvov — mení Money odpis, preto viditeľne
+   (nie sivým drobným textom), ale bez farby chyby: je to zámer obsluhy */
+.kol-rucne {
+	display: block;
+	margin-top: 4px;
+	color: #0f766e;
+	font-size: 13px;
+	font-weight: 600;
+}
 .b2b-upoz {
 	display: block;
 	margin-top: 5px;
