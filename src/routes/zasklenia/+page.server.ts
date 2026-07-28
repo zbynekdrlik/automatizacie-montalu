@@ -18,6 +18,8 @@ import {
 	type OdpisJob
 } from '$lib/server/money';
 import type { ComputeResult, MultiResult, PosuvSpec } from '$lib/server/compute';
+import { kovanieDoOdpisu } from '$lib/server/kovanie';
+import { komponentyPre } from '$lib/server/komponenty-cfg';
 import {
 	parseVstup,
 	parseMultiVstup,
@@ -27,7 +29,12 @@ import {
 	type MultiVstup
 } from '$lib/server/vstup';
 
-function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
+function jobFor(
+	vstup: Vstup,
+	r: ComputeResult,
+	createdBy: string,
+	kovanie: OdpisJob['polozky'] = []
+): OdpisJob {
 	return {
 		modul: 'zasklenia',
 		zak: vstup.zak,
@@ -38,7 +45,12 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 		cakaSubdir: r.system,
 		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ${safe(r.system)} ${safe(r.styl)}`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
-		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+		// profily (metre) + kovanie (kusy a tesnenia) — kovanie ide za profilmi,
+		// aby si dielňa v xlsx zachovala poradie, na ktoré je zvyknutá
+		polozky: [
+			...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+			...kovanie
+		],
 		detail: {
 			system: r.system,
 			styl: r.styl,
@@ -57,9 +69,20 @@ function jobFor(vstup: Vstup, r: ComputeResult, createdBy: string): OdpisJob {
 			klin: vstup.klin,
 			// ručne zadané koľajnice — MENIA odpis, preto do histórie (audit prečo
 			// sedí toľko metrov); null = počítané zo šírky
-			kolajnica: vstup.kolajnica
+			kolajnica: vstup.kolajnica,
+			// jednostranná FAB — MENÍ počet kľučiek/krytiek vložky v odpise
+			jednostrannaFab: vstup.jednostrannaFab
 		}
 	};
+}
+
+/**
+ * Kovanie (kusy + tesnenia) pre zákazku. Berie TIE ISTÉ specy, z ktorých sa počítal
+ * nárezový plán — inak by sa odpis kovania mohol rozísť s tým, čo sa reže.
+ * Chyba tu MUSÍ zastaviť odoslanie: radšej žiadny odpis než polovičný.
+ */
+function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean) {
+	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab);
 }
 
 /** Existuje taký nárezák? Zdroj pravdy pre server je konfigurácia (cfg z DB). */
@@ -77,26 +100,40 @@ function skloPre(cfg: ReturnType<typeof loadCfg>, system: string, styl: string, 
 	return povolene.includes(sklo) ? (platne.find((g) => g.nazov === sklo) ?? null) : null;
 }
 
-function compute(vstup: Vstup) {
+function compute(vstup: Vstup): {
+	r: ComputeResult | null;
+	err: string | null;
+	spec: PosuvSpec | null;
+} {
 	const cfg = loadCfg();
 	// sklo musí patriť k zvolenému systému (Robust = 4/16/4, Slide = 4/8/4) —
 	// nedá sa cez skriptovaný POST poslať cudzie sklo
 	const g = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo);
-	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém a štýl.' };
+	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém a štýl.', spec: null };
 	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
 	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
 	// sysStylPre: v Štandard + vyberá basic/IZO nárezák ZVOLENÉ SKLO (Patrik)
-	return safeCompute(
-		cfg,
-		sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg)),
-		vstup.s,
-		vstup.v,
-		g.redukciaZero,
-		g.hrubka,
-		vstup.pridavnaKolajnica,
+	const spec: PosuvSpec = {
+		sysStyl: sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg)),
+		S: vstup.s,
+		V: vstup.v,
+		redukciaZero: g.redukciaZero,
+		skloHrubka: g.hrubka,
+		pridavnaKolajnica: vstup.pridavnaKolajnica,
 		// ručná dĺžka koľajnice (Patrik): mení rez → mení metre v odpise
-		vstup.kolajnica ?? undefined
+		kolajnica: vstup.kolajnica ?? undefined
+	};
+	const out = safeCompute(
+		cfg,
+		spec.sysStyl,
+		spec.S,
+		spec.V,
+		spec.redukciaZero,
+		spec.skloHrubka,
+		spec.pridavnaKolajnica,
+		spec.kolajnica
 	);
+	return { ...out, spec };
 }
 
 // ---- Viac posuvov (zimná záhrada) ----
@@ -108,7 +145,11 @@ function computeMultiFrom(vstup: MultiVstup) {
 		const p = vstup.posuvy[i];
 		const g = skloPre(cfg, p.system, p.styl, p.sklo);
 		if (!g)
-			return { r: null, err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.` };
+			return {
+				r: null,
+				err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.`,
+				specs: []
+			};
 		specs.push({
 			sysStyl: sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg)),
 			S: p.s,
@@ -126,10 +167,15 @@ function computeMultiFrom(vstup: MultiVstup) {
 			kolajnica: p.kolajnica ?? undefined
 		});
 	}
-	return safeComputeMulti(cfg, specs);
+	return { ...safeComputeMulti(cfg, specs), specs };
 }
 
-function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): OdpisJob {
+function jobForMulti(
+	vstup: MultiVstup,
+	r: MultiResult,
+	createdBy: string,
+	kovanie: OdpisJob['polozky'] = []
+): OdpisJob {
 	const sys0 = r.posuvy[0]?.system ?? 'Robust';
 	return {
 		modul: 'zasklenia',
@@ -141,10 +187,14 @@ function jobForMulti(vstup: MultiVstup, r: MultiResult, createdBy: string): Odpi
 		cakaSubdir: sys0,
 		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ZIMNA ZAHRADA ${r.posuvy.length}x posuv`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
-		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+		polozky: [
+			...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+			...kovanie
+		],
 		detail: {
 			zimnaZahrada: true,
 			pocetPosuvov: r.posuvy.length,
+			jednostrannaFab: vstup.jednostrannaFab,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
 			posuvy: r.posuvy.map((p, i) => ({
@@ -179,6 +229,9 @@ export const load: PageServerLoad = async () => {
 		// systémy, kde má zmysel ručná dĺžka koľajnice (majú hornú + spodnú zvlášť):
 		// Deluxe / Štandard + / Štandard. Robust a Slide majú jednu obvodovú (Patrik).
 		systemyKolajnica: systemyRucnaKolajnica(loadCfg()),
+		// systémy, ktoré posielajú kovanie do Money (Slide čaká na skladové zásoby) —
+		// derivuje sa z konfigurácie kovania, aby sa zoznam nemusel držať na dvoch miestach
+		systemyKovanie: systemy.filter((sys) => komponentyPre(sys) !== null),
 		live: isLive()
 	};
 };
@@ -199,19 +252,25 @@ export const actions: Actions = {
 			heightWarn = checkB2BHeight(sysStyl, vstup.v) ?? undefined;
 		}
 
-		const { r, err } = compute(vstup);
-		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		const { r, err, spec } = compute(vstup);
+		if (err || !r || !spec) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		// kovanie (kusy + tesnenia) — chyba v počtoch zastaví už náhľad, aby sa
+		// nedalo odoslať niečo, čo appka nevie spočítať celé
+		const kov = kovanieFor([spec], vstup.jednostrannaFab);
+		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
+		const job = jobFor(vstup, r, '', kov.polozky);
 		return {
 			step: 'nahlad' as const,
 			vstup,
 			plan: r,
+			kovanie: kov.polozky,
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
-			planHash: contentHash(vstup.zak, jobFor(vstup, r, '').polozky),
+			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
 			heightWarn,
 			cielInfo: {
 				live: isLive(),
-				filename: filenameFor(jobFor(vstup, r, '')),
+				filename: filenameFor(job),
 				dir: targetDirFor(r.system, vstup.caka)
 			}
 		};
@@ -226,13 +285,15 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const { vstup, error } = parseVstup(formData);
 		if (error) return { step: 'form' as const, error, vstup };
-		const { r, err } = compute(vstup);
-		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		const { r, err, spec } = compute(vstup);
+		if (err || !r || !spec) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		const kov = kovanieFor([spec], vstup.jednostrannaFab);
+		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 
 		// ak niekto medzi náhľadom a potvrdením zmenil vzorce (Nastavenia),
 		// prepočet už nesedí s tým, čo užívateľ videl → nezapisuj, ukáž nový náhľad
 		const potvrdene = String(formData.get('planHash') ?? '');
-		const job = jobFor(vstup, r, locals.user?.username ?? '');
+		const job = jobFor(vstup, r, locals.user?.username ?? '', kov.polozky);
 		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
 			return {
@@ -304,13 +365,16 @@ export const actions: Actions = {
 			heightWarn = warns.length ? [...new Set(warns)].join(' ') : undefined;
 		}
 
-		const { r, err } = computeMultiFrom(vstup);
+		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
-		const job = jobForMulti(vstup, r, '');
+		const kov = kovanieFor(specs, vstup.jednostrannaFab);
+		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
+		const job = jobForMulti(vstup, r, '', kov.polozky);
 		return {
 			step: 'nahladMulti' as const,
 			multiVstup: vstup,
 			multi: r,
+			kovanie: kov.polozky,
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
 			heightWarn,
@@ -330,11 +394,13 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const { vstup, error } = parseMultiVstup(formData);
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
-		const { r, err } = computeMultiFrom(vstup);
+		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 
 		const potvrdene = String(formData.get('planHash') ?? '');
-		const job = jobForMulti(vstup, r, locals.user?.username ?? '');
+		const kov = kovanieFor(specs, vstup.jednostrannaFab);
+		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
+		const job = jobForMulti(vstup, r, locals.user?.username ?? '', kov.polozky);
 		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
 			return {

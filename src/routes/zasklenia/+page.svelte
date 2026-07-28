@@ -41,6 +41,7 @@
 			ral: zd?.ral ?? '',
 			caka: zd?.caka ?? false,
 			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false,
+			jednostrannaFab: zd?.jednostrannaFab ?? false,
 			klin: (form?.vstup?.klin ?? null) as Klin | null,
 			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
 			kolajnica: (form?.vstup?.kolajnica ?? null) as { horna?: number; spodna?: number } | null
@@ -112,6 +113,8 @@
 	let ralS = $state('');
 	let cakaS = $state(false);
 	let pridavnaKolajnicaS = $state(false);
+	// jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks)
+	let jednostrannaFabS = $state(false);
 	let system = $state('Robust');
 	let styl = $state('2K');
 	let sklo = $state('');
@@ -144,6 +147,7 @@
 		ralS = zd?.ral ?? '';
 		cakaS = zd?.caka ?? false;
 		pridavnaKolajnicaS = zd?.pridavnaKolajnica ?? false;
+		jednostrannaFabS = zd?.jednostrannaFab ?? false;
 		const kl = (form?.vstup?.klin ?? null) as Klin | null;
 		klinS = !!kl;
 		klinDlzkaS = kl?.dlzka ?? '';
@@ -193,6 +197,8 @@
 	// ručná dĺžka koľajnice má zmysel len tam, kde je horná a spodná ZVLÁŠŤ
 	// (Deluxe / Štandard + / Štandard); zoznam posiela server z konfigurácie
 	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
+	// kovanie do Money má zatiaľ len Robust (Slide čaká na skladové zásoby v Money)
+	let maKovanie = $derived(data.systemyKovanie.includes(system));
 	let maKolajnicu = $derived(kolajnicaPre(system));
 	$effect(() => {
 		if (!maKolajnicu) {
@@ -373,6 +379,7 @@
 	<input type="hidden" name="ral" value={vstup.ral} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
+	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
 	{#if vstup.kolajnica?.horna}
 		<input type="hidden" name="kolajnicaHorna" value={vstup.kolajnica.horna} />
 	{/if}
@@ -488,6 +495,17 @@
 		{/each}
 	</div>
 
+	{#if form?.kovanie?.length}
+		<div class="card" data-testid="kovanie-karta">
+			<div class="sec">Kovanie a tesnenia (do Money)</div>
+			{#each form.kovanie as k (k.kod)}
+				<div class="row">
+					<span>{k.kod} · {k.nazov}</span><b>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b>
+				</div>
+			{/each}
+		</div>
+	{/if}
+
 	<div class="card">
 		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
 		<p class="sub" style="margin-bottom:14px">
@@ -506,6 +524,7 @@
 	<input type="hidden" name="posuvy" value={JSON.stringify(multiVstup?.posuvy ?? [])} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
+	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
 {/snippet}
 
 {#snippet planKartyMulti(m: NonNullable<typeof multi>)}
@@ -585,6 +604,17 @@
 			<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.metre)} m</b></div>
 		{/each}
 	</div>
+
+	{#if form?.kovanie?.length}
+		<div class="card" data-testid="kovanie-karta">
+			<div class="sec">Kovanie a tesnenia (do Money)</div>
+			{#each form.kovanie as k (k.kod)}
+				<div class="row">
+					<span>{k.kod} · {k.nazov}</span><b>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b>
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="sec">Rozpis rezov na tyče — pre pílu (posuvy zdieľajú tyče)</div>
@@ -749,6 +779,23 @@
 							style="width:auto"
 						/>
 						➕ Prídavná koľajnica (spodná koľajnica o veľkosť väčšia)
+					</label>
+				</div>
+			{/if}
+			<!-- Jednostranná FAB (Dominik 2026-07-28: „chodí jeden zo 100") — MENÍ Money
+			     odpis: kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. -->
+			{#if maKovanie}
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+						<input
+							type="checkbox"
+							name="jednostrannaFab"
+							value="1"
+							bind:checked={jednostrannaFabS}
+							style="width:auto"
+							data-testid="jednostranna-fab"
+						/>
+						🔑 Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)
 					</label>
 				</div>
 			{/if}

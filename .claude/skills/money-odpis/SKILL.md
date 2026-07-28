@@ -225,3 +225,44 @@ zrazu ukazuje niečo iné než formulár. Kryje to e2e „prežije Späť a upra
 „do Money nejde", o pár hodín „má ísť do Money" → čaká na katalógové kódy + počty ks).
 Preto drž prvok v `detail` (zapíše sa do histórie) — keď sa rozhodnutie otočí, dáta
 o minulých zákazkách existujú.
+
+## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
+
+Do v0.8.0 odpis poznal len metrážové profily a jednotka v xlsx bola natvrdo `'m'`.
+Kovanie (Dominik 2026-07-28) je prvá kusová položka. Čo z toho vyplýva:
+
+- **Jednotka je per položka:** `Polozka.mj?: 'm' | 'ks'`, xlsx píše `o.mj ?? 'm'`. Default
+  drží spätnú kompatibilitu — bez `mj` je export bajt na bajt ako predtým (kryté testom
+  nad každým riadkom). Money má MJ na karte zásoby; keď sa rozídu, naveze sa zlé množstvo.
+- **Kusy sa NEPOOLUJÚ, sčítavajú sa.** Profily naprieč posuvmi zdieľajú tyče (FFD), takže
+  2 posuvy ≠ 2× odpis. Kovanie je opak: každý posuv má svoje krídla, takže 2 posuvy = 2×
+  kusy. Preto sa kovanie počíta PER POSUV cez `computeFlat` (nie z `computeMulti`, ktorý
+  materiál už zlial po kóde) a až potom sa zlúči.
+- **Počty odvodzuj z už spočítaného plánu, nie z nového vzorca** (`zakladPoctov`): počet
+  krídel = `N` štýlu, počty nosových profilov a súčty dĺžok rámového/nosového/oponového z
+  `material[].rezy`. Roly sa poznajú z NÁZVU profilu — tá istá konvencia ako `jeSikmyRez`.
+- **Konštanta môže visieť na KOĽAJNICI, nie na štýle.** Rohovník obvodový: „je jedno koľko
+  okien na tom je, stále je to tá istá koľajnica" → opona `2x3K` berie počet `3K`. Preto
+  `konstPreKolajnicu` + `kolajnicaStylu()`, nie ďalší riadok v mape štýlov.
+- **Jeden kód môže mať dve pravidlá naraz.** Slide nemá zvlášť rohovník krídla — `ZASK00037`
+  je obvod (podľa koľajnice) AJ 4 ks/krídlo. V tabuľke je dvakrát a `pocitajKomponenty` ho
+  zlúči do JEDNÉHO riadku odpisu (dva riadky s tým istým kódom by Money zmiatli).
+- **Chýbajúci počet = HLASNÁ chyba, nikdy 0 ks.** Štýl bez konštanty vráti `chyby` a
+  `kovanieDoOdpisu` z toho spraví `err`, ktorý zastaví už náhľad. Tichá nula by znamenala,
+  že sa kovanie nikdy neodpíše a nikto si to nevšimne — rovnaká disciplína ako
+  `oversizeCut` / `missingHrubkaProfile`.
+- **Artikel v Money ≠ skladová zásoba.** Kód môže byť v `Artikly_Artikl` (a používateľ ho
+  VIDÍ v Katalógu), ale bez riadku v `Sklady_Zasoba` naň nejde zapísať skladový pohyb.
+  Pri overovaní kódu sa preto pýtaj na OBE tabuľky; Slide kovanie je kvôli tomu vypnuté
+  cez `SLIDE_PRIPRAVENY`. (Diagnóza „ten kód v Money neexistuje" bola kvôli tomuto
+  nesprávna — Dominik ho v Katalógu videl.)
+- **Vstup, ktorý mení počty, musí prejsť celou cestou** (jednostranná FAB): `parse*Vstup`
+  → `Vstup`/`MultiVstup` → `kovanieDoOdpisu` → `job.polozky` + `job.detail` (audit) →
+  hidden inputy („Späť a upraviť"). Bez `detail` sa po rokoch nedá zistiť, prečo tá zákazka
+  mala polovicu kľučiek.
+- **Pasca pri návrate z akcie:** nový kľúč (`kovanie`) pridaj do VŠETKÝCH náhľadových
+  vetiev naraz (`nahlad` aj `nahladMulti`). Keď je len v jednej, SvelteKit `ActionData`
+  prestane zužovať `form.vstup` a `svelte-check` vysype ~24 chýb v `+page.svelte`, ktoré
+  vyzerajú ako chyby úplne inde.
+- **E2E beží proti `npm run preview`, čiže proti POSLEDNÉMU BUILDU** — po zmene servera
+  spusti `npm run build`, inak testuješ starý kód a márne hľadáš chybu v novom.
