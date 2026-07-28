@@ -59,7 +59,9 @@ test('Štandard + 4K: horná 2690 / spodná 2695 sa objaví v rezoch plánu', as
 	await expect(page.locator('tr', { hasText: 'ZASP00036' })).not.toContainText('3447 mm');
 	// ostatné profily podľa rozmeru otvoru (nedotknuté) + odpis stále 7,5 m (jedna tyč)
 	await expect(riadok(page, 'ZASP00036')).toContainText(/(^|\D)7,5 m/);
-	await expect(page.getByTestId('sklo-sirka')).toHaveText('803');
+	// sklo sa ručnou koľajnicou NEMENÍ — 826 mm je basic 4K nárezák pre šírku 3447
+	// (predvolené sklo je float; IZO by dalo 803, viď tests/kolajnica-rucna.test.ts)
+	await expect(page.getByTestId('sklo-sirka')).toHaveText('826');
 
 	expect(errs).toEqual([]);
 });
