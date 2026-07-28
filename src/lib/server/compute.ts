@@ -5,6 +5,7 @@
 import { jeSikmyRez, systemRovnyRez } from '$lib/cut';
 import type { Klin } from '$lib/klin';
 import { rolaKolajnice, type KolajnicaRucne } from '$lib/kolajnica';
+import type { ZakladPoctov } from '$lib/komponenty';
 
 export interface SysRow {
 	sysStyl: string;
@@ -359,6 +360,33 @@ export function computeFlat(
 			vyska: Math.round(val(sv, S, V, N, true) - g.skloOffset),
 			pocet: N
 		}
+	};
+}
+
+/**
+ * Podklad na výpočet kovania ({@link ZakladPoctov}) z už spočítaného plánu JEDNÉHO
+ * posuvu. Nič sa nehádá: počet krídel je `N` štýlu, počty a dĺžky profilov sú tie
+ * isté čísla, podľa ktorých dielňa reže. Roly sa poznajú z NÁZVU profilu — rovnaká
+ * konvencia, akú už používa `jeSikmyRez` (nosový/oponový = rovný rez).
+ *
+ * POZOR: pri multi-posuve to volaj PER POSUV a výsledky zlúč (`zlucKomponenty`) —
+ * `computeMulti` materiál pooluje po kóde, takže z jeho `material` by sa počty
+ * jednotlivých posuvov už nedali oddeliť.
+ */
+export function zakladPoctov(r: ComputeResult): ZakladPoctov {
+	const dlzka = (re: RegExp) =>
+		r.material
+			.filter((m) => re.test(m.nazov))
+			.reduce((s, m) => s + m.rezy.reduce((a, x) => a + x.rozmer * x.ks, 0), 0);
+	const nosoveProfily = r.material
+		.filter((m) => /nos[oó]v/i.test(m.nazov))
+		.reduce((s, m) => s + m.rezy.reduce((a, x) => a + x.ks, 0), 0);
+	return {
+		kridla: r.N,
+		nosoveProfily,
+		dlzkaRamovehoMm: dlzka(/r[áa]mov/i),
+		dlzkaNosovehoMm: dlzka(/nos[oó]v/i),
+		dlzkaOponovehoMm: dlzka(/opon/i)
 	};
 }
 

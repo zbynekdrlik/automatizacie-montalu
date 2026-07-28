@@ -135,6 +135,9 @@ export interface Vstup {
 	caka: boolean;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica: boolean;
+	/** jednostranná FAB — výnimka (Dominik: „chodí jeden zo 100"). MENÍ Money odpis:
+	 *  kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. */
+	jednostrannaFab: boolean;
 	/** klín nad posuvom (Patrik) — display-only, do Money odpisu NEJDE; null = žiadny */
 	klin: Klin | null;
 	/** ručne zadané dĺžky koľajníc — MENÍ Money odpis; null = počítaj zo šírky */
@@ -173,6 +176,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
+		jednostrannaFab: form.get('jednostrannaFab') === '1',
 		klin: null,
 		kolajnica: null
 	};
@@ -230,6 +234,8 @@ export interface MultiVstup {
 	caka: boolean;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica: boolean;
+	/** jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks) */
+	jednostrannaFab: boolean;
 	posuvy: PosuvVstup[];
 }
 
@@ -244,7 +250,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300),
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
-		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1'
+		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
+		jednostrannaFab: form.get('jednostrannaFab') === '1'
 	};
 	let posuvyRaw: unknown;
 	try {
