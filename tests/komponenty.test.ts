@@ -10,6 +10,12 @@ import {
 	zlucKomponenty,
 	type Komponent
 } from '../src/lib/komponenty';
+import {
+	KOMPONENTY_ROBUST,
+	KOMPONENTY_SLIDE,
+	SLIDE_PRIPRAVENY,
+	komponentyPre
+} from '../src/lib/server/komponenty-cfg';
 import seed from '../src/lib/server/cfg_seed.json';
 
 const cfg = buildCFG(seed.sys as never, seed.rez as never);
@@ -161,6 +167,128 @@ describe('fail-loud: nenakonfigurovaný štýl NESMIE dať tichú nulu', () => {
 		const r = spocitaj('Robust|2x4K');
 		expect(r.chyby[0].sprava).toMatch(/ZASK00029/);
 		expect(r.chyby[0].sprava).toMatch(/Robust\|2x4K/);
+	});
+});
+
+// ——— OSTRÁ konfigurácia (tabuľky od Dominika + jeho odpovede z 2026-07-28) ———
+describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
+	const spocitajR = (sysStyl: string, obojstrannaFab = true) =>
+		pocitajKomponenty(
+			KOMPONENTY_ROBUST,
+			sysStyl,
+			zaklad(sysStyl),
+			pocetUzaverov(KOMPONENTY_ROBUST.find((k) => k.kod === 'ZASK00029')!, sysStyl),
+			obojstrannaFab
+		);
+	const qr = (sysStyl: string, kod: string, fab = true) =>
+		spocitajR(sysStyl, fab).polozky.find((p) => p.kod === kod)?.qty;
+
+	it('KAŽDÝ Robust štýl z konfigurácie sa spočíta bez chyby', () => {
+		const styly = Object.keys(cfg).filter((s) => s.startsWith('Robust|'));
+		expect(styly.length).toBeGreaterThan(0);
+		for (const s of styly) expect({ styl: s, chyby: spocitajR(s).chyby }).toEqual({
+			styl: s,
+			chyby: []
+		});
+	});
+
+	it('uzávery: jednoduchý systém 2 ks, opona 3 ks (Dominik 4K-2, 2x3K-3, 2x4K-3)', () => {
+		expect(qr('Robust|4K', 'ZASK00029')).toBe(2);
+		expect(qr('Robust|2x3K', 'ZASK00029')).toBe(3);
+		expect(qr('Robust|2x4K', 'ZASK00029')).toBe(3);
+	});
+
+	it('rohovník obvodový sa riadi KOĽAJNICOU, nie štýlom', () => {
+		// „je jedno koľko okien na tom je, stále je to tá istá koľajnica"
+		expect(qr('Robust|2K', 'ZASK00037')).toBe(8);
+		expect(qr('Robust|2x2K', 'ZASK00037')).toBe(8);
+		expect(qr('Robust|3K', 'ZASK00037')).toBe(12);
+		expect(qr('Robust|2x3K', 'ZASK00037')).toBe(12);
+		expect(qr('Robust|4K', 'ZASK00037')).toBe(12);
+		expect(qr('Robust|2x4K', 'ZASK00037')).toBe(12);
+	});
+
+	it('kľučka a krytka vložky: obojstranná FAB 2 ks, jednostranná 1 ks na uzáver', () => {
+		expect(qr('Robust|2K', 'ZASK00030')).toBe(4); // 2 uzávery × 2
+		expect(qr('Robust|2K', 'ZASK00035')).toBe(4);
+		expect(qr('Robust|2K', 'ZASK00030', false)).toBe(2);
+		expect(qr('Robust|2K', 'ZASK00035', false)).toBe(2);
+		expect(qr('Robust|2x2K', 'ZASK00030')).toBe(6); // opona: 3 uzávery × 2
+	});
+
+	it('FAB mení LEN kľučku a krytku vložky, nič iné', () => {
+		const obojstranna = spocitajR('Robust|3K', true).polozky.filter(
+			(p) => !['ZASK00030', 'ZASK00035'].includes(p.kod)
+		);
+		const jednostranna = spocitajR('Robust|3K', false).polozky.filter(
+			(p) => !['ZASK00030', 'ZASK00035'].includes(p.kod)
+		);
+		expect(jednostranna).toEqual(obojstranna);
+	});
+
+	it('zasklievacie tesnenie 10 a 12 je 50/50 z rámového profilu (Dominikova dohoda)', () => {
+		const z = zaklad('Robust|2K');
+		const polovica = Math.round((z.dlzkaRamovehoMm / 2 / 1000) * 1000) / 1000;
+		expect(qr('Robust|2K', 'ZASK20241')).toBe(polovica);
+		expect(qr('Robust|2K', 'ZASK20242')).toBe(polovica);
+		// a spolu to dá presne celú dĺžku rámového profilu, nie dvojnásobok
+		expect(qr('Robust|2K', 'ZASK20241')! + qr('Robust|2K', 'ZASK20242')!).toBeCloseTo(
+			z.dlzkaRamovehoMm / 1000,
+			3
+		);
+	});
+
+	it('kefové 7x3,5 pri opone počíta aj oponový profil', () => {
+		const z = zaklad('Robust|2x2K');
+		expect(z.dlzkaOponovehoMm).toBeGreaterThan(0);
+		expect(qr('Robust|2x2K', 'ZASK00041')).toBeCloseTo(
+			(z.dlzkaNosovehoMm + 2 * z.dlzkaOponovehoMm) / 1000,
+			3
+		);
+	});
+
+	it('každý kód v tabuľke je overený proti Money (nemenná kontrola zoznamu)', () => {
+		// zoznam overený read-only SQL 2026-07-28: existuje, Deleted=0, zásoba na sklade Materiál
+		expect(KOMPONENTY_ROBUST.map((k) => k.kod).sort()).toEqual([
+			'ZASK00027', 'ZASK00029', 'ZASK00030', 'ZASK00031', 'ZASK00032', 'ZASK00033',
+			'ZASK00034', 'ZASK00035', 'ZASK00036', 'ZASK00037', 'ZASK00038', 'ZASK00039',
+			'ZASK00041', 'ZASK00042', 'ZASK20241', 'ZASK20242'
+		]);
+	});
+});
+
+describe('KOMPONENTY_SLIDE — pripravené, ale do Money zatiaľ nejde', () => {
+	const spocitajS = (sysStyl: string) =>
+		pocitajKomponenty(
+			KOMPONENTY_SLIDE,
+			sysStyl,
+			zaklad(sysStyl),
+			pocetUzaverov(KOMPONENTY_SLIDE.find((k) => k.kod === 'ZASK20254')!, sysStyl)
+		);
+
+	it('Slide je vypnutý, kým 7 kódov nemá v Money skladovú zásobu', () => {
+		expect(SLIDE_PRIPRAVENY).toBe(false);
+		expect(komponentyPre('Slide')).toBeNull();
+		expect(komponentyPre('Robust')).toBe(KOMPONENTY_ROBUST);
+		expect(komponentyPre('Štandard +')).toBeNull();
+	});
+
+	it('KAŽDÝ Slide štýl sa spočíta bez chyby (aby to po založení zásob len bežalo)', () => {
+		for (const s of Object.keys(cfg).filter((x) => x.startsWith('Slide|')))
+			expect({ styl: s, chyby: spocitajS(s).chyby }).toEqual({ styl: s, chyby: [] });
+	});
+
+	it('ZASK00037 je JEDEN riadok = obvod podľa koľajnice + 4 ks na krídlo', () => {
+		const r = spocitajS('Slide|3K');
+		const rohovniky = r.polozky.filter((p) => p.kod === 'ZASK00037');
+		expect(rohovniky).toHaveLength(1); // nie dva riadky do Money
+		expect(rohovniky[0].qty).toBe(8 + 4 * zaklad('Slide|3K').kridla);
+	});
+
+	it('Slide nemá vlastný rohovník krídla ani kód ZASK00038/39 z Robustu', () => {
+		const kody = KOMPONENTY_SLIDE.map((k) => k.kod);
+		expect(kody).not.toContain('ZASK00038');
+		expect(kody).not.toContain('ZASK00039');
 	});
 });
 

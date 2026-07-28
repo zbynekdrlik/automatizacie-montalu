@@ -41,10 +41,22 @@ export type Pravidlo =
 	| { typ: 'naKridlo'; koef: number }
 	/** ks = koef × počet uzáverov (podložka 5 ks, protikus 2 ks, sada 1 ks…) */
 	| { typ: 'naUzaver'; koef: number }
+	/**
+	 * ks = počet uzáverov × (obojstranná FAB ? 2 : 1) — kľučka a krytka vložky.
+	 * Dominik 2026-07-28: jednostranná FAB „chodí jeden zo 100", takže obojstranná
+	 * je predvolená a jednostranná je zaškrtávacia výnimka vo formulári.
+	 */
+	| { typ: 'naUzaverPodlaFab' }
 	/** ks = koef × počet kusov nosového profilu (krytka krídla 2 ks) */
 	| { typ: 'naNosovyProfil'; koef: number }
-	/** ks = konštanta podľa štýlu (uzáver/zámok, rohovník obvodový) */
+	/** ks = konštanta podľa štýlu (uzáver / automatický zámok) */
 	| { typ: 'konstPreStyl'; ks: Record<string, number> }
+	/**
+	 * ks = konštanta podľa KOĽAJNICE, nie podľa štýlu (rohovník obvodový).
+	 * Dominik 2026-07-28: „je jedno koľko okien na tom je, stále je to tá istá koľajnica" —
+	 * takže opona 2x3K berie počet 3K koľajnice, nie dvojnásobok.
+	 */
+	| { typ: 'konstPreKolajnicu'; ks: Record<string, number> }
 	/** m = súčet dĺžok danej role profilu (zasklievacie tesnenie = rámový) */
 	| { typ: 'dlzkaProfilu'; role: 'ramovy' | 'nosovy'; koef: number }
 	/** m = (nosový + 2 × oponový) — kefové tesnenie 7x3,5 */
@@ -76,6 +88,17 @@ export interface PolozkaKomponentu {
 const R3 = (x: number) => Math.round(x * 1000) / 1000;
 
 /**
+ * Koľajnica, na ktorej štýl beží — `2x3K` aj `3K` jazdia po TEJ ISTEJ 3K koľajnici.
+ * Používa sa len pre {@link Pravidlo} `konstPreKolajnicu` (rohovník obvodový).
+ */
+export function kolajnicaStylu(sysStyl: string): string {
+	const styl = sysStyl.includes('|') ? sysStyl.split('|')[1] : sysStyl;
+	// štýl môže niesť aj nárezák („4K IZO") — koľajnicu určuje len počet krídel
+	const m = /(\d+K)/.exec(styl.replace(/^\d+x/, ''));
+	return m ? m[1] : styl;
+}
+
+/**
  * Počet uzáverov (Robust) / automatických zámkov (Slide) pre daný štýl — kotva, na
  * ktorej visí 5 ďalších položiek (podložka, protikus, protikus podložka, upevňovacia
  * sada, madlo). Preto sa počíta raz a zvlášť.
@@ -95,7 +118,8 @@ export function pocitajKomponenty(
 	komponenty: Komponent[],
 	sysStyl: string,
 	zaklad: ZakladPoctov,
-	uzavery: number | null
+	uzavery: number | null,
+	obojstrannaFab = true
 ): { polozky: PolozkaKomponentu[]; chyby: ChybaKomponentu[] } {
 	const polozky: PolozkaKomponentu[] = [];
 	const chyby: ChybaKomponentu[] = [];
@@ -110,6 +134,7 @@ export function pocitajKomponenty(
 			case 'naNosovyProfil':
 				qty = p.koef * zaklad.nosoveProfily;
 				break;
+			case 'naUzaverPodlaFab':
 			case 'naUzaver':
 				if (uzavery === null) {
 					chyby.push({
@@ -117,7 +142,7 @@ export function pocitajKomponenty(
 						sprava: `${k.nazov} (${k.kod}): počet sa odvodzuje od uzáveru, ale pre štýl ${sysStyl} nie je nakonfigurovaný počet uzáverov`
 					});
 				} else {
-					qty = p.koef * uzavery;
+					qty = (p.typ === 'naUzaver' ? p.koef : obojstrannaFab ? 2 : 1) * uzavery;
 				}
 				break;
 			case 'konstPreStyl': {
@@ -126,6 +151,19 @@ export function pocitajKomponenty(
 					chyby.push({
 						kod: k.kod,
 						sprava: `${k.nazov} (${k.kod}): pre štýl ${sysStyl} nie je nakonfigurovaný počet kusov`
+					});
+				} else {
+					qty = ks;
+				}
+				break;
+			}
+			case 'konstPreKolajnicu': {
+				const kol = kolajnicaStylu(sysStyl);
+				const ks = p.ks[kol];
+				if (!Number.isFinite(ks)) {
+					chyby.push({
+						kod: k.kod,
+						sprava: `${k.nazov} (${k.kod}): pre koľajnicu ${kol} (štýl ${sysStyl}) nie je nakonfigurovaný počet kusov`
 					});
 				} else {
 					qty = ks;
@@ -156,7 +194,10 @@ export function pocitajKomponenty(
 		polozky.push({ kod: k.kod, nazov: k.nazov, mj: k.mj, qty });
 	}
 
-	return { polozky, chyby };
+	// Ten istý kód môže byť v tabuľke viackrát s rôznym pravidlom — Slide používa
+	// `ZASK00037` naraz ako obvodový rohovník (podľa koľajnice) AJ ako rohovník krídla
+	// (4 ks/krídlo). Do Money musí ísť JEDEN riadok so súčtom.
+	return { polozky: zlucKomponenty([polozky]), chyby };
 }
 
 /** Zlúči kovanie z viacerých posuvov po kóde (rovnako ako sa poolujú profily). */
