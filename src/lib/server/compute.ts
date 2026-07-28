@@ -4,6 +4,7 @@
 // zmeny testovacích vektorov v tests/compute.test.ts.
 import { jeSikmyRez, systemRovnyRez } from '$lib/cut';
 import type { Klin } from '$lib/klin';
+import { rolaKolajnice, type KolajnicaRucne } from '$lib/kolajnica';
 
 export interface SysRow {
 	sysStyl: string;
@@ -175,7 +176,8 @@ function profilCuts(
 	N: number,
 	redukciaZero: boolean,
 	skloHrubka: number,
-	posuv?: number
+	posuv?: number,
+	rucnaKolajnica?: KolajnicaRucne
 ): ProfilCuts[] {
 	const order: string[] = [];
 	const byKod: Record<string, RezRow[]> = {};
@@ -196,10 +198,14 @@ function profilCuts(
 		const rezy: { rozmer: number; ks: number }[] = [];
 		// dĺžka pre balenie je bez prerezu; zobrazený rozmer je s prerezom
 		const kusy: Kus[] = [];
+		// ručne zadaná dĺžka koľajnice (Patrik): nahradí vypočítanú dĺžku pre TÚTO
+		// rolu (horná / spodná). Koľajnice majú kerf 0, takže rezaná = balená dĺžka.
+		const rola = rolaKolajnice(rows[0].nazov);
+		const rucne = rola ? Number(rucnaKolajnica?.[rola]) || 0 : 0;
 		for (const r of rows) {
 			const t = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
-			const q = val(r, S, V, N, false);
-			const rozmer = Math.round(val(r, S, V, N, true));
+			const q = rucne > 0 ? rucne : val(r, S, V, N, false);
+			const rozmer = rucne > 0 ? rucne : Math.round(val(r, S, V, N, true));
 			for (let i = 0; i < t; i++)
 				if (q > 0) kusy.push(posuv ? { dlzka: q, rozmer, posuv } : { dlzka: q, rozmer });
 			rezy.push({ rozmer, ks: t });
@@ -224,11 +230,12 @@ export function oversizeCut(
 	S: number,
 	V: number,
 	redukciaZero: boolean,
-	skloHrubka: number
+	skloHrubka: number,
+	rucnaKolajnica?: KolajnicaRucne
 ): string | null {
 	const g = cfg[sysStyl];
 	if (!g) return null;
-	for (const c of profilCuts(g, S, V, g.N, redukciaZero, skloHrubka)) {
+	for (const c of profilCuts(g, S, V, g.N, redukciaZero, skloHrubka, undefined, rucnaKolajnica)) {
 		for (const k of c.kusy) {
 			if (k.dlzka + KOTUC > c.barLen)
 				return `Rez ${Math.round(k.rozmer)} mm (${c.nazov}) je dlhší než tyč ${c.barLen} mm — tento rozmer sa z daného profilu nedá vyrobiť. Zmenši rozmer alebo zvoľ iný systém.`;
@@ -285,6 +292,26 @@ export function railUpsize(
 	return { kod, nazov };
 }
 
+/**
+ * Systémy, kde sa dá koľajnica zadať RUČNE — tie, ktoré majú v konfigurácii
+ * ODDELENÚ hornú a spodnú koľajnicu (Deluxe, Štandard +, Štandard). Robust a Slide
+ * majú jednu obvodovú koľajnicu, takže „iná horná / iná spodná" tam nemá zmysel
+ * (Patrik: „Robust a slide sa to stať nemôže max ešte delux"). Zoznam sa NEZADÁVA
+ * natvrdo — vyplýva z názvov profilov v cfg, takže nový systém ho zdedí sám.
+ */
+export function systemyRucnaKolajnica(cfg: Cfg): string[] {
+	const roly: Record<string, Set<string>> = {};
+	for (const sysStyl in cfg) {
+		const system = sysStyl.split('|')[0];
+		for (const r of cfg[sysStyl].rez) {
+			const rola = rolaKolajnice(r.nazov);
+			if (!rola) continue;
+			(roly[system] ??= new Set()).add(rola);
+		}
+	}
+	return Object.keys(roly).filter((s) => roly[s].has('horna') && roly[s].has('spodna'));
+}
+
 export function computeFlat(
 	cfg: Cfg,
 	sysStyl: string,
@@ -292,7 +319,8 @@ export function computeFlat(
 	V: number,
 	redukciaZero: boolean,
 	skloHrubka = 0,
-	pridavnaKolajnica = false
+	pridavnaKolajnica = false,
+	rucnaKolajnica?: KolajnicaRucne
 ): ComputeResult | null {
 	const g = cfg[sysStyl];
 	if (!g || !g.rez.length) return null;
@@ -300,7 +328,7 @@ export function computeFlat(
 	const system = sysStyl.split('|')[0];
 	const material: MaterialRow[] = [];
 	const odpis: OdpisRow[] = [];
-	for (const c of profilCuts(g, S, V, N, redukciaZero, skloHrubka)) {
+	for (const c of profilCuts(g, S, V, N, redukciaZero, skloHrubka, undefined, rucnaKolajnica)) {
 		const bary = ffdPack(c.kusy, c.barLen);
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
@@ -411,16 +439,17 @@ export function safeCompute(
 	V: number,
 	redukciaZero: boolean,
 	skloHrubka = 0,
-	pridavnaKolajnica = false
+	pridavnaKolajnica = false,
+	rucnaKolajnica?: KolajnicaRucne
 ): { r: ComputeResult | null; err: string | null } {
 	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
 	const boundErr = inBounds(cfg, sysStyl);
 	if (boundErr) return { r: null, err: 'Konfigurácia mimo povolených rozsahov: ' + boundErr };
 	const hrubkaErr = missingHrubkaProfile(cfg, sysStyl, skloHrubka);
 	if (hrubkaErr) return { r: null, err: hrubkaErr };
-	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka);
+	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
 	if (overErr) return { r: null, err: overErr };
-	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka, pridavnaKolajnica);
+	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka, pridavnaKolajnica, rucnaKolajnica);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
 	return { r, err: null };
@@ -438,6 +467,8 @@ export interface PosuvSpec {
 	skloHrubka?: number;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica?: boolean;
+	/** ručne zadaná dĺžka hornej / spodnej koľajnice — MENÍ odpis (Patrik 2026-07-28) */
+	kolajnica?: KolajnicaRucne;
 	/** len na plán/detail (nemení výpočet) */
 	otvaranie?: string;
 	sklo?: string;
@@ -461,6 +492,8 @@ export interface PosuvInfo {
 	kovanieL?: string;
 	kovanieP?: string;
 	klin?: Klin | null;
+	/** ručne zadané dĺžky koľajníc tohto posuvu — na plán/tlač (výpočet ich už použil) */
+	kolajnica?: KolajnicaRucne | null;
 }
 
 export interface MultiResult {
@@ -501,7 +534,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		// tyče, toto treba prehodnotiť. Pozn.: príznak sikmyRez pooled riadku sa
 		// preberá z PRVÉHO posuvu — pri zmiešanej Deluxe+Štandard+ zákazke to môže
 		// zle označiť uhol rezu iba v KRESBE (odpis nie je dotknutý).
-		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, p.skloHrubka ?? 0, i + 1)) {
+		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, p.skloHrubka ?? 0, i + 1, p.kolajnica)) {
 			// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +) — swap
 			// PRED poolovaním, aby sa metre pooli pod správnym (väčším) kódom.
 			const up = railUpsize(system, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
@@ -540,7 +573,8 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			skloNazov: p.sklo,
 			kovanieL: p.kovanieL,
 			kovanieP: p.kovanieP,
-			klin: p.klin ?? null
+			klin: p.klin ?? null,
+			kolajnica: p.kolajnica ?? null
 		});
 	}
 	const material: MaterialRow[] = [];
@@ -571,7 +605,15 @@ export function safeComputeMulti(
 		if (boundErr) return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
 		const hrubkaErr = missingHrubkaProfile(cfg, p.sysStyl, p.skloHrubka ?? 0);
 		if (hrubkaErr) return { r: null, err: `Posuv ${i + 1}: ${hrubkaErr}` };
-		const overErr = oversizeCut(cfg, p.sysStyl, p.S, p.V, p.redukciaZero, p.skloHrubka ?? 0);
+		const overErr = oversizeCut(
+			cfg,
+			p.sysStyl,
+			p.S,
+			p.V,
+			p.redukciaZero,
+			p.skloHrubka ?? 0,
+			p.kolajnica
+		);
 		if (overErr) return { r: null, err: `Posuv ${i + 1}: ${overErr}` };
 	}
 	const r = computeMulti(cfg, posuvy);

@@ -2,6 +2,7 @@
 // serverový strážca rozsahov (HTML5 min/max vie skriptovaný POST obísť).
 import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
+import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
@@ -74,6 +75,37 @@ export function parseKlin(raw: KlinRaw): { klin: Klin | null; error: string | nu
 	return { klin, error };
 }
 
+/**
+ * Ručne zadaná dĺžka koľajníc (Patrik 2026-07-28). Prázdne pole = počítaj zo šírky
+ * (pôvodné chovanie). MONEY-KRITICKÉ: zadaná dĺžka mení balenie na tyče → mení metre
+ * v odpise, preto preklep musí padnúť tu (skriptovaný POST obíde HTML5 min/max).
+ * Nulu / prázdno berieme ako „nezadané", nie ako chybu.
+ */
+export function parseKolajnica(
+	horna: unknown,
+	spodna: unknown
+): { kolajnica: KolajnicaRucne | null; error: string | null } {
+	const n = (x: unknown) => {
+		const s = String(x ?? '').trim();
+		if (!s) return 0;
+		const f = parseFloat(s.replace(',', '.'));
+		return Number.isFinite(f) ? f : NaN;
+	};
+	const h = n(horna),
+		sp = n(spodna);
+	const rozsah = (x: number, kto: string) =>
+		Number.isNaN(x) || (x !== 0 && !(x >= KOLAJNICA_MIN && x <= KOLAJNICA_MAX))
+			? `Koľajnica ${kto}: dĺžka musí byť ${KOLAJNICA_MIN}–${KOLAJNICA_MAX} mm (alebo prázdne = podľa šírky).`
+			: null;
+	const error = rozsah(h, 'horná') ?? rozsah(sp, 'spodná');
+	if (error) return { kolajnica: null, error };
+	if (!h && !sp) return { kolajnica: null, error: null };
+	const kolajnica: KolajnicaRucne = {};
+	if (h) kolajnica.horna = Math.round(h);
+	if (sp) kolajnica.spodna = Math.round(sp);
+	return { kolajnica, error: null };
+}
+
 export interface Vstup {
 	zak: string;
 	op: string;
@@ -105,6 +137,8 @@ export interface Vstup {
 	pridavnaKolajnica: boolean;
 	/** klín nad posuvom (Patrik) — display-only, do Money odpisu NEJDE; null = žiadny */
 	klin: Klin | null;
+	/** ručne zadané dĺžky koľajníc — MENÍ Money odpis; null = počítaj zo šírky */
+	kolajnica: KolajnicaRucne | null;
 }
 
 export function parseVstup(form: FormData): { vstup: Vstup; error: string | null } {
@@ -139,8 +173,11 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
-		klin: null
+		klin: null,
+		kolajnica: null
 	};
+	const kol = parseKolajnica(form.get('kolajnicaHorna'), form.get('kolajnicaSpodna'));
+	vstup.kolajnica = kol.kolajnica;
 	const k = parseKlin({
 		on: form.get('klin'),
 		dlzka: form.get('klinDlzka'),
@@ -160,6 +197,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	else if (!(vstup.s >= 300 && vstup.s <= 20000)) error = 'Šírka musí byť 300–20000 mm.';
 	else if (!(vstup.v >= 300 && vstup.v <= 20000)) error = 'Výška musí byť 300–20000 mm.';
 	else if (!OTVARANIA.includes(vstup.otvaranie)) error = 'Vyber otváranie.';
+	else if (kol.error) error = kol.error;
 	else if (k.error) error = k.error;
 	return { vstup, error };
 }
@@ -178,6 +216,8 @@ export interface PosuvVstup {
 	kovanieP: string;
 	/** klín nad TÝMTO posuvom — display-only, do Money odpisu NEJDE; null = žiadny */
 	klin: Klin | null;
+	/** ručné dĺžky koľajníc TOHOTO posuvu — MENÍ Money odpis; null = zo šírky */
+	kolajnica: KolajnicaRucne | null;
 }
 
 export interface MultiVstup {
@@ -232,6 +272,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				v2: p.klinV2,
 				ks: p.klinKs
 			});
+			const kol = parseKolajnica(p.kolajnicaHorna, p.kolajnicaSpodna);
 			const posuv: PosuvVstup = {
 				system: String(p.system ?? '').trim(),
 				styl: normalizujStyl(String(p.system ?? '').trim(), String(p.styl ?? '').trim()),
@@ -241,7 +282,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				otvaranie: String(p.otvaranie ?? '').trim(),
 				kovanieL: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieL),
 				kovanieP: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieP),
-				klin: k.klin
+				klin: k.klin,
+				kolajnica: kol.kolajnica
 			};
 			if (!posuv.system || !posuv.styl) {
 				error = `Posuv ${i + 1}: vyber systém a štýl.`;
@@ -263,6 +305,10 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			}
 			if (!OTVARANIA.includes(posuv.otvaranie)) {
 				error = `Posuv ${i + 1}: vyber otváranie.`;
+				break;
+			}
+			if (kol.error) {
+				error = `Posuv ${i + 1}: ${kol.error.replace(/^Koľajnica /, 'koľajnica ')}`;
 				break;
 			}
 			if (k.error) {
