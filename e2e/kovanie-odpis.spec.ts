@@ -1,7 +1,8 @@
 // Kovanie do Money odpisu (Dominik 2026-07-28) v prehliadači: dielňa musí vidieť
 // kusy pred odoslaním a jednostranná FAB musí naozaj zmeniť počty.
 //
-// Všetko READ-ONLY — len „Spočítať" a „Späť a upraviť", nič sa neodosiela do Money.
+// Väčšina testov je READ-ONLY („Spočítať" / „Späť"); posledný odosiela v TEST režime
+// (MONEY_LIVE nie je 1), takže súbor ide do testovacieho priečinka, nikdy do Money.
 import { test, expect, type Page } from '@playwright/test';
 import { collectConsole, loginAs, waitHydrated } from './helpers';
 
@@ -111,6 +112,25 @@ test('zimná záhrada: kusy sa sčítajú za oba posuvy', async ({ page }) => {
 	// 2 posuvy × 2 krídla × 2 ks = 8 kladiek, 2 × 8 = 16 rohovníkov obvodových
 	await expect(riadok(page, 'ZASK00027')).toContainText('8 ks');
 	await expect(riadok(page, 'ZASK00037')).toContainText('16 ks');
+
+	expect(errs).toEqual([]);
+});
+
+test('po odoslaní vidno kovanie aj na potvrdzovacej obrazovke', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '06');
+	await page.getByLabel('Systém').selectOption('Robust');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+	// TEST režim (MONEY_LIVE nie je 1) — zapisuje sa do testovacieho priečinka, nie do Money
+	await page.getByRole('button', { name: /Odoslať odpis/ }).click();
+	await waitHydrated(page);
+
+	// to, čo odišlo do súboru, musí byť vidieť aj tu — inak dielňa nevie, že kusy odišli
+	await expect(page.getByTestId('kovanie-karta')).toBeVisible();
+	await expect(riadok(page, 'ZASK00027')).toContainText('4 ks');
 
 	expect(errs).toEqual([]);
 });

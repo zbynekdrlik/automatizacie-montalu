@@ -320,7 +320,7 @@ export const actions: Actions = {
 					vstup
 				};
 			}
-			return { step: 'hotovo', vstup, plan: r, outcome };
+			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome };
 		} catch (e) {
 			console.error('writeOdpis zlyhal:', e);
 			return {
@@ -425,7 +425,7 @@ export const actions: Actions = {
 					multiVstup: vstup
 				};
 			}
-			return { step: 'hotovoMulti', multiVstup: vstup, multi: r, outcome };
+			return { step: 'hotovoMulti', multiVstup: vstup, multi: r, kovanie: kov.polozky, outcome };
 		} catch (e) {
 			console.error('writeOdpis (multi) zlyhal:', e);
 			return {
