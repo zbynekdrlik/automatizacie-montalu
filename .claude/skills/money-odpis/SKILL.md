@@ -266,3 +266,16 @@ Kovanie (Dominik 2026-07-28) je prvá kusová položka. Čo z toho vyplýva:
   vyzerajú ako chyby úplne inde.
 - **E2E beží proti `npm run preview`, čiže proti POSLEDNÉMU BUILDU** — po zmene servera
   spusti `npm run build`, inak testuješ starý kód a márne hľadáš chybu v novom.
+
+## 6. Verzie: `version-check` porovnáva cez `sort -V`, NIE semver
+
+CI gate robí `printf '%s\n%s\n' "$MAIN" "$DEV" | sort -V | tail -1` a žiada, aby najvyššia
+bola dev. `sort -V` radí **`0.9.1-dev.1` VYŠŠIE než `0.9.1`** (semver má prerelease nižšie).
+Dôsledky, ktoré stáli jeden červený beh:
+
+- **Pred mergom dev→main daj na dev RIADNU verziu** (`0.9.1`), nie `-dev.N`. Značka, ktorú
+  main dostane, je tá, čo svieti dielni na dashboarde.
+- **Keď sa `-dev.N` raz dostane na main, späť na čistú `0.9.1` sa už nedá** — `sort -V` ju
+  považuje za nižšiu. Jediná cesta vpred je ďalšie číslo (`0.9.2`).
+- Po merge bumpni dev na ĎALŠIU pracovnú verziu (`0.9.3-dev.1`) — vtedy je `-dev.N` v poriadku,
+  lebo je vyššia než release na main.
