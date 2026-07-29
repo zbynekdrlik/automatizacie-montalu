@@ -178,30 +178,6 @@ export function computeBazen(v: BazenVstup): { out: BazenPolozka[]; error: strin
 	return { out, error };
 }
 
-/**
- * Aplikuje ručné úpravy množstiev z kontrolnej stránky. Kľúč = kod.
- * Na rozdiel od n8n verzie: nečíselná alebo záporná hodnota = CHYBA
- * (nie tiché 0 do Money) a limit 10 000 m chráni pred preklepom.
- */
-export function applyEdits(
-	out: BazenPolozka[],
-	edits: Map<string, string>
-): { finalOut: BazenPolozka[]; zmenene: string[]; error: string | null } {
-	const finalOut: BazenPolozka[] = [];
-	const zmenene: string[] = [];
-	for (const o of out) {
-		const raw = edits.get(o.kod);
-		if (raw === undefined || raw.trim() === '') {
-			finalOut.push({ ...o });
-			continue;
-		}
-		const q = parseFloat(String(raw).replace(',', '.'));
-		if (!Number.isFinite(q)) return { finalOut: [], zmenene: [], error: `Neplatné množstvo „${raw}" pri ${o.kod} ${o.nazov}.` };
-		if (q < 0) return { finalOut: [], zmenene: [], error: `Záporné množstvo (${q}) pri ${o.kod} ${o.nazov} — do Money nesmie ísť.` };
-		if (q > 100000) return { finalOut: [], zmenene: [], error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.` };
-		const rq = R(q);
-		if (rq !== o.qty) zmenene.push(o.kod);
-		finalOut.push({ kod: o.kod, nazov: o.nazov, qty: rq });
-	}
-	return { finalOut, zmenene, error: null };
-}
+// Ručné úpravy množstiev sú spoločné pre bazén aj pergolu — implementácia žije
+// v money.ts; tu ostáva re-export, aby volajúci a testy bazéna ostali bez zmeny.
+export { applyEdits } from './money';
