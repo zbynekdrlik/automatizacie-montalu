@@ -12,9 +12,8 @@ process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
 // import až PO nastavení env (db.ts číta DATABASE_PATH pri importe)
-const { writeOdpis, safe, targetDirFor, contentHash, releaseOdpis, listOdpisy } = await import(
-	'../src/lib/server/money'
-);
+const { writeOdpis, safe, targetDirFor, contentHash, releaseOdpis, listOdpisy, filenameFor } =
+	await import('../src/lib/server/money');
 const { loadCfg, db } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');
 import type { OdpisJob } from '../src/lib/server/money';
@@ -31,12 +30,44 @@ function makeReq(zak: string, op: string, modul: OdpisJob['modul'] = 'zasklenia'
 		caka: false,
 		createdBy: 'vitest',
 		cakaSubdir: 'Robust',
-		filenameBase: `${safe(zak)} - OP${safe(op)} - Test Zákazník ZASKLENIA Robust 2K`,
 		popis: (op + ' : Test Zákazník').trim(),
 		polozky: r!.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
 		detail: { system: 'Robust', styl: '2K', s: 2509, v: 1930 }
 	};
 }
+
+// Šéf 2026-07-29 (foto z Money import priečinka): názov bol
+// „ZAK2025428 - OPOP250359 - PERGOLA Vyroubalová PERGOLA [4d2d4db1].xlsx" —
+// kód lepil „OP" pred to, čo užívateľ do kolónky napísal (a on tam OP píše).
+// Nový tvar: len číslo zákazky + zákazník.
+describe('filenameFor — ZAK - zákazník, žiadne OP', () => {
+	const polozky = [{ kod: 'PRP20258', nazov: 'Kotviaci profil', qty: 7.5 }];
+
+	it('nezdvojí OP, keď ho užívateľ napíše do kolónky', () => {
+		const f = filenameFor({ zak: 'ZAK2025428', op: 'OP250359', zakaznik: 'Vyroubalová', polozky });
+		expect(f).not.toContain('OPOP');
+		expect(f).toMatch(/^ZAK2025428 - Vyroubalová \[[0-9a-f]{8}\]\.xlsx$/);
+	});
+
+	it('OP sa v názve neobjaví ani keď ho užívateľ napíše bez prefixu', () => {
+		const f = filenameFor({ zak: 'ZAK2026337', op: '260286', zakaznik: 'Tschakert', polozky });
+		expect(f).toMatch(/^ZAK2026337 - Tschakert \[[0-9a-f]{8}\]\.xlsx$/);
+	});
+
+	// bez OP v názve by dva odpisy tej istej zákazky s rovnakým obsahom mali
+	// rovnaký názov — druhý by prvý v Money import priečinku PREPÍSAL
+	it('dve rôzne OP tej istej zákazky majú rôzny súbor aj pri rovnakom obsahu', () => {
+		const a = filenameFor({ zak: 'ZAK1', op: '01', zakaznik: 'Novák', polozky });
+		const b = filenameFor({ zak: 'ZAK1', op: '02', zakaznik: 'Novák', polozky });
+		expect(a).not.toBe(b);
+	});
+
+	it('sanitizuje znaky, ktoré Windows v názve nepovolí', () => {
+		expect(filenameFor({ zak: 'ZAK/1', op: '1', zakaznik: 'A:B?', polozky })).toContain(
+			'ZAK_1 - A_B_ ['
+		);
+	});
+});
 
 describe('writeOdpis', () => {
 	beforeAll(() => {
@@ -47,7 +78,7 @@ describe('writeOdpis', () => {
 		const out = await writeOdpis(makeReq('TEST-1', '01'));
 		expect(out.status).toBe('written');
 		expect(out.live).toBe(false);
-		expect(out.filename).toContain('OP01');
+		expect(out.filename).toContain('TEST-1 - Test Zákazník');
 		expect(fs.existsSync(out.target)).toBe(true);
 
 		const wb = new ExcelJS.Workbook();
