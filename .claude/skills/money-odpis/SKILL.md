@@ -77,6 +77,37 @@ na 1 tyč so záporným odpadom → odpis podhodnotený na polovicu. `oversizeCu
 idú cez safeCompute, takže zlé číslo sa nedostane do Money. `dlzkaTyce` je aj v
 `BOUNDS`/`inBounds` (preklep 600/75000 sa odmietne).
 
+## 2d. PERGOLA: profil vedený vo VIACERÝCH dĺžkach tyče — kusy MUSIA zdieľať tyč
+
+Money vedie časť pergola profilov vo viacerých dĺžkach naraz (žľab 110/140, kotviaci
+horný, 200x140, 250x110 → 4500 / 6000 / 7500 mm; zvyšok len 7500). `pergola.ts transform()`
+má preto dve vetvy a **tá viac-variantová dlho nebalila vôbec** — každý kus dostal vlastnú
+tyč (`nearestHigher`), takže rezy 6400 + 1030 dali 7,5 m + 4,5 m namiesto jednej 7,5 m tyče
+(nadodpis v Money, hlásené zo živej ZAK2026337, 2026-07-29).
+
+Pravidlo: kusy ≤ najdlhšia tyč sa balia **spoločne** (`packMulti()` — FFD do tyčí každej
+dostupnej dĺžky ≥ najdlhší kus, každá tyč sa zmenší na najkratšiu variantu, ktorá na jej
+obsah stačí, vyberie sa variant s najmenším materiálom). Kus dlhší než najdlhšia tyč ide
+inou cestou — `minCoverCombo` + voľba kombinácie podľa polohy nohy — a NESMIE sa zabaliť.
+
+- **Prídavok na kotúč pergola engine NEMÁ** (na rozdiel od zasklení, kde je `KOTUC=4`).
+  Je tak overený proti reálnym Money párom; nepridávať bez rozhodnutia Dominika.
+- Overené vektory (2 reálne Money páry) majú od každého viac-variantového profilu len
+  JEDEN kus — takže „prešli testy" tu nikdy nedokazovalo, že balenie funguje. Pri zmene
+  balenia píš test na VIAC kusov, nie na tie páry.
+- Interné poznámky z `trace.notes` idú do UI pod hlavičku „Dlhé profily (rez > 7500 mm)" —
+  čokoľvek tam pridáš sa používateľovi zobrazí ako tvrdenie o dlhom reze. Note o niečom
+  inom = falošné varovanie (presne tento prípad).
+
+## 2e. Ručná úprava množstiev pred odoslaním — `applyEdits` v `money.ts`
+
+Bazén aj pergola dávajú obsluhe upraviť množstvá v náhľade: polia `qty_<KOD>`, prázdne =
+spočítaná hodnota, `applyEdits()` odmieta záporné / nečíselné / > 100 000 **chybou** (nikdy
+tichá nula do Money) a vracia `zmenene` na značku ✏️. Poradie je záväzné: najprv engine,
+potom voľby (kombinácie tyčí), **ručné úpravy až úplne nakoniec** — do Money ide presne to,
+čo obsluha vidí v poliach. Pri chybe sa ostáva v náhľade s echom zadaných hodnôt
+(`editVals`), nikdy sa nespadne späť do formulára so stratou zadania.
+
 ## 2b. Ručný ROZMER rezu od obsluhy (koľajnica) — MENÍ odpis, patrí do compute
 
 Dielňa občas reže profil na inú dĺžku než dá vzorec (Patrik 2026-07-28: horná koľajnica
