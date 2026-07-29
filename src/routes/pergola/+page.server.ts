@@ -11,7 +11,7 @@ import {
 	validatePergola,
 	CATALOG
 } from '$lib/server/pergola';
-import { writeOdpis, isLive, safe, applyEdits, type OdpisJob } from '$lib/server/money';
+import { writeOdpis, isLive, applyEdits, type OdpisJob } from '$lib/server/money';
 
 interface PergolaVstup {
 	zak: string;
@@ -145,7 +145,6 @@ export const actions: Actions = {
 			caka: vstup.caka,
 			createdBy: locals.user?.username ?? '',
 			cakaSubdir: 'Pergola',
-			filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} PERGOLA`,
 			// popis 1:1 s n8n verziou: "OP Zákazník"
 			popis: (vstup.op + ' ' + vstup.zakaznik).trim(),
 			// Money rozpis: VŠETKÝCH 25 katalógových riadkov (aj nulové) — ako n8n

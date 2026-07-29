@@ -57,7 +57,9 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 	await expect(page.getByTestId('vysledok')).toContainText(RUN);
-	await expect(page.getByTestId('vysledok')).toContainText('OP01');
+	// názov súboru = „ZAK - zákazník [hash].xlsx"; OP v ňom už nie je (2026-07-29)
+	await expect(page.getByTestId('vysledok')).toContainText(`${RUN} - E2E Test [`);
+	const suborOP01 = (await page.getByTestId('vysledok').textContent())!;
 	await expect(page.getByRole('button', { name: /Tlačiť/ })).toBeVisible();
 
 	// 3. nový plán → rovnaká ZAK+OP → duplikát, nič sa nezapíše
@@ -83,7 +85,11 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByLabel('Výška (mm) *').fill('1930');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
-	await expect(page.getByTestId('vysledok')).toContainText('OP02');
+	// rovnaké rozmery ako v kroku 2 → rovnaký obsah odpisu; keďže OP už v názve
+	// nie je, jediné, čo súbory odlišuje, je hash — musí sa líšiť, inak by druhý
+	// odpis ten prvý v Money import priečinku prepísal
+	await expect(page.getByTestId('vysledok')).toContainText(`${RUN} - E2E Test [`);
+	expect(await page.getByTestId('vysledok').textContent()).not.toBe(suborOP01);
 
 	// 5. história odpisov obsahuje oba záznamy
 	await page.getByRole('link', { name: 'História', exact: true }).click();

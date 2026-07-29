@@ -5,7 +5,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { computeBazen, applyEdits } from '$lib/server/bazen';
 import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
-import { writeOdpis, isLive, safe, type OdpisJob } from '$lib/server/money';
+import { writeOdpis, isLive, type OdpisJob } from '$lib/server/money';
 
 function jobFor(
 	vstup: BazenVstup,
@@ -20,7 +20,6 @@ function jobFor(
 		caka: vstup.caka,
 		createdBy,
 		cakaSubdir: 'Bazen',
-		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} BAZEN`,
 		// popis 1:1 s n8n verziou: "OP Zákazník" (bez dvojbodky)
 		popis: (vstup.op + ' ' + vstup.zakaznik).trim(),
 		// Money rozpis: VŠETKY riadky (aj nulové), poradie ako Excel
