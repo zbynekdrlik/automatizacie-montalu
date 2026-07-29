@@ -14,7 +14,6 @@ import {
 	targetDirFor,
 	filenameFor,
 	contentHash,
-	safe,
 	type OdpisJob
 } from '$lib/server/money';
 import type { ComputeResult, MultiResult, PosuvSpec } from '$lib/server/compute';
@@ -43,7 +42,6 @@ function jobFor(
 		caka: vstup.caka,
 		createdBy,
 		cakaSubdir: r.system,
-		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ${safe(r.system)} ${safe(r.styl)}`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
 		// profily (metre) + kovanie (kusy a tesnenia) — kovanie ide za profilmi,
 		// aby si dielňa v xlsx zachovala poradie, na ktoré je zvyknutá
@@ -185,7 +183,6 @@ function jobForMulti(
 		caka: vstup.caka,
 		createdBy,
 		cakaSubdir: sys0,
-		filenameBase: `${safe(vstup.zak)} - OP${safe(vstup.op)} - ${safe(vstup.zakaznik)} ZASKLENIA ZIMNA ZAHRADA ${r.posuvy.length}x posuv`,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
 		polozky: [
 			...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),

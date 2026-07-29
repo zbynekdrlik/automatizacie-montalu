@@ -69,8 +69,6 @@ export interface OdpisJob {
 	createdBy: string;
 	/** podpriečinok v NA ODPIS pre čaká-režim (Robust/Slide/Bazen/Pergola) */
 	cakaSubdir: string;
-	/** názov súboru bez [hash].xlsx */
-	filenameBase: string;
 	/** Popis dokladu v PRVOM riadku xlsx (formát per modul — 1:1 s n8n verziou) */
 	popis: string;
 	/** riadky do xlsx PRESNE v tomto poradí (bazén posiela aj nulové — ako Excel) */
@@ -111,10 +109,19 @@ export function contentHash(zak: string, polozky: Polozka[]): string {
 	return ('00000000' + h.toString(16)).slice(-8);
 }
 
-export function filenameFor(job: Pick<OdpisJob, 'zak' | 'filenameBase' | 'polozky'>): string {
-	// contentHash na konci kryje kolíziu dvoch RÔZNYCH zákaziek, ktoré
-	// sanitizácia zloží na rovnaký názov (hash počíta zo surovej ZAK)
-	return `${job.filenameBase} [${contentHash(job.zak, job.polozky)}].xlsx`;
+/**
+ * Názov súboru: „ZAK2026337 - Tschakert [b1e403ee].xlsx" — číslo zákazky
+ * a zákazník, nič viac (šéf 2026-07-29). OP sa do názvu NEDÁVA: kolónka je
+ * „OP/OPDL číslo" a ľudia do nej OP píšu, takže starý prefix vyrábal „OPOP250359".
+ *
+ * Hash na konci kryje kolízie: dve RÔZNE zákazky, ktoré sanitizácia zloží na
+ * rovnaký názov, aj dva odpisy tej istej zákazky s rôznym OP (bez OP v názve
+ * by mali rovnaký názov a druhý by ten prvý v import priečinku prepísal),
+ * preto do neho ide aj OP.
+ */
+export function filenameFor(job: Pick<OdpisJob, 'zak' | 'op' | 'zakaznik' | 'polozky'>): string {
+	const hash = contentHash(`${job.zak}|OP${job.op}`, job.polozky);
+	return `${safe(job.zak)} - ${safe(job.zakaznik)} [${hash}].xlsx`;
 }
 
 async function buildXlsx(job: OdpisJob): Promise<Buffer> {

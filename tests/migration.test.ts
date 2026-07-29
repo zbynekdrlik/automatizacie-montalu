@@ -124,7 +124,6 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 			caka: false,
 			createdBy: 'vitest',
 			cakaSubdir: 'Robust',
-			filenameBase: 'ZAK-MIG-1 - OP01 - Migrovaný ZASKLENIA Robust 2K',
 			popis: '01 : Migrovaný',
 			polozky: [{ kod: 'ZASP00014', nazov: 'Koľajnica', qty: 15 }],
 			detail: {}
@@ -141,7 +140,6 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 			caka: false,
 			createdBy: 'vitest',
 			cakaSubdir: 'Bazen',
-			filenameBase: 'ZAK-MIG-1 - OP01 - Migrovaný BAZEN',
 			popis: '01 Migrovaný',
 			polozky: [{ kod: 'BPP00091', nazov: '2-koľaj', qty: 4.6 }],
 			detail: {}
