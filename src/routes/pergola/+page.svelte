@@ -44,7 +44,7 @@
 			value={v?.editVals?.[o.kod] ?? (o.qty || '')}
 			aria-label="Množstvo {o.kod}"
 			style="width:110px;padding:6px 8px;font-size:14px;text-align:center" />
-		<span class="noprint" style="color:#64748b;font-size:13px">m</span>
+		<span style="color:#64748b;font-size:13px">m</span>
 	</div>
 {/snippet}
 
@@ -223,6 +223,12 @@
 		{/each}
 		{#if v.zmenene.length}
 			<p class="sub">✏️ = množstvo si upravil ručne pred odoslaním.</p>
+		{/if}
+		{#if v.nulove.some((o) => v.zmenene.includes(o.kod))}
+			<p class="sub">
+				Vynulované úpravou (v odpise nie sú):
+				{v.nulove.filter((o) => v.zmenene.includes(o.kod)).map((o) => o.kod).join(', ')}
+			</p>
 		{/if}
 	</div>
 

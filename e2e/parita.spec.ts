@@ -168,6 +168,19 @@ test('pergola: ručná úprava množstva pred odoslaním (aj odmietnutie záporn
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 	await expect(page.locator('.row', { hasText: 'PRP00044' })).toContainText('60 m');
 	await expect(page.locator('.row', { hasText: 'PRP00044' })).toContainText('✏️');
+
+	// vynulovanie úpravou sa vypíše, aby dielňa vedela, že položka v odpise nie je
+	await goto(page, '/pergola');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-NULA`);
+	await page.getByLabel('OP/OPDL číslo *').fill('02');
+	await page.getByLabel('Zákazník *').fill('E2E Nula');
+	await page.getByLabel('Materiál (CAD nárez) *').fill('18004 PRIECKOVY PROFIL 105\t9\t3871');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+	await page.getByLabel('Množstvo PRP00044').fill('0');
+	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	await expect(page.getByText('Vynulované úpravou')).toContainText('PRP00044');
 	expect(consoleMsgs).toEqual([]);
 });
 
