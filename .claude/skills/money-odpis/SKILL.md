@@ -108,6 +108,23 @@ potom voľby (kombinácie tyčí), **ručné úpravy až úplne nakoniec** — d
 čo obsluha vidí v poliach. Pri chybe sa ostáva v náhľade s echom zadaných hodnôt
 (`editVals`), nikdy sa nespadne späť do formulára so stratou zadania.
 
+## 2f. Názov xlsx súboru — `filenameFor` je JEDINÉ miesto, hash nesie OP
+
+Tvar: `ZAK2026337 - Tschakert [b1e403ee].xlsx` — číslo zákazky, zákazník, nič viac
+(šéf 2026-07-29). Dve pravidlá, obe vykúpené chybou:
+
+- **Do názvu NEDÁVAJ OP.** Kolónka sa volá „OP/OPDL číslo" a obsluha do nej píše aj
+  prefix (`OP250359`, `OPDL260092` — vidno v histórii odpisov), takže šablóna
+  `- OP${op} -` vyrábala `OPOP250359`. Rovnako tam nepatrí názov modulu: zákazník
+  býva zadaný ako „PERGOLA Tschakert", takže z toho bolo `… PERGOLA X PERGOLA`.
+- **Hash na konci MUSÍ počítať aj s OP** (`contentHash(\`${zak}|OP${op}\`, polozky)`).
+  Bez OP v názve majú dva odpisy tej istej zákazky s rovnakým obsahom rovnaký názov
+  a druhý ten prvý v Money import priečinku **prepíše** — tichá strata odpisu.
+  `contentHash(zak, polozky)` samotný ostáva planHash strážcom, nemeň mu vstup.
+
+Názov skladá výhradne `filenameFor()` v `money.ts` — moduly ho neskladajú (pole
+`filenameBase` v `OdpisJob` bolo zrušené práve preto, že tú istú šablónu držali 4×).
+
 ## 2b. Ručný ROZMER rezu od obsluhy (koľajnica) — MENÍ odpis, patrí do compute
 
 Dielňa občas reže profil na inú dĺžku než dá vzorec (Patrik 2026-07-28: horná koľajnica
