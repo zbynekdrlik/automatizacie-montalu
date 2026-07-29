@@ -74,9 +74,10 @@ test('pergola: CAD nárez → Money rozpis + tyče → odoslanie (1:1 Bartoníč
 	);
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 
-	// Money rozpis 1:1: priečkový 9×7500 = 67,5 m; 110x43 FFD → 15 m
-	await expect(page.locator('.row', { hasText: 'PRP00044' })).toContainText('67,5 m');
-	await expect(page.locator('.row', { hasText: 'PRP202410' })).toContainText('15 m');
+	// Money rozpis 1:1 (v náhľade sú množstvá v poliach na ručnú úpravu):
+	// priečkový 9×7500 = 67,5 m; 110x43 FFD → 15 m
+	await expect(page.getByLabel('Množstvo PRP00044')).toHaveValue('67.5');
+	await expect(page.getByLabel('Množstvo PRP202410')).toHaveValue('15');
 	// tyče pre Solid Edge
 	await expect(page.locator('.row', { hasText: '18004' })).toContainText('9(7,5m)');
 	await expect(page.locator('.row', { hasText: '18016' })).toContainText('2(7,5m)');
@@ -104,8 +105,8 @@ test('pergola: rez > 7500 ponúkne kombinácie a voľba zmení rozpis aj tyče',
 	await expect(page.getByText('Dlhé profily')).toBeVisible();
 	const radio = page.getByRole('radio').first();
 	await expect(radio).toBeChecked();
-	await expect(page.locator('.row', { hasText: 'PRP202526' })).toContainText('4,5 m');
-	await expect(page.locator('.row', { hasText: 'PRP202525' })).toContainText('6 m');
+	await expect(page.getByLabel('Množstvo PRP202526')).toHaveValue('4.5');
+	await expect(page.getByLabel('Množstvo PRP202525')).toHaveValue('6');
 
 	// zvoľ 7500+4500 → po odoslaní je v rozpise 7500-ka a tyče 1(4,5m) 1(7,5m)
 	await page.getByRole('radio', { name: /7500\+4500/ }).check();
@@ -113,6 +114,60 @@ test('pergola: rez > 7500 ponúkne kombinácie a voľba zmení rozpis aj tyče',
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 	await expect(page.locator('.row', { hasText: 'PRP202524' })).toContainText('7,5 m');
 	await expect(page.locator('.row', { hasText: '18021' })).toContainText('1(4,5m) 1(7,5m)');
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('pergola: kusy viac-variantového profilu zdieľajú tyč, bez falošného varovania', async ({ page }) => {
+	// spocitat NEzapisuje → bezpečné aj na LIVE
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola');
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PACK`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Balenie');
+	await page.getByLabel('Materiál (CAD nárez) *').fill(
+		['18019 KOTVIACI PROFIL HORNY V2\t1\t6400', '18019 KOTVIACI PROFIL HORNY V2\t1\t1030'].join('\n')
+	);
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+
+	// 6400 + 1030 = 7430 → JEDNA 7,5 m tyč (predtým 7,5 + 4,5 = nadodpis)
+	await expect(page.locator('.row', { hasText: '18019' })).toContainText('1(7,5m)');
+	await expect(page.getByLabel('Množstvo PRP20258')).toHaveValue('7.5');
+	// 4,5 m tyč sa vôbec nepoužila (v nulových je prázdne pole)
+	await expect(page.getByLabel('Množstvo PRP202510')).toHaveValue('');
+	// žiadny rez > 7500 → žiadne varovanie o dlhých profiloch
+	await expect(page.getByText('Dlhé profily')).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('pergola: ručná úprava množstva pred odoslaním (aj odmietnutie zápornej)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await goto(page, '/pergola');
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-EDIT`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Úprava');
+	await page.getByLabel('Materiál (CAD nárez) *').fill('18004 PRIECKOVY PROFIL 105\t9\t3871');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+
+	await expect(page.getByLabel('Množstvo PRP00044')).toHaveValue('67.5');
+
+	// záporná hodnota → chyba, do Money nič nejde
+	await page.getByLabel('Množstvo PRP00044').fill('-5');
+	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('nahlad-error')).toContainText('Záporné');
+
+	// platná úprava → odošle sa upravená hodnota a je označená ✏️
+	await page.getByLabel('Množstvo PRP00044').fill('60');
+	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	await expect(page.locator('.row', { hasText: 'PRP00044' })).toContainText('60 m');
+	await expect(page.locator('.row', { hasText: 'PRP00044' })).toContainText('✏️');
 	expect(consoleMsgs).toEqual([]);
 });
 

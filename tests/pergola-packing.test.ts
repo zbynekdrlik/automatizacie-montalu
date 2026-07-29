@@ -39,3 +39,25 @@ describe('viac-variantový profil: kusy zdieľajú tyč', () => {
 		expect(bars('18019 KOTVIACI PROFIL HORNY V2\t1\t5930')).toBe('1(6m)');
 	});
 });
+
+describe('varovanie „Dlhé profily" len pri skutočne dlhom reze', () => {
+	it('viac kusov bez dlhého rezu nehlási nič (predtým falošné „rez > 7500")', () => {
+		const r = transform('18019 KOTVIACI PROFIL HORNY V2\t1\t6400\n18019 KOTVIACI PROFIL HORNY V2\t1\t1030');
+		expect(r.trace[0].notes).toEqual([]);
+		expect(r.comboCases).toEqual([]);
+	});
+
+	it('rez > 7500 hlási aj naďalej a ponúka voľbu kombinácie', () => {
+		const r = transform('18021 ZLABOVY PROFIL 110 V2\t1\t9120');
+		expect(r.trace[0].notes.length).toBe(1);
+		expect(r.comboCases.length).toBe(1);
+	});
+
+	it('dlhý rez + krátke kusy naraz: krátke sa zabalia, dlhý ide cez kombináciu', () => {
+		const t = '18021 ZLABOVY PROFIL 110 V2\t1\t9120\n18021 ZLABOVY PROFIL 110 V2\t2\t2000';
+		const r = transform(t);
+		expect(r.comboCases.length).toBe(1);
+		// 9120 → 4500+6000 (minimal), 2× 2000 → jedna 4,5 m tyč
+		expect(fmtBars(r.trace[0].bars)).toBe('2(4,5m) 1(6m)');
+	});
+});

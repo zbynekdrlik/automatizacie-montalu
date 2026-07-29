@@ -204,14 +204,50 @@ export function coverCombos(cut: number, availIn: number[]): ComboOption[] {
 }
 
 function ffd(pieces: number[], bar: number): number {
-	const rem: number[] = [];
+	return ffdBins(pieces, bar).length;
+}
+
+/** FFD do tyčí dĺžky `bar` — vracia využitú dĺžku každej tyče (nie len počet). */
+function ffdBins(pieces: number[], bar: number): number[] {
+	const used: number[] = [];
 	for (const p of [...pieces].sort((a, b) => b - a)) {
 		let i = 0;
-		for (; i < rem.length; i++) if (rem[i] >= p) break;
-		if (i === rem.length) rem.push(bar - p);
-		else rem[i] -= p;
+		for (; i < used.length; i++) if (bar - used[i] >= p) break;
+		if (i === used.length) used.push(p);
+		else used[i] += p;
 	}
-	return rem.length;
+	return used;
+}
+
+/**
+ * Viac-variantový profil (žľab / kotviaci / 200x140 / 250x110 — Money ho vedie
+ * v 4500 / 6000 / 7500 mm): kusy MUSIA zdieľať tyč, inak sa odpisuje materiál
+ * navyše (ZAK2026337: 6400 + 1030 dalo 7,5 + 4,5 m namiesto jednej 7,5 m tyče).
+ *
+ * Skúsi zabaliť do tyčí každej dostupnej dĺžky ≥ najdlhší kus, potom KAŽDÚ tyč
+ * zmenší na najkratšiu variantu, ktorá na jej obsah stačí, a vyberie variant s
+ * najmenším celkovým materiálom (pri zhode menej tyčí). Bez prídavku na kotúč —
+ * rovnako ako zvyšok pergola enginu, overeného proti reálnym Money exportom.
+ */
+function packMulti(pieces: number[], avail: number[]): Record<number, number> {
+	const mx = Math.max(...avail);
+	let best: { bars: Record<number, number>; total: number; cnt: number } | null = null;
+	for (const bar of avail) {
+		if (bar < Math.max(...pieces)) continue;
+		const bars: Record<number, number> = {};
+		let total = 0;
+		let cnt = 0;
+		for (const usedMm of ffdBins(pieces, bar)) {
+			const b = nearestHigher(usedMm, avail);
+			bars[b] = (bars[b] || 0) + 1;
+			total += b;
+			cnt++;
+		}
+		if (!best || total < best.total || (total === best.total && cnt < best.cnt))
+			best = { bars, total, cnt };
+	}
+	// poistka: kus dlhší než najdlhšia tyč sem nepatrí (rieši ho minCoverCombo)
+	return best ? best.bars : { [mx]: pieces.length };
 }
 
 export interface ComboCase {
@@ -276,13 +312,16 @@ export function transform(text: string): TransformResult {
 			for (const p of big) cnt += Math.ceil(p / b);
 			barsUsed[b] = cnt;
 		} else {
-			if (info.pieces.length > 1) notes.push('viac kusov viac-variantového profilu — over výťažnosť/spoj');
 			const mx = Math.max(...avail);
+			// kusy ≤ najdlhšia tyč sa balia SPOLOČNE (zdieľajú tyč); dlhšie idú
+			// cez kombináciu tyčí a majú vlastnú voľbu podľa polohy nohy
+			const small = info.pieces.filter((p) => p <= mx);
+			if (small.length)
+				for (const [b, n] of Object.entries(packMulti(small, avail)))
+					barsUsed[Number(b)] = (barsUsed[Number(b)] || 0) + n;
 			for (const p of info.pieces) {
-				if (p <= mx) {
-					const b = nearestHigher(p, avail);
-					barsUsed[b] = (barsUsed[b] || 0) + 1;
-				} else {
+				if (p <= mx) continue; // už zabalené v packMulti
+				{
 					for (const b of minCoverCombo(p, avail)) barsUsed[b] = (barsUsed[b] || 0) + 1;
 					notes.push(`rez ${Math.round(p)} > ${mx} — kombinácia tyčí (žľab: spoj nad nohou skontrolovať)`);
 					const fm: Record<number, string> = {};

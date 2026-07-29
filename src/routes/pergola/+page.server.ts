@@ -11,7 +11,7 @@ import {
 	validatePergola,
 	CATALOG
 } from '$lib/server/pergola';
-import { writeOdpis, isLive, safe, type OdpisJob } from '$lib/server/money';
+import { writeOdpis, isLive, safe, applyEdits, type OdpisJob } from '$lib/server/money';
 
 interface PergolaVstup {
 	zak: string;
@@ -46,6 +46,16 @@ function choicesFrom(form: FormData, r: ReturnType<typeof transform>) {
 	return { choices, raw };
 }
 
+// ručné úpravy množstiev z náhľadu (kľúč qty_<PRP>) — rovnaký tvar ako v bazéne
+function editsFrom(form: FormData): Map<string, string> {
+	const edits = new Map<string, string>();
+	for (const [key, value] of form.entries()) {
+		const m = key.match(/^qty_(.+)$/);
+		if (m) edits.set(m[1], String(value));
+	}
+	return edits;
+}
+
 function view(vstup: PergolaVstup, form?: FormData) {
 	const r = transform(vstup.cad);
 	const error = validatePergola(vstup.zak, vstup.op, vstup.zakaznik, vstup.cad, r);
@@ -53,14 +63,25 @@ function view(vstup: PergolaVstup, form?: FormData) {
 	const { choices, raw } = form ? choicesFrom(form, r) : { choices: new Map<number, number[]>(), raw: new Map<number, string>() };
 	const q = applyCombos(r, choices);
 	const copyBack = buildCopyBack(vstup.cad, r, choices);
-	const polozky = CATALOG.map((c) => ({ kod: c.prp, nazov: c.name, qty: q[c.prp] || 0 }));
+	const spocitane = CATALOG.map((c) => ({ kod: c.prp, nazov: c.name, qty: q[c.prp] || 0 }));
+	// ručné úpravy sa aplikujú AŽ NA KONCI (po kombináciách) — do Money ide to,
+	// čo užívateľ vidí v poliach; neplatná hodnota je CHYBA, nikdy tichá nula.
+	// Pri chybe ostáva náhľad na spočítaných hodnotách, aby sa dala opraviť.
+	const edits = form ? editsFrom(form) : new Map<string, string>();
+	const { finalOut, zmenene, error: editError } = applyEdits(spocitane, edits);
+	const polozky = editError ? spocitane : finalOut;
+	const editVals = Object.fromEntries(edits);
 	const longNotes = r.trace.filter((t) => t.notes.length).map((t) => t.cad + ': ' + t.notes.join('; '));
 	return {
 		error: null,
+		editError,
 		r,
 		view: {
 			polozky,
+			zmenene,
+			editVals,
 			nonzero: polozky.filter((o) => o.qty > 0),
+			nulove: polozky.filter((o) => o.qty <= 0),
 			copyLines: copyBack.lines,
 			totalBars: copyBack.totalBars,
 			cadLastCol: copyBack.lines.map((l) => l.barsStr).join('\n'),
@@ -88,6 +109,7 @@ export const actions: Actions = {
 		const vstup = parseVstup(form);
 		const { error, view: v } = view(vstup, form);
 		if (error) return { step: 'form' as const, error, vstup };
+		// „Spočítať" beží z formulára, kde polia qty_ ešte nie sú — editError tu nevzniká
 		return { step: 'nahlad' as const, vstup, v, error: null as string | null };
 	},
 
@@ -101,8 +123,10 @@ export const actions: Actions = {
 	odoslat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const vstup = parseVstup(form);
-		const { error, view: v } = view(vstup, form);
+		const { error, editError, view: v } = view(vstup, form);
 		if (error) return { step: 'form' as const, error, vstup };
+		// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
+		if (editError) return { step: 'nahlad' as const, vstup, v, error: editError };
 
 		// posledná poistka pred zápisom do Money — nikdy záporné/nekonečné metre
 		if (v!.polozky.some((o) => o.qty < 0 || !Number.isFinite(o.qty)))

@@ -28,6 +28,38 @@ export interface Polozka {
 	mj?: MJ;
 }
 
+/**
+ * Aplikuje ručné úpravy množstiev z kontrolnej stránky. Kľúč = kod.
+ * Nečíselná alebo záporná hodnota = CHYBA (nie tiché 0 do Money), limit
+ * 100 000 chráni pred preklepom. Zdieľané bazénom aj pergolou.
+ */
+export function applyEdits<T extends Polozka>(
+	out: T[],
+	edits: Map<string, string>
+): { finalOut: T[]; zmenene: string[]; error: string | null } {
+	const R = (x: number) => Math.round(x * 1000) / 1000;
+	const finalOut: T[] = [];
+	const zmenene: string[] = [];
+	for (const o of out) {
+		const raw = edits.get(o.kod);
+		if (raw === undefined || raw.trim() === '') {
+			finalOut.push({ ...o });
+			continue;
+		}
+		const q = parseFloat(String(raw).replace(',', '.'));
+		if (!Number.isFinite(q))
+			return { finalOut: [], zmenene: [], error: `Neplatné množstvo „${raw}" pri ${o.kod} ${o.nazov}.` };
+		if (q < 0)
+			return { finalOut: [], zmenene: [], error: `Záporné množstvo (${q}) pri ${o.kod} ${o.nazov} — do Money nesmie ísť.` };
+		if (q > 100000)
+			return { finalOut: [], zmenene: [], error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.` };
+		const rq = R(q);
+		if (rq !== o.qty) zmenene.push(o.kod);
+		finalOut.push({ ...o, qty: rq });
+	}
+	return { finalOut, zmenene, error: null };
+}
+
 export interface OdpisJob {
 	modul: Modul;
 	zak: string;

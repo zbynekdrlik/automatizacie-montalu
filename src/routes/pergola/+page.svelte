@@ -31,6 +31,23 @@
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 {/snippet}
 
+{#snippet qtyRiadok(o: { kod: string; nazov: string; qty: number })}
+	<div class="row" style="align-items:center;gap:12px">
+		<ProfilObrazok kod={o.kod} nazov={o.nazov} />
+		<span style="flex:1">{o.kod} · {o.nazov}</span>
+		<!-- bez min/max — rozsahy stráži server (applyEdits), nech typo dostane
+		     zrozumiteľnú chybu namiesto tichého browser tooltipu -->
+		<input
+			name="qty_{o.kod}"
+			type="number"
+			step="any"
+			value={v?.editVals?.[o.kod] ?? (o.qty || '')}
+			aria-label="Množstvo {o.kod}"
+			style="width:110px;padding:6px 8px;font-size:14px;text-align:center" />
+		<span class="noprint" style="color:#64748b;font-size:13px">m</span>
+	</div>
+{/snippet}
+
 {#snippet tyceKarta(withCopy: boolean)}
 	{#if v}
 		<div class="card">
@@ -136,13 +153,24 @@
 			{/if}
 
 			<div class="sec">Money rozpis — {v.nonzero.length} položiek</div>
+			<p class="sub noprint">
+				Množstvá môžeš pred odoslaním upraviť — prázdne pole = spočítaná hodnota. Záporné a
+				nečíselné sa odmietnu.
+			</p>
 			{#each v.nonzero as o (o.kod)}
-				<div class="row" style="align-items:center;gap:12px">
-					<ProfilObrazok kod={o.kod} nazov={o.nazov} />
-					<span style="flex:1">{o.kod} · {o.nazov}</span>
-					<b>{fmtM(o.qty)} m</b>
-				</div>
+				{@render qtyRiadok(o)}
 			{/each}
+
+			<details class="noprint" style="margin-top:10px">
+				<summary style="cursor:pointer;font-size:13px;color:#475569">
+					➕ Pridať položku, ktorá v náreze nebola ({v.nulove.length} nulových)
+				</summary>
+				<div style="margin-top:8px">
+					{#each v.nulove as o (o.kod)}
+						{@render qtyRiadok(o)}
+					{/each}
+				</div>
+			</details>
 
 			<div style="height:14px" class="noprint"></div>
 			<button class="btn noprint" type="submit" data-testid="odoslat">
@@ -189,10 +217,13 @@
 		{#each v.nonzero as o (o.kod)}
 			<div class="row" style="align-items:center;gap:12px">
 				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
-				<span style="flex:1">{o.kod} · {o.nazov}</span>
+				<span style="flex:1">{o.kod} · {o.nazov}{v.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
 				<b>{fmtM(o.qty)} m</b>
 			</div>
 		{/each}
+		{#if v.zmenene.length}
+			<p class="sub">✏️ = množstvo si upravil ručne pred odoslaním.</p>
+		{/if}
 	</div>
 
 	<div class="card noprint">
