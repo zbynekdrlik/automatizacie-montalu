@@ -7,7 +7,7 @@
 // nezapisujú odpis ani nemenia konfiguráciu → dá sa pustiť aj proti nasadenej
 // appke (BASE_URL). „Odoslať odpis" tu nikdy nepadne.
 import { test, expect, type Page } from "@playwright/test";
-import { collectConsole, loginAs, waitHydrated } from "./helpers";
+import { collectConsole, loginAs, waitHydrated, skipAkLive } from "./helpers";
 
 async function zaklad(page: Page, zak: string, zakaznik: string) {
   await page.getByLabel("Číslo objednávky (ZAK) *").fill(zak);
@@ -217,6 +217,86 @@ test("klín: obídená HTML5 validácia → serverová chyba, plán sa nespočí
   await expect(
     page.locator(".card", { hasText: "Odpis (do Money)" }),
   ).toHaveCount(0);
+
+  expect(errs).toEqual([]);
+});
+
+// Šéf 2026-07-30: „tie klíny, čo si dorábal — potom, čo klikne odpísať do Money,
+// už ich nie je vidno vo vizualizácii." Náhľad posielal posuvy v sparsovanom
+// tvare, ktorý druhý parse zahodil. TENTO test ide až za odoslanie, preto je
+// ZÁPISOVÝ → `skipAkLive`, aby proti ostrej appke nikdy nebežal.
+test("viac posuvov: klín je vidno AJ po odoslaní odpisu (nie len v náhľade)", async ({
+  page,
+}) => {
+  const errs = collectConsole(page);
+  await skipAkLive(page);
+  await loginAs(page);
+
+  await zaklad(page, `E2E-KLIN-ODO-${Date.now().toString(36)}`, "E2E Klin po odoslani");
+  await page.getByRole("button", { name: "➕ Pridať posuv" }).click();
+  await page.locator("#ps0-s").fill("4365");
+  await page.locator("#ps0-v").fill("2320");
+  await page.locator("#ps0-klin-on").check();
+  await page.locator("#ps0-klin-dlzka").fill("2000");
+  await page.locator("#ps0-klin-sirka").fill("200");
+  await page.locator("#ps0-klin-v1").fill("300");
+  await page.locator("#ps0-klin-v2").fill("80");
+  await page.locator("#ps0-klin-ks").fill("2");
+  await page.getByTestId("spocitat").click();
+  await waitHydrated(page);
+  await expect(page.getByTestId("nahlad-klin")).toHaveCount(1);
+
+  await page.getByTestId("odoslat-multi").click();
+  await waitHydrated(page);
+
+  // po odoslaní musí byť klín stále nakreslený aj vypísaný v karte
+  await expect(page.getByTestId("vysledok")).toContainText("TEST");
+  await expect(page.getByTestId("nahlad-klin")).toHaveCount(1);
+  await expect(page.getByTestId("nahlad-klin")).toContainText("2000");
+  const karta = page.getByTestId("klin-karta-multi");
+  await expect(karta).toContainText("Posuv 2");
+  await expect(karta).toContainText("2× klín 2000 × 200 mm, výška 300 → 80 mm");
+
+  expect(errs).toEqual([]);
+});
+
+// Ručná dĺžka koľajnice chodí tou istou cestou ako klín a je MONEY-KRITICKÁ:
+// keby ju druhý parse zahodil, do Money by odišli iné metre, než obsluha videla.
+test("viac posuvov: ručná dĺžka koľajnice prežije odoslanie (Money-kritické)", async ({
+  page,
+}) => {
+  const errs = collectConsole(page);
+  await skipAkLive(page);
+  await loginAs(page);
+
+  await page
+    .getByLabel("Číslo objednávky (ZAK) *")
+    .fill(`E2E-KOL-ODO-${Date.now().toString(36)}`);
+  await page.getByLabel("OP/OPDL číslo *").fill("01");
+  await page.getByLabel("Zákazník *").fill("E2E Kolajnica po odoslani");
+  await page.getByLabel("Systém").selectOption("Štandard +");
+  await page.locator("#s").fill("2509");
+  await page.locator("#v").fill("1930");
+  await page.getByLabel(/Koľajnica horná \(mm\)/).fill("2690");
+  await page.getByLabel(/Koľajnica spodná \(mm\)/).fill("2695");
+  await page.getByRole("button", { name: /Pridať posuv/ }).click();
+  await page.locator("#ps0-s").fill("3980");
+  await page.locator("#ps0-v").fill("2162");
+  await page.getByRole("button", { name: /Spočítať spoločný plán/ }).click();
+  await waitHydrated(page);
+  await expect(page.getByTestId("kolajnica-rucne-0")).toContainText("2690");
+
+  await page.getByTestId("odoslat-multi").click();
+  await waitHydrated(page);
+
+  // odpis sa zapísal (žiadne „vzorce sa medzitým zmenili") a ručné dĺžky držia
+  await expect(page.getByTestId("vysledok")).toContainText("TEST");
+  await expect(page.getByTestId("kolajnica-rucne-0")).toContainText("2690");
+  await expect(page.getByTestId("kolajnica-rucne-0")).toContainText("2695");
+  // rez 2690 (ručne) musí byť aj po odoslaní na profile hornej koľajnice
+  await expect(
+    page.locator("tr", { hasText: "Koľajnica horná" }).first(),
+  ).toContainText("2690 mm");
 
   expect(errs).toEqual([]);
 });

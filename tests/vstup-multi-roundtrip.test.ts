@@ -76,6 +76,6 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 		const { error } = znovuPosli([
 			{ ...POSUV_PLOCHY, klin: { dlzka: 0, sirka: 250, v1: 120, v2: 0, ks: 1 }, kolajnica: null }
 		]);
-		expect(error).toContain('Klín');
+		expect(error).toBe('Posuv 1: klín — dĺžka musí byť 1–20000 mm.');
 	});
 });
