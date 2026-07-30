@@ -60,7 +60,7 @@ scp -q -i "$KEY" -r "$HOST":/tmp/profil-obrazky "$TMP/"
 echo "→ optimalizujem na webp…"
 mkdir -p "$OUT"
 python3 - "$TMP/profil-obrazky" "$OUT" <<'PYEOF'
-import sys, os, glob
+import sys, os, glob, re
 from PIL import Image, ImageChops
 src, out = sys.argv[1], sys.argv[2]
 kods = []
@@ -75,10 +75,25 @@ for f in sorted(glob.glob(src + '/*')):
     im.thumbnail((480, 480), Image.LANCZOS)
     im.save(os.path.join(out, kod + '.webp'), 'WEBP', quality=84, method=6)
     kods.append(kod)
-# aktualizuj zoznam v src/lib/profil-obrazky.ts
-setlit = ',\n\t'.join("'" + k + "'" for k in sorted(kods))
-print('webp:', len(kods))
+# ZAPÍŠ zoznam do src/lib/profil-obrazky.ts — ručné dopĺňanie bolo príčina
+# driftu (Štandard / Štandard + mali stiahnuteľné rezy, ale v zozname neboli
+# → dielňa ich nevidela; šéf 2026-07-30). Test tests/profil-obrazky.test.ts
+# drží zoznam a súbory v zhode.
+ts = os.path.join(os.path.dirname(out), '..', 'src', 'lib', 'profil-obrazky.ts')
+ts = os.path.normpath(ts)
+riadky, cur = [], []
+for k in sorted(kods):
+    cur.append("'" + k + "'")
+    if len(cur) == 6:
+        riadky.append('\t' + ', '.join(cur) + ','); cur = []
+if cur: riadky.append('\t' + ', '.join(cur))
+src = open(ts).read()
+novy = re.sub(r'(export const PROFIL_S_OBRAZKOM = new Set<string>\(\[\n).*?(\n\]\);)',
+              lambda m: m.group(1) + '\n'.join(riadky) + m.group(2), src, flags=re.S)
+assert novy != src, 'nenasiel som PROFIL_S_OBRAZKOM v ' + ts
+open(ts, 'w').write(novy)
+print('webp:', len(kods), '→ zapisane do', ts)
 PYEOF
 
-echo "→ hotovo. Skontroluj static/profil/ a aktualizuj PROFIL_S_OBRAZKOM v src/lib/profil-obrazky.ts (ls static/profil | sed 's/.webp//')."
+echo "→ hotovo. Skontroluj `git status` (nove .webp + prepisany zoznam) a pusti: npx vitest run tests/profil-obrazky.test.ts"
 rm -rf "$TMP"
