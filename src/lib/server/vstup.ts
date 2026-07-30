@@ -106,6 +106,35 @@ export function parseKolajnica(
 	return { kolajnica, error: null };
 }
 
+/**
+ * Riadok posuvu chodí na server v DVOCH tvaroch a oba musia prejsť rovnako:
+ * z formulára ploché polia (`klin: '1'`, `klinDlzka: '2509'`, `kolajnicaHorna`),
+ * z náhľadu (skryté pole `posuvy`) JSON toho, čo server vrátil — teda už
+ * SPARSOVANÝ tvar (`klin: {dlzka,…}`, `kolajnica: {horna,…}`). Kým sa čítali len
+ * ploché názvy, druhý parse (Odoslať / Späť a upraviť) klín aj ručnú dĺžku
+ * koľajnice tichor zahodil — klín zmizol z plánu a koľajnica menila Money odpis
+ * (šéf 2026-07-30). Vnorený tvar tu vždy znamená „zapnuté": zapínač už padol
+ * pri prvom parse, tak sa nulou v `on` nesmie prepnúť naspäť.
+ */
+function klinRaw(p: Record<string, unknown>): KlinRaw {
+	const k = p.klin;
+	if (k && typeof k === 'object') {
+		const o = k as Record<string, unknown>;
+		return { on: '1', dlzka: o.dlzka, sirka: o.sirka, v1: o.v1, v2: o.v2, ks: o.ks };
+	}
+	return { on: k, dlzka: p.klinDlzka, sirka: p.klinSirka, v1: p.klinV1, v2: p.klinV2, ks: p.klinKs };
+}
+
+/** Ručná koľajnica z posuvu — vnorený `{horna,spodna}` aj ploché polia (viď `klinRaw`). */
+function kolajnicaRaw(p: Record<string, unknown>): [unknown, unknown] {
+	const k = p.kolajnica;
+	if (k && typeof k === 'object') {
+		const o = k as Record<string, unknown>;
+		return [o.horna, o.spodna];
+	}
+	return [p.kolajnicaHorna, p.kolajnicaSpodna];
+}
+
 export interface Vstup {
 	zak: string;
 	op: string;
@@ -271,15 +300,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			const p = (posuvyRaw[i] ?? {}) as Record<string, unknown>;
 			const s = parseFloat(String(p.s ?? '').replace(',', '.'));
 			const v = parseFloat(String(p.v ?? '').replace(',', '.'));
-			const k = parseKlin({
-				on: p.klin,
-				dlzka: p.klinDlzka,
-				sirka: p.klinSirka,
-				v1: p.klinV1,
-				v2: p.klinV2,
-				ks: p.klinKs
-			});
-			const kol = parseKolajnica(p.kolajnicaHorna, p.kolajnicaSpodna);
+			const k = parseKlin(klinRaw(p));
+			const kol = parseKolajnica(...kolajnicaRaw(p));
 			const posuv: PosuvVstup = {
 				system: String(p.system ?? '').trim(),
 				styl: normalizujStyl(String(p.system ?? '').trim(), String(p.styl ?? '').trim()),

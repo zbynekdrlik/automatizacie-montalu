@@ -108,6 +108,61 @@ potom voľby (kombinácie tyčí), **ručné úpravy až úplne nakoniec** — d
 čo obsluha vidí v poliach. Pri chybe sa ostáva v náhľade s echom zadaných hodnôt
 (`editVals`), nikdy sa nespadne späť do formulára so stratou zadania.
 
+## 2f. Názov xlsx súboru — `filenameFor` je JEDINÉ miesto, hash nesie OP
+
+Tvar: `ZAK2026337 - Tschakert [b1e403ee].xlsx` — číslo zákazky, zákazník, nič viac
+(šéf 2026-07-29). Dve pravidlá, obe vykúpené chybou:
+
+- **Do názvu NEDÁVAJ OP.** Kolónka sa volá „OP/OPDL číslo" a obsluha do nej píše aj
+  prefix (`OP250359`, `OPDL260092` — vidno v histórii odpisov), takže šablóna
+  `- OP${op} -` vyrábala `OPOP250359`. Rovnako tam nepatrí názov modulu: zákazník
+  býva zadaný ako „PERGOLA Tschakert", takže z toho bolo `… PERGOLA X PERGOLA`.
+- **Hash na konci MUSÍ počítať aj s OP** (`contentHash(\`${zak}|OP${op}\`, polozky)`).
+  Bez OP v názve majú dva odpisy tej istej zákazky s rovnakým obsahom rovnaký názov
+  a druhý ten prvý v Money import priečinku **prepíše** — tichá strata odpisu.
+  `contentHash(zak, polozky)` samotný ostáva planHash strážcom, nemeň mu vstup.
+
+Názov skladá výhradne `filenameFor()` v `money.ts` — moduly ho neskladajú (pole
+`filenameBase` v `OdpisJob` bolo zrušené práve preto, že tú istú šablónu držali 4×).
+
+## 2g. Multi-posuv round-trip: náhľad posiela SPARSOVANÝ tvar posuvu
+
+`hiddenMulti` v náhľade serializuje `multiVstup.posuvy` — teda to, čo server
+vrátil, nie ploché polia formulára. Preto každý per-posuv údaj chodí na server
+v DVOCH tvaroch a `parseMultiVstup` musí zvládnuť oba:
+
+| Z formulára (ploché) | Z náhľadu (sparsované) |
+|---|---|
+| `klin: '1'`, `klinDlzka: '2509'`, … | `klin: { dlzka: 2509, … }` |
+| `kolajnicaHorna: '2690'` | `kolajnica: { horna: 2690, … }` |
+
+Kým sa čítali len ploché názvy, druhý parse (Odoslať / Späť a upraviť) hodnoty
+**tichor zahodil**: klín zmizol z plánu po odoslaní a ručná dĺžka koľajnice —
+ktorá je **Money-kritická** — sa vrátila na výpočet zo šírky (šéf 2026-07-30).
+Pomocníci `klinRaw()` / `kolajnicaRaw()` vo `vstup.ts` normalizujú oba tvary;
+vnorený tvar vždy znamená „zapnuté" (zapínač padol pri prvom parse).
+
+**Keď pridávaš ďalší per-posuv údaj, otestuj DRUHÝ parse**, nie len prvý —
+`tests/vstup-multi-roundtrip.test.ts` je vzor (parse → serialize → parse).
+
+## 2h. Rezy profilov: sync z Money + zámka, aby zoznam nedriftoval
+
+Náhľady rezov (`static/profil/<KOD>.webp`, zoznam `src/lib/profil-obrazky.ts`)
+ťahá `scripts/sync-profil-obrazky.sh` z príloh Money kariet artiklov. Dve pasce,
+obe už zamknuté testom:
+
+- **Sync je MANUÁLNY.** Nový systém (Štandard / Štandard + v0.7.0) doniesol 11
+  profilov, ktorých rezy v Money boli, ale nikto sync nespustil — dielňa videla
+  obrázok len pri pár profiloch. Po každom pridaní profilu/systému ho pusti.
+- **Zoznam sa dopĺňal ručne** → aj stiahnutý rez mohol ostať nezapísaný. Skript
+  ho už prepisuje sám. `tests/profil-obrazky.test.ts` drží zoznam == súbory ==
+  kódy v použití, `e2e/profil-obrazky.spec.ts` kontroluje `naturalWidth` v
+  prehliadači (rozbitý súbor padne, nie len chýbajúci).
+
+Zdroj kódov je rovnaký pre skript aj test: `pergola.ts` + `bazen.ts` +
+`cfg_seed.json`. Kód pridaný LEN v editore vzorcov (ostrá DB) tam nie je — vtedy
+ho pridaj aj do seedu, inak mu rez nikto nestiahne.
+
 ## 2b. Ručný ROZMER rezu od obsluhy (koľajnica) — MENÍ odpis, patrí do compute
 
 Dielňa občas reže profil na inú dĺžku než dá vzorec (Patrik 2026-07-28: horná koľajnica
