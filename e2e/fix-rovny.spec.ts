@@ -102,3 +102,35 @@ test('šikmý fix ostal nezmenený — rovnaké výšky navedú na nový tvar', 
 
 	expect(errs).toEqual([]);
 });
+
+test('šikmý fix s 1 mm rozdielom výšok si NECHÁ kóty (sklon zaokrúhli na 0,0°)', async ({
+	page
+}) => {
+	// Nález z review: popisky sa gejtovali na `alfa === 0`, lenže alfa je zaokrúhlená
+	// na desatinu stupňa — pri rozdiele výšok ~1 mm padne na 0 aj poctivo šikmý fix
+	// a ten by prišiel o kóty a čítačka by ho ohlásila ako rovný.
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await page.goto('/fix');
+	await waitHydrated(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-1MM');
+	await page.getByLabel('OP/OPDL číslo *').fill('04');
+	await page.getByLabel('Zákazník *').fill('E2E 1mm');
+	await page.locator('#s').fill('2000');
+	await page.locator('#v1').fill('1800');
+	await page.locator('#v2').fill('1799');
+	await page.getByTestId('nakreslit').click();
+
+	await expect(page.getByTestId('fix-badge')).toContainText('Fix šikmý');
+	// sklon sa vypíše ako 0°, ale popisky MUSIA ostať — je to šikmý kus
+	await expect(page.getByTestId('uhol-sklonu')).toContainText('0');
+	await expect(page.getByTestId('fix-sikma')).toBeVisible();
+	await expect(page.getByTestId('fix-uhol')).toBeVisible();
+	await expect(page.getByTestId('fix-vykres')).toHaveAttribute(
+		'aria-label',
+		/šikmého fixu 2000×1800\/1799 mm/
+	);
+
+	expect(errs).toEqual([]);
+});
