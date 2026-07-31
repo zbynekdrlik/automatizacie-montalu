@@ -48,7 +48,7 @@ test('2K + float: basic nárezák s rámom ZASP00018 a dorazovým ZASP00021', as
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(page.getByTestId('plan-badge')).toContainText('Štandard 2K');
+	await expect(page.getByTestId('plan-badge')).toContainText('Starý štandard 2K');
 	await expect(riadok(page, 'ZASP00107')).toContainText(/(^|\D)7,5 m/);
 	await expect(riadok(page, 'ZASP00104')).toContainText(/(^|\D)7,5 m/);
 	await expect(riadok(page, 'ZASP202415')).toContainText(/(^|\D)7,2 m/);
@@ -74,7 +74,7 @@ test('2K + izolačné: IZO nárezák — U profil 21,6 m a spodná koľajnica o 
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(page.getByTestId('plan-badge')).toContainText('Štandard 2K IZO');
+	await expect(page.getByTestId('plan-badge')).toContainText('Starý štandard 2K IZO');
 	await expect(riadok(page, 'ZASP202439')).toContainText(/(^|\D)21,6 m/);
 	// spodná koľajnica 2K IZO = 3K profil (ZASP00030), nie ZASP00104
 	await expect(riadok(page, 'ZASP00030')).toContainText(/(^|\D)7,5 m/);
@@ -95,7 +95,7 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ (na rozdiel od Št
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(page.getByTestId('plan-badge')).toContainText('Štandard 2x3K IZO');
+	await expect(page.getByTestId('plan-badge')).toContainText('Starý štandard 2x3K IZO');
 	await expect(riadok(page, 'ZASP202439')).toContainText(/(^|\D)43,2 m/);
 	await expect(riadok(page, 'ZASP00024')).toContainText(/(^|\D)22,5 m/);
 

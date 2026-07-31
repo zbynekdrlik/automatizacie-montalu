@@ -42,7 +42,7 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(page.getByTestId('plan-badge')).toContainText('Štandard + 4K IZO');
+	await expect(page.getByTestId('plan-badge')).toContainText('Štandard plus 4K IZO');
 	await expect(page.locator('.row', { hasText: U_PROFIL })).toHaveCount(1);
 
 	// to isté zadanie, len float sklo → basic nárezák bez „U" profilu
@@ -54,7 +54,7 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(page.getByTestId('plan-badge')).toContainText('Štandard + 4K ·');
+	await expect(page.getByTestId('plan-badge')).toContainText('Štandard plus 4K ·');
 	await expect(page.locator('.row', { hasText: U_PROFIL })).toHaveCount(0);
 
 	expect(errs).toEqual([]);

@@ -67,6 +67,10 @@
 	let yVysoka = $derived(Y(Math.max(r.V1, r.V2)));
 	// popisok ostrého uhla musí ísť pod ŠIKMÚ hranu, nie pod vodorovnú — pri strmom
 	// sklone hrana v mieste popisku už klesla o 52·tg α (inak text leží na čiare)
+	// Rovný (pravouhlý) fix: α = 0 ⇒ „šikmá hrana" je obyčajná horná hrana a oba
+	// vnútorné uhly sú 90°. Kótovať sklon 0°, hranu rovnú šírke a dvakrát 90° by bol
+	// šum cez celý výkres, tak sa tie popisky vynechajú (Patrik 2026-07-31).
+	let rovny = $derived(r.alfa === 0);
 	let ostryOdsad = $derived(28 + 52 * Math.tan((r.alfa * Math.PI) / 180));
 	// to isté pre tupý uhol nad šikmou hranou: vo vzdialenosti 44 px dovnútra je
 	// hrana o 44·tg α VYŠŠIE, takže konštantné odsadenie by pri strmom sklone
@@ -251,7 +255,7 @@
 	>
 
 	<!-- šikmá hrana: dĺžky po poliach (rozmiestnené bez prekryvov) -->
-	{#each popisySikma as p (p.text + p.x)}
+	{#each rovny ? [] : popisySikma as p (p.text + p.x)}
 		<text
 			x={p.x}
 			y={p.y}
@@ -266,6 +270,7 @@
 			transform="rotate({sklonTextu} {p.x} {p.y})">{p.text}</text
 		>
 	{/each}
+	{#if !rovny}
 	<text
 		x={(X(0) + X(r.S)) / 2}
 		y={20}
@@ -275,7 +280,9 @@
 		fill="#b45309"
 		data-testid="fix-sikma">šikmá hrana {fmt(r.sikmaCelkom)} mm · sklon {fmt(r.alfa)}°</text
 	>
+	{/if}
 
+{#if !rovny}
 	<!-- uhol sklonu pri vyššej strane (ostrý uhol konštrukcie) -->
 	<text
 		x={popisUhlov[0].x}
@@ -304,4 +311,5 @@
 		paint-order="stroke"
 		data-testid="fix-uhol-tupy">{fmt(r.uholTupy)}°</text
 	>
+{/if}
 </svg>

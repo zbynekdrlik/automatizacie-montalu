@@ -1,14 +1,16 @@
-// Parsovanie a serverová validácia vstupu šikmého FIXu. Žije v $lib/server (nie
-// v +page.server.ts) — SvelteKit povoľuje z page-server súboru exportovať len
+// Parsovanie a serverová validácia vstupu FIXu (pevného zasklenia). Žije v $lib/server
+// (nie v +page.server.ts) — SvelteKit povoľuje z page-server súboru exportovať len
 // load/actions/…, a takto sa dá vstup priamo unit-testovať.
-import { chybaFixVstupu, FIX_MAX_POLI } from '$lib/fix';
+import { chybaFixVstupu, jeFixTvar, FIX_MAX_POLI, type FixTvar } from '$lib/fix';
 
 export interface FixVstup {
 	zak: string;
 	op: string;
 	zakaznik: string;
-	/** názov kusu na výkrese (napr. „FIX KMS") */
+	/** názov kusu na výkrese */
 	nazov: string;
+	/** tvar konštrukcie — šikmá horná hrana vs pravouhlý obdĺžnik */
+	tvar: FixTvar;
 	s: number;
 	v1: number;
 	v2: number;
@@ -27,6 +29,13 @@ function num(form: FormData, k: string): number {
 
 export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string | null } {
 	const s = num(form, 's');
+	const tvarRaw = String(form.get('tvar') ?? 'sikmy');
+	// neznámy tvar = šikmý (pôvodné správanie) — starý bookmark/POST bez poľa `tvar`
+	// tak ostáva platný a nič sa mu nezmení
+	const tvar: FixTvar = jeFixTvar(tvarRaw) ? tvarRaw : 'sikmy';
+	// rovný fix má JEDNU výšku; formulár posiela `v1`, druhá je jej kópia
+	const v1 = num(form, 'v1');
+	const v2 = tvar === 'rovny' ? v1 : num(form, 'v2');
 	let polia: number[] = [];
 	try {
 		const raw: unknown = JSON.parse(String(form.get('polia') ?? '[]'));
@@ -48,9 +57,10 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
 		nazov: String(form.get('nazov') ?? '').trim().slice(0, 60),
+		tvar,
 		s,
-		v1: num(form, 'v1'),
-		v2: num(form, 'v2'),
+		v1,
+		v2,
 		polia,
 		zrkadlo: form.get('zrkadlo') === '1',
 		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
@@ -62,7 +72,7 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
-	else error = chybaFixVstupu(vstup.s, vstup.v1, vstup.v2, vstup.polia);
+	else error = chybaFixVstupu(vstup.s, vstup.v1, vstup.v2, vstup.polia, vstup.tvar);
 	return { vstup, error };
 }
 
