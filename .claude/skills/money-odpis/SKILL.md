@@ -286,7 +286,7 @@ inak overuješ nulu a myslíš si, že je to v poriadku.
 IBA rátajú, nič nezapíšu. Post-deploy over cez Playwright len náhľadom (čítaj odpis +
 rozpis), Odoslať NIKDY neklikaj.
 
-## 5. DISPLAY-ONLY prvky dielne (poznámka, RAL, kovanie, klín) — cesta a dôkaz neutrality
+## 5. DISPLAY-ONLY prvky dielne (poznámka, RAL, kovanie, klín, sieťka) — cesta a dôkaz neutrality
 
 Dielňa si pravidelne vyžiada prvok, ktorý „len nech je na pláne" (poznámka, RAL, kovanie
 kľučky, klín). Ich cesta je VŽDY tá istá a nikdy nesmie zabočiť do `polozky`:
@@ -311,6 +311,16 @@ zrazu ukazuje niečo iné než formulár. Kryje to e2e „prežije Späť a upra
 „do Money nejde", o pár hodín „má ísť do Money" → čaká na katalógové kódy + počty ks).
 Preto drž prvok v `detail` (zapíše sa do histórie) — keď sa rozhodnutie otočí, dáta
 o minulých zákazkách existujú.
+
+**Sieťka (2026-07-31, #86–#90) je presne tento prípad, ale VEDOME rozdelený na dve
+polovice hneď od začiatku:** appka postavila len display-only časť (checkbox, úchyt,
+2K upozornenie, samostatná stránka `/sietka` bez odpisu vôbec — vzor `/fix`), lebo
+Money strana chýbala na TROCH miestach naraz: joklík nemá v katalógu žiadnu kartu
+(§2j), presné kusy/metre nie sú potvrdené pri žiadnej položke, a rozmer sieťky
+(vzorec voči otvoru) nie je daný vôbec — preto sa rozmer sieťky **nepočíta**, zadáva
+ho ručne dielňa, rovnako ako 4 kóty klina (`KlinPolia.svelte`/`SietkaPolia.svelte`).
+Keď je dôvod „nemáme dosť čísel na to, aby appka niečo tvrdila", nevymýšľaj vzorec —
+nechaj pole na ručné zadanie a zdokumentuj v komentári na tickete presne to, čo chýba.
 
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 
