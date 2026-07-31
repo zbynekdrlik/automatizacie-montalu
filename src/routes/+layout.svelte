@@ -19,12 +19,17 @@
 	// resolve(l.href) — to spĺňa svelte/no-navigation-without-resolve (#99).
 	const links = $derived(
 		data.user?.role === 'b2b'
-			? ([{ href: '/zasklenia', label: 'Zasklenia' }] satisfies { href: RouteId; label: string }[])
+			? ([
+					{ href: '/zasklenia', label: 'Zasklenia' },
+					// dodatočná sieťka bez posuvu (#89) — Patrik: „hlavne pre externých"
+					{ href: '/sietka', label: 'Sieťka' }
+				] satisfies { href: RouteId; label: string }[])
 			: ([
 					{ href: '/pergola', label: 'Pergola' },
 					{ href: '/fix', label: 'Fixy' },
 					{ href: '/bazen', label: 'Bazén' },
 					{ href: '/zasklenia', label: 'Zasklenia' },
+					{ href: '/sietka', label: 'Sieťka' },
 					{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
 					{ href: '/odpisy', label: 'História' },
 					{ href: '/problem', label: '⚠ Problém' },

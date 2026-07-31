@@ -6,6 +6,7 @@ import { jeSikmyRez, systemRovnyRez } from '$lib/cut';
 import type { Klin } from '$lib/klin';
 import { rolaKolajnice, type KolajnicaRucne } from '$lib/kolajnica';
 import type { ZakladPoctov } from '$lib/komponenty';
+import type { Sietka } from '$lib/sietka';
 
 export interface SysRow {
 	sysStyl: string;
@@ -525,6 +526,8 @@ export interface PosuvSpec {
 	kovanieStredOkno?: 'L' | 'P';
 	/** klín nad posuvom — len na plán/náhľad, do Money odpisu NEJDE */
 	klin?: Klin | null;
+	/** sieťka na posuve (#86–#90) — len na plán/náhľad, do Money odpisu NEJDE */
+	sietka?: Sietka | null;
 }
 
 export interface PosuvInfo {
@@ -544,6 +547,8 @@ export interface PosuvInfo {
 	klin?: Klin | null;
 	/** ručne zadané dĺžky koľajníc tohto posuvu — na plán/tlač (výpočet ich už použil) */
 	kolajnica?: KolajnicaRucne | null;
+	/** sieťka tohto posuvu (#86–#90) — na plán/tlač, do Money odpisu NEJDE */
+	sietka?: Sietka | null;
 }
 
 export interface MultiResult {
@@ -641,7 +646,8 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			kovanieStred: p.kovanieStred,
 			kovanieStredOkno: p.kovanieStredOkno,
 			klin: p.klin ?? null,
-			kolajnica: p.kolajnica ?? null
+			kolajnica: p.kolajnica ?? null,
+			sietka: p.sietka ?? null
 		});
 	}
 	const material: MaterialRow[] = [];

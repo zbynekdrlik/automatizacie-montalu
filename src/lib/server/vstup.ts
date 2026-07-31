@@ -3,6 +3,7 @@
 import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
+import { SIETKA_MAX_ROZMER, jeSietkaUchyt, maSietkaSystem, type Sietka } from '$lib/sietka';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
@@ -93,6 +94,56 @@ export function parseKlin(raw: KlinRaw): { klin: Klin | null; error: string | nu
 	return { klin, error };
 }
 
+/** Surové polia sieťky — z plochého formulára aj z JSON riadku posuvu (multi).
+ *  `on` je zapínač: '1' / true = „so sieťkou" je zapnuté. */
+export interface SietkaRaw {
+	on: unknown;
+	sirka: unknown;
+	vyska: unknown;
+	uchyt: unknown;
+}
+
+/**
+ * Sieťka (display-only prvok pri posuve, #86–#90). Vypnutý zapínač → `null` a žiadna
+ * chyba (sieťka je nepovinná). Zapnutá → rozmer je NEPOVINNÝ (zadá ho dielňa, keď ho
+ * pozná — appka ho nepočíta, vzorec/offset voči otvoru nie je potvrdený), ale KEĎ je
+ * zadaný, musí byť v rozsahu; strážime to tu, pretože skriptovaný POST obíde HTML5
+ * min/max (rovnaký vzor ako `parseKlin`). Úchyt sa sanitizuje na jednu zo 4 hodnôt,
+ * nezmyselná/chýbajúca hodnota = „bez ničoho" (nikdy sa nesprávne nezobrazí niečo,
+ * čo obsluha nevybrala).
+ */
+export function parseSietka(raw: SietkaRaw): { sietka: Sietka | null; error: string | null } {
+	const on = raw.on === '1' || raw.on === true || raw.on === 'true';
+	if (!on) return { sietka: null, error: null };
+	const n = (x: unknown): number | null => {
+		const s = String(x ?? '').trim();
+		if (!s) return null;
+		const f = parseFloat(s.replace(',', '.'));
+		return Number.isFinite(f) ? f : NaN;
+	};
+	const sirka = n(raw.sirka);
+	const vyska = n(raw.vyska);
+	const rozmerOk = (x: number | null) => x === null || (x > 0 && x <= SIETKA_MAX_ROZMER);
+	let error: string | null = null;
+	if (!rozmerOk(sirka)) error = `Sieťka: šírka musí byť prázdna alebo 1–${SIETKA_MAX_ROZMER} mm.`;
+	else if (!rozmerOk(vyska))
+		error = `Sieťka: výška musí byť prázdna alebo 1–${SIETKA_MAX_ROZMER} mm.`;
+	const uchytRaw = raw.uchyt;
+	const sietka: Sietka = {
+		sirka: sirka === null || Number.isNaN(sirka) ? null : sirka,
+		vyska: vyska === null || Number.isNaN(vyska) ? null : vyska,
+		uchyt: jeSietkaUchyt(uchytRaw) ? uchytRaw : 'ziadny'
+	};
+	return { sietka, error };
+}
+
+/** Sieťka je len tam, kde ju appka ponúka (Robust/Slide) — pri inom systéme
+ *  (aj zo skriptovaného POST-u) sa zahodí, nech sa na plán nedostane nezmysel
+ *  (rovnaký vzor ako `sanitizeKovanie`). */
+export function sanitizeSietka(system: string, sietka: Sietka | null): Sietka | null {
+	return maSietkaSystem(system) ? sietka : null;
+}
+
 /**
  * Ručne zadaná dĺžka koľajníc (Patrik 2026-07-28). Prázdne pole = počítaj zo šírky
  * (pôvodné chovanie). MONEY-KRITICKÉ: zadaná dĺžka mení balenie na tyče → mení metre
@@ -150,6 +201,21 @@ function klinRaw(p: Record<string, unknown>): KlinRaw {
 	};
 }
 
+/** Sieťka z posuvu — vnorený `{sirka,vyska,uchyt}` aj ploché polia (viď `klinRaw`). */
+function sietkaRaw(p: Record<string, unknown>): SietkaRaw {
+	const k = p.sietka;
+	if (k && typeof k === 'object') {
+		const o = k as Record<string, unknown>;
+		return { on: '1', sirka: o.sirka, vyska: o.vyska, uchyt: o.uchyt };
+	}
+	return {
+		on: k,
+		sirka: p.sietkaSirka,
+		vyska: p.sietkaVyska,
+		uchyt: p.sietkaUchyt
+	};
+}
+
 /** Ručná koľajnica z posuvu — vnorený `{horna,spodna}` aj ploché polia (viď `klinRaw`). */
 function kolajnicaRaw(p: Record<string, unknown>): [unknown, unknown] {
 	const k = p.kolajnica;
@@ -200,6 +266,8 @@ export interface Vstup {
 	klin: Klin | null;
 	/** ručne zadané dĺžky koľajníc — MENÍ Money odpis; null = počítaj zo šírky */
 	kolajnica: KolajnicaRucne | null;
+	/** sieťka na posuve (#86–#90) — display-only, do Money odpisu NEJDE; null = žiadna */
+	sietka: Sietka | null;
 }
 
 export function parseVstup(form: FormData): { vstup: Vstup; error: string | null } {
@@ -245,7 +313,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
 		jednostrannaFab: form.get('jednostrannaFab') === '1',
 		klin: null,
-		kolajnica: null
+		kolajnica: null,
+		sietka: null
 	};
 	const kol = parseKolajnica(form.get('kolajnicaHorna'), form.get('kolajnicaSpodna'));
 	vstup.kolajnica = kol.kolajnica;
@@ -258,11 +327,19 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		ks: form.get('klinKs')
 	});
 	vstup.klin = k.klin;
+	const sk = parseSietka({
+		on: form.get('sietka'),
+		sirka: form.get('sietkaSirka'),
+		vyska: form.get('sietkaVyska'),
+		uchyt: form.get('sietkaUchyt')
+	});
 	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
 	// skriptovaný POST neobíde (otváranie je len na plán/náhľad, nemení výpočet)
 	if (vstup.styl.startsWith('2x')) vstup.otvaranie = 'Opona';
-	// až TU, keď je štýl normalizovaný — mimo opony sa stredová kľučka zahadzuje
+	// až TU, keď je systém aj štýl normalizovaný — mimo opony sa stredová kľučka
+	// zahadzuje a sieťka sa ponúka len na systémoch, ktoré ju majú (Robust/Slide)
 	vstup.kovanieStred = sanitizeKovanieStred(vstup.system, vstup.styl, form.get('kovanieStred'));
+	vstup.sietka = sanitizeSietka(vstup.system, sk.sietka);
 	let error: string | null = null;
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
@@ -272,6 +349,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	else if (!OTVARANIA.includes(vstup.otvaranie)) error = 'Vyber otváranie.';
 	else if (kol.error) error = kol.error;
 	else if (k.error) error = k.error;
+	else if (maSietkaSystem(vstup.system) && sk.error) error = sk.error;
 	return { vstup, error };
 }
 
@@ -295,6 +373,8 @@ export interface PosuvVstup {
 	klin: Klin | null;
 	/** ručné dĺžky koľajníc TOHOTO posuvu — MENÍ Money odpis; null = zo šírky */
 	kolajnica: KolajnicaRucne | null;
+	/** sieťka TOHOTO posuvu (#86–#90) — display-only, do Money odpisu NEJDE; null = žiadna */
+	sietka: Sietka | null;
 }
 
 export interface MultiVstup {
@@ -351,19 +431,22 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			const v = parseFloat(String(p.v ?? '').replace(',', '.'));
 			const k = parseKlin(klinRaw(p));
 			const kol = parseKolajnica(...kolajnicaRaw(p));
+			const sk = parseSietka(sietkaRaw(p));
+			const posuvSystem = String(p.system ?? '').trim();
 			const posuv: PosuvVstup = {
-				system: String(p.system ?? '').trim(),
-				styl: normalizujStyl(String(p.system ?? '').trim(), String(p.styl ?? '').trim()),
+				system: posuvSystem,
+				styl: normalizujStyl(posuvSystem, String(p.styl ?? '').trim()),
 				s: Number.isFinite(s) ? s : 0,
 				v: Number.isFinite(v) ? v : 0,
 				sklo: String(p.sklo ?? '').trim(),
 				otvaranie: String(p.otvaranie ?? '').trim(),
-				kovanieL: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieL),
-				kovanieP: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieP),
+				kovanieL: sanitizeKovanie(posuvSystem, p.kovanieL),
+				kovanieP: sanitizeKovanie(posuvSystem, p.kovanieP),
 				kovanieStred: '',
 				kovanieStredOkno: sanitizeStredOkno(p.kovanieStredOkno),
 				klin: k.klin,
-				kolajnica: kol.kolajnica
+				kolajnica: kol.kolajnica,
+				sietka: sanitizeSietka(posuvSystem, sk.sietka)
 			};
 			if (!posuv.system || !posuv.styl) {
 				error = `Posuv ${i + 1}: vyber systém a štýl.`;
@@ -394,6 +477,10 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			}
 			if (k.error) {
 				error = `Posuv ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
+				break;
+			}
+			if (maSietkaSystem(posuv.system) && sk.error) {
+				error = `Posuv ${i + 1}: ${sk.error.replace(/^Sieťka: /, 'sieťka — ')}`;
 				break;
 			}
 			posuvy.push(posuv);

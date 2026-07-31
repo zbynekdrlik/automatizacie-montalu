@@ -65,6 +65,8 @@ function jobFor(
 			ral: vstup.ral,
 			// klín — len záznam do histórie/plánu, do Money položiek nejde
 			klin: vstup.klin,
+			// sieťka (#86–#90) — len záznam do histórie/plánu, do Money položiek nejde
+			sietka: vstup.sietka,
 			// ručne zadané koľajnice — MENIA odpis, preto do histórie (audit prečo
 			// sedí toľko metrov); null = počítané zo šírky
 			kolajnica: vstup.kolajnica,
@@ -172,7 +174,9 @@ function computeMultiFrom(vstup: MultiVstup) {
 			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
 			// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
-			kolajnica: p.kolajnica ?? undefined
+			kolajnica: p.kolajnica ?? undefined,
+			// sieťka (#86–#90) — len na plán/náhľad, do Money odpisu NEJDE
+			sietka: p.sietka ?? undefined
 		});
 	}
 	return { ...safeComputeMulti(cfg, specs), specs };
@@ -215,7 +219,8 @@ function jobForMulti(
 				kovanieStred: vstup.posuvy[i]?.kovanieStred,
 				kovanieStredOkno: vstup.posuvy[i]?.kovanieStredOkno,
 				klin: vstup.posuvy[i]?.klin ?? null,
-				kolajnica: vstup.posuvy[i]?.kolajnica ?? null
+				kolajnica: vstup.posuvy[i]?.kolajnica ?? null,
+				sietka: vstup.posuvy[i]?.sietka ?? null
 			}))
 		}
 	};

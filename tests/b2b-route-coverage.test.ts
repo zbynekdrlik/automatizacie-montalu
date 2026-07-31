@@ -14,7 +14,10 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 // - /zasklenia — jediná zápisová stránka pre b2b, chránená na úrovni action (odoslat/
 //   odoslatMulti odmietnu b2b, viď b2b-money-reject.test.ts)
 // - /login, /logout, /health — nutné pre autentifikáciu / liveness, nemajú b2b-citlivý zápis
-const ALLOWED = new Set(['/zasklenia', '/login', '/logout', '/health']);
+// - /sietka — dodatočná sieťka bez posuvu (#89): Patrik „hlavne pre externých" —
+//   modul NEMÁ žiadny zápis do Money vôbec (rovnako ako /fix, ktoré je napriek tomu
+//   v denylist-e — /fix je interné z iného dôvodu), takže tu je vedomé povolenie
+const ALLOWED = new Set(['/zasklenia', '/sietka', '/login', '/logout', '/health']);
 
 /** Prevedie adresár routy (relatívne k src/routes) na URL cestu. Ignoruje route groups (...). */
 function toRoutePath(dirAbs: string): string {
@@ -74,5 +77,9 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('/zasklenia (povolená zápisová stránka pre b2b) nie je presmerovaná', () => {
 		expect(b2bRedirectTarget('/zasklenia')).toBeNull();
+	});
+
+	it('/sietka (#89 — Patrik: „hlavne pre externých", žiadny Money zápis) nie je presmerovaná', () => {
+		expect(b2bRedirectTarget('/sietka')).toBeNull();
 	});
 });
