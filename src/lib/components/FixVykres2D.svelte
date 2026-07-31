@@ -67,16 +67,22 @@
 	let yVysoka = $derived(Y(Math.max(r.V1, r.V2)));
 	// popisok ostrého uhla musí ísť pod ŠIKMÚ hranu, nie pod vodorovnú — pri strmom
 	// sklone hrana v mieste popisku už klesla o 52·tg α (inak text leží na čiare)
-	// Rovný (pravouhlý) fix: α = 0 ⇒ „šikmá hrana" je obyčajná horná hrana a oba
-	// vnútorné uhly sú 90°. Kótovať sklon 0°, hranu rovnú šírke a dvakrát 90° by bol
-	// šum cez celý výkres, tak sa tie popisky vynechajú (Patrik 2026-07-31).
-	let rovny = $derived(r.alfa === 0);
 	let ostryOdsad = $derived(28 + 52 * Math.tan((r.alfa * Math.PI) / 180));
 	// to isté pre tupý uhol nad šikmou hranou: vo vzdialenosti 44 px dovnútra je
 	// hrana o 44·tg α VYŠŠIE, takže konštantné odsadenie by pri strmom sklone
 	// popisok znova posadilo na čiaru
 	let tupyOdsad = $derived(12 + 44 * Math.tan((r.alfa * Math.PI) / 180));
 
+
+	// Rovný (pravouhlý) fix: horná hrana je vodorovná ⇒ „šikmá hrana" je obyčajná
+	// horná hrana a oba vnútorné uhly sú 90°. Kótovať sklon 0°, hranu rovnú šírke
+	// a dvakrát 90° by bol šum cez celý výkres, tak sa tie popisky vynechajú
+	// (Patrik 2026-07-31).
+	//
+	// Podmienkou je ROVNOSŤ VÝŠOK, nie `alfa === 0`: alfa je zaokrúhlená na desatinu
+	// stupňa, takže by na 0 spadol aj šikmý fix s rozdielom výšok ~1 mm — a ten by
+	// potom prišiel o kóty a čítačka by ho ohlásila ako rovný.
+	let rovny = $derived(r.V1 === r.V2);
 
 	let yNizka = $derived(Y(Math.min(r.V1, r.V2)));
 
