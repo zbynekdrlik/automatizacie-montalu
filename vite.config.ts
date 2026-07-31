@@ -3,13 +3,21 @@ import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
-// verzia zobrazená v pätičke — git describe pri builde (post-deploy verifikácia
-// číta túto hodnotu z DOM a porovnáva s nasadeným commitom)
+// verzia zobrazená v pätičke — deploy job posiela APP_VERSION="<package.json verzia>
+// (<sha7>)" (viď .github/workflows/ci.yml). Lokálny beh a CI `test` job (npm run build
+// bez APP_VERSION) ho nemá — repo nikdy nemalo git tag, takže `git describe --tags`
+// by padol na holý SHA a porušil by mandatórny v<semver> formát (version-on-dashboard).
+// Fallback preto berie verziu z package.json (jediný zdroj pravdy, viď
+// version-bumping) + krátky SHA v ROVNAKOM tvare ako deploy job.
 let version = process.env.APP_VERSION || '';
 if (!version) {
 	try {
-		version = execSync('git describe --tags --always --dirty').toString().trim();
+		const pkgVersion = (JSON.parse(readFileSync('./package.json', 'utf8')) as { version: string })
+			.version;
+		const sha = execSync('git rev-parse --short=7 HEAD').toString().trim();
+		version = `${pkgVersion} (${sha})`;
 	} catch {
 		version = 'dev';
 	}

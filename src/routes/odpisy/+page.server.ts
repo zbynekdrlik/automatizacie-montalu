@@ -6,7 +6,7 @@ export const load: PageServerLoad = async () => {
 	// celú históriu (a „Uvoľniť" je jediná cesta k oprave duplikátov)
 	return {
 		odpisy: listOdpisy(200).map((o) => {
-			let d: Record<string, unknown> = {};
+			let d: Record<string, unknown>;
 			try {
 				d = JSON.parse(o.detail || '{}');
 			} catch {

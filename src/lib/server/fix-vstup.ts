@@ -68,7 +68,7 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300)
 	};
 
-	let error: string | null = null;
+	let error: string | null;
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!vstup.zakaznik) error = 'Chýba zákazník.';

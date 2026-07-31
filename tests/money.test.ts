@@ -12,7 +12,7 @@ process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
 // import až PO nastavení env (db.ts číta DATABASE_PATH pri importe)
-const { writeOdpis, safe, targetDirFor, contentHash, releaseOdpis, listOdpisy, filenameFor } =
+const { writeOdpis, targetDirFor, contentHash, releaseOdpis, listOdpisy, filenameFor } =
 	await import('../src/lib/server/money');
 const { loadCfg, db } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');

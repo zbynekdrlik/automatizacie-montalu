@@ -16,7 +16,11 @@ test('login: zlé heslo zobrazí chybu, správne prihlási; verzia v pätičke',
 	await expect(page.getByTestId('login-error')).toContainText('Nesprávne');
 
 	await loginAs(page);
-	await expect(page.getByTestId('version')).toHaveText(/^v.+/);
+	// tvar v<semver>[-dev.N][ (sha7)] — viď version-on-dashboard; nasadená appka
+	// ukazuje napr. "v0.10.0 (177e390)", lokálny/CI build "v0.10.1-dev.1 (9477686)"
+	const version = page.getByTestId('version');
+	await expect(version).toBeVisible();
+	await expect(version).toHaveText(/^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$/);
 	await expect(page.getByTestId('mode')).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });
