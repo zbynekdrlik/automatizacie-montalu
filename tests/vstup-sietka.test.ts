@@ -172,13 +172,28 @@ describe('parseMultiVstup — sieťka je PER POSUV', () => {
 
 describe('MONEY-NEUTRALITA — sieťka nesmie zmeniť odpis ani materiál', () => {
 	const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
+
+	// Naprieč VŠETKÝMI systémami, ktoré appka pre sieťku ponúka (SIETKA_SYSTEMY v
+	// $lib/sietka — dnes Robust a Slide). Predtým sa Slide „kryl" len argumentom, že
+	// computeMulti prepúšťa `sietka` bez vetvenia podľa systému (žiadny test) — presne
+	// preto vzniklo #90 (Slide dostane vlastný zužovací profil pre sieťku, teda skoro
+	// pribudne systémová vetva). Vektory musia byť platné pre daný systém+štýl:
+	// Robust|3K S=4645/V=2320 je pôvodný test vektor; Slide|3K S=3500/V=2001 je overený
+	// platný vektor z tests/compute.test.ts („rôzne systémy sa nemiešajú na jednu tyč").
+	const vektory: [system: string, sysStyl: string, S: number, V: number][] = [
+		['Robust', 'Robust|3K', 4645, 2320],
+		['Slide', 'Slide|3K', 3500, 2001]
+	];
 	const spec = (
+		sysStyl: string,
+		S: number,
+		V: number,
 		sietka: { sirka: number | null; vyska: number | null; uchyt: SietkaUchyt } | null
 	) => [
 		{
-			sysStyl: 'Robust|3K',
-			S: 4645,
-			V: 2320,
+			sysStyl,
+			S,
+			V,
 			redukciaZero: true,
 			skloHrubka: 0,
 			otvaranie: 'P - L',
@@ -187,21 +202,33 @@ describe('MONEY-NEUTRALITA — sieťka nesmie zmeniť odpis ani materiál', () =
 		}
 	];
 
-	it('odpis aj materiál sú identické so sieťkou a bez nej; sieťka sa vráti pre náhľad', () => {
-		const bez = computeMulti(cfg, spec(null))!;
-		const s = computeMulti(cfg, spec({ sirka: 1200, vyska: 1450, uchyt: 'madloVelke' }))!;
-		expect(s.odpis).toEqual(bez.odpis);
-		expect(s.material).toEqual(bez.material);
-		expect(s.posuvy[0].sietka).toEqual({ sirka: 1200, vyska: 1450, uchyt: 'madloVelke' });
-		expect(bez.posuvy[0].sietka).toBeNull();
-	});
+	it.each(vektory)(
+		'%s: odpis aj materiál sú identické so sieťkou a bez nej; sieťka sa vráti pre náhľad',
+		(_system, sysStyl, S, V) => {
+			const bez = computeMulti(cfg, spec(sysStyl, S, V, null))!;
+			const s = computeMulti(
+				cfg,
+				spec(sysStyl, S, V, { sirka: 1200, vyska: 1450, uchyt: 'madloVelke' })
+			)!;
+			expect(s.odpis).toEqual(bez.odpis);
+			expect(s.material).toEqual(bez.material);
+			expect(s.posuvy[0].sietka).toEqual({ sirka: 1200, vyska: 1450, uchyt: 'madloVelke' });
+			expect(bez.posuvy[0].sietka).toBeNull();
+		}
+	);
 
-	it('to isté platí aj keď rozmer sieťky nie je zadaný (null)', () => {
-		const bez = computeMulti(cfg, spec(null))!;
-		const s = computeMulti(cfg, spec({ sirka: null, vyska: null, uchyt: 'ziadny' }))!;
-		expect(s.odpis).toEqual(bez.odpis);
-		expect(s.material).toEqual(bez.material);
-	});
+	it.each(vektory)(
+		'%s: to isté platí aj keď rozmer sieťky nie je zadaný (null)',
+		(_system, sysStyl, S, V) => {
+			const bez = computeMulti(cfg, spec(sysStyl, S, V, null))!;
+			const s = computeMulti(
+				cfg,
+				spec(sysStyl, S, V, { sirka: null, vyska: null, uchyt: 'ziadny' })
+			)!;
+			expect(s.odpis).toEqual(bez.odpis);
+			expect(s.material).toEqual(bez.material);
+		}
+	);
 });
 
 describe('sietkaPopis — jeden riadok do plánu a histórie', () => {
