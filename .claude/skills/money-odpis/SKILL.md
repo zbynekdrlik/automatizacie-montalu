@@ -110,13 +110,13 @@ potom voľby (kombinácie tyčí), **ručné úpravy až úplne nakoniec** — d
 
 ## 2f. Názov xlsx súboru — `filenameFor` je JEDINÉ miesto, hash nesie OP
 
-Tvar: `ZAK2026337 - Tschakert [b1e403ee].xlsx` — číslo zákazky, zákazník, nič viac
+Tvar: `ZAK2026337 - Zákazník B [b1e403ee].xlsx` — číslo zákazky, zákazník, nič viac
 (šéf 2026-07-29). Dve pravidlá, obe vykúpené chybou:
 
 - **Do názvu NEDÁVAJ OP.** Kolónka sa volá „OP/OPDL číslo" a obsluha do nej píše aj
   prefix (`OP250359`, `OPDL260092` — vidno v histórii odpisov), takže šablóna
   `- OP${op} -` vyrábala `OPOP250359`. Rovnako tam nepatrí názov modulu: zákazník
-  býva zadaný ako „PERGOLA Tschakert", takže z toho bolo `… PERGOLA X PERGOLA`.
+  býva zadaný ako „PERGOLA Zákazník B", takže z toho bolo `… PERGOLA X PERGOLA`.
 - **Hash na konci MUSÍ počítať aj s OP** (`contentHash(\`${zak}|OP${op}\`, polozky)`).
   Bez OP v názve majú dva odpisy tej istej zákazky s rovnakým obsahom rovnaký názov
   a druhý ten prvý v Money import priečinku **prepíše** — tichá strata odpisu.

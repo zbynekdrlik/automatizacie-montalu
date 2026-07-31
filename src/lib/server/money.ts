@@ -110,7 +110,7 @@ export function contentHash(zak: string, polozky: Polozka[]): string {
 }
 
 /**
- * Názov súboru: „ZAK2026337 - Tschakert [b1e403ee].xlsx" — číslo zákazky
+ * Názov súboru: „ZAK2026337 - Zákazník B [b1e403ee].xlsx" — číslo zákazky
  * a zákazník, nič viac (šéf 2026-07-29). OP sa do názvu NEDÁVA: kolónka je
  * „OP/OPDL číslo" a ľudia do nej OP píšu, takže starý prefix vyrábal „OPOP250359".
  *

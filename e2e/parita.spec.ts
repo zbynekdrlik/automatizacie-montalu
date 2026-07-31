@@ -53,7 +53,7 @@ test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporn�
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('pergola: CAD nárez → Money rozpis + tyče → odoslanie (1:1 Bartoníček vektor)', async ({
+test('pergola: CAD nárez → Money rozpis + tyče → odoslanie (1:1 vzorová zákazka A vektor)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
