@@ -61,6 +61,8 @@ function jobFor(
 			// kovanie (kľučky) — len záznam do histórie/plánu, do Money položiek nejde
 			kovanieL: vstup.kovanieL,
 			kovanieP: vstup.kovanieP,
+			kovanieStred: vstup.kovanieStred,
+			kovanieStredOkno: vstup.kovanieStredOkno,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
 			// klín — len záznam do histórie/plánu, do Money položiek nejde
@@ -158,6 +160,8 @@ function computeMultiFrom(vstup: MultiVstup) {
 			sklo: p.sklo,
 			kovanieL: p.kovanieL,
 			kovanieP: p.kovanieP,
+			kovanieStred: p.kovanieStred,
+			kovanieStredOkno: p.kovanieStredOkno,
 			klin: p.klin,
 			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
@@ -204,6 +208,8 @@ function jobForMulti(
 				otvaranie: p.otvaranie,
 				kovanieL: vstup.posuvy[i]?.kovanieL,
 				kovanieP: vstup.posuvy[i]?.kovanieP,
+				kovanieStred: vstup.posuvy[i]?.kovanieStred,
+				kovanieStredOkno: vstup.posuvy[i]?.kovanieStredOkno,
 				klin: vstup.posuvy[i]?.klin ?? null,
 				kolajnica: vstup.posuvy[i]?.kolajnica ?? null
 			}))

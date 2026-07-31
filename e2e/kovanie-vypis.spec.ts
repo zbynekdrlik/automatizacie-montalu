@@ -87,3 +87,42 @@ test('viac posuvov: kovanie je vypísané per posuv, posuv bez kovania sa neuvá
 
 	expect(errs).toEqual([]);
 });
+
+// Opona (2x2K/2x3K/2x4K): kľučka navyše na jednom z dvoch stredových krídel.
+// Patrik 2026-07-31 + jeho snímka: „ak máme 2x3, kľučka bude okno 1, okno 6 a
+// potom buď okno 3 alebo 4." Voľba L/P vyberá, ktoré stredové okno ju nesie.
+test('opona: pole pre stredové okno je len pri 2× štýle a kreslí sa do stredu', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await zaklad(page, 'E2E-KOVS');
+	// 3K nie je opona → pole nie je
+	await expect(page.getByTestId('kovanie-stred-polia')).toHaveCount(0);
+
+	await page.selectOption('#styl', '2x2K');
+	await expect(page.getByTestId('kovanie-stred-polia')).toBeVisible();
+	await page.selectOption('#kovanieL', LAVA);
+	await page.selectOption('#kovanieP', LAVA);
+	await page.selectOption('#kovanieStred', PRAVA);
+	await page.selectOption('#kovanieStredOkno', 'P');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// v pláne je vypísaná ako tretí riadok posuvu
+	const karta = page.getByTestId('kovanie-strany');
+	await expect(karta).toContainText('stredové okno (pravé)');
+	await expect(karta).toContainText(PRAVA);
+
+	// v kresbe je tretí blok kovania a leží MEDZI krajnými dvomi
+	const stred = page.getByTestId('kovanie-stred');
+	await expect(stred).toHaveCount(1);
+	const x = async (id: string) =>
+		Number(await page.getByTestId(id).locator('text').first().getAttribute('x'));
+	const [xl, xs, xp] = [await x('kovanie-l'), await x('kovanie-stred'), await x('kovanie-p')];
+	expect(xs).toBeGreaterThan(xl);
+	expect(xs).toBeLessThan(xp);
+
+	expect(errs).toEqual([]);
+});
