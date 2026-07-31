@@ -1,6 +1,6 @@
 import js from '@eslint/js';
 import svelte from 'eslint-plugin-svelte';
-import svelteConfigPrettier from 'eslint-config-prettier';
+import eslintConfigPrettier from 'eslint-config-prettier';
 import ts from 'typescript-eslint';
 import globals from 'globals';
 
@@ -23,7 +23,7 @@ export default ts.config(
 	...ts.configs.recommended,
 	...svelte.configs.recommended,
 	...svelte.configs.prettier,
-	svelteConfigPrettier,
+	eslintConfigPrettier,
 	{
 		languageOptions: {
 			globals: {
@@ -42,15 +42,14 @@ export default ts.config(
 		}
 	},
 	{
-		// generovaný SvelteKit build output typing — nie je náš zdrojový kód
-		files: ['.svelte-kit/**'],
-		ignores: ['.svelte-kit/**']
-	},
-	{
 		rules: {
-			// `any` sa v tomto MVP repe cielene používa na okrajoch (exceljs bunky,
-			// SQLite rows) — nechceme ho zakázať naprieč, len upozorniť.
-			'@typescript-eslint/no-explicit-any': 'warn',
+			// Zámerne `error`, nie voľnejšie `warn` — bez `--max-warnings 0` v `npm run
+			// lint` by `warn` bolo v CI netrestané (nikdy by nezhodilo build). Repo
+			// aktuálne nemá ANI JEDNO `any` — ak niekedy vznikne genuinny okrajový prípad
+			// (exceljs bunky, SQLite rows), rieš cieleným
+			// `// eslint-disable-next-line @typescript-eslint/no-explicit-any` s
+			// odôvodnením, nie plošným výnimkovaním.
+			'@typescript-eslint/no-explicit-any': 'error',
 			'@typescript-eslint/no-unused-vars': [
 				'error',
 				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
