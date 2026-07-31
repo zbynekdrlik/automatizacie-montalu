@@ -29,6 +29,20 @@ export function sanitizeKovanie(system: string, raw: unknown): string {
 	return system === 'Robust' && KOVANIA.includes(v) ? v : '';
 }
 
+/** Kľučka NAVYŠE na stredovom krídle — len opona (2x štýly), len Robust.
+ *  Patrik 2026-07-31: „pri opone 2x2, 2x3, 2x4 sú na pravej a ľavej strane +
+ *  je navyše aj na jednom krídle v strede, kde sa stretávajú." Money sa tým
+ *  NEMENÍ — uzávery (a teda kľučky) majú opony v tabuľke 3 ks už dávno; toto je
+ *  informácia pre dielňu, ktorá kľučka a na ktorom stredovom okne. */
+export function sanitizeKovanieStred(system: string, styl: string, raw: unknown): string {
+	return styl.startsWith('2x') ? sanitizeKovanie(system, raw) : '';
+}
+
+/** Ktoré z dvoch stredových krídel kľučku nesie: 'L' (ľavé) alebo 'P' (pravé). */
+export function sanitizeStredOkno(raw: unknown): 'L' | 'P' {
+	return String(raw ?? '').trim().toUpperCase() === 'P' ? 'P' : 'L';
+}
+
 /** Surové polia klina — z plochého formulára aj z JSON riadku posuvu (multi).
  *  `on` je zapínač: '1' / true = klín je zapnutý. */
 export interface KlinRaw {
@@ -152,6 +166,10 @@ export interface Vstup {
 	kovanieL: string;
 	/** kovanie PRAVEJ strany posuvu (kľučka) — len Robust, len na plán/náhľad */
 	kovanieP: string;
+	/** kľučka navyše na STREDOVOM krídle — len opona; prázdne = žiadna */
+	kovanieStred: string;
+	/** ktoré stredové krídlo ju nesie: 'L' ľavé, 'P' pravé */
+	kovanieStredOkno: 'L' | 'P';
 	/** výška vŕtania zámku [mm od spodku skla] — len Deluxe (otvory D46 v náhľade),
 	 *  default 1050; do budúcna aj do objednávky skla */
 	vrtanieZamku: number;
@@ -196,6 +214,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
 		kovanieL: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieL')),
 		kovanieP: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieP')),
+		kovanieStred: '',
+		kovanieStredOkno: sanitizeStredOkno(form.get('kovanieStredOkno')),
 		// Deluxe zámok: kladná výška vŕtania, inak default 1050 (len na náhľad/tlač)
 		vrtanieZamku: (() => {
 			const x = num('vrtanieZamku');
@@ -223,6 +243,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
 	// skriptovaný POST neobíde (otváranie je len na plán/náhľad, nemení výpočet)
 	if (vstup.styl.startsWith('2x')) vstup.otvaranie = 'Opona';
+	// až TU, keď je štýl normalizovaný — mimo opony sa stredová kľučka zahadzuje
+	vstup.kovanieStred = sanitizeKovanieStred(vstup.system, vstup.styl, form.get('kovanieStred'));
 	let error: string | null = null;
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
@@ -247,6 +269,10 @@ export interface PosuvVstup {
 	/** kovanie ľavej/pravej strany TOHOTO posuvu (Patrik: „pri každom posuve sólo") */
 	kovanieL: string;
 	kovanieP: string;
+	/** kľučka navyše na stredovom krídle TOHOTO posuvu — len opona */
+	kovanieStred: string;
+	/** ktoré stredové krídlo ju nesie: 'L' ľavé, 'P' pravé */
+	kovanieStredOkno: 'L' | 'P';
 	/** klín nad TÝMTO posuvom — display-only, do Money odpisu NEJDE; null = žiadny */
 	klin: Klin | null;
 	/** ručné dĺžky koľajníc TOHOTO posuvu — MENÍ Money odpis; null = zo šírky */
@@ -311,6 +337,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				otvaranie: String(p.otvaranie ?? '').trim(),
 				kovanieL: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieL),
 				kovanieP: sanitizeKovanie(String(p.system ?? '').trim(), p.kovanieP),
+				kovanieStred: '',
+				kovanieStredOkno: sanitizeStredOkno(p.kovanieStredOkno),
 				klin: k.klin,
 				kolajnica: kol.kolajnica
 			};
@@ -320,6 +348,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			}
 			// 2x štýly sú vždy opona (serverové vynútenie, viď parseVstup)
 			if (posuv.styl.startsWith('2x')) posuv.otvaranie = 'Opona';
+			posuv.kovanieStred = sanitizeKovanieStred(posuv.system, posuv.styl, p.kovanieStred);
 			if (!(posuv.s >= 300 && posuv.s <= 20000)) {
 				error = `Posuv ${i + 1}: šírka musí byť 300–20000 mm.`;
 				break;

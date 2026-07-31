@@ -15,6 +15,8 @@
 		vrtanieZamku = 1050,
 		kovanieL = '',
 		kovanieP = '',
+		kovanieStred = '',
+		kovanieStredOkno = 'L',
 		klin = null
 	}: {
 		S: number;
@@ -31,6 +33,10 @@
 		kovanieL?: string;
 		/** kovanie PRAVEJ strany (kľučka) — vypíše sa do KRAJNÉHO PRAVÉHO krídla */
 		kovanieP?: string;
+		/** kovanie STREDOVÉHO krídla — len opona; kľučka navyše tam, kde sa polovice stretávajú */
+		kovanieStred?: string;
+		/** ktoré z dvoch stredových krídel kľučku nesie: 'L' = ľavé, 'P' = pravé */
+		kovanieStredOkno?: 'L' | 'P';
 		/** klín nad posuvom (Patrik) — trapéz s kótami nad rámom; null = žiadny */
 		klin?: Klin | null;
 	} = $props();
@@ -162,6 +168,13 @@
 				: kovBlok(kovanieP, 0, 0.72, { prvyMin: M.top + h / 2 + 26 })
 			: null
 	);
+	// OPONA má kľučku NAVYŠE na jednom z dvoch krídel, kde sa polovice stretávajú
+	// (Patrik 2026-07-31: „ak máme 2x3, kľučka bude okno 1, okno 6 a potom buď
+	// okno 3 alebo 4"). 'L' = posledné pole ľavej polovice, 'P' = prvé pole pravej.
+	let poleStred = $derived(
+		Math.min(N - 1, Math.max(0, kovanieStredOkno === 'P' ? Math.floor(N / 2) : Math.floor(N / 2) - 1))
+	);
+	let kovS = $derived(kovanieStred && N > 1 ? kovBlok(kovanieStred, poleStred, 0.6) : null);
 
 	// Deluxe zámkové otvory D46: ⌀46 mm, 50 mm od kraja skla, na KRAJNÝCH sklách
 	// (ľavé pole pri ľavej hrane, pravé pole pri pravej). Výška vŕtania od spodku
@@ -342,6 +355,14 @@
 		<g data-testid="kovanie-p">
 			{#each kovP.lines as ln (ln.y)}
 				<text x={kovP.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
+			{/each}
+		</g>
+	{/if}
+	<!-- kľučka navyše na stredovom krídle (opona) -->
+	{#if kovS}
+		<g data-testid="kovanie-stred">
+			{#each kovS.lines as ln (ln.y)}
+				<text x={kovS.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
 			{/each}
 		</g>
 	{/if}

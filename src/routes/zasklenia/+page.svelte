@@ -36,6 +36,8 @@
 			otvaranie: form?.vstup?.otvaranie ?? 'P - L',
 			kovanieL: form?.vstup?.kovanieL ?? '',
 			kovanieP: form?.vstup?.kovanieP ?? '',
+			kovanieStred: form?.vstup?.kovanieStred ?? '',
+			kovanieStredOkno: (form?.vstup?.kovanieStredOkno ?? 'L') as 'L' | 'P',
 			vrtanieZamku: form?.vstup?.vrtanieZamku ?? 1050,
 			poznamka: zd?.poznamka ?? '',
 			ral: zd?.ral ?? '',
@@ -90,6 +92,8 @@
 		otvaranie: string;
 		kovanieL: string;
 		kovanieP: string;
+		kovanieStred: string;
+		kovanieStredOkno: 'L' | 'P';
 		// klín TOHOTO posuvu — ploché polia (rovnaký tvar ako primárny posuv), do
 		// JSON-u idú tak, ako ich parsuje server (klin='1' + 4 rozmery + ks)
 		klin: boolean;
@@ -122,6 +126,8 @@
 	// kovanie (kľučka) ľavej/pravej strany — len Robust, len na plán/náhľad
 	let kovanieLS = $state('');
 	let kovaniePS = $state('');
+	let kovanieStredS = $state('');
+	let kovanieStredOknoS = $state<'L' | 'P'>('L');
 	let sirka = $state<number | string>('');
 	let vyska = $state<number | string>('');
 	let vrtanieZamkuS = $state<number | string>(1050);
@@ -164,10 +170,14 @@
 		otvaranie = p?.otvaranie ?? 'P - L';
 		kovanieLS = p?.kovanieL ?? '';
 		kovaniePS = p?.kovanieP ?? '';
+		kovanieStredS = p?.kovanieStred ?? '';
+		kovanieStredOknoS = (p?.kovanieStredOkno ?? 'L') as 'L' | 'P';
 		sirka = (p?.s as number | string) ?? '';
 		vyska = (p?.v as number | string) ?? '';
 		posuvyExtra = (form?.multiVstup?.posuvy ?? []).slice(1).map((x) => ({
 			...x,
+			kovanieStred: x.kovanieStred ?? '',
+			kovanieStredOkno: (x.kovanieStredOkno ?? 'L') as 'L' | 'P',
 			klin: !!x.klin,
 			klinDlzka: x.klin?.dlzka ?? '',
 			klinSirka: x.klin?.sirka ?? '',
@@ -192,6 +202,7 @@
 		if (!jeRobust) {
 			kovanieLS = '';
 			kovaniePS = '';
+			kovanieStredS = '';
 		}
 	});
 	// ručná dĺžka koľajnice má zmysel len tam, kde je horná a spodná ZVLÁŠŤ
@@ -240,6 +251,8 @@
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
+				kovanieStred: kovanieStredS,
+				kovanieStredOkno: kovanieStredOknoS,
 				klin: klinS ? '1' : '',
 				klinDlzka: klinDlzkaS,
 				klinSirka: klinSirkaS,
@@ -258,6 +271,8 @@
 				otvaranie: p.otvaranie,
 				kovanieL: p.kovanieL,
 				kovanieP: p.kovanieP,
+				kovanieStred: p.kovanieStred,
+				kovanieStredOkno: p.kovanieStredOkno,
 				klin: p.klin ? '1' : '',
 				klinDlzka: p.klinDlzka,
 				klinSirka: p.klinSirka,
@@ -299,6 +314,8 @@
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
+				kovanieStred: '',
+				kovanieStredOkno: 'L',
 				klin: false,
 				klinDlzka: '',
 				klinSirka: '',
@@ -374,6 +391,8 @@
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
 	<input type="hidden" name="kovanieL" value={vstup.kovanieL} />
 	<input type="hidden" name="kovanieP" value={vstup.kovanieP} />
+	<input type="hidden" name="kovanieStred" value={vstup.kovanieStred} />
+	<input type="hidden" name="kovanieStredOkno" value={vstup.kovanieStredOkno} />
 	<input type="hidden" name="vrtanieZamku" value={vstup.vrtanieZamku} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 	<input type="hidden" name="ral" value={vstup.ral} />
@@ -418,6 +437,25 @@
 	{/if}
 {/snippet}
 
+{#snippet kovanieStrany(
+	nadpis: string,
+	lava: string,
+	prava: string,
+	stred = '',
+	stredOkno: 'L' | 'P' = 'L'
+)}
+	<div class="kov-posuv">
+		<div class="kov-hd">{nadpis}</div>
+		<div class="row"><span>ľavá strana</span><b>{lava || '—'}</b></div>
+		<div class="row"><span>pravá strana</span><b>{prava || '—'}</b></div>
+		{#if stred}
+			<div class="row">
+				<span>stredové okno ({stredOkno === 'P' ? 'pravé' : 'ľavé'})</span><b>{stred}</b>
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
 {#snippet planKarty(p: NonNullable<typeof plan>)}
 	{@render poznamkaRal()}
 	<div class="card">
@@ -443,8 +481,15 @@
 
 	<div class="card">
 		<div class="sec">Náhľad</div>
-		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} klin={vstup.klin} />
+		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} kovanieStred={vstup.kovanieStred} kovanieStredOkno={vstup.kovanieStredOkno} klin={vstup.klin} />
 	</div>
+
+	{#if vstup.kovanieL || vstup.kovanieP || vstup.kovanieStred}
+		<div class="card" data-testid="kovanie-strany">
+			<div class="sec">Kovanie — kľučky a FAB</div>
+			{@render kovanieStrany('Posuv 1', vstup.kovanieL, vstup.kovanieP, vstup.kovanieStred, vstup.kovanieStredOkno)}
+		</div>
+	{/if}
 
 	{#if vstup.klin}
 		<div class="card" data-testid="klin-karta">
@@ -563,11 +608,25 @@
 			{#each m.posuvy as pv, i (i)}
 				<div class="posuv-nahlad">
 					<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
-					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} kovanieL={pv.kovanieL ?? ''} kovanieP={pv.kovanieP ?? ''} klin={pv.klin ?? null} />
+					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} kovanieL={pv.kovanieL ?? ''} kovanieP={pv.kovanieP ?? ''} kovanieStred={pv.kovanieStred ?? ''} kovanieStredOkno={(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'} klin={pv.klin ?? null} />
 				</div>
 			{/each}
 		</div>
 	</div>
+
+	<!-- Patrik 2026-07-31 (Odoo „Vyroba automatizacia"): „pri posuve Robust by som
+	     potreboval tie kľučky fabky vypísať niekam rozumnejšie, zle je to vidieť —
+	     kľudne aj pod tie posuvy". V kresbe sú ďalej, toto je čitateľný výpis. -->
+	{#if m.posuvy.some((pv) => pv.kovanieL || pv.kovanieP || pv.kovanieStred)}
+		<div class="card" data-testid="kovanie-strany-multi">
+			<div class="sec">Kovanie — kľučky a FAB</div>
+			{#each m.posuvy as pv, i (i)}
+				{#if pv.kovanieL || pv.kovanieP || pv.kovanieStred}
+					{@render kovanieStrany(`Posuv ${i + 1}`, pv.kovanieL ?? '', pv.kovanieP ?? '', pv.kovanieStred ?? '', (pv.kovanieStredOkno ?? 'L') as 'L' | 'P')}
+				{/if}
+			{/each}
+		</div>
+	{/if}
 
 	{#if m.posuvy.some((pv) => pv.klin)}
 		<div class="card" data-testid="klin-karta-multi">
@@ -714,6 +773,28 @@
 						</select>
 					</div>
 				</div>
+				<!-- Opona má kľučku NAVYŠE na jednom z dvoch krídel v strede (Patrik
+				     2026-07-31: „ak máme 2x3, kľučka bude okno 1, okno 6 a potom buď
+				     okno 3 alebo 4"). Money sa tým nemení — opony majú 3 uzávery
+				     (a teda 3 kľučky) v tabuľke komponentov už teraz. -->
+				{#if jeOpona}
+					<div class="grid2" data-testid="kovanie-stred-polia">
+						<div class="field">
+							<label for="kovanieStred">Kovanie — stredové okno</label>
+							<select id="kovanieStred" name="kovanieStred" bind:value={kovanieStredS}>
+								<option value="">—</option>
+								{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
+							</select>
+						</div>
+						<div class="field">
+							<label for="kovanieStredOkno">Ktoré okno v strede</label>
+							<select id="kovanieStredOkno" name="kovanieStredOkno" bind:value={kovanieStredOknoS}>
+								<option value="L">ľavé zo stredovej dvojice</option>
+								<option value="P">pravé zo stredovej dvojice</option>
+							</select>
+						</div>
+					</div>
+				{/if}
 			{/if}
 			{#if system === 'Deluxe'}
 				<div class="field">
@@ -891,6 +972,20 @@
 									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
 								</select></div>
 						</div>
+						{#if p.styl.startsWith('2x')}
+							<div class="grid2" data-testid={`kovanie-stred-polia-${i}`}>
+								<div class="field"><label for={`ps${i}-kovs`}>Kovanie — stredové okno</label>
+									<select id={`ps${i}-kovs`} bind:value={p.kovanieStred}>
+										<option value="">—</option>
+										{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
+									</select></div>
+								<div class="field"><label for={`ps${i}-kovso`}>Ktoré okno v strede</label>
+									<select id={`ps${i}-kovso`} bind:value={p.kovanieStredOkno}>
+										<option value="L">ľavé zo stredovej dvojice</option>
+										<option value="P">pravé zo stredovej dvojice</option>
+									</select></div>
+							</div>
+						{/if}
 					{/if}
 					{#if kolajnicaPre(p.system)}
 						<div class="grid2" data-testid={`kolajnica-polia-${i}`}>

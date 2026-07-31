@@ -1,4 +1,4 @@
-// 1:1 vektory z n8n verzie: Bartoníček + Štepanovský (reálne páry overené
+// 1:1 vektory z n8n verzie: vzorová zákazka A + Štepanovský (reálne páry overené
 // proti Money exportom), single-variant >7500 fix, combo prepočet a copy-back.
 import { describe, it, expect } from 'vitest';
 import {
@@ -51,7 +51,7 @@ const got = (text: string) => {
 };
 
 describe('transform — 1:1 s overenými Money pármi', () => {
-	it('Bartoníček (bin-pack, tab formát)', () => {
+	it('vzorová zákazka A (bin-pack, tab formát)', () => {
 		const { r, g } = got(BARTONICEK);
 		expect(r.unresolved).toEqual([]);
 		expect(g).toEqual({

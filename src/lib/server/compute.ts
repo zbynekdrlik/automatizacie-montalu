@@ -503,6 +503,10 @@ export interface PosuvSpec {
 	/** kovanie ľavej/pravej strany (kľučka) — len na plán/náhľad, len Robust */
 	kovanieL?: string;
 	kovanieP?: string;
+	/** kľučka navyše na stredovom krídle (opona) — len na plán/náhľad */
+	kovanieStred?: string;
+	/** ktoré stredové krídlo ju nesie: 'L' ľavé, 'P' pravé */
+	kovanieStredOkno?: 'L' | 'P';
 	/** klín nad posuvom — len na plán/náhľad, do Money odpisu NEJDE */
 	klin?: Klin | null;
 }
@@ -519,6 +523,8 @@ export interface PosuvInfo {
 	skloNazov?: string;
 	kovanieL?: string;
 	kovanieP?: string;
+	kovanieStred?: string;
+	kovanieStredOkno?: 'L' | 'P';
 	klin?: Klin | null;
 	/** ručne zadané dĺžky koľajníc tohto posuvu — na plán/tlač (výpočet ich už použil) */
 	kolajnica?: KolajnicaRucne | null;
@@ -601,6 +607,8 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			skloNazov: p.sklo,
 			kovanieL: p.kovanieL,
 			kovanieP: p.kovanieP,
+			kovanieStred: p.kovanieStred,
+			kovanieStredOkno: p.kovanieStredOkno,
 			klin: p.klin ?? null,
 			kolajnica: p.kolajnica ?? null
 		});

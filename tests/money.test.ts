@@ -37,21 +37,21 @@ function makeReq(zak: string, op: string, modul: OdpisJob['modul'] = 'zasklenia'
 }
 
 // Šéf 2026-07-29 (foto z Money import priečinka): názov bol
-// „ZAK2025428 - OPOP250359 - PERGOLA Vyroubalová PERGOLA [4d2d4db1].xlsx" —
+// „ZAK2025428 - OPOP250359 - PERGOLA Zákazník A PERGOLA [4d2d4db1].xlsx" —
 // kód lepil „OP" pred to, čo užívateľ do kolónky napísal (a on tam OP píše).
 // Nový tvar: len číslo zákazky + zákazník.
 describe('filenameFor — ZAK - zákazník, žiadne OP', () => {
 	const polozky = [{ kod: 'PRP20258', nazov: 'Kotviaci profil', qty: 7.5 }];
 
 	it('nezdvojí OP, keď ho užívateľ napíše do kolónky', () => {
-		const f = filenameFor({ zak: 'ZAK2025428', op: 'OP250359', zakaznik: 'Vyroubalová', polozky });
+		const f = filenameFor({ zak: 'ZAK2025428', op: 'OP250359', zakaznik: 'Zákazník A', polozky });
 		expect(f).not.toContain('OPOP');
-		expect(f).toMatch(/^ZAK2025428 - Vyroubalová \[[0-9a-f]{8}\]\.xlsx$/);
+		expect(f).toMatch(/^ZAK2025428 - Zákazník A \[[0-9a-f]{8}\]\.xlsx$/);
 	});
 
 	it('OP sa v názve neobjaví ani keď ho užívateľ napíše bez prefixu', () => {
-		const f = filenameFor({ zak: 'ZAK2026337', op: '260286', zakaznik: 'Tschakert', polozky });
-		expect(f).toMatch(/^ZAK2026337 - Tschakert \[[0-9a-f]{8}\]\.xlsx$/);
+		const f = filenameFor({ zak: 'ZAK2026337', op: '260286', zakaznik: 'Zákazník B', polozky });
+		expect(f).toMatch(/^ZAK2026337 - Zákazník B \[[0-9a-f]{8}\]\.xlsx$/);
 	});
 
 	// bez OP v názve by dva odpisy tej istej zákazky s rovnakým obsahom mali
