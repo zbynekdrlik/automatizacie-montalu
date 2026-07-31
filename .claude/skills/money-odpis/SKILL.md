@@ -365,3 +365,34 @@ Dôsledky, ktoré stáli jeden červený beh:
   považuje za nižšiu. Jediná cesta vpred je ďalšie číslo (`0.9.2`).
 - Po merge bumpni dev na ĎALŠIU pracovnú verziu (`0.9.3-dev.1`) — vtedy je `-dev.N` v poriadku,
   lebo je vyššia než release na main.
+
+## 2i. Názov systému, ktorý vidí obsluha, ≠ kľúč konfigurácie
+
+`Štandard +` **nie je len text** — je to `sysStyl` kľúč (`Štandard +|4K IZO`), na ktorom
+visia nárezáky v `cfg_seed.json` aj v DB, `b2b-limits.ts` a história odpisov
+(`odpis_log.detail`). Premenovanie kľúča rozbije nárezáky aj históriu.
+
+Zobrazovaný názov preto žije samostatne v **`src/lib/system-nazvy.ts`**
+(`nazovSystemu` / `nazovSysStyl`). Pravidlá:
+
+- do UI ide `nazovSystemu(...)`, ale `<option value>`, hidden inputy a POST nesú
+  **pôvodný kľúč** — inak server dostane názov, ktorý v cfg neexistuje;
+- Money `popis` dokladu je `OP : zákazník`, systém neobsahuje ⇒ premenovanie je
+  Money-neutrálne. Keby sa doň niekedy systém dopĺňal, MUSÍ ísť kľúč, nie label;
+- test `tests/system-nazvy.test.ts` stráži, že sa v `cfg_seed.json` neobjavil kľúč
+  s novým zobrazovaným názvom.
+
+**Prečo to nerozbilo existujúce e2e:** Playwright `selectOption('Štandard +')` matchuje
+najprv **value**, takže testy, ktoré vyberajú systém, prežijú premenovanie labelu — padnú
+len tie, čo asertujú TEXT (`plan-badge`). To je správne rozdelenie: value = kontrakt,
+text = kozmetika.
+
+## 2j. Money katalóg: položka bez `Kod` sa NEDÁ odpísať
+
+Pri hľadaní kariet pre novú funkciu (read-only SQL, viď skill `money-readonly-sql`) sa dá
+naraziť na položky s **prázdnym `Kod`** — napr. všetkých 24 kariet „Jokel …" (2026-07-31).
+Odpis ich riadok identifikuje kódom, takže taká položka je pre appku nepoužiteľná.
+
+⇒ Keď sa hľadá kód pre nový materiál, vždy sa pýtaj aj na `Kod` a prázdne vyhoď zo
+zoznamu kandidátov **predtým**, než ich niekomu ponúkneš — inak sa dohodne mapovanie na
+kartu, ktorá sa nedá zapísať.
