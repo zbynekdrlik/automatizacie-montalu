@@ -16,7 +16,14 @@ až v `npm run build`.
 Drift guard `tests/b2b-route-coverage.test.ts` enumeruje adresáre s `+page.server.ts`
 a padne, kým novú route nepridáš. To je zámer: nová stránka je pre b2b zakázaná, kým
 sa vedome nerozhodne inak. Nezabudni ani na odkaz v `src/routes/+layout.svelte`
-(interné `links`).
+(interné `links`, prípadne aj b2b `links`, ak má stránku vidieť).
+
+**Keď b2b MÁ stránku vidieť** (napr. `/sietka`, #89 — Patrik: „hlavne pre externých"),
+route sa jednoducho NEPRIDÁ do `B2B_FORBIDDEN_PREFIXES` — ale drift guard test to
+očakáva ako VEDOMÉ rozhodnutie, nie obídenie: pridaj cestu do `ALLOWED` množiny v
+`tests/b2b-route-coverage.test.ts` s komentárom prečo (typicky „stránka nemá žiaden
+zápis do Money"), a pridaj pozitívny test (`b2bRedirectTarget('/nova') === null`) —
+inak nabudúce niekto uvidí padajúci drift guard a route bez rozmyslu zakáže.
 
 ## 3. `$effect`, ktorý zapisuje to, čo číta, sa ZACYKLÍ
 
