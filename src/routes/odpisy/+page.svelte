@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { nazovSystemu } from '$lib/system-nazvy';
+	import { resolve } from '$app/paths';
 	let { data, form } = $props();
 </script>
 
@@ -73,7 +74,7 @@
 								     isté. Je to LEN odkaz, ktorý predvyplní formulár — nič sa tým neodpisuje. -->
 								<a
 									class="btn secondary"
-									href="/zasklenia?znova={o.id}"
+									href={resolve(`/zasklenia?znova=${o.id}`)}
 									data-testid={`znova-${o.id}`}>♻️ Použiť znova</a
 								>
 							{/if}

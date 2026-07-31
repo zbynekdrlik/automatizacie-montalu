@@ -2,6 +2,8 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
+	import type { RouteId } from '$app/types';
 
 	let { data, children } = $props();
 
@@ -13,10 +15,12 @@
 
 	// B2B vidí LEN Zasklenia — zvyšné odkazy (vrátane Vzorce/Nastavenia, ktoré sú
 	// mimo /zasklenia) sú interné. Používatelia je nový odkaz len pre interných.
+	// href je typovaný ako RouteId (z $app/types) a šablóna nižšie ho vždy volá cez
+	// resolve(l.href) — to spĺňa svelte/no-navigation-without-resolve (#99).
 	const links = $derived(
 		data.user?.role === 'b2b'
-			? [{ href: '/zasklenia', label: 'Zasklenia' }]
-			: [
+			? ([{ href: '/zasklenia', label: 'Zasklenia' }] satisfies { href: RouteId; label: string }[])
+			: ([
 					{ href: '/pergola', label: 'Pergola' },
 					{ href: '/fix', label: 'Fixy' },
 					{ href: '/bazen', label: 'Bazén' },
@@ -25,7 +29,7 @@
 					{ href: '/odpisy', label: 'História' },
 					{ href: '/problem', label: '⚠ Problém' },
 					{ href: '/pouzivatelia', label: 'Používatelia' }
-				]
+				] satisfies { href: RouteId; label: string }[])
 	);
 </script>
 
@@ -38,7 +42,7 @@
 		<div class="inner">
 			<span class="brand">MONTALU</span>
 			{#each links as l (l.href)}
-				<a href={l.href} class:active={page.url.pathname === l.href}>{l.label}</a>
+				<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}>{l.label}</a>
 			{/each}
 			<span class="spacer"></span>
 			{#if !data.live}

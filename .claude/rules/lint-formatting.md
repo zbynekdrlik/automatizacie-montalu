@@ -46,8 +46,19 @@ is `^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$`, which a bare-SHA fallback
   exists and import `svelteConfig` into the parser options; that import is skipped here
   (it only affects kit-route/type detection this repo doesn't rely on).
 - `svelte/no-navigation-without-resolve` (typed `resolve()` navigation, SvelteKit
-  2.12+) is deliberately `off` — the app uses plain `href="/…"` across every route.
-  Adopting typed navigation is tracked in #99, not silently ignored.
+  2.12+) is `error` since #99 — every internal `<a href>` MUST go through `resolve()`
+  from `$app/paths`. Two patterns that satisfy the rule's TS-type check:
+  - Static path → `href={resolve('/route')}` directly at the usage site.
+  - A `href` value built ahead of time (e.g. a nav-links array) → type the field as
+    `RouteId` (`import type { RouteId } from '$app/types'`) and still call
+    `resolve(l.href)` at the usage site — pre-resolving the array entries themselves
+    (`href: resolve('/route')`) does NOT reliably satisfy the rule's type-checker at
+    the template call site, even though the value is a `ResolvedPathname`.
+  - Query strings work directly: `resolve(\`/route?param=${value}\`)` — `resolve()`
+    accepts `${Pathname}?${string}`, no need to split off the query string.
+  - `window.location.href = ...` assignments are NOT covered by this rule (it only
+    checks `<a href>`, `goto()`, `pushState()`, `replaceState()`) — don't assume every
+    navigation-shaped line needs `resolve()`.
 - `@typescript-eslint/no-explicit-any` is `error`, not `warn` — `npm run lint` has no
   `--max-warnings 0`, so a bare `warn` never fails CI (a warn-only rule with no
   `--max-warnings` gate is toothless). A genuine edge case (e.g. an untyped exceljs

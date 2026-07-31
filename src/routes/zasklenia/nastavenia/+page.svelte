@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { nazovSysStyl } from '$lib/system-nazvy';
+	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
 
@@ -61,10 +62,12 @@
 		</div>
 	{/if}
 	<div class="card noprint">
-		<a class="btn secondary" href="/zasklenia/nastavenia?sysStyl={encodeURIComponent(form.sysStyl)}"
+		<a
+			class="btn secondary"
+			href={resolve(`/zasklenia/nastavenia?sysStyl=${encodeURIComponent(form.sysStyl)}`)}
 			>➕ Upraviť ďalší štýl</a
 		>
-		<a class="btn secondary" href="/zasklenia">→ Späť na Zasklenia</a>
+		<a class="btn secondary" href={resolve('/zasklenia')}>→ Späť na Zasklenia</a>
 	</div>
 {:else if data.editable}
 	<div class="card">

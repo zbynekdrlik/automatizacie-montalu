@@ -18,6 +18,13 @@ Version file: `package.json` `"version"`. Bump it on `dev` FIRST (before any wor
 `dev` > `main` (per version-bumping). The web UI MUST display this version label — see
 "CI + deploy" below.
 
+**Convention: `dev` carries `X.Y.Z-dev.N`, `main` carries the clean `X.Y.Z`.** The
+FIRST commit on `dev` after a merge bumps to the next `-dev.1`; right before opening the
+PR to `main`, bump again to the clean released version (no `-dev` suffix). A `-dev`
+string ending up on `main` is a real bug, not cosmetic — it happened twice (#1/#101) and
+was fixed in #98 (which also taught `sort -V` to rank `X-dev.N` above the clean `X`, so
+the CI version-check compares correctly either way).
+
 ## Local build policy (Tier 0)
 
 - Before pushing, run the cheap gates locally: `npm run check` (svelte-check = tsc, no

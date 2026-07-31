@@ -53,13 +53,8 @@ export default ts.config(
 			'@typescript-eslint/no-unused-vars': [
 				'error',
 				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' }
-			],
-			// Novšia typovaná `resolve()` navigácia (SvelteKit 2.12+) sem nebola nikdy
-			// zavedená — celý app používa plain `href="/…"` string literály naprieč
-			// desiatkami stránok. Prijať toto pravidlo by znamenalo prerobiť navigáciu
-			// v celej appke (cross-cutting), čo je mimo rozsahu tohto lint-foundation
-			// ticketu (#1) — sledované samostatne v #99.
-			'svelte/no-navigation-without-resolve': 'off'
+			]
+			// Typovaná `resolve()` navigácia (SvelteKit 2.12+) — zavedená v #99.
 		}
 	}
 );
