@@ -611,6 +611,26 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 19) {
+		// v18 → v19: Robust je IZO-ONLY — kalené 8/10 mm sa v ňom už neponúkajú.
+		//
+		// Patrik 2026-07-31: „pri robuste mi ponúka kalené sklá 8-10mm" — hlásil to ako
+		// CHYBU. Sedí to s Dominikovým zadaním z 2026-07-14 (Robust = izolačné skladby).
+		// Kalené 8/10 sa do Robustu dostali nedopatrením: pôvodne boli spoločné
+		// (`system = 'ALL'`), vo v17 sa obmedzovali kvôli Slide a Robust im ostal ako
+		// jediný systém. Do žiadneho iného systému nepatria (Deluxe má vlastné
+		// „Float kalené 6/10 mm"), takže sa mažú.
+		//
+		// Money: odpis existujúcich zákaziek sa NEMENÍ. Robust nemá žiadny sklozávislý
+		// profil (`sklozavisle`), takže voľba skla mu nemení ani jeden riadok odpisu —
+		// sklo je pri ňom len popis do plánu. História odpisov si názov skla drží ako
+		// text v `detail`, takže staré zákazky ostávajú čitateľné.
+		db.transaction(() => {
+			db.prepare("DELETE FROM glass_types WHERE nazov IN ('Kalené 8mm', 'Kalené 10mm')").run();
+			db.pragma('user_version = 19');
+		})();
+	}
+
 	seedData();
 	seedUsers();
 }
@@ -648,8 +668,9 @@ const SLIDE_GLASS_6MM = [
 // Sklá podľa systému: Robust = izolačné 4/16/4, Slide = izolačné 4/8/4
 // (Slide 4/8/4 = skladba 16 mm BEZ redukcie → obe ju nulujú) + 6 mm sklá S redukciou.
 // Redukcia 6mm je sklozavislý profil, ktorý má LEN Slide, takže `redukcia_zero` na
-// sklách iných systémov je bez účinku. Kalené 8/10 patria k Robustu (do žiadnej Slide
-// skladby sa nezmestia — Patrik 2026-07-27).
+// sklách iných systémov je bez účinku. Kalené 8/10 mm tu UŽ NIE SÚ — Robust je IZO-only
+// (Patrik 2026-07-31: „pri robuste mi ponúka kalené sklá 8-10mm" ako chybu); do žiadneho
+// iného systému nepatria, Deluxe má vlastné „Float kalené 6/10 mm".
 function seedGlass() {
 	const ins = db.prepare(
 		'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES (?, ?, ?, ?)'
@@ -660,8 +681,9 @@ function seedGlass() {
 		ins.run('Izolačné sklo 4/8/4 mliečne', 1, 10, 'Slide');
 		ins.run('Izolačné sklo 4/8/4 číre', 1, 20, 'Slide');
 		for (const g of SLIDE_GLASS_6MM) ins.run(g.nazov, 0, g.poradie, 'Slide');
-		ins.run('Kalené 8mm', 0, 30, 'Robust');
-		ins.run('Kalené 10mm', 0, 40, 'Robust');
+		// Kalené 8/10 mm sa NESEEDUJÚ — Robust je IZO-only (Patrik 2026-07-31, migrácia
+		// v19). Keby tu ostali, seed by ich po každom štarte vrátil späť a migrácia by
+		// sa navonok tvárila, že nič nespravila.
 	})();
 }
 

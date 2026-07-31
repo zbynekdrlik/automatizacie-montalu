@@ -20,40 +20,44 @@
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
-	// predvyplnenie: po chybe/náhľade sa vraciame k odoslaným hodnotám (jedno- aj
-	// viac-posuvový vstup zdieľa zak/op/zákazník/poznámku/čaká)
+	// Zdroj predvyplnenia: (1) akcia — po chybe/náhľade sa vraciame k odoslaným
+	// hodnotám, alebo (2) „Použiť znova" z histórie (`?znova=<id>`), ktoré server
+	// vracia v ROVNAKOM tvare. Jedna cesta pre oboje — žiadna druhá vetva.
+	let fv = $derived(form?.vstup ?? data.znova?.vstup ?? null);
+	let fmv = $derived(form?.multiVstup ?? data.znova?.multiVstup ?? null);
+	// predvyplnenie: jedno- aj viac-posuvový vstup zdieľa zak/op/zákazník/poznámku/čaká
 	let vstup = $derived.by(() => {
-		const zd = form?.vstup ?? form?.multiVstup ?? null;
+		const zd = fv ?? fmv ?? null;
 		return {
 			zak: zd?.zak ?? '',
 			op: zd?.op ?? '',
 			zakaznik: zd?.zakaznik ?? '',
-			system: form?.vstup?.system ?? 'Robust',
-			styl: form?.vstup?.styl ?? '2K',
-			s: (form?.vstup?.s ?? '') as unknown as number,
-			v: (form?.vstup?.v ?? '') as unknown as number,
-			sklo: form?.vstup?.sklo ?? '',
-			skloPresne: form?.vstup?.skloPresne ?? '',
-			otvaranie: form?.vstup?.otvaranie ?? 'P - L',
-			kovanieL: form?.vstup?.kovanieL ?? '',
-			kovanieP: form?.vstup?.kovanieP ?? '',
-			kovanieStred: form?.vstup?.kovanieStred ?? '',
-			kovanieStredOkno: (form?.vstup?.kovanieStredOkno ?? 'L') as 'L' | 'P',
-			vrtanieZamku: form?.vstup?.vrtanieZamku ?? 1050,
+			system: fv?.system ?? 'Robust',
+			styl: fv?.styl ?? '2K',
+			s: (fv?.s ?? '') as unknown as number,
+			v: (fv?.v ?? '') as unknown as number,
+			sklo: fv?.sklo ?? '',
+			skloPresne: fv?.skloPresne ?? '',
+			otvaranie: fv?.otvaranie ?? 'P - L',
+			kovanieL: fv?.kovanieL ?? '',
+			kovanieP: fv?.kovanieP ?? '',
+			kovanieStred: fv?.kovanieStred ?? '',
+			kovanieStredOkno: (fv?.kovanieStredOkno ?? 'L') as 'L' | 'P',
+			vrtanieZamku: fv?.vrtanieZamku ?? 1050,
 			poznamka: zd?.poznamka ?? '',
 			ral: zd?.ral ?? '',
 			caka: zd?.caka ?? false,
 			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false,
 			jednostrannaFab: zd?.jednostrannaFab ?? false,
-			klin: (form?.vstup?.klin ?? null) as Klin | null,
+			klin: (fv?.klin ?? null) as Klin | null,
 			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
-			kolajnica: (form?.vstup?.kolajnica ?? null) as { horna?: number; spodna?: number } | null
+			kolajnica: (fv?.kolajnica ?? null) as { horna?: number; spodna?: number } | null
 		};
 	});
 
 	// primárny posuv (posuv 1) = ploché polia; ďalšie posuvy (zimná záhrada) v posuvyExtra.
 	// po chybe/náhľade obnov primárny z jednoposuvového ALEBO viacposuvového vstupu
-	const prim = () => form?.multiVstup?.posuvy?.[0] ?? form?.vstup ?? null;
+	const prim = () => fmv?.posuvy?.[0] ?? fv ?? null;
 	// Štandard +: v ponuke sú LEN počty krídel (2K…6K, opona 2x…). Či sa ťahá basic
 	// alebo IZO nárezák, rozhoduje zvolené SKLO — Patrik 2026-07-27: „ako pri SLIDE,
 	// zvolím počet okien a podľa výberu skla mi určí, ktorý nárezák to bude ťahať".
@@ -144,18 +148,18 @@
 	let kolSS = $state<number | string>('');
 	let posuvyExtra = $state<PosuvRow[]>([]);
 	$effect(() => {
-		const zd = form?.vstup ?? form?.multiVstup ?? null;
+		const zd = fv ?? fmv ?? null;
 		zakS = zd?.zak ?? '';
 		opS = zd?.op ?? '';
 		zakaznikS = zd?.zakaznik ?? '';
-		skloPresneS = form?.vstup?.skloPresne ?? '';
-		vrtanieZamkuS = form?.vstup?.vrtanieZamku ?? 1050;
+		skloPresneS = fv?.skloPresne ?? '';
+		vrtanieZamkuS = fv?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
 		ralS = zd?.ral ?? '';
 		cakaS = zd?.caka ?? false;
 		pridavnaKolajnicaS = zd?.pridavnaKolajnica ?? false;
 		jednostrannaFabS = zd?.jednostrannaFab ?? false;
-		const kl = (form?.vstup?.klin ?? null) as Klin | null;
+		const kl = (fv?.klin ?? null) as Klin | null;
 		klinS = !!kl;
 		klinDlzkaS = kl?.dlzka ?? '';
 		klinSirkaS = kl?.sirka ?? '';
@@ -175,7 +179,7 @@
 		kovanieStredOknoS = (p?.kovanieStredOkno ?? 'L') as 'L' | 'P';
 		sirka = (p?.s as number | string) ?? '';
 		vyska = (p?.v as number | string) ?? '';
-		posuvyExtra = (form?.multiVstup?.posuvy ?? []).slice(1).map((x) => ({
+		posuvyExtra = (fmv?.posuvy ?? []).slice(1).map((x) => ({
 			...x,
 			kovanieStred: x.kovanieStred ?? '',
 			kovanieStredOkno: (x.kovanieStredOkno ?? 'L') as 'L' | 'P',
@@ -694,6 +698,21 @@
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
 	</div>
+
+	{#if data.znova && !form}
+		<!-- „Použiť znova": nič sa neodpísalo, len sa predvyplnil formulár. ZAK/OP/zákazník
+		     ostávajú prázdne — práve tie sa pri novej zákazke menia. -->
+		<div class="okmsg" data-testid="znova-info">
+			♻️ Predvyplnené zo zákazky <b>{data.znova.zdroj.zak}</b> (OP {data.znova.zdroj.op},
+			{data.znova.zdroj.created_at}). Doplň nové číslo objednávky, OP a zákazníka — do Money
+			sa zatiaľ neposlalo nič.
+			{#if data.znova.chybajuce.length}
+				<ul style="margin:8px 0 0 18px">
+					{#each data.znova.chybajuce as ch (ch)}<li>{ch}</li>{/each}
+				</ul>
+			{/if}
+		</div>
+	{/if}
 
 	{#if form?.error}
 		<div class="err" data-testid="form-error">⚠️ {form.error}</div>

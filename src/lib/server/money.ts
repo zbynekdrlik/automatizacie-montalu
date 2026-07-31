@@ -252,3 +252,20 @@ export function releaseOdpis(id: number, username: string): boolean {
 	})();
 	return true;
 }
+
+/**
+ * Jeden záznam histórie — podklad pre „Použiť znova" (Patrik 2026-07-31: viacerí
+ * zákazníci si objednávajú to isté, nech to nemusí vypĺňať nanovo).
+ *
+ * Vracia LEN dáta; nič sa nezapisuje a nič sa neodpisuje — volajúci z toho
+ * predvyplní FORMULÁR, ktorý používateľ ešte vidí a musí odoslať sám.
+ */
+export function getOdpis(id: number): OdpisLogRow | null {
+	if (!Number.isInteger(id) || id <= 0) return null;
+	const row = db
+		.prepare(
+			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at FROM odpis_log WHERE id = ?'
+		)
+		.get(id) as OdpisLogRow | undefined;
+	return row ?? null;
+}

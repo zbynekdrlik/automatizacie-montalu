@@ -73,7 +73,7 @@ const off = (sysStyl: string, nazov: string) =>
 
 describe('reálny v9 → v10 upgrade: oprava šírky skla Štandard + (+2 mm)', () => {
 	it('user_version = 10', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(18);
+		expect(db.pragma('user_version', { simple: true })).toBe(19);
 	});
 
 	it('offset šírky skla je opravený na cfg_seed hodnotu (o 2N vyššie) pre KAŽDÝ Štandard štýl', () => {
