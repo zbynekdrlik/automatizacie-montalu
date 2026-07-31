@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { nazovSysStyl } from '$lib/system-nazvy';
+
 	let { data, form } = $props();
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
@@ -25,7 +27,7 @@
 
 {#if form?.ulozene}
 	<div class="okmsg" data-testid="nastavenia-ulozene">
-		✅ Nastavenia uložené — {form.sysStyl.replace('|', ' ')}.
+		✅ Nastavenia uložené — {nazovSysStyl(form.sysStyl)}.
 		{#if form.zmeny.length === 0}Žiadna hodnota sa nezmenila.{/if}
 	</div>
 	{#if form.zmeny.length > 0}
@@ -67,7 +69,7 @@
 			<label for="vyber">Systém · štýl</label>
 			<select id="vyber" onchange={vyberStyl} value={data.sysStyl}>
 				{#each data.styly as st (st.sysStyl)}
-					<option value={st.sysStyl}>{st.system} {st.styl}</option>
+					<option value={st.sysStyl}>{nazovSysStyl(st.sysStyl)}</option>
 				{/each}
 			</select>
 		</div>

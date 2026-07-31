@@ -18,7 +18,7 @@
 			? [{ href: '/zasklenia', label: 'Zasklenia' }]
 			: [
 					{ href: '/pergola', label: 'Pergola' },
-					{ href: '/fix', label: 'Šikmý FIX' },
+					{ href: '/fix', label: 'Fixy' },
 					{ href: '/bazen', label: 'Bazén' },
 					{ href: '/zasklenia', label: 'Zasklenia' },
 					{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },

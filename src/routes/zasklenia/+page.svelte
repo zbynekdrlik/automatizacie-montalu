@@ -7,6 +7,7 @@
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
 	import { stylyDoPonuky, sklaDoPonuky, sysStylPre, skloVyberaIzo } from '$lib/styl';
 	import { popisMulti, posuvySlovom } from '$lib/popis';
+	import { nazovSystemu } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
@@ -582,7 +583,7 @@
 				{#each m.posuvy as pv, i (i)}
 					<tr>
 						<td class="c"><b>Posuv {i + 1}</b></td>
-						<td>{pv.system} {pv.styl}</td>
+						<td>{nazovSystemu(pv.system)} {pv.styl}</td>
 						<td
 							>{pv.S} × {pv.V} mm{#if popisRucnejKolajnice(pv.kolajnica)}<span
 									class="kol-rucne"
@@ -718,7 +719,7 @@
 				<div class="field">
 					<label for="system">Systém</label>
 					<select id="system" name="system" bind:value={system}>
-						{#each data.systemy as sys (sys)}<option>{sys}</option>{/each}
+						{#each data.systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option>{/each}
 					</select>
 				</div>
 				<div class="field">
@@ -936,7 +937,7 @@
 					<div class="grid2">
 						<div class="field"><label for={`ps${i}-sys`}>Systém</label>
 							<select id={`ps${i}-sys`} bind:value={p.system} onchange={() => fixPosuv(i)}>
-								{#each data.systemy as sys (sys)}<option>{sys}</option>{/each}
+								{#each data.systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option>{/each}
 							</select></div>
 						<div class="field"><label for={`ps${i}-styl`}>Štýl</label>
 							<select id={`ps${i}-styl`} bind:value={p.styl} onchange={() => fixPosuv(i)}>
@@ -1019,7 +1020,7 @@
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge"
-				>Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span
+				>Zasklenia · {nazovSystemu(plan.system)} {plan.styl} · {vstup.otvaranie}</span
 			>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
 		</p>
@@ -1058,7 +1059,7 @@
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge"
-				>Zasklenia · {plan.system} {plan.styl} · {vstup.otvaranie}</span
+				>Zasklenia · {nazovSystemu(plan.system)} {plan.styl} · {vstup.otvaranie}</span
 			>
 		</p>
 	</div>

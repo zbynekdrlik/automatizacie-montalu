@@ -1,7 +1,8 @@
 <script lang="ts">
-	// Šikmý FIX — zadanie rozmerov → výkres konštrukcie na tlač. Do Money nejde nič.
+	// FIX (pevné zasklenie) — zadanie rozmerov → výkres konštrukcie na tlač.
+	// Do Money nejde nič. Tvar: šikmý (šikmá horná hrana) alebo rovný (obdĺžnik).
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
-	import { rovnomernePolia, FIX_MAX_POLI, FIX_MAX } from '$lib/fix';
+	import { rovnomernePolia, popisTvaru, FIX_MAX_POLI, FIX_MAX, type FixTvar } from '$lib/fix';
 
 	let { form } = $props();
 
@@ -16,6 +17,7 @@
 		op: form?.vstup?.op ?? '',
 		zakaznik: form?.vstup?.zakaznik ?? '',
 		nazov: form?.vstup?.nazov ?? '',
+		tvar: (form?.vstup?.tvar ?? 'sikmy') as FixTvar,
 		s: form?.vstup?.s ?? 0,
 		v1: form?.vstup?.v1 ?? 0,
 		v2: form?.vstup?.v2 ?? 0,
@@ -32,6 +34,7 @@
 	let opS = $state('');
 	let zakaznikS = $state('');
 	let nazovS = $state('');
+	let tvarS = $state<FixTvar>('sikmy');
 	let sirkaS = $state<number | string>('');
 	let v1S = $state<number | string>('');
 	let v2S = $state<number | string>('');
@@ -46,6 +49,7 @@
 		opS = v?.op ?? '';
 		zakaznikS = v?.zakaznik ?? '';
 		nazovS = v?.nazov ?? '';
+		tvarS = (v?.tvar ?? 'sikmy') as FixTvar;
 		sirkaS = v?.s || '';
 		v1S = v?.v1 || '';
 		v2S = v?.v2 || '';
@@ -79,13 +83,14 @@
 	let poliaJSON = $derived(JSON.stringify(poliaS.length ? poliaS : sirkaNum ? [sirkaNum] : []));
 </script>
 
-<svelte:head><title>Šikmý FIX — výkres konštrukcie</title></svelte:head>
+<svelte:head><title>Fixy — pevné zasklenie</title></svelte:head>
 
 {#snippet hidden()}
 	<input type="hidden" name="zak" value={vstup.zak} />
 	<input type="hidden" name="op" value={vstup.op} />
 	<input type="hidden" name="zakaznik" value={vstup.zakaznik} />
 	<input type="hidden" name="nazov" value={vstup.nazov} />
+	<input type="hidden" name="tvar" value={vstup.tvar} />
 	<input type="hidden" name="s" value={vstup.s} />
 	<input type="hidden" name="v1" value={vstup.v1} />
 	<input type="hidden" name="v2" value={vstup.v2} />
@@ -98,10 +103,11 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<h1>Šikmý FIX — výkres konštrukcie</h1>
+		<h1>Fixy — pevné zasklenie</h1>
 		<p class="sub">
-			Fixné zasklenie so šikmou hornou hranou (do boku pergoly). Zadaj šírku a obe výšky —
-			vykreslím konštrukciu s kótami a uhlami, dielňa reže podľa výkresu.
+			Vyber tvar a zadaj rozmery — vykreslím konštrukciu s kótami, dielňa reže podľa výkresu.
+			<b>Šikmý</b> má šikmú hornú hranu (do boku pergoly, dve rôzne výšky),
+			<b>rovný (pravouhlý)</b> je obdĺžnik s jednou výškou.
 			<b>Do Money sa neposiela nič</b> — tento modul len kreslí.
 		</p>
 	</div>
@@ -130,19 +136,34 @@
 				<label for="nazov">Názov kusu na výkrese (nepovinné)</label>
 				<input id="nazov" name="nazov" bind:value={nazovS} maxlength="60" placeholder="napr. FIX bok pergoly" />
 			</div>
+			<div class="field">
+				<label for="tvar">Tvar</label>
+				<select id="tvar" name="tvar" bind:value={tvarS}>
+					<option value="sikmy">Šikmý (šikmá horná hrana)</option>
+					<option value="rovny">Rovný (pravouhlý)</option>
+				</select>
+			</div>
 			<div class="grid3">
 				<div class="field">
 					<label for="s">Šírka (mm) *</label>
 					<input id="s" name="s" type="number" min="300" max={FIX_MAX} step="any" bind:value={sirkaS} required />
 				</div>
-				<div class="field">
-					<label for="v1">Výška vľavo (mm) *</label>
-					<input id="v1" name="v1" type="number" min="0" max={FIX_MAX} step="any" bind:value={v1S} required />
-				</div>
-				<div class="field">
-					<label for="v2">Výška vpravo (mm) *</label>
-					<input id="v2" name="v2" type="number" min="0" max={FIX_MAX} step="any" bind:value={v2S} required />
-				</div>
+				{#if tvarS === 'rovny'}
+					<!-- rovný fix má JEDNU výšku; server si ju skopíruje aj do druhej -->
+					<div class="field">
+						<label for="v1">Výška (mm) *</label>
+						<input id="v1" name="v1" type="number" min="1" max={FIX_MAX} step="any" bind:value={v1S} required />
+					</div>
+				{:else}
+					<div class="field">
+						<label for="v1">Výška vľavo (mm) *</label>
+						<input id="v1" name="v1" type="number" min="0" max={FIX_MAX} step="any" bind:value={v1S} required />
+					</div>
+					<div class="field">
+						<label for="v2">Výška vpravo (mm) *</label>
+						<input id="v2" name="v2" type="number" min="0" max={FIX_MAX} step="any" bind:value={v2S} required />
+					</div>
+				{/if}
 			</div>
 
 			<!-- delenie na polia (stĺpiky) — ako L1/L2/L3 na výrobnom výkrese -->
@@ -223,8 +244,8 @@
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
-			<span class="badge"
-				>Šikmý FIX{vstup.nazov ? ` · ${vstup.nazov}` : ''} · {r.polia.length}
+			<span class="badge" data-testid="fix-badge"
+				>Fix {popisTvaru(vstup.tvar)}{vstup.nazov ? ` · ${vstup.nazov}` : ''} · {r.polia.length}
 				{r.polia.length === 1 ? 'pole' : r.polia.length < 5 ? 'polia' : 'polí'}{vstup.zrkadlo
 					? ' · zrkadlový kus'
 					: ''}</span
@@ -250,11 +271,15 @@
 		<div class="sec">Rozmery konštrukcie</div>
 		<div class="g">
 			<div><span>Šírka</span><b>{fmt(r.S)} mm</b></div>
-			<div><span>Výška vľavo</span><b>{fmt(r.V1)} mm</b></div>
-			<div><span>Výška vpravo</span><b>{fmt(r.V2)} mm</b></div>
-			<div><span>Sklon</span><b data-testid="uhol-sklonu">{fmt(r.alfa)}°</b></div>
-			<div><span>Šikmá hrana</span><b>{fmt(r.sikmaCelkom)} mm</b></div>
-			<div><span>Uhly konštrukcie</span><b>{fmt(r.uholOstry)}° / {fmt(r.uholTupy)}°</b></div>
+			{#if vstup.tvar === 'rovny'}
+				<div><span>Výška</span><b>{fmt(r.V1)} mm</b></div>
+			{:else}
+				<div><span>Výška vľavo</span><b>{fmt(r.V1)} mm</b></div>
+				<div><span>Výška vpravo</span><b>{fmt(r.V2)} mm</b></div>
+				<div><span>Sklon</span><b data-testid="uhol-sklonu">{fmt(r.alfa)}°</b></div>
+				<div><span>Šikmá hrana</span><b>{fmt(r.sikmaCelkom)} mm</b></div>
+				<div><span>Uhly konštrukcie</span><b>{fmt(r.uholOstry)}° / {fmt(r.uholTupy)}°</b></div>
+			{/if}
 			<div><span>Plocha</span><b>{String(r.m2).replace('.', ',')} m²</b></div>
 		</div>
 	</div>
@@ -263,16 +288,24 @@
 		<div class="sec">Polia</div>
 		<table data-testid="fix-tabulka">
 			<thead>
-				<tr><th>Pole</th><th>Šírka</th><th>Výška vľavo</th><th>Výška vpravo</th><th>Šikmá hrana</th><th class="c">Plocha</th></tr>
+				{#if vstup.tvar === 'rovny'}
+					<tr><th>Pole</th><th>Šírka</th><th>Výška</th><th class="c">Plocha</th></tr>
+				{:else}
+					<tr><th>Pole</th><th>Šírka</th><th>Výška vľavo</th><th>Výška vpravo</th><th>Šikmá hrana</th><th class="c">Plocha</th></tr>
+				{/if}
 			</thead>
 			<tbody>
 				{#each r.polia as p, i (i)}
 					<tr>
 						<td><b>{vstup.zrkadlo ? 'P' : 'L'}{r.V1 >= r.V2 ? i + 1 : r.polia.length - i}</b></td>
 						<td>{fmt(p.sirka)} mm</td>
-						<td>{fmt(p.vLavo)} mm</td>
-						<td>{fmt(p.vPravo)} mm</td>
-						<td>{fmt(p.sikma)} mm</td>
+						{#if vstup.tvar === 'rovny'}
+							<td>{fmt(p.vLavo)} mm</td>
+						{:else}
+							<td>{fmt(p.vLavo)} mm</td>
+							<td>{fmt(p.vPravo)} mm</td>
+							<td>{fmt(p.sikma)} mm</td>
+						{/if}
 						<td class="c">{String(p.m2).replace('.', ',')} m²</td>
 					</tr>
 				{/each}

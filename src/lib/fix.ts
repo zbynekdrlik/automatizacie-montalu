@@ -1,4 +1,8 @@
-// Šikmé FIX zasklenie (do boku pergoly) — geometria konštrukcie.
+// FIX = pevné zasklenie — geometria konštrukcie. Dva tvary: šikmý a rovný.
+//
+// Patrik 2026-07-31: „ako je kolónka šikmé fixe, zmenil by som to na FIXE prípadne
+// pevné zasklenie, tam by som ďalej išiel rozbaľovacie menu na šikmé a rovné
+// (pravouhlé)". Rovný fix je ten istý výpočet s α = 0 — obdĺžnik, obe výšky rovnaké.
 //
 // Dominik 2026-07-15/16: fixy do bokov pergoly nie sú pravouhlé — horná hrana je
 // šikmá podľa sklonu strechy, takže rezy nie sú 45/90, ale „celá škála uhlov".
@@ -122,18 +126,48 @@ export const FIX_MAX_POLI = 8;
 /** tolerancia na súčet šírok polí voči celkovej šírke [mm] */
 export const FIX_TOL = 0.5;
 
+/** Tvar konštrukcie: šikmá horná hrana vs pravouhlý obdĺžnik. */
+export type FixTvar = 'sikmy' | 'rovny';
+
+/** Je hodnota z formulára platný tvar? (skriptovaný POST môže poslať čokoľvek) */
+export function jeFixTvar(x: unknown): x is FixTvar {
+	return x === 'sikmy' || x === 'rovny';
+}
+
+/** Popis tvaru pre človeka (hlavička výkresu, badge). */
+export function popisTvaru(tvar: FixTvar): string {
+	return tvar === 'rovny' ? 'rovný (pravouhlý)' : 'šikmý';
+}
+
 /**
  * Serverová kontrola vstupu (HTML5 min/max obíde skriptovaný POST). Vracia text
- * chyby alebo null. Aspoň jedna výška musí byť kladná; druhá smie byť 0 =
- * konštrukcia dobehnutá do špičky (trojuholník).
+ * chyby alebo null.
+ *
+ * `sikmy`: aspoň jedna výška musí byť kladná; druhá smie byť 0 = konštrukcia
+ * dobehnutá do špičky (trojuholník). Rovnaké výšky sú chyba — to nie je šikmý fix.
+ *
+ * `rovny`: obdĺžnik, takže obe výšky musia byť rovnaké a kladné. Formulár posiela
+ * jednu výšku a server ju skopíruje do druhej; táto kontrola je poistka pre POST,
+ * ktorý obišiel formulár.
  */
-export function chybaFixVstupu(S: number, V1: number, V2: number, polia: number[]): string | null {
+export function chybaFixVstupu(
+	S: number,
+	V1: number,
+	V2: number,
+	polia: number[],
+	tvar: FixTvar = 'sikmy'
+): string | null {
 	const rozmerOk = (x: number) => x >= 300 && x <= FIX_MAX;
 	const vyskaOk = (x: number) => x >= 0 && x <= FIX_MAX;
 	if (!rozmerOk(S)) return `Šírka musí byť 300–${FIX_MAX} mm.`;
 	if (!vyskaOk(V1) || !vyskaOk(V2)) return `Výšky musia byť 0–${FIX_MAX} mm.`;
-	if (!(V1 > 0 || V2 > 0)) return 'Zadaj aspoň jednu výšku.';
-	if (V1 === V2) return 'Výšky sú rovnaké — to je obyčajný pravouhlý fix, nie šikmý.';
+	if (tvar === 'rovny') {
+		if (!(V1 > 0)) return 'Zadaj výšku.';
+		if (V1 !== V2) return 'Rovný fix má obe výšky rovnaké.';
+	} else {
+		if (!(V1 > 0 || V2 > 0)) return 'Zadaj aspoň jednu výšku.';
+		if (V1 === V2) return 'Výšky sú rovnaké — vyber tvar „rovný (pravouhlý)".';
+	}
 	if (!polia.length || polia.length > FIX_MAX_POLI)
 		return `Počet polí musí byť 1–${FIX_MAX_POLI}.`;
 	if (polia.some((w) => !(w >= FIX_MIN && w <= FIX_MAX)))
