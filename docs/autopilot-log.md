@@ -24,3 +24,27 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - **PR:** #104 (dev→main, merge `85de174`), main CI zelené vrátane deploy jobu.
 - **Nasadené a naživo overené:** `v0.11.0 (85de174)` na `app.montalu.cloud`, checkbox
   „so sieťkou" aj `/sietka` stránka overené v Playwright naživo, 0 console errors.
+
+## #90 (Slide sieťka — Money-neutralita guard) — 2026-07-31/08-01
+
+- **Kontext:** #90 (Slide sieťka, Money-kritická časť BLOKOVANÁ do potvrdenia parametrov
+  Patrikom) zostáva OTVORENÉ. Toto je len test-hardening: MONEY-NEUTRALITA test v
+  `tests/vstup-sietka.test.ts` (PR #104) overoval ekvivalenciu odpisu/materiálu so/bez
+  sieťky len pre Robust; Slide bol krytý len argumentom, že `computeMulti` prepúšťa
+  `sietka` bez systémového vetvenia (bez testu).
+- **Design komentár (pred prvým commitom):**
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/90#issuecomment-5147832676
+- **Commits (dev):** `2c4ed93` verzia 0.11.2-dev.1 → `650054b` test(sietka):
+  parametrizovať MONEY-NEUTRALITA guard aj pre Slide (`it.each` naprieč
+  `SIETKA_SYSTEMY`) → `eb43f2f` verzia 0.11.2.
+- **Sabotážou overené:** dočasná lokálna úprava `compute.ts` (fiktívny riadok do
+  odpisu pri Slide+sieťke) → oba nové Slide testy RED, Robust ostal GREEN → sabotáž
+  vrátená (nie je v diffe).
+- **Tests:** `tests/vstup-sietka.test.ts` 24→26 (Robust aj Slide vektor v oboch
+  MONEY-NEUTRALITA testoch). Celá sada 635 unit + 107 e2e, 0 regresií.
+- **PR:** #106 (dev→main, merge `d9c4960`), main CI zelené vrátane deploy jobu.
+- **Nasadené a naživo overené:** `v0.11.2 (d9c4960)` na `app.montalu.cloud`.
+- **#90 zostáva OTVORENÉ** — Slide Money odpis (redukcia pre sieťku) stále čaká na
+  potvrdené kódy/dĺžku od Patrika.
+- **Discord karta:** `notify --run-card` vrátil `dedup` (repo#90 už má kartu z
+  predošlej dávky #86–#90 / PR #104) — legitímny dedup, nie chyba.
