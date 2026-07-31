@@ -375,6 +375,19 @@ footer.app {
 	color: #475569;
 	margin-bottom: 4px;
 }
+/* Výpis kovania (kľučky/FAB) po stranách — Patrik 2026-07-31: v kresbe je to
+   zle vidieť, dielňa to potrebuje čitateľne vypísané pod posuvmi. */
+.kov-posuv + .kov-posuv {
+	margin-top: 10px;
+	padding-top: 8px;
+	border-top: 1px solid #e2e8f0;
+}
+.kov-hd {
+	font-size: 12px;
+	font-weight: 700;
+	color: #475569;
+	margin-bottom: 2px;
+}
 @media print {
 	/* celý nárezový plán na JEDNU A4 — kompaktné rozostupy, menšie písmo */
 	@page {

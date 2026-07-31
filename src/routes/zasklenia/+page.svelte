@@ -418,6 +418,14 @@
 	{/if}
 {/snippet}
 
+{#snippet kovanieStrany(nadpis: string, lava: string, prava: string)}
+	<div class="kov-posuv">
+		<div class="kov-hd">{nadpis}</div>
+		<div class="row"><span>ľavá strana</span><b>{lava || '—'}</b></div>
+		<div class="row"><span>pravá strana</span><b>{prava || '—'}</b></div>
+	</div>
+{/snippet}
+
 {#snippet planKarty(p: NonNullable<typeof plan>)}
 	{@render poznamkaRal()}
 	<div class="card">
@@ -445,6 +453,13 @@
 		<div class="sec">Náhľad</div>
 		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} klin={vstup.klin} />
 	</div>
+
+	{#if vstup.kovanieL || vstup.kovanieP}
+		<div class="card" data-testid="kovanie-strany">
+			<div class="sec">Kovanie — kľučky a FAB</div>
+			{@render kovanieStrany('Posuv 1', vstup.kovanieL, vstup.kovanieP)}
+		</div>
+	{/if}
 
 	{#if vstup.klin}
 		<div class="card" data-testid="klin-karta">
@@ -568,6 +583,20 @@
 			{/each}
 		</div>
 	</div>
+
+	<!-- Patrik 2026-07-31 (Odoo „Vyroba automatizacia"): „pri posuve Robust by som
+	     potreboval tie kľučky fabky vypísať niekam rozumnejšie, zle je to vidieť —
+	     kľudne aj pod tie posuvy". V kresbe sú ďalej, toto je čitateľný výpis. -->
+	{#if m.posuvy.some((pv) => pv.kovanieL || pv.kovanieP)}
+		<div class="card" data-testid="kovanie-strany-multi">
+			<div class="sec">Kovanie — kľučky a FAB</div>
+			{#each m.posuvy as pv, i (i)}
+				{#if pv.kovanieL || pv.kovanieP}
+					{@render kovanieStrany(`Posuv ${i + 1}`, pv.kovanieL ?? '', pv.kovanieP ?? '')}
+				{/if}
+			{/each}
+		</div>
+	{/if}
 
 	{#if m.posuvy.some((pv) => pv.klin)}
 		<div class="card" data-testid="klin-karta-multi">
