@@ -63,7 +63,17 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 
 	it('posuv BEZ klina a bez ručnej koľajnice ostáva bez nich (null neprepne zapínač)', () => {
 		const prvy = znovuPosli([
-			{ ...POSUV_PLOCHY, klin: '', klinDlzka: '', klinSirka: '', klinV1: '', klinV2: '', klinKs: '', kolajnicaHorna: '', kolajnicaSpodna: '' }
+			{
+				...POSUV_PLOCHY,
+				klin: '',
+				klinDlzka: '',
+				klinSirka: '',
+				klinV1: '',
+				klinV2: '',
+				klinKs: '',
+				kolajnicaHorna: '',
+				kolajnicaSpodna: ''
+			}
 		]).vstup;
 		expect(prvy.posuvy[0].klin).toBeNull();
 		const { vstup, error } = znovuPosli(prvy.posuvy);

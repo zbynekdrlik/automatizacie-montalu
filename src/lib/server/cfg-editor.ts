@@ -29,8 +29,7 @@ const baseRole = (nazov: string) =>
 
 export function getEditableRows(sysStyl: string): { rows: EditRow[]; skloOffset: number } | null {
 	const sys = db.prepare('SELECT sklo_offset FROM cfg_sys WHERE sys_styl = ?').get(sysStyl) as
-		| { sklo_offset: number }
-		| undefined;
+		{ sklo_offset: number } | undefined;
 	if (!sys) return null;
 	const raw = db
 		.prepare(
@@ -88,7 +87,11 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 	for (const r of cur.rows) {
 		const nova = input.offsets.get(r.id);
 		if (nova !== undefined && nova !== r.offset)
-			zmeny.push({ pole: `${r.nazov} · ${r.dim === 'S' ? 'šírka' : 'výška'}`, stara: r.offset, nova });
+			zmeny.push({
+				pole: `${r.nazov} · ${r.dim === 'S' ? 'šírka' : 'výška'}`,
+				stara: r.offset,
+				nova
+			});
 	}
 	if (input.skloOffset !== cur.skloOffset)
 		zmeny.push({ pole: 'Sklo — konečné zmenšenie', stara: cur.skloOffset, nova: input.skloOffset });
@@ -103,7 +106,11 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 			const want = input.glassRedukcia.get(g.nazov);
 			if (want !== undefined && (want ? 1 : 0) !== g.redukcia_zero) {
 				glassZmeny.push({ nazov: g.nazov, stara: g.redukcia_zero, nova: want ? 1 : 0 });
-				zmeny.push({ pole: `Sklo „${g.nazov}" nuluje Redukciu 6mm`, stara: g.redukcia_zero, nova: want ? 1 : 0 });
+				zmeny.push({
+					pole: `Sklo „${g.nazov}" nuluje Redukciu 6mm`,
+					stara: g.redukcia_zero,
+					nova: want ? 1 : 0
+				});
 			}
 		}
 	}
@@ -112,9 +119,7 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 
 	// všetky profil riadky (vrátane skrytého 10mm dvojčaťa) — na zrkadlenie 6→10 offsetu
 	const allProfil = db
-		.prepare(
-			`SELECT id, nazov, sklo_hrubka FROM cfg_rez WHERE sys_styl = ? AND typ = 'profil'`
-		)
+		.prepare(`SELECT id, nazov, sklo_hrubka FROM cfg_rez WHERE sys_styl = ? AND typ = 'profil'`)
 		.all(input.sysStyl) as { id: number; nazov: string; sklo_hrubka: number }[];
 
 	const updRez = db.prepare('UPDATE cfg_rez SET offset = ? WHERE id = ?');
@@ -123,9 +128,7 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 	);
 	const updSys = db.prepare('UPDATE cfg_sys SET sklo_offset = ? WHERE sys_styl = ?');
 	const updGlass = db.prepare('UPDATE glass_types SET redukcia_zero = ? WHERE nazov = ?');
-	const insAudit = db.prepare(
-		'INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)'
-	);
+	const insAudit = db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)');
 
 	try {
 		db.transaction(() => {
@@ -160,7 +163,9 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 			for (const r of after) (byRole[baseRole(r.nazov)] ??= new Set()).add(r.offset);
 			for (const role in byRole)
 				if (byRole[role].size > 1)
-					throw new Error(`Profil „${role}" má rozdielne odsadenie pre 6/10 mm — musí byť rovnaké.`);
+					throw new Error(
+						`Profil „${role}" má rozdielne odsadenie pre 6/10 mm — musí byť rovnaké.`
+					);
 
 			// poistka: nová konfigurácia MUSÍ byť platná, inak sa celá transakcia vráti
 			const cfg = loadCfg();

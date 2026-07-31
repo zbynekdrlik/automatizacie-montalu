@@ -162,7 +162,10 @@ describe('computeMulti — kovanie je len prieťahové pole, výpočet nemení',
 		const bez = computeMulti(cfg, spec({}))!;
 		const s = computeMulti(
 			cfg,
-			spec({ kovanieL: 'Obojstranná kľučka s FAB', kovanieP: 'Jednostranná kľučka z vnútra bez FAB' })
+			spec({
+				kovanieL: 'Obojstranná kľučka s FAB',
+				kovanieP: 'Jednostranná kľučka z vnútra bez FAB'
+			})
 		)!;
 		expect(s.posuvy[0].kovanieL).toBe('Obojstranná kľučka s FAB');
 		expect(s.posuvy[0].kovanieP).toBe('Jednostranná kľučka z vnútra bez FAB');

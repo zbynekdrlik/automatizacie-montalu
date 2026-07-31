@@ -49,7 +49,9 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		// v1 DB prejde VŠETKÝMI migráciami po import db.ts (naposledy v9 Štandard +).
 		expect(db.pragma('user_version', { simple: true })).toBe(19);
 		const row = db
-			.prepare('SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?')
+			.prepare(
+				'SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?'
+			)
 			.get('ZAK-MIG-1') as Record<string, unknown>;
 		expect(row.modul).toBe('zasklenia');
 		expect(row.zakaznik).toBe('Migrovaný');
@@ -59,40 +61,100 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		expect(d.styl).toBe('2K');
 		expect(d.s).toBe(2509);
 		// v4: Robust 4K + 2x4K (koľajnica ZASP20254); v5: Slide opona 2x2K + 2x3K
-		const styly = db.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl IN ('Robust|4K','Robust|2x4K','Slide|2x2K','Slide|2x3K')").all() as { sys_styl: string }[];
+		const styly = db
+			.prepare(
+				"SELECT sys_styl FROM cfg_sys WHERE sys_styl IN ('Robust|4K','Robust|2x4K','Slide|2x2K','Slide|2x3K')"
+			)
+			.all() as { sys_styl: string }[];
 		expect(styly.length).toBe(4);
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Robust|2x4K' AND kod='ZASP20254'").get()).toEqual({ c: 2 });
+		expect(
+			db
+				.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Robust|2x4K' AND kod='ZASP20254'")
+				.get()
+		).toEqual({ c: 2 });
 		// Slide opona má redukciu (sklozavislé) — kľúčový rozdiel oproti Robust opone
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Slide|2x2K' AND kod='ZASP00091' AND sklozavisle=1").get()).toEqual({ c: 2 });
+		expect(
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Slide|2x2K' AND kod='ZASP00091' AND sklozavisle=1"
+				)
+				.get()
+		).toEqual({ c: 2 });
 	});
 
 	it('v7: Deluxe — 8 štýlov, hrúbka skla vyberá kladka/klzný (sklo_hrubka + glass_types.hrubka)', () => {
 		// v7 zlúčila 5K6/5K10/6K6/6K10 → 5K/6K: 8 základných štýlov (2K…6K), hrúbka
 		// skla (6/10) vyberá kladka/klzný profil — nie štýl (Dominik 2026-07-10).
-		const deluxe = db.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").all() as { sys_styl: string }[];
+		const deluxe = db
+			.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'")
+			.all() as { sys_styl: string }[];
 		expect(deluxe.length).toBe(8);
 		const styly = new Set(deluxe.map((d) => d.sys_styl.split('|')[1]));
 		expect(styly).toEqual(new Set(['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K', '6K']));
 		// staré delené štýly už NEEXISTUJÚ
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Deluxe|5K6','Deluxe|5K10','Deluxe|6K6','Deluxe|6K10')").get()).toEqual({ c: 0 });
+		expect(
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Deluxe|5K6','Deluxe|5K10','Deluxe|6K6','Deluxe|6K10')"
+				)
+				.get()
+		).toEqual({ c: 0 });
 		// nové stĺpce existujú
-		const cols = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).map((c) => c.name);
+		const cols = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
 		expect(cols).toContain('dlzka_tyce');
 		expect(cols).toContain('sklo_hrubka');
-		const gcols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map((c) => c.name);
+		const gcols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
 		expect(gcols).toContain('hrubka');
 		// kladka/klzný sú hrúbko-závislé: 6mm → sklo_hrubka=6, 10mm → =10; oba 3600mm tyč
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202416'").get()).toEqual({ h: 6, d: 3600 });
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202424'").get()).toEqual({ h: 6, d: 3600 });
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202417'").get()).toEqual({ h: 10, d: 3600 });
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202425'").get()).toEqual({ h: 10, d: 3600 });
+		expect(
+			db
+				.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202416'")
+				.get()
+		).toEqual({ h: 6, d: 3600 });
+		expect(
+			db
+				.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202424'")
+				.get()
+		).toEqual({ h: 6, d: 3600 });
+		expect(
+			db
+				.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202417'")
+				.get()
+		).toEqual({ h: 10, d: 3600 });
+		expect(
+			db
+				.prepare("SELECT DISTINCT sklo_hrubka h, dlzka_tyce d FROM cfg_rez WHERE kod='ZASP202425'")
+				.get()
+		).toEqual({ h: 10, d: 3600 });
 		// každý Deluxe štýl má PRÁVE JEDNU 6mm + JEDNU 10mm kladku (nie napevno 10mm)
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND sklo_hrubka=6").get()).toEqual({ c: 2 }); // kladka+klzný 6mm
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND sklo_hrubka=10").get()).toEqual({ c: 2 }); // kladka+klzný 10mm
+		expect(
+			db
+				.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND sklo_hrubka=6")
+				.get()
+		).toEqual({ c: 2 }); // kladka+klzný 6mm
+		expect(
+			db
+				.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND sklo_hrubka=10")
+				.get()
+		).toEqual({ c: 2 }); // kladka+klzný 10mm
 		// koľajnice/dorazové/sklo = hrúbko-nezávislé (sklo_hrubka=0)
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod IN ('ZASP00078','ZASP00104','ZASP00021')").all()).toEqual([{ h: 0 }]);
+		expect(
+			db
+				.prepare(
+					"SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod IN ('ZASP00078','ZASP00104','ZASP00021')"
+				)
+				.all()
+		).toEqual([{ h: 0 }]);
 		// 5K horná koľajnica = 6000mm tyč (Money-kritické)
-		expect(db.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202434'").get()).toEqual({ d: 6000 });
+		expect(
+			db
+				.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202434'")
+				.get()
+		).toEqual({ d: 6000 });
 		// migrované Robust/Slide riadky = default 7500 tyč + sklo_hrubka 0 (žiadna regresia).
 		// Štandard + (v9) aj starší Štandard (v18) LEGITÍMNE majú vlastné 3600mm-tyčové
 		// profily (kladkový prírez, IZO U profil) — vylúčené z tejto v7-scoped kontroly,
@@ -105,12 +167,28 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 				.get()
 		).toEqual({ c: 0 });
 		// Deluxe sklá (Float kalené) majú hrúbku 6/10; Robust/Slide/ALL sklá = 0
-		expect(db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 6 mm'").get()).toEqual({ h: 6 });
-		expect(db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 10 mm'").get()).toEqual({ h: 10 });
-		expect(db.prepare("SELECT COUNT(*) c FROM glass_types WHERE system<>'Deluxe' AND hrubka<>0").get()).toEqual({ c: 0 });
+		expect(
+			db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 6 mm'").get()
+		).toEqual({ h: 6 });
+		expect(
+			db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 10 mm'").get()
+		).toEqual({ h: 10 });
+		expect(
+			db.prepare("SELECT COUNT(*) c FROM glass_types WHERE system<>'Deluxe' AND hrubka<>0").get()
+		).toEqual({ c: 0 });
 		// 2x3K spodná koľajnica = 3K (ZASP00030), workbook preklep ZASP00104 opravený
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND poradie=15 AND kod='ZASP00030'").get()).toEqual({ c: 1 });
-		expect(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND kod='ZASP00104'").get()).toEqual({ c: 0 });
+		expect(
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND poradie=15 AND kod='ZASP00030'"
+				)
+				.get()
+		).toEqual({ c: 1 });
+		expect(
+			db
+				.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|2x3K' AND kod='ZASP00104'")
+				.get()
+		).toEqual({ c: 0 });
 	});
 
 	it('dedup migrovaného záznamu drží — tá istá ZAK+OP sa neodošle druhýkrát', async () => {
@@ -172,6 +250,8 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 			`)
 		).not.toThrow();
 		expect(db.pragma('user_version', { simple: true })).toBe(2);
-		expect((db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c).toBeGreaterThan(0);
+		expect(
+			(db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c
+		).toBeGreaterThan(0);
 	});
 });

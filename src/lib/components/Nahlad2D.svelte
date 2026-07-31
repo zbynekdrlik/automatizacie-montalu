@@ -61,7 +61,13 @@
 	let frame = $derived(Math.max(4, Math.min(14, 45 * scale))); // vizuálna hrúbka rámu poľa
 
 	let dir = $derived(
-		otvaranie.replace(/\s/g, '') === 'P-L' ? 'PL' : otvaranie.replace(/\s/g, '') === 'L-P' ? 'LP' : otvaranie ? 'OP' : ''
+		otvaranie.replace(/\s/g, '') === 'P-L'
+			? 'PL'
+			: otvaranie.replace(/\s/g, '') === 'L-P'
+				? 'LP'
+				: otvaranie
+					? 'OP'
+					: ''
 	);
 
 	// Reálny presah susedných krídel (mm) per systém žije v $lib/cut.ts (overlapMm),
@@ -172,7 +178,10 @@
 	// (Patrik 2026-07-31: „ak máme 2x3, kľučka bude okno 1, okno 6 a potom buď
 	// okno 3 alebo 4"). 'L' = posledné pole ľavej polovice, 'P' = prvé pole pravej.
 	let poleStred = $derived(
-		Math.min(N - 1, Math.max(0, kovanieStredOkno === 'P' ? Math.floor(N / 2) : Math.floor(N / 2) - 1))
+		Math.min(
+			N - 1,
+			Math.max(0, kovanieStredOkno === 'P' ? Math.floor(N / 2) : Math.floor(N / 2) - 1)
+		)
 	);
 	let kovS = $derived(kovanieStred && N > 1 ? kovBlok(kovanieStred, poleStred, 0.6) : null);
 
@@ -257,11 +266,21 @@
 				font-weight="600">klín — dĺžka {fmt(klin.dlzka)} mm</text
 			>
 			<!-- výšky na oboch stranách -->
-			<text x={klinGeo.x0 - 6} y={klinGeo.y1 - 4} text-anchor="start" font-size="10" fill="#92400e" font-weight="600"
-				>v1 {fmt(klin.v1)}</text
+			<text
+				x={klinGeo.x0 - 6}
+				y={klinGeo.y1 - 4}
+				text-anchor="start"
+				font-size="10"
+				fill="#92400e"
+				font-weight="600">v1 {fmt(klin.v1)}</text
 			>
-			<text x={klinGeo.x1 - 2} y={klinGeo.y2 - 4} text-anchor="end" font-size="10" fill="#92400e" font-weight="600"
-				>v2 {fmt(klin.v2)}</text
+			<text
+				x={klinGeo.x1 - 2}
+				y={klinGeo.y2 - 4}
+				text-anchor="end"
+				font-size="10"
+				fill="#92400e"
+				font-weight="600">v2 {fmt(klin.v2)}</text
 			>
 			<!-- hĺbka + počet kusov pod klinom -->
 			<text x={klinGeo.x0 + 4} y={klinGeo.base + 12} font-size="10" fill="#92400e"
@@ -276,7 +295,14 @@
 		<line x1={M.left} y1={M.top - 24} x2={M.left} y2={M.top - 12} />
 		<line x1={W - M.right} y1={M.top - 24} x2={W - M.right} y2={M.top - 12} />
 	</g>
-	<text x={M.left + (W - M.left - M.right) / 2} y={M.top - 24} text-anchor="middle" font-size="13" fill="#334155" font-weight="600">{fmt(S)} mm</text>
+	<text
+		x={M.left + (W - M.left - M.right) / 2}
+		y={M.top - 24}
+		text-anchor="middle"
+		font-size="13"
+		fill="#334155"
+		font-weight="600">{fmt(S)} mm</text
+	>
 
 	<!-- kóta výšky vľavo -->
 	<g stroke="#94a3b8" stroke-width="1" fill="none">
@@ -295,13 +321,30 @@
 	>
 
 	<!-- vonkajší rám (koľajnice) -->
-	<rect x={M.left - 3} y={M.top - 3} width={W - M.left - M.right + 6} height={h + 6} fill="none" stroke="#475569" stroke-width="1.5" rx="2" />
+	<rect
+		x={M.left - 3}
+		y={M.top - 3}
+		width={W - M.left - M.right + 6}
+		height={h + 6}
+		fill="none"
+		stroke="#475569"
+		stroke-width="1.5"
+		rx="2"
+	/>
 
 	<!-- polia -->
 	{#each Array(N) as _, i (i)}
 		{@const x = M.left + i * panelW}
 		<!-- rám poľa -->
-		<rect x={x + 1} y={M.top + 1} width={panelW - 2} height={h - 2} fill="#e2e8f0" stroke="#64748b" stroke-width="0.9" />
+		<rect
+			x={x + 1}
+			y={M.top + 1}
+			width={panelW - 2}
+			height={h - 2}
+			fill="#e2e8f0"
+			stroke="#64748b"
+			stroke-width="0.9"
+		/>
 		<!-- sklo -->
 		<rect
 			x={x + frame}
@@ -323,38 +366,73 @@
 			stroke-linecap="round"
 			opacity="0.8"
 		/>
-		<text x={x + panelW / 2} y={M.top + 18} text-anchor="middle" font-size="11" fill="#64748b">{i + 1}</text>
+		<text x={x + panelW / 2} y={M.top + 18} text-anchor="middle" font-size="11" fill="#64748b"
+			>{i + 1}</text
+		>
 	{/each}
 
 	<!-- Deluxe zámkové otvory D46 na krajných sklách (⌀46, 50 mm od kraja, výška vŕtania) -->
 	{#each zamky as z (z.cx)}
 		{@const yDim = z.cy - z.r - 9}
 		<!-- otvor (prerušovaný kruh = vŕtaný otvor) -->
-		<circle cx={z.cx} cy={z.cy} r={z.r} fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="3 2" />
+		<circle
+			cx={z.cx}
+			cy={z.cy}
+			r={z.r}
+			fill="none"
+			stroke="#334155"
+			stroke-width="1"
+			stroke-dasharray="3 2"
+		/>
 		<!-- kóta 50 mm od kraja skla -->
 		<g stroke="#475569" stroke-width="0.8" fill="none">
 			<line x1={z.edgeX} y1={z.cy} x2={z.edgeX} y2={yDim - 3} />
 			<line x1={z.cx} y1={z.cy - z.r} x2={z.cx} y2={yDim - 3} />
 			<line x1={z.edgeX} y1={yDim} x2={z.cx} y2={yDim} />
 		</g>
-		<text x={(z.edgeX + z.cx) / 2} y={yDim - 2} text-anchor="middle" font-size="9" fill="#334155">{OKRAJ_ZAMOK}</text>
+		<text x={(z.edgeX + z.cx) / 2} y={yDim - 2} text-anchor="middle" font-size="9" fill="#334155"
+			>{OKRAJ_ZAMOK}</text
+		>
 		<!-- ⌀46 + výška vŕtania pod otvorom -->
-		<text x={z.cx} y={z.cy + z.r + 11} text-anchor="middle" font-size="9" fill="#334155" font-weight="600">⌀{D_ZAMOK}</text>
-		<text x={z.cx} y={z.cy + z.r + 21} text-anchor="middle" font-size="9" fill="#334155">v {fmt(vrtanieZamku)}</text>
+		<text
+			x={z.cx}
+			y={z.cy + z.r + 11}
+			text-anchor="middle"
+			font-size="9"
+			fill="#334155"
+			font-weight="600">⌀{D_ZAMOK}</text
+		>
+		<text x={z.cx} y={z.cy + z.r + 21} text-anchor="middle" font-size="9" fill="#334155"
+			>v {fmt(vrtanieZamku)}</text
+		>
 	{/each}
 
 	<!-- kovanie (kľučka) v krajných krídlach — ľavé a pravé zvlášť -->
 	{#if kovL}
 		<g data-testid="kovanie-l">
 			{#each kovL.lines as ln (ln.y)}
-				<text x={kovL.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
+				<text
+					x={kovL.cx}
+					y={ln.y}
+					text-anchor="middle"
+					font-size={KOV_FONT}
+					fill="#0f172a"
+					font-weight="600">{ln.t}</text
+				>
 			{/each}
 		</g>
 	{/if}
 	{#if kovP}
 		<g data-testid="kovanie-p">
 			{#each kovP.lines as ln (ln.y)}
-				<text x={kovP.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
+				<text
+					x={kovP.cx}
+					y={ln.y}
+					text-anchor="middle"
+					font-size={KOV_FONT}
+					fill="#0f172a"
+					font-weight="600">{ln.t}</text
+				>
 			{/each}
 		</g>
 	{/if}
@@ -362,13 +440,27 @@
 	{#if kovS}
 		<g data-testid="kovanie-stred">
 			{#each kovS.lines as ln (ln.y)}
-				<text x={kovS.cx} y={ln.y} text-anchor="middle" font-size={KOV_FONT} fill="#0f172a" font-weight="600">{ln.t}</text>
+				<text
+					x={kovS.cx}
+					y={ln.y}
+					text-anchor="middle"
+					font-size={KOV_FONT}
+					fill="#0f172a"
+					font-weight="600">{ln.t}</text
+				>
 			{/each}
 		</g>
 	{/if}
 
 	<!-- rozmer skla v prvom poli — s jednotkami hneď za číslom (kopíruje sa do objednávky skla) -->
-	<text x={M.left + panelW / 2} y={M.top + h / 2 - 8} text-anchor="middle" font-size="12" fill="#1d4ed8" font-weight="600">sklo</text>
+	<text
+		x={M.left + panelW / 2}
+		y={M.top + h / 2 - 8}
+		text-anchor="middle"
+		font-size="12"
+		fill="#1d4ed8"
+		font-weight="600">sklo</text
+	>
 	<text
 		x={M.left + panelW / 2}
 		y={M.top + h / 2 + 9}
@@ -389,10 +481,27 @@
 					: ' (L-P)'}</text
 		>
 		<!-- rámček = šírka okna (zarovnaný s čelným pohľadom hore) -->
-		<rect x={M.left} y={casTop} width={W - M.left - M.right} height={casFrameH} rx="5" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2" />
+		<rect
+			x={M.left}
+			y={casTop}
+			width={W - M.left - M.right}
+			height={casFrameH}
+			rx="5"
+			fill="#f8fafc"
+			stroke="#94a3b8"
+			stroke-width="1.2"
+		/>
 		<g data-testid="kaskada">
 			{#each cascade as c (`${c.x}-${c.y}`)}
-				<rect x={c.x} y={c.y} width={c.w} height={CAS_BAR} rx={CAS_BAR / 2} fill="#2563eb" opacity="0.9" />
+				<rect
+					x={c.x}
+					y={c.y}
+					width={c.w}
+					height={CAS_BAR}
+					rx={CAS_BAR / 2}
+					fill="#2563eb"
+					opacity="0.9"
+				/>
 			{/each}
 		</g>
 	{/if}

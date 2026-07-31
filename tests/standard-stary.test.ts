@@ -35,18 +35,144 @@ const sklo = (sysStyl: string, S: number, V: number) => {
 
 // Vektory pri S = 3000, V = 2400 — metre = počet tyčí × dĺžka tyče (7500 / 3600 mm).
 const VEKTORY: [string, Record<string, number>][] = [
-	['Štandard|2K', { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 7.2, ZASP00018: 7.5, ZASP00024: 7.5, ZASP00021: 7.5 }],
-	['Štandard|3K', { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP00018: 7.5, ZASP00024: 15, ZASP00021: 7.5 }],
-	['Štandard|4K', { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP00018: 7.5, ZASP00024: 15, ZASP00021: 7.5 }],
-	['Štandard|2K IZO', { ZASP00107: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP00018: 7.5, ZASP00024: 7.5, ZASP00021: 7.5, ZASP202439: 21.6 }],
-	['Štandard|3K IZO', { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP00018: 7.5, ZASP00024: 15, ZASP00021: 7.5, ZASP202439: 21.6 }],
-	['Štandard|4K IZO', { ZASP00036: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP00018: 7.5, ZASP00024: 15, ZASP00021: 7.5, ZASP202439: 28.8 }],
-	['Štandard|2x2K', { ZASP00107: 7.5, ZASP00104: 7.5, ZASP202415: 7.2, ZASP00018: 15, ZASP00024: 15, ZASP00021: 7.5 }],
-	['Štandard|2x3K', { ZASP00027: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP00018: 15, ZASP00024: 22.5, ZASP00021: 7.5 }],
-	['Štandard|2x4K', { ZASP00036: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP00018: 15, ZASP00024: 30, ZASP00021: 7.5 }],
-	['Štandard|2x2K IZO', { ZASP00107: 7.5, ZASP00030: 7.5, ZASP202415: 7.2, ZASP00018: 15, ZASP00024: 15, ZASP00021: 7.5, ZASP202439: 28.8 }],
-	['Štandard|2x3K IZO', { ZASP00027: 7.5, ZASP00033: 7.5, ZASP202415: 7.2, ZASP00018: 15, ZASP00024: 22.5, ZASP00021: 7.5, ZASP202439: 43.2 }],
-	['Štandard|2x4K IZO', { ZASP00036: 7.5, ZASP202432: 7.5, ZASP202415: 7.2, ZASP00018: 15, ZASP00024: 30, ZASP00021: 7.5, ZASP202439: 57.6 }]
+	[
+		'Štandard|2K',
+		{
+			ZASP00107: 7.5,
+			ZASP00104: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 7.5,
+			ZASP00024: 7.5,
+			ZASP00021: 7.5
+		}
+	],
+	[
+		'Štandard|3K',
+		{
+			ZASP00027: 7.5,
+			ZASP00030: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 7.5,
+			ZASP00024: 15,
+			ZASP00021: 7.5
+		}
+	],
+	[
+		'Štandard|4K',
+		{
+			ZASP00036: 7.5,
+			ZASP00033: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 7.5,
+			ZASP00024: 15,
+			ZASP00021: 7.5
+		}
+	],
+	[
+		'Štandard|2K IZO',
+		{
+			ZASP00107: 7.5,
+			ZASP00030: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 7.5,
+			ZASP00024: 7.5,
+			ZASP00021: 7.5,
+			ZASP202439: 21.6
+		}
+	],
+	[
+		'Štandard|3K IZO',
+		{
+			ZASP00027: 7.5,
+			ZASP00033: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 7.5,
+			ZASP00024: 15,
+			ZASP00021: 7.5,
+			ZASP202439: 21.6
+		}
+	],
+	[
+		'Štandard|4K IZO',
+		{
+			ZASP00036: 7.5,
+			ZASP202432: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 7.5,
+			ZASP00024: 15,
+			ZASP00021: 7.5,
+			ZASP202439: 28.8
+		}
+	],
+	[
+		'Štandard|2x2K',
+		{
+			ZASP00107: 7.5,
+			ZASP00104: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 15,
+			ZASP00024: 15,
+			ZASP00021: 7.5
+		}
+	],
+	[
+		'Štandard|2x3K',
+		{
+			ZASP00027: 7.5,
+			ZASP00030: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 15,
+			ZASP00024: 22.5,
+			ZASP00021: 7.5
+		}
+	],
+	[
+		'Štandard|2x4K',
+		{
+			ZASP00036: 7.5,
+			ZASP00033: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 15,
+			ZASP00024: 30,
+			ZASP00021: 7.5
+		}
+	],
+	[
+		'Štandard|2x2K IZO',
+		{
+			ZASP00107: 7.5,
+			ZASP00030: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 15,
+			ZASP00024: 15,
+			ZASP00021: 7.5,
+			ZASP202439: 28.8
+		}
+	],
+	[
+		'Štandard|2x3K IZO',
+		{
+			ZASP00027: 7.5,
+			ZASP00033: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 15,
+			ZASP00024: 22.5,
+			ZASP00021: 7.5,
+			ZASP202439: 43.2
+		}
+	],
+	[
+		'Štandard|2x4K IZO',
+		{
+			ZASP00036: 7.5,
+			ZASP202432: 7.5,
+			ZASP202415: 7.2,
+			ZASP00018: 15,
+			ZASP00024: 30,
+			ZASP00021: 7.5,
+			ZASP202439: 57.6
+		}
+	]
 ];
 
 describe('Štandard (bez +) — odpis 1:1 s nárezákom, všetkých 12 štýlov', () => {
@@ -94,9 +220,7 @@ describe('Štandard vs Štandard + — sú to naozaj RÔZNE systémy', () => {
 	});
 
 	it('rovnaká šírka dá INÉ sklo (Štandard + má +2 mm reznú rezervu a inú medzeru)', () => {
-		expect(sklo('Štandard|2K', 3000, 2400).sirka).not.toBe(
-			sklo('Štandard +|2K', 3000, 2400).sirka
-		);
+		expect(sklo('Štandard|2K', 3000, 2400).sirka).not.toBe(sklo('Štandard +|2K', 3000, 2400).sirka);
 	});
 
 	it('IZO posúva SPODNÚ koľajnicu o veľkosť vyššie, horná ostáva', () => {

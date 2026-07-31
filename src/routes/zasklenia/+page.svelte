@@ -356,7 +356,9 @@
 	let b2bSirkaErr = $derived.by(() => {
 		if (!isB2B) return null;
 		const s = dimOrNull(sirka);
-		return s === null ? null : checkB2BWidth(data.styly, sysStylPre(system, styl, sklo, existuje), s);
+		return s === null
+			? null
+			: checkB2BWidth(data.styly, sysStylPre(system, styl, sklo, existuje), s);
 	});
 	let b2bVyskaWarn = $derived.by(() => {
 		if (!isB2B) return null;
@@ -367,7 +369,9 @@
 		posuvyExtra.map((p) => {
 			if (!isB2B) return null;
 			const s = dimOrNull(p.s);
-			return s === null ? null : checkB2BWidth(data.styly, sysStylPre(p.system, p.styl, p.sklo, existuje), s);
+			return s === null
+				? null
+				: checkB2BWidth(data.styly, sysStylPre(p.system, p.styl, p.sklo, existuje), s);
 		})
 	);
 	let posuvB2bWarns = $derived(
@@ -486,13 +490,33 @@
 
 	<div class="card">
 		<div class="sec">Náhľad</div>
-		<Nahlad2D S={p.S} V={p.V} N={p.N} skloS={p.sklo.sirka} skloV={p.sklo.vyska} otvaranie={vstup.otvaranie} system={p.system} vrtanieZamku={vstup.vrtanieZamku} kovanieL={vstup.kovanieL} kovanieP={vstup.kovanieP} kovanieStred={vstup.kovanieStred} kovanieStredOkno={vstup.kovanieStredOkno} klin={vstup.klin} />
+		<Nahlad2D
+			S={p.S}
+			V={p.V}
+			N={p.N}
+			skloS={p.sklo.sirka}
+			skloV={p.sklo.vyska}
+			otvaranie={vstup.otvaranie}
+			system={p.system}
+			vrtanieZamku={vstup.vrtanieZamku}
+			kovanieL={vstup.kovanieL}
+			kovanieP={vstup.kovanieP}
+			kovanieStred={vstup.kovanieStred}
+			kovanieStredOkno={vstup.kovanieStredOkno}
+			klin={vstup.klin}
+		/>
 	</div>
 
 	{#if vstup.kovanieL || vstup.kovanieP || vstup.kovanieStred}
 		<div class="card" data-testid="kovanie-strany">
 			<div class="sec">Kovanie — kľučky a FAB</div>
-			{@render kovanieStrany('Posuv 1', vstup.kovanieL, vstup.kovanieP, vstup.kovanieStred, vstup.kovanieStredOkno)}
+			{@render kovanieStrany(
+				'Posuv 1',
+				vstup.kovanieL,
+				vstup.kovanieP,
+				vstup.kovanieStred,
+				vstup.kovanieStredOkno
+			)}
 		</div>
 	{/if}
 
@@ -516,21 +540,32 @@
 			<div><span>Výška</span><b data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
 			<div><span>Počet</span><b>{p.sklo.pocet} ks</b></div>
 			<div><span>Typ</span><b style="font-size:13px">{vstup.skloPresne || vstup.sklo}</b></div>
-			<div><span>Rozmer (na objednávku skla)</span><b data-testid="sklo-rozmer">{fmtSkloRozmer(p.sklo.sirka, p.sklo.vyska)}</b></div>
+			<div>
+				<span>Rozmer (na objednávku skla)</span><b data-testid="sklo-rozmer"
+					>{fmtSkloRozmer(p.sklo.sirka, p.sklo.vyska)}</b
+				>
+			</div>
 		</div>
 	</div>
 
 	<div class="card">
 		<div class="sec">Zoznam materiálu — profily</div>
 		<table>
-			<thead><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead>
+			<thead
+				><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead
+			>
 			<tbody>
 				{#each p.material as m (m.kod)}
 					<tr>
 						<td style="width:52px"><ProfilObrazok kod={m.kod} nazov={m.nazov} /></td>
 						<td>{m.nazov}</td>
 						<td class="c">{m.kod}</td>
-						<td>{m.rezy.filter((x) => x.ks > 0).map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ') || '—'}</td>
+						<td
+							>{m.rezy
+								.filter((x) => x.ks > 0)
+								.map((x) => `${x.ks}×${x.rozmer} mm`)
+								.join(' + ') || '—'}</td
+						>
 						<td class="c"><b>{m.tyce}</b></td>
 					</tr>
 				{/each}
@@ -559,7 +594,8 @@
 	<div class="card">
 		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
 		<p class="sub" style="margin-bottom:14px">
-			Každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci (dĺžka tyče je pri každom profile — Deluxe má kratšie: kladka/klzný 3600, 5K horná 6000 mm).
+			Každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci (dĺžka tyče je pri
+			každom profile — Deluxe má kratšie: kladka/klzný 3600, 5K horná 6000 mm).
 		</p>
 		<RozpisRezov material={p.material} />
 	</div>
@@ -582,7 +618,9 @@
 	<div class="card">
 		<div class="sec">Posuvy ({m.posuvy.length}) — spolu {fmtM(m.m2)} m²</div>
 		<table>
-			<thead><tr><th></th><th>Systém</th><th>Rozmer</th><th>Sklo (mm)</th><th>Otváranie</th></tr></thead>
+			<thead
+				><tr><th></th><th>Systém</th><th>Rozmer</th><th>Sklo (mm)</th><th>Otváranie</th></tr></thead
+			>
 			<tbody>
 				{#each m.posuvy as pv, i (i)}
 					<tr>
@@ -613,7 +651,20 @@
 			{#each m.posuvy as pv, i (i)}
 				<div class="posuv-nahlad">
 					<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
-					<Nahlad2D S={pv.S} V={pv.V} N={pv.N} skloS={pv.sklo.sirka} skloV={pv.sklo.vyska} otvaranie={pv.otvaranie ?? 'Opona'} system={pv.system} kovanieL={pv.kovanieL ?? ''} kovanieP={pv.kovanieP ?? ''} kovanieStred={pv.kovanieStred ?? ''} kovanieStredOkno={(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'} klin={pv.klin ?? null} />
+					<Nahlad2D
+						S={pv.S}
+						V={pv.V}
+						N={pv.N}
+						skloS={pv.sklo.sirka}
+						skloV={pv.sklo.vyska}
+						otvaranie={pv.otvaranie ?? 'Opona'}
+						system={pv.system}
+						kovanieL={pv.kovanieL ?? ''}
+						kovanieP={pv.kovanieP ?? ''}
+						kovanieStred={pv.kovanieStred ?? ''}
+						kovanieStredOkno={(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'}
+						klin={pv.klin ?? null}
+					/>
 				</div>
 			{/each}
 		</div>
@@ -627,7 +678,13 @@
 			<div class="sec">Kovanie — kľučky a FAB</div>
 			{#each m.posuvy as pv, i (i)}
 				{#if pv.kovanieL || pv.kovanieP || pv.kovanieStred}
-					{@render kovanieStrany(`Posuv ${i + 1}`, pv.kovanieL ?? '', pv.kovanieP ?? '', pv.kovanieStred ?? '', (pv.kovanieStredOkno ?? 'L') as 'L' | 'P')}
+					{@render kovanieStrany(
+						`Posuv ${i + 1}`,
+						pv.kovanieL ?? '',
+						pv.kovanieP ?? '',
+						pv.kovanieStred ?? '',
+						(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'
+					)}
 				{/if}
 			{/each}
 		</div>
@@ -647,14 +704,21 @@
 	<div class="card">
 		<div class="sec">Zoznam materiálu — spoločný (naprieč posuvmi)</div>
 		<table>
-			<thead><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead>
+			<thead
+				><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead
+			>
 			<tbody>
 				{#each m.material as mt (mt.kod)}
 					<tr>
 						<td style="width:52px"><ProfilObrazok kod={mt.kod} nazov={mt.nazov} /></td>
 						<td>{mt.nazov}</td>
 						<td class="c">{mt.kod}</td>
-						<td>{mt.rezy.filter((x) => x.ks > 0).map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ') || '—'}</td>
+						<td
+							>{mt.rezy
+								.filter((x) => x.ks > 0)
+								.map((x) => `${x.ks}×${x.rozmer} mm`)
+								.join(' + ') || '—'}</td
+						>
 						<td class="c"><b>{mt.tyce}</b></td>
 					</tr>
 				{/each}
@@ -704,8 +768,8 @@
 		     ostávajú prázdne — práve tie sa pri novej zákazke menia. -->
 		<div class="okmsg" data-testid="znova-info">
 			♻️ Predvyplnené zo zákazky <b>{data.znova.zdroj.zak}</b> (OP {data.znova.zdroj.op},
-			{data.znova.zdroj.created_at}). Doplň nové číslo objednávky, OP a zákazníka — do Money
-			sa zatiaľ neposlalo nič.
+			{data.znova.zdroj.created_at}). Doplň nové číslo objednávky, OP a zákazníka — do Money sa
+			zatiaľ neposlalo nič.
 			{#if data.znova.chybajuce.length}
 				<ul style="margin:8px 0 0 18px">
 					{#each data.znova.chybajuce as ch (ch)}<li>{ch}</li>{/each}
@@ -751,11 +815,33 @@
 			<div class="grid2">
 				<div class="field">
 					<label for="s">Šírka (mm) *</label>
-					<input id="s" name="s" type="number" min="300" max="20000" step="any" bind:value={sirka} required />{#if b2bSirkaErr}<span class="b2b-blok" data-testid="b2b-sirka-err"> ⛔ {b2bSirkaErr}</span>{/if}
+					<input
+						id="s"
+						name="s"
+						type="number"
+						min="300"
+						max="20000"
+						step="any"
+						bind:value={sirka}
+						required
+					/>{#if b2bSirkaErr}<span class="b2b-blok" data-testid="b2b-sirka-err">
+							⛔ {b2bSirkaErr}</span
+						>{/if}
 				</div>
 				<div class="field">
 					<label for="v">Výška (mm) *</label>
-					<input id="v" name="v" type="number" min="300" max="20000" step="any" bind:value={vyska} required />{#if b2bVyskaWarn}<span class="b2b-upoz" data-testid="b2b-vyska-warn"> {b2bVyskaWarn}</span>{/if}
+					<input
+						id="v"
+						name="v"
+						type="number"
+						min="300"
+						max="20000"
+						step="any"
+						bind:value={vyska}
+						required
+					/>{#if b2bVyskaWarn}<span class="b2b-upoz" data-testid="b2b-vyska-warn">
+							{b2bVyskaWarn}</span
+						>{/if}
 				</div>
 			</div>
 			<div class="grid2">
@@ -771,7 +857,8 @@
 					<select id="otvaranie" name="otvaranie" bind:value={otvaranie}>
 						{#each otvaraniaPre as o (o)}<option>{o}</option>{/each}
 					</select>
-					{#if jeOpona}<span class="hint">Pri 2× štýle je otváranie vždy opona (od stredu).</span>{/if}
+					{#if jeOpona}<span class="hint">Pri 2× štýle je otváranie vždy opona (od stredu).</span
+						>{/if}
 				</div>
 			</div>
 			<!-- Kovanie (kľučka) — LEN Robust; ľavá aj pravá strana zvlášť, pri každom
@@ -841,7 +928,9 @@
 				/>
 			</div>
 			<div class="field">
-				<label for="poznamka">Poznámka (viacriadková — vľavo na pláne aj v tlači, píš pod seba)</label>
+				<label for="poznamka"
+					>Poznámka (viacriadková — vľavo na pláne aj v tlači, píš pod seba)</label
+				>
 				<textarea
 					id="poznamka"
 					name="poznamka"
@@ -954,65 +1043,126 @@
 						<button type="button" class="link-del" onclick={() => removePosuv(i)}>✕ odobrať</button>
 					</div>
 					<div class="grid2">
-						<div class="field"><label for={`ps${i}-sys`}>Systém</label>
+						<div class="field">
+							<label for={`ps${i}-sys`}>Systém</label>
 							<select id={`ps${i}-sys`} bind:value={p.system} onchange={() => fixPosuv(i)}>
-								{#each data.systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option>{/each}
-							</select></div>
-						<div class="field"><label for={`ps${i}-styl`}>Štýl</label>
+								{#each data.systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option
+									>{/each}
+							</select>
+						</div>
+						<div class="field">
+							<label for={`ps${i}-styl`}>Štýl</label>
 							<select id={`ps${i}-styl`} bind:value={p.styl} onchange={() => fixPosuv(i)}>
 								{#each stylyForSystem(p.system) as st (st)}<option>{st}</option>{/each}
-							</select></div>
+							</select>
+						</div>
 					</div>
 					<div class="grid2">
-						<div class="field"><label for={`ps${i}-s`}>Šírka (mm) *</label>
-							<input id={`ps${i}-s`} type="number" min="300" max="20000" step="any" bind:value={p.s} required />{#if posuvB2bErrs[i]}<span class="b2b-blok" data-testid={`b2b-sirka-err-${i}`}> ⛔ {posuvB2bErrs[i]}</span>{/if}</div>
-						<div class="field"><label for={`ps${i}-v`}>Výška (mm) *</label>
-							<input id={`ps${i}-v`} type="number" min="300" max="20000" step="any" bind:value={p.v} required />{#if posuvB2bWarns[i]}<span class="b2b-upoz" data-testid={`b2b-vyska-warn-${i}`}> {posuvB2bWarns[i]}</span>{/if}</div>
+						<div class="field">
+							<label for={`ps${i}-s`}>Šírka (mm) *</label>
+							<input
+								id={`ps${i}-s`}
+								type="number"
+								min="300"
+								max="20000"
+								step="any"
+								bind:value={p.s}
+								required
+							/>{#if posuvB2bErrs[i]}<span class="b2b-blok" data-testid={`b2b-sirka-err-${i}`}>
+									⛔ {posuvB2bErrs[i]}</span
+								>{/if}
+						</div>
+						<div class="field">
+							<label for={`ps${i}-v`}>Výška (mm) *</label>
+							<input
+								id={`ps${i}-v`}
+								type="number"
+								min="300"
+								max="20000"
+								step="any"
+								bind:value={p.v}
+								required
+							/>{#if posuvB2bWarns[i]}<span class="b2b-upoz" data-testid={`b2b-vyska-warn-${i}`}>
+									{posuvB2bWarns[i]}</span
+								>{/if}
+						</div>
 					</div>
 					<div class="grid2">
-						<div class="field"><label for={`ps${i}-sklo`}>Sklo</label>
+						<div class="field">
+							<label for={`ps${i}-sklo`}>Sklo</label>
 							<select id={`ps${i}-sklo`} bind:value={p.sklo}>
 								{#each sklaForSystem(p.system, p.styl) as g (g)}<option>{g}</option>{/each}
-							</select></div>
-						<div class="field"><label for={`ps${i}-otv`}>Otváranie</label>
+							</select>
+						</div>
+						<div class="field">
+							<label for={`ps${i}-otv`}>Otváranie</label>
 							<select id={`ps${i}-otv`} bind:value={p.otvaranie}>
 								{#each otvaraniaForStyl(p.styl) as o (o)}<option>{o}</option>{/each}
-							</select></div>
+							</select>
+						</div>
 					</div>
 					{#if p.system === 'Robust'}
 						<div class="grid2">
-							<div class="field"><label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
+							<div class="field">
+								<label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
 								<select id={`ps${i}-kovl`} bind:value={p.kovanieL}>
 									<option value="">—</option>
 									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-								</select></div>
-							<div class="field"><label for={`ps${i}-kovp`}>Kovanie — pravá strana</label>
+								</select>
+							</div>
+							<div class="field">
+								<label for={`ps${i}-kovp`}>Kovanie — pravá strana</label>
 								<select id={`ps${i}-kovp`} bind:value={p.kovanieP}>
 									<option value="">—</option>
 									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-								</select></div>
+								</select>
+							</div>
 						</div>
 						{#if p.styl.startsWith('2x')}
 							<div class="grid2" data-testid={`kovanie-stred-polia-${i}`}>
-								<div class="field"><label for={`ps${i}-kovs`}>Kovanie — stredové okno</label>
+								<div class="field">
+									<label for={`ps${i}-kovs`}>Kovanie — stredové okno</label>
 									<select id={`ps${i}-kovs`} bind:value={p.kovanieStred}>
 										<option value="">—</option>
 										{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-									</select></div>
-								<div class="field"><label for={`ps${i}-kovso`}>Ktoré okno v strede</label>
+									</select>
+								</div>
+								<div class="field">
+									<label for={`ps${i}-kovso`}>Ktoré okno v strede</label>
 									<select id={`ps${i}-kovso`} bind:value={p.kovanieStredOkno}>
 										<option value="L">ľavé zo stredovej dvojice</option>
 										<option value="P">pravé zo stredovej dvojice</option>
-									</select></div>
+									</select>
+								</div>
 							</div>
 						{/if}
 					{/if}
 					{#if kolajnicaPre(p.system)}
 						<div class="grid2" data-testid={`kolajnica-polia-${i}`}>
-							<div class="field"><label for={`ps${i}-kolh`}>Koľajnica horná (mm) — prázdne = podľa šírky</label>
-								<input id={`ps${i}-kolh`} type="number" min={KOLAJNICA_MIN} max={KOLAJNICA_MAX} step="any" bind:value={p.kolajnicaHorna} placeholder={String(p.s || '')} /></div>
-							<div class="field"><label for={`ps${i}-kols`}>Koľajnica spodná (mm) — prázdne = podľa šírky</label>
-								<input id={`ps${i}-kols`} type="number" min={KOLAJNICA_MIN} max={KOLAJNICA_MAX} step="any" bind:value={p.kolajnicaSpodna} placeholder={String(p.s || '')} /></div>
+							<div class="field">
+								<label for={`ps${i}-kolh`}>Koľajnica horná (mm) — prázdne = podľa šírky</label>
+								<input
+									id={`ps${i}-kolh`}
+									type="number"
+									min={KOLAJNICA_MIN}
+									max={KOLAJNICA_MAX}
+									step="any"
+									bind:value={p.kolajnicaHorna}
+									placeholder={String(p.s || '')}
+								/>
+							</div>
+							<div class="field">
+								<label for={`ps${i}-kols`}>Koľajnica spodná (mm) — prázdne = podľa šírky</label>
+								<input
+									id={`ps${i}-kols`}
+									type="number"
+									min={KOLAJNICA_MIN}
+									max={KOLAJNICA_MAX}
+									step="any"
+									bind:value={p.kolajnicaSpodna}
+									placeholder={String(p.s || '')}
+								/>
+							</div>
 						</div>
 					{/if}
 					<KlinPolia
@@ -1027,7 +1177,13 @@
 				</div>
 			{/each}
 			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>
-			<button class="btn" type="submit" formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'} disabled={b2bBlok} data-testid="spocitat">
+			<button
+				class="btn"
+				type="submit"
+				formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'}
+				disabled={b2bBlok}
+				data-testid="spocitat"
+			>
 				{jeMulti
 					? `Spočítať spoločný plán (${posuvySlovom(posuvyExtra.length + 1)})`
 					: 'Spočítať nárezový plán'}
@@ -1062,7 +1218,9 @@
 				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
 				<button class="btn" type="submit" data-testid="odoslat">
 					{data.live
-						? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')
+						? vstup.caka
+							? '⏳ Odoslať odpis (odloží sa do NA ODPIS)'
+							: '✅ Odoslať odpis do Money'
 						: '🧪 Odoslať odpis (TEST priečinok)'}
 				</button>
 			</form>
@@ -1087,8 +1245,8 @@
 		{#if !form.outcome.live}
 			🧪 TEST — do Money NEJDE (testovací priečinok): <b>{form.outcome.filename}</b>
 		{:else if vstup.caka}
-			⏳ Odložené — čaká na materiál. Súbor <b>{form.outcome.filename}</b> je v NA ODPIS, presuň do
-			dlv keď máš materiál.
+			⏳ Odložené — čaká na materiál. Súbor <b>{form.outcome.filename}</b> je v NA ODPIS, presuň do dlv
+			keď máš materiál.
 		{:else}
 			✅ Odoslané do Money na import: <b>{form.outcome.filename}</b>
 		{/if}
@@ -1123,7 +1281,9 @@
 				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
 				<button class="btn" type="submit" data-testid="odoslat-multi">
 					{data.live
-						? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS)' : '✅ Odoslať odpis do Money')
+						? vstup.caka
+							? '⏳ Odoslať odpis (odloží sa do NA ODPIS)'
+							: '✅ Odoslať odpis do Money'
 						: '🧪 Odoslať odpis (TEST priečinok)'}
 				</button>
 			</form>

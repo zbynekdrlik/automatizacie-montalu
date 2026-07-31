@@ -125,9 +125,7 @@ describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', 
 	});
 
 	it('sklá sa NEduplikovali — Štandard zdieľa katalóg so Štandard +', () => {
-		const pocet = (
-			db.prepare('SELECT COUNT(*) c FROM glass_types').get() as { c: number }
-		).c;
+		const pocet = (db.prepare('SELECT COUNT(*) c FROM glass_types').get() as { c: number }).c;
 		expect(pocet).toBe(7); // presne to, čo bolo pred migráciou
 		expect(glassTypesForSystem('Štandard').map((g) => g.nazov)).toEqual([
 			'Float sklo 4 mm',

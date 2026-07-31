@@ -12,9 +12,8 @@ process.env.SEED_USERS = 'tester:tajne-heslo-42';
 const { db, hashPassword, verifyPassword, loadCfg, listGlassTypes, glassTypesForSystem } =
 	await import('../src/lib/server/db');
 const { login, getSessionUser, logout } = await import('../src/lib/server/auth');
-const { getEditableRows, saveCfgChanges, getAuditLog } = await import(
-	'../src/lib/server/cfg-editor'
-);
+const { getEditableRows, saveCfgChanges, getAuditLog } =
+	await import('../src/lib/server/cfg-editor');
 const { safeCompute } = await import('../src/lib/server/compute');
 
 describe('heslá a sessions', () => {
@@ -62,9 +61,17 @@ describe('editor vzorcov', () => {
 	});
 
 	it('neznámy štýl / cudzí row id sa odmietne', () => {
-		expect(saveCfgChanges({ sysStyl: 'Slide|9K', username: 't', offsets: new Map(), skloOffset: 83 }).error).toBeTruthy();
 		expect(
-			saveCfgChanges({ sysStyl: 'Robust|2K', username: 't', offsets: new Map([[999999, 10]]), skloOffset: 135 }).error
+			saveCfgChanges({ sysStyl: 'Slide|9K', username: 't', offsets: new Map(), skloOffset: 83 })
+				.error
+		).toBeTruthy();
+		expect(
+			saveCfgChanges({
+				sysStyl: 'Robust|2K',
+				username: 't',
+				offsets: new Map([[999999, 10]]),
+				skloOffset: 135
+			}).error
 		).toBeTruthy();
 	});
 
@@ -139,7 +146,9 @@ describe('editor vzorcov', () => {
 
 		// OBE dvojčatá (6mm ZASP202416 + 10mm ZASP202417) dostali nový offset
 		const off = db
-			.prepare(`SELECT kod, offset FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND kod IN ('ZASP202416','ZASP202417')`)
+			.prepare(
+				`SELECT kod, offset FROM cfg_rez WHERE sys_styl='Deluxe|2K' AND kod IN ('ZASP202416','ZASP202417')`
+			)
 			.all() as { kod: string; offset: number }[];
 		expect(off.length).toBe(2);
 		expect(off.every((r) => r.offset === kladka.offset + 2)).toBe(true);

@@ -46,10 +46,7 @@ function jobFor(
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
 		// profily (metre) + kovanie (kusy a tesnenia) — kovanie ide za profilmi,
 		// aby si dielňa v xlsx zachovala poradie, na ktoré je zvyknutá
-		polozky: [
-			...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
-			...kovanie
-		],
+		polozky: [...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })), ...kovanie],
 		detail: {
 			system: r.system,
 			styl: r.styl,
@@ -92,7 +89,10 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean) {
 }
 
 /** Existuje taký nárezák? Zdroj pravdy pre server je konfigurácia (cfg z DB). */
-const existujeVCfg = (cfg: ReturnType<typeof loadCfg>): ExistujeSysStyl => (s) => !!cfg[s];
+const existujeVCfg =
+	(cfg: ReturnType<typeof loadCfg>): ExistujeSysStyl =>
+	(s) =>
+		!!cfg[s];
 
 /** Sklo musí patriť k systému AJ k štýlu (napr. Štandard + opona nemá IZO skladbu). */
 function skloPre(cfg: ReturnType<typeof loadCfg>, system: string, styl: string, sklo: string) {
@@ -194,10 +194,7 @@ function jobForMulti(
 		createdBy,
 		cakaSubdir: sys0,
 		popis: (vstup.op + ' : ' + vstup.zakaznik).trim(),
-		polozky: [
-			...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
-			...kovanie
-		],
+		polozky: [...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })), ...kovanie],
 		detail: {
 			zimnaZahrada: true,
 			pocetPosuvov: r.posuvy.length,
@@ -268,7 +265,8 @@ export const actions: Actions = {
 		}
 
 		const { r, err, spec } = compute(vstup);
-		if (err || !r || !spec) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		if (err || !r || !spec)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		// kovanie (kusy + tesnenia) — chyba v počtoch zastaví už náhľad, aby sa
 		// nedalo odoslať niečo, čo appka nevie spočítať celé
 		const kov = kovanieFor([spec], vstup.jednostrannaFab);
@@ -301,7 +299,8 @@ export const actions: Actions = {
 		const { vstup, error } = parseVstup(formData);
 		if (error) return { step: 'form' as const, error, vstup };
 		const { r, err, spec } = compute(vstup);
-		if (err || !r || !spec) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		if (err || !r || !spec)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		const kov = kovanieFor([spec], vstup.jednostrannaFab);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 
@@ -381,7 +380,8 @@ export const actions: Actions = {
 		}
 
 		const { r, err, specs } = computeMultiFrom(vstup);
-		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+		if (err || !r)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 		const kov = kovanieFor(specs, vstup.jednostrannaFab);
 		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
 		const job = jobForMulti(vstup, r, '', kov.polozky);
@@ -396,7 +396,7 @@ export const actions: Actions = {
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(job),
-				dir: targetDirFor((r.posuvy[0]?.system ?? 'Robust'), vstup.caka)
+				dir: targetDirFor(r.posuvy[0]?.system ?? 'Robust', vstup.caka)
 			}
 		};
 	},
@@ -410,7 +410,8 @@ export const actions: Actions = {
 		const { vstup, error } = parseMultiVstup(formData);
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const { r, err, specs } = computeMultiFrom(vstup);
-		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+		if (err || !r)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 
 		const potvrdene = String(formData.get('planHash') ?? '');
 		const kov = kovanieFor(specs, vstup.jednostrannaFab);
@@ -427,7 +428,7 @@ export const actions: Actions = {
 				cielInfo: {
 					live: isLive(),
 					filename: filenameFor(job),
-					dir: targetDirFor((r.posuvy[0]?.system ?? 'Robust'), vstup.caka)
+					dir: targetDirFor(r.posuvy[0]?.system ?? 'Robust', vstup.caka)
 				}
 			};
 		}

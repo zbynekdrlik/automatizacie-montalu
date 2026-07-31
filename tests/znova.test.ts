@@ -137,8 +137,26 @@ describe('znovaZOdpisu — zimná záhrada (viac posuvov)', () => {
 			jednostrannaFab: false,
 			pridavnaKolajnica: true,
 			posuvy: [
-				{ posuv: 1, system: 'Robust', styl: '2K', s: 2000, v: 2200, sklo: 'Izolačné sklo 4/16/4 číre', otvaranie: 'P - L' },
-				{ posuv: 2, system: 'Robust', styl: '3K', s: 3000, v: 2200, sklo: 'Izolačné sklo 4/16/4 číre', otvaranie: 'L - P', klin: null, kolajnica: null }
+				{
+					posuv: 1,
+					system: 'Robust',
+					styl: '2K',
+					s: 2000,
+					v: 2200,
+					sklo: 'Izolačné sklo 4/16/4 číre',
+					otvaranie: 'P - L'
+				},
+				{
+					posuv: 2,
+					system: 'Robust',
+					styl: '3K',
+					s: 3000,
+					v: 2200,
+					sklo: 'Izolačné sklo 4/16/4 číre',
+					otvaranie: 'L - P',
+					klin: null,
+					kolajnica: null
+				}
 			]
 		});
 		const m = znovaZOdpisu(id)!.multiVstup!;

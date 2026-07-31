@@ -75,9 +75,9 @@ test('modul nikam nezapisuje — žiadny Money odpis ani odoslanie', async ({ pa
 	await expect(page.locator('.card', { hasText: 'Odpis (do Money)' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: /Odoslať/ })).toHaveCount(0);
 	// a ani formulár na zápis (jediné POST akcie sú vykres/upravit/rozdelit)
-	const akcie = await page.locator('form[action*="?/"]').evaluateAll((fs) =>
-		fs.map((f) => f.getAttribute('action') ?? '')
-	);
+	const akcie = await page
+		.locator('form[action*="?/"]')
+		.evaluateAll((fs) => fs.map((f) => f.getAttribute('action') ?? ''));
 	expect(akcie.every((a) => /\?\/(vykres|upravit|rozdelit)$/.test(a))).toBe(true);
 
 	expect(errs).toEqual([]);
@@ -164,8 +164,7 @@ test('popisky vo výkrese sa neprekrývajú ani pri 8 poliach', async ({ page })
 		for (let j = i + 1; j < boxy.length; j++) {
 			const a = boxy[i];
 			const b = boxy[j];
-			const prekryv =
-				a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+			const prekryv = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 			expect(prekryv, `prekryv „${a.t}" × „${b.t}"`).toBe(false);
 		}
 

@@ -55,7 +55,9 @@ const OLD_RAM: Record<string, number> = {
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v13.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v13.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v13.pragma('user_version = 13');
 	v13.close();
 }
@@ -64,9 +66,11 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 const off = (sysStyl: string, poradie: number) =>
-	(db.prepare('SELECT offset FROM cfg_rez WHERE sys_styl = ? AND poradie = ?').get(sysStyl, poradie) as
-		| { offset: number }
-		| undefined)?.offset;
+	(
+		db
+			.prepare('SELECT offset FROM cfg_rez WHERE sys_styl = ? AND poradie = ?')
+			.get(sysStyl, poradie) as { offset: number } | undefined
+	)?.offset;
 
 describe('reálny v13 → v14 (+v15): Slide opona rámový podľa Excelu', () => {
 	it('user_version = 17', () => {

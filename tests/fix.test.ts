@@ -48,8 +48,7 @@ describe('OP260264 „FIX Minegis" — sklon 9,3°, 3 polia (ground truth z výk
 	it('polia na seba nadväzujú a plocha je súčtom polí', () => {
 		expect(r.polia[0].vLavo).toBe(524);
 		expect(r.polia[2].vPravo).toBe(64.6);
-		for (let i = 1; i < r.polia.length; i++)
-			expect(r.polia[i].vLavo).toBe(r.polia[i - 1].vPravo);
+		for (let i = 1; i < r.polia.length; i++) expect(r.polia[i].vLavo).toBe(r.polia[i - 1].vPravo);
 		const sucet = r.polia.reduce((s, p) => s + p.m2, 0);
 		expect(Math.abs(sucet - r.m2)).toBeLessThan(0.002);
 	});
@@ -66,7 +65,7 @@ describe('OP260236 „FIX KMS" — sklon 22,8° a zrkadlo 21,7°', () => {
 	it('P2 (zrkadlo): 233,9 → 858 stúpa doprava, dĺžky sú rovnaké', () => {
 		const r = pocitajFix(1561, 233.9, 858, [1561]);
 		expect(Math.abs(r.alfa - 21.7)).toBeLessThanOrEqual(0.2);
-		expect(Math.abs(r.sikmaCelkom - 1680) ).toBeLessThanOrEqual(2);
+		expect(Math.abs(r.sikmaCelkom - 1680)).toBeLessThanOrEqual(2);
 		expect(r.klesaVpravo).toBe(false);
 		// tá istá konštrukcia otočená → identické dĺžky aj uhly
 		const zrkadlo = pocitajFix(1561, 858, 233.9, [1561]);

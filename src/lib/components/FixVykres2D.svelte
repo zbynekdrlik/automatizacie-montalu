@@ -72,7 +72,6 @@
 	// popisok znova posadilo na čiaru
 	let tupyOdsad = $derived(12 + 44 * Math.tan((r.alfa * Math.PI) / 180));
 
-
 	// Rovný (pravouhlý) fix: horná hrana je vodorovná ⇒ „šikmá hrana" je obyčajná
 	// horná hrana a oba vnútorné uhly sú 90°. Kótovať sklon 0°, hranu rovnú šírke
 	// a dvakrát 90° by bol šum cez celý výkres, tak sa tie popisky vynechajú
@@ -104,9 +103,7 @@
 
 	// Popisky dĺžok sa natočia POZDĹŽ šikmej hrany (ako kóty v CAD) — inak dlhý
 	// text preteká cez šikmú čiaru a pri strmom sklone ju pretína.
-	let sklonTextu = $derived(
-		(r.V2 - r.V1 < 0 ? 1 : -1) * (zrkadlo ? -1 : 1) * r.alfa
-	);
+	let sklonTextu = $derived((r.V2 - r.V1 < 0 ? 1 : -1) * (zrkadlo ? -1 : 1) * r.alfa);
 
 	let popisUhlov = $derived([
 		{ x: xVysoka + dovnutra * 52, y: yVysoka + ostryOdsad, w: sirkaTextu(fmt(r.uholOstry) + '°') },
@@ -166,8 +163,13 @@
 		{@const x1 = hranice[i + 1]}
 		{@const cx = (X(x0) + X(x1)) / 2}
 		{@const stred = (p.vLavo + p.vPravo) / 2}
-		<text x={cx} y={Y(stred / 2) + 4} text-anchor="middle" font-size="14" font-weight="700" fill="#0f172a"
-			>{oznacenie}{cislovanieZlava ? i + 1 : r.polia.length - i}</text
+		<text
+			x={cx}
+			y={Y(stred / 2) + 4}
+			text-anchor="middle"
+			font-size="14"
+			font-weight="700"
+			fill="#0f172a">{oznacenie}{cislovanieZlava ? i + 1 : r.polia.length - i}</text
 		>
 		{#if i < r.polia.length - 1}
 			<!-- stĺpik medzi poľami -->
@@ -190,40 +192,40 @@
 
 	<!-- kóta ĽAVEJ krajnej výšky (nulovú výšku nekótujeme — konštrukcia tam dobehla do ostra) -->
 	{#if r.V1 > 0}
-	<g stroke="#94a3b8" stroke-width="1" fill="none">
-		<line x1={X(0) + 26 * vonV1} y1={Y(r.V1)} x2={X(0) + 26 * vonV1} y2={base} />
-		<line x1={X(0) + 32 * vonV1} y1={Y(r.V1)} x2={X(0) + 20 * vonV1} y2={Y(r.V1)} />
-		<line x1={X(0) + 32 * vonV1} y1={base} x2={X(0) + 20 * vonV1} y2={base} />
-	</g>
-	<text
-		x={X(0) + 34 * vonV1}
-		y={(Y(r.V1) + base) / 2}
-		text-anchor="middle"
-		font-size="13"
-		font-weight="600"
-		fill="#334155"
-		transform="rotate(-90 {X(0) + 34 * vonV1} {(Y(r.V1) + base) / 2})"
-		data-testid="fix-v1">{fmt(r.V1)} mm</text
-	>
+		<g stroke="#94a3b8" stroke-width="1" fill="none">
+			<line x1={X(0) + 26 * vonV1} y1={Y(r.V1)} x2={X(0) + 26 * vonV1} y2={base} />
+			<line x1={X(0) + 32 * vonV1} y1={Y(r.V1)} x2={X(0) + 20 * vonV1} y2={Y(r.V1)} />
+			<line x1={X(0) + 32 * vonV1} y1={base} x2={X(0) + 20 * vonV1} y2={base} />
+		</g>
+		<text
+			x={X(0) + 34 * vonV1}
+			y={(Y(r.V1) + base) / 2}
+			text-anchor="middle"
+			font-size="13"
+			font-weight="600"
+			fill="#334155"
+			transform="rotate(-90 {X(0) + 34 * vonV1} {(Y(r.V1) + base) / 2})"
+			data-testid="fix-v1">{fmt(r.V1)} mm</text
+		>
 	{/if}
 
 	<!-- kóta PRAVEJ krajnej výšky -->
 	{#if r.V2 > 0}
-	<g stroke="#94a3b8" stroke-width="1" fill="none">
-		<line x1={X(r.S) + 26 * vonV2} y1={Y(r.V2)} x2={X(r.S) + 26 * vonV2} y2={base} />
-		<line x1={X(r.S) + 20 * vonV2} y1={Y(r.V2)} x2={X(r.S) + 32 * vonV2} y2={Y(r.V2)} />
-		<line x1={X(r.S) + 20 * vonV2} y1={base} x2={X(r.S) + 32 * vonV2} y2={base} />
-	</g>
-	<text
-		x={X(r.S) + 34 * vonV2}
-		y={(Y(r.V2) + base) / 2}
-		text-anchor="middle"
-		font-size="13"
-		font-weight="600"
-		fill="#334155"
-		transform="rotate(-90 {X(r.S) + 34 * vonV2} {(Y(r.V2) + base) / 2})"
-		data-testid="fix-v2">{fmt(r.V2)} mm</text
-	>
+		<g stroke="#94a3b8" stroke-width="1" fill="none">
+			<line x1={X(r.S) + 26 * vonV2} y1={Y(r.V2)} x2={X(r.S) + 26 * vonV2} y2={base} />
+			<line x1={X(r.S) + 20 * vonV2} y1={Y(r.V2)} x2={X(r.S) + 32 * vonV2} y2={Y(r.V2)} />
+			<line x1={X(r.S) + 20 * vonV2} y1={base} x2={X(r.S) + 32 * vonV2} y2={base} />
+		</g>
+		<text
+			x={X(r.S) + 34 * vonV2}
+			y={(Y(r.V2) + base) / 2}
+			text-anchor="middle"
+			font-size="13"
+			font-weight="600"
+			fill="#334155"
+			transform="rotate(-90 {X(r.S) + 34 * vonV2} {(Y(r.V2) + base) / 2})"
+			data-testid="fix-v2">{fmt(r.V2)} mm</text
+		>
 	{/if}
 
 	<!-- kóty šírok polí (nad spodnou hranou) + celková šírka pod ňou -->
@@ -278,45 +280,45 @@
 		>
 	{/each}
 	{#if !rovny}
-	<text
-		x={(X(0) + X(r.S)) / 2}
-		y={20}
-		text-anchor="middle"
-		font-size="13"
-		font-weight="700"
-		fill="#b45309"
-		data-testid="fix-sikma">šikmá hrana {fmt(r.sikmaCelkom)} mm · sklon {fmt(r.alfa)}°</text
-	>
+		<text
+			x={(X(0) + X(r.S)) / 2}
+			y={20}
+			text-anchor="middle"
+			font-size="13"
+			font-weight="700"
+			fill="#b45309"
+			data-testid="fix-sikma">šikmá hrana {fmt(r.sikmaCelkom)} mm · sklon {fmt(r.alfa)}°</text
+		>
 	{/if}
 
-{#if !rovny}
-	<!-- uhol sklonu pri vyššej strane (ostrý uhol konštrukcie) -->
-	<text
-		x={popisUhlov[0].x}
-		y={popisUhlov[0].y}
-		text-anchor="middle"
-		font-size="12"
-		font-weight="700"
-		fill="#0f766e"
-		stroke="#fff"
-		stroke-width="3"
-		paint-order="stroke"
-		data-testid="fix-uhol">{fmt(r.uholOstry)}°</text
-	>
-	<!-- Tupý uhol pri nižšej strane. Ide NAD šikmú hranu (mimo konštrukcie) — pri
+	{#if !rovny}
+		<!-- uhol sklonu pri vyššej strane (ostrý uhol konštrukcie) -->
+		<text
+			x={popisUhlov[0].x}
+			y={popisUhlov[0].y}
+			text-anchor="middle"
+			font-size="12"
+			font-weight="700"
+			fill="#0f766e"
+			stroke="#fff"
+			stroke-width="3"
+			paint-order="stroke"
+			data-testid="fix-uhol">{fmt(r.uholOstry)}°</text
+		>
+		<!-- Tupý uhol pri nižšej strane. Ide NAD šikmú hranu (mimo konštrukcie) — pri
 	     nízkej špičke (napr. 64,6 mm) je vnútri sotva pár pixelov a popisok by ležal
 	     na obryse; nad hranou je vždy voľno. -->
-	<text
-		x={popisUhlov[1].x}
-		y={popisUhlov[1].y}
-		text-anchor="middle"
-		font-size="12"
-		font-weight="700"
-		fill="#0f766e"
-		stroke="#fff"
-		stroke-width="3"
-		paint-order="stroke"
-		data-testid="fix-uhol-tupy">{fmt(r.uholTupy)}°</text
-	>
-{/if}
+		<text
+			x={popisUhlov[1].x}
+			y={popisUhlov[1].y}
+			text-anchor="middle"
+			font-size="12"
+			font-weight="700"
+			fill="#0f766e"
+			stroke="#fff"
+			stroke-width="3"
+			paint-order="stroke"
+			data-testid="fix-uhol-tupy">{fmt(r.uholTupy)}°</text
+		>
+	{/if}
 </svg>

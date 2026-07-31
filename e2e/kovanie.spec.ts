@@ -14,7 +14,9 @@ const KOVANIA = [
 	'Obojstranná kľučka s FAB'
 ];
 
-test('predvolené sklo je vždy číre (Robust aj Slide), po prepnutí systému tiež', async ({ page }) => {
+test('predvolené sklo je vždy číre (Robust aj Slide), po prepnutí systému tiež', async ({
+	page
+}) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 

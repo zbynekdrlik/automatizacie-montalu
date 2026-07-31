@@ -37,7 +37,13 @@ describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_see
 			.prepare(
 				"SELECT sys_styl, poradie, kod, dlzka_tyce, sklo_hrubka FROM cfg_rez WHERE sys_styl LIKE 'Štandard +|%'"
 			)
-			.all() as { sys_styl: string; poradie: number; kod: string; dlzka_tyce: number; sklo_hrubka: number }[];
+			.all() as {
+			sys_styl: string;
+			poradie: number;
+			kod: string;
+			dlzka_tyce: number;
+			sklo_hrubka: number;
+		}[];
 		expect(dbRows.length).toBe(stdRez.length);
 		for (const r of stdRez) {
 			const dbRow = dbRows.find((x) => x.sys_styl === r.sysStyl && x.poradie === r.poradie);
@@ -57,9 +63,7 @@ describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_see
 	});
 
 	it('fresh DB má VŠETKY systémy (Robust/Slide/Deluxe/Štandard +) — plná konvergencia s cfg_seed', () => {
-		const dbSys = (
-			db.prepare('SELECT COUNT(*) c FROM cfg_sys').get() as { c: number }
-		).c;
+		const dbSys = (db.prepare('SELECT COUNT(*) c FROM cfg_sys').get() as { c: number }).c;
 		expect(dbSys).toBe(seed.sys.length);
 		const systems = new Set(
 			(db.prepare('SELECT sys_styl FROM cfg_sys').all() as { sys_styl: string }[]).map(

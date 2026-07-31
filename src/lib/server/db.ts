@@ -202,9 +202,9 @@ function migrate() {
 		// odpis = tyče × dĺžka tyče). Pridá stĺpec dlzka_tyce (existujúce Robust/Slide
 		// riadky → default 7500, nezmenené) a naseeduje Deluxe štýly aj ich sklá.
 		// Idempotentné: ALTER len ak stĺpec chýba, štýl/sklo len ak ešte nie sú.
-		const hasCol = (
-			db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]
-		).some((c) => c.name === 'dlzka_tyce');
+		const hasCol = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).some(
+			(c) => c.name === 'dlzka_tyce'
+		);
 		// ALTER PRED prepare(insRez) — prepare validuje SQL proti aktuálnej schéme,
 		// takže stĺpec musí existovať skôr. Idempotentné cez hasCol; ak by seed
 		// transakcia nižšie zlyhala, re-run preskočí ALTER (hasCol) a doseeduje.
@@ -241,13 +241,16 @@ function migrate() {
 						(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500
 					);
 			}
-			for (const g of DELUXE_GLASS) if (!hasGlass.get(g.nazov)) insGlass.run(g.nazov, 0, g.poradie, 'Deluxe');
+			for (const g of DELUXE_GLASS)
+				if (!hasGlass.get(g.nazov)) insGlass.run(g.nazov, 0, g.poradie, 'Deluxe');
 			// zosúlaď dĺžku tyče s cfg_seed pre VŠETKY riadky. v<5 seed beží skôr než
 			// existuje stĺpec dlzka_tyce, takže non-Deluxe riadky by inak dostali len
 			// ALTER default 7500 — ak by non-Deluxe profil niekedy potreboval ≠7500,
 			// tu sa to premietne (fresh aj upgrade rovnako). dlzka_tyce NIE je
 			// user-editovateľná, takže prepis neprepíše ručnú úpravu vzorca. Dnes no-op.
-			const updBar = db.prepare('UPDATE cfg_rez SET dlzka_tyce = ? WHERE sys_styl = ? AND poradie = ?');
+			const updBar = db.prepare(
+				'UPDATE cfg_rez SET dlzka_tyce = ? WHERE sys_styl = ? AND poradie = ?'
+			);
 			for (const r of seed.rez)
 				updBar.run((r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500, r.sysStyl, r.poradie);
 			db.pragma('user_version = 6');
@@ -737,16 +740,20 @@ migrate();
 // ---- konfigurácia vzorcov ----
 
 export function loadCfg(): Cfg {
-	const sys = (db.prepare('SELECT sys_styl, n, sklo_offset FROM cfg_sys').all() as {
-		sys_styl: string;
-		n: number;
-		sklo_offset: number;
-	}[]).map<SysRow>((r) => ({ sysStyl: r.sys_styl, N: r.n, skloOffset: r.sklo_offset }));
-	const rez = (db
-		.prepare(
-			'SELECT sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka FROM cfg_rez ORDER BY sys_styl, poradie'
-		)
-		.all() as Record<string, unknown>[]).map<RezRow>((r) => ({
+	const sys = (
+		db.prepare('SELECT sys_styl, n, sklo_offset FROM cfg_sys').all() as {
+			sys_styl: string;
+			n: number;
+			sklo_offset: number;
+		}[]
+	).map<SysRow>((r) => ({ sysStyl: r.sys_styl, N: r.n, skloOffset: r.sklo_offset }));
+	const rez = (
+		db
+			.prepare(
+				'SELECT sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka FROM cfg_rez ORDER BY sys_styl, poradie'
+			)
+			.all() as Record<string, unknown>[]
+	).map<RezRow>((r) => ({
 		sysStyl: r.sys_styl as string,
 		poradie: r.poradie as number,
 		typ: r.typ as 'profil' | 'sklo',
@@ -766,10 +773,12 @@ export function loadCfg(): Cfg {
 }
 
 export function listSysStyly(): { sysStyl: string; system: string; styl: string; N: number }[] {
-	return (db.prepare('SELECT sys_styl, n FROM cfg_sys ORDER BY sys_styl').all() as {
-		sys_styl: string;
-		n: number;
-	}[]).map((r) => ({
+	return (
+		db.prepare('SELECT sys_styl, n FROM cfg_sys ORDER BY sys_styl').all() as {
+			sys_styl: string;
+			n: number;
+		}[]
+	).map((r) => ({
 		sysStyl: r.sys_styl,
 		system: r.sys_styl.split('|')[0],
 		styl: r.sys_styl.split('|')[1],
@@ -786,9 +795,11 @@ export interface GlassType {
 }
 
 export function listGlassTypes(): GlassType[] {
-	return (db
-		.prepare('SELECT nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
-		.all() as { nazov: string; redukcia_zero: number; system: string; hrubka: number }[]).map((r) => ({
+	return (
+		db
+			.prepare('SELECT nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
+			.all() as { nazov: string; redukcia_zero: number; system: string; hrubka: number }[]
+	).map((r) => ({
 		nazov: r.nazov,
 		redukciaZero: !!r.redukcia_zero,
 		system: r.system,
@@ -799,7 +810,7 @@ export function listGlassTypes(): GlassType[] {
 /** Starší „Štandard" (bez plus) má PRESNE ten istý katalóg skiel ako Štandard +
  *  (Float 4/6/10 + Izolačné 4.8.4). `glass_types.nazov` je UNIQUE, takže tie isté
  *  názvy nemôžu existovať dvakrát → oba systémy čítajú jeden katalóg. */
-const GLASS_SYSTEM_ALIAS: Record<string, string> = { 'Štandard': 'Štandard +' };
+const GLASS_SYSTEM_ALIAS: Record<string, string> = { Štandard: 'Štandard +' };
 
 /** Sklá platné pre daný systém. Deluxe: LEN vlastné (Float kalené 6/10, hrúbka
  *  vyberá profil) — spoločné 'ALL' sklá (Kalené 8mm/10mm) nemajú Deluxe profil.
@@ -843,7 +854,8 @@ export function addUser(
 
 /** Zmaže LEN b2b účet (interné účty nie — ochrana proti lockoutu). Sessions padnú cez CASCADE. */
 export function deleteB2BUser(id: number): { error: string | null } {
-	const row = db.prepare('SELECT role FROM users WHERE id = ?').get(id) as { role: string } | undefined;
+	const row = db.prepare('SELECT role FROM users WHERE id = ?').get(id) as
+		{ role: string } | undefined;
 	if (!row) return { error: 'Účet neexistuje.' };
 	if (row.role !== 'b2b') return { error: 'Zmazať sa dajú len B2B účty.' };
 	db.prepare('DELETE FROM users WHERE id = ?').run(id);

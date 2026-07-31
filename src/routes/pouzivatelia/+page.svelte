@@ -7,8 +7,8 @@
 <div class="card">
 	<h1>Používatelia</h1>
 	<p class="sub">
-		Interné a veľkoobchodné (B2B) účty. B2B účet vidí len Zasklenia, nemôže odpisovať do Money a
-		má rozmerové limity (šírka zablokuje, výška nad limit len upozorní „bez záruky").
+		Interné a veľkoobchodné (B2B) účty. B2B účet vidí len Zasklenia, nemôže odpisovať do Money a má
+		rozmerové limity (šírka zablokuje, výška nad limit len upozorní „bez záruky").
 	</p>
 </div>
 
@@ -47,7 +47,10 @@
 		<tbody>
 			{#each data.users as u (u.id)}
 				<tr>
-					<td>{u.username}{#if u.username === data.me} <span class="badge">ja</span>{/if}</td>
+					<td
+						>{u.username}{#if u.username === data.me}
+							<span class="badge">ja</span>{/if}</td
+					>
 					<td>{u.role === 'b2b' ? 'B2B' : 'Interný'}</td>
 					<td>{u.created_at}</td>
 					<td class="c">

@@ -54,8 +54,7 @@
 {#if on}
 	<div class="klin-box" data-testid={`${idPrefix}-box`}>
 		<p class="klin-hint" data-testid={`${idPrefix}-hint`}>
-			Zadaj skutočné rozmery klina — <b>nemusí</b> byť po celej dĺžke posuvu ani mať šírku podľa
-			koľajnice.
+			Zadaj skutočné rozmery klina — <b>nemusí</b> byť po celej dĺžke posuvu ani mať šírku podľa koľajnice.
 		</p>
 		<div class="grid2">
 			<div class="field">

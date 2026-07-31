@@ -33,8 +33,12 @@ const dbPath = path.join(tmpRoot, 'v6.db');
 	v6.prepare(
 		"INSERT INTO cfg_rez (sys_styl,poradie,typ,kod,nazov,dim) VALUES ('Robust|2K',10,'profil','ZASP00014','Koľajnica','S')"
 	).run();
-	v6.prepare("INSERT INTO glass_types (nazov,redukcia_zero,poradie,system) VALUES ('Float kalené 6 mm',0,10,'Deluxe')").run();
-	v6.prepare("INSERT INTO glass_types (nazov,redukcia_zero,poradie,system) VALUES ('Float kalené 10 mm',0,20,'Deluxe')").run();
+	v6.prepare(
+		"INSERT INTO glass_types (nazov,redukcia_zero,poradie,system) VALUES ('Float kalené 6 mm',0,10,'Deluxe')"
+	).run();
+	v6.prepare(
+		"INSERT INTO glass_types (nazov,redukcia_zero,poradie,system) VALUES ('Float kalené 10 mm',0,20,'Deluxe')"
+	).run();
 	v6.pragma('user_version = 6');
 	v6.close();
 }
@@ -51,30 +55,62 @@ describe('reálny v6 → v7 upgrade (prod stav: 10 pôvodných Deluxe štýlov)'
 
 		// staré delené štýly zmazané
 		expect(
-			db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Deluxe|5K6','Deluxe|5K10','Deluxe|6K6','Deluxe|6K10')").get()
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Deluxe|5K6','Deluxe|5K10','Deluxe|6K6','Deluxe|6K10')"
+				)
+				.get()
 		).toEqual({ c: 0 });
 		// presne 8 nových štýlov
-		expect((db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").get() as { c: number }).c).toBe(8);
+		expect(
+			(
+				db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").get() as {
+					c: number;
+				}
+			).c
+		).toBe(8);
 		expect(
 			new Set(
-				(db.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").all() as { sys_styl: string }[]).map(
-					(r) => r.sys_styl.split('|')[1]
-				)
+				(
+					db.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Deluxe|%'").all() as {
+						sys_styl: string;
+					}[]
+				).map((r) => r.sys_styl.split('|')[1])
 			)
 		).toEqual(new Set(['2K', '3K', '4K', '2x2K', '2x3K', '2x4K', '5K', '6K']));
 
 		// nové stĺpce + hodnoty
-		const cols = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).map((c) => c.name);
+		const cols = (db.prepare('PRAGMA table_info(cfg_rez)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
 		expect(cols).toContain('sklo_hrubka');
-		const gcols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map((c) => c.name);
+		const gcols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
 		expect(gcols).toContain('hrubka');
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP202417'").get()).toEqual({ h: 10 });
-		expect(db.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP202416'").get()).toEqual({ h: 6 });
-		expect(db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 6 mm'").get()).toEqual({ h: 6 });
-		expect(db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 10 mm'").get()).toEqual({ h: 10 });
+		expect(
+			db.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP202417'").get()
+		).toEqual({ h: 10 });
+		expect(
+			db.prepare("SELECT DISTINCT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP202416'").get()
+		).toEqual({ h: 6 });
+		expect(
+			db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 6 mm'").get()
+		).toEqual({ h: 6 });
+		expect(
+			db.prepare("SELECT hrubka h FROM glass_types WHERE nazov='Float kalené 10 mm'").get()
+		).toEqual({ h: 10 });
 
 		// Robust NEDOTKNUTÝ (dáta ostali, sklo_hrubka default 0)
-		expect((db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl='Robust|2K'").get() as { c: number }).c).toBe(1);
-		expect(db.prepare("SELECT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP00014'").get()).toEqual({ h: 0 });
+		expect(
+			(
+				db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl='Robust|2K'").get() as {
+					c: number;
+				}
+			).c
+		).toBe(1);
+		expect(db.prepare("SELECT sklo_hrubka h FROM cfg_rez WHERE kod='ZASP00014'").get()).toEqual({
+			h: 0
+		});
 	});
 });

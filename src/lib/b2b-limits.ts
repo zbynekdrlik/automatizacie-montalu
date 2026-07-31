@@ -8,16 +8,17 @@
 // data.styly, server z cfg — obaja majú N per sysStyl.
 export type StyleN = { sysStyl: string; system: string; styl: string; N: number };
 
-export const B2B_LIMITS: Record<string, { minPanel: number; maxPanel: number; maxHeight: number }> = {
-	Deluxe: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
-	Slide: { minPanel: 800, maxPanel: 1300, maxHeight: 2500 },
-	Robust: { minPanel: 800, maxPanel: 1500, maxHeight: 2600 },
-	// Štandard +: ROVNAKÉ ako Deluxe (potvrdil Dominik 2026-07-14: „rovnako ako deluxe").
-	'Štandard +': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
-	// starší „Štandard" — zatiaľ rovnaké limity ako Štandard + (rovnaká rodina);
-	// reálne výrobné limity potvrdiť s Dominikom
-	'Štandard': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
-};
+export const B2B_LIMITS: Record<string, { minPanel: number; maxPanel: number; maxHeight: number }> =
+	{
+		Deluxe: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
+		Slide: { minPanel: 800, maxPanel: 1300, maxHeight: 2500 },
+		Robust: { minPanel: 800, maxPanel: 1500, maxHeight: 2600 },
+		// Štandard +: ROVNAKÉ ako Deluxe (potvrdil Dominik 2026-07-14: „rovnako ako deluxe").
+		'Štandard +': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
+		// starší „Štandard" — zatiaľ rovnaké limity ako Štandard + (rovnaká rodina);
+		// reálne výrobné limity potvrdiť s Dominikom
+		Štandard: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
+	};
 
 // Rodina štýlu: dvojité (opona) začínajú „2x", ostatné sú jednoduché. Návrh štýlu
 // ostáva v tej istej rodine (jednoduché ↔ jednoduché, 2x ↔ 2x) — inak by sa zmenil
@@ -27,7 +28,11 @@ function family(styl: string): '2x' | 'single' {
 }
 
 /** Štýly daného systému + rodiny, s N, zoradené vzostupne podľa N. */
-function familyStyles(styles: StyleN[], system: string, fam: '2x' | 'single'): { styl: string; N: number }[] {
+function familyStyles(
+	styles: StyleN[],
+	system: string,
+	fam: '2x' | 'single'
+): { styl: string; N: number }[] {
 	return styles
 		.filter((s) => s.system === system && family(s.styl) === fam)
 		.map((s) => ({ styl: s.styl, N: s.N }))
@@ -59,7 +64,9 @@ export function checkB2BWidth(styles: StyleN[], sysStyl: string, S: number): str
 	}
 	// žiadny štýl v rodine nesedí → mŕtva zóna medzi počtami polí
 	const ranges = options
-		.map((o) => `${o.styl} = ${Math.round(lim.minPanel * o.N)}–${Math.round(lim.maxPanel * o.N)} mm`)
+		.map(
+			(o) => `${o.styl} = ${Math.round(lim.minPanel * o.N)}–${Math.round(lim.maxPanel * o.N)} mm`
+		)
 		.join(', ');
 	return `Šírka ${S} mm sa pri ${system} nedá rozdeliť na sklá v rozsahu ${lim.minPanel}–${lim.maxPanel} mm. Platné šírky: ${ranges}. Uprav šírku.`;
 }

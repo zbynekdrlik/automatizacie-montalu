@@ -63,15 +63,35 @@ const BOM: [string, string, (p: BomParams) => number][] = [
 	['BPP00097', '3-koľaj Surový 6700 mm', (p) => p.koraj3_6700 * 6.7],
 	['BPP00054', 'Čelný profil Surový 4500 mm', (p) => (p.vs4500 * 2 + p.ss4500 + p.ms4500) * 4.5],
 	['BPP00057', 'Čelný profil Surový 6000 mm', (p) => (p.vs6000 * 2 + p.ss6000 + p.ms6000) * 6],
-	['BPP00061', 'Krajný profil Surový 4500 mm', (p) => (p.ss4500 + p.ms4500 + (p.dvere === 1 && p.vs4500 === 1 ? 1 : 0)) * 4.5],
-	['BPP00064', 'Krajný profil Surový 6000 mm', (p) => (p.ss6000 + p.ms6000 + (p.dvere === 1 && p.vs6000 === 1 ? 1 : 0)) * 6],
+	[
+		'BPP00061',
+		'Krajný profil Surový 4500 mm',
+		(p) => (p.ss4500 + p.ms4500 + (p.dvere === 1 && p.vs4500 === 1 ? 1 : 0)) * 4.5
+	],
+	[
+		'BPP00064',
+		'Krajný profil Surový 6000 mm',
+		(p) => (p.ss6000 + p.ms6000 + (p.dvere === 1 && p.vs6000 === 1 ? 1 : 0)) * 6
+	],
 	['BPP00068', 'Čelná nožička Surový 7500 mm', (p) => 2.4 + (p.pocetSekcii - 2) * 0.4 * 2],
 	['BPP00072', 'Krajná nožička Surová 7500 mm', (p) => 0.8 + (p.pocetSekcii - 2) * 0.8],
-	['BPP00087', 'Krycia lišta Surový 7500 mm', (p) => 2.4 + (p.pocetSekcii - 2) * 0.4 * 2 + (0.8 + (p.pocetSekcii - 2) * 0.8)],
+	[
+		'BPP00087',
+		'Krycia lišta Surový 7500 mm',
+		(p) => 2.4 + (p.pocetSekcii - 2) * 0.4 * 2 + (0.8 + (p.pocetSekcii - 2) * 0.8)
+	],
 	// BPP00046 (starý „Kladkový profil") je 0 na sklade → Money odpis zlyhá.
 	// Dominik 2026-07-05: nahradiť za BPP202414 „Kladkový profil V2 Surový 4400 mm".
-	['BPP202414', 'Kladkový profil V2 Surový 4400 mm', (p) => p.pocetSekcii * 2.2 * p.jednokolaj + 2 * (p.pocetSekcii * 2.2 * p.dvojkolaj)],
-	['BPP00050', 'Kladkový profil jednokolaj Surový 4400 mm', (p) => p.pocetSekcii * 2.2 * p.jednokolaj],
+	[
+		'BPP202414',
+		'Kladkový profil V2 Surový 4400 mm',
+		(p) => p.pocetSekcii * 2.2 * p.jednokolaj + 2 * (p.pocetSekcii * 2.2 * p.dvojkolaj)
+	],
+	[
+		'BPP00050',
+		'Kladkový profil jednokolaj Surový 4400 mm',
+		(p) => p.pocetSekcii * 2.2 * p.jednokolaj
+	],
 	['BPP00076', 'Priečkový profil Surový 4300 mm', (p) => p.prieckovy4300 * 4.3],
 	['BPP00079', 'Priečkový profil Surový 6000 mm', (p) => p.prieckovy6000 * 6],
 	['BPP20245', 'Priečna výstuha Surový 4200 mm', (p) => p.pocetPriecok * p.pocetSekcii * 4.2],
@@ -173,7 +193,8 @@ export function computeBazen(v: BazenVstup): { out: BazenPolozka[]; error: strin
 	else if (!v.op) error = 'Chýba OP/OPDL číslo (ide do popisu dokladu).';
 	else if (!v.zakaznik) error = 'Chýba zákazník.';
 	else if (!(v.pocetSekcii > 0)) error = 'Zadaj počet sekcií (väčší ako 0).';
-	else if (out.every((o) => o.qty <= 0)) error = 'Žiadne položky na výstup — skontroluj zadané počty.';
+	else if (out.every((o) => o.qty <= 0))
+		error = 'Žiadne položky na výstup — skontroluj zadané počty.';
 
 	return { out, error };
 }

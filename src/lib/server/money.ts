@@ -48,11 +48,23 @@ export function applyEdits<T extends Polozka>(
 		}
 		const q = parseFloat(String(raw).replace(',', '.'));
 		if (!Number.isFinite(q))
-			return { finalOut: [], zmenene: [], error: `Neplatné množstvo „${raw}" pri ${o.kod} ${o.nazov}.` };
+			return {
+				finalOut: [],
+				zmenene: [],
+				error: `Neplatné množstvo „${raw}" pri ${o.kod} ${o.nazov}.`
+			};
 		if (q < 0)
-			return { finalOut: [], zmenene: [], error: `Záporné množstvo (${q}) pri ${o.kod} ${o.nazov} — do Money nesmie ísť.` };
+			return {
+				finalOut: [],
+				zmenene: [],
+				error: `Záporné množstvo (${q}) pri ${o.kod} ${o.nazov} — do Money nesmie ísť.`
+			};
 		if (q > 100000)
-			return { finalOut: [], zmenene: [], error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.` };
+			return {
+				finalOut: [],
+				zmenene: [],
+				error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.`
+			};
 		const rq = R(q);
 		if (rq !== o.qty) zmenene.push(o.kod);
 		finalOut.push({ ...o, qty: rq });
@@ -94,7 +106,10 @@ const testDir = () =>
 	process.env.MONEY_TEST_DIR ||
 	'/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT';
 
-export const safe = (s: string) => String(s).replace(/[/\\:*?"<>|]+/g, '_').trim();
+export const safe = (s: string) =>
+	String(s)
+		.replace(/[/\\:*?"<>|]+/g, '_')
+		.trim();
 
 export function targetDirFor(cakaSubdir: string, caka: boolean): string {
 	if (!isLive()) return testDir();
@@ -103,7 +118,13 @@ export function targetDirFor(cakaSubdir: string, caka: boolean): string {
 }
 
 export function contentHash(zak: string, polozky: Polozka[]): string {
-	const sig = zak + '|' + polozky.map((o) => o.kod + ':' + o.qty).sort().join(';');
+	const sig =
+		zak +
+		'|' +
+		polozky
+			.map((o) => o.kod + ':' + o.qty)
+			.sort()
+			.join(';');
 	let h = 5381;
 	for (let i = 0; i < sig.length; i++) h = ((h << 5) + h + sig.charCodeAt(i)) >>> 0;
 	return ('00000000' + h.toString(16)).slice(-8);
@@ -127,7 +148,14 @@ export function filenameFor(job: Pick<OdpisJob, 'zak' | 'op' | 'zakaznik' | 'pol
 async function buildXlsx(job: OdpisJob): Promise<Buffer> {
 	const wb = new ExcelJS.Workbook();
 	const ws = wb.addWorksheet('Hárok2');
-	ws.addRow(['číslo zakázky', 'Kód položky', 'Název položky', 'Množství v m', 'MJ', 'Popis dokladu']);
+	ws.addRow([
+		'číslo zakázky',
+		'Kód položky',
+		'Název položky',
+		'Množství v m',
+		'MJ',
+		'Popis dokladu'
+	]);
 	job.polozky.forEach((o, i) => {
 		// hlavička stĺpca zostáva „Množství v m" (tak ju Money import očakáva) — skutočnú
 		// jednotku nesie stĺpec MJ, kde 'm' je default kvôli všetkým metrážovým položkám
@@ -233,8 +261,7 @@ export function releaseOdpis(id: number, username: string): boolean {
 	const row = db
 		.prepare('SELECT modul, zak, op, live, filename FROM odpis_log WHERE id = ?')
 		.get(id) as
-		| { modul: string; zak: string; op: string; live: number; filename: string }
-		| undefined;
+		{ modul: string; zak: string; op: string; live: number; filename: string } | undefined;
 	if (!row) return false;
 	db.transaction(() => {
 		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(id);

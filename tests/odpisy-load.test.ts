@@ -64,9 +64,7 @@ describe('/odpisy load — pokazený JSON detail nezhodí históriu (audit #29)'
 	});
 
 	it('uvolnit odmietne neplatné id bez zásahu do DB', async () => {
-		const before = (
-			db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }
-		).c;
+		const before = (db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c;
 		const fd = new FormData();
 		fd.append('id', '-5');
 		const r = await actions.uvolnit({

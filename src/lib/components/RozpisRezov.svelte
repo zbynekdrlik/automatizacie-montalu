@@ -70,7 +70,13 @@
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 	<defs>
-		<pattern id="odpad-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+		<pattern
+			id="odpad-hatch"
+			width="7"
+			height="7"
+			patternUnits="userSpaceOnUse"
+			patternTransform="rotate(45)"
+		>
 			<rect width="7" height="7" fill="#f1f5f9" />
 			<line x1="0" y1="0" x2="0" y2="7" stroke="#cbd5e1" stroke-width="1" />
 		</pattern>
@@ -110,7 +116,16 @@
 							aria-label="Tyč {ti + 1}"
 						>
 							<!-- podklad celej tyče -->
-							<rect x="0" y="0" width={barLen} height={H} fill="#f8fafc" stroke="#475569" stroke-width="1" vector-effect="non-scaling-stroke" />
+							<rect
+								x="0"
+								y="0"
+								width={barLen}
+								height={H}
+								fill="#f8fafc"
+								stroke="#475569"
+								stroke-width="1"
+								vector-effect="non-scaling-stroke"
+							/>
 							{#each segs as seg (seg.body)}
 								<polygon
 									points={seg.body}
@@ -124,7 +139,8 @@
 						{#each segs as seg (seg.body)}
 							{#if !seg.skryLabel}
 								<span class="lbl" class:odp={seg.odpad} style="left:{seg.labelPct}%"
-									>{#if viacPosuvov && seg.posuv}<span class="pbadge">P{seg.posuv}</span> {/if}{seg.text}</span
+									>{#if viacPosuvov && seg.posuv}<span class="pbadge">P{seg.posuv}</span>
+									{/if}{seg.text}</span
 								>
 							{/if}
 						{/each}
@@ -136,7 +152,11 @@
 				<thead><tr><th>Dĺžka (mm)</th><th class="c">Kusov</th><th>Rez</th></tr></thead>
 				<tbody>
 					{#each m.rezy.filter((r) => r.ks > 0) as r, ri (ri)}
-						<tr><td>{fmt(r.rozmer)}</td><td class="c">{r.ks}</td><td>{sikmy ? '45° / 45°' : 'rovný'}</td></tr>
+						<tr
+							><td>{fmt(r.rozmer)}</td><td class="c">{r.ks}</td><td
+								>{sikmy ? '45° / 45°' : 'rovný'}</td
+							></tr
+						>
 					{/each}
 				</tbody>
 			</table>

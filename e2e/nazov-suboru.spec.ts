@@ -51,7 +51,9 @@ test('pergola: názov súboru je „ZAK - zákazník" (bez OP a bez slova PERGOL
 	await page.getByTestId('odoslat').click();
 
 	const vysledok = page.getByTestId('vysledok');
-	await expect(vysledok).toContainText(new RegExp(`${RUN}-P - E2E Pergola \\[[0-9a-f]{8}\\]\\.xlsx`));
+	await expect(vysledok).toContainText(
+		new RegExp(`${RUN}-P - E2E Pergola \\[[0-9a-f]{8}\\]\\.xlsx`)
+	);
 	await expect(vysledok).not.toContainText('OPOP');
 	await expect(vysledok).not.toContainText('PERGOLA [');
 

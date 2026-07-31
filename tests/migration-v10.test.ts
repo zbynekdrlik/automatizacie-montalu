@@ -56,7 +56,9 @@ for (const s of seed.sys) N[s.sysStyl] = s.N;
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v9.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v9.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v9.pragma('user_version = 9');
 	v9.close();
 }

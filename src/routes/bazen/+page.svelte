@@ -110,21 +110,52 @@
 				</div>
 				<div class="field">
 					<label for="pocetSekcii">Počet sekcií *</label>
-					<input id="pocetSekcii" name="pocetSekcii" type="number" min="1" max="100" step="1" value={vstup.pocetSekcii} required />
+					<input
+						id="pocetSekcii"
+						name="pocetSekcii"
+						type="number"
+						min="1"
+						max="100"
+						step="1"
+						value={vstup.pocetSekcii}
+						required
+					/>
 				</div>
 			</div>
 			<div class="grid3">
 				<div class="field">
 					<label for="pocetPriecok">Počet priečok</label>
-					<input id="pocetPriecok" name="pocetPriecok" type="number" min="0" max="100" step="1" value={vstup.pocetPriecok} />
+					<input
+						id="pocetPriecok"
+						name="pocetPriecok"
+						type="number"
+						min="0"
+						max="100"
+						step="1"
+						value={vstup.pocetPriecok}
+					/>
 				</div>
 				<div class="field">
 					<label for="dlzkaKolajnic">Celková dĺžka koľajníc (mm)</label>
-					<input id="dlzkaKolajnic" name="dlzkaKolajnic" type="number" min="0" max="200000" step="any" value={vstup.dlzkaKolajnic} />
+					<input
+						id="dlzkaKolajnic"
+						name="dlzkaKolajnic"
+						type="number"
+						min="0"
+						max="200000"
+						step="any"
+						value={vstup.dlzkaKolajnic}
+					/>
 				</div>
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
-						<input type="checkbox" name="dvere" value="1" checked={vstup.dvere} style="width:auto" />
+						<input
+							type="checkbox"
+							name="dvere"
+							value="1"
+							checked={vstup.dvere}
+							style="width:auto"
+						/>
 						Dvere
 					</label>
 				</div>
@@ -153,7 +184,10 @@
 			<span class="badge">Bazén · {vstup.model} · {vstup.kolaj} · {vstup.pocetSekcii} sekcií</span>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
 		</p>
-		<p class="sub">Množstvá môžeš upraviť — prázdne pole = automatická hodnota. Záporné a nečíselné hodnoty sa odmietnu.</p>
+		<p class="sub">
+			Množstvá môžeš upraviť — prázdne pole = automatická hodnota. Záporné a nečíselné hodnoty sa
+			odmietnu.
+		</p>
 	</div>
 
 	{#if form?.error}
@@ -164,7 +198,12 @@
 		<form method="POST" action="?/odoslat">
 			{@render hiddenVstup()}
 			<table data-testid="kontrola-tabulka">
-				<thead><tr><th></th><th>Kód</th><th>Položka</th><th class="c" style="width:140px">Množstvo (m)</th></tr></thead>
+				<thead
+					><tr
+						><th></th><th>Kód</th><th>Položka</th><th class="c" style="width:140px">Množstvo (m)</th
+						></tr
+					></thead
+				>
 				<tbody>
 					{#each form.out as o (o.kod)}
 						<tr>
@@ -190,11 +229,15 @@
 			<div style="height:12px" class="noprint"></div>
 			<button class="btn noprint" type="submit" data-testid="odoslat">
 				{data.live
-					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS/Bazen)' : '✅ Odoslať odpis do Money')
+					? vstup.caka
+						? '⏳ Odoslať odpis (odloží sa do NA ODPIS/Bazen)'
+						: '✅ Odoslať odpis do Money'
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
-		<button class="btn secondary noprint" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<button class="btn secondary noprint" onclick={() => window.print()}
+			>🖨 Tlačiť / uložiť PDF</button
+		>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hiddenVstup()}
 			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
@@ -210,8 +253,8 @@
 		{#if !form.outcome.live}
 			🧪 TEST — do Money NEJDE (testovací priečinok): <b>{form.outcome.filename}</b>
 		{:else if vstup.caka}
-			⏳ Odložené — čaká na materiál. Súbor <b>{form.outcome.filename}</b> je v NA ODPIS/Bazen,
-			presuň do dlv keď máš materiál.
+			⏳ Odložené — čaká na materiál. Súbor <b>{form.outcome.filename}</b> je v NA ODPIS/Bazen, presuň
+			do dlv keď máš materiál.
 		{:else}
 			✅ Odoslané do Money na import: <b>{form.outcome.filename}</b>
 		{/if}
@@ -229,7 +272,10 @@
 		{#if form.finalOut.some((o) => o.qty <= 0 && form.zmenene.includes(o.kod))}
 			<p class="sub" style="margin-top:10px">
 				Vynulované úpravou:
-				{form.finalOut.filter((o) => o.qty <= 0 && form.zmenene.includes(o.kod)).map((o) => o.kod).join(', ')}
+				{form.finalOut
+					.filter((o) => o.qty <= 0 && form.zmenene.includes(o.kod))
+					.map((o) => o.kod)
+					.join(', ')}
 			</p>
 		{/if}
 	</div>

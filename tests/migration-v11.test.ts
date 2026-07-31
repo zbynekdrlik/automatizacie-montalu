@@ -49,7 +49,9 @@ const dbPath = path.join(tmpRoot, 'v10.db');
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v10.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v10.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v10.pragma('user_version = 10');
 	v10.close();
 }
@@ -70,9 +72,12 @@ describe('reálny v10 → v11 upgrade: oprava názvov profilov Štandard +', () 
 	});
 
 	it('KAŽDÝ Štandard profil názov je opravený na cfg_seed (žiadne „OLD-")', () => {
-		const stdProfil = seed.rez.filter((r) => r.sysStyl.startsWith('Štandard +') && r.typ === 'profil');
+		const stdProfil = seed.rez.filter(
+			(r) => r.sysStyl.startsWith('Štandard +') && r.typ === 'profil'
+		);
 		expect(stdProfil.length).toBeGreaterThan(50);
-		for (const r of stdProfil) expect(naz(r.sysStyl, r.poradie), `${r.sysStyl} ${r.kod}`).toBe(r.nazov);
+		for (const r of stdProfil)
+			expect(naz(r.sysStyl, r.poradie), `${r.sysStyl} ${r.kod}`).toBe(r.nazov);
 	});
 
 	it('konkrétne opravy z katalógu (kladkový/koncový profil)', () => {

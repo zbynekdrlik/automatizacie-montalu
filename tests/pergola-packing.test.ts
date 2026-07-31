@@ -42,7 +42,9 @@ describe('viac-variantový profil: kusy zdieľajú tyč', () => {
 
 describe('varovanie „Dlhé profily" len pri skutočne dlhom reze', () => {
 	it('viac kusov bez dlhého rezu nehlási nič (predtým falošné „rez > 7500")', () => {
-		const r = transform('18019 KOTVIACI PROFIL HORNY V2\t1\t6400\n18019 KOTVIACI PROFIL HORNY V2\t1\t1030');
+		const r = transform(
+			'18019 KOTVIACI PROFIL HORNY V2\t1\t6400\n18019 KOTVIACI PROFIL HORNY V2\t1\t1030'
+		);
 		expect(r.trace[0].notes).toEqual([]);
 		expect(r.comboCases).toEqual([]);
 	});

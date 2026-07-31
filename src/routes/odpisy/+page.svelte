@@ -9,13 +9,15 @@
 	<h1>História odpisov — Zasklenia</h1>
 	<p class="sub">
 		Každý odoslaný odpis. Riadok = jeden xlsx súbor do Money importu (alebo TEST priečinka).
-		„Uvoľniť" zmaže záznam a dovolí poslať tú istú ZAK+OP znova — použi LEN po zmazaní
-		chybného importu v Money.
+		„Uvoľniť" zmaže záznam a dovolí poslať tú istú ZAK+OP znova — použi LEN po zmazaní chybného
+		importu v Money.
 	</p>
 </div>
 
 {#if form?.uvolnene}
-	<div class="okmsg" data-testid="uvolnene">✅ Záznam uvoľnený — zákazku je možné poslať znova.</div>
+	<div class="okmsg" data-testid="uvolnene">
+		✅ Záznam uvoľnený — zákazku je možné poslať znova.
+	</div>
 {:else if form?.error}
 	<div class="err">⚠️ {form.error}</div>
 {/if}
@@ -43,12 +45,23 @@
 					{@const d = o.d}
 					<tr>
 						<td style="white-space:nowrap">{o.created_at}</td>
-						<td>{o.modul === 'zasklenia' ? 'Zasklenia' : o.modul === 'bazen' ? 'Bazén' : 'Pergola'}</td>
+						<td
+							>{o.modul === 'zasklenia'
+								? 'Zasklenia'
+								: o.modul === 'bazen'
+									? 'Bazén'
+									: 'Pergola'}</td
+						>
 						<td><b>{o.zak}</b></td>
 						<td>{o.op}</td>
 						<td>{o.zakaznik}</td>
 						<td
-							>{[d.system && `${nazovSystemu(String(d.system))} ${d.styl}`, d.s && `${d.s}×${d.v}`, d.model, d.riadkov && `${d.riadkov} pol.`]
+							>{[
+								d.system && `${nazovSystemu(String(d.system))} ${d.styl}`,
+								d.s && `${d.s}×${d.v}`,
+								d.model,
+								d.riadkov && `${d.riadkov} pol.`
+							]
 								.filter(Boolean)
 								.join(' · ')}{o.caka ? ' ⏳' : ''}</td
 						>

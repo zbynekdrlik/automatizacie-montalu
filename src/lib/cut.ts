@@ -22,7 +22,7 @@ export const OVERLAP_MM: Record<string, number> = {
 	'Štandard +': 40,
 	// starší „Štandard" = tá istá rodina posuvov ako Štandard + (líši sa rámovým a
 	// dorazovým profilom) → rovnaký presah; len náhľad, Money nemení
-	'Štandard': 40,
+	Štandard: 40,
 	Deluxe: 50
 };
 export const overlapMm = (system: string): number => OVERLAP_MM[system] ?? OVERLAP_DEFAULT;
