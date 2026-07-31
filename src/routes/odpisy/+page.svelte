@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { nazovSystemu } from '$lib/system-nazvy';
 	let { data, form } = $props();
 </script>
 
@@ -47,7 +48,7 @@
 						<td>{o.op}</td>
 						<td>{o.zakaznik}</td>
 						<td
-							>{[d.system && `${d.system} ${d.styl}`, d.s && `${d.s}×${d.v}`, d.model, d.riadkov && `${d.riadkov} pol.`]
+							>{[d.system && `${nazovSystemu(String(d.system))} ${d.styl}`, d.s && `${d.s}×${d.v}`, d.model, d.riadkov && `${d.riadkov} pol.`]
 								.filter(Boolean)
 								.join(' · ')}{o.caka ? ' ⏳' : ''}</td
 						>

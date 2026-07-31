@@ -15,13 +15,13 @@ describe('posuvySlovom — slovenské množné číslo', () => {
 });
 
 describe('popisMulti — badge ťahá názov systému', () => {
-	it('KĽÚČOVÉ: 3× Štandard + → „Štandard + · 3 posuvy" (nie „Zimná záhrada")', () => {
+	it('KĽÚČOVÉ: 3× Štandard + → „Štandard plus · 3 posuvy" (nie „Zimná záhrada")', () => {
 		const p = [
 			{ system: 'Štandard +' },
 			{ system: 'Štandard +' },
 			{ system: 'Štandard +' }
 		];
-		expect(popisMulti(p)).toBe('Štandard + · 3 posuvy');
+		expect(popisMulti(p)).toBe('Štandard plus · 3 posuvy');
 		expect(popisMulti(p)).not.toContain('Zimná záhrada');
 	});
 
@@ -33,12 +33,12 @@ describe('popisMulti — badge ťahá názov systému', () => {
 	it('zmiešané systémy sa vypíšu všetky v poradí posuvov', () => {
 		expect(
 			popisMulti([{ system: 'Štandard +' }, { system: 'Robust' }, { system: 'Slide' }])
-		).toBe('Štandard +, Robust, Slide · 3 posuvy');
+		).toBe('Štandard plus, Robust, Slide · 3 posuvy');
 	});
 
 	it('starý systém „Štandard" (bez plus) sa nezlúči so „Štandard +"', () => {
 		expect(popisMulti([{ system: 'Štandard' }, { system: 'Štandard +' }])).toBe(
-			'Štandard, Štandard + · 2 posuvy'
+			'Starý štandard, Štandard plus · 2 posuvy'
 		);
 	});
 
