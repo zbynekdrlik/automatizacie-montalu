@@ -76,7 +76,7 @@ const glass = (nazov: string) =>
 
 describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm)', () => {
 	it('user_version = 17', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(18);
+		expect(db.pragma('user_version', { simple: true })).toBe(19);
 	});
 
 	it('Slide zoznam je presne to, čo si dielňa vypýtala (v poradí)', () => {
@@ -100,11 +100,13 @@ describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm
 		}
 	});
 
-	it('kalené 8/10 zmizli zo Slide, ale Robustu zostali', () => {
+	it('kalené 8/10 zmizli zo Slide a vo v19 aj z Robustu', () => {
 		expect(nazvy('Slide')).not.toContain('Kalené 8mm');
 		expect(nazvy('Slide')).not.toContain('Kalené 10mm');
-		expect(nazvy('Robust')).toContain('Kalené 8mm');
-		expect(nazvy('Robust')).toContain('Kalené 10mm');
+		// v19 ich potom zmazala úplne — Robust je IZO-only (Patrik 2026-07-31),
+		// takže po plnej migrácii nie sú ani v Robuste
+		expect(nazvy('Robust')).not.toContain('Kalené 8mm');
+		expect(nazvy('Robust')).not.toContain('Kalené 10mm');
 	});
 
 	it('Robust sklá sa nezmenili (4/16/4 zostávajú vrátane ich príznakov)', () => {

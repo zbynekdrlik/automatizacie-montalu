@@ -6,6 +6,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
 import { safeCompute, safeComputeMulti, systemyRucnaKolajnica } from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
+import { znovaZOdpisu } from '$lib/server/znova';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
 import { sysStylPre, sklaDoPonuky, type ExistujeSysStyl } from '$lib/styl';
 import {
@@ -71,7 +72,12 @@ function jobFor(
 			// sedí toľko metrov); null = počítané zo šírky
 			kolajnica: vstup.kolajnica,
 			// jednostranná FAB — MENÍ počet kľučiek/krytiek vložky v odpise
-			jednostrannaFab: vstup.jednostrannaFab
+			jednostrannaFab: vstup.jednostrannaFab,
+			// prídavná koľajnica — MENÍ odpis (spodná koľajnica o veľkosť vyššie);
+			// bez nej by „Použiť znova" prebralo zákazku s iným odpisom, než mala
+			pridavnaKolajnica: vstup.pridavnaKolajnica,
+			// výška vŕtania zámku — display-only (Deluxe), ale patrí k zadaniu
+			vrtanieZamku: vstup.vrtanieZamku
 		}
 	};
 }
@@ -196,6 +202,7 @@ function jobForMulti(
 			zimnaZahrada: true,
 			pocetPosuvov: r.posuvy.length,
 			jednostrannaFab: vstup.jednostrannaFab,
+			pridavnaKolajnica: vstup.pridavnaKolajnica,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
 			posuvy: r.posuvy.map((p, i) => ({
@@ -217,8 +224,12 @@ function jobForMulti(
 	};
 }
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url, locals }) => {
 	const styly = listSysStyly();
+	// „Použiť znova" z histórie — len pre interných (b2b históriu odpisov nemá).
+	// Vracia iba PREDVYPLNENIE formulára; nič sa tým nezapisuje ani neodpisuje.
+	const znovaId = Number(url.searchParams.get('znova') ?? '');
+	const znova = znovaId && !isB2B(locals.user) ? znovaZOdpisu(znovaId) : null;
 	const systemy = [...new Set(styly.map((s) => s.system))];
 	return {
 		systemy,
@@ -235,6 +246,7 @@ export const load: PageServerLoad = async () => {
 		// systémy, ktoré posielajú kovanie do Money (Slide čaká na skladové zásoby) —
 		// derivuje sa z konfigurácie kovania, aby sa zoznam nemusel držať na dvoch miestach
 		systemyKovanie: systemy.filter((sys) => komponentyPre(sys) !== null),
+		znova,
 		live: isLive()
 	};
 };

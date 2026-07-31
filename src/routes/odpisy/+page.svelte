@@ -55,6 +55,15 @@
 						<td class="c">{o.live ? '● LIVE' : '🧪 TEST'}</td>
 						<td>{o.created_by}</td>
 						<td class="c">
+							{#if o.modul === 'zasklenia'}
+								<!-- „Použiť znova" (Patrik 2026-07-31): viacerí zákazníci si objednávajú to
+								     isté. Je to LEN odkaz, ktorý predvyplní formulár — nič sa tým neodpisuje. -->
+								<a
+									class="btn secondary"
+									href="/zasklenia?znova={o.id}"
+									data-testid={`znova-${o.id}`}>♻️ Použiť znova</a
+								>
+							{/if}
 							<form
 								method="POST"
 								action="?/uvolnit"
