@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
+	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
 
@@ -254,7 +255,7 @@
 
 	<div class="card noprint">
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary" href="/pergola">➕ Nový rozpis</a>
+		<a class="btn secondary" href={resolve('/pergola')}>➕ Nový rozpis</a>
 	</div>
 {:else if step === 'duplikat'}
 	<div class="card">
@@ -262,7 +263,7 @@
 	</div>
 	<div class="err" data-testid="duplikat">{form?.error}</div>
 	<div class="card noprint">
-		<a class="btn secondary" href="/pergola">← Späť na formulár</a>
-		<a class="btn secondary" href="/odpisy">📋 História odpisov</a>
+		<a class="btn secondary" href={resolve('/pergola')}>← Späť na formulár</a>
+		<a class="btn secondary" href={resolve('/odpisy')}>📋 História odpisov</a>
 	</div>
 {/if}

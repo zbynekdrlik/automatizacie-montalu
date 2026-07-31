@@ -11,6 +11,7 @@
 	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
+	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
 
@@ -1256,7 +1257,7 @@
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary" href="/zasklenia">➕ Nový nárezový plán</a>
+		<a class="btn secondary" href={resolve('/zasklenia')}>➕ Nový nárezový plán</a>
 	</div>
 {:else if step === 'nahladMulti' && multi}
 	<div class="card">
@@ -1316,7 +1317,7 @@
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<a class="btn secondary" href="/zasklenia">➕ Nový nárezový plán</a>
+		<a class="btn secondary" href={resolve('/zasklenia')}>➕ Nový nárezový plán</a>
 	</div>
 {:else if step === 'duplikat'}
 	<div class="card">
@@ -1324,7 +1325,7 @@
 	</div>
 	<div class="err" data-testid="duplikat">{form?.error}</div>
 	<div class="card noprint">
-		<a class="btn secondary" href="/zasklenia">← Späť na formulár</a>
-		<a class="btn secondary" href="/odpisy">📋 História odpisov</a>
+		<a class="btn secondary" href={resolve('/zasklenia')}>← Späť na formulár</a>
+		<a class="btn secondary" href={resolve('/odpisy')}>📋 História odpisov</a>
 	</div>
 {/if}

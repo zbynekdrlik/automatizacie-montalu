@@ -3,6 +3,7 @@
 	// Do Money nejde nič. Tvar: šikmý (šikmá horná hrana) alebo rovný (obdĺžnik).
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
 	import { rovnomernePolia, popisTvaru, FIX_MAX_POLI, FIX_MAX, type FixTvar } from '$lib/fix';
+	import { resolve } from '$app/paths';
 
 	let { form } = $props();
 
@@ -383,7 +384,7 @@
 			{@render hidden()}
 			<button class="btn secondary" type="submit">← Späť a upraviť</button>
 		</form>
-		<a class="btn secondary" href="/fix">➕ Nový výkres</a>
+		<a class="btn secondary" href={resolve('/fix')}>➕ Nový výkres</a>
 	</div>
 {/if}
 
