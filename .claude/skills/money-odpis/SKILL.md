@@ -303,6 +303,18 @@ Dva povinné dôkazy, inak sa „display-only" nedá tvrdiť:
   potom „← Späť a upraviť", zapni prvok, spočítaj znova a riadky musia byť IDENTICKÉ.
   Toto chytí aj chybu, ktorú unit nechytí (napr. keby prvok menil `sysStyl`/voľbu).
 
+**Parametrizuj neutralitu naprieč VŠETKÝMI systémami, ktoré prvok ponúkajú, nie len
+jedným (#90, 2026-08-01).** `computeMulti` dnes odovzdáva `sietka`/`klin`/… bez
+vetvenia podľa systému, takže jeden systémový vektor v teste vyzerá ako dostatočný
+dôkaz — ale to je len ARGUMENT, nie stráž: v momente, keď pribudne systémovo-
+špecifická vetva (napr. Slide dostane vlastný zužovací profil pre sieťku, presne
+#90), pri jednom otestovanom systéme nič nezačervená. Over si allowlist prvku
+(`SIETKA_SYSTEMY`, alebo ekvivalent pre klin/kovanie) a daj `it.each` vektor pre
+KAŽDÝ systém v ňom — vektor musí byť platný pre daný systém+štýl (over v existujúcich
+testoch, napr. `tests/compute.test.ts`, nevymýšľaj S/V naslepo). Dôkaz, že guard
+naozaj chytí regresiu: dočasne priprav sabotáž (fiktívny riadok do odpisu pri danom
+systéme+prvku), over RED, vráť späť pred commitom.
+
 **Hidden round-trip:** každý nový display-only vstup MUSÍ ísť aj do snippetu `hiddenVstup`
 (pri multi do JSON-u `posuvy`), inak sa pri „Späť a upraviť" / „Odoslať" stratí a plán
 zrazu ukazuje niečo iné než formulár. Kryje to e2e „prežije Späť a upraviť".
