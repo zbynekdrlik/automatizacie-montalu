@@ -39,9 +39,11 @@ function odoslat(extra: Record<string, string>) {
 
 const lastDetail = () =>
 	JSON.parse(
-		(db.prepare('SELECT detail FROM odpis_log ORDER BY id DESC LIMIT 1').get() as {
-			detail: string;
-		}).detail
+		(
+			db.prepare('SELECT detail FROM odpis_log ORDER BY id DESC LIMIT 1').get() as {
+				detail: string;
+			}
+		).detail
 	);
 
 describe('odpis detail — skloPresne vs. základné sklo (audit #14)', () => {

@@ -119,7 +119,14 @@ describe('parseMultiVstup — klín je PER POSUV', () => {
 
 	it('klín má len ten posuv, ktorý ho má zapnutý', () => {
 		const { vstup, error } = multi([
-			posuv({ klin: '1', klinDlzka: '4645', klinSirka: '250', klinV1: '350', klinV2: '120', klinKs: '2' }),
+			posuv({
+				klin: '1',
+				klinDlzka: '4645',
+				klinSirka: '250',
+				klinV1: '350',
+				klinV2: '120',
+				klinKs: '2'
+			}),
 			posuv()
 		]);
 		expect(error).toBeNull();
@@ -138,7 +145,9 @@ describe('parseMultiVstup — klín je PER POSUV', () => {
 
 describe('MONEY-NEUTRALITA — klín nesmie zmeniť odpis ani materiál', () => {
 	const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
-	const spec = (klin: { dlzka: number; sirka: number; v1: number; v2: number; ks: number } | null) => [
+	const spec = (
+		klin: { dlzka: number; sirka: number; v1: number; v2: number; ks: number } | null
+	) => [
 		{
 			sysStyl: 'Robust|3K',
 			S: 4645,

@@ -100,9 +100,7 @@ describe('parseFixVstup — rovný fix posiela JEDNU výšku', () => {
 	});
 
 	it('poslaná v2 sa pri rovnom tvare IGNORUJE (nedá sa ňou obísť obdĺžnik)', () => {
-		const { vstup, error } = parseFixVstup(
-			fd({ ...zaklad, tvar: 'rovny', v1: '1500', v2: '900' })
-		);
+		const { vstup, error } = parseFixVstup(fd({ ...zaklad, tvar: 'rovny', v1: '1500', v2: '900' }));
 		expect(error).toBeNull();
 		expect(vstup.v2).toBe(1500);
 	});

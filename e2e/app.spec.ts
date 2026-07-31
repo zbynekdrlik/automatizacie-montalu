@@ -104,7 +104,9 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 // Poznámka (viacriadková, vľavo) + RAL (veľkým, vpravo) na nárezovom pláne aj v tlači;
 // Money „Odoslané… .xlsx" riadok sa v TLAČI NEZOBRAZUJE (na obrazovke ostáva). Dominik
 // 2026-07-23. Poznámka + RAL sú DISPLAY-only — do Money odpisu nejdú.
-test('nárezový plán: poznámka (pod seba) + RAL veľkým; Money box preč z tlače', async ({ page }) => {
+test('nárezový plán: poznámka (pod seba) + RAL veľkým; Money box preč z tlače', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
@@ -149,7 +151,9 @@ test('nárezový plán: poznámka (pod seba) + RAL veľkým; Money box preč z t
 // Kľúč (Dominik 2026-07-10): HRÚBKA SKLA (6/10) vyberá kladka/klzný profil, nie štýl.
 // 10mm sklo → kladka ZASP202417; 6mm sklo → ZASP202416; množstvo rovnaké, líši sa LEN
 // kód. + per-profil dĺžka tyče: 5K horná koľajnica 6000mm (→ 6 m), kladka 3600mm (→ 7,2 m).
-test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + per-profil tyč', async ({ page }) => {
+test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + per-profil tyč', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
@@ -315,9 +319,7 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await page.getByLabel('Zákazník *').fill('NeDefault');
 	await page.getByLabel('Systém').selectOption('Slide');
 	await page.getByLabel('Štýl').selectOption('3K');
-	await page
-		.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')
-		.fill('Stopsol Grey');
+	await page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)').fill('Stopsol Grey');
 	await page.getByLabel(/Poznámka/).fill('Pozn X');
 	await page.getByLabel(/RAL \(farba\)/).fill('7016');
 	await page.getByLabel(/Čaká na materiál/).check();
@@ -330,9 +332,9 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await waitHydrated(page);
 	await expect(page.getByLabel('Systém')).toHaveValue('Slide');
 	await expect(page.getByLabel('Štýl')).toHaveValue('3K');
-	await expect(
-		page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')
-	).toHaveValue('Stopsol Grey');
+	await expect(page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')).toHaveValue(
+		'Stopsol Grey'
+	);
 	await expect(page.getByLabel(/Poznámka/)).toHaveValue('Pozn X');
 	await expect(page.getByLabel(/RAL \(farba\)/)).toHaveValue('7016');
 	await expect(page.getByLabel(/Čaká na materiál/)).toBeChecked();
@@ -384,15 +386,25 @@ test('zimná záhrada: odobratie posuvu zachová správne indexy a prepne späť
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps1-s').fill('3000');
 	// tlačidlo ukazuje 3 posuvy (primárny + 2)
-	await expect(page.getByRole('button', { name: /Spočítať spoločný plán \(3 posuvy\)/ })).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: /Spočítať spoločný plán \(3 posuvy\)/ })
+	).toBeVisible();
 
 	// odober PRVÝ extra (2509) → zostane ten s 3000 ako nový ps0 (nie 2509)
-	await page.getByRole('button', { name: /odobrať/ }).first().click();
+	await page
+		.getByRole('button', { name: /odobrať/ })
+		.first()
+		.click();
 	await expect(page.locator('#ps0-s')).toHaveValue('3000');
-	await expect(page.getByRole('button', { name: /Spočítať spoločný plán \(2 posuvy\)/ })).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: /Spočítať spoločný plán \(2 posuvy\)/ })
+	).toBeVisible();
 
 	// odober aj druhý → späť na jednoposuvový režim
-	await page.getByRole('button', { name: /odobrať/ }).first().click();
+	await page
+		.getByRole('button', { name: /odobrať/ })
+		.first()
+		.click();
 	await expect(page.getByRole('button', { name: 'Spočítať nárezový plán' })).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });

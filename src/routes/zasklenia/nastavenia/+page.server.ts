@@ -23,8 +23,7 @@ export const actions: Actions = {
 	ulozit: async ({ request, locals }) => {
 		const form = await request.formData();
 		const sysStyl = String(form.get('sysStyl') ?? '');
-		const num = (v: FormDataEntryValue | null) =>
-			parseFloat(String(v ?? '').replace(',', '.'));
+		const num = (v: FormDataEntryValue | null) => parseFloat(String(v ?? '').replace(',', '.'));
 
 		const offsets = new Map<number, number>();
 		for (const [key, value] of form.entries()) {
@@ -34,7 +33,8 @@ export const actions: Actions = {
 		const skloOffset = num(form.get('skloOffset'));
 
 		const glassRedukcia = new Map<string, boolean>();
-		for (const g of listGlassTypes()) glassRedukcia.set(g.nazov, form.get(`glass_${g.nazov}`) === '1');
+		for (const g of listGlassTypes())
+			glassRedukcia.set(g.nazov, form.get(`glass_${g.nazov}`) === '1');
 
 		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je
 		// hrúbko-závislý (6/10) — bez zvolenej hrúbky by z náhľadu vypadol, tak zvoľ

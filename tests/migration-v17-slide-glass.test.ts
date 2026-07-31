@@ -71,8 +71,7 @@ const { db, glassTypesForSystem } = await import('../src/lib/server/db');
 const nazvy = (system: string) => glassTypesForSystem(system).map((g) => g.nazov);
 const glass = (nazov: string) =>
 	db.prepare('SELECT redukcia_zero, system FROM glass_types WHERE nazov = ?').get(nazov) as
-		| { redukcia_zero: number; system: string }
-		| undefined;
+		{ redukcia_zero: number; system: string } | undefined;
 
 describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm)', () => {
 	it('user_version = 17', () => {

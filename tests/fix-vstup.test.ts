@@ -41,9 +41,9 @@ describe('parseFixVstup', () => {
 	it('rozmerové chyby prejdú z chybaFixVstupu (obídená HTML5 validácia)', () => {
 		expect(parseFixVstup(fd({ ...zaklad, v2: '524' })).error).toMatch(/rovnaké/);
 		expect(parseFixVstup(fd({ ...zaklad, s: '10' })).error).toMatch(/Šírka/);
-		expect(
-			parseFixVstup(fd({ ...zaklad, polia: JSON.stringify([1000, 1000]) })).error
-		).toMatch(/nerovná/);
+		expect(parseFixVstup(fd({ ...zaklad, polia: JSON.stringify([1000, 1000]) })).error).toMatch(
+			/nerovná/
+		);
 	});
 
 	it('texty sa orežú na maximálnu dĺžku a zrkadlo je prepínač', () => {

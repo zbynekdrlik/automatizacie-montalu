@@ -11,31 +11,156 @@ export interface CatalogItem {
 }
 
 export const CATALOG: CatalogItem[] = [
-	{ prp: 'PRP202526', name: 'Pergola - Žlabový profil 110 V2 Surový 4500mm', bar_mm: 4500, base: 'Žlabový profil 110 V2' },
-	{ prp: 'PRP202525', name: 'Pergola - Žlabový profil 110 V2 Surový 6000mm', bar_mm: 6000, base: 'Žlabový profil 110 V2' },
-	{ prp: 'PRP202524', name: 'Pergola - Žlabový profil 110 V2 Surový 7500mm', bar_mm: 7500, base: 'Žlabový profil 110 V2' },
-	{ prp: 'PRP20256', name: 'Pergola - Žlabový profil 140 surový 4500mm', bar_mm: 4500, base: 'Žlabový profil 140' },
-	{ prp: 'PRP20255', name: 'Pergola - Žlabový profil 140 surový 6000mm', bar_mm: 6000, base: 'Žlabový profil 140' },
-	{ prp: 'PRP20254', name: 'Pergola - Žlabový profil 140 surový 7500mm', bar_mm: 7500, base: 'Žlabový profil 140' },
-	{ prp: 'PRP202510', name: 'Pergola - Kotviaci profil horny V2 surový 4500mm', bar_mm: 4500, base: 'Kotviaci profil horny V2' },
-	{ prp: 'PRP20259', name: 'Pergola - Kotviaci profil horny V2 surový 6000mm', bar_mm: 6000, base: 'Kotviaci profil horny V2' },
-	{ prp: 'PRP20258', name: 'Pergola - Kotviaci profil horny V2 surový 7500mm', bar_mm: 7500, base: 'Kotviaci profil horny V2' },
-	{ prp: 'PRP00044', name: 'Pergola - Priečkový profil 105 Surový 7500mm', bar_mm: 7500, base: 'Priečkový profil 105' },
-	{ prp: 'PRP00046', name: 'Pergola - Priečkový profil 105 (light) Surový 7500mm', bar_mm: 7500, base: 'Priečkový profil 105 (light)' },
-	{ prp: 'PRP20242', name: 'Pergola - Profil 110x110 V2 surový 7500mm', bar_mm: 7500, base: 'Profil 110x110 V2' },
-	{ prp: 'PRP20252', name: 'Pergola - Profil 140x140 surový 7500mm', bar_mm: 7500, base: 'Profil 140x140' },
-	{ prp: 'PRP202410', name: 'Pergola - Profil 110x43 V2 surový 7500mm', bar_mm: 7500, base: 'Profil 110x43 V2' },
-	{ prp: 'PRP202530', name: 'Pergola - Profil 200x140 Surový 4500mm', bar_mm: 4500, base: 'Profil 200x140' },
-	{ prp: 'PRP202529', name: 'Pergola - Profil 200x140 Surový 6000mm', bar_mm: 6000, base: 'Profil 200x140' },
-	{ prp: 'PRP202528', name: 'Pergola - Profil 200x140 Surový 7500mm', bar_mm: 7500, base: 'Profil 200x140' },
-	{ prp: 'PRP20243', name: 'Pergola - Profil 250x110 surový 4500mm', bar_mm: 4500, base: 'Profil 250x110' },
-	{ prp: 'PRP202411', name: 'Pergola - Profil 250x110 surový 6000mm', bar_mm: 6000, base: 'Profil 250x110' },
-	{ prp: 'PRP20244', name: 'Pergola - Profil 250x110 surový 7500mm', bar_mm: 7500, base: 'Profil 250x110' },
-	{ prp: 'PRP00047', name: 'Pergola - Prítlačná lišta Surový 7500mm', bar_mm: 7500, base: 'Prítlačná lišta' },
-	{ prp: 'PRP00040', name: 'Pergola - Maskovacia lišta Surový 7500mm', bar_mm: 7500, base: 'Maskovacia lišta' },
-	{ prp: 'PRP00042', name: 'Pergola - Maskovacia lišta krajova Surový 7500mm', bar_mm: 7500, base: 'Maskovacia lišta krajova' },
-	{ prp: 'PRP20246', name: 'Pergola - Zaklapávacia lišta čelná surový 7500mm', bar_mm: 7500, base: 'Zaklapávacia lišta čelná' },
-	{ prp: 'PRP20248', name: 'Pergola - Okapnica kotviaceho profilu Surový 6000mm', bar_mm: 6000, base: 'Okapnica kotviaceho profilu' }
+	{
+		prp: 'PRP202526',
+		name: 'Pergola - Žlabový profil 110 V2 Surový 4500mm',
+		bar_mm: 4500,
+		base: 'Žlabový profil 110 V2'
+	},
+	{
+		prp: 'PRP202525',
+		name: 'Pergola - Žlabový profil 110 V2 Surový 6000mm',
+		bar_mm: 6000,
+		base: 'Žlabový profil 110 V2'
+	},
+	{
+		prp: 'PRP202524',
+		name: 'Pergola - Žlabový profil 110 V2 Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Žlabový profil 110 V2'
+	},
+	{
+		prp: 'PRP20256',
+		name: 'Pergola - Žlabový profil 140 surový 4500mm',
+		bar_mm: 4500,
+		base: 'Žlabový profil 140'
+	},
+	{
+		prp: 'PRP20255',
+		name: 'Pergola - Žlabový profil 140 surový 6000mm',
+		bar_mm: 6000,
+		base: 'Žlabový profil 140'
+	},
+	{
+		prp: 'PRP20254',
+		name: 'Pergola - Žlabový profil 140 surový 7500mm',
+		bar_mm: 7500,
+		base: 'Žlabový profil 140'
+	},
+	{
+		prp: 'PRP202510',
+		name: 'Pergola - Kotviaci profil horny V2 surový 4500mm',
+		bar_mm: 4500,
+		base: 'Kotviaci profil horny V2'
+	},
+	{
+		prp: 'PRP20259',
+		name: 'Pergola - Kotviaci profil horny V2 surový 6000mm',
+		bar_mm: 6000,
+		base: 'Kotviaci profil horny V2'
+	},
+	{
+		prp: 'PRP20258',
+		name: 'Pergola - Kotviaci profil horny V2 surový 7500mm',
+		bar_mm: 7500,
+		base: 'Kotviaci profil horny V2'
+	},
+	{
+		prp: 'PRP00044',
+		name: 'Pergola - Priečkový profil 105 Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Priečkový profil 105'
+	},
+	{
+		prp: 'PRP00046',
+		name: 'Pergola - Priečkový profil 105 (light) Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Priečkový profil 105 (light)'
+	},
+	{
+		prp: 'PRP20242',
+		name: 'Pergola - Profil 110x110 V2 surový 7500mm',
+		bar_mm: 7500,
+		base: 'Profil 110x110 V2'
+	},
+	{
+		prp: 'PRP20252',
+		name: 'Pergola - Profil 140x140 surový 7500mm',
+		bar_mm: 7500,
+		base: 'Profil 140x140'
+	},
+	{
+		prp: 'PRP202410',
+		name: 'Pergola - Profil 110x43 V2 surový 7500mm',
+		bar_mm: 7500,
+		base: 'Profil 110x43 V2'
+	},
+	{
+		prp: 'PRP202530',
+		name: 'Pergola - Profil 200x140 Surový 4500mm',
+		bar_mm: 4500,
+		base: 'Profil 200x140'
+	},
+	{
+		prp: 'PRP202529',
+		name: 'Pergola - Profil 200x140 Surový 6000mm',
+		bar_mm: 6000,
+		base: 'Profil 200x140'
+	},
+	{
+		prp: 'PRP202528',
+		name: 'Pergola - Profil 200x140 Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Profil 200x140'
+	},
+	{
+		prp: 'PRP20243',
+		name: 'Pergola - Profil 250x110 surový 4500mm',
+		bar_mm: 4500,
+		base: 'Profil 250x110'
+	},
+	{
+		prp: 'PRP202411',
+		name: 'Pergola - Profil 250x110 surový 6000mm',
+		bar_mm: 6000,
+		base: 'Profil 250x110'
+	},
+	{
+		prp: 'PRP20244',
+		name: 'Pergola - Profil 250x110 surový 7500mm',
+		bar_mm: 7500,
+		base: 'Profil 250x110'
+	},
+	{
+		prp: 'PRP00047',
+		name: 'Pergola - Prítlačná lišta Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Prítlačná lišta'
+	},
+	{
+		prp: 'PRP00040',
+		name: 'Pergola - Maskovacia lišta Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Maskovacia lišta'
+	},
+	{
+		prp: 'PRP00042',
+		name: 'Pergola - Maskovacia lišta krajova Surový 7500mm',
+		bar_mm: 7500,
+		base: 'Maskovacia lišta krajova'
+	},
+	{
+		prp: 'PRP20246',
+		name: 'Pergola - Zaklapávacia lišta čelná surový 7500mm',
+		bar_mm: 7500,
+		base: 'Zaklapávacia lišta čelná'
+	},
+	{
+		prp: 'PRP20248',
+		name: 'Pergola - Okapnica kotviaceho profilu Surový 6000mm',
+		bar_mm: 6000,
+		base: 'Okapnica kotviaceho profilu'
+	}
 ];
 
 // CAD (Dominok) kód → profil. Zdroj: Money DominokKod_UserData.
@@ -299,7 +424,10 @@ export function transform(text: string): TransformResult {
 			unresolved.push({ cad: code, name: info.name });
 			continue;
 		}
-		const avail = Object.keys(family).map(Number).filter(Boolean).sort((a, b) => a - b);
+		const avail = Object.keys(family)
+			.map(Number)
+			.filter(Boolean)
+			.sort((a, b) => a - b);
 		const barsUsed: Record<number, number> = {};
 		const notes: string[] = [];
 		if (avail.length === 1) {
@@ -323,7 +451,9 @@ export function transform(text: string): TransformResult {
 				if (p <= mx) continue; // už zabalené v packMulti
 				{
 					for (const b of minCoverCombo(p, avail)) barsUsed[b] = (barsUsed[b] || 0) + 1;
-					notes.push(`rez ${Math.round(p)} > ${mx} — kombinácia tyčí (žľab: spoj nad nohou skontrolovať)`);
+					notes.push(
+						`rez ${Math.round(p)} > ${mx} — kombinácia tyčí (žľab: spoj nad nohou skontrolovať)`
+					);
 					const fm: Record<number, string> = {};
 					for (const b of avail) fm[b] = family[b].prp;
 					const minimal = minCoverCombo(p, avail);
@@ -374,10 +504,17 @@ export function transform(text: string): TransformResult {
 }
 
 // numericky — lexikografický sort by pri tyči ≥10000 mm porovnával zle
-const sortedKey = (bars: number[]) => bars.slice().sort((a, b) => a - b).join('+');
+const sortedKey = (bars: number[]) =>
+	bars
+		.slice()
+		.sort((a, b) => a - b)
+		.join('+');
 
 export const fmtBars = (dict: Record<number, number>): string => {
-	const ks = Object.keys(dict).map(Number).filter((b) => dict[b] > 0).sort((a, b) => a - b);
+	const ks = Object.keys(dict)
+		.map(Number)
+		.filter((b) => dict[b] > 0)
+		.sort((a, b) => a - b);
 	return ks.map((b) => dict[b] + '(' + String(b / 1000).replace('.', ',') + 'm)').join(' ');
 };
 
@@ -476,7 +613,9 @@ export function parseChoice(
 }
 
 export function comboOptionLabel(o: ComboOption, isFirst: boolean): string {
-	return o.bars.join('+') + ' mm (' + o.total / 1000 + ' m)' + (isFirst ? ' — najmenej odpadu' : '');
+	return (
+		o.bars.join('+') + ' mm (' + o.total / 1000 + ' m)' + (isFirst ? ' — najmenej odpadu' : '')
+	);
 }
 
 export function validatePergola(
@@ -495,7 +634,10 @@ export function validatePergola(
 	if (skipped.length)
 		return (
 			'Nerozpoznané riadky (oprav vstup, inak by v odpise chýbal materiál): ' +
-			skipped.slice(0, 3).map((l) => `„${l.slice(0, 60)}"`).join(', ') +
+			skipped
+				.slice(0, 3)
+				.map((l) => `„${l.slice(0, 60)}"`)
+				.join(', ') +
 			(skipped.length > 3 ? ` a ďalšie ${skipped.length - 3}` : '')
 		);
 	if (r.unresolved.length)

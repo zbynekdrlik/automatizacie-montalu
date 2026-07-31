@@ -14,7 +14,11 @@ const base = { zak: 'Z1', op: 'O1', zakaznik: 'Test' };
 describe('parseMultiVstup — strážne kontroly viac-posuvového vstupu', () => {
 	it('platný vstup s 2 posuvmi prejde', () => {
 		const { vstup, error } = parseMultiVstup(
-			fd({ ...base, poznamka: 'pozn', posuvy: JSON.stringify([POSUV, { ...POSUV, s: 2509, v: 1930 }]) })
+			fd({
+				...base,
+				poznamka: 'pozn',
+				posuvy: JSON.stringify([POSUV, { ...POSUV, s: 2509, v: 1930 }])
+			})
 		);
 		expect(error).toBeNull();
 		expect(vstup.posuvy).toHaveLength(2);

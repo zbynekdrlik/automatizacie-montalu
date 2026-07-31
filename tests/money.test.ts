@@ -99,7 +99,7 @@ describe('writeOdpis', () => {
 		expect(row2[3]).toBe(15);
 		expect(row2[5]).toBe('01 : Test Zákazník');
 		// Popis dokladu len v prvom riadku
-		expect(((ws.getRow(3).values as unknown[]).slice(1))[5] ?? '').toBe('');
+		expect((ws.getRow(3).values as unknown[]).slice(1)[5] ?? '').toBe('');
 	});
 
 	// jednotka v xlsx: profily 'm' (default, ako doteraz), kovanie 'ks' (Dominik 2026-07-28).

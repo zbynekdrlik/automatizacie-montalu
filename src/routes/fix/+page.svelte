@@ -76,8 +76,7 @@
 	// nemusí prepisovať dve políčka naraz. POZOR: efekt zapisuje to, čo aj číta —
 	// bez porovnania hodnoty by sa zacyklil (effect_update_depth_exceeded, chytené e2e).
 	$effect(() => {
-		if (poliaS.length === 1 && sirkaNum > 0 && cislo(poliaS[0]) !== sirkaNum)
-			poliaS = [sirkaNum];
+		if (poliaS.length === 1 && sirkaNum > 0 && cislo(poliaS[0]) !== sirkaNum) poliaS = [sirkaNum];
 	});
 
 	let poliaJSON = $derived(JSON.stringify(poliaS.length ? poliaS : sirkaNum ? [sirkaNum] : []));
@@ -134,7 +133,13 @@
 			</div>
 			<div class="field">
 				<label for="nazov">Názov kusu na výkrese (nepovinné)</label>
-				<input id="nazov" name="nazov" bind:value={nazovS} maxlength="60" placeholder="napr. FIX bok pergoly" />
+				<input
+					id="nazov"
+					name="nazov"
+					bind:value={nazovS}
+					maxlength="60"
+					placeholder="napr. FIX bok pergoly"
+				/>
 			</div>
 			<div class="field">
 				<label for="tvar">Tvar</label>
@@ -146,22 +151,58 @@
 			<div class="grid3">
 				<div class="field">
 					<label for="s">Šírka (mm) *</label>
-					<input id="s" name="s" type="number" min="300" max={FIX_MAX} step="any" bind:value={sirkaS} required />
+					<input
+						id="s"
+						name="s"
+						type="number"
+						min="300"
+						max={FIX_MAX}
+						step="any"
+						bind:value={sirkaS}
+						required
+					/>
 				</div>
 				{#if tvarS === 'rovny'}
 					<!-- rovný fix má JEDNU výšku; server si ju skopíruje aj do druhej -->
 					<div class="field">
 						<label for="v1">Výška (mm) *</label>
-						<input id="v1" name="v1" type="number" min="1" max={FIX_MAX} step="any" bind:value={v1S} required />
+						<input
+							id="v1"
+							name="v1"
+							type="number"
+							min="1"
+							max={FIX_MAX}
+							step="any"
+							bind:value={v1S}
+							required
+						/>
 					</div>
 				{:else}
 					<div class="field">
 						<label for="v1">Výška vľavo (mm) *</label>
-						<input id="v1" name="v1" type="number" min="0" max={FIX_MAX} step="any" bind:value={v1S} required />
+						<input
+							id="v1"
+							name="v1"
+							type="number"
+							min="0"
+							max={FIX_MAX}
+							step="any"
+							bind:value={v1S}
+							required
+						/>
 					</div>
 					<div class="field">
 						<label for="v2">Výška vpravo (mm) *</label>
-						<input id="v2" name="v2" type="number" min="0" max={FIX_MAX} step="any" bind:value={v2S} required />
+						<input
+							id="v2"
+							name="v2"
+							type="number"
+							min="0"
+							max={FIX_MAX}
+							step="any"
+							bind:value={v2S}
+							required
+						/>
 					</div>
 				{/if}
 			</div>
@@ -197,7 +238,9 @@
 					<div class="row">
 						<span
 							>Súčet polí: <b data-testid="sucet-poli">{fmt(sucetPoli)} mm</b>
-							{#if !sedíSucet}<span class="nesedi"> ⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span>{/if}
+							{#if !sedíSucet}<span class="nesedi">
+									⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span
+								>{/if}
 						</span>
 						<button type="button" class="btn secondary" onclick={rozdelitRovnomerne}
 							>Rozdeliť rovnomerne</button
@@ -208,7 +251,13 @@
 
 			<div class="field">
 				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input type="checkbox" name="zrkadlo" value="1" bind:checked={zrkadloS} style="width:auto" />
+					<input
+						type="checkbox"
+						name="zrkadlo"
+						value="1"
+						bind:checked={zrkadloS}
+						style="width:auto"
+					/>
 					🔁 Zrkadlový kus (druhá strana pergoly)
 				</label>
 			</div>
@@ -219,7 +268,13 @@
 				</div>
 				<div class="field">
 					<label for="sklo">Sklo (voľný text)</label>
-					<input id="sklo" name="sklo" bind:value={skloS} maxlength="120" placeholder="napr. 4-8-4 IZO číre" />
+					<input
+						id="sklo"
+						name="sklo"
+						bind:value={skloS}
+						maxlength="120"
+						placeholder="napr. 4-8-4 IZO číre"
+					/>
 				</div>
 			</div>
 			<div class="field">
@@ -256,7 +311,9 @@
 
 	{#if vstup.poznamka || vstup.ral || vstup.sklo}
 		<div class="card" data-testid="fix-hlavicka">
-			{#if vstup.poznamka}<div class="row"><span>Poznámka</span><b style="white-space:pre-wrap">{vstup.poznamka}</b></div>{/if}
+			{#if vstup.poznamka}<div class="row">
+					<span>Poznámka</span><b style="white-space:pre-wrap">{vstup.poznamka}</b>
+				</div>{/if}
 			{#if vstup.ral}<div class="row"><span>RAL</span><b>{vstup.ral}</b></div>{/if}
 			{#if vstup.sklo}<div class="row"><span>Sklo</span><b>{vstup.sklo}</b></div>{/if}
 		</div>
@@ -291,7 +348,10 @@
 				{#if vstup.tvar === 'rovny'}
 					<tr><th>Pole</th><th>Šírka</th><th>Výška</th><th class="c">Plocha</th></tr>
 				{:else}
-					<tr><th>Pole</th><th>Šírka</th><th>Výška vľavo</th><th>Výška vpravo</th><th>Šikmá hrana</th><th class="c">Plocha</th></tr>
+					<tr
+						><th>Pole</th><th>Šírka</th><th>Výška vľavo</th><th>Výška vpravo</th><th>Šikmá hrana</th
+						><th class="c">Plocha</th></tr
+					>
 				{/if}
 			</thead>
 			<tbody>
@@ -312,8 +372,8 @@
 			</tbody>
 		</table>
 		<p class="sub" style="margin-top:10px">
-			Výšky sú VONKAJŠIE rozmery konštrukcie (na výrobnom výkrese sú kótované svetlé rozmery
-			skla, ktoré sú o hrúbku rámu menšie).
+			Výšky sú VONKAJŠIE rozmery konštrukcie (na výrobnom výkrese sú kótované svetlé rozmery skla,
+			ktoré sú o hrúbku rámu menšie).
 		</p>
 	</div>
 

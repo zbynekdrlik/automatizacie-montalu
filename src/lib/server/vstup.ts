@@ -40,7 +40,11 @@ export function sanitizeKovanieStred(system: string, styl: string, raw: unknown)
 
 /** Ktoré z dvoch stredových krídel kľučku nesie: 'L' (ľavé) alebo 'P' (pravé). */
 export function sanitizeStredOkno(raw: unknown): 'L' | 'P' {
-	return String(raw ?? '').trim().toUpperCase() === 'P' ? 'P' : 'L';
+	return String(raw ?? '')
+		.trim()
+		.toUpperCase() === 'P'
+		? 'P'
+		: 'L';
 }
 
 /** Surové polia klina — z plochého formulára aj z JSON riadku posuvu (multi).
@@ -136,7 +140,14 @@ function klinRaw(p: Record<string, unknown>): KlinRaw {
 		const o = k as Record<string, unknown>;
 		return { on: '1', dlzka: o.dlzka, sirka: o.sirka, v1: o.v1, v2: o.v2, ks: o.ks };
 	}
-	return { on: k, dlzka: p.klinDlzka, sirka: p.klinSirka, v1: p.klinV1, v2: p.klinV2, ks: p.klinKs };
+	return {
+		on: k,
+		dlzka: p.klinDlzka,
+		sirka: p.klinSirka,
+		v1: p.klinV1,
+		v2: p.klinV2,
+		ks: p.klinKs
+	};
 }
 
 /** Ručná koľajnica z posuvu — vnorený `{horna,spodna}` aj ploché polia (viď `klinRaw`). */
@@ -210,7 +221,9 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		s: num('s'),
 		v: num('v'),
 		sklo: String(form.get('sklo') ?? '').trim(),
-		skloPresne: String(form.get('skloPresne') ?? '').trim().slice(0, 120),
+		skloPresne: String(form.get('skloPresne') ?? '')
+			.trim()
+			.slice(0, 120),
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
 		kovanieL: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieL')),
 		kovanieP: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieP')),
@@ -221,8 +234,13 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 			const x = num('vrtanieZamku');
 			return x > 0 && x <= 20000 ? x : 1050;
 		})(),
-		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300),
-		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
+		poznamka: String(form.get('poznamka') ?? '')
+			.replace(/\r\n/g, '\n')
+			.trim()
+			.slice(0, 300),
+		ral: String(form.get('ral') ?? '')
+			.trim()
+			.slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
 		jednostrannaFab: form.get('jednostrannaFab') === '1',
@@ -302,8 +320,13 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
-		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300),
-		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
+		poznamka: String(form.get('poznamka') ?? '')
+			.replace(/\r\n/g, '\n')
+			.trim()
+			.slice(0, 300),
+		ral: String(form.get('ral') ?? '')
+			.trim()
+			.slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
 		jednostrannaFab: form.get('jednostrannaFab') === '1'

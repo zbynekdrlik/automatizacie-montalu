@@ -170,14 +170,16 @@ test('pergola: kliknutie na „Kopírovať počet tyčí" dá potvrdenie a do sc
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PCOP`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Pergola Kopia');
-	await page.getByLabel('Materiál (CAD nárez) *').fill(
-		[
-			'18004 PRIECKOVY PROFIL 105\t9\t3871',
-			'18006 PRITLACNA LISTA\t9\t3894',
-			'18016 PROFIL 110x43 V2\t2\t3812',
-			'18016 PROFIL 110x43 V2\t2\t2510'
-		].join('\n')
-	);
+	await page
+		.getByLabel('Materiál (CAD nárez) *')
+		.fill(
+			[
+				'18004 PRIECKOVY PROFIL 105\t9\t3871',
+				'18006 PRITLACNA LISTA\t9\t3894',
+				'18016 PROFIL 110x43 V2\t2\t3812',
+				'18016 PROFIL 110x43 V2\t2\t2510'
+			].join('\n')
+		);
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');

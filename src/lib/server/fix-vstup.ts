@@ -40,12 +40,10 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 	try {
 		const raw: unknown = JSON.parse(String(form.get('polia') ?? '[]'));
 		if (Array.isArray(raw))
-			polia = raw
-				.slice(0, FIX_MAX_POLI + 1)
-				.map((x) => {
-					const n = parseFloat(String(x).replace(',', '.'));
-					return Number.isFinite(n) ? n : 0;
-				});
+			polia = raw.slice(0, FIX_MAX_POLI + 1).map((x) => {
+				const n = parseFloat(String(x).replace(',', '.'));
+				return Number.isFinite(n) ? n : 0;
+			});
 	} catch {
 		polia = [];
 	}
@@ -56,16 +54,25 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
-		nazov: String(form.get('nazov') ?? '').trim().slice(0, 60),
+		nazov: String(form.get('nazov') ?? '')
+			.trim()
+			.slice(0, 60),
 		tvar,
 		s,
 		v1,
 		v2,
 		polia,
 		zrkadlo: form.get('zrkadlo') === '1',
-		ral: String(form.get('ral') ?? '').trim().slice(0, 40),
-		sklo: String(form.get('sklo') ?? '').trim().slice(0, 120),
-		poznamka: String(form.get('poznamka') ?? '').replace(/\r\n/g, '\n').trim().slice(0, 300)
+		ral: String(form.get('ral') ?? '')
+			.trim()
+			.slice(0, 40),
+		sklo: String(form.get('sklo') ?? '')
+			.trim()
+			.slice(0, 120),
+		poznamka: String(form.get('poznamka') ?? '')
+			.replace(/\r\n/g, '\n')
+			.trim()
+			.slice(0, 300)
 	};
 
 	let error: string | null;
@@ -75,4 +82,3 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 	else error = chybaFixVstupu(vstup.s, vstup.v1, vstup.v2, vstup.polia, vstup.tvar);
 	return { vstup, error };
 }
-

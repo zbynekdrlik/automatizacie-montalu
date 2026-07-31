@@ -168,8 +168,7 @@ export function chybaFixVstupu(
 		if (!(V1 > 0 || V2 > 0)) return 'Zadaj aspoň jednu výšku.';
 		if (V1 === V2) return 'Výšky sú rovnaké — vyber tvar „rovný (pravouhlý)".';
 	}
-	if (!polia.length || polia.length > FIX_MAX_POLI)
-		return `Počet polí musí byť 1–${FIX_MAX_POLI}.`;
+	if (!polia.length || polia.length > FIX_MAX_POLI) return `Počet polí musí byť 1–${FIX_MAX_POLI}.`;
 	if (polia.some((w) => !(w >= FIX_MIN && w <= FIX_MAX)))
 		return `Šírka poľa musí byť ${FIX_MIN}–${FIX_MAX} mm.`;
 	const sucet = polia.reduce((a, b) => a + b, 0);

@@ -62,8 +62,7 @@ export function kovanieDoOdpisu(
 			uzaver ? pocetUzaverov(uzaver, spec.sysStyl) : null,
 			!jednostrannaFab
 		);
-		if (chyby.length)
-			return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${chyby[0].sprava}` };
+		if (chyby.length) return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${chyby[0].sprava}` };
 		davky.push(polozky);
 	}
 

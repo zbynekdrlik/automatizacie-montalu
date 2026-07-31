@@ -28,9 +28,7 @@ async function zaklad(page: Page, zak: string) {
 	await page.locator('#v').fill('2320');
 }
 
-test('jeden posuv: kľučky sú vypísané pod posuvom a Money odpis je NEZMENENÝ', async ({
-	page
-}) => {
+test('jeden posuv: kľučky sú vypísané pod posuvom a Money odpis je NEZMENENÝ', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 

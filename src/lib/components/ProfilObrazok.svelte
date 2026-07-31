@@ -2,8 +2,11 @@
 	// Rez profilu z Money katalógu. Malý náhľad v riadku; klik → zväčšenie.
 	import { maObrazok, obrazokUrl } from '$lib/profil-obrazky';
 
-	let { kod, nazov = '', velkost = 44 }: { kod: string; nazov?: string; velkost?: number } =
-		$props();
+	let {
+		kod,
+		nazov = '',
+		velkost = 44
+	}: { kod: string; nazov?: string; velkost?: number } = $props();
 
 	let otvorene = $state(false);
 	let dostupny = $derived(maObrazok(kod));
@@ -31,7 +34,9 @@
 						<b>{kod}</b>{#if nazov}<span> · {nazov}</span>{/if}
 						<div class="lb-sub">Rez profilu (Money katalóg)</div>
 					</div>
-					<button type="button" class="lb-x" onclick={() => (otvorene = false)} aria-label="Zavrieť">✕</button>
+					<button type="button" class="lb-x" onclick={() => (otvorene = false)} aria-label="Zavrieť"
+						>✕</button
+					>
 				</div>
 				<img src={obrazokUrl(kod)} alt="Rez profilu {kod}" />
 			</div>
@@ -52,7 +57,9 @@
 		border-radius: 8px;
 		cursor: zoom-in;
 		flex: 0 0 auto;
-		transition: border-color 0.12s ease, box-shadow 0.12s ease;
+		transition:
+			border-color 0.12s ease,
+			box-shadow 0.12s ease;
 	}
 	.thumb:hover {
 		border-color: #2563eb;

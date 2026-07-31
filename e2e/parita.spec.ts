@@ -5,7 +5,6 @@ import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpe
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
 
-
 test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporná úprava sa odmietne', async ({
 	page
 }) => {
@@ -64,14 +63,16 @@ test('pergola: CAD nárez → Money rozpis + tyče → odoslanie (1:1 vzorová z
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PER`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Pergola');
-	await page.getByLabel('Materiál (CAD nárez) *').fill(
-		[
-			'18004 PRIECKOVY PROFIL 105\t9\t3871',
-			'18006 PRITLACNA LISTA\t9\t3894',
-			'18016 PROFIL 110x43 V2\t2\t3812',
-			'18016 PROFIL 110x43 V2\t2\t2510'
-		].join('\n')
-	);
+	await page
+		.getByLabel('Materiál (CAD nárez) *')
+		.fill(
+			[
+				'18004 PRIECKOVY PROFIL 105\t9\t3871',
+				'18006 PRITLACNA LISTA\t9\t3894',
+				'18016 PROFIL 110x43 V2\t2\t3812',
+				'18016 PROFIL 110x43 V2\t2\t2510'
+			].join('\n')
+		);
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 
 	// Money rozpis 1:1 (v náhľade sú množstvá v poliach na ručnú úpravu):
@@ -117,7 +118,9 @@ test('pergola: rez > 7500 ponúkne kombinácie a voľba zmení rozpis aj tyče',
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('pergola: kusy viac-variantového profilu zdieľajú tyč, bez falošného varovania', async ({ page }) => {
+test('pergola: kusy viac-variantového profilu zdieľajú tyč, bez falošného varovania', async ({
+	page
+}) => {
 	// spocitat NEzapisuje → bezpečné aj na LIVE
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
@@ -126,9 +129,13 @@ test('pergola: kusy viac-variantového profilu zdieľajú tyč, bez falošného 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PACK`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Balenie');
-	await page.getByLabel('Materiál (CAD nárez) *').fill(
-		['18019 KOTVIACI PROFIL HORNY V2\t1\t6400', '18019 KOTVIACI PROFIL HORNY V2\t1\t1030'].join('\n')
-	);
+	await page
+		.getByLabel('Materiál (CAD nárez) *')
+		.fill(
+			['18019 KOTVIACI PROFIL HORNY V2\t1\t6400', '18019 KOTVIACI PROFIL HORNY V2\t1\t1030'].join(
+				'\n'
+			)
+		);
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 	await waitHydrated(page);
 
@@ -142,7 +149,9 @@ test('pergola: kusy viac-variantového profilu zdieľajú tyč, bez falošného 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('pergola: ručná úprava množstva pred odoslaním (aj odmietnutie zápornej)', async ({ page }) => {
+test('pergola: ručná úprava množstva pred odoslaním (aj odmietnutie zápornej)', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);

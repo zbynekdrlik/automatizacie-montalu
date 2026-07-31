@@ -2,10 +2,17 @@
 // (?next=) a predvyplnenie mena. Trieda navigačných/stavových bugov + Money-
 // kritické uvoľnenie. Nula console errors všade.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, skipAkLive, E2E_USER, E2E_PASS } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	skipAkLive,
+	E2E_USER,
+	E2E_PASS
+} from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
-
 
 test('odpisy: uvoľnenie dovolí poslať tú istú ZAK+OP znova (celý UI tok)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);

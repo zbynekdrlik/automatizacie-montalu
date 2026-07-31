@@ -16,8 +16,8 @@
 <div class="card">
 	<h1>⚙ Vzorce — nastavenia rezov</h1>
 	<p class="sub">
-		Odsadenia (mm) v vzorci <i>rez = rozmer + odsadenie</i> (šírkové sa delia počtom polí).
-		Zmeny sa uložia naraz, s históriou kto/kedy/čo. Preklepy mimo ±500 mm sa odmietnu.
+		Odsadenia (mm) v vzorci <i>rez = rozmer + odsadenie</i> (šírkové sa delia počtom polí). Zmeny sa uložia
+		naraz, s históriou kto/kedy/čo. Preklepy mimo ±500 mm sa odmietnu.
 	</p>
 </div>
 
@@ -54,13 +54,16 @@
 					{#if form.preview.pred.sklo.sirka !== form.preview.po.sklo.sirka || form.preview.pred.sklo.vyska !== form.preview.po.sklo.vyska}
 						{fmtM(form.preview.pred.sklo.sirka)}×{fmtM(form.preview.pred.sklo.vyska)} →
 					{/if}
-					{fmtM(form.preview.po.sklo.sirka)} × {fmtM(form.preview.po.sklo.vyska)} mm · {form.preview.po.sklo.pocet} ks
+					{fmtM(form.preview.po.sklo.sirka)} × {fmtM(form.preview.po.sklo.vyska)} mm · {form.preview
+						.po.sklo.pocet} ks
 				</b>
 			</div>
 		</div>
 	{/if}
 	<div class="card noprint">
-		<a class="btn secondary" href="/zasklenia/nastavenia?sysStyl={encodeURIComponent(form.sysStyl)}">➕ Upraviť ďalší štýl</a>
+		<a class="btn secondary" href="/zasklenia/nastavenia?sysStyl={encodeURIComponent(form.sysStyl)}"
+			>➕ Upraviť ďalší štýl</a
+		>
 		<a class="btn secondary" href="/zasklenia">→ Späť na Zasklenia</a>
 	</div>
 {:else if data.editable}
@@ -80,7 +83,9 @@
 			<div class="sec" style="margin-top:16px">Odsadenia profilov (mm)</div>
 			{#each data.editable.rows as r (r.id)}
 				<div class="field">
-					<label for="offset_{r.id}">{r.nazov} · {r.dim === 'S' ? 'Šírka' : 'Výška'} — odsadenie</label>
+					<label for="offset_{r.id}"
+						>{r.nazov} · {r.dim === 'S' ? 'Šírka' : 'Výška'} — odsadenie</label
+					>
 					<input
 						id="offset_{r.id}"
 						name="offset_{r.id}"
@@ -96,17 +101,33 @@
 
 			<div class="field">
 				<label for="skloOffset">Sklo — konečné zmenšenie (mm)</label>
-				<input id="skloOffset" name="skloOffset" type="number" step="any" min="0" max="500" value={data.editable.skloOffset} required />
+				<input
+					id="skloOffset"
+					name="skloOffset"
+					type="number"
+					step="any"
+					min="0"
+					max="500"
+					value={data.editable.skloOffset}
+					required
+				/>
 			</div>
 
 			<div class="sec" style="margin-top:16px">Sklá — nulovanie Redukcie 6mm (Slide)</div>
 			<p class="sub" style="margin-bottom:10px">
-				Zaškrtnuté sklo znamená: pri tomto skle sa Redukcia 6mm do odpisu NEpočíta. Platí pre všetky štýly.
+				Zaškrtnuté sklo znamená: pri tomto skle sa Redukcia 6mm do odpisu NEpočíta. Platí pre všetky
+				štýly.
 			</p>
 			{#each data.glass as g (g.nazov)}
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-						<input type="checkbox" name="glass_{g.nazov}" value="1" checked={g.redukciaZero} style="width:auto" />
+						<input
+							type="checkbox"
+							name="glass_{g.nazov}"
+							value="1"
+							checked={g.redukciaZero}
+							style="width:auto"
+						/>
 						{g.nazov}
 					</label>
 				</div>
@@ -135,7 +156,12 @@
 				<div class="row" style="flex-direction:column;align-items:flex-start;gap:2px">
 					<span><b>{a.ts}</b> · {a.username || '—'} · {a.sys_styl.replace('|', ' ')}</span>
 					<span style="color:#64748b">
-						{a.zmeny.map((z: { pole: string; stara: number; nova: number }) => `${z.pole}: ${z.stara} → ${z.nova}`).join(' · ')}
+						{a.zmeny
+							.map(
+								(z: { pole: string; stara: number; nova: number }) =>
+									`${z.pole}: ${z.stara} → ${z.nova}`
+							)
+							.join(' · ')}
 					</span>
 				</div>
 			{/each}

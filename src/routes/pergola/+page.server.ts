@@ -60,7 +60,9 @@ function view(vstup: PergolaVstup, form?: FormData) {
 	const r = transform(vstup.cad);
 	const error = validatePergola(vstup.zak, vstup.op, vstup.zakaznik, vstup.cad, r);
 	if (error) return { error, r: null, view: null };
-	const { choices, raw } = form ? choicesFrom(form, r) : { choices: new Map<number, number[]>(), raw: new Map<number, string>() };
+	const { choices, raw } = form
+		? choicesFrom(form, r)
+		: { choices: new Map<number, number[]>(), raw: new Map<number, string>() };
 	const q = applyCombos(r, choices);
 	const copyBack = buildCopyBack(vstup.cad, r, choices);
 	const spocitane = CATALOG.map((c) => ({ kod: c.prp, nazov: c.name, qty: q[c.prp] || 0 }));
@@ -71,7 +73,9 @@ function view(vstup: PergolaVstup, form?: FormData) {
 	const { finalOut, zmenene, error: editError } = applyEdits(spocitane, edits);
 	const polozky = editError ? spocitane : finalOut;
 	const editVals = Object.fromEntries(edits);
-	const longNotes = r.trace.filter((t) => t.notes.length).map((t) => t.cad + ': ' + t.notes.join('; '));
+	const longNotes = r.trace
+		.filter((t) => t.notes.length)
+		.map((t) => t.cad + ': ' + t.notes.join('; '));
 	return {
 		error: null,
 		editError,
@@ -168,7 +172,8 @@ export const actions: Actions = {
 				step: 'nahlad' as const,
 				vstup,
 				v,
-				error: 'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
+				error:
+					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};
 		}
 	}

@@ -104,7 +104,10 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 		expect(dbRows.length).toBe(seedRows.length);
 		// U profil (ZASP202439) je prítomný DVAKRÁT (vodorovný + zvislý, rovnaký kód)
 		expect(dbRows.filter((r) => r.kod === 'ZASP202439').length).toBe(2);
-		expect((db.prepare("SELECT n FROM cfg_sys WHERE sys_styl='Štandard +|2x3K'").get() as { n: number }).n).toBe(6);
+		expect(
+			(db.prepare("SELECT n FROM cfg_sys WHERE sys_styl='Štandard +|2x3K'").get() as { n: number })
+				.n
+		).toBe(6);
 	});
 
 	it('4 nové glass_types so system=Štandard + (Float 4/6/10 + Izolačné 4.8.4)', () => {
@@ -125,21 +128,35 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 		const robustSlideDeluxe = seed.sys.filter((s) => !s.sysStyl.startsWith('Štandard +'));
 		const countBefore = robustSlideDeluxe.length;
 		const countAfter = (
-			db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl NOT LIKE 'Štandard +|%'").get() as { c: number }
+			db.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl NOT LIKE 'Štandard +|%'").get() as {
+				c: number;
+			}
 		).c;
 		expect(countAfter).toBe(countBefore);
 		// spot-check: Robust|2K a Deluxe|5K rez riadky nezmenené (kódy + počty)
 		expect(
-			(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Robust|2K'").get() as { c: number }).c
+			(
+				db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Robust|2K'").get() as {
+					c: number;
+				}
+			).c
 		).toBe(seed.rez.filter((r) => r.sysStyl === 'Robust|2K').length);
 		expect(
-			(db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|5K'").get() as { c: number }).c
+			(
+				db.prepare("SELECT COUNT(*) c FROM cfg_rez WHERE sys_styl='Deluxe|5K'").get() as {
+					c: number;
+				}
+			).c
 		).toBe(seed.rez.filter((r) => r.sysStyl === 'Deluxe|5K').length);
 		// pôvodné glass_types (Robust/Deluxe) nedotknuté
 		expect(
-			(db.prepare("SELECT COUNT(*) c FROM glass_types WHERE system IN ('Robust','Deluxe')").get() as {
-				c: number;
-			}).c
+			(
+				db
+					.prepare("SELECT COUNT(*) c FROM glass_types WHERE system IN ('Robust','Deluxe')")
+					.get() as {
+					c: number;
+				}
+			).c
 		).toBe(3);
 	});
 });

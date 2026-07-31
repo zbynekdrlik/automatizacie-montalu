@@ -61,7 +61,9 @@ const OLD_UPSIZE: Record<string, { kod: string; nazov: string }> = {
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v11.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v11.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v11.pragma('user_version = 11');
 	v11.close();
 }
@@ -70,9 +72,9 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 const row = (sysStyl: string, poradie: number) =>
-	db.prepare('SELECT kod, nazov FROM cfg_rez WHERE sys_styl = ? AND poradie = ?').get(sysStyl, poradie) as
-		| { kod: string; nazov: string }
-		| undefined;
+	db
+		.prepare('SELECT kod, nazov FROM cfg_rez WHERE sys_styl = ? AND poradie = ?')
+		.get(sysStyl, poradie) as { kod: string; nazov: string } | undefined;
 
 describe('reálny v11 → v12: IZO spodná koľajnica späť na normálnu', () => {
 	it('user_version = 13 (finálna po všetkých migráciách)', () => {
@@ -95,7 +97,9 @@ describe('reálny v11 → v12: IZO spodná koľajnica späť na normálnu', () =
 
 	it('NEDOTKNE sa hornej koľajnice ani basic/opona spodnej', () => {
 		// 2K IZO horná = ZASP00107 (nezmenené)
-		const horna = seed.rez.find((r) => r.sysStyl === 'Štandard +|2K IZO' && /horná/i.test(r.nazov))!;
+		const horna = seed.rez.find(
+			(r) => r.sysStyl === 'Štandard +|2K IZO' && /horná/i.test(r.nazov)
+		)!;
 		expect(row('Štandard +|2K IZO', horna.poradie)!.kod).toBe(horna.kod);
 		// basic 2K spodná = ZASP00104 (nezmenené)
 		expect(row('Štandard +|2K', 15)!.kod).toBe('ZASP00104');

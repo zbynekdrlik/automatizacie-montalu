@@ -62,7 +62,9 @@ const OLD_OFF: Record<string, number> = {
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v12.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v12.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v12.pragma('user_version = 12');
 	v12.close();
 }
@@ -71,9 +73,11 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 const off = (sysStyl: string, poradie: number) =>
-	(db.prepare('SELECT offset FROM cfg_rez WHERE sys_styl = ? AND poradie = ?').get(sysStyl, poradie) as
-		| { offset: number }
-		| undefined)?.offset;
+	(
+		db
+			.prepare('SELECT offset FROM cfg_rez WHERE sys_styl = ? AND poradie = ?')
+			.get(sysStyl, poradie) as { offset: number } | undefined
+	)?.offset;
 
 describe('reálny v12 → v13: Slide opona geometria podľa Excelu', () => {
 	it('user_version = 13', () => {
@@ -82,7 +86,10 @@ describe('reálny v12 → v13: Slide opona geometria podľa Excelu', () => {
 
 	it('KAŽDÝ opravený Slide opona offset sedí s cfg_seed', () => {
 		for (const key of Object.keys(OLD_OFF)) {
-			const [sysStyl, por] = [key.slice(0, key.lastIndexOf('|')), Number(key.slice(key.lastIndexOf('|') + 1))];
+			const [sysStyl, por] = [
+				key.slice(0, key.lastIndexOf('|')),
+				Number(key.slice(key.lastIndexOf('|') + 1))
+			];
 			const seedRow = seed.rez.find((r) => r.sysStyl === sysStyl && r.poradie === por)!;
 			expect(off(sysStyl, por), key).toBe(seedRow.offset);
 		}

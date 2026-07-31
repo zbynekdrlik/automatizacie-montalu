@@ -7,11 +7,7 @@ import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
 import { writeOdpis, isLive, type OdpisJob } from '$lib/server/money';
 
-function jobFor(
-	vstup: BazenVstup,
-	finalOut: BazenPolozka[],
-	createdBy: string
-): OdpisJob {
+function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string): OdpisJob {
 	return {
 		modul: 'bazen',
 		zak: vstup.zak,
@@ -73,8 +69,13 @@ export const actions: Actions = {
 		// úpravy sa nesmú ticho stratiť a nahradiť auto-výpočtom (nález review)
 		const edits = editsFrom(form);
 		const editVals = Object.fromEntries(edits);
-		const kontrola = (err: string) =>
-			({ step: 'kontrola' as const, vstup, out, editVals, error: err });
+		const kontrola = (err: string) => ({
+			step: 'kontrola' as const,
+			vstup,
+			out,
+			editVals,
+			error: err
+		});
 
 		const { finalOut, zmenene, error: eErr } = applyEdits(out, edits);
 		if (eErr) return kontrola(eErr);

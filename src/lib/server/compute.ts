@@ -253,11 +253,7 @@ export function oversizeCut(
  * Dnes nedosiahnuteľné cez UI (glassTypesForSystem púšťa pre Deluxe len sklá s
  * hrúbkou 6/10), ale bráni tichej regresii, ak by tá záruka niekedy padla.
  */
-export function missingHrubkaProfile(
-	cfg: Cfg,
-	sysStyl: string,
-	skloHrubka: number
-): string | null {
+export function missingHrubkaProfile(cfg: Cfg, sysStyl: string, skloHrubka: number): string | null {
 	const g = cfg[sysStyl];
 	if (!g) return null;
 	const sh = Number(skloHrubka) || 0;
@@ -338,7 +334,17 @@ export function computeFlat(
 		const sikmyRez = !systemRovnyRez(system) && jeSikmyRez(c.nazov);
 		// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +)
 		const up = railUpsize(system, pridavnaKolajnica, c.kod, c.nazov);
-		material.push({ kod: up.kod, nazov: up.nazov, rezy: c.rezy, tyce, bary, odpadMm, odpadPct, barLen: c.barLen, sikmyRez });
+		material.push({
+			kod: up.kod,
+			nazov: up.nazov,
+			rezy: c.rezy,
+			tyce,
+			bary,
+			odpadMm,
+			odpadPct,
+			barLen: c.barLen,
+			sikmyRez
+		});
 		odpis.push({ kod: up.kod, nazov: up.nazov, metre: R((tyce * c.barLen) / 1000) });
 	}
 	const ss = g.sklo.s,
@@ -470,14 +476,24 @@ export function safeCompute(
 	pridavnaKolajnica = false,
 	rucnaKolajnica?: KolajnicaRucne
 ): { r: ComputeResult | null; err: string | null } {
-	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
+	if (!validSys(cfg, sysStyl))
+		return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
 	const boundErr = inBounds(cfg, sysStyl);
 	if (boundErr) return { r: null, err: 'Konfigurácia mimo povolených rozsahov: ' + boundErr };
 	const hrubkaErr = missingHrubkaProfile(cfg, sysStyl, skloHrubka);
 	if (hrubkaErr) return { r: null, err: hrubkaErr };
 	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
 	if (overErr) return { r: null, err: overErr };
-	const r = computeFlat(cfg, sysStyl, S, V, redukciaZero, skloHrubka, pridavnaKolajnica, rucnaKolajnica);
+	const r = computeFlat(
+		cfg,
+		sysStyl,
+		S,
+		V,
+		redukciaZero,
+		skloHrubka,
+		pridavnaKolajnica,
+		rucnaKolajnica
+	);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
 	return { r, err: null };
@@ -552,7 +568,13 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 	const order: string[] = [];
 	const pool: Record<
 		string,
-		{ nazov: string; rezy: { rozmer: number; ks: number }[]; kusy: Kus[]; barLen: number; sikmyRez: boolean }
+		{
+			nazov: string;
+			rezy: { rozmer: number; ks: number }[];
+			kusy: Kus[];
+			barLen: number;
+			sikmyRez: boolean;
+		}
 	> = {};
 	for (let i = 0; i < posuvy.length; i++) {
 		const p = posuvy[i];
@@ -568,7 +590,16 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		// tyče, toto treba prehodnotiť. Pozn.: príznak sikmyRez pooled riadku sa
 		// preberá z PRVÉHO posuvu — pri zmiešanej Deluxe+Štandard+ zákazke to môže
 		// zle označiť uhol rezu iba v KRESBE (odpis nie je dotknutý).
-		for (const c of profilCuts(g, p.S, p.V, N, p.redukciaZero, p.skloHrubka ?? 0, i + 1, p.kolajnica)) {
+		for (const c of profilCuts(
+			g,
+			p.S,
+			p.V,
+			N,
+			p.redukciaZero,
+			p.skloHrubka ?? 0,
+			i + 1,
+			p.kolajnica
+		)) {
 			// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +) — swap
 			// PRED poolovaním, aby sa metre pooli pod správnym (väčším) kódom.
 			const up = railUpsize(system, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
@@ -622,7 +653,17 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * pk.barLen)) * 1000) / 10 : 0;
 		pk.rezy.sort((a, b) => b.rozmer - a.rozmer);
-		material.push({ kod, nazov: pk.nazov, rezy: pk.rezy, tyce, bary, odpadMm, odpadPct, barLen: pk.barLen, sikmyRez: pk.sikmyRez });
+		material.push({
+			kod,
+			nazov: pk.nazov,
+			rezy: pk.rezy,
+			tyce,
+			bary,
+			odpadMm,
+			odpadPct,
+			barLen: pk.barLen,
+			sikmyRez: pk.sikmyRez
+		});
 		odpis.push({ kod, nazov: pk.nazov, metre: R((tyce * pk.barLen) / 1000) });
 	}
 	return { posuvy: infos, material, odpis, m2: R(infos.reduce((s, x) => s + x.m2, 0)) };
@@ -638,7 +679,8 @@ export function safeComputeMulti(
 		if (!validSys(cfg, p.sysStyl))
 			return { r: null, err: `Posuv ${i + 1}: konfigurácia systému je neúplná alebo chybná.` };
 		const boundErr = inBounds(cfg, p.sysStyl);
-		if (boundErr) return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
+		if (boundErr)
+			return { r: null, err: `Posuv ${i + 1}: konfigurácia mimo rozsahov — ${boundErr}` };
 		const hrubkaErr = missingHrubkaProfile(cfg, p.sysStyl, p.skloHrubka ?? 0);
 		if (hrubkaErr) return { r: null, err: `Posuv ${i + 1}: ${hrubkaErr}` };
 		const overErr = oversizeCut(

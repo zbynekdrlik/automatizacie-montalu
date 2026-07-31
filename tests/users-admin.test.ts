@@ -24,7 +24,11 @@ describe('user-admin helpery', () => {
 		expect(db.deleteB2BUser(vo2.id)).toEqual({ error: null });
 		expect(db.listUsers().find((x) => x.username === 'vo2')).toBeUndefined();
 
-		db.db.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('interny', 'x:y', 'internal')").run();
+		db.db
+			.prepare(
+				"INSERT INTO users (username, pass_hash, role) VALUES ('interny', 'x:y', 'internal')"
+			)
+			.run();
 		const interny = db.listUsers().find((x) => x.username === 'interny')!;
 		expect(db.deleteB2BUser(interny.id).error).toBeTruthy(); // nezmaže internal
 		expect(db.listUsers().find((x) => x.username === 'interny')).toBeDefined();

@@ -176,7 +176,9 @@ describe('bezpečnostné zábrany', () => {
 		expect(oversizeCut(cfg, 'Štandard +|2K', 3000, 2400, false, 0)).toBeNull();
 		const err = oversizeCut(cfg, 'Štandard +|2K', 3000, 2400, false, 0, { horna: 7499 });
 		expect(err).toMatch(/dlhší než tyč 7500/);
-		expect(safeCompute(cfg, 'Štandard +|2K', 3000, 2400, false, 0, false, { horna: 7499 }).r).toBeNull();
+		expect(
+			safeCompute(cfg, 'Štandard +|2K', 3000, 2400, false, 0, false, { horna: 7499 }).r
+		).toBeNull();
 	});
 
 	it('safeCompute s platným zadaním prejde a nesie nový rez', () => {

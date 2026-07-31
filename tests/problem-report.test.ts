@@ -13,8 +13,7 @@ delete process.env.MONEY_LIVE;
 const { db } = await import('../src/lib/server/db');
 const { actions, load } = await import('../src/routes/problem/+page.server');
 
-const pocet = () =>
-	(db.prepare('SELECT COUNT(*) c FROM problem_reports').get() as { c: number }).c;
+const pocet = () => (db.prepare('SELECT COUNT(*) c FROM problem_reports').get() as { c: number }).c;
 
 function ev(body: Record<string, string>, username = 'tester') {
 	const fd = new FormData();
@@ -58,9 +57,9 @@ describe('nahlásenie problému — guard na prázdny popis (audit #35)', () => 
 	});
 
 	it('load() vracia uložené hlásenia (najnovšie prvé)', async () => {
-		const { reports } = (await load(
-			{} as Parameters<typeof load>[0]
-		)) as unknown as { reports: { popis: string }[] };
+		const { reports } = (await load({} as Parameters<typeof load>[0])) as unknown as {
+			reports: { popis: string }[];
+		};
 		expect(reports.length).toBeGreaterThanOrEqual(2);
 		expect(reports[0].popis.length).toBe(5000); // posledné vložené = najnovšie
 	});

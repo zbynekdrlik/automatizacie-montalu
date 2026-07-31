@@ -56,7 +56,9 @@ const V15_RED: Record<string, number> = {
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v15.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v15.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v15.pragma('user_version = 15');
 	v15.close();
 }

@@ -37,9 +37,19 @@ const ROBUST: Komponent[] = [
 	{ kod: 'ZASK00031', nazov: 'Podložka uzáveru', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 5 } },
 	{ kod: 'ZASK00032', nazov: 'Protikus uzáveru', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 2 } },
 	{ kod: 'ZASK00034', nazov: 'Upevňovacia sada', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 1 } },
-	{ kod: 'ZASK00036', nazov: 'Krytka krídla', mj: 'ks', pravidlo: { typ: 'naNosovyProfil', koef: 2 } },
+	{
+		kod: 'ZASK00036',
+		nazov: 'Krytka krídla',
+		mj: 'ks',
+		pravidlo: { typ: 'naNosovyProfil', koef: 2 }
+	},
 	{ kod: 'ZASK00038', nazov: 'Rohovník krídla', mj: 'ks', pravidlo: { typ: 'naKridlo', koef: 4 } },
-	{ kod: 'ZASK00039', nazov: 'Rohovník zarovnávací', mj: 'ks', pravidlo: { typ: 'naKridlo', koef: 8 } },
+	{
+		kod: 'ZASK00039',
+		nazov: 'Rohovník zarovnávací',
+		mj: 'ks',
+		pravidlo: { typ: 'naKridlo', koef: 8 }
+	},
 	{
 		kod: 'ZASK20242',
 		nazov: 'Tesnenie zasklievacie 12',
@@ -77,10 +87,7 @@ describe('zakladPoctov — čísla sa berú z konfigurácie, nie z odhadu', () =
 	it('dĺžka rámového profilu = súčet rezov rámového profilu z plánu', () => {
 		const r = computeFlat(cfg, 'Robust|2K', 3000, 2200, false)!;
 		const ramovy = r.material.filter((m) => /Rámový/i.test(m.nazov));
-		const rucne = ramovy.reduce(
-			(s, m) => s + m.rezy.reduce((a, x) => a + x.rozmer * x.ks, 0),
-			0
-		);
+		const rucne = ramovy.reduce((s, m) => s + m.rezy.reduce((a, x) => a + x.rozmer * x.ks, 0), 0);
 		expect(ramovy.length).toBeGreaterThan(0);
 		expect(zakladPoctov(r).dlzkaRamovehoMm).toBe(rucne);
 	});
@@ -135,7 +142,7 @@ describe('pocitajKomponenty — Robustove pravidlá od Dominika', () => {
 
 	it('kefové 7x5 = (rámový − nosový) × 2, v metroch a nikdy záporné', () => {
 		const z = zaklad('Robust|2K');
-		const cakane = Math.round(((z.dlzkaRamovehoMm - z.dlzkaNosovehoMm) * 2) / 1000 * 1000) / 1000;
+		const cakane = Math.round((((z.dlzkaRamovehoMm - z.dlzkaNosovehoMm) * 2) / 1000) * 1000) / 1000;
 		expect(q(spocitaj('Robust|2K'), 'ZASK00042')).toBe(cakane);
 		expect(cakane).toBeGreaterThan(0);
 	});
@@ -177,7 +184,10 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 			KOMPONENTY_ROBUST,
 			sysStyl,
 			zaklad(sysStyl),
-			pocetUzaverov(KOMPONENTY_ROBUST.find((k) => k.kod === 'ZASK00029')!, sysStyl),
+			pocetUzaverov(
+				KOMPONENTY_ROBUST.find((k) => k.kod === 'ZASK00029')!,
+				sysStyl
+			),
 			obojstrannaFab
 		);
 	const qr = (sysStyl: string, kod: string, fab = true) =>
@@ -186,10 +196,11 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 	it('KAŽDÝ Robust štýl z konfigurácie sa spočíta bez chyby', () => {
 		const styly = Object.keys(cfg).filter((s) => s.startsWith('Robust|'));
 		expect(styly.length).toBeGreaterThan(0);
-		for (const s of styly) expect({ styl: s, chyby: spocitajR(s).chyby }).toEqual({
-			styl: s,
-			chyby: []
-		});
+		for (const s of styly)
+			expect({ styl: s, chyby: spocitajR(s).chyby }).toEqual({
+				styl: s,
+				chyby: []
+			});
 	});
 
 	it('uzávery: jednoduchý systém 2 ks, opona 3 ks (Dominik 4K-2, 2x3K-3, 2x4K-3)', () => {
@@ -250,9 +261,22 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 	it('každý kód v tabuľke je overený proti Money (nemenná kontrola zoznamu)', () => {
 		// zoznam overený read-only SQL 2026-07-28: existuje, Deleted=0, zásoba na sklade Materiál
 		expect(KOMPONENTY_ROBUST.map((k) => k.kod).sort()).toEqual([
-			'ZASK00027', 'ZASK00029', 'ZASK00030', 'ZASK00031', 'ZASK00032', 'ZASK00033',
-			'ZASK00034', 'ZASK00035', 'ZASK00036', 'ZASK00037', 'ZASK00038', 'ZASK00039',
-			'ZASK00041', 'ZASK00042', 'ZASK20241', 'ZASK20242'
+			'ZASK00027',
+			'ZASK00029',
+			'ZASK00030',
+			'ZASK00031',
+			'ZASK00032',
+			'ZASK00033',
+			'ZASK00034',
+			'ZASK00035',
+			'ZASK00036',
+			'ZASK00037',
+			'ZASK00038',
+			'ZASK00039',
+			'ZASK00041',
+			'ZASK00042',
+			'ZASK20241',
+			'ZASK20242'
 		]);
 	});
 });
@@ -263,7 +287,10 @@ describe('KOMPONENTY_SLIDE — pripravené, ale do Money zatiaľ nejde', () => {
 			KOMPONENTY_SLIDE,
 			sysStyl,
 			zaklad(sysStyl),
-			pocetUzaverov(KOMPONENTY_SLIDE.find((k) => k.kod === 'ZASK20254')!, sysStyl)
+			pocetUzaverov(
+				KOMPONENTY_SLIDE.find((k) => k.kod === 'ZASK20254')!,
+				sysStyl
+			)
 		);
 
 	it('Slide je vypnutý, kým 7 kódov nemá v Money skladovú zásobu', () => {

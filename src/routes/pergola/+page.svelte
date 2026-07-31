@@ -43,7 +43,8 @@
 			step="any"
 			value={v?.editVals?.[o.kod] ?? (o.qty || '')}
 			aria-label="Množstvo {o.kod}"
-			style="width:110px;padding:6px 8px;font-size:14px;text-align:center" />
+			style="width:110px;padding:6px 8px;font-size:14px;text-align:center"
+		/>
 		<span style="color:#64748b;font-size:13px">m</span>
 	</div>
 {/snippet}
@@ -57,7 +58,9 @@
 			{/each}
 			{#if withCopy}
 				<div style="height:12px"></div>
-				<button class="btn" type="button" onclick={kopiruj} data-testid="kopiruj-tyce">{copyBtnText}</button>
+				<button class="btn" type="button" onclick={kopiruj} data-testid="kopiruj-tyce"
+					>{copyBtnText}</button
+				>
 			{/if}
 		</div>
 	{/if}
@@ -67,8 +70,8 @@
 	<div class="card">
 		<h1>Pergola — CAD nárez → Money</h1>
 		<p class="sub">
-			Vlož CAD nárez (riadky: KÓD NÁZOV KS REZ), ukážem Money rozpis a počty tyčí pre Solid
-			Edge. Odpis sa odošle až po tvojom potvrdení.
+			Vlož CAD nárez (riadky: KÓD NÁZOV KS REZ), ukážem Money rozpis a počty tyčí pre Solid Edge.
+			Odpis sa odošle až po tvojom potvrdení.
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
 	</div>
@@ -101,7 +104,9 @@
 					rows="10"
 					required
 					placeholder="18004 PRIECKOVY PROFIL 105&#9;9&#9;3871"
-					style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:ui-monospace,monospace">{vstup.cad}</textarea>
+					style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:ui-monospace,monospace"
+					>{vstup.cad}</textarea
+				>
 			</div>
 			<div class="field">
 				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
@@ -127,8 +132,8 @@
 
 	{#if v.longNotes.length}
 		<div class="warn">
-			<b>⚠ Dlhé profily (rez &gt; 7500 mm)</b> — riešené kombináciou tyčí. Pri <b>žľabe</b> over,
-			že spoj vyjde nad nohu pergoly.
+			<b>⚠ Dlhé profily (rez &gt; 7500 mm)</b> — riešené kombináciou tyčí. Pri <b>žľabe</b> over, že spoj
+			vyjde nad nohu pergoly.
 		</div>
 	{/if}
 
@@ -143,13 +148,21 @@
 						<label for="combo_{k.idx}">{k.fieldLabel}</label>
 						{#each k.options as opt (opt)}
 							<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:4px 0">
-								<input type="radio" name="combo_{k.idx}" value={opt} checked={opt === k.selected} style="width:auto" />
+								<input
+									type="radio"
+									name="combo_{k.idx}"
+									value={opt}
+									checked={opt === k.selected}
+									style="width:auto"
+								/>
 								{opt}
 							</label>
 						{/each}
 					</div>
 				{/each}
-				<p class="sub noprint" style="margin-bottom:14px">Zmena voľby prepočíta Money rozpis aj počty tyčí pri odoslaní.</p>
+				<p class="sub noprint" style="margin-bottom:14px">
+					Zmena voľby prepočíta Money rozpis aj počty tyčí pri odoslaní.
+				</p>
 			{/if}
 
 			<div class="sec">Money rozpis — {v.nonzero.length} položiek</div>
@@ -175,11 +188,15 @@
 			<div style="height:14px" class="noprint"></div>
 			<button class="btn noprint" type="submit" data-testid="odoslat">
 				{data.live
-					? (vstup.caka ? '⏳ Odoslať odpis (odloží sa do NA ODPIS/Pergola)' : '✅ Odoslať odpis do Money')
+					? vstup.caka
+						? '⏳ Odoslať odpis (odloží sa do NA ODPIS/Pergola)'
+						: '✅ Odoslať odpis do Money'
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
-		<button class="btn secondary noprint" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<button class="btn secondary noprint" onclick={() => window.print()}
+			>🖨 Tlačiť / uložiť PDF</button
+		>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hiddenVstup()}
 			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
@@ -197,8 +214,8 @@
 		{#if !form.outcome.live}
 			🧪 TEST — do Money NEJDE (testovací priečinok): <b>{form.outcome.filename}</b>
 		{:else if vstup.caka}
-			⏳ Odložené — čaká na materiál. Súbor <b>{form.outcome.filename}</b> je v NA ODPIS/Pergola,
-			presuň do dlv keď máš materiál.
+			⏳ Odložené — čaká na materiál. Súbor <b>{form.outcome.filename}</b> je v NA ODPIS/Pergola, presuň
+			do dlv keď máš materiál.
 		{:else}
 			✅ Odoslané do Money na import: <b>{form.outcome.filename}</b>
 		{/if}
@@ -227,7 +244,10 @@
 		{#if v.nulove.some((o) => v.zmenene.includes(o.kod))}
 			<p class="sub">
 				Vynulované úpravou (v odpise nie sú):
-				{v.nulove.filter((o) => v.zmenene.includes(o.kod)).map((o) => o.kod).join(', ')}
+				{v.nulove
+					.filter((o) => v.zmenene.includes(o.kod))
+					.map((o) => o.kod)
+					.join(', ')}
 			</p>
 		{/if}
 	</div>

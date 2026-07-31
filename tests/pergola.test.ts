@@ -102,7 +102,9 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 	it('neznámy CAD kód → unresolved + validácia ho hlási', () => {
 		const r = transform('99999 NEZNAMY PROFIL\t1\t2000');
 		expect(r.unresolved.length).toBe(1);
-		expect(validatePergola('Z', 'O', 'Zak', '99999 NEZNAMY PROFIL\t1\t2000', r)).toContain('Nenamapované');
+		expect(validatePergola('Z', 'O', 'Zak', '99999 NEZNAMY PROFIL\t1\t2000', r)).toContain(
+			'Nenamapované'
+		);
 	});
 
 	it('validácia: prázdny vstup / chýbajúce polia (vrátane zákazníka)', () => {
@@ -132,11 +134,24 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 		expect(r.comboCases[0].fieldLabel).toContain('(kus 1)');
 		expect(r.comboCases[1].fieldLabel).toContain('(kus 2)');
 		// rôzne voľby pre každý kus sa aplikujú NEZÁVISLE
-		const q = applyCombos(r, new Map([[0, [7500, 4500]], [1, [4500, 6000]]]));
+		const q = applyCombos(
+			r,
+			new Map([
+				[0, [7500, 4500]],
+				[1, [4500, 6000]]
+			])
+		);
 		expect(q['PRP202524']).toBe(7.5); // jeden kus na 7500
 		expect(q['PRP202525']).toBe(6); // druhý kus drží 6000
 		expect(q['PRP202526']).toBe(9); // 2× 4500
-		const cb = buildCopyBack(text, r, new Map([[0, [7500, 4500]], [1, [4500, 6000]]]));
+		const cb = buildCopyBack(
+			text,
+			r,
+			new Map([
+				[0, [7500, 4500]],
+				[1, [4500, 6000]]
+			])
+		);
 		expect(cb.lines[0].barsStr).toBe('2(4,5m) 1(6m) 1(7,5m)');
 	});
 });

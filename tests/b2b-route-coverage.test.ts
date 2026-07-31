@@ -20,9 +20,7 @@ const ALLOWED = new Set(['/zasklenia', '/login', '/logout', '/health']);
 function toRoutePath(dirAbs: string): string {
 	const rel = path.relative(ROUTES_DIR, dirAbs);
 	if (!rel) return '/';
-	const segments = rel
-		.split(path.sep)
-		.filter((seg) => !(seg.startsWith('(') && seg.endsWith(')')));
+	const segments = rel.split(path.sep).filter((seg) => !(seg.startsWith('(') && seg.endsWith(')')));
 	return '/' + segments.join('/');
 }
 

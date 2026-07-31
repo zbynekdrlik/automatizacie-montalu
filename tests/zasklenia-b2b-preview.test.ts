@@ -15,7 +15,10 @@ const { actions } = await import('../src/routes/zasklenia/+page.server');
 const B2B_USER = { id: 1, username: 'vo', role: 'b2b' as const };
 const INTERNAL_USER = { id: 2, username: 'admin', role: 'internal' as const };
 
-function nahladEvent(fields: Record<string, string>, user: typeof B2B_USER | typeof INTERNAL_USER | null) {
+function nahladEvent(
+	fields: Record<string, string>,
+	user: typeof B2B_USER | typeof INTERNAL_USER | null
+) {
 	const fd = new FormData();
 	for (const [k, v] of Object.entries(fields)) fd.append(k, v);
 	return {
@@ -62,9 +65,30 @@ describe('nahlad — b2b šírkový blok + výškové upozornenie', () => {
 	});
 });
 
-const POSUV1 = { system: 'Robust', styl: '2K', s: 5000, v: 2000, sklo: BASE.sklo, otvaranie: 'P - L' };
-const POSUV2_HEIGHT = { system: 'Robust', styl: '2K', s: 2600, v: 2700, sklo: BASE.sklo, otvaranie: 'P - L' };
-const POSUV_OK = { system: 'Robust', styl: '2K', s: 2600, v: 2000, sklo: BASE.sklo, otvaranie: 'P - L' };
+const POSUV1 = {
+	system: 'Robust',
+	styl: '2K',
+	s: 5000,
+	v: 2000,
+	sklo: BASE.sklo,
+	otvaranie: 'P - L'
+};
+const POSUV2_HEIGHT = {
+	system: 'Robust',
+	styl: '2K',
+	s: 2600,
+	v: 2700,
+	sklo: BASE.sklo,
+	otvaranie: 'P - L'
+};
+const POSUV_OK = {
+	system: 'Robust',
+	styl: '2K',
+	s: 2600,
+	v: 2000,
+	sklo: BASE.sklo,
+	otvaranie: 'P - L'
+};
 
 function nahladMultiEvent(posuvy: unknown[], user: typeof B2B_USER | typeof INTERNAL_USER | null) {
 	const fd = new FormData();

@@ -65,7 +65,9 @@ const V14_OPONA_NAZOV = 'Oponový profil Surový 7500 mm';
 			(r as { skloHrubka?: number }).skloHrubka ?? 0
 		);
 	}
-	v14.exec("INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')");
+	v14.exec(
+		"INSERT INTO glass_types (nazov, redukcia_zero, poradie, system) VALUES ('X', 0, 1, 'ALL')"
+	);
 	v14.pragma('user_version = 14');
 	v14.close();
 }
@@ -74,9 +76,9 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 const row = (sysStyl: string, poradie: number) =>
-	db.prepare('SELECT kod, nazov, offset FROM cfg_rez WHERE sys_styl = ? AND poradie = ?').get(sysStyl, poradie) as
-		| { kod: string; nazov: string; offset: number }
-		| undefined;
+	db
+		.prepare('SELECT kod, nazov, offset FROM cfg_rez WHERE sys_styl = ? AND poradie = ?')
+		.get(sysStyl, poradie) as { kod: string; nazov: string; offset: number } | undefined;
 const off = (sysStyl: string, poradie: number) => row(sysStyl, poradie)?.offset;
 
 describe('reálny v14 → v15: Slide opona rámový „rozmer" + oponový kód', () => {

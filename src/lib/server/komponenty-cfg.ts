@@ -136,7 +136,12 @@ export const KOMPONENTY_SLIDE: Komponent[] = [
 		mj: 'ks',
 		pravidlo: { typ: 'konstPreKolajnicu', ks: { '2K': 8, '3K': 8 } }
 	},
-	{ kod: 'ZASK00037', nazov: 'Rohovník obvodový', mj: 'ks', pravidlo: { typ: 'naKridlo', koef: 4 } },
+	{
+		kod: 'ZASK00037',
+		nazov: 'Rohovník obvodový',
+		mj: 'ks',
+		pravidlo: { typ: 'naKridlo', koef: 4 }
+	},
 	...TESNENIE_ZASKLIEVACIE,
 	{
 		kod: 'ZASK20259',
