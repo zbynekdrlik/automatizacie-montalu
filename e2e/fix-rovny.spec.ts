@@ -41,6 +41,13 @@ test('rovný fix: jedna výška, výkres bez sklonu a bez uhlov', async ({ page 
 	// šírka sa kótuje aj naďalej
 	await expect(page.getByTestId('fix-sirka')).toContainText('2000');
 
+	// popis výkresu pre čítačku obrazovky hovorí „rovného", nie „šikmého", a nesie
+	// jednu výšku (nález pri živom overení v0.9.7)
+	await expect(page.getByTestId('fix-vykres')).toHaveAttribute(
+		'aria-label',
+		'Výkres rovného fixu 2000×1500 mm, 1 polí'
+	);
+
 	// tabuľka polí má jednu výšku, nie „vľavo/vpravo/šikmá hrana"
 	const tab = page.getByTestId('fix-tabulka');
 	await expect(tab).toContainText('1500 mm');

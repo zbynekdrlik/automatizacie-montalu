@@ -147,7 +147,9 @@
 	viewBox="0 0 {W} {totalH}"
 	width="100%"
 	role="img"
-	aria-label="Výkres šikmého fixu {r.S}×{r.V1}/{r.V2} mm, {r.polia.length} polí"
+	aria-label={rovny
+		? `Výkres rovného fixu ${r.S}×${r.V1} mm, ${r.polia.length} polí`
+		: `Výkres šikmého fixu ${r.S}×${r.V1}/${r.V2} mm, ${r.polia.length} polí`}
 	data-testid="fix-vykres"
 >
 	<!-- obrys konštrukcie -->
