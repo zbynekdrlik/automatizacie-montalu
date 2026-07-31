@@ -35,6 +35,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Lint (eslint + prettier --check)
+        run: npm run lint
       - name: Typová kontrola (svelte-check)
         run: npm run check
       - name: Unit testy (vitest — 1:1 vektory výpočtov + dedup)

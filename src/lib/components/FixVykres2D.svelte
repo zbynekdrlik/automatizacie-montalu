@@ -25,7 +25,6 @@
 	// mierka: šírka aj výška v ROVNAKEJ mierke (tvar musí sedieť), zmenšená ak by
 	// bola konštrukcia privysoká na kresbu
 	let scale = $derived(Math.min(KRESBA_W / r.S, MAX_H / Math.max(r.V1, r.V2)));
-	let kresbaW = $derived(r.S * scale);
 	let base = $derived(M.top + Math.max(r.V1, r.V2) * scale); // spodná hrana konštrukcie
 	let totalH = $derived(base + M.bottom);
 

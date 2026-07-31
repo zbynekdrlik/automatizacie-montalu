@@ -16,14 +16,18 @@ dev→main when ready. Merge commits only (no squash/rebase). Auto-merge default
 
 Version file: `package.json` `"version"`. Bump it on `dev` FIRST (before any work) so
 `dev` > `main` (per version-bumping). The web UI MUST display this version label — see
-the foundation gap below.
+"CI + deploy" below.
 
 ## Local build policy (Tier 0)
 
-- Before pushing, run the cheap type gate locally: `npm run check` (svelte-check = tsc,
-  no bundle) — fix errors before push.
+- Before pushing, run the cheap gates locally: `npm run check` (svelte-check = tsc, no
+  bundle) and `npm run lint` (eslint + `prettier --check`) — fix before push.
 - `npm run build` / `vite build` is a bundler build → **CI only, not local** (no-local-builds).
-- No eslint/prettier configured yet — `svelte-check` is the current type gate.
+- eslint (`eslint.config.js`) + prettier (`.prettierrc.json`) are configured — tabs,
+  single quotes, ~100 print width, matching the pre-existing hand-formatted code. Most of
+  the existing tree is hand-formatted (not run through prettier) and is listed in
+  `.prettierignore` under gradual adoption (#98) — new/edited files must be
+  prettier-clean; don't add to that list.
 - `better-sqlite3` is a native module (needs a compile step on `npm ci`).
 
 ## Testing
