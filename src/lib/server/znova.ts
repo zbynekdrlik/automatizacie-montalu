@@ -17,6 +17,7 @@ import { glassTypesForSystem, listSysStyly } from './db';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
 import type { Klin } from '$lib/klin';
 import type { KolajnicaRucne } from '$lib/kolajnica';
+import type { Sietka } from '$lib/sietka';
 
 export interface ZnovaVysledok {
 	/** z ktorej zákazky sa predvypĺňa (do hlášky nad formulárom) */
@@ -68,7 +69,8 @@ function posuvZDetailu(
 		kovanieStred: s(d.kovanieStred),
 		kovanieStredOkno: d.kovanieStredOkno === 'P' ? 'P' : 'L',
 		klin: obj<Klin>(d.klin),
-		kolajnica: obj<KolajnicaRucne>(d.kolajnica)
+		kolajnica: obj<KolajnicaRucne>(d.kolajnica),
+		sietka: obj<Sietka>(d.sietka)
 	};
 }
 

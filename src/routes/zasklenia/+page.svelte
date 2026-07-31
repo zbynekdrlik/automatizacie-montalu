@@ -11,6 +11,15 @@
 	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
+	import {
+		sietkaPopis,
+		maSietkaSystem,
+		sietkaStrana,
+		potrebuje3KKolajnicu,
+		type Sietka,
+		type SietkaUchyt
+	} from '$lib/sietka';
+	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -52,7 +61,9 @@
 			jednostrannaFab: zd?.jednostrannaFab ?? false,
 			klin: (fv?.klin ?? null) as Klin | null,
 			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
-			kolajnica: (fv?.kolajnica ?? null) as { horna?: number; spodna?: number } | null
+			kolajnica: (fv?.kolajnica ?? null) as { horna?: number; spodna?: number } | null,
+			// sieťka (#86–#90) — display-only, do Money odpisu NEJDE
+			sietka: (fv?.sietka ?? null) as Sietka | null
 		};
 	});
 
@@ -111,6 +122,11 @@
 		// ručné dĺžky koľajníc TOHOTO posuvu — prázdne = počítaj zo šírky (mení odpis)
 		kolajnicaHorna: number | string;
 		kolajnicaSpodna: number | string;
+		// sieťka TOHOTO posuvu (#86–#90) — ploché polia, do Money odpisu NEJDE
+		sietka: boolean;
+		sietkaSirka: number | string;
+		sietkaVyska: number | string;
+		sietkaUchyt: SietkaUchyt;
 	};
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
@@ -144,6 +160,11 @@
 	let klinV1S = $state<number | string>('');
 	let klinV2S = $state<number | string>('');
 	let klinKsS = $state<number | string>(1);
+	// sieťka primárneho posuvu (#86–#90) — display-only, do Money odpisu NEJDE
+	let sietkaS = $state(false);
+	let sietkaSirkaS = $state<number | string>('');
+	let sietkaVyskaS = $state<number | string>('');
+	let sietkaUchytS = $state<SietkaUchyt>('ziadny');
 	// ručné dĺžky koľajníc primárneho posuvu (Patrik 2026-07-28) — MENIA Money odpis
 	let kolHS = $state<number | string>('');
 	let kolSS = $state<number | string>('');
@@ -167,6 +188,11 @@
 		klinV1S = kl?.v1 ?? '';
 		klinV2S = kl?.v2 ?? '';
 		klinKsS = kl?.ks ?? 1;
+		const sk = (fv?.sietka ?? null) as Sietka | null;
+		sietkaS = !!sk;
+		sietkaSirkaS = sk?.sirka ?? '';
+		sietkaVyskaS = sk?.vyska ?? '';
+		sietkaUchytS = sk?.uchyt ?? 'ziadny';
 		const kolP = (prim()?.kolajnica ?? null) as { horna?: number; spodna?: number } | null;
 		kolHS = kolP?.horna ?? '';
 		kolSS = kolP?.spodna ?? '';
@@ -191,7 +217,11 @@
 			klinV2: x.klin?.v2 ?? '',
 			klinKs: x.klin?.ks ?? 1,
 			kolajnicaHorna: x.kolajnica?.horna ?? '',
-			kolajnicaSpodna: x.kolajnica?.spodna ?? ''
+			kolajnicaSpodna: x.kolajnica?.spodna ?? '',
+			sietka: !!x.sietka,
+			sietkaSirka: x.sietka?.sirka ?? '',
+			sietkaVyska: x.sietka?.vyska ?? '',
+			sietkaUchyt: x.sietka?.uchyt ?? 'ziadny'
 		}));
 	});
 	// 2x2K / 2x3K = opona (otváranie od stredu) → povoľ len „Opona" a nastav ju
@@ -204,13 +234,27 @@
 	// kovanie je zatiaľ len robustové — pri inom systéme voľbu zahoď (aj v JSON-e
 	// posuvov), nech sa na plán nedostane kovanie k systému, ktorý ho neponúka
 	let jeRobust = $derived(system === 'Robust');
+	// #88: sieťka nemá kľučku/FAB — kým je zapnutá, kovanie sa v ponuke skryje aj
+	// vynuluje (namiesto neho sa ponúka úchyt v SietkaPolia)
 	$effect(() => {
-		if (!jeRobust) {
+		if (!jeRobust || sietkaS) {
 			kovanieLS = '';
 			kovaniePS = '';
 			kovanieStredS = '';
 		}
 	});
+	// sieťka (#86–#90) sa ponúka len na Robust/Slide — pri inom systéme zapínač zhoď
+	let maSietka = $derived(maSietkaSystem(system));
+	$effect(() => {
+		if (!maSietka) {
+			sietkaS = false;
+			sietkaSirkaS = '';
+			sietkaVyskaS = '';
+			sietkaUchytS = 'ziadny';
+		}
+	});
+	// strana sieťky podľa smeru posuvu (L-P → ľavá, P-L → pravá)
+	let sietkaStranaVal = $derived(sietkaStrana(otvaranie));
 	// ručná dĺžka koľajnice má zmysel len tam, kde je horná a spodná ZVLÁŠŤ
 	// (Deluxe / Štandard + / Štandard); zoznam posiela server z konfigurácie
 	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
@@ -266,7 +310,11 @@
 				klinV2: klinV2S,
 				klinKs: klinKsS,
 				kolajnicaHorna: kolHS,
-				kolajnicaSpodna: kolSS
+				kolajnicaSpodna: kolSS,
+				sietka: sietkaS ? '1' : '',
+				sietkaSirka: sietkaSirkaS,
+				sietkaVyska: sietkaVyskaS,
+				sietkaUchyt: sietkaUchytS
 			},
 			...posuvyExtra.map((p) => ({
 				system: p.system,
@@ -286,7 +334,11 @@
 				klinV2: p.klinV2,
 				klinKs: p.klinKs,
 				kolajnicaHorna: p.kolajnicaHorna,
-				kolajnicaSpodna: p.kolajnicaSpodna
+				kolajnicaSpodna: p.kolajnicaSpodna,
+				sietka: p.sietka ? '1' : '',
+				sietkaSirka: p.sietkaSirka,
+				sietkaVyska: p.sietkaVyska,
+				sietkaUchyt: p.sietkaUchyt
 			}))
 		])
 	);
@@ -306,6 +358,12 @@
 		if (!kolajnicaPre(p.system)) {
 			p.kolajnicaHorna = '';
 			p.kolajnicaSpodna = '';
+		}
+		if (!maSietkaSystem(p.system)) {
+			p.sietka = false;
+			p.sietkaSirka = '';
+			p.sietkaVyska = '';
+			p.sietkaUchyt = 'ziadny';
 		}
 	}
 	function addPosuv() {
@@ -329,7 +387,11 @@
 				klinV2: '',
 				klinKs: 1,
 				kolajnicaHorna: '',
-				kolajnicaSpodna: ''
+				kolajnicaSpodna: '',
+				sietka: false,
+				sietkaSirka: '',
+				sietkaVyska: '',
+				sietkaUchyt: 'ziadny'
 			}
 		];
 		fixPosuv(posuvyExtra.length - 1);
@@ -423,6 +485,20 @@
 		<input type="hidden" name="klinV2" value={vstup.klin.v2} />
 		<input type="hidden" name="klinKs" value={vstup.klin.ks} />
 	{/if}
+	{#if vstup.sietka}
+		<input type="hidden" name="sietka" value="1" />
+		{#if vstup.sietka.sirka}<input
+				type="hidden"
+				name="sietkaSirka"
+				value={vstup.sietka.sirka}
+			/>{/if}
+		{#if vstup.sietka.vyska}<input
+				type="hidden"
+				name="sietkaVyska"
+				value={vstup.sietka.vyska}
+			/>{/if}
+		<input type="hidden" name="sietkaUchyt" value={vstup.sietka.uchyt} />
+	{/if}
 {/snippet}
 
 <!-- Poznámka (viacriadková, vľavo) + RAL (veľkým, vpravo) na nárezovom pláne aj
@@ -505,6 +581,7 @@
 			kovanieStred={vstup.kovanieStred}
 			kovanieStredOkno={vstup.kovanieStredOkno}
 			klin={vstup.klin}
+			sietka={vstup.sietka}
 		/>
 	</div>
 
@@ -531,6 +608,34 @@
 				<div><span>Výška 2</span><b>{vstup.klin.v2} mm</b></div>
 				<div><span>Počet</span><b>{vstup.klin.ks} ks</b></div>
 			</div>
+		</div>
+	{/if}
+
+	{#if vstup.sietka}
+		<div class="card" data-testid="sietka-karta">
+			<div class="sec">Sieťka — do Money odpisu zatiaľ nejde</div>
+			<div class="g">
+				<div>
+					<span>Strana</span><b data-testid="sietka-strana"
+						>{sietkaStrana(vstup.otvaranie) ?? '—'}</b
+					>
+				</div>
+				<div>
+					<span>Rozmer</span><b data-testid="sietka-rozmer"
+						>{vstup.sietka.sirka && vstup.sietka.vyska
+							? `${fmtM(vstup.sietka.sirka)} × ${fmtM(vstup.sietka.vyska)} mm`
+							: 'doplní dielňa'}</b
+					>
+				</div>
+				<div><span>Úchyt</span><b>{sietkaPopis(vstup.sietka).split('úchyt: ')[1]}</b></div>
+				<div><span>Rám</span><b>o 1 viac (joklík navyše)</b></div>
+			</div>
+			{#if potrebuje3KKolajnicu(vstup.styl)}
+				<p class="sub" data-testid="sietka-2k-warn-karta">
+					⚠ 2K systém — potrebná 3K koľajnica (do nárezáka pridať koľaj 3K 2 ks + 2 ks namiesto 2K).
+					Money odpis sa NEMENÍ.
+				</p>
+			{/if}
 		</div>
 	{/if}
 
@@ -665,6 +770,7 @@
 						kovanieStred={pv.kovanieStred ?? ''}
 						kovanieStredOkno={(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'}
 						klin={pv.klin ?? null}
+						sietka={pv.sietka ?? null}
 					/>
 				</div>
 			{/each}
@@ -697,6 +803,28 @@
 			{#each m.posuvy as pv, i (i)}
 				{#if pv.klin}
 					<div class="row"><span>Posuv {i + 1}</span><b>{klinPopis(pv.klin)}</b></div>
+				{/if}
+			{/each}
+		</div>
+	{/if}
+
+	{#if m.posuvy.some((pv) => pv.sietka)}
+		<div class="card" data-testid="sietka-karta-multi">
+			<div class="sec">Sieťky — do Money odpisu zatiaľ nejdú</div>
+			{#each m.posuvy as pv, i (i)}
+				{#if pv.sietka}
+					<div class="row">
+						<span
+							>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
+								· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
+						><b>{sietkaPopis(pv.sietka)}</b>
+					</div>
+					{#if potrebuje3KKolajnicu(pv.styl)}
+						<p class="sub" data-testid={`sietka-2k-warn-multi-${i}`}>
+							⚠ Posuv {i + 1}: 2K systém — potrebná 3K koľajnica (2 ks + 2 ks namiesto 2K). Money
+							odpis sa NEMENÍ.
+						</p>
+					{/if}
 				{/if}
 			{/each}
 		</div>
@@ -863,8 +991,9 @@
 				</div>
 			</div>
 			<!-- Kovanie (kľučka) — LEN Robust; ľavá aj pravá strana zvlášť, pri každom
-			     posuve sólo. Display-only: plán/náhľad + detail v histórii, Money NIE. -->
-			{#if jeRobust}
+			     posuve sólo. Display-only: plán/náhľad + detail v histórii, Money NIE.
+			     #88: pri sieťke sa kľučka NEPONÚKA (namiesto nej úchyt v SietkaPolia). -->
+			{#if jeRobust && !sietkaS}
 				<div class="grid2">
 					<div class="field">
 						<label for="kovanieL">Kovanie — ľavá strana</label>
@@ -1035,6 +1164,20 @@
 				bind:v2={klinV2S}
 				bind:ks={klinKsS}
 			/>
+			<!-- Sieťka (#86–#90): zapínač + nepovinný rozmer + úchyt. Len na systémoch, kde ju
+			     appka ponúka (Robust/Slide). Display-only, do Money odpisu nevstupuje. -->
+			{#if maSietka}
+				<SietkaPolia
+					idPrefix="sietka"
+					names={true}
+					{styl}
+					strana={sietkaStranaVal}
+					bind:on={sietkaS}
+					bind:sirka={sietkaSirkaS}
+					bind:vyska={sietkaVyskaS}
+					bind:uchyt={sietkaUchytS}
+				/>
+			{/if}
 			<!-- Zimná záhrada: ďalšie posuvy sa zoptimalizujú do zdieľaných tyčí -->
 			<input type="hidden" name="posuvy" value={posuvyJSON} />
 			{#each posuvyExtra as p, i (i)}
@@ -1102,7 +1245,7 @@
 							</select>
 						</div>
 					</div>
-					{#if p.system === 'Robust'}
+					{#if p.system === 'Robust' && !p.sietka}
 						<div class="grid2">
 							<div class="field">
 								<label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
@@ -1175,6 +1318,24 @@
 						bind:v2={p.klinV2}
 						bind:ks={p.klinKs}
 					/>
+					{#if maSietkaSystem(p.system)}
+						<SietkaPolia
+							idPrefix={`ps${i}-sietka`}
+							styl={p.styl}
+							strana={sietkaStrana(p.otvaranie)}
+							bind:on={p.sietka}
+							bind:sirka={p.sietkaSirka}
+							bind:vyska={p.sietkaVyska}
+							bind:uchyt={p.sietkaUchyt}
+							onZmena={(on) => {
+								if (on) {
+									p.kovanieL = '';
+									p.kovanieP = '';
+									p.kovanieStred = '';
+								}
+							}}
+						/>
+					{/if}
 				</div>
 			{/each}
 			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>

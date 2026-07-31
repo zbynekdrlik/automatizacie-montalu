@@ -4,6 +4,7 @@
 	import { overlapMm } from '$lib/cut';
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import type { Klin } from '$lib/klin';
+	import { sietkaStrana, type Sietka } from '$lib/sietka';
 	let {
 		S,
 		V,
@@ -17,7 +18,8 @@
 		kovanieP = '',
 		kovanieStred = '',
 		kovanieStredOkno = 'L',
-		klin = null
+		klin = null,
+		sietka = null
 	}: {
 		S: number;
 		V: number;
@@ -39,6 +41,8 @@
 		kovanieStredOkno?: 'L' | 'P';
 		/** klín nad posuvom (Patrik) — trapéz s kótami nad rámom; null = žiadny */
 		klin?: Klin | null;
+		/** sieťka na posuve (#86–#90) — vyznačí sa mimo rámu na strane podľa smeru posuvu */
+		sietka?: Sietka | null;
 	} = $props();
 
 	const W = 760; // šírka kresby v px
@@ -237,6 +241,18 @@
 				.join(' ')
 		};
 	});
+
+	// Sieťka (#86–#90): vyznačí sa ako pruh MIMO rámu, na strane podľa smeru posuvu
+	// (L-P → vľavo, P-L → vpravo) — presné množstvá/kódy nie sú potvrdené, kreslíme
+	// len ORIENTAČNÝ pruh + popis, nie skutočnú geometriu profilu.
+	const SIETKA_W = 14; // px šírka pruhu sieťky v kresbe (nad krajným poľom)
+	let sietkaStranaVal = $derived(sietka ? sietkaStrana(otvaranie) : null);
+	let sietkaGeo = $derived.by(() => {
+		if (!sietka || !sietkaStranaVal) return null;
+		const vlavo = sietkaStranaVal === 'ľavá';
+		const x = vlavo ? M.left : W - M.right - SIETKA_W;
+		return { x, y: M.top, w: SIETKA_W, h, cx: x + SIETKA_W / 2 };
+	});
 </script>
 
 <svg
@@ -370,6 +386,33 @@
 			>{i + 1}</text
 		>
 	{/each}
+
+	<!-- Sieťka (#86–#90): orientačný pruh na strane podľa smeru posuvu — presná
+	     geometria profilu nie je potvrdená, toto len ukazuje KTORÁ strana. -->
+	{#if sietka && sietkaGeo}
+		<g data-testid="nahlad-sietka">
+			<rect
+				x={sietkaGeo.x}
+				y={sietkaGeo.y}
+				width={sietkaGeo.w}
+				height={sietkaGeo.h}
+				fill="#0ea5e9"
+				fill-opacity="0.22"
+				stroke="#0369a1"
+				stroke-width="1"
+				stroke-dasharray="4 3"
+			/>
+			<text
+				x={sietkaGeo.cx}
+				y={sietkaGeo.y + sietkaGeo.h / 2}
+				text-anchor="middle"
+				font-size="10"
+				fill="#0369a1"
+				font-weight="700"
+				transform="rotate(-90 {sietkaGeo.cx} {sietkaGeo.y + sietkaGeo.h / 2})">sieťka</text
+			>
+		</g>
+	{/if}
 
 	<!-- Deluxe zámkové otvory D46 na krajných sklách (⌀46, 50 mm od kraja, výška vŕtania) -->
 	{#each zamky as z (z.cx)}
