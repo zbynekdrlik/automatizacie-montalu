@@ -70,6 +70,8 @@ live in local memory, never committed (per security-basics).
 ## Playbook router
 
 Load the matching skill BEFORE working on that area (don't re-derive):
+- eslint / prettier / lint config / version-label fallback → auto-loads
+  `.claude/rules/lint-formatting.md` on its `paths:`
 - deploy / post-deploy E2E / LIVE flip → load `.claude/skills/deploy`
 - Money odpis / článkové kódy / nový systém-štýl / compute → load `.claude/skills/money-odpis`
 - unit/E2E test runs, local Playwright verification → load `.claude/skills/testing`
