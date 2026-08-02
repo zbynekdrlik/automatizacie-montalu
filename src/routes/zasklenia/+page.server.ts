@@ -129,7 +129,10 @@ function compute(vstup: Vstup): {
 		skloHrubka: g.hrubka,
 		pridavnaKolajnica: vstup.pridavnaKolajnica,
 		// ručná dĺžka koľajnice (Patrik): mení rez → mení metre v odpise
-		kolajnica: vstup.kolajnica ?? undefined
+		kolajnica: vstup.kolajnica ?? undefined,
+		// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ odpis
+		// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeFlat
+		sietka: vstup.sietka
 	};
 	const out = safeCompute(
 		cfg,
@@ -139,7 +142,8 @@ function compute(vstup: Vstup): {
 		spec.redukciaZero,
 		spec.skloHrubka,
 		spec.pridavnaKolajnica,
-		spec.kolajnica
+		spec.kolajnica,
+		spec.sietka
 	);
 	return { ...out, spec };
 }
