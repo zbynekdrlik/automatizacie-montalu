@@ -179,7 +179,8 @@ function computeMultiFrom(vstup: MultiVstup) {
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
 			// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
 			kolajnica: p.kolajnica ?? undefined,
-			// sieťka (#86–#90) — len na plán/náhľad, do Money odpisu NEJDE
+			// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ Money odpis
+			// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeMulti/computeFlat
 			sietka: p.sietka ?? undefined
 		});
 	}

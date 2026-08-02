@@ -226,6 +226,27 @@ test('samostatná stránka /sietka: Odoslať do Money zapíše odpis (TEST reži
 	await waitHydrated(page);
 	await expect(page.getByText('Odpis odoslaný')).toBeVisible();
 
+	// odoslanie ROVNAKÉHO ZAK+OP znova musí ukázať zrozumiteľnú „duplikát" hlášku,
+	// NIE prázdnu stránku (review nález PR #108: step==='duplikat' vetva sa
+	// renderuje v tom istom bloku ako step==='vysledok', gejtovanom na `r` — bez
+	// neho zostala stránka prázdna)
+	await goto(page, '/sietka');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka odoslanie');
+	await page.selectOption('#system', 'Robust');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('4645');
+	await page.locator('#otvorV').fill('2320');
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+	await page.getByTestId('odoslat-sietku').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('sietka-samostatna-duplikat')).toContainText('už bola odoslaná');
+	// karta s výsledkom (rám/nos/rozmer) ostáva vidno pod hláškou — nie je to
+	// prázdna stránka
+	await expect(page.getByTestId('sietka-samostatna-vysledok')).toBeVisible();
+
 	expect(errs).toEqual([]);
 });
 

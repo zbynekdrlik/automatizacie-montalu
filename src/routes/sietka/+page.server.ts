@@ -107,7 +107,11 @@ export const actions: Actions = {
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
-					vstup
+					vstup,
+					// `+page.svelte` renderuje `vysledok`/`duplikat` v JEDNOM zdieľanom bloku
+					// gejtovanom na `r` — bez neho by duplikát zobrazil PRÁZDNU stránku
+					r,
+					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)
 				};
 			}
 			return { step: 'hotovo' as const, vstup, r, outcome };

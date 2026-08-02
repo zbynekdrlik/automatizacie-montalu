@@ -16,7 +16,13 @@ import {
 	rozmerSietoviny,
 	type SietkaUchyt
 } from '../src/lib/sietka';
-import { buildCFG, computeMulti, type SysRow, type RezRow } from '../src/lib/server/compute';
+import {
+	buildCFG,
+	computeFlat,
+	computeMulti,
+	type SysRow,
+	type RezRow
+} from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
 
 const fd = (o: Record<string, string>) => {
@@ -229,17 +235,23 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 		expect(so.odpis.some((o) => o.kod === 'ZASP00097')).toBe(false);
 	});
 
-	it('bez sieťky je odpis aj materiál bit-identický s dneškom (regresný dôkaz)', () => {
+	it('bez sieťky: computeFlat (jeden posuv) a computeMulti (ten istý posuv) sa zhodujú — regresný dôkaz na DVA nezávislé vstupné body engine, nie na ten istý výpočet dvakrát', () => {
 		const vektory: [string, number, number][] = [
 			['Robust|3K', 4645, 2320],
 			['Slide|3K', 3500, 2001],
 			['Robust|2K', 2509, 1930]
 		];
 		for (const [sysStyl, S, V] of vektory) {
-			const a = computeMulti(cfg, spec(sysStyl, S, V, null))!;
-			const b = computeMulti(cfg, spec(sysStyl, S, V, null))!;
-			expect(a.odpis).toEqual(b.odpis);
-			expect(a.material).toEqual(b.material);
+			const flat = computeFlat(cfg, sysStyl, S, V, true)!;
+			const multi = computeMulti(cfg, spec(sysStyl, S, V, null))!;
+			// odpis (Money) musí byť bit-identický (rovnaký vzor ako compute.test.ts
+			// „computeFlat vs computeMulti pre 1 posuv" — vyššie)
+			expect(multi.odpis).toEqual(flat.odpis);
+			// materiál: rovnaké kódy a rovnaký počet tyčí (kusy nesú `posuv`-tag len v
+			// computeMulti, takže bary/kusy nie sú bajt-identické — to je OČAKÁVANÉ)
+			expect(multi.material.map((m) => [m.kod, m.tyce])).toEqual(
+				flat.material.map((m) => [m.kod, m.tyce])
+			);
 		}
 	});
 
