@@ -69,9 +69,7 @@ describe('parseSietkaSamostatnaVstup', () => {
 	});
 
 	it('nezmyselný úchyt sa sanitizuje na „bez ničoho", nikdy nezablokuje vstup', () => {
-		const { vstup, error } = parseSietkaSamostatnaVstup(
-			fd({ ...zaklad, sietkaUchyt: 'nezmysel' })
-		);
+		const { vstup, error } = parseSietkaSamostatnaVstup(fd({ ...zaklad, sietkaUchyt: 'nezmysel' }));
 		expect(error).toBeNull();
 		expect(vstup.sietka).toEqual({ uchyt: 'ziadny' });
 	});

@@ -1,11 +1,13 @@
-// Sieťka na posuve (#86–#90) — Patrik 2026-07-31: zaškrtávacie pole „so sieťkou"
-// pridá rám navyše na poslednej koľaji + úchyt namiesto kľučky; display-only, do
-// Money odpisu zatiaľ nejde (kódy/kusy ešte nie sú potvrdené).
+// Sieťka na posuve (#86–#90) — Patrik 2026-07-31 (Odoo, kanál Vyroba automatizacia),
+// KOREKCIA 2026-08-02: sieťka je ĎALŠIE krídlo toho istého posuvu (rovnaký rozmer ako
+// ostatné), takže MENÍ Money odpis na Robust/Slide (rám+nos, pri 2K aj koľajnicu).
+// Rozmer sa už NEZADÁVA — appka ho odvodí zo skla ("rozmer sieťoviny").
 //
-// Všetko ČÍTACIE: formulár + „Spočítať" (?/nahlad, ?/nahladMulti) len počítajú,
-// nezapisujú odpis → dá sa pustiť aj proti nasadenej appke (BASE_URL).
+// Väčšina testov je ČÍTACIA: formulár + „Spočítať" (?/nahlad, ?/nahladMulti) len
+// počítajú, nezapisujú odpis → dá sa pustiť aj proti nasadenej appke (BASE_URL).
+// Testy, ktoré idú AŽ ZA odoslanie do Money, sú označené a používajú `skipAkLive`.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, goto } from './helpers';
+import { collectConsole, loginAs, waitHydrated, goto, skipAkLive } from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string, styl = '3K') {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
@@ -17,7 +19,7 @@ async function zaklad(page: Page, zak: string, zakaznik: string, styl = '3K') {
 	await page.locator('#v').fill('2320');
 }
 
-/** riadky karty „Odpis (do Money)" — dôkaz Money-neutrality sieťky */
+/** riadky karty „Odpis (do Money)" */
 async function odpisRiadky(page: Page): Promise<string[]> {
 	const karta = page.locator('.card', { hasText: 'Odpis (do Money)' }).first();
 	return (await karta.locator('.row').allTextContents()).map((t) => t.replace(/\s+/g, ' ').trim());
@@ -44,7 +46,7 @@ test('sieťka: zapínač je len pri Robust/Slide, na inom systéme zmizne aj vyn
 	expect(errs).toEqual([]);
 });
 
-test('jeden posuv: sieťka je v karte plánu, v náhľade a Money odpis je NEZMENENÝ', async ({
+test('jeden posuv: sieťka pridá presnú deltu do Money odpisu (rám+nos, #86 korekcia)', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
@@ -63,25 +65,24 @@ test('jeden posuv: sieťka je v karte plánu, v náhľade a Money odpis je NEZME
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
 	await page.locator('#sietka-on').check();
-	await page.locator('#sietka-sirka').fill('1200');
-	await page.locator('#sietka-vyska').fill('1450');
 	await page.locator('#sietka-uchyt').selectOption('madloVelke');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
-	// sieťka nakreslená v náhľade (orientačný pruh — presná geometria nie je
-	// potvrdená, len ktorá strana)
+	// sieťka nakreslená v náhľade ako plnohodnotné pole naviac (4. krídlo)
 	await expect(page.getByTestId('nahlad-sietka')).toBeVisible();
 
-	// karta plánu nesie stranu + rozmer + úchyt
+	// karta plánu nesie stranu + rozmer sieťoviny (odvodený zo skla) + úchyt
 	const karta = page.getByTestId('sietka-karta');
 	await expect(karta).toContainText('pravá'); // P - L → sieťka vpravo
-	await expect(karta).toContainText('1200');
-	await expect(karta).toContainText('1450');
 	await expect(karta).toContainText('vystúpené madlo veľké');
 
-	// MONEY-NEUTRALITA: sieťka nesmie pridať/zmeniť ani jeden odpisový riadok
-	expect(await odpisRiadky(page)).toEqual(bezSietky);
+	// MONEY-KOREKCIA: sieťka MUSÍ zmeniť odpis (rámový profil pribudne)
+	const soSietkou = await odpisRiadky(page);
+	expect(soSietkou).not.toEqual(bezSietky);
+	// rámový kód (ZASP00002) musí mať VYŠŠIE metre so sieťkou
+	const ram = (riadky: string[]) => riadky.find((r) => r.includes('ZASP00002'));
+	expect(ram(soSietkou)).not.toBe(ram(bezSietky));
 
 	expect(errs).toEqual([]);
 });
@@ -107,34 +108,39 @@ test('sieťka: kľučka sa neponúka, keď je sieťka zapnutá (#88)', async ({ 
 	expect(errs).toEqual([]);
 });
 
-test('sieťka na 2K posuve ukáže upozornenie na 3K koľajnicu (#87), Money sa nemení', async ({
+test('sieťka na 2K posuve ukáže upozornenie a Money odpis PRIDÁ 3K koľajnicu (#87)', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-2K', 'E2E Sietka 2K', '2K');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	const bez2k = await odpisRiadky(page);
+
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
 	await page.locator('#sietka-on').check();
-	await expect(page.getByTestId('sietka-2k-warn')).toContainText('3K koľajnica');
+	await expect(page.getByTestId('sietka-2k-warn')).toContainText('3K');
 
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('sietka-2k-warn-karta')).toContainText('3K');
-	// odpisová karta neobsahuje žiadnu zmienku o zámene — dôkaz Money-neutrality
-	const odpis = (await odpisRiadky(page)).join(' ');
-	expect(odpis).not.toMatch(/3K/);
+	// odpisová karta TERAZ obsahuje 3K koľajnicu namiesto 2K
+	const so2k = (await odpisRiadky(page)).join(' ');
+	expect(so2k).toContain('3K');
+	expect(so2k).not.toEqual(bez2k.join(' '));
 
 	expect(errs).toEqual([]);
 });
 
-test('sieťka prežije „← Späť a upraviť" (rozmer aj úchyt)', async ({ page }) => {
+test('sieťka prežije „← Späť a upraviť" (úchyt)', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-B', 'E2E Sietka spat');
 	await page.locator('#sietka-on').check();
-	await page.locator('#sietka-sirka').fill('1180');
-	await page.locator('#sietka-vyska').fill('1420');
 	await page.locator('#sietka-uchyt').selectOption('zamok');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
@@ -142,8 +148,6 @@ test('sieťka prežije „← Späť a upraviť" (rozmer aj úchyt)', async ({ p
 	await waitHydrated(page);
 
 	await expect(page.locator('#sietka-on')).toBeChecked();
-	await expect(page.locator('#sietka-sirka')).toHaveValue('1180');
-	await expect(page.locator('#sietka-vyska')).toHaveValue('1420');
 	await expect(page.locator('#sietka-uchyt')).toHaveValue('zamok');
 
 	expect(errs).toEqual([]);
@@ -159,8 +163,6 @@ test('viac posuvov: sieťka má len ten posuv, ktorý ju má zapnutú', async ({
 	await page.locator('#ps0-v').fill('2320');
 	// sieťka len na DRUHOM posuve (primárny ostáva bez nej)
 	await page.locator('#ps0-sietka-on').check();
-	await page.locator('#ps0-sietka-sirka').fill('1300');
-	await page.locator('#ps0-sietka-vyska').fill('1500');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -168,12 +170,11 @@ test('viac posuvov: sieťka má len ten posuv, ktorý ju má zapnutú', async ({
 	const karta = page.getByTestId('sietka-karta-multi');
 	await expect(karta).toContainText('Posuv 2');
 	await expect(karta).not.toContainText('Posuv 1 ');
-	await expect(karta).toContainText('1300 × 1500 mm');
 
 	expect(errs).toEqual([]);
 });
 
-test('samostatná stránka /sietka: dodatočná sieťka bez posuvu, rám 2 ks + 2 ks, žiadne Odoslať do Money', async ({
+test('samostatná stránka /sietka: rám 2ks+2ks, nos 1ks, rozmer sieťoviny, tlačidlo Odoslať pre internych', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
@@ -191,21 +192,52 @@ test('samostatná stránka /sietka: dodatočná sieťka bez posuvu, rám 2 ks + 
 	await waitHydrated(page);
 
 	await expect(page.getByTestId('ram-profil')).toHaveText('2 ks + 2 ks');
+	await expect(page.getByTestId('nos-profil')).toHaveText('1 ks');
+	// rozmer sieťoviny je TERAZ vypočítaný (nie ručne zadaný) a vždy sa zobrazí
+	await expect(page.getByTestId('sietka-samostatna-rozmer')).toBeVisible();
 	// 2K posuv → tabuľka upozornenia na 3K koľajnicu
 	await expect(page.getByTestId('sietka-2k-tabulka')).toContainText('3K');
-	// žiadne tlačidlo pre zápis do Money nikde na stránke
-	await expect(page.getByRole('button', { name: /Odoslať/ })).toHaveCount(0);
+	// interný používateľ VIDÍ tlačidlo na odoslanie do Money (korekcia 2026-08-02)
+	await expect(page.getByTestId('odoslat-sietku')).toBeVisible();
 
 	expect(errs).toEqual([]);
 });
 
-test('/sietka je v nav odkazoch a b2b naň nie je presmerovaný preč', async ({ page }) => {
+// ZÁPISOVÝ → `skipAkLive`, aby proti ostrej appke nikdy nebežal (rovnaký vzor ako
+// e2e/klin.spec.ts „viac posuvov: klín je vidno AJ po odoslaní").
+test('samostatná stránka /sietka: Odoslať do Money zapíše odpis (TEST režim)', async ({ page }) => {
+	const errs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+
+	await goto(page, '/sietka');
+	const zak = `E2E-SIETKA-ODO-${Date.now().toString(36)}`;
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka odoslanie');
+	await page.selectOption('#system', 'Robust');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('4645');
+	await page.locator('#otvorV').fill('2320');
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+
+	await page.getByTestId('odoslat-sietku').click();
+	await waitHydrated(page);
+	await expect(page.getByText('Odpis odoslaný')).toBeVisible();
+
+	expect(errs).toEqual([]);
+});
+
+test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí tlačidlo Odoslať', async ({
+	page
+}) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await expect(page.getByRole('link', { name: 'Sieťka' })).toBeVisible();
 
 	// b2b throwaway účet (rovnaký vzor ako app.spec.ts B2B test) — over, že /sietka
-	// nepresmeruje preč (Patrik #89: „hlavne pre externých")
+	// nepresmeruje preč (Patrik #89: „hlavne pre externých") a nevidí Money zápis
 	page.on('dialog', (d) => d.accept());
 	const b2bUser = `e2e-sietka-b2b-${Date.now().toString(36)}`;
 	const b2bPass = 'e2eheslo1';
@@ -221,6 +253,18 @@ test('/sietka je v nav odkazoch a b2b naň nie je presmerovaný preč', async ({
 	await expect(page.getByRole('link', { name: 'Sieťka' })).toBeVisible();
 	await goto(page, '/sietka');
 	await expect(page).toHaveURL(/\/sietka/);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-SIETKA-B2B');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka b2b');
+	await page.selectOption('#system', 'Robust');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('4645');
+	await page.locator('#otvorV').fill('2320');
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+	// b2b nikdy nevidí tlačidlo na zápis do Money — len tabuľku/výpočet
+	await expect(page.getByRole('button', { name: /Odoslať/ })).toHaveCount(0);
 
 	// upratanie
 	await page.getByRole('button', { name: 'Odhlásiť' }).click();

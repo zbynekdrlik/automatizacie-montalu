@@ -242,24 +242,29 @@
 		};
 	});
 
-	// Sieťka (#86–#90): vyznačí sa ako pruh MIMO rámu, na strane podľa smeru posuvu
-	// (L-P → vľavo, P-L → vpravo) — presné množstvá/kódy nie sú potvrdené, kreslíme
-	// len ORIENTAČNÝ pruh + popis, nie skutočnú geometriu profilu.
-	const SIETKA_W = 14; // px šírka pruhu sieťky v kresbe (nad krajným poľom)
+	// Sieťka (#86–#90, KOREKCIA 2026-08-02): sieťka je ĎALŠIE krídlo tohto posuvu,
+	// „úplne rovnaký rozmer ako každé iné okno v tom posuve" — preto sa kreslí ako
+	// PLNOHODNOTNÉ pole TEJ ISTEJ šírky (`panelW`) mimo rámu, na strane podľa smeru
+	// posuvu (L-P → vľavo, P-L → vpravo). Len na jednom súvislom behu krídel (opona
+	// nemá určenú stranu — `sietkaStrana('Opona') === null` — tam sa nekreslí, presne
+	// ako pri Money výpočte). Viditeľná plocha (viewBox) sa o šírku panela rozšíri
+	// na tú stranu, kde sieťka pribúda — ostatné kóty/rám ostávajú nedotknuté.
 	let sietkaStranaVal = $derived(sietka ? sietkaStrana(otvaranie) : null);
+	let sietkaVlavo = $derived(sietkaStranaVal === 'ľavá');
 	let sietkaGeo = $derived.by(() => {
 		if (!sietka || !sietkaStranaVal) return null;
-		const vlavo = sietkaStranaVal === 'ľavá';
-		const x = vlavo ? M.left : W - M.right - SIETKA_W;
-		return { x, y: M.top, w: SIETKA_W, h, cx: x + SIETKA_W / 2 };
+		const x = sietkaVlavo ? M.left - panelW : W - M.right;
+		return { x, y: M.top, w: panelW, h, cx: x + panelW / 2 };
 	});
+	let viewX = $derived(sietkaGeo && sietkaVlavo ? -panelW : 0);
+	let viewW = $derived(W + (sietkaGeo ? panelW : 0));
 </script>
 
 <svg
-	viewBox="0 0 {W} {totalH}"
+	viewBox="{viewX} 0 {viewW} {totalH}"
 	width="100%"
 	role="img"
-	aria-label="Náhľad zasklenia {S}×{V} mm, {N} polí"
+	aria-label="Náhľad zasklenia {S}×{V} mm, {N} polí{sietkaGeo ? ' + sieťka' : ''}"
 	data-testid="nahlad-2d"
 >
 	<!-- KLÍN nad posuvom (len keď je zadaný): trapéz + kóty dĺžky, oboch výšok,
@@ -387,21 +392,44 @@
 		>
 	{/each}
 
-	<!-- Sieťka (#86–#90): orientačný pruh na strane podľa smeru posuvu — presná
-	     geometria profilu nie je potvrdená, toto len ukazuje KTORÁ strana. -->
+	<!-- Sieťka (#86–#90, KOREKCIA 2026-08-02): PLNOHODNOTNÉ pole (rovnaká šírka ako
+	     ostatné krídla) mimo rámu na strane podľa smeru posuvu — 3K so sieťkou takto
+	     ukáže 4 polia (3 sklenené + 1 sieťkové), presne ako Money odpis počíta. -->
 	{#if sietka && sietkaGeo}
 		<g data-testid="nahlad-sietka">
+			<defs>
+				<pattern
+					id="sietka-mriezka"
+					width="6"
+					height="6"
+					patternTransform="rotate(45)"
+					patternUnits="userSpaceOnUse"
+				>
+					<line x1="0" y1="0" x2="0" y2="6" stroke="#0369a1" stroke-width="1" opacity="0.5" />
+				</pattern>
+			</defs>
 			<rect
-				x={sietkaGeo.x}
-				y={sietkaGeo.y}
-				width={sietkaGeo.w}
-				height={sietkaGeo.h}
-				fill="#0ea5e9"
-				fill-opacity="0.22"
+				x={sietkaGeo.x + 1}
+				y={sietkaGeo.y + 1}
+				width={sietkaGeo.w - 2}
+				height={sietkaGeo.h - 2}
+				fill="#e2e8f0"
+				stroke="#64748b"
+				stroke-width="0.9"
+			/>
+			<rect
+				x={sietkaGeo.x + frame}
+				y={sietkaGeo.y + frame}
+				width={Math.max(0, sietkaGeo.w - 2 * frame)}
+				height={Math.max(0, sietkaGeo.h - 2 * frame)}
+				fill="url(#sietka-mriezka)"
 				stroke="#0369a1"
-				stroke-width="1"
+				stroke-width="0.8"
 				stroke-dasharray="4 3"
 			/>
+			<text x={sietkaGeo.cx} y={sietkaGeo.y + 18} text-anchor="middle" font-size="11" fill="#64748b"
+				>{N + 1}</text
+			>
 			<text
 				x={sietkaGeo.cx}
 				y={sietkaGeo.y + sietkaGeo.h / 2}

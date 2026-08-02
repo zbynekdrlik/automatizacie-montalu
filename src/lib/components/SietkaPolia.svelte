@@ -1,9 +1,11 @@
 <script lang="ts">
-	// Polia sieťky pre JEDEN posuv (#86–#90): zapínač + nepovinný rozmer (šírka/výška)
-	// + úchyt. Rovnaký vzor ako KlinPolia.svelte — jeden blok pre primárny posuv
-	// (posiela sa aj ako plochý formulár, preto `names`) aj pre každý ďalší posuv
-	// zimnej záhrady (ten ide len cez JSON `posuvy`).
-	import { SIETKA_MAX_ROZMER, SIETKA_UCHYTY, potrebuje3KKolajnicu } from '$lib/sietka';
+	// Polia sieťky pre JEDEN posuv (#86–#90, KOREKCIA 2026-08-02): zapínač + úchyt.
+	// Rozmer sa už NEZADÁVA — sieťka je ĎALŠIE krídlo toho istého posuvu s rovnakým
+	// rozmerom ako ostatné (appka ho odvodí z už spočítaného skla), rovnaký princíp
+	// ako predtým, len bez ručného vstupu. Rovnaký vzor ako KlinPolia.svelte — jeden
+	// blok pre primárny posuv (posiela sa aj ako plochý formulár, preto `names`) aj
+	// pre každý ďalší posuv zimnej záhrady (ten ide len cez JSON `posuvy`).
+	import { SIETKA_UCHYTY, potrebuje3KKolajnicu } from '$lib/sietka';
 	import type { SietkaUchyt } from '$lib/sietka';
 
 	let {
@@ -12,8 +14,6 @@
 		styl = '',
 		strana = null,
 		on = $bindable(false),
-		sirka = $bindable(''),
-		vyska = $bindable(''),
 		uchyt = $bindable('ziadny' as SietkaUchyt),
 		onZmena
 	}: {
@@ -26,8 +26,6 @@
 		/** strana, na ktorej sieťka beží — podľa smeru posuvu (null = neurčené) */
 		strana?: 'ľavá' | 'pravá' | null;
 		on?: boolean;
-		sirka?: number | string;
-		vyska?: number | string;
 		uchyt?: SietkaUchyt;
 		/** #88: pri zapnutí sieťky kľučka/FAB tohto posuvu zmizne — rodič si tak vie
 		 *  vynulovať svoje kovanieL/kovanieP polia (sieťka ich nahrádza úchytom) */
@@ -48,8 +46,7 @@
 			onchange={() => onZmena?.(on)}
 			style="width:auto"
 		/>
-		🦟 So sieťkou (na poslednej koľaji) — rám a joklík navyše; presné kusy/kódy čakajú na potvrdenie,
-		do Money odpisu zatiaľ nejde
+		🦟 So sieťkou (na poslednej koľaji) — pridá rám a nos podľa potvrdeného rozpisu, ide do Money odpisu
 	</label>
 </div>
 {#if on}
@@ -61,41 +58,10 @@
 		{/if}
 		{#if potrebuje3KKolajnicu(styl)}
 			<p class="sietka-warn" data-testid={`${idPrefix}-2k-warn`}>
-				⚠ Sieťka na 2K koľajnicu nemôže ísť — potrebná je 3K koľajnica (do nárezáka pridať koľaj 3K
-				2 ks + 2 ks namiesto 2K). Toto je len upozornenie pre dielňu — Money odpis sa NEMENÍ (zámena
-				koľajnice čaká na potvrdené kódy).
+				⚠ Sieťka na 2K koľajnicu nemôže ísť — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks)
+				namiesto 2K.
 			</p>
 		{/if}
-		<p class="sietka-hint">
-			Rozmer sieťky <b>nie je</b> rozmer skla — ak ho dielňa už pozná, zadaj ho; inak necháme na dielňu
-			pri montáži.
-		</p>
-		<div class="grid2">
-			<div class="field">
-				<label for={`${idPrefix}-sirka`}>Sieťka — šírka (mm)</label>
-				<input
-					id={`${idPrefix}-sirka`}
-					name={nm('sietkaSirka')}
-					type="number"
-					min="1"
-					max={SIETKA_MAX_ROZMER}
-					step="any"
-					bind:value={sirka}
-				/>
-			</div>
-			<div class="field">
-				<label for={`${idPrefix}-vyska`}>Sieťka — výška (mm)</label>
-				<input
-					id={`${idPrefix}-vyska`}
-					name={nm('sietkaVyska')}
-					type="number"
-					min="1"
-					max={SIETKA_MAX_ROZMER}
-					step="any"
-					bind:value={vyska}
-				/>
-			</div>
-		</div>
 		<div class="field">
 			<label for={`${idPrefix}-uchyt`}>Úchyt (sieťka nemá kľučku)</label>
 			<select id={`${idPrefix}-uchyt`} name={nm('sietkaUchyt')} bind:value={uchyt}>

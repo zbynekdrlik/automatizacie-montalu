@@ -134,12 +134,7 @@ describe('parseMultiVstup — sieťka je PER POSUV', () => {
 describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 korekcia 2026-08-02)', () => {
 	const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
 
-	const spec = (
-		sysStyl: string,
-		S: number,
-		V: number,
-		sietka: { uchyt: SietkaUchyt } | null
-	) => [
+	const spec = (sysStyl: string, S: number, V: number, sietka: { uchyt: SietkaUchyt } | null) => [
 		{
 			sysStyl,
 			S,

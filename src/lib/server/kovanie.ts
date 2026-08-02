@@ -38,6 +38,11 @@ export function kovanieDoOdpisu(
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
 
+		// VEDOME sa sem neposiela `spec.sietka` — sieťka mení len profily (rám/nos/
+		// koľajnica, #86 korekcia 2026-08-02), NIE kovanie. Patrik nikdy nepotvrdil
+		// žiadnu hardvérovú položku naviac za sieťku, takže `zakladPoctov(r)` nižšie
+		// musí vychádzať z počtov BEZ sieťky — pridanie by bolo hádanie kusov, presne
+		// to, čo tento modul zakazuje (fail-loud namiesto tichého čísla).
 		const r = computeFlat(
 			cfg,
 			spec.sysStyl,

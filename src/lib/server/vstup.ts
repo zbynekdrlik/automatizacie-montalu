@@ -3,7 +3,7 @@
 import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
-import { SIETKA_MAX_ROZMER, jeSietkaUchyt, maSietkaSystem, type Sietka } from '$lib/sietka';
+import { jeSietkaUchyt, maSietkaSystem, type Sietka } from '$lib/sietka';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
@@ -98,43 +98,21 @@ export function parseKlin(raw: KlinRaw): { klin: Klin | null; error: string | nu
  *  `on` je zapínač: '1' / true = „so sieťkou" je zapnuté. */
 export interface SietkaRaw {
 	on: unknown;
-	sirka: unknown;
-	vyska: unknown;
 	uchyt: unknown;
 }
 
 /**
- * Sieťka (display-only prvok pri posuve, #86–#90). Vypnutý zapínač → `null` a žiadna
- * chyba (sieťka je nepovinná). Zapnutá → rozmer je NEPOVINNÝ (zadá ho dielňa, keď ho
- * pozná — appka ho nepočíta, vzorec/offset voči otvoru nie je potvrdený), ale KEĎ je
- * zadaný, musí byť v rozsahu; strážime to tu, pretože skriptovaný POST obíde HTML5
- * min/max (rovnaký vzor ako `parseKlin`). Úchyt sa sanitizuje na jednu zo 4 hodnôt,
- * nezmyselná/chýbajúca hodnota = „bez ničoho" (nikdy sa nesprávne nezobrazí niečo,
- * čo obsluha nevybrala).
+ * Sieťka (#86–#90, KOREKCIA 2026-08-02). Vypnutý zapínač → `null` a žiadna chyba
+ * (sieťka je nepovinná). Zapnutá → jediné editovateľné pole je úchyt (rozmer sa už
+ * NEZADÁVA — je to ĎALŠIE krídlo posuvu, appka jeho rozmer odvodí sama, presne ako pri
+ * bežných krídlach). Úchyt sa sanitizuje na jednu zo 4 hodnôt, nezmyselná/chýbajúca
+ * hodnota = „bez ničoho" (nikdy sa nesprávne nezobrazí niečo, čo obsluha nevybrala).
  */
 export function parseSietka(raw: SietkaRaw): { sietka: Sietka | null; error: string | null } {
 	const on = raw.on === '1' || raw.on === true || raw.on === 'true';
 	if (!on) return { sietka: null, error: null };
-	const n = (x: unknown): number | null => {
-		const s = String(x ?? '').trim();
-		if (!s) return null;
-		const f = parseFloat(s.replace(',', '.'));
-		return Number.isFinite(f) ? f : NaN;
-	};
-	const sirka = n(raw.sirka);
-	const vyska = n(raw.vyska);
-	const rozmerOk = (x: number | null) => x === null || (x > 0 && x <= SIETKA_MAX_ROZMER);
-	let error: string | null = null;
-	if (!rozmerOk(sirka)) error = `Sieťka: šírka musí byť prázdna alebo 1–${SIETKA_MAX_ROZMER} mm.`;
-	else if (!rozmerOk(vyska))
-		error = `Sieťka: výška musí byť prázdna alebo 1–${SIETKA_MAX_ROZMER} mm.`;
 	const uchytRaw = raw.uchyt;
-	const sietka: Sietka = {
-		sirka: sirka === null || Number.isNaN(sirka) ? null : sirka,
-		vyska: vyska === null || Number.isNaN(vyska) ? null : vyska,
-		uchyt: jeSietkaUchyt(uchytRaw) ? uchytRaw : 'ziadny'
-	};
-	return { sietka, error };
+	return { sietka: { uchyt: jeSietkaUchyt(uchytRaw) ? uchytRaw : 'ziadny' }, error: null };
 }
 
 /** Sieťka je len tam, kde ju appka ponúka (Robust/Slide) — pri inom systéme
@@ -201,19 +179,14 @@ function klinRaw(p: Record<string, unknown>): KlinRaw {
 	};
 }
 
-/** Sieťka z posuvu — vnorený `{sirka,vyska,uchyt}` aj ploché polia (viď `klinRaw`). */
+/** Sieťka z posuvu — vnorený `{uchyt}` aj ploché polia (viď `klinRaw`). */
 function sietkaRaw(p: Record<string, unknown>): SietkaRaw {
 	const k = p.sietka;
 	if (k && typeof k === 'object') {
 		const o = k as Record<string, unknown>;
-		return { on: '1', sirka: o.sirka, vyska: o.vyska, uchyt: o.uchyt };
+		return { on: '1', uchyt: o.uchyt };
 	}
-	return {
-		on: k,
-		sirka: p.sietkaSirka,
-		vyska: p.sietkaVyska,
-		uchyt: p.sietkaUchyt
-	};
+	return { on: k, uchyt: p.sietkaUchyt };
 }
 
 /** Ručná koľajnica z posuvu — vnorený `{horna,spodna}` aj ploché polia (viď `klinRaw`). */
@@ -329,8 +302,6 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	vstup.klin = k.klin;
 	const sk = parseSietka({
 		on: form.get('sietka'),
-		sirka: form.get('sietkaSirka'),
-		vyska: form.get('sietkaVyska'),
 		uchyt: form.get('sietkaUchyt')
 	});
 	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
