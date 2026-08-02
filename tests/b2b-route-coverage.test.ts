@@ -11,12 +11,13 @@ import { b2bRedirectTarget } from '../src/lib/server/b2b-access';
 const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 
 // Cesty, kde b2b smie zostať (nepresmerúva sa preč):
-// - /zasklenia — jediná zápisová stránka pre b2b, chránená na úrovni action (odoslat/
+// - /zasklenia — zápisová stránka pre b2b, chránená na úrovni action (odoslat/
 //   odoslatMulti odmietnu b2b, viď b2b-money-reject.test.ts)
 // - /login, /logout, /health — nutné pre autentifikáciu / liveness, nemajú b2b-citlivý zápis
-// - /sietka — dodatočná sieťka bez posuvu (#89): Patrik „hlavne pre externých" —
-//   modul NEMÁ žiadny zápis do Money vôbec (rovnako ako /fix, ktoré je napriek tomu
-//   v denylist-e — /fix je interné z iného dôvodu), takže tu je vedomé povolenie
+// - /sietka — dodatočná sieťka bez posuvu (#89): Patrik „hlavne pre externých". Od
+//   korekcie 2026-08-02 MÁ akciu `odoslat` (Money zápis pre interných), ale rovnakou
+//   vrstvou ako /zasklenia — b2b je odmietnutý AKO PRVÝ krok v akcii samotnej
+//   (`isB2B(locals.user)` guard v +page.server.ts), nie len skrytým tlačidlom.
 const ALLOWED = new Set(['/zasklenia', '/sietka', '/login', '/logout', '/health']);
 
 /** Prevedie adresár routy (relatívne k src/routes) na URL cestu. Ignoruje route groups (...). */
