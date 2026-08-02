@@ -324,15 +324,67 @@ zrazu ukazuje niečo iné než formulár. Kryje to e2e „prežije Späť a upra
 Preto drž prvok v `detail` (zapíše sa do histórie) — keď sa rozhodnutie otočí, dáta
 o minulých zákazkách existujú.
 
-**Sieťka (2026-07-31, #86–#90) je presne tento prípad, ale VEDOME rozdelený na dve
-polovice hneď od začiatku:** appka postavila len display-only časť (checkbox, úchyt,
-2K upozornenie, samostatná stránka `/sietka` bez odpisu vôbec — vzor `/fix`), lebo
-Money strana chýbala na TROCH miestach naraz: joklík nemá v katalógu žiadnu kartu
-(§2j), presné kusy/metre nie sú potvrdené pri žiadnej položke, a rozmer sieťky
-(vzorec voči otvoru) nie je daný vôbec — preto sa rozmer sieťky **nepočíta**, zadáva
-ho ručne dielňa, rovnako ako 4 kóty klina (`KlinPolia.svelte`/`SietkaPolia.svelte`).
-Keď je dôvod „nemáme dosť čísel na to, aby appka niečo tvrdila", nevymýšľaj vzorec —
-nechaj pole na ručné zadanie a zdokumentuj v komentári na tickete presne to, čo chýba.
+**Sieťka (2026-07-31, #86–#90) bola presne tento prípad, VEDOME rozdelená na dve
+polovice hneď od začiatku** — a 2026-08-02 dostala Money polovicu (§5b nižšie). Ako
+príklad displays-only-najprv postupu ostáva platný: appka najprv postavila len
+display-only časť (checkbox, úchyt, 2K upozornenie, `/sietka` bez odpisu — vzor
+`/fix`), lebo Money strana chýbala na TROCH miestach naraz (joklík bez karty v
+katalógu §2j, kusy/metre nepotvrdené, rozmer nedaný). Keď je dôvod „nemáme dosť
+čísel na to, aby appka niečo tvrdila", nevymýšľaj vzorec — nechaj pole na ručné
+zadanie a zdokumentuj v komentári na tickete presne to, čo chýba (presne ako
+`KlinPolia.svelte` dodnes — klin nikdy nedostal Money polovicu, lebo šéf ju
+nechcel).
+
+## 5b. Sieťka = ĎALŠIE krídlo posuvu (KOREKCIA 2026-08-02) — počítadlo kusov, nie nová dĺžka
+
+Keď Patrik doplnil chýbajúce čísla (Odoo #1614821/#1614823/#1614827, kanál 207),
+korigoval aj SAMOTNÝ MODEL: sieťka nie je samostatný objekt s ručne zadaným
+rozmerom — je to **ĎALŠIE krídlo TOHO ISTÉHO posuvu**, „úplne rovnaký rozmer ako
+každé iné okno v tom posuve". Z toho vyplýva vzor, ktorý sa oplatí zopakovať
+nabudúce, keď treba pridať „ešte jedno z toho istého":
+
+- **Nepridávaj novú dĺžku rezu — zvýš POČET existujúcich kusov.** Rámový aj nosový
+  RezRow už majú presný `koef/offset/kerf` vzorec pre KAŽDÉ krídlo toho sysStyl
+  (3K: rám `pocetKs=6` na S aj V = 2 rezy/krídlo × 3 krídla). Sieťka len navýši
+  `pocetKs` (`sietkaExtraPocetKs` v `compute.ts`, tesne pred generovaním kusov v
+  `profilCuts`) — dĺžka rezu je AUTOMATICKY zhodná s existujúcimi krídlami, lebo
+  ju počíta ten istý `val()`. Natvrdo zapísaná dĺžka by sedela len pre JEDEN
+  rozmer okna; pri inom S/V by dala tichý zlý odpis.
+- **PEVNÁ delta, NIE odvodená z N.** Patrik: „(robust) 2 a 2 rám a 1x nos" — teda
+  vždy `+2` rámových rezov (S aj V) a `+1` nosový rez, na jednu sieťku, nezávisle
+  od toho, či je posuv 2K/3K/4K. Všeobecný vzorec pre existujúce nosové rezy je
+  `2×(N−1)` (over v `cfg_seed.json`: 2K→2, 3K→4, 4K→6) — pre N→N+1 by dal `+2`, nie
+  `+1`. Pri konflikte medzi odvodeným vzorcom a Patrikovým explicitným (dvakrát
+  zopakovaným) číslom vyhráva PRIAMA ODPOVEĎ, nie symetria vzorca — asymetrická
+  fyzická realita (Slide má na strane sieťky úplne INÝ profil miesto zužovacieho,
+  #90) je presne to, čo symetrický vzorec nevidí.
+- **Kód karty sa vie meniť BEZ zmeny dĺžky rezu — swap kódu, nie prepočet.** 2K
+  posuv nemá voľnú koľaj pre 4. krídlo → celá koľajnica (Robust/Slide majú JEDNU
+  obvodovú, `rolaKolajnice()===null`) sa mení na 3K variant. 2K aj 3K koľajnica
+  majú TOTOŽNÝ vzorec (`koef=1, offset=0, delitN=0`) — mení sa len Money kód/názov,
+  nikdy dĺžka. `sietkaKolajnicaSwap` berie 3K kód/názov ŽIVO z `cfg[system+'|3K']`
+  (nikdy natvrdo), rovnaký vzor ako `railUpsize` (Štandard + prídavná koľajnica).
+- **SAMOSTATNÁ objednávka (#89, `/sietka` bez posuvu) NIE JE diff dvoch výpočtov.**
+  Prvý inštinkt — spočítať `computeFlat` s sieťkou a bez nej a poslať rozdiel — je
+  fyzicky ZLE: dodatočná sieťka je SAMOSTATNÁ objednávka, ktorú dielňa reže týždne
+  po pôvodnej (tá je dávno preč zo skladu, žiadne zdieľané zvyšky tyčí neexistujú).
+  Diff by v prípadoch, keď extra kus „padne" do hypotetického zdieľaného zvyšku
+  (FFD to robí ticho — pozri nižšie), PODHODNOTIL odpis. Namiesto toho
+  `sietkaSamostatnaVypocet` zoberie LEN mesh kusy (2 rám S + 2 rám V + 1 nos, [+2
+  koľajnica S + 2 V ak 2K]) a zabalí ich VLASTNÝM čerstvým FFD behom — malá,
+  ale samostatná dodávka.
+- **FFD delta v ODPISE (metroch) sa nerovná delte v KUSOCH — to je SPRÁVNE, nie
+  bug.** Overené naživo (Robust|3K 4645×2320): nos ide zo 4 kusov na 5, ale odpis
+  ostáva 15 m v OBOCH prípadoch — 5. kus sa zmestí do zvyšku, ktorý FFD aj tak už
+  „stráca" na inej tyči. Test na túto zmenu píš na REZY (`material[].rezy`, kusy —
+  vždy deterministicky `+2/+2/+1`), nie na predpokladaný METROVÝ rozdiel — ten
+  závisí od konkrétneho S/V a môže vyjsť 0.
+- **Rozmer SIEŤOVINY (látky) ≠ rozmer krídla.** Mesh fabric sa objednáva u INÉHO
+  dodávateľa a má vlastný malý offset voči sklu bežného krídla: `rozmerSietoviny
+  = {sirka: skloS+2, vyska: skloV+1}` (Patrik, potvrdené jeho fotom vlastného
+  nárezáka — sklo 1063×1795 → sieťka 1065×1796). Do Money odpisu NEJDE (appka len
+  vypíše na tlač) — nepliesť s krídla dĺžkou rezu vyššie (tá je z RÁMOVÉHO profilu,
+  nie zo skla).
 
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 

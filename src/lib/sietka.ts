@@ -1,14 +1,16 @@
-// Sieťka (moskytiéra) na posuve — Patrik 2026-07-31 (Odoo, kanál Vyroba automatizacia):
-// zaškrtávacie pole „so sieťkou" pri posuve pridá na poslednej koľaji ďalší rám
-// (o jedno krídlo viac — príklad 3K: rám 6+6 ks → 8+8 ks) + prídavný joklík, sieťka
-// beží na strane podľa smeru posuvu a namiesto kľučky sa ponúka úchyt.
+// Sieťka (moskytiéra) na posuve — Patrik 2026-07-31 (Odoo, kanál Vyroba automatizacia),
+// KOREKCIA 2026-08-02 (msg #1614821/#1614823/#1614827, kanál 207): sieťka je ĎALŠIE
+// krídlo TOHO ISTÉHO posuvu — „úplne rovnaký rozmer ako každé iné okno v tom posuve" —
+// nie samostatný objekt s ručne zadaným rozmerom. Zaškrtávacie pole „so sieťkou" pridá
+// na poslednej koľaji ďalší rám (3K: rám 6+6 ks → 8+8 ks) + 1 nosový rez, sieťka beží
+// na strane podľa smeru posuvu a namiesto kľučky sa ponúka úchyt.
 //
-// DISPLAY-ONLY (rovnaký princíp ako klín, `$lib/klin`): tento modul a všetko, čo
-// z neho čerpá, ide LEN do náhľadu, nárezového plánu/tlače a do detailu histórie
-// odpisov. Do Money odpisu (.xlsx položky) NEVSTUPUJE — chýbajú potvrdené Money
-// kódy/kusy (joklík nemá v Money kartu vôbec, presné kusy nie sú potvrdené — pozri
-// komentáre na #86–#90 z 2026-07-31). Rozmer sieťky sa NEPOČÍTA z rozmeru otvoru
-// (vzorec/offset nie je daný) — zadáva ho ručne dielňa, presne ako 4 kóty klina.
+// MONEY-RELEVANTNÉ (od korekcie 2026-08-02, Robust aj Slide, len jeden súvislý beh
+// krídel — nie opona): rám + nos + [2K→3K koľajnica] IDE do Money odpisu — pozri
+// `sietkaExtraPocetKs`/`jeSietkaMoneyRelevant`/`sietkaKolajnicaSwap` v `compute.ts`.
+// Joklík (bez Money karty) a Slide sieťkový profil (neoverený, #90) OSTÁVAJÚ mimo.
+// Úchyt zostáva DISPLAY-ONLY — Patrik: „dáva sa tam všetko, čo nájdeme na firme…
+// neviem či by som to extra riešil" (#88, explicitná odpoveď, nie chýbajúci údaj).
 
 export type SietkaUchyt = 'ziadny' | 'madloVelke' | 'madloMale' | 'zamok';
 
@@ -28,16 +30,18 @@ export function uchytLabel(u: SietkaUchyt): string {
 }
 
 export interface Sietka {
-	/** rozmer sieťky — šírka [mm]; NEPOVINNÉ, meria/dopĺňa dielňa (nie je rozmer skla) */
-	sirka: number | null;
-	/** rozmer sieťky — výška [mm]; NEPOVINNÉ */
-	vyska: number | null;
-	/** úchyt namiesto kľučky — sieťka kľučku/FAB nemá (#88) */
+	/** úchyt namiesto kľučky — sieťka kľučku/FAB nemá (#88), display-only */
 	uchyt: SietkaUchyt;
 }
 
-/** hraničné hodnoty rozmeru sieťky — rovnaké ako klín (HTML5 min/max aj server) */
-export const SIETKA_MAX_ROZMER = 20000;
+/** Rozmer SIEŤOVINY (látky) na objednávku u iného dodávateľa — Patrik 2026-08-02:
+ *  „rozmer sieťky je rozmer skla +2mm +1", potvrdené aj jeho foto z nárezáka (Sklo
+ *  1063×1795 → Rozmer sieťky 1065×1796, msg #1614828, kanál 207). Do Money odpisu
+ *  NEJDE (sieťovina sa objednáva mimo appky) — len na tlač/nárezák. Počíta sa zo
+ *  skla BEŽNÉHO krídla toho posuvu (appka ho už má, sieťka má rovnaký rozmer). */
+export function rozmerSietoviny(skloS: number, skloV: number): { sirka: number; vyska: number } {
+	return { sirka: skloS + 2, vyska: skloV + 1 };
+}
 
 /** Systémy, kde appka sieťku ponúka (Patrik 2026-07-31 pri #90: „malo by to byť
  *  všetko totožné" ako Robust). Štandard/Deluxe/Bazén/Pergola sieťku nemajú. */
@@ -58,17 +62,18 @@ export function sietkaStrana(otvaranie: string): 'ľavá' | 'pravá' | null {
 }
 
 /** 2K nemá voľnú koľaj pre sieťku — treba 3K koľajnicu (Patrik 2026-07-31, #87).
- *  Len detekcia pre UPOZORNENIE; appka koľajnicu v odpise NEMENÍ (Money-kritické,
- *  presný pár kódov nie je potvrdený). */
+ *  Od korekcie 2026-08-02 appka koľajnicu v odpise SKUTOČNE mení (`sietkaKolajnicaSwap`
+ *  v `compute.ts`, keď je sieťka Money-relevantná) — táto funkcia určuje KEDY, gate aj
+ *  pre výpočet aj pre UI upozornenie (jeden zdroj pravdy). */
 export function potrebuje3KKolajnicu(styl: string): boolean {
 	return styl === '2K';
 }
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
 
-/** jednoriadkový popis sieťky do plánu / detailu histórie (rovnaký vzor ako klinPopis) */
-export function sietkaPopis(s: Sietka): string {
-	const rozmer =
-		s.sirka && s.vyska ? `${fmt(s.sirka)} × ${fmt(s.vyska)} mm` : 'rozmer doplní dielňa';
-	return `sieťka — ${rozmer}, úchyt: ${uchytLabel(s.uchyt)}`;
+/** jednoriadkový popis sieťky do plánu / detailu histórie (rovnaký vzor ako klinPopis).
+ *  `rozmer` = `rozmerSietoviny(skloS, skloV)` toho posuvu — appka ho vždy vie (je
+ *  odvodený zo skla), preto tu nie je nepovinný ako predtým. */
+export function sietkaPopis(s: Sietka, rozmer: { sirka: number; vyska: number }): string {
+	return `sieťka — ${fmt(rozmer.sirka)} × ${fmt(rozmer.vyska)} mm, úchyt: ${uchytLabel(s.uchyt)}`;
 }

@@ -16,6 +16,8 @@
 		maSietkaSystem,
 		sietkaStrana,
 		potrebuje3KKolajnicu,
+		rozmerSietoviny,
+		uchytLabel,
 		type Sietka,
 		type SietkaUchyt
 	} from '$lib/sietka';
@@ -62,7 +64,8 @@
 			klin: (fv?.klin ?? null) as Klin | null,
 			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
 			kolajnica: (fv?.kolajnica ?? null) as { horna?: number; spodna?: number } | null,
-			// sieťka (#86–#90) — display-only, do Money odpisu NEJDE
+			// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide jednom behu krídel
+			// IDE do Money odpisu (rám+nos+[2K→3K koľajnica]); úchyt zostáva display-only
 			sietka: (fv?.sietka ?? null) as Sietka | null
 		};
 	});
@@ -122,10 +125,8 @@
 		// ručné dĺžky koľajníc TOHOTO posuvu — prázdne = počítaj zo šírky (mení odpis)
 		kolajnicaHorna: number | string;
 		kolajnicaSpodna: number | string;
-		// sieťka TOHOTO posuvu (#86–#90) — ploché polia, do Money odpisu NEJDE
+		// sieťka TOHOTO posuvu (#86–#90, KOREKCIA 2026-08-02) — rozmer sa už nezadáva
 		sietka: boolean;
-		sietkaSirka: number | string;
-		sietkaVyska: number | string;
 		sietkaUchyt: SietkaUchyt;
 	};
 
@@ -160,10 +161,8 @@
 	let klinV1S = $state<number | string>('');
 	let klinV2S = $state<number | string>('');
 	let klinKsS = $state<number | string>(1);
-	// sieťka primárneho posuvu (#86–#90) — display-only, do Money odpisu NEJDE
+	// sieťka primárneho posuvu (#86–#90, KOREKCIA 2026-08-02) — rozmer sa už nezadáva
 	let sietkaS = $state(false);
-	let sietkaSirkaS = $state<number | string>('');
-	let sietkaVyskaS = $state<number | string>('');
 	let sietkaUchytS = $state<SietkaUchyt>('ziadny');
 	// ručné dĺžky koľajníc primárneho posuvu (Patrik 2026-07-28) — MENIA Money odpis
 	let kolHS = $state<number | string>('');
@@ -190,8 +189,6 @@
 		klinKsS = kl?.ks ?? 1;
 		const sk = (fv?.sietka ?? null) as Sietka | null;
 		sietkaS = !!sk;
-		sietkaSirkaS = sk?.sirka ?? '';
-		sietkaVyskaS = sk?.vyska ?? '';
 		sietkaUchytS = sk?.uchyt ?? 'ziadny';
 		const kolP = (prim()?.kolajnica ?? null) as { horna?: number; spodna?: number } | null;
 		kolHS = kolP?.horna ?? '';
@@ -219,8 +216,6 @@
 			kolajnicaHorna: x.kolajnica?.horna ?? '',
 			kolajnicaSpodna: x.kolajnica?.spodna ?? '',
 			sietka: !!x.sietka,
-			sietkaSirka: x.sietka?.sirka ?? '',
-			sietkaVyska: x.sietka?.vyska ?? '',
 			sietkaUchyt: x.sietka?.uchyt ?? 'ziadny'
 		}));
 	});
@@ -248,8 +243,6 @@
 	$effect(() => {
 		if (!maSietka) {
 			sietkaS = false;
-			sietkaSirkaS = '';
-			sietkaVyskaS = '';
 			sietkaUchytS = 'ziadny';
 		}
 	});
@@ -312,8 +305,6 @@
 				kolajnicaHorna: kolHS,
 				kolajnicaSpodna: kolSS,
 				sietka: sietkaS ? '1' : '',
-				sietkaSirka: sietkaSirkaS,
-				sietkaVyska: sietkaVyskaS,
 				sietkaUchyt: sietkaUchytS
 			},
 			...posuvyExtra.map((p) => ({
@@ -336,8 +327,6 @@
 				kolajnicaHorna: p.kolajnicaHorna,
 				kolajnicaSpodna: p.kolajnicaSpodna,
 				sietka: p.sietka ? '1' : '',
-				sietkaSirka: p.sietkaSirka,
-				sietkaVyska: p.sietkaVyska,
 				sietkaUchyt: p.sietkaUchyt
 			}))
 		])
@@ -361,8 +350,6 @@
 		}
 		if (!maSietkaSystem(p.system)) {
 			p.sietka = false;
-			p.sietkaSirka = '';
-			p.sietkaVyska = '';
 			p.sietkaUchyt = 'ziadny';
 		}
 	}
@@ -389,8 +376,6 @@
 				kolajnicaHorna: '',
 				kolajnicaSpodna: '',
 				sietka: false,
-				sietkaSirka: '',
-				sietkaVyska: '',
 				sietkaUchyt: 'ziadny'
 			}
 		];
@@ -487,16 +472,6 @@
 	{/if}
 	{#if vstup.sietka}
 		<input type="hidden" name="sietka" value="1" />
-		{#if vstup.sietka.sirka}<input
-				type="hidden"
-				name="sietkaSirka"
-				value={vstup.sietka.sirka}
-			/>{/if}
-		{#if vstup.sietka.vyska}<input
-				type="hidden"
-				name="sietkaVyska"
-				value={vstup.sietka.vyska}
-			/>{/if}
 		<input type="hidden" name="sietkaUchyt" value={vstup.sietka.uchyt} />
 	{/if}
 {/snippet}
@@ -612,8 +587,9 @@
 	{/if}
 
 	{#if vstup.sietka}
+		{@const rozmer = rozmerSietoviny(p.sklo.sirka, p.sklo.vyska)}
 		<div class="card" data-testid="sietka-karta">
-			<div class="sec">Sieťka — do Money odpisu zatiaľ nejde</div>
+			<div class="sec">Sieťka — v Money odpise (rám + nos)</div>
 			<div class="g">
 				<div>
 					<span>Strana</span><b data-testid="sietka-strana"
@@ -621,19 +597,17 @@
 					>
 				</div>
 				<div>
-					<span>Rozmer</span><b data-testid="sietka-rozmer"
-						>{vstup.sietka.sirka && vstup.sietka.vyska
-							? `${fmtM(vstup.sietka.sirka)} × ${fmtM(vstup.sietka.vyska)} mm`
-							: 'doplní dielňa'}</b
+					<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b data-testid="sietka-rozmer"
+						>{fmtM(rozmer.sirka)} × {fmtM(rozmer.vyska)} mm</b
 					>
 				</div>
-				<div><span>Úchyt</span><b>{sietkaPopis(vstup.sietka).split('úchyt: ')[1]}</b></div>
-				<div><span>Rám</span><b>o 1 viac (joklík navyše)</b></div>
+				<div><span>Úchyt</span><b>{uchytLabel(vstup.sietka.uchyt)}</b></div>
+				<div><span>Rám + nos</span><b>+2 rámové rezy (S aj V) + 1 nosový rez</b></div>
+				<div><span>Joklík</span><b>bez skladovej karty — nájde dielňa, neodpisuje sa</b></div>
 			</div>
 			{#if potrebuje3KKolajnicu(vstup.styl)}
 				<p class="sub" data-testid="sietka-2k-warn-karta">
-					⚠ 2K systém — potrebná 3K koľajnica (do nárezáka pridať koľaj 3K 2 ks + 2 ks namiesto 2K).
-					Money odpis sa NEMENÍ.
+					⚠ 2K systém — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks) namiesto 2K.
 				</p>
 			{/if}
 		</div>
@@ -810,19 +784,20 @@
 
 	{#if m.posuvy.some((pv) => pv.sietka)}
 		<div class="card" data-testid="sietka-karta-multi">
-			<div class="sec">Sieťky — do Money odpisu zatiaľ nejdú</div>
+			<div class="sec">Sieťky — v Money odpise (rám + nos)</div>
 			{#each m.posuvy as pv, i (i)}
 				{#if pv.sietka}
+					{@const rozmer = rozmerSietoviny(pv.sklo.sirka, pv.sklo.vyska)}
 					<div class="row">
 						<span
 							>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
 								· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
-						><b>{sietkaPopis(pv.sietka)}</b>
+						><b>{sietkaPopis(pv.sietka, rozmer)}</b>
 					</div>
 					{#if potrebuje3KKolajnicu(pv.styl)}
 						<p class="sub" data-testid={`sietka-2k-warn-multi-${i}`}>
-							⚠ Posuv {i + 1}: 2K systém — potrebná 3K koľajnica (2 ks + 2 ks namiesto 2K). Money
-							odpis sa NEMENÍ.
+							⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks)
+							namiesto 2K.
 						</p>
 					{/if}
 				{/if}
@@ -1164,8 +1139,8 @@
 				bind:v2={klinV2S}
 				bind:ks={klinKsS}
 			/>
-			<!-- Sieťka (#86–#90): zapínač + nepovinný rozmer + úchyt. Len na systémoch, kde ju
-			     appka ponúka (Robust/Slide). Display-only, do Money odpisu nevstupuje. -->
+			<!-- Sieťka (#86–#90, KOREKCIA 2026-08-02): zapínač + úchyt. Len na systémoch, kde
+			     ju appka ponúka (Robust/Slide). Rám + nos IDE do Money odpisu (úchyt display-only). -->
 			{#if maSietka}
 				<SietkaPolia
 					idPrefix="sietka"
@@ -1173,8 +1148,6 @@
 					{styl}
 					strana={sietkaStranaVal}
 					bind:on={sietkaS}
-					bind:sirka={sietkaSirkaS}
-					bind:vyska={sietkaVyskaS}
 					bind:uchyt={sietkaUchytS}
 				/>
 			{/if}
@@ -1324,8 +1297,6 @@
 							styl={p.styl}
 							strana={sietkaStrana(p.otvaranie)}
 							bind:on={p.sietka}
-							bind:sirka={p.sietkaSirka}
-							bind:vyska={p.sietkaVyska}
 							bind:uchyt={p.sietkaUchyt}
 							onZmena={(on) => {
 								if (on) {

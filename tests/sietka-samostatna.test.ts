@@ -1,6 +1,9 @@
 // Dodatočná sieťka BEZ posuvu (#89 — Patrik: „90% si kúpi posuv a sieťku chce
-// až potom"). Modul nezapisuje do Money nič (rovnaký princíp ako fix-vstup.ts) —
-// tu strážime len parsovanie a rozsahovú validáciu vstupu.
+// až potom"), KOREKCIA 2026-08-02: rozmer sieťky sa už nezadáva ručne (appka ho
+// odvodí zo skla toho posuvu), takže tu strážime len parsovanie zvyšných polí.
+// Samotný Money výpočet (`sietkaSamostatnaVypocet`) má vlastné testy v
+// tests/compute.test.ts (patrí k `compute.ts`, rovnaká konvencia ako ostatné
+// odpisové funkcie).
 import { describe, it, expect } from 'vitest';
 import { parseSietkaSamostatnaVstup } from '../src/lib/server/sietka-samostatna';
 
@@ -20,22 +23,20 @@ const zaklad = {
 };
 
 describe('parseSietkaSamostatnaVstup', () => {
-	it('platný vstup bez zadaného rozmeru sieťky (dielňa doplní)', () => {
+	it('platný vstup, úchyt predvolený „bez ničoho"', () => {
 		const { vstup, error } = parseSietkaSamostatnaVstup(fd(zaklad));
 		expect(error).toBeNull();
 		expect(vstup.system).toBe('Robust');
 		expect(vstup.styl).toBe('3K');
 		expect(vstup.otvorS).toBe(2000);
 		expect(vstup.otvorV).toBe(1500);
-		expect(vstup.sietka).toEqual({ sirka: null, vyska: null, uchyt: 'ziadny' });
+		expect(vstup.sietka).toEqual({ uchyt: 'ziadny' });
 	});
 
-	it('platný vstup s rozmerom sieťky a úchytom', () => {
-		const { vstup, error } = parseSietkaSamostatnaVstup(
-			fd({ ...zaklad, sietkaSirka: '1900', sietkaVyska: '1400', sietkaUchyt: 'zamok' })
-		);
+	it('platný vstup s úchytom', () => {
+		const { vstup, error } = parseSietkaSamostatnaVstup(fd({ ...zaklad, sietkaUchyt: 'zamok' }));
 		expect(error).toBeNull();
-		expect(vstup.sietka).toEqual({ sirka: 1900, vyska: 1400, uchyt: 'zamok' });
+		expect(vstup.sietka).toEqual({ uchyt: 'zamok' });
 	});
 
 	it('Slide je tiež platný systém', () => {
@@ -67,7 +68,9 @@ describe('parseSietkaSamostatnaVstup', () => {
 		);
 	});
 
-	it('nezmyselný rozmer sieťky je odmietnutý (skriptovaný POST obíde HTML5)', () => {
-		expect(parseSietkaSamostatnaVstup(fd({ ...zaklad, sietkaSirka: '-5' })).error).toMatch(/šírka/);
+	it('nezmyselný úchyt sa sanitizuje na „bez ničoho", nikdy nezablokuje vstup', () => {
+		const { vstup, error } = parseSietkaSamostatnaVstup(fd({ ...zaklad, sietkaUchyt: 'nezmysel' }));
+		expect(error).toBeNull();
+		expect(vstup.sietka).toEqual({ uchyt: 'ziadny' });
 	});
 });

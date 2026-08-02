@@ -1,12 +1,15 @@
 <script lang="ts">
 	// Dodatočná sieťka BEZ posuvu (#89 — Patrik: „90% si kúpi posuv a sieťku chce
-	// až potom"). Zadám parametre otvoru → appka vypľuje rámový profil 2 ks + 2 ks
-	// a rozmer sieťky (na tlač). Do Money sa neposiela nič — modul len počíta/kreslí.
+	// až potom"). Zadám parametre otvoru → appka vypočíta rám 2 ks + 2 ks + nos 1 ks
+	// (pri 2K aj 3K koľajnicu 2 ks + 2 ks) a rozmer sieťoviny (na objednávku u iného
+	// dodávateľa). Interní používatelia môžu odpis odoslať do Money (KOREKCIA
+	// 2026-08-02); b2b vidí len výpočet/tabuľku (existujúce pravidlo — bez zápisu).
 	import { SIETKA_UCHYTY, uchytLabel, type SietkaUchyt } from '$lib/sietka';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
 
+	const isB2B = $derived(data.user?.role === 'b2b');
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
 	let step = $derived(form?.step ?? 'form');
@@ -18,11 +21,14 @@
 		styl: form?.vstup?.styl ?? '2K',
 		otvorS: form?.vstup?.otvorS ?? 0,
 		otvorV: form?.vstup?.otvorV ?? 0,
-		sietka: form?.vstup?.sietka ?? { sirka: null, vyska: null, uchyt: 'ziadny' as SietkaUchyt },
+		sietka: form?.vstup?.sietka ?? { uchyt: 'ziadny' as SietkaUchyt },
 		poznamka: form?.vstup?.poznamka ?? ''
 	});
-	let N = $derived(form && 'N' in form ? form.N : 0);
+	let r = $derived(form && 'r' in form ? form.r : null);
 	let potrebuje3K = $derived(form && 'potrebuje3K' in form ? form.potrebuje3K : false);
+	let planHash = $derived(form && 'planHash' in form ? form.planHash : '');
+	let cielInfo = $derived(form && 'cielInfo' in form ? form.cielInfo : null);
+	let outcome = $derived(form && 'outcome' in form ? form.outcome : null);
 
 	// všetky editovateľné polia sú $state (bind) — jednosmerné value={} by sa pri
 	// re-renderi vymazali (rovnaká pasca ako v ostatných moduloch appky)
@@ -33,8 +39,6 @@
 	let stylS = $state('2K');
 	let otvorSS = $state<number | string>('');
 	let otvorVS = $state<number | string>('');
-	let sietkaSirkaS = $state<number | string>('');
-	let sietkaVyskaS = $state<number | string>('');
 	let sietkaUchytS = $state<SietkaUchyt>('ziadny');
 	let poznamkaS = $state('');
 	$effect(() => {
@@ -46,8 +50,6 @@
 		stylS = v?.styl ?? '2K';
 		otvorSS = v?.otvorS || '';
 		otvorVS = v?.otvorV || '';
-		sietkaSirkaS = v?.sietka?.sirka ?? '';
-		sietkaVyskaS = v?.sietka?.vyska ?? '';
 		sietkaUchytS = v?.sietka?.uchyt ?? 'ziadny';
 		poznamkaS = v?.poznamka ?? '';
 	});
@@ -69,8 +71,6 @@
 	<input type="hidden" name="styl" value={vstup.styl} />
 	<input type="hidden" name="otvorS" value={vstup.otvorS} />
 	<input type="hidden" name="otvorV" value={vstup.otvorV} />
-	{#if vstup.sietka.sirka}<input type="hidden" name="sietkaSirka" value={vstup.sietka.sirka} />{/if}
-	{#if vstup.sietka.vyska}<input type="hidden" name="sietkaVyska" value={vstup.sietka.vyska} />{/if}
 	<input type="hidden" name="sietkaUchyt" value={vstup.sietka.uchyt} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
 {/snippet}
@@ -80,9 +80,13 @@
 		<h1>Sieťka — dodatočná objednávka</h1>
 		<p class="sub">
 			Pre zákazku, ktorá <b>už má posuv namontovaný</b> a sieťku chce dodatočne (Patrik: „90% si
-			kúpi posuv a sieťku chce až potom"). Zadaj rozmery otvoru a systém posuvu — appka vypíše
-			rámový profil na nárezák a rozmer sieťky na tlač.
-			<b>Do Money sa neposiela nič</b> — presné kódy/kusy sieťky ešte čakajú na potvrdenie.
+			kúpi posuv a sieťku chce až potom"). Zadaj rozmery otvoru a systém posuvu — appka vypočíta
+			rámový profil, nosový profil (a pri 2K aj 3K koľajnicu) a rozmer sieťoviny na objednávku.
+			{#if isB2B}
+				<b>Do Money sa neposiela nič</b> — len výpočet/tlač.
+			{:else}
+				Interne sa dá výsledok aj <b>odoslať do Money</b>.
+			{/if}
 		</p>
 	</div>
 
@@ -148,36 +152,6 @@
 					/>
 				</div>
 			</div>
-			<p class="sub">
-				Rozmer sieťky <b>nie je</b> rozmer otvoru — ak ho dielňa už pozná, zadaj ho; inak necháme na dielňu
-				pri montáži.
-			</p>
-			<div class="grid2">
-				<div class="field">
-					<label for="sietkaSirka">Sieťka — šírka (mm)</label>
-					<input
-						id="sietkaSirka"
-						name="sietkaSirka"
-						type="number"
-						min="1"
-						max="20000"
-						step="any"
-						bind:value={sietkaSirkaS}
-					/>
-				</div>
-				<div class="field">
-					<label for="sietkaVyska">Sieťka — výška (mm)</label>
-					<input
-						id="sietkaVyska"
-						name="sietkaVyska"
-						type="number"
-						min="1"
-						max="20000"
-						step="any"
-						bind:value={sietkaVyskaS}
-					/>
-				</div>
-			</div>
 			<div class="field">
 				<label for="sietkaUchyt">Úchyt (sieťka nemá kľučku)</label>
 				<select id="sietkaUchyt" name="sietkaUchyt" bind:value={sietkaUchytS}>
@@ -198,7 +172,7 @@
 			<button class="btn" type="submit" data-testid="spocitat-sietku">Spočítať</button>
 		</form>
 	</div>
-{:else if step === 'vysledok'}
+{:else if (step === 'vysledok' || step === 'duplikat') && r}
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
@@ -209,55 +183,115 @@
 		</p>
 	</div>
 
+	{#if form && 'warn' in form && form.warn}
+		<div class="err" data-testid="sietka-samostatna-warn">⚠️ {form.warn}</div>
+	{/if}
+	{#if step === 'duplikat' && form?.error}
+		<div class="err" data-testid="sietka-samostatna-duplikat">⚠️ {form.error}</div>
+	{/if}
+
 	<div class="card">
 		<div class="sec">Otvor</div>
 		<div class="g">
 			<div><span>Šírka</span><b>{fmtM(vstup.otvorS)} mm</b></div>
 			<div><span>Výška</span><b>{fmtM(vstup.otvorV)} mm</b></div>
-			<div><span>Počet krídel posuvu</span><b>{N}</b></div>
+			<div><span>Počet krídel posuvu</span><b>{r.N}</b></div>
 		</div>
 	</div>
 
 	<div class="card" data-testid="sietka-samostatna-vysledok">
-		<div class="sec">Sieťka — do nárezáka, do Money odpisu zatiaľ nejde</div>
+		<div class="sec">
+			Sieťka — {isB2B ? 'do nárezáka, do Money odpisu nejde' : 'do Money odpisu'}
+		</div>
 		<div class="g">
 			<div><span>Rámový profil</span><b data-testid="ram-profil">2 ks + 2 ks</b></div>
+			<div><span>Nosový profil</span><b data-testid="nos-profil">1 ks</b></div>
 			<div>
-				<span>Rozmer sieťky</span><b data-testid="sietka-samostatna-rozmer"
-					>{vstup.sietka.sirka && vstup.sietka.vyska
-						? `${fmtM(vstup.sietka.sirka)} × ${fmtM(vstup.sietka.vyska)} mm`
-						: 'doplní dielňa'}</b
+				<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b
+					data-testid="sietka-samostatna-rozmer"
+					>{fmtM(r.rozmerSietoviny.sirka)} × {fmtM(r.rozmerSietoviny.vyska)} mm</b
 				>
 			</div>
 			<div><span>Úchyt</span><b>{uchytLabel(vstup.sietka.uchyt)}</b></div>
 		</div>
 	</div>
 
+	{#if !isB2B}
+		<div class="card">
+			<div class="sec">Odpis (do Money)</div>
+			<table>
+				<thead
+					><tr><th>Kód</th><th>Názov</th><th class="c">Rezy</th><th class="c">Metre</th></tr></thead
+				>
+				<tbody>
+					{#each r.material as m (m.kod)}
+						<tr>
+							<td class="c">{m.kod}</td>
+							<td>{m.nazov}</td>
+							<td>{m.rezy.map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ')}</td>
+							<td class="c"><b>{fmtM(r.odpis.find((o) => o.kod === m.kod)?.metre ?? 0)} m</b></td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+
 	{#if potrebuje3K}
 		<div class="card warn-zaruka" data-testid="sietka-2k-tabulka">
 			<div class="sec">⚠ Pozor — 2K systém</div>
 			<p class="sub" style="margin:0">
-				Pri 2K systéme je potrebné <b>dokúpiť koľajnicu 3K</b> — do nárezáka pridať koľaj
-				<b>3K 2 ks + 2 ks</b> namiesto pôvodnej 2K. Toto je len upozornenie pre dielňu — Money odpis sa
-				touto stránkou NEMENÍ (nič sa neodpisuje).
+				Pri 2K systéme je potrebné <b>dokúpiť koľajnicu 3K</b> — appka
+				{isB2B ? 'by odpísala' : 'odpíše'}
+				<b>3K koľajnicu 2 ks + 2 ks</b> namiesto pôvodnej 2K.
 			</p>
 		</div>
 	{/if}
 
-	{#if vstup.poznamka}
-		<div class="card" data-testid="sietka-samostatna-poznamka">
-			<div class="row">
-				<span>Poznámka</span><b style="white-space:pre-wrap">{vstup.poznamka}</b>
+	{#if step === 'vysledok' && !isB2B && cielInfo}
+		<div class="card">
+			<div class="sec">Cieľ zápisu</div>
+			<div class="g">
+				<div><span>Režim</span><b>{cielInfo.live ? 'LIVE — ostrý Money import' : 'TEST'}</b></div>
+				<div><span>Súbor</span><b style="font-size:12px">{cielInfo.filename}</b></div>
 			</div>
 		</div>
 	{/if}
 
 	<div class="card noprint">
-		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		{#if step === 'vysledok'}
+			<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+			{#if !isB2B}
+				<form method="POST" action="?/odoslat" style="display:inline">
+					{@render hidden()}
+					<input type="hidden" name="planHash" value={planHash} />
+					<button class="btn" type="submit" data-testid="odoslat-sietku"
+						>✅ Odoslať odpis do Money</button
+					>
+				</form>
+			{/if}
+		{/if}
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
 			<button class="btn secondary" type="submit">← Späť a upraviť</button>
 		</form>
+		<a class="btn secondary" href={resolve('/sietka')}>➕ Nová sieťka</a>
+	</div>
+{:else if step === 'hotovo' && r}
+	<div class="card">
+		<h1>✅ Odpis odoslaný</h1>
+		<p class="sub">
+			{vstup.op} · {vstup.zakaznik} · ZAK {vstup.zak} — sieťka {vstup.system}
+			{vstup.styl}
+		</p>
+		{#if outcome}
+			<div class="g">
+				<div><span>Cieľ</span><b style="font-size:12px">{outcome.target}</b></div>
+				<div><span>Režim</span><b>{outcome.live ? 'LIVE' : 'TEST'}</b></div>
+			</div>
+		{/if}
+	</div>
+	<div class="card noprint">
 		<a class="btn secondary" href={resolve('/sietka')}>➕ Nová sieťka</a>
 	</div>
 {/if}
