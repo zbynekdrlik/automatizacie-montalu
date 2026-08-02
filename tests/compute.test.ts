@@ -11,7 +11,8 @@ import {
 	safeCompute,
 	inBounds,
 	missingHrubkaProfile,
-	RAIL_UPSIZE
+	RAIL_UPSIZE,
+	sietkaSamostatnaVypocet
 } from '../src/lib/server/compute';
 import type { PosuvSpec } from '../src/lib/server/compute';
 import { jeSikmyRez, OVERLAP_MM } from '../src/lib/cut';
@@ -1198,5 +1199,83 @@ describe('safeCompute — žiadny tichý fallback, chyba sa hlási', () => {
 		const { r, err } = safeCompute(typo, 'Robust|2K', 5000, 2000, false);
 		expect(r).toBeNull();
 		expect(err).toContain('rozsah');
+	});
+});
+
+describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korekcia 2026-08-02)', () => {
+	// SAMOSTATNÁ objednávka — kusy sa balia VLASTNÝMI čerstvými tyčami, nezdieľajú
+	// zvyšok s pôvodnou objednávkou (tá je dávno preč zo skladu). Preto tu NEPLATÍ
+	// diff oproti in-posuv delte v tests/vstup-sietka.test.ts — ide o SAMOSTATNÝ FFD
+	// pack len tých pár kusov (2 rám S + 2 rám V + 1 nos, [+2 koľajnica S + 2 V]).
+
+	it('Robust 3K S=4645/V=2320: rám 2+2, nos 1, rozmer sieťoviny zo skla', () => {
+		const { r, err } = sietkaSamostatnaVypocet(cfg, 'Robust', '3K', 4645, 2320);
+		expect(err).toBeNull();
+		expect(r!.N).toBe(3);
+		expect(r!.potrebuje3K).toBe(false);
+		expect(r!.sklo).toEqual({ sirka: 1445, vyska: 2115 });
+		expect(r!.rozmerSietoviny).toEqual({ sirka: 1447, vyska: 2116 });
+		expect(r!.material).toEqual([
+			{
+				kod: 'ZASP00002',
+				nazov: 'Rámový profil Surový 7500 mm',
+				rezy: [
+					{ rozmer: 1580, ks: 2 },
+					{ rozmer: 2250, ks: 2 }
+				],
+				tyce: 2
+			},
+			{
+				kod: 'ZASP00010',
+				nazov: 'Nosový profil Surový 7500 mm',
+				rezy: [{ rozmer: 2250, ks: 1 }],
+				tyce: 1
+			}
+		]);
+		expect(r!.odpis).toEqual([
+			{ kod: 'ZASP00002', nazov: 'Rámový profil Surový 7500 mm', metre: 15 },
+			{ kod: 'ZASP00010', nazov: 'Nosový profil Surový 7500 mm', metre: 7.5 }
+		]);
+	});
+
+	it('Robust 2K S=2509/V=1930: potrebuje3K = true, koľajnica 3K 2ks+2ks v odpise', () => {
+		const { r, err } = sietkaSamostatnaVypocet(cfg, 'Robust', '2K', 2509, 1930);
+		expect(err).toBeNull();
+		expect(r!.potrebuje3K).toBe(true);
+		const kolaj = r!.material.find((m) => m.kod === 'ZASP00016')!;
+		expect(kolaj.nazov).toBe('Koľajnica 3K Surový 7500 mm');
+		expect(kolaj.rezy).toEqual([
+			{ rozmer: 2509, ks: 2 },
+			{ rozmer: 1930, ks: 2 }
+		]);
+		expect(r!.odpis).toEqual([
+			{ kod: 'ZASP00002', nazov: 'Rámový profil Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00010', nazov: 'Nosový profil Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00016', nazov: 'Koľajnica 3K Surový 7500 mm', metre: 15 }
+		]);
+	});
+
+	it('Slide 3K S=3500/V=2001: rovnaká delta ako Robust, žiadna redukcia v odpise', () => {
+		const { r, err } = sietkaSamostatnaVypocet(cfg, 'Slide', '3K', 3500, 2001);
+		expect(err).toBeNull();
+		expect(r!.potrebuje3K).toBe(false);
+		expect(r!.odpis).toEqual([
+			{ kod: 'ZASP00088', nazov: 'Rámový profil Slide Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202410', nazov: 'Nosový profil Slide Surový 7500 mm', metre: 7.5 }
+		]);
+		expect(r!.odpis.some((o) => o.kod === 'ZASP00091')).toBe(false); // redukcia sa NEODPISUJE
+	});
+
+	it('neznámy systém/štýl vráti chybu, nie čísla', () => {
+		const { r, err } = sietkaSamostatnaVypocet(cfg, 'Robust', '9K', 3000, 2000);
+		expect(r).toBeNull();
+		expect(err).toBeTruthy();
+	});
+
+	it('rozmer mimo rozsahu (oversize — rez dlhší než tyč) vráti chybu, nie podhodnotený odpis', () => {
+		// Robust|2K rám S = (S+22)/2 — pri S=16000 vyjde ~8011 mm > 7500 mm tyč
+		const { r, err } = sietkaSamostatnaVypocet(cfg, 'Robust', '2K', 16000, 2000);
+		expect(r).toBeNull();
+		expect(err).toBeTruthy();
 	});
 });
