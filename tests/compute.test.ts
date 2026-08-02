@@ -1278,4 +1278,10 @@ describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korek
 		expect(r).toBeNull();
 		expect(err).toBeTruthy();
 	});
+
+	it('opona (2x*) štýl je odmietnutý — Patrikov popis platí len pre jeden súvislý beh krídel', () => {
+		const { r, err } = sietkaSamostatnaVypocet(cfg, 'Robust', '2x3K', 5000, 2200);
+		expect(r).toBeNull();
+		expect(err).toMatch(/opon/i);
+	});
 });

@@ -21,7 +21,11 @@ import {
 } from '$lib/server/money';
 
 export const load: PageServerLoad = async () => {
-	const styly = listSysStyly().filter((s) => SIETKA_SYSTEMY.includes(s.system));
+	// opona (2x*) nie je podporovaná (rovnaký gate ako sietkaSamostatnaVypocet) —
+	// nenúkaj ju vôbec v selecte, nech sa scriptovaný POST nemusí odmietať v akcii
+	const styly = listSysStyly().filter(
+		(s) => SIETKA_SYSTEMY.includes(s.system) && !s.styl.startsWith('2x')
+	);
 	return { styly, live: isLive() };
 };
 

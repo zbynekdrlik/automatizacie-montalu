@@ -276,6 +276,12 @@ export function sietkaSamostatnaVypocet(
 	S: number,
 	V: number
 ): { r: SietkaSamostatnaOdpis | null; err: string | null } {
+	// opona (2x*) — rovnaký gate ako `jeSietkaMoneyRelevant` pre in-posuv sieťku:
+	// Patrikov popis aj strana sieťky (`sietkaStrana('Opona')===null`) platia len
+	// pre jeden súvislý beh krídel. Bez tohto gate by appka napísala Money odpis
+	// pre scenár (ktorá strana opony?), ktorý Patrik nikdy nepotvrdil.
+	if (styl.startsWith('2x'))
+		return { r: null, err: 'Sieťka pre oponové (2x) štýly zatiaľ nie je podporovaná.' };
 	const sysStyl = `${system}|${styl}`;
 	if (!validSys(cfg, sysStyl)) return { r: null, err: 'Neznámy systém/štýl.' };
 	const boundErr = inBounds(cfg, sysStyl);
