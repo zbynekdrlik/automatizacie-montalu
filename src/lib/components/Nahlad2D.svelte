@@ -5,6 +5,9 @@
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import type { Klin } from '$lib/klin';
 	import { sietkaStrana, type Sietka } from '$lib/sietka';
+	// unikátne id pre <pattern> (viac Nahlad2D inštancií na jednej stránke pri
+	// zimnej záhrade s viac posuvmi — duplicitné SVG id by boli neplatné DOM)
+	const uid = $props.id();
 	let {
 		S,
 		V,
@@ -399,7 +402,7 @@
 		<g data-testid="nahlad-sietka">
 			<defs>
 				<pattern
-					id="sietka-mriezka"
+					id="sietka-mriezka-{uid}"
 					width="6"
 					height="6"
 					patternTransform="rotate(45)"
@@ -422,7 +425,7 @@
 				y={sietkaGeo.y + frame}
 				width={Math.max(0, sietkaGeo.w - 2 * frame)}
 				height={Math.max(0, sietkaGeo.h - 2 * frame)}
-				fill="url(#sietka-mriezka)"
+				fill="url(#sietka-mriezka-{uid})"
 				stroke="#0369a1"
 				stroke-width="0.8"
 				stroke-dasharray="4 3"
