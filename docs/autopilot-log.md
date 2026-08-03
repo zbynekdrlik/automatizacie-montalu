@@ -163,3 +163,27 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   priečka) berie krajný odskok len od ľavého kraja; n≥4 rozkladá ďalšie
   priečky rovnomerne medzi krajné — výkres pokrýva len n=3, zvyšok je
   najpravdepodobnejšie čítanie, nie potvrdené.
+
+## #85 follow-up — n=2 oprava, n≥4 potvrdené (2026-08-03)
+
+- **Zdroj:** Patrik, Odoo kanál 207, msg #1618564 — odpoveď na oba otvorené
+  predpoklady z PR #112.
+- **n=2 bolo ZLE:** "Ak sú dve polia sklo ide priamo na stred je jedno čí tam
+  posuv je nie je" — presné 50/50, systém sa ignoruje. Predpoklad z PR #112
+  (`[KRAJNY, S-KRAJNY]` od ľavého kraja) bol nesprávny.
+- **n≥4 OVERENÉ, kód sa nemenil:** "by som to delil rovnako ako pri 3 oknách
+  ... 21 a 21 obsadenie, priečku beriem na stred" — matematicky zhodné so
+  súčasnou implementáciou (numericky dokázané: Štandard S=3000 n=6 →
+  `[59, 720.5, 720.5, 720.5, 720.5, 59]`).
+- **Design komentár:** posted BEFORE code na #85 — root cause (n=2 vetva
+  bola nepotvrdený predpoklad), zvolený prístup (presný stred, ignoruj
+  systém), zamietnutá alternatíva (ponechať asymetrický rez).
+- **Commits:** `722673c` verzia bump, `83bd370` RED test (n=2 dôkaz zlého
+  predpokladu + nový n=6 numerický test), `44e7a8d` GREEN fix + UI hlášky +
+  e2e testy + playbook (`.claude/rules/fix-module.md`).
+- **Testy:** `tests/fix-podla-posuvu.test.ts` (opravený n=2 test, pridaný
+  n=6), `e2e/fix-podla-posuvu.spec.ts` (upravený existujúci n=3 test, 2 nové
+  — n=2 happy path 50/50 + n=2 hláška bez system/KRAJNY zmienky). Plná sada:
+  `npx vitest run` 695/695, `npm run check` 0 chýb, `npm run lint` čisté,
+  `npx playwright test` 119/119 lokálne, 0 regresií, 0 chýb konzoly.
+- **PR:** #113 (dev→main), closes #85.
