@@ -57,18 +57,25 @@ describe('rozpocitajPodlaPosuvu — reprodukcia výkresu (3 polia, 2 priečky) p
 	}
 });
 
-describe('rozpocitajPodlaPosuvu — hraničné a odvodené prípady (predpoklady, viď fix.ts komentár)', () => {
+describe('rozpocitajPodlaPosuvu — hraničné a odvodené prípady (n=2 a n>=4 POTVRDENÉ Patrikom #85)', () => {
 	it('n=1: žiadna priečka, celá šírka je jedno pole (zhodné s rovnomernePolia)', () => {
 		expect(rozpocitajPodlaPosuvu(2400, 'Robust', 1)).toEqual([2400]);
 		expect(rozpocitajPodlaPosuvu(2400, 'Robust', 1)).toEqual(rovnomernePolia(2400, 1));
 	});
 
-	it('n=2 (PREDPOKLAD): jediná priečka, krajny sa berie od ĽAVÉHO kraja', () => {
-		expect(rozpocitajPodlaPosuvu(2000, 'Štandard', 2)).toEqual([59, 2000 - 59]);
-		expect(rozpocitajPodlaPosuvu(3000, 'Robust', 2)).toEqual([106.6, 3000 - 106.6]);
+	it('n=2 (POTVRDENÉ Patrikom, Odoo 207 #1618564): dve polia = presne STRED (50/50), systém sa ignoruje', () => {
+		// "Ak sú dve polia sklo ide priamo na stred je jedno čí tam posuv je nie je"
+		// — KRAJNY/PRIECKA sa pri n=2 vôbec nepoužívajú, delí sa vždy presne na polovicu.
+		expect(rozpocitajPodlaPosuvu(2000, 'Štandard', 2)).toEqual([1000, 1000]);
+		expect(rozpocitajPodlaPosuvu(3000, 'Robust', 2)).toEqual([1500, 1500]);
+		expect(rozpocitajPodlaPosuvu(1500, 'Slide', 2)).toEqual([750, 750]);
+		// nepárny súčet (nedeliteľný na 0,1 mm rovnako) — súčet musí sedieť PRESNE na S
+		const polia = rozpocitajPodlaPosuvu(2001, 'Štandard', 2);
+		expect(polia[0] + polia[1]).toBe(2001);
+		expect(Math.abs(polia[0] - polia[1])).toBeLessThanOrEqual(0.1);
 	});
 
-	it('n=4 (PREDPOKLAD): symetrické — krajné = krajny, stredné dve rovnaké', () => {
+	it('n=4: symetrické — krajné = krajny, stredné dve rovnaké', () => {
 		const polia = rozpocitajPodlaPosuvu(3000, 'Robust', 4);
 		expect(polia[0]).toBe(106.6);
 		expect(polia[3]).toBe(106.6);
@@ -76,7 +83,7 @@ describe('rozpocitajPodlaPosuvu — hraničné a odvodené prípady (predpoklady
 		expect(polia.reduce((a, b) => a + b, 0)).toBeCloseTo(3000, 6);
 	});
 
-	it('n=5 (PREDPOKLAD): tri stredné polia takmer rovnaké (do 0,1 mm), súčet presne S', () => {
+	it('n=5: tri stredné polia takmer rovnaké (do 0,1 mm), súčet presne S', () => {
 		const polia = rozpocitajPodlaPosuvu(4000, 'Robust', 5);
 		expect(polia[0]).toBe(106.6);
 		expect(polia[4]).toBe(106.6);
@@ -86,6 +93,18 @@ describe('rozpocitajPodlaPosuvu — hraničné a odvodené prípady (predpoklady
 		const min = Math.min(...stred);
 		expect(max - min).toBeLessThanOrEqual(0.1);
 		expect(polia.reduce((a, b) => a + b, 0)).toBeCloseTo(4000, 6);
+	});
+
+	it('n=6 (POTVRDENÉ Patrikom, Odoo 207 #1618564, „štandard 6 okien"): každá vnútorná priečka berie rovnaké 21+21, stred = hranica', () => {
+		// "by som to delil rovnako ako pri 3 oknách ... pri štandardne 21 a 21
+		// obsadenie a pričku beriem na stred" — repeat pravidla z n=3: krajné
+		// polia = KRAJNY (nezmenené), VŠETKY vnútorné polia navzájom PRESNE
+		// rovnaké (žiadne "rozloženie zvyšku", len opakovanie toho istého
+		// stred-je-hranica pravidla) — Štandard, S=3000: krajny=59,
+		// 4 vnútorné polia = (3000 - 2*59) / 4 = 720,5 každé.
+		const polia = rozpocitajPodlaPosuvu(3000, 'Štandard', 6);
+		expect(polia).toEqual([59, 720.5, 720.5, 720.5, 720.5, 59]);
+		expect(polia.reduce((a, b) => a + b, 0)).toBe(3000);
 	});
 
 	it('n=6: súčet je VŽDY presne S (invariant, rovnaký ako rovnomernePolia)', () => {
