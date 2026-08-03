@@ -297,8 +297,13 @@
 			</div>
 			{#if delenieS === 'posuv'}
 				<p class="sub" data-testid="posuv-info">
-					Krajné pole {fmt(KRAJNY[systemS])} mm (od každého kraja k stredu priečky posuvu), priečka posuvu
-					{fmt(PRIECKA[systemS])} mm — hranica poľa je jej STRED, súčet polí sedí presne na šírku.
+					{#if pocetPoli === 2}
+						Dve polia: delí sa presne na stred (50/50) — systém posuvu sa pri dvoch poliach
+						neuplatňuje.
+					{:else}
+						Krajné pole {fmt(KRAJNY[systemS])} mm (od každého kraja k stredu priečky posuvu), priečka
+						posuvu {fmt(PRIECKA[systemS])} mm — hranica poľa je jej STRED, súčet polí sedí presne na šírku.
+					{/if}
 				</p>
 			{/if}
 			{#if poliaS.length > 1}
@@ -325,9 +330,14 @@
 									⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span
 								>{/if}
 							{#if poleMimoRozsahu}<span class="nesedi" data-testid="pole-mimo-rozsahu">
-									⛔ šírka {fmt(sirkaNum)} mm je pre {systemS} a {pocetPoli}
-									{pocetPoli === 1 ? 'pole' : pocetPoli < 5 ? 'polia' : 'polí'} nevhodná — krajné pole
-									({fmt(KRAJNY[systemS])} mm) sa nezmestí, uprav šírku alebo počet polí</span
+									{#if pocetPoli === 2}
+										⛔ šírka {fmt(sirkaNum)} mm je na 2 polia príliš úzka (minimálna šírka poľa {FIX_MIN}
+										mm), uprav šírku alebo počet polí
+									{:else}
+										⛔ šírka {fmt(sirkaNum)} mm je pre {systemS} a {pocetPoli}
+										{pocetPoli === 1 ? 'pole' : pocetPoli < 5 ? 'polia' : 'polí'} nevhodná — krajné pole
+										({fmt(KRAJNY[systemS])} mm) sa nezmestí, uprav šírku alebo počet polí
+									{/if}</span
 								>{/if}
 						</span>
 						<button
@@ -439,8 +449,13 @@
 		</div>
 		{#if vstup.delenie === 'posuv'}
 			<p class="sub" data-testid="posuv-info-vykres" style="margin-top:10px">
-				Delenie polí: podľa posuvu ({vstup.system}) — krajné pole {fmt(KRAJNY[vstup.system])} mm, priečka
-				posuvu {fmt(PRIECKA[vstup.system])} mm (informatívne, hranica poľa je jej stred).
+				{#if vstup.polia.length === 2}
+					Delenie polí: podľa posuvu — dve polia sa delia presne na stred (50/50), systém posuvu sa
+					neuplatňuje.
+				{:else}
+					Delenie polí: podľa posuvu ({vstup.system}) — krajné pole {fmt(KRAJNY[vstup.system])} mm, priečka
+					posuvu {fmt(PRIECKA[vstup.system])} mm (informatívne, hranica poľa je jej stred).
+				{/if}
 			</p>
 		{/if}
 	</div>

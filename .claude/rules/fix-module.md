@@ -49,3 +49,23 @@ only (shown in the UI/print), never subtracted from any field — subtracting it
 would have broken the invariant every other part of the FIX module (validation,
 `pocitajFix`, the 2D drawing) already relies on. If a future "delenie" mode is
 added, keep this invariant unless there is a genuine, confirmed reason to break it.
+
+## `n=2` is a SPECIAL CASE that does NOT follow the general "posuv" pattern — verify low-n edge cases with the source, don't extrapolate
+
+PR #112 shipped `rozpocitajPodlaPosuvu`'s `n===2` branch as an educated GUESS
+(`[KRAJNY, S−KRAJNY]`, asymmetric offset from the left edge only) because the
+drawing only showed the `n=3` case and an offset from BOTH edges can't work in
+general (`2×KRAJNY === S` only holds for the one example width). Patrik later
+corrected it (#85 follow-up, Odoo 207 msg #1618564): **at n=2 the split is
+ALWAYS exactly 50/50, independent of system, independent of whether a posuv
+even sits above the fix** — `KRAJNY`/`PRIECKA` do not apply at all at n=2. The
+general "mullion center = field boundary" pattern that holds for n=3 and n≥4
+does NOT extrapolate down to n=2 (there's no meaningful "mullion" for a single
+dividing line splitting a fix in half). **Lesson: when a physical/geometric
+rule is confirmed for one arity (n=3) and extrapolated to a DIFFERENT arity
+(n=2, n≥4) without an explicit worked example, treat every extrapolated case as
+an OPEN ASSUMPTION until the domain expert confirms it with a concrete number —
+never assume the general pattern holds at the boundary.** n≥4 turned out to
+match the general pattern (verified: Štandard S=3000 n=6 → `[59, 720.5, 720.5,
+720.5, 720.5, 59]`); n=2 did not. Both had to be checked independently — one
+confirmed as-is, the other required a real code fix.

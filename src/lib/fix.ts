@@ -118,15 +118,23 @@ export const PRIECKA: Record<FixSystem, number> = {
  * presne na `S`, rovnako ako pri `rovnomernePolia` — `PRIECKA` sa nikde
  * neodpočítava, je to len informatívny údaj (viď `PRIECKA` vyššie).
  *
- * PREDPOKLADY (nepotvrdené Patrikom, viď komentár na #85 — implementované
- * najpravdepodobnejšie čítanie, aby sa ticket nezasekol na potvrdení):
- *  - `n === 2` (jediná priečka): krajný odskok sa berie len od ĽAVÉHO kraja
- *    (`[krajny, S − krajny]`) — pri všeobecnej šírke S nejde súčasne od
- *    OBOCH krajov (2×krajny === S platí len v Patrikovom príklade, kde sú
- *    krajné polia OBE odvodené z dvoch RÔZNYCH priečok, nie jednej).
- *  - `n >= 4` (viac než 2 priečky): výkres ukazuje len 2 krajné priečky;
- *    ďalšie vnútorné priečky rozkladám ROVNOMERNE medzi krajnú ľavú a
- *    krajnú pravú (symetrické delenie zvyšku).
+ * POTVRDENÉ Patrikom (Odoo 207, msg #1618564, 2026-08-03) — oba prípady,
+ * ktoré PR #112 nechalo ako predpoklad, sú teraz overené:
+ *  - `n === 2` (jediná priečka): DELÍ SA PRESNE NA STRED (50/50) —
+ *    „Ak sú dve polia sklo ide priamo na stred je jedno čí tam posuv je nie
+ *    je". `KRAJNY`/`PRIECKA` sa tu vôbec nepoužívajú — pri dvoch poliach nejde
+ *    o kopírovanie posuvu, len o rovný rez v strede, nezávisle od systému.
+ *    (PR #112 tu mal ZLÝ predpoklad — asymetrický rez `[krajny, S−krajny]`
+ *    od ľavého kraja — opravené v #85 follow-up.)
+ *  - `n >= 4` (viac než 2 priečky): „by som to delil rovnako ako pri 3
+ *    oknách ... pri štandardne 21 a 21 obsadenie a pričku beriem na stred"
+ *    — rovnaké pravidlo ako n=3, len opakované: krajné polia zostávajú
+ *    `KRAJNY[system]`, každá VNÚTORNÁ priečka je rovnako braná na svoj
+ *    STRED, takže všetky vnútorné polia vychádzajú NAVZÁJOM ROVNAKÉ (žiadne
+ *    iné rozloženie, žiadna fixná medzera). Implementácia nižšie (rovnomerné
+ *    rozloženie pozícií vnútorných priečok medzi krajnú ľavú a krajnú pravú)
+ *    dáva presne toto — overené numericky (Štandard, S=3000, n=6: krajné
+ *    59/59, 4 vnútorné polia = 720,5 každé) — kód sa NEMENIL.
  *
  * `n === 1`: žiadna priečka, celá šírka je jedno pole (zhodné s
  * `rovnomernePolia(S, 1)`).
@@ -134,8 +142,14 @@ export const PRIECKA: Record<FixSystem, number> = {
 export function rozpocitajPodlaPosuvu(S: number, system: FixSystem, n: number): number[] {
 	const k = Math.max(1, Math.round(n));
 	if (k === 1) return [R1(S)];
+	// n=2: presne stred (50/50), systém sa ignoruje — rovnaký zaokrúhľovací
+	// vzor ako `rovnomernePolia` (zvyšok z R1 ide do druhého poľa, aby súčet
+	// sedel PRESNE na S aj pri nepárnej/nedeliteľnej šírke).
+	if (k === 2) {
+		const polovica = R1(S / 2);
+		return [polovica, R1(S - polovica)];
+	}
 	const krajny = KRAJNY[system];
-	if (k === 2) return [R1(krajny), R1(S - krajny)];
 
 	const posledna = S - krajny;
 	const rozpatie = posledna - krajny; // medzi krajnou ľavou a krajnou priečkou
