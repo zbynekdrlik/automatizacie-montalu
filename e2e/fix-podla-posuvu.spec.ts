@@ -106,3 +106,28 @@ test('prepnutie späť na „rovnomerne" prepočíta polia rovnomerne (systém s
 
 	expect(errs).toEqual([]);
 });
+
+// #85 review (Important, PR #112): Robust krajny (106,6) sa nezmestí dvakrát do
+// príliš úzkej šírky — súčet by aj tak sedel na S (krajné pole by vyšlo záporné),
+// takže treba samostatnú hlášku + zablokovanie tlačidla, nie len spoliehať na
+// generickú serverovú kontrolu súčtu.
+test('príliš úzka šírka pre zvolený systém: konkrétna hláška, tlačidlo zablokované', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-FIX-POSUV-D', 'OP-POSUV4');
+
+	await page.selectOption('#tvar', 'rovny');
+	await page.locator('#s').fill('100');
+	await page.locator('#v1').fill('500');
+	await page.selectOption('#pocet', '2');
+	await page.selectOption('#delenie', 'posuv');
+	await page.selectOption('#system', 'Robust');
+
+	await expect(page.getByTestId('pole-mimo-rozsahu')).toBeVisible();
+	await expect(page.getByTestId('pole-mimo-rozsahu')).toContainText('Robust');
+	await expect(page.getByTestId('nakreslit')).toBeDisabled();
+
+	expect(errs).toEqual([]);
+});

@@ -84,6 +84,13 @@
 	let sirkaNum = $derived(cislo(sirkaS));
 	let sucetPoli = $derived(poliaS.reduce<number>((a, b) => a + cislo(b), 0));
 	let sedíSucet = $derived(!poliaS.length || Math.abs(sucetPoli - sirkaNum) <= 0.5);
+	// #85 review (Important): pri "podľa posuvu" môže KRAJNY presiahnuť dostupnú
+	// šírku (napr. malé S s viac poľami) — súčet by aj tak sedel na S (krajné pole
+	// by len vyšlo záporné), takže samotné `sedíSucet` to nechytí. Ukáž konkrétnu
+	// hlášku namiesto len generickej serverovej "Šírka poľa musí byť 59–20000 mm."
+	let poleMimoRozsahu = $derived(
+		delenieS === 'posuv' && poliaS.some((p) => cislo(p) < FIX_MIN || cislo(p) > FIX_MAX)
+	);
 
 	/** rozdelenie šírky na `n` polí PODĽA AKTUÁLNE ZVOLENÉHO režimu (rovnomerne /
 	 *  podľa posuvu) — jedno miesto, ktoré používa aj „Počet polí", aj tlačidlo
@@ -317,6 +324,11 @@
 							{#if !sedíSucet}<span class="nesedi">
 									⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span
 								>{/if}
+							{#if poleMimoRozsahu}<span class="nesedi" data-testid="pole-mimo-rozsahu">
+									⛔ šírka {fmt(sirkaNum)} mm je pre {systemS} a {pocetPoli}
+									{pocetPoli === 1 ? 'pole' : pocetPoli < 5 ? 'polia' : 'polí'} nevhodná — krajné pole
+									({fmt(KRAJNY[systemS])} mm) sa nezmestí, uprav šírku alebo počet polí</span
+								>{/if}
 						</span>
 						<button
 							type="button"
@@ -370,8 +382,11 @@
 			</div>
 
 			<input type="hidden" name="polia" value={poliaJSON} />
-			<button class="btn" type="submit" disabled={!sedíSucet} data-testid="nakreslit"
-				>Nakresliť výkres</button
+			<button
+				class="btn"
+				type="submit"
+				disabled={!sedíSucet || poleMimoRozsahu}
+				data-testid="nakreslit">Nakresliť výkres</button
 			>
 		</form>
 	</div>
