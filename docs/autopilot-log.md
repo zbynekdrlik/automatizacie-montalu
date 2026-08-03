@@ -129,3 +129,37 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   počet kusov/dĺžka Slide sieťkovej redukcie (odvodené, nie doslovné číslo).
 - **Discord karty:** #110 `sent`, #90 `dedup` (exit 0, kartu už dostal pri
   predošlej dávke #86–#90/PR #104).
+
+## #85 — FIX: rozpočítanie polí podľa posuvu (Robust/Slide/Štandard) (2026-08-03)
+
+- **Zdroj:** Patrik, Odoo kanál 207, msg #1614896 + výkres msg #1614897 (odpoveď
+  na blokujúcu časť #85 — "variant 2, podľa posuvu"). Read-only stiahnutý cez
+  Odoo JSON-RPC, pixel-grid analýza ukázala že výkres NIE JE v mierke (rovnaké
+  pixelové rozostupy pre 3 rôzne systémy) — číselné kóty sú ground truth, nie
+  pixely.
+- **Design komentár:** posted BEFORE code na #85 — root cause (appka vie len
+  rovnomerne), zvolený prístup (hranica poľa = STRED priečky, `KRAJNY`
+  konštanta per systém, `PRIECKA` len informatívna), zamietnutá alternatíva
+  (odpočítanie priečky ako mŕtvej šírky — porušilo by invariant súčtu polí=S).
+- **Commits:** `0a5e2bd` verzia bump, `7a45340` implementácia
+  (`rozpocitajPodlaPosuvu` + UI + round-trip + FIX_MIN 100→59), `429deda`
+  deep-review fix (client-side hláška pre príliš úzku šírku), release bump.
+- **RED→GREEN + sabotáž dôkaz:** implementácia + testy v jednej dávke
+  (feature). `rozpocitajPodlaPosuvu` sabotáž-overené (dočasne rozbité →
+  6 testov RED → opravené → GREEN).
+- **Nové testy:** `tests/fix-podla-posuvu.test.ts` (15 — KRAJNY/PRIECKA,
+  reprodukcia výkresu pre 3 systémy, n=1..8 invariant), round-trip pridaný do
+  `tests/fix-vstup.test.ts` (3), `tests/fix-money-safety.test.ts` (2 — byte-
+  identický zasklenia odpis canary + statická kontrola žiadneho importu z
+  compute.ts). `e2e/fix-podla-posuvu.spec.ts` (4, Playwright).
+- **Review:** `/review` (0 🔴 0 🟡 0 🔵 blokujúcich) + `superpowers:requesting-
+  code-review` deep pass — 1 Important nález (príliš úzka šírka pre zvolený
+  systém nemala konkrétnu hlášku), opravený v `429deda` + nový e2e test.
+- **Tests:** `npx vitest run --coverage` 700/700, `npm run check` 0 chýb,
+  `npm run lint` čisté, `npx playwright test` 120/120 lokálne (fix-podla-
+  posuvu + celá existujúca sada), 0 regresií, 0 chýb konzoly.
+- **PR:** #112 (dev→main).
+- **Otvorené (Patrikovi treba potvrdiť, needs-answer na #85):** n=2 (jediná
+  priečka) berie krajný odskok len od ľavého kraja; n≥4 rozkladá ďalšie
+  priečky rovnomerne medzi krajné — výkres pokrýva len n=3, zvyšok je
+  najpravdepodobnejšie čítanie, nie potvrdené.
