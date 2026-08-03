@@ -368,11 +368,26 @@ export function sietkaSlideExtra(
 	return { rezy: [kus(sRow, 2), kus(vRow, 2)], err: null };
 }
 
+/** Kus z riadku navyše dlhší než jeho tyč — ten istý guard ako `oversizeCut`, ale
+ *  pre `ExtraRez[]` (sieťková delta). Väčšina extra kusov má IDENTICKÚ dĺžku ako
+ *  existujúci riadok toho istého systému, ktorý `oversizeCut` už overil — GAP je
+ *  cross-systémová šírka prírezov (#110), kde sa k základnej dĺžke pripočíta
+ *  Patrikova ±16,5 mm konštanta a mohla by (tesne pri hranici tyče) preklopiť
+ *  kus, ktorý bez delty ešte sedel, na kus, ktorý sa už nezmestí. */
+function extraOversizeErr(extra: ExtraRez[]): string | null {
+	for (const e of extra) {
+		if (e.dlzka + KOTUC > e.barLen)
+			return `Rez ${Math.round(e.rozmer)} mm (${e.nazov}) je dlhší než tyč ${e.barLen} mm — tento rozmer sa z daného profilu nedá vyrobiť. Zmenši rozmer alebo zvoľ iný systém.`;
+	}
+	return null;
+}
+
 /** Predbežná validácia sieťkovej delty (#110/#90) — rovnaká vrstva ako
  *  `missingHrubkaProfile`/`oversizeCut`: nech `safeCompute`/`safeComputeMulti`
  *  vráti PRESNÚ chybu namiesto všeobecného „výpočet zlyhal", keď zvolená
  *  kombinácia sieťky nie je k dispozícii (napr. sieťka „Štandard" na 5K/6K
- *  Štandard + posuve — starý Štandard existuje len do 4K). */
+ *  Štandard + posuve — starý Štandard existuje len do 4K) ALEBO by dala kus
+ *  dlhší než jeho tyč. */
 export function sietkaChyba(
 	cfg: Cfg,
 	system: string,
@@ -383,9 +398,14 @@ export function sietkaChyba(
 	N: number
 ): string | null {
 	if (!jeSietkaMoneyRelevant(system, styl, sietka)) return null;
-	if (system === 'Slide') return sietkaSlideExtra(cfg, styl, S, V, N).err;
-	if (maSietkaSystemVyber(system))
-		return sietkaStandardExtra(cfg, system, styl, sietka, S, V, N).err;
+	if (system === 'Slide') {
+		const { rezy, err } = sietkaSlideExtra(cfg, styl, S, V, N);
+		return err ?? extraOversizeErr(rezy);
+	}
+	if (maSietkaSystemVyber(system)) {
+		const { rezy, err } = sietkaStandardExtra(cfg, system, styl, sietka, S, V, N);
+		return err ?? extraOversizeErr(rezy);
+	}
 	return null;
 }
 

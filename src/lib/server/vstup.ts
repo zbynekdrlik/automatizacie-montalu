@@ -128,7 +128,7 @@ export function parseSietka(raw: SietkaRaw): { sietka: Sietka | null; error: str
  *  jedna z dvoch platných (Štandard/Štandard +) A líši sa od posuvu (rovnaký kód
  *  ako keby sa nezadal vôbec — default = rovnaký systém). */
 export function sanitizeSietka(system: string, sietka: Sietka | null): Sietka | null {
-	if (!maSietkaSystem(system) || !sietka) return maSietkaSystem(system) ? sietka : null;
+	if (!maSietkaSystem(system) || !sietka) return null;
 	// `system` pole má zmysel len pri výbere (Štandard/Štandard +), a len keď je
 	// platnou (inou) hodnotou z tej istej dvojice — inak sa zahodí (default =
 	// rovnaký systém ako posuv), presne ako keby sa vôbec nezadalo.

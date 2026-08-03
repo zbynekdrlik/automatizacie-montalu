@@ -151,6 +151,27 @@ describe('#110 — sieťka INÉHO systému (Štandard ↔ Štandard +), Patrikov
 			err: null
 		});
 	});
+
+	it('cross-systémová +16,5mm delta môže preklopiť kus TESNE pod hranicou tyče na kus NAD ňou — presná chyba, nie tichý podhodnotený odpis', () => {
+		// S=7308, Štandard +|2K: BÁZOVÝ (rovnaký systém) rez 3597mm ešte sedí do 3600mm
+		// tyče (Kladkový profil), ale +16,5mm cross-systémová delta by dala 3597+16,5≈
+		// 3614mm — cez limit. `oversizeCut` sám o sebe toto NEVIDÍ (nepozná sieťkovú
+		// deltu) — bez `extraOversizeErr` v `sietkaChyba` by FFD kus ticho zabalil na
+		// 1 tyč so záporným odpadom → podhodnotený odpis (rovnaký bug ako `oversizeCut`
+		// pôvodne riešil pre bázové rezy).
+		const bez = safeCompute(cfg, 'Štandard +|2K', 7308, 1850, false, 0, false, undefined, null);
+		expect(bez.err).toBeNull();
+		const sameSystem = safeCompute(cfg, 'Štandard +|2K', 7308, 1850, false, 0, false, undefined, {
+			uchyt: 'ziadny'
+		});
+		expect(sameSystem.err).toBeNull(); // rovnaký systém = žiadna delta na dĺžku, stále sedí
+		const cross = safeCompute(cfg, 'Štandard +|2K', 7308, 1850, false, 0, false, undefined, {
+			uchyt: 'ziadny',
+			system: 'Štandard'
+		});
+		expect(cross.r).toBeNull();
+		expect(cross.err).toMatch(/dlhší než tyč 3600 mm/);
+	});
 });
 
 describe('#110 — IZO sklo: sieťka ide BEZ rozširujúceho profilu (msg #1616281)', () => {

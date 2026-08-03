@@ -818,7 +818,7 @@
 
 	{#if m.posuvy.some((pv) => pv.sietka)}
 		<div class="card" data-testid="sietka-karta-multi">
-			<div class="sec">Sieťky — v Money odpise (rám + nos)</div>
+			<div class="sec">Sieťky — v Money odpise</div>
 			{#each m.posuvy as pv, i (i)}
 				{#if pv.sietka}
 					{@const rozmer = rozmerSietovinyPre(pv.system, pv.sklo.sirka, pv.sklo.vyska)}
