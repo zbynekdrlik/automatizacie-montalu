@@ -69,6 +69,100 @@ export function rovnomernePolia(S: number, n: number): number[] {
 }
 
 /**
+ * Systémy posuvu, ku ktorým vieme rozpočítať fix „podľa posuvu" (issue #85,
+ * Patrik — Odoo 207 msg #1614896, výkres #1614897).
+ */
+export const FIX_SYSTEMY = ['Štandard', 'Slide', 'Robust'] as const;
+export type FixSystem = (typeof FIX_SYSTEMY)[number];
+
+/** Je hodnota z formulára platný systém posuvu? (skriptovaný POST môže poslať čokoľvek) */
+export function jeFixSystem(x: unknown): x is FixSystem {
+	return (FIX_SYSTEMY as readonly string[]).includes(x as string);
+}
+
+/** Ako sa rozpočítajú polia fixu — rovnomerne, alebo zarovnané na posuv nad ním. */
+export type FixDelenie = 'rovnomerne' | 'posuv';
+
+export function jeFixDelenie(x: unknown): x is FixDelenie {
+	return x === 'rovnomerne' || x === 'posuv';
+}
+
+/**
+ * Krajný odskok [mm] — vzdialenosť od KAŽDÉHO kraja fixu k STREDU najbližšej
+ * priečky (stretu krídel) posuvu nad ním. Systémová konštanta, nezávislá od
+ * šírky S (zdroj: Patrikov výkres, msg #1614897, prepísané do issue #85).
+ */
+export const KRAJNY: Record<FixSystem, number> = {
+	Štandard: 59,
+	Slide: 82.5,
+	Robust: 106.6
+};
+
+/**
+ * Celá priečka [mm] (2× jej polovica) — fyzická šírka stretu krídel posuvu.
+ * ČISTO INFORMATÍVNA hodnota (viď `rozpocitajPodlaPosuvu`) — hranicu poľa
+ * fixu nemení, hranica = jej STRED. Slúži len na zobrazenie/kontrolu.
+ */
+export const PRIECKA: Record<FixSystem, number> = {
+	Štandard: 42,
+	Slide: 54.3,
+	Robust: 78.5
+};
+
+/**
+ * Rozpočítanie polí fixu PODĽA POSUVU (issue #85, Patrik msg #1614896 +
+ * výkres #1614897): „Hore mam 'posuv' a potom si len pretiahnem stred
+ * priečky do fixu" — hranica poľa = STRED priečky (stretu krídel), nie jej
+ * okraj. Preto krajné pole = presne `KRAJNY[system]` (rovnaká hodnota od
+ * KAŽDÉHO kraja, čo výkres potvrdzuje pre obe strany) a súčet polí sedí
+ * presne na `S`, rovnako ako pri `rovnomernePolia` — `PRIECKA` sa nikde
+ * neodpočítava, je to len informatívny údaj (viď `PRIECKA` vyššie).
+ *
+ * PREDPOKLADY (nepotvrdené Patrikom, viď komentár na #85 — implementované
+ * najpravdepodobnejšie čítanie, aby sa ticket nezasekol na potvrdení):
+ *  - `n === 2` (jediná priečka): krajný odskok sa berie len od ĽAVÉHO kraja
+ *    (`[krajny, S − krajny]`) — pri všeobecnej šírke S nejde súčasne od
+ *    OBOCH krajov (2×krajny === S platí len v Patrikovom príklade, kde sú
+ *    krajné polia OBE odvodené z dvoch RÔZNYCH priečok, nie jednej).
+ *  - `n >= 4` (viac než 2 priečky): výkres ukazuje len 2 krajné priečky;
+ *    ďalšie vnútorné priečky rozkladám ROVNOMERNE medzi krajnú ľavú a
+ *    krajnú pravú (symetrické delenie zvyšku).
+ *
+ * `n === 1`: žiadna priečka, celá šírka je jedno pole (zhodné s
+ * `rovnomernePolia(S, 1)`).
+ */
+export function rozpocitajPodlaPosuvu(S: number, system: FixSystem, n: number): number[] {
+	const k = Math.max(1, Math.round(n));
+	if (k === 1) return [R1(S)];
+	const krajny = KRAJNY[system];
+	if (k === 2) return [R1(krajny), R1(S - krajny)];
+
+	const posledna = S - krajny;
+	const rozpatie = posledna - krajny; // medzi krajnou ľavou a krajnou priečkou
+	const vnutornePriecky = k - 3; // priečky OKREM krajnej ľavej a krajnej pravej
+
+	// pozície priečok OD ľavého kraja (nezaokrúhlené — zaokrúhľujeme až ROZDIELY nižšie)
+	const pozicie: number[] = [krajny];
+	for (let i = 1; i <= vnutornePriecky; i++) {
+		pozicie.push(krajny + (rozpatie * i) / (vnutornePriecky + 1));
+	}
+	pozicie.push(posledna);
+
+	// súčet MUSÍ sedieť na S presne (rovnaká invariant ako rovnomernePolia) — preto
+	// sa `predch` posúva o už ZAOKRÚHLENÚ šírku poľa, nie o surovú pozíciu priečky;
+	// posledné pole (za poslednou priečkou) potom dostane celý zvyšok.
+	const polia: number[] = [];
+	let predch = 0;
+	for (const p of pozicie) {
+		const w = R1(p - predch);
+		polia.push(w);
+		predch += w;
+	}
+	polia.push(R1(S - predch));
+	return polia;
+}
+
+/**
  * Geometria šikmého fixu. `V1` je výška na ľavom kraji, `V2` na pravom — ktorá je
  * väčšia je jedno, sklon si odvodíme. `polia` sú šírky jednotlivých polí zľava
  * doprava; ich súčet musí sedieť so `S` (kontroluje volajúci / `chybaFixVstupu`).
@@ -120,7 +214,11 @@ export function pocitajFix(S: number, V1: number, V2: number, polia: number[]): 
 	};
 }
 
-export const FIX_MIN = 100;
+// Znížené 100→59 v #85: pri delení „podľa posuvu" je krajné pole Štandardu presne
+// KRAJNY.Štandard = 59 mm — reálna, hardvérovo daná šírka z Patrikovho výkresu, nie
+// preklep. Pôvodných 100 mm by túto (a Slide 82,5 mm) hodnotu natvrdo blokovalo, aj
+// keď je to presne to, čo appka sama vypočíta.
+export const FIX_MIN = 59;
 export const FIX_MAX = 20000;
 export const FIX_MAX_POLI = 8;
 /** tolerancia na súčet šírok polí voči celkovej šírke [mm] */

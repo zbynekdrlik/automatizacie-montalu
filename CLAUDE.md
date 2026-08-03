@@ -84,3 +84,4 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - unit/E2E test runs, local Playwright verification → load `.claude/skills/testing`
 - roles / b2b / route gating / Money-write boundary / auth migration → load `.claude/skills/access-control`
 - pridávam NOVÚ stránku/route (exporty, b2b denylist, nav, `$effect` slučka) → load `.claude/skills/nova-stranka`
+- FIX (pevné zasklenie) modul → auto-loads `.claude/rules/fix-module.md` on its `paths:`

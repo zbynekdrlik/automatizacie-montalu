@@ -70,4 +70,33 @@ describe('parseFixVstup', () => {
 		);
 		expect(error).toMatch(/Počet polí/);
 	});
+
+	// #85 — delenie/systém sú round-trip metadáta (rovnaký princíp ako `tvar`): bez
+	// nich = rovnomerne/Štandard (starý bookmark/POST ostáva platný), s nimi prežijú
+	// „Späť a upraviť" presne tak, ako to popisuje PR #85 (round-trip pasca #81/#108).
+	it('bez delenia/systému = rovnomerne/Štandard (starý POST ostáva platný)', () => {
+		const { vstup } = parseFixVstup(fd(zaklad));
+		expect(vstup.delenie).toBe('rovnomerne');
+		expect(vstup.system).toBe('Štandard');
+	});
+
+	it('delenie „posuv" + systém prejdú round-trip presne tak, ako boli poslané', () => {
+		const { vstup, error } = parseFixVstup(
+			fd({
+				...zaklad,
+				delenie: 'posuv',
+				system: 'Robust',
+				polia: JSON.stringify([106.6, 2795 - 213.2, 106.6])
+			})
+		);
+		expect(error).toBeNull();
+		expect(vstup.delenie).toBe('posuv');
+		expect(vstup.system).toBe('Robust');
+	});
+
+	it('neznáme/cudzie delenie alebo systém (skriptovaný POST) spadnú na bezpečný default', () => {
+		const { vstup } = parseFixVstup(fd({ ...zaklad, delenie: 'neco', system: 'Deluxe' }));
+		expect(vstup.delenie).toBe('rovnomerne');
+		expect(vstup.system).toBe('Štandard');
+	});
 });
