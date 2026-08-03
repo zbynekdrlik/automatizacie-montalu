@@ -155,7 +155,17 @@ describe('#110 — sieťka INÉHO systému (Štandard ↔ Štandard +), Patrikov
 
 describe('#110 — IZO sklo: sieťka ide BEZ rozširujúceho profilu (msg #1616281)', () => {
 	it('Rozširujúci profil (ZASP202439) je BEZ sieťky a SO sieťkou bit-identický', () => {
-		const bez = computeFlat(cfg, 'Štandard +|3K IZO', 3000, 1850, false, 0, false, undefined, null)!;
+		const bez = computeFlat(
+			cfg,
+			'Štandard +|3K IZO',
+			3000,
+			1850,
+			false,
+			0,
+			false,
+			undefined,
+			null
+		)!;
 		const so = computeFlat(cfg, 'Štandard +|3K IZO', 3000, 1850, false, 0, false, undefined, {
 			uchyt: 'ziadny'
 		})!;
