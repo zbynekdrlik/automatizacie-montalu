@@ -8,7 +8,7 @@
 // ODOSIELA odpis (`sietkaSamostatnaVypocet` v `compute.ts` — 2 rámové rezy + 1
 // nosový rez, pri 2K aj 3K koľajnicu), rovnakým `writeOdpis`/MONEY_LIVE mechanizmom
 // ako Zasklenia. B2B naďalej NEODPISUJE (existujúce pravidlo — len tabuľka/výpočet).
-import { SIETKA_SYSTEMY, type Sietka } from '$lib/sietka';
+import { SIETKA_SAMOSTATNA_SYSTEMY, type Sietka } from '$lib/sietka';
 import { parseSietka } from './vstup';
 
 export interface SietkaSamostatnaVstup {
@@ -58,7 +58,8 @@ export function parseSietkaSamostatnaVstup(form: FormData): {
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
-	else if (!SIETKA_SYSTEMY.includes(vstup.system)) error = 'Vyber systém (Robust alebo Slide).';
+	else if (!SIETKA_SAMOSTATNA_SYSTEMY.includes(vstup.system))
+		error = 'Vyber systém (Robust alebo Slide).';
 	else if (!vstup.styl) error = 'Vyber štýl (počet krídel posuvu).';
 	else if (!(vstup.otvorS >= 300 && vstup.otvorS <= 20000))
 		error = 'Šírka otvoru musí byť 300–20000 mm.';

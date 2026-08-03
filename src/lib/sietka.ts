@@ -8,9 +8,18 @@
 // MONEY-RELEVANTNÉ (od korekcie 2026-08-02, Robust aj Slide, len jeden súvislý beh
 // krídel — nie opona): rám + nos + [2K→3K koľajnica] IDE do Money odpisu — pozri
 // `sietkaExtraPocetKs`/`jeSietkaMoneyRelevant`/`sietkaKolajnicaSwap` v `compute.ts`.
-// Joklík (bez Money karty) a Slide sieťkový profil (neoverený, #90) OSTÁVAJÚ mimo.
-// Úchyt zostáva DISPLAY-ONLY — Patrik: „dáva sa tam všetko, čo nájdeme na firme…
-// neviem či by som to extra riešil" (#88, explicitná odpoveď, nie chýbajúci údaj).
+// Joklík (bez Money karty) OSTÁVA mimo. Úchyt zostáva DISPLAY-ONLY — Patrik: „dáva
+// sa tam všetko, čo nájdeme na firme… neviem či by som to extra riešil" (#88,
+// explicitná odpoveď, nie chýbajúci údaj).
+//
+// ROZŠÍRENIE 2026-08-03 (#110, #90, Odoo kanál 207 msg #1614895/#1616278–#1616285):
+// - Slide dostal vlastný redukčný profil na sieťku (namiesto zužovacieho pri 6mm
+//   skle) — `sietkaSlideExtra` v `compute.ts`.
+// - Štandard aj Štandard + dostali sieťku — a NAVYŠE si obsluha vyberá SYSTÉM
+//   sieťky nezávisle od systému posuvu (Patrik #1616278: „Vyberiem si systém či
+//   plus alebo starý a keď si dám sieťku vyberiem si či chcem sieťku plus štandard
+//   alebo starý"). Pole `Sietka.system` nesie tento výber — pozri
+//   `maSietkaSystemVyber`/`sietkaStandardExtra` v `compute.ts`.
 
 export type SietkaUchyt = 'ziadny' | 'madloVelke' | 'madloMale' | 'zamok';
 
@@ -32,6 +41,11 @@ export function uchytLabel(u: SietkaUchyt): string {
 export interface Sietka {
 	/** úchyt namiesto kľučky — sieťka kľučku/FAB nemá (#88), display-only */
 	uchyt: SietkaUchyt;
+	/** SYSTÉM sieťky, keď sa líši od systému posuvu — LEN pri dvojici Štandard /
+	 *  Štandard + (#110, Patrik #1616278). `undefined`/chýbajúce = sieťka je
+	 *  toho istého systému ako posuv (jediná možnosť pre Robust/Slide, aj default
+	 *  pre Štandard-rodinu). Sanitizuje sa cez `sanitizeSietkaSystem` v `vstup.ts`. */
+	system?: string;
 }
 
 /** Rozmer SIEŤOVINY (látky) na objednávku u iného dodávateľa — Patrik 2026-08-02:
@@ -43,13 +57,59 @@ export function rozmerSietoviny(skloS: number, skloV: number): { sirka: number; 
 	return { sirka: skloS + 2, vyska: skloV + 1 };
 }
 
-/** Systémy, kde appka sieťku ponúka (Patrik 2026-07-31 pri #90: „malo by to byť
- *  všetko totožné" ako Robust). Štandard/Deluxe/Bazén/Pergola sieťku nemajú. */
-export const SIETKA_SYSTEMY = ['Robust', 'Slide'];
+/** Rozmer SIEŤOVINY pre Štandard/Štandard + (#110, jeho vlastný nárezák
+ *  „ŠTANDARD PLUS V2 3K+1K sieťka", msg #1616284): sklo 957×1735 → riadok
+ *  „sieťka" 960×1738 → +3mm šírka, +3mm výška. INÁ delta ako Robust/Slide
+ *  (`rozmerSietoviny`, +2/+1) — preto samostatná funkcia, nie parameter. */
+export function rozmerSietovinyStandard(
+	skloS: number,
+	skloV: number
+): { sirka: number; vyska: number } {
+	return { sirka: skloS + 3, vyska: skloV + 3 };
+}
+
+/** Rozmer sieťoviny podľa RODINY systému posuvu — jeden vstupný bod pre UI,
+ *  aby si komponenty nemuseli pamätať, ktorá formula patrí ktorému systému. */
+export function rozmerSietovinyPre(
+	system: string,
+	skloS: number,
+	skloV: number
+): { sirka: number; vyska: number } {
+	return maSietkaSystemVyber(system)
+		? rozmerSietovinyStandard(skloS, skloV)
+		: rozmerSietoviny(skloS, skloV);
+}
+
+/** Systémy, kde appka sieťku ponúka NA POSUVE (Patrik 2026-07-31 pri #90: „malo
+ *  by to byť všetko totožné" ako Robust; #110 pridal Štandard/Štandard +).
+ *  Deluxe/Bazén/Pergola sieťku nemajú. */
+export const SIETKA_SYSTEMY = ['Robust', 'Slide', 'Štandard', 'Štandard +'];
 
 export function maSietkaSystem(system: string): boolean {
 	return SIETKA_SYSTEMY.includes(system);
 }
+
+/** Systémy pre SAMOSTATNÚ sieťku (`/sietka`, „dodatočná sieťka bez posuvu", #89)
+ *  — ZÁMERNE NEROZŠÍRENÉ o Štandard/Štandard + (#110 pokrýva LEN sieťku NA
+ *  posuve; `sietkaSamostatnaVypocet` v `compute.ts` má vlastný, jednoduchší
+ *  rámový/nosový mechanizmus, ktorý by na Štandarde dal nesprávny výsledok —
+ *  Štandardova krajová aj nos zdieľajú predponu „Rámový profil"). Rozšírenie
+ *  samostatnej sieťky o Štandard je samostatná, nezadaná úloha. */
+export const SIETKA_SAMOSTATNA_SYSTEMY = ['Robust', 'Slide'];
+
+/** Systémy, kde si obsluha NAVYŠE vyberá SYSTÉM sieťky nezávisle od systému
+ *  posuvu (#110, Patrik #1616278) — len dvojica Štandard / Štandard +. Robust
+ *  a Slide majú jediný sieťkový systém (ten istý ako posuv), žiadny výber. */
+export function maSietkaSystemVyber(system: string): boolean {
+	return system === 'Štandard' || system === 'Štandard +';
+}
+
+/** „Ten druhý" systém z dvojice Štandard / Štandard + — default hodnota pre
+ *  výber sieťkového systému (predvolené = rovnaký ako posuv, viď `maSietkaSystemVyber`). */
+export const SIETKA_SYSTEM_ALT: Record<string, string> = {
+	Štandard: 'Štandard +',
+	'Štandard +': 'Štandard'
+};
 
 /** Strana, na ktorej sieťka beží — podľa smeru posuvu (Patrik: „ak je L-P tak na
  *  ľavú stranu, ak P-L tak opačné garde"). Opona/neurčené = null (sieťka na oponových

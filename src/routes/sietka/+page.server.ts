@@ -8,7 +8,7 @@
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly } from '$lib/server/db';
 import { parseSietkaSamostatnaVstup } from '$lib/server/sietka-samostatna';
-import { SIETKA_SYSTEMY, potrebuje3KKolajnicu } from '$lib/sietka';
+import { SIETKA_SAMOSTATNA_SYSTEMY, potrebuje3KKolajnicu } from '$lib/sietka';
 import { sietkaSamostatnaVypocet } from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
 import {
@@ -24,7 +24,7 @@ export const load: PageServerLoad = async () => {
 	// opona (2x*) nie je podporovaná (rovnaký gate ako sietkaSamostatnaVypocet) —
 	// nenúkaj ju vôbec v selecte, nech sa scriptovaný POST nemusí odmietať v akcii
 	const styly = listSysStyly().filter(
-		(s) => SIETKA_SYSTEMY.includes(s.system) && !s.styl.startsWith('2x')
+		(s) => SIETKA_SAMOSTATNA_SYSTEMY.includes(s.system) && !s.styl.startsWith('2x')
 	);
 	return { styly, live: isLive() };
 };

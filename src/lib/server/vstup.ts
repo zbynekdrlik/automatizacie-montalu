@@ -3,7 +3,7 @@
 import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
-import { jeSietkaUchyt, maSietkaSystem, type Sietka } from '$lib/sietka';
+import { jeSietkaUchyt, maSietkaSystem, maSietkaSystemVyber, type Sietka } from '$lib/sietka';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
@@ -95,31 +95,52 @@ export function parseKlin(raw: KlinRaw): { klin: Klin | null; error: string | nu
 }
 
 /** Surové polia sieťky — z plochého formulára aj z JSON riadku posuvu (multi).
- *  `on` je zapínač: '1' / true = „so sieťkou" je zapnuté. */
+ *  `on` je zapínač: '1' / true = „so sieťkou" je zapnuté. `system` = voľba systému
+ *  sieťky (#110), zmysluplná LEN pri Štandard/Štandard + posuve. */
 export interface SietkaRaw {
 	on: unknown;
 	uchyt: unknown;
+	system?: unknown;
 }
 
 /**
- * Sieťka (#86–#90, KOREKCIA 2026-08-02). Vypnutý zapínač → `null` a žiadna chyba
- * (sieťka je nepovinná). Zapnutá → jediné editovateľné pole je úchyt (rozmer sa už
- * NEZADÁVA — je to ĎALŠIE krídlo posuvu, appka jeho rozmer odvodí sama, presne ako pri
- * bežných krídlach). Úchyt sa sanitizuje na jednu zo 4 hodnôt, nezmyselná/chýbajúca
- * hodnota = „bez ničoho" (nikdy sa nesprávne nezobrazí niečo, čo obsluha nevybrala).
+ * Sieťka (#86–#90, KOREKCIA 2026-08-02, #110 systém sieťky). Vypnutý zapínač →
+ * `null` a žiadna chyba (sieťka je nepovinná). Zapnutá → úchyt (rozmer sa
+ * NEZADÁVA — je to ĎALŠIE krídlo posuvu, appka jeho rozmer odvodí sama) + voliteľný
+ * systém sieťky. Úchyt sa sanitizuje na jednu zo 4 hodnôt, nezmyselná/chýbajúca
+ * hodnota = „bez ničoho". Systém sa NEUKLADÁ, keď je nezmyselný alebo zhodný s
+ * posuvom (default = rovnaký ako posuv) — `system` sa dosanitizuje podľa systému
+ * POSUVU v `sanitizeSietka` (tu ho ešte nepoznáme).
  */
 export function parseSietka(raw: SietkaRaw): { sietka: Sietka | null; error: string | null } {
 	const on = raw.on === '1' || raw.on === true || raw.on === 'true';
 	if (!on) return { sietka: null, error: null };
 	const uchytRaw = raw.uchyt;
-	return { sietka: { uchyt: jeSietkaUchyt(uchytRaw) ? uchytRaw : 'ziadny' }, error: null };
+	const sietka: Sietka = { uchyt: jeSietkaUchyt(uchytRaw) ? uchytRaw : 'ziadny' };
+	if (typeof raw.system === 'string' && raw.system) sietka.system = raw.system;
+	return { sietka, error: null };
 }
 
-/** Sieťka je len tam, kde ju appka ponúka (Robust/Slide) — pri inom systéme
- *  (aj zo skriptovaného POST-u) sa zahodí, nech sa na plán nedostane nezmysel
- *  (rovnaký vzor ako `sanitizeKovanie`). */
+/** Sieťka je len tam, kde ju appka ponúka (Robust/Slide/Štandard/Štandard +) —
+ *  pri inom systéme (aj zo skriptovaného POST-u) sa zahodí, nech sa na plán
+ *  nedostane nezmysel (rovnaký vzor ako `sanitizeKovanie`). Pole `system` (#110)
+ *  sa ponechá LEN keď posuv má výber (`maSietkaSystemVyber`) A zvolená hodnota je
+ *  jedna z dvoch platných (Štandard/Štandard +) A líši sa od posuvu (rovnaký kód
+ *  ako keby sa nezadal vôbec — default = rovnaký systém). */
 export function sanitizeSietka(system: string, sietka: Sietka | null): Sietka | null {
-	return maSietkaSystem(system) ? sietka : null;
+	if (!maSietkaSystem(system) || !sietka) return maSietkaSystem(system) ? sietka : null;
+	// `system` pole má zmysel len pri výbere (Štandard/Štandard +), a len keď je
+	// platnou (inou) hodnotou z tej istej dvojice — inak sa zahodí (default =
+	// rovnaký systém ako posuv), presne ako keby sa vôbec nezadalo.
+	const platnyVyber =
+		maSietkaSystemVyber(system) &&
+		!!sietka.system &&
+		sietka.system !== system &&
+		maSietkaSystemVyber(sietka.system);
+	if (platnyVyber) return sietka;
+	if (sietka.system === undefined) return sietka;
+	const { uchyt } = sietka;
+	return { uchyt };
 }
 
 /**
@@ -179,14 +200,17 @@ function klinRaw(p: Record<string, unknown>): KlinRaw {
 	};
 }
 
-/** Sieťka z posuvu — vnorený `{uchyt}` aj ploché polia (viď `klinRaw`). */
+/** Sieťka z posuvu — vnorený `{uchyt,system}` aj ploché polia (viď `klinRaw`).
+ *  `system` (#110) musí prežiť round-trip rovnako ako `uchyt` — inak sa výber
+ *  systému sieťky stratí pri „Späť a upraviť" presne ako sa stratil klín/ručná
+ *  koľajnica pred opravou #81/#108. */
 function sietkaRaw(p: Record<string, unknown>): SietkaRaw {
 	const k = p.sietka;
 	if (k && typeof k === 'object') {
 		const o = k as Record<string, unknown>;
-		return { on: '1', uchyt: o.uchyt };
+		return { on: '1', uchyt: o.uchyt, system: o.system };
 	}
-	return { on: k, uchyt: p.sietkaUchyt };
+	return { on: k, uchyt: p.sietkaUchyt, system: p.sietkaSystem };
 }
 
 /** Ručná koľajnica z posuvu — vnorený `{horna,spodna}` aj ploché polia (viď `klinRaw`). */
@@ -302,7 +326,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	vstup.klin = k.klin;
 	const sk = parseSietka({
 		on: form.get('sietka'),
-		uchyt: form.get('sietkaUchyt')
+		uchyt: form.get('sietkaUchyt'),
+		system: form.get('sietkaSystem')
 	});
 	// 2x štýly sú vždy opona (otváranie od stredu) — vynúť aj serverovo, nech to
 	// skriptovaný POST neobíde (otváranie je len na plán/náhľad, nemení výpočet)

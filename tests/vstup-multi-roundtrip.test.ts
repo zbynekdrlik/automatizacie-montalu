@@ -89,3 +89,46 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 		expect(error).toBe('Posuv 1: klín — dĺžka musí byť 1–20000 mm.');
 	});
 });
+
+// #110 (2026-08-03): sieťkin SYSTÉM (Štandard/Štandard +) je nové pole, ktoré musí
+// prežiť presne ten istý round-trip ako klín/ručná koľajnica vyššie — inak by sa
+// pri „Späť a upraviť" tichor stratila voľba, ktorú si obsluha zvolila (rovnaká
+// trieda chyby ako #81/#108, len na novom poli).
+const POSUV_SO_SIETKOU_STANDARD = {
+	...POSUV_PLOCHY,
+	system: 'Štandard +',
+	sietka: '1',
+	sietkaUchyt: 'madloVelke',
+	sietkaSystem: 'Štandard'
+};
+
+describe('parseMultiVstup — druhý parse nesmie stratiť SYSTÉM sieťky (#110)', () => {
+	it('prvý parse (z formulára) systém sieťky prečíta', () => {
+		const { vstup, error } = znovuPosli([POSUV_SO_SIETKOU_STANDARD]);
+		expect(error).toBeNull();
+		expect(vstup.posuvy[0].sietka).toEqual({ uchyt: 'madloVelke', system: 'Štandard' });
+	});
+
+	it('druhý parse (náhľad → odoslať) systém sieťky ZACHOVÁ', () => {
+		const prvy = znovuPosli([POSUV_SO_SIETKOU_STANDARD]).vstup;
+		const { vstup, error } = znovuPosli(prvy.posuvy);
+		expect(error).toBeNull();
+		expect(vstup.posuvy[0].sietka).toEqual(prvy.posuvy[0].sietka);
+		expect(vstup.posuvy[0].sietka?.system).toBe('Štandard');
+	});
+
+	it('opakovaný round-trip (späť a upraviť ×3) drží systém sieťky', () => {
+		let v = znovuPosli([POSUV_SO_SIETKOU_STANDARD]).vstup;
+		for (let i = 0; i < 3; i++) v = znovuPosli(v.posuvy).vstup;
+		expect(v.posuvy[0].sietka).toEqual({ uchyt: 'madloVelke', system: 'Štandard' });
+	});
+
+	it('sieťka BEZ zvoleného systému (rovnaký ako posuv) round-trip drží — pole ostáva chýbajúce, nie omylom vyplnené', () => {
+		const posuv = { ...POSUV_PLOCHY, system: 'Štandard +', sietka: '1', sietkaUchyt: 'zamok' };
+		const prvy = znovuPosli([posuv]).vstup;
+		expect(prvy.posuvy[0].sietka).toEqual({ uchyt: 'zamok' });
+		const { vstup, error } = znovuPosli(prvy.posuvy);
+		expect(error).toBeNull();
+		expect(vstup.posuvy[0].sietka?.system).toBeUndefined();
+	});
+});
