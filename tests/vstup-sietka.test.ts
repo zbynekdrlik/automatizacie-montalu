@@ -14,6 +14,7 @@ import {
 	maSietkaSystem,
 	uchytLabel,
 	rozmerSietoviny,
+	rozmerSietovinyStandard,
 	type SietkaUchyt
 } from '../src/lib/sietka';
 import {
@@ -69,8 +70,14 @@ describe('sanitizeSietka — sieťka len na systémoch, ktoré ju ponúkajú', (
 	});
 	it('iný systém (aj zo skriptovaného POST-u) sieťku zahodí', () => {
 		expect(sanitizeSietka('Deluxe', s)).toBeNull();
-		expect(sanitizeSietka('Štandard +', s)).toBeNull();
 		expect(sanitizeSietka('Robust', null)).toBeNull();
+	});
+	// ZMENA #110 (2026-08-03): Štandard/Štandard + odteraz sieťku PODPORUJÚ (predtým
+	// zahadzovaná) — Patrik #1616278. Test hore aktualizovaný na Deluxe (ostáva bez
+	// podpory) namiesto Štandard +.
+	it('Štandard/Štandard + sieťku odteraz prepustia (#110)', () => {
+		expect(sanitizeSietka('Štandard +', s)).toEqual(s);
+		expect(sanitizeSietka('Štandard', s)).toEqual(s);
 	});
 });
 
@@ -193,7 +200,7 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 		expect(bez.posuvy[0].sietka).toBeNull();
 	});
 
-	it('Slide|3K S=3500/V=2001: rovnaká delta ako Robust, Redukcia nedotknutá', () => {
+	it('Slide|3K S=3500/V=2001: rovnaká delta ako Robust, Redukcia 6mm nedotknutá', () => {
 		const bez = computeMulti(cfg, spec('Slide|3K', 3500, 2001, null))!;
 		const so = computeMulti(cfg, spec('Slide|3K', 3500, 2001, { uchyt: 'ziadny' }))!;
 
@@ -203,11 +210,16 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 			{ kod: 'ZASP202410', nazov: 'Nosový profil Slide Surový 7500 mm', metre: 15 },
 			{ kod: 'ZASP00091', nazov: 'Redukcia 6mm Surový 7500 mm', metre: 0 }
 		]);
+		// ZMENA #90 (2026-08-03): Slide+sieťka teraz NAVYŠE odpisuje vlastný redukčný
+		// profil (ZASP20252, pozri tests/sietka-slide-redukcia.test.ts pre plnú
+		// deriváciu) — pridaný riadok na konci, existujúce 4 riadky nedotknuté
+		// (Redukcia 6mm zostáva 0 m, nezávisle od sieťkovej redukcie).
 		expect(so.odpis).toEqual([
 			{ kod: 'ZASP00100', nazov: 'Koľajnica 3K Slide Surový 7500 mm', metre: 15 },
 			{ kod: 'ZASP00088', nazov: 'Rámový profil Slide Surový 7500 mm', metre: 30 },
 			{ kod: 'ZASP202410', nazov: 'Nosový profil Slide Surový 7500 mm', metre: 15 },
-			{ kod: 'ZASP00091', nazov: 'Redukcia 6mm Surový 7500 mm', metre: 0 }
+			{ kod: 'ZASP00091', nazov: 'Redukcia 6mm Surový 7500 mm', metre: 0 },
+			{ kod: 'ZASP20252', nazov: 'Redukcia pre sieťku Surový 7500 mm', metre: 7.5 }
 		]);
 	});
 
@@ -294,6 +306,12 @@ describe('rozmerSietoviny — Patrik 2026-08-02, potvrdené foto z nárezáka', 
 	});
 });
 
+describe('rozmerSietovinyStandard — #110, Patrikov Štandard+ nárezák (msg #1616284)', () => {
+	it('sklo +3mm šírka, +3mm výška (sklo 957×1735 → sieťka 960×1738)', () => {
+		expect(rozmerSietovinyStandard(957, 1735)).toEqual({ sirka: 960, vyska: 1738 });
+	});
+});
+
 describe('sietkaPopis — jeden riadok do plánu a histórie', () => {
 	it('vypíše rozmer sieťoviny (odvodený zo skla) a úchyt', () => {
 		expect(sietkaPopis({ uchyt: 'madloVelke' }, { sirka: 1447, vyska: 2116 })).toBe(
@@ -303,11 +321,14 @@ describe('sietkaPopis — jeden riadok do plánu a histórie', () => {
 });
 
 describe('sieťka — pomocné funkcie', () => {
-	it('maSietkaSystem: len Robust a Slide', () => {
+	// ZMENA #110 (2026-08-03): Štandard/Štandard + pribudli — pozri
+	// tests/sietka-standard.test.ts pre plné pokrytie Money delty.
+	it('maSietkaSystem: Robust, Slide, Štandard, Štandard +', () => {
 		expect(maSietkaSystem('Robust')).toBe(true);
 		expect(maSietkaSystem('Slide')).toBe(true);
+		expect(maSietkaSystem('Štandard')).toBe(true);
+		expect(maSietkaSystem('Štandard +')).toBe(true);
 		expect(maSietkaSystem('Deluxe')).toBe(false);
-		expect(maSietkaSystem('Štandard +')).toBe(false);
 	});
 
 	it('sietkaStrana: L-P → ľavá, P-L → pravá, inak neurčené', () => {

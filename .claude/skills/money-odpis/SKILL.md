@@ -384,7 +384,60 @@ nabudúce, keď treba pridať „ešte jedno z toho istého":
   = {sirka: skloS+2, vyska: skloV+1}` (Patrik, potvrdené jeho fotom vlastného
   nárezáka — sklo 1063×1795 → sieťka 1065×1796). Do Money odpisu NEJDE (appka len
   vypíše na tlač) — nepliesť s krídla dĺžkou rezu vyššie (tá je z RÁMOVÉHO profilu,
-  nie zo skla).
+  nie zo skla). Tento offset je SYSTÉM-ŠPECIFICKÝ, nie univerzálny — Štandard/
+  Štandard + majú vlastnú formulu `rozmerSietovinyStandard = {sirka: skloS+3,
+  vyska: skloV+3}` (#110, jeho Štandard+ nárezák: sklo 957×1735 → sieťka
+  960×1738) — INÁ delta ako Robust/Slide vyššie. Nový systém nikdy nededí túto
+  formulu automaticky.
+
+## 5c. Sieťka na ĎALŠOM systéme (#110/#90, 2026-08-03) — keď „počítadlo kusov" prestane stačiť
+
+Keď Štandard/Štandard + dostali sieťku, `sietkaExtraPocetKs`-ov generický regex na
+predponu mena (`^R[áa]mov`) prestal stačiť — a pribudla druhá, KOMPLEXNEJŠIA
+požiadavka (výber SYSTÉMU sieťky nezávisle od posuvu). Poučenia, ktoré sa oplatí
+zopakovať pri ĎALŠOM systéme so sieťkou (alebo inou "delta rolí"):
+
+- **Keď dve role zdieľajú predponu mena, ale MAJÚ inú deltu, regex na predponu
+  praská.** Štandardova krajová („Rámový profil Surový…") aj nos („Rámový profil
+  **stredový** Surový…") obe začínajú na „Rámov" — Robustov jednoduchý
+  `/^R[áa]mov/i → +2` by ich nevedel rozlíšiť (a krajová aj tak potrebuje `+1`,
+  nie `+2`). Riešenie: explicitná TABUĽKA rolí per systém (`STANDARD_ROLY` v
+  `compute.ts`), s kotveným regexom vrátane negative lookahead tam, kde treba
+  vylúčiť dlhší variant (`/^Rámový profil(?! stredový)/i`) — over vždy proti
+  VŠETKÝM štýlom (2K–6K + IZO) cez `cfg_seed.json`, nie len proti jednému.
+- **Cross-systémová delta (kód, ktorý posuv SÁM nemá) sa nedá vyjadriť ako „+ks
+  na existujúci riadok" — treba PRIDAŤ nový riadok.** Keď je sieťka INÉHO
+  systému než posuv (Štandard ↔ Štandard +), krajová/dorazová idú s KÓDOM
+  cudzieho systému (posuv ich vo vlastnej cfg skupine vôbec nemá). Vzor:
+  `mergeExtraCuts` zlúči zoznam `ExtraRez[]` do `ProfilCuts[]` PRED balením —
+  rovnaký kód + rovnaký `rozmer` → pripočíta sa do JEDNÉHO `rezy` riadku (nie
+  dva riadky s rovnakou dĺžkou vedľa seba — to by nesedelo s tým, ako Money
+  nárezák zobrazuje zlúčené počty); iný kód → nový riadok.
+- **Delta na už zaokrúhlenú dĺžku ≠ delta na SUROVÚ dĺžku pred zaokrúhlením.**
+  Pri kombinácii plus-posuv+starý-sieťka Patrik dal DOSLOVNÉ číslo `942,5 + 16,5
+  = 959`. Naivná implementácia (`Math.round(val(...)) + delta`) dá `943 + 16,5 =
+  959,5` — o 0,5 mm vedľa, lebo zaokrúhlenie prebehlo PRED pripočítaním delty.
+  Správne: `Math.round(val(...) + delta)`. Vždy over PRIAMYM prepočtom
+  (spusti `computeFlat`/`computeMulti` v scratch teste a porovnaj s dodaným
+  číslom), nikdy nepredpokladaj poradie operácií.
+- **Rozšírenie zdieľanej „ktoré systémy majú X" konštanty môže omylom
+  sprístupniť INÚ funkciu, ktorá X interpretuje inak.** `SIETKA_SYSTEMY`
+  (sieťka NA POSUVE) aj `/sietka` (samostatná sieťka BEZ posuvu, #89) pôvodne
+  zdieľali JEDEN zoznam systémov. Rozšírenie o Štandard/Štandard + pre #110 by
+  ticho sprístupnilo aj `/sietka`, ktorej VLASTNÝ (jednoduchší) rámový/nosový
+  mechanizmus (`sietkaSamostatnaVypocet`) by na Štandarde dal nesprávny počet
+  (rovnaká kolízia predpony mena ako vyššie). Fix: dve NEZÁVISLÉ konštanty
+  (`SIETKA_SYSTEMY` vs. `SIETKA_SAMOSTATNA_SYSTEMY`) — keď dve funkcie zdieľajú
+  gate konštantu, over PRED rozšírením, že OBE funkcie vedia rozšírenú množinu
+  spracovať rovnako správne, inak rozdeľ.
+- **IZO-only rozšírenie (`Rozširujúci profil`) sa dá vylúčiť „zadarmo" presnosťou
+  rolovej tabuľky.** Patrik: „ak pôjde IZO sklo, sieťka ide bez rozširujúceho
+  profilu". Namiesto explicitného IZO-gate `if` stačí, že `Rozširujúci profil`
+  nesedí na ŽIADNU rolu v `STANDARD_ROLY` (jeho meno nezačína na „Kladkový"/
+  „Koncový"/„Rámový profil stredový"/„Dorazová/Dorazový") — IZO variant má
+  IDENTICKÉ ostatné role (over v `cfg_seed.json`: krajová/nos/dorazová majú v
+  „…IZO" skupine ROVNAKÉ hodnoty ako v základnej), takže presné regexy exkluzívne
+  na role automaticky vylúčia len ten JEDEN riadok, ktorý sieťka nemá dostať.
 
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 

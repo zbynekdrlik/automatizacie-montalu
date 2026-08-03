@@ -5,34 +5,54 @@
 	// ako predtým, len bez ručného vstupu. Rovnaký vzor ako KlinPolia.svelte — jeden
 	// blok pre primárny posuv (posiela sa aj ako plochý formulár, preto `names`) aj
 	// pre každý ďalší posuv zimnej záhrady (ten ide len cez JSON `posuvy`).
-	import { SIETKA_UCHYTY, potrebuje3KKolajnicu } from '$lib/sietka';
+	//
+	// #110 (2026-08-03): Štandard/Štandard + navyše ponúkajú VLASTNÝ výber SYSTÉMU
+	// sieťky (Patrik: „vyberiem si či chcem sieťku plus štandard alebo starý") —
+	// `system` prop hovorí, ktorý posuv (Robust/Slide nemajú výber vôbec), `sietkaSystem`
+	// je zvolená hodnota — PRÁZDNY reťazec (nie undefined — jednoduchší typ na
+	// $bindable) = rovnaký ako posuv (default); server (`sanitizeSietka`) prázdny
+	// reťazec aj tak zahodí rovnako ako chýbajúcu hodnotu.
+	import {
+		SIETKA_UCHYTY,
+		potrebuje3KKolajnicu,
+		maSietkaSystemVyber,
+		SIETKA_SYSTEM_ALT
+	} from '$lib/sietka';
 	import type { SietkaUchyt } from '$lib/sietka';
 
 	let {
 		idPrefix = 'sietka',
 		names = false,
+		system = '',
 		styl = '',
 		strana = null,
 		on = $bindable(false),
 		uchyt = $bindable('ziadny' as SietkaUchyt),
+		sietkaSystem = $bindable(''),
 		onZmena
 	}: {
 		/** predpona id-čiek (unikátna per posuv) */
 		idPrefix?: string;
 		/** true = polia sa posielajú aj ako name= (plochý formulár primárneho posuvu) */
 		names?: boolean;
+		/** systém POSUVU — určuje, či sa ponúkne výber systému sieťky (#110) */
+		system?: string;
 		/** štýl posuvu (2K/3K/…) — určuje, či treba upozornenie na 3K koľajnicu (#87) */
 		styl?: string;
 		/** strana, na ktorej sieťka beží — podľa smeru posuvu (null = neurčené) */
 		strana?: 'ľavá' | 'pravá' | null;
 		on?: boolean;
 		uchyt?: SietkaUchyt;
+		/** zvolený systém sieťky (#110) — prázdny reťazec = rovnaký ako posuv */
+		sietkaSystem?: string;
 		/** #88: pri zapnutí sieťky kľučka/FAB tohto posuvu zmizne — rodič si tak vie
 		 *  vynulovať svoje kovanieL/kovanieP polia (sieťka ich nahrádza úchytom) */
 		onZmena?: (on: boolean) => void;
 	} = $props();
 
 	const nm = (k: string) => (names ? k : undefined);
+	let maVyber = $derived(maSietkaSystemVyber(system));
+	let altSystem = $derived(SIETKA_SYSTEM_ALT[system] ?? '');
 </script>
 
 <div class="field">
@@ -61,6 +81,23 @@
 				⚠ Sieťka na 2K koľajnicu nemôže ísť — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks)
 				namiesto 2K.
 			</p>
+		{/if}
+		{#if maVyber}
+			<div class="field">
+				<label for={`${idPrefix}-system`}>Systém sieťky</label>
+				<select
+					id={`${idPrefix}-system`}
+					name={nm('sietkaSystem')}
+					value={sietkaSystem || system}
+					onchange={(e) => {
+						const v = e.currentTarget.value;
+						sietkaSystem = v === system ? '' : v;
+					}}
+				>
+					<option value={system}>{system} (rovnaký ako posuv)</option>
+					<option value={altSystem}>{altSystem}</option>
+				</select>
+			</div>
 		{/if}
 		<div class="field">
 			<label for={`${idPrefix}-uchyt`}>Úchyt (sieťka nemá kľučku)</label>

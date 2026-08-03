@@ -6,7 +6,12 @@ import { jeSikmyRez, systemRovnyRez } from '$lib/cut';
 import type { Klin } from '$lib/klin';
 import { rolaKolajnice, type KolajnicaRucne } from '$lib/kolajnica';
 import type { ZakladPoctov } from '$lib/komponenty';
-import { maSietkaSystem, potrebuje3KKolajnicu, type Sietka } from '$lib/sietka';
+import {
+	maSietkaSystem,
+	maSietkaSystemVyber,
+	potrebuje3KKolajnicu,
+	type Sietka
+} from '$lib/sietka';
 
 export interface SysRow {
 	sysStyl: string;
@@ -182,13 +187,14 @@ interface ProfilCuts {
 // hoci všeobecný vzorec 2×(N−1) by pre N→N+1 dal +2) — Patrik to zopakoval dvakrát
 // explicitne, fyzicky to sedí s jeho poznámkou, že Slide má na strane sieťky úplne INÝ
 // profil miesto zužovacieho (teda tá strana škáry nepoužíva rovnaký zosilnený nosový
-// profil ako škára medzi dvoma sklenými krídlami — #90, zatiaľ neimplementované).
+// profil ako škára medzi dvoma sklenými krídlami — #90, riešené nižšie `sietkaSlideExtra`).
 const JE_RAMOVY_PROFIL = /^R[áa]mov/i;
 const JE_NOSOVY_PROFIL = /^Nosov/i;
 
-/** Sieťka mení Money odpis len na Robust/Slide a len na JEDNOM súvislom behu krídel
- *  (nie oponové 2x* štýly — Patrikov popis aj `sietkaStrana('Opona')===null` platia
- *  len pre jeden riadok krídel). Opona ostáva presne v stave PR #104 (display-only). */
+/** Sieťka mení Money odpis na Robust/Slide/Štandard/Štandard + a len na JEDNOM
+ *  súvislom behu krídel (nie oponové 2x* štýly — Patrikov popis aj
+ *  `sietkaStrana('Opona')===null` platia len pre jeden riadok krídel). Opona ostáva
+ *  presne v stave PR #104 (display-only). */
 export function jeSietkaMoneyRelevant(
 	system: string,
 	styl: string,
@@ -198,12 +204,242 @@ export function jeSietkaMoneyRelevant(
 }
 
 /** +2 rámové rezy (S aj V), +1 nosový rez (V) — PEVNÁ delta na jednu sieťku, nezávislá
- *  od N (viď komentár vyššie prečo nie odvodený všeobecný vzorec). */
-function sietkaExtraPocetKs(r: RezRow, sietkaOn: boolean): number {
+ *  od N (viď komentár vyššie prečo nie odvodený všeobecný vzorec). LEN Robust/Slide —
+ *  Štandard/Štandard + majú VLASTNÝ mechanizmus (`sietkaStandardExtra` nižšie), lebo
+ *  tento generický regex na predponu mena by na Štandarde kolidoval („Rámový profil"
+ *  krajová vs „Rámový profil stredový" nos — rovnaká predpona, INÁ delta) a nevie
+ *  pridať riadok s cudzím kódom (cross-systémová sieťka, #110). */
+function sietkaExtraPocetKs(system: string, r: RezRow, sietkaOn: boolean): number {
 	if (!sietkaOn) return 0;
+	if (system !== 'Robust' && system !== 'Slide') return 0;
 	if (JE_RAMOVY_PROFIL.test(r.nazov)) return 2;
 	if (JE_NOSOVY_PROFIL.test(r.nazov)) return 1;
 	return 0;
+}
+
+// ---- Sieťka: Štandard / Štandard + (#110) a Slide redukcia (#90) — 2026-08-03 ----
+//
+// Štandard/Štandard+ NEVEDIA zdieľať `sietkaExtraPocetKs` s Robust/Slide (dôvod v
+// komentári vyššie). Preto explicitná tabuľka rolí, jeden riadok na rolu — overené
+// proti VŠETKÝM štýlom oboch systémov (2K–6K + IZO, cfg_seed.json), žiadna kolízia.
+// „Rozširujúci profil" (IZO rozšírenie rámu, len pri „…IZO" štýloch) do tabuľky
+// VEDOME nepatrí — Patrik (#1616281): „Len ak pôjde IZO sklo tak sieťka ide bez
+// rozširujúceho profilu". Keďže žiadna rola sem nesedí, IZO sieťka ho automaticky
+// nedostane — bez extra vetvy, „zadarmo" z presnosti regexov.
+const STANDARD_ROLY: Record<
+	string,
+	{ sirka: RegExp; krajova: RegExp; nos: RegExp; doraz: RegExp }
+> = {
+	Štandard: {
+		sirka: /^Kladkový profil/i,
+		krajova: /^Rámový profil(?! stredový)/i,
+		nos: /^Rámový profil stredový/i,
+		doraz: /^Dorazový profil/i
+	},
+	'Štandard +': {
+		sirka: /^Kladkový profil/i,
+		krajova: /^Koncový profil \(PLUS\)/i,
+		nos: /^Rámový profil stredový/i,
+		doraz: /^Dorazová lišta/i
+	}
+};
+
+/** Jeden riadok profilu navyše (kus so svojou dĺžkou) — vstup pre `mergeExtraCuts`. */
+export interface ExtraRez {
+	kod: string;
+	nazov: string;
+	barLen: number;
+	rozmer: number;
+	dlzka: number;
+	ks: number;
+}
+
+function najdiRolu(g: CfgGroup, re: RegExp): RezRow | undefined {
+	return g.rez.find((r) => r.typ === 'profil' && re.test(r.nazov));
+}
+
+/**
+ * Sieťka na Štandarde/Štandard+ (#110) — 4 riadky navyše (šírka prírezov ×2,
+ * krajová ×1, nos ×1, dorazová ×1), ALEBO chyba, keď zvolená kombinácia systém
+ * posuvu × systém sieťky × štýl nemá potrebné riadky (starý Štandard existuje
+ * len do 4K, Štandard + má aj 5K/6K — #110 nešpecifikuje, appka to nehádže,
+ * vráti presnú chybu).
+ *
+ * Krajová/dorazová/nos sa čerpajú zo SYSTÉMU SIEŤKY (jeho VLASTNÝ kód — to je
+ * celý zmysel výberu #110, napr. starý „Rámový profil"/„Dorazový profil" na
+ * plus posuve). Šírka prírezov sa číta z POSUVU (kód ZASP202415 je zdieľaný
+ * oboma systémami) a keď je sieťka INÉHO systému než posuv, pripočíta sa
+ * Patrikova PEVNÁ konštanta ±16,5 mm (#1616282/#1616285) — jeho DOSLOVNÉ číslo,
+ * nie prepočet vzorcom cudzieho systému (ten by dal iné číslo — overené ručne:
+ * (3000−143)/3 = 952,33 mm, nie 942,5+16,5 = 959 mm, ktoré uviedol on).
+ * Smer „starý sieťka na plus posuve" (+16,5) je doslovne potvrdený; opačný smer
+ * „plus sieťka na starom posuve" (−16,5) je SYMETRICKÝ, zatiaľ NEPOTVRDENÝ
+ * (pozri #110 „Otvorené" — treba dať Patrikovi potvrdiť pred reálnou zákazkou).
+ */
+export function sietkaStandardExtra(
+	cfg: Cfg,
+	posuvSystem: string,
+	styl: string,
+	sietka: Sietka | null | undefined,
+	S: number,
+	V: number,
+	N: number
+): { rezy: ExtraRez[]; err: string | null } {
+	if (!maSietkaSystemVyber(posuvSystem) || !sietka) return { rezy: [], err: null };
+	const sietkaSystem = sietka.system && sietka.system !== posuvSystem ? sietka.system : posuvSystem;
+	const roly = STANDARD_ROLY[sietkaSystem];
+	if (!roly) return { rezy: [], err: `Neznámy systém sieťky „${sietkaSystem}".` };
+	const posuvGroup = cfg[`${posuvSystem}|${styl}`];
+	const sietkaGroup = cfg[`${sietkaSystem}|${styl}`];
+	if (!posuvGroup) return { rezy: [], err: 'Konfigurácia posuvu chýba.' };
+	if (!sietkaGroup)
+		return {
+			rezy: [],
+			err: `Sieťka systému „${sietkaSystem}" nie je pre štýl ${styl} k dispozícii (tento systém tento štýl nemá).`
+		};
+	const sirkaRow = najdiRolu(posuvGroup, STANDARD_ROLY[posuvSystem].sirka);
+	const krajovaRow = najdiRolu(sietkaGroup, roly.krajova);
+	const nosRow = najdiRolu(sietkaGroup, roly.nos);
+	const dorazRow = najdiRolu(sietkaGroup, roly.doraz);
+	if (!sirkaRow || !krajovaRow || !nosRow || !dorazRow)
+		return {
+			rezy: [],
+			err: 'Konfigurácia sieťky nemá všetky potrebné profily (šírka/krajová/nos/dorazová).'
+		};
+	const sirkaDelta = sietkaSystem === posuvSystem ? 0 : sietkaSystem === 'Štandard' ? 16.5 : -16.5;
+	// delta sa pripočíta PRED zaokrúhlením (nie na už zaokrúhlené číslo) — inak by
+	// 942,5 + 16,5 dalo 943 + 16,5 = 959,5 namiesto Patrikovho doslovného 959
+	// (#1616282/#1616285: 942,5 + 16,5 = 959).
+	const kus = (r: RezRow, ks: number, delta = 0): ExtraRez => ({
+		kod: r.kod,
+		nazov: r.nazov,
+		barLen: Number(r.dlzkaTyce) || BAR,
+		rozmer: Math.round(val(r, S, V, N, true) + delta),
+		dlzka: val(r, S, V, N, false) + delta,
+		ks
+	});
+	return {
+		rezy: [kus(sirkaRow, 2, sirkaDelta), kus(krajovaRow, 1), kus(nosRow, 1), kus(dorazRow, 1)],
+		err: null
+	};
+}
+
+/**
+ * Sieťka na Slide (#90) — vlastný redukčný profil MIESTO zužovacieho pri 6mm skle
+ * (Patrik #1614827: „sa vkladá ten sieťkový profil miesto zúžovacieho"). Kód
+ * potvrdil priamo (#1614895 „Redukcia pre sieťku Surový 7500 mm - ZASP20252"),
+ * overené aj v Money SQL (Sklady_Zasoba, read-only, 2026-08-03) — karta existuje,
+ * nezmazaná.
+ *
+ * Počet kusov/dĺžka NIE sú Patrikovým doslovným číslom — ODVODENÉ z existujúceho
+ * „Redukcia 6mm" riadku (ZASP00091, ten istý štýl): jedno okno navyše = rovnaký
+ * vzorec ako každé bežné okno (2 ks S-smer + 2 ks V-smer), len s novým kódom.
+ * NEZÁVISLE od `redukciaZero` (vlastnosť ZVOLENÉHO SKLA — sieťovina nie je sklo,
+ * ide vždy, keď je sieťka na Slide zapnutá, nech je hrúbka skla akákoľvek). Ak sa
+ * toto odvodenie ukáže nesprávne, treba ho opraviť PRED prvou reálnou objednávkou
+ * (pozri komentár na #90).
+ */
+const SLIDE_SIETKA_REDUKCIA = { kod: 'ZASP20252', nazov: 'Redukcia pre sieťku Surový 7500 mm' };
+export function sietkaSlideExtra(
+	cfg: Cfg,
+	styl: string,
+	S: number,
+	V: number,
+	N: number
+): { rezy: ExtraRez[]; err: string | null } {
+	const g = cfg[`Slide|${styl}`];
+	if (!g) return { rezy: [], err: 'Konfigurácia Slide chýba.' };
+	const redukcia = g.rez.filter((r) => r.typ === 'profil' && /^Redukcia 6mm/i.test(r.nazov));
+	const sRow = redukcia.find((r) => r.dim === 'S');
+	const vRow = redukcia.find((r) => r.dim === 'V');
+	if (!sRow || !vRow)
+		return {
+			rezy: [],
+			err: 'Slide nemá pre tento štýl vzorec redukcie na odvodenie sieťkovej redukcie.'
+		};
+	const kus = (r: RezRow, ks: number): ExtraRez => ({
+		kod: SLIDE_SIETKA_REDUKCIA.kod,
+		nazov: SLIDE_SIETKA_REDUKCIA.nazov,
+		barLen: Number(r.dlzkaTyce) || BAR,
+		rozmer: Math.round(val(r, S, V, N, true)),
+		dlzka: val(r, S, V, N, false),
+		ks
+	});
+	return { rezy: [kus(sRow, 2), kus(vRow, 2)], err: null };
+}
+
+/** Kus z riadku navyše dlhší než jeho tyč — ten istý guard ako `oversizeCut`, ale
+ *  pre `ExtraRez[]` (sieťková delta). Väčšina extra kusov má IDENTICKÚ dĺžku ako
+ *  existujúci riadok toho istého systému, ktorý `oversizeCut` už overil — GAP je
+ *  cross-systémová šírka prírezov (#110), kde sa k základnej dĺžke pripočíta
+ *  Patrikova ±16,5 mm konštanta a mohla by (tesne pri hranici tyče) preklopiť
+ *  kus, ktorý bez delty ešte sedel, na kus, ktorý sa už nezmestí. */
+function extraOversizeErr(extra: ExtraRez[]): string | null {
+	for (const e of extra) {
+		if (e.dlzka + KOTUC > e.barLen)
+			return `Rez ${Math.round(e.rozmer)} mm (${e.nazov}) je dlhší než tyč ${e.barLen} mm — tento rozmer sa z daného profilu nedá vyrobiť. Zmenši rozmer alebo zvoľ iný systém.`;
+	}
+	return null;
+}
+
+/** Predbežná validácia sieťkovej delty (#110/#90) — rovnaká vrstva ako
+ *  `missingHrubkaProfile`/`oversizeCut`: nech `safeCompute`/`safeComputeMulti`
+ *  vráti PRESNÚ chybu namiesto všeobecného „výpočet zlyhal", keď zvolená
+ *  kombinácia sieťky nie je k dispozícii (napr. sieťka „Štandard" na 5K/6K
+ *  Štandard + posuve — starý Štandard existuje len do 4K) ALEBO by dala kus
+ *  dlhší než jeho tyč. */
+export function sietkaChyba(
+	cfg: Cfg,
+	system: string,
+	styl: string,
+	sietka: Sietka | null | undefined,
+	S: number,
+	V: number,
+	N: number
+): string | null {
+	if (!jeSietkaMoneyRelevant(system, styl, sietka)) return null;
+	if (system === 'Slide') {
+		const { rezy, err } = sietkaSlideExtra(cfg, styl, S, V, N);
+		return err ?? extraOversizeErr(rezy);
+	}
+	if (maSietkaSystemVyber(system)) {
+		const { rezy, err } = sietkaStandardExtra(cfg, system, styl, sietka, S, V, N);
+		return err ?? extraOversizeErr(rezy);
+	}
+	return null;
+}
+
+/** Zlúči zoznam riadkov navyše (`ExtraRez`) do existujúceho `ProfilCuts[]` PRED
+ *  balením (`ffdPack`) — spoločné miesto pre `computeFlat` aj `computeMulti`, aby
+ *  oba dali identický odpis. Rovnaký kód → pripočíta sa do existujúceho riadku
+ *  (rovnaký `rozmer` → zlúči sa do JEDNÉHO `rezy` riadku — presne ako Patrikov
+ *  nárezák ukazuje „8 ks", nie „6 ks" + „2 ks" osobitne; iný `rozmer`, napr.
+ *  cross-systémová šírka prírezov s ±16,5 mm, ostáva vlastný riadok). Cudzí kód
+ *  (cross-systémová sieťka #110) → pridá sa nový riadok. Vracia NOVÝ zoznam,
+ *  pôvodný nemutuje. */
+function mergeExtraCuts(cuts: ProfilCuts[], extra: ExtraRez[], posuv?: number): ProfilCuts[] {
+	if (!extra.length) return cuts;
+	const byKod = new Map<string, ProfilCuts>();
+	const order: string[] = [];
+	for (const c of cuts) {
+		byKod.set(c.kod, { ...c, rezy: [...c.rezy], kusy: [...c.kusy] });
+		order.push(c.kod);
+	}
+	for (const e of extra) {
+		if (!byKod.has(e.kod)) {
+			byKod.set(e.kod, { kod: e.kod, nazov: e.nazov, rezy: [], kusy: [], barLen: e.barLen });
+			order.push(e.kod);
+		}
+		const c = byKod.get(e.kod)!;
+		const existujuci = c.rezy.find((rz) => rz.rozmer === e.rozmer);
+		if (existujuci) existujuci.ks += e.ks;
+		else c.rezy.push({ rozmer: e.rozmer, ks: e.ks });
+		for (let i = 0; i < e.ks; i++)
+			c.kusy.push(
+				posuv ? { dlzka: e.dlzka, rozmer: e.rozmer, posuv } : { dlzka: e.dlzka, rozmer: e.rozmer }
+			);
+	}
+	return order.map((k) => byKod.get(k)!);
 }
 
 /**
@@ -362,7 +598,8 @@ function profilCuts(
 	skloHrubka: number,
 	posuv?: number,
 	rucnaKolajnica?: KolajnicaRucne,
-	sietkaOn = false
+	sietkaOn = false,
+	system = ''
 ): ProfilCuts[] {
 	const order: string[] = [];
 	const byKod: Record<string, RezRow[]> = {};
@@ -390,7 +627,7 @@ function profilCuts(
 		for (const r of rows) {
 			const t =
 				(Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs)) +
-				sietkaExtraPocetKs(r, sietkaOn);
+				sietkaExtraPocetKs(system, r, sietkaOn);
 			const q = rucne > 0 ? rucne : val(r, S, V, N, false);
 			const rozmer = rucne > 0 ? rucne : Math.round(val(r, S, V, N, true));
 			for (let i = 0; i < t; i++)
@@ -514,17 +751,21 @@ export function computeFlat(
 	const sietkaOn = jeSietkaMoneyRelevant(system, styl, sietka);
 	const material: MaterialRow[] = [];
 	const odpis: OdpisRow[] = [];
-	for (const c of profilCuts(
-		g,
-		S,
-		V,
-		N,
-		redukciaZero,
-		skloHrubka,
-		undefined,
-		rucnaKolajnica,
-		sietkaOn
-	)) {
+	// sieťka Štandard/Štandard+ (#110) a Slide (#90) — riadky navyše, zlúčené PRED
+	// balením; `sietkaChyba` (v `safeCompute`) validuje kombináciu VOPRED, takže tu
+	// chyba znamená priame volanie mimo safeCompute — bezpečný default je nič nepridať.
+	const extra = sietkaOn
+		? system === 'Slide'
+			? sietkaSlideExtra(cfg, styl, S, V, N)
+			: maSietkaSystemVyber(system)
+				? sietkaStandardExtra(cfg, system, styl, sietka, S, V, N)
+				: { rezy: [], err: null }
+		: { rezy: [], err: null };
+	const cuts = mergeExtraCuts(
+		profilCuts(g, S, V, N, redukciaZero, skloHrubka, undefined, rucnaKolajnica, sietkaOn, system),
+		extra.err ? [] : extra.rezy
+	);
+	for (const c of cuts) {
 		const bary = ffdPack(c.kusy, c.barLen);
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
@@ -686,6 +927,11 @@ export function safeCompute(
 	if (hrubkaErr) return { r: null, err: hrubkaErr };
 	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
 	if (overErr) return { r: null, err: overErr };
+	const g = cfg[sysStyl];
+	const sietkaErr = g
+		? sietkaChyba(cfg, sysStyl.split('|')[0], sysStyl.split('|')[1] ?? '', sietka, S, V, g.N)
+		: null;
+	if (sietkaErr) return { r: null, err: sietkaErr };
 	const r = computeFlat(
 		cfg,
 		sysStyl,
@@ -799,17 +1045,32 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		// tyče, toto treba prehodnotiť. Pozn.: príznak sikmyRez pooled riadku sa
 		// preberá z PRVÉHO posuvu — pri zmiešanej Deluxe+Štandard+ zákazke to môže
 		// zle označiť uhol rezu iba v KRESBE (odpis nie je dotknutý).
-		for (const c of profilCuts(
-			g,
-			p.S,
-			p.V,
-			N,
-			p.redukciaZero,
-			p.skloHrubka ?? 0,
-			i + 1,
-			p.kolajnica,
-			sietkaOn
-		)) {
+		// sieťka Štandard/Štandard+ (#110) a Slide (#90) — rovnaká delta ako
+		// computeFlat (`sietkaChyba` v `safeComputeMulti` validuje VOPRED).
+		const extra = sietkaOn
+			? system === 'Slide'
+				? sietkaSlideExtra(cfg, styl, p.S, p.V, N)
+				: maSietkaSystemVyber(system)
+					? sietkaStandardExtra(cfg, system, styl, p.sietka, p.S, p.V, N)
+					: { rezy: [], err: null }
+			: { rezy: [], err: null };
+		const cuts = mergeExtraCuts(
+			profilCuts(
+				g,
+				p.S,
+				p.V,
+				N,
+				p.redukciaZero,
+				p.skloHrubka ?? 0,
+				i + 1,
+				p.kolajnica,
+				sietkaOn,
+				system
+			),
+			extra.err ? [] : extra.rezy,
+			i + 1
+		);
+		for (const c of cuts) {
 			// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +) — swap
 			// PRED poolovaním, aby sa metre pooli pod správnym (väčším) kódom.
 			const up = railUpsize(system, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
@@ -907,6 +1168,19 @@ export function safeComputeMulti(
 			p.kolajnica
 		);
 		if (overErr) return { r: null, err: `Posuv ${i + 1}: ${overErr}` };
+		const g = cfg[p.sysStyl];
+		const sietkaErr = g
+			? sietkaChyba(
+					cfg,
+					p.sysStyl.split('|')[0],
+					p.sysStyl.split('|')[1] ?? '',
+					p.sietka,
+					p.S,
+					p.V,
+					g.N
+				)
+			: null;
+		if (sietkaErr) return { r: null, err: `Posuv ${i + 1}: ${sietkaErr}` };
 	}
 	const r = computeMulti(cfg, posuvy);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))

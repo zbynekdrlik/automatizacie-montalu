@@ -21,9 +21,20 @@ sa vedome nerozhodne inak. Nezabudni ani na odkaz v `src/routes/+layout.svelte`
 **Keď b2b MÁ stránku vidieť** (napr. `/sietka`, #89 — Patrik: „hlavne pre externých"),
 route sa jednoducho NEPRIDÁ do `B2B_FORBIDDEN_PREFIXES` — ale drift guard test to
 očakáva ako VEDOMÉ rozhodnutie, nie obídenie: pridaj cestu do `ALLOWED` množiny v
-`tests/b2b-route-coverage.test.ts` s komentárom prečo (typicky „stránka nemá žiaden
-zápis do Money"), a pridaj pozitívny test (`b2bRedirectTarget('/nova') === null`) —
-inak nabudúce niekto uvidí padajúci drift guard a route bez rozmyslu zakáže.
+`tests/b2b-route-coverage.test.ts` s komentárom prečo, a pridaj pozitívny test
+(`b2bRedirectTarget('/nova') === null`) — inak nabudúce niekto uvidí padajúci drift
+guard a route bez rozmyslu zakáže.
+
+**Ak stránka NESKÔR dostane vlastnú Money-zápis akciu** (presne toto sa stalo
+`/sietka` — #86 korekcia 2026-08-02, `/review` nález PR #108): route-level povolenie
+v `ALLOWED`/`B2B_FORBIDDEN_PREFIXES` sa NEMENÍ (b2b smie stránku naďalej OTVORIŤ),
+ale nová akcia musí mať VLASTNÚ akcia-úrovňovú obranu — `isB2B(locals.user)` guard
+ako PRVÝ riadok akcie (rovnaký vzor ako `/zasklenia` `odoslat`), plus forged-POST test
+v `tests/b2b-money-reject.test.ts` (volaj `actions.odoslat` priamo s b2b `locals.user`,
+nie len „tlačidlo je skryté"). A **aktualizuj komentáre**, ktoré tvrdia „stránka nemá
+žiaden zápis do Money" — na dvoch miestach naraz (`tests/b2b-route-coverage.test.ts`
+aj tu) — zastaraný komentár na Money-bezpečnostnej hranici je presne ten typ pasce,
+čo zmýli budúceho čitateľa.
 
 ## 3. `$effect`, ktorý zapisuje to, čo číta, sa ZACYKLÍ
 
@@ -48,3 +59,16 @@ na serveri + skrytý input na každé pole — a e2e test, že zadanie prežije.
 `npx playwright test` bez `BASE_URL` servíruje existujúci `build/`. Po `mv …bak` späť
 teda MUSÍ nasledovať `npm run build`, inak preview stále beží na zmutovanom bundli a
 test „zázračne" padá/prechádza. (Živý zásah 2026-07-27 pri mutačnej kontrole zrkadlenia.)
+
+## 6. Nová akcia MUSÍ vrátiť VŠETKY polia, na ktoré je zdieľaný render blok gejtovaný
+
+Keď `+page.svelte` renderuje viac krokov v JEDNOM zdieľanom bloku (napr.
+`{#if (step === 'vysledok' || step === 'duplikat') && r}`), KAŽDÁ server akcia, ktorá
+vracia niektorý z tých `step` hodnôt, musí vrátiť aj polia, na ktoré je blok gejtovaný
+— inak sa vykreslí PRÁZDNA stránka, žiadna chyba v konzole ani v builde. Presne toto
+sa stalo `/sietka` (nezávislý code-review nález, PR #108): `odoslat`'s `duplicate`
+vetva vrátila `{ step: 'duplikat', error, vstup }` bez `r`, takže duplicitné odoslanie
+zobrazilo prázdnu stránku namiesto „už bola odoslaná" hlášky. Pri pridávaní NOVEJ
+vetvy do existujúcej akcie (alebo novej akcie vracajúcej existujúci `step`) skontroluj
+`+page.svelte`-in `{#if}` podmienku pre ten `step` a vráť VŠETKO, čo podmienka aj telo
+bloku čítajú — nielen polia, ktoré sa ti zdajú relevantné pre tú konkrétnu vetvu.
