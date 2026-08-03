@@ -2,7 +2,20 @@
 	// FIX (pevné zasklenie) — zadanie rozmerov → výkres konštrukcie na tlač.
 	// Do Money nejde nič. Tvar: šikmý (šikmá horná hrana) alebo rovný (obdĺžnik).
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
-	import { rovnomernePolia, popisTvaru, FIX_MAX_POLI, FIX_MAX, type FixTvar } from '$lib/fix';
+	import {
+		rovnomernePolia,
+		rozpocitajPodlaPosuvu,
+		popisTvaru,
+		FIX_SYSTEMY,
+		KRAJNY,
+		PRIECKA,
+		FIX_MAX_POLI,
+		FIX_MAX,
+		FIX_MIN,
+		type FixTvar,
+		type FixDelenie,
+		type FixSystem
+	} from '$lib/fix';
 	import { resolve } from '$app/paths';
 
 	let { form } = $props();
@@ -23,6 +36,8 @@
 		v1: form?.vstup?.v1 ?? 0,
 		v2: form?.vstup?.v2 ?? 0,
 		polia: (form?.vstup?.polia ?? []) as number[],
+		delenie: (form?.vstup?.delenie ?? 'rovnomerne') as FixDelenie,
+		system: (form?.vstup?.system ?? 'Štandard') as FixSystem,
 		zrkadlo: form?.vstup?.zrkadlo ?? false,
 		ral: form?.vstup?.ral ?? '',
 		sklo: form?.vstup?.sklo ?? '',
@@ -39,6 +54,8 @@
 	let sirkaS = $state<number | string>('');
 	let v1S = $state<number | string>('');
 	let v2S = $state<number | string>('');
+	let delenieS = $state<FixDelenie>('rovnomerne');
+	let systemS = $state<FixSystem>('Štandard');
 	let zrkadloS = $state(false);
 	let ralS = $state('');
 	let skloS = $state('');
@@ -54,6 +71,8 @@
 		sirkaS = v?.s || '';
 		v1S = v?.v1 || '';
 		v2S = v?.v2 || '';
+		delenieS = (v?.delenie ?? 'rovnomerne') as FixDelenie;
+		systemS = (v?.system ?? 'Štandard') as FixSystem;
 		zrkadloS = v?.zrkadlo ?? false;
 		ralS = v?.ral ?? '';
 		skloS = v?.sklo ?? '';
@@ -65,13 +84,39 @@
 	let sirkaNum = $derived(cislo(sirkaS));
 	let sucetPoli = $derived(poliaS.reduce<number>((a, b) => a + cislo(b), 0));
 	let sedíSucet = $derived(!poliaS.length || Math.abs(sucetPoli - sirkaNum) <= 0.5);
+	// #85 review (Important): pri "podľa posuvu" môže KRAJNY presiahnuť dostupnú
+	// šírku (napr. malé S s viac poľami) — súčet by aj tak sedel na S (krajné pole
+	// by len vyšlo záporné), takže samotné `sedíSucet` to nechytí. Ukáž konkrétnu
+	// hlášku namiesto len generickej serverovej "Šírka poľa musí byť 59–20000 mm."
+	let poleMimoRozsahu = $derived(
+		delenieS === 'posuv' && poliaS.some((p) => cislo(p) < FIX_MIN || cislo(p) > FIX_MAX)
+	);
 
+	/** rozdelenie šírky na `n` polí PODĽA AKTUÁLNE ZVOLENÉHO režimu (rovnomerne /
+	 *  podľa posuvu) — jedno miesto, ktoré používa aj „Počet polí", aj tlačidlo
+	 *  „Rozdeliť" nižšie, nech neexistujú dve rôzne cesty k tomu istému výpočtu */
+	function vypocitajPolia(n: number): (number | string)[] {
+		if (sirkaNum <= 0) return Array.from({ length: n }, () => '');
+		return delenieS === 'posuv'
+			? rozpocitajPodlaPosuvu(sirkaNum, systemS, n)
+			: rovnomernePolia(sirkaNum, n);
+	}
 	function nastavPocet(n: number) {
 		const k = Math.max(1, Math.min(FIX_MAX_POLI, n));
-		poliaS = sirkaNum > 0 ? rovnomernePolia(sirkaNum, k) : Array.from({ length: k }, () => '');
+		poliaS = vypocitajPolia(k);
 	}
-	function rozdelitRovnomerne() {
-		if (sirkaNum > 0) poliaS = rovnomernePolia(sirkaNum, pocetPoli);
+	function rozdelit() {
+		poliaS = vypocitajPolia(pocetPoli);
+	}
+	/** zmena delenia/systému prepočíta UŽ ZADANÉ polia rovno — operátor nemusí
+	 *  ručne klikať na „Rozdeliť" po každej zmene voľby (nález pri návrhu #85) */
+	function zmenDelenie(d: FixDelenie) {
+		delenieS = d;
+		if (poliaS.length > 1) poliaS = vypocitajPolia(pocetPoli);
+	}
+	function zmenSystem(s: FixSystem) {
+		systemS = s;
+		if (delenieS === 'posuv' && poliaS.length > 1) poliaS = vypocitajPolia(pocetPoli);
 	}
 	// Jedno pole = celá šírka; drž ho v súlade so zadanou šírkou, nech užívateľ
 	// nemusí prepisovať dve políčka naraz. POZOR: efekt zapisuje to, čo aj číta —
@@ -95,6 +140,8 @@
 	<input type="hidden" name="v1" value={vstup.v1} />
 	<input type="hidden" name="v2" value={vstup.v2} />
 	<input type="hidden" name="polia" value={JSON.stringify(vstup.polia)} />
+	<input type="hidden" name="delenie" value={vstup.delenie} />
+	<input type="hidden" name="system" value={vstup.system} />
 	<input type="hidden" name="ral" value={vstup.ral} />
 	<input type="hidden" name="sklo" value={vstup.sklo} />
 	<input type="hidden" name="poznamka" value={vstup.poznamka} />
@@ -219,6 +266,41 @@
 					{#each Array(FIX_MAX_POLI) as _, i (i)}<option value={i + 1}>{i + 1}</option>{/each}
 				</select>
 			</div>
+			<div class="grid2">
+				<div class="field">
+					<label for="delenie">Rozpočítanie polí</label>
+					<select
+						id="delenie"
+						name="delenie"
+						value={delenieS}
+						onchange={(e) =>
+							zmenDelenie((e.currentTarget as HTMLSelectElement).value as FixDelenie)}
+					>
+						<option value="rovnomerne">Rovnomerne</option>
+						<option value="posuv">Podľa posuvu (Robust/Slide/Štandard)</option>
+					</select>
+				</div>
+				{#if delenieS === 'posuv'}
+					<div class="field">
+						<label for="system">Systém posuvu</label>
+						<select
+							id="system"
+							name="system"
+							value={systemS}
+							onchange={(e) =>
+								zmenSystem((e.currentTarget as HTMLSelectElement).value as FixSystem)}
+						>
+							{#each FIX_SYSTEMY as s (s)}<option value={s}>{s}</option>{/each}
+						</select>
+					</div>
+				{/if}
+			</div>
+			{#if delenieS === 'posuv'}
+				<p class="sub" data-testid="posuv-info">
+					Krajné pole {fmt(KRAJNY[systemS])} mm (od každého kraja k stredu priečky posuvu), priečka posuvu
+					{fmt(PRIECKA[systemS])} mm — hranica poľa je jej STRED, súčet polí sedí presne na šírku.
+				</p>
+			{/if}
 			{#if poliaS.length > 1}
 				<div class="polia-box" data-testid="polia-box">
 					<div class="grid3">
@@ -228,7 +310,7 @@
 								<input
 									id={`pole${i}`}
 									type="number"
-									min="100"
+									min={FIX_MIN}
 									max={FIX_MAX}
 									step="any"
 									bind:value={poliaS[i]}
@@ -242,9 +324,18 @@
 							{#if !sedíSucet}<span class="nesedi">
 									⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span
 								>{/if}
+							{#if poleMimoRozsahu}<span class="nesedi" data-testid="pole-mimo-rozsahu">
+									⛔ šírka {fmt(sirkaNum)} mm je pre {systemS} a {pocetPoli}
+									{pocetPoli === 1 ? 'pole' : pocetPoli < 5 ? 'polia' : 'polí'} nevhodná — krajné pole
+									({fmt(KRAJNY[systemS])} mm) sa nezmestí, uprav šírku alebo počet polí</span
+								>{/if}
 						</span>
-						<button type="button" class="btn secondary" onclick={rozdelitRovnomerne}
-							>Rozdeliť rovnomerne</button
+						<button
+							type="button"
+							class="btn secondary"
+							onclick={rozdelit}
+							data-testid="rozdelit-btn"
+							>{delenieS === 'posuv' ? 'Rozdeliť podľa posuvu' : 'Rozdeliť rovnomerne'}</button
 						>
 					</div>
 				</div>
@@ -291,8 +382,11 @@
 			</div>
 
 			<input type="hidden" name="polia" value={poliaJSON} />
-			<button class="btn" type="submit" disabled={!sedíSucet} data-testid="nakreslit"
-				>Nakresliť výkres</button
+			<button
+				class="btn"
+				type="submit"
+				disabled={!sedíSucet || poleMimoRozsahu}
+				data-testid="nakreslit">Nakresliť výkres</button
 			>
 		</form>
 	</div>
@@ -307,6 +401,9 @@
 					: ''}</span
 			>
 			<span class="badge">ZAK {vstup.zak}</span>
+			{#if vstup.delenie === 'posuv'}
+				<span class="badge" data-testid="delenie-badge">Podľa posuvu · {vstup.system}</span>
+			{/if}
 		</p>
 	</div>
 
@@ -340,6 +437,12 @@
 			{/if}
 			<div><span>Plocha</span><b>{String(r.m2).replace('.', ',')} m²</b></div>
 		</div>
+		{#if vstup.delenie === 'posuv'}
+			<p class="sub" data-testid="posuv-info-vykres" style="margin-top:10px">
+				Delenie polí: podľa posuvu ({vstup.system}) — krajné pole {fmt(KRAJNY[vstup.system])} mm, priečka
+				posuvu {fmt(PRIECKA[vstup.system])} mm (informatívne, hranica poľa je jej stred).
+			</p>
+		{/if}
 	</div>
 
 	<div class="card">

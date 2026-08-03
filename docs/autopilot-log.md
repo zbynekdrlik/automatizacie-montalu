@@ -91,3 +91,75 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - **Discord karty:** #86/#87/#88/#89 vrátili `dedup` (exit 0) — kartu už
   dostali pri predošlej dávke #86–#90/PR #104; táto Money korekcia je
   pokračovanie tej istej ticket-karty, nie nová.
+
+## #110 + #90 — Sieťka: Štandard/Štandard+ výber systému + Slide redukcia (2026-08-03)
+
+- **Zdroj:** Patrik, Odoo kanál 207, msg #1614895 (#90 kód) + #1616278–#1616285
+  (#110) + dva jeho nárezáky (fotky, stiahnuté read-only cez Odoo JSON-RPC).
+- **Design komentáre:** posted BEFORE code na oboch issues (#110, #90) —
+  root cause (regex-na-predponu koliduje na Štandarde), zvolený prístup
+  (dátová rolová tabuľka + `mergeExtraCuts` na cross-systémovú deltu),
+  zamietnutá alternatíva (rozšíriť existujúci regex).
+- **Commits:** `5cacfd5` verzia bump, `567e115` implementácia (#110+#90),
+  `ad98000` verzia release + playbook, `25cc9d1` self-review fix (oversize
+  guard pre cross-systémovú deltu, chýbajúci pred fixom — Money-kritická
+  medzera, ktorú `oversizeCut` sám nevidel).
+- **RED→GREEN + sabotáž dôkaz:** implementácia + testy v jednej dávke
+  (feature, nie bug — flexibilné poradie per `tdd-workflow.md`), OBA delta
+  mechanizmy sabotáž-overené (dočasne rozbité priamo v kóde → testy padli na
+  presné Money čísla → obnovené).
+- **Nové testy:** `tests/sietka-standard.test.ts` (19), `tests/sietka-slide-
+  redukcia.test.ts` (6), round-trip pridané do `tests/vstup-multi-
+  roundtrip.test.ts` (4), 3 existujúce testy vo `tests/vstup-sietka.test.ts`
+  aktualizované so stated justification (Štandard+/Slide teraz podporujú
+  sieťku inak ako predtým). `e2e/sietka-standard.spec.ts` (5, Playwright).
+- **Review:** self-review 2 kolá — 1. nález (oversize guard chýbajúci pre
+  ±16,5mm cross-systémovú deltu) opravený + nový hraničný test (S=7308,
+  Štandard +|2K); 2 drobné nálezy (zjednodušená podmienka, UI text) opravené.
+- **Tests:** `npx vitest run` 674/674, `npm run check` 0 chýb, `npm run lint`
+  čisté, relevantné e2e (sietka, sietka-standard, klin, kolajnica-rucna,
+  standard-narezak, standard-stary, znova) 36/36 lokálne, 0 regresií.
+- **PR:** #111 (dev→main, merge `02398a77`), main CI zelené vrátane deploy jobu.
+- **Nasadené a naživo overené:** `v0.13.0 (02398a7)` na `app.montalu.cloud` —
+  Štandard + 3K + sieťka „Štandard" (cross-systém, tá presná otvorená otázka
+  z issue): odpis obsahuje `ZASP00018`/`ZASP00021` (starý koncový/doraz),
+  rozmer sieťoviny 960×1738 mm, náhľad kreslí 4. krídlo, 0 chýb konzoly.
+- **Otvorené (Patrikovi treba potvrdiť pred reálnou objednávkou):** smer
+  „plus sieťka na starom posuve" (−16,5mm, symetrický, nepotvrdený); presný
+  počet kusov/dĺžka Slide sieťkovej redukcie (odvodené, nie doslovné číslo).
+- **Discord karty:** #110 `sent`, #90 `dedup` (exit 0, kartu už dostal pri
+  predošlej dávke #86–#90/PR #104).
+
+## #85 — FIX: rozpočítanie polí podľa posuvu (Robust/Slide/Štandard) (2026-08-03)
+
+- **Zdroj:** Patrik, Odoo kanál 207, msg #1614896 + výkres msg #1614897 (odpoveď
+  na blokujúcu časť #85 — "variant 2, podľa posuvu"). Read-only stiahnutý cez
+  Odoo JSON-RPC, pixel-grid analýza ukázala že výkres NIE JE v mierke (rovnaké
+  pixelové rozostupy pre 3 rôzne systémy) — číselné kóty sú ground truth, nie
+  pixely.
+- **Design komentár:** posted BEFORE code na #85 — root cause (appka vie len
+  rovnomerne), zvolený prístup (hranica poľa = STRED priečky, `KRAJNY`
+  konštanta per systém, `PRIECKA` len informatívna), zamietnutá alternatíva
+  (odpočítanie priečky ako mŕtvej šírky — porušilo by invariant súčtu polí=S).
+- **Commits:** `0a5e2bd` verzia bump, `7a45340` implementácia
+  (`rozpocitajPodlaPosuvu` + UI + round-trip + FIX_MIN 100→59), `429deda`
+  deep-review fix (client-side hláška pre príliš úzku šírku), release bump.
+- **RED→GREEN + sabotáž dôkaz:** implementácia + testy v jednej dávke
+  (feature). `rozpocitajPodlaPosuvu` sabotáž-overené (dočasne rozbité →
+  6 testov RED → opravené → GREEN).
+- **Nové testy:** `tests/fix-podla-posuvu.test.ts` (15 — KRAJNY/PRIECKA,
+  reprodukcia výkresu pre 3 systémy, n=1..8 invariant), round-trip pridaný do
+  `tests/fix-vstup.test.ts` (3), `tests/fix-money-safety.test.ts` (2 — byte-
+  identický zasklenia odpis canary + statická kontrola žiadneho importu z
+  compute.ts). `e2e/fix-podla-posuvu.spec.ts` (4, Playwright).
+- **Review:** `/review` (0 🔴 0 🟡 0 🔵 blokujúcich) + `superpowers:requesting-
+  code-review` deep pass — 1 Important nález (príliš úzka šírka pre zvolený
+  systém nemala konkrétnu hlášku), opravený v `429deda` + nový e2e test.
+- **Tests:** `npx vitest run --coverage` 700/700, `npm run check` 0 chýb,
+  `npm run lint` čisté, `npx playwright test` 120/120 lokálne (fix-podla-
+  posuvu + celá existujúca sada), 0 regresií, 0 chýb konzoly.
+- **PR:** #112 (dev→main).
+- **Otvorené (Patrikovi treba potvrdiť, needs-answer na #85):** n=2 (jediná
+  priečka) berie krajný odskok len od ľavého kraja; n≥4 rozkladá ďalšie
+  priečky rovnomerne medzi krajné — výkres pokrýva len n=3, zvyšok je
+  najpravdepodobnejšie čítanie, nie potvrdené.

@@ -1,7 +1,16 @@
 // Parsovanie a serverová validácia vstupu FIXu (pevného zasklenia). Žije v $lib/server
 // (nie v +page.server.ts) — SvelteKit povoľuje z page-server súboru exportovať len
 // load/actions/…, a takto sa dá vstup priamo unit-testovať.
-import { chybaFixVstupu, jeFixTvar, FIX_MAX_POLI, type FixTvar } from '$lib/fix';
+import {
+	chybaFixVstupu,
+	jeFixTvar,
+	jeFixDelenie,
+	jeFixSystem,
+	FIX_MAX_POLI,
+	type FixTvar,
+	type FixDelenie,
+	type FixSystem
+} from '$lib/fix';
 
 export interface FixVstup {
 	zak: string;
@@ -15,6 +24,11 @@ export interface FixVstup {
 	v1: number;
 	v2: number;
 	polia: number[];
+	/** delenie polí — rovnomerne (default), alebo zarovnané na posuv nad fixom (#85) */
+	delenie: FixDelenie;
+	/** systém posuvu pre delenie `posuv` — uložený aj keď je delenie `rovnomerne`,
+	 *  nech je čo predvyplniť, ak operátor prepne späť */
+	system: FixSystem;
 	/** zrkadlový kus — tá istá konštrukcia otočená */
 	zrkadlo: boolean;
 	ral: string;
@@ -50,6 +64,13 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 	// prázdne pole šírok = jedno pole cez celú šírku (najčastejší prípad)
 	if (!polia.length && s > 0) polia = [s];
 
+	// neznáme delenie/systém = rovnomerne/Štandard (starý bookmark/POST bez týchto
+	// polí ostáva platný, presne ako pri `tvar` vyššie)
+	const delenieRaw = String(form.get('delenie') ?? 'rovnomerne');
+	const delenie: FixDelenie = jeFixDelenie(delenieRaw) ? delenieRaw : 'rovnomerne';
+	const systemRaw = String(form.get('system') ?? 'Štandard');
+	const system: FixSystem = jeFixSystem(systemRaw) ? systemRaw : 'Štandard';
+
 	const vstup: FixVstup = {
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
@@ -62,6 +83,8 @@ export function parseFixVstup(form: FormData): { vstup: FixVstup; error: string 
 		v1,
 		v2,
 		polia,
+		delenie,
+		system,
 		zrkadlo: form.get('zrkadlo') === '1',
 		ral: String(form.get('ral') ?? '')
 			.trim()
