@@ -91,3 +91,41 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - **Discord karty:** #86/#87/#88/#89 vrátili `dedup` (exit 0) — kartu už
   dostali pri predošlej dávke #86–#90/PR #104; táto Money korekcia je
   pokračovanie tej istej ticket-karty, nie nová.
+
+## #110 + #90 — Sieťka: Štandard/Štandard+ výber systému + Slide redukcia (2026-08-03)
+
+- **Zdroj:** Patrik, Odoo kanál 207, msg #1614895 (#90 kód) + #1616278–#1616285
+  (#110) + dva jeho nárezáky (fotky, stiahnuté read-only cez Odoo JSON-RPC).
+- **Design komentáre:** posted BEFORE code na oboch issues (#110, #90) —
+  root cause (regex-na-predponu koliduje na Štandarde), zvolený prístup
+  (dátová rolová tabuľka + `mergeExtraCuts` na cross-systémovú deltu),
+  zamietnutá alternatíva (rozšíriť existujúci regex).
+- **Commits:** `5cacfd5` verzia bump, `567e115` implementácia (#110+#90),
+  `ad98000` verzia release + playbook, `25cc9d1` self-review fix (oversize
+  guard pre cross-systémovú deltu, chýbajúci pred fixom — Money-kritická
+  medzera, ktorú `oversizeCut` sám nevidel).
+- **RED→GREEN + sabotáž dôkaz:** implementácia + testy v jednej dávke
+  (feature, nie bug — flexibilné poradie per `tdd-workflow.md`), OBA delta
+  mechanizmy sabotáž-overené (dočasne rozbité priamo v kóde → testy padli na
+  presné Money čísla → obnovené).
+- **Nové testy:** `tests/sietka-standard.test.ts` (19), `tests/sietka-slide-
+  redukcia.test.ts` (6), round-trip pridané do `tests/vstup-multi-
+  roundtrip.test.ts` (4), 3 existujúce testy vo `tests/vstup-sietka.test.ts`
+  aktualizované so stated justification (Štandard+/Slide teraz podporujú
+  sieťku inak ako predtým). `e2e/sietka-standard.spec.ts` (5, Playwright).
+- **Review:** self-review 2 kolá — 1. nález (oversize guard chýbajúci pre
+  ±16,5mm cross-systémovú deltu) opravený + nový hraničný test (S=7308,
+  Štandard +|2K); 2 drobné nálezy (zjednodušená podmienka, UI text) opravené.
+- **Tests:** `npx vitest run` 674/674, `npm run check` 0 chýb, `npm run lint`
+  čisté, relevantné e2e (sietka, sietka-standard, klin, kolajnica-rucna,
+  standard-narezak, standard-stary, znova) 36/36 lokálne, 0 regresií.
+- **PR:** #111 (dev→main, merge `02398a77`), main CI zelené vrátane deploy jobu.
+- **Nasadené a naživo overené:** `v0.13.0 (02398a7)` na `app.montalu.cloud` —
+  Štandard + 3K + sieťka „Štandard" (cross-systém, tá presná otvorená otázka
+  z issue): odpis obsahuje `ZASP00018`/`ZASP00021` (starý koncový/doraz),
+  rozmer sieťoviny 960×1738 mm, náhľad kreslí 4. krídlo, 0 chýb konzoly.
+- **Otvorené (Patrikovi treba potvrdiť pred reálnou objednávkou):** smer
+  „plus sieťka na starom posuve" (−16,5mm, symetrický, nepotvrdený); presný
+  počet kusov/dĺžka Slide sieťkovej redukcie (odvodené, nie doslovné číslo).
+- **Discord karty:** #110 `sent`, #90 `dedup` (exit 0, kartu už dostal pri
+  predošlej dávke #86–#90/PR #104).
