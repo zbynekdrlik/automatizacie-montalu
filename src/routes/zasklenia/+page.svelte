@@ -1414,7 +1414,7 @@
 			<span class="badge" data-testid="plan-badge"
 				>Zasklenia · {nazovSystemu(plan.system)} {plan.styl} · {vstup.otvaranie}</span
 			>
-			{#if form.vytvorene}
+			{#if form?.vytvorene}
 				<span class="vytvorene" data-testid="vytvorene">🕓 {formatDatumCasSk(form.vytvorene)}</span>
 			{/if}
 		</p>
@@ -1481,7 +1481,7 @@
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>
-			{#if form.vytvorene}
+			{#if form?.vytvorene}
 				<span class="vytvorene" data-testid="vytvorene">🕓 {formatDatumCasSk(form.vytvorene)}</span>
 			{/if}
 		</p>

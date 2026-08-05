@@ -84,7 +84,13 @@ test('viac posuvov: dátum vytvorenia v hlavičke pri spoločnom náhľade aj po
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('opakované „Spočítať" na tej istej stránke dá ROZDIELNY dátum (server clock, nie zamrznutý)', async ({
+// Formát v hlavičke ukazuje len minúty (nie sekundy), takže dva „Spočítať" klik-y v tom istom
+// teste takmer vždy padnú do tej istej minúty — porovnávanie VYKRESLENÉHO textu na nerovnosť by
+// bolo flaky (a v skutočnosti by nič neoverovalo cez hranicu minúty). Namiesto toho overujeme
+// silnejšiu vlastnosť: vykreslená hodnota zodpovedá SKUTOČNÉMU aktuálnemu serverovému času (nie
+// zamrznutej/build-time hodnote) — to isté zlyhá, ak by niekto `vytvorene` prerobil na hodnotu
+// počítanú raz pri štarte servera namiesto per-request.
+test('opakované „Spočítať" dá dátum zodpovedajúci AKTUÁLNEMU serverovému času (nie zamrznutá hodnota)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -99,14 +105,41 @@ test('opakované „Spočítať" na tej istej stránke dá ROZDIELNY dátum (ser
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	const prvy = await page.getByTestId('vytvorene').textContent();
 	expect(prvy).toMatch(DATUM_RE);
+	expect(jeBlizkoTeraz(prvy!)).toBe(true);
 
 	// „Späť a upraviť" → nový „Spočítať" → nový server-side timestamp (round-trip, nie
-	// vypočítaný raz na klientovi a zamrznutý)
+	// vypočítaný raz na klientovi/pri štarte servera a zamrznutý)
 	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
 	await waitHydrated(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	const druhy = await page.getByTestId('vytvorene').textContent();
 	expect(druhy).toMatch(DATUM_RE);
+	expect(jeBlizkoTeraz(druhy!)).toBe(true);
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+/** Je vykreslený „🕓 D.M.YYYY HH:MM" v Europe/Bratislava do 2 minút od skutočného „teraz"? */
+function jeBlizkoTeraz(vykresleny: string): boolean {
+	const teraz = new Date();
+	const partsFor = (d: Date) =>
+		new Intl.DateTimeFormat('en-US', {
+			timeZone: 'Europe/Bratislava',
+			year: 'numeric',
+			month: 'numeric',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit',
+			hourCycle: 'h23'
+		}).formatToParts(d);
+	const fmt = (d: Date) => {
+		const p = partsFor(d);
+		const g = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+		return `🕓 ${g('day')}.${g('month')}.${g('year')} ${g('hour')}:${g('minute')}`;
+	};
+	// akceptuj „teraz", „teraz - 1 min" aj „teraz - 2 min" (hranica minúty, latencia kliku)
+	for (const delta of [0, -60_000, -120_000]) {
+		if (vykresleny === fmt(new Date(teraz.getTime() + delta))) return true;
+	}
+	return false;
+}
