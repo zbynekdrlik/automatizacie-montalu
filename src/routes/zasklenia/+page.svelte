@@ -24,6 +24,7 @@
 	} from '$lib/sietka';
 	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
 	import { resolve } from '$app/paths';
+	import { formatDatumCasSk } from '$lib/datum';
 
 	let { data, form } = $props();
 
@@ -1370,6 +1371,9 @@
 				>Zasklenia · {nazovSystemu(plan.system)} {plan.styl} · {vstup.otvaranie}</span
 			>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
+			{#if form?.vytvorene}
+				<span class="vytvorene" data-testid="vytvorene">🕓 {formatDatumCasSk(form.vytvorene)}</span>
+			{/if}
 		</p>
 	</div>
 
@@ -1410,6 +1414,9 @@
 			<span class="badge" data-testid="plan-badge"
 				>Zasklenia · {nazovSystemu(plan.system)} {plan.styl} · {vstup.otvaranie}</span
 			>
+			{#if form.vytvorene}
+				<span class="vytvorene" data-testid="vytvorene">🕓 {formatDatumCasSk(form.vytvorene)}</span>
+			{/if}
 		</p>
 	</div>
 
@@ -1436,6 +1443,9 @@
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
+			{#if form?.vytvorene}
+				<span class="vytvorene" data-testid="vytvorene">🕓 {formatDatumCasSk(form.vytvorene)}</span>
+			{/if}
 		</p>
 	</div>
 
@@ -1471,6 +1481,9 @@
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>
+			{#if form.vytvorene}
+				<span class="vytvorene" data-testid="vytvorene">🕓 {formatDatumCasSk(form.vytvorene)}</span>
+			{/if}
 		</p>
 	</div>
 

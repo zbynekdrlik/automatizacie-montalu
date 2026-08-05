@@ -260,6 +260,9 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
 export const actions: Actions = {
 	nahlad: async ({ request, locals }) => {
+		// dátum vzniku plánu pre tlačenú hlavičku (#114) — server clock PRI spracovaní
+		// akcie, nie new Date() na klientovi, aby sa nemenilo, ak stránka ostane otvorená
+		const vytvorene = new Date().toISOString();
 		const { vstup, error } = parseVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
 
@@ -291,6 +294,7 @@ export const actions: Actions = {
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
 			heightWarn,
+			vytvorene,
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(job),
@@ -300,6 +304,8 @@ export const actions: Actions = {
 	},
 
 	odoslat: async ({ request, locals }) => {
+		// dátum vzniku plánu pre tlačenú hlavičku (#114) — pozri poznámku pri `nahlad`
+		const vytvorene = new Date().toISOString();
 		// b2b nesmie zapisovať do Money — obrana do hĺbky, UI tlačidlo je skryté,
 		// ale skriptovaný POST musí byť odmietnutý aj tu (pred parsom/výpočtom/zápisom)
 		if (isB2B(locals.user)) {
@@ -326,6 +332,7 @@ export const actions: Actions = {
 				plan: r,
 				planHash: aktualny,
 				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				vytvorene,
 				cielInfo: {
 					live: isLive(),
 					filename: filenameFor(job),
@@ -344,7 +351,7 @@ export const actions: Actions = {
 					vstup
 				};
 			}
-			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome };
+			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome, vytvorene };
 		} catch (e) {
 			console.error('writeOdpis zlyhal:', e);
 			return {
@@ -370,6 +377,8 @@ export const actions: Actions = {
 
 	// ---- Viac posuvov (zimná záhrada): spoločné balenie tyčí naprieč posuvmi ----
 	nahladMulti: async ({ request, locals }) => {
+		// dátum vzniku plánu pre tlačenú hlavičku (#114) — pozri poznámku pri `nahlad`
+		const vytvorene = new Date().toISOString();
 		const { vstup, error } = parseMultiVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 
@@ -403,6 +412,7 @@ export const actions: Actions = {
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
 			heightWarn,
+			vytvorene,
 			cielInfo: {
 				live: isLive(),
 				filename: filenameFor(job),
@@ -412,6 +422,8 @@ export const actions: Actions = {
 	},
 
 	odoslatMulti: async ({ request, locals }) => {
+		// dátum vzniku plánu pre tlačenú hlavičku (#114) — pozri poznámku pri `nahlad`
+		const vytvorene = new Date().toISOString();
 		// b2b nesmie zapisovať do Money — obrana do hĺbky, viď odoslat vyššie
 		if (isB2B(locals.user)) {
 			return { step: 'form' as const, error: 'Veľkoobchodný účet nemôže odpisovať do Money.' };
@@ -435,6 +447,7 @@ export const actions: Actions = {
 				multi: r,
 				planHash: aktualny,
 				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				vytvorene,
 				cielInfo: {
 					live: isLive(),
 					filename: filenameFor(job),
@@ -451,7 +464,14 @@ export const actions: Actions = {
 					multiVstup: vstup
 				};
 			}
-			return { step: 'hotovoMulti', multiVstup: vstup, multi: r, kovanie: kov.polozky, outcome };
+			return {
+				step: 'hotovoMulti',
+				multiVstup: vstup,
+				multi: r,
+				kovanie: kov.polozky,
+				outcome,
+				vytvorene
+			};
 		} catch (e) {
 			console.error('writeOdpis (multi) zlyhal:', e);
 			return {

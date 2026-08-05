@@ -55,6 +55,10 @@ h1 {
 	background: #dcfce7;
 	color: #15803d;
 }
+/* Dátum vytvorenia plánu v tlačenej hlavičke (#114) — display-only, do Money nejde. */
+.vytvorene {
+	margin-left: 8px;
+}
 table {
 	width: 100%;
 	border-collapse: collapse;
