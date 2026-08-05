@@ -85,3 +85,5 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - roles / b2b / route gating / Money-write boundary / auth migration → load `.claude/skills/access-control`
 - pridávam NOVÚ stránku/route (exporty, b2b denylist, nav, `$effect` slučka) → load `.claude/skills/nova-stranka`
 - FIX (pevné zasklenie) modul → auto-loads `.claude/rules/fix-module.md` on its `paths:`
+- server-side wall-clock timestamp zobrazovaný na obrazovke/tlači → auto-loads
+  `.claude/rules/timestamps.md` on its `paths:` (Docker nemá TZ → UTC default gotcha)

@@ -187,3 +187,35 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   `npx vitest run` 695/695, `npm run check` 0 chýb, `npm run lint` čisté,
   `npx playwright test` 119/119 lokálne, 0 regresií, 0 chýb konzoly.
 - **PR:** #113 (dev→main), closes #85.
+
+## #114 — dátum vytvorenia v tlačenej hlavičke nárezáku (2026-08-05)
+
+- **Zdroj:** Patrik, pripomienka z výroby — dielňa nevedela zoradiť vytlačené
+  plány podľa dátumu vzniku.
+- **Design komentár:** posted BEFORE code na #114 — root cause (žiadne
+  časové pole v action-výsledku), zvolený prístup (server-side
+  `Date.now()` per action, explicitná `Europe/Bratislava` zóna cez Intl —
+  Docker image nemá TZ nastavené, bez toho by appka ukazovala UTC), zamietnutá
+  alternatíva (čítať `odpis_log.created_at` — nekonzistentné medzi
+  nahlad/odoslat).
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/114#issuecomment-5193748749
+- **Commits:** `f21f74d` verzia 0.14.2-dev.1 → `b09b9d5` RED test
+  (`formatDatumCasSk`) → `2e656f4` GREEN implementácia (server `vytvorene`
+  vo všetkých 4 akciách + `$lib/datum.ts` + 4 miesta v hlavičke) →
+  `d9cc8fb` opravy z `/requesting-code-review` (e2e test na „iný dátum"
+  nikdy neoveroval nerovnosť → prepísaný na silnejšiu non-flaky kontrolu
+  „zodpovedá aktuálnemu serverovému času"; unit „nie je locale-dependent"
+  nikdy nemenil TZ → nahradený testom čerstvého node procesu s `TZ=UTC`;
+  pridaný test na jednociferné hodiny; zjednotené `form?.vytvorene`).
+- **Testy:** `tests/datum.test.ts` (7, vrátane sabotage-verified TZ ochrany),
+  `e2e/datum-vytvorenia.spec.ts` (3, sabotage-verified proti zamrznutej
+  hodnote). Plná sada: `npx vitest run` 702/702, `npm run check` 0 chýb,
+  `npm run lint` čisté, `npx playwright test` 122/122 lokálne, 0 regresií,
+  0 chýb konzoly.
+- **Money:** nulový dopad — `vytvorene` nikdy nejde do `job.polozky`/xlsx;
+  canary testy (`money.test.ts`, `fix-money-safety.test.ts`,
+  `b2b-money-reject.test.ts`) prešli bez zmeny.
+- **PR:** #115 (dev→main), merge `7b1c720`, closes #114 (auto-closed
+  mergom). Post-deploy overené naživo (marek@app.montalu.cloud): DOM
+  verzia `v0.14.2 (7b1c720)`, testovací nárezák ukázal `🕓 5.8.2026 17:57`
+  v hlavičke, 0 chýb konzoly, Money odpis sa NEODOSLAL.
