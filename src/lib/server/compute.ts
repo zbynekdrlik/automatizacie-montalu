@@ -978,33 +978,42 @@ export interface PosuvSpec {
 	sietka?: Sietka | null;
 }
 
+/** Kľúče `PosuvSpec`, ktoré sú tam POVINNÉ (bez `?`). */
+type PosuvSpecRequiredKeys = {
+	[K in keyof PosuvSpec]-?: Record<string, never> extends Pick<PosuvSpec, K> ? never : K;
+}[keyof PosuvSpec];
+
+/** Kľúče `PosuvSpec`, ktoré sú tam VOLITEĽNÉ (`?`). */
+type PosuvSpecOptionalKeys = Exclude<keyof PosuvSpec, PosuvSpecRequiredKeys>;
+
 /**
- * Vstup pre `buildPosuvSpec` — ZRKADLÍ `PosuvSpec` pole po poli, ale KAŽDÉ pole je
- * POVINNÉ (žiadne `?`), aj keď hodnota smie byť `undefined`/`null`. Toto je celý
- * mechanizmus, ktorý #109 rieši: keď niekto pridá nové pole do `PosuvSpec` a zabudne
- * ho pridať sem, TypeScript odmietne skompilovať OBIDVA volajúce miesta
- * (`compute()` aj `computeMultiFrom()` v +page.server.ts) naraz — nie len jedno,
- * ako sa stalo so `sietka` (PR #108: 2 z 9 e2e testov padali, kým sa nedoplnilo).
+ * Vstup pre `buildPosuvSpec` — ODVODENÝ z `PosuvSpec` cez mapované typy (nie ručne
+ * prepísaný zoznam polí), takže je štruktúrne NEMOŽNÉ, aby sa `PosuvSpecInput`
+ * rozišiel s `PosuvSpec` pridaním poľa na jednom mieste a zabudnutím na druhom.
+ * Polia povinné v `PosuvSpec` (`sysStyl`, `S`, `V`, `redukciaZero`) ostávajú
+ * povinné a bez `undefined`; polia voliteľné v `PosuvSpec` (`?`) sú tu POVINNÉ
+ * KĽÚČOM (žiadne `?`), ale hodnota smie byť `undefined`/`null`.
+ *
+ * Toto je celý mechanizmus, ktorý #109 rieši: keď niekto pridá nové pole do
+ * `PosuvSpec`, `PosuvSpecInput` ho automaticky ZDEDÍ (mapovaný typ nad `keyof
+ * PosuvSpec`, nič sa nekopíruje ručne) a TypeScript odmietne skompilovať OBIDVA
+ * volajúce miesta (`compute()` aj `computeMultiFrom()` v +page.server.ts) naraz,
+ * kým pole nedostanú OBE — nie len jedno, ako sa stalo so `sietka` (PR #108: 2 z 9
+ * e2e testov padali, kým sa nedoplnilo).
+ *
+ * Prvá verzia tohto typu (code review #109) bola ručne písaná zrkadlová definícia
+ * (rovnaké polia ako `PosuvSpec`, prepísané druhýkrát). Nezávislý review izolovaným
+ * `tsc --strict` repro dokázal, že táto verzia mala rovnaký únik o úroveň vyššie:
+ * pridané pole do `PosuvSpec` bez ručného doplnenia do ručne písaného
+ * `PosuvSpecInput` by ticho skompilovalo (`{...input}` je stále priraditeľné, lebo
+ * nové pole je v `PosuvSpec` voliteľné). Mapovaný typ nižšie toto zatvára
+ * ŠTRUKTÚRNE (žiadny ručný zoznam polí na údržbu), nie disciplínou autora.
  *
  * Vedome NIE je `extra?: {...}` voliteľný druhý parameter — to by dovolilo jednému
  * volajúcemu ho celý vynechať a ticho skompilovať, čo je presne ten istý únik.
  */
-export type PosuvSpecInput = {
-	sysStyl: string;
-	S: number;
-	V: number;
-	redukciaZero: boolean;
-	skloHrubka: number | undefined;
-	pridavnaKolajnica: boolean | undefined;
-	kolajnica: KolajnicaRucne | undefined;
-	otvaranie: string | undefined;
-	sklo: string | undefined;
-	kovanieL: string | undefined;
-	kovanieP: string | undefined;
-	kovanieStred: string | undefined;
-	kovanieStredOkno: 'L' | 'P' | undefined;
-	klin: Klin | null | undefined;
-	sietka: Sietka | null | undefined;
+export type PosuvSpecInput = { [K in PosuvSpecRequiredKeys]: PosuvSpec[K] } & {
+	[K in PosuvSpecOptionalKeys]-?: PosuvSpec[K] | undefined;
 };
 
 /**
