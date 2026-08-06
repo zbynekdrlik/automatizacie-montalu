@@ -4,7 +4,15 @@
 
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
-import { safeCompute, safeComputeMulti, systemyRucnaKolajnica } from '$lib/server/compute';
+import {
+	safeCompute,
+	safeComputeMulti,
+	systemyRucnaKolajnica,
+	buildPosuvSpec,
+	type ComputeResult,
+	type MultiResult,
+	type PosuvSpec
+} from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
 import { znovaZOdpisu } from '$lib/server/znova';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
@@ -17,7 +25,6 @@ import {
 	contentHash,
 	type OdpisJob
 } from '$lib/server/money';
-import type { ComputeResult, MultiResult, PosuvSpec } from '$lib/server/compute';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
 import { komponentyPre } from '$lib/server/komponenty-cfg';
 import {
@@ -121,7 +128,9 @@ function compute(vstup: Vstup): {
 	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
 	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
 	// sysStylPre: v Štandard + vyberá basic/IZO nárezák ZVOLENÉ SKLO (Patrik)
-	const spec: PosuvSpec = {
+	// #109: zdieľaný builder pre OBE cesty (compute() aj computeMultiFrom()) — nové
+	// pole PosuvSpec, ktoré tu chýba, je teraz kompilačná chyba, nie tichá diera.
+	const spec: PosuvSpec = buildPosuvSpec({
 		sysStyl: sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg)),
 		S: vstup.s,
 		V: vstup.v,
@@ -132,8 +141,19 @@ function compute(vstup: Vstup): {
 		kolajnica: vstup.kolajnica ?? undefined,
 		// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ odpis
 		// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeFlat
-		sietka: vstup.sietka
-	};
+		sietka: vstup.sietka,
+		// jednoposuvová cesta tieto polia zo `spec` NIKDY nečíta — jobFor() číta
+		// otvaranie/sklo/kovanie*/klin PRIAMO z `vstup` (jedna sada hodnôt, jeden
+		// formulár). Explicitný `undefined` namiesto tichého vynechania poľa —
+		// presne dôvod #109 (viď design komentár na tickete).
+		otvaranie: undefined,
+		sklo: undefined,
+		kovanieL: undefined,
+		kovanieP: undefined,
+		kovanieStred: undefined,
+		kovanieStredOkno: undefined,
+		klin: undefined
+	});
 	const out = safeCompute(
 		cfg,
 		spec.sysStyl,
@@ -162,27 +182,32 @@ function computeMultiFrom(vstup: MultiVstup) {
 				err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.`,
 				specs: []
 			};
-		specs.push({
-			sysStyl: sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg)),
-			S: p.s,
-			V: p.v,
-			redukciaZero: g.redukciaZero,
-			skloHrubka: g.hrubka,
-			otvaranie: p.otvaranie,
-			sklo: p.sklo,
-			kovanieL: p.kovanieL,
-			kovanieP: p.kovanieP,
-			kovanieStred: p.kovanieStred,
-			kovanieStredOkno: p.kovanieStredOkno,
-			klin: p.klin,
-			// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
-			pridavnaKolajnica: vstup.pridavnaKolajnica,
-			// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
-			kolajnica: p.kolajnica ?? undefined,
-			// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ Money odpis
-			// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeMulti/computeFlat
-			sietka: p.sietka ?? undefined
-		});
+		// #109: rovnaký zdieľaný builder ako compute() vyššie — na tejto ceste sú
+		// naopak VŠETKY polia potrebné (echo pre plán/tlač cez PosuvInfo, viď design
+		// komentár na tickete).
+		specs.push(
+			buildPosuvSpec({
+				sysStyl: sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg)),
+				S: p.s,
+				V: p.v,
+				redukciaZero: g.redukciaZero,
+				skloHrubka: g.hrubka,
+				otvaranie: p.otvaranie,
+				sklo: p.sklo,
+				kovanieL: p.kovanieL,
+				kovanieP: p.kovanieP,
+				kovanieStred: p.kovanieStred,
+				kovanieStredOkno: p.kovanieStredOkno,
+				klin: p.klin,
+				// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
+				pridavnaKolajnica: vstup.pridavnaKolajnica,
+				// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
+				kolajnica: p.kolajnica ?? undefined,
+				// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ Money odpis
+				// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeMulti/computeFlat
+				sietka: p.sietka ?? undefined
+			})
+		);
 	}
 	return { ...safeComputeMulti(cfg, specs), specs };
 }

@@ -439,6 +439,43 @@ zopakovať pri ĎALŠOM systéme so sieťkou (alebo inou "delta rolí"):
   „…IZO" skupine ROVNAKÉ hodnoty ako v základnej), takže presné regexy exkluzívne
   na role automaticky vylúčia len ten JEDEN riadok, ktorý sieťka nemá dostať.
 
+## 5d. `buildPosuvSpec()` — pridávaj NOVÉ pole PosuvSpec TU, nie do `compute()`/`computeMultiFrom()` priamo (#109)
+
+`compute()` (jeden posuv) a `computeMultiFrom()` (viac posuvov) skladali `PosuvSpec`
+každý ako VLASTNÝ objektový literál — presne preto sa dalo pridať `sietka` len na
+JEDNU z dvoch ciest (§5 vyššie, sieťka bug). Od #109 existuje `buildPosuvSpec()`
+(`compute.ts`, vedľa `PosuvSpec`) — **pri pridaní nového poľa do `PosuvSpec` uprav
+OBE volania `buildPosuvSpec({...})`** v `+page.server.ts` (jedno v `compute()`,
+jedno v `computeMultiFrom()`); TypeScript odmietne skompilovať, kým to neurobíš na
+oboch. Jednoposuvová cesta bežne nepotrebuje polia, ktoré sú len pre plán/tlač
+(`otvaranie/sklo/kovanieL/kovanieP/kovanieStred/kovanieStredOkno/klin`) — tam sa
+píše explicitný `undefined` s komentárom prečo (jobFor číta tie polia priamo z
+`vstup`), nie vynechanie poľa.
+
+**Gotcha objavená pri code review #109 (Money-kritické, over si to pri KAŽDOM
+podobnom „vynúť oba call-sites" type-trick):** ručne prepísaný „zrkadlový" typ
+(`PosuvSpecInput` so všetkými poľami `PosuvSpec` skopírovanými nanovo, len bez
+`?`) zatvorí LEN „2 volania sa rozídu" dieru — NIE „`PosuvSpec` a jeho ručne
+písaný mirror sa rozídu" dieru. Pridané pole do `PosuvSpec` bez ručného
+doplnenia do ručne písaného mirror typu ticho skompiluje (`{...input}` je stále
+priraditeľné, lebo nové pole je v `PosuvSpec` voliteľné). Over si to izolovaným
+`tsc --strict` repro, nie len čítaním kódu. Fix: mirror typ ODVODIŤ z `keyof
+PosuvSpec` mapovaným typom (rozdeliť na povinné/voliteľné kľúče cez `Record<string,
+never> extends Pick<T, K> ? never : K`), nie ručne prepísať — vtedy je štruktúrne
+nemožné, aby sa mirror rozišiel od zdroja. Tento vzor (jeden vstupný typ so
+VŠETKÝMI kľúčmi povinnými, ODVODENÝ nie ručne písaný) je opakovane použiteľný
+kdekoľvek appka potrebuje „viac volaní musí zostať v sync s jedným typom".
+
+**Dôkaz Money-identity pri podobnom refaktore (žiadna zmena logiky, len ako sa
+skladá vstup):** golden/charakterizačný vitest snapshot cez `nahlad`/`nahladMulti`
+(preview akcie — nikdy nezapisujú, ani do TEST priečinka) je lacnejší než
+`odoslat`/`odoslatMulti` (žiadna DB dedup ochrana na riešenie) a rovnako platný
+dôkaz, lebo obe cesty volajú identický `compute()`/`kovanieFor()`/`jobFor()`.
+Commitni snapshot PRED refaktorom (zelený na starom kóde), refaktoruj, over že
+ISTÝ istý snapshot prejde bezo zmeny. Vynechaj zo snapshotu `vytvorene` (server
+clock) a `cielInfo.dir` (náhodný mkdtemp per beh) — nezávisia od `PosuvSpec`,
+inak test padá na čase/ceste behu, nie na dátach.
+
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 
 Do v0.8.0 odpis poznal len metrážové profily a jednotka v xlsx bola natvrdo `'m'`.
