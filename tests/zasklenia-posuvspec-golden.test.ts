@@ -218,50 +218,51 @@ const VIAC_POSUVOV: Record<string, Record<string, string>> = {
 			}
 		])
 	},
-	'3 posuvy: deluxe-3K (kolajnica) + standard-plus-4K-izo (sieťka+prídavná koľajnica) + robust-2x2K-opona': {
-		zak: 'ZAK-GM2',
-		op: '01',
-		zakaznik: 'Zákazník GM2',
-		pridavnaKolajnica: '1',
-		jednostrannaFab: '0',
-		poznamka: '',
-		ral: '',
-		posuvy: JSON.stringify([
-			{
-				system: 'Deluxe',
-				styl: '3K',
-				s: '4200',
-				v: '2250',
-				sklo: 'Float kalené 10 mm',
-				otvaranie: 'P - L',
-				kolajnicaHorna: '2690',
-				kolajnicaSpodna: '2695'
-			},
-			{
-				system: 'Štandard +',
-				styl: '4K',
-				s: '4800',
-				v: '2100',
-				sklo: 'Izolačné sklo 4.8.4',
-				otvaranie: 'P - L',
-				kolajnicaHorna: '2690',
-				kolajnicaSpodna: '2695',
-				sietka: '1',
-				sietkaUchyt: 'madloVelke',
-				sietkaSystem: 'Štandard'
-			},
-			{
-				system: 'Robust',
-				styl: '2x2K',
-				s: '5200',
-				v: '2200',
-				sklo: 'Izolačné sklo 4/16/4 mliečne',
-				otvaranie: 'Opona',
-				kovanieStred: 'Jednostranná kľučka z vnútra s FAB',
-				kovanieStredOkno: 'P'
-			}
-		])
-	}
+	'3 posuvy: deluxe-3K (kolajnica) + standard-plus-4K-izo (sieťka+prídavná koľajnica) + robust-2x2K-opona':
+		{
+			zak: 'ZAK-GM2',
+			op: '01',
+			zakaznik: 'Zákazník GM2',
+			pridavnaKolajnica: '1',
+			jednostrannaFab: '0',
+			poznamka: '',
+			ral: '',
+			posuvy: JSON.stringify([
+				{
+					system: 'Deluxe',
+					styl: '3K',
+					s: '4200',
+					v: '2250',
+					sklo: 'Float kalené 10 mm',
+					otvaranie: 'P - L',
+					kolajnicaHorna: '2690',
+					kolajnicaSpodna: '2695'
+				},
+				{
+					system: 'Štandard +',
+					styl: '4K',
+					s: '4800',
+					v: '2100',
+					sklo: 'Izolačné sklo 4.8.4',
+					otvaranie: 'P - L',
+					kolajnicaHorna: '2690',
+					kolajnicaSpodna: '2695',
+					sietka: '1',
+					sietkaUchyt: 'madloVelke',
+					sietkaSystem: 'Štandard'
+				},
+				{
+					system: 'Robust',
+					styl: '2x2K',
+					s: '5200',
+					v: '2200',
+					sklo: 'Izolačné sklo 4/16/4 mliečne',
+					otvaranie: 'Opona',
+					kovanieStred: 'Jednostranná kľučka z vnútra s FAB',
+					kovanieStredOkno: 'P'
+				}
+			])
+		}
 };
 
 describe('golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom PosuvSpec builderu', () => {

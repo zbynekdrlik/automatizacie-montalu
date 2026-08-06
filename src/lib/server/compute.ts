@@ -978,6 +978,44 @@ export interface PosuvSpec {
 	sietka?: Sietka | null;
 }
 
+/**
+ * Vstup pre `buildPosuvSpec` — ZRKADLÍ `PosuvSpec` pole po poli, ale KAŽDÉ pole je
+ * POVINNÉ (žiadne `?`), aj keď hodnota smie byť `undefined`/`null`. Toto je celý
+ * mechanizmus, ktorý #109 rieši: keď niekto pridá nové pole do `PosuvSpec` a zabudne
+ * ho pridať sem, TypeScript odmietne skompilovať OBIDVA volajúce miesta
+ * (`compute()` aj `computeMultiFrom()` v +page.server.ts) naraz — nie len jedno,
+ * ako sa stalo so `sietka` (PR #108: 2 z 9 e2e testov padali, kým sa nedoplnilo).
+ *
+ * Vedome NIE je `extra?: {...}` voliteľný druhý parameter — to by dovolilo jednému
+ * volajúcemu ho celý vynechať a ticho skompilovať, čo je presne ten istý únik.
+ */
+export type PosuvSpecInput = {
+	sysStyl: string;
+	S: number;
+	V: number;
+	redukciaZero: boolean;
+	skloHrubka: number | undefined;
+	pridavnaKolajnica: boolean | undefined;
+	kolajnica: KolajnicaRucne | undefined;
+	otvaranie: string | undefined;
+	sklo: string | undefined;
+	kovanieL: string | undefined;
+	kovanieP: string | undefined;
+	kovanieStred: string | undefined;
+	kovanieStredOkno: 'L' | 'P' | undefined;
+	klin: Klin | null | undefined;
+	sietka: Sietka | null | undefined;
+};
+
+/**
+ * JEDINÝ zdroj pravdy pre skladanie `PosuvSpec` — volaný z `compute()` AJ
+ * `computeMultiFrom()` (viď #109). Sám osebe je triviálny (`{...input}`); hodnota
+ * je v type-checku `PosuvSpecInput` (pozri komentár tam), nie v tele funkcie.
+ */
+export function buildPosuvSpec(input: PosuvSpecInput): PosuvSpec {
+	return { ...input };
+}
+
 export interface PosuvInfo {
 	system: string;
 	styl: string;
