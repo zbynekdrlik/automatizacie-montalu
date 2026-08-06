@@ -1,0 +1,4248 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > deluxe-3K-kolajnica-rucna (kladka/klzný podľa skla) — plan/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-G4 - Zákazník G4 [4fdb17e9].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [],
+  "plan": {
+    "N": 3,
+    "S": 4200,
+    "V": 2250,
+    "m2": 9.45,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2690,
+                "rozmer": 2690,
+              },
+            ],
+            "zvysok": 4806,
+          },
+        ],
+        "kod": "ZASP00081",
+        "nazov": "Koľajnica horná 3K Surový 7500 mm",
+        "odpadMm": 4806,
+        "odpadPct": 64.1,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2690,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2695,
+                "rozmer": 2695,
+              },
+            ],
+            "zvysok": 4801,
+          },
+        ],
+        "kod": "ZASP00030",
+        "nazov": "Koľajnica spodná 3K Surový 7500 mm",
+        "odpadMm": 4801,
+        "odpadPct": 64,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2695,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "rozmer": 1403,
+              },
+              {
+                "dlzka": 1403.3333333333333,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 785.3333333333337,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 2192.666666666667,
+          },
+        ],
+        "kod": "ZASP202417",
+        "nazov": "Kladkový profil 10 mm Surový 3600 mm",
+        "odpadMm": 2978,
+        "odpadPct": 41.4,
+        "rezy": [
+          {
+            "ks": 3,
+            "rozmer": 1403,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "rozmer": 1403,
+              },
+              {
+                "dlzka": 1403.3333333333333,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 785.3333333333337,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 2192.666666666667,
+          },
+        ],
+        "kod": "ZASP202425",
+        "nazov": "Klzný profil 10 mm Surový 3600 mm",
+        "odpadMm": 2978,
+        "odpadPct": 41.4,
+        "rezy": [
+          {
+            "ks": 3,
+            "rozmer": 1403,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2197,
+                "rozmer": 2197,
+              },
+              {
+                "dlzka": 2197,
+                "rozmer": 2197,
+              },
+            ],
+            "zvysok": 3098,
+          },
+        ],
+        "kod": "ZASP00021",
+        "nazov": "Dorazový profil Surový 7500 mm",
+        "odpadMm": 3098,
+        "odpadPct": 41.3,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2197,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00081",
+        "metre": 7.5,
+        "nazov": "Koľajnica horná 3K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00030",
+        "metre": 7.5,
+        "nazov": "Koľajnica spodná 3K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202417",
+        "metre": 7.2,
+        "nazov": "Kladkový profil 10 mm Surový 3600 mm",
+      },
+      {
+        "kod": "ZASP202425",
+        "metre": 7.2,
+        "nazov": "Klzný profil 10 mm Surový 3600 mm",
+      },
+      {
+        "kod": "ZASP00021",
+        "metre": 7.5,
+        "nazov": "Dorazový profil Surový 7500 mm",
+      },
+    ],
+    "sklo": {
+      "pocet": 3,
+      "sirka": 1402,
+      "vyska": 2164,
+    },
+    "styl": "3K",
+    "system": "Deluxe",
+  },
+  "planHash": "40c1e4ed",
+  "step": "nahlad",
+  "vstup": {
+    "caka": false,
+    "jednostrannaFab": false,
+    "klin": null,
+    "kolajnica": {
+      "horna": 2690,
+      "spodna": 2695,
+    },
+    "kovanieL": "",
+    "kovanieP": "",
+    "kovanieStred": "",
+    "kovanieStredOkno": "L",
+    "op": "01",
+    "otvaranie": "P - L",
+    "poznamka": "",
+    "pridavnaKolajnica": false,
+    "ral": "",
+    "s": 4200,
+    "sietka": null,
+    "sklo": "Float kalené 10 mm",
+    "skloPresne": "",
+    "styl": "3K",
+    "system": "Deluxe",
+    "v": 2250,
+    "vrtanieZamku": 1050,
+    "zak": "ZAK-G4",
+    "zakaznik": "Zákazník G4",
+  },
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > robust-2K-plny (klin+sietka+kovanie+FAB obojstranná) — plan/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-G1 - Zákazník G1 [d9dd18c7].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [
+    {
+      "kod": "ZASK00027",
+      "mj": "ks",
+      "nazov": "Kladka RS ROBUST",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00029",
+      "mj": "ks",
+      "nazov": "Uzáver RS ROBSUT",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00030",
+      "mj": "ks",
+      "nazov": "Kľučka",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00031",
+      "mj": "ks",
+      "nazov": "Podložka uzáveru",
+      "qty": 10,
+    },
+    {
+      "kod": "ZASK00032",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00033",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru podložka",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00034",
+      "mj": "ks",
+      "nazov": "Upevňovacia sada",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00035",
+      "mj": "ks",
+      "nazov": "Krytka vložky",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00036",
+      "mj": "ks",
+      "nazov": "Krytka krídla",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00037",
+      "mj": "ks",
+      "nazov": "Rohovník obvodový",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00038",
+      "mj": "ks",
+      "nazov": "Rohovník krídla",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00039",
+      "mj": "ks",
+      "nazov": "Rohovník zarovnávací",
+      "qty": 16,
+    },
+    {
+      "kod": "ZASK20242",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 12",
+      "qty": 9.164,
+    },
+    {
+      "kod": "ZASK20241",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 10",
+      "qty": 9.164,
+    },
+    {
+      "kod": "ZASK00041",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x,3,5",
+      "qty": 4.5,
+    },
+    {
+      "kod": "ZASK00042",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x5,00",
+      "qty": 27.656,
+    },
+  ],
+  "plan": {
+    "N": 2,
+    "S": 4645,
+    "V": 2320,
+    "m2": 10.776,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 4645,
+                "rozmer": 4645,
+              },
+              {
+                "dlzka": 2320,
+                "rozmer": 2320,
+              },
+            ],
+            "zvysok": 527,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 4645,
+                "rozmer": 4645,
+              },
+              {
+                "dlzka": 2320,
+                "rozmer": 2320,
+              },
+            ],
+            "zvysok": 527,
+          },
+        ],
+        "kod": "ZASP00016",
+        "nazov": "Koľajnica 3K Surový 7500 mm",
+        "odpadMm": 1054,
+        "odpadPct": 7,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 4645,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2320,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2333.5,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "rozmer": 2332,
+              },
+            ],
+            "zvysok": 487.5,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2333.5,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "rozmer": 2332,
+              },
+            ],
+            "zvysok": 487.5,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+            ],
+            "zvysok": 738,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+            ],
+            "zvysok": 738,
+          },
+        ],
+        "kod": "ZASP00002",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 2451,
+        "odpadPct": 8.2,
+        "rezy": [
+          {
+            "ks": 6,
+            "rozmer": 2332,
+          },
+          {
+            "ks": 6,
+            "rozmer": 2250,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 4,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "rozmer": 2250,
+              },
+            ],
+            "zvysok": 738,
+          },
+        ],
+        "kod": "ZASP00010",
+        "nazov": "Nosový profil Surový 7500 mm",
+        "odpadMm": 738,
+        "odpadPct": 9.8,
+        "rezy": [
+          {
+            "ks": 3,
+            "rozmer": 2250,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00016",
+        "metre": 15,
+        "nazov": "Koľajnica 3K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00002",
+        "metre": 30,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00010",
+        "metre": 7.5,
+        "nazov": "Nosový profil Surový 7500 mm",
+      },
+    ],
+    "sklo": {
+      "pocet": 2,
+      "sirka": 2197,
+      "vyska": 2115,
+    },
+    "styl": "2K",
+    "system": "Robust",
+  },
+  "planHash": "355c342b",
+  "step": "nahlad",
+  "vstup": {
+    "caka": false,
+    "jednostrannaFab": false,
+    "klin": {
+      "dlzka": 4645,
+      "ks": 2,
+      "sirka": 250,
+      "v1": 120,
+      "v2": 0,
+    },
+    "kolajnica": null,
+    "kovanieL": "Obojstranná kľučka s FAB",
+    "kovanieP": "Obojstranná kľučka s FAB",
+    "kovanieStred": "",
+    "kovanieStredOkno": "L",
+    "op": "01",
+    "otvaranie": "P - L",
+    "poznamka": "test poznámka
+riadok 2",
+    "pridavnaKolajnica": false,
+    "ral": "RAL 7016 štruktúra",
+    "s": 4645,
+    "sietka": {
+      "uchyt": "madloVelke",
+    },
+    "sklo": "Izolačné sklo 4/16/4 číre",
+    "skloPresne": "",
+    "styl": "2K",
+    "system": "Robust",
+    "v": 2320,
+    "vrtanieZamku": 1050,
+    "zak": "ZAK-G1",
+    "zakaznik": "Zákazník G1",
+  },
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > robust-2x2K-opona (kovanieStred, jednostranná FAB) — plan/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-G2 - Zákazník G2 [8c22017e].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [
+    {
+      "kod": "ZASK00027",
+      "mj": "ks",
+      "nazov": "Kladka RS ROBUST",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00029",
+      "mj": "ks",
+      "nazov": "Uzáver RS ROBSUT",
+      "qty": 3,
+    },
+    {
+      "kod": "ZASK00030",
+      "mj": "ks",
+      "nazov": "Kľučka",
+      "qty": 3,
+    },
+    {
+      "kod": "ZASK00031",
+      "mj": "ks",
+      "nazov": "Podložka uzáveru",
+      "qty": 15,
+    },
+    {
+      "kod": "ZASK00032",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru",
+      "qty": 6,
+    },
+    {
+      "kod": "ZASK00033",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru podložka",
+      "qty": 6,
+    },
+    {
+      "kod": "ZASK00034",
+      "mj": "ks",
+      "nazov": "Upevňovacia sada",
+      "qty": 3,
+    },
+    {
+      "kod": "ZASK00035",
+      "mj": "ks",
+      "nazov": "Krytka vložky",
+      "qty": 3,
+    },
+    {
+      "kod": "ZASK00036",
+      "mj": "ks",
+      "nazov": "Krytka krídla",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00037",
+      "mj": "ks",
+      "nazov": "Rohovník obvodový",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00038",
+      "mj": "ks",
+      "nazov": "Rohovník krídla",
+      "qty": 16,
+    },
+    {
+      "kod": "ZASK00039",
+      "mj": "ks",
+      "nazov": "Rohovník zarovnávací",
+      "qty": 32,
+    },
+    {
+      "kod": "ZASK20242",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 12",
+      "qty": 13.8,
+    },
+    {
+      "kod": "ZASK20241",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 10",
+      "qty": 13.8,
+    },
+    {
+      "kod": "ZASK00041",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x,3,5",
+      "qty": 12.78,
+    },
+    {
+      "kod": "ZASK00042",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x5,00",
+      "qty": 38.16,
+    },
+  ],
+  "plan": {
+    "N": 4,
+    "S": 5200,
+    "V": 2200,
+    "m2": 11.44,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 5200,
+                "rozmer": 5200,
+              },
+              {
+                "dlzka": 2200,
+                "rozmer": 2200,
+              },
+            ],
+            "zvysok": 92,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 5200,
+                "rozmer": 5200,
+              },
+              {
+                "dlzka": 2200,
+                "rozmer": 2200,
+              },
+            ],
+            "zvysok": 92,
+          },
+        ],
+        "kod": "ZASP00014",
+        "nazov": "Koľajnica 2K Surový 7500 mm",
+        "odpadMm": 184,
+        "odpadPct": 1.2,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 5200,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2200,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 1098,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 1098,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+            ],
+            "zvysok": 583.5,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+            ],
+            "zvysok": 878.75,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1320.25,
+                "rozmer": 1320,
+              },
+            ],
+            "zvysok": 6175.75,
+          },
+        ],
+        "kod": "ZASP00002",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 9834,
+        "odpadPct": 26.2,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 1320,
+          },
+          {
+            "ks": 8,
+            "rozmer": 2130,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 5,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 5366,
+          },
+        ],
+        "kod": "ZASP00006",
+        "nazov": "Oponový profil Surový 7500 mm",
+        "odpadMm": 5366,
+        "odpadPct": 71.5,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2130,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 1098,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 5366,
+          },
+        ],
+        "kod": "ZASP00010",
+        "nazov": "Nosový profil Surový 7500 mm",
+        "odpadMm": 6464,
+        "odpadPct": 43.1,
+        "rezy": [
+          {
+            "ks": 4,
+            "rozmer": 2130,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00014",
+        "metre": 15,
+        "nazov": "Koľajnica 2K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00002",
+        "metre": 37.5,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00006",
+        "metre": 7.5,
+        "nazov": "Oponový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00010",
+        "metre": 15,
+        "nazov": "Nosový profil Surový 7500 mm",
+      },
+    ],
+    "sklo": {
+      "pocet": 4,
+      "sirka": 1185,
+      "vyska": 1995,
+    },
+    "styl": "2x2K",
+    "system": "Robust",
+  },
+  "planHash": "d2eabfc2",
+  "step": "nahlad",
+  "vstup": {
+    "caka": false,
+    "jednostrannaFab": true,
+    "klin": null,
+    "kolajnica": null,
+    "kovanieL": "",
+    "kovanieP": "",
+    "kovanieStred": "Jednostranná kľučka z vnútra s FAB",
+    "kovanieStredOkno": "P",
+    "op": "01",
+    "otvaranie": "Opona",
+    "poznamka": "",
+    "pridavnaKolajnica": false,
+    "ral": "",
+    "s": 5200,
+    "sietka": null,
+    "sklo": "Izolačné sklo 4/16/4 mliečne",
+    "skloPresne": "",
+    "styl": "2x2K",
+    "system": "Robust",
+    "v": 2200,
+    "vrtanieZamku": 1050,
+    "zak": "ZAK-G2",
+    "zakaznik": "Zákazník G2",
+  },
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > slide-3K-6mm (sieťka, redukcia) — plan/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-G3 - Zákazník G3 [3a7697ad].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [],
+  "plan": {
+    "N": 3,
+    "S": 3600,
+    "V": 2100,
+    "m2": 7.56,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 3600,
+                "rozmer": 3600,
+              },
+              {
+                "dlzka": 3600,
+                "rozmer": 3600,
+              },
+            ],
+            "zvysok": 292,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2100,
+                "rozmer": 2100,
+              },
+              {
+                "dlzka": 2100,
+                "rozmer": 2100,
+              },
+            ],
+            "zvysok": 3292,
+          },
+        ],
+        "kod": "ZASP00100",
+        "nazov": "Koľajnica 3K Slide Surový 7500 mm",
+        "odpadMm": 3584,
+        "odpadPct": 23.9,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 3600,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2100,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 988,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 2632,
+          },
+        ],
+        "kod": "ZASP00088",
+        "nazov": "Rámový profil Slide Surový 7500 mm",
+        "odpadMm": 3952,
+        "odpadPct": 13.2,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 1213,
+          },
+          {
+            "ks": 8,
+            "rozmer": 2035,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 4,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+            ],
+            "zvysok": 1383,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+            ],
+            "zvysok": 3422,
+          },
+        ],
+        "kod": "ZASP202410",
+        "nazov": "Nosový profil Slide Surový 7500 mm",
+        "odpadMm": 4805,
+        "odpadPct": 32,
+        "rezy": [
+          {
+            "ks": 5,
+            "rozmer": 2035,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 2632,
+          },
+        ],
+        "kod": "ZASP00091",
+        "nazov": "Redukcia 6mm Surový 7500 mm",
+        "odpadMm": 2964,
+        "odpadPct": 13.2,
+        "rezy": [
+          {
+            "ks": 6,
+            "rozmer": 1213,
+          },
+          {
+            "ks": 6,
+            "rozmer": 2035,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 3,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 988,
+          },
+        ],
+        "kod": "ZASP20252",
+        "nazov": "Redukcia pre sieťku Surový 7500 mm",
+        "odpadMm": 988,
+        "odpadPct": 13.2,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 1213,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2035,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 1,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00100",
+        "metre": 15,
+        "nazov": "Koľajnica 3K Slide Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00088",
+        "metre": 30,
+        "nazov": "Rámový profil Slide Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202410",
+        "metre": 15,
+        "nazov": "Nosový profil Slide Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00091",
+        "metre": 22.5,
+        "nazov": "Redukcia 6mm Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP20252",
+        "metre": 7.5,
+        "nazov": "Redukcia pre sieťku Surový 7500 mm",
+      },
+    ],
+    "sklo": {
+      "pocet": 3,
+      "sirka": 1130,
+      "vyska": 1952,
+    },
+    "styl": "3K",
+    "system": "Slide",
+  },
+  "planHash": "4bd16fd1",
+  "step": "nahlad",
+  "vstup": {
+    "caka": false,
+    "jednostrannaFab": false,
+    "klin": null,
+    "kolajnica": null,
+    "kovanieL": "",
+    "kovanieP": "",
+    "kovanieStred": "",
+    "kovanieStredOkno": "L",
+    "op": "01",
+    "otvaranie": "L - P",
+    "poznamka": "",
+    "pridavnaKolajnica": false,
+    "ral": "",
+    "s": 3600,
+    "sietka": {
+      "uchyt": "zamok",
+    },
+    "sklo": "6mm číre",
+    "skloPresne": "",
+    "styl": "3K",
+    "system": "Slide",
+    "v": 2100,
+    "vrtanieZamku": 1050,
+    "zak": "ZAK-G3",
+    "zakaznik": "Zákazník G3",
+  },
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > standard-2K-basic (minimálny vektor, žiadne voliteľné polia) — plan/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-G6 - Zákazník G6 [7bfb481a].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [],
+  "plan": {
+    "N": 2,
+    "S": 2509,
+    "V": 1930,
+    "m2": 4.842,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2509,
+                "rozmer": 2509,
+              },
+            ],
+            "zvysok": 4987,
+          },
+        ],
+        "kod": "ZASP00107",
+        "nazov": "Koľajnica horná 2K Surový 7500 mm",
+        "odpadMm": 4987,
+        "odpadPct": 66.5,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2509,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2509,
+                "rozmer": 2509,
+              },
+            ],
+            "zvysok": 4987,
+          },
+        ],
+        "kod": "ZASP00104",
+        "nazov": "Koľajnica spodná 2K  Surový 7500 mm",
+        "odpadMm": 4987,
+        "odpadPct": 66.5,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2509,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1196.5,
+                "rozmer": 1197,
+              },
+              {
+                "dlzka": 1196.5,
+                "rozmer": 1197,
+              },
+            ],
+            "zvysok": 1199,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1196.5,
+                "rozmer": 1197,
+              },
+              {
+                "dlzka": 1196.5,
+                "rozmer": 1197,
+              },
+            ],
+            "zvysok": 1199,
+          },
+        ],
+        "kod": "ZASP202415",
+        "nazov": "Kladkový profil Surový 3600mm",
+        "odpadMm": 2398,
+        "odpadPct": 33.3,
+        "rezy": [
+          {
+            "ks": 4,
+            "rozmer": 1197,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1897,
+                "rozmer": 1897,
+              },
+              {
+                "dlzka": 1897,
+                "rozmer": 1897,
+              },
+            ],
+            "zvysok": 3698,
+          },
+        ],
+        "kod": "ZASP00018",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 3698,
+        "odpadPct": 49.3,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 1897,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1897,
+                "rozmer": 1897,
+              },
+              {
+                "dlzka": 1897,
+                "rozmer": 1897,
+              },
+            ],
+            "zvysok": 3698,
+          },
+        ],
+        "kod": "ZASP00024",
+        "nazov": "Rámový profil stredový Surový 7500 mm",
+        "odpadMm": 3698,
+        "odpadPct": 49.3,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 1897,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1923,
+                "rozmer": 1923,
+              },
+              {
+                "dlzka": 1923,
+                "rozmer": 1923,
+              },
+            ],
+            "zvysok": 3646,
+          },
+        ],
+        "kod": "ZASP00021",
+        "nazov": "Dorazový profil Surový 7500 mm",
+        "odpadMm": 3646,
+        "odpadPct": 48.6,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 1923,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00107",
+        "metre": 7.5,
+        "nazov": "Koľajnica horná 2K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00104",
+        "metre": 7.5,
+        "nazov": "Koľajnica spodná 2K  Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202415",
+        "metre": 7.2,
+        "nazov": "Kladkový profil Surový 3600mm",
+      },
+      {
+        "kod": "ZASP00018",
+        "metre": 7.5,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00024",
+        "metre": 7.5,
+        "nazov": "Rámový profil stredový Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00021",
+        "metre": 7.5,
+        "nazov": "Dorazový profil Surový 7500 mm",
+      },
+    ],
+    "sklo": {
+      "pocet": 2,
+      "sirka": 1211,
+      "vyska": 1815,
+    },
+    "styl": "2K",
+    "system": "Štandard",
+  },
+  "planHash": "ac04825e",
+  "step": "nahlad",
+  "vstup": {
+    "caka": false,
+    "jednostrannaFab": false,
+    "klin": null,
+    "kolajnica": null,
+    "kovanieL": "",
+    "kovanieP": "",
+    "kovanieStred": "",
+    "kovanieStredOkno": "L",
+    "op": "01",
+    "otvaranie": "L - P",
+    "poznamka": "",
+    "pridavnaKolajnica": false,
+    "ral": "",
+    "s": 2509,
+    "sietka": null,
+    "sklo": "Float sklo 6 mm",
+    "skloPresne": "",
+    "styl": "2K",
+    "system": "Štandard",
+    "v": 1930,
+    "vrtanieZamku": 1050,
+    "zak": "ZAK-G6",
+    "zakaznik": "Zákazník G6",
+  },
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > standard-plus-4K-izo (prídavná koľajnica, sieťka so systémom) — plan/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-G5 - Zákazník G5 [3d95f4ee].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [],
+  "plan": {
+    "N": 4,
+    "S": 4800,
+    "V": 2100,
+    "m2": 10.08,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2690,
+                "rozmer": 2690,
+              },
+            ],
+            "zvysok": 4806,
+          },
+        ],
+        "kod": "ZASP00036",
+        "nazov": "Koľajnica horná 4K Surový 7500 mm",
+        "odpadMm": 4806,
+        "odpadPct": 64.1,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2690,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2695,
+                "rozmer": 2695,
+              },
+            ],
+            "zvysok": 4801,
+          },
+        ],
+        "kod": "ZASP202432",
+        "nazov": "Koľajnica spodná 5K Surový 7500 mm",
+        "odpadMm": 4801,
+        "odpadPct": 64,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2695,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1167.125,
+                "rozmer": 1167,
+              },
+              {
+                "dlzka": 1167.125,
+                "rozmer": 1167,
+              },
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 103.125,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 136.125,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 136.125,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1150.625,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 2445.375,
+          },
+        ],
+        "kod": "ZASP202415",
+        "nazov": "Kladkový profil Surový 3600mm",
+        "odpadMm": 2821,
+        "odpadPct": 19.6,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 1151,
+          },
+          {
+            "ks": 2,
+            "rozmer": 1167,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 4,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 3358,
+          },
+        ],
+        "kod": "ZASP20244",
+        "nazov": "Koncový profil (PLUS) surový 7500 mm",
+        "odpadMm": 3358,
+        "odpadPct": 44.8,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2067,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 1287,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 1287,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 5429,
+          },
+        ],
+        "kod": "ZASP00024",
+        "nazov": "Rámový profil stredový Surový 7500 mm",
+        "odpadMm": 8003,
+        "odpadPct": 35.6,
+        "rezy": [
+          {
+            "ks": 7,
+            "rozmer": 2067,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 3,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2089,
+                "rozmer": 2089,
+              },
+              {
+                "dlzka": 2089,
+                "rozmer": 2089,
+              },
+            ],
+            "zvysok": 3314,
+          },
+        ],
+        "kod": "ZASP202419",
+        "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+        "odpadMm": 3314,
+        "odpadPct": 44.2,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2089,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+        ],
+        "kod": "ZASP202439",
+        "nazov": "Rozširujúci profil Surový 3600 mm",
+        "odpadMm": 4051,
+        "odpadPct": 14.1,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 1147,
+          },
+          {
+            "ks": 8,
+            "rozmer": 1939,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 8,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 5429,
+          },
+        ],
+        "kod": "ZASP00018",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 5429,
+        "odpadPct": 72.4,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2067,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2089,
+                "rozmer": 2089,
+              },
+            ],
+            "zvysok": 5407,
+          },
+        ],
+        "kod": "ZASP00021",
+        "nazov": "Dorazový profil Surový 7500 mm",
+        "odpadMm": 5407,
+        "odpadPct": 72.1,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2089,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00036",
+        "metre": 7.5,
+        "nazov": "Koľajnica horná 4K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202432",
+        "metre": 7.5,
+        "nazov": "Koľajnica spodná 5K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202415",
+        "metre": 14.4,
+        "nazov": "Kladkový profil Surový 3600mm",
+      },
+      {
+        "kod": "ZASP20244",
+        "metre": 7.5,
+        "nazov": "Koncový profil (PLUS) surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00024",
+        "metre": 22.5,
+        "nazov": "Rámový profil stredový Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202419",
+        "metre": 7.5,
+        "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202439",
+        "metre": 28.8,
+        "nazov": "Rozširujúci profil Surový 3600 mm",
+      },
+      {
+        "kod": "ZASP00018",
+        "metre": 7.5,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00021",
+        "metre": 7.5,
+        "nazov": "Dorazový profil Surový 7500 mm",
+      },
+    ],
+    "sklo": {
+      "pocet": 4,
+      "sirka": 1142,
+      "vyska": 1965,
+    },
+    "styl": "4K IZO",
+    "system": "Štandard +",
+  },
+  "planHash": "1d3cd3d2",
+  "step": "nahlad",
+  "vstup": {
+    "caka": false,
+    "jednostrannaFab": false,
+    "klin": null,
+    "kolajnica": {
+      "horna": 2690,
+      "spodna": 2695,
+    },
+    "kovanieL": "",
+    "kovanieP": "",
+    "kovanieStred": "",
+    "kovanieStredOkno": "L",
+    "op": "01",
+    "otvaranie": "P - L",
+    "poznamka": "",
+    "pridavnaKolajnica": true,
+    "ral": "",
+    "s": 4800,
+    "sietka": {
+      "system": "Štandard",
+      "uchyt": "madloVelke",
+    },
+    "sklo": "Izolačné sklo 4.8.4",
+    "skloPresne": "",
+    "styl": "4K",
+    "system": "Štandard +",
+    "v": 2100,
+    "vrtanieZamku": 1050,
+    "zak": "ZAK-G5",
+    "zakaznik": "Zákazník G5",
+  },
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom PosuvSpec builderu > 2 posuvy: robust-2K (klin+sietka+kovanie) + slide-3K-6mm (sieťka) — multi/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-GM1 - Zákazník GM1 [8dd81a8e].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [
+    {
+      "kod": "ZASK00027",
+      "mj": "ks",
+      "nazov": "Kladka RS ROBUST",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00029",
+      "mj": "ks",
+      "nazov": "Uzáver RS ROBSUT",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00030",
+      "mj": "ks",
+      "nazov": "Kľučka",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00031",
+      "mj": "ks",
+      "nazov": "Podložka uzáveru",
+      "qty": 10,
+    },
+    {
+      "kod": "ZASK00032",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00033",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru podložka",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00034",
+      "mj": "ks",
+      "nazov": "Upevňovacia sada",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00035",
+      "mj": "ks",
+      "nazov": "Krytka vložky",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00036",
+      "mj": "ks",
+      "nazov": "Krytka krídla",
+      "qty": 4,
+    },
+    {
+      "kod": "ZASK00037",
+      "mj": "ks",
+      "nazov": "Rohovník obvodový",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00038",
+      "mj": "ks",
+      "nazov": "Rohovník krídla",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00039",
+      "mj": "ks",
+      "nazov": "Rohovník zarovnávací",
+      "qty": 16,
+    },
+    {
+      "kod": "ZASK20242",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 12",
+      "qty": 9.164,
+    },
+    {
+      "kod": "ZASK20241",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 10",
+      "qty": 9.164,
+    },
+    {
+      "kod": "ZASK00041",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x,3,5",
+      "qty": 4.5,
+    },
+    {
+      "kod": "ZASK00042",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x5,00",
+      "qty": 27.656,
+    },
+  ],
+  "multi": {
+    "m2": 18.336,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 4645,
+                "posuv": 1,
+                "rozmer": 4645,
+              },
+              {
+                "dlzka": 2320,
+                "posuv": 1,
+                "rozmer": 2320,
+              },
+            ],
+            "zvysok": 527,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 4645,
+                "posuv": 1,
+                "rozmer": 4645,
+              },
+              {
+                "dlzka": 2320,
+                "posuv": 1,
+                "rozmer": 2320,
+              },
+            ],
+            "zvysok": 527,
+          },
+        ],
+        "kod": "ZASP00016",
+        "nazov": "Koľajnica 3K Surový 7500 mm",
+        "odpadMm": 1054,
+        "odpadPct": 7,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 4645,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2320,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2333.5,
+                "posuv": 1,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "posuv": 1,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "posuv": 1,
+                "rozmer": 2332,
+              },
+            ],
+            "zvysok": 487.5,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2333.5,
+                "posuv": 1,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "posuv": 1,
+                "rozmer": 2332,
+              },
+              {
+                "dlzka": 2333.5,
+                "posuv": 1,
+                "rozmer": 2332,
+              },
+            ],
+            "zvysok": 487.5,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+            ],
+            "zvysok": 738,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+            ],
+            "zvysok": 738,
+          },
+        ],
+        "kod": "ZASP00002",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 2451,
+        "odpadPct": 8.2,
+        "rezy": [
+          {
+            "ks": 6,
+            "rozmer": 2332,
+          },
+          {
+            "ks": 6,
+            "rozmer": 2250,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 4,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+              {
+                "dlzka": 2250,
+                "posuv": 1,
+                "rozmer": 2250,
+              },
+            ],
+            "zvysok": 738,
+          },
+        ],
+        "kod": "ZASP00010",
+        "nazov": "Nosový profil Surový 7500 mm",
+        "odpadMm": 738,
+        "odpadPct": 9.8,
+        "rezy": [
+          {
+            "ks": 3,
+            "rozmer": 2250,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 3600,
+                "posuv": 2,
+                "rozmer": 3600,
+              },
+              {
+                "dlzka": 3600,
+                "posuv": 2,
+                "rozmer": 3600,
+              },
+            ],
+            "zvysok": 292,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2100,
+                "posuv": 2,
+                "rozmer": 2100,
+              },
+              {
+                "dlzka": 2100,
+                "posuv": 2,
+                "rozmer": 2100,
+              },
+            ],
+            "zvysok": 3292,
+          },
+        ],
+        "kod": "ZASP00100",
+        "nazov": "Koľajnica 3K Slide Surový 7500 mm",
+        "odpadMm": 3584,
+        "odpadPct": 23.9,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 3600,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2100,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 988,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 2632,
+          },
+        ],
+        "kod": "ZASP00088",
+        "nazov": "Rámový profil Slide Surový 7500 mm",
+        "odpadMm": 3952,
+        "odpadPct": 13.2,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 2035,
+          },
+          {
+            "ks": 8,
+            "rozmer": 1213,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 4,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+            ],
+            "zvysok": 1383,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+            ],
+            "zvysok": 3422,
+          },
+        ],
+        "kod": "ZASP202410",
+        "nazov": "Nosový profil Slide Surový 7500 mm",
+        "odpadMm": 4805,
+        "odpadPct": 32,
+        "rezy": [
+          {
+            "ks": 5,
+            "rozmer": 2035,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 166,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 2632,
+          },
+        ],
+        "kod": "ZASP00091",
+        "nazov": "Redukcia 6mm Surový 7500 mm",
+        "odpadMm": 2964,
+        "odpadPct": 13.2,
+        "rezy": [
+          {
+            "ks": 6,
+            "rozmer": 2035,
+          },
+          {
+            "ks": 6,
+            "rozmer": 1213,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 3,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 2035,
+                "posuv": 2,
+                "rozmer": 2035,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+              {
+                "dlzka": 1213,
+                "posuv": 2,
+                "rozmer": 1213,
+              },
+            ],
+            "zvysok": 988,
+          },
+        ],
+        "kod": "ZASP20252",
+        "nazov": "Redukcia pre sieťku Surový 7500 mm",
+        "odpadMm": 988,
+        "odpadPct": 13.2,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2035,
+          },
+          {
+            "ks": 2,
+            "rozmer": 1213,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 1,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00016",
+        "metre": 15,
+        "nazov": "Koľajnica 3K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00002",
+        "metre": 30,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00010",
+        "metre": 7.5,
+        "nazov": "Nosový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00100",
+        "metre": 15,
+        "nazov": "Koľajnica 3K Slide Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00088",
+        "metre": 30,
+        "nazov": "Rámový profil Slide Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202410",
+        "metre": 15,
+        "nazov": "Nosový profil Slide Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00091",
+        "metre": 22.5,
+        "nazov": "Redukcia 6mm Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP20252",
+        "metre": 7.5,
+        "nazov": "Redukcia pre sieťku Surový 7500 mm",
+      },
+    ],
+    "posuvy": [
+      {
+        "N": 2,
+        "S": 4645,
+        "V": 2320,
+        "klin": {
+          "dlzka": 4645,
+          "ks": 2,
+          "sirka": 250,
+          "v1": 120,
+          "v2": 0,
+        },
+        "kolajnica": null,
+        "kovanieL": "Obojstranná kľučka s FAB",
+        "kovanieP": "Obojstranná kľučka s FAB",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "m2": 10.776,
+        "otvaranie": "P - L",
+        "sietka": {
+          "uchyt": "madloVelke",
+        },
+        "sklo": {
+          "pocet": 2,
+          "sirka": 2197,
+          "vyska": 2115,
+        },
+        "skloNazov": "Izolačné sklo 4/16/4 číre",
+        "styl": "2K",
+        "system": "Robust",
+      },
+      {
+        "N": 3,
+        "S": 3600,
+        "V": 2100,
+        "klin": null,
+        "kolajnica": null,
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "m2": 7.56,
+        "otvaranie": "L - P",
+        "sietka": {
+          "uchyt": "zamok",
+        },
+        "sklo": {
+          "pocet": 3,
+          "sirka": 1130,
+          "vyska": 1952,
+        },
+        "skloNazov": "6mm číre",
+        "styl": "3K",
+        "system": "Slide",
+      },
+    ],
+  },
+  "multiVstup": {
+    "caka": false,
+    "jednostrannaFab": true,
+    "op": "01",
+    "posuvy": [
+      {
+        "klin": {
+          "dlzka": 4645,
+          "ks": 2,
+          "sirka": 250,
+          "v1": 120,
+          "v2": 0,
+        },
+        "kolajnica": null,
+        "kovanieL": "Obojstranná kľučka s FAB",
+        "kovanieP": "Obojstranná kľučka s FAB",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "otvaranie": "P - L",
+        "s": 4645,
+        "sietka": {
+          "uchyt": "madloVelke",
+        },
+        "sklo": "Izolačné sklo 4/16/4 číre",
+        "styl": "2K",
+        "system": "Robust",
+        "v": 2320,
+      },
+      {
+        "klin": null,
+        "kolajnica": null,
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "otvaranie": "L - P",
+        "s": 3600,
+        "sietka": {
+          "uchyt": "zamok",
+        },
+        "sklo": "6mm číre",
+        "styl": "3K",
+        "system": "Slide",
+        "v": 2100,
+      },
+    ],
+    "poznamka": "viacposuvová poznámka",
+    "pridavnaKolajnica": false,
+    "ral": "RAL 9010",
+    "zak": "ZAK-GM1",
+    "zakaznik": "Zákazník GM1",
+  },
+  "planHash": "a146f452",
+  "step": "nahladMulti",
+  "warn": null,
+}
+`;
+
+exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom PosuvSpec builderu > 3 posuvy: deluxe-3K (kolajnica) + standard-plus-4K-izo (sieťka+prídavná koľajnica) + robust-2x2K-opona — multi/kovanie/planHash nezmenené 1`] = `
+{
+  "cielInfo": {
+    "filename": "ZAK-GM2 - Zákazník GM2 [ca809027].xlsx",
+    "live": false,
+  },
+  "heightWarn": undefined,
+  "kovanie": [
+    {
+      "kod": "ZASK00027",
+      "mj": "ks",
+      "nazov": "Kladka RS ROBUST",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00029",
+      "mj": "ks",
+      "nazov": "Uzáver RS ROBSUT",
+      "qty": 3,
+    },
+    {
+      "kod": "ZASK00030",
+      "mj": "ks",
+      "nazov": "Kľučka",
+      "qty": 6,
+    },
+    {
+      "kod": "ZASK00031",
+      "mj": "ks",
+      "nazov": "Podložka uzáveru",
+      "qty": 15,
+    },
+    {
+      "kod": "ZASK00032",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru",
+      "qty": 6,
+    },
+    {
+      "kod": "ZASK00033",
+      "mj": "ks",
+      "nazov": "Protikus uzáveru podložka",
+      "qty": 6,
+    },
+    {
+      "kod": "ZASK00034",
+      "mj": "ks",
+      "nazov": "Upevňovacia sada",
+      "qty": 3,
+    },
+    {
+      "kod": "ZASK00035",
+      "mj": "ks",
+      "nazov": "Krytka vložky",
+      "qty": 6,
+    },
+    {
+      "kod": "ZASK00036",
+      "mj": "ks",
+      "nazov": "Krytka krídla",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00037",
+      "mj": "ks",
+      "nazov": "Rohovník obvodový",
+      "qty": 8,
+    },
+    {
+      "kod": "ZASK00038",
+      "mj": "ks",
+      "nazov": "Rohovník krídla",
+      "qty": 16,
+    },
+    {
+      "kod": "ZASK00039",
+      "mj": "ks",
+      "nazov": "Rohovník zarovnávací",
+      "qty": 32,
+    },
+    {
+      "kod": "ZASK20242",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 12",
+      "qty": 13.8,
+    },
+    {
+      "kod": "ZASK20241",
+      "mj": "m",
+      "nazov": "Tesnenie zasklievacie 10",
+      "qty": 13.8,
+    },
+    {
+      "kod": "ZASK00041",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x,3,5",
+      "qty": 12.78,
+    },
+    {
+      "kod": "ZASK00042",
+      "mj": "m",
+      "nazov": "Kefové tesnenie 7x5,00",
+      "qty": 38.16,
+    },
+  ],
+  "multi": {
+    "m2": 30.97,
+    "material": [
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2690,
+                "posuv": 1,
+                "rozmer": 2690,
+              },
+            ],
+            "zvysok": 4806,
+          },
+        ],
+        "kod": "ZASP00081",
+        "nazov": "Koľajnica horná 3K Surový 7500 mm",
+        "odpadMm": 4806,
+        "odpadPct": 64.1,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2690,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2695,
+                "posuv": 1,
+                "rozmer": 2695,
+              },
+            ],
+            "zvysok": 4801,
+          },
+        ],
+        "kod": "ZASP00030",
+        "nazov": "Koľajnica spodná 3K Surový 7500 mm",
+        "odpadMm": 4801,
+        "odpadPct": 64,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2695,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "posuv": 1,
+                "rozmer": 1403,
+              },
+              {
+                "dlzka": 1403.3333333333333,
+                "posuv": 1,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 785.3333333333337,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "posuv": 1,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 2192.666666666667,
+          },
+        ],
+        "kod": "ZASP202417",
+        "nazov": "Kladkový profil 10 mm Surový 3600 mm",
+        "odpadMm": 2978,
+        "odpadPct": 41.4,
+        "rezy": [
+          {
+            "ks": 3,
+            "rozmer": 1403,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "posuv": 1,
+                "rozmer": 1403,
+              },
+              {
+                "dlzka": 1403.3333333333333,
+                "posuv": 1,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 785.3333333333337,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1403.3333333333333,
+                "posuv": 1,
+                "rozmer": 1403,
+              },
+            ],
+            "zvysok": 2192.666666666667,
+          },
+        ],
+        "kod": "ZASP202425",
+        "nazov": "Klzný profil 10 mm Surový 3600 mm",
+        "odpadMm": 2978,
+        "odpadPct": 41.4,
+        "rezy": [
+          {
+            "ks": 3,
+            "rozmer": 1403,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2197,
+                "posuv": 1,
+                "rozmer": 2197,
+              },
+              {
+                "dlzka": 2197,
+                "posuv": 1,
+                "rozmer": 2197,
+              },
+              {
+                "dlzka": 2089,
+                "posuv": 2,
+                "rozmer": 2089,
+              },
+            ],
+            "zvysok": 1005,
+          },
+        ],
+        "kod": "ZASP00021",
+        "nazov": "Dorazový profil Surový 7500 mm",
+        "odpadMm": 1005,
+        "odpadPct": 13.4,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2197,
+          },
+          {
+            "ks": 1,
+            "rozmer": 2089,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2690,
+                "posuv": 2,
+                "rozmer": 2690,
+              },
+            ],
+            "zvysok": 4806,
+          },
+        ],
+        "kod": "ZASP00036",
+        "nazov": "Koľajnica horná 4K Surový 7500 mm",
+        "odpadMm": 4806,
+        "odpadPct": 64.1,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2690,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2695,
+                "posuv": 2,
+                "rozmer": 2695,
+              },
+            ],
+            "zvysok": 4801,
+          },
+        ],
+        "kod": "ZASP202432",
+        "nazov": "Koľajnica spodná 5K Surový 7500 mm",
+        "odpadMm": 4801,
+        "odpadPct": 64,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2695,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1167.125,
+                "posuv": 2,
+                "rozmer": 1167,
+              },
+              {
+                "dlzka": 1167.125,
+                "posuv": 2,
+                "rozmer": 1167,
+              },
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 103.125,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 136.125,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 136.125,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1150.625,
+                "posuv": 2,
+                "rozmer": 1151,
+              },
+            ],
+            "zvysok": 2445.375,
+          },
+        ],
+        "kod": "ZASP202415",
+        "nazov": "Kladkový profil Surový 3600mm",
+        "odpadMm": 2821,
+        "odpadPct": 19.6,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 1167,
+          },
+          {
+            "ks": 8,
+            "rozmer": 1151,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 4,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 3358,
+          },
+        ],
+        "kod": "ZASP20244",
+        "nazov": "Koncový profil (PLUS) surový 7500 mm",
+        "odpadMm": 3358,
+        "odpadPct": 44.8,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2067,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 1287,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 1287,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 5429,
+          },
+        ],
+        "kod": "ZASP00024",
+        "nazov": "Rámový profil stredový Surový 7500 mm",
+        "odpadMm": 8003,
+        "odpadPct": 35.6,
+        "rezy": [
+          {
+            "ks": 7,
+            "rozmer": 2067,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 3,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2089,
+                "posuv": 2,
+                "rozmer": 2089,
+              },
+              {
+                "dlzka": 2089,
+                "posuv": 2,
+                "rozmer": 2089,
+              },
+            ],
+            "zvysok": 3314,
+          },
+        ],
+        "kod": "ZASP202419",
+        "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+        "odpadMm": 3314,
+        "odpadPct": 44.2,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 2089,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 3600,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1939,
+                "posuv": 2,
+                "rozmer": 1939,
+              },
+              {
+                "dlzka": 1146.625,
+                "posuv": 2,
+                "rozmer": 1147,
+              },
+            ],
+            "zvysok": 506.375,
+          },
+        ],
+        "kod": "ZASP202439",
+        "nazov": "Rozširujúci profil Surový 3600 mm",
+        "odpadMm": 4051,
+        "odpadPct": 14.1,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 1939,
+          },
+          {
+            "ks": 8,
+            "rozmer": 1147,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 8,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2067,
+                "posuv": 2,
+                "rozmer": 2067,
+              },
+            ],
+            "zvysok": 5429,
+          },
+        ],
+        "kod": "ZASP00018",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 5429,
+        "odpadPct": 72.4,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2067,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 5200,
+                "posuv": 3,
+                "rozmer": 5200,
+              },
+              {
+                "dlzka": 2200,
+                "posuv": 3,
+                "rozmer": 2200,
+              },
+            ],
+            "zvysok": 92,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 5200,
+                "posuv": 3,
+                "rozmer": 5200,
+              },
+              {
+                "dlzka": 2200,
+                "posuv": 3,
+                "rozmer": 2200,
+              },
+            ],
+            "zvysok": 92,
+          },
+        ],
+        "kod": "ZASP00014",
+        "nazov": "Koľajnica 2K Surový 7500 mm",
+        "odpadMm": 184,
+        "odpadPct": 1.2,
+        "rezy": [
+          {
+            "ks": 2,
+            "rozmer": 5200,
+          },
+          {
+            "ks": 2,
+            "rozmer": 2200,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 2,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 1098,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 1098,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+            ],
+            "zvysok": 583.5,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+            ],
+            "zvysok": 878.75,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 1320.25,
+                "posuv": 3,
+                "rozmer": 1320,
+              },
+            ],
+            "zvysok": 6175.75,
+          },
+        ],
+        "kod": "ZASP00002",
+        "nazov": "Rámový profil Surový 7500 mm",
+        "odpadMm": 9834,
+        "odpadPct": 26.2,
+        "rezy": [
+          {
+            "ks": 8,
+            "rozmer": 2130,
+          },
+          {
+            "ks": 8,
+            "rozmer": 1320,
+          },
+        ],
+        "sikmyRez": true,
+        "tyce": 5,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 5366,
+          },
+        ],
+        "kod": "ZASP00006",
+        "nazov": "Oponový profil Surový 7500 mm",
+        "odpadMm": 5366,
+        "odpadPct": 71.5,
+        "rezy": [
+          {
+            "ks": 1,
+            "rozmer": 2130,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 1,
+      },
+      {
+        "barLen": 7500,
+        "bary": [
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 1098,
+          },
+          {
+            "kusy": [
+              {
+                "dlzka": 2130,
+                "posuv": 3,
+                "rozmer": 2130,
+              },
+            ],
+            "zvysok": 5366,
+          },
+        ],
+        "kod": "ZASP00010",
+        "nazov": "Nosový profil Surový 7500 mm",
+        "odpadMm": 6464,
+        "odpadPct": 43.1,
+        "rezy": [
+          {
+            "ks": 4,
+            "rozmer": 2130,
+          },
+        ],
+        "sikmyRez": false,
+        "tyce": 2,
+      },
+    ],
+    "odpis": [
+      {
+        "kod": "ZASP00081",
+        "metre": 7.5,
+        "nazov": "Koľajnica horná 3K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00030",
+        "metre": 7.5,
+        "nazov": "Koľajnica spodná 3K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202417",
+        "metre": 7.2,
+        "nazov": "Kladkový profil 10 mm Surový 3600 mm",
+      },
+      {
+        "kod": "ZASP202425",
+        "metre": 7.2,
+        "nazov": "Klzný profil 10 mm Surový 3600 mm",
+      },
+      {
+        "kod": "ZASP00021",
+        "metre": 7.5,
+        "nazov": "Dorazový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00036",
+        "metre": 7.5,
+        "nazov": "Koľajnica horná 4K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202432",
+        "metre": 7.5,
+        "nazov": "Koľajnica spodná 5K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202415",
+        "metre": 14.4,
+        "nazov": "Kladkový profil Surový 3600mm",
+      },
+      {
+        "kod": "ZASP20244",
+        "metre": 7.5,
+        "nazov": "Koncový profil (PLUS) surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00024",
+        "metre": 22.5,
+        "nazov": "Rámový profil stredový Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202419",
+        "metre": 7.5,
+        "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP202439",
+        "metre": 28.8,
+        "nazov": "Rozširujúci profil Surový 3600 mm",
+      },
+      {
+        "kod": "ZASP00018",
+        "metre": 7.5,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00014",
+        "metre": 15,
+        "nazov": "Koľajnica 2K Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00002",
+        "metre": 37.5,
+        "nazov": "Rámový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00006",
+        "metre": 7.5,
+        "nazov": "Oponový profil Surový 7500 mm",
+      },
+      {
+        "kod": "ZASP00010",
+        "metre": 15,
+        "nazov": "Nosový profil Surový 7500 mm",
+      },
+    ],
+    "posuvy": [
+      {
+        "N": 3,
+        "S": 4200,
+        "V": 2250,
+        "klin": null,
+        "kolajnica": {
+          "horna": 2690,
+          "spodna": 2695,
+        },
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "m2": 9.45,
+        "otvaranie": "P - L",
+        "sietka": null,
+        "sklo": {
+          "pocet": 3,
+          "sirka": 1402,
+          "vyska": 2164,
+        },
+        "skloNazov": "Float kalené 10 mm",
+        "styl": "3K",
+        "system": "Deluxe",
+      },
+      {
+        "N": 4,
+        "S": 4800,
+        "V": 2100,
+        "klin": null,
+        "kolajnica": {
+          "horna": 2690,
+          "spodna": 2695,
+        },
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "m2": 10.08,
+        "otvaranie": "P - L",
+        "sietka": {
+          "system": "Štandard",
+          "uchyt": "madloVelke",
+        },
+        "sklo": {
+          "pocet": 4,
+          "sirka": 1142,
+          "vyska": 1965,
+        },
+        "skloNazov": "Izolačné sklo 4.8.4",
+        "styl": "4K IZO",
+        "system": "Štandard +",
+      },
+      {
+        "N": 4,
+        "S": 5200,
+        "V": 2200,
+        "klin": null,
+        "kolajnica": null,
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "Jednostranná kľučka z vnútra s FAB",
+        "kovanieStredOkno": "P",
+        "m2": 11.44,
+        "otvaranie": "Opona",
+        "sietka": null,
+        "sklo": {
+          "pocet": 4,
+          "sirka": 1185,
+          "vyska": 1995,
+        },
+        "skloNazov": "Izolačné sklo 4/16/4 mliečne",
+        "styl": "2x2K",
+        "system": "Robust",
+      },
+    ],
+  },
+  "multiVstup": {
+    "caka": false,
+    "jednostrannaFab": false,
+    "op": "01",
+    "posuvy": [
+      {
+        "klin": null,
+        "kolajnica": {
+          "horna": 2690,
+          "spodna": 2695,
+        },
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "otvaranie": "P - L",
+        "s": 4200,
+        "sietka": null,
+        "sklo": "Float kalené 10 mm",
+        "styl": "3K",
+        "system": "Deluxe",
+        "v": 2250,
+      },
+      {
+        "klin": null,
+        "kolajnica": {
+          "horna": 2690,
+          "spodna": 2695,
+        },
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "",
+        "kovanieStredOkno": "L",
+        "otvaranie": "P - L",
+        "s": 4800,
+        "sietka": {
+          "system": "Štandard",
+          "uchyt": "madloVelke",
+        },
+        "sklo": "Izolačné sklo 4.8.4",
+        "styl": "4K",
+        "system": "Štandard +",
+        "v": 2100,
+      },
+      {
+        "klin": null,
+        "kolajnica": null,
+        "kovanieL": "",
+        "kovanieP": "",
+        "kovanieStred": "Jednostranná kľučka z vnútra s FAB",
+        "kovanieStredOkno": "P",
+        "otvaranie": "Opona",
+        "s": 5200,
+        "sietka": null,
+        "sklo": "Izolačné sklo 4/16/4 mliečne",
+        "styl": "2x2K",
+        "system": "Robust",
+        "v": 2200,
+      },
+    ],
+    "poznamka": "",
+    "pridavnaKolajnica": true,
+    "ral": "",
+    "zak": "ZAK-GM2",
+    "zakaznik": "Zákazník GM2",
+  },
+  "planHash": "607ab1cb",
+  "step": "nahladMulti",
+  "warn": null,
+}
+`;
