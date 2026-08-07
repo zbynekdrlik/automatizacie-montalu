@@ -15,6 +15,7 @@
 	import {
 		SIETKA_UCHYTY,
 		potrebuje3KKolajnicu,
+		popis3KKolajnicaVymena,
 		maSietkaSystemVyber,
 		SIETKA_SYSTEM_ALT
 	} from '$lib/sietka';
@@ -78,8 +79,9 @@
 		{/if}
 		{#if potrebuje3KKolajnicu(styl)}
 			<p class="sietka-warn" data-testid={`${idPrefix}-2k-warn`}>
-				⚠ Sieťka na 2K koľajnicu nemôže ísť — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks)
-				namiesto 2K.
+				⚠ Sieťka na 2K koľajnicu nemôže ísť — appka automaticky odpíše {popis3KKolajnicaVymena(
+					system
+				)}.
 			</p>
 		{/if}
 		{#if maVyber}

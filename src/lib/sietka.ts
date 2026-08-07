@@ -129,6 +129,26 @@ export function potrebuje3KKolajnicu(styl: string): boolean {
 	return styl === '2K';
 }
 
+/** Systémy zo `SIETKA_SYSTEMY`, kde koľajnica na 2K je DELENÁ (samostatná horná +
+ *  spodná, dva ROZDIELNE Money kódy — `rolaKolajnice` v `compute.ts`) namiesto
+ *  JEDNEJ obvodovej koľajnice v dvoch kusoch (Robust/Slide). #91: `potrebuje3KKolajnicu`
+ *  sama o sebe hovorí len KEDY sa niečo mení, nie ČO presne — UI hláška predtým
+ *  tvrdila „(2 ks + 2 ks)" aj pre Štandard/Štandard +, kde je to nepravda (1 ks horná
+ *  + 1 ks spodná, dva odlišné kódy). Tento zoznam MUSÍ zostať v zhode s `rolaKolajnice`
+ *  — test `sietka-3k-warn-sync.test.ts` to overuje priamo proti živému `cfg_seed.json`,
+ *  takže budúci systém s delenou koľajnicou padne na teste namiesto tichej klamúcej
+ *  hlášky, presne to, čo sa stalo v #91. */
+export const SIETKA_SYSTEMY_DELENA_KOLAJNICA = ['Štandard', 'Štandard +'];
+
+/** Presný text „čo appka odpíše namiesto 2K" pre UI upozornenie (3 miesta:
+ *  +page.svelte primárny aj multi posuv, SietkaPolia.svelte) — jeden zdroj pravdy,
+ *  aby žiadne z nich nemohlo klamať o počte kusov (#91). */
+export function popis3KKolajnicaVymena(system: string): string {
+	return SIETKA_SYSTEMY_DELENA_KOLAJNICA.includes(system)
+		? '3K koľajnicu (hornú aj spodnú, po 1 ks) namiesto 2K'
+		: '3K koľajnicu (2 ks + 2 ks) namiesto 2K';
+}
+
 const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
 
 /** jednoriadkový popis sieťky do plánu / detailu histórie (rovnaký vzor ako klinPopis).
