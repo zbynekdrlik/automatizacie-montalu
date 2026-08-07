@@ -476,6 +476,42 @@ ISTÝ istý snapshot prejde bezo zmeny. Vynechaj zo snapshotu `vytvorene` (serve
 clock) a `cielInfo.dir` (náhodný mkdtemp per beh) — nezávisia od `PosuvSpec`,
 inak test padá na čase/ceste behu, nie na dátach.
 
+## 5e. 2K→3K koľajnicová výmena so sieťkou — gate na ZÁKLADNÝ štýl, párovanie riadkov na (rola, dim) (#91, 2026-08-07)
+
+Adversariálna revízia otvoreného PR našla, že `sietkaKolajnicaSwap`/
+`potrebuje3KKolajnicu` gejtovali `styl === '2K'` — presná rovnosť, ktorá na
+Štandarde/Štandard + nikdy nesedela, lebo o IZO/basic nárezáku rozhoduje ZVOLENÉ
+SKLO (`sysStylPre`), nie štýl-select: výpočet dostane `styl = '2K IZO'`, UI hláška
+sa pritom riadi iným (bez IZO prípony) `vstup.styl` — takže appka klamala presne v
+tej istej triede prípadov, ktorú mala táto oprava riešiť pôvodne.
+
+- **Keď je štýl/kľúč konfigurácie zložený z „základu + voliteľnej prípony podľa
+  inej voľby" (tu: sklo pridáva ` IZO`), KAŽDÝ gate/lookup nad tým štýlom musí
+  transformovať PRÍPONU, nikdy nekontrolovať PRESNÚ ZHODU celého reťazca.** Vzor:
+  `zakladnyStyl(styl) === '2K'` (existujúca funkcia z `styl.ts`, nepíš druhú) +
+  cieľová skupina cez `styl.replace(/^2K/, '3K')` (nie natvrdo `` `${system}|3K` ``)
+  — mechanizmus, ktorý funguje pre `'2K'` aj `'2K IZO'` (aj budúci tretí variant)
+  tou istou vetvou.
+- **Pri PÁROVANÍ riadkov medzi dvoma cfg skupinami (2K vs. jej 3K náprotivok) na
+  účely POROVNANIA vzorca (nie len swapu kódu) nestačí párovať len podľa `rola`
+  (`rolaKolajnice`) — treba AJ `dim`.** Robust/Slide majú JEDNU fyzickú
+  obvodovú koľajnicu reprezentovanú DVOMA riadkami v cfg (`dim: 'S'` a `dim: 'V'`,
+  rovnaký kód, `rola === null` pre obe). Samotný swap (kód/názov) to nerozlišuje,
+  lebo cieľová skupina má na oboch riadkoch identický kód — ALE fail-loud guard,
+  ktorý porovnáva `dim/koef/offset/delitN/dlzkaTyce`, by bez `dim` v párovaní
+  omylom porovnal V-riadok proti S-riadkovému náprotivku (`.find()` vráti PRVÝ
+  match podľa poľa) a nahlásil falošnú/preskočil skutočnú nezhodu. Vždy over
+  fail-loud guard nad Robust/Slide AJ Štandard/Štandard + (rozdielny počet
+  riadkov na rolu), nielen nad tým systémom, kde vznikol.
+- **Test, ktorý má chytiť „appka klame o výmene", MUSÍ reálne zavolať funkciu, čo
+  výmenu robí, nad VŠETKÝMI dosiahnuteľnými štýlmi (vrátane IZO variantov) — nie
+  len porovnať ručný zoznam systémov proti configu.** Presne toto bola diera:
+  predošlý sync test overoval len `SIETKA_SYSTEMY_DELENA_KOLAJNICA` proti
+  `cfg['<system>|2K']`, nikdy nezavolal `sietkaKolajnicaSwap`, nikdy sa nepozrel
+  na `'2K IZO'` — takže rovnaký bug (IZO gate) by prešiel znova bez povšimnutia
+  všetkých 717/719 ostatných testov. Invariant riadený `Object.keys(cfg)` (živý
+  config) namiesto natvrdo vypísaného zoznamu je jediný spôsob, ako to zaručiť.
+
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 
 Do v0.8.0 odpis poznal len metrážové profily a jednotka v xlsx bola natvrdo `'m'`.
