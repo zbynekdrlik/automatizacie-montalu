@@ -275,3 +275,39 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   NEODOSLANÝ (len Spočítať + Späť).
 - Issue #91 auto-closed mergom, evidencia doplnená komentárom. Filed #124
   (follow-up, chýbajúca 3K skupina — mimo scope tohto PR).
+
+## #124 — sietkaKolajnicaVzorecChyba fail-loud pre chýbajúcu 3K skupinu/riadok (2026-08-07)
+
+- Deep-review follow-up po #91/PR #122: `sietkaKolajnicaVzorecChyba` mala
+  `if (!g2k || !g3k) return null;` — chýbajúca CELÁ `3K(-variant)` skupina
+  bola ticho `null`, `sietkaKolajnicaSwap` ticho ponechal 2K kód (rovnaká
+  trieda chyby ako #91, iná príčina). Nedosiahnuteľné cez dnešný formulár
+  (obrana proti budúcej dátovej zmene).
+- STEP 0 evidencia (komentár na #124): mutovaný `cfg` bez `Robust|3K` →
+  potvrdené ticho zlé správanie DNES.
+- Design komentár PRED kódom: rozhodnutie, že aj pôvodné `if (!r3) continue;`
+  (riadok existuje v skupine, ale rola+dim sa nenájde) MUSÍ byť tiež chyba,
+  nie skip — `sietkaKolajnicaSwap` páruje LEN podľa `rola` (bez `dim`), takže
+  by mohol ticho použiť riadok s iným (možno nekompatibilným) vzorcom.
+- `[red]` test `a2f5054` (`tests/sietka-kolajnica-chybajuca-3k.test.ts`, 6
+  testov: chýbajúca skupina × 2 systémy + safeCompute + sabotage-verify
+  dnešného správania, chýbajúci riadok × 2 systémy) → `[green]` fix `de777b4`.
+- Rozšírený invariant `643f76a` (`tests/sietka-3k-warn-sync.test.ts`) —
+  mechanizmová kontrola naprieč KAŽDOU `SIETKA_SYSTEMY` skupinou s hláškou
+  (nie len ručne vybrané prípady).
+- Sabotage-verify: revert `[green]` → 5/6 nových testov padá presne ako pred
+  opravou.
+- Na živom `cfg_seed.json` je to no-op — plný test suite 756/756, golden
+  snapshot (`zasklenia-posuvspec-golden`) nedotknutý.
+- **PR #127** (dev→main, verzia 0.14.11→0.14.12), merge `e65116c`. CI +
+  deploy main zelené. Issue #124 auto-closed mergom, evidencia doplnená
+  komentárom.
+- **Playbook update** (sekcia 5e money-odpis skill — guard-vs-akcia
+  asymetrické párovanie) ako samostatný docs **PR #128**, verzia
+  0.14.12→0.14.13, merge `21ecc18`.
+- **Post-deploy overenie naživo:** `/health` `0.14.13 (21ecc18)`; reálny
+  formulár (Štandard plus | 2K | Float 4mm | S=3000 V=1850 | sieťka ON) —
+  **Odpis (do Money) obsahuje ZASP00027/ZASP00030 (3K)** rovnako ako pred
+  touto opravou (fix nemenil fungujúcu cestu). 0 chýb konzoly. Money odpis
+  NEODOSLANÝ (len Spočítať + Späť).
+- #123 (prídavná koľajnica × sieťka poradie volania) nezmenený, otvorený.
