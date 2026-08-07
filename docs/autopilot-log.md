@@ -244,3 +244,34 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   konzoly. Money odpis NEODOSLANÝ.
 - **Issue #118** auto-closed mergom PR #119 (`Closes #118` v tele). Evidencia
   doplnená komentárom po merge #120.
+
+## 2026-08-07 — #91 dokončené: adversariálna revízia nálezy 1/3/5 (PR #122)
+
+- **Issue:** #91 (Sieťky Štandard 2K: 3K koľajnica sa reálne nezamieňa, hoci UI to
+  tvrdí). Adversariálna revízia už-otvoreného PR #122 potvrdila mechanizmus, ale
+  našla 3 zostávajúce nálezy (1 HIGH, 3 MEDIUM, 5 LOW) + 1 mimo scope (2, → #123).
+- **Nález 1 (HIGH):** `sietkaKolajnicaSwap`/`potrebuje3KKolajnicu` gejtovali
+  `styl === '2K'` — na Štandarde/Štandard + o IZO/basic rozhoduje ZVOLENÉ SKLO
+  (`sysStylPre`), takže výpočet dostal `styl='2K IZO'` a swap sa vzdal. Fix: gate
+  na `zakladnyStyl(styl)==='2K'` + náprotivok `styl.replace(/^2K/,'3K')`.
+  RED `ac490ac` → GREEN `d1aae92`.
+- **Nález 3 (MEDIUM):** `sietka-3k-warn-sync.test.ts` predtým nikdy nevolal
+  `sietkaKolajnicaSwap` — nahradené reálnym invariantom riadeným živým
+  `cfg_seed.json` (`91bdbb7`), sabotage-verified obojsmerne.
+- **Nález 5 (LOW):** nový fail-loud guard `sietkaKolajnicaVzorecChyba` (Money
+  formula mismatch medzi 2K a 3K riadkom), zapojený do `sietkaChyba`
+  (`d1aae92` + testy `e329012`).
+- **Nález 2:** vecné rozhodnutie, presunuté do #123 (OTVORENÝ, čaká na výrobu),
+  pinning test overil, že fix nálezu 1 túto kombináciu nemení (`84d1579`).
+- **e2e:** nový Playwright test cez reálny formulár s IZO sklom (`5ca7689`),
+  sabotage-verified.
+- **PR #122** (dev→main, verzia 0.14.8→0.14.9), merge `37b6765`. CI + deploy
+  main zelené. Deep-review pass (`requesting-code-review`) 0 Critical/Important,
+  2 Minor (1 kozmetický, 1 filed ako #124 — chýbajúca 3K skupina, mimo scope).
+- **Post-deploy overenie naživo:** `/health` `0.14.9 (37b6765)`; reálny formulár
+  (Štandard plus | 2K | Izolačné sklo 4.8.4 | S=3000 V=1850 | sieťka ON) —
+  nárezák-hint aj hláška sedia, **Odpis (do Money) skutočne obsahuje
+  ZASP00027/ZASP00030 (3K)**, žiadny 2K kód. 0 chýb konzoly. Money odpis
+  NEODOSLANÝ (len Spočítať + Späť).
+- Issue #91 auto-closed mergom, evidencia doplnená komentárom. Filed #124
+  (follow-up, chýbajúca 3K skupina — mimo scope tohto PR).
