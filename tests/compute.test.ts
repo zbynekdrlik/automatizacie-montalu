@@ -796,6 +796,27 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			);
 		});
 
+		// #91 nález 2 (adversariálna revízia PR #122, presunuté do samostatného
+		// ticketu — vecné rozhodnutie, ČO má fyzicky nastať, keď je „prídavná
+		// koľajnica" ZAPNUTÁ SÚČASNE so sieťkou): `railUpsize` beží PRED
+		// `sietkaKolajnicaSwap` a swap ho prepíše — kombinácia nie je súčasťou
+		// tejto opravy (nález 1). PINNING test: overuje, že nález-1 fix (IZO gate
+		// na `zakladnyStyl`) na TÚTO kombináciu NIČ nemení — `Štandard +|3K IZO`
+		// zdieľa RESNE tie isté koľajnicové kódy ako `Štandard +|3K` (žiadny
+		// vlastný IZO kód pre koľajnicu), takže IZO aj basic dajú identický
+		// výsledok pred aj po tejto oprave. Keby sa raz #91-nadväzný ticket
+		// rozhodol kombináciu meniť zámerne, tento test spadne a upozorní.
+		it('PINNING (súvisí s nedoriešeným ticketom o prídavnej koľajnici×sieťke): prídavná + sieťka na Štandard +|2K IZO dá TEN ISTÝ kód ako basic 2K — nález-1 fix túto kombináciu nemení', () => {
+			const basic = computeFlat(cfg, 'Štandard +|2K', 3000, 1850, false, 0, true, undefined, {
+				uchyt: 'ziadny'
+			})!;
+			const izo = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 1850, false, 0, true, undefined, {
+				uchyt: 'ziadny'
+			})!;
+			expect(spodna(basic)).toBe('ZASP00030');
+			expect(spodna(izo)).toBe('ZASP00030'); // rovnaký kód ako basic — nezmenené IZO gate fixom
+		});
+
 		it('prídavná koľajnica sa NEaplikuje mimo Štandard + (Deluxe zdieľa ZASP00104 — Money guard)', () => {
 			// Deluxe 2K spodná = ZASP00104; checkbox NESMIE zmeniť Deluxe odpis
 			const d = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false, 10, true)!;
