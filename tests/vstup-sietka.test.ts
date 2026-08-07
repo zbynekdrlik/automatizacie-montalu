@@ -277,6 +277,37 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 		expect(so.odpis.some((o) => o.kod === 'ZASP00107' || o.kod === 'ZASP00104')).toBe(false);
 	});
 
+	// #91 nález 1 (adversariálna revízia PR #122): na Štandarde/Štandard + o
+	// IZO/basic nárezáku rozhoduje ZVOLENÉ SKLO, nie štýl (`sysStylPre` v
+	// `styl.ts`) — takže `computeFlat`/`computeMulti` dostanú `styl = '2K IZO'`,
+	// nikdy holé `'2K'`. Predchádzajúca prísna rovnosť `styl !== '2K'` sa preto
+	// na PRVOM koľajnicovom riadku vzdala a IZO sklo nedostalo ŽIADNU výmenu,
+	// hoci UI hláška (ktorá sa riadi `vstup.styl`, bez IZO prípony) tvrdila
+	// opak. Obidve IZO skupiny (`|2K IZO`/`|3K IZO`) existujú pre Štandard aj
+	// Štandard + a IZO sklo je pre oba naseedované — dosiahnuteľné cez bežný
+	// formulár. Overené proti cfg_seed.json aj proti Money (#91 STEP 0 komentár).
+	it('Štandard +|2K IZO S=3000/V=1850 + sieťka: OBIDVE koľajnice sa menia na 3K IZO (rovnaké 3K kódy ako bez IZO — ZASP00107→ZASP00027, ZASP00104→ZASP00030)', () => {
+		const bez = computeMulti(cfg, spec('Štandard +|2K IZO', 3000, 1850, null))!;
+		const so = computeMulti(cfg, spec('Štandard +|2K IZO', 3000, 1850, { uchyt: 'ziadny' }))!;
+
+		expect(bez.odpis.some((o) => o.kod === 'ZASP00107')).toBe(true);
+		expect(bez.odpis.some((o) => o.kod === 'ZASP00104')).toBe(true);
+
+		expect(so.odpis.some((o) => o.kod === 'ZASP00027')).toBe(true);
+		expect(so.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
+		// 2K kódy (obidva) sa v odpise so sieťkou vôbec nevyskytujú — nahradené, nie pridané
+		expect(so.odpis.some((o) => o.kod === 'ZASP00107' || o.kod === 'ZASP00104')).toBe(false);
+	});
+
+	it('Štandard|2K IZO S=3000/V=1850 + sieťka: horná sa mení na 3K IZO (ZASP00107→ZASP00027) — starý Štandard má INÝ 3K IZO spodný kód (ZASP00033) než jeho vlastný 3K bez IZO, kód sa berie ŽIVO z cfg', () => {
+		const so = computeMulti(cfg, spec('Štandard|2K IZO', 3000, 1850, { uchyt: 'ziadny' }))!;
+
+		expect(so.odpis.some((o) => o.kod === 'ZASP00027')).toBe(true); // horná 3K IZO
+		expect(so.odpis.some((o) => o.kod === 'ZASP00033')).toBe(true); // spodná 3K IZO (živo z cfg, nie natvrdo)
+		// pôvodné 2K IZO kódy horná (ZASP00107) sa nesmú objaviť — nahradené
+		expect(so.odpis.some((o) => o.kod === 'ZASP00107')).toBe(false);
+	});
+
 	it('Štandard|2K S=3000/V=1850 + sieťka: rovnaká výmena (starý štandard, tie isté 3K kódy ako Plus)', () => {
 		const bez = computeMulti(cfg, spec('Štandard|2K', 3000, 1850, null))!;
 		const so = computeMulti(cfg, spec('Štandard|2K', 3000, 1850, { uchyt: 'ziadny' }))!;
