@@ -500,14 +500,30 @@ export function sietkaKolajnicaSwap(
  * do Money článok 3K s dĺžkou rezu 2K (alebo naopak) — nárezák, podľa ktorého dielňa
  * reže, by bol zle OKAMŽITE. Namiesto tichého zlého odpisu (rovnaká disciplína ako
  * `missingHrubkaProfile`) výpočet zlyhá nahlas skôr, než sa čokoľvek zapíše.
+ *
+ * OPRAVA #124 (deep-review nález po PR #122): pôvodne `if (!g2k || !g3k) return null;`
+ * — keď 3K(-variant) skupina VÔBEC NEEXISTUJE, funkcia sa vzdala ticho a
+ * `sietkaKolajnicaSwap` ticho nechal pôvodný 2K kód v odpise (rovnaká trieda chyby
+ * ako #91, len iná príčina). Teraz: chýbajúca `g3k` skupina je FAIL-LOUD (menuje
+ * systém aj hľadaný kľúč skupiny), rovnako ako chýbajúci KONKRÉTNY riadok v rámci
+ * existujúcej skupiny (predtým `if (!r3) continue;` — pozri komentár nižšie prečo to
+ * bol nesprávny predpoklad, nie legitímny skip).
  */
 export function sietkaKolajnicaVzorecChyba(cfg: Cfg, system: string, styl: string): string | null {
 	if (zakladnyStyl(styl) !== '2K') return null;
 	const g2k = cfg[`${system}|${styl}`];
-	const g3k = cfg[`${system}|${styl.replace(/^2K/, '3K')}`];
-	if (!g2k || !g3k) return null;
+	if (!g2k) return null; // neznámy systém/štýl — mimo scope (validSys to rieši pred volaním)
+	const g3kStyl = styl.replace(/^2K/, '3K');
+	const g3k = cfg[`${system}|${g3kStyl}`];
 	for (const r2 of g2k.rez) {
 		if (r2.typ !== 'profil' || !/^Koľajnica\b/i.test(r2.nazov)) continue;
+		if (!g3k) {
+			return (
+				`Systém „${system}" (${styl}) potrebuje pri zapnutej sieťke 3K koľajnicu, ale ` +
+				`konfigurácia nemá skupinu „${system}|${g3kStyl}" vôbec definovanú — sieťková ` +
+				`výmena kódu by nemala čo dosadiť. Skontroluj nastavenia (${system}).`
+			);
+		}
 		const rola = rolaKolajnice(r2.nazov);
 		// Robust/Slide majú JEDNU obvodovú koľajnicu, ale DVA riadky (rola=null) — po
 		// S aj po V dimenzii, s TÝM ISTÝM kódom (`sietkaKolajnicaSwap` to nerozlišuje,
@@ -521,8 +537,24 @@ export function sietkaKolajnicaVzorecChyba(cfg: Cfg, system: string, styl: strin
 				rolaKolajnice(r.nazov) === rola &&
 				r.dim === r2.dim
 		);
-		if (!r3) continue; // sietkaKolajnicaSwap sám o sebe nič nezmení — nemá čo pokaziť
-		// `dim` je súčasťou párovania vyššie, takže sa tu už porovnávať nemusí.
+		// #124 bod 2: PREDTÝM `continue` s komentárom „sietkaKolajnicaSwap sám o sebe
+		// nič nezmení — nemá čo pokaziť". To bolo nepresné: `sietkaKolajnicaSwap`
+		// hľadá náprotivok LEN podľa `rola` (žiadna `dim` podmienka, pozri jej vlastný
+		// docblock vyššie) — je teda MENEJ prísna než párovanie tu. Keby v `g3k`
+		// existoval riadok s rovnakou `rola`, ale INÝM `dim` (chýba práve ten s
+		// presne zhodným `dim`), `swap` by ho ticho POUŽIL aj s jeho (možno
+		// nekompatibilným) vzorcom — presne ten istý druh tichého zlého odpisu, aký
+		// táto funkcia existuje zachytiť. Preto je to FAIL-LOUD, nie skip. Na dnešnom
+		// `cfg_seed.json` je to no-op (každá existujúca `Koľajnica` skupina má S aj V
+		// riadok s identickým kódom/vzorcom) — chyba sa prejaví len na syntetickej/
+		// mutovanej konfigurácii.
+		if (!r3) {
+			return (
+				`Koľajnica „${r2.nazov}" (${styl}) nemá vo svojej 3K skupine „${system}|${g3kStyl}" ` +
+				`žiadny zodpovedajúci riadok — sieťková výmena kódu by nenašla čo dosadiť. ` +
+				`Skontroluj nastavenia (${system}).`
+			);
+		}
 		const nezhoda =
 			r2.koef !== r3.koef ||
 			r2.offset !== r3.offset ||
