@@ -511,6 +511,21 @@ tej istej triede prípadov, ktorú mala táto oprava riešiť pôvodne.
   na `'2K IZO'` — takže rovnaký bug (IZO gate) by prešiel znova bez povšimnutia
   všetkých 717/719 ostatných testov. Invariant riadený `Object.keys(cfg)` (živý
   config) namiesto natvrdo vypísaného zoznamu je jediný spôsob, ako to zaručiť.
+- **DODATOK (#124, 2026-08-07): keď GUARD páruje PRÍSNEJŠIE než funkcia, ktorú
+  chráni, `!match → skip/continue` NIE JE bezpečné — musí byť `!match → chyba`.**
+  `sietkaKolajnicaVzorecChyba` párovala `rola`+`dim` (nutné pre porovnanie
+  vzorca), ale `sietkaKolajnicaSwap` sama páruje LEN `rola` (žiadny `dim`) — je
+  teda MENEJ prísna. Pôvodný kód mal `if (!r3) continue;` s komentárom „swap
+  sám o sebe nič nezmení", čo bolo nepravdivé: keby `g3k` mala riadok s rovnakou
+  `rola`, ale INÝM `dim` (presne ten prípad, keď prísnejšie párovanie guardu
+  nenájde zhodu), swap by ho ticho POUŽIL aj s jeho možno nekompatibilným
+  vzorcom — guard by mlčal presne vtedy, keď mal hovoriť. Rovnako platilo pre
+  úplne CHÝBAJÚCU `g3k` skupinu (`if (!g2k || !g3k) return null;`) — swap sa v
+  tom prípade nevzdá o nič bezpečnejšie, len ticho necháva pôvodný kód. **Vzor
+  na budúce guardy nad dvojicou (guard-funkcia, akčná-funkcia):** over, ČI je
+  párovanie guardu prísnejšie/voľnejšie než párovanie akčnej funkcie — ak je
+  guard prísnejší, jeho „nenašiel som zhodu" MUSÍ byť fail-loud, nikdy tichý
+  skip, lebo akčná funkcia môže aj tak niečo (možno nesprávne) urobiť.
 
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 
