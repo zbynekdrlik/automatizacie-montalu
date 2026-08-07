@@ -247,6 +247,59 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 		expect(so.odpis.some((o) => o.kod === 'ZASP00097')).toBe(false);
 	});
 
+	// #91: Robust/Slide majú JEDNU obvodovú koľajnicu (test vyššie) — Štandard/
+	// Štandard + majú DELENÚ hornú + spodnú (`rolaKolajnice` v `compute.ts`), a
+	// presne PRE TENTO prípad sa `sietkaKolajnicaSwap` predtým vzdávala (bail-out
+	// na akúkoľvek rolovanú koľajnicu), takže kódy koľajníc so sieťkou aj bez nej
+	// vychádzali IDENTICKÉ (2K), hoci UI tvrdilo výmenu na 3K. Kódy 3K overené proti
+	// `cfg_seed.json` AJ proti živému Money (`Sklady_Zasoba`, `Deleted=0`, #91 STEP 0).
+	it('Štandard +|2K S=3000/V=1850 + sieťka: OBIDVE koľajnice (horná aj spodná) sa menia na 3K (ZASP00107→ZASP00027, ZASP00104→ZASP00030)', () => {
+		const bez = computeMulti(cfg, spec('Štandard +|2K', 3000, 1850, null))!;
+		const so = computeMulti(cfg, spec('Štandard +|2K', 3000, 1850, { uchyt: 'ziadny' }))!;
+
+		expect(bez.odpis).toEqual([
+			{ kod: 'ZASP00107', nazov: 'Koľajnica horná 2K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00104', nazov: 'Koľajnica spodná 2K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202415', nazov: 'Kladkový profil Surový 3600mm', metre: 7.2 },
+			{ kod: 'ZASP20244', nazov: 'Koncový profil (PLUS) surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00024', nazov: 'Rámový profil stredový Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202419', nazov: 'Dorazová lišta zámok (PLUS) Surový 7500 mm', metre: 7.5 }
+		]);
+		expect(so.odpis).toEqual([
+			{ kod: 'ZASP00027', nazov: 'Koľajnica horná 3K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00030', nazov: 'Koľajnica spodná 3K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202415', nazov: 'Kladkový profil Surový 3600mm', metre: 10.8 },
+			{ kod: 'ZASP20244', nazov: 'Koncový profil (PLUS) surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00024', nazov: 'Rámový profil stredový Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202419', nazov: 'Dorazová lišta zámok (PLUS) Surový 7500 mm', metre: 7.5 }
+		]);
+		// 2K kódy (obidva) sa v odpise so sieťkou vôbec nevyskytujú — nahradené, nie pridané
+		expect(so.odpis.some((o) => o.kod === 'ZASP00107' || o.kod === 'ZASP00104')).toBe(false);
+	});
+
+	it('Štandard|2K S=3000/V=1850 + sieťka: rovnaká výmena (starý štandard, tie isté 3K kódy ako Plus)', () => {
+		const bez = computeMulti(cfg, spec('Štandard|2K', 3000, 1850, null))!;
+		const so = computeMulti(cfg, spec('Štandard|2K', 3000, 1850, { uchyt: 'ziadny' }))!;
+
+		expect(bez.odpis).toEqual([
+			{ kod: 'ZASP00107', nazov: 'Koľajnica horná 2K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00104', nazov: 'Koľajnica spodná 2K  Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202415', nazov: 'Kladkový profil Surový 3600mm', metre: 7.2 },
+			{ kod: 'ZASP00018', nazov: 'Rámový profil Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00024', nazov: 'Rámový profil stredový Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00021', nazov: 'Dorazový profil Surový 7500 mm', metre: 7.5 }
+		]);
+		expect(so.odpis).toEqual([
+			{ kod: 'ZASP00027', nazov: 'Koľajnica horná 3K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00030', nazov: 'Koľajnica spodná 3K Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP202415', nazov: 'Kladkový profil Surový 3600mm', metre: 10.8 },
+			{ kod: 'ZASP00018', nazov: 'Rámový profil Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00024', nazov: 'Rámový profil stredový Surový 7500 mm', metre: 7.5 },
+			{ kod: 'ZASP00021', nazov: 'Dorazový profil Surový 7500 mm', metre: 7.5 }
+		]);
+		expect(so.odpis.some((o) => o.kod === 'ZASP00107' || o.kod === 'ZASP00104')).toBe(false);
+	});
+
 	it('bez sieťky: computeFlat (jeden posuv) a computeMulti (ten istý posuv) sa zhodujú — regresný dôkaz na DVA nezávislé vstupné body engine, nie na ten istý výpočet dvakrát', () => {
 		const vektory: [string, number, number][] = [
 			['Robust|3K', 4645, 2320],
