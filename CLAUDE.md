@@ -87,3 +87,5 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - FIX (pevné zasklenie) modul → auto-loads `.claude/rules/fix-module.md` on its `paths:`
 - server-side wall-clock timestamp zobrazovaný na obrazovke/tlači → auto-loads
   `.claude/rules/timestamps.md` on its `paths:` (Docker nemá TZ → UTC default gotcha)
+- `.github/workflows/*.yml` (CI/deploy pipeline) → auto-loads `.claude/rules/ci.md`
+  on its `paths:` (zombie run recovery, `workflow_dispatch` retry, deploy-landed check)
