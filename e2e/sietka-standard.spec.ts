@@ -123,3 +123,39 @@ test('výber systému sieťky prežije „← Späť a upraviť"', async ({ page
 
 	expect(errs).toEqual([]);
 });
+
+// #91: 2K posuv nemá voľnú koľaj pre sieťku — appka mala VŽDY vymeniť koľajnicu na
+// 3K, ale pre Štandard/Štandard + (delená horná+spodná) to bol tichý no-op, hoci
+// hláška tvrdila opak. Overuje SKUTOČNÝ odpis (nie len text upozornenia).
+test('Štandard + 2K + sieťka: nárezák aj odpis PRIDÁ 3K koľajnicu (hornú aj spodnú), hláška sedí s realitou (#91)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await zaklad(page, 'E2E-SIETKA-STD-2K', 'E2E Sietka standard 2K');
+	await page.selectOption('#styl', '2K');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	const bez = await odpisRiadky(page);
+	expect(bez.join(' ')).toContain('Koľajnica horná 2K');
+	expect(bez.join(' ')).toContain('Koľajnica spodná 2K');
+
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await page.locator('#sietka-on').check();
+	// hláška MUSÍ hovoriť o dvoch ODLIŠNÝCH koľajniciach (delená), nie „2 ks + 2 ks"
+	await expect(page.getByTestId('sietka-2k-warn')).toContainText('hornú aj spodnú');
+
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('sietka-2k-warn-karta')).toContainText('hornú aj spodnú');
+
+	const so = (await odpisRiadky(page)).join(' ');
+	expect(so).toContain('Koľajnica horná 3K');
+	expect(so).toContain('Koľajnica spodná 3K');
+	expect(so).not.toContain('Koľajnica horná 2K');
+	expect(so).not.toContain('Koľajnica spodná 2K');
+
+	expect(errs).toEqual([]);
+});
