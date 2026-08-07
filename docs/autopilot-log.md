@@ -219,3 +219,28 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   mergom). Post-deploy overené naživo (marek@app.montalu.cloud): DOM
   verzia `v0.14.2 (7b1c720)`, testovací nárezák ukázal `🕓 5.8.2026 17:57`
   v hlavičke, 0 chýb konzoly, Money odpis sa NEODOSLAL.
+
+## 2026-08-07 — CI zombie run + workflow_dispatch (#118)
+
+- **Issue:** #118 (CI: deploy sa nedá zopakovať, keď na main neprejde — chýba
+  `workflow_dispatch`). Root cause: `ci.yml` mal jediný spúšťač `push`; keď
+  GitHub nepridelil runner deploy jobu na `main` po merge PR #117 (0.14.4),
+  run zamrzol (`status: queued`, `conclusion: null`, joby `completed`) a
+  `gh run cancel`/`gh run rerun` obe zlyhali — bez umelého commitu neexistoval
+  spôsob, ako CI zopakovať. Live appka zostala na 0.14.3.
+- **PR #119** (dev→main, `7735eac`→merge `7d2f6d7`): `workflow_dispatch:`
+  pridaný do `on:` bloku `ci.yml` (1 riadok), verzia 0.14.4→0.14.5. Gate
+  podmienky nezmenené. `/review` + `/requesting-code-review` obe 0🔴0🟡0🔵.
+  Nasledujúci `main` beh prebehol prirodzene zelený (žiadny zombie tentokrát),
+  appka naživo `0.14.5 (7d2f6d7)`.
+- **PR #120** (playbook, docs-only, spustený PO merge #119 — chyba v poradí
+  krokov, napravená rovnakým vzorom ako `2708dc2`): `.claude/rules/ci.md`
+  (nový, `paths: .github/workflows/*.yml`) — zombie-run rozpoznanie,
+  `workflow_dispatch` retry postup, pripomienka že CI zelené ≠ nasadené.
+  Verzia 0.14.6, merge `551c6d7`, appka naživo `0.14.6 (551c6d7)`.
+- **Post-deploy overenie:** Playwright na `https://app.montalu.cloud/zasklenia`
+  — testovací nárezák (Robust 2K, 1500×2000mm) spočítaný, plán + kovanie +
+  tesnenia + rozpis rezov vykreslené, DOM verzia `v0.14.6 (551c6d7)`, 0 chýb
+  konzoly. Money odpis NEODOSLANÝ.
+- **Issue #118** auto-closed mergom PR #119 (`Closes #118` v tele). Evidencia
+  doplnená komentárom po merge #120.
