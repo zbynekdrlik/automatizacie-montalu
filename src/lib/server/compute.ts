@@ -446,10 +446,16 @@ function mergeExtraCuts(cuts: ProfilCuts[], extra: ExtraRez[], posuv?: number): 
  * 2K posuv so sieťkou nemá voľnú koľaj pre 4. krídlo — „musí sa meniť celý rám čiže
  * spodná horná a prava ľava koľajnica" (Patrik #1614827 bod 5) na 3K variant. Robust aj
  * Slide majú JEDNU obvodovú koľajnicu (`rolaKolajnice` vráti `null` — žiadne rozdelenie
- * horná/spodná), takže „celý rám" = jeden Money kód. 2K aj 3K koľajnica majú TOTOŽNÝ
- * vzorec dĺžky (koef=1, offset=0, delitN=0 — over v cfg_seed.json), takže sa mení LEN
- * kód/názov karty — dĺžka rezu ostáva rovnaká (rovnaký vzor ako `railUpsize` vyššie, pre
- * iný profil a iný gate). 3K kód/názov sa berie ŽIVO z `cfg`, nikdy natvrdo.
+ * horná/spodná), takže „celý rám" = jeden Money kód. Štandard/Štandard + majú DELENÚ
+ * hornú a spodnú (`rolaKolajnice` vráti `'horna'`/`'spodna'`, #91) — pre ne treba
+ * vymeniť KAŽDÚ zvlášť za jej 3K náprotivok S ROVNAKOU rolou (horná→horná,
+ * spodná→spodná), nie jeden spoločný kód. Funkcia sa volá per riadok (raz na hornú,
+ * raz na spodnú), takže stačí hľadať zhodu podľa role namiesto vzdania sa pri
+ * akejkoľvek role — mechanizmus tak funguje pre KAŽDÝ systém s delenou koľajnicou bez
+ * ďalšieho per-systém vetvenia. 2K aj 3K koľajnica majú TOTOŽNÝ vzorec dĺžky (koef=1,
+ * offset=0, delitN=0 — over v cfg_seed.json), takže sa mení LEN kód/názov karty —
+ * dĺžka rezu ostáva rovnaká (rovnaký vzor ako `railUpsize` vyššie, pre iný profil a
+ * iný gate). 3K kód/názov sa berie ŽIVO z `cfg`, nikdy natvrdo.
  */
 export function sietkaKolajnicaSwap(
 	cfg: Cfg,
@@ -460,10 +466,11 @@ export function sietkaKolajnicaSwap(
 	nazov: string
 ): { kod: string; nazov: string } {
 	if (!sietkaOn || styl !== '2K') return { kod, nazov };
-	if (!/^Koľajnica\b/i.test(nazov) || rolaKolajnice(nazov)) return { kod, nazov };
+	if (!/^Koľajnica\b/i.test(nazov)) return { kod, nazov };
+	const rola = rolaKolajnice(nazov);
 	const g3k = cfg[`${system}|3K`];
 	const row = g3k?.rez.find(
-		(r) => r.typ === 'profil' && /^Koľajnica\b/i.test(r.nazov) && !rolaKolajnice(r.nazov)
+		(r) => r.typ === 'profil' && /^Koľajnica\b/i.test(r.nazov) && rolaKolajnice(r.nazov) === rola
 	);
 	return row ? { kod: row.kod, nazov: row.nazov } : { kod, nazov };
 }
