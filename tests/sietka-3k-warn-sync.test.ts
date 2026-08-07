@@ -9,12 +9,7 @@
 // ďalší systém so sieťkou a delenou koľajnicou, tento test PADNE namiesto toho, aby
 // UI opäť ticho klamalo o počte kusov.
 import { describe, it, expect } from 'vitest';
-import {
-	buildCFG,
-	sietkaKolajnicaSwap,
-	type SysRow,
-	type RezRow
-} from '../src/lib/server/compute';
+import { buildCFG, sietkaKolajnicaSwap, type SysRow, type RezRow } from '../src/lib/server/compute';
 import { rolaKolajnice } from '../src/lib/kolajnica';
 import {
 	SIETKA_SYSTEMY,
