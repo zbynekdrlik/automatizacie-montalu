@@ -74,7 +74,14 @@ describe('#124 — CELÁ 3K(-variant) skupina chýba: fail-loud, nie ticho null'
 
 	it('sabotage-verify: sietkaKolajnicaSwap sám o sebe by BEZO ZMENY zvládol kód (dôkaz, prečo guard musí zasiahnuť)', () => {
 		const zly = bezSkupiny(cfg, 'Robust|3K');
-		const out = sietkaKolajnicaSwap(zly, 'Robust', '2K', true, 'ZASP00014', 'Koľajnica 2K Surový 7500 mm');
+		const out = sietkaKolajnicaSwap(
+			zly,
+			'Robust',
+			'2K',
+			true,
+			'ZASP00014',
+			'Koľajnica 2K Surový 7500 mm'
+		);
 		expect(out.kod).toBe('ZASP00014'); // swap ticho necháva 2K kód — presne #91 trieda chyby
 	});
 });
