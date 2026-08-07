@@ -12,6 +12,7 @@ import {
 	potrebuje3KKolajnicu,
 	type Sietka
 } from '$lib/sietka';
+import { zakladnyStyl } from '$lib/styl';
 
 export interface SysRow {
 	sysStyl: string;
@@ -398,6 +399,11 @@ export function sietkaChyba(
 	N: number
 ): string | null {
 	if (!jeSietkaMoneyRelevant(system, styl, sietka)) return null;
+	// #91 nález 5: koľajnicový vzorcový mismatch platí pre KAŽDÝ systém s 2K/3K
+	// výmenou (aj Robust/Slide, nielen Slide/maSietkaSystemVyber vetvy nižšie) —
+	// over PRED nimi, nech jedna chyba nezakryje druhú.
+	const kolajnicaErr = sietkaKolajnicaVzorecChyba(cfg, system, styl);
+	if (kolajnicaErr) return kolajnicaErr;
 	if (system === 'Slide') {
 		const { rezy, err } = sietkaSlideExtra(cfg, styl, S, V, N);
 		return err ?? extraOversizeErr(rezy);
@@ -446,10 +452,25 @@ function mergeExtraCuts(cuts: ProfilCuts[], extra: ExtraRez[], posuv?: number): 
  * 2K posuv so sieťkou nemá voľnú koľaj pre 4. krídlo — „musí sa meniť celý rám čiže
  * spodná horná a prava ľava koľajnica" (Patrik #1614827 bod 5) na 3K variant. Robust aj
  * Slide majú JEDNU obvodovú koľajnicu (`rolaKolajnice` vráti `null` — žiadne rozdelenie
- * horná/spodná), takže „celý rám" = jeden Money kód. 2K aj 3K koľajnica majú TOTOŽNÝ
- * vzorec dĺžky (koef=1, offset=0, delitN=0 — over v cfg_seed.json), takže sa mení LEN
- * kód/názov karty — dĺžka rezu ostáva rovnaká (rovnaký vzor ako `railUpsize` vyššie, pre
- * iný profil a iný gate). 3K kód/názov sa berie ŽIVO z `cfg`, nikdy natvrdo.
+ * horná/spodná), takže „celý rám" = jeden Money kód. Štandard/Štandard + majú DELENÚ
+ * hornú a spodnú (`rolaKolajnice` vráti `'horna'`/`'spodna'`, #91) — pre ne treba
+ * vymeniť KAŽDÚ zvlášť za jej 3K náprotivok S ROVNAKOU rolou (horná→horná,
+ * spodná→spodná), nie jeden spoločný kód. Funkcia sa volá per riadok (raz na hornú,
+ * raz na spodnú), takže stačí hľadať zhodu podľa role namiesto vzdania sa pri
+ * akejkoľvek role — mechanizmus tak funguje pre KAŽDÝ systém s delenou koľajnicou bez
+ * ďalšieho per-systém vetvenia. 2K aj 3K koľajnica majú TOTOŽNÝ vzorec dĺžky (koef=1,
+ * offset=0, delitN=0 — over v cfg_seed.json, a od #91 nálezu 5 aj FAIL-LOUD vynútené,
+ * pozri `sietkaKolajnicaVzorecChyba`), takže sa mení LEN kód/názov karty — dĺžka rezu
+ * ostáva rovnaká (rovnaký vzor ako `railUpsize` vyššie, pre iný profil a iný gate). 3K
+ * kód/názov sa berie ŽIVO z `cfg`, nikdy natvrdo.
+ *
+ * OPRAVA #91 nález 1 (adversariálna revízia PR #122): gate bol `styl !== '2K'` — na
+ * Štandarde/Štandard + ale o IZO/basic nárezáku rozhoduje ZVOLENÉ SKLO, nie štýl
+ * (`sysStylPre`), takže sem prišiel `styl = '2K IZO'` a prísna rovnosť sa vzdala hneď
+ * na prvom riadku (nulová výmena, hláška aj tak klamala). Gate je teraz na ZÁKLADNOM
+ * štýle (`zakladnyStyl`) a náprotivok sa hľadá v skupine s tou istou IZO príponou
+ * (`2K IZO` → `3K IZO`), nie natvrdo v `|3K` — mechanizmus, nie per-systém `if`, takže
+ * funguje pre KAŽDÚ existujúcu IZO skupinu bez ďalšieho dopĺňania.
  */
 export function sietkaKolajnicaSwap(
 	cfg: Cfg,
@@ -459,13 +480,63 @@ export function sietkaKolajnicaSwap(
 	kod: string,
 	nazov: string
 ): { kod: string; nazov: string } {
-	if (!sietkaOn || styl !== '2K') return { kod, nazov };
-	if (!/^Koľajnica\b/i.test(nazov) || rolaKolajnice(nazov)) return { kod, nazov };
-	const g3k = cfg[`${system}|3K`];
+	if (!sietkaOn || zakladnyStyl(styl) !== '2K') return { kod, nazov };
+	if (!/^Koľajnica\b/i.test(nazov)) return { kod, nazov };
+	const rola = rolaKolajnice(nazov);
+	const g3k = cfg[`${system}|${styl.replace(/^2K/, '3K')}`];
 	const row = g3k?.rez.find(
-		(r) => r.typ === 'profil' && /^Koľajnica\b/i.test(r.nazov) && !rolaKolajnice(r.nazov)
+		(r) => r.typ === 'profil' && /^Koľajnica\b/i.test(r.nazov) && rolaKolajnice(r.nazov) === rola
 	);
 	return row ? { kod: row.kod, nazov: row.nazov } : { kod, nazov };
+}
+
+/**
+ * Fail-loud guard (#91 nález 5, adversariálna revízia PR #122): `sietkaKolajnicaSwap`
+ * kopíruje len `{kod, nazov}` z 3K náprotivku a drží dĺžkový vzorec (`dim`/`koef`/
+ * `offset`/`delitN`/`dlzkaTyce`) PÔVODNÉHO 2K riadku — v tichom predpoklade, že 2K aj
+ * 3K koľajnica majú TOTOŽNÝ vzorec (dnes naozaj majú, pozri `cfg_seed.json`). `offset`
+ * je pritom ŽIVO editovateľný v `/zasklenia/nastavenia` (per riadok, per `poradie`) —
+ * kto ho zmení len na jednej strane (2K alebo 3K), appka by so sieťkou ticho napísala
+ * do Money článok 3K s dĺžkou rezu 2K (alebo naopak) — nárezák, podľa ktorého dielňa
+ * reže, by bol zle OKAMŽITE. Namiesto tichého zlého odpisu (rovnaká disciplína ako
+ * `missingHrubkaProfile`) výpočet zlyhá nahlas skôr, než sa čokoľvek zapíše.
+ */
+export function sietkaKolajnicaVzorecChyba(cfg: Cfg, system: string, styl: string): string | null {
+	if (zakladnyStyl(styl) !== '2K') return null;
+	const g2k = cfg[`${system}|${styl}`];
+	const g3k = cfg[`${system}|${styl.replace(/^2K/, '3K')}`];
+	if (!g2k || !g3k) return null;
+	for (const r2 of g2k.rez) {
+		if (r2.typ !== 'profil' || !/^Koľajnica\b/i.test(r2.nazov)) continue;
+		const rola = rolaKolajnice(r2.nazov);
+		// Robust/Slide majú JEDNU obvodovú koľajnicu, ale DVA riadky (rola=null) — po
+		// S aj po V dimenzii, s TÝM ISTÝM kódom (`sietkaKolajnicaSwap` to nerozlišuje,
+		// lebo cieľová skupina má rovnaký kód na oboch). Tento guard porovnáva VZOREC,
+		// takže musí párovať aj podľa `dim`, inak by V-riadok omylom porovnal proti
+		// S-riadkovému náprotivku a nahlásil falošnú nezhodu.
+		const r3 = g3k.rez.find(
+			(r) =>
+				r.typ === 'profil' &&
+				/^Koľajnica\b/i.test(r.nazov) &&
+				rolaKolajnice(r.nazov) === rola &&
+				r.dim === r2.dim
+		);
+		if (!r3) continue; // sietkaKolajnicaSwap sám o sebe nič nezmení — nemá čo pokaziť
+		// `dim` je súčasťou párovania vyššie, takže sa tu už porovnávať nemusí.
+		const nezhoda =
+			r2.koef !== r3.koef ||
+			r2.offset !== r3.offset ||
+			r2.delitN !== r3.delitN ||
+			(Number(r2.dlzkaTyce) || 0) !== (Number(r3.dlzkaTyce) || 0);
+		if (nezhoda) {
+			return (
+				`Koľajnica „${r2.nazov}" (${styl}) a jej 3K náprotivok „${r3.nazov}" majú rozdielny ` +
+				`vzorec dĺžky rezu — sieťková výmena kódu by dala nesprávnu dĺžku. Skontroluj ` +
+				`nastavenia vzorcov (${system}).`
+			);
+		}
+	}
+	return null;
 }
 
 export interface SietkaSamostatnaMaterialRow {

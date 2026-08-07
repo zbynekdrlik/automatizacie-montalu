@@ -20,6 +20,16 @@
 //   plus alebo starý a keď si dám sieťku vyberiem si či chcem sieťku plus štandard
 //   alebo starý"). Pole `Sietka.system` nesie tento výber — pozri
 //   `maSietkaSystemVyber`/`sietkaStandardExtra` v `compute.ts`.
+//
+// OPRAVA 2026-08-07 (#91 nález 1, adversariálna revízia PR #122): na Štandarde/
+// Štandard + o IZO/basic nárezáku ROZHODUJE ZVOLENÉ SKLO, nie štýl (`sysStylPre`
+// v `styl.ts`) — takže samotný výpočet dostane `styl = '2K IZO'`, nikdy holé
+// `'2K'`. `potrebuje3KKolajnicu` aj `sietkaKolajnicaSwap` preto gejtujú na
+// `zakladnyStyl(styl) === '2K'`, nie na prísnu rovnosť — inak sa swap na IZO
+// skle vôbec nespustí, hoci UI hlásku aj tak zobrazí (hláška sa vždy riadila
+// základným štýlom cez `vstup.styl`, ktorý IZO nikdy nenesie).
+
+import { zakladnyStyl } from './styl';
 
 export type SietkaUchyt = 'ziadny' | 'madloVelke' | 'madloMale' | 'zamok';
 
@@ -124,9 +134,32 @@ export function sietkaStrana(otvaranie: string): 'ľavá' | 'pravá' | null {
 /** 2K nemá voľnú koľaj pre sieťku — treba 3K koľajnicu (Patrik 2026-07-31, #87).
  *  Od korekcie 2026-08-02 appka koľajnicu v odpise SKUTOČNE mení (`sietkaKolajnicaSwap`
  *  v `compute.ts`, keď je sieťka Money-relevantná) — táto funkcia určuje KEDY, gate aj
- *  pre výpočet aj pre UI upozornenie (jeden zdroj pravdy). */
+ *  pre výpočet aj pre UI upozornenie (jeden zdroj pravdy). Gate je na ZÁKLADNOM štýle
+ *  (`zakladnyStyl`), nie na prísnej rovnosti — na Štandarde/Štandard + môže niesť
+ *  príponu „ IZO" podľa zvoleného skla (`sysStylPre`), a 2K IZO potrebuje presne tú
+ *  istú 3K výmenu ako obyčajné 2K (#91 nález 1). */
 export function potrebuje3KKolajnicu(styl: string): boolean {
-	return styl === '2K';
+	return zakladnyStyl(styl) === '2K';
+}
+
+/** Systémy zo `SIETKA_SYSTEMY`, kde koľajnica na 2K je DELENÁ (samostatná horná +
+ *  spodná, dva ROZDIELNE Money kódy — `rolaKolajnice` v `compute.ts`) namiesto
+ *  JEDNEJ obvodovej koľajnice v dvoch kusoch (Robust/Slide). #91: `potrebuje3KKolajnicu`
+ *  sama o sebe hovorí len KEDY sa niečo mení, nie ČO presne — UI hláška predtým
+ *  tvrdila „(2 ks + 2 ks)" aj pre Štandard/Štandard +, kde je to nepravda (1 ks horná
+ *  + 1 ks spodná, dva odlišné kódy). Tento zoznam MUSÍ zostať v zhode s `rolaKolajnice`
+ *  — test `sietka-3k-warn-sync.test.ts` to overuje priamo proti živému `cfg_seed.json`,
+ *  takže budúci systém s delenou koľajnicou padne na teste namiesto tichej klamúcej
+ *  hlášky, presne to, čo sa stalo v #91. */
+export const SIETKA_SYSTEMY_DELENA_KOLAJNICA = ['Štandard', 'Štandard +'];
+
+/** Presný text „čo appka odpíše namiesto 2K" pre UI upozornenie (3 miesta:
+ *  +page.svelte primárny aj multi posuv, SietkaPolia.svelte) — jeden zdroj pravdy,
+ *  aby žiadne z nich nemohlo klamať o počte kusov (#91). */
+export function popis3KKolajnicaVymena(system: string): string {
+	return SIETKA_SYSTEMY_DELENA_KOLAJNICA.includes(system)
+		? '3K koľajnicu (hornú aj spodnú, po 1 ks) namiesto 2K'
+		: '3K koľajnicu (2 ks + 2 ks) namiesto 2K';
 }
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');

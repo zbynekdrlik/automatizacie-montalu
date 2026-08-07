@@ -17,6 +17,7 @@
 		maSietkaSystemVyber,
 		sietkaStrana,
 		potrebuje3KKolajnicu,
+		popis3KKolajnicaVymena,
 		rozmerSietovinyPre,
 		uchytLabel,
 		type Sietka,
@@ -642,7 +643,7 @@
 			</div>
 			{#if potrebuje3KKolajnicu(vstup.styl)}
 				<p class="sub" data-testid="sietka-2k-warn-karta">
-					⚠ 2K systém — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks) namiesto 2K.
+					⚠ 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(p.system)}.
 				</p>
 			{/if}
 		</div>
@@ -831,8 +832,9 @@
 					</div>
 					{#if potrebuje3KKolajnicu(pv.styl)}
 						<p class="sub" data-testid={`sietka-2k-warn-multi-${i}`}>
-							⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše 3K koľajnicu (2 ks + 2 ks)
-							namiesto 2K.
+							⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
+								pv.system
+							)}.
 						</p>
 					{/if}
 				{/if}
