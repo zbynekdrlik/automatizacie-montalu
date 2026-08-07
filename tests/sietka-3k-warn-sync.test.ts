@@ -9,7 +9,14 @@
 // ďalší systém so sieťkou a delenou koľajnicou, tento test PADNE namiesto toho, aby
 // UI opäť ticho klamalo o počte kusov.
 import { describe, it, expect } from 'vitest';
-import { buildCFG, sietkaKolajnicaSwap, type SysRow, type RezRow } from '../src/lib/server/compute';
+import {
+	buildCFG,
+	sietkaKolajnicaSwap,
+	sietkaKolajnicaVzorecChyba,
+	type SysRow,
+	type RezRow,
+	type Cfg
+} from '../src/lib/server/compute';
 import { rolaKolajnice } from '../src/lib/kolajnica';
 import {
 	SIETKA_SYSTEMY,
@@ -20,6 +27,17 @@ import {
 import seed from '../src/lib/server/cfg_seed.json';
 
 const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
+
+/** Systém/štýl skupiny zo `SIETKA_SYSTEMY`, pri ktorých appka 3K-koľajnicovú hlášku
+ *  zobrazí (`potrebuje3KKolajnicu`) — odvodené zo skutočných kľúčov `cfg`, nie
+ *  natvrdo vypísané, takže nový systém/IZO-variant sa do testov zaradí sám. Zdieľané
+ *  nálezom 3 (swap MUSÍ zmeniť kód) aj #124 (chýbajúca 3K skupina MUSÍ nahlásiť chybu). */
+const styloveSkupiny = Object.keys(cfg)
+	.map((sysStyl) => {
+		const i = sysStyl.indexOf('|');
+		return { sysStyl, system: sysStyl.slice(0, i), styl: sysStyl.slice(i + 1) };
+	})
+	.filter(({ system, styl }) => SIETKA_SYSTEMY.includes(system) && potrebuje3KKolajnicu(styl));
 
 /** Má systém v cfg (podľa jeho `|2K` variantu) DELENÚ koľajnicu (horná+spodná)? */
 function maDelenuKolajnicuVCfg(system: string): boolean {
@@ -67,13 +85,6 @@ describe('#91 — SIETKA_SYSTEMY_DELENA_KOLAJNICA musí byť v zhode s cfg_seed.
 // štýly sa berú zo skutočných kľúčov `cfg` (nie natvrdo vypísané) — nový
 // systém alebo nová IZO/variant skupina sa do testu zaradí sama.
 describe('#91 nález 3 — sietkaKolajnicaSwap MUSÍ vymeniť KAŽDÚ koľajnicu, pre KAŽDÝ systém/štýl s hláškou', () => {
-	const styloveSkupiny = Object.keys(cfg)
-		.map((sysStyl) => {
-			const i = sysStyl.indexOf('|');
-			return { sysStyl, system: sysStyl.slice(0, i), styl: sysStyl.slice(i + 1) };
-		})
-		.filter(({ system, styl }) => SIETKA_SYSTEMY.includes(system) && potrebuje3KKolajnicu(styl));
-
 	// dosiahnuteľnosť: musí pokrývať aj IZO štýl, nielen holé '2K' — inak by
 	// bola diera z nálezu 1 preň znovu neviditeľná, presne ako v predošlej
 	// verzii tohto testu.
@@ -98,6 +109,32 @@ describe('#91 nález 3 — sietkaKolajnicaSwap MUSÍ vymeniť KAŽDÚ koľajnicu
 				const out = sietkaKolajnicaSwap(cfg, system, styl, true, r.kod, r.nazov);
 				expect(out.kod, `${sysStyl}: „${r.nazov}" (${r.kod}) sa nezmenilo`).not.toBe(r.kod);
 			}
+		});
+	}
+});
+
+// #124 — rozšírenie invariantu: NIELEN že skupina/riadok EXISTUJE a swap zmení kód
+// (nález 3 vyššie), ale aj že keď 3K(-variant) skupina CHÝBA, `sietkaKolajnicaVzorecChyba`
+// to zachytí NAHLAS pre KAŽDÚ skupinu z `SIETKA_SYSTEMY`, ktorá sieťkovú výmenu
+// potrebuje — nie len pre jeden-dva ručne vybrané prípady (`sietka-kolajnica-chybajuca-3k.test.ts`
+// overuje mechanizmus na Robust/Štandard +; tento blok ho overuje MECHANIZMOVO naprieč
+// KAŽDOU `styloveSkupiny` skupinou, odvodenou zo živého `cfg`, presne ako nález 3).
+describe('#124 — sietkaKolajnicaVzorecChyba MUSÍ nahlásiť chybu, keď 3K(-variant) skupina chýba, pre KAŽDÚ skupinu s hláškou', () => {
+	/** Hlboká kópia cfg s CELOU 3K(-variant) skupinou odstránenou. */
+	function bezSkupiny(base: typeof cfg, sysStylChybajucej: string): Cfg {
+		const clone: Cfg = JSON.parse(JSON.stringify(base));
+		expect(clone[sysStylChybajucej]).toBeDefined(); // sabotáž musí naozaj niečo zmazať
+		delete clone[sysStylChybajucej];
+		return clone;
+	}
+
+	for (const { sysStyl, system, styl } of styloveSkupiny) {
+		const g3kSysStyl = `${system}|${styl.replace(/^2K/, '3K')}`;
+		it(`${sysStyl}: chýbajúca „${g3kSysStyl}" → sietkaKolajnicaVzorecChyba hlási chybu (nie ticho null)`, () => {
+			const zly = bezSkupiny(cfg, g3kSysStyl);
+			const err = sietkaKolajnicaVzorecChyba(zly, system, styl);
+			expect(err, `${sysStyl}: chýbajúca 3K skupina mala nahlásiť chybu`).not.toBeNull();
+			expect(err).toContain(system);
 		});
 	}
 });
