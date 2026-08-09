@@ -45,15 +45,25 @@ export function skloVyberaIzo(system: string): boolean {
 }
 
 /**
+ * Jediný zdroj pravdy pre „je toto Štandard + s koľajnicou, ktorá sa DÁ
+ * zväčšiť" (#134 — predtým trojnásobne duplikovaný literál: `railUpsize`
+ * v compute.ts, checkbox visibility v +page.svelte, a `pridavnaKolajnicaDefault`
+ * nižšie). `Štandard +`, mimo 6K — 6K koľajnica nemá +1 (7K neexistuje,
+ * pozri `RAIL_UPSIZE` v compute.ts).
+ */
+export function standardPlusRailEligible(system: string, styl: string): boolean {
+	return system === STANDARD_PLUS && !styl.startsWith('6K');
+}
+
+/**
  * Má sa checkbox „Prídavná koľajnica" predvyplniť zaškrtnutý? (#132, Patrik —
  * Odoo 207, msg #1646652, 2026-08-09: „my vždy dávame pri štandardoch IZO
  * spodnú koľaj navyše ale iba spodnú"). DEFAULT, nie vynútenie — obsluha ho
  * môže kedykoľvek odškrtnúť; MENÍ Money odpis (railUpsize v compute.ts:
  * ZASP00104→ZASP00030 na 2K, ZASP00030→ZASP00033 na 3K).
  *
- * Platí len tam, kde checkbox vôbec EXISTUJE — `Štandard +`, mimo 6K (7K
- * koľajnica neexistuje) — rovnaký gate ako viditeľnosť checkboxu v
- * +page.svelte A `railUpsize`'s vlastný `system === 'Štandard +'` gate.
+ * Platí len tam, kde checkbox vôbec EXISTUJE — rovnaký `standardPlusRailEligible`
+ * gate ako viditeľnosť checkboxu v +page.svelte A `railUpsize` v compute.ts (#134).
  * IZO stav berie z `jeIzoSklo` — z toho istého zdroja pravdy, ktorý používa
  * `sysStylPre` na výber basic/IZO nárezáku, žiadny vlastný zoznam skiel.
  *
@@ -63,7 +73,7 @@ export function skloVyberaIzo(system: string): boolean {
  * susedný `$effect`.
  */
 export function pridavnaKolajnicaDefault(system: string, styl: string, sklo: string): boolean {
-	return system === STANDARD_PLUS && !styl.startsWith('6K') && jeIzoSklo(sklo);
+	return standardPlusRailEligible(system, styl) && jeIzoSklo(sklo);
 }
 
 /**

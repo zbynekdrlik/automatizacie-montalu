@@ -12,7 +12,7 @@ import {
 	potrebuje3KKolajnicu,
 	type Sietka
 } from '$lib/sietka';
-import { zakladnyStyl } from '$lib/styl';
+import { standardPlusRailEligible, zakladnyStyl } from '$lib/styl';
 
 export interface SysRow {
 	sysStyl: string;
@@ -807,11 +807,18 @@ export const RAIL_UPSIZE: Record<string, { kod: string; nazov: string }> = {
 };
 export function railUpsize(
 	system: string,
+	styl: string,
 	pridavna: boolean,
 	kod: string,
 	nazov: string
 ): { kod: string; nazov: string } {
-	if (pridavna && system === 'Štandard +' && RAIL_UPSIZE[kod]) return RAIL_UPSIZE[kod];
+	// Gate zjednotený s checkbox visibility (+page.svelte) a `pridavnaKolajnicaDefault`
+	// (styl.ts) cez `standardPlusRailEligible` (#134). Bez-styl-checku (len `system`)
+	// bol donedávna náhodne bezpečný LEN preto, že RAIL_UPSIZE nemá záznam pre 6K kód
+	// (ZASP202437) — teraz je to explicitná súčasť podmienky, nie vedľajší efekt tabuľky.
+	if (pridavna && standardPlusRailEligible(system, styl) && RAIL_UPSIZE[kod]) {
+		return RAIL_UPSIZE[kod];
+	}
 	return { kod, nazov };
 }
 
@@ -876,7 +883,7 @@ export function computeFlat(
 		// Deluxe + Štandard + = všetko rovný 90°; inak podľa názvu profilu (nosový/oponový 90°)
 		const sikmyRez = !systemRovnyRez(system) && jeSikmyRez(c.nazov);
 		// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +)
-		const up = railUpsize(system, pridavnaKolajnica, c.kod, c.nazov);
+		const up = railUpsize(system, styl, pridavnaKolajnica, c.kod, c.nazov);
 		// sieťka na 2K: celá koľajnica sa mení na 3K variant (#87)
 		const sk = sietkaKolajnicaSwap(cfg, system, styl, sietkaOn, up.kod, up.nazov);
 		material.push({
@@ -1223,7 +1230,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		for (const c of cuts) {
 			// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +) — swap
 			// PRED poolovaním, aby sa metre pooli pod správnym (väčším) kódom.
-			const up = railUpsize(system, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
+			const up = railUpsize(system, styl, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
 			// sieťka na 2K: celá koľajnica sa mení na 3K variant (#87) — swap PRED
 			// poolovaním z rovnakého dôvodu ako railUpsize vyššie.
 			const sk = sietkaKolajnicaSwap(cfg, system, styl, sietkaOn, up.kod, up.nazov);

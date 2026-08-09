@@ -358,3 +358,39 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   navrhnuté funkcie meniace ten istý fyzický kus — over prienik živým
   výpočtom, oprav len UI keď je Money už správny, checkbox sa nikdy
   nedisabluje kvôli prekrytiu, `{@const}` namiesto dvojitého volania).
+
+## #132 — Prídavná koľajnica pri Štandard + IZO: predvyplnenie (2026-08-09)
+
+- Rozhodnutie: Patrik (Odoo 207, msg #1646652) — „my vždy dávame pri
+  štandardoch IZO spodnú koľaj navyše ale iba spodnú" → checkbox „Prídavná
+  koľajnica" (Štandard +, mimo 6K) sa predvypĺňa zaškrtnutý, keď je zvolené
+  izolačné sklo; obsluha ho môže odškrtnúť.
+- Verzia 0.14.16 → 0.14.17 (`e49fad2`).
+- RED→GREEN: `tests/pridavna-kolajnica-default.test.ts` (`7105d5a` → `647d6d2`)
+  — nová čistá funkcia `pridavnaKolajnicaDefault` v `src/lib/styl.ts`.
+- `src/routes/zasklenia/+page.svelte` (`0326120`) — HRANOVO spúšťaný `$effect`:
+  checkbox sa prepíše len keď sa odporúčaná hodnota SKUTOČNE zmení (glass IZO
+  stav zapnutý/vypnutý), takže ručný klik obsluhy prežije akúkoľvek
+  nesúvisiacu zmenu poľa; „Použiť znova" sa nikdy neprepíše (tracker sa
+  zasieva priamo z obnovených dát v reštart-efekte).
+- e2e (`7972e90`, `aca8d5b`) — 9 nových testov: default ON/OFF, ručné
+  odškrtnutie prežije nesúvisiacu zmenu, prepnutie skla PREČ z IZO odškrtne,
+  6K nemá checkbox, zmiešaný multi-posuv prípad (order-level default z
+  primárneho posuvu upsizne AJ extra posuv s NE-IZO sklom), „Použiť znova"
+  sa neprepíše. `e2e/app.spec.ts` aktualizovaný na nový default (mechanizmus
+  `railUpsize` nezmenený).
+- Deep-review (dispatchovaný Senior Code Reviewer): 0 Critical, 2 Important
+  (chýbajúci systém-round-trip test → doplnený `404f988`; trojnásobne
+  duplikovaný gate „Štandard + mimo 6K" → filed **#134**, `cross-cutting`,
+  zámerne mimo tejto PR), 2 Minor (STANDARD_PLUS import, JSDoc krížový
+  odkaz → obidva opravené `404f988`).
+- Golden snapshot (`zasklenia-posuvspec-golden.test.ts.snap`) — nezmenený
+  (čisto klientská UI logika).
+- **PR #133** (dev→main), merge `6d9b199`. Main CI (test+deploy) zelené.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet):
+  footer `v0.14.17 (6d9b199)`; Štandard plus | 2K | Izolačné sklo 4.8.4 →
+  checkbox automaticky zaškrtnutý; „Spočítať" (READ-ONLY) ukázal
+  `ZASP00030` (spodná 3K) namiesto `ZASP00104` — presne zámerná zmena
+  Money odpisu. 0 chýb konzoly. Odoslat sa nepoužilo (len Spočítať+Späť).
+- #132 auto-zavretý mergom PR #133 (`Closes #132`); evidenčný komentár
+  pridaný samostatne.
