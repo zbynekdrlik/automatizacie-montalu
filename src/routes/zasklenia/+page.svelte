@@ -5,7 +5,14 @@
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
-	import { stylyDoPonuky, sklaDoPonuky, sysStylPre, skloVyberaIzo } from '$lib/styl';
+	import {
+		stylyDoPonuky,
+		sklaDoPonuky,
+		sysStylPre,
+		skloVyberaIzo,
+		pridavnaKolajnicaDefault,
+		STANDARD_PLUS
+	} from '$lib/styl';
 	import { popisMulti, posuvySlovom } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
@@ -146,6 +153,9 @@
 	let ralS = $state('');
 	let cakaS = $state(false);
 	let pridavnaKolajnicaS = $state(false);
+	// #132: hranový tracker pre DEFAULT „Prídavná koľajnica" — pozri
+	// pridavnaKolajnicaOdporucana nižšie prečo je hranový, nie „vždy keď true"
+	let pridavnaKolajnicaOdporucanaPrev = $state(false);
 	// jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks)
 	let jednostrannaFabS = $state(false);
 	let system = $state('Robust');
@@ -203,6 +213,16 @@
 		kolHS = kolP?.horna ?? '';
 		kolSS = kolP?.spodna ?? '';
 		const p = prim();
+		// #132: zasej hranový tracker priamo z OBNOVENÝCH dát (nie z reaktívnych
+		// system/styl/sklo, ktoré sa ustália až v neskorších efektoch) — inak by
+		// hranový $effect nižšie po tomto obnovení videl zmenu a prepísal by
+		// zd?.pridavnaKolajnica, ktorý sme práve nastavili vyššie ("Použiť znova"
+		// sa NESMIE prepísať).
+		pridavnaKolajnicaOdporucanaPrev = pridavnaKolajnicaDefault(
+			p?.system ?? 'Robust',
+			p?.styl ?? '2K',
+			p?.sklo ?? ''
+		);
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
 		otvaranie = p?.otvaranie ?? 'P - L';
@@ -294,6 +314,29 @@
 		// prepísať voľbu obsluhy); inak predvoľba = vždy ČÍRE, ak ho systém má
 		const chcene = untrack(() => sklo) || prim()?.sklo;
 		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam);
+	});
+
+	// #132 (Patrik, Odoo 207 #1646652: „vždy dávame pri štandardoch IZO spodnú
+	// koľaj navyše") — DEFAULT pre checkbox „Prídavná koľajnica", odvodený z
+	// PRIMÁRNEHO posuvu (system/styl/sklo tu vždy nesú posuv 1 — rovnaký gate
+	// ako viditeľnosť checkboxu nižšie, žiadna nová sémantika naprieč posuvmi).
+	// HRANOVO spúšťané, nie „vždy keď true": $effect prepíše `pridavnaKolajnicaS`
+	// LEN keď sa odporúčaná hodnota SKUTOČNE zmení (sklo prepnuté na/z IZO,
+	// prípadne zmena systému/štýlu) — kým sa nemení, obsluhin ručný klik (v
+	// hociktorom smere) ostáva nedotknutý, aj keď medzitým zmení iné pole
+	// (rozmery, poznámku, RAL…). Prepnutie NA IZO teda vždy zaškrtne (nová
+	// voľba skla = nová príležitosť na default), prepnutie PREČ z IZO vždy
+	// odškrtne (nenechá zaškrtnutý checkbox bez platného IZO dôvodu — presne
+	// ten „stays ticked after the reason disappears" bug, ktorému sa chceme
+	// vyhnúť). `pridavnaKolajnicaOdporucanaPrev` sa zasieva aj v reštart-efekte
+	// vyššie, aby „Použiť znova" nikdy neprepísalo obnovenú hodnotu.
+	let pridavnaKolajnicaOdporucana = $derived(pridavnaKolajnicaDefault(system, styl, sklo));
+	$effect(() => {
+		const chce = pridavnaKolajnicaOdporucana;
+		if (chce !== untrack(() => pridavnaKolajnicaOdporucanaPrev)) {
+			pridavnaKolajnicaS = chce;
+			pridavnaKolajnicaOdporucanaPrev = chce;
+		}
 	});
 
 	// viac-posuvový režim: aktívny keď je pridaný aspoň jeden ďalší posuv
@@ -1122,8 +1165,10 @@
 					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
 				</label>
 			</div>
-			<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje -->
-			{#if system === 'Štandard +' && !styl.startsWith('6K')}
+			<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje. Rovnaký gate
+			     ako `pridavnaKolajnicaDefault` (styl.ts) — zdieľaný import STANDARD_PLUS,
+			     nie druhý reťazcový literál (#132 review). -->
+			{#if system === STANDARD_PLUS && !styl.startsWith('6K')}
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
 						<input
