@@ -162,6 +162,46 @@ export function popis3KKolajnicaVymena(system: string): string {
 		: '3K koľajnicu (2 ks + 2 ks) namiesto 2K';
 }
 
+/** #123 (ROZHODNUTÉ — Patrik, Odoo 207 #1646652, 2026-08-09): checkbox „Prídavná
+ *  koľajnica" (`railUpsize` v `compute.ts`) dvíha LEN spodnú koľajnicu o 1 veľkosť
+ *  a platí IBA pre systém „Štandard +" (`railUpsize` má vlastný prísny gate
+ *  `system === 'Štandard +'`, `compute.ts`) — na inom systéme (vrátane holého
+ *  „Štandard", kde sa checkbox v UI ani nezobrazuje) nemá žiadny efekt, nižšie teda
+ *  vždy vráti `false`. Keď je NA TOM ISTOM systéme naraz zapnutá aj sieťka na 2K,
+ *  sieťka sama vynúti CELÚ 3K sadu (`sietkaKolajnicaSwap`, beží AŽ PO `railUpsize`
+ *  a jeho výsledok prepíše) — spodná, ktorú by inak pridala „prídavná koľajnica",
+ *  je teda v tej 3K sade UŽ zahrnutá. Patrikova doslovná odpoveď: „Ak už bude 3K
+ *  a viac nič mi sieťka iné nemení" — potvrdzuje, že current gate
+ *  (`zakladnyStyl(styl) === '2K'`, cez `potrebuje3KKolajnicu`) je presne správny
+ *  aj pre TÚTO kombináciu, žiadne 4K. Money odpis sa touto funkciou NEMENÍ — je to
+ *  čisto UI otázka „má hláška vedľa checkboxu klamať, že niečo mení navyše". */
+export function pridavnaJeVSietke(system: string, styl: string, sietkaOn: boolean): boolean {
+	return system === 'Štandard +' && sietkaOn && potrebuje3KKolajnicu(styl);
+}
+
+/** Presný text hlášky pre UI, keď `pridavnaJeVSietke` platí (jeden zdroj pravdy —
+ *  pozri `pridavnaJeVSietke` prečo; rovnaký vzor ako `popis3KKolajnicaVymena`).
+ *  `null`, keď hláška nemá zmysel (checkbox NEOSTÁVA skrytý/disablovaný — Patrik
+ *  ani zadanie to nežiada — len text vedľa sieťky hovorí pravdu).
+ *  `pridavna` = AKTUÁLNA hodnota order-level checkboxu „Prídavná koľajnica" — mení
+ *  LEN znenie (zaškrtnuté „nechaj tak" vs nezaškrtnuté „ani netreba zapínať"),
+ *  nie podmienku samotnú (tá je vždy `pridavnaJeVSietke`, nezávisle od checkboxu). */
+export function pridavnaKolajnicaHint(
+	system: string,
+	styl: string,
+	sietkaOn: boolean,
+	pridavna: boolean
+): string | null {
+	if (!pridavnaJeVSietke(system, styl, sietkaOn)) return null;
+	const zaklad =
+		'„Prídavná koľajnica" tu už nič navyše nezmení — sieťka na 2K sama zdvihla ' +
+		'obidve koľajnice (hornú aj spodnú) na 3K, a spodnú, ktorú by inak pridala ' +
+		'táto voľba, tá 3K sada už obsahuje.';
+	return pridavna
+		? `${zaklad} Nechaj ju zaškrtnutú: keď sieťku vypneš, prídavná koľajnica bude opäť platiť bez ďalšieho zásahu.`
+		: `${zaklad} Netreba ju kvôli tomu zapínať.`;
+}
+
 const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
 
 /** jednoriadkový popis sieťky do plánu / detailu histórie (rovnaký vzor ako klinPopis).
