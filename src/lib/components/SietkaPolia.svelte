@@ -78,6 +78,7 @@
 	</label>
 </div>
 {#if on}
+	{@const pridavnaHint = pridavnaKolajnicaHint(system, styl, on, pridavna)}
 	<div class="sietka-box" data-testid={`${idPrefix}-box`}>
 		{#if strana}
 			<p class="sietka-hint" data-testid={`${idPrefix}-strana`}>
@@ -91,9 +92,9 @@
 				)}.
 			</p>
 		{/if}
-		{#if pridavnaKolajnicaHint(system, styl, on, pridavna)}
+		{#if pridavnaHint}
 			<p class="sietka-hint" data-testid={`${idPrefix}-pridavna-v-sietke`}>
-				ℹ {pridavnaKolajnicaHint(system, styl, on, pridavna)}
+				ℹ {pridavnaHint}
 			</p>
 		{/if}
 		{#if maVyber}

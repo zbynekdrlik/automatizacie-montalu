@@ -612,6 +612,12 @@
 	{#if vstup.sietka}
 		{@const rozmer = rozmerSietovinyPre(p.system, p.sklo.sirka, p.sklo.vyska)}
 		{@const sietkaSystemVal = vstup.sietka.system ?? p.system}
+		{@const pridavnaHint = pridavnaKolajnicaHint(
+			p.system,
+			vstup.styl,
+			true,
+			vstup.pridavnaKolajnica
+		)}
 		<div class="card" data-testid="sietka-karta">
 			<div class="sec">Sieťka — v Money odpise</div>
 			<div class="g">
@@ -647,9 +653,9 @@
 					⚠ 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(p.system)}.
 				</p>
 			{/if}
-			{#if pridavnaKolajnicaHint(p.system, vstup.styl, true, vstup.pridavnaKolajnica)}
+			{#if pridavnaHint}
 				<p class="sub" data-testid="pridavna-v-sietke-karta">
-					ℹ {pridavnaKolajnicaHint(p.system, vstup.styl, true, vstup.pridavnaKolajnica)}
+					ℹ {pridavnaHint}
 				</p>
 			{/if}
 		</div>
@@ -830,6 +836,12 @@
 			{#each m.posuvy as pv, i (i)}
 				{#if pv.sietka}
 					{@const rozmer = rozmerSietovinyPre(pv.system, pv.sklo.sirka, pv.sklo.vyska)}
+					{@const pridavnaHint = pridavnaKolajnicaHint(
+						pv.system,
+						pv.styl,
+						true,
+						vstup.pridavnaKolajnica
+					)}
 					<div class="row">
 						<span
 							>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
@@ -843,14 +855,9 @@
 							)}.
 						</p>
 					{/if}
-					{#if pridavnaKolajnicaHint(pv.system, pv.styl, true, vstup.pridavnaKolajnica)}
+					{#if pridavnaHint}
 						<p class="sub" data-testid={`pridavna-v-sietke-multi-${i}`}>
-							ℹ Posuv {i + 1}: {pridavnaKolajnicaHint(
-								pv.system,
-								pv.styl,
-								true,
-								vstup.pridavnaKolajnica
-							)}
+							ℹ Posuv {i + 1}: {pridavnaHint}
 						</p>
 					{/if}
 				{/if}
