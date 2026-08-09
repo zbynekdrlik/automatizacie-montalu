@@ -18,6 +18,7 @@
 		sietkaStrana,
 		potrebuje3KKolajnicu,
 		popis3KKolajnicaVymena,
+		pridavnaKolajnicaHint,
 		rozmerSietovinyPre,
 		uchytLabel,
 		type Sietka,
@@ -611,6 +612,12 @@
 	{#if vstup.sietka}
 		{@const rozmer = rozmerSietovinyPre(p.system, p.sklo.sirka, p.sklo.vyska)}
 		{@const sietkaSystemVal = vstup.sietka.system ?? p.system}
+		{@const pridavnaHint = pridavnaKolajnicaHint(
+			p.system,
+			vstup.styl,
+			true,
+			vstup.pridavnaKolajnica
+		)}
 		<div class="card" data-testid="sietka-karta">
 			<div class="sec">Sieťka — v Money odpise</div>
 			<div class="g">
@@ -644,6 +651,11 @@
 			{#if potrebuje3KKolajnicu(vstup.styl)}
 				<p class="sub" data-testid="sietka-2k-warn-karta">
 					⚠ 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(p.system)}.
+				</p>
+			{/if}
+			{#if pridavnaHint}
+				<p class="sub" data-testid="pridavna-v-sietke-karta">
+					ℹ {pridavnaHint}
 				</p>
 			{/if}
 		</div>
@@ -824,6 +836,12 @@
 			{#each m.posuvy as pv, i (i)}
 				{#if pv.sietka}
 					{@const rozmer = rozmerSietovinyPre(pv.system, pv.sklo.sirka, pv.sklo.vyska)}
+					{@const pridavnaHint = pridavnaKolajnicaHint(
+						pv.system,
+						pv.styl,
+						true,
+						vstup.pridavnaKolajnica
+					)}
 					<div class="row">
 						<span
 							>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
@@ -835,6 +853,11 @@
 							⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
 								pv.system
 							)}.
+						</p>
+					{/if}
+					{#if pridavnaHint}
+						<p class="sub" data-testid={`pridavna-v-sietke-multi-${i}`}>
+							ℹ Posuv {i + 1}: {pridavnaHint}
 						</p>
 					{/if}
 				{/if}
@@ -1186,6 +1209,7 @@
 					{system}
 					{styl}
 					strana={sietkaStranaVal}
+					pridavna={pridavnaKolajnicaS}
 					bind:on={sietkaS}
 					bind:uchyt={sietkaUchytS}
 					bind:sietkaSystem={sietkaSystemS}
@@ -1337,6 +1361,7 @@
 							system={p.system}
 							styl={p.styl}
 							strana={sietkaStrana(p.otvaranie)}
+							pridavna={pridavnaKolajnicaS}
 							bind:on={p.sietka}
 							bind:uchyt={p.sietkaUchyt}
 							bind:sietkaSystem={p.sietkaSystem}

@@ -771,6 +771,10 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 		// koľajnicu (rovnakú ako basic). O 1 väčšiu dá až checkbox „prídavná koľajnica".
 		const spodna = (r: NonNullable<ReturnType<typeof computeFlat>>) =>
 			r.odpis.find((o) => /Koľajnica spodná/i.test(o.nazov))!.kod;
+		// #123: horná koľajnica — treba ju porovnať samostatne, lebo sieťka na 2K
+		// (na rozdiel od „prídavná koľajnica") dvíha OBIDVE koľajnice, nielen spodnú.
+		const horna = (r: NonNullable<ReturnType<typeof computeFlat>>) =>
+			r.odpis.find((o) => /Koľajnica horná/i.test(o.nazov))!.kod;
 		it('IZO používa NORMÁLNU spodnú koľajnicu (rovnakú ako basic), bez auto-zväčšenia', () => {
 			expect(spodna(computeFlat(cfg, 'Štandard +|2K IZO', 3000, 2400, false)!)).toBe('ZASP00104');
 			expect(spodna(computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!)).toBe('ZASP00104'); // basic = to isté
@@ -796,25 +800,94 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			);
 		});
 
-		// #91 nález 2 (adversariálna revízia PR #122, presunuté do samostatného
-		// ticketu — vecné rozhodnutie, ČO má fyzicky nastať, keď je „prídavná
-		// koľajnica" ZAPNUTÁ SÚČASNE so sieťkou): `railUpsize` beží PRED
-		// `sietkaKolajnicaSwap` a swap ho prepíše — kombinácia nie je súčasťou
-		// tejto opravy (nález 1). PINNING test: overuje, že nález-1 fix (IZO gate
-		// na `zakladnyStyl`) na TÚTO kombináciu NIČ nemení — `Štandard +|3K IZO`
-		// zdieľa RESNE tie isté koľajnicové kódy ako `Štandard +|3K` (žiadny
-		// vlastný IZO kód pre koľajnicu), takže IZO aj basic dajú identický
-		// výsledok pred aj po tejto oprave. Keby sa raz #91-nadväzný ticket
-		// rozhodol kombináciu meniť zámerne, tento test spadne a upozorní.
-		it('PINNING (súvisí s nedoriešeným ticketom o prídavnej koľajnici×sieťke): prídavná + sieťka na Štandard +|2K IZO dá TEN ISTÝ kód ako basic 2K — nález-1 fix túto kombináciu nemení', () => {
-			const basic = computeFlat(cfg, 'Štandard +|2K', 3000, 1850, false, 0, true, undefined, {
+		// #123 ROZHODNUTÉ — Patrik (Odoo 207, msg #1646652, 2026-08-09): „Prídavná
+		// koľajnica" je LEN spodná, sieťka na 2K si vyžiada AJ vrchnú navyše väčšiu
+		// („ak by som chcel ešte sieťku do 2K tak mi musí dať aj vrchnú koľaj
+		// navyše väčšiu"); keď sú zapnuté OBE naraz, nesčítavajú sa — sieťka sama
+		// vynúti CELÚ 3K sadu a to, čo by pridala prídavná (spodná +1), je v nej už
+		// zahrnuté („ak už bude 3K a viac nič mi sieťka iné nemení… tak sa mi to
+		// nebíje"). `railUpsize` beží PRED `sietkaKolajnicaSwap` a swap jeho
+		// výsledok prepíše — to je PRESNE Patrikova tabuľka, Money odpis sa touto
+		// odpoveďou NEMENÍ (overené aj naživo v STEP 0, issue #123). Poradie volaní
+		// (`compute.ts:879-881`) sa nemení — potvrdzuje sa, nie opravuje.
+		it('#123 ROZHODNUTÉ: prídavná × sieťka na Štandard +|2K — všetky 4 riadky tabuľky (Odoo 207 #1646652)', () => {
+			const bez = (pridavna: boolean, sietkaOn: boolean) =>
+				computeFlat(
+					cfg,
+					'Štandard +|2K',
+					3000,
+					1850,
+					false,
+					0,
+					pridavna,
+					undefined,
+					sietkaOn ? { uchyt: 'ziadny' } : null
+				)!;
+			// prídavná OFF, sieťka OFF → obidve 2K (základný stav)
+			expect(horna(bez(false, false))).toBe('ZASP00107');
+			expect(spodna(bez(false, false))).toBe('ZASP00104');
+			// prídavná ON, sieťka OFF → horná 2K, spodná 3K (len prídavná pôsobí)
+			expect(horna(bez(true, false))).toBe('ZASP00107');
+			expect(spodna(bez(true, false))).toBe('ZASP00030');
+			// prídavná OFF, sieťka ON → obidve 3K (sieťka sama vynúti celú 3K sadu)
+			expect(horna(bez(false, true))).toBe('ZASP00027');
+			expect(spodna(bez(false, true))).toBe('ZASP00030');
+			// prídavná ON, sieťka ON → obidve 3K, TEN ISTÝ výsledok ako len sieťka —
+			// prídavná „sa nebíje" so sieťkou, nesčítavajú sa na 4K
+			expect(horna(bez(true, true))).toBe('ZASP00027');
+			expect(spodna(bez(true, true))).toBe('ZASP00030');
+		});
+
+		it('#123 ROZHODNUTÉ: rovnaká tabuľka platí aj na Štandard +|2K IZO — IZO nemá vlastný koľajnicový kód', () => {
+			const bez = (pridavna: boolean, sietkaOn: boolean) =>
+				computeFlat(
+					cfg,
+					'Štandard +|2K IZO',
+					3000,
+					1850,
+					false,
+					0,
+					pridavna,
+					undefined,
+					sietkaOn ? { uchyt: 'ziadny' } : null
+				)!;
+			expect(horna(bez(false, false))).toBe('ZASP00107');
+			expect(spodna(bez(false, false))).toBe('ZASP00104');
+			expect(horna(bez(true, false))).toBe('ZASP00107');
+			expect(spodna(bez(true, false))).toBe('ZASP00030');
+			expect(horna(bez(false, true))).toBe('ZASP00027');
+			expect(spodna(bez(false, true))).toBe('ZASP00030');
+			expect(horna(bez(true, true))).toBe('ZASP00027');
+			expect(spodna(bez(true, true))).toBe('ZASP00030'); // rovnaký kód ako basic riadok vyššie
+		});
+
+		// Guard proti OPAČNEJ regresii (Patrik: „Ak už bude 3K a viac nič mi sieťka
+		// iné nemení") — keby niekto raz rozšíril `sietkaKolajnicaSwap`-ov gate z
+		// `zakladnyStyl(styl) === '2K'` na čokoľvek širšie, tento test spadne skôr,
+		// než by sa taká zmena ticho dostala do odpisu na 3K+.
+		it('#123 guard: na 3K a vyššie sieťka koľajnicu VÔBEC nemení (žiadne ďalšie zväčšenie)', () => {
+			const bezSietky = computeFlat(cfg, 'Štandard +|3K', 3000, 1850, false, 0, false)!;
+			const soSietkou = computeFlat(cfg, 'Štandard +|3K', 3000, 1850, false, 0, false, undefined, {
 				uchyt: 'ziadny'
 			})!;
-			const izo = computeFlat(cfg, 'Štandard +|2K IZO', 3000, 1850, false, 0, true, undefined, {
-				uchyt: 'ziadny'
-			})!;
-			expect(spodna(basic)).toBe('ZASP00030');
-			expect(spodna(izo)).toBe('ZASP00030'); // rovnaký kód ako basic — nezmenené IZO gate fixom
+			expect(horna(soSietkou)).toBe(horna(bezSietky));
+			expect(spodna(soSietkou)).toBe(spodna(bezSietky));
+			// aj s prídavnou zapnutou zároveň — 3K+ sieťka stále nemení koľajnicu,
+			// len `railUpsize` (prídavná) štandardne zväčší spodnú o 1
+			const soSietkouAPridavnou = computeFlat(
+				cfg,
+				'Štandard +|3K',
+				3000,
+				1850,
+				false,
+				0,
+				true,
+				undefined,
+				{ uchyt: 'ziadny' }
+			)!;
+			const lenPridavna = computeFlat(cfg, 'Štandard +|3K', 3000, 1850, false, 0, true)!;
+			expect(horna(soSietkouAPridavnou)).toBe(horna(lenPridavna));
+			expect(spodna(soSietkouAPridavnou)).toBe(spodna(lenPridavna));
 		});
 
 		it('prídavná koľajnica sa NEaplikuje mimo Štandard + (Deluxe zdieľa ZASP00104 — Money guard)', () => {
