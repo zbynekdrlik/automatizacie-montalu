@@ -18,6 +18,7 @@
 		sietkaStrana,
 		potrebuje3KKolajnicu,
 		popis3KKolajnicaVymena,
+		pridavnaKolajnicaHint,
 		rozmerSietovinyPre,
 		uchytLabel,
 		type Sietka,
@@ -646,6 +647,11 @@
 					⚠ 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(p.system)}.
 				</p>
 			{/if}
+			{#if pridavnaKolajnicaHint(p.system, vstup.styl, true, vstup.pridavnaKolajnica)}
+				<p class="sub" data-testid="pridavna-v-sietke-karta">
+					ℹ {pridavnaKolajnicaHint(p.system, vstup.styl, true, vstup.pridavnaKolajnica)}
+				</p>
+			{/if}
 		</div>
 	{/if}
 
@@ -835,6 +841,16 @@
 							⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
 								pv.system
 							)}.
+						</p>
+					{/if}
+					{#if pridavnaKolajnicaHint(pv.system, pv.styl, true, vstup.pridavnaKolajnica)}
+						<p class="sub" data-testid={`pridavna-v-sietke-multi-${i}`}>
+							ℹ Posuv {i + 1}: {pridavnaKolajnicaHint(
+								pv.system,
+								pv.styl,
+								true,
+								vstup.pridavnaKolajnica
+							)}
 						</p>
 					{/if}
 				{/if}
@@ -1186,6 +1202,7 @@
 					{system}
 					{styl}
 					strana={sietkaStranaVal}
+					pridavna={pridavnaKolajnicaS}
 					bind:on={sietkaS}
 					bind:uchyt={sietkaUchytS}
 					bind:sietkaSystem={sietkaSystemS}
@@ -1337,6 +1354,7 @@
 							system={p.system}
 							styl={p.styl}
 							strana={sietkaStrana(p.otvaranie)}
+							pridavna={pridavnaKolajnicaS}
 							bind:on={p.sietka}
 							bind:uchyt={p.sietkaUchyt}
 							bind:sietkaSystem={p.sietkaSystem}

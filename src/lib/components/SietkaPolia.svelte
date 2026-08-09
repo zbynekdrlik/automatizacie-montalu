@@ -16,6 +16,7 @@
 		SIETKA_UCHYTY,
 		potrebuje3KKolajnicu,
 		popis3KKolajnicaVymena,
+		pridavnaKolajnicaHint,
 		maSietkaSystemVyber,
 		SIETKA_SYSTEM_ALT
 	} from '$lib/sietka';
@@ -27,6 +28,7 @@
 		system = '',
 		styl = '',
 		strana = null,
+		pridavna = false,
 		on = $bindable(false),
 		uchyt = $bindable('ziadny' as SietkaUchyt),
 		sietkaSystem = $bindable(''),
@@ -42,6 +44,11 @@
 		styl?: string;
 		/** strana, na ktorej sieťka beží — podľa smeru posuvu (null = neurčené) */
 		strana?: 'ľavá' | 'pravá' | null;
+		/** #123: hodnota order-level checkboxu „Prídavná koľajnica" (platí pre celú
+		 *  objednávku, rovnaký vstup ako posiela server do `railUpsize`) — potrebné
+		 *  len na to, aby táto sieťka vedela povedať, či na 2K „Štandard +" už nič
+		 *  navyše nepridá (`pridavnaJeVSietke`). Nemení, čo checkbox ROBÍ. */
+		pridavna?: boolean;
 		on?: boolean;
 		uchyt?: SietkaUchyt;
 		/** zvolený systém sieťky (#110) — prázdny reťazec = rovnaký ako posuv */
@@ -82,6 +89,11 @@
 				⚠ Sieťka na 2K koľajnicu nemôže ísť — appka automaticky odpíše {popis3KKolajnicaVymena(
 					system
 				)}.
+			</p>
+		{/if}
+		{#if pridavnaKolajnicaHint(system, styl, on, pridavna)}
+			<p class="sietka-hint" data-testid={`${idPrefix}-pridavna-v-sietke`}>
+				ℹ {pridavnaKolajnicaHint(system, styl, on, pridavna)}
 			</p>
 		{/if}
 		{#if maVyber}
