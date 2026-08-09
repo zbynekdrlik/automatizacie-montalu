@@ -113,6 +113,47 @@ test('prepnutie skla PREČ z IZO odškrtne default (žiadny IZO dôvod neostáva
 	expect(errs).toEqual([]);
 });
 
+// #132 review (deep pass, requesting-code-review): manuálny override nesmie
+// „prežiť navždy" prepnutie SYSTÉMU preč a späť — hranový tracker sa pri odchode
+// z Štandard + tiež hranovo prepne (na false), takže návrat na Štandard + s NOVO
+// zvoleným IZO sklom je opäť nová hrana a znova zaškrtne, presne ako pri prepnutí
+// SKLA (test vyššie). Bez tohto testu bol scenár len odôvodnený v komentároch, nie
+// overený behom.
+test('prepnutie SYSTÉMU preč z Štandard + a späť: ručný override nezostane naveky, nová voľba IZO skla znova zaškrtne', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+
+	const checkbox = page.getByLabel(/Prídavná koľajnica/);
+	await expect(checkbox).toBeChecked();
+	await checkbox.uncheck(); // deliberatívny override
+	await expect(checkbox).not.toBeChecked();
+
+	// odchod zo Štandard + → checkbox v UI vôbec nie je (iný systém ho neponúka)
+	await page.getByLabel('Systém').selectOption('Robust');
+	await expect(page.getByLabel(/Prídavná koľajnica/)).toHaveCount(0);
+
+	// návrat na Štandard + | 2K — sklo sa automaticky prepnutím systému zresetuje
+	// na NE-izolačné (Robustové IZO sklo tu nie je platné), checkbox je späť
+	// viditeľný, ale NEzaškrtnutý (žiadny IZO dôvod)
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await expect(checkbox).toBeVisible();
+	await expect(checkbox).not.toBeChecked();
+
+	// nová voľba IZO skla PO návrate → nová hrana → znova zaškrtne (override
+	// spred odchodu zo systému neplatí naveky)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await expect(checkbox).toBeChecked();
+
+	expect(errs).toEqual([]);
+});
+
 test('Štandard + | 3K | IZO sklo: predvyplní tiež, odpis ukáže 4K spodnú', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);

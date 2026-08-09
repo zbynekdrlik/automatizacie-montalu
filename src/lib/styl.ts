@@ -56,6 +56,11 @@ export function skloVyberaIzo(system: string): boolean {
  * +page.svelte A `railUpsize`'s vlastný `system === 'Štandard +'` gate.
  * IZO stav berie z `jeIzoSklo` — z toho istého zdroja pravdy, ktorý používa
  * `sysStylPre` na výber basic/IZO nárezáku, žiadny vlastný zoznam skiel.
+ *
+ * Reaktívne volanie (kedy sa táto hodnota naozaj premietne do checkboxu —
+ * HRANOVO, nie „vždy keď true", aby neprepísala ručný klik obsluhy) je v
+ * `src/routes/zasklenia/+page.svelte`, `pridavnaKolajnicaOdporucana` +
+ * susedný `$effect`.
  */
 export function pridavnaKolajnicaDefault(system: string, styl: string, sklo: string): boolean {
 	return system === STANDARD_PLUS && !styl.startsWith('6K') && jeIzoSklo(sklo);

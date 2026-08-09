@@ -10,7 +10,8 @@
 		sklaDoPonuky,
 		sysStylPre,
 		skloVyberaIzo,
-		pridavnaKolajnicaDefault
+		pridavnaKolajnicaDefault,
+		STANDARD_PLUS
 	} from '$lib/styl';
 	import { popisMulti, posuvySlovom } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
@@ -1164,8 +1165,10 @@
 					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
 				</label>
 			</div>
-			<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje -->
-			{#if system === 'Štandard +' && !styl.startsWith('6K')}
+			<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje. Rovnaký gate
+			     ako `pridavnaKolajnicaDefault` (styl.ts) — zdieľaný import STANDARD_PLUS,
+			     nie druhý reťazcový literál (#132 review). -->
+			{#if system === STANDARD_PLUS && !styl.startsWith('6K')}
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
 						<input
