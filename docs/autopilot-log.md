@@ -394,3 +394,38 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   Money odpisu. 0 chýb konzoly. Odoslat sa nepoužilo (len Spočítať+Späť).
 - #132 auto-zavretý mergom PR #133 (`Closes #132`); evidenčný komentár
   pridaný samostatne.
+
+## #134 — Zjednotenie trojnásobne duplikovaného „Štandard + mimo 6K" gate (2026-08-09)
+
+- Nález z hĺbkového review PR #133/#132 (filed ako #134, `cross-cutting`,
+  zámerne mimo tej PR — `compute.ts` je Money-kritický, refaktor „popri tom"
+  by riskoval regresiu).
+- Design comment (pred prvým code commitom):
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/134#issuecomment-5230938752
+- Root cause: `railUpsize`'s gate kontroloval len `system`, bez `styl` — bolo
+  to náhodne bezpečné len preto, že `RAIL_UPSIZE` (compute.ts) nemá záznam
+  pre 6K kód `ZASP202437` („6K nemá +1"), takže lookup pre 6K vždy padol na
+  no-op nezávisle od gate.
+- Verzia 0.14.18 → 0.14.19 (`906cb18`).
+- `standardPlusRailEligible(system, styl)` vyextrahovaný do `src/lib/styl.ts`
+  (`8c451da`) — používajú ho `railUpsize` (compute.ts, dostal nový `styl`
+  parameter), checkbox visibility (+page.svelte), `pridavnaKolajnicaDefault`.
+  Nový test `tests/standard-plus-rail-eligible.test.ts` — truth-table 5
+  systémov × 7 štýlov + zhoda railUpsize/pridavnaKolajnicaDefault pre rovnaké
+  vstupy, vrátane priameho dôkazu že `RAIL_UPSIZE['ZASP202437']` je
+  `undefined`.
+- Golden snapshot (`tests/__snapshots__/`) — `git diff --stat origin/main`
+  prázdny, byte-identický (overené pred aj po merge).
+- Review: vlastný pass + dispatchovaný `/requesting-code-review` subagent —
+  0 Critical, 0 Important, 0 Minor. Komentár:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/134#issuecomment-5230986688
+- Lokálne: `npx vitest run` 778/778, `npm run lint` čisté, `npm run check`
+  0/0/0, `npm run build` OK, `npx playwright test` 137/137 (celá e2e sada).
+- **PR #135** (dev→main), merge `601062d`. Main CI (test+deploy) zelené.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet): `/health`
+  → `{"ok":true,"version":"0.14.19 (601062d)","live":true}`; footer
+  `v0.14.19 (601062d)`. Štandard plus | 2K | Float sklo → checkbox viditeľný,
+  odškrtnutý; prepnutie na Izolačné sklo 4.8.4 → checkbox sa automaticky
+  zaškrtol; prepnutie štýlu na 6K → checkbox zmizol. 0 chýb konzoly.
+  Odoslať sa nepoužilo (len Systém/Štýl/Sklo prepínanie).
+- #134 zavretý mergom PR #135 (`Closes #134`).
