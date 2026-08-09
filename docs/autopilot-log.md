@@ -310,4 +310,51 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   **Odpis (do Money) obsahuje ZASP00027/ZASP00030 (3K)** rovnako ako pred
   touto opravou (fix nemenil fungujúcu cestu). 0 chýb konzoly. Money odpis
   NEODOSLANÝ (len Spočítať + Späť).
-- #123 (prídavná koľajnica × sieťka poradie volania) nezmenený, otvorený.
+
+## 2026-08-09 — Prídavná koľajnica × sieťka na 2K: UI hláška namiesto klamúceho sľubu (#123)
+
+- **Issue:** #123 — checkbox „Prídavná koľajnica" (Štandard +, `railUpsize`) pri
+  súčasne zapnutej sieťke na 2K (`sietkaKolajnicaSwap`, obe pridané
+  nezávisle) sľuboval zmenu, ktorú sieťkina 3K sada už obsahuje.
+- STEP 0 evidencia (komentár na #123): živý `computeFlat` pre všetky 4
+  kombinácie prídavná×sieťka na `Štandard +|2K` aj `Štandard +|2K IZO` —
+  presne Patrikova tabuľka, Money odpis od začiatku správny.
+- **ROZHODNUTIE** (Patrik, Odoo kanál 207, msg 1646652, 2026-08-09): prídavná
+  = len spodná, sieťka na 2K si vyžiada aj vrchnú — pri obidvoch naraz sa
+  nesčítavajú (žiadne 4K), sieťka sama vynúti celú 3K sadu, ktorá spodnú
+  (jediné, čo prídavná pridáva) už obsahuje.
+- Design komentár PRED kódom (#123): jeden zdroj pravdy v `sietka.ts`
+  (`pridavnaJeVSietke`/`pridavnaKolajnicaHint`), checkbox sa NEschováva/
+  nedisabluje — len text vedľa sieťky hovorí pravdu.
+- `dc667a6` (test): pôvodný PINNING test v `tests/compute.test.ts`
+  („čaká na rozhodnutie") prepísaný na potvrdený, rozšírený na všetky 4
+  riadky × horná/spodná × basic/IZO + guard že 3K+ sieťka nemení
+  (sabotage-verified — dočasné rozšírenie gate → guard test spadol, po
+  revertnutí zelený). Nové unit testy `tests/pridavna-v-sietke.test.ts`.
+- `e7fb566` (feat): `SietkaPolia.svelte` (`pridavna` prop) + preview/tlačové
+  karty v `+page.svelte` (jeden aj viac-posuvový plán) dostanú hlášku z
+  jedného zdroja pravdy. Nový e2e `e2e/pridavna-v-sietke.spec.ts` (4 testy:
+  primárny posuv ON/OFF, mimo 2K gate, extra posuv v zimnej záhrade).
+- `cb96abd` (refactor, self-review nález): `pridavnaKolajnicaHint` sa volalo
+  dvakrát na miesto — opravené na `{@const}` (rovnaký vzor ako existujúci
+  `{@const rozmer = ...}`), na všetkých troch miestach.
+- Nezávislý deep-review subagent (diff `6b787dc..cb96abd`): potvrdil, že
+  `compute.ts` aj golden snapshot majú PRÁZDNY diff, `pridavnaJeVSietke`
+  presne zrkadlí prienik oboch reálnych gate podmienok, IZO/opona/3K+/
+  samostatná stránka `/sietka` správne pokryté. 0 Critical, 0 Important,
+  1 Minor (poznámka bez akcie). Ready to merge.
+- Plný test suite 767/767, `npm run check`/`npm run lint` čisté, golden
+  snapshot nedotknutý.
+- **PR #130** (dev→main, verzia 0.14.14→0.14.15), merge `c8bbfab`. CI + main
+  deploy zelené.
+- **Post-deploy overenie naživo (Playwright MCP, live session ako `marek`):**
+  footer `v0.14.15 (c8bbfab)`; reálny formulár (Štandard plus | 2K | Float
+  4mm | S=3000 V=1850 | sieťka ON) — hláška pri sieťke správne mení znenie
+  podľa stavu checkboxu prídavnej (nezaškrtnutá → „Netreba ju kvôli tomu
+  zapínať."; zaškrtnutá → „Nechaj ju zaškrtnutú…"), **Odpis (do Money)
+  obsahuje presne ZASP00027/ZASP00030 (3K), žiadne 2K ani 4K kódy**. 0 chýb
+  konzoly. Money odpis NEODOSLANÝ (len Spočítať + Späť).
+- Playbook: `.claude/skills/money-odpis/SKILL.md` §5f (dve nezávisle
+  navrhnuté funkcie meniace ten istý fyzický kus — over prienik živým
+  výpočtom, oprav len UI keď je Money už správny, checkbox sa nikdy
+  nedisabluje kvôli prekrytiu, `{@const}` namiesto dvojitého volania).

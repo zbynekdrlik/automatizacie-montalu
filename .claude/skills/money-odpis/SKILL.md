@@ -527,6 +527,45 @@ tej istej triede prípadov, ktorú mala táto oprava riešiť pôvodne.
   guard prísnejší, jeho „nenašiel som zhodu" MUSÍ byť fail-loud, nikdy tichý
   skip, lebo akčná funkcia môže aj tak niečo (možno nesprávne) urobiť.
 
+## 5f. Dve NEZÁVISLE navrhnuté funkcie meniace TEN ISTÝ fyzický kus — over PRIENIK skôr, než veríš UI textu (#123, 2026-08-09)
+
+„Prídavná koľajnica" (`railUpsize`, Dominik 2026-07-15) zväčšuje spodnú koľajnicu
+o 1 veľkosť; sieťka na 2K (`sietkaKolajnicaSwap`, #91) mení CELÚ koľajnicovú sadu
+na 3K. Obe boli navrhnuté a otestované NEZÁVISLE (rôzne dátumy, rôzni ľudia v Odoo
+vlákne) — nikto v čase ich vzniku neriešil, čo sa stane, keď sú zapnuté SÚČASNE.
+`railUpsize` beží pred `sietkaKolajnicaSwap` (poradie volania v `compute.ts`), takže
+swap výsledok prvej funkcie ticho PREPÍŠE — Money odpis vyšiel náhodou správne (presne
+to, čo by fyzicky malo nastať, potvrdil Patrik spätne), ale UI text pri checkboxe
+„prídavná koľajnica" sľuboval zmenu, ktorá sa v tejto kombinácii fyzicky nedeje.
+
+- **Keď dve funkcie/checkboxy nezávisle menia TEN ISTÝ Money kód/fyzický kus, PRIENIK
+  ich stavov je vlastný prípad, ktorý treba explicitne overiť — nikdy predpokladať,
+  že „druhá vyhrá a bude to OK".** Tu to fungovalo len preto, že poradie volania
+  (`railUpsize` → `sietkaKolajnicaSwap`) náhodou zodpovedalo fyzickej realite (sieťka
+  potrebuje ROVNAKÚ spodnú, akú by zväčšila prídavná — nie inú/väčšiu). Over to
+  ŽIVÝM výpočtom (STEP 0 na tickete: `computeFlat` pre všetky 4 kombinácie
+  prídavná×sieťka × basic/IZO), nikdy len čítaním kódu — a keby tabuľka NESEDELA
+  s realitou (výrobou), je to skutočná zmena poradia/logiky, nie „len UI text".
+- **Keď je Money výstup UŽ SPRÁVNY, oprava je LEN UI text — a to je LACNÁ oprava,
+  neopravuj to, čo nie je zlomené.** Nemeň `railUpsize`/`sietkaKolajnicaSwap` ani ich
+  poradie len preto, že objavíš prekrytie — over najprv, či prekryté chovanie zodpovedá
+  fyzike (spýtaj sa výroby), a ak áno, over do fixácie iba to, že sa fixácia dotýka len
+  hlášky vedľa checkboxu, nikdy funkcie, ktorá počíta kód.
+- **Checkbox, ktorého efekt je v danom stave prekrytý inou voľbou, sa NESMIE
+  disablovať/skrývať** — druhá voľba sa môže kedykoľvek vypnúť a vtedy musí prvá opäť
+  platiť bez toho, aby ju obsluha musela znova zaškrtnúť. Namiesto toho hláška vedľa
+  neho (jeden zdroj pravdy — `pridavnaKolajnicaHint` v `sietka.ts`, rovnaký vzor ako
+  `popis3KKolajnicaVymena`) hovorí PRAVDU o aktuálnom stave a mení znenie podľa toho,
+  či je checkbox momentálne zaškrtnutý (`Nechaj ju zaškrtnutú…`) alebo nie
+  (`Netreba ju kvôli tomu zapínať.`) — nikdy nezľahčuje na jednu univerzálnu vetu.
+- **Svelte: keď rovnaká čistá funkcia rozhoduje AJ `{#if}` podmienku AJ text vnútri,
+  volaj ju RAZ cez `{@const x = f(...)}` hneď za otváracím `{#if}`/`{#each}`, nie
+  dvakrát (raz v podmienke, raz v texte).** `{@const}` musí byť PRIAMY potomok bloku
+  (`{#if}`/`{#each}`/`{#snippet}`) — nie potomok obyčajného `<div>` vnútri neho, inak
+  `svelte-check` nahlási `const_tag_invalid_placement`. Existujúci vzor v repe:
+  `{@const rozmer = rozmerSietovinyPre(...)}` hneď za `{#if vstup.sietka}`
+  (`+page.svelte`).
+
 ## 2c. KUSOVÉ položky (kovanie) — iná jednotka, iné pooling pravidlo než profily
 
 Do v0.8.0 odpis poznal len metrážové profily a jednotka v xlsx bola natvrdo `'m'`.
