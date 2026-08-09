@@ -192,9 +192,14 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 
 // Štandard + (basic/IZO/opona) — READ-ONLY náhľad (nič sa nezapisuje do Money).
 // 2K IZO @ S=3000 V=2400 overené 1:1 proti Money odpisu (U profil ZASP202439 21,6 m).
-// Dominik 2026-07-15: veľkosť spodnej koľajnice NEurčuje IZO — IZO používa NORMÁLNU
-// (2K = ZASP00104); o 1 väčšiu (ZASP00030) dá až checkbox „prídavná koľajnica".
-test('Štandard + 2K IZO: normálna koľajnica + „prídavná koľajnica" checkbox → o 1 väčšia', async ({
+// Dominik 2026-07-15: veľkosť spodnej koľajnice NEurčuje IZO samotné — mechanizmus
+// (`railUpsize`) je nezávislý od skla, mení ju LEN checkbox „prídavná koľajnica".
+// #132 (Patrik, Odoo 207 #1646652, 2026-08-09: „vždy dávame pri štandardoch IZO
+// spodnú koľaj navyše") ZMENIL DEFAULT toho checkboxu — pri Štandard + s izolačným
+// sklom sa teraz predvypĺňa ZAŠKRTNUTÝ (obsluha ho môže odškrtnúť). Tento test preto
+// explicitne odškrtne, aby overil, že mechanizmus (normálna 2K spodná bez checkboxu)
+// je nezmenený, a až potom znova zaškrtne, aby overil zväčšenie (ZASP00030).
+test('Štandard + 2K IZO: default „prídavná koľajnica" zaškrtnutý, mechanizmus (odškrtnutie → normálna, zaškrtnutie → o 1 väčšia) nezmenený', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -209,13 +214,19 @@ test('Štandard + 2K IZO: normálna koľajnica + „prídavná koľajnica" check
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4.8.4');
+
+	// #132: IZO sklo na Štandard + → checkbox sa predvyplní zaškrtnutý; pre tento
+	// test ho explicitne odškrtneme, aby sme overili mechanizmus (nie default)
+	const pridavna = page.getByLabel(/Prídavná koľajnica/);
+	await expect(pridavna).toBeChecked();
+	await pridavna.uncheck();
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	// sklo (len plán, nie Money) — 1417 × 2265 (šírka +2mm oprava)
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('1417');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('2265');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	// IZO používa NORMÁLNU spodnú koľajnicu ZASP00104 (2K), NIE zväčšenú ZASP00030
+	// odškrtnuté → NORMÁLNA spodná koľajnica ZASP00104 (2K), NIE zväčšená ZASP00030
 	await expect(page.locator('.row', { hasText: 'ZASP00107' })).toContainText(/(^|\D)7,5 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP00104' })).toContainText(/(^|\D)7,5 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toHaveCount(0);
