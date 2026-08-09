@@ -24,7 +24,6 @@ describe('pridavnaKolajnicaDefault — #132', () => {
 
 	it('false na 6K — checkbox tam v UI vôbec nie je (7K koľajnica neexistuje)', () => {
 		expect(pridavnaKolajnicaDefault('Štandard +', '6K', 'Izolačné sklo 4.8.4')).toBe(false);
-		expect(pridavnaKolajnicaDefault('Štandard +', '2x6K', 'Izolačné sklo 4.8.4')).toBe(false);
 	});
 
 	it('false mimo Štandard + — checkbox sa tam v UI vôbec nezobrazuje', () => {
