@@ -153,6 +153,53 @@ test('Štandard + | 6K: checkbox v UI vôbec nie je (7K koľajnica neexistuje) �
 	expect(errs).toEqual([]);
 });
 
+// #132 bod 5 (zdieľané pole naprieč posuvmi): „Prídavná koľajnica" je order-level
+// vstup, platí pre VŠETKY posuvy (+page.server.ts, komentár „prídavná koľajnica je
+// vstup na úrovni objednávky → platí pre všetky posuvy") — existujúce správanie,
+// #132 mení len JEJ ŠTARTOVACIU hodnotu (default). Zmiešaný prípad: primárny posuv
+// je Štandard + s IZO sklom (default ju zaškrtne), extra posuv je TIEŽ Štandard +,
+// ale s NE-izolačným sklom — zdieľaný checkbox napriek tomu upsizne AJ jeho
+// koľajnicu, presne ako keby ho obsluha zaškrtla ručne (žiadna nová per-posuvová
+// logika, len iný zdroj štartovacej hodnoty).
+test('zimná záhrada: order-level default z primárneho posuvu upsizne AJ extra posuv s NE-IZO sklom', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`E2E-132-MULTI-${Date.now()}`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Prídavná multi zmiešaný');
+	// primárny posuv = Štandard + | 2K | IZO sklo → default zaškrtne order-level box
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await page.getByLabel('Šírka (mm) *').fill('3000');
+	await page.getByLabel('Výška (mm) *').fill('1850');
+	await expect(page.getByLabel(/Prídavná koľajnica/)).toBeChecked();
+
+	// extra posuv = TIEŽ Štandard + | 2K, ale s NE-izolačným sklom (vlastný default
+	// by ho NEzaškrtol, keby bol per-posuv — dôkaz, že pole je naozaj zdieľané)
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps0-sys').selectOption('Štandard +');
+	await page.locator('#ps0-styl').selectOption('2K');
+	await page.locator('#ps0-sklo').selectOption(NIE_IZO);
+	await page.locator('#ps0-s').fill('3200');
+	await page.locator('#ps0-v').fill('1900');
+
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// obidva posuvy majú hornú 2K (nemení sa checkboxom) a UPSIZNUTÚ spodnú (3K) —
+	// základná 2K spodná (ZASP00104) nie je nikde, aj keď extra posuv sám o sebe
+	// (jeho vlastné sklo) by default nikdy nedostal
+	await expect(page.locator('.row', { hasText: 'ZASP00107' })).toBeVisible(); // horná 2K
+	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toBeVisible(); // spodná 3K (obidva posuvy)
+	await expect(page.locator('.row', { hasText: 'ZASP00104' })).toHaveCount(0); // základná 2K spodná nikde
+
+	expect(errs).toEqual([]);
+});
+
 test('„Použiť znova": ručne odškrtnutá IZO objednávka sa po obnovení NEPREPÍŠE naspäť na zaškrtnutú', async ({
 	page
 }) => {
