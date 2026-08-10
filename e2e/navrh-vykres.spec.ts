@@ -56,7 +56,7 @@ test('/vykresy/preview: rám s mriežkou (1-16/A-L), pečiatka vyplnená, dátum
 	await expect(page.getByTestId('tb-cislo-vykresu')).toContainText('OP000000');
 	await expect(page.getByTestId('tb-revizia')).toContainText('0');
 	await expect(page.getByTestId('tb-varianta')).toContainText('DEMO');
-	await expect(page.getByTestId('tb-vypracoval')).toContainText('interné demo');
+	await expect(page.getByTestId('tb-vypracoval')).toContainText('demo');
 	// dátum je zo SERVERA (formatDatumCasSk, D.M.RRRR HH:MM) — over aspoň tvar, nie
 	// presnú hodnotu (test beží v ľubovoľnom čase)
 	await expect(page.getByTestId('tb-datum')).toHaveText(/^\d{1,2}\.\d{1,2}\.\d{4} \d{2}:\d{2}$/);

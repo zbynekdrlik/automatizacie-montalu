@@ -87,6 +87,10 @@ export interface DimensionGeometry {
 	 *  Ťaháky sú KOLMÉ na kótovú čiaru (CAD konvencia — krížové značky na koncoch). */
 	lines: [Segment, Segment, Segment];
 	label: DimensionLabel;
+	/** odkazové (witness) čiary od PÔVODNÝCH bodov (x0,y0)/(x1,y1) — pred `perpOffset`
+	 *  — ku (odsadenej) kótovej čiare. Prázdne pole, keď `perpOffset === 0` (kótová
+	 *  čiara leží priamo na geometrii, žiadny „stonok" netreba). */
+	witnesses: Segment[];
 }
 
 export interface DimensionOpts {
@@ -158,36 +162,54 @@ export function lineDimension(
 	const ax1 = x1 + nx * perpOffset;
 	const ay1 = y1 + ny * perpOffset;
 	const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+	// odkazové čiary len keď je kótová čiara naozaj odsadená (perpOffset !== 0) — smer
+	// (dirSign*nx, dirSign*ny) ukazuje SPRÁVNYM smerom aj pri zápornom perpOffset
+	// (odsadenie na druhú stranu), overShoot vždy PRESAHUJE za skutočnú kótovú čiaru.
+	const dirSign = Math.sign(perpOffset) || 1;
+	const witnesses: Segment[] =
+		perpOffset === 0
+			? []
+			: [
+					witnessLine(x0, y0, nx * dirSign, ny * dirSign, Math.abs(perpOffset)),
+					witnessLine(x1, y1, nx * dirSign, ny * dirSign, Math.abs(perpOffset))
+				];
 	return {
 		lines: dimensionLines(ax0, ay0, ax1, ay1, nx, ny, tick),
 		label: {
 			x: (ax0 + ax1) / 2 + nx * labelOffset,
 			y: (ay0 + ay1) / 2 + ny * labelOffset,
 			rotate: readableLabelAngle(angleDeg)
-		}
+		},
+		witnesses
 	};
 }
 
-/** Vodorovná čiarová kóta medzi x0 a x1 vo výške `y` — popisok bez otočenia. */
+/** Vodorovná čiarová kóta medzi (x0,y) a (x1,y) — geometria, NIE už-odsadená poloha;
+ *  `perpOffset` ju posunie kolmo (kladné = nadol, SVG konvencia) a zapne odkazové
+ *  čiary presne ako `lineDimension`. Popisok bez otočenia. */
 export function horizontalDimension(
 	x0: number,
 	x1: number,
 	y: number,
+	perpOffset = 0,
 	opts: DimensionOpts = {}
 ): DimensionGeometry {
-	return lineDimension(x0, y, x1, y, 0, opts);
+	return lineDimension(x0, y, x1, y, perpOffset, opts);
 }
 
-/** Zvislá čiarová kóta medzi y0 (hore) a y1 (dole) na x-e `x`. Popisok je VŽDY otočený
- *  o -90° bez ohľadu na poradie y0/y1 — čitateľný zdola nahor, presne konvencia
+/** Zvislá čiarová kóta medzi (x,y0) (hore) a (x,y1) (dole) — geometria, NIE
+ *  už-odsadená poloha; `perpOffset` ju posunie kolmo (kladné = doľava od smeru
+ *  zhora nadol, SVG konvencia) a zapne odkazové čiary. Popisok je VŽDY otočený o
+ *  -90° bez ohľadu na poradie y0/y1 — čitateľný zdola nahor, presne konvencia
  *  `rotate(-90 …)` z FixVykres2D/Nahlad2D pre zvislé kóty. */
 export function verticalDimension(
 	y0: number,
 	y1: number,
 	x: number,
+	perpOffset = 0,
 	opts: DimensionOpts = {}
 ): DimensionGeometry {
-	const g = lineDimension(x, y0, x, y1, 0, opts);
+	const g = lineDimension(x, y0, x, y1, perpOffset, opts);
 	return { ...g, label: { ...g.label, rotate: -90 } };
 }
 

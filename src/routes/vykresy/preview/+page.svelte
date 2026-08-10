@@ -9,7 +9,7 @@
 	import Kota from '$lib/components/vykres/Kota.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
 	import { vypocitajMierku } from '$lib/vykres/mierka';
-	import { angleDimension, fmtDeg } from '$lib/vykres/kota';
+	import { angleDimension, fitScale, fmtDeg } from '$lib/vykres/kota';
 
 	let { data } = $props();
 
@@ -38,7 +38,7 @@
 		mierka: mierkaText,
 		revizia: '0',
 		varianta: 'DEMO',
-		vypracoval: 'interné demo',
+		vypracoval: 'demo',
 		datum
 	});
 </script>
@@ -67,7 +67,7 @@
 			{@const padY = oblast.h * 0.24}
 			{@const x0 = oblast.x + padX}
 			{@const y0 = oblast.y + padY}
-			{@const scale = Math.min((oblast.w * 0.5) / REAL_W, (oblast.h * 0.4) / REAL_H)}
+			{@const scale = fitScale(REAL_W, REAL_H, oblast.w * 0.5, oblast.h * 0.4)}
 			{@const x1 = x0 + REAL_W * scale}
 			{@const y1 = y0 + REAL_H * scale}
 			<!-- uhlová kóta pri PRAVOM hornom rohu (mimo poznámky, ktorá sedí vľavo hore) -->
@@ -92,9 +92,10 @@
 				stroke-width="0.5"
 				data-testid="demo-geometria"
 			/>
-			<!-- modré kóty (vodorovná, zvislá, uhlová) — cez zdieľaný Kota.svelte -->
-			<Kota {x0} y0={y1 + 9} {x1} y1={y1 + 9} text={`${REAL_W} mm`} />
-			<Kota x0={x0 - 9} {y0} x1={x0 - 9} {y1} text={`${REAL_H} mm`} />
+			<!-- modré kóty (vodorovná, zvislá, uhlová) cez zdieľaný Kota.svelte — perpOffset
+			     posúva kótovú čiaru MIMO geometrie a zapína aj odkazové (witness) čiary -->
+			<Kota {x0} y0={y1} {x1} {y1} perpOffset={9} text={`${REAL_W} mm`} />
+			<Kota {x0} {y0} x1={x0} {y1} perpOffset={9} text={`${REAL_H} mm`} />
 			<path
 				d={arc.arcPath}
 				stroke="#1d4ed8"

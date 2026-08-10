@@ -3,7 +3,7 @@
 	// priamo použiteľný z komponenty (#137, bod "malé Svelte komponenty ak sú užitočné").
 	// Kreslí JEDNU čiarovú kótu (kótová čiara + 2 ťaháky + popisok) ako <g>/<text>
 	// fragment do existujúceho rodičovského <svg> — nemá vlastný <svg>/viewBox.
-	import { lineDimension, fmtMm, type DimensionOpts } from '$lib/vykres/kota';
+	import { lineDimension, verticalDimension, fmtMm, type DimensionOpts } from '$lib/vykres/kota';
 
 	let {
 		x0,
@@ -29,17 +29,28 @@
 		opts?: DimensionOpts;
 	} = $props();
 
-	// presne zvislá kóta (x0≈x1, dĺžka > 0) číta sa VŽDY zdola nahor (-90°) — kanonická
-	// konvencia zdieľaná s existujúcimi FixVykres2D/Nahlad2D kótami (viď kota.ts
-	// `verticalDimension`); vodorovné aj šikmé kóty dostanú uhol priamo z `lineDimension`.
+	// presne zvislá kóta (x0≈x1, dĺžka > 0) číta sa VŽDY zdola nahor (-90°) — deleguje
+	// priamo na `verticalDimension` (kanonická konvencia zdieľaná s existujúcimi
+	// FixVykres2D/Nahlad2D kótami); vodorovné aj šikmé kóty idú cez všeobecný
+	// `lineDimension`, ktorý uhol dopočíta sám.
 	let zvisla = $derived(Math.abs(x1 - x0) < 1e-6 && Math.abs(y1 - y0) > 1e-6);
-	let geom = $derived.by(() => {
-		const g = lineDimension(x0, y0, x1, y1, perpOffset, opts);
-		return zvisla ? { ...g, label: { ...g.label, rotate: -90 } } : g;
-	});
+	let geom = $derived(
+		zvisla
+			? verticalDimension(y0, y1, x0, perpOffset, opts)
+			: lineDimension(x0, y0, x1, y1, perpOffset, opts)
+	);
 	let label = $derived(text ?? fmtMm(Math.hypot(x1 - x0, y1 - y0)) + ' mm');
 </script>
 
+{#if geom.witnesses.length > 0}
+	<!-- odkazové (witness) čiary — od geometrie po odsadenú kótovú čiaru, tenšie než
+	     kótová čiara samotná (CAD konvencia, issue #137 bod "s odkazovými čiarami") -->
+	<g stroke={color} stroke-width="0.5" fill="none" data-testid="kota-witness">
+		{#each geom.witnesses as w (w.x1 + ':' + w.y1 + ':' + w.x2 + ':' + w.y2)}
+			<line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />
+		{/each}
+	</g>
+{/if}
 <g stroke={color} stroke-width="1" fill="none" data-testid="kota">
 	<line x1={geom.lines[0].x1} y1={geom.lines[0].y1} x2={geom.lines[0].x2} y2={geom.lines[0].y2} />
 	<line x1={geom.lines[1].x1} y1={geom.lines[1].y1} x2={geom.lines[1].x2} y2={geom.lines[1].y2} />

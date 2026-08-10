@@ -156,6 +156,38 @@ describe('lineDimension — vodorovná kóta (dy=0)', () => {
 	});
 });
 
+describe('lineDimension — witnesses (odkazové čiary), issue #137 bod „s odkazovými čiarami"', () => {
+	it('perpOffset===0: ŽIADNE odkazové čiary (kótová čiara leží priamo na geometrii)', () => {
+		const g = lineDimension(0, 100, 200, 100, 0);
+		expect(g.witnesses).toEqual([]);
+	});
+	it('perpOffset>0 (nadol): odkazové čiary idú OD geometrie K odsadenej kótovej čiare, s presahom za ňu', () => {
+		const g = lineDimension(0, 100, 200, 100, 20, { tick: 5 });
+		expect(g.witnesses).toHaveLength(2);
+		const [w0, w1] = g.witnesses;
+		// začínajú tesne pri geometrii (y≈100, malá medzera gap=2 default)
+		expect(w0.x1).toBeCloseTo(0, 6);
+		expect(w0.y1).toBeCloseTo(102, 6); // 100 + gap(2)
+		expect(w1.x1).toBeCloseTo(200, 6);
+		// končia ZA kótovou čiarou (perpOffset 20 + overshoot 3 default)
+		expect(w0.y2).toBeCloseTo(123, 6);
+		expect(w1.y2).toBeCloseTo(123, 6);
+	});
+	it('perpOffset<0 (nahor): odkazové čiary idú SPRÁVNYM smerom (nie opačným) a presahujú za kótovú čiaru', () => {
+		const g = lineDimension(0, 100, 200, 100, -20, { tick: 5 });
+		const [w0] = g.witnesses;
+		// smer je NAHOR (y klesá) — odkazová čiara musí prekonať aspoň |perpOffset|, teda
+		// jej koncový bod musí byť VYŠŠIE (menšie y) ako samotná odsadená kótová čiara (y=80)
+		expect(w0.y2).toBeLessThan(80);
+		expect(w0.y1).toBeLessThan(100); // začína tiež smerom nahor, nie nadol
+	});
+	it('zvislá kóta s perpOffset: odkazové čiary sú vodorovné (kolmé na zvislý smer)', () => {
+		const g = lineDimension(50, 0, 50, 300, 15);
+		expect(g.witnesses).toHaveLength(2);
+		expect(g.witnesses[0].y1).toBeCloseTo(g.witnesses[0].y2, 6); // vodorovný segment
+	});
+});
+
 describe('lineDimension — zvislá kóta cez všeobecnú funkciu (dx=0)', () => {
 	it('kótová čiara spája zadané body', () => {
 		const g = lineDimension(50, 0, 50, 300, 0);
@@ -187,11 +219,21 @@ describe('lineDimension — pozdĺž šikmej hrany (napr. sklon strechy 4,3°)',
 });
 
 describe('horizontalDimension — wrapper', () => {
-	it('zodpovedá priamemu volaniu lineDimension s perpOffset a y1=y2', () => {
-		const g = horizontalDimension(10, 210, 50, { tick: 4, labelOffset: -6 });
+	it('zodpovedá priamemu volaniu lineDimension s perpOffset=0 a y1=y2', () => {
+		const g = horizontalDimension(10, 210, 50, 0, { tick: 4, labelOffset: -6 });
 		expect(g.lines[0]).toEqual({ x1: 10, y1: 50, x2: 210, y2: 50 });
 		expect(g.label.rotate).toBe(0);
 		expect(g.label.y).toBeCloseTo(50 - 6, 6); // labelOffset v smere normály (0,1)*-6 = (0,-6)
+	});
+	it('perpOffset posunie kótovú čiaru MIMO geometrie a zapne odkazové čiary (nález review)', () => {
+		const g = horizontalDimension(10, 210, 50, 12);
+		expect(g.lines[0].y1).toBeCloseTo(62, 6); // 50 + 12
+		expect(g.witnesses).toHaveLength(2);
+	});
+	it('perpOffset default je 0 — zachováva pôvodné správanie bez tretieho argumentu', () => {
+		const g = horizontalDimension(10, 210, 50);
+		expect(g.lines[0].y1).toBeCloseTo(50, 6);
+		expect(g.witnesses).toEqual([]);
 	});
 });
 
@@ -206,9 +248,15 @@ describe('verticalDimension — wrapper, VŽDY -90° bez ohľadu na poradie y0/y
 		expect(g.label.rotate).toBe(-90);
 	});
 	it('ťaháky sú kolmé (horizontálne segmenty) na zvislú kótu', () => {
-		const g = verticalDimension(0, 300, 40, { tick: 6 });
+		const g = verticalDimension(0, 300, 40, 0, { tick: 6 });
 		expect(g.lines[1].y1).toBeCloseTo(0, 6);
 		expect(Math.abs(g.lines[1].x2 - g.lines[1].x1)).toBeCloseTo(12, 6); // 2×tick
+	});
+	it('perpOffset posunie kótovú čiaru MIMO geometrie, rotate ostáva -90, zapne odkazové čiary (nález review)', () => {
+		const g = verticalDimension(0, 300, 40, 15);
+		expect(g.lines[0].x1).toBeCloseTo(40 - 15, 6); // normála (-1,0) pri smere zhora nadol
+		expect(g.label.rotate).toBe(-90);
+		expect(g.witnesses).toHaveLength(2);
 	});
 });
 
@@ -325,6 +373,14 @@ describe('angleDimension — geometria oblúka (round-trip overenie stredu)', ()
 		// polovica uhla 0→90 je 45°, label by mal byť v 1. kvadrante (x>0, SVG y<0 = hore)
 		expect(g.label.x).toBeGreaterThan(0);
 		expect(g.label.y).toBeLessThan(0);
+	});
+
+	it('degenerovaný uhol (fromDeg === toDeg, delta=0) nehodí chybu — bod, nie oblúk', () => {
+		expect(() => angleDimension(0, 0, 10, 45, 45)).not.toThrow();
+		const g = angleDimension(0, 0, 10, 45, 45);
+		// start a end splynú do toho istého bodu (nulová dĺžka oblúka)
+		expect(g.start.x).toBeCloseTo(g.end.x, 6);
+		expect(g.start.y).toBeCloseTo(g.end.y, 6);
 	});
 });
 
