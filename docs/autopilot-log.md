@@ -429,3 +429,52 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   zaškrtol; prepnutie štýlu na 6K → checkbox zmizol. 0 chýb konzoly.
   Odoslať sa nepoužilo (len Systém/Štýl/Sklo prepínanie).
 - #134 zavretý mergom PR #135 (`Closes #134`).
+
+## #137 — Základ návrhových výkresov: kóta helper, výkresový hárok, A4 landscape (2026-08-10)
+
+- Základový ticket série NÁVRH (na ňom stoja #138+ pergola/bazén). ROZHODNUTÉ
+  komentár (user 2026-08-10) rozšíril zadanie o celý výkresový hárok (rám +
+  mriežka 1-16/A-L), nielen pečiatku.
+- Design comment (pred prvým code commitom):
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/137#issuecomment-5236457517
+- Verzia 0.14.20 → 0.14.21 (`318afe5`).
+- `src/lib/vykres/kota.ts` — vyextrahovaný z FixVykres2D/Nahlad2D (existujúce
+  3 kresliace komponenty NEZMENENÉ, migrácia je mimo scope): `lineDimension`/
+  `horizontalDimension`/`verticalDimension` (čiarové kóty + odkazové/witness
+  čiary + ťaháky), `angleDimension` (uhlová kóta, oblúk overený round-trip
+  testom endpoint→center podľa SVG spec F.6.5), `boxesCollide`/`placeLabel`
+  (kolízne odsadzovanie), `fitScale`/`viewBoxAttr`, `fmtMm`/`fmtDeg`.
+  `src/lib/vykres/mierka.ts` — `vypocitajMierku()`: MIERKA vždy VYPOČÍTANÁ
+  (nikdy natvrdo "1:20", issue bod 4).
+- `src/lib/components/vykres/`: `Kota.svelte` (tenký wrapper), `MontAluLogo.svelte`
+  (inline SVG, žiadny externý fetch), `TitleBlock.svelte` (NÁZOV/PROJEKT/
+  ČÍSLO VÝKRESU/MIERKA/Revízia/VARIANTA/Vypracoval/Dátum/NAVRH, clipPath
+  ochrana proti pretečeniu na všetkých 8 hodnotových poliach), `VykresovyHarok.svelte`
+  (rám + mriežka + title block v rohu + content snippet pre budúcu kresbu).
+- A4 landscape tlač scoped LEN na `/vykresy/preview` (route-CSS-split `@page`)
+  — overené e2e AJ naživo (CSSOM), že `/zasklenia` zostáva len `a4` (portrait).
+- Nová interná demo route `/vykresy/preview` (nie v nav, b2b denylist
+  `src/lib/server/b2b-access.ts` — drift guard `b2b-route-coverage.test.ts`
+  ju vyžadoval).
+- Adversariálny review (dispatchovaný Explore subagent) — 0 Critical, 3
+  Warning (všetky opravené v `7d42c5b`: TitleBlock clipPath chýbal na 5/8
+  poliach → Dátum mohol pretiecť; `horizontalDimension`/`verticalDimension`
+  mali `perpOffset` natvrdo 0 → nepoužiteľné pre odsadenú CAD kótu, teraz
+  prijímajú `perpOffset` + `Kota.svelte` deleguje na `verticalDimension`
+  a vykresľuje witness čiary; `+page.svelte` dogfooduje `fitScale()` namiesto
+  duplicitného `Math.min(...)`), 2 Suggestion (nekritické, pokryté).
+  Review komentár: https://github.com/zbynekdrlik/automatizacie-montalu/issues/137#issuecomment-5236813500
+- Golden snapshot (`tests/__snapshots__/`) — nezmenený (čisto display-only).
+- Lokálne: `npx vitest run` 849/849 (62 kota.test.ts + 8 mierka.test.ts),
+  `npm run lint` čisté, `npm run check` 0/0/0, `npm run build` OK,
+  `npx playwright test` 140/140 (3 nové v `navrh-vykres.spec.ts`).
+- **PR #140** (dev→main), merge `0af5223`. Main CI (test+deploy) zelené.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet): `/health`
+  → `{"ok":true,"version":"0.14.21 (0af5223)","live":true}`; footer
+  `v0.14.21 (0af5223)`. `/vykresy/preview` — mriežka 1-16/A-L, pečiatka
+  vyplnená (dátum zo servera), vodorovná/zvislá kóta s odkazovými čiarami,
+  uhlová kóta 4,3°, červená poznámka — vizuálne zhodné s lokálnym
+  screenshotom. CSSOM naživo potvrdil: `/vykresy/preview` = `["a4","a4
+  landscape"]`, `/zasklenia` = `["a4"]` (nedotknuté). 0 chýb konzoly na
+  oboch stránkach.
+- #137 auto-zavretý mergom PR #140 (`Closes #137`).
