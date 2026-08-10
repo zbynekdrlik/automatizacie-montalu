@@ -3,6 +3,9 @@ paths:
   - "src/lib/vykres/**"
   - "src/lib/components/vykres/**"
   - "src/routes/vykresy/**"
+  - "src/lib/pergola-navrh.ts"
+  - "src/lib/components/PergolaNavrhVykres.svelte"
+  - "src/routes/pergola/navrh/**"
 ---
 
 # Návrhové výkresy (kóta helper, výkresový hárok) — gotchy z #137
@@ -64,3 +67,45 @@ posunutie kolmo na smer čiary sa počíta VNÚTRI, spolu s odkazovými (witness
 (geometria + `perpOffset`, nie predpočítaná offsetnutá pozícia) — inak sa
 odkazové čiary nedajú dopočítať konzistentne a `Kota.svelte` (ktorý na `witnesses`
 z `lineDimension`/`verticalDimension` spolieha) ich nebude vedieť vykresliť.
+
+## `<Kota>` s `y0===y1` (alebo `x0===x1` PRE ZVISLÚ kótu) = tichý degenerát → `each_key_duplicate`
+
+Zadanie zhodných súradníc na oboch koncoch (typicky preklep — skopírovaný
+`{y1}` shorthand namiesto `y0={y0}`) NEVYHODÍ chybu z `lineDimension` — vráti
+nulovú-dĺžku geometriu, ktorej DVE witness čiary vyjdú identické (rovnaký bod,
+rovnaký smer). Svelte to odhalí až za behu ako `each_key_duplicate` konzolovú
+chybu v `Kota.svelte`'s `{#each geom.witnesses}` bloku — netriviálne dohľadať
+spätne z chyby k príčine. Keď Kota kreslí "cez nič" alebo konzola hlási
+`each_key_duplicate`, PRVÉ podozrenie: skontroluj, či `x0/y0/x1/y1` naozaj
+tvoria nenulovú úsečku (#138).
+
+## `angleDimension`'s `label` má FIXNÝ odsah `r+12` — nepoužiteľné v malej/kompaktnej scéne
+
+`angleDimension(cx, cy, r, fromDeg, toDeg)` (kota.ts) počíta pozíciu popisku ako
+`cx/cy ± (r+12)·cos/sin(stred uhla)` — konštanta `+12` je NAPEVNO v module, nedá
+sa vyladiť len parametrom `r`. Vo `/vykresy/preview` deme to funguje (kresba
+zaberá takmer celý hárok, 12mm je tam málo), ale v KOMPAKTNEJ scéne (viac
+pohľadov na jednom hárku, každý len zlomok plochy — napr. #138 bočný rez REZ A)
+môže `+12` vytlačiť popisok DESIATKY milimetrov mimo zamýšľanú oblasť (až za
+okraj papiera). Vždy over `label.y` voči veľkosti svojej vlastnej oblasti PRED
+nasadením; ak nesedí, POUŽI LEN `arc.arcPath` (vykresli oblúk) a popisok umiestni
+RUČNE (malý pevný odsad od `cx,cy`, nie z `arc.label`).
+
+## Playwright `toBeVisible()` na perfektne vodorovnej/zvislej SVG `<line>` = falošný FAIL
+
+Element `<line x1 y1 x2 y2>`, ktorého jedna súradnica je na oboch koncoch ROVNAKÁ
+(zvislý stĺp: `x1===x2`; vodorovný nosník: `y1===y2`), má bounding box s NULOVOU
+šírkou alebo výškou — Playwright ho preto vyhodnotí ako `hidden`, hoci sa reálne
+vykresľuje (viditeľný v screenshote). `toBeVisible()` na takomto prvku (napr.
+`getByTestId(/post-\d/).first()`) FLAKY/vždy zlyhá. Namiesto toho over
+PRÍTOMNOSŤ/POČET (`toHaveCount(N)`) — nikdy visibility-check na jednotlivom
+perfektne osovo zarovnanom `<line>` (#138).
+
+## 3D izometria (#138) — `$lib/vykres/iso.ts`
+
+Generický 30° dimetrický/axonometrický projektor `{x,y,z}→{x,y}` (x=šírka,
+y=výška HORE matematicky, z=hĺbka; výstup priamo v SVG y-dole súradniciach,
+výška sa kreslí PRESNE zvisle). Znovupoužiteľný pre ďalší 3D náhľad (bazén/iné)
+— nie je pergola-špecifický, žije preto v `$lib/vykres/`, nie v
+`$lib/pergola-navrh.ts` (tam je len samotná 3D KONŠTRUKCIA pergoly — zoznam
+úsečiek + kotvové body pre šípky/poznámky — postavená NAD týmto projektorom).
