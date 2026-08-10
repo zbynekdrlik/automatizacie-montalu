@@ -8,7 +8,9 @@ const B2B_FORBIDDEN_PREFIXES = [
 	'/odpisy',
 	'/problem',
 	'/pouzivatelia',
-	'/zasklenia/nastavenia'
+	'/zasklenia/nastavenia',
+	// interná demo/preview stránka pre návrhové výkresy (#137) — nikdy pre b2b
+	'/vykresy'
 ];
 
 /** Cieľ presmerovania pre b2b, alebo null keď cesta je povolená. */
