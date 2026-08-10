@@ -97,6 +97,17 @@
 		const k = Math.max(1, Math.min(PERGOLA_MAX_POLI, n));
 		const noveDlzky = Array.from({ length: k }, (_, i) => poliaS[i] ?? 3000);
 		poliaS = noveDlzky;
+		// zníženie počtu polí zruší niektoré stĺpy — zaškrtnuté zvody na zaniknutých
+		// stĺpoch by inak zostali v stave (checkbox už nie je v UI vidno, ale server
+		// by ich pri odoslaní odmietol ako "Neplatná pozícia zvodu", bez zjavnej
+		// príčiny pre operátora) — zahodíme ich hneď pri zmene počtu polí (#138 review)
+		const novyPocetStlpov = k + 1;
+		const orezane: Record<string, boolean> = {};
+		for (const [key, checked] of Object.entries(zvodyS)) {
+			const idx = Number(key.split('-')[0]);
+			if (idx < novyPocetStlpov) orezane[key] = checked;
+		}
+		zvodyS = orezane;
 	}
 
 	function zvodyJSON(): string {

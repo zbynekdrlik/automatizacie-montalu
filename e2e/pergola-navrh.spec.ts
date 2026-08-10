@@ -187,6 +187,28 @@ test('ručný prepis šírky/dĺžky panelu výplne prepíše dopočítanú hodn
 	).toBeVisible();
 });
 
+// review nález (#138): zaškrtnutý zvod na vysokom stĺpe + neskoršie zníženie počtu
+// polí by inak nechalo v stave zaniknutý zvod (checkbox už nie je v UI vidno), server
+// by odoslanie odmietol s neintuitívnou chybou — zníženie počtu polí ho musí zahodiť
+test('zníženie počtu polí po zaškrtnutí zvodu na zaniknutom stĺpe: odoslanie prejde bez chyby', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo *').fill('OP260032');
+	// 8 polí → 9 stĺpov, zaškrtneme zvod na poslednom (index 8)
+	await page.selectOption('#pocetPoli', '8');
+	const poslednyRiadok = page.getByTestId('zvody-box').locator('.row').last();
+	await poslednyRiadok.getByRole('checkbox', { name: 'vpredu' }).check();
+	// zníženie na 1 pole → 2 stĺpy, zaniknutý zvod sa musí ticho zahodiť
+	await page.selectOption('#pocetPoli', '1');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('form-error')).toHaveCount(0);
+	await expect(page.getByTestId('pn-isometria')).toBeVisible();
+});
+
 // Neplatný vstup (chýbajúce OP číslo a pod.) je pokrytý priamo v
 // tests/pergola-navrh-vstup.test.ts / tests/pergola-navrh.test.ts (server je jediný
 // strážca rozsahov — rovnaká disciplína ako fix-vstup.test.ts) — formulárové polia tu
