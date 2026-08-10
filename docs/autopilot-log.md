@@ -478,3 +478,54 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   landscape"]`, `/zasklenia` = `["a4"]` (nedotknuté). 0 chýb konzoly na
   oboch stránkach.
 - #137 auto-zavretý mergom PR #140 (`Closes #137`).
+
+## #138 — Pergola: zákaznícky návrhový výkres z rozmerového formulára (vzor OP260032) (2026-08-10)
+
+- ROZHODNUTÉ komentár (user 2026-08-10) prepísal telo issue: 3D izometria SO
+  ZVOD šípkami JE súčasť prvej verzie (pôvodne "bez 3D").
+- Design comment (pred prvým code commitom):
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/138#issuecomment-5237090825
+  (+ doplnok s "dôvod/prístup/alternatíva" frázovaním pre design-gate hook:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/138#issuecomment-5237339945)
+- Verzia 0.14.22 → 0.14.23 (`eb5dfc9`).
+- Nová route `/pergola/navrh` (formulár → SVG výkres → A4 landscape tlač),
+  postavená na základe #137 (`VykresovyHarok`/`Kota`/`TitleBlock`). Nový
+  generický `src/lib/vykres/iso.ts` (30° dimetrická/axonometrická projekcia,
+  4 kardinálne smery overené priamym výpočtom). Nový čistý TS compute modul
+  `src/lib/pergola-navrh.ts` (spád, svetlá výška, rozmery strešnej výplne,
+  3D izometrické hrany, ZVOD/poznámka kotvy) + `src/lib/server/pergola-navrh-vstup.ts`
+  (parser formulára).
+- Presné vzorce a ČESTNE PRIZNANÁ číselná nezrovnalosť oproti vzorovému "VIEW A
+  2200"/"4,3°" (nedali sa čisto odvodiť jednou konzistentnou formulou z
+  flattened PDF bez per-view magických konštánt) — plné zdôvodnenie v
+  design komentári + hlavičke `pergola-navrh.ts`. Šírka/dĺžka strešnej výplne
+  a predná svetlá výška sedia na vzore PRESNE (726mm, 3411mm, 2310mm).
+- Money: 0 zásahov do `compute.ts`/`pergola.ts`, golden snapshot nezmenený.
+  b2b: automaticky pokrytý existujúcim `/pergola` prefixom (drift guard).
+- Self-review (pred `/requesting-code-review`) našiel a opravil 1 nález:
+  `nastavPocetPoli()` nechávalo v stave zaškrtnutý ZVOD na stĺpe, ktorý po
+  znížení počtu polí zanikol — server ho pri odoslaní odmietal bez zjavnej
+  príčiny. Opravené `4a9f8f5`, regresný e2e test overený AJ na skutočnom páde
+  (dočasný revert + rebuild pred obnovením opravy).
+  Review komentár: https://github.com/zbynekdrlik/automatizacie-montalu/issues/138#issuecomment-5237548574
+- Dispatchovaný `general-purpose` reviewer (`/requesting-code-review`,
+  base `0af5223`, head `4a9f8f5`) — 0 Critical, 0 Important, 4 Minor
+  (mierka je jednodimenzionálna aproximácia — už zdokumentované; diakritika
+  v názve funkcie `stlpyZPolí`; zníženie počtu polí nevracia zvody pri
+  opätovnom zvýšení — zámerné; chýba dedikovaný b2b e2e test na tejto
+  konkrétnej podroute — pokryté unit drift-guardom). Verdikt: Ready to merge.
+- Golden snapshot (`tests/__snapshots__/`) — nezmenený.
+- Lokálne: `npm run lint` čisté, `npm run check` 0/0/0, `npx vitest run`
+  910/910 (11 iso.test.ts + 37 pergola-navrh.test.ts + 12
+  pergola-navrh-vstup.test.ts nové), `npm run build` OK,
+  `npx playwright test` 146/146 (6 nových v `pergola-navrh.spec.ts`).
+- **PR #141** (dev→main), merge `08e9874`. Main CI (test+deploy) zelené.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet): `/health`
+  → `{"ok":true,"version":"0.14.23 (08e9874)","live":true}`; footer
+  `v0.14.23 (08e9874)`. `/pergola/navrh` s hodnotami OP260032
+  (6000=3000+3000, hĺbka 3500, výšky 2500/2800, 8×726mm výplň) — všetkých 5
+  pohľadov vykreslených, pečiatka vyplnená, ZVOD šípky na oboch zaškrtnutých
+  stĺpoch, vizuálne zodpovedá vzoru (spány/hĺbka/panel presne, sklon 4,9° vs
+  vzorové 4,3° — zdokumentovaná nezrovnalosť). 0 chýb konzoly.
+- Discord run-card odoslaná (`notify --run-card --issue 138`, potvrdené
+  doručenie). #138 auto-zavretý mergom PR #141 (`Closes #138`).
