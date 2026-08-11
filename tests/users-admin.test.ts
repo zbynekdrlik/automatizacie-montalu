@@ -68,7 +68,7 @@ describe('role — voľba pri založení + zmena roly (#142)', () => {
 		db.addUser('rola-zmena', 'tajneheslo', 'b2b');
 		const u = db.listUsers().find((x) => x.username === 'rola-zmena')!;
 		const r = db.changeUserRole(u.id, 'internal', { id: 999999, username: 'sef' });
-		expect(r).toEqual({ error: null });
+		expect(r).toEqual({ error: null, changed: true });
 		expect(db.listUsers().find((x) => x.id === u.id)?.role).toBe('internal');
 		const audit = db.db
 			.prepare(
@@ -110,12 +110,12 @@ describe('role — voľba pri založení + zmena roly (#142)', () => {
 		expect(r.error).toBeTruthy();
 	});
 
-	it('changeUserRole na rovnakú rolu je no-op — bez chyby, bez audit riadku', () => {
+	it('changeUserRole na rovnakú rolu je no-op — bez chyby, changed:false, bez audit riadku', () => {
 		db.addUser('noop-rola', 'tajneheslo', 'b2b');
 		const u = db.listUsers().find((x) => x.username === 'noop-rola')!;
 		const predAudit = (db.db.prepare('SELECT COUNT(*) c FROM user_audit').get() as { c: number }).c;
 		const r = db.changeUserRole(u.id, 'b2b', { id: 999999, username: 'sef' });
-		expect(r).toEqual({ error: null });
+		expect(r).toEqual({ error: null, changed: false });
 		const poAudit = (db.db.prepare('SELECT COUNT(*) c FROM user_audit').get() as { c: number }).c;
 		expect(poAudit).toBe(predAudit); // žiadny nový riadok — nič sa nezmenilo
 	});

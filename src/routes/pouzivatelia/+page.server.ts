@@ -47,11 +47,13 @@ export const actions: Actions = {
 		const id = Number(fd.get('id'));
 		const role = parseRole(fd.get('role'));
 		if (!role) return fail(400, { error: 'Neplatná rola.' });
-		const { error } = changeUserRole(id, role, {
+		const { error, changed } = changeUserRole(id, role, {
 			id: locals.user.id,
 			username: locals.user.username
 		});
 		if (error) return fail(400, { error });
-		return { ok: `Rola účtu zmenená na ${role === 'b2b' ? 'B2B' : 'Interný'}.` };
+		const rolaLabel = role === 'b2b' ? 'B2B' : 'Interný';
+		// no-op (rovnaká rola ako doteraz) hlási neutrálne, nie „zmenená" — nič sa nezmenilo
+		return { ok: changed ? `Rola účtu zmenená na ${rolaLabel}.` : `Rola účtu je už ${rolaLabel}.` };
 	}
 };

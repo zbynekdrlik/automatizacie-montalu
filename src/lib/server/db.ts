@@ -894,20 +894,21 @@ export function addUser(
  * - vlastnú rolu si aktér nemôže zmeniť (ochrana pred odrezaním — porovnáva sa `id`,
  *   nie username, aby prípadná zhoda mena case-insensitive login nezmiatla).
  * - posledný interný účet nemožno degradovať na B2B (appka by stratila správcu).
- * Nezmenená rola je no-op (žiadny UPDATE, žiadny audit riadok — nič sa nestalo).
+ * Nezmenená rola je no-op (žiadny UPDATE, žiadny audit riadok — nič sa nestalo);
+ * `changed: false` to odlišuje, nech volajúci nehlási „zmenená", keď sa nič nezmenilo.
  */
 export function changeUserRole(
 	id: number,
 	newRole: 'internal' | 'b2b',
 	actor: { id: number; username: string }
-): { error: string | null } {
+): { error: string | null; changed: boolean } {
 	const row = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(id) as
 		{ id: number; username: string; role: string } | undefined;
-	if (!row) return { error: 'Účet neexistuje.' };
-	if (row.id === actor.id) return { error: 'Vlastnú rolu si nemôžeš zmeniť.' };
-	if (row.role === newRole) return { error: null };
+	if (!row) return { error: 'Účet neexistuje.', changed: false };
+	if (row.id === actor.id) return { error: 'Vlastnú rolu si nemôžeš zmeniť.', changed: false };
+	if (row.role === newRole) return { error: null, changed: false };
 	if (row.role === 'internal' && newRole === 'b2b' && countInternalUsers() <= 1) {
-		return { error: 'Posledný interný účet nemožno zmeniť na B2B.' };
+		return { error: 'Posledný interný účet nemožno zmeniť na B2B.', changed: false };
 	}
 	db.transaction(() => {
 		db.prepare('UPDATE users SET role = ? WHERE id = ?').run(newRole, id);
@@ -915,7 +916,7 @@ export function changeUserRole(
 			'INSERT INTO user_audit (actor, action, target_username, detail) VALUES (?, ?, ?, ?)'
 		).run(actor.username, 'role_change', row.username, `${row.role}→${newRole}`);
 	})();
-	return { error: null };
+	return { error: null, changed: true };
 }
 
 /** Zmaže LEN b2b účet (interné účty nie — ochrana proti lockoutu). Sessions padnú cez CASCADE. */
