@@ -279,3 +279,38 @@ test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva bloko
 
 	expect(errs).toEqual([]);
 });
+
+// #145: nadpisy pohľadov (PREDNÝ POHĽAD / REZ A) kreslené na y={r.y - 1} kolidovali
+// s hornou rastrovou lištou hárku (r.y pre tieto dva top-row pohľady == oblast.y ==
+// presne dolná hranica lišty; "-1" skončí VNÚTRI nej). Zmerané cez getBoundingClientRect
+// vo vlastnom review komentári na #145 (bbox nadpisu takmer identický s bbox čísla
+// stĺpca v hornej lište). Regresný test overuje priamo to isté meranie: nadpis musí
+// byť CELÝ POD hornou rastrovou lištou (jeho top >= spodná hranica lišty).
+test('regresia #145: nadpisy PREDNÝ POHĽAD / REZ A nekolidujú s hornou rastrovou lištou', async ({
+	page
+}) => {
+	await loginAs(page);
+	await vyplnFormular(page);
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// horná rastrová lišta — čísla stĺpcov majú rovnakú y-pozíciu naprieč celým
+	// riadkom (líši sa len x), takže ľubovoľné jedno stačí ako referenčná spodná
+	// hranica lišty
+	const gridTopNumber = page.locator('[data-testid="mriezka-stlpce"] text').first();
+	const gridBox = await gridTopNumber.boundingBox();
+	expect(gridBox).not.toBeNull();
+
+	for (const heading of ['PREDNÝ POHĽAD', 'REZ A']) {
+		const headingBox = await page
+			.locator('[data-testid="vykresovy-harok"] text', { hasText: heading })
+			.first()
+			.boundingBox();
+		expect(headingBox, `bounding box pre nadpis "${heading}"`).not.toBeNull();
+		// nadpis musí začínať AŽ POD hornou rastrovou lištou (žiadny vertikálny prekryv)
+		expect(
+			headingBox!.y,
+			`nadpis "${heading}" (top=${headingBox!.y}) koliduje s hornou rastrovou lištou (spodná hranica=${gridBox!.y + gridBox!.height})`
+		).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height);
+	}
+});
