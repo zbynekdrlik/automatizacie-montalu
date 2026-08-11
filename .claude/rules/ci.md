@@ -48,6 +48,29 @@ existing job `if:` guards (`version-check` only on `dev`, `deploy` only on
 `main`, `needs: test`) behave exactly the same, no gate is weakened by this
 trigger.
 
+## Variant: a single CHECK-RUN gets stuck, even though the WORKFLOW RUN itself completed fine
+
+Seen on `dev` (#146, `perpOffset` fix commit): `gh run view <id>` reported
+`status: completed, conclusion: success` and `gh run view --job=<id>` showed
+every step of `version-check` with a ✓ (including "Complete job") — yet `gh
+pr checks` and the raw Checks API kept reporting that SAME job as
+`IN_PROGRESS` with `completed_at: null` for 10+ minutes, keeping the PR's
+`mergeStateStatus` stuck at `UNSTABLE`:
+
+```bash
+gh api repos/<owner>/<repo>/commits/<sha>/check-runs \
+  --jq '.check_runs[] | {name, status, conclusion, completed_at}'
+# {"name":"version-check","status":"in_progress","conclusion":null,"completed_at":null}
+# ← genuinely stuck, not a `gh` CLI cache artifact (confirmed via the raw API)
+```
+
+This is the SAME class of GitHub-side bookkeeping glitch as the whole-run
+zombie above, just on one check-run's object instead of the run's own
+top-level status. Same fix, same command: `gh workflow run ci.yml --ref dev`
+(or `--ref main`) gets a fresh run whose check-runs all report `completed`
+cleanly — confirmed via the check-runs API, not just `gh run view`, since
+that's the endpoint branch-protection actually reads for mergeability.
+
 ## Always verify the deploy actually landed — don't trust "CI green" alone
 
 `main` CI green does not by itself prove the live app updated (the zombie run
