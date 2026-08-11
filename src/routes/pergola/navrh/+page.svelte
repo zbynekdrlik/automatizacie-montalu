@@ -383,7 +383,10 @@
 	</div>
 {:else if step === 'vykres'}
 	<div class="card">
-		<h1>{vstup.op}{vstup.nazov ? ` · ${vstup.nazov}` : ''}</h1>
+		<!-- #144 review nález: OP číslo je od tejto verzie voliteľné — bez fallbacku by
+		     prázdne OP aj prázdny názov spolu dali VIZUÁLNE PRÁZDNY nadpis. Rovnaký „—"
+		     idiom ako pečiatka (PergolaNavrhVykres.svelte), nikdy nič neposiela do Money. -->
+		<h1>{vstup.op || '—'}{vstup.nazov ? ` · ${vstup.nazov}` : ''}</h1>
 		<p class="sub">
 			<span class="badge">Pergola — návrhový výkres</span>
 			<span class="badge">{fmt(celkovaSirka)} × {fmt(vstup.hlbka)} mm</span>

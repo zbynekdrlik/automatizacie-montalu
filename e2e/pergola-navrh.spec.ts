@@ -259,6 +259,10 @@ test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva bloko
 	await expect(page.getByTestId('pn-isometria')).toBeVisible();
 	await expect(page.getByTestId('tb-cislo-vykresu')).toHaveText('—');
 	await expect(page.getByTestId('tb-revizia')).toHaveText('—');
+	// review nález (deep review na #144): OP prázdne + názov výkresu prázdny (obe
+	// nevyplnené v tomto teste) by bez fallbacku dali VIZUÁLNE PRÁZDNY <h1> nad
+	// samotným výkresom — musí ukázať „—", nie prázdny nadpis.
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('—');
 	await expect(page.getByRole('button', { name: '🖨 Tlačiť / uložiť PDF' })).toBeVisible();
 
 	// priama navigácia na /pergola (Money odpis z CAD nárezu) OSTÁVA zablokovaná
