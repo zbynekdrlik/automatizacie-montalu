@@ -28,7 +28,7 @@ async function najdiPageSizes(page: Page): Promise<string[]> {
 async function vyplnFormular(page: Page) {
 	await goto(page, '/pergola/navrh');
 	await waitHydrated(page);
-	await page.getByLabel('OP číslo *').fill('OP260032');
+	await page.getByLabel('OP číslo').fill('OP260032');
 	// hĺbka/výšky/počet polí/panelov už majú predvyplnené vzorové hodnoty OP260032
 	// (6000=3000+3000, hĺbka 3500, výšky 2500/2800, 8 panelov) — netreba prepisovať
 	await page.getByLabel('RAL (červená poznámka na výkrese)').fill('7016-ANTRACIT JŠ');
@@ -162,7 +162,7 @@ test('← Späť a upraviť: formulár sa vráti s predvyplneným vstupom (nevyn
 
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
-	await expect(page.getByLabel('OP číslo *')).toHaveValue('OP260032');
+	await expect(page.getByLabel('OP číslo')).toHaveValue('OP260032');
 	await expect(page.getByLabel('Hĺbka (mm) *')).toHaveValue('3500');
 	await expect(page.getByLabel('Výška vpredu (mm) *')).toHaveValue('2500');
 });
@@ -195,7 +195,7 @@ test('zníženie počtu polí po zaškrtnutí zvodu na zaniknutom stĺpe: odosla
 }) => {
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
-	await page.getByLabel('OP číslo *').fill('OP260032');
+	await page.getByLabel('OP číslo').fill('OP260032');
 	// 8 polí → 9 stĺpov, zaškrtneme zvod na poslednom (index 8)
 	await page.selectOption('#pocetPoli', '8');
 	const poslednyRiadok = page.getByTestId('zvody-box').locator('.row').last();
@@ -209,9 +209,69 @@ test('zníženie počtu polí po zaškrtnutí zvodu na zaniknutom stĺpe: odosla
 	await expect(page.getByTestId('pn-isometria')).toBeVisible();
 });
 
-// Neplatný vstup (chýbajúce OP číslo a pod.) je pokrytý priamo v
-// tests/pergola-navrh-vstup.test.ts / tests/pergola-navrh.test.ts (server je jediný
-// strážca rozsahov — rovnaká disciplína ako fix-vstup.test.ts) — formulárové polia tu
-// majú HTML5 `required`/min/max, takže reálny používateľ sa k neplatnému stavu cez
-// UI vôbec nedostane; e2e simuluje SKUTOČNÉHO používateľa, nie skriptovaný obchádzajúci
-// POST (to je práve to, čo unit testy nad parserom pokrývajú lepšie).
+// Neplatný vstup (mimo rozsahu hĺbka/výška/panely, neplatná pozícia zvodu a pod.) je
+// pokrytý priamo v tests/pergola-navrh-vstup.test.ts / tests/pergola-navrh.test.ts
+// (server je jediný strážca rozsahov — rovnaká disciplína ako fix-vstup.test.ts) —
+// formulárové polia tu majú HTML5 `required`/min/max, takže reálny používateľ sa
+// k neplatnému stavu cez UI vôbec nedostane; e2e simuluje SKUTOČNÉHO používateľa, nie
+// skriptovaný obchádzajúci POST (to je práve to, čo unit testy nad parserom pokrývajú
+// lepšie). OP číslo je od #144 VOLITEĽNÉ (rovnaké testy) — nie je v tomto zozname.
+
+// #144 — VO odberateľ (b2b) dostáva prístup na tento display-only návrhový výkres:
+// nav odkaz, samotné otvorenie/vykreslenie funguje, /pergola (Money odpis) ostáva
+// zablokované, a keď b2b (bez Montalu OP čísla) OP nechá prázdne, pečiatka to ukáže
+// ako „—" (nie prázdny text ani natvrdo predstierané "0"/meno).
+test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva blokované, prázdne OP = "—" v pečiatke (#144)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	// b2b throwaway účet (rovnaký vzor ako app.spec.ts/sietka.spec.ts B2B testy)
+	page.on('dialog', (d) => d.accept());
+	const b2bUser = `e2e-pergola-navrh-b2b-${Date.now().toString(36)}`;
+	const b2bPass = 'e2eheslo1';
+	await goto(page, '/pouzivatelia');
+	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
+	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
+	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+
+	await page.getByRole('button', { name: 'Odhlásiť' }).click();
+	await expect(page).toHaveURL(/\/login/);
+	await loginAs(page, b2bUser, b2bPass);
+
+	// nav odkaz viditeľný pre b2b, pôvodná "Pergola" (Money odpis) NIE JE v b2b menu
+	await expect(page.getByRole('link', { name: 'Pergola návrh' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Pergola', exact: true })).toHaveCount(0);
+
+	await page.getByRole('link', { name: 'Pergola návrh' }).click();
+	await waitHydrated(page);
+	await expect(page).toHaveURL(/\/pergola\/navrh$/);
+
+	// OP číslo ostáva PRÁZDNE (VO odberateľ nemá Montalu OP číslo) — dimenzie majú
+	// platné predvolené hodnoty, vykreslenie prejde aj tak
+	await expect(page.getByLabel('OP číslo')).toHaveValue('');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('form-error')).toHaveCount(0);
+	await expect(page.getByTestId('pn-isometria')).toBeVisible();
+	await expect(page.getByTestId('tb-cislo-vykresu')).toHaveText('—');
+	await expect(page.getByTestId('tb-revizia')).toHaveText('—');
+	await expect(page.getByRole('button', { name: '🖨 Tlačiť / uložiť PDF' })).toBeVisible();
+
+	// priama navigácia na /pergola (Money odpis z CAD nárezu) OSTÁVA zablokovaná
+	await goto(page, '/pergola');
+	await expect(page).toHaveURL(/\/zasklenia$/);
+
+	// upratanie
+	await page.getByRole('button', { name: 'Odhlásiť' }).click();
+	await expect(page).toHaveURL(/\/login/);
+	await loginAs(page);
+	await goto(page, '/pouzivatelia');
+	await page.locator('tr', { hasText: b2bUser }).getByRole('button', { name: 'Zmazať' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
+
+	expect(errs).toEqual([]);
+});

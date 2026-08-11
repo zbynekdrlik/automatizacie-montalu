@@ -535,9 +535,12 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await expect(page).toHaveURL(/\/login/);
 	await loginAs(page, b2bUser, b2bPass);
 
-	// 3. B2B: nav ukazuje len Zasklenia; /pergola aj /pouzivatelia presmerujú na /zasklenia
+	// 3. B2B: nav ukazuje Zasklenia + Sieťka + Pergola návrh (display-only, #144);
+	//    pôvodná Pergola (Money odpis z CAD nárezu) aj /pouzivatelia presmerujú na
+	//    /zasklenia — "Pergola návrh" OBSAHUJE podreťazec "Pergola", takže exact:true
+	//    je nutné, inak by substring-match omylom chytil aj ten nový povolený odkaz.
 	await expect(page.getByRole('link', { name: 'Zasklenia' })).toBeVisible();
-	await expect(page.getByRole('link', { name: 'Pergola' })).toHaveCount(0);
+	await expect(page.getByRole('link', { name: 'Pergola', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Používatelia' })).toHaveCount(0);
 	await goto(page, '/pergola');
 	await expect(page).toHaveURL(/\/zasklenia/);
