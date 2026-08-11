@@ -213,8 +213,11 @@ describe('chybaPergolaNavrhVstupu — validácia', () => {
 			chybaPergolaNavrhVstupu({ ...VZOR, zvody: [{ postIndex: 5, strana: 'predna' }] })
 		).toMatch(/zvod/i);
 	});
-	it('chýbajúce OP číslo = chyba', () => {
-		expect(chybaPergolaNavrhVstupu({ ...VZOR, op: '' })).toMatch(/OP číslo/i);
+	// #144 — VO odberateľ (b2b) nemá Montalu OP číslo; OP je teraz voliteľné PRE
+	// VŠETKÝCH (formulár je zdieľaný interní/b2b) — prázdne sa v pečiatke vykreslí
+	// ako „—" (PergolaNavrhVykres.svelte), nie je to už validačná chyba.
+	it('#144: chýbajúce OP číslo NIE JE chyba (voliteľné)', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, op: '' })).toBeNull();
 	});
 	it('konštanty sú stabilné (dokumentované hodnoty, nie magické čísla bez zmyslu)', () => {
 		expect(NOSNIK_HRUBKA_MM).toBe(190);

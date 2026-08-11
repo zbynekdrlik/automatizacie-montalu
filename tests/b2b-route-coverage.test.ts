@@ -18,7 +18,19 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 //   korekcie 2026-08-02 MÁ akciu `odoslat` (Money zápis pre interných), ale rovnakou
 //   vrstvou ako /zasklenia — b2b je odmietnutý AKO PRVÝ krok v akcii samotnej
 //   (`isB2B(locals.user)` guard v +page.server.ts), nie len skrytým tlačidlom.
-const ALLOWED = new Set(['/zasklenia', '/sietka', '/login', '/logout', '/health']);
+// - /pergola/navrh — zákaznícky NÁVRHOVÝ výkres (#138), sprístupnený b2b v #144.
+//   Display-only: žiadny import `$lib/server/money`, žiadna zápisová akcia (viď
+//   popisný test nižšie) — na rozdiel od /sietka tu NIET ČO chrániť extra guardom,
+//   lebo sa nezapisuje vôbec nič. Samotné /pergola (Money odpis z CAD nárezu) OSTÁVA
+//   v denylist-e — výnimka v `b2b-access.ts` je úzka, len na `/navrh` pod-cestu.
+const ALLOWED = new Set([
+	'/zasklenia',
+	'/sietka',
+	'/pergola/navrh',
+	'/login',
+	'/logout',
+	'/health'
+]);
 
 /** Prevedie adresár routy (relatívne k src/routes) na URL cestu. Ignoruje route groups (...). */
 function toRoutePath(dirAbs: string): string {
@@ -53,6 +65,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/bazen',
 				'/odpisy',
 				'/pergola',
+				'/pergola/navrh',
 				'/pouzivatelia',
 				'/problem',
 				'/zasklenia',
@@ -82,5 +95,21 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('/sietka (#89 — Patrik: „hlavne pre externých", žiadny Money zápis) nie je presmerovaná', () => {
 		expect(b2bRedirectTarget('/sietka')).toBeNull();
+	});
+
+	it('#144: /pergola/navrh (návrhový výkres) nie je presmerovaná', () => {
+		expect(b2bRedirectTarget('/pergola/navrh')).toBeNull();
+	});
+});
+
+// #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k
+// odpisu" — na rozdiel od /sietka a /zasklenia (ktoré MAJÚ zápisovú akciu chránenú
+// vrstvou isB2B guardu) /pergola/navrh nemá ŽIADNU zápisovú akciu vôbec, takže tu
+// niet čo obchádzať. Tento test stráži, že to tak ZOSTANE — pridanie akejkoľvek
+// budúcej zápisovej akcie (napr. omylom skopírovanej z /pergola) tento test rozbije.
+describe('/pergola/navrh — žiadna cesta k Money odpisu (#144)', () => {
+	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/pergola/navrh/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
 	});
 });
