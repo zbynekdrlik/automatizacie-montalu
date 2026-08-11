@@ -59,30 +59,32 @@ test('formulár → výkres OP260032: všetkých 5 pohľadov + pečiatka + kóty
 	await expect(page.getByTestId('pn-panel-pocet')).toContainText('8ks strešná výplň');
 
 	// predný pohľad — polia 3000+3000=6000, výšky 2500/2310 (front/clearance)
+	// #146 bod 1: kóty BEZ jednotky "mm" (CAD píše holé čísla) — presná zhoda,
+	// nie substring (aby "3000" nekolidovalo s "23000"/"30000" a pod.)
 	await expect(
-		page.locator('[data-testid="pn-elevation"] text', { hasText: '3000 mm' })
+		page.locator('[data-testid="pn-elevation"] text', { hasText: /^3000$/ })
 	).toHaveCount(2);
 	await expect(
-		page.locator('[data-testid="pn-elevation"] text', { hasText: '6000 mm' })
+		page.locator('[data-testid="pn-elevation"] text', { hasText: /^6000$/ })
 	).toBeVisible();
 	await expect(
-		page.locator('[data-testid="pn-elevation"] text', { hasText: '2500 mm' })
+		page.locator('[data-testid="pn-elevation"] text', { hasText: /^2500$/ })
 	).toBeVisible();
 	await expect(
-		page.locator('[data-testid="pn-elevation"] text', { hasText: '2310 mm' })
+		page.locator('[data-testid="pn-elevation"] text', { hasText: /^2310$/ })
 	).toBeVisible();
-	// zvislé <line> stĺpy majú nulovú ŠÍRKU bounding boxu (Playwright ich preto
-	// nepovažuje za "visible") — sila je v POČTE (3 stĺpy pre 2 polia), nie vo
-	// visibility-checku na perfektne zvislom prvku
+	// stĺpy — #146 bod 2: kreslené ako <rect> s reálnou hrúbkou v mierke (nie
+	// jednočiarové), počet (3 stĺpy pre 2 polia) je stále silnejší/jednoduchší
+	// dôkaz než visibility-check na jednotlivom prvku
 	await expect(page.getByTestId(/pn-elevation-post-\d/)).toHaveCount(3);
 
 	// bočný rez (VIEW A) — hĺbka 3500, sklon vypočítaný z 2500/2800/3500 (čestne, nie
-	// natvrdo "4,3°" zo vzoru — dôvod je v design komentári na #138)
+	// natvrdo "4,3°" zo vzoru — dôvod je v design komentári na #138). #146 bod 1: bez "mm".
 	await expect(
-		page.locator('[data-testid="pn-section"] text', { hasText: '3500 mm' })
+		page.locator('[data-testid="pn-section"] text', { hasText: /^3500$/ })
 	).toBeVisible();
 	await expect(
-		page.locator('[data-testid="pn-section"] text', { hasText: '2800 mm' })
+		page.locator('[data-testid="pn-section"] text', { hasText: /^2800$/ })
 	).toBeVisible();
 	const sklon = page.getByTestId('pn-sklon');
 	await expect(sklon).toBeVisible();
@@ -178,12 +180,13 @@ test('ručný prepis šírky/dĺžky panelu výplne prepíše dopočítanú hodn
 	await waitHydrated(page);
 
 	await expect(page.getByTestId('pn-panel-obrys')).toBeVisible();
-	// kóty v detaile výplne teraz nesú PREPÍSANÉ hodnoty, nie dopočítané (726/3411)
+	// kóty v detaile výplne teraz nesú PREPÍSANÉ hodnoty, nie dopočítané (726/3411).
+	// #146 bod 1: bez "mm" — presná zhoda, nie substring.
 	await expect(
-		page.locator('[data-testid="pn-panel-detail"] text', { hasText: '700 mm' })
+		page.locator('[data-testid="pn-panel-detail"] text', { hasText: /^700$/ })
 	).toBeVisible();
 	await expect(
-		page.locator('[data-testid="pn-panel-detail"] text', { hasText: '3000 mm' })
+		page.locator('[data-testid="pn-panel-detail"] text', { hasText: /^3000$/ })
 	).toBeVisible();
 });
 
@@ -278,4 +281,39 @@ test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva bloko
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
 
 	expect(errs).toEqual([]);
+});
+
+// #145: nadpisy pohľadov (PREDNÝ POHĽAD / REZ A) kreslené na y={r.y - 1} kolidovali
+// s hornou rastrovou lištou hárku (r.y pre tieto dva top-row pohľady == oblast.y ==
+// presne dolná hranica lišty; "-1" skončí VNÚTRI nej). Zmerané cez getBoundingClientRect
+// vo vlastnom review komentári na #145 (bbox nadpisu takmer identický s bbox čísla
+// stĺpca v hornej lište). Regresný test overuje priamo to isté meranie: nadpis musí
+// byť CELÝ POD hornou rastrovou lištou (jeho top >= spodná hranica lišty).
+test('regresia #145: nadpisy PREDNÝ POHĽAD / REZ A nekolidujú s hornou rastrovou lištou', async ({
+	page
+}) => {
+	await loginAs(page);
+	await vyplnFormular(page);
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// horná rastrová lišta — čísla stĺpcov majú rovnakú y-pozíciu naprieč celým
+	// riadkom (líši sa len x), takže ľubovoľné jedno stačí ako referenčná spodná
+	// hranica lišty
+	const gridTopNumber = page.locator('[data-testid="mriezka-stlpce"] text').first();
+	const gridBox = await gridTopNumber.boundingBox();
+	expect(gridBox).not.toBeNull();
+
+	for (const heading of ['PREDNÝ POHĽAD', 'REZ A']) {
+		const headingBox = await page
+			.locator('[data-testid="vykresovy-harok"] text', { hasText: heading })
+			.first()
+			.boundingBox();
+		expect(headingBox, `bounding box pre nadpis "${heading}"`).not.toBeNull();
+		// nadpis musí začínať AŽ POD hornou rastrovou lištou (žiadny vertikálny prekryv)
+		expect(
+			headingBox!.y,
+			`nadpis "${heading}" (top=${headingBox!.y}) koliduje s hornou rastrovou lištou (spodná hranica=${gridBox!.y + gridBox!.height})`
+		).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height);
+	}
 });

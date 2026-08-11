@@ -26,6 +26,14 @@ export const PANEL_MEDZERA_MM = 24;
  *  (3500 − 89 = 3411). */
 export const PANEL_TRIM_MM = 89;
 
+/** hrúbka stĺpa V KRESBE [mm] — LEN vizuálna konštanta (#146, bod 2 —
+ *  "stĺpy s hrúbkou ~90–120 mm"), nevstupuje do žiadneho výpočtu geometrie
+ *  ani Money odpisu, používa ju len `PergolaNavrhVykres.svelte` na
+ *  odmierkovanie hrúbky stĺpov/nosníkov v elevation/section/izometrii
+ *  (rovnaká disciplína ako NOSNIK_HRUBKA_MM — dokumentovaná hodnota, nie
+ *  magické číslo bez zmyslu). Stred rozsahu 90–120 mm zo zadania. */
+export const STLP_HRUBKA_VIZ_MM = 100;
+
 export const PERGOLA_MAX_POLI = 8;
 export const ROZPATIE_MIN = 500;
 export const ROZPATIE_MAX = 20000;
