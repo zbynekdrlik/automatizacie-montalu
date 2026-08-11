@@ -21,20 +21,22 @@ function parseRole(v: FormDataEntryValue | null): 'internal' | 'b2b' | null {
 
 export const actions: Actions = {
 	pridat: async ({ request, locals }) => {
-		if (isB2B(locals.user)) return fail(403, { error: 'Nedostupné.' });
+		// !locals.user gate je tu obrana do hĺbky (hooks.server.ts už garantuje non-null
+		// pre všetky non-public cesty) — zarovnané s zmenit_rolu nižšie (review nález #142).
+		if (isB2B(locals.user) || !locals.user) return fail(403, { error: 'Nedostupné.' });
 		const fd = await request.formData();
 		const username = String(fd.get('username') ?? '');
 		const password = String(fd.get('password') ?? '');
 		// default B2B, nech sa omylom nerozdá interný prístup — sedí so stavom pred
 		// touto zmenou, keď formulár zakladal LEN B2B.
 		const role = parseRole(fd.get('role')) ?? 'b2b';
-		const { error } = addUser(username, password, role, locals.user?.username ?? '');
+		const { error } = addUser(username, password, role, locals.user.username);
 		if (error) return fail(400, { error });
 		const rolaLabel = role === 'b2b' ? 'B2B' : 'Interný';
 		return { ok: `Účet „${username.trim()}" (${rolaLabel}) vytvorený.` };
 	},
 	zmazat: async ({ request, locals }) => {
-		if (isB2B(locals.user)) return fail(403, { error: 'Nedostupné.' });
+		if (isB2B(locals.user) || !locals.user) return fail(403, { error: 'Nedostupné.' });
 		const fd = await request.formData();
 		const id = Number(fd.get('id'));
 		const { error } = deleteB2BUser(id);
