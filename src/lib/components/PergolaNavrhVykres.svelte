@@ -169,9 +169,11 @@
 <!-- ============================= detail strešnej výplne ============================= -->
 {#snippet panelDetail(r: { x: number; y: number; w: number; h: number })}
 	<!-- #146 body 1/6: kóty bez "mm" + rect posunutý DOPRAVA (nie centrovaný) s
-	     popisom "Nks strešná výplň" VEDĽA (dvojriadkovo, vpravo zarovnaný, medzi
+	     popisom "Nks strešná výplň" VEDĽA (jednoriadkovo, vpravo zarovnaný, medzi
 	     dĺžkovou kótou a obrysom) — poradie zľava doprava presne ako vo vzore
-	     OP260032: [dĺžková kóta] [popis] [obrys s break-markami]. -->
+	     OP260032: [dĺžková kóta] [popis] [obrys s break-markami]. (deep-review
+	     nález: pôvodný komentár tvrdil "dvojriadkovo" — text nižšie je jeden
+	     `<text>` bez zalomenia/`<tspan>`, teda jeden riadok; opravené na presné.) -->
 	{@const dlzkaPx = r.h * 0.66}
 	{@const sirkaPx = Math.min(r.w * 0.42, dlzkaPx * 0.42)}
 	{@const x0 = r.x + r.w * 0.56}
@@ -206,19 +208,23 @@
 		stroke-width="0.35"
 		fill="none"
 	/>
-	<!-- deep-review nález (#146): `verticalDimension`'s vlastný dokumentovaný kontrakt
-	     (`$lib/vykres/kota.ts`) je "kladné perpOffset = doľava" — predchádzajúci
+	<!-- deep-review nález (#146, 2 kolo): `verticalDimension`'s vlastný dokumentovaný
+	     kontrakt (`$lib/vykres/kota.ts`) je "kladné perpOffset = doľava" — pôvodný
 	     `perpOffset={-16}` teda posúval kótu DOPRAVA, priamo DO obrysu (cez
-	     break-marky), nie preč od neho vľavo, ako bolo zamýšľané. Kladná hodnota
-	     (21) ju posúva doľava AŽ ZA popis (captionX vyššie skrátený na -2, aby na
-	     to ostalo miesto) — zmenšený `tick` drží ťaháky kompaktné v úzkom stĺpci. -->
+	     break-marky). Prvá oprava (perpOffset=21) kótu z obrysu aj popisu dostala,
+	     ale posunula `witnessLine`'s pevný `overshoot` (kota.ts, +3mm za tick) ZA
+	     ľavú hranicu kresliacej oblasti (`oblast.x`) — nezávislý druhý nález z
+	     deep-review. Riešenie: `perpOffset=17` drží ťaháky/witness vnútri hranice
+	     (over. render-diff), a `labelOffset` NEZÁVISLE dolaďuje POZÍCIU POPISKU
+	     bez zásahu do witness geometrie (kota.ts L99-102) — `labelOffset=0` centruje
+	     "3411" presne medzi rámom a popisom "Nks strešná výplň". -->
 	<Kota
 		x0={x0 - 3}
 		{y0}
 		x1={x0 - 3}
 		{y1}
-		perpOffset={21}
-		opts={{ tick: 1 }}
+		perpOffset={17}
+		opts={{ tick: 1, labelOffset: 0 }}
 		text={fmtMm(g.panelDlzka)}
 		fontSize={3}
 		color={MODRA}
