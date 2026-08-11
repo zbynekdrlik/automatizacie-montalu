@@ -225,6 +225,8 @@ export function chybaPergolaNavrhVstupu(v: PergolaNavrhVstup): string | null {
 	const postCount = v.polia.length + 1;
 	if (v.zvody.some((z) => z.postIndex < 0 || z.postIndex >= postCount))
 		return 'Neplatná pozícia zvodu.';
-	if (!v.op.trim()) return 'Chýba OP číslo.';
+	// OP číslo je VOLITEĽNÉ (#144) — VO odberateľ (b2b) nemá Montalu OP číslo;
+	// prázdne sa v pečiatke vykreslí ako „—" (PergolaNavrhVykres.svelte). Relaxované
+	// pre VŠETKÝCH (formulár je zdieľaný interní/b2b), viď design komentár na #144.
 	return null;
 }
