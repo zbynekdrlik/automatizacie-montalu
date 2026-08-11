@@ -10,6 +10,14 @@
 	import { viewBoxAttr } from '$lib/vykres/kota';
 	import TitleBlock from './TitleBlock.svelte';
 	import type { Snippet } from 'svelte';
+	// #146 bod 8: úzke technické písmo pre CELÝ výkresový hárok — self-hosted
+	// Archivo Variable, `wdth` (šírkova) os namiesto `wght` (index.css, používaná
+	// na /login) — žiadny externý font fetch, súbory bundlené z node_modules
+	// rovnako ako existujúci import na login stránke. `font-stretch` na koreňovom
+	// <svg> nižšie sa DEDÍ do všetkých vnorených <text> (mriežka, Kota, TitleBlock,
+	// aj obsah konzumenta) bez potreby nastavovať ho v každej komponente zvlášť —
+	// bežná CSS kaskáda funguje naprieč hranicami Svelte komponent.
+	import '@fontsource-variable/archivo/wdth.css';
 
 	const STLPCE = 16;
 	const RIADKY_PISMENA = 'ABCDEFGHIJKL'.split(''); // 12 riadkov
@@ -69,6 +77,7 @@
 	role="img"
 	aria-label="Výkresový hárok A4 na šírku s mriežkou a pečiatkou"
 	data-testid="vykresovy-harok"
+	style="font-family: 'Archivo Variable', sans-serif; font-stretch: 62%;"
 >
 	<!-- biele pozadie celej strany (tlač) -->
 	<rect x="0" y="0" width={pageW} height={pageH} fill="#fff" />

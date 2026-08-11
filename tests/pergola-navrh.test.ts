@@ -17,6 +17,7 @@ import {
 	NOSNIK_HRUBKA_MM,
 	PANEL_MEDZERA_MM,
 	PANEL_TRIM_MM,
+	STLP_HRUBKA_VIZ_MM,
 	type PergolaNavrhVstup
 } from '../src/lib/pergola-navrh';
 
@@ -223,5 +224,9 @@ describe('chybaPergolaNavrhVstupu — validácia', () => {
 		expect(NOSNIK_HRUBKA_MM).toBe(190);
 		expect(PANEL_MEDZERA_MM).toBe(24);
 		expect(PANEL_TRIM_MM).toBe(89);
+		// #146: len vizuálna konštanta (hrúbka stĺpa v kresbe), nevstupuje do
+		// žiadneho geometrického výpočtu ani Money odpisu — viď komentár v
+		// pergola-navrh.ts
+		expect(STLP_HRUBKA_VIZ_MM).toBe(100);
 	});
 });

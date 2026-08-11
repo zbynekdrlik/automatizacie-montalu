@@ -17,6 +17,8 @@
 		izometriaHrany,
 		zvodoveBody,
 		poznamkaKotva,
+		NOSNIK_HRUBKA_MM,
+		STLP_HRUBKA_VIZ_MM,
 		type PergolaNavrhVstup
 	} from '$lib/pergola-navrh';
 
@@ -68,6 +70,22 @@
 	const MODRA = '#1d4ed8';
 	const CERVENA = '#dc2626';
 
+	// #146 bod 2/3: hierarchia hrúbok čiar — konštrukčné obrysy (stĺpy, nosníky,
+	// hlavné hrany izometrie) sú NAJHRUBŠIE (STRUKTURA_STROKE), kóty/odkazové čiary
+	// sú tenšie (Kota.svelte, 0.7/0.4), raster hárku najtenší (VykresovyHarok, 0.2-0.5).
+	const STRUKTURA_STROKE = 1.8;
+	const STRUKTURA_STROKE_VEDLAJSIA = 0.4;
+	// previs strechy (eave) oproti vonkajšej hrane stĺpa/steny [mm] — len vizuálne,
+	// rovnaká disciplína ako STLP_HRUBKA_VIZ_MM (nevstupuje do žiadneho výpočtu)
+	const PREVIS_VIZ_MM = 60;
+
+	/** Polovičná hrúbka stĺpa v PX pri danej mierke — orezaná zdola (nikdy nezmizne
+	 *  pri veľmi malej mierke) aj zhora (nikdy nepretečie do susedného poľa pri
+	 *  minimálnom rozpätí ROZPATIE_MIN=500mm). */
+	function stlpHalfW(scale: number, maxPx: number): number {
+		return Math.min(Math.max((STLP_HRUBKA_VIZ_MM * scale) / 2, 0.5), maxPx);
+	}
+
 	/** Vrcholy trojuholníkovej šípky na konci úsečky (x1,y1)→(x2,y2), hrot v (x2,y2). */
 	function sipka(x1: number, y1: number, x2: number, y2: number, dlzka = 4, sirka = 2.2): string {
 		const dx = x2 - x1;
@@ -98,11 +116,19 @@
 	titleBlock={titleBlockData}
 >
 	{#snippet content(oblast)}
-		{@const topH = oblast.h * 0.38}
+		<!-- #146 bod 4: rozloženie podľa vzoru OP260032 (detail vľavo hore, predný
+		     pohľad v strede hore, REZ A vpravo hore, izometria vľavo dole, texty/RAL
+		     vpravo dole NAD pečiatkou) + vyplniť prázdne plochy/pohľady väčšie —
+		     topH zväčšený z 0.38 na 0.40, textCol už nesedí na pevný zlomok výšky ale
+		     siaha až tesne nad pečiatku (TB_H/TB_W musia zodpovedať VykresovyHarok
+		     defaultom, keďže titleBlock={titleBlockData} nižšie žiadne width/height
+		     neposiela). -->
+		{@const TB_H = 50}
+		{@const topH = oblast.h * 0.4}
 		{@const gap = oblast.w * 0.015}
-		{@const pd = { x: oblast.x, y: oblast.y, w: oblast.w * 0.14, h: topH }}
-		{@const fe = { x: oblast.x + oblast.w * 0.17, y: oblast.y, w: oblast.w * 0.45, h: topH }}
-		{@const sec = { x: oblast.x + oblast.w * 0.65, y: oblast.y, w: oblast.w * 0.33, h: topH }}
+		{@const pd = { x: oblast.x, y: oblast.y, w: oblast.w * 0.16, h: topH }}
+		{@const fe = { x: oblast.x + oblast.w * 0.19, y: oblast.y, w: oblast.w * 0.45, h: topH }}
+		{@const sec = { x: oblast.x + oblast.w * 0.66, y: oblast.y, w: oblast.w * 0.34, h: topH }}
 		{@const iso = {
 			x: oblast.x,
 			y: oblast.y + topH + gap,
@@ -112,8 +138,8 @@
 		{@const textCol = {
 			x: oblast.x + oblast.w * 0.68,
 			y: oblast.y + topH + gap,
-			w: oblast.w * 0.3,
-			h: oblast.h * 0.28
+			w: oblast.w - oblast.w * 0.68,
+			h: Math.max(0, oblast.h - TB_H - 2 - (topH + gap))
 		}}
 
 		<g data-testid="pn-panel-detail">
@@ -136,12 +162,18 @@
 
 <!-- ============================= detail strešnej výplne ============================= -->
 {#snippet panelDetail(r: { x: number; y: number; w: number; h: number })}
+	<!-- #146 body 1/6: kóty bez "mm" + rect posunutý DOPRAVA (nie centrovaný) s
+	     popisom "Nks strešná výplň" VEDĽA (dvojriadkovo, vpravo zarovnaný, medzi
+	     dĺžkovou kótou a obrysom) — poradie zľava doprava presne ako vo vzore
+	     OP260032: [dĺžková kóta] [popis] [obrys s break-markami]. -->
 	{@const dlzkaPx = r.h * 0.66}
-	{@const sirkaPx = Math.min(r.w * 0.6, dlzkaPx * 0.42)}
-	{@const x0 = r.x + r.w * 0.28}
+	{@const sirkaPx = Math.min(r.w * 0.42, dlzkaPx * 0.42)}
+	{@const x0 = r.x + r.w * 0.56}
 	{@const x1 = x0 + sirkaPx}
 	{@const y0 = r.y + r.h * 0.06}
 	{@const y1 = y0 + dlzkaPx}
+	{@const captionX = x0 - 6}
+	{@const captionY = y0 + dlzkaPx / 2}
 	<rect
 		x={x0}
 		y={y0}
@@ -149,7 +181,7 @@
 		height={y1 - y0}
 		fill="#eff6ff"
 		stroke={CIERNA}
-		stroke-width="0.4"
+		stroke-width="0.6"
 		data-testid="pn-panel-obrys"
 	/>
 	<path
@@ -169,8 +201,8 @@
 		{y0}
 		x1={x0 - 3}
 		{y1}
-		perpOffset={-8}
-		text={fmtMm(g.panelDlzka) + ' mm'}
+		perpOffset={-16}
+		text={fmtMm(g.panelDlzka)}
 		fontSize={3}
 		color={MODRA}
 	/>
@@ -180,14 +212,14 @@
 		{x1}
 		y1={y1 + 3}
 		perpOffset={8}
-		text={fmtMm(g.panelSirka) + ' mm'}
+		text={fmtMm(g.panelSirka)}
 		fontSize={3}
 		color={MODRA}
 	/>
 	<text
-		x={r.x + r.w / 2}
-		y={y1 + 14}
-		text-anchor="middle"
+		x={captionX}
+		y={captionY}
+		text-anchor="end"
 		font-size="3"
 		fill={CIERNA}
 		font-weight="600"
@@ -202,41 +234,48 @@
 	{@const x0 = r.x + r.w * 0.12}
 	{@const X = (mm: number) => x0 + mm * scale}
 	{@const topY = baseY - vstup.vyskaVpredu * scale}
-	{@const roofH = Math.max(2, r.h * 0.03)}
+	{@const roofH = Math.max(1.5, NOSNIK_HRUBKA_MM * scale)}
+	{@const previs = PREVIS_VIZ_MM * scale}
 	{@const n = Math.max(1, Math.round(vstup.panelPocet))}
+	{@const minPole = Math.min(...vstup.polia)}
+	{@const postHalfW = stlpHalfW(scale, minPole * scale * 0.4)}
+	<!-- #145: nadpis DNU do panela (kladný odsad od r.y), nie -1 nad r.y — r.y je
+	     tu presne na hranici hornej rastrovej lišty, "-1" by skončil VNÚTRI nej. -->
 	<text
 		x={r.x + r.w * 0.5}
-		y={r.y - 1}
+		y={r.y + 3}
 		text-anchor="middle"
 		font-size="3"
 		fill={CIERNA}
 		font-weight="600">PREDNÝ POHĽAD</text
 	>
-	<!-- strešná doska s naznačenou výplňou -->
+	<!-- strešná doska (nosník) v reálnej hrúbke (NOSNIK_HRUBKA_MM), s previsom cez
+	     krajné stĺpy (#146 bod 2) + naznačenou výplňou (deliace čiarky panelov) -->
 	<rect
-		x={X(0)}
+		x={X(0) - previs}
 		y={topY - roofH}
-		width={X(g.celkovaSirka) - X(0)}
+		width={X(g.celkovaSirka) - X(0) + 2 * previs}
 		height={roofH}
 		fill="#eff6ff"
 		stroke={CIERNA}
-		stroke-width="0.35"
+		stroke-width={STRUKTURA_STROKE}
 	/>
-	<g stroke={CIERNA} stroke-width="0.2">
+	<g stroke={CIERNA} stroke-width="0.3">
 		{#each Array(n - 1) as _, i (i)}
 			{@const x = X((g.celkovaSirka * (i + 1)) / n)}
 			<line x1={x} y1={topY - roofH} x2={x} y2={topY} />
 		{/each}
 	</g>
-	<!-- stĺpy -->
+	<!-- stĺpy — reálna hrúbka v mierke (STLP_HRUBKA_VIZ_MM), nie jednočiarové -->
 	{#each g.postX as px, i (i)}
-		<line
-			x1={X(px)}
-			y1={baseY}
-			x2={X(px)}
-			y2={topY}
+		<rect
+			x={X(px) - postHalfW}
+			y={topY}
+			width={postHalfW * 2}
+			height={baseY - topY}
+			fill="#fff"
 			stroke={CIERNA}
-			stroke-width="0.6"
+			stroke-width={STRUKTURA_STROKE}
 			data-testid="pn-elevation-post-{i}"
 		/>
 	{/each}
@@ -248,7 +287,7 @@
 			x1={X(g.postX[i + 1])}
 			y1={baseY}
 			perpOffset={r.h * 0.06}
-			text={fmtMm(p) + ' mm'}
+			text={fmtMm(p)}
 			color={MODRA}
 			fontSize={3}
 		/>
@@ -259,7 +298,7 @@
 		x1={X(g.celkovaSirka)}
 		y1={baseY}
 		perpOffset={r.h * 0.16}
-		text={fmtMm(g.celkovaSirka) + ' mm'}
+		text={fmtMm(g.celkovaSirka)}
 		color={MODRA}
 		fontSize={3.2}
 	/>
@@ -270,7 +309,7 @@
 		x1={X(0)}
 		y1={topY}
 		perpOffset={-(r.w * 0.06)}
-		text={fmtMm(vstup.vyskaVpredu) + ' mm'}
+		text={fmtMm(vstup.vyskaVpredu)}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -280,7 +319,7 @@
 		x1={X(g.celkovaSirka)}
 		y1={baseY - g.svetlaVyska * scale}
 		perpOffset={r.w * 0.06}
-		text={fmtMm(g.svetlaVyska) + ' mm'}
+		text={fmtMm(g.svetlaVyska)}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -306,46 +345,67 @@
 	{@const yWallTop = baseY - vstup.vyskaPriStene * scale}
 	{@const yFrontTop = baseY - vstup.vyskaVpredu * scale}
 	{@const yClearTop = baseY - g.svetlaVyska * scale}
+	{@const roofH = Math.max(1.5, NOSNIK_HRUBKA_MM * scale)}
+	{@const previs = PREVIS_VIZ_MM * scale}
+	{@const postHalfW = stlpHalfW(scale, (xFront - xWall) * 0.15)}
 	{@const arc = angleDimension(xWall, yWallTop, 7, 90, 90 + g.sklonDeg)}
+	<!-- #145: nadpis DNU do panela (rovnaký fix ako elevation vyššie) -->
 	<text
 		x={r.x + r.w * 0.5}
-		y={r.y - 1}
+		y={r.y + 3}
 		text-anchor="middle"
 		font-size="3"
 		fill={CIERNA}
 		font-weight="600">REZ A</text
 	>
+	<!-- stena — len tenká referenčná čiara (nie profil, mieri to na múr), zvýraznená
+	     o niečo viac než kóty, ale ĎALEKO pod hrúbkou skutočného profilu vpravo -->
 	<line
 		x1={xWall}
 		y1={baseY}
 		x2={xWall}
 		y2={yWallTop}
 		stroke={CIERNA}
-		stroke-width="0.6"
+		stroke-width="1"
 		data-testid="pn-section-stena"
 	/>
-	<line
-		x1={xFront}
-		y1={baseY}
-		x2={xFront}
-		y2={yFrontTop}
+	<!-- strešný profil (nosník) s reálnou hrúbkou (NOSNIK_HRUBKA_MM) a previsom cez
+	     predný stĺp (#146 bod 2: "profil strechy so spádom ako pás, previs") — jeden
+	     vyplnený tvar, jednoduchý zvislý odsad hrúbky (dostatočne presné pri malom
+	     sklone ~pár stupňov) -->
+	<path
+		d={`M ${xWall} ${yWallTop} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${yWallTop + roofH} Z`}
+		fill={CIERNA}
 		stroke={CIERNA}
-		stroke-width="0.7"
+		stroke-width={STRUKTURA_STROKE_VEDLAJSIA}
+		data-testid="pn-section-strecha"
+	/>
+	<!-- predný stĺp — reálna hrúbka v mierke (STLP_HRUBKA_VIZ_MM), vyplnený (CAD
+	     konvencia pre koncový/rezový pohľad na profil) — spolu so strechou vyššie
+	     tvorí "L" presne ako vo vzore -->
+	<rect
+		x={xFront - postHalfW}
+		y={yFrontTop + roofH}
+		width={postHalfW * 2}
+		height={baseY - (yFrontTop + roofH)}
+		fill={CIERNA}
 		data-testid="pn-section-predok"
 	/>
+	<!-- #146 bod 9: uhlová kóta ako malý oblúk S radius-čiarami k vrcholu (CAD
+	     "flag" konvencia), nie voľne plávajúce číslo -->
 	<line
 		x1={xWall}
 		y1={yWallTop}
-		x2={xFront}
-		y2={yFrontTop}
-		stroke={CIERNA}
-		stroke-width="0.5"
-		data-testid="pn-section-strecha"
+		x2={arc.start.x}
+		y2={arc.start.y}
+		stroke={MODRA}
+		stroke-width="0.3"
 	/>
-	<path d={arc.arcPath} stroke={MODRA} stroke-width="0.35" fill="none" />
+	<line x1={xWall} y1={yWallTop} x2={arc.end.x} y2={arc.end.y} stroke={MODRA} stroke-width="0.3" />
+	<path d={arc.arcPath} stroke={MODRA} stroke-width="0.5" fill="none" />
 	<!-- NEUŽÍVAME arc.label — jeho fixný odsah "r+12" (kota.ts) je v tomto malom
 	     kompaktnom náhľade neúmerne veľký (vytláča popisok mimo oblasť rezu), takže
-	     popisok umiestňujeme sami, blízko rohu oblúka. -->
+	     popisok umiestňujeme sami, tesne pri oblúku (viazaný naň radius-čiarami vyššie). -->
 	<text
 		x={xWall + 4}
 		y={yWallTop - 2}
@@ -362,7 +422,7 @@
 		x1={xWall}
 		y1={yWallTop}
 		perpOffset={-(r.w * 0.1)}
-		text={fmtMm(vstup.vyskaPriStene) + ' mm'}
+		text={fmtMm(vstup.vyskaPriStene)}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -372,7 +432,7 @@
 		x1={xFront}
 		y1={yClearTop}
 		perpOffset={r.w * 0.06}
-		text={fmtMm(g.svetlaVyska) + ' mm'}
+		text={fmtMm(g.svetlaVyska)}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -382,7 +442,7 @@
 		x1={xFront}
 		y1={baseY}
 		perpOffset={r.h * 0.14}
-		text={fmtMm(vstup.hlbka) + ' mm'}
+		text={fmtMm(vstup.hlbka)}
 		color={MODRA}
 		fontSize={3.2}
 	/>
@@ -417,6 +477,8 @@
 		fill={CIERNA}
 		font-weight="600">3D — IZOMETRICKÝ POHĽAD</text
 	>
+	<!-- #146 bod 7: krokvy/hlavné hrany hrubšie (STRUKTURA_STROKE), vedľajšie panelové
+	     deliace krokvy tenšie — jasný vizuálny kontrast hlavná vs. vedľajšia hrana -->
 	<g stroke={CIERNA} fill="none" data-testid="pn-iso-hrany">
 		{#each hrany as h, i (i)}
 			{@const s = projekciaUsecky(h.a, h.b, isoScale)}
@@ -425,7 +487,7 @@
 				y1={s.y1 + offY}
 				x2={s.x2 + offX}
 				y2={s.y2 + offY}
-				stroke-width={h.hlavna ? 0.7 : 0.3}
+				stroke-width={h.hlavna ? STRUKTURA_STROKE : STRUKTURA_STROKE_VEDLAJSIA}
 			/>
 		{/each}
 	</g>
@@ -441,17 +503,17 @@
 			x2={px}
 			y2={py}
 			stroke={CIERNA}
-			stroke-width="0.3"
+			stroke-width="0.45"
 			data-testid="pn-zvod-cira"
 		/>
-		<polygon points={sipka(lx, ly, px, py, 2.6, 1.3)} fill={CIERNA} />
+		<polygon points={sipka(lx, ly, px, py, 3, 1.5)} fill={CIERNA} />
 		<text
 			x={lx}
 			y={ly + 3}
 			text-anchor="middle"
-			font-size="2.6"
+			font-size="2.8"
 			fill={CIERNA}
-			font-weight="600"
+			font-weight="700"
 			data-testid="pn-zvod-label">ZVOD</text
 		>
 	{/each}

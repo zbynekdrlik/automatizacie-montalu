@@ -44,14 +44,17 @@
 
 {#if geom.witnesses.length > 0}
 	<!-- odkazové (witness) čiary — od geometrie po odsadenú kótovú čiaru, tenšie než
-	     kótová čiara samotná (CAD konvencia, issue #137 bod "s odkazovými čiarami") -->
-	<g stroke={color} stroke-width="0.5" fill="none" data-testid="kota-witness">
+	     kótová čiara samotná (CAD konvencia, issue #137 bod "s odkazovými čiarami").
+	     #146 bod 3: hierarchia hrúbok čiar — odkazové čiary sú NAJTENŠIE z kótovej
+	     skupiny (0.4), kótová čiara samotná o niečo hrubšia (0.7 nižšie), obe pod
+	     konštrukčnými obrysmi (~1.6-2, kreslené priamo v PergolaNavrhVykres.svelte). -->
+	<g stroke={color} stroke-width="0.4" fill="none" data-testid="kota-witness">
 		{#each geom.witnesses as w (w.x1 + ':' + w.y1 + ':' + w.x2 + ':' + w.y2)}
 			<line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />
 		{/each}
 	</g>
 {/if}
-<g stroke={color} stroke-width="1" fill="none" data-testid="kota">
+<g stroke={color} stroke-width="0.7" fill="none" data-testid="kota">
 	<line x1={geom.lines[0].x1} y1={geom.lines[0].y1} x2={geom.lines[0].x2} y2={geom.lines[0].y2} />
 	<line x1={geom.lines[1].x1} y1={geom.lines[1].y1} x2={geom.lines[1].x2} y2={geom.lines[1].y2} />
 	<line x1={geom.lines[2].x1} y1={geom.lines[2].y1} x2={geom.lines[2].x2} y2={geom.lines[2].y2} />
