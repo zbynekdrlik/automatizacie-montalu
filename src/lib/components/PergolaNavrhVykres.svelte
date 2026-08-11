@@ -37,6 +37,12 @@
 	const GRID_BAND = 5;
 	const OBLAST_W = PAGE_W - 2 * MARGIN - 2 * GRID_BAND;
 	const OBLAST_H = PAGE_H - 2 * MARGIN - 2 * GRID_BAND;
+	// deep-review nález (#146): predtým bola `content` snippetu hardcoded lokálna
+	// `TB_H = 50` ktorá musela ručne sedieť s `VykresovyHarok`'s internym defaultom
+	// (`tbH = titleBlock?.height ?? 50`) — nič to nevynucovalo, tichý rozchod pri
+	// zmene jedného z nich by textCol posunul cez pečiatku. Namiesto dvoch čísel:
+	// JEDNA konštanta poslaná explicitne ako `titleBlockData.height` nižšie.
+	const TB_H = 50;
 
 	let g = $derived(vypocitajGeometriu(vstup));
 
@@ -63,7 +69,8 @@
 		revizia: emDash(vstup.revizia),
 		varianta: vstup.varianta || 'NAVRH',
 		vypracoval: emDash(vstup.vypracoval),
-		datum
+		datum,
+		height: TB_H
 	});
 
 	const CIERNA = '#0f172a';
@@ -120,10 +127,9 @@
 		     pohľad v strede hore, REZ A vpravo hore, izometria vľavo dole, texty/RAL
 		     vpravo dole NAD pečiatkou) + vyplniť prázdne plochy/pohľady väčšie —
 		     topH zväčšený z 0.38 na 0.40, textCol už nesedí na pevný zlomok výšky ale
-		     siaha až tesne nad pečiatku (TB_H/TB_W musia zodpovedať VykresovyHarok
-		     defaultom, keďže titleBlock={titleBlockData} nižšie žiadne width/height
-		     neposiela). -->
-		{@const TB_H = 50}
+		     siaha až tesne nad pečiatku. Výška pečiatky je skriptová konštanta `TB_H`
+		     poslaná explicitne cez `titleBlockData.height` vyššie (deep-review nález
+		     #146 — predtým dve nezávislé "50" duplicity, ktoré sa museli ručne zhodovať). -->
 		{@const topH = oblast.h * 0.4}
 		{@const gap = oblast.w * 0.015}
 		{@const pd = { x: oblast.x, y: oblast.y, w: oblast.w * 0.16, h: topH }}
@@ -172,7 +178,11 @@
 	{@const x1 = x0 + sirkaPx}
 	{@const y0 = r.y + r.h * 0.06}
 	{@const y1 = y0 + dlzkaPx}
-	{@const captionX = x0 - 6}
+	<!-- deep-review nález (#146): pri x0-6 caption a kóta 3411 (posunutá vľavo od
+	     nej, viď nižšie) obsadzovali rovnaký ~16mm pás v tomto úzkom 44mm stĺpci —
+	     -2 namiesto -6 posúva popis 4mm bližšie k obrysu (stále čisté 2mm medzera
+	     od neho) a uvoľní presne toľko miesta kóte na jej ľavej strane. -->
+	{@const captionX = x0 - 2}
 	{@const captionY = y0 + dlzkaPx / 2}
 	<rect
 		x={x0}
@@ -196,12 +206,19 @@
 		stroke-width="0.35"
 		fill="none"
 	/>
+	<!-- deep-review nález (#146): `verticalDimension`'s vlastný dokumentovaný kontrakt
+	     (`$lib/vykres/kota.ts`) je "kladné perpOffset = doľava" — predchádzajúci
+	     `perpOffset={-16}` teda posúval kótu DOPRAVA, priamo DO obrysu (cez
+	     break-marky), nie preč od neho vľavo, ako bolo zamýšľané. Kladná hodnota
+	     (21) ju posúva doľava AŽ ZA popis (captionX vyššie skrátený na -2, aby na
+	     to ostalo miesto) — zmenšený `tick` drží ťaháky kompaktné v úzkom stĺpci. -->
 	<Kota
 		x0={x0 - 3}
 		{y0}
 		x1={x0 - 3}
 		{y1}
-		perpOffset={-16}
+		perpOffset={21}
+		opts={{ tick: 1 }}
 		text={fmtMm(g.panelDlzka)}
 		fontSize={3}
 		color={MODRA}
