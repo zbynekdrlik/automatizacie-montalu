@@ -529,3 +529,50 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   vzorové 4,3° — zdokumentovaná nezrovnalosť). 0 chýb konzoly.
 - Discord run-card odoslaná (`notify --run-card --issue 138`, potvrdené
   doručenie). #138 auto-zavretý mergom PR #141 (`Closes #138`).
+
+## #142 — Voľba roly pri založení účtu + zmena roly z appky (2026-08-11)
+
+- Reálny incident: šéf si cez jediný dostupný formulár (len B2B) založil
+  účet `palo@montalu.sk`, dostal orezanú rolu, opravovalo sa ručne cez
+  docker exec. Design comment (pred prvým code commitom):
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/142#issuecomment-5251316355
+  (+ validačný komentár:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/142#issuecomment-5251315994)
+- Verzia 0.14.24 → 0.14.25 (`54c22c5`).
+- `pridat` číta rolu z formulára (default B2B) — bezpečné, lebo b2b aktér je
+  odmietnutý PRED čítaním role. Nová `changeUserRole()` (db.ts) + akcia
+  `zmenit_rolu`: vlastnú rolu nemožno zmeniť (porovnáva `id`), posledný
+  interný účet nemožno degradovať. Nová tabuľka `user_audit` (migrácia
+  v19→v20, aditívna) — audit vytvorenia aj zmeny roly.
+- Commity: `bd41431` (feat), `78aaa1d` (unit testy), `8e44d2c` (e2e testy),
+  `8d387f8` (docs/playbook access-control), `584caf4` (fix: self-review —
+  no-op zmena roly nehlásila „zmenená", pridaný `changed:boolean`),
+  `d700c56` (fix: deep-review nález — `pridat`/`zmazat` zarovnané s
+  `!locals.user` gate).
+- Testy: `tests/users-admin.test.ts` (addUser audit, countInternalUsers,
+  changeUserRole úspech/vlastná rola/posledný interný/no-op),
+  `tests/pouzivatelia-actions.test.ts` (forged POST na všetky 3 akcie —
+  b2b nemôže eskalovať ani s `role=internal` v tele), `e2e/pouzivatelia-role.spec.ts`
+  (3 nové: založenie Interný účtu → plný prístup → zmena roly späť na B2B cez
+  UI → zmazanie; vlastná rola sa v UI vôbec nezobrazí; popisok viditeľný) +
+  aktualizované `e2e/app.spec.ts`/`e2e/sietka.spec.ts` (tlačidlo „Pridať B2B
+  účet" → „Pridať účet"). Migrácia teraz končí na v20 — všetky
+  `migration-*.test.ts` finálne assercie prepísané z 19 na 20.
+  Lokálne: `npm run lint` čisté, `npm run check` 0/0/0, `npm test` 925/925,
+  `npm run build` OK, `npx playwright test` 149/149.
+- `superpowers:requesting-code-review` (nezávislý subagent, skutočne spustil
+  celý lokálny gate na izolovanom worktree nad `08e9874c..8d387f8d`): 0 🔴,
+  1 🟡 (presne no-op-hlásenie nález, už opravený v `584caf4`), 2 🔵
+  (`!locals.user` konzistencia — opravená v `d700c56`; chýbajúci
+  autopilot-log záznam — toto je ten záznam). Review komentár:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/142#issuecomment-5251671233
+- **PR #143** (dev→main), merge `3d5ccfc`. Main CI (test+deploy) zelené.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet): `/health`
+  → `{"ok":true,"version":"0.14.25 (3d5ccfc)","live":true}`; footer
+  `v0.14.25 (3d5ccfc)`. `/pouzivatelia`: select roly (default B2B) + popisok
+  v pridávacom formulári, per-riadok select+Zmeniť na 5/6 účtoch (marekova
+  vlastná rola bez ovládača, len text), `palo@montalu.sk` zobrazený ako
+  Interný. Live smoke test: vytvorený `e2e-postdeploy-test-142` (B2B) →
+  potvrdené v tabuľke → zmazaný → späť na 6 účtov. 0 chýb konzoly.
+- Discord run-card odoslaná (`notify --run-card --issue 142`, potvrdené
+  doručenie). #142 auto-zavretý mergom PR #143 (`Closes #142`).

@@ -1,5 +1,18 @@
 # Testing (unit + E2E) — local run gotchas
 
+## Testing a form action directly (forged-POST security tests) — `fail()` returns `{status, data}`
+
+Per `access-control` skill §2: prove a security boundary with a scripted POST
+straight to the SvelteKit `actions.<name>` function, not just "button hidden in
+UI". `fail(status, body)` (`@sveltejs/kit`) constructs an `ActionFailure` —
+inspect it as `{ status: number, data: T }` (`node_modules/@sveltejs/kit/src/exports/internal/index.js`,
+`class ActionFailure { constructor(status, data) { this.status = status; this.data = data; } }`).
+So a forged-POST test asserts `expect(r).toMatchObject({ status: 403 })` and
+reads the message via `(r as { data?: { error?: string } }).data?.error` — NOT
+`.error` directly (that's the shape of a plain `return { error }` success-path
+object, which `fail()` does not produce). See `tests/pouzivatelia-actions.test.ts`
+(#142) and `tests/b2b-money-reject.test.ts` for the pattern.
+
 ## Running the full gate locally
 
 ```bash
