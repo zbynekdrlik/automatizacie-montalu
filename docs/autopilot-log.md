@@ -576,3 +576,54 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   potvrdené v tabuľke → zmazaný → späť na 6 účtov. 0 chýb konzoly.
 - Discord run-card odoslaná (`notify --run-card --issue 142`, potvrdené
   doručenie). #142 auto-zavretý mergom PR #143 (`Closes #142`).
+
+## 2026-08-11 — Pergola návrh: vizuálna vernosť CAD vzoru 2. kolo + oprava kolízie nadpisov (#145 #146)
+
+- **Issues:** #145 (nadpisy PREDNÝ POHĽAD / REZ A kolidujú s hornou rastrovou
+  lištou), #146 (druhé kolo vizuálnej vernosti voči vzoru OP260032 — kóty bez
+  „mm", reálna hrúbka konštrukcie, hierarchia hrúbok čiar, rozloženie hárku,
+  úzke technické písmo, uhlová kóta spádu). Oba CLOSED (auto, `Closes #145`
+  `Closes #146` v PR #148).
+- **Design comment** (predchádzajúci worker, pred prvým code commitom):
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/146#issuecomment-5252667266
+  (DESIGN + OVERENÉ, viď issue #146 história pre plné znenie)
+- **Commity (dev):** `caa8051` verzia 0.14.28 → `d5770d1` test:[red] regresný
+  test #145 → `1ac976b` fix:[green] #145 fix + #146 vizuálna vernosť (hlavná
+  implementácia predchádzajúceho workera, ktorý zomrel na API rate limit
+  uprostred vlastného review — nálezy neboli zapísané) → `897ca0e` fix:[green]
+  MÔJ deep-review nález #1 (panelDlzka kóta renderovaná CEZ obrys, sign error
+  v `perpOffset` — `verticalDimension`'s vlastný kontrakt je "kladné =
+  doľava", `-16` posúval opačne) + duplicitná `TB_H=50` (teraz
+  `titleBlockData.height`) → `19a011b` fix:[green] MÔJ deep-review nález #2
+  (nezávislý fresh-context subagent našiel: oprava #1 posunula
+  `witnessLine`'s pevný `overshoot` za ľavú hranicu kresliacej oblasti —
+  `perpOffset=17` + nezávislé `labelOffset=0` to opravilo bez nového
+  kolízneho nálezu; + zastaraný komentár "dvojriadkovo").
+- **Testy:** `e2e/pergola-navrh.spec.ts` regresia #145
+  (`getBoundingClientRect` nadpis vs. horná rastrová lišta) + prepis kót na
+  presnú zhodu bez „mm" (regex `/^3000$/` namiesto substring). Lokálne:
+  `npm run check` 0/0/0, `npm run lint` čisté, `npm test` 929/929,
+  `npx playwright test e2e/pergola-navrh.spec.ts` 8/8 (vrátane b2b #144 aj
+  regresie #145).
+- **Review:** fresh-context `general-purpose` subagent (ekvivalent /review +
+  requesting-code-review), napísal samostatný skript replikujúci
+  `kota.ts`'s dimension funkcie na overenie súradníc. Prvé kolo: 0 🔴 0 🟡
+  2 🔵 (witness presah cez rám, zastaraný komentár) — oba opravené v `19a011b`.
+  Finálny stav: 0 🔴 0 🟡 0 🔵. Review komentáre na #146:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/146#issuecomment-5254191665
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/146#issuecomment-5254614141
+- **PR #148** (dev→main), merge `a2087f2`. Main CI (test+deploy) zelené.
+  CI gotcha: `version-check` check-run zamrzol na `IN_PROGRESS` napriek tomu,
+  že run aj job-log boli hotové/zelené (nová varianta zombie-run bugu, viď
+  `.claude/rules/ci.md`) — opravené cez `gh workflow run ci.yml --ref dev`.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet): `/health`
+  → `{"ok":true,"version":"0.14.28 (a2087f2)","live":true}`; footer
+  `v0.14.28 (a2087f2)`. `/pergola/navrh` s OP260032 hodnotami: všetkých 5
+  pohľadov, kóty bez „mm", 0 chýb konzoly, žiadny vizuálny prekryv v paneli
+  výplne. Golden snapshot (`zasklenia-posuvspec-golden.test.ts.snap`)
+  overený byte-identický (žiadna zmena).
+- Discord run-card odoslaná pre #145 aj #146 (`notify --run-card`,
+  potvrdené doručenie).
+- Playbook: `.claude/rules/vykres.md` (2 nové sekcie — `perpOffset` sign
+  overenie + tight-column `labelOffset` decoupling) a `.claude/rules/ci.md`
+  (zombie check-run variant) — viď PR pre túto verziu.

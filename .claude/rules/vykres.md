@@ -101,6 +101,36 @@ vykresľuje (viditeľný v screenshote). `toBeVisible()` na takomto prvku (napr.
 PRÍTOMNOSŤ/POČET (`toHaveCount(N)`) — nikdy visibility-check na jednotlivom
 perfektne osovo zarovnanom `<line>` (#138).
 
+## `verticalDimension`'s `perpOffset` sign is easy to get backwards — verify with real coordinates, not by eye
+
+Docstring says "kladné = doľava od smeru zhora nadol" (`kota.ts`), but a
+flipped sign renders NO error — it just draws the dimension line/label
+INSIDE the geometry it measures instead of beside it (#146: `perpOffset={-16}`
+put the "3411" panel-length kóta at x=48.64mm, inside the rect `[35.64,
+54.12]`; no test caught it, only a deep-review screenshot did). Before
+shipping a NEW `Kota` placement, verify the ACTUAL rendered position
+(`getBoundingClientRect`/raw SVG attrs via Playwright `browser_evaluate`)
+against the geometry you're avoiding — don't trust "the sign looks right".
+
+## Tight column (<~30mm) with `Kota` + adjacent text: `perpOffset` moves witness+tick+label TOGETHER — use `labelOffset` to decouple
+
+`witnessLine`'s `gap`/`overshoot` (kota.ts, fixed 2mm/3mm, NOT exposed via
+`DimensionOpts`) mean the witness's far end always reaches `perpOffset+3mm`
+past the geometry point, no matter what `tick` is set to. In a narrow column
+(#146's ~44mm panel-detail area: a caption AND a dimension both competing
+for ~24mm of free space) a `perpOffset` big enough to clear an adjacent
+text label ALSO drags the witness overshoot past the drawable region's own
+edge (`oblast.x`) — two independent boundary constraints that `perpOffset`
+alone can't satisfy at once. `opts.labelOffset` is a SEPARATE param (`kota.ts`
+`lineDimension`, `label.x = midpoint + nx·labelOffset` — no coupling to the
+witness geometry): use it to move JUST the label, e.g.
+`opts={{ tick: 1, labelOffset: 0 }}` centers the label directly on the
+dimension line instead of the default `-4` (which pulls it back TOWARD the
+geometry — often straight back into the thing `perpOffset` just offset away
+from). Verify tick span, witness far-end, AND label position separately
+against the region's boundaries via raw SVG attributes — hand math is
+error-prone here; #146's fix needed 3 render-verify iterations.
+
 ## 3D izometria (#138) — `$lib/vykres/iso.ts`
 
 Generický 30° dimetrický/axonometrický projektor `{x,y,z}→{x,y}` (x=šírka,
