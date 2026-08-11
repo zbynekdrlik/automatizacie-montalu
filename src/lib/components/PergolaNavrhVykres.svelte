@@ -38,10 +38,16 @@
 
 	let g = $derived(vypocitajGeometriu(vstup));
 
+	// #144: OP číslo / vypracoval / revízia sú voliteľné (VO odberateľ nemá Montalu OP
+	// číslo) — prázdna hodnota sa v pečiatke vykreslí ako „—", rovnaký čestný-neznáme
+	// idiom aký už používa `vypocitajMierku` (nikdy prázdny text, nikdy natvrdo predstierané
+	// "0"/meno).
+	const emDash = (s: string) => (s.trim() ? s : '—');
+
 	let titleBlockData = $derived({
 		nazov: vstup.nazov || 'PERGOLA — NÁVRH',
 		projekt: 'automatizacie-montalu',
-		cisloVykresu: vstup.op,
+		cisloVykresu: emDash(vstup.op),
 		// čestná mierka sa počíta z REÁLNEJ najväčšej kresby na hárku (izometria/pôdorys
 		// šírka) voči dostupnej ploche — presný výpočet nižšie v `content` snippete by
 		// vyžadoval dvojfázový render; tu použijeme celkovú šírku ako limitujúci rozmer
@@ -52,9 +58,9 @@
 			OBLAST_W * 0.66,
 			OBLAST_H
 		),
-		revizia: vstup.revizia || '0',
+		revizia: emDash(vstup.revizia),
 		varianta: vstup.varianta || 'NAVRH',
-		vypracoval: vstup.vypracoval,
+		vypracoval: emDash(vstup.vypracoval),
 		datum
 	});
 

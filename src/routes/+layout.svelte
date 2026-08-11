@@ -13,8 +13,9 @@
 		document.documentElement.dataset.hydrated = '1';
 	});
 
-	// B2B vidí LEN Zasklenia — zvyšné odkazy (vrátane Vzorce/Nastavenia, ktoré sú
-	// mimo /zasklenia) sú interné. Používatelia je nový odkaz len pre interných.
+	// B2B vidí Zasklenia + Sieťka + (od #144) display-only Pergola návrh — zvyšné
+	// odkazy (vrátane Vzorce/Nastavenia, ktoré sú mimo /zasklenia) sú interné.
+	// Používatelia je nový odkaz len pre interných.
 	// href je typovaný ako RouteId (z $app/types) a šablóna nižšie ho vždy volá cez
 	// resolve(l.href) — to spĺňa svelte/no-navigation-without-resolve (#99).
 	const links = $derived(
@@ -22,7 +23,10 @@
 			? ([
 					{ href: '/zasklenia', label: 'Zasklenia' },
 					// dodatočná sieťka bez posuvu (#89) — Patrik: „hlavne pre externých"
-					{ href: '/sietka', label: 'Sieťka' }
+					{ href: '/sietka', label: 'Sieťka' },
+					// zákaznícky návrhový výkres (#138), sprístupnený b2b (#144) — display-only,
+					// žiadny Money zápis; /pergola (Money odpis z CAD nárezu) pre b2b NIE JE tu
+					{ href: '/pergola/navrh', label: 'Pergola návrh' }
 				] satisfies { href: RouteId; label: string }[])
 			: ([
 					{ href: '/pergola', label: 'Pergola' },

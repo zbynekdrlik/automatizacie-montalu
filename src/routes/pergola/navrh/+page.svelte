@@ -169,15 +169,10 @@
 		<form method="POST" action="?/vykres">
 			<div class="grid3">
 				<div class="field">
-					<label for="op">OP číslo *</label>
-					<input
-						id="op"
-						name="op"
-						bind:value={opS}
-						required
-						maxlength="40"
-						placeholder="napr. OP260032"
-					/>
+					<!-- #144: OP číslo je VOLITEĽNÉ — VO odberateľ (b2b) nemá Montalu OP číslo,
+					     prázdne sa v pečiatke vykreslí ako „—" -->
+					<label for="op">OP číslo</label>
+					<input id="op" name="op" bind:value={opS} maxlength="40" placeholder="napr. OP260032" />
 				</div>
 				<div class="field">
 					<label for="nazov">Názov výkresu</label>
@@ -388,7 +383,10 @@
 	</div>
 {:else if step === 'vykres'}
 	<div class="card">
-		<h1>{vstup.op}{vstup.nazov ? ` · ${vstup.nazov}` : ''}</h1>
+		<!-- #144 review nález: OP číslo je od tejto verzie voliteľné — bez fallbacku by
+		     prázdne OP aj prázdny názov spolu dali VIZUÁLNE PRÁZDNY nadpis. Rovnaký „—"
+		     idiom ako pečiatka (PergolaNavrhVykres.svelte), nikdy nič neposiela do Money. -->
+		<h1>{vstup.op || '—'}{vstup.nazov ? ` · ${vstup.nazov}` : ''}</h1>
 		<p class="sub">
 			<span class="badge">Pergola — návrhový výkres</span>
 			<span class="badge">{fmt(celkovaSirka)} × {fmt(vstup.hlbka)} mm</span>

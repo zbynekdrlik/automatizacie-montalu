@@ -89,9 +89,11 @@ describe('parsePergolaNavrhVstup', () => {
 		expect(error).toBeNull();
 	});
 
-	it('chýbajúce OP číslo = chyba', () => {
-		const { error } = parsePergolaNavrhVstup(fd({ ...zaklad, op: '' }));
-		expect(error).toMatch(/OP číslo/i);
+	// #144 — OP je teraz voliteľné (VO odberateľ nemá Montalu OP číslo)
+	it('#144: chýbajúce OP číslo NIE JE chyba (voliteľné)', () => {
+		const { error, vstup } = parsePergolaNavrhVstup(fd({ ...zaklad, op: '' }));
+		expect(error).toBeNull();
+		expect(vstup.op).toBe('');
 	});
 
 	it('textové polia sú orezané na max dĺžku', () => {

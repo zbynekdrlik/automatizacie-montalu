@@ -41,6 +41,17 @@ account create/role-change is written to `user_audit` (actor, action, target,
 timestamp) — a dedicated table, not `cfg_audit` (that one is schema-bound to
 `sys_styl`/formula edits). Forged-POST coverage: `tests/pouzivatelia-actions.test.ts`.
 
+**A `count() <= N` check-then-act guard (e.g. "don't demote the last internal
+user") needs NO extra locking in this deployment.** `deploy/docker-compose.yml`
+runs a single `node build` process (adapter-node, no clustering) and
+better-sqlite3 is fully synchronous — so a guard function with no `await`
+between its `COUNT(*)` read and its `UPDATE`/`INSERT` (wrapped in one
+`db.transaction()`) cannot be interleaved by a concurrent request: Node's
+single-threaded event loop only yields at an `await`, and there isn't one
+inside the guard. If this app ever moves to multi-process/clustered deploy,
+re-derive this — a check-then-act guard across processes needs a real
+transaction-level re-check, not just "it's in one `db.transaction()`".
+
 ## 3. Fail-OPEN drift guards (CI tests) — the denylist's weak spot
 
 A denylist + a per-system limits map both fail OPEN for anything not listed: a NEW
