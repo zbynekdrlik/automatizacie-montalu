@@ -265,7 +265,7 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 	await goto(page, '/pouzivatelia');
 	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
 	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
-	await page.getByRole('button', { name: 'Pridať B2B účet' }).click();
+	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 
 	await page.getByRole('button', { name: 'Odhlásiť' }).click();

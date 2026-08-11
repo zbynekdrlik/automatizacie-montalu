@@ -24,11 +24,22 @@ Hiding a button is not security. The b2b Money-write lock is 3 layers:
 2. `/zasklenia` is the one write-page b2b may open, so its `odoslat`/`odoslatMulti`
    actions reject b2b as the **first statement** (before parse/compute/write):
    `if (isB2B(locals.user)) return { step: 'form', error: '…' }`.
-3. `deleteB2BUser` refuses non-b2b rows in the DB helper itself; `/pouzivatelia`
-   `pridat` hardcodes `role='b2b'` (never from form input) — a forged field can't
-   escalate.
+3. `deleteB2BUser` refuses non-b2b rows in the DB helper itself.
 Test the boundary with a **forged POST** (call the action directly with a b2b
 `locals.user`), not just "button hidden" — see `tests/b2b-money-reject.test.ts`.
+
+**`/pouzivatelia` `pridat` reads `role` from the form (#142)** — this stopped being a
+trust boundary the moment `pridat` started gating `isB2B(locals.user)` as its FIRST
+statement (before the form is even parsed): a b2b actor never reaches the `role` field
+at all, so a forged `role=internal` in the POST body cannot escalate — only an actor
+ALREADY internal can choose a role, and an internal actor choosing 'internal' is not an
+escalation (same trust level as the old direct-DB-write path). `changeUserRole` (role
+switch on an EXISTING account) is gated the identical way, plus two extra guards: an
+actor cannot change their OWN role (compares `id`, not `username` — see §5) and the
+LAST `internal` account cannot be demoted to `b2b` (`countInternalUsers() <= 1`). Every
+account create/role-change is written to `user_audit` (actor, action, target,
+timestamp) — a dedicated table, not `cfg_audit` (that one is schema-bound to
+`sys_styl`/formula edits). Forged-POST coverage: `tests/pouzivatelia-actions.test.ts`.
 
 ## 3. Fail-OPEN drift guards (CI tests) — the denylist's weak spot
 
@@ -53,9 +64,12 @@ better-sqlite3 is synchronous → no request ever sees a half-migrated schema. A
 COLUMN with a constant default is O(1) (no row rewrite). Existing sessions survive
 (sessions table untouched; existing users resolve to the default). A role/permission
 feature stays INERT until the first privileged account exists — so the deploy is a
-no-op for existing users. Provision new restricted accounts via the internal-only
-`/pouzivatelia` admin page (`addUser`/`deleteB2BUser`), not env re-seed (seed only
-runs on an empty users table).
+no-op for existing users. Provision/manage accounts via the internal-only `/pouzivatelia`
+admin page (`addUser` with a chosen role, `changeUserRole` to promote/demote an existing
+account, `deleteB2BUser` for b2b cleanup), not env re-seed (seed only runs on an empty
+users table) and never a direct `docker exec`/SQL `UPDATE` — the #142 incident (an
+internal account created via the app's only-B2B form, fixed by hand in prod) is exactly
+what the UI-level role choice + role-switch now cover.
 
 ## 5. Usernames match CASE-INSENSITIVELY (login + dup-check)
 

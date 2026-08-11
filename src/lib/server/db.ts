@@ -634,6 +634,26 @@ function migrate() {
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 20) {
+		// v19 → v20: audit účtových udalostí (vytvorenie + zmena roly) — #142. Reálny
+		// incident (2026-08-11): šéf si cez /pouzivatelia založil účet, jediný formulár
+		// zakladal LEN B2B, dostal orezanú rolu, opravovalo sa ručne cez docker exec
+		// (appka nemala žiadnu cestu na zmenu roly z UI). Dedikovaná tabuľka namiesto
+		// `cfg_audit` (tá je schémou viazaná na `sys_styl` — editor vzorcov, nehodí sa
+		// na účtové udalosti). Aditívne — no-op na existujúcich dátach.
+		db.exec(`
+			CREATE TABLE user_audit (
+				id INTEGER PRIMARY KEY,
+				ts TEXT NOT NULL DEFAULT (datetime('now')),
+				actor TEXT NOT NULL,
+				action TEXT NOT NULL CHECK (action IN ('create','role_change')),
+				target_username TEXT NOT NULL,
+				detail TEXT NOT NULL DEFAULT ''
+			);
+		`);
+		db.pragma('user_version = 20');
+	}
+
 	seedData();
 	seedUsers();
 }
@@ -824,7 +844,7 @@ export function glassTypesForSystem(system: string): GlassType[] {
 	return listGlassTypes().filter((g) => g.system === sys || g.system === 'ALL');
 }
 
-// ---- user-admin (B2B veľkoobchodné účty) ----
+// ---- user-admin (interné + B2B veľkoobchodné účty) ----
 
 export function listUsers() {
 	return db
@@ -832,10 +852,22 @@ export function listUsers() {
 		.all() as { id: number; username: string; role: string; created_at: string }[];
 }
 
+/** Počet interných účtov — guard proti degradovaniu POSLEDNÉHO interného na B2B (#142). */
+export function countInternalUsers(): number {
+	return (db.prepare("SELECT COUNT(*) c FROM users WHERE role = 'internal'").get() as { c: number })
+		.c;
+}
+
+/**
+ * `actor` = prihlasovacie meno toho, KTO účet zakladá — zapíše sa do `user_audit`
+ * (#142: dohľadateľnosť „kto koho vytvoril/povýšil"). Prázdny reťazec je platný
+ * (napr. seed/test bez session kontextu) — stĺpec je NOT NULL, nie POVINNÝ neprázdny.
+ */
 export function addUser(
 	username: string,
 	password: string,
-	role: 'internal' | 'b2b'
+	role: 'internal' | 'b2b',
+	actor = ''
 ): { error: string | null } {
 	const u = username.trim();
 	if (!u) return { error: 'Meno účtu je povinné.' };
@@ -844,12 +876,47 @@ export function addUser(
 	// case-insensitive) — inak by 'Obchod@…' aj 'obchod@…' koexistovali a mýlili.
 	const exists = db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(u);
 	if (exists) return { error: `Účet „${u}" už existuje.` };
-	db.prepare('INSERT INTO users (username, pass_hash, role) VALUES (?, ?, ?)').run(
-		u,
-		hashPassword(password),
-		role
-	);
+	db.transaction(() => {
+		db.prepare('INSERT INTO users (username, pass_hash, role) VALUES (?, ?, ?)').run(
+			u,
+			hashPassword(password),
+			role
+		);
+		db.prepare(
+			'INSERT INTO user_audit (actor, action, target_username, detail) VALUES (?, ?, ?, ?)'
+		).run(actor, 'create', u, `role=${role}`);
+	})();
 	return { error: null };
+}
+
+/**
+ * Zmena roly existujúceho účtu (#142 — dnes sa dalo len ručne v DB). Dve poistky:
+ * - vlastnú rolu si aktér nemôže zmeniť (ochrana pred odrezaním — porovnáva sa `id`,
+ *   nie username, aby prípadná zhoda mena case-insensitive login nezmiatla).
+ * - posledný interný účet nemožno degradovať na B2B (appka by stratila správcu).
+ * Nezmenená rola je no-op (žiadny UPDATE, žiadny audit riadok — nič sa nestalo);
+ * `changed: false` to odlišuje, nech volajúci nehlási „zmenená", keď sa nič nezmenilo.
+ */
+export function changeUserRole(
+	id: number,
+	newRole: 'internal' | 'b2b',
+	actor: { id: number; username: string }
+): { error: string | null; changed: boolean } {
+	const row = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(id) as
+		{ id: number; username: string; role: string } | undefined;
+	if (!row) return { error: 'Účet neexistuje.', changed: false };
+	if (row.id === actor.id) return { error: 'Vlastnú rolu si nemôžeš zmeniť.', changed: false };
+	if (row.role === newRole) return { error: null, changed: false };
+	if (row.role === 'internal' && newRole === 'b2b' && countInternalUsers() <= 1) {
+		return { error: 'Posledný interný účet nemožno zmeniť na B2B.', changed: false };
+	}
+	db.transaction(() => {
+		db.prepare('UPDATE users SET role = ? WHERE id = ?').run(newRole, id);
+		db.prepare(
+			'INSERT INTO user_audit (actor, action, target_username, detail) VALUES (?, ?, ?, ?)'
+		).run(actor.username, 'role_change', row.username, `${row.role}→${newRole}`);
+	})();
+	return { error: null, changed: true };
 }
 
 /** Zmaže LEN b2b účet (interné účty nie — ochrana proti lockoutu). Sessions padnú cez CASCADE. */

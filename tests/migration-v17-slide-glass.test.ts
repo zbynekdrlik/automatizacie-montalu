@@ -75,7 +75,7 @@ const glass = (nazov: string) =>
 
 describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm)', () => {
 	it('user_version = 17', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(19);
+		expect(db.pragma('user_version', { simple: true })).toBe(20);
 	});
 
 	it('Slide zoznam je presne to, čo si dielňa vypýtala (v poradí)', () => {

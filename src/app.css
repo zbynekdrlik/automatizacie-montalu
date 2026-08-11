@@ -364,6 +364,13 @@ footer.app {
 	font-size: 13px;
 	padding: 2px 6px;
 }
+/* /pouzivatelia — per-riadok zmena roly (#142): select + tlačidlo vedľa seba,
+   nie na celú šírku bunky ako .field/.btn (tie sú pre hlavný formulár). */
+.rola-form {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
 .posuv-nahlady {
 	display: flex;
 	flex-wrap: wrap;
