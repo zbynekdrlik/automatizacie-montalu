@@ -44,6 +44,32 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: 3D vizuál chunk gzip <= 220 KB (#170 §2.13)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const zlib = require('zlib');
+            const dir = 'build/client/_app/immutable/chunks';
+            if (!fs.existsSync(dir)) { console.log('no chunks dir — nothing to check'); process.exit(0); }
+            let total = 0;
+            const hit = [];
+            for (const f of fs.readdirSync(dir)) {
+              if (!f.endsWith('.js')) continue;
+              const p = path.join(dir, f);
+              const src = fs.readFileSync(p, 'utf8');
+              // PMREMGenerator je dostatočne unikátny identifikátor z three.js
+              // jadra (§2.6) — chunk, ktorý ho obsahuje, je 'the viewer chunk'.
+              if (!src.includes('PMREMGenerator')) continue;
+              const gz = zlib.gzipSync(fs.readFileSync(p)).length;
+              hit.push([f, gz]);
+              total += gz;
+            }
+            const KB = 1024;
+            console.log('three.js chunky:', hit.map(([f, g]) => f + ' ' + (g/KB).toFixed(1) + 'KB').join(', ') || '(žiadne)');
+            console.log('spolu gzip:', (total/KB).toFixed(1) + 'KB (limit 220KB)');
+            if (total > 220 * KB) { console.error('::error::viewer chunk presiahol 220KB gzip'); process.exit(1); }
+          "
       - name: Playwright
         run: npx playwright install --with-deps chromium
       - name: E2E (reálny prehliadač, nula console errors)
