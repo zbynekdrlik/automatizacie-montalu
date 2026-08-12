@@ -108,15 +108,35 @@
 	// #146 bod 2/3, prekalibrované #153: hierarchia hrúbok čiar — konštrukčné obrysy
 	// (stĺpy, nosníky, hlavné hrany izometrie) sú NAJHRUBŠIE (STRUKTURA_STROKE), kóty/
 	// odkazové čiary sú tenšie (Kota.svelte, 0.7/0.4), raster hárku najtenší
-	// (VykresovyHarok, 0.2-0.5). STRUKTURA_STROKE znížená 1,8→1,2mm (#153) a používaná
-	// JEDNOTNE v oboch režimoch (technický aj farebný) — dôvod a výpočet v komentári
-	// vyššie pri `farebny`. STRUKTURA_STROKE_VEDLAJSIA ostáva len na svoj pôvodný
-	// účel: tenšie VNÚTORNÉ krokvy izometrie oproti hlavným hranám (#146 bod 7).
+	// (VykresovyHarok, 0.2-0.5). STRUKTURA_STROKE znížená 1,8→1,2mm (#153) a
+	// používaná JEDNOTNE v oboch režimoch (technický aj farebný) — dôvod a výpočet
+	// v komentári vyššie pri `farebny`. Na VYPLNENÝCH tvaroch (strecha/stĺpy/predok)
+	// ide vždy cez `obrysStroke()` nižšie (review nález #153 — pevná hodnota by pri
+	// extrémnych rozmeroch vstupu znova zhltla fill); na IZOMETRICKÝCH hranách (čisté
+	// čiary bez fill, žiadne riziko zhltnutia) sa používa priamo. STRUKTURA_STROKE_
+	// VEDLAJSIA ostáva len na svoj pôvodný účel: tenšie VNÚTORNÉ krokvy izometrie
+	// oproti hlavným hranám (#146 bod 7).
 	const STRUKTURA_STROKE = 1.2;
 	const STRUKTURA_STROKE_VEDLAJSIA = 0.4;
 	// previs strechy (eave) oproti vonkajšej hrane stĺpa/steny [mm] — len vizuálne,
 	// rovnaká disciplína ako STLP_HRUBKA_VIZ_MM (nevstupuje do žiadneho výpočtu)
 	const PREVIS_VIZ_MM = 60;
+
+	/** Obrysová hrúbka pre vyplnený štruktúrny tvar s daným (menším) rozmerom v PX —
+	 *  review nález na #153: pevná STRUKTURA_STROKE=1,2mm je bezpečná len pri BEŽNEJ
+	 *  mierke (OP260032 ≈0,0165) — `stlpHalfW` má vlastnú spodnú hranicu 0,5mm
+	 *  (polovica), teda stĺp/predný stĺp v reze môže reálne vyjsť už len 1,0mm ŠIROKÝ
+	 *  pri hlbke/výške bližšie k hornej hranici vstupu (napr. hlbka=6000, výška
+	 *  vpredu/pri stene=2800 — validný rozsah, HLBKA_MAX=10000/VYSKA_MAX=4500) — teda
+	 *  ŠIRŠÍ obrys než tvar, presne ten istý swallow-bug, ktorý #153 malo opraviť
+	 *  (a NOVÁ regresia pre farebný RAL režim, ktorý predtým vždy používal bezpečnú
+	 *  tenkú STRUKTURA_STROKE_VEDLAJSIA=0,4mm). Namiesto pevnej konštanty preto obrys
+	 *  NIKDY nepresiahne polovicu rozmeru tvaru — fill ostáva viditeľný pri ĽUBOVOĽNOM
+	 *  validnom vstupe, nielen pri vzorovej mierke. Pri bežnej mierke (rozmer strechy/
+	 *  nosníka ≥ ~3mm) sa nič nemení — min() vráti nezmenenú STRUKTURA_STROKE. */
+	function obrysStroke(rozmerPx: number): number {
+		return Math.min(STRUKTURA_STROKE, rozmerPx * 0.5);
+	}
 
 	/** Polovičná hrúbka stĺpa v PX pri danej mierke — orezaná zdola (nikdy nezmizne
 	 *  pri veľmi malej mierke) aj zhora (nikdy nepretečie do susedného poľa pri
@@ -306,9 +326,9 @@
 	>
 	<!-- strešná doska (nosník) v reálnej hrúbke (NOSNIK_HRUBKA_MM), s previsom cez
 	     krajné stĺpy (#146 bod 2) + naznačenou výplňou (deliace čiarky panelov).
-	     #153: obrysový profil (svetlá fill + jednotná STRUKTURA_STROKE v oboch
-	     režimoch) + shape-rendering crispEdges — tento rect je osovo zarovnaný
-	     (bez sklonu), takže crisp hrany nič nezúbkujú. -->
+	     #153: obrysový profil (svetlá fill + obrysStroke v oboch režimoch) +
+	     shape-rendering crispEdges — tento rect je osovo zarovnaný (bez sklonu),
+	     takže crisp hrany nič nezúbkujú. -->
 	<rect
 		x={X(0) - previs}
 		y={topY - roofH}
@@ -316,7 +336,7 @@
 		height={roofH}
 		fill={farebny ? farba.hex : '#eff6ff'}
 		stroke={CIERNA}
-		stroke-width={STRUKTURA_STROKE}
+		stroke-width={obrysStroke(roofH)}
 		shape-rendering="crispEdges"
 		data-testid="pn-elevation-strecha"
 	/>
@@ -336,7 +356,7 @@
 			height={baseY - topY}
 			fill={farebny ? farba.hex : '#fff'}
 			stroke={CIERNA}
-			stroke-width={STRUKTURA_STROKE}
+			stroke-width={obrysStroke(postHalfW * 2)}
 			shape-rendering="crispEdges"
 			data-testid="pn-elevation-post-{i}"
 		/>
@@ -435,14 +455,14 @@
 	     predný stĺp (#146 bod 2: "profil strechy so spádom ako pás, previs") — jeden
 	     vyplnený tvar, jednoduchý zvislý odsad hrúbky (dostatočne presné pri malom
 	     sklone ~pár stupňov). #153: obrysový profil — svetlá fill (nie CIERNA) +
-	     jednotná STRUKTURA_STROKE v oboch režimoch, rovnaký kontrakt ako elevation
-	     strecha vyššie (rovnaký fyzický prvok, iný pohľad). ŽIADNE crispEdges — táto
-	     cesta je šikmá (sklon strechy), crisp hrany by na diagonále zúbkovali. -->
+	     obrysStroke v oboch režimoch, rovnaký kontrakt ako elevation strecha vyššie
+	     (rovnaký fyzický prvok, iný pohľad). ŽIADNE crispEdges — táto cesta je šikmá
+	     (sklon strechy), crisp hrany by na diagonále zúbkovali. -->
 	<path
 		d={`M ${xWall} ${yWallTop} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${yWallTop + roofH} Z`}
 		fill={farebny ? farba.hex : '#eff6ff'}
 		stroke={CIERNA}
-		stroke-width={STRUKTURA_STROKE}
+		stroke-width={obrysStroke(roofH)}
 		data-testid="pn-section-strecha"
 	/>
 	<!-- predný stĺp — reálna hrúbka v mierke (STLP_HRUBKA_VIZ_MM), vyplnený (CAD
@@ -457,7 +477,7 @@
 		height={baseY - (yFrontTop + roofH)}
 		fill={farebny ? farba.hex : '#fff'}
 		stroke={CIERNA}
-		stroke-width={STRUKTURA_STROKE}
+		stroke-width={obrysStroke(postHalfW * 2)}
 		shape-rendering="crispEdges"
 		data-testid="pn-section-predok"
 	/>
