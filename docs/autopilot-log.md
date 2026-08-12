@@ -627,3 +627,46 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - Playbook: `.claude/rules/vykres.md` (2 nové sekcie — `perpOffset` sign
   overenie + tight-column `labelOffset` decoupling) a `.claude/rules/ci.md`
   (zombie check-run variant) — viď PR pre túto verziu.
+
+## #150 — Pergola návrh: farebný režim podľa RAL (prepínač technický/farebný + RAL dropdown)
+
+- **Predošlý worker** (zahynul po code review, nestihol reagovať): implementoval
+  celú feature (`c0ef640` — dátový model `RAL_PALETA`/`farbaKonstrukcie`/
+  `ciarovaFarba` v `pergola-navrh.ts`, podmienený fill/stroke v
+  `PergolaNavrhVykres.svelte`, print CSS vo `VykresovyHarok.svelte`, RAL
+  dropdown + swatch vo formulári, testy) + version bump `56e87b9`
+  (0.14.29 → 0.14.30-dev.1). Review verdikt: 0 🔴 1 🟡 4 🔵.
+- **Táto session dokončila:** oprava 🟡 (`src/routes/pergola/navrh/+page.svelte:397-402`
+  — výber „— nevybraté —" nevynuloval `ralS`, červená poznámka ukazovala starý
+  odtieň). RED (`1488d89`, overené na rebuilde BEZ fixu — padá presne na
+  `not.toBeAttached()`) → GREEN (`a5e3690` — `ralS = ''` pri `kod === ''`).
+  Vlastný prechod diffom nenašiel žiadny zo 4 nespecifikovaných 🔵 nálezov
+  (neboli enumerované, nič nevymýšľané).
+- **Review:** vlastný prechod + nezávislý fresh-context subagent nad celým
+  diffom `origin/main..HEAD` — **0 🔴 0 🟡 0 🔵**. Komentár:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/150#issuecomment-5265315136
+- **Testy:** `npm run lint` čisté, `npm test` 944/944, `npm run build` zelený,
+  `npx playwright test` 158/158 (vrátane všetkých 15 v
+  `e2e/pergola-navrh.spec.ts`, incl. nového regresného testu). Snapshot diff
+  (`tests/__snapshots__/`) proti `origin/main` prázdny.
+- **PR #151** (dev→main), merge `da846c7`. Main CI (test+deploy) zelené,
+  všetky joby (`test`, `deploy`) success.
+- **Post-deploy overenie naživo** (Playwright MCP, `marek` účet): `/health`
+  → `{"ok":true,"version":"0.14.30-dev.1 (da846c7)","live":true}`; footer
+  zhoda. `/pergola/navrh` s OP260032 hodnotami: technický (čiernobiely,
+  default) render nezmenený; farebný RAL 7016 ANTRACIT — konštrukcia
+  `fill=#383E42`, tenký obrys `stroke-width=0.4` (< šírka tvaru), izometria
+  stroke `#383E42` (nezmenený, tmavý odtieň); farebný RAL 9006 STRIEBORNÁ —
+  `fill=#A5A8A6`, tenký obrys drží kontrast na bielom, izometria stmavená na
+  `#4a4c4b`, 17 hrán (žiadne zdvojenie). 0 chýb konzoly na všetkých 3
+  renderoch.
+- Discord run-card odoslaná pre #150 (`notify --run-card`, potvrdené
+  doručenie).
+- Playbook: `.claude/skills/testing/SKILL.md` — opravená existujúca
+  poznámka o `browser_click`/`browser_select_option` „Invalid arguments"
+  (skutočná príčina je zlý parameter `element`/`ref` namiesto `target`, nie
+  flaky tool — `ToolSearch` + `target: <ref>` funguje priamo,
+  `browser_evaluate` netreba len kvôli tomuto); + 2 nové poznámky (RED-state
+  overenie cez `git stash` potrebuje tiež rebuild pred testom; Playwright MCP
+  screenshot píše len do allowed roots AKTUÁLNEJ session, nie cieľového repa
+  pri cross-project dispatchi — ukladaj relatívne, potom `cp`).

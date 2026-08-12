@@ -50,9 +50,21 @@ there's no local preview server, no build needed.
 
 ## Post-deploy prod verification via the Playwright MCP — drive forms with `browser_evaluate`
 
+**`Invalid arguments … expected string, received undefined → at target` is just the
+wrong PARAMETER NAME, not a flaky tool (#150).** The `mcp__plugin_playwright_playwright__*`
+tools are deferred — until you call `ToolSearch({query: "select:browser_click,browser_type,browser_select_option"})`
+their schemas aren't loaded, and guessing `element`/`ref` (the human-readable label +
+the snapshot ref look like the obvious pair) throws this exact error because the real
+required param is `target` (the snapshot ref goes there; `element` is only the
+human-readable description string). Once you `ToolSearch` the real schema and pass
+`target: <ref-from-snapshot>`, `browser_click` / `browser_type` / `browser_select_option`
+work directly and reliably — no `browser_evaluate` workaround needed for this specific
+error. `browser_evaluate` is still the right tool for the genuinely separate problems
+below (driving `use:enhance` forms around a `confirm()` dialog, the Svelte reactive
+`<select>` race) — don't reach for it just to dodge a parameter-name typo.
+
 When verifying the LIVE deploy hands-on through the Playwright MCP (not a `playwright
-test` file), `browser_click` / `browser_select_option` intermittently fail with
-`Invalid arguments … expected string, received undefined → at target`. Don't fight it —
+test` file) and you DO need to bypass a `confirm()` dialog or a reactive-select race,
 drive the SvelteKit `use:enhance` forms directly with `browser_evaluate`:
 
 ```js
@@ -121,4 +133,16 @@ očami (screenshot `nahlad-2d`), či ti kóta šírky okna na `M.top-24` nekolid
 **Po REVERTE mutácie prebuilduj.** Mutačná kontrola bez `BASE_URL` beží proti `build/`,
 takže po vrátení zdroja (`mv …bak`) treba `npm run build` — inak preview stále servíruje
 zmutovaný bundle a ďalší beh testuje niečo iné, než si myslíš (živý zásah 2026-07-27:
-zrkadlenie výkresu „nefungovalo", pritom bežala stará zmutovaná verzia).
+zrkadlenie výkresu „nefungovalo", pritom bežala stará zmutovaná verzia). **Rovnaká
+pasca platí pre RED-state overenie regresného testu cez `git stash`** — ak potvrdzuješ,
+že nový e2e test padá BEZ opravy (napr. odstášuješ fix, necháš test), musíš tiež
+`npm run build` PRED spustením testu — inak `vite preview` stále servíruje starý build
+S fixom a test prejde, hoci zdroj fix nemá (#150 review nález — RED sa dosiahol až po
+rebuilde bez fixu, prvý pokus bez rebuildu ukázal falošné GREEN).
+
+**Playwright MCP `browser_take_screenshot` píše LEN do allowed roots AKTUÁLNEJ session
+(nie cieľového repa).** Keď túto appku pracuješ zo session-u whose `cwd` je INÝ projekt
+(napr. `montalu/n8n` namiesto `automatizacie-montalu` — bežné pri autopilot dispatchi
+naprieč projektmi), MCP screenshot s absolútnou cestou mimo tej session zlyhá `File
+access denied … Allowed roots: <cwd>/.playwright-mcp, <cwd>`. Fix: `filename` bez cesty
+(relatívne, uloží sa do session-ovho `cwd`), potom `cp` na požadované miesto cez Bash.
