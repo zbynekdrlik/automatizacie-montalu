@@ -94,3 +94,5 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - `src/lib/vykres/**`, `src/lib/components/vykres/**` (kóta helper, výkresový
   hárok) → auto-loads `.claude/rules/vykres.md` on its `paths:` (route-scoped
   `@page` print, SVG arc sweep round-trip check)
+- pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` (nové pole do `odpis_log.detail`,
+  FormData `\r\n` test gotcha) → auto-loads `.claude/rules/odpis-detail.md` on its `paths:`
