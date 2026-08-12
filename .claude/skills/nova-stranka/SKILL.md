@@ -48,6 +48,50 @@ $effect(() => { if (polia.length === 1 && cislo(polia[0]) !== sirka) polia = [si
 Chytí to e2e kontrola „nula console errors" (`[pageerror] …/e/effect_update_depth_exceeded`)
 — preto ju má KAŽDÝ test, nielen tie o vzhľade.
 
+**SILENTNÝ variant (#162, LIVE nález — console-error kontrola ho NEODHALÍ):**
+zacyklenie nemusí byť do NEKONEČNA a nemusí hodiť `effect_update_depth_exceeded`
+— stačí, keď effect PREČÍTA hodnotu, ktorú TEN ISTÝ effect zapísal o riadok
+vyššie, aj keď na PRVÝ pohľad ide o "restore z formulára" kód, nie o zjavný
+`if (x) x = ...` self-check:
+
+```js
+// ZLE: reštart-effect (obnoví formulár z `form?.vstup` po serverovom kole)
+// číta systemS HNEĎ PO tom, čo ho TEN ISTÝ effect zapísal — effect sa tak
+// sám prihlási na `systemS`, takže KAŽDÁ POUŽÍVATEĽOVA zmena <select
+// bind:value={systemS}> effect znova spustí, a keďže `form` je pred
+// odoslaním stále `null`, effect systemS TICHO PREPÍŠE SPÄŤ na default.
+// Jeden extra beh, žiadna slučka do nekonečna, ŽIADNA konzolová chyba —
+// select navonok vyzerá funkčný (DOM ukáže zvolenú hodnotu na okamih), ale
+// odoslaný formulár vždy nesie PRVÚ hodnotu v zozname, nikdy zvolenú.
+$effect(() => {
+	const v = form?.vstup ?? null;
+	systemS = v?.system || data.systemy[0] || '';
+	stylS = v?.styl ?? stylyForSystem(systemS)[0] ?? ''; // ← číta systemS, ktoré effect PRÁVE zapísal
+});
+
+// DOBRE: reštart-effect NEČÍTA vlastný zápis vôbec — samostatný fixup effect
+// (ktorý závislosť na `systemS`/`stylyPre` má ZÁMERNE) rieši "stylS nie je
+// v aktuálnom zozname štýlov" bez tejto slučky.
+$effect(() => {
+	const v = form?.vstup ?? null;
+	systemS = v?.system || data.systemy[0] || '';
+	stylS = v?.styl ?? '';
+});
+let stylyPre = $derived(stylyForSystem(systemS));
+$effect(() => {
+	if (!stylyPre.includes(stylS)) stylS = stylyPre[0] ?? '';
+});
+```
+
+Toto NEODHALILI lokálne e2e testy pred mergom — existujúce testy vždy vyberali
+`Robust`, ktorý bol zhodou okolností PRVÝ systém v lokálnom/CI seede, takže
+revert-na-default náhodou dal SPRÁVNU hodnotu. Na produkcii bol prvý systém
+iný (`Deluxe`), čo bug hneď odhalilo pri prvom manuálnom výbere. **Nauč sa z
+toho pri písaní e2e pre podobný "vyber zo zoznamu" formulár: aspoň JEDEN test
+musí vyberať hodnotu ZISTENÚ ZA BEHU ako NIE prvú v zozname** (`options[0]`),
+nikdy natvrdo prvú hodnotu podľa mena — inak môže presne táto trieda bugu
+prejsť testom zhodou okolností.
+
 ## 4. Formulárové polia sú `$state` + `bind:`, nikdy `value={}`
 
 Jednosmerné `value={vstup.x}` sa pri re-renderi vymaže (pasca, ktorá už vynulovala
