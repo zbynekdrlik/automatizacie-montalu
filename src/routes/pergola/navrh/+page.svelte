@@ -397,6 +397,13 @@
 							onchange={(e) => {
 								const kod = (e.currentTarget as HTMLSelectElement).value;
 								ralKodS = kod;
+								if (kod === '') {
+									// #150 review nález: „— nevybraté —" musí vynulovať aj `ralS`
+									// (display text pre červenú poznámku) — inak poznámka ukazuje
+									// STARÝ odtieň aj po tom, čo ho užívateľ v dropdowne zrušil.
+									ralS = '';
+									return;
+								}
 								const vzorka = RAL_PALETA.find((r) => r.kod === kod);
 								if (vzorka) ralS = `${vzorka.kod} ${vzorka.nazov}`;
 							}}
