@@ -80,9 +80,29 @@ describe('pergola — detail.cad + detail.komboVolby (#156)', () => {
 		// zvolená hodnota NIE je default (inak by test o ničom nevypovedal)
 		expect(d.komboVolby[0].selected).not.toBe(comboOptionLabel(t.comboCases[0].options[0], true));
 	});
+
+	// review nález #1: detail.cad musí byť bound-ovaný, nie neobmedzený
+	it('patologicky veľký CAD paste sa v detail.cad odstrihne na CAD_DETAIL_MAX (20 000 znakov)', async () => {
+		const line = '18004 PRIECKOVY PROFIL 105\t9\t3871';
+		// \r\n (nie holé \n) — presne to, čo reálny <textarea> multipart form-data POST
+		// pošle (aj tento testový FormData/Request round-trip to tak serializuje);
+		// parseCad() si \r pri parsovaní strihá sám (L205), takže na výpočet to nemá vplyv
+		const bigCad = Array(700).fill(line).join('\r\n');
+		expect(bigCad.length).toBeGreaterThan(20000);
+
+		const r = await pergola.actions.odoslat(
+			ev('pergola', { zak: 'ZAK-P3', op: '01', zakaznik: 'X', cad: bigCad })
+		);
+		expect(r).toMatchObject({ step: 'hotovo' });
+		const d = lastDetail();
+		expect(d.cad.length).toBe(20000);
+		expect(d.cad).toBe(bigCad.slice(0, 20000));
+	});
 });
 
 describe('zasklenia — jednoposuv: detail.vstupRaw == naparsovaný Vstup 1:1 (#156)', () => {
+	// review nález #2: klin/kolajnica/sietka NEsmú ostať null, inak toEqual
+	// nedokáže, že sa vnorené objekty naozaj prenesú (nielen ploché polia)
 	const BODY = {
 		zak: 'ZAK-Z1',
 		op: '01',
@@ -94,11 +114,24 @@ describe('zasklenia — jednoposuv: detail.vstupRaw == naparsovaný Vstup 1:1 (#
 		sklo: 'Izolačné sklo 4/8/4 číre',
 		otvaranie: 'P - L',
 		poznamka: 'test poznámka',
-		ral: 'RAL 9016'
+		ral: 'RAL 9016',
+		klin: '1',
+		klinDlzka: '500',
+		klinSirka: '300',
+		klinV1: '200',
+		klinV2: '150',
+		klinKs: '2',
+		kolajnicaHorna: '2690',
+		kolajnicaSpodna: '2695',
+		sietka: '1',
+		sietkaUchyt: 'zamok'
 	};
 
-	it('vstupRaw je hlboko rovný tomu, čo parseVstup naparsuje z tých istých polí', async () => {
+	it('vstupRaw je hlboko rovný tomu, čo parseVstup naparsuje z tých istých polí (vrátane klin/kolajnica/sietka)', async () => {
 		const { vstup: expected } = parseVstup(fd(BODY));
+		expect(expected.klin).not.toBeNull();
+		expect(expected.kolajnica).not.toBeNull();
+		expect(expected.sietka).not.toBeNull();
 		const r = await zasklenia.actions.odoslat(ev('zasklenia', BODY));
 		expect(r).toMatchObject({ step: 'hotovo' });
 		const d = lastDetail();
@@ -107,6 +140,7 @@ describe('zasklenia — jednoposuv: detail.vstupRaw == naparsovaný Vstup 1:1 (#
 });
 
 describe('zasklenia — viac posuvov: detail.vstupRaw == naparsovaný MultiVstup 1:1 (#156)', () => {
+	// review nález #2: prvý posuv nesie vnorené klin/kolajnica/sietka objekty
 	const posuvy = JSON.stringify([
 		{
 			system: 'Slide',
@@ -114,13 +148,19 @@ describe('zasklenia — viac posuvov: detail.vstupRaw == naparsovaný MultiVstup
 			s: 3000,
 			v: 2000,
 			sklo: 'Izolačné sklo 4/8/4 číre',
-			otvaranie: 'P - L'
+			otvaranie: 'P - L',
+			klin: { dlzka: 500, sirka: 300, v1: 200, v2: 150, ks: 2 },
+			kolajnica: { horna: 2690, spodna: 2695 },
+			sietka: { uchyt: 'zamok' }
 		}
 	]);
 	const BODY = { zak: 'ZAK-Z2', op: '01', zakaznik: 'X', posuvy };
 
-	it('vstupRaw je hlboko rovný tomu, čo parseMultiVstup naparsuje z tých istých polí', async () => {
+	it('vstupRaw je hlboko rovný tomu, čo parseMultiVstup naparsuje z tých istých polí (vrátane klin/kolajnica/sietka)', async () => {
 		const { vstup: expected } = parseMultiVstup(fd(BODY));
+		expect(expected.posuvy[0].klin).not.toBeNull();
+		expect(expected.posuvy[0].kolajnica).not.toBeNull();
+		expect(expected.posuvy[0].sietka).not.toBeNull();
 		const r = await zasklenia.actions.odoslatMulti(ev('zasklenia', BODY));
 		expect(r).toMatchObject({ step: 'hotovoMulti' });
 		const d = lastDetail();
