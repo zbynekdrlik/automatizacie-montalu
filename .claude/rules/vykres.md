@@ -9,6 +9,10 @@ paths:
   - "src/lib/zasklenia-navrh.ts"
   - "src/lib/components/ZaskleniaNavrhVykres.svelte"
   - "src/routes/zasklenia/navrh/**"
+  - "src/lib/bazen-navrh.ts"
+  - "src/lib/components/BazenNavrhVykres.svelte"
+  - "src/lib/components/vykres/PodpisovaLista.svelte"
+  - "src/routes/bazen/navrh/**"
 ---
 
 # Návrhové výkresy (kóta helper, výkresový hárok) — gotchy z #137
@@ -193,3 +197,62 @@ dodržiava a treba ho dodržať aj pri NOVÝCH pod-pohľadoch: outer `<g>` dosta
 "kategóriový" testid (`zn-klin`, `zn-elevacia`), KAŽDÝ vnútorný element
 dostane VLASTNÝ, odlišný (typicky `-text`/`-obrys`/`-v1`/… suffix) — nikdy tú
 istú reťazcovú hodnotu na dvoch úrovniach vnorenia.
+
+## Popisok `<Kota>` MUSÍ čítať zo skutočne NAKRESLENEJ geometrie (poľa), nikdy priamo z formulárových polí (#139)
+
+Keď sa geometria počíta do POĽA (napr. `sekcieVysky()` v `bazen-navrh.ts`,
+kaskáda výšok sekcií) a kresba potom vykresľuje AJ dimenzujúcu `<Kota>` pri
+krajných prvkoch, popisok kóty musí čítať `pole[0]`/`pole[pole.length-1]`
+(presne to, čo sa fyzicky nakreslilo), NIKDY priamo `vstup.hodnotaA`/
+`vstup.hodnotaB`, ktoré do výpočtu poľa vstupovali. Dôvod: okrajové prípady
+funkcie (napr. `sekcieVysky(1, vyskaMax, vyskaMin)` pri JEDNEJ sekcii vráti
+LEN `[vyskaMax]` — druhý vstup sa vôbec nepoužije, lebo jedna sekcia
+nekaskáduje) môžu vyrobiť pole, kde krajná hodnota NESEDÍ s pôvodným
+formulárovým poľom. Priame čítanie z `vstup.*` v tomto prípade vytlačí kótu s
+TEXTOM, ktorý nezodpovedá NAKRESLENEJ dĺžke čiary (review nález #139 — 1
+sekcia, `vyskaMax≠vyskaMin`, čiara dlhá `vyskaMax`mm ale popisok ukazoval
+`vyskaMin`). Fix je vždy čítať z výstupu geometrickej funkcie, nikdy zo
+surového vstupu, ktorý do nej vošiel.
+
+## Ručný override MUSÍ posunúť aj POZÍCIU (nie len popisok kóty) — inak kóta meria niečo iné, než je nakreslené (#139)
+
+Keď formulár ponúka ručný prepis jednej hodnoty (napr. `sirkaSekcieOverride`
+— appka nepozná skutočné vnorenie sekcií, viď kóty šírky sekcie vyššie v tomto
+súbore), NESTAČÍ poslať override LEN do `<Kota text={fmtMm(override)}>` a
+nechať POZÍCIU (hranicu/deliacu čiaru) nezmenenú na schematickom rovnomernom
+delení — vizuálne to vyzerá, akoby kóta merala nakreslenú hranicu, ale číslo,
+ktoré ukazuje, je INÉ (OP260027 vzor: reálna prvá sekcia 2140mm, schematické
+delenie 10500/5=2100mm). Fix (`sekciePozicie()`'s 3. voliteľný parameter):
+override MUSÍ posunúť SKUTOČNÚ hranicu vo výpočte pozícií, zvyšná dĺžka sa
+rovnomerne rozdelí medzi ostatné (stále schematické) sekcie — kóta a kresba
+potom ukazujú TÚ ISTÚ vec.
+
+## Text-blok vedľa pečiatky: zúženie REGIÓNU nič nevynucuje — treba `<clipPath>` (#139)
+
+Keď voľnotextový blok (napr. textový popis MODEL/VÝPLŇ/…) zdieľa hárok s
+`titleBlock` (pečiatka, bottom-right roh) a jeho pravý okraj sa numericky
+zhoduje s pravým okrajom pečiatky (`region.x + region.w === oblast.x +
+oblast.w === tbX + tbW`), NESTAČÍ len zúžiť `region.w` tak, aby končil pred
+`tbX` — SVG `<text>` nie je orezaný podľa "regiónu", ktorý mu len určuje
+POZÍCIU, nie hranicu renderovania. Dlhá voľnotextová hodnota (max-length pole,
+napr. 60 znakov) sa môže vykresliť ĎALEKO za `region.w` a skončiť POD
+nepriehľadnou bielou pečiatkou (`TitleBlock.svelte` má vlastný `fill="#fff"`
+rám, ktorý prekreslí čokoľvek pod sebou). Fix: pridaj `<clipPath>` (rovnaká
+technika ako `TitleBlock.svelte`'s per-pole clip rects, `uid` z
+`$props.id()` proti kolízii viacerých inštancií na stránke) OKOLO textového
+bloku, veľkosťou zodpovedajúci zúženému regiónu — tá HRANICU renderovania
+skutočne vynúti.
+
+## `podpisovaLista` (#139) — nová opt-in vlastnosť `VykresovyHarok`, vzor pre ďalší podobný prvok
+
+Signatúrna lišta dielne ("Rezal/Opracoval/Kompletoval/Balil-Gumoval") sa
+kreslí PRIAMO cez `VykresovyHarok` (nie cez konzumentov `content` snippet) —
+rovnaký precedens ako `titleBlock`: opt-in prop (`podpisovaLista?: boolean`,
+default `false`), pozícia zrkadlová k pečiatke (top-right namiesto
+bottom-right rohu kresliacej oblasti). Konzument, ktorý ju zapne, si MUSÍ vo
+vlastnom `content` layoute vynechať zodpovedajúci roh (presne rovnaká
+disciplína ako "vynechaj roh s pečiatkou" pri `titleBlock`) — `VykresovyHarok`
+sám o sebe layout konzumenta nijako neobmedzuje/nekliparuje. Ďalší podobný
+"hárkový" (nie kresebný) prvok pridávaj rovnakým vzorom: nová opt-in prop na
+`VykresovyHarok`, vlastný malý komponent v `$lib/components/vykres/`, default
+`false` (existujúci konzumenti sa nemenia).

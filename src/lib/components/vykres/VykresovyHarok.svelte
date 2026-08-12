@@ -9,6 +9,7 @@
 	// papier, z ktorej sa dá čestne dopočítať MIERKA (viď $lib/vykres/mierka.ts).
 	import { viewBoxAttr } from '$lib/vykres/kota';
 	import TitleBlock from './TitleBlock.svelte';
+	import PodpisovaLista from './PodpisovaLista.svelte';
 	import type { Snippet } from 'svelte';
 	// #146 bod 8: úzke technické písmo pre CELÝ výkresový hárok — self-hosted
 	// Archivo Variable, `wdth` (šírkova) os namiesto `wght` (index.css, používaná
@@ -28,6 +29,7 @@
 		margin = 6,
 		gridBand = 5,
 		titleBlock,
+		podpisovaLista = false,
 		content
 	}: {
 		pageW?: number;
@@ -49,6 +51,10 @@
 			width?: number;
 			height?: number;
 		};
+		/** opt-in podpisová lišta dielne "Rezal/Opracoval/Kompletoval/Balil-Gumoval"
+		 *  (#139, oba bazénové vzory) — default false, takže pergolový aj zaskleniový
+		 *  hárok ostávajú bez zmeny. */
+		podpisovaLista?: boolean;
 		/** obsah výkresu (kresba) — dostane plochu kresliacej oblasti (mm) na vykreslenie */
 		content?: Snippet<[{ x: number; y: number; w: number; h: number }]>;
 	} = $props();
@@ -69,6 +75,15 @@
 	const tbH = $derived(titleBlock?.height ?? 50);
 	const tbX = $derived(oblast.x + oblast.w - tbW);
 	const tbY = $derived(oblast.y + oblast.h - tbH);
+
+	// podpisová lišta — top-right roh kresliacej oblasti (zrkadlový vzor k
+	// pečiatke, ktorá sedí bottom-right). Konzument, ktorý `podpisovaLista`
+	// zapne, si sám vynechá tento roh vo svojom `content` layoute — rovnaká
+	// disciplína ako "vynechaj roh s pečiatkou" pri titleBlock vyššie.
+	const PL_W = 90;
+	const PL_H = 12;
+	const plX = $derived(oblast.x + oblast.w - PL_W);
+	const plY = $derived(oblast.y);
 </script>
 
 <svg
@@ -187,6 +202,13 @@
 				vypracoval={titleBlock.vypracoval}
 				datum={titleBlock.datum}
 			/>
+		</g>
+	{/if}
+
+	<!-- podpisová lišta dielne (#139, opt-in) -->
+	{#if podpisovaLista}
+		<g transform="translate({plX} {plY})">
+			<PodpisovaLista width={PL_W} height={PL_H} />
 		</g>
 	{/if}
 </svg>
