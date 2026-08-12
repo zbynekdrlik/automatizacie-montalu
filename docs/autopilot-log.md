@@ -2,6 +2,60 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-08-13 — 3D náhľad zasklení: vizuálna iterácia — sklo, kamera, kontrast, tieň (#174)
+
+- **Issue:** #174 — iteračná fáza po #170: live screenshoty ukázali sklo ako
+  mliečny plast, jednotku vznášajúcu sa nad dlažbou, kameru orezávajúcu vrch
+  konštrukcie, a vymytú scénu bez kontrastu. Čisto vizuálny ticket,
+  architektúra sa nemenila.
+- **STEP 0 validácia** (issuecomment-5273187508 / -5273227524): repro
+  lokálne na v0.16.4 vo OBOCH tieroch (`?viz=low` aj default mid-tier) —
+  všetky 4 nálezy potvrdené aktuálne.
+- **Design comment** (pred prvým commitom, issuecomment-5273194958 /
+  -5273228772): root cause + prístup + zamietnutá alternatíva per nález —
+  sklo: tint tónovo splýval so stenou + `attenuationDistance:6` dávala
+  Beer-Lambert útlm ~0.13% (neviditeľný); tieň: slabá opacity + veľký posun
+  v smere svetla; kamera: len 15% rezerva marže + príliš vysoké elevácie;
+  scéna: nedostatočný farebný kontrast pri ACES tonemappingu.
+- **Commits (dev):** `5e1c33e` verzia 0.16.5-dev.1 → `cd8d152` feat: sklo
+  (sýty modrozelený attenuationColor + clearcoat), tieň (silnejšia
+  opacity + menší posun/veľkosť), kamera (rezerva 1.15→1.35, elevácie
+  16°/8°→7°/6°), scéna (sýtejšia stena, kontrastnejšia obloha/dlažba) →
+  `5d8f132` self-review doc fix → `3214dfb` fix: adversariálny review
+  nálezy (nesprávne ilustračné čísla v komentári — sRGB vs. lineárny
+  farebný priestor, 3 tautologické test assertions sprísnené) →
+  `bc2f158`/`16079f4` verzia 0.16.5→0.16.6 (viď nižšie, sort -V gotcha).
+- **Testy:** 6 nových (`tests/vizual-materialy.test.ts` — tier-based sklo,
+  SKUTOČNÁ Beer-Lambert formula priamo z `mat.attenuationColor[k]`) + 21
+  nových (`vizual-kamera-kvalita.test.ts` — celý bbox v kamerovom frustume
+  cez skutočnú 3D projekciu pri 4 veľkostiach × 2 presetoch, výška oka v
+  pásme 1,5–1,9m). Existujúca sada 1141/1141 + e2e (vizual3d 10/10,
+  zasklenia-zakaznicky 3/3, zasklenia-navrh 9/9) zelené, zero console errors.
+- **Deep review** (fresh-context `general-purpose` subagent, ~500s,
+  issuecomment-5273628838): 0🔴 2🟡 2🔵 — oba 🟡 opravené v tejto vetve
+  (nesprávne ilustračné čísla, tautologické testy), 1🔵 filed ako **#177**
+  (chýbajúce testy pre textury.ts/scena.ts, pre-existing), 1🔵 objasnené
+  komentárom.
+- **PR #178** (dev→main), zlúčené `a471c07`. **Gotcha nájdená post-deploy:**
+  PR sa zlúčil s `-dev.1` verziou stále na dev (missed the "clean bump
+  before merge" krok) — `/health` ukázal `"0.16.5-dev.1 (a471c07)"`.
+  Follow-up **PR #179**: bump na čistú `0.16.5` PADOL na version-check —
+  tento projekt's `sort -V` porovnanie ZÁMERNE radí `X-dev.N` VYŠŠIE než
+  holé `X` (aby prvý post-merge `-dev.1` bump vždy porazil práve zlúčený
+  main) — predpoklad, ktorý platí LEN keď sa čistý bump stane PRED
+  merge, nie po ňom. Rovnaké patch číslo preto porovnáva main > dev.
+  Oprava: bump na `0.16.6` (skutočný patch increment) obišiel gotchu,
+  overené priamo proti `sort -V` pred pushom. Zlúčené `b2643e2`, nasadené,
+  `/health` → `"0.16.6 (b2643e2)"`, čisté.
+- **Post-deploy overenie:** Playwright naživo (`app.montalu.cloud`, marek
+  účet), desktop 1440×900 aj phone 390×844, 4 presety (3/4, čelný,
+  zvnútra, otvorené) — identické s lokálnou verifikáciou, verzia
+  potvrdená z DOM footera.
+- **Playbook:** `.claude/rules/vizual3d.md` — pridaná sekcia o tejto
+  gotche (Beer-Lambert je PO KANÁLI mocnina farby, nie exponenciála
+  vzdialenosti; `THREE.Color`'s `.r/.g/.b` sú LINEÁRNE, nie sRGB) a o
+  version-bump-po-merge gotche (`sort -V` `X-dev.N` > `X` predpoklad).
+
 ## 2026-08-12 — Surový vstup odpisu do odpis_log.detail, krok 0 pre #155 (#156)
 
 - **Issue:** #156 — appka zahadzovala surový submitnutý vstup odpisu po prepočte

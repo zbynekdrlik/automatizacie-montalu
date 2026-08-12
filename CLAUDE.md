@@ -21,9 +21,25 @@ Version file: `package.json` `"version"`. Bump it on `dev` FIRST (before any wor
 **Convention: `dev` carries `X.Y.Z-dev.N`, `main` carries the clean `X.Y.Z`.** The
 FIRST commit on `dev` after a merge bumps to the next `-dev.1`; right before opening the
 PR to `main`, bump again to the clean released version (no `-dev` suffix). A `-dev`
-string ending up on `main` is a real bug, not cosmetic — it happened twice (#1/#101) and
-was fixed in #98 (which also taught `sort -V` to rank `X-dev.N` above the clean `X`, so
-the CI version-check compares correctly either way).
+string ending up on `main` is a real bug, not cosmetic — it happened three times
+(#1/#101/#174) and was fixed in #98 (which also taught `sort -V` to rank `X-dev.N`
+above the clean `X`, so the CI version-check compares correctly either way).
+
+**Before opening the dev→main PR: `Read` `package.json` and confirm the version has NO
+`-dev` suffix** — don't rely on remembering you bumped it earlier in the session (#174:
+the clean bump was skipped, the PR merged with `-dev.1` still on `dev`, and `/health`
+showed `"0.16.5-dev.1 (…)"` live on `main` post-deploy).
+
+**If this IS missed and a `-dev.N` string lands on `main`: the recovery is a NEW patch
+bump, never retrying the SAME clean version number.** The `sort -V` "rank `X-dev.N`
+above bare `X`" fix (#98) only holds when the clean bump happens BEFORE the merge — it
+assumes `main` never itself carries an `X-dev.N` string. Once it does (the mistake
+above), bumping `dev` to the SAME clean `X.Y.Z` FAILS `version-check`: `sort -V` now
+compares `dev="X.Y.Z"` against `main="X.Y.Z-dev.N"` at the SAME patch number, and ranks
+main's dev-suffixed string higher — the exact #98 rule working against you. Bump to
+`X.Y.(Z+1)` instead (a real patch increment always wins regardless of any suffix); this
+happened live in #174 (`0.16.5-dev.1` on `main` → retrying `0.16.5` on `dev` failed CI →
+`0.16.6` fixed it, verified against `sort -V` directly before pushing).
 
 ## Local build policy (Tier 0)
 
