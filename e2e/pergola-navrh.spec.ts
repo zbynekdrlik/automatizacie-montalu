@@ -406,9 +406,13 @@ test('#153: konštrukčné prvky sú OBRYSOVÉ profily (svetlá výplň + čiern
 	expect(await attr(page, 'pn-iso-hrany', 'shape-rendering')).not.toBe('crispEdges');
 
 	// hierarchia hrúbok: hlavný konštrukčný obrys je viditeľne HRUBŠÍ než hlavná
-	// kótová čiara (Kota.svelte stroke-width 0.7 na g[data-testid="kota"])
+	// kótová čiara (Kota.svelte stroke-width 0.7 na g[data-testid="kota"]). Meria sa
+	// na STRESNOM ráme (pn-elevation-strecha), nie na stĺpe — `obrysStroke()` (review
+	// nález nižšie) môže stĺp per-vstup zoštíhliť POD hierarchickú hranicu, kým
+	// strecha/nosník má vlastnú spodnú hranicu hrúbky (NOSNIK_HRUBKA_MM=190mm,
+	// roofH≥1,5mm) vždy nad STRUKTURA_STROKE — bezpečná referencia pre tento pomer.
 	const strukturaSw = parseFloat(
-		(await page.getByTestId('pn-elevation-post-0').getAttribute('stroke-width')) ?? '0'
+		(await page.getByTestId('pn-elevation-strecha').getAttribute('stroke-width')) ?? '0'
 	);
 	const kotaSw = parseFloat(
 		(await page.getByTestId('kota').first().getAttribute('stroke-width')) ?? '0'
@@ -418,6 +422,62 @@ test('#153: konštrukčné prvky sú OBRYSOVÉ profily (svetlá výplň + čiern
 		strukturaSw / kotaSw,
 		`pomer konštrukcia/kóty (${strukturaSw}/${kotaSw}) musí byť viditeľne > 1 (hierarchia #146/#153)`
 	).toBeGreaterThan(1.5);
+});
+
+// review nález (#153, deep-review pred mergom): pevná STRUKTURA_STROKE=1,2mm bola
+// bezpečná len pri VZOROVEJ mierke OP260032 — `stlpHalfW()` má vlastnú spodnú
+// hranicu 0,5mm (polovica), teda stĺp/predný stĺp v reze môže pri hĺbke/výške
+// bližšie k hornej hranici validného vstupu (HLBKA_MAX=10000, VYSKA_MAX=4500)
+// reálne vyjsť už len 1,0mm ŠIROKÝ — ŠIRŠÍ obrys než 1,2mm by fill znova celý
+// zhltol (presne ten istý bug, ktorý #153 malo opraviť), navyše NOVÁ regresia pre
+// farebný RAL režim (predtým vždy bezpečná tenká STRUKTURA_STROKE_VEDLAJSIA=0,4mm
+// v OBOCH režimoch). `obrysStroke()` fix: obrys nikdy nepresiahne polovicu rozmeru
+// tvaru — tento test priamo overuje EXTRÉMNY (ale validný) vstup, kde by sa bez
+// tohto fixu fill znova stratil.
+test('#153 review nález: fill neostáva zhltnutý pri extrémnych (ale validných) rozmeroch — technický aj farebný režim', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	// 3 polia × 3000mm = 9000mm celková šírka (elevation swallow nad ~8250mm),
+	// hĺbka 6000mm (section-predok swallow nad ~5844mm, pri ĽUBOVOĽNEJ výške)
+	await page.selectOption('#pocetPoli', '3');
+	await page.getByLabel('Rozpätie 1 (mm)').fill('3000');
+	await page.getByLabel('Rozpätie 2 (mm)').fill('3000');
+	await page.getByLabel('Rozpätie 3 (mm)').fill('3000');
+	await page.getByLabel('Hĺbka (mm) *').fill('6000');
+	await page.getByLabel('Výška vpredu (mm) *').fill('2500');
+	await page.getByLabel('Výška pri stene (mm) *').fill('2800');
+
+	const overObrys = async (testid: string) => {
+		const el = page.getByTestId(testid);
+		const w = parseFloat((await el.getAttribute('width')) ?? '0');
+		const h = parseFloat((await el.getAttribute('height')) ?? '0');
+		const sw = parseFloat((await el.getAttribute('stroke-width')) ?? '0');
+		const menšiRozmer = Math.min(w, h);
+		expect(menšiRozmer, `${testid}: menší rozmer tvaru pri extrémnom vstupe`).toBeGreaterThan(0);
+		expect(
+			sw,
+			`${testid}: stroke-width (${sw}) musí byť menší než rozmer tvaru (${menšiRozmer}) aj pri extrémnom vstupe — inak fill zmizne`
+		).toBeLessThan(menšiRozmer);
+	};
+
+	// technický režim (default)
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await overObrys('pn-elevation-post-0');
+	await overObrys('pn-section-predok');
+
+	// farebný RAL režim — predtým TOTO bolo vždy bezpečné (STRUKTURA_STROKE_VEDLAJSIA
+	// v celom rozsahu vstupu), unifikácia #153 to muselo overiť/zachovať
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await page.getByLabel('RAL odtieň').selectOption('7016');
+	await page.getByRole('radio', { name: 'Farebný (podľa RAL)' }).check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await overObrys('pn-elevation-post-0');
+	await overObrys('pn-section-predok');
 });
 
 test('#150: farebný režim + známy RAL (7016 ANTRACIT) — konštrukcia sa vyfarbí, kóty/poznámky ostávajú', async ({
