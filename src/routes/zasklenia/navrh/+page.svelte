@@ -57,10 +57,22 @@
 	let ralKodS = $state('');
 	let ralS = $state('');
 
+	// KRITICKÝ nález pri live post-deploy overení: `stylyForSystem(systemS)` tu
+	// PREDTÝM čítalo `systemS` HNEĎ PO tom, čo ho ten istý effect zapísal o dva
+	// riadky vyššie — sebareferenčné čítanie effect samo-prihlási na `systemS`,
+	// takže KAŽDÁ používateľova zmena selectu "Systém" (bind:value) effect znova
+	// spustila a effect (keďže `form` je stále null pred odoslaním) systemS
+	// TICHO PREPÍSAL SPÄŤ na `data.systemy[0]` — select sa navonok javil ako
+	// funkčný (DOM ukázal zvolenú hodnotu na okamih), ale odoslaný formulár vždy
+	// niesol PRVÝ systém v zozname, nie zvolený. Rovnaká trieda chyby ako
+	// `zasklenia-form-reactivity.md`'s "smart default" pasca, len tu bez
+	// akéhokoľvek smart-default zámeru — čisto náhodný self-loop. Fix: `stylS`
+	// tu NEČÍTA `systemS` vôbec — samostatný fixup effect nižšie (`stylyPre`)
+	// už rieši "stylS nie je v aktuálnom zozname štýlov" bez tejto slučky.
 	$effect(() => {
 		const v = form?.vstup ?? null;
 		systemS = v?.system || data.systemy[0] || '';
-		stylS = v?.styl ?? stylyForSystem(systemS)[0] ?? '';
+		stylS = v?.styl ?? '';
 		sS = v?.s || 1500;
 		vS = v?.v || 1500;
 		otvaranieS = v?.otvaranie || data.otvarania[0] || '';

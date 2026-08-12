@@ -36,6 +36,55 @@ async function vyplnFormular(page: Page) {
 	await page.getByLabel('Smer otvárania').selectOption('P - L');
 }
 
+// REGRESIA (nájdené pri LIVE post-deploy overení #162, nie lokálnym testom —
+// pozri vysvetlenie nižšie): reštart-effect v +page.svelte čítal `stylyForSystem
+// (systemS)` HNEĎ PO tom, čo ten istý effect `systemS` zapísal o riadok vyššie —
+// sebareferenčné čítanie effect samo-prihlásilo na `systemS`, takže KAŽDÁ
+// zmena selectu „Systém" effect znova spustila a effect (form je pred
+// odoslaním stále null) `systemS` TICHO PREPÍSAL SPÄŤ na `data.systemy[0]`.
+// Odoslaný formulár preto vždy niesol PRVÝ systém v DB zozname, nikdy ten
+// zvolený v UI — na produkcii (prvý systém = Deluxe) to bolo viditeľné, no
+// lokálny/CI seed má prvý systém `Robust`, presne ten istý, aký si predošlé
+// testy v tomto súbore VŽDY vyberajú — zhoda náhodne maskovala chybu. Tento
+// test si preto vyberá systém EXPLICITNE ZISTENÝ ako NIE prvý v zozname.
+test('regresia (live nález): zmena systému sa NEVRÁTI späť na prvý v zozname (self-loop v reštart-effecte)', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/zasklenia/navrh');
+	await waitHydrated(page);
+
+	const initial = await page.locator('#system').inputValue();
+	const systemyOptions = await page.locator('#system').locator('option').allTextContents();
+	// zvoľ systém, ktorý NIE JE ten pôvodne vybraný (teda nie systemy[0])
+	const cielovyIdx = systemyOptions.findIndex((label) => label !== initial);
+	const cielovy = await page
+		.locator('#system')
+		.locator('option')
+		.nth(cielovyIdx)
+		.getAttribute('value');
+	expect(cielovy).not.toBe(initial);
+	expect(cielovy).not.toBeNull();
+
+	await page.getByLabel('Systém').selectOption(cielovy!);
+	// over hodnotu HNEĎ aj o chvíľu neskôr — self-loop bug ju prepisoval späť
+	// na najbližšom reaktívnom flushi, nie okamžite pri samotnom výbere
+	await expect(page.locator('#system')).toHaveValue(cielovy!);
+	await page.waitForTimeout(300);
+	await expect(page.locator('#system')).toHaveValue(cielovy!);
+
+	const stylOptions = await page.locator('#styl').locator('option').allTextContents();
+	await page.getByLabel('Štýl').selectOption(stylOptions[0]);
+	await page.getByLabel('Celková šírka (mm) *').fill('3000');
+	await page.getByLabel('Celková výška (mm) *').fill('2000');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('form-error')).toHaveCount(0);
+	// nadpis pod výkresom nesie SKUTOČNE zvolený systém, nie prvý v zozname
+	await expect(page.getByTestId('zn-system')).toContainText(cielovy!);
+});
+
 test('vyplnenie formulára nakreslí predný pohľad s kótami — 2 krídla (Robust 2K), zero console errors', async ({
 	page
 }) => {
