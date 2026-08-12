@@ -110,4 +110,32 @@ describe('parsePergolaNavrhVstup', () => {
 		);
 		expect(vstup.polia.length).toBe(8);
 	});
+
+	// #150 — farebný režim + RAL ako výber
+	describe('rezimVykresu/ralKod (#150)', () => {
+		it('chýbajúce rezimVykresu = default "technicky"', () => {
+			const { vstup } = parsePergolaNavrhVstup(fd(zaklad));
+			expect(vstup.rezimVykresu).toBe('technicky');
+		});
+		it('rezimVykresu=farebny prejde', () => {
+			const { vstup } = parsePergolaNavrhVstup(fd({ ...zaklad, rezimVykresu: 'farebny' }));
+			expect(vstup.rezimVykresu).toBe('farebny');
+		});
+		it('neplatná hodnota rezimVykresu sa tichým fallbackom vráti na "technicky" (nikdy chyba)', () => {
+			const { vstup, error } = parsePergolaNavrhVstup(
+				fd({ ...zaklad, rezimVykresu: 'neexistuje' })
+			);
+			expect(error).toBeNull();
+			expect(vstup.rezimVykresu).toBe('technicky');
+		});
+		it('ralKod sa parsuje ako obyčajný text (validácia farby je na vypocitanej strane, nie tu)', () => {
+			const { vstup } = parsePergolaNavrhVstup(fd({ ...zaklad, ralKod: '7016' }));
+			expect(vstup.ralKod).toBe('7016');
+		});
+		it('chýbajúce ralKod = prázdny reťazec (nie chyba — RAL ostáva voliteľný)', () => {
+			const { vstup, error } = parsePergolaNavrhVstup(fd(zaklad));
+			expect(error).toBeNull();
+			expect(vstup.ralKod).toBe('');
+		});
+	});
 });

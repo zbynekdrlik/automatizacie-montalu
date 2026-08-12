@@ -190,3 +190,18 @@
 		</g>
 	{/if}
 </svg>
+
+<style>
+	/* #150: farebný režim výkresu (fill konštrukčných prvkov podľa RAL) sa musí
+	   pri tlači zachovať — bez tohto niektoré prehliadače/tlačové ovládače orezávajú
+	   farby ako "background graphics". No-op pre technický (čiernobiely) režim —
+	   nemení žiadny existujúci fill/stroke, len hovorí tlači "zachovaj presne to,
+	   čo je nastavené". Cieli priamo na VLASTNÝ <svg> tejto komponenty (žiadny
+	   :global() netreba, keďže ho táto komponenta kreslí priamo). */
+	@media print {
+		svg {
+			print-color-adjust: exact;
+			-webkit-print-color-adjust: exact;
+		}
+	}
+</style>

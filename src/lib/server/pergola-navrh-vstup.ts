@@ -5,7 +5,9 @@
 import {
 	chybaPergolaNavrhVstupu,
 	PERGOLA_MAX_POLI,
+	PERGOLA_REZIM_DEFAULT,
 	type PergolaNavrhVstup,
+	type PergolaVykresRezim,
 	type ZvodPozicia,
 	type ZvodStrana
 } from '$lib/pergola-navrh';
@@ -70,6 +72,12 @@ const text = (form: FormData, k: string, max: number) =>
 		.trim()
 		.slice(0, max);
 
+/** neplatná/chýbajúca hodnota tichým fallbackom na technický (default, #150) —
+ *  rovnaká disciplína ako `varianta` nižšie (nikdy chyba, vždy platný default) */
+function rezimVykresu(form: FormData): PergolaVykresRezim {
+	return text(form, 'rezimVykresu', 20) === 'farebny' ? 'farebny' : PERGOLA_REZIM_DEFAULT;
+}
+
 export function parsePergolaNavrhVstup(form: FormData): {
 	vstup: PergolaNavrhVstup;
 	error: string | null;
@@ -98,7 +106,9 @@ export function parsePergolaNavrhVstup(form: FormData): {
 		nazov: text(form, 'nazov', 80),
 		revizia: text(form, 'revizia', 20),
 		varianta: text(form, 'varianta', 20) || 'NAVRH',
-		vypracoval: text(form, 'vypracoval', 60)
+		vypracoval: text(form, 'vypracoval', 60),
+		rezimVykresu: rezimVykresu(form),
+		ralKod: text(form, 'ralKod', 10)
 	};
 
 	const error = chybaPergolaNavrhVstupu(vstup);

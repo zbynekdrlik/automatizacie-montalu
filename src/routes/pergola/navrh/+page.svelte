@@ -17,8 +17,13 @@
 		PANEL_POCET_MIN,
 		PANEL_POCET_MAX,
 		PERGOLA_MAX_POLI,
+		PERGOLA_REZIM_DEFAULT,
+		RAL_PALETA,
+		RAL_INY_KOD,
+		RAL_FALLBACK_HEX,
 		type ZvodStrana,
-		type PergolaNavrhVstup
+		type PergolaNavrhVstup,
+		type PergolaVykresRezim
 	} from '$lib/pergola-navrh';
 
 	let { data, form } = $props();
@@ -44,7 +49,9 @@
 		nazov: form?.vstup?.nazov ?? '',
 		revizia: form?.vstup?.revizia ?? '',
 		varianta: form?.vstup?.varianta ?? 'NAVRH',
-		vypracoval: form?.vstup?.vypracoval ?? data.user?.username ?? ''
+		vypracoval: form?.vstup?.vypracoval ?? data.user?.username ?? '',
+		rezimVykresu: (form?.vstup?.rezimVykresu ?? PERGOLA_REZIM_DEFAULT) as PergolaVykresRezim,
+		ralKod: form?.vstup?.ralKod ?? ''
 	} satisfies PergolaNavrhVstup);
 
 	// editovateľné polia sú $state (bind) — jednosmerné value={} by sa pri re-renderi
@@ -66,6 +73,9 @@
 	let vypracovalS = $state('');
 	/** kľúč `${postIndex}-${strana}` → zaškrtnuté */
 	let zvodyS = $state<Record<string, boolean>>({});
+	// #150: farebný režim + RAL ako výber (nie voľný text)
+	let rezimVykresuS = $state<PergolaVykresRezim>(PERGOLA_REZIM_DEFAULT);
+	let ralKodS = $state('');
 
 	$effect(() => {
 		const v = form?.vstup ?? null;
@@ -87,6 +97,8 @@
 		const zv: Record<string, boolean> = {};
 		for (const z of v?.zvody ?? []) zv[`${z.postIndex}-${z.strana}`] = true;
 		zvodyS = zv;
+		rezimVykresuS = v?.rezimVykresu === 'farebny' ? 'farebny' : PERGOLA_REZIM_DEFAULT;
+		ralKodS = v?.ralKod ?? '';
 	});
 
 	let poliaNum = $derived(poliaS.map(cislo));
@@ -141,6 +153,8 @@
 		/>{/if}
 	<input type="hidden" name="zvody" value={zvodyJSON()} />
 	<input type="hidden" name="ral" value={ralS} />
+	<input type="hidden" name="rezimVykresu" value={rezimVykresuS} />
+	<input type="hidden" name="ralKod" value={ralKodS} />
 	<input type="hidden" name="textVyplne" value={textVyplneS} />
 	<input type="hidden" name="poznamkaIzometria" value={poznamkaIzometriaS} />
 	<input type="hidden" name="op" value={opS} />
@@ -344,27 +358,91 @@
 				</div>
 			</div>
 
+			<!-- #150: režim výkresu (technický/farebný) + RAL ako riadený výber (dropdown +
+			     ukážka odtieňa), "iný…" odomkne voľný text a povie, že sa použije neutrálna
+			     tmavosivá (žiadny presný odtieň nie je pre neho známy) -->
 			<div class="grid2">
 				<div class="field">
-					<label for="ral">RAL (červená poznámka na výkrese)</label>
-					<input
-						id="ral"
-						name="ral"
-						bind:value={ralS}
-						maxlength="40"
-						placeholder="napr. 7016-ANTRACIT JŠ"
-					/>
+					<span style="font-weight:600;font-size:14px">Režim výkresu</span>
+					<div class="row" style="gap:18px;margin-top:4px">
+						<label style="display:flex;align-items:center;gap:6px;font-weight:400">
+							<input
+								type="radio"
+								name="pn-rezim"
+								checked={rezimVykresuS === 'technicky'}
+								onchange={() => (rezimVykresuS = 'technicky')}
+								style="width:auto"
+							/>
+							Technický (čiernobiely)
+						</label>
+						<label style="display:flex;align-items:center;gap:6px;font-weight:400">
+							<input
+								type="radio"
+								name="pn-rezim"
+								checked={rezimVykresuS === 'farebny'}
+								onchange={() => (rezimVykresuS = 'farebny')}
+								style="width:auto"
+								data-testid="rezim-farebny-radio"
+							/>
+							Farebný (podľa RAL)
+						</label>
+					</div>
 				</div>
 				<div class="field">
-					<label for="textVyplne">Text výplne / etapy (modrý text)</label>
-					<input
-						id="textVyplne"
-						name="textVyplne"
-						bind:value={textVyplneS}
-						maxlength="120"
-						placeholder="napr. FIX v 1. etape STADUR RAL 7016JŠ"
-					/>
+					<label for="ralKod">RAL odtieň</label>
+					<div class="row" style="gap:8px;align-items:center">
+						<select
+							id="ralKod"
+							value={ralKodS}
+							onchange={(e) => {
+								const kod = (e.currentTarget as HTMLSelectElement).value;
+								ralKodS = kod;
+								const vzorka = RAL_PALETA.find((r) => r.kod === kod);
+								if (vzorka) ralS = `${vzorka.kod} ${vzorka.nazov}`;
+							}}
+						>
+							<option value="">— nevybraté —</option>
+							{#each RAL_PALETA as r (r.kod)}
+								<option value={r.kod} style="background:{r.hex}">{r.kod} {r.nazov} ({r.hex})</option
+								>
+							{/each}
+							<option value={RAL_INY_KOD}>iný…</option>
+						</select>
+						{#if ralKodS}
+							{@const vzorka = RAL_PALETA.find((r) => r.kod === ralKodS)}
+							<span
+								class="ral-swatch"
+								style="display:inline-block;width:22px;height:22px;border-radius:4px;border:1px solid #94a3b8;background:{vzorka?.hex ??
+									RAL_FALLBACK_HEX}"
+								data-testid="ral-swatch"
+							></span>
+						{/if}
+					</div>
+					{#if ralKodS === RAL_INY_KOD}
+						<label for="ralIny" style="margin-top:6px;display:block">RAL — vlastný text</label>
+						<input
+							id="ralIny"
+							bind:value={ralS}
+							maxlength="40"
+							placeholder="napr. RAL 7021 matná"
+							data-testid="ral-iny-text"
+						/>
+						<p class="sub" data-testid="ral-iny-hint">
+							Vlastný RAL — farebný výkres použije neutrálnu tmavosivú (presný odtieň appka
+							nepozná).
+						</p>
+					{/if}
 				</div>
+			</div>
+			<div class="field">
+				<label for="textVyplne">Text výplne / etapy (modrý text)</label>
+				<input
+					id="textVyplne"
+					name="textVyplne"
+					bind:value={textVyplneS}
+					maxlength="120"
+					placeholder="napr. FIX v 1. etape STADUR RAL 7016JŠ"
+				/>
 			</div>
 			<div class="field">
 				<label for="poznamkaIzometria">Poznámka na izometrii (odkazová čiara)</label>

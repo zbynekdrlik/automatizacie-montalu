@@ -31,7 +31,12 @@ async function vyplnFormular(page: Page) {
 	await page.getByLabel('OP číslo').fill('OP260032');
 	// hĺbka/výšky/počet polí/panelov už majú predvyplnené vzorové hodnoty OP260032
 	// (6000=3000+3000, hĺbka 3500, výšky 2500/2800, 8 panelov) — netreba prepisovať
-	await page.getByLabel('RAL (červená poznámka na výkrese)').fill('7016-ANTRACIT JŠ');
+	// #150: RAL je teraz select ("iný…" odomkne voľný text) — rovnaký reťazec ako
+	// predtým, len cez novú UI (dropdown → free text), aby ostali existujúce
+	// asercie na "7016-ANTRACIT JŠ" nižšie nezmenené. Dedikovaný známy-RAL/farebný
+	// režim flow má vlastné testy nižšie.
+	await page.getByLabel('RAL odtieň').selectOption('iny');
+	await page.getByLabel('RAL — vlastný text').fill('7016-ANTRACIT JŠ');
 	await page
 		.getByLabel('Text výplne / etapy (modrý text)')
 		.fill('FIX v 1. etape STADUR RAL 7016JŠ');
@@ -316,4 +321,161 @@ test('regresia #145: nadpisy PREDNÝ POHĽAD / REZ A nekolidujú s hornou rastro
 			`nadpis "${heading}" (top=${headingBox!.y}) koliduje s hornou rastrovou lištou (spodná hranica=${gridBox!.y + gridBox!.height})`
 		).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height);
 	}
+});
+
+// #150 — farebný režim výkresu podľa RAL
+const attr = (page: Page, testid: string, name: string) =>
+	page.getByTestId(testid).getAttribute(name);
+
+test('#150: technický režim (default) — konštrukcia nezmenená oproti pôvodným farbám', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo').fill('OP260032');
+	// default je "Technický (čiernobiely)" — netreba nič prepínať
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	expect(await attr(page, 'pn-elevation-strecha', 'fill')).toBe('#eff6ff');
+	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#fff');
+	expect(await attr(page, 'pn-section-strecha', 'fill')).toBe('#0f172a');
+	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#0f172a');
+	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('none');
+	expect(await attr(page, 'pn-iso-hrany', 'stroke')).toBe('#0f172a');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#150: farebný režim + známy RAL (7016 ANTRACIT) — konštrukcia sa vyfarbí, kóty/poznámky ostávajú', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo').fill('OP260032');
+	await page.getByLabel('RAL odtieň').selectOption('7016');
+	await expect(page.getByTestId('ral-swatch')).toBeVisible();
+	await page.getByRole('radio', { name: 'Farebný (podľa RAL)' }).check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// konštrukcia vyfarbená na skutočný hex 7016 ANTRACIT
+	expect(await attr(page, 'pn-elevation-strecha', 'fill')).toBe('#383E42');
+	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#383E42');
+	expect(await attr(page, 'pn-section-strecha', 'fill')).toBe('#383E42');
+	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#383E42');
+	// existujúci tmavý obrys ostáva (nezmizne pri farebnej výplni)
+	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('#0f172a');
+	// izometria — tmavý odtieň sa NEmení (nie je tmavyObrys)
+	expect(await attr(page, 'pn-iso-hrany', 'stroke')).toBe('#383E42');
+	// izometrické drôtené hrany sú stále rovnaký POČET ako v technickom režime
+	// (žiadne zdvojenie elementov — pozri design komentár na #150)
+	await expect(page.getByTestId('pn-iso-hrany').locator('line')).toHaveCount(17);
+
+	// kóty ostávajú modré, RAL poznámka ostáva červená a odráža výber
+	await expect(page.getByTestId('pn-ral')).toHaveCSS('fill', 'rgb(220, 38, 38)');
+	await expect(page.getByTestId('pn-ral')).toContainText('RAL: 7016 ANTRACIT');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#150: svetlý RAL (9006 STRIEBORNÁ) — filled prvky majú svetlú výplň s tmavým obrysom, izometria je stmavená (nezmizne na bielom)', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo').fill('OP260032');
+	await page.getByLabel('RAL odtieň').selectOption('9006');
+	await page.getByRole('radio', { name: 'Farebný (podľa RAL)' }).check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// filled tvary — svetlá výplň, existujúci CIERNA stroke drží obrys viditeľný
+	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#A5A8A6');
+	expect(await attr(page, 'pn-elevation-post-0', 'stroke')).toBe('#0f172a');
+	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#A5A8A6');
+	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('#0f172a');
+
+	// regresia (nález pri vizuálnej iterácii #150): stĺpy sú pri bežnej mierke UŽŠIE
+	// než pôvodná hrubá STRUKTURA_STROKE (1,8mm) — stred-zarovnaný SVG stroke by
+	// prekryl CELÚ fill plochu a stĺp by vyšiel vždy čierny bez ohľadu na RAL. Vo
+	// farebnom režime MUSÍ byť stroke-width < šírka tvaru, inak je fill neviditeľný.
+	for (const testid of ['pn-elevation-post-0', 'pn-section-predok']) {
+		const w = parseFloat((await attr(page, testid, 'width')) ?? '0');
+		const sw = parseFloat((await attr(page, testid, 'stroke-width')) ?? '0');
+		expect(w, `${testid}: šírka tvaru`).toBeGreaterThan(0);
+		expect(
+			sw,
+			`${testid}: stroke-width (${sw}) musí byť menší než šírka tvaru (${w}), inak fill zmizne`
+		).toBeLessThan(w);
+	}
+	// izometria (bez fill) — stroke sa STMAVIL, nie je to surová #A5A8A6 (zmizla by
+	// na bielom hárku)
+	const isoStroke = await attr(page, 'pn-iso-hrany', 'stroke');
+	expect(isoStroke).not.toBe('#A5A8A6');
+	expect(isoStroke).toMatch(/^#[0-9a-f]{6}$/i);
+});
+
+test('#150: "iný…" RAL — voľný text, farebný režim použije neutrálnu tmavosivú a povie to', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo').fill('OP260032');
+	await page.getByLabel('RAL odtieň').selectOption('iny');
+	await expect(page.getByTestId('ral-iny-hint')).toContainText('neutrálnu tmavosivú');
+	await page.getByLabel('RAL — vlastný text').fill('RAL 7021 matná');
+	await expect(page.getByTestId('ral-swatch')).toBeVisible();
+	await page.getByRole('radio', { name: 'Farebný (podľa RAL)' }).check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#4b5563');
+	await expect(page.getByTestId('pn-ral')).toContainText('RAL: RAL 7021 matná');
+});
+
+test('#150: prepnutie technický ↔ farebný na tej istej kresbe (Späť a upraviť) mení farby bez straty ostatného vstupu', async ({
+	page
+}) => {
+	await loginAs(page);
+	await vyplnFormular(page); // "iný…" RAL "7016-ANTRACIT JŠ", technický (default)
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#fff');
+
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	// vstup sa nevynuloval — OP aj RAL voľný text ostali
+	await expect(page.getByLabel('OP číslo')).toHaveValue('OP260032');
+	await expect(page.getByLabel('RAL — vlastný text')).toHaveValue('7016-ANTRACIT JŠ');
+
+	await page.getByRole('radio', { name: 'Farebný (podľa RAL)' }).check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	// "iný" RAL bez známeho hexu → neutrálny fallback
+	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#4b5563');
+});
+
+test('#150: tlač zachováva farbu (print-color-adjust: exact na výkresovom hárku)', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo').fill('OP260032');
+	await page.getByLabel('RAL odtieň').selectOption('7016');
+	await page.getByRole('radio', { name: 'Farebný (podľa RAL)' }).check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await page.emulateMedia({ media: 'print' });
+	const hodnota = await page.getByTestId('vykresovy-harok').evaluate((el) => {
+		const cs = getComputedStyle(el);
+		return (
+			cs.getPropertyValue('print-color-adjust') || cs.getPropertyValue('-webkit-print-color-adjust')
+		);
+	});
+	expect(hodnota.trim()).toBe('exact');
+	await page.emulateMedia({ media: 'screen' });
 });

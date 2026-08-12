@@ -17,6 +17,8 @@
 		izometriaHrany,
 		zvodoveBody,
 		poznamkaKotva,
+		farbaKonstrukcie,
+		ciarovaFarba,
 		NOSNIK_HRUBKA_MM,
 		STLP_HRUBKA_VIZ_MM,
 		type PergolaNavrhVstup
@@ -45,6 +47,25 @@
 	const TB_H = 50;
 
 	let g = $derived(vypocitajGeometriu(vstup));
+
+	// #150: farebný režim vyfarbuje LEN konštrukciu (fill vyplnených tvarov;
+	// izometria je čisto líniová bez fill, tam sa stroke sfarbí priamo cez
+	// `ciarovaFarba`, ktorá stmaví svetlé odtiene). Kóty/poznámky/raster/pečiatka
+	// sa nemenia.
+	//
+	// Vizuálna iterácia (render + zoom screenshot 9006 STRIEBORNÁ) odhalila:
+	// existujúci CIERNA `stroke` na stĺpoch/streche NIE JE vždy len "tenký obrys" —
+	// stĺpy sa pri bežnej mierke kreslia UŽŠIE než pôvodná hrúbka obrysu
+	// (STRUKTURA_STROKE=1,8mm, napr. reálny rect width≈1,65mm), takže stred-zarovnaný
+	// SVG stroke prekryje CELÚ fill plochu a stĺp vyjde vždy CIERNA bez ohľadu na
+	// zvolený RAL. Preto vo farebnom režime obrys FILLED tvarov (streška, stĺpy,
+	// predný stĺp v reze) používa tenšiu STRUKTURA_STROKE_VEDLAJSIA (0,4mm — presne
+	// zodpovedá zadaniu "tenký tmavý obrys"), nie hrubú STRUKTURA_STROKE — fill sa
+	// tak reálne uvidí. Technický režim je NEZMENENÝ (stroke-width tam ostáva
+	// pôvodné STRUKTURA_STROKE, presne ako pred #150).
+	let farebny = $derived(vstup.rezimVykresu === 'farebny');
+	let farba = $derived(farbaKonstrukcie(vstup.ralKod));
+	let iznKonstrukcia = $derived(ciarovaFarba(farba));
 
 	// #144: OP číslo / vypracoval / revízia sú voliteľné (VO odberateľ nemá Montalu OP
 	// číslo) — prázdna hodnota sa v pečiatke vykreslí ako „—", rovnaký čestný-neznáme
@@ -279,9 +300,10 @@
 		y={topY - roofH}
 		width={X(g.celkovaSirka) - X(0) + 2 * previs}
 		height={roofH}
-		fill="#eff6ff"
+		fill={farebny ? farba.hex : '#eff6ff'}
 		stroke={CIERNA}
-		stroke-width={STRUKTURA_STROKE}
+		stroke-width={farebny ? STRUKTURA_STROKE_VEDLAJSIA : STRUKTURA_STROKE}
+		data-testid="pn-elevation-strecha"
 	/>
 	<g stroke={CIERNA} stroke-width="0.3">
 		{#each Array(n - 1) as _, i (i)}
@@ -296,9 +318,9 @@
 			y={topY}
 			width={postHalfW * 2}
 			height={baseY - topY}
-			fill="#fff"
+			fill={farebny ? farba.hex : '#fff'}
 			stroke={CIERNA}
-			stroke-width={STRUKTURA_STROKE}
+			stroke-width={farebny ? STRUKTURA_STROKE_VEDLAJSIA : STRUKTURA_STROKE}
 			data-testid="pn-elevation-post-{i}"
 		/>
 	{/each}
@@ -398,7 +420,7 @@
 	     sklone ~pár stupňov) -->
 	<path
 		d={`M ${xWall} ${yWallTop} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${yWallTop + roofH} Z`}
-		fill={CIERNA}
+		fill={farebny ? farba.hex : CIERNA}
 		stroke={CIERNA}
 		stroke-width={STRUKTURA_STROKE_VEDLAJSIA}
 		data-testid="pn-section-strecha"
@@ -411,7 +433,9 @@
 		y={yFrontTop + roofH}
 		width={postHalfW * 2}
 		height={baseY - (yFrontTop + roofH)}
-		fill={CIERNA}
+		fill={farebny ? farba.hex : CIERNA}
+		stroke={farebny ? CIERNA : 'none'}
+		stroke-width={farebny ? STRUKTURA_STROKE_VEDLAJSIA : 0}
 		data-testid="pn-section-predok"
 	/>
 	<!-- #146 bod 9: uhlová kóta ako malý oblúk S radius-čiarami k vrcholu (CAD
@@ -502,7 +526,7 @@
 	>
 	<!-- #146 bod 7: krokvy/hlavné hrany hrubšie (STRUKTURA_STROKE), vedľajšie panelové
 	     deliace krokvy tenšie — jasný vizuálny kontrast hlavná vs. vedľajšia hrana -->
-	<g stroke={CIERNA} fill="none" data-testid="pn-iso-hrany">
+	<g stroke={farebny ? iznKonstrukcia : CIERNA} fill="none" data-testid="pn-iso-hrany">
 		{#each hrany as h, i (i)}
 			{@const s = projekciaUsecky(h.a, h.b, isoScale)}
 			<line
