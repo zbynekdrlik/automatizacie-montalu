@@ -9,6 +9,7 @@
 	import { browser } from '$app/environment';
 	import type { Rola, VizVysledok } from '$lib/vizual/spec';
 	import { mm } from '$lib/vizual/jednotky';
+	import { SKLO_HRUBKA_DEFAULT_MM } from '$lib/vizual/konstanty';
 	import { postavGeometrie, type MergeGeometriesFn } from '$lib/vizual/builder';
 	import { nastavRAL, vytvorHlinikMaterial, vytvorSkloMaterial } from '$lib/vizual/materialy';
 	import {
@@ -273,7 +274,14 @@
 			produktMeshe.push(mesh);
 		}
 		if (geometrie.sklo) {
-			const skloMat = vytvorSkloMaterial(THREE, 8, nastavenia.sklo);
+			// review nález 🟡 #4: predtým natvrdo `8` — duplicitné magické číslo
+			// oproti `SKLO_HRUBKA_DEFAULT_MM` (ktoré `geo/zasklenia.ts` už
+			// používa pre samotnú geometriu skla, `tvar.d`). Appka dnes
+			// nezbiera per-objednávku hrúbku skla vo formulári zasklenia-navrh,
+			// takže presná hodnota z `ZaskleniaVizVstup.skloPresne` sa sem
+			// (mimo `vysledok.diely`) nedostane — zdieľaný default aspoň
+			// nevie "rozísť" s geometriou, ak sa `SKLO_HRUBKA_DEFAULT_MM` zmení.
+			const skloMat = vytvorSkloMaterial(THREE, SKLO_HRUBKA_DEFAULT_MM, nastavenia.sklo);
 			const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
 			scene.add(mesh);
 			produktMeshe.push(mesh);

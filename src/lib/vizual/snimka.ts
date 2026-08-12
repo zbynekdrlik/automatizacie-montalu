@@ -46,45 +46,52 @@ export async function snimka(THREE: ThreeNS, vst: SnimkaVstup): Promise<Blob> {
 	const sirkaPx = w * ss;
 	const vyskaPx = h * ss;
 
-	camera.aspect = w / h;
-	camera.updateProjectionMatrix();
-	renderer.setPixelRatio(1);
-	renderer.setSize(sirkaPx, vyskaPx, false);
-	renderer.render(scene, camera);
+	// review nález 🔵 #8: try/finally — bez neho by mid-sekvenčný throw
+	// (napr. `getContext('2d')` zlyhá) nechal renderer natrvalo veľký
+	// (tlačové rozlíšenie) namiesto pôvodnej veľkosti canvasu, takže
+	// nasledujúce bežné render() volania by kreslili do zlej veľkosti.
+	let vystupCanvas: HTMLCanvasElement;
+	try {
+		camera.aspect = w / h;
+		camera.updateProjectionMatrix();
+		renderer.setPixelRatio(1);
+		renderer.setSize(sirkaPx, vyskaPx, false);
+		renderer.render(scene, camera);
 
-	// readPixels HNEĎ, synchrónne, kým je buffer platný — žiadny await medzi
-	// render() a týmto riadkom
-	const pixely = new Uint8Array(sirkaPx * vyskaPx * 4);
-	gl.readPixels(0, 0, sirkaPx, vyskaPx, gl.RGBA, gl.UNSIGNED_BYTE, pixely);
+		// readPixels HNEĎ, synchrónne, kým je buffer platný — žiadny await
+		// medzi render() a týmto riadkom
+		const pixely = new Uint8Array(sirkaPx * vyskaPx * 4);
+		gl.readPixels(0, 0, sirkaPx, vyskaPx, gl.RGBA, gl.UNSIGNED_BYTE, pixely);
 
-	// WebGL vracia riadky ZDOLA NAHOR — canvas ich chce ZHORA NADOL
-	const surovyCanvas = document.createElement('canvas');
-	surovyCanvas.width = sirkaPx;
-	surovyCanvas.height = vyskaPx;
-	const surovyCtx = surovyCanvas.getContext('2d');
-	if (!surovyCtx) throw new Error('vizual/snimka: 2D canvas kontext sa nepodarilo získať');
-	const imgData = surovyCtx.createImageData(sirkaPx, vyskaPx);
-	const riadokBajty = sirkaPx * 4;
-	for (let y = 0; y < vyskaPx; y++) {
-		const zdrojOd = (vyskaPx - y - 1) * riadokBajty;
-		imgData.data.set(pixely.subarray(zdrojOd, zdrojOd + riadokBajty), y * riadokBajty);
+		// WebGL vracia riadky ZDOLA NAHOR — canvas ich chce ZHORA NADOL
+		const surovyCanvas = document.createElement('canvas');
+		surovyCanvas.width = sirkaPx;
+		surovyCanvas.height = vyskaPx;
+		const surovyCtx = surovyCanvas.getContext('2d');
+		if (!surovyCtx) throw new Error('vizual/snimka: 2D canvas kontext sa nepodarilo získať');
+		const imgData = surovyCtx.createImageData(sirkaPx, vyskaPx);
+		const riadokBajty = sirkaPx * 4;
+		for (let y = 0; y < vyskaPx; y++) {
+			const zdrojOd = (vyskaPx - y - 1) * riadokBajty;
+			imgData.data.set(pixely.subarray(zdrojOd, zdrojOd + riadokBajty), y * riadokBajty);
+		}
+		surovyCtx.putImageData(imgData, 0, 0);
+
+		// downscale na w×h (supersampled AA "zadarmo")
+		vystupCanvas = document.createElement('canvas');
+		vystupCanvas.width = w;
+		vystupCanvas.height = h;
+		const vystupCtx = vystupCanvas.getContext('2d');
+		if (!vystupCtx) throw new Error('vizual/snimka: 2D canvas kontext sa nepodarilo získať');
+		vystupCtx.drawImage(surovyCanvas, 0, 0, w, h);
+	} finally {
+		// obnov pôvodný stav rendera VŽDY, aj keď blok vyššie zlyhal
+		camera.aspect = povodnyAspect;
+		camera.updateProjectionMatrix();
+		renderer.setPixelRatio(povodnyDpr);
+		renderer.setSize(povodnaVelkost.x, povodnaVelkost.y, false);
+		renderer.render(scene, camera);
 	}
-	surovyCtx.putImageData(imgData, 0, 0);
-
-	// downscale na w×h (supersampled AA "zadarmo")
-	const vystupCanvas = document.createElement('canvas');
-	vystupCanvas.width = w;
-	vystupCanvas.height = h;
-	const vystupCtx = vystupCanvas.getContext('2d');
-	if (!vystupCtx) throw new Error('vizual/snimka: 2D canvas kontext sa nepodarilo získať');
-	vystupCtx.drawImage(surovyCanvas, 0, 0, w, h);
-
-	// obnov pôvodný stav rendera
-	camera.aspect = povodnyAspect;
-	camera.updateProjectionMatrix();
-	renderer.setPixelRatio(povodnyDpr);
-	renderer.setSize(povodnaVelkost.x, povodnaVelkost.y, false);
-	renderer.render(scene, camera);
 
 	return new Promise((resolve, reject) => {
 		vystupCanvas.toBlob((blob) => {

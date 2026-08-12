@@ -59,14 +59,18 @@ function najdiSubory(dir: string, out: string[] = []): string[] {
 	return out;
 }
 
-/** Extrahuje VŠETKY import špecifikátory zo zdrojového textu — statický
- *  `import … from '…'`/`import '…'` AJ dynamický `import('…')` (rovnaká
- *  disciplína ako #139 review nález — dynamický import sa NESMIE dať obísť). */
+/** Extrahuje VŠETKY import/re-export špecifikátory zo zdrojového textu —
+ *  statický `import … from '…'`/`import '…'`, dynamický `import('…')` (rovnaká
+ *  disciplína ako #139 review nález — dynamický import sa NESMIE dať obísť),
+ *  AJ re-export `export … from '…'`/`export * from '…'` (review nález 🔵 #7
+ *  — `export { x } from 'three'` by sa inak dalo použiť na obídenie guardu,
+ *  keďže by fyzicky NEobsahovalo slovo "import"). */
 function extrahujSpecifikatory(zdroj: string): string[] {
 	const out: string[] = [];
 	const staticRe = /import\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
 	const dynamicRe = /import\s*\(\s*['"`]([^'"`]+)['"`]/g;
-	for (const re of [staticRe, dynamicRe]) {
+	const exportRe = /export\s+(?:\*(?:\s+as\s+\S+)?|\{[^}]*\}|[^'";]+?)\s+from\s+['"]([^'"]+)['"]/g;
+	for (const re of [staticRe, dynamicRe, exportRe]) {
 		let m: RegExpExecArray | null;
 		while ((m = re.exec(zdroj))) out.push(m[1]);
 	}
@@ -169,7 +173,10 @@ describe('Money-safety guard (#170 §2.13) — src/lib/vizual/** a components/vi
 		// nebundluje do prehliadača), takže bundle-size/SSR účel tohto pravidla sa
 		// na ne nevzťahuje; `tests/vizual-builder.test.ts` preto zámerne importuje
 		// `three` priamo pre unit test builder.ts.
-		const staticImportRe = /import\s+(?:[^'";]+?\s+from\s+)?['"]three(\/[^'"]*)?['"]/;
+		// `export … from 'three'` (re-export) je ROVNAKO statický bundle-size
+		// dôsledok ako `import … from 'three'` — review nález 🔵 #7.
+		const staticImportRe =
+			/(?:import\s+(?:[^'";]+?\s+from\s+)?|export\s+(?:\*(?:\s+as\s+\S+)?|\{[^}]*\}|[^'";]+?)\s+from\s+)['"]three(\/[^'"]*)?['"]/;
 		const prehladavaneDiry = [path.join(SRC, 'routes'), path.join(SRC, 'lib')];
 		const porusenia: string[] = [];
 		for (const dir of prehladavaneDiry) {

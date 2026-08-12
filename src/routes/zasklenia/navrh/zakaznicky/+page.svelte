@@ -4,6 +4,7 @@
 	// `VykresovyHarok.svelte` shelli (cez `<foreignObject>`, aby sa dal použiť
 	// skutočný HTML `<img>` vnútri SVG rámu). Pod obrázkom, MIMO rastra: kóty,
 	// RAL, systém/štýl a povinné poznámky (§2.7/§2.13 — nikdy zapečené v PNG).
+	import { onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import Vizual3D from '$lib/components/vizual/Vizual3D.svelte';
@@ -46,6 +47,11 @@
 	let obrazokUrl = $state<string | null>(null);
 	let zachytavaSa = $state(false);
 	let zachyteneRaz = false;
+	// null = zatiaľ neznáme; string = chybová správa po zlyhanom pokuse
+	// (review nález 🟡 #2: predtým žiadny catch → nezachytené promise
+	// rejection a stránka navždy visela na "Pripravuje sa obrázok…" bez
+	// akéhokoľvek vysvetlenia alebo úniku späť na návrh)
+	let chyba = $state<string | null>(null);
 
 	async function zachyt() {
 		if (!browser || !vizRef || zachytavaSa || zachyteneRaz || aktualnyTier === 'none') return;
@@ -55,6 +61,10 @@
 			if (obrazokUrl) URL.revokeObjectURL(obrazokUrl);
 			obrazokUrl = URL.createObjectURL(blob);
 			zachyteneRaz = true;
+			chyba = null;
+		} catch (e) {
+			console.error('Zákaznícky list: zachytenie 3D náhľadu zlyhalo', e);
+			chyba = 'Náhľad sa nepodarilo zachytiť — skús to prosím znova.';
 		} finally {
 			zachytavaSa = false;
 		}
@@ -62,6 +72,20 @@
 
 	$effect(() => {
 		if (pripravene) void zachyt();
+	});
+
+	function skusZnova() {
+		chyba = null;
+		void zachyt();
+	}
+
+	// 3D náhľad nie je na tomto zariadení dostupný (T0) — rovnaká čestná
+	// správa ako Vizual3DPoster na hlavnej návrhovej stránke, nikdy tichý
+	// nekonečný "Čaká sa" stav.
+	let nedostupne = $derived(pripravene && aktualnyTier === 'none');
+
+	onDestroy(() => {
+		if (obrazokUrl) URL.revokeObjectURL(obrazokUrl);
 	});
 
 	const PAGE_W = 297;
@@ -97,7 +121,17 @@
 			<span class="badge">{fmtMm(vstup.s)} × {fmtMm(vstup.v)} mm</span>
 			<span class="badge">{nazovSysStyl(vstup.sysStyl)}</span>
 		</p>
-		{#if !obrazokUrl}
+		{#if chyba}
+			<p class="stav chyba" data-testid="zakaznicky-chyba">
+				⚠️ {chyba}
+				<button type="button" class="link" onclick={skusZnova}>Skúsiť znova</button>
+			</p>
+		{:else if nedostupne}
+			<p class="stav chyba" data-testid="zakaznicky-nedostupne">
+				3D náhľad nie je na tomto zariadení dostupný. Použi
+				<a href={resolve('/zasklenia/navrh')}>technický výkres</a> na návrhovej stránke.
+			</p>
+		{:else if !obrazokUrl}
 			<p class="stav">{zachytavaSa ? 'Pripravuje sa obrázok…' : 'Čaká sa na 3D scénu…'}</p>
 		{/if}
 	</div>
@@ -115,6 +149,14 @@
 							style="width:100%;height:100%;object-fit:contain"
 							data-testid="zakaznicky-obrazok"
 						/>
+					{:else if chyba}
+						<div class="placeholder" data-testid="zakaznicky-obrazok-chyba">
+							Náhľad sa nepodarilo zachytiť.
+						</div>
+					{:else if nedostupne}
+						<div class="placeholder" data-testid="zakaznicky-obrazok-nedostupne">
+							3D náhľad nie je na tomto zariadení dostupný.
+						</div>
 					{:else}
 						<div class="placeholder">3D náhľad sa pripravuje…</div>
 					{/if}
@@ -169,6 +211,21 @@
 	.stav {
 		color: #64748b;
 		font-size: 13px;
+	}
+
+	.stav.chyba {
+		color: #b45309;
+	}
+
+	.stav .link {
+		background: none;
+		border: none;
+		padding: 0;
+		margin-left: 6px;
+		color: #1d4ed8;
+		text-decoration: underline;
+		cursor: pointer;
+		font-size: inherit;
 	}
 
 	.placeholder {

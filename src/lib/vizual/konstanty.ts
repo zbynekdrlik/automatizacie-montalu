@@ -65,5 +65,7 @@ export const OTVORENE_NA_DEFAULT = 0.35;
 /** Ak dielňa potrebuje OPAČNÉ poradie krídel v hĺbke (najbližšie/najďalšie
  *  vpredu), prepne sa TÁTO jediná konštanta — `geo/zasklenia.ts` číta iba ju,
  *  nikde inde sa poradie nehardcoduje. Konvenciu (default `false`) drží
- *  snapshot test v `tests/vizual-zasklenia.test.ts`. */
+ *  snapshot test v `tests/vizual-zasklenia.test.ts`. Vizuál, nie katalóg —
+ *  nemení žiadnu kótu ani odpis, len smer, ktorým krídla v 3D scéne
+ *  "kaskádujú". */
 export const ZASK_PORADIE_OBRATENE = false;
