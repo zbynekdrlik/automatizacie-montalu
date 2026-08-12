@@ -188,7 +188,15 @@ describe('kamera — #174 výška oka v prirodzenom pásme ~1,5–1,7 m', () => 
 		}
 	});
 
-	it('pôvodné (pred #174) elevácie 16°/8° by boli MIMO tohto pásma — dôkaz, že test naozaj chytá regresiu', () => {
+	it('IZOLOVANÁ premenná: pôvodná elevácia troStvrte (16°) by SAMA OSEBE (pri dnešnej rezerve/pull-down) dala výšku mimo pásma', () => {
+		// Toto NIE JE reprodukcia skutočného pred-#174 stavu (ten mal
+		// rezerva=0.15 + pull-down=0.92, nie dnešných 0.35/0.90 — kombinácia
+		// oboch dala pôvodne ~2.3m, viď `kamera.ts`'s vlastný komentár) —
+		// zámerne izoluje LEN elevačný uhol ako premennú (rezerva/fitCiel sú
+		// dnešné), aby dokázal, že bez zníženia elevácie by výška bola mimo
+		// pásma AJ pri dnešnej väčšej marži, nie len v pôvodnej kombinácii
+		// (#174 adversariálny review — objasnené, aby test netvrdil, že
+		// reprodukuje presne pred-#174 stav).
 		const bbox = { w: 4200, h: 2100, d: 150 };
 		const fit = autoFitVzdialenost(bbox, ASPECT_16_10);
 		const ciel = fitCiel(bbox);

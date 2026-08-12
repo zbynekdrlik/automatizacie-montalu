@@ -69,15 +69,23 @@ export function jePoznanyRal(ralKod: string): boolean {
  *  `transmittance = attenuationColor ^ (dráhaVSkle / attenuationDistance)`
  *  (`transmission_pars_fragment.glsl.js`, `volumeAttenuation()`) — to je
  *  MOCNINA farby, nie exponenciála vzdialenosti samotnej. Pri takmer BIELOM
- *  `attenuationColor` (napr. `0x9fd6c4` ⇒ zložky 0.62–0.84) je aj pri
- *  agresívne krátkej `attenuationDistance` výsledok stále ≈ 0.9–0.97
- *  (prakticky žiadny viditeľný útlm) — presne prečo 1. kolo (kratšia
- *  distance, ale stále bledý `attenuationColor`) vizuálne takmer nič
- *  nezmenilo. Skutočný, viditeľný tint potrebuje SÝTY (nie bledý)
- *  `attenuationColor` — nižšie zvolené hodnoty dávajú pri 8 mm skle
- *  transmitanciu ~0.45–0.85 po kanáli (overené v `tests/vizual-materialy.test.ts`
- *  PRIAMO tou istou Beer–Lambert-po-kanáli formulou, nie zjednodušenou
- *  aproximáciou).
+ *  `attenuationColor` je aj pri agresívne krátkej `attenuationDistance`
+ *  výsledok stále blízko 1 (prakticky žiadny viditeľný útlm) — presne prečo
+ *  1. kolo (kratšia distance, ale stále bledý `attenuationColor`) vizuálne
+ *  takmer nič nezmenilo. Skutočný, viditeľný tint potrebuje SÝTY (nie bledý)
+ *  `attenuationColor`.
+ *
+ *  POZOR pri prepočítavaní tejto formuly ručne: `THREE.Color`'s `.r/.g/.b`
+ *  sú po `ColorManagement` sRGB→LINEÁRNOM prevode (three@0.185, zapnuté
+ *  defaultne), NIE surové `hex/255` zlomky — `0x2f9478` je sRGB (0.18, 0.58,
+ *  0.47), ale `new THREE.Color(0x2f9478).r/.g/.b` je (0.03, 0.30, 0.19).
+ *  Prepočet zo surových sRGB zlomkov namiesto skutočných `.r/.g/.b` hodnôt
+ *  dá viditeľne iné (nesprávne) číslo — presne táto chyba sa stala v
+ *  predchádzajúcej verzii tohto komentára (adversariálny review #174).
+ *  Skutočná transmitancia pri danej hrúbke/attenuationDistance je overená
+ *  priamo v `tests/vizual-materialy.test.ts` cez `mat.attenuationColor[k]`
+ *  (teda tie isté, už skonvertované lineárne hodnoty, ktoré shader použije)
+ *  — ten test je zdroj pravdy, nie ilustračné čísla v komentári.
  *
  *  `clearcoat` pridáva DRUHÚ, nezávislú lesklú vrstvu zachytávajúcu priame
  *  kľúčové svetlo (§2.6, fixné) ako viditeľný "hot-spot" — vizuálna skratka
@@ -118,11 +126,13 @@ export function vytvorSkloMaterial(
 		// takmer neutrálna — tint nesie hlavne attenuationColor (Beer–Lambert),
 		// `color` by pri sýtej hodnote útlm len duplicitne prehĺbil
 		color: new THREE.Color(0xf2faf7),
-		// #174 3. kolo: 2. kolo (attenuationDistance 0.02) dávalo pri 8 mm skle
-		// transmitanciu ~0.5/0.8/0.74 — čítalo sa to ako sýte zelené sklo,
-		// nie "jemný modrozelený nádych". Väčšia attenuationDistance (0.035)
-		// pri rovnakej sýtej `attenuationColor` dáva jemnejší, ale stále jasne
-		// VIDITEĽNÝ tón (overené screenshotom + `tests/vizual-materialy.test.ts`).
+		// #174 3. kolo: 2. kolo (attenuationDistance 0.02) čítalo naživo ako
+		// SÝTE zelené sklo, nie "jemný modrozelený nádych" zo zadania. Väčšia
+		// attenuationDistance (0.035) pri rovnakej sýtej `attenuationColor`
+		// dáva jemnejší, ale stále jasne VIDITEĽNÝ tón — overené screenshotom
+		// AJ `tests/vizual-materialy.test.ts` (skutočná Beer–Lambert
+		// transmitancia po kanáli, viď funkcie vlastný header komentár vyššie
+		// pre presnú formulu a upozornenie na lineárny vs. sRGB priestor).
 		attenuationColor: new THREE.Color(0x2f9478),
 		attenuationDistance: 0.035,
 		envMapIntensity: 1.6,

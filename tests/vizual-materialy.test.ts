@@ -16,7 +16,10 @@ describe('materialy — vytvorSkloMaterial (#174 tier-based sklo)', () => {
 		expect(mat.transparent).toBe(true);
 		expect(mat.transmission).toBe(0);
 		expect(mat.opacity).toBeGreaterThan(0);
-		expect(mat.opacity).toBeLessThan(0.5); // stále jasne priehľadné, nie takmer nepriehľadný panel
+		// #174 adversariálny review: < 0.5 by prešlo aj s pôvodnou (nepriehľadnou)
+		// hodnotou 0.34 — 0.30 je jediná hranica, ktorá SKUTOČNE odlíši od
+		// pôvodného stavu, nie len teoreticky "menej ako niečo vysoké"
+		expect(mat.opacity).toBeLessThan(0.3);
 		// silnejší odraz prostredia — inak sklo nečíta ako sklo nezávisle od
 		// toho, čo je za ním (issue #174 nález 1)
 		expect(mat.envMapIntensity).toBeGreaterThan(1);
@@ -64,11 +67,20 @@ describe('materialy — vytvorSkloMaterial (#174 tier-based sklo)', () => {
 		>;
 		for (const mat of [falosne, transmission]) {
 			expect(mat.envMapIntensity).toBeGreaterThanOrEqual(1.5);
-			expect(mat.specularIntensity).toBeGreaterThanOrEqual(1);
+			// #174 adversariálny review: `>= 1` by prešlo aj s three.js DEFAULTNOU
+			// hodnotou `specularIntensity` (1) — teda aj keby sa riadok
+			// `specularIntensity: 1.3` úplne vymazal. Prísne `> 1` je jediná
+			// hranica, ktorá to naozaj odlíši.
+			expect(mat.specularIntensity).toBeGreaterThan(1);
 			// clearcoat = druhá lesklá vrstva zachytávajúca kľúčové svetlo ako
 			// hot-spot — nezávislé od (prípadne slabého) fresnel odrazu
 			// environment mapy pri takmer čelnom pohľade (#174 druhé kolo)
 			expect(mat.clearcoat).toBeGreaterThan(0.5);
+			// #174 adversariálny review: `< 0.2` samo osebe by prešlo aj s
+			// three.js DEFAULTNOU hodnotou `clearcoatRoughness` (0) — teda aj
+			// keby `clearcoat`/`clearcoatRoughness` blok úplne chýbal. Dolná
+			// hranica (> 0) dokazuje, že hodnota bola SKUTOČNE nastavená.
+			expect(mat.clearcoatRoughness).toBeGreaterThan(0);
 			expect(mat.clearcoatRoughness).toBeLessThan(0.2);
 		}
 	});
