@@ -10,9 +10,16 @@ function zdroj(relPath: string): string {
 	return fs.readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
 }
 
+// review nález #139 (🔵): pôvodné vzory chytia len statický ESM `import …
+// from '...'` — pridané aj `import(...)` (dynamický import) so ZHODNÝM
+// zakázaným segmentom ciesty, nech sa nedá obísť `await import('$lib/server/'
+// + 'money')`-štýlom. Rovnaká disciplína by sa mala doplniť aj do
+// tests/fix-money-safety.test.ts (mimo rozsahu tohto ticketu).
 const ZAKAZANE_VZORY = [
 	/from ['"].*server\/money['"]/,
 	/from ['"].*server\/bazen['"]/,
+	/import\(\s*['"`].*server\/money['"`]/,
+	/import\(\s*['"`].*server\/bazen['"`]/,
 	/writeOdpis|MONEY_LIVE/
 ];
 

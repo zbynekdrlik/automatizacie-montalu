@@ -111,6 +111,17 @@ describe('sekcieVysky — lineárna kaskáda medzi najvyššou a najnižšou sek
 	it('rovnaké výšky → konštantné pole (žiadny kolaps na kaskádu)', () => {
 		expect(sekcieVysky(3, 900, 900)).toEqual([900, 900, 900]);
 	});
+	// review nález #139 (🔴, dokumentácia fixu v BazenNavrhVykres.svelte): pri 1
+	// sekcii vyskaMin NEVSTUPUJE do výsledku vôbec, aj keď sa líši od vyskaMax —
+	// jedna sekcia nekaskáduje. Kresliaca komponenta preto MUSÍ čítať výšku
+	// z tohto poľa (vysky[0]/vysky[posledná]), NIKDY priamo vstup.vyskaMax/
+	// vyskaMin — inak by vytlačila kótu s textom, ktorý nesedí s nakreslenou
+	// geometriou (napr. čiara dlhá 1600mm s popiskom "1200").
+	it('1 sekcia s ROZDIELNYMI vyskaMax/vyskaMin → vyskaMin sa v poli vôbec nezjaví (vysky[0] je jediná pravda)', () => {
+		const v = sekcieVysky(1, 1600, 1200);
+		expect(v).toEqual([1600]);
+		expect(v[v.length - 1]).toBe(1600); // NIE 1200
+	});
 });
 
 describe('sekciePozicie — rovnomerné vizuálne delenie, posledná hranica presne na zatvorenaDlzka', () => {
@@ -131,6 +142,42 @@ describe('sekciePozicie — rovnomerné vizuálne delenie, posledná hranica pre
 	});
 	it('neplatná (nekladná) dĺžka → nulové pozície, nie NaN', () => {
 		expect(sekciePozicie(0, 4)).toEqual([0, 0, 0, 0, 0]);
+	});
+
+	// review nález #139 (🟡): ručne zadaná šírka prvej sekcie musí SKUTOČNE
+	// posunúť prvú hranicu tam, kam ukazuje jej kóta — inak kóta meria niečo iné,
+	// než je nakreslené (OP260027 vzor: reálna prvá sekcia 2140mm ≠ schematické
+	// rovnomerné delenie 10500/5=2100mm).
+	describe('sirkaPrvejOverride (3. parameter) — prvá hranica na SKUTOČNEJ zadanej šírke', () => {
+		it('OP260027 vzor: 5 sekcií, 10500mm, override 2140 → prvá hranica presne 2140', () => {
+			const p = sekciePozicie(10500, 5, 2140);
+			expect(p[0]).toBe(0);
+			expect(p[1]).toBe(2140);
+			expect(p[p.length - 1]).toBe(10500);
+		});
+		it('zvyšná dĺžka (10500-2140=8360) sa rovnomerne rozdelí medzi ostávajúce 4 sekcie', () => {
+			const p = sekciePozicie(10500, 5, 2140);
+			const krok = (10500 - 2140) / 4;
+			expect(p[2]).toBeCloseTo(2140 + krok, 5);
+			expect(p[3]).toBeCloseTo(2140 + krok * 2, 5);
+			expect(p[4]).toBeCloseTo(2140 + krok * 3, 5);
+		});
+		it('bez override (undefined) sa správa ako predtým — rovnomerné delenie', () => {
+			expect(sekciePozicie(10500, 5, undefined)).toEqual(sekciePozicie(10500, 5));
+		});
+		it('override pri 1 sekcii sa ignoruje (žiadny "zvyšok" na rozdelenie)', () => {
+			expect(sekciePozicie(5000, 1, 2000)).toEqual([0, 5000]);
+		});
+		it('override väčší než celková dĺžka sa orezáva na celkovú dĺžku', () => {
+			const p = sekciePozicie(4000, 4, 9000);
+			expect(p[1]).toBe(4000);
+			// zvyšok pre ostatné sekcie je 0 — všetky splynú na konci
+			expect(p[2]).toBe(4000);
+		});
+		it('nekladný override (0 alebo záporný) sa ignoruje — späť na rovnomerné delenie', () => {
+			expect(sekciePozicie(4000, 4, 0)).toEqual(sekciePozicie(4000, 4));
+			expect(sekciePozicie(4000, 4, -100)).toEqual(sekciePozicie(4000, 4));
+		});
 	});
 });
 
@@ -223,7 +270,16 @@ describe('chybaBazenNavrhVstupu — validácia (rovnaká disciplína ako chybaPe
 	it('dĺžka koľajiska kratšia než zatvorená dĺžka — zamietnutá (presah nemôže byť záporný)', () => {
 		expect(
 			chybaBazenNavrhVstupu({ ...VZOR_OP260055, dlzkaKolajiska: VZOR_OP260055.zatvorenaDlzka - 1 })
-		).toMatch(/kratšia než zatvorená dĺžka/);
+		).toMatch(/musí byť väčšia než zatvorená dĺžka/);
+	});
+
+	// review nález #139 (🔴): PÔVODNE bola rovnosť dovolená (presah=0) — degenerovaná
+	// nulovej-dĺžky "presah" kóta v BazenNavrhVykres.svelte by spôsobila pád
+	// (each_key_duplicate, .claude/rules/vykres.md). Teraz musí byť PRESAH KLADNÝ.
+	it('dĺžka koľajiska ROVNÁ zatvorenej dĺžke (presah=0) — zamietnutá', () => {
+		expect(
+			chybaBazenNavrhVstupu({ ...VZOR_OP260055, dlzkaKolajiska: VZOR_OP260055.zatvorenaDlzka })
+		).toMatch(/musí byť väčšia než zatvorená dĺžka/);
 	});
 
 	it('sirkaSekcieOverride nekladná — zamietnutá', () => {

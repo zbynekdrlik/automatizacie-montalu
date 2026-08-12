@@ -58,7 +58,11 @@ export const VYSKA_CELA_MAX = 300;
 
 export type Kolaj = 'jednokolaj' | 'dvojkolaj';
 export type Smer = 'vpravo' | 'vlavo';
-export type DvereSmer = 'vpravo' | 'vlavo';
+// smer dverí je NEZÁVISLÝ od smeru posuvu (viď `dverePopis` nižšie), ale
+// zdieľa PRESNE tú istú hodnotovú množinu — jeden zdroj pravdy pre "vpravo"/
+// "vlavo" (review nález #139: dva samostatné typy s identickou úniou boli
+// zbytočná duplicita).
+export type DvereSmer = Smer;
 
 export interface BazenNavrhVstup {
 	/** zatvorená dĺžka krytu [mm] — "10500"/"8570" v názve vzoru */
@@ -128,13 +132,33 @@ export function sekcieVysky(pocetSekcii: number, vyskaMax: number, vyskaMin: num
 /** X pozície deliacich hraníc sekcií (0-based, od 0 po `zatvorenaDlzka`) pri
  *  `pocetSekcii` ROVNOMERNE širokých sekciách — LEN vizuálne polohy pre
  *  kreslenie deliacich čiar v bokoryse/pôdoryse, appka ich NIKDY netlačí ako
- *  kótu šírky (skutočné vnorenie sekcií nepozná, viď `sirkaSekcieOverride`).
- *  Posledná hranica je EXPLICITNE priradená `zatvorenaDlzka` (rovnaká oprava
- *  ako `deliaceStlpiky` v zasklenia-navrh.ts #162 review nález — zaokrúhľovanie
- *  po jednotlivých krokoch by inak pri niektorých kombináciách skončilo mimo
- *  skutočnej dĺžky). */
-export function sekciePozicie(zatvorenaDlzka: number, pocetSekcii: number): number[] {
+ *  kótu šírky (skutočné vnorenie sekcií nepozná). Posledná hranica je
+ *  EXPLICITNE priradená `zatvorenaDlzka` (rovnaká oprava ako `deliaceStlpiky`
+ *  v zasklenia-navrh.ts #162 review nález — zaokrúhľovanie po jednotlivých
+ *  krokoch by inak pri niektorých kombináciách skončilo mimo skutočnej dĺžky).
+ *
+ *  `sirkaPrvejOverride` (review nález #139): keď je zadaná ručná šírka prvej
+ *  sekcie, PRVÁ hranica sa nakreslí PRESNE tam (nie na schematickom
+ *  rovnomernom delení) a zvyšná dĺžka sa rovnomerne rozdelí medzi ostávajúce
+ *  sekcie — inak by kóta ručne zadanej šírky ukazovala na hranicu, ktorá ju
+ *  vôbec nemeria (vizuálne klamlivé, aj keď číselne správne). Bez override
+ *  (alebo pri 1 sekcii, kde "zvyšok" nedáva zmysel) sa správa nezmenene ako
+ *  predtým. */
+export function sekciePozicie(
+	zatvorenaDlzka: number,
+	pocetSekcii: number,
+	sirkaPrvejOverride?: number
+): number[] {
 	const n = Math.max(1, Math.round(pocetSekcii));
+	if (sirkaPrvejOverride !== undefined && sirkaPrvejOverride > 0 && n > 1) {
+		const prva = Math.min(sirkaPrvejOverride, zatvorenaDlzka);
+		const zvysok = Math.max(0, zatvorenaDlzka - prva);
+		const sirkaOstatnych = zvysok / (n - 1);
+		const out = [0, R1(prva)];
+		for (let i = 2; i <= n; i++) out.push(R1(prva + sirkaOstatnych * (i - 1)));
+		out[n] = R1(zatvorenaDlzka);
+		return out;
+	}
 	const sirka = zatvorenaDlzka > 0 ? zatvorenaDlzka / n : 0;
 	const out = Array.from({ length: n + 1 }, (_, i) => R1(i * sirka));
 	out[n] = R1(zatvorenaDlzka);
@@ -185,8 +209,15 @@ export function chybaBazenNavrhVstupu(v: BazenNavrhVstup): string | null {
 		return `Počet sekcií musí byť ${POCET_SEKCII_MIN}–${POCET_SEKCII_MAX}.`;
 	if (!(v.dlzkaKolajiska >= DLZKA_KOLAJISKA_MIN && v.dlzkaKolajiska <= DLZKA_KOLAJISKA_MAX))
 		return `Dĺžka koľajiska musí byť ${DLZKA_KOLAJISKA_MIN}–${DLZKA_KOLAJISKA_MAX} mm.`;
-	if (v.dlzkaKolajiska < v.zatvorenaDlzka)
-		return 'Dĺžka koľajiska nemôže byť kratšia než zatvorená dĺžka.';
+	// review nález #139: PÔVODNE len `<` — dovolilo rovnosť (presah=0), čo
+	// odporuje vlastnému typovému komentáru "vždy väčšia než zatvorenaDlzka"
+	// (BazenNavrhVstup.dlzkaKolajiska) AJ domain pravidlu (presah = reálny
+	// presah teleskopu). Rovnosť navyše vyrobí DEGENEROVANÚ (nulovej dĺžky)
+	// "presah" kótu v BazenNavrhVykres.svelte — x0===x1 aj y0===y1 — presne ten
+	// istý `each_key_duplicate` pád, ktorý `.claude/rules/vykres.md` už
+	// dokumentuje pre `<Kota>` s `y0===y1`.
+	if (v.dlzkaKolajiska <= v.zatvorenaDlzka)
+		return 'Dĺžka koľajiska musí byť väčšia než zatvorená dĺžka (presah musí byť kladný).';
 	if (v.sirkaSekcieOverride !== undefined && !(v.sirkaSekcieOverride > 0))
 		return 'Ručná šírka sekcie musí byť kladné číslo.';
 	const n = Math.max(1, Math.round(v.pocetSekcii));

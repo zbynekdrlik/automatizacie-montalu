@@ -36,6 +36,11 @@
 		datum: string;
 	} = $props();
 
+	// unikátne id pre <clipPath> — viac inštancií tejto komponenty na jednej
+	// stránke by inak zdieľalo id (rovnaký vzor ako `uid` v TitleBlock.svelte /
+	// Nahlad2D.svelte).
+	const uid = $props.id();
+
 	const PAGE_W = 297;
 	const PAGE_H = 210;
 	const MARGIN = 6;
@@ -44,11 +49,21 @@
 	const OBLAST_H = PAGE_H - 2 * MARGIN - 2 * GRID_BAND;
 	// rovnaká disciplína ako pergola (#146 review nález) — JEDNA konštanta
 	// poslaná explicitne cez `titleBlockData.height`, nikdy dve nezávislé "50".
+	// TB_W = VykresovyHarok's default `tbW` (titleBlock.width nie je nastavené,
+	// takže platí jeho interný default 92) — potrebné TU na výpočet, kam smie
+	// textový popis siahať, nech ho pečiatka nezakryje (review nález #139).
 	const TB_H = 50;
+	const TB_W = 92;
 
 	let pocetSekcii = $derived(Math.max(1, Math.round(vstup.pocetSekcii)));
 	let vysky = $derived(sekcieVysky(pocetSekcii, vstup.vyskaMax, vstup.vyskaMin));
-	let pozicie = $derived(sekciePozicie(vstup.zatvorenaDlzka, pocetSekcii));
+	// `sirkaSekcieOverride` sa odovzdáva AJ sem (nie len do Kota popisku) —
+	// inak by ručne zadaná šírka prvej sekcie ukazovala kótu na hranicu
+	// nakreslenú podľa schematického rovnomerného delenia, ktorá ju vôbec
+	// nemeria (review nález #139: vizuálne klamlivé, hoci číselne správne).
+	let pozicie = $derived(
+		sekciePozicie(vstup.zatvorenaDlzka, pocetSekcii, vstup.sirkaSekcieOverride)
+	);
 	let presah = $derived(presahKolajniska(vstup.dlzkaKolajiska, vstup.zatvorenaDlzka));
 	let varianta = $derived(variantaZSekcii(pocetSekcii));
 
@@ -138,10 +153,18 @@
 		{@const podH = (oblast.h - topPad) * 0.3}
 		{@const bok = { x: mainX, y: oblast.y + topPad, w: mainW, h: bokH }}
 		{@const pod = { x: mainX, y: bok.y + bokH + gap, w: mainW, h: podH }}
+		<!-- review nález #139 (🟡): `spec` predtým siahal na CELÚ zvyšnú šírku
+		     mainW, ktorej pravý okraj sa PRESNE zhoduje s pravým okrajom pečiatky
+		     (tbX+TB_W === oblast.x+oblast.w) — dlhá voľnotextová hodnota (MODEL/
+		     VÝPLŇ/ARETÁCIA, až 60 znakov) by sa tak mohla vykresliť POD nepriehľadnú
+		     bielu pečiatku. Šírka teraz zámerne končí 2mm pred pečiatkou (`tbX`);
+		     `texty` snippet nižšie to navyše fyzicky vynucuje cez <clipPath>, nie
+		     len polohou regiónu (ktorá SVG <text> sama osebe neobmedzuje). -->
+		{@const tbX = oblast.x + oblast.w - TB_W}
 		{@const spec = {
 			x: mainX,
 			y: pod.y + podH + gap,
-			w: mainW,
+			w: Math.max(0, tbX - 2 - mainX),
 			h: Math.max(0, oblast.y + oblast.h - (pod.y + podH + gap))
 		}}
 		<!-- jedna spoločná dĺžková mierka pre bokorys AJ pôdorys (aby stĺpiky
@@ -244,14 +267,20 @@
 			data-testid={`bn-bokorys-sekcia-${i}`}
 		/>
 	{/each}
-	<!-- výšky: najvyššia sekcia (vľavo) / najnižšia sekcia (vpravo) -->
+	<!-- výšky: najvyššia sekcia (vľavo) / najnižšia sekcia (vpravo). Popisok
+	     ČÍTA `vysky[]` (skutočne nakreslenú geometriu), NIE `vstup.vyskaMax`/
+	     `vyskaMin` priamo — review nález #139: pri 1 sekcii `sekcieVysky` vráti
+	     LEN [vyskaMax] (vyskaMin sa ignoruje, jedna sekcia nekaskáduje), takže
+	     čítanie `vstup.vyskaMin` priamo by vytlačilo kótu, ktorej text nesedí
+	     s nakreslenou výškou. Pre pocetSekcii>1 sú hodnoty zhodné s predošlým
+	     správaním (vysky[0]===vyskaMax, vysky[posledná]===vyskaMin). -->
 	<Kota
 		x0={X(pozicie[0])}
 		y0={baseY}
 		x1={X(pozicie[0])}
 		y1={baseY - vysky[0] * scale}
 		perpOffset={-(r.w * 0.05)}
-		text={fmtMm(vstup.vyskaMax)}
+		text={fmtMm(vysky[0])}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -261,7 +290,7 @@
 		x1={X(pozicie[pozicie.length - 1])}
 		y1={baseY - vysky[vysky.length - 1] * scale}
 		perpOffset={r.w * 0.05}
-		text={fmtMm(vstup.vyskaMin)}
+		text={fmtMm(vysky[vysky.length - 1])}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -343,7 +372,11 @@
 		stroke-width={obrysStroke(Math.min(X(vstup.zatvorenaDlzka) - X(0), y1 - y0) * 0.5)}
 		data-testid="bn-podorys-obrys"
 	/>
-	<!-- dverová sekcia zvýraznená oranžovo -->
+	<!-- dverová sekcia zvýraznená oranžovo. stroke-width cez obrysStroke() —
+	     review nález #139 (🟡, #153 disciplína): pevná hodnota by pri extrémnom
+	     (ale platnom) vstupe (napr. 12 sekcií, malá zatvorenaDlzka, veľká hĺbka)
+	     zhltla oranžovú výplň vlastným obrysom, presne ako ostatné vyplnené
+	     tvary v tomto module. -->
 	<rect
 		x={dverySx0}
 		y={y0}
@@ -352,7 +385,7 @@
 		fill={ORANZOVA}
 		fill-opacity="0.55"
 		stroke={CIERNA}
-		stroke-width="0.35"
+		stroke-width={obrysStroke(Math.min(dverySx1 - dverySx0, y1 - y0) * 0.5)}
 		data-testid="bn-podorys-dvere"
 	/>
 	<!-- deliace čiary sekcií -->
@@ -439,23 +472,36 @@
 		['VÝŠKA ČELA', 'vyska-cela', `${fmtMm(vstup.vyskaCela)} mm`],
 		['DĹŽKA KOĽAJISKA', 'dlzka-kolajiska', `${fmtMm(vstup.dlzkaKolajiska)} mm`]
 	]}
-	{#each riadky as [label, testid, hodnota], i (testid)}
-		<text
-			x={r.x}
-			y={r.y + 4 + i * 4.6}
-			font-size="3"
-			fill={CIERNA}
-			data-testid={`bn-spec-${testid}`}><tspan font-weight="700">{label}:</tspan> {hodnota}</text
-		>
-	{/each}
-	{#if vstup.ral}
-		<text
-			x={r.x}
-			y={r.y + 4 + riadky.length * 4.6 + 2}
-			font-size="3.6"
-			font-weight="700"
-			fill={CERVENA}
-			data-testid="bn-ral-text">RAL: {vstup.ral}</text
-		>
-	{/if}
+	<!-- review nález #139 (🟡): región `r` už stopuje 2mm pred pečiatkou (viď
+	     `spec` vyššie), ale zúženie regiónu SAMO OSEBE nič nevynucuje — SVG
+	     <text> nie je orezaný podľa neho, dlhá hodnota by cezeň jednoducho
+	     pretiekla. <clipPath> ju fyzicky odreže (rovnaká technika ako
+	     TitleBlock.svelte, `uid` z `$props.id()` proti kolízii viacerých
+	     inštancií na stránke). -->
+	<defs>
+		<clipPath id="bn-texty-clip-{uid}">
+			<rect x={r.x} y={r.y - 4} width={r.w} height={r.h + 8} />
+		</clipPath>
+	</defs>
+	<g clip-path="url(#bn-texty-clip-{uid})">
+		{#each riadky as [label, testid, hodnota], i (testid)}
+			<text
+				x={r.x}
+				y={r.y + 4 + i * 4.6}
+				font-size="3"
+				fill={CIERNA}
+				data-testid={`bn-spec-${testid}`}><tspan font-weight="700">{label}:</tspan> {hodnota}</text
+			>
+		{/each}
+		{#if vstup.ral}
+			<text
+				x={r.x}
+				y={r.y + 4 + riadky.length * 4.6 + 2}
+				font-size="3.6"
+				font-weight="700"
+				fill={CERVENA}
+				data-testid="bn-ral-text">RAL: {vstup.ral}</text
+			>
+		{/if}
+	</g>
 {/snippet}
