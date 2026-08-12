@@ -14,6 +14,12 @@ import {
 	zvodoveBody,
 	poznamkaKotva,
 	chybaPergolaNavrhVstupu,
+	farbaKonstrukcie,
+	ciarovaFarba,
+	RAL_PALETA,
+	RAL_INY_KOD,
+	RAL_FALLBACK_HEX,
+	PERGOLA_REZIM_DEFAULT,
 	NOSNIK_HRUBKA_MM,
 	PANEL_MEDZERA_MM,
 	PANEL_TRIM_MM,
@@ -38,7 +44,9 @@ const VZOR: PergolaNavrhVstup = {
 	nazov: 'PERGOLA — NÁVRH',
 	revizia: '1',
 	varianta: 'NAVRH',
-	vypracoval: 'test'
+	vypracoval: 'test',
+	rezimVykresu: 'technicky',
+	ralKod: ''
 };
 
 describe('stlpyZPolí — kumulatívne X pozície stĺpov', () => {
@@ -228,5 +236,68 @@ describe('chybaPergolaNavrhVstupu — validácia', () => {
 		// žiadneho geometrického výpočtu ani Money odpisu — viď komentár v
 		// pergola-navrh.ts
 		expect(STLP_HRUBKA_VIZ_MM).toBe(100);
+	});
+});
+
+// #150 — farebný režim výkresu podľa RAL
+describe('RAL_PALETA — firemná paleta zo zadania #150', () => {
+	it('obsahuje presne 5 zadaných odtieňov so správnymi hex kódmi', () => {
+		expect(RAL_PALETA).toHaveLength(5);
+		const hexPodlaKodu = Object.fromEntries(RAL_PALETA.map((r) => [r.kod, r.hex]));
+		expect(hexPodlaKodu['7016']).toBe('#383E42');
+		expect(hexPodlaKodu['9006']).toBe('#A5A8A6');
+		expect(hexPodlaKodu['9010']).toBe('#F1EDE1');
+		expect(hexPodlaKodu['8014']).toBe('#382C1E');
+		expect(hexPodlaKodu['9005']).toBe('#0E0E10');
+	});
+	it('svetlé odtiene (9010 BIELA, 9006 STRIEBORNÁ) sú označené tmavyObrys — potrebujú tenký tmavý obrys', () => {
+		const svetle = RAL_PALETA.filter((r) => r.kod === '9010' || r.kod === '9006');
+		expect(svetle.every((r) => r.tmavyObrys)).toBe(true);
+	});
+	it('tmavé odtiene (7016, 8014, 9005) NIE SÚ tmavyObrys', () => {
+		const tmave = RAL_PALETA.filter((r) => ['7016', '8014', '9005'].includes(r.kod));
+		expect(tmave).toHaveLength(3);
+		expect(tmave.every((r) => !r.tmavyObrys)).toBe(true);
+	});
+});
+
+describe('farbaKonstrukcie — lookup s čestným fallbackom', () => {
+	it('známy kód vráti presný odtieň z RAL_PALETA', () => {
+		expect(farbaKonstrukcie('7016')).toEqual({ hex: '#383E42', tmavyObrys: false });
+		expect(farbaKonstrukcie('9006')).toEqual({ hex: '#A5A8A6', tmavyObrys: true });
+	});
+	it('"iny" (voľný text) vráti neutrálny fallback, nie predstieraný odtieň', () => {
+		expect(farbaKonstrukcie(RAL_INY_KOD)).toEqual({ hex: RAL_FALLBACK_HEX, tmavyObrys: false });
+	});
+	it('prázdne/neznáme kódy vrátia rovnaký neutrálny fallback', () => {
+		expect(farbaKonstrukcie('')).toEqual({ hex: RAL_FALLBACK_HEX, tmavyObrys: false });
+		expect(farbaKonstrukcie('9999')).toEqual({ hex: RAL_FALLBACK_HEX, tmavyObrys: false });
+	});
+});
+
+describe('ciarovaFarba — stroke pre čiarové prvky (izometria bez fill)', () => {
+	it('tmavé odtiene sa nemenia (fill aj stroke rovnaký, ako pri filled tvaroch)', () => {
+		const farba = farbaKonstrukcie('7016');
+		expect(ciarovaFarba(farba)).toBe('#383E42');
+	});
+	it('svetlé odtiene (tmavyObrys) sa STMAVIA — čiara na bielom hárku nesmie zmiznúť', () => {
+		const farba9010 = farbaKonstrukcie('9010');
+		const stmavena = ciarovaFarba(farba9010);
+		expect(stmavena).not.toBe(farba9010.hex);
+		expect(stmavena).toMatch(/^#[0-9a-f]{6}$/);
+		// stmavená verzia musí byť skutočne TMAVŠIA (nižší súčet RGB zložiek)
+		const suma = (hex: string) =>
+			parseInt(hex.slice(1, 3), 16) + parseInt(hex.slice(3, 5), 16) + parseInt(hex.slice(5, 7), 16);
+		expect(suma(stmavena)).toBeLessThan(suma(farba9010.hex));
+	});
+	it('9006 STRIEBORNÁ sa tiež stmaví (druhý svetlý odtieň zo zadania)', () => {
+		const farba9006 = farbaKonstrukcie('9006');
+		expect(ciarovaFarba(farba9006)).not.toBe(farba9006.hex);
+	});
+});
+
+describe('PergolaNavrhVstup — rezimVykresu/ralKod default (#150)', () => {
+	it('PERGOLA_REZIM_DEFAULT je "technicky" (zhoda s CAD vzorom OP260032)', () => {
+		expect(PERGOLA_REZIM_DEFAULT).toBe('technicky');
 	});
 });
