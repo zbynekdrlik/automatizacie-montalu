@@ -436,6 +436,27 @@ test('#150: "iný…" RAL — voľný text, farebný režim použije neutrálnu 
 	await expect(page.getByTestId('pn-ral')).toContainText('RAL: RAL 7021 matná');
 });
 
+test('#150 review nález: zrušenie výberu RAL ("— nevybraté —") vymaže aj červenú poznámku — neostáva starý odtieň', async ({
+	page
+}) => {
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await page.getByLabel('OP číslo').fill('OP260032');
+	await page.getByLabel('RAL odtieň').selectOption('7016');
+	await expect(page.getByLabel('RAL odtieň')).toHaveValue('7016');
+
+	// späť na „— nevybraté —" — swatch aj hint zmiznú, poznámka sa nesmie „zaseknúť"
+	// na starej hodnote „7016 ANTRACIT"
+	await page.getByLabel('RAL odtieň').selectOption('');
+	await expect(page.getByTestId('ral-swatch')).not.toBeVisible();
+
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// vstup.ral je prázdny → celý <text data-testid="pn-ral"> sa nevykresľuje
+	await expect(page.getByTestId('pn-ral')).not.toBeAttached();
+});
+
 test('#150: prepnutie technický ↔ farebný na tej istej kresbe (Späť a upraviť) mení farby bez straty ostatného vstupu', async ({
 	page
 }) => {
