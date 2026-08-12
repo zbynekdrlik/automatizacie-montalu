@@ -35,12 +35,17 @@ function miesaj(
 	return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-/** Obloha — prevrátená sféra dostane vertikálny gradient `#dfe7ee → #8fb4d6`. */
+/** Obloha — prevrátená sféra dostane vertikálny gradient. #174: pôvodný
+ *  `#dfe7ee → #8fb4d6` bol pri ACES tonemappingu tak bledý, že splýval so
+ *  stenou aj sklom (bod "scéna je vymytá") — zväčšený rozsah zenit↔horizont
+ *  (jasnejší vrch, sýtejšia hlbšia modrá dole) dáva viditeľný, ale stále
+ *  jemný gradient a jasne studený kontrapunkt k teplej stene (`textury.ts`
+ *  nižšie). */
 export function vytvorOblohuTexturu(THREE: ThreeNS): Texture {
 	const { canvas, ctx } = canvas2d(256);
 	const grad = ctx.createLinearGradient(0, 0, 0, 256);
-	grad.addColorStop(0, '#dfe7ee');
-	grad.addColorStop(1, '#8fb4d6');
+	grad.addColorStop(0, '#eef6fb');
+	grad.addColorStop(1, '#4f80ad');
 	ctx.fillStyle = grad;
 	ctx.fillRect(0, 0, 256, 256);
 	return ztexturuj(THREE, canvas);
@@ -50,14 +55,19 @@ export function vytvorOblohuTexturu(THREE: ThreeNS): Texture {
  *  Canvas reprezentuje `mriezka × mriezka` dlaždíc naraz (nie len jednu), aby
  *  bola vidieť SKUTOČNÁ variácia medzi dlaždicami, nie len opakovaná jedna —
  *  `repeat` sa nastavuje v `scena.ts` tak, aby JEDNA dlaždica = 600×600 mm
- *  (hlavný mierkový kľúč scény). */
+ *  (hlavný mierkový kľúč scény).
+ *
+ *  #174: základná farba dlaždice o niečo tmavšia/chladnejšia (`#b9b3ab` →
+ *  `#a7a199`) a špáry výrazne tmavšie (`#8a8479` → `#655f57`) — pôvodná
+ *  kombinácia bola pri ACES exposure príliš svetlá na to, aby bol 600 mm
+ *  mierkový raster čitateľný, a splývala so stenou/sklom. */
 export function vytvorDlazbuTexturu(THREE: ThreeNS, rozlisenie = 512, mriezka = 4): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
 	const bunka = rozlisenie / mriezka;
 	const spara = Math.max(1, Math.round((12 / 600) * bunka)); // 12mm špára pri 600mm dlaždici
-	const zaklad: [number, number, number] = hexNaRgb('#b9b3ab');
+	const zaklad: [number, number, number] = hexNaRgb('#a7a199');
 
-	ctx.fillStyle = '#8a8479';
+	ctx.fillStyle = '#655f57';
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
 
 	for (let gy = 0; gy < mriezka; gy++) {
@@ -93,13 +103,19 @@ export function vytvorDlazbuTexturu(THREE: ThreeNS, rozlisenie = 512, mriezka = 
  *  Zámerne TEPLEJŠÍ a SÝTEJŠÍ tón než pôvodný takmer-biely `#e9e4dc` — pri
  *  jasnom kľúčovom svetle (§2.6, 2.4 intenzita) a ACES tonemappingu splýval
  *  vizuálne s bledou oblohou (`#dfe7ee`), takže stena ako samostatná plocha
- *  prakticky zmizla (nájdené pri live vizuálnej kontrole screenshotu). */
+ *  prakticky zmizla (nájdené pri live vizuálnej kontrole screenshotu).
+ *
+ *  #174 druhé kolo: `#d9cfc0`/`#b9ab95` bolo STÁLE príliš bledé — splývalo s
+ *  chladným tintom skla (`materialy.ts`) rovnako ako predtým s oblohou.
+ *  Ešte sýtejší, tmavší, teplejší okrový tón (studená vs. teplá farebná
+ *  dvojica so sklom/oblohou je zámerný spôsob, ako "predať" priehľadnosť
+ *  skla aj bez plnej fyzikálnej transmisie). */
 export function vytvorStenuTexturu(
 	THREE: ThreeNS,
 	rozlisenie = 1024
 ): { map: Texture; roughnessMap: Texture } {
-	const zaklad: [number, number, number] = hexNaRgb('#d9cfc0');
-	const tmava: [number, number, number] = hexNaRgb('#b9ab95');
+	const zaklad: [number, number, number] = hexNaRgb('#c2ab84');
+	const tmava: [number, number, number] = hexNaRgb('#9c8158');
 
 	const sum2d = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, farebna: boolean) => {
 		const img = ctx.createImageData(canvas.width, canvas.height);
@@ -140,26 +156,32 @@ export function vytvorStenuTexturu(
 	};
 }
 
-/** Dvojvrstvový kontaktný tieň — mäkká vrstva (radiálny gradient, opacity 0.55)
- *  + tvrdé jadro (samotný pôdorys, opacity 0.20), oba v JEDNEJ textúre (dve
- *  vrstvy nakreslené nad seba), aplikuje sa na alpha-decal rovinu. */
+/** Dvojvrstvový kontaktný tieň — mäkká vrstva (radiálny gradient) + tvrdé
+ *  jadro (samotný pôdorys), oba v JEDNEJ textúre (dve vrstvy nakreslené nad
+ *  seba), aplikuje sa na alpha-decal rovinu.
+ *
+ *  #174: pôvodné opacity (mäkká 0.55, jadro 0.20) boli na 3/4 exteriérovom
+ *  zábere príliš slabé na to, aby jednotka pôsobila ukotvená k zemi —
+ *  zosilnené na mäkká 0.68 / jadro 0.38 a jadro zúžené (0.32 → 0.24 polomer
+ *  textúry), aby "odtlačok" priamo pod pätkou vyzeral ostrejšie/pevnejšie,
+ *  nie ako veľká difúzna škvrna. */
 export function vytvorKontaktnyTienTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
 	const stred = rozlisenie / 2;
 
 	// mäkká vrstva — radiálny gradient cez celú plochu
 	const mekka = ctx.createRadialGradient(stred, stred, 0, stred, stred, stred);
-	mekka.addColorStop(0, 'rgba(15,23,42,0.55)');
-	mekka.addColorStop(0.6, 'rgba(15,23,42,0.28)');
+	mekka.addColorStop(0, 'rgba(15,23,42,0.68)');
+	mekka.addColorStop(0.55, 'rgba(15,23,42,0.34)');
 	mekka.addColorStop(1, 'rgba(15,23,42,0)');
 	ctx.fillStyle = mekka;
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
 
 	// tvrdé jadro — menší, ostrejší tieň v strede (footprint produktu)
-	const jadroR = rozlisenie * 0.32;
+	const jadroR = rozlisenie * 0.24;
 	const jadro = ctx.createRadialGradient(stred, stred, 0, stred, stred, jadroR);
-	jadro.addColorStop(0, 'rgba(15,23,42,0.20)');
-	jadro.addColorStop(0.85, 'rgba(15,23,42,0.16)');
+	jadro.addColorStop(0, 'rgba(15,23,42,0.38)');
+	jadro.addColorStop(0.85, 'rgba(15,23,42,0.3)');
 	jadro.addColorStop(1, 'rgba(15,23,42,0)');
 	ctx.fillStyle = jadro;
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
