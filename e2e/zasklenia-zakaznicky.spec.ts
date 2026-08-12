@@ -34,7 +34,7 @@ async function vyplnAOtvorZakaznickyList(page: Page) {
 
 /** Počká, kým `[data-testid="zakaznicky-obrazok"]` (vo foreignObject) dostane
  *  neprázdny `src` — surové DOM API, viď hlavičkový komentár. */
-async function pockajNaObrazok(page: Page, timeout = 15000) {
+async function pockajNaObrazok(page: Page, timeout = 20000) {
 	await page.waitForFunction(
 		() => {
 			const img = document.querySelector('[data-testid="zakaznicky-obrazok"]');

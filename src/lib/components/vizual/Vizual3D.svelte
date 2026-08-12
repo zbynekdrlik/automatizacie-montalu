@@ -338,7 +338,12 @@
 
 		const renderer = vytvorRenderer(THREE, canvas, nastavenia);
 		const scene = new THREE.Scene();
-		scene.environment = vytvorEnvironment(THREE, RoomEnvironment, renderer, nastavenia);
+		const environmentTex = vytvorEnvironment(THREE, RoomEnvironment, renderer, nastavenia);
+		scene.environment = environmentTex;
+		// PMREM environment textúra sa inak NIKDY nezlikviduje — únik GPU pamäte
+		// pri každom opätovnom mount/unmount (SPA navigácia preč a späť) alebo
+		// context-lost/restored cykle.
+		disposables.push(environmentTex);
 
 		const { key, fill } = vytvorSvetla(THREE);
 		scene.add(key, fill);
@@ -346,6 +351,8 @@
 		const obloha = vytvorOblohu(THREE);
 		scene.add(obloha);
 		disposables.push(obloha.geometry, obloha.material as Disposable);
+		const oblohaMat = obloha.material as InstanceType<ThreeNS['MeshBasicMaterial']>;
+		if (oblohaMat.map) disposables.push(oblohaMat.map);
 
 		const zem = vytvorZem(THREE, nastavenia);
 		scene.add(zem);
@@ -493,32 +500,13 @@
 			// zdeformovaný aspect pomer, ktorý pôsobil ako orezanie obsahu).
 			pripravVelkost();
 
-			canvasEl.addEventListener(
-				'webglcontextlost',
-				(e) => {
-					e.preventDefault();
-					if (!ziva) return;
-					ziva.contextLostCount += 1;
-					if (ziva.contextLostCount >= 2) {
-						uvolniScenu();
-						tier = 'none';
-					}
-				},
-				{ passive: false }
-			);
-			canvasEl.addEventListener('webglcontextrestored', () => {
-				if (tier === 'none') return;
-				uvolniScenu();
-				inicializuj();
-			});
-			canvasEl.addEventListener(
-				'pointerdown',
-				() => {
-					dotykOverlayViditelny = false;
-				},
-				{ once: true }
-			);
-
+			// POZOR: `webglcontextlost`/`webglcontextrestored`/`pointerdown`
+			// listenery sa registrujú RAZ v `onMount` (nižšie), NIE tu — táto
+			// funkcia (`inicializuj`) sa môže zavolať OPAKOVANE na TOM ISTOM
+			// `canvasEl` (napr. `webglcontextrestored` handler ju volá znova po
+			// obnove kontextu); keby sa listenery pridávali tu, každý ďalší
+			// stratený/obnovený cyklus by nahromadil ĎALŠIU kópiu tých istých
+			// listenerov na tom istom canvase.
 			aktualizujCamDataAtributy();
 			render();
 			pripravene = true;
@@ -547,6 +535,32 @@
 	}
 
 	onMount(() => {
+		// `webglcontextlost`/`webglcontextrestored`/`pointerdown` sa registrujú
+		// RAZ TU (na `canvasEl`, ktorý žije pre celý mount) — NIE vnútri
+		// `inicializuj()`, ktorá sa môže na tom istom canvase zavolať opakovane
+		// (viď jej vlastný komentár) a inak by pri každom stratenom/obnovenom
+		// kontexte nahromadila ďalšiu kópiu tých istých listenerov.
+		const naStrataKontextu = (e: Event) => {
+			e.preventDefault();
+			if (!ziva) return;
+			ziva.contextLostCount += 1;
+			if (ziva.contextLostCount >= 2) {
+				uvolniScenu();
+				tier = 'none';
+			}
+		};
+		const naObnovuKontextu = () => {
+			if (tier === 'none') return;
+			uvolniScenu();
+			void inicializuj();
+		};
+		const naPrvyDotyk = () => {
+			dotykOverlayViditelny = false;
+		};
+		canvasEl?.addEventListener('webglcontextlost', naStrataKontextu, { passive: false });
+		canvasEl?.addEventListener('webglcontextrestored', naObnovuKontextu);
+		canvasEl?.addEventListener('pointerdown', naPrvyDotyk, { once: true });
+
 		void inicializuj();
 		let ro: ResizeObserver | undefined;
 		if (containerEl && 'ResizeObserver' in window) {
@@ -556,6 +570,9 @@
 		return () => {
 			zruseneVOnMounte = true;
 			ro?.disconnect();
+			canvasEl?.removeEventListener('webglcontextlost', naStrataKontextu);
+			canvasEl?.removeEventListener('webglcontextrestored', naObnovuKontextu);
+			canvasEl?.removeEventListener('pointerdown', naPrvyDotyk);
 			uvolniScenu();
 		};
 	});
