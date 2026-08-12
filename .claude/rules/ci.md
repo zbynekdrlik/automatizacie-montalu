@@ -84,3 +84,28 @@ curl -s https://app.montalu.cloud/health   # {"ok":true,"version":"<X.Y.Z> (<sha
 If it doesn't match the merge commit's short SHA within a few minutes, use
 `gh workflow run ci.yml --ref main` above instead of guessing or force-pushing
 a dummy commit.
+
+## If a `-dev.N` string EVER lands on `main` (skipped clean-version bump before merge), do NOT bump dev back to the same clean digits — bump the NEXT number instead
+
+`version-check`'s comparison is `sort -V`, which is **not semver-aware**: it
+does not know a `-dev.N` suffix means "pre-release, lower than the release" —
+empirically it ranks the SUFFIXED string as the "greater" one whenever the
+numeric prefix is otherwise equal:
+
+```bash
+printf '%s\n%s\n' "0.14.32-dev.1" "0.14.32" | sort -V
+# 0.14.32
+# 0.14.32-dev.1        ← ranked LAST = "highest" by sort -V
+```
+
+This is fine in the NORMAL flow (dev's numeric prefix is always one bump
+AHEAD of main's, so the suffix never has to arbitrate). But if `main` ever
+accidentally receives a `-dev.N` string (the clean-bump-before-PR step in
+`CLAUDE.md`'s `## Version` got skipped — #153 incident: PR merged with dev
+still at `0.14.32-dev.1`), the natural-looking fix — bump dev back to the
+SAME clean `X.Y.Z` main already has the `-dev.N` form of — **fails
+`version-check`**, because `sort -V` still ranks main's `-dev.N` string above
+dev's now-identical-prefix clean one. The fix is to bump dev to the **NEXT**
+number (`0.14.33`, not `0.14.32`) — treat the digits main accidentally
+carries as "spent", exactly like any other released version, even though
+that release never actually shipped cleanly.

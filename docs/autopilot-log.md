@@ -670,3 +670,59 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   overenie cez `git stash` potrebuje tiež rebuild pred testom; Playwright MCP
   screenshot píše len do allowed roots AKTUÁLNEJ session, nie cieľového repa
   pri cross-project dispatchi — ukladaj relatívne, potom `cp`).
+
+## 2026-08-12 — Pergola výkres: obrysové profily namiesto plných pásov (#153)
+
+- **Issue:** #153 — šéf (Odoo #1671033) porovnal náš výkres so Solid Edge
+  vzormi: "ešte trocha ostrejšie kontúry na profiloch, pôsobí to
+  rozmazane". Rescope komentár (ROZHODNUTÉ) zúžil rozsah na ostrosť
+  profilov — obsah/rozloženie výkresu sa nemení.
+- **Design comment** (root cause, prístup, zamietnutá alternatíva) pred
+  prvým kódovým commitom:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/153#issuecomment-5265909510
+- **Root cause:** `STRUKTURA_STROKE=1,8mm` (technický režim) bola pri
+  typickej mierke (OP260032) ŠIRŠIA než reálne nakreslená hrúbka profilu
+  (stĺp ≈1,65mm) — stred-zarovnaný SVG stroke zhltol celú svetlú fill.
+  `pn-section-strecha`/`pn-section-predok` mali navyše priamo
+  `fill=CIERNA` v technickom režime.
+- **Commits (dev):** `093605a` verzia 0.14.32-dev.1 → `25155ba` zjednotená
+  STRUKTURA_STROKE=1,2mm (oba režimy) + crispEdges → `bc2c125` [red] +
+  `0b26aea` [green] review nález (obrysStroke — dynamický clamp na
+  polovicu rozmeru tvaru) → `1fa8891` verzia 0.14.32 + autopilot log +
+  playbook (proces-nález nižšie) → `<tento commit>` oprava na 0.14.33.
+- **Review:** fresh-context subagent nad celým diffom `origin/main..dev` —
+  **1 🔴 nález** (pevná STRUKTURA_STROKE=1,2mm sa pri extrémnych, stále
+  validných rozmeroch vstupu (hĺbka blízko HLBKA_MAX) opäť zhltne — NOVÁ
+  regresia aj pre farebný RAL režim), opravené `obrysStroke()` + RED→GREEN
+  regresný test. Komentár:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/153#issuecomment-5266374356
+- **Testy:** `npm run check`/`npm run lint` čisté, `npm test` 944/944,
+  `npx playwright test` 160/160 (17 v `e2e/pergola-navrh.spec.ts`, vrátane
+  nového `#153` obrysového spot-checku + nového extrémne-rozmerového
+  regresného testu).
+- **PR #157** (dev→main), merge `4cfcb59`. Main CI (test+deploy) zelené.
+  **Proces-nález (vlastný, nie review):** PR #157 sa zmergol s dev ešte na
+  `0.14.32-dev.1` — vynechaný krok „bump na čistú verziu TESNE PRED PR"
+  (CLAUDE.md „## Version") — main tak krátko niesol `-dev` string (známa
+  trieda bugu #1/#101/#98). Náprava (`1fa8891`) skúsila vrátiť dev na
+  čistú `0.14.32`, ale `version-check`'s `sort -V` porovnanie NIE JE
+  semver-aware — pri ROVNAKOM číselnom prefixe radí `-dev.N` variant
+  VYŠŠIE než čistý (`sort -V` na `["0.14.32-dev.1","0.14.32"]` vráti
+  `-dev.1` posledný = "najvyšší"), takže `main=0.14.32-dev.1` vyšlo
+  "vyššie" než `dev=0.14.32` a CI `version-check` spadol. Skutočná náprava:
+  bump na ĎALŠIE číslo (`0.14.33`), nie späť na rovnaké — zdokumentované v
+  `.claude/rules/ci.md`.
+- **Post-deploy overenie naživo** (Playwright MCP, `e2e` účet cez lokálny
+  preview pred pushom + `/health` po deploji): technický aj farebný RAL
+  7016 režim vizuálne overené screenshotmi — profily majú svetlý interiér
+  s ostrým tenkým obrysom namiesto plných čiernych pásov, presne podľa
+  Solid Edge vzoru.
+- Discord run-card odoslaná pre #153 (`notify --run-card`).
+- Playbook: `.claude/rules/vykres.md` — nová poznámka (fixed stroke-width
+  na vyplnenom tvare treba overiť proti CELÉMU vstupnému rozsahu, nie len
+  proti demo fixture — `obrysStroke()` vzor na znovupoužitie);
+  `.claude/skills/testing/SKILL.md` — nová poznámka (manuálny
+  `npm run preview` pre živý MCP screenshot potrebuje rovnaké env
+  premenné ako `playwright.config.ts`'s `webServer`, a musí bežať cez
+  `run_in_background: true`, nie `(cmd &)` subshell); `.claude/rules/ci.md`
+  — nová poznámka (`sort -V` `-dev.N` vs. čistá verzia kolízia + náprava).
