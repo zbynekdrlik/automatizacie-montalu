@@ -21,6 +21,13 @@ interface PergolaVstup {
 	caka: boolean;
 }
 
+// #156 review nález: ostatné textové polia v detaile histórie sú bound-ované
+// (poznamka 300, skloPresne 120, ral 40 v zaskleniach) — CAD paste bound nemal
+// žiaden. Reálne zákazky majú pár desiatok riadkov (~1-2 KB); 20 000 znakov je
+// 10x nadštandard, len proti patologicky veľkému vstupu do DB. Strihá sa LEN
+// kópia v `detail` — `vstup.cad` použitý na prepočet ostáva nedotknutý.
+const CAD_DETAIL_MAX = 20000;
+
 function parseVstup(form: FormData): PergolaVstup {
 	return {
 		zak: String(form.get('zak') ?? '').trim(),
@@ -153,7 +160,17 @@ export const actions: Actions = {
 			popis: (vstup.op + ' ' + vstup.zakaznik).trim(),
 			// Money rozpis: VŠETKÝCH 25 katalógových riadkov (aj nulové) — ako n8n
 			polozky: v!.polozky,
-			detail: { riadkov: v!.nonzero.length, tyce: v!.totalBars, kombinacie: v!.kombinacie.length }
+			detail: {
+				riadkov: v!.nonzero.length,
+				tyce: v!.totalBars,
+				kombinacie: v!.kombinacie.length,
+				// #156 (krok 0 pre #155): surový vložený CAD text 1:1 (bound-ovaný proti
+				// patologicky veľkému vstupu — viď CAD_DETAIL_MAX) + skutočne zvolené
+				// kombinácie tyčí (nielen počet) — bez toho sa dá dohľadať len prepočet,
+				// nie vstup, z ktorého vznikol
+				cad: vstup.cad.slice(0, CAD_DETAIL_MAX),
+				komboVolby: v!.kombinacie
+			}
 		};
 
 		try {

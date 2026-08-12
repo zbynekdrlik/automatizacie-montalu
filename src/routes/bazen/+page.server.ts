@@ -24,7 +24,11 @@ function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string):
 			model: vstup.model,
 			kolaj: vstup.kolaj,
 			pocetSekcii: vstup.pocetSekcii,
-			dvere: vstup.dvere ? 1 : 0
+			dvere: vstup.dvere ? 1 : 0,
+			// #156 (krok 0 pre #155): celý naparsovaný vstup 1:1, VEDĽA polí vyššie —
+			// doterajší detail nenesie pocetPriecok/vs*/ss*/ms*/dlzkaKolajnic/
+			// prieckovy*/vyklopneCelo vôbec, tie sa doteraz strácali úplne
+			vstupRaw: vstup
 		}
 	};
 }
