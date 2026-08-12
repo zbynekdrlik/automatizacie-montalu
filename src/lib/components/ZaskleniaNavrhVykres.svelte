@@ -176,6 +176,10 @@
 <!-- ============================= predný pohľad ============================= -->
 {#snippet elevacia(r: { x: number; y: number; w: number; h: number })}
 	{@const scale = fitScale(vstup.s, vstup.v, r.w * 0.82, r.h * 0.7)}
+	<!-- #162 review nález (🔵): headroom pod baseY je r.h*0.15 — celková-šírka
+	     Kota nižšie musí použiť perpOffset PRÍSNE menší než to (0.13), inak jej
+	     kótová čiara pretečie cez spodnú hranicu elevačnej oblasti do pásu smeru
+	     otvárania pod ňou, nezávisle od reálnych s/v/n. -->
 	{@const baseY = r.y + r.h * 0.85}
 	{@const x0 = r.x + r.w * 0.09}
 	{@const X = (mm: number) => x0 + mm * scale}
@@ -186,32 +190,43 @@
 
 	<!-- vonkajší rám (celá jednotka) — plnená farba/technická svetlá výplň,
 	     medzery medzi tabuľami skla nižšie SÚ deliace stĺpiky (rovnaká technika
-	     ako reálne CAD elevácie — rám sa nekreslí ako samostatné pásy). -->
+	     ako reálne CAD elevácie — rám sa nekreslí ako samostatné pásy).
+	     #162 review nález (deep review): na rozdiel od pergolového stĺpu/nosníka
+	     (jeden dlhý rozmer, druhý vždy vizuálne konštantný) má TÁTO jednotka OBA
+	     rozmery nezávisle v rozsahu S_MIN..S_MAX / V_MIN..V_MAX — `obrysStroke()`
+	     preto musí brať MENŠÍ z (šírka, výška), nikdy len výšku (inak pri
+	     S=300/V=20000 ostane úzka šírka nechránená plnou hrúbkou obrysu). -->
+	{@const ramW = X(vstup.s) - X(0)}
+	{@const ramH = baseY - topY}
 	<rect
 		x={X(0)}
 		y={topY}
-		width={X(vstup.s) - X(0)}
-		height={baseY - topY}
+		width={ramW}
+		height={ramH}
 		fill={farebny ? farba.hex : '#fff'}
 		stroke={CIERNA}
-		stroke-width={obrysStroke((baseY - topY) * 0.5)}
+		stroke-width={obrysStroke(Math.min(ramW, ramH) * 0.5)}
 		shape-rendering="crispEdges"
 		data-testid="zn-elevation-ram"
 	/>
-	<!-- sklá jednotlivých krídel — inset od vonkajšieho rámu a od suseda -->
+	<!-- sklá jednotlivých krídel — inset od vonkajšieho rámu a od suseda.
+	     #162 review nález: pevný stroke-width="0.3" mohol pri extrémnom vstupe
+	     (S_MIN/N_MAX -> veľmi úzke krídlo) prehltnúť celú svetlú výplň — rovnaký
+	     `obrysStroke()` guard ako vonkajší rám vyššie (#153 disciplína). -->
 	{#each Array(n) as _, i (i)}
 		{@const left = stlpiky[i] + (i === 0 ? ramMm : mulMm / 2)}
 		{@const right = stlpiky[i + 1] - (i === n - 1 ? ramMm : mulMm / 2)}
 		{@const gx0 = X(left)}
 		{@const gx1 = Math.max(gx0 + 0.5, X(right))}
+		{@const gh = baseY - topY - 2 * ramMm * scale}
 		<rect
 			x={gx0}
 			y={topY + ramMm * scale}
 			width={gx1 - gx0}
-			height={baseY - topY - 2 * ramMm * scale}
+			height={gh}
 			fill="#eff6ff"
 			stroke={CIERNA}
-			stroke-width="0.3"
+			stroke-width={obrysStroke(Math.min(gx1 - gx0, gh) * 0.5)}
 			data-testid={`zn-kridlo-${i}`}
 		/>
 	{/each}
@@ -234,7 +249,7 @@
 		y0={baseY}
 		x1={X(vstup.s)}
 		y1={baseY}
-		perpOffset={r.h * 0.16}
+		perpOffset={r.h * 0.13}
 		text={fmtMm(vstup.s)}
 		color={MODRA}
 		fontSize={3.2}

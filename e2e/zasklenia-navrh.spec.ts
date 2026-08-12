@@ -53,15 +53,15 @@ test('vyplnenie formulára nakreslí predný pohľad s kótami — 2 krídla (Ro
 	// celková šírka 3000mm / 2 krídla = 1500mm na krídlo — OBIDVE rovnako široké
 	// krídla teda dajú DVE zhodné kóty "1500" — presná zhoda, nie substring (aby
 	// "3000" nekolidovalo s "23000"/"30000" a pod.)
-	await expect(
-		page.locator('[data-testid="zn-elevacia"] text', { hasText: /^1500$/ })
-	).toHaveCount(2);
-	await expect(
-		page.locator('[data-testid="zn-elevacia"] text', { hasText: /^3000$/ })
-	).toHaveCount(1);
-	await expect(
-		page.locator('[data-testid="zn-elevacia"] text', { hasText: /^2000$/ })
-	).toHaveCount(1);
+	await expect(page.locator('[data-testid="zn-elevacia"] text', { hasText: /^1500$/ })).toHaveCount(
+		2
+	);
+	await expect(page.locator('[data-testid="zn-elevacia"] text', { hasText: /^3000$/ })).toHaveCount(
+		1
+	);
+	await expect(page.locator('[data-testid="zn-elevacia"] text', { hasText: /^2000$/ })).toHaveCount(
+		1
+	);
 	// smer otvárania sa vykreslil
 	await expect(page.getByTestId('zn-smer')).toBeVisible();
 	await expect(page.getByTestId('zn-smer-text')).toHaveText('P - L');
@@ -148,6 +148,18 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByLabel('Názov výkresu (voliteľné)').fill('Ponuka pre ZAK202699');
+	// #162 review nález: round-trip musí pokryť AJ klín/koľajnicu/RAL/režim —
+	// presne tá trieda polí, ktorú `zasklenia-form-reactivity.md` (#132) označuje
+	// za historicky náchylnú na stratu pri „← Späť a upraviť"
+	await page.getByRole('checkbox', { name: 'Klín nad posuvom' }).check();
+	await page.getByLabel('Dĺžka (mm)', { exact: true }).fill('1000');
+	await page.getByLabel('Šírka (mm)', { exact: true }).fill('300');
+	await page.getByLabel('Výška 1 (mm)', { exact: true }).fill('80');
+	await page.getByLabel('Výška 2 (mm)', { exact: true }).fill('40');
+	await page.getByLabel('Horná (mm)').fill('2690');
+	await page.getByLabel('Spodná (mm)').fill('2695');
+	await page.getByTestId('rezim-farebny-radio').check();
+	await page.getByLabel('RAL odtieň').selectOption('7016');
 	await page.getByTestId('nakreslit').click();
 	await waitHydrated(page);
 
@@ -157,6 +169,24 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 	await expect(page.getByLabel('Celková šírka (mm) *')).toHaveValue('3000');
 	await expect(page.getByLabel('Celková výška (mm) *')).toHaveValue('2000');
 	await expect(page.getByLabel('Názov výkresu (voliteľné)')).toHaveValue('Ponuka pre ZAK202699');
+	await expect(page.getByRole('checkbox', { name: 'Klín nad posuvom' })).toBeChecked();
+	await expect(page.getByLabel('Dĺžka (mm)', { exact: true })).toHaveValue('1000');
+	await expect(page.getByLabel('Šírka (mm)', { exact: true })).toHaveValue('300');
+	await expect(page.getByLabel('Výška 1 (mm)', { exact: true })).toHaveValue('80');
+	await expect(page.getByLabel('Výška 2 (mm)', { exact: true })).toHaveValue('40');
+	await expect(page.getByLabel('Horná (mm)')).toHaveValue('2690');
+	await expect(page.getByLabel('Spodná (mm)')).toHaveValue('2695');
+	await expect(page.getByTestId('rezim-farebny-radio')).toBeChecked();
+	await expect(page.getByLabel('RAL odtieň')).toHaveValue('7016');
+	await expect(page.getByTestId('ral-swatch')).toBeVisible();
+
+	// opätovné vykreslenie po obnovení potvrdí, že sa NIČ nestratilo
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('zn-klin')).toBeVisible();
+	await expect(page.getByTestId('zn-kolajnica-text')).toContainText('horná 2690 mm');
+	await expect(page.getByTestId('zn-kolajnica-text')).toContainText('spodná 2695 mm');
+	await expect(page.getByTestId('zn-ral-text')).toHaveText('RAL: 7016 ANTRACIT');
 });
 
 // #162 bod 5: b2b — dostupná AUTOMATICKY (na rozdiel od pergoly nepotrebuje výnimku
@@ -183,6 +213,9 @@ test('b2b: odkaz "→ Návrhový výkres" na /zasklenia, otvorenie a vykreslenie
 	await loginAs(page, b2bUser, b2bPass);
 
 	await expect(page).toHaveURL(/\/zasklenia$/);
+	// #162 review nález: top-nav odkaz (b2b menu, rovnaká disciplína ako "Pergola
+	// návrh" #144) AJ in-page odkaz na /zasklenia — obe cesty musia fungovať
+	await expect(page.getByRole('link', { name: 'Zasklenia návrh' })).toBeVisible();
 	await expect(page.getByTestId('link-navrh')).toBeVisible();
 	await page.getByTestId('link-navrh').click();
 	await waitHydrated(page);

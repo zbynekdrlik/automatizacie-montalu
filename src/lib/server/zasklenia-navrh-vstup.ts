@@ -9,7 +9,7 @@ import {
 	VYKRES_REZIM_DEFAULT,
 	type ZaskleniaNavrhVstup
 } from '$lib/zasklenia-navrh';
-import { KLIN_MAX_KS, KLIN_MAX_ROZMER, KLIN_MIN_ROZMER, type Klin } from '$lib/klin';
+import type { Klin } from '$lib/klin';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 import type { VykresRezim } from '$lib/vykres/ral';
 
@@ -38,20 +38,23 @@ const text = (form: FormData, k: string, max: number) =>
 		.trim()
 		.slice(0, max);
 
+/** Vypnutý zapínač → `null`, žiadna chyba (klín je nepovinný). Zapnutý → hodnoty sa
+ *  parsujú SUROVO, nič sa NEZATVÁRA/nedopĺňa na tichý platný default — presne
+ *  disciplína `parseKlin` v `$lib/server/vstup.ts` (klín na `/zasklenia`): pri
+ *  polovične vyplnenom kline (napr. len dĺžka bez šírky) sa NESMIE tichým
+ *  Math.min/max-clampom vyrobiť vymyslený "platný" 1mm rozmer — `chybaZasklenia
+ *  NavrhVstupu` túto surovú hodnotu odmietne s reálnou chybovou hláškou (#162
+ *  review nález — pôvodná verzia clampovala, čo bola presne táto tichá diera). */
 function parseKlin(form: FormData): Klin | null {
 	if (String(form.get('klinZapnuty') ?? '') !== '1') return null;
-	const dlzka = num(form, 'klinDlzka');
-	const sirka = num(form, 'klinSirka');
-	const v1 = num(form, 'klinV1');
-	const v2 = num(form, 'klinV2');
-	const ks = Math.round(num(form, 'klinKs')) || 1;
-	if (dlzka <= 0 && sirka <= 0) return null;
 	return {
-		dlzka: Math.min(Math.max(dlzka, KLIN_MIN_ROZMER), KLIN_MAX_ROZMER),
-		sirka: Math.min(Math.max(sirka, KLIN_MIN_ROZMER), KLIN_MAX_ROZMER),
-		v1: Math.min(Math.max(v1, 0), KLIN_MAX_ROZMER),
-		v2: Math.min(Math.max(v2, 0), KLIN_MAX_ROZMER),
-		ks: Math.min(Math.max(ks, 1), KLIN_MAX_KS)
+		dlzka: num(form, 'klinDlzka'),
+		sirka: num(form, 'klinSirka'),
+		v1: num(form, 'klinV1'),
+		v2: num(form, 'klinV2'),
+		// nevyplnený počet = 1 kus (rovnaký idiom ako vstup.ts) — nezmyselná
+		// hodnota (0 po zaokrúhlení, záporná, > max) padne do validácie nižšie
+		ks: Math.round(num(form, 'klinKs')) || 1
 	};
 }
 

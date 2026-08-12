@@ -72,9 +72,30 @@ describe('parseZaskleniaNavrhVstup', () => {
 		expect(vstup.klin).toEqual({ dlzka: 1000, sirka: 500, v1: 100, v2: 50, ks: 2 });
 	});
 
-	it('klín zapnutý ale bez rozmerov (dlzka aj sirka <= 0) -> klin je null', () => {
-		const { vstup } = parseZaskleniaNavrhVstup(fd({ ...zaklad, klinZapnuty: '1' }), styly);
-		expect(vstup.klin).toBeNull();
+	// #162 review nález: predtým sa polovične/vôbec nevyplnený, ale ZAPNUTÝ klín
+	// tichým Math.min/max-clampom stal "platným" 1mm rozmerom bez chyby — teraz
+	// (rovnaká disciplína ako $lib/server/vstup.ts) je to REÁLNA chyba, klin sa
+	// NEODMLČÍ na null.
+	it('klín zapnutý ale bez rozmerov (dlzka aj sirka <= 0) -> chyba, nie tichý null', () => {
+		const { vstup, error } = parseZaskleniaNavrhVstup(fd({ ...zaklad, klinZapnuty: '1' }), styly);
+		expect(vstup.klin).toEqual({ dlzka: 0, sirka: 0, v1: 0, v2: 0, ks: 1 });
+		expect(error).toMatch(/klín.*dĺžka/i);
+	});
+
+	it('klín zapnutý s dĺžkou ale bez šírky -> chyba (nie tichý clamp na 1mm)', () => {
+		const { error } = parseZaskleniaNavrhVstup(
+			fd({ ...zaklad, klinZapnuty: '1', klinDlzka: '1000' }),
+			styly
+		);
+		expect(error).toMatch(/klín.*šírka/i);
+	});
+
+	it('klín zapnutý s platnou dĺžkou/šírkou ale v1=v2=0 -> chyba (neviditeľný plochý klin)', () => {
+		const { error } = parseZaskleniaNavrhVstup(
+			fd({ ...zaklad, klinZapnuty: '1', klinDlzka: '1000', klinSirka: '500' }),
+			styly
+		);
+		expect(error).toMatch(/klín.*výšku/i);
 	});
 
 	it('bez ručnej koľajnice -> kolajnica je null', () => {

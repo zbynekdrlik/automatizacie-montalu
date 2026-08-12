@@ -243,6 +243,15 @@
 				<div class="field">
 					<label for="ralKod">RAL odtieň</label>
 					<div class="row" style="gap:8px;align-items:center">
+						<!-- #162 review nález (🔵): zámerne value={} + onchange namiesto
+						     bind:value — výber RAL kódu musí AJ odvodiť zobrazovaný text
+						     `ralS` ako vedľajší účinok (viď nižšie), čo `bind:value` samo
+						     osebe neponúka. `ralKodS` je čisto lokálny $state (nie
+						     server-odvodený vstup), takže sa sem NEVZŤAHUJE "$state+bind:,
+						     nikdy value={}" (nova-stranka §4) — to pravidlo rieši
+						     jednosmerné `value={vstup.x}` z formu, ktoré by pri re-renderi
+						     vynulovalo POLE ODOSLANÉ SERVEROM; toto pole žiadny server
+						     nevracia. -->
 						<select
 							id="ralKod"
 							value={ralKodS}

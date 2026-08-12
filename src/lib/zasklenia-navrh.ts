@@ -7,7 +7,7 @@
 // Počet krídel `N` sa ZNOVUPOUŽÍVA priamo z `listSysStyly()` (server, rovnaký
 // zdroj ako formulár na `/zasklenia`) — táto komponenta ho len prijíma ako
 // vstup, nikdy ho neprepočítava paralelne.
-import type { Klin } from '$lib/klin';
+import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import type { KolajnicaRucne } from '$lib/kolajnica';
 import { type VykresRezim, VYKRES_REZIM_DEFAULT } from '$lib/vykres/ral';
 
@@ -67,11 +67,17 @@ export function sirkaKridla(s: number, n: number): number {
 }
 
 /** X pozície deliacich stĺpikov (0-based, od 0 po `s`) pri `n` rovnomerne
- *  širokých krídlach — [0, s/n, 2·s/n, …, s]. */
+ *  širokých krídlach — [0, s/n, 2·s/n, …, s]. Posledná hranica je EXPLICITNE
+ *  priradená `s` (nie len dopočítaná násobením) — zaokrúhľovanie po jednotlivých
+ *  krokoch (`i · sirka`) by inak pri niektorých s/n kombináciách skončilo o
+ *  0,1 mm mimo skutočnej celkovej šírky (#162 review nález 🔵: invariant
+ *  "posledná hranica == s" bol doteraz len náhodný, nie vynútený). */
 export function deliaceStlpiky(s: number, n: number): number[] {
 	const pocet = Math.max(1, Math.round(n));
 	const sirka = sirkaKridla(s, pocet);
-	return Array.from({ length: pocet + 1 }, (_, i) => Math.round(i * sirka * 10) / 10);
+	const out = Array.from({ length: pocet + 1 }, (_, i) => Math.round(i * sirka * 10) / 10);
+	out[pocet] = Math.round(s * 10) / 10;
+	return out;
 }
 
 /** Chybová hláška vstupu, alebo null keď je platný. Rovnaká disciplína ako
@@ -82,9 +88,20 @@ export function chybaZaskleniaNavrhVstupu(v: ZaskleniaNavrhVstup): string | null
 	if (!(v.s >= S_MIN && v.s <= S_MAX)) return `Šírka musí byť ${S_MIN}–${S_MAX} mm.`;
 	if (!(v.v >= V_MIN && v.v <= V_MAX)) return `Výška musí byť ${V_MIN}–${V_MAX} mm.`;
 	if (v.klin) {
-		if (!(v.klin.dlzka > 0) || !(v.klin.sirka > 0))
-			return 'Klín — dĺžka a šírka musia byť kladné čísla.';
-		if (!(v.klin.ks >= 1)) return 'Klín — počet kusov musí byť aspoň 1.';
+		// #162 review nález: rovnaké pravidlá ako `parseKlin` v `$lib/server/vstup.ts`
+		// (klín na `/zasklenia`) — polovične vyplnený klín (napr. len dĺžka bez
+		// šírky) je REÁLNA chyba, nie tichý fallback; aspoň JEDNA výška musí byť
+		// kladná (v1=v2=0 by dal neviditeľný plochý klin), druhá smie byť 0
+		// (klín dobehnutý do ostra).
+		const rozmerOk = (x: number) => x > 0 && x <= KLIN_MAX_ROZMER;
+		const vyskaOk = (x: number) => x >= 0 && x <= KLIN_MAX_ROZMER;
+		if (!rozmerOk(v.klin.dlzka)) return `Klín — dĺžka musí byť 1–${KLIN_MAX_ROZMER} mm.`;
+		if (!rozmerOk(v.klin.sirka)) return `Klín — šírka musí byť 1–${KLIN_MAX_ROZMER} mm.`;
+		if (!vyskaOk(v.klin.v1) || !vyskaOk(v.klin.v2))
+			return `Klín — výšky musia byť 0–${KLIN_MAX_ROZMER} mm.`;
+		if (!(v.klin.v1 > 0 || v.klin.v2 > 0)) return 'Klín — zadaj aspoň jednu výšku.';
+		if (!(v.klin.ks >= 1 && v.klin.ks <= KLIN_MAX_KS))
+			return `Klín — počet kusov musí byť 1–${KLIN_MAX_KS}.`;
 	}
 	return null;
 }

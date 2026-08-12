@@ -13,11 +13,18 @@
 		document.documentElement.dataset.hydrated = '1';
 	});
 
-	// B2B vidí Zasklenia + Sieťka + (od #144) display-only Pergola návrh — zvyšné
-	// odkazy (vrátane Vzorce/Nastavenia, ktoré sú mimo /zasklenia) sú interné.
-	// Používatelia je nový odkaz len pre interných.
+	// B2B vidí Zasklenia + Sieťka + (od #144) display-only Pergola návrh + (od #162)
+	// display-only Zasklenia návrh — zvyšné odkazy (vrátane Vzorce/Nastavenia, ktoré
+	// sú mimo /zasklenia) sú interné. Používatelia je nový odkaz len pre interných.
 	// href je typovaný ako RouteId (z $app/types) a šablóna nižšie ho vždy volá cez
 	// resolve(l.href) — to spĺňa svelte/no-navigation-without-resolve (#99).
+	//
+	// Interné menu #162 review nález (deep review): /zasklenia/navrh NEDOSTÁVA
+	// vlastný top-nav odkaz pre interných (rovnaká disciplína ako pergola — pozri
+	// #144 komentár nižšie), lebo interní ju už dosiahnu jedným klikom z vnútra
+	// /zasklenia (in-page odkaz „→ Návrhový výkres" pridaný v #162). B2B naopak MÁ
+	// tento odkaz priamo v (krátkom, len 3-položkovom) menu — presne to isté
+	// zdôvodnenie, aké #144 dalo pergole.
 	const links = $derived(
 		data.user?.role === 'b2b'
 			? ([
@@ -26,7 +33,12 @@
 					{ href: '/sietka', label: 'Sieťka' },
 					// zákaznícky návrhový výkres (#138), sprístupnený b2b (#144) — display-only,
 					// žiadny Money zápis; /pergola (Money odpis z CAD nárezu) pre b2b NIE JE tu
-					{ href: '/pergola/navrh', label: 'Pergola návrh' }
+					{ href: '/pergola/navrh', label: 'Pergola návrh' },
+					// zákaznícky návrhový výkres pre zasklenia (#162) — rovnaká disciplína ako
+					// vyššie; na rozdiel od pergoly /zasklenia/navrh NEPOTREBUJE výnimku v
+					// B2B_FORBIDDEN_PREFIXES (rodičovská /zasklenia už nie je zakázaná), ale
+					// priamy odkaz v krátkom b2b menu je rovnako žiaduci ako pri pergole
+					{ href: '/zasklenia/navrh', label: 'Zasklenia návrh' }
 				] satisfies { href: RouteId; label: string }[])
 			: ([
 					{ href: '/pergola', label: 'Pergola' },
