@@ -840,3 +840,61 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   pečiatky potrebuje `<clipPath>`, zúženie regiónu samo nič nevynucuje;
   `podpisovaLista` vzor pre ďalší hárkový prvok) + rozšírená `paths:`
   frontmatter o nové bazén súbory.
+
+## 2026-08-12 — Zasklenia: profesionálny zákaznícky 3D náhľad, fáza 1 (#170)
+
+- **Issue:** #170 — plochý 2D SVG technický výkres ako predajný materiál pre
+  zákazníka bol majiteľom zamietnutý ("uplne hrozne to vyzera, ma to byt profi
+  upútavujúci 3d model"). Nahrádza/dopĺňa ho three.js 3D scéna produktu v
+  skutočnom kontexte (dlažba/stena/obloha/kontaktný tieň) — víťazný koncept
+  "scena-kontext" zo 7-agentového design workflow, roubovaný s prvkami
+  prehratého konceptu "stylizovany" (bez voľnej orbity, dvojvrstvý kontaktný
+  tieň, nula textu v rendere, T0 SVG-poster fallback).
+- **Validácia + prístup** (pred prvým commitom): issuecomment-5270444307
+  (STEP 0 overenie), issuecomment-5270444741 + issuecomment-5270468999
+  (root cause → prístup → zamietnutá alternatíva), issuecomment-5270488644
+  (doplnenie STEP 0).
+- **Commits (dev, feature):** `563640c` verzia 0.16.0-dev.1 → `04ba0bb` feat:
+  THREE-free geometria (`geo/zasklenia.ts`) + builder/materiály/textúry/
+  scéna/kamera/kvalita/snímka → `fd4762c` feat: `Vizual3D.svelte` (canvas +
+  onMount + dynamic import), `Vizual3DPanel`, `Vizual3DPoster` (T0), wire do
+  `/zasklenia/navrh` + nová `/zasklenia/navrh/zakaznicky` (tlačový list,
+  `<foreignObject>` PNG) → `1321d60` self-review fix (context listener
+  duplicity, dispose leaky) → `48ce62d` fix: 10 review nálezov → `bac4c6a`
+  verzia 0.16.0 → `058463a` fix: e2e timeout 60s pre 2 najťažšie testy
+  (softvérový WebGL na CI runneri pomalší než lokál).
+- **Testy:** 95 nových unit (geometria/proporcie/RAL/builder/kamera/kvalita/
+  snímka/money-guard) + existujúca sada (1125/1125). 13 nových e2e
+  (`vizual3d.spec.ts`, `zasklenia-zakaznicky.spec.ts`) + existujúca
+  `zasklenia-navrh.spec.ts` sada (190/190 v CI).
+- **Deep review** (fresh-context `general-purpose` subagent): 1 🔴 4 🟡 5 🔵 —
+  všetkých 10 opravených v tejto vetve. 🔴 = duplicitné WebGL context
+  listenery (registrácia presunutá z `inicializuj()` do `onMount`). Reviewed
+  komentár: issuecomment-5271973286.
+- **PR #171** (dev→main), verzia 0.16.0 (`788f2d1`). Live post-deploy
+  overenie Playwrightom: desktop (1440×900) aj phone (390×844) viewport,
+  4 presety (3/4 exteriér, čelný, zvnútra, otvorené/zatvorené) na oboch,
+  nula console errors/warnings v celom behu, verzia potvrdená z DOM footera.
+- **Follow-up (dokumentácia + deploy hardening, MIMO #170 diffu, nájdené pri
+  post-deploy overovaní):**
+  - PR #172 (`c51a633`, v0.16.1) — `.claude/rules/vizual3d.md` (WebGL
+    context-lock probe, `forceContextLoss()` nevratnosť, `preserveDrawingBuffer`
+    test gotcha, SVG `<foreignObject>` Playwright locator limit) + CLAUDE.md
+    router.
+  - Deploy na `167.233.125.9` zlyhal 3× po sebe (`npm ci` → `better-sqlite3`
+    `prebuild-install` "socket hang up" pri sťahovaní z GitHub CDN, node-gyp
+    fallback vždy padne — image zámerne bez Pythonu). Root cause: prechodná
+    záťaž VPS (build cache 21GB reklamovateľných → vyčistené na 5.7GB, disk
+    82%→43%), NIE trvalá porucha — nepodarilo sa manuálne zreprodukovať
+    (curl×3, `docker run`, `docker build` cez BuildKit, všetko čisto).
+  - PR #173 (`fc57d25`, v0.16.2) — prvý pokus fixu (`npm ci --fetch-retries`)
+    bol OMYLOM: ten flag pokrýva len npm registry klienta, `prebuild-install`
+    má vlastný HTTP klient mimo neho — 4. deploy zlyhal identicky AJ s flagom.
+  - PR #175 (`6720fab`, v0.16.3) — skutočný fix: retry CELÉHO `npm ci`
+    shell príkazu (2 opakovania, 5s/20s backoff) — zopakuje aj
+    `prebuild-install`-ov fetch. Overené priamym `docker build --target build`
+    na VPS pred pushom. Nasadené a zdravé (`{"ok":true,"version":"0.16.3
+    (6720fab)","live":true}`).
+- Playbook: `.claude/rules/vizual3d.md` (nový, viď vyššie) + poznámka na
+  budúce: `npm ci --fetch-retries` NEPOMÁHA proti prebuild-install zlyhaniam
+  (registry-only flag) — použi shell-level retry celého príkazu.
