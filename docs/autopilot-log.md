@@ -761,3 +761,42 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   premenné ako `playwright.config.ts`'s `webServer`, a musí bežať cez
   `run_in_background: true`, nie `(cmd &)` subshell); `.claude/rules/ci.md`
   — nová poznámka (`sort -V` `-dev.N` vs. čistá verzia kolízia + náprava).
+
+## #162 — Zasklenia: zákaznícky návrhový výkres (2026-08-12)
+
+- Nová route `/zasklenia/navrh`, architektúra 1:1 podľa pergolového `/pergola/navrh`
+  (#138/#144/#150/#153): `src/lib/components/ZaskleniaNavrhVykres.svelte` na
+  zdieľanom #137 základe (VykresovyHarok bez `titleBlock` — bod 4 zadania, žiadny
+  info rámček), `src/lib/zasklenia-navrh.ts` (čistá geometria, N ZNOVUPOUŽITÉ z
+  `listSysStyly()`), `src/lib/server/zasklenia-navrh-vstup.ts`,
+  `src/routes/zasklenia/navrh/+page.{server.ts,svelte}`. RAL logika
+  vyextrahovaná z `pergola-navrh.ts` do zdieľaného `src/lib/vykres/ral.ts`
+  (pergola-navrh.ts re-exportuje pre spätnú kompatibilitu). b2b prístup
+  automaticky (žiadna výnimka v `B2B_ALLOWED_EXCEPTIONS` netreba) + top-nav
+  odkaz. Design komentár: issuecomment-5267691601 (repost 5267739296).
+- Testy: `tests/zasklenia-navrh.test.ts`, `tests/zasklenia-navrh-vstup.test.ts`
+  (45 nových), `e2e/zasklenia-navrh.spec.ts` (9 testov), `tests/b2b-route-
+  coverage.test.ts` rozšírený. Commity 7c9a698 (verzia)/649a89e (feature).
+- Deep review (general-purpose subagent): 0 🔴, 5 🟡, 3 🔵 — všetky opravené
+  v 397a763 (obrysStroke guard na MIN(šírka,výška), parseKlin prepísaný na
+  rovnakú validáciu ako `$lib/server/vstup.ts`, top-nav odkaz + opravená e2e
+  kolízia v `app.spec.ts`, round-trip test rozšírený). Reviewed komentár:
+  issuecomment-5268462797.
+- PR #164 merged ab924f4 → main CI zelené, deploy OK, ale `/health` ukázal
+  `0.15.0-dev.1` — CHÝBAJÚCI clean-version bump pred PR (rovnaký bug ako
+  #1/#101). Naprava per `.claude/rules/ci.md`: bump na ĎALŠIE číslo (0.15.1,
+  nie späť na 0.15.0), PR #165 (748d647→4b9a0a3), `/health` opravené.
+- **Live post-deploy overenie (Playwright MCP, marek účet) odhalilo KRITICKÝ
+  bug**: select "Systém" na `/zasklenia/navrh` sa po zmene TICHO vrátil na
+  prvý systém v DB zozname (Deluxe) namiesto zvoleného — sebareferenčný
+  `$effect` self-loop (`stylS = v?.styl ?? stylyForSystem(systemS)[0] ?? ''`
+  čítalo `systemS` hneď po tom, čo ho ten istý effect zapísal). Lokálne E2E
+  testy to nechytili, lebo vždy vyberali "Robust" — zhodou okolností PRVÝ
+  systém v lokálnom/CI seede, takže revert-na-default náhodou dal správnu
+  hodnotu. Fix (f9905be, verzia 0.15.2): odstránené sebareferenčné čítanie.
+  Nový regresný e2e test (explicitne zisťuje NIE-prvý systém za behu) overený
+  RED bez opravy / GREEN s opravou. PR #166 (f9905be→849f444). Live
+  re-overené: Robust 3K, 3 krídla, kóty správne, 0 console chýb.
+- Discord run-card odoslaná pre #162 (`notify --run-card`).
+- Playbook: `.claude/rules/vykres.md` — nové poznámky (RAL logika žije v
+  `$lib/vykres/ral.ts`, outer-`<g>`-vs-inner-element `data-testid` kolízia).
