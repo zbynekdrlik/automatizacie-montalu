@@ -131,6 +131,30 @@ from). Verify tick span, witness far-end, AND label position separately
 against the region's boundaries via raw SVG attributes — hand math is
 error-prone here; #146's fix needed 3 render-verify iterations.
 
+## Fixed `stroke-width` on a filled shape — validate against the FULL input domain, not just the demo fixture
+
+A stroke-width constant that "leaves visible fill" when checked against ONE
+sample (e.g. `OP260032`, or whatever the E2E fixture happens to use) is only
+proven safe AT THAT SCALE. Any drawing whose element sizes derive from
+`fitScale(...)` (this is true of every filled profile/rect in `vykres/*` —
+posts, beams, panels) shrinks as the real-world dimensions grow toward the
+input's own documented max (`ROZPATIE_MAX`/`HLBKA_MAX`/`VYSKA_MAX` etc. in
+`pergola-navrh.ts`) — a helper's own defensive floor clamp (e.g. `stlpHalfW`'s
+`Math.max(…, 0.5)`) can let the rendered shape shrink BELOW a stroke-width
+that looked comfortably safe at the demo scale, silently swallowing the fill
+again (#153: `STRUKTURA_STROKE=1.2mm` was safe at OP260032's ≈0.0165 scale,
+but a still-valid `hlbka=6000` shrank the post to ~1.0-1.1mm — narrower than
+the stroke). The existing E2E suite, which only exercises the fixed sample,
+did NOT catch this — a fresh-context review that worked out the threshold
+scale algebraically did. **Fix pattern:** never hardcode the stroke-width;
+derive it from the shape's OWN rendered size, e.g.
+`Math.min(FIXED_STROKE, rozmerPx * 0.5)` (`obrysStroke()` in
+`PergolaNavrhVykres.svelte`) — guarantees visible fill at ANY valid scale,
+not just the one your test fixture happens to use. When adding a NEW filled
+structural shape (bazén/zasklenia or a future pergola view), either reuse
+this pattern or add an E2E case at an EXTREME (but still-valid) input, not
+only the standard demo values.
+
 ## 3D izometria (#138) — `$lib/vykres/iso.ts`
 
 Generický 30° dimetrický/axonometrický projektor `{x,y,z}→{x,y}` (x=šírka,

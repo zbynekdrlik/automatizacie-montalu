@@ -1,5 +1,19 @@
 # Testing (unit + E2E) — local run gotchas
 
+## Manually starting `npm run preview` for a live MCP screenshot needs the SAME env vars as `playwright.config.ts`'s `webServer`
+
+A bare `npm run preview` (no env) serves the build fine (`/health` returns
+200) but has NO seeded login user — `loginAs()`-style credentials
+(`e2e`/`e2e-heslo-123`) silently fail (login form just re-renders). Pass the
+exact same env block `playwright.config.ts`'s `webServer.env` uses:
+`DATABASE_PATH=./data/<scratch>.db SEED_USERS='e2e:e2e-heslo-123'
+MONEY_LIVE=0 MONEY_TEST_DIR=./data/e2e-odpis-export npm run preview -- --port
+4173` — use a SCRATCH `DATABASE_PATH` (not the real dev DB), and delete it
+after (`rm -f ./data/<scratch>.db*`). Also start it via **Bash
+`run_in_background: true`**, not a `(cmd &)` background-subshell trick inside
+a normal foreground Bash call — the subshell gets killed when that tool call
+returns, so the server never actually stays up for the MCP browser to reach.
+
 ## Testing a form action directly (forged-POST security tests) — `fail()` returns `{status, data}`
 
 Per `access-control` skill §2: prove a security boundary with a scripted POST
