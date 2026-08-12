@@ -23,10 +23,17 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 //   popisný test nižšie) — na rozdiel od /sietka tu NIET ČO chrániť extra guardom,
 //   lebo sa nezapisuje vôbec nič. Samotné /pergola (Money odpis z CAD nárezu) OSTÁVA
 //   v denylist-e — výnimka v `b2b-access.ts` je úzka, len na `/navrh` pod-cestu.
+// - /zasklenia/navrh — zákaznícky NÁVRHOVÝ výkres pre zasklenia (#162), rovnaká
+//   architektúra ako /pergola/navrh. Na rozdiel od pergoly nepotrebuje výnimku v
+//   `B2B_ALLOWED_EXCEPTIONS` — `/zasklenia/*` NIE JE v `B2B_FORBIDDEN_PREFIXES`
+//   (len `/zasklenia/nastavenia` je), takže je pre b2b dostupná AUTOMATICKY. Tu v
+//   ALLOWED je len VEDOMÉ potvrdenie (drift guard by inak zlyhal), nie obídenie.
+//   Display-only rovnako ako /pergola/navrh — viď popisný test nižšie.
 const ALLOWED = new Set([
 	'/zasklenia',
 	'/sietka',
 	'/pergola/navrh',
+	'/zasklenia/navrh',
 	'/login',
 	'/logout',
 	'/health'
@@ -70,6 +77,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/problem',
 				'/zasklenia',
 				'/zasklenia/nastavenia',
+				'/zasklenia/navrh',
 				'/login',
 				'/logout',
 				'/health'
@@ -100,6 +108,10 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	it('#144: /pergola/navrh (návrhový výkres) nie je presmerovaná', () => {
 		expect(b2bRedirectTarget('/pergola/navrh')).toBeNull();
 	});
+
+	it('#162: /zasklenia/navrh (návrhový výkres pre zasklenia) nie je presmerovaná', () => {
+		expect(b2bRedirectTarget('/zasklenia/navrh')).toBeNull();
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k
@@ -110,6 +122,15 @@ describe('b2b route coverage (denylist drift guard)', () => {
 describe('/pergola/navrh — žiadna cesta k Money odpisu (#144)', () => {
 	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/pergola/navrh/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
+	});
+});
+
+// #162, rovnaká disciplína ako #144 vyššie — /zasklenia/navrh nemá ŽIADNU zápisovú
+// akciu vôbec (display-only), tento test stráži, že to tak ZOSTANE.
+describe('/zasklenia/navrh — žiadna cesta k Money odpisu (#162)', () => {
+	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/zasklenia/navrh/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
 	});
 });

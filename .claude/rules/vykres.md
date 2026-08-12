@@ -6,6 +6,9 @@ paths:
   - "src/lib/pergola-navrh.ts"
   - "src/lib/components/PergolaNavrhVykres.svelte"
   - "src/routes/pergola/navrh/**"
+  - "src/lib/zasklenia-navrh.ts"
+  - "src/lib/components/ZaskleniaNavrhVykres.svelte"
+  - "src/routes/zasklenia/navrh/**"
 ---
 
 # Návrhové výkresy (kóta helper, výkresový hárok) — gotchy z #137
@@ -163,3 +166,30 @@ výška sa kreslí PRESNE zvisle). Znovupoužiteľný pre ďalší 3D náhľad (
 — nie je pergola-špecifický, žije preto v `$lib/vykres/`, nie v
 `$lib/pergola-navrh.ts` (tam je len samotná 3D KONŠTRUKCIA pergoly — zoznam
 úsečiek + kotvové body pre šípky/poznámky — postavená NAD týmto projektorom).
+
+## RAL farebná logika žije v `$lib/vykres/ral.ts` (#162), nie v `pergola-navrh.ts`
+
+Rovnaký precedens ako `iso.ts` vyššie: `RAL_PALETA`/`farbaKonstrukcie`/
+`ciarovaFarba`/`VykresRezim` boli pôvodne v `pergola-navrh.ts` (#150), ale sú
+generické (nič pergola-špecifické) — od #162 (zasklenia návrh, druhý konzument)
+žijú v `$lib/vykres/ral.ts`. `pergola-navrh.ts` ich re-exportuje POD PÔVODNÝMI
+menami (`RAL_PALETA`, `PergolaVykresRezim`, `PERGOLA_REZIM_DEFAULT`, …), takže
+existujúce importy sa nemenili. Nový konzument (tretí návrhový výkres) importuje
+priamo z `$lib/vykres/ral.ts`, nikdy cez `pergola-navrh.ts`.
+
+## `getByTestId` na outer `<g>` wrapper A vnútornom prvku s TOU ISTOU hodnotou = strict-mode violation
+
+Keď `content` snippet obalí pod-pohľad do `<g data-testid="zn-x">{@render
+podpohlad(...)}</g>` (bežný vzor — `pn-elevation`/`pn-section`/… v pergole,
+`zn-elevacia`/`zn-klin`/… v zaskleniach), a TEN SAMÝ podpohľad má vo svojom
+vnútri PRESNE JEDEN `<text>`/`<rect>`/… element, je LÁKAVÉ dať tomu vnútornému
+elementu ROVNAKÝ `data-testid` ako má outer `<g>` (najmä keď sa snippet volá
+napr. `ralText` a jeho JEDINÝ element je ten "RAL" text). Playwright's
+`getByTestId` vtedy resolvne OBOM (g aj text majú rovnaký atribút) →
+`strict mode violation: resolved to 2 elements` na `toHaveText()`/podobných
+asserciách vyžadujúcich presne jeden match (#162, `zn-ral` kolidovalo, opravené
+na outer `zn-ral` / inner `zn-ral-text`). Vzor, ktorý sa v tomto module už
+dodržiava a treba ho dodržať aj pri NOVÝCH pod-pohľadoch: outer `<g>` dostane
+"kategóriový" testid (`zn-klin`, `zn-elevacia`), KAŽDÝ vnútorný element
+dostane VLASTNÝ, odlišný (typicky `-text`/`-obrys`/`-v1`/… suffix) — nikdy tú
+istú reťazcovú hodnotu na dvoch úrovniach vnorenia.
