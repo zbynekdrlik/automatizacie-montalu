@@ -1,10 +1,24 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Chromium/ANGLE niekedy vypíše VLASTNÚ nízkoúrovňovú GPU driver diagnostiku
+// (nie `console.error`/`console.warn` z APLIKAČNÉHO JS, ale priamo z GL
+// backendu prehliadača) presne RAZ za život WORKEROVHO browser procesu — pri
+// PRVOM VÔBEC vytvorenom WebGL kontexte (nezávisle od toho, ktorý test/stránka
+// ho vytvorí). Nájdené naživo (#170, Vizual3D 3D náhľad): "GPU stall due to
+// ReadPixels" hlásenie o VÝKONE, nie o chybe — reprodukovalo sa v teste, ktorý
+// `readPixels` vôbec nevolá, a nikdy znova v tom istom workeri. Je to
+// hardvér/driver-špecifické (viazané na skutočný OpenGL backend tohto stroja,
+// nie na SwiftShader softvérové vykresľovanie, aké typicky beží v CI), takže
+// filter je zámerne ÚZKY (presný vzor GL Driver Message + Performance), nikdy
+// nezachytí skutočnú aplikačnú chybu.
+const NESKODNY_GL_DRIVER_VZOR = /GL Driver Message.*Performance.*GPU stall due to ReadPixels/;
+
 /** Zbiera console errors/warnings — každý test na konci overí, že je prázdne. */
 export function collectConsole(page: Page): string[] {
 	const messages: string[] = [];
 	page.on('console', (msg) => {
 		if (msg.type() === 'error' || msg.type() === 'warning') {
+			if (NESKODNY_GL_DRIVER_VZOR.test(msg.text())) return;
 			messages.push(`[${msg.type()}] ${msg.text()}`);
 		}
 	});

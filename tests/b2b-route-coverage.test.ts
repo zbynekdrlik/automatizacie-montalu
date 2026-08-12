@@ -37,11 +37,20 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 // zmeny b2b-access.ts — ostáva mimo ALLOWED zámerne, aby ju `it.each` nižšie
 // pokryl generickým "presmerovaná preč" testom (plus explicitný popisný test
 // nižšie pre čitateľnosť).
+//
+// - /zasklenia/navrh/zakaznicky — zákaznícky TLAČOVÝ list pre 3D náhľad (#170),
+//   child routa pod /zasklenia/navrh. Rovnaká disciplína ako /zasklenia/navrh
+//   samotná (a /pergola/navrh): display-only (žiadny import server/money,
+//   žiadna zápisová akcia — `src/lib/server/zasklenia-navrh-vstup.ts` sa
+//   znovupoužíva 1:1, viď `tests/vizual-money-guard.test.ts` pre samotnú 3D
+//   vrstvu). `/zasklenia/*` nie je v B2B_FORBIDDEN_PREFIXES, takže je
+//   dostupná AUTOMATICKY — tu v ALLOWED je len vedomé potvrdenie.
 const ALLOWED = new Set([
 	'/zasklenia',
 	'/sietka',
 	'/pergola/navrh',
 	'/zasklenia/navrh',
+	'/zasklenia/navrh/zakaznicky',
 	'/login',
 	'/logout',
 	'/health'
@@ -122,6 +131,10 @@ describe('b2b route coverage (denylist drift guard)', () => {
 		expect(b2bRedirectTarget('/zasklenia/navrh')).toBeNull();
 	});
 
+	it('#170: /zasklenia/navrh/zakaznicky (zákaznícky tlačový list, 3D náhľad) nie je presmerovaná', () => {
+		expect(b2bRedirectTarget('/zasklenia/navrh/zakaznicky')).toBeNull();
+	});
+
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
 	// zadanie #139 ho explicitne vylučuje z b2b ("pre b2b stránka prístupná
 	// nebude"). Generický it.each vyššie to už pokrýva (nie je v ALLOWED), tento
@@ -159,5 +172,15 @@ describe('/bazen/navrh — žiadna cesta k Money odpisu (#139)', () => {
 	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/bazen/navrh/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
+	});
+});
+
+// #170, rovnaká disciplína — zákaznícky tlačový list (3D náhľad) má LEN default
+// akciu (parsuje ten istý vstup ako `?/vykres` na rodičovskej route), žiadnu
+// odpisovú/zápisovú akciu vôbec.
+describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', () => {
+	it('akcie routy sú presne default — žiadna odpisová/zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/zasklenia/navrh/zakaznicky/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['default']);
 	});
 });

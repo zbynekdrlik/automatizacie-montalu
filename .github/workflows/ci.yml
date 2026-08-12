@@ -44,6 +44,49 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: 3D vizuál chunk gzip <= 220 KB (#170 §2.13)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const zlib = require('zlib');
+            const dir = 'build/client/_app/immutable/chunks';
+            // FAIL LOUDLY, nie tichý exit(0) — review nález 🟡 #3: pri zmene
+            // build layoutu (adapter update a pod.) sa má tento krok POKAZIŤ,
+            // nie ticho 'nemám čo skontrolovať' prejsť ako zelený.
+            if (!fs.existsSync(dir)) {
+              console.error('::error::build/client/_app/immutable/chunks neexistuje — build layout sa zmenil, over cestu');
+              process.exit(1);
+            }
+            // Viacero markerov, NIE len 'PMREMGenerator' — Vite rozdeľuje
+            // three/OrbitControls/RoomEnvironment/BufferGeometryUtils (4
+            // samostatné dynamické importy vo Vizual3D.svelte) do VIACERÝCH
+            // samostatných chunkov; len 'PMREMGenerator' pokrylo v reálnom
+            // builde iba 2 z 5 (review nález 🟡 #3, overené 'npm run build' +
+            // ručnou inšpekciou skutočného výstupu — OrbitControls/
+            // RoomEnvironment/BufferGeometryUtils chunky unikli, ~5% reálnej
+            // veľkosti nepočítané).
+            const MARKERY = ['PMREMGenerator', 'OrbitControls', 'RoomEnvironment', 'mergeGeometries', 'ACESFilmicToneMapping'];
+            let total = 0;
+            const hit = [];
+            for (const f of fs.readdirSync(dir)) {
+              if (!f.endsWith('.js')) continue;
+              const p = path.join(dir, f);
+              const src = fs.readFileSync(p, 'utf8');
+              if (!MARKERY.some((m) => src.includes(m))) continue;
+              const gz = zlib.gzipSync(fs.readFileSync(p)).length;
+              hit.push([f, gz]);
+              total += gz;
+            }
+            const KB = 1024;
+            console.log('three.js chunky:', hit.map(([f, g]) => f + ' ' + (g/KB).toFixed(1) + 'KB').join(', ') || '(žiadne)');
+            console.log('spolu gzip:', (total/KB).toFixed(1) + 'KB (limit 220KB)');
+            if (hit.length === 0) {
+              console.error('::error::žiadny chunk nezodpovedal three.js markerom — guard pravdepodobne rozbitý (dynamic import zmenený?)');
+              process.exit(1);
+            }
+            if (total > 220 * KB) { console.error('::error::viewer chunk presiahol 220KB gzip'); process.exit(1); }
+          "
       - name: Playwright
         run: npx playwright install --with-deps chromium
       - name: E2E (reálny prehliadač, nula console errors)
