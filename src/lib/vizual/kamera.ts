@@ -21,10 +21,11 @@ export interface Preset {
 /** §2.8 — tri primárne presety. `troStvrte` je DEFAULT aj záber pre tlač.
  *
  *  Elevácie `troStvrte`/`celny` znížené z pôvodných 16°/8° na 7°/6° (#174) —
- *  pri `REZERVA` marži nižšie (35 %) toto pásmo drží svetovú výšku kamery v
- *  prirodzenom rozsahu ~1,5–1,7 m (výška oka) namiesto pôvodných ~2,3 m/1,6 m
- *  (`troStvrte` bolo nad pásmom, dnes obe presety padnú doň — pozri
- *  `fitCiel`'s `PULL_K_ZEMI` a `REZERVA` komentáre nižšie pre presný prepočet). */
+ *  pri novej `rezerva` marži (`autoFitVzdialenost`'s default, 35 %) toto
+ *  pásmo drží svetovú výšku kamery v prirodzenom rozsahu ~1,5–1,7 m (výška
+ *  oka) namiesto pôvodných ~2,3 m/1,6 m (`troStvrte` bolo nad pásmom, dnes
+ *  obe presety padnú doň — pozri `autoFitVzdialenost`'s aj `fitCiel`'s
+ *  vlastné komentáre nižšie pre presný prepočet). */
 export const PRESETY = {
 	troStvrte: { nazov: '3/4 exteriér', azimut: -32, elevacia: 7 },
 	celny: { nazov: 'Čelný', azimut: 0, elevacia: 6 },
