@@ -2,15 +2,19 @@
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-# --fetch-retries: better-sqlite3's `prebuild-install` sťahuje jej prebuilt
-# binárku priamo z GitHub releases CDN (mimo npm registry, mimo npm vlastného
-# retry mechanizmu) — na zaťaženom VPS (build cache/RAM tlak) toto sťahovanie
-# vie občas padnúť na "socket hang up", čo zhodí CELÝ build a spadne na
-# node-gyp fallback (ten padne vždy, image nemá Python — zámerne, netreba ho).
-# 3 po sebe idúce zlyhania (2026-08-12) reprodukované NEBOLI manuálne
-# (curl aj `docker build` mimo CI prešli čisto) → dôkaz prechodnej záťaže,
-# nie trvalej poruchy. Retry namiesto slepého "skús znova" na CI úrovni.
-RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=5000 --fetch-retry-maxtimeout=30000
+# better-sqlite3's `prebuild-install` sťahuje jej prebuilt binárku priamo z
+# GitHub releases CDN cez VLASTNÝ HTTP klient — MIMO npm registry klienta,
+# takže `npm ci --fetch-retries=…` naň NEMÁ ŽIADEN vplyv (overené naživo:
+# pridanie flagu zlyhanie vôbec nezmenilo, 4. zlyhanie v rade malo identickú
+# "socket hang up" stopu ako predošlé 3). Skutočný fix: retry CELÉHO `npm ci`
+# príkazu na shell úrovni — to reálne zopakuje aj prebuild-install-ov fetch,
+# nie len npm registry požiadavky. Node-gyp fallback (keby aj retry zlyhal)
+# vždy padne, image nemá Python — zámerne, netreba ho pri fungujúcom
+# prebuild-install. 4 po sebe idúce zlyhania na VPS (2026-08-12) sa manuálne
+# nedali zreprodukovať (curl aj `docker build` mimo CI prešli čisto) → dôkaz
+# prechodnej záťaže na tomto konkrétnom, zdrojmi obmedzenom hostiteľovi.
+RUN npm ci || (echo 'npm ci #1 zlyhalo, skúšam znova o 5s' && sleep 5 && npm ci) || \
+    (echo 'npm ci #2 zlyhalo, skúšam znova o 20s' && sleep 20 && npm ci)
 COPY . .
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
