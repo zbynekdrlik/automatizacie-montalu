@@ -58,30 +58,76 @@ export function jePoznanyRal(ralKod: string): boolean {
 
 /** Sklo — buď skutočný transmission pass (jedna zliata geometria + jedna
  *  inštancia materiálu, §2.6), alebo lacnejšia priehľadnosť pre `low` tier
- *  (§2.9: `{ transparent:true, opacity:0.34, roughness:0.05, transmission:0 }`). */
+ *  (§2.9).
+ *
+ *  #174 vizuálna iterácia, 1. kolo — pôvodné hodnoty (opacity 0.34 / bledá
+ *  0xeaf2ee / attenuationDistance 6) v OBOCH režimoch vyzerali ako mliečny
+ *  plast, lebo tint skla bol tónovo takmer identický so stenou za ním.
+ *
+ *  #174, 2. kolo (DÔLEŽITÁ OPRAVA) — "skrátiť attenuationDistance" SAMO
+ *  OSEBE nestačí. Three.js počíta útlm cez Beer–Lambert PO KANÁLI:
+ *  `transmittance = attenuationColor ^ (dráhaVSkle / attenuationDistance)`
+ *  (`transmission_pars_fragment.glsl.js`, `volumeAttenuation()`) — to je
+ *  MOCNINA farby, nie exponenciála vzdialenosti samotnej. Pri takmer BIELOM
+ *  `attenuationColor` (napr. `0x9fd6c4` ⇒ zložky 0.62–0.84) je aj pri
+ *  agresívne krátkej `attenuationDistance` výsledok stále ≈ 0.9–0.97
+ *  (prakticky žiadny viditeľný útlm) — presne prečo 1. kolo (kratšia
+ *  distance, ale stále bledý `attenuationColor`) vizuálne takmer nič
+ *  nezmenilo. Skutočný, viditeľný tint potrebuje SÝTY (nie bledý)
+ *  `attenuationColor` — nižšie zvolené hodnoty dávajú pri 8 mm skle
+ *  transmitanciu ~0.45–0.85 po kanáli (overené v `tests/vizual-materialy.test.ts`
+ *  PRIAMO tou istou Beer–Lambert-po-kanáli formulou, nie zjednodušenou
+ *  aproximáciou).
+ *
+ *  `clearcoat` pridáva DRUHÚ, nezávislú lesklú vrstvu zachytávajúcu priame
+ *  kľúčové svetlo (§2.6, fixné) ako viditeľný "hot-spot" — vizuálna skratka
+ *  "toto je lesklé sklo" nezávislá od (pri takmer čelnom pohľade fyzikálne
+ *  slabého) fresnel odrazu environment mapy, rovnaká technika, akú
+ *  `vytvorHlinikMaterial` už používa pre kov. */
 export function vytvorSkloMaterial(
 	THREE: ThreeNS,
 	skloHrubkaMm: number,
 	rezim: 'transmission' | 'falosne'
 ): Material {
+	const clearcoatSpolocne = { clearcoat: 0.85, clearcoatRoughness: 0.04 };
 	if (rezim === 'falosne') {
 		return new THREE.MeshPhysicalMaterial({
 			transparent: true,
-			opacity: 0.34,
-			roughness: 0.05,
+			// #174 3. kolo: 2. kolo (opacity 0.32, farba 0x3fae8c) vizuálne
+			// čítalo ako SÝTE zelené sklo, nie "jemný modrozelený nádych" zo
+			// zadania — znížené opacity aj zosvetlená/menej sýta farba dávajú
+			// stále jasne VIDITEĽNÝ, ale jemnejší tón (overené screenshotom)
+			opacity: 0.26,
+			roughness: 0.04,
 			transmission: 0,
-			color: new THREE.Color(0xeaf2ee),
-			metalness: 0
+			color: new THREE.Color(0x8fcab3),
+			metalness: 0,
+			envMapIntensity: 1.6,
+			specularIntensity: 1.3,
+			specularColor: new THREE.Color(0xffffff),
+			...clearcoatSpolocne
 		});
 	}
 	return new THREE.MeshPhysicalMaterial({
 		transmission: 1,
 		ior: 1.5,
-		roughness: 0.08,
+		roughness: 0.06,
 		thickness: mm(skloHrubkaMm),
 		metalness: 0,
 		transparent: false,
-		attenuationColor: new THREE.Color(0xeaf2ee),
-		attenuationDistance: 6
+		// takmer neutrálna — tint nesie hlavne attenuationColor (Beer–Lambert),
+		// `color` by pri sýtej hodnote útlm len duplicitne prehĺbil
+		color: new THREE.Color(0xf2faf7),
+		// #174 3. kolo: 2. kolo (attenuationDistance 0.02) dávalo pri 8 mm skle
+		// transmitanciu ~0.5/0.8/0.74 — čítalo sa to ako sýte zelené sklo,
+		// nie "jemný modrozelený nádych". Väčšia attenuationDistance (0.035)
+		// pri rovnakej sýtej `attenuationColor` dáva jemnejší, ale stále jasne
+		// VIDITEĽNÝ tón (overené screenshotom + `tests/vizual-materialy.test.ts`).
+		attenuationColor: new THREE.Color(0x2f9478),
+		attenuationDistance: 0.035,
+		envMapIntensity: 1.6,
+		specularIntensity: 1.3,
+		specularColor: new THREE.Color(0xffffff),
+		...clearcoatSpolocne
 	});
 }

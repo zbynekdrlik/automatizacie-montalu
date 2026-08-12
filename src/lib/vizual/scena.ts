@@ -99,7 +99,8 @@ export function vytvorZem(
 	geo.rotateX(-Math.PI / 2);
 	let mat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (nastavenia.plochyGradientMiestoMap) {
-		mat = new THREE.MeshStandardMaterial({ color: 0xb9b3ab, roughness: 0.85, metalness: 0 });
+		// #174: zladené s vytvorDlazbuTexturu's novou tmavšou/chladnejšou farbou
+		mat = new THREE.MeshStandardMaterial({ color: 0xa7a199, roughness: 0.85, metalness: 0 });
 	} else {
 		const tex = vytvorDlazbuTexturu(THREE, nastavenia.dlazba);
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -149,8 +150,9 @@ export function vytvorStenu(
 
 	let mat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (nastavenia.plochyGradientMiestoMap) {
+		// #174: zladené s vytvorStenuTexturu's novým sýtejším/teplejším odtieňom
 		mat = new THREE.MeshStandardMaterial({
-			color: 0xd9cfc0,
+			color: 0xc2ab84,
 			roughness: 0.92,
 			metalness: 0,
 			side: THREE.DoubleSide
@@ -170,12 +172,18 @@ export function vytvorStenu(
 
 /** Dvojvrstvový kontaktný tieň — alpha decal na rovine `y = +2 mm`, posunutý
  *  v azimute kľúčového svetla (§2.6). `rozmerBboxMm` je väčší z (w, d), tieň
- *  je `× 1.6` tohto rozmeru. */
+ *  je `× 1.35` tohto rozmeru.
+ *
+ *  #174: veľkosť zmenšená z `×1.6` na `×1.35` a posun z `12 %` na `5 %` —
+ *  pôvodná kombinácia (veľký tieň + veľký posun) pôsobila na 3/4 zábere ako
+ *  nesúvisiaca škvrna vedľa pätky konštrukcie namiesto pevného odtlačku
+ *  priamo pod ňou ("jednotka sa vznáša"). Spolu so zosilnenou nepriehľadnosťou
+ *  (`vytvorKontaktnyTienTexturu`) drží tvrdé jadro tesne pod koľajnicou. */
 export function vytvorKontaktnyTien(
 	THREE: ThreeNS,
 	rozmerBboxMm: number
 ): InstanceType<ThreeNS['Mesh']> {
-	const velkost = mm(rozmerBboxMm) * 1.6;
+	const velkost = mm(rozmerBboxMm) * 1.35;
 	const geo = new THREE.PlaneGeometry(velkost, velkost);
 	geo.rotateX(-Math.PI / 2);
 	const tex = vytvorKontaktnyTienTexturu(THREE);
@@ -188,7 +196,7 @@ export function vytvorKontaktnyTien(
 	const mesh = new THREE.Mesh(geo, mat);
 	mesh.position.y = mm(2);
 	// posun v smere kľúčového svetla — tieň padá OPAČNÝM smerom od svetla
-	const posunM = mm(rozmerBboxMm) * 0.12;
+	const posunM = mm(rozmerBboxMm) * 0.05;
 	mesh.position.x += Math.sin(KEY_SVETLO_AZIMUT_RAD + Math.PI) * posunM;
 	mesh.position.z += Math.cos(KEY_SVETLO_AZIMUT_RAD + Math.PI) * posunM;
 	return mesh;

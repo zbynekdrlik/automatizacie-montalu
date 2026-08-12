@@ -18,10 +18,16 @@ export interface Preset {
 	elevacia: number;
 }
 
-/** §2.8 — tri primárne presety. `troStvrte` je DEFAULT aj záber pre tlač. */
+/** §2.8 — tri primárne presety. `troStvrte` je DEFAULT aj záber pre tlač.
+ *
+ *  Elevácie `troStvrte`/`celny` znížené z pôvodných 16°/8° na 7°/6° (#174) —
+ *  pri `REZERVA` marži nižšie (35 %) toto pásmo drží svetovú výšku kamery v
+ *  prirodzenom rozsahu ~1,5–1,7 m (výška oka) namiesto pôvodných ~2,3 m/1,6 m
+ *  (`troStvrte` bolo nad pásmom, dnes obe presety padnú doň — pozri
+ *  `fitCiel`'s `PULL_K_ZEMI` a `REZERVA` komentáre nižšie pre presný prepočet). */
 export const PRESETY = {
-	troStvrte: { nazov: '3/4 exteriér', azimut: -32, elevacia: 16 },
-	celny: { nazov: 'Čelný', azimut: 0, elevacia: 8 },
+	troStvrte: { nazov: '3/4 exteriér', azimut: -32, elevacia: 7 },
+	celny: { nazov: 'Čelný', azimut: 0, elevacia: 6 },
 	zvnutra: { nazov: 'Zvnútra', azimut: 152, elevacia: 4 }
 } as const satisfies Record<string, Preset>;
 
@@ -38,10 +44,14 @@ export const FOV_DEG = 35;
 const ZVNUTRA_VZDIALENOST_M = 1.6;
 
 /** Vzdialenosť kamery od stredu bboxu (m), aby sa produkt zmestil do zorného
- *  poľa s `rezerva` (default 15 %) pri danom aspect pomere. Analytický výpočet
- *  priamo z bboxu — NIKDY hardcoded, volajúci ho prepočítava pri každom
- *  resize (§2.8). */
-export function autoFitVzdialenost(bbox: Bbox, aspect: number, rezerva = 1.15): number {
+ *  poľa s `rezerva` (default 35 %, #174 — pôvodných 15 % nechávalo len tesný
+ *  okraj pri FOV 35°: orezaný vrch v `celny`, minimálna dlažba pod jednotkou
+ *  v `troStvrte`. 35 % dáva "celá jednotka + okraj" zo zadania a zároveň, v
+ *  kombinácii so zníženými eleváciami `PRESETY`, drží výšku kamery v pásme
+ *  ~1,5–1,7 m — pozri `PRESETY`'s vlastný komentár pre presný prepočet)
+ *  pri danom aspect pomere. Analytický výpočet priamo z bboxu — NIKDY
+ *  hardcoded, volajúci ho prepočítava pri každom resize (§2.8). */
+export function autoFitVzdialenost(bbox: Bbox, aspect: number, rezerva = 1.35): number {
 	const w = mm(bbox.w) * rezerva;
 	const h = mm(bbox.h) * rezerva;
 	const vFov = (FOV_DEG * Math.PI) / 180;
@@ -57,10 +67,14 @@ export function vzdialenostPrePreset(preset: PresetKluc, fitVzdialenost: number)
 	return preset === 'zvnutra' ? ZVNUTRA_VZDIALENOST_M : fitVzdialenost;
 }
 
-/** Cieľ (`OrbitControls.target`) — stred bboxu stiahnutý o 8 % k zemi (m). */
+/** Cieľ (`OrbitControls.target`) — stred bboxu stiahnutý o 10 % k zemi (m).
+ *  Predtým 8 % (×0,92) — #174 mierne zväčšilo pull-down na 10 % (×0,90) ako
+ *  súčasť ladenia výšky kamery (viď `PRESETY`'s komentár) — kombinovaný
+ *  efekt s `REZERVA` je "viac vzduchu navôkol", nie primárny páka na výšku
+ *  oka (tú drží hlavne `PRESETY`'s elevácia + `REZERVA`). */
 export function fitCiel(bbox: Bbox): { x: number; y: number; z: number } {
 	const stredY = mm(bbox.h) / 2;
-	return { x: 0, y: stredY * 0.92, z: 0 };
+	return { x: 0, y: stredY * 0.9, z: 0 };
 }
 
 /** Sférické súradnice → pozícia kamery okolo `ciel` (m), `azimutDeg`/`elevaciaDeg`
