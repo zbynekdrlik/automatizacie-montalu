@@ -150,7 +150,7 @@ export function vytvorStenu(
 	let mat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (nastavenia.plochyGradientMiestoMap) {
 		mat = new THREE.MeshStandardMaterial({
-			color: 0xe9e4dc,
+			color: 0xd9cfc0,
 			roughness: 0.92,
 			metalness: 0,
 			side: THREE.DoubleSide

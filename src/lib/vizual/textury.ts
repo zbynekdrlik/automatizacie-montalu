@@ -88,14 +88,18 @@ export function vytvorDlazbuTexturu(THREE: ThreeNS, rozlisenie = 512, mriezka = 
 	return ztexturuj(THREE, canvas);
 }
 
-/** Stena domu — 3-oktávový šum, `#e9e4dc`, plus samostatná roughness mapa
- *  z toho istého šumu (drobnejšia štuková štruktúra bez farebnej zmeny). */
+/** Stena domu — 3-oktávový šum, teplý štukový tón, plus samostatná roughness
+ *  mapa z toho istého šumu (drobnejšia štuková štruktúra bez farebnej zmeny).
+ *  Zámerne TEPLEJŠÍ a SÝTEJŠÍ tón než pôvodný takmer-biely `#e9e4dc` — pri
+ *  jasnom kľúčovom svetle (§2.6, 2.4 intenzita) a ACES tonemappingu splýval
+ *  vizuálne s bledou oblohou (`#dfe7ee`), takže stena ako samostatná plocha
+ *  prakticky zmizla (nájdené pri live vizuálnej kontrole screenshotu). */
 export function vytvorStenuTexturu(
 	THREE: ThreeNS,
 	rozlisenie = 1024
 ): { map: Texture; roughnessMap: Texture } {
-	const zaklad: [number, number, number] = hexNaRgb('#e9e4dc');
-	const tmava: [number, number, number] = hexNaRgb('#d8d2c7');
+	const zaklad: [number, number, number] = hexNaRgb('#d9cfc0');
+	const tmava: [number, number, number] = hexNaRgb('#b9ab95');
 
 	const sum2d = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, farebna: boolean) => {
 		const img = ctx.createImageData(canvas.width, canvas.height);

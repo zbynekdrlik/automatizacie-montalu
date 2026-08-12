@@ -4,7 +4,9 @@
 	// plán → Money odpis sa touto stránkou nedotýka). Rovnaký vzor ako
 	// `/pergola/navrh`: formulár → výkres → tlač, žiadny zápisový krok.
 	import ZaskleniaNavrhVykres from '$lib/components/ZaskleniaNavrhVykres.svelte';
+	import Vizual3DPanel from '$lib/components/vizual/Vizual3DPanel.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { RAL_PALETA, RAL_INY_KOD, RAL_FALLBACK_HEX, VYKRES_REZIM_DEFAULT } from '$lib/vykres/ral';
@@ -17,6 +19,16 @@
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
 	let step = $derived(form?.step ?? 'form');
+
+	// `?viz=low` (e2e determinizmus, #170 §2.12) PRETRVÁ cez POST na `?/vykres`
+	// aj cez POST na `/zakaznicky` — `action="?/vykres"` by inak celý pôvodný
+	// query string (vrátane `viz`) NAHRADIL len `/vykres` (relatívne `?…`
+	// URL referencie nahrádzajú CELÝ query, nie ho dopĺňajú).
+	let vizParam = $derived(page.url.searchParams.get('viz'));
+	let vykresAction = $derived(vizParam ? `?/vykres&viz=${vizParam}` : '?/vykres');
+	let zakaznickyAction = $derived(
+		vizParam ? `/zasklenia/navrh/zakaznicky?viz=${vizParam}` : '/zasklenia/navrh/zakaznicky'
+	);
 
 	let vstup = $derived({
 		system: form?.vstup?.system ?? data.systemy[0] ?? '',
@@ -134,7 +146,7 @@
 	{/if}
 
 	<div class="card">
-		<form method="POST" action="?/vykres">
+		<form method="POST" action={vykresAction}>
 			<div class="grid3">
 				<div class="field">
 					<label for="system">Systém</label>
@@ -321,12 +333,25 @@
 		</p>
 	</div>
 
+	<div class="card noprint">
+		<h2 class="sekcia-nadpis">Zákaznícky náhľad</h2>
+		<Vizual3DPanel {vstup} datum={formatDatumCasSk(data.datumIso)} />
+	</div>
+
 	<div class="card" style="overflow:auto;padding:10px">
+		<h2 class="sekcia-nadpis noprint">Technický výkres</h2>
 		<ZaskleniaNavrhVykres {vstup} datum={formatDatumCasSk(data.datumIso)} />
 	</div>
 
 	<div class="card noprint">
-		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<button class="btn" onclick={() => window.print()}
+			>🖨 Tlačiť / uložiť PDF (technický výkres)</button
+		>
+		<form method="POST" action={zakaznickyAction} style="display:inline">
+			{@render hidden()}
+			<button class="btn" type="submit" data-testid="zakaznicky-list-btn">📷 Zákaznícky list</button
+			>
+		</form>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
 			<button class="btn secondary" type="submit">← Späť a upraviť</button>
@@ -336,6 +361,13 @@
 {/if}
 
 <style>
+	.sekcia-nadpis {
+		margin: 0 0 10px;
+		font-size: 15px;
+		font-weight: 700;
+		color: #0f172a;
+	}
+
 	.polia-box {
 		border: 1px solid #bfdbfe;
 		background: #f8fbff;

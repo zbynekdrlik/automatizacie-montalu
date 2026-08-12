@@ -9,7 +9,10 @@ import path from 'node:path';
 
 const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
-const VIZUAL_DIRS = [path.join(SRC, 'lib', 'vizual'), path.join(SRC, 'lib', 'components', 'vizual')];
+const VIZUAL_DIRS = [
+	path.join(SRC, 'lib', 'vizual'),
+	path.join(SRC, 'lib', 'components', 'vizual')
+];
 
 const ZAKAZANE_VZORY = [
 	/(^|\/)server\//,
@@ -82,7 +85,12 @@ function rozlisSpecifikator(specifikator: string, odKade: string): string | null
 	} else {
 		return null;
 	}
-	for (const kandidat of [zakladCesta, `${zakladCesta}.ts`, `${zakladCesta}.svelte`, path.join(zakladCesta, 'index.ts')]) {
+	for (const kandidat of [
+		zakladCesta,
+		`${zakladCesta}.ts`,
+		`${zakladCesta}.svelte`,
+		path.join(zakladCesta, 'index.ts')
+	]) {
 		if (fs.existsSync(kandidat) && fs.statSync(kandidat).isFile()) return kandidat;
 	}
 	return null;

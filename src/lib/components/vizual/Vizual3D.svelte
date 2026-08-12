@@ -5,7 +5,7 @@
 	// (žiadny trvalý requestAnimationFrame — §2.6): render sa spustí pri zmene
 	// parametra (RAL/preset/otvorené) a pri interakcii (krátkodobá rAF slučka,
 	// ktorá sa SAMA ukončí, keď `controls.update()` vráti `false` — damping dobehol).
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import type { Rola, VizVysledok } from '$lib/vizual/spec';
 	import { mm } from '$lib/vizual/jednotky';
@@ -40,6 +40,8 @@
 		ralKod,
 		preset = $bindable<PresetKluc>(PRESET_DEFAULT),
 		vynutenyTier,
+		pripravene = $bindable(false),
+		aktualnyTier = $bindable<Tier>('high'),
 		posterZaznam
 	}: {
 		vysledok: VizVysledok;
@@ -48,17 +50,30 @@
 		/** testovací hook (`?viz=low`/`?viz=none` v URL) — vynúti tier bez ohľadu
 		 *  na skutočné HW, pre e2e determinizmus (§2.12) */
 		vynutenyTier?: Tier;
+		/** scéna je postavená a prvý render prebehol (alebo T0 poster je aktívny) —
+		 *  rodič (napr. zákaznícky tlačový list) na toto čaká pred `zachytObrazok()` */
+		pripravene?: boolean;
+		/** zistený kvalitatívny tier (pre rodiča, napr. na zobrazenie diagnostiky) */
+		aktualnyTier?: Tier;
 		/** T0 poster content — vykreslí sa namiesto/nad canvasom pri tier==='none' */
 		posterZaznam?: import('svelte').Snippet;
 	} = $props();
 
 	let canvasEl = $state<HTMLCanvasElement | undefined>();
 	let containerEl = $state<HTMLDivElement | undefined>();
-	let tier = $state<Tier>('high');
-	let pripravene = $state(false);
+	// seedne sa z bindable `aktualnyTier` (default 'high') — inak by ESLint
+	// správne varoval, že jeho default sa nikde nečíta pred prepísaním nižšie
+	let tier = $state<Tier>(aktualnyTier);
 	let dotykOverlayViditelny = $state(true);
 	let camAzimutDeg = $state(PRESETY[PRESET_DEFAULT].azimut);
 	let camElevaciaDeg = $state(PRESETY[PRESET_DEFAULT].elevacia);
+
+	// `tier` (interný) sa zrkadlí do bindable `aktualnyTier` (verejný) — rodič
+	// (napr. zákaznícky tlačový list) ho môže čítať bez potreby vlastnej kópie
+	// detekčnej logiky.
+	$effect(() => {
+		aktualnyTier = tier;
+	});
 
 	type ThreeNS = typeof import('three');
 	type OrbitControlsCtor =
@@ -67,11 +82,19 @@
 
 	interface ZivaScena {
 		THREE: ThreeNS;
+		mergeGeometries: MergeGeometriesFn;
 		renderer: InstanceType<ThreeNS['WebGLRenderer']>;
 		scene: InstanceType<ThreeNS['Scene']>;
 		camera: InstanceType<ThreeNS['PerspectiveCamera']>;
 		controls: OrbitControlsInst;
 		materialy: Partial<Record<Rola, InstanceType<ThreeNS['MeshPhysicalMaterial']>>>;
+		/** LEN meshe produktu (ram/sklo/kolajnica/klucka/klin/sietka) — oddelené
+		 *  od `disposables` (scéna/prostredie), aby `prestavGeometriuProduktu()`
+		 *  vedela zmazať/prestavať IBA produkt, bez toho, aby sa dotkla
+		 *  rendereru/kamery/svetiel/zeme/steny/oblohy (viď jeho vlastný komentár
+		 *  — `renderer.forceContextLoss()` je NEVRATNÉ, nesmie sa volať pri
+		 *  bežnej zmene geometrie, len pri skutočnom unmounte). */
+		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
 		disposables: Disposable[];
 		contextLostCount: number;
 		fitVzdialenost: number;
@@ -100,17 +123,24 @@
 		camElevaciaDeg = p.elevacia;
 	}
 
-	function nastavPreset(novy: PresetKluc, znovaFit = false) {
+	/** Aplikuje kameru pre daný preset — NIKDY nezapisuje do `preset` (na rozdiel
+	 *  od pôvodnej `nastavPreset`, ktorá to robila a preto sa nedala bezpečne
+	 *  volať z efektu sledujúceho `preset`). Volá sa (a) z `$effect` nižšie —
+	 *  JEDINÝ trigger pre zmenu presetu, vrátane zmeny cez `bind:preset` z
+	 *  rodiča (klik na tlačidlo presetu v paneli) — predtým sa taký externý
+	 *  zápis do bindable `preset` NIKDY neaplikoval na kameru, lebo nič naň
+	 *  nereagovalo; (b) priamo z `reset()` pre istotu, aj keď sa `preset`
+	 *  nezmenil (Svelte efekt sa pri zápise ROVNAKEJ hodnoty znova nespustí). */
+	function aplikujPreset(kluc: PresetKluc, znovaFit = false) {
 		if (!ziva) return;
-		preset = novy;
-		const p = PRESETY[novy];
+		const p = PRESETY[kluc];
 		if (znovaFit && containerEl) {
 			ziva.fitVzdialenost = autoFitVzdialenost(
 				vysledok.bbox,
 				containerEl.clientWidth / Math.max(1, containerEl.clientHeight)
 			);
 		}
-		const vzd = vzdialenostPrePreset(novy, ziva.fitVzdialenost);
+		const vzd = vzdialenostPrePreset(kluc, ziva.fitVzdialenost);
 		const ciel = fitCiel(vysledok.bbox);
 		const poz = poziciaKamery(ciel, p.azimut, p.elevacia, vzd);
 		ziva.camera.position.set(poz.x, poz.y, poz.z);
@@ -123,14 +153,23 @@
 		ziva.controls.minDistance = lim.minDistance;
 		ziva.controls.maxDistance = lim.maxDistance;
 		ziva.controls.update();
-		aktualizujCamDataAtributy();
+		camAzimutDeg = p.azimut;
+		camElevaciaDeg = p.elevacia;
 		render();
 	}
+
+	// JEDINÝ miesto, kde sa preset naozaj aplikuje na kameru — reaguje na
+	// AKÚKOĽVEK zmenu `preset` (interný `reset()`/`nastavPresetVerejne()`, AJ
+	// externý zápis cez `bind:preset` z Vizual3DPanel.svelte).
+	$effect(() => {
+		aplikujPreset(preset);
+	});
 
 	function reset() {
 		if (!ziva) return;
 		ziva.controls.reset();
-		nastavPreset(PRESET_DEFAULT);
+		preset = PRESET_DEFAULT;
+		aplikujPreset(PRESET_DEFAULT, true);
 	}
 
 	function prekresliRAL() {
@@ -190,6 +229,102 @@
 		});
 	}
 
+	/** Zlikviduje VŠETKY meshe produktu — geometriu KAŽDÉHO a materiál
+	 *  KAŽDÉHO (aj keď sa `hlinik` zdieľa naprieč ram/kolajnica/klucka/klin —
+	 *  opakovaný `.dispose()` na tej istej inštancii je v three.js neškodný
+	 *  no-op, takže sa netreba starať o duplicity). */
+	function zlikvidujProduktMeshe(meshe: InstanceType<ThreeNS['Mesh']>[]) {
+		for (const mesh of meshe) {
+			mesh.geometry.dispose();
+			const mat = mesh.material as unknown as Disposable | Disposable[];
+			for (const m of Array.isArray(mat) ? mat : [mat]) m.dispose();
+		}
+	}
+
+	/** Postaví MESHE PRODUKTU (ram/kolajnica/klucka/klin/sklo/sietka) a pridá ich
+	 *  do `scene` — ODDELENÉ od `postavScenu()`, aby to isté vedela zavolať aj
+	 *  `prestavGeometriuProduktu()` (napr. "Otvoriť") BEZ toho, aby sa dotkla
+	 *  rendereru/kamery/svetiel/zeme/steny/oblohy. `materialy` (ram/kolajnica/
+	 *  klucka/klin, zdieľajú JEDNU `hlinik` inštanciu) je len pre RAL update
+	 *  (`prekresliRAL()`) — dispose ide cez `produktMeshe` (`zlikvidujProduktMeshe`),
+	 *  nie cez tento map (ten sklo/sietka materiály vôbec nedrží). */
+	function postavProduktMeshe(
+		THREE: ThreeNS,
+		mergeGeometries: MergeGeometriesFn,
+		scene: InstanceType<ThreeNS['Scene']>,
+		vysledok: VizVysledok,
+		ralKod: string,
+		nastavenia: ReturnType<typeof nastaveniaPreTier>
+	): {
+		materialy: ZivaScena['materialy'];
+		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
+	} {
+		const geometrie = postavGeometrie(vysledok.diely, THREE, mergeGeometries);
+		const materialy: ZivaScena['materialy'] = {};
+		const produktMeshe: InstanceType<ThreeNS['Mesh']>[] = [];
+
+		const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat);
+		for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
+			const geo = geometrie[rola];
+			if (!geo) continue;
+			materialy[rola] = hlinik;
+			const mesh = new THREE.Mesh(geo, hlinik);
+			scene.add(mesh);
+			produktMeshe.push(mesh);
+		}
+		if (geometrie.sklo) {
+			const skloMat = vytvorSkloMaterial(THREE, 8, nastavenia.sklo);
+			const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
+			scene.add(mesh);
+			produktMeshe.push(mesh);
+		}
+		if (geometrie.sietka) {
+			// sieťkový panel — vizuál, nie katalóg (appka dnes nezbiera samostatné
+			// rozmery sieťky, len boolean prítomnosť — §2.5)
+			const sietkaMat = new THREE.MeshStandardMaterial({
+				color: 0x1e293b,
+				transparent: true,
+				opacity: 0.28,
+				side: THREE.DoubleSide,
+				roughness: 0.7,
+				metalness: 0
+			});
+			const mesh = new THREE.Mesh(geometrie.sietka, sietkaMat);
+			scene.add(mesh);
+			produktMeshe.push(mesh);
+		}
+
+		return { materialy, produktMeshe };
+	}
+
+	/** V-mieste prestavba LEN geometrie produktu (napr. "Otvoriť"/rozmer) —
+	 *  renderer/kamera/controls/svetlá/zem/stena/obloha/tieň ZOSTÁVAJÚ. NIKDY
+	 *  nevolá `renderer.forceContextLoss()` (na rozdiel od `uvolniScenu()`) —
+	 *  tá je NEVRATNÁ (webgl kontext sa na tom istom canvase už nikdy nedá
+	 *  znova vytvoriť bez skutočného prehliadačového `webglcontextrestored`),
+	 *  takže volanie plného `uvolniScenu()+inicializuj()` pri KAŽDEJ zmene
+	 *  geometrie spôsobovalo pád na druhý pokus (nájdené pri live vizuálnej
+	 *  kontrole — klik na "Otvoriť" spadol na T0 poster s
+	 *  `WebGLCapabilities`/`getMaxPrecision` TypeError). */
+	function prestavGeometriuProduktu(novyVysledok: VizVysledok) {
+		if (!ziva) return;
+		for (const mesh of ziva.produktMeshe) ziva.scene.remove(mesh);
+		zlikvidujProduktMeshe(ziva.produktMeshe);
+
+		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
+		const { materialy, produktMeshe } = postavProduktMeshe(
+			ziva.THREE,
+			ziva.mergeGeometries,
+			ziva.scene,
+			novyVysledok,
+			ralKod,
+			nastavenia
+		);
+		ziva.materialy = materialy;
+		ziva.produktMeshe = produktMeshe;
+		render();
+	}
+
 	function postavScenu(
 		THREE: ThreeNS,
 		OrbitControls: OrbitControlsCtor,
@@ -233,38 +368,22 @@
 		const tienMat = tien.material as InstanceType<ThreeNS['MeshBasicMaterial']>;
 		if (tienMat.map) disposables.push(tienMat.map);
 
-		// geometria produktu
-		const geometrie = postavGeometrie(vysledok.diely, THREE, mergeGeometries);
-		const materialy: ZivaScena['materialy'] = {};
-		const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat);
-		disposables.push(hlinik);
-		for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
-			const geo = geometrie[rola];
-			if (!geo) continue;
-			materialy[rola] = hlinik;
-			const mesh = new THREE.Mesh(geo, hlinik);
-			scene.add(mesh);
-			disposables.push(geo);
-		}
-		if (geometrie.sklo) {
-			const skloMat = vytvorSkloMaterial(THREE, 8, nastavenia.sklo);
-			scene.add(new THREE.Mesh(geometrie.sklo, skloMat));
-			disposables.push(geometrie.sklo, skloMat);
-		}
-		if (geometrie.sietka) {
-			// sieťkový panel — vizuál, nie katalóg (appka dnes nezbiera samostatné
-			// rozmery sieťky, len boolean prítomnosť — §2.5)
-			const sietkaMat = new THREE.MeshStandardMaterial({
-				color: 0x1e293b,
-				transparent: true,
-				opacity: 0.28,
-				side: THREE.DoubleSide,
-				roughness: 0.7,
-				metalness: 0
-			});
-			scene.add(new THREE.Mesh(geometrie.sietka, sietkaMat));
-			disposables.push(geometrie.sietka, sietkaMat);
-		}
+		// geometria produktu (extrahované do zdieľanej funkcie — volá ju aj
+		// `prestavGeometriuProduktu()` pri "Otvoriť"/zmene rozmerov, bez toho,
+		// aby sa dotkla tohto rendereru/scény/kamery)
+		const { materialy, produktMeshe } = postavProduktMeshe(
+			THREE,
+			mergeGeometries,
+			scene,
+			vysledok,
+			ralKod,
+			nastavenia
+		);
+		// POZOR: `produktMeshe` (geometrie/materiály) sa NEDÁVAJÚ do `disposables`
+		// — tie idú cez `ziva.produktMeshe` + `zlikvidujProduktMeshe()`, lebo
+		// `prestavGeometriuProduktu()` ich priebežne NAHRÁDZA (stará položka v
+		// `disposables` by po prestavbe ukazovala na už zlikvidovaný objekt a
+		// nová by v `disposables` chýbala — pozri `uvolniScenu()`).
 
 		const aspect = (containerEl?.clientWidth ?? 16) / Math.max(1, containerEl?.clientHeight ?? 9);
 		const camera = new THREE.PerspectiveCamera(35, aspect, 0.05, 400);
@@ -299,11 +418,13 @@
 
 		return {
 			THREE,
+			mergeGeometries,
 			renderer,
 			scene,
 			camera,
 			controls,
 			materialy,
+			produktMeshe,
 			disposables,
 			contextLostCount: 0,
 			fitVzdialenost
@@ -313,6 +434,7 @@
 	function uvolniScenu() {
 		if (!ziva) return;
 		ziva.controls.dispose();
+		zlikvidujProduktMeshe(ziva.produktMeshe);
 		disposeVsetko(ziva.disposables);
 		ziva.renderer.forceContextLoss();
 		ziva.renderer.dispose();
@@ -361,6 +483,15 @@
 			ziva = postavScenu(THREE, OrbitControls, RoomEnvironment, mergeGeometries, canvasEl, tier);
 			(globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS =
 				((globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? 0) + 1;
+			// KRITICKÉ: `THREE.WebGLRenderer({canvas, ...})` NEmení canvas
+			// atribúty width/height (zostávajú na HTML default 300×150), kým sa
+			// explicitne nezavolá `renderer.setSize()` — spoliehať sa len na
+			// `ResizeObserver`'s prvý (asynchrónny) callback pretekalo s týmto
+			// async blokom a niekedy prehralo (žiadna ĎALŠIA zmena veľkosti
+			// kontajnera už nikdy nenastala, takže canvas ostal navždy na
+			// 300×150 roztiahnutý cez CSS na celú šírku — extrémna pixelácia +
+			// zdeformovaný aspect pomer, ktorý pôsobil ako orezanie obsahu).
+			pripravVelkost();
 
 			canvasEl.addEventListener(
 				'webglcontextlost',
@@ -391,7 +522,13 @@
 			aktualizujCamDataAtributy();
 			render();
 			pripravene = true;
-		} catch {
+		} catch (e) {
+			// Nikdy nesmie zostať tichá — chyba počas stavby scény (napr.
+			// programátorská chyba, nie skutočná nedostupnosť WebGL) by sa
+			// inak nerozoznateľne maskovala ako "zariadenie WebGL nepodporuje",
+			// čo klame používateľa AJ znemožňuje debugovanie (§2.9 T0 fallback
+			// je pre GENUINE WebGL zlyhanie, nie pre bug v našom kóde).
+			console.error('Vizual3D: chyba pri stavbe scény, prepínam na T0 poster', e);
 			tier = 'none';
 			pripravene = true;
 		}
@@ -438,16 +575,35 @@
 		prekresliRAL();
 	});
 
-	let poslednyVysledok: VizVysledok | undefined;
+	// KRITICKÉ: `zaskleniaSpec()` (volaná v rodičovi, Vizual3DPanel.svelte)
+	// vracia VŽDY nový objekt/pole — aj keď sa zmenil LEN `ralKod` (RAL
+	// ovplyvňuje `poznamky`, teda `$derived(zaskleniaSpec(...))` sa v rodičovi
+	// prepočíta pri KAŽDEJ zmene RAL). Porovnávanie čistou REFERENCIOU by preto
+	// spustilo PLNÝ rebuild geometrie pri každom kliku na RAL čip — presne to,
+	// čo §2.7 zakazuje ("RAL čipy menia iba material.color, ŽIADNA rebuild
+	// geometrie"), a pretekalo by to s ľahkým `prekresliRAL()` efektom vyššie.
+	// Namiesto referencie sa porovnáva ĽAHKÝ ŠTRUKTÚRNY podpis (diely + bbox) —
+	// rebuild nastane LEN keď sa naozaj zmenila geometria (rozmery/otvorenie/
+	// kliny…). Baseline sa počíta HNEĎ (nie až v efekte) — inak by prvá zmena
+	// po mounte (aj čisto RAL) omylom vyzerala ako "zmena", lebo by nemala s
+	// čím sa porovnať.
+	function geometrickyPodpis(v: VizVysledok): string {
+		return JSON.stringify({ bbox: v.bbox, diely: v.diely });
+	}
+
+	// `untrack()` — čítanie počiatočnej hodnoty `vysledok` je TU zámerne
+	// jednorazové (baseline), nie reaktívna závislosť tohto riadku.
+	let posledniPodpis = untrack(() => geometrickyPodpis(vysledok));
 	$effect(() => {
-		if (!ziva || poslednyVysledok === vysledok) return;
-		poslednyVysledok = vysledok;
-		if (poslednyVysledok) {
-			// otvorenie/zatvorenie zmenilo pozície dielov — geometria produktu sa
-			// musí prestavať; zvyšok scény (svetlá/zem/stena/tieň) ostáva
-			uvolniScenu();
-			void inicializuj();
-		}
+		const podpis = geometrickyPodpis(vysledok);
+		if (podpis === posledniPodpis) return; // žiadna geometrická zmena (napr. len RAL)
+		posledniPodpis = podpis;
+		if (!ziva) return; // scéna ešte nie je postavená (napr. tier 'none') — niet čo prestavať
+		// otvorenie/zatvorenie alebo zmena rozmerov zmenili pozície dielov —
+		// LEN geometria produktu sa prestavia (`prestavGeometriuProduktu`,
+		// NIKDY plný `uvolniScenu()+inicializuj()` — ten volá nevratný
+		// `renderer.forceContextLoss()`, viď jeho vlastný komentár).
+		prestavGeometriuProduktu(vysledok);
 	});
 
 	export async function zachytObrazok(sirkaPx?: number, vyskaPx?: number) {
@@ -463,7 +619,8 @@
 	}
 
 	export function nastavPresetVerejne(kluc: PresetKluc) {
-		nastavPreset(kluc);
+		preset = kluc;
+		aplikujPreset(kluc);
 	}
 
 	export function resetVerejne() {
