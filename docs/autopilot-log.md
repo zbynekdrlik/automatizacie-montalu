@@ -2,6 +2,41 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-08-12 — Surový vstup odpisu do odpis_log.detail, krok 0 pre #155 (#156)
+
+- **Issue:** #156 — appka zahadzovala surový submitnutý vstup odpisu po prepočte
+  (len 2/39 reálnych pergol malo zachovaný CAD text); pre plánované budúce generovanie
+  nárezu z rozmerov je každá ďalšia odoslaná zákazka bez toho stratený tréningový pár.
+- **Design comment** (pred prvým commitom):
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/156#issuecomment-5266769720
+- **Commits (dev):** `0234dad` verzia 0.14.34-dev.1 → `45360bd` feat: pergola `cad`+
+  `komboVolby`, zasklenia (jednoposuv+multi) aj bazén `vstupRaw` do `detail` → `97ce423`
+  verzia 0.14.34 → `b03d6fa` fix review nálezy (CAD_DETAIL_MAX=20000 cap +
+  klin/kolajnica/sietka v round-trip testoch).
+- **Review:** fresh-context subagent nad celým diffom `origin/main..dev` — 0 🔴 0 🟡
+  **2 🔵 nálezy** (detail.cad bez stropu; round-trip testy nechávali nested objekty
+  null), oba opravené v `b03d6fa`. Komentár:
+  https://github.com/zbynekdrlik/automatizacie-montalu/issues/156#issuecomment-5266939221
+- **Testy:** `tests/odpis-detail-vstup-raw.test.ts` (6 nových — 1:1 zhoda
+  detail.cad/komboVolby/vstupRaw s parseVstup/parseMultiVstup/parseBazenVstup, vrátane
+  nested klin/kolajnica/sietka a CAD length-cap). `npm test` 950/950, `npm run lint`
+  čisté, `npm run check` 0/0/0.
+- **Gotcha zachytená v teste:** `FormData`/`Request` round-trip v tomto testovom
+  prostredí normalizuje textové polia `\n` → `\r\n` presne ako reálny `<textarea>`
+  multipart POST — fixture pre veľký CAD paste musela použiť `\r\n`, inak sa slice
+  porovnanie rozišlo o 1 znak na riadok. `parseCad()` si `\r` pri parsovaní strihá sám,
+  takže na samotný prepočet to nemá vplyv — len na testové fixture porovnanie.
+- **PR #159** (dev→main), merge `42592d4`. Main CI (test+deploy) zelené.
+- **Post-deploy overenie naživo:** `/health` `{"ok":true,"version":"0.14.34 (42592d4)"}`;
+  Playwright DOM read na `/zasklenia` potvrdil `v0.14.34` viditeľné na stránke; `/odpisy`
+  história načítaná bez console errorov. Money-critical app — živý zápis do Money
+  (MONEY_LIVE=1) sa neskúšal zámerne (dispatch inštrukcia); write-cesta je overená
+  CI e2e v MONEY_LIVE=0 režime.
+- Discord run-card odoslaná pre #156 (`notify --run-card`).
+- Playbook: `.claude/rules/odpis-detail.md` — nové pravidlo (bound VŠETKO čo ide do
+  `odpis_log.detail`, FormData round-trip `\r\n` gotcha pre viacriadkové textové polia
+  v testoch — pozri playbook-review nižšie).
+
 ## 2026-07-31 — Sieťky, display-only polovica (#86 #87 #88 #89 #90)
 
 - **Issues:** #86 (checkbox „so sieťkou" — Robust), #87 (2K→3K upozornenie), #88 (úchyt
