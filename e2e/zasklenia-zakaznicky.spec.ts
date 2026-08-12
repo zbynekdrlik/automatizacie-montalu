@@ -54,6 +54,14 @@ async function textObrazkovehoTestidu(page: Page, testid: string): Promise<strin
 test('zákaznícky list: zachytí PNG z 3D scény, caption nesie rozmery/RAL/poznámku, nula console errorov', async ({
 	page
 }) => {
+	// Táto route stavia CELÚ 3D scénu (three.js + WebGL + PMREM environment)
+	// na skrytom canvase a POTOM z nej zachytáva vysoké rozlíšenie (2400×1620,
+	// so supersamplingom) — výrazne ťažšia práca než bežná stránka. Live CI
+	// beh (GitHub Actions runner, softvérový WebGL) potreboval viac než
+	// globálny `timeout: 30000` z playwright.config.ts (188/190 ostatných
+	// testov v tom istom behu prešlo bez problému — toto je timing tejto
+	// KONKRÉTNEJ route, nie všeobecná CI pomalosť).
+	test.setTimeout(60000);
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnAOtvorZakaznickyList(page);
@@ -95,6 +103,8 @@ test('zákaznícky list bez predchádzajúceho vykreslenia → jasná správa, �
 });
 
 test('žiadne "odoslať" (Money) tlačidlo na zákazníckom tlačovom liste', async ({ page }) => {
+	// rovnaký dôvod ako vyššie — táto route stavia + zachytáva celú 3D scénu
+	test.setTimeout(60000);
 	await loginAs(page);
 	await vyplnAOtvorZakaznickyList(page);
 	await pockajNaObrazok(page);
