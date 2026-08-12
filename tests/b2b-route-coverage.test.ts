@@ -29,6 +29,14 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 //   (len `/zasklenia/nastavenia` je), takže je pre b2b dostupná AUTOMATICKY. Tu v
 //   ALLOWED je len VEDOMÉ potvrdenie (drift guard by inak zlyhal), nie obídenie.
 //   Display-only rovnako ako /pergola/navrh — viď popisný test nižšie.
+//
+// #139: /bazen/navrh (zákaznícky NÁVRHOVÝ výkres pre bazén) NIE JE v ALLOWED —
+// zadanie #139 explicitne hovorí "pre b2b stránka prístupná nebude", na rozdiel
+// od pergoly/zaskleniam. Žije pod existujúcim /bazen prefixom v
+// B2B_FORBIDDEN_PREFIXES, takže ju denylist blokuje AUTOMATICKY bez akejkoľvek
+// zmeny b2b-access.ts — ostáva mimo ALLOWED zámerne, aby ju `it.each` nižšie
+// pokryl generickým "presmerovaná preč" testom (plus explicitný popisný test
+// nižšie pre čitateľnosť).
 const ALLOWED = new Set([
 	'/zasklenia',
 	'/sietka',
@@ -70,6 +78,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 			expect.arrayContaining([
 				'/',
 				'/bazen',
+				'/bazen/navrh',
 				'/odpisy',
 				'/pergola',
 				'/pergola/navrh',
@@ -112,6 +121,15 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	it('#162: /zasklenia/navrh (návrhový výkres pre zasklenia) nie je presmerovaná', () => {
 		expect(b2bRedirectTarget('/zasklenia/navrh')).toBeNull();
 	});
+
+	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
+	// zadanie #139 ho explicitne vylučuje z b2b ("pre b2b stránka prístupná
+	// nebude"). Generický it.each vyššie to už pokrýva (nie je v ALLOWED), tento
+	// test je len čitateľné explicitné potvrdenie — presne zrkadlový vzor k
+	// riadkom vyššie pre /pergola/navrh a /zasklenia/navrh.
+	it('#139: /bazen/navrh (návrhový výkres pre bazén, NEPRÍSTUPNÝ pre b2b) JE presmerovaná preč', () => {
+		expect(b2bRedirectTarget('/bazen/navrh')).toBe('/zasklenia');
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k
@@ -131,6 +149,15 @@ describe('/pergola/navrh — žiadna cesta k Money odpisu (#144)', () => {
 describe('/zasklenia/navrh — žiadna cesta k Money odpisu (#162)', () => {
 	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/zasklenia/navrh/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
+	});
+});
+
+// #139, rovnaká disciplína — /bazen/navrh nemá ŽIADNU zápisovú akciu vôbec
+// (display-only), aj keď je pre b2b navyše ÚPLNE zablokovaná (viď test vyššie).
+describe('/bazen/navrh — žiadna cesta k Money odpisu (#139)', () => {
+	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/bazen/navrh/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
 	});
 });

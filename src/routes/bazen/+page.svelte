@@ -72,6 +72,10 @@
 			Zadaj parametre krytu, rozpis si skontroluješ a upravíš pred odoslaním.
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
+		<p class="sub">
+			📐 Potrebuješ zákaznícky návrhový výkres namiesto Money odpisu?
+			<a href={resolve('/bazen/navrh')} data-testid="link-navrh">→ Návrhový výkres</a>
+		</p>
 	</div>
 
 	{#if form?.error}
