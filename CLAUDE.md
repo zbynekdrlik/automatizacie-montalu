@@ -89,6 +89,10 @@ Load the matching skill BEFORE working on that area (don't re-derive):
   `.claude/rules/timestamps.md` on its `paths:` (Docker nemá TZ → UTC default gotcha)
 - `.github/workflows/*.yml` (CI/deploy pipeline) → auto-loads `.claude/rules/ci.md`
   on its `paths:` (zombie run recovery, `workflow_dispatch` retry, deploy-landed check)
+- `src/lib/vizual/**`, `src/lib/components/vizual/**` (three.js 3D náhľad) →
+  auto-loads `.claude/rules/vizual3d.md` on its `paths:` (WebGL context-lock,
+  `forceContextLoss` irreversibility, `preserveDrawingBuffer` test gotcha,
+  SVG `<foreignObject>` Playwright locator limit)
 - `src/routes/zasklenia/+page.svelte` (smart-default checkbox, reštart-efekt poradie)
   → auto-loads `.claude/rules/zasklenia-form-reactivity.md` on its `paths:`
 - `src/lib/vykres/**`, `src/lib/components/vykres/**` (kóta helper, výkresový
