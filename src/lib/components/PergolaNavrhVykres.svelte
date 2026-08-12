@@ -53,16 +53,23 @@
 	// `ciarovaFarba`, ktorá stmaví svetlé odtiene). Kóty/poznámky/raster/pečiatka
 	// sa nemenia.
 	//
-	// Vizuálna iterácia (render + zoom screenshot 9006 STRIEBORNÁ) odhalila:
-	// existujúci CIERNA `stroke` na stĺpoch/streche NIE JE vždy len "tenký obrys" —
-	// stĺpy sa pri bežnej mierke kreslia UŽŠIE než pôvodná hrúbka obrysu
-	// (STRUKTURA_STROKE=1,8mm, napr. reálny rect width≈1,65mm), takže stred-zarovnaný
-	// SVG stroke prekryje CELÚ fill plochu a stĺp vyjde vždy CIERNA bez ohľadu na
-	// zvolený RAL. Preto vo farebnom režime obrys FILLED tvarov (streška, stĺpy,
-	// predný stĺp v reze) používa tenšiu STRUKTURA_STROKE_VEDLAJSIA (0,4mm — presne
-	// zodpovedá zadaniu "tenký tmavý obrys"), nie hrubú STRUKTURA_STROKE — fill sa
-	// tak reálne uvidí. Technický režim je NEZMENENÝ (stroke-width tam ostáva
-	// pôvodné STRUKTURA_STROKE, presne ako pred #150).
+	// #153 (šéf: "ostrejšie kontúry, pôsobí to rozmazane"): #150 pôvodne opravilo
+	// tento "stred-zarovnaný SVG stroke prekryje CELÚ fill plochu" jav LEN pre
+	// farebný režim (tenšia STRUKTURA_STROKE_VEDLAJSIA). Technický režim ostal na
+	// starej hrubej STRUKTURA_STROKE=1,8mm — pri vzorovej mierke OP260032 (≈0,0165)
+	// je stĺp (STLP_HRUBKA_VIZ_MM=100mm) nakreslený ≈1,65mm ŠIRŠÍ obrys ho celý
+	// zhltne bez ohľadu na (správne nastavenú) svetlú fill — presne "hrubé vyplnené
+	// pásy" zo šéfovho porovnania s Solid Edge vzorom. Riešenie (#153, design
+	// komentár na issue): ZJEDNOTIŤ oba režimy na JEDNU prekalibrovanú hrúbku
+	// (STRUKTURA_STROKE=1,2mm nižšie) namiesto ďalšieho per-režim vetvenia — 1,2mm
+	// necháva viditeľnú svetlú výplň aj na najužšom profile (stĺp ≈1,6mm) A ostáva
+	// ~1,7× hrubšia než hlavná kótová čiara (Kota.svelte 0.7), teda drží hierarchiu
+	// "konštrukcia hrubšia než kóty ~2:1". `pn-section-strecha`/`pn-section-predok`
+	// mali v technickom režime navyše priamo `fill=CIERNA` (skutočný plný čierny
+	// tvar, nie len ilúzia zhltnutej výplne) — teraz majú rovnakú svetlú fill ako
+	// elevation (žiadny samostatný "tmavý obrys pre svetlé RAL" prípad netreba
+	// riešiť zvlášť — filled tvary majú CIERNA stroke VŽDY, bez ohľadu na jas RAL,
+	// to je presne "existujúci tmavý obrys" pravidlo, ktoré #153 žiada znovupoužiť).
 	let farebny = $derived(vstup.rezimVykresu === 'farebny');
 	let farba = $derived(farbaKonstrukcie(vstup.ralKod));
 	let iznKonstrukcia = $derived(ciarovaFarba(farba));
@@ -98,10 +105,14 @@
 	const MODRA = '#1d4ed8';
 	const CERVENA = '#dc2626';
 
-	// #146 bod 2/3: hierarchia hrúbok čiar — konštrukčné obrysy (stĺpy, nosníky,
-	// hlavné hrany izometrie) sú NAJHRUBŠIE (STRUKTURA_STROKE), kóty/odkazové čiary
-	// sú tenšie (Kota.svelte, 0.7/0.4), raster hárku najtenší (VykresovyHarok, 0.2-0.5).
-	const STRUKTURA_STROKE = 1.8;
+	// #146 bod 2/3, prekalibrované #153: hierarchia hrúbok čiar — konštrukčné obrysy
+	// (stĺpy, nosníky, hlavné hrany izometrie) sú NAJHRUBŠIE (STRUKTURA_STROKE), kóty/
+	// odkazové čiary sú tenšie (Kota.svelte, 0.7/0.4), raster hárku najtenší
+	// (VykresovyHarok, 0.2-0.5). STRUKTURA_STROKE znížená 1,8→1,2mm (#153) a používaná
+	// JEDNOTNE v oboch režimoch (technický aj farebný) — dôvod a výpočet v komentári
+	// vyššie pri `farebny`. STRUKTURA_STROKE_VEDLAJSIA ostáva len na svoj pôvodný
+	// účel: tenšie VNÚTORNÉ krokvy izometrie oproti hlavným hranám (#146 bod 7).
+	const STRUKTURA_STROKE = 1.2;
 	const STRUKTURA_STROKE_VEDLAJSIA = 0.4;
 	// previs strechy (eave) oproti vonkajšej hrane stĺpa/steny [mm] — len vizuálne,
 	// rovnaká disciplína ako STLP_HRUBKA_VIZ_MM (nevstupuje do žiadneho výpočtu)
@@ -294,7 +305,10 @@
 		font-weight="600">PREDNÝ POHĽAD</text
 	>
 	<!-- strešná doska (nosník) v reálnej hrúbke (NOSNIK_HRUBKA_MM), s previsom cez
-	     krajné stĺpy (#146 bod 2) + naznačenou výplňou (deliace čiarky panelov) -->
+	     krajné stĺpy (#146 bod 2) + naznačenou výplňou (deliace čiarky panelov).
+	     #153: obrysový profil (svetlá fill + jednotná STRUKTURA_STROKE v oboch
+	     režimoch) + shape-rendering crispEdges — tento rect je osovo zarovnaný
+	     (bez sklonu), takže crisp hrany nič nezúbkujú. -->
 	<rect
 		x={X(0) - previs}
 		y={topY - roofH}
@@ -302,7 +316,8 @@
 		height={roofH}
 		fill={farebny ? farba.hex : '#eff6ff'}
 		stroke={CIERNA}
-		stroke-width={farebny ? STRUKTURA_STROKE_VEDLAJSIA : STRUKTURA_STROKE}
+		stroke-width={STRUKTURA_STROKE}
+		shape-rendering="crispEdges"
 		data-testid="pn-elevation-strecha"
 	/>
 	<g stroke={CIERNA} stroke-width="0.3">
@@ -311,7 +326,8 @@
 			<line x1={x} y1={topY - roofH} x2={x} y2={topY} />
 		{/each}
 	</g>
-	<!-- stĺpy — reálna hrúbka v mierke (STLP_HRUBKA_VIZ_MM), nie jednočiarové -->
+	<!-- stĺpy — reálna hrúbka v mierke (STLP_HRUBKA_VIZ_MM), nie jednočiarové.
+	     #153: obrysový profil + crispEdges (osovo zarovnaný rect). -->
 	{#each g.postX as px, i (i)}
 		<rect
 			x={X(px) - postHalfW}
@@ -320,7 +336,8 @@
 			height={baseY - topY}
 			fill={farebny ? farba.hex : '#fff'}
 			stroke={CIERNA}
-			stroke-width={farebny ? STRUKTURA_STROKE_VEDLAJSIA : STRUKTURA_STROKE}
+			stroke-width={STRUKTURA_STROKE}
+			shape-rendering="crispEdges"
 			data-testid="pn-elevation-post-{i}"
 		/>
 	{/each}
@@ -417,25 +434,31 @@
 	<!-- strešný profil (nosník) s reálnou hrúbkou (NOSNIK_HRUBKA_MM) a previsom cez
 	     predný stĺp (#146 bod 2: "profil strechy so spádom ako pás, previs") — jeden
 	     vyplnený tvar, jednoduchý zvislý odsad hrúbky (dostatočne presné pri malom
-	     sklone ~pár stupňov) -->
+	     sklone ~pár stupňov). #153: obrysový profil — svetlá fill (nie CIERNA) +
+	     jednotná STRUKTURA_STROKE v oboch režimoch, rovnaký kontrakt ako elevation
+	     strecha vyššie (rovnaký fyzický prvok, iný pohľad). ŽIADNE crispEdges — táto
+	     cesta je šikmá (sklon strechy), crisp hrany by na diagonále zúbkovali. -->
 	<path
 		d={`M ${xWall} ${yWallTop} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${yWallTop + roofH} Z`}
-		fill={farebny ? farba.hex : CIERNA}
+		fill={farebny ? farba.hex : '#eff6ff'}
 		stroke={CIERNA}
-		stroke-width={STRUKTURA_STROKE_VEDLAJSIA}
+		stroke-width={STRUKTURA_STROKE}
 		data-testid="pn-section-strecha"
 	/>
 	<!-- predný stĺp — reálna hrúbka v mierke (STLP_HRUBKA_VIZ_MM), vyplnený (CAD
 	     konvencia pre koncový/rezový pohľad na profil) — spolu so strechou vyššie
-	     tvorí "L" presne ako vo vzore -->
+	     tvorí "L" presne ako vo vzore. #153: obrysový profil — svetlá fill + čierny
+	     obrys VŽDY (predtým v technickom režime `fill=CIERNA, stroke=none` — plný
+	     čierny silueta, presne nahlásený bug) + crispEdges (osovo zarovnaný rect). -->
 	<rect
 		x={xFront - postHalfW}
 		y={yFrontTop + roofH}
 		width={postHalfW * 2}
 		height={baseY - (yFrontTop + roofH)}
-		fill={farebny ? farba.hex : CIERNA}
-		stroke={farebny ? CIERNA : 'none'}
-		stroke-width={farebny ? STRUKTURA_STROKE_VEDLAJSIA : 0}
+		fill={farebny ? farba.hex : '#fff'}
+		stroke={CIERNA}
+		stroke-width={STRUKTURA_STROKE}
+		shape-rendering="crispEdges"
 		data-testid="pn-section-predok"
 	/>
 	<!-- #146 bod 9: uhlová kóta ako malý oblúk S radius-čiarami k vrcholu (CAD

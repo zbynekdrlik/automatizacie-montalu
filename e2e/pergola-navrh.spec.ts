@@ -327,7 +327,7 @@ test('regresia #145: nadpisy PREDNÝ POHĽAD / REZ A nekolidujú s hornou rastro
 const attr = (page: Page, testid: string, name: string) =>
 	page.getByTestId(testid).getAttribute(name);
 
-test('#150: technický režim (default) — konštrukcia nezmenená oproti pôvodným farbám', async ({
+test('#150/#153: technický režim (default) — konštrukcia svetlá s čiernym obrysom (nezmenené farby, #153 zjednotilo strecha/predok v REZ A na rovnaký obrysový kontrakt)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -340,12 +340,84 @@ test('#150: technický režim (default) — konštrukcia nezmenená oproti pôvo
 
 	expect(await attr(page, 'pn-elevation-strecha', 'fill')).toBe('#eff6ff');
 	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#fff');
-	expect(await attr(page, 'pn-section-strecha', 'fill')).toBe('#0f172a');
-	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#0f172a');
-	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('none');
+	// #153: predtým '#0f172a' (plný čierny silueta) — teraz rovnaká svetlá fill ako
+	// elevation (rovnaký fyzický prvok, iný pohľad) + VŽDY viditeľný čierny obrys
+	expect(await attr(page, 'pn-section-strecha', 'fill')).toBe('#eff6ff');
+	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#fff');
+	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('#0f172a');
 	expect(await attr(page, 'pn-iso-hrany', 'stroke')).toBe('#0f172a');
 
 	expect(consoleMsgs).toEqual([]);
+});
+
+// #153 (šéf: "ostrejšie kontúry, pôsobí to rozmazane") — root cause bola PRÁVE táto
+// dvojica javov: (1) fill=CIERNA priamo na strecha/predok v REZ A (plný čierny tvar),
+// (2) stred-zarovnaný stroke ŠIRŠÍ než reálna nakreslená hrúbka profilu (stĺp
+// STLP_HRUBKA_VIZ_MM=100mm pri vzorovej mierke ≈1,6-1,65mm), ktorý zhltol aj správne
+// nastavenú svetlú fill. Tento test priamo overuje OBRYSOVÝ kontrakt — každý
+// konštrukčný tvar musí mať stroke-width MENŠÍ než jeho rozmer (viditeľná svetlá
+// výplň dnu = "obrys", nie "plný pás"), čierny obrys a hrúbku viditeľne HRUBŠIU než
+// hlavná kótová čiara (hierarchia "konštrukcia > kóty ~2:1" — #146/#153).
+test('#153: konštrukčné prvky sú OBRYSOVÉ profily (svetlá výplň + čierny obrys), nie plné pásy — technický režim', async ({
+	page
+}) => {
+	await loginAs(page);
+	await vyplnFormular(page);
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// elevation — strecha (rect, previs zarátaný do width) + prvý stĺp
+	for (const testid of ['pn-elevation-strecha', 'pn-elevation-post-0']) {
+		const el = page.getByTestId(testid);
+		const w = parseFloat((await el.getAttribute('width')) ?? '0');
+		const h = parseFloat((await el.getAttribute('height')) ?? '0');
+		const sw = parseFloat((await el.getAttribute('stroke-width')) ?? '0');
+		const menšiRozmer = Math.min(w, h);
+		expect(menšiRozmer, `${testid}: menší rozmer tvaru`).toBeGreaterThan(0);
+		expect(
+			sw,
+			`${testid}: stroke-width (${sw}) musí byť menší než rozmer tvaru (${menšiRozmer}), inak fill zmizne (obrys namiesto plného pásu)`
+		).toBeLessThan(menšiRozmer);
+		expect(await el.getAttribute('shape-rendering'), `${testid}: crisp osovo zarovnaný rect`).toBe(
+			'crispEdges'
+		);
+	}
+
+	// section (REZ A) — predný stĺp je rovnako osovo zarovnaný rect
+	{
+		const el = page.getByTestId('pn-section-predok');
+		const w = parseFloat((await el.getAttribute('width')) ?? '0');
+		const h = parseFloat((await el.getAttribute('height')) ?? '0');
+		const sw = parseFloat((await el.getAttribute('stroke-width')) ?? '0');
+		expect(sw).toBeLessThan(Math.min(w, h));
+		expect(await el.getAttribute('shape-rendering')).toBe('crispEdges');
+	}
+
+	// section — strešný profil je ŠIKMÁ cesta (podľa sklonu strechy) — NESMIE mať
+	// crispEdges (zúbkovala by sa diagonála), ale MUSÍ mať rovnaký obrysový kontrakt
+	{
+		const el = page.getByTestId('pn-section-strecha');
+		expect(await el.getAttribute('fill')).not.toBe('#0f172a');
+		expect(await el.getAttribute('stroke')).toBe('#0f172a');
+		expect(await el.getAttribute('shape-rendering')).not.toBe('crispEdges');
+	}
+
+	// izometrické hrany (diagonálne z princípu) tiež bez crispEdges
+	expect(await attr(page, 'pn-iso-hrany', 'shape-rendering')).not.toBe('crispEdges');
+
+	// hierarchia hrúbok: hlavný konštrukčný obrys je viditeľne HRUBŠÍ než hlavná
+	// kótová čiara (Kota.svelte stroke-width 0.7 na g[data-testid="kota"])
+	const strukturaSw = parseFloat(
+		(await page.getByTestId('pn-elevation-post-0').getAttribute('stroke-width')) ?? '0'
+	);
+	const kotaSw = parseFloat(
+		(await page.getByTestId('kota').first().getAttribute('stroke-width')) ?? '0'
+	);
+	expect(kotaSw).toBeGreaterThan(0);
+	expect(
+		strukturaSw / kotaSw,
+		`pomer konštrukcia/kóty (${strukturaSw}/${kotaSw}) musí byť viditeľne > 1 (hierarchia #146/#153)`
+	).toBeGreaterThan(1.5);
 });
 
 test('#150: farebný režim + známy RAL (7016 ANTRACIT) — konštrukcia sa vyfarbí, kóty/poznámky ostávajú', async ({
@@ -398,10 +470,12 @@ test('#150: svetlý RAL (9006 STRIEBORNÁ) — filled prvky majú svetlú výpl�
 	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#A5A8A6');
 	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('#0f172a');
 
-	// regresia (nález pri vizuálnej iterácii #150): stĺpy sú pri bežnej mierke UŽŠIE
-	// než pôvodná hrubá STRUKTURA_STROKE (1,8mm) — stred-zarovnaný SVG stroke by
-	// prekryl CELÚ fill plochu a stĺp by vyšiel vždy čierny bez ohľadu na RAL. Vo
-	// farebnom režime MUSÍ byť stroke-width < šírka tvaru, inak je fill neviditeľný.
+	// regresia (nález pri vizuálnej iterácii #150, prekalibrované #153): stĺpy sú
+	// pri bežnej mierke UŽŠIE než pôvodná hrubá STRUKTURA_STROKE (1,8mm, teraz
+	// 1,2mm) — stred-zarovnaný SVG stroke by mohol prekryť CELÚ fill plochu a
+	// stĺp by vyšiel vždy čierny bez ohľadu na RAL. Vo farebnom režime MUSÍ byť
+	// stroke-width < šírka tvaru, inak je fill neviditeľný (rovnaký kontrakt teraz
+	// platí aj v technickom režime — priamy test #153 nižšie).
 	for (const testid of ['pn-elevation-post-0', 'pn-section-predok']) {
 		const w = parseFloat((await attr(page, testid, 'width')) ?? '0');
 		const sw = parseFloat((await attr(page, testid, 'stroke-width')) ?? '0');
@@ -498,5 +572,19 @@ test('#150: tlač zachováva farbu (print-color-adjust: exact na výkresovom há
 		);
 	});
 	expect(hodnota.trim()).toBe('exact');
+
+	// #153 bod 3: obrysové profily (crispEdges, tenšia STRUKTURA_STROKE) nesmú
+	// zaviesť žiadny raster do tlačového/PDF výstupu — celý hárok ostáva čisto
+	// vektorový <svg> (rect/path/line/text), žiadny <image>/<canvas>, aj pod
+	// print médiom (shape-rendering je len vykresľovací hint, nie rasterizácia).
+	const vektorovyStav = await page.getByTestId('vykresovy-harok').evaluate((el) => ({
+		raster: el.querySelectorAll('image, canvas, foreignObject').length,
+		strechaTag: el.querySelector('[data-testid="pn-section-strecha"]')?.tagName,
+		predokTag: el.querySelector('[data-testid="pn-section-predok"]')?.tagName
+	}));
+	expect(vektorovyStav.raster).toBe(0);
+	expect(vektorovyStav.strechaTag).toBe('path');
+	expect(vektorovyStav.predokTag).toBe('rect');
+
 	await page.emulateMedia({ media: 'screen' });
 });
