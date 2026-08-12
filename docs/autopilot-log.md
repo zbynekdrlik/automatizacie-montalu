@@ -800,3 +800,43 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - Discord run-card odoslaná pre #162 (`notify --run-card`).
 - Playbook: `.claude/rules/vykres.md` — nové poznámky (RAL logika žije v
   `$lib/vykres/ral.ts`, outer-`<g>`-vs-inner-element `data-testid` kolízia).
+
+## #139 — Bazén: zákaznícky návrhový výkres, fáza 1 (2026-08-12)
+
+- Nová route `/bazen/navrh`, architektúra 1:1 podľa `/pergola/navrh`
+  (#138/#144/#150/#153) a `/zasklenia/navrh` (#162): `src/lib/bazen-navrh.ts`
+  (čistá geometria — `variantaZSekcii`, `presahKolajniska`, `sekcieVysky`,
+  `sekciePozicie`, `posuvPopis`, `dverePopis`, `predvyplnenyNazov`),
+  `src/lib/server/bazen-navrh-vstup.ts`, `src/lib/components/
+  BazenNavrhVykres.svelte` (bokorys/pôdorys/textový popis/rez sekciou
+  rezervovaný), `src/routes/bazen/navrh/+page.{server.ts,svelte}`.
+  `VykresovyHarok.svelte` dostal novú opt-in `podpisovaLista` prop (default
+  `false`) + nový `PodpisovaLista.svelte` komponent. Na rozdiel od pergoly/
+  zasklenia je `/bazen/navrh` pre b2b ÚPLNE zablokovaná (zadanie ticketu) —
+  žiadna výnimka v `b2b-access.ts`, blokuje ju existujúci `/bazen` prefix.
+  Priečny rez sekciou (VIEW A) je zámerne mimo fázy 1 — tvar oblúka
+  overiteľne nesedí na kruh ani elipsu, tracked ako samostatný issue.
+  Design komentár: issuecomment-5269395174.
+- Testy: `tests/bazen-navrh.test.ts`, `tests/bazen-navrh-vstup.test.ts`,
+  `tests/bazen-navrh-money-safety.test.ts` (68 nových), `tests/
+  b2b-route-coverage.test.ts` rozšírený, `e2e/bazen-navrh.spec.ts`
+  (8 testov, vektor OP260055). Commity `9190750` (verzia)/`18bd93f`
+  (feature).
+- Deep review (fresh-context `general-purpose` subagent): 3 🔴 3 🟡 2 🔵 —
+  všetky opravené v `7a28d29`: degenerovaná (nulovej dĺžky) presah-kóta pri
+  `dlzkaKolajiska === zatvorenaDlzka` (validácia `<` → `<=`), výškové
+  popisky kót čítali priamo z `vstup.vyskaMax/vyskaMin` namiesto zo
+  skutočne nakreslenej `vysky[]` geometrie (nesedelo pri 1 sekcii),
+  `obrysStroke()` guard chýbal na dverovej sekcii, `sirkaSekcieOverride`
+  neposúval skutočnú pozíciu hranice (len popisok), textový popis mohol
+  pretiecť pod pečiatku (pridaný `<clipPath>`). Reviewed komentár:
+  issuecomment-5270007279.
+- PR #169 (dev→main), verzia 0.15.4 (`a400c86`). Lokálne overené pred
+  pushom: 1050 unit + 177 e2e (celý balík, potvrdzuje zdieľanú
+  `VykresovyHarok.svelte` zmenu ako bezpečnú pre pergolu/zasklenia).
+- Playbook: `.claude/rules/vykres.md` — nové poznámky (kóta popisok MUSÍ
+  čítať z nakreslenej geometrie nie priamo z formulárových polí; ručný
+  override musí posunúť aj pozíciu, nie len popisok; text-blok vedľa
+  pečiatky potrebuje `<clipPath>`, zúženie regiónu samo nič nevynucuje;
+  `podpisovaLista` vzor pre ďalší hárkový prvok) + rozšírená `paths:`
+  frontmatter o nové bazén súbory.
