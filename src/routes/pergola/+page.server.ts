@@ -153,7 +153,16 @@ export const actions: Actions = {
 			popis: (vstup.op + ' ' + vstup.zakaznik).trim(),
 			// Money rozpis: VŠETKÝCH 25 katalógových riadkov (aj nulové) — ako n8n
 			polozky: v!.polozky,
-			detail: { riadkov: v!.nonzero.length, tyce: v!.totalBars, kombinacie: v!.kombinacie.length }
+			detail: {
+				riadkov: v!.nonzero.length,
+				tyce: v!.totalBars,
+				kombinacie: v!.kombinacie.length,
+				// #156 (krok 0 pre #155): surový vložený CAD text 1:1 + skutočne zvolené
+				// kombinácie tyčí (nielen počet) — bez toho sa dá dohľadať len prepočet,
+				// nie vstup, z ktorého vznikol
+				cad: vstup.cad,
+				komboVolby: v!.kombinacie
+			}
 		};
 
 		try {

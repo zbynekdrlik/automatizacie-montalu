@@ -83,7 +83,11 @@ function jobFor(
 			// bez nej by „Použiť znova" prebralo zákazku s iným odpisom, než mala
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
 			// výška vŕtania zámku — display-only (Deluxe), ale patrí k zadaniu
-			vrtanieZamku: vstup.vrtanieZamku
+			vrtanieZamku: vstup.vrtanieZamku,
+			// #156 (krok 0 pre #155): celý naparsovaný vstup 1:1, VEDĽA polí vyššie —
+			// tie ostávajú (znova.ts z nich odvodzuje predvyplnenie formulára), toto
+			// je surová záloha nezávislá od toho, čo si niekto pamätá zrkadliť
+			vstupRaw: vstup
 		}
 	};
 }
@@ -251,7 +255,9 @@ function jobForMulti(
 				klin: vstup.posuvy[i]?.klin ?? null,
 				kolajnica: vstup.posuvy[i]?.kolajnica ?? null,
 				sietka: vstup.posuvy[i]?.sietka ?? null
-			}))
+			})),
+			// #156 (krok 0 pre #155): celý naparsovaný MultiVstup 1:1, VEDĽA polí vyššie
+			vstupRaw: vstup
 		}
 	};
 }
