@@ -688,8 +688,8 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - **Commits (dev):** `093605a` verzia 0.14.32-dev.1 → `25155ba` zjednotená
   STRUKTURA_STROKE=1,2mm (oba režimy) + crispEdges → `bc2c125` [red] +
   `0b26aea` [green] review nález (obrysStroke — dynamický clamp na
-  polovicu rozmeru tvaru) → `<tento commit>` verzia 0.14.32 + autopilot
-  log + playbook.
+  polovicu rozmeru tvaru) → `1fa8891` verzia 0.14.32 + autopilot log +
+  playbook (proces-nález nižšie) → `<tento commit>` oprava na 0.14.33.
 - **Review:** fresh-context subagent nad celým diffom `origin/main..dev` —
   **1 🔴 nález** (pevná STRUKTURA_STROKE=1,2mm sa pri extrémnych, stále
   validných rozmeroch vstupu (hĺbka blízko HLBKA_MAX) opäť zhltne — NOVÁ
@@ -701,6 +701,17 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   nového `#153` obrysového spot-checku + nového extrémne-rozmerového
   regresného testu).
 - **PR #157** (dev→main), merge `4cfcb59`. Main CI (test+deploy) zelené.
+  **Proces-nález (vlastný, nie review):** PR #157 sa zmergol s dev ešte na
+  `0.14.32-dev.1` — vynechaný krok „bump na čistú verziu TESNE PRED PR"
+  (CLAUDE.md „## Version") — main tak krátko niesol `-dev` string (známa
+  trieda bugu #1/#101/#98). Náprava (`1fa8891`) skúsila vrátiť dev na
+  čistú `0.14.32`, ale `version-check`'s `sort -V` porovnanie NIE JE
+  semver-aware — pri ROVNAKOM číselnom prefixe radí `-dev.N` variant
+  VYŠŠIE než čistý (`sort -V` na `["0.14.32-dev.1","0.14.32"]` vráti
+  `-dev.1` posledný = "najvyšší"), takže `main=0.14.32-dev.1` vyšlo
+  "vyššie" než `dev=0.14.32` a CI `version-check` spadol. Skutočná náprava:
+  bump na ĎALŠIE číslo (`0.14.33`), nie späť na rovnaké — zdokumentované v
+  `.claude/rules/ci.md`.
 - **Post-deploy overenie naživo** (Playwright MCP, `e2e` účet cez lokálny
   preview pred pushom + `/health` po deploji): technický aj farebný RAL
   7016 režim vizuálne overené screenshotmi — profily majú svetlý interiér
@@ -713,4 +724,5 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   `.claude/skills/testing/SKILL.md` — nová poznámka (manuálny
   `npm run preview` pre živý MCP screenshot potrebuje rovnaké env
   premenné ako `playwright.config.ts`'s `webServer`, a musí bežať cez
-  `run_in_background: true`, nie `(cmd &)` subshell).
+  `run_in_background: true`, nie `(cmd &)` subshell); `.claude/rules/ci.md`
+  — nová poznámka (`sort -V` `-dev.N` vs. čistá verzia kolízia + náprava).
