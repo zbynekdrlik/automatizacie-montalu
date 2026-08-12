@@ -968,6 +968,10 @@
 			{#if !isB2B}Odpis sa do Money odošle až po tvojom potvrdení.{/if}
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
+		<p class="sub">
+			📐 Potrebuješ zákaznícky návrhový výkres namiesto nárezového plánu?
+			<a href={resolve('/zasklenia/navrh')} data-testid="link-navrh">→ Návrhový výkres</a>
+		</p>
 	</div>
 
 	{#if data.znova && !form}
