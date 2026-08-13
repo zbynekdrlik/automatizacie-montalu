@@ -663,7 +663,11 @@ function migrate() {
 		// Naplní ju `maybeImportSnapshot()` z externého read-only Money exportu
 		// (`scripts/ceny-snapshot.py`) — appka do Money nič nezapisuje. Chýbajúca cena
 		// je NULL (nikdy 0 — Money má reálne kódy bez ceny, viď design komentár na
-		// tikete), `sklad` je vždy číslo (0 = reálne vypredané, nie neznáme).
+		// tikete). `sklad` je REAL nullable: 0/záporné = REÁLNA hodnota z Money
+		// (vypredané / rezervované nad rámec skladu), NULL = Money pre tento kód
+		// vôbec nemá skladovú kartu (#154 review nález — `S5_...` LEFT JOIN bez
+		// zhody sa predtým v producer skripte kolabovalo na 0, čím sa "neznáme"
+		// nerozoznateľne miešalo so skutočnou nulou).
 		//
 		// `material_prices_meta` — JEDEN riadok (id=1), drží mtime naposledy
 		// naimportovaného súboru (aby import bol lacný no-op, keď sa súbor nezmenil)
@@ -682,13 +686,13 @@ function migrate() {
 				nakup_posledna_faktura REAL,
 				predaj_vo REAL,
 				mena TEXT NOT NULL DEFAULT 'EUR',
-				sklad REAL NOT NULL DEFAULT 0,
+				sklad REAL,
 				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 			);
 			CREATE TABLE material_prices_meta (
 				id INTEGER PRIMARY KEY CHECK (id = 1),
 				snapshot_generated_at TEXT,
-				snapshot_file_mtime_ms INTEGER,
+				snapshot_file_mtime_ms REAL,
 				imported_at TEXT,
 				row_count INTEGER NOT NULL DEFAULT 0,
 				rejected_count INTEGER NOT NULL DEFAULT 0

@@ -175,6 +175,29 @@ describe('maybeImportSnapshot + getSnapshotMeta', () => {
 		).toBeFalsy();
 	});
 
+	it('sklad `null` (Money pre kód nemá skladovú kartu) sa PRIJME — neznáma dostupnosť, nie zamietnutý riadok, nie 0 (#154 review nález)', async () => {
+		await tick();
+		writeSnapshot('2026-08-15T06:00:00Z', [
+			{ kod: 'ZASP-SKLAD-NULL', nakupCennik: 5, sklad: null, mena: 'EUR' },
+			{ kod: 'ZASP-SKLAD-CHYBA', nakupCennik: 5, mena: 'EUR' } // sklad úplne chýba = to isté ako null
+		]);
+		const r = maybeImportSnapshot();
+		expect(r).toMatchObject({ imported: true, rowCount: 2, rejectedCount: 0 });
+		expect(
+			db.prepare("SELECT sklad FROM material_prices WHERE kod = 'ZASP-SKLAD-NULL'").get()
+		).toEqual({ sklad: null });
+		expect(
+			db.prepare("SELECT sklad FROM material_prices WHERE kod = 'ZASP-SKLAD-CHYBA'").get()
+		).toEqual({ sklad: null });
+		// a odlišuje sa od SKUTOČNEJ nuly (vypredané) — nezlievajú sa do jednej hodnoty
+		const r2 = enrichPolozky([
+			{ kod: 'ZASP-SKLAD-NULL', nazov: 'X', qty: 1, mj: 'm' },
+			{ kod: 'ZASP-NULA', nazov: 'Y', qty: 1, mj: 'm' } // z predošlého testu vyššie, sklad=0 reálne
+		]);
+		expect(r2.radky[0].sklad).toBeNull();
+		expect(r2.radky[1].sklad).toBe(0);
+	});
+
 	it('neplatná JEDNOTLIVÁ cena (string namiesto čísla) nezhodí celý riadok — len tá cena je neznáma', async () => {
 		await tick();
 		writeSnapshot('2026-08-16T00:00:00Z', [
@@ -218,7 +241,8 @@ describe('enrichPolozky', () => {
 				nakupPoslednaFaktura: null,
 				predajVo: null,
 				marza: null,
-				sklad: null
+				sklad: null,
+				mena: 'EUR'
 			}
 		]);
 		expect(r.sucty.nakupCennik).toEqual({ suma: 0, kompletne: false });

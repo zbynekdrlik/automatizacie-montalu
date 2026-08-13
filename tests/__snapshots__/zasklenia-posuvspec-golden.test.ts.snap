@@ -7,6 +7,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00081",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -18,6 +19,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00030",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -29,6 +31,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202417",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -40,6 +43,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202425",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -51,6 +55,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00021",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -335,6 +340,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00016",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -346,6 +352,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00002",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -357,6 +364,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00010",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -368,6 +376,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00027",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -379,6 +388,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00029",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -390,6 +400,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00030",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -401,6 +412,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00031",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -412,6 +424,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00032",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -423,6 +436,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00033",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -434,6 +448,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00034",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -445,6 +460,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00035",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -456,6 +472,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00036",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -467,6 +484,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00037",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -478,6 +496,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00038",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -489,6 +508,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00039",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -500,6 +520,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK20242",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -511,6 +532,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK20241",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -522,6 +544,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00041",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -533,6 +556,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00042",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -920,6 +944,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00014",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -931,6 +956,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00002",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -942,6 +968,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00006",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -953,6 +980,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00010",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -964,6 +992,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00027",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -975,6 +1004,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00029",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -986,6 +1016,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00030",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -997,6 +1028,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00031",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1008,6 +1040,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00032",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1019,6 +1052,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00033",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1030,6 +1064,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00034",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1041,6 +1076,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00035",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1052,6 +1088,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00036",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1063,6 +1100,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00037",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1074,6 +1112,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00038",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1085,6 +1124,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00039",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1096,6 +1136,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK20242",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1107,6 +1148,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK20241",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1118,6 +1160,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00041",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1129,6 +1172,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASK00042",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1568,6 +1612,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00100",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1579,6 +1624,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00088",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1590,6 +1636,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202410",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1601,6 +1648,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00091",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -1612,6 +1660,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP20252",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2060,6 +2109,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00107",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2071,6 +2121,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00104",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2082,6 +2133,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202415",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2093,6 +2145,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00018",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2104,6 +2157,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00024",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2115,6 +2169,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00021",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2426,6 +2481,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00036",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2437,6 +2493,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202432",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2448,6 +2505,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202415",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2459,6 +2517,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP20244",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2470,6 +2529,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00024",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2481,6 +2541,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202419",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2492,6 +2553,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP202439",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2503,6 +2565,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00018",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -2514,6 +2577,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       {
         "kod": "ZASP00021",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3091,6 +3155,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00016",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3102,6 +3167,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00002",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3113,6 +3179,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00010",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3124,6 +3191,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00100",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3135,6 +3203,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00088",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3146,6 +3215,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202410",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3157,6 +3227,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00091",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3168,6 +3239,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP20252",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3179,6 +3251,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00027",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3190,6 +3263,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00029",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3201,6 +3275,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00030",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3212,6 +3287,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00031",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3223,6 +3299,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00032",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3234,6 +3311,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00033",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3245,6 +3323,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00034",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3256,6 +3335,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00035",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3267,6 +3347,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00036",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3278,6 +3359,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00037",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3289,6 +3371,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00038",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3300,6 +3383,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00039",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3311,6 +3395,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK20242",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3322,6 +3407,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK20241",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3333,6 +3419,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00041",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -3344,6 +3431,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00042",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4205,6 +4293,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00081",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4216,6 +4305,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00030",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4227,6 +4317,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202417",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4238,6 +4329,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202425",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4249,6 +4341,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00021",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4260,6 +4353,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00036",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4271,6 +4365,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202432",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4282,6 +4377,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202415",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4293,6 +4389,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP20244",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4304,6 +4401,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00024",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4315,6 +4413,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202419",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4326,6 +4425,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP202439",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4337,6 +4437,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00018",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4348,6 +4449,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00014",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4359,6 +4461,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00002",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4370,6 +4473,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00006",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4381,6 +4485,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASP00010",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4392,6 +4497,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00027",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4403,6 +4509,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00029",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4414,6 +4521,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00030",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4425,6 +4533,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00031",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4436,6 +4545,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00032",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4447,6 +4557,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00033",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4458,6 +4569,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00034",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4469,6 +4581,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00035",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4480,6 +4593,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00036",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4491,6 +4605,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00037",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4502,6 +4617,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00038",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4513,6 +4629,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00039",
         "marza": null,
+        "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4524,6 +4641,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK20242",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4535,6 +4653,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK20241",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4546,6 +4665,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00041",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
@@ -4557,6 +4677,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       {
         "kod": "ZASK00042",
         "marza": null,
+        "mena": "EUR",
         "mj": "m",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,

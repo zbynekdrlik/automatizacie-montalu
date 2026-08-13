@@ -137,7 +137,12 @@ def fetch_rows(conn) -> list[dict]:
                 "nakupPoslednaFaktura": _num(r.get("nakupPoslednaFaktura")),
                 "predajVo": _num(r.get("predajVo")),
                 "mena": (r.get("mena") or "EUR").strip() or "EUR",
-                "sklad": _num(r.get("sklad")) or 0.0,
+                # #154 review nález: `None` (LEFT JOIN na S5_Artikl_... bez zhody —
+                # Money pre tento kód vôbec nemá skladovú kartu) MUSÍ ostať `null` v
+                # JSON-e, nie skolabovať na 0.0 — appka 0 zobrazuje ako reálnu (aj
+                # keď nulovú) dostupnosť, nie ako "neznáme". `or 0.0` by tieto dva
+                # stavy nerozoznateľne zmiešalo.
+                "sklad": _num(r.get("sklad")),
             }
         )
     rows.sort(key=lambda x: x["kod"])

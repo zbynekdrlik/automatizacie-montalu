@@ -13,7 +13,9 @@ export interface PriceRow {
 	nakupPoslednaFaktura: number | null;
 	predajVo: number | null;
 	mena: string;
-	sklad: number;
+	/** `null` = Money pre tento kód vôbec nemá skladovú kartu (neznáme); 0/záporné
+	 *  sú REÁLNE hodnoty (vypredané / rezervované nad rámec skladu). */
+	sklad: number | null;
 }
 
 const snapshotPath = () => process.env.CENY_SNAPSHOT_PATH || '/data/ceny/ceny.json';
@@ -57,10 +59,17 @@ function validateRow(raw: unknown, idx: number, log: (m: string) => void): Price
 	}
 	const rowLog = (m: string) => log(`riadok ${idx} (${kod}): ${m}`);
 	// sklad SMIE byť záporný — Money ho vie vrátiť pod nulou (rezervované > fyzicky na
-	// sklade), overené live na ostrých kódoch (2026-08-13 smoke query). Zamietame len
-	// štrukturálne nezmyselné hodnoty (nie je to vôbec číslo / NaN / Infinity).
+	// sklade), overené live na ostrých kódoch (2026-08-13 smoke query). SMIE byť aj
+	// `null`/chýbajúce — Money pre daný kód nemá skladovú kartu vôbec (#154 review
+	// nález); to je NEZNÁME, nie 0. Zamietame LEN štrukturálne nezmyselné hodnoty
+	// (niečo iné než číslo/null — napr. text).
 	const skladRaw = r.sklad;
-	if (!(typeof skladRaw === 'number' && Number.isFinite(skladRaw))) {
+	let sklad: number | null;
+	if (skladRaw === null || skladRaw === undefined) {
+		sklad = null;
+	} else if (typeof skladRaw === 'number' && Number.isFinite(skladRaw)) {
+		sklad = skladRaw;
+	} else {
 		rowLog(`neplatný „sklad" (${JSON.stringify(skladRaw)}) — celý riadok zamietnutý`);
 		return null;
 	}
@@ -78,7 +87,7 @@ function validateRow(raw: unknown, idx: number, log: (m: string) => void): Price
 		nakupPoslednaFaktura: priceOrNull(r.nakupPoslednaFaktura, 'nakupPoslednaFaktura', rowLog),
 		predajVo,
 		mena,
-		sklad: skladRaw
+		sklad
 	};
 }
 
@@ -222,7 +231,7 @@ function getPriceRow(kod: string): PriceRow | undefined {
 				nakupPoslednaFaktura: number | null;
 				predajVo: number | null;
 				mena: string;
-				sklad: number;
+				sklad: number | null;
 		  }
 		| undefined;
 	return row;
@@ -239,9 +248,13 @@ export interface CenaRiadok {
 	/** JEDNOTKOVÁ marža (predajVo − nakupCennik, na jednotku) — marža sa počíta
 	 *  z CENNÍKOVEJ nákupnej ceny, nie z poslednej faktúry (šéf 2026-08-12). */
 	marza: number | null;
-	/** dostupné množstvo na sklade. `null` = kód nikdy nebol v Money snapshote
-	 *  (appka o ňom nič nevie); `0`/záporné = reálna hodnota z Money, nikdy "neznáma". */
+	/** dostupné množstvo na sklade. `null` = neznáme (kód nikdy nebol v Money
+	 *  snapshote, ALEBO tam bol, ale Money preň nemá skladovú kartu — obe sa
+	 *  zobrazujú rovnako); `0`/záporné = reálna hodnota z Money, nikdy "neznáma". */
 	sklad: number | null;
+	/** mena zdrojovej ceny (z Money price-booku); `EUR`, keď appka o kóde vôbec
+	 *  nemá cenové dáta — nemá čo inak zobraziť. */
+	mena: string;
 }
 
 export interface CenySucet {
@@ -310,7 +323,8 @@ export function enrichPolozky(
 			nakupPoslednaFaktura,
 			predajVo,
 			marza,
-			sklad: price?.sklad ?? null
+			sklad: price?.sklad ?? null,
+			mena: price?.mena ?? 'EUR'
 		};
 	});
 	for (const s of Object.values(sucty)) s.suma = round2(s.suma);
