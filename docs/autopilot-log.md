@@ -1127,3 +1127,12 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - **Zistenie 2:** ZAK2026302 mal reálny rozostup 721.7 > 700 (tvrdý strop enginu) → engine by mohol nadrátať priečku. Otázka na Dominika → #198.
 - **Neoverené (v histórii chýba vzor, čestne zapísané):** zadná noha (žiadna samostatne stojaca), výstuha −280 (žiaden zosilnený nosník), dĺžky rezov (O1). Komponenty #195, krov #161 = očakávané medzery.
 - **Bez PR-do-Money / bez deploy user-zmeny** (test + docs). Otvorené otázky zapísané na #198, verifikačný záver + tabuľka na #196. #196 uzavretý (#155 zostáva otvorený).
+
+## #161 — Pergola krov: geometria uloženia (prah 7°) — POTVRDENÝ prírastok (2026-08-14, v0.19.2)
+- **Zdroj:** analýza nahrávky callu 13.8. (komentár na #161). Prvá oprava zadania: TANGENS, nie sínus. SE tabuľka scr_030: `uhol2=IF(UHOL<=7,0,1)`, `uhol3=UHOL−7`, `ls=ps=tan(uhol3)·c+0,01` (c=29), `lv=pv=tan(uhol3)·cc+0,01` (cc=37,28).
+- **Nový pure engine `src/lib/pergola-krov.ts`** — `krovUlozenie(sklon)`. Číselný vektor 8° (uhol3=1): ps=ls=tan(1°)·29+0,01=0,516→**0,52**, lv=pv=tan(1°)·37,28+0,01=0,661→**0,66** (presne tabuľka). Dekódovaný trojuholník 0,52–29–0,01 = (ps, c, konštanta) pri 8°.
+- **Prah 7°:** `=7°` → rovnobežne (offsety = konštanta 0,01); `>7°` → otvara (dva dotyky + previs); `<7°` → **nepodporované** (O5 prehodenie bodu dotyku, lv/ps by vyšli záporné); nezadané → nezadane; `≥9–10°` pridá poznámku o zatváraní drážky (frézovací detail O5), offsety ostávajú z potvrdeného vzorca.
+- **Vstup:** voliteľný `sklonStrechy?` do `PergolaNarezVstup` (NIE odvodený z výšok/hĺbky — vzťah nepotvrdený; SE má `uhol` oddelene). Parser prázdne→null, validácia 0<sklon≤60 len keď zadané.
+- **Výkres:** keď sklon ≥7° → krov-note detail (režim, c/cc, ps=ls/lv=pv + schematický trojuholník „nie v mierke") + ponechaná poznámka „frézovanie drážok → #161". Bez sklonu / <7° → súčasný placeholder → #161 (bez regresu). Route karta „Krov — uloženie".
+- **Testy:** RED→GREEN vektory `tests/pergola-krov.test.ts` (23), parser `tests/pergola-narez-vstup.test.ts` (+4), E2E `e2e/pergola-narez.spec.ts` (+2: 8° detail, 5° nepodporované). money-safety SUBORY += pergola-krov.ts.
+- **#161 OSTÁVA OTVORENÝ** — frézovanie drážok (výrobný list, O5), vetva <7° (O5), priradenie odvesny c/cc (O5), jednotka 0,01 (O5b), metrický prepočet (O14). Dodaný LEN potvrdený prírastok. Display-only, žiaden Money zápis.
