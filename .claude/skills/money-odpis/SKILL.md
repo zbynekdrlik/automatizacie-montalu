@@ -650,3 +650,38 @@ Odpis ich riadok identifikuje kódom, takže taká položka je pre appku nepouž
 ⇒ Keď sa hľadá kód pre nový materiál, vždy sa pýtaj aj na `Kod` a prázdne vyhoď zo
 zoznamu kandidátov **predtým**, než ich niekomu ponúkneš — inak sa dohodne mapovanie na
 kartu, ktorá sa nedá zapísať.
+
+## 6b. Ceny materiálu (#154) — price-book GUID mapovanie a "0 = neznáma" empíria
+
+Fáza 1 (cenový zoznam materiálu, READ-ONLY z denného Money snapshotu, `src/lib/server/ceny.ts`
++ `scripts/ceny-snapshot.py`) overila ŽIVO (2026-08-13, tunel + `montalu_ro`, TOP-n dotazy),
+kde presne v Money bývajú ceny profilov/kovania:
+
+| appka pole | Money zdroj | overené GUID (`Ceniky_Cenik.ID`) |
+|---|---|---|
+| nákup, cenník (dohodnutý) | `Ceniky_PolozkaCeniku.Cena` | `NC` = `BA7DA0F8-8086-4963-AAE1-09D2C1C7266C` „Nákupný cenník" |
+| nákup, posledná faktúra | `Artikly_ArtiklDodavatel.PosledniCena` (cez `Artikly_Artikl.HlavniDodavatel_ID`) | — (nie price-book) |
+| predaj, veľkoobchod (VO) | `Ceniky_PolozkaCeniku.Cena` | `PRF_VO` = `AEEF5C92-5B44-4755-8680-F01CE6E4D5C2` „Profily a príslušenstvo - VO" |
+| dostupnosť na sklade | `S5_Artikl_CelkoveMnozstviNaSkladech.CelkoveDostupneMnozstviNaSkladech` | — (view, nie price-book) |
+
+**Money `Cena=0` v price-booku reálne znamená „nikdy zadané", nie „zadarmo"** — overené na
+viacerých AKTÍVNYCH ZASP profiloch (`ZASP00079`, `ZASP00114`, `ZASP00131`, `ZASP00019`), ktoré
+mali v `NC` doslova `0.0000`, zatiaľ čo pri kóde s reálnou cenou (`ZASP00002`) sedeli hodnoty
+presne so šéfovým príkladom z tiketu (5,80 € cenník / 7,02 € faktúra). ⇒ appka `Cena=0` číta
+ako „cena neznáma" (NULL), nikdy ako platnú nulu — rovnaká disciplína ako §2j vyššie
+(prázdny `Kod` = nepoužiteľné), len o jednu úroveň nižšie (platný kód, ale prázdna cena).
+
+**LEFT JOIN bez zhody ≠ 0 — plať to isté pravidlo aj na `sklad`** (review nález #154,
+opravené `be07b0d`): `scripts/ceny-snapshot.py` pôvodne robilo `_num(...) or 0.0`, čím
+kolabovalo kód BEZ skladovej karty v `S5_Artikl_...` (LEFT JOIN nenašiel riadok) na rovnakú
+hodnotu ako kód SO skladovou kartou a reálnou nulou (vypredané). `material_prices.sklad` je
+preto nullable (`REAL`, nie `NOT NULL DEFAULT 0`) — `NULL` = appka o kóde nič nevie, `0`/
+záporné = reálna hodnota z Money. Vzor na budúce polia z LEFT JOIN-u: **NIKDY `x or default`**
+(v Pythone aj JS) na hodnotu, kde `None`/`null` a skutočná nula musia zostať rozlíšiteľné.
+
+**ZASK* (komponenty/kovanie) kódy nikdy nedostanú veľkoobchodnú predajnú cenu** — vedomé
+zúženie (šéf 2026-08-12: „veľkoobchodným cenníkom si pri ZASK ešte nie istí"), live overené
+prečo: `ZASK00037` (Rohovník obvodový) v `PCMO`/„Predajný cenník polykarbonát MO" (ZLÝ
+price-book pre kovanie) malo cenu, ktorá s daným artiklom nemá nič spoločné. Vynútené v
+`ceny.ts` samotnom (nielen v producer skripte) — defense in depth, rovnaký vzor ako b2b
+Money-write hranica (§2 access-control skill).
