@@ -42,6 +42,11 @@ export const VYSKA_ZADNA_MIN = 1500;
 export const VYSKA_ZADNA_MAX = 5000;
 export const POCET_NOH_MIN = 2;
 export const POCET_NOH_MAX = 20;
+/** rozsah sklonu strechy [°] pre krov uloženie (#161) — voliteľný vstup. Horná hranica
+ *  je len obranná (odmietne nezmysel typu 200°); vetvy pod 7° rieši krov engine čestne
+ *  ako „nepodporované", nie chybou. */
+export const SKLON_MIN = 0;
+export const SKLON_MAX = 60;
 
 export type PergolaSystem = 'Robust' | 'Massive';
 export type Uchytenie = 'stena' | 'samostatne';
@@ -98,6 +103,11 @@ export interface PergolaNarezVstup {
 	prieckaLight: boolean;
 	/** zosilnený nosník — profil je O2/O3 blokovaný, len vypíšeme ako nepodporované */
 	zosilnenyNosnik: boolean;
+	/** sklon strechy [°] pre krov uloženie (#161) — VOLITEĽNÝ. null = nezadaný (krov
+	 *  ostáva len poznámkou, ako doteraz). Keď zadaný, `krovUlozenie` (pergola-krov.ts)
+	 *  z neho počíta POTVRDENÉ uloženie (prah 7°). NIE JE odvodený z výšok/hĺbky — vzťah
+	 *  nie je potvrdený, sklon je priamy vstup ako `uhol` v SE modeli. */
+	sklonStrechy?: number | null;
 }
 
 /** Jedna položka nárezu. `dlzkaRezuMm === null` = počet je potvrdený, ale dĺžku rezu
@@ -298,6 +308,10 @@ export function chybaPergolaNarezVstupu(v: PergolaNarezVstup): string | null {
 		return `Počet predných nôh musí byť ${POCET_NOH_MIN}–${POCET_NOH_MAX}.`;
 	if (v.hornyProfilZadnej !== 110 && v.hornyProfilZadnej !== 140)
 		return 'Horný profil zadnej konštrukcie musí byť 110 alebo 140.';
+	// sklon strechy je VOLITEĽNÝ (null = nezadaný, OK); keď zadaný, len obranný rozsah —
+	// vetvu pod 7° rieši krov engine čestne, nie chybou
+	if (v.sklonStrechy != null && !(v.sklonStrechy > SKLON_MIN && v.sklonStrechy <= SKLON_MAX))
+		return `Sklon strechy musí byť ${SKLON_MIN + 0.1}–${SKLON_MAX}° (alebo prázdne).`;
 	// zadné nohy sa validujú LEN pri samostatne stojacej — na stenu sa nepoužívajú
 	if (v.uchytenie === 'samostatne') {
 		if (!(v.vyskaZadna >= VYSKA_ZADNA_MIN && v.vyskaZadna <= VYSKA_ZADNA_MAX))

@@ -16,6 +16,7 @@
 		type Uchytenie,
 		type HornyProfil
 	} from '$lib/pergola-narez';
+	import { krovUlozenie } from '$lib/pergola-krov';
 
 	let { data, form } = $props();
 
@@ -34,7 +35,8 @@
 		pocetZadnychNoh: form?.vstup?.pocetZadnychNoh ?? 4,
 		hornyProfilZadnej: (form?.vstup?.hornyProfilZadnej ?? 140) as HornyProfil,
 		prieckaLight: form?.vstup?.prieckaLight ?? false,
-		zosilnenyNosnik: form?.vstup?.zosilnenyNosnik ?? false
+		zosilnenyNosnik: form?.vstup?.zosilnenyNosnik ?? false,
+		sklonStrechy: form?.vstup?.sklonStrechy ?? null
 	} satisfies PergolaNarezVstup);
 
 	// editovateľné polia — $state + bind (nova-stranka §4: jednosmerné value={} sa pri
@@ -50,6 +52,8 @@
 	let hornyProfilZadnejS = $state<HornyProfil>(140);
 	let prieckaLightS = $state(false);
 	let zosilnenyNosnikS = $state(false);
+	// #161 — voliteľný sklon strechy pre krov uloženie; prázdne = nezadané
+	let sklonStrechyS = $state<number | string>('');
 
 	// reštart-effect: číta LEN form?.vstup, NIKDY vlastný *S zápis (nova-stranka §3 —
 	// self-loop by ticho prepísal používateľovu voľbu systému späť na default).
@@ -66,9 +70,14 @@
 		hornyProfilZadnejS = (v?.hornyProfilZadnej as HornyProfil) ?? 140;
 		prieckaLightS = v?.prieckaLight ?? false;
 		zosilnenyNosnikS = v?.zosilnenyNosnik ?? false;
+		sklonStrechyS = v?.sklonStrechy ?? '';
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
+	// #161 — krov uloženie z potvrdených vzorcov, len keď je sklon zadaný
+	let krov = $derived(
+		step === 'vysledok' && vstup.sklonStrechy != null ? krovUlozenie(vstup.sklonStrechy) : null
+	);
 
 	const mm = (n: number | null) => (n === null ? '— (čaká na výkres)' : `${n} mm`);
 </script>
@@ -87,6 +96,7 @@
 	<input type="hidden" name="hornyProfilZadnej" value={hornyProfilZadnejS} />
 	{#if prieckaLightS}<input type="hidden" name="prieckaLight" value="1" />{/if}
 	{#if zosilnenyNosnikS}<input type="hidden" name="zosilnenyNosnik" value="1" />{/if}
+	{#if sklonStrechyS !== ''}<input type="hidden" name="sklonStrechy" value={sklonStrechyS} />{/if}
 {/snippet}
 
 {#if step === 'form'}
@@ -227,6 +237,26 @@
 				</div>
 			</div>
 
+			<div class="grid3">
+				<div class="field">
+					<label for="sklonStrechy">Sklon strechy (°) — krov uloženie (#161)</label>
+					<input
+						id="sklonStrechy"
+						name="sklonStrechy"
+						type="number"
+						step="any"
+						min="0"
+						max="60"
+						placeholder="voliteľné"
+						bind:value={sklonStrechyS}
+					/>
+					<p class="sub" style="margin:4px 0 0">
+						voliteľné · ≥ 7° = <b>potvrdené</b> uloženie (prah 7°, vzorce z callu 13.8.); pod 7° zatiaľ
+						nepodporované (O5). Frézovanie drážok ostáva na konštruktérovi.
+					</p>
+				</div>
+			</div>
+
 			<button class="btn" type="submit" data-testid="spocitat">Spočítať materiál</button>
 		</form>
 	</div>
@@ -252,6 +282,51 @@
 		</p>
 		<PergolaNarezVykres {vstup} datum={formatDatumCasSk(data.datumIso)} />
 	</div>
+
+	{#if krov}
+		<div class="card">
+			<div class="sec">Krov — uloženie (#161)</div>
+			{#if krov.podporovane}
+				<p class="sub">
+					Potvrdené uloženie z prahu 7° (vzorce z callu 13.8., číselne overené). Frézovanie drážok
+					(výrobný list) ostáva na konštruktérovi. <b>Do Money sa neposiela nič.</b>
+				</p>
+				<div data-testid="krov-ulozenie">
+					<div class="row"><span>Sklon strechy</span><b>{krov.sklonStupne}°</b></div>
+					<div class="row">
+						<span>Rovina uloženia</span>
+						<b
+							>{krov.rezim === 'rovnobezne'
+								? '= 7° — rovnobežne s hranou'
+								: '> 7° — dva dotyky + previs'}</b
+						>
+					</div>
+					<div class="row">
+						<span>uhol2 / uhol3 (SE model)</span><b>{krov.uhol2} / {krov.uhol3}°</b>
+					</div>
+					<div class="row">
+						<span>Odvesna c = 29 mm → ps = ls</span>
+						<b data-testid="krov-ps">{krov.ps} mm</b>
+					</div>
+					<div class="row">
+						<span>Odvesna cc = 37,28 mm → lv = pv</span>
+						<b data-testid="krov-lv">{krov.lv} mm</b>
+					</div>
+				</div>
+			{:else}
+				<p class="sub" data-testid="krov-nepodporovane">
+					Zadaný sklon <b>{krov.sklonStupne}°</b> je pod prahom 7° — bod dotyku sa „prehodí" (trojuholník
+					sa otočí), táto vetva nie je potvrdeným vzorcom pokrytá (O5). Uloženie sa nepočíta — nič sa
+					nehádže.
+				</p>
+			{/if}
+			<ul style="margin:6px 0 0;padding-left:18px">
+				{#each krov.poznamky as p (p)}
+					<li style="margin:4px 0" class="sub">{p}</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="sec">Materiál — vypočítané ({vysledok.vypocitane.length} položiek)</div>

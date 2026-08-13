@@ -79,4 +79,28 @@ describe('parsePergolaNarezVstup', () => {
 		);
 		expect(error).toMatch(/zadná|výšk/i);
 	});
+
+	it('#161 sklon strechy: prázdny → null (voliteľný, žiadna chyba)', () => {
+		const { vstup, error } = parsePergolaNarezVstup(fd({ ...PLATNY }));
+		expect(error).toBeNull();
+		expect(vstup.sklonStrechy).toBeNull();
+	});
+
+	it('#161 sklon strechy: zadaný 8 → 8; čiarka 7,2 → 7.2', () => {
+		expect(parsePergolaNarezVstup(fd({ ...PLATNY, sklonStrechy: '8' })).vstup.sklonStrechy).toBe(8);
+		expect(parsePergolaNarezVstup(fd({ ...PLATNY, sklonStrechy: '7,2' })).vstup.sklonStrechy).toBe(
+			7.2
+		);
+	});
+
+	it('#161 sklon strechy pod 7° je PLATNÝ vstup (engine ho hlási ako nepodporované, nie chybou)', () => {
+		const { vstup, error } = parsePergolaNarezVstup(fd({ ...PLATNY, sklonStrechy: '5' }));
+		expect(error).toBeNull();
+		expect(vstup.sklonStrechy).toBe(5);
+	});
+
+	it('#161 sklon strechy mimo obranného rozsahu (200°) = chyba', () => {
+		const { error } = parsePergolaNarezVstup(fd({ ...PLATNY, sklonStrechy: '200' }));
+		expect(error).toMatch(/sklon/i);
+	});
 });
