@@ -20,7 +20,12 @@
 	import VykresovyHarok from '$lib/components/vykres/VykresovyHarok.svelte';
 	import Kota from '$lib/components/vykres/Kota.svelte';
 	import { fitScale, fmtMm } from '$lib/vykres/kota';
-	import { fitCentered, MIN_TITLE_FONT, MIN_SUBTITLE_FONT } from '$lib/vykres/kompozicia';
+	import {
+		fitCentered,
+		MIN_TITLE_FONT,
+		MIN_SUBTITLE_FONT,
+		MIN_DIM_FONT
+	} from '$lib/vykres/kompozicia';
 	import { farbaKonstrukcie } from '$lib/vykres/ral';
 	import { nazovSysStyl } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice } from '$lib/kolajnica';
@@ -193,11 +198,11 @@
 			x={x0 - 2}
 			y={y1 - 2}
 			text-anchor="end"
-			font-size="2.8"
+			font-size={MIN_DIM_FONT}
 			fill={MODRA}
 			data-testid="zn-klin-v1">v1 {fmtMm(k.v1)} mm</text
 		>
-		<text x={x1 + 2} y={y2 - 2} font-size="2.8" fill={MODRA} data-testid="zn-klin-v2"
+		<text x={x1 + 2} y={y2 - 2} font-size={MIN_DIM_FONT} fill={MODRA} data-testid="zn-klin-v2"
 			>v2 {fmtMm(k.v2)} mm</text
 		>
 	{/if}

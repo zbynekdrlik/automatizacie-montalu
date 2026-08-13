@@ -71,6 +71,13 @@ test('vyplnenie formulára (OP260055) nakreslí bokorys/pôdorys s presnými kó
 	await expect(
 		page.locator('[data-testid="bn-bokorys-presah"] text', { hasText: /^2530$/ })
 	).toHaveCount(1);
+	// review nález (#168): kóty museli čítať MIN_DIM_FONT (3) — pred opravou bola
+	// kóta presahu natvrdo 2,8 (pod deklarovanou spoločnou podlahou čitateľnosti
+	// z kompozicia.ts, ktorá tvrdí "NIKDY nekresli menšie").
+	const presahFontSize = await page
+		.locator('[data-testid="bn-bokorys-presah"] [data-testid="kota-label"]')
+		.getAttribute('font-size');
+	expect(Number(presahFontSize)).toBeGreaterThanOrEqual(3);
 	await expect(page.locator('[data-testid="bn-bokorys"] text', { hasText: /^750$/ })).toHaveCount(
 		1
 	);
@@ -159,6 +166,12 @@ test('šírka prvej sekcie sa vykreslí LEN keď je ručne zadaná (appka nehád
 	await expect(
 		page.locator('[data-testid="bn-bokorys-sirka-sekcie"] text', { hasText: /2183,2/ })
 	).toHaveCount(1);
+	// review nález (#168): kóty museli čítať MIN_DIM_FONT (3) — pred opravou bola
+	// táto kóta natvrdo 2,8 (pod deklarovanou spoločnou podlahou čitateľnosti).
+	const sirkaFontSize = await page
+		.locator('[data-testid="bn-bokorys-sirka-sekcie"] [data-testid="kota-label"]')
+		.getAttribute('font-size');
+	expect(Number(sirkaFontSize)).toBeGreaterThanOrEqual(3);
 });
 
 test('dvojkoľaj (obojsmerný posuv) — POSUV popis a bez smerového poľa vo formulári', async ({

@@ -21,7 +21,13 @@
 	import Kota from '$lib/components/vykres/Kota.svelte';
 	import { fmtMm } from '$lib/vykres/kota';
 	import { vypocitajMierku } from '$lib/vykres/mierka';
-	import { sharedFitScale, centerAt, MIN_SPEC_FONT, type FitResult } from '$lib/vykres/kompozicia';
+	import {
+		sharedFitScale,
+		centerAt,
+		MIN_SPEC_FONT,
+		MIN_DIM_FONT,
+		type FitResult
+	} from '$lib/vykres/kompozicia';
 	import {
 		variantaZSekcii,
 		presahKolajniska,
@@ -371,7 +377,7 @@
 				perpOffset={r.h * 0.05}
 				text={fmtMm(vstup.sirkaSekcieOverride)}
 				color={MODRA}
-				fontSize={2.8}
+				fontSize={MIN_DIM_FONT}
 			/>
 		</g>
 	{/if}
@@ -395,7 +401,7 @@
 			perpOffset={r.h * 0.16}
 			text={fmtMm(presah)}
 			color={MODRA}
-			fontSize={2.8}
+			fontSize={MIN_DIM_FONT}
 		/>
 	</g>
 	<Kota

@@ -204,6 +204,13 @@ test('klín nad posuvom — vyplnené polia sa vykreslia s kótou', async ({ pag
 	await expect(page.getByTestId('zn-klin-obrys')).toHaveCount(1);
 	await expect(page.getByTestId('zn-klin-v1')).toHaveText('v1 80 mm');
 	await expect(page.getByTestId('zn-klin-v2')).toHaveText('v2 40 mm');
+	// review nález (#168): v1/v2 popisky museli čítať MIN_DIM_FONT (3) — pred
+	// opravou boli natvrdo 2,8 (pod deklarovanou spoločnou podlahou čitateľnosti
+	// z kompozicia.ts, ktorá tvrdí "NIKDY nekresli menšie").
+	const v1FontSize = await page.getByTestId('zn-klin-v1').getAttribute('font-size');
+	const v2FontSize = await page.getByTestId('zn-klin-v2').getAttribute('font-size');
+	expect(Number(v1FontSize)).toBeGreaterThanOrEqual(3);
+	expect(Number(v2FontSize)).toBeGreaterThanOrEqual(3);
 });
 
 test('ručná koľajnica — vyplnená horná dĺžka sa vykreslí ako poznámka', async ({ page }) => {
