@@ -189,21 +189,34 @@ export function vytvorStenu(
  *     kód bral JEDEN rozmer (`Math.max(w,d)`) a staval Z NEHO štvorcovú
  *     rovinu s KRUHOVÝM radiálnym gradientom (`vytvorKontaktnyTienTexturu` —
  *     `createRadialGradient`, symetrický). Pri typickej jednotke (napr.
- *     4200×150 mm, pomer strán 28:1) kruh vpísaný do štvorca so stranou
- *     podľa ŠÍRKY má tvrdé jadro s POLOMEROM len `0.24×2835 mm ≈ 680 mm` —
- *     pokrýva stred rámu, ale VÔBEC nedosiahne ku koncom koľajnice
- *     (`x=±2100 mm`), kde ostáva len slabý mäkký okraj (opacity ~0.3 pri
- *     r=1,56 m, 0 pri r=2,835 m). Krajné ~75 % dĺžky koľajnice tak vizuálne
- *     "nemá" kontaktný tieň → presne nahlásené "pravý spodný roh visí vo
- *     vzduchu" (`troStvrte`). OPRAVA: rovina NIE JE štvorec — šírka (X) sa
- *     škáluje podľa `bbox.w`, hĺbka (Z) podľa `max(bbox.d, 0.45×bbox.h)`
- *     (posledné zabraňuje neviditeľne tenkému tieňu pri "papierovo" plytkých
- *     jednotkách — hĺbka posuvu ~90-300 mm by inak dala tieň tenší než
- *     jeho vlastný mäkký polomer). Rovnaká KRUHOVÁ textúra namapovaná na
- *     NEROVNOMERNE škálovanú rovinu vykreslí PRIRODZENE PODLHOVASTÚ elipsu
- *     (tvrdé jadro naťahuje pozdĺž X spolu s celou rovinou), ktorá sleduje
- *     tvar koľajnice namiesto kruhu v strede pod ňou — žiadna zmena
- *     textúry potrebná. */
+ *     4200×150 mm, pomer strán 28:1, štvorcová rovina strany
+ *     `4200×1,35=5670 mm`) je tvrdé jadro `jadroR = rozlisenie×0,24`
+ *     PIXELOV z `rozlisenie×rozlisenie` canvasu — teda `0,24` FRAKCIA CELEJ
+ *     šírky canvasu (nie polovice!), čo sa pri UV mapovaní 0..1 na CELÚ
+ *     rovinu premieta na svetový polomer `0,24×5670 mm ≈ 1361 mm` (review
+ *     #181 opravil pôvodnú chybu v tomto komentári — počítal `0,24×2835`,
+ *     teda z POLOVIČNEJ strany, rovnaká trieda chyby ako sRGB/lineárny
+ *     gotcha v `.claude/rules/vizual3d.md`: zlá základňa pre násobenie).
+ *     Pri polovičnej šírke koľajnice `2100 mm` tak jadro pokryje len
+ *     `1361/2100 ≈ 65 %` od stredu — krajných `~739 mm` (`~35 %`) z KAŽDEJ
+ *     strany má len slabý mäkký okraj (opacity ~0.3 pri r=1,56 m, 0 pri
+ *     r=2,835 m — TENTO výpočet, mekka vrstva s `radius=stred`, teda
+ *     PRESNE polovica šírky, bol v pôvodnom komentári správne). Krajné
+ *     konce koľajnice tak vizuálne "nemajú" kontaktný tieň → presne
+ *     nahlásené "pravý spodný roh visí vo vzduchu" (`troStvrte`). OPRAVA:
+ *     rovina NIE JE štvorec — šírka (X) sa škáluje podľa `bbox.w`, hĺbka
+ *     (Z) podľa `max(bbox.d, 0.45×bbox.h)`, VŽDY orezaná zhora na `sirkaM`
+ *     (`Math.min`) — druhý (výškový) člen zabraňuje neviditeľne tenkému
+ *     tieňu pri "papierovo" plytkých jednotkách (hĺbka posuvu ~90-300 mm by
+ *     inak dala tieň tenší než jeho vlastný mäkký polomer), no BEZ orezania
+ *     zhora by pri úzkej-vysokej jednotke (napr. `s=300 mm` pri `S_MIN`,
+ *     `h` blízko `V_MAX`) prevážil a otočil elipsu o 90° (hlbšia než
+ *     širšia — review #181 nález, žiadna z pôvodných testovacích bbox
+ *     kombinácií to nezachytila, doplnené nižšie). Rovnaká KRUHOVÁ textúra
+ *     namapovaná na NEROVNOMERNE škálovanú rovinu vykreslí PRIRODZENE
+ *     PODLHOVASTÚ elipsu (tvrdé jadro naťahuje pozdĺž X spolu s celou
+ *     rovinou), ktorá sleduje tvar koľajnice namiesto kruhu v strede pod
+ *     ňou — žiadna zmena textúry potrebná. */
 export function vytvorKontaktnyTien(
 	THREE: ThreeNS,
 	bboxSirkaMm: number,
@@ -211,7 +224,7 @@ export function vytvorKontaktnyTien(
 	bboxVyskaMm: number
 ): InstanceType<ThreeNS['Mesh']> {
 	const sirkaM = mm(bboxSirkaMm) * 1.35;
-	const hlbkaM = Math.max(mm(bboxHlbkaMm) * 1.35, mm(bboxVyskaMm) * 0.45);
+	const hlbkaM = Math.min(sirkaM, Math.max(mm(bboxHlbkaMm) * 1.35, mm(bboxVyskaMm) * 0.45));
 	const geo = new THREE.PlaneGeometry(sirkaM, hlbkaM);
 	geo.rotateX(-Math.PI / 2);
 	const tex = vytvorKontaktnyTienTexturu(THREE);

@@ -142,9 +142,11 @@ describe('scena — #174 ZNOVUOTVORENÉ: svetové Y spodku jednotky/zeme/steny/t
 describe('scena — #174 ZNOVUOTVORENÉ: kontaktný tieň sleduje PODLHOVASTÝ pôdorys (nie kruh v štvorci)', () => {
 	it('rovina tieňa NIE JE štvorec pre širokú/plytkú jednotku — šírka (X) sa škáluje s bbox.w, hĺbka (Z) NEZÁVISLE', () => {
 		// 4200×150mm pôdorys (pomer strán 28:1) — pôvodný bug: štvorcová rovina
-		// podľa Math.max(w,d)=4200 dala KRUHOVÝ tvrdý gradient s polomerom len
-		// ~680mm, ktorý zďaleka nedosiahol ku koncom 2100mm-polovičnej šírky
-		// koľajnice ("pravý spodný roh visí vo vzduchu", troStvrte #174).
+		// podľa Math.max(w,d)=4200 dala KRUHOVÝ tvrdý gradient s polomerom
+		// ~1361mm (0,24 × celá strana 5670mm — viď `vytvorKontaktnyTien`'s
+		// vlastný komentár pre presný prepočet a review #181 opravu pôvodnej
+		// chyby v tomto čísle), ktorý nedosiahol ku koncom 2100mm-polovičnej
+		// šírky koľajnice ("pravý spodný roh visí vo vzduchu", troStvrte #174).
 		const tien = vytvorKontaktnyTien(THREE, 4200, 150, 2100);
 		tien.geometry.computeBoundingBox();
 		const bb = tien.geometry.boundingBox!;
@@ -175,5 +177,20 @@ describe('scena — #174 ZNOVUOTVORENÉ: kontaktný tieň sleduje PODLHOVASTÝ p
 		tien.geometry.computeBoundingBox();
 		const hlbkaM = tien.geometry.boundingBox!.max.z - tien.geometry.boundingBox!.min.z;
 		expect(hlbkaM).toBeGreaterThan(0.3); // aspoň 300mm — čitateľná "mláka", nie vlas
+	});
+
+	it('review #181 nález: úzka-VYSOKÁ jednotka NIKDY neotočí elipsu o 90° — hĺbka (Z) je orezaná zhora na šírku (X)', () => {
+		// s=300mm (S_MIN), h=20000mm (blízko V_MAX) — bez orezania by výškový
+		// člen (0,45×20 = 9m) hlboko prevážil nad šírkovým (0,3×1,35=0,405m),
+		// elipsa by bola ~22× hlbšia než širšia (otočená o 90° voči skutočnému
+		// podlhovastému pôdorysu). Kontaktný tieň MUSÍ ostať aspoň tak široký
+		// ako hlboký, nikdy naopak — inak by pri úzkej-vysokej jednotke znova
+		// vznikol presne ten istý druh "tieň nesleduje pôdorys" bugu.
+		const tien = vytvorKontaktnyTien(THREE, 300, 90, 20000);
+		tien.geometry.computeBoundingBox();
+		const bb = tien.geometry.boundingBox!;
+		const sirkaM = bb.max.x - bb.min.x;
+		const hlbkaM = bb.max.z - bb.min.z;
+		expect(hlbkaM).toBeLessThanOrEqual(sirkaM);
 	});
 });
