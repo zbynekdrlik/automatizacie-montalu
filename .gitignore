@@ -30,6 +30,12 @@ data/
 *.db-wal
 *.db-shm
 
+# Money cenový snapshot (#154) — NIKDY sa necommituje, repo je VEREJNÉ. `data/` vyššie
+# už pokrýva predvolenú cestu (`/data/ceny/ceny.json`), toto je explicitná druhá vrstva
+# pre hocijaké iné umiestnenie (CENY_SNAPSHOT_PATH je nastaviteľná).
+ceny.json
+/ceny/
+
 # playwright
 test-results/
 playwright-report/
