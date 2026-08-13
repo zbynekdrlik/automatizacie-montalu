@@ -26,6 +26,8 @@ import {
 	vytvorOblohuTexturu,
 	vytvorStenuTexturu
 } from '../src/lib/vizual/textury';
+import { vytvorStenu, vytvorZem } from '../src/lib/vizual/scena';
+import { nastaveniaPreTier } from '../src/lib/vizual/kvalita';
 
 class FakeGradient {
 	stops: Array<{ offset: number; color: string }> = [];
@@ -271,5 +273,45 @@ describe('vytvorKontaktnyTienTexturu — dvojvrstvový radiálny gradient, plne 
 			{ x: 0, y: 0, w: 300, h: 300, fillStyle: ctx.radialGradients[0].grad },
 			{ x: 0, y: 0, w: 300, h: 300, fillStyle: ctx.radialGradients[1].grad }
 		]);
+	});
+});
+
+describe('nízky-tier flat-color fallback (scena.ts) sa ZHODUJE so ZÁKLADNOU farbou procedurálnej textúry (textury.ts) — regresná ochrana proti "zmenil som jednu, zabudol na druhú" (#177 vlastný text — presne toto #174 review predtým manuálne overoval)', () => {
+	it('vytvorZem (low tier fallback) vs vytvorDlazbuTexturu základná farba (Math.random=>0.5 dáva jitter=0 => čistá báza)', () => {
+		const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+		let dlazbaZaklad: string;
+		try {
+			const tex = vytvorDlazbuTexturu(THREE, 128, 4);
+			const ctx = fakeCanvasOf(tex).getContext('2d')!;
+			// 1. dlaždica (fillRectCalls[0] je základný fillRect špár) — jitter=(0.5*2-1)*0.06=0
+			dlazbaZaklad = ctx.fillRectCalls[1].fillStyle as string;
+		} finally {
+			spy.mockRestore();
+		}
+		expect(dlazbaZaklad).toBe('rgb(167, 161, 153)'); // hexNaRgb('#a7a199')
+
+		const zem = vytvorZem(THREE, nastaveniaPreTier('low'));
+		const mat = zem.material as InstanceType<typeof THREE.MeshStandardMaterial>;
+		// getHexString(SRGBColorSpace) — rovnaká sRGB reprezentácia, priamo porovnateľná
+		// s vyššie odvodenou hex bázou (167,161,153 = a7a199)
+		expect(mat.color.getHexString(THREE.SRGBColorSpace)).toBe('a7a199');
+	});
+
+	it('vytvorStenu (low tier fallback) vs vytvorStenuTexturu základná farba (Math.random=>0 dáva v=0 => čistý zaklad)', () => {
+		const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+		let stenaZaklad: number[];
+		try {
+			const { map } = vytvorStenuTexturu(THREE, 2);
+			const ctx = fakeCanvasOf(map).getContext('2d')!;
+			const data = ctx.lastImageData!.data;
+			stenaZaklad = [data[0], data[1], data[2]];
+		} finally {
+			spy.mockRestore();
+		}
+		expect(stenaZaklad).toEqual([194, 171, 132]); // hexNaRgb('#c2ab84')
+
+		const stena = vytvorStenu(THREE, nastaveniaPreTier('low'), 4200);
+		const mat = stena.material as InstanceType<typeof THREE.MeshStandardMaterial>;
+		expect(mat.color.getHexString(THREE.SRGBColorSpace)).toBe('c2ab84');
 	});
 });
