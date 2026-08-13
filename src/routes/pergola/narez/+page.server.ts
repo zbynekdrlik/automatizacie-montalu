@@ -7,8 +7,14 @@
 // `/pergola` prefixom v `B2B_FORBIDDEN_PREFIXES` (b2b-access.ts), takže redirect na
 // /zasklenia rieši drift guard `b2b-route-coverage.test.ts` bez zmeny. Interná,
 // Money-priľahlá — zámerne NIE v `B2B_ALLOWED_EXCEPTIONS`.
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { parsePergolaNarezVstup } from '$lib/server/pergola-narez-vstup';
+
+export const load: PageServerLoad = async () => {
+	// Dátum do rohovej pečiatky výkresu (#194) = SERVEROVÝ čas (rovnaká disciplína
+	// ako /pergola/navrh #138) — nepočíta sa na klientovi, aby neuplával cez polnoc.
+	return { datumIso: new Date().toISOString() };
+};
 
 export const actions: Actions = {
 	spocitat: async ({ request }) => {

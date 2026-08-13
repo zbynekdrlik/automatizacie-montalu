@@ -1,10 +1,12 @@
 <script lang="ts">
 	// Pergola — materiál/nárez z rozmerov (#155). DISPLAY-ONLY: nič sa neposiela do
 	// Money (Money odpis z CAD nárezu ostáva na pôvodnej stránke /pergola). Formulár →
-	// výsledok (materiálová tabuľka + informatívne výpočty + zoznam „zatiaľ
-	// nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6). Vizuálny výkres
-	// (schéma z rozmerov) je vyčlenený do samostatného ticketu — nie je v tomto PR.
+	// výsledok (technický výkres #194 + materiálová tabuľka + informatívne výpočty +
+	// zoznam „zatiaľ nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6).
+	// Výkres kreslí PergolaNarezVykres z potvrdených vzorcov (#194).
 	import { resolve } from '$app/paths';
+	import PergolaNarezVykres from '$lib/components/PergolaNarezVykres.svelte';
+	import { formatDatumCasSk } from '$lib/datum';
 	import {
 		spocitajNarez,
 		PREDNA_SVETLOST_STD,
@@ -15,7 +17,7 @@
 		type HornyProfil
 	} from '$lib/pergola-narez';
 
-	let { form } = $props();
+	let { data, form } = $props();
 
 	let step = $derived(form?.step ?? 'form');
 
@@ -241,6 +243,16 @@
 		</p>
 	</div>
 
+	<div class="card" style="overflow:auto;padding:10px">
+		<div class="sec noprint">Technický výkres z rozmerov (#194)</div>
+		<p class="sub noprint" style="margin:0 0 8px">
+			Predný pohľad, bokorys a pôdorys z <b>potvrdených</b> vzorcov (nohy, rozostupy, priečky,
+			žľab). Krov je zjednodušený obrys — jeho detail (sklon 7°, rozostup, frézovanie) doplní
+			konštruktér (#161). <b>Do Money sa neposiela nič.</b>
+		</p>
+		<PergolaNarezVykres {vstup} datum={formatDatumCasSk(data.datumIso)} />
+	</div>
+
 	<div class="card">
 		<div class="sec">Materiál — vypočítané ({vysledok.vypocitane.length} položiek)</div>
 		<p class="sub noprint">
@@ -345,5 +357,14 @@
 	table.narez th:last-child {
 		text-align: center;
 		width: 90px;
+	}
+
+	/* Landscape tlač LEN pre túto route (route-CSS-splitting, vykres.md) — výkres je
+	   A4 na šírku; nedotýka sa portrait tlače iných stránok. */
+	@media print {
+		@page {
+			size: A4 landscape;
+			margin: 6mm;
+		}
 	}
 </style>
