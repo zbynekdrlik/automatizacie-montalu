@@ -15,7 +15,7 @@
 	// bokorys (bočný rez), pôdorys (mriežka nôh).
 	import VykresovyHarok from '$lib/components/vykres/VykresovyHarok.svelte';
 	import Kota from '$lib/components/vykres/Kota.svelte';
-	import { fmtMm } from '$lib/vykres/kota';
+	import { fmtMm, fmtDeg } from '$lib/vykres/kota';
 	import { vypocitajMierku } from '$lib/vykres/mierka';
 	import {
 		sharedFitScale,
@@ -27,7 +27,6 @@
 	} from '$lib/vykres/kompozicia';
 	import { schemaVykresu, MAX_ROZOSTUP_PRIECOK, type PergolaNarezVstup } from '$lib/pergola-narez';
 	import { krovUlozenie, type KrovUlozenie } from '$lib/pergola-krov';
-	import { fmtDeg } from '$lib/vykres/kota';
 
 	let {
 		vstup,
