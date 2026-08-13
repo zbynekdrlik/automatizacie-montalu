@@ -1,9 +1,9 @@
 <script lang="ts">
 	// Pergola — materiál/nárez z rozmerov (#155). DISPLAY-ONLY: nič sa neposiela do
 	// Money (Money odpis z CAD nárezu ostáva na pôvodnej stránke /pergola). Formulár →
-	// výsledok (materiálová tabuľka + informatívne výpočty + zoznam „zatiaľ
-	// nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6). Vizuálny výkres
-	// (schéma z rozmerov) je vyčlenený do samostatného ticketu — nie je v tomto PR.
+	// výsledok (technický výkres #194 + materiálová tabuľka + informatívne výpočty +
+	// zoznam „zatiaľ nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6).
+	// Výkres kreslí PergolaNarezVykres z potvrdených vzorcov (#194).
 	import { resolve } from '$app/paths';
 	import PergolaNarezVykres from '$lib/components/PergolaNarezVykres.svelte';
 	import { formatDatumCasSk } from '$lib/datum';

@@ -55,19 +55,26 @@
 
 	let s = $derived(schemaVykresu(vstup));
 
+	// najvyššia SKUTOČNE nakreslená vertikálna kóta na hárku — pri samostatne stojacej
+	// bokorys kreslí až po `vyskaZadna` (t.j. vyššie než predná svetlosť), takže čestná
+	// mierka MUSÍ zahrnúť aj ju (review nález #194 🟡: inak by úzka+vysoká samostatná
+	// zákazka reportovala mierku podhodnotenú ~1,5×; rovnaká disciplína ako
+	// `Math.max(vyskaPriStene, hlbka)` v PergolaNavrhVykres).
+	let najvyssiaVyska = $derived(
+		Math.max(
+			s.prednaSvetlost,
+			s.zadnaKonstrukcia.typ === 'samostatne' ? s.zadnaKonstrukcia.vyskaZadna : 0
+		) + s.zlabHrubka
+	);
+
 	let titleBlockData = $derived({
 		nazov: `PERGOLA NÁREZ — ${vstup.system}`,
 		projekt: 'automatizacie-montalu',
 		cisloVykresu: '—',
-		// čestná mierka z REÁLNEJ najväčšej kresby (šírka je najširší rozmer na hárku)
-		// voči dostupnej ploche — rovnaká disciplína ako vypocitajMierku inde (nikdy
-		// natvrdo "1:20").
-		mierka: vypocitajMierku(
-			s.sirka,
-			Math.max(s.prednaSvetlost + s.zlabHrubka, s.hlbka),
-			OBLAST_W * 0.6,
-			OBLAST_H
-		),
+		// čestná mierka z REÁLNEJ najväčšej kresby (šírka je najširší rozmer na hárku,
+		// najvyssiaVyska najvyšší) voči dostupnej ploche — rovnaká disciplína ako
+		// vypocitajMierku inde (nikdy natvrdo "1:20").
+		mierka: vypocitajMierku(s.sirka, Math.max(najvyssiaVyska, s.hlbka), OBLAST_W * 0.6, OBLAST_H),
 		revizia: '—',
 		varianta: 'NÁREZ',
 		vypracoval: '—',
@@ -159,6 +166,10 @@
 		])}
 		{@const feFit = centerAt(s.sirka, feVyska, feContent, scale)}
 		{@const podVFit = centerAt(s.sirka, s.hlbka, podContent, scale)}
+		<!-- pôdorys ZDIEĽA x0 s predným pohľadom, aby nohy sedeli pod sebou. Tu je to
+		     de-facto no-op (obe oblasti majú rovnaké x/w/mmW/scale), ale override
+		     drží zarovnanie explicitne aj keby sa layout niekedy rozišiel (rovnaká
+		     disciplína ako bazén, kde dlzkaKolajiska≠zatvorenaDlzka to robí nutným). -->
 		{@const podFit: FitResult = { ...podVFit, x0: feFit.x0, x1: feFit.x0 + s.sirka * scale }}
 
 		<g data-testid="pnr-predny-pohlad">
@@ -432,7 +443,7 @@
 		height={y1 - y0}
 		fill="none"
 		stroke={CIERNA}
-		stroke-width={obrysStroke(Math.min(X(s.sirka) - X(0), y1 - y0) * 0.5)}
+		stroke-width={obrysStroke(Math.min(X(s.sirka) - X(0), y1 - y0))}
 		data-testid="pnr-pod-obrys"
 	/>
 	<!-- predné nohy — štvorčeky na PREDNEJ hrane (dole, y1) -->
