@@ -106,4 +106,34 @@ export function chybaZaskleniaNavrhVstupu(v: ZaskleniaNavrhVstup): string | null
 	return null;
 }
 
+/** Jedno POHYBLIVÉ krídlo — 0-based index + smer posunu na SVG x-osi (-1 = doľava,
+ *  1 = doprava). */
+export interface PohyblivyPanel {
+	index: number;
+	znamienko: -1 | 1;
+}
+
+/** Ktoré krídlo(á) sú POHYBLIVÉ (a ktorým smerom) pri danom počte krídel a smere
+ *  otvárania — #168 bod 3 ("z výkresu sa nedá vyčítať, ktoré pole je pohyblivé").
+ *  Rovnaká konvencia ako `vodiaceIndexy()` v `$lib/vizual/geo/zasklenia.ts`
+ *  (zákaznícky 3D náhľad, #170) — zámerne NEZÁVISLÁ implementácia (tento súbor je
+ *  technický návrhový výkres, nie vizuál — žiadny import z `$lib/vizual/**`, viď
+ *  design komentár #168, aby `src/lib/vizual/**` ostal nedotknutý).
+ *
+ *  'PL' (P-L) = jedno krídlo VĽAVO (idx 0) ide doľava; 'LP' (L-P) = jedno krídlo
+ *  VPRAVO (idx n-1) ide doprava; 'OP' (opona) = OBE krajné krídlá sa rozchádzajú od
+ *  stredu. Jediné krídlo (n≤1, typicky FIX) sa NIKDY neoznačuje ako pohyblivé —
+ *  žiadna dráha, na výber niet. Prázdny smer ('' — appka `otvaranie` nezadala)
+ *  → nič neoznačíme (nikdy hádanie). */
+export function pohyblivePanely(n: number, smer: Smer): PohyblivyPanel[] {
+	if (!(n > 1) || !smer) return [];
+	if (smer === 'PL') return [{ index: 0, znamienko: -1 }];
+	if (smer === 'LP') return [{ index: n - 1, znamienko: 1 }];
+	// 'OP' — opona, oba kraje sa rozchádzajú od stredu
+	return [
+		{ index: 0, znamienko: -1 },
+		{ index: n - 1, znamienko: 1 }
+	];
+}
+
 export { VYKRES_REZIM_DEFAULT };

@@ -119,6 +119,48 @@ test('vyplnenie formulára nakreslí predný pohľad s kótami — 2 krídla (Ro
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #168 bod 2/3: väčšia hlavička (čitateľná) + šípka na pohyblivom krídle — priama
+// regresia nálezu "horná tretina prázdna, hlavička mikroskopická, nevidno ktoré pole
+// sa hýbe" (živá kontrola po #162, viď design komentár na #168).
+test('#168: väčší nadpis + šípka na pohyblivom krídle podľa smeru otvárania (P-L/L-P/Opona)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await vyplnFormular(page); // Robust 2K, 3000×2000, P-L
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// hlavička je čitateľná — MIN_TITLE_FONT (6) > pôvodných 4,5
+	const titulFontSize = await page.getByTestId('zn-titul').getAttribute('font-size');
+	expect(Number(titulFontSize)).toBeGreaterThanOrEqual(6);
+
+	// P-L: LEN krídlo 0 (vľavo) je pohyblivé, krídlo 1 (vpravo, jediné druhé pri n=2) nie
+	await expect(page.getByTestId('zn-pohyblive-pole-0')).toBeVisible();
+	await expect(page.getByTestId('zn-pohyblive-pole-1')).toHaveCount(0);
+
+	// zmena na L-P: pohyblivé je teraz posledné krídlo (index 1), nie prvé —
+	// „Vykresliť" nahradí formulár výsledkom, treba sa najprv vrátiť späť
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await page.getByLabel('Smer otvárania').selectOption('L - P');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('zn-pohyblive-pole-0')).toHaveCount(0);
+	await expect(page.getByTestId('zn-pohyblive-pole-1')).toBeVisible();
+
+	// Opona: OBIDVE krajné krídla sú pohyblivé
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await page.getByLabel('Smer otvárania').selectOption('Opona');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('zn-pohyblive-pole-0')).toBeVisible();
+	await expect(page.getByTestId('zn-pohyblive-pole-1')).toBeVisible();
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 // #162 bod 4: „bez rámčeka vpravo dole a bez konštrukčných mierok" — na rozdiel od
 // pergoly (ktorá titleBlock prop POSIELA) táto stránka VykresovyHarok volá BEZ
 // titleBlock, takže `title-block`/`tb-*` testidy sa NIKDY nevykreslia.
@@ -162,6 +204,13 @@ test('klín nad posuvom — vyplnené polia sa vykreslia s kótou', async ({ pag
 	await expect(page.getByTestId('zn-klin-obrys')).toHaveCount(1);
 	await expect(page.getByTestId('zn-klin-v1')).toHaveText('v1 80 mm');
 	await expect(page.getByTestId('zn-klin-v2')).toHaveText('v2 40 mm');
+	// review nález (#168): v1/v2 popisky museli čítať MIN_DIM_FONT (3) — pred
+	// opravou boli natvrdo 2,8 (pod deklarovanou spoločnou podlahou čitateľnosti
+	// z kompozicia.ts, ktorá tvrdí "NIKDY nekresli menšie").
+	const v1FontSize = await page.getByTestId('zn-klin-v1').getAttribute('font-size');
+	const v2FontSize = await page.getByTestId('zn-klin-v2').getAttribute('font-size');
+	expect(Number(v1FontSize)).toBeGreaterThanOrEqual(3);
+	expect(Number(v2FontSize)).toBeGreaterThanOrEqual(3);
 });
 
 test('ručná koľajnica — vyplnená horná dĺžka sa vykreslí ako poznámka', async ({ page }) => {
