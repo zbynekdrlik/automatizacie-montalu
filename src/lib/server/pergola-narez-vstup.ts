@@ -34,6 +34,14 @@ function hornyProfil(form: FormData): HornyProfil {
 
 const bool = (form: FormData, k: string) => form.get(k) === '1' || form.get(k) === 'on';
 
+/** voliteľné číslo: prázdne pole → null (nezadané), inak parsované (čiarka → bodka). */
+function numOrNull(form: FormData, k: string): number | null {
+	const raw = String(form.get(k) ?? '').trim();
+	if (raw === '') return null;
+	const x = parseFloat(raw.replace(',', '.'));
+	return Number.isFinite(x) ? x : null;
+}
+
 export function parsePergolaNarezVstup(form: FormData): {
 	vstup: PergolaNarezVstup;
 	error: string | null;
@@ -51,7 +59,9 @@ export function parsePergolaNarezVstup(form: FormData): {
 		pocetZadnychNoh: Math.round(num(form, 'pocetZadnychNoh')) || 0,
 		hornyProfilZadnej: hornyProfil(form),
 		prieckaLight: bool(form, 'prieckaLight'),
-		zosilnenyNosnik: bool(form, 'zosilnenyNosnik')
+		zosilnenyNosnik: bool(form, 'zosilnenyNosnik'),
+		// #161 — voliteľný sklon strechy pre krov uloženie (prázdne → null = nezadané)
+		sklonStrechy: numOrNull(form, 'sklonStrechy')
 	};
 
 	const error = chybaPergolaNarezVstupu(vstup);

@@ -189,3 +189,62 @@ test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// --- Krov uloženie (#161) — potvrdené vzorce prahu 7° --------------------------
+test('krov uloženie 8°: karta aj výkres ukážu potvrdené hodnoty (ps=0.52, lv=0.66), frézovanie ostáva #161', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5760');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.locator('#sklonStrechy').fill('8'); // verifikačný vektor
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// výstupná karta — potvrdené uloženie
+	const karta = page.getByTestId('krov-ulozenie');
+	await expect(karta).toBeVisible();
+	await expect(karta).toContainText('dva dotyky'); // > 7° režim
+	await expect(page.getByTestId('krov-ps')).toContainText('0.52'); // ps=ls
+	await expect(page.getByTestId('krov-lv')).toContainText('0.66'); // lv=pv
+
+	// výkres — uloženie detail nahradil generickú poznámku
+	await expect(page.getByTestId('pnr-krov-ulozenie')).toContainText('ULOŽENIE');
+	await expect(page.getByTestId('pnr-krov-ulozenie-hodnoty')).toContainText('0,52');
+	await expect(page.getByTestId('pnr-krov-ulozenie-hodnoty')).toContainText('0,66');
+	await expect(page.getByTestId('pnr-krov-trojuholnik')).toHaveCount(1);
+	// frézovanie (výrobný list) STÁLE nepodporované → #161
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('frézovanie');
+	// bokorys poznámka odkazuje na uloženie, stále nesie #161
+	await expect(page.getByTestId('pnr-bok-krov-pozn')).toContainText('#161');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('krov uloženie pod 7° (5°): čestne „nepodporované" (O5), nič sa nehádže, výkres ostáva placeholder', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5760');
+	await page.locator('#sklonStrechy').fill('5'); // pod prahom 7°
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// karta hlási nepodporované, žiadne vymyslené hodnoty
+	await expect(page.getByTestId('krov-nepodporovane')).toContainText('pod prahom 7°');
+	await expect(page.getByTestId('krov-ulozenie')).toHaveCount(0);
+	// výkres ostáva čestný placeholder → #161 (nie uloženie detail)
+	await expect(page.getByTestId('pnr-krov-ulozenie')).toHaveCount(0);
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
+
+	expect(consoleMsgs).toEqual([]);
+});

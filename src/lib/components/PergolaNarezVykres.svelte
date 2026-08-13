@@ -15,7 +15,7 @@
 	// bokorys (bočný rez), pôdorys (mriežka nôh).
 	import VykresovyHarok from '$lib/components/vykres/VykresovyHarok.svelte';
 	import Kota from '$lib/components/vykres/Kota.svelte';
-	import { fmtMm } from '$lib/vykres/kota';
+	import { fmtMm, fmtDeg } from '$lib/vykres/kota';
 	import { vypocitajMierku } from '$lib/vykres/mierka';
 	import {
 		sharedFitScale,
@@ -26,6 +26,7 @@
 		type FitResult
 	} from '$lib/vykres/kompozicia';
 	import { schemaVykresu, MAX_ROZOSTUP_PRIECOK, type PergolaNarezVstup } from '$lib/pergola-narez';
+	import { krovUlozenie, type KrovUlozenie } from '$lib/pergola-krov';
 
 	let {
 		vstup,
@@ -54,6 +55,21 @@
 	const TB_W = 92;
 
 	let s = $derived(schemaVykresu(vstup));
+
+	// #161 — krov uloženie z POTVRDENÝCH vzorcov (prah 7°). Počíta sa LEN keď je sklon
+	// strechy zadaný; inak (a pri sklone < 7°, ktorý engine hlási ako „nepodporované")
+	// ostáva krov len čestnou poznámkou → #161, presne ako doteraz (#194). NIKDY sa
+	// nekreslí sklon/uloženie, ktoré engine nepotvrdil.
+	let krov: KrovUlozenie | null = $derived(
+		vstup.sklonStrechy != null ? krovUlozenie(vstup.sklonStrechy) : null
+	);
+	let krovRezimText = $derived(
+		krov?.rezim === 'rovnobezne'
+			? `= ${7}° — krov leží rovnobežne s hranou`
+			: krov?.rezim === 'otvara'
+				? '> 7° — dva dotyky + previs'
+				: ''
+	);
 
 	// najvyššia SKUTOČNE nakreslená vertikálna kóta na hárku — pri samostatne stojacej
 	// bokorys kreslí až po `vyskaZadna` (t.j. vyššie než predná svetlosť), takže čestná
@@ -409,14 +425,16 @@
 			fontSize={MIN_DIM_FONT}
 		/>
 	{/if}
-	<!-- poznámka o zjednodušenom krove priamo v pohľade -->
+	<!-- poznámka o krove priamo v pohľade — keď je uloženie potvrdené (sklon zadaný ≥ 7°),
+	     odkáž na uloženie detail; inak zjednodušený obrys. VŽDY nesie #161. -->
 	<text
 		x={r.x + r.w * 0.5}
 		y={baseY + r.h * 0.26}
 		text-anchor="middle"
 		font-size={MIN_SPEC_FONT}
 		fill={SIVA}
-		data-testid="pnr-bok-krov-pozn">krov zjednodušený → #161</text
+		data-testid="pnr-bok-krov-pozn"
+		>{krov?.podporovane ? 'krov: uloženie #161 (detail nižšie)' : 'krov zjednodušený → #161'}</text
 	>
 {/snippet}
 
@@ -503,7 +521,7 @@
 	/>
 {/snippet}
 
-<!-- ============================= krov — poznámka (#161) ============================= -->
+<!-- ============================= krov — uloženie / poznámka (#161) ================= -->
 {#snippet krovPoznamka(r: { x: number; y: number; w: number; h: number })}
 	<rect
 		x={r.x}
@@ -516,26 +534,97 @@
 		stroke-dasharray="2,1.5"
 		data-testid="pnr-krov-ram"
 	/>
+	{#if krov?.podporovane}
+		{@render krovUlozenieDetail(r)}
+	{:else}
+		<!-- sklon nezadaný alebo < 7° (O5) → čestný placeholder, presne ako #194 -->
+		<text
+			x={r.x + r.w / 2}
+			y={r.y + r.h * 0.3}
+			text-anchor="middle"
+			font-size="3.2"
+			font-weight="700"
+			fill={CIERNA}>KROV / STRECHA</text
+		>
+		<text
+			x={r.x + r.w / 2}
+			y={r.y + r.h * 0.42}
+			text-anchor="middle"
+			font-size={MIN_SPEC_FONT}
+			fill={SIVA}
+			data-testid="pnr-krov-pozn"
+		>
+			<tspan x={r.x + r.w / 2} dy="0">detail krovu (sklon 7°, rozostup,</tspan>
+			<tspan x={r.x + r.w / 2} dy="3.4">frézovanie) doplní konštruktér</tspan>
+			<tspan x={r.x + r.w / 2} dy="3.4">→ #161</tspan>
+		</text>
+		{#if krov && krov.rezim === 'nepodporovane'}
+			<text
+				x={r.x + r.w / 2}
+				y={r.y + r.h * 0.42 + 12}
+				text-anchor="middle"
+				font-size={MIN_SPEC_FONT}
+				fill={SIVA}
+				data-testid="pnr-krov-pod7"
+				>zadaný sklon {fmtDeg(krov.sklonStupne ?? 0)} &lt; 7° — uloženie O5 (nepodporované)</text
+			>
+		{/if}
+	{/if}
+{/snippet}
+
+<!-- Uloženie detail — LEN potvrdené hodnoty (prah 7°). Schematický trojuholník je
+     zámerne NIE v mierke (uloženie je sub-mm oproti 29 mm odvesne) — všetky KÓTY sú
+     potvrdené, len proporcia je schéma. Nič sa nevymýšľa. -->
+{#snippet krovUlozenieDetail(r: { x: number; y: number; w: number; h: number })}
+	{@const cx = r.x + r.w / 2}
+	{@const pad = 3}
 	<text
-		x={r.x + r.w / 2}
-		y={r.y + r.h * 0.34}
+		x={cx}
+		y={r.y + pad + 1}
 		text-anchor="middle"
 		font-size="3.2"
 		font-weight="700"
-		fill={CIERNA}>KROV / STRECHA</text
+		fill={CIERNA}
+		data-testid="pnr-krov-ulozenie">KROV — ULOŽENIE (#161)</text
 	>
+	<g font-size={MIN_SPEC_FONT} fill={CIERNA} data-testid="pnr-krov-ulozenie-hodnoty">
+		<text x={r.x + pad} y={r.y + pad + 6}
+			><tspan font-weight="700">sklon {fmtDeg(krov?.sklonStupne ?? 0)}</tspan> · {krovRezimText}</text
+		>
+		<text x={r.x + pad} y={r.y + pad + 10.5}
+			>uhol2={krov?.uhol2} · uhol3={fmtDeg(krov?.uhol3 ?? 0)}</text
+		>
+		<text x={r.x + pad} y={r.y + pad + 15}
+			>odvesna c=29 → <tspan font-weight="700">ps=ls={fmtMm(krov?.ps ?? 0, 2)} mm</tspan></text
+		>
+		<text x={r.x + pad} y={r.y + pad + 19.5}
+			>odvesna cc=37,28 → <tspan font-weight="700">lv=pv={fmtMm(krov?.lv ?? 0, 2)} mm</tspan></text
+		>
+	</g>
+	<!-- schematický trojuholník uloženia (ps–c–konštanta), NIE v mierke -->
+	{@const triY = r.y + r.h - pad - 9}
+	{@const triX0 = r.x + pad + 2}
+	{@const triW = Math.min(26, r.w - 2 * pad - 30)}
+	{@const triH = 6}
+	<g data-testid="pnr-krov-trojuholnik" stroke={MODRA} stroke-width="0.4" fill="none">
+		<polygon points="{triX0},{triY} {triX0 + triW},{triY} {triX0 + triW},{triY - triH}" />
+	</g>
+	<g font-size={MIN_SPEC_FONT} fill={SIVA}>
+		<text x={triX0 + triW / 2} y={triY + 3} text-anchor="middle">c 29</text>
+		<text x={triX0 + triW + 1.5} y={triY - triH / 2} text-anchor="start"
+			>ps {fmtMm(krov?.ps ?? 0, 2)}</text
+		>
+		<text x={triX0 + triW + 12} y={triY} text-anchor="start">schéma (nie v mierke)</text>
+	</g>
+	<!-- to, čo OSTÁVA nepodporované — frézovanie výrobného listu → #161 -->
 	<text
-		x={r.x + r.w / 2}
-		y={r.y + r.h * 0.44}
+		x={cx}
+		y={r.y + r.h - pad}
 		text-anchor="middle"
 		font-size={MIN_SPEC_FONT}
 		fill={SIVA}
-		data-testid="pnr-krov-pozn"
+		data-testid="pnr-krov-pozn">frézovanie drážok (výrobný list) doplní konštruktér → #161</text
 	>
-		<tspan x={r.x + r.w / 2} dy="0">detail krovu (sklon 7°, rozostup,</tspan>
-		<tspan x={r.x + r.w / 2} dy="3.4">frézovanie) doplní konštruktér</tspan>
-		<tspan x={r.x + r.w / 2} dy="3.4">→ #161</tspan>
-	</text>
 {/snippet}
 
 <!-- ============================= spec (potvrdené rozmery) ============================= -->

@@ -1,10 +1,12 @@
 ---
 paths:
   - 'src/lib/pergola-narez.ts'
+  - 'src/lib/pergola-krov.ts'
   - 'src/lib/server/pergola-narez-vstup.ts'
   - 'src/lib/components/PergolaNarezVykres.svelte'
   - 'src/routes/pergola/narez/**'
   - 'tests/pergola-narez*.test.ts'
+  - 'tests/pergola-krov*.test.ts'
   - 'e2e/pergola-narez.spec.ts'
 ---
 
@@ -39,18 +41,32 @@ nohám). Overovací vektor: ZAK2026302 = 4× predná noha 2215 pri svetlosti 220
 Miešanie týchto dvoch je ľahká chyba (obe sú „light"). Priečka-light je Money kód
 tu; krov-light je konštrukcia inde (#161).
 
-## Krov vo výkrese = LEN zjednodušený obrys + poznámka → #161
+## Krov = uloženie (prah 7°) POTVRDENÉ (#161), frézovanie STÁLE poznámka → #161
 
-`PergolaNarezVykres.svelte` NIKDY nekreslí krovovú geometriu (sklon 7°, rozostup
-krovov, frézovanie drážok) — tá je #161 a O4/O5/O6 blokovaná. Kreslí:
-- **bokorys**: strecha = zjednodušený PRERUŠOVANÝ obrys medzi potvrdenými výškami
-  (predná svetlosť vpravo/nižšie, zadná výška vľavo/vyššie) — LEN pri samostatne
-  stojacej (na stenu je výška uloženia na stenu nepotvrdená → strecha sa NEKRESLÍ,
-  len poznámka).
-- **rezervovaný box „KROV / STRECHA — doplní konštruktér → #161"** (dashed, vzor
-  bazén `rezSekciou`).
-Keď #161 dodá krovovú geometriu, nahradí sa poznámka skutočným rezom — dovtedy je
-čestný placeholder povinný (nikdy vymyslený sklon).
+Call 13.8. dodal SE vzorce prahu 7° → potvrdená časť #161 je implementovaná v
+**`src/lib/pergola-krov.ts`** (`krovUlozenie(sklon)`), frézovanie výrobného listu
+ostáva otvorené. Disciplína „len POTVRDENÉ" platí BEZ zmeny:
+
+- **Engine `pergola-krov.ts`** počíta LEN vzorce z tabuľky scr_030 (POZOR: TANGENS,
+  nie sínus): `uhol2=IF(UHOL<=7,0,1)`, `uhol3=UHOL−7`, `ls=ps=tan(uhol3)·c+0,01`
+  (c=29), `lv=pv=tan(uhol3)·cc+0,01` (cc=37,28). Číselný vektor: 8° → ps=ls=0,52,
+  lv=pv=0,66. `< 7°` = „nepodporované" (O5 „prehodenie" bodu dotyku), nezadané =
+  „nezadane", `≥ 9–10°` pridá poznámku o zatváraní drážky (frézovací detail O5),
+  ale offsety ostávajú. NIKDY sa nehádže: pod-7° vetva, priradenie odvesny c/cc
+  prednej/zadnej hrane (O5), jednotka 0,01 (O5b), metrický prepočet (O14).
+- **Sklon strechy je SAMOSTATNÝ voliteľný vstup** (`sklonStrechy?`), NIE odvodený z
+  výšok/hĺbky — ten vzťah call nepotvrdil (SE má `uhol` oddelene od `výšok`).
+  Neodvodzuj sklon zo strechy medzi výškami — to by bol vymyslený rozmer.
+- **Výkres `PergolaNarezVykres.svelte`**: keď je sklon zadaný a ≥ 7° → krov-note box
+  vykreslí **uloženie detail** (režim prahu 7°, c=29/cc=37,28, ps=ls/lv=pv +
+  schematický trojuholník „nie v mierke") + ponechá „frézovanie drážok … → #161".
+  Keď sklon nezadaný alebo < 7° → SÚČASNÝ čestný placeholder „→ #161" (bez regresu,
+  E2E bez sklonu ostávajú zelené). Bokorys strechu stále kreslí len ako zjednodušený
+  PRERUŠOVANÝ obrys medzi výškami (samostatne stojaca) — sklon NElabeluje z uhla
+  (vzťah uhol↔výšky nepotvrdený), len inline poznámka odkáže na uloženie detail.
+- Schematický trojuholník je zámerne NIE v mierke (uloženie je sub-mm vs 29 mm
+  odvesna) — všetky KÓTY sú potvrdené, len proporcia je schéma; to nie je vymyslený
+  rozmer.
 
 ## Výkres stojí na zdieľanom `$lib/vykres` základe — NIKDY vlastný `<svg>`/mierka
 
