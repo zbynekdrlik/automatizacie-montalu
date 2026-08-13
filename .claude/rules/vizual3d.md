@@ -165,3 +165,48 @@ celým) sa dostala do prvého komentára tohto PR-u a chytil ju až
 adversariálny review (#181) — rovnaká trieda chyby ako sRGB/lineárny gotcha
 vyššie: over PRIAMYM prepočtom (`jadroR/rozlisenie × plná_strana_mm`),
 nikdy netvrď frakciu "×2" alebo "z polovice" bez prepočtu.
+
+## Testovanie `textury.ts` (procedurálne CanvasTexture) — NAHRÁVACÍ stub, nie no-op (#177)
+
+`tests/vizual-scena.test.ts`'s `FakeCanvas`/`FakeCtx` je zámerne NO-OP (testuje
+len POZÍCIU/GEOMETRIU meshov postavených NA textúre, obsah canvasu mu je
+jedno). Na otestovanie SAMOTNÝCH `textury.ts` generátorov (aké farby/rozmery/
+gradient vyprodukovali — presne toto #177 žiadalo) treba NAHRÁVACÍ stub:
+`FakeCtx` ukladá `createLinearGradient`/`createRadialGradient` argumenty +
+vrátený `FakeGradient`'s `addColorStop` páry + `fillRect` argumenty (vrátane
+`this.fillStyle` v čase volania) + `putImageData`'s posledný `ImageData`.
+Viď `tests/vizual-textury.test.ts`.
+
+**`THREE.CanvasTexture`'s `.image` drží presne canvas, ktorý dostala do
+konštruktora** (`three/src/textures/{Texture,CanvasTexture}.js`: `this.image
+= image`) — takto sa dá z VRÁTENEJ `Texture` vytiahnuť náš `FakeCanvas` a
+jeho nahratý `FakeCtx` bez toho, aby generátor musel čokoľvek exportovať
+navyše: `const canvas = tex.image as FakeCanvas; const ctx =
+canvas.getContext('2d');`.
+
+**`needsUpdate` na `THREE.Texture` je LEN SETTER (žiadny getter)** —
+`tex.needsUpdate` sa VŽDY vráti `undefined`, aj keď bol nastavený `true`
+(`three/src/textures/Texture.js`: `set needsUpdate(value) { if (value ===
+true) { this.version++; ... } }`, žiadny `get`). Over `tex.version >
+0` namiesto toho.
+
+**`vytvorDlazbuTexturu`/`vytvorStenuTexturu` používajú `Math.random()`**
+(jitter/šum) — pre DETERMINISTICKÝ test na fixný `vi.spyOn(Math,
+'random').mockReturnValue(<hodnota>)`, VŽDY v `try { … } finally {
+spy.mockRestore(); }` (reštart musí prebehnúť aj keď assertion zlyhá, inak
+zostane zmockovaný `Math.random` unikať do ĎALŠÍCH testov v tom istom
+súbore). `vytvorOblohuTexturu`/`vytvorKontaktnyTienTexturu` sú čisto
+deterministické už samy osebe (žiadny `Math.random`), netreba mockovať.
+
+## `THREE.Light` farba/intenzita read-back — `getHex(SRGBColorSpace)`, nie bez argumentu
+
+Na overenie, že `new THREE.DirectionalLight(0xfff4ea, 2.4)`/
+`HemisphereLight(sky, ground, i)` dostali presne tie hex hodnoty, ktoré im
+boli zadané: `light.color.getHex(THREE.SRGBColorSpace)` (round-trip presne
+naspäť na pôvodný hex) — VOLANIE BEZ ARGUMENTU aplikuje implicitnú
+colorspace konverziu a hodnota sa nezhoduje. `HemisphereLight` má navyše
+`.groundColor` (rovnaký `getHex(SRGBColorSpace)` postup). Pri pozičných
+svetlách (kľúčové svetlo §2.6 — FIXNÉ NAVŽDY, azimut/elevácia/vzdialenosť)
+prepočítaj OČAKÁVANÚ pozíciu z DOKUMENTOVANÝCH hodnôt priamo v teste
+(nezávislý `Math.cos`/`Math.sin` výpočet), nikdy len re-importuj
+implementáciu — inak test nezachytí budúcu tichú zmenu konštánt.

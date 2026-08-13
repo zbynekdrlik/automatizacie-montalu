@@ -1063,3 +1063,46 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   RAL 9006 — malý REZ SEKCIOU box, väčší bokorys/pôdorys, sekcie zarovnané) —
   0 console errors (len benígne GL driver warning), verzia v pätičke sedí s
   deployom.
+
+## #177 + #183 (jeden batch, 2026-08-13) — vizual testy + db.ts split
+
+- **#177**: chýbajúce unit testy `src/lib/vizual/textury.ts` (0 testov predtým)
+  + zvyšné netestované `scena.ts` exporty. `tests/vizual-scena.test.ts` (#174)
+  medzičasom pokryla `vytvorZem`/`vytvorStenu`/`vytvorKontaktnyTien` — scope
+  zúžený, žiadna duplicita. Nové súbory: `tests/vizual-textury.test.ts` (canvas
+  rozmery/colorSpace, deterministický výstup cez `vi.spyOn(Math,'random')`
+  pre dlažbu/stenu, presné gradient/radial-gradient parametre — regresný test
+  proti staršiemu jadroR/rozlisenie fraction nálezu), `tests/vizual-scena-svetla.test.ts`
+  (`vytvorSvetla` — FIXNÉ NAVŽDY §2.6 azimut/elevácia/vzdialenosť nezávisle
+  prepočítané, nie re-importované; `vytvorOblohu`; `disposeVsetko` dispose-
+  registry completeness vrátane regresie na "jedna zhodená výnimka nezabráni
+  disposu zvyšku"). Žiadny production kód sa nemenil.
+- **#183**: `src/lib/server/db.ts` (986 riadkov, `migrate()` sama 679) sa blížil
+  k 1000-riadkovému stropu. Presunuté do nového `src/lib/server/migracie.ts`
+  (795 riadkov): `migrate(db, hashPassword)` berie oboje ako PARAMETRE (nie
+  import z `./db`) — žiadny cyklický import. `db.ts` (209 riadkov) zostal len
+  pripojenie + `hashPassword`/`verifyPassword` + query API. Nulová zmena
+  správania — overené fresh-context review agentom byte-for-byte normalizovaným
+  diffom (prázdny) + celou sadou 14+ migračných testov.
+- Fresh-context deep-review subagent (jeden pass pre oba tikety): 0 🔴 0 🟡 0 🔵.
+  Nezávisle prepočítal viacero deterministických assertion (dlažba/stena
+  matematika, svetlá trig), nezávisle overil `.image`/`needsUpdate` proti
+  reálnemu three.js zdroju, nezávisle spustil celú sadu (95/1223 zelené),
+  lint, svelte-check.
+- **Nájdený a nahlásený airuleset bug** (samostatný ticket, `zbynekdrlik/airuleset#436`):
+  `hooks/post-record-design-comment.sh` nepíše design/validated/reviewed
+  marker pre workera dispatchnutého do INÉHO repozitára než je jeho session
+  cwd (cross-repo dispatch) — používa surové `cwd` z payloadu namiesto
+  `resolve_work_cwd(cmd, cwd)`-štýlového rozpoznania inline `cd <path> &&`
+  prefixu, ktoré `block-commit-without-design.sh` už má. Workaround v TOMTO
+  behu: markery zapísané priamo cez `design_gate.write_marker()` s overenou
+  evidenciou (komentár už klasifikoval `ok`, len marker sa nezapísal).
+- Commity: `f086ffb`(bump 0.17.6-dev.1) → `de4b074`(test #177) →
+  `6075936`(refactor #183 db.ts split) → `b0a1ac4`(bump 0.17.6 pred mergom).
+- PR #190 (dev→main), merge `b107173`. main CI (test/build/E2E/deploy) zelené.
+  Nasadená verzia `0.17.6 (b107173)`.
+- Post-deploy overenie na `app.montalu.cloud` (LIVE): `/health` `{"ok":true,
+  "version":"0.17.6 (b107173)","live":true}`, Playwright DOM footer
+  `v0.17.6 (b107173)` sedí, 0 console errors/warnings. Žiadna user-viditeľná
+  zmena v tomto batchi (test coverage + interný refaktor) — potvrdené, nie
+  vymyslené.

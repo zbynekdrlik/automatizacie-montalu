@@ -116,3 +116,6 @@ Load the matching skill BEFORE working on that area (don't re-derive):
   `@page` print, SVG arc sweep round-trip check)
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` (nové pole do `odpis_log.detail`,
   FormData `\r\n` test gotcha) → auto-loads `.claude/rules/odpis-detail.md` on its `paths:`
+- `src/lib/server/**` súbor blížiaci sa k 1000-riadkovému stropu → auto-loads
+  `.claude/rules/large-file-split.md` on its `paths:` (parameter-injection split
+  vzor, pure-move overenie diffom)
