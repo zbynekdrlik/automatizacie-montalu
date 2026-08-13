@@ -25,6 +25,8 @@ const ZAKAZANE_VZORY = [
 
 const SUBORY = [
 	'src/lib/pergola-narez.ts',
+	// #161 — krov uloženie engine je tiež LEN potvrdené vzorce, display-only
+	'src/lib/pergola-krov.ts',
 	'src/lib/server/pergola-narez-vstup.ts',
 	'src/routes/pergola/narez/+page.server.ts',
 	'src/routes/pergola/narez/+page.svelte',
