@@ -1,12 +1,12 @@
 <script lang="ts">
 	// Pergola — materiál/nárez z rozmerov (#155). DISPLAY-ONLY: nič sa neposiela do
 	// Money (Money odpis z CAD nárezu ostáva na pôvodnej stránke /pergola). Formulár →
-	// výsledok (materiálová tabuľka + informatívne výpočty + schéma čelného pohľadu +
-	// zoznam „zatiaľ nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6).
+	// výsledok (materiálová tabuľka + informatívne výpočty + zoznam „zatiaľ
+	// nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6). Vizuálny výkres
+	// (schéma z rozmerov) je vyčlenený do samostatného ticketu — nie je v tomto PR.
 	import { resolve } from '$app/paths';
 	import {
 		spocitajNarez,
-		schemaCelnehoPohladu,
 		PREDNA_SVETLOST_STD,
 		MAX_ROZOSTUP_PRIECOK,
 		type PergolaNarezVstup,
@@ -67,17 +67,8 @@
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
-	let schema = $derived(step === 'vysledok' ? schemaCelnehoPohladu(vstup) : null);
 
 	const mm = (n: number | null) => (n === null ? '— (čaká na výkres)' : `${n} mm`);
-
-	// SVG schéma čelného pohľadu — súradnice v mm (viewBox), škáluje sa cez width:100%.
-	const MARGIN = 500;
-	const BEAM = 90;
-	const LEG = 70;
-	let svgW = $derived(schema ? schema.sirka + 2 * MARGIN : 0);
-	let svgH = $derived(schema ? schema.nohaVyska + 2 * MARGIN + BEAM : 0);
-	let pismo = $derived(schema ? Math.max(180, Math.round(schema.sirka / 26)) : 200);
 </script>
 
 <svelte:head><title>Pergola — materiál/nárez z rozmerov</title></svelte:head>
@@ -237,7 +228,7 @@
 			<button class="btn" type="submit" data-testid="spocitat">Spočítať materiál</button>
 		</form>
 	</div>
-{:else if step === 'vysledok' && vysledok && schema}
+{:else if step === 'vysledok' && vysledok}
 	<div class="card">
 		<h1 data-testid="narez-nadpis">
 			Materiál/nárez — {vstup.system}
@@ -312,79 +303,6 @@
 			Výstuha je informatívna — profil (Robust 250×110/230×110, Massive 200×140) a per-systém
 			varianta (šírka − 2×noha) čakajú na potvrdenie (O2/O3).
 		</p>
-	</div>
-
-	<div class="card">
-		<div class="sec">Schéma — čelný pohľad (z potvrdených vzorcov)</div>
-		<p class="sub noprint">
-			Predné nohy rovnomerne po šírke, výška = svetlosť + 15, horný nosník. <b
-				>Krov (krokvy) sa zámerne nekreslí</b
-			>
-			— geometria je v #161; plný zákaznícky výkres má
-			<a href={resolve('/pergola/navrh')}>Pergola návrh</a>.
-		</p>
-		<div style="overflow:auto">
-			<svg
-				data-testid="narez-schema"
-				viewBox="{-MARGIN} {-BEAM - MARGIN} {svgW} {svgH}"
-				style="width:100%;max-width:720px;height:auto;background:#fff"
-				shape-rendering="crispEdges"
-			>
-				<!-- horný nosník -->
-				<rect
-					x="0"
-					y={-BEAM}
-					width={schema.sirka}
-					height={BEAM}
-					fill="#eff6ff"
-					stroke="#0f172a"
-					stroke-width="8"
-				/>
-				<!-- predné nohy -->
-				{#each schema.nohyX as x (x)}
-					<rect
-						data-testid="schema-noha"
-						x={x - LEG / 2}
-						y="0"
-						width={LEG}
-						height={schema.nohaVyska}
-						fill="#fff"
-						stroke="#0f172a"
-						stroke-width="8"
-					/>
-				{/each}
-				<!-- zem -->
-				<line
-					x1={-MARGIN / 2}
-					y1={schema.nohaVyska}
-					x2={schema.sirka + MARGIN / 2}
-					y2={schema.nohaVyska}
-					stroke="#0f172a"
-					stroke-width="6"
-				/>
-				<!-- kóta šírky -->
-				<text
-					x={schema.sirka / 2}
-					y={schema.nohaVyska + MARGIN * 0.7}
-					font-size={pismo}
-					text-anchor="middle"
-					fill="#1d4ed8"
-				>
-					šírka {schema.sirka}
-				</text>
-				<!-- kóta výšky nohy -->
-				<text
-					x={-MARGIN * 0.15}
-					y={schema.nohaVyska / 2}
-					font-size={pismo}
-					text-anchor="middle"
-					fill="#1d4ed8"
-					transform="rotate(-90 {-MARGIN * 0.15} {schema.nohaVyska / 2})"
-				>
-					noha {schema.nohaVyska}
-				</text>
-			</svg>
-		</div>
 	</div>
 
 	<div class="card">

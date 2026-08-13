@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import { goto, loginAs, collectConsole, waitHydrated } from './helpers';
 
-test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noha 2215, schéma, nepodporované', async ({
+test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noha 2215, nepodporované', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -33,10 +33,6 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 
 	// informatívne: výstuha = 5760 − 280 = 5480
 	await expect(page.getByTestId('vystuha-rez')).toContainText('5480');
-
-	// schéma čelného pohľadu — 4 predné nohy
-	await expect(page.getByTestId('narez-schema')).toBeVisible();
-	await expect(page.getByTestId('schema-noha')).toHaveCount(4);
 
 	// zatiaľ nepodporované — krov (ticket 161), žľab, sklá vypísané, nič sa nehádže
 	const nepodp = page.getByTestId('narez-nepodporovane');

@@ -189,34 +189,6 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	};
 }
 
-/** Geometria jednoduchej schémy ČELNÉHO pohľadu z potvrdených vzorcov — predné nohy
- *  rovnomerne po šírke (rozostupy dopočítané), výška nohy = svetlosť + 15, horný
- *  nosník po celej šírke. Krov (krokvy) sa VEDOME NEKRESLÍ (geometria je #161).
- *  Čistá funkcia — SVG ju vykreslí +page.svelte. */
-export interface SchemaCelnehoPohladu {
-	sirka: number;
-	nohaVyska: number;
-	/** X pozície predných nôh [mm], 0..šírka, rovnomerne (počet = pocetPrednychNoh) */
-	nohyX: number[];
-	pocetPriecok: number;
-}
-
-export function schemaCelnehoPohladu(v: PergolaNarezVstup): SchemaCelnehoPohladu {
-	const n = Math.max(1, Math.round(v.pocetPrednychNoh));
-	const nohyX: number[] = [];
-	if (n === 1) {
-		nohyX.push(0);
-	} else {
-		for (let i = 0; i < n; i++) nohyX.push(R1((v.sirka * i) / (n - 1)));
-	}
-	return {
-		sirka: v.sirka,
-		nohaVyska: R1(v.prednaSvetlost + PREDNA_NOHA_PRIDAVOK),
-		nohyX,
-		pocetPriecok: pocetPriecok(v.sirka)
-	};
-}
-
 /** Serverová validácia rozsahov — Slovak chybová hláška, alebo null keď je vstup
  *  platný. Server je jediný strážca rozsahov (rovnaká disciplína ako fix.ts /
  *  pergola-navrh.ts). */

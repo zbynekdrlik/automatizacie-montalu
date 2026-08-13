@@ -11,7 +11,6 @@ import { describe, it, expect } from 'vitest';
 import {
 	spocitajNarez,
 	chybaPergolaNarezVstupu,
-	schemaCelnehoPohladu,
 	SYSTEMY,
 	PREDNA_SVETLOST_STD,
 	PREDNA_NOHA_PRIDAVOK,
@@ -209,18 +208,5 @@ describe('chybaPergolaNarezVstupu — validácia rozsahov', () => {
 		expect(
 			chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'samostatne', pocetZadnychNoh: 1 })
 		).toMatch(/zadných nôh/i);
-	});
-});
-
-describe('schemaCelnehoPohladu — čelný pohľad z potvrdených vzorcov (schéma, krov vynechaný)', () => {
-	it('predné nohy rozmiestnené rovnomerne po šírke (4 nohy 5760 → x = 0,1920,3840,5760)', () => {
-		const s = schemaCelnehoPohladu({ ...VZOR, sirka: 5760, pocetPrednychNoh: 4 });
-		expect(s.nohyX).toEqual([0, 1920, 3840, 5760]);
-		expect(s.nohaVyska).toBe(2215);
-		expect(s.sirka).toBe(5760);
-	});
-	it('počet priečok v schéme = engine počet', () => {
-		const s = schemaCelnehoPohladu({ ...VZOR, sirka: 5000 });
-		expect(s.pocetPriecok).toBe(9);
 	});
 });
