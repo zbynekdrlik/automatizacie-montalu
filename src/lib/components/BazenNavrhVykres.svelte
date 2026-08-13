@@ -11,10 +11,17 @@
 	// zámerne PRÁZDNE s poznámkou "Rez sekciou doplní konštruktér", NIKDY
 	// vymyslený oblúk (#163 — tvar nesedí na kruh ani elipsu, viď design
 	// komentár na #139).
+	//
+	// #168: REZ SEKCIOU (kým #163 nedoplní skutočný rez) je zámerne MALÝ pevný
+	// poznámkový box namiesto stĺpca cez celú výšku hárku — uvoľňuje priestor
+	// bokorysu/pôdorysu, ktoré teraz zdieľajú JEDNU mierku cez `sharedFitScale`
+	// (kompozicia.ts) a sú vycentrované vo svojich riadkoch (namiesto doterajšieho
+	// fixného `bokH*0.55`/`podH*0.6` odsadu) — viď design komentár na #168.
 	import VykresovyHarok from '$lib/components/vykres/VykresovyHarok.svelte';
 	import Kota from '$lib/components/vykres/Kota.svelte';
 	import { fmtMm } from '$lib/vykres/kota';
 	import { vypocitajMierku } from '$lib/vykres/mierka';
+	import { sharedFitScale, centerAt, MIN_SPEC_FONT, type FitResult } from '$lib/vykres/kompozicia';
 	import {
 		variantaZSekcii,
 		presahKolajniska,
@@ -145,14 +152,78 @@
 		     komentár), len navyše hore namiesto dole. -->
 		{@const topPad = 14}
 		{@const gap = oblast.w * 0.015}
-		{@const rezW = oblast.w * 0.17}
-		{@const rez = { x: oblast.x, y: oblast.y + topPad, w: rezW, h: oblast.h - topPad }}
-		{@const mainX = oblast.x + rezW + gap}
-		{@const mainW = oblast.w - rezW - gap}
-		{@const bokH = (oblast.h - topPad) * 0.32}
-		{@const podH = (oblast.h - topPad) * 0.3}
-		{@const bok = { x: mainX, y: oblast.y + topPad, w: mainW, h: bokH }}
-		{@const pod = { x: mainX, y: bok.y + bokH + gap, w: mainW, h: podH }}
+		<!-- #168: REZ SEKCIOU je odteraz MALÝ pevný poznámkový box (nesie len 2-3
+		     riadky textu, kým #163 nedoplní skutočný rez) namiesto stĺpca
+		     `oblast.w*0.17` × CELÁ výška — bokorys/pôdorys dostanú CELÚ šírku
+		     hárku namiesto zúženého `mainW`. -->
+		{@const noteW = 52}
+		{@const noteH = 24}
+		{@const specRowH = 42}
+		{@const viewsY = oblast.y + topPad}
+		{@const viewsH = Math.max(1, oblast.h - topPad - specRowH - gap)}
+		{@const views = { x: oblast.x, y: viewsY, w: oblast.w, h: viewsH }}
+		<!-- bokorys/pôdorys NEDOSTÁVAJÚ rovnaký 50/50 výškový pás — bokorys je takmer
+		     vždy pomerovo VEĽMI plochý (výška čela/sekcie rádovo stovky mm oproti
+		     mnohometrovej dĺžke koľajiska), zatiaľ čo pôdorys býva bližšie k
+		     štvorcu (hĺbka vs zatvorená dĺžka) a teda potrebuje VIAC výšky, aby ho
+		     `sharedFitScale` (spoločná mierka OBOCH pohľadov) nezviazal na
+		     bokorysov zbytočne veľký, no nevyužitý výškový pás. Pomer sa odvíja od
+		     reálnych rozmerov (vyskaMax vs hlbka), s podlahou/stropom, aby ani
+		     extrémny vstup nezmenšil bokorysovu vlastnú hlavičku+kóty pod
+		     čitateľnosť ani nepripravil pôdorys o väčšinový podiel. -->
+		{@const bokFrac = Math.min(
+			0.42,
+			Math.max(0.22, vstup.vyskaMax / (vstup.vyskaMax + vstup.hlbka))
+		)}
+		{@const bokH = viewsH * bokFrac}
+		{@const vgap = viewsH * 0.06}
+		{@const podH = Math.max(1, viewsH - bokH - vgap)}
+		{@const bok = { x: views.x, y: views.y, w: views.w, h: bokH }}
+		{@const pod = { x: views.x, y: views.y + bokH + vgap, w: views.w, h: podH }}
+		<!-- vlastná kresliaca podoblasť KAŽDÉHO pohľadu — hore odsadené pre jeho
+		     nadpis ("BOKORYS"/"PÔDORYS"), dole pre jeho kóty (bokorys má TROJICU
+		     kót pod sebou — šírka/dĺžka+presah/celková dĺžka, potrebuje viac
+		     miesta než pôdorys s jednou). -->
+		{@const bokTitlePad = bokH * 0.12}
+		{@const bokDimPad = bokH * 0.32}
+		{@const bokContent = {
+			x: bok.x,
+			y: bok.y + bokTitlePad,
+			w: bok.w,
+			h: Math.max(1, bokH - bokTitlePad - bokDimPad)
+		}}
+		{@const podTitlePad = podH * 0.12}
+		{@const podDimPad = podH * 0.2}
+		{@const podContent = {
+			x: pod.x,
+			y: pod.y + podTitlePad,
+			w: pod.w,
+			h: Math.max(1, podH - podTitlePad - podDimPad)
+		}}
+		<!-- jedna spoločná dĺžková mierka pre bokorys AJ pôdorys (aby stĺpiky
+		     sekcií v oboch pohľadoch vizuálne sedeli pod sebou — rovnaká
+		     projekčná disciplína ako v reálnych CAD výkresoch), teraz cez zdieľaný
+		     `sharedFitScale` (kompozicia.ts, #168) namiesto ručného
+		     `Math.min(scaleLenW, scaleBokH, scalePodH)`. Vodorovný počiatok (X=0,
+		     rovnaký reálny bod pre OBA pohľady — koľajisko aj zatvorená dĺžka
+		     začínajú na tej istej hrane) sa NESMIE centrovať nezávisle (dlzkaKolajiska
+		     ≠ zatvorenaDlzka by inak posunulo počiatky a stĺpiky sekcií by sa
+		     rozišli) — zdieľa sa z BOKORYSU (dlzkaKolajiska je vždy ten širší z
+		     oboch, `presahKolajniska` garantuje dlzkaKolajiska > zatvorenaDlzka). -->
+		{@const scale = sharedFitScale([
+			{ mmW: vstup.dlzkaKolajiska, mmH: vstup.vyskaMax, area: bokContent },
+			{ mmW: vstup.zatvorenaDlzka, mmH: vstup.hlbka, area: podContent }
+		])}
+		{@const bokFit = centerAt(vstup.dlzkaKolajiska, vstup.vyskaMax, bokContent, scale)}
+		{@const podVFit = centerAt(vstup.zatvorenaDlzka, vstup.hlbka, podContent, scale)}
+		{@const podFit: FitResult = {
+			...podVFit,
+			x0: bokFit.x0,
+			x1: bokFit.x0 + vstup.zatvorenaDlzka * scale
+		}}
+
+		{@const noteRowY = oblast.y + oblast.h - specRowH}
+		{@const note = { x: oblast.x, y: noteRowY + (specRowH - noteH) / 2, w: noteW, h: noteH }}
 		<!-- review nález #139 (🟡): `spec` predtým siahal na CELÚ zvyšnú šírku
 		     mainW, ktorej pravý okraj sa PRESNE zhoduje s pravým okrajom pečiatky
 		     (tbX+TB_W === oblast.x+oblast.w) — dlhá voľnotextová hodnota (MODEL/
@@ -162,28 +233,20 @@
 		     len polohou regiónu (ktorá SVG <text> sama osebe neobmedzuje). -->
 		{@const tbX = oblast.x + oblast.w - TB_W}
 		{@const spec = {
-			x: mainX,
-			y: pod.y + podH + gap,
-			w: Math.max(0, tbX - 2 - mainX),
-			h: Math.max(0, oblast.y + oblast.h - (pod.y + podH + gap))
+			x: oblast.x + noteW + gap,
+			y: noteRowY,
+			w: Math.max(0, tbX - 2 - (oblast.x + noteW + gap)),
+			h: specRowH
 		}}
-		<!-- jedna spoločná dĺžková mierka pre bokorys AJ pôdorys (aby stĺpiky
-		     sekcií v oboch pohľadoch vizuálne sedeli pod sebou — rovnaká
-		     projekčná disciplína ako v reálnych CAD výkresoch) — limitované
-		     zdola šírkou stĺpca AJ výškou OBOCH riadkov, nikdy len jedným z nich. -->
-		{@const scaleLenW = (mainW * 0.82) / Math.max(vstup.dlzkaKolajiska, 1)}
-		{@const scaleBokH = (bokH * 0.55) / Math.max(vstup.vyskaMax, 1)}
-		{@const scalePodH = (podH * 0.6) / Math.max(vstup.hlbka, 1)}
-		{@const scale = Math.min(scaleLenW, scaleBokH, scalePodH)}
 
 		<g data-testid="bn-rez-sekciou">
-			{@render rezSekciou(rez)}
+			{@render rezSekciou(note)}
 		</g>
 		<g data-testid="bn-bokorys">
-			{@render bokorys(bok, scale)}
+			{@render bokorys(bok, bokFit)}
 		</g>
 		<g data-testid="bn-podorys">
-			{@render podorys(pod, scale)}
+			{@render podorys(pod, podFit)}
 		</g>
 		<g data-testid="bn-texty">
 			{@render texty(spec)}
@@ -214,23 +277,26 @@
 	>
 	<text
 		x={r.x + r.w / 2}
-		y={r.y + r.h * 0.5}
+		y={r.y + r.h * 0.52}
 		text-anchor="middle"
-		font-size="2.6"
+		font-size={MIN_SPEC_FONT}
 		fill="#64748b"
 		data-testid="bn-rez-sekciou-poznamka"
 	>
 		<tspan x={r.x + r.w / 2} dy="0">Rez sekciou</tspan>
-		<tspan x={r.x + r.w / 2} dy="3.4">doplní</tspan>
-		<tspan x={r.x + r.w / 2} dy="3.4">konštruktér</tspan>
+		<tspan x={r.x + r.w / 2} dy="3.6">doplní</tspan>
+		<tspan x={r.x + r.w / 2} dy="3.6">konštruktér</tspan>
 	</text>
 {/snippet}
 
 <!-- ============================= bokorys (kaskáda sekcií) ============================= -->
-{#snippet bokorys(r: { x: number; y: number; w: number; h: number }, scale: number)}
-	{@const baseY = r.y + r.h * 0.62}
-	{@const x0 = r.x + r.w * 0.07}
-	{@const X = (mm: number) => x0 + mm * scale}
+<!-- #168: `fit` (namiesto samostatného `scale`) nesie zdieľanú mierku AJ vopred
+     vycentrovanú pozíciu (x0/y0/y1) — bokorys/pôdorys sa už NEPOČÍTAJÚ nezávisle
+     s vlastným fixným `r.h*0.62` odsadom; `x0` je navyše ZDIEĽANÝ s pôdorysom
+     (viď `content` snippet vyššie), aby stĺpiky sekcií sedeli pod sebou. -->
+{#snippet bokorys(r: { x: number; y: number; w: number; h: number }, fit: FitResult)}
+	{@const baseY = fit.y1}
+	{@const X = (mm: number) => fit.x0 + mm * fit.scale}
 	<text
 		x={r.x + r.w * 0.5}
 		y={r.y + 3}
@@ -254,7 +320,7 @@
 	{#each vysky as vyskaSekcie, i (i)}
 		{@const sx0 = X(pozicie[i])}
 		{@const sx1 = X(pozicie[i + 1])}
-		{@const sy1 = baseY - vyskaSekcie * scale}
+		{@const sy1 = baseY - vyskaSekcie * fit.scale}
 		<rect
 			x={sx0}
 			y={sy1}
@@ -278,7 +344,7 @@
 		x0={X(pozicie[0])}
 		y0={baseY}
 		x1={X(pozicie[0])}
-		y1={baseY - vysky[0] * scale}
+		y1={baseY - vysky[0] * fit.scale}
 		perpOffset={-(r.w * 0.05)}
 		text={fmtMm(vysky[0])}
 		color={MODRA}
@@ -288,7 +354,7 @@
 		x0={X(pozicie[pozicie.length - 1])}
 		y0={baseY}
 		x1={X(pozicie[pozicie.length - 1])}
-		y1={baseY - vysky[vysky.length - 1] * scale}
+		y1={baseY - vysky[vysky.length - 1] * fit.scale}
 		perpOffset={r.w * 0.05}
 		text={fmtMm(vysky[vysky.length - 1])}
 		color={MODRA}
@@ -345,11 +411,13 @@
 {/snippet}
 
 <!-- ============================= pôdorys (dverová sekcia + smer) ============================= -->
-{#snippet podorys(r: { x: number; y: number; w: number; h: number }, scale: number)}
-	{@const x0 = r.x + r.w * 0.07}
-	{@const X = (mm: number) => x0 + mm * scale}
-	{@const y0 = r.y + r.h * 0.16}
-	{@const y1 = y0 + vstup.hlbka * scale}
+<!-- #168: `fit.x0` je ZDIEĽANÝ s bokorysom (viď `content` snippet) — X=0 musí byť
+     na ROVNAKEJ pozícii v oboch pohľadoch, aby deliace čiary sekcií vizuálne sedeli
+     pod sebou (rovnaká disciplína, akú predtým garantoval spoločný `mainX`/`r.w`). -->
+{#snippet podorys(r: { x: number; y: number; w: number; h: number }, fit: FitResult)}
+	{@const X = (mm: number) => fit.x0 + mm * fit.scale}
+	{@const y0 = fit.y0}
+	{@const y1 = fit.y1}
 	{@const dverySx0 = X(pozicie[vstup.dverovaSekcia - 1] ?? 0)}
 	{@const dverySx1 = X(pozicie[vstup.dverovaSekcia] ?? 0)}
 	{@const arrowY = (y0 + y1) / 2}
@@ -488,7 +556,7 @@
 			<text
 				x={r.x}
 				y={r.y + 4 + i * 4.6}
-				font-size="3"
+				font-size={MIN_SPEC_FONT}
 				fill={CIERNA}
 				data-testid={`bn-spec-${testid}`}><tspan font-weight="700">{label}:</tspan> {hodnota}</text
 			>

@@ -9,13 +9,27 @@
 	//
 	// Počet krídel (`vstup.n`) a všetky kóty vychádzajú PRIAMO zo vstupu — táto
 	// komponenta len KRESLÍ, nič neprepočítava paralelne (viď design komentár na #162).
+	//
+	// #168: kompozícia (mierka + vertikálne/vodorovné centrovanie elevácie, min.
+	// veľkosti písma) ide cez zdieľané `$lib/vykres/kompozicia.ts` primitívy — NAHRÁDZA
+	// doterajší fixný `baseY = r.y + r.h*0.85` odsad, ktorý bol príčinou nálezu "horná
+	// tretina hárku prázdna" (viď design komentár na #168). Pohyblivé/fixné krídla sa
+	// označujú šípkou (`pohyblivePanely`, `zasklenia-navrh.ts`) — nezávislá
+	// reimplementácia rovnakého pravidla, aké používa `$lib/vizual/geo/zasklenia.ts`
+	// (zákaznícky 3D náhľad), zámerne oddelená aby `$lib/vizual/**` ostal nedotknutý.
 	import VykresovyHarok from '$lib/components/vykres/VykresovyHarok.svelte';
 	import Kota from '$lib/components/vykres/Kota.svelte';
 	import { fitScale, fmtMm } from '$lib/vykres/kota';
+	import { fitCentered, MIN_TITLE_FONT, MIN_SUBTITLE_FONT } from '$lib/vykres/kompozicia';
 	import { farbaKonstrukcie } from '$lib/vykres/ral';
 	import { nazovSysStyl } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice } from '$lib/kolajnica';
-	import { deliaceStlpiky, smerZOtvarania, type ZaskleniaNavrhVstup } from '$lib/zasklenia-navrh';
+	import {
+		deliaceStlpiky,
+		smerZOtvarania,
+		pohyblivePanely,
+		type ZaskleniaNavrhVstup
+	} from '$lib/zasklenia-navrh';
 
 	let {
 		vstup,
@@ -74,12 +88,17 @@
 	let smer = $derived(smerZOtvarania(vstup.otvaranie));
 	let kolajnicaPopis = $derived(popisRucnejKolajnice(vstup.kolajnica));
 	let maKlin = $derived(!!vstup.klin);
+	// #168 bod 3: ktoré krídlo(á) sú pohyblivé (šípka priamo v elevácii) — čisto
+	// odvodené z n+smer, žiadne nové vstupné pole (viď design komentár #168).
+	let pohyblive = $derived(pohyblivePanely(n, smer));
 </script>
 
 <VykresovyHarok pageW={PAGE_W} pageH={PAGE_H} margin={MARGIN} gridBand={GRID_BAND}>
 	{#snippet content(oblast)}
 		{@const klinH = maKlin ? oblast.h * 0.16 : 0}
-		{@const headH = oblast.h * 0.07}
+		<!-- #168 bod 2: hlavička (nadpis/podnadpis) potrebuje viac miesta pre
+		     MIN_TITLE_FONT/MIN_SUBTITLE_FONT (predtým 0.07 pri menších fontoch 4,5/3) -->
+		{@const headH = oblast.h * 0.09}
 		{@const smerH = smer ? oblast.h * 0.08 : 0}
 		{@const kolH = kolajnicaPopis ? oblast.h * 0.05 : 0}
 		{@const ralH = vstup.ral ? oblast.h * 0.06 : 0}
@@ -122,12 +141,23 @@
 </VykresovyHarok>
 
 <!-- ============================= nadpis (žiadny rámček — #162 bod 4) ============================= -->
+<!-- #168 bod 2: MIN_TITLE_FONT/MIN_SUBTITLE_FONT (predtým 4,5/3 — pod pečiatkovým
+     tb-nazov=4, hoci na tomto hárku bez pečiatky je toto JEDINÉ miesto s menom zákazky) -->
 {#snippet nadpis(r: { x: number; y: number; w: number; h: number })}
-	<text x={r.x} y={r.y + 4} font-size="4.5" fill={CIERNA} font-weight="700" data-testid="zn-titul"
-		>{vstup.nazov || 'ZASKLENIE — NÁVRH'}</text
+	<text
+		x={r.x}
+		y={r.y + MIN_TITLE_FONT}
+		font-size={MIN_TITLE_FONT}
+		fill={CIERNA}
+		font-weight="700"
+		data-testid="zn-titul">{vstup.nazov || 'ZASKLENIE — NÁVRH'}</text
 	>
-	<text x={r.x} y={r.y + r.h - 1} font-size="3" fill={CIERNA} data-testid="zn-system"
-		>{nazovSysStyl(vstup.sysStyl)} · {datum}</text
+	<text
+		x={r.x}
+		y={r.y + r.h - 1}
+		font-size={MIN_SUBTITLE_FONT}
+		fill={CIERNA}
+		data-testid="zn-system">{nazovSysStyl(vstup.sysStyl)} · {datum}</text
 	>
 {/snippet}
 
@@ -175,15 +205,16 @@
 
 <!-- ============================= predný pohľad ============================= -->
 {#snippet elevacia(r: { x: number; y: number; w: number; h: number })}
-	{@const scale = fitScale(vstup.s, vstup.v, r.w * 0.82, r.h * 0.7)}
-	<!-- #162 review nález (🔵): headroom pod baseY je r.h*0.15 — celková-šírka
-	     Kota nižšie musí použiť perpOffset PRÍSNE menší než to (0.13), inak jej
-	     kótová čiara pretečie cez spodnú hranicu elevačnej oblasti do pásu smeru
-	     otvárania pod ňou, nezávisle od reálnych s/v/n. -->
-	{@const baseY = r.y + r.h * 0.85}
-	{@const x0 = r.x + r.w * 0.09}
-	{@const X = (mm: number) => x0 + mm * scale}
-	{@const topY = baseY - vstup.v * scale}
+	<!-- #168 bod 1: `fitCentered` NAHRÁDZA doterajší fixný `baseY = r.y + r.h*0.85`
+	     odsad — pri pomerovo širokom/nízkom obsahu (napr. 4200×2100mm) vo vysokej
+	     oblasti bola mierka limitovaná ŠÍRKOU a ušetrená výška sa hromadila HORE
+	     ako prázdny pás (design komentár #168, nález 1 "horná tretina prázdna").
+	     Vycentrovanie rieši oba smery naraz, so zdieľaným cieľom 60-75% plochy. -->
+	{@const fit = fitCentered(vstup.s, vstup.v, r)}
+	{@const scale = fit.scale}
+	{@const baseY = fit.y1}
+	{@const topY = fit.y0}
+	{@const X = (mm: number) => fit.x0 + mm * scale}
 	{@const minKridloMm = Math.min(...stlpiky.slice(1).map((x, i) => x - stlpiky[i]))}
 	{@const ramMm = Math.min(RAM_VIZ_MM, minKridloMm * 0.3, vstup.v * 0.3)}
 	{@const mulMm = Math.min(MULLION_VIZ_MM, minKridloMm * 0.4)}
@@ -229,6 +260,25 @@
 			stroke-width={obrysStroke(Math.min(gx1 - gx0, gh) * 0.5)}
 			data-testid={`zn-kridlo-${i}`}
 		/>
+	{/each}
+
+	<!-- #168 bod 3: sipka na POHYBLIVOM kridle (smer posunu) — vzor z realneho
+	     Solid Edge vykresu OP260027 (sipka priamo v zvyraznenej sekcii + text
+	     "dvere posuv. do lava" pod kresbou, vid design komentar #168). Fixne
+	     kridla ostavaju neoznacene (rovnaka konvencia ako vzor — len pohyblive
+	     sa zvyraznuju). -->
+	{#each pohyblive as p (p.index)}
+		{@const left = stlpiky[p.index] + (p.index === 0 ? ramMm : mulMm / 2)}
+		{@const right = stlpiky[p.index + 1] - (p.index === n - 1 ? ramMm : mulMm / 2)}
+		{@const gx0 = X(left) + 2}
+		{@const gx1 = Math.max(gx0 + 2, X(right) - 2)}
+		{@const midY = (topY + baseY) / 2}
+		{@const od = p.znamienko === -1 ? gx1 : gx0}
+		{@const po = p.znamienko === -1 ? gx0 : gx1}
+		<g data-testid={`zn-pohyblive-pole-${p.index}`}>
+			<line x1={od} y1={midY} x2={po} y2={midY} stroke={CIERNA} stroke-width="0.6" />
+			<polygon points={sipka(od, midY, po, midY, 4, 2.2)} fill={CIERNA} />
+		</g>
 	{/each}
 
 	<!-- kóty krídel + celková šírka -->

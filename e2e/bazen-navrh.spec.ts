@@ -115,6 +115,30 @@ test('vyplnenie formulára (OP260055) nakreslí bokorys/pôdorys s presnými kó
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #168: REZ SEKCIOU je odteraz MALÝ pevný poznámkový box (nie stĺpec cez celú výšku
+// hárku) — priama regresia živého nálezu "prázdny box zaberá tretinu šírky a dve
+// tretiny výšky, kresba zaberá ~pätinu hárku" (viď design komentár na #168).
+test('#168: REZ SEKCIOU je malý pevný box (nezaberá celú výšku hárku), bokorys/pôdorys sú väčšie', async ({
+	page
+}) => {
+	await loginAs(page);
+	await vyplnFormularOP260055(page);
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	const ramW = Number(await page.getByTestId('bn-rez-sekciou-ram').getAttribute('width'));
+	const ramH = Number(await page.getByTestId('bn-rez-sekciou-ram').getAttribute('height'));
+	// starý box: oblast.w*0.17 (~47mm) × takmer celá výška hárku (~184mm) — nový box
+	// je pevný a MALÝ v OBOCH rozmeroch (viď kompozicia.ts noteW=52/noteH=24)
+	expect(ramW).toBeLessThan(60);
+	expect(ramH).toBeLessThan(30);
+
+	// bokorys aj pôdorys sú stále prítomné a viditeľné (kompozícia sa zmenila,
+	// obsah nie)
+	await expect(page.getByTestId('bn-bokorys')).toBeVisible();
+	await expect(page.getByTestId('bn-podorys')).toBeVisible();
+});
+
 test('šírka prvej sekcie sa vykreslí LEN keď je ručne zadaná (appka nehádže vnorenie)', async ({
 	page
 }) => {
