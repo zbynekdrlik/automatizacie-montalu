@@ -1106,3 +1106,24 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   `v0.17.6 (b107173)` sedí, 0 console errors/warnings. Žiadna user-viditeľná
   zmena v tomto batchi (test coverage + interný refaktor) — potvrdené, nie
   vymyslené.
+
+## 2026-08-13 — Pergola z rozmerov: technický výkres (vzor OP260032) (#194)
+
+- **Issue:** #194 (part of #155 epic), engine base = #193 (PergolaNarezVstup / schemaVykresu na `pergola-narez.ts`).
+- **Commits:** 42fe048 (bump 0.19.0-dev.1) -> ed5c4f2 (feat výkres) -> c2d2684 (bump 0.19.0) -> 2bb10b6 (docs rule) -> 0d8d5b0 (review fixes). PR #200, merge 38c74f6.
+- **Čo:** `schemaVykresu(v)` čistá geometria (engine) + `PergolaNarezVykres.svelte` (predný pohľad + bokorys + pôdorys) na zdieľanom `$lib/vykres` (VykresovyHarok+Kota+kompozicia sharedFitScale/fitCentered). Krov = zjednodušený obrys + poznámka na krov-ticket #161, nikdy hádaná geometria. Display-only, money-safety guard rozšírený, route-scoped landscape tlač.
+- **Testy:** +8 geometria unit (2215, [0,1920,3840,5760], 2760, priečky <=700 invariant @20000) v `pergola-narez.test.ts`; +2 E2E (`e2e/pergola-narez.spec.ts`, console-zero); 1276 unit + 7 E2E zelené.
+- **Review:** adversariálny 0 R 2 Y 3 B -> Y/B opravené v 0d8d5b0 (čestná mierka zahŕňa vyskaZadna, stale komentár, obrysStroke dvojité *0.5, podFit komentár); font-literál ponechaný (sesterský precedens).
+- **Nasadené:** 0.19.0 (38c74f6), overené naživo app.montalu.cloud/pergola/narez (DOM verzia + 3 pohľady + kóty + krov-poznámka).
+- **Playbook:** `.claude/rules/pergola-narez.md` (2x „light", krov-ticket, len potvrdené vzorce, spec do spodného riadku).
+
+## 2026-08-14 — Pergola: verifikácia enginu proti historickým zákazkám (#196)
+
+- **Issue:** #196 (part of #155 epic), GATE pred #197 (napojenie na Money odpis). Engine = #193.
+- **Commit:** 145d4c0 (harness `tests/pergola-narez-historicka-verifikacia.test.ts` + doc komentár na `sirka`). Žiadny formula fix — engine chybu nemá.
+- **Dáta:** z 39 historických pergol majú surový CAD po kusoch len 2 (ZAK202694/OP260086, ZAK2026302/OP260258) + ich VYROBA výkresy (jediné rozmery). Zdroj: `montalu/n8n/cad2dlv/server-sync/ODPIS VZOR/*.xlsx` list PERGOLY + `*.pdf`. 37/39 = len agregované metre bez rozmerov.
+- **Overené 1:1 (obe zákazky, Robust/na stenu):** predná noha = svetlosť+15 (2150→2165, 2200→2215; svetlosť je kóta na výkrese), systém→kód stĺpu/žľabu (18013/18021), priečka kód+počet (18004/18102, ceil(šírka/700)+1), metráž jednotka. 11 GREEN asertácií.
+- **Zistenie 1 (dôležité pre #197):** engine `sirka` = šírka RÁMU (poľa krokiev), NIE dĺžka žľabu — žľab presahuje rám (~318/558 mm/str.). Žľab→10/15 priečok, rám→9/13 (reálne). #197 musí posielať šírku rámu. Zafixované v teste + doc komentári.
+- **Zistenie 2:** ZAK2026302 mal reálny rozostup 721.7 > 700 (tvrdý strop enginu) → engine by mohol nadrátať priečku. Otázka na Dominika → #198.
+- **Neoverené (v histórii chýba vzor, čestne zapísané):** zadná noha (žiadna samostatne stojaca), výstuha −280 (žiaden zosilnený nosník), dĺžky rezov (O1). Komponenty #195, krov #161 = očakávané medzery.
+- **Bez PR-do-Money / bez deploy user-zmeny** (test + docs). Otvorené otázky zapísané na #198, verifikačný záver + tabuľka na #196. #196 uzavretý (#155 zostáva otvorený).

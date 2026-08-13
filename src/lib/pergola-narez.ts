@@ -70,7 +70,11 @@ export const SYSTEMY: Record<PergolaSystem, SystemProfil> = {
 
 export interface PergolaNarezVstup {
 	system: PergolaSystem;
-	/** celková šírka pergoly [mm] */
+	/** šírka pergoly [mm] = šírka RÁMU / poľa krokiev, do vzorca počtu priečok.
+	 *  POZOR (verifikácia #196 proti ZAK202694/ZAK2026302): žľab presahuje rám o presah
+	 *  na obe strany (5930 vs rám ~5294; 9120 vs rám ~8004), takže `sirka` NIE JE celková
+	 *  dĺžka žľabu — inak by ceil(šírka/700)+1 nadrátalo ~2 priečky. #197 (napojenie na
+	 *  Money) musí posielať šírku rámu; vzťah žľab = rám + 2×presah je O1-blokovaný (#198). */
 	sirka: number;
 	/** hĺbka pergoly [mm] — evidenčný rozmer (potvrdené vzorce ju zatiaľ nepoužívajú;
 	 *  dĺžky priečok/krovu, ktoré ju potrebujú, sú O1/#161 blokované) */
