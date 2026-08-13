@@ -73,10 +73,6 @@ export function vytvorSvetla(THREE: ThreeNS): Svetla {
 	return { key, fill };
 }
 
-/** Azimut kľúčového svetla v radiánoch — použité aj na orientáciu kontaktného
- *  tieňa (posunutý presne v smere svetla, §2.6). */
-export const KEY_SVETLO_AZIMUT_RAD = (135 * Math.PI) / 180;
-
 export function vytvorOblohu(THREE: ThreeNS): InstanceType<ThreeNS['Mesh']> {
 	const geo = new THREE.SphereGeometry(60, 32, 16);
 	const mat = new THREE.MeshBasicMaterial({
@@ -170,21 +166,53 @@ export function vytvorStenu(
 	return new THREE.Mesh(geo, mat);
 }
 
-/** Dvojvrstvový kontaktný tieň — alpha decal na rovine `y = +2 mm`, posunutý
- *  v azimute kľúčového svetla (§2.6). `rozmerBboxMm` je väčší z (w, d), tieň
- *  je `× 1.35` tohto rozmeru.
+/** Dvojvrstvový kontaktný tieň — alpha decal na rovine `y = +2 mm`, CENTROVANÝ
+ *  presne na pôdoryse produktu (x=0, z=0 — rovnaká konvencia ako spodná
+ *  koľajnica, zem aj základňa steny, všetky `y=0`) a TVAROVANÝ podľa
+ *  pôdorysu (šírka × hĺbka, NIE jednotný štvorec podľa väčšieho rozmeru).
  *
- *  #174: veľkosť zmenšená z `×1.6` na `×1.35` a posun z `12 %` na `5 %` —
- *  pôvodná kombinácia (veľký tieň + veľký posun) pôsobila na 3/4 zábere ako
- *  nesúvisiaca škvrna vedľa pätky konštrukcie namiesto pevného odtlačku
- *  priamo pod ňou ("jednotka sa vznáša"). Spolu so zosilnenou nepriehľadnosťou
- *  (`vytvorKontaktnyTienTexturu`) drží tvrdé jadro tesne pod koľajnicou. */
+ *  #174 druhé kolo (ZNOVUOTVORENÉ) — DVE nezávislé príčiny "vznášania sa",
+ *  obe numericky overené (`tests/vizual-scena.test.ts`, naživo cez
+ *  `window.__VIZDEBUG` scene-introspekciu — SVETOVÉ Y spodku jednotky/zeme/
+ *  základne steny/roviny tieňa sú VŠETKY zhodné, 0 resp. tieň 2 mm nad
+ *  zámerne kvôli z-fighting — "vznášanie" teda NIE JE výškový/Y posun):
+ *
+ *  1. **X/Z posun celej roviny.** Predchádzajúci diel (pôvodných `12 %`, aj
+ *     toto kolo skúšaných `5 %`) POSÚVAL celú rovinu tieňa v azimute
+ *     kľúčového svetla — fyzikálne správne pre VRHNUTÝ (cast) tieň, ale
+ *     TENTO dekal je KONTAKTNÝ tieň (dokazuje, že objekt sa DOTÝKA zeme
+ *     PRESNE tu). Posunutá plocha (vrátane tvrdého jadra) sa odchýlila od
+ *     skutočnej päty koľajnice — OPRAVA: žiadny X/Z posun, vždy centrovaný.
+ *  2. **Kruhový gradient na PODLHOVASTOM pôdoryse** (dominantná príčina —
+ *     samotné odstránenie posunu z bodu 1 zmenilo render len minimálne,
+ *     merateľné cez pixel-diff, ale vizuálne stále "vznášajúce"). Predošlý
+ *     kód bral JEDEN rozmer (`Math.max(w,d)`) a staval Z NEHO štvorcovú
+ *     rovinu s KRUHOVÝM radiálnym gradientom (`vytvorKontaktnyTienTexturu` —
+ *     `createRadialGradient`, symetrický). Pri typickej jednotke (napr.
+ *     4200×150 mm, pomer strán 28:1) kruh vpísaný do štvorca so stranou
+ *     podľa ŠÍRKY má tvrdé jadro s POLOMEROM len `0.24×2835 mm ≈ 680 mm` —
+ *     pokrýva stred rámu, ale VÔBEC nedosiahne ku koncom koľajnice
+ *     (`x=±2100 mm`), kde ostáva len slabý mäkký okraj (opacity ~0.3 pri
+ *     r=1,56 m, 0 pri r=2,835 m). Krajné ~75 % dĺžky koľajnice tak vizuálne
+ *     "nemá" kontaktný tieň → presne nahlásené "pravý spodný roh visí vo
+ *     vzduchu" (`troStvrte`). OPRAVA: rovina NIE JE štvorec — šírka (X) sa
+ *     škáluje podľa `bbox.w`, hĺbka (Z) podľa `max(bbox.d, 0.45×bbox.h)`
+ *     (posledné zabraňuje neviditeľne tenkému tieňu pri "papierovo" plytkých
+ *     jednotkách — hĺbka posuvu ~90-300 mm by inak dala tieň tenší než
+ *     jeho vlastný mäkký polomer). Rovnaká KRUHOVÁ textúra namapovaná na
+ *     NEROVNOMERNE škálovanú rovinu vykreslí PRIRODZENE PODLHOVASTÚ elipsu
+ *     (tvrdé jadro naťahuje pozdĺž X spolu s celou rovinou), ktorá sleduje
+ *     tvar koľajnice namiesto kruhu v strede pod ňou — žiadna zmena
+ *     textúry potrebná. */
 export function vytvorKontaktnyTien(
 	THREE: ThreeNS,
-	rozmerBboxMm: number
+	bboxSirkaMm: number,
+	bboxHlbkaMm: number,
+	bboxVyskaMm: number
 ): InstanceType<ThreeNS['Mesh']> {
-	const velkost = mm(rozmerBboxMm) * 1.35;
-	const geo = new THREE.PlaneGeometry(velkost, velkost);
+	const sirkaM = mm(bboxSirkaMm) * 1.35;
+	const hlbkaM = Math.max(mm(bboxHlbkaMm) * 1.35, mm(bboxVyskaMm) * 0.45);
+	const geo = new THREE.PlaneGeometry(sirkaM, hlbkaM);
 	geo.rotateX(-Math.PI / 2);
 	const tex = vytvorKontaktnyTienTexturu(THREE);
 	const mat = new THREE.MeshBasicMaterial({
@@ -195,10 +223,6 @@ export function vytvorKontaktnyTien(
 	});
 	const mesh = new THREE.Mesh(geo, mat);
 	mesh.position.y = mm(2);
-	// posun v smere kľúčového svetla — tieň padá OPAČNÝM smerom od svetla
-	const posunM = mm(rozmerBboxMm) * 0.05;
-	mesh.position.x += Math.sin(KEY_SVETLO_AZIMUT_RAD + Math.PI) * posunM;
-	mesh.position.z += Math.cos(KEY_SVETLO_AZIMUT_RAD + Math.PI) * posunM;
 	return mesh;
 }
 

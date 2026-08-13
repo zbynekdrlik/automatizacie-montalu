@@ -377,7 +377,7 @@
 		if (stenaMat.roughnessMap && stenaMat.roughnessMap !== stenaMat.map)
 			disposables.push(stenaMat.roughnessMap);
 
-		const tien = vytvorKontaktnyTien(THREE, Math.max(vysledok.bbox.w, vysledok.bbox.d));
+		const tien = vytvorKontaktnyTien(THREE, vysledok.bbox.w, vysledok.bbox.d, vysledok.bbox.h);
 		scene.add(tien);
 		disposables.push(tien.geometry, tien.material as Disposable);
 		const tienMat = tien.material as InstanceType<ThreeNS['MeshBasicMaterial']>;
