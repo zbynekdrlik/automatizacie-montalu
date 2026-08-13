@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	spocitajNarez,
+	schemaVykresu,
 	chybaPergolaNarezVstupu,
 	SYSTEMY,
 	PREDNA_SVETLOST_STD,
@@ -208,5 +209,83 @@ describe('chybaPergolaNarezVstupu — validácia rozsahov', () => {
 		expect(
 			chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'samostatne', pocetZadnychNoh: 1 })
 		).toMatch(/zadných nôh/i);
+	});
+});
+
+// --- Geometria technického výkresu (#194) --------------------------------------
+describe('schemaVykresu (#194) — geometria z POTVRDENÝCH vzorcov, krov je #161', () => {
+	it('profil systému + výšky: Massive 140, predná svetlosť 2200, predná noha 2215', () => {
+		const s = schemaVykresu(VZOR);
+		expect(s.profilRozmer).toBe(140);
+		expect(s.zlabHrubka).toBe(140);
+		expect(s.prednaSvetlost).toBe(2200);
+		expect(s.prednaNohaDlzka).toBe(2215); // 2200 + 15 (ZAK2026302)
+		expect(schemaVykresu({ ...VZOR, system: 'Robust' }).profilRozmer).toBe(110);
+	});
+
+	it('predné nohy: 4 nohy na šírke 5760 → rovnomerne [0,1920,3840,5760], rozostup 1920', () => {
+		const s = schemaVykresu(VZOR);
+		expect(s.prednaNohyX).toEqual([0, 1920, 3840, 5760]);
+		expect(s.rozostupPrednychNoh).toBe(1920);
+	});
+
+	it('2 predné nohy → krajné [0, sirka], rozostup = celá šírka', () => {
+		const s = schemaVykresu({ ...VZOR, sirka: 5000, pocetPrednychNoh: 2 });
+		expect(s.prednaNohyX).toEqual([0, 5000]);
+		expect(s.rozostupPrednychNoh).toBe(5000);
+	});
+
+	it('na stenu (default 9/10): zadná konštrukcia = stena, žiadne zadné nohy', () => {
+		const s = schemaVykresu(VZOR);
+		expect(s.zadnaKonstrukcia.typ).toBe('stena');
+	});
+
+	it('samostatne stojaca: zadné nohy s dĺžkou = výška zadná − horný profil (2900 − 140 = 2760)', () => {
+		const s = schemaVykresu({ ...VZOR, uchytenie: 'samostatne', pocetZadnychNoh: 4 });
+		expect(s.zadnaKonstrukcia.typ).toBe('samostatne');
+		if (s.zadnaKonstrukcia.typ === 'samostatne') {
+			expect(s.zadnaKonstrukcia.nohaDlzka).toBe(2760);
+			expect(s.zadnaKonstrukcia.vyskaZadna).toBe(2900);
+			expect(s.zadnaKonstrukcia.hornyProfil).toBe(140);
+			expect(s.zadnaKonstrukcia.nohyX).toEqual([0, 1920, 3840, 5760]);
+		}
+		// horný profil 110 → 2900 − 110 = 2790
+		const s110 = schemaVykresu({
+			...VZOR,
+			uchytenie: 'samostatne',
+			hornyProfilZadnej: 110
+		});
+		if (s110.zadnaKonstrukcia.typ === 'samostatne')
+			expect(s110.zadnaKonstrukcia.nohaDlzka).toBe(2790);
+	});
+
+	it('priečky: počet = ceil(5760/700)+1 = 10, vnútorných deliacich = 8, každý rozostup ≤ 700', () => {
+		const s = schemaVykresu(VZOR);
+		expect(s.priecky.pocet).toBe(10);
+		expect(s.priecky.pozicieX).toHaveLength(8); // bez 2 krajných
+		// rozostup medzi susednými (vrátane krajných 0 a sirka) ≤ 700
+		const vsetky = [0, ...s.priecky.pozicieX, VZOR.sirka];
+		for (let i = 1; i < vsetky.length; i++)
+			expect(vsetky[i] - vsetky[i - 1]).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK + 1e-6);
+		// vnútorné pozície sú striktne medzi 0 a sirka
+		for (const x of s.priecky.pozicieX) {
+			expect(x).toBeGreaterThan(0);
+			expect(x).toBeLessThan(VZOR.sirka);
+		}
+	});
+
+	it('priečky rozostup ≤ 700 aj pri extrémnej šírke (20000) — invariant, nie len demo', () => {
+		const s = schemaVykresu({ ...VZOR, sirka: 20000 });
+		const vsetky = [0, ...s.priecky.pozicieX, 20000];
+		for (let i = 1; i < vsetky.length; i++)
+			expect(vsetky[i] - vsetky[i - 1]).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK + 1e-6);
+	});
+
+	it('schemaVykresu je čistá — nič nezapisuje, hodnoty sedia so spocitajNarez informatívnymi', () => {
+		const s = schemaVykresu(VZOR);
+		const info = spocitajNarez(VZOR).informativne;
+		expect(s.prednaNohaDlzka).toBe(info.prednaNohaDlzka);
+		expect(s.priecky.pocet).toBe(info.pocetPriecok);
+		expect(s.rozostupPrednychNoh).toBe(info.rozostupPrednychNoh);
 	});
 });

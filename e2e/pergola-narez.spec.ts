@@ -119,3 +119,73 @@ test('odkaz z /pergola → /pergola/narez funguje, Money odpis formulár ostáva
 	).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });
+
+// --- Technický výkres z rozmerov (#194) ----------------------------------------
+test('výkres: predný pohľad + bokorys + pôdorys sa vykreslia z potvrdených rozmerov, krov → #161, console-zero', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5760');
+	await page.locator('#hlbka').fill('3690');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// výkresový hárok + tri pohľady
+	await expect(page.getByTestId('vykresovy-harok')).toBeVisible();
+	await expect(page.getByTestId('pnr-predny-pohlad')).toHaveCount(1);
+	await expect(page.getByTestId('pnr-bokorys')).toHaveCount(1);
+	await expect(page.getByTestId('pnr-podorys')).toHaveCount(1);
+
+	// 4 predné nohy nakreslené v prednom pohľade AJ v pôdoryse (osovo zarovnané rects
+	// — počítame prítomnosť, NIE toBeVisible; vykres.md)
+	await expect(page.getByTestId(/^pnr-fe-noha-\d+$/)).toHaveCount(4);
+	await expect(page.getByTestId(/^pnr-pod-predna-noha-\d+$/)).toHaveCount(4);
+
+	// na stenu (default): pôdorys má čiaru steny, žiadne zadné nohy
+	await expect(page.getByTestId('pnr-pod-stena')).toHaveCount(1);
+	await expect(page.getByTestId(/^pnr-pod-zadna-noha-\d+$/)).toHaveCount(0);
+
+	// krov je zjednodušený s poznámkou → #161, NIKDY sa nehádže sklon
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
+	await expect(page.getByTestId('pnr-bok-krov-pozn')).toContainText('#161');
+
+	// spec ukazuje potvrdené hodnoty (systém, rozostup nôh 1920) + display-only
+	await expect(page.getByTestId('pnr-spec-nohy')).toContainText('1920');
+	await expect(page.getByTestId('pnr-spec-money')).toContainText('/pergola');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse (výška 2900)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5000');
+	await page.locator('#pocetPrednychNoh').fill('3');
+	await page.locator('#uchytenie').selectOption('samostatne');
+	await page.locator('#vyskaZadna').fill('2900');
+	await page.locator('#pocetZadnychNoh').fill('3');
+	await page.locator('#hornyProfilZadnej').selectOption('140');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// zadné nohy nakreslené: bokorys (1 profil) + pôdorys (3 štvorčeky), žiadna stena
+	await expect(page.getByTestId('pnr-bok-zadna-noha')).toHaveCount(1);
+	await expect(page.getByTestId(/^pnr-pod-zadna-noha-\d+$/)).toHaveCount(3);
+	await expect(page.getByTestId('pnr-pod-stena')).toHaveCount(0);
+	// strecha (zjednodušený obrys) sa kreslí len pri samostatne stojacej
+	await expect(page.getByTestId('pnr-bok-strecha')).toHaveCount(1);
+	// spec ukazuje zadnú nohu 2760 (2900 − 140)
+	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2760');
+
+	expect(consoleMsgs).toEqual([]);
+});

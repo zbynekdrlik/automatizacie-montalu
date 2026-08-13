@@ -27,7 +27,9 @@ const SUBORY = [
 	'src/lib/pergola-narez.ts',
 	'src/lib/server/pergola-narez-vstup.ts',
 	'src/routes/pergola/narez/+page.server.ts',
-	'src/routes/pergola/narez/+page.svelte'
+	'src/routes/pergola/narez/+page.svelte',
+	// #194 — technický výkres z rozmerov je tiež LEN display-only kresba
+	'src/lib/components/PergolaNarezVykres.svelte'
 ];
 
 describe('Money safety (#155) — pergola nárez z rozmerov neimportuje server/money ani server/pergola', () => {

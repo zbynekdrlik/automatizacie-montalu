@@ -192,6 +192,93 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	};
 }
 
+// --- Geometria pre technický výkres (#194) ---------------------------------------
+// Čistá geometria pre výkresovú vrstvu (`PergolaNarezVykres.svelte`) — rovnaká
+// disciplína ako `vypocitajGeometriu` v pergola-navrh.ts / `sekciePozicie` v
+// bazen-navrh.ts: geometria žije v .ts engine (unit-testovateľná, pokrytá
+// money-safety guardom), komponenta LEN kreslí. Kreslí sa LEN potvrdená geometria
+// (nohy/rozostupy/priečky/žľab pozícia) — krov je #161 (O4/O5/O6 blokované), preto
+// ho výkres kreslí len ako obrys s poznámkou, NIKDY nehádže sklon/rozostup krovu.
+
+/** Rovnomerné X-pozície `pocet` prvkov na úsečke [0, sirka] (mm). Pri 2+ nohách
+ *  krajné sadnú na 0 a sirka, ostatné rovnomerne medzi ne (rozostup = sirka/(n−1)).
+ *  Prázdne pole pri `pocet < 1`. */
+function rovnomerneX(pocet: number, sirka: number): number[] {
+	if (pocet < 1) return [];
+	if (pocet === 1) return [R1(sirka / 2)];
+	return Array.from({ length: pocet }, (_, i) => R1((i * sirka) / (pocet - 1)));
+}
+
+/** Zadná konštrukcia výkresu — na stenu (žiadne zadné nohy, len referenčná stena)
+ *  vs samostatne stojaca (zadné nohy s dĺžkou/výškou). */
+export type ZadnaKonstrukciaSchema =
+	| { typ: 'stena' }
+	| {
+			typ: 'samostatne';
+			nohyX: number[];
+			nohaDlzka: number;
+			vyskaZadna: number;
+			hornyProfil: HornyProfil;
+	  };
+
+export interface PergolaNarezSchema {
+	sirka: number;
+	hlbka: number;
+	/** rozmer profilu stĺpu/žľabu systému [mm] (110/140) — vizuálna hrúbka nôh + žľabu */
+	profilRozmer: 110 | 140;
+	/** predná svetlá výška [mm] — VIZUÁLNA výška prednej nohy po spodok žľabu */
+	prednaSvetlost: number;
+	/** dĺžka rezu prednej nohy [mm] = svetlosť + 15 (info popisok, nie kreslená výška) */
+	prednaNohaDlzka: number;
+	/** hrúbka horného nosníka (žľab + kotviaci profil) [mm] = profilRozmer */
+	zlabHrubka: number;
+	/** X-pozície predných nôh [mm], 0..sirka */
+	prednaNohyX: number[];
+	/** dopočítaný rozostup predných nôh [mm], null keď < 2 nohy */
+	rozostupPrednychNoh: number | null;
+	zadnaKonstrukcia: ZadnaKonstrukciaSchema;
+	/** priečky (deliace výplne v prednom pohľade). `pocet` = celkový počet vrátane
+	 *  dvoch krajných (= vonkajšie profily); `pozicieX` = LEN vnútorné deliace čiary
+	 *  (bez krajných), rovnomerne, rozostup ≤ 700 (MAX_ROZOSTUP_PRIECOK). */
+	priecky: { pocet: number; pozicieX: number[] };
+}
+
+/** Čistá geometria technického výkresu z rozmerov (#194). Kreslí LEN potvrdené
+ *  vzorce — krov (sklon/rozostup) NIE JE súčasťou (patrí do #161), komponenta ho
+ *  zobrazí len ako obrys s poznámkou. Bez vedľajších efektov, bez Money zápisu. */
+export function schemaVykresu(v: PergolaNarezVstup): PergolaNarezSchema {
+	const sys = SYSTEMY[v.system];
+	const priecky = pocetPriecok(v.sirka);
+	// vnútorné deliace čiary priečok — krajné (i=0, i=priecky-1) sadnú na hrany
+	// (vonkajšie profily), preto ich vynechávame, aby sa neprekrývali s rámom
+	const priezkyVnutorne =
+		priecky >= 3
+			? Array.from({ length: priecky - 2 }, (_, i) => R1(((i + 1) * v.sirka) / (priecky - 1)))
+			: [];
+	const samostatne = v.uchytenie === 'samostatne';
+
+	return {
+		sirka: v.sirka,
+		hlbka: v.hlbka,
+		profilRozmer: sys.stlp.rozmer,
+		prednaSvetlost: v.prednaSvetlost,
+		prednaNohaDlzka: R1(v.prednaSvetlost + PREDNA_NOHA_PRIDAVOK),
+		zlabHrubka: sys.stlp.rozmer,
+		prednaNohyX: rovnomerneX(v.pocetPrednychNoh, v.sirka),
+		rozostupPrednychNoh: v.pocetPrednychNoh > 1 ? R1(v.sirka / (v.pocetPrednychNoh - 1)) : null,
+		zadnaKonstrukcia: samostatne
+			? {
+					typ: 'samostatne',
+					nohyX: rovnomerneX(v.pocetZadnychNoh, v.sirka),
+					nohaDlzka: R1(v.vyskaZadna - v.hornyProfilZadnej),
+					vyskaZadna: v.vyskaZadna,
+					hornyProfil: v.hornyProfilZadnej
+				}
+			: { typ: 'stena' },
+		priecky: { pocet: priecky, pozicieX: priezkyVnutorne }
+	};
+}
+
 /** Serverová validácia rozsahov — Slovak chybová hláška, alebo null keď je vstup
  *  platný. Server je jediný strážca rozsahov (rovnaká disciplína ako fix.ts /
  *  pergola-navrh.ts). */
