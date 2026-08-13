@@ -11,12 +11,15 @@ function zdroj(relPath: string): string {
 }
 
 // server/money = Money zápisovač, server/pergola = pergolová Money odpisová cesta
-// (writeOdpis/dlv-import). Statické aj dynamické importy so zhodným zakázaným segmentom.
+// (writeOdpis/dlv-import), server/db = odpis_log DB (dedup/claim). Display-only modul
+// sa nesmie dotknúť ani jedného. Statické aj dynamické importy so zhodným segmentom.
 const ZAKAZANE_VZORY = [
 	/from ['"].*server\/money['"]/,
 	/from ['"].*server\/pergola['"]/,
+	/from ['"].*server\/db['"]/,
 	/import\(\s*['"`].*server\/money['"`]/,
 	/import\(\s*['"`].*server\/pergola['"`]/,
+	/import\(\s*['"`].*server\/db['"`]/,
 	/writeOdpis|MONEY_LIVE/
 ];
 

@@ -73,6 +73,7 @@ test('samostatne stojaca: zobrazí zadné nohy, výsledok = zadná noha (výška
 test('← Späť a upraviť: vstup prežije (systém aj šírka), nevynuluje sa (nova-stranka §4)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/narez');
 	await page.locator('#system').selectOption('Massive');
@@ -84,6 +85,7 @@ test('← Späť a upraviť: vstup prežije (systém aj šírka), nevynuluje sa 
 	await waitHydrated(page);
 	await expect(page.locator('#system')).toHaveValue('Massive');
 	await expect(page.locator('#sirka')).toHaveValue('5760');
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('neplatná šírka cez UI: prejdeme priamo (HTML5), ale server chytí extrémnu hodnotu', async ({
@@ -102,6 +104,7 @@ test('neplatná šírka cez UI: prejdeme priamo (HTML5), ale server chytí extr�
 test('odkaz z /pergola → /pergola/narez funguje, Money odpis formulár ostáva nedotknutý', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola');
 	// pôvodný CAD nárez → Money formulár je stále na svojom mieste
@@ -114,4 +117,5 @@ test('odkaz z /pergola → /pergola/narez funguje, Money odpis formulár ostáva
 	await expect(
 		page.getByRole('heading', { name: 'Pergola — materiál/nárez z rozmerov' })
 	).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });

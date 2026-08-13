@@ -2,6 +2,11 @@
 // (žiadny import server/money ani server/pergola — statický guard v
 // tests/pergola-narez-money-safety.test.ts). Rovnaký vzor ako /bazen/navrh:
 // formulár → výsledok, žiadny zápisový krok. Parser žije v $lib/server (nova-stranka §1).
+//
+// b2b: táto route je pre b2b automaticky ZABLOKOVANÁ (fail-closed) — žije pod
+// `/pergola` prefixom v `B2B_FORBIDDEN_PREFIXES` (b2b-access.ts), takže redirect na
+// /zasklenia rieši drift guard `b2b-route-coverage.test.ts` bez zmeny. Interná,
+// Money-priľahlá — zámerne NIE v `B2B_ALLOWED_EXCEPTIONS`.
 import type { Actions } from './$types';
 import { parsePergolaNarezVstup } from '$lib/server/pergola-narez-vstup';
 
