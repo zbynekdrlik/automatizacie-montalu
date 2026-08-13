@@ -985,3 +985,49 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   introspekcia technika, (3) canvas/`document` no-op polyfill pre testovanie
   `scena.ts` mimo `low` tieru, (4) `jadroR`/`stred` sú frakcie CELEJ šírky
   canvasu, nie polovice (rovnaká trieda chyby ako sRGB/lineárny gotcha).
+
+## #154 — Cenový zoznam materiálu k zákazke, fáza 1 (2026-08-13)
+
+- ROZHODNUTÉ (šéf/tím, komentáre na tikete 2026-08-12): fáza 1 = ceny + dostupnosť
+  materiálu, READ-ONLY z denného Money snapshotu (appka do Money nikdy nezapisuje).
+  Rezervácia + sledovanie cez pracoviská ostávajú otvorené — #154 touto prácou
+  NEZATVORENÉ.
+- Migrácia v21: `material_prices` (kod PK, `sklad` nullable REAL — 0/záporné sú
+  reálne hodnoty z Money, `NULL` = kód nikdy nemal skladovú kartu), `material_prices_meta`
+  (1 riadok, vek/mtime snapshotu), `odpis_polozky` (FK CASCADE na odpis_log, zapisované
+  v TEJ ISTEJ transakcii ako `odpis_log` insert — `writeOdpis` v money.ts obalené).
+- `src/lib/server/ceny.ts` — lazy mtime-gated import, zlý riadok sa preskočí+zaloguje
+  (nikdy nezhodí celý import), `enrichPolozky()` JOIN + súčty s `kompletne` príznakom.
+  ZASK* (kovanie) kódy nikdy nedostanú veľkoobchodnú predajnú cenu (šéfovo rozhodnutie,
+  vynútené priamo v ceny.ts, nielen v producer skripte).
+- `scripts/ceny-snapshot.py` — read-only producer, overený ŽIVO cez tunel proti Money
+  (299 riadkov ZASP*/ZASK*). Stĺpcové mapovanie: `nakupCennik`=Ceniky_PolozkaCeniku
+  (Cenik `NC`/Nákupný cenník), `nakupPoslednaFaktura`=Artikly_ArtiklDodavatel.PosledniCena,
+  `predajVo`=Ceniky_PolozkaCeniku (Cenik `PRF_VO`), `sklad`=S5_Artikl_CelkoveMnozstviNaSkladech.
+- UI: `CenyTabulka.svelte` (zdieľaná) v zasklenia náhľade (nahlad/nahladMulti, LEN
+  interní — `cenyPre()` gate) + nová `/odpisy/[id]` detail stránka (tlačiteľná).
+- Fresh-context review (general-purpose subagent): 0🔴 2🟡(oba opravené — sklad
+  nullable namiesto kolapsu na 0, rejectedCount surfacnutý v UI) 5🔵(2 opravené —
+  mtime typ REAL, mena per-riadok; 3 vedome neopravené, zdôvodnené na tikete).
+  Golden charakterizačný snapshot (#109) ostal čisto ADITÍVNY (dve kolá: +1563/-0,
+  +121/-0).
+- Commity: `fb2af1a`(bump 0.17.0-dev.1) → `7208044`(migrácia v21) → `c366c1a`
+  (transakcia) → `37e40e5`(ceny.ts) → `b04dd25`(UI) → `c3192c0`(/odpisy/[id]) →
+  `cd2fda2`(producer+ops) → `88402ba`(e2e) → `be07b0d`(review fixes) →
+  `e8a0c6b`(proces oprava: čistá verzia pred mergom).
+- PR #184 (dev→main), merge `9acf88f`, verzia `0.17.0-dev.1` (CHYBA — zabudnutý
+  druhý version bump pred mergom, viď money-odpis skill §6). Opravené PR #185,
+  merge `c87ee24`, výsledná nasadená verzia `0.17.1`.
+- Post-deploy Playwright overenie na `app.montalu.cloud` (interný účet, LEN
+  Spočítať, NIKDY Odoslať): cenová tabuľka sa vykreslila správne, „cena neznáma"
+  všade (žiadny snapshot na VPS ešte neexistuje), súčty priznané ako neúplné,
+  0 console errors/warnings, verzia v pätičke `v0.17.1 (c87ee24)` sedí s deployom.
+- Ops krok, ktorý appka sama nespraví: `scripts/ceny-snapshot.py` treba spustiť
+  DENNE (cron) na boxe, odkiaľ je Money dosiahnuteľné (dev1, cez tunel), výstup
+  rsync-nuť na VPS do `/opt/automatizacie-montalu/ceny/ceny.json`
+  (`docker-compose.yml` má pripravený `:ro` bind mount) — nespravené v tomto behu,
+  potrebuje človeka na nastavenie cronu + credentials na dev1.
+- Playbook: `.claude/skills/money-odpis/SKILL.md` §6 (verzia pred mergom) — pridaný
+  živý dôkaz, prečo sa na to oplatí dať pozor: PR #184 sa zmergovala s „-dev.1"
+  priamo na main, opravné PR #185 muselo bumpnúť o celé číslo vyššie (0.17.1),
+  lebo `sort -V` nedovolí návrat na čistú 0.17.0.
