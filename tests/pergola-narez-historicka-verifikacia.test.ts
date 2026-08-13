@@ -47,7 +47,13 @@ interface HistorickaZakazka {
 	uchytenie: 'stena' | 'samostatne';
 	/** predná svetlosť [mm] — kóta z VYROBA výkresu (predná svetlá výška) */
 	prednaSvetlostZVykresu: number;
-	/** celková dĺžka žľabu [mm] z odpisu (= šírka + presah na obe strany) */
+	/** šírka RÁMU (pole krokiev) [mm] = vstup do vzorca počtu priečok.
+	 *  ZAK202694: 5293.9 = KÓTA na výkrese (nezávislé overenie počtu).
+	 *  ZAK2026302: ~8004 = ODVODENÉ z počtu 13 (výkres nemá samostatnú kótu šírky rámu;
+	 *  8003 je RAL kód, nie rozmer) — konzistencia, nie nezávislé overenie. */
+	sirkaRamuMm: number;
+	/** celková dĺžka žľabu [mm] z odpisu = šírka rámu + presah na obe strany (presah
+	 *  = (zlabDlzkaMm − sirkaRamuMm)/2: ~318 mm ZAK202694, ~558 mm ZAK2026302). */
 	zlabDlzkaMm: number;
 	/** priečka: normal (18004) alebo light (18102) — z reálneho odpisu */
 	prieckaLight: boolean;
@@ -59,20 +65,19 @@ interface HistorickaZakazka {
 	};
 	/** reálne rozostupy priečok = dĺžky zaklapávacej lišty 18005 medzi krokvami [mm] */
 	realneRozostupyPriecok: number[];
-	/** všetky reálne Money riadky sú metráž (MJ = 'm') — jednotková kontrola */
-	vsetkyMJMetre: true;
 }
 
 // ZAK202694 (OP260086): PERGOLA ROBUST, na stenu, priečka NORMAL.
-// Výkres: predná svetlosť 2150 → predná noha 2165 (=2150+15); celková šírka (žľab) 5930;
-// rozostup krokiev 684.7 (≤700). Odpis (ODPIS VZOR list PERGOLY): 3× 18013 @2165,
-// 9× 18004 @3870.81, 1× 18021 @5930 (+ 18019 kotviaci @5930, lišty…).
+// Výkres: predná svetlosť 2150 → predná noha 2165 (=2150+15); šírka rámu 5293.9 (kóta),
+// celková šírka (žľab) 5930; rozostup krokiev 684.7 (≤700). Odpis (ODPIS VZOR list
+// PERGOLY): 3× 18013 @2165, 9× 18004 @3870.81, 1× 18021 @5930 (+ 18019 kotviaci @5930).
 const ZAK202694: HistorickaZakazka = {
 	zak: 'ZAK202694',
 	op: 'OP260086',
 	system: 'Robust',
 	uchytenie: 'stena',
 	prednaSvetlostZVykresu: 2150,
+	sirkaRamuMm: 5293.9,
 	zlabDlzkaMm: 5930,
 	prieckaLight: false,
 	realne: {
@@ -80,21 +85,21 @@ const ZAK202694: HistorickaZakazka = {
 		priecka: { kod: '18004', ks: 9, rezMm: 3870.81 },
 		zlab: { kod: '18021', ks: 1, rezMm: 5930 }
 	},
-	realneRozostupyPriecok: [684.7],
-	vsetkyMJMetre: true
+	realneRozostupyPriecok: [684.7]
 };
 
 // ZAK2026302 (OP260258): PERGOLA ROBUST, na stenu, priečka LIGHT.
-// Výkres: predná svetlosť 2200 → predná noha 2215 (=2200+15); celková šírka (žľab) 9120
-// (2 tyče 3915+5205). Odpis: 4× 18013 @2215, 13× 18102 @2624.54, 1× 18021 @9120 (+ 18104
-// kotviaci @9120). Rozostupy krokiev = zaklapávacia lišta 18005: 721.7 aj 694.1 — POZOR:
-// 721.7 > 700 (tvrdý strop enginu), reálna zákazka strop prekročila (viď #198).
+// Výkres: predná svetlosť 2200 → predná noha 2215 (=2200+15); šírka rámu ~8004 (odvodené),
+// celková šírka (žľab) 9120 (2 tyče 3915+5205). Odpis: 4× 18013 @2215, 13× 18102 @2624.54,
+// 1× 18021 @9120 (+ 18104 kotviaci @9120). Rozostupy krokiev = zaklapávacia lišta 18005:
+// 721.7 aj 694.1 — POZOR: 721.7 > 700 (tvrdý strop enginu), reálna zákazka strop prekročila.
 const ZAK2026302: HistorickaZakazka = {
 	zak: 'ZAK2026302',
 	op: 'OP260258',
 	system: 'Robust',
 	uchytenie: 'stena',
 	prednaSvetlostZVykresu: 2200,
+	sirkaRamuMm: 8004,
 	zlabDlzkaMm: 9120,
 	prieckaLight: true,
 	realne: {
@@ -102,24 +107,23 @@ const ZAK2026302: HistorickaZakazka = {
 		priecka: { kod: '18102', ks: 13, rezMm: 2624.54 },
 		zlab: { kod: '18021', ks: 1, rezMm: 9120 }
 	},
-	realneRozostupyPriecok: [721.7, 694.1],
-	vsetkyMJMetre: true
+	realneRozostupyPriecok: [721.7, 694.1]
 };
 
 /** Zloží engine vstup z historickej zákazky. `sirka` = šírka RÁMU (pole krokiev), nie
  *  celková dĺžka žľabu — viď zistenie o presahu nižšie. Polia, ktoré potvrdené vzorce
- *  „na stenu" nepoužívajú (vyskaZadna/pocetZadnychNoh/hornyProfilZadnej), sú platné
+ *  „na stenu" nepoužívajú (vyskaZadna/pocetZadnychNoh/hornyProfilZadnej), sú inertné
  *  výplňové hodnoty. */
-function vstupZoZakazky(z: HistorickaZakazka, sirkaRamu: number): PergolaNarezVstup {
+function vstupZoZakazky(z: HistorickaZakazka): PergolaNarezVstup {
 	return {
 		system: z.system,
-		sirka: sirkaRamu,
+		sirka: z.sirkaRamuMm,
 		hlbka: 3690,
 		prednaSvetlost: z.prednaSvetlostZVykresu,
 		vyskaZadna: 2900,
 		pocetPrednychNoh: z.realne.prednaNoha.ks,
 		uchytenie: z.uchytenie,
-		pocetZadnychNoh: z.realne.prednaNoha.ks,
+		pocetZadnychNoh: 2, // inertné pri „na stenu" (bez zadných nôh)
 		hornyProfilZadnej: 110,
 		prieckaLight: z.prieckaLight,
 		zosilnenyNosnik: false
@@ -133,17 +137,21 @@ function prieckaEngine(r: ReturnType<typeof spocitajNarez>) {
 	return r.vypocitane.find((p) => /priečk/i.test(p.nazov));
 }
 
-describe('#196 verifikácia — predná noha = svetlosť + 15 (potvrdený vzorec vs realita)', () => {
+describe('#196 verifikácia — predná noha: kód + dĺžka = svetlosť + 15 (potvrdený vzorec vs realita)', () => {
 	for (const z of [ZAK202694, ZAK2026302]) {
-		it(`${z.zak}: engine z rozmerov reprodukuje reálnu prednú nohu 1:1 (kód + ks + dĺžka)`, () => {
-			// šírka rámu na počet priečok tu nie je podstatná (predná noha na nej nezávisí)
-			const r = spocitajNarez(vstupZoZakazky(z, z.zlabDlzkaMm - 700));
+		it(`${z.zak}: engine reprodukuje reálnu prednú nohu — kód + dĺžka rezu (ks je echo vstupu)`, () => {
+			const r = spocitajNarez(vstupZoZakazky(z));
 			const noha = prednaNohaEngine(r)!;
+			// GENUÍNNE overenie: kód (z konštanty systému) aj dĺžka (svetlosť z výkresu + 15)
+			// pochádzajú z NEZÁVISLÝCH zdrojov a mostí ich engine → dokáže spadnúť, keby sa
+			// vzorec zmenil.
 			expect(noha.kod).toBe(z.realne.prednaNoha.kod);
-			expect(noha.pocetKs).toBe(z.realne.prednaNoha.ks);
 			expect(noha.dlzkaRezuMm).toBe(z.realne.prednaNoha.rezMm);
-			// a je to naozaj svetlosť + 15 (nie náhoda): kóta svetlosti z výkresu + 15
+			// kóta svetlosti z výkresu + 15 = reálna dĺžka rezu z odpisu (nie náhoda)
 			expect(z.prednaSvetlostZVykresu + PREDNA_NOHA_PRIDAVOK).toBe(z.realne.prednaNoha.rezMm);
+			// ks je VSTUP (echovaný enginom na správnu položku), nie vzorec — kontrolujeme
+			// len, že ho engine nezahodí a priradí prednej nohe.
+			expect(noha.pocetKs).toBe(z.realne.prednaNoha.ks);
 		});
 	}
 });
@@ -155,7 +163,7 @@ describe('#196 verifikácia — systém → kód stĺpu/žľabu (mapovanie vs re
 			expect(SYSTEMY[z.system].stlp.kod).toBe(z.realne.prednaNoha.kod);
 			expect(SYSTEMY[z.system].zlab.kod).toBe(z.realne.zlab.kod);
 			// engine žľab vypisuje ako „vždy prítomný" v nepodporované s tým istým kódom
-			const r = spocitajNarez(vstupZoZakazky(z, z.zlabDlzkaMm - 700));
+			const r = spocitajNarez(vstupZoZakazky(z));
 			expect(r.nepodporovane.join(' | ')).toContain(z.realne.zlab.kod);
 			// kotviaci profil horný V2 (18019) engine tiež vypisuje ako vždy prítomný
 			expect(r.nepodporovane.join(' | ')).toContain('18019');
@@ -164,11 +172,9 @@ describe('#196 verifikácia — systém → kód stĺpu/žľabu (mapovanie vs re
 });
 
 describe('#196 verifikácia — priečka: kód + počet (dĺžka rezu je O1-blokovaná = null)', () => {
-	it('ZAK202694: šírka rámu (bucket ≤700) → engine 9 priečok = realita; kód 18004 (normal)', () => {
+	it('ZAK202694: šírka rámu 5293.9 (kóta) → engine 9 priečok = realita; kód 18004 (normal)', () => {
 		// rozostup krokiev 684.7 (≤700) na výkrese → 9 krokiev cez pole rámu.
-		// Počet je NECITLIVÝ na presnú šírku vnútri 700-bucketu — stačí ktorákoľvek
-		// hodnota z (4900, 5600] (rám < žľab).
-		const r = spocitajNarez(vstupZoZakazky(ZAK202694, 5293.9));
+		const r = spocitajNarez(vstupZoZakazky(ZAK202694));
 		const priecka = prieckaEngine(r)!;
 		expect(priecka.pocetKs).toBe(ZAK202694.realne.priecka.ks); // 9
 		expect(priecka.kod).toBe('18004'); // normal
@@ -178,30 +184,32 @@ describe('#196 verifikácia — priečka: kód + počet (dĺžka rezu je O1-blok
 			expect(rz).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK);
 	});
 
-	it('ZAK2026302: kód priečky 18102 (light); počet 13 (dĺžka rezu null/O1)', () => {
-		const r = spocitajNarez(vstupZoZakazky(ZAK2026302, 8004));
+	it('ZAK2026302: šírka rámu ~8004 (odvodené) → engine 13 = realita; kód 18102 (light), dĺžka null', () => {
+		const r = spocitajNarez(vstupZoZakazky(ZAK2026302));
 		const priecka = prieckaEngine(r)!;
 		expect(priecka.kod).toBe('18102'); // light
 		expect(priecka.dlzkaRezuMm).toBeNull();
-		// šírka rámu ~8004 (rám < žľab 9120) reprodukuje reálny počet 13
-		expect(priecka.pocetKs).toBe(ZAK2026302.realne.priecka.ks); // 13
+		expect(priecka.pocetKs).toBe(ZAK2026302.realne.priecka.ks); // 13 (rám < žľab 9120)
 	});
 });
 
 describe('#196 ZISTENIE — engine `sirka` = šírka RÁMU (pole krokiev), NIE dĺžka žľabu', () => {
 	// KĽÚČOVÉ zistenie verifikácie: žľab presahuje rám o presah na obe strany
-	// (ZAK202694 5930 vs rám ~5294; ZAK2026302 9120 vs rám ~8004). Vzorec priečok
+	// (ZAK202694 5930 vs rám 5293.9; ZAK2026302 9120 vs rám ~8004). Vzorec priečok
 	// ceil(šírka/700)+1 sedí na realitu LEN keď `sirka` = šírka rámu. Keby #197/app
 	// posunul do enginu celkovú dĺžku žľabu, počet priečok by bol o ~2 vyšší.
-	it('ZAK202694: rám (bucket) → 9, ale žľab 5930 → 10 (≠ reálnych 9)', () => {
-		expect(pocetPriecok(5293.9)).toBe(9); // rám
-		expect(pocetPriecok(5930)).toBe(10); // žľab — nesprávne, presah
-		expect(pocetPriecok(5930)).not.toBe(ZAK202694.realne.priecka.ks);
-	});
-	it('ZAK2026302: rám ~8004 → 13, ale žľab 9120 → 15 (≠ reálnych 13)', () => {
-		expect(pocetPriecok(8004)).toBe(13); // rám
-		expect(pocetPriecok(9120)).toBe(15); // žľab — nesprávne, presah
-		expect(pocetPriecok(9120)).not.toBe(ZAK2026302.realne.priecka.ks);
+	for (const z of [ZAK202694, ZAK2026302]) {
+		it(`${z.zak}: rám ${z.sirkaRamuMm} → ${z.realne.priecka.ks} (realita), ale žľab ${z.zlabDlzkaMm} → viac`, () => {
+			expect(pocetPriecok(z.sirkaRamuMm)).toBe(z.realne.priecka.ks); // rám = realita
+			// žľab je o bucket vyššie → engine by nadrátal priečky (nesprávne)
+			expect(pocetPriecok(z.zlabDlzkaMm)).toBeGreaterThan(z.realne.priecka.ks);
+		});
+	}
+	it('konkrétne buckety: rám 5293.9→9 / 8004→13 vs žľab 5930→10 / 9120→15', () => {
+		expect(pocetPriecok(5293.9)).toBe(9);
+		expect(pocetPriecok(5930)).toBe(10);
+		expect(pocetPriecok(8004)).toBe(13);
+		expect(pocetPriecok(9120)).toBe(15);
 	});
 });
 
@@ -216,18 +224,16 @@ describe('#196 ZISTENIE — reálny rozostup krokiev môže prekročiť 700 (tvr
 	});
 });
 
-describe('#196 verifikácia — jednotka: každý pergolový profil je metráž (dĺžka × ks)', () => {
+describe('#196 verifikácia — jednotka: každý pergolový profil je metráž (dĺžka rezu × počet ks)', () => {
 	for (const z of [ZAK202694, ZAK2026302]) {
-		it(`${z.zak}: reálny Money odpis je celý metráž (MJ='m'), engine modeluje profily ako dĺžka rezu × počet ks`, () => {
-			expect(z.vsetkyMJMetre).toBe(true);
-			// engine položky nesú (kód, dlzkaRezuMm, pocetKs) = dĺžka × počet = metráž,
-			// nie kusová jednotka
-			const r = spocitajNarez(vstupZoZakazky(z, z.zlabDlzkaMm - 700));
-			for (const p of r.vypocitane) {
-				expect(p).toHaveProperty('dlzkaRezuMm');
-				expect(p).toHaveProperty('pocetKs');
-				expect(typeof p.pocetKs).toBe('number');
-			}
+		it(`${z.zak}: engine modeluje prednú nohu ako dĺžku × počet (metráž), nie kusovú položku`, () => {
+			// Reálne Money riadky sú CELÉ metráž (MJ='m') — overené na EXPORT liste oboch
+			// zákaziek. Substantívna kontrola enginu: predná noha nesie ČÍSELNÚ dĺžku rezu
+			// (nie null, nie kusová jednotka) a číselný počet → dĺžka × počet = metráž.
+			const noha = prednaNohaEngine(spocitajNarez(vstupZoZakazky(z)))!;
+			expect(typeof noha.dlzkaRezuMm).toBe('number');
+			expect(noha.dlzkaRezuMm as number).toBeGreaterThan(0);
+			expect(typeof noha.pocetKs).toBe('number');
 		});
 	}
 });
