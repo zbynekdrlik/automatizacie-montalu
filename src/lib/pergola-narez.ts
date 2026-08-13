@@ -87,7 +87,10 @@ export interface PergolaNarezVstup {
 	pocetZadnychNoh: number;
 	/** rozmer horného profilu zadnej konštrukcie (110/140) — do vzorca zadnej nohy */
 	hornyProfilZadnej: HornyProfil;
-	/** priečka light (18102) vs normal (18004) — manuálny checkbox (t=225–252s) */
+	/** priečka light (18102) vs normal (18004) — manuálny checkbox, volí Money KÓD
+	 *  priečky. Zdroj = ťažba Money histórie (17/17 zákaziek, 9× normal/11× light),
+	 *  NIE call. POZOR na zámenu: krov „light/vystužený" z callu (t=225–252s) je INÝ
+	 *  vstup bez vzorca → patrí ku #161, v tomto engine NIE JE. */
 	prieckaLight: boolean;
 	/** zosilnený nosník — profil je O2/O3 blokovaný, len vypíšeme ako nepodporované */
 	zosilnenyNosnik: boolean;
