@@ -114,6 +114,9 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - `src/lib/vykres/**`, `src/lib/components/vykres/**` (kóta helper, výkresový
   hárok) → auto-loads `.claude/rules/vykres.md` on its `paths:` (route-scoped
   `@page` print, SVG arc sweep round-trip check)
+- pergola nárez/výkres z rozmerov (`pergola-narez*`, `PergolaNarezVykres.svelte`,
+  `pergola/narez/**`) → auto-loads `.claude/rules/pergola-narez.md` on its `paths:`
+  (2× „light", krov→#161, len potvrdené vzorce, spec do spodného riadku)
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` (nové pole do `odpis_log.detail`,
   FormData `\r\n` test gotcha) → auto-loads `.claude/rules/odpis-detail.md` on its `paths:`
 - `src/lib/server/**` súbor blížiaci sa k 1000-riadkovému stropu → auto-loads
