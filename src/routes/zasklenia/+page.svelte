@@ -32,6 +32,7 @@
 		type SietkaUchyt
 	} from '$lib/sietka';
 	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
+	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
 
@@ -721,7 +722,7 @@
 
 	<div class="card">
 		<div class="sec">Zoznam materiálu — profily</div>
-		<table>
+		<table data-testid="material-tabulka">
 			<thead
 				><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead
 			>
@@ -760,6 +761,12 @@
 				</div>
 			{/each}
 		</div>
+	{/if}
+
+	<!-- cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; b2b nikdy nedostane
+	     `form.ceny` (viď cenyPre v +page.server.ts), takže sa im tento blok vôbec nevykreslí -->
+	{#if form?.ceny}
+		<CenyTabulka ceny={form.ceny} />
 	{/if}
 
 	<div class="card">
@@ -910,7 +917,7 @@
 
 	<div class="card">
 		<div class="sec">Zoznam materiálu — spoločný (naprieč posuvmi)</div>
-		<table>
+		<table data-testid="material-tabulka">
 			<thead
 				><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead
 			>
@@ -949,6 +956,11 @@
 				</div>
 			{/each}
 		</div>
+	{/if}
+
+	<!-- cenový zoznam materiálu (#154, fáza 1) — LEN pre interných, viď planKarty vyššie -->
+	{#if form?.ceny}
+		<CenyTabulka ceny={form.ceny} />
 	{/if}
 
 	<div class="card">

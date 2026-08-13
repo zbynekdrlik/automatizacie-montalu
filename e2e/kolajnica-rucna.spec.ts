@@ -53,10 +53,12 @@ test('Štandard + 4K: horná 2690 / spodná 2695 sa objaví v rezoch plánu', as
 	// karta Rozmery pripomenie, že koľajnice sú ručné
 	await expect(page.getByTestId('kolajnica-horna')).toHaveText('2690 mm');
 	await expect(page.getByTestId('kolajnica-spodna')).toHaveText('2695 mm');
-	// a hlavne: dielňa reže 2690 / 2695, nie šírku 3447
-	await expect(page.locator('tr', { hasText: 'ZASP00036' })).toContainText('2690 mm');
-	await expect(page.locator('tr', { hasText: 'ZASP00033' })).toContainText('2695 mm');
-	await expect(page.locator('tr', { hasText: 'ZASP00036' })).not.toContainText('3447 mm');
+	// a hlavne: dielňa reže 2690 / 2695, nie šírku 3447 — scoped na materiálovú tabuľku
+	// (#154 pridal cenovú tabuľku, kde ten istý kód/nazov TIEŽ vystupuje v <tr>)
+	const materialTab = page.getByTestId('material-tabulka');
+	await expect(materialTab.locator('tr', { hasText: 'ZASP00036' })).toContainText('2690 mm');
+	await expect(materialTab.locator('tr', { hasText: 'ZASP00033' })).toContainText('2695 mm');
+	await expect(materialTab.locator('tr', { hasText: 'ZASP00036' })).not.toContainText('3447 mm');
 	// ostatné profily podľa rozmeru otvoru (nedotknuté) + odpis stále 7,5 m (jedna tyč)
 	await expect(riadok(page, 'ZASP00036')).toContainText(/(^|\D)7,5 m/);
 	// sklo sa ručnou koľajnicou NEMENÍ — 826 mm je basic 4K nárezák pre šírku 3447
@@ -76,7 +78,10 @@ test('prázdne polia = pôvodný výpočet zo šírky', async ({ page }) => {
 	await waitHydrated(page);
 
 	await expect(page.getByTestId('kolajnica-horna')).toHaveCount(0);
-	await expect(page.locator('tr', { hasText: 'ZASP00036' })).toContainText('3447 mm');
+	// scoped na materiálovú tabuľku (#154: cenová tabuľka má vlastný <tr> s tým istým kódom)
+	await expect(
+		page.getByTestId('material-tabulka').locator('tr', { hasText: 'ZASP00036' })
+	).toContainText('3447 mm');
 
 	expect(errs).toEqual([]);
 });
