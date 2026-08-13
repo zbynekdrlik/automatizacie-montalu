@@ -177,12 +177,19 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 
 	let rowId: number | bigint;
 	try {
-		rowId = db
-			.prepare(
-				`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-			)
-			.run(
+		// odpis_log + odpis_polozky v JEDNEJ transakcii (#154, fáza 1): položky sú 1:1
+		// s tým, čo odišlo do Money (predtým appka držala len súhrn v `detail`) a musia
+		// vzniknúť/zaniknúť SPOLU s dedup záznamom — nikdy log bez položiek alebo naopak.
+		// UNIQUE (dedup) aj FK zlyhanie automaticky rollbackne CELÚ transakciu.
+		const insLog = db.prepare(
+			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		);
+		const insPolozka = db.prepare(
+			`INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, ?)`
+		);
+		rowId = db.transaction(() => {
+			const id = insLog.run(
 				job.modul,
 				job.zak,
 				job.op,
@@ -195,6 +202,9 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 				JSON.stringify(job.detail),
 				job.createdBy
 			).lastInsertRowid;
+			for (const o of job.polozky) insPolozka.run(id, o.kod, o.nazov, o.qty, o.mj ?? 'm');
+			return id;
+		})();
 	} catch (e: unknown) {
 		if (e instanceof Error && e.message.includes('UNIQUE')) {
 			const existing = db
@@ -295,4 +305,17 @@ export function getOdpis(id: number): OdpisLogRow | null {
 		)
 		.get(id) as OdpisLogRow | undefined;
 	return row ?? null;
+}
+
+/**
+ * Presné položky odpisu (#154, fáza 1) — 1:1 s tým, čo odišlo do Money, zapísané
+ * v tej istej transakcii ako `odpis_log` (viď `writeOdpis`). Podklad pre cenový
+ * detail v histórii odpisov (`/odpisy/[id]`). Prázdne pole pre staršie odpisy
+ * spred fázy 1 (žiadne položky sa im spätne nedoplnia).
+ */
+export function listOdpisPolozky(odpisLogId: number): Polozka[] {
+	if (!Number.isInteger(odpisLogId) || odpisLogId <= 0) return [];
+	return db
+		.prepare('SELECT kod, nazov, qty, mj FROM odpis_polozky WHERE odpis_log_id = ? ORDER BY id')
+		.all(odpisLogId) as Polozka[];
 }
