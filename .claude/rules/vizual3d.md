@@ -4,6 +4,7 @@ paths:
   - "src/lib/components/vizual/**"
   - "e2e/vizual3d.spec.ts"
   - "e2e/zasklenia-zakaznicky.spec.ts"
+  - "tests/vizual-*.test.ts"
 ---
 
 # `src/lib/vizual/**` — three.js 3D náhľad, gotchy (#170)
@@ -118,3 +119,49 @@ pre čokoľvek odvodené z `THREE.Color`, buď ich počítaj cez
 lepšie — nehardcoduj ilustračné čísla vôbec a odkáž na unit test, ktorý
 počíta skutočnú hodnotu priamo z materiálu (`tests/vizual-materialy.test.ts`
 to robí správne cez `mat.attenuationColor[k]`).
+
+## "Jednotka sa vznáša" (#174 ZNOVUOTVORENÉ) — NIKDY nepredpokladaj Y-posun,
+## over ho ČÍSLAMI; skutočná príčina bola X/Z tvar kontaktného tieňa
+
+Naживo vyzeralo, že jednotka "levituje" nad dlažbou (viditeľná medzera,
+odpojená tieňová elipsa). Prirodzený prvý dohad — niečo má zlé svetové Y
+(skupina posunutá, zem pod nulou, kamera vytvára zdanlivý posun) — bol
+DOKÁZATEĽNE nesprávny: `postavGeometrie()`/`vytvorZem()`/`vytvorStenu()` sa
+dajú zavolať priamo v Node (Vitest) bez canvasu (žiadny WebGL potrebný na
+STAVBU geometrie, len na `renderer.render()`), takže Y-hypotézu over TAKTO
+PRED akýmkoľvek predpokladom o kamere/FOV. Skutočná príčina bola X/Z tvar/
+pozícia kontaktného tieňa (`vytvorKontaktnyTien`, `scena.ts`) — kruhový
+radiálny gradient na ŠTVORCOVEJ ploche podľa `Math.max(w,d)`, ktorý pri
+širokej/plytkej jednotke (pomer strán ~28:1) nedosiahol tvrdým jadrom ku
+koncom koľajnice, PLUS X/Z posun celej roviny v smere svetla (fyzikálne
+správne pre vrhnutý tieň, nesprávne pre kontaktný dekal — ten musí byť
+VŽDY centrovaný na skutočnom pôdoryse).
+
+**Naživo scene-introspekcia bez prestavby appky** — keď numerický Node test
+nestačí (treba OVERIŤ, čo appka SKUTOČNE vykresľuje, nie čo by mala): dočasne
+pridaj `(globalThis).__VIZDEBUG = ziva;` hneď po `ziva = postavScenu(...)` v
+`Vizual3D.svelte` (`inicializuj()`), potom v Playwright `page.evaluate()`
+volaj `window.__VIZDEBUG.scene.traverse(...)` a čítaj `mesh.position`/
+`geometry.boundingBox` priamo zo živého rendereru. REVERTNI pred commitom —
+toto je len diagnostický hák, nikdy sa nemerguje.
+
+**Canvas/`document` polyfill pre testovanie `scena.ts` mimo `low` tieru** —
+`vytvorKontaktnyTien` VŽDY volá `vytvorKontaktnyTienTexturu` (canvas 2D),
+nezávisle od tieru (na rozdiel od `vytvorZem`/`vytvorStenu`, ktoré `low` tier
+obíde plochou farbou). Testovanie POZÍCIE/GEOMETRIE (nie obsahu pixelov) v
+Node vitest (žiadny jsdom v repe) potrebuje minimálny no-op stub —
+`document.createElement('canvas')` vracajúci objekt s `getContext('2d')` →
+objekt s no-op `createLinearGradient`/`createRadialGradient`/`fillRect`/
+`createImageData`/`putImageData`. Viď `tests/vizual-scena.test.ts`'s
+`FakeCanvas`/`FakeCtx` — bezpečné pre pozičné testy, NEPOKRÝVA skutočný obsah
+textúry (to zostáva #177 follow-up).
+
+**`jadroR`/`stred` v `vytvorKontaktnyTienTexturu` sú FRAKCIE CELEJ šírky
+canvasu, nie polovice** — `jadroR = rozlisenie×0,24` je polomer v PIXELOCH
+z `rozlisenie×rozlisenie` canvasu; pri UV mapovaní 0..1 na CELÚ rovinu sa
+world-space polomer rovná `0,24 × CELÁ strana roviny` (nie `0,24 ×
+polovica`). Presne TÁTO chyba (násobenie polovičným rozmerom namiesto
+celým) sa dostala do prvého komentára tohto PR-u a chytil ju až
+adversariálny review (#181) — rovnaká trieda chyby ako sRGB/lineárny gotcha
+vyššie: over PRIAMYM prepočtom (`jadroR/rozlisenie × plná_strana_mm`),
+nikdy netvrď frakciu "×2" alebo "z polovice" bez prepočtu.
