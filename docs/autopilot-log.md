@@ -952,3 +952,36 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - Playbook: `.claude/rules/vizual3d.md` (nový, viď vyššie) + poznámka na
   budúce: `npm ci --fetch-retries` NEPOMÁHA proti prebuild-install zlyhaniam
   (registry-only flag) — použi shell-level retry celého príkazu.
+
+## #174 ZNOVUOTVORENÉ (usadenie na zem) — PR #181
+
+- Reopen po #178 (prijaté: sklo/kamera/kontrast): finálne live screenshoty
+  ukázali jednotku "vznášajúcu sa" nad dlažbou (medzera, odpojená tieňová
+  elipsa, "pravý spodný roh visí vo vzduchu" v troStvrte).
+- Numerické overenie (Node + `window.__VIZDEBUG` live scene-introspekcia)
+  VYVRÁTILO prvý dohad — žiadny Y-výškový posun (unit-bottom/zem/základňa
+  steny/rovina tieňa všetky = 0). Skutočná príčina: `vytvorKontaktnyTien`
+  (scena.ts) — (1) X/Z posun celej roviny v smere svetla (správne pre
+  vrhnutý tieň, nesprávne pre kontaktný dekal), (2) kruhový radiálny
+  gradient na ŠTVORCOVEJ ploche podľa `Math.max(w,d)` — pri širokej/plytkej
+  jednotke (~28:1) tvrdé jadro nedosiahlo ku koncom koľajnice.
+- Fix: tieň vždy centrovaný (x=0,z=0), tvarovaný nezávisle šírka/hĺbka
+  (šírka podľa bbox.w, hĺbka podľa `max(bbox.d, 0.45×bbox.h)`, orezaná
+  zhora na šírku).
+- Commity: `f7a52c6` (bump 0.16.8) → `36b4c7b` [red] → `5fe8cb3` [green] →
+  `0461fea` (review fixes: komentárová aritmetika 680mm→1361mm + hĺbkový
+  clamp pre úzku-vysokú jednotku). Fresh-context review (general-purpose
+  subagent): 0🔴 2🟡(oba opravené) 2🔵. `tests/vizual-scena.test.ts` (9 testov,
+  nový súbor).
+- PR #181 (dev→main), merge `f1758c2`, verzia 0.16.8. CI: version-check +
+  test (1149 unit + 190 e2e, `npx playwright test` celá sada lokálne pred
+  pushom aj v main-branch CI) + deploy, všetko zelené.
+- Post-deploy Playwright overenie (desktop 1440×900 + phone 390×844,
+  celny/troStvrte/otvorene, live app.montalu.cloud): VŠETKY kritériá PASS —
+  rám sedí priamo na dlažbe, žiadna medzera, tieň sleduje celú šírku rámu.
+  `{"ok":true,"version":"0.16.8 (f1758c2)","live":true}`.
+- Playbook: `.claude/rules/vizual3d.md` rozšírený o (1) "nepredpokladaj
+  Y-posun, over číslami" ponaučenie, (2) `__VIZDEBUG` naживo scene-
+  introspekcia technika, (3) canvas/`document` no-op polyfill pre testovanie
+  `scena.ts` mimo `low` tieru, (4) `jadroR`/`stred` sú frakcie CELEJ šírky
+  canvasu, nie polovice (rovnaká trieda chyby ako sRGB/lineárny gotcha).
