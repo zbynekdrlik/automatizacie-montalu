@@ -1106,3 +1106,13 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   `v0.17.6 (b107173)` sedí, 0 console errors/warnings. Žiadna user-viditeľná
   zmena v tomto batchi (test coverage + interný refaktor) — potvrdené, nie
   vymyslené.
+
+## 2026-08-13 — Pergola z rozmerov: technický výkres (vzor OP260032) (#194)
+
+- **Issue:** #194 (part of #155 epic), engine base = #193 (PergolaNarezVstup / schemaVykresu na `pergola-narez.ts`).
+- **Commits:** 42fe048 (bump 0.19.0-dev.1) -> ed5c4f2 (feat výkres) -> c2d2684 (bump 0.19.0) -> 2bb10b6 (docs rule) -> 0d8d5b0 (review fixes). PR #200, merge 38c74f6.
+- **Čo:** `schemaVykresu(v)` čistá geometria (engine) + `PergolaNarezVykres.svelte` (predný pohľad + bokorys + pôdorys) na zdieľanom `$lib/vykres` (VykresovyHarok+Kota+kompozicia sharedFitScale/fitCentered). Krov = zjednodušený obrys + poznámka na krov-ticket #161, nikdy hádaná geometria. Display-only, money-safety guard rozšírený, route-scoped landscape tlač.
+- **Testy:** +8 geometria unit (2215, [0,1920,3840,5760], 2760, priečky <=700 invariant @20000) v `pergola-narez.test.ts`; +2 E2E (`e2e/pergola-narez.spec.ts`, console-zero); 1276 unit + 7 E2E zelené.
+- **Review:** adversariálny 0 R 2 Y 3 B -> Y/B opravené v 0d8d5b0 (čestná mierka zahŕňa vyskaZadna, stale komentár, obrysStroke dvojité *0.5, podFit komentár); font-literál ponechaný (sesterský precedens).
+- **Nasadené:** 0.19.0 (38c74f6), overené naživo app.montalu.cloud/pergola/narez (DOM verzia + 3 pohľady + kóty + krov-poznámka).
+- **Playbook:** `.claude/rules/pergola-narez.md` (2x „light", krov-ticket, len potvrdené vzorce, spec do spodného riadku).
