@@ -654,6 +654,62 @@ function migrate() {
 		db.pragma('user_version = 20');
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 21) {
+		// v20 → v21: cenový zoznam materiálu k zákazke — fáza 1 (#154, ROZHODNUTÉ
+		// 2026-08-12: ceny + dostupnosť, read-only, žiadna rezervácia/pracoviská).
+		//
+		// `material_prices` — LEN aktuálna hodnota (upsert podľa `kod`), nie história:
+		// appka ukazuje "aká je cena TERAZ + ako starý je snapshot", nikdy graf vývoja.
+		// Naplní ju `maybeImportSnapshot()` z externého read-only Money exportu
+		// (`scripts/ceny-snapshot.py`) — appka do Money nič nezapisuje. Chýbajúca cena
+		// je NULL (nikdy 0 — Money má reálne kódy bez ceny, viď design komentár na
+		// tikete). `sklad` je REAL nullable: 0/záporné = REÁLNA hodnota z Money
+		// (vypredané / rezervované nad rámec skladu), NULL = Money pre tento kód
+		// vôbec nemá skladovú kartu (#154 review nález — `S5_...` LEFT JOIN bez
+		// zhody sa predtým v producer skripte kolabovalo na 0, čím sa "neznáme"
+		// nerozoznateľne miešalo so skutočnou nulou).
+		//
+		// `material_prices_meta` — JEDEN riadok (id=1), drží mtime naposledy
+		// naimportovaného súboru (aby import bol lacný no-op, keď sa súbor nezmenil)
+		// + počty pre "N dní staré"/"M riadkov odmietnutých" v UI.
+		//
+		// `odpis_polozky` — appka doteraz odpis_log-u ukladala len SÚHRN (`detail`
+		// JSON), nikdy presné položky 1:1 s tým, čo odišlo do Money — spätne sa preto
+		// nedal zrekonštruovať materiál starej zákazky. FK s CASCADE na odpis_log:
+		// zmazanie/uvoľnenie odpisu (`releaseOdpis`) zmaže aj jeho položky. Písané v
+		// TEJ ISTEJ transakcii ako `odpis_log` insert (viď `writeOdpis` v money.ts) —
+		// dedup záznam bez položiek (alebo naopak) nesmie nikdy vzniknúť.
+		db.exec(`
+			CREATE TABLE material_prices (
+				kod TEXT PRIMARY KEY,
+				nakup_cennik REAL,
+				nakup_posledna_faktura REAL,
+				predaj_vo REAL,
+				mena TEXT NOT NULL DEFAULT 'EUR',
+				sklad REAL,
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE TABLE material_prices_meta (
+				id INTEGER PRIMARY KEY CHECK (id = 1),
+				snapshot_generated_at TEXT,
+				snapshot_file_mtime_ms REAL,
+				imported_at TEXT,
+				row_count INTEGER NOT NULL DEFAULT 0,
+				rejected_count INTEGER NOT NULL DEFAULT 0
+			);
+			CREATE TABLE odpis_polozky (
+				id INTEGER PRIMARY KEY,
+				odpis_log_id INTEGER NOT NULL REFERENCES odpis_log(id) ON DELETE CASCADE,
+				kod TEXT NOT NULL,
+				nazov TEXT NOT NULL,
+				qty REAL NOT NULL,
+				mj TEXT NOT NULL DEFAULT 'm'
+			);
+			CREATE INDEX idx_odpis_polozky_log ON odpis_polozky(odpis_log_id);
+		`);
+		db.pragma('user_version = 21');
+	}
+
 	seedData();
 	seedUsers();
 }

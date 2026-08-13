@@ -20,7 +20,20 @@ const stdRez = seed.rez.filter((r) => r.sysStyl.startsWith('Štandard +'));
 
 describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_seed', () => {
 	it('user_version=9 po plnej migrácii od nuly', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(20);
+		expect(db.pragma('user_version', { simple: true })).toBe(21);
+	});
+
+	it('v21 tabuľky (material_prices, material_prices_meta, odpis_polozky) existujú aj na fresh DB', () => {
+		const names = (
+			db
+				.prepare(
+					"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('material_prices','material_prices_meta','odpis_polozky')"
+				)
+				.all() as { name: string }[]
+		).map((r) => r.name);
+		expect(new Set(names)).toEqual(
+			new Set(['material_prices', 'material_prices_meta', 'odpis_polozky'])
+		);
 	});
 
 	it('všetkých 13 Štandard + štýlov je zoseedovaných (bez duplicít z v9)', () => {

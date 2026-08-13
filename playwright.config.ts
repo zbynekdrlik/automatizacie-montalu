@@ -37,7 +37,10 @@ export default defineConfig({
 					DATABASE_PATH: './data/e2e.db',
 					SEED_USERS: 'e2e:e2e-heslo-123',
 					MONEY_LIVE: '0',
-					MONEY_TEST_DIR: './data/e2e-odpis-export'
+					MONEY_TEST_DIR: './data/e2e-odpis-export',
+					// #154: E2E si vie na tento súbor napísať VLASTNÝ snapshot fixture (appka
+					// beží ako lokálny child proces preview servera, zdieľa filesystem s testom)
+					CENY_SNAPSHOT_PATH: './data/e2e-ceny.json'
 				}
 			}
 });

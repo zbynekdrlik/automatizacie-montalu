@@ -13,7 +13,7 @@ import {
 	type MultiResult,
 	type PosuvSpec
 } from '$lib/server/compute';
-import { isB2B } from '$lib/server/auth';
+import { isB2B, type SessionUser } from '$lib/server/auth';
 import { znovaZOdpisu } from '$lib/server/znova';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
 import { sysStylPre, sklaDoPonuky, type ExistujeSysStyl } from '$lib/styl';
@@ -27,6 +27,7 @@ import {
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
 import { komponentyPre } from '$lib/server/komponenty-cfg';
+import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import {
 	parseVstup,
 	parseMultiVstup,
@@ -99,6 +100,17 @@ function jobFor(
  */
 function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean) {
 	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab);
+}
+
+/**
+ * Cenový zoznam materiálu (#154, fáza 1) — LEN pre interných. B2B nesmie vidieť
+ * nákupnú cenu/maržu/sklad vôbec (šéf 2026-08-12) — obrana do hĺbky ako Money-write
+ * hranica (access-control skill §2): dáta sa pre b2b vôbec NEDOPOČÍTAJÚ, nielen
+ * neukážu v UI, takže sa nikdy nedostanú do HTML odpovede ani skriptovaným POST-om.
+ */
+function cenyPre(user: SessionUser | null, polozky: OdpisJob['polozky']): CenyResult | undefined {
+	if (isB2B(user)) return undefined;
+	return enrichPolozky(polozky);
 }
 
 /** Existuje taký nárezák? Zdroj pravdy pre server je konfigurácia (cfg z DB). */
@@ -321,6 +333,9 @@ export const actions: Actions = {
 			vstup,
 			plan: r,
 			kovanie: kov.polozky,
+			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; undefined pre
+			// b2b, takže sa nedostane ani do HTML odpovede (obrana do hĺbky)
+			ceny: cenyPre(locals.user, job.polozky),
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
@@ -440,6 +455,8 @@ export const actions: Actions = {
 			multiVstup: vstup,
 			multi: r,
 			kovanie: kov.polozky,
+			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných (viď nahlad vyššie)
+			ceny: cenyPre(locals.user, job.polozky),
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
 			heightWarn,

@@ -69,6 +69,12 @@
 						<td class="c">{o.live ? '● LIVE' : '🧪 TEST'}</td>
 						<td>{o.created_by}</td>
 						<td class="c">
+							<!-- cenový detail (#154) — položky + ich ceny k tomuto konkrétnemu odpisu -->
+							<a
+								class="btn secondary"
+								href={resolve(`/odpisy/${o.id}`)}
+								data-testid={`detail-${o.id}`}>💶 Detail</a
+							>
 							{#if o.modul === 'zasklenia'}
 								<!-- „Použiť znova" (Patrik 2026-07-31): viacerí zákazníci si objednávajú to
 								     isté. Je to LEN odkaz, ktorý predvyplní formulár — nič sa tým neodpisuje. -->
