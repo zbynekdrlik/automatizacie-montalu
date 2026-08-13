@@ -1031,3 +1031,35 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   živý dôkaz, prečo sa na to oplatí dať pozor: PR #184 sa zmergovala s „-dev.1"
   priamo na main, opravné PR #185 muselo bumpnúť o celé číslo vyššie (0.17.1),
   lebo `sort -V` nedovolí návrat na čistú 0.17.0.
+
+## #168 — spoločná kompozícia technických hárkov (2026-08-13)
+
+- Root cause: `ZaskleniaNavrhVykres.svelte` fixný `baseY = r.y + r.h*0.85` (nie
+  centrovanie) → prázdna horná tretina pri width-limited mierke; `BazenNavrhVykres
+  .svelte`'s `REZ SEKCIOU` box zaberal `oblast.w*0.17` × celú výšku, hoci nesie len
+  2-3 riadky textu, kým #163 nedoplní skutočný rez.
+- Nový zdieľaný modul `src/lib/vykres/kompozicia.ts` (`fitCentered`/`centerAt`/
+  `sharedFitScale` + `MIN_TITLE_FONT`/`MIN_SUBTITLE_FONT`/`MIN_DIM_FONT`/
+  `MIN_SPEC_FONT`) — cieľ 60-75% plochy, vycentrované v oboch osiach namiesto
+  fixného odsadu. Nová `pohyblivePanely(n, smer)` (`zasklenia-navrh.ts`) — šípka
+  na pohyblivom krídle, nezávislá reimplementácia `vodiaceIndexy()` z
+  `vizual/geo/zasklenia.ts` (ten súbor ostal nedotknutý). Bazén: bokorys/pôdorys
+  zdieľajú JEDNU mierku + zdieľaný X=0 (aby deliace sekcií sedeli pod sebou),
+  vážený (nie 50/50) výškový split (`bokFrac`), keďže bokorys je takmer vždy
+  pomerovo veľmi plochý. Pergola nezmenená (referenčný vzor z tela ticketu).
+- RED→GREEN: `tests/kompozicia.test.ts` (13 testov), `pohyblivePanely` prípady v
+  `tests/zasklenia-navrh.test.ts`, nové `#168:`-prefixované e2e v
+  `e2e/zasklenia-navrh.spec.ts`/`e2e/bazen-navrh.spec.ts`.
+- Fresh-context deep-review subagent našiel 1× 🟡 (MIN_DIM_FONT deklarovaný, ale
+  nezapojený do 4 kót — opravené v `39af47d`, adjacent-finding-in-touched-file,
+  #311 same-branch-fix).
+- Commity: `178f27c`(bump 0.17.4-dev.1) → `2dabf7a`(feat kompozícia) →
+  `2cca8a0`(bump 0.17.4 pred mergom) → `39af47d`(review fix MIN_DIM_FONT).
+- PR #188 (dev→main), merge `cc46d41`. main CI (incl. deploy) zelené. Nasadená
+  verzia `0.17.4 (cc46d41)`.
+- Post-deploy Playwright overenie na `app.montalu.cloud` (marek, LIVE): pergola
+  (nezmenená, stále dobre využitá), zasklenia (Robust 3K 4200×2100 P-L — veľký
+  čitateľný nadpis, vycentrovaná kresba, šípka na ľavom krídle), bazén (OP260055,
+  RAL 9006 — malý REZ SEKCIOU box, väčší bokorys/pôdorys, sekcie zarovnané) —
+  0 console errors (len benígne GL driver warning), verzia v pätičke sedí s
+  deployom.

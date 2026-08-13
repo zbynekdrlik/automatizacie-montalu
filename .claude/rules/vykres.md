@@ -243,6 +243,48 @@ technika ako `TitleBlock.svelte`'s per-pole clip rects, `uid` z
 bloku, veľkosťou zodpovedajúci zúženému regiónu — tá HRANICU renderovania
 skutočne vynúti.
 
+## Nový hárok / pohľad → použi `$lib/vykres/kompozicia.ts`, nie fixný `baseY`/`fitScale` odsad (#168)
+
+Pred #168 si každý hárok počítal svoju mierku a pozíciu ad-hoc: `fitScale(mmW, mmH,
+r.w*X, r.h*Y)` + fixný `baseY = r.y + r.h*0.8`-štýl dolný odsad. Toto vyzerá v poriadku
+pri DEMO fixture, ale keď je obsah pomerovo iný než jeho oblasť (typicky: kresba
+širšia/plochejšia, než je oblasť), `fitScale` vráti mierku LIMITOVANÚ jedným rozmerom
+— a fixný odsad nechá CELÝ ušetrený priestor na JEDNEJ strane (zvyčajne hore, keďže
+odsad býva dolný), namiesto rovnomerného rozdelenia. Presne toto bolo príčinou
+"horná tretina hárku prázdna" (zasklenia) aj "kresba zaberá ~1/5 hárku" (bazén).
+
+**Namiesto toho pre KAŽDÝ nový pohľad/hárok:**
+- **Jeden pohľad v oblasti:** `fitCentered(mmW, mmH, area)` (voliteľný `targetFill`,
+  default 0.72 — pásmo 60-75%) vráti `{scale, x0, y0, x1, y1}` vycentrovaný v OBOCH
+  osiach. Nahraď `baseY`/`x0`/`X(mm)` výpočty jeho výstupom priamo (`baseY = fit.y1`,
+  `topY = fit.y0`, `X = mm => fit.x0 + mm*fit.scale`).
+- **Viac pohľadov, KTORÉ MUSIA zdieľať mierku** (napr. bokorys+pôdorys bazéna — ich
+  deliace stĺpiky/sekcie musia vizuálne sedieť pod sebou): `sharedFitScale(items)`
+  vráti JEDNU mierku (najmenšiu spomedzi všetkých položiek), potom `centerAt(mmW, mmH,
+  area, scale)` KAŽDÝ pohľad zvlášť.
+- **Ak dva pohľady zdieľajúce mierku majú RÔZNE mmW** (napr. `dlzkaKolajiska` vs
+  `zatvorenaDlzka` — different-length x-osi, ale ROVNAKÝ fyzický počiatok X=0), NEZ-
+  centruj ich vodorovne NEZÁVISLE — `centerAt` by dal každému inú `x0` (širší obsah =
+  väčší odsad = INÝ x0), čo by rozladilo zarovnanie. Namiesto toho vypočítaj JEDEN
+  vodorovný fit (na ŠIRŠOM z dvoch, napr. `centerAt(dlzkaKolajiska, ...)`), a druhému
+  pohľadu OVERRIDNI len jeho `x0`/`x1` na tú istú hodnotu (`{ ...vlastnýFit, x0:
+  zdieľanéX0, x1: zdieľanéX0 + vlastnéMmW*scale }`) — vertikálne (`y0`/`y1`) môže
+  ostať nezávisle vycentrované na vlastnú výšku oblasti, keďže dva pohľady v
+  SAMOSTATNÝCH riadkoch nemajú žiadny dôvod zdieľať Y.
+- **Nerovnaký 50/50 výškový split pri VEĽMI odlišných pomeroch strán:** keď dva
+  pohľady zdieľajúce `sharedFitScale` majú veľmi odlišný pomer strán (napr. bokorys
+  takmer plochý vs. pôdorys takmer štvorcový), naivný 50/50 split výškového pásma
+  medzi nimi zviaže spoločnú mierku na tesnejšie obmedzenie toho pohľadu, ktorý
+  výšku SKUTOČNE potrebuje (čím ho zbytočne zmenší, aj keď ten druhý svoj prebytočný
+  pás vôbec nevyužije). Váž rozdelenie podľa reálnych rozmerov (napr. `Math.min(cap,
+  Math.max(floor, vyskaA/(vyskaA+vyskaB)))`), nikdy nie fixný zlomok.
+- **Font-size floors:** `MIN_TITLE_FONT`/`MIN_SUBTITLE_FONT`/`MIN_DIM_FONT`/
+  `MIN_SPEC_FONT` sú deklarovaná spoločná podlaha čitateľnosti — pri PRIDÁVANÍ nového
+  textového prvku ich rovno POUŽI (`font-size={MIN_DIM_FONT}`), nespoliehaj sa na to,
+  že literál "vyzerá dosť veľký". Zabudnutý import = literál pod podlahou prežije aj
+  review, kým to niekto výslovne neporovná s deklarovanou konštantou (#168 review
+  nález: 4 kóty zostali na `2.8` napriek deklarovanej podlahe `3`).
+
 ## `podpisovaLista` (#139) — nová opt-in vlastnosť `VykresovyHarok`, vzor pre ďalší podobný prvok
 
 Signatúrna lišta dielne ("Rezal/Opracoval/Kompletoval/Balil-Gumoval") sa

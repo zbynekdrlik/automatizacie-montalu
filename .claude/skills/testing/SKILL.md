@@ -62,6 +62,24 @@ server change before re-running E2E; a stale build silently keeps serving the ol
 When `BASE_URL` IS set (post-deploy E2E against a live target), this doesn't apply —
 there's no local preview server, no build needed.
 
+## A LONG-LIVED manual `npm run preview` (for ad-hoc Playwright MCP visual iteration) must be RESTARTED after every rebuild — a fresh build alone is not enough
+
+The section above covers `npx playwright test`'s OWN `webServer` (short-lived, one
+process per test run — a fresh `npm run build` before invoking it is sufficient). A
+DIFFERENT case: when iterating on SVG/layout changes visually (screenshot → judge →
+tweak → repeat) you typically start `npm run preview` yourself via `run_in_background`
+and drive it with the Playwright MCP across several rounds. That server is a
+LONG-LIVED Node process — `vite preview`/adapter-node loads the SSR module graph into
+memory ONCE at startup. Running `npm run build` again REGENERATES the files on disk,
+but the already-running process keeps serving the OLD in-memory modules (#168, live:
+a bazén layout rebalance produced byte-identical screenshots across two `npm run
+build` cycles until the preview process itself was killed and relaunched — no error,
+no stale-404 symptom, just silently wrong output that looks like "my source change
+had no effect"). **Fix: `TaskStop` the background preview task and relaunch `npm run
+preview` fresh after EVERY rebuild during this kind of iterative session** — not just
+after the first one. Symptom to watch for: a `git diff`-verified source change
+produces a screenshot pixel-identical to the previous round.
+
 ## Post-deploy prod verification via the Playwright MCP — drive forms with `browser_evaluate`
 
 **`Invalid arguments … expected string, received undefined → at target` is just the
