@@ -73,6 +73,18 @@ výstuha profil (O2/O3), strop 700 pre krov (O4), sklá (O11), pozície zvodov (
 Kým O nie sú zodpovedané, príslušný prvok ostáva „nepodporované"/poznámka — pozri
 #198 pred pridávaním nového vzorca.
 
+## `sirka` = šírka RÁMU (poľa krokiev), NIE dĺžka žľabu — verifikácia #196
+
+Overenie proti reálnym zákazkám ZAK202694/ZAK2026302 (`tests/pergola-narez-historicka-verifikacia.test.ts`)
+ukázalo: vzorec počtu priečok `ceil(šírka/700)+1` sedí na realitu LEN keď `sirka` =
+šírka **rámu** (pole krokiev), NIE celková dĺžka žľabu. Žľab presahuje rám na obe strany
+(ZAK202694 žľab 5930 vs rám 5293.9; ZAK2026302 žľab 9120 vs rám ~8004). Keby sa do enginu
+posunula dĺžka žľabu, počet priečok by bol o ~2 vyšší. **#197 (napojenie na Money) musí
+posielať šírku rámu**; vzťah žľab = rám + 2×presah je O1-blokovaný (#198). Predná noha
+(svetlosť+15) a systém→kódy (18013/18021, 18004/18102) sú overené 1:1; zadná noha a výstuha
+−280 v histórii NEMAJÚ vzor (obe surovo-CAD zákazky sú na stenu, bez zosilneného nosníka) —
+nezapínať do Money bez ďalšieho overenia.
+
 ## Money-safety je STATICKY strážená
 
 Engine, parser, route AJ výkresová komponenta NEimportujú `server/money`/
