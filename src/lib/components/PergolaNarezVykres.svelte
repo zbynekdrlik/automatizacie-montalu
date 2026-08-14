@@ -102,15 +102,21 @@
 	const MODRA = '#1d4ed8';
 	const SIVA = '#64748b';
 
-	const STRUKTURA_STROKE = 1.2;
+	// #204 — CAD konvencia hrúbky čiar: rezová/hlavná obrysová čiara (cut line) je hrubšia
+	// než POMOCNÉ pohľadové čiary (view line). Dominik (Odoo #1691127): „hrubé čiary v tých
+	// pohľadoch … ako cez skicár" → pohľadové čiary tenké technické, hrubšia ostáva LEN pre
+	// samotný rez/hlavný obrys (žľab-sekcia, pôdorysný obrys). Predtým bola jednotná 1.2.
+	const REZ_STROKE = 0.5; // rezová/hlavná obrysová čiara (žľab sekcia, pôdorysný obrys)
+	const POHLAD_STROKE = 0.3; // pomocná pohľadová čiara (nohy, steny, obrys strechy, zem)
 	// previs žľabu/strechy oproti krajnej nohe [mm] — LEN vizuálne (nevstupuje do
 	// žiadneho výpočtu), rovnaká disciplína ako PREVIS_VIZ_MM v PergolaNavrhVykres.
 	const PREVIS_VIZ_MM = 60;
 
 	/** Obrysová hrúbka vyplneného tvaru — nikdy širšia než polovica tvaru, aby pri
-	 *  extrémnej (ale platnej) mierke nezhltla fill (vykres.md #153, `obrysStroke`). */
-	function obrysStroke(rozmerPx: number): number {
-		return Math.min(STRUKTURA_STROKE, rozmerPx * 0.5);
+	 *  extrémnej (ale platnej) mierke nezhltla fill (vykres.md #153, `obrysStroke`).
+	 *  `base` = REZ_STROKE (rezová čiara) alebo POHLAD_STROKE (pohľadová, default). */
+	function obrysStroke(rozmerPx: number, base: number = POHLAD_STROKE): number {
+		return Math.min(base, rozmerPx * 0.5);
 	}
 
 	/** Polovičná hrúbka nohy v PX pri danej mierke — orezaná zdola (nikdy nezmizne)
@@ -234,13 +240,13 @@
 		height={zlabH}
 		fill="#eff6ff"
 		stroke={CIERNA}
-		stroke-width={obrysStroke(zlabH)}
+		stroke-width={obrysStroke(zlabH, REZ_STROKE)}
 		shape-rendering="crispEdges"
 		data-testid="pnr-fe-zlab"
 	/>
 	<!-- priečky — tenké deliace čiary výplne (rozostup ≤ 700), LEN vnútorné (krajné
 	     sadnú na profily). Sekundárne oproti nohám (tenšie). -->
-	<g stroke={SIVA} stroke-width="0.35" data-testid="pnr-fe-priecky">
+	<g stroke={SIVA} stroke-width={POHLAD_STROKE} data-testid="pnr-fe-priecky">
 		{#each s.priecky.pozicieX as px, i (i)}
 			<line x1={X(px)} y1={topY} x2={X(px)} y2={baseY} />
 		{/each}
@@ -330,7 +336,7 @@
 			x2={xFront}
 			y2={yFrontTop - zlabH}
 			stroke={SIVA}
-			stroke-width="0.5"
+			stroke-width={POHLAD_STROKE}
 			stroke-dasharray="3,1.5"
 			data-testid="pnr-bok-strecha"
 		/>
@@ -343,7 +349,7 @@
 		height={zlabH}
 		fill="#eff6ff"
 		stroke={CIERNA}
-		stroke-width={obrysStroke(zlabH)}
+		stroke-width={obrysStroke(zlabH, REZ_STROKE)}
 		shape-rendering="crispEdges"
 		data-testid="pnr-bok-zlab"
 	/>
@@ -379,7 +385,7 @@
 			x2={xBack}
 			y2={yFrontTop}
 			stroke={CIERNA}
-			stroke-width="1"
+			stroke-width={POHLAD_STROKE}
 			data-testid="pnr-bok-stena"
 		/>
 		<text
@@ -391,7 +397,7 @@
 		>
 	{/if}
 	<!-- zem -->
-	<line x1={xBack} y1={baseY} x2={xFront} y2={baseY} stroke={CIERNA} stroke-width="0.4" />
+	<line x1={xBack} y1={baseY} x2={xFront} y2={baseY} stroke={CIERNA} stroke-width={POHLAD_STROKE} />
 	<!-- kóty: hĺbka (dole), predná svetlá výška (vpravo), zadná výška (vľavo, samostatne) -->
 	<Kota
 		x0={xBack}
@@ -461,7 +467,7 @@
 		height={y1 - y0}
 		fill="none"
 		stroke={CIERNA}
-		stroke-width={obrysStroke(Math.min(X(s.sirka) - X(0), y1 - y0))}
+		stroke-width={obrysStroke(Math.min(X(s.sirka) - X(0), y1 - y0), REZ_STROKE)}
 		data-testid="pnr-pod-obrys"
 	/>
 	<!-- predné nohy — štvorčeky na PREDNEJ hrane (dole, y1) -->
@@ -494,7 +500,7 @@
 			x2={X(s.sirka)}
 			y2={y0}
 			stroke={CIERNA}
-			stroke-width="1.2"
+			stroke-width={POHLAD_STROKE}
 			data-testid="pnr-pod-stena"
 		/>
 	{/if}

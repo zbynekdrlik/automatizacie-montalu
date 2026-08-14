@@ -18,6 +18,12 @@ Version file: `package.json` `"version"`. Bump it on `dev` FIRST (before any wor
 `dev` > `main` (per version-bumping). The web UI MUST display this version label — see
 "CI + deploy" below.
 
+**Bump via a TARGETED edit of the `"version"` line (preserve the file's TABS) — never
+`node -e 'JSON.stringify(p,null,2)'`.** `JSON.stringify` re-indents `package.json` to
+2 SPACES, which fails `prettier --check` (this repo's `.prettierrc` = tabs) and costs a
+lint round (#161, 2026-08-14). If you did reformat it, run `prettier --write package.json`
+before committing.
+
 **Convention: `dev` carries `X.Y.Z-dev.N`, `main` carries the clean `X.Y.Z`.** The
 FIRST commit on `dev` after a merge bumps to the next `-dev.1`; right before opening the
 PR to `main`, bump again to the clean released version (no `-dev` suffix). A `-dev`

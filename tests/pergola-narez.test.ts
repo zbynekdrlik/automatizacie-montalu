@@ -122,10 +122,12 @@ describe('spocitajNarez — priečky (počet z max rozostupu 700, dĺžka O1-blo
 	it('presné delenie (šírka 4200 → ceil(6)+1 = 7)', () => {
 		expect(spocitajNarez({ ...VZOR, sirka: 4200 }).informativne.pocetPriecok).toBe(7);
 	});
-	it('dĺžka rezu priečky je NULL (čaká na kótovaný výkres O1), nie vymyslená', () => {
+	it('dĺžka rezu priečky je NULL (= HH krovu, #161 neodvoditeľné), nie vymyslená', () => {
 		const priecka = spocitajNarez(VZOR).vypocitane.find((p) => /priečk/i.test(p.nazov));
 		expect(priecka!.dlzkaRezuMm).toBeNull();
-		expect(priecka!.poznamka).toMatch(/O1|výkres/i);
+		// #205: kótovaný výkres OP260282 dorazil, ale priečka = HH krovu, čo nie je vzorec
+		// zo vstupov (CAD výsledok geometrie krovu) → poznámka odkazuje na HH krovu / #161
+		expect(priecka!.poznamka).toMatch(/HH krovu|#161/i);
 	});
 	it('light checkbox → kód priečky 18102, inak 18004', () => {
 		expect(
@@ -159,15 +161,20 @@ describe('spocitajNarez — informatívne výpočty', () => {
 });
 
 describe('spocitajNarez — zatiaľ nepodporované (O-otázky), nič sa nehádže', () => {
-	it('krov, žľab, kotviaci profil, lišty, sklá sú v nepodporované s O/N referenciou', () => {
-		const n = spocitajNarez(VZOR).nepodporovane.join(' | ');
+	it('krov, lišty (HH krovu), sklá v nepodporované; žľab + kotviaci sú TERAZ vo vypocitane (#205)', () => {
+		const r = spocitajNarez(VZOR);
+		const n = r.nepodporovane.join(' | ');
 		expect(n).toMatch(/krov/i);
 		expect(n).toMatch(/#161/);
-		expect(n).toMatch(/žľab|žlab/i);
-		expect(n).toMatch(/kotviaci/i);
-		expect(n).toMatch(/lišt/i);
+		expect(n).toMatch(/lišt|prítlačn|maskovac/i);
 		expect(n).toMatch(/skl/i);
 		expect(n).toMatch(/O1/);
+		// #205: žľab (18018/18021) + kotviaci (18019) sa presunuli z „nepodporované" do
+		// „vypocitane" — kótovaný výkres OP260282 potvrdil dĺžku = šírka (O1 čiastočne).
+		expect(
+			r.vypocitane.some((p) => /žľab|žlab/i.test(p.nazov) && p.dlzkaRezuMm === VZOR.sirka)
+		).toBe(true);
+		expect(r.vypocitane.some((p) => p.kod === '18019' && p.dlzkaRezuMm === VZOR.sirka)).toBe(true);
 	});
 	it('zosilnený nosník checkbox → profil (250×110/230×110/200×140) je nepodporovaný (O2/O3)', () => {
 		const bez = spocitajNarez({ ...VZOR, zosilnenyNosnik: false }).nepodporovane.join(' | ');
