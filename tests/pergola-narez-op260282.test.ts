@@ -41,7 +41,10 @@ const OP260282: PergolaNarezVstup = {
 	sklonStrechy: 6.1
 };
 
-function riadok(v: PolozkaNarezu[], pred: (p: PolozkaNarezu) => boolean): PolozkaNarezu | undefined {
+function riadok(
+	v: PolozkaNarezu[],
+	pred: (p: PolozkaNarezu) => boolean
+): PolozkaNarezu | undefined {
 	return v.find(pred);
 }
 
