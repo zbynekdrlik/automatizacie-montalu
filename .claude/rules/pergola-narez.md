@@ -107,3 +107,31 @@ Engine, parser, route AJ výkresová komponenta NEimportujú `server/money`/
 `server/pergola`/`server/db` — `tests/pergola-narez-money-safety.test.ts` to skenuje
 (zoznam `SUBORY`). Nová súčasť modulu → pridaj ju do `SUBORY`. Žiadny golden
 snapshot, žiadny zápis do dlv-import.
+
+**Bin-packing (výdaj tyčí) — REPLIKUJ, NEIMPORTUJ (#205).** Algoritmus výdaja tyčí žije v
+`$lib/server/pergola.ts` (Money odpisová cesta, katalóg tyčí 7500/6000/4500 mm), ktorú
+money-safety guard ZAKAZUJE importovať. Preto je v `pergola-narez.ts` čistá funkcia
+`pocetTyci(dlzka, ks, tycMm) = ceil(ks / floor(tyc/dlzka))` (null keď kus > tyč) — vzor sa
+kopíruje, neimportuje. Tyče: 7,5 m default; žľab (18018/18021) + kotviaci (18019) na 6 m.
+
+## Výkres OP260282 (O1 čiastočne odblokoval) — čo je POTVRDENÉ a čo ostáva NULL (#205/#207)
+
+Kótovaný výkres OP260282 (PERGOLA MASSIVE 140 SS, Odoo správa 1691126) je prvý zdroj s
+Plánom rezov 1:1. Golden vektor: `tests/pergola-narez-op260282.test.ts` (šírka 4990, hĺbka
+3470, ZV 2790, sklon 6,1°, Massive 140 SS, výstuha 140×140). **NEROZŠIRUJ nad tento zoznam
+bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu:**
+
+- **POTVRDENÉ (vo `vypocitane[]`, golden asertuje presne):** žľab (18018/18021) = šírka;
+  kotviaci (18019) = šírka; zadná konštr. horná (18013, LEN SS) = šírka; výstuha horná
+  (18017, LEN massive+zosilnenyNosnik) = šírka − 280. + výdaj tyčí.
+- **NULL (nikdy sa nehádže):** `HH krovu` (3240.9) NIE JE vzorec zo vstupov — je to CAD
+  výsledok geometrie krovu (#161, `pergola-krov.ts` počíta uloženie, NIE dĺžku HH). Preto
+  priečka dĺžka (= HH krovu) a prítlačná/maskovacie (18006/18007/18008 = HH krovu + 40)
+  ostávajú čestný null (#161/#198). Robust prítlačná HH krovu + 39 = NEPOTVRDENÉ (O18).
+- **Počet priečok:** engine `ceil(šírka/700)+1 = 9`, výkres 8 (rám < žľab, presah O1/#196).
+  Confirmed vzorec sa NEMENÍ; rozdiel je zdokumentovaný v `nepodporovane[]`.
+- **Nekonzistentné poznámky výkresu ↔ hodnoty (na potvrdenie Dominikovi, ostávajú NULL):**
+  18016 (110×43) pozn. „šírka − …" nesedí s 3220 (≈ hĺbka − 250); zadná výstuha (18017
+  zvislá) pozn. „ZV − 140" = 2650 ale výkres 2340; zadné nohy pri SS+výstuha: výkres 2790
+  profil 18013, engine confirmed ZV − horný profil = 2650 (kód podľa systému) — táto
+  SS+výstuha konfigurácia nemá historický vzor (#196), vzorec sa NEMENÍ.
