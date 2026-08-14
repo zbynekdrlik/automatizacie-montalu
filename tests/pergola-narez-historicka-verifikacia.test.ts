@@ -162,11 +162,16 @@ describe('#196 verifikácia — systém → kód stĺpu/žľabu (mapovanie vs re
 			// systém som určil z výkresu (110×110 stĺp), engine z neho odvodí kódy
 			expect(SYSTEMY[z.system].stlp.kod).toBe(z.realne.prednaNoha.kod);
 			expect(SYSTEMY[z.system].zlab.kod).toBe(z.realne.zlab.kod);
-			// engine žľab vypisuje ako „vždy prítomný" v nepodporované s tým istým kódom
+			// #205: žľab + kotviaci sa presunuli z „nepodporované" do „vypocitane"; kód
+			// ostáva rovnaký. Dĺžka žľabu = zadaná šírka — pre historické zákazky je zadaná
+			// šírka RÁMU, NIE skutočná dĺžka žľabu (5930 vs rám 5294), to je práve rozdiel
+			// #196/O1 → tu sa žľab-dĺžka neasertuje, len kód.
 			const r = spocitajNarez(vstupZoZakazky(z));
-			expect(r.nepodporovane.join(' | ')).toContain(z.realne.zlab.kod);
+			expect(
+				r.vypocitane.some((p) => p.kod === z.realne.zlab.kod && /žľab|žlab/i.test(p.nazov))
+			).toBe(true);
 			// kotviaci profil horný V2 (18019) engine tiež vypisuje ako vždy prítomný
-			expect(r.nepodporovane.join(' | ')).toContain('18019');
+			expect(r.vypocitane.some((p) => p.kod === '18019')).toBe(true);
 		});
 	}
 });

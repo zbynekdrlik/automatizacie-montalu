@@ -336,7 +336,7 @@
 		</p>
 		<table class="narez" data-testid="narez-tabulka">
 			<thead>
-				<tr><th>Kód</th><th>Názov</th><th>Dĺžka rezu</th><th>Počet ks</th></tr>
+				<tr><th>Kód</th><th>Názov</th><th>Dĺžka rezu</th><th>Počet ks</th><th>Výdaj</th></tr>
 			</thead>
 			<tbody>
 				{#each vysledok.vypocitane as p (p.kod + p.nazov)}
@@ -345,6 +345,9 @@
 						<td>{p.nazov}{p.poznamka ? ` · ${p.poznamka}` : ''}</td>
 						<td>{mm(p.dlzkaRezuMm)}</td>
 						<td><b>{p.pocetKs}</b></td>
+						<td data-testid="vydaj-{p.kod}"
+							>{p.vydajTyce ? `${p.vydajTyce.pocet}×(${p.vydajTyce.tycMm / 1000} m)` : '—'}</td
+						>
 					</tr>
 				{/each}
 			</tbody>
