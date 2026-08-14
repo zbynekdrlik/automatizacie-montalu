@@ -304,7 +304,7 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 	await page.locator('#vyskaZadna').fill('2790');
 	await page.locator('#pocetZadnychNoh').fill('4');
 	await page.locator('#hornyProfilZadnej').selectOption('140');
-	await page.locator('input[name="zosilnenyNosnik"]').check();
+	await page.locator('#zosilnenyNosnik').check();
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 

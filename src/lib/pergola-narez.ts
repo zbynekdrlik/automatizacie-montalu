@@ -245,7 +245,7 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 			dlzkaRezuMm: sirkaMm,
 			pocetKs: 1,
 			poznamka:
-				'= šírka (profil 110×110 z výkresu OP260282; výkres zdieľa 7,5 m tyče so zadnými nohami)',
+				'= šírka; profil 110×110 potvrdený z výkresu OP260282 (Massive-SS) — pri inom systéme kód overiť s Dominikom pred napojením na Money (#197). Výkres zdieľa 7,5 m tyče so zadnými nohami.',
 			vydajTyce: spocitajVydaj(sirkaMm, 1, TYC_STANDARD_MM)
 		});
 	}
