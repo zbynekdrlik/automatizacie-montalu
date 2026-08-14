@@ -76,6 +76,41 @@
 	// mierka MUSÍ zahrnúť aj ju (review nález #194 🟡: inak by úzka+vysoká samostatná
 	// zákazka reportovala mierku podhodnotenú ~1,5×; rovnaká disciplína ako
 	// `Math.max(vyskaPriStene, hlbka)` v PergolaNavrhVykres).
+	// #206 — spec riadky: potvrdené rozmery + nové voľby (výstuha profil, zasklenie, sklá,
+	// zvod). Voliteľné riadky sa pridávajú len keď sú vyplnené, aby sa spec nezhltol pečiatkou.
+	let specRiadky = $derived.by((): [string, string, string][] => {
+		const rows: [string, string, string][] = [
+			['SYSTÉM', 'system', vstup.system],
+			['ROZMER', 'rozmer', `${fmtMm(s.sirka)} × ${fmtMm(s.hlbka)} mm`],
+			[
+				'PREDNÁ SVETLOSŤ',
+				'svetlost',
+				`${fmtMm(s.prednaSvetlost)} mm${vstup.vystuhaProfil === '200x140' ? ' (200×140: −60)' : ''}`
+			],
+			[
+				'PREDNÉ NOHY',
+				'nohy',
+				`${vstup.pocetPrednychNoh} ks${s.rozostupPrednychNoh ? ` · rozostup ${fmtMm(s.rozostupPrednychNoh)} mm` : ''}`
+			],
+			[
+				'UCHYTENIE',
+				'uchytenie',
+				s.zadnaKonstrukcia.typ === 'samostatne'
+					? `samostatne · zadná noha ${fmtMm(s.zadnaKonstrukcia.nohaDlzka)} mm`
+					: 'na stenu'
+			],
+			['PRIEČKY', 'priecky', `${s.priecky.pocet} ks · rozostup ≤ ${MAX_ROZOSTUP_PRIECOK} mm`]
+		];
+		if (vstup.vystuhaProfil) rows.push(['VÝSTUHA', 'vystuha', vstup.vystuhaProfil]);
+		if (vstup.jednoduchaBezZasklenia)
+			rows.push(['ZASKLENIE', 'zasklenie', 'jednoduchá bez zasklenia · bočné 110×43 vypnuté']);
+		if (vstup.strechaSklo) rows.push(['STRECHA SKLO', 'strechasklo', vstup.strechaSklo]);
+		if (vstup.obvodoveZasklenie) rows.push(['OBVODOVÉ', 'obvodove', vstup.obvodoveZasklenie]);
+		if (vstup.zvodFrezovat && vstup.zvodFrezovanieSHmm != null)
+			rows.push(['ZVOD SH', 'zvod', `frézovať ${fmtMm(vstup.zvodFrezovanieSHmm)} mm`]);
+		return rows;
+	});
+
 	let najvyssiaVyska = $derived(
 		Math.max(
 			s.prednaSvetlost,
@@ -635,24 +670,9 @@
 
 <!-- ============================= spec (potvrdené rozmery) ============================= -->
 {#snippet specText(r: { x: number; y: number; w: number; h: number })}
-	{@const riadky: [string, string, string][] = [
-		['SYSTÉM', 'system', vstup.system],
-		['ROZMER', 'rozmer', `${fmtMm(s.sirka)} × ${fmtMm(s.hlbka)} mm`],
-		['PREDNÁ SVETLOSŤ', 'svetlost', `${fmtMm(s.prednaSvetlost)} mm`],
-		[
-			'PREDNÉ NOHY',
-			'nohy',
-			`${vstup.pocetPrednychNoh} ks${s.rozostupPrednychNoh ? ` · rozostup ${fmtMm(s.rozostupPrednychNoh)} mm` : ''}`
-		],
-		[
-			'UCHYTENIE',
-			'uchytenie',
-			s.zadnaKonstrukcia.typ === 'samostatne'
-				? `samostatne · zadná noha ${fmtMm(s.zadnaKonstrukcia.nohaDlzka)} mm`
-				: 'na stenu'
-		],
-		['PRIEČKY', 'priecky', `${s.priecky.pocet} ks · rozostup ≤ ${MAX_ROZOSTUP_PRIECOK} mm`]
-	]}
+	{@const riadky = specRiadky}
+	<!-- adaptívne riadkovanie: pri viac riadkoch sa zmenší, aby sa spec zmestil (nezhltne pečiatka) -->
+	{@const dy = Math.min(4.4, (r.h - 6) / (riadky.length + 1))}
 	<!-- clipPath vynúti hranicu renderovania (SVG <text> zúženie regiónu samo o sebe
 	     neobmedzuje — vykres.md „Text-blok vedľa pečiatky"). -->
 	<defs>
@@ -664,7 +684,7 @@
 		{#each riadky as [label, testid, hodnota], i (testid)}
 			<text
 				x={r.x}
-				y={r.y + 4 + i * 4.4}
+				y={r.y + 4 + i * dy}
 				font-size={MIN_SPEC_FONT}
 				fill={CIERNA}
 				data-testid={`pnr-spec-${testid}`}><tspan font-weight="700">{label}:</tspan> {hodnota}</text
@@ -672,7 +692,7 @@
 		{/each}
 		<text
 			x={r.x}
-			y={r.y + 4 + riadky.length * 4.4 + 2}
+			y={r.y + 4 + riadky.length * dy + 2}
 			font-size={MIN_SPEC_FONT}
 			fill={SIVA}
 			data-testid="pnr-spec-money">Display-only · Money odpis: /pergola</text

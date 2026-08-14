@@ -103,4 +103,51 @@ describe('parsePergolaNarezVstup', () => {
 		const { error } = parsePergolaNarezVstup(fd({ ...PLATNY, sklonStrechy: '200' }));
 		expect(error).toMatch(/sklon/i);
 	});
+
+	// --- #206 nové polia (a/c/d/e) ---------------------------------------------------
+	it('#206 (a) jednoduchá bez zasklenia: checkbox "1"/"on" → true, inak false', () => {
+		expect(
+			parsePergolaNarezVstup(fd({ ...PLATNY, jednoduchaBezZasklenia: '1' })).vstup
+				.jednoduchaBezZasklenia
+		).toBe(true);
+		expect(parsePergolaNarezVstup(fd(PLATNY)).vstup.jednoduchaBezZasklenia).toBe(false);
+	});
+
+	it('#206 (c) profil výstuhy: známa hodnota prejde, neznáma → null', () => {
+		expect(
+			parsePergolaNarezVstup(fd({ ...PLATNY, vystuhaProfil: '200x140' })).vstup.vystuhaProfil
+		).toBe('200x140');
+		expect(
+			parsePergolaNarezVstup(fd({ ...PLATNY, vystuhaProfil: '110x250' })).vstup.vystuhaProfil
+		).toBe('110x250');
+		expect(
+			parsePergolaNarezVstup(fd({ ...PLATNY, vystuhaProfil: 'XxY' })).vstup.vystuhaProfil
+		).toBe(null);
+		expect(parsePergolaNarezVstup(fd(PLATNY)).vstup.vystuhaProfil).toBe(null);
+	});
+
+	it('#206 (d) zvod frézovanie: toggle + výška; zapnuté bez výšky = chyba', () => {
+		const { vstup, error } = parsePergolaNarezVstup(
+			fd({ ...PLATNY, zvodFrezovat: '1', zvodFrezovanieSHmm: '120' })
+		);
+		expect(error).toBeNull();
+		expect(vstup.zvodFrezovat).toBe(true);
+		expect(vstup.zvodFrezovanieSHmm).toBe(120);
+		// zapnuté bez výšky → validácia chytí
+		expect(parsePergolaNarezVstup(fd({ ...PLATNY, zvodFrezovat: '1' })).error).toMatch(
+			/frézovani|SH/i
+		);
+	});
+
+	it('#206 (e) sklá: voľný text sa orezáva a prenáša (žiadny Money výpočet)', () => {
+		const { vstup } = parsePergolaNarezVstup(
+			fd({
+				...PLATNY,
+				strechaSklo: '  4-4-2číre-8-6stopsol classic grey  ',
+				obvodoveZasklenie: 'RS STANDARD PLUS 4-8-4číre'
+			})
+		);
+		expect(vstup.strechaSklo).toBe('4-4-2číre-8-6stopsol classic grey');
+		expect(vstup.obvodoveZasklenie).toBe('RS STANDARD PLUS 4-8-4číre');
+	});
 });
