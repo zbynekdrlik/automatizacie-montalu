@@ -323,3 +323,101 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// --- #206 — nové voľby z výkresu OP260282 (a/b/c/d/e) ---------------------------
+test('#206 (b) stena zasklená: bočný 110×43 pod kotviacim = ZV − 190 (2790 → 2600)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5000');
+	// ZV pole je viditeľné pri stena + zasklená (pre bočný 110×43 pod kotviacim)
+	await page.locator('#vyskaZadna').fill('2790');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// (b) POTVRDENÝ vzorec: 110×43 pod kotviacim = 2790 − 190 = 2600, 2 ks
+	await expect(page.getByTestId('polozka-18016')).toContainText('2600');
+	await expect(page.getByTestId('polozka-18016')).toContainText('pod kotviacim');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#206 (a) jednoduchá bez zasklenia: bočný 110×43 zmizne, ZV pole sa skryje', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5000');
+	// zapni „jednoduchá pergola bez zasklenia" → ZV pole sa skryje (nepoužíva sa)
+	await page.locator('#jednoduchaBezZasklenia').check();
+	await expect(page.locator('#vyskaZadna')).toHaveCount(0);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// (a) bočný 110×43 sa nepočíta; evidencia v „nepodporované"
+	await expect(page.getByTestId('polozka-18016')).toHaveCount(0);
+	await expect(page.getByTestId('narez-nepodporovane')).toContainText('bez zasklenia');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#206 (c) výstuha 200×140: svetlosť −60 → predná noha 2155 (2200 − 60 + 15)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5000');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	// predná svetlosť ostáva default 2200
+	await page.locator('#vystuhaProfil').selectOption('200x140');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// predná noha (18017) = (2200 − 60) + 15 = 2155
+	await expect(page.getByTestId('polozka-18017')).toContainText('2155');
+	// efektívna svetlosť = 2140 (informatívne)
+	await expect(page.getByTestId('info-efektivna-svetlost')).toContainText('2140');
+	await expect(page.getByTestId('info-vystuha-profil')).toContainText('200x140');
+	// výkres spec ukazuje profil výstuhy + −60 poznámku
+	await expect(page.getByTestId('pnr-spec-vystuha')).toContainText('200x140');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#206 (d)+(e) zvod frézovanie + sklá: v karte údajov aj vo výkrese', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5000');
+	// (d) zvod frézovanie
+	await page.locator('#zvodFrezovat').check();
+	await page.locator('#zvodFrezovanieSHmm').fill('120');
+	// (e) sklá
+	await page.locator('#strechaSklo').fill('4-4-2číre-8-6stopsol classic grey');
+	await page.locator('#obvodoveZasklenie').fill('RS STANDARD PLUS 4-8-4číre');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// karta údajov zákazky
+	const udaje = page.getByTestId('narez-udaje-zakazky');
+	await expect(udaje).toContainText('4-4-2číre-8-6stopsol classic grey');
+	await expect(udaje).toContainText('RS STANDARD PLUS 4-8-4číre');
+	await expect(udaje).toContainText('120 mm');
+	// výkres spec anotácie
+	await expect(page.getByTestId('pnr-spec-strechasklo')).toContainText('stopsol');
+	await expect(page.getByTestId('pnr-spec-zvod')).toContainText('120');
+
+	expect(consoleMsgs).toEqual([]);
+});

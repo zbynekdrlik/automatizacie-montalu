@@ -11,10 +11,12 @@
 		spocitajNarez,
 		PREDNA_SVETLOST_STD,
 		MAX_ROZOSTUP_PRIECOK,
+		ZVOD_SH_MAX,
 		type PergolaNarezVstup,
 		type PergolaSystem,
 		type Uchytenie,
-		type HornyProfil
+		type HornyProfil,
+		type VystuhaProfil
 	} from '$lib/pergola-narez';
 	import { krovUlozenie } from '$lib/pergola-krov';
 
@@ -36,7 +38,14 @@
 		hornyProfilZadnej: (form?.vstup?.hornyProfilZadnej ?? 140) as HornyProfil,
 		prieckaLight: form?.vstup?.prieckaLight ?? false,
 		zosilnenyNosnik: form?.vstup?.zosilnenyNosnik ?? false,
-		sklonStrechy: form?.vstup?.sklonStrechy ?? null
+		sklonStrechy: form?.vstup?.sklonStrechy ?? null,
+		// #206 nové polia
+		jednoduchaBezZasklenia: form?.vstup?.jednoduchaBezZasklenia ?? false,
+		vystuhaProfil: (form?.vstup?.vystuhaProfil ?? null) as VystuhaProfil | null,
+		zvodFrezovat: form?.vstup?.zvodFrezovat ?? false,
+		zvodFrezovanieSHmm: form?.vstup?.zvodFrezovanieSHmm ?? null,
+		strechaSklo: form?.vstup?.strechaSklo ?? '',
+		obvodoveZasklenie: form?.vstup?.obvodoveZasklenie ?? ''
 	} satisfies PergolaNarezVstup);
 
 	// editovateľné polia — $state + bind (nova-stranka §4: jednosmerné value={} sa pri
@@ -54,6 +63,13 @@
 	let zosilnenyNosnikS = $state(false);
 	// #161 — voliteľný sklon strechy pre krov uloženie; prázdne = nezadané
 	let sklonStrechyS = $state<number | string>('');
+	// #206 — nové voľby z výkresu OP260282
+	let jednoduchaBezZaskleniaS = $state(false);
+	let vystuhaProfilS = $state<VystuhaProfil | ''>('');
+	let zvodFrezovatS = $state(false);
+	let zvodFrezovanieSHmmS = $state<number | string>('');
+	let strechaSkloS = $state('');
+	let obvodoveZasklenieS = $state('');
 
 	// reštart-effect: číta LEN form?.vstup, NIKDY vlastný *S zápis (nova-stranka §3 —
 	// self-loop by ticho prepísal používateľovu voľbu systému späť na default).
@@ -71,6 +87,13 @@
 		prieckaLightS = v?.prieckaLight ?? false;
 		zosilnenyNosnikS = v?.zosilnenyNosnik ?? false;
 		sklonStrechyS = v?.sklonStrechy ?? '';
+		// #206
+		jednoduchaBezZaskleniaS = v?.jednoduchaBezZasklenia ?? false;
+		vystuhaProfilS = (v?.vystuhaProfil as VystuhaProfil | null) ?? '';
+		zvodFrezovatS = v?.zvodFrezovat ?? false;
+		zvodFrezovanieSHmmS = v?.zvodFrezovanieSHmm ?? '';
+		strechaSkloS = v?.strechaSklo ?? '';
+		obvodoveZasklenieS = v?.obvodoveZasklenie ?? '';
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
@@ -97,6 +120,24 @@
 	{#if prieckaLightS}<input type="hidden" name="prieckaLight" value="1" />{/if}
 	{#if zosilnenyNosnikS}<input type="hidden" name="zosilnenyNosnik" value="1" />{/if}
 	{#if sklonStrechyS !== ''}<input type="hidden" name="sklonStrechy" value={sklonStrechyS} />{/if}
+	{#if jednoduchaBezZaskleniaS}<input type="hidden" name="jednoduchaBezZasklenia" value="1" />{/if}
+	{#if vystuhaProfilS !== ''}<input
+			type="hidden"
+			name="vystuhaProfil"
+			value={vystuhaProfilS}
+		/>{/if}
+	{#if zvodFrezovatS}<input type="hidden" name="zvodFrezovat" value="1" />{/if}
+	{#if zvodFrezovanieSHmmS !== ''}<input
+			type="hidden"
+			name="zvodFrezovanieSHmm"
+			value={zvodFrezovanieSHmmS}
+		/>{/if}
+	{#if strechaSkloS !== ''}<input type="hidden" name="strechaSklo" value={strechaSkloS} />{/if}
+	{#if obvodoveZasklenieS !== ''}<input
+			type="hidden"
+			name="obvodoveZasklenie"
+			value={obvodoveZasklenieS}
+		/>{/if}
 {/snippet}
 
 {#if step === 'form'}
@@ -173,10 +214,46 @@
 				</div>
 			</div>
 
-			{#if uchytenieS === 'samostatne'}
-				<div class="grid3" data-testid="zadne-nohy-box">
+			<!-- #206 (a) jednoduchá pergola bez zasklenia + (c) profil výstuhy -->
+			<div class="grid2">
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+						<input
+							id="jednoduchaBezZasklenia"
+							type="checkbox"
+							name="jednoduchaBezZasklenia"
+							value="1"
+							bind:checked={jednoduchaBezZaskleniaS}
+							style="width:auto"
+						/>
+						Jednoduchá pergola bez zasklenia (vypne bočné profily 110×43)
+					</label>
+				</div>
+				<div class="field">
+					<label for="vystuhaProfil">Profil výstuhy (nosníka)</label>
+					<select id="vystuhaProfil" name="vystuhaProfil" bind:value={vystuhaProfilS}>
+						<option value="">— systémový štandard —</option>
+						{#if systemS === 'Massive'}
+							<option value="140x140">140×140 (štandard)</option>
+							<option value="200x140">200×140 (svetlosť −60)</option>
+						{:else}
+							<option value="110x110">110×110</option>
+							<option value="110x250">110×250</option>
+						{/if}
+					</select>
+					<p class="sub" style="margin:4px 0 0">
+						<b>200×140</b> zníži svetlosť o 60 mm; Robust varianty dĺžky zatiaľ nepodporované
+					</p>
+				</div>
+			</div>
+
+			<!-- Výška zadná (ZV): pri samostatne (zadné nohy) alebo stena+zasklená (bočný 110×43
+			     pod kotviacim = ZV − 190, #206 b). Pri „jednoduchej bez zasklenia" na stene sa ZV
+			     nepoužíva → pole skryté. -->
+			{#if uchytenieS === 'samostatne' || (uchytenieS === 'stena' && !jednoduchaBezZaskleniaS)}
+				<div class="grid3">
 					<div class="field">
-						<label for="vyskaZadna">Výška zadná (mm) *</label>
+						<label for="vyskaZadna">Výška zadná ZV (mm) *</label>
 						<input
 							id="vyskaZadna"
 							name="vyskaZadna"
@@ -185,28 +262,39 @@
 							bind:value={vyskaZadnaS}
 							required
 						/>
+						<p class="sub" style="margin:4px 0 0">
+							{uchytenieS === 'samostatne'
+								? 'zadná noha = ZV − horný profil'
+								: 'bočný profil 110×43 pod kotviacim = ZV − 190 (#206)'}
+						</p>
 					</div>
-					<div class="field">
-						<label for="pocetZadnychNoh">Počet zadných nôh *</label>
-						<input
-							id="pocetZadnychNoh"
-							name="pocetZadnychNoh"
-							type="number"
-							min="2"
-							max="20"
-							step="1"
-							bind:value={pocetZadnychNohS}
-							required
-						/>
-					</div>
-					<div class="field">
-						<label for="hornyProfilZadnej">Horný profil zadnej konštrukcie *</label>
-						<select id="hornyProfilZadnej" name="hornyProfilZadnej" bind:value={hornyProfilZadnejS}>
-							<option value={110}>110</option>
-							<option value={140}>140</option>
-						</select>
-						<p class="sub" style="margin:4px 0 0">zadná noha = výška zadná − tento rozmer</p>
-					</div>
+					{#if uchytenieS === 'samostatne'}
+						<div class="field" data-testid="zadne-nohy-box">
+							<label for="pocetZadnychNoh">Počet zadných nôh *</label>
+							<input
+								id="pocetZadnychNoh"
+								name="pocetZadnychNoh"
+								type="number"
+								min="2"
+								max="20"
+								step="1"
+								bind:value={pocetZadnychNohS}
+								required
+							/>
+						</div>
+						<div class="field">
+							<label for="hornyProfilZadnej">Horný profil zadnej konštrukcie *</label>
+							<select
+								id="hornyProfilZadnej"
+								name="hornyProfilZadnej"
+								bind:value={hornyProfilZadnejS}
+							>
+								<option value={110}>110</option>
+								<option value={140}>140</option>
+							</select>
+							<p class="sub" style="margin:4px 0 0">zadná noha = výška zadná − tento rozmer</p>
+						</div>
+					{/if}
 				</div>
 			{/if}
 
@@ -254,6 +342,67 @@
 					<p class="sub" style="margin:4px 0 0">
 						voliteľné · ≥ 7° = <b>potvrdené</b> uloženie (prah 7°, vzorce z callu 13.8.); pod 7° zatiaľ
 						nepodporované (O5). Frézovanie drážok ostáva na konštruktérovi.
+					</p>
+				</div>
+			</div>
+
+			<!-- #206 (d) ZVOD frézovanie (evidencia/výkres) + (e) sklá zákazky -->
+			<div class="grid3">
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+						<input
+							id="zvodFrezovat"
+							type="checkbox"
+							name="zvodFrezovat"
+							value="1"
+							bind:checked={zvodFrezovatS}
+							style="width:auto"
+						/>
+						Frézovať zvod (SH)
+					</label>
+				</div>
+				{#if zvodFrezovatS}
+					<div class="field">
+						<label for="zvodFrezovanieSHmm">Výška SH frézovania zvodu (mm) *</label>
+						<input
+							id="zvodFrezovanieSHmm"
+							name="zvodFrezovanieSHmm"
+							type="number"
+							step="any"
+							min="0"
+							max={ZVOD_SH_MAX}
+							bind:value={zvodFrezovanieSHmmS}
+							required
+						/>
+						<p class="sub" style="margin:4px 0 0">evidencia na výkrese; detail frézovania → #161</p>
+					</div>
+				{/if}
+			</div>
+
+			<div class="grid2">
+				<div class="field">
+					<label for="strechaSklo">Strecha — sklo</label>
+					<input
+						id="strechaSklo"
+						name="strechaSklo"
+						type="text"
+						maxlength="200"
+						placeholder="napr. 4-4-2číre-8-6stopsol classic grey"
+						bind:value={strechaSkloS}
+					/>
+				</div>
+				<div class="field">
+					<label for="obvodoveZasklenie">Obvodové zasklenie</label>
+					<input
+						id="obvodoveZasklenie"
+						name="obvodoveZasklenie"
+						type="text"
+						maxlength="200"
+						placeholder="napr. RS STANDARD PLUS 4-8-4číre"
+						bind:value={obvodoveZasklenieS}
+					/>
+					<p class="sub" style="margin:4px 0 0">
+						informatívne — Zasklenia má vlastný odpis, tu žiadny Money výpočet
 					</p>
 				</div>
 			</div>
@@ -363,6 +512,17 @@
 			<div class="row">
 				<span>Predná svetlosť</span><b>{vysledok.informativne.prednaSvetlost} mm</b>
 			</div>
+			{#if vysledok.informativne.efektivnaSvetlost !== vysledok.informativne.prednaSvetlost}
+				<div class="row" data-testid="info-efektivna-svetlost">
+					<span>Efektívna svetlosť (výstuha 200×140: −60)</span>
+					<b>{vysledok.informativne.efektivnaSvetlost} mm</b>
+				</div>
+			{/if}
+			{#if vysledok.informativne.vystuhaProfil}
+				<div class="row" data-testid="info-vystuha-profil">
+					<span>Profil výstuhy</span><b>{vysledok.informativne.vystuhaProfil}</b>
+				</div>
+			{/if}
 			<div class="row">
 				<span>Predná noha (svetlosť + 15)</span><b>{vysledok.informativne.prednaNohaDlzka} mm</b>
 			</div>
@@ -397,6 +557,32 @@
 			varianta (šírka − 2×noha) čakajú na potvrdenie (O2/O3).
 		</p>
 	</div>
+
+	{#if vstup.strechaSklo || vstup.obvodoveZasklenie || vstup.zvodFrezovat}
+		<div class="card">
+			<div class="sec">Údaje zákazky (výkres) — informatívne</div>
+			<div data-testid="narez-udaje-zakazky">
+				{#if vstup.strechaSklo}
+					<div class="row"><span>Strecha — sklo</span><b>{vstup.strechaSklo}</b></div>
+				{/if}
+				{#if vstup.obvodoveZasklenie}
+					<div class="row"><span>Obvodové zasklenie</span><b>{vstup.obvodoveZasklenie}</b></div>
+				{/if}
+				<div class="row">
+					<span>ZVOD — frézovanie SH</span>
+					<b
+						>{vstup.zvodFrezovat && vstup.zvodFrezovanieSHmm != null
+							? `${vstup.zvodFrezovanieSHmm} mm`
+							: 'nefrézovať'}</b
+					>
+				</div>
+			</div>
+			<p class="sub">
+				Sklá sú informatívny údaj (Zasklenia má vlastný odpis). Frézovanie zvodu je evidencia na
+				výkrese — výrobný detail dopĺňa konštruktér (#161). <b>Do Money sa neposiela nič.</b>
+			</p>
+		</div>
+	{/if}
 
 	<div class="card">
 		<div class="sec">Zatiaľ nepodporované (čaká na pravidlá)</div>

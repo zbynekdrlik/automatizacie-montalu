@@ -12,14 +12,21 @@ import {
 	spocitajNarez,
 	schemaVykresu,
 	chybaPergolaNarezVstupu,
+	efektivnaSvetlost,
 	SYSTEMY,
 	PREDNA_SVETLOST_STD,
 	PREDNA_NOHA_PRIDAVOK,
 	VYSTUHA_ODPOCET,
+	VYSTUHA_200x140_SVETLOST_ODPOCET,
+	POD_KOTVIACI_110x43_ODPOCET,
+	POCET_BOCNYCH_POD_KOTVIACIM,
+	KOD_PROFIL_110x43,
+	KOD_VYSTUHA_200x140,
 	MAX_ROZOSTUP_PRIECOK,
 	KOD_PRIECKA_NORMAL,
 	KOD_PRIECKA_LIGHT,
-	type PergolaNarezVstup
+	type PergolaNarezVstup,
+	type VystuhaProfil
 } from '../src/lib/pergola-narez';
 
 // Massive, na stenu (9/10 pergol) — vzorové kóty z výkresu „PERGOLA MASSIVE 140x140"
@@ -209,8 +216,23 @@ describe('chybaPergolaNarezVstupu — validácia rozsahov', () => {
 			/zadná|výšk/i
 		);
 	});
-	it('na stenu: výška zadná sa NEvaliduje (nepoužíva sa) — 0 je OK', () => {
-		expect(chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'stena', vyskaZadna: 0 })).toBeNull();
+	it('#206 na stenu + jednoduchá bez zasklenia: ZV sa NEvaliduje (nepoužíva sa) — 0 je OK', () => {
+		expect(
+			chybaPergolaNarezVstupu({
+				...VZOR,
+				uchytenie: 'stena',
+				jednoduchaBezZasklenia: true,
+				vyskaZadna: 0
+			})
+		).toBeNull();
+	});
+	it('#206 na stenu + zasklená: ZV je load-bearing (bočný 110×43 = ZV−190) → mimo rozsahu = chyba', () => {
+		// stena + zasklená (default) používa ZV pre bočný 110×43 pod kotviacim → 0 je chyba
+		expect(chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'stena', vyskaZadna: 0 })).toMatch(
+			/zadná ZV|110×43/i
+		);
+		// platná ZV pri stena+zasklená = OK
+		expect(chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'stena', vyskaZadna: 2790 })).toBeNull();
 	});
 	it('samostatne stojaca: počet zadných nôh mimo rozsahu = chyba', () => {
 		expect(
@@ -294,5 +316,149 @@ describe('schemaVykresu (#194) — geometria z POTVRDENÝCH vzorcov, krov je #16
 		expect(s.prednaNohaDlzka).toBe(info.prednaNohaDlzka);
 		expect(s.priecky.pocet).toBe(info.pocetPriecok);
 		expect(s.rozostupPrednychNoh).toBe(info.rozostupPrednychNoh);
+	});
+});
+
+// --- #206 (a) — jednoduchá pergola bez zasklenia vypína bočné 110×43 ----------------
+describe('#206 (a) jednoduchá pergola bez zasklenia — vypne bočné 110×43', () => {
+	it('stena + zasklená → bočný 110×43 pod kotviacim JE vo vypocitane; bez zasklenia → NIE JE', () => {
+		const zasklena = spocitajNarez({ ...VZOR, uchytenie: 'stena', vyskaZadna: 2900 });
+		expect(zasklena.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(true);
+
+		const bez = spocitajNarez({
+			...VZOR,
+			uchytenie: 'stena',
+			vyskaZadna: 2900,
+			jednoduchaBezZasklenia: true
+		});
+		expect(bez.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(false);
+		expect(bez.nepodporovane.join(' | ')).toMatch(/bez zasklenia/i);
+	});
+
+	it('default (pole nezadané) = zasklená (bočný 110×43 sa počíta pri stene)', () => {
+		// jednoduchaBezZasklenia je voliteľné → undefined sa správa ako false (zasklená)
+		expect(
+			spocitajNarez({ ...VZOR, uchytenie: 'stena', vyskaZadna: 2900 }).vypocitane.some(
+				(p) => p.kod === KOD_PROFIL_110x43
+			)
+		).toBe(true);
+	});
+});
+
+// --- #206 (b) — bočný 110×43 pod kotviacim = ZV − 190 pri NIE-SS --------------------
+describe('#206 (b) 110×43 pod kotviacim (u steny) = ZV − 190, len NIE-SS', () => {
+	it('POTVRDENÝ vzorec: stena, ZV 2790 → bočný 110×43 = 2600, 2 ks, výdaj 1×(7,5 m)', () => {
+		const r = spocitajNarez({ ...VZOR, uchytenie: 'stena', vyskaZadna: 2790 });
+		const boc = r.vypocitane.find((p) => p.kod === KOD_PROFIL_110x43);
+		expect(boc, '110×43 pod kotviacim musí byť vo vypocitane pri stene').toBeTruthy();
+		expect(boc!.dlzkaRezuMm).toBe(2790 - POD_KOTVIACI_110x43_ODPOCET); // 2600
+		expect(boc!.pocetKs).toBe(POCET_BOCNYCH_POD_KOTVIACIM); // 2
+		expect(boc!.vydajTyce).toEqual({ tycMm: 7500, pocet: 1 });
+		expect(boc!.nazov).toMatch(/pod kotviacim/i);
+	});
+
+	it('konštanta = 190 (nie magické číslo)', () => {
+		expect(POD_KOTVIACI_110x43_ODPOCET).toBe(190);
+	});
+
+	it('samostatne stojaca (SS) → žiadny bočný 110×43 pod kotviacim (poznámka b je len NIE-SS)', () => {
+		const r = spocitajNarez({ ...VZOR, uchytenie: 'samostatne', vyskaZadna: 2790 });
+		expect(r.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(false);
+	});
+
+	it('ZV mimo rozsahu (0 pri stene) → riadok sa NEemituje, žiadna chyba (na stenu ZV nevaliduje)', () => {
+		const r = spocitajNarez({ ...VZOR, uchytenie: 'stena', vyskaZadna: 0 });
+		expect(r.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(false);
+	});
+});
+
+// --- #206 (c) — výstuha 200×140 → svetlosť −60; Robust varianty honest-null ----------
+describe('#206 (c) výstuha 200×140 → svetlosť −60 (preteká do prednej nohy)', () => {
+	it('konštanta = 60 (200 − 140); efektívna svetlosť = zadaná − 60 pri 200×140', () => {
+		expect(VYSTUHA_200x140_SVETLOST_ODPOCET).toBe(60);
+		expect(efektivnaSvetlost({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' })).toBe(
+			2140
+		);
+		// bez 200×140 → efektívna = zadaná (žiadny −60)
+		expect(efektivnaSvetlost({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '140x140' })).toBe(
+			2200
+		);
+		expect(efektivnaSvetlost({ ...VZOR, prednaSvetlost: 2200 })).toBe(2200);
+	});
+
+	it('predná noha pri 200×140 = (svetlosť − 60) + 15 (2200 → 2155), inak nezmenená (2215)', () => {
+		const r200 = spocitajNarez({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' });
+		expect(r200.informativne.efektivnaSvetlost).toBe(2140);
+		expect(r200.informativne.prednaNohaDlzka).toBe(2155); // (2200−60)+15
+		const noha200 = r200.vypocitane.find((p) => !/zadná/i.test(p.nazov) && /noha/i.test(p.nazov));
+		expect(noha200!.dlzkaRezuMm).toBe(2155);
+
+		const rStd = spocitajNarez({ ...VZOR, prednaSvetlost: 2200 });
+		expect(rStd.informativne.prednaNohaDlzka).toBe(2215); // POTVRDENÝ vektor sa NEMENÍ
+	});
+
+	it('výkres kreslí efektívnu svetlosť (200×140 → 2140), predná noha 2155', () => {
+		const s = schemaVykresu({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' });
+		expect(s.prednaSvetlost).toBe(2140);
+		expect(s.prednaNohaDlzka).toBe(2155);
+	});
+
+	it('Robust varianty výstuhy (110×110 / 110×250) — honest-null (žiadny vymyslený riadok)', () => {
+		const r = spocitajNarez({ ...VZOR, system: 'Robust', vystuhaProfil: '110x250' });
+		// žiadny −60 (to je len 200×140), žiadny vymyslený riadok výstuhy Robust
+		expect(r.informativne.efektivnaSvetlost).toBe(VZOR.prednaSvetlost);
+		expect(r.nepodporovane.join(' | ')).toMatch(/110×250|110x250/);
+		expect(r.nepodporovane.join(' | ')).toMatch(/skovan|žľabe/i);
+		expect(r.informativne.vystuhaProfil).toBe('110x250');
+	});
+
+	it('Massive + zosilnený + 200×140: výstuha horná odzrkadľuje kód 18022/200x140 (nie 18017/140x140)', () => {
+		const r = spocitajNarez({ ...VZOR, zosilnenyNosnik: true, vystuhaProfil: '200x140' });
+		const vy = r.vypocitane.find((p) => /výstuha horná/i.test(p.nazov));
+		expect(vy).toBeTruthy();
+		expect(vy!.kod).toBe(KOD_VYSTUHA_200x140); // 18022
+		expect(vy!.nazov).toMatch(/200x140/);
+		expect(vy!.dlzkaRezuMm).toBe(VZOR.sirka - VYSTUHA_ODPOCET); // dĺžka (rozpätie) nezávisí na priereze
+		// bez zvoleného 200×140 (default) ostáva 18017/140x140
+		const rStd = spocitajNarez({ ...VZOR, zosilnenyNosnik: true });
+		expect(rStd.vypocitane.find((p) => /výstuha horná/i.test(p.nazov))!.kod).toBe('18017');
+	});
+
+	it('−60 sa neaplikuje pri Robust + 200×140 (nekonzistentný ručný vstup) — gate na Massive', () => {
+		expect(efektivnaSvetlost({ ...VZOR, system: 'Robust', vystuhaProfil: '200x140' })).toBe(
+			VZOR.prednaSvetlost
+		);
+	});
+});
+
+// --- #206 (d)/(c) — validácia nových polí ------------------------------------------
+describe('#206 validácia — zvod frézovanie + profil výstuhy', () => {
+	it('zvod: frézovať zapnuté bez výšky = chyba', () => {
+		expect(chybaPergolaNarezVstupu({ ...VZOR, zvodFrezovat: true })).toMatch(/frézovani|SH/i);
+	});
+	it('zvod: frézovať zapnuté s platnou výškou = OK', () => {
+		expect(
+			chybaPergolaNarezVstupu({ ...VZOR, zvodFrezovat: true, zvodFrezovanieSHmm: 120 })
+		).toBeNull();
+	});
+	it('zvod: nefrézovať (default) → výška sa nevaliduje, OK', () => {
+		expect(chybaPergolaNarezVstupu({ ...VZOR, zvodFrezovat: false })).toBeNull();
+	});
+	it('neplatný profil výstuhy = chyba', () => {
+		expect(chybaPergolaNarezVstupu({ ...VZOR, vystuhaProfil: '999x999' as VystuhaProfil })).toMatch(
+			/výstuh/i
+		);
+	});
+	it('profil výstuhy nesedí so systémom = chyba (Robust+200x140, Massive+110x110)', () => {
+		// VZOR je Massive; Robust profil pri Massive = nekonzistentné
+		expect(chybaPergolaNarezVstupu({ ...VZOR, vystuhaProfil: '110x110' })).toMatch(/systém/i);
+		expect(
+			chybaPergolaNarezVstupu({ ...VZOR, system: 'Robust', vystuhaProfil: '200x140' })
+		).toMatch(/systém/i);
+		// konzistentné = OK
+		expect(chybaPergolaNarezVstupu({ ...VZOR, vystuhaProfil: '200x140' })).toBeNull();
+		expect(
+			chybaPergolaNarezVstupu({ ...VZOR, system: 'Robust', vystuhaProfil: '110x250' })
+		).toBeNull();
 	});
 });
