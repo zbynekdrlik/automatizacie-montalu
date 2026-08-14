@@ -39,6 +39,9 @@ export const POD_KOTVIACI_110x43_ODPOCET = 190;
 /** počet bočných profilov 110×43 pod kotviacim (u steny) — modrá poznámka a „2 ks pod
  *  kotviacim vzadu na stene". */
 export const POCET_BOCNYCH_POD_KOTVIACIM = 2;
+/** #206 (d) — obranný horný rozsah výšky SH frézovania zvodu [mm]. Používa engine validácia
+ *  aj formulár (`max`), aby nebola tá istá hodnota dvakrát nezávisle (vykres.md #146). */
+export const ZVOD_SH_MAX = 5000;
 
 /** dĺžky surových tyčí [mm] pre výdaj materiálu (bin-packing), per stĺpec „Výdaj" výkresu
  *  OP260282: väčšina profilov sa reže zo 7,5 m tyčí, žľab a kotviaci profil zo 6 m tyčí. */
@@ -229,7 +232,10 @@ function spocitajVydaj(
  *  POTVRDENÝCH pravidiel (noha = svetlosť + 15; 200×140 → svetlosť − 60), NIE vymyslený vzorec.
  *  Reziduálna neistota (mení −60 reálnu dĺžku nohy alebo len svetlú výšku?) je gap na #198. */
 export function efektivnaSvetlost(v: PergolaNarezVstup): number {
-	const odpocet = v.vystuhaProfil === '200x140' ? VYSTUHA_200x140_SVETLOST_ODPOCET : 0;
+	// −60 je Massive-only pravidlo (200×140 je Massive profil); gate proti system×profil
+	// nekonzistencii z ručného POST (formulár ponúka 200×140 len pri Massive).
+	const odpocet =
+		v.vystuhaProfil === '200x140' && v.system === 'Massive' ? VYSTUHA_200x140_SVETLOST_ODPOCET : 0;
 	return R1(v.prednaSvetlost - odpocet);
 }
 
@@ -310,9 +316,16 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	}
 	if (v.zosilnenyNosnik && v.system === 'Massive') {
 		const vystuhaHorna = R1(v.sirka - VYSTUHA_ODPOCET);
+		// #206 (c): keď je zvolený profil výstuhy 200×140, výstuha horná JE ten profil —
+		// odzrkadli kód (18022, z katalógu) a názov, nech dielňa nereže 140×140 pri
+		// výslovne zvolenom 200×140. Dĺžka (šírka − 280) je rozpätie medzi nohami, na
+		// priereze nezávisí, takže sa nemení. Default (140×140/nezadané) = 18017.
+		const je200 = v.vystuhaProfil === '200x140';
 		vypocitane.push({
-			kod: '18017',
-			nazov: 'Profil 140x140 — výstuha horná (zosilnenie)',
+			kod: je200 ? KOD_VYSTUHA_200x140 : '18017',
+			nazov: je200
+				? 'Profil 200x140 — výstuha horná (zosilnenie)'
+				: 'Profil 140x140 — výstuha horná (zosilnenie)',
 			dlzkaRezuMm: vystuhaHorna,
 			pocetKs: 1,
 			poznamka:
@@ -359,7 +372,7 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	}
 	if (v.zosilnenyNosnik) {
 		nepodporovane.push(
-			'Zosilnený nosník — profil (Robust 250×110 alebo 230×110 / Massive 200×140) čaká na potvrdenie kódu a pravidla (O2/O3); výstuha horná (massive = šírka − 280) je vo vypocitane, Robust (šírka − 220) je zatiaľ len informatívny.'
+			'Zosilnený nosník — per-systém varianta (šírka − 2×noha) je O2, presné pravidlo O3. Výstuha horná (massive = šírka − 280) je vo vypocitane a odzrkadľuje zvolený profil (140×140=18017 / 200×140=18022 z katalógu); Robust (šírka − 220) je zatiaľ len informatívny.'
 		);
 	}
 	// #206 (c): Robust varianty výstuhy (110×110 / 110×250) — presné dĺžky nad −220 pravidlo
@@ -501,16 +514,23 @@ export function chybaPergolaNarezVstupu(v: PergolaNarezVstup): string | null {
 	// vetvu pod 7° rieši krov engine čestne, nie chybou
 	if (v.sklonStrechy != null && !(v.sklonStrechy > SKLON_MIN && v.sklonStrechy <= SKLON_MAX))
 		return `Sklon strechy musí byť ${SKLON_MIN + 0.1}–${SKLON_MAX}° (alebo prázdne).`;
-	// #206 (c) — profil výstuhy: buď nezadaný (systémový štandard) alebo známa hodnota
-	if (
-		v.vystuhaProfil != null &&
-		!['140x140', '200x140', '110x110', '110x250'].includes(v.vystuhaProfil)
-	)
-		return 'Neplatný profil výstuhy.';
+	// #206 (c) — profil výstuhy: buď nezadaný (systémový štandard) alebo známa hodnota, a
+	// prierez musí sedieť so systémom (140×140/200×140 = Massive; 110×110/110×250 = Robust) —
+	// gate proti system×profil nekonzistencii z ručného POST (formulár ponúka správne per systém).
+	if (v.vystuhaProfil != null) {
+		if (!['140x140', '200x140', '110x110', '110x250'].includes(v.vystuhaProfil))
+			return 'Neplatný profil výstuhy.';
+		const massiveProfil = v.vystuhaProfil === '140x140' || v.vystuhaProfil === '200x140';
+		if (massiveProfil !== (v.system === 'Massive'))
+			return 'Profil výstuhy nesedí so systémom (140×140/200×140 = Massive, 110×110/110×250 = Robust).';
+	}
 	// #206 (d) — keď je zapnuté frézovanie zvodu, výška SH frézovania musí byť zadaná a v rozsahu
 	if (v.zvodFrezovat) {
-		if (v.zvodFrezovanieSHmm == null || !(v.zvodFrezovanieSHmm > 0 && v.zvodFrezovanieSHmm <= 5000))
-			return 'Zadaj výšku SH frézovania zvodu (0–5000 mm) alebo zvoľ „nefrézovať".';
+		if (
+			v.zvodFrezovanieSHmm == null ||
+			!(v.zvodFrezovanieSHmm > 0 && v.zvodFrezovanieSHmm <= ZVOD_SH_MAX)
+		)
+			return `Zadaj výšku SH frézovania zvodu (0–${ZVOD_SH_MAX} mm) alebo zvoľ „nefrézovať".`;
 	}
 	// zadné nohy sa validujú LEN pri samostatne stojacej — na stenu sa nepoužívajú
 	if (v.uchytenie === 'samostatne') {
@@ -518,6 +538,13 @@ export function chybaPergolaNarezVstupu(v: PergolaNarezVstup): string | null {
 			return `Výška zadná musí byť ${VYSKA_ZADNA_MIN}–${VYSKA_ZADNA_MAX} mm.`;
 		if (!(v.pocetZadnychNoh >= POCET_NOH_MIN && v.pocetZadnychNoh <= POCET_NOH_MAX))
 			return `Počet zadných nôh musí byť ${POCET_NOH_MIN}–${POCET_NOH_MAX}.`;
+	}
+	// #206 (b) — ZV je load-bearing aj pri stena+zasklená (bočný 110×43 pod kotviacim = ZV−190),
+	// takže ju tu validujeme (inak by mimo rozsahu ticho zmizol riadok bez vysvetlenia). Pri
+	// „jednoduchej bez zasklenia" na stene sa ZV nepoužíva → nevaliduje sa (0 je OK).
+	if (v.uchytenie === 'stena' && !v.jednoduchaBezZasklenia) {
+		if (!(v.vyskaZadna >= VYSKA_ZADNA_MIN && v.vyskaZadna <= VYSKA_ZADNA_MAX))
+			return `Výška zadná ZV musí byť ${VYSKA_ZADNA_MIN}–${VYSKA_ZADNA_MAX} mm (pre bočný profil 110×43 pod kotviacim), alebo zvoľ „jednoduchá bez zasklenia".`;
 	}
 	return null;
 }

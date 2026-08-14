@@ -83,9 +83,11 @@
 			['SYSTÉM', 'system', vstup.system],
 			['ROZMER', 'rozmer', `${fmtMm(s.sirka)} × ${fmtMm(s.hlbka)} mm`],
 			[
-				'PREDNÁ SVETLOSŤ',
+				vstup.vystuhaProfil === '200x140' && vstup.system === 'Massive'
+					? 'EFEKTÍVNA SVETLOSŤ'
+					: 'PREDNÁ SVETLOSŤ',
 				'svetlost',
-				`${fmtMm(s.prednaSvetlost)} mm${vstup.vystuhaProfil === '200x140' ? ' (200×140: −60)' : ''}`
+				`${fmtMm(s.prednaSvetlost)} mm${vstup.vystuhaProfil === '200x140' && vstup.system === 'Massive' ? ' (200×140: −60)' : ''}`
 			],
 			[
 				'PREDNÉ NOHY',

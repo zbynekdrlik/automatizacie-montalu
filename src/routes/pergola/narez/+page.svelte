@@ -11,6 +11,7 @@
 		spocitajNarez,
 		PREDNA_SVETLOST_STD,
 		MAX_ROZOSTUP_PRIECOK,
+		ZVOD_SH_MAX,
 		type PergolaNarezVstup,
 		type PergolaSystem,
 		type Uchytenie,
@@ -68,7 +69,7 @@
 	let zvodFrezovatS = $state(false);
 	let zvodFrezovanieSHmmS = $state<number | string>('');
 	let strechaSkloS = $state('');
-	let obvodoveZaskleniS = $state('');
+	let obvodoveZasklenieS = $state('');
 
 	// reštart-effect: číta LEN form?.vstup, NIKDY vlastný *S zápis (nova-stranka §3 —
 	// self-loop by ticho prepísal používateľovu voľbu systému späť na default).
@@ -92,7 +93,7 @@
 		zvodFrezovatS = v?.zvodFrezovat ?? false;
 		zvodFrezovanieSHmmS = v?.zvodFrezovanieSHmm ?? '';
 		strechaSkloS = v?.strechaSklo ?? '';
-		obvodoveZaskleniS = v?.obvodoveZasklenie ?? '';
+		obvodoveZasklenieS = v?.obvodoveZasklenie ?? '';
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
@@ -132,10 +133,10 @@
 			value={zvodFrezovanieSHmmS}
 		/>{/if}
 	{#if strechaSkloS !== ''}<input type="hidden" name="strechaSklo" value={strechaSkloS} />{/if}
-	{#if obvodoveZaskleniS !== ''}<input
+	{#if obvodoveZasklenieS !== ''}<input
 			type="hidden"
 			name="obvodoveZasklenie"
-			value={obvodoveZaskleniS}
+			value={obvodoveZasklenieS}
 		/>{/if}
 {/snippet}
 
@@ -369,7 +370,7 @@
 							type="number"
 							step="any"
 							min="0"
-							max="5000"
+							max={ZVOD_SH_MAX}
 							bind:value={zvodFrezovanieSHmmS}
 							required
 						/>
@@ -398,7 +399,7 @@
 						type="text"
 						maxlength="200"
 						placeholder="napr. RS STANDARD PLUS 4-8-4číre"
-						bind:value={obvodoveZaskleniS}
+						bind:value={obvodoveZasklenieS}
 					/>
 					<p class="sub" style="margin:4px 0 0">
 						informatívne — Zasklenia má vlastný odpis, tu žiadny Money výpočet

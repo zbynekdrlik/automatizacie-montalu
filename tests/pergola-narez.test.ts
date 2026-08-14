@@ -21,6 +21,7 @@ import {
 	POD_KOTVIACI_110x43_ODPOCET,
 	POCET_BOCNYCH_POD_KOTVIACIM,
 	KOD_PROFIL_110x43,
+	KOD_VYSTUHA_200x140,
 	MAX_ROZOSTUP_PRIECOK,
 	KOD_PRIECKA_NORMAL,
 	KOD_PRIECKA_LIGHT,
@@ -215,8 +216,23 @@ describe('chybaPergolaNarezVstupu — validácia rozsahov', () => {
 			/zadná|výšk/i
 		);
 	});
-	it('na stenu: výška zadná sa NEvaliduje (nepoužíva sa) — 0 je OK', () => {
-		expect(chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'stena', vyskaZadna: 0 })).toBeNull();
+	it('#206 na stenu + jednoduchá bez zasklenia: ZV sa NEvaliduje (nepoužíva sa) — 0 je OK', () => {
+		expect(
+			chybaPergolaNarezVstupu({
+				...VZOR,
+				uchytenie: 'stena',
+				jednoduchaBezZasklenia: true,
+				vyskaZadna: 0
+			})
+		).toBeNull();
+	});
+	it('#206 na stenu + zasklená: ZV je load-bearing (bočný 110×43 = ZV−190) → mimo rozsahu = chyba', () => {
+		// stena + zasklená (default) používa ZV pre bočný 110×43 pod kotviacim → 0 je chyba
+		expect(chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'stena', vyskaZadna: 0 })).toMatch(
+			/zadná ZV|110×43/i
+		);
+		// platná ZV pri stena+zasklená = OK
+		expect(chybaPergolaNarezVstupu({ ...VZOR, uchytenie: 'stena', vyskaZadna: 2790 })).toBeNull();
 	});
 	it('samostatne stojaca: počet zadných nôh mimo rozsahu = chyba', () => {
 		expect(
@@ -395,6 +411,24 @@ describe('#206 (c) výstuha 200×140 → svetlosť −60 (preteká do prednej no
 		expect(r.nepodporovane.join(' | ')).toMatch(/skovan|žľabe/i);
 		expect(r.informativne.vystuhaProfil).toBe('110x250');
 	});
+
+	it('Massive + zosilnený + 200×140: výstuha horná odzrkadľuje kód 18022/200x140 (nie 18017/140x140)', () => {
+		const r = spocitajNarez({ ...VZOR, zosilnenyNosnik: true, vystuhaProfil: '200x140' });
+		const vy = r.vypocitane.find((p) => /výstuha horná/i.test(p.nazov));
+		expect(vy).toBeTruthy();
+		expect(vy!.kod).toBe(KOD_VYSTUHA_200x140); // 18022
+		expect(vy!.nazov).toMatch(/200x140/);
+		expect(vy!.dlzkaRezuMm).toBe(VZOR.sirka - VYSTUHA_ODPOCET); // dĺžka (rozpätie) nezávisí na priereze
+		// bez zvoleného 200×140 (default) ostáva 18017/140x140
+		const rStd = spocitajNarez({ ...VZOR, zosilnenyNosnik: true });
+		expect(rStd.vypocitane.find((p) => /výstuha horná/i.test(p.nazov))!.kod).toBe('18017');
+	});
+
+	it('−60 sa neaplikuje pri Robust + 200×140 (nekonzistentný ručný vstup) — gate na Massive', () => {
+		expect(efektivnaSvetlost({ ...VZOR, system: 'Robust', vystuhaProfil: '200x140' })).toBe(
+			VZOR.prednaSvetlost
+		);
+	});
 });
 
 // --- #206 (d)/(c) — validácia nových polí ------------------------------------------
@@ -414,5 +448,17 @@ describe('#206 validácia — zvod frézovanie + profil výstuhy', () => {
 		expect(chybaPergolaNarezVstupu({ ...VZOR, vystuhaProfil: '999x999' as VystuhaProfil })).toMatch(
 			/výstuh/i
 		);
+	});
+	it('profil výstuhy nesedí so systémom = chyba (Robust+200x140, Massive+110x110)', () => {
+		// VZOR je Massive; Robust profil pri Massive = nekonzistentné
+		expect(chybaPergolaNarezVstupu({ ...VZOR, vystuhaProfil: '110x110' })).toMatch(/systém/i);
+		expect(
+			chybaPergolaNarezVstupu({ ...VZOR, system: 'Robust', vystuhaProfil: '200x140' })
+		).toMatch(/systém/i);
+		// konzistentné = OK
+		expect(chybaPergolaNarezVstupu({ ...VZOR, vystuhaProfil: '200x140' })).toBeNull();
+		expect(
+			chybaPergolaNarezVstupu({ ...VZOR, system: 'Robust', vystuhaProfil: '110x250' })
+		).toBeNull();
 	});
 });
