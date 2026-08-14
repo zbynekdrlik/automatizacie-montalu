@@ -28,13 +28,17 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 	await expect(massiveNoha).toContainText('predná noha');
 	await expect(page.getByTestId('polozka-18013')).toHaveCount(0);
 
-	// priečka (18004) prítomná s počtom, dĺžka „čaká na výkres"
-	await expect(page.getByTestId('polozka-18004')).toContainText('čaká na výkres');
+	// priečka (18004) prítomná s počtom, dĺžka „—" (= HH krovu, #161 neodvoditeľné) (#205)
+	await expect(page.getByTestId('polozka-18004')).toContainText('HH krovu');
+	// #205: žľab (18018) + kotviaci (18019) TERAZ vo vypocitane = šírka 5760, výdaj na 6 m
+	await expect(page.getByTestId('polozka-18018')).toContainText('5760');
+	await expect(page.getByTestId('vydaj-18018')).toContainText('(6 m)');
+	await expect(page.getByTestId('polozka-18019')).toContainText('5760');
 
 	// informatívne: výstuha = 5760 − 280 = 5480
 	await expect(page.getByTestId('vystuha-rez')).toContainText('5480');
 
-	// zatiaľ nepodporované — krov (ticket 161), žľab, sklá vypísané, nič sa nehádže
+	// zatiaľ nepodporované — krov (ticket 161), lišty (HH krovu), sklá vypísané, nič sa nehádže
 	const nepodp = page.getByTestId('narez-nepodporovane');
 	await expect(nepodp).toContainText('Krov');
 	await expect(nepodp).toContainText('161');
@@ -245,6 +249,77 @@ test('krov uloženie pod 7° (5°): čestne „nepodporované" (O5), nič sa neh
 	// výkres ostáva čestný placeholder → #161 (nie uloženie detail)
 	await expect(page.getByTestId('pnr-krov-ulozenie')).toHaveCount(0);
 	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// --- #204 — tenšie čiary v pohľadoch (CAD cut/view konvencia) -------------------
+test('#204 výkres: pohľadové čiary (nohy/steny) sú tenké, rezová čiara (žľab/obrys) hrubšia', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5760');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	const num = async (testid: string) =>
+		parseFloat((await page.getByTestId(testid).first().getAttribute('stroke-width')) ?? 'NaN');
+
+	const noha = await num('pnr-fe-noha-0'); // pohľadová čiara (view line)
+	const zlab = await num('pnr-fe-zlab'); // rezová čiara (cut line)
+	const podObrys = await num('pnr-pod-obrys'); // hlavný obrys (rez)
+
+	// pohľadová čiara nohy je TENKÁ — výrazne pod pôvodnou 1.2 („cez skicár")
+	expect(noha).toBeLessThanOrEqual(0.35);
+	expect(noha).toBeLessThan(1.2);
+	// rezová/obrysová čiara ostáva vizuálne ODLÍŠENÁ (hrubšia) než pohľadová, ale stále
+	// tenká technická (≤ REZ_STROKE 0.5) — CAD konvencia cut line vs view line
+	expect(zlab).toBeGreaterThan(noha);
+	expect(zlab).toBeLessThanOrEqual(0.5);
+	expect(podObrys).toBeGreaterThan(noha);
+	expect(podObrys).toBeLessThanOrEqual(0.5);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// --- #205/#207 — materiál z výkresu OP260282 (odvoditeľné riadky + výdaj tyčí) ---
+test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výstuha 4710, priečka „—"', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	// vstupy zákazky OP260282: Massive 140, samostatne stojaca, výstuha 140×140
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.locator('#uchytenie').selectOption('samostatne');
+	await page.locator('#vyskaZadna').fill('2790');
+	await page.locator('#pocetZadnychNoh').fill('4');
+	await page.locator('#hornyProfilZadnej').selectOption('140');
+	await page.locator('input[name="zosilnenyNosnik"]').check();
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// žľab (18018) = 4990, výdaj 1×(6 m)
+	await expect(page.getByTestId('polozka-18018')).toContainText('4990');
+	await expect(page.getByTestId('vydaj-18018')).toContainText('1×(6 m)');
+	// kotviaci (18019) = 4990, výdaj 1×(6 m)
+	await expect(page.getByTestId('polozka-18019')).toContainText('4990');
+	await expect(page.getByTestId('vydaj-18019')).toContainText('1×(6 m)');
+	// výstuha horná (18017, massive) = 4990 − 280 = 4710
+	await expect(page.getByTestId('narez-tabulka')).toContainText('4710');
+	// priečka (18004) dĺžka „—" (HH krovu neodvoditeľné) — nič sa nehádže
+	await expect(page.getByTestId('polozka-18004')).toContainText('HH krovu');
+	// nepodporované vypisuje HH-krovu + nekonzistentné poznámky výkresu (18016)
+	await expect(page.getByTestId('narez-nepodporovane')).toContainText('HH krovu');
 
 	expect(consoleMsgs).toEqual([]);
 });
