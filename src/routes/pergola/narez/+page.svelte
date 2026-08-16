@@ -9,6 +9,7 @@
 	import { formatDatumCasSk } from '$lib/datum';
 	import {
 		spocitajNarez,
+		komponentyPergoly,
 		PREDNA_SVETLOST_STD,
 		MAX_ROZOSTUP_PRIECOK,
 		ZVOD_SH_MAX,
@@ -97,6 +98,8 @@
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
+	// #195 — kusové komponenty (spojky, krytky) relevantné pre zvolený systém (display-only)
+	let komponenty = $derived(step === 'vysledok' ? komponentyPergoly(vstup) : []);
 	// #161 — krov uloženie z potvrdených vzorcov, len keď je sklon zadaný
 	let krov = $derived(
 		step === 'vysledok' && vstup.sklonStrechy != null ? krovUlozenie(vstup.sklonStrechy) : null
@@ -504,6 +507,37 @@
 				{/each}
 			</tbody>
 		</table>
+	</div>
+
+	<div class="card">
+		<div class="sec">Komponenty (spojky, krytky) — {komponenty.length} typov</div>
+		<p class="sub noprint">
+			Kusové komponenty vyčítané z reálnych výkresov (spojky, krytky, rámové/zakladacie lišty).
+			<b>Zatiaľ len TYPY</b> — počty a Money kódy čakajú na tabuľky od Dominika. „—" pri počte = bez
+			potvrdeného pravidla, nič sa nehádže. CAD kód je informatívny (<b>NIE</b> Money odpisový kód).
+			<b>Do Money sa neposiela nič.</b>
+		</p>
+		{#if komponenty.length === 0}
+			<p class="sub" data-testid="komponenty-prazdne">
+				Pre systém {vstup.system} zatiaľ nemáme vyčítané žiadne komponenty.
+			</p>
+		{:else}
+			<table class="narez" data-testid="komponenty-tabulka">
+				<thead>
+					<tr><th>Typ</th><th>Kde sa používa</th><th>CAD kód</th><th>Počet ks</th></tr>
+				</thead>
+				<tbody>
+					{#each komponenty as k (k.typ)}
+						<tr>
+							<td>{k.typ}{k.poznamka ? ` · ${k.poznamka}` : ''}</td>
+							<td>{k.kdePouzity}</td>
+							<td>{k.kodCad ?? '—'}</td>
+							<td><b>{k.pocetKs ?? '—'}</b></td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
 	</div>
 
 	<div class="card">

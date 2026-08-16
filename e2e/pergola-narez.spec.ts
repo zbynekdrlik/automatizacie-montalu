@@ -44,6 +44,16 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 	await expect(nepodp).toContainText('161');
 	await expect(nepodp).toContainText('Sklá');
 
+	// #195 — komponenty (spojky, krytky): Massive typy prítomné, počty honest-null „—",
+	// Robust-only komponent (zakladacia lišta) sa NEzobrazí (per-systém filter)
+	const komp = page.getByTestId('komponenty-tabulka');
+	await expect(komp).toBeVisible();
+	await expect(komp).toContainText('Spojka U');
+	await expect(komp).toContainText('Krytka zadná roh');
+	await expect(komp).toContainText('24007'); // CAD kód rámovej lišty (informatívny)
+	await expect(komp).not.toContainText('Zakladacia lišta'); // Robust-only
+	await expect(komp).toContainText('—'); // počet honest-null
+
 	expect(consoleMsgs).toEqual([]);
 });
 
