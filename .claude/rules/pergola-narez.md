@@ -158,3 +158,29 @@ ostanú nezmenené. Nové vzorce nech sa uplatňujú na INÉ konfigurácie než 
 výstuha 140×140, zasklená): (b) je NIE-SS → SS golden ho nevidí; (c) −60 je 200×140 → 140×140 golden ho
 nevidí. Kódy nových profilov (18016/18022/18014) = KÓPIA stringov z `server/pergola.ts` CODE_MAP, NIE
 import (money-safety).
+
+## Kusové komponenty (spojky, krytky) — #195, honest-null na POČTY aj KÓDY
+
+Vrstva KUSOVÝCH komponentov (spojky, krytky, rámové/zakladacie lišty) žije v
+`pergola-narez.ts` ako **samostatná** funkcia `komponentyPergoly(v)` + statický katalóg
+`PERGOLA_KOMPONENTY` — ZÁMERNE NIE v `NarezVysledok`, aby golden `pergola-narez-op260282`
+a `spocitajNarez` ostali bit-identické (vzor = `schemaVykresu`). Zdroj TYPOV = call 13.8.
+(scr_014/015 Massive „KOMPONENTY Pergola 140"; scr_042 Robust „KOMPONENTY Pergola 110"/
+expedícia) + výkres OP260282. User (16.8., #195): „len mi stačia tie typy" — nečakať na
+Dominikove sľúbené tabuľky, dorobiť z TYPOV.
+
+- **Honest-null sa vzťahuje aj na POČTY komponentov:** `pocetKs = null` („—") pre VŠETKY
+  typy — pravidlo počtu neexistuje (Dominik komponenty neklasifikoval vždy/často). Jednorazové
+  pozorovanie z JEDNÉHO výkresu (spojka U 12 ks, rámová lišta 2 ks na OP260282) ide LEN do
+  `poznamka`, NIKDY do stĺpca počet. Keď reálne prídu tabuľky, doplní sa počet + pravidlo.
+- **Money kód komponentu = LEN potvrdený ZASK* (kusové sú ks, ZASK; profily sú m, ZASP).**
+  Žiaden ZASK* nie je v zdrojoch potvrdený → `kodCad` je len informatívny CAD kód zo Solid
+  Edge (24007/24003), výslovne NIE Money odpisový kód; do odpisu (#197) nejde nič. Nečitateľná
+  číslica (2400?) sa NIKDY nedopĺňa → `kodCad = null` + poznámka.
+- **Systémová príslušnosť evidence-strict:** `systemy: PergolaSystem[]` per typ, filtrované
+  `komponentyPergoly` podľa `v.system` (Massive 5, Robust 2). Nepridávaj typ systému, kde
+  nie je zo zdroja doložený. Profily, ktoré engine už emituje (žľabový 110 = 18021 atď.), do
+  komponentov NEDUPLIKUJ — sem patria LEN kusové položky navyše.
+- **Testy:** unit `tests/pergola-narez-komponenty.test.ts` (honest-null, per-systém filter,
+  no-shared-mutation guard); E2E v `pergola-narez.spec.ts` (Massive + Robust vetva,
+  počet-bunka `data-testid="komponent-pocet"` = „—", console-zero).

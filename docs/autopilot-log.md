@@ -1157,3 +1157,17 @@ nedotknuté.
 - **Gap → #198:** či −60 pri 200×140 mení reálnu dĺžku nohy alebo len svetlú výšku (kompozícia
   potvrdených pravidiel, display-only).
 - **#155 (epic) OSTÁVA OTVORENÝ.**
+
+## #195 — Pergola: komponenty (spojky, krytky) do nárezu (2026-08-16)
+
+- **PR #210** (merge 2a62b34), nasadené **v0.19.6**, deploy verified (/health live:true,
+  DOM v0.19.6 (2a62b34)).
+- **Engine:** nová `komponentyPergoly(v)` + katalóg `PERGOLA_KOMPONENTY` v `pergola-narez.ts`
+  — SAMOSTATNÁ funkcia (golden `pergola-narez-op260282` + `NarezVysledok` bit-identické).
+- **Honest-null aj na komponenty:** počet ks = „—" pre všetky typy (žiadne pravidlo),
+  jednorazové pozorovanie (spojka U 12 ks / rámová 2 ks) len v poznámke; žiadny ZASK*
+  Money kód (CAD kódy 24007/24003 informatívne, 2400? sa nedopĺňa). User (16.8.): „len typy".
+- **RED→GREEN:** `tests/pergola-narez-komponenty.test.ts` (11) e10799d→b6903da; E2E Massive+Robust.
+- **Review (fresh Opus 4.8):** 0 🔴 0 🟡 4 🔵 — všetky 4 fixnuté v branchi (493c383).
+- **Live overené:** Massive 5 typov (počty „—", CAD 24007/24003), Robust 2 typy (per-systém filter).
+- **#155 (epic) OSTÁVA OTVORENÝ.**
