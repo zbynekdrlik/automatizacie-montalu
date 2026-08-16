@@ -87,8 +87,14 @@ describe('#195 — komponentyPergoly filtruje podľa systému', () => {
 		expect(typy).toMatch(/krytka vrchná/);
 	});
 
-	it('funkcia je deterministická (rovnaký vstup → rovnaký výstup)', () => {
-		expect(komponentyPergoly(BASE)).toEqual(komponentyPergoly(BASE));
+	it('vracia ČERSTVÉ pole pri každom volaní — mutácia výsledku neovplyvní ďalšie volanie ani katalóg', () => {
+		const prve = komponentyPergoly(BASE);
+		const pocet = prve.length;
+		expect(pocet).toBeGreaterThan(0);
+		// mutácia vráteného poľa NESMIE presiaknuť do katalógu ani do ďalšieho volania
+		prve.push({ ...prve[0], typ: 'MUTÁCIA-TEST' });
+		expect(komponentyPergoly(BASE).length).toBe(pocet);
+		expect(PERGOLA_KOMPONENTY.some((k) => k.typ === 'MUTÁCIA-TEST')).toBe(false);
 	});
 });
 

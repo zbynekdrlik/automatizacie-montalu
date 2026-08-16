@@ -99,7 +99,7 @@
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
 	// #195 — kusové komponenty (spojky, krytky) relevantné pre zvolený systém (display-only)
-	let komponenty = $derived(step === 'vysledok' ? komponentyPergoly(vstup) : []);
+	let komponenty = $derived(step === 'vysledok' && vysledok ? komponentyPergoly(vstup) : []);
 	// #161 — krov uloženie z potvrdených vzorcov, len keď je sklon zadaný
 	let krov = $derived(
 		step === 'vysledok' && vstup.sklonStrechy != null ? krovUlozenie(vstup.sklonStrechy) : null
@@ -531,8 +531,8 @@
 						<tr>
 							<td>{k.typ}{k.poznamka ? ` · ${k.poznamka}` : ''}</td>
 							<td>{k.kdePouzity}</td>
-							<td>{k.kodCad ?? '—'}</td>
-							<td><b>{k.pocetKs ?? '—'}</b></td>
+							<td data-testid="komponent-kod">{k.kodCad ?? '—'}</td>
+							<td data-testid="komponent-pocet"><b>{k.pocetKs ?? '—'}</b></td>
 						</tr>
 					{/each}
 				</tbody>
