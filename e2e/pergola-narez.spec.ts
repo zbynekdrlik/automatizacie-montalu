@@ -44,6 +44,47 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 	await expect(nepodp).toContainText('161');
 	await expect(nepodp).toContainText('Sklá');
 
+	// #195 — komponenty (spojky, krytky): Massive typy prítomné, počty honest-null „—",
+	// Robust-only komponent (zakladacia lišta) sa NEzobrazí (per-systém filter)
+	const komp = page.getByTestId('komponenty-tabulka');
+	await expect(komp).toBeVisible();
+	await expect(komp).toContainText('Spojka U');
+	await expect(komp).toContainText('Krytka zadná roh');
+	await expect(komp).toContainText('24007'); // CAD kód rámovej lišty (informatívny)
+	await expect(komp).not.toContainText('Zakladacia lišta'); // Robust-only
+	// počet honest-null: KAŽDÁ bunka počtu (5 typov Massive) = „—" (nie len „niekde v tabuľke")
+	const pocty = page.getByTestId('komponent-pocet');
+	await expect(pocty).toHaveCount(5);
+	for (let i = 0; i < 5; i++) await expect(pocty.nth(i)).toHaveText('—');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('Robust: komponenty = zakladacia lišta + krytka vrchná; Massive typy (spojka U) skryté (#195)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	// Robust je default systém — necháme ho, len vyplníme rozmery a spočítame
+	await page.locator('#sirka').fill('5000');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	const komp = page.getByTestId('komponenty-tabulka');
+	await expect(komp).toBeVisible();
+	await expect(komp).toContainText('Zakladacia lišta');
+	await expect(komp).toContainText('Krytka vrchná');
+	// Massive-only typy sa pri Robuste NEzobrazia (per-systém filter)
+	await expect(komp).not.toContainText('Spojka U');
+	await expect(komp).not.toContainText('Krytka zadná roh');
+	// počet honest-null: obe Robust bunky počtu = „—"
+	const pocty = page.getByTestId('komponent-pocet');
+	await expect(pocty).toHaveCount(2);
+	for (let i = 0; i < 2; i++) await expect(pocty.nth(i)).toHaveText('—');
+
 	expect(consoleMsgs).toEqual([]);
 });
 

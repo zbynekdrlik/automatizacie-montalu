@@ -1136,3 +1136,24 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
 - **Výkres:** keď sklon ≥7° → krov-note detail (režim, c/cc, ps=ls/lv=pv + schematický trojuholník „nie v mierke") + ponechaná poznámka „frézovanie drážok → #161". Bez sklonu / <7° → súčasný placeholder → #161 (bez regresu). Route karta „Krov — uloženie".
 - **Testy:** RED→GREEN vektory `tests/pergola-krov.test.ts` (15), parser `tests/pergola-narez-vstup.test.ts` (+4), E2E `e2e/pergola-narez.spec.ts` (+2: 8° detail, 5° nepodporované). money-safety SUBORY += pergola-krov.ts.
 - **#161 OSTÁVA OTVORENÝ** — frézovanie drážok (výrobný list, O5), vetva <7° (O5), priradenie odvesny c/cc (O5), jednotka 0,01 (O5b), metrický prepočet (O14). Dodaný LEN potvrdený prírastok. Display-only, žiaden Money zápis.
+
+## #206 — Pergola formulár: 5 nových volieb z výkresu OP260282 (2026-08-14)
+
+PR #209 (dev→main), merge `142ab059`, release **v0.19.5 (142ab05)**, nasadené + naživo overené
+(app.montalu.cloud/pergola/narez). Commity: `35fed22` (feat), `46aab4e` (review fixes),
+`4221e83` (release). Display/engine-only, žiadne Money wiring; golden OP260282 + money-safety
+nedotknuté.
+
+- **(a)** checkbox „jednoduchá pergola bez zasklenia" → vypína bočné 110×43 (engine drop + poznámka).
+- **(b)** POTVRDENÉ: NIE-SS (u steny) bočný 110×43 pod kotviacim = **ZV − 190**, 2 ks (18016),
+  do vypocitane; SS/bez-zasklenia → riadok sa neemituje. ZV validovaná aj pri stena+zasklená.
+- **(c)** profil výstuhy: **200×140 → efektívna svetlosť −60** (preteká do prednej nohy sv+15,
+  Massive-gate); výstuha horná odzrkadľuje kód 18022. Robust 110×110/110×250 = honest-null (poznámka).
+- **(d)** ZVOD frézovanie: toggle + výška SH — evidencia na výkrese (detail → #161).
+- **(e)** sklá: strecha sklo + obvodové zasklenie — informatívne polia (žiadny Zasklenia engine).
+- **Testy:** +22 unit/parser vektorov (`pergola-narez.test.ts`/`-vstup.test.ts`) + 4 e2e (a/b/c/d/e).
+  Kódy 18016/18022/18014 = KÓPIA z katalógu `server/pergola.ts`, nie import.
+- **Review (fresh Opus 4.8):** 0 🔴 2 🟡 6 🔵 — všetko fixnuté v branchi (viď komentár na #206).
+- **Gap → #198:** či −60 pri 200×140 mení reálnu dĺžku nohy alebo len svetlú výšku (kompozícia
+  potvrdených pravidiel, display-only).
+- **#155 (epic) OSTÁVA OTVORENÝ.**

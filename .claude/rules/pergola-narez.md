@@ -135,3 +135,26 @@ bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu
   zvislá) pozn. „ZV − 140" = 2650 ale výkres 2340; zadné nohy pri SS+výstuha: výkres 2790
   profil 18013, engine confirmed ZV − horný profil = 2650 (kód podľa systému) — táto
   SS+výstuha konfigurácia nemá historický vzor (#196), vzorec sa NEMENÍ.
+
+## Modré poznámky OP260282 (#206) — POTVRDENÉ vzorce sú TERAZ v engine
+
+Výkres OP260282 mal 5 modrých poznámok (nové voľby); #206 ich pridal do formulára + enginu +
+výkresu. **Dva sú POTVRDENÉ číselné vzorce — už NIE sú otvorené, sú vo `vypocitane`/`efektivnaSvetlost`:**
+
+- **110×43 pod kotviacim (18016) = ZV − 190**, 2 ks, LEN pri NIE-SS (`uchytenie='stena'`) + zasklenej.
+  `POD_KOTVIACI_110x43_ODPOCET`. Checkbox „jednoduchá bez zasklenia" (`jednoduchaBezZasklenia`) ho vypína.
+- **výstuha 200×140 → efektívna svetlosť − 60** (`VYSTUHA_200x140_SVETLOST_ODPOCET`, Massive-gate),
+  preteká do prednej nohy (svetlosť + 15) cez `efektivnaSvetlost()`. Výstuha horná odzrkadľuje kód 18022.
+- **honest-null (poznámka only):** „2 pod fixom" 110×43 dĺžky (poznámka výkresu nesedí); Robust výstuhy
+  110×110/110×250 dĺžky nad −220. Gap #198: či −60 mení reálnu dĺžku nohy alebo len svetlú výšku.
+
+**POZOR — `vyskaZadna` (ZV) je TERAZ load-bearing aj pri `stena`+zasklená** (nie len samostatne):
+počíta bočný 110×43 a validuje sa (`chybaPergolaNarezVstupu`) pri `stena && !jednoduchaBezZasklenia`.
+Neber ju ako samostatne-only.
+
+**Vzor pre ĎALŠIE modré poznámky / OP-výkresy (zachovaj golden bit-identický):** nové polia na
+`PergolaNarezVstup` dávaj VOLITEĽNÉ (`?`) — existujúce fixtúry (VZOR) aj golden `pergola-narez-op260282`
+ostanú nezmenené. Nové vzorce nech sa uplatňujú na INÉ konfigurácie než golden (OP260282 = Massive/SS/
+výstuha 140×140, zasklená): (b) je NIE-SS → SS golden ho nevidí; (c) −60 je 200×140 → 140×140 golden ho
+nevidí. Kódy nových profilov (18016/18022/18014) = KÓPIA stringov z `server/pergola.ts` CODE_MAP, NIE
+import (money-safety).
