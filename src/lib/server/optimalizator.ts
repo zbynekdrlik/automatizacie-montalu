@@ -88,9 +88,7 @@ export function optimalizuj(v: OptimalizatorVstup): OptimalizatorVysledok {
 		);
 	}
 	if (tyceUsed > pocetTyci) {
-		varovania.push(
-			`Kusy sa nezmestia do zadaných ${pocetTyci} tyčí — potrebných je ${tyceUsed}.`
-		);
+		varovania.push(`Kusy sa nezmestia do zadaných ${pocetTyci} tyčí — potrebných je ${tyceUsed}.`);
 	}
 
 	const vojdeSa = tooLong.length === 0 && tyceUsed <= pocetTyci;
