@@ -1171,3 +1171,25 @@ nedotknuté.
 - **Review (fresh Opus 4.8):** 0 🔴 0 🟡 4 🔵 — všetky 4 fixnuté v branchi (493c383).
 - **Live overené:** Massive 5 typov (počty „—", CAD 24007/24003), Robust 2 typy (per-systém filter).
 - **#155 (epic) OSTÁVA OTVORENÝ.**
+
+## #212 — Nárezový optimalizátor (samostatná kalkulačka) (2026-08-17)
+
+- **PR #213** (merge f4eaec3), nasadené **v0.20.0**, deploy verified (/health live:true, DOM
+  `v0.20.0 (f4eaec3)`; live /optimalizator: 8×2834 mm → **4 tyče**, spolu 22672 mm, odpad
+  1248 mm (5,2 %), hlavička „kotúč 10 mm", **nula console chýb**).
+- **Nová stránka `/optimalizator`** (interné-only): kalkulačka nárezu tyčí — dĺžka+počet tyčí,
+  dynamické riadky kusov, voliteľná rezná medzera (default 10). Bez Money odpisu, bez
+  katalógových kódov, bez väzby na zákazku. Nahrádza platenú externú appku (dielňa, 5/deň).
+- **Engine reuse (žiadny druhý packer):** `ffdPack` rozšírený **spätne-kompatibilne** o param
+  `kerf` (default `KOTUC`=4; existujúci volajúci nezmenení, 152 golden/compute vektorov zelené).
+  `RozpisRezov` dostal voliteľný `kerf` prop (default 4). Nové `optimalizator.ts` (`optimalizuj`)
+  + `optimalizator-vstup.ts` (parser). Reprodukuje screenshot externej appky 1:1 (zoskupenie tyčí
+  identické; odpad o 1 kotúč/tyč konzervatívnejší = per-kus model kerf).
+- **b2b:** `/optimalizator` v `B2B_FORBIDDEN_PREFIXES` + drift-guard test (`b2b-route-coverage`).
+- **RED→GREEN:** `tests/optimalizator.test.ts` + `tests/optimalizator-vstup.test.ts`
+  (ac19ce0 → 4281773); e2e `e2e/optimalizator.spec.ts` (2 testy, real-browser rozpis zo screenshotu).
+- **DoS strop:** parser ohraničuje pocet/dĺžku/počet tyčí (bránil OOM — `optimalizuj` rozbaľuje
+  `pocet` na kusy + O(n²) FFD by inak zablokoval Node proces obsluhujúci aj ostré Money routy).
+- **Review (fresh Opus 4.8):** 1 🔴/🟡 (DoS) + 2 🔵 — všetko fixnuté v branchi (dd7f24d);
+  po oprave **0 🔴 0 🟡 0 🔵**. Money-safety čistá (žiadny `$lib/server/money`, `/data/dlv-import`,
+  DB/`fs` zápis).
