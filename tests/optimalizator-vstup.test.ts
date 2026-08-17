@@ -112,4 +112,53 @@ describe('parseOptimalizatorVstup', () => {
 		);
 		expect('error' in r).toBe(true);
 	});
+
+	// horné stropy proti OOM/zamrznutiu procesu (review nález #212)
+	it('absurdný počet v jednom riadku → chyba (žiadny OOM)', () => {
+		const r = parseOptimalizatorVstup(
+			fd([
+				['dlzkaTyce', '6000'],
+				['pocetTyci', '10'],
+				['reznaMedzera', '10'],
+				['dlzka', '1000'],
+				['pocet', '1000000000']
+			])
+		);
+		expect('error' in r).toBe(true);
+	});
+
+	it('príliš veľa kusov spolu (nad celkový strop) → chyba', () => {
+		const rows: [string, string][] = [
+			['dlzkaTyce', '6000'],
+			['pocetTyci', '10'],
+			['reznaMedzera', '10']
+		];
+		for (let i = 0; i < 10; i++) {
+			rows.push(['dlzka', '1000']);
+			rows.push(['pocet', '5000']); // 10×5000 = 50000 > 20000 strop
+		}
+		const r = parseOptimalizatorVstup(fd(rows));
+		expect('error' in r).toBe(true);
+	});
+
+	it('absurdná dĺžka tyče alebo počet tyčí → chyba', () => {
+		const velkaTyc = parseOptimalizatorVstup(
+			fd([
+				['dlzkaTyce', '9999999'],
+				['pocetTyci', '10'],
+				['dlzka', '1000'],
+				['pocet', '1']
+			])
+		);
+		expect('error' in velkaTyc).toBe(true);
+		const velaTyci = parseOptimalizatorVstup(
+			fd([
+				['dlzkaTyce', '6000'],
+				['pocetTyci', '999999'],
+				['dlzka', '1000'],
+				['pocet', '1']
+			])
+		);
+		expect('error' in velaTyci).toBe(true);
+	});
 });

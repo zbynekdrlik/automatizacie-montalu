@@ -142,6 +142,7 @@
 	<section class="vysledok" data-testid="vysledok">
 		<div class="sumar" class:nevojde={!v.vojdeSa}>
 			<span>Použitých tyčí: <b data-testid="tyce-pouzite">{v.tyceUsed}</b> / {v.pocetTyci}</span>
+			<span>Spolu narezané: <b data-testid="spolu-narezane">{fmt(v.celkovaDlzkaKusov)} mm</b></span>
 			<span>Celkový odpad (konce tyčí): <b>{fmt(v.odpadMm)} mm</b> ({fmt(v.odpadPct)} %)</span>
 			<span>Rezná medzera: {fmt(v.reznaMedzera)} mm</span>
 		</div>

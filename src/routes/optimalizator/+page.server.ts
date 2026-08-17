@@ -9,8 +9,8 @@ import { parseOptimalizatorVstup } from '$lib/server/optimalizator-vstup';
 import { optimalizuj } from '$lib/server/optimalizator';
 
 export const actions: Actions = {
-	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — aby ho
-	// stránka (aj no-JS full POST fallback) čítala bez union-narrowingu
+	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ
+	// pre use:enhance callback bez union-narrowingu
 	default: async ({ request }) => {
 		const parsed = parseOptimalizatorVstup(await request.formData());
 		if ('error' in parsed) return fail(400, { vysledok: null, error: parsed.error });

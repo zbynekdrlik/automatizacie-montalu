@@ -40,6 +40,7 @@ describe('optimalizuj — nárezový optimalizátor (#212)', () => {
 		expect(r.tyceUsed).toBe(4);
 		expect(r.vojdeSa).toBe(true);
 		expect(r.tooLong).toEqual([]);
+		expect(r.celkovaDlzkaKusov).toBe(18217); // 3780+1390+988+1280+2280+2831+2×2834
 		expect(r.material).toHaveLength(1);
 		const m = r.material[0];
 		expect(m.tyce).toBe(4);

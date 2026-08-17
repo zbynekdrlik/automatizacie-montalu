@@ -39,6 +39,7 @@ test('optimalizátor: tyč 6000 + kusy zo screenshotu → 4 tyče, grafický roz
 	const vysledok = page.getByTestId('vysledok');
 	await expect(vysledok).toBeVisible();
 	await expect(page.getByTestId('tyce-pouzite')).toHaveText('4');
+	await expect(page.getByTestId('spolu-narezane')).toHaveText('18217 mm');
 	// grafický rozpis (RozpisRezov) vykreslil 4 tyče (SVG pruhy)
 	await expect(vysledok.locator('svg.bar-svg')).toHaveCount(4);
 	// hlavička rozpisu ukazuje POUŽITÚ reznú medzeru 10 mm (nie default 4)
