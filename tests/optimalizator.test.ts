@@ -69,10 +69,16 @@ describe('optimalizuj — nárezový optimalizátor (#212)', () => {
 		expect(r.varovania.join(' ')).toMatch(/nezmest|tyč/i);
 	});
 
-	it('rezná medzera 0 zmenší odpad oproti medzere 10', () => {
+	it('rezná medzera mení výsledok balenia (odpad = koncový zvyšok tyče)', () => {
+		// odpad = súčet koncových zvyškov (ako grafický rozpis a screenshot).
+		// Materiál spotrebovaný rezmi sa NEráta do koncového odpadu, takže pri
+		// kerf 0 je koncový zvyšok VÄČŠÍ o spotrebu rezov (8 kusov × 10 mm = 80 mm).
 		const s0 = optimalizuj({ ...SCREENSHOT, reznaMedzera: 0 });
 		const s10 = optimalizuj(SCREENSHOT);
-		expect(s0.material[0].odpadMm).toBeLessThan(s10.material[0].odpadMm);
+		expect(s0.tyceUsed).toBe(4);
+		expect(s10.tyceUsed).toBe(4);
+		expect(s0.material[0].odpadMm).toBe(5783); // 4×6000 − 18217
+		expect(s10.material[0].odpadMm).toBe(5703); // 4×6000 − 18217 − 8×10
 	});
 
 	it('kus dlhší ako tyč (aj s reznou medzerou) sa nebalí a ohlási sa', () => {
