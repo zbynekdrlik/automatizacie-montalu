@@ -142,13 +142,16 @@ function val(row: RezRow, S: number, V: number, N: number, useKerf: boolean): nu
  * počítal na samostatnú tyč a preto nadhodnocoval počet tyčí (a odpis do Money).
  */
 /** FFD balenie so sledovaním, ktorý kus je na ktorej tyči (pre grafický rozpis).
- *  Každý kus rezervuje svoju dĺžku + hrúbku kotúča (KOTUC) — reálny rez odoberie
- *  4 mm. zvysok = skutočný odpad (offcut) po odrátaní kusov aj rezov. */
-function ffdPack(kusy: Kus[], barLen: number = BAR): Tyc[] {
+ *  Každý kus rezervuje svoju dĺžku + reznú medzeru (`kerf`, default KOTUC = 4 mm) —
+ *  reálny rez odoberie materiál. zvysok = skutočný odpad (offcut) po odrátaní kusov
+ *  aj rezov. `kerf` je parameter (spätne kompatibilný default 4 mm) kvôli nárezovému
+ *  optimalizátoru (#212), ktorý používa vlastnú reznú medzeru (default 10 mm);
+ *  existujúci volajúci (zasklenia, sieťka) parameter neposielajú → ostáva 4 mm. */
+export function ffdPack(kusy: Kus[], barLen: number = BAR, kerf: number = KOTUC): Tyc[] {
 	const bary: Tyc[] = [];
 	const rem: number[] = [];
 	for (const k of [...kusy].sort((a, b) => b.dlzka - a.dlzka)) {
-		const need = k.dlzka + KOTUC;
+		const need = k.dlzka + kerf;
 		let i = 0;
 		for (; i < rem.length; i++) if (rem[i] >= need) break;
 		if (i === rem.length) {

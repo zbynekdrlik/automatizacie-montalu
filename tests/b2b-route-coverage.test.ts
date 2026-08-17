@@ -143,6 +143,14 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	it('#139: /bazen/navrh (návrhový výkres pre bazén, NEPRÍSTUPNÝ pre b2b) JE presmerovaná preč', () => {
 		expect(b2bRedirectTarget('/bazen/navrh')).toBe('/zasklenia');
 	});
+
+	// #212: nárezový optimalizátor — kalkulačka pre dielňu (interní), žiadny Money
+	// odpis; b2b nemá požiadavku → vedome zakázaná (v B2B_FORBIDDEN_PREFIXES).
+	// Generický it.each vyššie to už pokrýva (nie je v ALLOWED), toto je len
+	// čitateľné explicitné potvrdenie vedomého rozhodnutia.
+	it('#212: /optimalizator (nárezový optimalizátor, interné-only) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/optimalizator')).toBe('/zasklenia');
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k

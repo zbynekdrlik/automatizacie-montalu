@@ -10,7 +10,11 @@ const B2B_FORBIDDEN_PREFIXES = [
 	'/pouzivatelia',
 	'/zasklenia/nastavenia',
 	// interná demo/preview stránka pre návrhové výkresy (#137) — nikdy pre b2b
-	'/vykresy'
+	'/vykresy',
+	// nárezový optimalizátor (#212) — kalkulačka pre dielňu (interní), žiadny Money
+	// odpis; b2b nemá požiadavku, konvencia = nová route zakázaná, kým sa vedome
+	// nerozhodne inak (drift guard: tests/b2b-route-coverage.test.ts)
+	'/optimalizator'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —

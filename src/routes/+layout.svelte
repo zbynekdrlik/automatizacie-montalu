@@ -46,6 +46,9 @@
 					{ href: '/bazen', label: 'Bazén' },
 					{ href: '/zasklenia', label: 'Zasklenia' },
 					{ href: '/sietka', label: 'Sieťka' },
+					// samostatný nárezový optimalizátor (#212) — kalkulačka bez Money odpisu,
+					// len pre interných (b2b má /optimalizator v B2B_FORBIDDEN_PREFIXES)
+					{ href: '/optimalizator', label: 'Optimalizátor' },
 					{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
 					{ href: '/odpisy', label: 'História' },
 					{ href: '/problem', label: '⚠ Problém' },

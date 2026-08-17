@@ -9,8 +9,9 @@
 	let {
 		material,
 		bar = 7500,
-		viacPosuvov = false
-	}: { material: MaterialRow[]; bar?: number; viacPosuvov?: boolean } = $props();
+		viacPosuvov = false,
+		kerf = 4
+	}: { material: MaterialRow[]; bar?: number; viacPosuvov?: boolean; kerf?: number } = $props();
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 	// uhol rezu (45° vs rovný 90°) rozhoduje server per profil (m.sikmyRez):
@@ -95,9 +96,9 @@
 			<div class="hd">
 				<ProfilObrazok kod={m.kod} nazov={m.nazov} velkost={48} />
 				<div class="hd-txt">
-					<div class="nazov"><b>{m.kod}</b> · {m.nazov}</div>
+					<div class="nazov"><b>{m.kod}</b>{m.kod && m.nazov ? ' · ' : ''}{m.nazov}</div>
 					<div class="stat">
-						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(barLen)} mm · kotúč 4 mm · odpad
+						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(barLen)} mm · kotúč {fmt(kerf)} mm · odpad
 						<b>{fmt(m.odpadMm)} mm</b> ({fmt(m.odpadPct)} %) · rez {sikmy ? '45°' : 'rovný'}
 					</div>
 				</div>
