@@ -2,6 +2,37 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-08-18 — Zasklenia: sklo „3.3.1" pre Štandard plus a starý Štandard (#214)
+
+- **Issue:** #214 — Patrik (Odoo 207, správa 1703260, 18.8.): pridať do výberu skla pri
+  systémoch Štandard plus a starý Štandard možnosť „3.3.1" (lepené), správa sa ako
+  obyčajná 6 mm — nič sa v Money odpise nemení.
+- **STEP 0 validácia** (issuecomment-5324887596): sklo „3.3.1" NIE je ponúkané pre
+  Štandardy — katalóg `glassTypesForSystem('Štandard +')` = Float 4/6/10 + Izolačné 4.8.4;
+  „3.3.1" existuje len ako Slide riadok (v17), max migrácia v21 → tiket platný.
+- **Design** (issuecomment-5324918791, non-triviálne, 3 prístupy + Architektúra):
+  root cause = `glass_types.nazov` GLOBÁLNE UNIQUE blokoval sklo rovnakého názvu vo dvoch
+  systémoch. Zvolené: uvoľniť na `UNIQUE(nazov, system)` (recreate) + riadok pod
+  `Štandard +` (presný label „3.3.1" ako v Slide, modelovo správne). Zavrhnuté: unikátny
+  názov „Lepené 3.3.1" (label ≠ „3.3.1"); zdieľanie Slide riadku (tesná väzba).
+- **Migrácia v22:** recreate `glass_types` UNIQUE(nazov)→UNIQUE(nazov, system) + INSERT
+  `('3.3.1', 0, 25, 'Štandard +')`. Money-neutralita: „3.3.1" nie je izolačné → basic
+  nárezák = „Float sklo 6 mm" (žiadny sklozávislý profil v Štandardoch).
+- **RED→GREEN:** `tests/sklo-3-3-1-standard.test.ts` (9d25a79 → 0406f53) — DB migračný
+  test + Money-neutralita voči Float sklo 6 mm (nárezák + odpis z migrovanej DB).
+  20 existujúcich migračných testov aktualizovaných (user_version 22, katalóg + počty).
+  E2E `e2e/sklo-3-3-1.spec.ts`. cfg-editor + nastavenia render skiel: dedup po názve.
+- **Review** (fresh Fable, issuecomment-5325209325): 0 🔴, 1 🟡, 2 🔵 — všetky opravené
+  v branchi (009eefa): db.ts docblock (falošný UNIQUE invariant), dedup tie-break
+  zjednotený s save-path, odpisový test load-bearing z migrovanej DB.
+- **PR #215** (merge 1f34e329), nasadené **v0.21.0**, deploy verified (/health live:true,
+  DOM `v0.21.0 (1f34e32)`; live zasklenia: Štandard plus AJ starý Štandard ponúkajú „3.3.1"
+  na pozícii za Float 6 mm, hint „nárezák Štandard + 4K" / „Štandard 2K" = basic; výpočet
+  Starý štandard 2K + „3.3.1" = basic profily ZASP00018/00107/00104/202415, žiadny IZO
+  U-profil, nula console chýb).
+- **Playbook:** nové `.claude/rules/glass-catalog.md` (glass_types model, (nazov,system)
+  kľúč, Money-neutralita cez `jeIzoSklo`, migračná pasca „user_version všade").
+
 ## 2026-08-13 — 3D náhľad zasklení: vizuálna iterácia — sklo, kamera, kontrast, tieň (#174)
 
 - **Issue:** #174 — iteračná fáza po #170: live screenshoty ukázali sklo ako
