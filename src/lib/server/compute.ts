@@ -736,6 +736,8 @@ function profilCuts(
 				sietkaExtraPocetKs(system, r, sietkaOn);
 			const q = rucne > 0 ? rucne : val(r, S, V, N, false);
 			const rozmer = rucne > 0 ? rucne : Math.round(val(r, S, V, N, true));
+			// SYNC-POINT (#216): `q <= 0` sa tu TICHO zahodí. `undersizeCut` musí mať
+			// identický inklúzny predikát (`t` vyššie), aby taký kus zachytil PRED zápisom.
 			for (let i = 0; i < t; i++)
 				if (q > 0) kusy.push(posuv ? { dlzka: q, rozmer, posuv } : { dlzka: q, rozmer });
 			rezy.push({ rozmer, ks: t });
@@ -778,12 +780,18 @@ export function oversizeCut(
  * Zrkadlový SPODNÝ guard k `oversizeCut` (#216). Keď je rozmer priMALÝ, `val()`
  * vráti pre niektorý profil ZÁPORNÚ/nulovú dĺžku a `profilCuts` taký kus TICHO
  * zahodí (`if (q > 0) kusy.push(...)`) → do Money by šiel odpis s CHÝBAJÚCIM
- * profilom (napr. Štandard +|2K 130×130 → kladka ZASP202415 = 0 m, sklo 5×15 mm,
- * bez chyby). Rovnako záporný rozmer skla = nezmyselný výstup. Namiesto tichého
- * zlého odpisu zlyhá NAHLAS s konkrétnou hláškou. Volá sa v safeCompute/
- * safeComputeMulti PRED zápisom, hneď za `oversizeCut`. Inklúzia riadkov je presne
- * tá istá ako v `profilCuts` (hrúbka-gate, redukciaZero, ručná koľajnica), aby guard
- * videl to isté, čo by sa reálne balilo do odpisu.
+ * profilom (napr. Štandard +|2K 130×130 → kladka ZASP202415 = 0 m, bez chyby).
+ * Namiesto tichého zlého odpisu zlyhá NAHLAS s konkrétnou hláškou. Volá sa v
+ * safeCompute/safeComputeMulti PRED zápisom, hneď za `oversizeCut`.
+ *
+ * ⚠️ SYNC-POINT: predikát „ktorý riadok prispieva kusom" (hrúbka-gate, sklozavisle
+ * +redukciaZero, `sietkaExtraPocetKs`, ručná koľajnica) MUSÍ ostať 1:1 s `profilCuts`
+ * (compute.ts, `t`+`if (q > 0) kusy.push`). Guard nemôže volať `profilCuts` ako
+ * `oversizeCut` — potrebuje vidieť práve tie kusy, ktoré `profilCuts` ZAHODÍ (q≤0) —
+ * preto sa loop duplikuje; keď meníš inklúziu v `profilCuts`, uprav aj tu. `sietka`
+ * sa preto prevlieka až sem (kryje aj hypotetický Robust/Slide rámový/nosový riadok,
+ * ktorý by aktivovala až sieťka). Sklová vetva nie je Money-safety (sklo NIE je v
+ * Money odpise — viď `computeFlat`), ale záporný rozmer skla = nezmyselný nárez/plán.
  */
 export function undersizeCut(
 	cfg: Cfg,
@@ -792,17 +800,20 @@ export function undersizeCut(
 	V: number,
 	redukciaZero: boolean,
 	skloHrubka: number,
-	rucnaKolajnica?: KolajnicaRucne
+	rucnaKolajnica?: KolajnicaRucne,
+	sietkaOn = false
 ): string | null {
 	const g = cfg[sysStyl];
 	if (!g) return null;
 	const system = sysStyl.split('|')[0];
 	const sh = Number(skloHrubka) || 0;
-	// Profilové rezy — rovnaká inklúzia riadkov ako `profilCuts`.
+	// Profilové rezy — rovnaká inklúzia riadkov ako `profilCuts` (viď SYNC-POINT).
 	for (const r of g.rez) {
 		const rh = Number(r.skloHrubka) || 0;
 		if (rh !== 0 && rh !== sh) continue; // hrúbko-závislý riadok pre iné sklo
-		const pocet = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
+		const pocet =
+			(Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs)) +
+			sietkaExtraPocetKs(system, r, sietkaOn);
 		if (pocet <= 0) continue; // riadok neprispieva žiadnym kusom
 		// ručne zadaná koľajnica nahradí vypočítanú dĺžku a je vždy > 0 (validované vo vstupe)
 		const rola = rolaKolajnice(r.nazov);
@@ -811,11 +822,11 @@ export function undersizeCut(
 		if (dlzka <= 0)
 			return `Rozmer ${S}×${V} mm je pri systéme ${system} priMALÝ — profil ${r.nazov} by vyšiel ${Math.round(dlzka)} mm (≤ 0) a odpis by bol neúplný. Zväčši rozmer alebo zvoľ iný systém.`;
 	}
-	// Sklo — rovnaká geometria (ako `computeFlat`: `val(...) - skloOffset`).
+	// Sklo — rovnaká geometria ako `computeFlat` (`Math.round(val(...) - skloOffset)`).
 	for (const key of ['s', 'v'] as const) {
 		const sr = g.sklo[key];
 		if (!sr) continue;
-		const dim = Math.round(val(sr, S, V, g.N, true)) - Number(g.skloOffset);
+		const dim = Math.round(val(sr, S, V, g.N, true) - Number(g.skloOffset));
 		if (dim <= 0)
 			return `Rozmer ${S}×${V} mm je pri systéme ${system} priMALÝ — sklo by malo rozmer ≤ 0 mm. Zväčši rozmer alebo zvoľ iný systém.`;
 	}
@@ -1088,7 +1099,16 @@ export function safeCompute(
 	if (hrubkaErr) return { r: null, err: hrubkaErr };
 	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
 	if (overErr) return { r: null, err: overErr };
-	const underErr = undersizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
+	const underErr = undersizeCut(
+		cfg,
+		sysStyl,
+		S,
+		V,
+		redukciaZero,
+		skloHrubka,
+		rucnaKolajnica,
+		!!sietka
+	);
 	if (underErr) return { r: null, err: underErr };
 	const g = cfg[sysStyl];
 	const sietkaErr = g
@@ -1385,7 +1405,8 @@ export function safeComputeMulti(
 			p.V,
 			p.redukciaZero,
 			p.skloHrubka ?? 0,
-			p.kolajnica
+			p.kolajnica,
+			!!p.sietka
 		);
 		if (underErr) return { r: null, err: `Posuv ${i + 1}: ${underErr}` };
 		const g = cfg[p.sysStyl];

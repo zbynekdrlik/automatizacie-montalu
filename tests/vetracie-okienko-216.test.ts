@@ -61,18 +61,19 @@ describe('#216 vetracie okienko — interní môžu zadať malé rozmery', () =>
 	}
 
 	// (3) Engine pri PRÍLIŠ malom rozmere zlyhá NAHLAS (nie ticho metre=0).
-	//     130×130 → padne kladkový profil (záporná dĺžka) — profilová vetva guardu.
-	it('safeCompute odmietne priMALÝ rozmer (Štandard + 130×130) — nie tichý zlý odpis', () => {
+	//     130×130 → padne kladkový PROFIL (záporná dĺžka) — profilová vetva guardu.
+	it('safeCompute odmietne priMALÝ rozmer (Štandard + 130×130) — profilová vetva', () => {
 		const { r, err } = safeCompute(cfg, 'Štandard +|2K', 130, 130, false);
-		expect(err).toBeTruthy();
 		expect(r).toBeNull();
+		expect(err).toMatch(/profil/i); // konkrétne profilová vetva guardu, nie tichý metre=0
 	});
 
 	// (3b) Nízka výška (200×100): profily ešte vyjdú kladne, ale SKLO by malo
-	//      zápornú výšku (V−115 = −15) — sklová vetva guardu ju musí zachytiť.
-	it('safeCompute odmietne rozmer, kde by sklo vyšlo ≤ 0 (Štandard 200×100)', () => {
+	//      zápornú výšku (V−115 = −15) — SKLOVÁ vetva guardu ju musí zachytiť.
+	//      Assert na „sklo", aby sa sklová vetva nemohla ticho stať nedosiahnuteľnou.
+	it('safeCompute odmietne rozmer, kde by sklo vyšlo ≤ 0 (Štandard 200×100) — sklová vetva', () => {
 		const { r, err } = safeCompute(cfg, 'Štandard|2K', 200, 100, false);
-		expect(err).toBeTruthy();
 		expect(r).toBeNull();
+		expect(err).toMatch(/sklo/i);
 	});
 });

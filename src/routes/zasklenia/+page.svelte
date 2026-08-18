@@ -462,6 +462,10 @@
 	// dopisuje šírku po číslici (3 → 30 → 300 → 3000), medzihodnoty pod 300 sa
 	// nevyhodnocujú, takže neblikne falošný ⛔; natívna min/max validácia + server
 	// stráženie odoslania platia ďalej.
+	// POZN. (#216): toto 300 je ZÁMERNE b2b-scoped anti-flicker prah, NIE vstupný
+	// floor — ten je teraz S_MIN=100 (viď $lib/zasklenia-navrh). b2b panel je vždy
+	// ≥ 800 (checkB2BWidth), takže táto hodnota na b2b vetve nikdy neblokuje interné
+	// malé okienka a nepatrí do „jediného zdroja pravdy" rozmerových medzí.
 	const dimOrNull = (x: number | string): number | null => {
 		const n = typeof x === 'number' ? x : parseFloat(String(x));
 		return Number.isFinite(n) && n >= 300 && n <= 20000 ? n : null;
