@@ -29,6 +29,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Fail-fast: job bez limitu môže pri zaseknutom kroku (napr. hung `playwright
+    # install` na degradovanom GitHub runneri, 2026-08-18) visieť default 6 h. 25 min
+    # pokrýva pomalý-ale-funkčný beh (lint+check+unit+build+e2e ~10 min) a zaseknutie
+    # zahodí rýchlo namiesto blokovania merge na hodiny.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -87,6 +92,14 @@ jobs:
             }
             if (total > 220 * KB) { console.error('::error::viewer chunk presiahol 220KB gzip'); process.exit(1); }
           "
+      # Cache prehliadačov Playwright — na cache-hit sa preskočí pomalé/nespoľahlivé
+      # sťahovanie Chromia (redukuje riziko hung `playwright install`). Kľúč viazaný na
+      # lockfile: zmena verzie @playwright/test → nový kľúč → čerstvé stiahnutie.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Playwright
         run: npx playwright install --with-deps chromium
       - name: E2E (reálny prehliadač, nula console errors)
