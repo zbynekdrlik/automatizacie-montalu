@@ -101,7 +101,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Playwright
-        run: npx playwright install --with-deps chromium
+        # `--with-deps` spúšťa apt-get na systémové knižnice; na degradovanom apt mirrore
+        # GitHub runnera (2026-08-18) sa apt zasekol na desiatky minút. Ohraničíme pokus
+        # na 6 min a padneme na inštaláciu SAMOTNÉHO prehliadača (systémové knižnice sú na
+        # ubuntu-latest predinštalované) — pri zaseknutom apt sa tak beh nezablokuje.
+        run: timeout 360 npx playwright install --with-deps chromium || npx playwright install chromium
       - name: E2E (reálny prehliadač, nula console errors)
         run: npx playwright test
       - uses: actions/upload-artifact@v4
