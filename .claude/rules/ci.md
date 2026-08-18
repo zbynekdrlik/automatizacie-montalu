@@ -109,3 +109,25 @@ dev's now-identical-prefix clean one. The fix is to bump dev to the **NEXT**
 number (`0.14.33`, not `0.14.32`) — treat the digits main accidentally
 carries as "spent", exactly like any other released version, even though
 that release never actually shipped cleanly.
+
+## `playwright install --with-deps` can HANG for tens of minutes on a degraded apt mirror
+
+Seen 2026-08-18 (#155): the `test` job's `npx playwright install --with-deps chromium`
+step hung on `apt-get` (the `--with-deps` system-library install) for 30–48 min across
+multiple runs, while a run ~1 h earlier did it in minutes. The `updatedAt` freezes at the
+step start (no heartbeat) — that's the tell it is genuinely stuck, not slow. Browser
+caching (`~/.cache/ms-playwright`) does NOT help — the hang is the apt step, not the
+browser download. Fixes now IN `ci.yml`:
+
+- **`timeout-minutes: 25` on the `test` job** — a job without it hangs the GitHub default
+  6 h and blocks merge; this fails-fast instead.
+- **Resilient install:** `timeout 360 npx playwright install --with-deps chromium || npx
+  playwright install chromium` — bounds the `--with-deps` apt attempt to 6 min, then falls
+  back to the browser-only install (system libs are preinstalled on `ubuntu-latest`), so a
+  hung apt mirror never blocks the run.
+- **Browser cache** (`actions/cache` on `~/.cache/ms-playwright`, keyed on `package-lock.json`)
+  — speeds the download on cache-hits (does not fix the apt hang, but reduces total time).
+
+Recovery when a run is hung on this: `gh run cancel <id>`, then push a fresh commit (a
+cancelled run's rerun keeps landing on the same degraded condition; a NEW commit gets a
+fresh runner). The `timeout-minutes` net means you no longer have to babysit a 6 h zombie.
