@@ -59,11 +59,9 @@ const GLASS_V21: [string, number, number, string, number][] = [
 		CREATE TABLE odpis_polozky (id INTEGER PRIMARY KEY, odpis_log_id INTEGER NOT NULL REFERENCES odpis_log(id) ON DELETE CASCADE, kod TEXT NOT NULL, nazov TEXT NOT NULL, qty REAL NOT NULL, mj TEXT NOT NULL DEFAULT 'm');
 	`);
 	// jeden cfg_sys riadok — nech seedData po migrácii nezačne dopĺňať celý cfg_seed
-	v21.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)').run(
-		'Štandard +|2K',
-		2,
-		0
-	);
+	v21
+		.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)')
+		.run('Štandard +|2K', 2, 0);
 	v21.prepare('INSERT INTO users (username, pass_hash) VALUES (?, ?)').run('palo', 'x:y');
 	const insG = v21.prepare(
 		'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system, hrubka) VALUES (?, ?, ?, ?, ?)'

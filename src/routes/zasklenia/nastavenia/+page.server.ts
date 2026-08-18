@@ -14,7 +14,10 @@ export const load: PageServerLoad = async ({ url }) => {
 		styly,
 		sysStyl,
 		editable,
-		glass: listGlassTypes(),
+		// jedno sklo môže žiť vo viacerých systémoch pod tým istým názvom (napr. „3.3.1"
+		// je Slide aj Štandard, #214) — redukcia je vlastnosť názvu, tak v editore ukáž
+		// každý názov len raz
+		glass: [...new Map(listGlassTypes().map((g) => [g.nazov, g])).values()],
 		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) }))
 	};
 };
