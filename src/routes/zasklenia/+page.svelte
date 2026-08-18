@@ -94,7 +94,7 @@
 			data.styly.filter((x) => x.system === sys).map((x) => x.styl)
 		);
 	// Deluxe aj Štandard +: LEN vlastné sklá (Deluxe: Float kalené 6/10 — hrúbka
-	// vyberá kladka/klzný profil; Štandard +: Float 4/6/10 + Izolačné 4.8.4);
+	// vyberá kladka/klzný profil; Štandard +: Float 4/6/10 + „3.3.1" + Izolačné 4.8.4);
 	// spoločné 'ALL' sklá nemajú ich profil (musí sedieť so serverovým
 	// glassTypesForSystem, inak by formulár ponúkol sklo, ktoré server odmietne).
 	// (a Štandard + opona nemá izolačnú skladbu → sklaDoPonuky ju odfiltruje)

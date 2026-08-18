@@ -123,8 +123,14 @@ describe('migrácia v21 → v22: sklo „3.3.1" pre Štandard plus a starý Šta
 describe('Money-neutralita: „3.3.1" == „Float sklo 6 mm" v Štandardoch (#214)', () => {
 	const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
 	const existuje = (s: string) => !!cfg[s];
-	const G331 = { nazov: '3.3.1', redukciaZero: false, hrubka: 0 };
-	const G6 = { nazov: 'Float sklo 6 mm', redukciaZero: false, hrubka: 0 };
+	// vlastnosti skla NEHARDKÓDUJEME — čítame ich z MIGROVANEJ DB (glassTypesForSystem),
+	// takže odpisový test je load-bearing: zle naseedovaný „3.3.1" (redukciaZero/hrubka !=
+	// „Float sklo 6 mm") ho zhodí priamo, nie je to tautológia.
+	const std = glassTypesForSystem('Štandard +');
+	const g331Row = std.find((g) => g.nazov === '3.3.1')!;
+	const g6Row = std.find((g) => g.nazov === 'Float sklo 6 mm')!;
+	const G331 = { nazov: '3.3.1', redukciaZero: g331Row.redukciaZero, hrubka: g331Row.hrubka };
+	const G6 = { nazov: 'Float sklo 6 mm', redukciaZero: g6Row.redukciaZero, hrubka: g6Row.hrubka };
 	const rozmery: [number, number][] = [
 		[3000, 2000],
 		[5000, 2200],
@@ -158,10 +164,14 @@ describe('Money-neutralita: „3.3.1" == „Float sklo 6 mm" v Štandardoch (#21
 		});
 
 		it(`${sysStyl}: odpis pri „3.3.1" == odpis pri „Float sklo 6 mm"`, () => {
-			const resolved = sysStylPre(system, styl, G331.nazov, existuje);
+			// CELÁ cesta zvlášť pre každé sklo (nárezák z názvu + vlastnosti z migrovanej DB)
+			// — keby „3.3.1" ťahalo iný nárezák alebo malo iné redukciaZero/hrubka, odpis by
+			// sa líšil a test padne. Nie je to tautológia (identické literály).
+			const rA = sysStylPre(system, styl, G331.nazov, existuje);
+			const rB = sysStylPre(system, styl, G6.nazov, existuje);
 			for (const [S, V] of rozmery) {
-				const a = computeFlat(cfg, resolved, S, V, G331.redukciaZero, G331.hrubka);
-				const b = computeFlat(cfg, resolved, S, V, G6.redukciaZero, G6.hrubka);
+				const a = computeFlat(cfg, rA, S, V, G331.redukciaZero, G331.hrubka);
+				const b = computeFlat(cfg, rB, S, V, G6.redukciaZero, G6.hrubka);
 				expect(a === null).toBe(b === null);
 				if (!a || !b) continue;
 				expect(a.odpis, `${sysStyl} ${S}×${V}`).toEqual(b.odpis);
