@@ -234,8 +234,8 @@ test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse
 	await expect(page.getByTestId('pnr-pod-stena')).toHaveCount(0);
 	// strecha (zjednodušený obrys) sa kreslí len pri samostatne stojacej
 	await expect(page.getByTestId('pnr-bok-strecha')).toHaveCount(1);
-	// spec ukazuje zadnú nohu 2760 (2900 − 140)
-	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2760');
+	// #205: spec ukazuje zadnú nohu 2900 = plná ZV (výkres OP260282), nie ZV − horný profil
+	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2900');
 
 	expect(consoleMsgs).toEqual([]);
 });
