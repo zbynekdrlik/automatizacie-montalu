@@ -1224,3 +1224,24 @@ nedotknuté.
 - **Review (fresh Opus 4.8):** 1 🔴/🟡 (DoS) + 2 🔵 — všetko fixnuté v branchi (dd7f24d);
   po oprave **0 🔴 0 🟡 0 🔵**. Money-safety čistá (žiadny `$lib/server/money`, `/data/dlv-import`,
   DB/`fs` zápis).
+
+## #155/#161 — nárez OP260282: 110×43 pod fixom + zadné nohy plná ZV (v0.23.0-dev.1)
+
+Krížová kontrola výkresu OP260282 vs engine `pergola-narez.ts`. Reprodukovateľné pravidlá
+implementované, nereprodukovateľné čestný null:
+- **Task 1 (implementované):** 110×43 „pod fixom" = hĺbka − (frontProfil + zadný prvok);
+  `podFixomOdpocet` reprodukuje 5 hodnôt kaskády výkresu (frontProfil 110/140 + zadný prvok 43
+  stena / 110|140 SS). OP260282: 3470 − (140+110) = 3220, 2 ks, gated `zasklena`. RED→GREEN.
+  Golden r.8.
+- **Task 3 (implementované):** zadné nohy = plná ZV (výkres 2790), nie ZV − horný profil
+  (call citoval ZV−profil). Rozdiel = miesto merania ZV, poznamka + na potvrdenie Dominikovi.
+  hornyProfilZadnej teraz diskriminuje kaskádu pod fixom, nie dĺžku nohy. Golden r.3, schema.
+- **Task 2 (čestný null + otázka Dominikovi):** zvislá zadná výstuha 2340 = svetlosť 2325 + 15,
+  ale 2325 nie je vstup (predná 2200 → 2215). Formula položená Dominikovi (zberný ticket otázok).
+- **Task 4 (IF-NO, krov ticket):** HH krovu 3240,9 sa zo vstupov nereprodukuje (slant 3489,8 /
+  hypotenuza 3519,8; 6,1° je pod-7° nepodporovaná vetva; sklon↔výšky nepotvrdený). HH cluster
+  ostáva čestný null; pokus zaznamenaný na krov tickete.
+- **Task 5 (no-op):** CODE_MAP už obsahuje 18016 + celú rodinu; napojenie na Money je gated
+  (samostatný ticket).
+- **Lekcia:** dispatch prescribed 4 pravidlá; 2 sa zo vstupov nereprodukovali → honest-null +
+  otázka, nie force-fit do Money-priľahlého výstupu. Oba tickety ostávajú OTVORENÉ (viac scope).

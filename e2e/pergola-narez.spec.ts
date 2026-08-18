@@ -88,7 +88,7 @@ test('Robust: komponenty = zakladacia lišta + krytka vrchná; Massive typy (spo
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('samostatne stojaca: zobrazí zadné nohy, výsledok = zadná noha (výška 2900 − 140 = 2760)', async ({
+test('samostatne stojaca (OP260282): zadná noha = plná ZV 2790 + bočný 110×43 pod fixom 3220', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -98,19 +98,24 @@ test('samostatne stojaca: zobrazí zadné nohy, výsledok = zadná noha (výška
 	// na stenu (default) → zadné-nohy polia skryté
 	await expect(page.getByTestId('zadne-nohy-box')).toHaveCount(0);
 
+	// Vstupy reálnej zákazky OP260282 (massive, samostatne stojaca, zadná konštrukcia 110)
 	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
 	await page.locator('#uchytenie').selectOption('samostatne');
 	await expect(page.getByTestId('zadne-nohy-box')).toBeVisible();
-	await page.locator('#vyskaZadna').fill('2900');
+	await page.locator('#vyskaZadna').fill('2790');
 	await page.locator('#pocetZadnychNoh').fill('4');
-	await page.locator('#hornyProfilZadnej').selectOption('140');
+	await page.locator('#hornyProfilZadnej').selectOption('110');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
-	// dve položky s kódom 18017 (predná + zadná noha) — zadná = 2760
+	// #205 task 3: zadná noha = PLNÁ ZV = 2790 (nie ZV−profil), profil systému 18017
 	await expect(page.getByTestId('narez-tabulka')).toContainText('zadná noha');
-	await expect(page.getByTestId('narez-tabulka')).toContainText('2760 mm');
-	await expect(page.getByTestId('narez-informativne')).toContainText('2760');
+	await expect(page.getByTestId('narez-tabulka')).toContainText('2790 mm');
+	// #205 task 1: bočný 110×43 „pod fixom" = hĺbka − (140+110) = 3220
+	await expect(page.getByTestId('narez-tabulka')).toContainText('pod fixom');
+	await expect(page.getByTestId('narez-tabulka')).toContainText('3220 mm');
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -229,8 +234,8 @@ test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse
 	await expect(page.getByTestId('pnr-pod-stena')).toHaveCount(0);
 	// strecha (zjednodušený obrys) sa kreslí len pri samostatne stojacej
 	await expect(page.getByTestId('pnr-bok-strecha')).toHaveCount(1);
-	// spec ukazuje zadnú nohu 2760 (2900 − 140)
-	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2760');
+	// #205: spec ukazuje zadnú nohu 2900 = plná ZV (výkres OP260282), nie ZV − horný profil
+	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2900');
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -359,7 +364,7 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 	await expect(page.getByTestId('narez-tabulka')).toContainText('4710');
 	// priečka (18004) dĺžka „—" (HH krovu neodvoditeľné) — nič sa nehádže
 	await expect(page.getByTestId('polozka-18004')).toContainText('HH krovu');
-	// nepodporované vypisuje HH-krovu + nekonzistentné poznámky výkresu (18016)
+	// nepodporované vypisuje HH-krovu + zvislú zadnú výstuhu (18016 pod fixom je už vo vypocitane)
 	await expect(page.getByTestId('narez-nepodporovane')).toContainText('HH krovu');
 
 	expect(consoleMsgs).toEqual([]);
@@ -375,14 +380,20 @@ test('#206 (b) stena zasklená: bočný 110×43 pod kotviacim = ZV − 190 (2790
 
 	await page.locator('#system').selectOption('Massive');
 	await page.locator('#sirka').fill('5000');
+	await page.locator('#hlbka').fill('3500');
 	// ZV pole je viditeľné pri stena + zasklená (pre bočný 110×43 pod kotviacim)
 	await page.locator('#vyskaZadna').fill('2790');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
+	// stena + zasklená má DVA riadky 18016 (pod fixom + pod kotviacim) → disambiguuj názvom.
 	// (b) POTVRDENÝ vzorec: 110×43 pod kotviacim = 2790 − 190 = 2600, 2 ks
-	await expect(page.getByTestId('polozka-18016')).toContainText('2600');
-	await expect(page.getByTestId('polozka-18016')).toContainText('pod kotviacim');
+	const podKotviacim = page.getByTestId('polozka-18016').filter({ hasText: 'pod kotviacim' });
+	await expect(podKotviacim).toContainText('2600');
+	await expect(podKotviacim).toContainText('pod kotviacim');
+	// #205: pod fixom (massive stena) = hĺbka − (140+43) = 3500 − 183 = 3317
+	const podFixom = page.getByTestId('polozka-18016').filter({ hasText: 'pod fixom' });
+	await expect(podFixom).toContainText('3317');
 
 	expect(consoleMsgs).toEqual([]);
 });

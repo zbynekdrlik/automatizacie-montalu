@@ -35,7 +35,10 @@ const OP260282: PergolaNarezVstup = {
 	pocetPrednychNoh: 4,
 	uchytenie: 'samostatne',
 	pocetZadnychNoh: 4,
-	hornyProfilZadnej: 140,
+	// Výkres OP260282: zadná konštrukcia horná = 18013 (110×110) → zadná konštrukcia 110.
+	// (Po #205: dĺžka zadnej nohy = plná ZV nezávisí od tohto poľa; 110/140 určuje kaskádu
+	// bočného 110×43 „pod fixom" — massive SS so 110 zadnou = −250.)
+	hornyProfilZadnej: 110,
 	prieckaLight: false,
 	zosilnenyNosnik: true, // výstuha 140×140 prítomná
 	sklonStrechy: 6.1
@@ -83,6 +86,26 @@ describe('OP260282 golden — ODVODITEĽNÉ riadky (presne na výkres)', () => {
 		expect(vy!.pocetKs).toBe(1);
 		expect(vy!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 1 });
 	});
+
+	it('r.8 profil 110×43 „pod fixom" 18016 = hĺbka − (140+110) = 3220, 2 ks (massive SS so 110 zadnou)', () => {
+		// #205: kaskáda z poznámky výkresu = predná noha profil (140) + zadný prvok (110) = 250;
+		// hĺbka 3470 − 250 = 3220 = presný rez z Plánu rezov (dôkaz základu = HĹBKA, nie šírka).
+		const pf = riadok(r.vypocitane, (p) => p.kod === '18016' && /pod fixom/i.test(p.nazov));
+		expect(pf, '110×43 „pod fixom" (18016) musí byť vo vypocitane').toBeTruthy();
+		expect(pf!.dlzkaRezuMm).toBe(3220);
+		expect(pf!.pocetKs).toBe(2);
+		expect(pf!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 1 }); // 2×3220 na 7,5 m → 1 tyč
+	});
+
+	it('r.3 zadné nohy 18017 = plná ZV = 2790, 4 ks (SS; výkres OP260282, nie ZV−profil)', () => {
+		// #205 DIVERGENCIA riešená v prospech výkresu: zadné nohy = plná zadná výška (leg = ZV).
+		// Call citoval ZV−profil (2790−140=2650) — rozdiel je v mieste merania ZV (výkres: ZV =
+		// dĺžka nohy). Na potvrdenie Dominikovi (#198). Kód = stĺp systému (Massive 18017).
+		const zadna = riadok(r.vypocitane, (p) => /zadná noha/i.test(p.nazov));
+		expect(zadna, 'zadná noha musí byť vo vypocitane pri SS').toBeTruthy();
+		expect(zadna!.dlzkaRezuMm).toBe(2790);
+		expect(zadna!.pocetKs).toBe(4);
+	});
 });
 
 describe('OP260282 golden — bin-packing pocetTyci (výdaj materiálu)', () => {
@@ -128,25 +151,12 @@ describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3)'
 		expect(r.vypocitane.some((p) => p.kod === '18005')).toBe(false);
 	});
 
-	it('r.8 profil 110×43 (18016) = 3220 → v nepodporované (poznámka výkresu nesedí s hodnotou)', () => {
+	it('r.6 zvislá zadná výstuha (2340) → čestný null (svetlosť 2325 nie je vstup; #198 Dominik)', () => {
+		// task 2 (ostáva honest-null): 2340 = svetlosť 2325 + 15, ale 2325 sa zo vstupov (predná
+		// svetlosť 2200 → 2215) neodvodí; formula položená Dominikovi (#198). Žiadny vypocitane riadok.
 		const n = r.nepodporovane.join(' | ');
-		expect(n).toMatch(/110×43|110x43|18016/i);
-		expect(r.vypocitane.some((p) => p.kod === '18016')).toBe(false);
-	});
-
-	it('r.6 zadná výstuha (18017 zvislá, 2340) → v nepodporované (poznámka „ZV−140" dáva 2650)', () => {
-		const n = r.nepodporovane.join(' | ');
-		expect(n).toMatch(/zadná výstuha/i);
-	});
-
-	it('r.3 zadné nohy: engine ZV−140 = 2650 (potvrdený vzorec) — výkres 2790/18013 = divergencia', () => {
-		const zadna = riadok(r.vypocitane, (p) => /zadná noha/i.test(p.nazov));
-		expect(zadna).toBeTruthy();
-		expect(zadna!.dlzkaRezuMm).toBe(2650); // 2790 − 140, POTVRDENÝ vzorec sa NEMENÍ
-		// GAP: výkres uvádza 2790 mm profil 18013 (SS+výstuha bez hist. vzoru #196) →
-		// zdokumentované v nepodporované, na potvrdenie Dominikovi
-		const n = r.nepodporovane.join(' | ');
-		expect(n).toMatch(/zadné nohy/i);
-		expect(n).toMatch(/2790/);
+		expect(n).toMatch(/zvislá zadná výstuha|zadná výstuha/i);
+		expect(n).toMatch(/2340/);
+		expect(n).toMatch(/#198/);
 	});
 });

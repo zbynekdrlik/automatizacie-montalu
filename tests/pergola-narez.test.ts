@@ -93,7 +93,7 @@ describe('spocitajNarez — zadné nohy LEN pri samostatne stojacej', () => {
 		expect(r.vypocitane.some((p) => /zadná/i.test(p.nazov))).toBe(false);
 		expect(r.informativne.zadnaNohaDlzka).toBeNull();
 	});
-	it('samostatne stojaca, horný profil 140 → zadná noha = výška zadná − 140 (2900 − 140 = 2760)', () => {
+	it('#205: samostatne stojaca → zadná noha = PLNÁ zadná výška (výkres OP260282), 2900 → 2900', () => {
 		const r = spocitajNarez({
 			...VZOR,
 			uchytenie: 'samostatne',
@@ -103,19 +103,27 @@ describe('spocitajNarez — zadné nohy LEN pri samostatne stojacej', () => {
 		});
 		const zadna = r.vypocitane.find((p) => /zadná/i.test(p.nazov));
 		expect(zadna).toBeTruthy();
-		expect(zadna!.dlzkaRezuMm).toBe(2760);
+		expect(zadna!.dlzkaRezuMm).toBe(2900); // plná ZV (nie ZV−profil); výkres OP260282
 		expect(zadna!.pocetKs).toBe(4);
-		expect(r.informativne.zadnaNohaDlzka).toBe(2760);
+		expect(r.informativne.zadnaNohaDlzka).toBe(2900);
 	});
-	it('OPRAVA z callu: horný profil zadnej NIE je viazaný na systém — Massive s horným 110 → výška − 110', () => {
-		const r = spocitajNarez({
+	it('#205: dĺžka zadnej nohy = plná ZV nezávisí od hornyProfilZadnej (110 aj 140 → 2900)', () => {
+		// Po korekcii výkresom hornyProfilZadnej UŽ neurčuje dĺžku nohy (call citoval ZV−profil,
+		// výkres uvádza plnú ZV) — 110/140 teraz slúži ako diskriminátor kaskády 110×43 pod fixom.
+		const s110 = spocitajNarez({
 			...VZOR,
-			system: 'Massive',
 			uchytenie: 'samostatne',
 			vyskaZadna: 2900,
 			hornyProfilZadnej: 110
 		});
-		expect(r.informativne.zadnaNohaDlzka).toBe(2790);
+		const s140 = spocitajNarez({
+			...VZOR,
+			uchytenie: 'samostatne',
+			vyskaZadna: 2900,
+			hornyProfilZadnej: 140
+		});
+		expect(s110.informativne.zadnaNohaDlzka).toBe(2900);
+		expect(s140.informativne.zadnaNohaDlzka).toBe(2900);
 	});
 });
 
@@ -269,23 +277,23 @@ describe('schemaVykresu (#194) — geometria z POTVRDENÝCH vzorcov, krov je #16
 		expect(s.zadnaKonstrukcia.typ).toBe('stena');
 	});
 
-	it('samostatne stojaca: zadné nohy s dĺžkou = výška zadná − horný profil (2900 − 140 = 2760)', () => {
+	it('#205: samostatne stojaca → zadné nohy = PLNÁ ZV (2900), nezávisí od hornyProfilZadnej', () => {
 		const s = schemaVykresu({ ...VZOR, uchytenie: 'samostatne', pocetZadnychNoh: 4 });
 		expect(s.zadnaKonstrukcia.typ).toBe('samostatne');
 		if (s.zadnaKonstrukcia.typ === 'samostatne') {
-			expect(s.zadnaKonstrukcia.nohaDlzka).toBe(2760);
+			expect(s.zadnaKonstrukcia.nohaDlzka).toBe(2900); // plná ZV (výkres OP260282)
 			expect(s.zadnaKonstrukcia.vyskaZadna).toBe(2900);
 			expect(s.zadnaKonstrukcia.hornyProfil).toBe(140);
 			expect(s.zadnaKonstrukcia.nohyX).toEqual([0, 1920, 3840, 5760]);
 		}
-		// horný profil 110 → 2900 − 110 = 2790
+		// horný profil 110 → stále plná ZV = 2900 (dĺžka nohy už nezávisí od profilu)
 		const s110 = schemaVykresu({
 			...VZOR,
 			uchytenie: 'samostatne',
 			hornyProfilZadnej: 110
 		});
 		if (s110.zadnaKonstrukcia.typ === 'samostatne')
-			expect(s110.zadnaKonstrukcia.nohaDlzka).toBe(2790);
+			expect(s110.zadnaKonstrukcia.nohaDlzka).toBe(2900);
 	});
 
 	it('priečky: počet = ceil(5760/700)+1 = 10, vnútorných deliacich = 8, každý rozostup ≤ 700', () => {
@@ -346,10 +354,14 @@ describe('#206 (a) jednoduchá pergola bez zasklenia — vypne bočné 110×43',
 });
 
 // --- #206 (b) — bočný 110×43 pod kotviacim = ZV − 190 pri NIE-SS --------------------
+// (po #205 sú dva 110×43 riadky: „pod fixom" — VŠETKY konfigy, kaskáda z hĺbky; „pod kotviacim" —
+// len NIE-SS, ZV−190. Preto sa tu disambiguuje NÁZVOM, nie len kódom 18016.)
+const podKotviacim = (r: ReturnType<typeof spocitajNarez>) =>
+	r.vypocitane.find((p) => p.kod === KOD_PROFIL_110x43 && /pod kotviacim/i.test(p.nazov));
 describe('#206 (b) 110×43 pod kotviacim (u steny) = ZV − 190, len NIE-SS', () => {
 	it('POTVRDENÝ vzorec: stena, ZV 2790 → bočný 110×43 = 2600, 2 ks, výdaj 1×(7,5 m)', () => {
 		const r = spocitajNarez({ ...VZOR, uchytenie: 'stena', vyskaZadna: 2790 });
-		const boc = r.vypocitane.find((p) => p.kod === KOD_PROFIL_110x43);
+		const boc = podKotviacim(r);
 		expect(boc, '110×43 pod kotviacim musí byť vo vypocitane pri stene').toBeTruthy();
 		expect(boc!.dlzkaRezuMm).toBe(2790 - POD_KOTVIACI_110x43_ODPOCET); // 2600
 		expect(boc!.pocetKs).toBe(POCET_BOCNYCH_POD_KOTVIACIM); // 2
@@ -361,14 +373,67 @@ describe('#206 (b) 110×43 pod kotviacim (u steny) = ZV − 190, len NIE-SS', ()
 		expect(POD_KOTVIACI_110x43_ODPOCET).toBe(190);
 	});
 
-	it('samostatne stojaca (SS) → žiadny bočný 110×43 pod kotviacim (poznámka b je len NIE-SS)', () => {
+	it('samostatne stojaca (SS) → žiadny bočný 110×43 POD KOTVIACIM (poznámka b je len NIE-SS)', () => {
 		const r = spocitajNarez({ ...VZOR, uchytenie: 'samostatne', vyskaZadna: 2790 });
-		expect(r.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(false);
+		expect(podKotviacim(r)).toBeUndefined(); // pod fixom pri SS existuje, pod kotviacim NIE
 	});
 
-	it('ZV mimo rozsahu (0 pri stene) → riadok sa NEemituje, žiadna chyba (na stenu ZV nevaliduje)', () => {
+	it('ZV mimo rozsahu (0 pri stene) → POD KOTVIACIM sa NEemituje, žiadna chyba (na stenu ZV nevaliduje)', () => {
 		const r = spocitajNarez({ ...VZOR, uchytenie: 'stena', vyskaZadna: 0 });
-		expect(r.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(false);
+		expect(podKotviacim(r)).toBeUndefined(); // pod fixom (z hĺbky) tým nie je dotknutý
+	});
+});
+
+// --- #205 — bočný 110×43 „pod fixom" = HĹBKA − (predná noha profil + zadný prvok) --------
+describe('#205 110×43 „pod fixom" (2 ks) = hĺbka − kaskáda (system × SS/stena × 110/140)', () => {
+	const podFixom = (r: ReturnType<typeof spocitajNarez>) =>
+		r.vypocitane.find((p) => p.kod === KOD_PROFIL_110x43 && /pod fixom/i.test(p.nazov));
+
+	it('massive SS so 110 zadnou = hĺbka − 250 (140+110); OP260282: 3470 − 250 = 3220, 2 ks', () => {
+		const r = spocitajNarez({
+			...VZOR,
+			system: 'Massive',
+			hlbka: 3470,
+			uchytenie: 'samostatne',
+			hornyProfilZadnej: 110,
+			vyskaZadna: 2790
+		});
+		const pf = podFixom(r)!;
+		expect(pf, 'pod fixom musí byť vo vypocitane').toBeTruthy();
+		expect(pf.dlzkaRezuMm).toBe(3220);
+		expect(pf.pocetKs).toBe(2);
+	});
+
+	it('kaskáda reprodukuje všetkých 5 hodnôt z poznámky výkresu (odpočet = frontProfil + zadný prvok)', () => {
+		const dl = (o: Partial<PergolaNarezVstup>) =>
+			podFixom(spocitajNarez({ ...VZOR, hlbka: 3470, vyskaZadna: 2790, ...o }))!.dlzkaRezuMm;
+		// robust stena: 110+43 = 153
+		expect(dl({ system: 'Robust', uchytenie: 'stena' })).toBe(3470 - 153);
+		// robust SS (110): 110+110 = 220
+		expect(dl({ system: 'Robust', uchytenie: 'samostatne', hornyProfilZadnej: 110 })).toBe(
+			3470 - 220
+		);
+		// massive stena: 140+43 = 183
+		expect(dl({ system: 'Massive', uchytenie: 'stena' })).toBe(3470 - 183);
+		// massive SS 110: 140+110 = 250
+		expect(dl({ system: 'Massive', uchytenie: 'samostatne', hornyProfilZadnej: 110 })).toBe(
+			3470 - 250
+		);
+		// massive SS 140: 140+140 = 280
+		expect(dl({ system: 'Massive', uchytenie: 'samostatne', hornyProfilZadnej: 140 })).toBe(
+			3470 - 280
+		);
+	});
+
+	it('pod fixom sa vypína „jednoduchá pergola bez zasklenia" (#206 a)', () => {
+		const bez = spocitajNarez({
+			...VZOR,
+			hlbka: 3470,
+			uchytenie: 'samostatne',
+			vyskaZadna: 2790,
+			jednoduchaBezZasklenia: true
+		});
+		expect(podFixom(bez)).toBeUndefined();
 	});
 });
 
