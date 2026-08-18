@@ -3,6 +3,8 @@
 import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
+// Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
+import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 import { jeSietkaUchyt, maSietkaSystem, maSietkaSystemVyber, type Sietka } from '$lib/sietka';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
@@ -340,8 +342,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
-	else if (!(vstup.s >= 300 && vstup.s <= 20000)) error = 'Šírka musí byť 300–20000 mm.';
-	else if (!(vstup.v >= 300 && vstup.v <= 20000)) error = 'Výška musí byť 300–20000 mm.';
+	else if (!(vstup.s >= S_MIN && vstup.s <= S_MAX)) error = `Šírka musí byť ${S_MIN}–${S_MAX} mm.`;
+	else if (!(vstup.v >= V_MIN && vstup.v <= V_MAX)) error = `Výška musí byť ${V_MIN}–${V_MAX} mm.`;
 	else if (!OTVARANIA.includes(vstup.otvaranie)) error = 'Vyber otváranie.';
 	else if (kol.error) error = kol.error;
 	else if (k.error) error = k.error;
@@ -451,12 +453,12 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			// 2x štýly sú vždy opona (serverové vynútenie, viď parseVstup)
 			if (posuv.styl.startsWith('2x')) posuv.otvaranie = 'Opona';
 			posuv.kovanieStred = sanitizeKovanieStred(posuv.system, posuv.styl, p.kovanieStred);
-			if (!(posuv.s >= 300 && posuv.s <= 20000)) {
-				error = `Posuv ${i + 1}: šírka musí byť 300–20000 mm.`;
+			if (!(posuv.s >= S_MIN && posuv.s <= S_MAX)) {
+				error = `Posuv ${i + 1}: šírka musí byť ${S_MIN}–${S_MAX} mm.`;
 				break;
 			}
-			if (!(posuv.v >= 300 && posuv.v <= 20000)) {
-				error = `Posuv ${i + 1}: výška musí byť 300–20000 mm.`;
+			if (!(posuv.v >= V_MIN && posuv.v <= V_MAX)) {
+				error = `Posuv ${i + 1}: výška musí byť ${V_MIN}–${V_MAX} mm.`;
 				break;
 			}
 			if (!posuv.sklo) {

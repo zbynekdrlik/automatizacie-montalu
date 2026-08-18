@@ -16,6 +16,7 @@
 	import { popisMulti, posuvySlovom } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
+	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 	import {
@@ -461,6 +462,10 @@
 	// dopisuje šírku po číslici (3 → 30 → 300 → 3000), medzihodnoty pod 300 sa
 	// nevyhodnocujú, takže neblikne falošný ⛔; natívna min/max validácia + server
 	// stráženie odoslania platia ďalej.
+	// POZN. (#216): toto 300 je ZÁMERNE b2b-scoped anti-flicker prah, NIE vstupný
+	// floor — ten je teraz S_MIN=100 (viď $lib/zasklenia-navrh). b2b panel je vždy
+	// ≥ 800 (checkB2BWidth), takže táto hodnota na b2b vetve nikdy neblokuje interné
+	// malé okienka a nepatrí do „jediného zdroja pravdy" rozmerových medzí.
 	const dimOrNull = (x: number | string): number | null => {
 		const n = typeof x === 'number' ? x : parseFloat(String(x));
 		return Number.isFinite(n) && n >= 300 && n <= 20000 ? n : null;
@@ -1042,8 +1047,8 @@
 						id="s"
 						name="s"
 						type="number"
-						min="300"
-						max="20000"
+						min={S_MIN}
+						max={S_MAX}
 						step="any"
 						bind:value={sirka}
 						required
@@ -1057,8 +1062,8 @@
 						id="v"
 						name="v"
 						type="number"
-						min="300"
-						max="20000"
+						min={V_MIN}
+						max={V_MAX}
 						step="any"
 						bind:value={vyska}
 						required
@@ -1305,8 +1310,8 @@
 							<input
 								id={`ps${i}-s`}
 								type="number"
-								min="300"
-								max="20000"
+								min={S_MIN}
+								max={S_MAX}
 								step="any"
 								bind:value={p.s}
 								required
@@ -1319,8 +1324,8 @@
 							<input
 								id={`ps${i}-v`}
 								type="number"
-								min="300"
-								max="20000"
+								min={V_MIN}
+								max={V_MAX}
 								step="any"
 								bind:value={p.v}
 								required
