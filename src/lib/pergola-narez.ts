@@ -237,7 +237,10 @@ function spocitajVydaj(
 /** #205 (výkres OP260282): odpočet pre bočný 110×43 „pod fixom" = profil prednej nohy
  *  (systém 110/140) + zadný prvok (na stene = vlastná šírka 43; SS = horný profil zadnej
  *  110/140). Reprodukuje 5 hodnôt poznámky výkresu; OP260282 (massive SS so 110 zadnou):
- *  140 + 110 = 250 → hĺbka 3470 − 250 = 3220 = presný rez. ČISTÁ funkcia. */
+ *  140 + 110 = 250 → hĺbka 3470 − 250 = 3220 = presný rez. ČISTÁ funkcia.
+ *  POZNÁMKA (na potvrdenie Dominikovi): poznámka výkresu dáva 5 kombinácií; aditívny rozklad
+ *  ich reprodukuje presne, ale zovšeobecňuje aj na Robust SS so 140 zadnou (110+140), ktorý
+ *  poznámka nedokladá (Robust SS uvádza len −220 = 110+110). Rozklad je overený na 5 bodoch. */
 export function podFixomOdpocet(v: PergolaNarezVstup): number {
 	const frontProfil = SYSTEMY[v.system].stlp.rozmer; // 110 / 140
 	const zadnyPrvok =
@@ -310,8 +313,9 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	// skutočná šírka profilu — vzťah žľab↔rám (presah) je O1-blokovaný a je aj dôvod,
 	// prečo počet priečok (ceil(š/700)+1) môže byť o 1 vyšší než na výkrese (rám < žľab).
 	// Dĺžky viazané na HH krovu (priečka, prítlačná/maskovacie) sa NEDOPĹŇAJÚ — viď
-	// nepodporovane[]. Ostatné nekonzistentné poznámky výkresu (18016, zadná výstuha,
-	// zadné nohy 2790) tiež NIE — nefitujeme vzorec nasilu.
+	// nepodporovane[]. #205: 18016 „pod fixom" (hĺbka − kaskáda) a zadné nohy (plná ZV) SÚ už
+	// vo vypocitane (výkresom overené); čestný null ostáva LEN zvislej zadnej výstuhe 2340
+	// (svetlosť 2325 nie je vstup) — nefitujeme nepotvrdený vzorec nasilu.
 	const sirkaMm = R1(v.sirka);
 	vypocitane.push({
 		kod: sys.zlab.kod,

@@ -492,6 +492,9 @@
 				<tr><th>Kód</th><th>Názov</th><th>Dĺžka rezu</th><th>Počet ks</th><th>Výdaj</th></tr>
 			</thead>
 			<tbody>
+				<!-- POZOR: jeden kód môže mať VIAC riadkov (napr. 18016 pod fixom + pod kotviacim;
+				     18017 predná + zadná noha pri SS), takže data-testid="polozka-{kód}" NIE JE
+				     unikátny — v teste filtruj podľa textu riadku (`.filter({ hasText: '…' })`). -->
 				{#each vysledok.vypocitane as p (p.kod + p.nazov)}
 					<tr data-testid="polozka-{p.kod}">
 						<td>{p.kod}</td>

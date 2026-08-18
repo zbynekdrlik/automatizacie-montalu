@@ -364,7 +364,7 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 	await expect(page.getByTestId('narez-tabulka')).toContainText('4710');
 	// priečka (18004) dĺžka „—" (HH krovu neodvoditeľné) — nič sa nehádže
 	await expect(page.getByTestId('polozka-18004')).toContainText('HH krovu');
-	// nepodporované vypisuje HH-krovu + nekonzistentné poznámky výkresu (18016)
+	// nepodporované vypisuje HH-krovu + zvislú zadnú výstuhu (18016 pod fixom je už vo vypocitane)
 	await expect(page.getByTestId('narez-nepodporovane')).toContainText('HH krovu');
 
 	expect(consoleMsgs).toEqual([]);
@@ -380,14 +380,20 @@ test('#206 (b) stena zasklená: bočný 110×43 pod kotviacim = ZV − 190 (2790
 
 	await page.locator('#system').selectOption('Massive');
 	await page.locator('#sirka').fill('5000');
+	await page.locator('#hlbka').fill('3500');
 	// ZV pole je viditeľné pri stena + zasklená (pre bočný 110×43 pod kotviacim)
 	await page.locator('#vyskaZadna').fill('2790');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
+	// stena + zasklená má DVA riadky 18016 (pod fixom + pod kotviacim) → disambiguuj názvom.
 	// (b) POTVRDENÝ vzorec: 110×43 pod kotviacim = 2790 − 190 = 2600, 2 ks
-	await expect(page.getByTestId('polozka-18016')).toContainText('2600');
-	await expect(page.getByTestId('polozka-18016')).toContainText('pod kotviacim');
+	const podKotviacim = page.getByTestId('polozka-18016').filter({ hasText: 'pod kotviacim' });
+	await expect(podKotviacim).toContainText('2600');
+	await expect(podKotviacim).toContainText('pod kotviacim');
+	// #205: pod fixom (massive stena) = hĺbka − (140+43) = 3500 − 183 = 3317
+	const podFixom = page.getByTestId('polozka-18016').filter({ hasText: 'pod fixom' });
+	await expect(podFixom).toContainText('3317');
 
 	expect(consoleMsgs).toEqual([]);
 });
