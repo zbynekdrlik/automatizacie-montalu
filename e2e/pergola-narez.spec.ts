@@ -88,7 +88,7 @@ test('Robust: komponenty = zakladacia lišta + krytka vrchná; Massive typy (spo
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('samostatne stojaca: zobrazí zadné nohy, výsledok = zadná noha (výška 2900 − 140 = 2760)', async ({
+test('samostatne stojaca (OP260282): zadná noha = plná ZV 2790 + bočný 110×43 pod fixom 3220', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -98,19 +98,24 @@ test('samostatne stojaca: zobrazí zadné nohy, výsledok = zadná noha (výška
 	// na stenu (default) → zadné-nohy polia skryté
 	await expect(page.getByTestId('zadne-nohy-box')).toHaveCount(0);
 
+	// Vstupy reálnej zákazky OP260282 (massive, samostatne stojaca, zadná konštrukcia 110)
 	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
 	await page.locator('#uchytenie').selectOption('samostatne');
 	await expect(page.getByTestId('zadne-nohy-box')).toBeVisible();
-	await page.locator('#vyskaZadna').fill('2900');
+	await page.locator('#vyskaZadna').fill('2790');
 	await page.locator('#pocetZadnychNoh').fill('4');
-	await page.locator('#hornyProfilZadnej').selectOption('140');
+	await page.locator('#hornyProfilZadnej').selectOption('110');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
-	// dve položky s kódom 18017 (predná + zadná noha) — zadná = 2760
+	// #205 task 3: zadná noha = PLNÁ ZV = 2790 (nie ZV−profil), profil systému 18017
 	await expect(page.getByTestId('narez-tabulka')).toContainText('zadná noha');
-	await expect(page.getByTestId('narez-tabulka')).toContainText('2760 mm');
-	await expect(page.getByTestId('narez-informativne')).toContainText('2760');
+	await expect(page.getByTestId('narez-tabulka')).toContainText('2790 mm');
+	// #205 task 1: bočný 110×43 „pod fixom" = hĺbka − (140+110) = 3220
+	await expect(page.getByTestId('narez-tabulka')).toContainText('pod fixom');
+	await expect(page.getByTestId('narez-tabulka')).toContainText('3220 mm');
 
 	expect(consoleMsgs).toEqual([]);
 });
