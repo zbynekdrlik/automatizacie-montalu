@@ -23,9 +23,11 @@ Nárez GENERUJE vstup Money odpisu (#197 ho neskôr napojí). Preto engine aj v�
 kreslia/počítajú **iba to, čo call POTVRDIL**; všetko ostatné je explicitne „zatiaľ
 nepodporované" (engine) alebo čestný poznámkový box (výkres) — **NIKDY sa nehádže
 neoverený vzorec**. Potvrdené (s citáciami t=… v engine hlavičke): predná noha =
-svetlosť + 15; zadná noha (LEN samostatne stojaca) = výška zadná − horný profil
-(110/140, NIE systém); počet priečok = ceil(šírka/700)+1; systém → stĺp+žľab; priečka
-kód 18004/18102. Neoverené a preto NEIMPLEMENTOVANÉ: krov (#161), dĺžky líšt/žľabu
+svetlosť + 15; **zadná noha (LEN samostatne stojaca) = PLNÁ ZV** (#205, výkres OP260282 —
+call síce citoval „ZV − horný profil", ale reálny výkres uvádza plnú ZV = dĺžka nohy;
+`hornyProfilZadnej` UŽ neurčuje dĺžku nohy, po novom diskriminuje kaskádu 110×43 „pod
+fixom" — na potvrdenie Dominikovi); počet priečok = ceil(šírka/700)+1; systém → stĺp+žľab;
+priečka kód 18004/18102. Neoverené a preto NEIMPLEMENTOVANÉ: krov (#161), dĺžky líšt/žľabu
 (O1), výstuha profil (O2/O3), sklá (O11), spád/kliny (patria k zaskleniu, nie k
 nohám). Overovací vektor: ZAK2026302 = 4× predná noha 2215 pri svetlosti 2200.
 
@@ -130,11 +132,15 @@ bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu
   ostávajú čestný null (#161/#198). Robust prítlačná HH krovu + 39 = NEPOTVRDENÉ (O18).
 - **Počet priečok:** engine `ceil(šírka/700)+1 = 9`, výkres 8 (rám < žľab, presah O1/#196).
   Confirmed vzorec sa NEMENÍ; rozdiel je zdokumentovaný v `nepodporovane[]`.
-- **Nekonzistentné poznámky výkresu ↔ hodnoty (na potvrdenie Dominikovi, ostávajú NULL):**
-  18016 (110×43) pozn. „šírka − …" nesedí s 3220 (≈ hĺbka − 250); zadná výstuha (18017
-  zvislá) pozn. „ZV − 140" = 2650 ale výkres 2340; zadné nohy pri SS+výstuha: výkres 2790
-  profil 18013, engine confirmed ZV − horný profil = 2650 (kód podľa systému) — táto
-  SS+výstuha konfigurácia nemá historický vzor (#196), vzorec sa NEMENÍ.
+- **#205 DORIEŠENÉ (dva z troch už POČÍTANÉ, jeden ostáva NULL):**
+  - **110×43 „pod fixom" (18016) = hĺbka − (frontProfil + zadný prvok)** — TERAZ vo
+    `vypocitane` (`podFixomOdpocet`): frontProfil = systém 110/140, zadný prvok = 43 (stena) /
+    hornyProfilZadnej (SS). Reprodukuje 5 hodnôt poznámky výkresu (−153/−220/−183/−250/−280);
+    „šírka" v poznámke = smer HĹBKY (4990−250 nezmysel; 3470−250=3220 presne). Gated `zasklena`.
+  - **zadné nohy = PLNÁ ZV** (2790, nie ZV − horný profil) — TERAZ vo `vypocitane`; call citát
+    ZV−profil prehodnotený v prospech reálneho výkresu (rozdiel = miesto merania ZV).
+  - **Zvislá zadná výstuha (18017 zvislá, 2340) = STÁLE NULL** — 2340 = svetlosť 2325 + 15, ale
+    2325 NIE je vstup (predná svetlosť 2200 → 2215). Formula položená Dominikovi (#198).
 
 ## Modré poznámky OP260282 (#206) — POTVRDENÉ vzorce sú TERAZ v engine
 
@@ -145,8 +151,11 @@ výkresu. **Dva sú POTVRDENÉ číselné vzorce — už NIE sú otvorené, sú 
   `POD_KOTVIACI_110x43_ODPOCET`. Checkbox „jednoduchá bez zasklenia" (`jednoduchaBezZasklenia`) ho vypína.
 - **výstuha 200×140 → efektívna svetlosť − 60** (`VYSTUHA_200x140_SVETLOST_ODPOCET`, Massive-gate),
   preteká do prednej nohy (svetlosť + 15) cez `efektivnaSvetlost()`. Výstuha horná odzrkadľuje kód 18022.
-- **honest-null (poznámka only):** „2 pod fixom" 110×43 dĺžky (poznámka výkresu nesedí); Robust výstuhy
-  110×110/110×250 dĺžky nad −220. Gap #198: či −60 mení reálnu dĺžku nohy alebo len svetlú výšku.
+- **„2 pod fixom" 110×43 = POČÍTANÉ od #205** (`podFixomOdpocet`, hĺbka − kaskáda; VŠETKY konfigy,
+  gated `zasklena`) — DVA riadky 18016 (pod fixom + pod kotviacim), preto `data-testid="polozka-18016"`
+  NIE JE unikátny → v E2E filtruj názvom (`.filter({ hasText: 'pod kotviacim'/'pod fixom' })`).
+- **honest-null (poznámka only):** Robust výstuhy 110×110/110×250 dĺžky nad −220. Gap #198: či
+  −60 mení reálnu dĺžku nohy alebo len svetlú výšku.
 
 **POZOR — `vyskaZadna` (ZV) je TERAZ load-bearing aj pri `stena`+zasklená** (nie len samostatne):
 počíta bočný 110×43 a validuje sa (`chybaPergolaNarezVstupu`) pri `stena && !jednoduchaBezZasklenia`.
