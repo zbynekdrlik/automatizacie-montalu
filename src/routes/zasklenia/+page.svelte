@@ -16,6 +16,7 @@
 	import { popisMulti, posuvySlovom } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
+	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 	import { klinPopis, type Klin } from '$lib/klin';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 	import {
@@ -1042,8 +1043,8 @@
 						id="s"
 						name="s"
 						type="number"
-						min="300"
-						max="20000"
+						min={S_MIN}
+						max={S_MAX}
 						step="any"
 						bind:value={sirka}
 						required
@@ -1057,8 +1058,8 @@
 						id="v"
 						name="v"
 						type="number"
-						min="300"
-						max="20000"
+						min={V_MIN}
+						max={V_MAX}
 						step="any"
 						bind:value={vyska}
 						required
@@ -1305,8 +1306,8 @@
 							<input
 								id={`ps${i}-s`}
 								type="number"
-								min="300"
-								max="20000"
+								min={S_MIN}
+								max={S_MAX}
 								step="any"
 								bind:value={p.s}
 								required
@@ -1319,8 +1320,8 @@
 							<input
 								id={`ps${i}-v`}
 								type="number"
-								min="300"
-								max="20000"
+								min={V_MIN}
+								max={V_MAX}
 								step="any"
 								bind:value={p.v}
 								required

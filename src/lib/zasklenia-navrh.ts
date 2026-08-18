@@ -11,9 +11,15 @@ import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import type { KolajnicaRucne } from '$lib/kolajnica';
 import { type VykresRezim, VYKRES_REZIM_DEFAULT } from '$lib/vykres/ral';
 
-export const S_MIN = 300;
+// Spodný sanity-floor pre rozmery zasklenia. 100 mm = fyzicky reálne minimum pre
+// akékoľvek zasklievacie/vetracie okienko (#216 — Patrik, interní: vetracie okienko
+// ~1 zo 100 zákaziek sa nesmie blokovať). Presnú geometrickú spodnú hranicu pre daný
+// systém stráži engine (`undersizeCut` v $lib/server/compute) — profil/sklo ≤ 0 mm
+// zlyhá nahlas. Toto je jediný zdroj pravdy pre rozmerové medze (vstup.ts + oba
+// .svelte formuláre ho importujú). b2b limity (checkB2BWidth ≥ 800) sú oddelené.
+export const S_MIN = 100;
 export const S_MAX = 20000;
-export const V_MIN = 300;
+export const V_MIN = 100;
 export const V_MAX = 20000;
 export const N_MIN = 1;
 export const N_MAX = 30;

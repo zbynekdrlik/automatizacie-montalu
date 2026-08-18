@@ -775,6 +775,54 @@ export function oversizeCut(
 }
 
 /**
+ * Zrkadlový SPODNÝ guard k `oversizeCut` (#216). Keď je rozmer priMALÝ, `val()`
+ * vráti pre niektorý profil ZÁPORNÚ/nulovú dĺžku a `profilCuts` taký kus TICHO
+ * zahodí (`if (q > 0) kusy.push(...)`) → do Money by šiel odpis s CHÝBAJÚCIM
+ * profilom (napr. Štandard +|2K 130×130 → kladka ZASP202415 = 0 m, sklo 5×15 mm,
+ * bez chyby). Rovnako záporný rozmer skla = nezmyselný výstup. Namiesto tichého
+ * zlého odpisu zlyhá NAHLAS s konkrétnou hláškou. Volá sa v safeCompute/
+ * safeComputeMulti PRED zápisom, hneď za `oversizeCut`. Inklúzia riadkov je presne
+ * tá istá ako v `profilCuts` (hrúbka-gate, redukciaZero, ručná koľajnica), aby guard
+ * videl to isté, čo by sa reálne balilo do odpisu.
+ */
+export function undersizeCut(
+	cfg: Cfg,
+	sysStyl: string,
+	S: number,
+	V: number,
+	redukciaZero: boolean,
+	skloHrubka: number,
+	rucnaKolajnica?: KolajnicaRucne
+): string | null {
+	const g = cfg[sysStyl];
+	if (!g) return null;
+	const system = sysStyl.split('|')[0];
+	const sh = Number(skloHrubka) || 0;
+	// Profilové rezy — rovnaká inklúzia riadkov ako `profilCuts`.
+	for (const r of g.rez) {
+		const rh = Number(r.skloHrubka) || 0;
+		if (rh !== 0 && rh !== sh) continue; // hrúbko-závislý riadok pre iné sklo
+		const pocet = Number(r.sklozavisle) && redukciaZero ? 0 : Number(r.pocetKs);
+		if (pocet <= 0) continue; // riadok neprispieva žiadnym kusom
+		// ručne zadaná koľajnica nahradí vypočítanú dĺžku a je vždy > 0 (validované vo vstupe)
+		const rola = rolaKolajnice(r.nazov);
+		if (rola && Number(rucnaKolajnica?.[rola]) > 0) continue;
+		const dlzka = val(r, S, V, g.N, false);
+		if (dlzka <= 0)
+			return `Rozmer ${S}×${V} mm je pri systéme ${system} priMALÝ — profil ${r.nazov} by vyšiel ${Math.round(dlzka)} mm (≤ 0) a odpis by bol neúplný. Zväčši rozmer alebo zvoľ iný systém.`;
+	}
+	// Sklo — rovnaká geometria (ako `computeFlat`: `val(...) - skloOffset`).
+	for (const key of ['s', 'v'] as const) {
+		const sr = g.sklo[key];
+		if (!sr) continue;
+		const dim = Math.round(val(sr, S, V, g.N, true)) - Number(g.skloOffset);
+		if (dim <= 0)
+			return `Rozmer ${S}×${V} mm je pri systéme ${system} priMALÝ — sklo by malo rozmer ≤ 0 mm. Zväčši rozmer alebo zvoľ iný systém.`;
+	}
+	return null;
+}
+
+/**
  * Fail-loud guard: ak systém MÁ hrúbko-závislé profily (Deluxe kladka/klzný pre
  * 6/10 mm), ale pre zvolenú hrúbku skla ani jeden nesedí, `profilCuts` by ticho
  * VYNECHAL kladku aj klzný → odpis do Money podhodnotený o ~40 %. Namiesto tichého
@@ -1040,6 +1088,8 @@ export function safeCompute(
 	if (hrubkaErr) return { r: null, err: hrubkaErr };
 	const overErr = oversizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
 	if (overErr) return { r: null, err: overErr };
+	const underErr = undersizeCut(cfg, sysStyl, S, V, redukciaZero, skloHrubka, rucnaKolajnica);
+	if (underErr) return { r: null, err: underErr };
 	const g = cfg[sysStyl];
 	const sietkaErr = g
 		? sietkaChyba(cfg, sysStyl.split('|')[0], sysStyl.split('|')[1] ?? '', sietka, S, V, g.N)
@@ -1328,6 +1378,16 @@ export function safeComputeMulti(
 			p.kolajnica
 		);
 		if (overErr) return { r: null, err: `Posuv ${i + 1}: ${overErr}` };
+		const underErr = undersizeCut(
+			cfg,
+			p.sysStyl,
+			p.S,
+			p.V,
+			p.redukciaZero,
+			p.skloHrubka ?? 0,
+			p.kolajnica
+		);
+		if (underErr) return { r: null, err: `Posuv ${i + 1}: ${underErr}` };
 		const g = cfg[p.sysStyl];
 		const sietkaErr = g
 			? sietkaChyba(
