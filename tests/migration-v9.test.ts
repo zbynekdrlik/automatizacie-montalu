@@ -68,7 +68,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)', () => {
 	it('user_version=9', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(21);
+		expect(db.pragma('user_version', { simple: true })).toBe(22);
 	});
 
 	it('presne 13 nových Štandard + štýlov (basic 2K…6K, IZO 2K IZO…6K IZO, opona 2x2K/2x3K/2x4K)', () => {
@@ -110,13 +110,15 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 		).toBe(6);
 	});
 
-	it('4 nové glass_types so system=Štandard + (Float 4/6/10 + Izolačné 4.8.4)', () => {
+	it('glass_types so system=Štandard + (Float 4/6/10 + Izolačné 4.8.4; „3.3.1" pridané vo v22)', () => {
 		const rows = db
 			.prepare("SELECT nazov, hrubka FROM glass_types WHERE system = 'Štandard +' ORDER BY poradie")
 			.all() as { nazov: string; hrubka: number }[];
+		// „3.3.1" (#214, v22) sedí hneď za „Float sklo 6 mm" (poradie 25)
 		expect(rows.map((r) => r.nazov)).toEqual([
 			'Float sklo 4 mm',
 			'Float sklo 6 mm',
+			'3.3.1',
 			'Float sklo 10 mm',
 			'Izolačné sklo 4.8.4'
 		]);

@@ -75,7 +75,7 @@ const glass = (nazov: string) =>
 
 describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm)', () => {
 	it('user_version = 17', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(21);
+		expect(db.pragma('user_version', { simple: true })).toBe(22);
 	});
 
 	it('Slide zoznam je presne to, čo si dielňa vypýtala (v poradí)', () => {
@@ -121,7 +121,8 @@ describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm
 
 	it('Deluxe a Štandard + ostávajú na svojich vlastných sklách (žiadne Slide/Robust sklo)', () => {
 		expect(nazvy('Deluxe')).toEqual(['Float kalené 6 mm']);
-		expect(nazvy('Štandard +')).toEqual(['Float sklo 6 mm']);
+		// „3.3.1" je Štandard + VLASTNÉ sklo (#214, v22), nie preliate zo Slide
+		expect(nazvy('Štandard +')).toEqual(['Float sklo 6 mm', '3.3.1']);
 	});
 
 	it('opakovaný beh migrácie nič nezduplikuje (idempotencia)', () => {

@@ -98,7 +98,13 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 
 	const glassZmeny: { nazov: string; stara: number; nova: number }[] = [];
 	if (input.glassRedukcia) {
-		const glass = db.prepare('SELECT nazov, redukcia_zero FROM glass_types').all() as {
+		// Jedno sklo môže žiť vo viacerých systémoch pod tým istým názvom (napr. „3.3.1"
+		// je Slide aj Štandard, #214) — redukcia je vlastnosť NÁZVU skla, takže tu
+		// deduplikujeme cez GROUP BY (zápis nižšie beží `WHERE nazov = ?`, teda tiež
+		// naprieč systémami — konzistentné).
+		const glass = db
+			.prepare('SELECT nazov, MAX(redukcia_zero) AS redukcia_zero FROM glass_types GROUP BY nazov')
+			.all() as {
 			nazov: string;
 			redukcia_zero: number;
 		}[];

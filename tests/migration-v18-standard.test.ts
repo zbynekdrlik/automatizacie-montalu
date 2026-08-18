@@ -69,7 +69,7 @@ const styly = () => listSysStyly().filter((s) => s.system === 'Štandard');
 
 describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', () => {
 	it('user_version = 19', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(21);
+		expect(db.pragma('user_version', { simple: true })).toBe(22);
 	});
 
 	it('pribudlo presne 12 štýlov s N podľa počtu krídel (opona 2×n)', () => {
@@ -126,10 +126,12 @@ describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', 
 
 	it('sklá sa NEduplikovali — Štandard zdieľa katalóg so Štandard +', () => {
 		const pocet = (db.prepare('SELECT COUNT(*) c FROM glass_types').get() as { c: number }).c;
-		expect(pocet).toBe(7); // presne to, čo bolo pred migráciou
+		expect(pocet).toBe(8); // 7 pred migráciou + „3.3.1" doseedované vo v22 (#214)
+		// starý Štandard zdieľa katalóg so Štandard + vrátane „3.3.1" (poradie 25)
 		expect(glassTypesForSystem('Štandard').map((g) => g.nazov)).toEqual([
 			'Float sklo 4 mm',
 			'Float sklo 6 mm',
+			'3.3.1',
 			'Float sklo 10 mm',
 			'Izolačné sklo 4.8.4'
 		]);

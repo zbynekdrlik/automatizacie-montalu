@@ -116,3 +116,26 @@ zobrazilo prázdnu stránku namiesto „už bola odoslaná" hlášky. Pri pridá
 vetvy do existujúcej akcie (alebo novej akcie vracajúcej existujúci `step`) skontroluj
 `+page.svelte`-in `{#if}` podmienku pre ten `step` a vráť VŠETKO, čo podmienka aj telo
 bloku čítajú — nielen polia, ktoré sa ti zdajú relevantné pre tú konkrétnu vetvu.
+
+## 7. Živá kalkulačka (display-only) — `use:enhance` obíde pasce #3 a #4
+
+Body 3/4 vyššie (reštart-effect a value-reset) sú pasce plného POST-reloadu s
+serverovým echom `form?.vstup`. Pre **živú kalkulačku bez perzistencie a bez
+viackrokového wizardu** (napr. `/optimalizator`, #212) je jednoduchší a robustnejší
+vzor `use:enhance` (jadro SvelteKit, nie cudzí pattern): POST ide cez fetch, stránka
+sa NEreloadne, takže klientske `$state` vstupy ostanú tak, ako ich používateľ zadal —
+**žiadne value={} echo, žiadny reštart-effect, teda ani pasca #3 ani #4.** Výsledok
+napĺňaš z enhance callbacku do vlastného `$state` (`update()` zámerne NEvoláš, aby sa
+vstupy neresetovali). Dva detaily, ktoré sa oplatia:
+
+- **Jednotný tvar návratu akcie** (`{ vysledok, error }`, jedno je vždy `null`; chyba cez
+  `fail(400, { vysledok: null, error })`) → `ActionData` je bez union-vetiev, takže
+  `result.data?.vysledok` / `?.error` sa čítajú bez TS narrowingu.
+- **Žiadny `let { form } = $props()` fallback, ak appka je JS-first** — čítať `form` v
+  `$state(...)` initializeri spustí `state_referenced_locally` warning (zachytí len
+  úvodnú hodnotu). Buď to nechaj tak (result iba z callbacku), alebo fallback čítaj v
+  `$derived`. `/optimalizator` ho nemá vôbec.
+
+Pozn.: toto je JEDINÉ miesto v appke s `use:enhance` (ostatné stránky sú plný POST +
+echo, lebo sú viackrokové s tlačou/PDF). Pre kalkulačku je enhance správna voľba; pre
+wizard s krokmi ostáva plný POST + echo vzor z bodov 1–6.

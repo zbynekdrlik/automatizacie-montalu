@@ -107,14 +107,18 @@ export function listGlassTypes(): GlassType[] {
 }
 
 /** Starší „Štandard" (bez plus) má PRESNE ten istý katalóg skiel ako Štandard +
- *  (Float 4/6/10 + Izolačné 4.8.4). `glass_types.nazov` je UNIQUE, takže tie isté
- *  názvy nemôžu existovať dvakrát → oba systémy čítajú jeden katalóg. */
+ *  (Float 4/6/10 + „3.3.1" + Izolačné 4.8.4). Oba systémy čítajú riadky uložené pod
+ *  `system='Štandard +'` — NIE preto, že názvy sú globálne unikátne (od migrácie v22
+ *  je `glass_types` UNIQUE(nazov, system), takže to isté sklo môže legitímne existovať
+ *  vo viacerých systémoch — napr. „3.3.1" je aj Slide aj Štandard +), ale preto, že
+ *  starý Štandard sem cez tento alias zámerne smeruje. Preto sa sklo NIKDY nesmie
+ *  hľadať len podľa názvu naprieč systémami — vždy cez `glassTypesForSystem(system)`. */
 const GLASS_SYSTEM_ALIAS: Record<string, string> = { Štandard: 'Štandard +' };
 
 /** Sklá platné pre daný systém. Deluxe: LEN vlastné (Float kalené 6/10, hrúbka
  *  vyberá profil) — spoločné 'ALL' sklá (Kalené 8mm/10mm) nemajú Deluxe profil.
- *  Štandard + (a zdieľajúci ho Štandard): rovnako LEN vlastné (Float 4/6/10 +
- *  Izolačné 4.8.4) — spoločné 'ALL' sklá nemajú Štandard profil (dôvod ako Deluxe).
+ *  Štandard + (a zdieľajúci ho Štandard): rovnako LEN vlastné (Float 4/6/10 + „3.3.1"
+ *  + Izolačné 4.8.4) — spoločné 'ALL' sklá nemajú Štandard profil (dôvod ako Deluxe).
  *  Robust/Slide: vlastné + spoločné 'ALL'. */
 export function glassTypesForSystem(system: string): GlassType[] {
 	const sys = GLASS_SYSTEM_ALIAS[system] ?? system;

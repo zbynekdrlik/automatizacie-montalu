@@ -2,7 +2,7 @@
 // old→new náhľad odpisu na kontrolných rozmeroch.
 
 import type { Actions, PageServerLoad } from './$types';
-import { loadCfg, listSysStyly, listGlassTypes } from '$lib/server/db';
+import { loadCfg, listSysStyly, listGlassTypes, type GlassType } from '$lib/server/db';
 import { getEditableRows, saveCfgChanges, getAuditLog } from '$lib/server/cfg-editor';
 import { safeCompute } from '$lib/server/compute';
 
@@ -14,7 +14,20 @@ export const load: PageServerLoad = async ({ url }) => {
 		styly,
 		sysStyl,
 		editable,
-		glass: listGlassTypes(),
+		// jedno sklo môže žiť vo viacerých systémoch pod tým istým názvom (napr. „3.3.1"
+		// je Slide aj Štandard, #214) — redukcia je vlastnosť názvu, tak v editore ukáž
+		// každý názov len raz. Tie-break redukcie = MAX (ak by to isté sklo malo v rôznych
+		// systémoch rôzny redukcia_zero) — rovnaký ako v save-path (cfg-editor GROUP BY
+		// nazov, MAX(redukcia_zero)), aby stav prepínača sedel s tým, čo save porovnáva.
+		glass: [
+			...listGlassTypes()
+				.reduce((m, g) => {
+					const cur = m.get(g.nazov);
+					if (!cur || (!cur.redukciaZero && g.redukciaZero)) m.set(g.nazov, g);
+					return m;
+				}, new Map<string, GlassType>())
+				.values()
+		],
 		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) }))
 	};
 };

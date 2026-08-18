@@ -44,7 +44,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v20 → v21: cenový zoznam materiálu (#154, fáza 1)', () => {
 	it('user_version=21 po migrácii, existujúci odpis_log riadok nedotknutý', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(21);
+		expect(db.pragma('user_version', { simple: true })).toBe(22);
 		const row = db.prepare("SELECT zak, op FROM odpis_log WHERE zak = 'ZAK-V21'").get();
 		expect(row).toEqual({ zak: 'ZAK-V21', op: '01' });
 	});

@@ -687,6 +687,51 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		db.pragma('user_version = 21');
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 22) {
+		// v21 → v22: sklo „3.3.1" (lepené, connex 33.1) do systémov Štandard + a starý
+		// Štandard — Patrik, Odoo 207, msg #1703260, 2026-08-18: „štandard plus a starý
+		// štandard poprosím doplniť sklo 3.3.1 je to ako obyčajná 6mm nič sa nemení".
+		//
+		// „3.3.1" UŽ EXISTUJE ako Slide sklo (v17). `glass_types.nazov` bol GLOBÁLNE
+		// UNIQUE — dva systémy nemohli mať sklo rovnakého názvu. Fyzicky je to JEDNO sklo,
+		// ktoré dielňa v oboch systémoch volá „3.3.1"; model to nevedel vyjadriť. Preto sa
+		// UNIQUE zmäkčuje na (nazov, system) — presne tak, ako už model funguje (každý
+		// systém má vlastné riadky skiel: Slide „6mm číre" vs Štandard „Float sklo 6 mm"
+		// pre to isté fyzické 6 mm). SQLite nevie ALTER-nuť constraint → tabuľka sa
+		// RECREATE-ne (13 riadkov, guardované user_version, žiadny FK na glass_types —
+		// trieda operácie ako v3 DELETE-reseed). STANDARD_GLASS konštanta sa NEMENÍ:
+		// pridanie „3.3.1" do v9 by na fresh DB narazilo na v17 Slide seed, kým je constraint
+		// ešte globálny — fresh aj existujúca DB preto konvergujú AŽ tu, vo v22.
+		//
+		// Money-neutralita: v Štandardoch žiadny sklozávislý profil (redukcia má len Slide,
+		// hrubka len Deluxe), a „3.3.1" nie je izolačné (`jeIzoSklo` = false), takže ťahá ten
+		// istý BASIC nárezák ako „Float sklo 6 mm" → odpis je bit-identický. Overené testom
+		// (tests/sklo-3-3-1-standard.test.ts). Poradie 25 = hneď za „Float sklo 6 mm" (20).
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE glass_types_new (
+					id INTEGER PRIMARY KEY,
+					nazov TEXT NOT NULL,
+					redukcia_zero INTEGER NOT NULL DEFAULT 0,
+					poradie INTEGER NOT NULL DEFAULT 0,
+					system TEXT NOT NULL DEFAULT 'ALL',
+					hrubka INTEGER NOT NULL DEFAULT 0,
+					UNIQUE (nazov, system)
+				);
+				INSERT INTO glass_types_new (id, nazov, redukcia_zero, poradie, system, hrubka)
+					SELECT id, nazov, redukcia_zero, poradie, system, hrubka FROM glass_types;
+				DROP TABLE glass_types;
+				ALTER TABLE glass_types_new RENAME TO glass_types;
+			`);
+			const has = db.prepare('SELECT 1 FROM glass_types WHERE nazov = ? AND system = ?');
+			if (!has.get('3.3.1', 'Štandard +'))
+				db.prepare(
+					'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system, hrubka) VALUES (?, ?, ?, ?, ?)'
+				).run('3.3.1', 0, 25, 'Štandard +', 0);
+			db.pragma('user_version = 22');
+		})();
+	}
+
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

@@ -34,6 +34,7 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 	expect(skla).toEqual([
 		'Float sklo 4 mm',
 		'Float sklo 6 mm',
+		'3.3.1',
 		'Float sklo 10 mm',
 		'Izolačné sklo 4.8.4'
 	]);
