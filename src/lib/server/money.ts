@@ -158,7 +158,8 @@ export function filenameFor(
 	return `${safe(job.zak)} - ${safe(job.zakaznik)} ${rez}[${hash}].xlsx`;
 }
 
-async function buildXlsx(job: OdpisJob): Promise<Buffer> {
+// exportované kvôli goldenu #234 (test číta buffer priamo — bez DB, bez env, bez zápisu)
+export async function buildXlsx(job: OdpisJob): Promise<Buffer> {
 	const wb = new ExcelJS.Workbook();
 	const ws = wb.addWorksheet('Hárok2');
 	ws.addRow([

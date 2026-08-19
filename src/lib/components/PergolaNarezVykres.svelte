@@ -477,7 +477,9 @@
 		font-size={MIN_SPEC_FONT}
 		fill={SIVA}
 		data-testid="pnr-bok-krov-pozn"
-		>{krov?.podporovane ? 'krov: uloženie #161 (detail nižšie)' : 'krov zjednodušený → #161'}</text
+		>{krov?.podporovane
+			? 'krov: uloženie (detail nižšie)'
+			: 'krov zjednodušený — detail doplní konštruktér'}</text
 	>
 {/snippet}
 
@@ -599,7 +601,6 @@
 		>
 			<tspan x={r.x + r.w / 2} dy="0">detail krovu (sklon 7°, rozostup,</tspan>
 			<tspan x={r.x + r.w / 2} dy="3.4">frézovanie) doplní konštruktér</tspan>
-			<tspan x={r.x + r.w / 2} dy="3.4">→ #161</tspan>
 		</text>
 		{#if krov && krov.rezim === 'nepodporovane'}
 			<text
@@ -609,7 +610,7 @@
 				font-size={MIN_SPEC_FONT}
 				fill={SIVA}
 				data-testid="pnr-krov-pod7"
-				>zadaný sklon {fmtDeg(krov.sklonStupne ?? 0)} &lt; 7° — uloženie O5 (nepodporované)</text
+				>zadaný sklon {fmtDeg(krov.sklonStupne ?? 0)} &lt; 7° — uloženie zatiaľ nepodporované</text
 			>
 		{/if}
 	{/if}
@@ -628,7 +629,7 @@
 		font-size="3.2"
 		font-weight="700"
 		fill={CIERNA}
-		data-testid="pnr-krov-ulozenie">KROV — ULOŽENIE (#161)</text
+		data-testid="pnr-krov-ulozenie">KROV — ULOŽENIE</text
 	>
 	<g font-size={MIN_SPEC_FONT} fill={CIERNA} data-testid="pnr-krov-ulozenie-hodnoty">
 		<text x={r.x + pad} y={r.y + pad + 6}
@@ -666,7 +667,7 @@
 		text-anchor="middle"
 		font-size={MIN_SPEC_FONT}
 		fill={SIVA}
-		data-testid="pnr-krov-pozn">frézovanie drážok (výrobný list) doplní konštruktér → #161</text
+		data-testid="pnr-krov-pozn">frézovanie drážok (výrobný list) doplní konštruktér</text
 	>
 {/snippet}
 

@@ -118,7 +118,8 @@ describe('krovUlozenie — čestné poznámky (frézovanie #161 vždy, O5b, nad 
 	it('podporovaný výsledok VŽDY vypíše frézovanie ako nepodporované (#161, O5) + O5b jednotku', () => {
 		const p = krovUlozenie(8).poznamky.join(' | ');
 		expect(p).toMatch(/frézovan/i);
-		expect(p).toMatch(/#161/);
+		// #233 — poznámka je plain slovenčina (#161 → „doplní konštruktér")
+		expect(p).toMatch(/konštruktér/i);
 		expect(p).toMatch(/O5b|jednotk/i);
 	});
 	it('nad ~9–10° pridá poznámku o zatváraní drážky (frézovací detail O5), offsety ostávajú', () => {

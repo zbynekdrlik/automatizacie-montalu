@@ -96,3 +96,45 @@ test('výstup narezu: stavové zhrnutie (spočítané/čaká) + per-riadkové od
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #233 — akceptačné kritérium: na obrazovkách pergoly NIE JE ani jedno „#N", „O-čko"
+// (interné question ID typu O2/O5) ani odkaz na call. Skenuje CELÝ textový obsah stránky
+// (aj zbalené <details>, ktoré textContent vracia) na plnom výsledku vrátane krovu,
+// zosilneného nosníka a Robust výstuhy (najviac nepodporovaných položiek). ČÍTACIE.
+test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke rezervačného odpisu', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	// Massive + zosilnený nosník + sklon (krov) — čo najviac textu s poznámkami/nepodporované
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5760');
+	await page.locator('#hlbka').fill('3500');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.locator('#sklonStrechy').fill('8'); // krov uloženie (potvrdené)
+	await page.locator('#zosilnenyNosnik').check();
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// výsledok sa vykreslil (výkres, materiál, krov, nepodporované sú v DOM)
+	await expect(page.getByTestId('narez-nepodporovane')).toBeVisible();
+	await expect(page.getByTestId('narez-tabulka')).toBeVisible();
+
+	// CELÝ text stránky — textContent zahŕňa aj zbalené <details>, takže žargón sa
+	// neschová do rozklikávacieho detailu
+	const text = (await page.locator('body').textContent()) ?? '';
+	expect(text.length).toBeGreaterThan(0);
+	// žiadne „#161"/„#206"/… (ticket ref)
+	expect(text).not.toMatch(/#\d/);
+	// žiadne interné question ID „O5"/„O2"/„O11"… (O + číslica; „OP260282" má za O písmeno)
+	expect(text).not.toMatch(/\bO\d/);
+	// žiadny odkaz na call
+	expect(text).not.toMatch(/z callu|callu 13|call s Dominikom/i);
+
+	// pozitívny protipól — plain náhrady SÚ prítomné (sekcia nepodporované nie je prázdna)
+	await expect(page.getByTestId('narez-nepodporovane')).toContainText('vzorec');
+
+	expect(consoleMsgs).toEqual([]);
+});

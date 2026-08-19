@@ -29,7 +29,7 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 	await expect(page.getByTestId('polozka-18013')).toHaveCount(0);
 
 	// priečka (18004) prítomná s počtom, dĺžka „—" (= HH krovu, #161 neodvoditeľné) (#205)
-	await expect(page.getByTestId('polozka-18004')).toContainText('HH krovu');
+	await expect(page.getByTestId('polozka-18004')).toContainText('hrana krovu');
 	// #205: žľab (18018) + kotviaci (18019) TERAZ vo vypocitane = šírka 5760, výdaj na 6 m
 	await expect(page.getByTestId('polozka-18018')).toContainText('5760');
 	await expect(page.getByTestId('vydaj-18018')).toContainText('(6 m)');
@@ -38,10 +38,10 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 	// informatívne: výstuha = 5760 − 280 = 5480
 	await expect(page.getByTestId('vystuha-rez')).toContainText('5480');
 
-	// zatiaľ nepodporované — krov (ticket 161), lišty (HH krovu), sklá vypísané, nič sa nehádže
+	// zatiaľ nepodporované — krov, lišty, sklá vypísané, nič sa nehádže (#233 — plain text)
 	const nepodp = page.getByTestId('narez-nepodporovane');
 	await expect(nepodp).toContainText('Krov');
-	await expect(nepodp).toContainText('161');
+	await expect(nepodp).toContainText('vzorec');
 	await expect(nepodp).toContainText('Sklá');
 
 	// #195 — komponenty (spojky, krytky): Massive typy prítomné, počty honest-null „—",
@@ -198,9 +198,9 @@ test('výkres: predný pohľad + bokorys + pôdorys sa vykreslia z potvrdených 
 	await expect(page.getByTestId('pnr-pod-stena')).toHaveCount(1);
 	await expect(page.getByTestId(/^pnr-pod-zadna-noha-\d+$/)).toHaveCount(0);
 
-	// krov je zjednodušený s poznámkou → #161, NIKDY sa nehádže sklon
-	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
-	await expect(page.getByTestId('pnr-bok-krov-pozn')).toContainText('#161');
+	// krov je zjednodušený s poznámkou (#233 — plain text, žiadne #N), NIKDY sa nehádže sklon
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('konštruktér');
+	await expect(page.getByTestId('pnr-bok-krov-pozn')).toContainText('konštruktér');
 
 	// spec ukazuje potvrdené hodnoty (systém, rozostup nôh 1920) + display-only
 	await expect(page.getByTestId('pnr-spec-nohy')).toContainText('1920');
@@ -265,11 +265,11 @@ test('krov uloženie 8°: karta aj výkres ukážu potvrdené hodnoty (ps=0.52, 
 	await expect(page.getByTestId('pnr-krov-ulozenie-hodnoty')).toContainText('0,52');
 	await expect(page.getByTestId('pnr-krov-ulozenie-hodnoty')).toContainText('0,66');
 	await expect(page.getByTestId('pnr-krov-trojuholnik')).toHaveCount(1);
-	// frézovanie (výrobný list) STÁLE nepodporované → #161
-	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
+	// frézovanie (výrobný list) STÁLE nepodporované (#233 — plain text)
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('konštruktér');
 	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('frézovanie');
-	// bokorys poznámka odkazuje na uloženie, stále nesie #161
-	await expect(page.getByTestId('pnr-bok-krov-pozn')).toContainText('#161');
+	// bokorys poznámka odkazuje na uloženie (plain text, žiadne #N)
+	await expect(page.getByTestId('pnr-bok-krov-pozn')).toContainText('uloženie');
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -290,9 +290,9 @@ test('krov uloženie pod 7° (5°): čestne „nepodporované" (O5), nič sa neh
 	// karta hlási nepodporované, žiadne vymyslené hodnoty
 	await expect(page.getByTestId('krov-nepodporovane')).toContainText('pod prahom 7°');
 	await expect(page.getByTestId('krov-ulozenie')).toHaveCount(0);
-	// výkres ostáva čestný placeholder → #161 (nie uloženie detail)
+	// výkres ostáva čestný placeholder (#233 — plain text, nie uloženie detail)
 	await expect(page.getByTestId('pnr-krov-ulozenie')).toHaveCount(0);
-	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('#161');
+	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('konštruktér');
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -361,9 +361,9 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 	// výstuha horná (18017, massive) = 4990 − 280 = 4710
 	await expect(page.getByTestId('narez-tabulka')).toContainText('4710');
 	// priečka (18004) dĺžka „—" (HH krovu neodvoditeľné) — nič sa nehádže
-	await expect(page.getByTestId('polozka-18004')).toContainText('HH krovu');
+	await expect(page.getByTestId('polozka-18004')).toContainText('hrana krovu');
 	// nepodporované vypisuje HH-krovu + zvislú zadnú výstuhu (18016 pod fixom je už vo vypocitane)
-	await expect(page.getByTestId('narez-nepodporovane')).toContainText('HH krovu');
+	await expect(page.getByTestId('narez-nepodporovane')).toContainText('hrana krovu');
 
 	expect(consoleMsgs).toEqual([]);
 });

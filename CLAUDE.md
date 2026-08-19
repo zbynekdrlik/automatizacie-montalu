@@ -106,6 +106,9 @@ Load the matching skill BEFORE working on that area (don't re-derive):
 - katalóg skiel (`glass_types`), pridanie/zmena skla, Money-neutralita skla, migračná pasca
   „user_version všade" → auto-loads `.claude/rules/glass-catalog.md` na jeho `paths:`
   (`migracie.ts`, `db.ts`, `styl.ts`, `migration-*`/`sklo-*` testy)
+- ceny materiálu / cena skla / denný Money snapshot (IZOS vs NC cenník, `TS*` kódy skiel,
+  producent) → auto-loads `.claude/rules/ceny-snapshot.md` na jeho `paths:` (`ceny.ts`,
+  `sklo-cena.ts`, `CenyTabulka`/`SkloCena`, `ceny-snapshot.py`, `ceny*`/`sklo-cena*` testy)
 - unit/E2E test runs, local Playwright verification → load `.claude/skills/testing`
 - roles / b2b / route gating / Money-write boundary / auth migration → load `.claude/skills/access-control`
 - pridávam NOVÚ stránku/route (exporty, b2b denylist, nav, `$effect` slučka) → load `.claude/skills/nova-stranka`

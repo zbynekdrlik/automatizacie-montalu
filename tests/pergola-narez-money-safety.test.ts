@@ -37,7 +37,11 @@ const CISTY_ENGINE = [
 	'src/lib/pergola-krov.ts',
 	'src/lib/server/pergola-narez-vstup.ts',
 	// #194 — technický výkres z rozmerov je tiež LEN display-only kresba
-	'src/lib/components/PergolaNarezVykres.svelte'
+	'src/lib/components/PergolaNarezVykres.svelte',
+	// #234 — ručné položky modul je pure + client-imported (+page.svelte); Money-priľahlý
+	// (validuje Money kódy, emituje množstvá), MUSÍ ostať čistý, aby sa server kód
+	// nezaviezol do klientského bundlu (validácia dostáva katalóg ako parameter).
+	'src/lib/pergola-rucne.ts'
 ];
 
 describe('Money safety — vzorcový engine nárezu z rozmerov ostáva čistý (#155/#221)', () => {

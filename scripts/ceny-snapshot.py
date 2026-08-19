@@ -2,8 +2,8 @@
 """Cenový zoznam materiálu — fáza 1 (#154): READ-ONLY denný snapshot z Money.
 
 Vypíše JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura,
-predajVo, mena, sklad}]}` pre všetky ZASP*/ZASK* Money kódy (profily +
-komponenty/kovanie zasklenia — presne to, čo appka odpisuje). Appka tento
+predajVo, mena, sklad}]}` pre všetky ZASP*/ZASK*/TS* Money kódy (profily +
+komponenty/kovanie zasklenia + izolačné sklá, #235). Appka tento
 súbor sama LAZY naimportuje (`src/lib/server/ceny.ts`) — tento skript do
 appkinej DB nič nezapisuje a do appky sa nijako nenapája.
 
@@ -23,7 +23,10 @@ Stĺpcové mapovanie (overené live 2026-08-13, TOP 5 smoke query — presne sed
 šéfovým príkladom "5,80 € dohodnutý cenník vs 7,02 € posledná faktúra", viď
 design komentár na tikete #154):
 
-  nakupCennik            Ceniky_PolozkaCeniku.Cena, Cenik_ID = NC "Nákupný cenník"
+  nakupCennik            Ceniky_PolozkaCeniku.Cena, Cenik_ID = NC "Nákupný cenník";
+                          pre TS* (sklá, MJ = m²) z cenníka IZOS — sklá v NC vôbec
+                          nie sú (overené live 2026-08-19, 0 TS riadkov v NC,
+                          141 v IZOS; IZOS je EUR), viď tiket #235
   nakupPoslednaFaktura   Artikly_ArtiklDodavatel.PosledniCena (cez HlavniDodavatel_ID)
   predajVo               Ceniky_PolozkaCeniku.Cena, Cenik_ID = PRF_VO "Profily a
                           príslušenstvo - VO" (appka sama vynúti null pre ZASK*
@@ -58,11 +61,12 @@ except ImportError:
 # tieto ID-čka sú overené presne proti šéfovým príkladovým číslam.
 CENIK_NC = "BA7DA0F8-8086-4963-AAE1-09D2C1C7266C"  # Nákupný cenník
 CENIK_PRF_VO = "AEEF5C92-5B44-4755-8680-F01CE6E4D5C2"  # Profily a príslušenstvo - VO
+CENIK_IZOS = "F4A1DFEE-9298-45D2-9891-1548741B2063"  # IZOS (izolačné sklá TS*, ceny/m²)
 
 QUERY = """
 SELECT
     a.Kod AS kod,
-    nc.Cena AS nakupCennik,
+    CASE WHEN a.Kod LIKE 'TS%' THEN iz.Cena ELSE nc.Cena END AS nakupCennik,
     ad.PosledniCena AS nakupPoslednaFaktura,
     vo.Cena AS predajVo,
     ISNULL(m.Kod, 'EUR') AS mena,
@@ -73,9 +77,11 @@ LEFT JOIN Ceniky_PolozkaCeniku nc ON nc.Artikl_ID = a.ID AND nc.Cenik_ID = %(nc)
 LEFT JOIN Ceniky_Cenik ncc ON ncc.ID = nc.Cenik_ID
 LEFT JOIN Ceniky_PolozkaCeniku vo ON vo.Artikl_ID = a.ID AND vo.Cenik_ID = %(vo)s AND vo.Deleted = 0
 LEFT JOIN Ceniky_Cenik voc ON voc.ID = vo.Cenik_ID
-LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID)
+LEFT JOIN Ceniky_PolozkaCeniku iz ON iz.Artikl_ID = a.ID AND iz.Cenik_ID = %(iz)s AND iz.Deleted = 0
+LEFT JOIN Ceniky_Cenik izc ON izc.ID = iz.Cenik_ID
+LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID)
 LEFT JOIN S5_Artikl_CelkoveMnozstviNaSkladech s ON s.Artikl_ID = a.ID
-WHERE a.Deleted = 0 AND (a.Kod LIKE 'ZASP%' OR a.Kod LIKE 'ZASK%')
+WHERE a.Deleted = 0 AND (a.Kod LIKE 'ZASP%' OR a.Kod LIKE 'ZASK%' OR a.Kod LIKE 'TS%')
 """
 
 
@@ -124,7 +130,7 @@ def _num(v: object) -> float | None:
 
 def fetch_rows(conn) -> list[dict]:
     cur = conn.cursor(as_dict=True)
-    cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO})
+    cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO, "iz": CENIK_IZOS})
     rows = []
     for r in cur.fetchall():
         kod = (r.get("kod") or "").strip()
@@ -161,7 +167,7 @@ def main() -> None:
     }
     json.dump(out, sys.stdout, ensure_ascii=False)
     sys.stdout.write("\n")
-    print(f"ceny-snapshot: {len(rows)} riadkov (ZASP*/ZASK*)", file=sys.stderr)
+    print(f"ceny-snapshot: {len(rows)} riadkov (ZASP*/ZASK*/TS*)", file=sys.stderr)
 
 
 if __name__ == "__main__":
