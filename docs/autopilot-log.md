@@ -1245,3 +1245,20 @@ implementované, nereprodukovateľné čestný null:
   (samostatný ticket).
 - **Lekcia:** dispatch prescribed 4 pravidlá; 2 sa zo vstupov nereprodukovali → honest-null +
   otázka, nie force-fit do Money-priľahlého výstupu. Oba tickety ostávajú OTVORENÉ (viac scope).
+
+## #221 — Rezervačný odpis z rozmerov do Money (v0.24.0, PR #228)
+
+- **Zadanie (call Dominik 19.8.):** rezervovať materiál v Money už pri zadaní objednávky
+  z rozmerov (nie z CAD-u na konci), bez +20 %; „rezervácia = klasický odpis do Money".
+- **Riešenie:** stránka „Materiál z rozmerov" (`/pergola/narez`) premenovaná na
+  „Rezervačný odpis"; potvrdené riadky `spocitajNarez` (dlzkaRezuMm != null) → CadRow →
+  overený `transformRows` → Money odpis (PRP metre, 1:1 ako CAD). Explicitný potvrdzovací
+  tok (nahlad → potvrdenie). Honest-null (priečka = HH krovu) sa čestne vynechá.
+- **Označenie (párovateľnosť #227):** filename marker „REZ", doklad popis „REZ",
+  detail.rezervacia + rozmery + vylúčené kódy; modul='pergola' → zdieľaný dedup (bráni
+  dvojitému odpisu).
+- **`transform` → `transformRows(CadRow[])`** čistá extrakcia (obal zachováva vektory).
+- **Testy:** unit `pergola-rezervacia.test.ts` (mapovanie + honest-null + REZ marker +
+  validácia); E2E `pergola-rezervacia.spec.ts` (premenovaný tok → odoslanie v TEST režime).
+- **Lekcia:** odpis z rozmerov NEPOČÍTAJ nanovo — potvrdené riadky enginu = tvar CadRow,
+  prežeň ich overeným `transformRows`; honest-null vylúč filtrom (nikdy tiché číslo do Money).
