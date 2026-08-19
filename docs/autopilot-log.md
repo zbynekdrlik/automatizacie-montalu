@@ -1283,3 +1283,25 @@ implementované, nereprodukovateľné čestný null:
 - **Lekcia:** per-riadkový stavový odznak MUSÍ mať presne tú istú podmienku ako počítadlo
   zhrnutia aj ako filter do Money (`dlzkaRezuMm != null && pocetKs > 0`) — inak sa stav na
   obrazovke rozíde s tým, čo reálne ide do odpisu (review, opravené pred merge).
+
+## #225 — Cena skiel v nárezáku zasklení (display-only, snapshot cien) (v0.24.2, PR 231)
+- **Problém:** Dominik (call 19.8.) — šéf chce v nárezáku zasklení vidieť aj CENU skla
+  (náklad), aby včas videl materiálové náklady. Cenník skiel = IZOS v Money.
+- **Riešenie (display-only):** nový noprint blok `SkloCena.svelte` v `planKarty`/
+  `planKartyMulti` (LEN interní) — plocha reálnych tabúľ (`sirka×vyska×pocet`) × cena/m²
+  zo snapshotu (`material_prices.nakup_cennik`), per plán + súhrn. Server `sklo-cena.ts`
+  (`skloCenaPre`), `ceny.ts` `cenaZaM2`, `db.ts` `glassMoneyKod` (per (nazov,system)),
+  gate `skloCenyPre` (b2b undefined). Migrácia v23: nullable `glass_types.money_kod`,
+  seednuté len jednoznačné izo varianty (4/16/4 → TS00016/17, 4/8/4 → TS00021/22).
+- **Money-safe:** golden 109 diff ČISTO aditívny (0 odobraných riadkov, planHash
+  byte-identický) → odpis/xlsx nezmenený. Honest-null „cena nedostupná" (cena 0 = null).
+- **Dátový nález (Money read-only):** sklá NIE sú v NC cenníku, len v IZOS
+  (`Ceniky_Cenik.Kod=IZOS`, TS* kódy). Producent snapshotu (dev2, mimo repa) ťahá len
+  ZASP/ZASK → cena je dnes všade „nedostupná" (správny stav). Follow-up 235: rozšíriť
+  producenta (TS* + IZOS zdroj) + Dominik potvrdí mapovanie.
+- **Testy:** unit `sklo-cena.test.ts` (plocha×cena, honest-null, mapovanie, súhrn), route
+  b2b gate `zasklenia-ceny-preview.test.ts`, E2E `sklo-cena.spec.ts` (nedostupná/cena/
+  noprint, console-zero). 1486 unit + full E2E zelené; naživo overené (v0.24.2, marek):
+  blok „Izolačné sklo 4/16/4 číre | 3,90 m² | cena nedostupná".
+- **Lekcia:** mapovanie sklo→Money kód patrí per RIADOK `(nazov, system)`, nie name-only
+  (v22 collision trap); seeduj len jednoznačné zhody, zvyšok NULL → honest-null.
