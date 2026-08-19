@@ -41,19 +41,21 @@ async function doRozpisu(page: import('@playwright/test').Page, zak: string) {
 	await pripravit(page, zak);
 }
 
-test('bez Money snapshotu appka ukáže „cena neznáma" v pergolovom rozpise, súčet neúplný', async ({
-	page
-}) => {
+test('kód bez ceny v snapshote → „cena neznáma", súčet neúplný (honest-null)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
-	// lokálny beh: istota, že žiadny predošlý test nezanechal fixture (post-deploy beh
-	// proti BASE_URL na tento súbor nemá prístup — no-op)
+	// lokálny beh: zmaž fixture (post-deploy beh proti BASE_URL naň nemá prístup — no-op).
+	// POZN.: E2E DB je ZDIEĽANÁ medzi spec súbormi — zmazanie SÚBORU nevynuluje už
+	// naimportovanú snapshot-metu v DB (iný spec mohol seednúť skôr), takže netvrdíme
+	// „snapshot nebol naimportovaný" (to platí len na čistej DB). Testujeme honest-null,
+	// ktorý platí VŽDY: pergolové PRP kódy NIE SÚ v žiadnom seede → „cena neznáma".
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await napergolu(page);
 	await doRozpisu(page, `${RUN}-BEZ`);
 
 	await expect(page.getByTestId('ceny-tabulka')).toBeVisible();
-	await expect(page.getByTestId('ceny-snapshot-vek')).toContainText('nebol naimportovaný');
+	await expect(page.getByTestId('ceny-snapshot-vek')).toBeVisible(); // vek snapshotu je vždy
+	// PRP kódy nie sú v žiadnom snapshote → čestne „cena neznáma", súčet neúplný
 	await expect(page.getByTestId('cena-nakup-cennik-PRP20242')).toHaveText('cena neznáma');
 	await expect(page.getByTestId('ceny-sucet-nakup-cennik')).toContainText('neúplné');
 	expect(consoleMsgs).toEqual([]);
