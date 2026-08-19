@@ -65,6 +65,13 @@ h1 {
 	background: #fef3c7;
 	color: #b45309;
 }
+/* #239 — ručné položky (#234): fialový odznak, presunutý z pergola/narez/+page.svelte
+   pri rozdelení na subkomponenty (zdieľaný RucnePolozky/RezNahlad/RezHotovo). Reuse
+   .badge tokenov, žiadny nový dizajnový jazyk. */
+.badge.rucne {
+	background: #ede9fe;
+	color: #6d28d9;
+}
 /* Dátum vytvorenia plánu v tlačenej hlavičke (#114) — display-only, do Money nejde. */
 .vytvorene {
 	margin-left: 8px;
@@ -90,6 +97,35 @@ td {
 td.c,
 th.c {
 	text-align: center;
+}
+/* #239 — kompaktná tabuľka „narez" (materiál / komponenty / rozpis / ručné položky),
+   presunutá z pergola/narez/+page.svelte pri rozdelení na subkomponenty. Zdieľaná
+   RezVysledok/RucnePolozky/RezNahlad/RezHotovo; `.narez` sa používa LEN na tejto route.
+   Generické th (uppercase) sa uplatní ako predtým — narez th ho neprepisuje. */
+table.narez {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 14px;
+}
+table.narez th,
+table.narez td {
+	text-align: left;
+	padding: 7px 10px;
+	border-bottom: 1px solid #e2e8f0;
+}
+table.narez th {
+	color: #475569;
+	font-weight: 600;
+	font-size: 13px;
+}
+table.narez td:last-child,
+table.narez th:last-child {
+	text-align: center;
+	width: 90px;
+}
+table.narez .badge {
+	font-size: 12px;
+	padding: 2px 8px;
 }
 label {
 	display: block;
