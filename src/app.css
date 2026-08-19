@@ -55,6 +55,16 @@ h1 {
 	background: #dcfce7;
 	color: #15803d;
 }
+/* Stavové odznaky (#222) — spočítané/čaká — postavené na tých istých tokenoch
+   ako .badge.live/.badge.test, len sémanticky pomenované pre stav výpočtu. */
+.badge.ok {
+	background: #dcfce7;
+	color: #15803d;
+}
+.badge.wait {
+	background: #fef3c7;
+	color: #b45309;
+}
 /* Dátum vytvorenia plánu v tlačenej hlavičke (#114) — display-only, do Money nejde. */
 .vytvorene {
 	margin-left: 8px;

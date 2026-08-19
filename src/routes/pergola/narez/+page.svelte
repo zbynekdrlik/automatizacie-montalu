@@ -126,6 +126,19 @@
 	);
 
 	const mm = (n: number | null) => (n === null ? '— (čaká na výkres)' : `${n} mm`);
+
+	// #222 — stavové zhrnutie na prvý pohľad. Split je PRESNE ten, čo používa
+	// pergola-rezervacia pre Money: položka s dĺžkou rezu (`dlzkaRezuMm != null`,
+	// nenulový počet) ide do rezervácie = „spočítané"; `dlzkaRezuMm == null` = počet
+	// istý, dĺžka čaká; `nepodporovane[]` = čaká na pravidlo. Nič nové sa nepočíta.
+	let spocitaneCount = $derived(
+		vysledok ? vysledok.vypocitane.filter((p) => p.dlzkaRezuMm != null && p.pocetKs > 0).length : 0
+	);
+	let cakaDlzkaCount = $derived(
+		vysledok ? vysledok.vypocitane.filter((p) => p.dlzkaRezuMm == null).length : 0
+	);
+	let cakaPravidloCount = $derived(vysledok ? vysledok.nepodporovane.length : 0);
+	let cakaCount = $derived(cakaDlzkaCount + cakaPravidloCount);
 </script>
 
 <svelte:head><title>Rezervačný odpis — pergola</title></svelte:head>
@@ -173,11 +186,9 @@
 	<div class="card">
 		<h1>Rezervačný odpis — pergola</h1>
 		<p class="sub">
-			Zadaj rozmery objednávky — z <b>potvrdených</b> vzorcov spočítam materiál a môžeš ho
-			<b>rezervovať v Money</b> už pri zadaní objednávky (odpis do Money hneď, aby ti materiál
-			neušiel). Do rezervácie idú LEN potvrdené položky; čo ešte nemá pravidlo (krov, dĺžky
-			líšt/žľabu, sklá) ostáva čestne <b>„zatiaľ nepočítané"</b> a NEzahrnie sa — bez +20 % rezervy.
-			Odpis sa odošle až po tvojom potvrdení.
+			Zadaj rozmery objednávky — z <b>potvrdených</b> vzorcov spočítam materiál a rezervujem ho v
+			Money už pri zadaní objednávky (aby ti materiál neušiel). Do rezervácie idú LEN spočítané
+			položky, bez +20 % rezervy; odpis až po tvojom potvrdení.
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
 		<p class="sub">
@@ -449,7 +460,7 @@
 {:else if step === 'vysledok' && vysledok}
 	<div class="card">
 		<h1 data-testid="narez-nadpis">
-			Materiál/nárez — {vstup.system}
+			Rezervačný odpis — {vstup.system}
 			{vstup.sirka}×{vstup.hlbka} mm
 		</h1>
 		<p class="sub">
@@ -459,23 +470,54 @@
 		</p>
 	</div>
 
+	<!-- #222 — stavové zhrnutie navrchu: čo je spočítané (ide do rezervácie) a čo
+	     čaká, na prvý pohľad, bez čítania celej strany -->
+	<div class="card" data-testid="narez-stav">
+		<div class="sec">Stav výpočtu</div>
+		<div class="stav-grid">
+			<div class="stav-blok ok">
+				<span class="stav-cislo" data-testid="stav-spocitane">{spocitaneCount}</span>
+				<span class="stav-popis"
+					><span class="badge ok">✅ Spočítané</span> idú do rezervácie v Money</span
+				>
+			</div>
+			<div class="stav-blok wait">
+				<span class="stav-cislo" data-testid="stav-caka">{cakaCount}</span>
+				<span class="stav-popis"
+					><span class="badge wait">⏳ Čaká na vzorec</span> zatiaľ sa nezahŕňa (počet istý, dĺžka
+					čaká:
+					{cakaDlzkaCount} · čaká na pravidlo: {cakaPravidloCount})</span
+				>
+			</div>
+		</div>
+		<p class="sub" style="margin-top:12px">
+			Do rezervácie idú LEN spočítané položky (s dĺžkou rezu); „čaká na vzorec" sa NEZAHŔŇA — nikdy
+			vymyslené číslo. Odpis sa odošle až po tvojom potvrdení nižšie.
+			{#if !data.live}<b>🧪 TEST režim — do Money nejde nič.</b>{/if}
+		</p>
+	</div>
+
 	<div class="card" style="overflow:auto;padding:10px">
 		<div class="sec noprint">Technický výkres z rozmerov (#194)</div>
 		<p class="sub noprint" style="margin:0 0 8px">
-			Predný pohľad, bokorys a pôdorys z <b>potvrdených</b> vzorcov (nohy, rozostupy, priečky,
-			žľab). Krov je zjednodušený obrys — jeho detail (sklon 7°, rozostup, frézovanie) doplní
-			konštruktér (#161). <b>Do Money sa neposiela nič.</b>
+			Predný pohľad, bokorys a pôdorys z potvrdených vzorcov. Krov je zjednodušený obrys — detail
+			doplní konštruktér (#161).
 		</p>
 		<PergolaNarezVykres {vstup} datum={formatDatumCasSk(data.datumIso)} />
 	</div>
 
 	{#if krov}
 		<div class="card">
-			<div class="sec">Krov — uloženie (#161)</div>
+			<div class="sec">
+				Krov — uloženie (#161)
+				{#if krov.podporovane}<span class="badge ok">✅ potvrdené</span>{:else}<span
+						class="badge wait">⏳ nepodporované</span
+					>{/if}
+			</div>
 			{#if krov.podporovane}
 				<p class="sub">
-					Potvrdené uloženie z prahu 7° (vzorce z callu 13.8., číselne overené). Frézovanie drážok
-					(výrobný list) ostáva na konštruktérovi. <b>Do Money sa neposiela nič.</b>
+					Potvrdené uloženie z prahu 7° (číselne overené). Frézovanie drážok (výrobný list) ostáva
+					na konštruktérovi.
 				</p>
 				<div data-testid="krov-ulozenie">
 					<div class="row"><span>Sklon strechy</span><b>{krov.sklonStupne}°</b></div>
@@ -515,14 +557,22 @@
 	{/if}
 
 	<div class="card">
-		<div class="sec">Materiál — vypočítané ({vysledok.vypocitane.length} položiek)</div>
+		<div class="sec">
+			Materiál <span class="badge ok">✅ {spocitaneCount} spočítané</span>{#if cakaDlzkaCount}<span
+					class="badge wait">⏳ {cakaDlzkaCount} čaká na dĺžku</span
+				>{/if}
+		</div>
 		<p class="sub noprint">
-			Len z potvrdených vzorcov. „—" pri dĺžke = počet je istý, dĺžku rezu ešte nemáme (čaká na
-			kótovaný výkres, O1). <b>Nič sa neposiela do Money.</b>
+			Stĺpec „Stav": <b>✅</b> = dĺžka známa, ide do rezervácie · <b>⏳</b> = počet istý, dĺžka rezu čaká
+			na vzorec (kótovaný výkres) a do odpisu sa nezahrnie.
 		</p>
 		<table class="narez" data-testid="narez-tabulka">
 			<thead>
-				<tr><th>Kód</th><th>Názov</th><th>Dĺžka rezu</th><th>Počet ks</th><th>Výdaj</th></tr>
+				<tr
+					><th class="stav-col">Stav</th><th>Kód</th><th>Názov</th><th>Dĺžka rezu</th><th
+						>Počet ks</th
+					><th>Výdaj</th></tr
+				>
 			</thead>
 			<tbody>
 				<!-- POZOR: jeden kód môže mať VIAC riadkov (napr. 18016 pod fixom + pod kotviacim;
@@ -530,6 +580,21 @@
 				     unikátny — v teste filtruj podľa textu riadku (`.filter({ hasText: '…' })`). -->
 				{#each vysledok.vypocitane as p (p.kod + p.nazov)}
 					<tr data-testid="polozka-{p.kod}">
+						<td class="stav-col">
+							<!-- rovnaká podmienka ako spocitaneCount / narezToCadRows (do rezervácie
+							     ide `dlzkaRezuMm != null && pocetKs > 0`) — per-riadkový odznak sa tak
+							     nikdy nerozíde so zhrnutím ani s Money, aj keby pribudol riadok s
+							     dĺžkou ale nulovým počtom (#222 review) -->
+							{#if p.dlzkaRezuMm != null && p.pocetKs > 0}<span
+									class="badge ok"
+									data-testid="stav-{p.kod}"
+									title="dĺžka známa → ide do rezervácie">✅ v odpise</span
+								>{:else}<span
+									class="badge wait"
+									data-testid="stav-{p.kod}"
+									title="počet istý, dĺžka rezu čaká na vzorec">⏳ čaká</span
+								>{/if}
+						</td>
 						<td>{p.kod}</td>
 						<td>{p.nazov}{p.poznamka ? ` · ${p.poznamka}` : ''}</td>
 						<td>{mm(p.dlzkaRezuMm)}</td>
@@ -546,12 +611,13 @@
 	</div>
 
 	<div class="card">
-		<div class="sec">Komponenty (spojky, krytky) — {komponenty.length} typov</div>
+		<div class="sec">
+			Komponenty (spojky, krytky) — {komponenty.length} typov
+			<span class="badge wait">⏳ zatiaľ len typy</span>
+		</div>
 		<p class="sub noprint">
-			Kusové komponenty vyčítané z reálnych výkresov (spojky, krytky, rámové/zakladacie lišty).
-			<b>Zatiaľ len TYPY</b> — počty a Money kódy čakajú na tabuľky od Dominika. „—" pri počte = bez
-			potvrdeného pravidla, nič sa nehádže. CAD kód je informatívny (<b>NIE</b> Money odpisový kód).
-			<b>Do Money sa neposiela nič.</b>
+			Vyčítané z výkresov, ale <b>len TYPY</b> — počty a Money kódy čakajú na tabuľky od Dominika
+			(„—" pri počte). CAD kód je informatívny, <b>NIE</b> Money odpisový.
 		</p>
 		{#if komponenty.length === 0}
 			<p class="sub" data-testid="komponenty-prazdne">
@@ -648,14 +714,17 @@
 				</div>
 			</div>
 			<p class="sub">
-				Sklá sú informatívny údaj (Zasklenia má vlastný odpis). Frézovanie zvodu je evidencia na
-				výkrese — výrobný detail dopĺňa konštruktér (#161). <b>Do Money sa neposiela nič.</b>
+				Sklá sú informatívny údaj (Zasklenia má vlastný odpis); frézovanie zvodu je evidencia na
+				výkrese, detail dopĺňa konštruktér (#161).
 			</p>
 		</div>
 	{/if}
 
 	<div class="card">
-		<div class="sec">Zatiaľ nepodporované (čaká na pravidlá)</div>
+		<div class="sec">
+			Zatiaľ nepodporované (čaká na pravidlá)
+			<span class="badge wait">⏳ {cakaPravidloCount}</span>
+		</div>
 		<ul data-testid="narez-nepodporovane" style="margin:6px 0 0;padding-left:18px">
 			{#each vysledok.nepodporovane as n (n)}
 				<li style="margin:4px 0">{n}</li>
@@ -666,9 +735,8 @@
 	<div class="card noprint">
 		<div class="sec">Rezervačný odpis do Money</div>
 		<p class="sub">
-			Rezervuje materiál v Money už pri zadaní objednávky. Do odpisu idú LEN <b>potvrdené</b>
-			položky vyššie; „zatiaľ nepočítané" (napr. priečka = HH krovu) sa NEZAHRNÚ. Bez +20 % rezervy. Odpis
-			sa odošle až po tvojom potvrdení.
+			Do odpisu idú LEN spočítané položky vyššie (bez +20 % rezervy). Odpis sa odošle až po tvojom
+			potvrdení.
 			{#if !data.live}<b>🧪 TEST režim — do Money nejde nič.</b>{/if}
 		</p>
 		{#if rezError}
@@ -813,6 +881,70 @@
 {/if}
 
 <style>
+	/* #222 — stavové zhrnutie navrchu + stavový stĺpec v tabuľke. Reuse tokenov
+	   z app.css, žiadny nový dizajnový jazyk. */
+	.stav-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
+	}
+	@media (max-width: 640px) {
+		.stav-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+	.stav-blok {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 12px 14px;
+	}
+	.stav-blok.ok {
+		background: #f0fdf4;
+		border-color: #bbf7d0;
+	}
+	.stav-blok.wait {
+		background: #fffbeb;
+		border-color: #fde68a;
+	}
+	.stav-cislo {
+		font-size: 32px;
+		font-weight: 800;
+		line-height: 1;
+		min-width: 1.4em;
+		text-align: center;
+	}
+	.stav-blok.ok .stav-cislo {
+		color: #15803d;
+	}
+	.stav-blok.wait .stav-cislo {
+		color: #b45309;
+	}
+	.stav-popis {
+		font-size: 14px;
+		color: #475569;
+		line-height: 1.35;
+	}
+	/* stavové odznaky v nadpise sekcie — .sec je uppercase, badge nechať tak */
+	.sec .badge {
+		text-transform: none;
+		letter-spacing: 0;
+		vertical-align: middle;
+		margin-left: 6px;
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.stav-col {
+		width: 96px;
+		white-space: nowrap;
+	}
+	table.narez .badge {
+		font-size: 12px;
+		padding: 2px 8px;
+	}
+
 	table.narez {
 		width: 100%;
 		border-collapse: collapse;

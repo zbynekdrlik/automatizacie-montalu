@@ -69,21 +69,32 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<h1>Pergola — CAD nárez → Money</h1>
-		<p class="sub">
-			Vlož CAD nárez (riadky: KÓD NÁZOV KS REZ), ukážem Money rozpis a počty tyčí pre Solid Edge.
-			Odpis sa odošle až po tvojom potvrdení.
-			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
-		</p>
-		<p class="sub">
-			📐 Potrebuješ zákaznícky návrhový výkres namiesto Money odpisu?
-			<a href={resolve('/pergola/navrh')} data-testid="link-navrh">→ Návrhový výkres</a>
-		</p>
-		<p class="sub">
-			🧮 Rezervačný odpis: rezervuj materiál v Money z rozmerov (bez CAD-u) už pri zadaní objednávky
-			— len potvrdené vzorce, odpis až po potvrdení
-			<a href={resolve('/pergola/narez')} data-testid="link-narez">→ Rezervačný odpis</a>
-		</p>
+		<h1>Pergola</h1>
+		<p class="sub" style="margin-bottom:16px">Vyber, čo práve potrebuješ spraviť:</p>
+		<div class="mode-grid" data-testid="pergola-rezimy">
+			<div class="mode-card active" data-testid="rezim-cad">
+				<span class="mode-tag ok">➊ tu si</span>
+				<span class="mode-title">CAD nárez → Money odpis</span>
+				<span class="mode-desc"
+					>Máš hotový CAD nárez zo Solid Edge — prepíšem ho na Money odpis a počty tyčí.</span
+				>
+				<span class="mode-foot">Formulár je nižšie ↓</span>
+			</div>
+			<a class="mode-card" href={resolve('/pergola/narez')} data-testid="link-narez">
+				<span class="mode-tag">z rozmerov</span>
+				<span class="mode-title">Rezervačný odpis</span>
+				<span class="mode-desc"
+					>Ešte nemáš CAD — zarezervuj materiál v Money už z rozmerov objednávky.</span
+				>
+				<span class="mode-foot">Otvoriť →</span>
+			</a>
+			<a class="mode-card" href={resolve('/pergola/navrh')} data-testid="link-navrh">
+				<span class="mode-tag">bez Money</span>
+				<span class="mode-title">Návrhový výkres</span>
+				<span class="mode-desc">Pekný technický výkres pre zákazníka. Do Money nejde nič.</span>
+				<span class="mode-foot">Otvoriť →</span>
+			</a>
+		</div>
 	</div>
 
 	{#if form?.error}
@@ -91,6 +102,12 @@
 	{/if}
 
 	<div class="card">
+		<div class="sec">Režim ➊ · CAD nárez → Money odpis</div>
+		<p class="sub" style="margin:0 0 16px">
+			Vlož CAD nárez (riadky: KÓD NÁZOV KS REZ), ukážem Money rozpis a počty tyčí pre Solid Edge.
+			Odpis sa odošle až po tvojom potvrdení.
+			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
+		</p>
 		<form method="POST" action="?/spocitat">
 			<div class="grid3">
 				<div class="field">
@@ -276,3 +293,77 @@
 		<a class="btn secondary" href={resolve('/odpisy')}>📋 História odpisov</a>
 	</div>
 {/if}
+
+<style>
+	/* Rozcestník režimov (#222) — reuse tokenov z app.css, žiadny nový dizajnový
+	   jazyk. Aktívna karta (aktuálny CAD režim) modrý akcent, odkazy hover. */
+	.mode-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 12px;
+	}
+	@media (max-width: 720px) {
+		.mode-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+	.mode-card {
+		display: flex;
+		flex-direction: column;
+		text-align: left;
+		text-decoration: none;
+		color: inherit;
+		background: #f8fafc;
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 16px;
+		transition:
+			border-color 0.12s,
+			box-shadow 0.12s,
+			background 0.12s;
+	}
+	a.mode-card:hover {
+		border-color: #2563eb;
+		background: #fff;
+		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+	}
+	.mode-card.active {
+		background: #eff6ff;
+		border-color: #2563eb;
+		box-shadow: inset 0 0 0 1px #2563eb;
+	}
+	.mode-tag {
+		align-self: flex-start;
+		font-size: 12px;
+		font-weight: 700;
+		color: #64748b;
+		background: #e2e8f0;
+		border-radius: 999px;
+		padding: 2px 9px;
+		margin-bottom: 9px;
+	}
+	.mode-tag.ok {
+		background: #dcfce7;
+		color: #15803d;
+	}
+	.mode-title {
+		font-size: 17px;
+		font-weight: 700;
+		color: #0f172a;
+		margin-bottom: 5px;
+	}
+	.mode-desc {
+		font-size: 14px;
+		color: #475569;
+		line-height: 1.4;
+	}
+	.mode-foot {
+		margin-top: 10px;
+		font-size: 13px;
+		font-weight: 600;
+		color: #2563eb;
+	}
+	.mode-card.active .mode-foot {
+		color: #475569;
+	}
+</style>

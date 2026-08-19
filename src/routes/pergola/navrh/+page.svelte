@@ -167,11 +167,13 @@
 {#if step === 'form'}
 	<div class="card">
 		<h1>Pergola — návrhový výkres</h1>
+		<p class="sub" style="margin-top:6px">
+			<span class="badge">bez Money</span>
+		</p>
 		<p class="sub">
-			Zadaj rozmery — vykreslím zákaznícky návrhový výkres presne podľa vzoru OP260032 (predný
-			pohľad, bočný rez, detail strešnej výplne, 3D izometria so šípkami ZVOD).
-			<b>Do Money sa neposiela nič</b> — tento modul len kreslí. Money odpis z CAD nárezu ostáva na
-			<a href={resolve('/pergola')}>pôvodnej stránke Pergola</a>.
+			Zadaj rozmery — vykreslím zákaznícky výkres podľa vzoru OP260032 (predný pohľad, bočný rez,
+			detail výplne, 3D izometria). Tento modul len kreslí, do Money nejde nič. Money odpis z CAD
+			nárezu je na <a href={resolve('/pergola')}>pôvodnej stránke Pergola</a>.
 		</p>
 	</div>
 
