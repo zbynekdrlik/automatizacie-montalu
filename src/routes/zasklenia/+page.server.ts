@@ -28,6 +28,7 @@ import {
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
 import { komponentyPre } from '$lib/server/komponenty-cfg';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
+import { skloCenaPre, type SkloCenaResult, type SkloPlanVstup } from '$lib/server/sklo-cena';
 import {
 	parseVstup,
 	parseMultiVstup,
@@ -111,6 +112,15 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean) {
 function cenyPre(user: SessionUser | null, polozky: OdpisJob['polozky']): CenyResult | undefined {
 	if (isB2B(user)) return undefined;
 	return enrichPolozky(polozky);
+}
+
+/**
+ * Náklad na sklo (display-only, #225) — rovnaká interná-only hranica ako `cenyPre`:
+ * pre b2b sa cena skla vôbec NEDOPOČÍTA, takže sa nikdy nedostane do HTML odpovede.
+ */
+function skloCenyPre(user: SessionUser | null, plany: SkloPlanVstup[]): SkloCenaResult | undefined {
+	if (isB2B(user)) return undefined;
+	return skloCenaPre(plany);
 }
 
 /** Existuje taký nárezák? Zdroj pravdy pre server je konfigurácia (cfg z DB). */
@@ -336,6 +346,18 @@ export const actions: Actions = {
 			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; undefined pre
 			// b2b, takže sa nedostane ani do HTML odpovede (obrana do hĺbky)
 			ceny: cenyPre(locals.user, job.polozky),
+			// náklad na sklo (display-only, #225) — LEN pre interných, undefined pre b2b;
+			// plocha reálnych tabúľ × cena/m² zo snapshotu, honest-null keď cena chýba
+			skloCeny: skloCenyPre(locals.user, [
+				{
+					label: '',
+					system: vstup.system,
+					variant: vstup.sklo,
+					sirka: r.sklo.sirka,
+					vyska: r.sklo.vyska,
+					pocet: r.sklo.pocet
+				}
+			]),
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
@@ -457,6 +479,18 @@ export const actions: Actions = {
 			kovanie: kov.polozky,
 			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných (viď nahlad vyššie)
 			ceny: cenyPre(locals.user, job.polozky),
+			// náklad na sklo per posuv + súhrn (display-only, #225) — LEN pre interných
+			skloCeny: skloCenyPre(
+				locals.user,
+				r.posuvy.map((p, i) => ({
+					label: 'Posuv ' + (i + 1),
+					system: p.system,
+					variant: vstup.posuvy[i]?.sklo ?? '',
+					sirka: p.sklo.sirka,
+					vyska: p.sklo.vyska,
+					pocet: p.sklo.pocet
+				}))
+			),
 			planHash: contentHash(vstup.zak, job.polozky),
 			warn: null as string | null,
 			heightWarn,

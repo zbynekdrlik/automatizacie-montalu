@@ -732,6 +732,33 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 23) {
+		// v22 → v23: nepovinný Money kód skla (#225) — mapovanie variantu skla na
+		// TS* položku Money cenníka IZOS, LEN pre DISPLAY-ONLY zobrazenie nákladu skla
+		// v nárezáku (plocha × cena/m²). Money ODPIS skiel sa NEMENÍ (samostatné
+		// rozhodnutie, viď #225). Seedujú sa LEN jednoznačné zhody kompozície s IZOS
+		// katalógom (overené read-only proti Money 2026-08-19); ostatné varianty =
+		// NULL → „cena nedostupná" (honest-null, nič sa nedopočítava). Producent
+		// snapshotu (mimo repa, dev2) musí sklá do snapshotu ešte začať ťahať (TS* +
+		// IZOS cenník do `nakupCennik`) — dovtedy je cena všade nedostupná, čo je
+		// správny očakávaný stav. Stĺpec je nullable a `listGlassTypes` ho NEČÍTA, takže
+		// katalógové asercie v migračných testoch ostávajú nedotknuté (mení sa len
+		// user_version). Mapovanie je metadáta k RIADKU `(nazov, system)`, nie
+		// name-only lookup (rešpektuje glass-catalog rule — pozri glassMoneyKod v db.ts).
+		db.transaction(() => {
+			const cols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map(
+				(c) => c.name
+			);
+			if (!cols.includes('money_kod')) db.exec('ALTER TABLE glass_types ADD COLUMN money_kod TEXT');
+			const upd = db.prepare('UPDATE glass_types SET money_kod = ? WHERE nazov = ? AND system = ?');
+			upd.run('TS00016', 'Izolačné sklo 4/16/4 číre', 'Robust');
+			upd.run('TS00017', 'Izolačné sklo 4/16/4 mliečne', 'Robust');
+			upd.run('TS00021', 'Izolačné sklo 4/8/4 číre', 'Slide');
+			upd.run('TS00022', 'Izolačné sklo 4/8/4 mliečne', 'Slide');
+			db.pragma('user_version = 23');
+		})();
+	}
+
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

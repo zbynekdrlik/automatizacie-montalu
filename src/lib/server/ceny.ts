@@ -237,6 +237,28 @@ function getPriceRow(kod: string): PriceRow | undefined {
 	return row;
 }
 
+export interface CenaZaM2 {
+	/** €/m² z Money cenníka (pre sklo = IZOS cenník cez `nakupCennik`); `null` =
+	 *  kód je v snapshote, ale cenu preň Money nemá (0/chýba) → „cena nedostupná". */
+	eurM2: number | null;
+	mena: string;
+}
+
+/**
+ * Cena za m² pre daný Money kód zo snapshotu — pre display-only zobrazenie ceny
+ * skla v nárezáku (#225). Zdroj je existujúce pole `nakupCennik` (u skiel doň
+ * producent snapshotu mapne IZOS cenník). Vráti `null`, keď kód v snapshote VÔBEC
+ * NIE JE (variant je namapovaný, ale cena ešte nie je k dispozícii) — rovnaká
+ * honest-null hláška ako `eurM2 === null`. Sám si spustí lazy import (idempotentný).
+ */
+export function cenaZaM2(kod: string): CenaZaM2 | null {
+	if (!kod) return null;
+	maybeImportSnapshot();
+	const price = getPriceRow(kod);
+	if (!price) return null;
+	return { eurM2: price.nakupCennik, mena: price.mena };
+}
+
 export interface CenaRiadok {
 	kod: string;
 	nazov: string;

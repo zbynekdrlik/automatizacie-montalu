@@ -34,6 +34,7 @@
 	} from '$lib/sietka';
 	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
+	import SkloCena from '$lib/components/SkloCena.svelte';
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
 
@@ -774,6 +775,12 @@
 		<CenyTabulka ceny={form.ceny} />
 	{/if}
 
+	<!-- náklad na sklo (display-only, #225) — LEN pre interných, NOPRINT; b2b nikdy
+	     nedostane `form.skloCeny` (viď skloCenyPre v +page.server.ts) -->
+	{#if form?.skloCeny}
+		<SkloCena skloCeny={form.skloCeny} />
+	{/if}
+
 	<div class="card">
 		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
 		<p class="sub" style="margin-bottom:14px">
@@ -966,6 +973,11 @@
 	<!-- cenový zoznam materiálu (#154, fáza 1) — LEN pre interných, viď planKarty vyššie -->
 	{#if form?.ceny}
 		<CenyTabulka ceny={form.ceny} />
+	{/if}
+
+	<!-- náklad na sklo per posuv + súhrn (display-only, #225) — LEN pre interných, NOPRINT -->
+	{#if form?.skloCeny}
+		<SkloCena skloCeny={form.skloCeny} />
 	{/if}
 
 	<div class="card">
