@@ -142,7 +142,8 @@ describe('spocitajNarez — priečky (počet z max rozostupu 700, dĺžka O1-blo
 		expect(priecka!.dlzkaRezuMm).toBeNull();
 		// #205: kótovaný výkres OP260282 dorazil, ale priečka = HH krovu, čo nie je vzorec
 		// zo vstupov (CAD výsledok geometrie krovu) → poznámka odkazuje na HH krovu / #161
-		expect(priecka!.poznamka).toMatch(/HH krovu|#161/i);
+		// #233 — poznámka je plain slovenčina (HH krovu / #161 → „horná hrana krovu")
+		expect(priecka!.poznamka).toMatch(/hrana krovu/i);
 	});
 	it('light checkbox → kód priečky 18102, inak 18004', () => {
 		expect(
@@ -178,12 +179,13 @@ describe('spocitajNarez — informatívne výpočty', () => {
 describe('spocitajNarez — zatiaľ nepodporované (O-otázky), nič sa nehádže', () => {
 	it('krov, lišty (HH krovu), sklá v nepodporované; žľab + kotviaci sú TERAZ vo vypocitane (#205)', () => {
 		const r = spocitajNarez(VZOR);
-		const n = r.nepodporovane.join(' | ');
+		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
 		expect(n).toMatch(/krov/i);
-		expect(n).toMatch(/#161/);
+		// #233 — interné referencie (#161, O1) nahradené plain slovenčinou
+		expect(n).toMatch(/čaká na vzorec/i);
 		expect(n).toMatch(/lišt|prítlačn|maskovac/i);
 		expect(n).toMatch(/skl/i);
-		expect(n).toMatch(/O1/);
+		expect(n).toMatch(/hrana krovu/i);
 		// #205: žľab (18018/18021) + kotviaci (18019) sa presunuli z „nepodporované" do
 		// „vypocitane" — kótovaný výkres OP260282 potvrdil dĺžku = šírka (O1 čiastočne).
 		expect(
@@ -192,14 +194,23 @@ describe('spocitajNarez — zatiaľ nepodporované (O-otázky), nič sa nehádž
 		expect(r.vypocitane.some((p) => p.kod === '18019' && p.dlzkaRezuMm === VZOR.sirka)).toBe(true);
 	});
 	it('zosilnený nosník checkbox → profil (250×110/230×110/200×140) je nepodporovaný (O2/O3)', () => {
-		const bez = spocitajNarez({ ...VZOR, zosilnenyNosnik: false }).nepodporovane.join(' | ');
-		const s = spocitajNarez({ ...VZOR, zosilnenyNosnik: true }).nepodporovane.join(' | ');
+		const bez = spocitajNarez({ ...VZOR, zosilnenyNosnik: false })
+			.nepodporovane.map((x) => x.kratky + ' ' + x.detail)
+			.join(' | ');
+		const s = spocitajNarez({ ...VZOR, zosilnenyNosnik: true })
+			.nepodporovane.map((x) => x.kratky + ' ' + x.detail)
+			.join(' | ');
 		expect(bez).not.toMatch(/zosilnen/i);
 		expect(s).toMatch(/zosilnen/i);
-		expect(s).toMatch(/O2|O3/);
+		// #233 — O2/O3 nahradené plain vysvetlením
+		expect(s).toMatch(/per-systém|čaká na vzorec/i);
 	});
 	it('spád/kliny sú vylúčené s poznámkou, že patria k zaskleniu (nie k nohám)', () => {
-		expect(spocitajNarez(VZOR).nepodporovane.join(' | ')).toMatch(/klin|spád/i);
+		expect(
+			spocitajNarez(VZOR)
+				.nepodporovane.map((x) => x.kratky + ' ' + x.detail)
+				.join(' | ')
+		).toMatch(/klin|spád/i);
 	});
 });
 
@@ -340,7 +351,9 @@ describe('#206 (a) jednoduchá pergola bez zasklenia — vypne bočné 110×43',
 			jednoduchaBezZasklenia: true
 		});
 		expect(bez.vypocitane.some((p) => p.kod === KOD_PROFIL_110x43)).toBe(false);
-		expect(bez.nepodporovane.join(' | ')).toMatch(/bez zasklenia/i);
+		expect(bez.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ')).toMatch(
+			/bez zasklenia/i
+		);
 	});
 
 	it('default (pole nezadané) = zasklená (bočný 110×43 sa počíta pri stene)', () => {
@@ -472,8 +485,12 @@ describe('#206 (c) výstuha 200×140 → svetlosť −60 (preteká do prednej no
 		const r = spocitajNarez({ ...VZOR, system: 'Robust', vystuhaProfil: '110x250' });
 		// žiadny −60 (to je len 200×140), žiadny vymyslený riadok výstuhy Robust
 		expect(r.informativne.efektivnaSvetlost).toBe(VZOR.prednaSvetlost);
-		expect(r.nepodporovane.join(' | ')).toMatch(/110×250|110x250/);
-		expect(r.nepodporovane.join(' | ')).toMatch(/skovan|žľabe/i);
+		expect(r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ')).toMatch(
+			/110×250|110x250/
+		);
+		expect(r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ')).toMatch(
+			/skovan|žľabe/i
+		);
 		expect(r.informativne.vystuhaProfil).toBe('110x250');
 	});
 

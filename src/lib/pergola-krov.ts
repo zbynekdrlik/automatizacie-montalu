@@ -73,11 +73,11 @@ export interface KrovUlozenie {
 	poznamky: string[];
 }
 
-const FREZOVANIE_POZN =
-	'Frézovanie drážok (dĺžka/výška/uhol) = výrobný list — doplní konštruktér (#161, O5).';
-const ODVESNA_POZN =
-	'Priradenie odvesny c/cc prednej/zadnej hrane je odvodené, nie potvrdené (O5).';
-const JEDNOTKA_POZN = 'Konštanta 0,01 predpokladá mm (O5b — jednotku Dominik nepovedal).';
+// #233 — renderované poznámky (krov.poznamky) sú plain slovenčina bez interných
+// referencií (#161/O5/O5b ostávajú v komentároch kódu, nie na obrazovke).
+const FREZOVANIE_POZN = 'Frézovanie drážok (dĺžka/výška/uhol) = výrobný list — doplní konštruktér.';
+const ODVESNA_POZN = 'Priradenie odvesny c/cc prednej/zadnej hrane je odvodené, nie potvrdené.';
+const JEDNOTKA_POZN = 'Konštanta 0,01 predpokladá mm (jednotku Dominik nepovedal).';
 
 /** Uloženie krovu z uhla sklonu strechy — LEN potvrdené vzorce prahu 7° (#161). Čistá
  *  funkcia, bez vedľajších efektov, bez Money zápisu. Neodvodzuje sklon z výšok/hĺbky
@@ -121,7 +121,7 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 			konstanty,
 			poznamky: [
 				`Sklon pod ${KROV_PRAH_STUPNE}° — bod dotyku sa prehodí (trojuholník sa otočí), ` +
-					'vetva NIE JE potvrdeným vzorcom pokrytá (O5). Uloženie sa nepočíta.',
+					'vetva NIE JE potvrdeným vzorcom pokrytá. Uloženie sa nepočíta.',
 				FREZOVANIE_POZN
 			]
 		};
@@ -148,7 +148,7 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 	if (s >= KROV_FREZ_ZMENA_STUPNE) {
 		poznamky.push(
 			`Nad ~${KROV_FREZ_ZMENA_STUPNE}–10° sa drážka zatvára a výška krovu sa dvíha — ` +
-				'frézovací detail (O5); offsety uloženia ostávajú z potvrdeného vzorca.'
+				'frézovací detail; offsety uloženia ostávajú z potvrdeného vzorca.'
 		);
 	}
 	poznamky.push(ODVESNA_POZN, JEDNOTKA_POZN, FREZOVANIE_POZN);

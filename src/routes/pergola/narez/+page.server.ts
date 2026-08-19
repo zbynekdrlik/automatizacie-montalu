@@ -33,16 +33,23 @@ export const load: PageServerLoad = async () => {
 
 export const actions: Actions = {
 	spocitat: async ({ request }) => {
-		const { vstup, error } = parsePergolaNarezVstup(await request.formData());
-		if (error) return { step: 'form' as const, error, vstup };
-		return { step: 'vysledok' as const, vstup, error: null as string | null };
+		const form = await request.formData();
+		const { vstup, error } = parsePergolaNarezVstup(form);
+		// #233 — ZAK/OP/zákazník zadané skôr v tom istom toku echujeme späť, nech sa v
+		// odpisovom bloku predvyplnia a nezadávajú sa dvakrát.
+		const ident = parseIdent(form);
+		if (error) return { step: 'form' as const, error, vstup, ident };
+		return { step: 'vysledok' as const, vstup, ident, error: null as string | null };
 	},
 
 	// „← Späť a upraviť": echo vstupu späť do formulára (nekreslí), rovnaká pasca ako
-	// v ostatných moduloch (obyčajný <a href> by ho vynuloval — nova-stranka §4)
+	// v ostatných moduloch (obyčajný <a href> by ho vynuloval — nova-stranka §4).
+	// #233 — echujeme aj ident, aby ZAK/OP/zákazník prežili round-trip (nezadávať dvakrát).
 	upravit: async ({ request }) => {
-		const { vstup } = parsePergolaNarezVstup(await request.formData());
-		return { step: 'form' as const, vstup };
+		const form = await request.formData();
+		const { vstup } = parsePergolaNarezVstup(form);
+		const ident = parseIdent(form);
+		return { step: 'form' as const, vstup, ident };
 	},
 
 	// #221: z rozmerov → Money rozpis rezervácie (BEZ zápisu) → nahlad na potvrdenie.

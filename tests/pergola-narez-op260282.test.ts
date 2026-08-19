@@ -136,17 +136,18 @@ describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3)'
 	});
 
 	it('r.11/13/12 prítlačná+maskovacie = HH krovu+40 → v nepodporované (čestný null)', () => {
-		const n = r.nepodporovane.join(' | ');
+		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
 		expect(n).toMatch(/prítlačn/i);
 		expect(n).toMatch(/maskovac/i);
-		expect(n).toMatch(/HH krovu/i);
-		expect(n).toMatch(/#161|#198/);
+		// #233 — plain slovenčina namiesto interných referencií (#161/#198 → text)
+		expect(n).toMatch(/hrana krovu/i);
+		expect(n).toMatch(/čaká na vzorec/i);
 		// engine NEemituje pre ne dĺžku (3279.77) — žiadny vypocitane riadok 18006/18007/18008
 		expect(r.vypocitane.some((p) => ['18006', '18007', '18008'].includes(p.kod))).toBe(false);
 	});
 
 	it('r.9 zaklapávacia (18005) = (šírka−402)/7 → v nepodporované (počet krovov O1-blokovaný)', () => {
-		const n = r.nepodporovane.join(' | ');
+		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
 		expect(n).toMatch(/zaklapávac/i);
 		expect(r.vypocitane.some((p) => p.kod === '18005')).toBe(false);
 	});
@@ -154,9 +155,10 @@ describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3)'
 	it('r.6 zvislá zadná výstuha (2340) → čestný null (svetlosť 2325 nie je vstup; #198 Dominik)', () => {
 		// task 2 (ostáva honest-null): 2340 = svetlosť 2325 + 15, ale 2325 sa zo vstupov (predná
 		// svetlosť 2200 → 2215) neodvodí; formula položená Dominikovi (#198). Žiadny vypocitane riadok.
-		const n = r.nepodporovane.join(' | ');
+		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
 		expect(n).toMatch(/zvislá zadná výstuha|zadná výstuha/i);
 		expect(n).toMatch(/2340/);
-		expect(n).toMatch(/#198/);
+		// #233 — #198 nahradené plain vysvetlením
+		expect(n).toMatch(/čaká na vzorec|nedá odvodiť/i);
 	});
 });

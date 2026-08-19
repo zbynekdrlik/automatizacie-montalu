@@ -205,6 +205,7 @@
 
 	<div class="card">
 		<form method="POST" action="?/spocitat">
+			{@render hiddenIdent()}
 			<div class="grid3">
 				<div class="field">
 					<label for="system">Systém pergoly *</label>
@@ -310,7 +311,7 @@
 						<p class="sub" style="margin:4px 0 0">
 							{uchytenieS === 'samostatne'
 								? 'zadná noha = plná ZV (výkres OP260282)'
-								: 'bočný profil 110×43 pod kotviacim = ZV − 190 (#206)'}
+								: 'bočný profil 110×43 pod kotviacim = ZV − 190'}
 						</p>
 					</div>
 					{#if uchytenieS === 'samostatne'}
@@ -368,14 +369,14 @@
 							bind:checked={zosilnenyNosnikS}
 							style="width:auto"
 						/>
-						Zosilnený nosník (profil čaká na pravidlo — O2/O3)
+						Zosilnený nosník (profil zatiaľ čaká na vzorec od Dominika)
 					</label>
 				</div>
 			</div>
 
 			<div class="grid3">
 				<div class="field">
-					<label for="sklonStrechy">Sklon strechy (°) — krov uloženie (#161)</label>
+					<label for="sklonStrechy">Sklon strechy (°) — uloženie krovu</label>
 					<input
 						id="sklonStrechy"
 						name="sklonStrechy"
@@ -387,8 +388,8 @@
 						bind:value={sklonStrechyS}
 					/>
 					<p class="sub" style="margin:4px 0 0">
-						voliteľné · ≥ 7° = <b>potvrdené</b> uloženie (prah 7°, vzorce z callu 13.8.); pod 7° zatiaľ
-						nepodporované (O5). Frézovanie drážok ostáva na konštruktérovi.
+						voliteľné · ≥ 7° = <b>potvrdené</b> uloženie (prah 7°); pod 7° zatiaľ nepodporované. Frézovanie
+						drážok ostáva na konštruktérovi.
 					</p>
 				</div>
 			</div>
@@ -421,7 +422,9 @@
 							bind:value={zvodFrezovanieSHmmS}
 							required
 						/>
-						<p class="sub" style="margin:4px 0 0">evidencia na výkrese; detail frézovania → #161</p>
+						<p class="sub" style="margin:4px 0 0">
+							evidencia na výkrese; detail frézovania čaká na vzorec
+						</p>
 					</div>
 				{/if}
 			</div>
@@ -498,10 +501,10 @@
 	</div>
 
 	<div class="card" style="overflow:auto;padding:10px">
-		<div class="sec noprint">Technický výkres z rozmerov (#194)</div>
+		<div class="sec noprint">Technický výkres z rozmerov</div>
 		<p class="sub noprint" style="margin:0 0 8px">
 			Predný pohľad, bokorys a pôdorys z potvrdených vzorcov. Krov je zjednodušený obrys — detail
-			doplní konštruktér (#161).
+			doplní konštruktér.
 		</p>
 		<PergolaNarezVykres {vstup} datum={formatDatumCasSk(data.datumIso)} />
 	</div>
@@ -509,7 +512,7 @@
 	{#if krov}
 		<div class="card">
 			<div class="sec">
-				Krov — uloženie (#161)
+				Krov — uloženie
 				{#if krov.podporovane}<span class="badge ok">✅ potvrdené</span>{:else}<span
 						class="badge wait">⏳ nepodporované</span
 					>{/if}
@@ -544,8 +547,7 @@
 			{:else}
 				<p class="sub" data-testid="krov-nepodporovane">
 					Zadaný sklon <b>{krov.sklonStupne}°</b> je pod prahom 7° — bod dotyku sa „prehodí" (trojuholník
-					sa otočí), táto vetva nie je potvrdeným vzorcom pokrytá (O5). Uloženie sa nepočíta — nič sa
-					nehádže.
+					sa otočí), táto vetva nie je potvrdeným vzorcom pokrytá. Uloženie sa nepočíta — nič sa nehádže.
 				</p>
 			{/if}
 			<ul style="margin:6px 0 0;padding-left:18px">
@@ -596,7 +598,18 @@
 								>{/if}
 						</td>
 						<td>{p.kod}</td>
-						<td>{p.nazov}{p.poznamka ? ` · ${p.poznamka}` : ''}</td>
+						<td>
+							<!-- #233 — čistý názov + krátka šedá poznámka; dlhé vysvetlenie do
+							     rozklikávacieho detailu riadku (default zbalené) -->
+							<div class="nazov-hlavny">{p.nazov}</div>
+							{#if p.poznamka}<div class="nazov-pozn sub">{p.poznamka}</div>{/if}
+							{#if p.poznamkaDetail}
+								<details class="nazov-detail">
+									<summary>Prečo / detail</summary>
+									<p class="sub" style="margin:4px 0 0">{p.poznamkaDetail}</p>
+								</details>
+							{/if}
+						</td>
 						<td>{mm(p.dlzkaRezuMm)}</td>
 						<td><b>{p.pocetKs}</b></td>
 						<td data-testid="vydaj-{p.kod}"
@@ -690,7 +703,7 @@
 		</div>
 		<p class="sub">
 			Výstuha je informatívna — profil (Robust 250×110/230×110, Massive 200×140) a per-systém
-			varianta (šírka − 2×noha) čakajú na potvrdenie (O2/O3).
+			varianta (šírka − 2×noha) čakajú na potvrdenie.
 		</p>
 	</div>
 
@@ -715,7 +728,7 @@
 			</div>
 			<p class="sub">
 				Sklá sú informatívny údaj (Zasklenia má vlastný odpis); frézovanie zvodu je evidencia na
-				výkrese, detail dopĺňa konštruktér (#161).
+				výkrese, detail dopĺňa konštruktér.
 			</p>
 		</div>
 	{/if}
@@ -725,9 +738,17 @@
 			Zatiaľ nepodporované (čaká na pravidlá)
 			<span class="badge wait">⏳ {cakaPravidloCount}</span>
 		</div>
-		<ul data-testid="narez-nepodporovane" style="margin:6px 0 0;padding-left:18px">
-			{#each vysledok.nepodporovane as n (n)}
-				<li style="margin:4px 0">{n}</li>
+		<!-- #233 — jedna krátka veta na položku; plné odôvodnenie zbalené v <details>
+		     (default zbalené), aby to nebola stena textu -->
+		<ul data-testid="narez-nepodporovane" class="nepodporovane-zoznam">
+			{#each vysledok.nepodporovane as n (n.kratky)}
+				<li style="margin:6px 0">
+					<span class="nepodp-kratky">{n.kratky}</span>
+					<details class="nazov-detail">
+						<summary>Prečo</summary>
+						<p class="sub" style="margin:4px 0 0">{n.detail}</p>
+					</details>
+				</li>
 			{/each}
 		</ul>
 	</div>
@@ -768,6 +789,7 @@
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
+			{@render hiddenIdent()}
 			<button class="btn secondary" type="submit" data-testid="upravit">← Späť a upraviť</button>
 		</form>
 		<a class="btn secondary" href={resolve('/pergola/narez')}>➕ Nový výpočet</a>
@@ -816,7 +838,7 @@
 		<div class="card">
 			<div class="sec">Zatiaľ nepočítané — NIE sú v odpise ({rozpis.vylucene.length})</div>
 			<p class="sub">
-				Počet je istý, dĺžku rezu ešte nemáme (napr. priečka = HH krovu #161). Do rezervácie sa
+				Počet je istý, dĺžku rezu ešte nemáme (napr. priečka = horná hrana krovu). Do rezervácie sa
 				<b>NEZAHŔŇAJÚ</b> — nikdy vymyslené číslo. Doplní ich neskôr aktualizácia na reálne čísla.
 			</p>
 			<ul data-testid="rez-vylucene" style="margin:6px 0 0;padding-left:18px">
@@ -839,6 +861,7 @@
 		</form>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
+			{@render hiddenIdent()}
 			<button class="btn secondary" type="submit">← Upraviť zadanie</button>
 		</form>
 	</div>
@@ -943,6 +966,34 @@
 	table.narez .badge {
 		font-size: 12px;
 		padding: 2px 8px;
+	}
+
+	/* #233 — čistá bunka NÁZOV: hlavný názov + krátka šedá poznámka + rozklikávací detail;
+	   „zatiaľ nepodporované" ako zoznam krátkych viet s rozklikom. Reuse tokenov, žiadny
+	   nový dizajnový jazyk. */
+	.nazov-hlavny {
+		font-weight: 600;
+	}
+	.nazov-pozn {
+		margin-top: 2px;
+		font-size: 12.5px;
+	}
+	.nazov-detail {
+		margin-top: 3px;
+	}
+	.nazov-detail summary {
+		cursor: pointer;
+		font-size: 12px;
+		color: #64748b;
+		width: fit-content;
+	}
+	.nepodporovane-zoznam {
+		list-style: none;
+		margin: 6px 0 0;
+		padding-left: 0;
+	}
+	.nepodp-kratky {
+		font-weight: 500;
 	}
 
 	table.narez {

@@ -47,7 +47,7 @@ export function vylucenePolozky(vysledok: NarezVysledok): VylucenaPolozka[] {
 		.map((p) => ({
 			kod: p.kod,
 			nazov: p.nazov,
-			dovod: p.poznamka ?? 'dĺžka rezu zatiaľ neznáma (#161/#198)'
+			dovod: p.poznamka ?? 'dĺžka rezu zatiaľ neznáma — čaká na vzorec'
 		}));
 }
 
@@ -120,7 +120,9 @@ export function buildRezervaciaRozpis(
 			nonzero,
 			polozky,
 			vylucene: vylucenePolozky(vysledok),
-			nepodporovane: vysledok.nepodporovane,
+			// #233 — engine `nepodporovane` je teraz {kratky, detail}; rozpis nesie len krátku
+			// vetu (string[], tvar nezmenený; rez-nahlad ho nerenderuje).
+			nepodporovane: vysledok.nepodporovane.map((n) => n.kratky),
 			longNotes,
 			pocetPolozok: nonzero.length
 		},
