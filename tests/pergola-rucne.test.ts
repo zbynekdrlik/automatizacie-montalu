@@ -67,6 +67,14 @@ describe('parseRucnePolozky — vylúčenie prázdnych a chytenie chýb', () => 
 			parseRucnePolozky(JSON.stringify([{ kod: 'PRP20259', mnozstvo: 5, mj: 'kg' }])).error
 		).toMatch(/MJ/);
 	});
+	it('CHÝBAJÚCA MJ → chyba (nehádže sa default m) — #234 review', () => {
+		expect(parseRucnePolozky(JSON.stringify([{ kod: 'PRP20259', mnozstvo: 5 }])).error).toMatch(
+			/MJ/
+		);
+		expect(
+			parseRucnePolozky(JSON.stringify([{ kod: 'PRP20259', mnozstvo: 5, mj: '' }])).error
+		).toMatch(/MJ/);
+	});
 	it('nečíselné a absurdne veľké množstvo → chyba', () => {
 		expect(
 			parseRucnePolozky(JSON.stringify([{ kod: 'X', mnozstvo: 'abc', mj: 'm' }])).error

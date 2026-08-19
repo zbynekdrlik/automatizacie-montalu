@@ -72,7 +72,8 @@ export function parseRucnePolozky(raw: string | null | undefined): {
 		const o = it as Record<string, unknown>;
 		const kod = String(o.kod ?? '').trim();
 		const nazov = String(o.nazov ?? '').trim();
-		const mj = String(o.mj ?? 'm').trim();
+		// #234 review — MJ sa NEHÁDA: chýbajúca/prázdna MJ je chyba (nie tichý default 'm').
+		const mj = String(o.mj ?? '').trim();
 		const mnozRaw = String(o.mnozstvo ?? '')
 			.replace(',', '.')
 			.trim();
@@ -81,7 +82,7 @@ export function parseRucnePolozky(raw: string | null | undefined): {
 		if (!kod && !mnozRaw) continue;
 		if (!kod) return { rows: [], error: 'Ručná položka bez Money kódu.' };
 		if (mj !== 'm' && mj !== 'ks')
-			return { rows: [], error: `Neplatná MJ „${mj}" pri ${kod} (povolené: m / ks).` };
+			return { rows: [], error: `Chýbajúca alebo neplatná MJ pri ${kod} (povolené: m / ks).` };
 		if (!mnozRaw) return { rows: [], error: `Ručná položka ${kod} bez množstva.` };
 
 		const mnozstvo = parseFloat(mnozRaw);

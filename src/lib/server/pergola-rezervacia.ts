@@ -118,21 +118,31 @@ export function buildRezervaciaRozpis(
 	// #234 — ručné riadky OBÍDU CAD transform: sú už Money kód + MJ (m/ks), NIE CAD dĺžky.
 	// Validácia proti katalógu: neznámy kód = VAROVANIE, nie tiché prijatie (ani odmietnutie).
 	const codes = catalogCodes();
-	const manualWarnings: string[] = [];
+	const computedNonzero = t.out
+		.filter((o) => o.qty > 0)
+		.map((o) => ({ kod: o.prp, nazov: o.name, qty: o.qty }));
+	// kódy, ktoré už vyšli zo spočítaných — na varovanie pred dvojitým odpisom (#234 review)
+	const computedCodes = new Set(computedNonzero.map((o) => o.kod));
+	const warnings: string[] = [];
 	const manualNonzero: { kod: string; nazov: string; qty: number; rucne?: boolean; mj?: MJ }[] = [];
 	const manualPolozky: Polozka[] = [];
 	for (const m of manualRows) {
 		if (!(m.mnozstvo > 0)) continue; // prázdny/nulový ručný riadok sa nezahŕňa
 		const v = rucnaValidacia(m.kod, codes);
-		if (v.warning) manualWarnings.push(v.warning);
+		if (v.warning) warnings.push(v.warning);
+		// #234 review — ručný kód, ktorý UŽ vyšiel zo spočítaných, by v Money dvojito odpísal
+		if (computedCodes.has(m.kod))
+			warnings.push(
+				`Kód „${m.kod}" už je medzi spočítanými položkami — ručný riadok sa pripočíta navyše (over, či nejde o dvojitý odpis).`
+			);
 		manualNonzero.push({ kod: m.kod, nazov: m.nazov, qty: m.mnozstvo, rucne: true, mj: m.mj });
 		manualPolozky.push({ kod: m.kod, nazov: m.nazov, qty: m.mnozstvo, mj: m.mj });
 	}
+	// dedup varovaní — rovnaký neznámy/kolízny kód na dvoch riadkoch by inak dal rovnaký
+	// string a v svelte `{#each … (w)}` spôsobil duplicate-key chybu (#234 review)
+	const manualWarnings = [...new Set(warnings)];
 
-	const nonzero = [
-		...t.out.filter((o) => o.qty > 0).map((o) => ({ kod: o.prp, nazov: o.name, qty: o.qty })),
-		...manualNonzero
-	];
+	const nonzero = [...computedNonzero, ...manualNonzero];
 	if (nonzero.length === 0)
 		return { rozpis: null, error: 'Z rozmerov nevyšli žiadne Money položky na rezerváciu.' };
 

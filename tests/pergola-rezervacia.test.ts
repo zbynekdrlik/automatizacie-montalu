@@ -186,10 +186,29 @@ describe('buildRezervaciaRozpis — ručné položky (#234)', () => {
 		expect(rozpis!.nonzero.some((o) => o.kod === 'NEZNAMY123' && o.rucne)).toBe(true);
 	});
 
-	it('známy katalógový kód → žiadne varovanie', () => {
-		const rucne = [{ kod: 'PRP20259', nazov: 'Kotviaci', mnozstvo: 6, mj: 'm' as const }];
+	it('známy katalógový kód, ktorý sa NEpočíta → žiadne varovanie', () => {
+		// PRP202526 = Žlabový 110 V2 4500mm — v katalógu, ale STD (žľab 5000→6m) ho nepočíta
+		const rucne = [{ kod: 'PRP202526', nazov: 'Žľab 4500', mnozstvo: 6, mj: 'm' as const }];
 		const { rozpis } = buildRezervaciaRozpis(STD, IDENT, rucne);
 		expect(rozpis!.manualWarnings).toEqual([]);
+	});
+
+	it('ručný kód, ktorý sa UŽ počíta → varovanie pred dvojitým odpisom (#234 review)', () => {
+		// PRP20259 (kotviaci) je v STD medzi spočítanými → ručný riadok navyše = dvojitý odpis
+		const rucne = [{ kod: 'PRP20259', nazov: 'Kotviaci navyše', mnozstvo: 6, mj: 'm' as const }];
+		const { rozpis } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		expect(rozpis!.manualWarnings.some((w) => /dvojitý odpis/i.test(w))).toBe(true);
+	});
+
+	it('rovnaký neznámy kód na dvoch riadkoch → varovanie sa DEDUPne (bez duplicate-key)', () => {
+		const rucne = [
+			{ kod: 'NEZN', nazov: 'A', mnozstvo: 1, mj: 'm' as const },
+			{ kod: 'NEZN', nazov: 'B', mnozstvo: 2, mj: 'm' as const }
+		];
+		const { rozpis } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		// dva riadky s rovnakým neznámym kódom → jedno unikátne varovanie (nie dve rovnaké)
+		expect(rozpis!.manualWarnings.filter((w) => /NEZN/.test(w)).length).toBe(1);
+		expect(rozpis!.nonzero.filter((o) => o.kod === 'NEZN' && o.rucne).length).toBe(2);
 	});
 
 	it('prázdny/nulový ručný riadok sa NEZAHRNIE (množstvo <= 0)', () => {

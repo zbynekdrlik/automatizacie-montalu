@@ -113,8 +113,8 @@ test('ručné položky: pridanie + odznak + varovanie + zahrnutie v TEST odpise 
 	// ručná karta je viditeľná
 	await expect(page.getByTestId('rucne-karta')).toBeVisible();
 
-	// pridaj ZNÁMY katalógový kód (PRP20259 = Kotviaci profil horny V2) — bez varovania
-	await page.getByTestId('rucne-kod').fill('PRP20259');
+	// pridaj ZNÁMY katalógový kód, ktorý sa NEpočíta (PRP202526 = Žlab 110 4500mm) — bez varovania
+	await page.getByTestId('rucne-kod').fill('PRP202526');
 	await expect(page.getByTestId('rucne-znamy')).toBeVisible();
 	await page.getByTestId('rucne-nazov').fill('Kotviaci profil pometraný');
 	await page.getByTestId('rucne-mnozstvo').fill('3,5');
