@@ -7,6 +7,9 @@ paths:
   - 'scripts/ceny-snapshot.py'
   - 'tests/ceny*.test.ts'
   - 'tests/sklo-cena*.test.ts'
+  - 'tests/pergola-ceny*.test.ts'
+  - 'e2e/*ceny*.spec.ts'
+  - 'e2e/sklo-cena*.spec.ts'
 ---
 
 # Ceny materiálu + cena skla — denný Money snapshot (#154, #225)
@@ -57,3 +60,15 @@ staré kódy) a `db.ts` je singleton → v teste s viac prípadmi resetuj
 `DELETE FROM material_prices; DELETE FROM material_prices_meta;` v `beforeEach`, inak cena
 z predošlého testu prežije. E2E fixture: `CENY_SNAPSHOT_PATH=./data/e2e-ceny.json`
 (playwright.config), zapisovateľný len pri lokálnom preview (BASE_URL beh sa auto-skipne).
+
+**E2E DB je ZDIEĽANÁ medzi spec súbormi (#232 pasca — stála CI za jeden beh).** Playwright
+beží `workers:1` proti JEDNÉMU preview serveru s JEDNOU DB na celý beh. `fs.rmSync` fixture
+SÚBORU NEvynuluje už naimportovanú snapshot-metu v DB (`maybeImportSnapshot` na chýbajúci
+súbor len vráti `no-file`, DB nechá tak). Takže „snapshot nebol naimportovaný" (prázdna
+`material_prices_meta`) platí LEN na čistej DB — t.j. iba pre spec, ktorý beží v abecednom
+poradí PRVÝ (napr. `ceny.spec.ts` a jeho úvodný test). Spec, ktorý beží NESKÔR (napr.
+`pergola-ceny.spec.ts` po `ceny.spec.ts`, ktorý medzitým seedol), vidí v DB metu skoršieho
+seedu → `ceny-snapshot-vek` ukáže reálny dátum, nie „nebol naimportovaný". **Pravidlo:** v
+neskoršom spece netvrď virgin-DB hlášku; testuj honest-null, ktorý platí VŽDY — kód, ktorý
+NIE JE v žiadnom seede (pergolové `PRP*` nie sú v žiadnom ceny/sklo seede), ukáže „cena
+neznáma". Reprodukuj poradie lokálne: `npx playwright test e2e/ceny.spec.ts e2e/<tvoj>.spec.ts`.
