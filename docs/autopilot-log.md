@@ -1262,3 +1262,24 @@ implementované, nereprodukovateľné čestný null:
   validácia); E2E `pergola-rezervacia.spec.ts` (premenovaný tok → odoslanie v TEST režime).
 - **Lekcia:** odpis z rozmerov NEPOČÍTAJ nanovo — potvrdené riadky enginu = tvar CadRow,
   prežeň ich overeným `transformRows`; honest-null vylúč filtrom (nikdy tiché číslo do Money).
+
+## #222 — Pergola UI prehľadnosť: voľba režimu + čitateľný stav (v0.24.1, PR 230)
+- **Problém:** Dominik (call 19.8.) sa v pergolových stránkach strácal — `/pergola` tlačil
+  tri režimy do hustej prózy s emoji, výstup `/pergola/narez` bola stena kariet bez stavu
+  („neviem čo je dorobené/nedorobené").
+- **Riešenie (čisto prezentačné):** `/pergola` → rozcestník s 3 kartami (CAD nárez → Money
+  odpis / Rezervačný odpis / Návrhový výkres), každá s vetou „kedy použiť", aktívny CAD
+  režim, formulár ostáva pod ním. Výstup narezu → stavové zhrnutie navrchu
+  (`spocitaneCount` = `dlzkaRezuMm != null && pocetKs > 0` / `cakaDlzkaCount` =
+  `dlzkaRezuMm == null` / `cakaPravidloCount` = `nepodporovane.length`), per-riadkový
+  stavový odznak v tabuľke Materiál (v odpise / čaká), odznaky na nadpisoch sekcií,
+  zhustená próza, nadpis zjednotený „Materiál/nárez" → „Rezervačný odpis".
+- **Design system:** `.badge.ok`/`.badge.wait` na existujúcich tokenoch (`.badge.live`/
+  `.badge.test`) — žiadny nový dizajnový jazyk, žiadne CDN/fonty.
+- **Money-safe:** žiadna zmena zápisu; stavové počty len ČÍTAJÚ z `spocitajNarez`, split
+  1:1 ako `pergola-rezervacia` (`narezToCadRows`/`vylucenePolozky`).
+- **Testy:** E2E `e2e/pergola-uix.spec.ts` (3 režimy s popismi + odkazy; zhrnutie +
+  per-riadkové odznaky; console-zero). 1477 unit + full E2E zelené.
+- **Lekcia:** per-riadkový stavový odznak MUSÍ mať presne tú istú podmienku ako počítadlo
+  zhrnutia aj ako filter do Money (`dlzkaRezuMm != null && pocetKs > 0`) — inak sa stav na
+  obrazovke rozíde s tým, čo reálne ide do odpisu (review, opravené pred merge).
