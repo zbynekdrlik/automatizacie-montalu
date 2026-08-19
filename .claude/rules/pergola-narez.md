@@ -233,3 +233,22 @@ nahlad → **explicitné potvrdenie** → zápis), bez +20 %.
   v guarde; Money zápis daj do samostatného server mostu.
 - **Testovanie odoslania = LEN TEST režim** (`skipAkLive`, seedovaný `e2e` user) — appka
   na prode je LIVE (`/health` `live:true`), reálny „Odoslať do Money" na prode nikdy.
+
+## Stavové UI (#222) — počty/odznaky MUSIA mať tú istú podmienku ako Money filter
+
+Výstup `/pergola/narez` (`step === 'vysledok'`) ukazuje stavové zhrnutie (`spocitaneCount`
+/ `cakaDlzkaCount` / `cakaPravidloCount`) a per-riadkový odznak v tabuľke Materiál
+(✅ v odpise / ⏳ čaká). **Podmienka „spočítané / ide do rezervácie" MUSÍ byť BYTE-FOR-BYTE
+tá istá ako filter do Money** v `pergola-rezervacia.ts`:
+
+- `spocitané` (do rezervácie) = `dlzkaRezuMm != null && pocetKs > 0` — presne
+  `narezToCadRows`.
+- `počet istý, dĺžka čaká` = `dlzkaRezuMm == null` — presne `vylucenePolozky`.
+- `čaká na pravidlo` = `nepodporovane.length`.
+
+Ak sa per-riadkový odznak alebo počítadlo odchýli (napr. odznak len `dlzkaRezuMm != null`
+bez `pocetKs > 0`), obrazovka bude tvrdiť „ide do odpisu" o riadku, ktorý reálne do Money
+nejde — a Dominik zase nebude vedieť, čo je naozaj v odpise (presne to, čo #222 riešil).
+Pri akejkoľvek zmene enginu, ktorá vie vyrobiť riadok s dĺžkou ale nulovým počtom, over
+oba povrchy naraz. Stavové odznaky sú `.badge.ok`/`.badge.wait` (app.css, sémantické
+varianty existujúcich `.badge.live`/`.badge.test` — žiadny nový dizajnový jazyk).
