@@ -40,3 +40,12 @@ ceny.json
 test-results/
 playwright-report/
 coverage/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.env.local
+node_modules/
+dist/
+build/
