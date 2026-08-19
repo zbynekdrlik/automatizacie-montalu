@@ -1305,3 +1305,23 @@ implementované, nereprodukovateľné čestný null:
   blok „Izolačné sklo 4/16/4 číre | 3,90 m² | cena nedostupná".
 - **Lekcia:** mapovanie sklo→Money kód patrí per RIADOK `(nazov, system)`, nie name-only
   (v22 collision trap); seeduj len jednoznačné zhody, zvyšok NULL → honest-null.
+
+## 2026-08-19 — #233 + #234 (PR #236, merge 91d303d, v0.24.3, bundle)
+
+- **#233 UI polish — žargón von + zbaliť nepodporované** (commit 0600728): engine
+  `nepodporovane: string[]` → `NepodporovanaPolozka[] {kratky, detail}`; `poznamka` +
+  `poznamkaDetail`; zo všetkých renderovaných stringov (svelte, PergolaNarezVykres,
+  pergola-krov) odstránené `#N`/O-čka/odkaz na call → plain slovenčina; ZAK/OP echo cez
+  spocitat/upravit (round-trip). E2E sken textu stránky (pergola-uix.spec.ts). Testy
+  op260282/narez/krov prepísané zo `/#161|#198/` na plain znenie.
+- **#234 ručné položky (pometrané)** (commit d599670): nový `pergola-rucne.ts` (parse +
+  validácia, neznámy kód = varovanie, žiadne hádanie MJ); `buildRezervaciaRozpis(…,
+  manualRows=[])` merge priamo do nonzero/polozky s `rucne:true`; UI karta + round-trip
+  hidden JSON; server prepočet. Unit (pergola-rucne + merge) + golden (buildXlsx read-back,
+  MJ=ks) + E2E (pridanie, odznak, varovanie, TEST odpis, round-trip).
+- **Review (fresh-context) 0 🔴 2 🟡 3 🔵 → opravené** (commit f12b32e): dedup manualWarnings
+  (each-key), pergola-rucne do CISTY_ENGINE, varovanie ručný==spočítaný kód, chýbajúca MJ =
+  chyba; 🔵 veľkosť súboru (1218 r.) → follow-up #239.
+- **Post-deploy overené na LIVE** (marek): `/health` + DOM v0.24.3 (91d303d); nulový žargón na
+  pergola/narez (hashN/oX/call = []); ručný riadok pridaný s odznakom, prešiel do rez-nahlad
+  preview s MJ „3,5 m" — NEODOSLANÉ (live Money safety).

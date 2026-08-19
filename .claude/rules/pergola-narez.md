@@ -252,3 +252,41 @@ nejde — a Dominik zase nebude vedieť, čo je naozaj v odpise (presne to, čo 
 Pri akejkoľvek zmene enginu, ktorá vie vyrobiť riadok s dĺžkou ale nulovým počtom, over
 oba povrchy naraz. Stavové odznaky sú `.badge.ok`/`.badge.wait` (app.css, sémantické
 varianty existujúcich `.badge.live`/`.badge.test` — žiadny nový dizajnový jazyk).
+
+## Ručné položky do rezervácie (#234) + round-trip pasca (kritické)
+
+- **Ručné („pometrané") položky** (napr. kotviace profily): `$lib/pergola-rucne.ts`
+  (čistý, client-imported, v money-safety CISTY_ENGINE) — `RucnaPolozka {kod,nazov,mnozstvo,mj}`,
+  `parseRucnePolozky` (JSON z hidden inputu), `rucnaValidacia` (neznámy kód = VAROVANIE, nie
+  odmietnutie; MJ sa NEHÁDA — chýbajúca MJ = chyba). `buildRezervaciaRozpis(vstup, ident,
+  manualRows=[])` — ručné riadky OBÍDU `transformRows` (sú už Money kód + MJ) a pridajú sa
+  priamo do `nonzero`/`polozky` s `rucne:true`. Server ich prepočíta ZNOVA (nedôveruje klientu).
+- **`manualWarnings` sa DEDUPUJÚ (`[...new Set(...)]`)** — dva riadky s rovnakým neznámym/kolíznym
+  kódom dajú identický string; v svelte `{#each … (w)}` by to bola `each_key_duplicate` chyba.
+  Keyuj `nonzero` cez `(o.kod + '·' + i)` (ručný kód sa môže rovnať spočítanému). Kolízia
+  ručný==spočítaný kód → varovanie pred dvojitým odpisom (nie tiché).
+- **ROUND-TRIP PASCA (PR #81 vzor):** stav, ktorý má prežiť „Späť a upraviť" (ident ZAK/OP,
+  `rucnePolozky`), sa serializuje do hidden inputov a server ho ECHUJE späť v KAŽDEJ akcii
+  (spocitat/rezervovat/odoslat/upravit) → `$effect` ho obnoví. **POZOR:** formulárový krok
+  (`step==='form'`) `?/spocitat` form NErenderuje `hidden()` snippet (má viditeľné vstupy) —
+  každý nový carried-through stav tam MUSÍ dostať vlastný `<input type="hidden">`, inak sa pri
+  form→vysledok stratí. Server: `parseIdent`/`parseRucne` aj v `spocitat`+`upravit`.
+
+## Žiadny interný žargón na obrazovke (#233)
+
+- Renderované stringy (svelte, `PergolaNarezVykres` `<text>`, engine `nepodporovane`/`poznamka`,
+  `krov.poznamky`) NESMÚ obsahovať `#N` / `O-čka` / „callu 13.8." — plain slovenčina
+  („čaká na vzorec od Dominika"). Referencie ostávajú v komentároch kódu. Akceptačný E2E
+  (`pergola-uix.spec.ts`) skenuje `body.textContent()` (aj zbalené `<details>`) na `/#\d/`,
+  `/\bO\d/`, „call". CSS hex farby (`#15803d`) sú v `<style>`/`style=`, nie v `textContent`.
+- Engine `nepodporovane: NepodporovanaPolozka[] {kratky, detail}` — krátka veta v zozname +
+  plné odôvodnenie v `<details>` (default zbalené). `poznamka` (krátka šedá) + `poznamkaDetail`
+  (rozklik) v materiálovej tabuľke. Testy asertujúce staré `#N` stringy prepíš na plain znenie.
+
+## Post-deploy verifikácia na LIVE (bezpečne)
+
+`Spočítať` + `upravit` + `rezervovat` (Pripraviť rezervačný odpis → rez-nahlad) sú READ-ONLY
+(NEpíšu do Money) → dá sa overiť aj na prode (`live:true`). Iba `odoslat` (writeOdpis) zapisuje.
+Verifikuj až po rez-nahlad PREVIEW, nikdy neklikaj „Odoslať do Money" na prode. Login na prode:
+seed useri v `/opt/automatizacie-montalu/.env` (creds v lokálnej memory). Svelte 5 `bind:value`
+neberie syntetické `input` eventy z `evaluate` — na vyplnenie použi Playwright `fill`.
