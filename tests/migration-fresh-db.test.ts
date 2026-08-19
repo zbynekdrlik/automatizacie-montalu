@@ -20,7 +20,7 @@ const stdRez = seed.rez.filter((r) => r.sysStyl.startsWith('Štandard +'));
 
 describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_seed', () => {
 	it('user_version=9 po plnej migrácii od nuly', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(22);
+		expect(db.pragma('user_version', { simple: true })).toBe(23);
 	});
 
 	it('v21 tabuľky (material_prices, material_prices_meta, odpis_polozky) existujú aj na fresh DB', () => {

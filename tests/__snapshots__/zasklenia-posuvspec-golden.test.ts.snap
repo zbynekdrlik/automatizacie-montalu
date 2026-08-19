@@ -300,6 +300,28 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Deluxe",
   },
   "planHash": "40c1e4ed",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "",
+        "m2": 9.1,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Deluxe",
+        "variant": "Float kalené 10 mm",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -898,6 +920,28 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Robust",
   },
   "planHash": "355c342b",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "",
+        "m2": 9.29,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Robust",
+        "variant": "Izolačné sklo 4/16/4 číre",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -1575,6 +1619,28 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Robust",
   },
   "planHash": "d2eabfc2",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "",
+        "m2": 9.46,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Robust",
+        "variant": "Izolačné sklo 4/16/4 mliečne",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -2070,6 +2136,28 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Slide",
   },
   "planHash": "4bd16fd1",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "",
+        "m2": 6.62,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Slide",
+        "variant": "6mm číre",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -2444,6 +2532,28 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Štandard",
   },
   "planHash": "ac04825e",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "",
+        "m2": 4.4,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Štandard",
+        "variant": "Float sklo 6 mm",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -3112,6 +3222,28 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Štandard +",
   },
   "planHash": "1d3cd3d2",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "",
+        "m2": 8.98,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Štandard +",
+        "variant": "Izolačné sklo 4.8.4",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -4281,6 +4413,37 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "zakaznik": "Zákazník GM1",
   },
   "planHash": "a146f452",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "Posuv 1",
+        "m2": 9.29,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Robust",
+        "variant": "Izolačné sklo 4/16/4 číre",
+      },
+      {
+        "eurM2": null,
+        "label": "Posuv 2",
+        "m2": 6.62,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Slide",
+        "variant": "6mm číre",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahladMulti",
   "warn": null,
 }
@@ -5926,6 +6089,46 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "zakaznik": "Zákazník GM2",
   },
   "planHash": "607ab1cb",
+  "skloCeny": {
+    "kompletne": false,
+    "radky": [
+      {
+        "eurM2": null,
+        "label": "Posuv 1",
+        "m2": 9.1,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Deluxe",
+        "variant": "Float kalené 10 mm",
+      },
+      {
+        "eurM2": null,
+        "label": "Posuv 2",
+        "m2": 8.98,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Štandard +",
+        "variant": "Izolačné sklo 4.8.4",
+      },
+      {
+        "eurM2": null,
+        "label": "Posuv 3",
+        "m2": 9.46,
+        "mena": "EUR",
+        "spolu": null,
+        "system": "Robust",
+        "variant": "Izolačné sklo 4/16/4 mliečne",
+      },
+    ],
+    "snapshot": {
+      "daysOld": null,
+      "generatedAt": null,
+      "importedAt": null,
+      "rejectedCount": 0,
+      "rowCount": 0,
+    },
+    "spolu": 0,
+  },
   "step": "nahladMulti",
   "warn": null,
 }

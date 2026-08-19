@@ -127,6 +127,26 @@ export function glassTypesForSystem(system: string): GlassType[] {
 	return listGlassTypes().filter((g) => g.system === sys || g.system === 'ALL');
 }
 
+/** Money kód skla (TS* v cenníku IZOS) pre daný variant — LEN pre display-only
+ *  zobrazenie ceny skla v nárezáku (#225). Kľúčované RIADKOM `(nazov, system)` cez
+ *  ten istý alias + own/ALL princíp ako `glassTypesForSystem`, NIKDY len podľa názvu
+ *  naprieč systémami (glass-catalog rule). `null` = variant nemá namapovaný kód
+ *  (väčšina; mapovanie je zámerne konzervatívne) → „cena nedostupná" (honest-null). */
+export function glassMoneyKod(system: string, nazov: string): string | null {
+	const sys = GLASS_SYSTEM_ALIAS[system] ?? system;
+	const own = sys === 'Deluxe' || sys === 'Štandard +';
+	const row = db
+		.prepare(
+			own
+				? 'SELECT money_kod FROM glass_types WHERE nazov = ? AND system = ?'
+				: // Robust/Slide: preferuj vlastný systém, potom spoločné 'ALL' (rovnaké
+					// poradie zdrojov ako glassTypesForSystem)
+					"SELECT money_kod FROM glass_types WHERE nazov = ? AND system IN (?, 'ALL') ORDER BY (system = 'ALL') LIMIT 1"
+		)
+		.get(nazov, sys) as { money_kod: string | null } | undefined;
+	return row?.money_kod ?? null;
+}
+
 // ---- user-admin (interné + B2B veľkoobchodné účty) ----
 
 export function listUsers() {

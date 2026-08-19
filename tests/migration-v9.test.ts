@@ -68,7 +68,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)', () => {
 	it('user_version=9', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(22);
+		expect(db.pragma('user_version', { simple: true })).toBe(23);
 	});
 
 	it('presne 13 nových Štandard + štýlov (basic 2K…6K, IZO 2K IZO…6K IZO, opona 2x2K/2x3K/2x4K)', () => {

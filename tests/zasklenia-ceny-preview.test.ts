@@ -119,3 +119,46 @@ describe('nahladMulti — cenový blok (#154)', () => {
 		expect(r.ceny).toBeDefined();
 	});
 });
+
+describe('cena skla — display-only blok (#225)', () => {
+	const POSUV_OK = {
+		system: 'Robust',
+		styl: '2K',
+		s: 2600,
+		v: 2000,
+		sklo: BASE.sklo,
+		otvaranie: 'P - L'
+	};
+
+	it('b2b: form.skloCeny je undefined (náklad na sklo sa nikdy nedopočíta) — nahlad aj multi', async () => {
+		const r1 = await actions.nahlad(nahladEvent(BASE, B2B_USER));
+		expect((r1 as { skloCeny?: unknown }).skloCeny).toBeUndefined();
+		const r2 = await actions.nahladMulti(nahladMultiEvent([POSUV_OK], B2B_USER));
+		expect((r2 as { skloCeny?: unknown }).skloCeny).toBeUndefined();
+	});
+
+	it('interný: skloCeny má riadok pre zvolené sklo; bez snapshotu je cena nedostupná (honest-null)', async () => {
+		const r = (await actions.nahlad(nahladEvent(BASE, INTERNAL_USER))) as {
+			skloCeny?: {
+				radky: { variant: string; m2: number; eurM2: number | null; spolu: number | null }[];
+				kompletne: boolean;
+			};
+		};
+		expect(r.skloCeny).toBeDefined();
+		expect(r.skloCeny!.radky).toHaveLength(1);
+		expect(r.skloCeny!.radky[0].variant).toBe(BASE.sklo);
+		expect(r.skloCeny!.radky[0].m2).toBeGreaterThan(0);
+		// žiadny snapshot naimportovaný → cena nedostupná (nikdy dopočítaná), súhrn neúplný
+		expect(r.skloCeny!.radky[0].eurM2).toBeNull();
+		expect(r.skloCeny!.radky[0].spolu).toBeNull();
+		expect(r.skloCeny!.kompletne).toBe(false);
+	});
+
+	it('interný multi: skloCeny má riadok per posuv', async () => {
+		const r = (await actions.nahladMulti(
+			nahladMultiEvent([POSUV_OK, POSUV_OK], INTERNAL_USER)
+		)) as { skloCeny?: { radky: unknown[] } };
+		expect(r.skloCeny).toBeDefined();
+		expect(r.skloCeny!.radky).toHaveLength(2);
+	});
+});
