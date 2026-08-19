@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
+	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -9,6 +10,8 @@
 	let vstup = $derived(form?.vstup ?? { zak: '', op: '', zakaznik: '', cad: '', caka: false });
 	let step = $derived(form?.step ?? 'form');
 	let v = $derived(form && 'v' in form ? form.v : null);
+	// cenový blok (#232, display-only) — LEN interní; b2b nikdy nedostane `ceny`
+	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
 
 	let copyBtnText = $state('📋 Kopírovať počet tyčí');
 	async function kopiruj() {
@@ -229,6 +232,15 @@
 			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
 		</form>
 	</div>
+
+	<!-- ceny materiálu (#232, display-only) — LEN interní; b2b nikdy nedostane
+	     `form.ceny` (viď cenyPre v +page.server.ts). NOPRINT: náklady nikdy do
+	     dielenskej tlače (rovnaký vzor ako SkloCena / zasklenia cenový blok). -->
+	{#if ceny}
+		<div class="noprint">
+			<CenyTabulka {ceny} />
+		</div>
+	{/if}
 
 	{@render tyceKarta(false)}
 {:else if step === 'hotovo' && v && form?.outcome}

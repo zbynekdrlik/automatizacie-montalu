@@ -17,6 +17,8 @@ import {
 import { catalogForClient } from '$lib/server/pergola';
 import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
 import { writeOdpis, isLive } from '$lib/server/money';
+import { isB2B, type SessionUser } from '$lib/server/auth';
+import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 
 /** ZAK/OP/zákazník z formulára — do dokladu, dedupu a názvu súboru. */
 function parseIdent(form: FormData): RezervaciaIdent {
@@ -32,6 +34,21 @@ function parseIdent(form: FormData): RezervaciaIdent {
 function parseRucne(form: FormData): { rucne: RucnaPolozka[]; error: string | null } {
 	const { rows, error } = parseRucnePolozky(form.get('rucnePolozky') as string | null);
 	return { rucne: rows, error };
+}
+
+/**
+ * Cenový zoznam materiálu (#232, display-only) — LEN pre interných. /pergola* je pre
+ * b2b aj tak zablokovaná na úrovni hooku; toto je druhá vrstva (obrana do hĺbky ako
+ * zasklenia `cenyPre` / Money-write hranica): pre b2b sa cena VÔBEC nedopočíta, takže
+ * sa nikdy nedostane do HTML odpovede. Ceníme zobrazené nenulové položky — spočítané
+ * PRP profily + ručné riadky #234 (nesú vlastnú MJ m/ks). Money odpis sa NEMENÍ.
+ */
+function cenyPre(
+	user: SessionUser | null,
+	nonzero: { kod: string; nazov: string; qty: number; mj?: string }[]
+): CenyResult | undefined {
+	if (isB2B(user)) return undefined;
+	return enrichPolozky(nonzero);
 }
 
 export const load: PageServerLoad = async () => {
@@ -68,7 +85,7 @@ export const actions: Actions = {
 	},
 
 	// #221: z rozmerov → Money rozpis rezervácie (BEZ zápisu) → nahlad na potvrdenie.
-	rezervovat: async ({ request }) => {
+	rezervovat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const { vstup, error } = parsePergolaNarezVstup(form);
 		const ident = parseIdent(form);
@@ -92,7 +109,9 @@ export const actions: Actions = {
 			rucne: rucne.length,
 			vylucene: rozpis.vylucene.length
 		});
-		return { step: 'rez-nahlad' as const, vstup, ident, rucne, rozpis, rezError: null };
+		// cenový blok (#232) — LEN interní; b2b nikdy nedostane `ceny`
+		const ceny = cenyPre(locals.user, rozpis.nonzero);
+		return { step: 'rez-nahlad' as const, vstup, ident, rucne, rozpis, ceny, rezError: null };
 	},
 
 	// #221: zápis rezervačného odpisu do Money (LEN po explicitnom potvrdení, ten istý
@@ -122,6 +141,8 @@ export const actions: Actions = {
 			live: isLive(),
 			riadkov: rozpis.pocetPolozok
 		});
+		// cenový blok (#232) — LEN interní; spoločné pre rez-nahlad návraty nižšie
+		const ceny = cenyPre(locals.user, rozpis.nonzero);
 		try {
 			const outcome = await writeOdpis(job);
 			if (outcome.status === 'duplicate') {
@@ -131,6 +152,7 @@ export const actions: Actions = {
 					ident,
 					rucne,
 					rozpis,
+					ceny,
 					rezError: `Zákazka ${ident.zak} (OP ${ident.op}) už bola odoslaná (rezervácia alebo odpis) ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv uvoľni záznam v histórii odpisov.`
 				};
 			}
@@ -148,6 +170,7 @@ export const actions: Actions = {
 				ident,
 				rucne,
 				rozpis,
+				ceny,
 				rezError:
 					'Zápis rezervácie zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};

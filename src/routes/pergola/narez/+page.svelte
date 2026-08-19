@@ -8,6 +8,7 @@
 	// (nova-stranka §3/§4/§6). Výkres kreslí PergolaNarezVykres z potvrdených vzorcov (#194).
 	import { resolve } from '$app/paths';
 	import PergolaNarezVykres from '$lib/components/PergolaNarezVykres.svelte';
+	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
 	import {
 		spocitajNarez,
@@ -37,6 +38,8 @@
 	let rozpis = $derived(form && 'rozpis' in form ? form.rozpis : null);
 	let outcome = $derived(form && 'outcome' in form ? form.outcome : null);
 	let rezError = $derived(form && 'rezError' in form ? form.rezError : null);
+	// cenový blok (#232, display-only) — LEN interní; b2b nikdy nedostane `ceny`
+	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
 
 	// vstup na PREFILL + na výpočet výsledku (display-only). Merge form?.vstup s
 	// predvolenými hodnotami — rovnaká disciplína ako /bazen/navrh.
@@ -988,6 +991,15 @@
 			</tbody>
 		</table>
 	</div>
+
+	<!-- ceny materiálu (#232, display-only) — LEN interní; b2b nikdy nedostane
+	     `form.ceny` (viď cenyPre v +page.server.ts). NOPRINT: náklady nikdy do
+	     dielenskej tlače (rovnaký vzor ako SkloCena / zasklenia cenový blok). -->
+	{#if ceny}
+		<div class="noprint">
+			<CenyTabulka {ceny} />
+		</div>
+	{/if}
 
 	{#if rozpis.vylucene.length}
 		<div class="card">
