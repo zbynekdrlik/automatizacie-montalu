@@ -5,9 +5,12 @@ paths:
   - 'src/lib/server/pergola-narez-vstup.ts'
   - 'src/lib/components/PergolaNarezVykres.svelte'
   - 'src/routes/pergola/narez/**'
+  - 'src/lib/server/pergola-rezervacia.ts'
   - 'tests/pergola-narez*.test.ts'
+  - 'tests/pergola-rezervacia.test.ts'
   - 'tests/pergola-krov*.test.ts'
   - 'e2e/pergola-narez.spec.ts'
+  - 'e2e/pergola-rezervacia.spec.ts'
 ---
 
 # Pergola — nárez/výkres z rozmerov (#155 epic) — gotchy a disciplína
@@ -103,12 +106,16 @@ posielať šírku rámu**; vzťah žľab = rám + 2×presah je O1-blokovaný (#1
 −280 v histórii NEMAJÚ vzor (obe surovo-CAD zákazky sú na stenu, bez zosilneného nosníka) —
 nezapínať do Money bez ďalšieho overenia.
 
-## Money-safety je STATICKY strážená
+## Money-safety je STATICKY strážená (zúžené #221)
 
-Engine, parser, route AJ výkresová komponenta NEimportujú `server/money`/
-`server/pergola`/`server/db` — `tests/pergola-narez-money-safety.test.ts` to skenuje
-(zoznam `SUBORY`). Nová súčasť modulu → pridaj ju do `SUBORY`. Žiadny golden
-snapshot, žiadny zápis do dlv-import.
+**Od #221 už NIE JE route Money-clean** — route `/pergola/narez` legitímne posiela
+rezervačný odpis (cez most, viď sekcia „Rezervačný odpis" nižšie). Guard
+`tests/pergola-narez-money-safety.test.ts` stráži LEN **vzorcový ENGINE** (zoznam
+`CISTY_ENGINE`, predtým `SUBORY`): `pergola-narez.ts`, `pergola-krov.ts`,
+`pergola-narez-vstup.ts`, `PergolaNarezVykres.svelte` — tie NEimportujú
+`server/money`/`server/pergola`/`server/db`. Nový DISPLAY engine → pridaj do
+`CISTY_ENGINE`; Money ZÁPIS → daj do samostatného server mostu (nie do enginu ani do
+guardu). Žiadny golden snapshot, žiadny priamy zápis do dlv-import z enginu.
 
 **Bin-packing (výdaj tyčí) — REPLIKUJ, NEIMPORTUJ (#205).** Algoritmus výdaja tyčí žije v
 `$lib/server/pergola.ts` (Money odpisová cesta, katalóg tyčí 7500/6000/4500 mm), ktorú
@@ -193,3 +200,36 @@ Dominikove sľúbené tabuľky, dorobiť z TYPOV.
 - **Testy:** unit `tests/pergola-narez-komponenty.test.ts` (honest-null, per-systém filter,
   no-shared-mutation guard); E2E v `pergola-narez.spec.ts` (Massive + Robust vetva,
   počet-bunka `data-testid="komponent-pocet"` = „—", console-zero).
+
+## Rezervačný odpis do Money (#221) — MOST z rozmerov na Money odpis
+
+Od #221 route `/pergola/narez` už NIE JE display-only — premenovaná na **„Rezervačný
+odpis"**, posiela do Money rezervačný odpis pri zadaní objednávky (call Dominik 19.8.),
+cez EXISTUJÚCI potvrdzovací tok (rozmery → materiál → ZAK/OP/zákazník → Money rozpis
+nahlad → **explicitné potvrdenie** → zápis), bez +20 %.
+
+- **Kľúčový most (`src/lib/server/pergola-rezervacia.ts`):** potvrdené riadky
+  `spocitajNarez().vypocitane` s `dlzkaRezuMm != null` majú PRESNE tvar `CadRow`
+  (`{code, name, qty=pocetKs, cut_mm=dlzkaRezuMm}`), takže sa prehnajú tým istým, na
+  20/20 Money pároch overeným `transformRows` jadrom → PRP metre tyčí = bit-presne ako
+  CAD odpis pre tie isté rezy. **Nikdy nepočítaj Money metre nanovo** — reuse
+  `transformRows`, inak sa rezervácia rozíde s reálnym odpisom (a #227 nezmieri).
+- **Honest-null vylúčenie je BEZPEČNOSTNÉ:** `narezToCadRows` filtruje `dlzkaRezuMm != null`,
+  takže null riadok (priečka 18004 = HH krovu) sa ako CadRow ANI NEVYTVORÍ → do Money sa
+  nikdy nedostane; zobrazí sa cez `vylucenePolozky` ako „zatiaľ nepočítané". Komponenty
+  (bez Money kódu) do odpisu tiež nejdú.
+- **Označenie rezervácie (párovateľnosť pre #227):** `OdpisJob.rezervacia=true` →
+  `filenameFor` marker „REZ" (`ZAK - zákazník REZ [hash].xlsx`); `popis` prefix „REZ"
+  (vidno v Money); `detail.rezervacia` + rozmery + vylúčené kódy. **modul='pergola'
+  ZAMERNE** = zdieľaný dedup `(modul,zak,op,live)` s CAD odpisom → rezervácia + neskorší
+  CAD odpis tej istej ZAK+OP kolidujú (bráni dvojitému odpisu; oprava = `releaseOdpis`).
+- **`transform` refaktor:** čistá extrakcia `transformRows(CadRow[])`; `transform(text)`
+  je len obal `transformRows(parseInput(text))` — kontraktové vektory `pergola.test.ts`
+  platia. Ak treba odpis z iných štruktúrovaných riadkov, volaj `transformRows`, nie
+  serializáciu späť na CAD text.
+- **Money-safety guard (`tests/pergola-narez-money-safety.test.ts`) sa ZÚŽIL:** vzorcový
+  ENGINE (`pergola-narez.ts`, `pergola-krov.ts`, `pergola-narez-vstup.ts`, výkres) ostáva
+  Money-clean; route + most odpis posielať SMÚ. Ak pridávaš ďalší display engine, drž ho
+  v guarde; Money zápis daj do samostatného server mostu.
+- **Testovanie odoslania = LEN TEST režim** (`skipAkLive`, seedovaný `e2e` user) — appka
+  na prode je LIVE (`/health` `live:true`), reálny „Odoslať do Money" na prode nikdy.
