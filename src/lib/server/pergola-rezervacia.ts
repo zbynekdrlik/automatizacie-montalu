@@ -10,9 +10,11 @@
 // Tým, že potvrdené riadky enginu majú presne tvar `CadRow`, prechádzajú tým istým
 // na 20/20 Money pároch overeným `transformRows` jadrom → rezervácia je bit-presne
 // v rovnakom formáte ako reálny CAD odpis (→ #227 aktualizácia na reálne čísla).
-import { transformRows, type CadRow } from './pergola';
+import { transformRows, catalogCodes, type CadRow } from './pergola';
 import { spocitajNarez, type PergolaNarezVstup, type NarezVysledok } from '$lib/pergola-narez';
+import { rucnaValidacia, type RucnaPolozka } from '$lib/pergola-rucne';
 import type { OdpisJob, Polozka } from './money';
+import type { MJ } from '$lib/komponenty';
 
 /**
  * Potvrdené riadky nárezu → `CadRow[]` pre Money odpis. LEN riadky s ISTOU dĺžkou
@@ -59,10 +61,15 @@ export interface RezervaciaIdent {
 }
 
 export interface RezervaciaRozpis {
-	/** nenulové Money položky (PRP kód + metre surových tyčí) — na zobrazenie */
-	nonzero: { kod: string; nazov: string; qty: number }[];
-	/** VŠETKÝCH 25 katalógových riadkov do xlsx (aj nulové — 1:1 ako CAD/bazén) */
+	/** nenulové Money položky (PRP kód + metre surových tyčí) — na zobrazenie. `rucne:true`
+	 *  = ručne pridaný riadok (#234), zobrazí sa s odznakom „ručne pridané"; `mj` nesie
+	 *  jednotku (spočítané sú vždy 'm', ručné môžu byť 'ks'). */
+	nonzero: { kod: string; nazov: string; qty: number; rucne?: boolean; mj?: MJ }[];
+	/** VŠETKÝCH 25 katalógových riadkov do xlsx (aj nulové — 1:1 ako CAD/bazén) + ručné
+	 *  riadky (#234) na konci (Money kód + MJ položky). */
 	polozky: Polozka[];
+	/** #234 — varovania k ručným riadkom (neznámy kód v katalógu). Nikdy tiché prijatie. */
+	manualWarnings: string[];
 	/** čestne nespočítané (honest-null) — „zatiaľ nepočítané" */
 	vylucene: VylucenaPolozka[];
 	/** engine zoznam „zatiaľ nepodporované" (krov, sklá, lišty…) */
@@ -81,7 +88,8 @@ export interface RezervaciaRozpis {
  */
 export function buildRezervaciaRozpis(
 	vstup: PergolaNarezVstup,
-	ident: RezervaciaIdent
+	ident: RezervaciaIdent,
+	manualRows: RucnaPolozka[] = []
 ): { rozpis: RezervaciaRozpis; error: null } | { rozpis: null; error: string } {
 	if (!ident.zak.trim()) return { rozpis: null, error: 'Chýba číslo objednávky (ZAK).' };
 	if (!ident.zakaznik.trim()) return { rozpis: null, error: 'Chýba zákazník.' };
@@ -90,12 +98,16 @@ export function buildRezervaciaRozpis(
 
 	const vysledok = spocitajNarez(vstup);
 	const cadRows = narezToCadRows(vysledok);
-	if (cadRows.length === 0)
+	// #234 — odpis môže vzniknúť aj LEN z ručných riadkov; prázdny je len keď nemáme ani
+	// spočítané, ani ručné položky.
+	if (cadRows.length === 0 && manualRows.length === 0)
 		return {
 			rozpis: null,
 			error: 'Z rozmerov zatiaľ nevyšli žiadne potvrdené položky na odpis.'
 		};
 
+	// transformRows([]) vráti 25 katalógových riadkov s qty 0 — bezpečné aj pri prázdnych
+	// cadRows (odpis len z ručných riadkov).
 	const t = transformRows(cadRows);
 	if (t.unresolved.length)
 		return {
@@ -103,14 +115,33 @@ export function buildRezervaciaRozpis(
 			error: 'Nenamapované kódy na Money: ' + t.unresolved.map((u) => u.cad).join(', ')
 		};
 
-	const nonzero = t.out
-		.filter((o) => o.qty > 0)
-		.map((o) => ({ kod: o.prp, nazov: o.name, qty: o.qty }));
+	// #234 — ručné riadky OBÍDU CAD transform: sú už Money kód + MJ (m/ks), NIE CAD dĺžky.
+	// Validácia proti katalógu: neznámy kód = VAROVANIE, nie tiché prijatie (ani odmietnutie).
+	const codes = catalogCodes();
+	const manualWarnings: string[] = [];
+	const manualNonzero: { kod: string; nazov: string; qty: number; rucne?: boolean; mj?: MJ }[] = [];
+	const manualPolozky: Polozka[] = [];
+	for (const m of manualRows) {
+		if (!(m.mnozstvo > 0)) continue; // prázdny/nulový ručný riadok sa nezahŕňa
+		const v = rucnaValidacia(m.kod, codes);
+		if (v.warning) manualWarnings.push(v.warning);
+		manualNonzero.push({ kod: m.kod, nazov: m.nazov, qty: m.mnozstvo, rucne: true, mj: m.mj });
+		manualPolozky.push({ kod: m.kod, nazov: m.nazov, qty: m.mnozstvo, mj: m.mj });
+	}
+
+	const nonzero = [
+		...t.out.filter((o) => o.qty > 0).map((o) => ({ kod: o.prp, nazov: o.name, qty: o.qty })),
+		...manualNonzero
+	];
 	if (nonzero.length === 0)
 		return { rozpis: null, error: 'Z rozmerov nevyšli žiadne Money položky na rezerváciu.' };
 
-	// VŠETKÝCH 25 katalógových riadkov (aj nulové) — presne ako CAD/bazén odpis
-	const polozky: Polozka[] = t.out.map((o) => ({ kod: o.prp, nazov: o.name, qty: o.qty }));
+	// VŠETKÝCH 25 katalógových riadkov (aj nulové) — presne ako CAD/bazén odpis — + ručné
+	// riadky na konci (idú do xlsx so svojou MJ).
+	const polozky: Polozka[] = [
+		...t.out.map((o) => ({ kod: o.prp, nazov: o.name, qty: o.qty })),
+		...manualPolozky
+	];
 	const longNotes = t.trace
 		.filter((tr) => tr.notes.length)
 		.map((tr) => tr.name + ': ' + tr.notes.join('; '));
@@ -119,6 +150,7 @@ export function buildRezervaciaRozpis(
 		rozpis: {
 			nonzero,
 			polozky,
+			manualWarnings,
 			vylucene: vylucenePolozky(vysledok),
 			// #233 — engine `nepodporovane` je teraz {kratky, detail}; rozpis nesie len krátku
 			// vetu (string[], tvar nezmenený; rez-nahlad ho nerenderuje).
@@ -162,6 +194,8 @@ export function rezervaciaJob(
 		detail: {
 			rezervacia: true,
 			riadkov: rozpis.pocetPolozok,
+			// #234 — koľko z nich je ručne pridaných (pometrané) — na napárovanie/audit (#227)
+			rucneRiadkov: rozpis.nonzero.filter((o) => o.rucne).length,
 			// rozmery zákazky (podklad rezervácie) — #227 z nich vie napárovať/aktualizovať
 			system: vstup.system,
 			sirka: vstup.sirka,

@@ -149,3 +149,100 @@ describe('rezervaciaJob + filenameFor — označenie rezervácie (párovateľnos
 		expect(bezRez).toMatch(/ZAK2026999 - E2E Test \[[0-9a-f]{8}\]\.xlsx/);
 	});
 });
+
+// #234 — ručné („pometrané") položky: merge so spočítanými, MJ, validácia, golden xlsx tvar
+describe('buildRezervaciaRozpis — ručné položky (#234)', () => {
+	it('ručný riadok sa pridá do nonzero SPOLU so spočítanými, s odznakom rucne + MJ', () => {
+		const rucne = [
+			{ kod: 'PRP20259', nazov: 'Kotviaci profil ručne', mnozstvo: 3, mj: 'm' as const }
+		];
+		const { rozpis, error } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		expect(error).toBeNull();
+		// spočítané ostávajú
+		expect(rozpis!.nonzero.some((o) => o.kod === 'PRP20242' && !o.rucne)).toBe(true);
+		// ručný riadok pribudol, označený rucne=true, MJ nesie
+		const r = rozpis!.nonzero.find((o) => o.rucne);
+		expect(r).toBeDefined();
+		expect(r).toMatchObject({ kod: 'PRP20259', nazov: 'Kotviaci profil ručne', qty: 3, mj: 'm' });
+		// je aj v polozky (ide do xlsx) so svojou MJ
+		expect(rozpis!.polozky.some((p) => p.nazov === 'Kotviaci profil ručne' && p.mj === 'm')).toBe(
+			true
+		);
+	});
+
+	it('kusová ručná položka (MJ=ks) prejde s ks, nie s vymyslenou m', () => {
+		const rucne = [{ kod: 'ZASK9', nazov: 'Kľučka FAB', mnozstvo: 4, mj: 'ks' as const }];
+		const { rozpis } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		const p = rozpis!.polozky.find((x) => x.nazov === 'Kľučka FAB');
+		expect(p).toMatchObject({ kod: 'ZASK9', qty: 4, mj: 'ks' });
+	});
+
+	it('neznámy kód = VAROVANIE (nie tiché prijatie, nie odmietnutie); riadok sa aj tak zahrnie', () => {
+		const rucne = [{ kod: 'NEZNAMY123', nazov: 'X', mnozstvo: 2, mj: 'm' as const }];
+		const { rozpis, error } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		expect(error).toBeNull(); // neodmietnuté
+		expect(rozpis!.manualWarnings.length).toBe(1);
+		expect(rozpis!.manualWarnings[0]).toMatch(/NEZNAMY123/);
+		expect(rozpis!.nonzero.some((o) => o.kod === 'NEZNAMY123' && o.rucne)).toBe(true);
+	});
+
+	it('známy katalógový kód → žiadne varovanie', () => {
+		const rucne = [{ kod: 'PRP20259', nazov: 'Kotviaci', mnozstvo: 6, mj: 'm' as const }];
+		const { rozpis } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		expect(rozpis!.manualWarnings).toEqual([]);
+	});
+
+	it('prázdny/nulový ručný riadok sa NEZAHRNIE (množstvo <= 0)', () => {
+		const rucne = [{ kod: 'PRP20259', nazov: 'X', mnozstvo: 0, mj: 'm' as const }];
+		const { rozpis } = buildRezervaciaRozpis(STD, IDENT, rucne);
+		expect(rozpis!.nonzero.some((o) => o.rucne)).toBe(false);
+	});
+
+	it('pocetPolozok zahŕňa ručné riadky (2 ručné → +2)', () => {
+		const bez = buildRezervaciaRozpis(STD, IDENT).rozpis!.pocetPolozok;
+		const rucne = [
+			{ kod: 'PRP20259', nazov: 'A', mnozstvo: 1, mj: 'm' as const },
+			{ kod: 'ZASK1', nazov: 'B', mnozstvo: 2, mj: 'ks' as const }
+		];
+		const s = buildRezervaciaRozpis(STD, IDENT, rucne).rozpis!.pocetPolozok;
+		expect(s).toBe(bez + 2);
+	});
+
+	it('GOLDEN xlsx tvar ručného riadku: [ZAK, kód, názov, qty, MJ] priamo z buffra (bez DB/zápisu)', async () => {
+		const ExcelJS = (await import('exceljs')).default;
+		const { buildXlsx } = await import('../src/lib/server/money');
+
+		const rucne = [
+			{ kod: 'ZASK-KLUCKA', nazov: 'Kľučka FAB pravá', mnozstvo: 4, mj: 'ks' as const }
+		];
+		const { rozpis } = buildRezervaciaRozpis(STD, { ...IDENT, zak: 'ZAK-G-1' }, rucne);
+		const job = rezervaciaJob(STD, { ...IDENT, zak: 'ZAK-G-1' }, rozpis!, 'vitest');
+
+		const buf = await buildXlsx(job);
+		const wb = new ExcelJS.Workbook();
+		// ArrayBuffer (nie Node Buffer) — obíde generic Buffer<ArrayBufferLike> mismatch v typoch
+		await wb.xlsx.load(new Uint8Array(buf).buffer);
+		const ws = wb.worksheets[0];
+		// hlavička = 6 stĺpcov (číslo zakázky, Kód, Název, Množství v m, MJ, Popis dokladu)
+		expect((ws.getRow(1).values as unknown[]).slice(1)).toEqual([
+			'číslo zakázky',
+			'Kód položky',
+			'Název položky',
+			'Množství v m',
+			'MJ',
+			'Popis dokladu'
+		]);
+		// nájdi riadok ručnej položky a over presný tvar bunky [zak, kód, názov, qty, MJ]
+		let found: unknown[] | null = null;
+		ws.eachRow((row) => {
+			const v = (row.values as unknown[]).slice(1);
+			if (v[1] === 'ZASK-KLUCKA') found = v;
+		});
+		expect(found).not.toBeNull();
+		expect(found![0]).toBe('ZAK-G-1'); // číslo zakázky
+		expect(found![1]).toBe('ZASK-KLUCKA'); // Money kód
+		expect(found![2]).toBe('Kľučka FAB pravá'); // názov
+		expect(found![3]).toBe(4); // množstvo
+		expect(found![4]).toBe('ks'); // MJ — kusová, NIE vymyslené 'm'
+	});
+});

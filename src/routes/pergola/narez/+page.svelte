@@ -22,6 +22,8 @@
 		type VystuhaProfil
 	} from '$lib/pergola-narez';
 	import { krovUlozenie } from '$lib/pergola-krov';
+	import { rucnaValidacia, type RucnaPolozka } from '$lib/pergola-rucne';
+	import type { MJ } from '$lib/komponenty';
 
 	let { data, form } = $props();
 
@@ -87,6 +89,48 @@
 	let opS = $state('');
 	let zakaznikS = $state('');
 
+	// #234 — ručné („pometrané") položky: pridané riadky + rozpracovaný nový riadok.
+	// `rucneRiadky` je zdroj pravdy, serializuje sa do hidden JSON inputu (round-trip vzor
+	// PR #81), server ho prepočíta znova (nedôveruje klientovi).
+	let rucneRiadky = $state<RucnaPolozka[]>([]);
+	let rucneKodS = $state('');
+	let rucneNazovS = $state('');
+	let rucneMnozstvoS = $state<number | string>('');
+	let rucneMjS = $state<MJ>('m');
+	let rucneChyba = $state('');
+	// katalóg z load — kód → názov (na varovanie/predvyplnenie mena pri známom kóde)
+	let katByKod = $derived(new Map((data.catalog ?? []).map((c) => [c.kod, c.nazov])));
+	let katKody = $derived(new Set((data.catalog ?? []).map((c) => c.kod)));
+	// živé varovanie pri rozpísanom kóde (neznámy = upozornenie, nie blok)
+	let rucneVarovanie = $derived(rucnaValidacia(rucneKodS, katKody).warning);
+
+	function pridajRucny() {
+		rucneChyba = '';
+		const kod = rucneKodS.trim();
+		const mnoz = parseFloat(String(rucneMnozstvoS).replace(',', '.'));
+		if (!kod) {
+			rucneChyba = 'Zadaj Money kód položky.';
+			return;
+		}
+		if (!Number.isFinite(mnoz) || mnoz <= 0) {
+			rucneChyba = 'Zadaj množstvo väčšie ako 0.';
+			return;
+		}
+		const nazov = rucneNazovS.trim() || katByKod.get(kod) || kod;
+		rucneRiadky = [
+			...rucneRiadky,
+			{ kod, nazov, mnozstvo: Math.round(mnoz * 1000) / 1000, mj: rucneMjS }
+		];
+		rucneKodS = '';
+		rucneNazovS = '';
+		rucneMnozstvoS = '';
+		rucneMjS = 'm';
+	}
+
+	function odoberRucny(i: number) {
+		rucneRiadky = rucneRiadky.filter((_, idx) => idx !== i);
+	}
+
 	// reštart-effect: číta LEN form?.vstup, NIKDY vlastný *S zápis (nova-stranka §3 —
 	// self-loop by ticho prepísal používateľovu voľbu systému späť na default).
 	$effect(() => {
@@ -115,6 +159,9 @@
 		zakS = id?.zak ?? '';
 		opS = id?.op ?? '';
 		zakaznikS = id?.zakaznik ?? '';
+		// #234 — echo ručných riadkov z form (round-trip: prežijú „Späť a upraviť")
+		const rc = form && 'rucne' in form ? form.rucne : null;
+		rucneRiadky = Array.isArray(rc) ? (rc as RucnaPolozka[]) : [];
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
@@ -174,6 +221,8 @@
 			name="obvodoveZasklenie"
 			value={obvodoveZasklenieS}
 		/>{/if}
+	<!-- #234 — ručné položky ako JSON (round-trip cez celý tok, vzor PR #81) -->
+	<input type="hidden" name="rucnePolozky" value={JSON.stringify(rucneRiadky)} />
 {/snippet}
 
 {#snippet hiddenIdent()}
@@ -206,6 +255,8 @@
 	<div class="card">
 		<form method="POST" action="?/spocitat">
 			{@render hiddenIdent()}
+			<!-- #234 — ručné riadky prežijú aj cez formulárový krok (round-trip, PR #81) -->
+			<input type="hidden" name="rucnePolozky" value={JSON.stringify(rucneRiadky)} />
 			<div class="grid3">
 				<div class="field">
 					<label for="system">Systém pergoly *</label>
@@ -753,6 +804,101 @@
 		</ul>
 	</div>
 
+	<!-- #234 — ručné („pometrané") položky: Money kód + názov + množstvo v MJ položky.
+	     Idú do odpisu SPOLU so spočítanými, po tom istom potvrdení. Neznámy kód = varovanie. -->
+	<div class="card noprint" data-testid="rucne-karta">
+		<div class="sec">
+			Ručné položky (pometrané)
+			{#if rucneRiadky.length}<span class="badge rucne" data-testid="rucne-pocet"
+					>✍️ {rucneRiadky.length} ručne pridané</span
+				>{/if}
+		</div>
+		<p class="sub">
+			Pridaj položku, ktorú počítaš ručne (napr. <b>kotviace profily</b> „pometrané", alebo položka bez
+			vzorca): Money kód + názov + množstvo v jednotke položky (m alebo ks). Pridané riadky idú do odpisu
+			spolu so spočítanými, po tom istom potvrdení.
+		</p>
+
+		{#if rucneRiadky.length}
+			<table class="narez" data-testid="rucne-tabulka">
+				<thead>
+					<tr><th>Money kód</th><th>Názov</th><th>Množstvo</th><th></th></tr>
+				</thead>
+				<tbody>
+					{#each rucneRiadky as r, i (r.kod + '·' + i)}
+						<tr data-testid="rucne-riadok">
+							<td>{r.kod} <span class="badge rucne">✍️ ručne pridané</span></td>
+							<td>{r.nazov}</td>
+							<td><b>{fmtM(r.mnozstvo)} {r.mj}</b></td>
+							<td
+								><button
+									type="button"
+									class="btn-link"
+									data-testid="rucne-odober"
+									onclick={() => odoberRucny(i)}>✕ odobrať</button
+								></td
+							>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
+
+		<div class="grid4 rucne-vstup">
+			<div class="field">
+				<label for="rucneKod">Money kód</label>
+				<input
+					id="rucneKod"
+					data-testid="rucne-kod"
+					bind:value={rucneKodS}
+					placeholder="napr. PRP20259"
+				/>
+			</div>
+			<div class="field">
+				<label for="rucneNazov">Názov</label>
+				<input
+					id="rucneNazov"
+					data-testid="rucne-nazov"
+					bind:value={rucneNazovS}
+					placeholder={rucneKodS && katByKod.get(rucneKodS.trim())
+						? katByKod.get(rucneKodS.trim())
+						: 'názov položky'}
+				/>
+			</div>
+			<div class="field">
+				<label for="rucneMnozstvo">Množstvo</label>
+				<input
+					id="rucneMnozstvo"
+					data-testid="rucne-mnozstvo"
+					type="text"
+					inputmode="decimal"
+					bind:value={rucneMnozstvoS}
+					placeholder="napr. 12,5"
+				/>
+			</div>
+			<div class="field">
+				<label for="rucneMj">MJ</label>
+				<select id="rucneMj" data-testid="rucne-mj" bind:value={rucneMjS}>
+					<option value="m">m (metre)</option>
+					<option value="ks">ks (kusy)</option>
+				</select>
+			</div>
+		</div>
+		{#if rucneVarovanie}
+			<p class="sub" data-testid="rucne-varovanie" style="color:#b45309">⚠️ {rucneVarovanie}</p>
+		{:else if rucneKodS.trim() && katByKod.get(rucneKodS.trim())}
+			<p class="sub" data-testid="rucne-znamy" style="color:#15803d">
+				✅ Kód v katalógu: {katByKod.get(rucneKodS.trim())}
+			</p>
+		{/if}
+		{#if rucneChyba}
+			<p class="sub" data-testid="rucne-chyba" style="color:#dc2626">⚠️ {rucneChyba}</p>
+		{/if}
+		<button type="button" class="btn secondary" data-testid="rucne-pridat" onclick={pridajRucny}
+			>➕ Pridať ručnú položku</button
+		>
+	</div>
+
 	<div class="card noprint">
 		<div class="sec">Rezervačný odpis do Money</div>
 		<p class="sub">
@@ -814,20 +960,29 @@
 		</div>
 	{/if}
 
+	{#if rozpis.manualWarnings.length}
+		<div class="warn" data-testid="rez-rucne-varovanie">
+			{#each rozpis.manualWarnings as w (w)}<div>⚠️ {w}</div>{/each}
+		</div>
+	{/if}
+
 	<div class="card">
 		<div class="sec">Money rozpis — {rozpis.nonzero.length} položiek</div>
 		<p class="sub noprint">
-			Množstvá sú metre surových tyčí (bin-packing, presne ako klasický CAD odpis). Do Money sa po
-			potvrdení pošle presne toto.
+			Spočítané množstvá sú metre surových tyčí (bin-packing, presne ako klasický CAD odpis); ručne
+			pridané riadky nesú svoje množstvo v MJ položky. Do Money sa po potvrdení pošle presne toto.
 		</p>
 		<table class="narez" data-testid="rez-rozpis">
 			<thead><tr><th>Money kód</th><th>Názov</th><th>Množstvo</th></tr></thead>
 			<tbody>
-				{#each rozpis.nonzero as o (o.kod)}
-					<tr>
-						<td>{o.kod}</td>
+				{#each rozpis.nonzero as o, i (o.kod + '·' + i)}
+					<tr data-testid={o.rucne ? 'rez-rucne-riadok' : 'rez-spocitany-riadok'}>
+						<td
+							>{o.kod}{#if o.rucne}
+								<span class="badge rucne">✍️ ručne pridané</span>{/if}</td
+						>
 						<td>{o.nazov}</td>
-						<td><b>{fmtM(o.qty)} m</b></td>
+						<td><b>{fmtM(o.qty)} {o.mj ?? 'm'}</b></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -884,8 +1039,13 @@
 			<table class="narez">
 				<thead><tr><th>Money kód</th><th>Názov</th><th>Množstvo</th></tr></thead>
 				<tbody>
-					{#each rozpis.nonzero as o (o.kod)}
-						<tr><td>{o.kod}</td><td>{o.nazov}</td><td><b>{fmtM(o.qty)} m</b></td></tr>
+					{#each rozpis.nonzero as o, i (o.kod + '·' + i)}
+						<tr
+							><td
+								>{o.kod}{#if o.rucne}
+									<span class="badge rucne">✍️ ručne pridané</span>{/if}</td
+							><td>{o.nazov}</td><td><b>{fmtM(o.qty)} {o.mj ?? 'm'}</b></td></tr
+						>
 					{/each}
 				</tbody>
 			</table>
@@ -994,6 +1154,35 @@
 	}
 	.nepodp-kratky {
 		font-weight: 500;
+	}
+
+	/* #234 — ručné položky: fialový odznak (odlíšený od spočítaných), vstupný grid,
+	   odobrať link. Reuse .badge tokenov, žiadny nový dizajnový jazyk. */
+	.badge.rucne {
+		background: #ede9fe;
+		color: #6d28d9;
+	}
+	.grid4 {
+		display: grid;
+		grid-template-columns: 1fr 1.4fr 0.8fr 0.8fr;
+		gap: 12px;
+		align-items: end;
+	}
+	@media (max-width: 640px) {
+		.grid4 {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+	.rucne-vstup {
+		margin-top: 8px;
+	}
+	.btn-link {
+		background: none;
+		border: none;
+		color: #dc2626;
+		cursor: pointer;
+		font-size: 13px;
+		padding: 0;
 	}
 
 	table.narez {

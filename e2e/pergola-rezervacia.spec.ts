@@ -91,3 +91,77 @@ test('rezervácia bez ZAK/OP/zákazník = chyba, do Money sa nič nezapíše', a
 	await expect(page.getByTestId('rez-error')).toContainText(/OP/);
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #234 — ručné („pometrané") položky: pridanie cez UI, odznak „ručne pridané", varovanie
+// pri neznámom kóde, zahrnutie v TEST odpise, a round-trip prežitie („Späť a upraviť",
+// pasca PR #81 klín/koľajnica). ZÁPIS je za skipAkLive → do ostrého Money nikdy nič.
+test('ručné položky: pridanie + odznak + varovanie + zahrnutie v TEST odpise + round-trip', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Robust');
+	await page.locator('#sirka').fill('5000');
+	await page.locator('#hlbka').fill('3500');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// ručná karta je viditeľná
+	await expect(page.getByTestId('rucne-karta')).toBeVisible();
+
+	// pridaj ZNÁMY katalógový kód (PRP20259 = Kotviaci profil horny V2) — bez varovania
+	await page.getByTestId('rucne-kod').fill('PRP20259');
+	await expect(page.getByTestId('rucne-znamy')).toBeVisible();
+	await page.getByTestId('rucne-nazov').fill('Kotviaci profil pometraný');
+	await page.getByTestId('rucne-mnozstvo').fill('3,5');
+	await page.getByTestId('rucne-mj').selectOption('m');
+	await page.getByTestId('rucne-pridat').click();
+
+	// riadok pribudol s odznakom „ručne pridané"
+	const rucneRiadok = page.getByTestId('rucne-riadok');
+	await expect(rucneRiadok).toHaveCount(1);
+	await expect(rucneRiadok).toContainText('ručne pridané');
+	await expect(rucneRiadok).toContainText('Kotviaci profil pometraný');
+	await expect(rucneRiadok).toContainText('3,5 m');
+
+	// NEZNÁMY kód → živé varovanie (nie tiché prijatie)
+	await page.getByTestId('rucne-kod').fill('NEZNAMY999');
+	await expect(page.getByTestId('rucne-varovanie')).toContainText('NEZNAMY999');
+	await page.getByTestId('rucne-mnozstvo').fill('2');
+	await page.getByTestId('rucne-mj').selectOption('ks');
+	await page.getByTestId('rucne-pridat').click();
+	await expect(page.getByTestId('rucne-riadok')).toHaveCount(2);
+
+	// round-trip pasca (PR #81): „Späť a upraviť" → späť na výsledok → ručné riadky OSTÁVAJÚ
+	await page.getByTestId('upravit').click();
+	await waitHydrated(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('rucne-riadok')).toHaveCount(2); // nestratili sa
+
+	// ZAK/OP/zákazník + pripraviť rezervačný odpis
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-RUC`);
+	await page.getByLabel('OP/OPDL číslo *').fill('OP260RUC');
+	await page.getByLabel('Zákazník *').fill('E2E Rucne');
+	await page.getByTestId('pripravit-rezervaciu').click();
+	await waitHydrated(page);
+
+	// nahlad: ručné riadky sú v Money rozpise s odznakom + s vlastnou MJ (ks ostáva ks)
+	const rezRucne = page.getByTestId('rez-rucne-riadok');
+	await expect(rezRucne).toHaveCount(2);
+	await expect(page.getByTestId('rez-rozpis')).toContainText('Kotviaci profil pometraný');
+	await expect(page.getByTestId('rez-rozpis')).toContainText('2 ks'); // kusová MJ, nie vymyslené m
+	// varovanie k neznámemu kódu je vidieť pred potvrdením (nie tiché)
+	await expect(page.getByTestId('rez-rucne-varovanie')).toContainText('NEZNAMY999');
+
+	// potvrdenie → zápis do TEST priečinka (nikdy ostré Money)
+	await page.getByTestId('odoslat-rezervaciu').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('rez-vysledok')).toContainText('TEST');
+
+	expect(consoleMsgs).toEqual([]);
+});

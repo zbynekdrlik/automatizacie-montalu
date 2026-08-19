@@ -163,6 +163,18 @@ export const CATALOG: CatalogItem[] = [
 	}
 ];
 
+/** Množina Money PRP kódov pergola katalógu — na validáciu ručných riadkov rezervačného
+ *  odpisu (#234). Neznámy kód = varovanie (nie odmietnutie), viď `pergola-rucne.ts`. */
+export function catalogCodes(): Set<string> {
+	return new Set(CATALOG.map((c) => c.prp));
+}
+
+/** Katalóg pre klienta: PRP kód → krátky názov (base) — na okamžité varovanie/predvyplnenie
+ *  názvu pri ručnom riadku (#234). Bez `bar_mm` (tie sú interné pre bin-packing). */
+export function catalogForClient(): { kod: string; nazov: string }[] {
+	return CATALOG.map((c) => ({ kod: c.prp, nazov: c.base }));
+}
+
 // CAD (Dominok) kód → profil. Zdroj: Money DominokKod_UserData.
 // 18104 (light kotviaci) → V2 (light sa ruší).
 const CODE_MAP: Record<string, string> = {
