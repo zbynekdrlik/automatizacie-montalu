@@ -12,6 +12,8 @@ import {
 	CATALOG
 } from '$lib/server/pergola';
 import { writeOdpis, isLive, applyEdits, type OdpisJob } from '$lib/server/money';
+import { isB2B, type SessionUser } from '$lib/server/auth';
+import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 
 interface PergolaVstup {
 	zak: string;
@@ -110,18 +112,39 @@ function view(vstup: PergolaVstup, form?: FormData) {
 	};
 }
 
+/**
+ * Cenový zoznam materiálu (#232, display-only) — LEN pre interných. B2B nesmie
+ * vidieť nákupnú cenu/maržu/sklad vôbec — obrana do hĺbky (tá istá hranica ako
+ * zasklenia `cenyPre` / Money-write): pre b2b sa cena vôbec NEDOPOČÍTA, takže sa
+ * nikdy nedostane do HTML odpovede. Ceníme presne zobrazené nenulové Money položky
+ * (`v.nonzero` — PRP profily); Money odpis sa týmto NEMENÍ (goldeny byte-identické).
+ */
+function cenyPre(
+	user: SessionUser | null,
+	polozky: { kod: string; nazov: string; qty: number }[]
+): CenyResult | undefined {
+	if (isB2B(user)) return undefined;
+	return enrichPolozky(polozky);
+}
+
 export const load: PageServerLoad = async () => {
 	return { live: isLive() };
 };
 
 export const actions: Actions = {
-	spocitat: async ({ request }) => {
+	spocitat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const vstup = parseVstup(form);
 		const { error, view: v } = view(vstup, form);
 		if (error) return { step: 'form' as const, error, vstup };
 		// „Spočítať" beží z formulára, kde polia qty_ ešte nie sú — editError tu nevzniká
-		return { step: 'nahlad' as const, vstup, v, error: null as string | null };
+		return {
+			step: 'nahlad' as const,
+			vstup,
+			v,
+			ceny: v ? cenyPre(locals.user, v.nonzero) : undefined,
+			error: null as string | null
+		};
 	},
 
 	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝM vstupom vrátane CAD
@@ -136,8 +159,12 @@ export const actions: Actions = {
 		const vstup = parseVstup(form);
 		const { error, editError, view: v } = view(vstup, form);
 		if (error) return { step: 'form' as const, error, vstup };
+		// cenový blok (#232) — LEN interní. Lazy (thunk): úspešné odoslanie končí v kroku
+		// „hotovo" bez cenového bloku, tak ho nepočítame zbytočne — len keď sa vraciame
+		// do „nahlad" s chybou. Zavolá sa nanajvýš raz (vetvy sú return).
+		const cenyBlok = () => (v ? cenyPre(locals.user, v.nonzero) : undefined);
 		// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
-		if (editError) return { step: 'nahlad' as const, vstup, v, error: editError };
+		if (editError) return { step: 'nahlad' as const, vstup, v, ceny: cenyBlok(), error: editError };
 
 		// posledná poistka pred zápisom do Money — nikdy záporné/nekonečné metre
 		if (v!.polozky.some((o) => o.qty < 0 || !Number.isFinite(o.qty)))
@@ -145,6 +172,7 @@ export const actions: Actions = {
 				step: 'nahlad' as const,
 				vstup,
 				v,
+				ceny: cenyBlok(),
 				error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
 			};
 
@@ -189,6 +217,7 @@ export const actions: Actions = {
 				step: 'nahlad' as const,
 				vstup,
 				v,
+				ceny: cenyBlok(),
 				error:
 					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};
