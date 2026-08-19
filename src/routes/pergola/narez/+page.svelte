@@ -581,7 +581,11 @@
 				{#each vysledok.vypocitane as p (p.kod + p.nazov)}
 					<tr data-testid="polozka-{p.kod}">
 						<td class="stav-col">
-							{#if p.dlzkaRezuMm != null}<span
+							<!-- rovnaká podmienka ako spocitaneCount / narezToCadRows (do rezervácie
+							     ide `dlzkaRezuMm != null && pocetKs > 0`) — per-riadkový odznak sa tak
+							     nikdy nerozíde so zhrnutím ani s Money, aj keby pribudol riadok s
+							     dĺžkou ale nulovým počtom (#222 review) -->
+							{#if p.dlzkaRezuMm != null && p.pocetKs > 0}<span
 									class="badge ok"
 									data-testid="stav-{p.kod}"
 									title="dĺžka známa → ide do rezervácie">✅ v odpise</span
