@@ -154,6 +154,17 @@
 <style>
 	/* #234 — ručné položky: vstupný grid + odobrať link (scoped v komponente #239).
 	   `.badge.rucne` a `table.narez` sú zdieľané → v app.css (global). */
+	/* odznak „✍️ N ručne pridané" v .sec hlavičke — .sec je uppercase, badge nechať tak
+	   (page-scoped override z pôvodného +page.svelte; scoped, nie global — .sec+.badge na
+	   iných routách sa nesmie meniť). */
+	.sec .badge {
+		text-transform: none;
+		letter-spacing: 0;
+		vertical-align: middle;
+		margin-left: 6px;
+		font-size: 12px;
+		font-weight: 700;
+	}
 	.grid4 {
 		display: grid;
 		grid-template-columns: 1fr 1.4fr 0.8fr 0.8fr;
