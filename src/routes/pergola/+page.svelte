@@ -80,9 +80,9 @@
 			<a href={resolve('/pergola/navrh')} data-testid="link-navrh">→ Návrhový výkres</a>
 		</p>
 		<p class="sub">
-			🧮 Skúšobné: materiál (nárez) z rozmerov bez CAD-u (#155, len potvrdené vzorce,
-			<b>do Money nič nejde</b>)
-			<a href={resolve('/pergola/narez')} data-testid="link-narez">→ Materiál z rozmerov</a>
+			🧮 Rezervačný odpis: rezervuj materiál v Money z rozmerov (bez CAD-u) už pri zadaní objednávky
+			— len potvrdené vzorce, odpis až po potvrdení
+			<a href={resolve('/pergola/narez')} data-testid="link-narez">→ Rezervačný odpis</a>
 		</p>
 	</div>
 
