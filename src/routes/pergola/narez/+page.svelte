@@ -994,7 +994,8 @@
 
 	<!-- ceny materiálu (#232, display-only) — LEN interní; b2b nikdy nedostane
 	     `form.ceny` (viď cenyPre v +page.server.ts). NOPRINT: náklady nikdy do
-	     dielenskej tlače (rovnaký vzor ako SkloCena / zasklenia cenový blok). -->
+	     dielenskej tlače (rovnaký .noprint vzor ako SkloCena — výkres/rozpis sa tlačí,
+	     cenový blok nie). -->
 	{#if ceny}
 		<div class="noprint">
 			<CenyTabulka {ceny} />

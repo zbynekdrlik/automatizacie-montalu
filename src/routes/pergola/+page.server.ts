@@ -159,10 +159,12 @@ export const actions: Actions = {
 		const vstup = parseVstup(form);
 		const { error, editError, view: v } = view(vstup, form);
 		if (error) return { step: 'form' as const, error, vstup };
-		// cenový blok (#232) — LEN interní, počíta sa raz pre všetky nahlad návraty nižšie
-		const ceny = v ? cenyPre(locals.user, v.nonzero) : undefined;
+		// cenový blok (#232) — LEN interní. Lazy (thunk): úspešné odoslanie končí v kroku
+		// „hotovo" bez cenového bloku, tak ho nepočítame zbytočne — len keď sa vraciame
+		// do „nahlad" s chybou. Zavolá sa nanajvýš raz (vetvy sú return).
+		const cenyBlok = () => (v ? cenyPre(locals.user, v.nonzero) : undefined);
 		// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
-		if (editError) return { step: 'nahlad' as const, vstup, v, ceny, error: editError };
+		if (editError) return { step: 'nahlad' as const, vstup, v, ceny: cenyBlok(), error: editError };
 
 		// posledná poistka pred zápisom do Money — nikdy záporné/nekonečné metre
 		if (v!.polozky.some((o) => o.qty < 0 || !Number.isFinite(o.qty)))
@@ -170,7 +172,7 @@ export const actions: Actions = {
 				step: 'nahlad' as const,
 				vstup,
 				v,
-				ceny,
+				ceny: cenyBlok(),
 				error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
 			};
 
@@ -215,7 +217,7 @@ export const actions: Actions = {
 				step: 'nahlad' as const,
 				vstup,
 				v,
-				ceny,
+				ceny: cenyBlok(),
 				error:
 					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};

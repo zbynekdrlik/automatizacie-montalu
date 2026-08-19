@@ -141,8 +141,10 @@ export const actions: Actions = {
 			live: isLive(),
 			riadkov: rozpis.pocetPolozok
 		});
-		// cenový blok (#232) — LEN interní; spoločné pre rez-nahlad návraty nižšie
-		const ceny = cenyPre(locals.user, rozpis.nonzero);
+		// cenový blok (#232) — LEN interní. Lazy (thunk): úspešný zápis končí v „rez-hotovo"
+		// bez cenového bloku, tak ho nepočítame zbytočne — len keď sa vraciame do
+		// „rez-nahlad" (duplikát/chyba). Zavolá sa nanajvýš raz (vetvy sú return).
+		const cenyBlok = () => cenyPre(locals.user, rozpis.nonzero);
 		try {
 			const outcome = await writeOdpis(job);
 			if (outcome.status === 'duplicate') {
@@ -152,7 +154,7 @@ export const actions: Actions = {
 					ident,
 					rucne,
 					rozpis,
-					ceny,
+					ceny: cenyBlok(),
 					rezError: `Zákazka ${ident.zak} (OP ${ident.op}) už bola odoslaná (rezervácia alebo odpis) ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv uvoľni záznam v histórii odpisov.`
 				};
 			}
@@ -170,7 +172,7 @@ export const actions: Actions = {
 				ident,
 				rucne,
 				rozpis,
-				ceny,
+				ceny: cenyBlok(),
 				rezError:
 					'Zápis rezervácie zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};
