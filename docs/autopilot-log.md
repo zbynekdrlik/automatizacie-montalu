@@ -1325,3 +1325,32 @@ implementované, nereprodukovateľné čestný null:
 - **Post-deploy overené na LIVE** (marek): `/health` + DOM v0.24.3 (91d303d); nulový žargón na
   pergola/narez (hashN/oX/call = []); ručný riadok pridaný s odznakom, prešiel do rez-nahlad
   preview s MJ „3,5 m" — NEODOSLANÉ (live Money safety).
+
+## 2026-08-19 — #232 (PR #241, merge 65082a7, v0.24.4)
+
+- **#232 ceny materiálu v pergolovom rozpise (display-only)**: znovupoužitie #154/#225 infra
+  (`enrichPolozky` → `CenyTabulka`) v OBOCH tokoch — CAD nárez (`/pergola`, krok nahlad) aj
+  Rezervačný odpis (`/pergola/narez`, krok rez-nahlad). Server helper `cenyPre(user, nonzero)`
+  → `undefined` pre b2b (obrana do hĺbky; `/pergola*` je pre b2b aj tak blokovaná hookom).
+  Ceníme zobrazené nenulové položky (`v.nonzero`/`rozpis.nonzero` — spočítané PRP + ručné #234).
+  Klient: `<CenyTabulka>` obalený `.noprint`. Money odpis sa NEMENÍ (display-only, goldeny
+  byte-identické — diff bez money/xlsx/golden cesty).
+- **Testy**: unit `pergola-ceny.test.ts` (oba toky: interný→`ceny` s riadkami = zobrazené
+  položky, b2b→`undefined`, bez snapshotu→null+neúplný súčet, seed→reálna cena); E2E
+  `pergola-ceny.spec.ts` (render/honest-null/noprint/b2b redirect). RED (7339473) → GREEN
+  (a8c33ee) → E2E (3d52fe6).
+- **Review (fresh-context general-purpose + vlastný pass) 0 🔴 0 🟡 3 🔵 → opravené** (720b09c):
+  lazy `ceny` na odoslat happy-path (thunk), presnejší `.noprint` komentár (SkloCena vzor);
+  🔵 god-file split (`pergola/narez/+page.svelte` 1230 r.) už trackovaný #239.
+- **CI pasca (zdieľaná E2E DB)**: E2E „bez snapshotu" test padol v CI — E2E DB je ZDIEĽANÁ medzi
+  spec súbormi, zmazanie fixture SÚBORU nevynuluje snapshot-metu v DB (iný spec seedol skôr).
+  Fix (96ed4c1): test overuje honest-null (PRP „cena neznáma"), ktorý platí nezávisle od DB
+  stavu, nie „snapshot nebol naimportovaný" (to platí len na čistej DB). Overené reprodukciou
+  poradia `ceny.spec` → `pergola-ceny.spec`.
+- **Post-deploy overené na LIVE** (marek): `/health` v0.24.4 (65082a7) live:true; DOM verzia
+  v0.24.4; pergola/narez rez-nahlad — cenový blok sa vykreslil, vek snapshotu „k 19.8.2026
+  20:05, 0 dní", 4 PRP položky „cena neznáma", súčet „0,00 € ⚠ neúplné", obalený `.noprint`.
+  NEODOSLANÉ (rezervovat je read-only; live Money safety).
+- **Honest-null realita → follow-up #240**: producent `ceny-snapshot.py` ťahá len ZASP/ZASK/TS,
+  nie pergolové PRP → v prod čestne „cena neznáma", kým sa producent nerozšíri o PRP (obdoba
+  #235 pre sklá). Appka je pripravená, ceny sa napoja automaticky.
