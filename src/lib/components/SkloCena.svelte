@@ -9,6 +9,10 @@
 
 	let { skloCeny }: { skloCeny: SkloCenaResult } = $props();
 
+	// Súhrn (tfoot) je vždy EUR — cenník IZOS je jednomenový (appka dnes overila LEN
+	// EUR price-booky, viď ceny.ts), takže `skloCenaPre` sčítava len EUR riadky.
+	// Jednotlivé riadky nesú svoju MENU z Money a zobrazujú sa s ňou. Rovnaký
+	// jednomenový predpoklad ako súčty v `CenyTabulka`.
 	const eur = (n: number, mena = 'EUR') =>
 		n.toLocaleString('sk-SK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
 		' ' +
