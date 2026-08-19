@@ -164,9 +164,7 @@ test('odkaz z /pergola → /pergola/narez funguje, Money odpis formulár ostáva
 	await link.click();
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/pergola\/narez$/);
-	await expect(
-		page.getByRole('heading', { name: 'Pergola — materiál/nárez z rozmerov' })
-	).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Rezervačný odpis — pergola' })).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });
 

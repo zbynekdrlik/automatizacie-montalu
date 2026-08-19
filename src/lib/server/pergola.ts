@@ -401,14 +401,21 @@ export interface TransformResult {
 	qtyByPrp: Record<string, number>;
 }
 
-export function transform(text: string): TransformResult {
+/**
+ * Jadro odpisového výpočtu z už rozparsovaných riadkov (`CadRow[]`). `transform`
+ * je tenký obal `transformRows(parseInput(text))` — správanie sa NEMENÍ (kontraktové
+ * vektory `tests/pergola.test.ts` platia). Vyčlenené kvôli #221 (rezervačný odpis
+ * z rozmerov): potvrdené riadky z `spocitajNarez` majú presne tvar `CadRow`, takže
+ * ich stačí prehnať týmto istým, na Money pároch overeným, jadrom.
+ */
+export function transformRows(rows: CadRow[]): TransformResult {
 	const fam: Record<string, Record<number, CatalogItem>> = {};
 	for (const c of CATALOG) {
 		const b = norm(c.base);
 		(fam[b] = fam[b] || {})[c.bar_mm] = c;
 	}
 	const bycode: Record<string, { name: string; pieces: number[] }> = {};
-	for (const r of parseInput(text)) {
+	for (const r of rows) {
 		const e = (bycode[r.code] = bycode[r.code] || { name: r.name, pieces: [] });
 		for (let i = 0; i < r.qty; i++) e.pieces.push(r.cut_mm);
 	}
@@ -501,6 +508,11 @@ export function transform(text: string): TransformResult {
 	}
 	const out = CATALOG.map((c) => ({ prp: c.prp, name: c.name, qty: qtyByPrp[c.prp] || 0 }));
 	return { out, unresolved, trace, comboCases, qtyByPrp };
+}
+
+/** CAD nárez text → Money odpis (obal `transformRows(parseInput(text))`). */
+export function transform(text: string): TransformResult {
+	return transformRows(parseInput(text));
 }
 
 // numericky — lexikografický sort by pri tyči ≥10000 mm porovnával zle

@@ -87,6 +87,13 @@ export interface OdpisJob {
 	polozky: Polozka[];
 	/** modulovo-špecifické polia do histórie (system/styl/rozmery/model…) */
 	detail: Record<string, unknown>;
+	/** #221 — rezervačný odpis (materiál sa rezervuje pri zadaní objednávky, nie z CAD-u).
+	 *  default undefined/false = bežný odpis. Keď true: názov súboru dostane marker „REZ"
+	 *  a volajúci označí aj doklad (`popis`), aby neskoršia aktualizácia na reálne čísla
+	 *  (#227) vedela rezerváciu nájsť/napárovať. Dedup kľúč sa NEMENÍ (modul='pergola'),
+	 *  takže rezervácia a neskorší CAD odpis tej istej ZAK+OP kolidujú — bráni dvojitému
+	 *  odpisu materiálu. */
+	rezervacia?: boolean;
 }
 
 export interface OdpisOutcome {
@@ -140,9 +147,15 @@ export function contentHash(zak: string, polozky: Polozka[]): string {
  * by mali rovnaký názov a druhý by ten prvý v import priečinku prepísal),
  * preto do neho ide aj OP.
  */
-export function filenameFor(job: Pick<OdpisJob, 'zak' | 'op' | 'zakaznik' | 'polozky'>): string {
+export function filenameFor(
+	job: Pick<OdpisJob, 'zak' | 'op' | 'zakaznik' | 'polozky' | 'rezervacia'>
+): string {
 	const hash = contentHash(`${job.zak}|OP${job.op}`, job.polozky);
-	return `${safe(job.zak)} - ${safe(job.zakaznik)} [${hash}].xlsx`;
+	// #221: rezervačný odpis dostane marker „REZ" pred hash — v Money import priečinku
+	// je hneď vidno, že ide o rezerváciu, a #227 (aktualizácia na reálne čísla) ju
+	// vie nájsť/napárovať podľa ZAK + (hash nesie OP). Bežný odpis marker nemá.
+	const rez = job.rezervacia ? 'REZ ' : '';
+	return `${safe(job.zak)} - ${safe(job.zakaznik)} ${rez}[${hash}].xlsx`;
 }
 
 async function buildXlsx(job: OdpisJob): Promise<Buffer> {

@@ -1,9 +1,11 @@
 <script lang="ts">
-	// Pergola — materiál/nárez z rozmerov (#155). DISPLAY-ONLY: nič sa neposiela do
-	// Money (Money odpis z CAD nárezu ostáva na pôvodnej stránke /pergola). Formulár →
-	// výsledok (technický výkres #194 + materiálová tabuľka + informatívne výpočty +
-	// zoznam „zatiaľ nepodporované"). Vzor UX = /bazen/navrh (nova-stranka §3/§4/§6).
-	// Výkres kreslí PergolaNarezVykres z potvrdených vzorcov (#194).
+	// Pergola — REZERVAČNÝ ODPIS z rozmerov (#221, pôvodne „Materiál z rozmerov" #155).
+	// Formulár(rozmery) → výsledok(materiál + výkres #194) → [ZAK/OP/zákazník] → Money
+	// rozpis(nahlad) → explicitné potvrdenie → zápis (rez-hotovo). Rezervuje materiál v
+	// Money už pri zadaní objednávky, bez +20 %; do odpisu idú LEN potvrdené položky,
+	// honest-null ostáva „zatiaľ nepočítané". Vzorcový engine (spocitajNarez) je čistý;
+	// Money most žije v $lib/server/pergola-rezervacia. Vzor UX = /bazen/navrh + /pergola
+	// (nova-stranka §3/§4/§6). Výkres kreslí PergolaNarezVykres z potvrdených vzorcov (#194).
 	import { resolve } from '$app/paths';
 	import PergolaNarezVykres from '$lib/components/PergolaNarezVykres.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
@@ -24,6 +26,15 @@
 	let { data, form } = $props();
 
 	let step = $derived(form?.step ?? 'form');
+
+	// #221 — rezervačný odpis: metre s čiarkou (ako /pergola), echo ident + Money rozpis + výsledok
+	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
+	let ident = $derived(
+		(form && 'ident' in form ? form.ident : null) ?? { zak: '', op: '', zakaznik: '' }
+	);
+	let rozpis = $derived(form && 'rozpis' in form ? form.rozpis : null);
+	let outcome = $derived(form && 'outcome' in form ? form.outcome : null);
+	let rezError = $derived(form && 'rezError' in form ? form.rezError : null);
 
 	// vstup na PREFILL + na výpočet výsledku (display-only). Merge form?.vstup s
 	// predvolenými hodnotami — rovnaká disciplína ako /bazen/navrh.
@@ -71,6 +82,10 @@
 	let zvodFrezovanieSHmmS = $state<number | string>('');
 	let strechaSkloS = $state('');
 	let obvodoveZasklenieS = $state('');
+	// #221 — ident rezervácie (ZAK/OP/zákazník): bind + $state, aby prežili re-render
+	let zakS = $state('');
+	let opS = $state('');
+	let zakaznikS = $state('');
 
 	// reštart-effect: číta LEN form?.vstup, NIKDY vlastný *S zápis (nova-stranka §3 —
 	// self-loop by ticho prepísal používateľovu voľbu systému späť na default).
@@ -95,6 +110,11 @@
 		zvodFrezovanieSHmmS = v?.zvodFrezovanieSHmm ?? '';
 		strechaSkloS = v?.strechaSklo ?? '';
 		obvodoveZasklenieS = v?.obvodoveZasklenie ?? '';
+		// #221 — echo ident z form (rovnaká disciplína: číta LEN form, nie vlastné *S)
+		const id = form && 'ident' in form ? form.ident : null;
+		zakS = id?.zak ?? '';
+		opS = id?.op ?? '';
+		zakaznikS = id?.zakaznik ?? '';
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
@@ -108,7 +128,7 @@
 	const mm = (n: number | null) => (n === null ? '— (čaká na výkres)' : `${n} mm`);
 </script>
 
-<svelte:head><title>Pergola — materiál/nárez z rozmerov</title></svelte:head>
+<svelte:head><title>Rezervačný odpis — pergola</title></svelte:head>
 
 {#snippet hidden()}
 	<input type="hidden" name="system" value={systemS} />
@@ -143,16 +163,27 @@
 		/>{/if}
 {/snippet}
 
+{#snippet hiddenIdent()}
+	<input type="hidden" name="zak" value={zakS} />
+	<input type="hidden" name="op" value={opS} />
+	<input type="hidden" name="zakaznik" value={zakaznikS} />
+{/snippet}
+
 {#if step === 'form'}
 	<div class="card">
-		<h1>Pergola — materiál/nárez z rozmerov</h1>
+		<h1>Rezervačný odpis — pergola</h1>
 		<p class="sub">
-			Zadaj rozmery — ukážem materiál (nárez) z <b>potvrdených</b> vzorcov (call s Dominikom 13.8.).
-			Čo ešte nemá pravidlo (krov, dĺžky líšt/žľabu, sklá) je uvedené ako
-			<b>„zatiaľ nepodporované"</b> — nič sa nehádže. <b>Do Money sa neposiela nič</b> — Money odpis
-			z CAD nárezu ostáva na
-			<a href={resolve('/pergola')} data-testid="link-pergola">pôvodnej stránke Pergola</a>.
-			Zákaznícky výkres kreslí
+			Zadaj rozmery objednávky — z <b>potvrdených</b> vzorcov spočítam materiál a môžeš ho
+			<b>rezervovať v Money</b> už pri zadaní objednávky (odpis do Money hneď, aby ti materiál
+			neušiel). Do rezervácie idú LEN potvrdené položky; čo ešte nemá pravidlo (krov, dĺžky
+			líšt/žľabu, sklá) ostáva čestne <b>„zatiaľ nepočítané"</b> a NEzahrnie sa — bez +20 % rezervy.
+			Odpis sa odošle až po tvojom potvrdení.
+			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
+		</p>
+		<p class="sub">
+			Klasický Money odpis z CAD nárezu je na
+			<a href={resolve('/pergola')} data-testid="link-pergola">pôvodnej stránke Pergola</a>;
+			zákaznícky výkres kreslí
 			<a href={resolve('/pergola/navrh')} data-testid="link-navrh">Pergola návrh</a>.
 		</p>
 	</div>
@@ -633,12 +664,151 @@
 	</div>
 
 	<div class="card noprint">
-		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<div class="sec">Rezervačný odpis do Money</div>
+		<p class="sub">
+			Rezervuje materiál v Money už pri zadaní objednávky. Do odpisu idú LEN <b>potvrdené</b>
+			položky vyššie; „zatiaľ nepočítané" (napr. priečka = HH krovu) sa NEZAHRNÚ. Bez +20 % rezervy. Odpis
+			sa odošle až po tvojom potvrdení.
+			{#if !data.live}<b>🧪 TEST režim — do Money nejde nič.</b>{/if}
+		</p>
+		{#if rezError}
+			<div class="err" data-testid="rez-error">⚠️ {rezError}</div>
+		{/if}
+		<form method="POST" action="?/rezervovat">
+			{@render hidden()}
+			<div class="grid3">
+				<div class="field">
+					<label for="zak">Číslo objednávky (ZAK) *</label>
+					<input id="zak" name="zak" bind:value={zakS} required />
+				</div>
+				<div class="field">
+					<label for="op">OP/OPDL číslo *</label>
+					<input id="op" name="op" bind:value={opS} required />
+				</div>
+				<div class="field">
+					<label for="zakaznik">Zákazník *</label>
+					<input id="zakaznik" name="zakaznik" bind:value={zakaznikS} required />
+				</div>
+			</div>
+			<button class="btn" type="submit" data-testid="pripravit-rezervaciu"
+				>Pripraviť rezervačný odpis →</button
+			>
+		</form>
+	</div>
+
+	<div class="card noprint">
+		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
 			<button class="btn secondary" type="submit" data-testid="upravit">← Späť a upraviť</button>
 		</form>
 		<a class="btn secondary" href={resolve('/pergola/narez')}>➕ Nový výpočet</a>
+	</div>
+{:else if step === 'rez-nahlad' && rozpis}
+	<div class="card">
+		<h1 data-testid="rez-nadpis">Rezervačný odpis — {ident.zak} · {ident.zakaznik}</h1>
+		<p class="sub">
+			<span class="badge">Pergola · {rozpis.pocetPolozok} položiek</span>
+			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
+		</p>
+	</div>
+
+	{#if rezError}
+		<div class="err" data-testid="rez-nahlad-error">⚠️ {rezError}</div>
+	{/if}
+
+	{#if rozpis.longNotes.length}
+		<div class="warn">
+			<b>⚠ Dlhé profily (rez &gt; tyč)</b> — riešené kombináciou tyčí. Pri <b>žľabe</b> over, že spoj
+			vyjde nad nohu pergoly.
+		</div>
+	{/if}
+
+	<div class="card">
+		<div class="sec">Money rozpis — {rozpis.nonzero.length} položiek</div>
+		<p class="sub noprint">
+			Množstvá sú metre surových tyčí (bin-packing, presne ako klasický CAD odpis). Do Money sa po
+			potvrdení pošle presne toto.
+		</p>
+		<table class="narez" data-testid="rez-rozpis">
+			<thead><tr><th>Money kód</th><th>Názov</th><th>Množstvo</th></tr></thead>
+			<tbody>
+				{#each rozpis.nonzero as o (o.kod)}
+					<tr>
+						<td>{o.kod}</td>
+						<td>{o.nazov}</td>
+						<td><b>{fmtM(o.qty)} m</b></td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+
+	{#if rozpis.vylucene.length}
+		<div class="card">
+			<div class="sec">Zatiaľ nepočítané — NIE sú v odpise ({rozpis.vylucene.length})</div>
+			<p class="sub">
+				Počet je istý, dĺžku rezu ešte nemáme (napr. priečka = HH krovu #161). Do rezervácie sa
+				<b>NEZAHŔŇAJÚ</b> — nikdy vymyslené číslo. Doplní ich neskôr aktualizácia na reálne čísla.
+			</p>
+			<ul data-testid="rez-vylucene" style="margin:6px 0 0;padding-left:18px">
+				{#each rozpis.vylucene as v (v.kod + v.nazov)}
+					<li style="margin:4px 0" class="sub">{v.kod} · {v.nazov} — {v.dovod}</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
+
+	<div class="card noprint">
+		<form method="POST" action="?/odoslat" style="display:inline">
+			{@render hidden()}
+			{@render hiddenIdent()}
+			<button class="btn" type="submit" data-testid="odoslat-rezervaciu">
+				{data.live
+					? '✅ Odoslať rezervačný odpis do Money'
+					: '🧪 Odoslať rezervačný odpis (TEST priečinok)'}
+			</button>
+		</form>
+		<form method="POST" action="?/upravit" style="display:inline">
+			{@render hidden()}
+			<button class="btn secondary" type="submit">← Upraviť zadanie</button>
+		</form>
+	</div>
+{:else if step === 'rez-hotovo' && outcome}
+	<div class="card">
+		<h1 data-testid="rez-hotovo-nadpis">Rezervácia hotová — {ident.zak} · {ident.zakaznik}</h1>
+	</div>
+
+	<div class="okmsg" data-testid="rez-vysledok">
+		{#if !outcome.live}
+			🧪 TEST — do Money NEJDE (testovací priečinok): <b>{outcome.filename}</b>
+		{:else}
+			✅ Rezervácia odoslaná do Money na import: <b>{outcome.filename}</b>
+		{/if}
+	</div>
+
+	{#if rozpis}
+		<div class="card">
+			<div class="sec">Rezervované — Money rozpis ({rozpis.nonzero.length} položiek)</div>
+			<table class="narez">
+				<thead><tr><th>Money kód</th><th>Názov</th><th>Množstvo</th></tr></thead>
+				<tbody>
+					{#each rozpis.nonzero as o (o.kod)}
+						<tr><td>{o.kod}</td><td>{o.nazov}</td><td><b>{fmtM(o.qty)} m</b></td></tr>
+					{/each}
+				</tbody>
+			</table>
+			{#if rozpis.vylucene.length}
+				<p class="sub">
+					Nezahrnuté (zatiaľ nepočítané): {rozpis.vylucene.map((v) => v.kod).join(', ')}
+				</p>
+			{/if}
+		</div>
+	{/if}
+
+	<div class="card noprint">
+		<a class="btn secondary" href={resolve('/pergola/narez')}>➕ Nová rezervácia</a>
+		<a class="btn secondary" href={resolve('/odpisy')}>📋 História odpisov</a>
 	</div>
 {/if}
 
