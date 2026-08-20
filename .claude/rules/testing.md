@@ -43,6 +43,16 @@ npx vitest run          # unit tests (or npm test for coverage)
 npx playwright test     # E2E — see the build gotcha below
 ```
 
+**Paralelný `npm test` môže padnúť na zdieľanej DB (#261 race) — serial beh je
+`npx vitest run --no-file-parallelism`, NIE `--poolOptions.forks.singleFork=true`.**
+Symptóm: 1-2 náhodné testy padnú s `SqliteError: table material_prices already exists`
+(dvaja workeri bežia migráciu nad tým istým DB súborom naraz) — pritom ten súbor prejde
+sám (`npx vitest run <file>`). Je to len race, nie regresia. Serializuj cez
+`--no-file-parallelism` (vitest 4.x spustí test súbory sekvenčne). CLI tvar
+`--poolOptions.forks.singleFork=true` NEfunguje — vitest 4.x ho odmietne
+`CACError: Unknown option --poolOptions` (poolOptions sa dá nastaviť len v configu, nie
+z CLI). `--coverage` pridaj k obom (prahy sú v `vite.config.ts`).
+
 **Formátuj cez repo prettier (`npm run format`), NIE cez bare `npx prettier`.** Repo MÁ
 prettier (`^3.9.6` dev-dependency) + `.prettierrc.json` (taby + jednoduché úvodzovky), a
 `lint` = `eslint . && prettier --check .` je CI gate — takže formátovanie SA kontroluje.

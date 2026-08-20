@@ -19,12 +19,24 @@ const { _resetThrottle, MAX_FAILURES, LOCKOUT_MS } =
 
 const GOOD = 'tajne-heslo-123';
 
-function mkEvent(username: string, password: string, ip = '192.0.2.7') {
+// `ip` = edge IP z getClientAddress() (posledný XFF prvok). `cfConnectingIp` = hodnota
+// Cf-Connecting-Ip hlavičky (#264) — default null (žiadna CF hlavička; edge IP sa použije).
+function mkEvent(
+	username: string,
+	password: string,
+	ip = '192.0.2.7',
+	cfConnectingIp: string | null = null
+) {
 	const fd = new FormData();
 	fd.set('username', username);
 	fd.set('password', password);
 	return {
-		request: { formData: async () => fd },
+		request: {
+			formData: async () => fd,
+			headers: {
+				get: (name: string) => (name.toLowerCase() === 'cf-connecting-ip' ? cfConnectingIp : null)
+			}
+		},
 		cookies: { set: () => {} },
 		url: new URL('http://localhost/login'),
 		getClientAddress: () => ip
@@ -122,6 +134,25 @@ describe('login akcia — dĺžka, lockout, reset', () => {
 			expect(r.kind).toBe('return');
 			if (r.kind === 'return') expect(r.value.error).toMatch(/Nesprávne/);
 		}
+	});
+
+	it('#264: throttle kľúčuje REÁLNU klientsku IP za Cloudflare, nie zdieľaný CF edge', async () => {
+		// Za CF appka vidí ako edge (getClientAddress) CF PoP IP, spoločnú pre mnoho reálnych
+		// klientov; reálny klient je v Cf-Connecting-Ip. Kľúč musí byť (username, reálny klient),
+		// inak jeden útočník cez CF PoP zamkne všetkých reálnych userov na tom istom PoP.
+		const CF_EDGE = '172.70.225.170'; // ∈ 172.64.0.0/13 — CF edge, spoločný pre A aj B
+		// útočník A (reálna IP 85.248.11.235) vyčerpá 5 pokusov cez CF PoP
+		for (let i = 0; i < MAX_FAILURES; i++) {
+			await run(mkEvent('marek', 'zle-heslo', CF_EDGE, '85.248.11.235'));
+		}
+		// A je zamknutý (jeho (marek, 85.248.11.235))
+		const aLocked = await run(mkEvent('marek', GOOD, CF_EDGE, '85.248.11.235'));
+		expect(aLocked.kind).toBe('return');
+		if (aLocked.kind === 'return') expect(aLocked.value.error).toMatch(/Príliš veľa/);
+		// reálny marek z INEJ klientskej IP cez ROVNAKÝ CF PoP so správnym heslom PREJDE
+		// (RED pri bugu: kľúč (marek, CF_EDGE) → aj on zamknutý)
+		const bOk = await run(mkEvent('marek', GOOD, CF_EDGE, '90.180.1.2'));
+		expect(bOk.kind).toBe('redirect');
 	});
 
 	it('SÚBEŽNÉ pokusy neobídu 5-limit — najviac MAX_FAILURES scryptov (review 🔴 #2)', async () => {
