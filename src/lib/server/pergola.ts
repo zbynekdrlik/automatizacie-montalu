@@ -267,7 +267,7 @@ function nearestHigher(cut: number, avail: number[]): number {
 export function minCoverCombo(cut: number, availIn: number[]): number[] {
 	const avail = [...new Set(availIn.filter(Boolean))].sort((a, b) => a - b);
 	const cap = Math.ceil(cut / avail[0]) + 1;
-	const counts = new Array(avail.length).fill(0);
+	const counts = new Array<number>(avail.length).fill(0);
 	let bestKey: number | null = null;
 	let bestCombo: number[] | null = null;
 	for (;;) {
@@ -307,7 +307,7 @@ export function coverCombos(cut: number, availIn: number[]): ComboOption[] {
 	const maxBars = cut > avail[avail.length - 1] * 2 ? 3 : 2;
 	const cap = Math.min(maxBars, Math.ceil(cut / avail[0]));
 	const res: ComboOption[] = [];
-	const counts = new Array(avail.length).fill(0);
+	const counts = new Array<number>(avail.length).fill(0);
 	for (;;) {
 		const cnt = counts.reduce((a, b) => a + b, 0);
 		if (cnt >= 1 && cnt <= maxBars) {

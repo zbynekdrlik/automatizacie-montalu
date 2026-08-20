@@ -8,7 +8,7 @@ export const load: PageServerLoad = async () => {
 		odpisy: listOdpisy(200).map((o) => {
 			let d: Record<string, unknown>;
 			try {
-				d = JSON.parse(o.detail || '{}');
+				d = JSON.parse(o.detail || '{}') as Record<string, unknown>;
 			} catch {
 				d = {};
 			}

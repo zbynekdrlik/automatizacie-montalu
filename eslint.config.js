@@ -23,10 +23,57 @@ export default ts.config(
 		]
 	},
 	js.configs.recommended,
+	// Netypované `recommended` je baseline pre VŠETKY .ts/.js (testy, e2e, config
+	// súbory). Typovo-závislé pravidlá sa pridávajú nižšie len pre `src/**/*.ts`.
 	...ts.configs.recommended,
 	...svelte.configs.recommended,
 	...svelte.configs.prettier,
 	eslintConfigPrettier,
+	{
+		// TYPOVANÁ analýza (#257 / ARCH-4) — LEN produkčný `src/**/*.ts`. Cieľ:
+		// `no-floating-promises` / `no-misused-promises` na async Money ceste
+		// (dnes 0 nálezov = kód je správny, pravidlo stráži budúcnosť). Zámerne sa
+		// NEaplikuje na:
+		//   • `tests/**` + `e2e/**` — e2e nie je v žiadnom tsconfig `include`, takže
+		//     `projectService` ich nevie načítať (parse error); testy sú overené
+		//     samotným behom a sú synchrónne (better-sqlite3), žiadne promise riziko.
+		//   • `.svelte` / `.svelte.ts` — svelte parser + TS program sa neznesú
+		//     (ticket: „svelte súbory ponechať na recommended ak typed parsing
+		//     nefunguje"). `.ts` glob `.svelte` nechytá; `.svelte.ts` explicitne
+		//     vynímame nižšie.
+		// `projectService` postaví TS program z tsconfig.json (extends
+		// .svelte-kit/tsconfig.json); `tsconfigRootDir` kotví hľadanie na priečinok
+		// tohto configu (funguje aj vo worktree-fleet checkoutoch s vlastným tsconfig).
+		files: ['src/**/*.ts'],
+		ignores: ['**/*.svelte.ts'],
+		extends: [ts.configs.recommendedTypeChecked],
+		languageOptions: {
+			parserOptions: {
+				projectService: true,
+				tsconfigRootDir: import.meta.dirname
+			}
+		},
+		rules: {
+			// `no-base-to-string` VYPNUTÉ: každý nález je vstupno-parsovacia hranica,
+			// kde appka ZÁMERNE koercuje `FormData.get()` (`string | File`) a JSON
+			// `unknown` na string cez `String(x ?? '')`. Tieto formuláre nemajú file
+			// inputy → koercia je vždy string→string, žiadny reálny `[object Object]`.
+			// Korektné „zúženie" typov by muselo prepísať ~105 miest naprieč Money
+			// vstupom (`*-vstup.ts`, route akcie) — presne tá zmena, ktorú #257
+			// zakazuje (Money semantika nedotknutá, lint fixy behavior-preserving).
+			'@typescript-eslint/no-base-to-string': 'off'
+		}
+	},
+	{
+		// `require-await` VYPNUTÉ len pre SvelteKit route handlery: `load` / `+server`
+		// čítajú zo SYNCHRÓNNEHO better-sqlite3, takže dnes legitímne nemajú `await`;
+		// `async` je framework-idiomatický podpis handlera. Pre `src/lib/**` (biznis
+		// logika) pravidlo ZOSTÁVA zapnuté — tam je zbytočný `async` hoden nahlásenia.
+		files: ['src/routes/**/*.ts'],
+		rules: {
+			'@typescript-eslint/require-await': 'off'
+		}
+	},
 	{
 		languageOptions: {
 			globals: {
