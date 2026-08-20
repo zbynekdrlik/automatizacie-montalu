@@ -110,6 +110,10 @@ Load the matching skill BEFORE working on that area (don't re-derive):
   producent) → auto-loads `.claude/rules/ceny-snapshot.md` na jeho `paths:` (`ceny.ts`,
   `sklo-cena.ts`, `CenyTabulka`/`SkloCena`, `ceny-snapshot.py`, `ceny*`/`sklo-cena*` testy)
 - unit/E2E test runs, local Playwright verification → load `.claude/skills/testing`
+- e2e zero-console assert + guard (`e2e/**`, `tests/e2e-console-guard.test.ts`) →
+  auto-loads `.claude/rules/e2e-console.md` na jeho `paths:` (počítaj `collectConsole(` nie
+  `toEqual([])`, sankcionovaný len `process.env.BASE_URL` skip, `block-test-skips` false-block
+  na meta-teste, rAF stabilita namiesto `waitForTimeout`)
 - roles / b2b / route gating / Money-write boundary / auth migration → load `.claude/skills/access-control`
 - pridávam NOVÚ stránku/route (exporty, b2b denylist, nav, `$effect` slučka) → load `.claude/skills/nova-stranka`
 - FIX (pevné zasklenie) modul → auto-loads `.claude/rules/fix-module.md` on its `paths:`
