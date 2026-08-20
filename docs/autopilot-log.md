@@ -1354,3 +1354,28 @@ implementované, nereprodukovateľné čestný null:
 - **Honest-null realita → follow-up #240**: producent `ceny-snapshot.py` ťahá len ZASP/ZASK/TS,
   nie pergolové PRP → v prod čestne „cena neznáma", kým sa producent nerozšíri o PRP (obdoba
   #235 pre sklá). Appka je pripravená, ceny sa napoja automaticky.
+
+## 2026-08-20 — #239 (PR #242, merge 18eb069, v0.24.5)
+
+- **#239 refaktor: rozdeliť `pergola/narez/+page.svelte` (1231 r.) na krokové subkomponenty**
+  (čisto štruktúra, nula zmeny správania). 5 komponentov v `src/lib/components/pergola/`:
+  `RezForm` (form krok, 18× `$bindable` + `hiddenIdent` snippet), `RezVysledok` (vysledok
+  display, 9 kariet), `RucnePolozky` (#234 karta, `$bindable rucneRiadky` + lokálny input-stav),
+  `RezNahlad` (rez-nahlad, `hidden`/`hiddenIdent` snippety ako propy), `RezHotovo` (rez-hotovo).
+  `+page.svelte` 1231→311 r. = state + compute hub (všetok `$state`, `$effect` echo, oba
+  serializačné snippety ostávajú tu — round-trip disciplína `pergola-narez.md` nezmenená).
+  Zdieľané `table.narez` + `.badge.rucne` → app.css (repo vzor `.badge.ok/.wait`).
+- **Review (fresh-context general-purpose) → 1 🟡 opravený** (commit 2e6c285): `.sec .badge`
+  override pre `rucne-pocet` odznak sa stratil (skopírovaný len do RezVysledok) → odznak by
+  dedil `.sec` uppercase; scoped pridaný do RucnePolozky. Zvyšok behavior-preserving: `name=` +
+  `data-testid` parita, engine netknutý, `$lib/server/*` len `import type`.
+- **Overené**: svelte-check 0/0, eslint+prettier, 1522 unit testov; CI E2E (`pergola-narez`/
+  `-uix`/`-rezervacia`/`-ceny`/`-navrh`) zelené. Post-deploy LIVE (marek): `/health` 0.24.5
+  (18eb069) live:true, DOM verzia v0.24.5; celý tok pergola/narez identický — RezForm, vysledok
+  (stav 5/8, materiál 6 riadkov), RucnePolozky odznak „✍️ 1 ručne pridané" text-transform:none
+  (fix overený), rez-nahlad rez-rozpis 4 Money riadky. NEODOSLANÉ (rezervovat read-only).
+- **Pasca (post-deploy)**: reused Playwright session s pred-deploy client bundlom ukázal
+  prázdny rez-rozpis (hydration mismatch na novej hranici komponentu) — čerstvý prehliadač +
+  CI E2E potvrdili správne 4 riadky. Post-deploy overenie rob v ČISTOM prehliadači.
+- **PR nesie aj zlandovaný #240 commit `b3b8ad9`** (ceny-snapshot PRP, uzavreté) — samostatná
+  časť z predchádzajúceho dev cyklu.

@@ -4,6 +4,7 @@ paths:
   - 'src/lib/pergola-krov.ts'
   - 'src/lib/server/pergola-narez-vstup.ts'
   - 'src/lib/components/PergolaNarezVykres.svelte'
+  - 'src/lib/components/pergola/**'
   - 'src/routes/pergola/narez/**'
   - 'src/lib/server/pergola-rezervacia.ts'
   - 'tests/pergola-narez*.test.ts'
@@ -290,3 +291,40 @@ varianty existujúcich `.badge.live`/`.badge.test` — žiadny nový dizajnový 
 Verifikuj až po rez-nahlad PREVIEW, nikdy neklikaj „Odoslať do Money" na prode. Login na prode:
 seed useri v `/opt/automatizacie-montalu/.env` (creds v lokálnej memory). Svelte 5 `bind:value`
 neberie syntetické `input` eventy z `evaluate` — na vyplnenie použi Playwright `fill`.
+
+## Krokové subkomponenty (#239) — kde žije stav, kam pridať nový vstup
+
+`/pergola/narez` (kedysi 1231 r. monolit) je rozdelený: `+page.svelte` (~311 r.) = **state +
+compute hub**, kroky sú komponenty v `src/lib/components/pergola/`:
+
+- **`RezForm.svelte`** — krok `form` (rozmery). 18 polí ako `$bindable` propy (vzor
+  `KlinPolia.svelte`); `hiddenIdent` snippet + `rucneRiadky` prídu ako propy.
+- **`RezVysledok.svelte`** — krok `vysledok`, 9 kariet (nadpis/stav/výkres/krov/materiál/
+  komponenty/informatívne/údaje/nepodporované). Čistá prezentácia (props in).
+- **`RucnePolozky.svelte`** — karta Ručné položky (#234). `$bindable rucneRiadky` + lokálny
+  input-stav; katalóg si derivuje z `catalog` propu.
+- **`RezNahlad.svelte`** — krok `rez-nahlad`. `hidden`/`hiddenIdent` snippety prídu ako propy.
+- **`RezHotovo.svelte`** — krok `rez-hotovo`, čistý display.
+
+**Kritické pre round-trip (rozšírenie „ROUND-TRIP PASCA" vyššie):** VŠETOK `$state` (18 polí,
+ident, `rucneRiadky`), `$effect` echo a OBA serializačné snippety `hidden`/`hiddenIdent`
+zostávajú v `+page.svelte` — jediná autorita serializácie. Deti dostanú snippety ako propy a
+`{@render}`-nú ich vo svojich `<form>`-och (DOM potomkovia formulára → submit ich zahrnie).
+**Nový carried-through stav = nový `<input type="hidden">` v `hidden()` snippete rodiča** (a vo
+`form` kroku vlastný hidden v RezForm — form krok NErenderuje `hidden()`), NIE v dieťati.
+Editovateľné polia RezForm sú `$bindable`; rodič ostáva ich zdrojom (echo `$effect` ich obnoví).
+
+**CSS:** zdieľané `table.narez` + `.badge.rucne` sú v `src/app.css` (global). Page-lokálne triedy
+sú scoped v komponente, ktorý ich renderuje — **POZOR na `.sec .badge`** (odznak v `.sec`
+hlavičke): `.sec` je uppercase, `.sec .badge` to override-ne; MUSÍ byť scoped v KAŽDOM komponente
+s `.sec`-hlavičkovým odznakom (RezVysledok aj RucnePolozky), inak odznak zdedí uppercase (#239
+review nález).
+
+## Post-deploy na LIVE — v ČISTOM prehliadači (Svelte hydration pasca)
+
+Post-deploy overenie tejto appky rob v **čerstvom prehliadači** (`browser_close` → nový
+`browser_navigate`). Reused Playwright session s PRED-deploy client bundlom + nová SSR HTML =
+hydration mismatch na novej hranici komponentu → `{#each}` sa vykreslí PRÁZDNY (napr. rez-rozpis
+prázdny, kým `.length` header ukazuje nenulový počet). Nie je to bug kódu — čerstvý prehliadač +
+CI E2E render korektne. Príznak: `<tbody><!--[--><!--]--></tbody>` (prázdny each) pri nenulovom
+počte v hlavičke.
