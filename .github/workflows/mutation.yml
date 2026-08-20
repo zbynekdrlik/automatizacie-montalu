@@ -1,0 +1,138 @@
+name: Mutation
+
+# Dvojvrstvový mutačný gate (airuleset `mutation-testing`, StrykerJS):
+#  1) mutation-diff — na KAŽDÝ push do `dev`, diff-scoped (len zmenené
+#     `src/lib/**/*.ts` oproti main), tvrdý strop `timeout-minutes: 20`.
+#     Prázdny diff → explicitný exit 0 (žiadne mutovateľné súbory nie je chyba).
+#  2) mutation-sweep — LEN on-demand `workflow_dispatch`, full-tree, prežívajúce
+#     mutanty → dávkový `test-quality` issue. NIKDY cron (user vyvíja nonstop,
+#     cron by súperil o runnery). Job padne len keď zlyhá NÁSTROJ, nie skóre.
+# Samostatný workflow (ci.yml nedotknutý). GitHub-hosted runnery.
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+# Vlastný concurrency group. Push behy sa navzájom rušia (superseded), sweep
+# (workflow_dispatch) beží vždy do konca a nič ho neruší.
+concurrency:
+  group: mutation-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+jobs:
+  mutation-diff:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # TVRDÝ strop. Prekročenie = chyba SETUPU (zúž scope / sharduj / pridaj
+    # levers), NIKDY nezvyšuj tento timeout (no-timeout-band-aids).
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Zisti zmenené src/lib/**/*.ts oproti main
+        id: scope
+        run: |
+          git fetch origin +refs/heads/main:refs/remotes/origin/main
+          CHANGED=$(git diff --name-only origin/main...HEAD \
+            | grep -E '^src/lib/.*\.ts$' \
+            | grep -vE '\.svelte\.ts$' \
+            | tr '\n' ',' | sed 's/,$//' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "Žiadne zmenené src/lib/**/*.ts oproti main — mutačný gate nemá čo mutovať, končím zelený."
+            echo "changed=" >>"$GITHUB_OUTPUT"
+          else
+            echo "Mutujem zmenené súbory: $CHANGED"
+            echo "changed=$CHANGED" >>"$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.changed != ''
+        with:
+          node-version: 24
+          cache: npm
+      - name: Inštalácia
+        if: steps.scope.outputs.changed != ''
+        run: npm ci
+      - name: SvelteKit sync (vite config potrebuje .svelte-kit)
+        if: steps.scope.outputs.changed != ''
+        run: npx svelte-kit sync
+      - name: Obnov Stryker incremental cache
+        if: steps.scope.outputs.changed != ''
+        uses: actions/cache@v4
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-dev-${{ github.sha }}
+          restore-keys: |
+            stryker-incremental-dev-
+      - name: Diff-scoped mutačný gate (≤20 min, break 50)
+        if: steps.scope.outputs.changed != ''
+        env:
+          CHANGED: ${{ steps.scope.outputs.changed }}
+        run: npx stryker run --incremental --mutate "$CHANGED"
+
+  mutation-sweep:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # Full-tree, on-demand, NEblokuje dev. Timeout je len poistka proti
+    # zaseknutiu; pri raste stromu sharduj (nie väčší timeout).
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Inštalácia
+        run: npm ci
+      - name: SvelteKit sync
+        run: npx svelte-kit sync
+      - name: Full-tree mutačný sweep
+        # `|| true`: nízke skóre (break 50) vracia exit 1 — to NIE je zlyhanie
+        # nástroja. Existenciu reportu overí ďalší krok; to je diskriminátor
+        # "nástroj bežal" vs "nástroj spadol".
+        run: npx stryker run --force || true
+      - name: Over report + založ issue zo survivorov
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -f reports/mutation/mutation.json ]; then
+            echo "::error::Stryker report chýba — mutačný NÁSTROJ zlyhal (nie skóre)."
+            exit 1
+          fi
+          TOTAL=$(jq '[.files[].mutants[] | select(.status=="Survived" or .status=="NoCoverage")] | length' reports/mutation/mutation.json)
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "Žiadni survivori — sweep zelený, nič sa nezakladá."
+            exit 0
+          fi
+          {
+            echo "Full-tree mutačný sweep našiel **$TOTAL** prežívajúcich/nepokrytých mutantov (Survived + NoCoverage). Napíš asercie čo ich zabijú (\`test-strictness\`: coverage dokazuje beh, mutácia dokazuje overenie)."
+            echo
+            echo "Scope-gate: planned-work"
+            echo "<!-- mutation-sweep-auto -->"
+            echo
+            echo "| Súbor | Survived+NoCov |"
+            echo "|---|---|"
+            jq -r '.files | to_entries
+              | map({f: .key, n: ([.value.mutants[] | select(.status=="Survived" or .status=="NoCoverage")] | length)})
+              | map(select(.n > 0)) | sort_by(-.n)[]
+              | "| `\(.f)` | \(.n) |"' reports/mutation/mutation.json
+          } >/tmp/survivors.md
+          gh label create test-quality --color FBCA04 \
+            --description "Prežívajúce mutanty z mutačného sweepu" 2>/dev/null || true
+          # Dedup exaktne: filter na label test-quality (presné, cez API) + lokálny
+          # jq match na fixný titul — žiadny fuzzy free-text search (spoľahlivejšie
+          # než hľadať pomlčkovaný HTML-comment marker, ktorý GitHub search tokenizuje).
+          EXISTING=$(gh issue list --state open --label test-quality \
+            --json number,title \
+            --jq '[.[] | select(.title | startswith("Mutačný sweep"))][0].number // empty' || true)
+          if [ -n "$EXISTING" ]; then
+            echo "Aktualizujem existujúci issue #$EXISTING"
+            gh issue comment "$EXISTING" -F /tmp/survivors.md
+          else
+            gh issue create -t "Mutačný sweep: prežívajúce mutanty (test-quality)" \
+              -F /tmp/survivors.md -l test-quality
+          fi

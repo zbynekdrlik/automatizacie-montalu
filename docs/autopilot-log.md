@@ -1395,3 +1395,17 @@ implementované, nereprodukovateľné čestný null:
   na supervisorovom push-i; config-only advisory patch → `[no-test: reason]` empty commit.
 - Post-deploy: health+DOM `v0.24.7 (c06a3c2)`, konzola 0/0, docker healthy, LogConfig 10m×5,
   cron aj zálohy na disku potvrdené.
+
+## #248 — Mutation-testing gate (StrykerJS diff-scoped ≤20 min + on-demand sweep)
+- **Commity**: `31366b6` bump 0.24.6-dev.2; `4b16459` feat(ci) mutation gate.
+- **Pridané**: `stryker.config.json` (vitest-runner, perTest, mutate `src/lib/**/*.ts`,
+  break 50, incremental), `.github/workflows/mutation.yml` (samostatný, vlastný concurrency;
+  `mutation-diff` na push-do-dev diff-scoped `timeout-minutes: 20`, prázdny diff = exit 0;
+  `mutation-sweep` len `workflow_dispatch`, survivori → `test-quality` issue, nikdy cron).
+  Devdeps `@stryker-mutator/core` + `@stryker-mutator/vitest-runner`. `reports/`+`.stryker-tmp/`
+  ignorované.
+- **Non-behaviorálne** (CI/config). Overenie = lokálny Stryker proof-run na `src/lib/datum.ts`:
+  14 killed / 9 survived / 1 no-cov, score 58.33 ≥ break 50, exit 0. Lokálne gaty: lint/check
+  zelené, 1522 vitest testov zelených.
+- **Money-neutral**: beží len proti vitest, `tests/compute.test.ts` vektory nemenené.
+- Detaily + gotchas: `.claude/rules/ci.md` „Mutation gate" sekcia.

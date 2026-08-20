@@ -163,3 +163,48 @@ pipeline; it's the regression net for all of the above.
 **Compose healthcheck has NO curl** — runtime image `node:24-*-slim` lacks curl, so the
 healthcheck is `node -e "fetch('http://127.0.0.1:3000/health')..."` on the IN-CONTAINER port
 3000 (host 8090→3000 is only the VPS deploy poll). `/health` returns `{ok: sysCount>0}`.
+
+## Mutation gate (`mutation.yml`, StrykerJS — #248)
+
+Samostatný workflow **`.github/workflows/mutation.yml`** (ci.yml sa NEDOTÝKA), vlastný
+`concurrency` group `mutation-${{ github.event_name }}-${{ github.ref }}`. Dvojvrstvový tvar
+per airuleset `mutation-testing` (TypeScript = StrykerJS, config v `stryker.config.json`:
+vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `thresholds.break: 50`,
+`incremental`).
+
+- **`mutation-diff`** — na KAŽDÝ `push` do `dev`. Diff-scoped: `git diff --name-only
+  origin/main...HEAD` filtrovaný na `src/lib/**/*.ts` → `npx stryker run --incremental
+  --mutate "<súbory>"`. **Tvrdý strop `timeout-minutes: 20`** — prekročenie je chyba SETUPU
+  (zúž scope / sharduj), NIKDY nezvyšuj timeout (`no-timeout-band-aids`). **Prázdny diff =
+  explicitný `exit 0`** (žiadne mutovateľné súbory nie je zlyhanie; kroky setup+stryker sú
+  gated cez `steps.scope.outputs.changed != ''`, takže config-only push je rýchly no-op).
+  Incremental report (`reports/stryker-incremental.json`) je cachovaný cez `actions/cache`.
+- **`mutation-sweep`** — LEN `workflow_dispatch` (NIKDY cron — user vyvíja nonstop, cron by
+  súperil o runnery). Full `npx stryker run --force || true`; job padne **len keď chýba
+  `reports/mutation/mutation.json`** (zlyhal NÁSTROJ), NIE na nízkom skóre. Survivori
+  (Survived + NoCoverage) → dávkový `test-quality` issue (idempotentne: hľadá otvorený issue
+  s markerom `<!-- mutation-sweep-auto -->`, inak zakladá nový). Beží na GitHub-hosted
+  runneri.
+
+Gotchas:
+- Diff base: `fetch-depth: 0` (dev história) + `git fetch origin
+  +refs/heads/main:refs/remotes/origin/main` (main história) → `origin/main...HEAD` merge-base
+  sa spočíta správne. Bez full fetchu main by three-dot diff nemal spoločného predka.
+- `grep` bez zhody pod `bash -eo pipefail` vracia exit 1 → celý pipeline `... || true`, inak
+  by prázdny diff KROK POKAZIL namiesto exit 0.
+- StrykerJS beží NATÍVNE proti vitest suite; sandbox nie je git repo, takže
+  `execSync('git rev-parse')` vo `vite.config.ts` padne do try/catch fallbacku `'dev'` — OK.
+- `reports/` + `.stryker-tmp/` sú v `.gitignore` / `.prettierignore` / eslint-ignore.
+- `--incremental false` NEEXISTUJE ako CLI flag (Stryker ho číta ako config-file argument);
+  incremental sa vypína len v configu. Proof-run bez cache: vynechaj `--incremental`.
+- **`allowEmpty: true` je POVINNÉ** (v `stryker.config.json`). Diff, ktorý zmení LEN súbor
+  bez mutovateľného kódu (barrel `src/lib/index.ts`, čisto type-only súbor, len komentáre)
+  → Stryker inak padne `ConfigError: No tests were executed` (exit 1) = falošné zlyhanie
+  gate-u. `allowEmpty` to spraví exit 0 iba pre prázdny prípad; reálny netestovaný KÓD
+  (mutanty bez pokrytia) stále padne cez `break 50`, takže gate nič nezakrýva.
+- Vitest-runner default `vitest.related: true` nájde testy aj cez tranzitívny import
+  (napr. `src/lib/b2b-limits.ts` testovaný cez server re-export) — netreba vypínať. WARN
+  „Vitest failed to find test files related to mutated files" je OK pri 0-mutantovom súbore.
+- Sweep dedup je cez presný `--label test-quality` + lokálny `jq` match na fixný titul
+  (`startswith("Mutačný sweep")`), NIE cez GitHub free-text search pomlčkovaného markera
+  (ten sa tokenizuje a môže minúť → duplicitný issue).

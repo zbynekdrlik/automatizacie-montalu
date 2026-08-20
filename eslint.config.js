@@ -19,7 +19,9 @@ export default ts.config(
 			'.superpowers/',
 			// worktree-fleet checkouts majú vlastné tsconfig.json → typescript-eslint
 			// by videl viacero tsconfigRootDir kandidátov a lint by falošne padal
-			'.claude/worktrees/'
+			'.claude/worktrees/',
+			'reports/',
+			'.stryker-tmp/'
 		]
 	},
 	js.configs.recommended,
