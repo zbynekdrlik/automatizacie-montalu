@@ -37,6 +37,7 @@ test('post-deploy smoke: login + verzia v DOM (SHA) + kľúčové stránky bez c
 		await goto(page, path);
 	}
 
-	// zero-console-errors — rovnaká disciplína ako každý E2E
-	expect(errors, 'console chyby/varovania').toEqual([]);
+	// zero-console-errors — rovnaká disciplína ako každý E2E (per-blok guard #247
+	// vyžaduje presný tvar `expect(<var>).toEqual([])`, bez message argumentu)
+	expect(errors).toEqual([]);
 });
