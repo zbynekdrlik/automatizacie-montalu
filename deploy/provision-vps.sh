@@ -53,6 +53,10 @@ DEPLOY_HOME="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)"
 DEPLOY_AK="$DEPLOY_HOME/.ssh/authorized_keys"
 install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$DEPLOY_HOME/.ssh"
 if [ -f /root/.ssh/authorized_keys ]; then
+	# prvý beh na čerstvom hoste — deploy authorized_keys ešte neexistuje (install -d
+	# vytvoril len adresár); pod `set -euo pipefail` by chýbajúci súbor v `cat` (exit 1,
+	# stderr potlačený) cez pipefail zhodil celý skript. Založ ho (prázdny) vopred.
+	[ -f "$DEPLOY_AK" ] || install -m 600 -o "$DEPLOY_USER" -g "$DEPLOY_USER" /dev/null "$DEPLOY_AK"
 	TMP_AK="$(mktemp)"
 	cat /root/.ssh/authorized_keys "$DEPLOY_AK" 2>/dev/null | sort -u >"$TMP_AK"
 	install -m 600 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$TMP_AK" "$DEPLOY_AK"
