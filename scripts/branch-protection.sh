@@ -44,17 +44,19 @@ command -v jq >/dev/null 2>&1 || {
 	exit 1
 }
 
-# Počet mutačných shardov = job-level `SHARDS: N` v mutation.yml. Grep vráti
-# max 1 riadok (jediný match); `|| true` ošetrí no-match pod set -e, potom
-# vyžadujeme kladné celé číslo (fail-loud, no-timeout-band-aids: nikdy tichý default).
-SHARDS_MATCH="$(grep -oE 'SHARDS: *[0-9]+' "$MUTATION_WORKFLOW" | head -n1 || true)"
-SHARDS="${SHARDS_MATCH##*[!0-9]}"
-case "$SHARDS" in
-'' | *[!0-9]*)
-	echo "CHYBA: nenašiel som 'SHARDS: N' v $MUTATION_WORKFLOW — nedokážem odvodiť mutation contexts" >&2
+# Počet mutačných shardov = job-level `SHARDS: N` v mutation.yml (jediný zdroj
+# pravdy). Zachytíme VŠETKY zhody a vyžadujeme PRÁVE JEDNU unikátnu hodnotu:
+# keďže zmyslom skriptu je anti-drift, druhý `SHARDS: <n>` (napr. v komentári
+# alebo ďalšom jobe) NESMIE ticho zmeniť gate — radšej padneme hlasno. `sort -u`
+# zjednotí duplicitné rovnaké hodnoty (tolerované), rôzne hodnoty padnú.
+# (Proces-substitúcia neovplyvňuje set -e, takže no-match len dá 0 riadkov →
+# kontrola počtu nižšie ho odchytí; žiadny `head`, teda žiadny SIGPIPE.)
+mapfile -t SHARD_MATCHES < <(grep -oE 'SHARDS: *[0-9]+' "$MUTATION_WORKFLOW" | grep -oE '[0-9]+' | sort -u)
+if [ "${#SHARD_MATCHES[@]}" -ne 1 ]; then
+	echo "CHYBA: v $MUTATION_WORKFLOW som nenašiel PRÁVE JEDNU 'SHARDS: N' hodnotu (${#SHARD_MATCHES[@]} rôznych: ${SHARD_MATCHES[*]:-<žiadna>}) — nedokážem odvodiť mutation contexts" >&2
 	exit 1
-	;;
-esac
+fi
+SHARDS="${SHARD_MATCHES[0]}"
 
 # Vygeneruj mutation-diff (1..N) ako JSON pole a pridaj k pevným contexts z template.
 MUT_JSON="$(jq -cn --argjson n "$SHARDS" '[range(1; $n + 1) | "mutation-diff (\(.))"]')"
@@ -76,6 +78,10 @@ gh api -X PUT "repos/$REPO/branches/main/protection" \
 	--input "$TMP"
 
 # Merge commits only (two-branch-workflow: žiadny squash/rebase merge).
+# Pozn.: PUT protection + tento repo edit sú dve NEatomické mutácie. Ak by PUT
+# prešiel a repo edit padol, protection je nastavená ale merge-mód nie — je to
+# bezpečné, lebo obe zlyhajú hlasne (set -e) a skript je idempotentný (opakovaný
+# beh dorovná zvyšok).
 gh repo edit "$REPO" \
 	--enable-squash-merge=false \
 	--enable-rebase-merge=false \

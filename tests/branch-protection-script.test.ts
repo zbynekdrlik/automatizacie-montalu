@@ -10,6 +10,11 @@
 // počet shardov z job-level `SHARDS: N` v mutation.yml a vygeneruje
 // `mutation-diff (1..N)`. Test to overí cez fixture workflow so `SHARDS: 4` aj `6`
 // (`MUTATION_WORKFLOW` env override), aby protection nikdy nedriftla od workflowu.
+//
+// HRANICA: mock `gh` vždy `exit 0`, takže test overuje payload, ktorý skript
+// ZOSTAVÍ (názvy polí, contexts, flagy) — NIE že ho GitHub schémou AKCEPTUJE
+// (premenované/neplatné pole by v prode dalo 422, tu prejde). To je inherentná
+// hranica unit testu; reálnu akceptáciu overuje živé spustenie skriptu (#267).
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import {
@@ -49,10 +54,11 @@ interface Run {
 /**
  * Spustí branch-protection skript s mockom `gh`.
  * @param shards ak číslo → fixture mutation.yml so `SHARDS: N` cez MUTATION_WORKFLOW.
- *   `'missing'` → fixture bez `SHARDS:` (fail-loud vetva). `null` → default (reálny
- *   repo mutation.yml, bez override) — overuje wiring default cesty.
+ *   `'missing'` → fixture bez `SHARDS:` (fail-loud vetva). `'ambiguous'` → fixture s
+ *   DVOMA RÔZNYMI `SHARDS:` hodnotami (anti-drift fail-loud vetva). `null` → default
+ *   (reálny repo mutation.yml, bez override) — overuje wiring default cesty.
  */
-function run(shards: number | 'missing' | null): Run {
+function run(shards: number | 'missing' | 'ambiguous' | null): Run {
 	const dir = mkdtempSync(join(tmpdir(), 'branch-protection-'));
 	const bin = join(dir, 'bin');
 	mkdirSync(bin);
@@ -87,7 +93,9 @@ function run(shards: number | 'missing' | null): Run {
 		const body =
 			shards === 'missing'
 				? 'jobs:\n  mutation-diff:\n    env:\n      SHARD: x\n'
-				: `jobs:\n  mutation-diff:\n    env:\n      SHARDS: ${shards}\n      SHARD: x\n`;
+				: shards === 'ambiguous'
+					? 'jobs:\n  a:\n    env:\n      SHARDS: 4\n  b:\n    env:\n      SHARDS: 6\n'
+					: `jobs:\n  mutation-diff:\n    env:\n      SHARDS: ${shards}\n      SHARD: x\n`;
 		writeFileSync(wf, body);
 		env.MUTATION_WORKFLOW = wf;
 	}
@@ -178,6 +186,13 @@ describe('#267 scripts/branch-protection.sh — branch protection na main', () =
 
 	it('fail-loud: chýbajúci SHARDS v mutation.yml → nenulový exit, žiadne PUT', () => {
 		const r = run('missing');
+		expect(r.code).not.toBe(0);
+		expect(r.out).toMatch(/SHARDS/);
+		expect(r.payload).toBeNull();
+	});
+
+	it('anti-drift: dve RÔZNE SHARDS hodnoty → hlasný fail, žiadne PUT', () => {
+		const r = run('ambiguous');
 		expect(r.code).not.toBe(0);
 		expect(r.out).toMatch(/SHARDS/);
 		expect(r.payload).toBeNull();
