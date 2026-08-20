@@ -35,15 +35,22 @@ interface DeployRun {
  * @param mockHealthJson čo mock `curl` vráti na KAŽDÝ /health poll
  * @param hasPrev či `docker inspect` uspeje (beží predchádzajúci kontajner)
  * @param sha7 nasadený SHA (forward poll ho vyžaduje vo verzii)
+ * @param failUp `docker compose up -d` vráti nenulový kód (image sa nespustí)
  */
-function runDeploy(mockHealthJson: string, hasPrev: boolean, sha7: string): DeployRun {
+function runDeploy(
+	mockHealthJson: string,
+	hasPrev: boolean,
+	sha7: string,
+	failUp = false
+): DeployRun {
 	const dir = mkdtempSync(join(tmpdir(), 'deploy-remote-'));
 	const bin = join(dir, 'bin');
 	mkdirSync(bin);
 	const dockerLog = join(dir, 'docker-calls.log');
 
 	// mock docker: zaloguje args; `inspect` simuluje (ne)existujúci kontajner,
-	// všetko ostatné (compose build/up, tag, logs) len prejde.
+	// `compose up` môže zlyhať (failUp), všetko ostatné (build, tag, logs, images,
+	// rmi) len prejde.
 	writeFileSync(
 		join(bin, 'docker'),
 		[
@@ -52,6 +59,8 @@ function runDeploy(mockHealthJson: string, hasPrev: boolean, sha7: string): Depl
 			'case "$1" in',
 			'  inspect)',
 			`    if [ "${hasPrev ? '1' : '0'}" = "1" ]; then echo ${PREV_IMAGE}; exit 0; else exit 1; fi ;;`,
+			'  compose)',
+			`    if [ "$2" = "up" ] && [ "${failUp ? '1' : '0'}" = "1" ]; then exit 1; fi; exit 0 ;;`,
 			'  *) exit 0 ;;',
 			'esac',
 			''
@@ -142,6 +151,16 @@ describe('#254 deploy-remote.sh — rollback pri neúspešnom health', () => {
 		expect(r.code).toBe(1);
 		expect(rollbackTagged(r)).toBe(true); // rollback sa POKÚSIL
 		expect(upCount(r)).toBe(2);
-		expect(r.out).toMatch(/rollback health.*zlyhal|prod je pravdepodobne DOWN/i);
+		expect(r.out).toMatch(/rollback.*zlyhal|prod je pravdepodobne DOWN/i);
+	});
+
+	it('up -d zlyhá (image sa nespustí) → rollback aj tak prebehne, nie tichý abort', () => {
+		// 🟡-1: pred fixom (`docker compose up -d` bare pod set -e) by zlyhaný up
+		// abortol skript PRED rollbackom → rollbackTagged=false. S `if up -d && poll`
+		// zlyhanie up -d prepadne do rollbacku → rollbackTagged=true.
+		const r = runDeploy('{"ok":false}', true, 'abc1234', true);
+		expect(r.code).toBe(1);
+		expect(rollbackTagged(r)).toBe(true); // re-tag prev prebehol aj pri zlyhanom up -d
+		expect(r.out).toMatch(/rollback/i);
 	});
 });
