@@ -10,9 +10,12 @@ set -euo pipefail
 # Idempotentné: opakované spustenie je no-op (user existuje, kľúče sedia, práva sedia).
 #
 # Robí:
-#  1. vytvorí `deploy` usera (/bin/bash) v skupine `docker` — smie spúšťať docker
-#     (de-facto container-root, ale NIE host-root: menší blast-radius kompromitácie CI
-#     kľúča na zdieľanom hoste + čistejší audit ako priamy root login),
+#  1. vytvorí `deploy` usera (/bin/bash) v skupine `docker` — smie spúšťať docker.
+#     POZOR (úprimne, review 🔵 #4): členstvo v skupine `docker` je TRIVIÁLNE
+#     eskalovateľné na plný host-root (`docker run --user 0 -v /:/host …`), takže toto
+#     NIE je skutočná privilege-boundary. Reálny prínos je (a) audit/prehľadnosť a
+#     (b) že CI sa neprihlasuje PRIAMO ako root — menšia expozícia root shellu na
+#     zdieľanom hoste. Nie „menší blast-radius roota".
 #  2. autorizuje EXISTUJÚCI CI deploy kľúč aj pre `deploy` (kópia root authorized_keys —
 #     rovnaký pár, žiadna rotácia secretu `VPS_SSH_KEY`),
 #  3. prevlastní /opt/automatizacie-montalu na `deploy` (rsync/scp/compose cieľ +
@@ -41,16 +44,23 @@ fi
 usermod -aG docker "$DEPLOY_USER" # idempotentné (opakované pridanie do skupiny je no-op)
 echo "$DEPLOY_USER v skupinách: $(id -nG "$DEPLOY_USER")"
 
-# 2. autorizuj CI kľúč pre deploy (kópia root authorized_keys — rovnaký pár) --------
+# 2. autorizuj CI kľúč pre deploy — MERGE (dedup) root authorized_keys do deploy ----
+# Skript nepozná, KTORÝ z root kľúčov je CI kľúč (VPS_SSH_KEY má len CI, tu ho nevidíme),
+# tak zoberie CELÚ root sadu — deploy tak akceptuje ten istý pár bez rotácie secretu.
+# MERGE + `sort -u` (nie prepis): re-run NEPREPÍŠE ručne pridané deploy kľúče a
+# neduplikuje (review 🔵 #3 — pôvodný `install` prepisoval a klobroval deploy kľúče).
 DEPLOY_HOME="$(getent passwd "$DEPLOY_USER" | cut -d: -f6)"
+DEPLOY_AK="$DEPLOY_HOME/.ssh/authorized_keys"
 install -d -m 700 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$DEPLOY_HOME/.ssh"
 if [ -f /root/.ssh/authorized_keys ]; then
-	install -m 600 -o "$DEPLOY_USER" -g "$DEPLOY_USER" \
-		/root/.ssh/authorized_keys "$DEPLOY_HOME/.ssh/authorized_keys"
-	echo "autorizované kľúče skopírované z /root/.ssh/authorized_keys"
+	TMP_AK="$(mktemp)"
+	cat /root/.ssh/authorized_keys "$DEPLOY_AK" 2>/dev/null | sort -u >"$TMP_AK"
+	install -m 600 -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$TMP_AK" "$DEPLOY_AK"
+	rm -f "$TMP_AK"
+	echo "autorizované kľúče zmergované z /root/.ssh/authorized_keys (dedup, bez prepisu)"
 else
 	echo "VAROVANIE: /root/.ssh/authorized_keys neexistuje — pridaj CI pubkey do" \
-		"$DEPLOY_HOME/.ssh/authorized_keys ručne, inak deploy@ SSH zlyhá" >&2
+		"$DEPLOY_AK ručne, inak deploy@ SSH zlyhá" >&2
 fi
 
 # 3. prevlastni deploy pracovný adresár (rsync/scp/compose/backups cieľ) ------------

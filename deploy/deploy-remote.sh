@@ -68,11 +68,22 @@ prune_stare_obrazy() {
 # migrate_ownership: jednorazová (idempotentná) migrácia vlastníctva volumes na uid
 # 1000 (node) PRE non-root kontajner (#256). Po prepnutí na `USER node` musí kontajner
 # ďalej zapísať do:
-#  - appdata volume `/data/app` (SQLite DB + WAL/SHM) — app-EXKLUZÍVNe → chown -R,
-#  - `/data/dlv-import` KOREŇ (zdieľaný s n8n) — dir-write STAČÍ na create/delete odpis
-#    súborov, preto NErekurzívne, aby sme neprepísali vlastníctvo n8n súborov v ňom,
-#  - `/data/dlv-import/NA ODPIS` podstrom (naše odkladacie priečinky pre čaká-odpis) →
-#    chown -R (ekvivalent existujúcich root-vytvorených podpriečinkov).
+#  - appdata volume `/data/app` (SQLite DB + WAL/SHM) — app-EXKLUZÍVNe → `chown -R 1000:1000`
+#    (owner AJ group na 1000, žiadny zdieľaný spotrebiteľ).
+#  - `/data/dlv-import` KOREŇ (zdieľaný s n8n Money watcherom) — dir-write STAČÍ na
+#    create/delete odpis súborov, preto NErekurzívne (neprepíšeme n8n súbory) a
+#    **OWNER-ONLY `chown 1000`** — ZACHOVÁ existujúcu GROUP. Ak n8n závisel na zdieľanej
+#    group-write na tomto adresári, zostane mu zachovaná (defense-in-depth k UNVERIFIED
+#    predpokladu n8n uid=1000; review 🟡 #1). Ak je n8n uid=1000, je owner (píše); ak
+#    root, obchádza práva. Zvyšné riziko (n8n na treťom non-root uid BEZ group-write) sa
+#    overí na VPS (`docker inspect --format '{{.Config.User}}' <n8n>` + `stat`) — viď ci.md.
+#  - `/data/dlv-import/NA ODPIS` podstrom (naše odkladacie priečinky pre čaká-odpis, n8n
+#    ich NEČÍTA — Money importuje LEN koreň) → `chown -R 1000:1000` (naše).
+#  - `/data/montalu/.../ODPIS EXPORT` (TEST export, `money.ts` testDir) — na prode
+#    MONEY_LIVE=1 sa doň NEpíše, ale pri prepnutí na MONEY_LIVE=0 (sankčný test-switch na
+#    tom istom boxe) by non-root app dostala EACCES (review 🔵 #2). Owner-only `chown 1000`
+#    listu (zachová group na zdieľanom montalu mounte); `mkdir -p` je náš vlastný export
+#    adresár, idempotentný.
 # `/data/ceny` sa NETÝKA (`:ro` mount — číta sa, chown by aj tak zlyhal).
 # Beží ako ROOT v jednorazovom app-image kontajneri (`docker compose run --user 0`),
 # takže funguje AJ keď CI deployuje ako non-root `deploy` user (skupina docker ==
@@ -80,11 +91,13 @@ prune_stare_obrazy() {
 # bind-mounty presne ako `up`. `-T` = bez TTY (beh cez SSH bez terminálu).
 # Idempotentné (opakovaný chown = no-op). Chyba NIE je fatálna: health poll + rollback
 # nižšie je záchranná sieť (root-vlastnený volume → app nenabehne → rollback na starý
-# image, prod žije), preto len hlasné `::warning::`.
+# image, prod žije), preto len hlasné `::warning::`. POZOR: health/rollback pokrýva LEN
+# appdata (app nenabehne) — chybný chown ZDIEĽANÝCH mountov je pre health neviditeľný,
+# preto owner-only + VPS overenie n8n uid (ci.md UNVERIFIED) + sledovanie prvého odpisu.
 migrate_ownership() {
 	docker compose run --rm --no-deps -T --user 0 --entrypoint sh "$SERVICE" -c \
-		'set -e; chown -R 1000:1000 /data/app; if [ -d /data/dlv-import ]; then chown 1000:1000 /data/dlv-import; mkdir -p "/data/dlv-import/NA ODPIS"; chown -R 1000:1000 "/data/dlv-import/NA ODPIS"; fi' ||
-		echo "::warning::migrate_ownership: chown vlastníctva volumes zlyhal — over práva/vlastníctvo mountov na VPS (health poll + rollback je backstop)"
+		'set -e; chown -R 1000:1000 /data/app; if [ -d /data/dlv-import ]; then chown 1000 /data/dlv-import; mkdir -p "/data/dlv-import/NA ODPIS"; chown -R 1000:1000 "/data/dlv-import/NA ODPIS"; fi; if [ -d /data/montalu ]; then mkdir -p "/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT"; chown 1000 "/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT"; fi' ||
+		echo "::warning::migrate_ownership: chown vlastníctva volumes zlyhal — over práva/vlastníctvo mountov na VPS (health poll + rollback je backstop LEN pre appdata)"
 }
 
 # 1. ID práve bežiaceho image (pre rollback). Prázdne pri prvom deployi.

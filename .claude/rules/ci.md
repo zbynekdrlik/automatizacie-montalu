@@ -293,13 +293,23 @@ Kontajner beží ako **`USER node` (uid 1000)** a CI deploy sa prihlasuje ako **
   prefixu. `--user 0` = root v kontajneri, takže funguje AJ keď CI deployuje ako non-root
   `deploy` (skupina docker == root-v-kontajneri). Rozsah je zámerne MINIMÁLNY:
   - `appdata` `/data/app` → `chown -R 1000:1000` (app-EXKLUZÍVny volume, bezpečné).
-  - `/data/dlv-import` KOREŇ (zdieľaný s n8n) → `chown 1000:1000` **NErekurzívne** — na
-    create/delete odpis súboru treba write na ADRESÁR, nie vlastníctvo súboru; rekurzívny
-    chown by zbytočne prepísal vlastníctvo n8n súborov (race + blast-radius).
+  - `/data/dlv-import` KOREŇ (zdieľaný s n8n) → **OWNER-ONLY `chown 1000`** (nie `1000:1000`)
+    a **NErekurzívne** — na create/delete odpis súboru treba write na ADRESÁR, nie
+    vlastníctvo súboru; rekurzívny chown by zbytočne prepísal vlastníctvo n8n súborov.
+    Owner-only ZACHOVÁ existujúcu GROUP → ak n8n závisel na zdieľanej group-write na tomto
+    adresári, zostane zachovaná (review 🟡 #1 defense-in-depth k UNVERIFIED n8n uid).
   - `/data/dlv-import/NA ODPIS` podstrom → `chown -R 1000:1000` (naše odkladacie
-    priečinky pre čaká-odpis, `money.ts`).
+    priečinky pre čaká-odpis, `money.ts`; n8n ich NEČÍTA — Money importuje LEN koreň).
+  - `/data/montalu/.../ODPIS EXPORT` (TEST export, `money.ts` `testDir`) → `mkdir -p` +
+    owner-only `chown 1000` (review 🔵 #2). Na prode MONEY_LIVE=1 sa doň NEpíše, ale pri
+    prepnutí na MONEY_LIVE=0 (sankčný test-switch na tom istom boxe) by inak non-root app
+    dostala EACCES. Owner-only zachová group na zdieľanom montalu mounte.
   - `/data/ceny` sa **NETÝKA** (`:ro` mount — chown by aj tak zlyhal; JSON snapshot je
     world-readable, uid 1000 ho číta).
+  POZOR: health poll + rollback pokrýva LEN appdata (root-owned volume → app nenabehne →
+  rollback). Chybný chown ZDIEĽANÝCH mountov je pre health NEVIDITEĽNÝ (app nabehne, /health
+  OK, deploy = SUCCESS, no import silently piling up) — preto owner-only + VPS overenie n8n
+  uid + sledovanie prvého odpisu, nie spoliehanie na health.
   Idempotentné (opakovaný chown = no-op → beží každý deploy, self-healing pri drift/čerstvom
   volume). Chyba NIE je fatálna (len `::warning::`) — health poll + rollback (#254) je
   záchranná sieť: root-vlastnený volume → app nenabehne → rollback na starý image, prod žije.
@@ -308,9 +318,13 @@ Kontajner beží ako **`USER node` (uid 1000)** a CI deploy sa prihlasuje ako **
   loguje `"$*"`, viacriadkový `-c` by sa rozbil na fragmenty).
 
 - **Deploy user na VPS:** `deploy/provision-vps.sh` (NOVÝ, jednorazový, idempotentný root
-  skript) — vytvorí `deploy` usera v skupine `docker`, autorizuje EXISTUJÚCI CI kľúč (kópia
-  `/root/.ssh/authorized_keys` — **žiadna rotácia secretu `VPS_SSH_KEY`**), prevlastní
-  `/opt/automatizacie-montalu` na `deploy`. **PREREKVIZITA: spusti RAZ na VPS PRED prvým
+  skript) — vytvorí `deploy` usera v skupine `docker`, autorizuje EXISTUJÚCI CI kľúč
+  (**MERGE + `sort -u`** root `authorized_keys` do deploy — nie prepis, aby re-run
+  neklobroval ručne pridané deploy kľúče, review 🔵 #3; **žiadna rotácia secretu
+  `VPS_SSH_KEY`**), prevlastní `/opt/automatizacie-montalu` na `deploy`. ÚPRIMNE (review
+  🔵 #4): členstvo v skupine `docker` je triviálne eskalovateľné na host-root (`docker run
+  --user 0 -v /:/host`), takže to NIE je skutočná privilege-boundary — reálny prínos je
+  audit + že CI sa neprihlasuje PRIAMO ako root. **PREREKVIZITA: spusti RAZ na VPS PRED prvým
   `deploy@` deployom** (`ssh root@VPS 'bash -s' < deploy/provision-vps.sh`). Ak sa zabudne,
   SSH krok v ci.yml zlyhá HLASNE PRED dotykom kontajnera → prod ostane na aktuálnej verzii
   (bezpečné, nie prod damage). Záložný cron (#253) beží ďalej ako root, `docker exec`-om nie
