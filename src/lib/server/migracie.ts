@@ -775,6 +775,34 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 24) {
+		// v23 → v24: audit akcie „delete" + „seed" (#246, LOG-9). deleteB2BUser dovtedy
+		// NEzapisovalo `user_audit` riadok (addUser/changeUserRole áno) — mazanie účtu
+		// nebolo dohľadateľné. CHECK v20 poznal len ('create','role_change'); SQLite
+		// nevie ALTER-núť CHECK constraint → RECREATE tabuľky s rozšíreným CHECK a
+		// `INSERT…SELECT` zachová celú existujúcu históriu (na `user_audit` nie je žiadny
+		// FK → recreate je bezpečný). Celé v `db.transaction` (vzor v18/v19/v22): pád
+		// uprostred → rollback → blok sa čisto prehrá, nikdy crash-loop. 'seed' hodnota
+		// je pre seedUsers (seed-audit každého seed-nutého účtu, viď nižšie).
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE user_audit_new (
+					id INTEGER PRIMARY KEY,
+					ts TEXT NOT NULL DEFAULT (datetime('now')),
+					actor TEXT NOT NULL,
+					action TEXT NOT NULL CHECK (action IN ('create','role_change','delete','seed')),
+					target_username TEXT NOT NULL,
+					detail TEXT NOT NULL DEFAULT ''
+				);
+				INSERT INTO user_audit_new (id, ts, actor, action, target_username, detail)
+					SELECT id, ts, actor, action, target_username, detail FROM user_audit;
+				DROP TABLE user_audit;
+				ALTER TABLE user_audit_new RENAME TO user_audit;
+			`);
+			bump(24);
+		})();
+	}
+
 	seedData(db);
 	seedUsers(db, hashPassword);
 }
@@ -868,15 +896,25 @@ function seedUsers(db: Database.Database, hashPassword: (password: string) => st
 	if (userCount === 0) {
 		const spec = process.env.SEED_USERS || '';
 		const ins = db.prepare('INSERT INTO users (username, pass_hash) VALUES (?, ?)');
+		// seed-audit (#246): účty založené SEED-om (nie človekom) dostanú audit riadok
+		// action='seed' — inak by boli v audite nerozoznateľné od ničoho. actor='' =
+		// bez session kontextu (rovnaká konvencia ako addUser). INSERT users + audit
+		// v jednej transakcii, nech seed účet nikdy nevznikne bez svojho audit riadku.
+		const audit = db.prepare(
+			"INSERT INTO user_audit (actor, action, target_username, detail) VALUES ('', 'seed', ?, '')"
+		);
 		const seeded: string[] = [];
-		for (const pair of spec.split(',').filter(Boolean)) {
-			const idx = pair.indexOf(':');
-			if (idx < 1) continue;
-			const uname = pair.slice(0, idx).trim();
-			// heslo (pair.slice(idx+1)) sa NIKDY neloguje — len meno účtu
-			ins.run(uname, hashPassword(pair.slice(idx + 1)));
-			seeded.push(uname);
-		}
+		db.transaction(() => {
+			for (const pair of spec.split(',').filter(Boolean)) {
+				const idx = pair.indexOf(':');
+				if (idx < 1) continue;
+				const uname = pair.slice(0, idx).trim();
+				// heslo (pair.slice(idx+1)) sa NIKDY neloguje — len meno účtu
+				ins.run(uname, hashPassword(pair.slice(idx + 1)));
+				audit.run(uname);
+				seeded.push(uname);
+			}
+		})();
 		if (seeded.length > 0) log.info('seedUsers', { usernames: seeded });
 	}
 }
