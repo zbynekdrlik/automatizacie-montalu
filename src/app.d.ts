@@ -7,6 +7,12 @@ declare global {
 		interface Locals {
 			user: SessionUser | null;
 		}
+		// #245: handleError vracia bezpečnú správu + dohľadateľné errorId
+		// (užívateľ ho nahlási, my ho nájdeme v logu).
+		interface Error {
+			message: string;
+			errorId?: string;
+		}
 	}
 }
 

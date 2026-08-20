@@ -3,6 +3,7 @@
 // poslaným číslam) a zapíše odpis s dedup ochranou.
 
 import type { Actions, PageServerLoad } from './$types';
+import { logger } from '$lib/server/log';
 import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
 import {
 	safeCompute,
@@ -421,7 +422,7 @@ export const actions: Actions = {
 			}
 			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome, vytvorene };
 		} catch (e) {
-			console.error('writeOdpis zlyhal:', e);
+			logger('zasklenia').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return {
 				step: 'form' as const,
 				error:
@@ -555,7 +556,11 @@ export const actions: Actions = {
 				vytvorene
 			};
 		} catch (e) {
-			console.error('writeOdpis (multi) zlyhal:', e);
+			logger('zasklenia').error('writeOdpis (multi) zlyhal', {
+				zak: vstup.zak,
+				op: vstup.op,
+				error: e
+			});
 			return {
 				step: 'form' as const,
 				error:

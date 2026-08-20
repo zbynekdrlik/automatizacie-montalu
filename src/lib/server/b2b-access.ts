@@ -14,7 +14,11 @@ const B2B_FORBIDDEN_PREFIXES = [
 	// nárezový optimalizátor (#212) — kalkulačka pre dielňu (interní), žiadny Money
 	// odpis; b2b nemá požiadavku, konvencia = nová route zakázaná, kým sa vedome
 	// nerozhodne inak (drift guard: tests/b2b-route-coverage.test.ts)
-	'/optimalizator'
+	'/optimalizator',
+	// #245: test-only route na overenie chybovej stránky (v prode 404, len E2E ju
+	// zapína cez ENABLE_TEST_ERROR_ROUTE) — b2b sem nemá čo robiť; drift guard
+	// (tests/b2b-route-coverage.test.ts) beztak vyžaduje, aby bola v denyliste.
+	'/__test-error'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —

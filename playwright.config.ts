@@ -40,7 +40,10 @@ export default defineConfig({
 					MONEY_TEST_DIR: './data/e2e-odpis-export',
 					// #154: E2E si vie na tento súbor napísať VLASTNÝ snapshot fixture (appka
 					// beží ako lokálny child proces preview servera, zdieľa filesystem s testom)
-					CENY_SNAPSHOT_PATH: './data/e2e-ceny.json'
+					CENY_SNAPSHOT_PATH: './data/e2e-ceny.json',
+					// #245: zapne test-only /__test-error route (inak 404) — E2E overí chybovú
+					// stránku + errorId. VPS toto env NIKDY nemá, takže route je tam skrytá.
+					ENABLE_TEST_ERROR_ROUTE: '1'
 				}
 			}
 });

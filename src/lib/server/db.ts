@@ -13,7 +13,8 @@ import type { SysRow, RezRow, Cfg } from './compute';
 import { buildCFG } from './compute';
 import { migrate } from './migracie';
 
-const DB_PATH = process.env.DATABASE_PATH || './data/app.db';
+// exportované pre štartovací config log v hooks.server.ts (#245); jediný zdroj cesty k DB
+export const DB_PATH = process.env.DATABASE_PATH || './data/app.db';
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 export const db = new Database(DB_PATH);

@@ -8,11 +8,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, url }) => {
+	default: async ({ request, cookies, url, getClientAddress }) => {
 		const form = await request.formData();
 		const username = String(form.get('username') || '');
 		const password = String(form.get('password') || '');
-		const token = login(username, password);
+		const token = login(username, password, getClientAddress());
 		if (!token) {
 			// 200 render s chybou (nie fail(401)) — non-2xx na form POST loguje
 			// v prehliadači console error a porušuje zero-console-errors pravidlo

@@ -14,7 +14,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { db } from './db';
+import { logger } from './log';
 import type { MJ } from '$lib/komponenty';
+
+const log = logger('money');
 
 export type Modul = 'zasklenia' | 'bazen' | 'pergola';
 
@@ -124,6 +127,16 @@ export function targetDirFor(cakaSubdir: string, caka: boolean): string {
 	return liveDir();
 }
 
+/** Rozriešené Money cieľové adresáre + LIVE stav — pre štartovací config log (db.ts, #245). */
+export function moneyConfig(): {
+	live: boolean;
+	liveDir: string;
+	naOdpisDir: string;
+	testDir: string;
+} {
+	return { live: isLive(), liveDir: liveDir(), naOdpisDir: naOdpisDir(), testDir: testDir() };
+}
+
 export function contentHash(zak: string, polozky: Polozka[]): string {
 	const sig =
 		zak +
@@ -226,6 +239,13 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 					'SELECT created_at FROM odpis_log WHERE modul = ? AND zak = ? AND op = ? AND live = ?'
 				)
 				.get(job.modul, job.zak, job.op, live) as { created_at: string } | undefined;
+			log.warn('odpis duplikát — dedup kľúč už existuje, nič sa nezapisuje', {
+				modul: job.modul,
+				zak: job.zak,
+				op: job.op,
+				live: isLive(),
+				existingCreatedAt: existing?.created_at
+			});
 			return {
 				status: 'duplicate',
 				live: isLive(),
@@ -237,6 +257,15 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 		throw e;
 	}
 
+	// dedup kľúč zabraný (INSERT prešiel) — súbor sa ešte len zapisuje
+	log.info('odpis claim', {
+		modul: job.modul,
+		zak: job.zak,
+		op: job.op,
+		live: isLive(),
+		caka: job.caka
+	});
+
 	try {
 		const buf = await buildXlsx(job);
 		fs.mkdirSync(dir, { recursive: true });
@@ -246,9 +275,25 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 		const tmp = path.join(dir, `.tmp-${randomBytes(8).toString('hex')}`);
 		fs.writeFileSync(tmp, buf);
 		fs.renameSync(tmp, target);
+		log.info('odpis zapísaný', {
+			modul: job.modul,
+			zak: job.zak,
+			op: job.op,
+			live: isLive(),
+			target,
+			bytes: buf.length
+		});
 	} catch (e) {
 		// kompenzácia: súbor sa nezapísal → uvoľni dedup kľúč, nech sa dá poslať znova
 		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(rowId);
+		log.error('odpis kompenzácia — zápis súboru zlyhal, dedup kľúč uvoľnený', {
+			modul: job.modul,
+			zak: job.zak,
+			op: job.op,
+			live: isLive(),
+			target,
+			error: e
+		});
 		throw e;
 	}
 
@@ -301,6 +346,14 @@ export function releaseOdpis(id: number, username: string): boolean {
 			])
 		);
 	})();
+	log.info('odpis uvoľnený', {
+		id,
+		modul: row.modul,
+		zak: row.zak,
+		op: row.op,
+		live: !!row.live,
+		actor: username
+	});
 	return true;
 }
 
