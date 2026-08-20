@@ -6,6 +6,11 @@ const baseURL = process.env.BASE_URL || 'http://localhost:4173';
 
 export default defineConfig({
 	testDir: 'e2e',
+	// #245: test-only route /__test-error existuje LEN v CI preview (cez
+	// ENABLE_TEST_ERROR_ROUTE vo webServer.env nižšie); proti nasadeniu (BASE_URL)
+	// je to 404 by design, takže error-stranka spec je preview-only — proti
+	// deploymentu ho vynecháme na úrovni configu (nie runtime skip v spec súbore).
+	testIgnore: process.env.BASE_URL ? ['**/error-stranka.spec.ts'] : [],
 	globalSetup: './e2e/global-setup.ts',
 	timeout: 30000,
 	// cez SSH tunel na nasadenú appku sú odozvy pomalšie — default 5 s expect

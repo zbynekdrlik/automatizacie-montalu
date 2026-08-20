@@ -1,12 +1,13 @@
 // #245: neočakávaná serverová chyba (500) vykreslí +error.svelte s bezpečnou
 // SK správou a dohľadateľným errorId. Vyvolané cez test-only route /__test-error
-// (zapnutá len v CI preview cez ENABLE_TEST_ERROR_ROUTE; na nasadenej appke 404,
-// preto sa proti BASE_URL preskočí). Zero-console ako každý E2E.
+// (zapnutá len v CI preview cez ENABLE_TEST_ERROR_ROUTE; na nasadenej appke 404).
+// Spec je preto len pre CI preview — proti nasadeniu (BASE_URL) ho vynecháva
+// testIgnore v playwright.config.ts (nie runtime skip v spec súbore). Zero-console
+// ako každý E2E.
 import { test, expect } from '@playwright/test';
 import { collectConsole, loginAs } from './helpers';
 
 test('chybová stránka: 500 ukáže +error.svelte s errorId, zero-console', async ({ page }) => {
-	test.skip(!!process.env.BASE_URL, 'test-error route je len v CI preview, nie na nasadenej appke');
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
