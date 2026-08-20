@@ -117,6 +117,9 @@ Load the matching skill BEFORE working on that area (don't re-derive):
   `.claude/rules/timestamps.md` on its `paths:` (Docker nemá TZ → UTC default gotcha)
 - `.github/workflows/*.yml` (CI/deploy pipeline) → auto-loads `.claude/rules/ci.md`
   on its `paths:` (zombie run recovery, `workflow_dispatch` retry, deploy-landed check)
+- štruktúrovaný logger (`log.ts`), handleError, chybová stránka, testovanie logov →
+  auto-loads `.claude/rules/logging.md` on its `paths:` (LOG_LEVEL silent-pod-vitest,
+  redakcia tajomstiev, štartový log v hooks nie db kvôli cyklu, gated test-error route)
 - `src/lib/vizual/**`, `src/lib/components/vizual/**` (three.js 3D náhľad) →
   auto-loads `.claude/rules/vizual3d.md` on its `paths:` (WebGL context-lock,
   `forceContextLoss` irreversibility, `preserveDrawingBuffer` test gotcha,
