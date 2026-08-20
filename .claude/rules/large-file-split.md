@@ -1,17 +1,33 @@
 ---
 paths:
-  - "src/lib/server/**"
+  - "src/**"
 ---
 
-# Splitting a `src/lib/server/**` file that's approaching the 1000-line cap (#183)
+# Splitting a `src/**` file approaching the 1000-line cap (#183)
+
+The 1000-line cap governs **all of `src/**`** — server modules, `$lib/` helpers,
+components AND routes (`+page.svelte`, `+page.server.ts`), not just
+`src/lib/server/**`. Two split patterns below: **parameter injection** for a `.ts`
+module, **step subcomponents** for a big `.svelte` page (#239).
 
 `db.ts` was 986 lines (`migrate()` alone 679) — split into `db.ts` (connection +
-query API, 209 lines) + a new `migracie.ts` (the migration/seed chain, ~790
-lines). `compute.ts` is currently the next candidate over the cap (1346 lines,
-found during #183's own review) — not split yet, no action needed until a
-ticket actually touches it, but the pattern below is the one to reach for.
+query API, 209 lines) + a new `migracie.ts` (the migration/seed chain, ~790 lines).
 
-## Parameter injection, NOT a circular import
+## Watch-list — files at / over the cap (re-measure `wc -l` before acting)
+
+| File | Lines | Status |
+|---|---|---|
+| `src/routes/zasklenia/+page.svelte` | ~1620 | over — split tracked #250 |
+| `src/lib/server/compute.ts` | ~1430 | over — being split #249 |
+| `src/lib/server/migracie.ts` | ~861 | approaching |
+| `src/lib/pergola-narez.ts` | ~793 | approaching |
+| `src/lib/components/vizual/Vizual3D.svelte` | ~722 | approaching |
+| `src/lib/components/PergolaNarezVykres.svelte` | ~704 | approaching |
+
+No action until a ticket actually touches one; then reach for the matching pattern
+below. Line counts drift — re-measure before deciding.
+
+## Parameter injection, NOT a circular import (`.ts` modules)
 
 The extracted module needs the ORIGINAL module's shared state (here: the
 `db` instance + `hashPassword`). Two ways to give it that:
@@ -94,3 +110,26 @@ Verify identical to #183 (`git diff --color-moved=dimmed-zebra` = moves; a line-
 check that every original code line lands in exactly one module) PLUS the contractual proof:
 `tests/compute.test.ts` (109 Money vectors) + the `zasklenia-posuvspec-golden` snapshot
 unchanged and green.
+
+## Splitting a large `.svelte` page — step subcomponents (#239)
+
+A multi-step `.svelte` page splits by STEP, not by a shared-state extraction.
+#239 split `src/routes/pergola/narez/+page.svelte` (1231 → 311 lines) into 5 step
+components under `src/lib/components/pergola/` — `RezForm` (form step),
+`RezVysledok` (result display), `RucnePolozky` (manual-items card, #234),
+`RezNahlad` (cut preview), `RezHotovo` (done step) — a PURE structural move, zero
+behavior change. The mechanics:
+
+- **`+page.svelte` stays the state + compute HUB.** ALL `$state`, the `$effect`
+  echo, and both serialization snippets stay in the parent — the round-trip
+  serialization discipline is unchanged (see `pergola-narez.md`); each subcomponent
+  just renders one step.
+- **Pass parent state DOWN as `$bindable` props** (`RezForm` has 18× `$bindable`;
+  `RucnePolozky` binds `rucneRiadky` and keeps its own local input state), and pass
+  reusable `{#snippet}`s (`hidden` / `hiddenIdent`) as props rather than duplicating
+  them per child.
+- **Move shared component styles to the global stylesheet.** `table.narez` +
+  `.badge.rucne` went to `app.css` (following the repo's `.badge.ok/.wait` pattern).
+  A `.sec .badge` override copied into only ONE child silently dropped the badge on
+  the others — put shared component CSS in `app.css`, not per-child (review 🟡, fixed
+  in #239's own review, commit 2e6c285).

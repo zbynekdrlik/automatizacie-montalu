@@ -1,3 +1,12 @@
+---
+paths:
+  - 'src/hooks.server.ts'
+  - 'src/lib/server/auth.ts'
+  - 'src/lib/server/b2b-*.ts'
+  - 'src/routes/pouzivatelia/**'
+  - 'src/routes/login/**'
+---
+
 # Access control — roles, route gating, Money-write boundary
 
 App auth: `users(username, pass_hash, role)` + `sessions`, cookie `am_session`,
