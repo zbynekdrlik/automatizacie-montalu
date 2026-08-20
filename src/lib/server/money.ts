@@ -273,8 +273,33 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 		// *.xlsx a bodka na začiatku ho na Samba share neskryje; bez prípony ho
 		// watcher nevidí a rename v rovnakom adresári je atomický
 		const tmp = path.join(dir, `.tmp-${randomBytes(8).toString('hex')}`);
-		fs.writeFileSync(tmp, buf);
+		// #246: durable atomic write. `writeFileSync` samotné nechá dáta len v OS page
+		// cache a vráti sa — pri výpadku prúdu môže rename metadáta prežiť, kým dáta
+		// súboru ešte nie sú na disku → Money watcher by naimportoval NEÚPLNÝ/skrátený
+		// xlsx. Preto: zapíš do tmp cez fd, `fsync(fd)` (dáta durable) PRED rename; potom
+		// atomický rename; nakoniec best-effort `fsync(dir)` PO rename (durable aj samotný
+		// rename = dir-entry). writeFileSync(fd) zachováva plný zápisový loop originálu,
+		// fd necháva otvorený (zatvárame my). Dir fsync je best-effort — cez Samba / na
+		// Windows sa adresár nemusí dať fsync-núť, čo nie je fatálne (dáta sú už durable).
+		const fd = fs.openSync(tmp, 'w');
+		try {
+			fs.writeFileSync(fd, buf);
+			fs.fsyncSync(fd);
+		} finally {
+			fs.closeSync(fd);
+		}
 		fs.renameSync(tmp, target);
+		try {
+			const dirFd = fs.openSync(dir, 'r');
+			try {
+				fs.fsyncSync(dirFd);
+			} finally {
+				fs.closeSync(dirFd);
+			}
+		} catch {
+			// dir fsync best-effort (Windows/Samba adresár sa nemusí dať otvoriť na fsync)
+			// — obsah súboru je už durable cez fsync(fd) vyššie
+		}
 		log.info('odpis zapísaný', {
 			modul: job.modul,
 			zak: job.zak,
