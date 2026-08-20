@@ -208,3 +208,66 @@ Gotchas:
 - Sweep dedup je cez presný `--label test-quality` + lokálny `jq` match na fixný titul
   (`startswith("Mutačný sweep")`), NIE cez GitHub free-text search pomlčkovaného markera
   (ten sa tokenizuje a môže minúť → duplicitný issue).
+## Deploy rollback + post-deploy E2E (#254)
+
+Deploy job už nerobí surové `docker compose up -d --build` bez návratu. Shell
+logika je vyextrahovaná do `deploy/deploy-remote.sh` (beží NA VPS, volaná cez SSH),
+aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, mock
+`docker`/`curl` na PATH, žiadna nová dep, padne keď sa rollback pokazí).
+
+- **Rollback = natívny Docker image re-tag.** Compose služba `app` má stabilný
+  `image: automatizacie-montalu:current`. Skript pred `up` odchytí ID bežiaceho
+  image (`docker inspect --format '{{.Image}}' automatizacie-montalu`), `docker
+  compose build` (otaguje `:current`) + durable `:<sha7>`, `up -d`, forward health
+  poll (ok:true AND SHA7 vo verzii). Pri zlyhaní → re-tag odchyteného prev ID späť
+  na `:current` + `up -d` + rollback poll (LEN liveness — starý build má iný SHA) →
+  `exit 1` s `docker logs`. Prvý deploy (žiadny prev kontajner) sa nerollbackuje.
+
+- **Rollback SA robí LEN pri zlyhaní HEALTH polla** (deploy reálne nenabehol).
+  Zlyhanie post-deploy E2E po úspešnom health rollback NEVYVOLÁ — nová verzia je
+  live a zdravá; E2E červená = ALARM (červený job), nie dôvod vrátiť zdravý build
+  (rollback zdravého kvôli flaky tunelu by bol horší).
+
+- **Post-deploy E2E = krok v deploy jobe** (NIE nový job — `tests/ci-docker-
+  hardening.test.ts` tvrdí presne 3 joby). Po health OK: SSH tunel
+  `-L 18091:127.0.0.1:8090`, `DEPLOY_SHA7=<sha7> BASE_URL=http://localhost:18091
+  npx playwright test post-deploy.spec.ts` (`E2E_USER`/`E2E_PASS` zo secrets env
+  `production`). `e2e/post-deploy.spec.ts` je BY CONSTRUCTION read-only (login +
+  `[data-testid=version]`==SHA7 + navigácia, žiadny odpis) — nikdy sa nedotkne
+  Money. Beží aj lokálne v `test` jobe proti preview (SHA kontrola sa preskočí,
+  keď `DEPLOY_SHA7` nie je).
+
+- **E2E secrets:** `E2E_USER`+`E2E_PASS` treba pridať do GitHub environment
+  `production` (užívateľ/supervisor — agent secrets nepridáva). Kým chýbajú, krok
+  ich zisťuje (`steps.e2e_secrets`) a preskočí sa s hlasným `::warning::` (NIE
+  potlačenie chyby, NIE ticho zelený) — deploy tak nezlyhá na chýbajúcom secrete;
+  health poll (ok+SHA7) je backstop verzie. Po pridaní secrets beží naostro.
+
+### Gotchas pri úprave `deploy` jobu / pridaní post-deploy overenia (#254)
+
+Tri mechanické guardy tvarujú, ako sa deploy job smie meniť — nezistíš ich, kým
+ťa nezablokujú pri integrácii:
+
+- **`tests/ci-docker-hardening.test.ts` tvrdí PRESNE 3 joby** (`deploy/test/
+  version-check`). Post-deploy overenie preto MUSÍ byť KROK v `deploy` jobe, nie
+  nový job (4. job rozbije `parser vidí všetky tri joby`). Guard tiež žiada
+  `timeout-minutes` na KAŽDOM jobe a SHA-pin na KAŽDEJ `uses:` akcii.
+- **`not.toMatch(/continue-on-error/)` matchne aj v KOMENTÁRI.** Nepíš doslovný
+  reťazec „continue-on-error" ani do vysvetľujúceho YAML komentára — guard padne.
+- **GitHub Actions: vlastný step-level `if:` dostane IMPLICITNE `success() &&`.**
+  `if: steps.X.outcome == 'failure'` sa preto pri zlyhaní NIKDY nespustí (job je
+  vo `failure` stave → `success()` false). Pre „nahraj artefakt keď krok zlyhal"
+  píš `if: always() && steps.X.outcome == 'failure'`. Pre „spusti len po úspešnom
+  predošlom kroku" naopak `success() && <podmienka>` (bez `success()` by vlastný
+  `if:` bežal aj po zlyhanom deployi).
+
+Pri pridávaní NOVÉHO deployment-gated E2E spec-u: `block-test-skips.sh` blokuje
+doslovný `test.skip(` v PRIDANOM riadku test súboru pri push. Nový post-deploy
+spec preto negatuj cez `test.skip(` — nechaj ho bežať vždy a SHA-kontrolu (verzia
+z DOM == nasadený SHA) daj podmienenú na `process.env.DEPLOY_SHA7` (`if (SHA7) { … }`).
+Lokálne (bez DEPLOY_SHA7) beží ako login+navigácia smoke proti preview.
+
+Testovateľnosť deploy shellu: vyextrahuj logiku do `deploy/deploy-remote.sh`
+(env-riadený) a pokry ju vitest-om cez `node:child_process` + mock `docker`/`curl`
+na `PATH` (`tests/deploy-remote.test.ts`) — žiadna nová dep, padne keď sa rollback
+pokazí.
