@@ -49,5 +49,10 @@ describe('login timing oracle je uzavretý', () => {
 		const relDiff = Math.abs(mu - mw) / Math.max(mu, mw);
 		// oba behy spustia práve jeden scrypt (neznáme meno cez DUMMY_HASH) → minimá takmer zhodné
 		expect(relDiff).toBeLessThan(0.2);
-	});
+		// #261: per-test timeout 30 s. Test spustí ~98 (WARM+N)×2 scryptov — sám osebe
+		// ~3,6 s (blízko default 5 s stropu). Po izolácii test DB (#261) je paralelný beh
+		// naozaj paralelný → CPU kontencia PRIDÁVA wall-clock a 98 scryptov prekročí 5 s
+		// → `Test timed out`. Timeout riadi len trpezlivosť harnessu; TVRDENIE (pomer < 20 %
+		// cez minimá) sa NEMENÍ, takže bezpečnostná záruka ostáva rovnaká.
+	}, 30_000);
 });
