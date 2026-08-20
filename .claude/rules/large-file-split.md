@@ -7,9 +7,12 @@ paths:
 
 `db.ts` was 986 lines (`migrate()` alone 679) — split into `db.ts` (connection +
 query API, 209 lines) + a new `migracie.ts` (the migration/seed chain, ~790
-lines). `compute.ts` is currently the next candidate over the cap (1346 lines,
-found during #183's own review) — not split yet, no action needed until a
-ticket actually touches it, but the pattern below is the one to reach for.
+lines). `compute.ts` was the next over the cap (1430 lines) and got the same
+treatment in **#249** — see "Pure functions: a layered façade split" below for
+that variant. A mechanical guard now enforces the cap: `tests/server-file-size-cap.test.ts`
+walks every `src/lib/server/**/*.ts` and fails if any file exceeds 1000 lines
+(the prose convention alone let `compute.ts` silently reach 1430). New server
+modules are covered automatically by that walk — nothing to register per file.
 
 ## Parameter injection, NOT a circular import
 
