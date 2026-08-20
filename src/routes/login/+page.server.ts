@@ -12,7 +12,15 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const username = String(form.get('username') || '');
 		const password = String(form.get('password') || '');
-		const token = login(username, password, getClientAddress());
+		// getClientAddress() môže hodiť (ADDRESS_HEADER nastavený + hlavička chýba) — login je
+		// Money-zápisová brána, nesmie kvôli LOGOVANIU IP spadnúť (review #245)
+		let ip: string | undefined;
+		try {
+			ip = getClientAddress();
+		} catch {
+			ip = undefined;
+		}
+		const token = login(username, password, ip);
 		if (!token) {
 			// 200 render s chybou (nie fail(401)) — non-2xx na form POST loguje
 			// v prehliadači console error a porušuje zero-console-errors pravidlo

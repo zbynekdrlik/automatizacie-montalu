@@ -15,8 +15,10 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	// #245: INFO pri štarte + riadok per aplikovaný blok (cez helper `bump`). Na
 	// prod DB (už na aktuálnej verzii) sa žiadny blok neaplikuje — len štart riadok.
 	log.info('migrácie: kontrola schémy', { user_version: version });
+	// `→ N` (nie `N-1 → N`): dve skokové migrácie (v0→2, v3→5) by mali zavádzajúci
+	// ľavý bok; cieľová verzia je vždy správna (review #245)
 	const logMig = (v: number) =>
-		log.info('migrácia aplikovaná', { user_version: v, blok: `${v - 1} → ${v}` });
+		log.info('migrácia aplikovaná', { user_version: v, blok: `→ ${v}` });
 	const bump = (v: number) => {
 		db.pragma('user_version = ' + v);
 		logMig(v);

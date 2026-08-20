@@ -34,6 +34,9 @@ function serialize(v: unknown): unknown {
 	return v;
 }
 
+// Pozn. (review #245): redakcia aj Error-serializácia sú LEN na najvyššej úrovni fieldov
+// (nie rekurzívne). Všetky call-sites posielajú ploché objekty; vnorené tajomstvo nikto
+// neposiela — keby raz áno, buď to sploští, alebo sem doplň rekurziu.
 function redact(fields: Fields): Fields {
 	const out: Fields = {};
 	for (const [k, v] of Object.entries(fields))
