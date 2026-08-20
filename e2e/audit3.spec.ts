@@ -191,9 +191,12 @@ test('pergola: kliknutie na „Kopírovať počet tyčí" dá potvrdenie a do sc
 
 	const kopiruj = page.getByTestId('kopiruj-tyce');
 	await expect(kopiruj).toHaveText('📋 Kopírovať počet tyčí');
-	// clipboard API existuje len v bezpečnom kontexte (localhost / https)
+	// clipboard API musí byť dostupné — localhost aj CI preview SÚ bezpečný kontext;
+	// keby dostupné nebolo, test má PADNÚŤ (nie sa TICHO preskočiť)
 	const secure = await page.evaluate(() => window.isSecureContext && !!navigator.clipboard);
-	test.skip(!secure, 'nezabezpečený kontext — clipboard API nie je dostupné');
+	expect(secure, 'clipboard API nedostupné — očakávaný bezpečný kontext (localhost/https)').toBe(
+		true
+	);
 
 	await kopiruj.click();
 	await expect(kopiruj).toHaveText('✓ Skopírované — vlož do Solid Edge');

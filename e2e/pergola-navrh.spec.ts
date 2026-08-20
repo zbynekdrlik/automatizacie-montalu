@@ -126,6 +126,7 @@ test('formulár → výkres OP260032: všetkých 5 pohľadov + pečiatka + kóty
 test('tlač A4 na šírku (@page landscape) — LEN na tejto route, nedotýka sa nárezáku/fixu', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('nakreslit').click();
@@ -140,11 +141,13 @@ test('tlač A4 na šírku (@page landscape) — LEN na tejto route, nedotýka sa
 	const inePageSizes = await najdiPageSizes(page);
 	expect(inePageSizes.length).toBeGreaterThan(0);
 	expect(inePageSizes.some((s) => /landscape/i.test(s))).toBe(false);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('Money odpis existujúceho /pergola formulára nedotknutý — odkaz na návrh nezasahuje do CAD nárezu', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola');
 	await waitHydrated(page);
@@ -157,11 +160,13 @@ test('Money odpis existujúceho /pergola formulára nedotknutý — odkaz na ná
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/pergola\/navrh$/);
 	await expect(page.getByRole('heading', { name: 'Pergola — návrhový výkres' })).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('← Späť a upraviť: formulár sa vráti s predvyplneným vstupom (nevynuluje sa)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('nakreslit').click();
@@ -172,11 +177,13 @@ test('← Späť a upraviť: formulár sa vráti s predvyplneným vstupom (nevyn
 	await expect(page.getByLabel('OP číslo')).toHaveValue('OP260032');
 	await expect(page.getByLabel('Hĺbka (mm) *')).toHaveValue('3500');
 	await expect(page.getByLabel('Výška vpredu (mm) *')).toHaveValue('2500');
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('ručný prepis šírky/dĺžky panelu výplne prepíše dopočítanú hodnotu na výkrese', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByLabel('Šírka panelu (mm) — ručný prepis').fill('700');
@@ -193,6 +200,7 @@ test('ručný prepis šírky/dĺžky panelu výplne prepíše dopočítanú hodn
 	await expect(
 		page.locator('[data-testid="pn-panel-detail"] text', { hasText: /^3000$/ })
 	).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });
 
 // review nález (#138): zaškrtnutý zvod na vysokom stĺpe + neskoršie zníženie počtu
@@ -201,6 +209,7 @@ test('ručný prepis šírky/dĺžky panelu výplne prepíše dopočítanú hodn
 test('zníženie počtu polí po zaškrtnutí zvodu na zaniknutom stĺpe: odoslanie prejde bez chyby', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
 	await page.getByLabel('OP číslo').fill('OP260032');
@@ -215,6 +224,7 @@ test('zníženie počtu polí po zaškrtnutí zvodu na zaniknutom stĺpe: odosla
 
 	await expect(page.getByTestId('form-error')).toHaveCount(0);
 	await expect(page.getByTestId('pn-isometria')).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });
 
 // Neplatný vstup (mimo rozsahu hĺbka/výška/panely, neplatná pozícia zvodu a pod.) je
@@ -297,6 +307,7 @@ test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva bloko
 test('regresia #145: nadpisy PREDNÝ POHĽAD / REZ A nekolidujú s hornou rastrovou lištou', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('nakreslit').click();
@@ -321,6 +332,7 @@ test('regresia #145: nadpisy PREDNÝ POHĽAD / REZ A nekolidujú s hornou rastro
 			`nadpis "${heading}" (top=${headingBox!.y}) koliduje s hornou rastrovou lištou (spodná hranica=${gridBox!.y + gridBox!.height})`
 		).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height);
 	}
+	expect(consoleMsgs).toEqual([]);
 });
 
 // #150 — farebný režim výkresu podľa RAL
@@ -361,6 +373,7 @@ test('#150/#153: technický režim (default) — konštrukcia svetlá s čiernym
 test('#153: konštrukčné prvky sú OBRYSOVÉ profily (svetlá výplň + čierny obrys), nie plné pásy — technický režim', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('nakreslit').click();
@@ -422,6 +435,7 @@ test('#153: konštrukčné prvky sú OBRYSOVÉ profily (svetlá výplň + čiern
 		strukturaSw / kotaSw,
 		`pomer konštrukcia/kóty (${strukturaSw}/${kotaSw}) musí byť viditeľne > 1 (hierarchia #146/#153)`
 	).toBeGreaterThan(1.5);
+	expect(consoleMsgs).toEqual([]);
 });
 
 // review nález (#153, deep-review pred mergom): pevná STRUKTURA_STROKE=1,2mm bola
@@ -437,6 +451,7 @@ test('#153: konštrukčné prvky sú OBRYSOVÉ profily (svetlá výplň + čiern
 test('#153 review nález: fill neostáva zhltnutý pri extrémnych (ale validných) rozmeroch — technický aj farebný režim', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
 	// 3 polia × 3000mm = 9000mm celková šírka (elevation swallow nad ~8250mm),
@@ -478,6 +493,7 @@ test('#153 review nález: fill neostáva zhltnutý pri extrémnych (ale validný
 	await waitHydrated(page);
 	await overObrys('pn-elevation-post-0');
 	await overObrys('pn-section-predok');
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('#150: farebný režim + známy RAL (7016 ANTRACIT) — konštrukcia sa vyfarbí, kóty/poznámky ostávajú', async ({
@@ -516,6 +532,7 @@ test('#150: farebný režim + známy RAL (7016 ANTRACIT) — konštrukcia sa vyf
 test('#150: svetlý RAL (9006 STRIEBORNÁ) — filled prvky majú svetlú výplň s tmavým obrysom, izometria je stmavená (nezmizne na bielom)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
 	await page.getByLabel('OP číslo').fill('OP260032');
@@ -550,11 +567,13 @@ test('#150: svetlý RAL (9006 STRIEBORNÁ) — filled prvky majú svetlú výpl�
 	const isoStroke = await attr(page, 'pn-iso-hrany', 'stroke');
 	expect(isoStroke).not.toBe('#A5A8A6');
 	expect(isoStroke).toMatch(/^#[0-9a-f]{6}$/i);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('#150: "iný…" RAL — voľný text, farebný režim použije neutrálnu tmavosivú a povie to', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
 	await page.getByLabel('OP číslo').fill('OP260032');
@@ -568,11 +587,13 @@ test('#150: "iný…" RAL — voľný text, farebný režim použije neutrálnu 
 
 	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#4b5563');
 	await expect(page.getByTestId('pn-ral')).toContainText('RAL: RAL 7021 matná');
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('#150 review nález: zrušenie výberu RAL ("— nevybraté —") vymaže aj červenú poznámku — neostáva starý odtieň', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
 	await page.getByLabel('OP číslo').fill('OP260032');
@@ -589,11 +610,13 @@ test('#150 review nález: zrušenie výberu RAL ("— nevybraté —") vymaže a
 
 	// vstup.ral je prázdny → celý <text data-testid="pn-ral"> sa nevykresľuje
 	await expect(page.getByTestId('pn-ral')).not.toBeAttached();
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('#150: prepnutie technický ↔ farebný na tej istej kresbe (Späť a upraviť) mení farby bez straty ostatného vstupu', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page); // "iný…" RAL "7016-ANTRACIT JŠ", technický (default)
 	await page.getByTestId('nakreslit').click();
@@ -611,11 +634,13 @@ test('#150: prepnutie technický ↔ farebný na tej istej kresbe (Späť a upra
 	await waitHydrated(page);
 	// "iný" RAL bez známeho hexu → neutrálny fallback
 	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#4b5563');
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('#150: tlač zachováva farbu (print-color-adjust: exact na výkresovom hárku)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/navrh');
 	await page.getByLabel('OP číslo').fill('OP260032');
@@ -647,4 +672,5 @@ test('#150: tlač zachováva farbu (print-color-adjust: exact na výkresovom há
 	expect(vektorovyStav.predokTag).toBe('rect');
 
 	await page.emulateMedia({ media: 'screen' });
+	expect(consoleMsgs).toEqual([]);
 });
