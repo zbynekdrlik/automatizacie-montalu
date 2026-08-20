@@ -23,6 +23,7 @@ DB_PATH="${BACKUP_DB_PATH:-/data/app/app.db}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/automatizacie-montalu/backups}"
 LOG_FILE="${BACKUP_LOG_FILE:-/var/log/automatizacie-montalu-backup.log}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
+LOCK_FILE="${BACKUP_LOCK_FILE:-/var/lock/automatizacie-montalu-backup.lock}"
 
 # --- logovanie: skript je sebestačný (loguje aj bez cron redirectu) ----------
 mkdir -p "$BACKUP_DIR"
@@ -32,6 +33,10 @@ exec > >(tee -a "$LOG_FILE") 2>&1      # stdout+stderr do terminálu AJ do logu
 log() { printf '%s [backup] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 fail() { log "CHYBA: $*"; exit 1; }
 
+# --- zámok proti súbežnému behu (manuálny beh vs cron, alebo beh > 24 h) ------
+exec 9>"$LOCK_FILE"
+flock -n 9 || { log "Iný beh zálohy už prebieha ($LOCK_FILE) — končím."; exit 1; }
+
 # --- pracovné cesty ----------------------------------------------------------
 TS="$(date '+%Y%m%d-%H%M%S')"
 NAME="app-${TS}.db"
@@ -40,13 +45,17 @@ HOST_TMP="$(mktemp "${TMPDIR:-/tmp}/${NAME}.XXXXXX")"
 FINAL="${BACKUP_DIR}/${NAME}.gz"
 
 cleanup() {
-	rm -f "$HOST_TMP"
+	rm -f "$HOST_TMP" "${FINAL}.part"
 	docker exec "$CONTAINER" rm -f "$IN_CONTAINER_PATH" 2>/dev/null || true
 }
 on_exit() {
 	local rc=$?
 	cleanup
-	[ "$rc" -eq 0 ] || log "Skript skončil s chybou (exit $rc)"
+	if [ "$rc" -ne 0 ]; then
+		log "Skript skončil s chybou (exit $rc)"
+		# alert nezávislý na cron výstupe (journald) — aby zlyhanie nočnej zálohy nezapadlo
+		logger -p user.err -t automatizacie-backup "záloha ZLYHALA (exit $rc) — pozri $LOG_FILE" 2>/dev/null || true
+	fi
 }
 trap 'log "ZLYHANIE: príkaz zlyhal (exit $?, riadok $LINENO)"' ERR
 trap on_exit EXIT
@@ -72,9 +81,11 @@ INTEGRITY="$(docker exec "$CONTAINER" node -e '
 [ "$INTEGRITY" = "ok" ] || fail "integrity_check zálohy zlyhal: $INTEGRITY"
 log "integrity_check: ok"
 
-# 3) skopíruj MIMO volume a zabaľ (gzip)
+# 3) skopíruj MIMO volume a zabaľ (gzip) — píš do .part, over gzip -t, až potom atomický mv
 docker cp "${CONTAINER}:${IN_CONTAINER_PATH}" "$HOST_TMP"
-gzip -c "$HOST_TMP" > "$FINAL"
+gzip -c "$HOST_TMP" > "${FINAL}.part"
+gzip -t "${FINAL}.part" || fail "gzip verifikácia (gzip -t) zlyhala: ${FINAL}.part"
+mv "${FINAL}.part" "$FINAL"            # zverejni finálny .gz až po overení (žiadny useknutý artefakt)
 docker exec "$CONTAINER" rm -f "$IN_CONTAINER_PATH"
 SIZE="$(du -h "$FINAL" | cut -f1)"
 log "Záloha vytvorená: $FINAL ($SIZE)"

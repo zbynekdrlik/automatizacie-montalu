@@ -68,13 +68,18 @@ kontajneri) BEZ prerušenia appky.
 
 - Skript: `deploy/backup.sh` (v repo). Na VPS nainštalovaný ako
   `/opt/automatizacie-montalu/backup.sh` (`chmod 700`, root).
-- Tok: `docker exec automatizacie-montalu node -e "…better-sqlite3(app.db,{readonly}).backup(/tmp/app-TS.db)"`
-  → `PRAGMA integrity_check` (cez node, žiadny host `sqlite3`) → `docker cp` von →
-  `gzip` do `/opt/automatizacie-montalu/backups/app-TS.db.gz` (MIMO volume) →
-  rotácia `find -mtime +14 -delete`. Fail loudly (`set -euo pipefail` + trap, exit ≠ 0).
+- Tok: `flock` (zámok proti súbežnému behu) → `docker exec automatizacie-montalu node -e
+  "…better-sqlite3(app.db,{readonly}).backup(/tmp/app-TS.db)"` → `PRAGMA integrity_check`
+  (cez node, žiadny host `sqlite3`) → `docker cp` von → `gzip` do `…/app-TS.db.gz.part` →
+  `gzip -t` (overenie) → atomický `mv` na finálny `.gz` v `/opt/automatizacie-montalu/backups/`
+  (MIMO volume) → rotácia `find -mtime +14 -delete`. Fail loudly (`set -euo pipefail` + trap,
+  exit ≠ 0); `.part` + atomický `mv` = na disku nikdy nezostane useknutý „platne vyzerajúci" `.gz`.
 - Cron (root): `30 3 * * * /opt/automatizacie-montalu/backup.sh >/dev/null 2>&1`
   (n8n záloha beží o 03:00, táto 03:30). Log: `/var/log/automatizacie-montalu-backup.log`
-  (skript loguje sám cez `tee`).
+  (skript loguje sám cez `tee`). **Sledovanie zlyhaní:** skript pri chybe zapíše
+  `logger -p user.err -t automatizacie-backup` do journald (nezávislé na cron výstupe) →
+  `journalctl -t automatizacie-backup -p err` ukáže zlyhané behy; bohatší alert (MAILTO /
+  n8n webhook / healthcheck.io) je voliteľné rozšírenie (viď #253 „voliteľne n8n alert neskôr").
 - Ručný beh + dôkaz: `/opt/automatizacie-montalu/backup.sh` → v logu `integrity_check: ok`
   + `Záloha vytvorená`. Env prepíšeš cez `BACKUP_DIR=… BACKUP_RETENTION_DAYS=… …`.
 
@@ -101,7 +106,10 @@ $SSH 'docker cp /root/restore.db automatizacie-montalu:/tmp/restore.db'
 $SSH 'docker exec automatizacie-montalu node -e "const d=require(\"better-sqlite3\")(\"/tmp/restore.db\",{readonly:true}); console.log(d.pragma(\"integrity_check\",{simple:true})); console.log(\"odpis_log\", d.prepare(\"SELECT count(*) c FROM odpis_log\").get().c); d.close();"'
 # 3) STOP app (deštruktívne — pýtaj si súhlas), nahraď súbor vo volume, zmaž WAL/SHM zvyšky
 $SSH 'cd /opt/automatizacie-montalu && docker compose stop app'
-$SSH 'VOL=$(docker volume inspect appdata -f "{{.Mountpoint}}"); cp /root/restore.db "$VOL/app.db"; rm -f "$VOL/app.db-wal" "$VOL/app.db-shm"'
+# named volume je project-prefixovaný (automatizacie-montalu_appdata) — odvoď zdroj z mountov
+# kontajnera (funguje aj na zastavenom kontajneri, robustné voči prefixu); `cat >` zachová
+# vlastníka existujúceho súboru (na rozdiel od `cp`, keby raz pribudol USER v Dockerfile):
+$SSH 'VOL=$(docker inspect -f "{{range .Mounts}}{{if eq .Destination \"/data/app\"}}{{.Source}}{{end}}{{end}}" automatizacie-montalu); cat /root/restore.db > "$VOL/app.db"; rm -f "$VOL/app.db-wal" "$VOL/app.db-shm"'
 # 4) START app a over /health
 $SSH 'cd /opt/automatizacie-montalu && docker compose up -d app'
 ```

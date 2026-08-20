@@ -45,6 +45,20 @@ describe('deploy/backup.sh — bezpečnostné invarianty', () => {
 		expect(src).toMatch(/\bgzip\b/);
 	});
 
+	it('atomický artefakt: píše do .part, overí gzip -t a až potom mv (žiadny useknutý .gz)', () => {
+		expect(src).toMatch(/\.part/);
+		expect(src).toMatch(/gzip -t/);
+		expect(src).toMatch(/mv "\$\{FINAL\}\.part" "\$FINAL"/);
+	});
+
+	it('zámok proti súbežnému behu: flock', () => {
+		expect(src).toMatch(/flock -n 9/);
+	});
+
+	it('alert pri zlyhaní nezávislý na cron výstupe: logger -p user.err do journald', () => {
+		expect(src).toMatch(/logger -p user\.err/);
+	});
+
 	it('rotácia: find -mtime s RETENTION_DAYS a -delete', () => {
 		expect(src).toMatch(/RETENTION_DAYS/);
 		expect(src).toMatch(/find .*-mtime .*-delete/);
