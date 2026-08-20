@@ -2,6 +2,7 @@
 // s Money rozpisom + počtami tyčí + výberom kombinácií pri rezoch > 7500,
 // (3) „odoslat" prepočíta ZNOVA zo surového vstupu + volieb a zapíše odpis.
 import type { Actions, PageServerLoad } from './$types';
+import { logger } from '$lib/server/log';
 import {
 	transform,
 	applyCombos,
@@ -212,7 +213,7 @@ export const actions: Actions = {
 			}
 			return { step: 'hotovo' as const, vstup, v, outcome };
 		} catch (e) {
-			console.error('pergola writeOdpis zlyhal:', e);
+			logger('pergola').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return {
 				step: 'nahlad' as const,
 				vstup,

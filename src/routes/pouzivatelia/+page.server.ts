@@ -39,7 +39,7 @@ export const actions: Actions = {
 		if (isB2B(locals.user) || !locals.user) return fail(403, { error: 'Nedostupné.' });
 		const fd = await request.formData();
 		const id = Number(fd.get('id'));
-		const { error } = deleteB2BUser(id);
+		const { error } = deleteB2BUser(id, locals.user.username);
 		if (error) return fail(400, { error });
 		return { ok: 'Účet zmazaný.' };
 	},
