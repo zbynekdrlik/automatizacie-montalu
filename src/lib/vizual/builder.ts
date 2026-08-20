@@ -33,8 +33,8 @@ function lokalnaGeometria(tvar: Tvar, THREE: ThreeNS): BufferGeometry {
 		return new THREE.BoxGeometry(mm(tvar.w), mm(tvar.h), mm(tvar.d));
 	}
 	const shape = new THREE.Shape();
-	const [prvy, ...ostatne] = tvar.obrys;
-	shape.moveTo(mm(prvy[0]), mm(prvy[1]));
+	const [prvy, ...ostatne] = tvar.obrys; // extrude tvar má vždy neprázdny obrys
+	shape.moveTo(mm(prvy![0]), mm(prvy![1]));
 	for (const [x, y] of ostatne) shape.lineTo(mm(x), mm(y));
 	shape.closePath();
 	const hlbka = mm(tvar.dlzka);

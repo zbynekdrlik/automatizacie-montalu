@@ -45,7 +45,7 @@ function familyStyles(
  * data.styly, server z cfg).
  */
 export function checkB2BWidth(styles: StyleN[], sysStyl: string, S: number): string | null {
-	const [system, styl] = sysStyl.split('|');
+	const [system = '', styl = ''] = sysStyl.split('|');
 	const lim = B2B_LIMITS[system];
 	if (!lim) return null; // neznámy systém → nelimituj (fail-open, biznis limity sú len pre pár systémov)
 	const g = styles.find((s) => s.sysStyl === sysStyl);
@@ -73,7 +73,7 @@ export function checkB2BWidth(styles: StyleN[], sysStyl: string, S: number): str
 
 /** Výška NEblokuje — len warning „bez záruky" nad maxHeight. Vráti text alebo null. */
 export function checkB2BHeight(sysStyl: string, V: number): string | null {
-	const system = sysStyl.split('|')[0];
+	const system = sysStyl.split('|')[0] ?? '';
 	const lim = B2B_LIMITS[system];
 	if (!lim) return null;
 	if (V > lim.maxHeight)

@@ -195,8 +195,7 @@ export function pocitajFix(S: number, V1: number, V2: number, polia: number[]): 
 	const vyskyStlpikov: number[] = [];
 	const out: FixPole[] = [];
 	let x = 0;
-	for (let i = 0; i < polia.length; i++) {
-		const w = polia[i];
+	for (const [i, w] of polia.entries()) {
 		const vL = vyskaV(x);
 		const vP = vyskaV(x + w);
 		x += w;

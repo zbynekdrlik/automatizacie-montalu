@@ -61,7 +61,7 @@ export function placeLabel<T extends Box>(candidates: T[], existing: Box[], gapX
 	for (const c of candidates) {
 		if (!existing.some((e) => boxesCollide(c, e, gapX, gapY))) return c;
 	}
-	return candidates[candidates.length - 1];
+	return candidates[candidates.length - 1]!; // candidates.length >= 1 (guard hore)
 }
 
 // ---------------------------------------------------------------------------
