@@ -64,3 +64,52 @@ is `^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$`, which a bare-SHA fallback
   `--max-warnings` gate is toothless). A genuine edge case (e.g. an untyped exceljs
   cell) should get a targeted, justified `// eslint-disable-next-line` — never a
   blanket rule downgrade.
+
+## Type-aware eslint (`recommendedTypeChecked`) — scope it to `src/**/*.ts` ONLY (#257)
+
+Enabling type-aware rules (`ts.configs.recommendedTypeChecked` + `parserOptions.projectService`)
+must be SCOPED, not global, via a flat-config `extends` block:
+
+```js
+{ files: ['src/**/*.ts'], ignores: ['**/*.svelte.ts'],
+  extends: [ts.configs.recommendedTypeChecked],
+  languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } } }
+```
+
+Why NOT global:
+- `e2e/**/*.ts` is NOT in any tsconfig `include` (the generated `.svelte-kit/tsconfig.json`
+  lists `src/**`, `tests/**`, `vite.config.ts` — not `e2e/`), so `projectService` throws a
+  `Parsing error: … was not found by the project service` on all ~40 e2e specs. `allowDefaultProject`
+  can't cover that many files.
+- `.svelte` / `.svelte.ts` — the svelte parser and the TS program don't coexist; keep svelte on
+  the non-typed `svelte.configs.recommended` (`.ts` glob doesn't match `.svelte`; exclude `.svelte.ts`).
+- tests are synchronous (better-sqlite3) → no promise-safety value, and type-aware there adds only
+  fixture-`any` noise.
+
+Two rules deliberately calibrated (documented in `eslint.config.js`, NOT blanket disables):
+- `no-base-to-string` OFF — every finding is the intentional `String(x ?? '')` coercion of
+  `FormData.get()` (`string|File`) or JSON `unknown` at the Money input boundary; forms have no
+  file inputs, so it's always string→string. Narrowing would rewrite ~100 Money-input sites.
+- `require-await` OFF only for `src/routes/**` — SvelteKit `load`/`+server` handlers read from
+  synchronous better-sqlite3, so `async`-without-`await` is idiomatic; the rule stays ON for `src/lib/**`.
+
+`no-floating-promises` / `no-misused-promises` (the actual reason to go type-aware) found 0 — the
+async Money path already awaits correctly; the rules now guard the future.
+
+## Widening vitest coverage scope (#257)
+
+- Spread `coverageConfigDefaults.exclude` (`import { coverageConfigDefaults } from 'vitest/config'`)
+  into `coverage.exclude` — a bare explicit `exclude` REPLACES vitest's defaults (would then count
+  `*.d.ts` etc.).
+- The `text` reporter TRUNCATES rows (it silently drops files from the printed table) — do NOT trust
+  it to enumerate what's measured. Read `coverage/coverage-summary.json` (`--coverage.reporter=json-summary`)
+  for the true file list + `total`.
+- v8 measures every file matching `include` that any test imports; `all` didn't change the set here.
+- Excludes must be genuinely unmeasurable/empty only: `vizual/snimka.ts` (WebGL `gl.readPixels` + canvas
+  2D, headless-unmeasurable — its one pure fn keeps a unit test), `vizual/spec.ts` (types), `index.ts`
+  (empty `$lib` barrel). Keep partially-measurable files (e.g. `vizual/scena.ts` 74%) IN — don't exclude
+  to inflate the number.
+- Thresholds = measured − 2 %, integers, and NEVER below the previous effective gate. Switch
+  `defineConfig` import from `'vite'` to `'vitest/config'` (natively types the `test` block) so you can
+  drop the `/// <reference types="vitest/config" />` triple-slash — otherwise adding a `vitest/config`
+  import trips `@typescript-eslint/triple-slash-reference` (prefer-import).
