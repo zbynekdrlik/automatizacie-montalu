@@ -26,6 +26,14 @@ describe('isCloudflareIp — CIDR match voči oficiálnym CF rozsahom', () => {
 	it('cudzia IPv6 (Google DNS) → false', () => {
 		expect(isCloudflareIp('2001:4860:4860::8888')).toBe(false);
 	});
+	it('CF IPv6 z ďalších rozsahov (2400:cb00::/32, 2c0f:f248::/32) → true', () => {
+		expect(isCloudflareIp('2400:cb00::1')).toBe(true);
+		expect(isCloudflareIp('2c0f:f248::abcd')).toBe(true);
+	});
+	it('IPv6 s vedúcim `::` (loopback ::1) → false (mimo CF, pokrýva head-empty vetvu)', () => {
+		expect(isCloudflareIp('::1')).toBe(false);
+		expect(isCloudflareIp('::')).toBe(false);
+	});
 	it('nevalidný / prázdny / undefined vstup → false (bezpečný fallback)', () => {
 		expect(isCloudflareIp('nonsense')).toBe(false);
 		expect(isCloudflareIp('')).toBe(false);
