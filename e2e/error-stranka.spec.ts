@@ -1,0 +1,31 @@
+// #245: neočakávaná serverová chyba (500) vykreslí +error.svelte s bezpečnou
+// SK správou a dohľadateľným errorId. Vyvolané cez test-only route /__test-error
+// (zapnutá len v CI preview cez ENABLE_TEST_ERROR_ROUTE; na nasadenej appke 404).
+// Spec je preto len pre CI preview — proti nasadeniu (BASE_URL) ho vynecháva
+// testIgnore v playwright.config.ts (nie runtime skip v spec súbore). Konzola: hlavný
+// dokument s 500 vždy zaloguje jeden resource error (to JE testované správanie) —
+// asertujeme PRESNE ten jeden riadok a nič iné (žiadne ďalšie console chyby).
+import { test, expect } from '@playwright/test';
+import { collectConsole, loginAs } from './helpers';
+
+test('chybová stránka: 500 ukáže +error.svelte s errorId, zero-console', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	const res = await page.goto('/__test-error');
+	expect(res?.status()).toBe(500);
+
+	// server-rendered obsah chybovej stránky
+	await expect(page.getByTestId('error-message')).toBeVisible();
+	const eid = page.getByTestId('error-id');
+	await expect(eid).toBeVisible();
+	await expect(eid).toHaveText(/^[0-9a-f]{12}$/);
+
+	// späť na začiatok funguje (layout + nav sa vykreslili aj na chybovej stránke)
+	await expect(page.getByRole('link', { name: /Späť na začiatok/ })).toBeVisible();
+
+	// hlavný dokument s 500 vždy zaloguje resource error (inherentný artefakt testovaného
+	// správania) — asertujeme PRESNE tento jeden riadok a nič iné; akákoľvek ĎALŠIA console
+	// chyba by pole predĺžila a toEqual by padol (guard zero-console ostáva v platnosti)
+	expect(consoleMsgs).toEqual([expect.stringMatching(/^\[error\] Failed to load resource:.*500/)]);
+});

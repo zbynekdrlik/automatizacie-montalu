@@ -1409,3 +1409,20 @@ implementované, nereprodukovateľné čestný null:
   zelené, 1522 vitest testov zelených.
 - **Money-neutral**: beží len proti vitest, `tests/compute.test.ts` vektory nemenené.
 - Detaily + gotchas: `.claude/rules/ci.md` „Mutation gate" sekcia.
+
+## 2026-08-20 — #247 + #248 + #249 + #250 (PR #259, merge 26ec81e, v0.24.8, audit kolo 2)
+
+- **#247 E2E zero-console:** 37 specov s assertom konzoly 0/0 + štrukturálny guard
+  `tests/e2e-console-guard.test.ts` (118/118), `waitForTimeout` → rAF čakanie.
+- **#248 Mutation gate:** `mutation.yml` oddelený od `ci.yml` (vlastná concurrency),
+  diff-scoped ≤20 min; **prvý ostrý beh na dev (run 32355302241) zelený**.
+- **#249 compute.ts split:** 1430 r. → 4 moduly + fasáda (acyklický DAG), 109 Money vektorov
+  v `tests/compute.test.ts` nezmenených a zelených.
+- **#250 zasklenia split:** 1620 → 770 r., 5 krokových subkomponentov; cieľ <400 r. na tikete
+  zdokumentovaný ako nedosiahnuteľný bez zmeny správania (odchýlka schválená v PR).
+- **Fleet technika (cross-lane):** závislý worker si v SVOJOM worktree zmergoval vetvu
+  susednej lane (`worktree-agent-<id>`) namiesto čakania na dev — integrácia ostala sériová.
+- Gaty: svelte-check 0/0, lint čistý, 114 súborov/1693 testov, coverage 96,31 % / 89,72 %;
+  dev CI 32355302107 + Mutation 32355302241 zelené; main run 32356505451 deploy zelený.
+- Post-deploy (čistý prehliadač): health `0.24.8 (26ec81e)` live:true, DOM `v0.24.8 (26ec81e)`,
+  konzola 0/0, read-only, Money nedotknuté.

@@ -8,8 +8,28 @@ paths:
 
 Pravidlo `browser-console-zero-errors` je v e2e presadené MECHANICKY guardom
 `tests/e2e-console-guard.test.ts` (Vitest, číta `e2e/*.spec.ts` cez `node:fs`).
+Guard stráži PER TEST BLOK DVE veci: (1) počet — práve JEDEN `collectConsole(page)`
+na blok, A (2) záverečný console assert — jeho sankcionovaný tvar (nižšie).
 KAŽDÝ test blok musí mať `const consoleMsgs = collectConsole(page)` prvý riadok tela
-a `expect(consoleMsgs).toEqual([])` posledný assert (helper v `e2e/helpers.ts`).
+a sankcionovaný záverečný console assert (helper v `e2e/helpers.ts`).
+
+## Dva sankcionované tvary záverečného console assertu
+
+Guard (`finalConsoleAssertOk`) prijme PRE KAŽDÝ blok práve tieto dva tvary — nič
+voľnejšie:
+
+- **(a) default zero-console:** `expect(consoleMsgs).toEqual([])` — žiadna console
+  chyba/warning.
+- **(b) exact stringMatching-allowlist** (od #245, `error-stranka.spec.ts`):
+  `expect(consoleMsgs).toEqual([expect.stringMatching(/…/)[, expect.stringMatching(/…/)]])`
+  — pre INHERENTNÝ console riadok testovaného správania (500 chybová stránka VŽDY
+  zaloguje `[error] Failed to load resource: … 500` pre hlavný dokument, takže
+  `toEqual([])` tam nemôže nikdy prejsť). `toEqual` je ÚPLNÁ rovnosť poľa → assert
+  vynucuje PRESNE tie vymenované riadky a NIČ iné; každá ďalšia console chyba pole
+  predĺži a padne. **Povolený je LEN `expect.stringMatching(...)` člen** — žiadny
+  `toContain`, voľný string, spread ani iný matcher (guard po odstránení všetkých
+  stringMatching členov kontroluje, že v poli neostalo nič iné). Tvar (b) použi len keď
+  je console riadok NEVYHNUTNÝ artefakt testovaného správania, nie na obídenie iných chýb.
 
 ## Počítaj `collectConsole(`, NIKDY `toEqual([])`
 
@@ -18,7 +38,9 @@ per súbor. NEPOČÍTAJ `toEqual([])` — niektoré testy majú BIZNISOVÉ `toEq
 (napr. `profil-obrazky` 2, `standard-narezak` 5, `standard-stary` 5 pri 1/3/4 testoch),
 takže `count(test)==count(toEqual([]))` by falošne padal na už-správnych súboroch.
 Ticketov `grep -c 'test('` tiež nadhodnocuje (matchne neblokové výskyty) — dôveruj
-`^\s*test\(` a `collectConsole(`.
+`^\s*test\(` a `collectConsole(`. Per-block záverečný console assert (bod 2 vyššie) je
+NEZÁVISLÁ kontrola — viaže sa na KONKRÉTNU console premennú `<v>`
+(`expect(<v>).toEqual(…)`), takže biznisové `toEqual([])` na inej premennej ho nemýli.
 
 ## Sankcionované `test.skip` = LEN `process.env.BASE_URL` guard (+ `skipAkLive`)
 

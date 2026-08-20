@@ -6,9 +6,23 @@
 // postupnosť, len presunuté (viď design komentár na #183).
 import type Database from 'better-sqlite3';
 import seed from './cfg_seed.json';
+import { logger } from './log';
+
+const log = logger('migrate');
 
 export function migrate(db: Database.Database, hashPassword: (password: string) => string): void {
 	const version = db.pragma('user_version', { simple: true }) as number;
+	// #245: INFO pri štarte + riadok per aplikovaný blok (cez helper `bump`). Na
+	// prod DB (už na aktuálnej verzii) sa žiadny blok neaplikuje — len štart riadok.
+	log.info('migrácie: kontrola schémy', { user_version: version });
+	// `→ N` (nie `N-1 → N`): dve skokové migrácie (v0→2, v3→5) by mali zavádzajúci
+	// ľavý bok; cieľová verzia je vždy správna (review #245)
+	const logMig = (v: number) =>
+		log.info('migrácia aplikovaná', { user_version: v, blok: `→ ${v}` });
+	const bump = (v: number) => {
+		db.pragma('user_version = ' + v);
+		logMig(v);
+	};
 
 	if (version < 1) {
 		db.exec(`
@@ -83,7 +97,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 				popis TEXT NOT NULL
 			);
 		`);
-		db.pragma('user_version = 2');
+		bump(2);
 	}
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 2) {
@@ -120,6 +134,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			PRAGMA user_version = 2;
 			COMMIT;
 		`);
+		logMig(2);
 	}
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 3) {
@@ -134,6 +149,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			COMMIT;
 		`);
 		seedGlass(db);
+		logMig(3);
 	}
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 5) {
@@ -169,7 +185,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 						r.sklozavisle
 					);
 			}
-			db.pragma('user_version = 5');
+			bump(5);
 		})();
 	}
 
@@ -230,7 +246,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			);
 			for (const r of seed.rez)
 				updBar.run((r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500, r.sysStyl, r.poradie);
-			db.pragma('user_version = 6');
+			bump(6);
 		})();
 	}
 
@@ -285,7 +301,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			// Deluxe Float kalené: hrúbka skla vyberá profil (6 → kladka/klzný 6mm, 10 → 10mm)
 			db.prepare("UPDATE glass_types SET hrubka = 6 WHERE nazov = 'Float kalené 6 mm'").run();
 			db.prepare("UPDATE glass_types SET hrubka = 10 WHERE nazov = 'Float kalené 10 mm'").run();
-			db.pragma('user_version = 7');
+			bump(7);
 		})();
 	}
 
@@ -293,12 +309,17 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		// v7 → v8: B2B veľkoobchodná rola. Aditívne — appka je v ostrom používaní,
 		// existujúci users → 'internal' (default), interný tok sa nemení. Feature je
 		// neaktívny, kým nevznikne prvý 'b2b' účet. Idempotentné cez PRAGMA + column check.
-		const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
-			(c) => c.name
-		);
-		if (!userCols.includes('role'))
-			db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'internal'");
-		db.pragma('user_version = 8');
+		// #246: DDL + bump v jednej transakcii (predtým MIMO) — pád medzi ALTER a bumpom
+		// by nechal stĺpec pridaný a verziu nezdvihnutú → crash-loop pri štarte (blok sa
+		// prehrá, ALTER narazí). Transakcia → rollback → blok sa čisto prehrá.
+		db.transaction(() => {
+			const userCols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
+				(c) => c.name
+			);
+			if (!userCols.includes('role'))
+				db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'internal'");
+			bump(8);
+		})();
 	}
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 9) {
@@ -341,7 +362,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			}
 			for (const g of STANDARD_GLASS)
 				if (!hasGlass.get(g.nazov)) insGlass.run(g.nazov, 0, g.poradie, 'Štandard +');
-			db.pragma('user_version = 9');
+			bump(9);
 		})();
 	}
 
@@ -356,7 +377,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			for (const r of seed.rez)
 				if (r.sysStyl.startsWith('Štandard +') && r.nazov === 'Sklo šírka')
 					updOff.run(r.offset, r.sysStyl, r.poradie);
-			db.pragma('user_version = 10');
+			bump(10);
 		})();
 	}
 
@@ -371,7 +392,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			for (const r of seed.rez)
 				if (r.sysStyl.startsWith('Štandard +') && r.typ === 'profil')
 					updNaz.run(r.nazov, r.sysStyl, r.poradie);
-			db.pragma('user_version = 11');
+			bump(11);
 		})();
 	}
 
@@ -388,7 +409,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			for (const r of seed.rez)
 				if (/^Štandard \+\|\d+K IZO$/.test(r.sysStyl) && /spodná/i.test(r.nazov))
 					updRail.run(r.kod, r.nazov, r.sysStyl, r.poradie);
-			db.pragma('user_version = 12');
+			bump(12);
 		})();
 	}
 
@@ -409,7 +430,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			for (const r of seed.rez)
 				if (r.sysStyl === 'Slide|2x2K' || r.sysStyl === 'Slide|2x3K')
 					updOff.run(r.offset, r.sysStyl, r.poradie);
-			db.pragma('user_version = 13');
+			bump(13);
 		})();
 	}
 
@@ -428,7 +449,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			for (const r of seed.rez)
 				if ((r.sysStyl === 'Slide|2x2K' || r.sysStyl === 'Slide|2x3K') && r.poradie === 20)
 					updOff.run(r.offset, r.sysStyl, r.poradie);
-			db.pragma('user_version = 14');
+			bump(14);
 		})();
 	}
 
@@ -467,7 +488,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 				if (r.poradie === 20 || r.poradie === 21) updOff.run(r.offset, r.sysStyl, r.poradie);
 				if (r.poradie === 25) updKod.run(r.kod, r.nazov, r.sysStyl, r.poradie);
 			}
-			db.pragma('user_version = 15');
+			bump(15);
 		})();
 	}
 
@@ -501,7 +522,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 				if (r.sysStyl !== 'Slide|2x2K' && r.sysStyl !== 'Slide|2x3K') continue;
 				if (r.poradie === 40 || r.poradie === 41) updOff.run(r.offset, r.sysStyl, r.poradie);
 			}
-			db.pragma('user_version = 16');
+			bump(16);
 		})();
 	}
 
@@ -539,7 +560,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			db.prepare(
 				"UPDATE glass_types SET system = 'Robust' WHERE nazov IN ('Kalené 8mm', 'Kalené 10mm')"
 			).run();
-			db.pragma('user_version = 17');
+			bump(17);
 		})();
 	}
 
@@ -587,7 +608,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 						(r as { skloHrubka?: number }).skloHrubka ?? 0
 					);
 			}
-			db.pragma('user_version = 18');
+			bump(18);
 		})();
 	}
 
@@ -607,7 +628,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		// text v `detail`, takže staré zákazky ostávajú čitateľné.
 		db.transaction(() => {
 			db.prepare("DELETE FROM glass_types WHERE nazov IN ('Kalené 8mm', 'Kalené 10mm')").run();
-			db.pragma('user_version = 19');
+			bump(19);
 		})();
 	}
 
@@ -618,17 +639,21 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		// (appka nemala žiadnu cestu na zmenu roly z UI). Dedikovaná tabuľka namiesto
 		// `cfg_audit` (tá je schémou viazaná na `sys_styl` — editor vzorcov, nehodí sa
 		// na účtové udalosti). Aditívne — no-op na existujúcich dátach.
-		db.exec(`
-			CREATE TABLE user_audit (
-				id INTEGER PRIMARY KEY,
-				ts TEXT NOT NULL DEFAULT (datetime('now')),
-				actor TEXT NOT NULL,
-				action TEXT NOT NULL CHECK (action IN ('create','role_change')),
-				target_username TEXT NOT NULL,
-				detail TEXT NOT NULL DEFAULT ''
-			);
-		`);
-		db.pragma('user_version = 20');
+		// #246: DDL + bump v jednej transakcii (predtým MIMO) — pád medzi CREATE a bumpom
+		// = crash-loop (blok sa prehrá, CREATE narazí). Transakcia → rollback → čistý prehr.
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE user_audit (
+					id INTEGER PRIMARY KEY,
+					ts TEXT NOT NULL DEFAULT (datetime('now')),
+					actor TEXT NOT NULL,
+					action TEXT NOT NULL CHECK (action IN ('create','role_change')),
+					target_username TEXT NOT NULL,
+					detail TEXT NOT NULL DEFAULT ''
+				);
+			`);
+			bump(20);
+		})();
 	}
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 21) {
@@ -656,35 +681,39 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		// zmazanie/uvoľnenie odpisu (`releaseOdpis`) zmaže aj jeho položky. Písané v
 		// TEJ ISTEJ transakcii ako `odpis_log` insert (viď `writeOdpis` v money.ts) —
 		// dedup záznam bez položiek (alebo naopak) nesmie nikdy vzniknúť.
-		db.exec(`
-			CREATE TABLE material_prices (
-				kod TEXT PRIMARY KEY,
-				nakup_cennik REAL,
-				nakup_posledna_faktura REAL,
-				predaj_vo REAL,
-				mena TEXT NOT NULL DEFAULT 'EUR',
-				sklad REAL,
-				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-			);
-			CREATE TABLE material_prices_meta (
-				id INTEGER PRIMARY KEY CHECK (id = 1),
-				snapshot_generated_at TEXT,
-				snapshot_file_mtime_ms REAL,
-				imported_at TEXT,
-				row_count INTEGER NOT NULL DEFAULT 0,
-				rejected_count INTEGER NOT NULL DEFAULT 0
-			);
-			CREATE TABLE odpis_polozky (
-				id INTEGER PRIMARY KEY,
-				odpis_log_id INTEGER NOT NULL REFERENCES odpis_log(id) ON DELETE CASCADE,
-				kod TEXT NOT NULL,
-				nazov TEXT NOT NULL,
-				qty REAL NOT NULL,
-				mj TEXT NOT NULL DEFAULT 'm'
-			);
-			CREATE INDEX idx_odpis_polozky_log ON odpis_polozky(odpis_log_id);
-		`);
-		db.pragma('user_version = 21');
+		// #246: 3× CREATE + INDEX + bump v jednej transakcii (predtým MIMO) — pád uprostred
+		// = crash-loop (blok sa prehrá, prvý CREATE narazí). Transakcia → rollback → prehr.
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE material_prices (
+					kod TEXT PRIMARY KEY,
+					nakup_cennik REAL,
+					nakup_posledna_faktura REAL,
+					predaj_vo REAL,
+					mena TEXT NOT NULL DEFAULT 'EUR',
+					sklad REAL,
+					updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+				);
+				CREATE TABLE material_prices_meta (
+					id INTEGER PRIMARY KEY CHECK (id = 1),
+					snapshot_generated_at TEXT,
+					snapshot_file_mtime_ms REAL,
+					imported_at TEXT,
+					row_count INTEGER NOT NULL DEFAULT 0,
+					rejected_count INTEGER NOT NULL DEFAULT 0
+				);
+				CREATE TABLE odpis_polozky (
+					id INTEGER PRIMARY KEY,
+					odpis_log_id INTEGER NOT NULL REFERENCES odpis_log(id) ON DELETE CASCADE,
+					kod TEXT NOT NULL,
+					nazov TEXT NOT NULL,
+					qty REAL NOT NULL,
+					mj TEXT NOT NULL DEFAULT 'm'
+				);
+				CREATE INDEX idx_odpis_polozky_log ON odpis_polozky(odpis_log_id);
+			`);
+			bump(21);
+		})();
 	}
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 22) {
@@ -728,7 +757,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 				db.prepare(
 					'INSERT INTO glass_types (nazov, redukcia_zero, poradie, system, hrubka) VALUES (?, ?, ?, ?, ?)'
 				).run('3.3.1', 0, 25, 'Štandard +', 0);
-			db.pragma('user_version = 22');
+			bump(22);
 		})();
 	}
 
@@ -755,7 +784,35 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			upd.run('TS00017', 'Izolačné sklo 4/16/4 mliečne', 'Robust');
 			upd.run('TS00021', 'Izolačné sklo 4/8/4 číre', 'Slide');
 			upd.run('TS00022', 'Izolačné sklo 4/8/4 mliečne', 'Slide');
-			db.pragma('user_version = 23');
+			bump(23);
+		})();
+	}
+
+	if ((db.pragma('user_version', { simple: true }) as number) < 24) {
+		// v23 → v24: audit akcie „delete" + „seed" (#246, LOG-9). deleteB2BUser dovtedy
+		// NEzapisovalo `user_audit` riadok (addUser/changeUserRole áno) — mazanie účtu
+		// nebolo dohľadateľné. CHECK v20 poznal len ('create','role_change'); SQLite
+		// nevie ALTER-núť CHECK constraint → RECREATE tabuľky s rozšíreným CHECK a
+		// `INSERT…SELECT` zachová celú existujúcu históriu (na `user_audit` nie je žiadny
+		// FK → recreate je bezpečný). Celé v `db.transaction` (vzor v18/v19/v22): pád
+		// uprostred → rollback → blok sa čisto prehrá, nikdy crash-loop. 'seed' hodnota
+		// je pre seedUsers (seed-audit každého seed-nutého účtu, viď nižšie).
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE user_audit_new (
+					id INTEGER PRIMARY KEY,
+					ts TEXT NOT NULL DEFAULT (datetime('now')),
+					actor TEXT NOT NULL,
+					action TEXT NOT NULL CHECK (action IN ('create','role_change','delete','seed')),
+					target_username TEXT NOT NULL,
+					detail TEXT NOT NULL DEFAULT ''
+				);
+				INSERT INTO user_audit_new (id, ts, actor, action, target_username, detail)
+					SELECT id, ts, actor, action, target_username, detail FROM user_audit;
+				DROP TABLE user_audit;
+				ALTER TABLE user_audit_new RENAME TO user_audit;
+			`);
+			bump(24);
 		})();
 	}
 
@@ -852,10 +909,25 @@ function seedUsers(db: Database.Database, hashPassword: (password: string) => st
 	if (userCount === 0) {
 		const spec = process.env.SEED_USERS || '';
 		const ins = db.prepare('INSERT INTO users (username, pass_hash) VALUES (?, ?)');
-		for (const pair of spec.split(',').filter(Boolean)) {
-			const idx = pair.indexOf(':');
-			if (idx < 1) continue;
-			ins.run(pair.slice(0, idx).trim(), hashPassword(pair.slice(idx + 1)));
-		}
+		// seed-audit (#246): účty založené SEED-om (nie človekom) dostanú audit riadok
+		// action='seed' — inak by boli v audite nerozoznateľné od ničoho. actor='' =
+		// bez session kontextu (rovnaká konvencia ako addUser). INSERT users + audit
+		// v jednej transakcii, nech seed účet nikdy nevznikne bez svojho audit riadku.
+		const audit = db.prepare(
+			"INSERT INTO user_audit (actor, action, target_username, detail) VALUES ('', 'seed', ?, '')"
+		);
+		const seeded: string[] = [];
+		db.transaction(() => {
+			for (const pair of spec.split(',').filter(Boolean)) {
+				const idx = pair.indexOf(':');
+				if (idx < 1) continue;
+				const uname = pair.slice(0, idx).trim();
+				// heslo (pair.slice(idx+1)) sa NIKDY neloguje — len meno účtu
+				ins.run(uname, hashPassword(pair.slice(idx + 1)));
+				audit.run(uname);
+				seeded.push(uname);
+			}
+		})();
+		if (seeded.length > 0) log.info('seedUsers', { usernames: seeded });
 	}
 }

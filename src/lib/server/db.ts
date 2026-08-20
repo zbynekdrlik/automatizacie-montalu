@@ -13,12 +13,20 @@ import type { SysRow, RezRow, Cfg } from './compute';
 import { buildCFG } from './compute';
 import { migrate } from './migracie';
 
-const DB_PATH = process.env.DATABASE_PATH || './data/app.db';
+// exportované pre štartovací config log v hooks.server.ts (#245); jediný zdroj cesty k DB
+export const DB_PATH = process.env.DATABASE_PATH || './data/app.db';
 
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+// #246: explicitný durability-PIN. Na tomto better-sqlite3 builde je `synchronous` už
+// = FULL (2) aj pod WAL (default nie je znížený na NORMAL) — commitnutý dedup záznam v
+// odpis_log je teda fsync-ovaný pri každom commite. PRAGMA to PRIPÍNA explicitne, nech
+// durability kontrakt nezávisí od compile-flagu budúcej verzie better-sqlite3 (kde by
+// WAL default mohol klesnúť na NORMAL a commitnutý záznam by sa dal stratiť pred
+// checkpointom). Guard test drží hodnotu na 2.
+db.pragma('synchronous = FULL');
 
 export function hashPassword(password: string): string {
 	const salt = randomBytes(16).toString('hex');
@@ -222,12 +230,24 @@ export function changeUserRole(
 	return { error: null, changed: true };
 }
 
-/** Zmaže LEN b2b účet (interné účty nie — ochrana proti lockoutu). Sessions padnú cez CASCADE. */
-export function deleteB2BUser(id: number): { error: string | null } {
-	const row = db.prepare('SELECT role FROM users WHERE id = ?').get(id) as
-		{ role: string } | undefined;
+/**
+ * Zmaže LEN b2b účet (interné účty nie — ochrana proti lockoutu). Sessions padnú cez
+ * CASCADE. `actor` = prihlasovacie meno toho, KTO mazanie vykonal — zapíše sa do
+ * `user_audit` (action='delete', #246 / LOG-9): dohľadateľnosť „kto koho zmazal",
+ * rovnako ako addUser/changeUserRole. `target_username` sa načíta PRED delete; DELETE
+ * a audit riadok sú v JEDNEJ transakcii (atomické — účet sa nikdy nezmaže bez auditu).
+ * Prázdny actor je platný (bez session kontextu) — stĺpec je NOT NULL, nie POVINNÝ neprázdny.
+ */
+export function deleteB2BUser(id: number, actor = ''): { error: string | null } {
+	const row = db.prepare('SELECT username, role FROM users WHERE id = ?').get(id) as
+		{ username: string; role: string } | undefined;
 	if (!row) return { error: 'Účet neexistuje.' };
 	if (row.role !== 'b2b') return { error: 'Zmazať sa dajú len B2B účty.' };
-	db.prepare('DELETE FROM users WHERE id = ?').run(id);
+	db.transaction(() => {
+		db.prepare('DELETE FROM users WHERE id = ?').run(id);
+		db.prepare(
+			'INSERT INTO user_audit (actor, action, target_username, detail) VALUES (?, ?, ?, ?)'
+		).run(actor, 'delete', row.username, `role=${row.role}`);
+	})();
 	return { error: null };
 }

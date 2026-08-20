@@ -46,6 +46,28 @@ function testBlocks(src: string): Block[] {
 	return blocks;
 }
 
+// #245/#247: záverečný console assert bloku je platný v DVOCH tvaroch:
+//   (a) expect(<var>).toEqual([])  — zero-console default, ALEBO
+//   (b) exact-allowlist expect(<var>).toEqual([ expect.stringMatching(...)[, …] ])
+// Tvar (b) je pre INHERENTNÝ console riadok testovaného správania (napr. 500 chybová
+// stránka VŽDY zaloguje resource error hlavného dokumentu — error-stranka #245): riadok
+// sa asertuje PRESNE, guard ďalej VYNUCUJE úplný výpočet obsahu konzoly. NEoslabuje
+// zero-console — `toEqual` je ÚPLNÁ rovnosť poľa, takže KAŽDÁ ďalšia console chyba pole
+// predĺži a assert padne. Povolený je LEN `expect.stringMatching(...)` člen: po odstránení
+// všetkých takých členov v poli nesmie ostať NIČ iné (žiadny `toContain`, voľný string,
+// spread ani iný matcher). Extrakcia je regex-based a STRIKTNÁ — stringMatching, ktorého
+// regex obsahuje literálne '(' / ')', by (bezpečne, na prísnej strane) NEPREŠIEL; dnešné
+// sankcionované použitie také nemá.
+function finalConsoleAssertOk(blockText: string, v: string): boolean {
+	if (blockText.includes(`expect(${v}).toEqual([])`)) return true;
+	const m = new RegExp(`expect\\(${v}\\)\\.toEqual\\(\\[([\\s\\S]*?)\\]\\)`).exec(blockText);
+	if (!m) return false;
+	const body = m[1];
+	if (body.trim() === '') return true;
+	const stripped = body.replace(/expect\.stringMatching\([\s\S]*?\)/g, '');
+	return /expect\.stringMatching\(/.test(body) && /^[\s,]*$/.test(stripped);
+}
+
 describe('e2e zero-console guard (#247)', () => {
 	it('nájde spec súbory (sanity)', () => {
 		expect(specFiles.length).toBeGreaterThan(0);
@@ -55,7 +77,7 @@ describe('e2e zero-console guard (#247)', () => {
 		const src = read(file);
 		const blocks = testBlocks(src);
 
-		it('každý test blok má práve 1 collectConsole(page) + jeho expect(<var>).toEqual([])', () => {
+		it('každý test blok má práve 1 collectConsole(page) + jeho sankcionovaný záverečný console assert', () => {
 			for (const b of blocks) {
 				const vars = [...b.text.matchAll(/const (\w+) = collectConsole\(/g)].map((mm) => mm[1]);
 				expect(
@@ -64,8 +86,11 @@ describe('e2e zero-console guard (#247)', () => {
 				).toBe(1);
 				const v = vars[0];
 				expect(
-					b.text.includes(`expect(${v}).toEqual([])`),
-					`${file}:${b.line} — blok zbiera '${v}', ale chýba jeho expect(${v}).toEqual([])`
+					finalConsoleAssertOk(b.text, v),
+					`${file}:${b.line} — blok zbiera '${v}', ale chýba jeho sankcionovaný záverečný assert: ` +
+						`buď expect(${v}).toEqual([]) alebo exact-allowlist ` +
+						`expect(${v}).toEqual([expect.stringMatching(…)]) — každý člen LEN ` +
+						`expect.stringMatching (žiadny toContain/voľný string/iný matcher)`
 				).toBe(true);
 			}
 		});
