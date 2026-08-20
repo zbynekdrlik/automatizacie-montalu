@@ -1457,3 +1457,10 @@ implementované, nereprodukovateľné čestný null:
 - **Navyše:** favicon (`static/favicon.svg`) — koniec 404 console erroru z prod (nález post-deploy verifikácie kola 3); filed #261 (test-izolácia: zdieľaný ./data/app.db race pri paralelnom vitest).
 - **Cross-lane pasca (opakovala sa 2×):** lane s base spred kola N nevidí nové gates z kola N — #254's `post-deploy.spec.ts` mal console assert s message argumentom (`expect(errors, '…')`), guard #247 vyžaduje presný tvar `expect(<v>).toEqual([])`. Fix `089f741`. Ponaučenie: pri serial integrácii merged-lane špecov VŽDY lokálne pustiť `tests/e2e-console-guard.test.ts` pred pushom.
 - Post-deploy: health + DOM `v0.24.10 (6ae2f5a)`, console 0/0 (favicon 404 preč), favicon.svg 200.
+
+## Kolo 5 — #251 solo (PR #263, v0.24.11, merge 0317f8f)
+
+- **#251 (login hardening):** brute-force lockout (`login-throttle.ts`, per-user + per-IP, JSON text-safe kľúč, bounded memory), timing-oracle mitigácia, limit dĺžky vstupov, security headers (`hooks.server.ts`), compose `ADDRESS_HEADER=x-forwarded-for` + `XFF_DEPTH=1`, 420 r. testov RED→GREEN + adversariálny review fix. Solo PR (security boundary).
+- rerere: CLAUDE.md auto; package.json preimage zmenený (dev medzitým 0.24.11-dev.1) → ručne, nová resolution zaznamenaná.
+- Post-deploy: headers na /login živé (DENY/nosniff/referrer/permissions), marek login cez Caddy OK bez lockoutu, kontajner env OK, DOM `v0.24.11 (0317f8f)`, console 0/0.
+- **Nález:** app.montalu.cloud je za CLOUDFLARE (client → CF → Caddy → app) — `XFF_DEPTH=1` číta CF edge IP, nie klientsku. Throttle kľúč degraduje na CF PoP. Filed #264; medzera zdokumentovaná v `.claude/rules/login-hardening.md` (ada66b5).
