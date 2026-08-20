@@ -6,6 +6,7 @@
 	"coverageAnalysis": "perTest",
 	"mutate": ["src/lib/**/*.ts"],
 	"incremental": true,
+	"allowEmpty": true,
 	"thresholds": {
 		"high": 80,
 		"low": 60,

@@ -165,3 +165,14 @@ Gotchas:
 - `reports/` + `.stryker-tmp/` sú v `.gitignore` / `.prettierignore` / eslint-ignore.
 - `--incremental false` NEEXISTUJE ako CLI flag (Stryker ho číta ako config-file argument);
   incremental sa vypína len v configu. Proof-run bez cache: vynechaj `--incremental`.
+- **`allowEmpty: true` je POVINNÉ** (v `stryker.config.json`). Diff, ktorý zmení LEN súbor
+  bez mutovateľného kódu (barrel `src/lib/index.ts`, čisto type-only súbor, len komentáre)
+  → Stryker inak padne `ConfigError: No tests were executed` (exit 1) = falošné zlyhanie
+  gate-u. `allowEmpty` to spraví exit 0 iba pre prázdny prípad; reálny netestovaný KÓD
+  (mutanty bez pokrytia) stále padne cez `break 50`, takže gate nič nezakrýva.
+- Vitest-runner default `vitest.related: true` nájde testy aj cez tranzitívny import
+  (napr. `src/lib/b2b-limits.ts` testovaný cez server re-export) — netreba vypínať. WARN
+  „Vitest failed to find test files related to mutated files" je OK pri 0-mutantovom súbore.
+- Sweep dedup je cez presný `--label test-quality` + lokálny `jq` match na fixný titul
+  (`startswith("Mutačný sweep")`), NIE cez GitHub free-text search pomlčkovaného markera
+  (ten sa tokenizuje a môže minúť → duplicitný issue).

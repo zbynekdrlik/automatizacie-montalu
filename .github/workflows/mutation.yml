@@ -123,8 +123,12 @@ jobs:
           } >/tmp/survivors.md
           gh label create test-quality --color FBCA04 \
             --description "Prežívajúce mutanty z mutačného sweepu" 2>/dev/null || true
+          # Dedup exaktne: filter na label test-quality (presné, cez API) + lokálny
+          # jq match na fixný titul — žiadny fuzzy free-text search (spoľahlivejšie
+          # než hľadať pomlčkovaný HTML-comment marker, ktorý GitHub search tokenizuje).
           EXISTING=$(gh issue list --state open --label test-quality \
-            --search 'in:body mutation-sweep-auto' --json number --jq '.[0].number' || true)
+            --json number,title \
+            --jq '[.[] | select(.title | startswith("Mutačný sweep"))][0].number // empty' || true)
           if [ -n "$EXISTING" ]; then
             echo "Aktualizujem existujúci issue #$EXISTING"
             gh issue comment "$EXISTING" -F /tmp/survivors.md
