@@ -189,3 +189,30 @@ rebuilde bez fixu, prvý pokus bez rebuildu ukázal falošné GREEN).
 naprieč projektmi), MCP screenshot s absolútnou cestou mimo tej session zlyhá `File
 access denied … Allowed roots: <cwd>/.playwright-mcp, <cwd>`. Fix: `filename` bez cesty
 (relatívne, uloží sa do session-ovho `cwd`), potom `cp` na požadované miesto cez Bash.
+
+## Test DB izolácia je AUTOMATICKÁ — nový db-dotýkajúci test súbor NENASTAVUJ default cestu (#261)
+
+`src/lib/server/db.ts` je modulový singleton: pri IMPORTE otvorí + migruje SQLite na
+`process.env.DATABASE_PATH || './data/app.db'`. Preto keď test súbor (aj tranzitívne, cez
+route `+page.server.ts` alebo server modul) importuje `db.ts` a cestu nenastaví, mieri na
+zdieľaný `./data/app.db`. Pri paralelnom `npx vitest run` (default pool=forks + file
+parallelism) sa dvaja workeri pretekajú na PRVOTNEJ migrácii toho istého súboru →
+`SqliteError: table ... already exists` (obeť je náhodný db-dotýkajúci súbor).
+
+Rieši to **centrálny setup** `tests/setup/db-isolation.ts` (wired cez `test.setupFiles` v
+`vite.config.ts`): PRED (hoisted) importmi každého test súboru bezpodmienečne priradí
+unikátnu per-file `DATABASE_PATH` pod `os.tmpdir()` (`pid`+`randomUUID`) + `afterAll`
+cleanup. Dôsledky pre písanie testov:
+
+- **Nový test súbor, čo importuje db (aj tranzitívne), NENASTAVUJ `DATABASE_PATH`** — setup
+  ho izoluje sám (čerstvá migrovaná+seednutá DB per súbor). Guard: `tests/db-isolation.test.ts`.
+- Súbor, čo POTREBUJE vlastnú cestu (vlastný snapshot, kontrola cesty), si ju nastaví po
+  starom: `process.env.DATABASE_PATH = ...` na top-leveli + `await import('../src/lib/server/db')`
+  (dynamický import, NIE hoisted static — inak by `db.ts` prečítalo env priskoro). To len
+  prepíše setup hodnotu — žiaden konflikt (vzor: `tests/sklo-cena.test.ts`, `tests/ceny.test.ts`).
+- **NIKDY sa nespoliehaj na cross-file zdieľaný stav v DB** — každý súbor má odteraz vlastnú
+  izolovanú DB; test, čo číta dáta zapísané INÝM súborom, je odteraz nesprávny.
+- **CPU-ťažký wall-clock test** (napr. `login-timing.test.ts`, ~98 scryptov) potrebuje
+  EXPLICITNÝ per-test timeout (`it(..., fn, 30_000)`) — pravý paralelný beh pridá CPU
+  kontenciu a default 5 s strop sa prekročí (`Test timed out`, nie assertion fail). Timeout
+  rieši len trpezlivosť harnessu; TVRDENIE testu sa tým nemení.

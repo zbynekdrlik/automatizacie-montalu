@@ -41,6 +41,9 @@ export default defineConfig({
 	],
 	test: {
 		include: ['tests/**/*.test.ts'],
+		// #261: izolácia test DB — priradí unikátnu per-file DATABASE_PATH PRED importom
+		// db.ts, aby paralelný beh nepretekal workerov na prvotnej migrácii (viď súbor).
+		setupFiles: ['./tests/setup/db-isolation.ts'],
 		coverage: {
 			provider: 'v8',
 			// #257: meria sa CELÁ biznis logika v `src/lib` (nielen `server/`) — ~2953 LoC
