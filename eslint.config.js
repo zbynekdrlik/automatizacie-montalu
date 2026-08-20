@@ -16,7 +16,9 @@ export default ts.config(
 			'playwright-report/',
 			'test-results/',
 			'data/',
-			'.superpowers/'
+			'.superpowers/',
+			'reports/',
+			'.stryker-tmp/'
 		]
 	},
 	js.configs.recommended,

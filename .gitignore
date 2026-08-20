@@ -49,3 +49,8 @@ venv/
 node_modules/
 dist/
 build/
+
+# StrykerJS mutation testing (#248) — reporty + sandbox, nikdy sa necommitujú
+reports/
+.stryker-tmp/
+stryker.log
