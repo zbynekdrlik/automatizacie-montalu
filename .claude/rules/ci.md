@@ -360,3 +360,43 @@ Kontajner beží ako **`USER node` (uid 1000)** a CI deploy sa prihlasuje ako **
   `node`); chown zdieľaných mountov na 1000:1000 je bezpečný ak n8n = 1000 ALEBO root (root
   obchádza práva), zlomil by sa len pri n8n na treťom non-root uid. A prvý reálny produkčný
   odpis (`odpis_log` riadok + `.xlsx` v `/data/dlv-import`).
+
+## Branch protection na `main` (#267)
+
+`main` (produkcia, deploy na každý merge) je chránená cez GitHub branch protection.
+Aplikuje ju idempotentný **`scripts/branch-protection.sh`** (owner `gh` auth) z verzionovaného
+payloadu **`deploy/branch-protection.json`**. Čo je nastavené:
+
+- **`required_status_checks`** — `strict: false` + `contexts`:
+  - pevné (z `deploy/branch-protection.json`): `version-check`, `test`,
+  - odvodené za behu: `mutation-diff (1)`..`mutation-diff (N)`, kde **`N` = job-level `SHARDS: N`
+    v `.github/workflows/mutation.yml`** (skript ho vyčíta `grep`-om a vygeneruje contexts).
+  - **NIE `deploy`** (beží len na main → na PR head z `dev` nikdy nezíska `success`, required by
+    zablokoval KAŽDÝ merge navždy) a **NIE `mutation-sweep`** (`workflow_dispatch`, na push skipped).
+- **`enforce_admins: true`**, `allow_force_pushes: false`, `allow_deletions: false`.
+- `required_pull_request_reviews: null` (jednočlenný tím + autopilot auto-merge; CI checky sú gate),
+  `restrictions: null`, `required_linear_history: false` (merge commits only),
+  `required_conversation_resolution: false`.
+- Repo-level (v tom istom skripte): `--enable-squash-merge=false --enable-rebase-merge=false
+  --enable-merge-commit=true` (two-branch-workflow: merge commits only).
+
+**Prečo `strict: false` (zámer, nie omyl):** `dev` NIKDY nemerguje `main` späť, takže „up-to-date
+with base" (`strict: true`) by vyžadoval merge `main→dev` pred každým release PR — rozbil by čistý
+two-branch flow a de-facto zablokoval každý PR. Required checky sa počítajú na PR head SHA z `dev`
+push runu, kde všetkých N+2 prejde, takže `strict: false` je bezpečné a správne.
+
+**PASCA — pri KAŽDEJ zmene `SHARDS` v `mutation.yml` (napr. 4→6) MUSÍŠ re-aplikovať protection:**
+matrix check názvy `mutation-diff (N)` sa so `SHARDS` menia. Ak sa protection neaktualizuje,
+nesediace required contexts zablokujú merge (protection čaká na `mutation-diff (5)`/`(6)`, ktoré
+starý workflow nespúšťal — alebo naopak pod-chránia). Skript to rieši odvodením zo `SHARDS`, len
+ho treba spustiť:
+
+```bash
+git fetch origin && git checkout dev   # aby mutation.yml mal aktuálny SHARDS
+bash scripts/branch-protection.sh
+gh api repos/zbynekdrlik/automatizacie-montalu/branches/main/protection   # over výsledok
+```
+
+Test **`tests/branch-protection-script.test.ts`** (vitest, mock `gh` na PATH — žiadne reálne API)
+pripína payload aj odvodenie shardov (fixture `SHARDS: 6` → 6 mutation contexts), takže regresia v
+skripte padne.
