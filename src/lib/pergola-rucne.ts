@@ -97,7 +97,7 @@ export function parseRucnePolozky(raw: string | null | undefined): {
 		if (mnozstvo > RUCNE_MNOZSTVO_MAX)
 			return { rows: [], error: `Podozrivo veľké množstvo (${mnozstvo}) pri ${kod}.` };
 
-		rows.push({ kod, nazov: nazov || kod, mnozstvo: R3(mnozstvo), mj: mj as MJ });
+		rows.push({ kod, nazov: nazov || kod, mnozstvo: R3(mnozstvo), mj });
 	}
 	return { rows, error: null };
 }

@@ -3,7 +3,12 @@
 
 import type { Actions, PageServerLoad } from './$types';
 import { loadCfg, listSysStyly, listGlassTypes, type GlassType } from '$lib/server/db';
-import { getEditableRows, saveCfgChanges, getAuditLog } from '$lib/server/cfg-editor';
+import {
+	getEditableRows,
+	saveCfgChanges,
+	getAuditLog,
+	type CfgZmena
+} from '$lib/server/cfg-editor';
 import { safeCompute } from '$lib/server/compute';
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -28,7 +33,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				}, new Map<string, GlassType>())
 				.values()
 		],
-		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) }))
+		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) as CfgZmena[] }))
 	};
 };
 

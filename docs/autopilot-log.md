@@ -1426,3 +1426,26 @@ implementované, nereprodukovateľné čestný null:
   dev CI 32355302107 + Mutation 32355302241 zelené; main run 32356505451 deploy zelený.
 - Post-deploy (čistý prehliadač): health `0.24.8 (26ec81e)` live:true, DOM `v0.24.8 (26ec81e)`,
   konzola 0/0, read-only, Money nedotknuté.
+
+## 2026-08-20 — #245 + #246 (PR #260, merge d3f3949, v0.24.9, audit kolo 3)
+
+- **#245 Observability:** štruktúrovaný JSON logger (auth, Money, startup), `handleError`
+  + `+error.svelte` s `errorId`; test-only `/__test-error` route + E2E (preview-only cez
+  `testIgnore`). Guard rozšírený o PRESNÝ stringMatching-allowlist (inherentný 500 riadok).
+- **#246 Durabilita:** fsync tmp+dir pred rename (Money watcher nikdy neuvidí neúplný xlsx),
+  migrácie v8/v20/v21 atomicky, v24 audit deleteB2BUser/seedUsers, `synchronous=FULL` pin.
+- **Integračné pasce kola:** (1) `test.skip(BASE_URL)` v novom spec-u = pre-push blok →
+  config-level `testIgnore`; (2) 500 stránka VŽDY zaloguje resource error → exact allowlist;
+  (3) guard tail check bol mimo bázy lane → worker si mergol origin/dev a guard rozšíril.
+- Post-deploy (čistý browser): health+DOM `v0.24.9 (d3f3949)`, konzola 0/0 na /zasklenia,
+  štartový JSON log + migrácia 23→24 naživo z docker logs.
+
+## #254 — Deploy robustnosť: rollback pri neúspešnom health + post-deploy E2E cez tunel (2026-08-20)
+
+- Branch `worktree-agent-afcd6af162ce076aa` (base bf0b811, dev 0.24.7). Bump 0.24.7 → 0.24.8-dev.1 (0c1b698).
+- RED [9434355]: `tests/deploy-remote.test.ts` — vitest shell test (mock docker/curl na PATH, node:child_process, žiadna nová dep). GREEN [a611ab1]: `deploy/deploy-remote.sh`.
+- Rollback = natívny Docker image re-tag: compose `image: automatizacie-montalu:current`; skript odchytí prev image ID (`docker inspect --format '{{.Image}}'`), build+tag :current/:sha7, up, forward health poll (ok+SHA7); pri zlyhaní re-tag prev → :current + up + liveness poll → exit 1 s logmi. Rollback LEN pri zlyhaní health; zlyhanie post-deploy E2E po zdravom health = alarm (červený job), NIE rollback.
+- Post-deploy E2E = KROK v deploy jobe (nie nový job — `tests/ci-docker-hardening.test.ts` tvrdí 3 joby). SSH tunel 18091→8090, `e2e/post-deploy.spec.ts` (read-only: login + [data-testid=version]==SHA7 + navigácia, nikdy Money). `DEPLOY_SHA7` gate: SHA kontrola len v post-deploy kroku; lokálne beží ako login+nav smoke proti preview.
+- E2E secrets `E2E_USER`/`E2E_PASS` CHÝBAJÚ v env `production` (`gh secret list` = len VPS_SSH_KEY) → krok ich zisťuje (`steps.e2e_secrets`) a preskočí s hlasným `::warning::` (nie continue-on-error, nie ticho zelený). Pridanie secrets = krok užívateľa/supervisora.
+- Pasce: (1) `test.skip(` v pridanom test súbore blokuje `block-test-skips.sh` pri integrácii → post-deploy.spec bez skip, SHA kontrola conditional na DEPLOY_SHA7. (2) komentár s literálom „continue-on-error" padne na guard `not.toMatch(/continue-on-error/)` → preformulované. (3) SHA-pinnuté akcie (40-hex) → secret-scan false-positive, bypass `# airuleset:secret-ok`. (4) worker NESMIE `Closes #N` (block-worker-close-trigger.sh) — supervisor zatvára.
+- Lokálne zelené: check 0 err, test 1536 passed + coverage, lint clean, shellcheck clean, RED-keď-rollback-pokazený overené. Build + reálny deploy + live E2E = CI-only.

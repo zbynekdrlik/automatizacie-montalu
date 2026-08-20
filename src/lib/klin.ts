@@ -21,7 +21,6 @@ export interface Klin {
 }
 
 /** hraničné hodnoty klina — rovnaké pre klienta (HTML5 min/max) aj server */
-export const KLIN_MIN_ROZMER = 1;
 export const KLIN_MAX_ROZMER = 20000;
 export const KLIN_MAX_KS = 99;
 

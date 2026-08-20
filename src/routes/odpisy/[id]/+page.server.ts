@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	let detail: Record<string, unknown>;
 	try {
-		detail = JSON.parse(odpis.detail || '{}');
+		detail = JSON.parse(odpis.detail || '{}') as Record<string, unknown>;
 	} catch {
 		detail = {};
 	}
