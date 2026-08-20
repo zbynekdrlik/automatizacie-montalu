@@ -16,7 +16,10 @@ export default ts.config(
 			'playwright-report/',
 			'test-results/',
 			'data/',
-			'.superpowers/'
+			'.superpowers/',
+			// worktree-fleet checkouts majú vlastné tsconfig.json → typescript-eslint
+			// by videl viacero tsconfigRootDir kandidátov a lint by falošne padal
+			'.claude/worktrees/'
 		]
 	},
 	js.configs.recommended,
