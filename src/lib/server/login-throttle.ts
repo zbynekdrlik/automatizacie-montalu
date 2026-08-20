@@ -86,7 +86,7 @@ function sweepIfNeeded(now: number): void {
 	// stále priveľa aktívnych záznamov → vyhoď najstaršie na strop
 	const byAge = [...attempts.entries()].sort((a, b) => a[1].firstAt - b[1].firstAt);
 	const toEvict = attempts.size - MAX_TRACKED + 1;
-	for (let i = 0; i < toEvict && i < byAge.length; i++) attempts.delete(byAge[i][0]);
+	for (const [kOld] of byAge.slice(0, toEvict)) attempts.delete(kOld);
 }
 
 /** ms do konca lockoutu (0 = nie je zamknuté). Volať PRED pokusom o login. */
