@@ -179,6 +179,21 @@ vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `threshol
   explicitný `exit 0`** (žiadne mutovateľné súbory nie je zlyhanie; kroky setup+stryker sú
   gated cez `steps.scope.outputs.changed != ''`, takže config-only push je rýchly no-op).
   Incremental report (`reports/stryker-incremental.json`) je cachovaný cez `actions/cache`.
+- **Sharding (kolo 8 overrun, 2026-08-20)** — push c645e84 zmenil 18 `src/lib` súborov
+  (3753 mutantov) a presiahol `timeout-minutes: 20`. `mutation-diff` je teraz **matrix
+  job so 4 shardmi** (`strategy.matrix.shard: [1,2,3,4]`, `fail-fast: false`, job-level
+  `env: SHARDS: 4, SHARD: ${{ matrix.shard }}`). `scope` krok zoznam zmenených súborov
+  prepustí cez **`scripts/mutation-shard.sh`** (nový, `set -euo pipefail`, POVINNÉ
+  `SHARD`/`SHARDS` z envu) — deterministické rozdelenie podľa **hashu CESTY súboru**
+  (`cksum`), nie podľa poradia/počtu, takže Stryker incremental lineage per shard
+  ostáva stabilná naprieč pushmi. Každý shard má VLASTNÝ cache kľúč
+  `stryker-incremental-dev-s${{ matrix.shard }}-${{ github.sha }}` (žiadny race na
+  jednom kľúči medzi shardmi). **Check názvy sú teraz `mutation-diff (1)` .. `(4)`**
+  (branch protection required-checks treba prípadne prerátať, ak boli viazané na
+  jediný `mutation-diff`). Pri ĎALŠOM overrune **zväčši `SHARDS`** (config lever,
+  jediné miesto zmeny je job-level `env:` + `strategy.matrix.shard` zoznam) —
+  `timeout-minutes: 20` sa nikdy nedvíha (`no-timeout-band-aids`). Testy vlastností
+  skriptu (partícia/determinizmus/prázdny vstup/chýbajúci env): `tests/mutation-shard.test.ts`.
 - **`mutation-sweep`** — LEN `workflow_dispatch` (NIKDY cron — user vyvíja nonstop, cron by
   súperil o runnery). Full `npx stryker run --force || true`; job padne **len keď chýba
   `reports/mutation/mutation.json`** (zlyhal NÁSTROJ), NIE na nízkom skóre. Survivori

@@ -4,6 +4,12 @@ name: Mutation
 #  1) mutation-diff — na KAŽDÝ push do `dev`, diff-scoped (len zmenené
 #     `src/lib/**/*.ts` oproti main), tvrdý strop `timeout-minutes: 20`.
 #     Prázdny diff → explicitný exit 0 (žiadne mutovateľné súbory nie je chyba).
+#     SHARDOVANÉ do matrixu 4 shardov (overrun 2026-08-20, kolo 8: push zmenil
+#     18 src/lib súborov / 3753 mutantov, presiahol 20 min strop) —
+#     `scripts/mutation-shard.sh` deterministicky rozdelí zmenený zoznam podľa
+#     hashu CESTY súboru, každý shard mutuje len svoj kúsok, check názvy sú
+#     teraz `mutation-diff (1..4)`. Pri ĎALŠOM overrune ZVÄČŠI `SHARDS` (config
+#     lever v job-level `env:` nižšie) — NIKDY nezvyšuj timeout.
 #  2) mutation-sweep — LEN on-demand `workflow_dispatch`, full-tree, prežívajúce
 #     mutanty → dávkový `test-quality` issue. NIKDY cron (user vyvíja nonstop,
 #     cron by súperil o runnery). Job padne len keď zlyhá NÁSTROJ, nie skóre.
@@ -27,24 +33,33 @@ jobs:
     # TVRDÝ strop. Prekročenie = chyba SETUPU (zúž scope / sharduj / pridaj
     # levers), NIKDY nezvyšuj tento timeout (no-timeout-band-aids).
     timeout-minutes: 20
+    # Matrix sharding (kolo 8 overrun) — 4 nezávislé shardy, jeden pomalý/veľký
+    # shard nemá zrušiť ostatné.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      SHARDS: 4
+      SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Zisti zmenené src/lib/**/*.ts oproti main
+      - name: Zisti zmenené src/lib/**/*.ts oproti main a vyber shard
         id: scope
         run: |
           git fetch origin +refs/heads/main:refs/remotes/origin/main
           CHANGED=$(git diff --name-only origin/main...HEAD \
             | grep -E '^src/lib/.*\.ts$' \
-            | grep -vE '\.svelte\.ts$' \
-            | tr '\n' ',' | sed 's/,$//' || true)
-          if [ -z "$CHANGED" ]; then
-            echo "Žiadne zmenené src/lib/**/*.ts oproti main — mutačný gate nemá čo mutovať, končím zelený."
+            | grep -vE '\.svelte\.ts$' || true)
+          SHARDED=$(printf '%s\n' "$CHANGED" | bash scripts/mutation-shard.sh)
+          if [ -z "$SHARDED" ]; then
+            echo "Shard $SHARD/$SHARDS: žiadne zmenené súbory mu nepatria — mutačný gate nemá čo mutovať, končím zelený."
             echo "changed=" >>"$GITHUB_OUTPUT"
           else
-            echo "Mutujem zmenené súbory: $CHANGED"
-            echo "changed=$CHANGED" >>"$GITHUB_OUTPUT"
+            echo "Shard $SHARD/$SHARDS mutuje: $SHARDED"
+            echo "changed=$SHARDED" >>"$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-node@v4
         if: steps.scope.outputs.changed != ''
@@ -62,9 +77,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: reports/stryker-incremental.json
-          key: stryker-incremental-dev-${{ github.sha }}
+          key: stryker-incremental-dev-s${{ matrix.shard }}-${{ github.sha }}
           restore-keys: |
-            stryker-incremental-dev-
+            stryker-incremental-dev-s${{ matrix.shard }}-
       - name: Diff-scoped mutačný gate (≤20 min, break 50)
         if: steps.scope.outputs.changed != ''
         env:
