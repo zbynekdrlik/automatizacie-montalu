@@ -130,38 +130,87 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
-    # SSH `docker compose up --build` + 20× health poll je najpravdepodobnejší
-    # na zaseknutie (VPS build, sieť); bez limitu visí default 6 h.
-    timeout-minutes: 15
+    # Deploy (build + rollback + health) + inštalácia Playwright + post-deploy E2E
+    # cez SSH tunel. Bez limitu visí default 6 h; 20 min pokrýva build+poll (~5) +
+    # npm ci + playwright install (~5) + E2E (cap 10) s rezervou.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
       - name: SSH kľúč
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H 167.233.125.9 >> ~/.ssh/known_hosts 2>/dev/null
-      - name: Rsync zdroj na VPS
+      - name: E2E secrets prítomné?
+        # Secrets sa nedajú čítať v step-level `if:`; nastav step output a gatuj ním
+        # ďalšie kroky. Chýbajúce E2E secrets → hlasný ::warning:: + skip (NIE potlačenie
+        # chyby, NIE ticho zelený), aby deploy nezlyhal na chýbajúcom
+        # secrete. Health poll (ok+SHA7) je backstop verzie.
+        id: e2e_secrets
+        env:
+          E2E_USER: ${{ secrets.E2E_USER }}
+          E2E_PASS: ${{ secrets.E2E_PASS }}
+        run: |
+          if [ -n "$E2E_USER" ] && [ -n "$E2E_PASS" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::warning title=Post-deploy E2E preskocena::E2E_USER/E2E_PASS secrets chybaju v prostredi production - funkcna post-deploy E2E (prihlasenie + verzia z DOM) sa NEspustila. Health poll uz overil ok+SHA7 (backstop). Pridaj secrets do GitHub environment production pre plnu verifikaciu.'
+          fi
+      - name: Rsync zdroj + compose + deploy skript na VPS
         run: |
           ssh -i ~/.ssh/deploy_key root@167.233.125.9 'mkdir -p /opt/automatizacie-montalu/src'
           rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" \
             --exclude .git --exclude node_modules --exclude data \
             ./ root@167.233.125.9:/opt/automatizacie-montalu/src/
           scp -i ~/.ssh/deploy_key deploy/docker-compose.yml root@167.233.125.9:/opt/automatizacie-montalu/docker-compose.yml
-      - name: Build + up + verifikácia
+          scp -i ~/.ssh/deploy_key deploy/deploy-remote.sh root@167.233.125.9:/opt/automatizacie-montalu/deploy-remote.sh
+      - name: Deploy (build + rollback-safe up + health)
+        # deploy-remote.sh: build+tag, odchyt prev image, up, health poll; pri
+        # zlyhaní rollback na prev image + re-poll + exit 1 s logmi (#254).
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHA7=${GITHUB_SHA::7}
-          APP_VERSION="$VERSION ($SHA7)"
-          ssh -i ~/.ssh/deploy_key root@167.233.125.9 "
-            set -euo pipefail
-            cd /opt/automatizacie-montalu
-            APP_VERSION='$APP_VERSION' docker compose up -d --build
-            for i in \$(seq 1 20); do
-              sleep 3
-              H=\$(curl -s http://127.0.0.1:8090/health || true)
-              echo \"health: \$H\"
-              echo \"\$H\" | grep -q '\"ok\":true' && echo \"\$H\" | grep -qF '$SHA7' && exit 0
-            done
-            echo 'Health/verzia nesedí po deployi'; docker logs --tail 50 automatizacie-montalu; exit 1
-          "
+          ssh -i ~/.ssh/deploy_key root@167.233.125.9 \
+            "APP_VERSION='$VERSION ($SHA7)' SHA7='$SHA7' bash /opt/automatizacie-montalu/deploy-remote.sh"
+      - name: npm ci (pre post-deploy E2E)
+        if: success() && steps.e2e_secrets.outputs.present == 'true'
+        run: npm ci
+      - name: Cache Playwright browsers
+        if: success() && steps.e2e_secrets.outputs.present == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Playwright browser install
+        if: success() && steps.e2e_secrets.outputs.present == 'true'
+        run: timeout 360 npx playwright install --with-deps chromium || npx playwright install chromium
+      - name: Post-deploy E2E (SSH tunel, verzia z DOM, read-only)
+        # PO úspešnom health polle: read-only smoke proti nasadenej appke cez tunel
+        # (login + [data-testid=version] == SHA7 + stránky bez console chýb). Zlyhanie
+        # = červený job (ALARM), ale rollback sa TU NEROBÍ — nová verzia je zdravá.
+        id: postdeploy_e2e
+        if: success() && steps.e2e_secrets.outputs.present == 'true'
+        timeout-minutes: 10
+        env:
+          E2E_USER: ${{ secrets.E2E_USER }}
+          E2E_PASS: ${{ secrets.E2E_PASS }}
+        run: |
+          SHA7=${GITHUB_SHA::7}
+          # tunel: localhost:18091 → VPS 127.0.0.1:8090 (8091 býva obsadený presenterom)
+          ssh -f -N -L 18091:127.0.0.1:8090 -i ~/.ssh/deploy_key -o ExitOnForwardFailure=yes root@167.233.125.9
+          for _ in $(seq 1 15); do curl -sf --max-time 5 -o /dev/null http://localhost:18091/health && break || sleep 1; done
+          DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 npx playwright test post-deploy.spec.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        # always() lebo pri zlyhaní E2E je job vo `failure` stave a implicitné
+        # `success() &&` by tento krok preskočilo → padnutý report by sa nenahral.
+        if: always() && steps.postdeploy_e2e.outcome == 'failure'
+        with:
+          name: post-deploy-playwright-report
+          path: playwright-report
+          retention-days: 7

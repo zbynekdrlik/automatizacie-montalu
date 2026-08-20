@@ -10,6 +10,9 @@
 # vytvor `mkdir -p /opt/automatizacie-montalu/ceny` pred prvým `docker compose up`.
 services:
   app:
+    # Stabilný tag pre rollback (#254): `docker compose build` otaguje image
+    # takto; deploy-remote.sh pri zlyhaní health re-tagne prev ID späť na :current.
+    image: automatizacie-montalu:current
     build:
       context: ./src
       args:
