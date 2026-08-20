@@ -1,12 +1,15 @@
 // Guard #247: pravidlo browser-console-zero-errors sa v e2e presadzuje MECHANICKY,
-// nie ručne. Tento test číta e2e/*.spec.ts a stráži, že:
-//  (1) každý test blok zbiera konzolu — počet test blokov == počet collectConsole( volaní,
-//  (2) každá collectConsole premenná je aj asertovaná cez expect(<var>).toEqual([]),
-//  (3) žiadny pevný waitForTimeout( (nahradený ohraničeným stability assertom),
-//  (4) každý test.skip je len sankcionovaný process.env.BASE_URL deployment guard —
+// nie ručne. Číta e2e/*.spec.ts a stráži, PER TEST BLOK (nie len per-súbor agregát),
+// že:
+//  (1) každý test blok má PRÁVE JEDEN `collectConsole(page)` A jeho vlastný
+//      `expect(<var>).toEqual([])` — per-block, aby budúci blok, ktorý zbiera konzolu
+//      ale zabudne assert (alebo zbiera 2×/0×), NEPREŠIEL cez zdieľaný file-level assert,
+//  (2) žiadny pevný `waitForTimeout(` (nahradený ohraničeným stability assertom),
+//  (3) každý `test.skip` je len sankcionovaný process.env.BASE_URL deployment guard —
 //      capability/env skip (napr. clipboard secure-context) je zakázaný (test má FAILnúť,
-//      nie sa TICHO preskočiť). skipAkLive je volanie helpera, nie doslovný test.skip
-//      v spec súbore, takže je prirodzene mimo tejto kontroly.
+//      nie sa TICHO preskočiť). skipAkLive je volanie helpera, nie doslovný `test.skip`
+//      v spec súbore. POZNÁMKA: skip skrytý v HELPERI (ako skipAkLive) túto kontrolu
+//      obíde zámerne — helper skipy sú v réžii code-review, tu strážime len spec súbory.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -19,11 +22,29 @@ const specFiles = readdirSync(e2eDir)
 
 const read = (f: string) => readFileSync(join(e2eDir, f), 'utf8');
 
-// počet test blokov = riadky, ktoré po odsadení začínajú `test(` — vylučuje
-// `test.describe(`/`test.skip` (majú `test.`) aj neblokové výskyty v komentároch.
-const countTestBlocks = (src: string) => src.split('\n').filter((l) => /^\s*test\(/.test(l)).length;
+interface Block {
+	line: number; // 1-based riadok, kde blok začína (pre čitateľné hlásenie)
+	text: string;
+}
 
-const countMatches = (src: string, re: RegExp) => (src.match(re) || []).length;
+// Rozparsuje spec na jednotlivé test bloky. Indent-aware: kotví na `^(\s*)test(`
+// (vylučuje `test.describe(`/`test.skip` — tie majú `test.`) a hľadá uzatvárací
+// `<indent>});` na ROVNAKOM odsadení. Zvláda col-0 testy aj test.describe-vnorené
+// (1-tab) bloky vo vizual3d.
+function testBlocks(src: string): Block[] {
+	const lines = src.split('\n');
+	const blocks: Block[] = [];
+	for (let i = 0; i < lines.length; i++) {
+		const m = /^(\s*)test\(/.exec(lines[i]);
+		if (!m) continue;
+		const close = m[1] + '});';
+		let j = i;
+		while (j < lines.length && lines[j] !== close) j++;
+		blocks.push({ line: i + 1, text: lines.slice(i, j + 1).join('\n') });
+		i = j; // preskoč za uzatváraciu zátvorku bloku
+	}
+	return blocks;
+}
 
 describe('e2e zero-console guard (#247)', () => {
 	it('nájde spec súbory (sanity)', () => {
@@ -32,22 +53,19 @@ describe('e2e zero-console guard (#247)', () => {
 
 	describe.each(specFiles)('%s', (file) => {
 		const src = read(file);
+		const blocks = testBlocks(src);
 
-		it('každý test blok zbiera konzolu (počet test blokov === počet collectConsole)', () => {
-			const tests = countTestBlocks(src);
-			const collects = countMatches(src, /collectConsole\(/g);
-			expect(
-				collects,
-				`${file}: ${tests} test blokov, ale ${collects}× collectConsole(page) — každý test musí zbierať konzolu`
-			).toBe(tests);
-		});
-
-		it('každá collectConsole premenná má expect(<var>).toEqual([])', () => {
-			const vars = [...src.matchAll(/const (\w+) = collectConsole\(/g)].map((m) => m[1]);
-			for (const v of vars) {
+		it('každý test blok má práve 1 collectConsole(page) + jeho expect(<var>).toEqual([])', () => {
+			for (const b of blocks) {
+				const vars = [...b.text.matchAll(/const (\w+) = collectConsole\(/g)].map((mm) => mm[1]);
 				expect(
-					src.includes(`expect(${v}).toEqual([])`),
-					`${file}: premenná '${v}' z collectConsole nemá zodpovedajúci expect(${v}).toEqual([])`
+					vars.length,
+					`${file}:${b.line} — blok má ${vars.length}× collectConsole(page), očakávaný práve 1`
+				).toBe(1);
+				const v = vars[0];
+				expect(
+					b.text.includes(`expect(${v}).toEqual([])`),
+					`${file}:${b.line} — blok zbiera '${v}', ale chýba jeho expect(${v}).toEqual([])`
 				).toBe(true);
 			}
 		});
@@ -62,7 +80,7 @@ describe('e2e zero-console guard (#247)', () => {
 		it('každý test.skip je sankcionovaný process.env.BASE_URL guard', () => {
 			for (const m of src.matchAll(/test\.skip\(/g)) {
 				const idx = m.index ?? 0;
-				const okno = src.slice(idx, idx + 140);
+				const okno = src.slice(idx, idx + 160);
 				expect(
 					okno.includes('process.env.BASE_URL'),
 					`${file}: test.skip ktorý nie je process.env.BASE_URL deployment guard — ` +
