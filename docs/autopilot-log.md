@@ -1494,3 +1494,10 @@ implementované, nereprodukovateľné čestný null:
 - **Mutation gate prekročil 20-min strop** (18 súborov/3753 mutantov). Timeout NEdvihnutý: v1 hash-sharding 4× → shard 3 zhlukol 9/18 najťažších; v2 `scripts/mutation-shard.sh` LPT váhová partícia + 6 shardov → max 9 min. CAD paste test: Stryker perTest dry-run timeout → explicitný 30 s.
 - **Nález → #267:** main bez branch protection (404). Aplikovaná živo (8 required checks, enforce_admins, merge-only); `scripts/branch-protection.sh` odvodzuje kontexty zo `SHARDS:`.
 - Post-deploy: health + DOM `v0.24.14 (380671b)`, console 0/0.
+
+## Kolo 9 — #264 + #267 (PR #269, v0.24.15, merge 8da9105)
+
+- **#264 (reálna klientska IP za Cloudflare):** `client-ip.ts` — `Cf-Connecting-Ip` len keď edge hop ∈ CF rozsahy (spoof-safe aj CF-down-safe), bez zásahu do Caddyfile. Prod dôkaz: `auth` log neúspešného loginu nesie reálnu IP `85.248.11.235`, nie CF edge.
+- **#267 (branch protection):** aplikovaná živo pred PR — tento PR prešiel ako prvý cez 8 required checkov (`version-check`, `test`, `mutation-diff (1..6)`); `enforce_admins`, bez force-push, repo merge-only.
+- **INCIDENT — prod DOWN 18:22–18:34 UTC (~12 min):** deploy trafil okno, keď CIFS mounty na Money (`/opt/n8n/mounts/*`) boli „Host is down" → Docker nevie bind-mountnúť → recreate zabil v0.24.14, nový nenaštartoval, rollback #254 zlyhal na tom istom mounte. Credentials platné (testovací mount OK), soft mounty sa reconnectli samé; obnova `compose up -d` (current = rollback-tag 0.24.14) → `gh run rerun --failed` → DEPLOYED 0.24.15. Kód kola nesúvisí. Filed **#270** (deploy pre-flight bind-mount zdrojov pred recreate) — lane dispatchnutá.
+- Upratané: 4 worktree lanes + 8 `refs/autopilot-wip/*` (všetky predkovia dev) zmazané. Post-deploy: DOM `v0.24.15 (8da9105)`, console 0/0.

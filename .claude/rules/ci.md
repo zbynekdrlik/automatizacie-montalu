@@ -304,6 +304,39 @@ Testovateľnosť deploy shellu: vyextrahuj logiku do `deploy/deploy-remote.sh`
 na `PATH` (`tests/deploy-remote.test.ts`) — žiadna nová dep, padne keď sa rollback
 pokazí.
 
+## Pre-flight bind-mount kontrola pred recreate (#270)
+
+**Incident (kolo 9, 2026-08-20, prod DOWN ~12 min):** deploy spustil `docker compose
+up -d`, keď CIFS mounty na Money server (`/opt/n8n/mounts/{montalu,dlv-import,dlv-done}`
+→ `//192.168.1.200/...`) boli „Host is down". Docker nevie bind-mountnúť mŕtvy path
+(`error while creating mount source path … file exists`), recreate UŽ zabil bežiaci
+zdravý kontajner → nový nenaštartoval → 502. Navrch #254 rollback re-tagol prev image a
+spustil `up -d` ZNOVA — na tom istom mŕtvom mounte → rollback zlyhal tiež. Celý rollback
+backstop predpokladal, že zlyhá APP, nie hostiteľský mount.
+
+**Fix — pre-flight ako KROK 0 v `deploy-remote.sh` (pred akýmkoľvek recreate):**
+
+- `preflight_mounty` prejde host bind-mount ZDROJE z compose a spraví `stat` + `ls`
+  každého s bounded `timeout "$STAT_TIMEOUT"` (default 10 s — mŕtvy CIFS inak visí). Aspoň
+  jeden nedostupný → **`exit 1` PRED `build`/`migrate_ownership`/`up`** → starý kontajner
+  beží ďalej, prod ostáva UP na starej verzii. `migrate_ownership` (#256) beží AŽ PO tomto.
+- **Zoznam zdrojov sa ODVODZUJE z compose** (`mount_sources_from_compose`: list položky pod
+  `volumes:`, ktorých ľavá strana pred `:` je `/cesta`; named volumes ako `appdata:` sa
+  preskočia) — **žiadna druhá hardcoded kópia**, ktorá by driftla od toho, čo `up` mountuje.
+  Preto pri pridaní/premenovaní bind-mountu v `docker-compose.yml` netreba nič meniť v skripte.
+- Compose sa parsuje z `COMPOSE_FILE` (default `docker-compose.yml`, relatívne k `COMPOSE_DIR`
+  po `cd`). Ak súbor chýba (len test-harness, na VPS je vždy) → warning + skip (`docker compose
+  build` nižšie beztak zlyhá hlasno).
+- **Rollback vetva (4a) rozlišuje VRSTVU zlyhania:** re-check `preflight_mounty` → ak je príčina
+  mŕtvy mount (mohol padnúť v okne medzi pre-flightom a `up`), NEretaguje sa naslepo do mŕtveho
+  mountu — skúsi sa `docker start` pôvodného (recreate ho mohol nechať v stave Created)
+  kontajnera + rollback health poll; inak jasný „prod DOWN, manuálny zásah na mounte". Pri app-
+  health zlyhaní (mounty OK) ostáva pôvodná #254 image-tag rollback sémantika (4b).
+- Test: `tests/deploy-preflight-mount.test.ts` (vzor `deploy-remote.test.ts`, mock `docker`/`curl`
+  + compose fixture v `COMPOSE_DIR`): (a) zdravé → deploy pokračuje; (b) nedostupný → exit≠0 PRED
+  akýmkoľvek docker callom; (c) named volume sa NEkontroluje (odvodenie z compose); (d) viac
+  nedostupných. CIFS diagnostika + obnova „Host is down" → `.claude/skills/deploy`.
+
 ## Non-root kontajner + non-root deploy user + chown migrácia (#256)
 
 Kontajner beží ako **`USER node` (uid 1000)** a CI deploy sa prihlasuje ako **non-root

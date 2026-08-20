@@ -28,6 +28,8 @@ HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090/health}"
 POLL_TRIES="${POLL_TRIES:-20}"
 POLL_SLEEP="${POLL_SLEEP:-3}"
 KEEP_IMAGES="${KEEP_IMAGES:-5}" # koľko najnovších :sha7 obrazov ponechať (retencia)
+STAT_TIMEOUT="${STAT_TIMEOUT:-10}"                  # bounded timeout na stat/ls host bind-mount zdroja (mŕtvy CIFS visí) — #270
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"  # relatívne k COMPOSE_DIR (po cd) — pre-flight z neho odvodí bind-mount zdroje (#270)
 # APP_VERSION/SHA7 exportujeme raz → `docker compose` (child) ich zdedí bez opakovania
 # inline prefixu na každom volaní.
 export APP_VERSION SHA7
@@ -100,6 +102,67 @@ migrate_ownership() {
 		echo "::warning::migrate_ownership: chown vlastníctva volumes zlyhal — over práva/vlastníctvo mountov na VPS (health poll + rollback je backstop LEN pre appdata)"
 }
 
+# mount_sources_from_compose <compose>: vypíše (jeden na riadok) host bind-mount ZDROJE z
+# compose súboru. Podporuje OBA syntaxy (review 🟡-2 — inak by dlhý syntax dal 0 zdrojov a
+# pre-flight by sa TICHO vypol, čo znovu otvára #270):
+#   - krátky:  `- /host/src:/kontajner/cieľ[:ro]`      → `/host/src`
+#   - dlhý:    `- type: bind` + `  source: /host/src`  → `/host/src`
+# Named volumes (ľavá strana = meno, napr. `appdata:`) nezačínajú `/` → preskočené. Zoznam sa
+# ODVODZUJE z compose (žiadna druhá hardcoded kópia, ktorá by driftla od toho, čo `docker
+# compose up` naozaj mountuje). #270.
+# POZOR (review 🔵-2): grep nie je scopnutý na `volumes:` blok — spolieha sa, že jediné
+# `- /...` / `source: /...` riadky sú volume zdroje (dnes platí). `command:`/`devices:` s
+# absolútnou cestou by dali falošný zdroj; pri rozšírení compose to over.
+mount_sources_from_compose() {
+	{
+		grep -E '^[[:space:]]*-[[:space:]]*/' "$1" 2>/dev/null |
+			sed -E 's/^[[:space:]]*-[[:space:]]*//; s/:.*$//'
+		grep -E '^[[:space:]]*source:[[:space:]]*/' "$1" 2>/dev/null |
+			sed -E 's/^[[:space:]]*source:[[:space:]]*//; s/[[:space:]]*$//'
+	} || true
+}
+
+# preflight_mounty: PRED akýmkoľvek recreate over, že každý host bind-mount ZDROJ z compose
+# je dostupný (`stat` + `ls` s bounded `timeout` — mŕtvy CIFS/host mount inak visí). Návrat
+# 0 = všetky OK (alebo compose bez bind-mountov / nenájdený), 1 = aspoň jeden nedostupný. #270.
+preflight_mounty() {
+	local sources src rc=0
+	if [ ! -f "$COMPOSE_FILE" ]; then
+		echo "::warning::pre-flight: compose súbor '$COMPOSE_FILE' nenájdený — kontrola bind-mount zdrojov PRESKOČENÁ (docker compose build nižšie zlyhá hlasno, ak naozaj chýba)"
+		return 0
+	fi
+	sources="$(mount_sources_from_compose "$COMPOSE_FILE")"
+	if [ -z "$sources" ]; then
+		echo "pre-flight: compose nedeklaruje žiadny host bind-mount (len named volumes) — nič na kontrolu"
+		return 0
+	fi
+	echo "pre-flight: kontrolujem dostupnosť host bind-mount zdrojov z $COMPOSE_FILE:"
+	# `timeout` ohraničí ČAKANIE; predpoklad SOFT mountov (CIFS „Host is down" → stat vráti
+	# EHOSTDOWN a je killnuteľný). HARD mount v uninterruptible D-state by `timeout` nemusel
+	# prerušiť (SIGKILL nezabije D-state) — naše CIFS mounty sú soft (viď .claude/skills/deploy). 🔵-3
+	while IFS= read -r src; do
+		[ -n "$src" ] || continue
+		if timeout "$STAT_TIMEOUT" stat "$src" >/dev/null 2>&1 &&
+			timeout "$STAT_TIMEOUT" ls "$src" >/dev/null 2>&1; then
+			echo "  OK  $src"
+		else
+			echo "::error::pre-flight: bind-mount zdroj '$src' nedostupný — deploy sa NEvykoná, bežiaci kontajner ostáva"
+			rc=1
+		fi
+	done <<<"$sources"
+	return "$rc"
+}
+
+# 0. PRE-FLIGHT: over dostupnosť host bind-mount zdrojov (z compose) PRED akýmkoľvek recreate.
+# Mŕtvy CIFS/host mount = `docker compose up -d` zlyhá pri bind-mounte, ale recreate UŽ zabil
+# bežiaci kontajner → prod DOWN a rollback (#254) zlyhá na tom istom mounte (#270). Preto
+# fail-fast TU, kým starý kontajner ešte beží → prod ostáva UP na starej verzii.
+# migrate_ownership (#256, prvý dotyk mountov cez `compose run` len s warningom) beží AŽ PO tomto.
+if ! preflight_mounty; then
+	echo "::error::pre-flight zlyhal — aspoň jeden host bind-mount zdroj je nedostupný. Deploy sa NEVYKONAL, bežiaci kontajner ($CONTAINER) ostáva na aktuálnej verzii. Oprav mount (CIFS 'Host is down' obnova → .claude/skills/deploy) a re-run deploy."
+	exit 1
+fi
+
 # 1. ID práve bežiaceho image (pre rollback). Prázdne pri prvom deployi.
 PREV_IMAGE="$(docker inspect --format '{{.Image}}' "$CONTAINER" 2>/dev/null || true)"
 echo "predchádzajúci image: ${PREV_IMAGE:-<žiadny>}"
@@ -113,10 +176,15 @@ docker tag "$IMAGE:current" "$IMAGE:$SHA7"
 # `compose run`), pred up. Idempotentné.
 migrate_ownership
 
-# 3. up nový build + forward health poll (ok + SHA sedí). `if … && …` je vyňaté zo
-# `set -e`, takže aj zlyhanie samotného `up -d` (image sa nespustí — chýbajúca sieť,
-# obsadený port, chybný mount) prepadne do rollbacku namiesto tichého abortu.
-if docker compose up -d && poll_health sha; then
+# 3. up nový build + forward health poll (ok + SHA sedí). Zachytíme EXIT KÓD `up -d` (UP_RC)
+# — je to SPOĽAHLIVÝ signál VRSTVY zlyhania pre rollback (#270 🟡-1): mŕtvy/chybný mount,
+# chýbajúca sieť či obsadený port → `up -d` padne (UP_RC≠0); app-health zlyhanie → `up -d`
+# prejde (UP_RC=0), nesedí len health. `|| UP_RC=$?` drží zlyhanie mimo `set -e` (žiadny
+# tichý abort — prepadne do rollbacku). Predtým re-probe mountu v rollbacku vedel MYLNE
+# klasifikovať app-health zlyhanie ako mŕtvy mount, ak mount v okne re-checku preblikol.
+UP_RC=0
+docker compose up -d || UP_RC=$?
+if [ "$UP_RC" -eq 0 ] && poll_health sha; then
 	echo "deploy OK — verzia $APP_VERSION beží"
 	prune_stare_obrazy
 	exit 0
@@ -126,12 +194,29 @@ fi
 echo "::error::deploy zlyhal (up -d alebo health/verzia nesedí) — $APP_VERSION"
 docker logs --tail 50 "$CONTAINER" 2>/dev/null || true
 
+# 4a. Zisti VRSTVU zlyhania: mŕtvy host bind-mount vs. app health (#270). Pre-flight beží
+# pred recreate, ale mount môže padnúť aj v okne medzi pre-flightom a `up`; re-check dá
+# operátorovi jasný signál, ktorú obnovu robiť (mount reconnect vs. app debug), a zabráni
+# slepému re-tagu do mŕtveho mountu (rollback `up -d` by na ňom zlyhal rovnako).
+if [ "$UP_RC" -ne 0 ] && ! preflight_mounty; then
+	echo "::error::rollback: príčina je MŔTVY HOST BIND-MOUNT (nie app health) — ani rollback image nenaštartuje, kým je mount dole. Skúšam oživiť pôvodný kontajner cez 'docker start' (recreate ho mohol nechať v stave Created)…"
+	# `docker start` oživí pôvodný kontajner bez ďalšieho recreate, ktorý by na mŕtvom mounte
+	# znovu zlyhal. Ak pôvodný kontajner ešte beží, `start` je no-op a health prejde.
+	if docker start "$CONTAINER" >/dev/null 2>&1 && poll_health live; then
+		echo "::warning::rollback cez 'docker start' OK — mount sa medzitým obnovil, kontajner beží (nový build)"
+	else
+		echo "::error::rollback TIEŽ zlyhal (mŕtvy mount) — prod je pravdepodobne DOWN, treba manuálny zásah na mounte (.claude/skills/deploy 'Host is down' obnova)"
+	fi
+	exit 1
+fi
+
+# 4b. Mounty OK → príčina je app health. Pôvodná #254 image-tag rollback sémantika.
 if [ -z "$PREV_IMAGE" ]; then
 	echo "::error::žiadna predchádzajúca verzia (prvý deploy?) — nedá sa rollbacknúť, prod môže byť DOWN"
 	exit 1
 fi
 
-echo "rollback na predchádzajúci image $PREV_IMAGE"
+echo "rollback na predchádzajúci image $PREV_IMAGE (príčina: app health / nie mŕtvy mount)"
 docker tag "$PREV_IMAGE" "$IMAGE:current"
 if docker compose up -d && poll_health live; then
 	echo "::warning::deploy zlyhal, rollback na predchádzajúcu verziu OK — prod beží (starý build)"
