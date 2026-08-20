@@ -1,42 +1,65 @@
-# sv
+# automatizacie-montalu
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit (TypeScript + Vite) web app for **Montalu automations**. It computes glazing/
+construction jobs from dimensions and writes the resulting **Money odpis** (`.xlsx`
+material-consumption sheets) into the Money accounting import — for zasklenia, pergola,
+bazén, FIX (pevné zasklenie) and sieťka. It also renders workshop cut-lists (nárez) and
+technical drawings (výkres). Data is read/written with `exceljs` and persisted in SQLite
+(`better-sqlite3`).
 
-## Creating a project
+> Project conventions, Money-safety rules, versioning and the playbook router live in
+> [`CLAUDE.md`](./CLAUDE.md). Read it before working here.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Module map (route ↔ server)
 
-```sh
-# create a new project
-npx sv create my-app
-```
+Each user-facing area is a SvelteKit route under `src/routes/` backed by pure compute +
+input serialization in `src/lib/server/`:
 
-To recreate this project with the same configuration:
+| Route (`src/routes/`) | Server (`src/lib/server/`) | What it does |
+|---|---|---|
+| `zasklenia` | `compute.ts`, `vstup.ts`, `b2b-limits.ts` | Glazing quote + odpis (the one page b2b may open) |
+| `pergola`, `pergola/narez` | `pergola.ts`, `pergola-narez-vstup.ts`, `pergola-rezervacia.ts` | Pergola quote, cut-list + drawing, reservation odpis |
+| `bazen` | `bazen.ts`, `bazen-navrh-vstup.ts` | Pool cover quote + odpis |
+| `fix` | `fix-vstup.ts` | Fixed-glazing (FIX) quote + odpis |
+| `sietka` | `sietka-samostatna.ts` | Standalone insect-screen quote + odpis |
+| `optimalizator` | `optimalizator.ts`, `optimalizator-vstup.ts` | Cut optimization |
+| `odpisy` | `money.ts` | Money odpis log + the sanctioned "Uvoľniť" release |
+| `pouzivatelia`, `login`, `logout` | `auth.ts`, `b2b-access.ts` | Auth, roles (internal / b2b), route gating |
+| `vykresy`, `problem`, `health` | `db.ts`, `migracie.ts`, `ceny.ts`, `sklo-cena.ts` | Drawings, feedback, health/version, prices, DB + migrations |
 
-```sh
-# recreate this project
-npx sv@0.16.1 create --template minimal --types ts --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
+## Run
 
 ```sh
-npm run build
+npm ci                 # installs deps (better-sqlite3 compiles natively)
+npm run dev            # dev server (add -- --open to launch a browser tab)
+npm run check          # svelte-check (tsc, no bundle) — run before every push
+npm run lint           # eslint + prettier --check — run before every push
 ```
 
-You can preview the production build with `npm run preview`.
+`npm run build` / `vite build` is a bundler build and runs in **CI only**, not locally.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## Test
+
+```sh
+npm test               # unit — Vitest with coverage (thresholds in vite.config.ts)
+npx playwright test    # E2E — real browser, asserts zero console errors/warnings
+```
+
+Without `BASE_URL`, Playwright builds and serves a local preview. With
+`BASE_URL=<deployed-url>` it runs against a live deployment; **write tests auto-skip when
+the target reports `live: true` on `/health`**, so test data can never reach the real
+Money import. Bug fixes ship a RED regression test committed before the GREEN fix.
+
+## Deploy
+
+CI deploys `dev`→`main` merges to the VPS (docker compose build from the rsynced ref,
+health + version verified). The full manual/verification procedure is in
+[`.claude/skills/deploy`](./.claude/skills/deploy/SKILL.md). Live app + health:
+`https://app.montalu.cloud` (`/health`).
+
+## Money safety
+
+Nothing test-related may ever reach the live Money import. `MONEY_LIVE=1` on the VPS is
+the only switch that lets writes through, and flipping it is the user's call. The full
+hard rules (dedup, release path, watched-dir naming) are in
+[`CLAUDE.md`](./CLAUDE.md#money-safety-the-hard-rules).
