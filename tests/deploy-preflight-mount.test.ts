@@ -43,6 +43,7 @@ interface Fixture {
 	healthy?: number; // počet zdravých bind-mount zdrojov (reálne existujúce adresáre)
 	unreachable?: number; // počet nedostupných bind-mount zdrojov (neexistujúce cesty)
 	named?: string[]; // named volumes (ľavá strana = meno) — pre-flight ich NEmá kontrolovať
+	syntax?: 'short' | 'long'; // compose syntax bind-mountov: `- /src:/dst` vs `- type: bind\n  source: /src`
 }
 
 /**
@@ -51,7 +52,12 @@ interface Fixture {
  * `curl` vracia zdravý health so správnym SHA (forward poll prejde), takže happy path
  * dôjde k exit 0; keď pre-flight padne, mock `docker` sa NIKDY nezavolá.
  */
-function runPreflight({ healthy = 0, unreachable = 0, named = ['appdata'] }: Fixture): Run {
+function runPreflight({
+	healthy = 0,
+	unreachable = 0,
+	named = ['appdata'],
+	syntax = 'short'
+}: Fixture): Run {
 	const dir = mkdtempSync(join(tmpdir(), 'deploy-preflight-'));
 	const bin = join(dir, 'bin');
 	mkdirSync(bin);
@@ -88,12 +94,14 @@ function runPreflight({ healthy = 0, unreachable = 0, named = ['appdata'] }: Fix
 		binds.push({ src: join(dir, `mnt-dead-${i}`), ok: false });
 	}
 
-	// compose fixture: named volumes (ľavá strana = meno) + bind-mounty (ľavá strana = /cesta).
+	// compose fixture: named volumes (ľavá strana = meno) + bind-mounty (short alebo long syntax).
 	// Formát zodpovedá reálnemu deploy/docker-compose.yml (list položky pod services.app.volumes).
-	const volLines = [
-		...named.map((n) => `      - ${n}:/data/${n}`),
-		...binds.map((b, i) => `      - ${b.src}:/data/mnt${i}`)
-	].join('\n');
+	const bindLines = binds.map((b, i) =>
+		syntax === 'long'
+			? `      - type: bind\n        source: ${b.src}\n        target: /data/mnt${i}`
+			: `      - ${b.src}:/data/mnt${i}`
+	);
+	const volLines = [...named.map((n) => `      - ${n}:/data/${n}`), ...bindLines].join('\n');
 	writeFileSync(
 		join(dir, 'docker-compose.yml'),
 		`services:\n  app:\n    image: automatizacie-montalu:current\n    volumes:\n${volLines}\nvolumes:\n  appdata:\n`
@@ -175,5 +183,23 @@ describe('#270 deploy-remote.sh — pre-flight kontrola bind-mount zdrojov pred 
 			expect(r.out).toContain(`bind-mount zdroj '${b.src}' nedostupný`);
 		}
 		expect(r.dockerCalls).toHaveLength(0);
+	});
+
+	it('(e) DLHÝ compose syntax (type: bind / source:) sa tiež parsuje — nedostupný zdroj failne (🟡-2)', () => {
+		// Keby parser vedel len krátky syntax, dlhý `source:` bind by dal 0 zdrojov → pre-flight
+		// by sa TICHO vypol a #270 by sa vrátil. Tento test to pripína: dlhý-syntax nedostupný
+		// zdroj MUSÍ failnúť pred recreate.
+		const r = runPreflight({ healthy: 1, unreachable: 1, syntax: 'long' });
+		expect(r.code).not.toBe(0);
+		const dead = r.binds.find((b) => !b.ok)!.src;
+		expect(r.out).toContain(`bind-mount zdroj '${dead}' nedostupný`);
+		expect(r.dockerCalls).toHaveLength(0);
+	});
+
+	it('(f) DLHÝ syntax, všetky dostupné → pre-flight prejde, deploy pokračuje (up -d)', () => {
+		const r = runPreflight({ healthy: 2, syntax: 'long' });
+		expect(r.code, r.out).toBe(0);
+		expect(okCount(r)).toBe(2);
+		expect(r.dockerCalls).toContain('compose up -d');
 	});
 });

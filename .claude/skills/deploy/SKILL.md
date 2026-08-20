@@ -17,10 +17,12 @@ PRED recreate** a starý kontajner ostáva bežať (prod UP). To znamená: keď 
 mount a re-runnúť deploy. (Incident kolo 9: bez pre-flightu recreate zabil bežiaci kontajner a
 rollback zlyhal na tom istom mŕtvom mounte → 502 ~12 min.)
 
-**Dotknuté mounty** (3 host CIFS zdieľané aj s n8n): `/opt/n8n/mounts/dlv-import`,
-`/opt/n8n/mounts/montalu` (compose ich mountuje ako `/data/dlv-import`, `/data/montalu`;
-`/opt/automatizacie-montalu/ceny` je lokálny `:ro`, nie CIFS). **`n8n-n8n-1` používa TIE ISTÉ
-3 host mounty** — mŕtvy mount teda zasiahne aj n8n, nie len túto appku.
+**Dotknuté mounty** — táto appka bindne **2 CIFS** host mounty (`/opt/n8n/mounts/dlv-import`,
+`/opt/n8n/mounts/montalu`; kontajner `/data/dlv-import`, `/data/montalu`) + lokálny
+`/opt/automatizacie-montalu/ceny` (`:ro`, NIE CIFS). Pre-flight kontroluje všetky 3 bind
+zdroje, ale „Host is down" sa týka len tých 2 CIFS. **`n8n-n8n-1` bindne tie isté CIFS host
+mounty** (+ `dlv-done`, ktorý táto appka nepoužíva) — mŕtvy CIFS mount teda zasiahne aj n8n,
+nie len túto appku.
 
 **Diagnostika (na VPS `root@167.233.125.9`):**
 
