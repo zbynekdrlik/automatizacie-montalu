@@ -2,6 +2,7 @@
 // (2) kontrolná stránka s editovateľnými množstvami, (3) „odoslat" prepočíta
 // ZNOVA zo surových vstupov + validovaných úprav a zapíše odpis s dedup ochranou.
 import type { Actions, PageServerLoad } from './$types';
+import { logger } from '$lib/server/log';
 import { computeBazen, applyEdits } from '$lib/server/bazen';
 import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
@@ -99,7 +100,7 @@ export const actions: Actions = {
 			}
 			return { step: 'hotovo' as const, vstup, finalOut, zmenene, outcome };
 		} catch (e) {
-			console.error('bazen writeOdpis zlyhal:', e);
+			logger('bazen').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return kontrola(
 				'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			);

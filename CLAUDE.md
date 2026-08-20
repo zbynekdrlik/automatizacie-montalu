@@ -99,6 +99,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`
 - server-side wall-clock timestamp na obrazovke/tlači (UTC default pasca) → `.claude/rules/timestamps.md`
 - `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`
+- štruktúrovaný logger (`log.ts`) / handleError / chybová stránka / testovanie logov → `.claude/rules/logging.md`
 - three.js 3D náhľad (vizual) → `.claude/rules/vizual3d.md`
 - `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt poradie → `.claude/rules/zasklenia-form-reactivity.md`
 - kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`

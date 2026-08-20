@@ -2,6 +2,9 @@
 // formuláre zapisujú do Money importu, verejný prístup bol nález auditu.
 import { randomBytes } from 'node:crypto';
 import { db, verifyPassword } from './db';
+import { logger } from './log';
+
+const log = logger('auth');
 
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000; // 30 dní — interný nástroj, dlhá session
 export const SESSION_COOKIE = 'am_session';
@@ -14,25 +17,40 @@ export interface SessionUser {
 	role: UserRole;
 }
 
-export function login(username: string, password: string): string | null {
+export function login(username: string, password: string, ip?: string): string | null {
+	const uname = username.trim();
 	// COLLATE NOCASE: mená (najmä e-maily) sú case-insensitive — mobil kapitalizuje
 	// prvé písmeno, takže 'Obchod@…' sa musí prihlásiť na uložené 'obchod@…'.
 	// NOCASE je ASCII-only, čo pre e-mailové/ASCII mená stačí.
 	const user = db
 		.prepare('SELECT id, username, pass_hash FROM users WHERE username = ? COLLATE NOCASE')
-		.get(username.trim()) as { id: number; username: string; pass_hash: string } | undefined;
-	if (!user || !verifyPassword(password, user.pass_hash)) return null;
+		.get(uname) as { id: number; username: string; pass_hash: string } | undefined;
+	// dôvod sa rozlišuje kvôli logu (neznáme meno vs. zlé heslo); heslo sa NIKDY neloguje
+	if (!user) {
+		log.warn('login zlyhal', { username: uname, ip, reason: 'unknown_user' });
+		return null;
+	}
+	if (!verifyPassword(password, user.pass_hash)) {
+		log.warn('login zlyhal', { username: uname, ip, reason: 'bad_password' });
+		return null;
+	}
 	const token = randomBytes(32).toString('hex');
 	db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(
 		token,
 		user.id,
 		Date.now() + SESSION_TTL_MS
 	);
+	log.info('login ok', { username: user.username, ip });
 	return token;
 }
 
 export function logout(token: string) {
+	// meno sa dohľadá kvôli logu PRED zmazaním; token sa NIKDY neloguje
+	const row = db
+		.prepare('SELECT u.username FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?')
+		.get(token) as { username: string } | undefined;
 	db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+	log.info('logout', { username: row?.username });
 }
 
 export function getSessionUser(token: string | undefined): SessionUser | null {
@@ -53,7 +71,8 @@ export function getSessionUser(token: string | undefined): SessionUser | null {
 
 /** Priebežné čistenie expirovaných sessions (volané z hooks pri requestoch). */
 export function pruneSessions() {
-	db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+	const res = db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+	if (res.changes > 0) log.info('pruneSessions', { deleted: res.changes });
 }
 
 /**

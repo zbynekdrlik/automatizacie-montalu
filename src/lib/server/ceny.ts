@@ -6,6 +6,9 @@
 // reálne kódy, kde `Cena=0` znamená "nikdy zadané", nie "zadarmo" (overené live).
 import fs from 'node:fs';
 import { db } from './db';
+import { logger } from './log';
+
+const log = logger('ceny');
 
 export interface PriceRow {
 	kod: string;
@@ -19,6 +22,11 @@ export interface PriceRow {
 }
 
 const snapshotPath = () => process.env.CENY_SNAPSHOT_PATH || '/data/ceny/ceny.json';
+
+/** Rozriešená cesta k dennému cenníkovému snapshotu — pre štartovací config log (db.ts, #245). */
+export function cenySnapshotPath(): string {
+	return snapshotPath();
+}
 
 interface MetaRow {
 	snapshot_generated_at: string | null;
@@ -122,14 +130,14 @@ export function maybeImportSnapshot(): ImportResult {
 	try {
 		raw = fs.readFileSync(p, 'utf8');
 	} catch (e) {
-		console.error('ceny: čítanie snapshotu zlyhalo:', e);
+		log.error('čítanie snapshotu zlyhalo', { path: p, error: e });
 		return { imported: false, reason: 'read-error' };
 	}
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(raw);
 	} catch (e) {
-		console.error('ceny: JSON parse snapshotu zlyhal:', e);
+		log.error('JSON parse snapshotu zlyhal', { path: p, error: e });
 		return { imported: false, reason: 'parse-error' };
 	}
 	const file = (parsed ?? {}) as { generatedAt?: unknown; rows?: unknown };
@@ -139,7 +147,9 @@ export function maybeImportSnapshot(): ImportResult {
 	let rejected = 0;
 	const valid: PriceRow[] = [];
 	rowsRaw.forEach((r, i) => {
-		const row = validateRow(r, i, (m) => console.error(`ceny snapshot: ${m}`));
+		// zamietnutý riadok / neplatná jednotlivá cena = WARN (nie ERROR): dáta sa
+		// zbierajú ďalej, len to jedno pole je „neznáme"
+		const row = validateRow(r, i, (m) => log.warn(`snapshot: ${m}`));
 		if (!row) {
 			rejected++;
 			return;
@@ -173,7 +183,8 @@ export function maybeImportSnapshot(): ImportResult {
 		upsertMeta.run(generatedAt, stat.mtimeMs, valid.length, rejected);
 	})();
 
-	console.error(`ceny: naimportovaných ${valid.length} riadkov, zamietnutých ${rejected} (${p})`);
+	// úspešný súhrn importu = INFO (pôvodne console.error len kvôli stderr — oprava levelu)
+	log.info('snapshot naimportovaný', { rows: valid.length, rejected, path: p });
 	return {
 		imported: true,
 		reason: 'ok',
