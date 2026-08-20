@@ -11,6 +11,13 @@ Pravidlo `browser-console-zero-errors` je v e2e presadené MECHANICKY guardom
 KAŽDÝ test blok musí mať `const consoleMsgs = collectConsole(page)` prvý riadok tela
 a `expect(consoleMsgs).toEqual([])` posledný assert (helper v `e2e/helpers.ts`).
 
+**Assert MUSÍ byť presný tvar `expect(<var>).toEqual([])` BEZ message argumentu** — guard
+robí doslovný `b.text.includes(`expect(${v}).toEqual([])`)`, takže
+`expect(errors, 'console chyby').toEqual([])` (s message argumentom) NEPREJDE, hoci je
+funkčne správny. Pasca vidno pri MERGE staršej vetvy, ktorá predchádza #247 guardu
+(#256: #254 `post-deploy.spec` mal message argument → guard padol až po zlúčení; fix =
+zhodiť message argument). Chybová hláška poradí presne to (`chýba jeho expect(<var>).toEqual([])`).
+
 ## Počítaj `collectConsole(`, NIKDY `toEqual([])`
 
 Guard invariant je „počet test blokov (`^\s*test\(`) == počet `collectConsole(` volaní"
