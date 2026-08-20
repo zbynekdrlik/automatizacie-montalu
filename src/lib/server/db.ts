@@ -20,6 +20,13 @@ fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+// #246: explicitný durability-PIN. Na tomto better-sqlite3 builde je `synchronous` už
+// = FULL (2) aj pod WAL (default nie je znížený na NORMAL) — commitnutý dedup záznam v
+// odpis_log je teda fsync-ovaný pri každom commite. PRAGMA to PRIPÍNA explicitne, nech
+// durability kontrakt nezávisí od compile-flagu budúcej verzie better-sqlite3 (kde by
+// WAL default mohol klesnúť na NORMAL a commitnutý záznam by sa dal stratiť pred
+// checkpointom). Guard test drží hodnotu na 2.
+db.pragma('synchronous = FULL');
 
 export function hashPassword(password: string): string {
 	const salt = randomBytes(16).toString('hex');
