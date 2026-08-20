@@ -93,6 +93,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
+- login brute-force throttle / timing oracle / bezpečnostné hlavičky / getClientAddress za Caddy → `.claude/rules/login-hardening.md`
 - unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
 - katalóg skiel, pridanie/zmena skla, Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
