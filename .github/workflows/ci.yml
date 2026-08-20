@@ -141,6 +141,12 @@ jobs:
           node-version: 24
           cache: npm
       - name: SSH kľúč
+        # Deploy beží ako NON-ROOT `deploy` user na VPS (least-privilege, #256): v
+        # skupine `docker` (smie spúšťať docker), NIE root shell na zdieľanom hoste.
+        # PREREKVIZITA: `deploy/provision-vps.sh` musí zbehnúť RAZ na VPS pred prvým
+        # `deploy@` deployom (vytvorí usera, autorizuje tento istý kľúč, prevlastní
+        # /opt/automatizacie-montalu). Ak sa zabudne, SSH krok zlyhá HLASNE PRED
+        # dotykom kontajnera → prod ostane na aktuálnej verzii (bezpečné).
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
@@ -164,19 +170,19 @@ jobs:
           fi
       - name: Rsync zdroj + compose + deploy skript na VPS
         run: |
-          ssh -i ~/.ssh/deploy_key root@167.233.125.9 'mkdir -p /opt/automatizacie-montalu/src'
+          ssh -i ~/.ssh/deploy_key deploy@167.233.125.9 'mkdir -p /opt/automatizacie-montalu/src'
           rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" \
             --exclude .git --exclude node_modules --exclude data \
-            ./ root@167.233.125.9:/opt/automatizacie-montalu/src/
-          scp -i ~/.ssh/deploy_key deploy/docker-compose.yml root@167.233.125.9:/opt/automatizacie-montalu/docker-compose.yml
-          scp -i ~/.ssh/deploy_key deploy/deploy-remote.sh root@167.233.125.9:/opt/automatizacie-montalu/deploy-remote.sh
+            ./ deploy@167.233.125.9:/opt/automatizacie-montalu/src/
+          scp -i ~/.ssh/deploy_key deploy/docker-compose.yml deploy@167.233.125.9:/opt/automatizacie-montalu/docker-compose.yml
+          scp -i ~/.ssh/deploy_key deploy/deploy-remote.sh deploy@167.233.125.9:/opt/automatizacie-montalu/deploy-remote.sh
       - name: Deploy (build + rollback-safe up + health)
         # deploy-remote.sh: build+tag, odchyt prev image, up, health poll; pri
         # zlyhaní rollback na prev image + re-poll + exit 1 s logmi (#254).
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHA7=${GITHUB_SHA::7}
-          ssh -i ~/.ssh/deploy_key root@167.233.125.9 \
+          ssh -i ~/.ssh/deploy_key deploy@167.233.125.9 \
             "APP_VERSION='$VERSION ($SHA7)' SHA7='$SHA7' bash /opt/automatizacie-montalu/deploy-remote.sh"
       - name: npm ci (pre post-deploy E2E)
         if: success() && steps.e2e_secrets.outputs.present == 'true'
@@ -203,7 +209,7 @@ jobs:
         run: |
           SHA7=${GITHUB_SHA::7}
           # tunel: localhost:18091 → VPS 127.0.0.1:8090 (8091 býva obsadený presenterom)
-          ssh -f -N -L 18091:127.0.0.1:8090 -i ~/.ssh/deploy_key -o ExitOnForwardFailure=yes root@167.233.125.9
+          ssh -f -N -L 18091:127.0.0.1:8090 -i ~/.ssh/deploy_key -o ExitOnForwardFailure=yes deploy@167.233.125.9
           for _ in $(seq 1 15); do curl -sf --max-time 5 -o /dev/null http://localhost:18091/health && break || sleep 1; done
           DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 npx playwright test post-deploy.spec.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
