@@ -6,6 +6,7 @@
 // v `B2B_FORBIDDEN_PREFIXES`, takže denylist ju necháva prejsť, ale Money-zápis je
 // zamknutý v akcii samotnej (rovnaká vrstva ako `/zasklenia` `odoslat`).
 import type { Actions, PageServerLoad } from './$types';
+import { logger } from '$lib/server/log';
 import { loadCfg, listSysStyly } from '$lib/server/db';
 import { parseSietkaSamostatnaVstup } from '$lib/server/sietka-samostatna';
 import { SIETKA_SAMOSTATNA_SYSTEMY, potrebuje3KKolajnicu } from '$lib/sietka';
@@ -116,7 +117,11 @@ export const actions: Actions = {
 			}
 			return { step: 'hotovo' as const, vstup, r, outcome };
 		} catch (e) {
-			console.error('writeOdpis (sietka samostatná) zlyhal:', e);
+			logger('sietka').error('writeOdpis (samostatná sieťka) zlyhal', {
+				zak: vstup.zak,
+				op: vstup.op,
+				error: e
+			});
 			return {
 				step: 'form' as const,
 				error:

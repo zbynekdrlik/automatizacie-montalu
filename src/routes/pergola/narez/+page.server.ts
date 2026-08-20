@@ -19,6 +19,9 @@ import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
 import { writeOdpis, isLive } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
+import { logger } from '$lib/server/log';
+
+const log = logger('pergola:narez');
 
 /** ZAK/OP/zákazník z formulára — do dokladu, dedupu a názvu súboru. */
 function parseIdent(form: FormData): RezervaciaIdent {
@@ -94,7 +97,7 @@ export const actions: Actions = {
 		if (rucneError) return { step: 'vysledok' as const, vstup, ident, rucne, rezError: rucneError };
 		const res = buildRezervaciaRozpis(vstup, ident, rucne);
 		if (!res.rozpis) {
-			console.warn('pergola rezervacia rozpis chyba:', {
+			log.warn('rezervácia rozpis chyba', {
 				zak: ident.zak,
 				op: ident.op,
 				rezError: res.error
@@ -102,7 +105,7 @@ export const actions: Actions = {
 			return { step: 'vysledok' as const, vstup, ident, rucne, rezError: res.error };
 		}
 		const rozpis = res.rozpis;
-		console.info('pergola rezervacia rozpis:', {
+		log.info('rezervácia rozpis', {
 			zak: ident.zak,
 			op: ident.op,
 			polozky: rozpis.pocetPolozok,
@@ -135,7 +138,7 @@ export const actions: Actions = {
 			};
 
 		const job = rezervaciaJob(vstup, ident, rozpis, locals.user?.username ?? '');
-		console.info('pergola rezervacia odoslat:', {
+		log.info('rezervácia odoslať', {
 			zak: ident.zak,
 			op: ident.op,
 			live: isLive(),
@@ -158,14 +161,14 @@ export const actions: Actions = {
 					rezError: `Zákazka ${ident.zak} (OP ${ident.op}) už bola odoslaná (rezervácia alebo odpis) ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv uvoľni záznam v histórii odpisov.`
 				};
 			}
-			console.info('pergola rezervacia zapisana:', {
+			log.info('rezervácia zapísaná', {
 				zak: ident.zak,
 				filename: outcome.filename,
 				live: outcome.live
 			});
 			return { step: 'rez-hotovo' as const, vstup, ident, rucne, rozpis, outcome, rezError: null };
 		} catch (e) {
-			console.error('pergola rezervacia writeOdpis zlyhal:', e);
+			log.error('rezervácia writeOdpis zlyhal', { zak: ident.zak, op: ident.op, error: e });
 			return {
 				step: 'rez-nahlad' as const,
 				vstup,
