@@ -48,6 +48,15 @@ services:
       BODY_SIZE_LIMIT: 1M
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
+      # #251 SEC-1: bez ADDRESS_HEADER vracia getClientAddress() IP kontajnera
+      # Caddy (konštantná pre všetkých) → per-(username,ip) lockout by degeneroval
+      # na globálny-per-meno a útočník by vedel natrvalo zamknúť reálneho usera.
+      # Caddy (edge) pridáva reálnu klientsku IP ako POSLEDNÝ prvok X-Forwarded-For;
+      # XFF_DEPTH=1 číta práve ten posledný → spoof-safe (klientom podstrčený XFF
+      # prefix sa ignoruje). Priama požiadavka bez hlavičky (healthcheck /health)
+      # getClientAddress() nevolá; login akcia ho volá v try/catch → bucket '-'.
+      ADDRESS_HEADER: x-forwarded-for
+      XFF_DEPTH: '1'
       CENY_SNAPSHOT_PATH: /data/ceny/ceny.json
     volumes:
       - appdata:/data/app
