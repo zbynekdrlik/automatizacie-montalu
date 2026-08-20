@@ -1,3 +1,11 @@
+---
+paths:
+  - 'tests/**'
+  - 'e2e/**'
+  - 'playwright.config.ts'
+  - 'vite.config.ts'
+---
+
 # Testing (unit + E2E) — local run gotchas
 
 ## Manually starting `npm run preview` for a live MCP screenshot needs the SAME env vars as `playwright.config.ts`'s `webServer`
@@ -16,7 +24,7 @@ returns, so the server never actually stays up for the MCP browser to reach.
 
 ## Testing a form action directly (forged-POST security tests) — `fail()` returns `{status, data}`
 
-Per `access-control` skill §2: prove a security boundary with a scripted POST
+Per the `access-control` rule §2: prove a security boundary with a scripted POST
 straight to the SvelteKit `actions.<name>` function, not just "button hidden in
 UI". `fail(status, body)` (`@sveltejs/kit`) constructs an `ActionFailure` —
 inspect it as `{ status: number, data: T }` (`node_modules/@sveltejs/kit/src/exports/internal/index.js`,
@@ -35,11 +43,14 @@ npx vitest run          # unit tests (or npm test for coverage)
 npx playwright test     # E2E — see the build gotcha below
 ```
 
-**NEPÚŠŤAJ `npx prettier --write`.** Repo nemá prettier ani ako dev-dependenciu, ani
-`.prettierrc` — `npx` stiahne čerstvý prettier s DEFAULTMI (2 medzery, dvojité úvodzovky)
-a prepíše celý súbor mimo štýlu repa (taby + jednoduché úvodzovky). Formátovanie nie je
-v CI gate, tak píš rovno v štýle okolitého kódu; ak sa to už stalo, súbor prepíš späť
-(nový súbor sa nedá `git checkout`-núť).
+**Formátuj cez repo prettier (`npm run format`), NIE cez bare `npx prettier`.** Repo MÁ
+prettier (`^3.9.6` dev-dependency) + `.prettierrc.json` (taby + jednoduché úvodzovky), a
+`lint` = `eslint . && prettier --check .` je CI gate — takže formátovanie SA kontroluje.
+`npm run format` použije repo `.prettierrc.json`; bare `npx prettier --write` by stiahol
+čerstvý prettier s DEFAULTMI (2 medzery, dvojité úvodzovky) a prepísal súbor mimo štýlu
+repa — preto vždy `npm run format`, nie `npx`. `.md` a `.claude/` sú v `.prettierignore`
+(#98), takže playbook/README úpravy `prettier --check` nekontroluje; nové/upravené
+`.ts`/`.svelte` súbory musia byť prettier-clean (viď `lint-formatting.md`).
 
 ## E2E without `BASE_URL` needs a FRESH `npm run build` first — stale preview = false failures
 

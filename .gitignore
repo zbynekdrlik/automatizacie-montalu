@@ -49,3 +49,6 @@ venv/
 node_modules/
 dist/
 build/
+
+# Playwright MCP browser profile/artefakty (lokálny read-back)
+.playwright-mcp/

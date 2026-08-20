@@ -131,3 +131,35 @@ browser download. Fixes now IN `ci.yml`:
 Recovery when a run is hung on this: `gh run cancel <id>`, then push a fresh commit (a
 cancelled run's rerun keeps landing on the same degraded condition; a NEW commit gets a
 fresh runner). The `timeout-minutes` net means you no longer have to babysit a 6 h zombie.
+
+## Hardening (#244): SHA-pinned actions, blocking prod-audit gate, structural guard test
+
+**Every `uses:` action is pinned to a 40-char commit SHA** (not a floating `@v4`) with a
+`# vX.Y.Z` comment. To BUMP an action, don't revert to a tag — resolve the new SHA:
+
+```bash
+gh api repos/actions/checkout/git/ref/tags/v4 --jq '.object.sha'   # the commit @v4 points at
+gh api "repos/actions/checkout/tags?per_page=100" --jq '.[] | select(.commit.sha=="<sha>") | .name'  # its semver
+```
+
+then update BOTH the SHA and the `# vX.Y.Z` comment. NOTE: the airuleset secret-scan hook
+flags a 40-hex blob as a "possible secret" — a public action SHA is not one, bypass the
+`git add`/`git commit` with an inline `# airuleset:secret-ok <reason>` shell comment.
+
+**Blocking prod-dependency audit** in the `test` job: `npm audit --omit=dev --audit-level=high`
+(after `npm ci`, before lint). `--omit=dev` ignores dev-only advisories (they never enter the
+image). Prod advisories are patched via **`overrides` in `package.json`**, NOT `npm audit fix
+--force` — the `--force` path DOWNGRADES `exceljs` to 3.4.0 (breaking = behavioral change to
+the odpis Excel output). On a NEW high advisory: find the patched version, add a minimal
+`overrides` entry (version-selective key like `brace-expansion@1` keeps majors aligned; forcing
+`uuid@11` onto exceljs is safe — exceljs calls only `v4()`), then verify `npm ci` + `npm audit
+--omit=dev` = 0 + `npm test`.
+
+**Structural guard** `tests/ci-docker-hardening.test.ts` (vitest, no yaml dep — simple parse)
+FAILS if any job loses `timeout-minutes`, an action un-pins, `continue-on-error` appears, or
+`deploy/docker-compose.yml` loses its `logging`/`healthcheck`. Keep it green when editing the
+pipeline; it's the regression net for all of the above.
+
+**Compose healthcheck has NO curl** — runtime image `node:24-*-slim` lacks curl, so the
+healthcheck is `node -e "fetch('http://127.0.0.1:3000/health')..."` on the IN-CONTAINER port
+3000 (host 8090→3000 is only the VPS deploy poll). `/health` returns `{ok: sysCount>0}`.

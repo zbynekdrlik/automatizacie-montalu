@@ -7,14 +7,18 @@ on:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Na main NIKDY nerušiť bežiaci beh — push do main uprostred deploya by ho
+  # zabil v polovici (SSH docker build + health poll). Na dev/PR ruší staršie.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   version-check:
     if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
+    # Trvá sekundy (2× node -p + git fetch --depth 1); zaseknutie zahoď rýchlo.
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: dev verzia musí byť > main
         run: |
           DEV=$(node -p "require('./package.json').version")
@@ -35,12 +39,18 @@ jobs:
     # zahodí rýchlo namiesto blokovania merge na hodiny.
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Audit prod závislostí (blokujúci — high+)
+        # Blokuje merge pri high/critical advisory v PROD strome. `--omit=dev`
+        # ignoruje dev-only nálezy (nejdú do image). Patched cez `overrides`
+        # v package.json (brace-expansion, uuid). Beží pred lint/test/build,
+        # aby zraniteľná dep padla rýchlo.
+        run: npm audit --omit=dev --audit-level=high
       - name: Lint (eslint + prettier --check)
         run: npm run lint
       - name: Typová kontrola (svelte-check)
@@ -96,7 +106,7 @@ jobs:
       # sťahovanie Chromia (redukuje riziko hung `playwright install`). Kľúč viazaný na
       # lockfile: zmena verzie @playwright/test → nový kľúč → čerstvé stiahnutie.
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -108,7 +118,7 @@ jobs:
         run: timeout 360 npx playwright install --with-deps chromium || npx playwright install chromium
       - name: E2E (reálny prehliadač, nula console errors)
         run: npx playwright test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: playwright-report
@@ -120,8 +130,11 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
+    # SSH `docker compose up --build` + 20× health poll je najpravdepodobnejší
+    # na zaseknutie (VPS build, sieť); bez limitu visí default 6 h.
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: SSH kľúč
         run: |
           mkdir -p ~/.ssh

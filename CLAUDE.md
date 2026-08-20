@@ -6,6 +6,13 @@ SvelteKit web app (TypeScript + Vite) for **Montalu automations**. Reads/writes 
 (`exceljs`) and persists to SQLite (`better-sqlite3`). Scaffolded from `sv create`
 (minimal, TS). The global airuleset rules (`~/.claude/CLAUDE.md`) apply on top of this file.
 
+## Dashboards
+
+- **Prod:** `https://app.montalu.cloud` — health + deployed version: `https://app.montalu.cloud/health`
+- **No dev environment** — there is only prod; there is no dev URL. Verify changes
+  locally (`npm run preview` + Playwright); post-deploy verification reads the version
+  label from the prod DOM (see "CI + deploy").
+
 ## Branch model
 
 Two branches: `main` (production) + `dev` (development). All work on `dev`; open a PR
@@ -14,38 +21,17 @@ dev→main when ready. Merge commits only (no squash/rebase). Auto-merge default
 
 ## Version
 
-Version file: `package.json` `"version"`. Bump it on `dev` FIRST (before any work) so
-`dev` > `main` (per version-bumping). The web UI MUST display this version label — see
-"CI + deploy" below.
+Version file: `package.json` `"version"` — the web UI must display it (footer
+`data-testid="version"`, see "CI + deploy"). Every-ticket rule:
 
-**Bump via a TARGETED edit of the `"version"` line (preserve the file's TABS) — never
-`node -e 'JSON.stringify(p,null,2)'`.** `JSON.stringify` re-indents `package.json` to
-2 SPACES, which fails `prettier --check` (this repo's `.prettierrc` = tabs) and costs a
-lint round (#161, 2026-08-14). If you did reformat it, run `prettier --write package.json`
-before committing.
+1. Bump to the next `-dev.N` **FIRST**, before any work (so `dev` > `main`).
+2. Right before opening the dev→main PR, bump to the clean released `X.Y.Z` (no `-dev`).
+3. Before opening the PR, `Read` `package.json` and confirm it has **no** `-dev` suffix
+   — don't trust that you bumped it earlier (#174: a `-dev.1` reached `main` live).
 
-**Convention: `dev` carries `X.Y.Z-dev.N`, `main` carries the clean `X.Y.Z`.** The
-FIRST commit on `dev` after a merge bumps to the next `-dev.1`; right before opening the
-PR to `main`, bump again to the clean released version (no `-dev` suffix). A `-dev`
-string ending up on `main` is a real bug, not cosmetic — it happened three times
-(#1/#101/#174) and was fixed in #98 (which also taught `sort -V` to rank `X-dev.N`
-above the clean `X`, so the CI version-check compares correctly either way).
-
-**Before opening the dev→main PR: `Read` `package.json` and confirm the version has NO
-`-dev` suffix** — don't rely on remembering you bumped it earlier in the session (#174:
-the clean bump was skipped, the PR merged with `-dev.1` still on `dev`, and `/health`
-showed `"0.16.5-dev.1 (…)"` live on `main` post-deploy).
-
-**If this IS missed and a `-dev.N` string lands on `main`: the recovery is a NEW patch
-bump, never retrying the SAME clean version number.** The `sort -V` "rank `X-dev.N`
-above bare `X`" fix (#98) only holds when the clean bump happens BEFORE the merge — it
-assumes `main` never itself carries an `X-dev.N` string. Once it does (the mistake
-above), bumping `dev` to the SAME clean `X.Y.Z` FAILS `version-check`: `sort -V` now
-compares `dev="X.Y.Z"` against `main="X.Y.Z-dev.N"` at the SAME patch number, and ranks
-main's dev-suffixed string higher — the exact #98 rule working against you. Bump to
-`X.Y.(Z+1)` instead (a real patch increment always wins regardless of any suffix); this
-happened live in #174 (`0.16.5-dev.1` on `main` → retrying `0.16.5` on `dev` failed CI →
-`0.16.6` fixed it, verified against `sort -V` directly before pushing).
+Bump MECHANICS (tab-preserving edit, never `JSON.stringify` — #161) and the recovery
+when a `-dev.N` already landed on `main` (#98/#174 `sort -V`) → auto-loads
+`.claude/rules/version-bump.md` on `package.json` / `.github/workflows/ci.yml`.
 
 ## Local build policy (Tier 0)
 
@@ -98,39 +84,24 @@ live in local memory, never committed (per security-basics).
 
 ## Playbook router
 
-Load the matching skill BEFORE working on that area (don't re-derive):
-- eslint / prettier / lint config / version-label fallback → auto-loads
-  `.claude/rules/lint-formatting.md` on its `paths:`
-- deploy / post-deploy E2E / LIVE flip → load `.claude/skills/deploy`
-- Money odpis / článkové kódy / nový systém-štýl / compute → load `.claude/skills/money-odpis`
-- katalóg skiel (`glass_types`), pridanie/zmena skla, Money-neutralita skla, migračná pasca
-  „user_version všade" → auto-loads `.claude/rules/glass-catalog.md` na jeho `paths:`
-  (`migracie.ts`, `db.ts`, `styl.ts`, `migration-*`/`sklo-*` testy)
-- ceny materiálu / cena skla / denný Money snapshot (IZOS vs NC cenník, `TS*` kódy skiel,
-  producent) → auto-loads `.claude/rules/ceny-snapshot.md` na jeho `paths:` (`ceny.ts`,
-  `sklo-cena.ts`, `CenyTabulka`/`SkloCena`, `ceny-snapshot.py`, `ceny*`/`sklo-cena*` testy)
-- unit/E2E test runs, local Playwright verification → load `.claude/skills/testing`
-- roles / b2b / route gating / Money-write boundary / auth migration → load `.claude/skills/access-control`
-- pridávam NOVÚ stránku/route (exporty, b2b denylist, nav, `$effect` slučka) → load `.claude/skills/nova-stranka`
-- FIX (pevné zasklenie) modul → auto-loads `.claude/rules/fix-module.md` on its `paths:`
-- server-side wall-clock timestamp zobrazovaný na obrazovke/tlači → auto-loads
-  `.claude/rules/timestamps.md` on its `paths:` (Docker nemá TZ → UTC default gotcha)
-- `.github/workflows/*.yml` (CI/deploy pipeline) → auto-loads `.claude/rules/ci.md`
-  on its `paths:` (zombie run recovery, `workflow_dispatch` retry, deploy-landed check)
-- `src/lib/vizual/**`, `src/lib/components/vizual/**` (three.js 3D náhľad) →
-  auto-loads `.claude/rules/vizual3d.md` on its `paths:` (WebGL context-lock,
-  `forceContextLoss` irreversibility, `preserveDrawingBuffer` test gotcha,
-  SVG `<foreignObject>` Playwright locator limit)
-- `src/routes/zasklenia/+page.svelte` (smart-default checkbox, reštart-efekt poradie)
-  → auto-loads `.claude/rules/zasklenia-form-reactivity.md` on its `paths:`
-- `src/lib/vykres/**`, `src/lib/components/vykres/**` (kóta helper, výkresový
-  hárok) → auto-loads `.claude/rules/vykres.md` on its `paths:` (route-scoped
-  `@page` print, SVG arc sweep round-trip check)
-- pergola nárez/výkres z rozmerov (`pergola-narez*`, `PergolaNarezVykres.svelte`,
-  `pergola/narez/**`) → auto-loads `.claude/rules/pergola-narez.md` on its `paths:`
-  (2× „light", krov→#161, len potvrdené vzorce, spec do spodného riadku)
-- pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` (nové pole do `odpis_log.detail`,
-  FormData `\r\n` test gotcha) → auto-loads `.claude/rules/odpis-detail.md` on its `paths:`
-- `src/lib/server/**` súbor blížiaci sa k 1000-riadkovému stropu → auto-loads
-  `.claude/rules/large-file-split.md` on its `paths:` (parameter-injection split
-  vzor, pure-move overenie diffom)
+Load the matching entry BEFORE working on that area (rules auto-load on their `paths:`;
+skills load only on an explicit `Skill` call by name) — one line per area:
+
+- lint / prettier / eslint config / version-label fallback → `.claude/rules/lint-formatting.md`
+- version bump mechanics (tabs/#161) + `-dev`-on-`main` recovery (#98/#174) → `.claude/rules/version-bump.md`
+- deploy / post-deploy E2E / LIVE flip → skill `.claude/skills/deploy`
+- Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
+- NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
+- roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
+- unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
+- katalóg skiel, pridanie/zmena skla, Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
+- ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
+- FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`
+- server-side wall-clock timestamp na obrazovke/tlači (UTC default pasca) → `.claude/rules/timestamps.md`
+- `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`
+- three.js 3D náhľad (vizual) → `.claude/rules/vizual3d.md`
+- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt poradie → `.claude/rules/zasklenia-form-reactivity.md`
+- kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`
+- pergola nárez/výkres z rozmerov → `.claude/rules/pergola-narez.md`
+- pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` → `.claude/rules/odpis-detail.md`
+- 1000-r. strop pre celé `src/**` (split vzory) → `.claude/rules/large-file-split.md`
