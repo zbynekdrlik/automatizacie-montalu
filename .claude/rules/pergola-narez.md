@@ -292,6 +292,13 @@ Verifikuj až po rez-nahlad PREVIEW, nikdy neklikaj „Odoslať do Money" na pro
 seed useri v `/opt/automatizacie-montalu/.env` (creds v lokálnej memory). Svelte 5 `bind:value`
 neberie syntetické `input` eventy z `evaluate` — na vyplnenie použi Playwright `fill`.
 
+**Varovania #234 — KDE ich čítať (read-back 2026-08-20, falošný negatív):** `rucne-varovanie`
+(neznámy kód) je client `$derived` z aktuálneho inputu — po „➕ Pridať" sa input vyprázdni a
+varovanie ZMIZNE. `rez-rucne-varovanie` (neznámy + „dvojitý odpis") vyrába server v
+`buildRezervaciaRozpis` → vidno až na `rez-nahlad` po `rezervovat`. `pergola-rezervacia.spec.ts`
+je celý `skipAkLive` → proti produ beží 0 testov; ručne: Spočítať (stateless) → pridať riadok →
+Pripraviť rezervačný odpis (náhľad, stále bez zápisu).
+
 ## Krokové subkomponenty (#239) — kde žije stav, kam pridať nový vstup
 
 `/pergola/narez` (kedysi 1231 r. monolit) je rozdelený: `+page.svelte` (~311 r.) = **state +
