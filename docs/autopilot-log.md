@@ -1379,3 +1379,19 @@ implementované, nereprodukovateľné čestný null:
   CI E2E potvrdili správne 4 riadky. Post-deploy overenie rob v ČISTOM prehliadači.
 - **PR nesie aj zlandovaný #240 commit `b3b8ad9`** (ceny-snapshot PRP, uzavreté) — samostatná
   časť z predchádzajúceho dev cyklu.
+
+## 2026-08-20 — #244 + #252 + #253 (PR #258, merge c06a3c2, v0.24.7, audit kolo 1)
+
+- **#244 CI/Docker hardening:** timeouty jobov, cancel-in-progress mimo main, json-file log
+  rotácia 10m×5, healthcheck `/health` (node fetch), 4 actions SHA-pinned, prod advisories
+  cez `overrides` + blokujúci `npm audit --omit=dev` krok; guard `tests/ci-docker-hardening.test.ts`.
+- **#252 docs/playbook:** reálny README, `## Dashboards`, `version-bump.md` rule, skills
+  access-control+testing → paths rules, router jednoriadkový; CLAUDE.md 1157→853 slov.
+- **#253 záloha SQLite:** `deploy/backup.sh` WAL-safe `.backup()` v kontajneri, cron 03:30,
+  gzip+rotácia 14 d, fail-loud; overené NAŽIVO (integrity ok, count 81==live).
+- **Navyše (#243):** eslint ignores `.claude/worktrees/` (9 súbežných worktree lámalo
+  tsconfigRootDir resolution — falošný lint fail len lokálne, CI čistý checkout nevidí).
+- **Fleet pasca:** worker `fix(...)` commit pred prvým test commitom = pre-push Gate 2 blok
+  na supervisorovom push-i; config-only advisory patch → `[no-test: reason]` empty commit.
+- Post-deploy: health+DOM `v0.24.7 (c06a3c2)`, konzola 0/0, docker healthy, LogConfig 10m×5,
+  cron aj zálohy na disku potvrdené.
