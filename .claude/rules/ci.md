@@ -198,3 +198,32 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
   ich zisťuje (`steps.e2e_secrets`) a preskočí sa s hlasným `::warning::` (NIE
   potlačenie chyby, NIE ticho zelený) — deploy tak nezlyhá na chýbajúcom secrete;
   health poll (ok+SHA7) je backstop verzie. Po pridaní secrets beží naostro.
+
+### Gotchas pri úprave `deploy` jobu / pridaní post-deploy overenia (#254)
+
+Tri mechanické guardy tvarujú, ako sa deploy job smie meniť — nezistíš ich, kým
+ťa nezablokujú pri integrácii:
+
+- **`tests/ci-docker-hardening.test.ts` tvrdí PRESNE 3 joby** (`deploy/test/
+  version-check`). Post-deploy overenie preto MUSÍ byť KROK v `deploy` jobe, nie
+  nový job (4. job rozbije `parser vidí všetky tri joby`). Guard tiež žiada
+  `timeout-minutes` na KAŽDOM jobe a SHA-pin na KAŽDEJ `uses:` akcii.
+- **`not.toMatch(/continue-on-error/)` matchne aj v KOMENTÁRI.** Nepíš doslovný
+  reťazec „continue-on-error" ani do vysvetľujúceho YAML komentára — guard padne.
+- **GitHub Actions: vlastný step-level `if:` dostane IMPLICITNE `success() &&`.**
+  `if: steps.X.outcome == 'failure'` sa preto pri zlyhaní NIKDY nespustí (job je
+  vo `failure` stave → `success()` false). Pre „nahraj artefakt keď krok zlyhal"
+  píš `if: always() && steps.X.outcome == 'failure'`. Pre „spusti len po úspešnom
+  predošlom kroku" naopak `success() && <podmienka>` (bez `success()` by vlastný
+  `if:` bežal aj po zlyhanom deployi).
+
+Pri pridávaní NOVÉHO deployment-gated E2E spec-u: `block-test-skips.sh` blokuje
+doslovný `test.skip(` v PRIDANOM riadku test súboru pri push. Nový post-deploy
+spec preto negatuj cez `test.skip(` — nechaj ho bežať vždy a SHA-kontrolu (verzia
+z DOM == nasadený SHA) daj podmienenú na `process.env.DEPLOY_SHA7` (`if (SHA7) { … }`).
+Lokálne (bez DEPLOY_SHA7) beží ako login+navigácia smoke proti preview.
+
+Testovateľnosť deploy shellu: vyextrahuj logiku do `deploy/deploy-remote.sh`
+(env-riadený) a pokry ju vitest-om cez `node:child_process` + mock `docker`/`curl`
+na `PATH` (`tests/deploy-remote.test.ts`) — žiadna nová dep, padne keď sa rollback
+pokazí.
