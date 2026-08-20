@@ -24,13 +24,17 @@ const dbPath = path.join(tmpRoot, 'v23.db');
 		CREATE TABLE user_audit (id INTEGER PRIMARY KEY, ts TEXT NOT NULL DEFAULT (datetime('now')), actor TEXT NOT NULL, action TEXT NOT NULL CHECK (action IN ('create','role_change')), target_username TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '');
 	`);
 	// ≥1 riadok do každej tabuľky čítaje seedom → seedData/seedUsers no-op
-	v23.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')").run();
+	v23
+		.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')")
+		.run();
 	v23.prepare("INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES ('X', 1, 0)").run();
 	v23.prepare("INSERT INTO glass_types (nazov, system) VALUES ('X', 'ALL')").run();
 	// existujúci audit riadok — recreate ho MUSÍ zachovať
-	v23.prepare(
-		"INSERT INTO user_audit (actor, action, target_username, detail) VALUES ('boss', 'create', 'obchod', 'role=b2b')"
-	).run();
+	v23
+		.prepare(
+			"INSERT INTO user_audit (actor, action, target_username, detail) VALUES ('boss', 'create', 'obchod', 'role=b2b')"
+		)
+		.run();
 	v23.pragma('user_version = 23');
 	v23.close();
 }
@@ -53,7 +57,9 @@ describe('migrácia v23 → v24: audit CHECK delete+seed, história zachovaná (
 	it("CHECK akceptuje 'delete' aj 'seed'", () => {
 		expect(() =>
 			db
-				.prepare("INSERT INTO user_audit (actor, action, target_username) VALUES ('a', 'delete', 't')")
+				.prepare(
+					"INSERT INTO user_audit (actor, action, target_username) VALUES ('a', 'delete', 't')"
+				)
 				.run()
 		).not.toThrow();
 		expect(() =>
@@ -66,7 +72,9 @@ describe('migrácia v23 → v24: audit CHECK delete+seed, história zachovaná (
 	it('CHECK stále odmieta neznámu akciu', () => {
 		expect(() =>
 			db
-				.prepare("INSERT INTO user_audit (actor, action, target_username) VALUES ('a', 'bogus', 't')")
+				.prepare(
+					"INSERT INTO user_audit (actor, action, target_username) VALUES ('a', 'bogus', 't')"
+				)
 				.run()
 		).toThrow();
 	});

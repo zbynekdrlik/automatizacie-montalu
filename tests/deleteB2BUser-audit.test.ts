@@ -23,9 +23,7 @@ describe('deleteB2BUser — audit trail (#246)', () => {
 		expect(res.error).toBeNull();
 
 		const audit = db
-			.prepare(
-				"SELECT actor, action, target_username FROM user_audit WHERE action = 'delete'"
-			)
+			.prepare("SELECT actor, action, target_username FROM user_audit WHERE action = 'delete'")
 			.all();
 		expect(audit).toEqual([{ actor: 'boss', action: 'delete', target_username: 'obchod@x' }]);
 
