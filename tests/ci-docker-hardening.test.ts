@@ -24,10 +24,10 @@ function childBlocks(text: string, parentKey: string, childIndent: number): Reco
 	let cur: string | null = null;
 	for (let i = start + 1; i < lines.length; i++) {
 		const line = lines[i];
-		if (/^\S/.test(line) && line.trim() !== '') break; // dedent na top-level kľúč → koniec sekcie
-		const m = line.match(headerRe);
+		if (/^\S/.test(line!) && line!.trim() !== '') break; // dedent na top-level kľúč → koniec sekcie
+		const m = line!.match(headerRe);
 		if (m) {
-			cur = m[1];
+			cur = m[1]!;
 			out[cur] = '';
 			continue;
 		}

@@ -167,8 +167,8 @@ describe('computeMulti — kovanie je len prieťahové pole, výpočet nemení',
 				kovanieP: 'Jednostranná kľučka z vnútra bez FAB'
 			})
 		)!;
-		expect(s.posuvy[0].kovanieL).toBe('Obojstranná kľučka s FAB');
-		expect(s.posuvy[0].kovanieP).toBe('Jednostranná kľučka z vnútra bez FAB');
+		expect(s.posuvy[0]!.kovanieL).toBe('Obojstranná kľučka s FAB');
+		expect(s.posuvy[0]!.kovanieP).toBe('Jednostranná kľučka z vnútra bez FAB');
 		expect(s.odpis).toEqual(bez.odpis);
 		expect(s.material).toEqual(bez.material);
 	});

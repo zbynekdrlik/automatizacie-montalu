@@ -68,9 +68,9 @@ describe('checkB2BHeight', () => {
 
 describe('B2B_LIMITS', () => {
 	it('má tri systémy so správnymi hodnotami', () => {
-		expect(B2B_LIMITS.Robust.maxHeight).toBe(2600);
-		expect(B2B_LIMITS.Deluxe.maxPanel).toBe(1000);
-		expect(B2B_LIMITS.Slide.maxPanel).toBe(1300);
+		expect(B2B_LIMITS.Robust!.maxHeight).toBe(2600);
+		expect(B2B_LIMITS.Deluxe!.maxPanel).toBe(1000);
+		expect(B2B_LIMITS.Slide!.maxPanel).toBe(1300);
 	});
 	it('Štandard + = ROVNAKÉ ako Deluxe (Dominik 2026-07-14)', () => {
 		expect(B2B_LIMITS['Štandard +']).toEqual(B2B_LIMITS.Deluxe);

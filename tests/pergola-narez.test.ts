@@ -314,7 +314,7 @@ describe('schemaVykresu (#194) — geometria z POTVRDENÝCH vzorcov, krov je #16
 		// rozostup medzi susednými (vrátane krajných 0 a sirka) ≤ 700
 		const vsetky = [0, ...s.priecky.pozicieX, VZOR.sirka];
 		for (let i = 1; i < vsetky.length; i++)
-			expect(vsetky[i] - vsetky[i - 1]).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK + 1e-6);
+			expect(vsetky[i]! - vsetky[i - 1]!).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK + 1e-6);
 		// vnútorné pozície sú striktne medzi 0 a sirka
 		for (const x of s.priecky.pozicieX) {
 			expect(x).toBeGreaterThan(0);
@@ -326,7 +326,7 @@ describe('schemaVykresu (#194) — geometria z POTVRDENÝCH vzorcov, krov je #16
 		const s = schemaVykresu({ ...VZOR, sirka: 20000 });
 		const vsetky = [0, ...s.priecky.pozicieX, 20000];
 		for (let i = 1; i < vsetky.length; i++)
-			expect(vsetky[i] - vsetky[i - 1]).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK + 1e-6);
+			expect(vsetky[i]! - vsetky[i - 1]!).toBeLessThanOrEqual(MAX_ROZOSTUP_PRIECOK + 1e-6);
 	});
 
 	it('schemaVykresu je čistá — nič nezapisuje, hodnoty sedia so spocitajNarez informatívnymi', () => {

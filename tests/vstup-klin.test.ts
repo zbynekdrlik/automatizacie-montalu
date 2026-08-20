@@ -130,8 +130,8 @@ describe('parseMultiVstup — klín je PER POSUV', () => {
 			posuv()
 		]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
-		expect(vstup.posuvy[1].klin).toBeNull();
+		expect(vstup.posuvy[0]!.klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
+		expect(vstup.posuvy[1]!.klin).toBeNull();
 	});
 
 	it('nezmyselný klín na 2. posuve pomenuje posuv v chybe', () => {
@@ -165,8 +165,8 @@ describe('MONEY-NEUTRALITA — klín nesmie zmeniť odpis ani materiál', () => 
 		const s = computeMulti(cfg, spec({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 }))!;
 		expect(s.odpis).toEqual(bez.odpis);
 		expect(s.material).toEqual(bez.material);
-		expect(s.posuvy[0].klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
-		expect(bez.posuvy[0].klin).toBeNull();
+		expect(s.posuvy[0]!.klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
+		expect(bez.posuvy[0]!.klin).toBeNull();
 	});
 });
 

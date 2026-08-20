@@ -96,7 +96,7 @@ describe('CAD nárez /pergola — cenový blok (#232)', () => {
 
 	it('interný, seednutá cena pre PRP kód: ten riadok ukáže reálnu (vymyslenú) cenu', async () => {
 		const r0 = (await cadActions.spocitat(cadEvent(INTERNAL_USER))) as CadNahlad;
-		const kod = r0.ceny!.radky[0].kod;
+		const kod = r0.ceny!.radky[0]!.kod;
 		seed([
 			{ kod, nakupCennik: 4.25, nakupPoslednaFaktura: null, predajVo: null, mena: 'EUR', sklad: 10 }
 		]);

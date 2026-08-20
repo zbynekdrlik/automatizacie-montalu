@@ -161,8 +161,8 @@ describe('znovaZOdpisu — zimná záhrada (viac posuvov)', () => {
 		});
 		const m = znovaZOdpisu(id)!.multiVstup!;
 		expect(m.posuvy).toHaveLength(2);
-		expect(m.posuvy[0].styl).toBe('2K');
-		expect(m.posuvy[1].s).toBe(3000);
+		expect(m.posuvy[0]!.styl).toBe('2K');
+		expect(m.posuvy[1]!.s).toBe(3000);
 		expect(m.ral).toBe('9016');
 		expect(m.pridavnaKolajnica).toBe(true);
 		expect(m.zak).toBe('');

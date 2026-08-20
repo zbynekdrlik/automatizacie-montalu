@@ -172,8 +172,8 @@ describe('fail-loud: nenakonfigurovaný štýl NESMIE dať tichú nulu', () => {
 
 	it('chybová správa menuje kód aj štýl, aby dielňa vedela čo chýba', () => {
 		const r = spocitaj('Robust|2x4K');
-		expect(r.chyby[0].sprava).toMatch(/ZASK00029/);
-		expect(r.chyby[0].sprava).toMatch(/Robust\|2x4K/);
+		expect(r.chyby[0]!.sprava).toMatch(/ZASK00029/);
+		expect(r.chyby[0]!.sprava).toMatch(/Robust\|2x4K/);
 	});
 });
 
@@ -309,7 +309,7 @@ describe('KOMPONENTY_SLIDE — pripravené, ale do Money zatiaľ nejde', () => {
 		const r = spocitajS('Slide|3K');
 		const rohovniky = r.polozky.filter((p) => p.kod === 'ZASK00037');
 		expect(rohovniky).toHaveLength(1); // nie dva riadky do Money
-		expect(rohovniky[0].qty).toBe(8 + 4 * zaklad('Slide|3K').kridla);
+		expect(rohovniky[0]!.qty).toBe(8 + 4 * zaklad('Slide|3K').kridla);
 	});
 
 	it('Slide nemá vlastný rohovník krídla ani kód ZASK00038/39 z Robustu', () => {

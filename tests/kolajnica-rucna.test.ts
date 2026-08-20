@@ -166,8 +166,8 @@ describe('Money odpis sa MENÍ, keď sa zmení počet tyčí', () => {
 		const r = computeMulti(cfg, [mk({ horna: 3600, spodna: 3600 }), mk()])!;
 		const h = r.material.find((m) => m.kod === 'ZASP00107')!;
 		expect(h.rezy.map((x) => x.rozmer).sort((a, b) => a - b)).toEqual([3600, 4000]);
-		expect(r.posuvy[0].kolajnica).toEqual({ horna: 3600, spodna: 3600 });
-		expect(r.posuvy[1].kolajnica).toBeNull();
+		expect(r.posuvy[0]!.kolajnica).toEqual({ horna: 3600, spodna: 3600 });
+		expect(r.posuvy[1]!.kolajnica).toBeNull();
 	});
 });
 

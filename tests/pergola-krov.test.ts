@@ -137,7 +137,7 @@ describe('krovUlozenie — čistá funkcia, monotónny rast offsetov s uhlom', (
 	it('offsety rastú s uhlom (7 < 8 < 9 < 12) — geometria sa „otvára"', () => {
 		const uhly = [7, 8, 9, 12];
 		const ps = uhly.map((u) => krovUlozenie(u).ps!);
-		for (let i = 1; i < ps.length; i++) expect(ps[i]).toBeGreaterThan(ps[i - 1]);
+		for (let i = 1; i < ps.length; i++) expect(ps[i]).toBeGreaterThan(ps[i - 1]!);
 	});
 	it('lv/pv (odvesna cc) je vždy väčšie než ps/ls (odvesna c) pri > 7°', () => {
 		for (const u of [7.2, 8, 10, 12]) {

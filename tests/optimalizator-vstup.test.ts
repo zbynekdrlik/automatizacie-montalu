@@ -58,7 +58,7 @@ describe('parseOptimalizatorVstup', () => {
 		expect('error' in r).toBe(false);
 		if ('error' in r) return;
 		expect(r.vstup.dlzkaTyce).toBe(6000);
-		expect(r.vstup.kusy[0].dlzka).toBeCloseTo(2834.5);
+		expect(r.vstup.kusy[0]!.dlzka).toBeCloseTo(2834.5);
 	});
 
 	it('prázdne riadky kusov sa preskočia', () => {

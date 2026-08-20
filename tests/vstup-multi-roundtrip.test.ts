@@ -41,8 +41,8 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 	it('prvý parse (z formulára) klín aj koľajnicu prečíta', () => {
 		const { vstup, error } = znovuPosli([POSUV_PLOCHY]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].klin).toEqual({ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 });
-		expect(vstup.posuvy[0].kolajnica).toEqual({ horna: 2690, spodna: 2695 });
+		expect(vstup.posuvy[0]!.klin).toEqual({ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 });
+		expect(vstup.posuvy[0]!.kolajnica).toEqual({ horna: 2690, spodna: 2695 });
 	});
 
 	it('druhý parse (náhľad → odoslať) klín aj koľajnicu ZACHOVÁ', () => {
@@ -50,15 +50,15 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 		// náhľad posiela sparsovaný tvar späť na server
 		const { vstup, error } = znovuPosli(prvy.posuvy);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].klin).toEqual(prvy.posuvy[0].klin);
-		expect(vstup.posuvy[0].kolajnica).toEqual(prvy.posuvy[0].kolajnica);
+		expect(vstup.posuvy[0]!.klin).toEqual(prvy.posuvy[0]!.klin);
+		expect(vstup.posuvy[0]!.kolajnica).toEqual(prvy.posuvy[0]!.kolajnica);
 	});
 
 	it('opakovaný round-trip (späť a upraviť → znova náhľad → odoslať) drží hodnoty', () => {
 		let v = znovuPosli([POSUV_PLOCHY]).vstup;
 		for (let i = 0; i < 3; i++) v = znovuPosli(v.posuvy).vstup;
-		expect(v.posuvy[0].klin).toEqual({ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 });
-		expect(v.posuvy[0].kolajnica).toEqual({ horna: 2690, spodna: 2695 });
+		expect(v.posuvy[0]!.klin).toEqual({ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 });
+		expect(v.posuvy[0]!.kolajnica).toEqual({ horna: 2690, spodna: 2695 });
 	});
 
 	it('posuv BEZ klina a bez ručnej koľajnice ostáva bez nich (null neprepne zapínač)', () => {
@@ -75,11 +75,11 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 				kolajnicaSpodna: ''
 			}
 		]).vstup;
-		expect(prvy.posuvy[0].klin).toBeNull();
+		expect(prvy.posuvy[0]!.klin).toBeNull();
 		const { vstup, error } = znovuPosli(prvy.posuvy);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].klin).toBeNull();
-		expect(vstup.posuvy[0].kolajnica).toBeNull();
+		expect(vstup.posuvy[0]!.klin).toBeNull();
+		expect(vstup.posuvy[0]!.kolajnica).toBeNull();
 	});
 
 	it('sparsovaný klín s nezmyselnou hodnotou padne na chybu, nie tichor zmizne', () => {
@@ -106,29 +106,29 @@ describe('parseMultiVstup — druhý parse nesmie stratiť SYSTÉM sieťky (#110
 	it('prvý parse (z formulára) systém sieťky prečíta', () => {
 		const { vstup, error } = znovuPosli([POSUV_SO_SIETKOU_STANDARD]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].sietka).toEqual({ uchyt: 'madloVelke', system: 'Štandard' });
+		expect(vstup.posuvy[0]!.sietka).toEqual({ uchyt: 'madloVelke', system: 'Štandard' });
 	});
 
 	it('druhý parse (náhľad → odoslať) systém sieťky ZACHOVÁ', () => {
 		const prvy = znovuPosli([POSUV_SO_SIETKOU_STANDARD]).vstup;
 		const { vstup, error } = znovuPosli(prvy.posuvy);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].sietka).toEqual(prvy.posuvy[0].sietka);
-		expect(vstup.posuvy[0].sietka?.system).toBe('Štandard');
+		expect(vstup.posuvy[0]!.sietka).toEqual(prvy.posuvy[0]!.sietka);
+		expect(vstup.posuvy[0]!.sietka?.system).toBe('Štandard');
 	});
 
 	it('opakovaný round-trip (späť a upraviť ×3) drží systém sieťky', () => {
 		let v = znovuPosli([POSUV_SO_SIETKOU_STANDARD]).vstup;
 		for (let i = 0; i < 3; i++) v = znovuPosli(v.posuvy).vstup;
-		expect(v.posuvy[0].sietka).toEqual({ uchyt: 'madloVelke', system: 'Štandard' });
+		expect(v.posuvy[0]!.sietka).toEqual({ uchyt: 'madloVelke', system: 'Štandard' });
 	});
 
 	it('sieťka BEZ zvoleného systému (rovnaký ako posuv) round-trip drží — pole ostáva chýbajúce, nie omylom vyplnené', () => {
 		const posuv = { ...POSUV_PLOCHY, system: 'Štandard +', sietka: '1', sietkaUchyt: 'zamok' };
 		const prvy = znovuPosli([posuv]).vstup;
-		expect(prvy.posuvy[0].sietka).toEqual({ uchyt: 'zamok' });
+		expect(prvy.posuvy[0]!.sietka).toEqual({ uchyt: 'zamok' });
 		const { vstup, error } = znovuPosli(prvy.posuvy);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].sietka?.system).toBeUndefined();
+		expect(vstup.posuvy[0]!.sietka?.system).toBeUndefined();
 	});
 });

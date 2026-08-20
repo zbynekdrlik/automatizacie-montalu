@@ -100,10 +100,10 @@ describe('parseRucnePolozky — platné riadky (merge, MJ, čiarka)', () => {
 	});
 	it('chýbajúci názov → fallback na kód (nikdy prázdny názov do Money)', () => {
 		const { rows } = parseRucnePolozky(JSON.stringify([{ kod: 'PRP20259', mnozstvo: 3, mj: 'm' }]));
-		expect(rows[0].nazov).toBe('PRP20259');
+		expect(rows[0]!.nazov).toBe('PRP20259');
 	});
 	it('množstvo sa zaokrúhli na 0,001 (ako applyEdits)', () => {
 		const { rows } = parseRucnePolozky(JSON.stringify([{ kod: 'X', mnozstvo: 1.23456, mj: 'm' }]));
-		expect(rows[0].mnozstvo).toBe(1.235);
+		expect(rows[0]!.mnozstvo).toBe(1.235);
 	});
 });

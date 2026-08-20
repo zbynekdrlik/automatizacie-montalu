@@ -37,7 +37,7 @@ for (const s of seed.sys) N[s.sysStyl] = s.N;
 		// simuluj STARÝ (chybný) stav: Štandard šírka skla o 2N nižšie
 		const oldOffset =
 			r.sysStyl.startsWith('Štandard +') && r.nazov === 'Sklo šírka'
-				? r.offset - 2 * N[r.sysStyl]
+				? r.offset - 2 * N[r.sysStyl]!
 				: r.offset;
 		insRez.run(
 			r.sysStyl,

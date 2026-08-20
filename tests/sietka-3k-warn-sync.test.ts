@@ -100,7 +100,7 @@ describe('#91 nález 3 — sietkaKolajnicaSwap MUSÍ vymeniť KAŽDÚ koľajnicu
 
 	for (const { sysStyl, system, styl } of styloveSkupiny) {
 		it(`${sysStyl}: KAŽDÁ Koľajnica sa so zapnutou sieťkou zmení na iný kód`, () => {
-			const kolajnice = cfg[sysStyl].rez.filter(
+			const kolajnice = cfg[sysStyl]!.rez.filter(
 				(r) => r.typ === 'profil' && /^Koľajnica\b/i.test(r.nazov)
 			);
 			expect(kolajnice.length).toBeGreaterThan(0); // vektor musí mať čo testovať
