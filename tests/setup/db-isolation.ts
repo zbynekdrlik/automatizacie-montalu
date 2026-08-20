@@ -15,6 +15,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
+// Spolieha sa na default vitest `isolate: true` — `db.ts` sa re-evaluuje per súbor, takže
+// per-file env účinkuje. Keby niekto nastavil `isolate: false`, súbory v jednom workeri by
+// zdieľali prvú DB (nie však pôvodný migračný race — súbory v jednom workeri bežia sériovo).
 // scratch žije pod os.tmpdir() (nikdy v repo; `.gitignore` navyše kryje *.db/data/).
 // `am-vitest-db` marker + pid + UUID = bezkolízne naprieč súbormi aj paralelnými workermi.
 const scratchDir = path.join(os.tmpdir(), 'am-vitest-db', `${process.pid}-${randomUUID()}`);
