@@ -115,3 +115,41 @@ $SSH 'cd /opt/automatizacie-montalu && docker compose up -d app'
 ```
 Poznámka: krok 3 (`docker compose stop`) je jediná časť, ktorá appku preruší — bez neho
 by bola obnova nekonzistentná; robí sa LEN pri reálnom restore, nie pri zálohovaní.
+
+## Non-root kontajner + non-root deploy user (#256)
+
+Kontajner beží ako **`USER node` (uid 1000)** a **CI deploy sa prihlasuje ako `deploy@`**
+(non-root, v skupine `docker`), nie `root@`. (Manuálny admin prístup nižšie — backup scp,
+restore — používa admin kľúč `root@` ďalej; menil sa LEN CI deploy účet.)
+
+### Jednorazová provizícia VPS — PREREKVIZITA pred prvým `deploy@` deployom
+
+`deploy/provision-vps.sh` (idempotentný root skript) MUSÍ zbehnúť RAZ na VPS predtým, než
+CI po tomto tickete prvýkrát deployne ako `deploy@`:
+
+```bash
+ssh -i ~/.ssh/n8n_montalu_ed25519 root@167.233.125.9 'bash -s' < deploy/provision-vps.sh
+```
+
+Vytvorí `deploy` usera v skupine `docker`, autorizuje EXISTUJÚCI CI kľúč (kópia
+`/root/.ssh/authorized_keys` — **žiadna rotácia `VPS_SSH_KEY`**) a prevlastní
+`/opt/automatizacie-montalu` na `deploy`. Ak sa zabudne, CI SSH krok zlyhá HLASNE PRED
+dotykom kontajnera → prod ostane na aktuálnej verzii (bezpečné).
+
+### Vlastníctvo volumes (uid 1000) — automatické pri každom deployi
+
+`deploy-remote.sh` volá `migrate_ownership` (`docker compose run --user 0`) PRED `up`:
+`appdata` `/data/app` `-R 1000:1000`, `/data/dlv-import` koreň nerekurzívne (dir-write
+stačí na create/delete, neprepisuje n8n súbory), `NA ODPIS` podstrom `-R`. `ceny` `:ro` sa
+netýka. Idempotentné + self-healing; chyba len `::warning::` (health poll + rollback je
+backstop). Detaily a UNVERIFIED (n8n uid = predpoklad 1000; prvý reálny odpis) → `.claude/rules/ci.md`.
+
+### Overenie po nasadení (acceptance #256)
+
+```bash
+DEPLOY="ssh -i ~/.ssh/n8n_montalu_ed25519 deploy@167.233.125.9"
+$DEPLOY 'docker exec automatizacie-montalu id'                 # uid=1000(node)
+$DEPLOY 'docker exec -u node automatizacie-montalu sh -c "touch /data/dlv-import/.probe && rm /data/dlv-import/.probe && echo WRITE_OK"'
+$DEPLOY 'docker inspect --format "{{.Config.User}}" $(docker ps -qf name=n8n | head -1)'  # over n8n uid (predpoklad node/1000)
+```
+Prvý reálny produkčný odpis sleduj v `odpis_log` + súbor v `/data/dlv-import`.

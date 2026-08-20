@@ -31,6 +31,19 @@ XFF_DEPTH: '1'
 ignoruje → spoof-safe. `getClientAddress()` **hádže**, keď hlavička chýba (priamy hit na
 `/health` healthcheck ju nevolá; login akcia ju volá v `try/catch` → bucket `'-'`). Toto
 je jediné miesto v appke, ktoré `getClientAddress()` používa (throttle kľúč + log) — nie
+
+## ⚠️ Tento predpoklad NEPLATÍ za Cloudflare — #264 (ešte neopravené)
+
+Vyššie uvedený dizajn predpokladá, že **Caddy je JEDINÝ reverse proxy hop** medzi
+klientom a appkou. `app.montalu.cloud` je ale za Cloudflare (`server: cloudflare` +
+`cf-ray` hlavičky, DNS na Cloudflare anycast IP) — reťazec je klient → Cloudflare edge
+→ Caddy → app. Posledný prvok XFF, ktorý Caddy pridáva, je vtedy IP **Cloudflare edge
+node**, nie prehliadača klienta (potvrdené post-deploy verifikáciou #251 na v0.24.11:
+zalogovaná `ip` bola `172.70.225.170`, v rozsahu Cloudflare `172.64.0.0/13`, nie reálna
+IP testujúceho). `(username, ip)` throttle kľúč sa tak môže zdieľať naprieč viacerými
+reálnymi userami cez rovnaký Cloudflare PoP. Fix (buď `Cf-Connecting-Ip` hlavička,
+alebo `XFF_DEPTH` prepočítaný o Cloudflare hop) je otvorený v #264 — kým nie je
+zavretý, NEDÔVERUJ `ip` v throttle logoch ako reálnej klientskej IP.
 je to auth/access rozhodnutie, takže ani teoretický XFF spoof nie je bypass loginu.
 
 ## SvelteKit akcia: kontrola PRED `await` sa musí RE-CHECKnúť PO `await`

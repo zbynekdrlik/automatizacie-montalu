@@ -1450,6 +1450,17 @@ implementované, nereprodukovateľné čestný null:
 - Pasce: (1) `test.skip(` v pridanom test súbore blokuje `block-test-skips.sh` pri integrácii → post-deploy.spec bez skip, SHA kontrola conditional na DEPLOY_SHA7. (2) komentár s literálom „continue-on-error" padne na guard `not.toMatch(/continue-on-error/)` → preformulované. (3) SHA-pinnuté akcie (40-hex) → secret-scan false-positive, bypass `# airuleset:secret-ok`. (4) worker NESMIE `Closes #N` (block-worker-close-trigger.sh) — supervisor zatvára.
 - Lokálne zelené: check 0 err, test 1536 passed + coverage, lint clean, shellcheck clean, RED-keď-rollback-pokazený overené. Build + reálny deploy + live E2E = CI-only.
 
+## #256 — Non-root kontajner (USER node) + chown mountov + non-root deploy user (2026-08-20)
+
+- Worktree lane `worktree-agent-a7fda2c06e2ce488b`, base = dev 0.24.9-dev.1 + zlúčené #254 deploy lane (`2be137d`; package.json 0.24.9-dev.1, ci.md/autopilot-log oba boky). Merge-interakcia fix `84ce372`: #254 post-deploy.spec zosúladený s #247 per-blok console guardom (expect(<var>).toEqual([]) bez message argumentu).
+- RED [ac5167b]: `ci-docker-hardening.test.ts` (#256 blok — USER node, chown /data/app poradie, deploy@ nie root@, migrate_ownership + chown -R 1000:1000) + `deploy-remote.test.ts` happy path (compose run --user 0 + chown /data/app). GREEN [c7d32dd].
+- Dockerfile runtime stage: `mkdir -p /data/app && chown node:node /data/app` PRED `USER node` (uid 1000) → čerstvý appdata volume zdedí node owner; existujúci volume + zdieľané mounty rieši migrate_ownership.
+- `deploy/deploy-remote.sh` migrate_ownership (`docker compose run --user 0`) pred up: appdata -R 1000:1000, /data/dlv-import koreň NErekurzívne (dir-write stačí na create/delete, neprepisuje n8n súbory), NA ODPIS -R. Idempotentné, chyba = ::warning:: (health+rollback backstop). Jednoriadkový chown skript (mock loguje "$*").
+- `ci.yml` deploy job root@ → deploy@ (6×). `deploy/provision-vps.sh` NOVÝ jednorazový idempotentný root skript (deploy user v docker skupine, kópia root authorized_keys — bez rotácie secretu, chown /opt na deploy). PREREKVIZITA pred prvým deploy@.
+- Lokálne zelené: check 0 err, lint clean, full suite 1706 passed, shellcheck + bash -n clean (provision-vps.sh + deploy-remote.sh). Build + reálny deploy = CI-only (Tier 0).
+- UNVERIFIED (post-deploy, supervisor/user): n8n uid na VPS (predpoklad 1000 = oficiálny n8nio image; chown na 1000:1000 bezpečný ak n8n=1000 alebo root); prvý reálny produkčný odpis po prepnutí (Money zápis z worktree nedosiahnuteľný). Prerekvizita: provision-vps.sh raz na VPS pred merge deployom.
+- Detaily + gotchas: `.claude/rules/ci.md` „Non-root kontajner…" sekcia; overovacie príkazy: `.claude/skills/deploy/SKILL.md`.
+
 ## Kolo 4 — #254 + #257 (PR #262, v0.24.10, merge 6ae2f5a)
 
 - **#254 (deploy rollback + post-deploy E2E):** compose `image:` tag pre rollback; deploy job pri zlyhaní health/verzie rollbackne na predchádzajúci obraz; nový krok Post-deploy E2E cez SSH tunel (BASE_URL + DEPLOY_SHA7 + E2E_USER/E2E_PASS z GitHub env `production`) — read-only smoke `e2e/post-deploy.spec.ts`. Prvý ostrý beh: všetky kroky success.
@@ -1457,3 +1468,10 @@ implementované, nereprodukovateľné čestný null:
 - **Navyše:** favicon (`static/favicon.svg`) — koniec 404 console erroru z prod (nález post-deploy verifikácie kola 3); filed #261 (test-izolácia: zdieľaný ./data/app.db race pri paralelnom vitest).
 - **Cross-lane pasca (opakovala sa 2×):** lane s base spred kola N nevidí nové gates z kola N — #254's `post-deploy.spec.ts` mal console assert s message argumentom (`expect(errors, '…')`), guard #247 vyžaduje presný tvar `expect(<v>).toEqual([])`. Fix `089f741`. Ponaučenie: pri serial integrácii merged-lane špecov VŽDY lokálne pustiť `tests/e2e-console-guard.test.ts` pred pushom.
 - Post-deploy: health + DOM `v0.24.10 (6ae2f5a)`, console 0/0 (favicon 404 preč), favicon.svg 200.
+
+## Kolo 5 — #251 solo (PR #263, v0.24.11, merge 0317f8f)
+
+- **#251 (login hardening):** brute-force lockout (`login-throttle.ts`, per-user + per-IP, JSON text-safe kľúč, bounded memory), timing-oracle mitigácia, limit dĺžky vstupov, security headers (`hooks.server.ts`), compose `ADDRESS_HEADER=x-forwarded-for` + `XFF_DEPTH=1`, 420 r. testov RED→GREEN + adversariálny review fix. Solo PR (security boundary).
+- rerere: CLAUDE.md auto; package.json preimage zmenený (dev medzitým 0.24.11-dev.1) → ručne, nová resolution zaznamenaná.
+- Post-deploy: headers na /login živé (DENY/nosniff/referrer/permissions), marek login cez Caddy OK bez lockoutu, kontajner env OK, DOM `v0.24.11 (0317f8f)`, console 0/0.
+- **Nález:** app.montalu.cloud je za CLOUDFLARE (client → CF → Caddy → app) — `XFF_DEPTH=1` číta CF edge IP, nie klientsku. Throttle kľúč degraduje na CF PoP. Filed #264; medzera zdokumentovaná v `.claude/rules/login-hardening.md` (ada66b5).
