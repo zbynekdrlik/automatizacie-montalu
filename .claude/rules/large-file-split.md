@@ -11,14 +11,20 @@ components AND routes (`+page.svelte`, `+page.server.ts`), not just
 module, **step subcomponents** for a big `.svelte` page (#239).
 
 `db.ts` was 986 lines (`migrate()` alone 679) — split into `db.ts` (connection +
-query API, 209 lines) + a new `migracie.ts` (the migration/seed chain, ~790 lines).
+query API, 209 lines) + a new `migracie.ts` (the migration/seed chain, ~790
+lines). `compute.ts` was the next over the cap (1430 lines) and got the same
+treatment in **#249** — see "Pure functions: a layered façade split" below for
+that variant. A mechanical guard now enforces the cap: `tests/server-file-size-cap.test.ts`
+walks every `src/lib/server/**/*.ts` and fails if any file exceeds 1000 lines
+(the prose convention alone let `compute.ts` silently reach 1430). New server
+modules are covered automatically by that walk — nothing to register per file.
 
 ## Watch-list — files at / over the cap (re-measure `wc -l` before acting)
 
 | File | Lines | Status |
 |---|---|---|
 | `src/routes/zasklenia/+page.svelte` | ~1620 | over — split tracked #250 |
-| `src/lib/server/compute.ts` | ~1430 | over — being split #249 |
+| `src/lib/server/compute.ts` | — | split DONE (#249 → 4 moduly + fasáda) |
 | `src/lib/server/migracie.ts` | ~861 | approaching |
 | `src/lib/pergola-narez.ts` | ~793 | approaching |
 | `src/lib/components/vizual/Vizual3D.svelte` | ~722 | approaching |

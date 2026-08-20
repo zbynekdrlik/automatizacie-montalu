@@ -50,6 +50,7 @@ async function vyplnFormular(page: Page) {
 test('regresia (live nález): zmena systému sa NEVRÁTI späť na prvý v zozname (self-loop v reštart-effecte)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/zasklenia/navrh');
 	await waitHydrated(page);
@@ -67,11 +68,16 @@ test('regresia (live nález): zmena systému sa NEVRÁTI späť na prvý v zozna
 	expect(cielovy).not.toBeNull();
 
 	await page.getByLabel('Systém').selectOption(cielovy!);
-	// over hodnotu HNEĎ aj o chvíľu neskôr — self-loop bug ju prepisoval späť
-	// na najbližšom reaktívnom flushi, nie okamžite pri samotnom výbere
+	// over hodnotu HNEĎ aj po ustálení reaktívneho systému — self-loop bug ju
+	// prepisoval späť na najbližšom reaktívnom flushi, nie okamžite pri výbere.
+	// Namiesto pevného sleepu deterministicky prejdeme render-flush (2× rAF,
+	// spoľahlivo za mikroúlohami aj Svelte rAF flushom) a potom OHRANIČENE overíme,
+	// že hodnota zostala zvolená (nevrátila sa na prvý systém).
 	await expect(page.locator('#system')).toHaveValue(cielovy!);
-	await page.waitForTimeout(300);
-	await expect(page.locator('#system')).toHaveValue(cielovy!);
+	await page.evaluate(
+		() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+	);
+	await expect(page.locator('#system')).toHaveValue(cielovy!, { timeout: 2000 });
 
 	const stylOptions = await page.locator('#styl').locator('option').allTextContents();
 	await page.getByLabel('Štýl').selectOption(stylOptions[0]);
@@ -83,6 +89,7 @@ test('regresia (live nález): zmena systému sa NEVRÁTI späť na prvý v zozna
 	await expect(page.getByTestId('form-error')).toHaveCount(0);
 	// nadpis pod výkresom nesie SKUTOČNE zvolený systém, nie prvý v zozname
 	await expect(page.getByTestId('zn-system')).toContainText(cielovy!);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('vyplnenie formulára nakreslí predný pohľad s kótami — 2 krídla (Robust 2K), zero console errors', async ({
@@ -165,6 +172,7 @@ test('#168: väčší nadpis + šípka na pohyblivom krídle podľa smeru otvár
 // pergoly (ktorá titleBlock prop POSIELA) táto stránka VykresovyHarok volá BEZ
 // titleBlock, takže `title-block`/`tb-*` testidy sa NIKDY nevykreslia.
 test('#162 bod 4: zákaznícka verzia bez info rámčeka (žiadny title-block)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('nakreslit').click();
@@ -175,9 +183,11 @@ test('#162 bod 4: zákaznícka verzia bez info rámčeka (žiadny title-block)',
 	await expect(page.getByTestId('tb-cislo-vykresu')).toHaveCount(0);
 	// hárok s mriežkou (rám papiera) je STÁLE tam — len bez pečiatky
 	await expect(page.getByTestId('vykresovy-harok')).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('RAL farebný variant — výber odtieňa vyplní farbu a poznámku', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('rezim-farebny-radio').check();
@@ -187,9 +197,11 @@ test('RAL farebný variant — výber odtieňa vyplní farbu a poznámku', async
 
 	await expect(page.getByTestId('zn-ral-text')).toHaveText('RAL: 7016 ANTRACIT');
 	await expect(page.getByTestId('zn-elevation-ram')).toHaveAttribute('fill', '#383E42');
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('klín nad posuvom — vyplnené polia sa vykreslia s kótou', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByRole('checkbox', { name: 'Klín nad posuvom' }).check();
@@ -211,9 +223,11 @@ test('klín nad posuvom — vyplnené polia sa vykreslia s kótou', async ({ pag
 	const v2FontSize = await page.getByTestId('zn-klin-v2').getAttribute('font-size');
 	expect(Number(v1FontSize)).toBeGreaterThanOrEqual(3);
 	expect(Number(v2FontSize)).toBeGreaterThanOrEqual(3);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('ručná koľajnica — vyplnená horná dĺžka sa vykreslí ako poznámka', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByLabel('Horná (mm)').fill('2690');
@@ -222,10 +236,12 @@ test('ručná koľajnica — vyplnená horná dĺžka sa vykreslí ako poznámka
 
 	await expect(page.getByTestId('zn-kolajnica')).toBeVisible();
 	await expect(page.getByTestId('zn-kolajnica-text')).toContainText('horná 2690 mm');
+	expect(consoleMsgs).toEqual([]);
 });
 
 // tlač: rovnaký mechanizmus ako /pergola/navrh (route-scoped @page landscape).
 test('tlač: @page je A4 landscape, len na tejto route (route-CSS-splitting)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByTestId('nakreslit').click();
@@ -238,11 +254,13 @@ test('tlač: @page je A4 landscape, len na tejto route (route-CSS-splitting)', a
 	await goto(page, '/zasklenia');
 	const zaskleniaSizes = await najdiPageSizes(page);
 	expect(zaskleniaSizes.some((s) => /landscape/i.test(s))).toBe(false);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by ho vynuloval)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormular(page);
 	await page.getByLabel('Názov výkresu (voliteľné)').fill('Ponuka pre ZAK202699');
@@ -285,6 +303,7 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 	await expect(page.getByTestId('zn-kolajnica-text')).toContainText('horná 2690 mm');
 	await expect(page.getByTestId('zn-kolajnica-text')).toContainText('spodná 2695 mm');
 	await expect(page.getByTestId('zn-ral-text')).toHaveText('RAL: 7016 ANTRACIT');
+	expect(consoleMsgs).toEqual([]);
 });
 
 // #162 bod 5: b2b — dostupná AUTOMATICKY (na rozdiel od pergoly nepotrebuje výnimku

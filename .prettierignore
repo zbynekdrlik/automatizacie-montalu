@@ -11,3 +11,8 @@ package-lock.json
 **/*.md
 .claude/
 .superpowers/
+
+# StrykerJS mutation testing (#248)
+reports/
+.stryker-tmp/
+stryker.log
