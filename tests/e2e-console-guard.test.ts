@@ -35,7 +35,7 @@ function testBlocks(src: string): Block[] {
 	const lines = src.split('\n');
 	const blocks: Block[] = [];
 	for (let i = 0; i < lines.length; i++) {
-		const m = /^(\s*)test\(/.exec(lines[i]);
+		const m = /^(\s*)test\(/.exec(lines[i]!);
 		if (!m) continue;
 		const close = m[1] + '});';
 		let j = i;

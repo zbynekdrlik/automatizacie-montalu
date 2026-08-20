@@ -41,18 +41,18 @@ const KATALOG: Record<string, { nazov: string; redukciaZero: boolean; hrubka: nu
 
 describe('defaultSklo — predvoľba je vždy číre', () => {
 	it('Robust: 4/16/4 číre (nie mliečne, ktoré je prvé v katalógu)', () => {
-		const zoznam = KATALOG.Robust.map((g) => g.nazov);
+		const zoznam = KATALOG.Robust!.map((g) => g.nazov);
 		expect(zoznam[0]).toBe('Izolačné sklo 4/16/4 mliečne'); // pôvodná predvoľba
 		expect(defaultSklo(zoznam)).toBe('Izolačné sklo 4/16/4 číre');
 	});
 
 	it('Slide: 4/8/4 číre (štandardná skladba bez redukcie — Patrik)', () => {
-		expect(defaultSklo(KATALOG.Slide.map((g) => g.nazov))).toBe('Izolačné sklo 4/8/4 číre');
+		expect(defaultSklo(KATALOG.Slide!.map((g) => g.nazov))).toBe('Izolačné sklo 4/8/4 číre');
 	});
 
 	it('systém bez „číre" v názvoch → prvé sklo v katalógu (Deluxe, Štandard +)', () => {
-		expect(defaultSklo(KATALOG.Deluxe.map((g) => g.nazov))).toBe('Float kalené 6 mm');
-		expect(defaultSklo(KATALOG['Štandard +'].map((g) => g.nazov))).toBe('Float sklo 4 mm');
+		expect(defaultSklo(KATALOG.Deluxe!.map((g) => g.nazov))).toBe('Float kalené 6 mm');
+		expect(defaultSklo(KATALOG['Štandard +']!.map((g) => g.nazov))).toBe('Float sklo 4 mm');
 	});
 
 	it('prázdny zoznam nespadne (vráti prázdny string)', () => {
@@ -74,9 +74,9 @@ describe('Money-neutralita: nová predvoľba nemení ani jeden odpisový riadok'
 
 	for (const sysStyl of Object.keys(cfg)) {
 		const system = sysStyl.split('|')[0];
-		const katalog = KATALOG[system];
+		const katalog = KATALOG[system!];
 		if (!katalog) continue;
-		const stare = katalog[0];
+		const stare = katalog[0]!;
 		const nove = katalog.find((g) => g.nazov === defaultSklo(katalog.map((x) => x.nazov)))!;
 
 		it(`${sysStyl}: odpis pri „${stare.nazov}" == odpis pri „${nove.nazov}"`, () => {

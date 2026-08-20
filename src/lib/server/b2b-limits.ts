@@ -16,9 +16,9 @@ export type { StyleN };
 export function stylesFromCfg(cfg: Cfg): StyleN[] {
 	return Object.keys(cfg).map((sysStyl) => ({
 		sysStyl,
-		system: sysStyl.split('|')[0],
-		styl: sysStyl.split('|')[1],
-		N: cfg[sysStyl].N
+		system: sysStyl.split('|')[0] ?? '',
+		styl: sysStyl.split('|')[1] ?? '',
+		N: cfg[sysStyl]!.N // sysStyl ∈ Object.keys(cfg)
 	}));
 }
 

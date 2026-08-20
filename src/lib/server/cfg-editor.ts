@@ -167,8 +167,9 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 				.all(input.sysStyl) as { nazov: string; offset: number }[];
 			const byRole: Record<string, Set<number>> = {};
 			for (const r of after) (byRole[baseRole(r.nazov)] ??= new Set()).add(r.offset);
+			// role ∈ Object.keys(byRole) → byRole[role] je vždy definované
 			for (const role in byRole)
-				if (byRole[role].size > 1)
+				if (byRole[role]!.size > 1)
 					throw new Error(
 						`Profil „${role}" má rozdielne odsadenie pre 6/10 mm — musí byť rovnaké.`
 					);

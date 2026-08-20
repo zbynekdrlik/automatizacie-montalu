@@ -7,7 +7,7 @@ import type { Actions } from './$types';
 import { pocitajFix, rovnomernePolia, FIX_MAX_POLI } from '$lib/fix';
 import { parseFixVstup } from '$lib/server/fix-vstup';
 
-export const actions: Actions = {
+export const actions = {
 	vykres: async ({ request }) => {
 		const { vstup, error } = parseFixVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
@@ -34,4 +34,4 @@ export const actions: Actions = {
 		const n = Math.max(1, Math.min(FIX_MAX_POLI, Math.round(Number.isFinite(raw) ? raw : 1)));
 		return { step: 'form' as const, vstup: { ...vstup, polia: rovnomernePolia(vstup.s, n) } };
 	}
-};
+} satisfies Actions;

@@ -92,10 +92,11 @@ const R3 = (x: number) => Math.round(x * 1000) / 1000;
  * Používa sa len pre {@link Pravidlo} `konstPreKolajnicu` (rohovník obvodový).
  */
 export function kolajnicaStylu(sysStyl: string): string {
-	const styl = sysStyl.includes('|') ? sysStyl.split('|')[1] : sysStyl;
+	// keď sysStyl obsahuje '|', split má vždy prvok [1] (aj prázdny)
+	const styl = sysStyl.includes('|') ? sysStyl.split('|')[1]! : sysStyl;
 	// štýl môže niesť aj nárezák („4K IZO") — koľajnicu určuje len počet krídel
 	const m = /(\d+K)/.exec(styl.replace(/^\d+x/, ''));
-	return m ? m[1] : styl;
+	return m ? m[1]! : styl; // regex má 1 povinnú capture skupinu
 }
 
 /**
@@ -106,7 +107,7 @@ export function kolajnicaStylu(sysStyl: string): string {
 export function pocetUzaverov(uzaver: Komponent, sysStyl: string): number | null {
 	if (uzaver.pravidlo.typ !== 'konstPreStyl') return null;
 	const ks = uzaver.pravidlo.ks[sysStyl];
-	return Number.isFinite(ks) ? ks : null;
+	return Number.isFinite(ks) ? ks! : null; // isFinite(undefined) === false
 }
 
 /**
@@ -153,7 +154,7 @@ export function pocitajKomponenty(
 						sprava: `${k.nazov} (${k.kod}): pre štýl ${sysStyl} nie je nakonfigurovaný počet kusov`
 					});
 				} else {
-					qty = ks;
+					qty = ks!; // isFinite(undefined) === false → tu je ks konečné číslo
 				}
 				break;
 			}
@@ -166,7 +167,7 @@ export function pocitajKomponenty(
 						sprava: `${k.nazov} (${k.kod}): pre koľajnicu ${kol} (štýl ${sysStyl}) nie je nakonfigurovaný počet kusov`
 					});
 				} else {
-					qty = ks;
+					qty = ks!; // isFinite(undefined) === false → tu je ks konečné číslo
 				}
 				break;
 			}

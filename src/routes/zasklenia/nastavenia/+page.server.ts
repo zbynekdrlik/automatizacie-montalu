@@ -37,7 +37,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	};
 };
 
-export const actions: Actions = {
+export const actions = {
 	ulozit: async ({ request, locals }) => {
 		const form = await request.formData();
 		const sysStyl = String(form.get('sysStyl') ?? '');
@@ -84,4 +84,4 @@ export const actions: Actions = {
 			}
 		};
 	}
-};
+} satisfies Actions;

@@ -146,11 +146,11 @@ describe('cena skla — display-only blok (#225)', () => {
 		};
 		expect(r.skloCeny).toBeDefined();
 		expect(r.skloCeny!.radky).toHaveLength(1);
-		expect(r.skloCeny!.radky[0].variant).toBe(BASE.sklo);
-		expect(r.skloCeny!.radky[0].m2).toBeGreaterThan(0);
+		expect(r.skloCeny!.radky[0]!.variant).toBe(BASE.sklo);
+		expect(r.skloCeny!.radky[0]!.m2).toBeGreaterThan(0);
 		// žiadny snapshot naimportovaný → cena nedostupná (nikdy dopočítaná), súhrn neúplný
-		expect(r.skloCeny!.radky[0].eurM2).toBeNull();
-		expect(r.skloCeny!.radky[0].spolu).toBeNull();
+		expect(r.skloCeny!.radky[0]!.eurM2).toBeNull();
+		expect(r.skloCeny!.radky[0]!.spolu).toBeNull();
 		expect(r.skloCeny!.kompletne).toBe(false);
 	});
 

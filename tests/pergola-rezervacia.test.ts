@@ -241,7 +241,7 @@ describe('buildRezervaciaRozpis — ručné položky (#234)', () => {
 		const wb = new ExcelJS.Workbook();
 		// ArrayBuffer (nie Node Buffer) — obíde generic Buffer<ArrayBufferLike> mismatch v typoch
 		await wb.xlsx.load(new Uint8Array(buf).buffer);
-		const ws = wb.worksheets[0];
+		const ws = wb.worksheets[0]!;
 		// hlavička = 6 stĺpcov (číslo zakázky, Kód, Název, Množství v m, MJ, Popis dokladu)
 		expect((ws.getRow(1).values as unknown[]).slice(1)).toEqual([
 			'číslo zakázky',

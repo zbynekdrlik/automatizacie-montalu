@@ -80,7 +80,7 @@ describe('sysStylPre — sklo vyberá nárezák', () => {
 			const [system, styl] = s.sysStyl.split('|');
 			if (system === STANDARD || system === STANDARD_STARY) continue;
 			for (const sklo of ['Izolačné sklo 4/16/4 číre', 'Kalené 8mm', '6mm číre'])
-				expect(sysStylPre(system, styl, sklo, existuje)).toBe(s.sysStyl);
+				expect(sysStylPre(system!, styl!, sklo, existuje)).toBe(s.sysStyl);
 		}
 	});
 
@@ -97,7 +97,7 @@ describe('sysStylPre — sklo vyberá nárezák', () => {
 describe('ponuky vo formulári', () => {
 	const styly = (seed.sys as SysRow[])
 		.filter((s) => s.sysStyl.startsWith(STANDARD + '|'))
-		.map((s) => s.sysStyl.split('|')[1]);
+		.map((s) => s.sysStyl.split('|')[1]!);
 
 	it('Štandard + ponúka len počty krídel — žiadny štýl s „IZO"', () => {
 		const p = stylyDoPonuky(STANDARD, styly);

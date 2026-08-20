@@ -53,7 +53,7 @@ export function computeFlat(
 	const g = cfg[sysStyl];
 	if (!g || !g.rez.length) return null;
 	const N = g.N;
-	const system = sysStyl.split('|')[0];
+	const system = sysStyl.split('|')[0] ?? '';
 	const styl = sysStyl.split('|')[1] ?? '';
 	const sietkaOn = jeSietkaMoneyRelevant(system, styl, sietka);
 	const material: MaterialRow[] = [];
@@ -100,8 +100,8 @@ export function computeFlat(
 		sv = g.sklo.v;
 	if (!ss || !sv) return null;
 	return {
-		system: sysStyl.split('|')[0],
-		styl: sysStyl.split('|')[1],
+		system,
+		styl,
 		S,
 		V,
 		N,
@@ -182,7 +182,7 @@ export function safeCompute(
 	if (underErr) return { r: null, err: underErr };
 	const g = cfg[sysStyl];
 	const sietkaErr = g
-		? sietkaChyba(cfg, sysStyl.split('|')[0], sysStyl.split('|')[1] ?? '', sietka, S, V, g.N)
+		? sietkaChyba(cfg, sysStyl.split('|')[0] ?? '', sysStyl.split('|')[1] ?? '', sietka, S, V, g.N)
 		: null;
 	if (sietkaErr) return { r: null, err: sietkaErr };
 	const r = computeFlat(
@@ -329,12 +329,11 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			sikmyRez: boolean;
 		}
 	> = {};
-	for (let i = 0; i < posuvy.length; i++) {
-		const p = posuvy[i];
+	for (const [i, p] of posuvy.entries()) {
 		const g = cfg[p.sysStyl];
 		if (!g || !g.rez.length || !g.sklo.s || !g.sklo.v) return null;
 		const N = g.N;
-		const system = p.sysStyl.split('|')[0];
+		const system = p.sysStyl.split('|')[0] ?? '';
 		const styl = p.sysStyl.split('|')[1] ?? '';
 		const sietkaOn = jeSietkaMoneyRelevant(system, styl, p.sietka);
 		// INVARIANT: spájanie profilov po kóde na jednu tyč je bezpečné len ak KAŽDÝ
@@ -377,28 +376,30 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			// sieťka na 2K: celá koľajnica sa mení na 3K variant (#87) — swap PRED
 			// poolovaním z rovnakého dôvodu ako railUpsize vyššie.
 			const sk = sietkaKolajnicaSwap(cfg, system, styl, sietkaOn, up.kod, up.nazov);
-			if (!pool[sk.kod]) {
-				pool[sk.kod] = {
+			let bucket = pool[sk.kod];
+			if (!bucket) {
+				bucket = {
 					nazov: sk.nazov,
 					rezy: [],
 					kusy: [],
 					barLen: c.barLen,
 					sikmyRez: !systemRovnyRez(system) && jeSikmyRez(c.nazov)
 				};
+				pool[sk.kod] = bucket;
 				order.push(sk.kod);
 			}
-			pool[sk.kod].kusy.push(...c.kusy);
+			bucket.kusy.push(...c.kusy);
 			for (const rz of c.rezy) {
-				const ex = pool[sk.kod].rezy.find((x) => x.rozmer === rz.rozmer);
+				const ex = bucket.rezy.find((x) => x.rozmer === rz.rozmer);
 				if (ex) ex.ks += rz.ks;
-				else pool[sk.kod].rezy.push({ ...rz });
+				else bucket.rezy.push({ ...rz });
 			}
 		}
 		const ss = g.sklo.s,
 			sv = g.sklo.v;
 		infos.push({
-			system: p.sysStyl.split('|')[0],
-			styl: p.sysStyl.split('|')[1],
+			system,
+			styl,
 			S: p.S,
 			V: p.V,
 			N,
@@ -422,7 +423,9 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 	const material: MaterialRow[] = [];
 	const odpis: OdpisRow[] = [];
 	for (const kod of order) {
-		const pk = pool[kod];
+		// INVARIANT: `order` obsahuje len kódy vložené SPOLU s `pool[kod]` vyššie
+		// (order.push(sk.kod) je hneď po pool[sk.kod] = bucket), a nič sa z pool nemaže.
+		const pk = pool[kod]!;
 		const bary = ffdPack(pk.kusy, pk.barLen);
 		const tyce = bary.length;
 		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
@@ -449,8 +452,7 @@ export function safeComputeMulti(
 	posuvy: PosuvSpec[]
 ): { r: MultiResult | null; err: string | null } {
 	if (!posuvy.length) return { r: null, err: 'Zadaj aspoň jeden posuv.' };
-	for (let i = 0; i < posuvy.length; i++) {
-		const p = posuvy[i];
+	for (const [i, p] of posuvy.entries()) {
 		if (!validSys(cfg, p.sysStyl))
 			return { r: null, err: `Posuv ${i + 1}: konfigurácia systému je neúplná alebo chybná.` };
 		const boundErr = inBounds(cfg, p.sysStyl);
@@ -483,7 +485,7 @@ export function safeComputeMulti(
 		const sietkaErr = g
 			? sietkaChyba(
 					cfg,
-					p.sysStyl.split('|')[0],
+					p.sysStyl.split('|')[0] ?? '',
 					p.sysStyl.split('|')[1] ?? '',
 					p.sietka,
 					p.S,

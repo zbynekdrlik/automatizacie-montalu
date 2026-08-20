@@ -61,6 +61,6 @@ describe('nahlásenie problému — guard na prázdny popis (audit #35)', () => 
 			reports: { popis: string }[];
 		};
 		expect(reports.length).toBeGreaterThanOrEqual(2);
-		expect(reports[0].popis.length).toBe(5000); // posledné vložené = najnovšie
+		expect(reports[0]!.popis.length).toBe(5000); // posledné vložené = najnovšie
 	});
 });

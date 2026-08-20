@@ -200,8 +200,7 @@ function compute(vstup: Vstup): {
 function computeMultiFrom(vstup: MultiVstup) {
 	const cfg = loadCfg();
 	const specs: PosuvSpec[] = [];
-	for (let i = 0; i < vstup.posuvy.length; i++) {
-		const p = vstup.posuvy[i];
+	for (const [i, p] of vstup.posuvy.entries()) {
 		const g = skloPre(cfg, p.system, p.styl, p.sklo);
 		if (!g)
 			return {
@@ -312,7 +311,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	};
 };
 
-export const actions: Actions = {
+export const actions = {
 	nahlad: async ({ request, locals }) => {
 		// dátum vzniku plánu pre tlačenú hlavičku (#114) — server clock PRI spracovaní
 		// akcie, nie new Date() na klientovi, aby sa nemenilo, ak stránka ostane otvorená
@@ -569,4 +568,4 @@ export const actions: Actions = {
 			};
 		}
 	}
-};
+} satisfies Actions;

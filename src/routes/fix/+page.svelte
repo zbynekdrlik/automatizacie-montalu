@@ -122,7 +122,7 @@
 	// nemusí prepisovať dve políčka naraz. POZOR: efekt zapisuje to, čo aj číta —
 	// bez porovnania hodnoty by sa zacyklil (effect_update_depth_exceeded, chytené e2e).
 	$effect(() => {
-		if (poliaS.length === 1 && sirkaNum > 0 && cislo(poliaS[0]) !== sirkaNum) poliaS = [sirkaNum];
+		if (poliaS.length === 1 && sirkaNum > 0 && cislo(poliaS[0]!) !== sirkaNum) poliaS = [sirkaNum];
 	});
 
 	let poliaJSON = $derived(JSON.stringify(poliaS.length ? poliaS : sirkaNum ? [sirkaNum] : []));

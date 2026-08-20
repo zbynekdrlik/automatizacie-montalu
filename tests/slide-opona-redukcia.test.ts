@@ -52,12 +52,12 @@ describe('Slide opona — redukcia 6 mm = prírez − 72,4 (obe dimenzie)', () =
 				[3000, 2050],
 				[6940, 2200]
 			]) {
-				const p = plan(styl, S, V);
+				const p = plan(styl, S!, V!);
 				const ram = dlzky(p.material.find((m) => m.kod === 'ZASP00088')!);
 				const red = dlzky(p.material.find((m) => m.kod === 'ZASP00091')!);
 				expect(red.length, `${styl} ${S}×${V}`).toBe(ram.length);
 				for (let i = 0; i < ram.length; i++)
-					expect(ram[i] - red[i], `${styl} ${S}×${V} dim${i}`).toBeCloseTo(72.4, 6);
+					expect(ram[i]! - red[i]!, `${styl} ${S}×${V} dim${i}`).toBeCloseTo(72.4, 6);
 			}
 		}
 	});

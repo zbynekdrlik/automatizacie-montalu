@@ -127,20 +127,20 @@ describe('parseMultiVstup — sieťka je PER POSUV', () => {
 	it('sieťka má len ten posuv, ktorý ju má zapnutú', () => {
 		const { vstup, error } = multi([posuv({ sietka: '1', sietkaUchyt: 'zamok' }), posuv()]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].sietka).toEqual({ uchyt: 'zamok' });
-		expect(vstup.posuvy[1].sietka).toBeNull();
+		expect(vstup.posuvy[0]!.sietka).toEqual({ uchyt: 'zamok' });
+		expect(vstup.posuvy[1]!.sietka).toBeNull();
 	});
 
 	it('sieťka na 2K posuve (2K nemá voľnú koľaj) sa aj tak uloží — appka upozorní A odpíše 3K', () => {
 		const { vstup, error } = multi([posuv({ styl: '2K', ...sietkaFd })]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].sietka).toEqual({ uchyt: 'madloVelke' });
+		expect(vstup.posuvy[0]!.sietka).toEqual({ uchyt: 'madloVelke' });
 	});
 
 	it('sieťka na Slide posuve prejde rovnako ako Robust', () => {
 		const { vstup, error } = multi([posuv({ system: 'Slide', styl: '3K', ...sietkaFd })]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].sietka).not.toBeNull();
+		expect(vstup.posuvy[0]!.sietka).not.toBeNull();
 	});
 });
 
@@ -196,8 +196,8 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 			{ kod: 'ZASP00010', nazov: 'Nosový profil Surový 7500 mm', metre: 15 }
 		]);
 
-		expect(so.posuvy[0].sietka).toEqual({ uchyt: 'madloVelke' });
-		expect(bez.posuvy[0].sietka).toBeNull();
+		expect(so.posuvy[0]!.sietka).toEqual({ uchyt: 'madloVelke' });
+		expect(bez.posuvy[0]!.sietka).toBeNull();
 	});
 
 	it('Slide|3K S=3500/V=2001: rovnaká delta ako Robust, Redukcia 6mm nedotknutá', () => {

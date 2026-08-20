@@ -15,10 +15,10 @@ export const load: PageServerLoad = async () => {
 	};
 };
 
-export const actions: Actions = {
+export const actions = {
 	default: async ({ request }) => {
 		const { vstup, error } = parseZaskleniaNavrhVstup(await request.formData(), listSysStyly());
 		if (error) return { error, vstup: null };
 		return { vstup, error: null as string | null };
 	}
-};
+} satisfies Actions;

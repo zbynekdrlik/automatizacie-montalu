@@ -71,8 +71,8 @@ describe('rozpocitajPodlaPosuvu — hraničné a odvodené prípady (n=2 a n>=4 
 		expect(rozpocitajPodlaPosuvu(1500, 'Slide', 2)).toEqual([750, 750]);
 		// nepárny súčet (nedeliteľný na 0,1 mm rovnako) — súčet musí sedieť PRESNE na S
 		const polia = rozpocitajPodlaPosuvu(2001, 'Štandard', 2);
-		expect(polia[0] + polia[1]).toBe(2001);
-		expect(Math.abs(polia[0] - polia[1])).toBeLessThanOrEqual(0.1);
+		expect(polia[0]! + polia[1]!).toBe(2001);
+		expect(Math.abs(polia[0]! - polia[1]!)).toBeLessThanOrEqual(0.1);
 	});
 
 	it('n=4: symetrické — krajné = krajny, stredné dve rovnaké', () => {

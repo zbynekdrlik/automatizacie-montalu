@@ -53,11 +53,11 @@ describe('editor vzorcov', () => {
 		const { error } = saveCfgChanges({
 			sysStyl: 'Robust|2K',
 			username: 'tester',
-			offsets: new Map([[e.rows[0].id, 9999]]),
+			offsets: new Map([[e.rows[0]!.id, 9999]]),
 			skloOffset: e.skloOffset
 		});
 		expect(error).toContain('rozsah');
-		expect(getEditableRows('Robust|2K')!.rows[0].offset).toBe(e.rows[0].offset);
+		expect(getEditableRows('Robust|2K')!.rows[0]!.offset).toBe(e.rows[0]!.offset);
 	});
 
 	it('neznámy štýl / cudzí row id sa odmietne', () => {
@@ -89,8 +89,8 @@ describe('editor vzorcov', () => {
 
 		// audit
 		const audit = getAuditLog(5);
-		expect(audit[0].username).toBe('tester');
-		expect(audit[0].zmeny).toContain('140');
+		expect(audit[0]!.username).toBe('tester');
+		expect(audit[0]!.zmeny).toContain('140');
 
 		// sklo rez v S dimenzii zdieľa offset s rámom
 		const skloRez = db
@@ -221,7 +221,7 @@ describe('editor vzorcov', () => {
 
 	it('prepínač skla (redukcia_zero) sa uloží a audituje', () => {
 		const glass = listGlassTypes();
-		const cieľ = glass[0].nazov;
+		const cieľ = glass[0]!.nazov;
 		const { zmeny, error } = saveCfgChanges({
 			sysStyl: 'Slide|2K',
 			username: 'tester',

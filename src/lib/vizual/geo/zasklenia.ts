@@ -111,9 +111,10 @@ export function zaskleniaSpec(vst: ZaskleniaVizVstup): VizVysledok {
 	const zByLeaf: number[] = [];
 	const xCenterByLeaf: number[] = [];
 
+	// stlpiky.length === n+1 (deliaceStlpiky) → stlpiky[i] a stlpiky[i+1] pre i∈[0,n) definované
 	for (let i = 0; i < n; i++) {
-		const xLeft = stlpiky[i] - s / 2;
-		const xRight = stlpiky[i + 1] - s / 2;
+		const xLeft = stlpiky[i]! - s / 2;
+		const xRight = stlpiky[i + 1]! - s / 2;
 		const leafW = Math.max(1, xRight - xLeft);
 		const z = hlbkaZ(i, n, smer);
 		zByLeaf.push(z);
@@ -181,8 +182,9 @@ export function zaskleniaSpec(vst: ZaskleniaVizVstup): VizVysledok {
 	// kľučka — na vodiacom stojíne krídla podľa `kovanie`; null/chýba = nič
 	if (vst.kovanie) {
 		const idx = vst.kovanie === 'L' ? 0 : vst.kovanie === 'P' ? n - 1 : Math.floor((n - 1) / 2);
-		const xLeft = stlpiky[idx] - s / 2;
-		const xRight = stlpiky[idx + 1] - s / 2;
+		// idx ∈ [0,n-1]; stlpiky.length === n+1, zByLeaf.length === n → definované
+		const xLeft = stlpiky[idx]! - s / 2;
+		const xRight = stlpiky[idx + 1]! - s / 2;
 		// vnútorná (stredová) hrana toho krídla — ľavé kovanie sedí na jeho
 		// pravej hrane, pravé na jeho ľavej, stred berie pravú hranu (vizuál,
 		// nie katalóg — appka dnes presnú stranu pre "Stred" nezbiera)
@@ -190,7 +192,7 @@ export function zaskleniaSpec(vst: ZaskleniaVizVstup): VizVysledok {
 		diely.push({
 			rola: 'klucka',
 			tvar: { kind: 'box', w: KLUCKA_MM.w, h: KLUCKA_MM.h, d: KLUCKA_MM.d },
-			pos: { x, y: KLUCKA_Y_MM, z: zByLeaf[idx] + ZASK_RAM_HLBKA_MM / 2 + KLUCKA_MM.d / 2 }
+			pos: { x, y: KLUCKA_Y_MM, z: zByLeaf[idx]! + ZASK_RAM_HLBKA_MM / 2 + KLUCKA_MM.d / 2 }
 		});
 	}
 

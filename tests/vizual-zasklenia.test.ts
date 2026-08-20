@@ -52,7 +52,7 @@ describe('zaskleniaSpec — proporcie a bbox (#170 §4 "Proporcie nesmú lhať")
 			const s = 4321; // zámerne nedeliteľné číslo, aby test odhalil zaokrúhľovaciu chybu
 			const stlpiky = deliaceStlpiky(s, n);
 			let sum = 0;
-			for (let i = 0; i < n; i++) sum += stlpiky[i + 1] - stlpiky[i];
+			for (let i = 0; i < n; i++) sum += stlpiky[i + 1]! - stlpiky[i]!;
 			expect(Math.round(sum * 10) / 10).toBe(s);
 			expect(stlpiky[n]).toBe(s);
 		}
@@ -82,13 +82,13 @@ describe('zaskleniaSpec — poradie v hĺbke (Z) podľa smer', () => {
 		const r = zaskleniaSpec(zaklad({ n: 4, smer: 'LP' }));
 		const sklaZ = r.diely.filter((d) => d.rola === 'sklo').map((d) => d.pos.z);
 		expect(sklaZ.length).toBe(4);
-		for (let i = 1; i < sklaZ.length; i++) expect(sklaZ[i]).toBeGreaterThan(sklaZ[i - 1]);
+		for (let i = 1; i < sklaZ.length; i++) expect(sklaZ[i]).toBeGreaterThan(sklaZ[i - 1]!);
 	});
 
 	it('PL: z klesá s indexom (opačné poradie ako LP)', () => {
 		const r = zaskleniaSpec(zaklad({ n: 4, smer: 'PL' }));
 		const sklaZ = r.diely.filter((d) => d.rola === 'sklo').map((d) => d.pos.z);
-		for (let i = 1; i < sklaZ.length; i++) expect(sklaZ[i]).toBeLessThan(sklaZ[i - 1]);
+		for (let i = 1; i < sklaZ.length; i++) expect(sklaZ[i]).toBeLessThan(sklaZ[i - 1]!);
 	});
 
 	it('OP: stredné krídla najviac vzadu (min z), krajné najviac vpredu (max z), symetricky', () => {
@@ -98,9 +98,9 @@ describe('zaskleniaSpec — poradie v hĺbke (Z) podľa smer', () => {
 		// stred (index 2 z 5) musí mať najmenšie z zo všetkých
 		const stred = sklaZ[2];
 		for (let i = 0; i < sklaZ.length; i++)
-			if (i !== 2) expect(sklaZ[i]).toBeGreaterThanOrEqual(stred);
+			if (i !== 2) expect(sklaZ[i]).toBeGreaterThanOrEqual(stred!);
 		// symetria: krajné krídla (0 a 4) majú rovnaké z
-		expect(sklaZ[0]).toBeCloseTo(sklaZ[4], 6);
+		expect(sklaZ[0]).toBeCloseTo(sklaZ[4]!, 6);
 	});
 
 	it('n=3 smer=LP — konkrétne ručne dopočítané Z hodnoty (ROZTEC=34mm, off=34mm)', () => {

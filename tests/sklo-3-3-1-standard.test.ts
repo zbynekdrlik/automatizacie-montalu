@@ -152,14 +152,14 @@ describe('Money-neutralita: „3.3.1" == „Float sklo 6 mm" v Štandardoch (#21
 		const [system, styl] = sysStyl.split('|');
 
 		it(`${sysStyl}: „3.3.1" ťahá ten istý nárezák ako „Float sklo 6 mm"`, () => {
-			expect(sysStylPre(system, styl, G331.nazov, existuje)).toBe(
-				sysStylPre(system, styl, G6.nazov, existuje)
+			expect(sysStylPre(system!, styl!, G331.nazov, existuje)).toBe(
+				sysStylPre(system!, styl!, G6.nazov, existuje)
 			);
 		});
 
 		it(`${sysStyl}: prídavná koľajnica sa nemení voľbou „3.3.1" vs „6 mm"`, () => {
-			expect(pridavnaKolajnicaDefault(system, styl, G331.nazov)).toBe(
-				pridavnaKolajnicaDefault(system, styl, G6.nazov)
+			expect(pridavnaKolajnicaDefault(system!, styl!, G331.nazov)).toBe(
+				pridavnaKolajnicaDefault(system!, styl!, G6.nazov)
 			);
 		});
 
@@ -167,8 +167,8 @@ describe('Money-neutralita: „3.3.1" == „Float sklo 6 mm" v Štandardoch (#21
 			// CELÁ cesta zvlášť pre každé sklo (nárezák z názvu + vlastnosti z migrovanej DB)
 			// — keby „3.3.1" ťahalo iný nárezák alebo malo iné redukciaZero/hrubka, odpis by
 			// sa líšil a test padne. Nie je to tautológia (identické literály).
-			const rA = sysStylPre(system, styl, G331.nazov, existuje);
-			const rB = sysStylPre(system, styl, G6.nazov, existuje);
+			const rA = sysStylPre(system!, styl!, G331.nazov, existuje);
+			const rB = sysStylPre(system!, styl!, G6.nazov, existuje);
 			for (const [S, V] of rozmery) {
 				const a = computeFlat(cfg, rA, S, V, G331.redukciaZero, G331.hrubka);
 				const b = computeFlat(cfg, rB, S, V, G6.redukciaZero, G6.hrubka);

@@ -131,7 +131,9 @@ export function sietkaStandardExtra(
 			rezy: [],
 			err: `Sieťka systému „${sietkaSystem}" nie je pre štýl ${styl} k dispozícii (tento systém tento štýl nemá).`
 		};
-	const sirkaRow = najdiRolu(posuvGroup, STANDARD_ROLY[posuvSystem].sirka);
+	// `posuvSystem` prešiel `maSietkaSystemVyber` vyššie → je 'Štandard'/'Štandard +',
+	// čo sú PRESNE jediné dva kľúče STANDARD_ROLY → prístup je vždy definovaný.
+	const sirkaRow = najdiRolu(posuvGroup, STANDARD_ROLY[posuvSystem]!.sirka);
 	const krajovaRow = najdiRolu(sietkaGroup, roly.krajova);
 	const nosRow = najdiRolu(sietkaGroup, roly.nos);
 	const dorazRow = najdiRolu(sietkaGroup, roly.doraz);
@@ -465,6 +467,7 @@ export function sietkaSamostatnaVypocet(
 	const overErr = oversizeCut(cfg, sysStyl, S, V, false, 0);
 	if (overErr) return { r: null, err: overErr };
 	const g = cfg[sysStyl];
+	if (!g) return { r: null, err: 'Neznámy systém/štýl.' }; // validSys vyššie to už zaručuje
 	const N = g.N;
 	const ram = g.rez.filter((r) => r.typ === 'profil' && JE_RAMOVY_PROFIL.test(r.nazov));
 	const nos = g.rez.filter((r) => r.typ === 'profil' && JE_NOSOVY_PROFIL.test(r.nazov));

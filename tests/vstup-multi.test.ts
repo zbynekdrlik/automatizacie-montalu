@@ -22,7 +22,7 @@ describe('parseMultiVstup — strážne kontroly viac-posuvového vstupu', () =>
 		);
 		expect(error).toBeNull();
 		expect(vstup.posuvy).toHaveLength(2);
-		expect(vstup.posuvy[0].s).toBe(5000);
+		expect(vstup.posuvy[0]!.s).toBe(5000);
 		expect(vstup.poznamka).toBe('pozn');
 	});
 
@@ -31,7 +31,7 @@ describe('parseMultiVstup — strážne kontroly viac-posuvového vstupu', () =>
 			fd({ ...base, posuvy: JSON.stringify([{ ...POSUV, s: '2509,5' as unknown as number }]) })
 		);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].s).toBeCloseTo(2509.5, 3);
+		expect(vstup.posuvy[0]!.s).toBeCloseTo(2509.5, 3);
 	});
 
 	it.each([
@@ -75,7 +75,7 @@ describe('parseMultiVstup — strážne kontroly viac-posuvového vstupu', () =>
 			fd({ ...base, posuvy: JSON.stringify([{ ...POSUV, styl: '2x2K', otvaranie: 'P - L' }]) })
 		);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0].otvaranie).toBe('Opona');
+		expect(vstup.posuvy[0]!.otvaranie).toBe('Opona');
 	});
 });
 

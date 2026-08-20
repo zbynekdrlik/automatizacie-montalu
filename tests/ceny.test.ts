@@ -194,8 +194,8 @@ describe('maybeImportSnapshot + getSnapshotMeta', () => {
 			{ kod: 'ZASP-SKLAD-NULL', nazov: 'X', qty: 1, mj: 'm' },
 			{ kod: 'ZASP-NULA', nazov: 'Y', qty: 1, mj: 'm' } // z predošlého testu vyššie, sklad=0 reálne
 		]);
-		expect(r2.radky[0].sklad).toBeNull();
-		expect(r2.radky[1].sklad).toBe(0);
+		expect(r2.radky[0]!.sklad).toBeNull();
+		expect(r2.radky[1]!.sklad).toBe(0);
 	});
 
 	it('neplatná JEDNOTLIVÁ cena (string namiesto čísla) nezhodí celý riadok — len tá cena je neznáma', async () => {
@@ -278,7 +278,7 @@ describe('enrichPolozky', () => {
 		]);
 		maybeImportSnapshot();
 		const r = enrichPolozky([{ kod: 'ZASP-ENRICH-MARZA', nazov: 'X', qty: 2, mj: 'm' }]);
-		expect(r.radky[0].marza).toBe(3); // 8 − 5, NIE 8 − 9
+		expect(r.radky[0]!.marza).toBe(3); // 8 − 5, NIE 8 − 9
 		expect(r.sucty.marza).toEqual({ suma: 6, kompletne: true }); // 3 × 2 ks
 	});
 
@@ -302,7 +302,7 @@ describe('enrichPolozky', () => {
 			{ kod: 'ZASP-ENRICH-SKLAD', nazov: 'X', qty: 1, mj: 'm' },
 			{ kod: 'NEZNAMY-KOD-SKLAD', nazov: 'Y', qty: 1, mj: 'm' }
 		]);
-		expect(r.radky[0].sklad).toBe(42);
-		expect(r.radky[1].sklad).toBeNull();
+		expect(r.radky[0]!.sklad).toBe(42);
+		expect(r.radky[1]!.sklad).toBeNull();
 	});
 });

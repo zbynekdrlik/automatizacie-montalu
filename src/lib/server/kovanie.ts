@@ -32,9 +32,8 @@ export function kovanieDoOdpisu(
 ): { polozky: Polozka[]; err: string | null } {
 	const davky: PolozkaKomponentu[][] = [];
 
-	for (let i = 0; i < specs.length; i++) {
-		const spec = specs[i];
-		const system = spec.sysStyl.split('|')[0];
+	for (const [i, spec] of specs.entries()) {
+		const system = spec.sysStyl.split('|')[0] ?? '';
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
 
@@ -67,7 +66,7 @@ export function kovanieDoOdpisu(
 			uzaver ? pocetUzaverov(uzaver, spec.sysStyl) : null,
 			!jednostrannaFab
 		);
-		if (chyby.length) return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${chyby[0].sprava}` };
+		if (chyby.length) return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${chyby[0]!.sprava}` };
 		davky.push(polozky);
 	}
 

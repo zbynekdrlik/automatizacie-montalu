@@ -60,9 +60,9 @@ describe('pergola — detail.cad + detail.komboVolby (#156)', () => {
 		const t = transform(CAD);
 		expect(t.comboCases.length).toBe(1);
 		// vyber alternatívu odlišnú od default (options[0] = najmenej odpadu = default)
-		const alt = t.comboCases[0].options[1];
+		const alt = t.comboCases[0]!.options[1];
 		expect(alt).toBeTruthy();
-		const altLabel = comboOptionLabel(alt, false);
+		const altLabel = comboOptionLabel(alt!, false);
 
 		const r = await pergola.actions.odoslat(
 			ev('pergola', { zak: 'ZAK-P2', op: '01', zakaznik: 'X', cad: CAD, combo_0: altLabel })
@@ -74,11 +74,11 @@ describe('pergola — detail.cad + detail.komboVolby (#156)', () => {
 		expect(d.komboVolby).toHaveLength(1);
 		expect(d.komboVolby[0]).toMatchObject({
 			idx: 0,
-			fieldLabel: t.comboCases[0].fieldLabel,
+			fieldLabel: t.comboCases[0]!.fieldLabel,
 			selected: altLabel
 		});
 		// zvolená hodnota NIE je default (inak by test o ničom nevypovedal)
-		expect(d.komboVolby[0].selected).not.toBe(comboOptionLabel(t.comboCases[0].options[0], true));
+		expect(d.komboVolby[0].selected).not.toBe(comboOptionLabel(t.comboCases[0]!.options[0]!, true));
 	});
 
 	// review nález #1: detail.cad musí byť bound-ovaný, nie neobmedzený
@@ -158,9 +158,9 @@ describe('zasklenia — viac posuvov: detail.vstupRaw == naparsovaný MultiVstup
 
 	it('vstupRaw je hlboko rovný tomu, čo parseMultiVstup naparsuje z tých istých polí (vrátane klin/kolajnica/sietka)', async () => {
 		const { vstup: expected } = parseMultiVstup(fd(BODY));
-		expect(expected.posuvy[0].klin).not.toBeNull();
-		expect(expected.posuvy[0].kolajnica).not.toBeNull();
-		expect(expected.posuvy[0].sietka).not.toBeNull();
+		expect(expected.posuvy[0]!.klin).not.toBeNull();
+		expect(expected.posuvy[0]!.kolajnica).not.toBeNull();
+		expect(expected.posuvy[0]!.sietka).not.toBeNull();
 		const r = await zasklenia.actions.odoslatMulti(ev('zasklenia', BODY));
 		expect(r).toMatchObject({ step: 'hotovoMulti' });
 		const d = lastDetail();

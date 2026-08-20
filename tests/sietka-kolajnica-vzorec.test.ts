@@ -53,7 +53,7 @@ function mutujRiadok(
 	patch: Partial<RezRow>
 ): Cfg {
 	const clone: Cfg = JSON.parse(JSON.stringify(base));
-	const rows = clone[sysStyl].rez.filter(zhoda);
+	const rows = clone[sysStyl]!.rez.filter(zhoda);
 	expect(rows.length).toBeGreaterThan(0); // sabotáž musí naozaj niečo zasiahnuť
 	for (const r of rows) Object.assign(r, patch);
 	return clone;

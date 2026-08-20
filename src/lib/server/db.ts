@@ -87,8 +87,8 @@ export function listSysStyly(): { sysStyl: string; system: string; styl: string;
 		}[]
 	).map((r) => ({
 		sysStyl: r.sys_styl,
-		system: r.sys_styl.split('|')[0],
-		styl: r.sys_styl.split('|')[1],
+		system: r.sys_styl.split('|')[0] ?? '',
+		styl: r.sys_styl.split('|')[1] ?? '',
 		N: r.n
 	}));
 }

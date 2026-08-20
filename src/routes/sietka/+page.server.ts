@@ -30,7 +30,7 @@ export const load: PageServerLoad = async () => {
 	return { styly, live: isLive() };
 };
 
-export const actions: Actions = {
+export const actions = {
 	vypocitat: async ({ request }) => {
 		const { vstup, error } = parseSietkaSamostatnaVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
@@ -130,7 +130,7 @@ export const actions: Actions = {
 			};
 		}
 	}
-};
+} satisfies Actions;
 
 function jobFor(
 	vstup: Awaited<ReturnType<typeof parseSietkaSamostatnaVstup>>['vstup'],

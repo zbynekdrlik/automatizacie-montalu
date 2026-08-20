@@ -307,10 +307,10 @@
 		<Kota
 			x0={X(px)}
 			y0={baseY}
-			x1={X(s.prednaNohyX[i + 1])}
+			x1={X(s.prednaNohyX[i + 1]!)}
 			y1={baseY}
 			perpOffset={r.h * 0.06}
-			text={fmtMm(s.prednaNohyX[i + 1] - px)}
+			text={fmtMm(s.prednaNohyX[i + 1]! - px)}
 			color={MODRA}
 			fontSize={MIN_DIM_FONT}
 		/>

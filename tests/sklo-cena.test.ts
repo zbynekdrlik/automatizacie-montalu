@@ -64,9 +64,9 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 			}
 		]);
 		expect(r.radky).toHaveLength(1);
-		expect(r.radky[0].m2).toBe(4); // 1000×2000×2 / 1e6
-		expect(r.radky[0].eurM2).toBeNull();
-		expect(r.radky[0].spolu).toBeNull();
+		expect(r.radky[0]!.m2).toBe(4); // 1000×2000×2 / 1e6
+		expect(r.radky[0]!.eurM2).toBeNull();
+		expect(r.radky[0]!.spolu).toBeNull();
 		expect(r.kompletne).toBe(false);
 		expect(r.spolu).toBe(0);
 		expect(r.snapshot.generatedAt).toBeNull();
@@ -95,10 +95,10 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				pocet: 2
 			}
 		]);
-		expect(r.radky[0].m2).toBe(4);
-		expect(r.radky[0].eurM2).toBe(40);
-		expect(r.radky[0].spolu).toBe(160); // 4 m² × 40 €/m²
-		expect(r.radky[0].mena).toBe('EUR');
+		expect(r.radky[0]!.m2).toBe(4);
+		expect(r.radky[0]!.eurM2).toBe(40);
+		expect(r.radky[0]!.spolu).toBe(160); // 4 m² × 40 €/m²
+		expect(r.radky[0]!.mena).toBe('EUR');
 		expect(r.kompletne).toBe(true);
 		expect(r.spolu).toBe(160);
 	});
@@ -126,8 +126,8 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				pocet: 1
 			}
 		]);
-		expect(r.radky[0].eurM2).toBeNull();
-		expect(r.radky[0].spolu).toBeNull();
+		expect(r.radky[0]!.eurM2).toBeNull();
+		expect(r.radky[0]!.spolu).toBeNull();
 		expect(r.kompletne).toBe(false);
 	});
 
@@ -153,8 +153,8 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				pocet: 1
 			}
 		]);
-		expect(r.radky[0].eurM2).toBeNull();
-		expect(r.radky[0].spolu).toBeNull();
+		expect(r.radky[0]!.eurM2).toBeNull();
+		expect(r.radky[0]!.spolu).toBeNull();
 		expect(r.kompletne).toBe(false);
 	});
 
@@ -190,8 +190,8 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 			}
 		]);
 		expect(r.radky).toHaveLength(2);
-		expect(r.radky[0].spolu).toBe(100); // 2 m² × 50
-		expect(r.radky[1].spolu).toBeNull(); // TS00021 nie je v snapshote
+		expect(r.radky[0]!.spolu).toBe(100); // 2 m² × 50
+		expect(r.radky[1]!.spolu).toBeNull(); // TS00021 nie je v snapshote
 		expect(r.spolu).toBe(100); // len dostupný posuv
 		expect(r.kompletne).toBe(false);
 	});
@@ -218,8 +218,8 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				pocet: 1
 			}
 		]);
-		expect(r.radky[0].eurM2).toBeNull(); // 0 → null v ceny.ts
-		expect(r.radky[0].spolu).toBeNull();
+		expect(r.radky[0]!.eurM2).toBeNull(); // 0 → null v ceny.ts
+		expect(r.radky[0]!.spolu).toBeNull();
 		expect(r.kompletne).toBe(false);
 	});
 });
