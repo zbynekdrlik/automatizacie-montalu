@@ -1475,3 +1475,9 @@ implementované, nereprodukovateľné čestný null:
 - rerere: CLAUDE.md auto; package.json preimage zmenený (dev medzitým 0.24.11-dev.1) → ručne, nová resolution zaznamenaná.
 - Post-deploy: headers na /login živé (DENY/nosniff/referrer/permissions), marek login cez Caddy OK bez lockoutu, kontajner env OK, DOM `v0.24.11 (0317f8f)`, console 0/0.
 - **Nález:** app.montalu.cloud je za CLOUDFLARE (client → CF → Caddy → app) — `XFF_DEPTH=1` číta CF edge IP, nie klientsku. Throttle kľúč degraduje na CF PoP. Filed #264; medzera zdokumentovaná v `.claude/rules/login-hardening.md` (ada66b5).
+
+## Kolo 6 — #256 solo (PR #265, v0.24.12, merge 39d8541)
+
+- **#256 (non-root):** Dockerfile `USER node` (uid 1000), migrate_ownership pred up, ci.yml deploy `root@`→`deploy@`, provision-vps.sh (jednorazový root skript). Solo PR (kontajnerová hranica + ownership migrácia na prode).
+- **DEPLOYFAIL pasca (1. deploy@ beh):** rsync `Permission denied` na `/opt/.../src/**` — provisioning (chown na deploy) bežal PRED kolami 4/5, ktoré ako `root@` re-vytvorili súbory pod rootom. Poradie záleží: provisioning musí bežať PO poslednom root deployi. Fix: idempotentný provision-vps.sh znova (pipe z merged main ref cez ssh) + `gh run rerun --failed` → DEPLOYED. Prod bol celý čas bezpečný (fail na rsyncu = app nedotknutá, health 0.24.11 ok).
+- Post-deploy: kontajner `uid=1000(node)`; write proby OK ako node: `/data/dlv-import`, `NA ODPIS`, `AUTOMATIZACIA ODPIS MATERIALU`; appdata 1000:1000; n8n kontajnery healthy nedotknuté; DOM `v0.24.12 (39d8541)`, console 0/0; tunel E2E v deploy jobe zelený.
