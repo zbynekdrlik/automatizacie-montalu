@@ -65,7 +65,7 @@ function ipv4ToInt(ip: string): number | null {
 }
 
 function cidrMatchV4(ipInt: number, cidr: string): boolean {
-	const [base, prefixStr] = cidr.split('/');
+	const [base = '', prefixStr] = cidr.split('/');
 	const prefix = Number(prefixStr);
 	const baseInt = ipv4ToInt(base);
 	if (baseInt === null) return false;
@@ -100,7 +100,7 @@ function ipv6ToBigInt(ip: string): bigint | null {
 }
 
 function cidrMatchV6(ipInt: bigint, cidr: string): boolean {
-	const [base, prefixStr] = cidr.split('/');
+	const [base = '', prefixStr] = cidr.split('/');
 	const prefix = Number(prefixStr);
 	const baseInt = ipv6ToBigInt(base);
 	if (baseInt === null) return false;
