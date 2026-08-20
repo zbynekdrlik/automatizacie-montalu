@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 const fromRoot = (rel: string) => fileURLToPath(new URL('../' + rel, import.meta.url));
 const ci = readFileSync(fromRoot('.github/workflows/ci.yml'), 'utf8');
 const compose = readFileSync(fromRoot('deploy/docker-compose.yml'), 'utf8');
+const dockerfile = readFileSync(fromRoot('Dockerfile'), 'utf8');
+const deployRemote = readFileSync(fromRoot('deploy/deploy-remote.sh'), 'utf8');
 
 // Vráti druhoúrovňové bloky mapovania pod `parentKey` (napr. jobs → jednotlivé
 // joby). childIndent = počet medzier pred názvom child kľúča. Blok = všetky riadky
@@ -94,5 +96,45 @@ describe('#244 — Docker hardening (deploy/docker-compose.yml)', () => {
 		expect(app).toMatch(/interval:\s*\d+s/);
 		expect(app).toMatch(/retries:\s*\d+/);
 		expect(app).toMatch(/start_period:\s*\d+s/);
+	});
+});
+
+describe('#256 — non-root kontajner + deploy user (Dockerfile / ci.yml / deploy-remote.sh)', () => {
+	// runtime stage = časť za POSLEDNÝM `FROM` (build stage má `AS build`, runtime nie)
+	const lastFromIdx = dockerfile.lastIndexOf('\nFROM ');
+	const runtimeStage = lastFromIdx >= 0 ? dockerfile.slice(lastFromIdx) : dockerfile;
+
+	it('runtime stage beží ako non-root `USER node` (uid 1000)', () => {
+		expect(runtimeStage, 'runtime stage musí prepnúť na non-root node užívateľa').toMatch(
+			/^USER node\s*$/m
+		);
+	});
+
+	it('runtime stage pripraví node-vlastnený /data/app (čerstvý volume zdedí owner)', () => {
+		expect(
+			runtimeStage,
+			'image musí chown-núť /data/app na node, nech prázdny volume zdedí owner'
+		).toMatch(/chown\s+node:node\s+\/data\/app/);
+	});
+
+	it('`USER node` je AŽ po príprave /data/app (nie pred chownom)', () => {
+		const chownIdx = runtimeStage.search(/chown\s+node:node\s+\/data\/app/);
+		const userIdx = runtimeStage.search(/^USER node\s*$/m);
+		expect(chownIdx, 'chýba chown /data/app v runtime stage').toBeGreaterThanOrEqual(0);
+		expect(userIdx, '`USER node` musí byť až po chowne /data/app').toBeGreaterThan(chownIdx);
+	});
+
+	it('deploy job sa NEprihlasuje ako root@VPS (least-privilege deploy user)', () => {
+		const deploy = childBlocks(ci, 'jobs', 2).deploy ?? '';
+		expect(deploy.length, 'deploy job sa nenašiel').toBeGreaterThan(0);
+		expect(deploy, 'deploy job nesmie ssh/rsync/scp ako root@').not.toMatch(/root@/);
+		expect(deploy, 'deploy job má používať non-root deploy@ účet').toMatch(/deploy@/);
+	});
+
+	it('deploy-remote.sh migruje vlastníctvo na uid 1000 (non-root kontajner zapíše do volumes)', () => {
+		expect(deployRemote, 'chýba funkcia migrate_ownership').toMatch(/migrate_ownership/);
+		expect(deployRemote, 'chýba rekurzívny chown appdata volume na uid 1000').toMatch(
+			/chown\s+-R\s+1000:1000\s+\/data\/app/
+		);
 	});
 });

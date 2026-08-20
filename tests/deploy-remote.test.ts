@@ -118,6 +118,12 @@ describe('#254 deploy-remote.sh — rollback pri neúspešnom health', () => {
 		expect(r.dockerCalls).toContain(
 			'tag automatizacie-montalu:current automatizacie-montalu:abc1234'
 		);
+		// #256: migrácia vlastníctva pre non-root kontajner sa spustila ako root
+		// (docker compose run --user 0) a chownla appdata volume na uid 1000
+		const migration = r.dockerCalls.find((l) => l.startsWith('compose run'));
+		expect(migration, 'migrate_ownership sa nespustil (docker compose run --user 0)').toBeTruthy();
+		expect(migration).toContain('--user 0');
+		expect(migration).toContain('chown -R 1000:1000 /data/app');
 	});
 
 	it('rollback OK: forward SHA nesedí → re-tag prev + druhý `up -d` + exit 1', () => {
