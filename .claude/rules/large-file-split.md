@@ -50,3 +50,47 @@ Also grep every consumer of the file you're splitting (`grep -rn "from
 '.*server/db'" src/ tests/`) BEFORE moving anything, to confirm nothing
 that's actually imported elsewhere is about to get silently dropped or
 buried in the extracted module.
+
+## Pure functions: a layered façade split (#249, `compute.ts` 1430 → 5 files)
+
+`db.ts` needed **parameter injection** because the extracted code shared MODULE
+STATE (the `db` instance). `compute.ts` was different: every function is **pure**
+(cfg/rozmery as arguments, no module-level state), so there was nothing to inject —
+the only job was to cut cohesive blocks and break cross-references so the import
+graph stays **acyclic**. The result:
+
+```
+compute-model.ts   (LEAF: shared types + R/val/buildCFG/ffdPack/isFin/validSys/
+                     inBounds/BOUNDS + sietkaExtraPocetKs + JE_RAMOVY/NOSOVY;
+                     ZERO internal imports)
+   ↑ compute-profily.ts → model      (profilCuts, oversize/undersize/missingHrubka, rail)
+   ↑ compute-sietka.ts  → profily, model
+   ↑ compute-odpis.ts   → sietka, profily, model   (computeFlat/Multi, safe*, PosuvSpec)
+   ↑ compute.ts (FAÇADE) → explicit named re-export of the public API from all four
+```
+
+Key moves that made the DAG acyclic (the natural cycle is sieťka ↔ profily):
+`profilCuts`/`undersizeCut` (profily) call `sietkaExtraPocetKs`, while
+`sietkaSamostatnaVypocet` (sieťka) calls `oversizeCut`/`profilCuts` (profily). Pushing
+the LEAF helpers `sietkaExtraPocetKs` + its regexes `JE_RAMOVY_PROFIL`/`JE_NOSOVY_PROFIL`
++ the validation core `validSys`/`inBounds`/`BOUNDS`/`isFin` DOWN into `compute-model.ts`
+removes every back-edge — profily/sieťka then import only from model (and sieťka from profily,
+one direction).
+
+Two mechanical rules for THIS variant:
+
+1. **Formerly-private helpers that siblings need must be `export`ed at module level**
+   (`R`, `val`, `sietkaExtraPocetKs`, `ProfilCuts`, `profilCuts`, `mergeExtraCuts`, …) —
+   exactly like #183 had to export `migrate()`. Keep them OUT of the façade's re-export
+   list so `$lib/server/compute`'s public surface stays bit-identical (the façade re-exports
+   only the originally-`export`ed symbols; consumers never import a submodule directly).
+2. **The façade re-exports EXACTLY the original public API** via explicit
+   `export { … } from './…'` / `export type { … } from './…'` (not `export *`, which would
+   leak the helpers from rule 1 into the public surface). Adding `export ` to a signature can
+   push it past prettier's 100-col width → `prettier --write` the new files (allowed: it's
+   "reformatting prettier requires of moved text", not a logic change).
+
+Verify identical to #183 (`git diff --color-moved=dimmed-zebra` = moves; a line-coverage
+check that every original code line lands in exactly one module) PLUS the contractual proof:
+`tests/compute.test.ts` (109 Money vectors) + the `zasklenia-posuvspec-golden` snapshot
+unchanged and green.
