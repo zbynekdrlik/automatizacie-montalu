@@ -13,6 +13,7 @@ import {
 	recordFailure,
 	recordSuccess
 } from '$lib/server/login-throttle';
+import { resolveClientIp } from '$lib/server/client-ip';
 
 function lockMessage(remainingMs: number): string {
 	const mins = Math.max(1, Math.ceil(remainingMs / 60000));
@@ -37,14 +38,19 @@ export const actions = {
 			return fail(400, { error: 'Neplatný vstup.', username: username.slice(0, MAX_USERNAME_LEN) });
 		}
 
+		// #264: getClientAddress() (XFF_DEPTH=1) vracia posledný XFF prvok = CF edge IP (peer
+		// pripojený na Caddy), NIE reálneho klienta — appka je za Cloudflare. resolveClientIp
+		// z edge + Cf-Connecting-Ip odvodí reálnu klientsku IP: dôveruje CF hlavičke len keď
+		// edge je preukázateľne Cloudflare IP (spoof-safe), inak fallback na edge (CF-down-safe).
 		// getClientAddress() môže hodiť (ADDRESS_HEADER nastavený + hlavička chýba) — login je
-		// Money-zápisová brána, nesmie kvôli LOGOVANIU IP spadnúť (review #245)
-		let ip: string | undefined;
+		// Money-zápisová brána, nesmie kvôli LOGOVANIU IP spadnúť (review #245).
+		let edgeIp: string | undefined;
 		try {
-			ip = getClientAddress();
+			edgeIp = getClientAddress();
 		} catch {
-			ip = undefined;
+			edgeIp = undefined;
 		}
+		const ip = resolveClientIp(edgeIp, request.headers.get('cf-connecting-ip'));
 
 		// #251 SEC-1: lockout check PRED pokusom — aj SPRÁVNE heslo je počas lockoutu
 		// odmietnuté do expirácie (kľúč (username, ip), nie globálny → reálny user z

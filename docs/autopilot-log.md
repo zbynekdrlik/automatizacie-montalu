@@ -1487,3 +1487,10 @@ implementované, nereprodukovateľné čestný null:
 - **#261 (test-DB izolácia):** centrálny `tests/setup/db-isolation.ts` cez `test.setupFiles` — per-file `DATABASE_PATH` v tmpdir (pid+UUID) + cleanup; regresný guard `db-isolation.test.ts`; playbook sekcia v `testing.md`. Merge úplne bez konfliktov.
 - Akceptačný dôkaz: plný PARALELNÝ vitest 130 súborov/1770 testov zelený (lokálne aj v CI), predtým deterministický `SqliteError: table … already exists`.
 - Post-deploy (test-only zmena): health + DOM `v0.24.13 (0b28284)`, console 0/0.
+
+## Kolo 8 — #255 solo + shardovaný mutation gate (PR #268, v0.24.14, merge 380671b)
+
+- **#255 (`noUncheckedIndexedAccess`):** flag globálny → 5 nových chýb v kóde pridanom PO base lane (#251 eviction, guard test) + 2 v #264 lane (`client-ip.ts` cidr split) — narrowing fixy `c645e84`, `e63bdf2`. Kontraktné compute vektory nedotknuté.
+- **Mutation gate prekročil 20-min strop** (18 súborov/3753 mutantov). Timeout NEdvihnutý: v1 hash-sharding 4× → shard 3 zhlukol 9/18 najťažších; v2 `scripts/mutation-shard.sh` LPT váhová partícia + 6 shardov → max 9 min. CAD paste test: Stryker perTest dry-run timeout → explicitný 30 s.
+- **Nález → #267:** main bez branch protection (404). Aplikovaná živo (8 required checks, enforce_admins, merge-only); `scripts/branch-protection.sh` odvodzuje kontexty zo `SHARDS:`.
+- Post-deploy: health + DOM `v0.24.14 (380671b)`, console 0/0.
