@@ -209,7 +209,8 @@
 	let otvaraniaPre = $derived(otvaraniaForStyl(styl));
 	$effect(() => {
 		if (jeOpona) otvaranie = 'Opona';
-		else if (!otvaraniaPre.includes(otvaranie)) otvaranie = otvaraniaPre[0];
+		// otvaraniaPre je vždy neprázdne (['Opona'] alebo data.otvarania)
+		else if (!otvaraniaPre.includes(otvaranie)) otvaranie = otvaraniaPre[0]!;
 	});
 	// kovanie je zatiaľ len robustové — pri inom systéme voľbu zahoď (aj v JSON-e
 	// posuvov), nech sa na plán nedostane kovanie k systému, ktorý ho neponúka
@@ -259,7 +260,7 @@
 	});
 	let stylyPre = $derived(stylyForSystem(system));
 	$effect(() => {
-		if (!stylyPre.includes(styl)) styl = stylyPre[0];
+		if (!stylyPre.includes(styl)) styl = stylyPre[0]!; // stylyPre neprázdne pre platný systém
 	});
 	// sklá platné pre zvolený systém A ŠTÝL (jeho vlastné + spoločné ALL)
 	let sklaPre = $derived(sklaForSystem(system, styl));
@@ -350,12 +351,13 @@
 	// po zmene systému/štýlu ďalšieho posuvu daj do poriadku jeho štýl/sklo/otváranie
 	function fixPosuv(i: number) {
 		const p = posuvyExtra[i];
+		if (!p) return; // i je vždy platný index do posuvyExtra — guard len pre typ
 		const st = stylyForSystem(p.system);
-		if (!st.includes(p.styl)) p.styl = st[0];
+		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
 		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk);
 		const ot = otvaraniaForStyl(p.styl);
-		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0];
+		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {
 			p.kovanieL = '';
 			p.kovanieP = '';

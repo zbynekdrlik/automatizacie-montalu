@@ -220,7 +220,7 @@
 	{@const baseY = fit.y1}
 	{@const topY = fit.y0}
 	{@const X = (mm: number) => fit.x0 + mm * scale}
-	{@const minKridloMm = Math.min(...stlpiky.slice(1).map((x, i) => x - stlpiky[i]))}
+	{@const minKridloMm = Math.min(...stlpiky.slice(1).map((x, i) => x - stlpiky[i]!))}
 	{@const ramMm = Math.min(RAM_VIZ_MM, minKridloMm * 0.3, vstup.v * 0.3)}
 	{@const mulMm = Math.min(MULLION_VIZ_MM, minKridloMm * 0.4)}
 
@@ -249,9 +249,10 @@
 	     #162 review nález: pevný stroke-width="0.3" mohol pri extrémnom vstupe
 	     (S_MIN/N_MAX -> veľmi úzke krídlo) prehltnúť celú svetlú výplň — rovnaký
 	     `obrysStroke()` guard ako vonkajší rám vyššie (#153 disciplína). -->
+	<!-- stlpiky.length === n+1 (deliaceStlpiky) → stlpiky[i], stlpiky[i+1] pre i∈[0,n) definované -->
 	{#each Array(n) as _, i (i)}
-		{@const left = stlpiky[i] + (i === 0 ? ramMm : mulMm / 2)}
-		{@const right = stlpiky[i + 1] - (i === n - 1 ? ramMm : mulMm / 2)}
+		{@const left = stlpiky[i]! + (i === 0 ? ramMm : mulMm / 2)}
+		{@const right = stlpiky[i + 1]! - (i === n - 1 ? ramMm : mulMm / 2)}
 		{@const gx0 = X(left)}
 		{@const gx1 = Math.max(gx0 + 0.5, X(right))}
 		{@const gh = baseY - topY - 2 * ramMm * scale}
@@ -273,8 +274,8 @@
 	     kridla ostavaju neoznacene (rovnaka konvencia ako vzor — len pohyblive
 	     sa zvyraznuju). -->
 	{#each pohyblive as p (p.index)}
-		{@const left = stlpiky[p.index] + (p.index === 0 ? ramMm : mulMm / 2)}
-		{@const right = stlpiky[p.index + 1] - (p.index === n - 1 ? ramMm : mulMm / 2)}
+		{@const left = stlpiky[p.index]! + (p.index === 0 ? ramMm : mulMm / 2)}
+		{@const right = stlpiky[p.index + 1]! - (p.index === n - 1 ? ramMm : mulMm / 2)}
 		{@const gx0 = X(left) + 2}
 		{@const gx1 = Math.max(gx0 + 2, X(right) - 2)}
 		{@const midY = (topY + baseY) / 2}
@@ -289,12 +290,12 @@
 	<!-- kóty krídel + celková šírka -->
 	{#each Array(n) as _, i (i)}
 		<Kota
-			x0={X(stlpiky[i])}
+			x0={X(stlpiky[i]!)}
 			y0={baseY}
-			x1={X(stlpiky[i + 1])}
+			x1={X(stlpiky[i + 1]!)}
 			y1={baseY}
 			perpOffset={r.h * 0.06}
-			text={fmtMm(stlpiky[i + 1] - stlpiky[i])}
+			text={fmtMm(stlpiky[i + 1]! - stlpiky[i]!)}
 			color={MODRA}
 			fontSize={3}
 		/>

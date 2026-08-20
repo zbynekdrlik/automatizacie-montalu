@@ -323,9 +323,10 @@
 		data-testid="bn-bokorys-kolajisko"
 	/>
 	<!-- kaskáda sekcií — sekcia 0 (najvyššia) vľavo, posledná (najnižšia) vpravo -->
+	<!-- pozicie.length === pocetSekcii+1, vysky.length === pocetSekcii → indexy definované -->
 	{#each vysky as vyskaSekcie, i (i)}
-		{@const sx0 = X(pozicie[i])}
-		{@const sx1 = X(pozicie[i + 1])}
+		{@const sx0 = X(pozicie[i]!)}
+		{@const sx1 = X(pozicie[i + 1]!)}
 		{@const sy1 = baseY - vyskaSekcie * fit.scale}
 		<rect
 			x={sx0}
@@ -347,22 +348,22 @@
 	     s nakreslenou výškou. Pre pocetSekcii>1 sú hodnoty zhodné s predošlým
 	     správaním (vysky[0]===vyskaMax, vysky[posledná]===vyskaMin). -->
 	<Kota
-		x0={X(pozicie[0])}
+		x0={X(pozicie[0]!)}
 		y0={baseY}
-		x1={X(pozicie[0])}
-		y1={baseY - vysky[0] * fit.scale}
+		x1={X(pozicie[0]!)}
+		y1={baseY - vysky[0]! * fit.scale}
 		perpOffset={-(r.w * 0.05)}
-		text={fmtMm(vysky[0])}
+		text={fmtMm(vysky[0]!)}
 		color={MODRA}
 		fontSize={3}
 	/>
 	<Kota
-		x0={X(pozicie[pozicie.length - 1])}
+		x0={X(pozicie[pozicie.length - 1]!)}
 		y0={baseY}
-		x1={X(pozicie[pozicie.length - 1])}
-		y1={baseY - vysky[vysky.length - 1] * fit.scale}
+		x1={X(pozicie[pozicie.length - 1]!)}
+		y1={baseY - vysky[vysky.length - 1]! * fit.scale}
 		perpOffset={r.w * 0.05}
-		text={fmtMm(vysky[vysky.length - 1])}
+		text={fmtMm(vysky[vysky.length - 1]!)}
 		color={MODRA}
 		fontSize={3}
 	/>
@@ -370,9 +371,9 @@
 	{#if vstup.sirkaSekcieOverride !== undefined}
 		<g data-testid="bn-bokorys-sirka-sekcie">
 			<Kota
-				x0={X(pozicie[0])}
+				x0={X(pozicie[0]!)}
 				y0={baseY + r.h * 0.06}
-				x1={X(pozicie[1])}
+				x1={X(pozicie[1]!)}
 				y1={baseY + r.h * 0.06}
 				perpOffset={r.h * 0.05}
 				text={fmtMm(vstup.sirkaSekcieOverride)}

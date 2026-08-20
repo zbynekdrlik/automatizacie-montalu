@@ -240,7 +240,7 @@
 				[x1, base - (klin.v2 / maxV) * KLIN_KRESBA],
 				[x1, base]
 			]
-				.map(([x, y]) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`)
+				.map(([x, y]) => `${Math.round(x! * 10) / 10},${Math.round(y! * 10) / 10}`)
 				.join(' ')
 		};
 	});
