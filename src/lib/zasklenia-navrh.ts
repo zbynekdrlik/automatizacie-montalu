@@ -24,12 +24,6 @@ export const V_MAX = 20000;
 export const N_MIN = 1;
 export const N_MAX = 30;
 
-/** Rovnaké tri hodnoty ako `OTVARANIA` v `$lib/server/vstup.ts` — sem sa
- *  neimportujú (server-only modul), len ich TVAR sa opakuje pre klientsky
- *  bezpečnú `dir()` deriváciu nižšie. Zdroj pravdy pre VÝBER v dropdowne
- *  ostáva `data.otvarania` (server `load`, `OTVARANIA` z vstup.ts). */
-export type Otvaranie = 'P - L' | 'L - P' | 'Opona' | '';
-
 export interface ZaskleniaNavrhVstup {
 	system: string;
 	styl: string;

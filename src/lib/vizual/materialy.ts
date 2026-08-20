@@ -1,5 +1,5 @@
 // Zákaznícky 3D náhľad (#170) — materiály: hliník, sklo, RAL → farba (§2.6, §2.7).
-import { RAL_PALETA, farbaKonstrukcie } from '$lib/vykres/ral';
+import { farbaKonstrukcie } from '$lib/vykres/ral';
 import { mm } from './jednotky';
 
 type ThreeNS = typeof import('three');
@@ -45,15 +45,6 @@ export function nastavRAL(
 	mat.clearcoat = clearcoatPovoleny ? (farba.tmavyObrys ? 0.16 : 0.1) : 0;
 	mat.envMapIntensity = farba.tmavyObrys ? 1.15 : 1.0;
 	mat.needsUpdate = true;
-}
-
-/** Overí, či appka pozná SKUTOČNÝ odtieň zadaného RAL kódu (5 vzoriek v
- *  palete) — použité na rozhodnutie, či pridať povinnú "ilustračná farba"
- *  poznámku (§2.7, logika samotná žije v `geo/zasklenia.ts`, toto je len malý
- *  pomocník pre komponenty, ktoré potrebujú vedieť to isté bez re-importu RAL
- *  paletového poľa). */
-export function jePoznanyRal(ralKod: string): boolean {
-	return RAL_PALETA.some((r) => r.kod === ralKod);
 }
 
 /** Sklo — buď skutočný transmission pass (jedna zliata geometria + jedna
