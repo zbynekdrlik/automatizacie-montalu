@@ -62,7 +62,7 @@ export const load: PageServerLoad = async () => {
 	return { datumIso: new Date().toISOString(), live: isLive(), catalog: catalogForClient() };
 };
 
-export const actions: Actions = {
+export const actions = {
 	spocitat: async ({ request }) => {
 		const form = await request.formData();
 		const { vstup, error } = parsePergolaNarezVstup(form);
@@ -181,4 +181,4 @@ export const actions: Actions = {
 			};
 		}
 	}
-};
+} satisfies Actions;

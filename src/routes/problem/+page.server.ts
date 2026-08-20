@@ -8,7 +8,7 @@ export const load: PageServerLoad = async () => {
 	return { reports };
 };
 
-export const actions: Actions = {
+export const actions = {
 	default: async ({ request, locals }) => {
 		const form = await request.formData();
 		const oblast = String(form.get('oblast') ?? '').trim();
@@ -21,4 +21,4 @@ export const actions: Actions = {
 		);
 		return { ulozene: true };
 	}
-};
+} satisfies Actions;

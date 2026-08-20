@@ -17,7 +17,7 @@ export const load: PageServerLoad = async () => {
 	};
 };
 
-export const actions: Actions = {
+export const actions = {
 	// uvoľnenie dedup kľúča — legitímna oprava: zmaž import v Money, uvoľni tu,
 	// pošli znova. Auditované v histórii zmien.
 	uvolnit: async ({ request, locals }) => {
@@ -27,4 +27,4 @@ export const actions: Actions = {
 		const ok = releaseOdpis(id, locals.user?.username ?? '');
 		return ok ? { uvolnene: true } : { error: 'Záznam sa nenašiel.' };
 	}
-};
+} satisfies Actions;

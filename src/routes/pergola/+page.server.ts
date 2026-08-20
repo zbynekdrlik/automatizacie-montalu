@@ -61,7 +61,7 @@ function editsFrom(form: FormData): Map<string, string> {
 	const edits = new Map<string, string>();
 	for (const [key, value] of form.entries()) {
 		const m = key.match(/^qty_(.+)$/);
-		if (m) edits.set(m[1], String(value));
+		if (m) edits.set(m[1]!, String(value)); // regex má 1 povinnú capture skupinu
 	}
 	return edits;
 }
@@ -132,7 +132,7 @@ export const load: PageServerLoad = async () => {
 	return { live: isLive() };
 };
 
-export const actions: Actions = {
+export const actions = {
 	spocitat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const vstup = parseVstup(form);
@@ -224,4 +224,4 @@ export const actions: Actions = {
 			};
 		}
 	}
-};
+} satisfies Actions;

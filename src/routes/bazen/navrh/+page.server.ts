@@ -15,7 +15,7 @@ export const load: PageServerLoad = async () => {
 	return { datumIso: new Date().toISOString() };
 };
 
-export const actions: Actions = {
+export const actions = {
 	vykres: async ({ request, locals }) => {
 		const { vstup, error } = parseBazenNavrhVstup(await request.formData());
 		// predvyplň "vypracoval" prihláseným menom, keď ho operátor nechal prázdne
@@ -31,4 +31,4 @@ export const actions: Actions = {
 		const { vstup } = parseBazenNavrhVstup(await request.formData());
 		return { step: 'form' as const, vstup };
 	}
-};
+} satisfies Actions;
