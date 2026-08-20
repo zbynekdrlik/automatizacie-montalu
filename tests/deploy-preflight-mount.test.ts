@@ -16,7 +16,15 @@
 // na `PATH` (vzor `tests/deploy-remote.test.ts`) — žiadny reálny Docker/VPS, žiadna nová dep.
 import { describe, it, expect } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import {
+	mkdtempSync,
+	mkdirSync,
+	writeFileSync,
+	chmodSync,
+	readFileSync,
+	existsSync,
+	rmSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -112,7 +120,12 @@ function runPreflight({ healthy = 0, unreachable = 0, named = ['appdata'] }: Fix
 		? readFileSync(dockerLog, 'utf8').split('\n').filter(Boolean)
 		: [];
 	rmSync(dir, { recursive: true, force: true });
-	return { code: res.status ?? 1, out: (res.stdout ?? '') + (res.stderr ?? ''), dockerCalls, binds };
+	return {
+		code: res.status ?? 1,
+		out: (res.stdout ?? '') + (res.stderr ?? ''),
+		dockerCalls,
+		binds
+	};
 }
 
 // počet „OK  <src>" riadkov (jeden na skontrolovaný dostupný zdroj)
