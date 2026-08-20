@@ -1426,3 +1426,16 @@ implementované, nereprodukovateľné čestný null:
   dev CI 32355302107 + Mutation 32355302241 zelené; main run 32356505451 deploy zelený.
 - Post-deploy (čistý prehliadač): health `0.24.8 (26ec81e)` live:true, DOM `v0.24.8 (26ec81e)`,
   konzola 0/0, read-only, Money nedotknuté.
+
+## 2026-08-20 — #245 + #246 (PR #260, merge d3f3949, v0.24.9, audit kolo 3)
+
+- **#245 Observability:** štruktúrovaný JSON logger (auth, Money, startup), `handleError`
+  + `+error.svelte` s `errorId`; test-only `/__test-error` route + E2E (preview-only cez
+  `testIgnore`). Guard rozšírený o PRESNÝ stringMatching-allowlist (inherentný 500 riadok).
+- **#246 Durabilita:** fsync tmp+dir pred rename (Money watcher nikdy neuvidí neúplný xlsx),
+  migrácie v8/v20/v21 atomicky, v24 audit deleteB2BUser/seedUsers, `synchronous=FULL` pin.
+- **Integračné pasce kola:** (1) `test.skip(BASE_URL)` v novom spec-u = pre-push blok →
+  config-level `testIgnore`; (2) 500 stránka VŽDY zaloguje resource error → exact allowlist;
+  (3) guard tail check bol mimo bázy lane → worker si mergol origin/dev a guard rozšíril.
+- Post-deploy (čistý browser): health+DOM `v0.24.9 (d3f3949)`, konzola 0/0 na /zasklenia,
+  štartový JSON log + migrácia 23→24 naživo z docker logs.
