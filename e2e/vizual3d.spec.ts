@@ -49,6 +49,7 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 	test('canvas má nenulovú veľkosť a nenulovú varianciu pixelov (nie prázdny/jednofarebný buffer)', async ({
 		page
 	}) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		await vyplnAVykresli(page);
 		await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 10000 });
@@ -67,11 +68,13 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 		// prázdna/jednofarebná plocha PNG-kompresuje na pár stoviek bajtov;
 		// detailný 3D render (rám/sklo/dlažba/stena/obloha) na desiatky KB
 		expect(bajtov).toBeGreaterThan(5000);
+		expect(consoleMsgs).toEqual([]);
 	});
 
 	test('presety menia kameru (data-viz-preset + data-viz-cam), RAL čip mení farbu (data-viz-ral)', async ({
 		page
 	}) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		await vyplnAVykresli(page);
 		await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 10000 });
@@ -90,6 +93,7 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 		await expect(kontajner).toHaveAttribute('data-viz-ral', '7016');
 		await page.getByTestId('viz-ral-9010').click();
 		await expect(kontajner).toHaveAttribute('data-viz-ral', '9010');
+		expect(consoleMsgs).toEqual([]);
 	});
 
 	test('prepínač "Otvoriť" posúva krídla (geometria sa prestaví bez pádu na T0 poster)', async ({
@@ -116,6 +120,7 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 	});
 
 	test('reset tlačidlo vráti kameru na default preset', async ({ page }) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		await vyplnAVykresli(page);
 		await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 10000 });
@@ -131,11 +136,13 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 			'data-viz-preset',
 			'troStvrte'
 		);
+		expect(consoleMsgs).toEqual([]);
 	});
 
 	test('caption pásik nesie rozmery a RAL — v RENDERI (canvas) samotnom nie je žiadny text', async ({
 		page
 	}) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		await vyplnAVykresli(page);
 		await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 10000 });
@@ -144,9 +151,11 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 		await expect(page.getByTestId('viz-caption-ral')).toContainText('RAL 7016');
 		// caption je HTML mimo <canvas> — canvas sám neobsahuje žiadny <text>/DOM prvok
 		await expect(page.getByTestId('vizual3d-canvas').locator('text')).toHaveCount(0);
+		expect(consoleMsgs).toEqual([]);
 	});
 
 	test('RAL "iný…" (voľný text) → povinná ilustračná poznámka v caption', async ({ page }) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		await goto(page, '/zasklenia/navrh');
 		await waitHydrated(page);
@@ -163,6 +172,7 @@ test.describe('Vizual3D — zákaznícky 3D náhľad (#170)', () => {
 
 		await expect(page.getByTestId('vizual3d-caption')).toContainText('ilustračná');
 		await expect(page.getByTestId('vizual3d-caption')).toContainText('RAL 7021 matná');
+		expect(consoleMsgs).toEqual([]);
 	});
 
 	test('leak test SPA navigácie: mount → odnavigovať → vrátiť sa → nula console errorov, presne 1 živý VIZ kontext', async ({
@@ -223,9 +233,11 @@ test.describe('Vizual3D — money-guard (žiadny zápis do Money z tejto stránk
 	test('zákaznícky náhľad na /zasklenia/navrh nevystaví žiadne "odoslať" tlačidlo', async ({
 		page
 	}) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		await vyplnAVykresli(page);
 		await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 10000 });
 		await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
+		expect(consoleMsgs).toEqual([]);
 	});
 });

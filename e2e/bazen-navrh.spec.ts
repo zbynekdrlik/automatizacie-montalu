@@ -128,6 +128,7 @@ test('vyplnenie formulára (OP260055) nakreslí bokorys/pôdorys s presnými kó
 test('#168: REZ SEKCIOU je malý pevný box (nezaberá celú výšku hárku), bokorys/pôdorys sú väčšie', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormularOP260055(page);
 	await page.getByTestId('nakreslit').click();
@@ -144,11 +145,13 @@ test('#168: REZ SEKCIOU je malý pevný box (nezaberá celú výšku hárku), bo
 	// obsah nie)
 	await expect(page.getByTestId('bn-bokorys')).toBeVisible();
 	await expect(page.getByTestId('bn-podorys')).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('šírka prvej sekcie sa vykreslí LEN keď je ručne zadaná (appka nehádže vnorenie)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormularOP260055(page);
 	await page.getByTestId('nakreslit').click();
@@ -172,11 +175,13 @@ test('šírka prvej sekcie sa vykreslí LEN keď je ručne zadaná (appka nehád
 		.locator('[data-testid="bn-bokorys-sirka-sekcie"] [data-testid="kota-label"]')
 		.getAttribute('font-size');
 	expect(Number(sirkaFontSize)).toBeGreaterThanOrEqual(3);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('dvojkoľaj (obojsmerný posuv) — POSUV popis a bez smerového poľa vo formulári', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/bazen/navrh');
 	await waitHydrated(page);
@@ -198,9 +203,11 @@ test('dvojkoľaj (obojsmerný posuv) — POSUV popis a bez smerového poľa vo f
 	await expect(page.getByTestId('tb-varianta')).toHaveText('S5');
 	await expect(page.getByTestId('bn-bokorys-sekcia-4')).toHaveCount(1);
 	await expect(page.getByTestId('bn-bokorys-sekcia-5')).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('RAL farebný variant — výber odtieňa vyplní farbu a poznámku', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormularOP260055(page);
 	await page.getByTestId('rezim-farebny-radio').check();
@@ -209,11 +216,13 @@ test('RAL farebný variant — výber odtieňa vyplní farbu a poznámku', async
 	await waitHydrated(page);
 
 	await expect(page.getByTestId('bn-ral-text')).toHaveText('RAL: 9006 STRIEBORNÁ');
+	expect(consoleMsgs).toEqual([]);
 });
 
 // tlač: rovnaký mechanizmus ako /pergola/navrh a /zasklenia/navrh (route-scoped
 // @page landscape).
 test('tlač: @page je A4 landscape, len na tejto route (route-CSS-splitting)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormularOP260055(page);
 	await page.getByTestId('nakreslit').click();
@@ -226,11 +235,13 @@ test('tlač: @page je A4 landscape, len na tejto route (route-CSS-splitting)', a
 	await goto(page, '/bazen');
 	const bazenSizes = await najdiPageSizes(page);
 	expect(bazenSizes.some((s) => /landscape/i.test(s))).toBe(false);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by ho vynuloval)', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await vyplnFormularOP260055(page);
 	await page.getByLabel('Názov výkresu (voliteľné)').fill('Ponuka pre ZAK202699');
@@ -260,6 +271,7 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 	await waitHydrated(page);
 	await expect(page.getByTestId('bn-ral-text')).toHaveText('RAL: 9006 STRIEBORNÁ');
 	await expect(page.getByTestId('bn-podorys-dvere')).toHaveCount(1);
+	expect(consoleMsgs).toEqual([]);
 });
 
 // #139 zadanie: "pre b2b stránka prístupná nebude" — na rozdiel od
@@ -307,6 +319,7 @@ test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/z
 test('internal: odkaz "→ Návrhový výkres" na /bazen vedie na /bazen/navrh, žiadne tlačidlo odoslania do Money', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/bazen');
 	await expect(page.getByTestId('link-navrh')).toBeVisible();
@@ -322,4 +335,5 @@ test('internal: odkaz "→ Návrhový výkres" na /bazen vedie na /bazen/navrh, 
 	await expect(page.getByTestId('bn-bokorys')).toBeVisible();
 	// žiadna zápisová (Money odpis) akcia dostupná na tejto stránke
 	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
 });

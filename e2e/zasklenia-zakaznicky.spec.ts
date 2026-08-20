@@ -91,6 +91,7 @@ test('zákaznícky list: zachytí PNG z 3D scény, caption nesie rozmery/RAL/poz
 test('zákaznícky list bez predchádzajúceho vykreslenia → jasná správa, žiadny pád', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/zasklenia/navrh/zakaznicky');
 	await waitHydrated(page);
@@ -100,13 +101,16 @@ test('zákaznícky list bez predchádzajúceho vykreslenia → jasná správa, �
 		() => !!document.querySelector('[data-testid="zakaznicky-obrazok"]')
 	);
 	expect(existuje).toBe(false);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('žiadne "odoslať" (Money) tlačidlo na zákazníckom tlačovom liste', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
 	// rovnaký dôvod ako vyššie — táto route stavia + zachytáva celú 3D scénu
 	test.setTimeout(60000);
 	await loginAs(page);
 	await vyplnAOtvorZakaznickyList(page);
 	await pockajNaObrazok(page);
 	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
 });

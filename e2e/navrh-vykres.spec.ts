@@ -78,6 +78,7 @@ test('/vykresy/preview: rám s mriežkou (1-16/A-L), pečiatka vyplnená, dátum
 test('/vykresy/preview: tlač A4 na šírku (@page landscape) — LEN na tejto route', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/vykresy/preview');
 
@@ -86,11 +87,13 @@ test('/vykresy/preview: tlač A4 na šírku (@page landscape) — LEN na tejto r
 
 	// tlačidlo tlače je prítomné (rovnaký vzor ako fix/zasklenia)
 	await expect(page.getByRole('button', { name: '🖨 Tlačiť / uložiť PDF' })).toBeVisible();
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('nárezový plán (zasklenia): tlač ostáva A4 na výšku — landscape z /vykresy/preview nepresiahol', async ({
 	page
 }) => {
+	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	// najprv navštívime landscape route, aby sme overili, že jej @page pravidlo
 	// NEPRETRVÁ na inú route po prechode (route-CSS-splitting, #137 bod 3)
@@ -107,4 +110,5 @@ test('nárezový plán (zasklenia): tlač ostáva A4 na výšku — landscape z 
 	// a landscape z predošlej route sa NESMIE preniesť (na rozdiel od "portrait" sa
 	// "landscape" pri minifikácii NEZAHADZUJE — nie je to CSS default, viď test vyššie)
 	expect(pageSizes.some((s) => /landscape/i.test(s))).toBe(false);
+	expect(consoleMsgs).toEqual([]);
 });
