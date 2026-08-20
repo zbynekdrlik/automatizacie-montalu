@@ -97,7 +97,10 @@ describe('pergola — detail.cad + detail.komboVolby (#156)', () => {
 		const d = lastDetail();
 		expect(d.cad.length).toBe(20000);
 		expect(d.cad).toBe(bigCad.slice(0, 20000));
-	});
+		// explicitný timeout: pod Stryker perTest inštrumentáciou (pergola.ts v diff scope)
+		// stojí 700-riadkový CAD parse viac než default 5 s — trieda z testing.md (#261
+		// login-timing precedens): timeout rieši trpezlivosť harnessu, tvrdenie sa nemení
+	}, 30_000);
 });
 
 describe('zasklenia — jednoposuv: detail.vstupRaw == naparsovaný Vstup 1:1 (#156)', () => {
