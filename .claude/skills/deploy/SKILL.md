@@ -59,3 +59,51 @@ read-only SQL. `moneydb.connect()` sa pripája na agendu `S4_Agenda_MONT_ALUSro`
 - **paid-orders / order-map** = hotové príkazy mosta (`/opt/money-bridge/dispatch.sh`
   cez `SSH_ORIGINAL_COMMAND`) — n8n ich volá SSH nodom; nové read-only dotazy
   spustíš vlastným .py cez `venv/bin/python`.
+
+## Záloha DB (`odpis_log` dedup ledger) — #253
+
+DB (`/data/app/app.db`, named volume `appdata`) beží vo **WAL** móde → surová kópia
+je nekonzistentná. Záloha ide cez SQLite **online backup API** (better-sqlite3 v
+kontajneri) BEZ prerušenia appky.
+
+- Skript: `deploy/backup.sh` (v repo). Na VPS nainštalovaný ako
+  `/opt/automatizacie-montalu/backup.sh` (`chmod 700`, root).
+- Tok: `docker exec automatizacie-montalu node -e "…better-sqlite3(app.db,{readonly}).backup(/tmp/app-TS.db)"`
+  → `PRAGMA integrity_check` (cez node, žiadny host `sqlite3`) → `docker cp` von →
+  `gzip` do `/opt/automatizacie-montalu/backups/app-TS.db.gz` (MIMO volume) →
+  rotácia `find -mtime +14 -delete`. Fail loudly (`set -euo pipefail` + trap, exit ≠ 0).
+- Cron (root): `30 3 * * * /opt/automatizacie-montalu/backup.sh >/dev/null 2>&1`
+  (n8n záloha beží o 03:00, táto 03:30). Log: `/var/log/automatizacie-montalu-backup.log`
+  (skript loguje sám cez `tee`).
+- Ručný beh + dôkaz: `/opt/automatizacie-montalu/backup.sh` → v logu `integrity_check: ok`
+  + `Záloha vytvorená`. Env prepíšeš cez `BACKUP_DIR=… BACKUP_RETENTION_DAYS=… …`.
+
+**Aktualizácia skriptu na VPS** (po zmene `deploy/backup.sh` v repo): NIE je súčasťou
+CI deployu — treba ho prescp-núť ručne:
+```bash
+scp -i ~/.ssh/n8n_montalu_ed25519 deploy/backup.sh root@167.233.125.9:/opt/automatizacie-montalu/backup.sh
+ssh -i ~/.ssh/n8n_montalu_ed25519 root@167.233.125.9 'chmod 700 /opt/automatizacie-montalu/backup.sh'
+```
+(CI rsync ho síce prinesie aj do `/opt/automatizacie-montalu/src/deploy/backup.sh`, ale
+cron zámerne beží nad koreňovou kópiou, nie nad `src/`.)
+
+### Restore postup (bez host `sqlite3`)
+
+Obnova prepíše ŽIVÚ DB — je to deštruktívna operácia, rob ju len na pokyn a s istotou,
+ktorú zálohu chceš. Kroky:
+```bash
+SSH="ssh -i ~/.ssh/n8n_montalu_ed25519 root@167.233.125.9"
+# 1) vyber zálohu a rozbaľ na hoste
+$SSH 'ls -la /opt/automatizacie-montalu/backups/'
+$SSH 'gunzip -c /opt/automatizacie-montalu/backups/app-YYYYmmdd-HHMM.db.gz > /root/restore.db'
+# 2) over integritu rozbaleného súboru (cez node v kontajneri — skopíruj dnu a skontroluj)
+$SSH 'docker cp /root/restore.db automatizacie-montalu:/tmp/restore.db'
+$SSH 'docker exec automatizacie-montalu node -e "const d=require(\"better-sqlite3\")(\"/tmp/restore.db\",{readonly:true}); console.log(d.pragma(\"integrity_check\",{simple:true})); console.log(\"odpis_log\", d.prepare(\"SELECT count(*) c FROM odpis_log\").get().c); d.close();"'
+# 3) STOP app (deštruktívne — pýtaj si súhlas), nahraď súbor vo volume, zmaž WAL/SHM zvyšky
+$SSH 'cd /opt/automatizacie-montalu && docker compose stop app'
+$SSH 'VOL=$(docker volume inspect appdata -f "{{.Mountpoint}}"); cp /root/restore.db "$VOL/app.db"; rm -f "$VOL/app.db-wal" "$VOL/app.db-shm"'
+# 4) START app a over /health
+$SSH 'cd /opt/automatizacie-montalu && docker compose up -d app'
+```
+Poznámka: krok 3 (`docker compose stop`) je jediná časť, ktorá appku preruší — bez neho
+by bola obnova nekonzistentná; robí sa LEN pri reálnom restore, nie pri zálohovaní.
