@@ -272,3 +272,62 @@ Testovateľnosť deploy shellu: vyextrahuj logiku do `deploy/deploy-remote.sh`
 (env-riadený) a pokry ju vitest-om cez `node:child_process` + mock `docker`/`curl`
 na `PATH` (`tests/deploy-remote.test.ts`) — žiadna nová dep, padne keď sa rollback
 pokazí.
+
+## Non-root kontajner + non-root deploy user + chown migrácia (#256)
+
+Kontajner beží ako **`USER node` (uid 1000)** a CI deploy sa prihlasuje ako **non-root
+`deploy@`** (nie `root@`). Least-privilege (audit #243, CI-7).
+
+- **Dockerfile runtime stage:** `mkdir -p /data/app && chown node:node /data/app` PRED
+  `USER node`. Prečo chown v image: **čerstvý prázdny named volume ZDEDÍ vlastníctvo
+  image-adresára** pri prvom mounte (Docker to skopíruje) → nový `appdata` volume je
+  rovno node-vlastnený. EXISTUJÚCI (root-vytvorený) volume image chown NEPREPÍŠE — ten
+  rieši `migrate_ownership` nižšie. adapter-node servuje `build/` read-only a
+  better-sqlite3 sa len číta, takže `/app` nepotrebuje write (netreba chown-núť) — jediné
+  zapisovateľné cesty sú namontované volumes.
+
+- **`migrate_ownership` v `deploy-remote.sh`** (beží po `docker compose build`, pred `up`):
+  `docker compose run --rm --no-deps -T --user 0 --entrypoint sh app -c '<chown>'`. Prečo
+  `docker compose run` a nie `docker run`: `compose run` vyrieši prefixovaný názov named
+  volume (`automatizacie-montalu_appdata`) aj bind-mounty presne ako `up`, bez hádania
+  prefixu. `--user 0` = root v kontajneri, takže funguje AJ keď CI deployuje ako non-root
+  `deploy` (skupina docker == root-v-kontajneri). Rozsah je zámerne MINIMÁLNY:
+  - `appdata` `/data/app` → `chown -R 1000:1000` (app-EXKLUZÍVny volume, bezpečné).
+  - `/data/dlv-import` KOREŇ (zdieľaný s n8n) → `chown 1000:1000` **NErekurzívne** — na
+    create/delete odpis súboru treba write na ADRESÁR, nie vlastníctvo súboru; rekurzívny
+    chown by zbytočne prepísal vlastníctvo n8n súborov (race + blast-radius).
+  - `/data/dlv-import/NA ODPIS` podstrom → `chown -R 1000:1000` (naše odkladacie
+    priečinky pre čaká-odpis, `money.ts`).
+  - `/data/ceny` sa **NETÝKA** (`:ro` mount — chown by aj tak zlyhal; JSON snapshot je
+    world-readable, uid 1000 ho číta).
+  Idempotentné (opakovaný chown = no-op → beží každý deploy, self-healing pri drift/čerstvom
+  volume). Chyba NIE je fatálna (len `::warning::`) — health poll + rollback (#254) je
+  záchranná sieť: root-vlastnený volume → app nenabehne → rollback na starý image, prod žije.
+  Test: `tests/deploy-remote.test.ts` happy path overí `compose run --user 0` + `chown -R
+  1000:1000 /data/app` v mock-docker log-u (chown skript je JEDNORIADKOVÝ zámerne — mock
+  loguje `"$*"`, viacriadkový `-c` by sa rozbil na fragmenty).
+
+- **Deploy user na VPS:** `deploy/provision-vps.sh` (NOVÝ, jednorazový, idempotentný root
+  skript) — vytvorí `deploy` usera v skupine `docker`, autorizuje EXISTUJÚCI CI kľúč (kópia
+  `/root/.ssh/authorized_keys` — **žiadna rotácia secretu `VPS_SSH_KEY`**), prevlastní
+  `/opt/automatizacie-montalu` na `deploy`. **PREREKVIZITA: spusti RAZ na VPS PRED prvým
+  `deploy@` deployom** (`ssh root@VPS 'bash -s' < deploy/provision-vps.sh`). Ak sa zabudne,
+  SSH krok v ci.yml zlyhá HLASNE PRED dotykom kontajnera → prod ostane na aktuálnej verzii
+  (bezpečné, nie prod damage). Záložný cron (#253) beží ďalej ako root, `docker exec`-om nie
+  je dotknutý (root obchádza práva na deploy-vlastnených súboroch).
+
+- **Backup (#253) po prepnutí na non-root:** `docker exec automatizacie-montalu node …` beží
+  ako container-default user (teraz `node`) — číta `app.db` (readonly, vlastní ho node),
+  píše do `/tmp` v kontajneri (world-writable) → funguje bez zmeny. `docker cp` von + gzip
+  beží na hoste ako root cron. Nič v backup.sh sa pre #256 nemenilo.
+
+- **`ci-docker-hardening.test.ts` guard (#256):** tvrdí `USER node` v runtime stage (za
+  POSLEDNÝM `FROM`), `chown node:node /data/app` PRED `USER`, deploy job bez `root@` a s
+  `deploy@`, `migrate_ownership` + `chown -R 1000:1000 /data/app` v deploy-remote.sh. Guard
+  z #244 (`presne 3 joby`) NEZMENENÝ — nepribudol job.
+
+- **UNVERIFIED (over pri prvom deployi na VPS):** n8n uid (`docker inspect --format
+  '{{.Config.User}}' <n8n-kontajner>`) — predpoklad 1000 (oficiálny n8nio/n8n image beží ako
+  `node`); chown zdieľaných mountov na 1000:1000 je bezpečný ak n8n = 1000 ALEBO root (root
+  obchádza práva), zlomil by sa len pri n8n na treťom non-root uid. A prvý reálny produkčný
+  odpis (`odpis_log` riadok + `.xlsx` v `/data/dlv-import`).
