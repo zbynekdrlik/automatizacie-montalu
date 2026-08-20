@@ -34,10 +34,6 @@ export const KLUCKA_MM = { w: 130, h: 22, d: 26 };
 /** výška stredu kľučky nad zemou [mm] — vizuál, nie katalóg. */
 export const KLUCKA_Y_MM = 1050;
 
-/** rozteč pletiva sieťky (pre procedurálnu textúru, nie geometriu) [mm] —
- *  vizuál, nie katalóg. */
-export const SIETKA_ROZTEC_MM = 1.6;
-
 /** hrúbka sieťkového panelu [mm] — vizuál, nie katalóg (rovnaká hrúbka ako
  *  predvolené sklo, sieťka nemá vlastný katalógový rozmer v appke). */
 export const SIETKA_HRUBKA_MM = 8;

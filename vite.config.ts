@@ -1,7 +1,9 @@
-/// <reference types="vitest/config" />
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+// `defineConfig` z `vitest/config` (nie `vite`) — natívne typuje `test` blok, takže
+// netreba triple-slash `/// <reference types="vitest/config" />` (ktoré by teraz
+// koliduje s importom `coverageConfigDefaults` — triple-slash-reference/prefer-import).
+import { defineConfig, coverageConfigDefaults } from 'vitest/config';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -41,13 +43,26 @@ export default defineConfig({
 		include: ['tests/**/*.test.ts'],
 		coverage: {
 			provider: 'v8',
-			include: ['src/lib/server/**'],
-			// prah = namerané − 2 % (91,6 / 87,8 / 75,4 / 84) — len hore, nikdy dole
+			// #257: meria sa CELÁ biznis logika v `src/lib` (nielen `server/`) — ~2953 LoC
+			// v `src/lib/*.ts` malo testy, ale nebolo merané ani gatované. `.svelte` (UI)
+			// glob `**/*.ts` nechytá. Vylúčené len 3 nemerateľné/prázdne súbory (nižšie).
+			include: ['src/lib/**/*.ts'],
+			exclude: [
+				...coverageConfigDefaults.exclude,
+				'src/lib/index.ts', // prázdny `$lib` barrel (0 kódu)
+				'src/lib/vizual/spec.ts', // len typy
+				// WebGL capture: `gl.readPixels` + canvas 2D → v headless vitest nemerateľné;
+				// jediná čistá fn `supersampleFaktor` má vlastný unit test.
+				'src/lib/vizual/snimka.ts'
+			],
+			// Prahy = namerané − 2 %, LEN hore (nikdy pod predošlé server-only gaty
+			// 89/85/73/82). Namerané pri rozšírení 2026-08-20: lines 97,41 / stmts 96,23
+			// / funcs 97,5 / branch 90,54 → nové prahy zdvíhajú KAŽDÝ gate.
 			thresholds: {
-				lines: 89,
-				statements: 85,
-				branches: 73,
-				functions: 82
+				lines: 95,
+				statements: 94,
+				branches: 88,
+				functions: 95
 			}
 		}
 	}
