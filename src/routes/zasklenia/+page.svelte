@@ -1,50 +1,31 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import Nahlad2D from '$lib/components/Nahlad2D.svelte';
-	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
-	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
-	import { defaultSklo, fmtSkloRozmer } from '$lib/sklo';
+	import { defaultSklo } from '$lib/sklo';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
 		sysStylPre,
 		skloVyberaIzo,
-		pridavnaKolajnicaDefault,
-		standardPlusRailEligible
+		pridavnaKolajnicaDefault
 	} from '$lib/styl';
-	import { popisMulti, posuvySlovom } from '$lib/popis';
+	import { popisMulti } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
-	import { popisRucnejKolajnice, KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
-	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
-	import { klinPopis, type Klin } from '$lib/klin';
-	import KlinPolia from '$lib/components/KlinPolia.svelte';
-	import {
-		sietkaPopis,
-		maSietkaSystem,
-		maSietkaSystemVyber,
-		sietkaStrana,
-		potrebuje3KKolajnicu,
-		popis3KKolajnicaVymena,
-		pridavnaKolajnicaHint,
-		rozmerSietovinyPre,
-		uchytLabel,
-		type Sietka,
-		type SietkaUchyt
-	} from '$lib/sietka';
-	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
-	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
-	import SkloCena from '$lib/components/SkloCena.svelte';
+	import { type Klin } from '$lib/klin';
+	import { maSietkaSystem, sietkaStrana, type Sietka, type SietkaUchyt } from '$lib/sietka';
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
+	// #250 — vyčlenené krokové subkomponenty (vzor #239); +page ostáva state+compute hub
+	import { type PosuvRow } from '$lib/zasklenia-form';
+	import ZasklieniaForm from '$lib/components/zasklenia/ZasklieniaForm.svelte';
+	import PlanKarty from '$lib/components/zasklenia/PlanKarty.svelte';
+	import PlanKartyMulti from '$lib/components/zasklenia/PlanKartyMulti.svelte';
 
 	let { data, form } = $props();
 
 	// b2b nesmie odpisovať do Money — server to aj tak odmietne (defense in depth),
 	// tu skrývame odoslat/odoslatMulti UI, aby to b2b účet ani neskúšal
 	const isB2B = $derived(data.user?.role === 'b2b');
-
-	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
 	// Zdroj predvyplnenia: (1) akcia — po chybe/náhľade sa vraciame k odoslaným
 	// hodnotám, alebo (2) „Použiť znova" z histórie (`?znova=<id>`), ktoré server
@@ -116,35 +97,6 @@
 			existuje
 		);
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
-
-	type PosuvRow = {
-		system: string;
-		styl: string;
-		s: number | string;
-		v: number | string;
-		sklo: string;
-		otvaranie: string;
-		kovanieL: string;
-		kovanieP: string;
-		kovanieStred: string;
-		kovanieStredOkno: 'L' | 'P';
-		// klín TOHOTO posuvu — ploché polia (rovnaký tvar ako primárny posuv), do
-		// JSON-u idú tak, ako ich parsuje server (klin='1' + 4 rozmery + ks)
-		klin: boolean;
-		klinDlzka: number | string;
-		klinSirka: number | string;
-		klinV1: number | string;
-		klinV2: number | string;
-		klinKs: number | string;
-		// ručné dĺžky koľajníc TOHOTO posuvu — prázdne = počítaj zo šírky (mení odpis)
-		kolajnicaHorna: number | string;
-		kolajnicaSpodna: number | string;
-		// sieťka TOHOTO posuvu (#86–#90, KOREKCIA 2026-08-02) — rozmer sa už nezadáva
-		sietka: boolean;
-		sietkaUchyt: SietkaUchyt;
-		// systém sieťky (#110) — prázdny reťazec = rovnaký ako posuv tohto riadku
-		sietkaSystem: string;
-	};
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
 	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.
@@ -549,248 +501,6 @@
 	{/if}
 {/snippet}
 
-<!-- Poznámka (viacriadková, vľavo) + RAL (veľkým, vpravo) na nárezovom pláne aj
-     v tlači. Zdieľané pre jedno- aj viac-posuvový plán. Display-only — do Money
-     odpisu (.xlsx) NEJDE ani poznámka, ani RAL. -->
-{#snippet poznamkaRal()}
-	{#if vstup.poznamka || vstup.ral}
-		<div class="card poznamka-ral" data-testid="poznamka-ral">
-			{#if vstup.poznamka}
-				<div class="pr-note">
-					<div class="sec">Poznámka</div>
-					<div class="poznamka-plan">{vstup.poznamka}</div>
-				</div>
-			{/if}
-			{#if vstup.ral}
-				<div class="pr-ral">
-					<div class="sec">RAL</div>
-					<div class="ral-val" data-testid="ral-val">{vstup.ral}</div>
-				</div>
-			{/if}
-		</div>
-	{/if}
-{/snippet}
-
-{#snippet kovanieStrany(
-	nadpis: string,
-	lava: string,
-	prava: string,
-	stred = '',
-	stredOkno: 'L' | 'P' = 'L'
-)}
-	<div class="kov-posuv">
-		<div class="kov-hd">{nadpis}</div>
-		<div class="row"><span>ľavá strana</span><b>{lava || '—'}</b></div>
-		<div class="row"><span>pravá strana</span><b>{prava || '—'}</b></div>
-		{#if stred}
-			<div class="row">
-				<span>stredové okno ({stredOkno === 'P' ? 'pravé' : 'ľavé'})</span><b>{stred}</b>
-			</div>
-		{/if}
-	</div>
-{/snippet}
-
-{#snippet planKarty(p: NonNullable<typeof plan>)}
-	{@render poznamkaRal()}
-	<div class="card">
-		<div class="sec">Rozmery</div>
-		<div class="g">
-			<div><span>Šírka</span><b>{p.S} mm</b></div>
-			<div><span>Výška</span><b>{p.V} mm</b></div>
-			<div><span>Plocha</span><b>{fmtM(p.m2)} m²</b></div>
-			{#if vstup.kolajnica?.horna}
-				<div>
-					<span>Koľajnica horná (ručne)</span>
-					<b data-testid="kolajnica-horna">{vstup.kolajnica.horna} mm</b>
-				</div>
-			{/if}
-			{#if vstup.kolajnica?.spodna}
-				<div>
-					<span>Koľajnica spodná (ručne)</span>
-					<b data-testid="kolajnica-spodna">{vstup.kolajnica.spodna} mm</b>
-				</div>
-			{/if}
-		</div>
-	</div>
-
-	<div class="card">
-		<div class="sec">Náhľad</div>
-		<Nahlad2D
-			S={p.S}
-			V={p.V}
-			N={p.N}
-			skloS={p.sklo.sirka}
-			skloV={p.sklo.vyska}
-			otvaranie={vstup.otvaranie}
-			system={p.system}
-			vrtanieZamku={vstup.vrtanieZamku}
-			kovanieL={vstup.kovanieL}
-			kovanieP={vstup.kovanieP}
-			kovanieStred={vstup.kovanieStred}
-			kovanieStredOkno={vstup.kovanieStredOkno}
-			klin={vstup.klin}
-			sietka={vstup.sietka}
-		/>
-	</div>
-
-	{#if vstup.kovanieL || vstup.kovanieP || vstup.kovanieStred}
-		<div class="card" data-testid="kovanie-strany">
-			<div class="sec">Kovanie — kľučky a FAB</div>
-			{@render kovanieStrany(
-				'Posuv 1',
-				vstup.kovanieL,
-				vstup.kovanieP,
-				vstup.kovanieStred,
-				vstup.kovanieStredOkno
-			)}
-		</div>
-	{/if}
-
-	{#if vstup.klin}
-		<div class="card" data-testid="klin-karta">
-			<div class="sec">Klín</div>
-			<div class="g">
-				<div><span>Dĺžka</span><b data-testid="klin-dlzka">{vstup.klin.dlzka} mm</b></div>
-				<div><span>Šírka (hĺbka)</span><b>{vstup.klin.sirka} mm</b></div>
-				<div><span>Výška 1</span><b>{vstup.klin.v1} mm</b></div>
-				<div><span>Výška 2</span><b>{vstup.klin.v2} mm</b></div>
-				<div><span>Počet</span><b>{vstup.klin.ks} ks</b></div>
-			</div>
-		</div>
-	{/if}
-
-	{#if vstup.sietka}
-		{@const rozmer = rozmerSietovinyPre(p.system, p.sklo.sirka, p.sklo.vyska)}
-		{@const sietkaSystemVal = vstup.sietka.system ?? p.system}
-		{@const pridavnaHint = pridavnaKolajnicaHint(
-			p.system,
-			vstup.styl,
-			true,
-			vstup.pridavnaKolajnica
-		)}
-		<div class="card" data-testid="sietka-karta">
-			<div class="sec">Sieťka — v Money odpise</div>
-			<div class="g">
-				<div>
-					<span>Strana</span><b data-testid="sietka-strana"
-						>{sietkaStrana(vstup.otvaranie) ?? '—'}</b
-					>
-				</div>
-				{#if maSietkaSystemVyber(p.system)}
-					<div>
-						<span>Systém sieťky</span><b data-testid="sietka-system">{sietkaSystemVal}</b>
-					</div>
-				{/if}
-				<div>
-					<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b data-testid="sietka-rozmer"
-						>{fmtM(rozmer.sirka)} × {fmtM(rozmer.vyska)} mm</b
-					>
-				</div>
-				<div><span>Úchyt</span><b>{uchytLabel(vstup.sietka.uchyt)}</b></div>
-				<div>
-					<span>Profily navyše</span><b
-						>{maSietkaSystemVyber(p.system)
-							? '+2 šírka prírezov + 1 krajová + 1 nos + 1 dorazová'
-							: p.system === 'Slide'
-								? '+2 rámové rezy (S aj V) + 1 nosový rez + redukcia pre sieťku'
-								: '+2 rámové rezy (S aj V) + 1 nosový rez'}</b
-					>
-				</div>
-				<div><span>Joklík</span><b>bez skladovej karty — nájde dielňa, neodpisuje sa</b></div>
-			</div>
-			{#if potrebuje3KKolajnicu(vstup.styl)}
-				<p class="sub" data-testid="sietka-2k-warn-karta">
-					⚠ 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(p.system)}.
-				</p>
-			{/if}
-			{#if pridavnaHint}
-				<p class="sub" data-testid="pridavna-v-sietke-karta">
-					ℹ {pridavnaHint}
-				</p>
-			{/if}
-		</div>
-	{/if}
-
-	<div class="card">
-		<div class="sec">Sklo (mm)</div>
-		<div class="g">
-			<div><span>Šírka</span><b data-testid="sklo-sirka">{fmtM(p.sklo.sirka)}</b></div>
-			<div><span>Výška</span><b data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
-			<div><span>Počet</span><b>{p.sklo.pocet} ks</b></div>
-			<div><span>Typ</span><b style="font-size:13px">{vstup.skloPresne || vstup.sklo}</b></div>
-			<div>
-				<span>Rozmer (na objednávku skla)</span><b data-testid="sklo-rozmer"
-					>{fmtSkloRozmer(p.sklo.sirka, p.sklo.vyska)}</b
-				>
-			</div>
-		</div>
-	</div>
-
-	<div class="card">
-		<div class="sec">Zoznam materiálu — profily</div>
-		<table data-testid="material-tabulka">
-			<thead
-				><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead
-			>
-			<tbody>
-				{#each p.material as m (m.kod)}
-					<tr>
-						<td style="width:52px"><ProfilObrazok kod={m.kod} nazov={m.nazov} /></td>
-						<td>{m.nazov}</td>
-						<td class="c">{m.kod}</td>
-						<td
-							>{m.rezy
-								.filter((x) => x.ks > 0)
-								.map((x) => `${x.ks}×${x.rozmer} mm`)
-								.join(' + ') || '—'}</td
-						>
-						<td class="c"><b>{m.tyce}</b></td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-
-	<div class="card">
-		<div class="sec">Odpis (do Money)</div>
-		{#each p.odpis.filter((o) => o.metre > 0) as o (o.kod)}
-			<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.metre)} m</b></div>
-		{/each}
-	</div>
-
-	{#if form?.kovanie?.length}
-		<div class="card" data-testid="kovanie-karta">
-			<div class="sec">Kovanie a tesnenia (do Money)</div>
-			{#each form.kovanie as k (k.kod)}
-				<div class="row">
-					<span>{k.kod} · {k.nazov}</span><b>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b>
-				</div>
-			{/each}
-		</div>
-	{/if}
-
-	<!-- cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; b2b nikdy nedostane
-	     `form.ceny` (viď cenyPre v +page.server.ts), takže sa im tento blok vôbec nevykreslí -->
-	{#if form?.ceny}
-		<CenyTabulka ceny={form.ceny} />
-	{/if}
-
-	<!-- náklad na sklo (display-only, #225) — LEN pre interných, NOPRINT; b2b nikdy
-	     nedostane `form.skloCeny` (viď skloCenyPre v +page.server.ts) -->
-	{#if form?.skloCeny}
-		<SkloCena skloCeny={form.skloCeny} />
-	{/if}
-
-	<div class="card">
-		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
-		<p class="sub" style="margin-bottom:14px">
-			Každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci (dĺžka tyče je pri
-			každom profile — Deluxe má kratšie: kladka/klzný 3600, 5K horná 6000 mm).
-		</p>
-		<RozpisRezov material={p.material} />
-	</div>
-{/snippet}
-
 {#snippet hiddenMulti()}
 	<input type="hidden" name="zak" value={vstup.zak} />
 	<input type="hidden" name="op" value={vstup.op} />
@@ -801,192 +511,6 @@
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
-{/snippet}
-
-{#snippet planKartyMulti(m: NonNullable<typeof multi>)}
-	{@render poznamkaRal()}
-	<div class="card">
-		<div class="sec">Posuvy ({m.posuvy.length}) — spolu {fmtM(m.m2)} m²</div>
-		<table>
-			<thead
-				><tr><th></th><th>Systém</th><th>Rozmer</th><th>Sklo (mm)</th><th>Otváranie</th></tr></thead
-			>
-			<tbody>
-				{#each m.posuvy as pv, i (i)}
-					<tr>
-						<td class="c"><b>Posuv {i + 1}</b></td>
-						<td>{nazovSystemu(pv.system)} {pv.styl}</td>
-						<td
-							>{pv.S} × {pv.V} mm{#if popisRucnejKolajnice(pv.kolajnica)}<span
-									class="kol-rucne"
-									data-testid={`kolajnica-rucne-${i}`}>{popisRucnejKolajnice(pv.kolajnica)}</span
-								>{/if}</td
-						>
-						<!-- oddeľovač je v BUNKE ako výraz — `{#if} · {/if}` by o medzeru pred
-						     bodkou prišlo pri kompilácii (zachytil e2e: „2115mm· Izolačné") -->
-						<td data-testid={`posuv-sklo-${i}`}
-							>{fmtSkloRozmer(pv.sklo.sirka, pv.sklo.vyska) +
-								(pv.skloNazov ? ` · ${pv.skloNazov}` : '')}</td
-						>
-						<td>{pv.otvaranie ?? ''}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-
-	<div class="card">
-		<div class="sec">Náhľady posuvov</div>
-		<div class="posuv-nahlady">
-			{#each m.posuvy as pv, i (i)}
-				<div class="posuv-nahlad">
-					<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
-					<Nahlad2D
-						S={pv.S}
-						V={pv.V}
-						N={pv.N}
-						skloS={pv.sklo.sirka}
-						skloV={pv.sklo.vyska}
-						otvaranie={pv.otvaranie ?? 'Opona'}
-						system={pv.system}
-						kovanieL={pv.kovanieL ?? ''}
-						kovanieP={pv.kovanieP ?? ''}
-						kovanieStred={pv.kovanieStred ?? ''}
-						kovanieStredOkno={(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'}
-						klin={pv.klin ?? null}
-						sietka={pv.sietka ?? null}
-					/>
-				</div>
-			{/each}
-		</div>
-	</div>
-
-	<!-- Patrik 2026-07-31 (Odoo „Vyroba automatizacia"): „pri posuve Robust by som
-	     potreboval tie kľučky fabky vypísať niekam rozumnejšie, zle je to vidieť —
-	     kľudne aj pod tie posuvy". V kresbe sú ďalej, toto je čitateľný výpis. -->
-	{#if m.posuvy.some((pv) => pv.kovanieL || pv.kovanieP || pv.kovanieStred)}
-		<div class="card" data-testid="kovanie-strany-multi">
-			<div class="sec">Kovanie — kľučky a FAB</div>
-			{#each m.posuvy as pv, i (i)}
-				{#if pv.kovanieL || pv.kovanieP || pv.kovanieStred}
-					{@render kovanieStrany(
-						`Posuv ${i + 1}`,
-						pv.kovanieL ?? '',
-						pv.kovanieP ?? '',
-						pv.kovanieStred ?? '',
-						(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'
-					)}
-				{/if}
-			{/each}
-		</div>
-	{/if}
-
-	{#if m.posuvy.some((pv) => pv.klin)}
-		<div class="card" data-testid="klin-karta-multi">
-			<div class="sec">Klíny</div>
-			{#each m.posuvy as pv, i (i)}
-				{#if pv.klin}
-					<div class="row"><span>Posuv {i + 1}</span><b>{klinPopis(pv.klin)}</b></div>
-				{/if}
-			{/each}
-		</div>
-	{/if}
-
-	{#if m.posuvy.some((pv) => pv.sietka)}
-		<div class="card" data-testid="sietka-karta-multi">
-			<div class="sec">Sieťky — v Money odpise</div>
-			{#each m.posuvy as pv, i (i)}
-				{#if pv.sietka}
-					{@const rozmer = rozmerSietovinyPre(pv.system, pv.sklo.sirka, pv.sklo.vyska)}
-					{@const pridavnaHint = pridavnaKolajnicaHint(
-						pv.system,
-						pv.styl,
-						true,
-						vstup.pridavnaKolajnica
-					)}
-					<div class="row">
-						<span
-							>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
-								· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
-						><b>{sietkaPopis(pv.sietka, rozmer)}</b>
-					</div>
-					{#if potrebuje3KKolajnicu(pv.styl)}
-						<p class="sub" data-testid={`sietka-2k-warn-multi-${i}`}>
-							⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
-								pv.system
-							)}.
-						</p>
-					{/if}
-					{#if pridavnaHint}
-						<p class="sub" data-testid={`pridavna-v-sietke-multi-${i}`}>
-							ℹ Posuv {i + 1}: {pridavnaHint}
-						</p>
-					{/if}
-				{/if}
-			{/each}
-		</div>
-	{/if}
-
-	<div class="card">
-		<div class="sec">Zoznam materiálu — spoločný (naprieč posuvmi)</div>
-		<table data-testid="material-tabulka">
-			<thead
-				><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead
-			>
-			<tbody>
-				{#each m.material as mt (mt.kod)}
-					<tr>
-						<td style="width:52px"><ProfilObrazok kod={mt.kod} nazov={mt.nazov} /></td>
-						<td>{mt.nazov}</td>
-						<td class="c">{mt.kod}</td>
-						<td
-							>{mt.rezy
-								.filter((x) => x.ks > 0)
-								.map((x) => `${x.ks}×${x.rozmer} mm`)
-								.join(' + ') || '—'}</td
-						>
-						<td class="c"><b>{mt.tyce}</b></td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-
-	<div class="card">
-		<div class="sec">Odpis (do Money) — spoločný za celú zákazku</div>
-		{#each m.odpis.filter((o) => o.metre > 0) as o (o.kod)}
-			<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.metre)} m</b></div>
-		{/each}
-	</div>
-
-	{#if form?.kovanie?.length}
-		<div class="card" data-testid="kovanie-karta">
-			<div class="sec">Kovanie a tesnenia (do Money)</div>
-			{#each form.kovanie as k (k.kod)}
-				<div class="row">
-					<span>{k.kod} · {k.nazov}</span><b>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b>
-				</div>
-			{/each}
-		</div>
-	{/if}
-
-	<!-- cenový zoznam materiálu (#154, fáza 1) — LEN pre interných, viď planKarty vyššie -->
-	{#if form?.ceny}
-		<CenyTabulka ceny={form.ceny} />
-	{/if}
-
-	<!-- náklad na sklo per posuv + súhrn (display-only, #225) — LEN pre interných, NOPRINT -->
-	{#if form?.skloCeny}
-		<SkloCena skloCeny={form.skloCeny} />
-	{/if}
-
-	<div class="card">
-		<div class="sec">Rozpis rezov na tyče — pre pílu (posuvy zdieľajú tyče)</div>
-		<p class="sub" style="margin-bottom:14px">
-			Rezy z rôznych posuvov sú v jednej tyči — pri každom reze je číslo posuvu (P1/P2/…).
-		</p>
-		<RozpisRezov material={m.material} viacPosuvov={true} />
-	</div>
 {/snippet}
 
 {#if step === 'form'}
@@ -1022,452 +546,66 @@
 		<div class="err" data-testid="form-error">⚠️ {form.error}</div>
 	{/if}
 
-	<div class="card">
-		<form method="POST" action="?/nahlad">
-			<div class="grid3">
-				<div class="field">
-					<label for="zak">Číslo objednávky (ZAK) *</label>
-					<input id="zak" name="zak" bind:value={zakS} required />
-				</div>
-				<div class="field">
-					<label for="op">OP/OPDL číslo *</label>
-					<input id="op" name="op" bind:value={opS} required />
-				</div>
-				<div class="field">
-					<label for="zakaznik">Zákazník *</label>
-					<input id="zakaznik" name="zakaznik" bind:value={zakaznikS} required />
-				</div>
-			</div>
-			<div class="grid2">
-				<div class="field">
-					<label for="system">Systém</label>
-					<select id="system" name="system" bind:value={system}>
-						{#each data.systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option>{/each}
-					</select>
-				</div>
-				<div class="field">
-					<label for="styl">Štýl</label>
-					<select id="styl" name="styl" bind:value={styl}>
-						{#each stylyPre as st (st)}<option>{st}</option>{/each}
-					</select>
-				</div>
-			</div>
-			<div class="grid2">
-				<div class="field">
-					<label for="s">Šírka (mm) *</label>
-					<input
-						id="s"
-						name="s"
-						type="number"
-						min={S_MIN}
-						max={S_MAX}
-						step="any"
-						bind:value={sirka}
-						required
-					/>{#if b2bSirkaErr}<span class="b2b-blok" data-testid="b2b-sirka-err">
-							⛔ {b2bSirkaErr}</span
-						>{/if}
-				</div>
-				<div class="field">
-					<label for="v">Výška (mm) *</label>
-					<input
-						id="v"
-						name="v"
-						type="number"
-						min={V_MIN}
-						max={V_MAX}
-						step="any"
-						bind:value={vyska}
-						required
-					/>{#if b2bVyskaWarn}<span class="b2b-upoz" data-testid="b2b-vyska-warn">
-							{b2bVyskaWarn}</span
-						>{/if}
-				</div>
-			</div>
-			<div class="grid2">
-				<div class="field">
-					<label for="sklo">Sklo (základ — určuje vzorec)</label>
-					<select id="sklo" name="sklo" bind:value={sklo}>
-						{#each sklaPre as g (g)}<option>{g}</option>{/each}
-					</select>
-					{#if narezakHint}<span class="hint" data-testid="narezak-hint">{narezakHint}</span>{/if}
-				</div>
-				<div class="field">
-					<label for="otvaranie">Otváranie</label>
-					<select id="otvaranie" name="otvaranie" bind:value={otvaranie}>
-						{#each otvaraniaPre as o (o)}<option>{o}</option>{/each}
-					</select>
-					{#if jeOpona}<span class="hint">Pri 2× štýle je otváranie vždy opona (od stredu).</span
-						>{/if}
-				</div>
-			</div>
-			<!-- Kovanie (kľučka) — LEN Robust; ľavá aj pravá strana zvlášť, pri každom
-			     posuve sólo. Display-only: plán/náhľad + detail v histórii, Money NIE.
-			     #88: pri sieťke sa kľučka NEPONÚKA (namiesto nej úchyt v SietkaPolia). -->
-			{#if jeRobust && !sietkaS}
-				<div class="grid2">
-					<div class="field">
-						<label for="kovanieL">Kovanie — ľavá strana</label>
-						<select id="kovanieL" name="kovanieL" bind:value={kovanieLS}>
-							<option value="">—</option>
-							{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-						</select>
-					</div>
-					<div class="field">
-						<label for="kovanieP">Kovanie — pravá strana</label>
-						<select id="kovanieP" name="kovanieP" bind:value={kovaniePS}>
-							<option value="">—</option>
-							{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-						</select>
-					</div>
-				</div>
-				<!-- Opona má kľučku NAVYŠE na jednom z dvoch krídel v strede (Patrik
-				     2026-07-31: „ak máme 2x3, kľučka bude okno 1, okno 6 a potom buď
-				     okno 3 alebo 4"). Money sa tým nemení — opony majú 3 uzávery
-				     (a teda 3 kľučky) v tabuľke komponentov už teraz. -->
-				{#if jeOpona}
-					<div class="grid2" data-testid="kovanie-stred-polia">
-						<div class="field">
-							<label for="kovanieStred">Kovanie — stredové okno</label>
-							<select id="kovanieStred" name="kovanieStred" bind:value={kovanieStredS}>
-								<option value="">—</option>
-								{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-							</select>
-						</div>
-						<div class="field">
-							<label for="kovanieStredOkno">Ktoré okno v strede</label>
-							<select id="kovanieStredOkno" name="kovanieStredOkno" bind:value={kovanieStredOknoS}>
-								<option value="L">ľavé zo stredovej dvojice</option>
-								<option value="P">pravé zo stredovej dvojice</option>
-							</select>
-						</div>
-					</div>
-				{/if}
-			{/if}
-			{#if system === 'Deluxe'}
-				<div class="field">
-					<label for="vrtanieZamku">Výška vŕtania zámku (mm) — otvory ⌀46 na krajných sklách</label>
-					<input
-						id="vrtanieZamku"
-						name="vrtanieZamku"
-						type="number"
-						min="0"
-						max="20000"
-						step="any"
-						bind:value={vrtanieZamkuS}
-					/>
-				</div>
-			{/if}
-			<div class="field">
-				<label for="skloPresne">Presné zloženie skla (nepovinné — nemení vzorec)</label>
-				<input
-					id="skloPresne"
-					name="skloPresne"
-					bind:value={skloPresneS}
-					maxlength="120"
-					placeholder="napr. Stopsol Classic Grey, dubová kôra…"
-				/>
-			</div>
-			<div class="field">
-				<label for="poznamka"
-					>Poznámka (viacriadková — vľavo na pláne aj v tlači, píš pod seba)</label
-				>
-				<textarea
-					id="poznamka"
-					name="poznamka"
-					rows="4"
-					bind:value={poznamkaS}
-					maxlength="300"
-					placeholder="napr. pozor na ľavé krídlo&#10;dodať do piatku&#10;montáž 5.8."
-					style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;font-family:inherit;resize:vertical"
-				></textarea>
-			</div>
-			<div class="field">
-				<label for="ral">RAL (farba) — zobrazí sa veľkým vpravo na pláne aj v tlači</label>
-				<input
-					id="ral"
-					name="ral"
-					bind:value={ralS}
-					maxlength="40"
-					placeholder="napr. 7016 / RAL 9005…"
-				/>
-			</div>
-			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input type="checkbox" name="caka" value="1" bind:checked={cakaS} style="width:auto" />
-					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
-				</label>
-			</div>
-			<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje. Zdieľaný
-			     predikát `standardPlusRailEligible` (styl.ts) — rovnaký gate ako
-			     `pridavnaKolajnicaDefault` aj `railUpsize` v compute.ts (#134). -->
-			{#if standardPlusRailEligible(system, styl)}
-				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-						<input
-							type="checkbox"
-							name="pridavnaKolajnica"
-							value="1"
-							bind:checked={pridavnaKolajnicaS}
-							style="width:auto"
-						/>
-						➕ Prídavná koľajnica (spodná koľajnica o veľkosť väčšia)
-					</label>
-				</div>
-			{/if}
-			<!-- Jednostranná FAB (Dominik 2026-07-28: „chodí jeden zo 100") — MENÍ Money
-			     odpis: kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. -->
-			{#if maKovanie}
-				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-						<input
-							type="checkbox"
-							name="jednostrannaFab"
-							value="1"
-							bind:checked={jednostrannaFabS}
-							style="width:auto"
-							data-testid="jednostranna-fab"
-						/>
-						🔑 Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)
-					</label>
-				</div>
-			{/if}
-			<!-- Ručná dĺžka koľajnice (Patrik 2026-07-28): dielňa občas reže hornú a spodnú
-			     inak než na šírku otvoru (napr. 2690 / 2695 mm). MENÍ Money odpis — prázdne
-			     pole = pôvodný výpočet zo šírky. Len systémy s oddelenou hornou/spodnou. -->
-			{#if maKolajnicu}
-				<div class="grid2" data-testid="kolajnica-polia">
-					<div class="field">
-						<label for="kolajnicaHorna">Koľajnica horná (mm) — prázdne = podľa šírky</label>
-						<input
-							id="kolajnicaHorna"
-							name="kolajnicaHorna"
-							type="number"
-							min={KOLAJNICA_MIN}
-							max={KOLAJNICA_MAX}
-							step="any"
-							bind:value={kolHS}
-							placeholder={String(sirka || '')}
-						/>
-					</div>
-					<div class="field">
-						<label for="kolajnicaSpodna">Koľajnica spodná (mm) — prázdne = podľa šírky</label>
-						<input
-							id="kolajnicaSpodna"
-							name="kolajnicaSpodna"
-							type="number"
-							min={KOLAJNICA_MIN}
-							max={KOLAJNICA_MAX}
-							step="any"
-							bind:value={kolSS}
-							placeholder={String(sirka || '')}
-						/>
-					</div>
-				</div>
-			{/if}
-			<!-- Klín nad posuvom (Patrik): zapínač + dĺžka/šírka/výška 1/výška 2 + ks.
-			     Display-only — kreslí sa v náhľade, do Money odpisu nevstupuje. -->
-			<KlinPolia
-				idPrefix="klin"
-				names={true}
-				bind:on={klinS}
-				bind:dlzka={klinDlzkaS}
-				bind:sirka={klinSirkaS}
-				bind:v1={klinV1S}
-				bind:v2={klinV2S}
-				bind:ks={klinKsS}
-			/>
-			<!-- Sieťka (#86–#90, KOREKCIA 2026-08-02, #110 systém sieťky): zapínač + úchyt.
-			     Len na systémoch, kde ju appka ponúka (Robust/Slide/Štandard/Štandard +).
-			     Rám/nos/redukcia IDE do Money odpisu (úchyt display-only). -->
-			{#if maSietka}
-				<SietkaPolia
-					idPrefix="sietka"
-					names={true}
-					{system}
-					{styl}
-					strana={sietkaStranaVal}
-					pridavna={pridavnaKolajnicaS}
-					bind:on={sietkaS}
-					bind:uchyt={sietkaUchytS}
-					bind:sietkaSystem={sietkaSystemS}
-				/>
-			{/if}
-			<!-- Zimná záhrada: ďalšie posuvy sa zoptimalizujú do zdieľaných tyčí -->
-			<input type="hidden" name="posuvy" value={posuvyJSON} />
-			{#each posuvyExtra as p, i (i)}
-				<div class="posuv-box">
-					<div class="posuv-hd">
-						<b>Posuv {i + 2}</b>
-						<button type="button" class="link-del" onclick={() => removePosuv(i)}>✕ odobrať</button>
-					</div>
-					<div class="grid2">
-						<div class="field">
-							<label for={`ps${i}-sys`}>Systém</label>
-							<select id={`ps${i}-sys`} bind:value={p.system} onchange={() => fixPosuv(i)}>
-								{#each data.systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option
-									>{/each}
-							</select>
-						</div>
-						<div class="field">
-							<label for={`ps${i}-styl`}>Štýl</label>
-							<select id={`ps${i}-styl`} bind:value={p.styl} onchange={() => fixPosuv(i)}>
-								{#each stylyForSystem(p.system) as st (st)}<option>{st}</option>{/each}
-							</select>
-						</div>
-					</div>
-					<div class="grid2">
-						<div class="field">
-							<label for={`ps${i}-s`}>Šírka (mm) *</label>
-							<input
-								id={`ps${i}-s`}
-								type="number"
-								min={S_MIN}
-								max={S_MAX}
-								step="any"
-								bind:value={p.s}
-								required
-							/>{#if posuvB2bErrs[i]}<span class="b2b-blok" data-testid={`b2b-sirka-err-${i}`}>
-									⛔ {posuvB2bErrs[i]}</span
-								>{/if}
-						</div>
-						<div class="field">
-							<label for={`ps${i}-v`}>Výška (mm) *</label>
-							<input
-								id={`ps${i}-v`}
-								type="number"
-								min={V_MIN}
-								max={V_MAX}
-								step="any"
-								bind:value={p.v}
-								required
-							/>{#if posuvB2bWarns[i]}<span class="b2b-upoz" data-testid={`b2b-vyska-warn-${i}`}>
-									{posuvB2bWarns[i]}</span
-								>{/if}
-						</div>
-					</div>
-					<div class="grid2">
-						<div class="field">
-							<label for={`ps${i}-sklo`}>Sklo</label>
-							<select id={`ps${i}-sklo`} bind:value={p.sklo}>
-								{#each sklaForSystem(p.system, p.styl) as g (g)}<option>{g}</option>{/each}
-							</select>
-						</div>
-						<div class="field">
-							<label for={`ps${i}-otv`}>Otváranie</label>
-							<select id={`ps${i}-otv`} bind:value={p.otvaranie}>
-								{#each otvaraniaForStyl(p.styl) as o (o)}<option>{o}</option>{/each}
-							</select>
-						</div>
-					</div>
-					{#if p.system === 'Robust' && !p.sietka}
-						<div class="grid2">
-							<div class="field">
-								<label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
-								<select id={`ps${i}-kovl`} bind:value={p.kovanieL}>
-									<option value="">—</option>
-									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-								</select>
-							</div>
-							<div class="field">
-								<label for={`ps${i}-kovp`}>Kovanie — pravá strana</label>
-								<select id={`ps${i}-kovp`} bind:value={p.kovanieP}>
-									<option value="">—</option>
-									{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-								</select>
-							</div>
-						</div>
-						{#if p.styl.startsWith('2x')}
-							<div class="grid2" data-testid={`kovanie-stred-polia-${i}`}>
-								<div class="field">
-									<label for={`ps${i}-kovs`}>Kovanie — stredové okno</label>
-									<select id={`ps${i}-kovs`} bind:value={p.kovanieStred}>
-										<option value="">—</option>
-										{#each data.kovania as k (k)}<option value={k}>{k}</option>{/each}
-									</select>
-								</div>
-								<div class="field">
-									<label for={`ps${i}-kovso`}>Ktoré okno v strede</label>
-									<select id={`ps${i}-kovso`} bind:value={p.kovanieStredOkno}>
-										<option value="L">ľavé zo stredovej dvojice</option>
-										<option value="P">pravé zo stredovej dvojice</option>
-									</select>
-								</div>
-							</div>
-						{/if}
-					{/if}
-					{#if kolajnicaPre(p.system)}
-						<div class="grid2" data-testid={`kolajnica-polia-${i}`}>
-							<div class="field">
-								<label for={`ps${i}-kolh`}>Koľajnica horná (mm) — prázdne = podľa šírky</label>
-								<input
-									id={`ps${i}-kolh`}
-									type="number"
-									min={KOLAJNICA_MIN}
-									max={KOLAJNICA_MAX}
-									step="any"
-									bind:value={p.kolajnicaHorna}
-									placeholder={String(p.s || '')}
-								/>
-							</div>
-							<div class="field">
-								<label for={`ps${i}-kols`}>Koľajnica spodná (mm) — prázdne = podľa šírky</label>
-								<input
-									id={`ps${i}-kols`}
-									type="number"
-									min={KOLAJNICA_MIN}
-									max={KOLAJNICA_MAX}
-									step="any"
-									bind:value={p.kolajnicaSpodna}
-									placeholder={String(p.s || '')}
-								/>
-							</div>
-						</div>
-					{/if}
-					<KlinPolia
-						idPrefix={`ps${i}-klin`}
-						bind:on={p.klin}
-						bind:dlzka={p.klinDlzka}
-						bind:sirka={p.klinSirka}
-						bind:v1={p.klinV1}
-						bind:v2={p.klinV2}
-						bind:ks={p.klinKs}
-					/>
-					{#if maSietkaSystem(p.system)}
-						<SietkaPolia
-							idPrefix={`ps${i}-sietka`}
-							system={p.system}
-							styl={p.styl}
-							strana={sietkaStrana(p.otvaranie)}
-							pridavna={pridavnaKolajnicaS}
-							bind:on={p.sietka}
-							bind:uchyt={p.sietkaUchyt}
-							bind:sietkaSystem={p.sietkaSystem}
-							onZmena={(on) => {
-								if (on) {
-									p.kovanieL = '';
-									p.kovanieP = '';
-									p.kovanieStred = '';
-								}
-							}}
-						/>
-					{/if}
-				</div>
-			{/each}
-			<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>
-			<button
-				class="btn"
-				type="submit"
-				formaction={jeMulti ? '?/nahladMulti' : '?/nahlad'}
-				disabled={b2bBlok}
-				data-testid="spocitat"
-			>
-				{jeMulti
-					? `Spočítať spoločný plán (${posuvySlovom(posuvyExtra.length + 1)})`
-					: 'Spočítať nárezový plán'}
-			</button>
-		</form>
-	</div>
+	<ZasklieniaForm
+		systemy={data.systemy}
+		kovania={data.kovania}
+		bind:zakS
+		bind:opS
+		bind:zakaznikS
+		bind:system
+		bind:styl
+		bind:sklo
+		bind:otvaranie
+		bind:sirka
+		bind:vyska
+		bind:kovanieLS
+		bind:kovaniePS
+		bind:kovanieStredS
+		bind:kovanieStredOknoS
+		bind:vrtanieZamkuS
+		bind:skloPresneS
+		bind:poznamkaS
+		bind:ralS
+		bind:cakaS
+		bind:pridavnaKolajnicaS
+		bind:jednostrannaFabS
+		bind:kolHS
+		bind:kolSS
+		bind:klinS
+		bind:klinDlzkaS
+		bind:klinSirkaS
+		bind:klinV1S
+		bind:klinV2S
+		bind:klinKsS
+		bind:sietkaS
+		bind:sietkaUchytS
+		bind:sietkaSystemS
+		bind:posuvyExtra
+		{stylyPre}
+		{sklaPre}
+		{otvaraniaPre}
+		{b2bSirkaErr}
+		{b2bVyskaWarn}
+		{narezakHint}
+		{jeOpona}
+		{jeRobust}
+		{maKovanie}
+		{maKolajnicu}
+		{maSietka}
+		{sietkaStranaVal}
+		{posuvB2bErrs}
+		{posuvB2bWarns}
+		{posuvyJSON}
+		{jeMulti}
+		{b2bBlok}
+		{stylyForSystem}
+		{sklaForSystem}
+		{otvaraniaForStyl}
+		{kolajnicaPre}
+		{addPosuv}
+		{removePosuv}
+		{fixPosuv}
+	/>
 {:else if step === 'nahlad' && plan}
 	<div class="card">
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
@@ -1490,7 +628,7 @@
 		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
 	{/if}
 
-	{@render planKarty(plan)}
+	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
 	<div class="card noprint">
 		{#if !isB2B}
@@ -1536,7 +674,7 @@
 		{/if}
 	</div>
 
-	{@render planKarty(plan)}
+	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
@@ -1559,7 +697,13 @@
 		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
 	{/if}
 
-	{@render planKartyMulti(multi)}
+	<PlanKartyMulti
+		{multi}
+		{vstup}
+		kovanie={form?.kovanie}
+		ceny={form?.ceny}
+		skloCeny={form?.skloCeny}
+	/>
 
 	<div class="card noprint">
 		{#if !isB2B}
@@ -1602,7 +746,13 @@
 		{/if}
 	</div>
 
-	{@render planKartyMulti(multi)}
+	<PlanKartyMulti
+		{multi}
+		{vstup}
+		kovanie={form?.kovanie}
+		ceny={form?.ceny}
+		skloCeny={form?.skloCeny}
+	/>
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
