@@ -96,19 +96,29 @@ const rollbackTagged = (r: DeployRun) =>
 
 describe('#254 deploy-remote.sh — rollback pri neúspešnom health', () => {
 	it('happy: health OK + SHA sedí → exit 0, žiadny rollback, jediný `up -d`', () => {
-		const r = runDeploy('{"ok":true,"version":"0.24.8-dev.1 (abc1234)","live":false}', true, 'abc1234');
+		const r = runDeploy(
+			'{"ok":true,"version":"0.24.8-dev.1 (abc1234)","live":false}',
+			true,
+			'abc1234'
+		);
 		expect(r.code).toBe(0);
 		expect(upCount(r)).toBe(1);
 		expect(rollbackTagged(r)).toBe(false);
 		// build + durable SHA tag prebehli
 		expect(r.dockerCalls).toContain('compose build');
-		expect(r.dockerCalls).toContain('tag automatizacie-montalu:current automatizacie-montalu:abc1234');
+		expect(r.dockerCalls).toContain(
+			'tag automatizacie-montalu:current automatizacie-montalu:abc1234'
+		);
 	});
 
 	it('rollback OK: forward SHA nesedí → re-tag prev + druhý `up -d` + exit 1', () => {
 		// ok:true ale verzia má INÝ sha → forward (mode sha) zlyhá; rollback poll
 		// (mode live) na ok:true uspeje → prod beží na starom builde.
-		const r = runDeploy('{"ok":true,"version":"0.24.8-dev.1 (WRONGSH)","live":false}', true, 'abc1234');
+		const r = runDeploy(
+			'{"ok":true,"version":"0.24.8-dev.1 (WRONGSH)","live":false}',
+			true,
+			'abc1234'
+		);
 		expect(r.code).toBe(1); // deploy zlyhal (job červený), aj keď rollback OK
 		expect(rollbackTagged(r)).toBe(true); // KĽÚČOVÉ: prev image re-tagnutý na :current
 		expect(upCount(r)).toBe(2); // pôvodný up + rollback up
@@ -116,7 +126,11 @@ describe('#254 deploy-remote.sh — rollback pri neúspešnom health', () => {
 	});
 
 	it('first-deploy: žiadny predchádzajúci kontajner → žiadny rollback, exit 1', () => {
-		const r = runDeploy('{"ok":true,"version":"0.24.8-dev.1 (WRONGSH)","live":false}', false, 'abc1234');
+		const r = runDeploy(
+			'{"ok":true,"version":"0.24.8-dev.1 (WRONGSH)","live":false}',
+			false,
+			'abc1234'
+		);
 		expect(r.code).toBe(1);
 		expect(rollbackTagged(r)).toBe(false); // nie je na čo rollbacknúť
 		expect(upCount(r)).toBe(1);

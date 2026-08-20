@@ -163,3 +163,38 @@ pipeline; it's the regression net for all of the above.
 **Compose healthcheck has NO curl** — runtime image `node:24-*-slim` lacks curl, so the
 healthcheck is `node -e "fetch('http://127.0.0.1:3000/health')..."` on the IN-CONTAINER port
 3000 (host 8090→3000 is only the VPS deploy poll). `/health` returns `{ok: sysCount>0}`.
+
+## Deploy rollback + post-deploy E2E (#254)
+
+Deploy job už nerobí surové `docker compose up -d --build` bez návratu. Shell
+logika je vyextrahovaná do `deploy/deploy-remote.sh` (beží NA VPS, volaná cez SSH),
+aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, mock
+`docker`/`curl` na PATH, žiadna nová dep, padne keď sa rollback pokazí).
+
+- **Rollback = natívny Docker image re-tag.** Compose služba `app` má stabilný
+  `image: automatizacie-montalu:current`. Skript pred `up` odchytí ID bežiaceho
+  image (`docker inspect --format '{{.Image}}' automatizacie-montalu`), `docker
+  compose build` (otaguje `:current`) + durable `:<sha7>`, `up -d`, forward health
+  poll (ok:true AND SHA7 vo verzii). Pri zlyhaní → re-tag odchyteného prev ID späť
+  na `:current` + `up -d` + rollback poll (LEN liveness — starý build má iný SHA) →
+  `exit 1` s `docker logs`. Prvý deploy (žiadny prev kontajner) sa nerollbackuje.
+
+- **Rollback SA robí LEN pri zlyhaní HEALTH polla** (deploy reálne nenabehol).
+  Zlyhanie post-deploy E2E po úspešnom health rollback NEVYVOLÁ — nová verzia je
+  live a zdravá; E2E červená = ALARM (červený job), nie dôvod vrátiť zdravý build
+  (rollback zdravého kvôli flaky tunelu by bol horší).
+
+- **Post-deploy E2E = krok v deploy jobe** (NIE nový job — `tests/ci-docker-
+  hardening.test.ts` tvrdí presne 3 joby). Po health OK: SSH tunel
+  `-L 18091:127.0.0.1:8090`, `DEPLOY_SHA7=<sha7> BASE_URL=http://localhost:18091
+  npx playwright test post-deploy.spec.ts` (`E2E_USER`/`E2E_PASS` zo secrets env
+  `production`). `e2e/post-deploy.spec.ts` je BY CONSTRUCTION read-only (login +
+  `[data-testid=version]`==SHA7 + navigácia, žiadny odpis) — nikdy sa nedotkne
+  Money. Beží aj lokálne v `test` jobe proti preview (SHA kontrola sa preskočí,
+  keď `DEPLOY_SHA7` nie je).
+
+- **E2E secrets:** `E2E_USER`+`E2E_PASS` treba pridať do GitHub environment
+  `production` (užívateľ/supervisor — agent secrets nepridáva). Kým chýbajú, krok
+  ich zisťuje (`steps.e2e_secrets`) a preskočí sa s hlasným `::warning::` (NIE
+  potlačenie chyby, NIE ticho zelený) — deploy tak nezlyhá na chýbajúcom secrete;
+  health poll (ok+SHA7) je backstop verzie. Po pridaní secrets beží naostro.
