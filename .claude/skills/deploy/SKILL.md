@@ -8,6 +8,46 @@
 - Verejný prístup: Caddy vhost `app.montalu.cloud` v `/opt/n8n/Caddyfile` → `automatizacie-montalu:3000`. Po zmene Caddyfile: `docker exec n8n-caddy-1 caddy reload --config /etc/caddy/Caddyfile`.
 - SSH: `ssh -i ~/.ssh/n8n_montalu_ed25519 root@167.233.125.9`.
 
+## CIFS „Host is down" — mŕtvy bind-mount = deploy fail-fast (#270)
+
+Deploy (`deploy-remote.sh`) má **pre-flight krok**: pred akýmkoľvek recreate spraví `stat` +
+`ls` každého host bind-mount zdroja z compose; pri nedostupnom mounte deploy **HLASNE zlyhá
+PRED recreate** a starý kontajner ostáva bežať (prod UP). To znamená: keď CI deploy padne s
+`::error::pre-flight … bind-mount zdroj '…' nedostupný`, prod NIE JE dole — treba len oživiť
+mount a re-runnúť deploy. (Incident kolo 9: bez pre-flightu recreate zabil bežiaci kontajner a
+rollback zlyhal na tom istom mŕtvom mounte → 502 ~12 min.)
+
+**Dotknuté mounty** (3 host CIFS zdieľané aj s n8n): `/opt/n8n/mounts/dlv-import`,
+`/opt/n8n/mounts/montalu` (compose ich mountuje ako `/data/dlv-import`, `/data/montalu`;
+`/opt/automatizacie-montalu/ceny` je lokálny `:ro`, nie CIFS). **`n8n-n8n-1` používa TIE ISTÉ
+3 host mounty** — mŕtvy mount teda zasiahne aj n8n, nie len túto appku.
+
+**Diagnostika (na VPS `root@167.233.125.9`):**
+
+```bash
+findmnt -rn -o TARGET,SOURCE,FSTYPE | grep cifs     # ktoré CIFS mounty existujú + zdroj
+stat /opt/n8n/mounts/dlv-import /opt/n8n/mounts/montalu   # mŕtvy → chyba/„Host is down"/visí
+dmesg | tail -30                                    # CIFS reconnect: STATUS_LOGON_FAILURE = prechodný, nie zlé creds
+```
+
+**Over, že creds sú platné** (mŕtvy mount ≠ zlé heslo — pri „Host is down" je zvyčajne len
+výpadok servera): namontuj TÝM ISTÝM cred súborom do temp adresára:
+
+```bash
+mkdir -p /tmp/smbtest
+mount -t cifs //192.168.1.200/dlv-import /tmp/smbtest -o credentials=/etc/n8n-smb.cred,ro
+ls /tmp/smbtest && umount /tmp/smbtest     # prejde → creds OK, pôvodný mount len treba reconnectnúť
+```
+
+**Obnova:**
+
+- **Soft mounty sa reconnectnú SAMY**, keď sa server vráti — často stačí počkať a re-runnúť
+  deploy (`gh run rerun --failed` alebo `gh workflow run ci.yml --ref main`).
+- Ak je mount **stále mŕtvy** aj po návrate servera: `umount -l /opt/n8n/mounts/<x>` (lazy, aj
+  keď je „busy") + `mount -a` (remount z `/etc/fstab`). Až POTOM re-run deploy.
+- **NIKDY** neriešiť mŕtvy mount cez rollback/redeploy appky — kým je mount dole, ani nový, ani
+  starý image nenaštartuje (to je celý #270). Najprv mount, potom deploy.
+
 ## Post-deploy E2E (funkčná verifikácia)
 
 ```bash
