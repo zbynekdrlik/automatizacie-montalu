@@ -95,6 +95,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
 - unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
 - štruktúrovaný logger (`log.ts`), handleError, chybová stránka, testovanie logov → `.claude/rules/logging.md`
+- SQLite/Money durability (synchronous pin, fsync zápis, v24 audit) → `.claude/rules/db-durability.md`
 - katalóg skiel, pridanie/zmena skla, Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
 - FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`
