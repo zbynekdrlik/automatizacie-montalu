@@ -22,7 +22,7 @@ export const load: PageServerLoad = async () => {
 	};
 };
 
-export const actions: Actions = {
+export const actions = {
 	vykres: async ({ request }) => {
 		const { vstup, error } = parseZaskleniaNavrhVstup(await request.formData(), listSysStyly());
 		if (error) return { step: 'form' as const, error, vstup };
@@ -36,4 +36,4 @@ export const actions: Actions = {
 		const { vstup } = parseZaskleniaNavrhVstup(await request.formData(), listSysStyly());
 		return { step: 'form' as const, vstup };
 	}
-};
+} satisfies Actions;

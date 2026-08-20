@@ -40,7 +40,7 @@ describe('logger', () => {
 	it('emits one JSON line with time/level/module/msg + fields', () => {
 		const recs = capture(() => logger('auth').info('login ok', { username: 'a', ip: '1.2.3.4' }));
 		expect(recs).toHaveLength(1);
-		const r = recs[0];
+		const r = recs[0]!;
 		expect(r.level).toBe('info');
 		expect(r.module).toBe('auth');
 		expect(r.msg).toBe('login ok');
@@ -64,12 +64,12 @@ describe('logger', () => {
 
 	it('child() nests the module name', () => {
 		const recs = capture(() => logger('db').child('migrate').warn('hm'));
-		expect(recs[0].module).toBe('db:migrate');
+		expect(recs[0]!.module).toBe('db:migrate');
 	});
 
 	it('serializes Error values with name/message/stack', () => {
 		const recs = capture(() => logger('err').error('zlyhalo', { error: new TypeError('bum') }));
-		const e = recs[0].error as { name: string; message: string; stack: string };
+		const e = recs[0]!.error as { name: string; message: string; stack: string };
 		expect(e.name).toBe('TypeError');
 		expect(e.message).toBe('bum');
 		expect(typeof e.stack).toBe('string');
@@ -80,9 +80,9 @@ describe('logger', () => {
 		const recs = capture(() =>
 			logger('auth').info('x', { password: 'tajne', token: 'abc', username: 'ok' })
 		);
-		expect(recs[0].password).toBe('[redacted]');
-		expect(recs[0].token).toBe('[redacted]');
-		expect(recs[0].username).toBe('ok');
+		expect(recs[0]!.password).toBe('[redacted]');
+		expect(recs[0]!.token).toBe('[redacted]');
+		expect(recs[0]!.username).toBe('ok');
 	});
 
 	it('LOG_LEVEL=warn suppresses debug/info but keeps warn/error', () => {

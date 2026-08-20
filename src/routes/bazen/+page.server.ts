@@ -38,7 +38,7 @@ function editsFrom(form: FormData): Map<string, string> {
 	const edits = new Map<string, string>();
 	for (const [key, value] of form.entries()) {
 		const m = key.match(/^qty_(.+)$/);
-		if (m) edits.set(m[1], String(value));
+		if (m) edits.set(m[1]!, String(value)); // regex má 1 povinnú capture skupinu
 	}
 	return edits;
 }
@@ -47,7 +47,7 @@ export const load: PageServerLoad = async () => {
 	return { live: isLive() };
 };
 
-export const actions: Actions = {
+export const actions = {
 	spocitat: async ({ request }) => {
 		const { vstup, error } = parseBazenVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
@@ -106,4 +106,4 @@ export const actions: Actions = {
 			);
 		}
 	}
-};
+} satisfies Actions;

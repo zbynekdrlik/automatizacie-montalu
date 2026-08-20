@@ -20,14 +20,14 @@ describe('OP260264 „FIX Minegis" — sklon 9,3°, 3 polia (ground truth z výk
 	it('kumulatívne dĺžky šikmej hrany sedia s kótami 948,7 / 1884,6 / 2832,3', () => {
 		// výkres kótuje vonkajšie hrany, my počítame ideálnu geometriu → do 0,5 mm
 		const ocakavane = [948.7, 1884.6, 2832.3];
-		r.kumulSikma.forEach((x, i) => expect(Math.abs(x - ocakavane[i])).toBeLessThanOrEqual(0.5));
+		r.kumulSikma.forEach((x, i) => expect(Math.abs(x - ocakavane[i]!)).toBeLessThanOrEqual(0.5));
 		expect(Math.abs(r.sikmaCelkom - 2832.3)).toBeLessThanOrEqual(0.5);
 	});
 
 	it('dĺžky šikmej hrany PO POLIACH sedia s rozdielmi kót výkresu', () => {
 		// výkres kótuje kumulatívne 948,7 / 1884,6 / 2832,3 → jednotlivé polia
 		const ocakavane = [948.7, 1884.6 - 948.7, 2832.3 - 1884.6];
-		r.polia.forEach((p, i) => expect(Math.abs(p.sikma - ocakavane[i])).toBeLessThanOrEqual(0.5));
+		r.polia.forEach((p, i) => expect(Math.abs(p.sikma - ocakavane[i]!)).toBeLessThanOrEqual(0.5));
 		// šikmá hrana je vždy DLHŠIA než šírka poľa (to je celý zmysel sklonu)
 		r.polia.forEach((p) => expect(p.sikma).toBeGreaterThan(p.sirka));
 		const sucet = r.polia.reduce((a, p) => a + p.sikma, 0);
@@ -41,14 +41,14 @@ describe('OP260264 „FIX Minegis" — sklon 9,3°, 3 polia (ground truth z výk
 	it('výšky na stĺpikoch sú VONKAJŠIE (výkres kótuje svetlé, o ~46 mm menšie)', () => {
 		// výkres: 323,3 a 171,9 = svetlá výška skla; vonkajšia = svetlá + ~46,5 mm rámu
 		expect(r.vyskyStlpikov).toEqual([370.1, 218.3]);
-		expect(Math.abs(r.vyskyStlpikov[0] - 46.8 - 323.3)).toBeLessThanOrEqual(0.5);
-		expect(Math.abs(r.vyskyStlpikov[1] - 46.4 - 171.9)).toBeLessThanOrEqual(0.5);
+		expect(Math.abs(r.vyskyStlpikov[0]! - 46.8 - 323.3)).toBeLessThanOrEqual(0.5);
+		expect(Math.abs(r.vyskyStlpikov[1]! - 46.4 - 171.9)).toBeLessThanOrEqual(0.5);
 	});
 
 	it('polia na seba nadväzujú a plocha je súčtom polí', () => {
-		expect(r.polia[0].vLavo).toBe(524);
-		expect(r.polia[2].vPravo).toBe(64.6);
-		for (let i = 1; i < r.polia.length; i++) expect(r.polia[i].vLavo).toBe(r.polia[i - 1].vPravo);
+		expect(r.polia[0]!.vLavo).toBe(524);
+		expect(r.polia[2]!.vPravo).toBe(64.6);
+		for (let i = 1; i < r.polia.length; i++) expect(r.polia[i]!.vLavo).toBe(r.polia[i - 1]!.vPravo);
 		const sucet = r.polia.reduce((s, p) => s + p.m2, 0);
 		expect(Math.abs(sucet - r.m2)).toBeLessThan(0.002);
 	});

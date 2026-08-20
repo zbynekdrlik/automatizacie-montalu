@@ -25,12 +25,12 @@ describe('ffdPack — spätná kompatibilita + parameter reznej medzery', () => 
 	it('default kerf ostáva KOTUC (4 mm) — existujúci volajúci sa nemenia', () => {
 		const bary = ffdPack([{ rozmer: 100, dlzka: 100 }], 7500);
 		expect(bary).toHaveLength(1);
-		expect(bary[0].zvysok).toBe(7500 - 104); // 100 + 4 mm kotúč
+		expect(bary[0]!.zvysok).toBe(7500 - 104); // 100 + 4 mm kotúč
 	});
 
 	it('tretí parameter kerf sa použije namiesto KOTUC', () => {
 		const bary = ffdPack([{ rozmer: 100, dlzka: 100 }], 6000, 10);
-		expect(bary[0].zvysok).toBe(6000 - 110); // 100 + 10 mm rezná medzera
+		expect(bary[0]!.zvysok).toBe(6000 - 110); // 100 + 10 mm rezná medzera
 	});
 });
 
@@ -42,7 +42,7 @@ describe('optimalizuj — nárezový optimalizátor (#212)', () => {
 		expect(r.tooLong).toEqual([]);
 		expect(r.celkovaDlzkaKusov).toBe(18217); // 3780+1390+988+1280+2280+2831+2×2834
 		expect(r.material).toHaveLength(1);
-		const m = r.material[0];
+		const m = r.material[0]!;
 		expect(m.tyce).toBe(4);
 		expect(m.bary).toHaveLength(4);
 		// množina odpadov na tyčiach (nezávisle od poradia)
@@ -78,8 +78,8 @@ describe('optimalizuj — nárezový optimalizátor (#212)', () => {
 		const s10 = optimalizuj(SCREENSHOT);
 		expect(s0.tyceUsed).toBe(4);
 		expect(s10.tyceUsed).toBe(4);
-		expect(s0.material[0].odpadMm).toBe(5783); // 4×6000 − 18217
-		expect(s10.material[0].odpadMm).toBe(5703); // 4×6000 − 18217 − 8×10
+		expect(s0.material[0]!.odpadMm).toBe(5783); // 4×6000 − 18217
+		expect(s10.material[0]!.odpadMm).toBe(5703); // 4×6000 − 18217 − 8×10
 	});
 
 	it('kus dlhší ako tyč (aj s reznou medzerou) sa nebalí a ohlási sa', () => {

@@ -166,25 +166,25 @@ describe('lineDimension — witnesses (odkazové čiary), issue #137 bod „s od
 		expect(g.witnesses).toHaveLength(2);
 		const [w0, w1] = g.witnesses;
 		// začínajú tesne pri geometrii (y≈100, malá medzera gap=2 default)
-		expect(w0.x1).toBeCloseTo(0, 6);
-		expect(w0.y1).toBeCloseTo(102, 6); // 100 + gap(2)
-		expect(w1.x1).toBeCloseTo(200, 6);
+		expect(w0!.x1).toBeCloseTo(0, 6);
+		expect(w0!.y1).toBeCloseTo(102, 6); // 100 + gap(2)
+		expect(w1!.x1).toBeCloseTo(200, 6);
 		// končia ZA kótovou čiarou (perpOffset 20 + overshoot 3 default)
-		expect(w0.y2).toBeCloseTo(123, 6);
-		expect(w1.y2).toBeCloseTo(123, 6);
+		expect(w0!.y2).toBeCloseTo(123, 6);
+		expect(w1!.y2).toBeCloseTo(123, 6);
 	});
 	it('perpOffset<0 (nahor): odkazové čiary idú SPRÁVNYM smerom (nie opačným) a presahujú za kótovú čiaru', () => {
 		const g = lineDimension(0, 100, 200, 100, -20, { tick: 5 });
 		const [w0] = g.witnesses;
 		// smer je NAHOR (y klesá) — odkazová čiara musí prekonať aspoň |perpOffset|, teda
 		// jej koncový bod musí byť VYŠŠIE (menšie y) ako samotná odsadená kótová čiara (y=80)
-		expect(w0.y2).toBeLessThan(80);
-		expect(w0.y1).toBeLessThan(100); // začína tiež smerom nahor, nie nadol
+		expect(w0!.y2).toBeLessThan(80);
+		expect(w0!.y1).toBeLessThan(100); // začína tiež smerom nahor, nie nadol
 	});
 	it('zvislá kóta s perpOffset: odkazové čiary sú vodorovné (kolmé na zvislý smer)', () => {
 		const g = lineDimension(50, 0, 50, 300, 15);
 		expect(g.witnesses).toHaveLength(2);
-		expect(g.witnesses[0].y1).toBeCloseTo(g.witnesses[0].y2, 6); // vodorovný segment
+		expect(g.witnesses[0]!.y1).toBeCloseTo(g.witnesses[0]!.y2, 6); // vodorovný segment
 	});
 });
 

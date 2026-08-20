@@ -41,8 +41,8 @@ const OLD_UPSIZE: Record<string, { kod: string; nazov: string }> = {
 		let kod = r.kod,
 			nazov = r.nazov;
 		if (/^Štandard \+\|\d+K IZO$/.test(r.sysStyl) && /spodná/i.test(r.nazov) && OLD_UPSIZE[r.kod]) {
-			kod = OLD_UPSIZE[r.kod].kod;
-			nazov = OLD_UPSIZE[r.kod].nazov;
+			kod = OLD_UPSIZE[r.kod]!.kod;
+			nazov = OLD_UPSIZE[r.kod]!.nazov;
 		}
 		insRez.run(
 			r.sysStyl,

@@ -85,7 +85,7 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 		});
 		// žľab 9120 aj kotviaci 9120 → 2 combo prípady na výber
 		expect(r.comboCases.length).toBe(2);
-		expect(r.comboCases[0].minimal).toEqual([4500, 6000]);
+		expect(r.comboCases[0]!.minimal).toEqual([4500, 6000]);
 	});
 
 	it('single-variant rez > 7500 sa počíta ceil(p/bar), nie 1 tyč (fix 2026-06-30)', () => {
@@ -95,7 +95,7 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 
 	it('parser zvláda tab aj medzerový formát a čiarku v reze', () => {
 		expect(parseInput('18016 PROFIL 110x43 V2\t2\t2510').length).toBe(1);
-		expect(parseInput('18016 PROFIL 110x43 V2 2 2510,5')[0].cut_mm).toBe(2510.5);
+		expect(parseInput('18016 PROFIL 110x43 V2 2 2510,5')[0]!.cut_mm).toBe(2510.5);
 		expect(parseInput('nezmysel bez cisla')).toEqual([]);
 	});
 
@@ -131,8 +131,8 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 		const text = '18021 ZLABOVY PROFIL 110 V2\t2\t9120';
 		const r = transform(text);
 		expect(r.comboCases.length).toBe(2);
-		expect(r.comboCases[0].fieldLabel).toContain('(kus 1)');
-		expect(r.comboCases[1].fieldLabel).toContain('(kus 2)');
+		expect(r.comboCases[0]!.fieldLabel).toContain('(kus 1)');
+		expect(r.comboCases[1]!.fieldLabel).toContain('(kus 2)');
 		// rôzne voľby pre každý kus sa aplikujú NEZÁVISLE
 		const q = applyCombos(
 			r,
@@ -152,7 +152,7 @@ describe('transform — 1:1 s overenými Money pármi', () => {
 				[1, [4500, 6000]]
 			])
 		);
-		expect(cb.lines[0].barsStr).toBe('2(4,5m) 1(6m) 1(7,5m)');
+		expect(cb.lines[0]!.barsStr).toBe('2(4,5m) 1(6m) 1(7,5m)');
 	});
 });
 
@@ -166,7 +166,7 @@ describe('kombinácie tyčí (žľab/kotviaci > 7500)', () => {
 
 	it('coverCombos ponúka alternatívy zoradené podľa odpadu', () => {
 		const opts = coverCombos(9120, avail);
-		expect(opts[0].bars).toEqual([6000, 4500]);
+		expect(opts[0]!.bars).toEqual([6000, 4500]);
 		expect(opts.map((o) => o.bars.join('+'))).toContain('7500+4500');
 		expect(opts.map((o) => o.bars.join('+'))).toContain('6000+6000');
 	});
@@ -195,8 +195,8 @@ describe('copy-back pre Solid Edge', () => {
 	it('jeden riadok na kód v poradí vstupu, formát count(dĺžka m)', () => {
 		const r = transform(BARTONICEK);
 		const { lines, totalBars } = buildCopyBack(BARTONICEK, r, new Map());
-		expect(lines[0].code).toBe('18004');
-		expect(lines[0].barsStr).toBe('9(7,5m)');
+		expect(lines[0]!.code).toBe('18004');
+		expect(lines[0]!.barsStr).toBe('9(7,5m)');
 		// 18016: 2×3812 + 2×2510 FFD → 2 tyče 7500
 		expect(lines.find((l) => l.code === '18016')!.barsStr).toBe('2(7,5m)');
 		expect(totalBars).toBeGreaterThan(0);
@@ -237,7 +237,7 @@ describe('copy-back pre Solid Edge', () => {
 			].join('\n')
 		);
 		// prvý a posledný riadok stĺpca patria prvému a poslednému kódu karty
-		expect(cadLastCol.split('\n')[0]).toBe(lines[0].barsStr);
+		expect(cadLastCol.split('\n')[0]).toBe(lines[0]!.barsStr);
 		expect(cadLastCol.split('\n').at(-1)).toBe(lines.at(-1)!.barsStr);
 	});
 });

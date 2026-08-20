@@ -21,7 +21,7 @@ export interface OptimalizatorVstup {
 }
 
 /** Číslo zo vstupu: akceptuje desatinnú čiarku aj medzery (napr. „6 000", „2834,5"). */
-function cislo(v: FormDataEntryValue | null): number {
+function cislo(v: FormDataEntryValue | null | undefined): number {
 	return Number(
 		String(v ?? '')
 			.replace(',', '.')

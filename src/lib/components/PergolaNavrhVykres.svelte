@@ -362,11 +362,12 @@
 		/>
 	{/each}
 	<!-- kóty polí + celková šírka -->
+	<!-- g.postX.length === vstup.polia.length+1 (stlpyZPolí) → postX[i], postX[i+1] definované -->
 	{#each vstup.polia as p, i (i)}
 		<Kota
-			x0={X(g.postX[i])}
+			x0={X(g.postX[i]!)}
 			y0={baseY}
-			x1={X(g.postX[i + 1])}
+			x1={X(g.postX[i + 1]!)}
 			y1={baseY}
 			perpOffset={r.h * 0.06}
 			text={fmtMm(p)}

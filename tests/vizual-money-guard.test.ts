@@ -72,7 +72,7 @@ function extrahujSpecifikatory(zdroj: string): string[] {
 	const exportRe = /export\s+(?:\*(?:\s+as\s+\S+)?|\{[^}]*\}|[^'";]+?)\s+from\s+['"]([^'"]+)['"]/g;
 	for (const re of [staticRe, dynamicRe, exportRe]) {
 		let m: RegExpExecArray | null;
-		while ((m = re.exec(zdroj))) out.push(m[1]);
+		while ((m = re.exec(zdroj))) out.push(m[1]!);
 	}
 	return out;
 }

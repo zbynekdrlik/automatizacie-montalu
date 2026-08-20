@@ -8,7 +8,7 @@ import { fail } from '@sveltejs/kit';
 import { parseOptimalizatorVstup } from '$lib/server/optimalizator-vstup';
 import { optimalizuj } from '$lib/server/optimalizator';
 
-export const actions: Actions = {
+export const actions = {
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ
 	// pre use:enhance callback bez union-narrowingu
 	default: async ({ request }) => {
@@ -16,4 +16,4 @@ export const actions: Actions = {
 		if ('error' in parsed) return fail(400, { vysledok: null, error: parsed.error });
 		return { vysledok: optimalizuj(parsed.vstup), error: null };
 	}
-};
+} satisfies Actions;

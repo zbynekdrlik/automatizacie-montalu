@@ -129,7 +129,7 @@ export function decompose(N: number): { k2: number; k3: number } {
 /** minimálne pokrytie dĺžky kusmi 4600/6700 (najmenší presah, potom kusy) */
 export function minCover(L: number): [number, number] {
 	if (!(L > 0)) return [0, 0];
-	const A = [4600, 6700];
+	const A = [4600, 6700] as const;
 	const cap = Math.ceil(L / A[0]) + 1;
 	let best: [number, number] = [0, 0];
 	let bk: number | null = null;
@@ -183,7 +183,7 @@ export function computeBazen(v: BazenVstup): { out: BazenPolozka[]; error: strin
 			nazov = name;
 		if (star && STAR_MAP[code]) {
 			kod = STAR_MAP[code];
-			nazov = STAR_NAME[kod];
+			nazov = STAR_NAME[kod]!; // každá hodnota STAR_MAP je kľúčom STAR_NAME
 		}
 		return { kod, nazov, qty: R(fn(p)) };
 	});

@@ -91,7 +91,7 @@ describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', 
 			.sort((a, b) => a.sysStyl.localeCompare(b.sysStyl) || a.poradie - b.poradie);
 		expect(rows.length).toBe(ocakavane.length);
 		rows.forEach((r, i) => {
-			const e = ocakavane[i];
+			const e = ocakavane[i]!;
 			expect(
 				{
 					kod: r.kod,

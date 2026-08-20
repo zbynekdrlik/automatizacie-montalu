@@ -35,7 +35,7 @@ function testBlocks(src: string): Block[] {
 	const lines = src.split('\n');
 	const blocks: Block[] = [];
 	for (let i = 0; i < lines.length; i++) {
-		const m = /^(\s*)test\(/.exec(lines[i]);
+		const m = /^(\s*)test\(/.exec(lines[i]!);
 		if (!m) continue;
 		const close = m[1] + '});';
 		let j = i;
@@ -62,7 +62,8 @@ function finalConsoleAssertOk(blockText: string, v: string): boolean {
 	if (blockText.includes(`expect(${v}).toEqual([])`)) return true;
 	const m = new RegExp(`expect\\(${v}\\)\\.toEqual\\(\\[([\\s\\S]*?)\\]\\)`).exec(blockText);
 	if (!m) return false;
-	const body = m[1];
+	// capture skupina 1 pri úspešnom matchi vždy participuje (aj ako '') — ?? '' je len TS narrowing
+	const body = m[1] ?? '';
 	if (body.trim() === '') return true;
 	const stripped = body.replace(/expect\.stringMatching\([\s\S]*?\)/g, '');
 	return /expect\.stringMatching\(/.test(body) && /^[\s,]*$/.test(stripped);
@@ -84,7 +85,7 @@ describe('e2e zero-console guard (#247)', () => {
 					vars.length,
 					`${file}:${b.line} — blok má ${vars.length}× collectConsole(page), očakávaný práve 1`
 				).toBe(1);
-				const v = vars[0];
+				const v = vars[0]!;
 				expect(
 					finalConsoleAssertOk(b.text, v),
 					`${file}:${b.line} — blok zbiera '${v}', ale chýba jeho sankcionovaný záverečný assert: ` +

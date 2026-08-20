@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { transform, fmtBars } from '../src/lib/server/pergola';
 
-const bars = (text: string) => fmtBars(transform(text).trace[0].bars);
+const bars = (text: string) => fmtBars(transform(text).trace[0]!.bars);
 const qty = (text: string) => {
 	const g: Record<string, number> = {};
 	transform(text).out.forEach((o) => {
@@ -45,13 +45,13 @@ describe('varovanie „Dlhé profily" len pri skutočne dlhom reze', () => {
 		const r = transform(
 			'18019 KOTVIACI PROFIL HORNY V2\t1\t6400\n18019 KOTVIACI PROFIL HORNY V2\t1\t1030'
 		);
-		expect(r.trace[0].notes).toEqual([]);
+		expect(r.trace[0]!.notes).toEqual([]);
 		expect(r.comboCases).toEqual([]);
 	});
 
 	it('rez > 7500 hlási aj naďalej a ponúka voľbu kombinácie', () => {
 		const r = transform('18021 ZLABOVY PROFIL 110 V2\t1\t9120');
-		expect(r.trace[0].notes.length).toBe(1);
+		expect(r.trace[0]!.notes.length).toBe(1);
 		expect(r.comboCases.length).toBe(1);
 	});
 
@@ -60,6 +60,6 @@ describe('varovanie „Dlhé profily" len pri skutočne dlhom reze', () => {
 		const r = transform(t);
 		expect(r.comboCases.length).toBe(1);
 		// 9120 → 4500+6000 (minimal), 2× 2000 → jedna 4,5 m tyč
-		expect(fmtBars(r.trace[0].bars)).toBe('2(4,5m) 1(6m)');
+		expect(fmtBars(r.trace[0]!.bars)).toBe('2(4,5m) 1(6m)');
 	});
 });

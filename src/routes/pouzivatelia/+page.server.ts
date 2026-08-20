@@ -19,7 +19,7 @@ function parseRole(v: FormDataEntryValue | null): 'internal' | 'b2b' | null {
 	return v === 'internal' || v === 'b2b' ? v : null;
 }
 
-export const actions: Actions = {
+export const actions = {
 	pridat: async ({ request, locals }) => {
 		// !locals.user gate je tu obrana do hĺbky (hooks.server.ts už garantuje non-null
 		// pre všetky non-public cesty) — zarovnané s zmenit_rolu nižšie (review nález #142).
@@ -58,4 +58,4 @@ export const actions: Actions = {
 		// no-op (rovnaká rola ako doteraz) hlási neutrálne, nie „zmenená" — nič sa nezmenilo
 		return { ok: changed ? `Rola účtu zmenená na ${rolaLabel}.` : `Rola účtu je už ${rolaLabel}.` };
 	}
-};
+} satisfies Actions;

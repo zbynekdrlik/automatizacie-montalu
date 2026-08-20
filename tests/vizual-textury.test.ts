@@ -132,12 +132,12 @@ describe('vytvorOblohuTexturu — vertikálny gradient, 256×256, sRGB', () => {
 		const ctx = fakeCanvasOf(tex).getContext('2d')!;
 		expect(ctx.linearGradients).toHaveLength(1);
 		expect(ctx.linearGradients[0]).toMatchObject({ x0: 0, y0: 0, x1: 0, y1: 256 });
-		expect(ctx.linearGradients[0].grad.stops).toEqual([
+		expect(ctx.linearGradients[0]!.grad.stops).toEqual([
 			{ offset: 0, color: '#eef6fb' },
 			{ offset: 1, color: '#4f80ad' }
 		]);
 		expect(ctx.fillRectCalls).toEqual([
-			{ x: 0, y: 0, w: 256, h: 256, fillStyle: ctx.linearGradients[0].grad }
+			{ x: 0, y: 0, w: 256, h: 256, fillStyle: ctx.linearGradients[0]!.grad }
 		]);
 	});
 });
@@ -244,7 +244,7 @@ describe('vytvorKontaktnyTienTexturu — dvojvrstvový radiálny gradient, plne 
 		expect(ctx.radialGradients).toHaveLength(2);
 		const [mekka] = ctx.radialGradients;
 		expect(mekka).toMatchObject({ x0: 256, y0: 256, r0: 0, x1: 256, y1: 256, r1: 256 });
-		expect(mekka.grad.stops).toEqual([
+		expect(mekka!.grad.stops).toEqual([
 			{ offset: 0, color: 'rgba(15,23,42,0.68)' },
 			{ offset: 0.55, color: 'rgba(15,23,42,0.34)' },
 			{ offset: 1, color: 'rgba(15,23,42,0)' }
@@ -257,9 +257,9 @@ describe('vytvorKontaktnyTienTexturu — dvojvrstvový radiálny gradient, plne 
 		const [, jadro] = ctx.radialGradients;
 		// jadroR = rozlisenie × 0,24 = 240 (NIE polovica×0,24=120 — presne TENTO omyl
 		// opravil review #181 v komentári; tento test ho zamyká v samotnom KÓDE)
-		expect(jadro.r1).toBe(240);
+		expect(jadro!.r1).toBe(240);
 		expect(jadro).toMatchObject({ x0: 500, y0: 500, r0: 0, x1: 500, y1: 500 });
-		expect(jadro.grad.stops).toEqual([
+		expect(jadro!.grad.stops).toEqual([
 			{ offset: 0, color: 'rgba(15,23,42,0.38)' },
 			{ offset: 0.85, color: 'rgba(15,23,42,0.3)' },
 			{ offset: 1, color: 'rgba(15,23,42,0)' }
@@ -270,8 +270,8 @@ describe('vytvorKontaktnyTienTexturu — dvojvrstvový radiálny gradient, plne 
 		const tex = vytvorKontaktnyTienTexturu(THREE, 300);
 		const ctx = fakeCanvasOf(tex).getContext('2d')!;
 		expect(ctx.fillRectCalls).toEqual([
-			{ x: 0, y: 0, w: 300, h: 300, fillStyle: ctx.radialGradients[0].grad },
-			{ x: 0, y: 0, w: 300, h: 300, fillStyle: ctx.radialGradients[1].grad }
+			{ x: 0, y: 0, w: 300, h: 300, fillStyle: ctx.radialGradients[0]!.grad },
+			{ x: 0, y: 0, w: 300, h: 300, fillStyle: ctx.radialGradients[1]!.grad }
 		]);
 	});
 });
@@ -284,7 +284,7 @@ describe('nízky-tier flat-color fallback (scena.ts) sa ZHODUJE so ZÁKLADNOU fa
 			const tex = vytvorDlazbuTexturu(THREE, 128, 4);
 			const ctx = fakeCanvasOf(tex).getContext('2d')!;
 			// 1. dlaždica (fillRectCalls[0] je základný fillRect špár) — jitter=(0.5*2-1)*0.06=0
-			dlazbaZaklad = ctx.fillRectCalls[1].fillStyle as string;
+			dlazbaZaklad = ctx.fillRectCalls[1]!.fillStyle as string;
 		} finally {
 			spy.mockRestore();
 		}
@@ -304,7 +304,7 @@ describe('nízky-tier flat-color fallback (scena.ts) sa ZHODUJE so ZÁKLADNOU fa
 			const { map } = vytvorStenuTexturu(THREE, 2);
 			const ctx = fakeCanvasOf(map).getContext('2d')!;
 			const data = ctx.lastImageData!.data;
-			stenaZaklad = [data[0], data[1], data[2]];
+			stenaZaklad = [data[0]!, data[1]!, data[2]!];
 		} finally {
 			spy.mockRestore();
 		}

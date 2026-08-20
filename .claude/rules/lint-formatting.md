@@ -113,3 +113,51 @@ async Money path already awaits correctly; the rules now guard the future.
   `defineConfig` import from `'vite'` to `'vitest/config'` (natively types the `test` block) so you can
   drop the `/// <reference types="vitest/config" />` triple-slash — otherwise adding a `vitest/config`
   import trips `@typescript-eslint/triple-slash-reference` (prefer-import).
+
+## `noUncheckedIndexedAccess` — honest narrowing taxonomy (#255)
+
+`tsconfig.json` has `strict: true` AND `noUncheckedIndexedAccess: true`. Every index
+access (`arr[i]`, `record[key]`, `s.split('|')[0]`, a regex `m[1]`) is `T | undefined`.
+`npm run check` (svelte-check) is the gate — 0 errors. Fix by honest narrowing that
+reflects the REAL invariant, NEVER a `?? default` that changes a value (Money-critical).
+`@typescript-eslint/no-non-null-assertion` is NOT enabled (it's `stylistic`, not in
+`recommendedTypeChecked`), and `no-unnecessary-condition` is NOT enabled (it's `strict`),
+so a locally-provable `!` and a never-firing `if (!x) continue` guard both pass lint.
+
+Pattern → fix:
+- **Bounded C-loop that needs the index** `for (let i=0;i<a.length;i++){const x=a[i];…i…}`
+  → `for (const [i, x] of a.entries())` — `entries()` gives `[number, T]` so `x` is
+  DEFINED, index kept. No index needed → `for (const x of a)`. This is the cleanest
+  (structural, zero `!`).
+- **`s.split(sep)[0]`** (always defined) → `?? ''` — matches the repo's existing
+  `[1] ?? ''` convention; the `??` never fires, zero value change. Array-destructure
+  default works too: `const [system = '', styl = ''] = s.split('|')`.
+- **Record/map lookup after a presence-guard** (`pool[k]` after `if(!pool[k]) pool[k]={…}`)
+  → capture a local `let bucket = pool[k]; if(!bucket){bucket={…}; pool[k]=bucket; …}` and
+  use `bucket` — TS doesn't narrow a re-indexed access across statements, a local it does.
+- **`for…in`/`Object.keys` key access** (`cfg[k]` for `k in cfg`) → local `const g=cfg[k];
+  if(!g) continue;` (never fires) or `cfg[k]!` with a `k ∈ Object.keys(...)` comment.
+- **Dense counter array in a bounded loop** (`counts[i]`, `used[i]` from `new Array(n).fill(0)`):
+  read `counts[i]!`; a WRITE `++counts[i]`/`used[i]+=p` can't take `!` on the l-value —
+  rewrite via a local: `const nv = counts[i]! + 1; counts[i] = nv;`.
+- **Regex capture group** `m[1]` after `if(!m)` → `m[1]!` (mandatory groups are always
+  present when the match succeeds — a known TS limitation, `!` + a "regex has N groups"
+  comment).
+- **Length-guarded access** (`fit[0]` after `fit.length ?`, `avail[0]` in `if(avail.length===1)`,
+  `candidates[len-1]` after `if(len===0) throw`) → `!` with the guard cited.
+- **SvelteKit `export const actions: Actions = {…}`** → `… satisfies Actions`. `Actions` is
+  `Record<string, Action>` (index signature) so `actions.nahlad` typed `Action|undefined` and
+  every TEST doing `actions.nahlad(event)` errors. `satisfies` keeps the literal type (runtime
+  identical — satisfies is erased), fixing the source AND all its test errors at once, without
+  losing the conformance check. Applied to all 16 route `+page.server.ts`.
+- **Provable-non-empty array-of-derived** (`popisUhlov = $derived([{…},{…}])`, geometry arrays
+  `stlpiky`/`pozicie`/`vysky`/`postX` whose length === a known `n±1` via `deliaceStlpiky`/
+  `sekcieVysky`/`sekciePozicie`/`stlpyZPolí`) → `[i]!` with the length-invariant in a comment.
+  Display/Vykres components only — `!` preserves the exact (never-hit-empty) runtime.
+- **Test assertions** (`r.material[0].barLen`, `find(...)!.rezy[0].x`) → add `!` at the
+  index (`r.material[0]!.barLen`). NEVER changes what the test asserts (`!` is erased; an
+  undefined element still throws) — the ONLY safe test edit. NEVER `?.`, never touch a
+  `.toBe(...)`/vector value. `tests/compute.test.ts` (109 Money vectors) stays byte-identical.
+
+A genuine possible-undefined that is a REAL latent bug (not a provable invariant) gets a
+guard + explicit error + RED→GREEN regression test, not a silencing `!`.

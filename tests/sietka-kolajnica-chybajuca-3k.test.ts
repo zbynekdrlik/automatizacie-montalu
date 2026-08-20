@@ -41,9 +41,9 @@ function bezSkupiny(base: Cfg, sysStyl: string): Cfg {
  *  nakonfigurovanú 3K skupinu (napr. len horná koľajnica, spodná chýba). */
 function bezRiadku(base: Cfg, sysStyl: string, zhoda: (r: RezRow) => boolean): Cfg {
 	const clone: Cfg = JSON.parse(JSON.stringify(base));
-	const pred = clone[sysStyl].rez.length;
-	clone[sysStyl].rez = clone[sysStyl].rez.filter((r) => !zhoda(r));
-	expect(clone[sysStyl].rez.length).toBeLessThan(pred); // sabotáž musí naozaj niečo zasiahnuť
+	const pred = clone[sysStyl]!.rez.length;
+	clone[sysStyl]!.rez = clone[sysStyl]!.rez.filter((r) => !zhoda(r));
+	expect(clone[sysStyl]!.rez.length).toBeLessThan(pred); // sabotáž musí naozaj niečo zasiahnuť
 	return clone;
 }
 

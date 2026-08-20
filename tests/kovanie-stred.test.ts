@@ -80,14 +80,14 @@ describe('kovanie stredového okna — parsovanie', () => {
 		const prvy = parseMultiVstup(
 			fd({ zak: 'Z', op: 'O', zakaznik: 'X', posuvy: JSON.stringify([posuv]) })
 		).vstup;
-		expect(prvy.posuvy[0].kovanieStred).toBe(KLUCKA);
-		expect(prvy.posuvy[0].kovanieStredOkno).toBe('P');
+		expect(prvy.posuvy[0]!.kovanieStred).toBe(KLUCKA);
+		expect(prvy.posuvy[0]!.kovanieStredOkno).toBe('P');
 		// náhľad posiela sparsovaný tvar späť (viď vstup-multi-roundtrip.test.ts)
 		const druhy = parseMultiVstup(
 			fd({ zak: 'Z', op: 'O', zakaznik: 'X', posuvy: JSON.stringify(prvy.posuvy) })
 		).vstup;
-		expect(druhy.posuvy[0].kovanieStred).toBe(KLUCKA);
-		expect(druhy.posuvy[0].kovanieStredOkno).toBe('P');
+		expect(druhy.posuvy[0]!.kovanieStred).toBe(KLUCKA);
+		expect(druhy.posuvy[0]!.kovanieStredOkno).toBe('P');
 	});
 });
 

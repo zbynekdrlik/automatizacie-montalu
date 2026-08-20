@@ -223,25 +223,26 @@ export function parseCad(text: string): { rows: CadRow[]; skipped: string[] } {
 				skipped.push(line.trim());
 				continue;
 			}
-			const mh = p[0].trim().match(/^(\d{3,6})\s+(.*)$/);
+			// p.length >= 3 (guard vyššie); regex má 2 povinné capture skupiny
+			const mh = p[0]!.trim().match(/^(\d{3,6})\s+(.*)$/);
 			if (!mh) {
 				skipped.push(line.trim());
 				continue;
 			}
-			code = mh[1];
-			name = mh[2].trim();
-			qty = p[1];
-			cut = p[2];
+			code = mh[1]!;
+			name = mh[2]!.trim();
+			qty = p[1]!;
+			cut = p[2]!;
 		} else {
 			const m = line.trim().match(/^(\d{3,6})\s+(.*?)\s+(\d+)\s+([\d.,]+)\s*$/);
 			if (!m) {
 				skipped.push(line.trim());
 				continue;
 			}
-			code = m[1];
-			name = m[2].trim();
-			qty = m[3];
-			cut = m[4];
+			code = m[1]!; // regex má 4 povinné capture skupiny (guard `if (!m)` vyššie)
+			name = m[2]!.trim();
+			qty = m[3]!;
+			cut = m[4]!;
 		}
 		const q = parseInt(String(parseFloat(qty)), 10);
 		const c = parseFloat(String(cut).replace(',', '.'));
@@ -260,34 +261,38 @@ export function parseInput(text: string): CadRow[] {
 
 function nearestHigher(cut: number, avail: number[]): number {
 	const fit = [...avail].sort((a, b) => a - b).filter((b) => b >= cut);
-	return fit.length ? fit[0] : Math.max(...avail);
+	return fit.length ? fit[0]! : Math.max(...avail);
 }
 
 /** rez > najdlhšia tyč → najmenšia sada tyčí so súčtom ≥ rez (min. dĺžka, potom počet) */
 export function minCoverCombo(cut: number, availIn: number[]): number[] {
+	// avail je neprázdne bar-dĺžky profilu; `avail[i]` je pre `i < counts.length`
+	// vždy definované (counts má rovnakú dĺžku ako avail).
 	const avail = [...new Set(availIn.filter(Boolean))].sort((a, b) => a - b);
-	const cap = Math.ceil(cut / avail[0]) + 1;
+	const cap = Math.ceil(cut / avail[0]!) + 1;
 	const counts = new Array<number>(avail.length).fill(0);
 	let bestKey: number | null = null;
 	let bestCombo: number[] | null = null;
 	for (;;) {
 		const cnt = counts.reduce((a, b) => a + b, 0);
 		if (cnt > 0) {
-			const total = counts.reduce((s, c, i) => s + c * avail[i], 0);
+			const total = counts.reduce((s, c, i) => s + c * avail[i]!, 0);
 			if (total >= cut) {
 				const key = total * 1000 + cnt;
 				if (bestKey === null || key < bestKey) {
 					bestKey = key;
 					bestCombo = [];
 					counts.forEach((c, i) => {
-						for (let k = 0; k < c; k++) bestCombo!.push(avail[i]);
+						for (let k = 0; k < c; k++) bestCombo!.push(avail[i]!);
 					});
 				}
 			}
 		}
 		let i = 0;
 		for (; i < counts.length; i++) {
-			if (++counts[i] <= cap) break;
+			const nv = counts[i]! + 1;
+			counts[i] = nv;
+			if (nv <= cap) break;
 			counts[i] = 0;
 		}
 		if (i === counts.length) break;
@@ -303,26 +308,29 @@ export interface ComboOption {
 
 /** všetky rozumné kombinácie tyčí pre rez (na výber podľa pozície nohy) */
 export function coverCombos(cut: number, availIn: number[]): ComboOption[] {
+	// avail neprázdne; `avail[i]` pre `i < counts.length` vždy definované (rovnaká dĺžka).
 	const avail = [...new Set(availIn.filter(Boolean))].sort((a, b) => a - b);
-	const maxBars = cut > avail[avail.length - 1] * 2 ? 3 : 2;
-	const cap = Math.min(maxBars, Math.ceil(cut / avail[0]));
+	const maxBars = cut > avail[avail.length - 1]! * 2 ? 3 : 2;
+	const cap = Math.min(maxBars, Math.ceil(cut / avail[0]!));
 	const res: ComboOption[] = [];
 	const counts = new Array<number>(avail.length).fill(0);
 	for (;;) {
 		const cnt = counts.reduce((a, b) => a + b, 0);
 		if (cnt >= 1 && cnt <= maxBars) {
-			const total = counts.reduce((s, c, i) => s + c * avail[i], 0);
+			const total = counts.reduce((s, c, i) => s + c * avail[i]!, 0);
 			if (total >= cut) {
 				const bars: number[] = [];
 				counts.forEach((c, i) => {
-					for (let k = 0; k < c; k++) bars.push(avail[i]);
+					for (let k = 0; k < c; k++) bars.push(avail[i]!);
 				});
 				res.push({ bars: bars.sort((a, b) => b - a), total, cnt });
 			}
 		}
 		let i = 0;
 		for (; i < counts.length; i++) {
-			if (++counts[i] <= cap + 1) break;
+			const nv = counts[i]! + 1;
+			counts[i] = nv;
+			if (nv <= cap + 1) break;
 			counts[i] = 0;
 		}
 		if (i === counts.length) break;
@@ -349,9 +357,9 @@ function ffdBins(pieces: number[], bar: number): number[] {
 	const used: number[] = [];
 	for (const p of [...pieces].sort((a, b) => b - a)) {
 		let i = 0;
-		for (; i < used.length; i++) if (bar - used[i] >= p) break;
+		for (; i < used.length; i++) if (bar - used[i]! >= p) break; // i < used.length
 		if (i === used.length) used.push(p);
-		else used[i] += p;
+		else used[i] = used[i]! + p;
 	}
 	return used;
 }
@@ -437,6 +445,7 @@ export function transformRows(rows: CadRow[]): TransformResult {
 	const comboCases: ComboCase[] = [];
 	for (const code in bycode) {
 		const info = bycode[code];
+		if (!info) continue; // for…in nad bycode — vždy prítomné; guard len pre typ
 		const base = CODE_MAP[code] || info.name;
 		const family = fam[norm(base)];
 		if (!family) {
@@ -452,7 +461,7 @@ export function transformRows(rows: CadRow[]): TransformResult {
 		if (avail.length === 1) {
 			// single-variant: FFD na kusy ≤ tyč + ceil(p/bar) na kusy > tyč
 			// (fix under-countu z 2026-06-30 — ffd by dal 1 tyč aj na 10 m rez)
-			const b = avail[0];
+			const b = avail[0]!; // vetva avail.length === 1
 			const small = info.pieces.filter((p) => p <= b);
 			const big = info.pieces.filter((p) => p > b);
 			let cnt = small.length ? ffd(small, b) : 0;
@@ -474,7 +483,7 @@ export function transformRows(rows: CadRow[]): TransformResult {
 						`rez ${Math.round(p)} > ${mx} — kombinácia tyčí (žľab: spoj nad nohou skontrolovať)`
 					);
 					const fm: Record<number, string> = {};
-					for (const b of avail) fm[b] = family[b].prp;
+					for (const b of avail) fm[b] = family[b]!.prp; // b ∈ Object.keys(family)
 					const minimal = minCoverCombo(p, avail);
 					let options = coverCombos(p, avail);
 					// extrémne dlhý rez (> ~3 tyče) — coverCombos nič neponúkne;
@@ -502,7 +511,8 @@ export function transformRows(rows: CadRow[]): TransformResult {
 		for (const bm in barsUsed) {
 			const bar = Number(bm);
 			const item = family[bar] || family[nearestHigher(bar, avail)];
-			const meters = Math.round(((barsUsed[bar] * bar) / 1000) * 1000) / 1000;
+			if (!item) continue; // bar je vždy kľúč family (viď avail) — guard len pre typ
+			const meters = Math.round(((barsUsed[bar]! * bar) / 1000) * 1000) / 1000;
 			qtyByPrp[item.prp] = (qtyByPrp[item.prp] || 0) + meters;
 		}
 		trace.push({ cad: code, name: info.name, base, bars: { ...barsUsed }, notes });
@@ -513,7 +523,7 @@ export function transformRows(rows: CadRow[]): TransformResult {
 	for (const c of comboCases) labelCount[c.fieldLabel] = (labelCount[c.fieldLabel] || 0) + 1;
 	const labelSeen: Record<string, number> = {};
 	for (const c of comboCases) {
-		if (labelCount[c.fieldLabel] > 1) {
+		if ((labelCount[c.fieldLabel] ?? 0) > 1) {
 			labelSeen[c.fieldLabel] = (labelSeen[c.fieldLabel] || 0) + 1;
 			c.fieldLabel += ` (kus ${labelSeen[c.fieldLabel]})`;
 		}
@@ -537,9 +547,9 @@ const sortedKey = (bars: number[]) =>
 export const fmtBars = (dict: Record<number, number>): string => {
 	const ks = Object.keys(dict)
 		.map(Number)
-		.filter((b) => dict[b] > 0)
+		.filter((b) => (dict[b] ?? 0) > 0)
 		.sort((a, b) => a - b);
-	return ks.map((b) => dict[b] + '(' + String(b / 1000).replace('.', ',') + 'm)').join(' ');
+	return ks.map((b) => dict[b]! + '(' + String(b / 1000).replace('.', ',') + 'm)').join(' ');
 };
 
 export interface CadCopyLine {
@@ -599,12 +609,15 @@ export function applyCombos(
 	r.comboCases.forEach((c, idx) => {
 		const bars = choices.get(idx) ?? c.minimal;
 		if (sortedKey(bars) === sortedKey(c.minimal)) return;
+		// `b` je vždy kľúč familyMap: minimal aj bars sú z avail (viď parseChoice
+		// validáciu voľby proti options ⊆ avail = kľúče familyMap). `!` zachováva
+		// presné správanie aj pre (upstream odchytený) neplatný vstup.
 		for (const b of c.minimal) {
-			const p = c.familyMap[b];
+			const p = c.familyMap[b]!;
 			q[p] = Math.round(((q[p] || 0) - b / 1000) * 1000) / 1000;
 		}
 		for (const b of bars) {
-			const p = c.familyMap[b];
+			const p = c.familyMap[b]!;
 			q[p] = Math.round(((q[p] || 0) + b / 1000) * 1000) / 1000;
 		}
 	});
@@ -625,7 +638,7 @@ export function parseChoice(
 	if (value) {
 		const m = String(value).match(/^([0-9+]+)/);
 		if (m) {
-			const bars = m[1].split('+').map(Number);
+			const bars = m[1]!.split('+').map(Number); // regex má 1 povinnú capture skupinu
 			const key = sortedKey(bars);
 			const valid = options
 				? options.some((o) => sortedKey(o.bars) === key)

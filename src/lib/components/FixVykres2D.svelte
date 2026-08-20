@@ -49,7 +49,8 @@
 			[X(r.S), Y(r.V2)],
 			[X(r.S), base]
 		]
-			.map(([x, y]) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`)
+			// každý bod je 2-prvkové [x, y] pole
+			.map(([x, y]) => `${Math.round(x! * 10) / 10},${Math.round(y! * 10) / 10}`)
 			.join(' ')
 	);
 	// Smer „von z konštrukcie" pre kóty krajných výšok. Pri zrkadlovom kuse je
@@ -115,9 +116,9 @@
 	let popisySikma = $derived.by(() => {
 		const hotove: Box[] = [...popisUhlov];
 		const out: { x: number; y: number; text: string }[] = [];
-		for (let i = 0; i < r.polia.length; i++) {
-			const p = r.polia[i];
-			const x0 = hranice[i];
+		// hranice.length === r.polia.length + 1 ([0, ...kumulSirka]) → hranice[i] definované
+		for (const [i, p] of r.polia.entries()) {
+			const x0 = hranice[i]!;
 			const text = fmt(p.sikma);
 			const w = sirkaTextu(text);
 			// kandidáti: stred poľa, potom postupne bližšie ku krajom
@@ -159,8 +160,8 @@
 
 	<!-- polia: stĺpiky + označenie + výška na stĺpiku -->
 	{#each r.polia as p, i (i)}
-		{@const x0 = hranice[i]}
-		{@const x1 = hranice[i + 1]}
+		{@const x0 = hranice[i]!}
+		{@const x1 = hranice[i + 1]!}
 		{@const cx = (X(x0) + X(x1)) / 2}
 		{@const stred = (p.vLavo + p.vPravo) / 2}
 		<text
@@ -230,8 +231,8 @@
 
 	<!-- kóty šírok polí (nad spodnou hranou) + celková šírka pod ňou -->
 	{#each r.polia.length > 1 ? r.polia : [] as p, i (i)}
-		{@const xa = X(hranice[i])}
-		{@const xb = X(hranice[i + 1])}
+		{@const xa = X(hranice[i]!)}
+		{@const xb = X(hranice[i + 1]!)}
 		<g stroke="#94a3b8" stroke-width="1" fill="none">
 			<line x1={xa} y1={base + 20} x2={xb} y2={base + 20} />
 			<line x1={xa} y1={base + 15} x2={xa} y2={base + 25} />
@@ -294,8 +295,8 @@
 	{#if !rovny}
 		<!-- uhol sklonu pri vyššej strane (ostrý uhol konštrukcie) -->
 		<text
-			x={popisUhlov[0].x}
-			y={popisUhlov[0].y}
+			x={popisUhlov[0]!.x}
+			y={popisUhlov[0]!.y}
 			text-anchor="middle"
 			font-size="12"
 			font-weight="700"
@@ -309,8 +310,8 @@
 	     nízkej špičke (napr. 64,6 mm) je vnútri sotva pár pixelov a popisok by ležal
 	     na obryse; nad hranou je vždy voľno. -->
 		<text
-			x={popisUhlov[1].x}
-			y={popisUhlov[1].y}
+			x={popisUhlov[1]!.x}
+			y={popisUhlov[1]!.y}
 			text-anchor="middle"
 			font-size="12"
 			font-weight="700"

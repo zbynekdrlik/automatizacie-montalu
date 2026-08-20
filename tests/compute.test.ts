@@ -218,8 +218,8 @@ describe('computeFlat — 1:1 s overenými odpismi (Excel ground truth)', () => 
 		const ram = w.material.find((m) => m.kod === 'ZASP00088')!;
 		expect(ram.rezy.map((x) => Math.round(x.rozmer))).toEqual([857, 1933]);
 		expect(ram.rezy.map((x) => x.ks)).toEqual([12, 12]);
-		expect(Math.round(w.material.find((m) => m.kod === 'ZASP20249')!.rezy[0].rozmer)).toBe(1933);
-		expect(Math.round(w.material.find((m) => m.kod === 'ZASP202410')!.rezy[0].rozmer)).toBe(1933);
+		expect(Math.round(w.material.find((m) => m.kod === 'ZASP20249')!.rezy[0]!.rozmer)).toBe(1933);
+		expect(Math.round(w.material.find((m) => m.kod === 'ZASP202410')!.rezy[0]!.rozmer)).toBe(1933);
 		// Excelový rozmer 6940×2200: dĺžky rezov + POČTY TYČÍ 1:1 s Excelom
 		const e = computeFlat(cfg, 'Slide|2x3K', 6940, 2200, true)!;
 		const eram = e.material.find((m) => m.kod === 'ZASP00088')!;
@@ -356,8 +356,8 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 				const r = computeFlat(cfg, sysStyl, S, V, false, hrubka);
 				expect(r).not.toBeNull();
 				const got = odpisByKod(r!);
-				const [kladka, klzny] = profilPreHrubku[hrubka];
-				const [inyKladka, inyKlzny] = profilPreHrubku[hrubka === 6 ? 10 : 6];
+				const [kladka, klzny] = profilPreHrubku[hrubka]!;
+				const [inyKladka, inyKlzny] = profilPreHrubku[hrubka === 6 ? 10 : 6]!;
 				// presne 5 profilov: 2 koľajnice + kladka + klzný + dorazové
 				expect(r!.odpis.length, sysStyl).toBe(5);
 				// koľajnice + dorazové sú rovnaké pre obe hrúbky
@@ -416,7 +416,7 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 	// drift-guard: KAŽDÝ systém musí mať reálny presah krídel (kaskáda ho kreslí v mierke).
 	// Nový/premenovaný systém bez hodnoty → kaskáda by ticho padla na default → chytí to test.
 	it('OVERLAP_MM má hodnotu presahu pre každý systém v cfg (kaskáda náhľadu)', () => {
-		const systemy = [...new Set((seed.sys as SysRow[]).map((s) => s.sysStyl.split('|')[0]))];
+		const systemy = [...new Set((seed.sys as SysRow[]).map((s) => s.sysStyl.split('|')[0]!))];
 		expect(systemy.length).toBeGreaterThan(0);
 		for (const system of systemy)
 			expect(Object.prototype.hasOwnProperty.call(OVERLAP_MM, system), system).toBe(true);
@@ -509,7 +509,7 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 		expect(bar('ZASP202417')).toBe(3600); // kladka 10mm
 		expect(bar('ZASP202432')).toBe(7500); // 5K spodná koľajnica
 		const rr = computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!;
-		expect(rr.material[0].barLen).toBe(7500); // Robust ostáva 7500
+		expect(rr.material[0]!.barLen).toBe(7500); // Robust ostáva 7500
 	});
 
 	it('dlzkaTyce mimo rozsahu (preklep 600 namiesto 6000) je odmietnutá inBounds — Money guard', () => {
@@ -652,7 +652,7 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 
 		it('overený anchor zo spec.md: 2K prírez kus (S=3000) = 1426,25 mm pred zaokrúhlením na rez', () => {
 			const r = computeFlat(cfg, 'Štandard +|2K', 3000, 2400, false)!;
-			const kus = r.material.find((m) => m.kod === 'ZASP202415')!.bary.flatMap((b) => b.kusy)[0];
+			const kus = r.material.find((m) => m.kod === 'ZASP202415')!.bary.flatMap((b) => b.kusy)[0]!;
 			expect(kus.rozmer).toBe(1426); // Math.round(1426.25) — rozmer je zaokrúhlený na celé mm
 		});
 	});

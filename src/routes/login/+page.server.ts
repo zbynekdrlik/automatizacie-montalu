@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	return {};
 };
 
-export const actions: Actions = {
+export const actions = {
 	default: async ({ request, cookies, url, getClientAddress }) => {
 		const form = await request.formData();
 		const username = String(form.get('username') || '');
@@ -87,4 +87,4 @@ export const actions: Actions = {
 		});
 		redirect(303, safeNext(url.searchParams.get('next')));
 	}
-};
+} satisfies Actions;
