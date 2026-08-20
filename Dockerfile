@@ -26,5 +26,15 @@ ENV NODE_ENV=production
 COPY --from=build /app/build build
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/package.json .
+# Non-root runtime (#256): bež ako `node` (uid 1000, existuje v base image) — least
+# privilege. Priprav /data/app node-vlastnené, aby ČERSTVÝ prázdny named volume
+# `appdata` zdedil owner node:node (Docker kopíruje vlastníctvo image adresára do
+# prázdneho volume pri prvom mounte). EXISTUJÚCI (root-vlastnený) volume + zdieľané
+# Money bind-mounty rieši idempotentná `migrate_ownership` v deploy-remote.sh — image
+# chown existujúci volume neprepíše. adapter-node servuje `build/` read-only a
+# better-sqlite3 sa len číta, takže /app nepotrebuje write; jediné zapisovateľné cesty
+# sú namontované volumes. Port 3000 (≥1024) nevyžaduje root.
+RUN mkdir -p /data/app && chown node:node /data/app
+USER node
 EXPOSE 3000
 CMD ["node", "build"]
