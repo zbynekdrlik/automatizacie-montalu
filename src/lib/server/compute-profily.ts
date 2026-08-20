@@ -46,20 +46,25 @@ export function profilCuts(
 		// zahrnie LEN keď sedí zvolená hrúbka skla; 0 = platí vždy (Robust/Slide)
 		const rh = Number(r.skloHrubka) || 0;
 		if (rh !== 0 && rh !== sh) continue;
-		if (!byKod[r.kod]) {
-			byKod[r.kod] = [];
+		let bucket = byKod[r.kod];
+		if (!bucket) {
+			bucket = [];
+			byKod[r.kod] = bucket;
 			order.push(r.kod);
 		}
-		byKod[r.kod].push(r);
+		bucket.push(r);
 	}
 	return order.map((kod) => {
-		const rows = byKod[kod];
+		// INVARIANT: `order` obsahuje len kódy, ktorých `byKod[kod]` sa VYTVORIL a
+		// dostal aspoň jeden riadok v tej istej iterácii vyššie → `rows` je neprázdne.
+		const rows = byKod[kod]!;
+		const first = rows[0]!;
 		const rezy: { rozmer: number; ks: number }[] = [];
 		// dĺžka pre balenie je bez prerezu; zobrazený rozmer je s prerezom
 		const kusy: Kus[] = [];
 		// ručne zadaná dĺžka koľajnice (Patrik): nahradí vypočítanú dĺžku pre TÚTO
 		// rolu (horná / spodná). Koľajnice majú kerf 0, takže rezaná = balená dĺžka.
-		const rola = rolaKolajnice(rows[0].nazov);
+		const rola = rolaKolajnice(first.nazov);
 		const rucne = rola ? Number(rucnaKolajnica?.[rola]) || 0 : 0;
 		for (const r of rows) {
 			const t =
@@ -75,8 +80,8 @@ export function profilCuts(
 		}
 		// dĺžka tyče je vlastnosť profilu (Money článku) — všetky rez-riadky toho
 		// istého kódu ju majú rovnakú; ber ju z prvého riadku, default BAR
-		const barLen = Number(rows[0].dlzkaTyce) || BAR;
-		return { kod, nazov: rows[0].nazov, rezy, kusy, barLen };
+		const barLen = Number(first.dlzkaTyce) || BAR;
+		return { kod, nazov: first.nazov, rezy, kusy, barLen };
 	});
 }
 
@@ -136,7 +141,7 @@ export function undersizeCut(
 ): string | null {
 	const g = cfg[sysStyl];
 	if (!g) return null;
-	const system = sysStyl.split('|')[0];
+	const system = sysStyl.split('|')[0] ?? '';
 	const sh = Number(skloHrubka) || 0;
 	// Profilové rezy — rovnaká inklúzia riadkov ako `profilCuts` (viď SYNC-POINT).
 	for (const r of g.rez) {
@@ -220,12 +225,17 @@ export function railUpsize(
 export function systemyRucnaKolajnica(cfg: Cfg): string[] {
 	const roly: Record<string, Set<string>> = {};
 	for (const sysStyl in cfg) {
-		const system = sysStyl.split('|')[0];
-		for (const r of cfg[sysStyl].rez) {
+		const system = sysStyl.split('|')[0] ?? '';
+		const entry = cfg[sysStyl];
+		if (!entry) continue; // for…in nad cfg — vždy prítomné; guard len pre typ
+		for (const r of entry.rez) {
 			const rola = rolaKolajnice(r.nazov);
 			if (!rola) continue;
 			(roly[system] ??= new Set()).add(rola);
 		}
 	}
-	return Object.keys(roly).filter((s) => roly[s].has('horna') && roly[s].has('spodna'));
+	return Object.keys(roly).filter((s) => {
+		const set = roly[s]; // s ∈ Object.keys(roly) → vždy prítomné
+		return !!set && set.has('horna') && set.has('spodna');
+	});
 }

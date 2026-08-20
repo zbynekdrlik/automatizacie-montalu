@@ -113,7 +113,10 @@ export function buildCFG(sysRows: SysRow[], rezRows: RezRow[]): Cfg {
 		if (r.typ === 'sklo') g.sklo[r.dim === 'S' ? 's' : 'v'] = r;
 		else g.rez.push(r);
 	}
-	for (const k in cfg) cfg[k].rez.sort((a, b) => Number(a.poradie) - Number(b.poradie));
+	for (const k in cfg) {
+		const g = cfg[k]; // for…in nad cfg — vždy prítomné; guard len pre typ
+		if (g) g.rez.sort((a, b) => Number(a.poradie) - Number(b.poradie));
+	}
 	return cfg;
 }
 
@@ -142,14 +145,18 @@ export function ffdPack(kusy: Kus[], barLen: number = BAR, kerf: number = KOTUC)
 	for (const k of [...kusy].sort((a, b) => b.dlzka - a.dlzka)) {
 		const need = k.dlzka + kerf;
 		let i = 0;
-		for (; i < rem.length; i++) if (rem[i] >= need) break;
+		// bounded scan: `i < rem.length` zaručuje, že `rem[i]` je definované
+		for (; i < rem.length; i++) if (rem[i]! >= need) break;
 		if (i === rem.length) {
 			bary.push({ kusy: [k], zvysok: barLen - need });
 			rem.push(barLen - need);
 		} else {
-			bary[i].kusy.push(k);
-			rem[i] -= need;
-			bary[i].zvysok = rem[i];
+			// vetva `i < rem.length`; `bary` a `rem` sú paralelné (spolu push vyššie)
+			const bar = bary[i]!;
+			const zvysok = rem[i]! - need;
+			bar.kusy.push(k);
+			rem[i] = zvysok;
+			bar.zvysok = zvysok;
 		}
 	}
 	// v každej tyči zoraď kusy od najdlhšieho (ako v optimalizačnom výstupe)
