@@ -57,6 +57,16 @@ export const actions: Actions = {
 		// exponenciálne oneskorenie podľa počtu doterajších neúspechov (spomalí brute-force)
 		await applyLoginBackoff(username, ip);
 
+		// #251 review 🔴: re-check lockout AJ PO backoff await. Bez toho súbežné
+		// požiadavky prejdú počiatočnú kontrolu (všetky vidia failures<5) a vyhodnotia
+		// N scryptov (concurrency bypass 5-pokusového limitu). scryptSync + recordFailure
+		// nižšie sú synchrónne (žiadny await medzi týmto re-checkom a záznamom), takže
+		// admission sa efektívne serializuje: 6. pokračovanie už vidí failures=5 → lock.
+		const remainingAfterBackoff = lockoutRemainingMs(username, ip);
+		if (remainingAfterBackoff > 0) {
+			return { error: lockMessage(remainingAfterBackoff), username };
+		}
+
 		const token = login(username, password, ip);
 		if (!token) {
 			// zaznamenaj neúspech (môže potichu nastaviť lock — WARN log); správu ukáž

@@ -13,12 +13,6 @@ process.env.DATABASE_PATH = path.join(tmpRoot, 'timing.db');
 const { login } = await import('../src/lib/server/auth');
 const { addUser } = await import('../src/lib/server/db');
 
-function median(xs: number[]): number {
-	const s = [...xs].sort((a, b) => a - b);
-	const m = Math.floor(s.length / 2);
-	return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-
 function timeCall(fn: () => void): number {
 	const t0 = process.hrtime.bigint();
 	fn();
@@ -30,9 +24,9 @@ describe('login timing oracle je uzavretý', () => {
 		addUser('realny-ucet', 'spravne-heslo-123', 'internal');
 	});
 
-	it('medián času neznáme meno vs zlé heslo sa líši < 20 %', () => {
-		const N = 31;
-		const WARM = 5;
+	it('čas neznáme meno vs zlé heslo sa líši < 20 % (oba behy spustia scrypt)', () => {
+		const N = 41;
+		const WARM = 8;
 		// warm-up (JIT, scrypt buffery) — nezapočítava sa
 		for (let i = 0; i < WARM; i++) {
 			login('nikto', 'x');
@@ -45,10 +39,15 @@ describe('login timing oracle je uzavretý', () => {
 			unknown.push(timeCall(() => login('neznamy-' + i, 'x')));
 			wrong.push(timeCall(() => login('realny-ucet', 'zle-heslo-' + i)));
 		}
-		const mu = median(unknown);
-		const mw = median(wrong);
+		// POROVNÁVAME MINIMÁ, nie mediány: pod plným behom testov + v8 coverage
+		// inštrumentáciou je CPU kontencia veľká a mediány driftujú (flaky nad 20 %
+		// — nájdené naživo). Kontencia čas iba PRIDÁVA, takže minimum každej cesty =
+		// čistá, nerušená cena scryptu = presne ten časový signál, ktorý by útočník
+		// s mnohými vzorkami odčítal. Minimá sú deterministické a robustné.
+		const mu = Math.min(...unknown);
+		const mw = Math.min(...wrong);
 		const relDiff = Math.abs(mu - mw) / Math.max(mu, mw);
-		// oba behy teraz spustia jeden scrypt → mediány takmer zhodné
+		// oba behy spustia práve jeden scrypt (neznáme meno cez DUMMY_HASH) → minimá takmer zhodné
 		expect(relDiff).toBeLessThan(0.2);
 	});
 });

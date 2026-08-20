@@ -118,7 +118,28 @@ describe('login akcia — dĺžka, lockout, reset', () => {
 		// po úspechu je štít čistý; ďalšie 4 preklepy stále neuzamknú
 		for (let i = 0; i < MAX_FAILURES - 1; i++) {
 			const r = await run(mkEvent('marek', 'zle-heslo'));
+			// #251 review 🔵 #7a: assert kind PRV, inak by nesprávny kind ticho prešiel
+			expect(r.kind).toBe('return');
 			if (r.kind === 'return') expect(r.value.error).toMatch(/Nesprávne/);
 		}
+	});
+
+	it('SÚBEŽNÉ pokusy neobídu 5-limit — najviac MAX_FAILURES scryptov (review 🔴 #2)', async () => {
+		// Bez re-checku PO backoffe prejde počiatočnú kontrolu N súbežných požiadaviek
+		// (všetky vidia failures<5) a vyhodnotia N scryptov (concurrency bypass). Re-check
+		// po awaite + synchrónny scrypt+record serializuje admission → max MAX_FAILURES.
+		const N = 40;
+		const results = await Promise.all(
+			Array.from({ length: N }, () => run(mkEvent('marek', 'zle-heslo', '192.0.2.99')))
+		);
+		const evaluated = results.filter(
+			(r) => r.kind === 'return' && /Nesprávne/.test(r.value.error ?? '')
+		).length;
+		const locked = results.filter(
+			(r) => r.kind === 'return' && /Príliš veľa/.test(r.value.error ?? '')
+		).length;
+		expect(evaluated).toBeLessThanOrEqual(MAX_FAILURES); // ← RED bez fixu (bolo by 40)
+		expect(evaluated + locked).toBe(N); // všetky skončili buď chybou alebo lockom
+		expect(locked).toBe(N - evaluated);
 	});
 });

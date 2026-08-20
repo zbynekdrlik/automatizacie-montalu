@@ -20,12 +20,17 @@ const log = logger('login-throttle');
 export const MAX_FAILURES = 5;
 /** Dĺžka lockoutu po dosiahnutí prahu. */
 export const LOCKOUT_MS = 15 * 60 * 1000; // 15 min
-/** Okno bez pokusu, po ktorom sa (nezamknuté) počítadlo resetuje na nulu. */
+/** Fixné okno od PRVÉHO neúspechu streaku: nezamknuté počítadlo staršie než
+ *  WINDOW_MS sa resetuje na nulu. Meria sa od `firstAt` (nie kĺzavé okno). */
 export const WINDOW_MS = 15 * 60 * 1000; // 15 min
 /** Základ exponenciálneho oneskorenia (1. neúspech). */
 export const BASE_DELAY_MS = 200;
 /** Strop exponenciálneho oneskorenia. */
 export const MAX_DELAY_MS = 5000;
+/** Strop počtu sledovaných (username, ip) záznamov — obrana proti memory DoS cez
+ *  variáciu mena/IP (#251 review 🟡). Pri prekročení sa expirované zmetú a ak treba,
+ *  vyhodia sa najstaršie podľa firstAt. Bežná prevádzka má pár záznamov. */
+export const MAX_TRACKED = 10_000;
 
 interface Entry {
 	failures: number;
@@ -43,18 +48,45 @@ function key(username: string, ip: string | undefined): string {
 
 /**
  * Vráti aktuálny (ešte platný) záznam, alebo undefined ak neexistuje / vypršal.
- * Nezamknutý záznam po uplynutí WINDOW_MS bez pokusu sa zabudne (čistý štít).
- * Zamknutý záznam sa drží až do konca lockoutu.
+ * Zamknutý záznam sa drží až do konca lockoutu; po expirácii locku ALEBO po
+ * uplynutí WINDOW_MS bez pokusu sa zabudne (čistý štít). Reset po locku je
+ * EXPLICITNÝ (#251 review 🔵 #4) — nezávisí od zhody LOCKOUT_MS == WINDOW_MS.
  */
 function getFresh(k: string, now: number): Entry | undefined {
 	const e = attempts.get(k);
 	if (!e) return undefined;
 	if (e.lockedUntil > now) return e; // stále zamknuté → drž
+	if (e.lockedUntil > 0) {
+		// lock existoval a vypršal → čistý štít (od nuly)
+		attempts.delete(k);
+		return undefined;
+	}
 	if (now - e.firstAt > WINDOW_MS) {
+		// nezamknutý streak starší než okno → zabudni
 		attempts.delete(k);
 		return undefined;
 	}
 	return e;
+}
+
+/**
+ * Obmedz rast Map (#251 review 🟡): keď počet záznamov dosiahne MAX_TRACKED,
+ * najprv zmeť expirované (lock vypršal, alebo nezamknuté po okne); ak je ich
+ * stále priveľa, vyhoď najstaršie podľa firstAt tak, aby sa nový záznam zmestil.
+ * Beží len pri veľkej Map (bežná prevádzka má pár záznamov) → O(n) je zriedkavé.
+ */
+function sweepIfNeeded(now: number): void {
+	if (attempts.size < MAX_TRACKED) return;
+	for (const [k, e] of attempts) {
+		const lockExpired = e.lockedUntil > 0 && e.lockedUntil <= now;
+		const windowExpired = e.lockedUntil <= now && now - e.firstAt > WINDOW_MS;
+		if (lockExpired || windowExpired) attempts.delete(k);
+	}
+	if (attempts.size < MAX_TRACKED) return;
+	// stále priveľa aktívnych záznamov → vyhoď najstaršie na strop
+	const byAge = [...attempts.entries()].sort((a, b) => a[1].firstAt - b[1].firstAt);
+	const toEvict = attempts.size - MAX_TRACKED + 1;
+	for (let i = 0; i < toEvict && i < byAge.length; i++) attempts.delete(byAge[i][0]);
 }
 
 /** ms do konca lockoutu (0 = nie je zamknuté). Volať PRED pokusom o login. */
@@ -89,10 +121,10 @@ export function recordFailure(
 	now: number = Date.now()
 ): boolean {
 	const k = key(username, ip);
-	let e = attempts.get(k);
-	// vypršané okno (a nie zamknuté) → nový streak od nuly
-	if (e && e.lockedUntil <= now && now - e.firstAt > WINDOW_MS) e = undefined;
+	// getFresh rieši reset po expirácii locku aj po uplynutí okna (jednotná logika)
+	let e = getFresh(k, now);
 	if (!e) {
+		sweepIfNeeded(now); // obmedz rast Map pred pridaním nového záznamu
 		e = { failures: 0, firstAt: now, lockedUntil: 0 };
 		attempts.set(k, e);
 	}

@@ -153,6 +153,7 @@
 					name="username"
 					value={form?.username ?? ''}
 					autocomplete="username"
+					maxlength="200"
 					required
 				/>
 			</div>
@@ -163,6 +164,7 @@
 					name="password"
 					type="password"
 					autocomplete="current-password"
+					maxlength="200"
 					required
 				/>
 			</div>
