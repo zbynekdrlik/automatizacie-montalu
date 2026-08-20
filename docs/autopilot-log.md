@@ -1449,3 +1449,11 @@ implementované, nereprodukovateľné čestný null:
 - E2E secrets `E2E_USER`/`E2E_PASS` CHÝBAJÚ v env `production` (`gh secret list` = len VPS_SSH_KEY) → krok ich zisťuje (`steps.e2e_secrets`) a preskočí s hlasným `::warning::` (nie continue-on-error, nie ticho zelený). Pridanie secrets = krok užívateľa/supervisora.
 - Pasce: (1) `test.skip(` v pridanom test súbore blokuje `block-test-skips.sh` pri integrácii → post-deploy.spec bez skip, SHA kontrola conditional na DEPLOY_SHA7. (2) komentár s literálom „continue-on-error" padne na guard `not.toMatch(/continue-on-error/)` → preformulované. (3) SHA-pinnuté akcie (40-hex) → secret-scan false-positive, bypass `# airuleset:secret-ok`. (4) worker NESMIE `Closes #N` (block-worker-close-trigger.sh) — supervisor zatvára.
 - Lokálne zelené: check 0 err, test 1536 passed + coverage, lint clean, shellcheck clean, RED-keď-rollback-pokazený overené. Build + reálny deploy + live E2E = CI-only.
+
+## Kolo 4 — #254 + #257 (PR #262, v0.24.10, merge 6ae2f5a)
+
+- **#254 (deploy rollback + post-deploy E2E):** compose `image:` tag pre rollback; deploy job pri zlyhaní health/verzie rollbackne na predchádzajúci obraz; nový krok Post-deploy E2E cez SSH tunel (BASE_URL + DEPLOY_SHA7 + E2E_USER/E2E_PASS z GitHub env `production`) — read-only smoke `e2e/post-deploy.spec.ts`. Prvý ostrý beh: všetky kroky success.
+- **#257 (coverage + typed lint):** coverage rozšírené na celé `src/lib`, thresholds 94/88/95/95; `recommendedTypeChecked` scopnuté na `src/**/*.ts` (projectService); mŕtve exporty von. Detaily kalibrácie v `.claude/rules/lint-formatting.md`.
+- **Navyše:** favicon (`static/favicon.svg`) — koniec 404 console erroru z prod (nález post-deploy verifikácie kola 3); filed #261 (test-izolácia: zdieľaný ./data/app.db race pri paralelnom vitest).
+- **Cross-lane pasca (opakovala sa 2×):** lane s base spred kola N nevidí nové gates z kola N — #254's `post-deploy.spec.ts` mal console assert s message argumentom (`expect(errors, '…')`), guard #247 vyžaduje presný tvar `expect(<v>).toEqual([])`. Fix `089f741`. Ponaučenie: pri serial integrácii merged-lane špecov VŽDY lokálne pustiť `tests/e2e-console-guard.test.ts` pred pushom.
+- Post-deploy: health + DOM `v0.24.10 (6ae2f5a)`, console 0/0 (favicon 404 preč), favicon.svg 200.

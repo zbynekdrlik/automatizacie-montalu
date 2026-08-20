@@ -61,7 +61,21 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	return resolve(event);
+	const response = await resolve(event);
+
+	// #251 SEC-3: obranné bezpečnostné hlavičky priamo z appky (reverzný proxy
+	// Caddy je mimo repa → defense-in-depth, appka sa nespolieha na infra config).
+	// Aplikované na každú vyrenderovanú odpoveď (vrátane /login, /zasklenia); 3xx
+	// redirecty (throw z redirect()) sem neprídu — nemajú framovateľný obsah.
+	// Permissions-Policy je ZÁMERNE minimálny — vypína len nepoužívané invazívne
+	// funkcie (kamera/mikrofón/poloha); WebGL/three.js Permissions-Policy neriadi.
+	// BEZ Content-Security-Policy v tomto tickete (#251) — three.js/inline štýly
+	// Svelte = riziko rozbitia; CSP sa rieši samostatne ak sa ukáže bezpečné.
+	response.headers.set('X-Frame-Options', 'DENY');
+	response.headers.set('X-Content-Type-Options', 'nosniff');
+	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+	return response;
 };
 
 // #245: neočakávané serverové chyby (500) — zaloguj plný kontext + stack pod

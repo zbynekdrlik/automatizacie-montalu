@@ -93,6 +93,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
+- login brute-force throttle / timing oracle / bezpečnostné hlavičky / getClientAddress za Caddy → `.claude/rules/login-hardening.md`
 - unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
 - štruktúrovaný logger (`log.ts`), handleError, chybová stránka, testovanie logov → `.claude/rules/logging.md`
 - SQLite/Money durability (synchronous pin, fsync zápis, v24 audit) → `.claude/rules/db-durability.md`
@@ -101,6 +102,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`
 - server-side wall-clock timestamp na obrazovke/tlači (UTC default pasca) → `.claude/rules/timestamps.md`
 - `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`
+- štruktúrovaný logger (`log.ts`) / handleError / chybová stránka / testovanie logov → `.claude/rules/logging.md`
 - three.js 3D náhľad (vizual) → `.claude/rules/vizual3d.md`
 - `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt poradie → `.claude/rules/zasklenia-form-reactivity.md`
 - kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`
