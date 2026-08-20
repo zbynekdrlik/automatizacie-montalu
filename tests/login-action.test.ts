@@ -14,9 +14,8 @@ process.env.DATABASE_PATH = path.join(tmpRoot, 'action.db');
 
 const { actions } = await import('../src/routes/login/+page.server');
 const { addUser } = await import('../src/lib/server/db');
-const { _resetThrottle, MAX_FAILURES, LOCKOUT_MS } = await import(
-	'../src/lib/server/login-throttle'
-);
+const { _resetThrottle, MAX_FAILURES, LOCKOUT_MS } =
+	await import('../src/lib/server/login-throttle');
 
 const GOOD = 'tajne-heslo-123';
 
