@@ -10,6 +10,9 @@
 	import {
 		PREDNA_SVETLOST_STD,
 		ZVOD_SH_MAX,
+		POCET_KROVOV_MIN,
+		POCET_KROVOV_MAX,
+		svetlostMedziKrovmi,
 		type PergolaSystem,
 		type Uchytenie,
 		type HornyProfil,
@@ -34,6 +37,7 @@
 		prieckaLightS = $bindable(false),
 		zosilnenyNosnikS = $bindable(false),
 		sklonStrechyS = $bindable(''),
+		pocetKrovovS = $bindable(''),
 		jednoduchaBezZaskleniaS = $bindable(false),
 		vystuhaProfilS = $bindable(''),
 		zvodFrezovatS = $bindable(false),
@@ -57,6 +61,7 @@
 		prieckaLightS?: boolean;
 		zosilnenyNosnikS?: boolean;
 		sklonStrechyS?: number | string;
+		pocetKrovovS?: number | string;
 		jednoduchaBezZaskleniaS?: boolean;
 		vystuhaProfilS?: VystuhaProfil | '';
 		zvodFrezovatS?: boolean;
@@ -64,6 +69,19 @@
 		strechaSkloS?: string;
 		obvodoveZasklenieS?: string;
 	} = $props();
+
+	// #161 — živý náhľad svetlosti medzi krovmi pre zadaný počet (Dominik podľa nej pridá/uberie
+	// krov). Zrkadlí serverovú validáciu: celé číslo v rozsahu (žiadne tiché zaokrúhlenie, aby
+	// hint neukázal svetlosť pre 2,4, ktoré server odmietne). svetlostMedziKrovmi vráti null aj
+	// pri zápornej/nulovej svetlosti (počet sa do šírky nezmestí).
+	const pocetKrovovN = $derived(
+		Number.isInteger(Number(pocetKrovovS)) &&
+			Number(pocetKrovovS) >= POCET_KROVOV_MIN &&
+			Number(pocetKrovovS) <= POCET_KROVOV_MAX
+			? Number(pocetKrovovS)
+			: null
+	);
+	const svetlostHint = $derived(svetlostMedziKrovmi(Number(sirkaS) || 0, pocetKrovovN));
 </script>
 
 <div class="card">
@@ -271,6 +289,27 @@
 				<p class="sub" style="margin:4px 0 0">
 					voliteľné · ≥ 7° = <b>potvrdené</b> uloženie (prah 7°); pod 7° zatiaľ nepodporované. Frézovanie
 					drážok ostáva na konštruktérovi.
+				</p>
+			</div>
+			<div class="field">
+				<label for="pocetKrovov">Počet krovov</label>
+				<input
+					id="pocetKrovov"
+					name="pocetKrovov"
+					type="number"
+					min="2"
+					max="50"
+					step="1"
+					placeholder="voliteľné"
+					bind:value={pocetKrovovS}
+				/>
+				<p class="sub" style="margin:4px 0 0" data-testid="svetlost-hint">
+					{#if svetlostHint != null}
+						Svetlosť medzi krovmi: <b>{String(svetlostHint).replace('.', ',')} mm</b> — podľa nej pridaj/uber
+						krov
+					{:else}
+						voliteľné · zadaj počet, ukážem svetlosť medzi krovmi
+					{/if}
 				</p>
 			</div>
 		</div>

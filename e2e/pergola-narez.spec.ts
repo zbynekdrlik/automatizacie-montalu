@@ -471,3 +471,48 @@ test('#206 (d)+(e) zvod frézovanie + sklá: v karte údajov aj vo výkrese', as
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// --- #161 KROV cut-list (derivácia 21.8. overená proti golden OP260282) ---------------
+test('#161 krov cut-list (OP260282): počet krovov 8 → svetlosť 655,43, priečka nominál 3239,76, prítlačná 3279,76, zaklapávacia 14 ks', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	// vstupy golden OP260282 + manuálny počet krovov = 8 (Dominik zadá)
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.locator('#uchytenie').selectOption('samostatne');
+	await page.locator('#vyskaZadna').fill('2790');
+	await page.locator('#pocetZadnychNoh').fill('4');
+	await page.locator('#hornyProfilZadnej').selectOption('110');
+	await page.locator('#zosilnenyNosnik').check();
+	await page.locator('#sklonStrechy').fill('6.1');
+	await page.locator('#pocetKrovov').fill('8');
+
+	// živý náhľad svetlosti v formulári (Dominik podľa nej pridá/uberie krov)
+	await expect(page.getByTestId('svetlost-hint')).toContainText('655,43');
+
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// priečka (18004) = NOMINÁL krovu (spodná hrana), NIE „—" — teraz ide do rezervácie (✅)
+	const priecka = page.getByTestId('polozka-18004');
+	await expect(priecka).toContainText('3239'); // ~3239,76
+	await expect(priecka).toContainText('✅ v odpise');
+	// prítlačná/maskovacie = nominál + 40 = 3279,76
+	await expect(page.getByTestId('polozka-18006')).toContainText('3279');
+	await expect(page.getByTestId('polozka-18007')).toContainText('3279');
+	await expect(page.getByTestId('polozka-18008')).toContainText('3279');
+	// zaklapávacia (18005) = svetlosť 655,43
+	await expect(page.getByTestId('polozka-18005')).toContainText('655');
+
+	// informatívne: počet krovov + svetlosť medzi krovmi
+	await expect(page.getByTestId('info-pocet-krovov')).toContainText('8');
+	await expect(page.getByTestId('info-svetlost-krovov')).toContainText('655,43');
+
+	expect(consoleMsgs).toEqual([]);
+});

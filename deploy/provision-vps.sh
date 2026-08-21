@@ -20,6 +20,12 @@ set -euo pipefail
 #     rovnaký pár, žiadna rotácia secretu `VPS_SSH_KEY`),
 #  3. prevlastní /opt/automatizacie-montalu na `deploy` (rsync/scp/compose cieľ +
 #     deploy-remote.sh + backups).
+#  4. povolí `deploy` traverz parent adresára Money CIFS mountov (/opt/n8n/mounts
+#     root:deploy 750) — bez toho pre-flight z #270 (stat/ls ako deploy@) zlyhá
+#     EACCES na KAŽDOM deployi a javí sa ako „mount nedostupný" (incident 20.8.
+#     večer: 700 root:root blokoval deploy@, root proby prechádzali). „Others"
+#     zámerne bez prístupu (Money dáta); deploy má VNÚTRI mountov plný prístup
+#     už cez mount opts uid=1000.
 #
 # Vlastníctvo appdata volume + zdieľaných Money mountov (uid 1000 = node) tento skript
 # NErieši — rieši ho idempotentne `migrate_ownership` v `deploy-remote.sh` pri KAŽDOM
@@ -71,5 +77,15 @@ fi
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$APP_DIR"
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
 echo "prevlastnené $APP_DIR na $DEPLOY_USER"
+
+# 4. traverz parentu Money CIFS mountov pre pre-flight (#270) ----------------------
+MOUNTS_PARENT="${MOUNTS_PARENT:-/opt/n8n/mounts}"
+if [ -d "$MOUNTS_PARENT" ]; then
+	chgrp "$DEPLOY_USER" "$MOUNTS_PARENT"
+	chmod 750 "$MOUNTS_PARENT"
+	echo "traverz $MOUNTS_PARENT: root:$DEPLOY_USER 750 (pre-flight stat/ls ako $DEPLOY_USER)"
+else
+	echo "VAROVANIE: $MOUNTS_PARENT neexistuje — Money CIFS mounty nie sú nastavené?" >&2
+fi
 
 echo "hotovo — VPS pripravený na non-root deploy@ (over: ssh $DEPLOY_USER@VPS 'docker ps')."

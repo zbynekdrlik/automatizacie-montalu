@@ -79,6 +79,8 @@ export function parsePergolaNarezVstup(form: FormData): {
 		zosilnenyNosnik: bool(form, 'zosilnenyNosnik'),
 		// #161 — voliteľný sklon strechy pre krov uloženie (prázdne → null = nezadané)
 		sklonStrechy: numOrNull(form, 'sklonStrechy'),
+		// #161 — voliteľný MANUÁLNY počet krovov (Dominik 21.8.); prázdne → null = auto fallback
+		pocetKrovov: numOrNull(form, 'pocetKrovov'),
 		// #206 (a) — jednoduchá pergola bez zasklenia (vypína bočné 110×43)
 		jednoduchaBezZasklenia: bool(form, 'jednoduchaBezZasklenia'),
 		// #206 (c) — profil výstuhy (200×140 → svetlosť −60)

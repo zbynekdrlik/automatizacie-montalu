@@ -9,11 +9,13 @@
 import { describe, it, expect } from 'vitest';
 import {
 	krovUlozenie,
+	krovDlzkaNominal,
 	KROV_C,
 	KROV_CC,
 	KROV_KONST,
 	KROV_PRAH_STUPNE,
-	KROV_FREZ_ZMENA_STUPNE
+	KROV_FREZ_ZMENA_STUPNE,
+	KROV_ODPOCET
 } from '../src/lib/pergola-krov';
 
 describe('konštanty uloženia — potvrdené hodnoty z callu (nie magické čísla)', () => {
@@ -144,5 +146,52 @@ describe('krovUlozenie — čistá funkcia, monotónny rast offsetov s uhlom', (
 			const r = krovUlozenie(u);
 			expect(r.lv!).toBeGreaterThan(r.ps!);
 		}
+	});
+});
+
+describe('krovDlzkaNominal — NOMINÁLNA dĺžka krovu (#161, derivácia 21.8. overená proti golden)', () => {
+	it('konštanta odpočtu = 250 (predný 140 + zadný 110, jediný golden bod OP260282)', () => {
+		expect(KROV_ODPOCET).toBe(250);
+	});
+
+	it('golden OP260282: hĺbka 3470, sklon 6,1° → 3470/cos(6,1°) − 250 ≈ 3239,76 (±0,01)', () => {
+		const v = krovDlzkaNominal(3470, 6.1);
+		expect(v).not.toBeNull();
+		expect(Math.abs((v as number) - 3239.76)).toBeLessThan(0.01);
+	});
+
+	it('funguje POD prahom 7° (golden 6,1° je pod prahom) — dĺžka je oddelená od uloženia', () => {
+		// krovUlozenie(6,1) je nepodporované (< 7°), ale dĺžka nominál MUSÍ ísť
+		expect(krovUlozenie(6.1).podporovane).toBe(false);
+		expect(krovDlzkaNominal(3470, 6.1)).not.toBeNull();
+	});
+
+	it('HH krovu (výkres 3240,93) = nominál + ~1,17 mm reálne uloženie (seating, bez vzorca)', () => {
+		const nominal = krovDlzkaNominal(3470, 6.1) as number;
+		expect(3240.93 - nominal).toBeCloseTo(1.17, 1); // seating gap sa nefituje
+		expect(nominal).toBeLessThan(3240.93);
+	});
+
+	it('rastie so sklonom (väčší sklon → dlhší krov po spáde) a monotónne', () => {
+		const a = krovDlzkaNominal(3470, 6.1) as number;
+		const b = krovDlzkaNominal(3470, 15) as number;
+		expect(b).toBeGreaterThan(a);
+	});
+
+	it('null keď sklon nezadaný / neplatný (bez sklonu sa dĺžka NEDÁ počítať — honest-null)', () => {
+		for (const s of [null, undefined, NaN, 0, -3]) {
+			expect(krovDlzkaNominal(3470, s as number)).toBeNull();
+		}
+	});
+
+	it('null keď hĺbka neplatná (0 / záporná / NaN) — nikdy NaN/nezmysel', () => {
+		for (const h of [0, -100, NaN]) {
+			expect(krovDlzkaNominal(h, 6.1)).toBeNull();
+		}
+	});
+
+	it('R2 (0,01 mm) — dve desatinné miesta ako výkres, nie R1', () => {
+		const v = krovDlzkaNominal(3470, 6.1) as number;
+		expect(Math.round(v * 100) / 100).toBe(v); // už zaokrúhlené na 0,01
 	});
 });

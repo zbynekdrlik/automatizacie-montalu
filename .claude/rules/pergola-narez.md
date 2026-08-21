@@ -335,3 +335,48 @@ hydration mismatch na novej hranici komponentu → `{#each}` sa vykreslí PRÁZD
 prázdny, kým `.length` header ukazuje nenulový počet). Nie je to bug kódu — čerstvý prehliadač +
 CI E2E render korektne. Príznak: `<tbody><!--[--><!--]--></tbody>` (prázdny each) pri nenulovom
 počte v hlavičke.
+
+## Krov cut-list (#161) — IMPLEMENTOVANÉ pre OVERENÚ konfiguráciu (config-gate na Money)
+
+Derivácia 21.8. (overená proti golden OP260282) odblokovala krovový cut-list — POZOR: časti
+vyššie („krov NEIMPLEMENTOVANÉ", „HH krovu / priečka / prítlačná / zaklapávacia ostávajú NULL")
+sú tým ČIASTOČNE prekonané. Aktuálny stav:
+
+- **Nominálna dĺžka krovu** = `krovDlzkaNominal(hĺbka, sklon)` v `pergola-krov.ts` (ODDELENÁ od
+  `krovUlozenie` — uloženie počíta len ≥ 7°, ale DĹŽKA funguje pre KAŽDÝ sklon > 0; golden 6,1° je
+  POD prahom, preto MUSÍ ísť mimo uloženia): `hĺbka/cos(sklon) − 250` = 3239,76. HH krovu (výkres
+  3240,93) = nominál + ~1,17 mm reálne uloženie (seating, BEZ čistého vzorca → emituje sa NOMINÁL,
+  gap sa len dokumentuje). R2 (0,01 mm) = presnosť výkresu.
+- **Priečka (18004)** = nominál, **prítlačná/maskovacie (18006/07/08)** = nominál + 40 = 3279,76
+  (počty n/(n−2)/2), **zaklapávacia (18005)** = svetlosť medzi krovmi, 2(n−1) ks. Premenované
+  zobrazenie „výstuha horná" → „žľabová výstuha".
+- **Počet krovov = MANUÁLNY vstup `pocetKrovov`** (Dominik 21.8.): RUŠÍ auto `ceil(šírka/700)+1`
+  (dával 9 vs výkres 8). Appka ukáže **svetlosť medzi krovmi = (šírka − 50n − 2)/(n−1)** (živý hint
+  v `RezForm` + informatívne). `pocetPriecok` ostáva len ako FALLBACK počtu (bez n) — do Money však
+  dĺžka bez n NEIDE.
+
+### CONFIG-GATE — najdôležitejšia Money-safety disciplína (single-golden pravidlo)
+
+Vzorec −250 (= predný 140 + zadný 110) je overený LEN na JEDNOM golden bode. Preto engine emituje
+nominál/lišty do Money **iba pre PRESNE overenú konfiguráciu**, nie len pre systém:
+
+```
+krovConfigOverena = system === 'Massive' && uchytenie === 'samostatne' && hornyProfilZadnej === 110
+krovNominal       = krovConfigOverena ? krovDlzkaNominal(hĺbka, sklon) : null
+krovDlzkaDoMoney  = krovNominal != null && pocetKrovov != null ? krovNominal : null   // AJ n-gate
+```
+
+- **Gate na SYSTÉM samotný je PASCA** (review nález): default formulára je `stena` + zadný `140`
+  (VZOR = „9/10 pergol") — `system === 'Massive'` samotné by poslalo neoverené −250 (malo by byť
+  −280 pri zadnom 140; na stene je zadný člen krovu iný) do rezervačného odpisu. Gatuj na presnú
+  overenú konfiguráciu; Robust / Massive-140 / stena ostávajú honest-null.
+- **Money-emitovaná DĹŽKA gatuj aj na MANUÁLNY `n`** — bez neho by priečka niesla starý (výkresom
+  vyvrátený) auto-počet do Money. Zaklapávacia potrebuje len `n` (svetlosť je geometria zo šírky).
+- **Záporná svetlosť guard:** priveľa krovov na šírku → svetlosť ≤ 0. `svetlostMedziKrovmi` vráti
+  null pri ≤ 0 A `chybaPergolaNarezVstupu` to odmietne (inak by záporná dĺžka/kladný počet prešli
+  `narezToCadRows` do Money). Engine-side `platnyPocetKrovov` ZRKADLÍ validátor (celé číslo + max,
+  žiadne tiché zaokrúhlenie) — inak caller mimo validácie dostane iný počet.
+- **Honest-null stále drží:** Robust lišta, Massive+140/stena, zvislá zadná výstuha 2340, seating
+  +1,17, frézovanie drážok. Rozšírenie na ďalšie konfigurácie = NOVÝ golden / potvrdenie Dominikom
+  (majiteľ posúdi), NIKDY dohad. Kódy 18004–18008 SÚ v Money CODE_MAP (`server/pergola.ts`), takže
+  po pustení idú cez `transformRows` do rezervácie — preto config-gate.

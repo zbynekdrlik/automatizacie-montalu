@@ -1,15 +1,18 @@
 // Pergola — GOLDEN / verifikačný test proti reálnemu CAD Plánu rezov zákazky OP260282
 // (#207). Výkres „PERGOLA MASSIVE 140 SAMOSTOJACA" od Dominika (Odoo správa #1691126,
 // 14.8.2026) je prvá skutočná zákazka s presnými vstupmi AJ zdrojovým Plánom rezov 1:1 —
-// ideálny vektor na overenie vzorcov doplnených v #205.
+// ideálny vektor na overenie vzorcov doplnených v #205 a KROVOVÉHO cut-listu (#161).
 //
 // DISCIPLÍNA (#155 HARD boundary, #207 §3): engine počíta LEN POTVRDENÉ vzorce. Riadok,
-// ktorý sa z potvrdených vzorcov NEDÁ reprodukovať (dĺžka viazaná na HH krovu, alebo
-// poznámka výkresu si protirečí s hodnotou), sa NEFITUJE nasilu — test asertuje engine
-// čestný null / divergenciu a GAP je nižšie explicitne vypísaný (aj v PR/komentári #205).
+// ktorý sa z potvrdených vzorcov NEDÁ reprodukovať (seating +1,17 mm HH krovu, zvislá
+// zadná výstuha 2340, Robust lišta), sa NEFITUJE nasilu — test asertuje engine čestný
+// null a GAP je nižšie explicitne vypísaný (aj v PR/komentári #161).
 //
-// RED-first: proti súčasnému enginu (pred #205) tento test PADNE — žľab/kotviaci/back-top/
-// výstuha ešte nie sú vo `vypocitane`. Po #205 PREJDE → dôkaz, že testuje nové vzorce.
+// KROV cut-list (#161, derivácia 21.8. overená proti tomuto výkresu): nominálna dĺžka
+// krovu = hĺbka/cos(sklon) − 250 = 3239,76 (HH krovu 3240,93 = nominál + ~1,17 mm reálne
+// uloženie, bez čistého vzorca → emituje sa NOMINÁL); prítlačná/maskovacie = nominál + 40
+// = 3279,76 ≈ výkres 3279,77 (Δ 0,01); počet krovov = MANUÁLNY vstup (Dominik 21.8.), appka
+// ukáže svetlosť = (šírka − 50n − 2)/(n−1) = 655,43 (výkres 655,40); zaklapávacia = 2(n−1) ks.
 //
 // Display-only — do Money NIČ nezapisuje (statický guard: pergola-narez-money-safety.test.ts).
 import { describe, it, expect } from 'vitest';
@@ -24,8 +27,8 @@ import {
 } from '../src/lib/pergola-narez';
 
 // Vstupy zákazky OP260282 (z tela #207 aj z výkresu, prečítaného ako dokument). Počet
-// nôh nie je v 12-riadkovom Pláne rezov (stĺpy 18017 nie sú v cut-liste) a NEOVPLYVŇUJE
-// žiaden z asertovaných riadkov — volíme platné hodnoty.
+// krovov = 8 (Dominik zadá manuálne; výkres OP260282 má 8 krovov). Sklon 6,1° je POD prahom
+// 7° (uloženie sa nepočíta), ale NOMINÁLNA dĺžka krovu funguje pre každý sklon > 0.
 const OP260282: PergolaNarezVstup = {
 	system: 'Massive',
 	sirka: 4990,
@@ -41,7 +44,8 @@ const OP260282: PergolaNarezVstup = {
 	hornyProfilZadnej: 110,
 	prieckaLight: false,
 	zosilnenyNosnik: true, // výstuha 140×140 prítomná
-	sklonStrechy: 6.1
+	sklonStrechy: 6.1,
+	pocetKrovov: 8 // #161 — manuálny vstup počtu krovov (výkres OP260282 = 8)
 };
 
 function riadok(
@@ -79,9 +83,9 @@ describe('OP260282 golden — ODVODITEĽNÉ riadky (presne na výkres)', () => {
 		expect(bt!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 1 });
 	});
 
-	it('r.5 výstuha horná 18017 = šírka − 280 = 4710, 1 ks (massive + zosilnený nosník)', () => {
+	it('r.5 žľabová výstuha 18017 = šírka − 280 = 4710, 1 ks (massive + zosilnený nosník)', () => {
 		const vy = riadok(r.vypocitane, (p) => p.kod === '18017' && /výstuha/i.test(p.nazov));
-		expect(vy, 'výstuha horná (18017) musí byť vo vypocitane pri massive+zosilnení').toBeTruthy();
+		expect(vy, 'žľabová výstuha (18017) musí byť vo vypocitane pri massive+zosilnení').toBeTruthy();
 		expect(vy!.dlzkaRezuMm).toBe(4990 - VYSTUHA_ODPOCET); // 4710
 		expect(vy!.pocetKs).toBe(1);
 		expect(vy!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 1 });
@@ -108,57 +112,96 @@ describe('OP260282 golden — ODVODITEĽNÉ riadky (presne na výkres)', () => {
 	});
 });
 
+describe('OP260282 golden — KROV cut-list (#161, derivácia 21.8. overená proti výkresu)', () => {
+	const r = spocitajNarez(OP260282);
+
+	it('r.7 priečka 18004 = NOMINÁL krovu = hĺbka/cos(6,1°) − 250 ≈ 3239,76 (±0,5), 8 ks', () => {
+		// NOMINÁL (spodná hrana/uloženie), NIE HH krovu. HH krovu (výkres 3240,93) = nominál +
+		// ~1,17 mm reálne uloženie („nesedí o ~2 mm, nerieš" — Dominik na výkres); +1,17 nemá
+		// čistý vzorec, preto sa emituje nominál. Počet = manuálny vstup n = 8 (RUŠÍ auto ceil(š/700)+1 = 9).
+		const pr = riadok(r.vypocitane, (p) => p.kod === '18004');
+		expect(pr, 'priečka (18004) musí byť vo vypocitane').toBeTruthy();
+		expect(pr!.dlzkaRezuMm).not.toBeNull();
+		expect(Math.abs((pr!.dlzkaRezuMm as number) - 3239.76)).toBeLessThan(0.5);
+		expect(pr!.pocetKs).toBe(8); // manuálny počet krovov (výkres 8, nie auto 9)
+		expect(pr!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 4 }); // 8×3239,76 na 7,5 m → 2/tyč → 4
+	});
+
+	it('r.11 prítlačná lišta 18006 = nominál + 40 ≈ 3279,77 (±0,1), 8 ks (= n)', () => {
+		const p = riadok(r.vypocitane, (x) => x.kod === '18006');
+		expect(p, 'prítlačná (18006) musí byť vo vypocitane pri massive+sklon+n').toBeTruthy();
+		expect(Math.abs((p!.dlzkaRezuMm as number) - 3279.77)).toBeLessThan(0.1); // výkres 3279,77
+		expect(p!.pocetKs).toBe(8); // = počet krovov
+		expect(p!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 4 });
+	});
+
+	it('r.13 maskovacia lišta 18007 = nominál + 40 ≈ 3279,77, 6 ks (= n − 2)', () => {
+		const p = riadok(r.vypocitane, (x) => x.kod === '18007');
+		expect(p, 'maskovacia (18007) musí byť vo vypocitane').toBeTruthy();
+		expect(Math.abs((p!.dlzkaRezuMm as number) - 3279.77)).toBeLessThan(0.1);
+		expect(p!.pocetKs).toBe(6); // n − 2 (stredné krovy)
+		expect(p!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 3 });
+	});
+
+	it('r.12 maskovacia lišta krajová 18008 = nominál + 40 ≈ 3279,77, 2 ks (kraje)', () => {
+		const p = riadok(r.vypocitane, (x) => x.kod === '18008');
+		expect(p, 'maskovacia krajová (18008) musí byť vo vypocitane').toBeTruthy();
+		expect(Math.abs((p!.dlzkaRezuMm as number) - 3279.77)).toBeLessThan(0.1);
+		expect(p!.pocetKs).toBe(2); // 2 kraje
+		expect(p!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 1 });
+	});
+
+	it('r.9 zaklapávacia čelná lišta 18005 = svetlosť medzi krovmi 655,43, 2(n−1) = 14 ks', () => {
+		const z = riadok(r.vypocitane, (x) => x.kod === '18005');
+		expect(z, 'zaklapávacia (18005) musí byť vo vypocitane pri zadanom počte krovov').toBeTruthy();
+		expect(z!.dlzkaRezuMm).toBe(655.43); // (4990 − 402)/7 = 655,43 (výkres 655,40)
+		expect(z!.pocetKs).toBe(14); // 2×(8−1)
+		expect(z!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 2 });
+	});
+
+	it('svetlosť medzi krovmi (informatívne) = (šírka − 50·n − 2)/(n−1) = 655,43; počet krovov = 8', () => {
+		expect(r.informativne.pocetKrovov).toBe(8);
+		expect(r.informativne.svetlostMedziKrovmi).toBe(655.43);
+	});
+});
+
 describe('OP260282 golden — bin-packing pocetTyci (výdaj materiálu)', () => {
 	it('žľab 1×4990 na 6 m tyč → 1 tyč; kotviaci rovnako', () => {
 		expect(pocetTyci(4990, 1, 6000)).toBe(1);
 	});
-	it('priečka: 8 ks × 3240.93 na 7,5 m → 2 kusy/tyč → 4 tyče (výkres 4×(7,5 m))', () => {
-		// nezávisle od HH-null: overenie samotného bin-pack vzorca proti stĺpcu Výdaj výkresu
-		expect(pocetTyci(3240.93, 8, 7500)).toBe(4);
+	it('priečka: 8 ks × 3239,76 na 7,5 m → 2 kusy/tyč → 4 tyče (výkres 4×(7,5 m))', () => {
+		expect(pocetTyci(3239.76, 8, 7500)).toBe(4);
 	});
-	it('zaklapávacia: 14 ks × 655.40 na 7,5 m → 11 kusov/tyč → 2 tyče (výkres 2×(7,5 m))', () => {
-		expect(pocetTyci(655.4, 14, 7500)).toBe(2);
+	it('zaklapávacia: 14 ks × 655,43 na 7,5 m → 11 kusov/tyč → 2 tyče (výkres 2×(7,5 m))', () => {
+		expect(pocetTyci(655.43, 14, 7500)).toBe(2);
 	});
 	it('kus dlhší než tyč → null (nevyrobiteľné z tejto tyče), nie NaN/0', () => {
 		expect(pocetTyci(8000, 1, 7500)).toBeNull();
 	});
 });
 
-describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3)', () => {
+describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3 / #161)', () => {
 	const r = spocitajNarez(OP260282);
+	const nepodpText = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
 
-	it('r.7 priečka 18004: dĺžka rezu = null (HH krovu 3240.9 nie je vzorec zo vstupov)', () => {
+	it('HH krovu 3240,93 sa NEFITUJE — emituje sa NOMINÁL 3239,76 (seating +1,17 mm ostáva bez vzorca)', () => {
+		// Δ HH − nominál = 3240,93 − 3239,76 = 1,17 mm = reálne uloženie (Dominik: nesedí o ~2 mm,
+		// nerieš). Engine NEEMITUJE 3240,93 (to by bol nasilu fitnutý CAD výsledok geometrie).
 		const pr = riadok(r.vypocitane, (p) => p.kod === '18004');
-		expect(pr).toBeTruthy();
-		expect(pr!.dlzkaRezuMm).toBeNull(); // GAP: výkres 3240.93 = HH krovu (#161/#198)
-		// GAP počtu: engine ceil(4990/700)+1 = 9, výkres uvádza 8 (rám < žľab, O1/#196)
-		expect(pr!.pocetKs).toBe(9);
-	});
-
-	it('r.11/13/12 prítlačná+maskovacie = HH krovu+40 → v nepodporované (čestný null)', () => {
-		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
-		expect(n).toMatch(/prítlačn/i);
-		expect(n).toMatch(/maskovac/i);
-		// #233 — plain slovenčina namiesto interných referencií (#161/#198 → text)
-		expect(n).toMatch(/hrana krovu/i);
-		expect(n).toMatch(/čaká na vzorec/i);
-		// engine NEemituje pre ne dĺžku (3279.77) — žiadny vypocitane riadok 18006/18007/18008
-		expect(r.vypocitane.some((p) => ['18006', '18007', '18008'].includes(p.kod))).toBe(false);
-	});
-
-	it('r.9 zaklapávacia (18005) = (šírka−402)/7 → v nepodporované (počet krovov O1-blokovaný)', () => {
-		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
-		expect(n).toMatch(/zaklapávac/i);
-		expect(r.vypocitane.some((p) => p.kod === '18005')).toBe(false);
+		expect(pr!.dlzkaRezuMm as number).toBeLessThan(3240.93); // nominál < HH (seating gap)
+		expect(3240.93 - (pr!.dlzkaRezuMm as number)).toBeCloseTo(1.17, 1);
 	});
 
 	it('r.6 zvislá zadná výstuha (2340) → čestný null (svetlosť 2325 nie je vstup; #198 Dominik)', () => {
-		// task 2 (ostáva honest-null): 2340 = svetlosť 2325 + 15, ale 2325 sa zo vstupov (predná
-		// svetlosť 2200 → 2215) neodvodí; formula položená Dominikovi (#198). Žiadny vypocitane riadok.
-		const n = r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ');
-		expect(n).toMatch(/zvislá zadná výstuha|zadná výstuha/i);
-		expect(n).toMatch(/2340/);
-		// #233 — #198 nahradené plain vysvetlením
-		expect(n).toMatch(/čaká na vzorec|nedá odvodiť/i);
+		// 2340 = svetlosť 2325 + 15, ale 2325 sa zo vstupov (predná svetlosť 2200 → 2215) neodvodí;
+		// formula položená Dominikovi (#198). Žiadny vypocitane riadok — nefitujeme nasilu.
+		expect(nepodpText).toMatch(/zvislá zadná výstuha|zadná výstuha/i);
+		expect(nepodpText).toMatch(/2340/);
+		expect(nepodpText).toMatch(/čaká na vzorec|nedá odvodiť/i);
+	});
+
+	it('frézovanie drážok (výrobný list) ostáva nepodporované — doplní konštruktér', () => {
+		expect(nepodpText).toMatch(/frézovan/i);
+		expect(nepodpText).toMatch(/konštruktér/i);
 	});
 });
