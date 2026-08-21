@@ -205,12 +205,14 @@ describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3 /
 		expect(3240.93 - (pr!.dlzkaRezuMm as number)).toBeCloseTo(1.17, 1);
 	});
 
-	it('r.6 zvislá zadná výstuha (2340) → čestný null (svetlosť 2325 nie je vstup; #198 Dominik)', () => {
-		// 2340 = svetlosť 2325 + 15, ale 2325 sa zo vstupov (predná svetlosť 2200 → 2215) neodvodí;
-		// formula položená Dominikovi (#198). Žiadny vypocitane riadok — nefitujeme nasilu.
-		expect(nepodpText).toMatch(/zvislá zadná výstuha|zadná výstuha/i);
-		expect(nepodpText).toMatch(/2340/);
-		expect(nepodpText).toMatch(/čaká na vzorec|nedá odvodiť/i);
+	it('r.6 „zvislá zadná výstuha 2340" REKONCILIOVANÁ na prednú nohu (A9) — už NIE je čestný null', () => {
+		// A9 (Dominik Odoo 1724498): „nerozumiem dĺžku 2340; noha = svetlosť + 140". Výkresová 2340×2
+		// pod 18017 = PREDNÁ NOHA (2200+140), nie samostatná zvislá zadná výstuha — skoršia misatribúcia
+		// (2340 = svetlosť 2325 + 15 vs predná 2200 + 140 dávali rovnaké číslo). Honest-null nota
+		// ODSTRÁNENÁ; dĺžka je vo `vypocitane` ako predná noha 2340. Nefitujeme nasilu — je to A9 potvrdené.
+		expect(nepodpText).not.toMatch(/zvislá zadná výstuha/i);
+		const noha = riadok(r.vypocitane, (p) => /predná noha/i.test(p.nazov));
+		expect(noha!.dlzkaRezuMm).toBe(2340);
 	});
 
 	it('frézovanie drážok (výrobný list) ostáva nepodporované — doplní konštruktér', () => {

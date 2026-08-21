@@ -95,7 +95,9 @@ describe('spocitajNarez — predné nohy (potvrdený vzorec svetlosť + 15)', ()
 // Bez zosilnenia ostáva +15 (overený vektor ZAK2026302 sa NEMENÍ).
 describe('#155 A9 — predná noha pri výstuhe = svetlosť + rozmer výstuhy (nie +15)', () => {
 	const noha = (v: Parameters<typeof spocitajNarez>[0]) =>
-		spocitajNarez(v).vypocitane.find((p) => !/zadná/i.test(p.nazov) && /predná noha/i.test(p.nazov));
+		spocitajNarez(v).vypocitane.find(
+			(p) => !/zadná/i.test(p.nazov) && /predná noha/i.test(p.nazov)
+		);
 
 	it('Massive + zosilnený, default profil (140×140) → 2200 + 140 = 2340 (OP260282 vzor)', () => {
 		const v = { ...VZOR, zosilnenyNosnik: true, prednaSvetlost: 2200 };
@@ -133,7 +135,9 @@ describe('#155 A9 — predná noha pri výstuhe = svetlosť + rozmer výstuhy (n
 		).toBe(2340);
 	});
 	it('BEZ zosilnenia → +15 (nezmenené): štandard 2215, 200×140-bez-zosilnenia 2155', () => {
-		expect(spocitajNarez({ ...VZOR, prednaSvetlost: 2200 }).informativne.prednaNohaDlzka).toBe(2215);
+		expect(spocitajNarez({ ...VZOR, prednaSvetlost: 2200 }).informativne.prednaNohaDlzka).toBe(
+			2215
+		);
 		// vystuhaProfil zadaný ale zosilnenyNosnik=false → NIE je výstuha → +15 (existujúci kontrakt)
 		expect(
 			spocitajNarez({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' }).informativne

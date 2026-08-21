@@ -332,6 +332,43 @@ export function efektivnaSvetlost(v: PergolaNarezVstup): number {
 	return R1(v.prednaSvetlost - odpocet);
 }
 
+/** Zvislý rozmer (výška) profilu výstuhy [mm] = väčší z dvoch rozmerov prierezu. 110×110→110,
+ *  140×140→140, 110×250→250 (A9 doslovne), 200×140→200 (#206: 200×140 je o 60 mm vyššia než
+ *  140×140, teda výška = 200). Do vzorca prednej nohy (A9, Dominik Odoo 1724498). */
+export const VYSTUHA_VYSKA: Record<VystuhaProfil, number> = {
+	'110x110': 110,
+	'140x140': 140,
+	'200x140': 200,
+	'110x250': 250
+};
+
+/** Systémový default profilu výstuhy, keď je zosilnený nosník ale profil nie je explicitne
+ *  zvolený (formulár default = prázdny → OP260282): Massive → 140×140, Robust → 110×110. */
+function defaultVystuhaProfil(system: PergolaSystem): VystuhaProfil {
+	return system === 'Massive' ? '140x140' : '110x110';
+}
+
+/** Prídavok k (efektívnej) svetlosti pre dĺžku prednej nohy [mm], A9 (Dominik Odoo 1724498):
+ *  - BEZ zosilneného nosníka → `PREDNA_NOHA_PRIDAVOK` (15), overené 1:1 na ZAK2026302.
+ *  - SO zosilneným nosníkom → zvislý rozmer výstuhy: `vystuhaProfil` ak zadaný, inak systémový
+ *    default (Massive 140×140, Robust 110×110). 110→+110, 140→+140, 250→+250 = A9 doslovne.
+ *
+ *  POZOR — kľúč je `zosilnenyNosnik`, NIE „je zadaný vystuhaProfil": OP260282 má zosilnenyNosnik
+ *  s PRÁZDNYM profilom (formulár default) → default 140×140. 200×140 A9 priamo NEDAL → prídavok =
+ *  výška 200 je ODVODENINA; s efektivnaSvetlost−60 (#206) dá noha = svetlosť + 140 (rovnaká ako
+ *  140×140) — geometricky konzistentné (vrch nohy fixný, vyššia výstuha len presahuje 60 mm nižšie
+ *  do svetlej výšky). Odvodené, nie priamo A9-potvrdené — na review majiteľom/Dominikom. */
+export function prednaNohaPridavok(v: PergolaNarezVstup): number {
+	if (!v.zosilnenyNosnik) return PREDNA_NOHA_PRIDAVOK;
+	return VYSTUHA_VYSKA[v.vystuhaProfil ?? defaultVystuhaProfil(v.system)];
+}
+
+/** Dĺžka rezu prednej nohy [mm] = efektívna svetlosť + prídavok (viď `prednaNohaPridavok`). Jeden
+ *  zdroj pravdy pre `spocitajNarez` aj `schemaVykresu` (predtým duplikovaný vzorec `svetlosť+15`). */
+export function prednaNohaDlzkaMm(v: PergolaNarezVstup): number {
+	return R1(efektivnaSvetlost(v) + prednaNohaPridavok(v));
+}
+
 /** Krovové lišty ako riadky nárezu (#161, derivácia 21.8. overená proti golden OP260282).
  *  Prítlačná (18006) / maskovacia (18007) / maskovacia krajová (18008) = nominál krovu + 40 —
  *  emitujú sa LEN keď je nominál (overená konfigurácia + sklon) A zadaný počet krovov `n`;
@@ -394,7 +431,12 @@ function krovoveListy(
 export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	const sys = SYSTEMY[v.system];
 	const svetlost = efektivnaSvetlost(v);
-	const prednaNohaDlzka = R1(svetlost + PREDNA_NOHA_PRIDAVOK);
+	// #155 A9 (Dominik Odoo 1724498): predná noha = svetlosť + rozmer výstuhy pri zosilnenom
+	// nosníku, inak + 15. Jeden zdroj so `schemaVykresu` cez `prednaNohaDlzkaMm`.
+	const prednaNohaDlzka = prednaNohaDlzkaMm(v);
+	const prednaNohaPozn = v.zosilnenyNosnik
+		? `= svetlosť + ${prednaNohaPridavok(v)} (rozmer výstuhy)`
+		: '= svetlosť + 15';
 	const samostatne = v.uchytenie === 'samostatne';
 	const zasklena = !v.jednoduchaBezZasklenia;
 	// #205 (výkres OP260282): zadná noha = PLNÁ zadná výška (ZV = dĺžka nohy), nie ZV − horný
@@ -429,7 +471,11 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 			kod: sys.stlp.kod,
 			nazov: `${sys.stlp.nazov} — predná noha`,
 			dlzkaRezuMm: prednaNohaDlzka,
-			pocetKs: v.pocetPrednychNoh
+			pocetKs: v.pocetPrednychNoh,
+			poznamka: prednaNohaPozn,
+			poznamkaDetail: v.zosilnenyNosnik
+				? 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy (110, 140 alebo 250). Pri výstuhe 200×140 je dĺžka odvodená (rovnaká ako pri 140×140) — na potvrdenie Dominikovi.'
+				: 'Dĺžka rezu prednej nohy = predná svetlosť plus 15 mm (skovanie v žľabe). Overené na reálnej zákazke.'
 		}
 	];
 	if (samostatne) {
@@ -615,14 +661,11 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 				'Dĺžka = svetlosť medzi krovmi = (šírka − 50 × počet krovov − 2) / (počet krovov − 1); počet líšt = 2 × (počet krovov − 1). Zadaj počet krovov, aby sa spočítala.'
 		});
 	}
+	// #155 A9 (Dominik Odoo 1724498): výkresová „2340×2 pod 18017" NIE JE samostatná zvislá zadná
+	// výstuha — je to PREDNÁ NOHA (svetlosť 2200 + výstuha 140), TERAZ vo `vypocitane`. Skoršia
+	// misatribúcia: 2340 = svetlosť 2325 + 15 (zadná svetlosť, nie vstup) vs predná 2200 + 140 dávali
+	// rovnaké číslo; A9 to reklasifikoval na prednú nohu. Preto honest-null nota ODSTRÁNENÁ.
 	nepodporovane.push(
-		{
-			// (zvislá zadná výstuha 18017; 2340 = svetlosť 2325 + 15, 2325 nie je vstup; #198)
-			kratky:
-				'Zvislá zadná výstuha — dĺžku sa z rozmerov nedá odvodiť, čaká na vzorec od Dominika.',
-			detail:
-				'Na výkrese je 2340 mm, čo zodpovedá vzoru „svetlosť + 15" pre svetlosť 2325 mm — lenže 2325 sa zo zadaných rozmerov neodvodí (predná svetlosť 2200 dáva 2215, nie 2340). Preto dĺžku nehádžeme; vzorec zvislej výstuhy je otázka na Dominika.'
-		},
 		{
 			// (sklá / strešná výplň = O11)
 			kratky: 'Sklá / strešná výplň (šírky, dĺžky, materiál, RAL) — zadáva sa vedome ručne.',
@@ -719,7 +762,8 @@ export interface PergolaNarezSchema {
 	profilRozmer: 110 | 140;
 	/** predná svetlá výška [mm] — VIZUÁLNA výška prednej nohy po spodok žľabu */
 	prednaSvetlost: number;
-	/** dĺžka rezu prednej nohy [mm] = svetlosť + 15 (info popisok, nie kreslená výška) */
+	/** dĺžka rezu prednej nohy [mm] = svetlosť + rozmer výstuhy (zosilnený nosník) / + 15 (bez);
+	 *  info popisok, nie kreslená výška. Viď `prednaNohaDlzkaMm`. */
 	prednaNohaDlzka: number;
 	/** hrúbka horného nosníka (žľab + kotviaci profil) [mm] = profilRozmer */
 	zlabHrubka: number;
@@ -756,7 +800,9 @@ export function schemaVykresu(v: PergolaNarezVstup): PergolaNarezSchema {
 		hlbka: v.hlbka,
 		profilRozmer: sys.stlp.rozmer,
 		prednaSvetlost: svetlost,
-		prednaNohaDlzka: R1(svetlost + PREDNA_NOHA_PRIDAVOK),
+		// #155 A9: pri zosilnenom nosníku noha = svetlosť + rozmer výstuhy (viď `prednaNohaDlzkaMm`),
+		// inak + 15. Rovnaký zdroj ako `spocitajNarez` → výkres a materiál sedia.
+		prednaNohaDlzka: prednaNohaDlzkaMm(v),
 		zlabHrubka: sys.stlp.rozmer,
 		prednaNohyX: rovnomerneX(v.pocetPrednychNoh, v.sirka),
 		rozostupPrednychNoh: v.pocetPrednychNoh > 1 ? R1(v.sirka / (v.pocetPrednychNoh - 1)) : null,
