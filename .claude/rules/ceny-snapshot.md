@@ -33,8 +33,11 @@ NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
 - **SKLÁ (`TS*` kódy):** cenené LEN v cenníku **IZOS** (`Ceniky_Cenik.Kod='IZOS'`, ID
   `f4a1dfee-9298-45d2-9891-1548741b2063`), **v NC vôbec nie sú** (0 riadkov). Názvy nesú
   kompozíciu, napr. `TS00016 = Izolačné sklo 4/16/4- číre`, `TS00021 = 4/8/4- číre`. Sklo
-  sa účtuje na **m²**. Aby cena skla vôbec bola v snapshote, producent musí ťahať aj
-  `Kod LIKE 'TS%'` a pre ne zdrojovať `nakupCennik` z IZOS cenníka (viď #235).
+  sa účtuje na **m²**. Producent **od `9ffbccf` (19.8.) ťahá aj `Kod LIKE 'TS%'`** a pre
+  TS* zdrojuje `nakupCennik` z IZOS (`CASE WHEN a.Kod LIKE 'TS%' THEN iz.Cena ELSE nc.Cena
+  END`) — live overené: v NC **0** TS riadkov, v IZOS **141**; v dennom snapshote je **149
+  TS riadkov** (136 s cenou > 0; zvyšok null/0 = „cena neznáma"). Bez zmeny schémy (appka
+  číta existujúce pole `nakupCennik`). Pôvodne #235 bod 1.
 
 ## Cena skla v nárezáku (#225) — display-only
 
@@ -48,7 +51,14 @@ NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
   s tým istým alias+own/ALL princípom ako `glassTypesForSystem`, **NIKDY name-only**
   (v22 collision trap: to isté „3.3.1"/„4.8.4" žije vo viacerých systémoch). Seedujú sa
   LEN jednoznačné zhody kompozície (`4/16/4 → TS00016/17`, `4/8/4 → TS00021/22`); zvyšok
-  NULL. Rozšírenie mapovania = ďalšia migrácia + potvrdenie Dominikom (#235).
+  NULL. Rozšírenie ZASKLIEVACIEHO mapovania = ďalšia migrácia + potvrdenie Dominikom (#235).
+- **Strešné sklo pergoly = SAMOSTATNÝ katalóg** (`src/lib/sklo-strecha.ts`,
+  `SKLO_STRECHA_TYPY` + `skloStrechaMoneyKod(nazov)`, #235 cesta A) — NIE `glass_types` (to
+  je katalóg zasklení posuvných dverí, iné sklá). 6 potvrdených mapovaní strešného skla → TS
+  (dôkaz v Money názve: 4.4.2 číre=TS00070, mliečne=TS00071, 5.5.2 číre=TS00076, IZO
+  4.4.2-8-6 číre=TS00014, mliečne=TS00129, 4.4.2ml/8/6ml=TS00012), 8 typov honest-null
+  (Dominik doplní/založí — otázka #198). Konzument (výber typu + €/m² zo snapshotu) = #223;
+  #235 ostáva otvorený, kým #223 cenu reálne nezobrazí.
 - **Honest-null:** kód/cena chýba → „cena nedostupná", nič sa nedopočítava; súhrn sa
   prizná ako neúplný (vzor `CenySucet.kompletne`). Súhrn (tfoot) je jednomenový EUR (IZOS
   je EUR-only), riadky nesú svoju `mena`.
@@ -72,3 +82,19 @@ seedu → `ceny-snapshot-vek` ukáže reálny dátum, nie „nebol naimportovan�
 neskoršom spece netvrď virgin-DB hlášku; testuj honest-null, ktorý platí VŽDY — kód, ktorý
 NIE JE v žiadnom seede (pergolové `PRP*` nie sú v žiadnom ceny/sklo seede), ukáže „cena
 neznáma". Reprodukuj poradie lokálne: `npx playwright test e2e/ceny.spec.ts e2e/<tvoj>.spec.ts`.
+
+## dev2 Money read-only kanál — snapshot AJ ad-hoc dotazy (NIKDY credentials v repe)
+
+Producent snapshotu beží na **dev2** v checkoute `~/montalu-ceny/` (cron `run-snapshot.sh`,
+05:30) → SSH tunel na Money read-only → JSON → rsync na VPS. Ten istý mechanizmus je
+**funkčný kanál aj pre jednorazové ad-hoc read-only SQL dotazy** do Money (nielen denný
+snapshot) — použitý napr. na lookup názvov všetkých 149 TS kódov (#235, 21.8.). Mechanizmus
+(BEZ akýchkoľvek credentials — tie žijú LEN na dev2, NIKDY v repe):
+
+- throwaway SSH tunel cez kľúč `money-ro-thirdparty` na Money SQL host (port `1433`), `pymssql`
+- DB `S4_Agenda_MONT_ALUSro`, účet len na ČÍTANIE (`montalu_ro`)
+- credentials sa parsujú za behu na dev2 z `MONEY-READONLY-PRISTUP.md` (mimo repa)
+- tunel po dotaze zavrieť (žiadny visiaci proces — overené 21.8., 5 pokusov čisté)
+
+Použiteľné pre ďalšie cenové/kódové lookupy bez potreby nového prístupu; v logu/výstupe
+NIKDY heslo (grep overený).
