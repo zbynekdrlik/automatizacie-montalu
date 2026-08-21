@@ -27,7 +27,9 @@ Nárez GENERUJE vstup Money odpisu (#197 ho neskôr napojí). Preto engine aj v�
 kreslia/počítajú **iba to, čo call POTVRDIL**; všetko ostatné je explicitne „zatiaľ
 nepodporované" (engine) alebo čestný poznámkový box (výkres) — **NIKDY sa nehádže
 neoverený vzorec**. Potvrdené (s citáciami t=… v engine hlavičke): predná noha =
-svetlosť + 15; **zadná noha (LEN samostatne stojaca) = PLNÁ ZV** (#205, výkres OP260282 —
+svetlosť + rozmer výstuhy (110/140/250) pri zosilnenom nosníku, inak svetlosť + 15 (#155 A9,
+Dominik 1724498; `prednaNohaPridavok`/`prednaNohaDlzkaMm` — kľúč je `zosilnenyNosnik`, profil =
+`vystuhaProfil` ?? systémový default; 200×140 odvodené = svetlosť+140); **zadná noha (LEN samostatne stojaca) = PLNÁ ZV** (#205, výkres OP260282 —
 call síce citoval „ZV − horný profil", ale reálny výkres uvádza plnú ZV = dĺžka nohy;
 `hornyProfilZadnej` UŽ neurčuje dĺžku nohy, po novom diskriminuje kaskádu 110×43 „pod
 fixom" — na potvrdenie Dominikovi); počet priečok = ceil(šírka/700)+1; systém → stĺp+žľab;
@@ -147,8 +149,18 @@ bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu
     „šírka" v poznámke = smer HĹBKY (4990−250 nezmysel; 3470−250=3220 presne). Gated `zasklena`.
   - **zadné nohy = PLNÁ ZV** (2790, nie ZV − horný profil) — TERAZ vo `vypocitane`; call citát
     ZV−profil prehodnotený v prospech reálneho výkresu (rozdiel = miesto merania ZV).
-  - **Zvislá zadná výstuha (18017 zvislá, 2340) = STÁLE NULL** — 2340 = svetlosť 2325 + 15, ale
-    2325 NIE je vstup (predná svetlosť 2200 → 2215). Formula položená Dominikovi (#198).
+    **POZOR — ZNÁMY BUG zadnej konštr. (Dominik QA, #155):** profil zadnej NOHY sa dnes odvodzuje
+    z `system` (Massive→18017/140) a „zadná konštr. horná" je HARDCODED 18013 → pri Massive je zadná
+    konštrukcia VŽDY nejednotná (nohy 140 + horný 110), hoci výkres OP260282 ju má jednotne 110×110.
+    Správne: obe majú sledovať `hornyProfilZadnej` (110→18013/140→18017) → jednotné by-construction.
+    Je to Money-KÓDOVÁ zmena (18017→18013) → patrí do rear-construction slice-u (dĺžka zadnej nohy =
+    horná výška − profil: 110→2790/140→2760), s potvrdením Dominikom. Golden r.3 matchuje nohu NÁZVOM,
+    nie kódom → bug je latentný (test zelený). Validácia mixu sa NEROBÍ (mix nie je zadateľný vstup —
+    jediný rear profil je `hornyProfilZadnej`; „system ≠ hornyProfilZadnej" je LEGITÍMNE, OP260282).
+  - **Zvislá zadná výstuha (18017 zvislá, 2340) = REKONCILIOVANÁ na prednú nohu (#155 A9)** — už
+    NIE honest-null. Dominik (A9, 1724498): „nerozumiem 2340; noha = svetlosť + 140" → výkresová
+    2340×2 pod 18017 = PREDNÁ NOHA (svetlosť 2200 + výstuha 140), TERAZ vo `vypocitane`. Skoršia
+    misatribúcia: 2340 = svetlosť 2325 + 15 vs predná 2200 + 140 dávali rovnaké číslo. Nota odstránená.
 
 ## Modré poznámky OP260282 (#206) — POTVRDENÉ vzorce sú TERAZ v engine
 
@@ -179,8 +191,9 @@ import (money-safety).
 ## Kusové komponenty (spojky, krytky) — #195, honest-null na POČTY aj KÓDY
 
 Vrstva KUSOVÝCH komponentov (spojky, krytky, rámové/zakladacie lišty) žije v
-`pergola-narez.ts` ako **samostatná** funkcia `komponentyPergoly(v)` + statický katalóg
-`PERGOLA_KOMPONENTY` — ZÁMERNE NIE v `NarezVysledok`, aby golden `pergola-narez-op260282`
+`pergola-komponenty.ts` (vyčlenené z `pergola-narez.ts` #183 large-file splitom; re-export fasáda
+z `pergola-narez.ts`, konzumenti importujú z `$lib/pergola-narez` bez zmeny) ako **samostatná**
+funkcia `komponentyPergoly(v)` + statický katalóg `PERGOLA_KOMPONENTY` — ZÁMERNE NIE v `NarezVysledok`, aby golden `pergola-narez-op260282`
 a `spocitajNarez` ostali bit-identické (vzor = `schemaVykresu`). Zdroj TYPOV = call 13.8.
 (scr_014/015 Massive „KOMPONENTY Pergola 140"; scr_042 Robust „KOMPONENTY Pergola 110"/
 expedícia) + výkres OP260282. User (16.8., #195): „len mi stačia tie typy" — nečakať na
@@ -376,7 +389,7 @@ krovDlzkaDoMoney  = krovNominal != null && pocetKrovov != null ? krovNominal : n
   null pri ≤ 0 A `chybaPergolaNarezVstupu` to odmietne (inak by záporná dĺžka/kladný počet prešli
   `narezToCadRows` do Money). Engine-side `platnyPocetKrovov` ZRKADLÍ validátor (celé číslo + max,
   žiadne tiché zaokrúhlenie) — inak caller mimo validácie dostane iný počet.
-- **Honest-null stále drží:** Robust lišta, Massive+140/stena, zvislá zadná výstuha 2340, seating
-  +1,17, frézovanie drážok. Rozšírenie na ďalšie konfigurácie = NOVÝ golden / potvrdenie Dominikom
+- **Honest-null stále drží:** Robust lišta, Massive+140/stena, seating +1,17, frézovanie drážok.
+  (Zvislá zadná výstuha 2340 UŽ NIE honest-null — rekonciliovaná na prednú nohu, #155 A9.) Rozšírenie na ďalšie konfigurácie = NOVÝ golden / potvrdenie Dominikom
   (majiteľ posúdi), NIKDY dohad. Kódy 18004–18008 SÚ v Money CODE_MAP (`server/pergola.ts`), takže
   po pustení idú cez `transformRows` do rezervácie — preto config-gate.
