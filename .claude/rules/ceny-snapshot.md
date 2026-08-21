@@ -2,6 +2,8 @@
 paths:
   - 'src/lib/server/ceny.ts'
   - 'src/lib/server/sklo-cena.ts'
+  - 'src/lib/sklo-strecha.ts'
+  - 'tests/sklo-strecha.test.ts'
   - 'src/lib/components/CenyTabulka.svelte'
   - 'src/lib/components/SkloCena.svelte'
   - 'scripts/ceny-snapshot.py'
