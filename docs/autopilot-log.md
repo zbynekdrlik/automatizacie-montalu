@@ -1517,3 +1517,14 @@ implementované, nereprodukovateľné čestný null:
 - **Honest-null drží:** Robust lišta, Massive+140/stena, zvislá zadná výstuha 2340, seating +1,17, frézovanie drážok ostávajú null/nepodporované. #161 OSTÁVA OTVORENÝ (frézovanie výrobného listu).
 - **Money-safe:** engine money-clean; nové riadky pretečú do rezervácie cez `narezToCadRows` (kódy 18004-18008 v CODE_MAP); v TEST režime nič nezapisuje. Plný beh 1836/1836 unit + 23 pergola E2E zelené. STOP na zelenom PR — majiteľ posúdi Money čísla pred merge.
 - **PR nesie aj pending #270 tail** (provision-vps krok 4 `a61684b` + log/bump `c9bc70b`/`404155e`/`1824b79`) — prác prior session na dev, ešte nereleasnutá; ide s týmto release PR-om.
+
+## Kolo 12 — #235 cesta A (PR #274, v0.24.19, merge c48a3c88) — advances #235, NEZATVORENÝ
+
+- **STEP 0 nález (predpoklad tiketu sa rozišiel s kódom):** potvrdené mapovanie 6 typov (od Dominika, A2/#198) sú sklá do STRECHY pergoly, NIE zasklievacie sklá. Cenená časť appky (#225: `glassMoneyKod`+`SkloCena`) je len nárezák zasklení (Robust/Slide/Štandard/Deluxe — iné sklá). Strešné sklo (`strechaSklo`) je voľný text (#206 e); cenený+odpisový povrch = #223 (blokovaný na rozmery od Dominika). → 6 mapovaní nemá dnes v cenenej ceste kam sadnúť; v23-štýl `UPDATE glass_types` by updatlo 0 riadkov.
+- **Otázka majiteľovi → ROZHODNUTÉ cesta A** (issuecomment-5370358942, engineering default, nie user fork): B nevie dodať celkovú cenu (rozmery čakajú na #223), 8/14 typov bez kódu (select by ich blokoval), voľný text→select je scope #223.
+- **Dodané:** pure `src/lib/sklo-strecha.ts` — `SKLO_STRECHA_TYPY` (14 variantov) + `skloStrechaMoneyKod(nazov): string|null`. 6 potvrdených (dôkaz v Money názve): 4.4.2 číre=TS00070, mliečne=TS00071, 5.5.2 číre=TS00076, IZO 4.4.2-8-6 číre=TS00014, mliečne=TS00129, 4.4.2ml/8/6ml=TS00012; 8 honest-null (NIKDY 0 €). Konzument = #223.
+- **RED→GREEN:** `tests/sklo-strecha.test.ts` (20 testov) RED (modul chýbal) → GREEN `595249c`. Netautologické: `toBe(exact)` + null/neznámy/cross-katalóg vetvy + invarianty (count/regex/dedup/konzistencia).
+- **Docs `f105b54`:** ceny-snapshot.md — TS kódy v snapshote od `9ffbccf` (149 riadkov, oprava „producent musí ťahať"); strešné sklo = samostatný katalóg; dev2 Money read-only kanál ako funkčný postup pre ad-hoc lookupy (BEZ credentials).
+- **Money-neutrálne:** žiadny UI/Money zásah (guard `pergola-narez-money-safety.test.ts`), `glass_types` nedotknuté.
+- **Review 0 R 0 Y 0 B** (fresh general-purpose, 6 kódov cross-check proti Money názvom). Plný beh 1865/1865 unit. Post-deploy: DOM footer `v0.24.19 (c48a3c8)`, health ok. Run-card fired.
+- **NEZATVORENÝ:** 8 typov čaká na Dominika, zobrazenie ceny rieši nasledujúci tiket.
