@@ -45,12 +45,13 @@ export const KROV_KONST = 0.01;
 /** prah sklonu strechy [°] — binárny prepínač roviny uloženia (CAD `uhol2`). */
 export const KROV_PRAH_STUPNE = 7;
 /** odpočet [mm] pre NOMINÁLNU dĺžku krovu = predný profil (140) + zadný (110), odpočítané
- *  po projekcii (meria sa po spáde). OVERENÉ na golden OP260282 (Massive 140, zadný 110):
- *  3470/cos(6,1°) − 250 = 3239,76.
- *  POZOR — JEDINÝ golden bod: −250 je overené len pre túto konfiguráciu (Massive 140,
- *  zadný 110). Pre Robust (predný 110) alebo Massive so 140 zadným je rozklad NEOVERENÝ,
- *  preto sa nominál emituje LEN pre Massive (viď `spocitajNarez` — Robust ostáva honest-null,
- *  zhodne s „Robust lišta ostáva null"). Zovšeobecnenie čaká na druhú zákazku (majiteľ posúdi). */
+ *  po projekcii (meria sa po spáde). OVERENÉ na golden OP260282 (Massive 140, samostatne
+ *  stojaca, zadný 110): 3470/cos(6,1°) − 250 = 3239,76.
+ *  POZOR — JEDINÝ golden bod: −250 je overené LEN pre presne túto konfiguráciu. Pre Robust
+ *  (predný 110), Massive so 140 zadným (→ 280) alebo na stenu (iný zadný člen krovu) je rozklad
+ *  NEOVERENÝ, preto `spocitajNarez` emituje nominál LEN pre overenú konfiguráciu (Massive +
+ *  samostatne stojaca + zadný 110); všetko ostatné ostáva honest-null (nikdy neoverené číslo do
+ *  Money). Zovšeobecnenie čaká na druhú zákazku / potvrdenie Dominikom (majiteľ posúdi). */
 export const KROV_ODPOCET = 250;
 /** sklon [°], nad ktorým Dominik popísal ZMENU správania drážky („nad 9–10° sa drážka
  *  zatvára, výška krovu sa dvíha") — frézovací detail (O5). Nemení potvrdené offsety. */

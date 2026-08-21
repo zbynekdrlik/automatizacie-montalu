@@ -10,6 +10,8 @@
 	import {
 		PREDNA_SVETLOST_STD,
 		ZVOD_SH_MAX,
+		POCET_KROVOV_MIN,
+		POCET_KROVOV_MAX,
 		svetlostMedziKrovmi,
 		type PergolaSystem,
 		type Uchytenie,
@@ -69,9 +71,15 @@
 	} = $props();
 
 	// #161 — živý náhľad svetlosti medzi krovmi pre zadaný počet (Dominik podľa nej pridá/uberie
-	// krov). null keď počet < 2 alebo neplatné — nikdy NaN.
+	// krov). Zrkadlí serverovú validáciu: celé číslo v rozsahu (žiadne tiché zaokrúhlenie, aby
+	// hint neukázal svetlosť pre 2,4, ktoré server odmietne). svetlostMedziKrovmi vráti null aj
+	// pri zápornej/nulovej svetlosti (počet sa do šírky nezmestí).
 	const pocetKrovovN = $derived(
-		Number(pocetKrovovS) >= 2 ? Math.round(Number(pocetKrovovS)) : null
+		Number.isInteger(Number(pocetKrovovS)) &&
+			Number(pocetKrovovS) >= POCET_KROVOV_MIN &&
+			Number(pocetKrovovS) <= POCET_KROVOV_MAX
+			? Number(pocetKrovovS)
+			: null
 	);
 	const svetlostHint = $derived(svetlostMedziKrovmi(Number(sirkaS) || 0, pocetKrovovN));
 </script>

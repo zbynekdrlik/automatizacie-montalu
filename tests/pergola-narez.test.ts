@@ -575,49 +575,65 @@ describe('#161 — počet krovov (manuál) + svetlosť medzi krovmi', () => {
 	});
 });
 
-describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (Massive-gate, honest-null)', () => {
-	const MASSIVE_SKLON: PergolaNarezVstup = { ...VZOR, sklonStrechy: 6.1, pocetKrovov: 8 };
+describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overená konfigurácia, honest-null)', () => {
+	// OVERENÁ konfigurácia golden OP260282: Massive + samostatne stojaca + zadný profil 110 + sklon + n.
+	const OVERENA: PergolaNarezVstup = {
+		...VZOR,
+		uchytenie: 'samostatne',
+		hornyProfilZadnej: 110,
+		sklonStrechy: 6.1,
+		pocetKrovov: 8
+	};
+	// VZOR hĺbka 3690, sklon 6,1° → nominál 3690/cos(6,1°) − 250
+	const NOMINAL = 3690 / Math.cos((6.1 * Math.PI) / 180) - 250;
 
-	it('Massive + sklon: priečka dĺžka = nominál (hĺbka/cos(sklon) − 250), NIE null', () => {
-		const pr = spocitajNarez(MASSIVE_SKLON).vypocitane.find((p) => /priečk/i.test(p.nazov))!;
+	it('overená konfigurácia (Massive+samostatne+110) + sklon + n: priečka = nominál, NIE null', () => {
+		const pr = spocitajNarez(OVERENA).vypocitane.find((p) => /priečk/i.test(p.nazov))!;
 		expect(pr.dlzkaRezuMm).not.toBeNull();
-		// VZOR hĺbka 3690, sklon 6,1° → 3690/cos(6,1°) − 250
-		expect(
-			Math.abs((pr.dlzkaRezuMm as number) - (3690 / Math.cos((6.1 * Math.PI) / 180) - 250))
-		).toBeLessThan(0.02);
+		expect(Math.abs((pr.dlzkaRezuMm as number) - NOMINAL)).toBeLessThan(0.02);
 	});
 
-	it('Robust + sklon: priečka dĺžka OSTÁVA null (−250 neoverené pre Robust → honest-null)', () => {
-		const pr = spocitajNarez({ ...MASSIVE_SKLON, system: 'Robust' }).vypocitane.find((p) =>
-			/priečk/i.test(p.nazov)
-		)!;
-		expect(pr.dlzkaRezuMm).toBeNull();
-		// a prítlačná/maskovacie sa pri Robust NEEMITUJÚ (ostávajú v nepodporovane)
-		const r = spocitajNarez({ ...MASSIVE_SKLON, system: 'Robust' });
-		expect(r.vypocitane.some((p) => ['18006', '18007', '18008'].includes(p.kod))).toBe(false);
-		expect(r.nepodporovane.map((x) => x.kratky).join(' | ')).toMatch(/prítlačn|maskovac/i);
+	it('config-gate: nominál sa NEEMITUJE mimo overenej konfigurácie (honest-null do Money)', () => {
+		// Robust (predný 110), Massive so zadným 140, Massive na stenu — každá je NEOVERENÁ → null
+		const konfigy: [string, Partial<PergolaNarezVstup>][] = [
+			['Robust', { system: 'Robust' }],
+			['Massive + zadný 140', { hornyProfilZadnej: 140 }],
+			['Massive na stenu', { uchytenie: 'stena' }]
+		];
+		for (const [nazov, over] of konfigy) {
+			const r = spocitajNarez({ ...OVERENA, ...over });
+			const pr = r.vypocitane.find((p) => /priečk/i.test(p.nazov))!;
+			expect(pr.dlzkaRezuMm, `${nazov}: priečka musí byť null (neoverené)`).toBeNull();
+			// a prítlačná/maskovacie sa TIEŽ neemitujú (viazané na nominál)
+			expect(
+				r.vypocitane.some((p) => ['18006', '18007', '18008'].includes(p.kod)),
+				`${nazov}: lišty sa nesmú emitovať`
+			).toBe(false);
+			expect(r.nepodporovane.map((x) => x.kratky).join(' | ')).toMatch(/prítlačn|maskovac/i);
+		}
 	});
 
-	it('Massive + sklon + n: prítlačná(18006)=n, maskovacia(18007)=n−2, krajová(18008)=2 ks; dĺžka = nominál+40', () => {
-		const r = spocitajNarez(MASSIVE_SKLON);
+	it('overená konfigurácia + n: prítlačná(18006)=n, maskovacia(18007)=n−2, krajová(18008)=2 ks; dĺžka = nominál+40', () => {
+		const r = spocitajNarez(OVERENA);
 		const p6 = r.vypocitane.find((p) => p.kod === '18006')!;
 		const p7 = r.vypocitane.find((p) => p.kod === '18007')!;
 		const p8 = r.vypocitane.find((p) => p.kod === '18008')!;
 		expect(p6.pocetKs).toBe(8); // = n
 		expect(p7.pocetKs).toBe(6); // n − 2
 		expect(p8.pocetKs).toBe(2); // kraje
-		const nominal = 3690 / Math.cos((6.1 * Math.PI) / 180) - 250;
-		expect(Math.abs((p6.dlzkaRezuMm as number) - (nominal + 40))).toBeLessThan(0.02);
+		expect(Math.abs((p6.dlzkaRezuMm as number) - (NOMINAL + 40))).toBeLessThan(0.02);
 		expect(p6.dlzkaRezuMm).toBe(p7.dlzkaRezuMm); // rovnaká dĺžka
 	});
 
-	it('Massive + sklon bez počtu krovov: prítlačná/maskovacie sa NEEMITUJÚ (počty potrebujú n)', () => {
-		const r = spocitajNarez({ ...VZOR, sklonStrechy: 6.1 }); // sklon, ale bez n
-		expect(r.vypocitane.some((p) => ['18006', '18007', '18008', '18005'].includes(p.kod))).toBe(
+	it('overená konfigurácia + sklon BEZ počtu krovov: priečka aj lišty ostávajú null (auto počet nejde do Money)', () => {
+		// bez manuálneho n by priečka niesla starý auto počet ceil(š/700)+1 (výkresom vyvrátený)
+		// → do Money sa dĺžka NEpustí (n-gate). Zaklapávacia tiež nie (potrebuje n pre svetlosť).
+		const r = spocitajNarez({ ...OVERENA, pocetKrovov: null });
+		expect(r.vypocitane.some((p) => p.kod === '18004')).toBe(true); // priečka riadok existuje
+		expect(r.vypocitane.find((p) => /priečk/i.test(p.nazov))!.dlzkaRezuMm).toBeNull(); // ...s null dĺžkou
+		expect(r.vypocitane.some((p) => ['18005', '18006', '18007', '18008'].includes(p.kod))).toBe(
 			false
 		);
-		// priečka dĺžku ale MÁ (nominál nezávisí od n)
-		expect(r.vypocitane.find((p) => /priečk/i.test(p.nazov))!.dlzkaRezuMm).not.toBeNull();
 	});
 
 	it('n bez sklonu: zaklapávacia(18005) sa emituje (svetlosť je geometria), lišty nie (potrebujú nominál)', () => {
@@ -631,17 +647,30 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (Massiv
 	});
 
 	it('maskovacia stredná (18007) sa NEEMITUJE pri n=2 (n−2=0), krajová aj prítlačná áno', () => {
-		const r = spocitajNarez({ ...VZOR, sklonStrechy: 6.1, pocetKrovov: 2 });
+		const r = spocitajNarez({ ...OVERENA, pocetKrovov: 2 });
 		expect(r.vypocitane.some((p) => p.kod === '18007')).toBe(false); // 0 stredných
 		expect(r.vypocitane.find((p) => p.kod === '18006')!.pocetKs).toBe(2);
 		expect(r.vypocitane.find((p) => p.kod === '18008')!.pocetKs).toBe(2);
 	});
 
 	it('emitované krovové riadky majú výdaj tyčí (bin-packing), nie sú null', () => {
-		const r = spocitajNarez(MASSIVE_SKLON);
+		const r = spocitajNarez(OVERENA);
 		for (const kod of ['18004', '18005', '18006', '18007', '18008']) {
 			const p = r.vypocitane.find((x) => x.kod === kod)!;
 			expect(p.vydajTyce, `${kod} má mať výdaj`).toBeTruthy();
 		}
+	});
+
+	it('svetlostMedziKrovmi vráti null (nie zápornú) keď sa krovy do šírky nezmestia', () => {
+		// šírka 2000, n 50 → (2000 − 2500 − 2)/49 = záporné → null (nikdy do Money)
+		expect(svetlostMedziKrovmi(2000, 50)).toBeNull();
+		expect(svetlostMedziKrovmi(4990, 8)).toBe(655.43); // kladná ostáva
+	});
+
+	it('validácia odmietne priveľa krovov na šírku (záporná svetlosť by inak šla do Money)', () => {
+		const chyba = chybaPergolaNarezVstupu({ ...OVERENA, sirka: 2000, pocetKrovov: 50 });
+		expect(chyba).toMatch(/počet krovov|nezmestí|svetlosť/i);
+		// rozumný počet prejde
+		expect(chybaPergolaNarezVstupu({ ...OVERENA, sirka: 2000, pocetKrovov: 4 })).toBeNull();
 	});
 });
