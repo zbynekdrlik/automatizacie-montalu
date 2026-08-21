@@ -360,9 +360,12 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 	await expect(page.getByTestId('vydaj-18019')).toContainText('1×(6 m)');
 	// výstuha horná (18017, massive) = 4990 − 280 = 4710
 	await expect(page.getByTestId('narez-tabulka')).toContainText('4710');
+	// #155 A9 (Dominik): predná noha = svetlosť 2200 + výstuha 140 = 2340 (nie starý „vždy +15" = 2215)
+	await expect(page.getByTestId('narez-tabulka')).toContainText('2340');
 	// priečka (18004) dĺžka „—" (HH krovu neodvoditeľné) — nič sa nehádže
 	await expect(page.getByTestId('polozka-18004')).toContainText('hrana krovu');
-	// nepodporované vypisuje HH-krovu + zvislú zadnú výstuhu (18016 pod fixom je už vo vypocitane)
+	// nepodporované vypisuje HH-krovu (18016 pod fixom je vo vypocitane; „zvislá zadná výstuha"
+	// 2340 je rekonciliovaná na prednú nohu — A9, už nie honest-null)
 	await expect(page.getByTestId('narez-nepodporovane')).toContainText('hrana krovu');
 
 	expect(consoleMsgs).toEqual([]);

@@ -110,6 +110,19 @@ describe('OP260282 golden — ODVODITEĽNÉ riadky (presne na výkres)', () => {
 		expect(zadna!.dlzkaRezuMm).toBe(2790);
 		expect(zadna!.pocetKs).toBe(4);
 	});
+
+	it('r.0 predná noha 18017 = svetlosť + výstuha 140 = 2340, 4 ks (A9 Dominik: noha = svetlosť + rozmer výstuhy)', () => {
+		// A9 (Odoo správa 1724498, na #198): pri výstuhe je predná noha = svetlosť + ROZMER VÝSTUHY
+		// (110×110 → +110, 140×140 → +140, 110×250 → +250), NIE +15. OP260282 má zosilnenyNosnik=true a
+		// vystuhaProfil PRÁZDNY → Massive systémový default 140×140 → prídavok 140. 2200 + 140 = 2340.
+		// Výkres: „2340×2 pod kódom 18017" = PREDNÁ NOHA (Massive stĺp 18017), nie samostatná „zvislá
+		// zadná výstuha" (tá bola misatribúcia — A9 to reklasifikuje: „nerozumiem 2340; noha = svetlosť+140").
+		const noha = riadok(r.vypocitane, (p) => /predná noha/i.test(p.nazov));
+		expect(noha, 'predná noha musí byť vo vypocitane').toBeTruthy();
+		expect(noha!.kod).toBe('18017'); // Massive stĺp
+		expect(noha!.dlzkaRezuMm).toBe(2340); // 2200 + 140 (A9), NIE 2215 (starý „vždy +15" bug)
+		expect(noha!.pocetKs).toBe(4); // počet podľa vstupu (pocetPrednychNoh)
+	});
 });
 
 describe('OP260282 golden — KROV cut-list (#161, derivácia 21.8. overená proti výkresu)', () => {
@@ -192,12 +205,14 @@ describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3 /
 		expect(3240.93 - (pr!.dlzkaRezuMm as number)).toBeCloseTo(1.17, 1);
 	});
 
-	it('r.6 zvislá zadná výstuha (2340) → čestný null (svetlosť 2325 nie je vstup; #198 Dominik)', () => {
-		// 2340 = svetlosť 2325 + 15, ale 2325 sa zo vstupov (predná svetlosť 2200 → 2215) neodvodí;
-		// formula položená Dominikovi (#198). Žiadny vypocitane riadok — nefitujeme nasilu.
-		expect(nepodpText).toMatch(/zvislá zadná výstuha|zadná výstuha/i);
-		expect(nepodpText).toMatch(/2340/);
-		expect(nepodpText).toMatch(/čaká na vzorec|nedá odvodiť/i);
+	it('r.6 „zvislá zadná výstuha 2340" REKONCILIOVANÁ na prednú nohu (A9) — už NIE je čestný null', () => {
+		// A9 (Dominik Odoo 1724498): „nerozumiem dĺžku 2340; noha = svetlosť + 140". Výkresová 2340×2
+		// pod 18017 = PREDNÁ NOHA (2200+140), nie samostatná zvislá zadná výstuha — skoršia misatribúcia
+		// (2340 = svetlosť 2325 + 15 vs predná 2200 + 140 dávali rovnaké číslo). Honest-null nota
+		// ODSTRÁNENÁ; dĺžka je vo `vypocitane` ako predná noha 2340. Nefitujeme nasilu — je to A9 potvrdené.
+		expect(nepodpText).not.toMatch(/zvislá zadná výstuha/i);
+		const noha = riadok(r.vypocitane, (p) => /predná noha/i.test(p.nazov));
+		expect(noha!.dlzkaRezuMm).toBe(2340);
 	});
 
 	it('frézovanie drážok (výrobný list) ostáva nepodporované — doplní konštruktér', () => {

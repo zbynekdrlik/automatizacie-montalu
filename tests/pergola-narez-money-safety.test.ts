@@ -35,6 +35,7 @@ const CISTY_ENGINE = [
 	'src/lib/pergola-narez.ts',
 	// #161 — krov uloženie engine je tiež LEN potvrdené vzorce, display-only
 	'src/lib/pergola-krov.ts',
+	'src/lib/pergola-komponenty.ts',
 	'src/lib/server/pergola-narez-vstup.ts',
 	// #194 — technický výkres z rozmerov je tiež LEN display-only kresba
 	'src/lib/components/PergolaNarezVykres.svelte',

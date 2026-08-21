@@ -88,6 +88,70 @@ describe('spocitajNarez — predné nohy (potvrdený vzorec svetlosť + 15)', ()
 	});
 });
 
+// --- #155 A9 (Dominik, Odoo 1724498) — predná noha pri VÝSTUHE = svetlosť + rozmer výstuhy ------
+// Keď je zosilnený nosník (výstuha), noha = svetlosť + zvislý rozmer výstuhy (110/140/250), NIE +15.
+// Kľúč = `zosilnenyNosnik` (nie „je zadaný vystuhaProfil"): profil sa berie z `vystuhaProfil` ak je
+// zadaný, inak systémový default (Massive 140×140, Robust 110×110) — OP260282 má prázdny profil.
+// Bez zosilnenia ostáva +15 (overený vektor ZAK2026302 sa NEMENÍ).
+describe('#155 A9 — predná noha pri výstuhe = svetlosť + rozmer výstuhy (nie +15)', () => {
+	const noha = (v: Parameters<typeof spocitajNarez>[0]) =>
+		spocitajNarez(v).vypocitane.find(
+			(p) => !/zadná/i.test(p.nazov) && /predná noha/i.test(p.nazov)
+		);
+
+	it('Massive + zosilnený, default profil (140×140) → 2200 + 140 = 2340 (OP260282 vzor)', () => {
+		const v = { ...VZOR, zosilnenyNosnik: true, prednaSvetlost: 2200 };
+		expect(spocitajNarez(v).informativne.prednaNohaDlzka).toBe(2340);
+		expect(noha(v)!.dlzkaRezuMm).toBe(2340);
+	});
+	it('Massive + zosilnený + explicitne 140×140 → 2340 (rovnaké ako default)', () => {
+		expect(
+			spocitajNarez({ ...VZOR, zosilnenyNosnik: true, vystuhaProfil: '140x140' }).informativne
+				.prednaNohaDlzka
+		).toBe(2340);
+	});
+	it('Robust + zosilnený, default profil (110×110) → 2200 + 110 = 2310', () => {
+		expect(
+			spocitajNarez({ ...VZOR, system: 'Robust', zosilnenyNosnik: true }).informativne
+				.prednaNohaDlzka
+		).toBe(2310);
+	});
+	it('Robust + zosilnený + 110×250 → 2200 + 250 = 2450 (A9 „pri 250 +250")', () => {
+		expect(
+			spocitajNarez({
+				...VZOR,
+				system: 'Robust',
+				zosilnenyNosnik: true,
+				vystuhaProfil: '110x250'
+			}).informativne.prednaNohaDlzka
+		).toBe(2450);
+	});
+	it('200×140 + zosilnený → efektivnaSvetlost + 200 = (2200−60)+200 = 2340 (odvodené, = 140×140 noha)', () => {
+		// A9 nedal 200×140 → ODVODENINA: −60 (efektivnaSvetlost, #206 potvrdené) + výška 200 (#206:
+		// 200×140 je o 60 vyššia = 200) = svetlosť + 140. Geometricky = rovnaká noha ako 140×140.
+		expect(
+			spocitajNarez({ ...VZOR, zosilnenyNosnik: true, vystuhaProfil: '200x140' }).informativne
+				.prednaNohaDlzka
+		).toBe(2340);
+	});
+	it('BEZ zosilnenia → +15 (nezmenené): štandard 2215, 200×140-bez-zosilnenia 2155', () => {
+		expect(spocitajNarez({ ...VZOR, prednaSvetlost: 2200 }).informativne.prednaNohaDlzka).toBe(
+			2215
+		);
+		// vystuhaProfil zadaný ale zosilnenyNosnik=false → NIE je výstuha → +15 (existujúci kontrakt)
+		expect(
+			spocitajNarez({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' }).informativne
+				.prednaNohaDlzka
+		).toBe(2155);
+	});
+	it('neštandardná svetlosť + zosilnený 140 → svetlosť + 140 (2500 → 2640)', () => {
+		expect(
+			spocitajNarez({ ...VZOR, prednaSvetlost: 2500, zosilnenyNosnik: true }).informativne
+				.prednaNohaDlzka
+		).toBe(2640);
+	});
+});
+
 describe('spocitajNarez — zadné nohy LEN pri samostatne stojacej', () => {
 	it('na stenu (9/10) → žiadne zadné nohy vôbec', () => {
 		const r = spocitajNarez({ ...VZOR, uchytenie: 'stena' });

@@ -225,7 +225,8 @@ export interface NarezInformativne {
 	/** predná svetlosť ZADANÁ vo formulári [mm] */
 	prednaSvetlost: number;
 	/** #206 (c) — efektívna svetlosť = zadaná − 60 pri výstuhe 200×140, inak = zadaná.
-	 *  Toto je hodnota, ktorá preteká do prednej nohy (svetlosť + 15). */
+	 *  Toto je hodnota, ktorá preteká do prednej nohy (viď `prednaNohaDlzkaMm`:
+	 *  + rozmer výstuhy pri zosilnenom nosníku, inak + 15). */
 	efektivnaSvetlost: number;
 	prednaNohaDlzka: number;
 	/** null keď na stenu (bez zadných nôh) */
@@ -332,6 +333,43 @@ export function efektivnaSvetlost(v: PergolaNarezVstup): number {
 	return R1(v.prednaSvetlost - odpocet);
 }
 
+/** Zvislý rozmer (výška) profilu výstuhy [mm] = väčší z dvoch rozmerov prierezu. 110×110→110,
+ *  140×140→140, 110×250→250 (A9 doslovne), 200×140→200 (#206: 200×140 je o 60 mm vyššia než
+ *  140×140, teda výška = 200). Do vzorca prednej nohy (A9, Dominik Odoo 1724498). */
+export const VYSTUHA_VYSKA: Record<VystuhaProfil, number> = {
+	'110x110': 110,
+	'140x140': 140,
+	'200x140': 200,
+	'110x250': 250
+};
+
+/** Systémový default profilu výstuhy, keď je zosilnený nosník ale profil nie je explicitne
+ *  zvolený (formulár default = prázdny → OP260282): Massive → 140×140, Robust → 110×110. */
+function defaultVystuhaProfil(system: PergolaSystem): VystuhaProfil {
+	return system === 'Massive' ? '140x140' : '110x110';
+}
+
+/** Prídavok k (efektívnej) svetlosti pre dĺžku prednej nohy [mm], A9 (Dominik Odoo 1724498):
+ *  - BEZ zosilneného nosníka → `PREDNA_NOHA_PRIDAVOK` (15), overené 1:1 na ZAK2026302.
+ *  - SO zosilneným nosníkom → zvislý rozmer výstuhy: `vystuhaProfil` ak zadaný, inak systémový
+ *    default (Massive 140×140, Robust 110×110). 110→+110, 140→+140, 250→+250 = A9 doslovne.
+ *
+ *  POZOR — kľúč je `zosilnenyNosnik`, NIE „je zadaný vystuhaProfil": OP260282 má zosilnenyNosnik
+ *  s PRÁZDNYM profilom (formulár default) → default 140×140. 200×140 A9 priamo NEDAL → prídavok =
+ *  výška 200 je ODVODENINA; s efektivnaSvetlost−60 (#206) dá noha = svetlosť + 140 (rovnaká ako
+ *  140×140) — geometricky konzistentné (vrch nohy fixný, vyššia výstuha len presahuje 60 mm nižšie
+ *  do svetlej výšky). Odvodené, nie priamo A9-potvrdené — na review majiteľom/Dominikom. */
+export function prednaNohaPridavok(v: PergolaNarezVstup): number {
+	if (!v.zosilnenyNosnik) return PREDNA_NOHA_PRIDAVOK;
+	return VYSTUHA_VYSKA[v.vystuhaProfil ?? defaultVystuhaProfil(v.system)];
+}
+
+/** Dĺžka rezu prednej nohy [mm] = efektívna svetlosť + prídavok (viď `prednaNohaPridavok`). Jeden
+ *  zdroj pravdy pre `spocitajNarez` aj `schemaVykresu` (predtým duplikovaný vzorec `svetlosť+15`). */
+export function prednaNohaDlzkaMm(v: PergolaNarezVstup): number {
+	return R1(efektivnaSvetlost(v) + prednaNohaPridavok(v));
+}
+
 /** Krovové lišty ako riadky nárezu (#161, derivácia 21.8. overená proti golden OP260282).
  *  Prítlačná (18006) / maskovacia (18007) / maskovacia krajová (18008) = nominál krovu + 40 —
  *  emitujú sa LEN keď je nominál (overená konfigurácia + sklon) A zadaný počet krovov `n`;
@@ -394,7 +432,12 @@ function krovoveListy(
 export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	const sys = SYSTEMY[v.system];
 	const svetlost = efektivnaSvetlost(v);
-	const prednaNohaDlzka = R1(svetlost + PREDNA_NOHA_PRIDAVOK);
+	// #155 A9 (Dominik Odoo 1724498): predná noha = svetlosť + rozmer výstuhy pri zosilnenom
+	// nosníku, inak + 15. Jeden zdroj so `schemaVykresu` cez `prednaNohaDlzkaMm`.
+	const prednaNohaDlzka = prednaNohaDlzkaMm(v);
+	const prednaNohaPozn = v.zosilnenyNosnik
+		? `= svetlosť + ${prednaNohaPridavok(v)} (rozmer výstuhy)`
+		: '= svetlosť + 15';
 	const samostatne = v.uchytenie === 'samostatne';
 	const zasklena = !v.jednoduchaBezZasklenia;
 	// #205 (výkres OP260282): zadná noha = PLNÁ zadná výška (ZV = dĺžka nohy), nie ZV − horný
@@ -429,7 +472,13 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 			kod: sys.stlp.kod,
 			nazov: `${sys.stlp.nazov} — predná noha`,
 			dlzkaRezuMm: prednaNohaDlzka,
-			pocetKs: v.pocetPrednychNoh
+			pocetKs: v.pocetPrednychNoh,
+			poznamka: prednaNohaPozn,
+			poznamkaDetail: !v.zosilnenyNosnik
+				? 'Dĺžka rezu prednej nohy = predná svetlosť plus 15 mm (skovanie v žľabe). Overené na reálnej zákazke.'
+				: v.vystuhaProfil === '200x140'
+					? 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy. Pri výstuhe 200×140 je dĺžka odvodená (rovnaká ako pri 140×140) — na potvrdenie Dominikovi.'
+					: 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy (110, 140 alebo 250).'
 		}
 	];
 	if (samostatne) {
@@ -615,14 +664,11 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 				'Dĺžka = svetlosť medzi krovmi = (šírka − 50 × počet krovov − 2) / (počet krovov − 1); počet líšt = 2 × (počet krovov − 1). Zadaj počet krovov, aby sa spočítala.'
 		});
 	}
+	// #155 A9 (Dominik Odoo 1724498): výkresová „2340×2 pod 18017" NIE JE samostatná zvislá zadná
+	// výstuha — je to PREDNÁ NOHA (svetlosť 2200 + výstuha 140), TERAZ vo `vypocitane`. Skoršia
+	// misatribúcia: 2340 = svetlosť 2325 + 15 (zadná svetlosť, nie vstup) vs predná 2200 + 140 dávali
+	// rovnaké číslo; A9 to reklasifikoval na prednú nohu. Preto honest-null nota ODSTRÁNENÁ.
 	nepodporovane.push(
-		{
-			// (zvislá zadná výstuha 18017; 2340 = svetlosť 2325 + 15, 2325 nie je vstup; #198)
-			kratky:
-				'Zvislá zadná výstuha — dĺžku sa z rozmerov nedá odvodiť, čaká na vzorec od Dominika.',
-			detail:
-				'Na výkrese je 2340 mm, čo zodpovedá vzoru „svetlosť + 15" pre svetlosť 2325 mm — lenže 2325 sa zo zadaných rozmerov neodvodí (predná svetlosť 2200 dáva 2215, nie 2340). Preto dĺžku nehádžeme; vzorec zvislej výstuhy je otázka na Dominika.'
-		},
 		{
 			// (sklá / strešná výplň = O11)
 			kratky: 'Sklá / strešná výplň (šírky, dĺžky, materiál, RAL) — zadáva sa vedome ručne.',
@@ -719,7 +765,8 @@ export interface PergolaNarezSchema {
 	profilRozmer: 110 | 140;
 	/** predná svetlá výška [mm] — VIZUÁLNA výška prednej nohy po spodok žľabu */
 	prednaSvetlost: number;
-	/** dĺžka rezu prednej nohy [mm] = svetlosť + 15 (info popisok, nie kreslená výška) */
+	/** dĺžka rezu prednej nohy [mm] = svetlosť + rozmer výstuhy (zosilnený nosník) / + 15 (bez);
+	 *  info popisok, nie kreslená výška. Viď `prednaNohaDlzkaMm`. */
 	prednaNohaDlzka: number;
 	/** hrúbka horného nosníka (žľab + kotviaci profil) [mm] = profilRozmer */
 	zlabHrubka: number;
@@ -756,7 +803,9 @@ export function schemaVykresu(v: PergolaNarezVstup): PergolaNarezSchema {
 		hlbka: v.hlbka,
 		profilRozmer: sys.stlp.rozmer,
 		prednaSvetlost: svetlost,
-		prednaNohaDlzka: R1(svetlost + PREDNA_NOHA_PRIDAVOK),
+		// #155 A9: pri zosilnenom nosníku noha = svetlosť + rozmer výstuhy (viď `prednaNohaDlzkaMm`),
+		// inak + 15. Rovnaký zdroj ako `spocitajNarez` → výkres a materiál sedia.
+		prednaNohaDlzka: prednaNohaDlzkaMm(v),
 		zlabHrubka: sys.stlp.rozmer,
 		prednaNohyX: rovnomerneX(v.pocetPrednychNoh, v.sirka),
 		rozostupPrednychNoh: v.pocetPrednychNoh > 1 ? R1(v.sirka / (v.pocetPrednychNoh - 1)) : null,
@@ -841,125 +890,8 @@ export function chybaPergolaNarezVstupu(v: PergolaNarezVstup): string | null {
 	return null;
 }
 
-// --- #195: vrstva KUSOVÝCH komponentov (spojky, krytky, rámové/zakladacie lišty) --------
-// Doteraz nárez emitoval LEN metrážové profily; kusové komponenty (spojky, krytky) z
-// reálnych výkresov chýbali. Zdroj = TYPY vyčítané z callu 13.8. (scr_014/015 Massive
-// „KOMPONENTY Pergola 140"; scr_042 Robust „KOMPONENTY Pergola 110"/expedícia) + výkres
-// OP260282. Dominik sľúbil kompletné tabuľky spojok/krytiek (počty+kódy), ZATIAĽ nedodané —
-// user (16.8., komentár na #195) rozhodol „len mi stačia tie typy": implementovať TERAZ
-// z dostupných TYPOV, počty/kódy sa doplnia keď tabuľky prídu.
-//
-// SAMOSTATNÁ funkcia (nie súčasť NarezVysledok) — golden `pergola-narez-op260282` a
-// `spocitajNarez` ostávajú bit-identické. Display-only: žiadny Money zápis (guard
-// pergola-narez-money-safety.test.ts pokrýva tento súbor).
-//
-// HONEST-NULL DISCIPLÍNA (Money-priľahlá, rovnaká ako pre profily vyššie):
-//  • POČET: iba keď ho odvodí POTVRDENÉ pravidlo. Žiadne pravidlo počtu komponentov
-//    zatiaľ nie je (Dominik ich neklasifikoval) → `pocetKs = null` („—") pre VŠETKY typy.
-//    Jednorazové pozorovanie z JEDNÉHO výkresu (spojka U 12 ks, rámová lišta 2 ks na
-//    OP260282) NIE JE pravidlo → ostáva v `poznamka`, NIKDY v stĺpci počet.
-//  • MONEY KÓD: iba potvrdený ZASK* z Money katalógu (#197/#E). Kódy 24xxx sú CAD kódy
-//    zo Solid Edge tabuľky, NEoverené proti Money → `kodMoney` sa NEZAVÁDZA (do odpisu
-//    nič nejde). `kodCad` je len informatívny; nečitateľná číslica (2400?) sa NIKDY
-//    nedopĺňa → `kodCad = null` + poznámka.
-//  • SYSTÉM: evidence-strict — typ patrí systému, kde je doložený zo zdroja.
-
-/** Jeden TYP kusového komponentu pergoly (spojka, krytka, rámová/zakladacia lišta). */
-export interface PergolaKomponent {
-	/** názov typu (vyčistený z OCR zo zdrojovej snímky) */
-	typ: string;
-	/** kde sa v pergole používa (plain Slovak) */
-	kdePouzity: string;
-	/** systémy, kde je typ doložený zo zdroja (evidence-strict, nie odhadom) */
-	systemy: PergolaSystem[];
-	/** CAD kód zo Solid Edge tabuľky — NIE potvrdený Money kód (ZASK*). null keď žiadny
-	 *  alebo na snímke nečitateľný (číslica sa nedopĺňa). */
-	kodCad: string | null;
-	/** citácia zdroja (snímka callu / výkres) */
-	zdroj: string;
-	/** počet ks: null = neodvoditeľný z POTVRDENÉHO pravidla (honest-null). Zatiaľ vždy
-	 *  null — pravidlo počtu komponentov neexistuje (čaká na Dominikove tabuľky). */
-	pocetKs: number | null;
-	/** voliteľná poznámka (napr. jednorazovo pozorovaný počet, nečitateľný CAD kód) */
-	poznamka?: string;
-}
-
-/** Statický katalóg TYPOV kusových komponentov, vyčítaných zo zdrojov (#195). Počty sú
- *  honest-null (žiadne pravidlo); Money kódy sa neasertujú (žiaden potvrdený ZASK*). */
-export const PERGOLA_KOMPONENTY: PergolaKomponent[] = [
-	// --- Massive 140 („KOMPONENTY Pergola 140", scr_014/015 + OP260282) -----------------
-	{
-		typ: 'Spojka U 100×50 (140×140)',
-		kdePouzity: 'spojka výstuhy (nosníka) 140×140 s nohami',
-		systemy: ['Massive'],
-		kodCad: null,
-		zdroj: 'scr_015 (čitateľné) / scr_014, výkres OP260282',
-		pocetKs: null,
-		poznamka:
-			'na výkrese OP260282 12 ks (Massive, samostatne stojaca) — jednorazové pozorovanie, NIE potvrdené pravidlo počtu'
-	},
-	{
-		typ: 'Profil rámová lišta',
-		kdePouzity: 'rámová lišta (obvod rámu strechy)',
-		systemy: ['Massive'],
-		kodCad: '24007',
-		zdroj: 'scr_014 (KOMPONENTY Pergola 140)',
-		pocetKs: null,
-		poznamka:
-			'na výkrese OP260282 2 ks — jednorazové pozorovanie, nie pravidlo. CAD kód 24007 je informatívny (NIE Money kód).'
-	},
-	{
-		typ: 'Krytka maskovacej lišty',
-		kdePouzity: 'krytka maskovacej lišty',
-		systemy: ['Massive'],
-		kodCad: '24003',
-		zdroj: 'scr_014 (KOMPONENTY Pergola 140)',
-		pocetKs: null,
-		poznamka: 'CAD kód 24003 je informatívny (NIE Money kód)'
-	},
-	{
-		typ: 'Krytka maskovacej lišty krajová',
-		kdePouzity: 'krytka krajovej maskovacej lišty',
-		systemy: ['Massive'],
-		kodCad: '24003',
-		zdroj: 'scr_014 (KOMPONENTY Pergola 140)',
-		pocetKs: null,
-		poznamka: 'CAD kód 24003 je informatívny (NIE Money kód)'
-	},
-	{
-		typ: 'Krytka zadná roh',
-		kdePouzity: 'krytka zadného rohu',
-		systemy: ['Massive'],
-		kodCad: null,
-		zdroj: 'scr_014 (KOMPONENTY Pergola 140)',
-		pocetKs: null,
-		poznamka: 'CAD kód 2400? — posledná číslica na snímke nečitateľná, nedopĺňa sa'
-	},
-	// --- Robust 110 („KOMPONENTY Pergola 110" / expedícia, scr_042) ---------------------
-	// (Robust profily — kotviaci, 110×110, žľabový 110, priečkový, prítlačná/maskovacie —
-	// už emituje engine ako profily; sem patria LEN kusové komponenty navyše.)
-	{
-		typ: 'Zakladacia lišta',
-		kdePouzity: 'zakladacia lišta (spodné uloženie zasklenia)',
-		systemy: ['Robust'],
-		kodCad: null,
-		zdroj: 'scr_042 (KOMPONENTY Pergola 110 / expedícia)',
-		pocetKs: null
-	},
-	{
-		typ: 'Krytka vrchná',
-		kdePouzity: 'vrchná krytka (nohy/profilu)',
-		systemy: ['Robust'],
-		kodCad: null,
-		zdroj: 'scr_042 (KOMPONENTY Pergola 110 / expedícia)',
-		pocetKs: null
-	}
-];
-
-/** Kusové komponenty (spojky, krytky, rámové/zakladacie lišty) relevantné pre systém
- *  zvolený vo vstupe. DISPLAY-ONLY: počty honest-null (žiadne potvrdené pravidlo), žiadny
- *  Money kód sa neasertuje. Filtruje katalóg podľa `v.system` — evidence-strict systémová
- *  príslušnosť (typ sa zobrazí len pre systém, kde je doložený zo zdroja). */
-export function komponentyPergoly(v: PergolaNarezVstup): PergolaKomponent[] {
-	return PERGOLA_KOMPONENTY.filter((k) => k.systemy.includes(v.system));
-}
+// --- #195 KUSOVÉ komponenty — vyčlenené do `pergola-komponenty.ts` (#183 large-file split) ------
+// Re-export ako fasáda: konzumenti ($lib/pergola-narez) importujú komponenty odtiaľto bez zmeny.
+// `pergola-komponenty` importuje LEN typy odtiaľto (`import type` = erased za behu → žiadny cyklus).
+export { PERGOLA_KOMPONENTY, komponentyPergoly } from './pergola-komponenty';
+export type { PergolaKomponent } from './pergola-komponenty';
