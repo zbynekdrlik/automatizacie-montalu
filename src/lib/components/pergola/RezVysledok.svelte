@@ -256,7 +256,10 @@
 			</div>
 		{/if}
 		<div class="row">
-			<span>Predná noha (svetlosť + 15)</span><b>{vysledok.informativne.prednaNohaDlzka} mm</b>
+			<span
+				>Predná noha (svetlosť + {vysledok.informativne.prednaNohaDlzka -
+					vysledok.informativne.efektivnaSvetlost})</span
+			><b>{vysledok.informativne.prednaNohaDlzka} mm</b>
 		</div>
 		<div class="row">
 			<span>Zadná noha</span>
