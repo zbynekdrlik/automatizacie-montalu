@@ -61,6 +61,7 @@
 		prieckaLight: form?.vstup?.prieckaLight ?? false,
 		zosilnenyNosnik: form?.vstup?.zosilnenyNosnik ?? false,
 		sklonStrechy: form?.vstup?.sklonStrechy ?? null,
+		pocetKrovov: form?.vstup?.pocetKrovov ?? null,
 		// #206 nové polia
 		jednoduchaBezZasklenia: form?.vstup?.jednoduchaBezZasklenia ?? false,
 		vystuhaProfil: (form?.vstup?.vystuhaProfil ?? null) as VystuhaProfil | null,
@@ -86,6 +87,8 @@
 	let zosilnenyNosnikS = $state(false);
 	// #161 — voliteľný sklon strechy pre krov uloženie; prázdne = nezadané
 	let sklonStrechyS = $state<number | string>('');
+	// #161 — voliteľný MANUÁLNY počet krovov (Dominik 21.8.); prázdne = auto fallback
+	let pocetKrovovS = $state<number | string>('');
 	// #206 — nové voľby z výkresu OP260282
 	let jednoduchaBezZaskleniaS = $state(false);
 	let vystuhaProfilS = $state<VystuhaProfil | ''>('');
@@ -119,6 +122,7 @@
 		prieckaLightS = v?.prieckaLight ?? false;
 		zosilnenyNosnikS = v?.zosilnenyNosnik ?? false;
 		sklonStrechyS = v?.sklonStrechy ?? '';
+		pocetKrovovS = v?.pocetKrovov ?? '';
 		// #206
 		jednoduchaBezZaskleniaS = v?.jednoduchaBezZasklenia ?? false;
 		vystuhaProfilS = (v?.vystuhaProfil as VystuhaProfil | null) ?? '';
@@ -173,6 +177,7 @@
 	{#if prieckaLightS}<input type="hidden" name="prieckaLight" value="1" />{/if}
 	{#if zosilnenyNosnikS}<input type="hidden" name="zosilnenyNosnik" value="1" />{/if}
 	{#if sklonStrechyS !== ''}<input type="hidden" name="sklonStrechy" value={sklonStrechyS} />{/if}
+	{#if pocetKrovovS !== ''}<input type="hidden" name="pocetKrovov" value={pocetKrovovS} />{/if}
 	{#if jednoduchaBezZaskleniaS}<input type="hidden" name="jednoduchaBezZasklenia" value="1" />{/if}
 	{#if vystuhaProfilS !== ''}<input
 			type="hidden"
@@ -219,6 +224,7 @@
 		bind:prieckaLightS
 		bind:zosilnenyNosnikS
 		bind:sklonStrechyS
+		bind:pocetKrovovS
 		bind:jednoduchaBezZaskleniaS
 		bind:vystuhaProfilS
 		bind:zvodFrezovatS

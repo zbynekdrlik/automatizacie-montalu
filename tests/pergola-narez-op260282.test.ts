@@ -188,7 +188,7 @@ describe('OP260282 golden — ČESTNÝ NULL / GAP (nefitujeme nasilu, #207 §3 /
 		// Δ HH − nominál = 3240,93 − 3239,76 = 1,17 mm = reálne uloženie (Dominik: nesedí o ~2 mm,
 		// nerieš). Engine NEEMITUJE 3240,93 (to by bol nasilu fitnutý CAD výsledok geometrie).
 		const pr = riadok(r.vypocitane, (p) => p.kod === '18004');
-		expect((pr!.dlzkaRezuMm as number)).toBeLessThan(3240.93); // nominál < HH (seating gap)
+		expect(pr!.dlzkaRezuMm as number).toBeLessThan(3240.93); // nominál < HH (seating gap)
 		expect(3240.93 - (pr!.dlzkaRezuMm as number)).toBeCloseTo(1.17, 1);
 	});
 

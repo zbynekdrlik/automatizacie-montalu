@@ -38,7 +38,11 @@
 		live: boolean;
 	} = $props();
 
-	const mm = (n: number | null) => (n === null ? '— (čaká na výkres)' : `${n} mm`);
+	// Slovenský formát: desatinná ČIARKA (celé čísla ostávajú bez zmeny) — rovnaká konvencia
+	// ako výdaj tyčí („7,5 m") a zvyšok appky.
+	const mm = (n: number | null) =>
+		n === null ? '— (čaká na výkres)' : `${String(n).replace('.', ',')} mm`;
+	const mmVal = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} mm`);
 </script>
 
 <div class="card">
@@ -270,11 +274,21 @@
 					: `${vysledok.informativne.rozostupPrednychNoh} mm`}</b
 			>
 		</div>
-		<div class="row">
-			<span>Počet priečok (max rozostup {MAX_ROZOSTUP_PRIECOK} mm)</span><b
-				>{vysledok.informativne.pocetPriecok}</b
-			>
-		</div>
+		{#if vysledok.informativne.pocetKrovov != null}
+			<div class="row" data-testid="info-pocet-krovov">
+				<span>Počet krovov (zadaný)</span><b>{vysledok.informativne.pocetKrovov}</b>
+			</div>
+			<div class="row" data-testid="info-svetlost-krovov">
+				<span>Svetlosť medzi krovmi</span>
+				<b>{mmVal(vysledok.informativne.svetlostMedziKrovmi)}</b>
+			</div>
+		{:else}
+			<div class="row">
+				<span>Počet priečok (max rozostup {MAX_ROZOSTUP_PRIECOK} mm)</span><b
+					>{vysledok.informativne.pocetPriecok}</b
+				>
+			</div>
+		{/if}
 		<div class="row">
 			<span>Výstuha medzi nohami (šírka − 280)</span>
 			<b data-testid="vystuha-rez">{vysledok.informativne.vystuhaRezMm} mm</b>

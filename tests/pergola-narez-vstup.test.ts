@@ -104,6 +104,28 @@ describe('parsePergolaNarezVstup', () => {
 		expect(error).toMatch(/sklon/i);
 	});
 
+	it('#161 počet krovov: prázdny → null (voliteľný, auto fallback, žiadna chyba)', () => {
+		const { vstup, error } = parsePergolaNarezVstup(fd({ ...PLATNY }));
+		expect(error).toBeNull();
+		expect(vstup.pocetKrovov).toBeNull();
+	});
+
+	it('#161 počet krovov: zadané 8 → 8', () => {
+		const { vstup, error } = parsePergolaNarezVstup(fd({ ...PLATNY, pocetKrovov: '8' }));
+		expect(error).toBeNull();
+		expect(vstup.pocetKrovov).toBe(8);
+	});
+
+	it('#161 počet krovov mimo rozsahu (1) = chyba', () => {
+		const { error } = parsePergolaNarezVstup(fd({ ...PLATNY, pocetKrovov: '1' }));
+		expect(error).toMatch(/počet krovov/i);
+	});
+
+	it('#161 počet krovov necelé číslo (8,5) = chyba (celé číslo)', () => {
+		const { error } = parsePergolaNarezVstup(fd({ ...PLATNY, pocetKrovov: '8,5' }));
+		expect(error).toMatch(/počet krovov|celé/i);
+	});
+
 	// --- #206 nové polia (a/c/d/e) ---------------------------------------------------
 	it('#206 (a) jednoduchá bez zasklenia: checkbox "1"/"on" → true, inak false', () => {
 		expect(

@@ -44,6 +44,14 @@ export const KROV_CC = 37.28;
 export const KROV_KONST = 0.01;
 /** prah sklonu strechy [°] — binárny prepínač roviny uloženia (CAD `uhol2`). */
 export const KROV_PRAH_STUPNE = 7;
+/** odpočet [mm] pre NOMINÁLNU dĺžku krovu = predný profil (140) + zadný (110), odpočítané
+ *  po projekcii (meria sa po spáde). OVERENÉ na golden OP260282 (Massive 140, zadný 110):
+ *  3470/cos(6,1°) − 250 = 3239,76.
+ *  POZOR — JEDINÝ golden bod: −250 je overené len pre túto konfiguráciu (Massive 140,
+ *  zadný 110). Pre Robust (predný 110) alebo Massive so 140 zadným je rozklad NEOVERENÝ,
+ *  preto sa nominál emituje LEN pre Massive (viď `spocitajNarez` — Robust ostáva honest-null,
+ *  zhodne s „Robust lišta ostáva null"). Zovšeobecnenie čaká na druhú zákazku (majiteľ posúdi). */
+export const KROV_ODPOCET = 250;
 /** sklon [°], nad ktorým Dominik popísal ZMENU správania drážky („nad 9–10° sa drážka
  *  zatvára, výška krovu sa dvíha") — frézovací detail (O5). Nemení potvrdené offsety. */
 export const KROV_FREZ_ZMENA_STUPNE = 9;
@@ -166,4 +174,32 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 		konstanty,
 		poznamky
 	};
+}
+
+/** NOMINÁLNA dĺžka krovu (spodná hrana / uloženie) zo sklonu strechy [mm] — meria sa po
+ *  spáde: `hĺbka / cos(sklon) − 250`. Vráti `null` keď sklon/hĺbka nezadané alebo neplatné
+ *  (honest-null — bez sklonu sa dĺžka NEDÁ počítať, nič sa nehádže).
+ *
+ *  Oddelené od `krovUlozenie` (offsety prahu 7°): uloženie sa počíta len pre sklon ≥ 7°,
+ *  ale NOMINÁLNA dĺžka funguje pre KAŽDÝ sklon > 0 — golden OP260282 má sklon 6,1° (POD
+ *  prahom), takže dĺžka MUSÍ ísť mimo uloženia. Overené na golden: 3470/cos(6,1°) − 250 =
+ *  3239,76 mm.
+ *
+ *  Horná hrana krovu (HH, výkres OP260282 = 3240,93) = nominál + ~1,17 mm reálne uloženie
+ *  („nesedí o ~2 mm, nerieš" — Dominik na výkres); +1,17 nemá čistý vzorec, preto sa emituje
+ *  NOMINÁL a seating gap sa len dokumentuje (do rezervačného odpisu stačí nominál).
+ *
+ *  Konštanta `KROV_ODPOCET = 250` je overená len pre Massive 140 / zadný 110 (jediný golden)
+ *  — emisiu preto Massive-gatuje `spocitajNarez` (Robust ostáva honest-null). R2 (0,01 mm) =
+ *  presnosť výkresu (3240,93). Čistá funkcia, bez vedľajších efektov, bez Money zápisu. */
+export function krovDlzkaNominal(
+	hlbkaMm: number,
+	sklonStupne: number | null | undefined
+): number | null {
+	const s = typeof sklonStupne === 'number' && Number.isFinite(sklonStupne) ? sklonStupne : null;
+	if (s === null || s <= 0) return null;
+	if (!(typeof hlbkaMm === 'number' && Number.isFinite(hlbkaMm) && hlbkaMm > 0)) return null;
+	const cos = Math.cos(rad(s));
+	if (!(cos > 0)) return null; // obranné (sklon → 90° by delil ~0)
+	return R2(hlbkaMm / cos - KROV_ODPOCET);
 }
