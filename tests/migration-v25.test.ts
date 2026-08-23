@@ -32,7 +32,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 	it('user_version === 25 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(25);
+		expect(db.pragma('user_version', { simple: true })).toBe(26);
 	});
 
 	it('existujúci user (palo) prežil migráciu (žiadna strata dát)', () => {
@@ -44,6 +44,7 @@ describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 		const cols = (db.prepare('PRAGMA table_info(dopyt)').all() as { name: string }[]).map(
 			(c) => c.name
 		);
+		// migrácia beží po NAJNOVŠIU verziu → v26 (#278) doplní Odoo lead stavové stĺpce
 		expect(cols).toEqual([
 			'id',
 			'konfiguracia',
@@ -52,7 +53,10 @@ describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 			'telefon',
 			'miesto',
 			'poznamka',
-			'created_at'
+			'created_at',
+			'odoo_lead_id',
+			'odoo_attempts',
+			'odoo_last_error'
 		]);
 	});
 
