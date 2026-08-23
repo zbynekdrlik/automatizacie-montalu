@@ -11,7 +11,13 @@
 	import { mm } from '$lib/vizual/jednotky';
 	import { SKLO_HRUBKA_DEFAULT_MM } from '$lib/vizual/konstanty';
 	import { postavGeometrie, type MergeGeometriesFn } from '$lib/vizual/builder';
-	import { nastavRAL, vytvorHlinikMaterial, vytvorSkloMaterial } from '$lib/vizual/materialy';
+	import {
+		nastavRAL,
+		nastavSkloVzhlad,
+		vytvorHlinikMaterial,
+		vytvorSkloMaterial,
+		type SkloVzhlad
+	} from '$lib/vizual/materialy';
 	import {
 		disposeVsetko,
 		vytvorEnvironment,
@@ -39,6 +45,7 @@
 	let {
 		vysledok,
 		ralKod,
+		skloVzhlad,
 		preset = $bindable<PresetKluc>(PRESET_DEFAULT),
 		vynutenyTier,
 		pripravene = $bindable(false),
@@ -47,6 +54,9 @@
 	}: {
 		vysledok: VizVysledok;
 		ralKod: string;
+		/** voliteľné prepísanie vzhľadu skla (#276 — priehľadnosť podľa typu skla).
+		 *  `undefined` = pôvodné zasklenia sklo (spätne kompatibilné). */
+		skloVzhlad?: SkloVzhlad;
 		preset?: PresetKluc;
 		/** testovací hook (`?viz=low`/`?viz=none` v URL) — vynúti tier bez ohľadu
 		 *  na skutočné HW, pre e2e determinizmus (§2.12) */
@@ -96,6 +106,9 @@
 		 *  — `renderer.forceContextLoss()` je NEVRATNÉ, nesmie sa volať pri
 		 *  bežnej zmene geometrie, len pri skutočnom unmounte). */
 		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
+		/** referencia na sklo materiál (ak scéna má sklo) — pre živú zmenu vzhľadu
+		 *  skla (`prekresliSklo()`) bez rebuildu geometrie (#276). */
+		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
 		disposables: Disposable[];
 		contextLostCount: number;
 		fitVzdialenost: number;
@@ -183,6 +196,17 @@
 		render();
 	}
 
+	/** Živá zmena vzhľadu skla (typ skla) BEZ rebuildu geometrie (#276) — mutuje
+	 *  existujúci sklo materiál (analógia `prekresliRAL`). Robí niečo LEN keď
+	 *  `skloVzhlad` je zadané (pergola zákaznícky režim); pri zasklení
+	 *  (`skloVzhlad === undefined`) je no-op a sklo ostáva pôvodné. */
+	function prekresliSklo() {
+		if (!ziva || !ziva.skloMaterial || !skloVzhlad) return;
+		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
+		nastavSkloVzhlad(ziva.THREE, ziva.skloMaterial, nastavenia.sklo, skloVzhlad);
+		render();
+	}
+
 	function pripravDataZAtributov(el: HTMLElement | undefined) {
 		if (!el) return;
 		el.dataset.vizReady = pripravene ? 'true' : 'false';
@@ -255,14 +279,17 @@
 		scene: InstanceType<ThreeNS['Scene']>,
 		vysledok: VizVysledok,
 		ralKod: string,
-		nastavenia: ReturnType<typeof nastaveniaPreTier>
+		nastavenia: ReturnType<typeof nastaveniaPreTier>,
+		skloVzhlad: SkloVzhlad | undefined
 	): {
 		materialy: ZivaScena['materialy'];
 		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
+		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
 	} {
 		const geometrie = postavGeometrie(vysledok.diely, THREE, mergeGeometries);
 		const materialy: ZivaScena['materialy'] = {};
 		const produktMeshe: InstanceType<ThreeNS['Mesh']>[] = [];
+		let skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null = null;
 
 		const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat);
 		for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
@@ -281,7 +308,13 @@
 			// takže presná hodnota z `ZaskleniaVizVstup.skloPresne` sa sem
 			// (mimo `vysledok.diely`) nedostane — zdieľaný default aspoň
 			// nevie "rozísť" s geometriou, ak sa `SKLO_HRUBKA_DEFAULT_MM` zmení.
-			const skloMat = vytvorSkloMaterial(THREE, SKLO_HRUBKA_DEFAULT_MM, nastavenia.sklo);
+			const skloMat = vytvorSkloMaterial(
+				THREE,
+				SKLO_HRUBKA_DEFAULT_MM,
+				nastavenia.sklo,
+				skloVzhlad
+			);
+			skloMaterial = skloMat;
 			const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
 			scene.add(mesh);
 			produktMeshe.push(mesh);
@@ -302,7 +335,7 @@
 			produktMeshe.push(mesh);
 		}
 
-		return { materialy, produktMeshe };
+		return { materialy, produktMeshe, skloMaterial };
 	}
 
 	/** V-mieste prestavba LEN geometrie produktu (napr. "Otvoriť"/rozmer) —
@@ -320,16 +353,18 @@
 		zlikvidujProduktMeshe(ziva.produktMeshe);
 
 		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
-		const { materialy, produktMeshe } = postavProduktMeshe(
+		const { materialy, produktMeshe, skloMaterial } = postavProduktMeshe(
 			ziva.THREE,
 			ziva.mergeGeometries,
 			ziva.scene,
 			novyVysledok,
 			ralKod,
-			nastavenia
+			nastavenia,
+			skloVzhlad
 		);
 		ziva.materialy = materialy;
 		ziva.produktMeshe = produktMeshe;
+		ziva.skloMaterial = skloMaterial;
 		render();
 	}
 
@@ -386,13 +421,14 @@
 		// geometria produktu (extrahované do zdieľanej funkcie — volá ju aj
 		// `prestavGeometriuProduktu()` pri "Otvoriť"/zmene rozmerov, bez toho,
 		// aby sa dotkla tohto rendereru/scény/kamery)
-		const { materialy, produktMeshe } = postavProduktMeshe(
+		const { materialy, produktMeshe, skloMaterial } = postavProduktMeshe(
 			THREE,
 			mergeGeometries,
 			scene,
 			vysledok,
 			ralKod,
-			nastavenia
+			nastavenia,
+			skloVzhlad
 		);
 		// POZOR: `produktMeshe` (geometrie/materiály) sa NEDÁVAJÚ do `disposables`
 		// — tie idú cez `ziva.produktMeshe` + `zlikvidujProduktMeshe()`, lebo
@@ -440,6 +476,7 @@
 			controls,
 			materialy,
 			produktMeshe,
+			skloMaterial,
 			disposables,
 			contextLostCount: 0,
 			fitVzdialenost
@@ -598,6 +635,14 @@
 	// funkciách), preto tu netreba samostatný `ralKod;` riadok len na závislosť.
 	$effect(() => {
 		prekresliRAL();
+	});
+
+	// #276: živá zmena typu skla (`skloVzhlad`) prekreslí sklo BEZ rebuildu
+	// geometrie (mutácia materiálu, analógia RAL efektu vyššie). `prekresliSklo`
+	// číta `skloVzhlad` priamo, takže `$effect` naň automaticky reaguje; pri
+	// zasklení (`skloVzhlad === undefined`) je no-op.
+	$effect(() => {
+		prekresliSklo();
 	});
 
 	// KRITICKÉ: `zaskleniaSpec()` (volaná v rodičovi, Vizual3DPanel.svelte)
