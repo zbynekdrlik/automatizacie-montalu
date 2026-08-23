@@ -47,16 +47,28 @@ export function jeSoftverovyRenderer(unmaskedRenderer: string): boolean {
  *  privacy) → volajúci graceful padne na pôvodnú heuristiku. */
 export type GpuTrieda = 'slabe' | 'mobilne' | 'integrovane' | 'diskretne' | 'neznamy';
 
-// diskrétny desktop → high. Poradie: kontroluje sa PRED mobilné/integrované, aby
-// „Apple M1 Pro"/„Radeon RX" nespadli do integrovaného kýbla.
+// diskrétny (dedikovaný) desktop GPU → high. Model-číslované herné/pro karty.
+// `(?:\s*\(TM\))?` znáša reálny „(TM)" (rovnaká disciplína ako Adreno `\D*`) — bez
+// neho by „AMD Radeon (TM) RX 480" nespadlo sem (review #288). POZOR poradie v
+// `klasifikujGpu`: `INTEGROVANE_IGPU_RE` sa kontroluje PRED týmto (integrované GPU
+// s „diskrétnym" menom).
 const DISKRETNE_GPU_RE =
-	/GeForce|\bRTX\b|\bGTX\b|Quadro|Radeon (?:RX|Pro)\b|\bArc\b|Apple M\d+ (?:Pro|Max|Ultra)/i;
+	/GeForce (?:RTX|GTX)|\bRTX\b|\bGTX\b|Quadro|TITAN|Radeon(?:\s*\(TM\))?\s+(?:RX|Pro)\b|\bArc\b\s*(?:\(TM\)\s*)?[AB]\d{3}\b|Apple M\d+ (?:Pro|Max|Ultra)/i;
+// Integrované GPU, ktoré NESÚ „diskrétne" meno — MUSIA sa chytiť PRED `DISKRETNE_GPU_RE`,
+// inak by dostali najťažší tier na tenkom zariadení (review #288):
+//  - AMD APU: „Radeon(TM) RX Vega 10 Graphics" / „Radeon Vega 8 Graphics" (Ryzen APU;
+//    diskrétne „RX Vega 64" NEMÁ „Graphics" suffix → ostane diskrétne),
+//  - Intel Core Ultra (Meteor/Lunar Lake) iGPU: „Intel(R) Arc(TM) Graphics" (bez Ax/Bx),
+//  - NVIDIA entry: „GeForce MX250" / „GeForce GT 710".
+const INTEGROVANE_IGPU_RE =
+	/Radeon(?:\s*\(TM\))?(?:\s+RX)?\s+Vega\s+\d+\s+Graphics|\bArc\b(?:\s*\(TM\))?\s+Graphics\b|GeForce\s+(?:MX|GT)\s*\d/i;
 // mobilné GPU (telefón/tablet) → mid: neslabé Apple/Adreno. `\D*` znáša „(TM)".
+// „Apple GPU" hlási AJ maskované macOS Safari na M-series desktope → mid (bezpečný smer).
 const MOBILNE_GPU_RE = /Apple (?:A\d+|GPU)\b|Adreno\D*[6-9]\d\d\b/i;
-// desktop integrované GPU → mid: Apple M base (bez Pro/Max/Ultra), Intel Iris/UHD/Xe,
-// AMD APU (Vega/Graphics).
+// ostatné desktop integrované GPU → mid: Apple M base (bez Pro/Max/Ultra), Intel
+// Iris/UHD/HD Graphics/Xe (`\bXe\b` aby „Xeon" neprešlo), AMD APU Radeon Vega/Graphics.
 const INTEGROVANE_GPU_RE =
-	/Apple M\d+\b|Intel.*(?:Iris|UHD|HD Graphics|Xe)|Radeon.*(?:Vega|Graphics)|AMD Radeon(?:\(TM\))? Graphics/i;
+	/Apple M\d+\b|Intel.*(?:Iris|UHD|HD Graphics|\bXe\b)|Radeon.*(?:Vega|Graphics)|AMD Radeon(?:\(TM\))? Graphics/i;
 
 export function klasifikujGpu(renderer: string): GpuTrieda {
 	const s = renderer.trim();
@@ -64,6 +76,8 @@ export function klasifikujGpu(renderer: string): GpuTrieda {
 	// slabé/softvérové najprv (zachováva #170 konvenciu: každé Mali/Adreno 1-5/
 	// PowerVR → low, bez ohľadu na CPU jadrá)
 	if (SLABE_GPU_RE.test(s) || jeSoftverovyRenderer(s)) return 'slabe';
+	// integrované „vyzerá diskrétne" tvary (APU/iGPU/entry) PRED diskrétnym testom
+	if (INTEGROVANE_IGPU_RE.test(s)) return 'integrovane';
 	if (DISKRETNE_GPU_RE.test(s)) return 'diskretne';
 	if (MOBILNE_GPU_RE.test(s)) return 'mobilne';
 	if (INTEGROVANE_GPU_RE.test(s)) return 'integrovane';
@@ -191,8 +205,8 @@ export function postprocPovoleny(nastavenia: TierNastavenia, unmaskedRenderer: s
 }
 
 /** #288: per-tier parametre post-processing efektov. Čisté DÁTA (žiadny THREE/DOM) —
- *  žijú TU (v mera­nej `kvalita.ts`, spolu s ostatnými tier→nastavenia rozhodnutiami),
- *  aby `postproc.ts` ostal čisto nemeratеľná THREE-composer továreň. `null` pre
+ *  žijú TU (v meranej `kvalita.ts`, spolu s ostatnými tier→nastavenia rozhodnutiami),
+ *  aby `postproc.ts` ostal čisto nemerateľná THREE-composer továreň. `null` pre
  *  `low`/`none` (composer sa tam nestavia; runtime gate rieši `postprocPovoleny`). */
 export interface PostprocKonfig {
 	gtao: boolean;

@@ -74,6 +74,31 @@ describe('klasifikujGpu (#288) — kurátorská benchmark trieda z renderer-stri
 		expect(klasifikujGpu('AMD Radeon(TM) Graphics')).toBe('integrovane'); // APU
 	});
 
+	it('review #288: „(TM)" diskrétne AMD Radeon RX/Pro → diskretne (nie integrovane)', () => {
+		expect(klasifikujGpu('AMD Radeon (TM) RX 480 Graphics')).toBe('diskretne');
+		expect(klasifikujGpu('ANGLE (AMD, AMD Radeon(TM) RX 6600 XT Direct3D11)')).toBe('diskretne');
+		expect(klasifikujGpu('AMD Radeon (TM) Pro 560')).toBe('diskretne');
+		expect(klasifikujGpu('AMD Radeon RX Vega 64')).toBe('diskretne'); // diskrétna Vega (bez „Graphics")
+	});
+
+	it('review #288: AMD APU „Radeon Vega N Graphics" → integrovane (nie diskretne/high)', () => {
+		expect(klasifikujGpu('AMD Radeon(TM) RX Vega 10 Graphics')).toBe('integrovane');
+		expect(klasifikujGpu('AMD Radeon Vega 8 Graphics')).toBe('integrovane');
+	});
+
+	it('review #288: Intel Core Ultra „Arc(TM) Graphics" iGPU → integrovane, ale Arc A/B model → diskretne', () => {
+		expect(klasifikujGpu('ANGLE (Intel, Intel(R) Arc(TM) Graphics (MTL))')).toBe('integrovane');
+		expect(klasifikujGpu('Intel Arc A770 Graphics')).toBe('diskretne');
+		expect(klasifikujGpu('Intel(R) Arc(TM) B580 Graphics')).toBe('diskretne');
+	});
+
+	it('review #288: NVIDIA entry „GeForce MX/GT" → integrovane (nie high), Xeon nie je Xe', () => {
+		expect(klasifikujGpu('NVIDIA GeForce MX250')).toBe('integrovane');
+		expect(klasifikujGpu('NVIDIA GeForce GT 710')).toBe('integrovane');
+		// „Xeon" nesmie matchnúť Intel `\bXe\b` integrovaného pravidla
+		expect(klasifikujGpu('Intel(R) Xeon(R) W-2295')).toBe('neznamy');
+	});
+
 	it('neznáme hardvérové GPU → neznamy (graceful fallback)', () => {
 		expect(klasifikujGpu('Some Exotic GPU 9000')).toBe('neznamy');
 	});
@@ -109,6 +134,17 @@ describe('detekujTier (#288) — reálny GPU má prednosť pred viewport heurist
 				hardwareConcurrency: 16,
 				devicePixelRatio: 1,
 				unmaskedRenderer: 'Intel(R) Iris(R) Xe Graphics'
+			})
+		).toBe('mid');
+	});
+
+	it('review #288: Intel Arc(TM) Graphics iGPU (Core Ultra) → mid, NIE high (perf over-tier)', () => {
+		expect(
+			detekujTier({
+				webgl2Dostupny: true,
+				hardwareConcurrency: 16,
+				devicePixelRatio: 2,
+				unmaskedRenderer: 'ANGLE (Intel, Intel(R) Arc(TM) Graphics (MTL))'
 			})
 		).toBe('mid');
 	});

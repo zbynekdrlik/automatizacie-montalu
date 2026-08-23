@@ -7,6 +7,9 @@
 // riadky (v CI beží proti preview, live:false → beží). Každý test = NULA console chýb.
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
+// #288 review 🔵: kanonický klasifikátor (Node kontext — helper beží mimo page.evaluate),
+// aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
+import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
 
 test('konfigurátor: verejný flow BEZ prihlásenia → súhrn konfigurácie, žiadna cena/Money kód, nula console chýb', async ({
 	page
@@ -174,10 +177,7 @@ async function overPostprocGate(page: import('@playwright/test').Page) {
 		return { renderer, postproc: el?.getAttribute('data-viz-postproc') };
 	});
 	expect(['true', 'false']).toContain(info.postproc);
-	const softverovy =
-		info.renderer === '' ||
-		/SwiftShader|llvmpipe|softpipe|Software|Basic Render|Microsoft/i.test(info.renderer);
-	if (softverovy) expect(info.postproc).toBe('false');
+	if (jeSoftverovyRenderer(info.renderer ?? '')) expect(info.postproc).toBe('false');
 }
 
 test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), nula console chýb, žiaden únik', async ({

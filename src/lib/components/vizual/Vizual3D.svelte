@@ -235,7 +235,7 @@
 		el.dataset.vizRal = ralKod;
 		// #288: či je aktívny post-processing composer (mid/high + hardvér). Diagnostika
 		// paralelná k `data-viz-ready` — E2E ňou overí, že na SOFTVÉROVOM CI rendereri je
-		// gate správne VYPNUTÝ (`false` → priamy render, žiadna #290 regresia), a naживо na
+		// gate správne VYPNUTÝ (`false` → priamy render, žiadna #290 regresia), a naživo na
 		// hardvéri ZAPNUTÝ (`true`). `ziva` nie je `$state`, ale efekt sa už spúšťa cez
 		// `pripravene` (flipne až po postavení scény), takže `ziva.postproc` je vtedy known.
 		el.dataset.vizPostproc = ziva?.postproc ? 'true' : 'false';
@@ -301,18 +301,11 @@
 	) {
 		if (vynutenyTier) return vynutenyTier;
 		if (!gl) return detekujTier({ webgl2Dostupny: false });
-		let unmaskedRenderer = '';
-		try {
-			const ext = gl.getExtension('WEBGL_debug_renderer_info');
-			if (ext) unmaskedRenderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
-		} catch {
-			// bez debug info sa jednoducho nevie odhadnúť GPU — zostane prázdne
-		}
 		return detekujTier({
 			webgl2Dostupny: true,
 			hardwareConcurrency: navigator.hardwareConcurrency,
 			deviceMemory: (navigator as unknown as { deviceMemory?: number }).deviceMemory,
-			unmaskedRenderer,
+			unmaskedRenderer: citajUnmaskedRenderer(gl), // #288 review 🔵: zdieľaný helper (bez duplicity)
 			devicePixelRatio: window.devicePixelRatio,
 			initMs,
 			contextLostCount
@@ -678,8 +671,12 @@
 			// #290). Moduly sa lazy-importujú len keď gate prejde (mimo low/mobil kritickej
 			// cesty). `citajUnmaskedRenderer(gl)` číta GPU string zo scratch kontextu — tá
 			// istá GPU ako reálny renderer, takže softvér/hardvér verdikt je rovnaký.
+			// #288 review 🟡: postproc pass moduly sú OPTIONAL (samostatný lazy chunk) —
+			// zlyhanie ich fetchu (flaky mobilná sieť na verejnej route) NESMIE zhodiť
+			// scénu na T0 poster (rovnaká graceful disciplína ako `nacitajHDRI` → null).
+			// `.catch(()=>null)` → composer sa nepostaví, ide priamy render, náhľad žije.
 			const postprocModuly = postprocPovoleny(nastaveniaPreTier(tier), citajUnmaskedRenderer(gl))
-				? await nacitajPostproc()
+				? await nacitajPostproc().catch(() => null)
 				: null;
 			if (zruseneVOnMounte || !canvasEl) {
 				hdrTexture?.dispose();
@@ -717,6 +714,19 @@
 			aktualizujCamDataAtributy();
 			render();
 			pripravene = true;
+			// #288 review 🔵: `pripravene` mení efekt `pripravDataZAtributov` LEN pri
+			// prvom flipe false→true; pri `webglcontextrestored` re-inite ostáva `true`,
+			// takže efekt sa znova nespustí a `data-viz-postproc` by ostal stale, ak sa
+			// gate rozhodol inak (napr. context restore na prepnutom GPU). Zavoláme ho
+			// explicitne (na prvom mounte redundantné, pri re-inite nutné).
+			pripravDataZAtributov(containerEl);
+			// #288 review 🔵: SMAA area/search textúry sa dekódujú async (Image.onload z
+			// data-URI); prvý composer render môže bežať pred ich pripravením → hero frame
+			// bez AA na hrany až do prvej interakcie (on-demand engine sám neprekresľuje).
+			// Jeden odložený re-render po dobehnutí textúr zachytí AA na počiatočnom zábere.
+			if (ziva?.postproc && typeof requestAnimationFrame === 'function') {
+				requestAnimationFrame(() => render());
+			}
 		} catch (e) {
 			// Nikdy nesmie zostať tichá — chyba počas stavby scény (napr.
 			// programátorská chyba, nie skutočná nedostupnosť WebGL) by sa
@@ -842,13 +852,20 @@
 	export async function zachytObrazok(sirkaPx?: number, vyskaPx?: number) {
 		if (!ziva) throw new Error('Vizual3D: scéna nie je pripravená');
 		dotykOverlayViditelny = false;
-		return zachytSnimku(ziva.THREE, {
+		const blob = await zachytSnimku(ziva.THREE, {
 			renderer: ziva.renderer,
 			scene: ziva.scene,
 			camera: ziva.camera,
 			sirkaPx,
 			vyskaPx
 		});
+		// #288 review 🟡: `snimka.ts`'s `finally` obnoví obrazovku PRIAMYM
+		// `renderer.render()` (bez composera). Na hardvéri (mid/high) by tak obrazovka
+		// po exporte PNG stratila GTAO/SMAA/bloom až do ďalšej interakcie (on-demand
+		// engine sám neprekresľuje). Composer-aware `render()` obnoví post-processovaný
+		// stav (na softvéri/low je `render()` beztak priamy — no-op rozdiel).
+		render();
+		return blob;
 	}
 
 	export function nastavPresetVerejne(kluc: PresetKluc) {
