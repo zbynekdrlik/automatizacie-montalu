@@ -94,6 +94,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`
+- SvelteKit form actions (`default` vs pomenované — nedajú sa miešať) → `.claude/rules/sveltekit-actions.md`
 - login brute-force throttle / timing oracle / bezpečnostné hlavičky / getClientAddress za Caddy → `.claude/rules/login-hardening.md`
 - unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
 - štruktúrovaný logger (`log.ts`), handleError, chybová stránka, testovanie logov → `.claude/rules/logging.md`
