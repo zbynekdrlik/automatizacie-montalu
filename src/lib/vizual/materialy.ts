@@ -5,9 +5,20 @@ import { mm } from './jednotky';
 type ThreeNS = typeof import('three');
 type Material = InstanceType<ThreeNS['MeshPhysicalMaterial']>;
 
-/** Hliníková konštrukcia — `MeshPhysicalMaterial` podľa §2.6. Tmavá anodizácia
- *  (RAL so `tmavyObrys`) je opticky lesklejšia — §2.7 (`roughness`/`clearcoat`/
- *  `envMapIntensity` sa jemne posunú, farba samotná ostáva presná). */
+/** Hliníková konštrukcia — `MeshPhysicalMaterial` podľa §2.6.
+ *
+ *  #285 (showroom kvalita): práškovaný hliník je **DIELEKTRIKUM**, nie holý kov.
+ *  Práškovanie je pigmentovaný polymérový LAK nanesený na profil — svetlo sa
+ *  odráža od farebnej lakovej vrstvy (difúzne, `metalness=0`), nie kovovo
+ *  zafarbeným zrkadlovým odrazom (`metalness=1`). Predchádzajúca hodnota
+ *  `metalness: 0.82` čítala ako surový leštený kov (presne slabina, ktorú
+ *  rešerš #276 vytkla SalesQueze — „matný hliník bez odozvy svetla"). Model:
+ *  `metalness 0`, `roughness ~0.35` (jemne matný lak), tenká `clearcoat ~0.3`
+ *  vrstva (číra ochranná/lesklá vrstva laku) so `clearcoatRoughness ~0.12` —
+ *  clearcoat dodá jemný, farbou nezafarbený odlesk HDRI oblohy/slnka, presne
+ *  ako reálny práškovaný povrch. Farba (RAL) ostáva presná (`farbaKonstrukcie`).
+ *  Tmavá anodizácia (`tmavyObrys`) je opticky o niečo lesklejšia — jemne nižšia
+ *  `roughness`, vyšší `clearcoat`. */
 export function vytvorHlinikMaterial(
 	THREE: ThreeNS,
 	ralKod: string,
@@ -16,15 +27,16 @@ export function vytvorHlinikMaterial(
 	const farba = farbaKonstrukcie(ralKod);
 	const mat = new THREE.MeshPhysicalMaterial({
 		color: new THREE.Color(farba.hex),
-		metalness: 0.82,
-		roughness: 0.32,
-		clearcoat: clearcoatPovoleny ? 0.1 : 0,
-		clearcoatRoughness: 0.25,
+		metalness: 0,
+		roughness: 0.35,
+		clearcoat: clearcoatPovoleny ? 0.3 : 0,
+		clearcoatRoughness: 0.12,
 		envMapIntensity: 1.0
 	});
 	if (farba.tmavyObrys) {
-		mat.roughness = 0.28;
-		mat.clearcoat = clearcoatPovoleny ? 0.16 : 0;
+		mat.roughness = 0.3;
+		mat.clearcoat = clearcoatPovoleny ? 0.4 : 0;
+		mat.clearcoatRoughness = 0.1;
 		mat.envMapIntensity = 1.15;
 	}
 	return mat;
@@ -41,15 +53,50 @@ export function nastavRAL(
 ): void {
 	const farba = farbaKonstrukcie(ralKod);
 	mat.color = new THREE.Color(farba.hex);
-	mat.roughness = farba.tmavyObrys ? 0.28 : 0.32;
-	mat.clearcoat = clearcoatPovoleny ? (farba.tmavyObrys ? 0.16 : 0.1) : 0;
+	// #285: dielektrický práškovaný hliník — držané konzistentne s
+	// `vytvorHlinikMaterial` (metalness 0 sa nastaví explicitne, keby sa RAL čip
+	// prepol na inštancii, ktorá by z akéhokoľvek dôvodu mala inú hodnotu).
+	mat.metalness = 0;
+	mat.roughness = farba.tmavyObrys ? 0.3 : 0.35;
+	mat.clearcoat = clearcoatPovoleny ? (farba.tmavyObrys ? 0.4 : 0.3) : 0;
+	mat.clearcoatRoughness = farba.tmavyObrys ? 0.1 : 0.12;
 	mat.envMapIntensity = farba.tmavyObrys ? 1.15 : 1.0;
 	mat.needsUpdate = true;
 }
 
+/** Voliteľné prepísanie vzhľadu skla (#276 — priehľadnosť podľa typu skla pre
+ *  zákaznícky pergola vizuál). `undefined` (default) = presne pôvodné zasklenia
+ *  správanie (kryté #170/#174 testami). Mapovanie typu skla → tento tvar žije v
+ *  `pergola-sklo.ts` (čistý, THREE-free). Prahy útlmu sú v METROCH (rovnaká
+ *  jednotka ako `attenuationDistance` nižšie). */
+export interface SkloVzhlad {
+	/** základná farba tabule (hex) */
+	farbaHex?: number;
+	/** `falosne` režim: opacity 0..1 */
+	opacity?: number;
+	/** `transmission` režim: Beer–Lambert attenuationColor (hex) */
+	attenuationHex?: number;
+	/** `transmission` režim: attenuationDistance [m] */
+	attenuationDistanceM?: number;
+	/** drsnosť povrchu (matné/opálové sklo = vyššia) */
+	roughness?: number;
+}
+
+// Predvolené hodnoty pôvodného (#174) zasklenia skla — použité, keď `vzhlad`
+// neprepíše danú vlastnosť. Zdieľané `vytvorSkloMaterial` aj `nastavSkloVzhlad`,
+// aby sa defaulty nemohli rozísť.
+const SKLO_FALOSNE_DEF = { farbaHex: 0x8fcab3, opacity: 0.26, roughness: 0.04 } as const;
+const SKLO_TRANSM_DEF = {
+	farbaHex: 0xf2faf7,
+	attenuationHex: 0x2f9478,
+	attenuationDistanceM: 0.035,
+	roughness: 0.06
+} as const;
+
 /** Sklo — buď skutočný transmission pass (jedna zliata geometria + jedna
  *  inštancia materiálu, §2.6), alebo lacnejšia priehľadnosť pre `low` tier
- *  (§2.9).
+ *  (§2.9). Voliteľný `vzhlad` (#276) prepíše farbu/priehľadnosť/útlm podľa typu
+ *  skla; bez neho ostáva presne pôvodné zasklenia sklo.
  *
  *  #174 vizuálna iterácia, 1. kolo — pôvodné hodnoty (opacity 0.34 / bledá
  *  0xeaf2ee / attenuationDistance 6) v OBOCH režimoch vyzerali ako mliečny
@@ -86,7 +133,8 @@ export function nastavRAL(
 export function vytvorSkloMaterial(
 	THREE: ThreeNS,
 	skloHrubkaMm: number,
-	rezim: 'transmission' | 'falosne'
+	rezim: 'transmission' | 'falosne',
+	vzhlad?: SkloVzhlad
 ): Material {
 	const clearcoatSpolocne = { clearcoat: 0.85, clearcoatRoughness: 0.04 };
 	if (rezim === 'falosne') {
@@ -95,11 +143,12 @@ export function vytvorSkloMaterial(
 			// #174 3. kolo: 2. kolo (opacity 0.32, farba 0x3fae8c) vizuálne
 			// čítalo ako SÝTE zelené sklo, nie "jemný modrozelený nádych" zo
 			// zadania — znížené opacity aj zosvetlená/menej sýta farba dávajú
-			// stále jasne VIDITEĽNÝ, ale jemnejší tón (overené screenshotom)
-			opacity: 0.26,
-			roughness: 0.04,
+			// stále jasne VIDITEĽNÝ, ale jemnejší tón (overené screenshotom).
+			// #276: `vzhlad` môže prepísať farbu/opacity/drsnosť podľa typu skla.
+			opacity: vzhlad?.opacity ?? SKLO_FALOSNE_DEF.opacity,
+			roughness: vzhlad?.roughness ?? SKLO_FALOSNE_DEF.roughness,
 			transmission: 0,
-			color: new THREE.Color(0x8fcab3),
+			color: new THREE.Color(vzhlad?.farbaHex ?? SKLO_FALOSNE_DEF.farbaHex),
 			metalness: 0,
 			envMapIntensity: 1.6,
 			specularIntensity: 1.3,
@@ -110,13 +159,13 @@ export function vytvorSkloMaterial(
 	return new THREE.MeshPhysicalMaterial({
 		transmission: 1,
 		ior: 1.5,
-		roughness: 0.06,
+		roughness: vzhlad?.roughness ?? SKLO_TRANSM_DEF.roughness,
 		thickness: mm(skloHrubkaMm),
 		metalness: 0,
 		transparent: false,
 		// takmer neutrálna — tint nesie hlavne attenuationColor (Beer–Lambert),
 		// `color` by pri sýtej hodnote útlm len duplicitne prehĺbil
-		color: new THREE.Color(0xf2faf7),
+		color: new THREE.Color(vzhlad?.farbaHex ?? SKLO_TRANSM_DEF.farbaHex),
 		// #174 3. kolo: 2. kolo (attenuationDistance 0.02) čítalo naživo ako
 		// SÝTE zelené sklo, nie "jemný modrozelený nádych" zo zadania. Väčšia
 		// attenuationDistance (0.035) pri rovnakej sýtej `attenuationColor`
@@ -124,11 +173,35 @@ export function vytvorSkloMaterial(
 		// AJ `tests/vizual-materialy.test.ts` (skutočná Beer–Lambert
 		// transmitancia po kanáli, viď funkcie vlastný header komentár vyššie
 		// pre presnú formulu a upozornenie na lineárny vs. sRGB priestor).
-		attenuationColor: new THREE.Color(0x2f9478),
-		attenuationDistance: 0.035,
+		attenuationColor: new THREE.Color(vzhlad?.attenuationHex ?? SKLO_TRANSM_DEF.attenuationHex),
+		attenuationDistance: vzhlad?.attenuationDistanceM ?? SKLO_TRANSM_DEF.attenuationDistanceM,
 		envMapIntensity: 1.6,
 		specularIntensity: 1.3,
 		specularColor: new THREE.Color(0xffffff),
 		...clearcoatSpolocne
 	});
+}
+
+/** Prepíše vzhľad skla na UŽ EXISTUJÚCEJ inštancii materiálu (živá zmena typu
+ *  skla bez rebuildu geometrie — analógia `nastavRAL` pre RAL, #276). Mení iba
+ *  vlastnosti relevantné pre daný režim (`falosne` = opacity/farba/drsnosť;
+ *  `transmission` = farba/attenuation/drsnosť). `undefined` polia `vzhlad`-u
+ *  padnú na pôvodné zasklenia defaulty. */
+export function nastavSkloVzhlad(
+	THREE: ThreeNS,
+	mat: Material,
+	rezim: 'transmission' | 'falosne',
+	vzhlad: SkloVzhlad
+): void {
+	if (rezim === 'falosne') {
+		mat.color = new THREE.Color(vzhlad.farbaHex ?? SKLO_FALOSNE_DEF.farbaHex);
+		mat.opacity = vzhlad.opacity ?? SKLO_FALOSNE_DEF.opacity;
+		mat.roughness = vzhlad.roughness ?? SKLO_FALOSNE_DEF.roughness;
+	} else {
+		mat.color = new THREE.Color(vzhlad.farbaHex ?? SKLO_TRANSM_DEF.farbaHex);
+		mat.attenuationColor = new THREE.Color(vzhlad.attenuationHex ?? SKLO_TRANSM_DEF.attenuationHex);
+		mat.attenuationDistance = vzhlad.attenuationDistanceM ?? SKLO_TRANSM_DEF.attenuationDistanceM;
+		mat.roughness = vzhlad.roughness ?? SKLO_TRANSM_DEF.roughness;
+	}
+	mat.needsUpdate = true;
 }

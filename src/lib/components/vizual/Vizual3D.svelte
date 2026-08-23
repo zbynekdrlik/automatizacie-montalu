@@ -7,13 +7,23 @@
 	// ktorá sa SAMA ukončí, keď `controls.update()` vráti `false` — damping dobehol).
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { browser } from '$app/environment';
+	import { base } from '$app/paths';
 	import type { Rola, VizVysledok } from '$lib/vizual/spec';
 	import { mm } from '$lib/vizual/jednotky';
 	import { SKLO_HRUBKA_DEFAULT_MM } from '$lib/vizual/konstanty';
 	import { postavGeometrie, type MergeGeometriesFn } from '$lib/vizual/builder';
-	import { nastavRAL, vytvorHlinikMaterial, vytvorSkloMaterial } from '$lib/vizual/materialy';
+	import {
+		nastavRAL,
+		nastavSkloVzhlad,
+		vytvorHlinikMaterial,
+		vytvorSkloMaterial,
+		type SkloVzhlad
+	} from '$lib/vizual/materialy';
 	import {
 		disposeVsetko,
+		hdriUrl,
+		nacitajHDRI,
+		nastavKluceoveSvetloTien,
 		vytvorEnvironment,
 		vytvorKontaktnyTien,
 		vytvorOblohu,
@@ -39,6 +49,7 @@
 	let {
 		vysledok,
 		ralKod,
+		skloVzhlad,
 		preset = $bindable<PresetKluc>(PRESET_DEFAULT),
 		vynutenyTier,
 		pripravene = $bindable(false),
@@ -47,6 +58,9 @@
 	}: {
 		vysledok: VizVysledok;
 		ralKod: string;
+		/** voliteľné prepísanie vzhľadu skla (#276 — priehľadnosť podľa typu skla).
+		 *  `undefined` = pôvodné zasklenia sklo (spätne kompatibilné). */
+		skloVzhlad?: SkloVzhlad;
 		preset?: PresetKluc;
 		/** testovací hook (`?viz=low`/`?viz=none` v URL) — vynúti tier bez ohľadu
 		 *  na skutočné HW, pre e2e determinizmus (§2.12) */
@@ -96,6 +110,9 @@
 		 *  — `renderer.forceContextLoss()` je NEVRATNÉ, nesmie sa volať pri
 		 *  bežnej zmene geometrie, len pri skutočnom unmounte). */
 		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
+		/** referencia na sklo materiál (ak scéna má sklo) — pre živú zmenu vzhľadu
+		 *  skla (`prekresliSklo()`) bez rebuildu geometrie (#276). */
+		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
 		disposables: Disposable[];
 		contextLostCount: number;
 		fitVzdialenost: number;
@@ -183,6 +200,17 @@
 		render();
 	}
 
+	/** Živá zmena vzhľadu skla (typ skla) BEZ rebuildu geometrie (#276) — mutuje
+	 *  existujúci sklo materiál (analógia `prekresliRAL`). Robí niečo LEN keď
+	 *  `skloVzhlad` je zadané (pergola zákaznícky režim); pri zasklení
+	 *  (`skloVzhlad === undefined`) je no-op a sklo ostáva pôvodné. */
+	function prekresliSklo() {
+		if (!ziva || !ziva.skloMaterial || !skloVzhlad) return;
+		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
+		nastavSkloVzhlad(ziva.THREE, ziva.skloMaterial, nastavenia.sklo, skloVzhlad);
+		render();
+	}
+
 	function pripravDataZAtributov(el: HTMLElement | undefined) {
 		if (!el) return;
 		el.dataset.vizReady = pripravene ? 'true' : 'false';
@@ -196,13 +224,16 @@
 	});
 
 	async function nacitajTHREE() {
-		const [THREE, { OrbitControls }, { RoomEnvironment }, { mergeGeometries }] = await Promise.all([
-			import('three'),
-			import('three/examples/jsm/controls/OrbitControls.js'),
-			import('three/examples/jsm/environments/RoomEnvironment.js'),
-			import('three/examples/jsm/utils/BufferGeometryUtils.js')
-		]);
-		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries };
+		const [THREE, { OrbitControls }, { RoomEnvironment }, { mergeGeometries }, { HDRLoader }] =
+			await Promise.all([
+				import('three'),
+				import('three/examples/jsm/controls/OrbitControls.js'),
+				import('three/examples/jsm/environments/RoomEnvironment.js'),
+				import('three/examples/jsm/utils/BufferGeometryUtils.js'),
+				// r0.185: HDRLoader (RGBELoader je deprecovaný alias — waroval by)
+				import('three/examples/jsm/loaders/HDRLoader.js')
+			]);
+		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries, HDRLoader };
 	}
 
 	function zistiTierVstup(
@@ -255,14 +286,17 @@
 		scene: InstanceType<ThreeNS['Scene']>,
 		vysledok: VizVysledok,
 		ralKod: string,
-		nastavenia: ReturnType<typeof nastaveniaPreTier>
+		nastavenia: ReturnType<typeof nastaveniaPreTier>,
+		skloVzhlad: SkloVzhlad | undefined
 	): {
 		materialy: ZivaScena['materialy'];
 		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
+		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
 	} {
 		const geometrie = postavGeometrie(vysledok.diely, THREE, mergeGeometries);
 		const materialy: ZivaScena['materialy'] = {};
 		const produktMeshe: InstanceType<ThreeNS['Mesh']>[] = [];
+		let skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null = null;
 
 		const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat);
 		for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
@@ -270,6 +304,9 @@
 			if (!geo) continue;
 			materialy[rola] = hlinik;
 			const mesh = new THREE.Mesh(geo, hlinik);
+			// #285: hliníková konštrukcia vrhá aj prijíma reálny tieň (mid/high)
+			mesh.castShadow = nastavenia.tiene;
+			mesh.receiveShadow = nastavenia.tiene;
 			scene.add(mesh);
 			produktMeshe.push(mesh);
 		}
@@ -281,8 +318,17 @@
 			// takže presná hodnota z `ZaskleniaVizVstup.skloPresne` sa sem
 			// (mimo `vysledok.diely`) nedostane — zdieľaný default aspoň
 			// nevie "rozísť" s geometriou, ak sa `SKLO_HRUBKA_DEFAULT_MM` zmení.
-			const skloMat = vytvorSkloMaterial(THREE, SKLO_HRUBKA_DEFAULT_MM, nastavenia.sklo);
+			const skloMat = vytvorSkloMaterial(
+				THREE,
+				SKLO_HRUBKA_DEFAULT_MM,
+				nastavenia.sklo,
+				skloVzhlad
+			);
+			skloMaterial = skloMat;
 			const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
+			// #285: sklo prijíma tieň, ale NEvrhá (transmisné sklo by vrhalo
+			// nefyzikálny nepriehľadný tieň)
+			mesh.receiveShadow = nastavenia.tiene;
 			scene.add(mesh);
 			produktMeshe.push(mesh);
 		}
@@ -302,7 +348,7 @@
 			produktMeshe.push(mesh);
 		}
 
-		return { materialy, produktMeshe };
+		return { materialy, produktMeshe, skloMaterial };
 	}
 
 	/** V-mieste prestavba LEN geometrie produktu (napr. "Otvoriť"/rozmer) —
@@ -320,16 +366,18 @@
 		zlikvidujProduktMeshe(ziva.produktMeshe);
 
 		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
-		const { materialy, produktMeshe } = postavProduktMeshe(
+		const { materialy, produktMeshe, skloMaterial } = postavProduktMeshe(
 			ziva.THREE,
 			ziva.mergeGeometries,
 			ziva.scene,
 			novyVysledok,
 			ralKod,
-			nastavenia
+			nastavenia,
+			skloVzhlad
 		);
 		ziva.materialy = materialy;
 		ziva.produktMeshe = produktMeshe;
+		ziva.skloMaterial = skloMaterial;
 		render();
 	}
 
@@ -339,14 +387,21 @@
 		RoomEnvironment: new () => InstanceType<ThreeNS['Scene']>,
 		mergeGeometries: MergeGeometriesFn,
 		canvas: HTMLCanvasElement,
-		aktualnyTier: Exclude<Tier, 'none'>
+		aktualnyTier: Exclude<Tier, 'none'>,
+		hdrTexture: InstanceType<ThreeNS['DataTexture']> | null
 	): ZivaScena {
 		const nastavenia = nastaveniaPreTier(aktualnyTier);
 		const disposables: Disposable[] = [];
 
 		const renderer = vytvorRenderer(THREE, canvas, nastavenia);
 		const scene = new THREE.Scene();
-		const environmentTex = vytvorEnvironment(THREE, RoomEnvironment, renderer, nastavenia);
+		const environmentTex = vytvorEnvironment(
+			THREE,
+			RoomEnvironment,
+			renderer,
+			nastavenia,
+			hdrTexture
+		);
 		scene.environment = environmentTex;
 		// PMREM environment textúra sa inak NIKDY nezlikviduje — únik GPU pamäte
 		// pri každom opätovnom mount/unmount (SPA navigácia preč a späť) alebo
@@ -354,6 +409,27 @@
 		disposables.push(environmentTex);
 
 		const { key, fill } = vytvorSvetla(THREE);
+		// #285: kľúčové svetlo vrhá reálny tieň (mid/high tier) — cieľ + shadow
+		// kamera podľa bboxu; `key.target` MUSÍ byť v scéne, inak three.js tieň
+		// mieri na (0,0,0). Low tier (`tiene===false`) tieň nekonfiguruje.
+		// POZN.: shadow frustum sa dimenzuje RAZ pri mounte podľa počiatočného
+		// bboxu — rovnako ako kontaktný dekal, stena a auto-fit kamery (všetka
+		// „scénická výbava" je mount-time). `prestavGeometriuProduktu` (otvoriť/
+		// zatvoriť) mení len pozície dielov, nie obálku, takže frustum ostáva
+		// platný. Live zmena ROZMEROV bez re-mountu (potenciálne až integrácia
+		// verejnej route #275) by potrebovala prestavať celú túto výbavu spolu —
+		// mimo rozsahu #285 (zdieľané pre-existujúce obmedzenie #170/#174).
+		if (nastavenia.tiene) {
+			nastavKluceoveSvetloTien(
+				THREE,
+				key,
+				vysledok.bbox.w,
+				vysledok.bbox.h,
+				vysledok.bbox.d,
+				nastavenia.shadowMapa
+			);
+			scene.add(key.target);
+		}
 		scene.add(key, fill);
 
 		const obloha = vytvorOblohu(THREE);
@@ -363,6 +439,7 @@
 		if (oblohaMat.map) disposables.push(oblohaMat.map);
 
 		const zem = vytvorZem(THREE, nastavenia);
+		zem.receiveShadow = nastavenia.tiene; // #285: zem prijíma vrhnutý tieň konštrukcie
 		scene.add(zem);
 		disposables.push(zem.geometry, zem.material as Disposable);
 		const zemMat = zem.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
@@ -370,6 +447,7 @@
 
 		const stena = vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
 		stena.position.z = -(mm(vysledok.bbox.d) / 2 + 0.05);
+		stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
 		scene.add(stena);
 		disposables.push(stena.geometry, stena.material as Disposable);
 		const stenaMat = stena.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
@@ -386,13 +464,14 @@
 		// geometria produktu (extrahované do zdieľanej funkcie — volá ju aj
 		// `prestavGeometriuProduktu()` pri "Otvoriť"/zmene rozmerov, bez toho,
 		// aby sa dotkla tohto rendereru/scény/kamery)
-		const { materialy, produktMeshe } = postavProduktMeshe(
+		const { materialy, produktMeshe, skloMaterial } = postavProduktMeshe(
 			THREE,
 			mergeGeometries,
 			scene,
 			vysledok,
 			ralKod,
-			nastavenia
+			nastavenia,
+			skloVzhlad
 		);
 		// POZOR: `produktMeshe` (geometrie/materiály) sa NEDÁVAJÚ do `disposables`
 		// — tie idú cez `ziva.produktMeshe` + `zlikvidujProduktMeshe()`, lebo
@@ -440,6 +519,7 @@
 			controls,
 			materialy,
 			produktMeshe,
+			skloMaterial,
 			disposables,
 			contextLostCount: 0,
 			fitVzdialenost
@@ -485,7 +565,8 @@
 		}
 
 		try {
-			const { THREE, OrbitControls, RoomEnvironment, mergeGeometries } = await nacitajTHREE();
+			const { THREE, OrbitControls, RoomEnvironment, mergeGeometries, HDRLoader } =
+				await nacitajTHREE();
 			if (zruseneVOnMounte || !canvasEl) return;
 			const initMs = performance.now() - t0;
 			const konecnyTier = zistiTierVstup(gl, initMs, 0);
@@ -495,7 +576,26 @@
 				return;
 			}
 			tier = konecnyTier;
-			ziva = postavScenu(THREE, OrbitControls, RoomEnvironment, mergeGeometries, canvasEl, tier);
+			// #285: reálne HDRI/IBL (mid/high tier) — načíta sa z vlastného
+			// originu (`static/hdri/`), NIKDY externý fetch. `nacitajHDRI` vráti
+			// `null` pri akejkoľvek chybe → `vytvorEnvironment` graceful padne na
+			// procedurálny `RoomEnvironment` (scéna sa nikdy nezhodí kvôli assetu).
+			const hdrTexture = nastaveniaPreTier(tier).hdri
+				? await nacitajHDRI(HDRLoader, hdriUrl(base))
+				: null;
+			if (zruseneVOnMounte || !canvasEl) {
+				hdrTexture?.dispose();
+				return;
+			}
+			ziva = postavScenu(
+				THREE,
+				OrbitControls,
+				RoomEnvironment,
+				mergeGeometries,
+				canvasEl,
+				tier,
+				hdrTexture
+			);
 			(globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS =
 				((globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? 0) + 1;
 			// KRITICKÉ: `THREE.WebGLRenderer({canvas, ...})` NEmení canvas
@@ -598,6 +698,14 @@
 	// funkciách), preto tu netreba samostatný `ralKod;` riadok len na závislosť.
 	$effect(() => {
 		prekresliRAL();
+	});
+
+	// #276: živá zmena typu skla (`skloVzhlad`) prekreslí sklo BEZ rebuildu
+	// geometrie (mutácia materiálu, analógia RAL efektu vyššie). `prekresliSklo`
+	// číta `skloVzhlad` priamo, takže `$effect` naň automaticky reaguje; pri
+	// zasklení (`skloVzhlad === undefined`) je no-op.
+	$effect(() => {
+		prekresliSklo();
 	});
 
 	// KRITICKÉ: `zaskleniaSpec()` (volaná v rodičovi, Vizual3DPanel.svelte)

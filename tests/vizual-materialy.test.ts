@@ -100,19 +100,36 @@ describe('materialy — vytvorSkloMaterial (#174 tier-based sklo)', () => {
 });
 
 describe('materialy — vytvorHlinikMaterial (RAL 7016 = tmavá anodizácia)', () => {
-	it('RAL 7016 (ANTRACIT, tmavyObrys=false) je TMAVÝ kov — nízka luminancia farby', () => {
+	it('#285: práškovaný hliník je DIELEKTRIKUM (metalness 0), nie holý kov — RAL 7016 farba ostáva tmavá antracitová', () => {
 		const mat = vytvorHlinikMaterial(THREE, '7016', true) as InstanceType<
 			typeof THREE.MeshPhysicalMaterial
 		>;
 		// #383E42 v sRGB je tmavá anodizovaná antracitová — luminancia (priemer
-		// RGB) musí byť jasne pod polovicou (potvrdzuje "číta sa ako tmavý
-		// antracit", nie vymytá do sivej strednej hodnoty)
+		// RGB) musí byť jasne pod polovicou (RAL farba ostáva PRESNÁ nezávisle od
+		// zmeny fyziky povrchu)
 		const luminancia = (mat.color.r + mat.color.g + mat.color.b) / 3;
 		expect(luminancia).toBeLessThan(0.35);
-		expect(mat.metalness).toBeGreaterThan(0.5);
+		// #285: práškovanie je pigmentovaný LAK, NIE holý kov → metalness 0
+		// (predchádzajúca hodnota 0.82 čítala ako leštený kov — presne slabina,
+		// ktorú rešerš #276 vytkla SalesQueze). Presné `toBe(0)` je jediná
+		// hranica, ktorá odlíši dielektrikum od pôvodného kovového povrchu.
+		expect(mat.metalness).toBe(0);
+		// matný lak (roughness ~0.35) + tenká číra clearcoat vrstva (lesklý
+		// ochranný povlak, ktorý dodá farbou-nezafarbený odlesk HDRI oblohy)
+		expect(mat.roughness).toBeGreaterThan(0.25);
+		expect(mat.roughness).toBeLessThan(0.5);
+		expect(mat.clearcoat).toBeGreaterThan(0); // clearcoatPovoleny=true
 	});
 
-	it('nastavRAL prepne farbu na existujúcej inštancii bez rebuildu (§2.7) — svetlý RAL (9010) má vyššiu luminanciu než 7016', () => {
+	it('#285: clearcoat sa vypne pri clearcoatPovoleny=false (low tier), metalness ostáva 0', () => {
+		const mat = vytvorHlinikMaterial(THREE, '7016', false) as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		expect(mat.metalness).toBe(0);
+		expect(mat.clearcoat).toBe(0);
+	});
+
+	it('nastavRAL prepne farbu na existujúcej inštancii bez rebuildu (§2.7) — svetlý RAL (9010) má vyššiu luminanciu než 7016, dielektrikum ostáva', () => {
 		const mat = vytvorHlinikMaterial(THREE, '7016', true) as InstanceType<
 			typeof THREE.MeshPhysicalMaterial
 		>;
@@ -121,6 +138,8 @@ describe('materialy — vytvorHlinikMaterial (RAL 7016 = tmavá anodizácia)', (
 		nastavRAL(THREE, mat, '9010', true);
 		const luminanciaSvetla = (mat.color.r + mat.color.g + mat.color.b) / 3;
 		expect(luminanciaSvetla).toBeGreaterThan(luminanciaTmava);
+		// #285: RAL prepnutie NIKDY nevráti materiál na kov — dielektrikum drží
+		expect(mat.metalness).toBe(0);
 		// `needsUpdate = true` je vo three.js write-only setter (inkrementuje
 		// interné `.version`, nie čitateľný boolean) — `.version` je overiteľný
 		// dôkaz, že `nastavRAL` naozaj označila materiál na GPU re-upload.
