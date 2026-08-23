@@ -46,6 +46,12 @@ const KLIENT_ZAKAZANE_SPEC = [
 function jeKlientskyReachable(subor: string): boolean {
 	// *.server.ts / +page.server.ts / +layout.server.ts sa NIKDY nebundlujú do klienta
 	if (/\.server\.ts$/.test(subor)) return false;
+	// +server.ts (route GET/POST endpoint) je TIEŽ server-only — SvelteKit ho nikdy
+	// nebundluje do klienta (rovnako ako +page.server.ts). #286 pridal
+	// `/konfigurator/model.glb/+server.ts` (GLB endpoint, smie importovať $lib/server/*);
+	// bez tejto výnimky by ho guard mylne bral ako klientsky vstup a spadol na jeho
+	// legitímnom serverovom importe. Money-neutralitu +server.ts stráži guard (B) nižšie.
+	if (/(^|\/)\+server\.ts$/.test(subor)) return false;
 	return /\.svelte$/.test(subor) || /\.ts$/.test(subor);
 }
 
@@ -172,7 +178,12 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 const SERVEROVE_ROUTY = [
 	'src/routes/konfigurator/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
-	'src/lib/server/public-throttle.ts'
+	'src/lib/server/public-throttle.ts',
+	// #286: serverový GLB endpoint (AR náhľad) — smie stavať geometriu/materiály, ale
+	// NESMIE sa dotknúť Money kód / cena / nárez (pracuje s typSkla kľúčom + RAL, nie katalógom).
+	'src/routes/konfigurator/model.glb/+server.ts',
+	'src/lib/vizual/glb.ts',
+	'src/lib/server/filereader-polyfill.ts'
 ];
 
 const SERVER_ZAKAZANE = [
