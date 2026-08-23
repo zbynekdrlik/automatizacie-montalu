@@ -56,3 +56,19 @@ export function sqliteUtcToIso(sqliteUtc: string): string {
 		? sqliteUtc.replace(' ', 'T') + 'Z'
 		: sqliteUtc;
 }
+
+// `en-CA` locale dáva zoradený tvar „YYYY-MM-DD"; zóna Europe/Bratislava rovnako ako ostatné
+// formátovače (inak by prod kontajner v UTC blízko polnoci dal iný kalendárny deň).
+const FORMAT_DATUM_ISO = new Intl.DateTimeFormat('en-CA', {
+	timeZone: 'Europe/Bratislava',
+	year: 'numeric',
+	month: '2-digit',
+	day: '2-digit'
+});
+
+/** „YYYY-MM-DD" v Europe/Bratislava (napr. názov súboru), ROVNAKÝ kalendárny deň ako
+ *  `formatDatumSk(iso)` — obe vychádzajú z toho istého okamihu, takže sa deň nerozíde ani v
+ *  ~2h okne po UTC polnoci (na rozdiel od holého `iso.slice(0,10)`, ktorý je v UTC). */
+export function formatDatumIsoSk(iso: string): string {
+	return FORMAT_DATUM_ISO.format(new Date(iso));
+}

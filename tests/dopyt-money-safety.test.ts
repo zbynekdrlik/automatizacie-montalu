@@ -60,6 +60,7 @@ describe('dopyt/ponuka Money-safety (#277)', () => {
 				'src/lib/server/dopyt-action.ts',
 				'src/lib/server/dopyt-store.ts',
 				'src/lib/server/dopyt-throttle.ts',
+				'src/lib/server/dopyt-pdf.ts',
 				'src/lib/components/DopytForm.svelte'
 			])
 		);

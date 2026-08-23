@@ -5,7 +5,9 @@
 //
 // MONEY-NEUTRÁLNE: žiadny import money/pergola, žiadny zápis. `load` len číta `dopyt` tabuľku
 // (audit trail z #277) a zostaví súhrn cez znovupoužité pure helpery z `$lib/ponuka`.
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { isInternal } from '$lib/server/auth';
 import { countDopyty, hasOdooLeadColumn, listDopyty } from '$lib/server/dopyt-store';
 import { sanitizePonukaConfig, zhrnutieRiadky } from '$lib/ponuka';
 import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
@@ -13,7 +15,11 @@ import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
 /** Počet dopytov na stránku. */
 const PER_PAGE = 50;
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ url, locals }) => {
+	// defense-in-depth (brána hooks.server.ts už redirectuje anon/b2b skôr) — symetria s
+	// PDF endpointom; interné-only zoznam.
+	if (!isInternal(locals.user)) error(403, 'Prístup len pre interných používateľov.');
+
 	const total = countDopyty();
 	const pageCount = Math.max(1, Math.ceil(total / PER_PAGE));
 	// query `?page=N` (1-based); nezmyselný/mimo rozsah vstup sa clampuje do [1, pageCount]
@@ -22,7 +28,8 @@ export const load: PageServerLoad = async ({ url }) => {
 	const offset = (page - 1) * PER_PAGE;
 
 	const hasOdooLead = hasOdooLeadColumn();
-	const dopyty = listDopyty(offset, PER_PAGE).map((r) => ({
+	// flag podaný do listDopyty → `PRAGMA table_info` sa spraví raz za request, nie 2×
+	const dopyty = listDopyty(offset, PER_PAGE, hasOdooLead).map((r) => ({
 		id: r.id,
 		// created_at je SQLite UTC timestamp → sqliteUtcToIso (UTC pasca #114) pred formátom
 		datum: formatDatumCasSk(sqliteUtcToIso(r.created_at)),

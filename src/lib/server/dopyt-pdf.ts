@@ -6,7 +6,7 @@
 import { getDopyt } from './dopyt-store';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
-import { formatDatumSk, sqliteUtcToIso } from '$lib/datum';
+import { formatDatumIsoSk, formatDatumSk, sqliteUtcToIso } from '$lib/datum';
 
 export interface RegenerovanePdf {
 	/** bajty PDF dokumentu */
@@ -27,5 +27,6 @@ export async function regeneratePonukaPdf(id: number): Promise<RegenerovanePdf |
 	const cfg = sanitizePonukaConfig(row.konfiguracia);
 	const iso = sqliteUtcToIso(row.created_at);
 	const bytes = await generatePonukaPdf(cfg, { datum: formatDatumSk(iso) });
-	return { bytes, filename: `Montalu-ponuka-dopyt-${id}-${iso.slice(0, 10)}.pdf` };
+	// dátum v názve = ROVNAKÝ kalendárny deň ako v pätičke (Europe/Bratislava), nie UTC slice
+	return { bytes, filename: `Montalu-ponuka-dopyt-${id}-${formatDatumIsoSk(iso)}.pdf` };
 }

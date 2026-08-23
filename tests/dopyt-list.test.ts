@@ -3,7 +3,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../src/lib/server/db';
 import { insertDopyt, listDopyty, hasOdooLeadColumn } from '../src/lib/server/dopyt-store';
-import { sqliteUtcToIso } from '../src/lib/datum';
+import { formatDatumIsoSk, sqliteUtcToIso } from '../src/lib/datum';
 
 /** Vloží N dopytov s rozlíšiteľným menom „Meno i" (id 1..N v poradí vloženia). */
 function seed(n: number): void {
@@ -80,5 +80,12 @@ describe('sqliteUtcToIso — UTC pasca #114 (#282)', () => {
 	});
 	it('vstup, ktorý už nie je SQLite tvar, vráti nezmenený (most, nie parser)', () => {
 		expect(sqliteUtcToIso('2026-08-23T12:34:56.000Z')).toBe('2026-08-23T12:34:56.000Z');
+	});
+
+	it('formatDatumIsoSk dáva YYYY-MM-DD v Europe/Bratislava (kalendárny deň, nie UTC slice)', () => {
+		// poludnie UTC → ten istý deň v Bratislave
+		expect(formatDatumIsoSk('2026-08-23T12:00:00Z')).toBe('2026-08-23');
+		// 23:00 UTC v lete (UTC+2) → už ďalší kalendárny deň v Bratislave (UTC slice by dal 08-23)
+		expect(formatDatumIsoSk('2026-08-23T23:00:00Z')).toBe('2026-08-24');
 	});
 });

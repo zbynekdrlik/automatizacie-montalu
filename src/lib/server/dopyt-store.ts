@@ -71,11 +71,16 @@ export function hasOdooLeadColumn(): boolean {
 
 /** Stránka dopytov, NAJNOVŠIE HORE (`id DESC` = monotónne, bez `created_at` remíz). `offset`/
  *  `limit` sa clampujú (obrana proti nezmyselnému vstupu z query). Ak schéma má `odoo_lead_id`
- *  (#278/v26), SELECT ho zahrnie a riadok ho nesie; inak kľúč chýba (defenzívne). */
-export function listDopyty(offset: number, limit: number): DopytListRiadok[] {
+ *  (#278/v26), SELECT ho zahrnie a riadok ho nesie; inak kľúč chýba (defenzívne). `hasOdoo`
+ *  default = detekcia; volajúci (load), čo flag už zistil, ho podá, aby sa `PRAGMA` nebehala 2×. */
+export function listDopyty(
+	offset: number,
+	limit: number,
+	hasOdoo: boolean = hasOdooLeadColumn()
+): DopytListRiadok[] {
 	const off = Math.max(0, Math.trunc(offset));
 	const lim = Math.max(1, Math.trunc(limit));
-	const cols = hasOdooLeadColumn()
+	const cols = hasOdoo
 		? 'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, odoo_lead_id'
 		: 'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at';
 	return db
