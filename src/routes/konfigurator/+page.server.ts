@@ -1,7 +1,7 @@
 // Verejný zákaznícky konfigurátor pergoly (#275, fáza 1) — VEREJNÁ route (bez auth,
 // pridaná do PUBLIC_PATHS v hooks.server.ts). Display-only, BEZ CIEN, BEZ Money kódov,
 // BEZ nárezu. `load` posiela klientovi LEN názvy strešného skla + RAL farby (kód+názov) +
-// číselné rozmedzia — NIKDY Money kód. `actions.default`: per-IP rate-limit → parse →
+// číselné rozmedzia — NIKDY Money kód. `actions.vypocet`: per-IP rate-limit → parse →
 // compute → súhrn (server-validované cez rozmedzia enginu). Žiadny import
 // money/ceny/db/pergola (Money odpisová cesta) — Money-neutrálne (guard:
 // tests/konfigurator-money-safety.test.ts). Parser žije v $lib/server/konfigurator-vstup.ts
@@ -38,7 +38,10 @@ export const actions = {
 	dopyt: dopytAction,
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).
-	default: async ({ request, getClientAddress, setHeaders }) => {
+	// SvelteKit ZAKAZUJE miešať `default` s pomenovanými akciami (actions.js:221 „When using
+	// named actions, the default action cannot be used"). Keďže #277 pridal pomenovanú
+	// `dopyt`, kalkulačka MUSÍ byť tiež pomenovaná — `vypocet` (formulár POSTuje `?/vypocet`).
+	vypocet: async ({ request, getClientAddress, setHeaders }) => {
 		// per-IP rate-limit verejného endpointu — reálna klientska IP za Cloudflare (#264):
 		// getClientAddress() (XFF_DEPTH=1) vracia CF edge IP, resolveClientIp z nej +
 		// Cf-Connecting-Ip odvodí reálneho klienta (spoof-safe aj CF-down-safe).

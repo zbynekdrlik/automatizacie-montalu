@@ -234,9 +234,9 @@ describe('Money safety (C) — runtime výstup neobsahuje cenu ani Money kód (#
 		const event = {
 			request: new Request('http://x/konfigurator', { method: 'POST', body: fd }),
 			getClientAddress: () => '203.0.113.5'
-		} as unknown as Parameters<typeof actions.default>[0];
+		} as unknown as Parameters<typeof actions.vypocet>[0];
 
-		const r = await actions.default(event);
+		const r = await actions.vypocet(event);
 		const json = JSON.stringify(r);
 		neobsahujeUnik(json);
 		// pozitívne: súhrn naozaj prišiel (obsahuje názov skla)

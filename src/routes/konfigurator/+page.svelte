@@ -75,8 +75,11 @@
 		</p>
 	</header>
 
+	<!-- kalkulačka POSTuje na pomenovanú akciu ?/vypocet (nie default — #277 pridal ?/dopyt,
+	     SvelteKit nedovolí default + pomenované naraz) -->
 	<form
 		method="POST"
+		action="?/vypocet"
 		class="karta"
 		use:enhance={() => {
 			spracuva = true;

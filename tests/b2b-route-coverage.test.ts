@@ -206,7 +206,7 @@ describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', 
 	});
 });
 
-// #275/#277, rovnaká disciplína — verejný konfigurátor má PRESNE `default` (display-only
+// #275/#277, rovnaká disciplína — verejný konfigurátor má PRESNE `vypocet` (kalkulačka, display-only
 // súhrn konfigurácie) + `dopyt` (#277: verejný kontaktný formulár → PDF ponuka BEZ CIEN).
 // `dopyt` je Money-NEUTRÁLNA akcia: zapisuje LEN do audit tabuľky `dopyt` (žiadny import
 // money/pergola, žiadny odpis, žiadny zápis do /data) — mechanicky strážené v
@@ -215,8 +215,11 @@ describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', 
 // tento test stráži, že sa NEPRIDÁ žiadna ĎALŠIA (napr. omylom skopírovaná Money-zápisová)
 // akcia. Pridanie akejkoľvek inej akcie tento test ROZBIJE (fail-closed).
 describe('/konfigurator — žiadna cesta k Money odpisu (#275/#277)', () => {
-	it('akcie routy sú presne default + dopyt — žiadna Money/odpisová zápisová akcia', async () => {
+	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['default', 'dopyt']);
+		// `vypocet` = kalkulačka súhrnu (bola `default`, ale SvelteKit nedovolí default +
+		// pomenované naraz — #277 pridal `dopyt`); `dopyt` = verejný formulár → PDF ponuka
+		// BEZ CIEN (Money-neutrálny). Obe pomenované; žiadna odpisová/Money-zápisová akcia.
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
