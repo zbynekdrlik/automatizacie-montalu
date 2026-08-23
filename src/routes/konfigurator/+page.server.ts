@@ -12,9 +12,12 @@ import { SKLO_STRECHA_TYPY } from '$lib/sklo-strecha';
 import { RAL_PALETA } from '$lib/vykres/ral';
 import { KONF_RANGES, konfiguruj } from '$lib/konfigurator';
 import { parseKonfiguratorVstup } from '$lib/server/konfigurator-vstup';
-import { allowRequest } from '$lib/server/public-throttle';
+import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
 
+// GET (SSR render stránky) NIE JE rate-limitovaný — je lacný (statický katalóg + rozmedzia,
+// žiadny výpočet) a rovnaká politika ako verejný /login dnes; drahý (výpočtový) je POST,
+// ten je throttlovaný nižšie.
 export const load: PageServerLoad = async () => {
 	// LEN názvy skla (`.nazov`, NIKDY Money kód) + RAL možnosti (kód+názov, žiadny Money
 	// údaj) + rozmedzia. Nič z toho neobsahuje cenu ani Money kód → žiadny únik.
@@ -28,7 +31,7 @@ export const load: PageServerLoad = async () => {
 export const actions = {
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).
-	default: async ({ request, getClientAddress }) => {
+	default: async ({ request, getClientAddress, setHeaders }) => {
 		// per-IP rate-limit verejného endpointu — reálna klientska IP za Cloudflare (#264):
 		// getClientAddress() (XFF_DEPTH=1) vracia CF edge IP, resolveClientIp z nej +
 		// Cf-Connecting-Ip odvodí reálneho klienta (spoof-safe aj CF-down-safe).
@@ -42,6 +45,7 @@ export const actions = {
 		}
 		const ip = resolveClientIp(edgeIp, request.headers.get('cf-connecting-ip'));
 		if (!allowRequest(ip)) {
+			setHeaders({ 'retry-after': String(Math.ceil(KONF_WINDOW_MS / 1000)) });
 			return fail(429, {
 				vysledok: null,
 				error: 'Priveľa požiadaviek. Skús to prosím o chvíľu.'
