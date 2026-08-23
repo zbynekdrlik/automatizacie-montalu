@@ -6,7 +6,7 @@
 // videla čas posunutý o 1-2h), takže výsledok je deterministický bez ohľadu na TZ CI runnera.
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { formatDatumCasSk } from '../src/lib/datum';
+import { formatDatumCasSk, formatDatumSk } from '../src/lib/datum';
 
 describe('formatDatumCasSk — slovenský tvar D.M.YYYY HH:MM', () => {
 	it('bežný dátum — deň/mesiac bez nuly, čas so nulou', () => {
@@ -55,5 +55,31 @@ describe('formatDatumCasSk — slovenský tvar D.M.YYYY HH:MM', () => {
 		// pod TZ=UTC bez explicitnej zóny by toto bolo „5.8.2026 12:32" (UTC, nie Bratislava) —
 		// dôkaz spustený priamo proti tomuto testu: odstránenie `timeZone` z datum.ts dá 12:32
 		expect(vystup).toBe('5.8.2026 14:32');
+	});
+});
+
+describe('formatDatumSk — slovenský dátum D.M.YYYY (bez času, #277 pätička PDF)', () => {
+	it('bežný dátum — deň/mesiac bez nuly', () => {
+		expect(formatDatumSk('2026-08-05T12:32:00.000Z')).toBe('5.8.2026');
+	});
+
+	it('polnoc miestneho času dá SPRÁVNY kalendárny deň (nie UTC deň predtým)', () => {
+		// 6.7.2026 00:30 CEST (UTC+2) = 5.7.2026 22:30 UTC — správne musí byť 6.7., nie 5.7.
+		expect(formatDatumSk('2026-07-05T22:30:00.000Z')).toBe('6.7.2026');
+	});
+
+	it('výsledok NEZÁVISÍ od TZ procesu — ČERSTVÝ proces s TZ=UTC (ako Docker) dá rovnaký deň', () => {
+		const vystup = execFileSync(
+			process.execPath,
+			[
+				'--experimental-strip-types',
+				'-e',
+				"import('./src/lib/datum.ts').then(m => console.log(m.formatDatumSk('2026-07-05T22:30:00.000Z')))"
+			],
+			{ cwd: import.meta.dirname + '/..', env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
+		).trim();
+		// pod TZ=UTC bez explicitnej zóny by toto bolo „5.7.2026" (UTC deň) — dôkaz, že
+		// pätička PDF ukáže bratislavský deň aj v prod kontajneri (UTC)
+		expect(vystup).toBe('6.7.2026');
 	});
 });
