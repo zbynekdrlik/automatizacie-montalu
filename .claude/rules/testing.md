@@ -226,3 +226,47 @@ cleanup. Dôsledky pre písanie testov:
   EXPLICITNÝ per-test timeout (`it(..., fn, 30_000)`) — pravý paralelný beh pridá CPU
   kontenciu a default 5 s strop sa prekročí (`Test timed out`, nie assertion fail). Timeout
   rieši len trpezlivosť harnessu; TVRDENIE testu sa tým nemení.
+
+## E2E: globalSetup beží AŽ PO boote webServera — NIKDY nemaž v ňom DB, ktorú si server drží otvorenú (#291)
+
+Playwright spúšťa `globalSetup` **až po tom**, čo je `webServer` hotový (readiness
+splnená). Empiricky overené build-free sondou: `SERVER_BOOT` predchádzal `GLOBALSETUP`
+o ~270 ms. A tento server si otvorí + **zmigruje** `./data/e2e.db` už pri BOOTE — nie
+až pri prvom requeste — lebo `src/hooks.server.ts` importuje `$lib/server/db`, ktoré pri
+module-load volá `migrate(db)` (module singleton, SvelteKit načíta hooks pri štarte).
+
+Dôsledok: starý `global-setup.ts`, ktorý `fs.rmSync('./data/e2e.db*')`, mazal už
+zmigrovanú DB **spod bežiaceho servera**. Na Linuxe server ďalej obsluhoval z osirotelého
+inode (fd ostal platný), ale CESTA na disku zmizla → keď test proces (`seedDopyt` v
+`dopyty-konfigurator.spec.ts`) urobil `new Database('./data/e2e.db')`, better-sqlite3
+vytvoril ČERSTVÝ prázdny súbor → `SqliteError: no such table: dopyt`. Symptóm bol
+zákerný: 244 testov PRED ním prešlo (bežali proti serverovmu inode), padol až prvý test,
+čo sa dotkol DB **priamo cez súbor**. `webServer.url:/health` readiness to NErieši —
+mazanie sa deje po boote tak či tak.
+
+**Pravidlo:** akýkoľvek e2e stav, ktorý si server pri boote otvorí a drží (SQLite DB),
+resetuj v **`webServer.command` PRED `npm run preview`** (`node e2e/reset-e2e-db.mjs &&
+npm run preview`), NIKDY v `globalSetup`. Tak čistá DB existuje skôr, než ju server
+otvorí, server aj test proces zdieľajú JEDEN migrovaný súbor (server cez WAL vidí riadok
+naseedovaný test procesom — to je presne to, čo spec renderuje) a nič sa nemaže spod
+bežiaceho procesu. Stav, ktorý server vytvára on-demand (odpis-export dir), je na
+timingu nezávislý, ale drž ho tiež v tom istom pre-boot resete kvôli jednote. Voči
+NASADENÉMU cieľu (`BASE_URL`) sa reset nespúšťa — `webServer` je vtedy `undefined`.
+
+## Mutácia: Stryker + vitest `ENOTEMPTY` rename race na zdieľanom `.vite` cache → izoluj cacheDir per proces (#291)
+
+`mutation-diff` môže spadnúť v ÚVODNOM dry-rune na `StrykerError: ENOTEMPTY: directory
+not empty, rename '.../node_modules/.vite/vitest/<hash>/deps___vitest___temp_* ->
+.../deps___vitest__'` — to NIE je prežívajúci mutant ani timeout. Stryker vytvára N
+paralelných vitest test-runner procesov, každý v sandboxe so **symlinknutým**
+`node_modules` → všetky zdieľajú ten istý reálny `node_modules/.vite` optimize cache a
+pretekajú na atomickom rename optimize temp adresára. Je to FLAKY (závisí od toho, ktoré
+súbory dostane shard a od timingu) — preto raz „prejde" a inokedy nie na tom istom kóde.
+
+**Fix (`vite.config.ts`):** izoluj vite `cacheDir` PER PROCES
+(`node_modules/.vite-stryker-${process.pid}`) LEN keď beží pod Strykerom (CWD obsahuje
+`.stryker-tmp`). Zdieľaný rename target zaniká → race zaniká. Normálny
+`test`/`dev`/`build`/`preview` beh (CWD = koreň repa) ostáva na defaulte
+`node_modules/.vite`, nedotknutý — zelený `test` job sa nemôže rozbiť. NIKDY namiesto
+toho neznižuj `break` threshold ani nezvyšuj `timeout-minutes` (no-timeout-band-aids) a
+neznižuj Stryker `concurrency` (strata paralelizmu → riziko 20-min stropu).
