@@ -1517,3 +1517,14 @@ implementované, nereprodukovateľné čestný null:
 - **Honest-null drží:** Robust lišta, Massive+140/stena, zvislá zadná výstuha 2340, seating +1,17, frézovanie drážok ostávajú null/nepodporované. #161 OSTÁVA OTVORENÝ (frézovanie výrobného listu).
 - **Money-safe:** engine money-clean; nové riadky pretečú do rezervácie cez `narezToCadRows` (kódy 18004-18008 v CODE_MAP); v TEST režime nič nezapisuje. Plný beh 1836/1836 unit + 23 pergola E2E zelené. STOP na zelenom PR — majiteľ posúdi Money čísla pred merge.
 - **PR nesie aj pending #270 tail** (provision-vps krok 4 `a61684b` + log/bump `c9bc70b`/`404155e`/`1824b79`) — prác prior session na dev, ešte nereleasnutá; ide s týmto release PR-om.
+
+## #278 — Lead z konfigurátora do Odoo CRM (BUILD-ONLY lane, stack na #277)
+
+- **Cieľ:** každý verejný dopyt (#277) → `crm.lead` v Montalu Odoo (`erp.montalu.cloud`, db `odoo`) cez XML-RPC, s PDF ponukou ako `ir.attachment` (best-effort). FIRE-AND-FORGET z `dopyt-action` po pripravení PDF — lead nikdy nezdrží/nezhodí zákazníkovo PDF.
+- **Nový `src/lib/server/odoo-lead.ts` (407 r.):** hand-rolled minimal XML-RPC cez `fetch` (dependency-free — Tier-0 bundling, vzor `log.ts`/`dejavu.ts`), injektovateľný transport (`_setLeadTransport`) pre mock testy. Encoder int/string/bool/struct/array; decoder skalár+fault. Dvojité escapovanie popisu (Html pole): HTML-escape zákazníckych hodnôt + XML-escape na drôte, `<br>` = reálny zlom.
+- **Resilience:** migrácia **v26** (`odoo_lead_id`/`odoo_attempts`/`odoo_last_error` na `dopyt`); Odoo dole ⇒ attempts++, dopyt sa nestratí; `retryPendingLeads()` sweep + `runStartupLeadSweep()` v `hooks.server.ts`. Credentials LEN z env (`ODOO_LEAD_*`, VPS `.env`), chýba ⇒ ticho vypnuté.
+- **Migračný ripple:** 17 `migration-*` + `dopyt-store`/`sklo-3-3-1-standard`/`migration-v25` testov zdvihnutých 25→26; nový `migration-v26.test.ts`.
+- **Review (Opus 4.8) → 0 🔴 2 🟡 3 🔵, VŠETKO opravené `182eb6b`:** 🟡 in-flight `Set` proti súbežnej duplicite leadu; 🟡 sweep len po úspešnom submite + štartový sweep; 🔵 `xmlEscape` odstraňuje XML-1.0 C0 znaky (poison-pill); 🔵 escapovací + súbeh + C0 testy; 🔵 titulok v25 testu.
+- **Money-safe:** žiadny money/pergola import, žiadny `/data`, nula cien v payloade; vlastný guard v `tests/odoo-lead.test.ts` (odoo-lead meno neťahá auto-guard `dopyt|ponuka`).
+- **Gate:** check + lint čisté, 1963 unit testov, coverage 95.88/89.65/97.65/97.29 — nad prahmi. Commity `a87edb8`/`7d2d95b`/`182eb6b`. BUILD-ONLY: bez bumpu/PR/merge/deploy, supervisor integruje (poradie #275→#277→#278). #278 OSTÁVA OTVORENÝ.
+- **Playbook:** nové `.claude/rules/odoo-lead.md` + router riadok; poznámka o non-migration testoch do `glass-catalog.md`.
