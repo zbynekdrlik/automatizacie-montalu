@@ -26,3 +26,28 @@ describe('supersampleFaktor (#285: pridaný 3× pre ostrejší tlačový PNG)', 
 		expect(supersampleFaktor(7199, 16384)).toBe(2);
 	});
 });
+
+// #290 (CI-fix PR #290, run 32661546086) — softvérové WebGL (SwiftShader na
+// GitHub CI, llvmpipe, alebo CHÝBAJÚCA GPU identifikácia) hlási VEĽKÉ
+// per-dimension limity (16384), ale má MALÝ CELKOVÝ alokačný rozpočet: 3×
+// supersample (7200×4860 MSAA buffer) prekročí SwiftShader "Texture total
+// allocation size is too large" → framebuffer incomplete → kaskáda GL
+// warningov → E2E `expect(consoleMsgs).toEqual([])` padne. 2× (4800×3240) je
+// DOKÁZANE bezpečné (main CI ho servoval). `softverovyRenderer` 3. parameter
+// (fail-safe default false) stropuje ss na 2× pre softvér, hardvér drží 3×.
+describe('supersampleFaktor — softvérový/neznámy renderer strop 2× (#290)', () => {
+	it('softverovyRenderer=true → strop 2× aj pri per-dimension limitoch >= 7200', () => {
+		expect(supersampleFaktor(16384, 16384, true)).toBe(2);
+		expect(supersampleFaktor(8192, 8192, true)).toBe(2);
+		expect(supersampleFaktor(7200, 7200, true)).toBe(2);
+	});
+
+	it('softvér pod 4800 stále padne na 1× (min() rozhoduje aj na softvéri)', () => {
+		expect(supersampleFaktor(4096, 8192, true)).toBe(1);
+		expect(supersampleFaktor(4799, 4799, true)).toBe(1);
+	});
+
+	it('hardvér (softverovyRenderer=false) drží 3× — #285 zámer nezmenený', () => {
+		expect(supersampleFaktor(16384, 16384, false)).toBe(3);
+	});
+});
