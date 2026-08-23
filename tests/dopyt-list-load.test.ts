@@ -40,7 +40,7 @@ describe('load /dopyty-konfigurator (#282)', () => {
 
 	it('prázdna DB → total 0, page 1, pageCount 1, žiadne dopyty', async () => {
 		const d = await loadOk();
-		expect(d).toMatchObject({ total: 0, page: 1, pageCount: 1, perPage: 50, hasOdooLead: false });
+		expect(d).toMatchObject({ total: 0, page: 1, pageCount: 1, perPage: 50, hasOdooLead: true });
 		expect(d.dopyty).toEqual([]);
 	});
 
@@ -79,8 +79,7 @@ describe('load /dopyty-konfigurator (#282)', () => {
 		expect(row.odooLeadId).toBeNull();
 	});
 
-	it('po ALTER (odoo_lead_id, #278/v26) load nesie hasOdooLead=true a hodnotu leadu', async () => {
-		db.exec('ALTER TABLE dopyt ADD COLUMN odoo_lead_id INTEGER');
+	it('na v26 (odoo_lead_id existuje) load nesie hasOdooLead=true a hodnotu leadu', async () => {
 		const id = insertDopyt({
 			konfiguracia: '{}',
 			meno: 'Lead',

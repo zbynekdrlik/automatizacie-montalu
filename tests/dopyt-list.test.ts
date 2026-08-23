@@ -1,5 +1,5 @@
 // #282 — interný zoznam dopytov: paging (`listDopyty`), feature-detect stĺpca odoo_lead_id
-// (#278/v26) a `sqliteUtcToIso` (UTC pasca #114). Izolovaná test DB (v25), per-test čistá.
+// (#278/v26) a `sqliteUtcToIso` (UTC pasca #114). Zdieľaná test DB (v26), per-test čistá (DELETE).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../src/lib/server/db';
 import { insertDopyt, listDopyty, hasOdooLeadColumn } from '../src/lib/server/dopyt-store';
@@ -22,16 +22,21 @@ function seed(n: number): void {
 describe('listDopyty paging (#282)', () => {
 	beforeEach(() => db.exec('DELETE FROM dopyt'));
 
-	it('na čerstvej v25 DB stĺpec odoo_lead_id NEEXISTUJE (feature-detect false)', () => {
-		expect(hasOdooLeadColumn()).toBe(false);
+	it('na v26 DB stĺpec odoo_lead_id EXISTUJE (feature-detect true); hasOdoo=false ho defenzívne vynechá', () => {
+		// #278 (v26) stĺpec už pridal → detekcia true; defenzívna vetva listDopyty (hasOdoo=false)
+		// SELECT bez odoo stĺpca → kľúč na riadku CHÝBA (nezávislé od toho, či #278 landol).
+		expect(hasOdooLeadColumn()).toBe(true);
+		seed(1);
+		expect('odoo_lead_id' in listDopyty(0, 50, false)[0]!).toBe(false);
 	});
 
 	it('vráti dopyty NAJNOVŠIE HORE (id DESC)', () => {
 		seed(3);
 		const rows = listDopyty(0, 50);
 		expect(rows.map((r) => r.meno)).toEqual(['Meno 3', 'Meno 2', 'Meno 1']);
-		// bez odoo_lead_id stĺpca kľúč na riadku CHÝBA (defenzívne)
-		expect('odoo_lead_id' in rows[0]!).toBe(false);
+		// na v26 (odoo_lead_id existuje) default SELECT stĺpec zahrnie → kľúč je na riadku (NULL)
+		expect('odoo_lead_id' in rows[0]!).toBe(true);
+		expect(rows[0]!.odoo_lead_id).toBeNull();
 	});
 
 	it('stránkuje cez offset/limit (okná sa neprekrývajú)', () => {
@@ -52,11 +57,10 @@ describe('listDopyty paging (#282)', () => {
 	});
 });
 
-describe('listDopyty — odoo_lead_id feature-detect (#282 / #278 v26 pripravené)', () => {
-	// Simuluje stav PO #278 (v26 pridá stĺpec) — na izolovanej test DB tohto súboru.
-	it('po ALTER TABLE ... ADD odoo_lead_id sa stĺpec deteguje a nesie sa na riadku', () => {
+describe('listDopyty — odoo_lead_id feature-detect (#282 / #278 v26)', () => {
+	// #278 (v26) už stĺpec pridal — listDopyty ho deteguje a nesie hodnotu leadu na riadku.
+	it('stĺpec sa deteguje a hodnota odoo_lead_id sa nesie na riadku', () => {
 		db.exec('DELETE FROM dopyt');
-		db.exec('ALTER TABLE dopyt ADD COLUMN odoo_lead_id INTEGER');
 		expect(hasOdooLeadColumn()).toBe(true);
 
 		const id = insertDopyt({
