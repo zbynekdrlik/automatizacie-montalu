@@ -185,6 +185,85 @@ describe('pergolaSpec — jednotková hranica (mm, nie m — prepočet je LEN v 
 	});
 });
 
+describe('pergolaSpec — SKUTOČNÉ svetové koncové polohy sklonených dielov (review 🔵 #276)', () => {
+	type Diel = ReturnType<typeof pergolaSpec>['diely'][number];
+
+	// koncový stred boxu po `rotateX(rot.x)` + `translate(pos)` — presne to, čo
+	// robí `builder.postavGeometrie` (rotate PRED translate). Bod (0,0,±d/2):
+	// rotateX(a) → (0, −sin(a)·z, cos(a)·z), potom + pos.
+	function svetovyKoniec(d: Diel, znamienko: 1 | -1) {
+		const dd = d.tvar.kind === 'box' ? d.tvar.d : 0;
+		const lz = (znamienko * dd) / 2;
+		const a = d.rot?.x ?? 0;
+		return { x: d.pos.x, y: d.pos.y - Math.sin(a) * lz, z: d.pos.z + Math.cos(a) * lz };
+	}
+
+	it('predný koniec skla klesne k FV pri z=+H/2, koniec pri stene stúpne k SV pri z=−H/2', () => {
+		const FV = 2500;
+		const SV = 2800;
+		const H = 3500;
+		const r = pergolaSpec(zaklad({ vyskaVpreduMm: FV, vyskaPriSteneMm: SV, hlbkaMm: H }));
+		const sklo = r.diely.filter((d) => d.rola === 'sklo');
+		expect(sklo.length).toBeGreaterThan(0);
+		for (const d of sklo) {
+			const predny = svetovyKoniec(d, 1);
+			const stena = svetovyKoniec(d, -1);
+			// z: predný koniec vpredu (+H/2), koniec pri stene vzadu (−H/2)
+			expect(predny.z).toBeCloseTo(H / 2, 3);
+			expect(stena.z).toBeCloseTo(-H / 2, 3);
+			// y: predný koniec pri FV (nižší), pri stene pri SV (vyšší) — tolerancia
+			// ~hrúbka skla (sklo sedí tesne nad rovinou strechy)
+			expect(predny.y).toBeGreaterThan(FV - 1);
+			expect(predny.y).toBeLessThan(FV + 20);
+			expect(stena.y).toBeGreaterThan(SV - 1);
+			expect(stena.y).toBeLessThan(SV + 20);
+			// kľúčový dôkaz spádu: predok NIŽŠIE než stena a bližšie k pozorovateľovi
+			expect(predny.y).toBeLessThan(stena.y);
+			expect(predny.z).toBeGreaterThan(stena.z);
+		}
+	});
+});
+
+describe('pergolaSpec — čestná poznámka pri neplatnej výške pri stene (review 🔵 #276)', () => {
+	it('vyskaPriStene < vyskaVpredu (pultová) → poznámka o rovnej streche', () => {
+		const r = pergolaSpec(zaklad({ vyskaVpreduMm: 2800, vyskaPriSteneMm: 2400 }));
+		expect(r.poznamky.some((p) => p.includes('rovná strecha'))).toBe(true);
+	});
+
+	it("explicitná 'rovna' strecha NEdostane poznámku o klampovaní (zámerne rovná)", () => {
+		const r = pergolaSpec({
+			...zaklad(),
+			typStrechy: 'rovna',
+			vyskaVpreduMm: 2500,
+			vyskaPriSteneMm: 2800
+		});
+		expect(r.poznamky.some((p) => p.includes('rovná strecha'))).toBe(false);
+	});
+
+	it('platná pultová (SV>FV) → žiadna taká poznámka', () => {
+		const r = pergolaSpec(zaklad({ vyskaVpreduMm: 2500, vyskaPriSteneMm: 2800 }));
+		expect(r.poznamky.some((p) => p.includes('rovná strecha'))).toBe(false);
+	});
+});
+
+describe('pergolaSpec — pocetPoli default (bez zadania → 1 pole, 2 stĺpy v rade)', () => {
+	it('vynechaný pocetPoli → 4 stĺpy (2 rady × 2)', () => {
+		const r = pergolaSpec({
+			sirkaMm: 4000,
+			hlbkaMm: 3500,
+			vyskaVpreduMm: 2500,
+			vyskaPriSteneMm: 2800,
+			panelPocet: 5,
+			ralKod: ''
+		});
+		const stlpy = r.diely.filter(
+			(d) =>
+				d.tvar.kind === 'box' && d.tvar.w === STLP_HRUBKA_VIZ_MM && d.tvar.d === STLP_HRUBKA_VIZ_MM
+		);
+		expect(stlpy.length).toBe(4);
+	});
+});
+
 describe('pergolaPngNazov — názov súboru z rozmerov (bez ceny/kódu)', () => {
 	it('pergola-{šírka}x{hĺbka}mm.png', () => {
 		expect(pergolaPngNazov(zaklad({ sirkaMm: 4000, hlbkaMm: 3500 }))).toBe(
@@ -196,5 +275,9 @@ describe('pergolaPngNazov — názov súboru z rozmerov (bez ceny/kódu)', () =>
 		expect(pergolaPngNazov(zaklad({ sirkaMm: 3999.6, hlbkaMm: 3000.2 }))).toBe(
 			'pergola-4000x3000mm.png'
 		);
+	});
+
+	it('podmierny rozmer sa klampuje na 1 (žiadny 0/záporný v názve)', () => {
+		expect(pergolaPngNazov(zaklad({ sirkaMm: 0.4, hlbkaMm: 0 }))).toBe('pergola-1x1mm.png');
 	});
 });

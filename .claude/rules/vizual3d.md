@@ -210,3 +210,38 @@ svetlách (kľúčové svetlo §2.6 — FIXNÉ NAVŽDY, azimut/elevácia/vzdiale
 prepočítaj OČAKÁVANÚ pozíciu z DOKUMENTOVANÝCH hodnôt priamo v teste
 (nezávislý `Math.cos`/`Math.sin` výpočet), nikdy len re-importuj
 implementáciu — inak test nezachytí budúcu tichú zmenu konštánt.
+
+## Rozšírenie vizuálu na NOVÚ produktovú rodinu (pergola #276) — vzor
+
+Generická pipeline (`scena`/`kamera`/`builder`/`materialy`/`snimka`/`kvalita` +
+`Vizual3D.svelte`) je **product-agnostic** — berie `VizVysledok`/`bbox`, nič
+zasklenia-špecifické. Nová zákaznícka rodina = **reuse, neprepisuj**:
+
+1. **Nový čistý `geo/<rodina>.ts`** (mm, THREE-free) → `VizVysledok`. Roly
+   **reuse** (`ram` = kov/konštrukcia, `sklo` = sklo) → 0 zmien `spec.ts`,
+   `builder.ts` ani render vetvy vo `Vizual3D.svelte` (tá kreslí len známe roly).
+   Rozmery/uhly ber z APPKOVÝCH helperov (`pergola.ts` reuse `stlpyZPolí`/
+   `vypocitajSklon`/`defaultPanelSirka` z `$lib/pergola-navrh`) — NIKDY paralelný
+   prepočet (rovnaká disciplína ako `geo/zasklenia.ts` s `deliaceStlpiky`).
+2. **Nový wrapper komponent** (`VizualPergolaZakaznik.svelte`) nad `Vizual3D` —
+   čistý props kontrakt + presety/RAL/sklo chipy + PNG export (`exportujPNG`/
+   `stiahniPNG` reuse `Vizual3D.zachytObrazok` → `snimka.ts`). Presety NEparametrizuj
+   (mení `PresetKluc`/`bind:preset` naprieč Vizual3D+Vizual3DPanel = široký blast
+   radius do #170); existujúce 3 presety + orbit polar limity (max ~67° elevácie)
+   stačia, auto-fit rámuje podľa bboxu.
+3. **Nová vizuálna schopnosť = ADITÍVNY optional prop**, spätne kompatibilný
+   (`skloVzhlad` na `Vizual3D`, undefined = pôvodné zasklenia sklo). Živá zmena
+   materiálu = mutácia + effect (analógia `prekresliRAL`/`nastavRAL` → `nastavSkloVzhlad`);
+   defaulty pôvodného skla drž v ZDIEĽANÝCH konštantách, aby sa `vytvorSkloMaterial`
+   a `nastavSkloVzhlad` nerozišli.
+
+**Sklonený diel (strecha):** box s `rot: {x: alfa}` — `builder.postavGeometrie`
+aplikuje `rotateX` PRED `translate`, takže `alfa = atan((SV−FV)/H)` sklopí `+Z`
+koniec dole (predok, `y=FV`) a `−Z` koniec hore (stena, `y=SV`). `sin(alfa)·roofLen
+= SV−FV`, `cos(alfa)·roofLen = H` → over rot.x PRIAMO v pure Node teste (žiadny
+canvas/THREE potrebný na `DielSpec`).
+
+**Money-guard:** nová `vizual/**` rodina smie importovať len allowlistované
+ne-vizual moduly (`$lib/pergola-navrh`, `$lib/vykres/ral`, `$lib/vykres/kota`);
+`$lib/pergola-navrh` už v allowliste `tests/vizual-money-guard.test.ts` bol
+(autor #170 pergola reuse anticipoval). Nový allowlist zápis len s dôvodom.

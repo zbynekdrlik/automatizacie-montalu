@@ -157,6 +157,13 @@ export function pergolaSpec(vst: PergolaVizVstup): VizVysledok {
 		});
 	}
 
+	// čestná poznámka, keď výška pri stene bola nižšia než vpredu a strecha sa
+	// preto zobrazila ako rovná (predok je definovaný ako NIŽŠIA strana — review
+	// 🔵 #276, "proporcie nesmú lhať")
+	if (vst.typStrechy !== 'rovna' && vst.vyskaPriSteneMm < FV) {
+		poznamky.push('Výška pri stene nemôže byť nižšia než vpredu — zobrazené ako rovná strecha.');
+	}
+
 	// RAL — hex sa rieši v materialy.ts (farbaKonstrukcie); tu len povinná
 	// poznámka o ilustračnej farbe PRESNE pri voľnom labeli (§2.7, rovnako ako
 	// zasklenia)
