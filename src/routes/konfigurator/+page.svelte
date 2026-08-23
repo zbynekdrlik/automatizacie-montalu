@@ -55,6 +55,9 @@
 	type VizualKompTyp =
 		(typeof import('$lib/components/vizual/VizualPergolaZakaznik.svelte'))['default'];
 	let VizualKomp = $state<VizualKompTyp | null>(null);
+	// in-flight guard: dva rýchle submity pred vyriešením prvého importu by inak spustili
+	// import() dvakrát (benígne — Vite chunk cache, ale zámer je explicitný)
+	let vizNacitava = false;
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
@@ -123,10 +126,11 @@
 						};
 						// lazy-load komponentu až pri PRVOM náhľade (3D/three.js bundle
 						// sa nenačíta skôr); ďalšie submity už používajú načítaný modul
-						if (!VizualKomp) {
-							void import('$lib/components/vizual/VizualPergolaZakaznik.svelte').then(
-								(m) => (VizualKomp = m.default)
-							);
+						if (!VizualKomp && !vizNacitava) {
+							vizNacitava = true;
+							void import('$lib/components/vizual/VizualPergolaZakaznik.svelte')
+								.then((m) => (VizualKomp = m.default))
+								.finally(() => (vizNacitava = false));
 						}
 					} else {
 						viz = null;

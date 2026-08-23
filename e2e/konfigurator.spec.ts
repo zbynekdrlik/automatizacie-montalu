@@ -146,7 +146,7 @@ async function velkostCanvasPng(page: import('@playwright/test').Page): Promise<
 	return buffer.length;
 }
 
-async function nakonfigurujASubmitni(page: import('@playwright/test').Page) {
+async function vyplnFormular(page: import('@playwright/test').Page) {
 	await page.getByTestId('sirka').fill('5000');
 	await page.getByTestId('hlbka').fill('3800');
 	await page.getByTestId('vyskaVpredu').fill('2800');
@@ -154,8 +154,6 @@ async function nakonfigurujASubmitni(page: import('@playwright/test').Page) {
 	// non-default sklo (mliečne → matný odtieň) + non-default RAL, nech 3D dostane reálny vstup
 	await page.getByTestId('sklo').selectOption({ label: '4.4.2 mliečne' });
 	await page.getByTestId('farba').selectOption('9005');
-	await page.getByTestId('zobrazit').click();
-	await expect(page.getByTestId('suhrn')).toBeVisible();
 }
 
 test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), nula console chýb, žiaden únik', async ({
@@ -167,7 +165,19 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	await goto(page, '/konfigurator?viz=mid');
 	await expect(page).toHaveURL(/\/konfigurator/);
 
-	await nakonfigurujASubmitni(page);
+	await vyplnFormular(page);
+
+	// #276 lazy-load LOCK: PRED submitom 3D vrstva NIE JE aktívna — komponent nie je
+	// namountovaný a žiadny WebGL kontext neexistuje → dôkaz, že 3D/three.js bundle sa
+	// nenačíta pred zobrazením náhľadu (hard constraint konfigurator.md — lazy dynamic import).
+	expect(await page.getByTestId('konf-viz').count()).toBe(0);
+	expect(await page.getByTestId('vizual3d-canvas').count()).toBe(0);
+	expect(
+		await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null)
+	).toBeNull();
+
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
 
 	// 3D náhľad je „hero" súhrnu — objaví sa nad tabuľkou; lazy komponent + engine ready
 	await expect(page.getByTestId('konf-viz')).toBeVisible();
@@ -198,7 +208,9 @@ test('konfigurátor: 3D náhľad na MOBILNOM viewporte 390×844 (low tier fallba
 	await page.setViewportSize({ width: 390, height: 844 });
 
 	await goto(page, '/konfigurator?viz=low');
-	await nakonfigurujASubmitni(page);
+	await vyplnFormular(page);
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
 
 	await expect(page.getByTestId('konf-viz')).toBeVisible();
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });

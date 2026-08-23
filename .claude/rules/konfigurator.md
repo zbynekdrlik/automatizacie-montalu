@@ -62,3 +62,34 @@ Throttluje sa len drahý POST; GET SSR render je lacný, zámerne bez limitu (ak
 
 Žiadny zápis (`server/money`/`server/db`/`server/pergola`) → E2E aj unit testy sa smú
 púšťať aj proti nasadenej appke (BASE_URL), žiadny `skipAkLive` (ako `/optimalizator`).
+
+## 6. 3D náhľad na verejnej route (#276 integrácia)
+
+Zákaznícky 3D vizuál (`VizualPergolaZakaznik`, `$lib/components/vizual/**`) je
+namontovaný do `+page.svelte` ako predajný „hero" súhrnu (vnútri `{#if suhrn}`,
+nad tabuľkou). Kľúčové vzory pri montáži ĎALŠEJ vizuál/3D schopnosti sem:
+
+- **Money guard prejde CELÝ vizuál graf.** Guard (A) rekurzívne prechádza import
+  graf klientsky dosiahnuteľných súborov — import `VizualPergolaZakaznik` doň vtiahne
+  `Vizual3D` + celý `$lib/vizual/**`. To je BEZPEČNÉ, lebo vizuál strom neobsahuje
+  žiadny `moneyKod`/`sklo-strecha`/`/server/` (má vlastný `vizual-money-guard.test.ts`)
+  a `Vizual3D` neimportuje `Vizual3DPoster`/`ZaskleniaNavrhVykres` (poster ide cez
+  `posterZaznam` snippet). Pred montážou over grep-om, že nová vizuál vetva nenesie
+  zakázaný reťazec — inak guard (A) SPADNE.
+- **Lazy dynamic import** (`import('…VizualPergolaZakaznik.svelte').then(m => VizualKomp = m.default)`
+  v `$state`, spustený v `use:enhance` success callbacku) — 3D/three.js bundle sa
+  nenačíta pred zobrazením náhľadu. Guard (A) `extrahujSpecifikatory` číta aj `import()`.
+- **`viz` SNAPSHOT pri submite**, nie live form-state → 3D je konzistentný so
+  zobrazeným (server-autoritatívnym) súhrnom aj keď zákazník po submite prepíše input.
+- **RAL kód pre 3D = form-state `farba` zachytený PRI submite** (`const odoslanaFarba = farba`
+  v enhance) — `suhrn.farba` je len display label „RAL 7016 ANTRACIT", 3D `ralKod` chce kód „7016".
+- **`{#key}` na rozmeroch** remountne 3D pri zmene rozmerov (nový canvas = sanktimovaný
+  teardown+mount, NIE zakázané `forceContextLoss` na tom istom canvase, viď `vizual3d.md`),
+  aby sa scénický rig (kamera/tiene/dekal, dimenzované raz pri mounte) prefitoval; zmena
+  len skla/RAL pri rovnakých rozmeroch → in-place update komponentu.
+- **`zobrazOvladanie={false}`** — form ostáva jediný zdroj pravdy (vlastné RAL/sklo čipy
+  komponentu by duplikovali formulár a rozišli sa so súhrnom/PDF #277); drag-to-orbit
+  ostáva (OrbitControls je nezávislý od čipov).
+- **Mapovanie názov skla → vizuálny odtieň**: `typSkla3D(nazovSkla)` v `konfigurator.ts`
+  (číre→cire, mliečne/matné/STADUR→matne, bronz→bronzove, default cire) — pure, testované,
+  bez katalógového importu.

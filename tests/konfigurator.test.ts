@@ -112,10 +112,32 @@ describe('konfigurátor — typSkla3D (názov skla → vizuálny odtieň 3D náh
 		expect(typSkla3D('xyz nič')).toBe('cire');
 	});
 
-	it('KAŽDÝ reálny katalógový názov sa mapuje na platný odtieň (kontrakt úplnosti)', () => {
-		const platneOdtiene = Object.keys(PERGOLA_SKLA_NAZVY);
+	it('KAŽDÝ reálny katalógový názov sa mapuje na OČAKÁVANÝ odtieň (kontrakt úplnosti + sémantika)', () => {
+		// Explicitná očakávaná mapa (nie tautológia „vráti platný typ" — návratový typ JE
+		// PergolaTypSkla): zachytí aj SÉMANTICKÝ drift (zlé priradenie odtieňa), aj pridanie
+		// nového katalógového názvu (chýbajúci kľúč → test padne a vynúti doplnenie).
+		const OCAKAVANE: Record<string, keyof typeof PERGOLA_SKLA_NAZVY> = {
+			'4.4.2 číre': 'cire',
+			'4.4.2 mliečne': 'matne',
+			'5.5.2 číre': 'cire',
+			'5.5.2 mliečne': 'matne',
+			'IZO 4.4.2-8-6 číre': 'cire',
+			'IZO 4.4.2-8-6 mliečne': 'matne',
+			'IZO 4.4.2-10-6': 'cire',
+			'IZO 5.5.2-8-6': 'cire',
+			'IZO 5.5.2-10-6': 'cire',
+			'4.4.2 mliečne/8/6 mliečne': 'matne',
+			'polykarbonát 16 mm číry': 'cire',
+			'polykarbonát 16 mm mliečny': 'matne',
+			'polykarbonát 16 mm bronz': 'bronzove',
+			'STADUR 24 mm': 'matne'
+		};
+		// (a) mapa pokrýva PRESNE aktuálny katalóg — nový/odobratý názov vynúti update testu
+		const katalog = SKLO_STRECHA_TYPY.map((t) => t.nazov).sort();
+		expect(Object.keys(OCAKAVANE).sort()).toEqual(katalog);
+		// (b) typSkla3D vráti pre každý názov OČAKÁVANÝ odtieň (nie len „nejaký platný")
 		for (const t of SKLO_STRECHA_TYPY) {
-			expect(platneOdtiene).toContain(typSkla3D(t.nazov));
+			expect(typSkla3D(t.nazov), `nesprávny odtieň pre „${t.nazov}"`).toBe(OCAKAVANE[t.nazov]);
 		}
 	});
 });
