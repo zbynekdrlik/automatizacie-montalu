@@ -45,6 +45,13 @@ services:
       DATABASE_PATH: /data/app/app.db
       MONEY_LIVE: ${MONEY_LIVE:-0}
       SEED_USERS: ${SEED_USERS:-}
+      # #278: Odoo lead integrácia (src/lib/server/odoo-lead.ts) číta tieto štyri
+      # výhradne z runtime env — bez forwardu je na prode ticho vypnutá. Hodnoty v
+      # /opt/automatizacie-montalu/.env; prázdny default = "chýba ktorákoľvek ⇒ vypnuté".
+      ODOO_LEAD_URL: ${ODOO_LEAD_URL:-}
+      ODOO_LEAD_DB: ${ODOO_LEAD_DB:-}
+      ODOO_LEAD_LOGIN: ${ODOO_LEAD_LOGIN:-}
+      ODOO_LEAD_API_KEY: ${ODOO_LEAD_API_KEY:-}
       BODY_SIZE_LIMIT: 1M
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
