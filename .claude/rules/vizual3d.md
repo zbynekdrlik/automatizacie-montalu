@@ -350,3 +350,27 @@ screen-res postaví + renderuje bez GL warningu (viditeľne hladšie hrany + kon
 sklo (transmission) sa vykreslí IDENTICKY (žiadne composer artefakty). Trvalý diagnostický
 atribút `data-viz-postproc` (paralela `data-viz-ready`) → E2E `overPostprocGate` overí, že
 na softvéri je gate OFF (regresný guard #290).
+
+**Review-driven gotchy (#288 adversariálny review):**
+
+- **GPU renderer-string klasifikácia — `(TM)` tolerancia UNIFORMNE + integrované-s-diskrétnym-
+  menom PRED diskrétnym testom.** Android/Windows hlásia „(TM)" medzi menom a číslom (`Adreno
+  (TM) 660`, `Radeon (TM) RX 480`, `Arc(TM) Graphics`) — každý vendor regex musí použiť `\D*` /
+  `(?:\s*\(TM\))?`, nielen Adreno. A POZOR na integrované GPU s „diskrétnym" menom: AMD APU
+  „Radeon Vega N Graphics", Intel Core Ultra „Arc(TM) Graphics" (bez Ax/Bx modelu), NVIDIA entry
+  „GeForce MX/GT" — MUSIA sa chytiť PRED diskrétnym pravidlom (`INTEGROVANE_IGPU_RE` v
+  `klasifikujGpu`), inak dostanú najťažší tier na tenkom zariadení. Diskrétny Arc/Vega sa odlíši
+  modelom/absenciou „Graphics" suffixu. `\bXe\b` (nie `Xe`) aby „Xeon" neprešlo Intel iGPU pravidlom.
+- **Optional LAZY CHUNK import potrebuje VLASTNÝ `.catch(()=>null)`** — `try/catch` okolo
+  KONŠTRUKCIE composera nezachytí zlyhanie `await import(...)` pass modulov (samostatný chunk,
+  flaky mobil). Bez `.catch` padne import do vonkajšieho catchu `inicializuj` → `tier='none'` →
+  zákazník stratí CELÝ náhľad. Graceful-degrade optional asset PRESNE ako `nacitajHDRI` (→ null).
+- **Snapshot `finally` obnoví obrazovku PRIAMYM `renderer.render()`** (bez composera) — po
+  `zachytObrazok` treba composer-aware `render()`, inak na hardvéri obrazovka po PNG exporte
+  stratí GTAO/SMAA/bloom do ďalšej interakcie (on-demand engine sám neprekresľuje).
+- **Composer továreň (`vytvorComposer`) je testovateľná FAKE ctormi** — berie všetky THREE
+  ctory injekciou, takže build vetvy + leak dispose slučka sa overia bez WebGL (`tests/vizual-
+  postproc.test.ts`, 100 %). NEVYLUČUJ ju z coverage ako `snimka.ts` (tá má reálny `gl.readPixels`).
+- **Slovenské komentáre: pozor na CYRILLIC HOMOGLYFY + soft hyphen (U+00AD).** Prekliky pri
+  písaní vsunú Cyrillic `е`/`о`/`живо` čo VYZERÁ ako Latin ale rozbije grep. Skenuj pred commitom:
+  `python3 -c "import re,sys; [print(f,i) for f in sys.argv[1:] for i,l in enumerate(open(f),1) if re.search(r'[Ѐ-ӿ­]',l)]" <súbory>`.
