@@ -1,7 +1,7 @@
 // Zákaznícky 3D náhľad (#170) — unit test `supersampleFaktor` (§2.10, čistá
 // funkcia bez DOM/WebGL).
 import { describe, expect, it } from 'vitest';
-import { supersampleFaktor } from '../src/lib/vizual/snimka';
+import { jeSoftverovyRenderer, supersampleFaktor } from '../src/lib/vizual/snimka';
 
 describe('supersampleFaktor (#285: pridaný 3× pre ostrejší tlačový PNG)', () => {
 	it('oba limity >= 7200 → 3× (7200 px = 3×2400 základnej šírky)', () => {
@@ -49,5 +49,35 @@ describe('supersampleFaktor — softvérový/neznámy renderer strop 2× (#290)'
 
 	it('hardvér (softverovyRenderer=false) drží 3× — #285 zámer nezmenený', () => {
 		expect(supersampleFaktor(16384, 16384, false)).toBe(3);
+	});
+});
+
+describe('jeSoftverovyRenderer (#290)', () => {
+	it('známe softvérové renderery → true (SwiftShader/llvmpipe/Microsoft/Software)', () => {
+		expect(
+			jeSoftverovyRenderer(
+				'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)'
+			)
+		).toBe(true);
+		expect(jeSoftverovyRenderer('Google SwiftShader')).toBe(true);
+		expect(jeSoftverovyRenderer('llvmpipe (LLVM 15.0.0, 256 bits)')).toBe(true);
+		expect(jeSoftverovyRenderer('Microsoft Basic Render Driver')).toBe(true);
+		expect(jeSoftverovyRenderer('Mesa OffScreen Software Rasterizer')).toBe(true);
+	});
+
+	it('prázdny / medzerový reťazec (debug info nedostupné, privacy) → true (fail-safe)', () => {
+		expect(jeSoftverovyRenderer('')).toBe(true);
+		expect(jeSoftverovyRenderer('   ')).toBe(true);
+	});
+
+	it('reálne hardvérové GPU → false (3× zostáva dostupné)', () => {
+		expect(
+			jeSoftverovyRenderer(
+				'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0, D3D11)'
+			)
+		).toBe(false);
+		expect(jeSoftverovyRenderer('Apple M2')).toBe(false);
+		expect(jeSoftverovyRenderer('AMD Radeon Pro 5500M OpenGL Engine')).toBe(false);
+		expect(jeSoftverovyRenderer('Intel(R) Iris(R) Xe Graphics')).toBe(false);
 	});
 });
