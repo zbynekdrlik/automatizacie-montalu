@@ -36,7 +36,15 @@ export default defineConfig({
 		? undefined
 		: {
 				command: 'npm run preview',
-				port: 4173,
+				// #291: HTTP readiness (GET /health), nie iba TCP `port`. Preview server
+				// (vite preview) načíta SSR moduly — a teda spustí migrácie, ktoré vytvoria
+				// tabuľky ako `dopyt` (v25) — LEN pri PRVOM HTTP requeste. `port` čaká iba na
+				// otvorený TCP socket, takže test, čo píše priamo do zdieľaného e2e.db PRED
+				// prvým page.goto (seedDopyt v dopyty-konfigurator.spec), otvoril ešte
+				// nemigrovanú DB → „no such table: dopyt". Readiness GET /health je prvý HTTP
+				// request → dokončí migrácie pred akýmkoľvek testom (a /health navyše číta
+				// cfg_sys, takže 200 vráti až po seedData).
+				url: 'http://localhost:4173/health',
 				reuseExistingServer: false,
 				env: {
 					DATABASE_PATH: './data/e2e.db',
