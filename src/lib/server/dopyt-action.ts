@@ -12,6 +12,7 @@ import { fail, type RequestEvent } from '@sveltejs/kit';
 import { resolveClientIp } from './client-ip';
 import { allowDopyt } from './dopyt-throttle';
 import { insertDopyt } from './dopyt-store';
+import { queueLeadCreation } from './odoo-lead';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
 import { HONEYPOT_FIELD, jeSpam, normalizeDopyt, validateDopyt, type DopytVstup } from '$lib/dopyt';
@@ -110,6 +111,12 @@ export async function dopytAction(event: RequestEvent) {
 			ulozene: true
 		});
 	}
+
+	// #278: dopyt do Odoo CRM leadu — FIRE-AND-FORGET až po pripravení PDF odpovede. Beží
+	// async MIMO tejto cesty (synchrónny `void` wrapper), takže NIKDY nezdrží ani nezhodí
+	// zákazníkovo PDF; chyby sa logujú a dopyt sa neminie (retry cez `odoo_attempts`). Keď
+	// chýba Odoo env, wrapper ticho no-opne.
+	queueLeadCreation(id, pdfBase64);
 
 	return { success: true, pdfBase64, filename: filename() };
 }

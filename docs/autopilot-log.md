@@ -1518,6 +1518,7 @@ implementované, nereprodukovateľné čestný null:
 - **Money-safe:** engine money-clean; nové riadky pretečú do rezervácie cez `narezToCadRows` (kódy 18004-18008 v CODE_MAP); v TEST režime nič nezapisuje. Plný beh 1836/1836 unit + 23 pergola E2E zelené. STOP na zelenom PR — majiteľ posúdi Money čísla pred merge.
 - **PR nesie aj pending #270 tail** (provision-vps krok 4 `a61684b` + log/bump `c9bc70b`/`404155e`/`1824b79`) — prác prior session na dev, ešte nereleasnutá; ide s týmto release PR-om.
 
+<<<<<<< HEAD
 ## Kolo 12 — #235 cesta A (PR #274, v0.24.19, merge c48a3c88) — advances #235, NEZATVORENÝ
 
 - **STEP 0 nález (predpoklad tiketu sa rozišiel s kódom):** potvrdené mapovanie 6 typov (od Dominika, A2/#198) sú sklá do STRECHY pergoly, NIE zasklievacie sklá. Cenená časť appky (#225: `glassMoneyKod`+`SkloCena`) je len nárezák zasklení (Robust/Slide/Štandard/Deluxe — iné sklá). Strešné sklo (`strechaSklo`) je voľný text (#206 e); cenený+odpisový povrch = #223 (blokovaný na rozmery od Dominika). → 6 mapovaní nemá dnes v cenenej ceste kam sadnúť; v23-štýl `UPDATE glass_types` by updatlo 0 riadkov.
@@ -1539,3 +1540,15 @@ implementované, nereprodukovateľné čestný null:
 - **Money-leak disciplína:** b2b-route-coverage guard = akcie presne `['dopyt','vypocet']` (fail-closed); leak-graf guard REÁLNE prechádza nové klientske súbory (DopytForm/ponuka/dopyt) — explicitný pokrývací test. ZERO cien/Money kódov na verejnej ploche.
 - **Review 0 🔴 0 🟡 1 🔵** (fresh general-purpose, môj Opus 4.8): 🔵 stale `konfigurator.md §1.3` (`['default']`) opravený v `cc4bcf8`. Plný beh 1979/1979 unit, coverage 96.18/90.23/98.03/97.7.
 - **Post-deploy (prod 0.24.22):** DOM footer `v0.24.22 (e7ba5b9)`, health ok/live. Funkčne: `/konfigurator` bez loginu → súhrn (4.4.2 číre, 14 m²) → dopyt formulár → PDF stiahnuté (`Montalu-ponuka-2026-08-23.pdf`), 0 console chýb, žiadna cena. PDF metadáta: „Špecifikácia pergoly", rozmery 4000×3500, RAL 7016, 4.4.2 číre, marker „bez cien", hasPrice=false. Run-card fired.
+=======
+## #278 — Lead z konfigurátora do Odoo CRM (BUILD-ONLY lane, stack na #277)
+
+- **Cieľ:** každý verejný dopyt (#277) → `crm.lead` v Montalu Odoo (`erp.montalu.cloud`, db `odoo`) cez XML-RPC, s PDF ponukou ako `ir.attachment` (best-effort). FIRE-AND-FORGET z `dopyt-action` po pripravení PDF — lead nikdy nezdrží/nezhodí zákazníkovo PDF.
+- **Nový `src/lib/server/odoo-lead.ts` (407 r.):** hand-rolled minimal XML-RPC cez `fetch` (dependency-free — Tier-0 bundling, vzor `log.ts`/`dejavu.ts`), injektovateľný transport (`_setLeadTransport`) pre mock testy. Encoder int/string/bool/struct/array; decoder skalár+fault. Dvojité escapovanie popisu (Html pole): HTML-escape zákazníckych hodnôt + XML-escape na drôte, `<br>` = reálny zlom.
+- **Resilience:** migrácia **v26** (`odoo_lead_id`/`odoo_attempts`/`odoo_last_error` na `dopyt`); Odoo dole ⇒ attempts++, dopyt sa nestratí; `retryPendingLeads()` sweep + `runStartupLeadSweep()` v `hooks.server.ts`. Credentials LEN z env (`ODOO_LEAD_*`, VPS `.env`), chýba ⇒ ticho vypnuté.
+- **Migračný ripple:** 17 `migration-*` + `dopyt-store`/`sklo-3-3-1-standard`/`migration-v25` testov zdvihnutých 25→26; nový `migration-v26.test.ts`.
+- **Review (Opus 4.8) → 0 🔴 2 🟡 3 🔵, VŠETKO opravené `182eb6b`:** 🟡 in-flight `Set` proti súbežnej duplicite leadu; 🟡 sweep len po úspešnom submite + štartový sweep; 🔵 `xmlEscape` odstraňuje XML-1.0 C0 znaky (poison-pill); 🔵 escapovací + súbeh + C0 testy; 🔵 titulok v25 testu.
+- **Money-safe:** žiadny money/pergola import, žiadny `/data`, nula cien v payloade; vlastný guard v `tests/odoo-lead.test.ts` (odoo-lead meno neťahá auto-guard `dopyt|ponuka`).
+- **Gate:** check + lint čisté, 1963 unit testov, coverage 95.88/89.65/97.65/97.29 — nad prahmi. Commity `a87edb8`/`7d2d95b`/`182eb6b`. BUILD-ONLY: bez bumpu/PR/merge/deploy, supervisor integruje (poradie #275→#277→#278). #278 OSTÁVA OTVORENÝ.
+- **Playbook:** nové `.claude/rules/odoo-lead.md` + router riadok; poznámka o non-migration testoch do `glass-catalog.md`.
+>>>>>>> worktree-agent-a48d1d5a3169a333e
