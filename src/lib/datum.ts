@@ -43,3 +43,16 @@ export function formatDatumSk(iso: string): string {
 	const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
 	return `${get('day')}.${get('month')}.${get('year')}`;
 }
+
+// SQLite `datetime('now')` vracia UTC v tvare „YYYY-MM-DD HH:MM:SS" (medzera, BEZ zóny).
+// `new Date('YYYY-MM-DD HH:MM:SS')` by ho JS parsol ako LOKÁLNY čas (medzera = nie ISO 8601)
+// → na prod kontajneri (UTC) blízko polnoci alebo pri zobrazení času posun o 1-2h (UTC pasca
+// #114 / timestamps.md). Normalizácia na UTC ISO (`...T...Z`) je jediný správny most medzi
+// SQLite timestampom a `formatDatumCasSk`/`formatDatumSk` (ktoré potom aplikujú Europe/Bratislava).
+/** SQLite `datetime('now')` UTC timestamp → korektný UTC ISO reťazec (`...T...Z`). Vstup, ktorý
+ *  už ISO je (alebo iný tvar), vráti nezmenený — most, nie parser. */
+export function sqliteUtcToIso(sqliteUtc: string): string {
+	return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(sqliteUtc)
+		? sqliteUtc.replace(' ', 'T') + 'Z'
+		: sqliteUtc;
+}
