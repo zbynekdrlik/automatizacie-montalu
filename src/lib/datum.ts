@@ -26,3 +26,20 @@ export function formatDatumCasSk(iso: string): string {
 	const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
 	return `${get('day')}.${get('month')}.${get('year')} ${get('hour')}:${get('minute')}`;
 }
+
+// Rovnaká TZ disciplína ako FORMAT vyššie, len bez času — pre miesta, ktoré chcú iba dátum
+// (napr. pätička PDF ponuky #277). Bez explicitnej zóny by prod kontajner (UTC) blízko polnoci
+// ukázal nesprávny kalendárny deň (viď timestamps.md / #114).
+const FORMAT_DATUM = new Intl.DateTimeFormat('en-US', {
+	timeZone: 'Europe/Bratislava',
+	year: 'numeric',
+	month: 'numeric',
+	day: 'numeric'
+});
+
+/** Slovenský dátum „5.8.2026" (deň/mesiac bez nuly), Europe/Bratislava, bez času. */
+export function formatDatumSk(iso: string): string {
+	const parts = FORMAT_DATUM.formatToParts(new Date(iso));
+	const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+	return `${get('day')}.${get('month')}.${get('year')}`;
+}
