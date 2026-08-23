@@ -11,7 +11,13 @@ import { DB_PATH } from '$lib/server/db';
 
 const log = logger('http');
 
-const PUBLIC_PATHS = ['/login', '/health'];
+// #275: /konfigurator je VEREJNÝ zákaznícky konfigurátor pergoly (fáza 1) — EXPLICITNÁ
+// allowlist výnimka z auth brány (brána ostáva bránou, pridáva sa jeden verejný prefix,
+// nie oslabenie gate). Display-only, BEZ CIEN/Money kódov/nárezu, žiadny zápis do Money
+// (guard: tests/konfigurator-money-safety.test.ts). b2b drift guard: je to top-level
+// route (nie pod Money-denylist prefixom) → dostupná pre všetkých vrátane prihláseného
+// b2b (tests/b2b-route-coverage.test.ts).
+const PUBLIC_PATHS = ['/login', '/health', '/konfigurator'];
 
 let pruneCounter = 0;
 
