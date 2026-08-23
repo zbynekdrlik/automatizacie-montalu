@@ -38,17 +38,26 @@ async function velkostCanvasPng(page: Page): Promise<number> {
 	return buffer.length;
 }
 
-/** Externé (cross-origin absolútne http[s]) requesty — MUSÍ byť prázdne
- *  (žiadna externá runtime závislosť; HDRI ide z vlastného originu). */
+/** Zbiera KAŽDÝ cross-origin http(s) request (origin != origin appky) — MUSÍ
+ *  ostať prázdny (žiadna externá runtime závislosť; HDRI aj všetko ostatné ide
+ *  z VLASTNÉHO originu). Nie host-denylist (ten by pustil hocijaký iný host) —
+ *  porovnáva sa reálny `URL.origin` proti originu appky; `data:`/`blob:`/ostatné
+ *  ne-http schémy sú v poriadku (žiaden sieťový fetch). MUSÍ sa volať AŽ PO
+ *  prvej navigácii (napr. po `loginAs`) — `page.url()` origin appky sa zachytí
+ *  RAZ pri setupe (pred prvou navigáciou by bol `about:blank`/„null" a prvý
+ *  request appky by sa javil ako externý). */
 function zbierajExterneRequesty(page: Page): string[] {
 	const externe: string[] = [];
+	const appOrigin = new URL(page.url()).origin;
 	page.on('request', (req) => {
-		const url = req.url();
-		// same-origin appka beží na http://localhost:4173 (alebo BASE_URL);
-		// čokoľvek smerujúce na polyhaven / iný absolútny host je porušenie
-		if (/polyhaven|dl\.polyhaven|amazonaws|cloudfront|googleapis|gstatic/.test(url)) {
-			externe.push(url);
+		let u: URL;
+		try {
+			u = new URL(req.url());
+		} catch {
+			return;
 		}
+		if (u.protocol !== 'http:' && u.protocol !== 'https:') return; // data:/blob:/… = žiaden fetch
+		if (u.origin !== appOrigin) externe.push(req.url());
 	});
 	return externe;
 }
@@ -79,8 +88,10 @@ test.describe('Vizual3D showroom (#285) — HDRI / dielektrický hliník / tiene
 	}) => {
 		test.setTimeout(60000);
 		const consoleMsgs = collectConsole(page);
-		const externe = zbierajExterneRequesty(page);
 		await loginAs(page);
+		// setup AŽ po loginAs — appOrigin sa zachytáva z `page.url()` (stabilný
+		// origin appky, nie about:blank pred prvou navigáciou)
+		const externe = zbierajExterneRequesty(page);
 		await vykresliSViz(page, 'high');
 
 		await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 15000 });
@@ -109,11 +120,13 @@ test.describe('Vizual3D showroom (#285) — HDRI / dielektrický hliník / tiene
 	});
 
 	test('HDRI asset je dosiahnuteľný z vlastného originu (200), nie 404', async ({ page }) => {
+		const consoleMsgs = collectConsole(page);
 		await loginAs(page);
 		const res = await page.request.get('/hdri/kloofendal_puresky_1k.hdr');
 		expect(res.status()).toBe(200);
 		// Radiance HDR magic — dôkaz, že sa servuje SKUTOČNÝ HDR, nie SPA fallback HTML
 		const telo = (await res.body()).subarray(0, 11).toString('latin1');
 		expect(telo).toContain('#?RADIANCE');
+		expect(consoleMsgs).toEqual([]);
 	});
 });

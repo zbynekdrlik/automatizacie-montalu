@@ -224,15 +224,16 @@
 	});
 
 	async function nacitajTHREE() {
-		const [THREE, { OrbitControls }, { RoomEnvironment }, { mergeGeometries }, { RGBELoader }] =
+		const [THREE, { OrbitControls }, { RoomEnvironment }, { mergeGeometries }, { HDRLoader }] =
 			await Promise.all([
 				import('three'),
 				import('three/examples/jsm/controls/OrbitControls.js'),
 				import('three/examples/jsm/environments/RoomEnvironment.js'),
 				import('three/examples/jsm/utils/BufferGeometryUtils.js'),
-				import('three/examples/jsm/loaders/RGBELoader.js')
+				// r0.185: HDRLoader (RGBELoader je deprecovaný alias — waroval by)
+				import('three/examples/jsm/loaders/HDRLoader.js')
 			]);
-		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries, RGBELoader };
+		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries, HDRLoader };
 	}
 
 	function zistiTierVstup(
@@ -411,6 +412,13 @@
 		// #285: kľúčové svetlo vrhá reálny tieň (mid/high tier) — cieľ + shadow
 		// kamera podľa bboxu; `key.target` MUSÍ byť v scéne, inak three.js tieň
 		// mieri na (0,0,0). Low tier (`tiene===false`) tieň nekonfiguruje.
+		// POZN.: shadow frustum sa dimenzuje RAZ pri mounte podľa počiatočného
+		// bboxu — rovnako ako kontaktný dekal, stena a auto-fit kamery (všetka
+		// „scénická výbava" je mount-time). `prestavGeometriuProduktu` (otvoriť/
+		// zatvoriť) mení len pozície dielov, nie obálku, takže frustum ostáva
+		// platný. Live zmena ROZMEROV bez re-mountu (potenciálne až integrácia
+		// verejnej route #275) by potrebovala prestavať celú túto výbavu spolu —
+		// mimo rozsahu #285 (zdieľané pre-existujúce obmedzenie #170/#174).
 		if (nastavenia.tiene) {
 			nastavKluceoveSvetloTien(
 				THREE,
@@ -557,7 +565,7 @@
 		}
 
 		try {
-			const { THREE, OrbitControls, RoomEnvironment, mergeGeometries, RGBELoader } =
+			const { THREE, OrbitControls, RoomEnvironment, mergeGeometries, HDRLoader } =
 				await nacitajTHREE();
 			if (zruseneVOnMounte || !canvasEl) return;
 			const initMs = performance.now() - t0;
@@ -573,7 +581,7 @@
 			// `null` pri akejkoľvek chybe → `vytvorEnvironment` graceful padne na
 			// procedurálny `RoomEnvironment` (scéna sa nikdy nezhodí kvôli assetu).
 			const hdrTexture = nastaveniaPreTier(tier).hdri
-				? await nacitajHDRI(RGBELoader, hdriUrl(base))
+				? await nacitajHDRI(HDRLoader, hdriUrl(base))
 				: null;
 			if (zruseneVOnMounte || !canvasEl) {
 				hdrTexture?.dispose();

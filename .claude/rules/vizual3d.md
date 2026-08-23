@@ -3,6 +3,7 @@ paths:
   - "src/lib/vizual/**"
   - "src/lib/components/vizual/**"
   - "e2e/vizual3d.spec.ts"
+  - "e2e/vizual-showroom.spec.ts"
   - "e2e/zasklenia-zakaznicky.spec.ts"
   - "tests/vizual-*.test.ts"
 ---
@@ -245,3 +246,51 @@ canvas/THREE potrebný na `DielSpec`).
 ne-vizual moduly (`$lib/pergola-navrh`, `$lib/vykres/ral`, `$lib/vykres/kota`);
 `$lib/pergola-navrh` už v allowliste `tests/vizual-money-guard.test.ts` bol
 (autor #170 pergola reuse anticipoval). Nový allowlist zápis len s dôvodom.
+
+## Showroom kvalita (#285) — HDRI/IBL, dielektrický hliník, reálne tiene, deprecated three API
+
+**Práškovaný hliník = DIELEKTRIKUM, nie kov.** `vytvorHlinikMaterial`/`nastavRAL`
+majú `metalness: 0` (nie 0.82), `roughness ~0.35`, `clearcoat ~0.3`. Práškovanie
+je pigmentovaný LAK — svetlo sa odráža od farebnej vrstvy difúzne, nie kovovým
+zrkadlom. Clearcoat dodá jemný farbou-NEzafarbený odlesk HDRI. `metalness 1`
+čítalo ako chróm (slabina, ktorú rešerš #276 vytkla SalesQueze). Testy zamykajú
+`metalness === 0` na oboch cestách (vytvor + nastavRAL prepnutie).
+
+**HDRI/IBL z VLASTNÉHO originu, NIKDY runtime fetch.** `static/hdri/*.hdr`
+(Poly Haven CC0, 1k ~1,4 MB — 1k stačí, PMREM aj tak rozmaže) sa lazy-loaduje
+cez `HDRLoader` (`scena.ts::nacitajHDRI`, `hdriUrl(base)`) len na mid/high tieri.
+`vytvorEnvironment` má DVOJITÝ graceful fallback na procedurálny `RoomEnvironment`:
+(1) load error → `nacitajHDRI` vráti null; (2) `pmrem.fromEquirectangular` throw
+(GPU quirk) → tichý try/catch. Oba TICHÉ (žiaden console výstup) — scéna sa nikdy
+nezhodí kvôli vizuálnemu assetu a E2E zero-console drží. Vstupná HDR DataTexture
+sa disposuje bezpodmienečne vo `finally`; PMREM env textúra ostáva v `disposables`.
+Toto je vedomé uvoľnenie §4 „žiaden binárny obrázok v repe" (majiteľ schválil v #285).
+
+**three r0.185 DEPRECATED API — chytené LEN živým renderom (E2E asertuje 0 warningov):**
+- `RGBELoader` je deprecovaný alias (extends `HDRLoader`, waruje v konštruktore)
+  → importuj `three/examples/jsm/loaders/HDRLoader.js` `{ HDRLoader }` priamo.
+- `PCFSoftShadowMap` je deprecovaný (renderer waruje + aj tak spadne na
+  `PCFShadowMap`) → `renderer.shadowMap.type = THREE.PCFShadowMap` + mäkkosť cez
+  `light.shadow.radius`. `svelte-check`/`vitest` tieto NEchytia (sú runtime three
+  warningy) — over ich ŽIVÝM renderom, nie len typmi.
+
+**Reálne cast-shadow tiene (mid/high tier).** `renderer.shadowMap.enabled =
+nastavenia.tiene`, kľúčové svetlo `castShadow` cez `nastavKluceoveSvetloTien`
+(ortho frustum podľa bboxu, cieľ na strede produktu, `scene.add(key.target)` je
+POVINNÉ — inak tieň mieri na 0,0,0). Hliník cast+receive, sklo len receive
+(transmisné by vrhalo nefyzikálny nepriehľadný tieň), zem/stena receive.
+**Shadow frustum sa dimenzuje RAZ pri mounte** (ako kontaktný dekal/stena/kamera
+auto-fit) — `prestavGeometriuProduktu` (otvoriť/zatvoriť) mení len pozície, nie
+obálku. Live zmena ROZMEROV bez re-mountu by potrebovala prestavať celú scénickú
+výbavu spolu (pre-existujúce #170/#174 obmedzenie, nie #285).
+
+**Tone mapping = `NeutralToneMapping`** (nie ACES/AgX) — kritérium je vernosť RAL
+farieb (predajný konfigurátor). Khronos PBR Neutral necháva base farbu nejasových
+plôch nezmenenú; AgX desaturuje celý rozsah. Jednoriadková zmena, keby review po
+živom renderi preferoval AgX.
+
+**Vizuálna verifikácia v build-only lane:** `vite dev` (dev server, NIE zakázaný
+`vite build`/preview-build) + Playwright MCP → login (native-setter driven form,
+viď `testing.md`) → `/zasklenia/navrh?viz=high|mid|low` (vynúti tier) → over
+`data-viz-ready=true`, `__VIZ_CONTEXTS===1`, screenshot, console warnings. Toto
+chytilo obidva deprecation warningy PRED CI. `?viz=` vynúti tier bez ohľadu na HW.

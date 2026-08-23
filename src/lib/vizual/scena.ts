@@ -13,7 +13,10 @@ import {
 import type { TierNastavenia } from './kvalita';
 
 type ThreeNS = typeof import('three');
-type RGBELoaderCtor = typeof import('three/examples/jsm/loaders/RGBELoader.js').RGBELoader;
+// three r0.185: `RGBELoader` je deprecovaný (len extends `HDRLoader` a waruje v
+// konštruktore) → používame priamo `HDRLoader` (rovnaké `.load` API, vracia
+// `DataTexture`), inak by scéna vypísala deprecation warning (E2E asertuje 0).
+type HDRLoaderCtor = typeof import('three/examples/jsm/loaders/HDRLoader.js').HDRLoader;
 
 /** URL commitnutého HDRI assetu (Poly Haven CC0, `static/hdri/`). Servuje sa z
  *  VLASTNÉHO originu appky (žiaden externý runtime fetch — #285); `base` (SvelteKit)
@@ -22,17 +25,17 @@ export function hdriUrl(base: string): string {
 	return `${base}/hdri/kloofendal_puresky_1k.hdr`;
 }
 
-/** Načíta HDRI equirect textúru (`RGBELoader`) z vlastného originu. Vráti
+/** Načíta HDRI equirect textúru (`HDRLoader`) z vlastného originu. Vráti
  *  `null` pri AKEJKOĽVEK chybe (chýbajúci súbor, sieťová chyba) — konzument
  *  potom graceful padne na procedurálny `RoomEnvironment` (#285). NIKDY
  *  nerejektuje (aby jedna chyba assetu nezhodila celú scénu). */
 export function nacitajHDRI(
-	RGBELoaderCtor: RGBELoaderCtor,
+	HDRLoaderCtor: HDRLoaderCtor,
 	url: string
 ): Promise<InstanceType<ThreeNS['DataTexture']> | null> {
 	return new Promise((resolve) => {
 		try {
-			new RGBELoaderCtor().load(
+			new HDRLoaderCtor().load(
 				url,
 				(tex) => resolve(tex),
 				undefined,
@@ -58,18 +61,32 @@ export function vytvorEnvironment(
 	hdrTexture?: InstanceType<ThreeNS['DataTexture']> | null
 ): InstanceType<ThreeNS['Texture']> {
 	const pmrem = new THREE.PMREMGenerator(renderer);
-	let texture: InstanceType<ThreeNS['Texture']>;
-	if (nastavenia.hdri && hdrTexture) {
-		hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
-		texture = pmrem.fromEquirectangular(hdrTexture).texture;
-		hdrTexture.dispose();
-	} else {
+	try {
+		if (nastavenia.hdri && hdrTexture) {
+			try {
+				hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+				return pmrem.fromEquirectangular(hdrTexture).texture;
+			} catch {
+				// #285: konverzia HDRI cez PMREM zlyhala (napr. GPU/half-float
+				// quirk na softvérovom WebGL v CI, nekompatibilný HDR) — TICHÝ
+				// graceful fallback na procedurálny RoomEnvironment. Zámerne
+				// bez console výstupu: (a) scéna sa NIKDY nezhodí kvôli
+				// vizuálnemu assetu, (b) E2E asertuje 0 console errorov/warningov,
+				// (c) RoomEnvironment je plnohodnotná pôvodná IBL (rovnaká
+				// „no HDRI" vetva ako keď `nacitajHDRI` vráti null pri load chybe).
+			}
+		}
 		const env = new RoomEnvironmentCtor();
-		texture = pmrem.fromScene(env, 0.04, 0.1, 100, { size: nastavenia.pmrem }).texture;
+		const tex = pmrem.fromScene(env, 0.04, 0.1, 100, { size: nastavenia.pmrem }).texture;
 		(env as unknown as { dispose?: () => void }).dispose?.();
+		return tex;
+	} finally {
+		// vstupná HDR DataTexture sa už nepoužije (PMREM z nej odvodil vlastnú) —
+		// dispose bezpodmienečne, ak bola dodaná (aj na fallback vetve), aby
+		// neunikla ani keď `nastavenia.hdri === false`.
+		if (hdrTexture) hdrTexture.dispose();
+		pmrem.dispose();
 	}
-	pmrem.dispose();
-	return texture;
 }
 
 export function vytvorRenderer(
@@ -101,10 +118,13 @@ export function vytvorRenderer(
 	renderer.toneMapping = THREE.NeutralToneMapping;
 	renderer.toneMappingExposure = 1.0;
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, nastavenia.dpr));
-	// #285: reálny cast-shadow map na mid/high tieri (PCFSoft = mäkké okraje);
-	// low tier ostáva bez shadow mapy (len kontaktný dekal — perf na slabom GPU).
+	// #285: reálny cast-shadow map na mid/high tieri; low tier ostáva bez shadow
+	// mapy (len kontaktný dekal — perf na slabom GPU). Typ = `PCFShadowMap`:
+	// `PCFSoftShadowMap` je v three r0.185 DEPRECOVANÝ (renderer by naň vypísal
+	// warning a aj tak spadol na `PCFShadowMap`) — používame priamo PCF a mäkkosť
+	// okrajov riešime cez `light.shadow.radius` (viď `nastavKluceoveSvetloTien`).
 	renderer.shadowMap.enabled = nastavenia.tiene;
-	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	renderer.shadowMap.type = THREE.PCFShadowMap;
 	return renderer;
 }
 
@@ -172,6 +192,9 @@ export function nastavKluceoveSvetloTien(
 
 	key.shadow.bias = -0.0004;
 	key.shadow.normalBias = 0.02;
+	// mäkké okraje tieňa (náhrada za deprecovaný PCFSoftShadowMap — PCF s
+	// polomerom rozostrenia dá porovnateľne mäkký kontakt bez warningu)
+	key.shadow.radius = 3;
 }
 
 export function vytvorOblohu(THREE: ThreeNS): InstanceType<ThreeNS['Mesh']> {
