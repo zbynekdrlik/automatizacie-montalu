@@ -26,6 +26,17 @@ if (!version) {
 }
 
 export default defineConfig({
+	// #291: pod StrykerJS beží N paralelných vitest test-runner procesov, každý vo vlastnom
+	// sandboxe so SYMLINKNUTÝM node_modules → všetky zdieľajú ten istý reálny
+	// `node_modules/.vite` optimize cache a pretekajú na atomickom rename
+	// `deps___vitest___temp_* → deps___vitest__` (`ENOTEMPTY: directory not empty, rename`,
+	// mutation run 32667546563 shard 4 spadol v úvodnom dry-rune — NIE prežívajúci mutant).
+	// Izoluj optimize cache PER PROCES (unikátny pid) LEN keď beží pod Strykerom (CWD v
+	// `.stryker-tmp`) — normálny `test`/`dev`/`build`/`preview` beh (CWD = koreň repa) ostáva
+	// na defaulte (`node_modules/.vite`), úplne nedotknutý.
+	cacheDir: process.cwd().includes('.stryker-tmp')
+		? `node_modules/.vite-stryker-${process.pid}`
+		: undefined,
 	define: {
 		__APP_VERSION__: JSON.stringify(version)
 	},
