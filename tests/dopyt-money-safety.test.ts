@@ -10,26 +10,34 @@ function zdroj(relPath: string): string {
 	return fs.readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
 }
 
-// Rekurzívne nájdi všetky dopyt/ponuka zdrojové súbory pod src/lib (auto-guard nových
-// súborov — #277 review 🔵: manuálny zoznam by nový dopyt/ponuka súbor prehliadol).
+// Rekurzívne nájdi všetky dopyt/ponuka zdrojové súbory (auto-guard nových súborov — #277
+// review 🔵: manuálny zoznam by nový súbor prehliadol). Dva korene: pod src/lib matchuje MENO
+// (dopyt|ponuka); celý route adresár src/routes/dopyty-konfigurator/ je dopyt-only (#282 review
+// 🔵), takže tam berieme KAŽDÝ .ts/.svelte — mená +page.server.ts / +server.ts by name-match
+// nechytil, no aj tie musia byť Money-neutrálne.
 function najdiDopytPonuka(): string[] {
-	const root = new URL('../src/lib/', import.meta.url);
 	const out: string[] = [];
-	const walk = (dirUrl: URL, rel: string) => {
+	const walk = (dirUrl: URL, rel: string, base: string, vsetkyVDir: boolean) => {
 		for (const e of fs.readdirSync(dirUrl, { withFileTypes: true })) {
 			const childRel = rel ? `${rel}/${e.name}` : e.name;
 			if (e.isDirectory()) {
-				walk(new URL(`${e.name}/`, dirUrl), childRel);
+				walk(new URL(`${e.name}/`, dirUrl), childRel, base, vsetkyVDir);
 			} else if (
-				/(dopyt|ponuka)/i.test(e.name) &&
 				/\.(ts|svelte)$/.test(e.name) &&
-				!e.name.endsWith('.d.ts')
+				!e.name.endsWith('.d.ts') &&
+				(vsetkyVDir || /(dopyt|ponuka)/i.test(e.name))
 			) {
-				out.push(`src/lib/${childRel}`);
+				out.push(`${base}${childRel}`);
 			}
 		}
 	};
-	walk(root, '');
+	walk(new URL('../src/lib/', import.meta.url), '', 'src/lib/', false);
+	walk(
+		new URL('../src/routes/dopyty-konfigurator/', import.meta.url),
+		'',
+		'src/routes/dopyty-konfigurator/',
+		true
+	);
 	return out.sort();
 }
 
@@ -61,7 +69,9 @@ describe('dopyt/ponuka Money-safety (#277)', () => {
 				'src/lib/server/dopyt-store.ts',
 				'src/lib/server/dopyt-throttle.ts',
 				'src/lib/server/dopyt-pdf.ts',
-				'src/lib/components/DopytForm.svelte'
+				'src/lib/components/DopytForm.svelte',
+				'src/routes/dopyty-konfigurator/+page.server.ts',
+				'src/routes/dopyty-konfigurator/pdf/+server.ts'
 			])
 		);
 	});

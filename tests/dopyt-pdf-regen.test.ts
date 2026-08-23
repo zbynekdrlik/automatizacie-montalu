@@ -1,6 +1,6 @@
 // #282 — znovu-vygenerovanie PDF ponuky pre uložený dopyt. Overuje, že sa PDF regeneruje z
 // ULOŽENEJ konfigurácie (metadáta = testovateľný kanál hodnôt, viď dopyt-ponuka.md), názov
-// súboru, invariant NULA cien a null pre neexistujúce id. Izolovaná test DB (v25).
+// súboru, invariant NULA cien a null pre neexistujúce id. Zdieľaná test DB (v26).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import { db } from '../src/lib/server/db';

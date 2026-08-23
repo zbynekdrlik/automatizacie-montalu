@@ -1,6 +1,6 @@
 // #282 — GET /dopyty-konfigurator/pdf endpoint: AUTH (defense-in-depth vrstva NAVYŠE k
 // globálnej bráne hooks.server.ts) + validácia id + úspešný PDF response. Volá `GET` handler
-// priamo s fake RequestEvent (vzor tests/dopyt-action.test.ts). Izolovaná test DB (v25).
+// priamo s fake RequestEvent (vzor tests/dopyt-action.test.ts). Zdieľaná test DB (v26).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GET } from '../src/routes/dopyty-konfigurator/pdf/+server';
 import { db } from '../src/lib/server/db';
