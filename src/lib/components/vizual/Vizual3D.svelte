@@ -43,8 +43,15 @@
 		type PresetKluc,
 		vzdialenostPrePreset
 	} from '$lib/vizual/kamera';
-	import { detekujTier, nastaveniaPreTier, type Tier } from '$lib/vizual/kvalita';
+	import {
+		detekujTier,
+		nastaveniaPreTier,
+		postprocKonfig,
+		postprocPovoleny,
+		type Tier
+	} from '$lib/vizual/kvalita';
 	import { snimka as zachytSnimku } from '$lib/vizual/snimka';
+	import { vytvorComposer, type PostprocModuly, type ZivyComposer } from '$lib/vizual/postproc';
 
 	let {
 		vysledok,
@@ -113,6 +120,12 @@
 		/** referencia na sklo materiál (ak scéna má sklo) — pre živú zmenu vzhľadu
 		 *  skla (`prekresliSklo()`) bez rebuildu geometrie (#276). */
 		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
+		/** #288: post-processing composer (GTAO/SMAA/bloom) — `null` na low/none tieri
+		 *  a na SOFTVÉROVOM rendereri (`postprocPovoleny`). Keď existuje, `render()`
+		 *  volá jeho `.render()` namiesto priameho `renderer.render()`. Prežije
+		 *  `prestavGeometriuProduktu` (referuje stabilné `scene`/`camera`; GTAO si
+		 *  re-renderuje G-buffer každý frame, takže vidí nové meshe). */
+		postproc: ZivyComposer | null;
 		disposables: Disposable[];
 		contextLostCount: number;
 		fitVzdialenost: number;
@@ -123,7 +136,10 @@
 
 	function render() {
 		if (!ziva) return;
-		ziva.renderer.render(ziva.scene, ziva.camera);
+		// #288: keď existuje post-processing composer (mid/high + hardvér), renderuje
+		// cezeň (GTAO/SMAA/bloom); inak priamy jednoprechodový render (low/none/softvér).
+		if (ziva.postproc) ziva.postproc.render();
+		else ziva.renderer.render(ziva.scene, ziva.camera);
 	}
 
 	/** Krátkodobá rAF slučka — SAMA sa ukončí, keď `controls.update()` vráti
@@ -217,6 +233,12 @@
 		el.dataset.vizPreset = preset;
 		el.dataset.vizCam = `${camAzimutDeg.toFixed(1)},${camElevaciaDeg.toFixed(1)}`;
 		el.dataset.vizRal = ralKod;
+		// #288: či je aktívny post-processing composer (mid/high + hardvér). Diagnostika
+		// paralelná k `data-viz-ready` — E2E ňou overí, že na SOFTVÉROVOM CI rendereri je
+		// gate správne VYPNUTÝ (`false` → priamy render, žiadna #290 regresia), a naживо na
+		// hardvéri ZAPNUTÝ (`true`). `ziva` nie je `$state`, ale efekt sa už spúšťa cez
+		// `pripravene` (flipne až po postavení scény), takže `ziva.postproc` je vtedy known.
+		el.dataset.vizPostproc = ziva?.postproc ? 'true' : 'false';
 	}
 
 	$effect(() => {
@@ -234,6 +256,42 @@
 				import('three/examples/jsm/loaders/HDRLoader.js')
 			]);
 		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries, HDRLoader };
+	}
+
+	/** #288: lazy-import post-processing pass modulov — LEN keď je gate ON (mid/high +
+	 *  hardvér). Oddelené od `nacitajTHREE()`, aby sa ~30–40 KB pass kódu nedostalo do
+	 *  low-tier/mobil kritickej cesty (bundle disciplína pre verejnú mobil-first route). */
+	async function nacitajPostproc(): Promise<PostprocModuly> {
+		const [
+			{ EffectComposer },
+			{ RenderPass },
+			{ GTAOPass },
+			{ UnrealBloomPass },
+			{ OutputPass },
+			{ SMAAPass }
+		] = await Promise.all([
+			import('three/examples/jsm/postprocessing/EffectComposer.js'),
+			import('three/examples/jsm/postprocessing/RenderPass.js'),
+			import('three/examples/jsm/postprocessing/GTAOPass.js'),
+			import('three/examples/jsm/postprocessing/UnrealBloomPass.js'),
+			import('three/examples/jsm/postprocessing/OutputPass.js'),
+			import('three/examples/jsm/postprocessing/SMAAPass.js')
+		]);
+		return { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, OutputPass, SMAAPass };
+	}
+
+	/** UNMASKED_RENDERER_WEBGL reťazec (na rozhodnutie post-processing gate —
+	 *  softvérový SwiftShader/CI vs hardvér). Prázdny keď `WEBGL_debug_renderer_info`
+	 *  nedostupné (privacy) → `jeSoftverovyRenderer` to berie ako softvér (fail-safe). */
+	function citajUnmaskedRenderer(gl: WebGL2RenderingContext | null): string {
+		if (!gl) return '';
+		try {
+			const ext = gl.getExtension('WEBGL_debug_renderer_info');
+			if (ext) return String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+		} catch {
+			// bez debug info → prázdny reťazec (fail-safe: softvér → composer OFF)
+		}
+		return '';
 	}
 
 	function zistiTierVstup(
@@ -388,7 +446,8 @@
 		mergeGeometries: MergeGeometriesFn,
 		canvas: HTMLCanvasElement,
 		aktualnyTier: Exclude<Tier, 'none'>,
-		hdrTexture: InstanceType<ThreeNS['DataTexture']> | null
+		hdrTexture: InstanceType<ThreeNS['DataTexture']> | null,
+		postprocModuly: PostprocModuly | null
 	): ZivaScena {
 		const nastavenia = nastaveniaPreTier(aktualnyTier);
 		const disposables: Disposable[] = [];
@@ -510,6 +569,32 @@
 		controls.addEventListener('start', tikaj);
 		controls.addEventListener('change', render);
 
+		// #288: post-processing composer (GTAO/SMAA/bloom). Stavia sa LEN keď volajúci
+		// (`inicializuj`) prešiel gate (`postprocPovoleny` = mid/high + hardvér) a dodal
+		// moduly. Konštrukcia v `try/catch` s TICHÝM graceful fallbackom na priamy render
+		// (vzor #285 HDRI — scéna sa nikdy nezhodí kvôli composeru; E2E zero-console drží).
+		let postproc: ZivyComposer | null = null;
+		const ppKonfig = postprocModuly ? postprocKonfig(aktualnyTier) : null;
+		if (postprocModuly && ppKonfig) {
+			try {
+				const wCss = containerEl?.clientWidth ?? 16;
+				const hCss = Math.max(1, containerEl?.clientHeight ?? 9);
+				postproc = vytvorComposer(
+					THREE,
+					postprocModuly,
+					renderer,
+					scene,
+					camera,
+					ppKonfig,
+					wCss,
+					hCss
+				);
+			} catch {
+				// composer sa nepodarilo postaviť (neočakávaný GPU quirk) → priamy render
+				postproc = null;
+			}
+		}
+
 		return {
 			THREE,
 			mergeGeometries,
@@ -520,6 +605,7 @@
 			materialy,
 			produktMeshe,
 			skloMaterial,
+			postproc,
 			disposables,
 			contextLostCount: 0,
 			fitVzdialenost
@@ -528,6 +614,10 @@
 
 	function uvolniScenu() {
 		if (!ziva) return;
+		// #288: composer targety (GTAO/bloom/SMAA) žijú na GL kontexte rendereru —
+		// dispose PRED `forceContextLoss()`, inak GPU pamäť unikne pri každom
+		// unmount/context-lost cykle.
+		ziva.postproc?.dispose();
 		ziva.controls.dispose();
 		zlikvidujProduktMeshe(ziva.produktMeshe);
 		disposeVsetko(ziva.disposables);
@@ -583,6 +673,14 @@
 			const hdrTexture = nastaveniaPreTier(tier).hdri
 				? await nacitajHDRI(HDRLoader, hdriUrl(base))
 				: null;
+			// #288: post-processing gate — LEN mid/high tier (`postproc` flag) A LEN
+			// HARDVÉROVÝ renderer (softvérový SwiftShader/CI má malý alokačný rozpočet,
+			// #290). Moduly sa lazy-importujú len keď gate prejde (mimo low/mobil kritickej
+			// cesty). `citajUnmaskedRenderer(gl)` číta GPU string zo scratch kontextu — tá
+			// istá GPU ako reálny renderer, takže softvér/hardvér verdikt je rovnaký.
+			const postprocModuly = postprocPovoleny(nastaveniaPreTier(tier), citajUnmaskedRenderer(gl))
+				? await nacitajPostproc()
+				: null;
 			if (zruseneVOnMounte || !canvasEl) {
 				hdrTexture?.dispose();
 				return;
@@ -594,7 +692,8 @@
 				mergeGeometries,
 				canvasEl,
 				tier,
-				hdrTexture
+				hdrTexture,
+				postprocModuly
 			);
 			(globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS =
 				((globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? 0) + 1;
@@ -639,6 +738,7 @@
 		ziva.fitVzdialenost = autoFitVzdialenost(vysledok.bbox, ziva.camera.aspect);
 		ziva.camera.updateProjectionMatrix();
 		ziva.renderer.setSize(w, h, false);
+		ziva.postproc?.setSize(w, h); // #288: composer targety musia držať krok s canvasom
 		render();
 	}
 

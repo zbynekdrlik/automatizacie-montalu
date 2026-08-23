@@ -56,7 +56,14 @@ export default defineConfig({
 				'src/lib/vizual/spec.ts', // len typy
 				// WebGL capture: `gl.readPixels` + canvas 2D → v headless vitest nemerateľné;
 				// jediná čistá fn `supersampleFaktor` má vlastný unit test.
-				'src/lib/vizual/snimka.ts'
+				'src/lib/vizual/snimka.ts',
+				// #288: post-processing composer TOVÁREŇ — `vytvorComposer` stavia THREE
+				// `EffectComposer` (GTAO/SMAA/bloom passy), potrebuje REÁLNY WebGL kontext →
+				// v headless vitest nemerateľné (rovnaký prípad ako snimka.ts). VŠETKA čistá
+				// rozhodovacia logika (postprocKonfig/postprocPovoleny) je v `kvalita.ts`
+				// (meraná + unit-testovaná); tu neostáva žiadna meratеľná logika. Composer
+				// sa overuje ŽIVO (E2E) na hardvéri.
+				'src/lib/vizual/postproc.ts'
 			],
 			// Prahy = namerané − 2 %, LEN hore (nikdy pod predošlé server-only gaty
 			// 89/85/73/82). Namerané pri rozšírení 2026-08-20: lines 97,41 / stmts 96,23
