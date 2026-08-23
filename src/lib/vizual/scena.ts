@@ -13,23 +13,80 @@ import {
 import type { TierNastavenia } from './kvalita';
 
 type ThreeNS = typeof import('three');
+// three r0.185: `RGBELoader` je deprecovaný (len extends `HDRLoader` a waruje v
+// konštruktore) → používame priamo `HDRLoader` (rovnaké `.load` API, vracia
+// `DataTexture`), inak by scéna vypísala deprecation warning (E2E asertuje 0).
+type HDRLoaderCtor = typeof import('three/examples/jsm/loaders/HDRLoader.js').HDRLoader;
 
-/** Prostredie (IBL) — `RoomEnvironment` + `PMREMGenerator`, procedurálne,
- *  0 bajtov zo siete. `RoomEnvironmentCtor` sa berie ako parameter (dynamický
- *  import z `three/examples/jsm/environments/RoomEnvironment.js`). */
+/** URL commitnutého HDRI assetu (Poly Haven CC0, `static/hdri/`). Servuje sa z
+ *  VLASTNÉHO originu appky (žiaden externý runtime fetch — #285); `base` (SvelteKit)
+ *  rieši prípadný base-path. */
+export function hdriUrl(base: string): string {
+	return `${base}/hdri/kloofendal_puresky_1k.hdr`;
+}
+
+/** Načíta HDRI equirect textúru (`HDRLoader`) z vlastného originu. Vráti
+ *  `null` pri AKEJKOĽVEK chybe (chýbajúci súbor, sieťová chyba) — konzument
+ *  potom graceful padne na procedurálny `RoomEnvironment` (#285). NIKDY
+ *  nerejektuje (aby jedna chyba assetu nezhodila celú scénu). */
+export function nacitajHDRI(
+	HDRLoaderCtor: HDRLoaderCtor,
+	url: string
+): Promise<InstanceType<ThreeNS['DataTexture']> | null> {
+	return new Promise((resolve) => {
+		try {
+			new HDRLoaderCtor().load(
+				url,
+				(tex) => resolve(tex),
+				undefined,
+				() => resolve(null)
+			);
+		} catch {
+			resolve(null);
+		}
+	});
+}
+
+/** Prostredie (IBL). #285: ak je zadaná `hdrTexture` (reálne Poly Haven CC0
+ *  HDRI, mid/high tier), použije sa cez `PMREMGenerator.fromEquirectangular` →
+ *  vonkajšia obloha so slnkom = reálne odlesky na hliníku/skle. Bez nej (alebo
+ *  keď HDR load zlyhal / low tier) sa graceful použije pôvodné procedurálne
+ *  `RoomEnvironment` (0 bajtov zo siete). Vstupná `hdrTexture` sa po PMREM
+ *  prevode zlikviduje (`.dispose()`) — už nie je potrebná. */
 export function vytvorEnvironment(
 	THREE: ThreeNS,
 	RoomEnvironmentCtor: new () => InstanceType<ThreeNS['Scene']>,
 	renderer: InstanceType<ThreeNS['WebGLRenderer']>,
-	nastavenia: TierNastavenia
+	nastavenia: TierNastavenia,
+	hdrTexture?: InstanceType<ThreeNS['DataTexture']> | null
 ): InstanceType<ThreeNS['Texture']> {
-	const env = new RoomEnvironmentCtor();
 	const pmrem = new THREE.PMREMGenerator(renderer);
-	const cieloveRT = pmrem.fromScene(env, 0.04, 0.1, 100, { size: nastavenia.pmrem });
-	const texture = cieloveRT.texture;
-	pmrem.dispose();
-	(env as unknown as { dispose?: () => void }).dispose?.();
-	return texture;
+	try {
+		if (nastavenia.hdri && hdrTexture) {
+			try {
+				hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+				return pmrem.fromEquirectangular(hdrTexture).texture;
+			} catch {
+				// #285: konverzia HDRI cez PMREM zlyhala (napr. GPU/half-float
+				// quirk na softvérovom WebGL v CI, nekompatibilný HDR) — TICHÝ
+				// graceful fallback na procedurálny RoomEnvironment. Zámerne
+				// bez console výstupu: (a) scéna sa NIKDY nezhodí kvôli
+				// vizuálnemu assetu, (b) E2E asertuje 0 console errorov/warningov,
+				// (c) RoomEnvironment je plnohodnotná pôvodná IBL (rovnaká
+				// „no HDRI" vetva ako keď `nacitajHDRI` vráti null pri load chybe).
+			}
+		}
+		const env = new RoomEnvironmentCtor();
+		const tex = pmrem.fromScene(env, 0.04, 0.1, 100, { size: nastavenia.pmrem }).texture;
+		(env as unknown as { dispose?: () => void }).dispose?.();
+		return tex;
+	} finally {
+		// vstupná HDR DataTexture sa už nepoužije (PMREM z nej odvodil vlastnú) —
+		// dispose bezpodmienečne, ak bola dodaná (aj na fallback vetve), aby
+		// neunikla ani keď `nastavenia.hdri === false`.
+		if (hdrTexture) hdrTexture.dispose();
+		pmrem.dispose();
+	}
 }
 
 export function vytvorRenderer(
@@ -44,10 +101,30 @@ export function vytvorRenderer(
 		powerPreference: 'high-performance'
 	});
 	renderer.outputColorSpace = THREE.SRGBColorSpace;
-	renderer.toneMapping = THREE.ACESFilmicToneMapping;
-	renderer.toneMappingExposure = 1.08;
+	// #285 tone mapping A/B (AgX vs Neutral) — ZVOLENÝ `NeutralToneMapping`:
+	// kritérium tiketu je VERNOSŤ RAL FARIEB (predajný konfigurátor — zobrazená
+	// farba MUSÍ sedieť s objednanou). Khronos PBR Neutral je NAVRHNUTÝ presne
+	// na toto: v nejasovom rozsahu necháva base farbu materiálu NEZMENENÚ
+	// (blízko identity) a desaturuje LEN smerom k bielej pri jasoch, ktoré by
+	// inak vypálili — bez posunu odtieňa. AgX naopak aplikuje filmický
+	// per-kanálový sigmoid, ktorý desaturuje CELÝ rozsah (krásne pre film,
+	// nevhodné pre presnú vzorkovnicu farieb — RAL patch by sa posunul).
+	// Rozhodnutie stojí na DIZAJNE tone mapperov (Khronos PBR Neutral špec:
+	// „leaves the color of non-bright objects unchanged"), nie na screenshote —
+	// tento build-only lane nerenderuje živo; finálne vizuálne A/B potvrdenie
+	// beží v CI E2E + post-deploy (`toneMapping` je jednoriadková zmena, keby
+	// review po živom renderi preferoval AgX). Predchádzajúci `ACESFilmicToneMapping`
+	// (exposure 1.08) tiež mierne desaturoval — Neutral je vernejší pre RAL.
+	renderer.toneMapping = THREE.NeutralToneMapping;
+	renderer.toneMappingExposure = 1.0;
 	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, nastavenia.dpr));
-	renderer.shadowMap.enabled = false;
+	// #285: reálny cast-shadow map na mid/high tieri; low tier ostáva bez shadow
+	// mapy (len kontaktný dekal — perf na slabom GPU). Typ = `PCFShadowMap`:
+	// `PCFSoftShadowMap` je v three r0.185 DEPRECOVANÝ (renderer by naň vypísal
+	// warning a aj tak spadol na `PCFShadowMap`) — používame priamo PCF a mäkkosť
+	// okrajov riešime cez `light.shadow.radius` (viď `nastavKluceoveSvetloTien`).
+	renderer.shadowMap.enabled = nastavenia.tiene;
+	renderer.shadowMap.type = THREE.PCFShadowMap;
 	return renderer;
 }
 
@@ -71,6 +148,53 @@ export function vytvorSvetla(THREE: ThreeNS): Svetla {
 	);
 	const fill = new THREE.HemisphereLight(0xcfe3f2, 0xb9ae9d, 0.3);
 	return { key, fill };
+}
+
+/** #285: nakonfiguruje kľúčové svetlo ako vrhač reálneho tieňa (PCFSoft).
+ *  Ortho shadow kamera sa nadimenzuje podľa bboxu produktu (v METROCH), cieľ
+ *  svetla sa nastaví na STRED produktu (x=0, y=h/2, z=0) — rovnaká svetová
+ *  konvencia ako zvyšok scény — aby frustum pokryl celú siluetu. `near`/`far`
+ *  obopnú produkt okolo fixnej 12 m vzdialenosti svetla. `bias`/`normalBias`
+ *  proti shadow acne (samotienenie tenkých profilov) a peter-panningu.
+ *
+ *  Volajúci MUSÍ pridať `key.target` do scény (`scene.add(key.target)`) — bez
+ *  toho three.js `target` ignoruje a tieň mieri na (0,0,0). */
+export function nastavKluceoveSvetloTien(
+	THREE: ThreeNS,
+	key: InstanceType<ThreeNS['DirectionalLight']>,
+	bboxSirkaMm: number,
+	bboxVyskaMm: number,
+	bboxHlbkaMm: number,
+	mapaSize: number
+): void {
+	const w = mm(bboxSirkaMm);
+	const h = mm(bboxVyskaMm);
+	const d = mm(bboxHlbkaMm);
+	// polovica priestorovej uhlopriečky + rezerva — bezpečná horná hranica
+	// siluety pri ľubovoľnom uhle svetla
+	const polDiag = 0.5 * Math.sqrt(w * w + h * h + d * d);
+	const rozsah = polDiag * 1.15 + 0.5;
+
+	key.castShadow = true;
+	key.shadow.mapSize.set(mapaSize, mapaSize);
+	key.target.position.set(0, h / 2, 0);
+
+	const cam = key.shadow.camera;
+	cam.left = -rozsah;
+	cam.right = rozsah;
+	cam.top = rozsah;
+	cam.bottom = -rozsah;
+	// kľúčové svetlo je fixné 12 m od stredu (§2.6); cieľ je stred produktu →
+	// vzdialenosť svetlo↔cieľ ≈ 12 m, produkt siaha ±polDiag okolo neho
+	cam.near = Math.max(0.1, 12 - polDiag - 1);
+	cam.far = 12 + polDiag + 2;
+	cam.updateProjectionMatrix();
+
+	key.shadow.bias = -0.0004;
+	key.shadow.normalBias = 0.02;
+	// mäkké okraje tieňa (náhrada za deprecovaný PCFSoftShadowMap — PCF s
+	// polomerom rozostrenia dá porovnateľne mäkký kontakt bez warningu)
+	key.shadow.radius = 3;
 }
 
 export function vytvorOblohu(THREE: ThreeNS): InstanceType<ThreeNS['Mesh']> {

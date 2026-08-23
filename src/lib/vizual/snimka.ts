@@ -20,11 +20,47 @@ export interface SnimkaVstup {
 	vyskaPx?: number;
 }
 
-/** Rozhodne o supersample faktore (2× ak GPU limity dovolia, inak 1×) — čisto
- *  na základe WebGL limitov, žiadny DOM. Exportované samostatne kvôli
- *  jednotkovej testovateľnosti (mockovateľný `gl.getParameter`). */
-export function supersampleFaktor(maxRenderbuffer: number, maxTextura: number): 1 | 2 {
-	return Math.min(maxRenderbuffer, maxTextura) >= 4800 ? 2 : 1;
+/** #290: je `UNMASKED_RENDERER_WEBGL` reťazec SOFTVÉROVÝ (alebo neznámy)
+ *  renderer? Softvérové WebGL (SwiftShader na GitHub CI runneri, llvmpipe,
+ *  Microsoft Basic Render, Mesa Software Rasterizer) hlási VEĽKÉ per-dimension
+ *  limity (`MAX_TEXTURE_SIZE`/`MAX_RENDERBUFFER_SIZE` 8192–16384), ale má MALÝ
+ *  CELKOVÝ alokačný rozpočet — viď `supersampleFaktor` prečo je to dôležité.
+ *  Prázdny reťazec (`WEBGL_debug_renderer_info` nedostupné, napr. privacy) sa
+ *  berie ako softvér/neznámy → konzervatívny fail-safe (radšej 2× ako pád). */
+const SOFTVEROVY_RENDERER_RE = /SwiftShader|llvmpipe|softpipe|Software|Basic Render|Microsoft/i;
+
+export function jeSoftverovyRenderer(unmaskedRenderer: string): boolean {
+	const s = unmaskedRenderer.trim();
+	return s === '' || SOFTVEROVY_RENDERER_RE.test(s);
+}
+
+/** Rozhodne o supersample faktore podľa GPU limitov — čisto na základe WebGL
+ *  limitov, žiadny DOM. Exportované samostatne kvôli jednotkovej testovateľnosti
+ *  (mockovateľný `gl.getParameter`).
+ *
+ *  #285: pridaný **3×** (tlačovo ostrejší PNG do PDF ponuky). Základ 2400 px
+ *  šírky → 3× = 7200 px, 2× = 4800 px; rozhoduje MENŠÍ z `MAX_RENDERBUFFER_SIZE`
+ *  / `MAX_TEXTURE_SIZE` (renderer.setSize aj readRenderTargetPixels potrebujú
+ *  oba). Väčšina desktopov (limit 16384) dá 3×, mobil so 4096 limitom padne na
+ *  1× (žiadny risk out-of-memory readbacku na slabom GPU).
+ *
+ *  #290: per-dimension limity NIE SÚ spoľahlivým proxy pre CELKOVÝ alokačný
+ *  rozpočet SOFTVÉROVÉHO WebGL — SwiftShader (CI) hlási 16384, ale 3× buffer
+ *  (7200×4860 MSAA) prekročí jeho „Texture total allocation size is too large"
+ *  → incomplete framebuffer → kaskáda GL warningov → E2E `toEqual([])` padne.
+ *  2× (4800×3240) je DOKÁZANE bezpečné (rovnaká CI SwiftShader ho servuje na
+ *  `main`). `softverovyRenderer` (viď `jeSoftverovyRenderer`, fail-safe default
+ *  `false`) preto stropuje ss na 2× — 3× len na POTVRDENOM hardvéri (#285 zámer
+ *  pre reálne desktopy zostáva). */
+export function supersampleFaktor(
+	maxRenderbuffer: number,
+	maxTextura: number,
+	softverovyRenderer = false
+): 1 | 2 | 3 {
+	const limit = Math.min(maxRenderbuffer, maxTextura);
+	if (limit >= 7200 && !softverovyRenderer) return 3;
+	if (limit >= 4800) return 2;
+	return 1;
 }
 
 export async function snimka(THREE: ThreeNS, vst: SnimkaVstup): Promise<Blob> {
@@ -33,9 +69,21 @@ export async function snimka(THREE: ThreeNS, vst: SnimkaVstup): Promise<Blob> {
 	const { renderer, scene, camera } = vst;
 	const gl = renderer.getContext() as WebGL2RenderingContext;
 
+	// #290: softvérové WebGL (SwiftShader na CI) stropuje supersample na 2× (viď
+	// jeSoftverovyRenderer / supersampleFaktor). UNMASKED_RENDERER cez
+	// WEBGL_debug_renderer_info — rovnaký vzor ako tier detekcia vo Vizual3D.svelte.
+	let unmaskedRenderer = '';
+	try {
+		const ext = gl.getExtension('WEBGL_debug_renderer_info');
+		if (ext) unmaskedRenderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+	} catch {
+		// bez debug info → prázdny reťazec → jeSoftverovyRenderer=true (fail-safe strop 2×)
+	}
+
 	const ss = supersampleFaktor(
 		gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number,
-		gl.getParameter(gl.MAX_TEXTURE_SIZE) as number
+		gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+		jeSoftverovyRenderer(unmaskedRenderer)
 	);
 
 	const povodnyAspect = camera.aspect;

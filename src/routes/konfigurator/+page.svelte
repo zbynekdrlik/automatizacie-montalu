@@ -7,7 +7,10 @@
 	// katalóg (žiadny Money kód na klientovi). Súčasť #280.
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import type { KonfiguratorSuhrn } from '$lib/konfigurator';
+	import { typSkla3D, type KonfiguratorSuhrn } from '$lib/konfigurator';
+	// #276: typ odtieňa 3D náhľadu (mapovaný z názvu skla cez typSkla3D). `import type`
+	// je pri builde zmazaný — žiadny runtime import vizuál/Money vrstvy z tohto klienta.
+	import type { PergolaTypSkla } from '$lib/vizual/pergola-sklo';
 	// #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). DopytForm je čistý
 	// klientsky komponent (importuje len pure `$lib/dopyt` + `$lib/ponuka`, žiadny katalóg/
 	// Money/server) — únik guard tests/konfigurator-money-safety.test.ts prejde jeho graf.
@@ -34,6 +37,27 @@
 	let suhrn = $state<KonfiguratorSuhrn | null>(null);
 	let chyba = $state<string>('');
 	let spracuva = $state(false);
+
+	// #276: 3D náhľad pergoly. `viz` je SNAPSHOT vstupov PRI SUBMITE (server-autoritatívny
+	// súhrn + odoslaný RAL kód) — 3D je vždy konzistentný so ZOBRAZENÝM súhrnom, aj keď
+	// zákazník po submite prepíše input bez re-submitu. Komponent sa načíta LAZY (dynamic
+	// import) až pri prvom náhľade — 3D/three.js bundle sa nenačíta pred zobrazením náhľadu.
+	// Form ostáva jediný zdroj pravdy (vlastné ovládanie komponentu je skryté).
+	type Viz3D = {
+		sirkaMm: number;
+		hlbkaMm: number;
+		vyskaVpreduMm: number;
+		vyskaPriSteneMm: number;
+		typSkla: PergolaTypSkla;
+		ralKod: string;
+	};
+	let viz = $state<Viz3D | null>(null);
+	type VizualKompTyp =
+		(typeof import('$lib/components/vizual/VizualPergolaZakaznik.svelte'))['default'];
+	let VizualKomp = $state<VizualKompTyp | null>(null);
+	// in-flight guard: dva rýchle submity pred vyriešením prvého importu by inak spustili
+	// import() dvakrát (benígne — Vite chunk cache, ale zámer je explicitný)
+	let vizNacitava = false;
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
@@ -83,16 +107,41 @@
 		class="karta"
 		use:enhance={() => {
 			spracuva = true;
+			// zachyť odoslaný RAL kód PRI submite (`suhrn.farba` nesie len display label
+			// „RAL 7016 ANTRACIT", 3D náhľad potrebuje samotný kód „7016")
+			const odoslanaFarba = farba;
 			return async ({ result }) => {
 				spracuva = false;
 				if (result.type === 'success') {
 					suhrn = (result.data?.vysledok as KonfiguratorSuhrn | null) ?? null;
 					chyba = '';
+					if (suhrn) {
+						viz = {
+							sirkaMm: suhrn.sirka,
+							hlbkaMm: suhrn.hlbka,
+							vyskaVpreduMm: suhrn.vyskaVpredu,
+							vyskaPriSteneMm: suhrn.vyskaPriStene,
+							typSkla: typSkla3D(suhrn.sklo),
+							ralKod: odoslanaFarba
+						};
+						// lazy-load komponentu až pri PRVOM náhľade (3D/three.js bundle
+						// sa nenačíta skôr); ďalšie submity už používajú načítaný modul
+						if (!VizualKomp && !vizNacitava) {
+							vizNacitava = true;
+							void import('$lib/components/vizual/VizualPergolaZakaznik.svelte')
+								.then((m) => (VizualKomp = m.default))
+								.finally(() => (vizNacitava = false));
+						}
+					} else {
+						viz = null;
+					}
 				} else if (result.type === 'failure') {
 					suhrn = null;
+					viz = null;
 					chyba = (result.data?.error as string | undefined) ?? 'Neplatný vstup.';
 				} else if (result.type === 'error') {
 					suhrn = null;
+					viz = null;
 					chyba = 'Nastala chyba pri výpočte. Skús to prosím znova.';
 				}
 				// zámerne NEvoláme update() — vstupy necháme tak, ako ich zákazník zadal
@@ -185,6 +234,33 @@
 
 	{#if suhrn}
 		{@const s = suhrn}
+
+		<!-- #276: predajný 3D náhľad konfigurovanej pergoly — „hero" súhrnu. Lazy-loaded,
+		     form-driven (vlastné ovládanie komponentu skryté), previazaný na rozmery/sklo/RAL
+		     zo submitnutého súhrnu. `{#key}` na rozmeroch remountne 3D pri zmene rozmerov,
+		     aby sa scénický rig (kamera/tiene/dekal, dimenzované raz pri mounte) prefitoval. -->
+		{#if viz}
+			{@const v = viz}
+			<section class="viz3d" data-testid="konf-viz" aria-label="3D náhľad pergoly">
+				{#if VizualKomp}
+					{@const Komp = VizualKomp}
+					{#key `${v.sirkaMm}|${v.hlbkaMm}|${v.vyskaVpreduMm}|${v.vyskaPriSteneMm}`}
+						<Komp
+							sirkaMm={v.sirkaMm}
+							hlbkaMm={v.hlbkaMm}
+							vyskaVpreduMm={v.vyskaVpreduMm}
+							vyskaPriSteneMm={v.vyskaPriSteneMm}
+							typSkla={v.typSkla}
+							ralKod={v.ralKod}
+							zobrazOvladanie={false}
+						/>
+					{/key}
+				{:else}
+					<div class="viz3d-loading" data-testid="konf-viz-loading">Načítavam 3D náhľad…</div>
+				{/if}
+			</section>
+		{/if}
+
 		<section class="suhrn" data-testid="suhrn">
 			<h2>Súhrn tvojej pergoly</h2>
 			<dl>
@@ -327,6 +403,24 @@
 		padding: 12px 14px;
 		font-size: 14.5px;
 		margin-top: 16px;
+	}
+	.viz3d {
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 14px;
+		padding: 12px;
+		margin-top: 18px;
+	}
+	.viz3d-loading {
+		width: 100%;
+		aspect-ratio: 16 / 10;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #dfe7ee;
+		border-radius: 10px;
+		color: #64748b;
+		font-size: 14px;
 	}
 	.suhrn {
 		background: #fff;

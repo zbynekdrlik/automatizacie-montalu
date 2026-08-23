@@ -7,6 +7,11 @@
 // žiadne server/DB/Money závislosti) → priamo unit-testovateľný. Súčasť #280.
 
 import { vypocitajSklon, NOSNIK_HRUBKA_MM, VYSKA_MAX } from '$lib/pergola-navrh';
+// #276 integrácia: typ pre mapovanie katalógového názvu skla na vizuálny odtieň 3D
+// náhľadu. `import type` je pri builde ZMAZANÝ — žiadny runtime import vizuál vrstvy
+// (a `pergola-sklo` nesie iba `import type SkloVzhlad`, žiadnu THREE/Money závislosť),
+// takže tento modul ostáva client-safe aj server-safe. Odtieň NIE JE cena/Money kód.
+import type { PergolaTypSkla } from '$lib/vizual/pergola-sklo';
 
 // Zákaznícke rozmedzia — zámerná PODMNOŽINA rozmedzí enginu `pergola-navrh` (každá
 // hodnota v nich je preto bezpečne validná aj pre engine). Šírka/hĺbka sú užšie než
@@ -94,4 +99,28 @@ export function konfiguruj(v: KonfiguratorVstup): KonfiguratorSuhrn {
 		sklo: v.sklo,
 		farba: v.farba
 	};
+}
+
+/** Mapuje katalógový NÁZOV strešného skla z formulára (napr. „4.4.2 mliečne",
+ *  „polykarbonát 16 mm bronz", „STADUR 24 mm", „IZO 5.5.2-8-6") na vizuálny odtieň
+ *  3D náhľadu (`cire`/`dymove`/`bronzove`/`matne`). Iba prezentačné mapovanie —
+ *  string match na NÁZOV (ktorý je už na klientovi cez `data.sklaTypy`), NIKDY na
+ *  cenu ani Money kód. ~15 katalógových názvov → 4 vizuálne rodiny; neznámy alebo
+ *  prázdny názov → `cire` (transparentné, konzistentné s PERGOLA_TYP_SKLA_DEFAULT).
+ *  - „bronz" → bronzové; „dym*" → dymové (rezerva, katalóg zatiaľ nemá dymové);
+ *  - „mlieč*"/„matn*"/„opál"/plný „STADUR" panel → matné (opálový mliečny vzhľad);
+ *  - inak (číre/číry, IZO bez prípony, polykarbonát číry) → číre. */
+export function typSkla3D(nazovSkla: string): PergolaTypSkla {
+	const n = nazovSkla.toLowerCase();
+	if (n.includes('bronz')) return 'bronzove';
+	if (n.includes('dym')) return 'dymove';
+	if (
+		n.includes('mlie') ||
+		n.includes('matn') ||
+		n.includes('opál') ||
+		n.includes('opal') ||
+		n.includes('stadur')
+	)
+		return 'matne';
+	return 'cire';
 }

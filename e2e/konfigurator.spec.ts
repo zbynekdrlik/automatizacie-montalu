@@ -132,3 +132,91 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #276: 3D náhľad pergoly na VEREJNEJ route. Náhľad sa objaví PO submite (lazy-loaded
+// komponent — 3D/three.js bundle sa nenačíta pred zobrazením), previazaný na rozmery/sklo/
+// RAL zo súhrnu. Kľúčové: render funguje + NULA console errorov/warningov (vrátane three.js
+// warningov) + žiaden únik ceny/Money kódu. `?viz=` vynúti tier (e2e determinizmus). Beží aj
+// proti nasadenej appke (display-only, žiadny zápis) — bez skipAkLive.
+
+/** Veľkosť PNG screenshotu canvasu — netriviálny 3D render deflate-komprimuje na výrazne
+ *  VIAC bajtov než prázdna/jednofarebná plocha (rovnaká heuristika ako vizual-showroom). */
+async function velkostCanvasPng(page: import('@playwright/test').Page): Promise<number> {
+	const buffer = await page.getByTestId('vizual3d-canvas').screenshot({ type: 'png' });
+	return buffer.length;
+}
+
+async function vyplnFormular(page: import('@playwright/test').Page) {
+	await page.getByTestId('sirka').fill('5000');
+	await page.getByTestId('hlbka').fill('3800');
+	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sklonDeg').fill('8');
+	// non-default sklo (mliečne → matný odtieň) + non-default RAL, nech 3D dostane reálny vstup
+	await page.getByTestId('sklo').selectOption({ label: '4.4.2 mliečne' });
+	await page.getByTestId('farba').selectOption('9005');
+}
+
+test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), nula console chýb, žiaden únik', async ({
+	page
+}) => {
+	test.setTimeout(60000); // softvérový WebGL v CI je pomalší (lazy import + stavba scény + HDRI)
+	const consoleMsgs = collectConsole(page);
+
+	await goto(page, '/konfigurator?viz=mid');
+	await expect(page).toHaveURL(/\/konfigurator/);
+
+	await vyplnFormular(page);
+
+	// #276 lazy-load LOCK: PRED submitom 3D vrstva NIE JE aktívna — komponent nie je
+	// namountovaný a žiadny WebGL kontext neexistuje → dôkaz, že 3D/three.js bundle sa
+	// nenačíta pred zobrazením náhľadu (hard constraint konfigurator.md — lazy dynamic import).
+	expect(await page.getByTestId('konf-viz').count()).toBe(0);
+	expect(await page.getByTestId('vizual3d-canvas').count()).toBe(0);
+	expect(
+		await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null)
+	).toBeNull();
+
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+
+	// 3D náhľad je „hero" súhrnu — objaví sa nad tabuľkou; lazy komponent + engine ready
+	await expect(page.getByTestId('konf-viz')).toBeVisible();
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+	await expect(page.getByTestId('vizual3d-canvas')).toBeVisible();
+
+	const box = await page.getByTestId('vizual3d-canvas').boundingBox();
+	expect(box).not.toBeNull();
+	expect(box!.width).toBeGreaterThan(50);
+	expect(box!.height).toBeGreaterThan(50);
+	// netriviálny obsah (nie prázdny/jednofarebný canvas)
+	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
+
+	// ÚNIK GUARD ostáva platný aj s 3D náhľadom na stránke
+	const telo = await page.locator('body').innerText();
+	expect(telo).not.toMatch(/€|EUR\b/);
+	expect(telo).not.toMatch(/TS\d{3}/);
+	expect(telo).not.toMatch(/nárez/i);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('konfigurátor: 3D náhľad na MOBILNOM viewporte 390×844 (low tier fallback), nula console chýb', async ({
+	page
+}) => {
+	test.setTimeout(60000);
+	const consoleMsgs = collectConsole(page);
+	await page.setViewportSize({ width: 390, height: 844 });
+
+	await goto(page, '/konfigurator?viz=low');
+	await vyplnFormular(page);
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+
+	await expect(page.getByTestId('konf-viz')).toBeVisible();
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+	await expect(page.getByTestId('vizual3d-canvas')).toBeVisible();
+	// low tier (bez HDRI/reálnych tieňov) musí stále vykresliť netriviálny obsah
+	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
+
+	expect(consoleMsgs).toEqual([]);
+});

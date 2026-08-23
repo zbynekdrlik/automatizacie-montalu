@@ -54,6 +54,15 @@ export interface TierNastavenia {
 	stena: number;
 	/** low tier: plochý gradient namiesto dlaždicovej textúry dlažby/steny */
 	plochyGradientMiestoMap: boolean;
+	/** #285: reálny HDRI/IBL (Poly Haven CC0) namiesto procedurálneho
+	 *  `RoomEnvironment`. `false` na `low` tieri (slabé GPU: RoomEnvironment je
+	 *  lacnejší, HDR load + PMREM z equirectu je navyše práca), `true` na mid/high. */
+	hdri: boolean;
+	/** #285: reálny cast-shadow (PCFSoftShadowMap) z kľúčového svetla. `false`
+	 *  na `low` tieri (len kontaktný dekal — perf), `true` na mid/high. */
+	tiene: boolean;
+	/** #285: rozlíšenie shadow mapy (0 = žiadny shadow map, `tiene===false`). */
+	shadowMapa: number;
 }
 
 const NASTAVENIA: Record<Exclude<Tier, 'none'>, TierNastavenia> = {
@@ -65,7 +74,10 @@ const NASTAVENIA: Record<Exclude<Tier, 'none'>, TierNastavenia> = {
 		pmrem: 128,
 		dlazba: 256,
 		stena: 256,
-		plochyGradientMiestoMap: true
+		plochyGradientMiestoMap: true,
+		hdri: false,
+		tiene: false,
+		shadowMapa: 0
 	},
 	mid: {
 		dpr: 1.5,
@@ -75,7 +87,10 @@ const NASTAVENIA: Record<Exclude<Tier, 'none'>, TierNastavenia> = {
 		pmrem: 128,
 		dlazba: 512,
 		stena: 512,
-		plochyGradientMiestoMap: false
+		plochyGradientMiestoMap: false,
+		hdri: true,
+		tiene: true,
+		shadowMapa: 1024
 	},
 	high: {
 		dpr: 2,
@@ -85,7 +100,10 @@ const NASTAVENIA: Record<Exclude<Tier, 'none'>, TierNastavenia> = {
 		pmrem: 256,
 		dlazba: 512,
 		stena: 1024,
-		plochyGradientMiestoMap: false
+		plochyGradientMiestoMap: false,
+		hdri: true,
+		tiene: true,
+		shadowMapa: 2048
 	}
 };
 
