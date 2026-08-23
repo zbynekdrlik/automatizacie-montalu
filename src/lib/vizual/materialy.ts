@@ -5,9 +5,20 @@ import { mm } from './jednotky';
 type ThreeNS = typeof import('three');
 type Material = InstanceType<ThreeNS['MeshPhysicalMaterial']>;
 
-/** Hliníková konštrukcia — `MeshPhysicalMaterial` podľa §2.6. Tmavá anodizácia
- *  (RAL so `tmavyObrys`) je opticky lesklejšia — §2.7 (`roughness`/`clearcoat`/
- *  `envMapIntensity` sa jemne posunú, farba samotná ostáva presná). */
+/** Hliníková konštrukcia — `MeshPhysicalMaterial` podľa §2.6.
+ *
+ *  #285 (showroom kvalita): práškovaný hliník je **DIELEKTRIKUM**, nie holý kov.
+ *  Práškovanie je pigmentovaný polymérový LAK nanesený na profil — svetlo sa
+ *  odráža od farebnej lakovej vrstvy (difúzne, `metalness=0`), nie kovovo
+ *  zafarbeným zrkadlovým odrazom (`metalness=1`). Predchádzajúca hodnota
+ *  `metalness: 0.82` čítala ako surový leštený kov (presne slabina, ktorú
+ *  rešerš #276 vytkla SalesQueze — „matný hliník bez odozvy svetla"). Model:
+ *  `metalness 0`, `roughness ~0.35` (jemne matný lak), tenká `clearcoat ~0.3`
+ *  vrstva (číra ochranná/lesklá vrstva laku) so `clearcoatRoughness ~0.12` —
+ *  clearcoat dodá jemný, farbou nezafarbený odlesk HDRI oblohy/slnka, presne
+ *  ako reálny práškovaný povrch. Farba (RAL) ostáva presná (`farbaKonstrukcie`).
+ *  Tmavá anodizácia (`tmavyObrys`) je opticky o niečo lesklejšia — jemne nižšia
+ *  `roughness`, vyšší `clearcoat`. */
 export function vytvorHlinikMaterial(
 	THREE: ThreeNS,
 	ralKod: string,
@@ -16,15 +27,16 @@ export function vytvorHlinikMaterial(
 	const farba = farbaKonstrukcie(ralKod);
 	const mat = new THREE.MeshPhysicalMaterial({
 		color: new THREE.Color(farba.hex),
-		metalness: 0.82,
-		roughness: 0.32,
-		clearcoat: clearcoatPovoleny ? 0.1 : 0,
-		clearcoatRoughness: 0.25,
+		metalness: 0,
+		roughness: 0.35,
+		clearcoat: clearcoatPovoleny ? 0.3 : 0,
+		clearcoatRoughness: 0.12,
 		envMapIntensity: 1.0
 	});
 	if (farba.tmavyObrys) {
-		mat.roughness = 0.28;
-		mat.clearcoat = clearcoatPovoleny ? 0.16 : 0;
+		mat.roughness = 0.3;
+		mat.clearcoat = clearcoatPovoleny ? 0.4 : 0;
+		mat.clearcoatRoughness = 0.1;
 		mat.envMapIntensity = 1.15;
 	}
 	return mat;
@@ -41,8 +53,13 @@ export function nastavRAL(
 ): void {
 	const farba = farbaKonstrukcie(ralKod);
 	mat.color = new THREE.Color(farba.hex);
-	mat.roughness = farba.tmavyObrys ? 0.28 : 0.32;
-	mat.clearcoat = clearcoatPovoleny ? (farba.tmavyObrys ? 0.16 : 0.1) : 0;
+	// #285: dielektrický práškovaný hliník — držané konzistentne s
+	// `vytvorHlinikMaterial` (metalness 0 sa nastaví explicitne, keby sa RAL čip
+	// prepol na inštancii, ktorá by z akéhokoľvek dôvodu mala inú hodnotu).
+	mat.metalness = 0;
+	mat.roughness = farba.tmavyObrys ? 0.3 : 0.35;
+	mat.clearcoat = clearcoatPovoleny ? (farba.tmavyObrys ? 0.4 : 0.3) : 0;
+	mat.clearcoatRoughness = farba.tmavyObrys ? 0.1 : 0.12;
 	mat.envMapIntensity = farba.tmavyObrys ? 1.15 : 1.0;
 	mat.needsUpdate = true;
 }

@@ -20,11 +20,20 @@ export interface SnimkaVstup {
 	vyskaPx?: number;
 }
 
-/** Rozhodne o supersample faktore (2× ak GPU limity dovolia, inak 1×) — čisto
- *  na základe WebGL limitov, žiadny DOM. Exportované samostatne kvôli
- *  jednotkovej testovateľnosti (mockovateľný `gl.getParameter`). */
-export function supersampleFaktor(maxRenderbuffer: number, maxTextura: number): 1 | 2 {
-	return Math.min(maxRenderbuffer, maxTextura) >= 4800 ? 2 : 1;
+/** Rozhodne o supersample faktore podľa GPU limitov — čisto na základe WebGL
+ *  limitov, žiadny DOM. Exportované samostatne kvôli jednotkovej testovateľnosti
+ *  (mockovateľný `gl.getParameter`).
+ *
+ *  #285: pridaný **3×** (tlačovo ostrejší PNG do PDF ponuky). Základ 2400 px
+ *  šírky → 3× = 7200 px, 2× = 4800 px; rozhoduje MENŠÍ z `MAX_RENDERBUFFER_SIZE`
+ *  / `MAX_TEXTURE_SIZE` (renderer.setSize aj readRenderTargetPixels potrebujú
+ *  oba). Väčšina desktopov (limit 16384) dá 3×, mobil so 4096 limitom padne na
+ *  1× (žiadny risk out-of-memory readbacku na slabom GPU). */
+export function supersampleFaktor(maxRenderbuffer: number, maxTextura: number): 1 | 2 | 3 {
+	const limit = Math.min(maxRenderbuffer, maxTextura);
+	if (limit >= 7200) return 3;
+	if (limit >= 4800) return 2;
+	return 1;
 }
 
 export async function snimka(THREE: ThreeNS, vst: SnimkaVstup): Promise<Blob> {

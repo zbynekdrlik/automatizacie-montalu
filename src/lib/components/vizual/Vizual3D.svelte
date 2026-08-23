@@ -7,6 +7,7 @@
 	// ktorá sa SAMA ukončí, keď `controls.update()` vráti `false` — damping dobehol).
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { browser } from '$app/environment';
+	import { base } from '$app/paths';
 	import type { Rola, VizVysledok } from '$lib/vizual/spec';
 	import { mm } from '$lib/vizual/jednotky';
 	import { SKLO_HRUBKA_DEFAULT_MM } from '$lib/vizual/konstanty';
@@ -20,6 +21,9 @@
 	} from '$lib/vizual/materialy';
 	import {
 		disposeVsetko,
+		hdriUrl,
+		nacitajHDRI,
+		nastavKluceoveSvetloTien,
 		vytvorEnvironment,
 		vytvorKontaktnyTien,
 		vytvorOblohu,
@@ -220,13 +224,15 @@
 	});
 
 	async function nacitajTHREE() {
-		const [THREE, { OrbitControls }, { RoomEnvironment }, { mergeGeometries }] = await Promise.all([
-			import('three'),
-			import('three/examples/jsm/controls/OrbitControls.js'),
-			import('three/examples/jsm/environments/RoomEnvironment.js'),
-			import('three/examples/jsm/utils/BufferGeometryUtils.js')
-		]);
-		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries };
+		const [THREE, { OrbitControls }, { RoomEnvironment }, { mergeGeometries }, { RGBELoader }] =
+			await Promise.all([
+				import('three'),
+				import('three/examples/jsm/controls/OrbitControls.js'),
+				import('three/examples/jsm/environments/RoomEnvironment.js'),
+				import('three/examples/jsm/utils/BufferGeometryUtils.js'),
+				import('three/examples/jsm/loaders/RGBELoader.js')
+			]);
+		return { THREE, OrbitControls, RoomEnvironment, mergeGeometries, RGBELoader };
 	}
 
 	function zistiTierVstup(
@@ -297,6 +303,9 @@
 			if (!geo) continue;
 			materialy[rola] = hlinik;
 			const mesh = new THREE.Mesh(geo, hlinik);
+			// #285: hliníková konštrukcia vrhá aj prijíma reálny tieň (mid/high)
+			mesh.castShadow = nastavenia.tiene;
+			mesh.receiveShadow = nastavenia.tiene;
 			scene.add(mesh);
 			produktMeshe.push(mesh);
 		}
@@ -316,6 +325,9 @@
 			);
 			skloMaterial = skloMat;
 			const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
+			// #285: sklo prijíma tieň, ale NEvrhá (transmisné sklo by vrhalo
+			// nefyzikálny nepriehľadný tieň)
+			mesh.receiveShadow = nastavenia.tiene;
 			scene.add(mesh);
 			produktMeshe.push(mesh);
 		}
@@ -374,14 +386,21 @@
 		RoomEnvironment: new () => InstanceType<ThreeNS['Scene']>,
 		mergeGeometries: MergeGeometriesFn,
 		canvas: HTMLCanvasElement,
-		aktualnyTier: Exclude<Tier, 'none'>
+		aktualnyTier: Exclude<Tier, 'none'>,
+		hdrTexture: InstanceType<ThreeNS['DataTexture']> | null
 	): ZivaScena {
 		const nastavenia = nastaveniaPreTier(aktualnyTier);
 		const disposables: Disposable[] = [];
 
 		const renderer = vytvorRenderer(THREE, canvas, nastavenia);
 		const scene = new THREE.Scene();
-		const environmentTex = vytvorEnvironment(THREE, RoomEnvironment, renderer, nastavenia);
+		const environmentTex = vytvorEnvironment(
+			THREE,
+			RoomEnvironment,
+			renderer,
+			nastavenia,
+			hdrTexture
+		);
 		scene.environment = environmentTex;
 		// PMREM environment textúra sa inak NIKDY nezlikviduje — únik GPU pamäte
 		// pri každom opätovnom mount/unmount (SPA navigácia preč a späť) alebo
@@ -389,6 +408,20 @@
 		disposables.push(environmentTex);
 
 		const { key, fill } = vytvorSvetla(THREE);
+		// #285: kľúčové svetlo vrhá reálny tieň (mid/high tier) — cieľ + shadow
+		// kamera podľa bboxu; `key.target` MUSÍ byť v scéne, inak three.js tieň
+		// mieri na (0,0,0). Low tier (`tiene===false`) tieň nekonfiguruje.
+		if (nastavenia.tiene) {
+			nastavKluceoveSvetloTien(
+				THREE,
+				key,
+				vysledok.bbox.w,
+				vysledok.bbox.h,
+				vysledok.bbox.d,
+				nastavenia.shadowMapa
+			);
+			scene.add(key.target);
+		}
 		scene.add(key, fill);
 
 		const obloha = vytvorOblohu(THREE);
@@ -398,6 +431,7 @@
 		if (oblohaMat.map) disposables.push(oblohaMat.map);
 
 		const zem = vytvorZem(THREE, nastavenia);
+		zem.receiveShadow = nastavenia.tiene; // #285: zem prijíma vrhnutý tieň konštrukcie
 		scene.add(zem);
 		disposables.push(zem.geometry, zem.material as Disposable);
 		const zemMat = zem.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
@@ -405,6 +439,7 @@
 
 		const stena = vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
 		stena.position.z = -(mm(vysledok.bbox.d) / 2 + 0.05);
+		stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
 		scene.add(stena);
 		disposables.push(stena.geometry, stena.material as Disposable);
 		const stenaMat = stena.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
@@ -522,7 +557,8 @@
 		}
 
 		try {
-			const { THREE, OrbitControls, RoomEnvironment, mergeGeometries } = await nacitajTHREE();
+			const { THREE, OrbitControls, RoomEnvironment, mergeGeometries, RGBELoader } =
+				await nacitajTHREE();
 			if (zruseneVOnMounte || !canvasEl) return;
 			const initMs = performance.now() - t0;
 			const konecnyTier = zistiTierVstup(gl, initMs, 0);
@@ -532,7 +568,26 @@
 				return;
 			}
 			tier = konecnyTier;
-			ziva = postavScenu(THREE, OrbitControls, RoomEnvironment, mergeGeometries, canvasEl, tier);
+			// #285: reálne HDRI/IBL (mid/high tier) — načíta sa z vlastného
+			// originu (`static/hdri/`), NIKDY externý fetch. `nacitajHDRI` vráti
+			// `null` pri akejkoľvek chybe → `vytvorEnvironment` graceful padne na
+			// procedurálny `RoomEnvironment` (scéna sa nikdy nezhodí kvôli assetu).
+			const hdrTexture = nastaveniaPreTier(tier).hdri
+				? await nacitajHDRI(RGBELoader, hdriUrl(base))
+				: null;
+			if (zruseneVOnMounte || !canvasEl) {
+				hdrTexture?.dispose();
+				return;
+			}
+			ziva = postavScenu(
+				THREE,
+				OrbitControls,
+				RoomEnvironment,
+				mergeGeometries,
+				canvasEl,
+				tier,
+				hdrTexture
+			);
 			(globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS =
 				((globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? 0) + 1;
 			// KRITICKÉ: `THREE.WebGLRenderer({canvas, ...})` NEmení canvas
