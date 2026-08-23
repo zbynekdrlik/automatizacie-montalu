@@ -164,6 +164,17 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	it('#212: /optimalizator (nárezový optimalizátor, interné-only) JE presmerovaný preč', () => {
 		expect(b2bRedirectTarget('/optimalizator')).toBe('/zasklenia');
 	});
+
+	// #282: interný prehľad dopytov z konfigurátora — kontaktné údaje + súhrn + re-download
+	// PDF, len pre interných. V B2B_FORBIDDEN_PREFIXES → generický it.each vyššie to už
+	// pokrýva; toto je čitateľné explicitné potvrdenie vedomého rozhodnutia (vrátane
+	// pokrytia GET endpointu /dopyty-konfigurator/pdf tým istým prefixom).
+	it('#282: /dopyty-konfigurator (interný zoznam dopytov) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/dopyty-konfigurator')).toBe('/zasklenia');
+	});
+	it('#282: /dopyty-konfigurator/pdf (PDF endpoint) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/dopyty-konfigurator/pdf')).toBe('/zasklenia');
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k
