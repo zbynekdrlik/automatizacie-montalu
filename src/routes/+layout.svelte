@@ -51,6 +51,9 @@
 					{ href: '/optimalizator', label: 'Optimalizátor' },
 					{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
 					{ href: '/odpisy', label: 'História' },
+					// #282: interný prehľad zákazníckych dopytov z verejného konfigurátora —
+					// len pre interných (b2b má /dopyty-konfigurator v B2B_FORBIDDEN_PREFIXES)
+					{ href: '/dopyty-konfigurator', label: 'Dopyty' },
 					{ href: '/problem', label: '⚠ Problém' },
 					{ href: '/pouzivatelia', label: 'Používatelia' }
 				] satisfies { href: RouteId; label: string }[])

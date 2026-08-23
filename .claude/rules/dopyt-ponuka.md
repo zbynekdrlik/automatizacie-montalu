@@ -6,8 +6,10 @@ paths:
   - "src/lib/server/dopyt-action.ts"
   - "src/lib/server/dopyt-store.ts"
   - "src/lib/server/dopyt-throttle.ts"
+  - "src/lib/server/dopyt-pdf.ts"
   - "src/lib/server/fonts/**"
   - "src/lib/components/DopytForm.svelte"
+  - "src/routes/dopyty-konfigurator/**"
   - "tests/dopyt-*.test.ts"
   - "tests/ponuka*.test.ts"
 ---
@@ -57,3 +59,27 @@ export const actions = { dopyt: dopytAction };
 `server/db`); server logika je v `ponuka-pdf.ts`/`dopyt-store.ts`/`dopyt-throttle.ts`/
 `dopyt-action.ts`. `dopyt-store.ts` SMIE importovať `./db` (len pripojenie), ale nič z
 Money. E-mailové doručenie = neskôr cez Odoo (samostatný tiket); teraz iba download-first.
+
+## Interný prehľad dopytov `/dopyty-konfigurator` (#282)
+
+Interná AUTH-gated read-only route (zoznam najnovšie hore + stránkovanie 50/str. +
+re-download PDF). Tri veci, ktoré sa oplatí vedieť pri ďalšej práci:
+
+- **PDF z GET endpointu — `Uint8Array` sa v aktuálnom TS lib NEPRIJME priamo ako `BodyInit`.**
+  `generatePonukaPdf`/`regeneratePonukaPdf` vracajú `Uint8Array<ArrayBufferLike>` (buffer môže
+  byť `SharedArrayBuffer`), takže `new Response(bytes)` aj `new Blob([bytes])` padnú na
+  `svelte-check` (`not assignable to BodyInit`/`BlobPart`). Fix: **kópia do čerstvého
+  `new Uint8Array(pdf.bytes)`** (konkrétny `ArrayBuffer` backing) — `new Response(new
+  Uint8Array(pdf.bytes), { headers: { 'content-type':'application/pdf', 'content-disposition':
+  'attachment; filename="…"' } })`. Rovnaké platí pre akýkoľvek budúci binárny download endpoint.
+- **Re-download PDF = deterministická regenerácia z uloženej konfigurácie** (`dopyt-pdf.ts`
+  `regeneratePonukaPdf(id)`: `getDopyt` → `sanitizePonukaConfig` → `generatePonukaPdf`;
+  `null` = neexistujúce id → volajúci `error(404)`). Pätička nesie PÔVODNÝ dátum vzniku dopytu
+  (`sqliteUtcToIso(created_at)` — UTC pasca, viď `timestamps.md`), nie „dnes". `dopyt-pdf.ts`
+  matchuje `/dopyt/`, takže je auto-krytý `dopyt-money-safety` guardom (žiadny Money import).
+- **Stĺpec „Odoo lead" = feature-detect na SCHÉME, nie na kľúčoch dát.** `hasOdooLeadColumn()`
+  (`PRAGMA table_info(dopyt)`) — `odoo_lead_id` pridá až #278 (migrácia v26); tu ho NEPRIDÁVAJ.
+  `listDopyty` podľa toho zloží SELECT (stĺpec sa nesie na riadku len keď existuje). Detekcia na
+  schéme funguje aj pri prázdnom zozname (na `Object.keys(row)` by pri 0 riadkoch zmizol).
+  AUTH: route je mimo `PUBLIC_PATHS` (anon → login) + v `B2B_FORBIDDEN_PREFIXES` (prefix kryje
+  aj `/dopyty-konfigurator/pdf`); GET endpoint má NAVYŠE `isInternal(locals.user)` guard.
