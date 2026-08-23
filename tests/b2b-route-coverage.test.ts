@@ -206,13 +206,20 @@ describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', 
 	});
 });
 
-// #275, rovnaká disciplína — verejný konfigurátor má LEN default akciu (display-only
-// súhrn konfigurácie), žiadnu odpisovú/zápisovú akciu vôbec. Toto je VEREJNÁ route
-// (bez auth), takže „žiadna cesta k Money" je tu ešte kritickejšie — samostatný
-// leak/Money guard je v tests/konfigurator-money-safety.test.ts.
-describe('/konfigurator — žiadna cesta k Money odpisu (#275)', () => {
-	it('akcie routy sú presne default — žiadna odpisová/zápisová akcia', async () => {
+// #275/#277, rovnaká disciplína — verejný konfigurátor má PRESNE `vypocet` (kalkulačka, display-only
+// súhrn konfigurácie) + `dopyt` (#277: verejný kontaktný formulár → PDF ponuka BEZ CIEN).
+// `dopyt` je Money-NEUTRÁLNA akcia: zapisuje LEN do audit tabuľky `dopyt` (žiadny import
+// money/pergola, žiadny odpis, žiadny zápis do /data) — mechanicky strážené v
+// tests/dopyt-money-safety.test.ts + tests/konfigurator-money-safety.test.ts. Toto je
+// VEREJNÁ route (bez auth), takže „žiadna cesta k MONEY odpisu" je tu ešte kritickejšie —
+// tento test stráži, že sa NEPRIDÁ žiadna ĎALŠIA (napr. omylom skopírovaná Money-zápisová)
+// akcia. Pridanie akejkoľvek inej akcie tento test ROZBIJE (fail-closed).
+describe('/konfigurator — žiadna cesta k Money odpisu (#275/#277)', () => {
+	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['default']);
+		// `vypocet` = kalkulačka súhrnu (bola `default`, ale SvelteKit nedovolí default +
+		// pomenované naraz — #277 pridal `dopyt`); `dopyt` = verejný formulár → PDF ponuka
+		// BEZ CIEN (Money-neutrálny). Obe pomenované; žiadna odpisová/Money-zápisová akcia.
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });

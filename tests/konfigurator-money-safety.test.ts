@@ -94,7 +94,7 @@ interface Porusenie {
 
 /** BFS import grafom KLIENTSKY dosiahnuteľných súborov. Spadne pri zakázanom
  *  špecifikátore ALEBO ak dosiahnuteľný súbor referencuje `moneyKod`/`skloStrechaMoneyKod`. */
-function prejdiKlientskyGraf(vstupy: string[]): Porusenie[] {
+function prejdiKlientskyGraf(vstupy: string[]): { porusenia: Porusenie[]; videne: Set<string> } {
 	const porusenia: Porusenie[] = [];
 	const videne = new Set<string>();
 	const fronta = [...vstupy];
@@ -118,22 +118,47 @@ function prejdiKlientskyGraf(vstupy: string[]): Porusenie[] {
 			fronta.push(rozlisene);
 		}
 	}
-	return porusenia;
+	return { porusenia, videne };
 }
 
-describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejnej routy (#275)', () => {
+// Vstupné body klientskeho grafu verejnej routy — súbory dosiahnuteľné z klienta
+// (mimo *.server.ts) + čistý compute konfigurátora. #277 pridal DopytForm.svelte, ktorý
+// route +page.svelte importuje → BFS ho (a jeho pure importy ponuka.ts/dopyt.ts) prejde
+// AUTOMATICKY. Ak DopytForm alebo pure moduly niekedy naimportujú katalóg/Money/server,
+// guard (A) nižšie spadne — pokrytie NOVÝCH importov je overené samostatným testom.
+function konfVstupy(): string[] {
+	return [
+		...najdiSubory(KONF_ROUTE_DIR).filter(jeKlientskyReachable),
+		path.join(SRC, 'lib', 'konfigurator.ts')
+	];
+}
+
+describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejnej routy (#275/#277)', () => {
 	it('žiadny klientsky dosiahnuteľný súbor nesiaha na katalóg/cenu/Money/server ani na moneyKod', () => {
-		const vstupy = [
-			...najdiSubory(KONF_ROUTE_DIR).filter(jeKlientskyReachable),
-			path.join(SRC, 'lib', 'konfigurator.ts')
-		];
+		const vstupy = konfVstupy();
 		expect(vstupy.length).toBeGreaterThan(1); // sanity — guard musí mať čo kontrolovať
-		const porusenia = prejdiKlientskyGraf(vstupy);
+		const { porusenia } = prejdiKlientskyGraf(vstupy);
 		if (porusenia.length) {
 			const hlasenie = porusenia
 				.map((p) => `${path.relative(ROOT, p.subor)}: ${p.detail}`)
 				.join('\n');
 			expect.fail(`Únik guard porušený:\n${hlasenie}`);
+		}
+	});
+
+	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
+	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
+	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
+	it('graf REÁLNE prechádza nové #277 klientsky-dosiahnuteľné súbory (DopytForm, ponuka, dopyt)', () => {
+		const { videne } = prejdiKlientskyGraf(konfVstupy());
+		const musiaByt = [
+			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
+			path.join(SRC, 'lib', 'ponuka.ts'),
+			path.join(SRC, 'lib', 'dopyt.ts')
+		];
+		for (const f of musiaByt) {
+			expect(fs.existsSync(f)).toBe(true); // súbor existuje (inak by test len ticho prešiel)
+			expect(videne.has(f), `graf nedosiahol ${path.relative(ROOT, f)}`).toBe(true);
 		}
 	});
 });
@@ -209,9 +234,9 @@ describe('Money safety (C) — runtime výstup neobsahuje cenu ani Money kód (#
 		const event = {
 			request: new Request('http://x/konfigurator', { method: 'POST', body: fd }),
 			getClientAddress: () => '203.0.113.5'
-		} as unknown as Parameters<typeof actions.default>[0];
+		} as unknown as Parameters<typeof actions.vypocet>[0];
 
-		const r = await actions.default(event);
+		const r = await actions.vypocet(event);
 		const json = JSON.stringify(r);
 		neobsahujeUnik(json);
 		// pozitívne: súhrn naozaj prišiel (obsahuje názov skla)

@@ -54,9 +54,20 @@ jobs:
         id: scope
         run: |
           git fetch origin +refs/heads/main:refs/remotes/origin/main
+          # Vylúč DÁTOVÉ/DDL súbory z mutácie (exclude_globs, airuleset mutation-testing):
+          #  - server/migracie.ts = schéma-migračné DDL (append-only v1..vN), overené
+          #    dedikovanými migration-vN.test.ts (čerstvá DB → migrácie → assert schémy).
+          #    Mutácia DDL je nízkohodnotná a NEúmerne drahá: celý 45 KB súbor je pokrytý
+          #    väčšinou DB testov → plná mutácia = 547 mutantov / >40 min (run 32648069930
+          #    shard 2 padol na 20-min strope pri 41 %). Whole-file mutáciu jedného veľkého
+          #    súboru sharding NErozdelí (súbor je atomický na shard) → jediná náprava je
+          #    vylúčenie (nie väčší timeout). Logika #277 (ponuka-pdf/ponuka/dopyt*/datum)
+          #    ostáva plne mutovaná.
+          #  - server/fonts/** = vendorované base64 font bloby (dáta, nie logika).
           CHANGED=$(git diff --name-only origin/main...HEAD \
             | grep -E '^src/lib/.*\.ts$' \
-            | grep -vE '\.svelte\.ts$' || true)
+            | grep -vE '\.svelte\.ts$' \
+            | grep -vE '^src/lib/server/migracie\.ts$|^src/lib/server/fonts/' || true)
           SHARDED=$(printf '%s\n' "$CHANGED" | bash scripts/mutation-shard.sh)
           if [ -z "$SHARDED" ]; then
             echo "Shard $SHARD/$SHARDS: žiadne zmenené súbory mu nepatria — mutačný gate nemá čo mutovať, končím zelený."

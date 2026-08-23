@@ -816,6 +816,30 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 25) {
+		// v24 → v25: verejný zákaznícky dopyt (#277) — audit trail konfigurácie + kontaktu
+		// z verejného konfigurátora pergoly. MONEY-NEUTRÁLNE: žiadny FK na odpis/Money, appka
+		// sem NIKDY nezapisuje odpis ani netvorí Money import — je to čisto marketingovo-lead
+		// tabuľka (guard `tests/dopyt-money-safety.test.ts`). `konfiguracia` = kanonický JSON
+		// (sanitizePonukaConfig). Celé v `db.transaction` (vzor v18/v19/v22/v24): pád uprostred
+		// → rollback → blok sa čisto prehrá, nikdy crash-loop.
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE dopyt (
+					id INTEGER PRIMARY KEY,
+					konfiguracia TEXT NOT NULL,
+					meno TEXT NOT NULL,
+					email TEXT NOT NULL,
+					telefon TEXT NOT NULL DEFAULT '',
+					miesto TEXT NOT NULL DEFAULT '',
+					poznamka TEXT NOT NULL DEFAULT '',
+					created_at TEXT NOT NULL DEFAULT (datetime('now'))
+				);
+			`);
+			bump(25);
+		})();
+	}
+
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

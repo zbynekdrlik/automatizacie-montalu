@@ -23,7 +23,10 @@ Pridať verejnú route znamená VŠETKY tri:
 2. `tests/b2b-route-coverage.test.ts` → pridať do `ALLOWED` množiny (verejná route je
    top-level, mimo Money-denylist prefixov, takže `b2bRedirectTarget`=null) + pozitívny
    assert. Drift guard inak PADNE.
-3. Akcie routy musia ostať `['default']` (žiadna Money-zápisová akcia) — strážené v
+3. Akcie routy sú PRESNE `['dopyt','vypocet']` (žiadna Money-zápisová akcia) — `vypocet` =
+   kalkulačka súhrnu, `dopyt` = verejný formulár → PDF ponuka bez cien (#277, Money-neutrálny,
+   viď `.claude/rules/dopyt-ponuka.md`). SvelteKit NEDOVOLÍ `default` + pomenované akcie naraz,
+   preto je aj kalkulačka pomenovaná (`?/vypocet`). Množina akcií je strážená v
    `b2b-route-coverage.test.ts`.
 
 ## 2. HARD hranica: žiadna CENA / Money kód / nárez na verejnú plochu
