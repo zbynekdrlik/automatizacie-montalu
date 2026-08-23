@@ -61,9 +61,74 @@ test('konfigurátor AR: mobil ukáže „Pozri v AR" odkaz na AR stránku (bez m
 	expect(href).toContain('/konfigurator/ar?');
 	expect(href).toContain('sirka=5000');
 	expect(href).toContain('sklo=cire');
+	// data-sveltekit-reload = plný reload dokumentu (nie SPA nav) → /ar má čerstvý JS kontext
+	// bez projektového three, takže model-viewerov three nezavolá multi-instance warning.
+	expect(await open.getAttribute('data-sveltekit-reload')).not.toBeNull();
 
 	// model-viewer sa NEnačíta na /konfigurator (dôkaz jednej three inštancie → zero-console)
 	expect(await page.locator('model-viewer').count()).toBe(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('konfigurátor AR: klik na „Pozri v AR" (po submite, s načítaným 3D) → plný reload na /ar, model-viewer render, nula console chýb', async ({
+	page
+}) => {
+	// REGRESIA (review #286): reálny mobilný tok je /konfigurator (projektový three@0.185 pre
+	// 3D náhľad #276) → klik na odkaz → /ar. Bez plného reloadu by SPA prechod natiahol
+	// model-viewerov vlastný three do TOHO ISTÉHO kontextu = THREE multi-instance warning
+	// (poruší zero-console). `data-sveltekit-reload` to rieši; tento test to ZAMKNE (klikne
+	// odkaz, nie priama goto navigácia).
+	test.setTimeout(60000);
+	const consoleMsgs = collectConsole(page);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await goto(page, '/konfigurator');
+	await submitKonfig(page);
+	// projektový three sa načíta pre 3D náhľad #276 (predpoklad regresie)
+	await expect(page.locator('[data-testid="vizual3d-canvas"]')).toBeVisible({ timeout: 20000 });
+
+	await page.getByTestId('pergola-ar-open').click();
+	await expect(page).toHaveURL(/\/konfigurator\/ar\?/);
+
+	const mv = page.getByTestId('pergola-ar-viewer');
+	await expect(mv).toBeVisible({ timeout: 20000 });
+	await page.waitForFunction(
+		() => {
+			const el = document.querySelector('[data-testid="pergola-ar-viewer"]') as
+				(Element & { loaded?: boolean; modelIsVisible?: boolean }) | null;
+			return !!el && el.loaded === true && el.modelIsVisible === true;
+		},
+		{ timeout: 30000 }
+	);
+	// čerstvý kontext má LEN model-viewerov three (žiadny projektový 3D náhľad na /ar)
+	expect(await page.locator('[data-testid="vizual3d-canvas"]').count()).toBe(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('konfigurátor AR: desktop ukáže QR na AR stránku (regeneruje sa pri re-submite), nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await page.setViewportSize({ width: 1280, height: 900 });
+	await goto(page, '/konfigurator');
+	await submitKonfig(page);
+
+	// desktop → QR (nie model-viewer, nie odkaz-tlačidlo)
+	const qr = page.getByTestId('pergola-ar-qr');
+	await expect(qr).toBeVisible();
+	const img = qr.locator('img');
+	await expect(img).toBeVisible();
+	const src1 = await img.getAttribute('src');
+	expect(src1 ?? '').toMatch(/^data:image\/png;base64,/);
+	expect(await page.locator('model-viewer').count()).toBe(0);
+
+	// re-submit s INOU konfiguráciou → QR sa REAKTÍVNE prekreslí na nový odkaz (nie stale)
+	await page.getByTestId('sirka').fill('6000');
+	await page.getByTestId('hlbka').fill('4500');
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+	await expect.poll(async () => await img.getAttribute('src'), { timeout: 8000 }).not.toBe(src1);
 
 	expect(consoleMsgs).toEqual([]);
 });

@@ -17,7 +17,12 @@ type FileReaderLike = {
 };
 
 /** Idempotentne zaručí `globalThis.FileReader` (potrebné pre GLTFExporter v Node).
- *  No-op, ak už existuje (prehliadač / opakované volanie). */
+ *  No-op, ak už existuje (prehliadač / opakované volanie).
+ *
+ *  Zámerné zjednodušenie oproti reálnemu `FileReader`: `onloadend` sa volá LEN pri úspechu
+ *  a `onerror` LEN pri chybe (reálny FileReader volá `loadend` v OBOCH prípadoch). Pre
+ *  GLTFExporter to stačí — číta `reader.result` výhradne vo vnútri `onloadend` na úspešnej
+ *  ceste (`three/examples/jsm/exporters/GLTFExporter.js`, `writeAsync`). */
 export function ensureFileReaderPolyfill(): void {
 	const g = globalThis as unknown as { FileReader?: unknown };
 	if (typeof g.FileReader !== 'undefined') return;

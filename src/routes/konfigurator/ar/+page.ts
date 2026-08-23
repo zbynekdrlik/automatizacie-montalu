@@ -3,6 +3,15 @@
 // číta konfiguráciu z query parametrov, bez servera → NIE JE „write-bearing" (b2b drift
 // guard ju nepokrýva) a je Money-neutrálny (žiadny import katalógu/ceny/servera).
 import type { PageLoad } from './$types';
+import {
+	KONF_SIRKA_MIN,
+	KONF_SIRKA_MAX,
+	KONF_HLBKA_MIN,
+	KONF_HLBKA_MAX,
+	KONF_VYSKA_MIN,
+	KONF_VYSKA_MAX,
+	KONF_VYSKA_STENA_MAX
+} from '$lib/konfigurator';
 
 function cislo(v: string | null): number {
 	return Number(
@@ -10,6 +19,10 @@ function cislo(v: string | null): number {
 			.replace(',', '.')
 			.trim()
 	);
+}
+
+function vRozmedzi(x: number, min: number, max: number): boolean {
+	return Number.isFinite(x) && x >= min && x <= max;
 }
 
 export const load: PageLoad = ({ url }) => {
@@ -20,14 +33,14 @@ export const load: PageLoad = ({ url }) => {
 	const vyskaPriSteneMm = cislo(q.get('vyskaPriStene'));
 	const typSkla = String(q.get('sklo') ?? '');
 	const ralKod = String(q.get('farba') ?? '');
+	// ROVNAKÉ rozmedzia ako GLB endpoint (/konfigurator/model.glb) — bez toho by stránka
+	// namontovala model-viewer s neplatnou konfiguráciou, ktorej GLB fetch by 400-nul
+	// (network console error → poruší zero-console). Neplatné → „chýba konfigurácia" hláška.
 	const platne =
-		Number.isFinite(sirkaMm) &&
-		Number.isFinite(hlbkaMm) &&
-		Number.isFinite(vyskaVpreduMm) &&
-		Number.isFinite(vyskaPriSteneMm) &&
-		sirkaMm > 0 &&
-		hlbkaMm > 0 &&
-		vyskaVpreduMm > 0 &&
-		vyskaPriSteneMm > 0;
+		vRozmedzi(sirkaMm, KONF_SIRKA_MIN, KONF_SIRKA_MAX) &&
+		vRozmedzi(hlbkaMm, KONF_HLBKA_MIN, KONF_HLBKA_MAX) &&
+		vRozmedzi(vyskaVpreduMm, KONF_VYSKA_MIN, KONF_VYSKA_MAX) &&
+		// výška pri stene: nikdy nižšia než vpredu, nikdy nad konštrukčné max enginu
+		vRozmedzi(vyskaPriSteneMm, vyskaVpreduMm, KONF_VYSKA_STENA_MAX);
 	return { sirkaMm, hlbkaMm, vyskaVpreduMm, vyskaPriSteneMm, typSkla, ralKod, platne };
 };

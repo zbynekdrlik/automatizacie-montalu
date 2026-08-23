@@ -93,3 +93,26 @@ nad tabuľkou). Kľúčové vzory pri montáži ĎALŠEJ vizuál/3D schopnosti s
 - **Mapovanie názov skla → vizuálny odtieň**: `typSkla3D(nazovSkla)` v `konfigurator.ts`
   (číre→cire, mliečne/matné/STADUR→matne, bronz→bronzove, default cire) — pure, testované,
   bez katalógového importu.
+
+## 7. AR náhľad (#286) — nové sub-routy pod /konfigurator
+
+`/konfigurator` má AR náhľad („pergola u teba na záhrade" cez telefón). Detaily GLB
+exportu + model-viewer sú v `.claude/rules/vizual3d.md` (auto-loaduje sa na
+`src/lib/vizual/**`); tu je len ROUTE/guard vzor pre túto verejnú plochu:
+
+- **Nové sub-routy sú UŽ verejné cez prefix** — `PUBLIC_PATHS` má `/konfigurator`
+  a match je `startsWith(p + '/')`, takže `/konfigurator/model.glb` aj
+  `/konfigurator/ar` prejdú BEZ pridania do `PUBLIC_PATHS` (na rozdiel od §1, ktoré
+  platí pre TOP-LEVEL verejnú route).
+- **`GET /konfigurator/model.glb` (`+server.ts`)** = serverový GLB endpoint. Je
+  „write-bearing" (má `+server.ts`) → MUSÍ byť v `ALLOWED` v
+  `tests/b2b-route-coverage.test.ts` (inak drift guard padne) A v `SERVEROVE_ROUTY`
+  v `tests/konfigurator-money-safety.test.ts` (B) (money-neutralita). Money-neutrálny:
+  vstup rozmery + typ skla (KĽÚČ cire/dymove/…, nie katalóg) + RAL kód; výstup čistá
+  geometria/materiály (žiadny kód/cena/nárez).
+- **`/konfigurator/ar` (`+page.ts`, NIE `+page.server.ts`)** = samostatná AR viewer
+  stránka. Univerzálny `+page.ts` load ju drží MIMO „write-bearing" množiny b2b guardu
+  (číta len query params, žiadny server) → netreba `ALLOWED` zápis.
+- **`+server.ts` je server-only ako `+page.server.ts`** — money-safety guard (A)
+  `jeKlientskyReachable` ho vylučuje (bez toho by ho bral ako klientsky vstup a spadol
+  na jeho legitímnom `$lib/server/*` importe).

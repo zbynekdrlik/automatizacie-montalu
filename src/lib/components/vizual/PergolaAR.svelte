@@ -56,7 +56,12 @@
 
 	let mvReady = $state(false);
 	let mvChyba = $state(false);
+	let qrChyba = $state(false);
+	// mobil sa detekuje až v onMount (po hydratácii) — SSR aj prvý klientsky render majú
+	// `jeMobil=false` (žiadny hydration mismatch), potom sa reaktívne aktualizuje. `detekovane`
+	// bráni QR efektu bežať pred detekciou (inak by na mobile zbytočne načítal qrcode).
 	let jeMobil = $state(false);
+	let detekovane = $state(false);
 	let qrDataUrl = $state<string>('');
 
 	onMount(() => {
@@ -70,15 +75,29 @@
 				.catch(() => (mvChyba = true));
 			return;
 		}
-		// inline 'auto' režim — detekcia mobilu; desktop dostane QR na AR stránku
+		// inline 'auto' režim — detekcia „mobil / dotykové zariadenie"
 		jeMobil = window.matchMedia?.('(pointer: coarse)').matches === true || window.innerWidth <= 768;
-		if (!jeMobil) {
-			const arUrl = `${window.location.origin}${arHref}`;
-			import('qrcode')
-				.then((m) => m.toDataURL(arUrl, { width: 220, margin: 1 }))
-				.then((u) => (qrDataUrl = u))
-				.catch(() => (mvChyba = true));
-		}
+		detekovane = true;
+	});
+
+	// Desktop QR sa generuje REAKTÍVNE z `arHref` (guardnuté na desktop+auto+po detekcii).
+	// Pri re-submite (nová konfigurácia) sa `arHref` zmení → efekt sa prehrá a QR ukáže NOVÚ
+	// konfiguráciu — komponent sa neremountuje, takže onMount by ostal na PRVEJ konfigurácii.
+	$effect(() => {
+		if (rezim === 'viewer' || !detekovane || jeMobil) return;
+		const arUrl = `${window.location.origin}${arHref}`;
+		let zrusene = false;
+		void import('qrcode')
+			.then((m) => m.toDataURL(arUrl, { width: 220, margin: 1 }))
+			.then((u) => {
+				if (!zrusene) qrDataUrl = u;
+			})
+			.catch(() => {
+				if (!zrusene) qrChyba = true;
+			});
+		return () => {
+			zrusene = true; // stará (superseded) generácia nesmie prepísať novú
+		};
 	});
 </script>
 
@@ -113,10 +132,17 @@
 		{/if}
 	{:else if jeMobil}
 		<!-- mobil: tlačidlo-odkaz na samostatnú AR stránku (tam sa načíta model-viewer).
-		     `arHref` je `resolve('/konfigurator/ar')` + query string — pravidlo nevie
-		     staticky prejsť cez $derived + template literal s query, hoci resolve() je použitý. -->
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-		<a class="ar-cta" href={arHref} data-testid="pergola-ar-open">📱 Pozri v AR u seba</a>
+		     `data-sveltekit-reload` VYNÚTI plný reload dokumentu (nie SPA navigáciu) — /konfigurator
+		     už má projektový three@0.185 (3D náhľad #276), takže SPA prechod na /ar by natiahol
+		     model-viewerov vlastný three do TOHO ISTÉHO JS kontextu → `THREE.WARNING: Multiple
+		     instances` (poruší zero-console). Plný reload = čerstvý kontext = len jedna three.
+		     `arHref` je `resolve('/konfigurator/ar')` + query string — pravidlo nevie staticky
+		     prejsť cez $derived + template literal s query, hoci resolve() je použitý. -->
+		<!-- eslint-disable svelte/no-navigation-without-resolve -->
+		<a class="ar-cta" href={arHref} data-sveltekit-reload data-testid="pergola-ar-open"
+			>📱 Pozri v AR u seba</a
+		>
+		<!-- eslint-enable svelte/no-navigation-without-resolve -->
 		<p class="ar-pozn" data-testid="pergola-ar-pozn">
 			Otvorí sa AR náhľad — pergolu umiestniš v skutočnej veľkosti u seba na pozemku.
 		</p>
@@ -131,7 +157,7 @@
 					width="220"
 					height="220"
 				/>
-			{:else if mvChyba}
+			{:else if qrChyba}
 				<p class="ar-chyba">QR kód sa nepodarilo vygenerovať.</p>
 			{:else}
 				<div class="ar-nacitava">Generujem QR kód…</div>
