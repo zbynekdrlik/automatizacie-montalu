@@ -45,12 +45,20 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 //   znovupoužíva 1:1, viď `tests/vizual-money-guard.test.ts` pre samotnú 3D
 //   vrstvu). `/zasklenia/*` nie je v B2B_FORBIDDEN_PREFIXES, takže je
 //   dostupná AUTOMATICKY — tu v ALLOWED je len vedomé potvrdenie.
+// - /konfigurator — VEREJNÝ zákaznícky konfigurátor pergoly (#275, fáza 1). Je to
+//   top-level route MIMO auth brány (v PUBLIC_PATHS), NIE pod žiadnym Money-denylist
+//   prefixom, takže `b2bRedirectTarget` ju NEPRESMERÚVA (verejná stránka je dostupná
+//   pre všetkých — anonym, interní aj prihlásený b2b). Display-only: žiadny import
+//   server/money, žiadna Money-zápisová akcia (viď popisný test nižšie), BEZ CIEN /
+//   Money kódov / nárezu (guard: tests/konfigurator-money-safety.test.ts). Tu v ALLOWED
+//   je VEDOMÉ potvrdenie (drift guard by inak zlyhal), nie obídenie.
 const ALLOWED = new Set([
 	'/zasklenia',
 	'/sietka',
 	'/pergola/navrh',
 	'/zasklenia/navrh',
 	'/zasklenia/navrh/zakaznicky',
+	'/konfigurator',
 	'/login',
 	'/logout',
 	'/health'
@@ -88,6 +96,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/',
 				'/bazen',
 				'/bazen/navrh',
+				'/konfigurator',
 				'/odpisy',
 				'/pergola',
 				'/pergola/navrh',
@@ -133,6 +142,10 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('#170: /zasklenia/navrh/zakaznicky (zákaznícky tlačový list, 3D náhľad) nie je presmerovaná', () => {
 		expect(b2bRedirectTarget('/zasklenia/navrh/zakaznicky')).toBeNull();
+	});
+
+	it('#275: /konfigurator (verejný zákaznícky konfigurátor pergoly) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator')).toBeNull();
 	});
 
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
@@ -189,6 +202,17 @@ describe('/bazen/navrh — žiadna cesta k Money odpisu (#139)', () => {
 describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', () => {
 	it('akcie routy sú presne default — žiadna odpisová/zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/zasklenia/navrh/zakaznicky/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['default']);
+	});
+});
+
+// #275, rovnaká disciplína — verejný konfigurátor má LEN default akciu (display-only
+// súhrn konfigurácie), žiadnu odpisovú/zápisovú akciu vôbec. Toto je VEREJNÁ route
+// (bez auth), takže „žiadna cesta k Money" je tu ešte kritickejšie — samostatný
+// leak/Money guard je v tests/konfigurator-money-safety.test.ts.
+describe('/konfigurator — žiadna cesta k Money odpisu (#275)', () => {
+	it('akcie routy sú presne default — žiadna odpisová/zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['default']);
 	});
 });
