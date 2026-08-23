@@ -14,6 +14,10 @@ import { KONF_RANGES, konfiguruj } from '$lib/konfigurator';
 import { parseKonfiguratorVstup } from '$lib/server/konfigurator-vstup';
 import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
+// #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). Táto route ju iba
+// naimportuje a namountuje ako pomenovanú akciu `dopyt` — Money-NEUTRÁLNA (žiadny import
+// money/pergola, zápis len do audit tabuľky `dopyt`, guard: tests/dopyt-money-safety.test.ts).
+import { dopytAction } from '$lib/server/dopyt-action';
 
 // GET (SSR render stránky) NIE JE rate-limitovaný — je lacný (statický katalóg + rozmedzia,
 // žiadny výpočet) a rovnaká politika ako verejný /login dnes; drahý (výpočtový) je POST,
@@ -29,6 +33,9 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions = {
+	// #277: verejný dopyt — validácia → rate-limit → honeypot → uloženie (audit) →
+	// PDF ponuka bez cien (download-first). Money-neutrálne, žiadna odpisová cesta.
+	dopyt: dopytAction,
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).
 	default: async ({ request, getClientAddress, setHeaders }) => {

@@ -8,6 +8,11 @@
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import type { KonfiguratorSuhrn } from '$lib/konfigurator';
+	// #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). DopytForm je čistý
+	// klientsky komponent (importuje len pure `$lib/dopyt` + `$lib/ponuka`, žiadny katalóg/
+	// Money/server) — únik guard tests/konfigurator-money-safety.test.ts prejde jeho graf.
+	import DopytForm from '$lib/components/DopytForm.svelte';
+	import type { PonukaConfig } from '$lib/ponuka';
 
 	let { data } = $props();
 
@@ -31,6 +36,26 @@
 	let spracuva = $state(false);
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+
+	// Konfigurácia pre PDF ponuku — mapovanie súhrnu enginu na PonukaConfig, ktorý DopytForm
+	// odošle skrytým JSON poľom. Sklon + svetlá výška + plocha idú do `popis` (PonukaConfig
+	// nemá pre ne vlastné pole), nech ich PDF špecifikácia zachová. BEZ CIEN / Money kódov.
+	const ponukaCfg = $derived<PonukaConfig>(
+		suhrn
+			? {
+					system: 'Pergola',
+					sirka: suhrn.sirka,
+					hlbka: suhrn.hlbka,
+					vyskaVpredu: suhrn.vyskaVpredu,
+					vyskaPriStene: suhrn.vyskaPriStene,
+					farba: suhrn.farba,
+					sklo: suhrn.sklo,
+					popis: `Sklon strechy ${fmt(suhrn.sklonDeg)}°, svetlá výška vpredu ${fmt(
+						suhrn.svetlaVyska
+					)} mm, zastrešená plocha ${fmt(suhrn.zastresenaPlochaM2)} m².`
+				}
+			: {}
+	);
 </script>
 
 <svelte:head>
@@ -202,6 +227,16 @@
 				požiadaviek.
 			</p>
 		</section>
+
+		<!-- #277: kontaktný formulár → PDF ponuka BEZ CIEN (download-first) -->
+		<section class="kontakt" data-testid="dopyt">
+			<h2>Máš záujem o túto pergolu?</h2>
+			<p class="kontakt-uvod">
+				Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
+				pripravíme po obhliadke.
+			</p>
+			<DopytForm konfiguracia={ponukaCfg} />
+		</section>
 	{/if}
 </div>
 
@@ -328,6 +363,23 @@
 		color: #64748b;
 		font-size: 13px;
 		margin: 14px 0 0;
+	}
+	.kontakt {
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 14px;
+		padding: 18px;
+		margin-top: 18px;
+	}
+	.kontakt h2 {
+		font-size: 18px;
+		margin: 0 0 8px;
+		color: #0f172a;
+	}
+	.kontakt-uvod {
+		color: #64748b;
+		font-size: 14px;
+		margin: 0 0 14px;
 	}
 	@media (min-width: 640px) {
 		.pole-mriezka {
