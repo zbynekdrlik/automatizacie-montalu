@@ -120,6 +120,41 @@ describe('buildLeadPayload — payload correctness + Money-neutralita', () => {
 	});
 });
 
+describe('escapovanie zákazníckeho vstupu (injection + XML poison-pill)', () => {
+	it('markup v poznámke je escapnutý — žiadny surový <script> tag (v hodnote aj na drôte)', async () => {
+		const id = vlozDopyt({ poznamka: '<script>alert(1)</script> & "x"' });
+		// hodnota Html poľa: zákaznícke znaky escapnuté, štrukturálny <br> zachovaný
+		const p = buildLeadPayload(getDopytForLead(id)!);
+		expect(p.description).toContain('&lt;script&gt;');
+		expect(p.description).not.toContain('<script>');
+		expect(p.description).toContain('<br>'); // oddeľovač riadkov = reálny tag
+		// na drôte (XML): zákaznícky markup DVOJITO escapnutý, <br> ostáva ako tag (&lt;br&gt;)
+		const mock = makeMock({ leadId: 42 });
+		_setLeadTransport(mock.transport);
+		await submitDopytLead(id, FAKE_PDF_B64);
+		const lead = mock.calls.find(
+			(c) => c.body.includes('crm.lead') && c.body.includes('<string>create</string>')
+		)!;
+		expect(lead.body).toContain('&amp;lt;script'); // zákaznícky <script> dvojito escapnutý
+		expect(lead.body).not.toContain('<script>'); // NIKDY surový tag na drôte
+		expect(lead.body).toContain('&lt;br&gt;'); // štrukturálny br (jednoducho escapnutý)
+	});
+
+	it('C0 riadiace znaky sa odstránia (nezlomia XML → nie poison-pill fault)', async () => {
+		const id = vlozDopyt({ poznamka: 'ok\x0Btext\x0C\x01x' });
+		const mock = makeMock({ leadId: 42 });
+		_setLeadTransport(mock.transport);
+		expect(await submitDopytLead(id, FAKE_PDF_B64)).toBe('created'); // XML platné → nie fault
+		const lead = mock.calls.find(
+			(c) => c.body.includes('crm.lead') && c.body.includes('<string>create</string>')
+		)!;
+		expect(lead.body.includes('\x0B')).toBe(false);
+		expect(lead.body.includes('\x0C')).toBe(false);
+		expect(lead.body.includes('\x01')).toBe(false);
+		expect(lead.body).toContain('oktextx'); // platné znaky prežili, len C0 zmizli
+	});
+});
+
 describe('odoo-lead.ts zdroj — Money-safety (nekrytý auto-guardom dopyt|ponuka)', () => {
 	it('neimportuje money/pergola a nezapisuje do /data', () => {
 		const src = fs.readFileSync(new URL('../src/lib/server/odoo-lead.ts', import.meta.url), 'utf8');
@@ -288,6 +323,29 @@ describe('XML-RPC fault + hraničné vetvy', () => {
 		expect(p.name).toContain('neznámy záujemca');
 		expect(p.name).not.toContain('(');
 		expect(p.description).toContain('bez detailov konfigurácie');
+	});
+});
+
+describe('súbežnosť — in-flight guard proti duplicite leadu', () => {
+	it('dva súbežné submity toho istého dopytu → len JEDEN crm.lead', async () => {
+		const id = vlozDopyt();
+		let leadCreates = 0;
+		const slow: LeadTransport = (_url, body) => {
+			if (body.includes('<methodName>authenticate</methodName>'))
+				return Promise.resolve(xmlResp('<value><int>7</int></value>'));
+			if (body.includes('ir.attachment'))
+				return Promise.resolve(xmlResp('<value><int>999</int></value>'));
+			leadCreates++; // crm.lead create — spomaľ, nech sa oba submity prekrývajú
+			return new Promise((r) => setTimeout(() => r(xmlResp('<value><int>42</int></value>')), 30));
+		};
+		_setLeadTransport(slow);
+		const [a, b] = await Promise.all([
+			submitDopytLead(id, FAKE_PDF_B64),
+			submitDopytLead(id, FAKE_PDF_B64)
+		]);
+		expect([a, b].sort()).toEqual(['created', 'skipped']); // jeden vytvoril, druhý preskočil
+		expect(leadCreates).toBe(1); // NIKDY dva crm.lead pre jeden dopyt
+		expect(getDopytForLead(id)!.odoo_lead_id).toBe(42);
 	});
 });
 

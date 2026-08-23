@@ -54,12 +54,19 @@ class OdooRpcError extends Error {
 }
 
 function xmlEscape(s: string): string {
-	return s
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;')
-		.replace(/'/g, '&apos;');
+	return (
+		s
+			// XML 1.0 nepovoľuje C0 riadiace znaky okrem \t \n \r — odstráň ich, inak crafted
+			// zákaznícky vstup (napr. \x0B v poznámke) rozbije celý XML dokument → Odoo fault →
+			// poison-pill do retry-until-give-up (#278 review). Ostatné znaky sa nižšie escapujú.
+			// eslint-disable-next-line no-control-regex
+			.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&apos;')
+	);
 }
 
 function xmlUnescape(s: string): string {
@@ -319,6 +326,12 @@ async function regeneratePdfBase64(konfiguraciaJson: string): Promise<string | u
 
 export type LeadSubmitResult = 'created' | 'failed' | 'disabled' | 'missing' | 'skipped';
 
+/** ID-čka dopytov, ktorých lead sa PRÁVE async vytvára. Kým beží tvorba, DB riadok má stále
+ *  `odoo_lead_id IS NULL`, takže by ho súbežný sweep (z iného dopytu) vzal a vytvoril DRUHÝ
+ *  lead. Beh je single-process (adapter-node), preto in-process Set spoľahlivo serializuje
+ *  per-dopyt tvorbu (#278 review). */
+const inFlight = new Set<number>();
+
 /**
  * Zrkadlí jeden dopyt do Odoo leadu. `pdfBase64` = z pôvodného submitu (initial cesta);
  * bez neho (retry cesta) sa PDF regeneruje. Chyba ⇒ `markLeadFailed` (dopyt ostáva, retry).
@@ -340,27 +353,33 @@ export async function submitDopytLead(
 	}
 	if (row.odoo_lead_id != null) return 'skipped'; // už zrkadlený
 	if (row.odoo_attempts >= MAX_ATTEMPTS) return 'skipped'; // vzdané po MAX pokusoch
+	if (inFlight.has(dopytId)) return 'skipped'; // práve sa vytvára (súbeh) — neduplikuj lead
+	inFlight.add(dopytId);
 
-	const payload = buildLeadPayload(row);
-	const pdf = pdfBase64 ?? (await regeneratePdfBase64(row.konfiguracia));
 	try {
-		const leadId = await createLeadViaXmlRpc(cfg, payload, pdf, leadFilename(row.created_at));
-		markLeadCreated(dopytId, leadId);
-		log.info('dopyt zrkadlený do Odoo CRM leadu', {
-			dopytId,
-			leadId,
-			pokus: row.odoo_attempts + 1
-		});
-		return 'created';
-	} catch (e) {
-		const msg = e instanceof Error ? e.message : String(e);
-		markLeadFailed(dopytId, msg);
-		log.error('lead do Odoo zlyhal — dopyt ostáva, retry neskôr', {
-			dopytId,
-			pokus: row.odoo_attempts + 1,
-			err: msg
-		});
-		return 'failed';
+		const payload = buildLeadPayload(row);
+		const pdf = pdfBase64 ?? (await regeneratePdfBase64(row.konfiguracia));
+		try {
+			const leadId = await createLeadViaXmlRpc(cfg, payload, pdf, leadFilename(row.created_at));
+			markLeadCreated(dopytId, leadId);
+			log.info('dopyt zrkadlený do Odoo CRM leadu', {
+				dopytId,
+				leadId,
+				pokus: row.odoo_attempts + 1
+			});
+			return 'created';
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e);
+			markLeadFailed(dopytId, msg);
+			log.error('lead do Odoo zlyhal — dopyt ostáva, retry neskôr', {
+				dopytId,
+				pokus: row.odoo_attempts + 1,
+				err: msg
+			});
+			return 'failed';
+		}
+	} finally {
+		inFlight.delete(dopytId);
 	}
 }
 
@@ -388,14 +407,19 @@ export async function retryPendingLeads(): Promise<void> {
  */
 export function queueLeadCreation(dopytId: number, pdfBase64?: string): void {
 	void (async () => {
+		let result: LeadSubmitResult = 'failed';
 		try {
-			await submitDopytLead(dopytId, pdfBase64);
+			result = await submitDopytLead(dopytId, pdfBase64);
 		} catch (e) {
 			log.error('lead queue: submit neočakávane hodil', {
 				dopytId,
 				err: e instanceof Error ? e.message : String(e)
 			});
 		}
+		// Sweep starých pending LEN keď TENTO submit uspel — úspech je dôkaz, že Odoo je hore.
+		// Pri výpadku (failed/disabled) by sweep len zbytočne míňal pokusy na starých riadkoch
+		// (a poison-pill riadok by zožral MAX_ATTEMPTS podľa frekvencie príchodov) — #278 review.
+		if (result !== 'created') return;
 		try {
 			await retryPendingLeads();
 		} catch (e) {
@@ -404,4 +428,20 @@ export function queueLeadCreation(dopytId: number, pdfBase64?: string): void {
 			});
 		}
 	})();
+}
+
+/**
+ * Jednorazový sweep pri ŠTARTE servera (volá `hooks.server.ts`). Zotaví dopyty, ktoré čakali
+ * na Odoo lead (Odoo bola dole / env pribudol) a medzitým sa appka reštartovala — inak by sa
+ * arrival-triggered retry rozbehol až pri ĎALŠOM dopyte (#278 review, finding #2). Deploy =
+ * reštart, takže tento sweep pokryje bežný „Odoo/env opravené → nasadené" prípad.
+ * Fire-and-forget, chyby zachytené; vypnuté (chýba env) ⇒ okamžite no-op.
+ */
+export function runStartupLeadSweep(): void {
+	if (!leadConfig()) return;
+	void retryPendingLeads().catch((e) =>
+		log.error('lead štartový sweep hodil', {
+			err: e instanceof Error ? e.message : String(e)
+		})
+	);
 }

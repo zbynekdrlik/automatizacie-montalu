@@ -64,6 +64,8 @@ describe('dopyt-action → Odoo lead wiring (#278)', () => {
 		const id = countDopyty(); // čerstvá izolovaná DB, sekvenčné PK → posledný = počet
 		const row = getDopytForLead(id)!;
 		expect(row.odoo_lead_id).toBeNull(); // lead sa (zatiaľ) nevytvoril — Odoo dole
-		expect(row.odoo_attempts).toBeGreaterThanOrEqual(1); // pokus sa zaznamenal → retry neskôr
+		// PRÁVE JEDEN pokus: pri neúspechu sa už NEspustí sweep (#278 review #2) — inak by
+		// jeden príchod dopytu zožral 2 pokusy a poison-pill riadok by rýchlo dosiahol MAX.
+		expect(row.odoo_attempts).toBe(1);
 	});
 });
