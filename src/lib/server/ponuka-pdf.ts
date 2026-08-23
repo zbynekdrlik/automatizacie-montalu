@@ -9,6 +9,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage, type RGB } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit';
 import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
 import { DISCLAIMER, FIRMA, firmaRiadky, zhrnutieRiadky, type PonukaConfig } from '$lib/ponuka';
+import { formatDatumSk } from '$lib/datum';
 
 // A4 na body (pt) + jednotný okraj.
 const A4_W = 595.28;
@@ -244,7 +245,9 @@ export async function generatePonukaPdf(
 	const page = doc.addPage([A4_W, A4_H]);
 	const ctx: Ctx = { page, reg, bold };
 
-	const datum = opts.datum ?? new Date().toLocaleDateString('sk-SK');
+	// Europe/Bratislava — prod kontajner beží v UTC, `toLocaleDateString` bez zóny by blízko
+	// polnoci ukázal nesprávny deň (timestamps.md / #114). `opts.datum` je test-inject.
+	const datum = opts.datum ?? formatDatumSk(new Date().toISOString());
 	let cursor = A4_H - MARGIN;
 	cursor = drawHeader(ctx, cursor);
 	cursor = drawKonfiguracia(ctx, cfg, cursor);

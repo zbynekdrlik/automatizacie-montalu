@@ -57,7 +57,7 @@ describe('dopytAction', () => {
 		expect(countDopyty()).toBe(before + 1);
 		// pdfBase64 je reálne PDF
 		expect(Buffer.from(res.pdfBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
-		expect(res.filename).toMatch(/^Montalu-ponuka-\d+\.pdf$/);
+		expect(res.filename).toMatch(/^Montalu-ponuka-\d{4}-\d{2}-\d{2}\.pdf$/);
 	});
 
 	it('honeypot vyplnený → ticho úspech, NIČ sa neuloží', async () => {

@@ -19,8 +19,10 @@ import { logger } from './log';
 
 const log = logger('dopyt-action');
 
-/** Strop veľkosti 3D renderu (dekódované bajty) — obrana proti nafúknutému POST. */
-const MAX_RENDER_BYTES = 4 * 1024 * 1024;
+/** Strop veľkosti 3D renderu (dekódované bajty) — obrana proti nafúknutému POST. Zladené s
+ *  deploy `BODY_SIZE_LIMIT: 1M` (adapter 413-ne väčšie telo skôr, než sa sem dostane; base64
+ *  render ~1 MB tela ≈ 750 KB dekódovaných). Pri #276 (reálne rendery) prehodnotiť oba stropy. */
+const MAX_RENDER_BYTES = 768 * 1024;
 
 /** Klientska IP (CF-aware) pre rate-limit + log; `getClientAddress` hádže, keď chýba XFF. */
 function clientIp(event: RequestEvent): string | undefined {
@@ -46,19 +48,23 @@ function decodeRenderPng(v: FormDataEntryValue | null): Uint8Array | undefined {
 	}
 }
 
-function filename(id: number): string {
-	return `Montalu-ponuka-${id}.pdf`;
+/** Názov PDF na stiahnutie — dátumový (nie sekvenčné `dopyt.id`, nech neúniká lead-count). */
+function filename(): string {
+	return `Montalu-ponuka-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
 export async function dopytAction(event: RequestEvent) {
 	const form = await event.request.formData();
+	const ip = clientIp(event);
 
-	// honeypot: reálny človek pole nevyplní → ticho „úspech" bez uloženia/PDF (bot nič nezíska)
+	// honeypot: reálny človek pole nevyplní → ticho „úspech" bez uloženia/PDF (bot nič nezíska).
+	// Logujeme (ip) — keby autofill/heslový manažér omylom vyplnil skryté pole reálnemu
+	// zákazníkovi, mis-fire je aspoň dohľadateľný v logu.
 	if (jeSpam(form.get(HONEYPOT_FIELD))) {
+		log.warn('dopyt honeypot zachytený', { ip });
 		return { success: true };
 	}
 
-	const ip = clientIp(event);
 	const rl = allowDopyt(ip);
 	if (!rl.allowed) {
 		return fail(429, {
@@ -105,5 +111,5 @@ export async function dopytAction(event: RequestEvent) {
 		});
 	}
 
-	return { success: true, pdfBase64, filename: filename(id) };
+	return { success: true, pdfBase64, filename: filename() };
 }
