@@ -3,6 +3,8 @@ paths:
   - 'src/lib/server/odoo-lead.ts'
   - 'tests/odoo-lead.test.ts'
   - 'tests/dopyt-action-lead.test.ts'
+  - 'tests/deploy-compose-env.test.ts'
+  - 'deploy/docker-compose.yml'
 ---
 
 # Odoo CRM lead z dopytu (#278) — XML-RPC, resilience, escapovanie
@@ -14,6 +16,22 @@ Credentials LEN z runtime env (`ODOO_LEAD_URL/DB/LOGIN/API_KEY`, na VPS
 `/opt/automatizacie-montalu/.env`), chýba ktorákoľvek zo 4 ⇒ feature TICHO vypnutá
 (dopyt ostáva pending na neskorší retry). Stav zrkadlenia = stĺpce
 `odoo_lead_id`/`odoo_attempts`/`odoo_last_error` na `dopyt` (migrácia v26).
+
+## Runtime env MUSÍ byť aj v compose `environment:` whiteliste (#278 reopened)
+
+`.env` na VPS NESTAČÍ. Docker Compose neforwarduje hostiteľské env automaticky —
+premenná sa dostane do `process.env` kontajnera LEN keď je vymenovaná v
+`services.app.environment:` v `deploy/docker-compose.yml`. #278 sa reopol práve
+preto: `ODOO_LEAD_*` boli v `/opt/automatizacie-montalu/.env`, ale chýbali vo
+whiteliste → v kontajneri `env | grep -c '^ODOO_LEAD_'` = 0 → feature ticho vypnutá
+(`odoo_attempts=0`). Tvar riadku: `ODOO_LEAD_URL: ${ODOO_LEAD_URL:-}` (interpolácia
+z `.env`, prázdny default = konzistentné s "chýba ktorákoľvek ⇒ vypnuté").
+
+**Pravidlo pre KAŽDÝ nový `process.env.FOO` read v serveri:** pridaj `FOO: ${FOO:-}`
+do compose `environment:` v tom istom PR, inak je na prode ticho unset. Chránené
+štruktúrnym config-guard testom `tests/deploy-compose-env.test.ts` (vzor
+`ci-docker-hardening.test.ts`, žiadna yaml dep) — pri pridaní ďalšej env premennej
+pridaj asertciu tam.
 
 ## Hand-rolled XML-RPC (žiadna npm závislosť)
 
