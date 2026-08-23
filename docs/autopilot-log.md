@@ -1558,3 +1558,10 @@ implementované, nereprodukovateľné čestný null:
 - **Review (fresh general-purpose, Opus 4.8): 0/0/3 (0 kritických, 0 warningov, 3 návrhy), všetky 3 opravené v `f0953d1`:** in-flight guard lazy importu; E2E assert 3D vrstva neaktívna pred submitom (lazy-load lock); explicitná názov→odtieň mapa testu (nie tautológia). Po oprave 2078 unit testov, coverage 95.73/89.28/97.75/97.17.
 - **Playbook:** nové `.claude/rules/konfigurator.md` sekcia 6 (3D náhľad na verejnej route — money guard graf, lazy import, viz snapshot, key remount, typSkla3D).
 - **Sesterský tiket (leštenie 3D) OSTÁVA OTVORENÝ** — engine na `dev` + používaný route-om, leštenie + reálny mobil tier. PR: uzatvára tento tiket + posúva sesterský (bez close-keywordu pre sesterský).
+## #276 — dohra: CI supersample fix + release 0.24.25
+
+- **CI E2E fail (run 32661546086):** `zasklenia-zakaznicky.spec.ts` ×2 na zero-console — 11 GL warningov (`Texture total allocation size is too large` → incomplete framebuffer). Root cause: #285 pridal 3× supersample vetvu; SwiftShader per-dimension limity (16384) prejdú, ale CELKOVÝ alokačný rozpočet 7200×4860 nezvládne (na maine max 2× = zelené).
+- **Fix (RED `70a2f57` → GREEN `ea5b817`):** `supersampleFaktor` strop 2× pre softvérový/neznámy renderer (`jeSoftverovyRenderer(UNMASKED_RENDERER)`), 3× len potvrdený hardvér; fail-safe default softvér. 2084 unit testov, coverage nad prahmi.
+- **Release:** PR #290 merged `7f8b727` → v0.24.25 na prode, deploy-set zelený, celý beh 32663385319 success. Prod verify: footer `v0.24.25 (7f8b727)`, 3D hero renderuje po submite (RAL 9005 + 4.4.2 mliečne, canvas 694×434, 1 kontext, 0 console errors — len známy GL-driver perf note), žiaden únik cien. #276 CLOSED, sesterský #285 OSTÁVA OTVORENÝ (leštenie #288).
+- **Playbook:** `vizual3d.md` — SwiftShader supersample gotcha (per-dimension limity klamú o celkovom rozpočte).
+---

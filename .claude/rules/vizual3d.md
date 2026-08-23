@@ -294,3 +294,15 @@ plôch nezmenenú; AgX desaturuje celý rozsah. Jednoriadková zmena, keby revie
 viď `testing.md`) → `/zasklenia/navrh?viz=high|mid|low` (vynúti tier) → over
 `data-viz-ready=true`, `__VIZ_CONTEXTS===1`, screenshot, console warnings. Toto
 chytilo obidva deprecation warningy PRED CI. `?viz=` vynúti tier bez ohľadu na HW.
+
+## Supersample strop 2× na softvérovom WebGL (SwiftShader CI) — per-dimension limity KLAMÚ (#290)
+
+`MAX_TEXTURE_SIZE`/`MAX_RENDERBUFFER_SIZE` na SwiftShader hlásia 16384, ale
+softvérový renderer má malý CELKOVÝ alokačný rozpočet — 3× supersample
+(7200×4860 MSAA buffer) padne: `glRenderbufferStorageMultisample: Texture total
+allocation size is too large` → `Framebuffer is incomplete` → GL warningy →
+zero-console E2E assert zlyhá. 2× (4800×3240) je dokázane bezpečné.
+Preto `supersampleFaktor(..., softverovyRenderer)`: 3× LEN na potvrdenom
+hardvéri (`jeSoftverovyRenderer(UNMASKED_RENDERER)` cez
+`WEBGL_debug_renderer_info`), fail-safe default = softvér → strop 2×.
+NIKDY nerozhoduj kapacitu bufferov z per-dimension GL limitov samotných.
