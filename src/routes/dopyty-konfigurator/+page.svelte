@@ -60,6 +60,7 @@
 							<a
 								class="pdf"
 								data-testid="pdf-{d.id}"
+								data-sveltekit-reload
 								href={resolve(`/dopyty-konfigurator/pdf?id=${d.id}`)}>PDF ↓</a
 							>
 						</td>
