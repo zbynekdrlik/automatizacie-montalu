@@ -8,6 +8,7 @@ import { logger } from '$lib/server/log';
 import { moneyConfig } from '$lib/server/money';
 import { cenySnapshotPath } from '$lib/server/ceny';
 import { DB_PATH } from '$lib/server/db';
+import { runStartupLeadSweep } from '$lib/server/odoo-lead';
 
 const log = logger('http');
 
@@ -37,6 +38,9 @@ let pruneCounter = 0;
 		testDir: mc.testDir,
 		cenySnapshotPath: cenySnapshotPath()
 	});
+	// #278: pri štarte zotav dopyty čakajúce na Odoo CRM lead (napr. po deploy/restarte po
+	// výpadku Odoo alebo po doplnení ODOO_LEAD_* env). Fire-and-forget, no-op keď chýba env.
+	runStartupLeadSweep();
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
