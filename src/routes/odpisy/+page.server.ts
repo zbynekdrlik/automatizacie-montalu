@@ -1,19 +1,42 @@
 import type { Actions, PageServerLoad } from './$types';
 import { listOdpisy, releaseOdpis, povolitReimport } from '$lib/server/money';
+import {
+	getDlvReadbackMeta,
+	readbackStav,
+	type ReadbackVysledok
+} from '$lib/server/money-readback';
+import type { DlvReadbackMeta } from '$lib/server/money-readback';
+import { logger } from '$lib/server/log';
+
+const log = logger('odpisy');
 
 export const load: PageServerLoad = async () => {
 	// detail sa parsuje TU s ochranou — jeden pokazený riadok nesmie zhodiť
 	// celú históriu (a „Uvoľniť" je jediná cesta k oprave duplikátov)
+	const odpisy = listOdpisy(200).map((o) => {
+		let d: Record<string, unknown>;
+		try {
+			d = JSON.parse(o.detail || '{}') as Record<string, unknown>;
+		} catch {
+			d = {};
+		}
+		return { ...o, d };
+	});
+	// #298 POST-import readback: LIVE odpisy overí proti Money DLV snapshotu (on-the-fly, lazy import).
+	// TEST odpisy do Money nikdy nešli → bez záznamu (v UI sa readback stĺpec pre ne nezobrazí).
+	// Readback NESMIE zhodiť /odpisy — táto stránka hostí „Uvoľniť" (jedinú cestu k oprave duplikátov),
+	// takže DB/IO chyba pri readbacku degraduje na „neoverené", NIKDY na 500 (#298 review).
+	let stav = new Map<number, ReadbackVysledok>();
+	let readbackMeta: DlvReadbackMeta | null = null;
+	try {
+		stav = readbackStav(odpisy.filter((o) => o.live).map((o) => o.id));
+		readbackMeta = getDlvReadbackMeta();
+	} catch (e) {
+		log.error('readback zlyhal — degradujem na „neoverené", stránka ostáva funkčná', { error: e });
+	}
 	return {
-		odpisy: listOdpisy(200).map((o) => {
-			let d: Record<string, unknown>;
-			try {
-				d = JSON.parse(o.detail || '{}') as Record<string, unknown>;
-			} catch {
-				d = {};
-			}
-			return { ...o, d };
-		})
+		odpisy: odpisy.map((o) => ({ ...o, readback: stav.get(o.id) ?? null })),
+		readbackMeta
 	};
 };
 

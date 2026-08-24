@@ -6,7 +6,7 @@ import { insertDopyt, getDopyt, countDopyty } from '../src/lib/server/dopyt-stor
 
 describe('dopyt store (migrácia v25)', () => {
 	it('DB je na verzii 25 a tabuľka dopyt existuje', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(28);
+		expect(db.pragma('user_version', { simple: true })).toBe(29);
 		const t = db
 			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='dopyt'")
 			.get();
