@@ -1,6 +1,7 @@
-// #277 — PDF generátor. Custom-font glyfy sa z PDF textu nedajú spoľahlivo prečítať, preto
-// overujeme REÁLNE hodnoty cez metadáta (ktoré pdf-lib vie načítať späť) + invariant NULA
-// cien. Aj že PDF je platný (%PDF, loadovateľný pdf-libom) a že PNG slot funguje.
+// #277/#279 Fáza C — PDF generátor. Custom-font glyfy sa z PDF textu nedajú spoľahlivo prečítať,
+// preto overujeme REÁLNE hodnoty cez metadáta (ktoré pdf-lib vie načítať späť). #279 Fáza C:
+// PDF nesie orientačnú MO cenu → invariant je „MO cena áno, VO cena/Money kód NIE" (nie „NULA
+// cien"). Aj že PDF je platný (%PDF, loadovateľný pdf-libom) a že PNG slot funguje.
 import { describe, it, expect } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import { generatePonukaPdf } from '../src/lib/server/ponuka-pdf';
@@ -14,6 +15,7 @@ const PNG_1x1 = Buffer.from(
 
 const FULL: PonukaConfig = {
 	system: 'Robust',
+	model: 'ROBUST',
 	typStrechy: 'bioklimatická lamelová',
 	sirka: 3000,
 	hlbka: 4000,
@@ -23,8 +25,6 @@ const FULL: PonukaConfig = {
 	farba: 'RAL 7016',
 	sklo: 'Deluxe Float'
 };
-
-const PRICE_RE = /€|EUR|\bcena\b|\bprice\b|\d+[,.]\d{2}\s*(?:€|eur)/i;
 
 async function meta(bytes: Uint8Array) {
 	const doc = await PDFDocument.load(bytes);
@@ -38,7 +38,10 @@ async function meta(bytes: Uint8Array) {
 }
 
 describe('generatePonukaPdf', () => {
-	it('vytvorí platný A4 PDF s konfiguráciou v metadátach (reálne hodnoty) a bez cien', async () => {
+	// #279 Fáza C — leak-guard REDEFINÍCIA (owner ROZHODNUTÉ issuecomment-5396941067): PDF ponuka
+	// TERAZ nesie ORIENTAČNÚ predajnú cenu. Zmenené z „INVARIANT: nikde žiadna cena" na „cena JE,
+	// ale žiadna VEĽKOOBCHODNÁ (VO) cena / Money kód".
+	it('vytvorí platný A4 PDF s konfiguráciou + orientačnou cenou v metadátach (#279 Fáza C)', async () => {
 		const bytes = await generatePonukaPdf(FULL, { datum: '23.08.2026' });
 		expect(Buffer.from(bytes.slice(0, 5)).toString()).toBe('%PDF-');
 		const m = await meta(bytes);
@@ -46,17 +49,35 @@ describe('generatePonukaPdf', () => {
 		expect(m.title).toMatch(/Špecifikácia/);
 		// reálne hodnoty konfigurácie sú v subjecte
 		expect(m.subject).toContain('Robust');
+		expect(m.subject).toContain('Model: ROBUST');
 		expect(m.subject).toContain('3000 × 4000 mm');
 		expect(m.subject).toContain('RAL 7016');
 		expect(m.subject).toContain('Deluxe Float');
 		// keywords nesú jednotlivé hodnoty
 		expect(m.keywords).toContain('Robust');
-		// INVARIANT: nikde žiadna cena
-		expect(m.subject).not.toMatch(PRICE_RE);
-		expect(m.keywords).not.toMatch(PRICE_RE);
-		expect(m.title).not.toMatch(PRICE_RE);
-		// pozitívny marker, že ide o špecifikáciu bez cien
-		expect(m.keywords).toMatch(/bez cien/i);
+		// POZITÍVNE: orientačná cena JE v metadátach (€ + marker)
+		expect(m.subject).toMatch(/Orientačná cena:.*€/);
+		expect(m.keywords).toMatch(/orientačná cena/i);
+		// NEGATÍVNE: žiadna ve[ľl]koobchodná (VO) cena ani Money kód/marker „bez cien"
+		expect(m.subject).not.toMatch(/priceB2B|ve[ľl]koobchod|VO cena/i);
+		expect(m.keywords).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
+		expect(m.keywords).not.toMatch(/bez cien/i);
+	});
+
+	it('pod-katalógový rozmer → PDF čestne uvedie katalógový rozmer, na ktorý cena platí (#279 Fáza C review 🟡)', async () => {
+		// šírka 2000 mm < 4,0 m mriežka → cena katalógového minima 4,0 × 2,0 m; PDF to zverejní
+		const bytes = await generatePonukaPdf({ system: 'Pergola', sirka: 2000, hlbka: 1500 });
+		const m = await meta(bytes);
+		expect(m.subject).toMatch(/Orientačná cena:.*€/);
+		expect(m.subject).toMatch(/katalógový rozmer 4 × 2 m/);
+	});
+
+	it('mimo katalógu (šírka > 7,5 m) → PDF nesie „Cena na vyžiadanie" (#279 Fáza C)', async () => {
+		// šírka 8000 mm > 7,5 m katalóg → individuálna ponuka; PDF to zobrazí namiesto sumy
+		const bytes = await generatePonukaPdf({ system: 'Pergola', sirka: 8000, hlbka: 3000 });
+		const m = await meta(bytes);
+		expect(m.subject).toMatch(/Cena na vyžiadanie/);
+		expect(m.subject).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 	});
 
 	it('embedne validný PNG render (bez pádu) a ostane platné PDF', async () => {

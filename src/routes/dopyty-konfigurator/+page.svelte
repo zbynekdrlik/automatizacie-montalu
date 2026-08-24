@@ -12,7 +12,7 @@
 	<h1>Dopyty z konfigurátora</h1>
 	<p class="sub">
 		Zákaznícke dopyty odoslané z verejného konfigurátora pergoly — najnovšie hore. Pre každý dopyt
-		sa dá znova stiahnuť PDF špecifikácia (bez cien). Spolu {data.total}
+		sa dá znova stiahnuť PDF špecifikácia (s orientačnou cenou). Spolu {data.total}
 		{data.total === 1 ? 'dopyt' : data.total >= 2 && data.total <= 4 ? 'dopyty' : 'dopytov'}.
 	</p>
 </div>

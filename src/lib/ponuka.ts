@@ -1,6 +1,11 @@
 // Zdieľané typy + čisté helpery pre verejnú PDF ponuku (#277). ŽIADNY server import
 // (žiadny DB/Money/pdf-lib) — použiteľné aj na klientovi (DopytForm náhľad) aj na serveri
-// (ponuka-pdf, dopyt-action). Money-neutrálne: iba zákaznícka konfigurácia, NULA cien.
+// (ponuka-pdf, dopyt-action). Money-neutrálne: iba zákaznícka konfigurácia + orientačná
+// PREDAJNÁ cena (#279 Fáza C) — NIKDY Money nákupné kódy, VO cena ani nárez.
+import { MODELY, type ModelPergoly } from '$lib/konfigurator';
+
+/** Platné modely (LIGHT/ROBUST/MASSIVE) — na obranné sparsovanie klientom dodaného `model`. */
+const PLATNE_MODELY = new Set<string>(MODELY.map((m) => m.kod));
 
 /**
  * Zákaznícka konfigurácia pergoly tak, ako ju odovzdá verejný konfigurátor (#275).
@@ -10,6 +15,9 @@
 export interface PonukaConfig {
 	system?: string;
 	typStrechy?: string;
+	/** model konštrukcie (LIGHT/ROBUST/MASSIVE) — cenotvorný vstup (#279 Fáza C). Cenu z neho
+	 *  počíta SERVER (`ponuka-pdf`), NIE klient (klient posiela len tento string). */
+	model?: ModelPergoly;
 	sirka?: number;
 	hlbka?: number;
 	vyskaVpredu?: number;
@@ -58,6 +66,10 @@ export function sanitizePonukaConfig(raw: unknown): PonukaConfig {
 	if (system) out.system = system;
 	const typStrechy = optStr(obj.typStrechy);
 	if (typStrechy) out.typStrechy = typStrechy;
+	// model (#279 Fáza C): iba platný LIGHT/ROBUST/MASSIVE — neznámy reťazec sa zahodí (žiadna
+	// injekcia). Cena sa z neho počíta server-side, klientom dodaná hodnota je len výberom.
+	const model = optStr(obj.model);
+	if (model && PLATNE_MODELY.has(model)) out.model = model as ModelPergoly;
 	const sirka = optPosNum(obj.sirka);
 	if (sirka !== undefined) out.sirka = sirka;
 	const hlbka = optPosNum(obj.hlbka);
@@ -87,6 +99,7 @@ const mm = (n: number) => `${Math.round(n)} mm`;
 export function zhrnutieRiadky(cfg: PonukaConfig): { label: string; value: string }[] {
 	const rows: { label: string; value: string }[] = [];
 	if (cfg.system) rows.push({ label: 'Systém', value: cfg.system });
+	if (cfg.model) rows.push({ label: 'Model', value: cfg.model });
 	if (cfg.typStrechy) rows.push({ label: 'Typ strechy', value: cfg.typStrechy });
 	if (cfg.sirka !== undefined && cfg.hlbka !== undefined)
 		rows.push({ label: 'Rozmery (š × h)', value: `${Math.round(cfg.sirka)} × ${mm(cfg.hlbka)}` });
@@ -120,11 +133,11 @@ export const FIRMA = {
 	adresa: ''
 } as const;
 
-/** Disclaimer — PDF je špecifikácia, NIE cenová ponuka. */
+/** Disclaimer — uvedená cena je ORIENTAČNÁ (#279 Fáza C), NIE záväzná cenová ponuka. */
 export const DISCLAIMER =
-	'Toto je nezáväzná špecifikácia produktu, nie cenová ponuka. Presnú cenu pripravíme ' +
-	'po obhliadke miesta stavby. Uvedené rozmery a prvky vychádzajú z vašej konfigurácie ' +
-	'a môžu sa po zameraní upresniť.';
+	'Uvedená cena je ORIENTAČNÁ (informatívna), nie záväzná cenová ponuka. Presnú cenu ' +
+	'pripravíme po obhliadke miesta stavby. Uvedené rozmery a prvky vychádzajú z vašej ' +
+	'konfigurácie a môžu sa po zameraní upresniť.';
 
 /** Neprázdne kontaktné riadky firmy (na vykreslenie do PDF). Param kvôli testovateľnosti
  *  (default = `FIRMA`); prázdne polia sa vynechajú, aby PDF neukázalo vymyslené dáta. */

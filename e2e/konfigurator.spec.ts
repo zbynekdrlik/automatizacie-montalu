@@ -1,17 +1,19 @@
-// Verejný zákaznícky konfigurátor pergoly (#275, fáza 1) — E2E cez reálny prehliadač.
-// Kľúčové: flow BEZ prihlásenia (verejná route), a v odpovedi sa NEOBJAVÍ žiadna cena,
-// Money kód (TS*) ani nárez. Display-only ČASŤ (súhrn) beží aj proti nasadenej appke
-// (BASE_URL), bez skipAkLive. #277 pridal DOPYT tok (kontaktný formulár → PDF ponuka BEZ
-// CIEN): ten zapisuje audit riadok do SQLite `dopyt` (Money-NEUTRÁLNE, žiadny Money
-// import) — je za `skipAkLive`, nech proti LIVE prode nepribúdajú testovacie dopyt
-// riadky (v CI beží proti preview, live:false → beží). Každý test = NULA console chýb.
+// Verejný zákaznícky konfigurátor pergoly (#275/#279 Fáza C) — E2E cez reálny prehliadač.
+// Kľúčové: flow BEZ prihlásenia (verejná route). #279 Fáza C: v odpovedi SMIE byť orientačná
+// MO cena (owner ROZHODNUTÉ), ale NIKDY VEĽKOOBCHOD (VO) cena, Money kód (TS*) ani nárez.
+// Display-only ČASŤ (súhrn + cena) beží aj proti nasadenej appke (BASE_URL), bez skipAkLive.
+// #277 DOPYT tok (kontaktný formulár → PDF ponuka s orientačnou cenou): zapisuje audit riadok
+// do SQLite `dopyt` (Money-NEUTRÁLNE, žiadny Money import) — je za `skipAkLive`, nech proti
+// LIVE prode nepribúdajú testovacie dopyty. Každý test = NULA console chýb.
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { PDFDocument } from 'pdf-lib';
 import { goto, collectConsole, skipAkLive } from './helpers';
 // #288 review 🔵: kanonický klasifikátor (Node kontext — helper beží mimo page.evaluate),
 // aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
 import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
 
-test('konfigurátor: verejný flow BEZ prihlásenia → súhrn konfigurácie, žiadna cena/Money kód, nula console chýb', async ({
+test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná cena, žiadny Money kód/VO, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -46,11 +48,18 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn konfigurácie, ž
 	await expect(page.getByTestId('s-sklo')).toHaveText(vybranySklo);
 	await expect(page.getByTestId('s-farba')).toContainText('RAL 7016');
 
-	// ÚNIK GUARD: nikde na stránke žiadna cena (€/EUR), žiadny Money kód (TS###), žiadny nárez
+	// #279 Fáza C: orientačná cena sa zobrazí (default model LIGHT) + súhrn nesie model
+	await expect(page.getByTestId('s-model')).toHaveText('LIGHT');
+	await expect(page.getByTestId('cena')).toBeVisible();
+	await expect(page.getByTestId('cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('cena-bezdph')).toContainText('bez DPH');
+
+	// ÚNIK GUARD (redefinovaný, #279 Fáza C): orientačná cena SMIE byť na stránke (owner
+	// ROZHODNUTÉ) — zakázaný ostáva len Money kód (TS###), nárez a VEĽKOOBCHOD (VO) cena.
 	const telo = await page.locator('body').innerText();
-	expect(telo).not.toMatch(/€|EUR\b/);
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	// verzia v pätičke (version-on-dashboard) — pätička je zdieľaná aj pre verejnú stránku
 	await expect(page.getByTestId('version')).toHaveText(
@@ -79,7 +88,7 @@ test('konfigurátor: kombinácia výška+hĺbka+sklon nad rozmedzie → friendly
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuka (bez cien) na stiahnutie, nula console chýb', async ({
+test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuka s orientačnou cenou na stiahnutie, nula console chýb', async ({
 	page
 }) => {
 	// zápisový tok (audit riadok do `dopyt`) — proti LIVE prode preskočiť, nech nepribúdajú
@@ -127,11 +136,71 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 	// 5) potvrdenie úspechu (formulár nahradený poďakovaním)
 	await expect(page.getByText('Ďakujeme! Dopyt sme prijali.')).toBeVisible();
 
-	// 6) ÚNIK GUARD (rovnako ako display-only test): žiadna cena / Money kód / nárez na stránke
+	// 6) ÚNIK GUARD (#279 Fáza C redefinícia): orientačná cena SMIE byť na stránke; zakázaný
+	//    ostáva Money kód (TS###), nárez a VEĽKOOBCHOD (VO) cena.
 	const telo = await page.locator('body').innerText();
-	expect(telo).not.toMatch(/€|EUR\b/);
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
+
+	// 7) #279 Fáza C: stiahnuté PDF nesie ORIENTAČNÚ cenu (čítané z metadát — custom-font
+	//    glyfy sa z PDF textu nedajú spoľahlivo prečítať, metadáta áno) a NIKDY VO cenu.
+	const pdfCesta = await download.path();
+	const pdfBytes = await readFile(pdfCesta);
+	const doc = await PDFDocument.load(pdfBytes);
+	const subject = doc.getSubject() ?? '';
+	expect(subject).toMatch(/Orientačná cena:.*€/);
+	expect(subject).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #279 Fáza C: cenová vrstva vo verejnom konfigurátore — výber modelu mení orientačnú cenu,
+// mimo katalógu → „cena na vyžiadanie". Display-only (žiadny zápis) → beží aj proti nasadenej
+// appke (BASE_URL), bez skipAkLive.
+test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → individuálna ponuka, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator');
+
+	// 1) konfigurácia s modelom LIGHT (3,0 × 5,0 m) → orientačná cena (€) + porovnanie 3 modelov
+	await page.getByTestId('sirka').fill('5000');
+	await page.getByTestId('hlbka').fill('3000');
+	await page.getByTestId('vyskaVpredu').fill('2500');
+	await page.getByTestId('sklonDeg').fill('6');
+	await page.getByTestId('model-LIGHT').check();
+	await page.getByTestId('zobrazit').click();
+
+	await expect(page.getByTestId('cena')).toBeVisible();
+	await expect(page.getByTestId('cena-sdph')).toContainText('€');
+	const lightCena = (await page.getByTestId('cena-sdph').innerText()).trim();
+
+	// porovnanie ukazuje všetky 3 modely (zrkadlo montalu.sk „ceny vedľa seba")
+	await expect(page.getByTestId('porovnanie-LIGHT')).toBeVisible();
+	await expect(page.getByTestId('porovnanie-ROBUST')).toBeVisible();
+	await expect(page.getByTestId('porovnanie-MASSIVE')).toBeVisible();
+
+	// 2) prepni na ROBUST → orientačná cena sa ZMENÍ (ROBUST je drahší než LIGHT)
+	await page.getByTestId('model-ROBUST').check();
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('s-model')).toHaveText('ROBUST');
+	await expect(page.getByTestId('cena-sdph')).toContainText('€');
+	const robustCena = (await page.getByTestId('cena-sdph').innerText()).trim();
+	expect(robustCena).not.toBe(lightCena);
+
+	// 3) LIGHT nad hĺbku 4 m (5000 mm) → mimo katalógu → „cena na vyžiadanie" (individuálna)
+	await page.getByTestId('model-LIGHT').check();
+	await page.getByTestId('hlbka').fill('5000');
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('cena-individualna')).toBeVisible();
+	await expect(page.getByTestId('cena-individualna')).toContainText(/vyžiadanie/i);
+
+	// leak-guard (redefinovaný): žiadny Money kód (TS###), nárez ani VEĽKOOBCHOD (VO) cena
+	const telo = await page.locator('body').innerText();
+	expect(telo).not.toMatch(/TS\d{3}/);
+	expect(telo).not.toMatch(/nárez/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -218,11 +287,12 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	// #288: post-processing gate (mid tier) — na softvérovom CI rendereri VYPNUTÝ (#290)
 	await overPostprocGate(page);
 
-	// ÚNIK GUARD ostáva platný aj s 3D náhľadom na stránke
+	// ÚNIK GUARD (redefinovaný, #279 Fáza C) ostáva platný aj s 3D náhľadom: cena SMIE byť,
+	// zakázaný je Money kód (TS###), nárez a VEĽKOOBCHOD (VO) cena.
 	const telo = await page.locator('body').innerText();
-	expect(telo).not.toMatch(/€|EUR\b/);
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	expect(consoleMsgs).toEqual([]);
 });

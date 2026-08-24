@@ -146,7 +146,9 @@
 		<button type="submit" disabled={odosielam}>
 			{odosielam ? 'Odosielam…' : 'Odoslať dopyt a stiahnuť špecifikáciu'}
 		</button>
-		<p class="disclaimer">Špecifikácia je nezáväzná, bez cien. Cenu pripravíme po obhliadke.</p>
+		<p class="disclaimer">
+			Špecifikácia je nezáväzná, s orientačnou cenou. Presnú cenu pripravíme po obhliadke.
+		</p>
 	</form>
 {/if}
 

@@ -98,3 +98,26 @@ describe('parseKonfiguratorVstup — katalóg (žiadna injekcia)', () => {
 		}
 	});
 });
+
+describe('parseKonfiguratorVstup — model (#279 Fáza C)', () => {
+	it('chýbajúce/prázdne pole model → default LIGHT (spätná kompatibilita)', () => {
+		const r = parseKonfiguratorVstup(platny()); // platny() neposiela model
+		expect('vstup' in r).toBe(true);
+		if ('vstup' in r) expect(r.vstup.model).toBe('LIGHT');
+		const r2 = parseKonfiguratorVstup(platny({ model: '' }));
+		if ('vstup' in r2) expect(r2.vstup.model).toBe('LIGHT');
+	});
+
+	it.each(['LIGHT', 'ROBUST', 'MASSIVE'])('akceptuje platný model %s', (m) => {
+		const r = parseKonfiguratorVstup(platny({ model: m }));
+		expect('vstup' in r).toBe(true);
+		if ('vstup' in r) expect(r.vstup.model).toBe(m);
+	});
+
+	it('odmietne neznámy model (žiadna injekcia ľubovoľného reťazca)', () => {
+		const r = parseKonfiguratorVstup(platny({ model: 'PREMIUM' }));
+		expect('error' in r).toBe(true);
+		const r2 = parseKonfiguratorVstup(platny({ model: '<script>' }));
+		expect('error' in r2).toBe(true);
+	});
+});

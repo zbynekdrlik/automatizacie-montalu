@@ -5,13 +5,18 @@
 //
 // Money-neutrálny a mimo klientskeho bundle ($lib/server/): NEIMPORTUJE katalóg skla
 // (nesie Money kód), `sklo-cena`, `server/money`, `server/db` — obsahuje interim PREDAJNÉ ceny
-// prevzaté z verejného konfigurátora montalu.sk, nie Money nákupné/odpisové kódy. Zákaz
-// zobrazenia cien vo VEREJNEJ route (#279 leak-guard) ostáva — tento modul sa do verejnej
-// odpovede NEZAPÁJA (to je Fáza C, samostatný vedomý krok). Modul je čistý (bez DB/siete),
-// priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
+// prevzaté z verejného konfigurátora montalu.sk, nie Money nákupné/odpisové kódy.
+// #279 Fáza C (owner ROZHODNUTÉ): tento modul sa DO VEREJNEJ ODPOVEDE ZAPÁJA — verejná route
+// dostane LEN maloobchod (MO) cez `naVerejnuCenu`/`verejnaCenaPreModel`/`verejneCenyModelov`
+// (VO strip). VO cena / Money kód / matica sa do verejnej odpovede NIKDY nedostanú. Modul je
+// čistý (bez DB/siete), priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
 import cennikJson from './cennik-pergola.json';
-
-export type ModelPergoly = 'LIGHT' | 'ROBUST' | 'MASSIVE';
+// #279 Fáza C: `ModelPergoly` + verejné cenové typy žijú v client-safe `$lib/konfigurator`
+// (jeden zdroj pravdy — vidí ich aj wizard). Tu ich importujeme (server-only lookup) a
+// `ModelPergoly` RE-EXPORTUJEME, aby existujúce importy z tohto modulu (parity test) fungovali.
+import { MODELY, MODEL_DEFAULT } from '$lib/konfigurator';
+import type { ModelPergoly, VerejnaCena, CenaModelu } from '$lib/konfigurator';
+export type { ModelPergoly };
 
 /** Kľúč strešnej výplne (mapuje na montalu.sk roofing slug v seed `vyplne`). */
 export type VyplnKluc =
@@ -215,4 +220,46 @@ export function dostupneVyplne(model: ModelPergoly): VyplnKluc[] {
 	return (Object.keys(SEED.cennik) as VyplnKluc[]).filter(
 		(vypln) => SEED.cennik[vypln]?.[model] !== undefined
 	);
+}
+
+// --------------------------------------------------------------------------- //
+// #279 Fáza C — VEREJNÁ (public-safe) cena: LEN maloobchod (MO), VO sa ODSTRÁNI. //
+// --------------------------------------------------------------------------- //
+
+/**
+ * Zmapuje interný výsledok (`CenaVysledok` s MO **aj** VO) na verejnú cenu (LEN MO).
+ * VO (`vo`) sa NIKDY nedostane do verejnej odpovede (#279 leak-guard: VO ostáva neverejné).
+ *
+ * **Invariant (volateľ ho MUSÍ dodržať):** `model` je autoritatívny LEN pre `individualna-ponuka`
+ * vetvu (tam ho `CenaVysledok` nenesie); pre `cena` vetvu sa použije `v.model` a `model` MUSÍ
+ * byť ten istý, aký dostal `vypocitajCenu`. `verejnaCenaPreModel` to garantuje (posiela ten istý
+ * model do oboch). Nevolaj s nekonzistentným párom (v, model).
+ */
+export function naVerejnuCenu(v: CenaVysledok, model: ModelPergoly): VerejnaCena {
+	if (v.druh === 'individualna-ponuka')
+		return { druh: 'individualna-ponuka', model, dovod: v.dovod };
+	return {
+		druh: 'cena',
+		model: v.model,
+		bezDph: v.mo.bezDph,
+		sDph: v.mo.sDph,
+		hlbkaGridM: v.hlbkaGridM,
+		sirkaGridM: v.sirkaGridM
+	};
+}
+
+/** Verejná orientačná cena pre JEDEN model (MO-only). Default model LIGHT, výplň polykarbonát-16
+ *  (interim BÁZOVÁ cena — dekoračné sklo interim cenu nemení, viď #279 Fáza C design). */
+export function verejnaCenaPreModel(v: CenaVstup): VerejnaCena {
+	const model = v.model ?? MODEL_DEFAULT;
+	return naVerejnuCenu(vypocitajCenu({ ...v, model }), model);
+}
+
+/** Orientačné ceny VŠETKÝCH modelov (LIGHT/ROBUST/MASSIVE) pre daný rozmer — zrkadlo montalu.sk
+ *  „ceny modelov vedľa seba". MO-only, žiadne VO. Výplň interim = bázová (polykarbonát-16). */
+export function verejneCenyModelov(hlbkaMm: number, sirkaMm: number): CenaModelu[] {
+	return MODELY.map((m) => ({
+		model: m.kod,
+		cena: verejnaCenaPreModel({ hlbkaMm, sirkaMm, model: m.kod })
+	}));
 }

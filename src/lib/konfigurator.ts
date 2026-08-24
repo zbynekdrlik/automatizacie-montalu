@@ -38,6 +38,52 @@ export const KONF_RANGES = {
 	sklon: { min: KONF_SKLON_MIN, max: KONF_SKLON_MAX }
 } as const;
 
+// #279 Fáza C: model konštrukcie (LIGHT/ROBUST/MASSIVE) — cenotvorný vstup zrkadlený z
+// montalu.sk. Typ žije TU (client-safe), aby ho videl aj wizard (výber) aj PDF náhľad;
+// server-only cenový modul `konfigurator-cena.ts` ho RE-EXPORTUJE (jeden zdroj pravdy).
+// Sú to len string literály — žiadna cena ani Money kód, bezpečné pre klientsky bundle.
+export type ModelPergoly = 'LIGHT' | 'ROBUST' | 'MASSIVE';
+
+/** Východiskový model (montalu.sk default LIGHT — odľahčená pergola). */
+export const MODEL_DEFAULT: ModelPergoly = 'LIGHT';
+
+export interface ModelInfo {
+	kod: ModelPergoly;
+	/** krátky plain-SK popis rozdielu (inšpirované montalu.sk) */
+	popis: string;
+}
+
+/** Modely na výber vo verejnom konfigurátore (poradie = montalu.sk: LIGHT → ROBUST → MASSIVE).
+ *  LEN popisy, ŽIADNA cena — cena je rozmerovo závislá a počíta ju server pri submite. */
+export const MODELY: readonly ModelInfo[] = [
+	{ kod: 'LIGHT', popis: 'Odľahčená konštrukcia, menší výsuv (hĺbka do 4 m). Ideálna k stene.' },
+	{ kod: 'ROBUST', popis: 'Masívnejšia konštrukcia pre väčšie rozmery (hĺbka do 6 m).' },
+	{ kod: 'MASSIVE', popis: 'Najsilnejšia konštrukcia — vylepšený ROBUST pre najväčšie rozpätia.' }
+];
+
+/**
+ * Verejná (client-safe) orientačná cena — LEN maloobchod (MO), bez DPH + s DPH. NIKDY VO
+ * (veľkoobchod) ani raw matica. Buď konkrétna cena, alebo „individuálna ponuka" (mimo katalógu).
+ * Odvodená serverom z `konfigurator-cena.ts` cez `naVerejnuCenu` (VO sa odstráni). Rozmery
+ * `hlbkaGridM`/`sirkaGridM` sú katalógové (po zaokrúhlení NAHOR na mriežku).
+ */
+export type VerejnaCena =
+	| {
+			druh: 'cena';
+			model: ModelPergoly;
+			bezDph: number;
+			sDph: number;
+			hlbkaGridM: number;
+			sirkaGridM: number;
+	  }
+	| { druh: 'individualna-ponuka'; model: ModelPergoly; dovod: string };
+
+/** Cena jedného modelu v porovnávacej tabuľke (zrkadlo montalu.sk „ceny modelov vedľa seba"). */
+export interface CenaModelu {
+	model: ModelPergoly;
+	cena: VerejnaCena;
+}
+
 export interface KonfiguratorVstup {
 	/** celková šírka pergoly [mm] */
 	sirka: number;
@@ -47,6 +93,8 @@ export interface KonfiguratorVstup {
 	vyskaVpredu: number;
 	/** sklon strechy [°] — pultová (lean-to) pergola, stena je vyššia */
 	sklonDeg: number;
+	/** model konštrukcie (LIGHT/ROBUST/MASSIVE) — cenotvorný vstup (#279 Fáza C) */
+	model: ModelPergoly;
 	/** názov typu strešného skla (validovaný voči katalógu v parseri) — BEZ Money kód */
 	sklo: string;
 	/** farba konštrukcie ako display label, napr. „RAL 7016 ANTRACIT" */
@@ -65,6 +113,8 @@ export interface KonfiguratorSuhrn {
 	svetlaVyska: number;
 	/** zastrešená pôdorysná plocha [m²] */
 	zastresenaPlochaM2: number;
+	/** model konštrukcie (LIGHT/ROBUST/MASSIVE) — passthrough zo vstupu (#279 Fáza C) */
+	model: ModelPergoly;
 	/** názov typu strešného skla (BEZ ceny, BEZ Money kód) */
 	sklo: string;
 	/** farba konštrukcie (display label) */
@@ -96,6 +146,7 @@ export function konfiguruj(v: KonfiguratorVstup): KonfiguratorSuhrn {
 		sklonDeg: R1(vypocitajSklon(v.vyskaVpredu, stena, v.hlbka)),
 		svetlaVyska: Math.max(0, R1(v.vyskaVpredu - NOSNIK_HRUBKA_MM)),
 		zastresenaPlochaM2: zastresenaPlocha(v.sirka, v.hlbka),
+		model: v.model,
 		sklo: v.sklo,
 		farba: v.farba
 	};

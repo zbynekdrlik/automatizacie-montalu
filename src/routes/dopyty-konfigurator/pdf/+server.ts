@@ -2,7 +2,7 @@
 // AUTH je zabezpečená GLOBÁLNE v `hooks.server.ts` (neprihlásený → /login, b2b → /zasklenia cez
 // denylist) — tu je NAVYŠE belt-and-suspenders kontrola roly (defense-in-depth, netreba sa
 // spoliehať len na bránu). PDF sa regeneruje deterministicky z uloženej konfigurácie, nič sa
-// nezapisuje. MONEY-NEUTRÁLNE (ponuka = ŠPECIFIKÁCIA bez cien).
+// nezapisuje. MONEY-NEUTRÁLNE (ponuka = ŠPECIFIKÁCIA s orientačnou MO cenou, žiadny Money kód).
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { isInternal } from '$lib/server/auth';
