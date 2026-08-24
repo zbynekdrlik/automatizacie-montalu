@@ -20,6 +20,7 @@
 	import ZasklieniaForm from '$lib/components/zasklenia/ZasklieniaForm.svelte';
 	import PlanKarty from '$lib/components/zasklenia/PlanKarty.svelte';
 	import PlanKartyMulti from '$lib/components/zasklenia/PlanKartyMulti.svelte';
+	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 
 	let { data, form } = $props();
 
@@ -760,6 +761,13 @@
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<a class="btn secondary" href={resolve('/zasklenia')}>➕ Nový nárezový plán</a>
 	</div>
+{:else if step === 'blocked' && form && 'rawEntries' in form && form.rawEntries}
+	<OdpisBlok
+		rawEntries={form.rawEntries}
+		blokReason={form.blokReason}
+		blokAction={form.blokAction}
+		error={form.error ?? ''}
+	/>
 {:else if step === 'duplikat'}
 	<div class="card">
 		<h1>⛔ Duplikát</h1>

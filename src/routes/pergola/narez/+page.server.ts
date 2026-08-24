@@ -16,7 +16,7 @@ import {
 } from '$lib/server/pergola-rezervacia';
 import { catalogForClient } from '$lib/server/pergola';
 import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
-import { writeOdpis, isLive, blokHlaska } from '$lib/server/money';
+import { writeOdpis, isLive, blokHlaska, overrideOpts, rawFormEntries } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import { logger } from '$lib/server/log';
@@ -149,7 +149,7 @@ export const actions = {
 		// „rez-nahlad" (duplikát/chyba). Zavolá sa nanajvýš raz (vetvy sú return).
 		const cenyBlok = () => cenyPre(locals.user, rozpis.nonzero);
 		try {
-			const outcome = await writeOdpis(job);
+			const outcome = await writeOdpis(job, overrideOpts(form));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'rez-nahlad' as const,
@@ -163,12 +163,15 @@ export const actions = {
 			}
 			if (outcome.status === 'blocked') {
 				return {
-					step: 'rez-nahlad' as const,
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslat',
+					rawEntries: rawFormEntries(form),
+					// echo vstup/ident/rucne (ako duplikát vetva) — inak reštart-`$effect` zmaže parent
+					// `$state` pri blocked renderi (#300 review 🔵)
 					vstup,
 					ident,
 					rucne,
-					rozpis,
-					ceny: cenyBlok(),
 					rezError: blokHlaska(outcome, ident.zak, ident.op)
 				};
 			}
