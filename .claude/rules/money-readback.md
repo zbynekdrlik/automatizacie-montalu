@@ -31,9 +31,25 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
 - **ČAS: VŽDY cez SQL `strftime('%s', created_at)`, NIKDY `Date.parse`.** SQLite ukladá
   `datetime('now')` ako space-oddelený UTC (`YYYY-MM-DD HH:MM:SS`); V8 `Date.parse` taký tvar
   berie ako LOKÁLNY čas → posun. `strftime('%s')` ho berie ako UTC (a `NULL` pri nezmysle → safe).
-- **PARKOVANÝ `caka=1` odpis NEALARMUJE.** `caka=1` odpis visí v `NA ODPIS/<subdir>` — Money ho
-  NEIMPORTUJE, kým ho človek ručne nepresunie do dlv-import. Chýbajúci DLV pri `caka=1` NIE je
-  skip → `caka`, nie `chyba-doklad`. SQL MUSÍ čítať `l.caka`.
+- **DÁTUM-TOLERANCIA je DATE-ONLY aware — porovnávaj KALENDÁRNE dni, nie sekundy (#308).** Money
+  `datum` (`DatumVystaveni`) je **date-only** (producer emituje „YYYY-MM-DDT00:00:00", polnoc
+  kalendárneho dňa). Pôvodná sekundová tolerancia (`DATUM_TOL_S` 12 h proti `createdEpoch`)
+  zamietla REÁLNY doklad TOHO ISTÉHO dňa: odoslané 12:28 − Money polnoc = 12h28m > 12h → falošný
+  „chýba doklad" (ZAK2026464, DLV20251398). Fix: `compat` porovnáva kalendárny deň DLV (`isoDayNum`
+  z `datum.slice(0,10)`) proti bratislavskému kalendárnemu dňu odoslania (`bratDayNum` cez
+  `formatDatumIsoSk`(`src/lib/datum.ts`) z `createdEpoch` — Intl + IANA zóna, DST-safe, NIKDY
+  `Date.parse` na SQLite stringu), s toleranciou `DATUM_TOL_DAYS = 1` deň spätne (kryje TZ/
+  near-midnight/clock-skew; stále zamietne reálne staršie 2+ dni). Money `datum` je BRATISLAVSKÝ
+  kalendárny deň, takže sa berie priamo (`.slice(0,10)`, žiadna TZ konverzia).
+- **PARKOVANÝ `caka=1` odpis sa z matchingu VYLUČUJE ÚPLNE → vždy `caka` (#308).** `caka=1` odpis
+  visí v `NA ODPIS/<subdir>` — appka ho do Money ZÁMERNE neposlala; do dlv-import ho môže presunúť
+  LEN človek ručne, čo appka NEVIE (`caka` je po inserte NEMENNÉ — `releaseOdpis` riadok MAŽE,
+  žiadny `UPDATE … SET caka`). Párovanie parkovaného odpisu len po zak+počte je preto nespoľahlivé:
+  pôvodne poistka `caka!=1` chránila LEN `chyba-doklad` vetvu, takže parkovaný odpis sa mohol
+  cross-matchnúť na cudzí doklad (napr. jeho FIX 5r) → falošný `pocet` „len 5/25" (ZAK2026450).
+  `priradGroup` teraz priradí každému `caka=1` odpisu `caka` HNEĎ na začiatku a NEPUSTÍ ho do
+  matchingu → nikdy falošný alarm ANI falošné `ok`, a hlavne NECLAIMuje DLV (nepokradne doklad
+  legit súrodencovi tej istej zákazky). „Neoverené" je čestný stav. SQL MUSÍ čítať `l.caka`.
 - **EXKLUZÍVNE priradenie DLV↔odpis per zákazka (`priradGroup`).** `UNIQUE(modul,zak,op,live)` →
   zasklenia+pergola+bazén jednej zákazky zdieľajú zak+op; jeden prežitý DLV by inak overil VIAC
   odpisov (a tichý drop by prešiel ako ok). Dvojfázový greedy: najprv v-pásme, potom zvyšné; každý
@@ -43,7 +59,8 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   posiela aj nulové). Ak sa LIVE potvrdí, že Money nuly ráta → pripni pásmo na presný počet.
 - **Okno chyba-doklad-alarmu:** merané od GENEROVANIA snapshotu (nie „teraz"), a klampnuté na
   producerovo (`windowDays` z JSON → `money_dlv_meta.window_days`) — kratšie producer okno by inak
-  falošne alarmovalo. `moneyMalCas` (gen > odoslanie+grace) + `caka!=1` + v okne = alarm; inak `caka`.
+  falošne alarmovalo. `moneyMalCas` (gen > odoslanie+grace) + v okne = alarm; inak `caka`. (Parkované
+  `caka=1` sa sem už nedostanú — sú vylúčené na začiatku `priradGroup`, viď bullet vyššie, #308.)
 - **`/odpisy` load MUSÍ byť try/catch okolo readbacku** — stránka hostí „Uvoľniť" (jediná cesta
   k oprave duplikátov); readback DB/IO chyba degraduje na „neoverené", NIKDY 500.
 
