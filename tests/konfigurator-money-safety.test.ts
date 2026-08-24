@@ -1,6 +1,7 @@
-// Verejný konfigurátor pergoly (#275) — Money / únik bezpečnostný guard. NAJDÔLEŽITEJŠÍ
-// test PR-u: verejná (bez-auth) route NESMIE do žiadnej odpovede (load/akcia/DOM/bundle)
-// pustiť CENU, Money kód (TS*/moneyKod), ani nárezový plán. Trojvrstvová obrana:
+// Verejný konfigurátor pergoly (#275, #279 Fáza C) — Money / únik bezpečnostný guard.
+// NAJDÔLEŽITEJŠÍ test PR-u: verejná (bez-auth) route SMIE zobraziť orientačnú maloobchodnú (MO)
+// cenu (owner ROZHODNUTÉ), ale do žiadnej odpovede (load/akcia/DOM/bundle) NESMIE pustiť
+// VEĽKOOBCHOD (VO) cenu, Money kód (TS*/moneyKod), ani nárezový plán. Trojvrstvová obrana:
 //   (A) REKURZÍVNY import-graf guard klientskeho bundlu — vzor
 //       tests/vizual-money-guard.test.ts (#170 §2.13): prejde import graf KLIENTSKY
 //       dosiahnuteľných súborov (nie *.server.ts / $lib/server/**) a spadne pri
@@ -231,12 +232,24 @@ function neobsahujeMoneyAniNarez(json: string) {
 	expect(json).not.toMatch(/panelSirka|panelDlzka|narez|nárez|krov/i);
 }
 
-/** VEĽKOOBCHOD (VO) ani raw matica sa NIKDY nesmú dostať do verejnej odpovede (#279 Fáza C). */
+/** VEĽKOOBCHOD (VO) ani raw matica sa NIKDY nesmú dostať do verejnej odpovede (#279 Fáza C).
+ *  Pozn.: `ve[ľl]koobchod` chytá diakritickú aj ASCII formu (review 🔵 5b). */
 function neobsahujeVOaniMaticu(json: string, voHodnoty: number[]) {
-	expect(json).not.toMatch(/"vo"|priceB2B|velkoobchod|bezDphVo/i);
+	expect(json).not.toMatch(/"vo"|priceB2B|ve[ľl]koobchod|bezDphVo/i);
 	for (const v of voHodnoty) expect(json).not.toContain(String(v));
 	// seed / cenová matica sa NIKDY neserializuje do verejnej odpovede
 	expect(json).not.toMatch(/cennik|update-pergolas|mriezka|verifikaciaDph/i);
+}
+
+/** VO hodnoty (net + s DPH) VŠETKÝCH 3 modelov pre daný rozmer — response nesie `cenyModely`
+ *  pre všetky 3, takže guard musí overiť absenciu VO každého (review 🔵 5a). */
+function voHodnotyVsetkychModelov(hlbkaMm: number, sirkaMm: number): number[] {
+	const out: number[] = [];
+	for (const model of ['LIGHT', 'ROBUST', 'MASSIVE'] as const) {
+		const c = vypocitajCenu({ hlbkaMm, sirkaMm, model });
+		if (c.druh === 'cena') out.push(c.vo.bezDph, c.vo.sDph);
+	}
+	return out;
 }
 
 describe('Money safety (C) — runtime výstup: cena SMIE, VO/Money/nárez/matica NIE (#275/#279 Fáza C)', () => {
@@ -276,8 +289,8 @@ describe('Money safety (C) — runtime výstup: cena SMIE, VO/Money/nárez/matic
 			// pozitívne: orientačná MO cena (net + s DPH) JE v odpovedi (cena sa smie zobraziť)
 			expect(json).toContain(String(interne.mo.bezDph));
 			expect(json).toContain(String(interne.mo.sDph));
-			// negatívne: VO hodnoty tej istej konfigurácie NIE SÚ v odpovedi
-			neobsahujeVOaniMaticu(json, [interne.vo.bezDph, interne.vo.sDph]);
+			// negatívne: VO hodnoty VŠETKÝCH 3 modelov (response nesie cenyModely) NIE SÚ v odpovedi
+			neobsahujeVOaniMaticu(json, voHodnotyVsetkychModelov(3500, 4000));
 		}
 		neobsahujeMoneyAniNarez(json);
 		// pozitívne: súhrn naozaj prišiel (názov skla)

@@ -466,4 +466,19 @@ describe('verejná cena (#279 Fáza C) — LEN MO, žiadne VO', () => {
 		expect(json).not.toContain(String(LIGHT_3x5_VO_NET));
 		expect(json).not.toContain(String(LIGHT_3x5_VO_DPH));
 	});
+
+	// review 🟡: verejné vstupné rozmedzia siahajú POD katalógovú mriežku (šírka min 4,0 m /
+	// hĺbka min 2,0 m). Pod-minimum sa prilepí na minimum a cena je katalógového minima — modul
+	// MUSÍ vrátiť katalógové grid rozmery, aby ich UI/PDF vedeli čestne zobraziť.
+	it('pod-minimum rozmer sa cení na katalógové minimum a vráti grid rozmery (2000×1500 → 4,0×2,0)', () => {
+		const r = verejnaCenaPreModel({ hlbkaMm: 1500, sirkaMm: 2000, model: 'LIGHT' });
+		expect(r.druh).toBe('cena');
+		if (r.druh === 'cena') {
+			expect(r.sirkaGridM).toBe(4); // šírka 2,0 m < min 4,0 m ⇒ prilepené na 4,0
+			expect(r.hlbkaGridM).toBe(2); // hĺbka 1,5 m < min 2,0 m ⇒ prilepené na 2,0
+			// cena zodpovedá katalógovej bunke 4,0 × 2,0 (nie zadanému 2,0 × 1,5)
+			const kotva = verejnaCenaPreModel({ hlbkaMm: 2000, sirkaMm: 4000, model: 'LIGHT' });
+			if (kotva.druh === 'cena') expect(r.sDph).toBe(kotva.sDph);
+		}
+	});
 });

@@ -78,6 +78,8 @@
 	let arNacitava = false;
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	// #279 Fáza C: katalógový rozmer [m] (bez zaokrúhľovacej straty — 4.25 → „4,25").
+	const fmtM = (n: number) => String(n).replace('.', ',');
 	// #279 Fáza C: formátovanie orientačnej EUR ceny (sk-SK, napr. „4 452,06 €").
 	const eur = (n: number) =>
 		n.toLocaleString('sk-SK', {
@@ -309,6 +311,15 @@
 						<span class="cena-mena">s DPH</span>
 					</div>
 					<div class="cena-bezdph" data-testid="cena-bezdph">{eur(cena.bezDph)} bez DPH</div>
+					<!-- #279 Fáza C: rozmer sa cení na najbližší katalógový rozmer (mriežka) —
+					     ak sa líši od zadaného, čestne to zobraz (inak by cena „nesedela" s rozmermi). -->
+					{#if Math.round(cena.sirkaGridM * 1000) !== s.sirka || Math.round(cena.hlbkaGridM * 1000) !== s.hlbka}
+						<div class="cena-grid" data-testid="cena-grid">
+							Cena platí pre najbližší katalógový rozmer {fmtM(cena.sirkaGridM)} × {fmtM(
+								cena.hlbkaGridM
+							)} m.
+						</div>
+					{/if}
 				{:else}
 					<div class="cena-individualna" data-testid="cena-individualna">
 						<span class="cena-label">Cena na vyžiadanie — model {cena.model}</span>
@@ -701,6 +712,11 @@
 		color: #cbd5e1;
 		font-size: 14px;
 		margin-top: 2px;
+	}
+	.cena-grid {
+		color: #94a3b8;
+		font-size: 12px;
+		margin-top: 6px;
 	}
 	.cena-individualna .cena-label {
 		font-size: 18px;

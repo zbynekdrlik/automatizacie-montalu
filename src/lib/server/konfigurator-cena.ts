@@ -5,10 +5,11 @@
 //
 // Money-neutrálny a mimo klientskeho bundle ($lib/server/): NEIMPORTUJE katalóg skla
 // (nesie Money kód), `sklo-cena`, `server/money`, `server/db` — obsahuje interim PREDAJNÉ ceny
-// prevzaté z verejného konfigurátora montalu.sk, nie Money nákupné/odpisové kódy. Zákaz
-// zobrazenia cien vo VEREJNEJ route (#279 leak-guard) ostáva — tento modul sa do verejnej
-// odpovede NEZAPÁJA (to je Fáza C, samostatný vedomý krok). Modul je čistý (bez DB/siete),
-// priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
+// prevzaté z verejného konfigurátora montalu.sk, nie Money nákupné/odpisové kódy.
+// #279 Fáza C (owner ROZHODNUTÉ): tento modul sa DO VEREJNEJ ODPOVEDE ZAPÁJA — verejná route
+// dostane LEN maloobchod (MO) cez `naVerejnuCenu`/`verejnaCenaPreModel`/`verejneCenyModelov`
+// (VO strip). VO cena / Money kód / matica sa do verejnej odpovede NIKDY nedostanú. Modul je
+// čistý (bez DB/siete), priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
 import cennikJson from './cennik-pergola.json';
 // #279 Fáza C: `ModelPergoly` + verejné cenové typy žijú v client-safe `$lib/konfigurator`
 // (jeden zdroj pravdy — vidí ich aj wizard). Tu ich importujeme (server-only lookup) a
@@ -228,7 +229,11 @@ export function dostupneVyplne(model: ModelPergoly): VyplnKluc[] {
 /**
  * Zmapuje interný výsledok (`CenaVysledok` s MO **aj** VO) na verejnú cenu (LEN MO).
  * VO (`vo`) sa NIKDY nedostane do verejnej odpovede (#279 leak-guard: VO ostáva neverejné).
- * `model` sa dopĺňa explicitne, lebo `individualna-ponuka` vetva ho vo `CenaVysledok` nenesie.
+ *
+ * **Invariant (volateľ ho MUSÍ dodržať):** `model` je autoritatívny LEN pre `individualna-ponuka`
+ * vetvu (tam ho `CenaVysledok` nenesie); pre `cena` vetvu sa použije `v.model` a `model` MUSÍ
+ * byť ten istý, aký dostal `vypocitajCenu`. `verejnaCenaPreModel` to garantuje (posiela ten istý
+ * model do oboch). Nevolaj s nekonzistentným párom (v, model).
  */
 export function naVerejnuCenu(v: CenaVysledok, model: ModelPergoly): VerejnaCena {
 	if (v.druh === 'individualna-ponuka')

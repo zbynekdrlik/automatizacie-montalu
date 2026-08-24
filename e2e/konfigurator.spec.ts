@@ -1,10 +1,10 @@
-// Verejný zákaznícky konfigurátor pergoly (#275, fáza 1) — E2E cez reálny prehliadač.
-// Kľúčové: flow BEZ prihlásenia (verejná route), a v odpovedi sa NEOBJAVÍ žiadna cena,
-// Money kód (TS*) ani nárez. Display-only ČASŤ (súhrn) beží aj proti nasadenej appke
-// (BASE_URL), bez skipAkLive. #277 pridal DOPYT tok (kontaktný formulár → PDF ponuka BEZ
-// CIEN): ten zapisuje audit riadok do SQLite `dopyt` (Money-NEUTRÁLNE, žiadny Money
-// import) — je za `skipAkLive`, nech proti LIVE prode nepribúdajú testovacie dopyt
-// riadky (v CI beží proti preview, live:false → beží). Každý test = NULA console chýb.
+// Verejný zákaznícky konfigurátor pergoly (#275/#279 Fáza C) — E2E cez reálny prehliadač.
+// Kľúčové: flow BEZ prihlásenia (verejná route). #279 Fáza C: v odpovedi SMIE byť orientačná
+// MO cena (owner ROZHODNUTÉ), ale NIKDY VEĽKOOBCHOD (VO) cena, Money kód (TS*) ani nárez.
+// Display-only ČASŤ (súhrn + cena) beží aj proti nasadenej appke (BASE_URL), bez skipAkLive.
+// #277 DOPYT tok (kontaktný formulár → PDF ponuka s orientačnou cenou): zapisuje audit riadok
+// do SQLite `dopyt` (Money-NEUTRÁLNE, žiadny Money import) — je za `skipAkLive`, nech proti
+// LIVE prode nepribúdajú testovacie dopyty. Každý test = NULA console chýb.
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
@@ -59,7 +59,7 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	const telo = await page.locator('body').innerText();
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
-	expect(telo).not.toMatch(/priceB2B|veľkoobchod/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	// verzia v pätičke (version-on-dashboard) — pätička je zdieľaná aj pre verejnú stránku
 	await expect(page.getByTestId('version')).toHaveText(
@@ -141,7 +141,7 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 	const telo = await page.locator('body').innerText();
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
-	expect(telo).not.toMatch(/priceB2B|veľkoobchod/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	// 7) #279 Fáza C: stiahnuté PDF nesie ORIENTAČNÚ cenu (čítané z metadát — custom-font
 	//    glyfy sa z PDF textu nedajú spoľahlivo prečítať, metadáta áno) a NIKDY VO cenu.
@@ -150,7 +150,7 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 	const doc = await PDFDocument.load(pdfBytes);
 	const subject = doc.getSubject() ?? '';
 	expect(subject).toMatch(/Orientačná cena:.*€/);
-	expect(subject).not.toMatch(/priceB2B|veľkoobchod/i);
+	expect(subject).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -200,7 +200,7 @@ test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → indiv
 	const telo = await page.locator('body').innerText();
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
-	expect(telo).not.toMatch(/priceB2B|veľkoobchod/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -292,7 +292,7 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	const telo = await page.locator('body').innerText();
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
-	expect(telo).not.toMatch(/priceB2B|veľkoobchod/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	expect(consoleMsgs).toEqual([]);
 });

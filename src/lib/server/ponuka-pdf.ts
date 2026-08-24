@@ -1,5 +1,7 @@
-// Server-side PDF generátor pre verejnú ponuku (#277). ŠPECIFIKÁCIA, NIE cenník —
-// NULA cien, NULA Money kódov (test `ponuka-pdf.test.ts` + Money-safety guard to strážia).
+// Server-side PDF generátor pre verejnú ponuku (#277, #279 Fáza C). Špecifikácia + ORIENTAČNÁ
+// maloobchodná (MO) cena — NULA VO cien, NULA Money kódov, NULA nárezu (test `ponuka-pdf.test.ts`
+// + Money-safety guard to strážia). Cena sa počíta SERVER-SIDE z rozmerov+modelu (klientom
+// dodaná cena sa NEDÔVERuje — `PonukaConfig` ju ani nemá).
 //
 // Knižnica: pdf-lib (+ @pdf-lib/fontkit) s vendorovaným DejaVu Sans subsetom (slovenské
 // mäkčene, viď `fonts/dejavu.ts`). Self-contained, žiadny network/asset za behu — dizajn
@@ -62,13 +64,24 @@ function cenaPreCfg(cfg: PonukaConfig): VerejnaCena | null {
 	return verejnaCenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model });
 }
 
-/** Textové riadky cenovej sekcie (zdieľané medzi PDF telom a metadátami). */
-function cenaRiadky(cena: VerejnaCena): { hlavny: string; podriadok: string } {
-	if (cena.druh === 'cena')
+const mPlain = (n: number) => String(n).replace('.', ',');
+
+/** Textové riadky cenovej sekcie (zdieľané medzi PDF telom a metadátami). Ak sa katalógový
+ *  rozmer (mriežka), na ktorý sa cena určila, líši od zadaného, čestne to doplní (#279 Fáza C
+ *  review 🟡 — inak by cena „nesedela" so zadanými rozmermi). */
+function cenaRiadky(cena: VerejnaCena, cfg: PonukaConfig): { hlavny: string; podriadok: string } {
+	if (cena.druh === 'cena') {
+		const liseSa =
+			Math.round(cena.sirkaGridM * 1000) !== cfg.sirka ||
+			Math.round(cena.hlbkaGridM * 1000) !== cfg.hlbka;
+		const grid = liseSa
+			? ` · katalógový rozmer ${mPlain(cena.sirkaGridM)} × ${mPlain(cena.hlbkaGridM)} m`
+			: '';
 		return {
 			hlavny: `${eurStr(cena.sDph)} s DPH`,
-			podriadok: `${eurStr(cena.bezDph)} bez DPH · model ${cena.model}`
+			podriadok: `${eurStr(cena.bezDph)} bez DPH · model ${cena.model}${grid}`
 		};
+	}
 	return {
 		hlavny: 'Cena na vyžiadanie',
 		podriadok: `Individuálna ponuka · model ${cena.model}`
@@ -134,7 +147,7 @@ function drawHeader(ctx: Ctx, cursorTop: number): number {
 }
 
 /** #279 Fáza C: sekcia s orientačnou cenou (LEN MO). Vykreslí sa len keď je cena známa. */
-function drawCena(ctx: Ctx, cena: VerejnaCena, cursorTop: number): number {
+function drawCena(ctx: Ctx, cena: VerejnaCena, cfg: PonukaConfig, cursorTop: number): number {
 	let y = cursorTop;
 	ctx.page.drawText('Orientačná cena', { x: MARGIN, y, size: 12, font: ctx.bold, color: ACCENT });
 	y -= 8;
@@ -145,7 +158,7 @@ function drawCena(ctx: Ctx, cena: VerejnaCena, cursorTop: number): number {
 		color: BORDER
 	});
 	y -= 22;
-	const { hlavny, podriadok } = cenaRiadky(cena);
+	const { hlavny, podriadok } = cenaRiadky(cena, cfg);
 	ctx.page.drawText(hlavny, { x: MARGIN, y, size: 17, font: ctx.bold, color: INK });
 	y -= 15;
 	ctx.page.drawText(podriadok, { x: MARGIN, y, size: 10, font: ctx.reg, color: MUTED });
@@ -195,7 +208,10 @@ async function drawRenderSlot(
 	renderPng: Uint8Array | undefined,
 	cursorTop: number
 ): Promise<number> {
-	const slotH = 210;
+	// #279 Fáza C review 🔵: pridané Model + cenové riadky posúvajú kurzor nižšie. Zmenši slot,
+	// aby firma/disclaimer (~150 pt) ostali nad pätičkou aj pri plnej konfigurácii + max popise
+	// (inak by drawText kreslil mimo stránky). Rezerva 180 pt pod vrchom slotu; slot 100–210 pt.
+	const slotH = Math.max(100, Math.min(210, cursorTop - MARGIN - 180));
 	const y = cursorTop - slotH;
 	ctx.page.drawRectangle({
 		x: MARGIN,
@@ -283,9 +299,9 @@ export interface PonukaPdfOpts {
 }
 
 /**
- * Vygeneruje PDF špecifikáciu z konfigurácie. Súhrn hodnôt sa vykreslí a SÚČASNE zapíše do
- * metadát (Title/Subject/Keywords) — to je testovateľný kanál (custom-font glyfy sa z PDF
- * textu nedajú spoľahlivo prečítať, metadáta áno). Nikde žiadna cena.
+ * Vygeneruje PDF špecifikáciu z konfigurácie. Súhrn hodnôt (vrátane orientačnej MO ceny) sa
+ * vykreslí a SÚČASNE zapíše do metadát (Title/Subject/Keywords) — to je testovateľný kanál
+ * (custom-font glyfy sa z PDF textu nedajú spoľahlivo prečítať, metadáta áno). Žiadna VO cena.
  */
 export async function generatePonukaPdf(
 	cfg: PonukaConfig,
@@ -306,14 +322,14 @@ export async function generatePonukaPdf(
 	let cursor = A4_H - MARGIN;
 	cursor = drawHeader(ctx, cursor);
 	cursor = drawKonfiguracia(ctx, cfg, cursor);
-	if (cena) cursor = drawCena(ctx, cena, cursor);
+	if (cena) cursor = drawCena(ctx, cena, cfg, cursor);
 	cursor = await drawRenderSlot(doc, ctx, opts.renderPng, cursor);
 	drawFirmaADisclaimer(ctx, cursor);
 	drawFooter(ctx, datum);
 
 	// metadáta = testovateľný kanál hodnôt + korektné vlastnosti dokumentu
 	const rows = zhrnutieRiadky(cfg);
-	const cenaMeta = cena ? cenaRiadky(cena) : null;
+	const cenaMeta = cena ? cenaRiadky(cena, cfg) : null;
 	doc.setTitle('Špecifikácia pergoly — Montalu');
 	doc.setAuthor(FIRMA.nazov);
 	doc.setCreator(FIRMA.nazov);
@@ -321,7 +337,9 @@ export async function generatePonukaPdf(
 	doc.setSubject(
 		[
 			...rows.map((r) => `${r.label}: ${r.value}`),
-			...(cenaMeta ? [`Orientačná cena: ${cenaMeta.hlavny}`] : [])
+			// podriadok (bez DPH · model · príp. katalógový rozmer) ide do subjectu tiež — je to
+			// testovateľný kanál (custom-font glyfy sa z PDF tela nedajú spoľahlivo prečítať).
+			...(cenaMeta ? [`Orientačná cena: ${cenaMeta.hlavny} (${cenaMeta.podriadok})`] : [])
 		].join('; ') || 'Prázdna konfigurácia'
 	);
 	// cena do keywords (Producer pdf-lib pri save() prepisuje svojím podpisom)

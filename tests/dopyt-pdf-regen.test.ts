@@ -1,6 +1,7 @@
-// #282 — znovu-vygenerovanie PDF ponuky pre uložený dopyt. Overuje, že sa PDF regeneruje z
-// ULOŽENEJ konfigurácie (metadáta = testovateľný kanál hodnôt, viď dopyt-ponuka.md), názov
-// súboru, invariant NULA cien a null pre neexistujúce id. Zdieľaná test DB (v26).
+// #282/#279 Fáza C — znovu-vygenerovanie PDF ponuky pre uložený dopyt. Overuje, že sa PDF
+// regeneruje z ULOŽENEJ konfigurácie (metadáta = testovateľný kanál hodnôt, viď dopyt-ponuka.md),
+// názov súboru, orientačná MO cena (Fáza C) bez VO ceny, a null pre neexistujúce id. Zdieľaná
+// test DB (v26). Pozn.: regen počíta cenu z AKTUÁLNEHO cenníka (historická presnosť → #309).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import { db } from '../src/lib/server/db';
@@ -40,10 +41,10 @@ describe('regeneratePonukaPdf (#282)', () => {
 		expect(subject).toContain('3000 × 4000 mm');
 		expect(subject).toContain('RAL 7016');
 		expect(subject).toContain('Deluxe Float');
-		// #279 Fáza C: regenerované PDF nesie ORIENTAČNÚ cenu (€), ale NIKDY veľkoobchod (VO)
+		// #279 Fáza C: regenerované PDF nesie ORIENTAČNÚ cenu (€), ale NIKDY ve[ľl]koobchod (VO)
 		expect(subject).toMatch(/Orientačná cena:.*€/);
-		expect(subject).not.toMatch(/priceB2B|veľkoobchod/i);
-		expect(doc.getKeywords() ?? '').not.toMatch(/priceB2B|veľkoobchod|bez cien/i);
+		expect(subject).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
+		expect(doc.getKeywords() ?? '').not.toMatch(/priceB2B|ve[ľl]koobchod|bez cien/i);
 	});
 
 	it('názov súboru nesie id dopytu + dátum (interný re-download kontext)', async () => {

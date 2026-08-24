@@ -14,11 +14,13 @@ paths:
   - "tests/ponuka*.test.ts"
 ---
 
-# Verejný dopyt + PDF ponuka bez cien (#277)
+# Verejný dopyt + PDF ponuka s orientačnou cenou (#277, #279 Fáza C)
 
 Verejný zákaznícky lead tok: konfigurátor pergoly → kontaktný formulár → PDF
-**špecifikácia BEZ CIEN** + uloženie dopytu. Marketingovo-lead vec, **NIKDY** sa
-nedotýka Money/odpis cesty (guard `tests/dopyt-money-safety.test.ts`).
+**špecifikácia + ORIENTAČNÁ maloobchodná (MO) cena** (#279 Fáza C, owner ROZHODNUTÉ) +
+uloženie dopytu. Marketingovo-lead vec, **NIKDY** sa nedotýka Money/odpis cesty ani VO ceny
+(guard `tests/dopyt-money-safety.test.ts`). Cena sa počíta server-side v `ponuka-pdf.ts` z
+rozmerov+modelu (`verejnaCenaPreModel`, VO strip) — klientom dodaná cena sa nedôveruje.
 
 ## Slovenský text v PDF — pdf-lib StandardFonts NEvie mäkčene
 
@@ -36,8 +38,9 @@ Custom-font glyfy sa z PDF obsahu **nedajú spoľahlivo prečítať** (CID/glyph
 Preto `generatePonukaPdf` zapisuje súhrn hodnôt SÚČASNE do metadát (`setTitle`/
 `setSubject`/`setKeywords`) — a test číta späť cez `PDFDocument.load(bytes).getSubject()`
 atď. **`setProducer` NEFUNGUJE** — pdf-lib ho pri `save()` prepíše svojím podpisom;
-marker („bez cien") daj do Keywords/Title/Subject. Invariant NULA cien = scan metadát
-regexom na `€|EUR|cena|price`.
+marker daj do Keywords/Title/Subject. #279 Fáza C: PDF TERAZ nesie orientačnú MO cenu →
+invariant sa zmenil z „NULA cien" na „**orientačná MO cena áno, VO cena/Money kód NIE**"
+(scan metadát na `priceB2B|ve[ľl]koobchod`, nie na `€|cena`). Viď `konfigurator.md §2`.
 
 ## Integračný kontrakt pre verejnú route (#275 ju napojí)
 
