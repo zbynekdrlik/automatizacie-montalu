@@ -69,8 +69,17 @@ services:
       ADDRESS_HEADER: x-forwarded-for
       XFF_DEPTH: '1'
       CENY_SNAPSHOT_PATH: /data/ceny/ceny.json
+      # #297: forenzný money-audit log (odpis claim/zapísaný/uvoľnený/override/
+      # dedup/ledger-blok/validácia z logger('money')) sa píše SEM — na perzistentný
+      # named volume `moneylog`, ktorý PREŽIJE redeploy (recreate) kontajnera. stdout
+      # json-file logy sú container-scoped a pri redeployi zmiznú (#294 §2.3-4).
+      MONEY_AUDIT_LOG: /data/money-log/money.jsonl
     volumes:
       - appdata:/data/app
+      # #297: dedikovaný perzistentný volume pre money-audit súbor (mimo kontajnera,
+      # prežije redeploy). Named volume ⇒ preflight-safe (deploy-remote kontroluje len
+      # bind-mounty). Čerstvý volume zdedí node:node z image (Dockerfile mkdir+chown).
+      - moneylog:/data/money-log
       - /opt/n8n/mounts/dlv-import:/data/dlv-import
       - /opt/n8n/mounts/montalu:/data/montalu
       - /opt/automatizacie-montalu/ceny:/data/ceny:ro
@@ -79,6 +88,7 @@ services:
 
 volumes:
   appdata:
+  moneylog: # #297: perzistentný money-audit log (prežije redeploy kontajnera)
 
 networks:
   n8n_default:

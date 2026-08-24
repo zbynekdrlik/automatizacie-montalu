@@ -151,7 +151,9 @@ describe('log.ts → money-audit integrácia', () => {
 	it('audit vypnutý ⇒ money.info nič nezapíše (feature off)', () => {
 		const file = freshFile();
 		// MONEY_AUDIT_LOG NEnastavené
-		const spy = vi.spyOn(process.stdout, 'write').mockImplementation((() => true) as typeof process.stdout.write);
+		const spy = vi
+			.spyOn(process.stdout, 'write')
+			.mockImplementation((() => true) as typeof process.stdout.write);
 		try {
 			logger('money').info('odpis', { zak: 'Z' });
 		} finally {
