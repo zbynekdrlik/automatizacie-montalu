@@ -58,33 +58,44 @@ except ImportError:
 # ľuďmi (ručný import skladu) NEsú náš odpis — filtrujeme na automat, nech readback nepáruje cudzie DLV.
 AUTOMAT_CREATE_ID = os.environ.get("MONEY_AUTOMAT_CREATE_ID", "")  # prázdne = bez filtra na tvorcu
 
-# ⚠️ BEST-EFFORT — potvrď názvy tabuliek/stĺpcov live (montalu_ro). Kontrakt aliasov (dlv/zak/op/
-# datum/pocetPolozek/popis) je fixný; menia sa len zdrojové tabuľky/stĺpce.
-#  - hlavička DLV: číslo dokladu (dlv), DatumVystaveni (datum), PocetPolozek (pocetPolozek),
-#    Nazev/Popis (popis) — z verdiktu §0/§2 vieme, že tieto polia na Money DLV existujú.
-#  - line-level „zakázka" (zak) + „OP" (op): naša xlsx dáva do stĺpca A „číslo zakázky" (job.zak) na
-#    KAŽDÝ riadok a „Popis dokladu" (job.popis, nesie OP) do 1. riadku — v Money to sedí na
-#    line-level zakázkovom poli, resp. na hlavičkovom popise. Appka páruje primárne po ZAK (OP je
-#    best-effort spresnenie), takže `zak` MUSÍ byť spoľahlivé; ak Money zak nedrží per-line, vytiahni
-#    ho z popisu / iného poľa a UPRAV QUERY.
+# ✅ LIVE-OVERENÉ 2026-08-24 (montalu_ro, read-only tunel) — pozri PROVISIONING #298. Money je
+# Money S5 (Solitea/Seyfor) s table-per-concrete-type modelom: `EconomicBase_Doklad` je PRÁZDNA
+# abstraktná báza (0 riadkov); reálne dodacie listy vydané žijú v konkrétnej tabuľke
+# `SkladovyDoklad_DodaciListVydany` (1809 riadkov, ~56/30dní, doklady „DLV20251409…", aktívne dnes).
+#  - hlavička DLV: `CisloDokladu` (dlv, tvar „DLV…"), `DatumVystaveni` (datum, date-only), `PocetPolozek`
+#    (pocetPolozek), `Nazev` (popis; nesie OP, napr. „OP260387 - BT hause fix").
+#  - „zakázka" (zak): hlavičkové `Zakazka_ID` je pri AUTOMATICKOM importe NULL (193/195 dokladov) —
+#    ZAK žije LINE-LEVEL v `SkladovyDoklad_PolozkaDodacihoListuVydaneho.Zakazka_ID` (FK →
+#    `Ciselniky_Zakazka.Kod`, tvar „ZAK2026450"). Line ↔ hlavička cez `Parent_ID = d.ID` (overené:
+#    počet riadkov cez Parent_ID == PocetPolozek). Každý DLV má PRÁVE JEDNU zakázku (distinctZak=1),
+#    takže OUTER APPLY TOP 1 je presné. Appka páruje LEN po `zak_norm` (`WHERE zak_norm = ?`), preto
+#    `zak` MUSÍ byť spoľahlivé — a je (z line zakázky). DLV bez line-zakázky sa v producerovi preskočí.
+#  - „OP" (op) = '' (PRÁZDNE, zámerne): appkin `compat` páruje `(!c.opNorm || !o.opNorm || c.opNorm ===
+#    o.opNorm)` — NEsprávny op by spravil reálny DLV NEkompatibilným → FALOŠNÝ „chýba doklad" alarm.
+#    Nazev nesie OP v nekonzistentnom tvare (OP260387 vs OPDL260182), ktorý sa nedá zaručene zladiť s
+#    appkiným `op_norm`, takže prázdny op (= appka ho ignoruje) je bezpečná a správna voľba; párovanie
+#    stojí na ZAK + počte-v-pásme + exkluzívnom greedy (OP je len best-effort spresnenie). `popis` (Nazev)
+#    nesie OP pre ľudské zobrazenie.
+#  - AUTOMAT filter: `Create_ID = 467d0e89-dade-40c7-b0e4-f07adc3afc85` (verdikt §2, LIVE overené:
+#    193/195 nedávnych DLV je od tohto účtu; 2 ručné vynechá — cudzí DLV nesmie falošne overiť odpis).
 QUERY = """
 SELECT
-    d.Cislo            AS dlv,
-    z.Zakazka          AS zak,
-    d.CisloObjednavky  AS op,
+    d.CisloDokladu      AS dlv,
+    zak.Kod             AS zak,
+    ''                  AS op,
     d.DatumVystaveni    AS datum,
     d.PocetPolozek      AS pocetPolozek,
     d.Nazev             AS popis
-FROM Sklad_Doklad d
+FROM SkladovyDoklad_DodaciListVydany d
 OUTER APPLY (
-    SELECT TOP 1 p.Zakazka
-    FROM Sklad_PolozkaDokladu p
-    WHERE p.Doklad_ID = d.ID AND p.Zakazka IS NOT NULL AND LTRIM(RTRIM(p.Zakazka)) <> ''
-) z
+    SELECT TOP 1 zk.Kod
+    FROM SkladovyDoklad_PolozkaDodacihoListuVydaneho p
+    JOIN Ciselniky_Zakazka zk ON zk.ID = p.Zakazka_ID
+    WHERE p.Parent_ID = d.ID AND p.Deleted = 0 AND p.Zakazka_ID IS NOT NULL
+) zak
 WHERE d.Deleted = 0
-  AND d.TypDokladu = 'DLV'
   AND d.DatumVystaveni >= DATEADD(day, -%(window)s, CAST(GETDATE() AS date))
-  AND (%(automat)s = '' OR d.Create_ID = %(automat)s)
+  AND (%(automat)s = '' OR LOWER(CONVERT(varchar(50), d.Create_ID)) = LOWER(%(automat)s))
 """
 
 

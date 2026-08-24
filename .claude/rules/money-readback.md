@@ -47,12 +47,34 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
 - **`/odpisy` load MUSÍ byť try/catch okolo readbacku** — stránka hostí „Uvoľniť" (jediná cesta
   k oprave duplikátov); readback DB/IO chyba degraduje na „neoverené", NIKDY 500.
 
-## Producer schéma je BEST-EFFORT (UNVERIFIED)
+## Producer schéma je LIVE-OVERENÁ (#298, 2026-08-24)
 
 `scripts/dlv-readback-snapshot.py` má fixný JSON kontrakt (`{generatedAt, windowDays, rows:[{dlv,
-zak, op, datum, pocetPolozek, popis}]}`), ale presné Money DLV tabuľky/stĺpce NIE SÚ overené (worker
-nemá Money prístup). Pri nasadení POTVRDIŤ live proti `montalu_ro`. Appka je robustná: neplatný
-riadok sa preskočí (nezhodí import), chýbajúci producer = všetko `neoverené` (banner to povie).
+zak, op, datum, pocetPolozek, popis}]}`). Money DLV tabuľky/stĺpce sú od 2026-08-24 **LIVE OVERENÉ**
+proti `montalu_ro` (read-only tunel, provisioning #298) — repo SQL už NIE je best-effort. Money je
+**Money S5 (Solitea/Seyfor)** s table-per-concrete-type modelom:
+
+- `EconomicBase_Doklad` je PRÁZDNA abstraktná báza (0 riadkov) — nečítať z nej.
+- Reálne DLV žijú v konkrétnej `SkladovyDoklad_DodaciListVydany`: hlavička `CisloDokladu` (dlv, tvar
+  „DLV…"), `DatumVystaveni` (datum, date-only), `PocetPolozek`, `Nazev` (popis; nesie OP).
+- **ZAK je LINE-LEVEL** — hlavičkové `Zakazka_ID` je pri AUTOMATICKOM importe NULL; zakázka žije v
+  `SkladovyDoklad_PolozkaDodacihoListuVydaneho.Zakazka_ID` (FK → `Ciselniky_Zakazka.Kod`, tvar
+  „ZAK…"), riadok ↔ hlavička cez `Parent_ID = d.ID`. Každý DLV = práve jedna zakázka → `OUTER APPLY
+  TOP 1` je presné. Appka páruje LEN po `zak`, preto MUSÍ byť spoľahlivé (a je — z line zakázky).
+- **`op = ''` (PRÁZDNE, zámerne)** — `Nazev` nesie OP v nekonzistentnom tvare (OP260387 vs
+  OPDL260182), ktorý sa nedá zaručene zladiť s appkiným `op_norm`; nesprávny op by spravil reálny DLV
+  NEkompatibilným (appkin `compat`: `!c.opNorm || !o.opNorm || c.opNorm === o.opNorm`) → FALOŠNÝ
+  „chýba doklad" alarm. Prázdny op = appka ho ignoruje = bezpečné; párovanie stojí na ZAK + počte-
+  v-pásme + exkluzívnom greedy (OP je len best-effort spresnenie).
+
+### Automat filter — Create_ID GUID (nový systém, dev2 wrapper)
+
+Doklady vytvorené ľuďmi (ručný import skladu) NEsú náš odpis. Filtrujeme na účet **automatického
+importu**: `Create_ID = 467d0e89-dade-40c7-b0e4-f07adc3afc85` (LIVE overené: 193/195 nedávnych DLV je
+od tohto účtu; 2 ručné vynechá — cudzí DLV nesmie falošne overiť odpis). Producer wrapper na **dev2**
+nastavuje `MONEY_AUTOMAT_CREATE_ID=467d0e89-dade-40c7-b0e4-f07adc3afc85` (GUID je KONFIG cez env, nie
+hardcode v repe; prázdne env = bez filtra na tvorcu). Porovnanie je case-insensitive cez
+`LOWER(CONVERT(varchar(50), d.Create_ID))`.
 
 ## Testy
 
