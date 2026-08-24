@@ -14,6 +14,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { SKLO_STRECHA_TYPY } from '../src/lib/sklo-strecha';
+// #279 Fáza C: interný cenový modul (MO + VO) — na overenie, že verejná odpoveď nesie MO,
+// ale VO (veľkoobchod) je z nej ODSTRÁNENÉ.
+import { vypocitajCenu } from '../src/lib/server/konfigurator-cena';
 
 const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
@@ -215,31 +218,47 @@ describe('Money safety (B) — serverové súbory routy sa neviažu na Money/cen
 
 const { load, actions } = await import('../src/routes/konfigurator/+page.server');
 
-function neobsahujeUnik(json: string) {
+// #279 Fáza C — leak-guard REDEFINÍCIA. Owner ROZHODNUTÉ (issuecomment-5396941067, 2026-08-24:
+// „vychádzať z aktuálneho konfigurátora … ceny — montalu.sk/konfigurator") POVOLIL zobraziť
+// orientačnú PREDAJNÚ cenu vo verejnom konfigurátore → doterajší blanket zákaz „žiadne €/cena"
+// PADOL pre PRICES ONLY. NAĎALEJ zakázané VŠADE: Money kód (TS*/moneyKod), nárez, VEĽKOOBCHOD
+// (VO) cena a raw cenová matica (seed).
+
+/** Money kód / moneyKod / nárez sa NIKDY nesmú objaviť vo verejnom výstupe (nezmenené #275). */
+function neobsahujeMoneyAniNarez(json: string) {
 	for (const kod of MONEY_KODY) expect(json).not.toContain(kod);
 	expect(json).not.toMatch(/moneyKod/);
-	expect(json).not.toMatch(/€|EUR\b/);
-	// cena v akejkoľvek podobe (aj bez menového symbolu, napr. pole `cena`/`cenaZaM2`)
-	expect(json).not.toMatch(/cena/i);
-	// nárezové / interné polia
 	expect(json).not.toMatch(/panelSirka|panelDlzka|narez|nárez|krov/i);
 }
 
-describe('Money safety (C) — runtime výstup neobsahuje cenu ani Money kód (#275)', () => {
-	it('load() posiela LEN názvy skla + RAL možnosti + rozmedzia — žiadny moneyKod', async () => {
+/** VEĽKOOBCHOD (VO) ani raw matica sa NIKDY nesmú dostať do verejnej odpovede (#279 Fáza C). */
+function neobsahujeVOaniMaticu(json: string, voHodnoty: number[]) {
+	expect(json).not.toMatch(/"vo"|priceB2B|velkoobchod|bezDphVo/i);
+	for (const v of voHodnoty) expect(json).not.toContain(String(v));
+	// seed / cenová matica sa NIKDY neserializuje do verejnej odpovede
+	expect(json).not.toMatch(/cennik|update-pergolas|mriezka|verifikaciaDph/i);
+}
+
+describe('Money safety (C) — runtime výstup: cena SMIE, VO/Money/nárez/matica NIE (#275/#279 Fáza C)', () => {
+	it('load() posiela názvy skla + RAL + modely (popisy) + rozmedzia — žiadna cena/moneyKod', async () => {
 		const data = await load({} as Parameters<typeof load>[0]);
 		const json = JSON.stringify(data);
-		neobsahujeUnik(json);
-		// pozitívne: obsahuje názvy skla (aby test dokazoval, že katalóg NAOZAJ prešiel)
+		neobsahujeMoneyAniNarez(json);
+		// load NEMÁ cenu (tá je až v akcii vypocet) → stále bez € aj bez slova „cena"
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena/i);
+		// pozitívne: obsahuje názvy skla + modely (aby test dokazoval, že dáta NAOZAJ prešli)
 		expect(json).toContain(SKLO_STRECHA_TYPY[0]!.nazov);
+		expect(json).toContain('LIGHT');
 	});
 
-	it('akcia (platný vstup) vráti súhrn BEZ ceny / moneyKod / nárezu', async () => {
+	it('akcia vráti orientačnú MO cenu (€), ale NIKDY VO / Money kód / nárez / maticu', async () => {
 		const fd = new FormData();
 		fd.append('sirka', '4000');
 		fd.append('hlbka', '3500');
 		fd.append('vyskaVpredu', '2500');
 		fd.append('sklonDeg', '6');
+		fd.append('model', 'LIGHT');
 		fd.append('sklo', SKLO_STRECHA_TYPY[0]!.nazov);
 		fd.append('farba', '7016');
 		const event = {
@@ -249,8 +268,19 @@ describe('Money safety (C) — runtime výstup neobsahuje cenu ani Money kód (#
 
 		const r = await actions.vypocet(event);
 		const json = JSON.stringify(r);
-		neobsahujeUnik(json);
-		// pozitívne: súhrn naozaj prišiel (obsahuje názov skla)
+
+		// interná cena (MO + VO) pre presne tento rozmer/model — nezávislá referencia
+		const interne = vypocitajCenu({ hlbkaMm: 3500, sirkaMm: 4000, model: 'LIGHT' });
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// pozitívne: orientačná MO cena (net + s DPH) JE v odpovedi (cena sa smie zobraziť)
+			expect(json).toContain(String(interne.mo.bezDph));
+			expect(json).toContain(String(interne.mo.sDph));
+			// negatívne: VO hodnoty tej istej konfigurácie NIE SÚ v odpovedi
+			neobsahujeVOaniMaticu(json, [interne.vo.bezDph, interne.vo.sDph]);
+		}
+		neobsahujeMoneyAniNarez(json);
+		// pozitívne: súhrn naozaj prišiel (názov skla)
 		expect(json).toContain(SKLO_STRECHA_TYPY[0]!.nazov);
 	});
 });

@@ -62,12 +62,16 @@ describe('seed integrita + Money-neutralita (#279)', () => {
 		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/db['"]/);
 	});
 
-	it('modul NIE je importovaný verejnou route (Fáza C je mimo tohto lane)', () => {
+	it('verejná route importuje LEN verejné MO mappery — nikdy VO priamo (#279 Fáza C)', () => {
+		// Fáza C (owner ROZHODNUTÉ issuecomment-5396941067): route cenový modul TERAZ importuje.
+		// Musí použiť verejné MO-only mappery (`verejnaCenaPreModel`/`verejneCenyModelov`) a NIKDY
+		// serializovať VO zložku (`.vo`) / B2B cenu do verejnej odpovede.
 		const route = fs.readFileSync(
 			path.resolve(__dirname, '../src/routes/konfigurator/+page.server.ts'),
 			'utf8'
 		);
-		expect(route).not.toMatch(/konfigurator-cena/);
+		expect(route).toMatch(/verejnaCenaPreModel|verejneCenyModelov/);
+		expect(route).not.toMatch(/\.vo\b|priceB2B/);
 	});
 });
 
