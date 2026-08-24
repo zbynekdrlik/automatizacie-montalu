@@ -327,12 +327,14 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 			7.2,
 			{ sirka: 806, vyska: 2314 }
 		],
-		// 5K: horná koľajnica 6000mm (× 6.0), spodná 7500 (× 7.5); kladka/klzný 3600
+		// 5K: horná koľajnica 6000mm (× 6.0), spodná 7500 (× 7.5); kladka/klzný 3600.
+		// Vrchná koľajnica = ZASP202427 (NIE ZASP202434) — kontraktnú opravu nahlásil
+		// zákazník Patrik Javorský (Odoo kanál 207, msg 1734424, 2026-08-24), #296.
 		[
 			'Deluxe|5K',
 			4500,
 			2400,
-			{ ZASP202434: 6.0, ZASP202432: 7.5, ZASP00021: 7.5 },
+			{ ZASP202427: 6.0, ZASP202432: 7.5, ZASP00021: 7.5 },
 			7.2,
 			{ sirka: 908, vyska: 2318 }
 		],
@@ -434,7 +436,7 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 
 	it('5K horná koľajnica je 6000mm tyč (× 6.0), spodná 7500 (× 7.5)', () => {
 		const r = computeFlat(cfg, 'Deluxe|5K', 4500, 2400, false, 10)!;
-		expect(r.odpis.find((o) => o.kod === 'ZASP202434')!.metre).toBe(6.0);
+		expect(r.odpis.find((o) => o.kod === 'ZASP202427')!.metre).toBe(6.0);
 		expect(r.odpis.find((o) => o.kod === 'ZASP202432')!.metre).toBe(7.5);
 	});
 
@@ -486,7 +488,7 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 	});
 
 	it('rez dlhší než tyč (5K šírka > 6000mm horná koľajnica) zlyhá — Money sa NEpodhodnotí', () => {
-		// 5K horná koľajnica ZASP202434 je 6000mm tyč; šírka 6100 → rez 6100 mm sa
+		// 5K horná koľajnica ZASP202427 je 6000mm tyč; šírka 6100 → rez 6100 mm sa
 		// fyzicky nedá vyrobiť. Bez guardu by FFD „zabalil" 6100 na 1 tyč (záporný
 		// odpad) a odpis by bol 6.0 namiesto ~12.0 → podhodnotenie do Money.
 		const { r, err } = safeCompute(cfg, 'Deluxe|5K', 6100, 2400, false, 10);
@@ -505,7 +507,7 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 	it('MaterialRow nesie per-profil dĺžku tyče (pre grafický rozpis) — nie natvrdo 7500', () => {
 		const r = computeFlat(cfg, 'Deluxe|5K', 4500, 2400, false, 10)!;
 		const bar = (kod: string) => r.material.find((m) => m.kod === kod)!.barLen;
-		expect(bar('ZASP202434')).toBe(6000); // 5K horná koľajnica
+		expect(bar('ZASP202427')).toBe(6000); // 5K horná koľajnica
 		expect(bar('ZASP202417')).toBe(3600); // kladka 10mm
 		expect(bar('ZASP202432')).toBe(7500); // 5K spodná koľajnica
 		const rr = computeFlat(cfg, 'Robust|2K', 5000, 2000, false)!;
@@ -514,7 +516,7 @@ describe('Deluxe — hrúbka skla vyberá kladka/klzný profil (Money-kritické,
 
 	it('dlzkaTyce mimo rozsahu (preklep 600 namiesto 6000) je odmietnutá inBounds — Money guard', () => {
 		const bad = seed.rez.map((r) => ({ ...r })) as RezRow[];
-		const row = bad.find((r) => r.sysStyl === 'Deluxe|5K' && r.kod === 'ZASP202434')!;
+		const row = bad.find((r) => r.sysStyl === 'Deluxe|5K' && r.kod === 'ZASP202427')!;
 		row.dlzkaTyce = 600; // preklep: malo byť 6000
 		const badCfg = buildCFG(seed.sys as SysRow[], bad);
 		expect(inBounds(badCfg, 'Deluxe|5K')).toMatch(/Dĺžka tyče/);

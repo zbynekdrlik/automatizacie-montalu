@@ -152,7 +152,7 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		// 5K horná koľajnica = 6000mm tyč (Money-kritické)
 		expect(
 			db
-				.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202434'")
+				.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202427'")
 				.get()
 		).toEqual({ d: 6000 });
 		// migrované Robust/Slide riadky = default 7500 tyč + sklo_hrubka 0 (žiadna regresia).
