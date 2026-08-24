@@ -105,8 +105,10 @@ export interface OdpisOutcome {
 	/** dôvod bloku (len `status==='blocked'`): `ledger-duplicate` = identický obsah tej istej
 	 *  zákazky už bol importovaný do Money a nebol RE-autorizovaný override-om (#294);
 	 *  `unknown-kod` = Money niektorý kód nepozná / nemá skladovú kartu → import by doklad ticho
-	 *  preskočil (#295). */
-	reason?: 'ledger-duplicate' | 'unknown-kod';
+	 *  preskočil (#295); `prehodene-polia` = zak/op sú pravdepodobne zamenené (zak obsahuje OP…,
+	 *  op obsahuje ZAK… — tvar ZAK2026499) → do Money by šiel doklad so zameneným číslom zákazky a
+	 *  objednávky; blokuje LEN pre live=1 (#307). */
+	reason?: 'ledger-duplicate' | 'unknown-kod' | 'prehodene-polia';
 	live: boolean;
 	target: string;
 	filename: string;
@@ -180,8 +182,8 @@ export function normZak(zak: string): string {
 	return String(zak).trim().toUpperCase().replace(/\s+/g, '');
 }
 
-/** Prehodené polia (`zak` obsahuje `OP…`, `op` obsahuje `ZAK…`) — verdikt §2 id=38/78. Nie je to
- *  tvrdý blok (dedup aj tak funguje na normalizovaných hodnotách), ale zaslúži si WARN do logu. */
+/** Prehodené polia (`zak` obsahuje `OP…`, `op` obsahuje `ZAK…`) — verdikt §2 id=38/78. Pre live=1 to
+ *  `writeOdpis` TVRDO BLOKUJE (audited override, #307); pre test/live=0 ostáva WARN-only. */
 function detekujPrehodenePolia(zakNorm: string, opNorm: string): boolean {
 	return zakNorm.startsWith('OP') || opNorm.startsWith('ZAK');
 }
@@ -211,25 +213,47 @@ function blokKodyHlaska(problemy: KodProblem[]): string {
 	);
 }
 
+/** Hláška pre operátora, keď sú polia zak/op pravdepodobne PREHODENÉ (#307, `reason==='prehodene-polia'`).
+ *  Pole „číslo zákazky" nesie OP… číslo a/alebo pole „OP/OPDL" nesie ZAK… — pravdepodobný preklep pri
+ *  zadaní. Do Money by šiel doklad so zameneným číslom zákazky a objednávky. */
+function blokPrehodeneHlaska(zak: string, op: string): string {
+	const problemy: string[] = [];
+	if (normZak(zak).startsWith('OP'))
+		problemy.push(`pole „číslo zákazky" obsahuje OP číslo (${zak})`);
+	if (normOp(op).startsWith('ZAK')) problemy.push(`pole „OP/OPDL" obsahuje číslo zákazky (${op})`);
+	return (
+		`Polia sú pravdepodobne prehodené: ${problemy.join(' a ')}. Do Money by šiel doklad so ` +
+		`zameneným číslom zákazky a objednávky. Skontroluj a oprav zadanie (správne ZAK do „číslo ` +
+		`zákazky", správne OP do „OP/OPDL"). Ak je zadanie naozaj správne, potvrď „Odoslať aj tak".`
+	);
+}
+
 /** Jeden zdroj pravdy pre hlášku bloku vo všetkých moduloch — vyberie správnu podľa `reason`. */
 export function blokHlaska(outcome: OdpisOutcome, zak: string, op: string): string {
 	if (outcome.reason === 'unknown-kod') return blokKodyHlaska(outcome.chybajuceKody ?? []);
+	if (outcome.reason === 'prehodene-polia') return blokPrehodeneHlaska(zak, op);
 	return blokLedgerHlaska(zak, op, outcome.ledgerImportedAt);
 }
 
 /**
  * (#300) „Odoslať aj tak" mapovanie: skryté pole(-a) `override` z re-submit formulára → override
- * flagy pre `writeOdpis`. `unknown-kod` ⇒ `overrideKody`, `ledger-duplicate` ⇒ `overrideLedger`.
- * Číta VŠETKY `override` hodnoty (`getAll`) — jeden doklad môže naraz naraziť na OBA bloky (Money
- * kód, čo snapshot ešte nemá, + identický obsah po „Uvoľniť"); vtedy druhé „Odoslať aj tak" nesie
- * OBE hodnoty, takže sa prekonajú NARAZ (bez donekonečna sa striedajúceho ping-pongu, #300 review 🟡).
- * Bežný (prvý) submit nemá `override` pole → obe flagy false = žiadny bypass.
+ * flagy pre `writeOdpis`. `unknown-kod` ⇒ `overrideKody`, `ledger-duplicate` ⇒ `overrideLedger`,
+ * `prehodene-polia` ⇒ `overridePrehodene` (#307). Číta VŠETKY `override` hodnoty (`getAll`) — jeden
+ * doklad môže naraz naraziť na VIAC blokov (Money kód, čo snapshot ešte nemá, + identický obsah po
+ * „Uvoľniť", + prehodené polia); vtedy ďalšie „Odoslať aj tak" nesie VŠETKY hodnoty, takže sa
+ * prekonajú NARAZ (bez donekonečna sa striedajúceho ping-pongu, #300 review 🟡). Bežný (prvý) submit
+ * nemá `override` pole → všetky flagy false = žiadny bypass.
  */
-export function overrideOpts(form: FormData): { overrideKody?: boolean; overrideLedger?: boolean } {
+export function overrideOpts(form: FormData): {
+	overrideKody?: boolean;
+	overrideLedger?: boolean;
+	overridePrehodene?: boolean;
+} {
 	const o = form.getAll('override').map(String);
 	return {
 		overrideKody: o.includes('unknown-kod'),
-		overrideLedger: o.includes('ledger-duplicate')
+		overrideLedger: o.includes('ledger-duplicate'),
+		overridePrehodene: o.includes('prehodene-polia')
 	};
 }
 
@@ -287,6 +311,28 @@ function auditOverrideLedger(job: OdpisJob): void {
 		])
 	);
 	log.warn('odpis: override ledgeru „Odoslať aj tak"', {
+		modul: job.modul,
+		zak: job.zak,
+		op: job.op
+	});
+}
+
+/** Audit vedomého override PREHODENÝCH polí zak/op (#307) — operátor potvrdil „Odoslať aj tak" pri
+ *  podozrení na zamenené číslo zákazky/objednávky. NIE tiché preskočenie: do `cfg_audit` sa zapíše,
+ *  KTO poslal odpis napriek varovaniu. */
+function auditOverridePrehodene(job: OdpisJob): void {
+	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+		job.createdBy,
+		'odpis',
+		JSON.stringify([
+			{
+				pole: `Override prehodených polí zak/op — odpis ${job.modul} ${job.zak} OP${job.op} odoslaný napriek varovaniu (číslo zákazky/objednávky pravdepodobne zamenené)`,
+				stara: 0,
+				nova: 1
+			}
+		])
+	);
+	log.warn('odpis: override prehodených polí zak/op', {
 		modul: job.modul,
 		zak: job.zak,
 		op: job.op
@@ -380,7 +426,7 @@ export async function buildXlsx(job: OdpisJob): Promise<Buffer> {
  */
 export async function writeOdpis(
 	job: OdpisJob,
-	opts: { overrideKody?: boolean; overrideLedger?: boolean } = {}
+	opts: { overrideKody?: boolean; overrideLedger?: boolean; overridePrehodene?: boolean } = {}
 ): Promise<OdpisOutcome> {
 	const live = isLive() ? 1 : 0;
 	const zakNorm = normZak(job.zak);
@@ -393,13 +439,40 @@ export async function writeOdpis(
 	const filename = filenameFor(job);
 	const target = path.join(dir, filename);
 
+	// (#307) Prehodené polia zak/op (zak obsahuje OP…, op obsahuje ZAK… — tvar ZAK2026499, verdikt §2
+	// id=38/78). Pre live=1 to TVRDO BLOKUJE (rovnaká audited-override sémantika ako #295 unknown-kod) —
+	// do Money by inak šiel doklad so zameneným číslom zákazky a objednávky. `overridePrehodene` =
+	// vedomý, AUDITOVANÝ bypass (audit až v zápisovej transakcii nižšie — #300 review 🟡 dôvod: inak by
+	// falošný audit vznikol aj keď to následne zablokoval ledger a nič sa neodoslalo). TEST/live=0
+	// ostáva WARN-only (E2E aj testové toky sa nesmú rozbiť; do Money nič testovacie nejde). Blok je
+	// PRVÝ (pred #295) — field-swap má operátor opraviť pri zdroji skôr než rieši kódy.
+	let overridingPrehodene = false;
 	if (detekujPrehodenePolia(zakNorm, opNorm)) {
+		if (live === 1 && opts.overridePrehodene !== true) {
+			log.warn('odpis blokovaný — prehodené polia zak/op (live, import so zameneným zak/op)', {
+				modul: job.modul,
+				zak: job.zak,
+				op: job.op,
+				zakNorm,
+				opNorm
+			});
+			return {
+				status: 'blocked',
+				reason: 'prehodene-polia',
+				live: true,
+				target,
+				filename
+			};
+		}
+		overridingPrehodene = live === 1 && opts.overridePrehodene === true;
 		log.warn('odpis: podozrenie na prehodené polia zak/op', {
 			modul: job.modul,
 			zak: job.zak,
 			op: job.op,
 			zakNorm,
-			opNorm
+			opNorm,
+			live: isLive(),
+			override: overridingPrehodene
 		});
 	}
 
@@ -542,6 +615,8 @@ export async function writeOdpis(
 			// (#300 review 🟡) audit override kódov AŽ TU — atomicky so zápisom, takže sa zapíše LEN keď
 			// sa odpis reálne odoslal (nie keď ho medzitým zablokoval ledger a nič neodišlo).
 			if (overridingKody) auditOverrideKody(job, kodProblemy);
+			// (#307) rovnaký atomický audit pre override prehodených polí zak/op.
+			if (overridingPrehodene) auditOverridePrehodene(job);
 			const id = insLog.run(
 				job.modul,
 				job.zak,
