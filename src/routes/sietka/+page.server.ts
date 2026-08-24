@@ -19,6 +19,8 @@ import {
 	filenameFor,
 	contentHash,
 	blokHlaska,
+	overrideOpts,
+	rawFormEntries,
 	type OdpisJob
 } from '$lib/server/money';
 
@@ -104,7 +106,7 @@ export const actions = {
 			};
 		}
 		try {
-			const outcome = await writeOdpis(job);
+			const outcome = await writeOdpis(job, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,
@@ -118,11 +120,12 @@ export const actions = {
 			}
 			if (outcome.status === 'blocked') {
 				return {
-					step: 'duplikat' as const,
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslat',
+					rawEntries: rawFormEntries(formData),
 					error: blokHlaska(outcome, vstup.zak, vstup.op),
-					vstup,
-					r,
-					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)
+					vstup
 				};
 			}
 			return { step: 'hotovo' as const, vstup, r, outcome };

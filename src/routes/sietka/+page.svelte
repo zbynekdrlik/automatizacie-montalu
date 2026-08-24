@@ -5,6 +5,7 @@
 	// dodávateľa). Interní používatelia môžu odpis odoslať do Money (KOREKCIA
 	// 2026-08-02); b2b vidí len výpočet/tabuľku (existujúce pravidlo — bez zápisu).
 	import { SIETKA_UCHYTY, uchytLabel, type SietkaUchyt } from '$lib/sietka';
+	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -294,4 +295,11 @@
 	<div class="card noprint">
 		<a class="btn secondary" href={resolve('/sietka')}>➕ Nová sieťka</a>
 	</div>
+{:else if step === 'blocked' && form && 'rawEntries' in form && form.rawEntries}
+	<OdpisBlok
+		rawEntries={form.rawEntries}
+		blokReason={form.blokReason}
+		blokAction={form.blokAction}
+		error={form.error ?? ''}
+	/>
 {/if}

@@ -53,11 +53,13 @@ describe('normZak', () => {
 describe('blokHlaska — správna hláška podľa reason', () => {
 	const base = { status: 'blocked' as const, live: true, target: '/x', filename: 'x.xlsx' };
 
-	it('ledger-duplicate → hláška o dvojitom importe + „Povoliť rovnaký"', () => {
+	it('ledger-duplicate → hláška o dvojitom importe + „Odoslať aj tak" (#300 koniec dead-endu)', () => {
 		const o: OdpisOutcome = { ...base, reason: 'ledger-duplicate', ledgerImportedAt: '2026-07-30' };
 		const h = blokHlaska(o, 'ZAK1', '01');
 		expect(h).toContain('už bol raz importovaný do Money');
-		expect(h).toContain('Povoliť rovnaký');
+		// #300: hláška smeruje na modulové tlačidlo „Odoslať aj tak" (po „Uvoľniť" už NEEXISTUJE
+		// /odpisy riadok na „Povoliť rovnaký" — to bol práve dead-end, ktorý #300 rieši)
+		expect(h).toContain('Odoslať aj tak');
 	});
 
 	it('unknown-kod (1) → jednotné číslo „kód" + zoznam', () => {

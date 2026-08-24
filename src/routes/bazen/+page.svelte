@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
+	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -289,6 +290,13 @@
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<a class="btn secondary" href={resolve('/bazen')}>➕ Nový rozpis</a>
 	</div>
+{:else if step === 'blocked' && form && 'rawEntries' in form && form.rawEntries}
+	<OdpisBlok
+		rawEntries={form.rawEntries}
+		blokReason={form.blokReason}
+		blokAction={form.blokAction}
+		error={form.error ?? ''}
+	/>
 {:else if step === 'duplikat'}
 	<div class="card">
 		<h1>⛔ Duplikát</h1>
