@@ -1645,3 +1645,13 @@ Dôkazy: `~/.claude/work-products/money-odpis-audit/verdict.md` §2/§3 + `our-s
   `opts.overrideKody` ⇒ auditovaný bypass (cfg_audit). live=0 sa neblokuje.
 - Post-import readback (verdikt §3 bod B) = follow-up **#298** (Scope-gate: security-boundary — Money
   DB RO prístup z VPS appky = nová infra).
+
+**Review (CYCLE step 6, adversariálny Fable dispatch): 1 🔴, 6 🟡, 5 🔵 — opravené `7b9acb2`:**
+🔴 svelte-check `?.[0].dovod`→`?.[0]?.dovod` (CI gate červený, chytila to až review — svelte-check
+kryje aj `.ts` testy). 🟡 deploy-okno: ledger `import` ATOMICKY s claim-om (pred zápisom súboru),
+kompenzácia zmaže aj import riadok. 🟡 v27 backfill ledgeru z existujúcich odpisov (história chránená).
+🔵 komentáre (cross-spelling race, ceny prefix asymetria), typo, testy (v27 backfill, povolitReimport
+akcia). Odložené 🟡 (override UI unreachable, Uvoľniť dead-end, OP/OPDL bare-digit, E2E) → **#300**
+(cross-cutting) + Money-side overenie OP/OPDL rád. Full suite 2192 zelené, branch cov 89.36% ≥ 88.
+**Playbook:** `lint-formatting.md` (`*/`-v-JSDoc pasca, optional-chaining `?.[0]?.x`), money-odpis
+skill §7 (dedup ledger + normalizácia + pre-export validácia).
