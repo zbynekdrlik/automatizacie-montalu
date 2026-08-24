@@ -710,13 +710,26 @@ dedup-e drž tieto invarianty:
   distinct od `OP…`, prázdny ostáva prázdny. **PASCA/riziko:** bare číslice sa promujú na OP
   (`260092 → OP260092`) — nutné pre dokázaný prípad, ALE ak by číselné rady OP/OPDL kolidovali a OPDL
   sa zadá bez prefixu → falošný `duplicate` → stratený odpis (over s Money, či sa rady prekrývajú).
-- **Override:** `/odpisy` „⚠️ Povoliť rovnaký" (`povolitReimport`) = release + append `override`
-  (one-shot, auditované) — povolí re-import IDENTICKÉHO obsahu; bežné „Uvoľniť" identický obsah ĎALEJ
-  blokuje. Uvoľniť-then-blocked dead-end (row už preč) → tuple-override je follow-up.
+- **Override (dve cesty, #294 + #300):** (a) `/odpisy` „⚠️ Povoliť rovnaký" (`povolitReimport`) =
+  release + append `override` z `odpis_log` riadku — funguje LEN keď riadok EXISTUJE (nie po
+  „Uvoľniť"). (b) **`writeOdpis(job, {overrideLedger:true})` = TUPLE override (#300)** — príde už s
+  `override` ledger riadkom z NORMALIZOVANÉHO tuple + content_hash job-u v zápisovej transakcii,
+  NEPOTREBUJE `odpis_log` riadok → rieši „Uvoľniť-then-blocked" dead-end (po Uvoľniť je row preč, na
+  „Povoliť rovnaký" niet čo kliknúť). Obe one-shot + auditované (`auditOverrideLedger`/cfg_audit).
+  UI: modulový blok `step:'blocked'` → zdieľaný `OdpisBlok.svelte` → confirm-gated „⚠️ Odoslať aj
+  tak" re-POSTne PRESNE ten istý formulár (`rawFormEntries`, textarea pre newline CAD) + skryté
+  `override=<reason>`; server `overrideOpts(form)` mapuje `unknown-kod`→overrideKody /
+  `ledger-duplicate`→overrideLedger. `blokLedgerHlaska` smeruje na toto tlačidlo, nie na /odpisy.
 - **Pre-export validácia kódov (`validateOdpisKody` v `ceny.ts`, #295):** live=1 neznámy kód /
   `sklad===null` (bez skladovej karty) ⇒ tvrdý blok (`{status:'blocked', reason:'unknown-kod'}`).
   **PREFIX-SCOPE (kritické):** validuj len kód, ktorého PREFIX snapshot REÁLNE pokrýva (empiricky zo
   `material_prices` — dnes `ZASP*/ZASK*/TS*`); pergola `PRP*`/bazén `BPP*` sú MIMO scope → NEblokuj
   (inak by popadali). `sklad===0`/záporné PREJDE (0-sklad je platný odpis), len `null` blokuje.
-  Snapshot >7 dní / chýba ⇒ degrade na warning (neblokuj). `overrideKody` param = auditovaný bypass
-  (dnes bez UI wiringu — follow-up).
+  Snapshot >7 dní / chýba ⇒ degrade na warning (neblokuj). `overrideKody` param = auditovaný bypass,
+  od #300 zapojený do UI („Odoslať aj tak" v `blocked` vetve, `override=unknown-kod`).
+- **E2E/TEST PASCA (stála príčina red CI, #300):** ledger sleduje `import` riadky aj pre `live=0`
+  (TEST), takže write→„Uvoľniť"→identický re-send je ledger-blok AJ v TEST režime (nie len live).
+  Preto E2E/test, čo re-sendne PO „Uvoľniť", MUSÍ buď (a) zmeniť obsah (iná šírka → iný content_hash),
+  alebo (b) prejsť cez override („Odoslať aj tak" / „Povoliť rovnaký"). #294 merge nechal
+  `e2e/odpisy.spec.ts` s pred-ledger predpokladom (identický re-send „prejde") → červený `test` job na
+  dev, kým to #300 neopravilo. Nový odpis E2E over v `e2e/odpis-blok-override.spec.ts`.
