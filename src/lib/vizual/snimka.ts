@@ -5,6 +5,15 @@
 // swapu). Volajúci (komponent) je zodpovedný za skrytie overlay/mierkovej
 // figúry a dočasné vynútenie tieru `high` PRED zavolaním a obnovenie PO ňom —
 // tento modul rieši len samotný capture + downscale + blob.
+//
+// #288: `jeSoftverovyRenderer` (softvérové WebGL — SwiftShader na CI, llvmpipe,
+// Basic Render — má malý CELKOVÝ alokačný rozpočet napriek veľkým per-dimension
+// limitom, #290) sa presunul do `kvalita.ts` (jediný zdroj pravdy klasifikácie
+// renderer-stringu: GPU-tier detekcia AJ post-processing gate ho zdieľajú). Re-exportuje
+// sa nižšie, aby `supersampleFaktor` volajúci + existujúce importy ostali funkčné.
+import { jeSoftverovyRenderer } from './kvalita';
+export { jeSoftverovyRenderer };
+
 type ThreeNS = typeof import('three');
 type Renderer = InstanceType<ThreeNS['WebGLRenderer']>;
 type Scene = InstanceType<ThreeNS['Scene']>;
@@ -20,19 +29,12 @@ export interface SnimkaVstup {
 	vyskaPx?: number;
 }
 
-/** #290: je `UNMASKED_RENDERER_WEBGL` reťazec SOFTVÉROVÝ (alebo neznámy)
- *  renderer? Softvérové WebGL (SwiftShader na GitHub CI runneri, llvmpipe,
- *  Microsoft Basic Render, Mesa Software Rasterizer) hlási VEĽKÉ per-dimension
- *  limity (`MAX_TEXTURE_SIZE`/`MAX_RENDERBUFFER_SIZE` 8192–16384), ale má MALÝ
- *  CELKOVÝ alokačný rozpočet — viď `supersampleFaktor` prečo je to dôležité.
- *  Prázdny reťazec (`WEBGL_debug_renderer_info` nedostupné, napr. privacy) sa
- *  berie ako softvér/neznámy → konzervatívny fail-safe (radšej 2× ako pád). */
-const SOFTVEROVY_RENDERER_RE = /SwiftShader|llvmpipe|softpipe|Software|Basic Render|Microsoft/i;
-
-export function jeSoftverovyRenderer(unmaskedRenderer: string): boolean {
-	const s = unmaskedRenderer.trim();
-	return s === '' || SOFTVEROVY_RENDERER_RE.test(s);
-}
+// #290: `jeSoftverovyRenderer` (softvérové WebGL — SwiftShader na CI, llvmpipe,
+// Microsoft Basic Render — má malý CELKOVÝ alokačný rozpočet napriek veľkým
+// per-dimension limitom) sa v #288 presunul do `kvalita.ts` (jediný zdroj pravdy
+// klasifikácie renderer-stringu — používa ho aj GPU-tier detekcia AJ post-processing
+// gate). Re-exportuje sa TU, aby `supersampleFaktor` volajúci + existujúce importy
+// (`tests/vizual-snimka.test.ts`) ostali funkčné (viď re-export hore).
 
 /** Rozhodne o supersample faktore podľa GPU limitov — čisto na základe WebGL
  *  limitov, žiadny DOM. Exportované samostatne kvôli jednotkovej testovateľnosti

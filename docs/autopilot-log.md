@@ -2,6 +2,24 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-08-24 — Integrácia: post-processing leštenie 3D (GTAO+SMAA+bloom tier-gated) (#288)
+
+- **Integrácia** lane `worktree-agent-a2b84ab372af0df27` (HEAD 9458e5e) do `dev` — serial
+  step fleet dispatchu. Version bump 0.24.26 → 0.24.27-dev.1 → clean 0.24.27.
+- **Merge (78f93d8):** jediný konflikt `.claude/rules/vizual3d.md` (append-both — obe sekcie
+  #290 supersample strop AJ #288 postproc zachované, žiadne leftover markery). Ostatné
+  (`vite.config.ts`, `snimka.ts`, `kvalita.ts`, `Vizual3D.svelte`) auto-mergli čisto (#290
+  je v spoločnej báze 7f8b727). `jeSoftverovyRenderer` presunutý do `kvalita.ts` (single
+  source of truth) = dôvod bezkonfliktného zdrojového merge dvoch renderer-gate lanes.
+- **Brány:** check 0/0, lint čistý, vitest 2157 PASS, coverage prahy držia (`postproc.ts`
+  reálne 32/32 = 100 %, NIE vylúčené).
+- **Review** (issuecomment-5389454963): `/review` self + `requesting-code-review`
+  (general-purpose subagent) → **0 🔴 0 🟡**, 3 🔵 non-blocking (tlačový PNG zámerne bez
+  postproc; glass-AO HW vizuálna kontrola = post-deploy item; scratch-ctx GPU string
+  note-only). Overených 5 integračných rizík; ctory vs three@0.185.1.
+- **PR:** dev→main, `Closes #288`, `Advances #285` (umbrella leštenie 3D).
+- **Deferraly #288** (4, už na tickete pred integráciou): N8AO knižnica, PCSS, baked AO,
+  KTX2 — nerobené v tomto tikete, follow-up.
 ## 2026-08-18 — Zasklenia: sklo „3.3.1" pre Štandard plus a starý Štandard (#214)
 
 - **Issue:** #214 — Patrik (Odoo 207, správa 1703260, 18.8.): pridať do výberu skla pri
@@ -1012,7 +1030,7 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   rám sedí priamo na dlažbe, žiadna medzera, tieň sleduje celú šírku rámu.
   `{"ok":true,"version":"0.16.8 (f1758c2)","live":true}`.
 - Playbook: `.claude/rules/vizual3d.md` rozšírený o (1) "nepredpokladaj
-  Y-posun, over číslami" ponaučenie, (2) `__VIZDEBUG` naживo scene-
+  Y-posun, over číslami" ponaučenie, (2) `__VIZDEBUG` naživo scene-
   introspekcia technika, (3) canvas/`document` no-op polyfill pre testovanie
   `scena.ts` mimo `low` tieru, (4) `jadroR`/`stred` sú frakcie CELEJ šírky
   canvasu, nie polovice (rovnaká trieda chyby ako sRGB/lineárny gotcha).
