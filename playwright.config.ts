@@ -11,7 +11,6 @@ export default defineConfig({
 	// je to 404 by design, takže error-stranka spec je preview-only — proti
 	// deploymentu ho vynecháme na úrovni configu (nie runtime skip v spec súbore).
 	testIgnore: process.env.BASE_URL ? ['**/error-stranka.spec.ts'] : [],
-	globalSetup: './e2e/global-setup.ts',
 	timeout: 30000,
 	// cez SSH tunel na nasadenú appku sú odozvy pomalšie — default 5 s expect
 	// timeout intermitentne padal na login redirecte
@@ -35,8 +34,19 @@ export default defineConfig({
 	webServer: process.env.BASE_URL
 		? undefined
 		: {
-				command: 'npm run preview',
-				port: 4173,
+				// #291 (2. kolo): reset zdieľanej e2e.db PRED štartom servera, nie v
+				// globalSetup. `hooks.server.ts` importuje `db.ts` → migrácia beží pri BOOTE
+				// servera (nie až pri prvom requeste), takže preview si otvorí + zmigruje
+				// e2e.db hneď na štarte. Playwright však spúšťa globalSetup AŽ PO tom, čo je
+				// webServer hotový (empiricky overené: SERVER_BOOT pred GLOBALSETUP) — starý
+				// globalSetup `rmSync('./data/e2e.db')` teda mazal už zmigrovanú DB spod bežiaceho
+				// servera: server ďalej obsluhoval z osirotelého inode, ale cesta na disku
+				// zmizla, takže seedDopyt (test proces) otvoril ČERSTVÝ prázdny súbor →
+				// „no such table: dopyt". Preto reset MUSÍ prebehnúť pred bootom → v `command`.
+				// (readiness GET /health si držíme — 200 vráti až po seedData, takže testy
+				// nikdy nebežia proti polovične nabehnutému serveru.)
+				command: 'node e2e/reset-e2e-db.mjs && npm run preview',
+				url: 'http://localhost:4173/health',
 				reuseExistingServer: false,
 				env: {
 					DATABASE_PATH: './data/e2e.db',

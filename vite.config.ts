@@ -26,6 +26,17 @@ if (!version) {
 }
 
 export default defineConfig({
+	// #291: pod StrykerJS beží N paralelných vitest test-runner procesov, každý vo vlastnom
+	// sandboxe so SYMLINKNUTÝM node_modules → všetky zdieľajú ten istý reálny
+	// `node_modules/.vite` optimize cache a pretekajú na atomickom rename
+	// `deps___vitest___temp_* → deps___vitest__` (`ENOTEMPTY: directory not empty, rename`,
+	// mutation run 32667546563 shard 4 spadol v úvodnom dry-rune — NIE prežívajúci mutant).
+	// Izoluj optimize cache PER PROCES (unikátny pid) LEN keď beží pod Strykerom (CWD v
+	// `.stryker-tmp`) — normálny `test`/`dev`/`build`/`preview` beh (CWD = koreň repa) ostáva
+	// na defaulte (`node_modules/.vite`), úplne nedotknutý.
+	cacheDir: process.cwd().includes('.stryker-tmp')
+		? `node_modules/.vite-stryker-${process.pid}`
+		: undefined,
 	define: {
 		__APP_VERSION__: JSON.stringify(version)
 	},
@@ -57,6 +68,9 @@ export default defineConfig({
 				// WebGL capture: `gl.readPixels` + canvas 2D → v headless vitest nemerateľné;
 				// jediná čistá fn `supersampleFaktor` má vlastný unit test.
 				'src/lib/vizual/snimka.ts'
+				// #288 pozn.: `postproc.ts` NIE JE vylúčené — `vytvorComposer` berie pass
+				// ctory INJEKCIOU, takže build vetvy + leak-kritická dispose slučka sa dajú
+				// testovať fake ctormi bez WebGL (viď `tests/vizual-postproc.test.ts`).
 			],
 			// Prahy = namerané − 2 %, LEN hore (nikdy pod predošlé server-only gaty
 			// 89/85/73/82). Namerané pri rozšírení 2026-08-20: lines 97,41 / stmts 96,23

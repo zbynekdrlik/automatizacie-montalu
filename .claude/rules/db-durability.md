@@ -56,3 +56,30 @@ riadok (`action='delete'`) v TEJ ISTEJ transakcii ako DELETE. Volajúci
 (`pouzivatelia/+page.server.ts` akcia `zmazat`) posiela `locals.user.username` —
 rovnako ako `addUser`. `action` enum je rozšírený migráciou v24 (recreate tabuľky,
 SQLite nevie ALTER CHECK) o `'delete'` + `'seed'` (`seedUsers` píše seed-audit).
+
+## Lane-merge: duplicitná migrácia a testy predpokladajúce staršiu verziu (#282)
+
+Pri integrácii STARŠEJ build-only lane sa stáva, že lane pridala migráciu, ktorú `dev`
+medzitým už dostal INÝM tiketom pod ROVNAKÝM číslom (napr. lane `#277 v25 CREATE TABLE
+dopyt`, kým `dev` má to isté `v25` + navyše `#278 v26 ALTER … ADD odoo_lead_id`). To
+NIE JE nová migrácia na prečíslovanie — je to DUPLIKÁT. Riešenie:
+
+- **`migracie.ts` = ponechať dev verziu, lane duplikát ZAHODIŤ.** Prečíslovanie (v25→v27)
+  urobíš LEN keď lane pridala GENUÍNNE novú, odlišnú migráciu. Duplikát tej istej tabuľky
+  sa nikdy nezdvojuje ani nerenumberuje — over `grep -nE '< 2[0-9]\)' migracie.ts` = jedna
+  každá.
+- **Lane testy predpokladajúce staršiu schému sa MUSIA zosúladiť s merged verziou.** Lane
+  `#282` testy predpokladali čerstvú `v25` (bez `odoo_lead_id`) a simulovali budúce `#278`
+  cez `ALTER TABLE dopyt ADD COLUMN odoo_lead_id` — po merge je zdieľaná test DB na `v26`,
+  stĺpec už existuje → `hasOdooLeadColumn()` je `true` a `ALTER` padne na *duplicate column*.
+  Uprav aserície na v26 realitu.
+- **Defenzívnu feature-detect vetvu ZACHOVAJ cez explicitný FLAG param, nie cez simuláciu
+  starej schémy.** `listDopyty(off, lim, hasOdoo=false)` otestuje SELECT bez odoo stĺpca aj
+  na v26 DB (kľúč na riadku chýba) — žiadna strata pokrytia bez potreby column-less DB.
+- Kontrola po každom kroku: `grep -c '<<<<<<<' <súbor>` = 0 (PreToolUse block na compound
+  príkaze = NIČ z neho nebežalo — píš merge-resolve a jeho overenie ako SAMOSTATNÉ volania).
+- **Renumber lane migrácie × SÚRODENECKÝ minimal-fixture migračný test (#296/#297 kolo,
+  commit 50786ef).** Pri renumber lane migrácie na `dev`, ktorý medzitým pridal SÚRODENECKÚ
+  minimal-fixture migračnú test (napr. #294 ledger v27 test), treba do fixtúry súrodenca
+  doplniť prázdnu tabuľku, ktorej sa renumbered krok dotýka, + zdvihnúť final-version assert
+  — kríži sa #282 renumber a no-such-table gotcha.

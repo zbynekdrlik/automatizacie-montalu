@@ -7,6 +7,9 @@
 // riadky (v CI beží proti preview, live:false → beží). Každý test = NULA console chýb.
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
+// #288 review 🔵: kanonický klasifikátor (Node kontext — helper beží mimo page.evaluate),
+// aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
+import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
 
 test('konfigurátor: verejný flow BEZ prihlásenia → súhrn konfigurácie, žiadna cena/Money kód, nula console chýb', async ({
 	page
@@ -156,6 +159,27 @@ async function vyplnFormular(page: import('@playwright/test').Page) {
 	await page.getByTestId('farba').selectOption('9005');
 }
 
+/** #288 post-processing gate — regresný guard. `data-viz-postproc` MUSÍ byť vždy
+ *  vydrôtovaný (`true`/`false`, nikdy chýbajúci). Na SOFTVÉROVOM rendereri (CI
+ *  SwiftShader, #290 malý alokačný rozpočet) MUSÍ ostať composer VYPNUTÝ (`false` →
+ *  priamy render, nulová regresia); na hardvéri je zapnutý, preto sa striktný
+ *  `false` assert vzťahuje LEN na softvér (robustné voči budúcemu hardvérovému CI). */
+async function overPostprocGate(page: import('@playwright/test').Page) {
+	const info = await page.evaluate(() => {
+		const el = document.querySelector('[data-testid="vizual3d"]');
+		const c = document.createElement('canvas');
+		const gl = c.getContext('webgl2');
+		let renderer = '';
+		if (gl) {
+			const ext = gl.getExtension('WEBGL_debug_renderer_info');
+			if (ext) renderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+		}
+		return { renderer, postproc: el?.getAttribute('data-viz-postproc') };
+	});
+	expect(['true', 'false']).toContain(info.postproc);
+	if (jeSoftverovyRenderer(info.renderer ?? '')) expect(info.postproc).toBe('false');
+}
+
 test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), nula console chýb, žiaden únik', async ({
 	page
 }) => {
@@ -191,6 +215,9 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	// netriviálny obsah (nie prázdny/jednofarebný canvas)
 	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
 
+	// #288: post-processing gate (mid tier) — na softvérovom CI rendereri VYPNUTÝ (#290)
+	await overPostprocGate(page);
+
 	// ÚNIK GUARD ostáva platný aj s 3D náhľadom na stránke
 	const telo = await page.locator('body').innerText();
 	expect(telo).not.toMatch(/€|EUR\b/);
@@ -217,6 +244,9 @@ test('konfigurátor: 3D náhľad na MOBILNOM viewporte 390×844 (low tier fallba
 	await expect(page.getByTestId('vizual3d-canvas')).toBeVisible();
 	// low tier (bez HDRI/reálnych tieňov) musí stále vykresliť netriviálny obsah
 	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
+
+	// #288: low tier NIKDY nemá post-processing (postproc flag=false) — vždy priamy render
+	await overPostprocGate(page);
 
 	expect(consoleMsgs).toEqual([]);
 });

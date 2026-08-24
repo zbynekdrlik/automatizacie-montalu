@@ -24,6 +24,9 @@ import {
 	targetDirFor,
 	filenameFor,
 	contentHash,
+	blokHlaska,
+	overrideOpts,
+	rawFormEntries,
 	type OdpisJob
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
@@ -409,13 +412,23 @@ export const actions = {
 			};
 		}
 		try {
-			const outcome = await writeOdpis(job);
+			const outcome = await writeOdpis(job, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
 				// 200 render (nie fail(409)) — non-2xx na form POST loguje v prehliadači
 				// console error a porušuje zero-console-errors; blokovanie drží DB constraint
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
+					vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslat',
+					rawEntries: rawFormEntries(formData),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup
 				};
 			}
@@ -538,11 +551,21 @@ export const actions = {
 			};
 		}
 		try {
-			const outcome = await writeOdpis(job);
+			const outcome = await writeOdpis(job, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
+					multiVstup: vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslatMulti',
+					rawEntries: rawFormEntries(formData),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					multiVstup: vstup
 				};
 			}

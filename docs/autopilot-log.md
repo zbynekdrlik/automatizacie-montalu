@@ -2,6 +2,24 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-08-24 — Integrácia: post-processing leštenie 3D (GTAO+SMAA+bloom tier-gated) (#288)
+
+- **Integrácia** lane `worktree-agent-a2b84ab372af0df27` (HEAD 9458e5e) do `dev` — serial
+  step fleet dispatchu. Version bump 0.24.26 → 0.24.27-dev.1 → clean 0.24.27.
+- **Merge (78f93d8):** jediný konflikt `.claude/rules/vizual3d.md` (append-both — obe sekcie
+  #290 supersample strop AJ #288 postproc zachované, žiadne leftover markery). Ostatné
+  (`vite.config.ts`, `snimka.ts`, `kvalita.ts`, `Vizual3D.svelte`) auto-mergli čisto (#290
+  je v spoločnej báze 7f8b727). `jeSoftverovyRenderer` presunutý do `kvalita.ts` (single
+  source of truth) = dôvod bezkonfliktného zdrojového merge dvoch renderer-gate lanes.
+- **Brány:** check 0/0, lint čistý, vitest 2157 PASS, coverage prahy držia (`postproc.ts`
+  reálne 32/32 = 100 %, NIE vylúčené).
+- **Review** (issuecomment-5389454963): `/review` self + `requesting-code-review`
+  (general-purpose subagent) → **0 🔴 0 🟡**, 3 🔵 non-blocking (tlačový PNG zámerne bez
+  postproc; glass-AO HW vizuálna kontrola = post-deploy item; scratch-ctx GPU string
+  note-only). Overených 5 integračných rizík; ctory vs three@0.185.1.
+- **PR:** dev→main, `Closes #288`, `Advances #285` (umbrella leštenie 3D).
+- **Deferraly #288** (4, už na tickete pred integráciou): N8AO knižnica, PCSS, baked AO,
+  KTX2 — nerobené v tomto tikete, follow-up.
 ## 2026-08-18 — Zasklenia: sklo „3.3.1" pre Štandard plus a starý Štandard (#214)
 
 - **Issue:** #214 — Patrik (Odoo 207, správa 1703260, 18.8.): pridať do výberu skla pri
@@ -1012,7 +1030,7 @@ Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, test
   rám sedí priamo na dlažbe, žiadna medzera, tieň sleduje celú šírku rámu.
   `{"ok":true,"version":"0.16.8 (f1758c2)","live":true}`.
 - Playbook: `.claude/rules/vizual3d.md` rozšírený o (1) "nepredpokladaj
-  Y-posun, over číslami" ponaučenie, (2) `__VIZDEBUG` naживo scene-
+  Y-posun, over číslami" ponaučenie, (2) `__VIZDEBUG` naživo scene-
   introspekcia technika, (3) canvas/`document` no-op polyfill pre testovanie
   `scena.ts` mimo `low` tieru, (4) `jadroR`/`stred` sú frakcie CELEJ šírky
   canvasu, nie polovice (rovnaká trieda chyby ako sRGB/lineárny gotcha).
@@ -1558,3 +1576,82 @@ implementované, nereprodukovateľné čestný null:
 - **Review (fresh general-purpose, Opus 4.8): 0/0/3 (0 kritických, 0 warningov, 3 návrhy), všetky 3 opravené v `f0953d1`:** in-flight guard lazy importu; E2E assert 3D vrstva neaktívna pred submitom (lazy-load lock); explicitná názov→odtieň mapa testu (nie tautológia). Po oprave 2078 unit testov, coverage 95.73/89.28/97.75/97.17.
 - **Playbook:** nové `.claude/rules/konfigurator.md` sekcia 6 (3D náhľad na verejnej route — money guard graf, lazy import, viz snapshot, key remount, typSkla3D).
 - **Sesterský tiket (leštenie 3D) OSTÁVA OTVORENÝ** — engine na `dev` + používaný route-om, leštenie + reálny mobil tier. PR: uzatvára tento tiket + posúva sesterský (bez close-keywordu pre sesterský).
+## #276 — dohra: CI supersample fix + release 0.24.25
+
+- **CI E2E fail (run 32661546086):** `zasklenia-zakaznicky.spec.ts` ×2 na zero-console — 11 GL warningov (`Texture total allocation size is too large` → incomplete framebuffer). Root cause: #285 pridal 3× supersample vetvu; SwiftShader per-dimension limity (16384) prejdú, ale CELKOVÝ alokačný rozpočet 7200×4860 nezvládne (na maine max 2× = zelené).
+- **Fix (RED `70a2f57` → GREEN `ea5b817`):** `supersampleFaktor` strop 2× pre softvérový/neznámy renderer (`jeSoftverovyRenderer(UNMASKED_RENDERER)`), 3× len potvrdený hardvér; fail-safe default softvér. 2084 unit testov, coverage nad prahmi.
+- **Release:** PR #290 merged `7f8b727` → v0.24.25 na prode, deploy-set zelený, celý beh 32663385319 success. Prod verify: footer `v0.24.25 (7f8b727)`, 3D hero renderuje po submite (RAL 9005 + 4.4.2 mliečne, canvas 694×434, 1 kontext, 0 console errors — len známy GL-driver perf note), žiaden únik cien. #276 CLOSED, sesterský #285 OSTÁVA OTVORENÝ (leštenie #288).
+- **Playbook:** `vizual3d.md` — SwiftShader supersample gotcha (per-dimension limity klamú o celkovom rozpočte).
+---
+## #282 — Interný zoznam dopytov z konfigurátora (/dopyty-konfigurator) — INTEGRÁCIA
+
+- **Merge build-only lane** `worktree-agent-a0d257d83d7909525` (tip `177ab3f`) do `dev` (merge commit `2f3088d`). Lane vznikla zo základu `5cd67fe` (len migrácie do v24) a niesla #277 + #282; `dev` medzitým dostal #277 (identicky), #278 (Odoo lead, migrácia v26), #276/#285 (3D vizuál). Lane = STARŠÍ snapshot bez #276/#278/#285.
+- **Jediný merge konflikt: `dopyt-store.ts` — vyriešený ako UNION:** ponechané #278 lead funkcie (`getDopytForLead`/`getPendingLeadDopyty`/`markLeadCreated`/`markLeadFailed`/`DopytLeadRiadok`) AJ #282 zoznam funkcie (`listDopyty`/`hasOdooLeadColumn`/`DopytListRiadok`). Ostatné súbory auto-merge v prospech dev základu.
+- **`migracie.ts` = dev (v25+v26); lane duplikát v25 (#277 tabuľka `dopyt`) zahodený — ŽIADNE prečíslovanie** (lane nepridal novú migráciu, len znovuvytvoril existujúcu). #282 číta `odoo_lead_id` defenzívne cez `PRAGMA table_info` (`hasOdooLeadColumn`), nezávisle od poradia landu #278/#282.
+- **Test integrácia (commit `77b2b26`):** lane #282 testy (`dopyt-list.test.ts`, `dopyt-list-load.test.ts`) predpokladali v25 (bez odoo stĺpca) a simulovali #278 cez `ALTER TABLE`. Po merge je zdieľaná test DB na v26 → stĺpec už existuje (`ALTER` by padol na duplicate column). Testy zosúladené s v26; defenzívna no-column vetva `listDopyty` naďalej krytá cez explicitný `hasOdoo=false` param.
+- **Money-safety:** `/dopyty-konfigurator` je INTERNÁ (auth cez `hooks.server.ts` PUBLIC_PATHS + b2b denylist `B2B_FORBIDDEN_PREFIXES` + defense-in-depth `isInternal` v loade aj PDF endpointe). `dopyt-pdf.ts` re-generuje PDF špecifikáciu (NULA cien) z uloženej konfigurácie. Verejná `/konfigurator` ostáva bez cien; nič testové k `/data/dlv-import`; `UNIQUE(zak,op,live)` nedotknuté.
+- **Review (fresh general-purpose, Opus 4.8): 0 🔴 0 🟡 2 🔵, oba opravené `2db8a8e`:** 🔵 `dopyt-money-safety` guard rozšírený o walk root `src/routes/dopyty-konfigurator/` (route súbory neboli kryté); 🔵 zastaralé „(v25)" komentáre → „(v26)".
+- **Živá verifikácia** (`vite dev` + Playwright, DB v26): anon → `/login?next=…`; interný login → zoznam so seed dopytom + súhrn (3000 × 4000 mm, RAL 7016, Deluxe Float) + stĺpec „Odoo lead" = „—", 0 console; PDF re-download → `%PDF-` 10 098 B, správny filename, 400/404 na neplatné/neexistujúce id; b2b → redirect na `/zasklenia` (zoznam aj PDF).
+- **Gate:** check 0 chýb, lint čisté, `npm test` 160 súborov / 2119 testov zelené, coverage nad prahmi. Clean bump `0.24.26`. PR dev→main „Closes #282".
+- **Playbook:** rule `.claude/rules/large-file-integration` neaplikuje; integračná gotcha (lane v25 duplikát vs dev v26, `hasOdoo=false` param na zachovanie defenzívnej vetvy) zachytená v playbook-review.
+
+## CI-fix PR #291 (#282) — 2. kolo, dve nezávislé zlyhania na head 182ed8e (2026-08-24)
+
+- **E2E `no such table: dopyt` (dopyty-konfigurator.spec.ts:50), DRUHÝKRÁT — root cause bol INÝ než 1. pokus.** `hooks.server.ts` importuje `db.ts` → migrácia beží pri BOOTE preview servera (nie pri prvom requeste, ako čakal 182ed8e `url:/health` fix). Playwright spúšťa `globalSetup` AŽ PO boote (build-free sonda: SERVER_BOOT pred GLOBALSETUP ~270 ms), takže starý globalSetup `rmSync('./data/e2e.db')` mazal už zmigrovanú DB spod bežiaceho servera → osirotený inode (244 testov prešlo z neho), cesta zmizla → seedDopyt otvoril prázdny súbor. Deterministicky reprodukované mimo CI (open+migrate → rmSync → nový connection = no such table; a FIXED order: reset → boot → server cez WAL vidí seed test procesu). **Fix (`867151f`):** reset e2e stavu presunutý do `webServer.command` PRED `npm run preview` (`node e2e/reset-e2e-db.mjs`), `global-setup.ts` zrušený. Gotcha v `.claude/rules/testing.md`.
+- **Mutation `ENOTEMPTY rename deps___vitest__` (mutation-diff shard 4).** NIE mutant, NIE timeout — flaky race: N paralelných Stryker vitest procesov zdieľa symlinknutý `node_modules/.vite` a preteká na atomickom rename optimize temp dir. **Fix (`24e1ce3`):** per-proces `cacheDir` (`node_modules/.vite-stryker-${pid}`) scoped na `.stryker-tmp` CWD; normálny beh nedotknutý. Gotcha v `.claude/rules/testing.md`.
+- **Gate:** `npm run check` 0 chýb, `npm run lint` čisté, `npm test` 160 súborov / 2119 testov zelené, coverage nad prahmi. Verzia ostáva `0.24.26` (release unit #282, nebumpovať). Lokálny build/E2E preview nespúšťaný (Tier 0 + dispatch) — end-to-end overí CI. Design comment + root-cause dôkazy na PR #291.
+- **Bypass:** sankcionovaný pre-existing `test.skip(BASE_URL)` guard z lane #282 v otvorenom PR rozsahu (`# airuleset:test-skip-ok`, zhodne s 8035878/182ed8e).
+
+## #294 + #295 — Odpis: dvojitý import + tichá strata položiek (BATCH, worktree agent-a85429d46bd9bd351)
+
+Vetva `worktree-agent-a85429d46bd9bd351` (base `4b3598a`). Bump `0.24.28-dev.1` (`ef2efec`).
+Dôkazy: `~/.claude/work-products/money-odpis-audit/verdict.md` §2/§3 + `our-side-analysis.md`.
+
+**#294 — dvojitý import (append-only ledger + normalizácia op/zak):**
+- Root cause (verdikt §2, dokázané): `releaseOdpis` maže dedup kľúč `odpis_log` bez Money-guardu
+  (uvoľni → pošli znova = re-import; 30.7 incident 4 uvoľnenia ↔ 5 identických content-hash v DONE);
+  `op`/`zak` nenormalizované (`OP260286` vs `260286` = 2 riadky).
+- RED `77fba2c` (`tests/money-ledger.test.ts`): (1) write→(Money spracoval, súbor preč)→release→write
+  identický ⇒ re-import (existsSync target=true, malo false); (2) `OP260286` potom `260286` ⇒ written
+  (malo duplicate). GREEN `21b3571`.
+- Migrácia v27 (`migracie.ts`): `odpis_imported(modul,zak_norm,op_norm,live,content_hash,kind∈
+  {import,override},filename,actor,reason,created_at)` — APPEND-ONLY, release/kompenzácia NEMAŽE +
+  `odpis_log.zak_norm/op_norm` (LOOKUP dedup, žiadny UNIQUE — verdikt zakazuje deštruktívnu migráciu
+  existujúcich kolidujúcich riadkov id 46/47; backfill raw copy; guard existencie odpis_log len pre
+  minimálne test-fixtures). `content_hash` v odpis_log zmenené na `contentHash(zak_norm,...)`
+  (write-only stĺpec, žiadny konzument logiky; planHash guard modulov je oddelený — z RAW zak).
+- `writeOdpis`: normalizovaný precheck → ledger safety-net (`imports>overrides` ⇒ `blocked`/
+  `ledger-duplicate`, per-order tuple + content_hash, NIKDY globálny hash — owner: „viacero
+  objednavok rovnaky obsah") → existing atomic claim (RAW UNIQUE, race) → file write → append
+  `import` AŽ PO úspešnom rename (kompenzácia ho nevytvorí). `normOp`: `260286≡OP260286`,
+  `OPOP260233→OP260233`, `OPDL…` distinct, swapped-fields log+warn.
+- Override `povolitReimport` na /odpisy = release + append `override` (one-shot, auditované cfg_audit);
+  bežné „Uvoľniť" identický obsah ĎALEJ blokuje (poistka). 5 modulov: `blocked` vetva reuse
+  `step:'duplikat'` cez `blokHlaska(outcome,...)`.
+- Test-fix (justif.): `money.test.ts` release test asertoval starý (buggy) „re-write prejde" → teraz
+  `blocked`; `migration.test.ts` idempotency `SELECT *` → explicitný zoznam stĺpcov (v27 pridal stĺpce).
+- Large-file-split: seed dáta/funkcie → `migracie-seed.ts` (parameter injection; migracie.ts 930 r. < 1000).
+- Follow-upy: #299 staging move-evidencia (needs-user-decision), #297 perzistencia money logov (cross-cutting).
+
+**#295 — tichá strata položiek (pre-export validácia kódov):**
+- Root cause (verdikt §3): `writeOdpis` po rename neoveruje NIČ na úrovni riadkov; neznámy Money kód →
+  import ticho zahodí CELÝ doklad (Dominik: „neodpíše VÔBEC").
+- RED `7e58ea5` (`tests/money-validacia-kody.test.ts`, MONEY_LIVE=1 do TEMP): live neznámy kód → súbor
+  vznikol. GREEN `9ef11bd`.
+- `ceny.ts validateOdpisKody`: proti dennému `material_prices` snapshotu; neznámy kód / `sklad=null` ⇒
+  problém. PREFIX-SCOPE (empirický zo snapshotu — validuje len ZASP/ZASK/TS prefix, pergola PRP*/bazén
+  BPP* mimo scope → neblokuje). Snapshot-age guard >7 dní/chýba ⇒ degrade (warning, neblokuj).
+- `writeOdpis` live=1 → `!ok` ⇒ `{status:'blocked', reason:'unknown-kod', chybajuceKody}`;
+  `opts.overrideKody` ⇒ auditovaný bypass (cfg_audit). live=0 sa neblokuje.
+- Post-import readback (verdikt §3 bod B) = follow-up **#298** (Scope-gate: security-boundary — Money
+  DB RO prístup z VPS appky = nová infra).
+
+**Review (CYCLE step 6, adversariálny Fable dispatch): 1 🔴, 6 🟡, 5 🔵 — opravené `7b9acb2`:**
+🔴 svelte-check `?.[0].dovod`→`?.[0]?.dovod` (CI gate červený, chytila to až review — svelte-check
+kryje aj `.ts` testy). 🟡 deploy-okno: ledger `import` ATOMICKY s claim-om (pred zápisom súboru),
+kompenzácia zmaže aj import riadok. 🟡 v27 backfill ledgeru z existujúcich odpisov (história chránená).
+🔵 komentáre (cross-spelling race, ceny prefix asymetria), typo, testy (v27 backfill, povolitReimport
+akcia). Odložené 🟡 (override UI unreachable, Uvoľniť dead-end, OP/OPDL bare-digit, E2E) → **#300**
+(cross-cutting) + Money-side overenie OP/OPDL rád. Full suite 2192 zelené, branch cov 89.36% ≥ 88.
+**Playbook:** `lint-formatting.md` (`*/`-v-JSDoc pasca, optional-chaining `?.[0]?.x`), money-odpis
+skill §7 (dedup ledger + normalizácia + pre-export validácia).

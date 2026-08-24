@@ -18,7 +18,11 @@ const B2B_FORBIDDEN_PREFIXES = [
 	// #245: test-only route na overenie chybovej stránky (v prode 404, len E2E ju
 	// zapína cez ENABLE_TEST_ERROR_ROUTE) — b2b sem nemá čo robiť; drift guard
 	// (tests/b2b-route-coverage.test.ts) beztak vyžaduje, aby bola v denyliste.
-	'/__test-error'
+	'/__test-error',
+	// #282: interný prehľad zákazníckych dopytov z konfigurátora — INTERNÉ-only
+	// (kontaktné údaje + súhrn + re-download PDF). Pokrýva aj /dopyty-konfigurator/pdf
+	// (GET endpoint) prefixom. b2b sem nemá prístup; drift guard to vynúti.
+	'/dopyty-konfigurator'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —

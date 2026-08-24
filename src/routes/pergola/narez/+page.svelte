@@ -19,6 +19,7 @@
 	import RucnePolozky from '$lib/components/pergola/RucnePolozky.svelte';
 	import RezNahlad from '$lib/components/pergola/RezNahlad.svelte';
 	import RezHotovo from '$lib/components/pergola/RezHotovo.svelte';
+	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import {
 		spocitajNarez,
 		komponentyPergoly,
@@ -301,6 +302,13 @@
 	/>
 {:else if step === 'rez-hotovo' && outcome}
 	<RezHotovo {ident} {outcome} rozpis={rozpis ?? null} />
+{:else if step === 'blocked' && form && 'rawEntries' in form && form.rawEntries}
+	<OdpisBlok
+		rawEntries={form.rawEntries}
+		blokReason={form.blokReason}
+		blokAction={form.blokAction}
+		error={form.rezError ?? ''}
+	/>
 {/if}
 
 <style>

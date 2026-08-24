@@ -15,6 +15,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { db } from './db';
 import { logger } from './log';
+import { validateOdpisKody, type KodProblem } from './ceny';
 import type { MJ } from '$lib/komponenty';
 
 const log = logger('money');
@@ -100,11 +101,20 @@ export interface OdpisJob {
 }
 
 export interface OdpisOutcome {
-	status: 'written' | 'duplicate';
+	status: 'written' | 'duplicate' | 'blocked';
+	/** dôvod bloku (len `status==='blocked'`): `ledger-duplicate` = identický obsah tej istej
+	 *  zákazky už bol importovaný do Money a nebol RE-autorizovaný override-om (#294);
+	 *  `unknown-kod` = Money niektorý kód nepozná / nemá skladovú kartu → import by doklad ticho
+	 *  preskočil (#295). */
+	reason?: 'ledger-duplicate' | 'unknown-kod';
 	live: boolean;
 	target: string;
 	filename: string;
 	duplicateCreatedAt?: string;
+	/** len `reason==='ledger-duplicate'`: kedy bol identický obsah naposledy importovaný */
+	ledgerImportedAt?: string;
+	/** len `reason==='unknown-kod'`: kódy, ktoré Money nepozná / nemajú skladovú kartu */
+	chybajuceKody?: KodProblem[];
 }
 
 // env sa číta pri každom volaní (nie pri importe) — kvôli testom a možnosti
@@ -148,6 +158,178 @@ export function contentHash(zak: string, polozky: Polozka[]): string {
 	let h = 5381;
 	for (let i = 0; i < sig.length; i++) h = ((h << 5) + h + sig.charCodeAt(i)) >>> 0;
 	return ('00000000' + h.toString(16)).slice(-8);
+}
+
+/**
+ * Normalizácia čísla objednávky (`op`) pre dedup + ledger kľúč (#294): `trim`, `toUpperCase`,
+ * zbaliť whitespace + kanonizovať OP prefix — `'260286'` ≡ `'OP260286'`, `'OPOP260233'` →
+ * `'OP260233'` (zdvojený OP z copy-paste). `'OPDL…'` je INÝ typ dokladu (nie OP) → ostáva
+ * nedotknutý. Prázdny reťazec ostáva prázdny.
+ */
+export function normOp(op: string): string {
+	let s = String(op).trim().toUpperCase().replace(/\s+/g, '');
+	if (!s) return '';
+	s = s.replace(/^(OP)+(?=\d)/, 'OP'); // OPOP260233 → OP260233 ; OP260286 → OP260286
+	if (/^\d/.test(s)) s = 'OP' + s; // 260286 → OP260286
+	return s;
+}
+
+/** Normalizácia čísla zákazky (`zak`) pre dedup + ledger kľúč (#294): `trim`/`toUpperCase`/
+ *  zbaliť whitespace. ZAK nemá prefixovú kanonizáciu ako `op`. */
+export function normZak(zak: string): string {
+	return String(zak).trim().toUpperCase().replace(/\s+/g, '');
+}
+
+/** Prehodené polia (`zak` obsahuje `OP…`, `op` obsahuje `ZAK…`) — verdikt §2 id=38/78. Nie je to
+ *  tvrdý blok (dedup aj tak funguje na normalizovaných hodnotách), ale zaslúži si WARN do logu. */
+function detekujPrehodenePolia(zakNorm: string, opNorm: string): boolean {
+	return zakNorm.startsWith('OP') || opNorm.startsWith('ZAK');
+}
+
+/** Hláška pre operátora, keď ledger zablokoval re-import IDENTICKÉHO obsahu (#294,
+ *  `reason==='ledger-duplicate'`). */
+function blokLedgerHlaska(zak: string, op: string, importedAt?: string): string {
+	return (
+		`Rovnaký obsah zákazky ${zak} (OP ${op}) už bol raz importovaný do Money` +
+		(importedAt ? ` (${importedAt})` : '') +
+		`. Znova ho NEposielam — poistka proti dvojitému importu. Ak si import v Money NAOZAJ zmazal, ` +
+		`potvrď to tlačidlom „⚠️ Odoslať aj tak" nižšie (rovnaký obsah pošle ešte raz).`
+	);
+}
+
+/** Hláška pre operátora, keď Money niektorý kód nepozná / nemá naň skladovú kartu (#295,
+ *  `reason==='unknown-kod'`). Import by taký doklad ticho NEODPÍSAL (celý sa preskočí). */
+function blokKodyHlaska(problemy: KodProblem[]): string {
+	const kody = problemy
+		.map((p) => `${p.kod}${p.dovod === 'bez-skladovej-karty' ? ' (bez skladovej karty)' : ''}`)
+		.join(', ');
+	const slovo = problemy.length === 1 ? 'kód' : 'kódy';
+	return (
+		`Money nepozná ${slovo}: ${kody}. Tento doklad by import NEODPÍSAL (Money pri neznámom ` +
+		`kóde preskočí CELÝ doklad). Skontroluj kód, alebo ho nechaj doplniť do Money. Ak je kód ` +
+		`správny a Money ho už má, cenník sa aktualizuje ráno.`
+	);
+}
+
+/** Jeden zdroj pravdy pre hlášku bloku vo všetkých moduloch — vyberie správnu podľa `reason`. */
+export function blokHlaska(outcome: OdpisOutcome, zak: string, op: string): string {
+	if (outcome.reason === 'unknown-kod') return blokKodyHlaska(outcome.chybajuceKody ?? []);
+	return blokLedgerHlaska(zak, op, outcome.ledgerImportedAt);
+}
+
+/**
+ * (#300) „Odoslať aj tak" mapovanie: skryté pole(-a) `override` z re-submit formulára → override
+ * flagy pre `writeOdpis`. `unknown-kod` ⇒ `overrideKody`, `ledger-duplicate` ⇒ `overrideLedger`.
+ * Číta VŠETKY `override` hodnoty (`getAll`) — jeden doklad môže naraz naraziť na OBA bloky (Money
+ * kód, čo snapshot ešte nemá, + identický obsah po „Uvoľniť"); vtedy druhé „Odoslať aj tak" nesie
+ * OBE hodnoty, takže sa prekonajú NARAZ (bez donekonečna sa striedajúceho ping-pongu, #300 review 🟡).
+ * Bežný (prvý) submit nemá `override` pole → obe flagy false = žiadny bypass.
+ */
+export function overrideOpts(form: FormData): { overrideKody?: boolean; overrideLedger?: boolean } {
+	const o = form.getAll('override').map(String);
+	return {
+		overrideKody: o.includes('unknown-kod'),
+		overrideLedger: o.includes('ledger-duplicate')
+	};
+}
+
+/**
+ * (#300) Surové string polia POST-u pre re-render „Odoslať aj tak". Zachová operátorove ručné úpravy
+ * množstiev (`qty_*`), vstup AJ už potvrdené `override` hodnoty (aby sa pri druhom bloku nestratil
+ * prvý override — #300 review 🟡; `OdpisBlok` dopĺňa len chýbajúcu hodnotu). Re-submit tak postaví
+ * IDENTICKÝ job (rovnaký content_hash → override mieri na správny tuple). `File` hodnoty sa vynechajú
+ * (odpis formuláre sú čisto textové).
+ */
+export function rawFormEntries(form: FormData): [string, string][] {
+	const out: [string, string][] = [];
+	for (const [k, v] of form.entries()) {
+		if (typeof v === 'string') out.push([k, v]);
+	}
+	return out;
+}
+
+/** Audit vedomého override chýbajúcich Money kódov (#295) — NIE tiché preskočenie: do `cfg_audit`
+ *  sa zapíše, KTO poslal odpis napriek varovaniu a ktoré kódy Money nepozná. */
+function auditOverrideKody(job: OdpisJob, problemy: KodProblem[]): void {
+	const kody = problemy.map((p) => p.kod).join(', ');
+	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+		job.createdBy,
+		'odpis',
+		JSON.stringify([
+			{
+				pole: `Override chýbajúcich Money kódov (${kody}) — odpis ${job.modul} ${job.zak} OP${job.op} odoslaný napriek varovaniu`,
+				stara: 0,
+				nova: 1
+			}
+		])
+	);
+	log.warn('odpis: override chýbajúcich Money kódov', {
+		modul: job.modul,
+		zak: job.zak,
+		op: job.op,
+		kody
+	});
+}
+
+/** Audit vedomého ledger override (#300) — operátor potvrdil „Odoslať aj tak" pri identickom
+ *  obsahu, ktorý ledger blokoval (import v Money zmazal, ale klikol „Uvoľniť" namiesto „Povoliť
+ *  rovnaký"). NIE tiché preskočenie: do `cfg_audit` sa zapíše, KTO povolil re-import. */
+function auditOverrideLedger(job: OdpisJob): void {
+	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+		job.createdBy,
+		'odpis',
+		JSON.stringify([
+			{
+				pole: `Override ledgeru „Odoslať aj tak" — re-import identického obsahu ${job.modul} ${job.zak} OP${job.op} povolený (potvrdené zmazanie importu v Money)`,
+				stara: 0,
+				nova: 1
+			}
+		])
+	);
+	log.warn('odpis: override ledgeru „Odoslať aj tak"', {
+		modul: job.modul,
+		zak: job.zak,
+		op: job.op
+	});
+}
+
+interface LedgerCounts {
+	imports: number;
+	overrides: number;
+	lastImportedAt: string | undefined;
+}
+
+/**
+ * Počítadlo APPEND-ONLY ledgeru `odpis_imported` (#294) pre daný per-order tuple + `content_hash`.
+ * `writeOdpis` blokuje re-import, keď `imports > overrides` (identický obsah už raz importovaný a
+ * nebol RE-autorizovaný). Kľúč NIKDY nie je globálny hash — dve rôzne zákazky smú mať rovnaký obsah.
+ */
+function ledgerCounts(
+	modul: string,
+	zakNorm: string,
+	opNorm: string,
+	live: number,
+	contentHashV: string
+): LedgerCounts {
+	const row = db
+		.prepare(
+			`SELECT
+				SUM(CASE WHEN kind = 'import' THEN 1 ELSE 0 END) AS imports,
+				SUM(CASE WHEN kind = 'override' THEN 1 ELSE 0 END) AS overrides,
+				MAX(CASE WHEN kind = 'import' THEN created_at END) AS lastImportedAt
+			 FROM odpis_imported
+			 WHERE modul = ? AND zak_norm = ? AND op_norm = ? AND live = ? AND content_hash = ?`
+		)
+		.get(modul, zakNorm, opNorm, live, contentHashV) as {
+		imports: number | null;
+		overrides: number | null;
+		lastImportedAt: string | null;
+	};
+	return {
+		imports: row.imports ?? 0,
+		overrides: row.overrides ?? 0,
+		lastImportedAt: row.lastImportedAt ?? undefined
+	};
 }
 
 /**
@@ -196,26 +378,170 @@ export async function buildXlsx(job: OdpisJob): Promise<Buffer> {
  * zápisu súboru — vtedy je dedup záznam už odstránený a odoslanie sa dá
  * bezpečne zopakovať.
  */
-export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
+export async function writeOdpis(
+	job: OdpisJob,
+	opts: { overrideKody?: boolean; overrideLedger?: boolean } = {}
+): Promise<OdpisOutcome> {
 	const live = isLive() ? 1 : 0;
+	const zakNorm = normZak(job.zak);
+	const opNorm = normOp(job.op);
+	// content_hash pre ledger AJ pre odpis_log — normalizovaný zak (planHash guard modulov je
+	// oddelený, počíta si vlastný hash z RAW zak; toto je iba dedup/ledger kľúč, žiadny konzument
+	// logiky ho z odpis_log nečíta — overené grepom).
+	const ledgerHash = contentHash(zakNorm, job.polozky);
 	const dir = targetDirFor(job.cakaSubdir, job.caka);
 	const filename = filenameFor(job);
 	const target = path.join(dir, filename);
 
+	if (detekujPrehodenePolia(zakNorm, opNorm)) {
+		log.warn('odpis: podozrenie na prehodené polia zak/op', {
+			modul: job.modul,
+			zak: job.zak,
+			op: job.op,
+			zakNorm,
+			opNorm
+		});
+	}
+
+	// (#295) PRE-export validácia kódov proti dennému Money snapshotu — LEN pre live=1 (do Money
+	// reálne ide). Neznámy kód / kód bez skladovej karty ⇒ Money by ho ticho preskočil (Dominik:
+	// „keď chýba profil, neodpíše VÔBEC" — celý doklad). `overrideKody` = vedomý, AUDITOVANÝ bypass
+	// (napr. kód je správny a Money ho už má, len snapshot ešte nedobehol) — NIKDY tiché preskočenie.
+	// (#300 review 🟡) override kódov sa AUDITUJE až v zápisovej transakcii (nie tu) — inak by vedomý
+	// bypass zapísal falošný `cfg_audit` riadok „odoslaný napriek varovaniu" AJ keď ho následne
+	// zablokoval ledger (`imports>overrides`) a REÁLNE sa nič neodoslalo. Preto tu len zaznamenáme
+	// zámer + problémové kódy a audit spustíme atomicky so zápisom nižšie.
+	let overridingKody = false;
+	let kodProblemy: KodProblem[] = [];
+	if (live === 1) {
+		const val = validateOdpisKody(job.polozky);
+		if (!val.ok) {
+			if (opts.overrideKody === true) {
+				overridingKody = true;
+				kodProblemy = val.problemy;
+			} else {
+				log.warn('odpis blokovaný — Money nepozná kódy (import by doklad preskočil)', {
+					modul: job.modul,
+					zak: job.zak,
+					op: job.op,
+					kody: val.problemy.map((p) => p.kod)
+				});
+				return {
+					status: 'blocked',
+					reason: 'unknown-kod',
+					live: true,
+					target,
+					filename,
+					chybajuceKody: val.problemy
+				};
+			}
+		}
+	}
+
+	// (#294) normalizovaný dedup precheck — OP260286 ≡ 260286 obíde RAW UNIQUE, tak dedup-ujeme na
+	// normalizovaných stĺpcoch. RAW UNIQUE(modul,zak,op,live) nižšie kryje ATOMICKY len race
+	// IDENTICKÉHO zápisu (rovnaké raw zak/op). Cross-spelling race (OP260286 vs 260286 súbežne) NEMÁ
+	// DB constraint — kryje ho len to, že precheck→claim beží BEZ `await` v jednom synchrónnom bloku
+	// (jeden proces, better-sqlite3 synchrónne). NEVKLADAJ `await` medzi tento precheck a INSERT
+	// nižšie — otvoril by cross-spelling double-import okno.
+	const normDup = db
+		.prepare(
+			'SELECT created_at FROM odpis_log WHERE modul = ? AND live = ? AND zak_norm = ? AND op_norm = ?'
+		)
+		.get(job.modul, live, zakNorm, opNorm) as { created_at: string } | undefined;
+	if (normDup) {
+		log.warn('odpis duplikát — normalizovaný dedup kľúč už existuje, nič sa nezapisuje', {
+			modul: job.modul,
+			zak: job.zak,
+			op: job.op,
+			zakNorm,
+			opNorm,
+			live: isLive(),
+			existingCreatedAt: normDup.created_at
+		});
+		return {
+			status: 'duplicate',
+			live: isLive(),
+			target,
+			filename,
+			duplicateCreatedAt: normDup.created_at
+		};
+	}
+
+	// (#294) APPEND-ONLY ledger safety-net — identický obsah tej istej zákazky (per-order tuple +
+	// content_hash) už bol importovaný do Money a nebol RE-autorizovaný override-om (`povolitReimport`).
+	// Toto je poistka, ktorú „Uvoľniť" NEZMAŽE: releaseOdpis maže len `odpis_log`, ledger ostáva.
+	const led = ledgerCounts(job.modul, zakNorm, opNorm, live, ledgerHash);
+	const ledgerWouldBlock = led.imports > led.overrides;
+	if (ledgerWouldBlock && opts.overrideLedger !== true) {
+		log.warn('odpis blokovaný ledgerom — identický obsah už importovaný do Money bez override', {
+			modul: job.modul,
+			zak: job.zak,
+			op: job.op,
+			live: isLive(),
+			lastImportedAt: led.lastImportedAt
+		});
+		return {
+			status: 'blocked',
+			reason: 'ledger-duplicate',
+			live: isLive(),
+			target,
+			filename,
+			ledgerImportedAt: led.lastImportedAt
+		};
+	}
+	// (#300) TUPLE-based ledger override — operátor potvrdil „Odoslať aj tak" po tom, čo import
+	// v Money NAOZAJ zmazal, ale klikol „Uvoľniť" (nie „Povoliť rovnaký"), takže už NEEXISTUJE
+	// `odpis_log` riadok, na ktorý by sa dal zavolať `povolitReimport(id)`. Autorizujeme re-import
+	// PRIAMO z normalizovaného tuple + `content_hash` job-u (nepotrebuje živý log riadok): v
+	// zápisovej transakcii pribudne `kind='override'` ledger riadok (imports==overrides ⇒ prejde),
+	// vedome + AUDITOVANE. One-shot: následný `import` riadok zdvihne imports späť nad overrides,
+	// takže ďalší identický re-send je zas blokovaný (rovnaká sémantika ako `povolitReimport`).
+	const overridingLedger = ledgerWouldBlock && opts.overrideLedger === true;
+
 	let rowId: number | bigint;
+	// (#294) id ledger 'import' riadku — zapíše sa ATOMICKY s claim-om (nižšie), pri zlyhaní
+	// zápisu súboru (kompenzácia) sa podľa neho zruší.
+	let ledgerImportId: number | bigint = 0;
 	try {
-		// odpis_log + odpis_polozky v JEDNEJ transakcii (#154, fáza 1): položky sú 1:1
-		// s tým, čo odišlo do Money (predtým appka držala len súhrn v `detail`) a musia
-		// vzniknúť/zaniknúť SPOLU s dedup záznamom — nikdy log bez položiek alebo naopak.
-		// UNIQUE (dedup) aj FK zlyhanie automaticky rollbackne CELÚ transakciu.
+		// odpis_log + odpis_polozky + ledger 'import' v JEDNEJ transakcii (#154 fáza 1 + #294):
+		// položky sú 1:1 s tým, čo odišlo do Money a musia vzniknúť/zaniknúť SPOLU s dedup
+		// záznamom. UNIQUE (dedup) aj FK zlyhanie automaticky rollbackne CELÚ transakciu.
 		const insLog = db.prepare(
-			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, zak_norm, op_norm)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		);
 		const insPolozka = db.prepare(
 			`INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, ?)`
 		);
+		const insImported = db.prepare(
+			`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor)
+			 VALUES (?, ?, ?, ?, ?, 'import', ?, ?)`
+		);
+		const insOverride = db.prepare(
+			`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor, reason)
+			 VALUES (?, ?, ?, ?, ?, 'override', ?, ?, ?)`
+		);
 		rowId = db.transaction(() => {
+			// (#300) override MUSÍ predchádzať `import` riadku v tej istej transakcii, aby počítadlo
+			// (imports vs overrides) ostalo konzistentné aj keby zápis súboru neskôr zlyhal
+			// (kompenzácia maže len `import` riadok, override authorization prežije → retry funguje).
+			if (overridingLedger) {
+				insOverride.run(
+					job.modul,
+					zakNorm,
+					opNorm,
+					live,
+					ledgerHash,
+					filename,
+					job.createdBy,
+					'override z modulu — „Odoslať aj tak" po zmazaní importu v Money (ledger-duplicate)'
+				);
+				auditOverrideLedger(job);
+			}
+			// (#300 review 🟡) audit override kódov AŽ TU — atomicky so zápisom, takže sa zapíše LEN keď
+			// sa odpis reálne odoslal (nie keď ho medzitým zablokoval ledger a nič neodišlo).
+			if (overridingKody) auditOverrideKody(job, kodProblemy);
 			const id = insLog.run(
 				job.modul,
 				job.zak,
@@ -225,11 +551,28 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 				live,
 				target,
 				filename,
-				contentHash(job.zak, job.polozky),
+				ledgerHash,
 				JSON.stringify(job.detail),
-				job.createdBy
+				job.createdBy,
+				zakNorm,
+				opNorm
 			).lastInsertRowid;
 			for (const o of job.polozky) insPolozka.run(id, o.kod, o.nazov, o.qty, o.mj ?? 'm');
+			// (#294) ledger 'import' ATOMICKY s claim-om — zapíše sa PRED zápisom súboru, takže ani
+			// reštart/pád v okne medzi `rename` a zápisom ledgeru nenechá REÁLNY Money import
+			// nezaznamenaný (inak by neskoršie uvoľnenie + identický re-send obišlo ledger →
+			// dvojitý import, presne to, čo ledger stráži). Pri ZLYHANÍ zápisu súboru (kompenzácia
+			// nižšie) sa TENTO riadok zmaže — import sa nikdy nevykonal, čo NIE JE porušenie
+			// append-only (append-only chráni záznam REÁLNEHO importu, nie zrušenú claim-nu).
+			ledgerImportId = insImported.run(
+				job.modul,
+				zakNorm,
+				opNorm,
+				live,
+				ledgerHash,
+				filename,
+				job.createdBy
+			).lastInsertRowid;
 			return id;
 		})();
 	} catch (e: unknown) {
@@ -309,9 +652,14 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 			bytes: buf.length
 		});
 	} catch (e) {
-		// kompenzácia: súbor sa nezapísal → uvoľni dedup kľúč, nech sa dá poslať znova
-		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(rowId);
-		log.error('odpis kompenzácia — zápis súboru zlyhal, dedup kľúč uvoľnený', {
+		// kompenzácia: súbor sa nezapísal → uvoľni dedup kľúč AJ zruš ledger 'import' riadok (import
+		// sa NIKDY nevykonal, takže jeho zmazanie NIE je porušenie append-only — append-only chráni
+		// záznam REÁLNEHO importu), nech sa dá poslať znova. Obe v jednej transakcii.
+		db.transaction(() => {
+			db.prepare('DELETE FROM odpis_log WHERE id = ?').run(rowId);
+			db.prepare('DELETE FROM odpis_imported WHERE id = ?').run(ledgerImportId);
+		})();
+		log.error('odpis kompenzácia — zápis súboru zlyhal, dedup kľúč + ledger claim uvoľnené', {
 			modul: job.modul,
 			zak: job.zak,
 			op: job.op,
@@ -372,6 +720,72 @@ export function releaseOdpis(id: number, username: string): boolean {
 		);
 	})();
 	log.info('odpis uvoľnený', {
+		id,
+		modul: row.modul,
+		zak: row.zak,
+		op: row.op,
+		live: !!row.live,
+		actor: username
+	});
+	return true;
+}
+
+/**
+ * OVERRIDE pre re-import IDENTICKÉHO obsahu (#294) — deliberátna, AUDITOVANÁ akcia, NIKDY tichý
+ * bypass. Použije sa LEN keď operátor NAOZAJ zmazal import v Money a potrebuje ho poslať znova s
+ * rovnakým obsahom (ledger by ho inak zablokoval). Robí dve veci atomicky:
+ *   1. APPEND `kind='override'` do `odpis_imported` (imports > overrides ⇒ blok; jeden override =
+ *      jeden povolený re-import, one-shot — počítadlo sa nikdy nevynuluje, len narastá).
+ *   2. Uvoľní dedup kľúč (`DELETE odpis_log`), inak by re-send padol na `duplicate`.
+ * Audituje sa v `cfg_audit` (rovnako ako `releaseOdpis`). NA ROZDIEL od „Uvoľniť" TOTO povolí aj
+ * IDENTICKÝ obsah — bežné „Uvoľniť" ledger stále blokuje (poistka proti nechcenému dvojitému importu).
+ */
+export function povolitReimport(id: number, username: string): boolean {
+	const row = db
+		.prepare(
+			'SELECT modul, zak, op, live, filename, content_hash, zak_norm, op_norm FROM odpis_log WHERE id = ?'
+		)
+		.get(id) as
+		| {
+				modul: string;
+				zak: string;
+				op: string;
+				live: number;
+				filename: string;
+				content_hash: string;
+				zak_norm: string;
+				op_norm: string;
+		  }
+		| undefined;
+	if (!row) return false;
+	db.transaction(() => {
+		db.prepare(
+			`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor, reason)
+			 VALUES (?, ?, ?, ?, ?, 'override', ?, ?, ?)`
+		).run(
+			row.modul,
+			row.zak_norm,
+			row.op_norm,
+			row.live,
+			row.content_hash,
+			row.filename,
+			username,
+			'povolený re-import identického obsahu (potvrdené zmazanie importu v Money)'
+		);
+		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(id);
+		db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+			username,
+			'odpis',
+			JSON.stringify([
+				{
+					pole: `Povolený RE-IMPORT odpisu ${row.modul} ${row.zak} OP${row.op} (${row.live ? 'LIVE' : 'TEST'}) — ${row.filename}`,
+					stara: 1,
+					nova: 0
+				}
+			])
+		);
+	})();
+	log.info('odpis re-import povolený (override)', {
 		id,
 		modul: row.modul,
 		zak: row.zak,

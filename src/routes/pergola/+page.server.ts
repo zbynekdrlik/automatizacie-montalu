@@ -12,7 +12,15 @@ import {
 	validatePergola,
 	CATALOG
 } from '$lib/server/pergola';
-import { writeOdpis, isLive, applyEdits, type OdpisJob } from '$lib/server/money';
+import {
+	writeOdpis,
+	isLive,
+	applyEdits,
+	blokHlaska,
+	overrideOpts,
+	rawFormEntries,
+	type OdpisJob
+} from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 
@@ -203,11 +211,21 @@ export const actions = {
 		};
 
 		try {
-			const outcome = await writeOdpis(job);
+			const outcome = await writeOdpis(job, overrideOpts(form));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a uvoľni záznam v histórii odpisov.`,
+					vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslat',
+					rawEntries: rawFormEntries(form),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup
 				};
 			}

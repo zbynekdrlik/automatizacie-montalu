@@ -8,6 +8,8 @@
 // neposiela; navyše kľúče password/token/secret/authorization/cookie sa redigujú
 // (defense-in-depth). `Error` hodnoty sa serializujú aj so `stack`.
 
+import { appendMoneyAudit, isMoneyModule, auditPath } from './money-audit';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 type Fields = Record<string, unknown>;
 
@@ -44,8 +46,17 @@ function redact(fields: Fields): Fields {
 	return out;
 }
 
+// Forenzný money-audit súbor (#297): money-modulové udalosti (info+) idú OKREM
+// stdout aj do perzistentného súboru — NEZÁVISLE od stdout LOG_LEVEL, aby
+// operačná zmena log-levelu nikdy neumlčala forenziku (odpis zapísaný/uvoľnený/
+// claim sú `info` a forenzne najdôležitejšie; prežijú redeploy — money-audit.ts).
+const AUDIT_MIN = LEVELS.info;
+
 function emit(level: LogLevel, module: string, msg: string, fields?: Fields): void {
-	if (LEVELS[level] < threshold()) return;
+	const toStdout = LEVELS[level] >= threshold();
+	const toAudit = LEVELS[level] >= AUDIT_MIN && isMoneyModule(module) && auditPath() !== null;
+	// early-return bez JSON.stringify keď žiaden sink záznam nechce (bežný non-money debug)
+	if (!toStdout && !toAudit) return;
 	const rec = {
 		time: new Date().toISOString(),
 		level,
@@ -53,11 +64,16 @@ function emit(level: LogLevel, module: string, msg: string, fields?: Fields): vo
 		msg,
 		...(fields ? redact(fields) : {})
 	};
-	try {
-		process.stdout.write(JSON.stringify(rec) + '\n');
-	} catch {
-		// logovanie nesmie NIKDY zhodiť požiadavku
+	const line = JSON.stringify(rec) + '\n';
+	if (toStdout) {
+		try {
+			process.stdout.write(line);
+		} catch {
+			// logovanie nesmie NIKDY zhodiť požiadavku
+		}
 	}
+	// money-audit sink má vlastné best-effort try/catch (nikdy nehodí)
+	if (toAudit) appendMoneyAudit(line);
 }
 
 export interface Logger {

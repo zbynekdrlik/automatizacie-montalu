@@ -51,3 +51,14 @@ hodnota zodpovedá AKTUÁLNEMU serverovému času (porovnaj s `new Date()` nafor
 Intl logikou v teste, s toleranciou ~1-2 minúty na hranicu minúty/latenciu kliku) — to zachytí
 regresiu typu "hodnota sa počíta raz pri štarte servera namiesto per-request", čo je presne to,
 čo taký test má chrániť.
+
+## SQLite `datetime('now')` timestamp → zobrazenie: cez `sqliteUtcToIso`, nie priamo (#282)
+
+SQLite `datetime('now')` (napr. `dopyt.created_at`) vracia UTC v tvare
+`YYYY-MM-DD HH:MM:SS` — **medzera, BEZ zóny**. `new Date('2026-08-23 12:34:56')` to JS
+parsuje ako **LOKÁLNY** čas (medzera = nie ISO 8601), takže `formatDatumCasSk(created_at)`
+priamo by na prod kontajneri (UTC) ukázal posunutý čas / blízko polnoci nesprávny deň —
+tá istá UTC pasca ako vyššie, len z iného zdroja. Preto najprv `sqliteUtcToIso(created_at)`
+(v `datum.ts`) → `...T...Z` (UTC ISO), až potom `formatDatumCasSk`/`formatDatumSk`. Vstup,
+ktorý už ISO je, vráti nezmenený (most, nie parser). Nový kód, čo zobrazuje SQLite timestamp
+na obrazovke/tlači, MUSÍ ísť cez `sqliteUtcToIso`.
