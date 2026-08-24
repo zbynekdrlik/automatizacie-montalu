@@ -72,14 +72,12 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 		expect(releaseOdpis(row!.id, 'tester')).toBe(true);
 
 		const overridesBefore = (
-			db
-				.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'override'")
-				.get() as { c: number }
+			db.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'override'").get() as {
+				c: number;
+			}
 		).c;
 		const auditBefore = (
-			db
-				.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'")
-				.get() as { c: number }
+			db.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'").get() as { c: number }
 		).c;
 
 		const ok = await writeOdpis(makeReq('ZAK-OVR1S', '01'), { overrideLedger: true });
@@ -87,14 +85,12 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 		fs.rmSync(ok.target);
 
 		const overridesAfter = (
-			db
-				.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'override'")
-				.get() as { c: number }
+			db.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'override'").get() as {
+				c: number;
+			}
 		).c;
 		const auditAfter = (
-			db
-				.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'")
-				.get() as { c: number }
+			db.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'").get() as { c: number }
 		).c;
 		expect(overridesAfter).toBe(overridesBefore + 1);
 		expect(auditAfter).toBe(auditBefore + 1); // vedomý override je AUDITOVANÝ, nie tiché preskočenie

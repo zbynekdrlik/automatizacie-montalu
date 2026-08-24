@@ -6,7 +6,14 @@ import { logger } from '$lib/server/log';
 import { computeBazen, applyEdits } from '$lib/server/bazen';
 import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
-import { writeOdpis, isLive, blokHlaska, type OdpisJob } from '$lib/server/money';
+import {
+	writeOdpis,
+	isLive,
+	blokHlaska,
+	overrideOpts,
+	rawFormEntries,
+	type OdpisJob
+} from '$lib/server/money';
 
 function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -90,7 +97,10 @@ export const actions = {
 			return kontrola('Po úpravách neostala žiadna položka — skontroluj množstvá.');
 
 		try {
-			const outcome = await writeOdpis(jobFor(vstup, finalOut, locals.user?.username ?? ''));
+			const outcome = await writeOdpis(
+				jobFor(vstup, finalOut, locals.user?.username ?? ''),
+				overrideOpts(form)
+			);
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,
@@ -100,7 +110,10 @@ export const actions = {
 			}
 			if (outcome.status === 'blocked') {
 				return {
-					step: 'duplikat' as const,
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslat',
+					rawEntries: rawFormEntries(form),
 					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup
 				};
