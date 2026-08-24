@@ -16,6 +16,8 @@ const dbPath = path.join(tmpRoot, 'v24.db');
 		CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), role TEXT NOT NULL DEFAULT 'internal');
 		CREATE TABLE cfg_sys (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL UNIQUE, n INTEGER NOT NULL, sklo_offset REAL NOT NULL);
 		CREATE TABLE glass_types (id INTEGER PRIMARY KEY, nazov TEXT NOT NULL, redukcia_zero INTEGER NOT NULL DEFAULT 0, poradie INTEGER NOT NULL DEFAULT 0, system TEXT NOT NULL DEFAULT 'ALL', hrubka INTEGER NOT NULL DEFAULT 0, UNIQUE(nazov, system));
+		-- reálna DB má cfg_rez od v1; migrácia v27 (#296) ho UPDATE-uje (Deluxe 5K vrchná koľajnica), prázdna tabuľka = no-op
+		CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL, dim TEXT NOT NULL, koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks REAL NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500, sklo_hrubka INTEGER NOT NULL DEFAULT 0);
 	`);
 	// ≥1 riadok do každej tabuľky čítanej seedom → seedData/seedUsers no-op
 	v24
@@ -32,7 +34,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 	it('user_version === 26 (migruje po najnovšiu) po v25 migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(27);
+		expect(db.pragma('user_version', { simple: true })).toBe(28);
 	});
 
 	it('existujúci user (palo) prežil migráciu (žiadna strata dát)', () => {

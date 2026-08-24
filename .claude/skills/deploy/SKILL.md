@@ -186,6 +186,18 @@ stačí na create/delete, neprepisuje n8n súbory), `NA ODPIS` podstrom `-R`. `c
 netýka. Idempotentné + self-healing; chyba len `::warning::` (health poll + rollback je
 backstop). Detaily a UNVERIFIED (n8n uid = predpoklad 1000; prvý reálny odpis) → `.claude/rules/ci.md`.
 
+**Pridávaš NOVÝ perzistentný volume (app doň zapisuje)? Použi NAMED volume, nie bind mount (#297).**
+`deploy-remote.sh preflight_mounty` `stat`-ne KAŽDÝ host bind-mount zdroj PRED recreate — chýbajúci
+adresár (napr. prvý deploy) ⇒ deploy sa NEvykoná (prod-down riziko). `mount_sources_from_compose`
+berie len zdroje začínajúce `/` (bind-mounty), **named volumes (ľavá strana = meno, bez `/`) PRESKOČÍ**
+⇒ named volume je preflight-safe, nemôže zhodiť pipeline. Vzor (money-audit `moneylog:/data/money-log`):
+(1) `docker-compose.yml`: `- moneylog:/data/money-log` + top-level `moneylog:`; (2) `Dockerfile`
+`RUN mkdir -p /data/money-log && chown node:node /data/money-log` PRED `USER node` — čerstvý prázdny
+named volume zdedí owner node:node z image adresára pri prvom mounte (non-root uid 1000 vie zapísať);
+(3) obranný `migrate_ownership` riadok `if [ -d /data/... ]; then chown -R 1000:1000 /data/...; fi`.
+Bind mount použi LEN keď owner potrebuje súbor priamo na hoste (`/opt/...`) a adresár vytvor
+deklaratívne PRED preflightom (nie ručný ssh mkdir).
+
 ### Overenie po nasadení (acceptance #256)
 
 ```bash

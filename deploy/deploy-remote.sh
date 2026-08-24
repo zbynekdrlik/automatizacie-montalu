@@ -72,6 +72,9 @@ prune_stare_obrazy() {
 # ďalej zapísať do:
 #  - appdata volume `/data/app` (SQLite DB + WAL/SHM) — app-EXKLUZÍVNe → `chown -R 1000:1000`
 #    (owner AJ group na 1000, žiadny zdieľaný spotrebiteľ).
+#  - `moneylog` volume `/data/money-log` (#297, forenzný money-audit súbor) — app-EXKLUZÍVNe
+#    → `chown -R 1000:1000`. Čerstvý volume zdedí node:node z image (Dockerfile mkdir+chown),
+#    toto je obranný idempotentný backstop (napr. pre-existujúci root-vlastnený volume).
 #  - `/data/dlv-import` KOREŇ (zdieľaný s n8n Money watcherom) — dir-write STAČÍ na
 #    create/delete odpis súborov, preto NErekurzívne (neprepíšeme n8n súbory) a
 #    **OWNER-ONLY `chown 1000`** — ZACHOVÁ existujúcu GROUP. Ak n8n závisel na zdieľanej
@@ -98,7 +101,7 @@ prune_stare_obrazy() {
 # preto owner-only + VPS overenie n8n uid (ci.md UNVERIFIED) + sledovanie prvého odpisu.
 migrate_ownership() {
 	docker compose run --rm --no-deps -T --user 0 --entrypoint sh "$SERVICE" -c \
-		'set -e; chown -R 1000:1000 /data/app; if [ -d /data/dlv-import ]; then chown 1000 /data/dlv-import; mkdir -p "/data/dlv-import/NA ODPIS"; chown -R 1000:1000 "/data/dlv-import/NA ODPIS"; fi; if [ -d /data/montalu ]; then mkdir -p "/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT"; chown 1000 "/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT"; fi' ||
+		'set -e; chown -R 1000:1000 /data/app; if [ -d /data/money-log ]; then chown -R 1000:1000 /data/money-log; fi; if [ -d /data/dlv-import ]; then chown 1000 /data/dlv-import; mkdir -p "/data/dlv-import/NA ODPIS"; chown -R 1000:1000 "/data/dlv-import/NA ODPIS"; fi; if [ -d /data/montalu ]; then mkdir -p "/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT"; chown 1000 "/data/montalu/konstrukcia/AUTOMATIZACIA ODPIS MATERIALU/ODPIS EXPORT"; fi' ||
 		echo "::warning::migrate_ownership: chown vlastníctva volumes zlyhal — over práva/vlastníctvo mountov na VPS (health poll + rollback je backstop LEN pre appdata)"
 }
 

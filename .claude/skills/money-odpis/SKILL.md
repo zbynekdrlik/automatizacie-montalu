@@ -732,4 +732,6 @@ dedup-e drž tieto invarianty:
   Preto E2E/test, čo re-sendne PO „Uvoľniť", MUSÍ buď (a) zmeniť obsah (iná šírka → iný content_hash),
   alebo (b) prejsť cez override („Odoslať aj tak" / „Povoliť rovnaký"). #294 merge nechal
   `e2e/odpisy.spec.ts` s pred-ledger predpokladom (identický re-send „prejde") → červený `test` job na
-  dev, kým to #300 neopravilo. Nový odpis E2E over v `e2e/odpis-blok-override.spec.ts`.
+  dev, kým to #300 neopravilo. Obe override cesty (`Povoliť rovnaký` + `Odoslať aj tak`) sú v jednom
+  UI toku v `e2e/odpisy.spec.ts` (Vetva A/B) — modulový ledger blok sa renderuje ako
+  `OdpisBlok` (`data-testid="blok"` + `odoslat-aj-tak`), NIE `duplikat` (to ostáva pre PURE dedup).
