@@ -88,7 +88,7 @@ test('konfigurátor: kombinácia výška+hĺbka+sklon nad rozmedzie → friendly
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuka (bez cien) na stiahnutie, nula console chýb', async ({
+test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuka s orientačnou cenou na stiahnutie, nula console chýb', async ({
 	page
 }) => {
 	// zápisový tok (audit riadok do `dopyt`) — proti LIVE prode preskočiť, nech nepribúdajú

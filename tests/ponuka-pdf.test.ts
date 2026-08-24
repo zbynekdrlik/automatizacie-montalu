@@ -63,6 +63,14 @@ describe('generatePonukaPdf', () => {
 		expect(m.keywords).not.toMatch(/bez cien/i);
 	});
 
+	it('mimo katalógu (šírka > 7,5 m) → PDF nesie „Cena na vyžiadanie" (#279 Fáza C)', async () => {
+		// šírka 8000 mm > 7,5 m katalóg → individuálna ponuka; PDF to zobrazí namiesto sumy
+		const bytes = await generatePonukaPdf({ system: 'Pergola', sirka: 8000, hlbka: 3000 });
+		const m = await meta(bytes);
+		expect(m.subject).toMatch(/Cena na vyžiadanie/);
+		expect(m.subject).not.toMatch(/priceB2B|veľkoobchod/i);
+	});
+
 	it('embedne validný PNG render (bez pádu) a ostane platné PDF', async () => {
 		const bytes = await generatePonukaPdf(FULL, { renderPng: new Uint8Array(PNG_1x1) });
 		expect(Buffer.from(bytes.slice(0, 5)).toString()).toBe('%PDF-');

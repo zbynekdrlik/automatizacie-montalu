@@ -40,7 +40,8 @@ export const load: PageServerLoad = async () => {
 
 export const actions = {
 	// #277: verejný dopyt — validácia → rate-limit → honeypot → uloženie (audit) →
-	// PDF ponuka bez cien (download-first). Money-neutrálne, žiadna odpisová cesta.
+	// PDF ponuka s orientačnou cenou (#279 Fáza C, download-first). Money-neutrálne, žiadna
+	// odpisová cesta (cena = orientačná MO predajná, nie Money nákupná).
 	dopyt: dopytAction,
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).

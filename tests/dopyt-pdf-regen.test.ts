@@ -7,10 +7,9 @@ import { db } from '../src/lib/server/db';
 import { insertDopyt } from '../src/lib/server/dopyt-store';
 import { regeneratePonukaPdf } from '../src/lib/server/dopyt-pdf';
 
-const PRICE_RE = /€|EUR|\bcena\b|\bprice\b|\d+[,.]\d{2}\s*(?:€|eur)/i;
-
 const CFG = {
 	system: 'Robust',
+	model: 'ROBUST',
 	typStrechy: 'bioklimatická lamelová',
 	sirka: 3000,
 	hlbka: 4000,
@@ -41,9 +40,10 @@ describe('regeneratePonukaPdf (#282)', () => {
 		expect(subject).toContain('3000 × 4000 mm');
 		expect(subject).toContain('RAL 7016');
 		expect(subject).toContain('Deluxe Float');
-		// INVARIANT: žiadna cena (ponuka = ŠPECIFIKÁCIA)
-		expect(subject).not.toMatch(PRICE_RE);
-		expect(doc.getKeywords() ?? '').not.toMatch(PRICE_RE);
+		// #279 Fáza C: regenerované PDF nesie ORIENTAČNÚ cenu (€), ale NIKDY veľkoobchod (VO)
+		expect(subject).toMatch(/Orientačná cena:.*€/);
+		expect(subject).not.toMatch(/priceB2B|veľkoobchod/i);
+		expect(doc.getKeywords() ?? '').not.toMatch(/priceB2B|veľkoobchod|bez cien/i);
 	});
 
 	it('názov súboru nesie id dopytu + dátum (interný re-download kontext)', async () => {
