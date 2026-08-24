@@ -934,8 +934,10 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
-	if ((db.pragma('user_version', { simple: true }) as number) < 27) {
-		// v26 → v27: Deluxe 5K vrchná (horná) koľajnica mala nesprávny Money kód
+	if ((db.pragma('user_version', { simple: true }) as number) < 28) {
+		// v27 → v28: Deluxe 5K vrchná (horná) koľajnica mala nesprávny Money kód
+		// (PREČÍSLOVANÉ z v27 na v28 — #296 pôvodne pridala v27, kolidovalo s #294
+		// odpis_imported ledgerom, ktorý dev medzitým dostal tiež ako v27).
 		// ZASP202434 → správne ZASP202427 (nahlásil zákazník Patrik Javorský, Odoo
 		// kanál 207, msg 1734424, 2026-08-24: „Delux 5K ma zlú vrchnú koľajnicu je
 		// tam ZASP202434 ma tam byť ZASP202427"). SET kód (+ názov) z (opraveného)
@@ -949,7 +951,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			for (const r of seed.rez)
 				if (r.sysStyl === 'Deluxe|5K' && r.poradie === 10)
 					updRail.run(r.kod, r.nazov, r.sysStyl, r.poradie);
-			bump(27);
+			bump(28);
 		})();
 	}
 
