@@ -158,20 +158,36 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 	it('overrideOpts mapuje skryté `override` pole na správny flag (aj OBA naraz)', () => {
 		const fKody = new FormData();
 		fKody.set('override', 'unknown-kod');
-		expect(overrideOpts(fKody)).toEqual({ overrideKody: true, overrideLedger: false });
+		expect(overrideOpts(fKody)).toEqual({
+			overrideKody: true,
+			overrideLedger: false,
+			overridePrehodene: false
+		});
 
 		const fLedger = new FormData();
 		fLedger.set('override', 'ledger-duplicate');
-		expect(overrideOpts(fLedger)).toEqual({ overrideKody: false, overrideLedger: true });
+		expect(overrideOpts(fLedger)).toEqual({
+			overrideKody: false,
+			overrideLedger: true,
+			overridePrehodene: false
+		});
 
 		// dvojitý blok (kód + ledger) → oba `override` v jednom formulári → oba flagy (žiadny ping-pong)
 		const fOba = new FormData();
 		fOba.append('override', 'unknown-kod');
 		fOba.append('override', 'ledger-duplicate');
-		expect(overrideOpts(fOba)).toEqual({ overrideKody: true, overrideLedger: true });
+		expect(overrideOpts(fOba)).toEqual({
+			overrideKody: true,
+			overrideLedger: true,
+			overridePrehodene: false
+		});
 
 		// bežný (prvý) submit nemá `override` pole → žiadny bypass
-		expect(overrideOpts(new FormData())).toEqual({ overrideKody: false, overrideLedger: false });
+		expect(overrideOpts(new FormData())).toEqual({
+			overrideKody: false,
+			overrideLedger: false,
+			overridePrehodene: false
+		});
 	});
 
 	it('rawFormEntries zachová string polia vrátane qty úprav AJ predošlých `override` hodnôt', () => {
