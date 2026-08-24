@@ -7,7 +7,12 @@
 	// katalóg (žiadny Money kód na klientovi). Súčasť #280.
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { typSkla3D, type KonfiguratorSuhrn } from '$lib/konfigurator';
+	import {
+		typSkla3D,
+		type KonfiguratorSuhrn,
+		type VerejnaCena,
+		type CenaModelu
+	} from '$lib/konfigurator';
 	// #276: typ odtieňa 3D náhľadu (mapovaný z názvu skla cez typSkla3D). `import type`
 	// je pri builde zmazaný — žiadny runtime import vizuál/Money vrstvy z tohto klienta.
 	import type { PergolaTypSkla } from '$lib/vizual/pergola-sklo';
@@ -32,9 +37,15 @@
 	// čítané cez untrack(), aby state initializer nevaroval state_referenced_locally
 	let sklo = $state<string>(untrack(() => data.sklaTypy[0] ?? ''));
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
+	// #279 Fáza C: model konštrukcie (LIGHT/ROBUST/MASSIVE) — cenotvorný vstup (default LIGHT).
+	let model = $state<string>(untrack(() => data.modely[0]?.kod ?? 'LIGHT'));
 
 	// výsledok napĺňa use:enhance callback (živá kalkulačka); žiadne value={} echo
 	let suhrn = $state<KonfiguratorSuhrn | null>(null);
+	// #279 Fáza C: orientačná cena zvoleného modelu (LEN MO — VO server odstráni) + porovnanie
+	// všetkých 3 modelov. Napĺňa sa spolu so `suhrn` pri submite (server-autoritatívne).
+	let cena = $state<VerejnaCena | null>(null);
+	let cenyModely = $state<CenaModelu[] | null>(null);
 	let chyba = $state<string>('');
 	let spracuva = $state(false);
 
@@ -67,6 +78,16 @@
 	let arNacitava = false;
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	// #279 Fáza C: katalógový rozmer [m] (bez zaokrúhľovacej straty — 4.25 → „4,25").
+	const fmtM = (n: number) => String(n).replace('.', ',');
+	// #279 Fáza C: formátovanie orientačnej EUR ceny (sk-SK, napr. „4 452,06 €").
+	const eur = (n: number) =>
+		n.toLocaleString('sk-SK', {
+			style: 'currency',
+			currency: 'EUR',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
 
 	// Konfigurácia pre PDF ponuku — mapovanie súhrnu enginu na PonukaConfig, ktorý DopytForm
 	// odošle skrytým JSON poľom. Sklon + svetlá výška + plocha idú do `popis` (PonukaConfig
@@ -75,6 +96,7 @@
 		suhrn
 			? {
 					system: 'Pergola',
+					model: suhrn.model,
 					sirka: suhrn.sirka,
 					hlbka: suhrn.hlbka,
 					vyskaVpredu: suhrn.vyskaVpredu,
@@ -101,8 +123,8 @@
 	<header class="hero">
 		<h1>Navrhni si svoju pergolu</h1>
 		<p class="lead">
-			Zadaj rozmery a vzhľad — hneď uvidíš prehľadný súhrn svojej pergoly. Nezáväzné, bez
-			registrácie.
+			Zadaj rozmery, model a vzhľad — hneď uvidíš súhrn a orientačnú cenu svojej pergoly. Nezáväzné,
+			bez registrácie.
 		</p>
 	</header>
 
@@ -121,6 +143,8 @@
 				spracuva = false;
 				if (result.type === 'success') {
 					suhrn = (result.data?.vysledok as KonfiguratorSuhrn | null) ?? null;
+					cena = (result.data?.cena as VerejnaCena | null) ?? null;
+					cenyModely = (result.data?.cenyModely as CenaModelu[] | null) ?? null;
 					chyba = '';
 					if (suhrn) {
 						viz = {
@@ -151,10 +175,14 @@
 					}
 				} else if (result.type === 'failure') {
 					suhrn = null;
+					cena = null;
+					cenyModely = null;
 					viz = null;
 					chyba = (result.data?.error as string | undefined) ?? 'Neplatný vstup.';
 				} else if (result.type === 'error') {
 					suhrn = null;
+					cena = null;
+					cenyModely = null;
 					viz = null;
 					chyba = 'Nastala chyba pri výpočte. Skús to prosím znova.';
 				}
@@ -237,6 +265,28 @@
 			</label>
 		</div>
 
+		<!-- #279 Fáza C: výber modelu konštrukcie (LIGHT/ROBUST/MASSIVE) — cenotvorný vstup
+		     zrkadlený z montalu.sk. Radio-karty s krátkym popisom rozdielu; cena je rozmerovo
+		     závislá a zobrazí sa po submite (súhrn + porovnanie modelov). -->
+		<fieldset class="modely" data-testid="modely">
+			<legend>Model konštrukcie</legend>
+			<div class="modely-mriezka">
+				{#each data.modely as m (m.kod)}
+					<label class="model-karta" class:vybrana={model === m.kod}>
+						<input
+							type="radio"
+							name="model"
+							value={m.kod}
+							bind:group={model}
+							data-testid="model-{m.kod}"
+						/>
+						<span class="model-nazov">{m.kod}</span>
+						<span class="model-popis">{m.popis}</span>
+					</label>
+				{/each}
+			</div>
+		</fieldset>
+
 		<button type="submit" class="zobrazit" data-testid="zobrazit" disabled={spracuva}>
 			{spracuva ? 'Počítam…' : 'Zobraziť moju pergolu'}
 		</button>
@@ -248,6 +298,56 @@
 
 	{#if suhrn}
 		{@const s = suhrn}
+
+		<!-- #279 Fáza C: ORIENTAČNÁ CENA zvoleného modelu (MO s DPH primárne, bez DPH sekundárne)
+		     + porovnanie všetkých 3 modelov (zrkadlo montalu.sk). LEN maloobchod — žiadna VO
+		     cena, žiadny Money kód, žiadny nárez. Mimo katalógu ⇒ „cena na vyžiadanie". -->
+		{#if cena}
+			<section class="cena-blok" data-testid="cena" aria-label="Orientačná cena pergoly">
+				{#if cena.druh === 'cena'}
+					<div class="cena-hlavne">
+						<span class="cena-label">Orientačná cena — model {cena.model}</span>
+						<span class="cena-sdph" data-testid="cena-sdph">{eur(cena.sDph)}</span>
+						<span class="cena-mena">s DPH</span>
+					</div>
+					<div class="cena-bezdph" data-testid="cena-bezdph">{eur(cena.bezDph)} bez DPH</div>
+					<!-- #279 Fáza C: rozmer sa cení na najbližší katalógový rozmer (mriežka) —
+					     ak sa líši od zadaného, čestne to zobraz (inak by cena „nesedela" s rozmermi). -->
+					{#if Math.round(cena.sirkaGridM * 1000) !== s.sirka || Math.round(cena.hlbkaGridM * 1000) !== s.hlbka}
+						<div class="cena-grid" data-testid="cena-grid">
+							Cena platí pre najbližší katalógový rozmer {fmtM(cena.sirkaGridM)} × {fmtM(
+								cena.hlbkaGridM
+							)} m.
+						</div>
+					{/if}
+				{:else}
+					<div class="cena-individualna" data-testid="cena-individualna">
+						<span class="cena-label">Cena na vyžiadanie — model {cena.model}</span>
+						<p class="cena-dovod">{cena.dovod} Pripravíme ti individuálnu ponuku.</p>
+					</div>
+				{/if}
+				<p class="cena-pozn">
+					Orientačná cena vychádza z aktuálneho cenníka pre zvolený model a rozmery (základná
+					výplň). Presnú, záväznú cenu pripravíme po obhliadke.
+				</p>
+			</section>
+
+			{#if cenyModely}
+				<section class="porovnanie" data-testid="porovnanie" aria-label="Porovnanie modelov">
+					<h3>Porovnanie modelov (orientačne, s DPH)</h3>
+					<ul>
+						{#each cenyModely as c (c.model)}
+							<li class:vybrany={c.model === cena.model} data-testid="porovnanie-{c.model}">
+								<span class="p-model">{c.model}</span>
+								<span class="p-cena">
+									{c.cena.druh === 'cena' ? eur(c.cena.sDph) : 'na vyžiadanie'}
+								</span>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/if}
+		{/if}
 
 		<!-- #276: predajný 3D náhľad konfigurovanej pergoly — „hero" súhrnu. Lazy-loaded,
 		     form-driven (vlastné ovládanie komponentu skryté), previazaný na rozmery/sklo/RAL
@@ -297,6 +397,10 @@
 			<h2>Súhrn tvojej pergoly</h2>
 			<dl>
 				<div>
+					<dt>Model</dt>
+					<dd data-testid="s-model">{s.model}</dd>
+				</div>
+				<div>
 					<dt>Šírka</dt>
 					<dd data-testid="s-sirka">{fmt(s.sirka)} mm</dd>
 				</div>
@@ -334,8 +438,8 @@
 				</div>
 			</dl>
 			<p class="pozn">
-				Toto je nezáväzný náhľad konfigurácie. Cenovú ponuku pripravíme na základe tvojich
-				požiadaviek.
+				Toto je nezáväzný náhľad konfigurácie s orientačnou cenou. Presnú, záväznú cenu pripravíme
+				po obhliadke.
 			</p>
 		</section>
 
@@ -343,8 +447,8 @@
 		<section class="kontakt" data-testid="dopyt">
 			<h2>Máš záujem o túto pergolu?</h2>
 			<p class="kontakt-uvod">
-				Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
-				pripravíme po obhliadke.
+				Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) s orientačnou cenou na
+				stiahnutie. Presnú cenu pripravíme po obhliadke.
 			</p>
 			<DopytForm konfiguracia={ponukaCfg} />
 		</section>
@@ -528,8 +632,150 @@
 		font-size: 14px;
 		margin: 0 0 14px;
 	}
+	/* #279 Fáza C: výber modelu (radio-karty) */
+	.modely {
+		border: 1px solid #e2e8f0;
+		border-radius: 12px;
+		padding: 12px 14px 14px;
+		margin: 0 0 18px;
+	}
+	.modely legend {
+		font-size: 13.5px;
+		font-weight: 600;
+		color: #475569;
+		padding: 0 6px;
+	}
+	.modely-mriezka {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+	.model-karta {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		column-gap: 10px;
+		align-items: center;
+		border: 1px solid #cbd5e1;
+		border-radius: 10px;
+		padding: 10px 12px;
+		cursor: pointer;
+	}
+	.model-karta.vybrana {
+		border-color: #2563eb;
+		background: #eff6ff;
+	}
+	.model-karta input {
+		grid-row: 1 / span 2;
+		width: 18px;
+		height: 18px;
+		accent-color: #2563eb;
+	}
+	.model-nazov {
+		font-weight: 700;
+		color: #0f172a;
+		font-size: 15px;
+	}
+	.model-popis {
+		grid-column: 2;
+		color: #64748b;
+		font-size: 13px;
+	}
+	/* #279 Fáza C: orientačná cena + porovnanie modelov */
+	.cena-blok {
+		background: #0f172a;
+		color: #fff;
+		border-radius: 14px;
+		padding: 18px;
+		margin-top: 18px;
+	}
+	.cena-hlavne {
+		display: flex;
+		align-items: baseline;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.cena-label {
+		flex-basis: 100%;
+		color: #cbd5e1;
+		font-size: 13px;
+	}
+	.cena-sdph {
+		font-size: clamp(26px, 7vw, 36px);
+		font-weight: 800;
+		line-height: 1.1;
+	}
+	.cena-mena {
+		color: #cbd5e1;
+		font-size: 14px;
+	}
+	.cena-bezdph {
+		color: #cbd5e1;
+		font-size: 14px;
+		margin-top: 2px;
+	}
+	.cena-grid {
+		color: #94a3b8;
+		font-size: 12px;
+		margin-top: 6px;
+	}
+	.cena-individualna .cena-label {
+		font-size: 18px;
+		font-weight: 700;
+		color: #fff;
+	}
+	.cena-dovod {
+		color: #cbd5e1;
+		font-size: 13.5px;
+		margin: 6px 0 0;
+	}
+	.cena-pozn {
+		color: #94a3b8;
+		font-size: 12px;
+		margin: 12px 0 0;
+	}
+	.porovnanie {
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 14px;
+		padding: 14px 18px;
+		margin-top: 12px;
+	}
+	.porovnanie h3 {
+		font-size: 14px;
+		margin: 0 0 10px;
+		color: #0f172a;
+	}
+	.porovnanie ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 2px;
+	}
+	.porovnanie li {
+		display: flex;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 8px;
+		border-radius: 8px;
+		font-size: 15px;
+	}
+	.porovnanie li.vybrany {
+		background: #eff6ff;
+		font-weight: 700;
+	}
+	.porovnanie .p-model {
+		color: #334155;
+	}
+	.porovnanie .p-cena {
+		color: #0f172a;
+		font-weight: 600;
+	}
 	@media (min-width: 640px) {
 		.pole-mriezka {
+			grid-template-columns: repeat(3, 1fr);
+		}
+		.modely-mriezka {
 			grid-template-columns: repeat(3, 1fr);
 		}
 		.zobrazit {

@@ -29,7 +29,23 @@ Pridať verejnú route znamená VŠETKY tri:
    preto je aj kalkulačka pomenovaná (`?/vypocet`). Množina akcií je strážená v
    `b2b-route-coverage.test.ts`.
 
-## 2. HARD hranica: žiadna CENA / Money kód / nárez na verejnú plochu
+## 2. HARD hranica: žiadny Money kód / nárez / VO cena (ORIENTAČNÁ cena SMIE — #279 Fáza C)
+
+**#279 Fáza C (owner ROZHODNUTÉ, `issuecomment-5396941067`, 2026-08-24) VEDOME dvihol zákaz
+CIEN pre PRICES ONLY:** verejná odpoveď (route akcia `vypocet`, PDF ponuka) teraz SMIE niesť
+ORIENTAČNÚ **maloobchodnú (MO)** predajnú cenu (zrkadlí montalu.sk). NAĎALEJ NIKDY na verejnú
+plochu: Money kód (`moneyKod`/TS*), nárez, **VEĽKOOBCHOD (VO)** cena (`priceB2B`) ani raw cenová
+matica (seed). Cenový modul je server-only (`konfigurator-cena.ts` v `$lib/server/`) — do klienta
+sa nedostane; verejná route dostane LEN MO cez `verejnaCenaPreModel`/`verejneCenyModelov` (VO
+strip). Leak-guard testy sú podľa toho REDEFINOVANÉ (blanket „žiadne €" → „cena áno, VO/Money/
+nárez/matica nie"). **PASCA (Fáza C, stálo 2 fix-kolá): STARÁ „žiadne ceny" politika bola
+rozsypaná v ŠIESTICH súboroch, nielen v očividnom leak-guarde** — pred dvíhaním takého guardu
+`grep -rnE "PRICE_RE|bez cien|nezáväzná špecifikácia|nie cenová ponuka|not\.toMatch\(/€"` cez celé
+`tests/` + `e2e/`. Redefinované: `konfigurator-money-safety.test.ts` (C, load bez ceny / akcia MO
+áno + VO nie), `e2e/konfigurator.spec.ts` (3 leak bloky + PDF metadáta), `ponuka-pdf.test.ts`
+(PRICE_RE → orientačná cena), `dopyt-pdf-regen.test.ts` (regen PDF cena), `ponuka.test.ts`
+(DISCLAIMER text), `konfigurator-cena.test.ts` (route-import assert). Detaily cenovej vrstvy:
+`.claude/rules/konfigurator-cena.md`.
 
 Katalóg `src/lib/sklo-strecha.ts` nesie pole `moneyKod` — TO je únikový vektor. Pravidlá:
 - **Klientsky bundle NIKDY neimportuje `sklo-strecha` (ani `sklo-cena`/`server/*`).** Názvy

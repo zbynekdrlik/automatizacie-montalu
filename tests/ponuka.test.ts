@@ -136,9 +136,11 @@ describe('firmaRiadky + konštanty', () => {
 		).toEqual(['Ulica 1', 'Tel.: +421 900 000 000', 'a@b.sk', 'x.sk']);
 	});
 
-	it('DISCLAIMER hovorí, že to NIE je cenová ponuka', () => {
-		expect(DISCLAIMER).toMatch(/nezáväzná špecifikácia/i);
-		expect(DISCLAIMER).toMatch(/nie cenová ponuka/i);
+	// #279 Fáza C: PDF teraz nesie ORIENTAČNÚ cenu → disclaimer hovorí, že cena je orientačná,
+	// nie záväzná cenová ponuka (owner ROZHODNUTÉ issuecomment-5396941067).
+	it('DISCLAIMER hovorí, že cena je ORIENTAČNÁ, nie záväzná ponuka', () => {
+		expect(DISCLAIMER).toMatch(/orientačná/i);
+		expect(DISCLAIMER).toMatch(/nie záväzná cenová ponuka/i);
 		expect(FIRMA.nazov).toBe('Montalu');
 	});
 });

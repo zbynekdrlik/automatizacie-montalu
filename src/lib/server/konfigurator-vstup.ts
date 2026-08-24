@@ -18,6 +18,9 @@ import {
 	KONF_SKLON_MIN,
 	KONF_SKLON_MAX,
 	KONF_VYSKA_STENA_MAX,
+	MODELY,
+	MODEL_DEFAULT,
+	type ModelPergoly,
 	type KonfiguratorVstup
 } from '$lib/konfigurator';
 
@@ -32,6 +35,9 @@ function cislo(v: FormDataEntryValue | null | undefined): number {
 
 /** Množina platných názvov strešného skla — LEN `.nazov`, žiadny Money kód. */
 const PLATNE_SKLA = new Set(SKLO_STRECHA_TYPY.map((t) => t.nazov));
+
+/** Množina platných modelov (LIGHT/ROBUST/MASSIVE) — #279 Fáza C. */
+const PLATNE_MODELY = new Set<string>(MODELY.map((m) => m.kod));
 
 /** Sparsuje FormData na typovaný vstup, alebo vráti { error } s hláškou v slovenčine.
  *  Neznámy názov skla / neplatná farba / rozmer mimo rozmedzia → odmietnuté (žiadna
@@ -63,6 +69,12 @@ export function parseKonfiguratorVstup(
 			error: `Kombinácia výšky, hĺbky a sklonu je pri stene priveľmi vysoká (max ${KONF_VYSKA_STENA_MAX} mm). Zmenši sklon alebo hĺbku.`
 		};
 
+	// model (#279 Fáza C): chýbajúce/prázdne pole → default LIGHT (spätná kompatibilita +
+	// robustnosť); prítomné, ale neznáme → odmietnuté (žiadna injekcia ľubovoľného reťazca).
+	const modelRaw = String(fd.get('model') ?? '').trim();
+	if (modelRaw && !PLATNE_MODELY.has(modelRaw)) return { error: 'Vyber platný model konštrukcie.' };
+	const model: ModelPergoly = (modelRaw || MODEL_DEFAULT) as ModelPergoly;
+
 	const sklo = String(fd.get('sklo') ?? '').trim();
 	if (!PLATNE_SKLA.has(sklo)) return { error: 'Vyber platný typ strešného skla.' };
 
@@ -71,5 +83,5 @@ export function parseKonfiguratorVstup(
 	if (!ral) return { error: 'Vyber platnú farbu konštrukcie.' };
 	const farba = `RAL ${ral.kod} ${ral.nazov}`;
 
-	return { vstup: { sirka, hlbka, vyskaVpredu, sklonDeg, sklo, farba } };
+	return { vstup: { sirka, hlbka, vyskaVpredu, sklonDeg, model, sklo, farba } };
 }

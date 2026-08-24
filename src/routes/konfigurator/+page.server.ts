@@ -10,8 +10,11 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { SKLO_STRECHA_TYPY } from '$lib/sklo-strecha';
 import { RAL_PALETA } from '$lib/vykres/ral';
-import { KONF_RANGES, konfiguruj } from '$lib/konfigurator';
+import { KONF_RANGES, MODELY, konfiguruj } from '$lib/konfigurator';
 import { parseKonfiguratorVstup } from '$lib/server/konfigurator-vstup';
+// #279 Fáza C: orientačná PREDAJNÁ cena (LEN MO — VO sa v mapperi odstráni). Server-only
+// modul; seed sa do klientskeho bundle nikdy nedostane (guard konfigurator-money-safety).
+import { verejnaCenaPreModel, verejneCenyModelov } from '$lib/server/konfigurator-cena';
 import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
 // #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). Táto route ju iba
@@ -28,13 +31,17 @@ export const load: PageServerLoad = async () => {
 	return {
 		sklaTypy: SKLO_STRECHA_TYPY.map((t) => t.nazov),
 		farby: RAL_PALETA.map((r) => ({ kod: r.kod, nazov: r.nazov })),
+		// #279 Fáza C: modely (kód + popis) na výber vo wizarde. LEN popisy, ŽIADNA cena —
+		// cena je rozmerovo závislá a počíta ju akcia `vypocet` pri submite.
+		modely: MODELY.map((m) => ({ kod: m.kod, popis: m.popis })),
 		rozmedzia: KONF_RANGES
 	};
 };
 
 export const actions = {
 	// #277: verejný dopyt — validácia → rate-limit → honeypot → uloženie (audit) →
-	// PDF ponuka bez cien (download-first). Money-neutrálne, žiadna odpisová cesta.
+	// PDF ponuka s orientačnou cenou (#279 Fáza C, download-first). Money-neutrálne, žiadna
+	// odpisová cesta (cena = orientačná MO predajná, nie Money nákupná).
 	dopyt: dopytAction,
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).
@@ -63,7 +70,18 @@ export const actions = {
 		}
 
 		const parsed = parseKonfiguratorVstup(await request.formData());
-		if ('error' in parsed) return fail(400, { vysledok: null, error: parsed.error });
-		return { vysledok: konfiguruj(parsed.vstup), error: null };
+		if ('error' in parsed)
+			return fail(400, { vysledok: null, cena: null, cenyModely: null, error: parsed.error });
+		const { vstup } = parsed;
+		// #279 Fáza C: orientačná cena zvoleného modelu (LEN MO) + porovnanie všetkých 3
+		// modelov (zrkadlo montalu.sk „ceny modelov vedľa seba"). VO sa v mapperi odstráni —
+		// verejná odpoveď NIKDY nenesie veľkoobchodnú cenu ani raw maticu.
+		const cena = verejnaCenaPreModel({
+			hlbkaMm: vstup.hlbka,
+			sirkaMm: vstup.sirka,
+			model: vstup.model
+		});
+		const cenyModely = verejneCenyModelov(vstup.hlbka, vstup.sirka);
+		return { vysledok: konfiguruj(vstup), cena, cenyModely, error: null };
 	}
 } satisfies Actions;

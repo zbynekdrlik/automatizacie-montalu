@@ -10,6 +10,9 @@ import {
 	vypocitajCenu,
 	zaokruhliNahor,
 	dostupneVyplne,
+	naVerejnuCenu,
+	verejnaCenaPreModel,
+	verejneCenyModelov,
 	DPH,
 	PRIPLATKY,
 	MRIEZKA,
@@ -59,12 +62,16 @@ describe('seed integrita + Money-neutralita (#279)', () => {
 		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/db['"]/);
 	});
 
-	it('modul NIE je importovaný verejnou route (Fáza C je mimo tohto lane)', () => {
+	it('verejná route importuje LEN verejné MO mappery — nikdy VO priamo (#279 Fáza C)', () => {
+		// Fáza C (owner ROZHODNUTÉ issuecomment-5396941067): route cenový modul TERAZ importuje.
+		// Musí použiť verejné MO-only mappery (`verejnaCenaPreModel`/`verejneCenyModelov`) a NIKDY
+		// serializovať VO zložku (`.vo`) / B2B cenu do verejnej odpovede.
 		const route = fs.readFileSync(
 			path.resolve(__dirname, '../src/routes/konfigurator/+page.server.ts'),
 			'utf8'
 		);
-		expect(route).not.toMatch(/konfigurator-cena/);
+		expect(route).toMatch(/verejnaCenaPreModel|verejneCenyModelov/);
+		expect(route).not.toMatch(/\.vo\b|priceB2B/);
 	});
 });
 
@@ -391,5 +398,87 @@ describe('defaulty a helpery', () => {
 		expect(dostupneVyplne('ROBUST')).toContain('izolacne-sklo-24');
 		expect(dostupneVyplne('ROBUST')).toContain('panel-izo-24');
 		expect(dostupneVyplne('MASSIVE')).toContain('panel-izo-24');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (#279 Fáza C) VEREJNÁ cena — LEN MO, VO sa ODSTRÁNI, nikdy raw matica
+// ---------------------------------------------------------------------------
+describe('verejná cena (#279 Fáza C) — LEN MO, žiadne VO', () => {
+	// Nezávislé kotvy z live montalu.sk (LIGHT 3×5 polykarbonát): MO net 3619,56 / s DPH 4452,06;
+	// VO net 2352,41 / s DPH 2893,46. Verejná cena SMIE niesť len MO, NIKDY VO.
+	const LIGHT_3x5_MO_NET = 3619.56;
+	const LIGHT_3x5_MO_DPH = 4452.06;
+	const LIGHT_3x5_VO_NET = 2352.41;
+	const LIGHT_3x5_VO_DPH = 2893.46;
+
+	it('naVerejnuCenu vezme LEN MO zložku a zahodí VO', () => {
+		const interne = vypocitajCenu({ hlbkaMm: 3000, sirkaMm: 5000, model: 'LIGHT' });
+		const verejna = naVerejnuCenu(interne, 'LIGHT');
+		expect(verejna).toEqual({
+			druh: 'cena',
+			model: 'LIGHT',
+			bezDph: LIGHT_3x5_MO_NET,
+			sDph: LIGHT_3x5_MO_DPH,
+			hlbkaGridM: 3,
+			sirkaGridM: 5
+		});
+		// VO hodnoty NESMÚ byť v serializovanej verejnej cene (ani ako pole, ani ako číslo)
+		const json = JSON.stringify(verejna);
+		expect(json).not.toContain(String(LIGHT_3x5_VO_NET));
+		expect(json).not.toContain(String(LIGHT_3x5_VO_DPH));
+		expect(json).not.toMatch(/"vo"|priceB2B|bezDphVo/i);
+	});
+
+	it('verejnaCenaPreModel: default LIGHT, MO-only, presné hodnoty', () => {
+		const r = verejnaCenaPreModel({ hlbkaMm: 3000, sirkaMm: 5000 });
+		expect(r.druh).toBe('cena');
+		if (r.druh === 'cena') {
+			expect(r.model).toBe('LIGHT');
+			expect(r.bezDph).toBe(LIGHT_3x5_MO_NET);
+			expect(r.sDph).toBe(LIGHT_3x5_MO_DPH);
+		}
+	});
+
+	it('verejnaCenaPreModel: mimo katalógu ⇒ individuálna ponuka (nesie model, žiadne číslo)', () => {
+		const r = verejnaCenaPreModel({ hlbkaMm: 3000, sirkaMm: 9000, model: 'ROBUST' });
+		expect(r.druh).toBe('individualna-ponuka');
+		if (r.druh === 'individualna-ponuka') expect(r.model).toBe('ROBUST');
+	});
+
+	it('verejnaCenaPreModel: LIGHT nad hĺbku 4 m ⇒ individuálna; ROBUST/MASSIVE cena', () => {
+		expect(verejnaCenaPreModel({ hlbkaMm: 5000, sirkaMm: 5000, model: 'LIGHT' }).druh).toBe(
+			'individualna-ponuka'
+		);
+		expect(verejnaCenaPreModel({ hlbkaMm: 5000, sirkaMm: 5000, model: 'ROBUST' }).druh).toBe(
+			'cena'
+		);
+	});
+
+	it('verejneCenyModelov: presne 3 modely (LIGHT/ROBUST/MASSIVE), MO-only, žiadne VO', () => {
+		const c = verejneCenyModelov(3000, 5000);
+		expect(c.map((x) => x.model)).toEqual(['LIGHT', 'ROBUST', 'MASSIVE']);
+		const light = c.find((x) => x.model === 'LIGHT')!.cena;
+		expect(light.druh).toBe('cena');
+		if (light.druh === 'cena') expect(light.sDph).toBe(LIGHT_3x5_MO_DPH);
+		// žiadna VO hodnota v celom porovnaní
+		const json = JSON.stringify(c);
+		expect(json).not.toContain(String(LIGHT_3x5_VO_NET));
+		expect(json).not.toContain(String(LIGHT_3x5_VO_DPH));
+	});
+
+	// review 🟡: verejné vstupné rozmedzia siahajú POD katalógovú mriežku (šírka min 4,0 m /
+	// hĺbka min 2,0 m). Pod-minimum sa prilepí na minimum a cena je katalógového minima — modul
+	// MUSÍ vrátiť katalógové grid rozmery, aby ich UI/PDF vedeli čestne zobraziť.
+	it('pod-minimum rozmer sa cení na katalógové minimum a vráti grid rozmery (2000×1500 → 4,0×2,0)', () => {
+		const r = verejnaCenaPreModel({ hlbkaMm: 1500, sirkaMm: 2000, model: 'LIGHT' });
+		expect(r.druh).toBe('cena');
+		if (r.druh === 'cena') {
+			expect(r.sirkaGridM).toBe(4); // šírka 2,0 m < min 4,0 m ⇒ prilepené na 4,0
+			expect(r.hlbkaGridM).toBe(2); // hĺbka 1,5 m < min 2,0 m ⇒ prilepené na 2,0
+			// cena zodpovedá katalógovej bunke 4,0 × 2,0 (nie zadanému 2,0 × 1,5)
+			const kotva = verejnaCenaPreModel({ hlbkaMm: 2000, sirkaMm: 4000, model: 'LIGHT' });
+			if (kotva.druh === 'cena') expect(r.sDph).toBe(kotva.sDph);
+		}
 	});
 });
