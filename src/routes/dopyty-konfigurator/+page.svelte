@@ -54,7 +54,7 @@
 							{/if}
 						</td>
 						<td class="cena" data-testid="cena-{d.id}">
-							{#if d.cena === '—'}
+							{#if d.cena === null}
 								<span class="muted">—</span>
 							{:else}
 								<span title={d.cenaVerzia ? `cenník ${d.cenaVerzia}` : undefined}>{d.cena}</span>

@@ -122,12 +122,13 @@ describe('load /dopyty-konfigurator (#282)', () => {
 		// PageData je voľne typované → anotuj tvar riadku pri hľadaní
 		const byMeno = (m: string) =>
 			d.dopyty.find(
-				(r: { meno: string; cena: string; cenaVerzia: string | null }) => r.meno === m
+				(r: { meno: string; cena: string | null; cenaVerzia: string | null }) => r.meno === m
 			)!;
 		expect(byMeno('Individualny').cena).toBe('Cena na vyžiadanie');
 		expect(byMeno('Konkretny').cena).toBe('123,00 € s DPH');
 		expect(byMeno('Konkretny').cenaVerzia).toBe('2026-01-01T00:00:00.000Z#abcdef012345');
-		expect(byMeno('Stary').cena).toBe('—');
+		// neopečiatkovaný (starý) riadok → `null` (driver-side signál, nie „—" reťazec)
+		expect(byMeno('Stary').cena).toBeNull();
 		expect(byMeno('Stary').cenaVerzia).toBeNull();
 	});
 });

@@ -95,16 +95,27 @@ export function stampNaStlpce(stamp?: CenaStamp): DopytCenaStlpce {
  *  (honest-degrade; historickú cenu, ktorú sme nikdy neuložili, nedopĺňame). `dovod` sa pri
  *  `individualna-ponuka` neukladá (PDF ho nevykresľuje — reprodukcia dokumentu ho nepotrebuje). */
 export function cenaZoStampu(row: DopytCenaStlpce): VerejnaCena | null {
-	if (row.cena_druh === null) return null;
-	const model = (row.cena_model ?? 'LIGHT') as ModelPergoly;
+	// neopečiatkovaný riadok (alebo obranne: opečiatkovaný bez modelu) → null = prepočet zo živej
+	if (row.cena_druh === null || row.cena_model === null) return null;
+	const model = row.cena_model as ModelPergoly;
 	if (row.cena_druh === 'cena') {
+		// opečiatkovaný 'cena' riadok má VŽDY vyplnené sumy+grid (`stampNaStlpce` ich píše spolu).
+		// Ak by niektorá chýbala (poškodený riadok), NEDEGRADUJ ticho na 0 € — vráť null a nechaj
+		// volajúceho prepočítať zo živej matice (čestný fallback, nie klamlivá 0 € cena; #309 review).
+		if (
+			row.cena_bez_dph === null ||
+			row.cena_s_dph === null ||
+			row.cena_hlbka_grid_m === null ||
+			row.cena_sirka_grid_m === null
+		)
+			return null;
 		return {
 			druh: 'cena',
 			model,
-			bezDph: row.cena_bez_dph ?? 0,
-			sDph: row.cena_s_dph ?? 0,
-			hlbkaGridM: row.cena_hlbka_grid_m ?? 0,
-			sirkaGridM: row.cena_sirka_grid_m ?? 0
+			bezDph: row.cena_bez_dph,
+			sDph: row.cena_s_dph,
+			hlbkaGridM: row.cena_hlbka_grid_m,
+			sirkaGridM: row.cena_sirka_grid_m
 		};
 	}
 	return { druh: 'individualna-ponuka', model, dovod: '' };
