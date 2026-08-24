@@ -56,6 +56,9 @@ export default defineConfig({
 					// #154: E2E si vie na tento súbor napísať VLASTNÝ snapshot fixture (appka
 					// beží ako lokálny child proces preview servera, zdieľa filesystem s testom)
 					CENY_SNAPSHOT_PATH: './data/e2e-ceny.json',
+					// #298: readback snapshot fixture cesta (neexistuje → reader je no-op, E2E seeduje
+					// money_dlv priamo do DB). Deterministické bez ohľadu na absolútny default `/data/...`.
+					DLV_READBACK_PATH: './data/e2e-dlv-readback.json',
 					// #245: zapne test-only /__test-error route (inak 404) — E2E overí chybovú
 					// stránku + errorId. VPS toto env NIKDY nemá, takže route je tam skrytá.
 					ENABLE_TEST_ERROR_ROUTE: '1'

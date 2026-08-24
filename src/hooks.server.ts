@@ -7,6 +7,7 @@ import { b2bRedirectTarget } from '$lib/server/b2b-access';
 import { logger } from '$lib/server/log';
 import { moneyConfig } from '$lib/server/money';
 import { cenySnapshotPath } from '$lib/server/ceny';
+import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
 
@@ -36,7 +37,8 @@ let pruneCounter = 0;
 		liveDir: mc.liveDir,
 		naOdpisDir: mc.naOdpisDir,
 		testDir: mc.testDir,
-		cenySnapshotPath: cenySnapshotPath()
+		cenySnapshotPath: cenySnapshotPath(),
+		dlvReadbackPath: dlvReadbackPath()
 	});
 	// #278: pri štarte zotav dopyty čakajúce na Odoo CRM lead (napr. po deploy/restarte po
 	// výpadku Odoo alebo po doplnení ODOO_LEAD_* env). Fire-and-forget, no-op keď chýba env.
