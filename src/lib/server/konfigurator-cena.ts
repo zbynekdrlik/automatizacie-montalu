@@ -167,6 +167,12 @@ export function vypocitajCenu(v: CenaVstup): CenaVysledok {
 	const model = v.model ?? 'LIGHT';
 	const vypln = v.vypln ?? 'polykarbonat-16';
 
+	// Nekladný/neplatný rozmer nesmie ticho spadnúť na katalógové minimum — inak by
+	// `{hlbkaMm:0}` alebo záporný vstup dostal reálnu cenu min. bunky. Verejný vstup je
+	// validovaný v `konfigurator-vstup.ts`, toto je obranná hranica pre budúcich volateľov.
+	if (!(v.hlbkaMm > 0) || !(v.sirkaMm > 0))
+		return { druh: 'individualna-ponuka', dovod: 'Neplatný rozmer (musí byť > 0).' };
+
 	const hlbkaGridM = zaokruhliNahor(v.hlbkaMm / 1000, MRIEZKA.hlbkaM);
 	if (hlbkaGridM === null)
 		return {

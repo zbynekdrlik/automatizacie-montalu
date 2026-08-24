@@ -241,6 +241,21 @@ describe('mimo katalógu / nedostupné ⇒ individuálna ponuka', () => {
 		});
 		expect(r.druh).toBe('individualna-ponuka');
 	});
+
+	// Obranná hranica (review 🔵): nekladný/neplatný rozmer NESMIE ticho spadnúť na
+	// katalógové minimum a vrátiť reálnu cenu — musí byť odmietnutý.
+	it('nekladný rozmer (0 / záporný / NaN) ⇒ individuálna, nie cena min. bunky', () => {
+		for (const v of [
+			{ hlbkaMm: 0, sirkaMm: 5000 },
+			{ hlbkaMm: 3000, sirkaMm: -500 },
+			{ hlbkaMm: -1, sirkaMm: -1 },
+			{ hlbkaMm: NaN, sirkaMm: 5000 }
+		]) {
+			const r = vypocitajCenu(v);
+			expect(r.druh, JSON.stringify(v)).toBe('individualna-ponuka');
+			if (r.druh === 'individualna-ponuka') expect(r.dovod).toMatch(/Neplatný rozmer/);
+		}
+	});
 });
 
 // ---------------------------------------------------------------------------
