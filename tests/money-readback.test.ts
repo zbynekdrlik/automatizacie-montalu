@@ -240,3 +240,90 @@ describe('#298 readback — EXKLUZÍVNE priradenie (jeden DLV neoverí dva odpis
 		expect(m.get(a)!.dlv).not.toBe(m.get(b)!.dlv);
 	});
 });
+
+// ── #308: 2 falošné readback alarmy (date-only tolerancia + caka=1 cross-match) ────────────────
+// Absolútne fixné UTC časy mirrorujú živé dáta z #293 comment 5399067512. Klasifikácia je relatívna
+// ku genEpoch (snapshotu), nie ku „teraz" (viď readbackStav) → fixné dátumy sú deterministické bez
+// ohľadu na hodiny CI. Money `datum` je DATE-ONLY (producer emituje „YYYY-MM-DDT00:00:00", polnoc).
+describe('#308 readback — date-only tolerancia + caka=1 cross-match (falošné alarmy)', () => {
+	/** odpis s ABSOLÚTNYM created_at — kontrola hodiny v dni (kľúčové pre date-only pascu). */
+	function insOdpisAbs(
+		zak: string,
+		op: string,
+		qtys: number[],
+		createdAtUtc: string,
+		opts: { caka?: number; modul?: string } = {}
+	): number {
+		const id = nextId++;
+		db.prepare(
+			`INSERT INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES (?, ?, ?, ?, 'Test', ?, 1, '/t/f.xlsx', 'f.xlsx', 'h', '{}', 'tester', ?, ?, ?)`
+		).run(
+			id,
+			opts.modul ?? 'zasklenia',
+			zak,
+			op,
+			opts.caka ?? 0,
+			createdAtUtc,
+			normZak(zak),
+			normOp(op)
+		);
+		const insP = db.prepare(
+			"INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, 'm')"
+		);
+		qtys.forEach((q, i) => insP.run(id, `ZASP${1000 + i}`, `Profil ${i}`, q));
+		return id;
+	}
+	/** DLV s DATE-ONLY datum (polnoc „YYYY-MM-DDT00:00:00") — presne tvar Money DatumVystaveni. */
+	function insDlvDateOnly(
+		dlv: string,
+		zak: string,
+		op: string,
+		pocet: number,
+		datumDateOnly: string
+	): void {
+		db.prepare(
+			`INSERT INTO money_dlv (dlv, zak_norm, op_norm, datum, pocet_polozek) VALUES (?, ?, ?, ?, ?)`
+		).run(dlv, normZak(zak), op ? normOp(op) : '', datumDateOnly, pocet);
+	}
+	/** snapshot meta s ABSOLÚTNYM generatedAt. */
+	function setMetaAbs(genAtUtc: string, windowDays = 0): void {
+		db.prepare('DELETE FROM money_dlv_meta').run();
+		db.prepare(
+			'INSERT INTO money_dlv_meta (id, snapshot_generated_at, imported_at, row_count, window_days) VALUES (1, ?, ?, 1, ?)'
+		).run(genAtUtc, genAtUtc, windowDays);
+	}
+
+	it('[RED] case 1: reálny DLV, odoslané 12:28 vs Money date-only polnoc TOHO dňa ⇒ ok, NIE chyba-doklad', () => {
+		// id=85 ZAK2026464 bazén: DLV20251398 (OPDL260182, 20r = presná zhoda, súbor v DONE 21.08),
+		// odoslané 2026-08-21 12:28:37, Money datum date-only 2026-08-21. DATUM_TOL_S 12h ho zamietal
+		// (medzera polnoc↔12:28 = 12h28m > 12h) → falošný „Money doklad chýba", hoci reálne prešiel.
+		const id = insOdpisAbs('ZAK2026464', 'OPDL260182', Array(20).fill(1), '2026-08-21 12:28:37', {
+			modul: 'bazen'
+		});
+		insDlvDateOnly('DLV20251398', 'ZAK2026464', '', 20, '2026-08-21T00:00:00');
+		setMetaAbs('2026-08-21 15:51:00');
+		const stav = readbackStav([id]).get(id)!;
+		expect(stav.stav).toBe('ok');
+		expect(stav.dovod).toBe('');
+		expect(stav.dlv).toBe('DLV20251398');
+		expect(stav.moneyPocet).toBe(20);
+		expect(stav.riadkov).toBe(20);
+	});
+
+	it('[RED] case 2: parkovaný caka=1 (25r) sa NEmatchuje na cudzí FIX doklad (5r) ⇒ caka, NIE pocet', () => {
+		// id=89 ZAK2026450 pergola PARKOVANÁ (caka=1, do Money zámerne nešla). Do Money šiel len jej
+		// FIX doklad DLV20251409 (5r). Readback parkovanú pergolu cross-matchol na FIX → falošný
+		// „len 5/25". Parkovaný odpis nesmie vôbec vstúpiť do matchingu.
+		const id = insOdpisAbs('ZAK2026450', 'OP260440', Array(25).fill(1), '2026-08-21 10:00:00', {
+			modul: 'pergola',
+			caka: 1
+		});
+		insDlvDateOnly('DLV20251409', 'ZAK2026450', '', 5, '2026-08-21T00:00:00');
+		setMetaAbs('2026-08-21 15:51:00');
+		const stav = readbackStav([id]).get(id)!;
+		expect(stav.stav).toBe('caka');
+		expect(stav.dovod).toBe('');
+		expect(stav.dlv).toBe(null);
+	});
+});
