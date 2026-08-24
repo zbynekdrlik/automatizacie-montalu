@@ -295,6 +295,61 @@ viď `testing.md`) → `/zasklenia/navrh?viz=high|mid|low` (vynúti tier) → ov
 `data-viz-ready=true`, `__VIZ_CONTEXTS===1`, screenshot, console warnings. Toto
 chytilo obidva deprecation warningy PRED CI. `?viz=` vynúti tier bez ohľadu na HW.
 
+## AR náhľad (#286) — model-viewer nesie VLASTNÝ three → NIKDY na stránke s projektovým three
+
+`<model-viewer>` (Apache-2.0, AR cez WebXR/Scene Viewer/Quick Look) sa importuje z
+**bundleného dist** (`@google/model-viewer/dist/model-viewer.js`), ktorý má three
+**zabudnutý dovnútra** (decoupled od projektového `three@0.185` — model-viewer 4.3.1
+chce peer `three@^0.183`, mismatch rieši `overrides: { "@google/model-viewer": { "three":
+"$three" } }` v package.json, LEN pre npm resolver; runtime používa bundlený three, nie
+projektový). Dôsledok:
+
+**Dve inštancie three na JEDNEJ stránke = `THREE.WARNING: Multiple instances of Three.js
+being imported.`** (three loguje pri module-load, keď `globalThis.__THREE__` už je set) —
+a to POKAZÍ zero-console E2E. /konfigurator už má 3D náhľad na projektovom three; ak by
+sa naň namontoval aj model-viewer (vlastný three), warning padne. **Riešenie: AR viewer
+(model-viewer) žije na SAMOSTATNEJ stránke `/konfigurator/ar`, kde je len model-viewer
+(jedna three).** Inline na /konfigurator je len tlačidlo-odkaz (mobil) / QR (desktop) na
+tú stránku — NEnačíta model-viewer. Bonus: ~1 MB model-viewer bundle sa nenačíta na súhrne.
+
+**Svelte 5 nastaví atribúty custom elementu ako PROPERTIES, nie atribúty** — `src={url}`
+na `<model-viewer>` sa v DOM prejaví ako `mv.src` (property), `getAttribute('src')` vráti
+`null`. Bare `ar` → `mv.ar === true`. V E2E teda over `mv.src` / `mv.ar` (property, cez
+`.evaluate`), nie `getAttribute`. Že model naozaj načítal + vykreslil: `mv.loaded === true
+&& mv.modelIsVisible === true` (funguje aj na softvérovom WebGL v CI).
+
+**AR button model-viewera je device-gated** — `slot="ar-button"` sa zobrazí LEN keď je AR
+podporované (reálny telefón s WebXR/Scene Viewer/Quick Look). V headless CI/desktop je
+skrytý → E2E naň neasertuje viditeľnosť, len na prítomnosť `<model-viewer>` + `src`/`ar`.
+Skutočný launch AR = real-device post-deploy krok (emulátor AR nepokryje).
+
+## GLB export (#286) — `src/lib/vizual/glb.ts`, product-only clean scéna, GLTFExporter v Node
+
+`glb.ts` je DI-based ako `builder.ts` (`THREE`/`mergeGeometries`/`GLTFExporter` ako
+parametre, len `import type` z three → SSR-safe, Node-testovateľné). Kľúčové:
+
+- **Product-only scéna** (len role `ram`+`sklo`, ŽIADNA zem/stena/obloha/tieň/svetlá) —
+  AR viewer prekladá model na REÁLNU podlahu + dodá vlastné svetlá. `postavGeometrie`
+  (reuse) dáva metre; origin (0,0,0) = päta v strede pôdorysu → sadne na AR podlahu.
+- **AR materiály na glTF core metallic-roughness** (`MeshStandardMaterial`): `ram` =
+  dielektrický hliník (metalness 0, roughness 0.35, #285); `sklo` = alpha
+  (`transparent`+`opacity`, NIE transmission — `KHR_materials_transmission` je v AR
+  vieweroch nespoľahlivé). Sklo opacitu zovri do AR-viditeľného rozsahu (číre 0.16 by
+  bolo takmer neviditeľné). ŽIADNY clearcoat/transmission (KHR ext.).
+- **Normály zaruč** (`computeVertexNormals` ak chýbajú) — bez normál sa GLB v Scene
+  Viewer / Quick Look vykreslí PRÁZDNY (známa GLTFExporter pasca). Box geometrie ich
+  majú, ale poistka je lacná.
+- **GLTFExporter v Node potrebuje `FileReader` polyfill** (`$lib/server/filereader-polyfill.ts`)
+  — binárna vetva (`writeAsync`) číta `Blob` cez `new FileReader().readAsArrayBuffer`;
+  `Blob` je Node global, `FileReader` NIE (bez polyfillu padá `FileReader is not defined`).
+  Polyfill aplikuje VOLAJÚCI (serverový `+server.ts` / Node test), nie `glb.ts` sám
+  (glb.ts ostáva client-safe/DI, v prehliadači je `FileReader` natívny).
+- **Serverový GLB endpoint** `/konfigurator/model.glb` (GET), NIE klientsky blob — blob
+  je viazaný na origin STRÁNKY a Scene Viewer (Android intent do externej appky) ho
+  NEDOKÁŽE fetchnúť; http URL funguje so VŠETKÝMI AR režimami. three sa v endpointe
+  načítava DYNAMICKY (statický `three` mimo `vizual/**` zakázaný guardom
+  `vizual-money-guard`; `+server.ts` je server-only, guard ho vylučuje ako `+page.server.ts`).
+
 ## Supersample strop 2× na softvérovom WebGL (SwiftShader CI) — per-dimension limity KLAMÚ (#290)
 
 `MAX_TEXTURE_SIZE`/`MAX_RENDERBUFFER_SIZE` na SwiftShader hlásia 16384, ale
