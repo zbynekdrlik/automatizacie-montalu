@@ -158,7 +158,7 @@ describe('spocitajNarez — zadné nohy LEN pri samostatne stojacej', () => {
 		expect(r.vypocitane.some((p) => /zadná/i.test(p.nazov))).toBe(false);
 		expect(r.informativne.zadnaNohaDlzka).toBeNull();
 	});
-	it('#205: samostatne stojaca → zadná noha = PLNÁ zadná výška (výkres OP260282), 2900 → 2900', () => {
+	it('#316: samostatne stojaca → zadná noha = ZV − horný profil (2900, profil 140 → 2760)', () => {
 		const r = spocitajNarez({
 			...VZOR,
 			uchytenie: 'samostatne',
@@ -166,15 +166,16 @@ describe('spocitajNarez — zadné nohy LEN pri samostatne stojacej', () => {
 			hornyProfilZadnej: 140,
 			pocetZadnychNoh: 4
 		});
-		const zadna = r.vypocitane.find((p) => /zadná/i.test(p.nazov));
+		const zadna = r.vypocitane.find((p) => /zadná noha/i.test(p.nazov));
 		expect(zadna).toBeTruthy();
-		expect(zadna!.dlzkaRezuMm).toBe(2900); // plná ZV (nie ZV−profil); výkres OP260282
+		expect(zadna!.dlzkaRezuMm).toBe(2760); // ZV − horný profil 140 (Dominik 24.8. kanál 207)
 		expect(zadna!.pocetKs).toBe(4);
-		expect(r.informativne.zadnaNohaDlzka).toBe(2900);
+		expect(r.informativne.zadnaNohaDlzka).toBe(2760);
 	});
-	it('#205: dĺžka zadnej nohy = plná ZV nezávisí od hornyProfilZadnej (110 aj 140 → 2900)', () => {
-		// Po korekcii výkresom hornyProfilZadnej UŽ neurčuje dĺžku nohy (call citoval ZV−profil,
-		// výkres uvádza plnú ZV) — 110/140 teraz slúži ako diskriminátor kaskády 110×43 pod fixom.
+	it('#316: dĺžka zadnej nohy = ZV − horný profil → ZÁVISÍ od hornyProfilZadnej (110 → 2790, 140 → 2760)', () => {
+		// Dominik 24.8. (kanál 207 msg 1731730): horizontálny profil sedí na nohách → dĺžka nohy =
+		// ZV − horný profil. hornyProfilZadnej po novom URČUJE dĺžku AJ kód zadnej konštrukcie
+		// (predtým chybne: dĺžka = plná ZV nezávislá od profilu).
 		const s110 = spocitajNarez({
 			...VZOR,
 			uchytenie: 'samostatne',
@@ -187,8 +188,58 @@ describe('spocitajNarez — zadné nohy LEN pri samostatne stojacej', () => {
 			vyskaZadna: 2900,
 			hornyProfilZadnej: 140
 		});
-		expect(s110.informativne.zadnaNohaDlzka).toBe(2900);
-		expect(s140.informativne.zadnaNohaDlzka).toBe(2900);
+		expect(s110.informativne.zadnaNohaDlzka).toBe(2790); // 2900 − 110
+		expect(s140.informativne.zadnaNohaDlzka).toBe(2760); // 2900 − 140
+	});
+});
+
+// --- #316 — zadná konštrukcia sleduje hornyProfilZadnej (kód + jednotnosť) --------------------
+// Dominik 24.8. (kanál 207 msg 1731730): pri výstuhe 110×110 sú aj zadné nohy 110; dĺžka nohy =
+// ZV − horný profil; horizontálny profil sedí na nohách. Zadná noha AJ „zadná konštrukcia horná"
+// majú sledovať hornyProfilZadnej (110 → 18013/110×110, 140 → 18017/140×140), nie systém/hardcode
+// → zadná konštrukcia jednotná by-construction (výkres OP260282 = jednotne 110×110).
+describe('#316 — zadná konštrukcia sleduje hornyProfilZadnej (kód + jednotnosť)', () => {
+	const SS = (
+		hp: 110 | 140,
+		system: PergolaNarezVstup['system'] = 'Massive'
+	): PergolaNarezVstup => ({
+		...VZOR,
+		system,
+		uchytenie: 'samostatne',
+		vyskaZadna: 2900,
+		hornyProfilZadnej: hp
+	});
+	const noha = (r: ReturnType<typeof spocitajNarez>) =>
+		r.vypocitane.find((p) => /zadná noha/i.test(p.nazov))!;
+	const horna = (r: ReturnType<typeof spocitajNarez>) =>
+		r.vypocitane.find((p) => /zadná konštr/i.test(p.nazov))!;
+
+	it('hornyProfilZadnej=110 → zadná noha AJ horná = kód 18013 (110×110), aj pri Massive systéme', () => {
+		const r = spocitajNarez(SS(110, 'Massive'));
+		expect(noha(r).kod).toBe('18013'); // predtým systémový 18017 → RED
+		expect(noha(r).nazov).toMatch(/110x110/);
+		expect(horna(r).kod).toBe('18013');
+		expect(horna(r).nazov).toMatch(/110x110/);
+	});
+
+	it('hornyProfilZadnej=140 → zadná noha AJ horná = kód 18017 (140×140), aj pri Robust systéme', () => {
+		const r = spocitajNarez(SS(140, 'Robust'));
+		expect(noha(r).kod).toBe('18017');
+		expect(noha(r).nazov).toMatch(/140x140/);
+		expect(horna(r).kod).toBe('18017'); // predtým hardcoded 18013 → RED
+		expect(horna(r).nazov).toMatch(/140x140/);
+	});
+
+	it('zadná konštrukcia je JEDNOTNÁ (noha aj horná ten istý kód) pre oba profily', () => {
+		for (const hp of [110, 140] as const) {
+			const r = spocitajNarez(SS(hp));
+			expect(noha(r).kod).toBe(horna(r).kod);
+		}
+	});
+
+	it('dĺžka zadnej nohy = ZV − horný profil (110 → 2790, 140 → 2760)', () => {
+		expect(noha(spocitajNarez(SS(110))).dlzkaRezuMm).toBe(2790);
+		expect(noha(spocitajNarez(SS(140))).dlzkaRezuMm).toBe(2760);
 	});
 });
 
@@ -353,23 +404,23 @@ describe('schemaVykresu (#194) — geometria z POTVRDENÝCH vzorcov, krov je #16
 		expect(s.zadnaKonstrukcia.typ).toBe('stena');
 	});
 
-	it('#205: samostatne stojaca → zadné nohy = PLNÁ ZV (2900), nezávisí od hornyProfilZadnej', () => {
+	it('#316: samostatne → zadná noha CUT = ZV − horný profil (140 → 2760, 110 → 2790); vizuál ostáva ZV', () => {
 		const s = schemaVykresu({ ...VZOR, uchytenie: 'samostatne', pocetZadnychNoh: 4 });
 		expect(s.zadnaKonstrukcia.typ).toBe('samostatne');
 		if (s.zadnaKonstrukcia.typ === 'samostatne') {
-			expect(s.zadnaKonstrukcia.nohaDlzka).toBe(2900); // plná ZV (výkres OP260282)
-			expect(s.zadnaKonstrukcia.vyskaZadna).toBe(2900);
+			expect(s.zadnaKonstrukcia.nohaDlzka).toBe(2760); // CUT = 2900 − 140 (VZOR hornyProfilZadnej 140)
+			expect(s.zadnaKonstrukcia.vyskaZadna).toBe(2900); // vizuálna výška ostáva plná ZV
 			expect(s.zadnaKonstrukcia.hornyProfil).toBe(140);
 			expect(s.zadnaKonstrukcia.nohyX).toEqual([0, 1920, 3840, 5760]);
 		}
-		// horný profil 110 → stále plná ZV = 2900 (dĺžka nohy už nezávisí od profilu)
+		// horný profil 110 → CUT = 2900 − 110 = 2790 (dĺžka nohy ZÁVISÍ od profilu)
 		const s110 = schemaVykresu({
 			...VZOR,
 			uchytenie: 'samostatne',
 			hornyProfilZadnej: 110
 		});
 		if (s110.zadnaKonstrukcia.typ === 'samostatne')
-			expect(s110.zadnaKonstrukcia.nohaDlzka).toBe(2900);
+			expect(s110.zadnaKonstrukcia.nohaDlzka).toBe(2790);
 	});
 
 	it('priečky: počet = ceil(5760/700)+1 = 10, vnútorných deliacich = 8, každý rozostup ≤ 700', () => {

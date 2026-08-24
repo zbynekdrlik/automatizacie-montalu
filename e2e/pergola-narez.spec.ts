@@ -88,7 +88,7 @@ test('Robust: komponenty = zakladacia lišta + krytka vrchná; Massive typy (spo
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('samostatne stojaca (OP260282): zadná noha = plná ZV 2790 + bočný 110×43 pod fixom 3220', async ({
+test('samostatne stojaca (OP260282): zadná noha = ZV − profil 110 = 2680 + bočný 110×43 pod fixom 3220', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -110,9 +110,9 @@ test('samostatne stojaca (OP260282): zadná noha = plná ZV 2790 + bočný 110×
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
-	// #205 task 3: zadná noha = PLNÁ ZV = 2790 (nie ZV−profil), profil systému 18017
+	// #316: zadná noha = ZV − horný profil = 2790 − 110 = 2680 (kód 18013/110×110), Dominik 24.8.
 	await expect(page.getByTestId('narez-tabulka')).toContainText('zadná noha');
-	await expect(page.getByTestId('narez-tabulka')).toContainText('2790 mm');
+	await expect(page.getByTestId('narez-tabulka')).toContainText('2680 mm');
 	// #205 task 1: bočný 110×43 „pod fixom" = hĺbka − (140+110) = 3220
 	await expect(page.getByTestId('narez-tabulka')).toContainText('pod fixom');
 	await expect(page.getByTestId('narez-tabulka')).toContainText('3220 mm');
@@ -232,8 +232,8 @@ test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse
 	await expect(page.getByTestId('pnr-pod-stena')).toHaveCount(0);
 	// strecha (zjednodušený obrys) sa kreslí len pri samostatne stojacej
 	await expect(page.getByTestId('pnr-bok-strecha')).toHaveCount(1);
-	// #205: spec ukazuje zadnú nohu 2900 = plná ZV (výkres OP260282), nie ZV − horný profil
-	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2900');
+	// #316: spec ukazuje CUT dĺžku zadnej nohy = ZV − horný profil = 2900 − 140 = 2760 (Dominik 24.8.)
+	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2760');
 
 	expect(consoleMsgs).toEqual([]);
 });
