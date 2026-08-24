@@ -101,6 +101,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - SQLite/Money durability (synchronous pin, fsync zápis, v24 audit) → `.claude/rules/db-durability.md`
 - katalóg skiel, pridanie/zmena skla, Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
+- POST-import readback z Money DB (money_dlv snapshot, /odpisy overenie, exkluzívne párovanie) → `.claude/rules/money-readback.md`
 - FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`
 - server-side wall-clock timestamp na obrazovke/tlači (UTC default pasca) → `.claude/rules/timestamps.md`
 - `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`

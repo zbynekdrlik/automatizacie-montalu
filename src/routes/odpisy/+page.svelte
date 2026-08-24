@@ -13,6 +13,19 @@
 		„Uvoľniť" zmaže záznam a dovolí poslať tú istú ZAK+OP znova — použi LEN po zmazaní chybného
 		importu v Money.
 	</p>
+	<!-- #298: stav Money readback snapshotu (producer na dev2 → dlv-readback.json). Kým producer
+	     nebeží, stĺpec „Overenie" ukazuje samé „neoverené" — banner vysvetlí prečo. -->
+	<p class="sub" data-testid="readback-stav">
+		{#if data.readbackMeta?.generatedAt}
+			Overenie voči Money: readback z {data.readbackMeta.generatedAt}{data.readbackMeta.daysOld !=
+			null
+				? ` (${data.readbackMeta.daysOld} dní)`
+				: ''}, {data.readbackMeta.rowCount} dokladov.
+		{:else}
+			Overenie voči Money: readback zatiaľ NEBEŽÍ (nič sa neoverilo) — LIVE odpisy ostávajú
+			„neoverené", kým sa nenasadí producent snapshotu.
+		{/if}
+	</p>
 </div>
 
 {#if form?.uvolnene}
@@ -42,6 +55,7 @@
 					<th>Zákazník</th>
 					<th>Detail</th>
 					<th class="c">Režim</th>
+					<th class="c">Overenie</th>
 					<th>Kto</th>
 					<th></th>
 				</tr>
@@ -72,6 +86,48 @@
 								.join(' · ')}{o.caka ? ' ⏳' : ''}</td
 						>
 						<td class="c">{o.live ? '● LIVE' : '🧪 TEST'}</td>
+						<td class="c">
+							<!-- #298 POST-import readback z Money DB: overí, že Money reálne naimportoval
+							     doklad a sedí počet riadkov. Nesúlad = ČERVENÝ alarm (nie ticho). Len LIVE. -->
+							{#if o.readback}
+								{#if o.readback.stav === 'ok'}
+									<span
+										class="badge ok"
+										data-testid={`readback-${o.id}`}
+										title={`Money doklad ${o.readback.dlv} · ${o.readback.moneyPocet} pol. — sedí.`}
+										>✅ overené</span
+									>
+								{:else if o.readback.stav === 'nesulad' && o.readback.dovod === 'chyba-doklad'}
+									<span
+										class="badge alarm"
+										data-testid={`readback-${o.id}`}
+										title="Money doklad k tomuto odpisu NEEXISTUJE — import ho pravdepodobne ticho zahodil (napr. neznámy kód). Skontroluj v Money a v prípade potreby pošli znova."
+										>⛔ Money doklad chýba</span
+									>
+								{:else if o.readback.stav === 'nesulad' && (o.readback.moneyPocet ?? 0) > o.readback.riadkov}
+									<span
+										class="badge alarm"
+										data-testid={`readback-${o.id}`}
+										title={`Money doklad ${o.readback.dlv} má ${o.readback.moneyPocet} položiek, odoslali sme ${o.readback.riadkov} — VIAC než odoslané, skontroluj doklad (možno zlúčený/cudzí).`}
+										>⛔ {o.readback.moneyPocet}/{o.readback.riadkov} pol. (viac)</span
+									>
+								{:else if o.readback.stav === 'nesulad'}
+									<span
+										class="badge alarm"
+										data-testid={`readback-${o.id}`}
+										title={`Money odpísal len ${o.readback.moneyPocet} z ${o.readback.riadkov} riadkov (doklad ${o.readback.dlv}) — niektorý riadok import preskočil.`}
+										>⛔ len {o.readback.moneyPocet}/{o.readback.riadkov} pol.</span
+									>
+								{:else}
+									<span
+										class="badge wait"
+										data-testid={`readback-${o.id}`}
+										title="Zatiaľ neoverené voči Money DB (readback snapshot ešte nedobehol alebo je starší než odpis)."
+										>⏳ neoverené</span
+									>
+								{/if}
+							{/if}
+						</td>
 						<td>{o.created_by}</td>
 						<td class="c">
 							<!-- cenový detail (#154) — položky + ich ceny k tomuto konkrétnemu odpisu -->

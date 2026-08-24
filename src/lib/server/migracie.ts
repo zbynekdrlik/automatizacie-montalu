@@ -955,6 +955,43 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 29) {
+		// v28 → v29: POST-import readback z Money DB (#298, kontrola B verdiktu §3). Denný externý
+		// read-only producer (`scripts/dlv-readback-snapshot.py`, dev2, `montalu_ro`) prinesie snapshot
+		// nedávnych Money DLV dokladov → appka ho LAZY naimportuje sem a on-the-fly overí, že pre každý
+		// LIVE odpis existuje DLV s `PocetPolozek == počet odoslaných riadkov`. 1:1 vzor
+		// `material_prices`/`material_prices_meta` (v21). Money-NEUTRÁLNE (žiadny odpis sa nemení,
+		// appka do Money nič nepíše ani nečíta cez sieť — len súborový snapshot). Celé v transakcii
+		// (vzor v21/v24/v25): CREATE je v SQLite transakčné → pád uprostred sa čisto prehrá.
+		// (PREČÍSLOVANÉ z v28 na v29 — #296 dostal v28 medzitým na deve.)
+		db.transaction(() => {
+			db.exec(`
+				CREATE TABLE money_dlv (
+					dlv TEXT PRIMARY KEY,
+					zak_norm TEXT NOT NULL,
+					op_norm TEXT NOT NULL DEFAULT '',
+					datum TEXT,
+					pocet_polozek INTEGER NOT NULL,
+					popis TEXT NOT NULL DEFAULT '',
+					updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+				);
+				CREATE INDEX idx_money_dlv_key ON money_dlv(zak_norm, op_norm);
+				CREATE TABLE money_dlv_meta (
+					id INTEGER PRIMARY KEY CHECK (id = 1),
+					snapshot_generated_at TEXT,
+					snapshot_file_mtime_ms REAL,
+					imported_at TEXT,
+					row_count INTEGER NOT NULL DEFAULT 0,
+					rejected_count INTEGER NOT NULL DEFAULT 0,
+					-- #298 review: producerovo DLV okno (dni). App si svoje readback okno zaklampuje na
+					-- min(app, producer), aby producer s kratším oknom nespôsobil falošné „chýba doklad".
+					window_days INTEGER NOT NULL DEFAULT 0
+				);
+			`);
+			bump(29);
+		})();
+	}
+
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

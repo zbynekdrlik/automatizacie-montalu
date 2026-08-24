@@ -65,6 +65,12 @@ h1 {
 	background: #fef3c7;
 	color: #b45309;
 }
+/* #298 — Money readback ALARM (doklad chýba / počet nesedí). Červený odznak na tých istých
+   tokenoch ako .badge.ok/.wait — žiadny nový dizajnový jazyk, len sémantika „pozor". */
+.badge.alarm {
+	background: #fee2e2;
+	color: #b91c1c;
+}
 /* #239 — ručné položky (#234): fialový odznak, presunutý z pergola/narez/+page.svelte
    pri rozdelení na subkomponenty (zdieľaný RucnePolozky/RezNahlad/RezHotovo). Reuse
    .badge tokenov, žiadny nový dizajnový jazyk. */
