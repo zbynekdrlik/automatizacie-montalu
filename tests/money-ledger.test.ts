@@ -13,14 +13,21 @@ process.env.DATABASE_PATH = path.join(tmpRoot, 'test.db');
 process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
-const { writeOdpis, releaseOdpis, listOdpisy } = await import('../src/lib/server/money');
+const { writeOdpis, releaseOdpis, listOdpisy, povolitReimport } =
+	await import('../src/lib/server/money');
 const { loadCfg } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');
 import type { OdpisJob } from '../src/lib/server/money';
 
-function makeReq(zak: string, op: string, modul: OdpisJob['modul'] = 'zasklenia'): OdpisJob {
+function makeReq(
+	zak: string,
+	op: string,
+	modul: OdpisJob['modul'] = 'zasklenia',
+	s = 2509,
+	v = 1930
+): OdpisJob {
 	const cfg = loadCfg();
-	const { r, err } = safeCompute(cfg, 'Robust|2K', 2509, 1930, false);
+	const { r, err } = safeCompute(cfg, 'Robust|2K', s, v, false);
 	expect(err).toBeNull();
 	return {
 		modul,
@@ -75,5 +82,39 @@ describe('#294 ledger — re-import identického obsahu po uvoľnení', () => {
 		const b = await writeOdpis(makeReq('ZAK-SAME-B', '01'));
 		expect(a.status).toBe('written');
 		expect(b.status).toBe('written');
+	});
+
+	it('release + re-send so ZMENENÝM obsahom prejde (ledger blokuje LEN identický obsah)', async () => {
+		const w1 = await writeOdpis(makeReq('ZAK-CHANGED', '01'));
+		expect(w1.status).toBe('written');
+		const row = listOdpisy(500).find((o) => o.zak === 'ZAK-CHANGED' && o.op === '01');
+		expect(releaseOdpis(row!.id, 'tester')).toBe(true);
+		// zmenené MNOŽSTVO → iný content_hash → NEblokuje sa (bežná oprava odpisu = re-send po zmene)
+		const j2 = makeReq('ZAK-CHANGED', '01');
+		j2.polozky = j2.polozky.map((p, i) => (i === 0 ? { ...p, qty: p.qty + 7.5 } : p));
+		const w2 = await writeOdpis(j2);
+		expect(w2.status).toBe('written');
+	});
+
+	it('override „Povoliť rovnaký" (povolitReimport) povolí JEDEN re-import identického obsahu', async () => {
+		const w1 = await writeOdpis(makeReq('ZAK-OVR', '01'));
+		expect(w1.status).toBe('written');
+		fs.rmSync(w1.target); // Money spracoval
+
+		// operátor potvrdí, že import v Money zmazal → povolí re-import (uvoľní + append override)
+		const row = listOdpisy(500).find((o) => o.zak === 'ZAK-OVR' && o.op === '01');
+		expect(povolitReimport(row!.id, 'tester')).toBe(true);
+
+		// prvý re-send po override prejde
+		const w2 = await writeOdpis(makeReq('ZAK-OVR', '01'));
+		expect(w2.status).toBe('written');
+		expect(fs.existsSync(w2.target)).toBe(true);
+
+		// ale je to ONE-SHOT — ďalší identický re-send (bez nového override) je zas blokovaný
+		const rowB = listOdpisy(500).find((o) => o.zak === 'ZAK-OVR' && o.op === '01');
+		expect(releaseOdpis(rowB!.id, 'tester')).toBe(true); // bežné uvoľnenie, NIE override
+		const w3 = await writeOdpis(makeReq('ZAK-OVR', '01'));
+		expect(w3.status).toBe('blocked');
+		expect(w3.reason).toBe('ledger-duplicate');
 	});
 });

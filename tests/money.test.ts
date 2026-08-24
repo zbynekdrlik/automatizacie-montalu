@@ -243,7 +243,12 @@ describe('releaseOdpis — uvoľnenie dedup kľúča', () => {
 		(db.prepare("SELECT COUNT(*) n FROM cfg_audit WHERE sys_styl = 'odpis'").get() as { n: number })
 			.n;
 
-	it('write → duplicate → release → audit → re-write prejde', async () => {
+	// #294: PÔVODNE tento test asertoval, že po „Uvoľniť" prejde opätovný zápis IDENTICKÉHO
+	// obsahu (`.toBe('written')`) — to bol PRESNE dvojitý import do Money (root cause z verdiktu §2).
+	// Po oprave: „Uvoľniť" stále zmaže dedup riadok + auditne (a/b), ALE append-only ledger blokuje
+	// re-import identického obsahu (c). Legitímny re-import rovnakého obsahu ide cez `povolitReimport`
+	// („Povoliť rovnaký" na /odpisy) — plné pokrytie ledgeru + override je v `money-ledger.test.ts`.
+	it('write → duplicate → release → audit → identický re-write je BLOKOVANÝ ledgerom (#294)', async () => {
 		const w = await writeOdpis(makeReq('TEST-REL', '01'));
 		expect(w.status).toBe('written');
 		expect((await writeOdpis(makeReq('TEST-REL', '01'))).status).toBe('duplicate');
@@ -263,8 +268,8 @@ describe('releaseOdpis — uvoľnenie dedup kľúča', () => {
 			.get() as { zmeny: string };
 		expect(audit.zmeny).toContain('Uvoľnený odpis');
 		expect(audit.zmeny).toContain('TEST-REL');
-		// (c) opätovný zápis tej istej ZAK+OP prejde
-		expect((await writeOdpis(makeReq('TEST-REL', '01'))).status).toBe('written');
+		// (c) opätovný zápis IDENTICKÉHO obsahu už NEprejde — ledger poistka proti dvojitému importu
+		expect((await writeOdpis(makeReq('TEST-REL', '01'))).status).toBe('blocked');
 	});
 
 	it('neplatné id (0, neexistujúce) → false, žiadny audit záznam', () => {

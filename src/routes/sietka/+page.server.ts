@@ -18,6 +18,7 @@ import {
 	targetDirFor,
 	filenameFor,
 	contentHash,
+	blokLedgerHlaska,
 	type OdpisJob
 } from '$lib/server/money';
 
@@ -111,6 +112,15 @@ export const actions = {
 					vstup,
 					// `+page.svelte` renderuje `vysledok`/`duplikat` v JEDNOM zdieľanom bloku
 					// gejtovanom na `r` — bez neho by duplikát zobrazil PRÁZDNU stránku
+					r,
+					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'duplikat' as const,
+					error: blokLedgerHlaska(vstup.zak, vstup.op, outcome.ledgerImportedAt),
+					vstup,
 					r,
 					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)
 				};

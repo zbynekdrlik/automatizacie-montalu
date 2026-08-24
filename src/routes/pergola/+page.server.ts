@@ -12,7 +12,7 @@ import {
 	validatePergola,
 	CATALOG
 } from '$lib/server/pergola';
-import { writeOdpis, isLive, applyEdits, type OdpisJob } from '$lib/server/money';
+import { writeOdpis, isLive, applyEdits, blokLedgerHlaska, type OdpisJob } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 
@@ -208,6 +208,13 @@ export const actions = {
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a uvoľni záznam v histórii odpisov.`,
+					vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'duplikat' as const,
+					error: blokLedgerHlaska(vstup.zak, vstup.op, outcome.ledgerImportedAt),
 					vstup
 				};
 			}

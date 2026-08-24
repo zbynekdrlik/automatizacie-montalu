@@ -16,7 +16,7 @@ import {
 } from '$lib/server/pergola-rezervacia';
 import { catalogForClient } from '$lib/server/pergola';
 import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
-import { writeOdpis, isLive } from '$lib/server/money';
+import { writeOdpis, isLive, blokLedgerHlaska } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import { logger } from '$lib/server/log';
@@ -159,6 +159,17 @@ export const actions = {
 					rozpis,
 					ceny: cenyBlok(),
 					rezError: `Zákazka ${ident.zak} (OP ${ident.op}) už bola odoslaná (rezervácia alebo odpis) ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv uvoľni záznam v histórii odpisov.`
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'rez-nahlad' as const,
+					vstup,
+					ident,
+					rucne,
+					rozpis,
+					ceny: cenyBlok(),
+					rezError: blokLedgerHlaska(ident.zak, ident.op, outcome.ledgerImportedAt)
 				};
 			}
 			log.info('rezervácia zapísaná', {
