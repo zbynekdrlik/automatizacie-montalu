@@ -339,7 +339,7 @@ function auditOverridePrehodene(job: OdpisJob): void {
 	});
 }
 
-interface LedgerCounts {
+export interface LedgerCounts {
 	imports: number;
 	overrides: number;
 	lastImportedAt: string | undefined;
@@ -349,8 +349,9 @@ interface LedgerCounts {
  * Počítadlo APPEND-ONLY ledgeru `odpis_imported` (#294) pre daný per-order tuple + `content_hash`.
  * `writeOdpis` blokuje re-import, keď `imports > overrides` (identický obsah už raz importovaný a
  * nebol RE-autorizovaný). Kľúč NIKDY nie je globálny hash — dve rôzne zákazky smú mať rovnaký obsah.
+ * Exportované aj pre `money-presun.ts` (#299 detekcia ručného presunu — idempotentný ledger append).
  */
-function ledgerCounts(
+export function ledgerCounts(
 	modul: string,
 	zakNorm: string,
 	opNorm: string,
@@ -760,15 +761,21 @@ export interface OdpisLogRow {
 	detail: string;
 	created_by: string;
 	created_at: string;
+	/** (#299) čas, kedy appka detekovala RUČNÝ presun parkovaného odpisu zo staging „NA ODPIS" do
+	 *  Money importu (`datetime('now')`); NULL = nepresunutý / neparkovaný. */
+	presunute_at: string | null;
 }
 
 export function listOdpisy(limit = 200): OdpisLogRow[] {
 	return db
 		.prepare(
-			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at FROM odpis_log ORDER BY id DESC LIMIT ?'
+			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at, presunute_at FROM odpis_log ORDER BY id DESC LIMIT ?'
 		)
 		.all(limit) as OdpisLogRow[];
 }
+
+// (#299) Detekcia RUČNÉHO presunu parkovaného odpisu zo staging → `money-presun.ts`
+// (`detectManualStagingMoves`), extrahované kvôli 1000-riadkovému stropu (large-file-split).
 
 /**
  * Uvoľní dedup kľúč (zmaže záznam) — jediná legitímna cesta, ako po oprave

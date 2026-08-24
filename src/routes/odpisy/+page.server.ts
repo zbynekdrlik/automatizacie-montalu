@@ -1,5 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { listOdpisy, releaseOdpis, povolitReimport } from '$lib/server/money';
+import { detectManualStagingMoves } from '$lib/server/money-presun';
 import {
 	getDlvReadbackMeta,
 	readbackStav,
@@ -11,6 +12,21 @@ import { logger } from '$lib/server/log';
 const log = logger('odpisy');
 
 export const load: PageServerLoad = async () => {
+	// #299: detekuj RUČNÝ presun parkovaných (`caka=1`) odpisov zo staging „NA ODPIS" do Money importu
+	// PRED čítaním histórie + readbacku, aby oboje videli aktuálny stav (presunutý odpis vstúpi do
+	// readback matchingu + dostane UI marker). READ-ONLY na staging (len `fs.existsSync`). NIKDY nesmie
+	// zhodiť stránku — /odpisy hostí „Uvoľniť" (jedinú cestu k oprave duplikátov), takže IO chyba
+	// degraduje na „nič sa nedetekovalo", nie na 500.
+	try {
+		const presuny = detectManualStagingMoves();
+		if (presuny.length > 0)
+			log.info('detekované ručné presuny zo staging do Money importu (#299)', {
+				pocet: presuny.length,
+				ids: presuny.map((p) => p.id)
+			});
+	} catch (e) {
+		log.error('detekcia ručného presunu zlyhala — /odpisy ostáva funkčné', { error: e });
+	}
 	// detail sa parsuje TU s ochranou — jeden pokazený riadok nesmie zhodiť
 	// celú históriu (a „Uvoľniť" je jediná cesta k oprave duplikátov)
 	const odpisy = listOdpisy(200).map((o) => {

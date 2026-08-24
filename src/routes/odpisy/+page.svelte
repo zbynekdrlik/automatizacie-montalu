@@ -75,16 +75,30 @@
 						<td><b>{o.zak}</b></td>
 						<td>{o.op}</td>
 						<td>{o.zakaznik}</td>
-						<td
-							>{[
+						<td>
+							{[
 								d.system && `${nazovSystemu(String(d.system))} ${d.styl}`,
 								d.s && `${d.s}×${d.v}`,
 								d.model,
 								d.riadkov && `${d.riadkov} pol.`
 							]
 								.filter(Boolean)
-								.join(' · ')}{o.caka ? ' ⏳' : ''}</td
-						>
+								.join(' · ')}
+							<!-- #299: parkovaný odpis, ktorého staged súbor appka detekovala ako RUČNE
+							     presunutý do Money importu → 📦 marker (namiesto ⏳ parkovaný). -->
+							{#if o.presunute_at}
+								<span
+									class="badge presun"
+									data-testid={`presunute-${o.id}`}
+									title={`Súbor bol RUČNE presunutý zo staging „NA ODPIS“ do ostrého Money importu — appka to detekovala ${o.presunute_at}. Odpis už nie je parkovaný a vstupuje do overenia voči Money.`}
+									>📦 presunuté ručne ({o.presunute_at.slice(0, 10)})</span
+								>
+							{:else if o.caka}
+								<span title="Parkované v „NA ODPIS“ — čaká na ručný presun do Money importu"
+									>⏳</span
+								>
+							{/if}
+						</td>
 						<td class="c">{o.live ? '● LIVE' : '🧪 TEST'}</td>
 						<td class="c">
 							<!-- #298 POST-import readback z Money DB: overí, že Money reálne naimportoval
