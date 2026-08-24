@@ -228,3 +228,28 @@ describe('#299 detectManualStagingMoves — hranice a bezpečnosť', () => {
 		expect(imports).toBe(1);
 	});
 });
+
+// #315 — detekcia MUSÍ byť async s tvrdým wall-clock rozpočtom. Na PRODE `target` cesty ležia na
+// CIFS/SMB share cez WireGuard (`fs.statSync` namerané 0,7–8,8 s/súbor) — SYNCHRÓNNE volanie
+// blokovalo event loop na desiatky sekúnd (aj /health zamrzol). Fix: async `readdir`+stat, pri
+// prekročení rozpočtu sa detekcia ČESTNE preskočí (riadok ostáva parkovaný), NIKDY nefalošuje presun.
+describe('#315 detekcia async s rozpočtom — pomalý/visiaci mount NEblokuje ani nefalošuje', () => {
+	const presunuteAt = (id: number) =>
+		(
+			db.prepare('SELECT presunute_at FROM odpis_log WHERE id = ?').get(id) as {
+				presunute_at: string | null;
+			}
+		).presunute_at;
+
+	it('[RED] visiaci mount (readdir sa nikdy nevyrieši) ⇒ dobehne v rozpočte a NEoznačí presun (#315)', async () => {
+		const gone = path.join(stagingDir, 'ZAKSLOW - Zákazník [slow].xlsx');
+		const id = seedMovedParked('ZAKSLOW', 'OPSLOW', [1], gone);
+		expect(fs.existsSync(gone)).toBe(false); // na rýchlom fs by sa OZNAČIL — tu má rozpočet vyhrať
+		const hanging = () => new Promise<string[]>(() => {}); // simulácia visiaceho CIFS mountu
+		const started = Date.now();
+		const det = await detectManualStagingMoves({ readdir: hanging, budgetMs: 300 });
+		expect(Date.now() - started).toBeLessThan(3000); // dobehla v rozpočte (event loop neblokovaný)
+		expect(det).toHaveLength(0); // nič sa neoznačilo
+		expect(presunuteAt(id)).toBeNull(); // visiaci/timeoutnutý stat NIKDY nefalošuje presun
+	});
+});
