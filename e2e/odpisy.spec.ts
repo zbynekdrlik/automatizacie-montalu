@@ -2,6 +2,7 @@
 // (?next=) a predvyplnenie mena. Trieda navigačných/stavových bugov + Money-
 // kritické uvoľnenie. Nula console errors všade.
 import { test, expect } from '@playwright/test';
+import Database from 'better-sqlite3';
 import {
 	collectConsole,
 	loginAs,
@@ -48,6 +49,50 @@ test('odpisy: uvoľnenie dovolí poslať tú istú ZAK+OP znova (celý UI tok)',
 	// 4. po uvoľnení sa tá istá ZAK+OP dá poslať znova (nie duplikát)
 	await posli();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('odpisy: Money readback badge — ✅ overené aj ⛔ chýba doklad sa vykreslí (#298)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	// seeduje LOKÁLNU zdieľanú e2e DB (WAL → preview server to vidí) — proti nasadenému cieľu (BASE_URL)
+	// sa DB priamo zapísať nedá, preto skip (sankcionovaný data-safety guard).
+	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	// MONEY_LIVE=0, takže žiadny súbor do Money — sú to len DB riadky. Fixné vysoké id (nekolidujú
+	// s UI-tvorenými riadkami). zak/op sú už normalizované (uppercase, bez medzier).
+	const db = new Database('./data/e2e.db');
+	try {
+		const insOdpis = db.prepare(
+			`INSERT INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES (?, 'zasklenia', ?, 'OP298', 'E2E Readback', 0, 1, '/t/f.xlsx', 'f.xlsx', 'h', '{}', 'e2e', datetime('now','-30 minutes'), ?, 'OP298')`
+		);
+		const insP = db.prepare(
+			"INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, 'm')"
+		);
+		// A (id 90001): sediaci DLV (2 pol.) → ✅ overené
+		insOdpis.run(90001, 'E2E-RB-OK', 'E2E-RB-OK');
+		insP.run(90001, 'ZASP1', 'P1', 3);
+		insP.run(90001, 'ZASP2', 'P2', 5);
+		// B (id 90002): žiadny DLV → ⛔ Money doklad chýba
+		insOdpis.run(90002, 'E2E-RB-MISS', 'E2E-RB-MISS');
+		insP.run(90002, 'ZASP1', 'P1', 3);
+		insP.run(90002, 'ZASP2', 'P2', 5);
+		db.prepare(
+			"INSERT INTO money_dlv (dlv, zak_norm, op_norm, pocet_polozek) VALUES ('DLVE2E', 'E2E-RB-OK', 'OP298', 2)"
+		).run();
+		db.prepare(
+			"INSERT OR REPLACE INTO money_dlv_meta (id, snapshot_generated_at, imported_at, row_count, window_days) VALUES (1, datetime('now'), datetime('now'), 1, 0)"
+		).run();
+	} finally {
+		db.close();
+	}
+	await loginAs(page);
+	await goto(page, '/odpisy');
+	await expect(page.getByRole('columnheader', { name: 'Overenie' })).toBeVisible();
+	await expect(page.getByTestId('readback-90001')).toContainText('overené');
+	await expect(page.getByTestId('readback-90002')).toContainText('chýba');
+	await expect(page.getByTestId('readback-stav')).toContainText('readback z');
 	expect(consoleMsgs).toEqual([]);
 });
 

@@ -31,6 +31,7 @@ interface DlvMetaRow {
 	imported_at: string | null;
 	row_count: number;
 	rejected_count: number;
+	window_days: number;
 }
 
 function getMetaRow(): DlvMetaRow | undefined {
@@ -127,8 +128,13 @@ export function maybeImportDlvReadback(): ImportResult {
 		log.error('JSON parse DLV readback snapshotu zlyhal', { path: p, error: e });
 		return { imported: false, reason: 'parse-error' };
 	}
-	const file = (parsed ?? {}) as { generatedAt?: unknown; rows?: unknown };
+	const file = (parsed ?? {}) as { generatedAt?: unknown; rows?: unknown; windowDays?: unknown };
 	const generatedAt = typeof file.generatedAt === 'string' ? file.generatedAt : null;
+	// #298 review: producerovo DLV okno (dni) — app si podľa neho zaklampuje readback okno. 0 = neznáme.
+	const windowDays =
+		typeof file.windowDays === 'number' && Number.isFinite(file.windowDays) && file.windowDays > 0
+			? Math.trunc(file.windowDays)
+			: 0;
 	const rowsRaw = Array.isArray(file.rows) ? file.rows : [];
 
 	let rejected = 0;
@@ -156,19 +162,20 @@ export function maybeImportDlvReadback(): ImportResult {
 			updated_at = excluded.updated_at
 	`);
 	const upsertMeta = db.prepare(`
-		INSERT INTO money_dlv_meta (id, snapshot_generated_at, snapshot_file_mtime_ms, imported_at, row_count, rejected_count)
-		VALUES (1, ?, ?, datetime('now'), ?, ?)
+		INSERT INTO money_dlv_meta (id, snapshot_generated_at, snapshot_file_mtime_ms, imported_at, row_count, rejected_count, window_days)
+		VALUES (1, ?, ?, datetime('now'), ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			snapshot_generated_at = excluded.snapshot_generated_at,
 			snapshot_file_mtime_ms = excluded.snapshot_file_mtime_ms,
 			imported_at = excluded.imported_at,
 			row_count = excluded.row_count,
-			rejected_count = excluded.rejected_count
+			rejected_count = excluded.rejected_count,
+			window_days = excluded.window_days
 	`);
 	db.transaction(() => {
 		db.prepare('DELETE FROM money_dlv').run();
 		for (const row of valid) insert.run(row);
-		upsertMeta.run(generatedAt, stat.mtimeMs, valid.length, rejected);
+		upsertMeta.run(generatedAt, stat.mtimeMs, valid.length, rejected, windowDays);
 	})();
 
 	log.info('DLV readback snapshot naimportovaný', { rows: valid.length, rejected, path: p });
@@ -222,7 +229,8 @@ export function getDlvReadbackMeta(): DlvReadbackMeta {
  *  - `nesulad` = ALARM: buď DLV chýba (`chyba-doklad` — Money doklad ticho zahodil), alebo existuje,
  *    ale `PocetPolozek` je nižší než počet reálnych (nenulových) riadkov (`pocet` — riadok preskočený).
  *  - `caka` = zatiaľ sa nedá overiť (snapshot chýba / je starší než odpis / odpis je mimo readback
- *    okna / odpis nemá položkové dáta) → v UI „neoverené", NIKDY neblokuje export. */
+ *    okna / odpis nemá položkové dáta / odpis je PARKOVANÝ `caka=1` a Money ho ešte neimportoval) →
+ *    v UI „neoverené", NIKDY neblokuje export ani falošne nealarmuje. */
 export type ReadbackStav = 'ok' | 'nesulad' | 'caka';
 export type ReadbackDovod = '' | 'pocet' | 'chyba-doklad';
 
@@ -252,6 +260,9 @@ interface OdpisRow {
 	id: number;
 	zakNorm: string;
 	opNorm: string;
+	/** #298 review: 1 = „čaká na materiál" odpis PARKOVANÝ v `NA ODPIS/<subdir>` — Money ho NEIMPORTUJE,
+	 *  kým ho človek ručne nepresunie do dlv-import. Chýbajúci DLV pri `caka=1` NIE je skip ⇒ `caka`. */
+	caka: number;
 	createdEpoch: number;
 	vsetky: number;
 	nenulove: number;
@@ -264,57 +275,108 @@ interface DlvCand {
 	datumEpoch: number | null;
 }
 
-function klasifikuj(
-	o: OdpisRow,
+const CAKA_VYSLEDOK = (o: OdpisRow): ReadbackVysledok => ({
+	stav: 'caka',
+	dovod: '',
+	dlv: null,
+	moneyPocet: null,
+	riadkov: o.vsetky
+});
+
+/**
+ * Priradí Money DLV k odpisom JEDNEJ zákazky (`zak_norm`) EXKLUZÍVNE — každý DLV overí NAJVIAC JEDEN
+ * odpis (#298 review 🟡). Bez toho by jeden prežitý DLV validoval viacero odpisov tej istej zákazky
+ * (napr. zasklenia+pergola+bazén zdieľajú zak+op, alebo „Uvoľniť"+re-send) a tichý drop by prešiel
+ * ako `ok`. Dvojfázový greedy: NAJPRV napáruj presné (v pásme) doklady, POTOM zvyšné; odpis bez
+ * dokladu = alarm `chyba-doklad` LEN keď Money mal čas, odpis je v okne A NIE JE parkovaný (`caka=1`).
+ * POZN.: úplná per-send exkluzivita potrebuje per-send diskriminátor v Money doklade (napr. názov
+ * súboru) — bez neho ostáva (b) „re-send rovnakého obsahu" slabé miesto (UNVERIFIED, provisioning #298).
+ */
+function priradGroup(
+	group: OdpisRow[],
 	cands: DlvCand[],
 	genEpoch: number | null,
-	nowEpoch: number
-): ReadbackVysledok {
-	const base = { dlv: null, moneyPocet: null, riadkov: o.vsetky } as const;
-	// odpis bez položiek (pred #154) alebo bez použiteľného snapshotu ⇒ nedá sa overiť
-	if (o.vsetky === 0 || genEpoch === null) return { stav: 'caka', dovod: '', ...base };
+	windowS: number
+): Map<number, ReadbackVysledok> {
+	const res = new Map<number, ReadbackVysledok>();
+	const claimed = new Set<string>();
+	// kompatibilné NEzabraté DLV: OP sedí (ak ho oboje nesie) + datum nie je zjavne spred odoslania
+	const compat = (o: OdpisRow): DlvCand[] =>
+		cands.filter(
+			(c) =>
+				!claimed.has(c.dlv) &&
+				(!c.opNorm || !o.opNorm || c.opNorm === o.opNorm) &&
+				(c.datumEpoch === null || c.datumEpoch >= o.createdEpoch - DATUM_TOL_S)
+		);
+	// staršie odpisy páruj skôr (staršie odoslanie ~ starší doklad) — deterministické priradenie
+	const sorted = [...group].sort((a, b) => a.createdEpoch - b.createdEpoch);
 
-	// relevantné DLV: OP kompatibilné (ak ho oboje nesie) + datum nie je zjavne spred odoslania
-	const rel = cands.filter((c) => {
-		const opOk = !c.opNorm || !o.opNorm || c.opNorm === o.opNorm;
-		const datumOk = c.datumEpoch === null || c.datumEpoch >= o.createdEpoch - DATUM_TOL_S;
-		return opOk && datumOk;
-	});
-
-	if (rel.length > 0) {
-		// pásmo [počet_nenulových .. počet_všetkých]: Money môže (ale nemusí) rátať nulové riadky.
-		// `reduce` (bez init) na neprázdnom poli vráti prvok (nie undefined) — žiadny indexový prístup.
-		const vBand = rel.filter((c) => c.pocet >= o.nenulove && c.pocet <= o.vsetky);
+	// FÁZA 1: overiteľné odpisy s DOKLADOM V PÁSME [nenulove..vsetky] (Money môže/nemusí rátať nulové
+	// riadky). Najvyšší v pásme = presná zhoda s počtom_všetkých, keď taký doklad existuje.
+	for (const o of sorted) {
+		if (o.vsetky === 0 || genEpoch === null) continue; // rozhodne sa v FÁZE 2 ako caka
+		const vBand = compat(o).filter((c) => c.pocet >= o.nenulove && c.pocet <= o.vsetky);
 		if (vBand.length > 0) {
-			// najvyšší v pásme = presná zhoda s počtom_všetkých, keď taký doklad existuje
 			const pick = vBand.reduce((a, b) => (b.pocet > a.pocet ? b : a));
-			return { stav: 'ok', dovod: '', dlv: pick.dlv, moneyPocet: pick.pocet, riadkov: o.vsetky };
+			claimed.add(pick.dlv);
+			res.set(o.id, {
+				stav: 'ok',
+				dovod: '',
+				dlv: pick.dlv,
+				moneyPocet: pick.pocet,
+				riadkov: o.vsetky
+			});
 		}
-		// DLV existuje, ale počet nesedí (reálny riadok preskočený / doklad zlúčený) ⇒ ALARM
-		const pick = rel.reduce((a, b) => (b.pocet > a.pocet ? b : a));
-		return {
-			stav: 'nesulad',
-			dovod: 'pocet',
-			dlv: pick.dlv,
-			moneyPocet: pick.pocet,
-			riadkov: o.vsetky
-		};
 	}
 
-	// žiadny relevantný DLV: alarm LEN keď Money mal čas (snapshot čerstvejší než odoslanie+grace) A
-	// odpis je v readback okne (producer ho reálne číta) — inak „neoverené", nikdy falošný alarm
-	const moneyMalCas = genEpoch > o.createdEpoch + GRACE_S;
-	const vOkne = o.createdEpoch >= nowEpoch - READBACK_WINDOW_S;
-	if (moneyMalCas && vOkne) return { stav: 'nesulad', dovod: 'chyba-doklad', ...base };
-	return { stav: 'caka', dovod: '', ...base };
+	// FÁZA 2: zvyšné odpisy. Zostal kompatibilný (mimo pásma) doklad ⇒ počet nesedí (ALARM `pocet`).
+	// Žiadny doklad ⇒ chýbajúci doklad (ALARM `chyba-doklad`) LEN keď Money mal čas + odpis je v okne
+	// + NIE JE parkovaný; inak „neoverené" (`caka`) — nikdy falošný alarm.
+	for (const o of sorted) {
+		if (res.has(o.id)) continue;
+		if (o.vsetky === 0 || genEpoch === null) {
+			res.set(o.id, CAKA_VYSLEDOK(o));
+			continue;
+		}
+		const rest = compat(o);
+		if (rest.length > 0) {
+			const pick = rest.reduce((a, b) => (b.pocet > a.pocet ? b : a));
+			claimed.add(pick.dlv);
+			res.set(o.id, {
+				stav: 'nesulad',
+				dovod: 'pocet',
+				dlv: pick.dlv,
+				moneyPocet: pick.pocet,
+				riadkov: o.vsetky
+			});
+			continue;
+		}
+		const moneyMalCas = genEpoch > o.createdEpoch + GRACE_S;
+		// okno sa meria od GENEROVANIA snapshotu (producer číta DLV okno relatívne k svojmu behu),
+		// nie od „teraz" — pri zastaranom snapshote by inak odpis vypadol z okna nesprávne (#298 review).
+		const vOkne = o.createdEpoch >= genEpoch - windowS;
+		if (o.caka !== 1 && moneyMalCas && vOkne) {
+			res.set(o.id, {
+				stav: 'nesulad',
+				dovod: 'chyba-doklad',
+				dlv: null,
+				moneyPocet: null,
+				riadkov: o.vsetky
+			});
+		} else {
+			res.set(o.id, CAKA_VYSLEDOK(o));
+		}
+	}
+	return res;
 }
 
 /**
  * Stav overenia LIVE odpisov proti Money DLV snapshotu — ČISTÁ funkcia (odpis_log + odpis_polozky +
  * money_dlv), počítaná on-the-fly (žiadna uložená reconcile state). Najprv LAZY refresh snapshotu.
  * Vracia záznam LEN pre LIVE odpisy z `odpisLogIds` (TEST odpisy do Money nikdy nešli → bez záznamu).
- * Všetka časová matematika je v SQL cez `strftime('%s', …)` (SQLite berie uložený `datetime('now')`
- * ako UTC) — vyhýbame sa `Date.parse` na space-oddelenom čase (V8 by ho bral ako lokálny).
+ * Odpisy zoskupí po `zak_norm` a priradí DLV EXKLUZÍVNE (jeden DLV = najviac jeden odpis, viď
+ * `priradGroup`). Všetka časová matematika je v SQL cez `strftime('%s', …)` (SQLite berie uložený
+ * `datetime('now')` ako UTC) — vyhýbame sa `Date.parse` na space-oddelenom čase (V8 by ho bral ako lokálny).
  */
 export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledok> {
 	maybeImportDlvReadback();
@@ -324,7 +386,7 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 	const ph = odpisLogIds.map(() => '?').join(',');
 	const odpisy = db
 		.prepare(
-			`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm,
+			`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm, l.caka AS caka,
 				CAST(strftime('%s', l.created_at) AS INTEGER) AS createdEpoch,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS vsetky,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id AND p.qty != 0) AS nenulove
@@ -336,25 +398,32 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 
 	const genRow = db
 		.prepare(
-			`SELECT CAST(strftime('%s', snapshot_generated_at) AS INTEGER) AS gen
+			`SELECT CAST(strftime('%s', snapshot_generated_at) AS INTEGER) AS gen, window_days AS windowDays
 			 FROM money_dlv_meta WHERE id = 1 AND snapshot_generated_at IS NOT NULL`
 		)
-		.get() as { gen: number | null } | undefined;
+		.get() as { gen: number | null; windowDays: number } | undefined;
 	const genEpoch = genRow?.gen ?? null;
-	const nowEpoch = (
-		db.prepare("SELECT CAST(strftime('%s','now') AS INTEGER) AS now").get() as {
-			now: number;
-		}
-	).now;
+	// zaklampuj readback okno na producerovo (keď ho pozná) — kratšie producer okno inak spôsobí
+	// falošné „chýba doklad" pri odpisoch, ktoré producer už nečíta (#298 review).
+	const prodWindowS =
+		genRow && genRow.windowDays > 0 ? genRow.windowDays * 86400 : READBACK_WINDOW_S;
+	const windowS = Math.min(READBACK_WINDOW_S, prodWindowS);
 
 	const candStmt = db.prepare(
 		`SELECT dlv, op_norm AS opNorm, pocet_polozek AS pocet,
 			CASE WHEN datum IS NULL THEN NULL ELSE CAST(strftime('%s', datum) AS INTEGER) END AS datumEpoch
 		 FROM money_dlv WHERE zak_norm = ?`
 	);
+	// zoskup odpisy po zákazke — DLV sa priraďujú EXKLUZÍVNE v rámci jednej zákazky
+	const byZak = new Map<string, OdpisRow[]>();
 	for (const o of odpisy) {
-		const cands = candStmt.all(o.zakNorm) as DlvCand[];
-		out.set(o.id, klasifikuj(o, cands, genEpoch, nowEpoch));
+		const g = byZak.get(o.zakNorm);
+		if (g) g.push(o);
+		else byZak.set(o.zakNorm, [o]);
+	}
+	for (const [zak, group] of byZak) {
+		const cands = candStmt.all(zak) as DlvCand[];
+		for (const [id, r] of priradGroup(group, cands, genEpoch, windowS)) out.set(id, r);
 	}
 	return out;
 }

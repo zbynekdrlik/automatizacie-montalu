@@ -25,15 +25,17 @@ function insOdpis(
 	zak: string,
 	op: string,
 	qtys: number[],
-	opts: { live?: number; createdMod?: string } = {}
+	opts: { live?: number; createdMod?: string; caka?: number; modul?: string } = {}
 ): number {
 	const id = nextId++;
 	const live = opts.live ?? 1;
 	const created = opts.createdMod ?? '-30 minutes';
+	const caka = opts.caka ?? 0;
+	const modul = opts.modul ?? 'zasklenia';
 	db.prepare(
 		`INSERT INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
-		 VALUES (?, 'zasklenia', ?, ?, 'Test', 0, ?, '/t/f.xlsx', 'f.xlsx', 'h', '{}', 'tester', datetime('now', ?), ?, ?)`
-	).run(id, zak, op, live, created, normZak(zak), normOp(op));
+		 VALUES (?, ?, ?, ?, 'Test', ?, ?, '/t/f.xlsx', 'f.xlsx', 'h', '{}', 'tester', datetime('now', ?), ?, ?)`
+	).run(id, modul, zak, op, caka, live, created, normZak(zak), normOp(op));
 	const insP = db.prepare(
 		"INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, 'm')"
 	);
@@ -60,13 +62,14 @@ function insDlv(
 	);
 }
 
-/** Nastaví meta snapshotu (kedy bol generovaný). `genMod` = modifikátor, null = žiadny snapshot. */
-function setMeta(genMod: string | null): void {
+/** Nastaví meta snapshotu (kedy bol generovaný). `genMod` = modifikátor, null = žiadny snapshot.
+ *  `windowDays` = producerovo DLV okno (0 = neznáme → app použije svoje 30 dní). */
+function setMeta(genMod: string | null, windowDays = 0): void {
 	db.prepare('DELETE FROM money_dlv_meta').run();
 	if (genMod === null) return;
 	db.prepare(
-		"INSERT INTO money_dlv_meta (id, snapshot_generated_at, imported_at, row_count) VALUES (1, datetime('now', ?), datetime('now'), 1)"
-	).run(genMod);
+		"INSERT INTO money_dlv_meta (id, snapshot_generated_at, imported_at, row_count, window_days) VALUES (1, datetime('now', ?), datetime('now'), 1, ?)"
+	).run(genMod, windowDays);
 }
 
 beforeEach(() => {
@@ -155,6 +158,14 @@ describe('#298 readback — neoverené (caka), NIKDY nefalošný alarm', () => {
 		expect(readbackStav([id]).get(id)!.stav).toBe('caka');
 	});
 
+	it('[review 🔵] odpis mimo PRODUCEROVHO okna (kratšie než app) ⇒ caka, nie alarm', () => {
+		// producer číta len 1 deň DLV; odpis spred 5 dní je mimo jeho okna → žiadny DLV NIE je dôkaz
+		// skipu (producer ho nečíta). App si okno zaklampuje na producerovo.
+		const id = insOdpis('ZAKW', 'OPW', [2], { createdMod: '-5 days' });
+		setMeta('-0 minutes', 1); // producer window = 1 deň
+		expect(readbackStav([id]).get(id)!.stav).toBe('caka');
+	});
+
 	it('odpis bez položiek (pred #154) ⇒ caka (nemáme čo overiť)', () => {
 		const id = nextId++;
 		db.prepare(
@@ -180,5 +191,52 @@ describe('#298 readback — TEST odpisy sa neoverujú (do Money nikdy nešli)', 
 		const id = insOdpis('ZAK11', 'OP1111', [2], { live: 0 });
 		setMeta('-0 minutes');
 		expect(readbackStav([id]).has(id)).toBe(false);
+	});
+});
+
+describe('#298 readback — PARKOVANÝ caka=1 odpis NEALARMUJE (Money ho ešte neimportoval)', () => {
+	it('[review 🔴] LIVE caka=1 bez DLV + čerstvý snapshot ⇒ caka, NIE chyba-doklad', () => {
+		// caka=1 = súbor visí v „NA ODPIS", Money ho neimportuje kým ho človek nepresunie → žiadny
+		// DLV NEznamená skip. Bez tejto poistky by KAŽDÝ parkovaný odpis falošne alarmoval.
+		const id = insOdpis('ZAKP', 'OPP1', [3, 5], { caka: 1 });
+		setMeta('-0 minutes');
+		expect(readbackStav([id]).get(id)!.stav).toBe('caka');
+	});
+
+	it('caka=1 odpis PO presune (DLV už existuje) ⇒ ok (readback funguje po importe)', () => {
+		const id = insOdpis('ZAKP2', 'OPP2', [3, 5], { caka: 1 });
+		insDlv('DLVP2', 'ZAKP2', 'OPP2', 2);
+		setMeta('-0 minutes');
+		expect(readbackStav([id]).get(id)!.stav).toBe('ok');
+	});
+});
+
+describe('#298 readback — EXKLUZÍVNE priradenie (jeden DLV neoverí dva odpisy)', () => {
+	it('[review 🟡] 2 moduly rovnaká zak+op, Money zahodil jeden ⇒ druhý ostane bez dokladu = alarm', () => {
+		// zasklenia + pergola tej istej zákazky (UNIQUE je (modul,zak,op,live), takže zdieľajú zak+op).
+		// Money naimportoval len JEDEN doklad (2 pol.). Bez exkluzivity by ten jeden overil OBA.
+		const a = insOdpis('ZAKX', 'OPX', [3, 5], { modul: 'zasklenia' });
+		const b = insOdpis('ZAKX', 'OPX', [1, 2], { modul: 'pergola' });
+		insDlv('DLVONE', 'ZAKX', 'OPX', 2); // sedí do pásma OBOCH (2 riadky každý)
+		setMeta('-0 minutes');
+		const m = readbackStav([a, b]);
+		// jeden ok (napárovaný na jediný DLV), druhý bez dokladu ⇒ alarm — NIE oba ok
+		const stavy = [m.get(a)!.stav, m.get(b)!.stav].sort();
+		expect(stavy).toEqual(['nesulad', 'ok']);
+		const alarm = m.get(a)!.stav === 'nesulad' ? m.get(a)! : m.get(b)!;
+		expect(alarm.dovod).toBe('chyba-doklad');
+	});
+
+	it('2 odpisy rovnakej zak, 2 zodpovedajúce DLV ⇒ OBA ok (každý svoj doklad)', () => {
+		const a = insOdpis('ZAKY', 'OPY', [3, 5], { modul: 'zasklenia' });
+		const b = insOdpis('ZAKY', 'OPY', [1, 2, 4], { modul: 'pergola' });
+		insDlv('DLVA', 'ZAKY', 'OPY', 2);
+		insDlv('DLVB', 'ZAKY', 'OPY', 3);
+		setMeta('-0 minutes');
+		const m = readbackStav([a, b]);
+		expect(m.get(a)!.stav).toBe('ok');
+		expect(m.get(b)!.stav).toBe('ok');
+		// rôzne DLV napárované (exkluzívne)
+		expect(m.get(a)!.dlv).not.toBe(m.get(b)!.dlv);
 	});
 });

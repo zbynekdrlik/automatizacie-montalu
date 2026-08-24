@@ -17,7 +17,9 @@ Použitie (tunel MUSÍ bežať — tento skript ho sám neotvára):
 
     ssh -i money-ro-thirdparty -N -L 11433:192.168.1.200:1433 root@<jump-host> &
     export MONEY_SQL_PASSWORD='<z MONEY-READONLY-PRISTUP.md>'
-    python3 scripts/dlv-readback-snapshot.py > /path/na/rsync/dlv-readback.json
+    # zapíš do TMP a atomicky premenuj — `> file.json` by pri páde producera zanechal skrátený/
+    # prázdny súbor (appka to prežije cez parse-error + staré dáta, ale radšej write-temp-then-rename):
+    python3 scripts/dlv-readback-snapshot.py > /path/dlv-readback.json.tmp && mv /path/dlv-readback.json.tmp /path/dlv-readback.json
 
 Cieľ na VPS (rsync): `/opt/automatizacie-montalu/ceny/dlv-readback.json` (appka číta
 `DLV_READBACK_PATH`, default `/data/ceny/dlv-readback.json`). Nasadenie ako cron na dev2
@@ -171,6 +173,9 @@ def main() -> None:
         conn.close()
     out = {
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # appka si podľa toho zaklampuje readback okno na min(app, producer) — kratšie producer okno
+        # inak spôsobí falošné „chýba doklad" (#298 review).
+        "windowDays": window_days,
         "rows": rows,
     }
     json.dump(out, sys.stdout, ensure_ascii=False)

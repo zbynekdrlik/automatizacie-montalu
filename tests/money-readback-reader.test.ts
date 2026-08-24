@@ -116,6 +116,34 @@ describe('#298 DLV readback reader', () => {
 		expect(dlvs).toEqual(['DNEW']); // DOLD je preč (autoritatívny snapshot)
 	});
 
+	it('windowDays z JSON sa uloží do meta; chýbajúce/neplatné ⇒ 0', () => {
+		writeSnap({
+			generatedAt: '2026-08-24T05:30:00Z',
+			windowDays: 10,
+			rows: [{ dlv: 'D1', zak: 'Z1', pocetPolozek: 1 }]
+		});
+		maybeImportDlvReadback();
+		const w1 = (
+			db.prepare('SELECT window_days AS w FROM money_dlv_meta WHERE id = 1').get() as { w: number }
+		).w;
+		expect(w1).toBe(10);
+		// nový súbor bez windowDays → 0 (neznáme)
+		fs.writeFileSync(
+			snapPath,
+			JSON.stringify({
+				generatedAt: '2026-08-25T05:30:00Z',
+				rows: [{ dlv: 'D2', zak: 'Z2', pocetPolozek: 1 }]
+			})
+		);
+		const t = Date.now() / 1000 + 5;
+		fs.utimesSync(snapPath, t, t);
+		maybeImportDlvReadback();
+		const w2 = (
+			db.prepare('SELECT window_days AS w FROM money_dlv_meta WHERE id = 1').get() as { w: number }
+		).w;
+		expect(w2).toBe(0);
+	});
+
 	it('nevalidný JSON ⇒ parse-error (nezhodí, len sa nenaimportuje)', () => {
 		fs.writeFileSync(snapPath, '{toto nie je json');
 		expect(maybeImportDlvReadback().reason).toBe('parse-error');

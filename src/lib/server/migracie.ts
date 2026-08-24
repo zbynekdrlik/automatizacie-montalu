@@ -960,7 +960,10 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 					snapshot_file_mtime_ms REAL,
 					imported_at TEXT,
 					row_count INTEGER NOT NULL DEFAULT 0,
-					rejected_count INTEGER NOT NULL DEFAULT 0
+					rejected_count INTEGER NOT NULL DEFAULT 0,
+					-- #298 review: producerovo DLV okno (dni). App si svoje readback okno zaklampuje na
+					-- min(app, producer), aby producer s kratším oknom nespôsobil falošné „chýba doklad".
+					window_days INTEGER NOT NULL DEFAULT 0
 				);
 			`);
 			bump(28);
