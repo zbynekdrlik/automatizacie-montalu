@@ -14,7 +14,8 @@ process.env.DATABASE_PATH = path.join(tmpRoot, 'test.db');
 process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
-const { writeOdpis, releaseOdpis, listOdpisy } = await import('../src/lib/server/money');
+const { writeOdpis, releaseOdpis, listOdpisy, overrideOpts, rawFormEntries } =
+	await import('../src/lib/server/money');
 const { loadCfg, db } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');
 import type { OdpisJob } from '../src/lib/server/money';
@@ -115,5 +116,33 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 				.get() as { c: number }
 		).c;
 		expect(overrides).toBe(0);
+	});
+});
+
+describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing', () => {
+	it('overrideOpts mapuje skryté `override` pole na správny flag', () => {
+		const fKody = new FormData();
+		fKody.set('override', 'unknown-kod');
+		expect(overrideOpts(fKody)).toEqual({ overrideKody: true, overrideLedger: false });
+
+		const fLedger = new FormData();
+		fLedger.set('override', 'ledger-duplicate');
+		expect(overrideOpts(fLedger)).toEqual({ overrideKody: false, overrideLedger: true });
+
+		// bežný (prvý) submit nemá `override` pole → žiadny bypass
+		expect(overrideOpts(new FormData())).toEqual({ overrideKody: false, overrideLedger: false });
+	});
+
+	it('rawFormEntries zachová string polia (aj qty úpravy), vynechá `override`', () => {
+		const f = new FormData();
+		f.set('zak', 'ZAK1');
+		f.set('op', 'OP260286');
+		f.set('qty_18004', '3,5'); // ručná úprava množstva
+		f.set('override', 'ledger-duplicate'); // toto sa NEsmie zopakovať (doplní ho komponent)
+		const e = rawFormEntries(f);
+		expect(e).toContainEqual(['zak', 'ZAK1']);
+		expect(e).toContainEqual(['op', 'OP260286']);
+		expect(e).toContainEqual(['qty_18004', '3,5']);
+		expect(e.some(([k]) => k === 'override')).toBe(false);
 	});
 });

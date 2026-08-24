@@ -14,29 +14,34 @@ import {
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
 
-test('odpisy: uvoľnenie dovolí poslať tú istú ZAK+OP znova (celý UI tok)', async ({ page }) => {
+test('odpisy: Uvoľniť dovolí poslať tú istú ZAK+OP znova so ZMENENÝM obsahom (celý UI tok)', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	page.on('dialog', (d) => d.accept()); // confirm() pri Uvoľniť
 	await loginAs(page);
 
-	const posli = async () => {
+	// #294 ledger: „Uvoľniť" (na rozdiel od „Povoliť rovnaký") povolí re-send len so ZMENENÝM
+	// obsahom — IDENTICKÝ ostáva blokovaný ako poistka proti dvojitému importu (viď
+	// odpis-blok-override.spec.ts pre override cestu). Preto step 4 zmení šírku.
+	const posli = async (sirka: string) => {
 		await goto(page, '/zasklenia');
 		await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-REL`);
 		await page.getByLabel('OP/OPDL číslo *').fill('01');
 		await page.getByLabel('Zákazník *').fill('E2E Uvoľniť');
-		await page.getByLabel('Šírka (mm) *').fill('2509');
+		await page.getByLabel('Šírka (mm) *').fill(sirka);
 		await page.getByLabel('Výška (mm) *').fill('1930');
 		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 		await page.getByTestId('odoslat').click();
 	};
 
 	// 1. prvé odoslanie prejde
-	await posli();
+	await posli('2509');
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	// 2. rovnaká ZAK+OP → duplikát
-	await posli();
+	// 2. rovnaká ZAK+OP + rovnaký obsah → duplikát
+	await posli('2509');
 	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
 
 	// 3. história → Uvoľniť ten záznam
@@ -45,8 +50,8 @@ test('odpisy: uvoľnenie dovolí poslať tú istú ZAK+OP znova (celý UI tok)',
 	await row.getByRole('button', { name: 'Uvoľniť' }).click();
 	await expect(page.getByTestId('uvolnene')).toBeVisible();
 
-	// 4. po uvoľnení sa tá istá ZAK+OP dá poslať znova (nie duplikát)
-	await posli();
+	// 4. po uvoľnení sa tá istá ZAK+OP dá poslať znova so ZMENENÝM obsahom (iná šírka)
+	await posli('2600');
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 	expect(consoleMsgs).toEqual([]);
 });
