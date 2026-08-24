@@ -140,7 +140,10 @@ export const SYSTEMY: Record<PergolaSystem, SystemProfil> = {
  *  `hornyProfilZadnej`, jednotná by-construction (výkres OP260282 = jednotne 110×110, hoci
  *  systém je Massive 140 — `hornyProfilZadnej` je NEZÁVISLÝ od systému). Kódy/názvy = KÓPIA
  *  stringov z katalógu profilov (money-safety guard — NIE import server/pergola).
- *  110 → 18013 (Profil 110x110 V2), 140 → 18017 (Profil 140x140). */
+ *  110 → 18013 (Profil 110x110 V2), 140 → 18017 (Profil 140x140). Hodnoty sú ZRKADLO
+ *  `SYSTEMY.Robust.stlp` / `SYSTEMY.Massive.stlp` `{kod, nazov}` — pri oprave katalógového
+ *  stringu drž ich v synchronizácii (odvodzovať z `SYSTEMY` sa ZÁMERNE NEROBÍ: zadná
+ *  konštrukcia je nezávislá od `system` — OP260282 = Massive 140 systém so 110 zadnou). */
 export const ZADNA_KONSTRUKCIA_PROFIL: Record<HornyProfil, { kod: string; nazov: string }> = {
 	110: { kod: '18013', nazov: 'Profil 110x110 V2' },
 	140: { kod: '18017', nazov: 'Profil 140x140' }
