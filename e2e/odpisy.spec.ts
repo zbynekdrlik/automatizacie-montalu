@@ -5,6 +5,7 @@
 // Trieda navigačných/stavových bugov + Money-kritický dedup/ledger. Nula console errors všade.
 import { test, expect } from '@playwright/test';
 import Database from 'better-sqlite3';
+import path from 'node:path';
 import {
 	collectConsole,
 	loginAs,
@@ -125,6 +126,46 @@ test('odpisy: Money readback badge — ✅ overené aj ⛔ chýba doklad sa vykr
 	await expect(page.getByTestId('readback-90001')).toContainText('overené');
 	await expect(page.getByTestId('readback-90002')).toContainText('chýba');
 	await expect(page.getByTestId('readback-stav')).toContainText('readback z');
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('odpisy: ručný presun zo staging → 📦 „presunuté ručne" + odpis vstúpi do readbacku (#299)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	// seeduje LOKÁLNU zdieľanú e2e DB (WAL → preview server to vidí) — proti nasadenému cieľu skip.
+	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	// caka=1 LIVE odpis, ktorého staged súbor „bol ručne presunutý do Money": `target` má EXISTUJÚCI
+	// rodičovský dir (./data), ale súbor tam nikdy nevznikne → detekcia (v /odpisy load) ho označí ako
+	// presunutý. MONEY_LIVE=0, takže do Money nič nejde — je to len DB riadok + neexistujúci súbor.
+	const goneTarget = path.resolve('data', 'e2e-presun-90003-gone.xlsx');
+	const db = new Database('./data/e2e.db');
+	try {
+		db.prepare(
+			`INSERT INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES (90003, 'pergola', 'E2E-PRESUN', 'OP299', 'E2E Presun', 1, 1, ?, 'gone.xlsx', 'h299', '{}', 'e2e', datetime('now','-30 minutes'), 'E2E-PRESUN', 'OP299')`
+		).run(goneTarget);
+		const insP = db.prepare(
+			"INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, 'm')"
+		);
+		insP.run(90003, 'ZASP1', 'P1', 3);
+		insP.run(90003, 'ZASP2', 'P2', 5);
+		// zhodný Money DLV (2 pol.) — po presune sa odpis MUSÍ napárovať (✅ overené), nie ostať ⏳
+		db.prepare(
+			"INSERT OR REPLACE INTO money_dlv (dlv, zak_norm, op_norm, pocet_polozek) VALUES ('DLV299', 'E2E-PRESUN', 'OP299', 2)"
+		).run();
+		db.prepare(
+			"INSERT OR REPLACE INTO money_dlv_meta (id, snapshot_generated_at, imported_at, row_count, window_days) VALUES (1, datetime('now'), datetime('now'), 1, 0)"
+		).run();
+	} finally {
+		db.close();
+	}
+	await loginAs(page);
+	await goto(page, '/odpisy');
+	// detekcia (v load) označí presun → UI marker 📦 „presunuté ručne" (namiesto ⏳ parkovaný)
+	await expect(page.getByTestId('presunute-90003')).toContainText('presunuté ručne');
+	// a odpis VSTÚPI do #308 readback matchingu → reálny Money verdikt (✅ overené), nie trvalé ⏳
+	await expect(page.getByTestId('readback-90003')).toContainText('overené');
 	expect(consoleMsgs).toEqual([]);
 });
 

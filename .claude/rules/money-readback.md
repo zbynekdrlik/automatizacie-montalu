@@ -50,6 +50,13 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   `priradGroup` teraz priradí každému `caka=1` odpisu `caka` HNEĎ na začiatku a NEPUSTÍ ho do
   matchingu → nikdy falošný alarm ANI falošné `ok`, a hlavne NECLAIMuje DLV (nepokradne doklad
   legit súrodencovi tej istej zákazky). „Neoverené" je čestný stav. SQL MUSÍ čítať `l.caka`.
+- **#299 VÝNIMKA — DETEKOVANÝ ručný presun VSTUPUJE do matchingu (`caka=1 AND presunute_at IS NULL`).**
+  Keďže `caka` je nemenné, presunutý parkovaný odpis by inak ostal navždy „neoverený" aj po tom, čo je
+  reálne v Money. `detectManualStagingMoves` (`money.ts`, volané z `/odpisy` load) diffom staging dir
+  označí `odpis_log.presunute_at`, keď staged súbor zmizol (rodičovský dir stále existuje — fail-safe).
+  Readback SQL preto číta AJ `CASE WHEN l.presunute_at IS NOT NULL THEN 1 ELSE 0 END AS presunute` a
+  `priradGroup` vylúči LEN `o.caka === 1 && o.presunute === 0`. Presunutý (`presunute=1`) odpis vstúpi
+  do matchingu ako aktívny → dostane reálny Money verdikt (✅/⛔). Detekcia je READ-ONLY na staging.
 - **EXKLUZÍVNE priradenie DLV↔odpis per zákazka (`priradGroup`).** `UNIQUE(modul,zak,op,live)` →
   zasklenia+pergola+bazén jednej zákazky zdieľajú zak+op; jeden prežitý DLV by inak overil VIAC
   odpisov (a tichý drop by prešiel ako ok). Dvojfázový greedy: najprv v-pásme, potom zvyšné; každý

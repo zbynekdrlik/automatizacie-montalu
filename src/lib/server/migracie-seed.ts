@@ -133,6 +133,29 @@ export function seedUsers(db: Database.Database, hashPassword: (password: string
  * (vzor v27 `odpis_log`): minimálne migračné fixtures skáču za v25 bez `dopyt` — ALTER sa preskočí;
  * na reálnej DB `dopyt` VŽDY existuje (v25). Všetky stĺpce nullable (NULL = neopečiatkovaný riadok).
  */
+// v30 → v31 (#299): evidencia RUČNÉHO presunu parkovaného (`caka=1`) odpisu zo staging „NA ODPIS"
+// do ostrého Money import dir. `caka=1` súbor visí v `NA ODPIS/<subdir>`; Money ho neimportuje, kým
+// ho ČLOVEK ručne nepresunie do rootu `dlv-import` — krok MIMO appky. Keďže `caka` je po inserte
+// NEMENNÉ, presunutý odpis dovtedy ostával navždy „parkovaný" (#308 readback ho vylučoval, #294
+// ledger nemal signál o presune). Nový nullable stĺpec `presunute_at` nesie čas, kedy appka
+// detekovala zmiznutie staged súboru (`detectManualStagingMoves`, /odpisy load); NULL = nepresunutý.
+// Money-NEUTRÁLNE. Feature-detect guard (vzor v27 `maOdpisLog`) — minimálne migračné fixtúry
+// `odpis_log` nestavajú; reálna prod DB ju má od v1/v2, takže ALTER prebehne. Celé v `db.transaction`
+// (vzor v24/v25/v27): ALTER je v SQLite transakčné → pád sa čisto prehrá. Extrahované sem
+// (large-file-split, aby `migracie.ts` zostal pod 1000-riadkovým stropom), vzor `migrateDopytCenaStamp`.
+export function migrateManualMoveColumn(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 31) return;
+	const maOdpisLog =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='odpis_log'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maOdpisLog) {
+			db.exec('ALTER TABLE odpis_log ADD COLUMN presunute_at TEXT;');
+		}
+		bump(31);
+	})();
+}
+
 export function migrateDopytCenaStamp(db: Database.Database, bump: (v: number) => void): void {
 	if ((db.pragma('user_version', { simple: true }) as number) >= 30) return;
 	const maDopyt =

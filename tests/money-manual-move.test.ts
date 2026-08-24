@@ -22,6 +22,7 @@ fs.mkdirSync(stagingDir, { recursive: true });
 
 const { db } = await import('../src/lib/server/db');
 const { normZak, normOp } = await import('../src/lib/server/money');
+const { detectManualStagingMoves } = await import('../src/lib/server/money-presun');
 const { load } = await import('../src/routes/odpisy/+page.server');
 
 type LoadRow = {
@@ -95,5 +96,92 @@ describe('#299 /odpisy load — detekcia ručného presunu zo staging NA ODPIS',
 			)
 			.get() as { c: number };
 		expect(led.c).toBe(1);
+	});
+});
+
+// unit testy `detectManualStagingMoves` — READ-ONLY na staging, idempotencia, fail-safe
+describe('#299 detectManualStagingMoves — hranice a bezpečnosť', () => {
+	const presunuteAt = (id: number) =>
+		(
+			db.prepare('SELECT presunute_at FROM odpis_log WHERE id = ?').get(id) as {
+				presunute_at: string | null;
+			}
+		).presunute_at;
+
+	it('súbor STÁLE v staging ⇒ NEdetekuje (odpis je reálne parkovaný)', () => {
+		const present = path.join(stagingDir, 'STILL-HERE.xlsx');
+		fs.writeFileSync(present, 'x'); // súbor existuje = ešte nepresunutý
+		const id = seedMovedParked('ZAKSTILL', 'OP9', [1], present);
+		try {
+			const det = detectManualStagingMoves();
+			expect(det.find((d) => d.id === id)).toBeUndefined();
+			expect(presunuteAt(id)).toBeNull();
+		} finally {
+			fs.rmSync(present, { force: true });
+		}
+	});
+
+	it('staging dir NEDOSTUPNÝ (share odpojený) ⇒ NEdetekuje (fail-safe, žiadne falošné presuny)', () => {
+		// target v NEEXISTUJÚCOM adresári — rodič nie je dostupný, takže nevieme rozhodnúť
+		const orphan = path.join(tmpRoot, 'NEEXISTUJE-SHARE', 'X', 'gone.xlsx');
+		const id = seedMovedParked('ZAKORPH', 'OP8', [1], orphan);
+		expect(fs.existsSync(path.dirname(orphan))).toBe(false);
+		const det = detectManualStagingMoves();
+		expect(det.find((d) => d.id === id)).toBeUndefined();
+		expect(presunuteAt(id)).toBeNull();
+	});
+
+	it('caka=0 (neparkovaný) odpis so zmiznutým súborom ⇒ NEdetekuje (netýka sa staging modelu)', () => {
+		const gone = path.join(stagingDir, 'ACTIVE-gone.xlsx');
+		const id = db
+			.prepare(
+				`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+				 VALUES ('pergola', 'ZAKACT', 'OP7', 'T', 0, 1, ?, 'f', 'h', '{}', 't', datetime('now'), 'ZAKACT', 'OP7')`
+			)
+			.run(gone).lastInsertRowid as number;
+		const det = detectManualStagingMoves();
+		expect(det.find((d) => d.id === id)).toBeUndefined();
+		expect(presunuteAt(id)).toBeNull();
+	});
+
+	it('idempotencia: druhý beh nič nezmení (presunute_at ostáva, ledger sa nezdvojuje)', () => {
+		const gone = path.join(stagingDir, 'IDEMPO.xlsx');
+		const id = seedMovedParked('ZAKIDEMPO', 'OP6', [2, 3], gone);
+		const first = detectManualStagingMoves();
+		expect(first.find((d) => d.id === id)).toBeTruthy();
+		const stamp = presunuteAt(id);
+		expect(stamp).toBeTruthy();
+		const ledCount = () =>
+			(
+				db.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE zak_norm = 'ZAKIDEMPO'").get() as {
+					c: number;
+				}
+			).c;
+		const after1 = ledCount();
+		const second = detectManualStagingMoves();
+		expect(second.find((d) => d.id === id)).toBeUndefined(); // už NIE je NOVO detekovaný
+		expect(presunuteAt(id)).toBe(stamp); // timestamp nezmenený
+		expect(ledCount()).toBe(after1); // žiadny druhý ledger riadok
+	});
+
+	it('ledger sa NEDVOJPOČÍTA: keď už import riadok existuje (imports>overrides), detekcia ho NEPRIDÁ', () => {
+		const gone = path.join(stagingDir, 'HASLEDGER.xlsx');
+		const id = seedMovedParked('ZAKHASLED', 'OP5', [4], gone);
+		// simuluj PROD stav: `writeOdpis` už nechal 'import' riadok pri pôvodnom zápise (imports=1)
+		db.prepare(
+			`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor)
+			 VALUES ('pergola', 'ZAKHASLED', 'OP5', 1, 'h-ZAKHASLED', 'import', 'HASLEDGER.xlsx', 'vyroba')`
+		).run();
+		detectManualStagingMoves();
+		expect(presunuteAt(id)).toBeTruthy(); // presun je označený
+		const imports = (
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM odpis_imported WHERE zak_norm = 'ZAKHASLED' AND kind = 'import'"
+				)
+				.get() as { c: number }
+		).c;
+		// stále LEN 1 import (pôvodný) — detekcia NEpridala druhý (inak by rozbila „1 override = 1 re-import")
+		expect(imports).toBe(1);
 	});
 });

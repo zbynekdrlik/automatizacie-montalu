@@ -281,6 +281,10 @@ interface OdpisRow {
 	/** #298 review: 1 = „čaká na materiál" odpis PARKOVANÝ v `NA ODPIS/<subdir>` — Money ho NEIMPORTUJE,
 	 *  kým ho človek ručne nepresunie do dlv-import. Chýbajúci DLV pri `caka=1` NIE je skip ⇒ `caka`. */
 	caka: number;
+	/** #299: 1 = appka DETEKOVALA ručný presun tohto parkovaného odpisu zo staging do Money importu
+	 *  (`odpis_log.presunute_at` nie je NULL). Presunutý odpis UŽ nie je parkovaný → VSTÚPI do matchingu
+	 *  (reálny Money verdikt), takže výluka platí len pre `caka=1 AND presunute=0`. */
+	presunute: number;
 	createdEpoch: number;
 	/** bratislavský kalendárny deň odoslania (dní od epochy) — pre date-only porovnanie s DLV datum. */
 	bratDay: number;
@@ -323,13 +327,15 @@ function priradGroup(
 	const res = new Map<number, ReadbackVysledok>();
 	const claimed = new Set<string>();
 	// PARKOVANÝ caka=1 odpis NEVSTUPUJE do matchingu (#308): appka ho do Money zámerne neposlala; do
-	// dlv-import ho môže presunúť LEN človek ručne (appka o tom nevie — `caka` je po inserte nemenné,
-	// `releaseOdpis` riadok MAŽE, žiadny `UPDATE … SET caka`). Párovanie len po zak+počte-v-pásme je
-	// preto nespoľahlivé: cross-match na cudzí doklad → falošný `pocet` (živý ZAK2026450), a prípadný
-	// claim by ukradol doklad legit súrodencovi. Vždy „neoverené" (`caka`) — nikdy alarm ani claim.
+	// dlv-import ho môže presunúť LEN človek ručne. Párovanie len po zak+počte-v-pásme je preto
+	// nespoľahlivé: cross-match na cudzí doklad → falošný `pocet` (živý ZAK2026450), a prípadný claim by
+	// ukradol doklad legit súrodencovi. Vždy „neoverené" (`caka`) — nikdy alarm ani claim.
+	// #299 VÝNIMKA: keď appka DETEKOVALA ručný presun (`presunute=1`), odpis UŽ je reálne v Money →
+	// VSTÚPI do matchingu (dostane reálny verdikt namiesto trvalého ⏳). Výluka teda platí len pre
+	// caka=1 A ešte-nepresunutý (`presunute=0`).
 	const active: OdpisRow[] = [];
 	for (const o of group) {
-		if (o.caka === 1) res.set(o.id, CAKA_VYSLEDOK(o));
+		if (o.caka === 1 && o.presunute === 0) res.set(o.id, CAKA_VYSLEDOK(o));
 		else active.push(o);
 	}
 	// kompatibilné NEzabraté DLV: OP sedí (ak ho oboje nesie) + datum nie je zjavne spred odoslania.
@@ -421,6 +427,7 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 		db
 			.prepare(
 				`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm, l.caka AS caka,
+				CASE WHEN l.presunute_at IS NOT NULL THEN 1 ELSE 0 END AS presunute,
 				CAST(strftime('%s', l.created_at) AS INTEGER) AS createdEpoch,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS vsetky,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id AND p.qty != 0) AS nenulove
