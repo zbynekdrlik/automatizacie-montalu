@@ -43,7 +43,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v26 → v27: ochrany proti dvojitému importu (#294)', () => {
 	it('user_version === 27 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(27);
+		expect(db.pragma('user_version', { simple: true })).toBe(28);
 	});
 
 	it('nová append-only tabuľka odpis_imported existuje s kind CHECK', () => {
