@@ -161,3 +161,16 @@ Pattern → fix:
 
 A genuine possible-undefined that is a REAL latent bug (not a provable invariant) gets a
 guard + explicit error + RED→GREEN regression test, not a silencing `!`.
+
+## Dve svelte-check pasce z #294/#295 (obe stáli debug cyklus)
+
+- **`*/` VNÚTRI `/** … */` JSDoc komentára ho PREDČASNE ZAVRIE.** Glob ako `ZASP*/ZASK*` (alebo
+  `PRP*/BPP*`) obsahuje `*/`, čo ukončí blokový komentár → zvyšok textu sa parsuje ako KÓD →
+  kaskáda „Cannot find name 'BPP'" / arithmetic errors (13 chýb naraz z jedného komentára v
+  `ceny.ts`). Fix: v JSDoc nepíš `*/` — použi `ZASP.../ZASK...` alebo `ZASP*` `/` `ZASK*` s medzerou,
+  prípadne `ZASP\*` mimo bloku. Riadkový `//` komentár túto pascu NEMÁ (nemá terminátor).
+- **Optional-chaining PRÍSTUP DO POĽA: `x?.[0].y` je stále „possibly undefined".** `x?.[0]` skráti
+  na `T | undefined`, takže `.y` na tom pod `strict` (noUncheckedIndexedAccess) padne. Píš
+  `x?.[0]?.y`. **svelte-check kryje aj `.ts` TESTY** — takže po pridaní testových asercií s
+  optional-chainingom ZNOVA spusti `npm run check` (nie len `vitest`+`lint`); `?.[0].dovod` v teste
+  prešlo cez vitest aj eslint, ale svelte-check ho odhalil (chytila to až review).

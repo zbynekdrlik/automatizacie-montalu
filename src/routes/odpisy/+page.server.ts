@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { listOdpisy, releaseOdpis } from '$lib/server/money';
+import { listOdpisy, releaseOdpis, povolitReimport } from '$lib/server/money';
 
 export const load: PageServerLoad = async () => {
 	// detail sa parsuje TU s ochranou — jeden pokazený riadok nesmie zhodiť
@@ -26,5 +26,16 @@ export const actions = {
 		if (!Number.isInteger(id) || id <= 0) return { error: 'Neplatný záznam.' };
 		const ok = releaseOdpis(id, locals.user?.username ?? '');
 		return ok ? { uvolnene: true } : { error: 'Záznam sa nenašiel.' };
+	},
+
+	// OVERRIDE (#294): re-import IDENTICKÉHO obsahu. Použi LEN keď si import v Money NAOZAJ zmazal —
+	// uvoľní dedup kľúč AJ povolí ledgeru jeden opätovný import rovnakého obsahu (bežné „Uvoľniť"
+	// identický obsah blokuje ako poistku proti dvojitému importu). Auditované.
+	povolitReimport: async ({ request, locals }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		if (!Number.isInteger(id) || id <= 0) return { error: 'Neplatný záznam.' };
+		const ok = povolitReimport(id, locals.user?.username ?? '');
+		return ok ? { reimportPovoleny: true } : { error: 'Záznam sa nenašiel.' };
 	}
 } satisfies Actions;

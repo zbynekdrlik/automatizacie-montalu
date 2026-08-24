@@ -28,7 +28,7 @@ const { db } = await import('../src/lib/server/db');
 describe('migrácia v7 → v8: role stĺpec', () => {
 	it('pridá role default internal, existujúci user nedotknutý, user_version=9 (po v8+v9)', () => {
 		// import db.ts spustí aj v9 (Štandard +) hneď po v8 — konečná verzia je 9.
-		expect(db.pragma('user_version', { simple: true })).toBe(26);
+		expect(db.pragma('user_version', { simple: true })).toBe(27);
 		const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(
 			(c) => c.name
 		);
