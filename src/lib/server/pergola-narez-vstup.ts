@@ -90,6 +90,8 @@ export function parsePergolaNarezVstup(form: FormData): {
 		zvodFrezovanieSHmm: numOrNull(form, 'zvodFrezovanieSHmm'),
 		// #206 (e) — sklá zákazky (informatívne, žiadny Money výpočet)
 		strechaSklo: str(form, 'strechaSklo'),
+		// #223 — zvolený typ strešného skla (katalóg SKLO_STRECHA_TYPY) pre vzorec + cenu
+		strechaSkloTyp: str(form, 'strechaSkloTyp'),
 		obvodoveZasklenie: str(form, 'obvodoveZasklenie')
 	};
 

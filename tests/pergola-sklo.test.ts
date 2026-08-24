@@ -81,7 +81,7 @@ describe('spocitajStrechaSklo — golden OP260282 (Massive, n=8, IZO 4.4.2-8-6 �
 		expect(r.moneyKod).toBe('TS00014');
 	});
 	it('poznámka o čakajúcej dĺžke je prítomná (plain, bez interných referencií)', () => {
-		expect(r.poznamky.some((p) => /d[íi]žk/i.test(p))).toBe(true);
+		expect(r.poznamky.some((p) => /dĺžk/i.test(p))).toBe(true);
 		expect(r.poznamky.join(' ')).not.toMatch(/#\d|\bO\d/);
 	});
 });
