@@ -53,7 +53,11 @@ function insDlv(
 	db.prepare(
 		`INSERT INTO money_dlv (dlv, zak_norm, op_norm, datum, pocet_polozek)
 		 VALUES (?, ?, ?, ${datum === null ? 'NULL' : "datetime('now', ?)"}, ?)`
-	).run(...(datum === null ? [dlv, normZak(zak), op ? normOp(op) : '', pocet] : [dlv, normZak(zak), op ? normOp(op) : '', datum, pocet]));
+	).run(
+		...(datum === null
+			? [dlv, normZak(zak), op ? normOp(op) : '', pocet]
+			: [dlv, normZak(zak), op ? normOp(op) : '', datum, pocet])
+	);
 }
 
 /** Nastaví meta snapshotu (kedy bol generovaný). `genMod` = modifikátor, null = žiadny snapshot. */

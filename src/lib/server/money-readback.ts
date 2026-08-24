@@ -70,7 +70,9 @@ function validateDlvRow(raw: unknown, idx: number, warn: (m: string) => void): V
 	}
 	const pocetRaw = r.pocetPolozek;
 	if (typeof pocetRaw !== 'number' || !Number.isFinite(pocetRaw) || pocetRaw < 0) {
-		warn(`riadok ${idx} (${dlv}): neplatný „pocetPolozek" (${JSON.stringify(pocetRaw)}) — zamietnutý`);
+		warn(
+			`riadok ${idx} (${dlv}): neplatný „pocetPolozek" (${JSON.stringify(pocetRaw)}) — zamietnutý`
+		);
 		return null;
 	}
 	const datum = typeof r.datum === 'string' && r.datum.trim() ? r.datum.trim() : null;
@@ -170,7 +172,13 @@ export function maybeImportDlvReadback(): ImportResult {
 	})();
 
 	log.info('DLV readback snapshot naimportovaný', { rows: valid.length, rejected, path: p });
-	return { imported: true, reason: 'ok', rowCount: valid.length, rejectedCount: rejected, generatedAt };
+	return {
+		imported: true,
+		reason: 'ok',
+		rowCount: valid.length,
+		rejectedCount: rejected,
+		generatedAt
+	};
 }
 
 export interface DlvReadbackMeta {
@@ -229,13 +237,124 @@ export interface ReadbackVysledok {
 	riadkov: number;
 }
 
+/** Snapshot musí byť generovaný aspoň o toľko po odoslaní, aby sme „chýbajúci DLV" vyhlásili za
+ *  Money skip (a nie „ešte nedobehol import"). Money watcher importuje v sekundách, toto je rezerva. */
+const GRACE_S = 10 * 60;
+/** DLV s `datum` staršou než (odoslanie − táto tolerancia) sa NEpočíta k tomuto odpisu — je to
+ *  starší doklad (napr. predošlé duplicitné odoslanie). Tolerancia kryje TZ posun (verdikt: konštantný
+ *  2 h) + drobný clock-skew, aby doklad tesne pred/po odoslaní stále napároval. */
+const DATUM_TOL_S = 12 * 60 * 60;
+/** Odpis starší než toto sa neoveruje (`caka`) — producer číta LEN nedávne DLV okno, takže „žiadny
+ *  DLV" pri starom odpise NIE JE dôkaz skipu. Musí byť ≤ producerovo DLV okno. */
+const READBACK_WINDOW_S = 30 * 24 * 60 * 60;
+
+interface OdpisRow {
+	id: number;
+	zakNorm: string;
+	opNorm: string;
+	createdEpoch: number;
+	vsetky: number;
+	nenulove: number;
+}
+
+interface DlvCand {
+	dlv: string;
+	opNorm: string;
+	pocet: number;
+	datumEpoch: number | null;
+}
+
+function klasifikuj(
+	o: OdpisRow,
+	cands: DlvCand[],
+	genEpoch: number | null,
+	nowEpoch: number
+): ReadbackVysledok {
+	const base = { dlv: null, moneyPocet: null, riadkov: o.vsetky } as const;
+	// odpis bez položiek (pred #154) alebo bez použiteľného snapshotu ⇒ nedá sa overiť
+	if (o.vsetky === 0 || genEpoch === null) return { stav: 'caka', dovod: '', ...base };
+
+	// relevantné DLV: OP kompatibilné (ak ho oboje nesie) + datum nie je zjavne spred odoslania
+	const rel = cands.filter((c) => {
+		const opOk = !c.opNorm || !o.opNorm || c.opNorm === o.opNorm;
+		const datumOk = c.datumEpoch === null || c.datumEpoch >= o.createdEpoch - DATUM_TOL_S;
+		return opOk && datumOk;
+	});
+
+	if (rel.length > 0) {
+		// pásmo [počet_nenulových .. počet_všetkých]: Money môže (ale nemusí) rátať nulové riadky.
+		// `reduce` (bez init) na neprázdnom poli vráti prvok (nie undefined) — žiadny indexový prístup.
+		const vBand = rel.filter((c) => c.pocet >= o.nenulove && c.pocet <= o.vsetky);
+		if (vBand.length > 0) {
+			// najvyšší v pásme = presná zhoda s počtom_všetkých, keď taký doklad existuje
+			const pick = vBand.reduce((a, b) => (b.pocet > a.pocet ? b : a));
+			return { stav: 'ok', dovod: '', dlv: pick.dlv, moneyPocet: pick.pocet, riadkov: o.vsetky };
+		}
+		// DLV existuje, ale počet nesedí (reálny riadok preskočený / doklad zlúčený) ⇒ ALARM
+		const pick = rel.reduce((a, b) => (b.pocet > a.pocet ? b : a));
+		return {
+			stav: 'nesulad',
+			dovod: 'pocet',
+			dlv: pick.dlv,
+			moneyPocet: pick.pocet,
+			riadkov: o.vsetky
+		};
+	}
+
+	// žiadny relevantný DLV: alarm LEN keď Money mal čas (snapshot čerstvejší než odoslanie+grace) A
+	// odpis je v readback okne (producer ho reálne číta) — inak „neoverené", nikdy falošný alarm
+	const moneyMalCas = genEpoch > o.createdEpoch + GRACE_S;
+	const vOkne = o.createdEpoch >= nowEpoch - READBACK_WINDOW_S;
+	if (moneyMalCas && vOkne) return { stav: 'nesulad', dovod: 'chyba-doklad', ...base };
+	return { stav: 'caka', dovod: '', ...base };
+}
+
 /**
- * PLACEHOLDER (#298 RED): appka DNES po exporte NIČ neoveruje — každý LIVE odpis je „neoverený".
- * GREEN commit nahradí telo reálnou klasifikáciou proti Money DLV snapshotu.
+ * Stav overenia LIVE odpisov proti Money DLV snapshotu — ČISTÁ funkcia (odpis_log + odpis_polozky +
+ * money_dlv), počítaná on-the-fly (žiadna uložená reconcile state). Najprv LAZY refresh snapshotu.
+ * Vracia záznam LEN pre LIVE odpisy z `odpisLogIds` (TEST odpisy do Money nikdy nešli → bez záznamu).
+ * Všetka časová matematika je v SQL cez `strftime('%s', …)` (SQLite berie uložený `datetime('now')`
+ * ako UTC) — vyhýbame sa `Date.parse` na space-oddelenom čase (V8 by ho bral ako lokálny).
  */
 export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledok> {
 	maybeImportDlvReadback();
 	const out = new Map<number, ReadbackVysledok>();
-	for (const id of odpisLogIds) out.set(id, { stav: 'caka', dovod: '', dlv: null, moneyPocet: null, riadkov: 0 });
+	if (odpisLogIds.length === 0) return out;
+
+	const ph = odpisLogIds.map(() => '?').join(',');
+	const odpisy = db
+		.prepare(
+			`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm,
+				CAST(strftime('%s', l.created_at) AS INTEGER) AS createdEpoch,
+				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS vsetky,
+				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id AND p.qty != 0) AS nenulove
+			 FROM odpis_log l
+			 WHERE l.live = 1 AND l.id IN (${ph})`
+		)
+		.all(...odpisLogIds) as OdpisRow[];
+	if (odpisy.length === 0) return out;
+
+	const genRow = db
+		.prepare(
+			`SELECT CAST(strftime('%s', snapshot_generated_at) AS INTEGER) AS gen
+			 FROM money_dlv_meta WHERE id = 1 AND snapshot_generated_at IS NOT NULL`
+		)
+		.get() as { gen: number | null } | undefined;
+	const genEpoch = genRow?.gen ?? null;
+	const nowEpoch = (
+		db.prepare("SELECT CAST(strftime('%s','now') AS INTEGER) AS now").get() as {
+			now: number;
+		}
+	).now;
+
+	const candStmt = db.prepare(
+		`SELECT dlv, op_norm AS opNorm, pocet_polozek AS pocet,
+			CASE WHEN datum IS NULL THEN NULL ELSE CAST(strftime('%s', datum) AS INTEGER) END AS datumEpoch
+		 FROM money_dlv WHERE zak_norm = ?`
+	);
+	for (const o of odpisy) {
+		const cands = candStmt.all(o.zakNorm) as DlvCand[];
+		out.set(o.id, klasifikuj(o, cands, genEpoch, nowEpoch));
+	}
 	return out;
 }

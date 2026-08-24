@@ -21,7 +21,9 @@ const dbPath = path.join(tmpRoot, 'v27.db');
 		CREATE TABLE odpis_imported (id INTEGER PRIMARY KEY, modul TEXT NOT NULL, zak_norm TEXT NOT NULL, op_norm TEXT NOT NULL, live INTEGER NOT NULL, content_hash TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('import','override')), filename TEXT NOT NULL DEFAULT '', actor TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')));
 	`);
 	// ≥1 riadok do tabuliek čítaných seedom → seedData/seedUsers no-op
-	v27.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')").run();
+	v27
+		.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')")
+		.run();
 	v27.prepare("INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES ('X', 1, 0)").run();
 	v27.prepare("INSERT INTO glass_types (nazov, system) VALUES ('X', 'ALL')").run();
 	// existujúci LIVE odpis pred migráciou — musí prežiť nedotknutý (Money-neutralita)
@@ -65,7 +67,7 @@ describe('migrácia v27 → v28: POST-import readback z Money DB (#298)', () => 
 		expect(cols).toContain('snapshot_generated_at');
 		// CHECK(id=1): druhý riadok s id=2 musí padnúť
 		db.prepare(
-			"INSERT INTO money_dlv_meta (id, row_count) VALUES (1, 0) ON CONFLICT(id) DO NOTHING"
+			'INSERT INTO money_dlv_meta (id, row_count) VALUES (1, 0) ON CONFLICT(id) DO NOTHING'
 		).run();
 		expect(() =>
 			db.prepare('INSERT INTO money_dlv_meta (id, row_count) VALUES (2, 0)').run()
