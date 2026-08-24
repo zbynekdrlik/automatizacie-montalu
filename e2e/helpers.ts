@@ -13,12 +13,22 @@ import { expect, test, type Page } from '@playwright/test';
 // nezachytí skutočnú aplikačnú chybu.
 const NESKODNY_GL_DRIVER_VZOR = /GL Driver Message.*Performance.*GPU stall due to ReadPixels/;
 
+// model-viewer (#286, AR náhľad pergoly) vypíše na CPU-hladovanom runneri VLASTNÝ
+// interný self-diagnostický warning "rAF timed out in updateSource" — jeho 500ms
+// rAF-vs-setTimeout poistka v [$updateSource] (node_modules/@google/model-viewer/
+// src/model-viewer-base.ts, `console.warn('rAF timed out in updateSource')`), NIE
+// chyba z APLIKAČNÉHO JS. Funkčné asserty (loaded/modelIsVisible/src/ar-modes)
+// prešli. Filter je EXACT-MATCH (celý reťazec zakotvený ^…$), aby nikdy nezakryl
+// skutočnú aplikačnú chybu.
+const NESKODNY_MODEL_VIEWER_VZOR = /^rAF timed out in updateSource$/;
+
 /** Zbiera console errors/warnings — každý test na konci overí, že je prázdne. */
 export function collectConsole(page: Page): string[] {
 	const messages: string[] = [];
 	page.on('console', (msg) => {
 		if (msg.type() === 'error' || msg.type() === 'warning') {
 			if (NESKODNY_GL_DRIVER_VZOR.test(msg.text())) return;
+			if (NESKODNY_MODEL_VIEWER_VZOR.test(msg.text())) return;
 			messages.push(`[${msg.type()}] ${msg.text()}`);
 		}
 	});
