@@ -172,9 +172,9 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('908');
 	await expect(page.getByTestId('sklo-vyska')).toHaveText('2318');
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	// 5K horná koľajnica ZASP202434 = 6000mm tyč → 6 m; kladka 10mm ZASP202417 → 7,2 m.
+	// 5K horná koľajnica ZASP202427 = 6000mm tyč → 6 m; kladka 10mm ZASP202417 → 7,2 m.
 	// (^|\D) hranica — aby "6 m" nechytilo napr. "16 m" v inom stĺpci riadku
-	await expect(page.locator('.row', { hasText: 'ZASP202434' })).toContainText(/(^|\D)6 m/);
+	await expect(page.locator('.row', { hasText: 'ZASP202427' })).toContainText(/(^|\D)6 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP202417' })).toContainText(/(^|\D)7,2 m/);
 	// 10mm sklo NESMIE ponúkať 6mm kladku
 	await expect(page.locator('.row', { hasText: 'ZASP202416' })).toHaveCount(0);
