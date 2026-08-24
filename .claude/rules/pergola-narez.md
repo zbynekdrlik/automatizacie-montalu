@@ -393,3 +393,32 @@ krovDlzkaDoMoney  = krovNominal != null && pocetKrovov != null ? krovNominal : n
   (Zvislá zadná výstuha 2340 UŽ NIE honest-null — rekonciliovaná na prednú nohu, #155 A9.) Rozšírenie na ďalšie konfigurácie = NOVÝ golden / potvrdenie Dominikom
   (majiteľ posúdi), NIKDY dohad. Kódy 18004–18008 SÚ v Money CODE_MAP (`server/pergola.ts`), takže
   po pustení idú cez `transformRows` do rezervácie — preto config-gate.
+
+## Strešné sklo (#223) — SAMOSTATNÁ pure funkcia, Money-NEUTRÁLNA (nikdy do `vypocitane`)
+
+Výpočet strešného skla žije v `src/lib/pergola-sklo.ts` (`spocitajStrechaSklo(v)`) ako
+**samostatná** pure funkcia — vzor `komponentyPergoly`, ZÁMERNE **mimo `NarezVysledok`/`spocitajNarez`**,
+aby golden OP260282 ostal bit-identický A aby sa sklo NIKDY nedostalo do `vypocitane` →
+`narezToCadRows` → Money. Modul je v `CISTY_ENGINE` money-safety guardu (importuje LEN pure moduly:
+`sklo-strecha` #274 + `pergola-narez`). Sklo je **display-only, žiadny Money odpis** (rozhodnutie až
+po potvrdení variácie, ticket #223).
+
+- **Šírka tabule = `svetlostMedziKrovmi(šírka, n)` + prídavok**: +30 (sklo/STADUR),
+  **+34 (polykarbonát)** — `strechaSkloSirkaPridavok(nazov)` cez `jePolykarbonatSklo` (name includes
+  „polykarbon"). Potvrdené A1 (Dominik #198, 21.8.); výstuha 140 do šírky NEvstupuje.
+- **Počet tabúľ = počet polí medzi krovmi = `platnyPocetKrovov(v) − 1`** (`platnyPocetKrovov` je
+  odteraz exportovaný z `pergola-narez.ts`). Bez manuálneho počtu krovov → honest-null.
+- **Dĺžka tabule = VŽDY honest-null** — vzorec dĺžky NEpotvrdený (chatové +30/+40 bolo prehodnotené
+  na prítlačnú lištu, #198 21.8. 09:20; HH krovu je aj tak sám honest-null). NEHÁDAŤ dĺžku, ani keď
+  „existujúca logika strechy" (`krovDlzkaNominal`) číslo vie dať — je to iný rozmer, delta nepotvrdená.
+- **Typ skla = NOVÝ `strechaSkloTyp` select** (14 typov z `SKLO_STRECHA_TYPY`), riadi vzorec (+30/+34)
+  aj cenu. Voľný text `strechaSklo` ostal SAMOSTATNE (poznámka/coating/RAL na výkres) — nulová regresia.
+- **Cena = €/m² UNIT zo snapshotu**, server modul `src/lib/server/sklo-strecha-cena.ts`
+  (`strechaSkloCenaPre` → `skloStrechaMoneyKod` → `cenaZaM2`), interní gate `!isB2B` v `spocitat`
+  (vzor `cenyPre`). **ŽIADNY total** (plocha = šírka × DĹŽKA × počet, dĺžka null → plocha neznáma).
+  Typ bez TS kódu (8/14) → „karta v Money zatiaľ neexistuje" (honest-null), NIKDY hádaný kód.
+- **Rozdelenie klient/server:** geometria je klientsky `$derived spocitajStrechaSklo(vstup)` (ako
+  `vysledok`/`komponenty`); cena príde zo servera (`form.strechaSkloCena`). `RezVysledok`/`+page.svelte`
+  NEimportujú `$lib/server/*` (ani cenový TYP) — prop používa klientsky štrukturálny typ.
+- Round-trip: `strechaSkloTyp` je vo vstupe, reset `$effect` echo, `hidden()` snippete aj `bind:` (select
+  je viditeľný vstup → submitne sa priamo vo `form` kroku, hidden je pre ďalšie kroky).
