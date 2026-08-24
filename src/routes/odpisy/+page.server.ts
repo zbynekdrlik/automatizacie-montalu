@@ -18,7 +18,7 @@ export const load: PageServerLoad = async () => {
 	// zhodiť stránku — /odpisy hostí „Uvoľniť" (jedinú cestu k oprave duplikátov), takže IO chyba
 	// degraduje na „nič sa nedetekovalo", nie na 500.
 	try {
-		const presuny = detectManualStagingMoves();
+		const presuny = await detectManualStagingMoves();
 		if (presuny.length > 0)
 			log.info('detekované ručné presuny zo staging do Money importu (#299)', {
 				pocet: presuny.length,
