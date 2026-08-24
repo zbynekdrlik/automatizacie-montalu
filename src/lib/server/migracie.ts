@@ -859,6 +859,25 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
+	if ((db.pragma('user_version', { simple: true }) as number) < 27) {
+		// v26 → v27: Deluxe 5K vrchná (horná) koľajnica mala nesprávny Money kód
+		// ZASP202434 → správne ZASP202427 (nahlásil zákazník Patrik Javorský, Odoo
+		// kanál 207, msg 1734424, 2026-08-24: „Delux 5K ma zlú vrchnú koľajnicu je
+		// tam ZASP202434 ma tam byť ZASP202427"). SET kód (+ názov) z (opraveného)
+		// cfg_seed per (sys_styl, poradie) — presný vzor v12/v15. MENÍ Money odpis
+		// Deluxe 5K objednávok (kód vrchnej koľajnice) — zákazníkom potvrdená oprava.
+		// Idempotentné (SET z cfg_seed), fyzický profil (6000mm tyč) nezmenený.
+		const updRail = db.prepare(
+			'UPDATE cfg_rez SET kod = ?, nazov = ? WHERE sys_styl = ? AND poradie = ?'
+		);
+		db.transaction(() => {
+			for (const r of seed.rez)
+				if (r.sysStyl === 'Deluxe|5K' && r.poradie === 10)
+					updRail.run(r.kod, r.nazov, r.sysStyl, r.poradie);
+			bump(27);
+		})();
+	}
+
 	seedData(db);
 	seedUsers(db, hashPassword);
 }
