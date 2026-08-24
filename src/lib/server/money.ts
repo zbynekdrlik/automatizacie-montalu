@@ -327,7 +327,7 @@ export async function buildXlsx(job: OdpisJob): Promise<Buffer> {
  */
 export async function writeOdpis(
 	job: OdpisJob,
-	opts: { overrideKody?: boolean } = {}
+	opts: { overrideKody?: boolean; overrideLedger?: boolean } = {}
 ): Promise<OdpisOutcome> {
 	const live = isLive() ? 1 : 0;
 	const zakNorm = normZak(job.zak);
