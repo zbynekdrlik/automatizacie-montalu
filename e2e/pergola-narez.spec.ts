@@ -519,3 +519,66 @@ test('#161 krov cut-list (OP260282): počet krovov 8 → svetlosť 655,43, prie�
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// --- #223 strešné sklo: výber typu → karta (šírka = svetlosť + 30/34, honest-null dĺžka) ------
+test('#223 strešné sklo (OP260282): typ IZO 4.4.2-8-6 číre, n=8 → 7 tabúľ, šírka 685,43, dĺžka „—", kód TS00014', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	// šírka + počet krovov určujú svetlosť (655,43); typ určuje prídavok (+30 sklo) + kód
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#pocetKrovov').fill('8');
+	await page.locator('#strechaSkloTyp').selectOption('IZO 4.4.2-8-6 číre');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	const karta = page.getByTestId('strecha-sklo-karta');
+	await expect(karta).toBeVisible();
+	await expect(page.getByTestId('strecha-sklo-typ')).toContainText('IZO 4.4.2-8-6 číre');
+	await expect(page.getByTestId('strecha-sklo-pocet')).toHaveText('7'); // n − 1
+	await expect(page.getByTestId('strecha-sklo-sirka')).toContainText('685,43'); // 655,43 + 30
+	await expect(page.getByTestId('strecha-sklo-dlzka')).toContainText('—'); // honest-null
+	await expect(page.getByTestId('strecha-sklo-kod')).toHaveText('TS00014');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#223 strešné sklo — bez zvoleného typu sa karta NEzobrazí (honest-null)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#pocetKrovov').fill('8');
+	// typ nevybraný (default „— nevybrané —")
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('strecha-sklo-karta')).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#223 strešné sklo — polykarbonát: šírka = svetlosť + 34, kód honest-null (karta v Money neexistuje)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#pocetKrovov').fill('8');
+	await page.locator('#strechaSkloTyp').selectOption('polykarbonát 16 mm číry');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('strecha-sklo-sirka')).toContainText('689,43'); // 655,43 + 34
+	await expect(page.getByTestId('strecha-sklo-kod')).toHaveText('—'); // polykarbonát bez TS kódu
+
+	expect(consoleMsgs).toEqual([]);
+});
