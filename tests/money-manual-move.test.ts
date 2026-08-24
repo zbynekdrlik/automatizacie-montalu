@@ -97,6 +97,31 @@ describe('#299 /odpisy load — detekcia ručného presunu zo staging NA ODPIS',
 			.get() as { c: number };
 		expect(led.c).toBe(1);
 	});
+
+	it('[review 🔴] STARÝ parkovaný odpis presunutý DNES, snapshot ešte nemá jeho DLV ⇒ caka, NIE falošný ⛔', async () => {
+		// Parkovaný odpis vytvorený pred 20 dňami; človek ho presunul do Money DNES. Denný snapshot bol
+		// vygenerovaný PRED presunom, takže preň ešte NEEXISTUJE DLV. „Money mal čas" + „v okne" sa MUSIA
+		// merať od PRESUNU (nie od vytvorenia) — inak by KAŽDÝ korektný presun privítal operátora falošným
+		// ⛔ „Money doklad chýba" (presne trieda #308, ktorú sme odstránili). Detekcia (v load) nastaví
+		// presunute_at=teraz → refEpoch=teraz → moneyMalCas=false → caka.
+		const gone = path.join(stagingDir, 'ZAKOLD - Zákazník [old].xlsx');
+		db.prepare(
+			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES ('pergola', 'ZAKOLD', 'OP20', 'T', 1, 1, ?, ?, 'h-ZAKOLD', '{}', 't', datetime('now','-20 days'), 'ZAKOLD', 'OP20')`
+		).run(gone, path.basename(gone));
+		const insP = db.prepare(
+			"INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, 'm')"
+		);
+		const id = (db.prepare("SELECT id FROM odpis_log WHERE zak = 'ZAKOLD'").get() as { id: number })
+			.id;
+		insP.run(id, 'ZASP0', 'P0', 3);
+		insP.run(id, 'ZASP1', 'P1', 5);
+		// žiadny money_dlv pre ZAKOLD — snapshot presun ešte „nevidel"
+
+		const row = (await runLoad()).find((o) => o.id === id)!;
+		expect(row.presunute_at).toBeTruthy(); // presun sa detekoval (vstúpil do matchingu)
+		expect(row.readback!.stav).toBe('caka'); // ale je „neoverené", NIE falošný ⛔ chyba-doklad
+	});
 });
 
 // unit testy `detectManualStagingMoves` — READ-ONLY na staging, idempotencia, fail-safe
@@ -126,6 +151,24 @@ describe('#299 detectManualStagingMoves — hranice a bezpečnosť', () => {
 		const orphan = path.join(tmpRoot, 'NEEXISTUJE-SHARE', 'X', 'gone.xlsx');
 		const id = seedMovedParked('ZAKORPH', 'OP8', [1], orphan);
 		expect(fs.existsSync(path.dirname(orphan))).toBe(false);
+		const det = detectManualStagingMoves();
+		expect(det.find((d) => d.id === id)).toBeUndefined();
+		expect(presunuteAt(id)).toBeNull();
+	});
+
+	it('[review 🟡] ČERSTVO staged riadok (<10 min) so „zmiznutým" súborom ⇒ NEdetekuje (race guard)', () => {
+		// writeOdpis zaberie DB riadok ATOMICKY, ale súbor zapíše až po `await buildXlsx` — v tom okne by
+		// súbežný load videl target-chýba a označil čerstvý riadok ako presunutý (trvalý false-positive).
+		// Vekový prah (created_at <= now-10min) to okno zatvára: riadok mladší než 10 min sa nedetekuje.
+		const gone = path.join(stagingDir, 'FRESH.xlsx');
+		db.prepare(
+			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES ('pergola', 'ZAKFRESH', 'OP4', 'T', 1, 1, ?, 'f', 'h', '{}', 't', datetime('now'), 'ZAKFRESH', 'OP4')`
+		).run(gone);
+		const id = (
+			db.prepare("SELECT id FROM odpis_log WHERE zak = 'ZAKFRESH'").get() as { id: number }
+		).id;
+		expect(fs.existsSync(gone)).toBe(false);
 		const det = detectManualStagingMoves();
 		expect(det.find((d) => d.id === id)).toBeUndefined();
 		expect(presunuteAt(id)).toBeNull();

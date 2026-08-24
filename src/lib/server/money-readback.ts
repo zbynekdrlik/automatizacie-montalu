@@ -285,6 +285,11 @@ interface OdpisRow {
 	 *  (`odpis_log.presunute_at` nie je NULL). Presunutý odpis UŽ nie je parkovaný → VSTÚPI do matchingu
 	 *  (reálny Money verdikt), takže výluka platí len pre `caka=1 AND presunute=0`. */
 	presunute: number;
+	/** #299: epoch (s) DETEKCIE presunu (`presunute_at`), alebo NULL keď nepresunutý. Pre presunutý
+	 *  odpis sa `chyba-doklad`/okno merajú od PRESUNU (nie od vytvorenia) — súbor mohol doraziť do Money
+	 *  až presunom, takže starý parkovaný odpis presunutý DNES by inak dal falošný ⛔ (snapshot ešte
+	 *  nemá jeho DLV) a &gt;30d-parkovaný by nikdy nealarmoval. Viď `refEpoch` vo `priradGroup`. */
+	presunuteEpoch: number | null;
 	createdEpoch: number;
 	/** bratislavský kalendárny deň odoslania (dní od epochy) — pre date-only porovnanie s DLV datum. */
 	bratDay: number;
@@ -390,10 +395,19 @@ function priradGroup(
 			});
 			continue;
 		}
-		const moneyMalCas = genEpoch > o.createdEpoch + GRACE_S;
+		// #299: pre PRESUNUTÝ odpis meraj „Money mal čas" + „v okne" od PRESUNU, nie od vytvorenia —
+		// súbor mohol doraziť do Money až ručným presunom, takže starý parkovaný odpis presunutý dnes by
+		// inak dal falošný `chyba-doklad` (snapshot ešte nemá jeho čerstvý DLV) a >30d-parkovaný presun by
+		// vypadol z okna a nikdy nealarmoval. `max(created, presunute)` = presunute pre presunutý (presun
+		// je vždy po vytvorení); pre nepresunutý ostáva createdEpoch. Nepresunutý caka=1 sa sem nedostane.
+		const refEpoch =
+			o.presunute === 1 && o.presunuteEpoch !== null
+				? Math.max(o.createdEpoch, o.presunuteEpoch)
+				: o.createdEpoch;
+		const moneyMalCas = genEpoch > refEpoch + GRACE_S;
 		// okno sa meria od GENEROVANIA snapshotu (producer číta DLV okno relatívne k svojmu behu),
 		// nie od „teraz" — pri zastaranom snapshote by inak odpis vypadol z okna nesprávne (#298 review).
-		const vOkne = o.createdEpoch >= genEpoch - windowS;
+		const vOkne = refEpoch >= genEpoch - windowS;
 		if (moneyMalCas && vOkne) {
 			res.set(o.id, {
 				stav: 'nesulad',
@@ -428,6 +442,7 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 			.prepare(
 				`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm, l.caka AS caka,
 				CASE WHEN l.presunute_at IS NOT NULL THEN 1 ELSE 0 END AS presunute,
+				CAST(strftime('%s', l.presunute_at) AS INTEGER) AS presunuteEpoch,
 				CAST(strftime('%s', l.created_at) AS INTEGER) AS createdEpoch,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS vsetky,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id AND p.qty != 0) AS nenulove

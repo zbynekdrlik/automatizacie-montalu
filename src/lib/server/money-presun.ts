@@ -46,8 +46,17 @@ export interface ManualMoveDetected {
 export function detectManualStagingMoves(): ManualMoveDetected[] {
 	const rows = db
 		.prepare(
+			// `created_at <= now-10min`: RACE-guard. `writeOdpis` zaberie DB riadok (caka=1, target,
+			// presunute_at NULL) ATOMICKY, ale súbor zapíše až PO `await buildXlsx` — v tom okne by
+			// súbežný /odpisy load videl dir-existuje (subdir sa recykluje) + target-chýba a označil
+			// čerstvo staged riadok ako „presunutý" (trvalý false-positive, presun sa neruší). Človek
+			// nikdy nepresunie súbor do minút od staging → 10-min prah okno zatvára. (Crash-residue:
+			// claim commitnutý, súbor nikdy nezapísaný, proces padol pred kompenzáciou → zostáva známy
+			// okrajový limit, nižšie riešený ENOENT-only kontrolou, nie týmto prahom.)
 			`SELECT id, modul, zak, op, live, target, filename, content_hash, zak_norm, op_norm
-			 FROM odpis_log WHERE live = 1 AND caka = 1 AND presunute_at IS NULL`
+			 FROM odpis_log
+			 WHERE live = 1 AND caka = 1 AND presunute_at IS NULL
+			   AND created_at <= datetime('now', '-10 minutes')`
 		)
 		.all() as {
 		id: number;
@@ -70,23 +79,33 @@ export function detectManualStagingMoves(): ManualMoveDetected[] {
 		 VALUES (?, ?, ?, ?, ?, 'import', ?, ?, ?)`
 	);
 	for (const r of rows) {
-		let gone: boolean;
+		// fail-safe: `existsSync` vráti false na AKEJKOĽVEK stat chybe (EACCES/EIO/stale CIFS handle), nie
+		// len na ENOENT — degradovaný (nie odpojený) share, kde dir-stat prejde z cache ale per-file stat
+		// zlyhá, by inak označil CELÝ subdir ako presunutý (trvalo). Preto `statSync` + rozlišuj kód:
+		// dir musí byť DOSTUPNÝ; „presunutý" = LEN čistý ENOENT na TARGETE. Iná chyba → preskoč.
+		const dir = path.dirname(r.target);
 		try {
-			const dir = path.dirname(r.target);
-			// fail-safe: staging dir NEDOSTUPNÝ (share odpojený / cesta neexistuje) → nevieme rozhodnúť,
-			// preskoč (inak by výpadok mountu falošne označil všetky parkované ako presunuté).
-			if (!fs.existsSync(dir)) continue;
-			// súbor STÁLE v staging → odpis je reálne parkovaný, nepresunutý.
-			if (fs.existsSync(r.target)) continue;
-			gone = true;
+			fs.statSync(dir); // dir nedostupný (odpojený mount / iná chyba) → catch → skip
 		} catch {
-			continue; // chyba čítania staging — nikdy nefalošuj presun ani nezhoď /odpisy
+			continue;
+		}
+		let gone = false;
+		try {
+			fs.statSync(r.target); // súbor STÁLE v staging → odpis je reálne parkovaný, nepresunutý
+		} catch (e) {
+			// LEN ENOENT (súbor naozaj nie je, dir je dostupný) = ručne presunutý. Iná chyba (EACCES/EIO/
+			// stale handle) NIE JE dôkaz presunu → preskoč, nikdy nefalošuj presun ani nezhoď /odpisy.
+			if ((e as NodeJS.ErrnoException).code === 'ENOENT') gone = true;
+			else continue;
 		}
 		if (!gone) continue;
 		// súbor je preč, ale adresár existuje → ručne presunutý do Money importu.
 		db.transaction(() => {
 			setPresunute.run(r.id);
-			// idempotentný ledger: len keď tuple+content EŠTE neblokuje appka-side re-send.
+			// idempotentný ledger: len keď tuple+content EŠTE neblokuje appka-side re-send. POZN.: v stave
+			// imports==overrides (operátor spravil `povolitReimport`, ešte neposlal) presun sem doplní
+			// `import` → čakajúca autorizácia sa „minie" a re-send zablokuje. Je to SPRÁVNE + fail-safe:
+			// presun JE reálny import, takže následný appka-side re-send by bol genuine dvojitý import.
 			const led = ledgerCounts(r.modul, r.zak_norm, r.op_norm, r.live, r.content_hash);
 			if (led.imports <= led.overrides) {
 				insManualMove.run(
