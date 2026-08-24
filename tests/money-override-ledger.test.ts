@@ -104,6 +104,41 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 		expect(w3.reason).toBe('ledger-duplicate');
 	});
 
+	it('override PREŽIJE kompenzáciu pri zlyhaní zápisu → retry prejde BEZ nového potvrdenia, potom zas blokuje', async () => {
+		// normálny zápis, „Money spracoval", „Uvoľniť"
+		const w1 = await writeOdpis(makeReq('ZAK-COMP', '01'));
+		expect(w1.status).toBe('written');
+		fs.rmSync(w1.target);
+		const row = listOdpisy(500).find((o) => o.zak === 'ZAK-COMP' && o.op === '01');
+		expect(releaseOdpis(row!.id, 'tester')).toBe(true);
+
+		// vynúť zlyhanie zápisu súboru: cieľový adresár sa nedá vytvoriť (rodič je SÚBOR → ENOTDIR)
+		const blockFile = path.join(tmpRoot, 'blockfile');
+		fs.writeFileSync(blockFile, 'x');
+		const goodDir = process.env.MONEY_TEST_DIR!;
+		process.env.MONEY_TEST_DIR = path.join(blockFile, 'sub');
+		try {
+			await expect(
+				writeOdpis(makeReq('ZAK-COMP', '01'), { overrideLedger: true })
+			).rejects.toThrow();
+		} finally {
+			process.env.MONEY_TEST_DIR = goodDir;
+		}
+		// kompenzácia zmazala odpis_log + `import` claim, ale override riadok PREŽIL (import sa nikdy
+		// nevykonal) → imports==overrides → retry BEZ nového override prejde
+		const retry = await writeOdpis(makeReq('ZAK-COMP', '01'));
+		expect(retry.status).toBe('written');
+		expect(fs.existsSync(retry.target)).toBe(true);
+		fs.rmSync(retry.target);
+
+		// a potom je to zas ONE-SHOT: ďalší identický re-send po „Uvoľniť" je zas blokovaný
+		const rowB = listOdpisy(500).find((o) => o.zak === 'ZAK-COMP' && o.op === '01');
+		expect(releaseOdpis(rowB!.id, 'tester')).toBe(true);
+		const again = await writeOdpis(makeReq('ZAK-COMP', '01'));
+		expect(again.status).toBe('blocked');
+		expect(again.reason).toBe('ledger-duplicate');
+	});
+
 	it('overrideLedger bez ledger bloku je no-op (normálny prvý zápis prejde)', async () => {
 		const ok = await writeOdpis(makeReq('ZAK-OVR-NOOP', '01'), { overrideLedger: true });
 		expect(ok.status).toBe('written');
@@ -120,7 +155,7 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 });
 
 describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing', () => {
-	it('overrideOpts mapuje skryté `override` pole na správny flag', () => {
+	it('overrideOpts mapuje skryté `override` pole na správny flag (aj OBA naraz)', () => {
 		const fKody = new FormData();
 		fKody.set('override', 'unknown-kod');
 		expect(overrideOpts(fKody)).toEqual({ overrideKody: true, overrideLedger: false });
@@ -129,20 +164,26 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		fLedger.set('override', 'ledger-duplicate');
 		expect(overrideOpts(fLedger)).toEqual({ overrideKody: false, overrideLedger: true });
 
+		// dvojitý blok (kód + ledger) → oba `override` v jednom formulári → oba flagy (žiadny ping-pong)
+		const fOba = new FormData();
+		fOba.append('override', 'unknown-kod');
+		fOba.append('override', 'ledger-duplicate');
+		expect(overrideOpts(fOba)).toEqual({ overrideKody: true, overrideLedger: true });
+
 		// bežný (prvý) submit nemá `override` pole → žiadny bypass
 		expect(overrideOpts(new FormData())).toEqual({ overrideKody: false, overrideLedger: false });
 	});
 
-	it('rawFormEntries zachová string polia (aj qty úpravy), vynechá `override`', () => {
+	it('rawFormEntries zachová string polia vrátane qty úprav AJ predošlých `override` hodnôt', () => {
 		const f = new FormData();
 		f.set('zak', 'ZAK1');
 		f.set('op', 'OP260286');
 		f.set('qty_18004', '3,5'); // ručná úprava množstva
-		f.set('override', 'ledger-duplicate'); // toto sa NEsmie zopakovať (doplní ho komponent)
+		f.set('override', 'unknown-kod'); // prvý potvrdený override sa NEsmie stratiť pri druhom bloku
 		const e = rawFormEntries(f);
 		expect(e).toContainEqual(['zak', 'ZAK1']);
 		expect(e).toContainEqual(['op', 'OP260286']);
 		expect(e).toContainEqual(['qty_18004', '3,5']);
-		expect(e.some(([k]) => k === 'override')).toBe(false);
+		expect(e).toContainEqual(['override', 'unknown-kod']);
 	});
 });

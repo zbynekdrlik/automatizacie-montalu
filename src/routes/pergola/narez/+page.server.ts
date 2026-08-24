@@ -167,6 +167,11 @@ export const actions = {
 					blokReason: outcome.reason!,
 					blokAction: '?/odoslat',
 					rawEntries: rawFormEntries(form),
+					// echo vstup/ident/rucne (ako duplikát vetva) — inak reštart-`$effect` zmaže parent
+					// `$state` pri blocked renderi (#300 review 🔵)
+					vstup,
+					ident,
+					rucne,
 					rezError: blokHlaska(outcome, ident.zak, ident.op)
 				};
 			}

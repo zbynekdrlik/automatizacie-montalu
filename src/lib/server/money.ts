@@ -218,29 +218,32 @@ export function blokHlaska(outcome: OdpisOutcome, zak: string, op: string): stri
 }
 
 /**
- * (#300) „Odoslať aj tak" mapovanie: skryté pole `override` z re-submit formulára → override flagy
- * pre `writeOdpis`. `unknown-kod` ⇒ `overrideKody` (Money kód, čo snapshot ešte nemá), `ledger-
- * duplicate` ⇒ `overrideLedger` (tuple re-import po „Uvoľniť"). Každý blok sa overriduje SAMOSTATNE
- * a vedome — bežný (prvý) submit nemá `override` pole, takže obe flagy sú false = žiadny bypass.
+ * (#300) „Odoslať aj tak" mapovanie: skryté pole(-a) `override` z re-submit formulára → override
+ * flagy pre `writeOdpis`. `unknown-kod` ⇒ `overrideKody`, `ledger-duplicate` ⇒ `overrideLedger`.
+ * Číta VŠETKY `override` hodnoty (`getAll`) — jeden doklad môže naraz naraziť na OBA bloky (Money
+ * kód, čo snapshot ešte nemá, + identický obsah po „Uvoľniť"); vtedy druhé „Odoslať aj tak" nesie
+ * OBE hodnoty, takže sa prekonajú NARAZ (bez donekonečna sa striedajúceho ping-pongu, #300 review 🟡).
+ * Bežný (prvý) submit nemá `override` pole → obe flagy false = žiadny bypass.
  */
 export function overrideOpts(form: FormData): { overrideKody?: boolean; overrideLedger?: boolean } {
-	const o = form.get('override');
+	const o = form.getAll('override').map(String);
 	return {
-		overrideKody: o === 'unknown-kod',
-		overrideLedger: o === 'ledger-duplicate'
+		overrideKody: o.includes('unknown-kod'),
+		overrideLedger: o.includes('ledger-duplicate')
 	};
 }
 
 /**
- * (#300) Surové string polia POST-u pre re-render „Odoslať aj tak" (bez `override`, ktoré doplní až
- * blok komponent). Zachová operátorove ručné úpravy množstiev (`qty_*`) aj vstup, takže re-submit
- * postaví IDENTICKÝ job (rovnaký content_hash → override mieri na správny tuple). `File` hodnoty sa
- * vynechajú (odpis formuláre sú čisto textové).
+ * (#300) Surové string polia POST-u pre re-render „Odoslať aj tak". Zachová operátorove ručné úpravy
+ * množstiev (`qty_*`), vstup AJ už potvrdené `override` hodnoty (aby sa pri druhom bloku nestratil
+ * prvý override — #300 review 🟡; `OdpisBlok` dopĺňa len chýbajúcu hodnotu). Re-submit tak postaví
+ * IDENTICKÝ job (rovnaký content_hash → override mieri na správny tuple). `File` hodnoty sa vynechajú
+ * (odpis formuláre sú čisto textové).
  */
 export function rawFormEntries(form: FormData): [string, string][] {
 	const out: [string, string][] = [];
 	for (const [k, v] of form.entries()) {
-		if (k !== 'override' && typeof v === 'string') out.push([k, v]);
+		if (typeof v === 'string') out.push([k, v]);
 	}
 	return out;
 }
@@ -404,11 +407,18 @@ export async function writeOdpis(
 	// reálne ide). Neznámy kód / kód bez skladovej karty ⇒ Money by ho ticho preskočil (Dominik:
 	// „keď chýba profil, neodpíše VÔBEC" — celý doklad). `overrideKody` = vedomý, AUDITOVANÝ bypass
 	// (napr. kód je správny a Money ho už má, len snapshot ešte nedobehol) — NIKDY tiché preskočenie.
+	// (#300 review 🟡) override kódov sa AUDITUJE až v zápisovej transakcii (nie tu) — inak by vedomý
+	// bypass zapísal falošný `cfg_audit` riadok „odoslaný napriek varovaniu" AJ keď ho následne
+	// zablokoval ledger (`imports>overrides`) a REÁLNE sa nič neodoslalo. Preto tu len zaznamenáme
+	// zámer + problémové kódy a audit spustíme atomicky so zápisom nižšie.
+	let overridingKody = false;
+	let kodProblemy: KodProblem[] = [];
 	if (live === 1) {
 		const val = validateOdpisKody(job.polozky);
 		if (!val.ok) {
-			if (opts.overrideKody) {
-				auditOverrideKody(job, val.problemy);
+			if (opts.overrideKody === true) {
+				overridingKody = true;
+				kodProblemy = val.problemy;
 			} else {
 				log.warn('odpis blokovaný — Money nepozná kódy (import by doklad preskočil)', {
 					modul: job.modul,
@@ -463,7 +473,7 @@ export async function writeOdpis(
 	// Toto je poistka, ktorú „Uvoľniť" NEZMAŽE: releaseOdpis maže len `odpis_log`, ledger ostáva.
 	const led = ledgerCounts(job.modul, zakNorm, opNorm, live, ledgerHash);
 	const ledgerWouldBlock = led.imports > led.overrides;
-	if (ledgerWouldBlock && !opts.overrideLedger) {
+	if (ledgerWouldBlock && opts.overrideLedger !== true) {
 		log.warn('odpis blokovaný ledgerom — identický obsah už importovaný do Money bez override', {
 			modul: job.modul,
 			zak: job.zak,
@@ -529,6 +539,9 @@ export async function writeOdpis(
 				);
 				auditOverrideLedger(job);
 			}
+			// (#300 review 🟡) audit override kódov AŽ TU — atomicky so zápisom, takže sa zapíše LEN keď
+			// sa odpis reálne odoslal (nie keď ho medzitým zablokoval ledger a nič neodišlo).
+			if (overridingKody) auditOverrideKody(job, kodProblemy);
 			const id = insLog.run(
 				job.modul,
 				job.zak,

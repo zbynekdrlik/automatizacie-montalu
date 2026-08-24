@@ -25,6 +25,11 @@
 			: 'Rovnaký obsah tejto zákazky už bol raz importovaný do Money. Odoslať znova AJ TAK? ' +
 					'(Použi LEN ak si import v Money NAOZAJ zmazal — inak vznikne dvojitý zápis.)'
 	);
+
+	// (#300 review 🟡) rawEntries už môže niesť DRUHÝ override z predošlého bloku — pridaj tento
+	// `blokReason` len ak tam ešte nie je, aby sa pri dvojitom bloku (kód + ledger) prekonali OBA
+	// naraz a nevznikol nekonečný ping-pong.
+	const maBlokReason = $derived(rawEntries.some(([k, v]) => k === 'override' && v === blokReason));
 </script>
 
 <div class="card">
@@ -43,12 +48,16 @@
 	>
 		{#each rawEntries as [k, v], i (i)}
 			{#if v.includes('\n')}
-				<textarea name={k} hidden>{v}</textarea>
+				<!-- HTML parser zhltne JEDEN vodiaci `\n` v textarea → keď hodnota začína newline,
+				     predsadíme ďalší, aby sa obsah pri submitne zachoval 1:1 (#300 review 🔵) -->
+				<textarea name={k} hidden>{(v.startsWith('\n') ? '\n' : '') + v}</textarea>
 			{:else}
 				<input type="hidden" name={k} value={v} />
 			{/if}
 		{/each}
-		<input type="hidden" name="override" value={blokReason} />
+		{#if !maBlokReason}
+			<input type="hidden" name="override" value={blokReason} />
+		{/if}
 		<button type="submit" class="btn danger" data-testid="odoslat-aj-tak">⚠️ Odoslať aj tak</button>
 	</form>
 	<button class="btn secondary" type="button" onclick={() => history.back()}
