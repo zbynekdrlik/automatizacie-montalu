@@ -124,7 +124,7 @@ to robí správne cez `mat.attenuationColor[k]`).
 ## "Jednotka sa vznáša" (#174 ZNOVUOTVORENÉ) — NIKDY nepredpokladaj Y-posun,
 ## over ho ČÍSLAMI; skutočná príčina bola X/Z tvar kontaktného tieňa
 
-Naживo vyzeralo, že jednotka "levituje" nad dlažbou (viditeľná medzera,
+Naživo vyzeralo, že jednotka "levituje" nad dlažbou (viditeľná medzera,
 odpojená tieňová elipsa). Prirodzený prvý dohad — niečo má zlé svetové Y
 (skupina posunutá, zem pod nulou, kamera vytvára zdanlivý posun) — bol
 DOKÁZATEĽNE nesprávny: `postavGeometrie()`/`vytvorZem()`/`vytvorStenu()` sa
@@ -386,3 +386,14 @@ na softvéri je gate OFF (regresný guard #290).
 - **Slovenské komentáre: pozor na CYRILLIC HOMOGLYFY + soft hyphen (U+00AD).** Prekliky pri
   písaní vsunú Cyrillic `е`/`о`/`живо` čo VYZERÁ ako Latin ale rozbije grep. Skenuj pred commitom:
   `python3 -c "import re,sys; [print(f,i) for f in sys.argv[1:] for i,l in enumerate(open(f),1) if re.search(r'[Ѐ-ӿ­]',l)]" <súbory>`.
+
+**Integrácia paralelných vizual lanes (poučenie #288↔#290/#291).** Keď dve vizual lanes
+GATUJÚ na tej istej klasifikácii renderera (#290 supersample strop + #288 postproc gate),
+mergnú sa v ZDROJI čisto práve preto, že `jeSoftverovyRenderer` žije v JEDNOM module
+(`kvalita.ts`, jediný zdroj pravdy) — `snimka.ts` ho len re-exportuje. Jediný očakávaný
+konflikt pri takej integrácii je **APPEND-BOTH v `vizual3d.md`** (obe lanes pripísali
+vlastnú `##` sekciu na koniec) — vyrieš zachovaním OBOCH sekcií (nič nevyhadzuj), a po
+merge over, že OBE správania koexistujú cez `kvalita.ts`: supersample strop 2× na softvéri
+AJ postproc gate OFF na softvéri (`overPostprocGate` E2E + `vizual-snimka`/`vizual-kvalita-gpu`
+testy). Ak by budúca lane presunula klasifikáciu späť do viacerých modulov, vráti sa
+zdrojový konflikt — drž ju v `kvalita.ts`.
