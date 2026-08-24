@@ -101,6 +101,19 @@ review, nie prvý návrh):
 - **Ledger append je IDEMPOTENTNÝ (`imports<=overrides`), nie bezpodmienečný.** V prode `writeOdpis` (aj v27
   backfill) už nechal `import` riadok (`imports=1`), takže detekčný append je tam no-op; bezpodmienečný
   append by rozbil #294 invariant „1 override = 1 re-import" (imports=2 → legit override neodblokuje).
+- **NIKDY synchrónny `fs.*Sync` na staged cesty — je to CIFS/SMB share cez WireGuard (#315).** `detectManualStagingMoves`
+  bežala v `/odpisy` load SYNCHRÓNNE (`fs.statSync`); na PRODE tie `target` cesty ležia na `//192.168.1.200/...`
+  CIFS mounte (`soft, actimeo=1`) kde jeden `statSync` trvá **0,7–8,8 s** (namerané) → synchrónne staty na 22
+  parkovaných riadkoch ZABLOKOVALI event loop na desiatky sekúnd, aj `/health` timeoutol (celá appka zamrzla).
+  Lokálne/CI mikrosekundový fs to NIKDY neodhalí. Preto je detekcia teraz celá **async cez `fs.promises`** s
+  tvrdým wall-clock rozpočtom (`Promise.race`, `PRESUN_DETECT_BUDGET_MS=2500`) — pri prekročení sa ČESTNE
+  preskočí (parkované ostávajú, WARN), stránka sa VŽDY načíta; **jedna in-flight detekcia** (gate držaný kým fs
+  ops doznejú) + sekvenčne → max 1 libuv threadpool worker (visiaci `readdir`/`stat` neuvoľní vlákno hneď).
+  `readdir`-per-adresár (nie stat-per-súbor) redukuje počet volaní; MARK stále LEN po POTVRDZUJÚCOM exact-path
+  `stat` s čistým ENOENT (timeout/EACCES NIKDY neoznačí presun). **Pravidlo: každý nový fs prístup na `target`/
+  staging cesty MUSÍ byť async + pod rozpočtom — sieťový mount môže visieť sekundy.** (Testovacia pasca: mock
+  visiaci `readdir` cez injektovanú `DetectDeps`, over že detekcia dobehne v rozpočte a NEoznačí; orphan op
+  drží `detectBusy` gate → v teste ho uvoľni + počkaj, nech ďalší test nevidí „už beží".)
 
 ## Producer schéma je LIVE-OVERENÁ (#298, 2026-08-24)
 
