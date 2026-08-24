@@ -6,7 +6,7 @@ import { logger } from '$lib/server/log';
 import { computeBazen, applyEdits } from '$lib/server/bazen';
 import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
-import { writeOdpis, isLive, blokLedgerHlaska, type OdpisJob } from '$lib/server/money';
+import { writeOdpis, isLive, blokHlaska, type OdpisJob } from '$lib/server/money';
 
 function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -101,7 +101,7 @@ export const actions = {
 			if (outcome.status === 'blocked') {
 				return {
 					step: 'duplikat' as const,
-					error: blokLedgerHlaska(vstup.zak, vstup.op, outcome.ledgerImportedAt),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup
 				};
 			}

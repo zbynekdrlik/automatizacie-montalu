@@ -16,7 +16,7 @@ import {
 } from '$lib/server/pergola-rezervacia';
 import { catalogForClient } from '$lib/server/pergola';
 import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
-import { writeOdpis, isLive, blokLedgerHlaska } from '$lib/server/money';
+import { writeOdpis, isLive, blokHlaska } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import { logger } from '$lib/server/log';
@@ -169,7 +169,7 @@ export const actions = {
 					rucne,
 					rozpis,
 					ceny: cenyBlok(),
-					rezError: blokLedgerHlaska(ident.zak, ident.op, outcome.ledgerImportedAt)
+					rezError: blokHlaska(outcome, ident.zak, ident.op)
 				};
 			}
 			log.info('rezervácia zapísaná', {

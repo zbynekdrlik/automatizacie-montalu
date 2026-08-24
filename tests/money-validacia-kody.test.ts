@@ -62,4 +62,67 @@ describe('#295 pre-export validácia kódov (live=1)', () => {
 		expect(w.status).toBe('written');
 		expect(fs.existsSync(w.target)).toBe(true);
 	});
+
+	it('blocked outcome nesie reason unknown-kod + zoznam chýbajúcich kódov', async () => {
+		const w = await writeOdpis(
+			job('ZAK-UNK2', '01', [{ kod: 'ZASP99999', nazov: 'Neznámy', qty: 3 }])
+		);
+		expect(w.status).toBe('blocked');
+		expect(w.reason).toBe('unknown-kod');
+		expect(w.chybajuceKody?.map((p) => p.kod)).toContain('ZASP99999');
+		expect(w.chybajuceKody?.[0].dovod).toBe('neznamy');
+	});
+
+	it('kód v snapshote ale BEZ skladovej karty (sklad=null) sa tiež blokuje', async () => {
+		const w = await writeOdpis(
+			job('ZAK-NOSKLAD', '01', [{ kod: 'ZASP00099', nazov: 'Bez karty', qty: 2 }])
+		);
+		expect(w.status).toBe('blocked');
+		expect(w.reason).toBe('unknown-kod');
+		expect(w.chybajuceKody?.[0].dovod).toBe('bez-skladovej-karty');
+	});
+
+	it('override (overrideKody) pošle napriek neznámemu kódu + zapíše audit', async () => {
+		const before = (
+			db.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'").get() as {
+				c: number;
+			}
+		).c;
+		const w = await writeOdpis(
+			job('ZAK-OVR-KOD', '01', [{ kod: 'ZASP99999', nazov: 'Neznámy', qty: 3 }]),
+			{ overrideKody: true }
+		);
+		expect(w.status).toBe('written');
+		expect(fs.existsSync(w.target)).toBe(true);
+		const after = (
+			db.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'").get() as {
+				c: number;
+			}
+		).c;
+		expect(after).toBe(before + 1); // override je auditovaný, nie tichý
+		const audit = db
+			.prepare("SELECT zmeny FROM cfg_audit WHERE sys_styl = 'odpis' ORDER BY id DESC LIMIT 1")
+			.get() as { zmeny: string };
+		expect(audit.zmeny).toContain('Override chýbajúcich Money kódov');
+		expect(audit.zmeny).toContain('ZASP99999');
+	});
+
+	it('kód mimo scope snapshotu (pergola PRP*, prefix nie je v snapshote) sa NEblokuje', async () => {
+		// snapshot má len ZASP* → prefix PRP nie je pokrytý → nevalidujeme (inak by pergola padala)
+		const w = await writeOdpis(
+			job('ZAK-PRP', '01', [{ kod: 'PRP20258', nazov: 'Kotviaci profil', qty: 7.5 }])
+		);
+		expect(w.status).toBe('written');
+	});
+
+	it('ZASTARANÝ snapshot ⇒ degrade na warning, NEblokuje (validácia nedostupná)', async () => {
+		// posuň snapshot > 7 dní do minulosti → snapshotUsable=false → neznámy kód NEblokuje
+		db.prepare(
+			"UPDATE material_prices_meta SET snapshot_generated_at = datetime('now', '-30 days') WHERE id = 1"
+		).run();
+		const w = await writeOdpis(
+			job('ZAK-STALE', '01', [{ kod: 'ZASP99999', nazov: 'Neznámy', qty: 3 }])
+		);
+		expect(w.status).toBe('written');
+	});
 });

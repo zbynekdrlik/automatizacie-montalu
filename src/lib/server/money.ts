@@ -15,6 +15,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { db } from './db';
 import { logger } from './log';
+import { validateOdpisKody, type KodProblem } from './ceny';
 import type { MJ } from '$lib/komponenty';
 
 const log = logger('money');
@@ -102,14 +103,18 @@ export interface OdpisJob {
 export interface OdpisOutcome {
 	status: 'written' | 'duplicate' | 'blocked';
 	/** dôvod bloku (len `status==='blocked'`): `ledger-duplicate` = identický obsah tej istej
-	 *  zákazky už bol importovaný do Money a nebol RE-autorizovaný override-om (#294). */
-	reason?: 'ledger-duplicate';
+	 *  zákazky už bol importovaný do Money a nebol RE-autorizovaný override-om (#294);
+	 *  `unknown-kod` = Money niektorý kód nepozná / nemá skladovú kartu → import by doklad ticho
+	 *  preskočil (#295). */
+	reason?: 'ledger-duplicate' | 'unknown-kod';
 	live: boolean;
 	target: string;
 	filename: string;
 	duplicateCreatedAt?: string;
 	/** len `reason==='ledger-duplicate'`: kedy bol identický obsah naposledy importovaný */
 	ledgerImportedAt?: string;
+	/** len `reason==='unknown-kod'`: kódy, ktoré Money nepozná / nemajú skladovú kartu */
+	chybajuceKody?: KodProblem[];
 }
 
 // env sa číta pri každom volaní (nie pri importe) — kvôli testom a možnosti
@@ -182,14 +187,57 @@ function detekujPrehodenePolia(zakNorm: string, opNorm: string): boolean {
 }
 
 /** Hláška pre operátora, keď ledger zablokoval re-import IDENTICKÉHO obsahu (#294,
- *  `reason==='ledger-duplicate'`). Jeden zdroj pravdy pre všetky moduly. */
-export function blokLedgerHlaska(zak: string, op: string, importedAt?: string): string {
+ *  `reason==='ledger-duplicate'`). */
+function blokLedgerHlaska(zak: string, op: string, importedAt?: string): string {
 	return (
 		`Rovnaký obsah zákazky ${zak} (OP ${op}) už bol raz importovaný do Money` +
 		(importedAt ? ` (${importedAt})` : '') +
 		`. Znova ho NEposielam — poistka proti dvojitému importu. Ak si import v Money NAOZAJ zmazal, ` +
 		`v „História odpisov" použi „⚠️ Povoliť rovnaký".`
 	);
+}
+
+/** Hláška pre operátora, keď Money niektorý kód nepozná / nemá naň skladovú kartu (#295,
+ *  `reason==='unknown-kod'`). Import by taký doklad ticho NEODPÍSAL (celý sa preskočí). */
+function blokKodyHlaska(problemy: KodProblem[]): string {
+	const kody = problemy
+		.map((p) => `${p.kod}${p.dovod === 'bez-skladovej-karty' ? ' (bez skladovej karty)' : ''}`)
+		.join(', ');
+	const slovo = problemy.length === 1 ? 'kód' : 'kódy';
+	return (
+		`Money nepozná ${slovo}: ${kody}. Tento doklad by import NEODPÍSAL (Money pri neznámom ` +
+		`kóde preskočí CELÝ doklad). Skontroluj kód, alebo ho nechaj doplniť do Money. Ak je kód ` +
+		`správny a Money ho už má, cenník sa aktualizuje ráno.`
+	);
+}
+
+/** Jeden zdroj pravdy pre hlášku bloku vo všetkých moduloch — vyberie správnu podľa `reason`. */
+export function blokHlaska(outcome: OdpisOutcome, zak: string, op: string): string {
+	if (outcome.reason === 'unknown-kod') return blokKodyHlaska(outcome.chybajuceKody ?? []);
+	return blokLedgerHlaska(zak, op, outcome.ledgerImportedAt);
+}
+
+/** Audit vedomého override chýbajúcich Money kódov (#295) — NIE tiché preskočenie: do `cfg_audit`
+ *  sa zapíše, KTO poslal odpis napriek varovaniu a ktoré kódy Money nepozná. */
+function auditOverrideKody(job: OdpisJob, problemy: KodProblem[]): void {
+	const kody = problemy.map((p) => p.kod).join(', ');
+	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+		job.createdBy,
+		'odpis',
+		JSON.stringify([
+			{
+				pole: `Override chýbajúcich Money kódov (${kody}) — odpis ${job.modul} ${job.zak} OP${job.op} odoslaný napriek varovaniu`,
+				stara: 0,
+				nova: 1
+			}
+		])
+	);
+	log.warn('odpis: override chýbajúcich Money kódov', {
+		modul: job.modul,
+		zak: job.zak,
+		op: job.op,
+		kody
+	});
 }
 
 interface LedgerCounts {
@@ -277,7 +325,10 @@ export async function buildXlsx(job: OdpisJob): Promise<Buffer> {
  * zápisu súboru — vtedy je dedup záznam už odstránený a odoslanie sa dá
  * bezpečne zopakovať.
  */
-export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
+export async function writeOdpis(
+	job: OdpisJob,
+	opts: { overrideKody?: boolean } = {}
+): Promise<OdpisOutcome> {
 	const live = isLive() ? 1 : 0;
 	const zakNorm = normZak(job.zak);
 	const opNorm = normOp(job.op);
@@ -297,6 +348,34 @@ export async function writeOdpis(job: OdpisJob): Promise<OdpisOutcome> {
 			zakNorm,
 			opNorm
 		});
+	}
+
+	// (#295) PRE-export validácia kódov proti dennému Money snapshotu — LEN pre live=1 (do Money
+	// reálne ide). Neznámy kód / kód bez skladovej karty ⇒ Money by ho ticho preskočil (Dominik:
+	// „keď chýba profil, neodpíše VÔBEC" — celý doklad). `overrideKody` = vedomý, AUDITOVANÝ bypass
+	// (napr. kód je správny a Money ho už má, len snapshot ešte nedobehol) — NIKDY tiché preskočenie.
+	if (live === 1) {
+		const val = validateOdpisKody(job.polozky);
+		if (!val.ok) {
+			if (opts.overrideKody) {
+				auditOverrideKody(job, val.problemy);
+			} else {
+				log.warn('odpis blokovaný — Money nepozná kódy (import by doklad preskočil)', {
+					modul: job.modul,
+					zak: job.zak,
+					op: job.op,
+					kody: val.problemy.map((p) => p.kod)
+				});
+				return {
+					status: 'blocked',
+					reason: 'unknown-kod',
+					live: true,
+					target,
+					filename,
+					chybajuceKody: val.problemy
+				};
+			}
+		}
 	}
 
 	// (#294) normalizovaný dedup precheck — OP260286 ≡ 260286 obíde RAW UNIQUE, tak dedup-ujeme na

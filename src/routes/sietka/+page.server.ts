@@ -18,7 +18,7 @@ import {
 	targetDirFor,
 	filenameFor,
 	contentHash,
-	blokLedgerHlaska,
+	blokHlaska,
 	type OdpisJob
 } from '$lib/server/money';
 
@@ -119,7 +119,7 @@ export const actions = {
 			if (outcome.status === 'blocked') {
 				return {
 					step: 'duplikat' as const,
-					error: blokLedgerHlaska(vstup.zak, vstup.op, outcome.ledgerImportedAt),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup,
 					r,
 					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)

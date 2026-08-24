@@ -248,6 +248,90 @@ function getPriceRow(kod: string): PriceRow | undefined {
 	return row;
 }
 
+// ---- pre-export validácia Money kódov (#295) ----
+
+/** Prečo je kód problematický pri exporte do Money. */
+export interface KodProblem {
+	kod: string;
+	nazov: string;
+	/** `neznamy` = kód v Money snapshote VÔBEC nie je; `bez-skladovej-karty` = je v snapshote,
+	 *  ale `sklad === null` (Money preň nemá skladovú kartu). Oba prípady import PRESKOČÍ. */
+	dovod: 'neznamy' | 'bez-skladovej-karty';
+	popis: string;
+}
+
+export interface OdpisKodyValidacia {
+	/** `true` = žiadny problém, ALEBO snapshot nie je použiteľný (degrade — NEblokuj naslepo). */
+	ok: boolean;
+	/** snapshot je čerstvý (≤ `SNAPSHOT_MAX_DNI`) + neprázdny → validácia má zmysel. */
+	snapshotUsable: boolean;
+	snapshot: SnapshotMeta;
+	/** len problematické položky, ktorých PREFIX snapshot reálne pokrýva. */
+	problemy: KodProblem[];
+}
+
+/** Nad koľko dní starý snapshot sa už validácii nedôveruje (degrade na warning, neblokuj). */
+const SNAPSHOT_MAX_DNI = 7;
+
+/** Písmenový prefix kódu (`ZASP` z `ZASP00014`, `PRP` z `PRP20258`) — určuje, či daný kód
+ *  vôbec spadá do rozsahu snapshotu (snapshot ťahá LEN ZASP.../ZASK... + TS..., nie PRP.../BPP...). */
+function kodPrefix(kod: string): string {
+	const m = /^[A-Za-z]+/.exec(kod.trim());
+	return m ? m[0].toUpperCase() : '';
+}
+
+/** Prefixy, ktoré snapshot REÁLNE obsahuje (empirický scope) — kód s prefixom mimo tejto množiny
+ *  sa NEVALIDUJE (nemáme oň dáta), aby pergola/bazén odpisy nepopadali na chýbajúcich PRP.../BPP.... */
+function snapshotPrefixy(): Set<string> {
+	const rows = db.prepare('SELECT kod FROM material_prices').all() as { kod: string }[];
+	const s = new Set<string>();
+	for (const r of rows) {
+		const p = kodPrefix(r.kod);
+		if (p) s.add(p);
+	}
+	return s;
+}
+
+/**
+ * PRE-export validácia položiek odpisu proti dennému Money snapshotu (#295). Kód, ktorého PREFIX
+ * snapshot pokrýva, ale ktorý v snapshote CHÝBA alebo má `sklad === null` (Money nemá skladovú
+ * kartu), by Money import TICHO preskočil (a Dominik potvrdil, že vtedy neodpíše CELÝ doklad).
+ * Volajúci (`writeOdpis` pre live=1) na základe `!ok` blokuje. Keď snapshot nie je použiteľný
+ * (chýba/zastaraný), vráti `ok=true`, `snapshotUsable=false` — NEblokuje naslepo, len degrade.
+ */
+export function validateOdpisKody(polozky: { kod: string; nazov: string }[]): OdpisKodyValidacia {
+	maybeImportSnapshot();
+	const snapshot = readSnapshotMetaFromDb();
+	const snapshotUsable =
+		snapshot.generatedAt !== null &&
+		snapshot.rowCount > 0 &&
+		(snapshot.daysOld ?? Infinity) <= SNAPSHOT_MAX_DNI;
+	const problemy: KodProblem[] = [];
+	if (snapshotUsable) {
+		const prefixy = snapshotPrefixy();
+		for (const p of polozky) {
+			if (!prefixy.has(kodPrefix(p.kod))) continue; // mimo scope snapshotu — nevalidujeme
+			const price = getPriceRow(p.kod);
+			if (!price) {
+				problemy.push({
+					kod: p.kod,
+					nazov: p.nazov,
+					dovod: 'neznamy',
+					popis: `Money nepozná kód ${p.kod} — import by tento riadok (a možno celý doklad) preskočil.`
+				});
+			} else if (price.sklad === null) {
+				problemy.push({
+					kod: p.kod,
+					nazov: p.nazov,
+					dovod: 'bez-skladovej-karty',
+					popis: `Money nemá skladovú kartu pre ${p.kod} — import by ho preskočil.`
+				});
+			}
+		}
+	}
+	return { ok: problemy.length === 0, snapshotUsable, snapshot, problemy };
+}
+
 export interface CenaZaM2 {
 	/** €/m² z Money cenníka (pre sklo = IZOS cenník cez `nakupCennik`); `null` =
 	 *  kód je v snapshote, ale cenu preň Money nemá (0/chýba) → „cena nedostupná". */
