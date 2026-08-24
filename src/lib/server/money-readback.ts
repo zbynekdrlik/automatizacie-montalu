@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import { db } from './db';
 import { logger } from './log';
 import { normZak, normOp } from './money';
+import { formatDatumIsoSk } from '../datum';
 
 const log = logger('readback');
 
@@ -248,13 +249,30 @@ export interface ReadbackVysledok {
 /** Snapshot musí byť generovaný aspoň o toľko po odoslaní, aby sme „chýbajúci DLV" vyhlásili za
  *  Money skip (a nie „ešte nedobehol import"). Money watcher importuje v sekundách, toto je rezerva. */
 const GRACE_S = 10 * 60;
-/** DLV s `datum` staršou než (odoslanie − táto tolerancia) sa NEpočíta k tomuto odpisu — je to
- *  starší doklad (napr. predošlé duplicitné odoslanie). Tolerancia kryje TZ posun (verdikt: konštantný
- *  2 h) + drobný clock-skew, aby doklad tesne pred/po odoslaní stále napároval. */
-const DATUM_TOL_S = 12 * 60 * 60;
+/** DLV, ktorého kalendárny DÁTUM je viac než toľko KALENDÁRNYCH dní pred kalendárnym dňom odoslania
+ *  (Europe/Bratislava), sa NEpočíta k tomuto odpisu — je to starší doklad (napr. predošlé duplicitné
+ *  odoslanie). Porovnanie je DATE-ONLY aware: Money `datum` (`DatumVystaveni`) je date-only — polnoc
+ *  kalendárneho dňa. Predošlá sekundová tolerancia (12 h) proti mid-day odoslaniu zamietla reálny
+ *  doklad TOHO ISTÉHO dňa (odoslané 12:28 − polnoc = 12h28m > 12h; #308). 1 deň kryje TZ posun,
+ *  near-midnight hranicu aj drobný clock-skew; stále zamietne reálne staršie doklady (2+ dni). */
+const DATUM_TOL_DAYS = 1;
 /** Odpis starší než toto sa neoveruje (`caka`) — producer číta LEN nedávne DLV okno, takže „žiadny
  *  DLV" pri starom odpise NIE JE dôkaz skipu. Musí byť ≤ producerovo DLV okno. */
 const READBACK_WINDOW_S = 30 * 24 * 60 * 60;
+
+/** „YYYY-MM-DD" → celočíselné číslo kalendárneho dňa (dní od epochy). Kalendárny dátum bez TZ —
+ *  Money `datum` UŽ JE bratislavský kalendárny deň (`.slice(0,10)` odreže prípadný čas). */
+function isoDayNum(isoDate: string): number {
+	const [y, m, d] = isoDate.slice(0, 10).split('-');
+	return Math.floor(Date.UTC(Number(y), Number(m) - 1, Number(d)) / 86400000);
+}
+
+/** Bratislavský kalendárny deň odpisu z jeho UTC epoch (`createdEpoch` zo SQL `strftime('%s')`).
+ *  Cez audítovaný `formatDatumIsoSk` (Intl + IANA zóna, DST-safe) — NIKDY `Date.parse` na SQLite
+ *  space-oddelenom čase (V8 by ho bral ako lokálny; #298/#114 pasca). */
+function bratDayNum(epochS: number): number {
+	return isoDayNum(formatDatumIsoSk(new Date(epochS * 1000).toISOString()));
+}
 
 interface OdpisRow {
 	id: number;
@@ -264,6 +282,8 @@ interface OdpisRow {
 	 *  kým ho človek ručne nepresunie do dlv-import. Chýbajúci DLV pri `caka=1` NIE je skip ⇒ `caka`. */
 	caka: number;
 	createdEpoch: number;
+	/** bratislavský kalendárny deň odoslania (dní od epochy) — pre date-only porovnanie s DLV datum. */
+	bratDay: number;
 	vsetky: number;
 	nenulove: number;
 }
@@ -272,7 +292,8 @@ interface DlvCand {
 	dlv: string;
 	opNorm: string;
 	pocet: number;
-	datumEpoch: number | null;
+	/** kalendárny deň Money `datum` (date-only, dní od epochy); `null` keď DLV nemá datum. */
+	datumDay: number | null;
 }
 
 const CAKA_VYSLEDOK = (o: OdpisRow): ReadbackVysledok => ({
@@ -288,7 +309,8 @@ const CAKA_VYSLEDOK = (o: OdpisRow): ReadbackVysledok => ({
  * odpis (#298 review 🟡). Bez toho by jeden prežitý DLV validoval viacero odpisov tej istej zákazky
  * (napr. zasklenia+pergola+bazén zdieľajú zak+op, alebo „Uvoľniť"+re-send) a tichý drop by prešiel
  * ako `ok`. Dvojfázový greedy: NAJPRV napáruj presné (v pásme) doklady, POTOM zvyšné; odpis bez
- * dokladu = alarm `chyba-doklad` LEN keď Money mal čas, odpis je v okne A NIE JE parkovaný (`caka=1`).
+ * dokladu = alarm `chyba-doklad` LEN keď Money mal čas a odpis je v okne. Parkované (`caka=1`) odpisy
+ * sa z matchingu VYLUČUJÚ úplne (dostanú `caka`) — appka ich do Money neposlala (#308).
  * POZN.: úplná per-send exkluzivita potrebuje per-send diskriminátor v Money doklade (napr. názov
  * súboru) — bez neho ostáva (b) „re-send rovnakého obsahu" slabé miesto (UNVERIFIED, provisioning #298).
  */
@@ -300,16 +322,27 @@ function priradGroup(
 ): Map<number, ReadbackVysledok> {
 	const res = new Map<number, ReadbackVysledok>();
 	const claimed = new Set<string>();
-	// kompatibilné NEzabraté DLV: OP sedí (ak ho oboje nesie) + datum nie je zjavne spred odoslania
+	// PARKOVANÝ caka=1 odpis NEVSTUPUJE do matchingu (#308): appka ho do Money zámerne neposlala; do
+	// dlv-import ho môže presunúť LEN človek ručne (appka o tom nevie — `caka` je po inserte nemenné,
+	// `releaseOdpis` riadok MAŽE, žiadny `UPDATE … SET caka`). Párovanie len po zak+počte-v-pásme je
+	// preto nespoľahlivé: cross-match na cudzí doklad → falošný `pocet` (živý ZAK2026450), a prípadný
+	// claim by ukradol doklad legit súrodencovi. Vždy „neoverené" (`caka`) — nikdy alarm ani claim.
+	const active: OdpisRow[] = [];
+	for (const o of group) {
+		if (o.caka === 1) res.set(o.id, CAKA_VYSLEDOK(o));
+		else active.push(o);
+	}
+	// kompatibilné NEzabraté DLV: OP sedí (ak ho oboje nesie) + datum nie je zjavne spred odoslania.
+	// Dátum sa porovnáva ako KALENDÁRNY deň (Money `datum` je date-only, polnoc), nie sekundy (#308).
 	const compat = (o: OdpisRow): DlvCand[] =>
 		cands.filter(
 			(c) =>
 				!claimed.has(c.dlv) &&
 				(!c.opNorm || !o.opNorm || c.opNorm === o.opNorm) &&
-				(c.datumEpoch === null || c.datumEpoch >= o.createdEpoch - DATUM_TOL_S)
+				(c.datumDay === null || c.datumDay >= o.bratDay - DATUM_TOL_DAYS)
 		);
 	// staršie odpisy páruj skôr (staršie odoslanie ~ starší doklad) — deterministické priradenie
-	const sorted = [...group].sort((a, b) => a.createdEpoch - b.createdEpoch);
+	const sorted = [...active].sort((a, b) => a.createdEpoch - b.createdEpoch);
 
 	// FÁZA 1: overiteľné odpisy s DOKLADOM V PÁSME [nenulove..vsetky] (Money môže/nemusí rátať nulové
 	// riadky). Najvyšší v pásme = presná zhoda s počtom_všetkých, keď taký doklad existuje.
@@ -329,9 +362,9 @@ function priradGroup(
 		}
 	}
 
-	// FÁZA 2: zvyšné odpisy. Zostal kompatibilný (mimo pásma) doklad ⇒ počet nesedí (ALARM `pocet`).
-	// Žiadny doklad ⇒ chýbajúci doklad (ALARM `chyba-doklad`) LEN keď Money mal čas + odpis je v okne
-	// + NIE JE parkovaný; inak „neoverené" (`caka`) — nikdy falošný alarm.
+	// FÁZA 2: zvyšné AKTÍVNE odpisy (parkované caka=1 sú už vyriešené vyššie ako `caka`). Zostal
+	// kompatibilný (mimo pásma) doklad ⇒ počet nesedí (ALARM `pocet`). Žiadny doklad ⇒ chýbajúci
+	// doklad (ALARM `chyba-doklad`) LEN keď Money mal čas + odpis je v okne; inak „neoverené" (`caka`).
 	for (const o of sorted) {
 		if (res.has(o.id)) continue;
 		if (o.vsetky === 0 || genEpoch === null) {
@@ -355,7 +388,7 @@ function priradGroup(
 		// okno sa meria od GENEROVANIA snapshotu (producer číta DLV okno relatívne k svojmu behu),
 		// nie od „teraz" — pri zastaranom snapshote by inak odpis vypadol z okna nesprávne (#298 review).
 		const vOkne = o.createdEpoch >= genEpoch - windowS;
-		if (o.caka !== 1 && moneyMalCas && vOkne) {
+		if (moneyMalCas && vOkne) {
 			res.set(o.id, {
 				stav: 'nesulad',
 				dovod: 'chyba-doklad',
@@ -384,16 +417,18 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 	if (odpisLogIds.length === 0) return out;
 
 	const ph = odpisLogIds.map(() => '?').join(',');
-	const odpisy = db
-		.prepare(
-			`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm, l.caka AS caka,
+	const odpisy = (
+		db
+			.prepare(
+				`SELECT l.id AS id, l.zak_norm AS zakNorm, l.op_norm AS opNorm, l.caka AS caka,
 				CAST(strftime('%s', l.created_at) AS INTEGER) AS createdEpoch,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS vsetky,
 				(SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id AND p.qty != 0) AS nenulove
 			 FROM odpis_log l
 			 WHERE l.live = 1 AND l.id IN (${ph})`
-		)
-		.all(...odpisLogIds) as OdpisRow[];
+			)
+			.all(...odpisLogIds) as Omit<OdpisRow, 'bratDay'>[]
+	).map((o) => ({ ...o, bratDay: bratDayNum(o.createdEpoch) }));
 	if (odpisy.length === 0) return out;
 
 	const genRow = db
@@ -409,9 +444,10 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 		genRow && genRow.windowDays > 0 ? genRow.windowDays * 86400 : READBACK_WINDOW_S;
 	const windowS = Math.min(READBACK_WINDOW_S, prodWindowS);
 
+	// datum sa berie RAW (date-only string) a prevedie na kalendárny deň v JS (`isoDayNum`) — porovnanie
+	// je date-only aware (Money `datum` je polnoc kalendárneho dňa), nie sekundové proti mid-day (#308).
 	const candStmt = db.prepare(
-		`SELECT dlv, op_norm AS opNorm, pocet_polozek AS pocet,
-			CASE WHEN datum IS NULL THEN NULL ELSE CAST(strftime('%s', datum) AS INTEGER) END AS datumEpoch
+		`SELECT dlv, op_norm AS opNorm, pocet_polozek AS pocet, datum
 		 FROM money_dlv WHERE zak_norm = ?`
 	);
 	// zoskup odpisy po zákazke — DLV sa priraďujú EXKLUZÍVNE v rámci jednej zákazky
@@ -422,7 +458,14 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 		else byZak.set(o.zakNorm, [o]);
 	}
 	for (const [zak, group] of byZak) {
-		const cands = candStmt.all(zak) as DlvCand[];
+		const cands = (
+			candStmt.all(zak) as { dlv: string; opNorm: string; pocet: number; datum: string | null }[]
+		).map((c) => ({
+			dlv: c.dlv,
+			opNorm: c.opNorm,
+			pocet: c.pocet,
+			datumDay: c.datum ? isoDayNum(c.datum) : null
+		}));
 		for (const [id, r] of priradGroup(group, cands, genEpoch, windowS)) out.set(id, r);
 	}
 	return out;

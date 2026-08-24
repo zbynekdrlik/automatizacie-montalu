@@ -203,11 +203,33 @@ describe('#298 readback — PARKOVANÝ caka=1 odpis NEALARMUJE (Money ho ešte n
 		expect(readbackStav([id]).get(id)!.stav).toBe('caka');
 	});
 
-	it('caka=1 odpis PO presune (DLV už existuje) ⇒ ok (readback funguje po importe)', () => {
+	it('caka=1 odpis sa NEMATCHUJE ani keď DLV pre jeho zákazku existuje ⇒ caka, NIE ok (#308)', () => {
+		// ZMENA SPRÁVANIA #308 (predtým „ok"): parkovaný odpis appka do Money NEposlala; do dlv-import
+		// ho môže presunúť LEN človek ručne (appka o tom nevie — `caka` je po inserte NEMENNÉ,
+		// `releaseOdpis` riadok maže, žiadny `UPDATE … SET caka`). Párovanie len po zak+počte je preto
+		// nespoľahlivé — cross-match na cudzí doklad dával falošný `pocet` (ZAK2026450). Parkovaný odpis
+		// sa z matchingu VYLUČUJE úplne a ostáva „neoverené" (`caka`) — čestný stav, nikdy falošný alarm
+		// ani falošné `ok` (tvrdiť „Money to má", hoci appka nič neposlala). NECLAIMuje ani DLV.
 		const id = insOdpis('ZAKP2', 'OPP2', [3, 5], { caka: 1 });
 		insDlv('DLVP2', 'ZAKP2', 'OPP2', 2);
 		setMeta('-0 minutes');
-		expect(readbackStav([id]).get(id)!.stav).toBe('ok');
+		const stav = readbackStav([id]).get(id)!;
+		expect(stav.stav).toBe('caka');
+		expect(stav.dlv).toBe(null);
+	});
+
+	it('caka=1 NEUKRADNE DLV — legit súrodenec (caka=0) tej istej zákazky ho stále overí (#308)', () => {
+		// Kľúčová vlastnosť vylúčenia: parkovaný odpis DLV neCLAIMuje, takže doklad ostane pre reálne
+		// odoslaného súrodenca tej istej zákazky (bez toho by parkovaný „ukradol" doklad a súrodenec
+		// by falošne alarmoval `chyba-doklad`).
+		const parked = insOdpis('ZAKP3', 'OPP3', [3, 5], { caka: 1, modul: 'pergola' });
+		const active = insOdpis('ZAKP3', 'OPP3', [1, 2], { caka: 0, modul: 'zasklenia' });
+		insDlv('DLVP3', 'ZAKP3', 'OPP3', 2); // sedí do pásma OBOCH (2 riadky každý)
+		setMeta('-0 minutes');
+		const m = readbackStav([parked, active]);
+		expect(m.get(parked)!.stav).toBe('caka'); // parkovaný sa neoveruje
+		expect(m.get(active)!.stav).toBe('ok'); // DLV ostal pre legit súrodenca
+		expect(m.get(active)!.dlv).toBe('DLVP3');
 	});
 });
 
