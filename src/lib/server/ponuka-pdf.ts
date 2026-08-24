@@ -10,11 +10,19 @@
 import { PDFDocument, rgb, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
-import { DISCLAIMER, FIRMA, firmaRiadky, zhrnutieRiadky, type PonukaConfig } from '$lib/ponuka';
+import {
+	DISCLAIMER,
+	FIRMA,
+	firmaRiadky,
+	formatEur,
+	zhrnutieRiadky,
+	type PonukaConfig
+} from '$lib/ponuka';
+import { cenaZCfg } from './dopyt-cena-stamp';
 import { formatDatumSk } from '$lib/datum';
-// #279 Fáza C: orientačná PREDAJNÁ cena (LEN MO — VO sa v mapperi odstráni). Seed + lookup
-// ostávajú SERVER-ONLY (tento súbor je server-only); do klienta sa nedostane.
-import { verejnaCenaPreModel } from './konfigurator-cena';
+// #279 Fáza C: orientačná PREDAJNÁ cena (LEN MO — VO sa v mapperi odstráni). Výpočet z cfg žije
+// v `dopyt-cena-stamp.ts` (`cenaZCfg`) — zdieľané so stampovaním (#309); oba server-only, do
+// klienta sa nedostanú. Opečiatkovanú cenu (regen / submit) preferuje `opts.cena` nižšie.
 import type { VerejnaCena } from '$lib/konfigurator';
 
 // A4 na body (pt) + jednotný okraj.
@@ -47,23 +55,6 @@ function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): 
 	return lines;
 }
 
-/** EUR suma → "4 452,06 €" (obyčajná medzera pre tisícky — spoľahlivý glyf v subsete DejaVu;
- *  nbsp z `Intl` by v PDF subsete nemusel byť). */
-function eurStr(n: number): string {
-	const cents = Math.round(n * 100);
-	const cele = Math.floor(cents / 100);
-	const dec = String(cents % 100).padStart(2, '0');
-	const tis = String(cele).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-	return `${tis},${dec} €`;
-}
-
-/** Orientačná cena z konfigurácie (LEN keď sú prítomné oba rozmery); inak `null`
- *  (honest-degrade — bez rozmerov cenu neurčíme). VO sa nikdy nepočíta do PDF. */
-function cenaPreCfg(cfg: PonukaConfig): VerejnaCena | null {
-	if (!(cfg.sirka && cfg.sirka > 0) || !(cfg.hlbka && cfg.hlbka > 0)) return null;
-	return verejnaCenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model });
-}
-
 const mPlain = (n: number) => String(n).replace('.', ',');
 
 /** Textové riadky cenovej sekcie (zdieľané medzi PDF telom a metadátami). Ak sa katalógový
@@ -78,8 +69,8 @@ function cenaRiadky(cena: VerejnaCena, cfg: PonukaConfig): { hlavny: string; pod
 			? ` · katalógový rozmer ${mPlain(cena.sirkaGridM)} × ${mPlain(cena.hlbkaGridM)} m`
 			: '';
 		return {
-			hlavny: `${eurStr(cena.sDph)} s DPH`,
-			podriadok: `${eurStr(cena.bezDph)} bez DPH · model ${cena.model}${grid}`
+			hlavny: `${formatEur(cena.sDph)} s DPH`,
+			podriadok: `${formatEur(cena.bezDph)} bez DPH · model ${cena.model}${grid}`
 		};
 	}
 	return {
@@ -296,6 +287,10 @@ export interface PonukaPdfOpts {
 	renderPng?: Uint8Array;
 	/** dátum na pätičke (test-injectable); default = dnešný v sk formáte. */
 	datum?: string;
+	/** #309: OPEČIATKOVANÁ orientačná cena (LEN MO). Ak je zadaná, PDF ju použije NAMIESTO
+	 *  prepočtu zo živej matice — tak re-download reprodukuje cenu platnú pri podaní. `undefined`
+	 *  → prepočet z cfg (`cenaZCfg`) pre neopečiatkované (staré) riadky. */
+	cena?: VerejnaCena;
 }
 
 /**
@@ -317,8 +312,10 @@ export async function generatePonukaPdf(
 	// Europe/Bratislava — prod kontajner beží v UTC, `toLocaleDateString` bez zóny by blízko
 	// polnoci ukázal nesprávny deň (timestamps.md / #114). `opts.datum` je test-inject.
 	const datum = opts.datum ?? formatDatumSk(new Date().toISOString());
-	// #279 Fáza C: orientačná cena (LEN MO). `null` keď rozmery chýbajú (honest-degrade).
-	const cena = cenaPreCfg(cfg);
+	// #279 Fáza C: orientačná cena (LEN MO). #309: OPEČIATKOVANÁ cena (`opts.cena`) má prednosť
+	// pred prepočtom zo živej matice — tak re-download reprodukuje cenu platnú pri podaní. Bez
+	// stampu (staré/neopečiatkované) → prepočet z cfg (`null` keď rozmery chýbajú, honest-degrade).
+	const cena = opts.cena ?? cenaZCfg(cfg);
 	let cursor = A4_H - MARGIN;
 	cursor = drawHeader(ctx, cursor);
 	cursor = drawKonfiguracia(ctx, cfg, cursor);

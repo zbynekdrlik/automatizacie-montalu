@@ -7,6 +7,7 @@ paths:
   - "src/lib/server/dopyt-store.ts"
   - "src/lib/server/dopyt-throttle.ts"
   - "src/lib/server/dopyt-pdf.ts"
+  - "src/lib/server/dopyt-cena-stamp.ts"
   - "src/lib/server/fonts/**"
   - "src/lib/components/DopytForm.svelte"
   - "src/routes/dopyty-konfigurator/**"
@@ -14,7 +15,37 @@ paths:
   - "tests/ponuka*.test.ts"
 ---
 
-# Verejný dopyt + PDF ponuka s orientačnou cenou (#277, #279 Fáza C)
+# Verejný dopyt + PDF ponuka s orientačnou cenou (#277, #279 Fáza C, #309)
+
+## Opečiatkovanie ceny pri PODANÍ = historická presnosť re-downloadu (#309)
+
+Cena orientačnej ponuky je čistá funkcia `(rozmery+model) × ŽIVÁ matica `cennik-pergola.json``.
+Bez opečiatkovania re-download (`regeneratePonukaPdf`) prepočítal cenu z AKTUÁLNEHO cenníka, takže
+každá regenerácia matice retroaktívne prepísala „historické" PDF. Fix (#309): pri PODANÍ sa cena +
+model + verzia cenníka OPEČIATKUJÚ do `dopyt` (migrácia v30), a regen preferuje uloženú hodnotu.
+
+- **`dopyt-cena-stamp.ts`** je jediný zdroj tvaru pečiatky: `opeciatkujCenu(cfg)` (spočíta pri
+  podaní), `stampNaStlpce(stamp)` (pečiatka → uložiteľné `cena_*`/`cennik_verzia` stĺpce),
+  `cenaZoStampu(row)` (rekonštrukcia späť na `VerejnaCena`), `cenaZCfg(cfg)` (zdieľané s
+  `ponuka-pdf` pre neopečiatkovaný fallback). Money-neutrálny (LEN MO), auto-krytý
+  `dopyt-money-safety` glob (matchuje `/dopyt/`).
+- **`generatePonukaPdf(cfg, { cena })`** — ak je `opts.cena` zadaná, PDF ju použije NAMIESTO
+  prepočtu; `undefined` → prepočet z cfg (`cenaZCfg`). `dopyt-action` opečiatkuje RAZ a odovzdá
+  tú istú `stamp.cena` do uloženia AJ PDF (submission PDF == budúci re-download).
+- **Neopečiatkované (staré) riadky** (`cena_druh` NULL) = honest-degrade: regen prepočíta zo
+  živej matice (historickú cenu, ktorú sme nikdy neuložili, nedopĺňame). NIE je to bug.
+- **`CENNIK_VERZIA`** (`konfigurator-cena.ts`) = `meta.vytazene # sha256(cennik+priplatky+dph+
+  mriezka)[:12]` — čitateľný čas + obsahový hash zachytávajúci AKÝKOĽVEK cenový drift.
+- **`formatEur`** (pure, `$lib/ponuka`) je zdieľaný medzi PDF (`ponuka-pdf`) a admin zoznamom
+  (`formatCenaKratko`) — byte-identický ako pôvodný privátny `eurStr` (PDF výstup nezmenený).
+- **Migrácia v30 ALTER `dopyt`** je extrahovaná do `migracie-seed.ts` (`migrateDopytCenaStamp`,
+  parameter injection) — `migracie.ts` bol na 1000-riadkovom strope. `migracie.ts` má TESNÚ
+  rezervu (999 r.): pred pridaním čohokoľvek do `migrate()` extrahuj do `migracie-seed.ts`.
+  Feature-detect `dopyt` existencie (vzor v27 `odpis_log`) — minimálne migračné fixtures skáču
+  za v25 bez `dopyt` tabuľky; test `migration-v25/v26` overuje PRESNÝ zoznam stĺpcov (musíš ho
+  pri ďalšom ALTER `dopyt` rozšíriť), `migration-v29`/`v28` fixtures `dopyt` NEmajú.
+
+## Pôvodný tok (#277, #279 Fáza C)
 
 Verejný zákaznícky lead tok: konfigurátor pergoly → kontaktný formulár → PDF
 **špecifikácia + ORIENTAČNÁ maloobchodná (MO) cena** (#279 Fáza C, owner ROZHODNUTÉ) +

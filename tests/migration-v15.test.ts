@@ -83,7 +83,7 @@ const off = (sysStyl: string, poradie: number) => row(sysStyl, poradie)?.offset;
 
 describe('reálny v14 → v15: Slide opona rámový „rozmer" + oponový kód', () => {
 	it('user_version = 17', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(29);
+		expect(db.pragma('user_version', { simple: true })).toBe(30);
 	});
 
 	it('rámový opravený na Excelov stĺpec „rozmer" (obe štýly, obe dimenzie)', () => {

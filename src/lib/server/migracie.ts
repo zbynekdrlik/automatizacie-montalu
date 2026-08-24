@@ -16,7 +16,8 @@ import {
 	SLIDE_GLASS_6MM,
 	seedGlass,
 	seedData,
-	seedUsers
+	seedUsers,
+	migrateDopytCenaStamp
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -992,6 +993,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
+	migrateDopytCenaStamp(db, bump); // v29 → v30 (#309); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

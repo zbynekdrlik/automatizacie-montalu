@@ -121,3 +121,35 @@ export function seedUsers(db: Database.Database, hashPassword: (password: string
 		if (seeded.length > 0) log.info('seedUsers', { usernames: seeded });
 	}
 }
+
+/**
+ * v29 → v30: opečiatkovanie orientačnej ceny + verzie cenníka pri PODANÍ dopytu (#309).
+ * Extrahované z `migrate()` (large-file-split — `migracie.ts` bol pri 1000-r. strope). Guard
+ * `< 30` + `db.transaction` + feature-detect `dopyt` sú vnútri; `bump` (parameter injection)
+ * zapíše `user_version` + logMig. Re-download PDF ponuky dovtedy prepočítaval cenu zo ŽIVEJ
+ * matice (`cennik-pergola.json`), takže zmena matice retroaktívne prepísala „historické" PDF;
+ * pri podaní teraz uložíme MO cenu (`cena_*`), model a verziu cenníka (`cennik_verzia`) a regen
+ * preferuje uloženú hodnotu. MONEY-NEUTRÁLNE (LEN MO, žiadna VO cena/Money kód). Feature-detect
+ * (vzor v27 `odpis_log`): minimálne migračné fixtures skáču za v25 bez `dopyt` — ALTER sa preskočí;
+ * na reálnej DB `dopyt` VŽDY existuje (v25). Všetky stĺpce nullable (NULL = neopečiatkovaný riadok).
+ */
+export function migrateDopytCenaStamp(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 30) return;
+	const maDopyt =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dopyt'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maDopyt) {
+			db.exec(`
+				ALTER TABLE dopyt ADD COLUMN cena_druh TEXT;
+				ALTER TABLE dopyt ADD COLUMN cena_bez_dph REAL;
+				ALTER TABLE dopyt ADD COLUMN cena_s_dph REAL;
+				ALTER TABLE dopyt ADD COLUMN cena_hlbka_grid_m REAL;
+				ALTER TABLE dopyt ADD COLUMN cena_sirka_grid_m REAL;
+				ALTER TABLE dopyt ADD COLUMN cena_model TEXT;
+				ALTER TABLE dopyt ADD COLUMN cennik_verzia TEXT;
+			`);
+		}
+		bump(30);
+	})();
+}

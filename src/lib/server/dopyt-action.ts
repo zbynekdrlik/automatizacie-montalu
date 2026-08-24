@@ -12,6 +12,7 @@ import { fail, type RequestEvent } from '@sveltejs/kit';
 import { resolveClientIp } from './client-ip';
 import { allowDopyt } from './dopyt-throttle';
 import { insertDopyt } from './dopyt-store';
+import { opeciatkujCenu } from './dopyt-cena-stamp';
 import { queueLeadCreation } from './odoo-lead';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
@@ -88,21 +89,28 @@ export async function dopytAction(event: RequestEvent) {
 
 	const cfg = sanitizePonukaConfig(form.get('konfiguracia'));
 	const renderPng = decodeRenderPng(form.get('renderPng'));
+	// #309: opečiatkuj orientačnú MO cenu + verziu cenníka PRI PODANÍ — uloží sa do dopytu a PDF
+	// ju použije, takže re-download reprodukuje cenu platnú TERAZ (nie prepočet z neskoršej matice).
+	const stamp = opeciatkujCenu(cfg);
 
-	// audit trail (Money-neutrálne) — ukladáme kanonický JSON konfigurácie
-	const id = insertDopyt({
-		konfiguracia: JSON.stringify(cfg),
-		meno: values.meno,
-		email: values.email,
-		telefon: values.telefon,
-		miesto: values.miesto,
-		poznamka: values.poznamka
-	});
+	// audit trail (Money-neutrálne) — ukladáme kanonický JSON konfigurácie + opečiatkovanú cenu
+	const id = insertDopyt(
+		{
+			konfiguracia: JSON.stringify(cfg),
+			meno: values.meno,
+			email: values.email,
+			telefon: values.telefon,
+			miesto: values.miesto,
+			poznamka: values.poznamka
+		},
+		stamp
+	);
 	log.info('dopyt uložený', { id, ip, maKonfiguraciu: Object.keys(cfg).length > 0 });
 
 	let pdfBase64: string;
 	try {
-		const bytes = await generatePonukaPdf(cfg, { renderPng });
+		// PDF nesie OPEČIATKOVANÚ cenu (identickú s uloženou) → submit PDF == budúci re-download.
+		const bytes = await generatePonukaPdf(cfg, { renderPng, cena: stamp.cena ?? undefined });
 		pdfBase64 = Buffer.from(bytes).toString('base64');
 	} catch (e) {
 		log.error('PDF generovanie zlyhalo', { id, err: e instanceof Error ? e.message : String(e) });

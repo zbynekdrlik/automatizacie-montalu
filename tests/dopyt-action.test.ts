@@ -3,8 +3,10 @@
 // (PDF base64 download-first), pád getClientAddress a data-URL render.
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
+import { db } from '../src/lib/server/db';
 import { dopytAction } from '../src/lib/server/dopyt-action';
-import { countDopyty } from '../src/lib/server/dopyt-store';
+import { countDopyty, getDopyt } from '../src/lib/server/dopyt-store';
+import { CENNIK_VERZIA } from '../src/lib/server/konfigurator-cena';
 import { allowDopyt, _resetDopytThrottle, MAX_PER_WINDOW } from '../src/lib/server/dopyt-throttle';
 import { HONEYPOT_FIELD } from '../src/lib/dopyt';
 
@@ -58,6 +60,18 @@ describe('dopytAction', () => {
 		// pdfBase64 je reálne PDF
 		expect(Buffer.from(res.pdfBase64, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
 		expect(res.filename).toMatch(/^Montalu-ponuka-\d{4}-\d{2}-\d{2}\.pdf$/);
+	});
+
+	it('#309: opečiatkuje orientačnú cenu + verziu cenníka do dopyt riadka pri podaní', async () => {
+		const res = (await dopytAction(makeEvent(OK_FIELDS))) as { success: boolean };
+		expect(res.success).toBe(true);
+		const lastId = (db.prepare('SELECT MAX(id) m FROM dopyt').get() as { m: number }).m;
+		const row = getDopyt(lastId)!;
+		// cena je opečiatkovaná (3000×4000 je v katalógu) + verzia zodpovedá aktuálnemu cenníku
+		expect(row.cena_druh).toBe('cena');
+		expect(typeof row.cena_s_dph).toBe('number');
+		expect(row.cena_s_dph).toBeGreaterThan(0);
+		expect(row.cennik_verzia).toBe(CENNIK_VERZIA);
 	});
 
 	it('honeypot vyplnený → ticho úspech, NIČ sa neuloží', async () => {
