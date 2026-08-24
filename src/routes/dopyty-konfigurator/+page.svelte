@@ -30,6 +30,7 @@
 					<th>Telefón</th>
 					<th>Miesto stavby</th>
 					<th>Súhrn konfigurácie</th>
+					<th>Orientačná cena</th>
 					<th>Poznámka</th>
 					{#if data.hasOdooLead}<th>Odoo lead</th>{/if}
 					<th></th>
@@ -50,6 +51,13 @@
 								{#each d.suhrn as r (r.label)}
 									<div><span class="lbl">{r.label}:</span> {r.value}</div>
 								{/each}
+							{/if}
+						</td>
+						<td class="cena" data-testid="cena-{d.id}">
+							{#if d.cena === '—'}
+								<span class="muted">—</span>
+							{:else}
+								<span title={d.cenaVerzia ? `cenník ${d.cenaVerzia}` : undefined}>{d.cena}</span>
 							{/if}
 						</td>
 						<td>{d.poznamka}</td>
@@ -95,6 +103,11 @@
 	}
 	.suhrn .lbl {
 		color: #64748b;
+	}
+	.cena {
+		white-space: nowrap;
+		font-size: 13.5px;
+		font-weight: 600;
 	}
 	.muted {
 		color: #94a3b8;

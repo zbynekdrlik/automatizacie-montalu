@@ -2,7 +2,7 @@
 // (žiadny DB/Money/pdf-lib) — použiteľné aj na klientovi (DopytForm náhľad) aj na serveri
 // (ponuka-pdf, dopyt-action). Money-neutrálne: iba zákaznícka konfigurácia + orientačná
 // PREDAJNÁ cena (#279 Fáza C) — NIKDY Money nákupné kódy, VO cena ani nárez.
-import { MODELY, type ModelPergoly } from '$lib/konfigurator';
+import { MODELY, type ModelPergoly, type VerejnaCena } from '$lib/konfigurator';
 
 /** Platné modely (LIGHT/ROBUST/MASSIVE) — na obranné sparsovanie klientom dodaného `model`. */
 const PLATNE_MODELY = new Set<string>(MODELY.map((m) => m.kod));
@@ -87,6 +87,26 @@ export function sanitizePonukaConfig(raw: unknown): PonukaConfig {
 	const popis = optStr(obj.popis, 400);
 	if (popis) out.popis = popis;
 	return out;
+}
+
+/** EUR suma → "4 452,06 €" (obyčajná medzera pre tisícky — spoľahlivý glyf v subsete DejaVu PDF
+ *  fontu; nbsp z `Intl` by v subsete nemusel byť). Zdieľané medzi PDF (`ponuka-pdf`) a admin
+ *  zoznamom (#309) — jeden zdroj pravdy formátu ceny. Pure (bez server importu). */
+export function formatEur(n: number): string {
+	const cents = Math.round(n * 100);
+	const cele = Math.floor(cents / 100);
+	const dec = String(cents % 100).padStart(2, '0');
+	const tis = String(cele).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+	return `${tis},${dec} €`;
+}
+
+/** Krátky label orientačnej ceny do admin zoznamu dopytov (#309). `null` (neopečiatkovaný /
+ *  starý riadok) → „—"; konkrétna cena → „4 452,06 € s DPH"; mimo katalógu → „Cena na vyžiadanie".
+ *  Pure — LEN MO (VerejnaCena už VO nenesie). */
+export function formatCenaKratko(cena: VerejnaCena | null): string {
+	if (cena === null) return '—';
+	if (cena.druh === 'cena') return `${formatEur(cena.sDph)} s DPH`;
+	return 'Cena na vyžiadanie';
 }
 
 /** celé mm bez desatinných (rozmery sú celé čísla). */

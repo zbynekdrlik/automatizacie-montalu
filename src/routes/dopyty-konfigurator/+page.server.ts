@@ -9,7 +9,8 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { isInternal } from '$lib/server/auth';
 import { countDopyty, hasOdooLeadColumn, listDopyty } from '$lib/server/dopyt-store';
-import { sanitizePonukaConfig, zhrnutieRiadky } from '$lib/ponuka';
+import { cenaZoStampu } from '$lib/server/dopyt-cena-stamp';
+import { formatCenaKratko, sanitizePonukaConfig, zhrnutieRiadky } from '$lib/ponuka';
 import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
 
 /** Počet dopytov na stránku. */
@@ -40,6 +41,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		poznamka: r.poznamka,
 		// súhrn konfigurácie (rozmery/typ strechy/sklo/farba…) — znovupoužitý pure helper
 		suhrn: zhrnutieRiadky(sanitizePonukaConfig(r.konfiguracia)),
+		// #309: opečiatkovaná orientačná cena (z podania) — „—" pri starých/neopečiatkovaných
+		// riadkoch; `cenaVerzia` = verzia cenníka (audit, z ktorej matice cena vzišla)
+		cena: formatCenaKratko(cenaZoStampu(r)),
+		cenaVerzia: r.cennik_verzia ?? null,
 		// Odoo lead (#278/v26) — kľúč prítomný len keď schéma stĺpec má (defenzívne)
 		odooLeadId: hasOdooLead ? (r.odoo_lead_id ?? null) : null
 	}));

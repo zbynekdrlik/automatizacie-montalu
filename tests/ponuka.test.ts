@@ -5,6 +5,8 @@ import {
 	sanitizePonukaConfig,
 	zhrnutieRiadky,
 	firmaRiadky,
+	formatCenaKratko,
+	formatEur,
 	FIRMA,
 	DISCLAIMER,
 	type PonukaConfig
@@ -142,5 +144,39 @@ describe('firmaRiadky + konštanty', () => {
 		expect(DISCLAIMER).toMatch(/orientačná/i);
 		expect(DISCLAIMER).toMatch(/nie záväzná cenová ponuka/i);
 		expect(FIRMA.nazov).toBe('Montalu');
+	});
+});
+
+describe('formatEur (#309)', () => {
+	it('formátuje s tisícovou medzerou a dvoma desatinami', () => {
+		expect(formatEur(4452.06)).toBe('4 452,06 €');
+		expect(formatEur(1234)).toBe('1 234,00 €');
+		expect(formatEur(0)).toBe('0,00 €');
+		// tisícové skupiny naprieč miliónmi + zaokrúhlenie centov (Math.round(n*100))
+		expect(formatEur(1234567.89)).toBe('1 234 567,89 €');
+		expect(formatEur(12.5)).toBe('12,50 €');
+	});
+});
+
+describe('formatCenaKratko (#309 admin zoznam)', () => {
+	it('null → „—" (neopečiatkovaný riadok)', () => {
+		expect(formatCenaKratko(null)).toBe('—');
+	});
+	it('konkrétna cena → suma s DPH', () => {
+		expect(
+			formatCenaKratko({
+				druh: 'cena',
+				model: 'ROBUST',
+				bezDph: 100,
+				sDph: 123,
+				hlbkaGridM: 4,
+				sirkaGridM: 5
+			})
+		).toBe('123,00 € s DPH');
+	});
+	it('individualna-ponuka → „Cena na vyžiadanie"', () => {
+		expect(formatCenaKratko({ druh: 'individualna-ponuka', model: 'LIGHT', dovod: 'x' })).toBe(
+			'Cena na vyžiadanie'
+		);
 	});
 });

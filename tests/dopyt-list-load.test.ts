@@ -98,4 +98,36 @@ describe('load /dopyty-konfigurator (#282)', () => {
 		await expect(load(ev('', 'b2b'))).rejects.toMatchObject({ status: 403 });
 		await expect(load(ev('', null))).rejects.toMatchObject({ status: 403 });
 	});
+
+	it('#309: zobrazí opečiatkovanú cenu (cena / individuálna / — pri starom riadku)', async () => {
+		const zaznam = (meno: string) => ({
+			konfiguracia: JSON.stringify({ system: 'X', sirka: 4000, hlbka: 4000 }),
+			meno,
+			email: `${meno}@x.sk`,
+			telefon: '',
+			miesto: '',
+			poznamka: ''
+		});
+		// najstarší → najnovší (zoznam je id DESC)
+		insertDopyt(zaznam('Stary')); // bez pečiatky → „—"
+		insertDopyt(zaznam('Konkretny'), {
+			cena: { druh: 'cena', model: 'ROBUST', bezDph: 100, sDph: 123, hlbkaGridM: 4, sirkaGridM: 4 },
+			cennikVerzia: '2026-01-01T00:00:00.000Z#abcdef012345'
+		});
+		insertDopyt(zaznam('Individualny'), {
+			cena: { druh: 'individualna-ponuka', model: 'LIGHT', dovod: 'x' },
+			cennikVerzia: 'v#9'
+		});
+		const d = await loadOk();
+		// PageData je voľne typované → anotuj tvar riadku pri hľadaní
+		const byMeno = (m: string) =>
+			d.dopyty.find(
+				(r: { meno: string; cena: string; cenaVerzia: string | null }) => r.meno === m
+			)!;
+		expect(byMeno('Individualny').cena).toBe('Cena na vyžiadanie');
+		expect(byMeno('Konkretny').cena).toBe('123,00 € s DPH');
+		expect(byMeno('Konkretny').cenaVerzia).toBe('2026-01-01T00:00:00.000Z#abcdef012345');
+		expect(byMeno('Stary').cena).toBe('—');
+		expect(byMeno('Stary').cenaVerzia).toBeNull();
+	});
 });
