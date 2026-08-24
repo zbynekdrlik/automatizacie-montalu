@@ -1,0 +1,212 @@
+// Interim cenotvorba pergoly (#279, Fáza B) — SERVER-ONLY cenový modul. Lookup do
+// vyťaženej matice montalu.sk (`cennik-pergola.json`, Fáza A) so zaokrúhlením rozmeru
+// NAHOR na katalógovú mriežku a obálkou dostupnosti. Mimo katalógu / nedostupná
+// kombinácia ⇒ 'individualna-ponuka' (NIKDY neextrapoluje).
+//
+// Money-neutrálny a mimo klientskeho bundle ($lib/server/): NEIMPORTUJE katalóg skla
+// (nesie Money kód), `sklo-cena`, `server/money`, `server/db` — obsahuje interim PREDAJNÉ ceny
+// prevzaté z verejného konfigurátora montalu.sk, nie Money nákupné/odpisové kódy. Zákaz
+// zobrazenia cien vo VEREJNEJ route (#279 leak-guard) ostáva — tento modul sa do verejnej
+// odpovede NEZAPÁJA (to je Fáza C, samostatný vedomý krok). Modul je čistý (bez DB/siete),
+// priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
+import cennikJson from './cennik-pergola.json';
+
+export type ModelPergoly = 'LIGHT' | 'ROBUST' | 'MASSIVE';
+
+/** Kľúč strešnej výplne (mapuje na montalu.sk roofing slug v seed `vyplne`). */
+export type VyplnKluc =
+	| 'polykarbonat-16'
+	| 'bezpecnostne-sklo-441'
+	| 'bezpecnostne-sklo-442'
+	| 'izolacne-sklo-24'
+	| 'panel-izo-24';
+
+interface Mriezka {
+	min: number;
+	max: number;
+	krok: number;
+}
+
+/** Bunka matice = [MO net, VO net] v EUR (bez DPH). */
+type Bunka = [number, number];
+/** šírkový kľúč ("4.00") → bunka */
+type SirkaMap = Record<string, Bunka>;
+/** hĺbkový kľúč ("3.0") → šírkový riadok */
+type HlbkaMap = Record<string, SirkaMap>;
+/** model → hĺbkový blok (nedostupné modely chýbajú) */
+type ModelMap = Partial<Record<ModelPergoly, HlbkaMap>>;
+/** výplň → model blok (nedostupné výplne chýbajú) */
+type CennikMap = Partial<Record<VyplnKluc, ModelMap>>;
+
+interface CennikSeed {
+	meta: {
+		zdroj: string;
+		vytazene: string;
+		dph: number;
+		rodina: string;
+		poznamka: string;
+		mriezka: { hlbkaM: Mriezka; sirkaM: Mriezka };
+	};
+	modely: Record<ModelPergoly, string>;
+	vyplne: Partial<Record<VyplnKluc, string>>;
+	priplatky: {
+		kominEur: number;
+		zaruka5rEur: number;
+		customRal: number | null;
+		ledRgb: number | null;
+	};
+	cennik: CennikMap;
+	verifikaciaDph: Array<{
+		roofing: VyplnKluc;
+		model: ModelPergoly;
+		hlbkaM: number;
+		sirkaM: number;
+		moNet: number;
+		moDph: string;
+		voNet: number;
+		voDph: string;
+	}>;
+}
+
+const SEED = cennikJson as unknown as CennikSeed;
+
+/** Sadzba DPH (0,23) prevzatá zo seedu — jeden zdroj pravdy. */
+export const DPH = SEED.meta.dph;
+/** Fixné príplatky (EUR, net) zo seedu. */
+export const PRIPLATKY = {
+	kominEur: SEED.priplatky.kominEur,
+	zaruka5rEur: SEED.priplatky.zaruka5rEur
+} as const;
+/** Katalógová mriežka (metre). */
+export const MRIEZKA = SEED.meta.mriezka;
+
+const EPS = 1e-9;
+/** DPH ako celé percentá (23) — na EXAKTNÚ celocentovú aritmetiku (bez FP driftu). */
+const DPH_PCT = Math.round(DPH * 100);
+
+/** Zaokrúhli EUR sumu na 2 desatiny (celé centy). */
+function eur2(net: number): number {
+	return Math.round(net * 100) / 100;
+}
+
+/** Suma s DPH v EUR = round(net × (1 + DPH), 2), počítané v celých centoch, aby sa
+ *  presne (bez FP driftu na .xx5 hraniciach) zhodovalo s PHP `round()` na montalu.sk.
+ *  net (v centoch) × (100 + DPH_PCT) / 100, zaokrúhlené half-up na celé centy. */
+function sDphEur(net: number): number {
+	const centy = Math.round(net * 100);
+	return Math.round((centy * (100 + DPH_PCT)) / 100) / 100;
+}
+
+export interface CenaVstup {
+	/** hĺbka (výsuv od domu) [mm] */
+	hlbkaMm: number;
+	/** šírka (pozdĺž steny) [mm] */
+	sirkaMm: number;
+	/** model konštrukcie — default LIGHT (pricing potrebuje model server-side; verejné UI
+	 *  výberu modelu je Fáza C, #279). */
+	model?: ModelPergoly;
+	/** kľúč strešnej výplne — default polykarbonát 16 mm */
+	vypln?: VyplnKluc;
+	/** predpríprava na komín (+250 € net) */
+	komin?: boolean;
+	/** predĺženie záruky na 5 rokov (+600 € net) */
+	zaruka5r?: boolean;
+}
+
+export interface CenaZlozka {
+	/** cena bez DPH [EUR] */
+	bezDph: number;
+	/** cena s DPH [EUR] = round(bezDph × (1 + DPH), 2) */
+	sDph: number;
+}
+
+export interface CenaOk {
+	druh: 'cena';
+	model: ModelPergoly;
+	vypln: VyplnKluc;
+	/** hĺbka po zaokrúhlení NAHOR na mriežku [m] */
+	hlbkaGridM: number;
+	/** šírka po zaokrúhlení NAHOR na mriežku [m] */
+	sirkaGridM: number;
+	/** maloobchod (MO) */
+	mo: CenaZlozka;
+	/** veľkoobchod (VO/B2B) */
+	vo: CenaZlozka;
+	priplatky: { kominEur: number; zaruka5rEur: number; spoluEur: number };
+}
+
+export interface CenaIndividualna {
+	druh: 'individualna-ponuka';
+	dovod: string;
+}
+
+export type CenaVysledok = CenaOk | CenaIndividualna;
+
+/** Zaokrúhli hodnotu [m] NAHOR na katalógovú mriežku. Pod minimum ⇒ minimum (prilepí sa).
+ *  Nad maximum ⇒ null (mimo katalógu → individuálna ponuka). Vracia hodnotu na mriežke. */
+export function zaokruhliNahor(hodnotaM: number, m: Mriezka): number | null {
+	if (!Number.isFinite(hodnotaM)) return null;
+	if (hodnotaM <= m.min) return m.min;
+	const g = Math.round(Math.ceil((hodnotaM - EPS) / m.krok) * m.krok * 100) / 100;
+	return g <= m.max + EPS ? g : null;
+}
+
+const kD = (d: number) => d.toFixed(1);
+const kW = (w: number) => w.toFixed(2);
+
+function zlozka(net: number): CenaZlozka {
+	return { bezDph: eur2(net), sDph: sDphEur(net) };
+}
+
+/**
+ * Vypočíta interim predajnú cenu pergoly (MO + VO, net + s DPH) lookupom do matice
+ * montalu.sk. Rozmer sa zaokrúhli NAHOR na mriežku; mimo katalógu (šírka > 7,5 m,
+ * hĺbka > 6,0 m) alebo nedostupná kombinácia model×výplň×rozmer ⇒ 'individualna-ponuka'.
+ */
+export function vypocitajCenu(v: CenaVstup): CenaVysledok {
+	const model = v.model ?? 'LIGHT';
+	const vypln = v.vypln ?? 'polykarbonat-16';
+
+	const hlbkaGridM = zaokruhliNahor(v.hlbkaMm / 1000, MRIEZKA.hlbkaM);
+	if (hlbkaGridM === null)
+		return {
+			druh: 'individualna-ponuka',
+			dovod: `Hĺbka presahuje katalóg (max ${MRIEZKA.hlbkaM.max} m) — individuálna ponuka.`
+		};
+
+	const sirkaGridM = zaokruhliNahor(v.sirkaMm / 1000, MRIEZKA.sirkaM);
+	if (sirkaGridM === null)
+		return {
+			druh: 'individualna-ponuka',
+			dovod: `Šírka presahuje katalóg (max ${MRIEZKA.sirkaM.max} m) — individuálna ponuka.`
+		};
+
+	const bunka = SEED.cennik[vypln]?.[model]?.[kD(hlbkaGridM)]?.[kW(sirkaGridM)];
+	if (!bunka)
+		return {
+			druh: 'individualna-ponuka',
+			dovod: 'Kombinácia modelu, výplne a rozmeru nie je v katalógu — individuálna ponuka.'
+		};
+
+	const kominEur = v.komin ? PRIPLATKY.kominEur : 0;
+	const zaruka5rEur = v.zaruka5r ? PRIPLATKY.zaruka5rEur : 0;
+	const spoluEur = kominEur + zaruka5rEur;
+
+	return {
+		druh: 'cena',
+		model,
+		vypln,
+		hlbkaGridM,
+		sirkaGridM,
+		mo: zlozka(bunka[0] + spoluEur),
+		vo: zlozka(bunka[1] + spoluEur),
+		priplatky: { kominEur, zaruka5rEur, spoluEur }
+	};
+}
+
+/** Zoznam výplní dostupných pre daný model (podľa vyťaženej matice) — pre budúce UI/testy. */
+export function dostupneVyplne(model: ModelPergoly): VyplnKluc[] {
+	return (Object.keys(SEED.cennik) as VyplnKluc[]).filter(
+		(vypln) => SEED.cennik[vypln]?.[model] !== undefined
+	);
+}
