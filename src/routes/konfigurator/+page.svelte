@@ -59,6 +59,13 @@
 	// import() dvakrát (benígne — Vite chunk cache, ale zámer je explicitný)
 	let vizNacitava = false;
 
+	// #286: AR náhľad (GLB export + model-viewer) — LAZY, rovnaký vzor ako VizualKomp
+	// (three/model-viewer bundle sa nenačíta pred zobrazením súhrnu). Používa ten istý
+	// `viz` snapshot (rozmery/typ skla/RAL) ako 3D náhľad.
+	type ARKompTyp = (typeof import('$lib/components/vizual/PergolaAR.svelte'))['default'];
+	let ARKomp = $state<ARKompTyp | null>(null);
+	let arNacitava = false;
+
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
 	// Konfigurácia pre PDF ponuku — mapovanie súhrnu enginu na PonukaConfig, ktorý DopytForm
@@ -131,6 +138,13 @@
 							void import('$lib/components/vizual/VizualPergolaZakaznik.svelte')
 								.then((m) => (VizualKomp = m.default))
 								.finally(() => (vizNacitava = false));
+						}
+						// #286: lazy AR komponent (rovnako len pri prvom náhľade)
+						if (!ARKomp && !arNacitava) {
+							arNacitava = true;
+							void import('$lib/components/vizual/PergolaAR.svelte')
+								.then((m) => (ARKomp = m.default))
+								.finally(() => (arNacitava = false));
 						}
 					} else {
 						viz = null;
@@ -257,6 +271,24 @@
 					{/key}
 				{:else}
 					<div class="viz3d-loading" data-testid="konf-viz-loading">Načítavam 3D náhľad…</div>
+				{/if}
+			</section>
+
+			<!-- #286: AR náhľad — „pergola u teba na záhrade" cez telefón. Lazy, mobil-first
+			     (mobil ukáže model-viewer + AR tlačidlo, desktop QR na presun na telefón). -->
+			<section class="ar-sekcia" data-testid="konf-ar" aria-label="AR náhľad pergoly">
+				{#if ARKomp}
+					{@const A = ARKomp}
+					<A
+						sirkaMm={v.sirkaMm}
+						hlbkaMm={v.hlbkaMm}
+						vyskaVpreduMm={v.vyskaVpreduMm}
+						vyskaPriSteneMm={v.vyskaPriSteneMm}
+						typSkla={v.typSkla}
+						ralKod={v.ralKod}
+					/>
+				{:else}
+					<div class="ar-loading" data-testid="konf-ar-loading">Načítavam AR náhľad…</div>
 				{/if}
 			</section>
 		{/if}
@@ -414,6 +446,24 @@
 	.viz3d-loading {
 		width: 100%;
 		aspect-ratio: 16 / 10;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #dfe7ee;
+		border-radius: 10px;
+		color: #64748b;
+		font-size: 14px;
+	}
+	.ar-sekcia {
+		background: #fff;
+		border: 1px solid #e2e8f0;
+		border-radius: 14px;
+		padding: 12px;
+		margin-top: 18px;
+	}
+	.ar-loading {
+		width: 100%;
+		min-height: 120px;
 		display: flex;
 		align-items: center;
 		justify-content: center;

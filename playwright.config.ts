@@ -45,7 +45,14 @@ export default defineConfig({
 				// „no such table: dopyt". Preto reset MUSÍ prebehnúť pred bootom → v `command`.
 				// (readiness GET /health si držíme — 200 vráti až po seedData, takže testy
 				// nikdy nebežia proti polovične nabehnutému serveru.)
-				command: 'node e2e/reset-e2e-db.mjs && npm run preview',
+				// #298 (5. kolo): webServer BUILDNE pred preview, inak `vite preview` servíruje
+				// STALE build/ — lokálne `npx playwright test` bez predošlého `npm run build` dá
+				// false failures (nová route 404, nesúvisiace timeouty). V CI je build/ už čerstvý
+				// z kroku „Build" → E2E krok nastaví E2E_PREBUILT=1 a rebuild sa preskočí (žiadny
+				// dvojitý build, CI sa nespomalí). Build failure padne HLASNO cez `&&` (preview sa
+				// nespustí), nikdy ticho na starom build/.
+				command:
+					'if [ "$E2E_PREBUILT" = 1 ]; then true; else npm run build; fi && node e2e/reset-e2e-db.mjs && npm run preview',
 				url: 'http://localhost:4173/health',
 				reuseExistingServer: false,
 				env: {
