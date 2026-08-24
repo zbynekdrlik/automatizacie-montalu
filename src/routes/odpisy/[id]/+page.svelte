@@ -2,6 +2,9 @@
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
+	// #313: created_at je SQLite `datetime('now')` (UTC) — cez `sqliteUtcToIso` + `formatDatumCasSk`
+	// na bratislavský lokálny čas (DST-safe, `.claude/rules/timestamps.md`), rovnako ako v histórii.
+	import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
 
 	let { data } = $props();
 	const o = $derived(data.odpis);
@@ -29,7 +32,7 @@
 		{#if d.s}
 			<div><span>Rozmer</span><b>{d.s}×{d.v} mm</b></div>
 		{/if}
-		<div><span>Kedy</span><b>{o.created_at}</b></div>
+		<div><span>Kedy</span><b>{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</b></div>
 		<div><span>Kto</span><b>{o.created_by || '—'}</b></div>
 		<div><span>Režim</span><b>{o.live ? '● LIVE' : '🧪 TEST'}</b></div>
 		<div><span>Súbor</span><b style="font-size:13px">{o.filename}</b></div>

@@ -6,7 +6,7 @@
 // videla čas posunutý o 1-2h), takže výsledok je deterministický bez ohľadu na TZ CI runnera.
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { formatDatumCasSk, formatDatumSk } from '../src/lib/datum';
+import { formatDatumCasSk, formatDatumSk, sqliteUtcToIso } from '../src/lib/datum';
 
 describe('formatDatumCasSk — slovenský tvar D.M.YYYY HH:MM', () => {
 	it('bežný dátum — deň/mesiac bez nuly, čas so nulou', () => {
@@ -81,5 +81,52 @@ describe('formatDatumSk — slovenský dátum D.M.YYYY (bez času, #277 pätičk
 		// pod TZ=UTC bez explicitnej zóny by toto bolo „5.7.2026" (UTC deň) — dôkaz, že
 		// pätička PDF ukáže bratislavský deň aj v prod kontajneri (UTC)
 		expect(vystup).toBe('6.7.2026');
+	});
+});
+
+// #313: /odpisy zobrazuje SQLite `datetime('now')` (created_at/presunute_at) a producentov
+// `…Z` (readback generatedAt) — obe UTC. Kontrakt stránky = `sqliteUtcToIso(x)` most →
+// `formatDatumCasSk`/`formatDatumSk` (Europe/Bratislava). Tento test zamyká práve túto kompozíciu
+// (page-render bug samotný chytá e2e/odpisy.spec.ts — helpery boli zelené aj pred fixom).
+describe('sqliteUtcToIso — most SQLite/UTC → ISO (#313 /odpisy kontrakt)', () => {
+	it('SQLite tvar s medzerou → korektné UTC ISO (`…T…Z`)', () => {
+		expect(sqliteUtcToIso('2026-01-05 13:32:00')).toBe('2026-01-05T13:32:00Z');
+	});
+
+	it('už-ISO producentov `…Z` (readback generatedAt) prejde NEZMENENÝ — most, nie parser', () => {
+		expect(sqliteUtcToIso('2026-08-24T05:30:00Z')).toBe('2026-08-24T05:30:00Z');
+	});
+
+	it('Kedy stĺpec: SQLite UTC → bratislavský dátum+čas (zima, CET UTC+1)', () => {
+		expect(formatDatumCasSk(sqliteUtcToIso('2026-01-05 13:32:00'))).toBe('5.1.2026 14:32');
+	});
+
+	it('presun odznak: SQLite UTC → bratislavský dátum (leto, CEST UTC+2)', () => {
+		// 5.8.2026 12:32 UTC = 14:32 CEST, dátum 5.8.2026
+		expect(formatDatumSk(sqliteUtcToIso('2026-08-05 12:32:00'))).toBe('5.8.2026');
+	});
+
+	it('readback generatedAt: producentov `…Z` → bratislavský dátum+čas (leto)', () => {
+		expect(formatDatumCasSk(sqliteUtcToIso('2026-08-24T05:30:00Z'))).toBe('24.8.2026 07:30');
+	});
+
+	it('presun odznak blízko polnoci: SQLite UTC 22:30 → SPRÁVNY deň, nie UTC deň predtým', () => {
+		// 5.7.2026 22:30 UTC = 6.7.2026 00:30 CEST → odznak MUSÍ ukázať 6.7.2026, nie surové 2026-07-05
+		expect(formatDatumSk(sqliteUtcToIso('2026-07-05 22:30:00'))).toBe('6.7.2026');
+	});
+
+	it('výsledok NEZÁVISÍ od TZ procesu — ČERSTVÝ proces s TZ=UTC (ako Docker) dá bratislavský čas', () => {
+		const vystup = execFileSync(
+			process.execPath,
+			[
+				'--experimental-strip-types',
+				'-e',
+				"import('./src/lib/datum.ts').then(m => console.log(m.formatDatumCasSk(m.sqliteUtcToIso('2026-01-05 13:32:00'))))"
+			],
+			{ cwd: import.meta.dirname + '/..', env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
+		).trim();
+		// pod TZ=UTC bez explicitnej zóny by /odpisy ukázalo „5.1.2026 13:32" (UTC) — dôkaz, že
+		// prod kontajner (UTC) ukáže bratislavský čas
+		expect(vystup).toBe('5.1.2026 14:32');
 	});
 });
