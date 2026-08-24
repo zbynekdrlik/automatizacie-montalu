@@ -54,7 +54,7 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   legit súrodencovi tej istej zákazky). „Neoverené" je čestný stav. SQL MUSÍ čítať `l.caka`.
 - **#299 VÝNIMKA — DETEKOVANÝ ručný presun VSTUPUJE do matchingu (`caka=1 AND presunute_at IS NULL`).**
   Keďže `caka` je nemenné, presunutý parkovaný odpis by inak ostal navždy „neoverený" aj po tom, čo je
-  reálne v Money. `detectManualStagingMoves` (`money.ts`, volané z `/odpisy` load) diffom staging dir
+  reálne v Money. `detectManualStagingMoves` (`money-presun.ts`, volané z `/odpisy` load) diffom staging dir
   označí `odpis_log.presunute_at`, keď staged súbor zmizol (rodičovský dir stále existuje — fail-safe).
   Readback SQL preto číta AJ `CASE WHEN l.presunute_at IS NOT NULL THEN 1 ELSE 0 END AS presunute` a
   `priradGroup` vylúči LEN `o.caka === 1 && o.presunute === 0`. Presunutý (`presunute=1`) odpis vstúpi
@@ -93,11 +93,15 @@ review, nie prvý návrh):
   riadok ako presunutý = TRVALÝ false-positive (presun sa neruší). Človek nikdy nepresunie súbor do
   minút od staging → 10-min prah okno zatvára. (Crash-residue medzi claim a zápisom je iný, dokumentovaný
   okraj.)
-- **„Súbor zmizol?" na sieťovom share = `statSync` + LEN ENOENT, NIE `existsSync`.** `fs.existsSync` vráti
-  `false` na AKEJKOĽVEK stat chybe (EACCES/EIO/stale CIFS handle), nie len ENOENT — degradovaný (nie
-  odpojený) share by tak označil CELÝ subdir presunutý (trvalo). Použi `statSync` v try/catch: dir musí byť
-  DOSTUPNÝ (dir-stat chyba → skip), „presunutý" = LEN čistý `err.code==='ENOENT'` na TARGETE; iná chyba →
-  skip. Detekcia je inak READ-ONLY na staging (žiadny move/write/delete), `writeOdpis` sa NEDOTÝKA.
+- **„Súbor zmizol?" na sieťovom share = ASYNC `fs.promises` pod rozpočtom + LEN ENOENT, NIKDY `existsSync`
+  ani SYNCHRÓNNY `statSync` (#315).** SYNCHRÓNNY `fs.statSync` na CIFS/WireGuard mounte blokoval event loop
+  na desiatky sekúnd (celý PROD freeze — viď #315 bullet nižšie), takže detekcia je celá async cez
+  `fs.promises` s tvrdým rozpočtom. A `fs.existsSync` je zakázaný z INÉHO dôvodu: vráti `false` na
+  AKEJKOĽVEK stat chybe (EACCES/EIO/stale CIFS handle), nie len ENOENT — degradovaný (nie odpojený) share
+  by tak označil CELÝ subdir presunutý (trvalo). Sémantika značenia: dir musí byť DOSTUPNÝ (`readdir`
+  úspech + per-riadková re-kontrola dir tesne pred markom, aby unmount uprostred behu neoznačil celý svep),
+  „presunutý" = LEN čistý `err.code==='ENOENT'` na TARGETE z POTVRDZUJÚCEHO exact-path statu; timeout/iná
+  chyba → skip. Detekcia je inak READ-ONLY na staging (žiadny move/write/delete), `writeOdpis` sa NEDOTÝKA.
 - **Ledger append je IDEMPOTENTNÝ (`imports<=overrides`), nie bezpodmienečný.** V prode `writeOdpis` (aj v27
   backfill) už nechal `import` riadok (`imports=1`), takže detekčný append je tam no-op; bezpodmienečný
   append by rozbil #294 invariant „1 override = 1 re-import" (imports=2 → legit override neodblokuje).

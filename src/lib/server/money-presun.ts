@@ -33,6 +33,11 @@ const BUDGET_MS = Number(process.env.PRESUN_DETECT_BUDGET_MS) || 2500;
 // timeoute) libuv threadpool vlákno aj po návrate — súbežné /odpisy loady by inak hromadili visiace
 // workery. `detectBusy` sa uvoľní až keď VŠETKY fs ops bežiacej detekcie doznejú (Promise.allSettled).
 let detectBusy = false;
+let detectBusySince = 0; // Date.now() keď sa gate zavrel — pre max-hold wedge detekciu (#315)
+let detectGen = 0; // generácia detekcie — neskoro doznený orphan z force-reopnutej gen nezhodí novšiu gate
+// Ak orphan fs op NIKDY nedoznie (hard mount / kernel wedge — PROD je `soft`, tam sa ops vždy dokončia),
+// gate by ostal navždy zavretý a detekcia ticho vypnutá. Po tomto max-holde ju force-reopneme + ERROR log.
+const MAX_HOLD_MS = Number(process.env.PRESUN_DETECT_MAX_HOLD_MS) || 60_000;
 
 export interface ManualMoveDetected {
 	id: number;
@@ -48,6 +53,7 @@ export interface DetectDeps {
 	stat?: (p: string) => Promise<unknown>;
 	now?: () => number;
 	budgetMs?: number;
+	maxHoldMs?: number;
 }
 
 interface ParkedRow {
@@ -101,20 +107,34 @@ function raceBudget<T>(p: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT>
 export async function detectManualStagingMoves(
 	deps: DetectDeps = {}
 ): Promise<ManualMoveDetected[]> {
+	const now = deps.now ?? (() => Date.now());
+	const maxHoldMs = deps.maxHoldMs ?? MAX_HOLD_MS;
 	if (detectBusy) {
-		log.warn('detekcia presunu už beží (pomalý mount?) — súbežné volanie preskočené (#315)');
-		return [];
+		if (now() - detectBusySince <= maxHoldMs) {
+			log.warn('detekcia presunu už beží (pomalý mount?) — súbežné volanie preskočené (#315)');
+			return [];
+		}
+		// gate držaný dlhšie než max-hold → mount pravdepodobne VISÍ (hard mount / kernel wedge). Na PROD
+		// `soft` mounte sa každá fs op dokončí v sekundách, takže dlhý hold = wedge. Nahlás HLUČNE (ERROR)
+		// a force-reopen — inak by orphan op, ktorý sa NIKDY nevyrieši, ticho vypol detekciu do reštartu.
+		log.error('detekcia presunu zaseknutá nad rozpočet — visiaci mount? force-reopen gate (#315)', {
+			drzanaMs: now() - detectBusySince,
+			maxHoldMs
+		});
 	}
 	detectBusy = true;
+	detectBusySince = now();
+	const gen = ++detectGen;
 	const bgOps: Promise<unknown>[] = [];
 	try {
 		return await runDetect(deps, bgOps);
 	} finally {
-		// gate držíme, kým VŠETKY fs ops (aj orphan opustené `race`-om na timeoute) reálne doznejú —
-		// inak by ďalší /odpisy load naštartoval druhú detekciu súbežne s visiacim libuv workerom.
+		// gate držíme, kým VŠETKY fs ops (aj orphan opustené `race`-om na timeoute) reálne doznejú — inak
+		// by ďalší /odpisy load naštartoval druhú detekciu súbežne s visiacim libuv workerom. `gen` bráni
+		// tomu, aby NESKORO doznený orphan z FORCE-REOPNUTEJ (wedged) generácie zhodil gate novšej.
 		// allSettled NIKDY nehádže.
 		void Promise.allSettled(bgOps).then(() => {
-			detectBusy = false;
+			if (detectGen === gen) detectBusy = false;
 		});
 	}
 }
@@ -224,7 +244,29 @@ async function runDetect(
 			// stale handle NIE JE dôkaz presunu → preskoč, riadok ostáva parkovaný.
 			if ((e as NodeJS.ErrnoException).code !== 'ENOENT') continue;
 		}
-		// súbor je preč, ale adresár je dostupný → ručne presunutý do Money importu.
+		// súbor je preč. Ešte RAZ over, že RODIČOVSKÝ dir je STÁLE dostupný — `readdir` bol raz na začiatku
+		// behu; keby strom medzitým zmizol (unmount do kontajnera / server-side zmazanie subdiru), ENOENT na
+		// target by inak označil VŠETKY zvyšné kandidáty v jednom svepe (sub-ms ENOENT na zmiznutej lokálnej
+		// ceste rozpočet nezastaví). Per-riadková re-kontrola dir tesne pred markom to okno zatvára (presne
+		// ako pôvodný synchrónny kód, čo statoval dir pred KAŽDÝM target statom).
+		if (now() >= deadline) {
+			budgetHit = true;
+			break;
+		}
+		const dirOp = statFn(path.dirname(r.target));
+		bgOps.push(dirOp);
+		try {
+			const dres = await raceBudget(dirOp, deadline - now());
+			if (dres === TIMED_OUT) {
+				budgetHit = true;
+				break;
+			}
+			// dir dostupný → target naozaj presunutý → MARK nižšie
+		} catch {
+			// rodičovský dir zmizol/nedostupný → strom zmizol, NIE dôkaz presunu → skip
+			continue;
+		}
+		// súbor je preč a adresár je stále dostupný → ručne presunutý do Money importu.
 		db.transaction(() => {
 			setPresunute.run(r.id);
 			// idempotentný ledger: len keď tuple+content EŠTE neblokuje appka-side re-send (imports<=overrides).

@@ -343,17 +343,94 @@ describe('#315 detekcia async s rozpočtom — pomalý/visiaci mount NEblokuje a
 		expect(presunuteAt(id)).toBeNull();
 	});
 
-	// POSLEDNÝ test v súbore: readdir sa NIKDY nevyrieši (leaked pending op) → gate ostáva zavretý, ale
-	// za ním už žiadny test nie je. Dokazuje ROOT: visiaci mount dobehne v rozpočte a NIKDY nefalošuje.
-	it('[RED] visiaci mount (readdir sa nikdy nevyrieši) ⇒ dobehne v rozpočte a NEoznačí presun (#315)', async () => {
+	it('strom zmizol PO readdir (target aj dir ENOENT pri potvrdení) ⇒ NEoznačí (per-riadková re-kontrola dir) (#315)', async () => {
+		const target = path.join(stagingDir, 'ZAKVANISH - Z [v].xlsx');
+		const id = seedMovedParked('ZAKVANISH', 'OPV', [1], target);
+		const enoent = async () => {
+			const err = new Error('ENOENT') as NodeJS.ErrnoException;
+			err.code = 'ENOENT';
+			throw err;
+		};
+		// readdir videl dir dostupný (prázdny), ale strom medzitým zmizol → target AJ dir stat ENOENT
+		const det = await detectManualStagingMoves({
+			readdir: async () => [],
+			stat: enoent,
+			budgetMs: 5000
+		});
+		expect(det.find((x) => x.id === id)).toBeUndefined(); // dir-revalidácia zabráni falošnému marku svepu
+		expect(presunuteAt(id)).toBeNull();
+	});
+
+	it('orphan readdir REJECTNE až po rozpočte ⇒ žiadny unhandled rejection, NEoznačí (#315)', async () => {
+		const gone = path.join(stagingDir, 'ZAKREJ - Z [r].xlsx');
+		const id = seedMovedParked('ZAKREJ', 'OPR', [1], gone);
+		let rej: (e: unknown) => void = () => {};
+		const lateReject = () => new Promise<string[]>((_, r) => (rej = r));
+		const started = Date.now();
+		const det = await detectManualStagingMoves({ readdir: lateReject, budgetMs: 200 });
+		expect(Date.now() - started).toBeLessThan(3000);
+		expect(det).toHaveLength(0);
+		expect(presunuteAt(id)).toBeNull();
+		rej(Object.assign(new Error('EIO'), { code: 'EIO' })); // orphan dozneje rejectom — musí byť handled
+		await settleGate();
+	});
+
+	it('gate zaseknutý nad max-hold (visiaci mount) ⇒ force-reopen + ďalšia detekcia REÁLNE beží (#315)', async () => {
+		const gone = path.join(stagingDir, 'ZAKWEDGE - Z [w].xlsx');
+		const id = seedMovedParked('ZAKWEDGE', 'OPW', [1], gone);
+		let release: (v: string[]) => void = () => {};
+		const gated = () => new Promise<string[]>((res) => (release = res));
+		// 1. detekcia drží gate visiacim readdir (drzana od now=1000)
+		const p1 = detectManualStagingMoves({ readdir: gated, budgetMs: 60_000, now: () => 1000 });
+		// 2. ďalšia detekcia s now ĎALEKO za max-hold → gate sa force-reopne a detekcia beží (nie skip)
+		const det = await detectManualStagingMoves({
+			readdir: async () => [],
+			budgetMs: 5000,
+			maxHoldMs: 100,
+			now: () => 999_999
+		});
+		expect(det.map((x) => x.id)).toContain(id); // force-reopnutá detekcia bežala a označila
+		expect(presunuteAt(id)).toBeTruthy();
+		release([]); // uvoľni orphan p1; jeho neskoro doznený settle nezhodí novšiu gate (gen guard)
+		await p1;
+		await settleGate();
+	});
+
+	it('potvrdzujúci DIR-stat prekročí rozpočet (target ENOENT, dir visí) ⇒ NEoznačí (timeout dir nie je dôkaz) (#315)', async () => {
+		const target = path.join(stagingDir, 'ZAKDIRTO - Z [dt].xlsx');
+		const id = seedMovedParked('ZAKDIRTO', 'OPDT', [1], target);
+		let releaseDir: () => void = () => {};
+		const stat = (p: string) => {
+			if (p === target) {
+				const err = new Error('ENOENT') as NodeJS.ErrnoException;
+				err.code = 'ENOENT';
+				return Promise.reject(err); // target je preč (ENOENT)
+			}
+			return new Promise((res) => (releaseDir = () => res({}))); // ale dir-stat VISÍ
+		};
+		const started = Date.now();
+		const det = await detectManualStagingMoves({ readdir: async () => [], stat, budgetMs: 200 });
+		expect(Date.now() - started).toBeLessThan(3000);
+		expect(det).toHaveLength(0); // dir sa nestihol overiť → NEoznačí (timeout nie je dôkaz presunu)
+		expect(presunuteAt(id)).toBeNull();
+		releaseDir();
+		await settleGate();
+	});
+
+	// POSLEDNÝ test: readdir sa vyrieši až PO rozpočte (releasable), gate sa potom čisto otvorí. Dokazuje
+	// ROOT: visiaci mount dobehne v rozpočte a NIKDY nefalošuje presun.
+	it('[RED] visiaci mount (readdir sa vyrieši až po rozpočte) ⇒ dobehne v rozpočte a NEoznačí presun (#315)', async () => {
 		const gone = path.join(stagingDir, 'ZAKSLOW - Zákazník [slow].xlsx');
 		const id = seedMovedParked('ZAKSLOW', 'OPSLOW', [1], gone);
 		expect(fs.existsSync(gone)).toBe(false); // na rýchlom fs by sa OZNAČIL — tu má rozpočet vyhrať
-		const hanging = () => new Promise<string[]>(() => {}); // simulácia visiaceho CIFS mountu
+		let release: (v: string[]) => void = () => {};
+		const hanging = () => new Promise<string[]>((res) => (release = res)); // visiaci CIFS mount
 		const started = Date.now();
 		const det = await detectManualStagingMoves({ readdir: hanging, budgetMs: 300 });
 		expect(Date.now() - started).toBeLessThan(3000); // dobehla v rozpočte (event loop neblokovaný)
 		expect(det).toHaveLength(0); // nič sa neoznačilo
 		expect(presunuteAt(id)).toBeNull(); // visiaci/timeoutnutý stat NIKDY nefalošuje presun
+		release([]);
+		await settleGate();
 	});
 });
