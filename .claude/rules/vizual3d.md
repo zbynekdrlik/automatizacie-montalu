@@ -452,3 +452,15 @@ merge over, že OBE správania koexistujú cez `kvalita.ts`: supersample strop 2
 AJ postproc gate OFF na softvéri (`overPostprocGate` E2E + `vizual-snimka`/`vizual-kvalita-gpu`
 testy). Ak by budúca lane presunula klasifikáciu späť do viacerých modulov, vráti sa
 zdrojový konflikt — drž ju v `kvalita.ts`.
+
+**CI chunk-size guard je DVOJKOŠÍKOVÝ — projektový three vs model-viewer (#286).** Krok „3D vizuál
+chunk gzip" v `.github/workflows/ci.yml` NEsčítava všetky three-marker chunky do jedného limitu.
+`@google/model-viewer` (AR, LEN `/konfigurator/ar`) VENDORUJE vlastný three, takže jeho chunk
+zodpovedá tým istým markerom (`ACESFilmicToneMapping`, `RoomEnvironment`, …) ako projektový
+viewer (#276). Guard ich preto DELÍ podľa reťazca `model-viewer` (custom element, má prednosť):
+**projektový three ≤ 220KB**, **model-viewer ≤ 320KB** (aktuálne ~198KB / ~283KB). Ak pridáš ĎALŠÍ
+vendorovaný-three 3D balík (alebo bumpneš model-viewer nad 320KB gzip), MUSÍŠ pridať/upraviť
+príslušný košík — inak guard padne FALOŠNE (sčítanie dvoch nezávislých lazy balíkov ~479KB, hoci
+každý je pod svojím reálnym stropom). Pozn.: worktree/lane vetva NIKDY nebeží GitHub CI (spúšťa sa
+len na push do `main`/`dev`), takže CI-only guardy sa prvýkrát ukážu AŽ pri integrácii do `dev` —
+over lokálne `npm run build` + guard skript PRED merge, nespoliehaj sa na „lane gates boli zelené".
