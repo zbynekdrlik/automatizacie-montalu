@@ -4,6 +4,7 @@
 // `ponuka-pdf` (ŠPECIFIKÁCIA, NULA cien) — súbor matchuje `/dopyt/`, takže je automaticky
 // krytý statickým guardom `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola).
 import { getDopyt } from './dopyt-store';
+import { cenaZoStampu } from './dopyt-cena-stamp';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
 import { formatDatumIsoSk, formatDatumSk, sqliteUtcToIso } from '$lib/datum';
@@ -26,7 +27,14 @@ export async function regeneratePonukaPdf(id: number): Promise<RegenerovanePdf |
 	if (!row) return null;
 	const cfg = sanitizePonukaConfig(row.konfiguracia);
 	const iso = sqliteUtcToIso(row.created_at);
-	const bytes = await generatePonukaPdf(cfg, { datum: formatDatumSk(iso) });
+	// #309: opečiatkovaná cena z podania (ak existuje) sa použije NAMIESTO prepočtu zo živej matice
+	// → re-download reprodukuje cenu, ktorú zákazník reálne dostal. Neopečiatkovaný (starý) riadok
+	// → `null` → `generatePonukaPdf` prepočíta z cfg (honest-degrade, nezmenené správanie).
+	const cena = cenaZoStampu(row);
+	const bytes = await generatePonukaPdf(cfg, {
+		datum: formatDatumSk(iso),
+		cena: cena ?? undefined
+	});
 	// dátum v názve = ROVNAKÝ kalendárny deň ako v pätičke (Europe/Bratislava), nie UTC slice
 	return { bytes, filename: `Montalu-ponuka-dopyt-${id}-${formatDatumIsoSk(iso)}.pdf` };
 }

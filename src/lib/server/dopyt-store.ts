@@ -4,6 +4,7 @@
 // `tests/dopyt-money-safety.test.ts`. Import `./db` je len pripojenie k SQLite (rovnaká DB
 // ako zvyšok appky) — nie odpisová/zápisová cesta.
 import { db } from './db';
+import { stampNaStlpce, type CenaStamp, type DopytCenaStlpce } from './dopyt-cena-stamp';
 
 export interface DopytZaznam {
 	/** kanonický JSON konfigurácie (už sanitizovaný `sanitizePonukaConfig` volajúcim) */
@@ -15,34 +16,47 @@ export interface DopytZaznam {
 	poznamka: string;
 }
 
-export interface DopytRiadok extends DopytZaznam {
+/** Uložený dopyt riadok + opečiatkovaná cena (#309, migrácia v30 — NULL = neopečiatkovaný). */
+export interface DopytRiadok extends DopytZaznam, DopytCenaStlpce {
 	id: number;
 	created_at: string;
 }
 
+// #309: cenové stĺpce (v30) sa vždy zapíšu — NULL keď dopyt neprišiel s pečiatkou (starý caller).
 const insertStmt = db.prepare(
-	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka)
-	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka)`
+	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka,
+	                    cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m,
+	                    cena_sirka_grid_m, cena_model, cennik_verzia)
+	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka,
+	         @cena_druh, @cena_bez_dph, @cena_s_dph, @cena_hlbka_grid_m,
+	         @cena_sirka_grid_m, @cena_model, @cennik_verzia)`
 );
 
-/** Vloží dopyt, vráti nové `id`. Nikdy sa nedotýka Money/odpis cesty. */
-export function insertDopyt(z: DopytZaznam): number {
+/** Vloží dopyt, vráti nové `id`. Voliteľná pečiatka ceny (#309) sa uloží do `cena_*`/`cennik_verzia`
+ *  (bez nej → NULL = neopečiatkovaný riadok). Nikdy sa nedotýka Money/odpis cesty. */
+export function insertDopyt(z: DopytZaznam, stamp?: CenaStamp): number {
 	const info = insertStmt.run({
 		konfiguracia: z.konfiguracia,
 		meno: z.meno,
 		email: z.email,
 		telefon: z.telefon,
 		miesto: z.miesto,
-		poznamka: z.poznamka
+		poznamka: z.poznamka,
+		...stampNaStlpce(stamp)
 	});
 	return Number(info.lastInsertRowid);
 }
 
-/** Načíta jeden dopyt (audit/diagnostika). */
+/** Cenové stĺpce (#309/v30) — súčasť SELECTu v `getDopyt`/`listDopyty` (opečiatkovaná cena). */
+const cenaStlpce =
+	'cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m, cena_sirka_grid_m, cena_model, cennik_verzia';
+
+/** Načíta jeden dopyt (audit/diagnostika + opečiatkovaná cena pre re-download PDF). */
 export function getDopyt(id: number): DopytRiadok | undefined {
 	return db
 		.prepare(
-			'SELECT id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at FROM dopyt WHERE id = ?'
+			`SELECT id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, ${cenaStlpce}
+			 FROM dopyt WHERE id = ?`
 		)
 		.get(id) as DopytRiadok | undefined;
 }
@@ -140,9 +154,10 @@ export function listDopyty(
 ): DopytListRiadok[] {
 	const off = Math.max(0, Math.trunc(offset));
 	const lim = Math.max(1, Math.trunc(limit));
-	const cols = hasOdoo
-		? 'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, odoo_lead_id'
-		: 'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at';
+	// #309: cenové stĺpce (v30) sú vždy súčasťou zoznamu (opečiatkovaná cena v admin prehľade);
+	// `odoo_lead_id` (v26) sa pridá len keď schéma stĺpec má (feature-detect, defenzívne).
+	const base = `id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, ${cenaStlpce}`;
+	const cols = hasOdoo ? `${base}, odoo_lead_id` : base;
 	return db
 		.prepare(`SELECT ${cols} FROM dopyt ORDER BY id DESC LIMIT ? OFFSET ?`)
 		.all(lim, off) as DopytListRiadok[];

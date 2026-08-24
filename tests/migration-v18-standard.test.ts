@@ -69,7 +69,7 @@ const styly = () => listSysStyly().filter((s) => s.system === 'Štandard');
 
 describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', () => {
 	it('user_version = 19', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(29);
+		expect(db.pragma('user_version', { simple: true })).toBe(30);
 	});
 
 	it('pribudlo presne 12 štýlov s N podľa počtu krídel (opona 2×n)', () => {

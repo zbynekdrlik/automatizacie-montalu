@@ -10,6 +10,7 @@
 // dostane LEN maloobchod (MO) cez `naVerejnuCenu`/`verejnaCenaPreModel`/`verejneCenyModelov`
 // (VO strip). VO cena / Money kód / matica sa do verejnej odpovede NIKDY nedostanú. Modul je
 // čistý (bez DB/siete), priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
+import { createHash } from 'node:crypto';
 import cennikJson from './cennik-pergola.json';
 // #279 Fáza C: `ModelPergoly` + verejné cenové typy žijú v client-safe `$lib/konfigurator`
 // (jeden zdroj pravdy — vidí ich aj wizard). Tu ich importujeme (server-only lookup) a
@@ -74,6 +75,26 @@ interface CennikSeed {
 }
 
 const SEED = cennikJson as unknown as CennikSeed;
+
+/** Obsahový hash CENOTVORNÝCH častí seedu (matica + príplatky + DPH + mriezka) — zmení sa pri
+ *  AKOMKOĽVEK cenovom drifte (aj ručnej úprave bez zmeny `vytazene`). Časová značka `vytazene`
+ *  sama nestačí ako verzia (je len metadáta a mení sa aj bez zmeny cien). */
+const CENNIK_HASH = createHash('sha256')
+	.update(
+		JSON.stringify({
+			cennik: SEED.cennik,
+			priplatky: SEED.priplatky,
+			dph: SEED.meta.dph,
+			mriezka: SEED.meta.mriezka
+		})
+	)
+	.digest('hex')
+	.slice(0, 12);
+
+/** Verzia cenníka pri opečiatkovaní ceny (#309) — čitateľný čas vyťaženia + obsahový hash
+ *  cenotvorných častí. Pri PODANÍ dopytu sa uloží (`dopyt.cennik_verzia`), aby sa dalo dohľadať,
+ *  z ktorej matice vzišla opečiatkovaná historická cena. */
+export const CENNIK_VERZIA = `${SEED.meta.vytazene}#${CENNIK_HASH}`;
 
 /** Sadzba DPH (0,23) prevzatá zo seedu — jeden zdroj pravdy. */
 export const DPH = SEED.meta.dph;

@@ -52,7 +52,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v25 → v26: Odoo lead stavové stĺpce na dopyt (#278)', () => {
 	it('user_version === 26 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(29);
+		expect(db.pragma('user_version', { simple: true })).toBe(30);
 	});
 
 	it('existujúci dopyt (Eva) prežil migráciu (žiadna strata dát)', () => {
@@ -75,7 +75,15 @@ describe('migrácia v25 → v26: Odoo lead stavové stĺpce na dopyt (#278)', ()
 			'created_at',
 			'odoo_lead_id',
 			'odoo_attempts',
-			'odoo_last_error'
+			'odoo_last_error',
+			// #309/v30 — opečiatkovaná cena (migrácia beží po najnovšiu verziu)
+			'cena_druh',
+			'cena_bez_dph',
+			'cena_s_dph',
+			'cena_hlbka_grid_m',
+			'cena_sirka_grid_m',
+			'cena_model',
+			'cennik_verzia'
 		]);
 	});
 
