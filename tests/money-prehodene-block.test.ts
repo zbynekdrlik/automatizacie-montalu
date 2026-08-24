@@ -17,9 +17,9 @@ process.env.MONEY_NA_ODPIS_DIR = path.join(tmpRoot, 'dlv-import', 'NA ODPIS'); /
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'test-export'); // TEMP — live=0 vetva
 process.env.CENY_SNAPSHOT_PATH = path.join(tmpRoot, 'neexistuje.json'); // no snapshot → #295 sa nespustí
 
-const { writeOdpis } = await import('../src/lib/server/money');
+const { writeOdpis, blokHlaska, overrideOpts } = await import('../src/lib/server/money');
 const { db } = await import('../src/lib/server/db');
-import type { OdpisJob, Polozka } from '../src/lib/server/money';
+import type { OdpisJob, OdpisOutcome, Polozka } from '../src/lib/server/money';
 
 function job(zak: string, op: string, polozky?: Polozka[]): OdpisJob {
 	return {
@@ -97,6 +97,49 @@ describe('#307 prehodené polia zak/op — live blokuje, test warn-only', () => 
 		} finally {
 			process.env.MONEY_LIVE = '1';
 		}
+	});
+});
+
+describe('#307 wiring — blokHlaska + overrideOpts', () => {
+	const base = { status: 'blocked' as const, live: true, target: '/x', filename: 'x.xlsx' };
+
+	it('blokHlaska(prehodene-polia) pomenuje zamenené pole „OP/OPDL" (op nesie ZAK)', () => {
+		const o: OdpisOutcome = { ...base, reason: 'prehodene-polia' };
+		const h = blokHlaska(o, 'ZAK2026500', 'ZAK2026499');
+		expect(h).toContain('prehodené');
+		expect(h).toContain('pole „OP/OPDL" obsahuje číslo zákazky (ZAK2026499)');
+		expect(h).toContain('Odoslať aj tak');
+	});
+
+	it('blokHlaska(prehodene-polia) pomenuje zamenené pole „číslo zákazky" (zak nesie OP)', () => {
+		const o: OdpisOutcome = { ...base, reason: 'prehodene-polia' };
+		const h = blokHlaska(o, 'OP260286', '01');
+		expect(h).toContain('pole „číslo zákazky" obsahuje OP číslo (OP260286)');
+	});
+
+	it('overrideOpts mapuje override=prehodene-polia → overridePrehodene', () => {
+		const fd = new FormData();
+		fd.append('override', 'prehodene-polia');
+		expect(overrideOpts(fd)).toMatchObject({
+			overridePrehodene: true,
+			overrideKody: false,
+			overrideLedger: false
+		});
+	});
+
+	it('overrideOpts prečíta VŠETKY override hodnoty naraz (kód + prehodené polia)', () => {
+		const fd = new FormData();
+		fd.append('override', 'unknown-kod');
+		fd.append('override', 'prehodene-polia');
+		expect(overrideOpts(fd)).toMatchObject({ overrideKody: true, overridePrehodene: true });
+	});
+
+	it('bežný submit bez override poľa → žiadny bypass', () => {
+		expect(overrideOpts(new FormData())).toMatchObject({
+			overrideKody: false,
+			overrideLedger: false,
+			overridePrehodene: false
+		});
 	});
 });
 

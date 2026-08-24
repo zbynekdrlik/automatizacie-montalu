@@ -1,6 +1,7 @@
 <script lang="ts">
-	// (#300) Zdieľaný blok pre `status:'blocked'` odpis (ledger-duplicate / unknown-kod) naprieč
-	// modulmi. Zobrazí hlášku bloku + confirm-gated „⚠️ Odoslať aj tak", ktoré RE-submitne PRESNE
+	// (#300) Zdieľaný blok pre `status:'blocked'` odpis (ledger-duplicate / unknown-kod /
+	// prehodene-polia #307) naprieč modulmi. Zobrazí hlášku bloku + confirm-gated „⚠️ Odoslať aj tak",
+	// ktoré RE-submitne PRESNE
 	// ten istý POST (`rawEntries` = pôvodné polia vrátane ručných úprav qty), doplní skryté
 	// `override=<blokReason>` a pošle na pôvodnú akciu → server volá `writeOdpis` s override flagom.
 	// Pure duplicate (dedup, `odpis_log` riadok existuje) sem NEIDE — tá ostáva dead-end na /odpisy.
@@ -13,7 +14,7 @@
 		error
 	}: {
 		rawEntries: [string, string][];
-		blokReason: 'unknown-kod' | 'ledger-duplicate';
+		blokReason: 'unknown-kod' | 'ledger-duplicate' | 'prehodene-polia';
 		blokAction: string;
 		error: string;
 	} = $props();
@@ -22,7 +23,10 @@
 		blokReason === 'unknown-kod'
 			? 'Money niektorý z kódov nepozná — pri neznámom kóde by import NEODPÍSAL CELÝ doklad. ' +
 					'Naozaj odoslať aj tak? (Použi len ak vieš, že kód je správny a Money ho už má.)'
-			: 'Rovnaký obsah tejto zákazky už bol raz importovaný do Money. Odoslať znova AJ TAK? ' +
+			: blokReason === 'prehodene-polia'
+				? 'Číslo zákazky a číslo objednávky (OP) sú pravdepodobne prehodené. Naozaj odoslať aj tak? ' +
+					'(Použi len ak vieš, že zadanie je správne.)'
+				: 'Rovnaký obsah tejto zákazky už bol raz importovaný do Money. Odoslať znova AJ TAK? ' +
 					'(Použi LEN ak si import v Money NAOZAJ zmazal — inak vznikne dvojitý zápis.)'
 	);
 
