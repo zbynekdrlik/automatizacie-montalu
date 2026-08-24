@@ -62,31 +62,37 @@ repa — preto vždy `npm run format`, nie `npx`. `.md` a `.claude/` sú v `.pre
 (#98), takže playbook/README úpravy `prettier --check` nekontroluje; nové/upravené
 `.ts`/`.svelte` súbory musia byť prettier-clean (viď `lint-formatting.md`).
 
-## E2E without `BASE_URL` needs a FRESH `npm run build` first — stale preview = false failures
+## E2E without `BASE_URL` — the `webServer` now AUTO-BUILDS (guarded); no manual `npm run build` first
 
-`playwright.config.ts`'s `webServer` (when `BASE_URL` is unset) runs `npm run preview`
-(`vite preview`), which serves whatever is already in `build/` — it does **not** rebuild.
-If you added/changed a route or server logic and only ran `npm run check` + `vitest`,
-the preview server still serves the OLD build. Symptom: a brand-new route 404s
-(`[WebServer] [404] GET /pouzivatelia`) and/or unrelated-looking tests time out on
-`selectOption`/`getByLabel` waits that make no sense given the source — because the
-served HTML/JS is stale, not because the test or the source is wrong.
+`playwright.config.ts`'s `webServer` (when `BASE_URL` is unset) BUILDS, then runs
+`npm run preview`. Its `command` is:
 
-**Fix:** run `npm run build` once before `npx playwright test` whenever you've changed
-routes/server code and are verifying E2E locally without `BASE_URL`. This is a
-deliberate, one-off LOCAL build for test verification — it does not contradict the
-"build/vite build is CI-only" policy above (that policy is about *shipping* a
-production bundle, not about producing the artifact `vite preview` needs to serve
-during local E2E verification). Re-run `npm run build` again after any further route/
-server change before re-running E2E; a stale build silently keeps serving the old code.
+```
+if [ "$E2E_PREBUILT" = 1 ]; then true; else npm run build; fi && node e2e/reset-e2e-db.mjs && npm run preview
+```
 
-When `BASE_URL` IS set (post-deploy E2E against a live target), this doesn't apply —
-there's no local preview server, no build needed.
+So `npx playwright test` locally always serves a FRESH `build/` — you no longer have to
+remember to run `npm run build` first (the round-5 gap, #298: the old command only reset
+the DB + previewed, never rebuilt, so a stale/missing `build/` silently served OLD code —
+a brand-new route 404'd `[WebServer] [404] GET /pouzivatelia`, and unrelated tests timed
+out on `selectOption`/`getByLabel` waits that made no sense given the source).
+
+- **CI does NOT double-build.** The CI `test` job already runs `npm run build` before the
+  E2E step, so that step sets `E2E_PREBUILT=1` → the `webServer` skips the rebuild (no
+  double build, CI is not slowed).
+- **A build failure fails LOUDLY** — the `&&` chain stops, the preview never starts, the
+  webServer errors; it never silently serves the old `build/`.
+- This local build produces exactly the artifact `vite preview` needs to serve — it does
+  NOT contradict the "build/vite build is CI-only" *shipping* policy above (that policy is
+  about shipping a production bundle, not about the E2E preview artifact).
+
+When `BASE_URL` IS set (post-deploy E2E against a live target), the `webServer` is
+`undefined` — no local preview server, no build — so this doesn't apply.
 
 ## A LONG-LIVED manual `npm run preview` (for ad-hoc Playwright MCP visual iteration) must be RESTARTED after every rebuild — a fresh build alone is not enough
 
 The section above covers `npx playwright test`'s OWN `webServer` (short-lived, one
-process per test run — a fresh `npm run build` before invoking it is sufficient). A
+process per test run — it now auto-builds `build/` itself before preview). A
 DIFFERENT case: when iterating on SVG/layout changes visually (screenshot → judge →
 tweak → repeat) you typically start `npm run preview` yourself via `run_in_background`
 and drive it with the Playwright MCP across several rounds. That server is a

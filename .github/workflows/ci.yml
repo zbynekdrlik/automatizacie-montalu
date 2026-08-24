@@ -117,6 +117,11 @@ jobs:
         # ubuntu-latest predinštalované) — pri zaseknutom apt sa tak beh nezablokuje.
         run: timeout 360 npx playwright install --with-deps chromium || npx playwright install chromium
       - name: E2E (reálny prehliadač, nula console errors)
+        # build/ je už čerstvý z kroku „Build" vyššie → E2E_PREBUILT=1 povie playwright
+        # webServeru nech NErebuilduje (žiadny dvojitý build, CI sa nespomalí). Lokálne
+        # (bez tohto env) webServer buildne sám pred preview (viď playwright.config.ts).
+        env:
+          E2E_PREBUILT: '1'
         run: npx playwright test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()

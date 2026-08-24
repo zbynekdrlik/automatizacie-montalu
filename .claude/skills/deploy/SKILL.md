@@ -64,6 +64,7 @@ Gotchy (stáli hodiny, nezabudni):
 - **Zápisové E2E sa auto-preskočia, keď `/health` hlási `live:true`** — testovací odpis nesmie do ostrého Money. Neobchádzať.
 - **`workers: 1` je zámer** — editor test dočasne mení vzorce; paralelné testy by videli cudzie čísla.
 - E2E artefakty: testovacie xlsx ostávajú v TEST priečinku (`/data/montalu/.../ODPIS EXPORT/`) a dedup riadky v `odpis_log` (live=0) — neškodné, dajú sa uvoľniť cez /odpisy.
+- **Lokálna PRED-deploy E2E (bez `BASE_URL`) vs post-deploy (s `BASE_URL`):** post-deploy beh hore ide proti ŽIVEJ appke cez tunel → `webServer` je `undefined`, žiadny lokálny build. Lokálne overenie zmeny PRED deployom (`npx playwright test` bez `BASE_URL`) používa `webServer`, ktorý si `build/` **SÁM zbuilduje** pred `preview` (guard `E2E_PREBUILT`, #298 5. kolo) — netreba ručný `npm run build`. Detaily: `.claude/rules/testing.md`.
 
 ## LIVE prepnutie (LEN na pokyn užívateľa)
 
