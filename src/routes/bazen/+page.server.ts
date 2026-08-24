@@ -6,7 +6,7 @@ import { logger } from '$lib/server/log';
 import { computeBazen, applyEdits } from '$lib/server/bazen';
 import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
-import { writeOdpis, isLive, type OdpisJob } from '$lib/server/money';
+import { writeOdpis, isLive, blokHlaska, type OdpisJob } from '$lib/server/money';
 
 function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -95,6 +95,13 @@ export const actions = {
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a uvoľni záznam v histórii odpisov.`,
+					vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'duplikat' as const,
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup
 				};
 			}

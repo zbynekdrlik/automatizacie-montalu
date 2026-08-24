@@ -685,3 +685,38 @@ prečo: `ZASK00037` (Rohovník obvodový) v `PCMO`/„Predajný cenník polykarb
 price-book pre kovanie) malo cenu, ktorá s daným artiklom nemá nič spoločné. Vynútené v
 `ceny.ts` samotnom (nielen v producer skripte) — defense in depth, rovnaký vzor ako b2b
 Money-write hranica (§2 access-control skill).
+
+## 7. Dedup ledger + normalizácia + pre-export validácia kódov (#294/#295)
+
+Tri vrstvy proti dvojitému importu a tichej strate položiek. Pri práci na `money.ts`/`ceny.ts`
+dedup-e drž tieto invarianty:
+
+- **Append-only ledger `odpis_imported`** (migrácia v27) = poistka MIMO mazateľného `odpis_log`.
+  `releaseOdpis` aj kompenzácia mažú `odpis_log`, takže poistka NESMIE žiť tam. `writeOdpis` blokuje
+  re-import IDENTICKÉHO obsahu pre **per-order tuple `(modul, zak_norm, op_norm, live)` + `content_hash`**
+  keď `imports > overrides` — **NIKDY globálny hash** (owner: „viacero objednávok môže mať rovnaký
+  obsah"; test: identický obsah pod INÝM zak/op MUSÍ prejsť).
+- **Ledger `import` sa zapisuje ATOMICKY s claim-om** (v tej istej `db.transaction` ako `odpis_log`
+  insert, PRED zápisom súboru), nie po `rename` — inak reštart/deploy v okne medzi `rename` a zápisom
+  ledgeru nechá reálny import nezaznamenaný → uvoľni+re-send obíde ledger → dvojitý import. Kompenzácia
+  (zlyhaný zápis) zmaže `odpis_log` AJ ten `import` riadok (import sa nevykonal — NIE porušenie
+  append-only). `release`/`povolitReimport` `import` riadky NIKDY nemažú.
+- **Migrácia v27 backfillne ledger z existujúcich odpisov** (`INSERT … SELECT FROM odpis_log`) — inak
+  celá história ostane nechránená. `zak_norm`/`op_norm` sú nové stĺpce (LOOKUP dedup, **žiadny UNIQUE**
+  na nich — existujúce kolidujúce riadky id 46/47 by constraint rozbili; verdikt zakazuje deštruktívnu
+  migráciu). RAW `UNIQUE(modul,zak,op,live)` ostáva pre atomicitu identického race-u; **cross-spelling
+  race kryje len to, že precheck→claim je BEZ `await`** — nevkladaj `await` medzi ne.
+- **`normOp`/`normZak`** (`money.ts`): `260286 ≡ OP260286`, `OPOP260233 → OP260233`, `OPDL…` ostáva
+  distinct od `OP…`, prázdny ostáva prázdny. **PASCA/riziko:** bare číslice sa promujú na OP
+  (`260092 → OP260092`) — nutné pre dokázaný prípad, ALE ak by číselné rady OP/OPDL kolidovali a OPDL
+  sa zadá bez prefixu → falošný `duplicate` → stratený odpis (over s Money, či sa rady prekrývajú).
+- **Override:** `/odpisy` „⚠️ Povoliť rovnaký" (`povolitReimport`) = release + append `override`
+  (one-shot, auditované) — povolí re-import IDENTICKÉHO obsahu; bežné „Uvoľniť" identický obsah ĎALEJ
+  blokuje. Uvoľniť-then-blocked dead-end (row už preč) → tuple-override je follow-up.
+- **Pre-export validácia kódov (`validateOdpisKody` v `ceny.ts`, #295):** live=1 neznámy kód /
+  `sklad===null` (bez skladovej karty) ⇒ tvrdý blok (`{status:'blocked', reason:'unknown-kod'}`).
+  **PREFIX-SCOPE (kritické):** validuj len kód, ktorého PREFIX snapshot REÁLNE pokrýva (empiricky zo
+  `material_prices` — dnes `ZASP*/ZASK*/TS*`); pergola `PRP*`/bazén `BPP*` sú MIMO scope → NEblokuj
+  (inak by popadali). `sklad===0`/záporné PREJDE (0-sklad je platný odpis), len `null` blokuje.
+  Snapshot >7 dní / chýba ⇒ degrade na warning (neblokuj). `overrideKody` param = auditovaný bypass
+  (dnes bez UI wiringu — follow-up).

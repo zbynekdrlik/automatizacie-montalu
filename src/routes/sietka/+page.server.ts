@@ -18,6 +18,7 @@ import {
 	targetDirFor,
 	filenameFor,
 	contentHash,
+	blokHlaska,
 	type OdpisJob
 } from '$lib/server/money';
 
@@ -111,6 +112,15 @@ export const actions = {
 					vstup,
 					// `+page.svelte` renderuje `vysledok`/`duplikat` v JEDNOM zdieľanom bloku
 					// gejtovanom na `r` — bez neho by duplikát zobrazil PRÁZDNU stránku
+					r,
+					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'duplikat' as const,
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
+					vstup,
 					r,
 					potrebuje3K: potrebuje3KKolajnicu(vstup.styl)
 				};

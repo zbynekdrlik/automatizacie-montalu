@@ -24,6 +24,7 @@ import {
 	targetDirFor,
 	filenameFor,
 	contentHash,
+	blokHlaska,
 	type OdpisJob
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
@@ -419,6 +420,13 @@ export const actions = {
 					vstup
 				};
 			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'duplikat' as const,
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
+					vstup
+				};
+			}
 			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome, vytvorene };
 		} catch (e) {
 			logger('zasklenia').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
@@ -543,6 +551,13 @@ export const actions = {
 				return {
 					step: 'duplikat' as const,
 					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
+					multiVstup: vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'duplikat' as const,
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					multiVstup: vstup
 				};
 			}
