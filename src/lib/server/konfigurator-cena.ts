@@ -10,8 +10,12 @@
 // odpovede NEZAPÁJA (to je Fáza C, samostatný vedomý krok). Modul je čistý (bez DB/siete),
 // priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
 import cennikJson from './cennik-pergola.json';
-
-export type ModelPergoly = 'LIGHT' | 'ROBUST' | 'MASSIVE';
+// #279 Fáza C: `ModelPergoly` + verejné cenové typy žijú v client-safe `$lib/konfigurator`
+// (jeden zdroj pravdy — vidí ich aj wizard). Tu ich importujeme (server-only lookup) a
+// `ModelPergoly` RE-EXPORTUJEME, aby existujúce importy z tohto modulu (parity test) fungovali.
+import { MODELY, MODEL_DEFAULT } from '$lib/konfigurator';
+import type { ModelPergoly, VerejnaCena, CenaModelu } from '$lib/konfigurator';
+export type { ModelPergoly };
 
 /** Kľúč strešnej výplne (mapuje na montalu.sk roofing slug v seed `vyplne`). */
 export type VyplnKluc =
@@ -215,4 +219,42 @@ export function dostupneVyplne(model: ModelPergoly): VyplnKluc[] {
 	return (Object.keys(SEED.cennik) as VyplnKluc[]).filter(
 		(vypln) => SEED.cennik[vypln]?.[model] !== undefined
 	);
+}
+
+// --------------------------------------------------------------------------- //
+// #279 Fáza C — VEREJNÁ (public-safe) cena: LEN maloobchod (MO), VO sa ODSTRÁNI. //
+// --------------------------------------------------------------------------- //
+
+/**
+ * Zmapuje interný výsledok (`CenaVysledok` s MO **aj** VO) na verejnú cenu (LEN MO).
+ * VO (`vo`) sa NIKDY nedostane do verejnej odpovede (#279 leak-guard: VO ostáva neverejné).
+ * `model` sa dopĺňa explicitne, lebo `individualna-ponuka` vetva ho vo `CenaVysledok` nenesie.
+ */
+export function naVerejnuCenu(v: CenaVysledok, model: ModelPergoly): VerejnaCena {
+	if (v.druh === 'individualna-ponuka')
+		return { druh: 'individualna-ponuka', model, dovod: v.dovod };
+	return {
+		druh: 'cena',
+		model: v.model,
+		bezDph: v.mo.bezDph,
+		sDph: v.mo.sDph,
+		hlbkaGridM: v.hlbkaGridM,
+		sirkaGridM: v.sirkaGridM
+	};
+}
+
+/** Verejná orientačná cena pre JEDEN model (MO-only). Default model LIGHT, výplň polykarbonát-16
+ *  (interim BÁZOVÁ cena — dekoračné sklo interim cenu nemení, viď #279 Fáza C design). */
+export function verejnaCenaPreModel(v: CenaVstup): VerejnaCena {
+	const model = v.model ?? MODEL_DEFAULT;
+	return naVerejnuCenu(vypocitajCenu({ ...v, model }), model);
+}
+
+/** Orientačné ceny VŠETKÝCH modelov (LIGHT/ROBUST/MASSIVE) pre daný rozmer — zrkadlo montalu.sk
+ *  „ceny modelov vedľa seba". MO-only, žiadne VO. Výplň interim = bázová (polykarbonát-16). */
+export function verejneCenyModelov(hlbkaMm: number, sirkaMm: number): CenaModelu[] {
+	return MODELY.map((m) => ({
+		model: m.kod,
+		cena: verejnaCenaPreModel({ hlbkaMm, sirkaMm, model: m.kod })
+	}));
 }

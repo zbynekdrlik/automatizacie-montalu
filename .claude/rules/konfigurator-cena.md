@@ -10,9 +10,22 @@ paths:
 # Interim cenotvorba pergoly (#279) — matica montalu.sk + cenový modul
 
 Interim cenník je REPLIKÁCIA diskrétnej matice zo živého `montalu.sk/konfigurator`
-(owner rozhodnutie 2026-08-24). Modul je server-only, Money-neutrálny, **mimo verejnej
-route** (zobrazenie cien = Fáza C, samostatný krok — #279 leak-guard `konfigurator.md`
-ostáva). Plný reverzný rozbor: `~/.claude/work-products/konfigurator-cenotvorba/montalu-sk-pricing.md`.
+(owner rozhodnutie 2026-08-24). Modul je server-only, Money-neutrálny. **Fáza C (2026-08-24)
+zapla ceny vo VEREJNOM konfigurátore** — `+page.server.ts` teraz modul importuje a vracia
+LEN maloobchodnú (MO) cenu; leak-guard sa VEDOME dvihol pre PRICES ONLY (viď `konfigurator.md §2`).
+Plný reverzný rozbor: `~/.claude/work-products/konfigurator-cenotvorba/montalu-sk-pricing.md`.
+
+## Verejná cena (Fáza C) — LEN MO, VO sa ODSTRÁNI
+
+- `naVerejnuCenu(CenaVysledok, model) → VerejnaCena` = strip VO. `CenaVysledok` nesie MO **aj**
+  VO; verejná odpoveď (route akcia `vypocet`, PDF ponuka) smie niesť **iba MO** (`bezDph`+`sDph`).
+  VO (`priceB2B`) NIKDY nejde do verejnej odpovede (guard: `konfigurator-money-safety.test.ts` C
+  po redefinícii — kontroluje, že reálna VO hodnota konfigurácie nie je v odpovedi).
+- `verejnaCenaPreModel(vstup)` = jeden model (default LIGHT), `verejneCenyModelov(hlbkaMm, sirkaMm)`
+  = všetky 3 modely (zrkadlo montalu.sk „ceny vedľa seba"). Interim výplň = bázová polykarbonát-16
+  (dekoračné sklo z katalógu interim cenu NEMENÍ — šéfove pravidlá môžu prísť ako korekcia).
+- `ModelPergoly` + `VerejnaCena`/`CenaModelu` typy žijú v client-safe `$lib/konfigurator` (jeden
+  zdroj pravdy — vidí ich wizard aj PDF); tento server modul ich importuje a `ModelPergoly` re-exportuje.
 
 ## Endpoint montalu.sk — ako sa vyťaží cena (autoritatívny zdroj)
 

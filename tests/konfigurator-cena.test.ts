@@ -10,6 +10,9 @@ import {
 	vypocitajCenu,
 	zaokruhliNahor,
 	dostupneVyplne,
+	naVerejnuCenu,
+	verejnaCenaPreModel,
+	verejneCenyModelov,
 	DPH,
 	PRIPLATKY,
 	MRIEZKA,
@@ -391,5 +394,72 @@ describe('defaulty a helpery', () => {
 		expect(dostupneVyplne('ROBUST')).toContain('izolacne-sklo-24');
 		expect(dostupneVyplne('ROBUST')).toContain('panel-izo-24');
 		expect(dostupneVyplne('MASSIVE')).toContain('panel-izo-24');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// (#279 Fáza C) VEREJNÁ cena — LEN MO, VO sa ODSTRÁNI, nikdy raw matica
+// ---------------------------------------------------------------------------
+describe('verejná cena (#279 Fáza C) — LEN MO, žiadne VO', () => {
+	// Nezávislé kotvy z live montalu.sk (LIGHT 3×5 polykarbonát): MO net 3619,56 / s DPH 4452,06;
+	// VO net 2352,41 / s DPH 2893,46. Verejná cena SMIE niesť len MO, NIKDY VO.
+	const LIGHT_3x5_MO_NET = 3619.56;
+	const LIGHT_3x5_MO_DPH = 4452.06;
+	const LIGHT_3x5_VO_NET = 2352.41;
+	const LIGHT_3x5_VO_DPH = 2893.46;
+
+	it('naVerejnuCenu vezme LEN MO zložku a zahodí VO', () => {
+		const interne = vypocitajCenu({ hlbkaMm: 3000, sirkaMm: 5000, model: 'LIGHT' });
+		const verejna = naVerejnuCenu(interne, 'LIGHT');
+		expect(verejna).toEqual({
+			druh: 'cena',
+			model: 'LIGHT',
+			bezDph: LIGHT_3x5_MO_NET,
+			sDph: LIGHT_3x5_MO_DPH,
+			hlbkaGridM: 3,
+			sirkaGridM: 5
+		});
+		// VO hodnoty NESMÚ byť v serializovanej verejnej cene (ani ako pole, ani ako číslo)
+		const json = JSON.stringify(verejna);
+		expect(json).not.toContain(String(LIGHT_3x5_VO_NET));
+		expect(json).not.toContain(String(LIGHT_3x5_VO_DPH));
+		expect(json).not.toMatch(/"vo"|priceB2B|bezDphVo/i);
+	});
+
+	it('verejnaCenaPreModel: default LIGHT, MO-only, presné hodnoty', () => {
+		const r = verejnaCenaPreModel({ hlbkaMm: 3000, sirkaMm: 5000 });
+		expect(r.druh).toBe('cena');
+		if (r.druh === 'cena') {
+			expect(r.model).toBe('LIGHT');
+			expect(r.bezDph).toBe(LIGHT_3x5_MO_NET);
+			expect(r.sDph).toBe(LIGHT_3x5_MO_DPH);
+		}
+	});
+
+	it('verejnaCenaPreModel: mimo katalógu ⇒ individuálna ponuka (nesie model, žiadne číslo)', () => {
+		const r = verejnaCenaPreModel({ hlbkaMm: 3000, sirkaMm: 9000, model: 'ROBUST' });
+		expect(r.druh).toBe('individualna-ponuka');
+		if (r.druh === 'individualna-ponuka') expect(r.model).toBe('ROBUST');
+	});
+
+	it('verejnaCenaPreModel: LIGHT nad hĺbku 4 m ⇒ individuálna; ROBUST/MASSIVE cena', () => {
+		expect(verejnaCenaPreModel({ hlbkaMm: 5000, sirkaMm: 5000, model: 'LIGHT' }).druh).toBe(
+			'individualna-ponuka'
+		);
+		expect(verejnaCenaPreModel({ hlbkaMm: 5000, sirkaMm: 5000, model: 'ROBUST' }).druh).toBe(
+			'cena'
+		);
+	});
+
+	it('verejneCenyModelov: presne 3 modely (LIGHT/ROBUST/MASSIVE), MO-only, žiadne VO', () => {
+		const c = verejneCenyModelov(3000, 5000);
+		expect(c.map((x) => x.model)).toEqual(['LIGHT', 'ROBUST', 'MASSIVE']);
+		const light = c.find((x) => x.model === 'LIGHT')!.cena;
+		expect(light.druh).toBe('cena');
+		if (light.druh === 'cena') expect(light.sDph).toBe(LIGHT_3x5_MO_DPH);
+		// žiadna VO hodnota v celom porovnaní
+		const json = JSON.stringify(c);
+		expect(json).not.toContain(String(LIGHT_3x5_VO_NET));
+		expect(json).not.toContain(String(LIGHT_3x5_VO_DPH));
 	});
 });

@@ -19,6 +19,7 @@ const vstup = (o: Partial<KonfiguratorVstup> = {}): KonfiguratorVstup => ({
 	hlbka: 3500,
 	vyskaVpredu: 2500,
 	sklonDeg: 6,
+	model: 'LIGHT',
 	sklo: '4.4.2 číre',
 	farba: 'RAL 7016 ANTRACIT',
 	...o
@@ -47,9 +48,15 @@ describe('konfigurátor — dopočet geometrie', () => {
 			sklonDeg: 6, // round-trip cez vypocitajSklon → zadaný sklon (v rámci zaokrúhlenia)
 			svetlaVyska: 2310, // 2500 − NOSNIK_HRUBKA_MM (190)
 			zastresenaPlochaM2: 14,
+			model: 'LIGHT', // #279 Fáza C: model passthrough zo vstupu
 			sklo: '4.4.2 číre',
 			farba: 'RAL 7016 ANTRACIT'
 		});
+	});
+
+	it('model sa prenáša zo vstupu do súhrnu (#279 Fáza C)', () => {
+		expect(konfiguruj(vstup({ model: 'ROBUST' })).model).toBe('ROBUST');
+		expect(konfiguruj(vstup({ model: 'MASSIVE' })).model).toBe('MASSIVE');
 	});
 
 	it('svetlá výška = výška vpredu − hrúbka nosníka (engine konštanta)', () => {

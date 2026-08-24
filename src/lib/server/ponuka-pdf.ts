@@ -10,6 +10,10 @@ import fontkit from '@pdf-lib/fontkit';
 import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
 import { DISCLAIMER, FIRMA, firmaRiadky, zhrnutieRiadky, type PonukaConfig } from '$lib/ponuka';
 import { formatDatumSk } from '$lib/datum';
+// #279 Fáza C: orientačná PREDAJNÁ cena (LEN MO — VO sa v mapperi odstráni). Seed + lookup
+// ostávajú SERVER-ONLY (tento súbor je server-only); do klienta sa nedostane.
+import { verejnaCenaPreModel } from './konfigurator-cena';
+import type { VerejnaCena } from '$lib/konfigurator';
 
 // A4 na body (pt) + jednotný okraj.
 const A4_W = 595.28;
@@ -39,6 +43,36 @@ function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): 
 	}
 	if (cur) lines.push(cur);
 	return lines;
+}
+
+/** EUR suma → "4 452,06 €" (obyčajná medzera pre tisícky — spoľahlivý glyf v subsete DejaVu;
+ *  nbsp z `Intl` by v PDF subsete nemusel byť). */
+function eurStr(n: number): string {
+	const cents = Math.round(n * 100);
+	const cele = Math.floor(cents / 100);
+	const dec = String(cents % 100).padStart(2, '0');
+	const tis = String(cele).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+	return `${tis},${dec} €`;
+}
+
+/** Orientačná cena z konfigurácie (LEN keď sú prítomné oba rozmery); inak `null`
+ *  (honest-degrade — bez rozmerov cenu neurčíme). VO sa nikdy nepočíta do PDF. */
+function cenaPreCfg(cfg: PonukaConfig): VerejnaCena | null {
+	if (!(cfg.sirka && cfg.sirka > 0) || !(cfg.hlbka && cfg.hlbka > 0)) return null;
+	return verejnaCenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model });
+}
+
+/** Textové riadky cenovej sekcie (zdieľané medzi PDF telom a metadátami). */
+function cenaRiadky(cena: VerejnaCena): { hlavny: string; podriadok: string } {
+	if (cena.druh === 'cena')
+		return {
+			hlavny: `${eurStr(cena.sDph)} s DPH`,
+			podriadok: `${eurStr(cena.bezDph)} bez DPH · model ${cena.model}`
+		};
+	return {
+		hlavny: 'Cena na vyžiadanie',
+		podriadok: `Individuálna ponuka · model ${cena.model}`
+	};
 }
 
 interface Ctx {
@@ -89,7 +123,7 @@ function drawHeader(ctx: Ctx, cursorTop: number): number {
 		font: ctx.bold,
 		color: INK
 	});
-	ctx.page.drawText('Nezáväzná špecifikácia produktu — bez cien', {
+	ctx.page.drawText('Nezáväzná špecifikácia s orientačnou cenou', {
 		x: MARGIN,
 		y: ruleY - 42,
 		size: 10,
@@ -97,6 +131,25 @@ function drawHeader(ctx: Ctx, cursorTop: number): number {
 		color: MUTED
 	});
 	return ruleY - 66;
+}
+
+/** #279 Fáza C: sekcia s orientačnou cenou (LEN MO). Vykreslí sa len keď je cena známa. */
+function drawCena(ctx: Ctx, cena: VerejnaCena, cursorTop: number): number {
+	let y = cursorTop;
+	ctx.page.drawText('Orientačná cena', { x: MARGIN, y, size: 12, font: ctx.bold, color: ACCENT });
+	y -= 8;
+	ctx.page.drawLine({
+		start: { x: MARGIN, y },
+		end: { x: A4_W - MARGIN, y },
+		thickness: 0.75,
+		color: BORDER
+	});
+	y -= 22;
+	const { hlavny, podriadok } = cenaRiadky(cena);
+	ctx.page.drawText(hlavny, { x: MARGIN, y, size: 17, font: ctx.bold, color: INK });
+	y -= 15;
+	ctx.page.drawText(podriadok, { x: MARGIN, y, size: 10, font: ctx.reg, color: MUTED });
+	return y - 14;
 }
 
 function drawKonfiguracia(ctx: Ctx, cfg: PonukaConfig, cursorTop: number): number {
@@ -248,22 +301,36 @@ export async function generatePonukaPdf(
 	// Europe/Bratislava — prod kontajner beží v UTC, `toLocaleDateString` bez zóny by blízko
 	// polnoci ukázal nesprávny deň (timestamps.md / #114). `opts.datum` je test-inject.
 	const datum = opts.datum ?? formatDatumSk(new Date().toISOString());
+	// #279 Fáza C: orientačná cena (LEN MO). `null` keď rozmery chýbajú (honest-degrade).
+	const cena = cenaPreCfg(cfg);
 	let cursor = A4_H - MARGIN;
 	cursor = drawHeader(ctx, cursor);
 	cursor = drawKonfiguracia(ctx, cfg, cursor);
+	if (cena) cursor = drawCena(ctx, cena, cursor);
 	cursor = await drawRenderSlot(doc, ctx, opts.renderPng, cursor);
 	drawFirmaADisclaimer(ctx, cursor);
 	drawFooter(ctx, datum);
 
 	// metadáta = testovateľný kanál hodnôt + korektné vlastnosti dokumentu
 	const rows = zhrnutieRiadky(cfg);
+	const cenaMeta = cena ? cenaRiadky(cena) : null;
 	doc.setTitle('Špecifikácia pergoly — Montalu');
 	doc.setAuthor(FIRMA.nazov);
 	doc.setCreator(FIRMA.nazov);
-	doc.setProducer('Montalu automatizácie — nezáväzná špecifikácia (bez cien)');
-	doc.setSubject(rows.map((r) => `${r.label}: ${r.value}`).join('; ') || 'Prázdna konfigurácia');
-	// „bez cien" marker do keywords (Producer pdf-lib pri save() prepisuje svojím podpisom)
-	doc.setKeywords([...rows.map((r) => r.value), 'bez cien', 'nezáväzná špecifikácia']);
+	doc.setProducer('Montalu automatizácie — nezáväzná špecifikácia s orientačnou cenou');
+	doc.setSubject(
+		[
+			...rows.map((r) => `${r.label}: ${r.value}`),
+			...(cenaMeta ? [`Orientačná cena: ${cenaMeta.hlavny}`] : [])
+		].join('; ') || 'Prázdna konfigurácia'
+	);
+	// cena do keywords (Producer pdf-lib pri save() prepisuje svojím podpisom)
+	doc.setKeywords([
+		...rows.map((r) => r.value),
+		...(cenaMeta ? [cenaMeta.hlavny] : []),
+		'orientačná cena',
+		'nezáväzná špecifikácia'
+	]);
 	doc.setCreationDate(new Date());
 	doc.setModificationDate(new Date());
 
