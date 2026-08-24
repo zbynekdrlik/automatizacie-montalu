@@ -891,7 +891,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		// prebehne. Feature-detect guard (rovnaký vzor ako v26 `hasOdooLeadColumn`, db-durability
 		// rule) je LEN pre minimálne migračné test-fixtures, ktoré `odpis_log` nestavajú a nepotrebujú
 		// — tam sa pridá len samostatná `odpis_imported`, `odpis_log` časť sa preskočí.
-		const maODpisLog =
+		const maOdpisLog =
 			db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='odpis_log'").get() !==
 			undefined;
 		db.transaction(() => {
@@ -912,12 +912,22 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 				CREATE INDEX idx_odpis_imported_key
 					ON odpis_imported(modul, zak_norm, op_norm, live, content_hash);
 			`);
-			if (maODpisLog) {
+			if (maOdpisLog) {
 				db.exec(`
 					ALTER TABLE odpis_log ADD COLUMN zak_norm TEXT NOT NULL DEFAULT '';
 					ALTER TABLE odpis_log ADD COLUMN op_norm TEXT NOT NULL DEFAULT '';
 					UPDATE odpis_log SET zak_norm = zak, op_norm = op;
 					CREATE INDEX idx_odpis_log_norm ON odpis_log(modul, live, zak_norm, op_norm);
+				`);
+				// BACKFILL ledgeru z existujúcich odpisov (review #294): bez neho by KAŽDÝ historický
+				// import ostal nechránený (uvoľnenie + identický re-send starého odpisu → dvojitý
+				// import — presne #294 trieda). Append-only, NEdeštruktívne (raw stĺpce nedotknuté).
+				// Použije `zak_norm/op_norm/content_hash/filename` z odpis_log (po UPDATE vyššie =
+				// raw copy pre existujúce riadky; verdikt: existujúce riadky ostávajú „as-is").
+				db.exec(`
+					INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor, created_at)
+						SELECT modul, zak_norm, op_norm, live, content_hash, 'import', filename, created_by, created_at
+						FROM odpis_log;
 				`);
 			}
 			bump(27);

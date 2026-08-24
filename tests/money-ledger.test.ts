@@ -15,7 +15,7 @@ process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 
 const { writeOdpis, releaseOdpis, listOdpisy, povolitReimport } =
 	await import('../src/lib/server/money');
-const { loadCfg } = await import('../src/lib/server/db');
+const { loadCfg, db } = await import('../src/lib/server/db');
 const { safeCompute } = await import('../src/lib/server/compute');
 import type { OdpisJob } from '../src/lib/server/money';
 
@@ -77,6 +77,24 @@ describe('#294 ledger — re-import identického obsahu po uvoľnení', () => {
 
 	// owner constraint (2026-08-24): „ale ved moze mat viacero objednavok rovnaky obsah" —
 	// dve RÔZNE zákazky s IDENTICKÝM obsahom sa NESMÚ blokovať navzájom.
+	// review #294: import sa zapisuje ATOMICKY s claim-om (pred zápisom súboru), aby reštart v okne
+	// medzi rename a zápisom ledgeru nenechal reálny import nezaznamenaný.
+	it('úspešný zápis zaznamená PRÁVE 1 import riadok v ledgeri', async () => {
+		const before = (
+			db.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'import'").get() as {
+				c: number;
+			}
+		).c;
+		const w = await writeOdpis(makeReq('ZAK-LED1', '01'));
+		expect(w.status).toBe('written');
+		const after = (
+			db.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'import'").get() as {
+				c: number;
+			}
+		).c;
+		expect(after).toBe(before + 1);
+	});
+
 	it('[GUARD] identický obsah pod INÝM zak/op prejde normálne (per-order tuple, nie globálny hash)', async () => {
 		const a = await writeOdpis(makeReq('ZAK-SAME-A', '01'));
 		const b = await writeOdpis(makeReq('ZAK-SAME-B', '01'));

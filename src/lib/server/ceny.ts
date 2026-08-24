@@ -274,7 +274,12 @@ export interface OdpisKodyValidacia {
 const SNAPSHOT_MAX_DNI = 7;
 
 /** Písmenový prefix kódu (`ZASP` z `ZASP00014`, `PRP` z `PRP20258`) — určuje, či daný kód
- *  vôbec spadá do rozsahu snapshotu (snapshot ťahá LEN ZASP.../ZASK... + TS..., nie PRP.../BPP...). */
+ *  vôbec spadá do rozsahu snapshotu (snapshot ťahá LEN ZASP.../ZASK... + TS..., nie PRP.../BPP...).
+ *  POZN.: `kodPrefix` je case-insensitive + trim, ale `getPriceRow` matchuje kód PRESNE (case-sensitive,
+ *  bez trimu) — takže kód s inou veľkosťou písmen / medzerami sa síce dostane do scope, ale lookup ho
+ *  nenájde → označí sa `neznamy` (blok). To je ZÁMERNE konzervatívne (mangled kód = radšej blok než
+ *  tichý import). Guard chytá len numerickú časť kódu — preklep v PÍSMENOVOM prefixe (`TSS` miesto `TS`)
+ *  posunie kód mimo scope a NEvaliduje sa (nemáme oň dáta). */
 function kodPrefix(kod: string): string {
 	const m = /^[A-Za-z]+/.exec(kod.trim());
 	return m ? m[0].toUpperCase() : '';

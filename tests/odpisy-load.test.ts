@@ -74,4 +74,45 @@ describe('/odpisy load — pokazený JSON detail nezhodí históriu (audit #29)'
 		expect((r as { error?: string }).error).toMatch(/Neplatný/);
 		expect((db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c).toBe(before);
 	});
+
+	// #294 override akcia „⚠️ Povoliť rovnaký" — deliberátny, auditovaný re-import identického obsahu.
+	it('povolitReimport odmietne neplatné id bez zásahu do DB', async () => {
+		const before = (db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c;
+		const fd = new FormData();
+		fd.append('id', '0');
+		const r = await actions.povolitReimport({
+			request: new Request('http://x/odpisy', { method: 'POST', body: fd }),
+			locals: { user: { id: 1, username: 'tester', role: 'internal' } }
+		} as Parameters<typeof actions.povolitReimport>[0]);
+		expect((r as { error?: string }).error).toMatch(/Neplatný/);
+		expect((db.prepare('SELECT COUNT(*) c FROM odpis_log').get() as { c: number }).c).toBe(before);
+	});
+
+	it('povolitReimport na platný odpis: zmaže riadok + pridá override do ledgeru + auditne', async () => {
+		const info = ins('ZAK-REIMP', '{}');
+		const id = Number(info.lastInsertRowid);
+		const fd = new FormData();
+		fd.append('id', String(id));
+		const r = await actions.povolitReimport({
+			request: new Request('http://x/odpisy', { method: 'POST', body: fd }),
+			locals: { user: { id: 1, username: 'tester', role: 'internal' } }
+		} as Parameters<typeof actions.povolitReimport>[0]);
+		expect((r as { reimportPovoleny?: boolean }).reimportPovoleny).toBe(true);
+		// (a) odpis_log riadok je preč (uvoľnený, aby re-send prešiel)
+		expect(db.prepare('SELECT 1 FROM odpis_log WHERE id = ?').get(id)).toBeUndefined();
+		// (b) v ledgeri pribudol override riadok
+		const ovr = db
+			.prepare(
+				"SELECT actor, reason FROM odpis_imported WHERE kind = 'override' ORDER BY id DESC LIMIT 1"
+			)
+			.get() as { actor: string; reason: string } | undefined;
+		expect(ovr).toBeTruthy();
+		expect(ovr!.actor).toBe('tester');
+		expect(ovr!.reason).toContain('re-import');
+		// (c) audit záznam o povolení
+		const audit = db
+			.prepare("SELECT zmeny FROM cfg_audit WHERE sys_styl = 'odpis' ORDER BY id DESC LIMIT 1")
+			.get() as { zmeny: string };
+		expect(audit.zmeny).toContain('Povolený RE-IMPORT');
+	});
 });

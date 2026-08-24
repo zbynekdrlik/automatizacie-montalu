@@ -379,7 +379,11 @@ export async function writeOdpis(
 	}
 
 	// (#294) normalizovaný dedup precheck — OP260286 ≡ 260286 obíde RAW UNIQUE, tak dedup-ujeme na
-	// normalizovaných stĺpcoch. RAW UNIQUE(modul,zak,op,live) nižšie ostáva pre atomicitu race-u.
+	// normalizovaných stĺpcoch. RAW UNIQUE(modul,zak,op,live) nižšie kryje ATOMICKY len race
+	// IDENTICKÉHO zápisu (rovnaké raw zak/op). Cross-spelling race (OP260286 vs 260286 súbežne) NEMÁ
+	// DB constraint — kryje ho len to, že precheck→claim beží BEZ `await` v jednom synchrónnom bloku
+	// (jeden proces, better-sqlite3 synchrónne). NEVKLADAJ `await` medzi tento precheck a INSERT
+	// nižšie — otvoril by cross-spelling double-import okno.
 	const normDup = db
 		.prepare(
 			'SELECT created_at FROM odpis_log WHERE modul = ? AND live = ? AND zak_norm = ? AND op_norm = ?'
@@ -427,17 +431,23 @@ export async function writeOdpis(
 	}
 
 	let rowId: number | bigint;
+	// (#294) id ledger 'import' riadku — zapíše sa ATOMICKY s claim-om (nižšie), pri zlyhaní
+	// zápisu súboru (kompenzácia) sa podľa neho zruší.
+	let ledgerImportId: number | bigint = 0;
 	try {
-		// odpis_log + odpis_polozky v JEDNEJ transakcii (#154, fáza 1): položky sú 1:1
-		// s tým, čo odišlo do Money (predtým appka držala len súhrn v `detail`) a musia
-		// vzniknúť/zaniknúť SPOLU s dedup záznamom — nikdy log bez položiek alebo naopak.
-		// UNIQUE (dedup) aj FK zlyhanie automaticky rollbackne CELÚ transakciu.
+		// odpis_log + odpis_polozky + ledger 'import' v JEDNEJ transakcii (#154 fáza 1 + #294):
+		// položky sú 1:1 s tým, čo odišlo do Money a musia vzniknúť/zaniknúť SPOLU s dedup
+		// záznamom. UNIQUE (dedup) aj FK zlyhanie automaticky rollbackne CELÚ transakciu.
 		const insLog = db.prepare(
 			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, zak_norm, op_norm)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		);
 		const insPolozka = db.prepare(
 			`INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, ?)`
+		);
+		const insImported = db.prepare(
+			`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor)
+			 VALUES (?, ?, ?, ?, ?, 'import', ?, ?)`
 		);
 		rowId = db.transaction(() => {
 			const id = insLog.run(
@@ -456,6 +466,21 @@ export async function writeOdpis(
 				opNorm
 			).lastInsertRowid;
 			for (const o of job.polozky) insPolozka.run(id, o.kod, o.nazov, o.qty, o.mj ?? 'm');
+			// (#294) ledger 'import' ATOMICKY s claim-om — zapíše sa PRED zápisom súboru, takže ani
+			// reštart/pád v okne medzi `rename` a zápisom ledgeru nenechá REÁLNY Money import
+			// nezaznamenaný (inak by neskoršie uvoľnenie + identický re-send obišlo ledger →
+			// dvojitý import, presne to, čo ledger stráži). Pri ZLYHANÍ zápisu súboru (kompenzácia
+			// nižšie) sa TENTO riadok zmaže — import sa nikdy nevykonal, čo NIE JE porušenie
+			// append-only (append-only chráni záznam REÁLNEHO importu, nie zrušenú claim-nu).
+			ledgerImportId = insImported.run(
+				job.modul,
+				zakNorm,
+				opNorm,
+				live,
+				ledgerHash,
+				filename,
+				job.createdBy
+			).lastInsertRowid;
 			return id;
 		})();
 	} catch (e: unknown) {
@@ -535,9 +560,14 @@ export async function writeOdpis(
 			bytes: buf.length
 		});
 	} catch (e) {
-		// kompenzácia: súbor sa nezapísal → uvoľni dedup kľúč, nech sa dá poslať znova
-		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(rowId);
-		log.error('odpis kompenzácia — zápis súboru zlyhal, dedup kľúč uvoľnený', {
+		// kompenzácia: súbor sa nezapísal → uvoľni dedup kľúč AJ zruš ledger 'import' riadok (import
+		// sa NIKDY nevykonal, takže jeho zmazanie NIE je porušenie append-only — append-only chráni
+		// záznam REÁLNEHO importu), nech sa dá poslať znova. Obe v jednej transakcii.
+		db.transaction(() => {
+			db.prepare('DELETE FROM odpis_log WHERE id = ?').run(rowId);
+			db.prepare('DELETE FROM odpis_imported WHERE id = ?').run(ledgerImportId);
+		})();
+		log.error('odpis kompenzácia — zápis súboru zlyhal, dedup kľúč + ledger claim uvoľnené', {
 			modul: job.modul,
 			zak: job.zak,
 			op: job.op,
@@ -547,14 +577,6 @@ export async function writeOdpis(
 		});
 		throw e;
 	}
-
-	// (#294) APPEND-ONLY ledger — až PO úspešnom `rename` (súbor je reálne v import priečinku, teda
-	// „bol importovaný"). Kompenzácia (vyššie) tento riadok NEVYTVORÍ (vzniká len po úspechu) a
-	// `releaseOdpis`/`povolitReimport` ho NIKDY nemažú — to je celý zmysel poistky mimo dedup kľúča.
-	db.prepare(
-		`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor)
-		 VALUES (?, ?, ?, ?, ?, 'import', ?, ?)`
-	).run(job.modul, zakNorm, opNorm, live, ledgerHash, filename, job.createdBy);
 
 	return { status: 'written', live: isLive(), target, filename };
 }

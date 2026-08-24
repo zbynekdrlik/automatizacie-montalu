@@ -97,4 +97,36 @@ describe('migrácia v26 → v27: ochrany proti dvojitému importu (#294)', () =>
 		);
 		expect(cols).toContain('odoo_lead_id');
 	});
+
+	// review #294: ledger sa backfillne z existujúcich odpisov, inak by historické importy ostali
+	// nechránené (uvoľnenie + identický re-send starého odpisu → dvojitý import).
+	it('ledger je backfillnutý z existujúcich odpisov (historické importy chránené)', () => {
+		const row = db
+			.prepare(
+				"SELECT modul, zak_norm, op_norm, live, content_hash, kind, filename, actor FROM odpis_imported WHERE zak_norm = 'ZAK2026273'"
+			)
+			.get() as {
+			modul: string;
+			zak_norm: string;
+			op_norm: string;
+			live: number;
+			content_hash: string;
+			kind: string;
+			filename: string;
+			actor: string;
+		};
+		expect(row).toBeTruthy();
+		expect(row.kind).toBe('import');
+		expect(row.op_norm).toBe('OP260233'); // raw copy (existujúci riadok „as-is")
+		expect(row.content_hash).toBe('deadbeef');
+		expect(row.filename).toBe('a.xlsx');
+		expect(row.actor).toBe('vyroba');
+		// backfill = práve 1 riadok na 1 existujúci odpis (žiadne zdvojenie)
+		const n = (
+			db.prepare("SELECT COUNT(*) c FROM odpis_imported WHERE kind = 'import'").get() as {
+				c: number;
+			}
+		).c;
+		expect(n).toBe(1);
+	});
 });

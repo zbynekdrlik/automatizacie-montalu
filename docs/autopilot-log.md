@@ -1601,3 +1601,47 @@ implementované, nereprodukovateľné čestný null:
 - **Mutation `ENOTEMPTY rename deps___vitest__` (mutation-diff shard 4).** NIE mutant, NIE timeout — flaky race: N paralelných Stryker vitest procesov zdieľa symlinknutý `node_modules/.vite` a preteká na atomickom rename optimize temp dir. **Fix (`24e1ce3`):** per-proces `cacheDir` (`node_modules/.vite-stryker-${pid}`) scoped na `.stryker-tmp` CWD; normálny beh nedotknutý. Gotcha v `.claude/rules/testing.md`.
 - **Gate:** `npm run check` 0 chýb, `npm run lint` čisté, `npm test` 160 súborov / 2119 testov zelené, coverage nad prahmi. Verzia ostáva `0.24.26` (release unit #282, nebumpovať). Lokálny build/E2E preview nespúšťaný (Tier 0 + dispatch) — end-to-end overí CI. Design comment + root-cause dôkazy na PR #291.
 - **Bypass:** sankcionovaný pre-existing `test.skip(BASE_URL)` guard z lane #282 v otvorenom PR rozsahu (`# airuleset:test-skip-ok`, zhodne s 8035878/182ed8e).
+
+## #294 + #295 — Odpis: dvojitý import + tichá strata položiek (BATCH, worktree agent-a85429d46bd9bd351)
+
+Vetva `worktree-agent-a85429d46bd9bd351` (base `4b3598a`). Bump `0.24.28-dev.1` (`ef2efec`).
+Dôkazy: `~/.claude/work-products/money-odpis-audit/verdict.md` §2/§3 + `our-side-analysis.md`.
+
+**#294 — dvojitý import (append-only ledger + normalizácia op/zak):**
+- Root cause (verdikt §2, dokázané): `releaseOdpis` maže dedup kľúč `odpis_log` bez Money-guardu
+  (uvoľni → pošli znova = re-import; 30.7 incident 4 uvoľnenia ↔ 5 identických content-hash v DONE);
+  `op`/`zak` nenormalizované (`OP260286` vs `260286` = 2 riadky).
+- RED `77fba2c` (`tests/money-ledger.test.ts`): (1) write→(Money spracoval, súbor preč)→release→write
+  identický ⇒ re-import (existsSync target=true, malo false); (2) `OP260286` potom `260286` ⇒ written
+  (malo duplicate). GREEN `21b3571`.
+- Migrácia v27 (`migracie.ts`): `odpis_imported(modul,zak_norm,op_norm,live,content_hash,kind∈
+  {import,override},filename,actor,reason,created_at)` — APPEND-ONLY, release/kompenzácia NEMAŽE +
+  `odpis_log.zak_norm/op_norm` (LOOKUP dedup, žiadny UNIQUE — verdikt zakazuje deštruktívnu migráciu
+  existujúcich kolidujúcich riadkov id 46/47; backfill raw copy; guard existencie odpis_log len pre
+  minimálne test-fixtures). `content_hash` v odpis_log zmenené na `contentHash(zak_norm,...)`
+  (write-only stĺpec, žiadny konzument logiky; planHash guard modulov je oddelený — z RAW zak).
+- `writeOdpis`: normalizovaný precheck → ledger safety-net (`imports>overrides` ⇒ `blocked`/
+  `ledger-duplicate`, per-order tuple + content_hash, NIKDY globálny hash — owner: „viacero
+  objednavok rovnaky obsah") → existing atomic claim (RAW UNIQUE, race) → file write → append
+  `import` AŽ PO úspešnom rename (kompenzácia ho nevytvorí). `normOp`: `260286≡OP260286`,
+  `OPOP260233→OP260233`, `OPDL…` distinct, swapped-fields log+warn.
+- Override `povolitReimport` na /odpisy = release + append `override` (one-shot, auditované cfg_audit);
+  bežné „Uvoľniť" identický obsah ĎALEJ blokuje (poistka). 5 modulov: `blocked` vetva reuse
+  `step:'duplikat'` cez `blokHlaska(outcome,...)`.
+- Test-fix (justif.): `money.test.ts` release test asertoval starý (buggy) „re-write prejde" → teraz
+  `blocked`; `migration.test.ts` idempotency `SELECT *` → explicitný zoznam stĺpcov (v27 pridal stĺpce).
+- Large-file-split: seed dáta/funkcie → `migracie-seed.ts` (parameter injection; migracie.ts 930 r. < 1000).
+- Follow-upy: #299 staging move-evidencia (needs-user-decision), #297 perzistencia money logov (cross-cutting).
+
+**#295 — tichá strata položiek (pre-export validácia kódov):**
+- Root cause (verdikt §3): `writeOdpis` po rename neoveruje NIČ na úrovni riadkov; neznámy Money kód →
+  import ticho zahodí CELÝ doklad (Dominik: „neodpíše VÔBEC").
+- RED `7e58ea5` (`tests/money-validacia-kody.test.ts`, MONEY_LIVE=1 do TEMP): live neznámy kód → súbor
+  vznikol. GREEN `9ef11bd`.
+- `ceny.ts validateOdpisKody`: proti dennému `material_prices` snapshotu; neznámy kód / `sklad=null` ⇒
+  problém. PREFIX-SCOPE (empirický zo snapshotu — validuje len ZASP/ZASK/TS prefix, pergola PRP*/bazén
+  BPP* mimo scope → neblokuje). Snapshot-age guard >7 dní/chýba ⇒ degrade (warning, neblokuj).
+- `writeOdpis` live=1 → `!ok` ⇒ `{status:'blocked', reason:'unknown-kod', chybajuceKody}`;
+  `opts.overrideKody` ⇒ auditovaný bypass (cfg_audit). live=0 sa neblokuje.
+- Post-import readback (verdikt §3 bod B) = follow-up **#298** (Scope-gate: security-boundary — Money
+  DB RO prístup z VPS appky = nová infra).

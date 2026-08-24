@@ -11,6 +11,7 @@ const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-valid-kody-'));
 process.env.DATABASE_PATH = path.join(tmpRoot, 'test.db');
 process.env.MONEY_LIVE = '1';
 process.env.MONEY_LIVE_DIR = path.join(tmpRoot, 'dlv-import'); // TEMP, nikdy reálny import dir
+process.env.MONEY_NA_ODPIS_DIR = path.join(tmpRoot, 'dlv-import', 'NA ODPIS'); // TEMP — nikdy reálny staging
 process.env.CENY_SNAPSHOT_PATH = path.join(tmpRoot, 'neexistuje.json'); // no-file → seed z DB ostane
 
 const { writeOdpis } = await import('../src/lib/server/money');
@@ -70,7 +71,7 @@ describe('#295 pre-export validácia kódov (live=1)', () => {
 		expect(w.status).toBe('blocked');
 		expect(w.reason).toBe('unknown-kod');
 		expect(w.chybajuceKody?.map((p) => p.kod)).toContain('ZASP99999');
-		expect(w.chybajuceKody?.[0].dovod).toBe('neznamy');
+		expect(w.chybajuceKody?.[0]?.dovod).toBe('neznamy');
 	});
 
 	it('kód v snapshote ale BEZ skladovej karty (sklad=null) sa tiež blokuje', async () => {
@@ -79,7 +80,7 @@ describe('#295 pre-export validácia kódov (live=1)', () => {
 		);
 		expect(w.status).toBe('blocked');
 		expect(w.reason).toBe('unknown-kod');
-		expect(w.chybajuceKody?.[0].dovod).toBe('bez-skladovej-karty');
+		expect(w.chybajuceKody?.[0]?.dovod).toBe('bez-skladovej-karty');
 	});
 
 	it('override (overrideKody) pošle napriek neznámemu kódu + zapíše audit', async () => {
