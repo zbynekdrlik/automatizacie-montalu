@@ -81,7 +81,7 @@ const off = (sysStyl: string, poradie: number) =>
 
 describe('reálny v12 → v13: Slide opona geometria podľa Excelu', () => {
 	it('user_version = 13', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(28);
+		expect(db.pragma('user_version', { simple: true })).toBe(29);
 	});
 
 	it('KAŽDÝ opravený Slide opona offset sedí s cfg_seed', () => {

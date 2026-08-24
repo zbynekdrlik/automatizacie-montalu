@@ -47,7 +47,7 @@ const { writeOdpis } = await import('../src/lib/server/money');
 describe('migrácia odpis_log v1 → v2/v3', () => {
 	it('user_version = 9 a dáta prežili s modul=zasklenia + detail JSON', () => {
 		// v1 DB prejde VŠETKÝMI migráciami po import db.ts (naposledy v9 Štandard +).
-		expect(db.pragma('user_version', { simple: true })).toBe(28);
+		expect(db.pragma('user_version', { simple: true })).toBe(29);
 		const row = db
 			.prepare(
 				'SELECT modul, zak, op, zakaznik, live, content_hash, detail FROM odpis_log WHERE zak = ?'
@@ -152,7 +152,7 @@ describe('migrácia odpis_log v1 → v2/v3', () => {
 		// 5K horná koľajnica = 6000mm tyč (Money-kritické)
 		expect(
 			db
-				.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202434'")
+				.prepare("SELECT dlzka_tyce d FROM cfg_rez WHERE sys_styl='Deluxe|5K' AND kod='ZASP202427'")
 				.get()
 		).toEqual({ d: 6000 });
 		// migrované Robust/Slide riadky = default 7500 tyč + sklo_hrubka 0 (žiadna regresia).

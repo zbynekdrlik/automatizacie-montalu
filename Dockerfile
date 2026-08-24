@@ -34,7 +34,10 @@ COPY --from=build /app/package.json .
 # chown existujúci volume neprepíše. adapter-node servuje `build/` read-only a
 # better-sqlite3 sa len číta, takže /app nepotrebuje write; jediné zapisovateľné cesty
 # sú namontované volumes. Port 3000 (≥1024) nevyžaduje root.
-RUN mkdir -p /data/app && chown node:node /data/app
+# #297: /data/money-log = perzistentný money-audit volume (forenzný logger sink,
+# prežije redeploy). Rovnaký vzor ako /data/app — čerstvý prázdny named volume
+# zdedí owner node:node z tohto image adresára pri prvom mounte (non-root USER node).
+RUN mkdir -p /data/app /data/money-log && chown node:node /data/app /data/money-log
 USER node
 EXPOSE 3000
 CMD ["node", "build"]
