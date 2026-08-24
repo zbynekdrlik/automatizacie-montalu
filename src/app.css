@@ -78,6 +78,12 @@ h1 {
 	background: #ede9fe;
 	color: #6d28d9;
 }
+/* #299 — ručne presunutý odpis zo staging „NA ODPIS" do Money importu. Fialový „manual" tón ako
+   .badge.rucne (rovnaká sémantika „ručný krok"), reuse .badge tokenov — žiadny nový dizajnový jazyk. */
+.badge.presun {
+	background: #ede9fe;
+	color: #6d28d9;
+}
 /* Dátum vytvorenia plánu v tlačenej hlavičke (#114) — display-only, do Money nejde. */
 .vytvorene {
 	margin-left: 8px;

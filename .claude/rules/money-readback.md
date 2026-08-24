@@ -1,11 +1,13 @@
 ---
 paths:
   - 'src/lib/server/money-readback.ts'
+  - 'src/lib/server/money-presun.ts'
   - 'src/routes/odpisy/+page.server.ts'
   - 'src/routes/odpisy/+page.svelte'
   - 'scripts/dlv-readback-snapshot.py'
   - 'tests/money-readback*.test.ts'
   - 'tests/odpisy-readback-load.test.ts'
+  - 'tests/money-manual-move.test.ts'
 ---
 
 # POST-import readback z Money DB (#298) — overenie, že odpis reálne prešiel
@@ -50,6 +52,13 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   `priradGroup` teraz priradí každému `caka=1` odpisu `caka` HNEĎ na začiatku a NEPUSTÍ ho do
   matchingu → nikdy falošný alarm ANI falošné `ok`, a hlavne NECLAIMuje DLV (nepokradne doklad
   legit súrodencovi tej istej zákazky). „Neoverené" je čestný stav. SQL MUSÍ čítať `l.caka`.
+- **#299 VÝNIMKA — DETEKOVANÝ ručný presun VSTUPUJE do matchingu (`caka=1 AND presunute_at IS NULL`).**
+  Keďže `caka` je nemenné, presunutý parkovaný odpis by inak ostal navždy „neoverený" aj po tom, čo je
+  reálne v Money. `detectManualStagingMoves` (`money.ts`, volané z `/odpisy` load) diffom staging dir
+  označí `odpis_log.presunute_at`, keď staged súbor zmizol (rodičovský dir stále existuje — fail-safe).
+  Readback SQL preto číta AJ `CASE WHEN l.presunute_at IS NOT NULL THEN 1 ELSE 0 END AS presunute` a
+  `priradGroup` vylúči LEN `o.caka === 1 && o.presunute === 0`. Presunutý (`presunute=1`) odpis vstúpi
+  do matchingu ako aktívny → dostane reálny Money verdikt (✅/⛔). Detekcia je READ-ONLY na staging.
 - **EXKLUZÍVNE priradenie DLV↔odpis per zákazka (`priradGroup`).** `UNIQUE(modul,zak,op,live)` →
   zasklenia+pergola+bazén jednej zákazky zdieľajú zak+op; jeden prežitý DLV by inak overil VIAC
   odpisov (a tichý drop by prešiel ako ok). Dvojfázový greedy: najprv v-pásme, potom zvyšné; každý
@@ -63,6 +72,35 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   `caka=1` sa sem už nedostanú — sú vylúčené na začiatku `priradGroup`, viď bullet vyššie, #308.)
 - **`/odpisy` load MUSÍ byť try/catch okolo readbacku** — stránka hostí „Uvoľniť" (jediná cesta
   k oprave duplikátov); readback DB/IO chyba degraduje na „neoverené", NIKDY 500.
+
+## #299 detekcia ručného presunu zo staging (`money-presun.ts`) — gotchy
+
+`detectManualStagingMoves()` (volané z `/odpisy` load) diffom staging dir ↔ `caka=1 live` riadky
+označí `odpis_log.presunute_at`, keď staged súbor zmizol → presunutý odpis vstúpi do readback
+matchingu (viď #299 VÝNIMKA bullet vyššie). Tri neintuitívne pasce (všetky našiel Money-safety
+review, nie prvý návrh):
+
+- **Readback presunutého odpisu MERAJ grace/okno od PRESUNU, nie od vytvorenia (`refEpoch`).** Parkovaný
+  odpis vzniká dni/týždne pred ručným presunom; súbor doráta do Money AŽ presunom, takže DLV vznikne až
+  potom. `moneyMalCas`/`vOkne` proti `createdEpoch` by dali falošný ⛔ „chyba-doklad" pri KAŽDOM
+  korektnom presune (snapshot ešte nemá čerstvý DLV) a >30d-parkovaný presun by z okna vypadol a nikdy
+  nealarmoval. `priradGroup` phase 2 preto počíta `refEpoch = presunute===1 ? max(created, presunute) :
+  created` (SELECT nesie `presunuteEpoch = strftime('%s', presunute_at)`). Date-compat (`bratDay` z
+  vytvorenia) sa NEMENÍ — move-datovaný DLV vždy prejde spätnou toleranciou.
+- **Detekcia MUSÍ mať vekový prah `created_at <= now-10min` (race guard).** `writeOdpis` zaberie DB
+  riadok ATOMICKY (caka=1, target, presunute_at NULL), ale súbor zapíše až PO `await buildXlsx`. V tom
+  okne súbežný /odpisy load vidí dir-existuje (subdir sa recykluje) + target-chýba → označí ČERSTVÝ
+  riadok ako presunutý = TRVALÝ false-positive (presun sa neruší). Človek nikdy nepresunie súbor do
+  minút od staging → 10-min prah okno zatvára. (Crash-residue medzi claim a zápisom je iný, dokumentovaný
+  okraj.)
+- **„Súbor zmizol?" na sieťovom share = `statSync` + LEN ENOENT, NIE `existsSync`.** `fs.existsSync` vráti
+  `false` na AKEJKOĽVEK stat chybe (EACCES/EIO/stale CIFS handle), nie len ENOENT — degradovaný (nie
+  odpojený) share by tak označil CELÝ subdir presunutý (trvalo). Použi `statSync` v try/catch: dir musí byť
+  DOSTUPNÝ (dir-stat chyba → skip), „presunutý" = LEN čistý `err.code==='ENOENT'` na TARGETE; iná chyba →
+  skip. Detekcia je inak READ-ONLY na staging (žiadny move/write/delete), `writeOdpis` sa NEDOTÝKA.
+- **Ledger append je IDEMPOTENTNÝ (`imports<=overrides`), nie bezpodmienečný.** V prode `writeOdpis` (aj v27
+  backfill) už nechal `import` riadok (`imports=1`), takže detekčný append je tam no-op; bezpodmienečný
+  append by rozbil #294 invariant „1 override = 1 re-import" (imports=2 → legit override neodblokuje).
 
 ## Producer schéma je LIVE-OVERENÁ (#298, 2026-08-24)
 

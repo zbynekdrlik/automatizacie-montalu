@@ -7,9 +7,7 @@
 import type Database from 'better-sqlite3';
 import seed from './cfg_seed.json';
 import { logger } from './log';
-// seed dáta + seed funkcie extrahované do `migracie-seed.ts` (#294, large-file-split, aby
-// `migracie.ts` zostal pod 1000-riadkovým stropom). Parameter injection (db/hashPassword ako
-// argumenty) — žiadny cyklický import. Volajú sa z migračných blokov aj na konci `migrate()`.
+// seed dáta + seed funkcie + neskoré migračné bloky (v30/v31) extrahované do `migracie-seed.ts` (#294 a i., large-file-split; parameter injection db/hashPassword, žiadny cyklický import; volané z blokov aj z konca `migrate()`).
 import {
 	DELUXE_GLASS,
 	STANDARD_GLASS,
@@ -17,7 +15,8 @@ import {
 	seedGlass,
 	seedData,
 	seedUsers,
-	migrateDopytCenaStamp
+	migrateDopytCenaStamp,
+	migrateManualMoveColumn
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -994,6 +993,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	}
 
 	migrateDopytCenaStamp(db, bump); // v29 → v30 (#309); extrahované do migracie-seed (viď docstring)
+	migrateManualMoveColumn(db, bump); // v30 → v31 (#299); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }
