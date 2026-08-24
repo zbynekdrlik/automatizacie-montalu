@@ -14,11 +14,12 @@ const log = logger('odpisy');
 export const load: PageServerLoad = async () => {
 	// #299: detekuj RUČNÝ presun parkovaných (`caka=1`) odpisov zo staging „NA ODPIS" do Money importu
 	// PRED čítaním histórie + readbacku, aby oboje videli aktuálny stav (presunutý odpis vstúpi do
-	// readback matchingu + dostane UI marker). READ-ONLY na staging (len `fs.existsSync`). NIKDY nesmie
-	// zhodiť stránku — /odpisy hostí „Uvoľniť" (jedinú cestu k oprave duplikátov), takže IO chyba
+	// readback matchingu + dostane UI marker). READ-ONLY na staging cez async `readdir`+`stat` pod tvrdým
+	// rozpočtom (#315 — synchrónny fs na CIFS mounte blokoval event loop). NIKDY nesmie zhodiť stránku —
+	// /odpisy hostí „Uvoľniť" (jedinú cestu k oprave duplikátov), takže IO chyba (aj časový rozpočet)
 	// degraduje na „nič sa nedetekovalo", nie na 500.
 	try {
-		const presuny = detectManualStagingMoves();
+		const presuny = await detectManualStagingMoves();
 		if (presuny.length > 0)
 			log.info('detekované ručné presuny zo staging do Money importu (#299)', {
 				pocet: presuny.length,

@@ -54,7 +54,7 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   legit súrodencovi tej istej zákazky). „Neoverené" je čestný stav. SQL MUSÍ čítať `l.caka`.
 - **#299 VÝNIMKA — DETEKOVANÝ ručný presun VSTUPUJE do matchingu (`caka=1 AND presunute_at IS NULL`).**
   Keďže `caka` je nemenné, presunutý parkovaný odpis by inak ostal navždy „neoverený" aj po tom, čo je
-  reálne v Money. `detectManualStagingMoves` (`money.ts`, volané z `/odpisy` load) diffom staging dir
+  reálne v Money. `detectManualStagingMoves` (`money-presun.ts`, volané z `/odpisy` load) diffom staging dir
   označí `odpis_log.presunute_at`, keď staged súbor zmizol (rodičovský dir stále existuje — fail-safe).
   Readback SQL preto číta AJ `CASE WHEN l.presunute_at IS NOT NULL THEN 1 ELSE 0 END AS presunute` a
   `priradGroup` vylúči LEN `o.caka === 1 && o.presunute === 0`. Presunutý (`presunute=1`) odpis vstúpi
@@ -93,14 +93,31 @@ review, nie prvý návrh):
   riadok ako presunutý = TRVALÝ false-positive (presun sa neruší). Človek nikdy nepresunie súbor do
   minút od staging → 10-min prah okno zatvára. (Crash-residue medzi claim a zápisom je iný, dokumentovaný
   okraj.)
-- **„Súbor zmizol?" na sieťovom share = `statSync` + LEN ENOENT, NIE `existsSync`.** `fs.existsSync` vráti
-  `false` na AKEJKOĽVEK stat chybe (EACCES/EIO/stale CIFS handle), nie len ENOENT — degradovaný (nie
-  odpojený) share by tak označil CELÝ subdir presunutý (trvalo). Použi `statSync` v try/catch: dir musí byť
-  DOSTUPNÝ (dir-stat chyba → skip), „presunutý" = LEN čistý `err.code==='ENOENT'` na TARGETE; iná chyba →
-  skip. Detekcia je inak READ-ONLY na staging (žiadny move/write/delete), `writeOdpis` sa NEDOTÝKA.
+- **„Súbor zmizol?" na sieťovom share = ASYNC `fs.promises` pod rozpočtom + LEN ENOENT, NIKDY `existsSync`
+  ani SYNCHRÓNNY `statSync` (#315).** SYNCHRÓNNY `fs.statSync` na CIFS/WireGuard mounte blokoval event loop
+  na desiatky sekúnd (celý PROD freeze — viď #315 bullet nižšie), takže detekcia je celá async cez
+  `fs.promises` s tvrdým rozpočtom. A `fs.existsSync` je zakázaný z INÉHO dôvodu: vráti `false` na
+  AKEJKOĽVEK stat chybe (EACCES/EIO/stale CIFS handle), nie len ENOENT — degradovaný (nie odpojený) share
+  by tak označil CELÝ subdir presunutý (trvalo). Sémantika značenia: dir musí byť DOSTUPNÝ (`readdir`
+  úspech + per-riadková re-kontrola dir tesne pred markom, aby unmount uprostred behu neoznačil celý svep),
+  „presunutý" = LEN čistý `err.code==='ENOENT'` na TARGETE z POTVRDZUJÚCEHO exact-path statu; timeout/iná
+  chyba → skip. Detekcia je inak READ-ONLY na staging (žiadny move/write/delete), `writeOdpis` sa NEDOTÝKA.
 - **Ledger append je IDEMPOTENTNÝ (`imports<=overrides`), nie bezpodmienečný.** V prode `writeOdpis` (aj v27
   backfill) už nechal `import` riadok (`imports=1`), takže detekčný append je tam no-op; bezpodmienečný
   append by rozbil #294 invariant „1 override = 1 re-import" (imports=2 → legit override neodblokuje).
+- **NIKDY synchrónny `fs.*Sync` na staged cesty — je to CIFS/SMB share cez WireGuard (#315).** `detectManualStagingMoves`
+  bežala v `/odpisy` load SYNCHRÓNNE (`fs.statSync`); na PRODE tie `target` cesty ležia na `//192.168.1.200/...`
+  CIFS mounte (`soft, actimeo=1`) kde jeden `statSync` trvá **0,7–8,8 s** (namerané) → synchrónne staty na 22
+  parkovaných riadkoch ZABLOKOVALI event loop na desiatky sekúnd, aj `/health` timeoutol (celá appka zamrzla).
+  Lokálne/CI mikrosekundový fs to NIKDY neodhalí. Preto je detekcia teraz celá **async cez `fs.promises`** s
+  tvrdým wall-clock rozpočtom (`Promise.race`, `PRESUN_DETECT_BUDGET_MS=2500`) — pri prekročení sa ČESTNE
+  preskočí (parkované ostávajú, WARN), stránka sa VŽDY načíta; **jedna in-flight detekcia** (gate držaný kým fs
+  ops doznejú) + sekvenčne → max 1 libuv threadpool worker (visiaci `readdir`/`stat` neuvoľní vlákno hneď).
+  `readdir`-per-adresár (nie stat-per-súbor) redukuje počet volaní; MARK stále LEN po POTVRDZUJÚCOM exact-path
+  `stat` s čistým ENOENT (timeout/EACCES NIKDY neoznačí presun). **Pravidlo: každý nový fs prístup na `target`/
+  staging cesty MUSÍ byť async + pod rozpočtom — sieťový mount môže visieť sekundy.** (Testovacia pasca: mock
+  visiaci `readdir` cez injektovanú `DetectDeps`, over že detekcia dobehne v rozpočte a NEoznačí; orphan op
+  drží `detectBusy` gate → v teste ho uvoľni + počkaj, nech ďalší test nevidí „už beží".)
 
 ## Producer schéma je LIVE-OVERENÁ (#298, 2026-08-24)
 
