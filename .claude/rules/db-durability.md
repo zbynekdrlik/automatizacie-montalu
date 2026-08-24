@@ -78,3 +78,8 @@ NIE JE nová migrácia na prečíslovanie — je to DUPLIKÁT. Riešenie:
   na v26 DB (kľúč na riadku chýba) — žiadna strata pokrytia bez potreby column-less DB.
 - Kontrola po každom kroku: `grep -c '<<<<<<<' <súbor>` = 0 (PreToolUse block na compound
   príkaze = NIČ z neho nebežalo — píš merge-resolve a jeho overenie ako SAMOSTATNÉ volania).
+- **Renumber lane migrácie × SÚRODENECKÝ minimal-fixture migračný test (#296/#297 kolo,
+  commit 50786ef).** Pri renumber lane migrácie na `dev`, ktorý medzitým pridal SÚRODENECKÚ
+  minimal-fixture migračnú test (napr. #294 ledger v27 test), treba do fixtúry súrodenca
+  doplniť prázdnu tabuľku, ktorej sa renumbered krok dotýka, + zdvihnúť final-version assert
+  — kríži sa #282 renumber a no-such-table gotcha.
