@@ -13,7 +13,7 @@ import { goto, collectConsole, skipAkLive } from './helpers';
 // aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
 import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
 
-test('konfigurátor: verejný flow BEZ prihlásenia → súhrn konfigurácie, žiadna cena/Money kód, nula console chýb', async ({
+test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná cena, žiadny Money kód/VO, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
