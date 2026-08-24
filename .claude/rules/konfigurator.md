@@ -38,8 +38,13 @@ plochu: Money kód (`moneyKod`/TS*), nárez, **VEĽKOOBCHOD (VO)** cena (`priceB
 matica (seed). Cenový modul je server-only (`konfigurator-cena.ts` v `$lib/server/`) — do klienta
 sa nedostane; verejná route dostane LEN MO cez `verejnaCenaPreModel`/`verejneCenyModelov` (VO
 strip). Leak-guard testy sú podľa toho REDEFINOVANÉ (blanket „žiadne €" → „cena áno, VO/Money/
-nárez/matica nie"): `konfigurator-money-safety.test.ts` (C), `e2e/konfigurator.spec.ts`,
-`ponuka-pdf.test.ts` aj `konfigurator-cena.test.ts` (route-import assert). Detaily cenovej vrstvy:
+nárez/matica nie"). **PASCA (Fáza C, stálo 2 fix-kolá): STARÁ „žiadne ceny" politika bola
+rozsypaná v ŠIESTICH súboroch, nielen v očividnom leak-guarde** — pred dvíhaním takého guardu
+`grep -rnE "PRICE_RE|bez cien|nezáväzná špecifikácia|nie cenová ponuka|not\.toMatch\(/€"` cez celé
+`tests/` + `e2e/`. Redefinované: `konfigurator-money-safety.test.ts` (C, load bez ceny / akcia MO
+áno + VO nie), `e2e/konfigurator.spec.ts` (3 leak bloky + PDF metadáta), `ponuka-pdf.test.ts`
+(PRICE_RE → orientačná cena), `dopyt-pdf-regen.test.ts` (regen PDF cena), `ponuka.test.ts`
+(DISCLAIMER text), `konfigurator-cena.test.ts` (route-import assert). Detaily cenovej vrstvy:
 `.claude/rules/konfigurator-cena.md`.
 
 Katalóg `src/lib/sklo-strecha.ts` nesie pole `moneyKod` — TO je únikový vektor. Pravidlá:
