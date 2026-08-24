@@ -460,12 +460,19 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 	for (const [zak, group] of byZak) {
 		const cands = (
 			candStmt.all(zak) as { dlv: string; opNorm: string; pocet: number; datum: string | null }[]
-		).map((c) => ({
-			dlv: c.dlv,
-			opNorm: c.opNorm,
-			pocet: c.pocet,
-			datumDay: c.datum ? isoDayNum(c.datum) : null
-		}));
+		).map((c) => {
+			// NEplatný datum (producer-side korupcia, napr. „garbage" / nezarovnaný „2026-8-1") → NaN.
+			// Degraduj ho na `null` = BEZPEČNÁ „dátum neznámy → kompatibilné" cesta (rovnako ako chýbajúci
+			// datum), nie na tiché vylúčenie DLV (NaN >= x je vždy false → falošný „chýba doklad", presný
+			// opak cieľa #308). Starý strftime('%s') tiež degradoval na NULL/kompatibilné (#308 review 🟡).
+			const day = c.datum ? isoDayNum(c.datum) : NaN;
+			return {
+				dlv: c.dlv,
+				opNorm: c.opNorm,
+				pocet: c.pocet,
+				datumDay: Number.isFinite(day) ? day : null
+			};
+		});
 		for (const [id, r] of priradGroup(group, cands, genEpoch, windowS)) out.set(id, r);
 	}
 	return out;

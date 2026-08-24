@@ -348,4 +348,17 @@ describe('#308 readback — date-only tolerancia + caka=1 cross-match (falošné
 		expect(stav.dovod).toBe('');
 		expect(stav.dlv).toBe(null);
 	});
+
+	it('[review 🟡] DLV s NEPLATNÝM datum (napr. „garbage") sa degraduje na kompatibilné, NIE vylúči (#308)', () => {
+		// Malformed datum (producer-side korupcia) → isoDayNum = NaN. MUSÍ ísť na BEZPEČNÚ cestu „dátum
+		// neznámy → kompatibilné" (ako `null`), NIE tiché vylúčenie DLV (NaN >= x = false → falošný
+		// chyba-doklad, presný OPAK cieľa #308). Doklad sedí počtom (3), takže výsledok = `ok`. Bez
+		// NaN→null poistky by tento test padol na `nesulad/chyba-doklad`.
+		const id = insOdpisAbs('ZAK2026470', 'OP260470', Array(3).fill(1), '2026-08-21 10:00:00');
+		insDlvDateOnly('DLVBAD', 'ZAK2026470', '', 3, 'garbage');
+		setMetaAbs('2026-08-21 15:51:00');
+		const stav = readbackStav([id]).get(id)!;
+		expect(stav.stav).toBe('ok');
+		expect(stav.dlv).toBe('DLVBAD');
+	});
 });
