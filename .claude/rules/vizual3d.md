@@ -306,3 +306,83 @@ Preto `supersampleFaktor(..., softverovyRenderer)`: 3× LEN na potvrdenom
 hardvéri (`jeSoftverovyRenderer(UNMASKED_RENDERER)` cez
 `WEBGL_debug_renderer_info`), fail-safe default = softvér → strop 2×.
 NIKDY nerozhoduj kapacitu bufferov z per-dimension GL limitov samotných.
+
+## Post-processing leštiaci layer (#288) — EffectComposer, softvérový gate, detect-gpu ekvivalent
+
+**Three-native `EffectComposer`, NIE pmndrs/postprocessing.** Pipeline (`postproc.ts`
+`vytvorComposer`): `RenderPass → GTAOPass (ground-truth AO) → UnrealBloomPass (jemný,
+len high) → OutputPass → SMAAPass`. Dôvod voľby: renderer je **on-demand** (žiadny 60fps
+loop — `tikaj()` sa sám ukončí), takže jediná výhoda pmndrs/postprocessing (zlučovanie
+passov pre per-frame perf) sa NEUPLATNÍ, kým jej cena (~100 KB+ bundle + nová závislosť na
+mobil-first verejnej route) áno. GTAO je three-native ekvivalent N8AO.
+
+**Poradie passov je load-bearing pre RAL vernosť.** Medzipassy renderujú do offscreen
+HalfFloat targetu (linear — three tam tone mapping NEaplikuje). `OutputPass` je JEDINÉ
+miesto tone-mappingu a **číta `renderer.toneMapping`** (`OutputPass.js` má
+`NEUTRAL_TONE_MAPPING` define) → `NeutralToneMapping` z #285 ostáva → RAL farby sedia.
+`SMAAPass` je POSLEDNÝ (renderToScreen) — AA na výslednom tone-mapnutom sRGB (na to je
+navrhnuté), NIE pred OutputPass. Dvojité tone-mapovanie sa nedeje (medzipassy sú offscreen).
+
+**`composer.dispose()` NEuvoľní render targety passov** — uvoľní LEN interné read/write
+targety + copyPass. GTAO/bloom/SMAA majú vlastné targety → `vytvorComposer` si drží pole
+passov a `dispose()` volá `pass.dispose?.()` na KAŽDOM pred `composer.dispose()`. Bez toho
+GPU pamäť unikne pri každom unmount/context-lost (leak test `__VIZ_CONTEXTS===1` by to
+nezachytil — počíta WebGL kontexty, nie targety).
+
+**SOFTVÉROVÝ gate (#290 pokračovanie) — composer LEN na HARDVÉRI.** `postprocPovoleny`
+(kvalita.ts) = `nastavenia.postproc` (mid/high) A `!jeSoftverovyRenderer(renderer)`.
+SwiftShader (CI/lokálny headless Chromium) má malý CELKOVÝ alokačný rozpočet — viac-RT
+post-processing tam RISKUJE incomplete framebuffer. Preto composer cieli na REÁLNE
+zákaznícke GPU; softvérový/CI render ide **nezmenenou priamou cestou** (`renderer.render`)
+→ 0 regresie existujúcich mid/high E2E na SwiftShaderi. Konštrukcia composera je v
+`try/catch` s TICHÝM fallbackom na priamy render (vzor #285 HDRI). **Snapshot (`snimka.ts`)
+ostáva PRIAMY render** — tlačový PNG @2–3× cez GTAO/bloom mip-reťazec by riskoval #290
+alokáciu aj na hardvéri; supersample downscale dáva dosť AA.
+
+**`jeSoftverovyRenderer` sa presunul zo `snimka.ts` do `kvalita.ts`** (jediný zdroj pravdy
+klasifikácie renderer-stringu — zdieľa ho supersample strop, GPU-tier detekcia AJ postproc
+gate). `snimka.ts` ho re-exportuje (existujúce importy + testy funkčné).
+
+**detect-gpu EKVIVALENT (nie knižnica).** `klasifikujGpu(renderer)` — kurátorská tabuľka
+slabe/mobilne/integrovane/diskretne/neznamy z `UNMASKED_RENDERER_WEBGL`. `detekujTier`
+používa reálny GPU ako PRIMÁRNY mid-vs-high signál (namiesto CPU-jadrá/DPR viewport
+heuristiky), s fallbackom na pôvodnú heuristiku pri `neznamy`. **Prečo nie knižnica
+`detect-gpu`:** default `getGPUTier()` fetchuje benchmark DB z CDN = externý runtime fetch
+→ poruší Money-guard (`zbierajExterneRequesty` → `[]`), plus stovky KB na mobil-first route.
+Ekvivalent = 0 závislosti, 0 fetchu, pure + testovateľné. `SLABE_GPU_RE` zmenené na
+`/Mali|Adreno\D*[1-5]\d\d\b|PowerVR/i` (`\D*` znáša reálny „Adreno (TM) 4xx"), zachováva
+`Adreno 330→low`/`Adreno 660→nie` (zamknuté vo `vizual-kamera-kvalita`).
+
+**Softvérový lokálny Chromium NEUKÁŽE composer živo** — Playwright na headless boxe hlási
+`ANGLE (Google, ... SwiftShader ...)`, takže gate composer vypne (`data-viz-postproc="false"`).
+Na živé A/B (GTAO/SMAA/bloom vs priamy render) DOČASNE forceni composer window flagom
+(`__VIZ_FORCE_POSTPROC` v gate riadku `inicializuj`), over screenshotom + 0 console, a
+**REVERTNI pred commitom** (vzor `__VIZDEBUG`). Overené: composer sa na SwiftShaderi pri
+screen-res postaví + renderuje bez GL warningu (viditeľne hladšie hrany + kontaktné AO),
+sklo (transmission) sa vykreslí IDENTICKY (žiadne composer artefakty). Trvalý diagnostický
+atribút `data-viz-postproc` (paralela `data-viz-ready`) → E2E `overPostprocGate` overí, že
+na softvéri je gate OFF (regresný guard #290).
+
+**Review-driven gotchy (#288 adversariálny review):**
+
+- **GPU renderer-string klasifikácia — `(TM)` tolerancia UNIFORMNE + integrované-s-diskrétnym-
+  menom PRED diskrétnym testom.** Android/Windows hlásia „(TM)" medzi menom a číslom (`Adreno
+  (TM) 660`, `Radeon (TM) RX 480`, `Arc(TM) Graphics`) — každý vendor regex musí použiť `\D*` /
+  `(?:\s*\(TM\))?`, nielen Adreno. A POZOR na integrované GPU s „diskrétnym" menom: AMD APU
+  „Radeon Vega N Graphics", Intel Core Ultra „Arc(TM) Graphics" (bez Ax/Bx modelu), NVIDIA entry
+  „GeForce MX/GT" — MUSIA sa chytiť PRED diskrétnym pravidlom (`INTEGROVANE_IGPU_RE` v
+  `klasifikujGpu`), inak dostanú najťažší tier na tenkom zariadení. Diskrétny Arc/Vega sa odlíši
+  modelom/absenciou „Graphics" suffixu. `\bXe\b` (nie `Xe`) aby „Xeon" neprešlo Intel iGPU pravidlom.
+- **Optional LAZY CHUNK import potrebuje VLASTNÝ `.catch(()=>null)`** — `try/catch` okolo
+  KONŠTRUKCIE composera nezachytí zlyhanie `await import(...)` pass modulov (samostatný chunk,
+  flaky mobil). Bez `.catch` padne import do vonkajšieho catchu `inicializuj` → `tier='none'` →
+  zákazník stratí CELÝ náhľad. Graceful-degrade optional asset PRESNE ako `nacitajHDRI` (→ null).
+- **Snapshot `finally` obnoví obrazovku PRIAMYM `renderer.render()`** (bez composera) — po
+  `zachytObrazok` treba composer-aware `render()`, inak na hardvéri obrazovka po PNG exporte
+  stratí GTAO/SMAA/bloom do ďalšej interakcie (on-demand engine sám neprekresľuje).
+- **Composer továreň (`vytvorComposer`) je testovateľná FAKE ctormi** — berie všetky THREE
+  ctory injekciou, takže build vetvy + leak dispose slučka sa overia bez WebGL (`tests/vizual-
+  postproc.test.ts`, 100 %). NEVYLUČUJ ju z coverage ako `snimka.ts` (tá má reálny `gl.readPixels`).
+- **Slovenské komentáre: pozor na CYRILLIC HOMOGLYFY + soft hyphen (U+00AD).** Prekliky pri
+  písaní vsunú Cyrillic `е`/`о`/`живо` čo VYZERÁ ako Latin ale rozbije grep. Skenuj pred commitom:
+  `python3 -c "import re,sys; [print(f,i) for f in sys.argv[1:] for i,l in enumerate(open(f),1) if re.search(r'[Ѐ-ӿ­]',l)]" <súbory>`.

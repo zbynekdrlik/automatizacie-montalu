@@ -68,6 +68,9 @@ export default defineConfig({
 				// WebGL capture: `gl.readPixels` + canvas 2D → v headless vitest nemerateľné;
 				// jediná čistá fn `supersampleFaktor` má vlastný unit test.
 				'src/lib/vizual/snimka.ts'
+				// #288 pozn.: `postproc.ts` NIE JE vylúčené — `vytvorComposer` berie pass
+				// ctory INJEKCIOU, takže build vetvy + leak-kritická dispose slučka sa dajú
+				// testovať fake ctormi bez WebGL (viď `tests/vizual-postproc.test.ts`).
 			],
 			// Prahy = namerané − 2 %, LEN hore (nikdy pod predošlé server-only gaty
 			// 89/85/73/82). Namerané pri rozšírení 2026-08-20: lines 97,41 / stmts 96,23
