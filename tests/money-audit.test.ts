@@ -115,6 +115,32 @@ describe('log.ts → money-audit integrácia', () => {
 		expect(recs[0]!.zak).toBe('ZAK1');
 	});
 
+	it('money.info ide SÚČASNE na stdout AJ do súboru — identický riadok (dvojitý sink)', () => {
+		const file = freshFile();
+		process.env.MONEY_AUDIT_LOG = file;
+		process.env.LOG_LEVEL = 'debug'; // stdout aktívny AJ audit → oba sinky
+		const stdoutLines: string[] = [];
+		const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+			stdoutLines.push(String(chunk));
+			return true;
+		}) as typeof process.stdout.write);
+		try {
+			logger('money').info('odpis claim', { zak: 'ZAKDUAL' });
+		} finally {
+			spy.mockRestore();
+		}
+		const stdoutRecs = stdoutLines
+			.join('')
+			.split('\n')
+			.filter(Boolean)
+			.map((l) => JSON.parse(l) as Record<string, unknown>);
+		const fileRecs = readLines(file);
+		expect(stdoutRecs).toHaveLength(1);
+		expect(fileRecs).toHaveLength(1);
+		expect(fileRecs[0]).toEqual(stdoutRecs[0]); // ten istý serializovaný záznam do oboch
+		expect(fileRecs[0]!.zak).toBe('ZAKDUAL');
+	});
+
 	it('money:sub child modul sa tiež zapíše', () => {
 		const file = freshFile();
 		process.env.MONEY_AUDIT_LOG = file;
