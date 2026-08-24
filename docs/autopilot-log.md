@@ -1655,3 +1655,20 @@ akcia). Odložené 🟡 (override UI unreachable, Uvoľniť dead-end, OP/OPDL ba
 (cross-cutting) + Money-side overenie OP/OPDL rád. Full suite 2192 zelené, branch cov 89.36% ≥ 88.
 **Playbook:** `lint-formatting.md` (`*/`-v-JSDoc pasca, optional-chaining `?.[0]?.x`), money-odpis
 skill §7 (dedup ledger + normalizácia + pre-export validácia).
+
+## #298 — POST-import readback z Money DB (build-only lane, base-synced 0.24.29)
+Kontrola B verdiktu §3: appka po exporte overí, že Money reálne naimportoval odpis (DLV existuje +
+`PocetPolozek == počet odoslaných riadkov`); nesúlad = viditeľný ⛔ alarm na /odpisy, nie ticho.
+Commity: `b091dd1` [red] (stav placeholder=caka → 8 aserícií RED), `46d31bf` [green] (reader +
+klasifikátor + /odpisy badge + producer), `9dfa12d` [review], `0e0116a` merge origin/dev.
+Transport (design #298): rozšírenie externého dev2 read-only snapshot kanála (vzor ceny.ts) — NULA
+nových credentials v appka kontajneri; `scripts/dlv-readback-snapshot.py` → `dlv-readback.json` →
+rsync → appka lazy import do `money_dlv` (migrácia v29, Money-neutrálna). Stav = ČISTÁ funkcia
+on-the-fly. Review (Fable) 🔴 caka=1 parking (parkovaný odpis nealarmuje), 🟡 exkluzívne DLV↔odpis
+párovanie (priradGroup), 🟡 pásmo zero-row + E2E, 🔵 strftime UTC / okno od gen / try-catch load /
+banner — všetko opravené. Money safety/čas/SQL/migrácia/#414 = review CLEAN. Base-sync: dev medzitým
+0.24.28→0.24.29 (#296 rail=v28, #297 audit), moja money_dlv migrácia prečíslovaná v28→**v29**.
+Gates: check 0, lint clean, vitest 2246, coverage prahy držia, playwright odpisy 5/5.
+UNVERIFIED (provisioning, mimo appky): presné Money DLV stĺpce + či PocetPolozek ráta nulové riadky.
+**Playbook:** nový `.claude/rules/money-readback.md` (dátový tok, on-the-fly stav, strftime UTC pasca,
+caka=1 parking, exkluzívne párovanie, okno-klamp, E2E seed, producer UNVERIFIED) + router v CLAUDE.md.
