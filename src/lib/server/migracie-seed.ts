@@ -224,3 +224,37 @@ export function migrateDeluxe5KRail(db: Database.Database, bump: (v: number) => 
 		bump(28);
 	})();
 }
+
+/**
+ * v32 → v33: záväzná objednávka z verejného konfigurátora (#319). Objednávka je escalácia
+ * dopytu — ukladá sa do TEJ ISTEJ tabuľky `dopyt` s príznakom `je_objednavka=1` + fakturačnými
+ * údajmi + súhlasom s podmienkami. Znovupoužije cenovú pečiatku #309/#318 (`cena_*`/`cena_hladina`
+ * — objednaná cena je zapečatená vrátane MO/VO hladiny) aj celý Odoo lead pipeline #278; lead sa
+ * len VETVÍ podľa `je_objednavka` (opportunity vs lead). Nové stĺpce: `je_objednavka` (1=objednávka,
+ * NULL/0=dopyt), fakturačné meno/adresa/IČO/DIČ, `suhlas_podmienky` (1=súhlas). Aditívne +
+ * idempotentné: ALTER s NULL defaultom je O(1) a neprepíše žiadny existujúci riadok (všetky ostanú
+ * dopyty s NULL). Feature-detect `dopyt` (vzor v30/v32): minimálne migračné fixtures skáču za v25
+ * bez `dopyt` → ALTER sa preskočí; reálna prod DB `dopyt` má od v25. Celé v `db.transaction` (ALTER
+ * je v SQLite transakčné → pád sa čisto prehrá). MONEY-NEUTRÁLNE: CRM/objednávková evidencia, žiadny
+ * odpis ani zápis do Money. Extrahované sem (large-file-split — `migracie.ts` je na 1000-riadkovom
+ * strope), vzor `migrateDopytCenaHladina`.
+ */
+export function migrateObjednavka(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 33) return;
+	const maDopyt =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dopyt'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maDopyt) {
+			db.exec(`
+				ALTER TABLE dopyt ADD COLUMN je_objednavka INTEGER;
+				ALTER TABLE dopyt ADD COLUMN fakt_meno TEXT;
+				ALTER TABLE dopyt ADD COLUMN fakt_adresa TEXT;
+				ALTER TABLE dopyt ADD COLUMN fakt_ico TEXT;
+				ALTER TABLE dopyt ADD COLUMN fakt_dic TEXT;
+				ALTER TABLE dopyt ADD COLUMN suhlas_podmienky INTEGER;
+			`);
+		}
+		bump(33);
+	})();
+}

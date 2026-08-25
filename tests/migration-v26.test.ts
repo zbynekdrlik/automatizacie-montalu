@@ -52,7 +52,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v25 → v26: Odoo lead stavové stĺpce na dopyt (#278)', () => {
 	it('user_version === 26 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(32);
+		expect(db.pragma('user_version', { simple: true })).toBe(33);
 	});
 
 	it('existujúci dopyt (Eva) prežil migráciu (žiadna strata dát)', () => {
@@ -85,7 +85,14 @@ describe('migrácia v25 → v26: Odoo lead stavové stĺpce na dopyt (#278)', ()
 			'cena_model',
 			'cennik_verzia',
 			// #318/v32 — typ cenovej hladiny (MO/VO) opečiatkovanej ceny
-			'cena_hladina'
+			'cena_hladina',
+			// #319/v33 — záväzná objednávka (fakturačné údaje + súhlas)
+			'je_objednavka',
+			'fakt_meno',
+			'fakt_adresa',
+			'fakt_ico',
+			'fakt_dic',
+			'suhlas_podmienky'
 		]);
 	});
 
