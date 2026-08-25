@@ -387,10 +387,12 @@ export function prednaNohaPridavok(v: PergolaNarezVstup): number {
 
 /** Trčanie výstuhy do svetlosti [mm] = zvislý rozmer − skovanie 15 (Dominik ch207 1731729:
  *  110×110 trčí 95, 140×140 trčí 125; 200×140 → 185, 110×250 → 235). `null` bez zosilneného
- *  nosníka (výstuha fyzicky nie je). Profil = `vystuhaProfil` ?? systémový default. */
+ *  nosníka (výstuha fyzicky nie je). Odvodené z `prednaNohaPridavok` BY CONSTRUCTION, aby
+ *  invariant „noha = svetlosť + 15 + trčanie = svetlosť + zvislý rozmer" držal z definície
+ *  (nie z dvoch textovo zhodných lookupov). */
 export function vystuhaTrcanieMm(v: PergolaNarezVstup): number | null {
 	if (!v.zosilnenyNosnik) return null;
-	return VYSTUHA_VYSKA[v.vystuhaProfil ?? defaultVystuhaProfil(v.system)] - VYSTUHA_SKOVANIE_MM;
+	return prednaNohaPridavok(v) - VYSTUHA_SKOVANIE_MM;
 }
 
 /** Dĺžka rezu prednej nohy [mm] = zadaná svetlosť + prídavok (viď `prednaNohaPridavok`;
@@ -420,12 +422,19 @@ function krovoveListy(
 			system === 'Robust' ? PRITLACNA_NAD_NOMINAL_ROBUST_MM : PRITLACNA_NAD_NOMINAL_MM;
 		const listaDlzka = R2(krovNominal + pridavok);
 		const listaPozn = `= nominál krovu + ${pridavok} (${system})`;
+		// Robust čísla (odpočet −220 aj prídavok +30) sú podľa pravidla konštruktéra bez
+		// vlastného overovacieho výkresu → emitovaný riadok nesie viditeľnú výhradu.
+		const listaDetail =
+			system === 'Robust'
+				? 'Prídavok +30 aj odpočet dĺžky krovu pri Robust sú podľa pravidla konštruktéra — na potvrdenie pri prvej Robust zákazke.'
+				: undefined;
 		riadky.push({
 			kod: '18006',
 			nazov: 'Prítlačná lišta',
 			dlzkaRezuMm: listaDlzka,
 			pocetKs: n,
 			poznamka: listaPozn,
+			poznamkaDetail: listaDetail,
 			vydajTyce: spocitajVydaj(listaDlzka, n, TYC_STANDARD_MM)
 		});
 		if (n - 2 >= 1) {
@@ -435,6 +444,7 @@ function krovoveListy(
 				dlzkaRezuMm: listaDlzka,
 				pocetKs: n - 2,
 				poznamka: listaPozn,
+				poznamkaDetail: listaDetail,
 				vydajTyce: spocitajVydaj(listaDlzka, n - 2, TYC_STANDARD_MM)
 			});
 		}
@@ -444,6 +454,7 @@ function krovoveListy(
 			dlzkaRezuMm: listaDlzka,
 			pocetKs: 2,
 			poznamka: listaPozn,
+			poznamkaDetail: listaDetail,
 			vydajTyce: spocitajVydaj(listaDlzka, 2, TYC_STANDARD_MM)
 		});
 	}
@@ -459,6 +470,101 @@ function krovoveListy(
 		});
 	}
 	return riadky;
+}
+
+/** Zoznam „zatiaľ nepodporované" (#233): krátka veta + plné odôvodnenie, plain slovenčina
+ *  bez interných referencií (tie ostávajú v komentároch). Vyčlenené zo `spocitajNarez`
+ *  (~300-r. budget funkcie) — čistý presun, žiadna zmena obsahu. */
+function zostavNepodporovane(
+	v: PergolaNarezVstup,
+	prieckaDlzkaNull: boolean,
+	listyEmitovane: boolean,
+	zaklapEmitovana: boolean
+): NepodporovanaPolozka[] {
+	// #233 — každá položka = krátka veta (`kratky`, do zoznamu) + plné odôvodnenie
+	// (`detail`, do rozklikávacieho <details>). OBE plain slovenčina bez interných
+	// referencií — tie ostávajú tu v komentároch, NIKDY na obrazovke.
+	const nepodporovane: NepodporovanaPolozka[] = [];
+	// Krov — frézovanie drážok (výrobný list) — VŽDY otvorené (nominál + uloženie sa už počítajú,
+	// frézovanie drážok na koncoch krovu ostáva na konštruktérovi; #233 — plain, bez referencií).
+	nepodporovane.push({
+		kratky: 'Krov — frézovanie drážok (dĺžka/výška/uhol) je výrobný list, doplní ho konštruktér.',
+		detail:
+			'Nominálna dĺžka krovu a (pri sklone nad 7°) uloženie sa už počítajú. Presné frézovanie drážok na koncoch krovu (dĺžka, výška a uhol drážky) je výrobný list a doplní ho konštruktér.'
+	});
+	// Priečka dĺžka — LEN keď nominál nemáme (Robust alebo bez sklonu). Pri Massive+sklon sa počíta.
+	if (prieckaDlzkaNull) {
+		nepodporovane.push({
+			kratky: 'Priečka (18004) — dĺžka rezu = nominálna dĺžka krovu, zatiaľ sa nepočíta.',
+			detail:
+				'Dĺžka priečky = nominálna dĺžka krovu (spodná hrana, meraná po spáde; hĺbka delené kosínusom sklonu, mínus predný a zadný profil). Počíta sa pre samostatne stojacu so zadným profilom 110 (Massive overené výkresom, Robust podľa pravidla konštruktéra), so sklonom strechy do 9° a zadaným počtom krovov; inak ostáva dĺžka čestný null — nič sa nehádže.'
+		});
+	}
+	// Prítlačná / maskovacie — LEN keď sa neemitovali (Robust, alebo bez sklonu / počtu krovov).
+	if (!listyEmitovane) {
+		nepodporovane.push({
+			kratky:
+				'Prítlačná / maskovacia / maskovacia krajová lišta — dĺžka viazaná na krov, čaká na vzorec.',
+			detail:
+				'Dĺžka = nominálna dĺžka krovu + 40 mm (Massive) alebo + 30 mm (Robust). Počíta sa pre samostatne stojacu so zadným profilom 110, so sklonom strechy do 9° a zadaným počtom krovov. Inak ostáva čestný null — nič sa nehádže.'
+		});
+	}
+	// Zaklapávacia — LEN keď sa neemitovala (bez zadaného počtu krovov).
+	if (!zaklapEmitovana) {
+		nepodporovane.push({
+			kratky:
+				'Zaklapávacia čelná lišta (18005) — dĺžka = svetlosť medzi krovmi, potrebuje počet krovov.',
+			detail:
+				'Dĺžka = svetlosť medzi krovmi = (šírka − 50 × počet krovov − 2) / (počet krovov − 1); počet líšt = 2 × (počet krovov − 1). Zadaj počet krovov, aby sa spočítala.'
+		});
+	}
+	// #155 A9 (Dominik Odoo 1724498): výkresová „2340×2 pod 18017" NIE JE samostatná zvislá zadná
+	// výstuha — je to PREDNÁ NOHA (svetlosť 2200 + výstuha 140), TERAZ vo `vypocitane`. Skoršia
+	// misatribúcia: 2340 = svetlosť 2325 + 15 (zadná svetlosť, nie vstup) vs predná 2200 + 140 dávali
+	// rovnaké číslo; A9 to reklasifikoval na prednú nohu. Preto honest-null nota ODSTRÁNENÁ.
+	nepodporovane.push(
+		{
+			// (sklá / strešná výplň = O11)
+			kratky: 'Sklá / strešná výplň (šírky, dĺžky, materiál, RAL) — zadáva sa vedome ručne.',
+			detail:
+				'Rozmery, materiál a RAL skiel appka zámerne nepočíta — zadávajú sa ručne, mimo tohto výpočtu.'
+		},
+		{
+			// (spád/kliny = zasklenie pod pergolou, mimo scope #155)
+			kratky: 'Spád / kliny — patria k zaskleniu pod pergolou, nie k nohám pergoly.',
+			detail:
+				'Spád a kliny sa riešia pri zasklení pod pergolou, nie pri konštrukcii pergoly — sú mimo tohto výpočtu.'
+		}
+	);
+	if (v.zosilnenyNosnik) {
+		// (per-systém varianta = O2, presné pravidlo = O3)
+		nepodporovane.push({
+			kratky: 'Zosilnený nosník — presné per-systém pravidlo profilu čaká na vzorec od Dominika.',
+			detail:
+				'Žľabová výstuha (Massive = šírka − 280) sa už počíta a odzrkadľuje zvolený profil (140×140 / 200×140); Robust varianta (šírka − 220) je zatiaľ len informatívna a presné per-systém pravidlo dĺžky čaká na potvrdenie.'
+		});
+	}
+	// #206 (c): Robust varianty výstuhy (110×110 / 110×250) — presné dĺžky nad −220 pravidlo
+	// nie sú potvrdené → honest-null. (Bývalý −60 model 200×140 bol odvolaný, ch207 1731729.)
+	if (v.vystuhaProfil === '110x110' || v.vystuhaProfil === '110x250') {
+		const kod =
+			v.vystuhaProfil === '110x250'
+				? `${KOD_VYSTUHA_250x110} (Profil 250x110)`
+				: `${SYSTEMY.Robust.stlp.kod} (Profil 110x110 V2)`;
+		nepodporovane.push({
+			kratky: `Výstuha Robust ${v.vystuhaProfil} — presná dĺžka rezu čaká na vzorec od Dominika.`,
+			detail: `Skovaná 15 mm v žľabe ako nohy; presná dĺžka rezu nad potvrdené pravidlo (šírka − 220) zatiaľ nie je overená → dĺžku nehádžeme. Kód: ${kod}.`
+		});
+	}
+	// #206 (a): jednoduchá pergola bez zasklenia → bočné 110×43 vypnuté (evidencia vo výstupe)
+	if (v.jednoduchaBezZasklenia) {
+		nepodporovane.push({
+			kratky: 'Jednoduchá pergola bez zasklenia — bočné profily 110×43 sú vypnuté.',
+			detail:
+				'Pri jednoduchej pergole bez zasklenia sa bočné profily 110×43 (2 pod fixom + 2 pod kotviacim pri stene, spolu 4) nepočítajú do materiálu.'
+		});
+	}
+	return nepodporovane;
 }
 
 /** Rozdelí materiál na potvrdené položky, informatívne hodnoty a zoznam „zatiaľ
@@ -544,11 +650,14 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 		poznamka:
 			krovDlzkaDoMoney != null
 				? '= nominálna dĺžka krovu (meraná po spáde)'
-				: 'dĺžka rezu = horná hrana krovu — čaká na vzorec',
+				: 'dĺžka rezu = nominálna dĺžka krovu — zatiaľ sa nepočíta',
 		poznamkaDetail:
 			krovDlzkaDoMoney != null
-				? 'Dĺžka = nominálna dĺžka krovu (spodná hrana), meraná po spáde: hĺbka delené kosínusom sklonu, mínus predný a zadný profil. Horná hrana krovu je o ~1 mm vyššie (reálne uloženie) — do rezervácie stačí nominál. Počet = zadaný počet krovov.'
-				: 'Dĺžka priečky = nominálna dĺžka krovu (horná hrana krovu). Počíta sa pre samostatne stojacu so zadným profilom 110 (Massive overené výkresom, Robust podľa pravidla konštruktéra — na potvrdenie pri prvej takej zákazke), so zadaným sklonom strechy do 9° a počtom krovov. Inak ostáva dĺžka čestný null — nič sa nehádže.',
+				? 'Dĺžka = nominálna dĺžka krovu (spodná hrana), meraná po spáde: hĺbka delené kosínusom sklonu, mínus predný a zadný profil. Horná hrana krovu je o ~1 mm vyššie (reálne uloženie) — do rezervácie stačí nominál. Počet = zadaný počet krovov.' +
+					(v.system === 'Robust'
+						? ' Robust odpočet je podľa pravidla konštruktéra — na potvrdenie pri prvej Robust zákazke.'
+						: '')
+				: 'Dĺžka priečky = nominálna dĺžka krovu (spodná hrana, meraná po spáde). Počíta sa pre samostatne stojacu so zadným profilom 110 (Massive overené výkresom, Robust podľa pravidla konštruktéra — na potvrdenie pri prvej takej zákazke), so zadaným sklonom strechy do 9° a počtom krovov. Inak ostáva dĺžka čestný null — nič sa nehádže.',
 		vydajTyce:
 			krovDlzkaDoMoney != null
 				? spocitajVydaj(krovDlzkaDoMoney, pocetKrovovAleboFallback, TYC_STANDARD_MM)
@@ -667,90 +776,12 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	const zaklapEmitovana = n != null && n >= 2 && svetlostKrovov != null;
 	vypocitane.push(...krovoveListy(krovNominal, n, svetlostKrovov, v.system));
 
-	// #233 — každá položka = krátka veta (`kratky`, do zoznamu) + plné odôvodnenie
-	// (`detail`, do rozklikávacieho <details>). OBE plain slovenčina bez interných
-	// referencií — tie ostávajú tu v komentároch, NIKDY na obrazovke.
-	const nepodporovane: NepodporovanaPolozka[] = [];
-	// Krov — frézovanie drážok (výrobný list) — VŽDY otvorené (nominál + uloženie sa už počítajú,
-	// frézovanie drážok na koncoch krovu ostáva na konštruktérovi; #233 — plain, bez referencií).
-	nepodporovane.push({
-		kratky: 'Krov — frézovanie drážok (dĺžka/výška/uhol) je výrobný list, doplní ho konštruktér.',
-		detail:
-			'Nominálna dĺžka krovu a (pri sklone nad 7°) uloženie sa už počítajú. Presné frézovanie drážok na koncoch krovu (dĺžka, výška a uhol drážky) je výrobný list a doplní ho konštruktér.'
-	});
-	// Priečka dĺžka — LEN keď nominál nemáme (Robust alebo bez sklonu). Pri Massive+sklon sa počíta.
-	if (krovDlzkaDoMoney == null) {
-		nepodporovane.push({
-			kratky: 'Priečka (18004) — dĺžka rezu = horná hrana krovu, čaká na vzorec od Dominika.',
-			detail:
-				'Dĺžka priečky = nominálna dĺžka krovu (horná hrana krovu; hĺbka delené kosínusom sklonu, mínus predný a zadný profil). Počíta sa pre samostatne stojacu so zadným profilom 110 (Massive overené výkresom, Robust podľa pravidla konštruktéra), so sklonom strechy do 9° a zadaným počtom krovov; inak ostáva dĺžka čestný null — nič sa nehádže.'
-		});
-	}
-	// Prítlačná / maskovacie — LEN keď sa neemitovali (Robust, alebo bez sklonu / počtu krovov).
-	if (!listyEmitovane) {
-		nepodporovane.push({
-			kratky:
-				'Prítlačná / maskovacia / maskovacia krajová lišta — dĺžka viazaná na krov, čaká na vzorec.',
-			detail:
-				'Dĺžka = nominálna dĺžka krovu + 40 mm (Massive) alebo + 30 mm (Robust). Počíta sa pre samostatne stojacu so zadným profilom 110, so sklonom strechy do 9° a zadaným počtom krovov. Inak ostáva čestný null — nič sa nehádže.'
-		});
-	}
-	// Zaklapávacia — LEN keď sa neemitovala (bez zadaného počtu krovov).
-	if (!zaklapEmitovana) {
-		nepodporovane.push({
-			kratky:
-				'Zaklapávacia čelná lišta (18005) — dĺžka = svetlosť medzi krovmi, potrebuje počet krovov.',
-			detail:
-				'Dĺžka = svetlosť medzi krovmi = (šírka − 50 × počet krovov − 2) / (počet krovov − 1); počet líšt = 2 × (počet krovov − 1). Zadaj počet krovov, aby sa spočítala.'
-		});
-	}
-	// #155 A9 (Dominik Odoo 1724498): výkresová „2340×2 pod 18017" NIE JE samostatná zvislá zadná
-	// výstuha — je to PREDNÁ NOHA (svetlosť 2200 + výstuha 140), TERAZ vo `vypocitane`. Skoršia
-	// misatribúcia: 2340 = svetlosť 2325 + 15 (zadná svetlosť, nie vstup) vs predná 2200 + 140 dávali
-	// rovnaké číslo; A9 to reklasifikoval na prednú nohu. Preto honest-null nota ODSTRÁNENÁ.
-	nepodporovane.push(
-		{
-			// (sklá / strešná výplň = O11)
-			kratky: 'Sklá / strešná výplň (šírky, dĺžky, materiál, RAL) — zadáva sa vedome ručne.',
-			detail:
-				'Rozmery, materiál a RAL skiel appka zámerne nepočíta — zadávajú sa ručne, mimo tohto výpočtu.'
-		},
-		{
-			// (spád/kliny = zasklenie pod pergolou, mimo scope #155)
-			kratky: 'Spád / kliny — patria k zaskleniu pod pergolou, nie k nohám pergoly.',
-			detail:
-				'Spád a kliny sa riešia pri zasklení pod pergolou, nie pri konštrukcii pergoly — sú mimo tohto výpočtu.'
-		}
+	const nepodporovane = zostavNepodporovane(
+		v,
+		krovDlzkaDoMoney == null,
+		listyEmitovane,
+		zaklapEmitovana
 	);
-	if (v.zosilnenyNosnik) {
-		// (per-systém varianta = O2, presné pravidlo = O3)
-		nepodporovane.push({
-			kratky: 'Zosilnený nosník — presné per-systém pravidlo profilu čaká na vzorec od Dominika.',
-			detail:
-				'Žľabová výstuha (Massive = šírka − 280) sa už počíta a odzrkadľuje zvolený profil (140×140 / 200×140); Robust varianta (šírka − 220) je zatiaľ len informatívna a presné per-systém pravidlo dĺžky čaká na potvrdenie.'
-		});
-	}
-	// #206 (c): Robust varianty výstuhy (110×110 / 110×250) — presné dĺžky nad −220 pravidlo
-	// nie sú potvrdené → honest-null. Massive 200×140 mení LEN svetlosť (−60, potvrdené).
-	if (v.vystuhaProfil === '110x110' || v.vystuhaProfil === '110x250') {
-		const kod =
-			v.vystuhaProfil === '110x250'
-				? `${KOD_VYSTUHA_250x110} (Profil 250x110)`
-				: `${SYSTEMY.Robust.stlp.kod} (Profil 110x110 V2)`;
-		nepodporovane.push({
-			kratky: `Výstuha Robust ${v.vystuhaProfil} — presná dĺžka rezu čaká na vzorec od Dominika.`,
-			detail: `Skovaná 15 mm v žľabe ako nohy; presná dĺžka rezu nad potvrdené pravidlo (šírka − 220) zatiaľ nie je overená → dĺžku nehádžeme. Kód: ${kod}.`
-		});
-	}
-	// #206 (a): jednoduchá pergola bez zasklenia → bočné 110×43 vypnuté (evidencia vo výstupe)
-	if (v.jednoduchaBezZasklenia) {
-		nepodporovane.push({
-			kratky: 'Jednoduchá pergola bez zasklenia — bočné profily 110×43 sú vypnuté.',
-			detail:
-				'Pri jednoduchej pergole bez zasklenia sa bočné profily 110×43 (2 pod fixom + 2 pod kotviacim pri stene, spolu 4) nepočítajú do materiálu.'
-		});
-	}
-
 	return {
 		vypocitane,
 		informativne: {

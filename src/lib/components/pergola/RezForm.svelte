@@ -218,7 +218,7 @@
 					/>
 					<p class="sub" style="margin:4px 0 0">
 						{uchytenieS === 'samostatne'
-							? 'zadná noha = plná ZV (výkres OP260282)'
+							? 'zadná noha = ZV − horný profil zadnej konštrukcie (110/140)'
 							: 'bočný profil 110×43 pod kotviacim = ZV − 190'}
 					</p>
 				</div>
@@ -243,7 +243,8 @@
 							<option value={140}>140</option>
 						</select>
 						<p class="sub" style="margin:4px 0 0">
-							určuje bočný profil 110×43 „pod fixom" (kaskáda); dĺžku zadnej nohy už nemení
+							určuje kód aj dĺžku celej zadnej konštrukcie (noha = ZV − profil, jednotná 110/140) a
+							kaskádu bočného profilu 110×43 „pod fixom"
 						</p>
 					</div>
 				{/if}

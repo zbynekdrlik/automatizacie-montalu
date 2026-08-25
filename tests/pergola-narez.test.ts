@@ -257,10 +257,9 @@ describe('spocitajNarez — priečky (počet z max rozostupu 700, dĺžka O1-blo
 	it('dĺžka rezu priečky je NULL (= HH krovu, #161 neodvoditeľné), nie vymyslená', () => {
 		const priecka = spocitajNarez(VZOR).vypocitane.find((p) => /priečk/i.test(p.nazov));
 		expect(priecka!.dlzkaRezuMm).toBeNull();
-		// #205: kótovaný výkres OP260282 dorazil, ale priečka = HH krovu, čo nie je vzorec
-		// zo vstupov (CAD výsledok geometrie krovu) → poznámka odkazuje na HH krovu / #161
-		// #233 — poznámka je plain slovenčina (HH krovu / #161 → „horná hrana krovu")
-		expect(priecka!.poznamka).toMatch(/hrana krovu/i);
+		// #233 — poznámka je plain slovenčina; jednotné pomenovanie = „nominálna dĺžka krovu"
+		// (spodná hrana — review 25.8. zjednotil framing, „horná hrana" bol protirečivý text)
+		expect(priecka!.poznamka).toMatch(/nominálna dĺžka krovu/i);
 	});
 	it('light checkbox → kód priečky 18102, inak 18004', () => {
 		expect(
@@ -302,7 +301,7 @@ describe('spocitajNarez — zatiaľ nepodporované (O-otázky), nič sa nehádž
 		expect(n).toMatch(/čaká na vzorec/i);
 		expect(n).toMatch(/lišt|prítlačn|maskovac/i);
 		expect(n).toMatch(/skl/i);
-		expect(n).toMatch(/hrana krovu/i);
+		expect(n).toMatch(/nominálna dĺžka krovu/i);
 		// #205: žľab (18018/18021) + kotviaci (18019) sa presunuli z „nepodporované" do
 		// „vypocitane" — kótovaný výkres OP260282 potvrdil dĺžku = šírka (O1 čiastočne).
 		expect(
@@ -751,6 +750,14 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overen
 		expect(p6, 'prítlačná sa pri Robust + zadná 110 emituje').toBeTruthy();
 		expect(Math.abs((p6.dlzkaRezuMm as number) - (NOMINAL_ROBUST + 30))).toBeLessThan(0.02);
 		expect(p6.poznamka).toMatch(/30/); // poznámka nesie Robust prídavok
+		// EMITOVANÉ Robust riadky nesú viditeľnú výhradu (bez Robust goldenu) — review 25.8. 🟡:
+		// výhrada nesmie žiť len v null vetve, ktorá sa pri emitovaní vôbec nezobrazí.
+		expect(p6.poznamkaDetail).toMatch(/na potvrdenie/i);
+		expect(pr.poznamkaDetail).toMatch(/na potvrdenie/i);
+		// Massive emitovaná priečka výhradu NEnesie (overená výkresom)
+		const rM = spocitajNarez(OVERENA);
+		const prM = rM.vypocitane.find((p) => /priečk/i.test(p.nazov))!;
+		expect(prM.poznamkaDetail).not.toMatch(/na potvrdenie/i);
 	});
 
 	it('A7: sklon nad 9° → priečka aj lišty honest-null (pásmo bez vzorca nejde do Money)', () => {

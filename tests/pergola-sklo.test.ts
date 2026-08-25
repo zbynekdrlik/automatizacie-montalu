@@ -98,6 +98,10 @@ describe('#223 VERIFIKÁCIA proti reálnemu sklu OP260282 (výrobný výkres, ch
 	});
 
 	it('šírka SEDÍ na reálny rez: 685,43 → rezaných 685 (celé mm nadol — sklo musí zapadnúť)', () => {
+		// Príloha má JEDEN rozmer pre všetkých 7 ks (žiadne užšie pole) a Dominik potvrdil
+		// „ano nevstupuje" (ch207 1725595) — trčanie výstuhy 95/125 patrí k prednej svetlej
+		// výške/nohe, nie k šírke strešných polí. Engine preto vracia JEDNU skalárnu šírku
+		// pre všetky polia (per-pole korekcia neexistuje) a tá sedí na reálny rez.
 		expect(r.sirkaMm).toBe(685.43);
 		expect(Math.floor(r.sirkaMm as number)).toBe(685); // rozmer tabule na výrobnom výkrese
 	});
@@ -117,14 +121,6 @@ describe('#223 VERIFIKÁCIA proti reálnemu sklu OP260282 (výrobný výkres, ch
 		// stopsol variácia nemá vlastnú kartu — appka priradí najbližšiu cenu (IZO 4.4.2-8-6
 		// číre = TS00014), reálnu Dominik po potvrdení prepíše ručne (zadanie #223).
 		expect(r.moneyKod).toBe('TS00014');
-	});
-
-	it('všetkých 7 tabúľ má ROVNAKÚ šírku — pole s výstuhou sa nekoriguje (výkres aj Dominik)', () => {
-		// Príloha má JEDEN rozmer pre všetkých 7 ks (žiadne užšie pole) a Dominik potvrdil
-		// „ano nevstupuje" (ch207 1725595) — trčanie výstuhy 95/125 patrí k prednej svetlej
-		// výške/nohe, nie k šírke strešných polí. Engine preto vracia jednu šírku pre všetky
-		// polia (sirkaMm je skalár, žiadna per-pole korekcia neexistuje).
-		expect(typeof r.sirkaMm).toBe('number');
 	});
 });
 
