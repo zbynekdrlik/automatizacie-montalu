@@ -97,6 +97,7 @@ describe('jeSuhlas — checkbox truthiness', () => {
 		for (const v of ['on', '1', 'true', 'yes', 'áno']) expect(jeSuhlas(v)).toBe(true);
 	});
 	it('prázdne/„0"/„false"/„off"/„no"/undefined → false', () => {
-		for (const v of ['', '0', 'false', 'off', 'no', undefined, null]) expect(jeSuhlas(v)).toBe(false);
+		for (const v of ['', '0', 'false', 'off', 'no', undefined, null])
+			expect(jeSuhlas(v)).toBe(false);
 	});
 });

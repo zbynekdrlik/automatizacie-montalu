@@ -40,7 +40,12 @@
 				{#each data.dopyty as d (d.id)}
 					<tr data-testid="dopyt-{d.id}">
 						<td style="white-space:nowrap">{d.datum}</td>
-						<td>{d.meno}</td>
+						<td>
+							{#if d.jeObjednavka}<span class="obj-badge" data-testid="obj-badge-{d.id}"
+									>OBJEDNÁVKA</span
+								>{/if}
+							{d.meno}
+						</td>
 						<td>{d.email}</td>
 						<td>{d.telefon}</td>
 						<td>{d.miesto}</td>
@@ -111,6 +116,19 @@
 	}
 	.muted {
 		color: #94a3b8;
+	}
+	/* #319: odlíšenie záväznej objednávky od nezáväzného dopytu v internom zozname */
+	.obj-badge {
+		display: inline-block;
+		margin-right: 6px;
+		padding: 1px 6px;
+		border-radius: 999px;
+		background: #16a34a;
+		color: #fff;
+		font-size: 10.5px;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+		vertical-align: middle;
 	}
 	a.pdf {
 		font-weight: 600;

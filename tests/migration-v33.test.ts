@@ -43,7 +43,9 @@ const dbPath = path.join(tmpRoot, 'v32.db');
 		);
 	`);
 	// ≥1 riadok do každej seed-čítanej tabuľky → seedData/seedUsers no-op
-	v32.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')").run();
+	v32
+		.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')")
+		.run();
 	v32.prepare("INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES ('X', 1, 0)").run();
 	v32.prepare("INSERT INTO glass_types (nazov, system) VALUES ('X', 'ALL')").run();
 	// existujúci dopyt (pred migráciou) → dôkaz, že ALTER nestratí dáta

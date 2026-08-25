@@ -84,9 +84,9 @@ describe('objednavkaAction — validácia + uloženie (#319)', () => {
 
 	it('honeypot vyplnený → ticho úspech, objednávka sa NEuloží', async () => {
 		const before = countDopyty();
-		const res = (await objednavkaAction(
-			makeEvent({ ...OK_FIELDS, firma_web: 'bot vyplnil' })
-		)) as { success: boolean };
+		const res = (await objednavkaAction(makeEvent({ ...OK_FIELDS, firma_web: 'bot vyplnil' }))) as {
+			success: boolean;
+		};
 		expect(res.success).toBe(true);
 		expect(countDopyty()).toBe(before); // bot nič neuložil
 	});

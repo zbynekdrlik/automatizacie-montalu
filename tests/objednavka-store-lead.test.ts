@@ -3,13 +3,24 @@
 // migrácia v33 pridá objednávkové stĺpce. Money-neutralita payloadu = objednaná cena je zapečatená
 // v DB, do leadu NEJDE.
 import { describe, it, expect } from 'vitest';
-import { insertDopyt, insertObjednavka, getDopyt, getDopytForLead } from '../src/lib/server/dopyt-store';
+import {
+	insertDopyt,
+	insertObjednavka,
+	getDopyt,
+	getDopytForLead
+} from '../src/lib/server/dopyt-store';
 import { opeciatkujCenu } from '../src/lib/server/dopyt-cena-stamp';
 import { buildLeadPayload } from '../src/lib/server/odoo-lead';
 import type { PonukaConfig } from '../src/lib/ponuka';
 
 // cfg s rozmermi v katalógu (LIGHT, 4×3 m) → cena sa opečiatkuje (obe hladiny sú číslo)
-const CFG: PonukaConfig = { model: 'LIGHT', sirka: 4000, hlbka: 3000, farba: 'RAL 7016', sklo: 'Číre' };
+const CFG: PonukaConfig = {
+	model: 'LIGHT',
+	sirka: 4000,
+	hlbka: 3000,
+	farba: 'RAL 7016',
+	sklo: 'Číre'
+};
 
 const zaznam = () => ({
 	konfiguracia: JSON.stringify(CFG),

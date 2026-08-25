@@ -20,6 +20,10 @@
 	// klientsky komponent (importuje len pure `$lib/dopyt` + `$lib/ponuka`, žiadny katalóg/
 	// Money/server) — únik guard tests/konfigurator-money-safety.test.ts prejde jeho graf.
 	import DopytForm from '$lib/components/DopytForm.svelte';
+	// #319: záväzná objednávka (kontakt + fakturačné údaje + súhlas → uloženie + PDF + Odoo
+	// opportunity). Rovnako čistý klientsky komponent ako DopytForm (len pure `$lib/dopyt` +
+	// `$lib/ponuka`) — únik guard (A) prejde jeho graf.
+	import ObjednavkaForm from '$lib/components/ObjednavkaForm.svelte';
 	import type { PonukaConfig } from '$lib/ponuka';
 
 	let { data } = $props();
@@ -461,6 +465,18 @@
 			</p>
 			<DopytForm konfiguracia={ponukaCfg} />
 		</section>
+
+		<!-- #319: voliteľný krok — ZÁVÄZNÁ OBJEDNÁVKA (kontakt + fakturačné údaje + súhlas).
+		     Money-neutrálne, žiadna platobná brána; objednaná cena sa zapečatí. -->
+		<section class="objednavka" data-testid="objednavka">
+			<h2>Chceš si túto pergolu záväzne objednať?</h2>
+			<p class="kontakt-uvod">
+				Vyplň kontakt a fakturačné údaje a odošli firme <strong>záväznú objednávku</strong>. Bez
+				online platby — ozveme sa ti, dohodneme obhliadku a presné podmienky. Orientačná cena z
+				konfigurátora sa stane súčasťou objednávky.
+			</p>
+			<ObjednavkaForm konfiguracia={ponukaCfg} />
+		</section>
 	{/if}
 </div>
 
@@ -640,6 +656,19 @@
 		color: #64748b;
 		font-size: 14px;
 		margin: 0 0 14px;
+	}
+	/* #319: záväzná objednávka — rovnaká karta ako kontakt, zelený akcent (predajná akcia) */
+	.objednavka {
+		background: #fff;
+		border: 1px solid #bbf7d0;
+		border-radius: 14px;
+		padding: 18px;
+		margin-top: 18px;
+	}
+	.objednavka h2 {
+		font-size: 18px;
+		margin: 0 0 8px;
+		color: #14532d;
 	}
 	/* #279 Fáza C: výber modelu (radio-karty) */
 	.modely {
