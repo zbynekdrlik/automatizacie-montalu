@@ -258,10 +258,10 @@
 		<div class="row">
 			<span>Predná svetlosť</span><b>{vysledok.informativne.prednaSvetlost} mm</b>
 		</div>
-		{#if vysledok.informativne.efektivnaSvetlost !== vysledok.informativne.prednaSvetlost}
-			<div class="row" data-testid="info-efektivna-svetlost">
-				<span>Efektívna svetlosť (výstuha 200×140: −60)</span>
-				<b>{vysledok.informativne.efektivnaSvetlost} mm</b>
+		{#if vysledok.informativne.svetlostBezVystuhy != null}
+			<div class="row" data-testid="info-svetlost-bez-vystuhy">
+				<span>Svetlosť bez výstuhy (výstuha trčí {vysledok.informativne.vystuhaTrcanieMm} mm)</span>
+				<b>{vysledok.informativne.svetlostBezVystuhy} mm</b>
 			</div>
 		{/if}
 		{#if vysledok.informativne.vystuhaProfil}
@@ -272,7 +272,7 @@
 		<div class="row">
 			<span
 				>Predná noha (svetlosť + {vysledok.informativne.prednaNohaDlzka -
-					vysledok.informativne.efektivnaSvetlost})</span
+					vysledok.informativne.prednaSvetlost})</span
 			><b>{vysledok.informativne.prednaNohaDlzka} mm</b>
 		</div>
 		<div class="row">

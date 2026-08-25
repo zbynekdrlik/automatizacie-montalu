@@ -53,10 +53,13 @@ export const POCET_KROVOV_MIN = 2;
 export const POCET_KROVOV_MAX = 50;
 
 // --- Nové potvrdené konštanty z výkresu OP260282 (modré poznámky, #206) -----------
-/** POTVRDENÉ (#206 modrá poznámka c): pri výstuhe 200×140 sa svetlosť zníži o ďalších
- *  60 mm (výstuha je o 60 mm vyššia než štandard 140×140: 200 − 140 = 60). Aplikuje sa na
- *  „efektívnu svetlosť", ktorá preteká do prednej nohy (svetlosť + 15). */
-export const VYSTUHA_200x140_SVETLOST_ODPOCET = 60;
+/** skovanie výstuhy v žľabe [mm] — Dominik VERBATIM (ch207 msg 1731729, 24.8.): „výstuha
+ *  je tiež 15 mm usadená v žľabe tak ako aj noha" → výstuha TRČÍ do svetlosti (zvislý
+ *  rozmer − 15): 110→95, 140→125, 200→185, 250→235. Kontrola konzistencie s A9: noha =
+ *  svetlosť + 15 + trčanie = svetlosť + zvislý rozmer (15+95=110, 15+125=140 ✓). Ten istý
+ *  odkaz ODVOLAL skorší −60 model pre 200×140 („tých 60 to je asi zle") — konštanta
+ *  VYSTUHA_200x140_SVETLOST_ODPOCET bola zrušená. */
+export const VYSTUHA_SKOVANIE_MM = 15;
 /** POTVRDENÉ (#206 modrá poznámka b): pri NIE-samostatne stojacej pergole je vzadu pod
  *  kotviacim profilom bočný profil 110×43 s dĺžkou ZV − 190 (ZV = zadná výška). */
 export const POD_KOTVIACI_110x43_ODPOCET = 190;
@@ -245,12 +248,15 @@ export interface NepodporovanaPolozka {
 }
 
 export interface NarezInformativne {
-	/** predná svetlosť ZADANÁ vo formulári [mm] */
+	/** predná svetlosť ZADANÁ vo formulári [mm] — do nohy preteká PRIAMO (žiadne tiché odpočty;
+	 *  bývalá „efektívna svetlosť −60" bola zrušená, ch207 1731729) */
 	prednaSvetlost: number;
-	/** #206 (c) — efektívna svetlosť = zadaná − 60 pri výstuhe 200×140, inak = zadaná.
-	 *  Toto je hodnota, ktorá preteká do prednej nohy (viď `prednaNohaDlzkaMm`:
-	 *  + rozmer výstuhy pri zosilnenom nosníku, inak + 15). */
-	efektivnaSvetlost: number;
+	/** trčanie výstuhy do svetlosti [mm] = zvislý rozmer − 15 (95/125/185/235); null bez
+	 *  zosilneného nosníka (ch207 1731729) */
+	vystuhaTrcanieMm: number | null;
+	/** svetlosť bez výstuhy [mm] = zadaná svetlosť + trčanie (kóta výkresu, OP260282: 2325);
+	 *  null bez zosilneného nosníka */
+	svetlostBezVystuhy: number | null;
 	prednaNohaDlzka: number;
 	/** null keď na stenu (bez zadných nôh) */
 	zadnaNohaDlzka: number | null;
@@ -344,18 +350,8 @@ export function podFixomOdpocet(v: PergolaNarezVstup): number {
 	return frontProfil + zadnyPrvok;
 }
 
-/** Efektívna predná svetlosť [mm] (#206 c): zadaná svetlosť znížená o 60 mm, keď je zvolená
- *  výstuha 200×140 (výstuha je o 60 mm vyššia než štandard 140×140). Inak = zadaná svetlosť.
- *  Toto je hodnota, ktorá preteká do prednej nohy `svetlosť + 15` — kompozícia dvoch
- *  POTVRDENÝCH pravidiel (noha = svetlosť + 15; 200×140 → svetlosť − 60), NIE vymyslený vzorec.
- *  Reziduálna neistota (mení −60 reálnu dĺžku nohy alebo len svetlú výšku?) je gap na #198. */
-export function efektivnaSvetlost(v: PergolaNarezVstup): number {
-	// −60 je Massive-only pravidlo (200×140 je Massive profil); gate proti system×profil
-	// nekonzistencii z ručného POST (formulár ponúka 200×140 len pri Massive).
-	const odpocet =
-		v.vystuhaProfil === '200x140' && v.system === 'Massive' ? VYSTUHA_200x140_SVETLOST_ODPOCET : 0;
-	return R1(v.prednaSvetlost - odpocet);
-}
+// (bývalá `efektivnaSvetlost` so −60 pri 200×140 ODSTRÁNENÁ — Dominik model odvolal,
+//  ch207 msg 1731729: „tých 60 to je asi zle"; zadaná svetlosť sa už nikde ticho nemení.)
 
 /** Zvislý rozmer (výška) profilu výstuhy [mm] = väčší z dvoch rozmerov prierezu. 110×110→110,
  *  140×140→140, 110×250→250 (A9 doslovne), 200×140→200 (#206: 200×140 je o 60 mm vyššia než
@@ -379,19 +375,29 @@ function defaultVystuhaProfil(system: PergolaSystem): VystuhaProfil {
  *    default (Massive 140×140, Robust 110×110). 110→+110, 140→+140, 250→+250 = A9 doslovne.
  *
  *  POZOR — kľúč je `zosilnenyNosnik`, NIE „je zadaný vystuhaProfil": OP260282 má zosilnenyNosnik
- *  s PRÁZDNYM profilom (formulár default) → default 140×140. 200×140 A9 priamo NEDAL → prídavok =
- *  výška 200 je ODVODENINA; s efektivnaSvetlost−60 (#206) dá noha = svetlosť + 140 (rovnaká ako
- *  140×140) — geometricky konzistentné (vrch nohy fixný, vyššia výstuha len presahuje 60 mm nižšie
- *  do svetlej výšky). Odvodené, nie priamo A9-potvrdené — na review majiteľom/Dominikom. */
+ *  s PRÁZDNYM profilom (formulár default) → default 140×140. Model 1731729 (výstuha skovaná
+ *  15 mm v žľabe, trčí zvislý rozmer − 15) dáva noha = svetlosť + 15 + trčanie = svetlosť +
+ *  zvislý rozmer — VŠEOBECNE, vrátane 200×140 (+200; bývalá −60 odvodenina „svetlosť + 140"
+ *  padla s Dominikovým odvolaním −60). 200×140 nemá vlastný golden — na potvrdenie pri prvej
+ *  takej zákazke. */
 export function prednaNohaPridavok(v: PergolaNarezVstup): number {
 	if (!v.zosilnenyNosnik) return PREDNA_NOHA_PRIDAVOK;
 	return VYSTUHA_VYSKA[v.vystuhaProfil ?? defaultVystuhaProfil(v.system)];
 }
 
-/** Dĺžka rezu prednej nohy [mm] = efektívna svetlosť + prídavok (viď `prednaNohaPridavok`). Jeden
- *  zdroj pravdy pre `spocitajNarez` aj `schemaVykresu` (predtým duplikovaný vzorec `svetlosť+15`). */
+/** Trčanie výstuhy do svetlosti [mm] = zvislý rozmer − skovanie 15 (Dominik ch207 1731729:
+ *  110×110 trčí 95, 140×140 trčí 125; 200×140 → 185, 110×250 → 235). `null` bez zosilneného
+ *  nosníka (výstuha fyzicky nie je). Profil = `vystuhaProfil` ?? systémový default. */
+export function vystuhaTrcanieMm(v: PergolaNarezVstup): number | null {
+	if (!v.zosilnenyNosnik) return null;
+	return VYSTUHA_VYSKA[v.vystuhaProfil ?? defaultVystuhaProfil(v.system)] - VYSTUHA_SKOVANIE_MM;
+}
+
+/** Dĺžka rezu prednej nohy [mm] = zadaná svetlosť + prídavok (viď `prednaNohaPridavok`;
+ *  ekvivalentne svetlosť + 15 + trčanie výstuhy — model 1731729). Jeden zdroj pravdy pre
+ *  `spocitajNarez` aj `schemaVykresu` (predtým duplikovaný vzorec `svetlosť+15`). */
 export function prednaNohaDlzkaMm(v: PergolaNarezVstup): number {
-	return R1(efektivnaSvetlost(v) + prednaNohaPridavok(v));
+	return R1(v.prednaSvetlost + prednaNohaPridavok(v));
 }
 
 /** Krovové lišty ako riadky nárezu (#161, derivácia 21.8. overená proti golden OP260282).
@@ -459,10 +465,10 @@ function krovoveListy(
  *  nepodporované". Čistá funkcia — bez vedľajších efektov, bez Money zápisu. */
 export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	const sys = SYSTEMY[v.system];
-	const svetlost = efektivnaSvetlost(v);
-	// #155 A9 (Dominik Odoo 1724498): predná noha = svetlosť + rozmer výstuhy pri zosilnenom
-	// nosníku, inak + 15. Jeden zdroj so `schemaVykresu` cez `prednaNohaDlzkaMm`.
+	// #155 A9 (Dominik Odoo 1724498) + model 1731729: predná noha = svetlosť + rozmer výstuhy
+	// pri zosilnenom nosníku, inak + 15. Jeden zdroj so `schemaVykresu` cez `prednaNohaDlzkaMm`.
 	const prednaNohaDlzka = prednaNohaDlzkaMm(v);
+	const trcanie = vystuhaTrcanieMm(v);
 	const prednaNohaPozn = v.zosilnenyNosnik
 		? `= svetlosť + ${prednaNohaPridavok(v)} (rozmer výstuhy)`
 		: '= svetlosť + 15';
@@ -511,8 +517,8 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 			poznamkaDetail: !v.zosilnenyNosnik
 				? 'Dĺžka rezu prednej nohy = predná svetlosť plus 15 mm (skovanie v žľabe). Overené na reálnej zákazke.'
 				: v.vystuhaProfil === '200x140'
-					? 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy. Pri výstuhe 200×140 je dĺžka odvodená (rovnaká ako pri 140×140) — na potvrdenie Dominikovi.'
-					: 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy (110, 140 alebo 250).'
+					? 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy — výstuha je skovaná 15 mm v žľabe a zvyšok trčí do svetlosti. Pri výstuhe 200×140 je to svetlosť plus 200 (všeobecné pravidlo konštruktéra) — na potvrdenie pri prvej takej zákazke.'
+					: 'Pri zosilnenom nosníku je dĺžka nohy predná svetlosť plus zvislý rozmer výstuhy (110, 140 alebo 250) — výstuha je skovaná 15 mm v žľabe a zvyšok trčí do svetlosti.'
 		}
 	];
 	if (samostatne) {
@@ -749,7 +755,8 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 		vypocitane,
 		informativne: {
 			prednaSvetlost: v.prednaSvetlost,
-			efektivnaSvetlost: svetlost,
+			vystuhaTrcanieMm: trcanie,
+			svetlostBezVystuhy: trcanie != null ? R1(v.prednaSvetlost + trcanie) : null,
 			prednaNohaDlzka,
 			zadnaNohaDlzka,
 			vystuhaRezMm: R1(v.sirka - VYSTUHA_ODPOCET),
@@ -828,15 +835,13 @@ export function schemaVykresu(v: PergolaNarezVstup): PergolaNarezSchema {
 			? Array.from({ length: priecky - 2 }, (_, i) => R1(((i + 1) * v.sirka) / (priecky - 1)))
 			: [];
 	const samostatne = v.uchytenie === 'samostatne';
-	// #206 (c) — výkres kreslí EFEKTÍVNU svetlosť (pri 200×140 zníženú o 60), aby predná výška
-	// aj kóta sedeli s materiálom (noha = efektívna svetlosť + 15). Pri štandarde = zadaná.
-	const svetlost = efektivnaSvetlost(v);
 
 	return {
 		sirka: v.sirka,
 		hlbka: v.hlbka,
 		profilRozmer: sys.stlp.rozmer,
-		prednaSvetlost: svetlost,
+		// výkres kreslí ZADANÚ svetlosť (žiadne tiché odpočty — bývalá −60 zrušená, 1731729)
+		prednaSvetlost: v.prednaSvetlost,
 		// #155 A9: pri zosilnenom nosníku noha = svetlosť + rozmer výstuhy (viď `prednaNohaDlzkaMm`),
 		// inak + 15. Rovnaký zdroj ako `spocitajNarez` → výkres a materiál sedia.
 		prednaNohaDlzka: prednaNohaDlzkaMm(v),

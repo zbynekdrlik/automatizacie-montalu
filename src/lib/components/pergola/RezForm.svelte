@@ -188,14 +188,15 @@
 					<option value="">— systémový štandard —</option>
 					{#if systemS === 'Massive'}
 						<option value="140x140">140×140 (štandard)</option>
-						<option value="200x140">200×140 (svetlosť −60)</option>
+						<option value="200x140">200×140</option>
 					{:else}
 						<option value="110x110">110×110</option>
 						<option value="110x250">110×250</option>
 					{/if}
 				</select>
 				<p class="sub" style="margin:4px 0 0">
-					<b>200×140</b> zníži svetlosť o 60 mm; Robust varianty dĺžky zatiaľ nepodporované
+					Výstuha je skovaná 15 mm v žľabe a zvyšok trčí do svetlosti (noha = svetlosť + zvislý
+					rozmer výstuhy); Robust varianty dĺžky zatiaľ nepodporované
 				</p>
 			</div>
 		</div>

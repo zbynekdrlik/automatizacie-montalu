@@ -83,7 +83,7 @@ export function parsePergolaNarezVstup(form: FormData): {
 		pocetKrovov: numOrNull(form, 'pocetKrovov'),
 		// #206 (a) — jednoduchá pergola bez zasklenia (vypína bočné 110×43)
 		jednoduchaBezZasklenia: bool(form, 'jednoduchaBezZasklenia'),
-		// #206 (c) — profil výstuhy (200×140 → svetlosť −60)
+		// #206 (c) — profil výstuhy (dĺžka nohy = svetlosť + zvislý rozmer, ch207 1731729)
 		vystuhaProfil: vystuhaProfil(form),
 		// #206 (d) — ZVOD frézovanie: toggle + výška SH (evidencia/výkres)
 		zvodFrezovat: bool(form, 'zvodFrezovat'),

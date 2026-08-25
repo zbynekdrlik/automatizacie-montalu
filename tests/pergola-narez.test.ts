@@ -567,7 +567,7 @@ describe('#205 110×43 „pod fixom" (2 ks) = hĺbka − kaskáda (system × SS/
 	});
 });
 
-// --- #206 (c) — výstuha 200×140 → svetlosť −60; Robust varianty honest-null ----------
+// --- #155 trčanie výstuhy (1731729) — svetlosť bez výstuhy; Robust varianty honest-null ---
 describe('#155 trčanie výstuhy (ch207 1731729) — svetlosť bez výstuhy, −60 ZRUŠENÉ', () => {
 	it('výstuha je skovaná 15 mm v žľabe → trčí (zvislý rozmer − 15): 95/125/185/235', () => {
 		// Dominik VERBATIM (1731729): „výstuha je tiež 15mm usadená v žlabe tak ako aj noha čiže
