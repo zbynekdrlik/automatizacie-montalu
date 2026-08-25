@@ -96,7 +96,8 @@ describe('#309 stampNaStlpce (pečiatka → uložiteľné stĺpce)', () => {
 			cena_hlbka_grid_m: null,
 			cena_sirka_grid_m: null,
 			cena_model: null,
-			cennik_verzia: null
+			cennik_verzia: null,
+			cena_hladina: null
 		});
 	});
 
@@ -125,7 +126,8 @@ describe('#309 stampNaStlpce (pečiatka → uložiteľné stĺpce)', () => {
 			cena_hlbka_grid_m: 4.5,
 			cena_sirka_grid_m: 5,
 			cena_model: 'MASSIVE',
-			cennik_verzia: 'v#2'
+			cennik_verzia: 'v#2',
+			cena_hladina: null // MO pečiatka (bez hladina poľa) → NULL
 		});
 	});
 
@@ -148,7 +150,8 @@ describe('#309 cenaZoStampu (rekonštrukcia z uložených stĺpcov)', () => {
 		cena_hlbka_grid_m: null,
 		cena_sirka_grid_m: null,
 		cena_model: null,
-		cennik_verzia: null
+		cennik_verzia: null,
+		cena_hladina: null
 	};
 
 	it('cena_druh === null → null (neopečiatkovaný riadok)', () => {
@@ -163,7 +166,8 @@ describe('#309 cenaZoStampu (rekonštrukcia z uložených stĺpcov)', () => {
 			cena_hlbka_grid_m: 4,
 			cena_sirka_grid_m: 5,
 			cena_model: 'ROBUST',
-			cennik_verzia: 'v#1'
+			cennik_verzia: 'v#1',
+			cena_hladina: null
 		});
 		expect(c).toEqual({
 			druh: 'cena',
@@ -241,7 +245,13 @@ describe('#309 uloženie + regen pre stampované varianty', () => {
 describe('#318 VO pečiatka — cena_hladina round-trip + regen', () => {
 	beforeEach(() => db.exec('DELETE FROM dopyt'));
 
-	const CFG_VO = { system: 'Robust', model: 'ROBUST' as const, sirka: 3000, hlbka: 4000, farba: 'RAL 7016' };
+	const CFG_VO = {
+		system: 'Robust',
+		model: 'ROBUST' as const,
+		sirka: 3000,
+		hlbka: 4000,
+		farba: 'RAL 7016'
+	};
 	const zaznam = (cfg: object) => ({
 		konfiguracia: JSON.stringify(cfg),
 		meno: 'VO Zákazník',

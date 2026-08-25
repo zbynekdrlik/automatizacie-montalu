@@ -16,7 +16,9 @@ import {
 	seedData,
 	seedUsers,
 	migrateDopytCenaStamp,
-	migrateManualMoveColumn
+	migrateManualMoveColumn,
+	migrateDopytCenaHladina,
+	migrateDeluxe5KRail
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -934,26 +936,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
-	if ((db.pragma('user_version', { simple: true }) as number) < 28) {
-		// v27 → v28: Deluxe 5K vrchná (horná) koľajnica mala nesprávny Money kód
-		// (PREČÍSLOVANÉ z v27 na v28 — #296 pôvodne pridala v27, kolidovalo s #294
-		// odpis_imported ledgerom, ktorý dev medzitým dostal tiež ako v27).
-		// ZASP202434 → správne ZASP202427 (nahlásil zákazník Patrik Javorský, Odoo
-		// kanál 207, msg 1734424, 2026-08-24: „Delux 5K ma zlú vrchnú koľajnicu je
-		// tam ZASP202434 ma tam byť ZASP202427"). SET kód (+ názov) z (opraveného)
-		// cfg_seed per (sys_styl, poradie) — presný vzor v12/v15. MENÍ Money odpis
-		// Deluxe 5K objednávok (kód vrchnej koľajnice) — zákazníkom potvrdená oprava.
-		// Idempotentné (SET z cfg_seed), fyzický profil (6000mm tyč) nezmenený.
-		const updRail = db.prepare(
-			'UPDATE cfg_rez SET kod = ?, nazov = ? WHERE sys_styl = ? AND poradie = ?'
-		);
-		db.transaction(() => {
-			for (const r of seed.rez)
-				if (r.sysStyl === 'Deluxe|5K' && r.poradie === 10)
-					updRail.run(r.kod, r.nazov, r.sysStyl, r.poradie);
-			bump(28);
-		})();
-	}
+	migrateDeluxe5KRail(db, bump); // v27 → v28 (#296); extrahované do migracie-seed (#318 large-file-split)
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 29) {
 		// v28 → v29: POST-import readback z Money DB (#298, kontrola B verdiktu §3). Denný externý
@@ -994,6 +977,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 
 	migrateDopytCenaStamp(db, bump); // v29 → v30 (#309); extrahované do migracie-seed (viď docstring)
 	migrateManualMoveColumn(db, bump); // v30 → v31 (#299); extrahované do migracie-seed (viď docstring)
+	migrateDopytCenaHladina(db, bump); // v31 → v32 (#318); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

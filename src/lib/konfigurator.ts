@@ -61,11 +61,20 @@ export const MODELY: readonly ModelInfo[] = [
 	{ kod: 'MASSIVE', popis: 'Najsilnejšia konštrukcia — vylepšený ROBUST pre najväčšie rozpätia.' }
 ];
 
+// #318: cenová hladina. Neprihlásený / interný zákazník = MO (maloobchod, verejná plocha);
+// prihlásený veľkoobchodný (b2b) účet = VO (veľkoobchod). Rozhoduje sa VÝHRADNE server-side
+// z `locals.user` (`$lib/server/konfigurator-hladina`), nikdy z klientom dodaného poľa.
+export type CenovaHladina = 'MO' | 'VO';
+
 /**
- * Verejná (client-safe) orientačná cena — LEN maloobchod (MO), bez DPH + s DPH. NIKDY VO
- * (veľkoobchod) ani raw matica. Buď konkrétna cena, alebo „individuálna ponuka" (mimo katalógu).
- * Odvodená serverom z `konfigurator-cena.ts` cez `naVerejnuCenu` (VO sa odstráni). Rozmery
+ * Verejná (client-safe) orientačná cena — bez DPH + s DPH. Buď konkrétna cena, alebo
+ * „individuálna ponuka" (mimo katalógu). Odvodená serverom z `konfigurator-cena.ts`. Rozmery
  * `hlbkaGridM`/`sirkaGridM` sú katalógové (po zaokrúhlení NAHOR na mriežku).
+ *
+ * #318: `hladina` je prítomná IBA pri veľkoobchodnej (VO) cene — MO/verejný výstup ju NENESIE
+ * (pole chýba), takže verejná odpoveď je byte-identická s pôvodnou (žiadny náznak VO hladiny).
+ * VO cena (nižšia než MO) sa serializuje LEN oprávnenému (prihlásenému b2b) používateľovi; do
+ * verejnej/MO odpovede sa VO NIKDY nedostane (leak-guard `konfigurator-money-safety.test.ts` C).
  */
 export type VerejnaCena =
 	| {
@@ -75,8 +84,9 @@ export type VerejnaCena =
 			sDph: number;
 			hlbkaGridM: number;
 			sirkaGridM: number;
+			hladina?: CenovaHladina;
 	  }
-	| { druh: 'individualna-ponuka'; model: ModelPergoly; dovod: string };
+	| { druh: 'individualna-ponuka'; model: ModelPergoly; dovod: string; hladina?: CenovaHladina };
 
 /** Cena jedného modelu v porovnávacej tabuľke (zrkadlo montalu.sk „ceny modelov vedľa seba"). */
 export interface CenaModelu {

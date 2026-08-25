@@ -8,7 +8,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
-import { goto, collectConsole, skipAkLive } from './helpers';
+import { goto, collectConsole, skipAkLive, loginAs } from './helpers';
 // #288 review 🔵: kanonický klasifikátor (Node kontext — helper beží mimo page.evaluate),
 // aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
 import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
@@ -53,6 +53,8 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	await expect(page.getByTestId('cena')).toBeVisible();
 	await expect(page.getByTestId('cena-sdph')).toContainText('€');
 	await expect(page.getByTestId('cena-bezdph')).toContainText('bez DPH');
+	// #318: neprihlásený návštevník je MO — NIKDY nevidí VO odznak (ani náznak VO hladiny)
+	await expect(page.getByTestId('cena-hladina')).toHaveCount(0);
 
 	// ÚNIK GUARD (redefinovaný, #279 Fáza C): orientačná cena SMIE byť na stránke (owner
 	// ROZHODNUTÉ) — zakázaný ostáva len Money kód (TS###), nárez a VEĽKOOBCHOD (VO) cena.
@@ -318,5 +320,75 @@ test('konfigurátor: 3D náhľad na MOBILNOM viewporte 390×844 (low tier fallba
 	// #288: low tier NIKDY nemá post-processing (postproc flag=false) — vždy priamy render
 	await overPostprocGate(page);
 
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #318: VO (veľkoobchodná) cenová vrstva pre prihlásených veľkoobchodných (b2b) zákazníkov.
+// Overuje CELÝ rozsah rozhodnutia hladiny naraz proti ROVNAKÉMU rozmeru:
+//  • INTERNÝ (prihlásený, nie b2b) → MO cena, žiadny VO odznak (interný = maloobchod)
+//  • VO/b2b → VEĽKOOBCHODNÁ cena + odznak, a cena je NIŽŠIA než MO (VO ≈ 65 % MO)
+// (neprihlásený = MO bez odznaku je overený v prvom teste vyššie). Účet sa vytvorí + zmaže
+// cez /pouzivatelia (users tabuľka NIE JE Money → sankcionovaný live check, vzor app.spec B2B).
+test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); interný vidí MO bez VO odznaku, nula console chýb (#318)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	page.on('dialog', (d) => d.accept()); // confirm() pri Zmazať
+
+	const voUser = `e2e-vo-${Date.now().toString(36)}`;
+	const voPass = 'e2eheslo1';
+
+	// vyplň konfigurátor FIXNÝM rozmerom (LIGHT default, v katalógu) a spočítaj → cena s DPH (€ ako number)
+	const spocitajCenu = async (): Promise<number> => {
+		await goto(page, '/konfigurator');
+		await page.getByTestId('sirka').fill('5000');
+		await page.getByTestId('hlbka').fill('3000');
+		await page.getByTestId('vyskaVpredu').fill('2800');
+		await page.getByTestId('sklonDeg').fill('8');
+		await page.getByTestId('zobrazit').click();
+		await expect(page.getByTestId('cena-sdph')).toContainText('€');
+		const txt = (await page.getByTestId('cena-sdph').innerText()).trim();
+		// "4 452,06 €" → 4452.06
+		return Number(txt.replace(/[^\d,]/g, '').replace(',', '.'));
+	};
+	const odhlas = async () => {
+		await goto(page, '/zasklenia'); // nav s Odhlásiť je na authed stránke, nie na verejnom /konfigurator
+		await page.getByRole('button', { name: 'Odhlásiť' }).click();
+		await expect(page).toHaveURL(/\/login/);
+	};
+
+	// 1. interný vytvorí VO/b2b účet (rola defaultne B2B)
+	await loginAs(page);
+	await goto(page, '/pouzivatelia');
+	await page.getByLabel('Prihlasovacie meno').fill(voUser);
+	await page.getByLabel('Heslo (min. 6 znakov)').fill(voPass);
+	await page.getByRole('button', { name: 'Pridať účet' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+
+	// 2. INTERNÝ vidí MO — žiadny VO odznak (interný v zákazníckom konfigurátore = maloobchod)
+	const moCena = await spocitajCenu();
+	await expect(page.getByTestId('cena-hladina')).toHaveCount(0);
+	expect(moCena).toBeGreaterThan(0);
+
+	// 3. odhlásenie + prihlásenie ako VO/b2b účet
+	await odhlas();
+	await loginAs(page, voUser, voPass);
+
+	// 4. VO/b2b vidí VEĽKOOBCHODNÚ cenu — odznak + cena NIŽŠIA než MO
+	const voCena = await spocitajCenu();
+	await expect(page.getByTestId('cena-hladina')).toBeVisible();
+	await expect(page.getByTestId('cena-hladina')).toContainText(/ve[ľl]koobchod/i);
+	expect(voCena).toBeGreaterThan(0);
+	expect(voCena).toBeLessThan(moCena); // VO ≈ 65 % MO — reálne nižšia než maloobchod
+
+	// 5. upratanie: odhlásenie VO, prihlásenie interný, zmazanie throwaway účtu
+	await odhlas();
+	await loginAs(page);
+	await goto(page, '/pouzivatelia');
+	const row = page.locator('tr', { hasText: voUser });
+	await expect(row).toBeVisible();
+	await row.getByRole('button', { name: 'Zmazať' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
+	await expect(page.locator('tr', { hasText: voUser })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });

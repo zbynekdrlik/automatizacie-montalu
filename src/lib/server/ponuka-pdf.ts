@@ -57,6 +57,12 @@ function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): 
 
 const mPlain = (n: number) => String(n).replace('.', ',');
 
+/** Nadpis cenovej sekcie podľa hladiny (#318): veľkoobchod (VO) → „Veľkoobchodná cena",
+ *  inak maloobchod → „Orientačná cena" (nezmenené pre verejný/MO výstup). */
+function cenaNadpis(cena: VerejnaCena): string {
+	return cena.hladina === 'VO' ? 'Veľkoobchodná cena' : 'Orientačná cena';
+}
+
 /** Textové riadky cenovej sekcie (zdieľané medzi PDF telom a metadátami). Ak sa katalógový
  *  rozmer (mriežka), na ktorý sa cena určila, líši od zadaného, čestne to doplní (#279 Fáza C
  *  review 🟡 — inak by cena „nesedela" so zadanými rozmermi). */
@@ -140,7 +146,7 @@ function drawHeader(ctx: Ctx, cursorTop: number): number {
 /** #279 Fáza C: sekcia s orientačnou cenou (LEN MO). Vykreslí sa len keď je cena známa. */
 function drawCena(ctx: Ctx, cena: VerejnaCena, cfg: PonukaConfig, cursorTop: number): number {
 	let y = cursorTop;
-	ctx.page.drawText('Orientačná cena', { x: MARGIN, y, size: 12, font: ctx.bold, color: ACCENT });
+	ctx.page.drawText(cenaNadpis(cena), { x: MARGIN, y, size: 12, font: ctx.bold, color: ACCENT });
 	y -= 8;
 	ctx.page.drawLine({
 		start: { x: MARGIN, y },
@@ -336,7 +342,10 @@ export async function generatePonukaPdf(
 			...rows.map((r) => `${r.label}: ${r.value}`),
 			// podriadok (bez DPH · model · príp. katalógový rozmer) ide do subjectu tiež — je to
 			// testovateľný kanál (custom-font glyfy sa z PDF tela nedajú spoľahlivo prečítať).
-			...(cenaMeta ? [`Orientačná cena: ${cenaMeta.hlavny} (${cenaMeta.podriadok})`] : [])
+			// #318: nadpis podľa hladiny — VO → „Veľkoobchodná cena:", MO → „Orientačná cena:".
+			...(cena && cenaMeta
+				? [`${cenaNadpis(cena)}: ${cenaMeta.hlavny} (${cenaMeta.podriadok})`]
+				: [])
 		].join('; ') || 'Prázdna konfigurácia'
 	);
 	// cena do keywords (Producer pdf-lib pri save() prepisuje svojím podpisom)

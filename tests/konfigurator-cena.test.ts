@@ -65,15 +65,17 @@ describe('seed integrita + Money-neutralita (#279)', () => {
 		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/db['"]/);
 	});
 
-	it('verejná route importuje LEN verejné MO mappery — nikdy VO priamo (#279 Fáza C)', () => {
-		// Fáza C (owner ROZHODNUTÉ issuecomment-5396941067): route cenový modul TERAZ importuje.
-		// Musí použiť verejné MO-only mappery (`verejnaCenaPreModel`/`verejneCenyModelov`) a NIKDY
-		// serializovať VO zložku (`.vo`) / B2B cenu do verejnej odpovede.
+	it('verejná route: hladina-aware mappery + hladina odvodená server-side, NIKDY VO priamo (#279/#318)', () => {
+		// #279 Fáza C: route cenový modul importuje. #318: route TERAZ používa hladina-aware mappery
+		// (`cenaPreModel`/`cenyModelov`) a hladinu odvodzuje SERVER-SIDE cez `cenovaHladina(locals.user)`
+		// — nikdy z klienta, nikdy sa nedotýka VO zložky (`.vo`) / B2B ceny priamo (o výber MO/VO sa
+		// stará mapper). Tak je bezpečnostná hranica (MO nevidí VO) v cenovom module, nie v route.
 		const route = fs.readFileSync(
 			path.resolve(__dirname, '../src/routes/konfigurator/+page.server.ts'),
 			'utf8'
 		);
-		expect(route).toMatch(/verejnaCenaPreModel|verejneCenyModelov/);
+		expect(route).toMatch(/cenaPreModel|cenyModelov/);
+		expect(route).toMatch(/cenovaHladina/);
 		expect(route).not.toMatch(/\.vo\b|priceB2B/);
 	});
 });

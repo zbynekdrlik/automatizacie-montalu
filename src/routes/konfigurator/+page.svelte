@@ -306,7 +306,14 @@
 			<section class="cena-blok" data-testid="cena" aria-label="Orientačná cena pergoly">
 				{#if cena.druh === 'cena'}
 					<div class="cena-hlavne">
-						<span class="cena-label">Orientačná cena — model {cena.model}</span>
+						<span class="cena-label"
+							>{cena.hladina === 'VO' ? 'Veľkoobchodná cena' : 'Orientačná cena'} — model {cena.model}</span
+						>
+						{#if cena.hladina === 'VO'}
+							<!-- #318: VO (veľkoobchodná) hladina — viditeľná LEN prihlásenému veľkoobchodnému
+							     (b2b) účtu; neprihlásený/MO návštevník tento odznak NIKDY nevidí. -->
+							<span class="cena-vo" data-testid="cena-hladina">veľkoobchodná cena</span>
+						{/if}
 						<span class="cena-sdph" data-testid="cena-sdph">{eur(cena.sDph)}</span>
 						<span class="cena-mena">s DPH</span>
 					</div>
@@ -323,6 +330,9 @@
 				{:else}
 					<div class="cena-individualna" data-testid="cena-individualna">
 						<span class="cena-label">Cena na vyžiadanie — model {cena.model}</span>
+						{#if cena.hladina === 'VO'}
+							<span class="cena-vo" data-testid="cena-hladina">veľkoobchodná cena</span>
+						{/if}
 						<p class="cena-dovod">{cena.dovod} Pripravíme ti individuálnu ponuku.</p>
 					</div>
 				{/if}
@@ -707,6 +717,20 @@
 	.cena-mena {
 		color: #cbd5e1;
 		font-size: 14px;
+	}
+	/* #318: odznak veľkoobchodnej (VO) hladiny — LEN pre prihláseného veľkoobchodného účtu. */
+	.cena-vo {
+		flex-basis: 100%;
+		align-self: flex-start;
+		width: fit-content;
+		padding: 2px 8px;
+		border-radius: 999px;
+		background: #1d4ed8;
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
 	.cena-bezdph {
 		color: #cbd5e1;

@@ -100,13 +100,15 @@ export function formatEur(n: number): string {
 	return `${tis},${dec} €`;
 }
 
-/** Krátky label orientačnej ceny do admin zoznamu dopytov (#309). `null` (neopečiatkovaný /
+/** Krátky label opečiatkovanej ceny do INTERNÉHO zoznamu dopytov (#309). `null` (neopečiatkovaný /
  *  starý riadok) → „—"; konkrétna cena → „4 452,06 € s DPH"; mimo katalógu → „Cena na vyžiadanie".
- *  Pure — LEN MO (VerejnaCena už VO nenesie). */
+ *  #318: veľkoobchodný (VO) dopyt nesie marker „· VO", nech personál rozozná VO cenu od MO
+ *  (zoznam je interný-only — VO label sa na verejnú plochu nikdy nedostane). Pure. */
 export function formatCenaKratko(cena: VerejnaCena | null): string {
 	if (cena === null) return '—';
-	if (cena.druh === 'cena') return `${formatEur(cena.sDph)} s DPH`;
-	return 'Cena na vyžiadanie';
+	const vo = cena.hladina === 'VO' ? ' · VO' : '';
+	if (cena.druh === 'cena') return `${formatEur(cena.sDph)} s DPH${vo}`;
+	return `Cena na vyžiadanie${vo}`;
 }
 
 /** celé mm bez desatinných (rozmery sú celé čísla). */

@@ -26,10 +26,10 @@ export interface DopytRiadok extends DopytZaznam, DopytCenaStlpce {
 const insertStmt = db.prepare(
 	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka,
 	                    cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m,
-	                    cena_sirka_grid_m, cena_model, cennik_verzia)
+	                    cena_sirka_grid_m, cena_model, cennik_verzia, cena_hladina)
 	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka,
 	         @cena_druh, @cena_bez_dph, @cena_s_dph, @cena_hlbka_grid_m,
-	         @cena_sirka_grid_m, @cena_model, @cennik_verzia)`
+	         @cena_sirka_grid_m, @cena_model, @cennik_verzia, @cena_hladina)`
 );
 
 /** Vloží dopyt, vráti nové `id`. Voliteľná pečiatka ceny (#309) sa uloží do `cena_*`/`cennik_verzia`
@@ -47,9 +47,10 @@ export function insertDopyt(z: DopytZaznam, stamp?: CenaStamp): number {
 	return Number(info.lastInsertRowid);
 }
 
-/** Cenové stĺpce (#309/v30) — súčasť SELECTu v `getDopyt`/`listDopyty` (opečiatkovaná cena). */
+/** Cenové stĺpce (#309/v30, #318/v32 `cena_hladina`) — súčasť SELECTu v `getDopyt`/`listDopyty`
+ *  (opečiatkovaná cena + typ hladiny MO/VO). */
 const cenaStlpce =
-	'cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m, cena_sirka_grid_m, cena_model, cennik_verzia';
+	'cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m, cena_sirka_grid_m, cena_model, cennik_verzia, cena_hladina';
 
 /** Načíta jeden dopyt (audit/diagnostika + opečiatkovaná cena pre re-download PDF). */
 export function getDopyt(id: number): DopytRiadok | undefined {
