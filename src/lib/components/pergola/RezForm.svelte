@@ -18,6 +18,8 @@
 		type HornyProfil,
 		type VystuhaProfil
 	} from '$lib/pergola-narez';
+	// #223 — katalóg typov strešného skla (výber pre vzorec šírky + cenu)
+	import { SKLO_STRECHA_TYPY } from '$lib/sklo-strecha';
 	import type { RucnaPolozka } from '$lib/pergola-rucne';
 
 	let {
@@ -42,6 +44,7 @@
 		vystuhaProfilS = $bindable(''),
 		zvodFrezovatS = $bindable(false),
 		zvodFrezovanieSHmmS = $bindable(''),
+		strechaSkloTypS = $bindable(''),
 		strechaSkloS = $bindable(''),
 		obvodoveZasklenieS = $bindable('')
 	}: {
@@ -66,6 +69,7 @@
 		vystuhaProfilS?: VystuhaProfil | '';
 		zvodFrezovatS?: boolean;
 		zvodFrezovanieSHmmS?: number | string;
+		strechaSkloTypS?: string;
 		strechaSkloS?: string;
 		obvodoveZasklenieS?: string;
 	} = $props();
@@ -349,9 +353,23 @@
 			{/if}
 		</div>
 
+		<div class="field">
+			<label for="strechaSkloTyp">Strešné sklo — typ (výpočet + cena)</label>
+			<select id="strechaSkloTyp" name="strechaSkloTyp" bind:value={strechaSkloTypS}>
+				<option value="">— nevybrané —</option>
+				{#each SKLO_STRECHA_TYPY as t (t.nazov)}
+					<option value={t.nazov}>{t.nazov}</option>
+				{/each}
+			</select>
+			<p class="sub" style="margin:4px 0 0">
+				šírka tabule = svetlosť medzi krovmi + 30 (sklo/STADUR) / + 34 (polykarbonát); dĺžka zatiaľ
+				čaká na vzorec
+			</p>
+		</div>
+
 		<div class="grid2">
 			<div class="field">
-				<label for="strechaSklo">Strecha — sklo</label>
+				<label for="strechaSklo">Strecha — sklo (poznámka na výkres)</label>
 				<input
 					id="strechaSklo"
 					name="strechaSklo"

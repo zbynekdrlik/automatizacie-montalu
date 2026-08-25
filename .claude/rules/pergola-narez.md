@@ -29,10 +29,14 @@ nepodporované" (engine) alebo čestný poznámkový box (výkres) — **NIKDY s
 neoverený vzorec**. Potvrdené (s citáciami t=… v engine hlavičke): predná noha =
 svetlosť + rozmer výstuhy (110/140/250) pri zosilnenom nosníku, inak svetlosť + 15 (#155 A9,
 Dominik 1724498; `prednaNohaPridavok`/`prednaNohaDlzkaMm` — kľúč je `zosilnenyNosnik`, profil =
-`vystuhaProfil` ?? systémový default; 200×140 odvodené = svetlosť+140); **zadná noha (LEN samostatne stojaca) = PLNÁ ZV** (#205, výkres OP260282 —
-call síce citoval „ZV − horný profil", ale reálny výkres uvádza plnú ZV = dĺžka nohy;
-`hornyProfilZadnej` UŽ neurčuje dĺžku nohy, po novom diskriminuje kaskádu 110×43 „pod
-fixom" — na potvrdenie Dominikovi); počet priečok = ceil(šírka/700)+1; systém → stĺp+žľab;
+`vystuhaProfil` ?? systémový default; 200×140 odvodené = svetlosť+140); **zadná konštrukcia
+(LEN samostatne stojaca) sleduje `hornyProfilZadnej`** (#316, Dominik 24.8. kanál 207 msg 1731730 —
+rozriešil ZV-protirečenie výkresu OP260282 plná 2790 vs call ZV−profil v prospech callu):
+**dĺžka zadnej nohy = ZV − horný profil** (110→ZV−110, 140→ZV−140; horizontálny profil sedí NA
+nohách) a **kód nohy AJ „zadnej konštr. hornej" = `ZADNA_KONSTRUKCIA_PROFIL[hornyProfilZadnej]`**
+(110→18013/110×110, 140→18017/140×140) → zadná konštrukcia jednotná by-construction, NEZÁVISLÁ od
+`system` (OP260282 = Massive 140 systém so 110 zadnou). `hornyProfilZadnej` diskriminuje AJ kaskádu
+110×43 „pod fixom" (podFixomOdpocet); počet priečok = ceil(šírka/700)+1; systém → stĺp+žľab;
 priečka kód 18004/18102. Neoverené a preto NEIMPLEMENTOVANÉ: krov (#161), dĺžky líšt/žľabu
 (O1), výstuha profil (O2/O3), sklá (O11), spád/kliny (patria k zaskleniu, nie k
 nohám). Overovací vektor: ZAK2026302 = 4× predná noha 2215 pri svetlosti 2200.
@@ -147,16 +151,16 @@ bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu
     `vypocitane` (`podFixomOdpocet`): frontProfil = systém 110/140, zadný prvok = 43 (stena) /
     hornyProfilZadnej (SS). Reprodukuje 5 hodnôt poznámky výkresu (−153/−220/−183/−250/−280);
     „šírka" v poznámke = smer HĹBKY (4990−250 nezmysel; 3470−250=3220 presne). Gated `zasklena`.
-  - **zadné nohy = PLNÁ ZV** (2790, nie ZV − horný profil) — TERAZ vo `vypocitane`; call citát
-    ZV−profil prehodnotený v prospech reálneho výkresu (rozdiel = miesto merania ZV).
-    **POZOR — ZNÁMY BUG zadnej konštr. (Dominik QA, #155):** profil zadnej NOHY sa dnes odvodzuje
-    z `system` (Massive→18017/140) a „zadná konštr. horná" je HARDCODED 18013 → pri Massive je zadná
-    konštrukcia VŽDY nejednotná (nohy 140 + horný 110), hoci výkres OP260282 ju má jednotne 110×110.
-    Správne: obe majú sledovať `hornyProfilZadnej` (110→18013/140→18017) → jednotné by-construction.
-    Je to Money-KÓDOVÁ zmena (18017→18013) → patrí do rear-construction slice-u (dĺžka zadnej nohy =
-    horná výška − profil: 110→2790/140→2760), s potvrdením Dominikom. Golden r.3 matchuje nohu NÁZVOM,
-    nie kódom → bug je latentný (test zelený). Validácia mixu sa NEROBÍ (mix nie je zadateľný vstup —
-    jediný rear profil je `hornyProfilZadnej`; „system ≠ hornyProfilZadnej" je LEGITÍMNE, OP260282).
+  - **zadné nohy = ZV − horný profil** (OP260282: ZV 2790, hornyProfilZadnej 110 → 2790−110 = 2680) —
+    TERAZ vo `vypocitane`; call citát ZV−profil POTVRDENÝ Dominikom 24.8. (#316), ZV-protirečenie
+    výkresu (plná 2790) rozriešené v prospech callu. Vizuálna kreslená výška ostáva plná ZV (noha +
+    horný profil dosiahnu ZV) — mení sa len CUT dĺžka.
+    **ZNÁMY BUG zadnej konštr. (Dominik QA, #155) — VYRIEŠENÝ v #316:** predtým sa profil zadnej NOHY
+    odvodzoval z `system` (Massive→18017/140) a „zadná konštr. horná" bola HARDCODED 18013 → pri Massive
+    so 110 zadnou nejednotná (nohy 140 + horný 110). TERAZ obe sledujú `hornyProfilZadnej` cez
+    `ZADNA_KONSTRUKCIA_PROFIL` (110→18013/110×110, 140→18017/140×140) → jednotné by-construction. Golden
+    r.3 asertuje kód AJ dĺžku (2680/18013), nie len názov. Validácia mixu sa NEROBÍ (mix nie je zadateľný
+    vstup — jediný rear profil je `hornyProfilZadnej`; „system ≠ hornyProfilZadnej" je LEGITÍMNE, OP260282).
   - **Zvislá zadná výstuha (18017 zvislá, 2340) = REKONCILIOVANÁ na prednú nohu (#155 A9)** — už
     NIE honest-null. Dominik (A9, 1724498): „nerozumiem 2340; noha = svetlosť + 140" → výkresová
     2340×2 pod 18017 = PREDNÁ NOHA (svetlosť 2200 + výstuha 140), TERAZ vo `vypocitane`. Skoršia
@@ -393,3 +397,32 @@ krovDlzkaDoMoney  = krovNominal != null && pocetKrovov != null ? krovNominal : n
   (Zvislá zadná výstuha 2340 UŽ NIE honest-null — rekonciliovaná na prednú nohu, #155 A9.) Rozšírenie na ďalšie konfigurácie = NOVÝ golden / potvrdenie Dominikom
   (majiteľ posúdi), NIKDY dohad. Kódy 18004–18008 SÚ v Money CODE_MAP (`server/pergola.ts`), takže
   po pustení idú cez `transformRows` do rezervácie — preto config-gate.
+
+## Strešné sklo (#223) — SAMOSTATNÁ pure funkcia, Money-NEUTRÁLNA (nikdy do `vypocitane`)
+
+Výpočet strešného skla žije v `src/lib/pergola-sklo.ts` (`spocitajStrechaSklo(v)`) ako
+**samostatná** pure funkcia — vzor `komponentyPergoly`, ZÁMERNE **mimo `NarezVysledok`/`spocitajNarez`**,
+aby golden OP260282 ostal bit-identický A aby sa sklo NIKDY nedostalo do `vypocitane` →
+`narezToCadRows` → Money. Modul je v `CISTY_ENGINE` money-safety guardu (importuje LEN pure moduly:
+`sklo-strecha` #274 + `pergola-narez`). Sklo je **display-only, žiadny Money odpis** (rozhodnutie až
+po potvrdení variácie, ticket #223).
+
+- **Šírka tabule = `svetlostMedziKrovmi(šírka, n)` + prídavok**: +30 (sklo/STADUR),
+  **+34 (polykarbonát)** — `strechaSkloSirkaPridavok(nazov)` cez `jePolykarbonatSklo` (name includes
+  „polykarbon"). Potvrdené A1 (Dominik #198, 21.8.); výstuha 140 do šírky NEvstupuje.
+- **Počet tabúľ = počet polí medzi krovmi = `platnyPocetKrovov(v) − 1`** (`platnyPocetKrovov` je
+  odteraz exportovaný z `pergola-narez.ts`). Bez manuálneho počtu krovov → honest-null.
+- **Dĺžka tabule = VŽDY honest-null** — vzorec dĺžky NEpotvrdený (chatové +30/+40 bolo prehodnotené
+  na prítlačnú lištu, #198 21.8. 09:20; HH krovu je aj tak sám honest-null). NEHÁDAŤ dĺžku, ani keď
+  „existujúca logika strechy" (`krovDlzkaNominal`) číslo vie dať — je to iný rozmer, delta nepotvrdená.
+- **Typ skla = NOVÝ `strechaSkloTyp` select** (14 typov z `SKLO_STRECHA_TYPY`), riadi vzorec (+30/+34)
+  aj cenu. Voľný text `strechaSklo` ostal SAMOSTATNE (poznámka/coating/RAL na výkres) — nulová regresia.
+- **Cena = €/m² UNIT zo snapshotu**, server modul `src/lib/server/sklo-strecha-cena.ts`
+  (`strechaSkloCenaPre` → `skloStrechaMoneyKod` → `cenaZaM2`), interní gate `!isB2B` v `spocitat`
+  (vzor `cenyPre`). **ŽIADNY total** (plocha = šírka × DĹŽKA × počet, dĺžka null → plocha neznáma).
+  Typ bez TS kódu (8/14) → „karta v Money zatiaľ neexistuje" (honest-null), NIKDY hádaný kód.
+- **Rozdelenie klient/server:** geometria je klientsky `$derived spocitajStrechaSklo(vstup)` (ako
+  `vysledok`/`komponenty`); cena príde zo servera (`form.strechaSkloCena`). `RezVysledok`/`+page.svelte`
+  NEimportujú `$lib/server/*` (ani cenový TYP) — prop používa klientsky štrukturálny typ.
+- Round-trip: `strechaSkloTyp` je vo vstupe, reset `$effect` echo, `hidden()` snippete aj `bind:` (select
+  je viditeľný vstup → submitne sa priamo vo `form` kroku, hidden je pre ďalšie kroky).

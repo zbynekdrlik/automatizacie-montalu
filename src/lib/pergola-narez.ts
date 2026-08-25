@@ -134,6 +134,21 @@ export const SYSTEMY: Record<PergolaSystem, SystemProfil> = {
 	}
 };
 
+/** Money kód + názov profilu ZADNEJ konštrukcie (zadná noha + „zadná konštrukcia horná")
+ *  podľa horného profilu zadnej (`hornyProfilZadnej`). Z callu (Dominik 24.8., kanál 207
+ *  msg 1731730): pri výstuhe 110×110 sú aj zadné nohy 110 → celá zadná konštrukcia sleduje
+ *  `hornyProfilZadnej`, jednotná by-construction (výkres OP260282 = jednotne 110×110, hoci
+ *  systém je Massive 140 — `hornyProfilZadnej` je NEZÁVISLÝ od systému). Kódy/názvy = KÓPIA
+ *  stringov z katalógu profilov (money-safety guard — NIE import server/pergola).
+ *  110 → 18013 (Profil 110x110 V2), 140 → 18017 (Profil 140x140). Hodnoty sú ZRKADLO
+ *  `SYSTEMY.Robust.stlp` / `SYSTEMY.Massive.stlp` `{kod, nazov}` — pri oprave katalógového
+ *  stringu drž ich v synchronizácii (odvodzovať z `SYSTEMY` sa ZÁMERNE NEROBÍ: zadná
+ *  konštrukcia je nezávislá od `system` — OP260282 = Massive 140 systém so 110 zadnou). */
+export const ZADNA_KONSTRUKCIA_PROFIL: Record<HornyProfil, { kod: string; nazov: string }> = {
+	110: { kod: '18013', nazov: 'Profil 110x110 V2' },
+	140: { kod: '18017', nazov: 'Profil 140x140' }
+};
+
 export interface PergolaNarezVstup {
 	system: PergolaSystem;
 	/** šírka pergoly [mm] = šírka RÁMU / poľa krokiev, do vzorca počtu priečok.
@@ -188,6 +203,11 @@ export interface PergolaNarezVstup {
 	/** #206 (e) — skladba strešného skla (voľný text, napr. „4-4-2číre-8-6stopsol classic
 	 *  grey"). Informatívny údaj zákazky na výkrese, žiadny Money výpočet. */
 	strechaSklo?: string;
+	/** #223 — ZVOLENÝ typ strešného skla z katalógu `SKLO_STRECHA_TYPY` (kanonický názov,
+	 *  napr. „IZO 4.4.2-8-6 číre"). Riadi vzorec šírky (polykarbonát → +34, inak +30) aj
+	 *  cenu (Money TS kód → €/m²). Prázdne/neznáme → sklo sa nepočíta (honest-null). Voľný
+	 *  text `strechaSklo` ostáva samostatná poznámka/coating na výkres. */
+	strechaSkloTyp?: string;
 	/** #206 (e) — obvodové zasklenie (voľný text, napr. „RS STANDARD PLUS 4-8-4číre").
 	 *  Informatívny údaj — Zasklenia má vlastný odpis, tu žiadne prepojenie na engine. */
 	obvodoveZasklenie?: string;
@@ -258,8 +278,9 @@ export function pocetPriecok(sirka: number): number {
 	return Math.ceil(sirka / MAX_ROZOSTUP_PRIECOK) + 1;
 }
 
-/** Platný manuálny počet krovov (≥ 2) alebo `null` (→ fallback). */
-function platnyPocetKrovov(v: PergolaNarezVstup): number | null {
+/** Platný manuálny počet krovov (≥ 2) alebo `null` (→ fallback). Exportované pre
+ *  `pergola-sklo.ts` (#223) — počet polí strešného skla = platný počet krovov − 1. */
+export function platnyPocetKrovov(v: PergolaNarezVstup): number | null {
 	const n = v.pocetKrovov;
 	// Zrkadlí `chybaPergolaNarezVstupu`: celé číslo v rozsahu, žiadne tiché zaokrúhlenie (aby
 	// caller, ktorý obíde validáciu, nedostal iný počet než ktorý prešiel validáciou).
@@ -440,12 +461,16 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 		: '= svetlosť + 15';
 	const samostatne = v.uchytenie === 'samostatne';
 	const zasklena = !v.jednoduchaBezZasklenia;
-	// #205 (výkres OP260282): zadná noha = PLNÁ zadná výška (ZV = dĺžka nohy), nie ZV − horný
-	// profil. Call citoval „ZV − 110/140" (t=1402–1417s), no reálny výkres OP260282 uvádza
-	// zadnú nohu 2790 = plná ZV → rozdiel je v mieste merania ZV (výkres: ZV = dĺžka nohy).
-	// Na potvrdenie Dominikovi. Dôsledok: hornyProfilZadnej UŽ neurčuje dĺžku nohy — po novom
-	// diskriminuje kaskádu bočného 110×43 „pod fixom" (podFixomOdpocet).
-	const zadnaNohaDlzka = samostatne ? R1(v.vyskaZadna) : null;
+	// #316 (Dominik 24.8., kanál 207 msg 1731730): zadná konštrukcia (LEN samostatne stojaca)
+	// sleduje HORNÝ PROFIL zadnej (110/140), nie systém. Pri výstuhe 110×110 sú aj zadné nohy 110;
+	// horizontálny profil sedí NA nohách → dĺžka zadnej nohy = ZV − rozmer horného profilu
+	// (110 → ZV−110, 140 → ZV−140), NIE plná ZV (rieši ZV-protirečenie výkresu OP260282 plná 2790
+	// vs call ZV−profil v prospech callu). Kód/názov nohy AJ horného profilu = ZADNA_KONSTRUKCIA_PROFIL
+	// → zadná konštrukcia je jednotná by-construction (predtým: noha = systémový kód, horný = hardcoded
+	// 18013 → pri Massive so 110 zadnou nejednotná). `hornyProfilZadnej` diskriminuje AJ kaskádu
+	// bočného 110×43 „pod fixom" (podFixomOdpocet, nezmenené).
+	const zadnaProfil = ZADNA_KONSTRUKCIA_PROFIL[v.hornyProfilZadnej];
+	const zadnaNohaDlzka = samostatne ? R1(v.vyskaZadna - v.hornyProfilZadnej) : null;
 	const priecky = pocetPriecok(v.sirka);
 	// #161 — MANUÁLNY počet krovov (Dominik 21.8.: nie auto ceil(š/700)+1). n = platný manuál
 	// alebo null → fallback na auto `priecky`. Svetlosť medzi krovmi + počet zaklapávacích
@@ -483,13 +508,13 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	];
 	if (samostatne) {
 		vypocitane.push({
-			kod: sys.stlp.kod,
-			nazov: `${sys.stlp.nazov} — zadná noha`,
+			kod: zadnaProfil.kod,
+			nazov: `${zadnaProfil.nazov} — zadná noha`,
 			dlzkaRezuMm: zadnaNohaDlzka,
 			pocetKs: v.pocetZadnychNoh,
-			poznamka: '= plná zadná výška (ZV = dĺžka nohy)',
+			poznamka: `= zadná výška − horný profil ${v.hornyProfilZadnej}`,
 			poznamkaDetail:
-				'Podľa výkresu je zadná noha rovná plnej zadnej výške ZV. Skoršie zadanie hovorilo „ZV mínus horný profil (110/140)" — rozdiel je v mieste merania ZV, na potvrdenie Dominikovi.'
+				'Dĺžka rezu zadnej nohy = zadná výška ZV mínus rozmer horného profilu zadnej konštrukcie — horizontálny profil sedí na nohách. Pri hornom profile 110 sú aj zadné nohy 110, pri 140 aj nohy 140; zadná konštrukcia je jednotná.'
 		});
 	}
 	// #161 — priečka (krokva): dĺžka = NOMINÁL krovu (LEN overená konfigurácia + zadaný počet
@@ -545,13 +570,13 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	});
 	if (samostatne) {
 		vypocitane.push({
-			kod: '18013',
-			nazov: 'Profil 110x110 V2 — zadná konštrukcia horná',
+			kod: zadnaProfil.kod,
+			nazov: `${zadnaProfil.nazov} — zadná konštrukcia horná`,
 			dlzkaRezuMm: sirkaMm,
 			pocetKs: 1,
 			poznamka: '= šírka',
 			poznamkaDetail:
-				'Profil 110×110 potvrdený z výkresu (Massive, samostatne stojaca) — pri inom systéme kód overiť s Dominikom. Zdieľa 7,5 m tyče so zadnými nohami.',
+				'Horný profil zadnej konštrukcie = šírka; kód aj profil sledujú horný profil zadnej (110 → 110×110, 140 → 140×140), jednotný so zadnými nohami. Zdieľa 7,5 m tyče so zadnými nohami.',
 			vydajTyce: spocitajVydaj(sirkaMm, 1, TYC_STANDARD_MM)
 		});
 	}
@@ -812,9 +837,10 @@ export function schemaVykresu(v: PergolaNarezVstup): PergolaNarezSchema {
 		zadnaKonstrukcia: samostatne
 			? {
 					typ: 'samostatne',
-					// #205: dĺžka nohy = plná ZV (výkres OP260282), nezávisí od hornyProfilZadnej
+					// #316: CUT dĺžka nohy = ZV − horný profil (Dominik 24.8.); VIZUÁLNA výška ostáva
+					// vyskaZadna (noha + horný profil dosiahnu ZV) — geometria kreslenia sa nemení.
 					nohyX: rovnomerneX(v.pocetZadnychNoh, v.sirka),
-					nohaDlzka: R1(v.vyskaZadna),
+					nohaDlzka: R1(v.vyskaZadna - v.hornyProfilZadnej),
 					vyskaZadna: v.vyskaZadna,
 					hornyProfil: v.hornyProfilZadnej
 				}

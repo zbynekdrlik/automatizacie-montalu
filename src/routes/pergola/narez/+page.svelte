@@ -31,6 +31,8 @@
 		type VystuhaProfil
 	} from '$lib/pergola-narez';
 	import { krovUlozenie } from '$lib/pergola-krov';
+	// #223 — strešné sklo: geometria (pure, klientsky $derived); cena príde zo servera (form)
+	import { spocitajStrechaSklo } from '$lib/pergola-sklo';
 	import type { RucnaPolozka } from '$lib/pergola-rucne';
 
 	let { data, form } = $props();
@@ -69,6 +71,7 @@
 		zvodFrezovat: form?.vstup?.zvodFrezovat ?? false,
 		zvodFrezovanieSHmm: form?.vstup?.zvodFrezovanieSHmm ?? null,
 		strechaSklo: form?.vstup?.strechaSklo ?? '',
+		strechaSkloTyp: form?.vstup?.strechaSkloTyp ?? '',
 		obvodoveZasklenie: form?.vstup?.obvodoveZasklenie ?? ''
 	} satisfies PergolaNarezVstup);
 
@@ -95,6 +98,7 @@
 	let vystuhaProfilS = $state<VystuhaProfil | ''>('');
 	let zvodFrezovatS = $state(false);
 	let zvodFrezovanieSHmmS = $state<number | string>('');
+	let strechaSkloTypS = $state('');
 	let strechaSkloS = $state('');
 	let obvodoveZasklenieS = $state('');
 	// #221 — ident rezervácie (ZAK/OP/zákazník): bind + $state, aby prežili re-render
@@ -129,6 +133,7 @@
 		vystuhaProfilS = (v?.vystuhaProfil as VystuhaProfil | null) ?? '';
 		zvodFrezovatS = v?.zvodFrezovat ?? false;
 		zvodFrezovanieSHmmS = v?.zvodFrezovanieSHmm ?? '';
+		strechaSkloTypS = v?.strechaSkloTyp ?? '';
 		strechaSkloS = v?.strechaSklo ?? '';
 		obvodoveZasklenieS = v?.obvodoveZasklenie ?? '';
 		// #221 — echo ident z form (rovnaká disciplína: číta LEN form, nie vlastné *S)
@@ -147,6 +152,12 @@
 	// #161 — krov uloženie z potvrdených vzorcov, len keď je sklon zadaný
 	let krov = $derived(
 		step === 'vysledok' && vstup.sklonStrechy != null ? krovUlozenie(vstup.sklonStrechy) : null
+	);
+	// #223 — strešné sklo: geometria (šírka/počet tabúľ, honest-null dĺžka) sa počíta klientsky
+	// (pure, ako vysledok/komponenty); cena €/m² príde zo servera (`spocitat` → form), interní.
+	let strechaSklo = $derived(step === 'vysledok' ? spocitajStrechaSklo(vstup) : null);
+	let strechaSkloCena = $derived(
+		form && 'strechaSkloCena' in form ? (form.strechaSkloCena ?? null) : null
 	);
 
 	// #222 — stavové zhrnutie na prvý pohľad. Split je PRESNE ten, čo používa
@@ -191,6 +202,11 @@
 			name="zvodFrezovanieSHmm"
 			value={zvodFrezovanieSHmmS}
 		/>{/if}
+	{#if strechaSkloTypS !== ''}<input
+			type="hidden"
+			name="strechaSkloTyp"
+			value={strechaSkloTypS}
+		/>{/if}
 	{#if strechaSkloS !== ''}<input type="hidden" name="strechaSklo" value={strechaSkloS} />{/if}
 	{#if obvodoveZasklenieS !== ''}<input
 			type="hidden"
@@ -230,6 +246,7 @@
 		bind:vystuhaProfilS
 		bind:zvodFrezovatS
 		bind:zvodFrezovanieSHmmS
+		bind:strechaSkloTypS
 		bind:strechaSkloS
 		bind:obvodoveZasklenieS
 	/>
@@ -239,6 +256,8 @@
 		{vysledok}
 		{komponenty}
 		{krov}
+		{strechaSklo}
+		{strechaSkloCena}
 		{spocitaneCount}
 		{cakaCount}
 		{cakaDlzkaCount}

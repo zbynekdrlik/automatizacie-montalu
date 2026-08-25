@@ -1672,3 +1672,28 @@ Gates: check 0, lint clean, vitest 2246, coverage prahy držia, playwright odpis
 UNVERIFIED (provisioning, mimo appky): presné Money DLV stĺpce + či PocetPolozek ráta nulové riadky.
 **Playbook:** nový `.claude/rules/money-readback.md` (dátový tok, on-the-fly stav, strftime UTC pasca,
 caka=1 parking, exkluzívne párovanie, okno-klamp, E2E seed, producer UNVERIFIED) + router v CLAUDE.md.
+
+## #315 — PROD freeze: /odpisy zamrazil celú appku (sync stat na CIFS mounte), release 0.24.38
+Incident (main run 32784140596, b1fce13): #299 detekcia ručného presunu bežala v /odpisy load
+SYNCHRÓNNE (`fs.statSync` na uložené `target` cesty). Na PRODE ležia na CIFS/SMB share cez WireGuard
+(`//192.168.1.200/...`, soft, actimeo=1) — namerané 0,7–8,8 s/súbor, ~5 s/adresár → 22 riadkov × 2
+staty zablokovali event loop na desiatky s, aj /health timeoutol (post-deploy E2E `/odpisy` freeze).
+Root cause fix (celá detekcia async, `money-presun.ts` 134→306 r.): `readdir`-per-adresár (dostupnosť
++ normalizačne odolná NFC/NFD „prítomný?" množina) + potvrdzujúci exact-path `stat` (ENOENT-only mark)
++ tvrdý wall-clock rozpočet (`Promise.race`, `PRESUN_DETECT_BUDGET_MS=2500`, čestný skip pri prekročení,
+WARN log, stránka sa VŽDY načíta) + sekvenčne + jedna in-flight detekcia (gate držaný kým fs ops
+doznejú → max 1 libuv threadpool worker). Commity: `32c1661` bump, `05a30e0` [red] (visiaci readdir →
+dobehne v rozpočte a neoznačí — padal na sync kóde), `a18d181` [green], `50c812b` playbook, `1e791d3`
+[review] (dir-revalidácia pred markom, wedge-gate max-hold watchdog + gen guard, doc oprava, 4 testy),
+`dd20dfe` clean 0.24.38, PR #317 merge `2f517ee`. Fable review: 0 🔴 2 🟡 3 🔵 — všetky opravené.
+#299 invarianty zachované (age-guard, ENOENT-only mark, idempotentný ledger, writeOdpis netknuté; testy
+z fd72a9b len mechanicky async, aserície identické). Gates: check 0, lint clean, full vitest + coverage
+nad prahmi (money-presun 98/95/100/98; celkovo stmts 96,18 / branch 89,87 / func 97,83 / lines 97,55),
+mutation-diff 6/6, E2E odpisy 6/6. PROD verify (= zároveň dokončenie #299 post-deploy verifikácie):
+0.24.38 (2f517ee) live, /odpisy sa NORMÁLNE načíta (91 riadkov, 0 console errors), /health živý počas
+toho; nová #315 WARN sa reálne odpálila (`budgetMs:2500, dirsCitane:0, dirsSpolu:2, oznacene:0` — pomalý
+mount → čestný skip, 0 falošných markov). #299 stav riadkov: caka=1 total=22, presunute=6 (nezmenené
+ids 39,44,46,47,53,54 z incidentu), parkovaných 16 (nezmenené). deploy job success.
+**Playbook:** `.claude/rules/money-readback.md` #315 bullet (nikdy sync fs na CIFS staged cesty; async
++ rozpočet + jedna in-flight; testovacia pasca s visiacim readdir + gate cleanup) + oprava starého
+statSync bulletu a referencie modulu (money.ts → money-presun.ts).

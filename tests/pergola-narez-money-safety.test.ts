@@ -36,6 +36,8 @@ const CISTY_ENGINE = [
 	// #161 — krov uloženie engine je tiež LEN potvrdené vzorce, display-only
 	'src/lib/pergola-krov.ts',
 	'src/lib/pergola-komponenty.ts',
+	// #223 — strešné sklo (vzorec šírky/počet tabúľ) je Money-NEUTRÁLNE, display-only pure modul
+	'src/lib/pergola-sklo.ts',
 	'src/lib/server/pergola-narez-vstup.ts',
 	// #194 — technický výkres z rozmerov je tiež LEN display-only kresba
 	'src/lib/components/PergolaNarezVykres.svelte',
