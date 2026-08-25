@@ -1,8 +1,9 @@
 // Strešné sklo pergoly — vzorec šírky + počet tabúľ + honest-null dĺžka (#223).
 // Konzumuje POTVRDENÚ A1 (Dominik #198, 21.8.): šírka skla = svetlosť medzi krovmi + 30
 // (sklo/STADUR) / + 34 (polykarbonát 16 mm); stredová výstuha 140 do šírky NEvstupuje.
-// DĹŽKA tabule je honest-null — chatové +30/+40 bolo prehodnotené na prítlačnú lištu
-// (#198, 21.8. 09:20), delta HH krovu→sklo nepotvrdená → dĺžka sa NEpočíta.
+// DĹŽKA tabule je honest-null — reálny výrobný výkres skla OP260282 (ch207 príloha 10504:
+// 7 ks, 685 × 3259) vyvracia chatové „dĺžka krovu + 40" (3279,76 ✗) aj call „HH + 20"
+// (3260,93 ✗) → kým Dominik rozpor nerozsekne, dĺžka sa NEpočíta (viď verifikačný describe).
 //
 // PURE modul (žiadna DB/server) — priamo unit-testovateľný. Strešné sklo je Money-NEUTRÁLNE
 // (display-only), NIKDY nevstupuje do `vypocitane`/Money.
@@ -83,6 +84,43 @@ describe('spocitajStrechaSklo — golden OP260282 (Massive, n=8, IZO 4.4.2-8-6 �
 	it('poznámka o čakajúcej dĺžke je prítomná (plain, bez interných referencií)', () => {
 		expect(r.poznamky.some((p) => /dĺžk/i.test(p))).toBe(true);
 		expect(r.poznamky.join(' ')).not.toMatch(/#\d|\bO\d/);
+	});
+});
+
+describe('#223 VERIFIKÁCIA proti reálnemu sklu OP260282 (výrobný výkres, ch207 príloha 10504)', () => {
+	// Reálny výrobný výkres skla, ktorý Dominik pripol do kanála 207 (msg 1731731; „sklo maš
+	// pripnute" — msg 1739824): STRECHA SKLO 4-4-2číre-8-6stopsol classic grey, 7 ks,
+	// tabuľa 685 × 3259 mm. Prvé overenie vzorcov proti reálne rezanému kusu (nie chatu).
+	const r = spocitajStrechaSklo(OP260282);
+
+	it('počet tabúľ SEDÍ na reálny rez: 7 ks (8 krovov → 7 polí)', () => {
+		expect(r.pocetTabul).toBe(7);
+	});
+
+	it('šírka SEDÍ na reálny rez: 685,43 → rezaných 685 (celé mm nadol — sklo musí zapadnúť)', () => {
+		// Príloha má JEDEN rozmer pre všetkých 7 ks (žiadne užšie pole) a Dominik potvrdil
+		// „ano nevstupuje" (ch207 1725595) — trčanie výstuhy 95/125 patrí k prednej svetlej
+		// výške/nohe, nie k šírke strešných polí. Engine preto vracia JEDNU skalárnu šírku
+		// pre všetky polia (per-pole korekcia neexistuje) a tá sedí na reálny rez.
+		expect(r.sirkaMm).toBe(685.43);
+		expect(Math.floor(r.sirkaMm as number)).toBe(685); // rozmer tabule na výrobnom výkrese
+	});
+
+	it('dĺžka OSTÁVA honest-null — žiadne verbatim pravidlo nereprodukuje reálnych 3259 mm', () => {
+		// Kandidáti vs. reálny rez 3259:
+		//  - chat „dĺžka skla = dĺžka krovu + 40 (masív)" (ch207 1725597–1725599):
+		//    nominál 3239,76 + 40 = 3279,76 ✗ (Δ +20,76; zhodou okolností presne dĺžka
+		//    prítlačnej lišty 3279,77 — pravidlo koliduje s vlastným pravidlom líšt)
+		//  - call 19.8. „dĺžka hornej hrany + 20 (masív)": HH 3240,93 + 20 = 3260,93 ✗ (Δ +1,93)
+		//  - hypotéza „nominál + 20, zaokrúhlené nadol" = 3259 by sedela, ale vyžaduje DVE
+		//    neoverené domnienky naraz → force-fit, do enginu nejde (rozpor zaznamenaný na #223)
+		expect(r.dlzkaMm).toBeNull();
+	});
+
+	it('reálny typ (4-4-2číre-8-6stopsol) → najbližší katalógový IZO typ s TS kódom', () => {
+		// stopsol variácia nemá vlastnú kartu — appka priradí najbližšiu cenu (IZO 4.4.2-8-6
+		// číre = TS00014), reálnu Dominik po potvrdení prepíše ručne (zadanie #223).
+		expect(r.moneyKod).toBe('TS00014');
 	});
 });
 

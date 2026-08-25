@@ -5,11 +5,16 @@
 // 16 mm). Stredová výstuha 140×140 do šírky skla NEvstupuje (Dominik to explicitne
 // potvrdil). Počet tabúľ = počet polí medzi krovmi = počet krovov − 1.
 //
-// DĹŽKA tabule je ZÁMERNE honest-null: chatové „+30/+40" bolo pri čítaní golden výkresu
-// OP260282 (#198, 21.8. 09:20) prehodnotené ako prítlačná/maskovacia lišta (= HH krovu
-// + 40), NIE dĺžka skla; delta HH krovu → sklo nie je potvrdená a aj sám základ (HH
-// krovu) je honest-null (nominál + ~1 mm reálne uloženie). Preto sa dĺžka NEPOČÍTA —
-// nikdy sa nehádže neoverený rozmer (rovnaká disciplína ako celý pergola-narez engine).
+// DĹŽKA tabule je ZÁMERNE honest-null — a od 25.8. je to podložené REÁLNYM kusom:
+// výrobný výkres skla OP260282 (Dominik ho pripol do ch207, msg 1731731, príloha 10504)
+// má tabuľu 685 × 3259 mm, 7 ks. Šírku aj počet vzorce reprodukujú (685,43 → rez 685;
+// 7 polí ✓), ale dĺžku NEreprodukuje ŽIADNE verbatim pravidlo: chat „dĺžka skla = dĺžka
+// krovu + 30/+40" (ch207 1725597–1725599) dáva 3239,76 + 40 = 3279,76 ✗ (Δ +20,76 —
+// zhodou okolností presne dĺžka prítlačnej lišty), call 19.8. „dĺžka hornej hrany + 20
+// (masív)" dáva 3240,93 + 20 = 3260,93 ✗ (Δ +1,93). Hypotéza „nominál + 20 zaokrúhlené
+// nadol" (= 3259) by sedela, ale sú to dve neoverené domnienky naraz → force-fit. Kým
+// Dominik rozpor nerozsekne, dĺžka sa NEPOČÍTA — nikdy sa nehádže neoverený rozmer
+// (rovnaká disciplína ako celý pergola-narez engine).
 //
 // PURE modul — importuje LEN pure moduly (`sklo-strecha`, `pergola-narez`), žiadny
 // server/DB. Strešné sklo je Money-NEUTRÁLNE (display-only): NIKDY nevstupuje do

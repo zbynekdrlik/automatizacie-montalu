@@ -421,9 +421,11 @@ test('#206 (a) jednoduchá bez zasklenia: bočný 110×43 zmizne, ZV pole sa skr
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('#206 (c) výstuha 200×140: svetlosť −60 → predná noha 2155 (2200 − 60 + 15)', async ({
+test('#155 výstuha 200×140 + zosilnenie: noha = svetlosť + 200 (2400), svetlosť bez výstuhy 2385', async ({
 	page
 }) => {
+	// Model 1731729 (Dominik 24.8.): výstuha skovaná 15 mm v žľabe, trčí zvyšok do svetlosti →
+	// noha = svetlosť + zvislý rozmer výstuhy (200×140 → +200); bývalý −60 model odvolaný.
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/narez');
@@ -432,16 +434,17 @@ test('#206 (c) výstuha 200×140: svetlosť −60 → predná noha 2155 (2200 �
 	await page.locator('#sirka').fill('5000');
 	await page.locator('#pocetPrednychNoh').fill('4');
 	// predná svetlosť ostáva default 2200
+	await page.locator('#zosilnenyNosnik').check();
 	await page.locator('#vystuhaProfil').selectOption('200x140');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
-	// predná noha (18017) = (2200 − 60) + 15 = 2155
-	await expect(page.getByTestId('polozka-18017')).toContainText('2155');
-	// efektívna svetlosť = 2140 (informatívne)
-	await expect(page.getByTestId('info-efektivna-svetlost')).toContainText('2140');
+	// predná noha (18017) = 2200 + 200 = 2400 (všeobecné pravidlo, žiadny −60)
+	await expect(page.getByTestId('polozka-18017')).toContainText('2400');
+	// svetlosť bez výstuhy = 2200 + trčanie 185 = 2385 (informatívne)
+	await expect(page.getByTestId('info-svetlost-bez-vystuhy')).toContainText('2385');
 	await expect(page.getByTestId('info-vystuha-profil')).toContainText('200x140');
-	// výkres spec ukazuje profil výstuhy + −60 poznámku
+	// výkres spec ukazuje profil výstuhy
 	await expect(page.getByTestId('pnr-spec-vystuha')).toContainText('200x140');
 
 	expect(consoleMsgs).toEqual([]);

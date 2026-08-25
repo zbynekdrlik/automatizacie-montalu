@@ -82,13 +82,7 @@
 		const rows: [string, string, string][] = [
 			['SYSTÉM', 'system', vstup.system],
 			['ROZMER', 'rozmer', `${fmtMm(s.sirka)} × ${fmtMm(s.hlbka)} mm`],
-			[
-				vstup.vystuhaProfil === '200x140' && vstup.system === 'Massive'
-					? 'EFEKTÍVNA SVETLOSŤ'
-					: 'PREDNÁ SVETLOSŤ',
-				'svetlost',
-				`${fmtMm(s.prednaSvetlost)} mm${vstup.vystuhaProfil === '200x140' && vstup.system === 'Massive' ? ' (200×140: −60)' : ''}`
-			],
+			['PREDNÁ SVETLOSŤ', 'svetlost', `${fmtMm(s.prednaSvetlost)} mm`],
 			[
 				'PREDNÉ NOHY',
 				'nohy',
