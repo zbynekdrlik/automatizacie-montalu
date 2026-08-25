@@ -2,7 +2,7 @@
 // `?page=` + tvar riadku (datum, súhrn) + interný-only guard. Volá `load` priamo s fake eventom.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../src/lib/server/db';
-import { insertDopyt } from '../src/lib/server/dopyt-store';
+import { insertDopyt, insertObjednavka } from '../src/lib/server/dopyt-store';
 import { load } from '../src/routes/dopyty-konfigurator/+page.server';
 
 type LoadEvent = Parameters<typeof load>[0];
@@ -130,5 +130,30 @@ describe('load /dopyty-konfigurator (#282)', () => {
 		// neopečiatkovaný (starý) riadok → `null` (driver-side signál, nie „—" reťazec)
 		expect(byMeno('Stary').cena).toBeNull();
 		expect(byMeno('Stary').cenaVerzia).toBeNull();
+	});
+
+	it('#319: interný zoznam odlíši objednávku od dopytu (jeObjednavka + hasObjednavka)', async () => {
+		const zaznam = (meno: string) => ({
+			konfiguracia: JSON.stringify({ system: 'X', sirka: 4000, hlbka: 3000 }),
+			meno,
+			email: `${meno}@x.sk`,
+			telefon: '',
+			miesto: '',
+			poznamka: ''
+		});
+		insertDopyt(zaznam('Dopytujuci'));
+		insertObjednavka({
+			...zaznam('Objednavatel'),
+			faktMeno: 'Firma s.r.o.',
+			faktAdresa: 'Ulica 1',
+			faktIco: '',
+			faktDic: ''
+		});
+		const d = await loadOk();
+		expect(d.hasObjednavka).toBe(true);
+		const byMeno = (m: string) =>
+			d.dopyty.find((r: { meno: string; jeObjednavka: boolean }) => r.meno === m)!;
+		expect(byMeno('Objednavatel').jeObjednavka).toBe(true);
+		expect(byMeno('Dopytujuci').jeObjednavka).toBe(false);
 	});
 });
