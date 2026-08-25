@@ -23,7 +23,7 @@ import { resolveClientIp } from '$lib/server/client-ip';
 // #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). Táto route ju iba
 // naimportuje a namountuje ako pomenovanú akciu `dopyt` — Money-NEUTRÁLNA (žiadny import
 // money/pergola, zápis len do audit tabuľky `dopyt`, guard: tests/dopyt-money-safety.test.ts).
-import { dopytAction } from '$lib/server/dopyt-action';
+import { dopytAction, objednavkaAction } from '$lib/server/dopyt-action';
 
 // GET (SSR render stránky) NIE JE rate-limitovaný — je lacný (statický katalóg + rozmedzia,
 // žiadny výpočet) a rovnaká politika ako verejný /login dnes; drahý (výpočtový) je POST,
@@ -46,6 +46,10 @@ export const actions = {
 	// PDF ponuka s orientačnou cenou (#279 Fáza C, download-first). Money-neutrálne, žiadna
 	// odpisová cesta (cena = orientačná MO predajná, nie Money nákupná).
 	dopyt: dopytAction,
+	// #319: záväzná objednávka — kontakt + fakturačné údaje + súhlas → uloženie (je_objednavka=1) +
+	// PDF špecifikácia + Odoo lead ako OPPORTUNITY. Money-neutrálne (ŽIADNA platobná brána, žiadny
+	// odpis); zapečatí objednanú cenu vrátane MO/VO hladiny.
+	objednavka: objednavkaAction,
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).
 	// SvelteKit ZAKAZUJE miešať `default` s pomenovanými akciami (actions.js:221 „When using

@@ -18,6 +18,7 @@ import {
 	migrateDopytCenaStamp,
 	migrateManualMoveColumn,
 	migrateDopytCenaHladina,
+	migrateObjednavka,
 	migrateDeluxe5KRail
 } from './migracie-seed';
 
@@ -978,6 +979,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateDopytCenaStamp(db, bump); // v29 → v30 (#309); extrahované do migracie-seed (viď docstring)
 	migrateManualMoveColumn(db, bump); // v30 → v31 (#299); extrahované do migracie-seed (viď docstring)
 	migrateDopytCenaHladina(db, bump); // v31 → v32 (#318); extrahované do migracie-seed (viď docstring)
+	migrateObjednavka(db, bump); // v32 → v33 (#319); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

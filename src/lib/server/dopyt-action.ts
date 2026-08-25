@@ -11,13 +11,21 @@
 import { fail, type RequestEvent } from '@sveltejs/kit';
 import { resolveClientIp } from './client-ip';
 import { allowDopyt } from './dopyt-throttle';
-import { insertDopyt } from './dopyt-store';
+import { insertDopyt, insertObjednavka } from './dopyt-store';
 import { opeciatkujCenu } from './dopyt-cena-stamp';
 import { cenovaHladina } from './konfigurator-hladina';
 import { queueLeadCreation } from './odoo-lead';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
-import { HONEYPOT_FIELD, jeSpam, normalizeDopyt, validateDopyt, type DopytVstup } from '$lib/dopyt';
+import {
+	HONEYPOT_FIELD,
+	jeSpam,
+	normalizeDopyt,
+	validateDopyt,
+	normalizeObjednavka,
+	validateObjednavka,
+	type DopytVstup
+} from '$lib/dopyt';
 import { logger } from './log';
 
 const log = logger('dopyt-action');
@@ -51,9 +59,10 @@ function decodeRenderPng(v: FormDataEntryValue | null): Uint8Array | undefined {
 	}
 }
 
-/** Názov PDF na stiahnutie — dátumový (nie sekvenčné `dopyt.id`, nech neúniká lead-count). */
-function filename(): string {
-	return `Montalu-ponuka-${new Date().toISOString().slice(0, 10)}.pdf`;
+/** Názov PDF na stiahnutie — dátumový (nie sekvenčné `dopyt.id`, nech neúniká lead-count).
+ *  `prefix` odlíši objednávkovú špecifikáciu od dopytovej ponuky (`ponuka` / `objednavka`). */
+function filename(prefix = 'ponuka'): string {
+	return `Montalu-${prefix}-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
 export async function dopytAction(event: RequestEvent) {
@@ -130,4 +139,89 @@ export async function dopytAction(event: RequestEvent) {
 	queueLeadCreation(id, pdfBase64);
 
 	return { success: true, pdfBase64, filename: filename() };
+}
+
+/**
+ * Verejná akcia pre ZÁVÄZNÚ OBJEDNÁVKU z konfigurátora (#319). Escalácia dopytu: rovnaký tok
+ * (honeypot → rate-limit → sanitize → opečiatkuj cenu → uloženie → PDF → Odoo lead FIRE-AND-FORGET),
+ * ale navyše fakturačné údaje + POVINNÝ súhlas s podmienkami, a uloží sa ako objednávka
+ * (`insertObjednavka`, `je_objednavka=1`). Zapečatí cenu VRÁTANE MO/VO hladiny (bod 5). Odoo lead
+ * sa vytvorí ako OBJEDNÁVKA (opportunity) — vetva podľa `je_objednavka` v `odoo-lead.ts`.
+ * MONEY-NEUTRÁLNE: žiadny odpis, žiadny zápis do /data; ŽIADNA platobná brána (objednávka je
+ * záväzná v zmysle „odoslaná firme", nie zaplatená).
+ */
+export async function objednavkaAction(event: RequestEvent) {
+	const form = await event.request.formData();
+	const ip = clientIp(event);
+
+	// honeypot — reálny človek pole nevyplní → ticho „úspech" bez uloženia (bot nič nezíska)
+	if (jeSpam(form.get(HONEYPOT_FIELD))) {
+		log.warn('objednávka honeypot zachytený', { ip });
+		return { success: true };
+	}
+
+	const rl = allowDopyt(ip);
+	if (!rl.allowed) {
+		return fail(429, {
+			chyba: 'Priveľa pokusov o odoslanie. Skúste to, prosím, o chvíľu znova.',
+			retryAfterMs: rl.retryAfterMs
+		});
+	}
+
+	const values = normalizeObjednavka({
+		meno: form.get('meno'),
+		email: form.get('email'),
+		telefon: form.get('telefon'),
+		miesto: form.get('miesto'),
+		poznamka: form.get('poznamka'),
+		faktMeno: form.get('faktMeno'),
+		faktAdresa: form.get('faktAdresa'),
+		faktIco: form.get('faktIco'),
+		faktDic: form.get('faktDic'),
+		suhlas: form.get('suhlas')
+	});
+	const { ok, errors } = validateObjednavka(values);
+	if (!ok) {
+		return fail(400, { errors, values });
+	}
+
+	const cfg = sanitizePonukaConfig(form.get('konfiguracia'));
+	const renderPng = decodeRenderPng(form.get('renderPng'));
+	// #309/#318: opečiatkuj cenu + MO/VO hladinu PRI PODANÍ — objednaná cena je zapečatená (bod 5).
+	const stamp = opeciatkujCenu(cfg, cenovaHladina(event.locals?.user ?? null));
+
+	const id = insertObjednavka(
+		{
+			konfiguracia: JSON.stringify(cfg),
+			meno: values.meno,
+			email: values.email,
+			telefon: values.telefon,
+			miesto: values.miesto,
+			poznamka: values.poznamka,
+			faktMeno: values.faktMeno,
+			faktAdresa: values.faktAdresa,
+			faktIco: values.faktIco,
+			faktDic: values.faktDic
+		},
+		stamp
+	);
+	log.info('objednávka uložená', { id, ip, maKonfiguraciu: Object.keys(cfg).length > 0 });
+
+	let pdfBase64: string;
+	try {
+		const bytes = await generatePonukaPdf(cfg, { renderPng, cena: stamp.cena ?? undefined });
+		pdfBase64 = Buffer.from(bytes).toString('base64');
+	} catch (e) {
+		log.error('PDF objednávky zlyhalo', { id, err: e instanceof Error ? e.message : String(e) });
+		return fail(500, {
+			chyba: 'Objednávku sme prijali, ale PDF sa nepodarilo vytvoriť. Ozveme sa vám.',
+			ulozene: true
+		});
+	}
+
+	// #278/#319: objednávka do Odoo CRM ako OPPORTUNITY (vetva v `odoo-lead.ts` podľa je_objednavka).
+	// FIRE-AND-FORGET, chyby sa logujú, objednávka sa neminie (retry cez `odoo_attempts`).
+	queueLeadCreation(id, pdfBase64);
+
+	return { success: true, pdfBase64, filename: filename('objednavka') };
 }

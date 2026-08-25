@@ -159,10 +159,13 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
 	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
 	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
-	it('graf REÁLNE prechádza nové #277 klientsky-dosiahnuteľné súbory (DopytForm, ponuka, dopyt)', () => {
+	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm, ponuka, dopyt)', () => {
 		const { videne } = prejdiKlientskyGraf(konfVstupy());
 		const musiaByt = [
 			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
+			// #319: objednávkový formulár je nový klientsky vstup — guard (A) MUSÍ prejsť aj jeho graf,
+			// inak by jeho prípadný budúci Money/katalóg import nezachytil.
+			path.join(SRC, 'lib', 'components', 'ObjednavkaForm.svelte'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];

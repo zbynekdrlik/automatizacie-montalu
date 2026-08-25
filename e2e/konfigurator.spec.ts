@@ -157,6 +157,141 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #319: ZÁVÄZNÁ OBJEDNÁVKA (MO, neprihlásený). Súhrn → objednávková sekcia → kontakt + fakturačné
+// údaje + súhlas → PDF na stiahnutie + potvrdenie. Zápisový tok (uloží objednávku) → proti LIVE
+// prode preskočiť (skipAkLive), nech nepribúdajú testovacie objednávky. Money-neutrálne, nula console.
+test('konfigurátor: objednávka (MO) — súhrn → záväzná objednávka → PDF na stiahnutie, nula console chýb', async ({
+	page
+}) => {
+	await skipAkLive(page);
+	const consoleMsgs = collectConsole(page);
+
+	await goto(page, '/konfigurator');
+	await page.getByTestId('sirka').fill('4500');
+	await page.getByTestId('hlbka').fill('3500');
+	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sklonDeg').fill('8');
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+	await expect(page.getByTestId('cena-sdph')).toContainText('€');
+
+	// objednávková sekcia (voliteľný krok „záväzne objednať")
+	const objednavka = page.getByTestId('objednavka');
+	await expect(objednavka).toBeVisible();
+	await expect(objednavka.getByRole('heading', { name: /záväzne objednať/i })).toBeVisible();
+
+	// kontakt — JASNE OZNAČENÁ testovacia objednávka (honeypot `firma_web` nechávame prázdny)
+	await objednavka.getByLabel(/Meno a priezvisko/).fill('TEST E2E — ignorovať');
+	await objednavka.getByLabel(/^E-mail/).fill('test-e2e@example.com');
+	await objednavka.getByLabel(/Telefón/).fill('+421900000000');
+	await objednavka.getByLabel(/Miesto stavby/).fill('83101 Bratislava');
+	// fakturačné údaje
+	await objednavka.getByLabel(/Meno alebo firma/).fill('TEST E2E s.r.o.');
+	await objednavka.getByLabel(/Fakturačná adresa/).fill('Testovacia 1, 83101 Bratislava');
+	await objednavka.getByLabel(/^IČO/).fill('12345678');
+	await objednavka.getByLabel(/DIČ/).fill('SK1234567890');
+	// súhlas s podmienkami je POVINNÝ — bez neho server objednávku odmietne
+	await objednavka.getByTestId('objednavka-suhlas').check();
+
+	const responsePromise = page.waitForResponse(
+		(r) => r.request().method() === 'POST' && r.url().includes('objednavka')
+	);
+	const downloadPromise = page.waitForEvent('download');
+	await objednavka.getByTestId('objednavka-odoslat').click();
+
+	const response = await responsePromise;
+	expect(response.ok()).toBe(true);
+	const download = await downloadPromise; // PDF špecifikácia objednávky sa reálne stiahla
+	expect(download.suggestedFilename()).toMatch(/^Montalu-objednavka-\d{4}-\d{2}-\d{2}\.pdf$/);
+
+	// potvrdenie úspechu (formulár nahradený poďakovaním)
+	await expect(page.getByTestId('objednavka-ok')).toBeVisible();
+	await expect(page.getByText('Ďakujeme! Objednávku sme prijali.')).toBeVisible();
+
+	// ÚNIK GUARD: žiadny Money kód (TS###), nárez ani VEĽKOOBCHOD (VO) cena (MO objednávka)
+	const telo = await page.locator('body').innerText();
+	expect(telo).not.toMatch(/TS\d{3}/);
+	expect(telo).not.toMatch(/nárez/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #319 + #318: ZÁVÄZNÁ OBJEDNÁVKA prihláseného VEĽKOOBCHODNÉHO (b2b) zákazníka. b2b na verejnom
+// konfigurátore vidí VO cenu (hladina sa odvodí server-side z účtu) A vie si záväzne objednať —
+// objednaná cena sa zapečatí vrátane VO hladiny (overené unit testom). Účet sa vytvorí + zmaže cez
+// /pouzivatelia (users tabuľka NIE JE Money → sankcionovaný live check, vzor #318). Zápisový tok →
+// skipAkLive. Nula console chýb.
+test('konfigurátor: objednávka (VO/b2b) — prihlásený veľkoobchod vidí VO cenu a záväzne objedná, nula console chýb (#319)', async ({
+	page
+}) => {
+	await skipAkLive(page);
+	const consoleMsgs = collectConsole(page);
+	page.on('dialog', (d) => d.accept()); // confirm() pri Zmazať
+
+	const voUser = `e2e-obj-vo-${Date.now().toString(36)}`;
+	const voPass = 'e2eheslo1';
+
+	const odhlas = async () => {
+		await goto(page, '/zasklenia'); // nav s Odhlásiť je na authed stránke, nie na verejnom /konfigurator
+		await page.getByRole('button', { name: 'Odhlásiť' }).click();
+		await expect(page).toHaveURL(/\/login/);
+	};
+
+	// 1. interný vytvorí VO/b2b účet (rola defaultne B2B)
+	await loginAs(page);
+	await goto(page, '/pouzivatelia');
+	await page.getByLabel('Prihlasovacie meno').fill(voUser);
+	await page.getByLabel('Heslo (min. 6 znakov)').fill(voPass);
+	await page.getByRole('button', { name: 'Pridať účet' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+
+	// 2. prihlásenie ako VO/b2b + konfigurácia → VO cena + odznak
+	await odhlas();
+	await loginAs(page, voUser, voPass);
+	await goto(page, '/konfigurator');
+	await page.getByTestId('sirka').fill('5000');
+	await page.getByTestId('hlbka').fill('3000');
+	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sklonDeg').fill('8');
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+	await expect(page.getByTestId('cena-hladina')).toBeVisible(); // VO odznak (b2b vidí veľkoobchod)
+	await expect(page.getByTestId('cena-hladina')).toContainText(/ve[ľl]koobchod/i);
+
+	// 3. VO/b2b vyplní záväznú objednávku
+	const objednavka = page.getByTestId('objednavka');
+	await objednavka.getByLabel(/Meno a priezvisko/).fill('TEST E2E VO — ignorovať');
+	await objednavka.getByLabel(/^E-mail/).fill('test-e2e-vo@example.com');
+	await objednavka.getByLabel(/Telefón/).fill('+421900000001');
+	await objednavka.getByLabel(/Miesto stavby/).fill('01001 Žilina');
+	await objednavka.getByLabel(/Meno alebo firma/).fill('VO Firma s.r.o.');
+	await objednavka.getByLabel(/Fakturačná adresa/).fill('Priemyselná 5, 01001 Žilina');
+	await objednavka.getByTestId('objednavka-suhlas').check();
+
+	const responsePromise = page.waitForResponse(
+		(r) => r.request().method() === 'POST' && r.url().includes('objednavka')
+	);
+	const downloadPromise = page.waitForEvent('download');
+	await objednavka.getByTestId('objednavka-odoslat').click();
+	const response = await responsePromise;
+	expect(response.ok()).toBe(true);
+	const download = await downloadPromise;
+	expect(download.suggestedFilename()).toMatch(/^Montalu-objednavka-\d{4}-\d{2}-\d{2}\.pdf$/);
+	await expect(page.getByTestId('objednavka-ok')).toBeVisible();
+
+	// 4. upratanie: odhlásenie VO, prihlásenie interný, zmazanie throwaway účtu
+	await odhlas();
+	await loginAs(page);
+	await goto(page, '/pouzivatelia');
+	const row = page.locator('tr', { hasText: voUser });
+	await expect(row).toBeVisible();
+	await row.getByRole('button', { name: 'Zmazať' }).click();
+	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
+	await expect(page.locator('tr', { hasText: voUser })).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});
+
 // #279 Fáza C: cenová vrstva vo verejnom konfigurátore — výber modelu mení orientačnú cenu,
 // mimo katalógu → „cena na vyžiadanie". Display-only (žiadny zápis) → beží aj proti nasadenej
 // appke (BASE_URL), bez skipAkLive.
