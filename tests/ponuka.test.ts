@@ -179,4 +179,26 @@ describe('formatCenaKratko (#309 admin zoznam)', () => {
 			'Cena na vyžiadanie'
 		);
 	});
+
+	// #318: VO (veľkoobchodný) dopyt v INTERNOM zozname nesie marker „· VO", nech personál
+	// rozozná veľkoobchodnú cenu od maloobchodnej.
+	it('VO cena → suma s DPH + · VO marker (#318)', () => {
+		expect(
+			formatCenaKratko({
+				druh: 'cena',
+				model: 'ROBUST',
+				bezDph: 100,
+				sDph: 123,
+				hlbkaGridM: 4,
+				sirkaGridM: 5,
+				hladina: 'VO'
+			})
+		).toBe('123,00 € s DPH · VO');
+	});
+
+	it('VO individualna-ponuka → „Cena na vyžiadanie · VO" (#318)', () => {
+		expect(
+			formatCenaKratko({ druh: 'individualna-ponuka', model: 'LIGHT', dovod: 'x', hladina: 'VO' })
+		).toBe('Cena na vyžiadanie · VO');
+	});
 });

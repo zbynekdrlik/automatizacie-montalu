@@ -13,6 +13,7 @@ import { resolveClientIp } from './client-ip';
 import { allowDopyt } from './dopyt-throttle';
 import { insertDopyt } from './dopyt-store';
 import { opeciatkujCenu } from './dopyt-cena-stamp';
+import { cenovaHladina } from './konfigurator-hladina';
 import { queueLeadCreation } from './odoo-lead';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
@@ -89,9 +90,11 @@ export async function dopytAction(event: RequestEvent) {
 
 	const cfg = sanitizePonukaConfig(form.get('konfiguracia'));
 	const renderPng = decodeRenderPng(form.get('renderPng'));
-	// #309: opečiatkuj orientačnú MO cenu + verziu cenníka PRI PODANÍ — uloží sa do dopytu a PDF
-	// ju použije, takže re-download reprodukuje cenu platnú TERAZ (nie prepočet z neskoršej matice).
-	const stamp = opeciatkujCenu(cfg);
+	// #309/#318: opečiatkuj cenu + verziu cenníka PRI PODANÍ — uloží sa do dopytu a PDF ju použije,
+	// takže re-download reprodukuje cenu platnú TERAZ (nie prepočet z neskoršej matice). Hladina sa
+	// určí SERVER-SIDE z prihláseného používateľa: veľkoobchodný (b2b) → VO cena + typ hladiny,
+	// inak MO (verejný dopyt). `locals` je pri reálnom requeste vždy prítomné (`?.` obranné).
+	const stamp = opeciatkujCenu(cfg, cenovaHladina(event.locals?.user ?? null));
 
 	// audit trail (Money-neutrálne) — ukladáme kanonický JSON konfigurácie + opečiatkovanú cenu
 	const id = insertDopyt(

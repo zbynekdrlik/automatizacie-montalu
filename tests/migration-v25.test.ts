@@ -34,7 +34,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 	it('user_version === 26 (migruje po najnovšiu) po v25 migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(31);
+		expect(db.pragma('user_version', { simple: true })).toBe(32);
 	});
 
 	it('existujúci user (palo) prežil migráciu (žiadna strata dát)', () => {
@@ -66,7 +66,9 @@ describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 			'cena_hlbka_grid_m',
 			'cena_sirka_grid_m',
 			'cena_model',
-			'cennik_verzia'
+			'cennik_verzia',
+			// #318/v32 — typ cenovej hladiny (MO/VO) opečiatkovanej ceny
+			'cena_hladina'
 		]);
 	});
 
