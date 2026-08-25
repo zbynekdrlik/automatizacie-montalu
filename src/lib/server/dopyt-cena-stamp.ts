@@ -1,19 +1,20 @@
-// Opečiatkovanie orientačnej ceny + verzie cenníka pri PODANÍ dopytu (#309). Pri podaní sa
-// vypočítaná MO cena a verzia cenníka ULOŽIA do `dopyt` riadka; re-download PDF potom
-// reprodukuje cenu PLATNÚ V ČASE PODANIA (nie prepočet zo živej matice, ktorá sa medzitým
-// zmenila). MONEY-NEUTRÁLNE: LEN maloobchod (MO) cez `naVerejnuCenu` (VO strip) — žiadna VO
-// cena, žiadny Money kód. Súbor matchuje `/dopyt/`, takže je auto-krytý statickým guardom
-// `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola/`/data`).
-import { CENNIK_VERZIA, verejnaCenaPreModel } from './konfigurator-cena';
+// Opečiatkovanie ceny + typu HLADINY + verzie cenníka pri PODANÍ dopytu (#309, #318). Pri podaní sa
+// vypočítaná cena (MO default, alebo VO ak podáva prihlásený veľkoobchodný b2b účet — `opeciatkujCenu`
+// dostane hladinu z `dopyt-action`), typ hladiny (`cena_hladina`) a verzia cenníka ULOŽIA do `dopyt`
+// riadka; re-download PDF potom reprodukuje cenu AJ hladinu PLATNÚ V ČASE PODANIA (nie prepočet zo
+// živej matice). MONEY-NEUTRÁLNE: predajná cena (MO/VO), NIKDY Money kód. Súbor matchuje `/dopyt/`,
+// takže je auto-krytý statickým guardom `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola/`/data`).
+import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
 import type { PonukaConfig } from '$lib/ponuka';
-import type { ModelPergoly, VerejnaCena } from '$lib/konfigurator';
+import type { ModelPergoly, VerejnaCena, CenovaHladina } from '$lib/konfigurator';
 
-/** Orientačná cena z konfigurácie (LEN keď sú prítomné oba rozmery); inak `null`
+/** Orientačná cena z konfigurácie v danej HLADINE (LEN keď sú prítomné oba rozmery); inak `null`
  *  (honest-degrade — bez rozmerov cenu neurčíme). Zdieľané s `ponuka-pdf` (prepočet bez stampu).
- *  VO sa nikdy nepočíta — `verejnaCenaPreModel` vracia LEN MO. */
-export function cenaZCfg(cfg: PonukaConfig): VerejnaCena | null {
+ *  #318: `hladina` default `'MO'` → verejný/re-download prepočet ostáva MO (spätná kompatibilita);
+ *  `'VO'` pri podaní od prihláseného veľkoobchodného účtu (cez `opeciatkujCenu`). */
+export function cenaZCfg(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): VerejnaCena | null {
 	if (!(cfg.sirka && cfg.sirka > 0) || !(cfg.hlbka && cfg.hlbka > 0)) return null;
-	return verejnaCenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model });
+	return cenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model }, hladina);
 }
 
 /** Pečiatka ceny na uloženie do `dopyt` (#309): vypočítaná verejná (MO) cena + verzia cenníka.
@@ -24,13 +25,16 @@ export interface CenaStamp {
 	cennikVerzia: string;
 }
 
-/** Opečiatkuj cenu pri podaní: spočíta verejnú MO cenu z cfg a priloží aktuálnu verziu cenníka. */
-export function opeciatkujCenu(cfg: PonukaConfig): CenaStamp {
-	return { cena: cenaZCfg(cfg), cennikVerzia: CENNIK_VERZIA };
+/** Opečiatkuj cenu pri podaní: spočíta cenu z cfg v danej HLADINE (#318 — default MO; VO pri
+ *  podaní od prihláseného veľkoobchodného účtu) a priloží aktuálnu verziu cenníka. Typ hladiny
+ *  sa opečiatkuje do `cena.hladina` (VO) → `stampNaStlpce` ho uloží do `cena_hladina`. */
+export function opeciatkujCenu(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): CenaStamp {
+	return { cena: cenaZCfg(cfg, hladina), cennikVerzia: CENNIK_VERZIA };
 }
 
-/** Uložené cenové stĺpce `dopyt` riadka (migrácia v30). `cena_druh === null` = neopečiatkovaný
- *  (starý) riadok. `cennik_verzia` môže byť prítomná aj bez ceny (dopyt bez rozmerov). */
+/** Uložené cenové stĺpce `dopyt` riadka (migrácia v30, #318 rozšírené o `cena_hladina` v32).
+ *  `cena_druh === null` = neopečiatkovaný (starý) riadok. `cennik_verzia` môže byť prítomná aj bez
+ *  ceny (dopyt bez rozmerov). `cena_hladina === 'VO'` = veľkoobchodná pečiatka; `null` = MO/starý. */
 export interface DopytCenaStlpce {
 	cena_druh: string | null;
 	cena_bez_dph: number | null;
@@ -39,6 +43,7 @@ export interface DopytCenaStlpce {
 	cena_sirka_grid_m: number | null;
 	cena_model: string | null;
 	cennik_verzia: string | null;
+	cena_hladina: string | null;
 }
 
 /** Rozlož pečiatku (`CenaStamp`) na uložiteľné stĺpce `dopyt` (v30). Bez stampu → všetko NULL
@@ -53,7 +58,8 @@ export function stampNaStlpce(stamp?: CenaStamp): DopytCenaStlpce {
 			cena_hlbka_grid_m: null,
 			cena_sirka_grid_m: null,
 			cena_model: null,
-			cennik_verzia: null
+			cennik_verzia: null,
+			cena_hladina: null
 		};
 	}
 	const { cena, cennikVerzia } = stamp;
@@ -65,9 +71,12 @@ export function stampNaStlpce(stamp?: CenaStamp): DopytCenaStlpce {
 			cena_hlbka_grid_m: null,
 			cena_sirka_grid_m: null,
 			cena_model: null,
-			cennik_verzia: cennikVerzia
+			cennik_verzia: cennikVerzia,
+			cena_hladina: null
 		};
 	}
+	// #318: `cena.hladina` je 'VO' iba pri veľkoobchodnej pečiatke; MO cenu `naCenu` nechá bez
+	// poľa → `?? null` uloží NULL (spätne kompatibilné so starými/MO riadkami).
 	if (cena.druh === 'cena') {
 		return {
 			cena_druh: 'cena',
@@ -76,7 +85,8 @@ export function stampNaStlpce(stamp?: CenaStamp): DopytCenaStlpce {
 			cena_hlbka_grid_m: cena.hlbkaGridM,
 			cena_sirka_grid_m: cena.sirkaGridM,
 			cena_model: cena.model,
-			cennik_verzia: cennikVerzia
+			cennik_verzia: cennikVerzia,
+			cena_hladina: cena.hladina ?? null
 		};
 	}
 	return {
@@ -86,7 +96,8 @@ export function stampNaStlpce(stamp?: CenaStamp): DopytCenaStlpce {
 		cena_hlbka_grid_m: null,
 		cena_sirka_grid_m: null,
 		cena_model: cena.model,
-		cennik_verzia: cennikVerzia
+		cennik_verzia: cennikVerzia,
+		cena_hladina: cena.hladina ?? null
 	};
 }
 
@@ -98,6 +109,9 @@ export function cenaZoStampu(row: DopytCenaStlpce): VerejnaCena | null {
 	// neopečiatkovaný riadok (alebo obranne: opečiatkovaný bez modelu) → null = prepočet zo živej
 	if (row.cena_druh === null || row.cena_model === null) return null;
 	const model = row.cena_model as ModelPergoly;
+	// #318: rekonštruuj hladinu z `cena_hladina` — 'VO' pole doplní (label „veľkoobchod"), inak
+	// (NULL/'MO' = starý/MO riadok) sa `hladina` NEnastaví (byte-identicky s pôvodným MO tvarom).
+	const vo = row.cena_hladina === 'VO' ? { hladina: 'VO' as const } : {};
 	if (row.cena_druh === 'cena') {
 		// opečiatkovaný 'cena' riadok má VŽDY vyplnené sumy+grid (`stampNaStlpce` ich píše spolu).
 		// Ak by niektorá chýbala (poškodený riadok), NEDEGRADUJ ticho na 0 € — vráť null a nechaj
@@ -115,8 +129,9 @@ export function cenaZoStampu(row: DopytCenaStlpce): VerejnaCena | null {
 			bezDph: row.cena_bez_dph,
 			sDph: row.cena_s_dph,
 			hlbkaGridM: row.cena_hlbka_grid_m,
-			sirkaGridM: row.cena_sirka_grid_m
+			sirkaGridM: row.cena_sirka_grid_m,
+			...vo
 		};
 	}
-	return { druh: 'individualna-ponuka', model, dovod: '' };
+	return { druh: 'individualna-ponuka', model, dovod: '', ...vo };
 }

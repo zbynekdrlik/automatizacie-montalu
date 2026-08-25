@@ -47,6 +47,25 @@ rozsypaná v ŠIESTICH súboroch, nielen v očividnom leak-guarde** — pred dv�
 (DISCLAIMER text), `konfigurator-cena.test.ts` (route-import assert). Detaily cenovej vrstvy:
 `.claude/rules/konfigurator-cena.md`.
 
+**#318 VO (veľkoobchodná) hladina — presný leak-bar.** Prihlásený b2b vidí VO cenu (konfigurátor +
+PDF ponuka + pečiatka), neprihlásený/interný ostáva MO. Hladinu rozhoduje SERVER
+(`konfigurator-hladina.ts` `cenovaHladina(locals.user)`), NIKDY klient (verejný návštevník nesmie
+forgeovať „som b2b"). Čo presne guardy vynucujú (a čo je vedome zúžené):
+- **VO HODNOTA (cena/pomer/`priceB2B`) sa NIKDY nedostane do MO/verejnej odpovede ani bundle** —
+  airtight: `VerejnaCena.hladina` je typovo `'VO'` (MO ju štrukturálne nemôže niesť), MO výstup je
+  byte-identický (`naCenu` MO nespreaduje nič), `konfigurator-money-safety.test.ts` (C) overuje, že
+  reálne VO čísla všetkých 3 modelov ANI názov diskriminátora (`hladina`) nie sú v MO odpovedi.
+- **VO tier LABEL v klientovi príde zo SERVERA** (`VerejnaCena.hladinaLabel`, nastavený LEN pri VO) —
+  verejný `+page.svelte` NEnesie žiadny VO literál („Veľkoobchodná cena"), nadpis je generický
+  „Orientačná cena", odznak renderuje `cena.hladinaLabel`. Tak MO/neprihlásený nevidí VO ani v DOM
+  ani v bundle.
+- **Vedome zúžené (žiadny value-leak):** `formatCenaKratko` (`$lib/ponuka`) nesie 2-znakový `· VO`
+  marker pre INTERNÝ admin zoznam `/dopyty-konfigurator` (auth-gated, b2b-denylist) — je v
+  zdieľanom chunku, ale číslo/hodnotu nenesie a v praxi je z verejného bundlu tree-shaknutý (verejná
+  route ho nevolá). PDF `ponuka-pdf.ts` je `$lib/server/*` (mimo klienta), takže jeho „Veľkoobchodná
+  cena" nadpis/keyword je bezpečný. Bar = „žiadna VO HODNOTA nikam k MO; VO LABEL len serverom
+  oprávnenému b2b".
+
 Katalóg `src/lib/sklo-strecha.ts` nesie pole `moneyKod` — TO je únikový vektor. Pravidlá:
 - **Klientsky bundle NIKDY neimportuje `sklo-strecha` (ani `sklo-cena`/`server/*`).** Názvy
   skla + RAL farby idú z `+page.server.ts` `load` (servera) ako `data` — `.svelte` ich číta

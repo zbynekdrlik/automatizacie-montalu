@@ -176,3 +176,51 @@ export function migrateDopytCenaStamp(db: Database.Database, bump: (v: number) =
 		bump(30);
 	})();
 }
+
+/**
+ * v31 → v32: typ cenovej HLADINY opečiatkovanej ceny dopytu (#318). Nový nullable stĺpec
+ * `cena_hladina` ('VO' = veľkoobchodná pečiatka od prihláseného b2b účtu; NULL = MO/starý riadok)
+ * dopĺňa cenovú pečiatku #309, aby re-download PDF reprodukoval nielen VO cenu, ale aj jej typ
+ * (label „Veľkoobchodná cena") historicky. Aditívne + idempotentné: ALTER s NULL defaultom je O(1)
+ * a neprepíše žiadny existujúci riadok (všetky ostanú MO/NULL). Feature-detect `dopyt` (vzor v30):
+ * minimálne migračné fixtures skáču za v25 bez `dopyt` → ALTER sa preskočí; reálna prod DB `dopyt`
+ * má od v25. Celé v `db.transaction` (ALTER je v SQLite transakčné → pád sa čisto prehrá).
+ * MONEY-NEUTRÁLNE (len marker MO/VO na verejnej PREDAJNEJ cene, žiadny Money kód). Extrahované sem
+ * (large-file-split — `migracie.ts` je na 1000-riadkovom strope), vzor `migrateDopytCenaStamp`.
+ */
+export function migrateDopytCenaHladina(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 32) return;
+	const maDopyt =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dopyt'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maDopyt) {
+			db.exec('ALTER TABLE dopyt ADD COLUMN cena_hladina TEXT;');
+		}
+		bump(32);
+	})();
+}
+
+/**
+ * v27 → v28: Deluxe 5K vrchná (horná) koľajnica mala nesprávny Money kód (PREČÍSLOVANÉ z v27 na
+ * v28 — #296 pôvodne pridala v27, kolidovalo s #294 odpis_imported ledgerom, ktorý dev medzitým
+ * dostal tiež ako v27). ZASP202434 → správne ZASP202427 (nahlásil zákazník Patrik Javorský, Odoo
+ * kanál 207, msg 1734424, 2026-08-24: „Delux 5K ma zlú vrchnú koľajnicu je tam ZASP202434 ma tam
+ * byť ZASP202427"). SET kód (+ názov) z (opraveného) cfg_seed per (sys_styl, poradie) — presný
+ * vzor v12/v15. MENÍ Money odpis Deluxe 5K objednávok (kód vrchnej koľajnice) — zákazníkom
+ * potvrdená oprava. Idempotentné (SET z cfg_seed), fyzický profil (6000mm tyč) nezmenený.
+ * Extrahované sem (large-file-split — `migracie.ts` na 1000-riadkovom strope, #318), PURE MOVE
+ * vzor `migrateDopytCenaStamp`; volané inline na pôvodnej pozícii (pred v29 blokom).
+ */
+export function migrateDeluxe5KRail(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 28) return;
+	const updRail = db.prepare(
+		'UPDATE cfg_rez SET kod = ?, nazov = ? WHERE sys_styl = ? AND poradie = ?'
+	);
+	db.transaction(() => {
+		for (const r of seed.rez)
+			if (r.sysStyl === 'Deluxe|5K' && r.poradie === 10)
+				updRail.run(r.kod, r.nazov, r.sysStyl, r.poradie);
+		bump(28);
+	})();
+}

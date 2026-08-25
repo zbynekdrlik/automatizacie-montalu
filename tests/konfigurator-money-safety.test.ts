@@ -237,6 +237,10 @@ function neobsahujeMoneyAniNarez(json: string) {
 function neobsahujeVOaniMaticu(json: string, voHodnoty: number[]) {
 	expect(json).not.toMatch(/"vo"|priceB2B|ve[ľl]koobchod|bezDphVo/i);
 	for (const v of voHodnoty) expect(json).not.toContain(String(v));
+	// #318 review 🔵: ani NÁZOV diskriminátora hladiny (`hladina`/`hladinaLabel`) sa nesmie
+	// dostať do MO odpovede — route regresia pripájajúca `hladina:'MO'` na verejný výstup by
+	// inak prešla (leak-guard je „druhá strana" mapper unit testu `'hladina' in mo === false`).
+	expect(json).not.toMatch(/hladina/);
 	// seed / cenová matica sa NIKDY neserializuje do verejnej odpovede
 	expect(json).not.toMatch(/cennik|update-pergolas|mriezka|verifikaciaDph/i);
 }
@@ -295,5 +299,38 @@ describe('Money safety (C) — runtime výstup: cena SMIE, VO/Money/nárez/matic
 		neobsahujeMoneyAniNarez(json);
 		// pozitívne: súhrn naozaj prišiel (názov skla)
 		expect(json).toContain(SKLO_STRECHA_TYPY[0]!.nazov);
+	});
+
+	// #318: prihlásený b2b (veľkoobchod) → akcia vráti VEĽKOOBCHOD (VO) cenu + hladina marker.
+	// Toto je „druhá strana" leak-guardu: MO návštevník VO NIKDY nevidí (test vyššie), ale
+	// oprávnený VO účet ju vidieť MÁ. Hladina sa odvodí SERVER-SIDE z `locals.user`.
+	it('prihlásený b2b (VO) → akcia vráti VO cenu + hladinu VO; Money kód/nárez stále NIE (#318)', async () => {
+		const fd = new FormData();
+		fd.append('sirka', '4000');
+		fd.append('hlbka', '3500');
+		fd.append('vyskaVpredu', '2500');
+		fd.append('sklonDeg', '6');
+		fd.append('model', 'LIGHT');
+		fd.append('sklo', SKLO_STRECHA_TYPY[0]!.nazov);
+		fd.append('farba', '7016');
+		const event = {
+			request: new Request('http://x/konfigurator', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.9',
+			locals: { user: { id: 1, username: 'obchod@phsplus.cz', role: 'b2b' } }
+		} as unknown as Parameters<typeof actions.vypocet>[0];
+
+		const r = await actions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		const interne = vypocitajCenu({ hlbkaMm: 3500, sirkaMm: 4000, model: 'LIGHT' });
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// VO cena vybraného modelu JE v odpovedi pre b2b (net + s DPH) + hladina marker
+			expect(json).toContain(String(interne.vo.bezDph));
+			expect(json).toContain(String(interne.vo.sDph));
+			expect(json).toMatch(/"hladina":"VO"/);
+		}
+		// Money kód / nárez sú zakázané aj pre VO výstup (VO je cena, nie Money kód)
+		neobsahujeMoneyAniNarez(json);
 	});
 });

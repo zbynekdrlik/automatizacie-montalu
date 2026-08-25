@@ -12,9 +12,12 @@ import { SKLO_STRECHA_TYPY } from '$lib/sklo-strecha';
 import { RAL_PALETA } from '$lib/vykres/ral';
 import { KONF_RANGES, MODELY, konfiguruj } from '$lib/konfigurator';
 import { parseKonfiguratorVstup } from '$lib/server/konfigurator-vstup';
-// #279 Fáza C: orientačná PREDAJNÁ cena (LEN MO — VO sa v mapperi odstráni). Server-only
+// #279 Fáza C: orientačná PREDAJNÁ cena. #318: hladina-aware mappery (MO/VO) — MO pre verejného/
+// interného návštevníka (byte-identické s #279), VO pre prihláseného veľkoobchodného (b2b). Server-only
 // modul; seed sa do klientskeho bundle nikdy nedostane (guard konfigurator-money-safety).
-import { verejnaCenaPreModel, verejneCenyModelov } from '$lib/server/konfigurator-cena';
+import { cenaPreModel, cenyModelov } from '$lib/server/konfigurator-cena';
+// #318: cenová hladina sa rozhoduje SERVER-SIDE z prihláseného používateľa (nikdy z klienta).
+import { cenovaHladina } from '$lib/server/konfigurator-hladina';
 import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
 // #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). Táto route ju iba
@@ -48,7 +51,7 @@ export const actions = {
 	// SvelteKit ZAKAZUJE miešať `default` s pomenovanými akciami (actions.js:221 „When using
 	// named actions, the default action cannot be used"). Keďže #277 pridal pomenovanú
 	// `dopyt`, kalkulačka MUSÍ byť tiež pomenovaná — `vypocet` (formulár POSTuje `?/vypocet`).
-	vypocet: async ({ request, getClientAddress, setHeaders }) => {
+	vypocet: async ({ request, getClientAddress, setHeaders, locals }) => {
 		// per-IP rate-limit verejného endpointu — reálna klientska IP za Cloudflare (#264):
 		// getClientAddress() (XFF_DEPTH=1) vracia CF edge IP, resolveClientIp z nej +
 		// Cf-Connecting-Ip odvodí reálneho klienta (spoof-safe aj CF-down-safe).
@@ -73,15 +76,18 @@ export const actions = {
 		if ('error' in parsed)
 			return fail(400, { vysledok: null, cena: null, cenyModely: null, error: parsed.error });
 		const { vstup } = parsed;
-		// #279 Fáza C: orientačná cena zvoleného modelu (LEN MO) + porovnanie všetkých 3
-		// modelov (zrkadlo montalu.sk „ceny modelov vedľa seba"). VO sa v mapperi odstráni —
-		// verejná odpoveď NIKDY nenesie veľkoobchodnú cenu ani raw maticu.
-		const cena = verejnaCenaPreModel({
-			hlbkaMm: vstup.hlbka,
-			sirkaMm: vstup.sirka,
-			model: vstup.model
-		});
-		const cenyModely = verejneCenyModelov(vstup.hlbka, vstup.sirka);
+		// #318: hladina sa určí SERVER-SIDE z `locals.user` — prihlásený b2b (veľkoobchod) → VO,
+		// inak MO (neprihlásený/interný). `locals` je pri reálnom requeste vždy prítomné; `?.` je
+		// obranné pre priame volania akcie (leak-guard test bez `locals` → MO). VO cena sa tak
+		// dostane LEN oprávnenému účtu; verejná/MO odpoveď ostáva byte-identická s #279.
+		const hladina = cenovaHladina(locals?.user ?? null);
+		// orientačná cena zvoleného modelu + porovnanie všetkých 3 modelov (zrkadlo montalu.sk
+		// „ceny modelov vedľa seba"), obe v odvodenej hladine. MO odpoveď NENESIE VO ani raw maticu.
+		const cena = cenaPreModel(
+			{ hlbkaMm: vstup.hlbka, sirkaMm: vstup.sirka, model: vstup.model },
+			hladina
+		);
+		const cenyModely = cenyModelov(vstup.hlbka, vstup.sirka, hladina);
 		return { vysledok: konfiguruj(vstup), cena, cenyModely, error: null };
 	}
 } satisfies Actions;

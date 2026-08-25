@@ -13,6 +13,9 @@ import {
 	naVerejnuCenu,
 	verejnaCenaPreModel,
 	verejneCenyModelov,
+	naCenu,
+	cenaPreModel,
+	cenyModelov,
 	DPH,
 	PRIPLATKY,
 	MRIEZKA,
@@ -62,15 +65,17 @@ describe('seed integrita + Money-neutralita (#279)', () => {
 		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/db['"]/);
 	});
 
-	it('verejná route importuje LEN verejné MO mappery — nikdy VO priamo (#279 Fáza C)', () => {
-		// Fáza C (owner ROZHODNUTÉ issuecomment-5396941067): route cenový modul TERAZ importuje.
-		// Musí použiť verejné MO-only mappery (`verejnaCenaPreModel`/`verejneCenyModelov`) a NIKDY
-		// serializovať VO zložku (`.vo`) / B2B cenu do verejnej odpovede.
+	it('verejná route: hladina-aware mappery + hladina odvodená server-side, NIKDY VO priamo (#279/#318)', () => {
+		// #279 Fáza C: route cenový modul importuje. #318: route TERAZ používa hladina-aware mappery
+		// (`cenaPreModel`/`cenyModelov`) a hladinu odvodzuje SERVER-SIDE cez `cenovaHladina(locals.user)`
+		// — nikdy z klienta, nikdy sa nedotýka VO zložky (`.vo`) / B2B ceny priamo (o výber MO/VO sa
+		// stará mapper). Tak je bezpečnostná hranica (MO nevidí VO) v cenovom module, nie v route.
 		const route = fs.readFileSync(
 			path.resolve(__dirname, '../src/routes/konfigurator/+page.server.ts'),
 			'utf8'
 		);
-		expect(route).toMatch(/verejnaCenaPreModel|verejneCenyModelov/);
+		expect(route).toMatch(/cenaPreModel|cenyModelov/);
+		expect(route).toMatch(/cenovaHladina/);
 		expect(route).not.toMatch(/\.vo\b|priceB2B/);
 	});
 });
@@ -479,6 +484,57 @@ describe('verejná cena (#279 Fáza C) — LEN MO, žiadne VO', () => {
 			// cena zodpovedá katalógovej bunke 4,0 × 2,0 (nie zadanému 2,0 × 1,5)
 			const kotva = verejnaCenaPreModel({ hlbkaMm: 2000, sirkaMm: 4000, model: 'LIGHT' });
 			if (kotva.druh === 'cena') expect(r.sDph).toBe(kotva.sDph);
+		}
+	});
+});
+
+describe('VO cenová vrstva (#318) — hladina-aware mappery (VO pre prihlásených veľkoobchodných)', () => {
+	it('naCenu VO vezme VO zložku + nesie hladina:"VO" a je NIŽŠIA než MO', () => {
+		const interne = vypocitajCenu({ hlbkaMm: 3000, sirkaMm: 5000, model: 'LIGHT' });
+		expect(interne.druh).toBe('cena');
+		if (interne.druh !== 'cena') return;
+		const vo = naCenu(interne, 'LIGHT', 'VO');
+		expect(vo.druh).toBe('cena');
+		if (vo.druh === 'cena') {
+			expect(vo.bezDph).toBe(interne.vo.bezDph);
+			expect(vo.sDph).toBe(interne.vo.sDph);
+			expect(vo.hladina).toBe('VO');
+			// veľkoobchod ≈ 65 % MO → VO < MO (dôkaz, že sa NEberie MO zložka)
+			expect(vo.bezDph).toBeLessThan(interne.mo.bezDph);
+		}
+	});
+
+	it('naCenu MO = dnešný verejný výstup, BEZ poľa hladina (žiadny náznak VO hladiny)', () => {
+		const interne = vypocitajCenu({ hlbkaMm: 3000, sirkaMm: 5000, model: 'LIGHT' });
+		if (interne.druh !== 'cena') return;
+		const mo = naCenu(interne, 'LIGHT', 'MO');
+		expect(mo).toEqual(naVerejnuCenu(interne, 'LIGHT'));
+		expect('hladina' in mo).toBe(false);
+	});
+
+	it('cenaPreModel VO = VO cena zvoleného modelu + hladina VO', () => {
+		const r = cenaPreModel({ hlbkaMm: 3000, sirkaMm: 5000, model: 'ROBUST' }, 'VO');
+		const interne = vypocitajCenu({ hlbkaMm: 3000, sirkaMm: 5000, model: 'ROBUST' });
+		expect(r.druh).toBe('cena');
+		if (r.druh === 'cena' && interne.druh === 'cena') {
+			expect(r.bezDph).toBe(interne.vo.bezDph);
+			expect(r.sDph).toBe(interne.vo.sDph);
+			expect(r.hladina).toBe('VO');
+		}
+	});
+
+	it('cenyModelov VO = 3 modely (LIGHT/ROBUST/MASSIVE) s VO cenou + hladina VO', () => {
+		const c = cenyModelov(3000, 5000, 'VO');
+		expect(c.map((x) => x.model)).toEqual(['LIGHT', 'ROBUST', 'MASSIVE']);
+		for (const x of c) if (x.cena.druh === 'cena') expect(x.cena.hladina).toBe('VO');
+	});
+
+	it('cenaPreModel VO mimo katalógu → individuálna, nesie hladina VO + model, žiadne číslo', () => {
+		const r = cenaPreModel({ hlbkaMm: 3000, sirkaMm: 9000, model: 'ROBUST' }, 'VO');
+		expect(r.druh).toBe('individualna-ponuka');
+		if (r.druh === 'individualna-ponuka') {
+			expect(r.model).toBe('ROBUST');
+			expect(r.hladina).toBe('VO');
 		}
 	});
 });

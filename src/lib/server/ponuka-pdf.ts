@@ -1,7 +1,8 @@
-// Server-side PDF generátor pre verejnú ponuku (#277, #279 Fáza C). Špecifikácia + ORIENTAČNÁ
-// maloobchodná (MO) cena — NULA VO cien, NULA Money kódov, NULA nárezu (test `ponuka-pdf.test.ts`
-// + Money-safety guard to strážia). Cena sa počíta SERVER-SIDE z rozmerov+modelu (klientom
-// dodaná cena sa NEDÔVERuje — `PonukaConfig` ju ani nemá).
+// Server-side PDF generátor pre ponuku (#277, #279 Fáza C, #318). Špecifikácia + PREDAJNÁ cena.
+// #318: cena môže byť MO (verejný/interný dopyt, default) ALEBO VO (opečiatkovaná pri podaní od
+// prihláseného veľkoobchodného účtu — `opts.cena.hladina === 'VO'`, nadpis „Veľkoobchodná cena").
+// NULA Money kódov, NULA nárezu (test `ponuka-pdf.test.ts` + Money-safety guard to strážia). Cena
+// sa počíta/pečiatkuje SERVER-SIDE (klientom dodaná cena sa NEDÔVERuje — `PonukaConfig` ju ani nemá).
 //
 // Knižnica: pdf-lib (+ @pdf-lib/fontkit) s vendorovaným DejaVu Sans subsetom (slovenské
 // mäkčene, viď `fonts/dejavu.ts`). Self-contained, žiadny network/asset za behu — dizajn
@@ -20,9 +21,9 @@ import {
 } from '$lib/ponuka';
 import { cenaZCfg } from './dopyt-cena-stamp';
 import { formatDatumSk } from '$lib/datum';
-// #279 Fáza C: orientačná PREDAJNÁ cena (LEN MO — VO sa v mapperi odstráni). Výpočet z cfg žije
-// v `dopyt-cena-stamp.ts` (`cenaZCfg`) — zdieľané so stampovaním (#309); oba server-only, do
-// klienta sa nedostanú. Opečiatkovanú cenu (regen / submit) preferuje `opts.cena` nižšie.
+// PREDAJNÁ cena. Neopečiatkovaný fallback (`cenaZCfg`, MO default) žije v `dopyt-cena-stamp.ts` —
+// zdieľané so stampovaním (#309); oba server-only, do klienta sa nedostanú. Opečiatkovanú cenu
+// (regen / submit, MO alebo VO podľa `opts.cena.hladina`, #318) preferuje `opts.cena` nižšie.
 import type { VerejnaCena } from '$lib/konfigurator';
 
 // A4 na body (pt) + jednotný okraj.
@@ -56,6 +57,12 @@ function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): 
 }
 
 const mPlain = (n: number) => String(n).replace('.', ',');
+
+/** Nadpis cenovej sekcie podľa hladiny (#318): veľkoobchod (VO) → „Veľkoobchodná cena",
+ *  inak maloobchod → „Orientačná cena" (nezmenené pre verejný/MO výstup). */
+function cenaNadpis(cena: VerejnaCena): string {
+	return cena.hladina === 'VO' ? 'Veľkoobchodná cena' : 'Orientačná cena';
+}
 
 /** Textové riadky cenovej sekcie (zdieľané medzi PDF telom a metadátami). Ak sa katalógový
  *  rozmer (mriežka), na ktorý sa cena určila, líši od zadaného, čestne to doplní (#279 Fáza C
@@ -137,10 +144,11 @@ function drawHeader(ctx: Ctx, cursorTop: number): number {
 	return ruleY - 66;
 }
 
-/** #279 Fáza C: sekcia s orientačnou cenou (LEN MO). Vykreslí sa len keď je cena známa. */
+/** Sekcia s cenou. Nadpis `cenaNadpis(cena)` — MO „Orientačná cena", VO „Veľkoobchodná cena"
+ *  (#318). Vykreslí sa len keď je cena známa. */
 function drawCena(ctx: Ctx, cena: VerejnaCena, cfg: PonukaConfig, cursorTop: number): number {
 	let y = cursorTop;
-	ctx.page.drawText('Orientačná cena', { x: MARGIN, y, size: 12, font: ctx.bold, color: ACCENT });
+	ctx.page.drawText(cenaNadpis(cena), { x: MARGIN, y, size: 12, font: ctx.bold, color: ACCENT });
 	y -= 8;
 	ctx.page.drawLine({
 		start: { x: MARGIN, y },
@@ -287,16 +295,17 @@ export interface PonukaPdfOpts {
 	renderPng?: Uint8Array;
 	/** dátum na pätičke (test-injectable); default = dnešný v sk formáte. */
 	datum?: string;
-	/** #309: OPEČIATKOVANÁ orientačná cena (LEN MO). Ak je zadaná, PDF ju použije NAMIESTO
-	 *  prepočtu zo živej matice — tak re-download reprodukuje cenu platnú pri podaní. `undefined`
-	 *  → prepočet z cfg (`cenaZCfg`) pre neopečiatkované (staré) riadky. */
+	/** #309/#318: OPEČIATKOVANÁ cena (MO alebo VO podľa `.hladina`). Ak je zadaná, PDF ju použije
+	 *  NAMIESTO prepočtu zo živej matice — tak re-download reprodukuje cenu (a hladinu) platnú pri
+	 *  podaní. `undefined` → prepočet z cfg (`cenaZCfg`, MO) pre neopečiatkované (staré) riadky. */
 	cena?: VerejnaCena;
 }
 
 /**
- * Vygeneruje PDF špecifikáciu z konfigurácie. Súhrn hodnôt (vrátane orientačnej MO ceny) sa
- * vykreslí a SÚČASNE zapíše do metadát (Title/Subject/Keywords) — to je testovateľný kanál
- * (custom-font glyfy sa z PDF textu nedajú spoľahlivo prečítať, metadáta áno). Žiadna VO cena.
+ * Vygeneruje PDF špecifikáciu z konfigurácie. Súhrn hodnôt (vrátane ceny — MO alebo VO podľa
+ * `opts.cena.hladina`, #318) sa vykreslí a SÚČASNE zapíše do metadát (Title/Subject/Keywords) —
+ * to je testovateľný kanál (custom-font glyfy sa z PDF textu nedajú spoľahlivo prečítať, metadáta
+ * áno). VO cesta je LEN pre opečiatkovanú VO cenu od prihláseného b2b (nikdy pre verejný dopyt).
  */
 export async function generatePonukaPdf(
 	cfg: PonukaConfig,
@@ -312,8 +321,8 @@ export async function generatePonukaPdf(
 	// Europe/Bratislava — prod kontajner beží v UTC, `toLocaleDateString` bez zóny by blízko
 	// polnoci ukázal nesprávny deň (timestamps.md / #114). `opts.datum` je test-inject.
 	const datum = opts.datum ?? formatDatumSk(new Date().toISOString());
-	// #279 Fáza C: orientačná cena (LEN MO). #309: OPEČIATKOVANÁ cena (`opts.cena`) má prednosť
-	// pred prepočtom zo živej matice — tak re-download reprodukuje cenu platnú pri podaní. Bez
+	// PREDAJNÁ cena. #309/#318: OPEČIATKOVANÁ cena (`opts.cena`, MO alebo VO) má prednosť pred
+	// prepočtom zo živej matice — tak re-download reprodukuje cenu (a hladinu) platnú pri podaní. Bez
 	// stampu (staré/neopečiatkované) → prepočet z cfg (`null` keď rozmery chýbajú, honest-degrade).
 	const cena = opts.cena ?? cenaZCfg(cfg);
 	let cursor = A4_H - MARGIN;
@@ -336,14 +345,19 @@ export async function generatePonukaPdf(
 			...rows.map((r) => `${r.label}: ${r.value}`),
 			// podriadok (bez DPH · model · príp. katalógový rozmer) ide do subjectu tiež — je to
 			// testovateľný kanál (custom-font glyfy sa z PDF tela nedajú spoľahlivo prečítať).
-			...(cenaMeta ? [`Orientačná cena: ${cenaMeta.hlavny} (${cenaMeta.podriadok})`] : [])
+			// #318: nadpis podľa hladiny — VO → „Veľkoobchodná cena:", MO → „Orientačná cena:".
+			...(cena && cenaMeta
+				? [`${cenaNadpis(cena)}: ${cenaMeta.hlavny} (${cenaMeta.podriadok})`]
+				: [])
 		].join('; ') || 'Prázdna konfigurácia'
 	);
-	// cena do keywords (Producer pdf-lib pri save() prepisuje svojím podpisom)
+	// cena do keywords (Producer pdf-lib pri save() prepisuje svojím podpisom). #318 review 🔵:
+	// keyword hladiny podľa cena.hladina — VO PDF nesie „veľkoobchodná cena", MO „orientačná cena"
+	// (inak by VO dokument mal v metadátach protirečivý „orientačná cena" marker).
 	doc.setKeywords([
 		...rows.map((r) => r.value),
 		...(cenaMeta ? [cenaMeta.hlavny] : []),
-		'orientačná cena',
+		cena?.hladina === 'VO' ? 'veľkoobchodná cena' : 'orientačná cena',
 		'nezáväzná špecifikácia'
 	]);
 	doc.setCreationDate(new Date());
