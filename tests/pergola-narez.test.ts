@@ -708,12 +708,13 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overen
 		expect(Math.abs((pr.dlzkaRezuMm as number) - NOMINAL)).toBeLessThan(0.02);
 	});
 
-	it('config-gate: nominál sa NEEMITUJE mimo overenej konfigurácie (honest-null do Money)', () => {
-		// Robust (predný 110), Massive so zadným 140, Massive na stenu — každá je NEOVERENÁ → null
+	it('config-gate: nominál sa NEEMITUJE mimo overenej/pravidlom pokrytej konfigurácie (honest-null do Money)', () => {
+		// Massive so zadným 140, Massive na stenu, Robust so zadným 140 — NEOVERENÉ → null.
+		// (Robust + zadná 110 má od 25.8. Dominikovo pravidlo −220 → emituje sa, viď test nižšie.)
 		const konfigy: [string, Partial<PergolaNarezVstup>][] = [
-			['Robust', { system: 'Robust' }],
 			['Massive + zadný 140', { hornyProfilZadnej: 140 }],
-			['Massive na stenu', { uchytenie: 'stena' }]
+			['Massive na stenu', { uchytenie: 'stena' }],
+			['Robust + zadný 140', { system: 'Robust', hornyProfilZadnej: 140 }]
 		];
 		for (const [nazov, over] of konfigy) {
 			const r = spocitajNarez({ ...OVERENA, ...over });
@@ -726,6 +727,28 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overen
 			).toBe(false);
 			expect(r.nepodporovane.map((x) => x.kratky).join(' | ')).toMatch(/prítlačn|maskovac/i);
 		}
+	});
+
+	it('#161 Robust vetva (ch207 1724329/1724331): priečka = hĺbka/cos − 220, lišty = nominál + 30', () => {
+		// Dominik VERBATIM: „pri masíve výsuv −154,94 a pri robuste je to 124,94" (rozdiel presne
+		// 30 = predný profil 140 − 110) → Robust = overená masív kotva (−250) + 30 = −220.
+		// Lišty (1724331): „pri robuste je výsledok +30 a pri massive +40". Gate: samostatne +
+		// zadná 110 (konfigurácia kotvy) + sklon + manuálny počet krovov.
+		const r = spocitajNarez({ ...OVERENA, system: 'Robust' });
+		const NOMINAL_ROBUST = 3690 / Math.cos((6.1 * Math.PI) / 180) - 220;
+		const pr = r.vypocitane.find((p) => /priečk/i.test(p.nazov))!;
+		expect(pr.dlzkaRezuMm).not.toBeNull();
+		expect(Math.abs((pr.dlzkaRezuMm as number) - NOMINAL_ROBUST)).toBeLessThan(0.02);
+		const p6 = r.vypocitane.find((p) => p.kod === '18006')!;
+		expect(p6, 'prítlačná sa pri Robust + zadná 110 emituje').toBeTruthy();
+		expect(Math.abs((p6.dlzkaRezuMm as number) - (NOMINAL_ROBUST + 30))).toBeLessThan(0.02);
+		expect(p6.poznamka).toMatch(/30/); // poznámka nesie Robust prídavok
+	});
+
+	it('A7: sklon nad 9° → priečka aj lišty honest-null (pásmo bez vzorca nejde do Money)', () => {
+		const r = spocitajNarez({ ...OVERENA, sklonStrechy: 12 });
+		expect(r.vypocitane.find((p) => /priečk/i.test(p.nazov))!.dlzkaRezuMm).toBeNull();
+		expect(r.vypocitane.some((p) => ['18006', '18007', '18008'].includes(p.kod))).toBe(false);
 	});
 
 	it('overená konfigurácia + n: prítlačná(18006)=n, maskovacia(18007)=n−2, krajová(18008)=2 ks; dĺžka = nominál+40', () => {

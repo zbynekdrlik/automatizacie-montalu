@@ -117,32 +117,45 @@ describe('krovUlozenie — nezadané / neplatné', () => {
 });
 
 describe('krovUlozenie — čestné poznámky (frézovanie #161 vždy, O5b, nad 9–10°)', () => {
-	it('podporovaný výsledok VŽDY vypíše frézovanie ako nepodporované (#161, O5) + O5b jednotku', () => {
+	it('podporovaný výsledok VŽDY vypíše frézovanie ako nepodporované (#161, O5); jednotka 0,01 už NIE JE otvorená', () => {
 		const p = krovUlozenie(8).poznamky.join(' | ');
 		expect(p).toMatch(/frézovan/i);
 		// #233 — poznámka je plain slovenčina (#161 → „doplní konštruktér")
 		expect(p).toMatch(/konštruktér/i);
-		expect(p).toMatch(/O5b|jednotk/i);
+		// 0,01 POTVRDENÉ v mm (Dominik ch207 msg 1724330: „je to v mm je to pomyslený trojuholnik
+		// ktorý prehadzuje rovinu bodu uloženia…") → poznámka o neistej jednotke je PREČ
+		expect(p).not.toMatch(/jednotk/i);
 	});
-	it('nad ~9–10° pridá poznámku o zatváraní drážky (frézovací detail O5), offsety ostávajú', () => {
+	it('A7: NAD 9° je uloženie NEPODPOROVANÉ (offsety null + viditeľná poznámka) — pásmo bez vzorca', () => {
+		// Dominik (call 13.8.): „nad 9–10° sa drážka zatvára, výška krovu sa zdvíha" = zmena režimu;
+		// otázka A7 (súhrn ch207 msg 1724259 bod 5) ostala NEZODPOVEDANÁ → pásmo nad 9° sa
+		// NEextrapoluje potvrdeným vzorcom — honest-null (#161).
+		for (const s of [9.1, 10, 12]) {
+			const r = krovUlozenie(s);
+			expect(r.podporovane, `sklon ${s}°`).toBe(false);
+			expect(r.rezim).toBe('nepodporovane');
+			expect(r.ps).toBeNull();
+			expect(r.lv).toBeNull();
+			expect(r.poznamky.join(' | ')).toMatch(/zatvár|nepodporovan/i);
+		}
+		// presne 9° ešte počíta (potvrdený režim „otvára") a nesie varovnú poznámku o pásme
 		const r9 = krovUlozenie(9);
-		expect(r9.poznamky.join(' | ')).toMatch(/9|zatvár/i);
-		// offsety uloženia sú stále počítané z potvrdeného vzorca (nie null)
-		expect(r9.ps).not.toBeNull();
 		expect(r9.podporovane).toBe(true);
+		expect(r9.ps).not.toBeNull();
+		expect(r9.poznamky.join(' | ')).toMatch(/zatvár/i);
 		// pod 9° (8°) poznámku o zatváraní NEMÁ
 		expect(krovUlozenie(8).poznamky.join(' | ')).not.toMatch(/zatvár/i);
 	});
 });
 
 describe('krovUlozenie — čistá funkcia, monotónny rast offsetov s uhlom', () => {
-	it('offsety rastú s uhlom (7 < 8 < 9 < 12) — geometria sa „otvára"', () => {
-		const uhly = [7, 8, 9, 12];
+	it('offsety rastú s uhlom (7 < 8 < 9) — geometria sa „otvára" (nad 9° = A7 nepodporované)', () => {
+		const uhly = [7, 8, 9];
 		const ps = uhly.map((u) => krovUlozenie(u).ps!);
 		for (let i = 1; i < ps.length; i++) expect(ps[i]).toBeGreaterThan(ps[i - 1]!);
 	});
 	it('lv/pv (odvesna cc) je vždy väčšie než ps/ls (odvesna c) pri > 7°', () => {
-		for (const u of [7.2, 8, 10, 12]) {
+		for (const u of [7.2, 8, 8.5, 9]) {
 			const r = krovUlozenie(u);
 			expect(r.lv!).toBeGreaterThan(r.ps!);
 		}
@@ -174,7 +187,7 @@ describe('krovDlzkaNominal — NOMINÁLNA dĺžka krovu (#161, derivácia 21.8. 
 
 	it('rastie so sklonom (väčší sklon → dlhší krov po spáde) a monotónne', () => {
 		const a = krovDlzkaNominal(3470, 6.1) as number;
-		const b = krovDlzkaNominal(3470, 15) as number;
+		const b = krovDlzkaNominal(3470, 8.5) as number; // 15° je už A7 pásmo (null)
 		expect(b).toBeGreaterThan(a);
 	});
 
@@ -193,5 +206,21 @@ describe('krovDlzkaNominal — NOMINÁLNA dĺžka krovu (#161, derivácia 21.8. 
 	it('R2 (0,01 mm) — dve desatinné miesta ako výkres, nie R1', () => {
 		const v = krovDlzkaNominal(3470, 6.1) as number;
 		expect(Math.round(v * 100) / 100).toBe(v); // už zaokrúhlené na 0,01
+	});
+
+	it('A7: nad 9° → null (pásmo „drážka sa zatvára / výška krovu sa zdvíha" nemá vzorec)', () => {
+		expect(krovDlzkaNominal(3470, 9.1)).toBeNull();
+		expect(krovDlzkaNominal(3470, 12)).toBeNull();
+		expect(krovDlzkaNominal(3470, 9)).not.toBeNull(); // presne 9° ešte platí
+	});
+
+	it('Robust: hĺbka/cos(sklon) − 220 (Dominik ch207 1724329: výsuv −154,94 masív / −124,94 Robust = rozdiel 30)', () => {
+		// Kotva = overený masív bod (−250, golden OP260282); Dominikov verbatim rozdiel masív↔Robust
+		// je presne 30 mm (predný profil 140 − 110) → Robust = −220. 3470/cos(6,1°) − 220 = 3269,76.
+		const r = krovDlzkaNominal(3470, 6.1, 'Robust');
+		expect(r).not.toBeNull();
+		expect(Math.abs((r as number) - 3269.76)).toBeLessThan(0.01);
+		// default (bez parametra) = Massive (spätná kompatibilita callerov)
+		expect(krovDlzkaNominal(3470, 6.1)).toBe(krovDlzkaNominal(3470, 6.1, 'Massive'));
 	});
 });
