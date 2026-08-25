@@ -233,12 +233,13 @@ describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', 
 // VEREJNÁ route (bez auth), takže „žiadna cesta k MONEY odpisu" je tu ešte kritickejšie —
 // tento test stráži, že sa NEPRIDÁ žiadna ĎALŠIA (napr. omylom skopírovaná Money-zápisová)
 // akcia. Pridanie akejkoľvek inej akcie tento test ROZBIJE (fail-closed).
-describe('/konfigurator — žiadna cesta k Money odpisu (#275/#277)', () => {
-	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
+describe('/konfigurator — žiadna cesta k Money odpisu (#275/#277/#319)', () => {
+	it('akcie routy sú presne dopyt + objednavka + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/+page.server');
-		// `vypocet` = kalkulačka súhrnu (bola `default`, ale SvelteKit nedovolí default +
-		// pomenované naraz — #277 pridal `dopyt`); `dopyt` = verejný formulár → PDF ponuka
-		// BEZ CIEN (Money-neutrálny). Obe pomenované; žiadna odpisová/Money-zápisová akcia.
-		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
+		// `vypocet` = kalkulačka súhrnu; `dopyt` = verejný formulár → PDF ponuka BEZ CIEN;
+		// `objednavka` (#319) = záväzná objednávka → uloženie (je_objednavka=1) + Odoo opportunity.
+		// Všetky pomenované (SvelteKit nedovolí default + pomenované naraz), všetky Money-neutrálne
+		// (žiadny odpis, žiadny zápis do /data — strážené dopyt-money-safety.test.ts).
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'objednavka', 'vypocet']);
 	});
 });
