@@ -15,6 +15,12 @@
 
 <div class="card noprint">
 	<a class="btn secondary" href={resolve('/odpisy')}>← Späť na históriu</a>
+	<!-- cenový zoznam K ZÁKAZKE (#154, časti 1+2) — agregát všetkých odpisov tejto ZAK -->
+	<a
+		class="btn secondary"
+		href={resolve(`/odpisy/zakazka/${encodeURIComponent(o.zak)}`)}
+		data-testid="cela-zakazka">📋 Celá zákazka</a
+	>
 </div>
 
 <div class="card">

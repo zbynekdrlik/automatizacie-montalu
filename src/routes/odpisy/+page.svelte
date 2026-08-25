@@ -77,7 +77,14 @@
 									? 'Bazén'
 									: 'Pergola'}</td
 						>
-						<td><b>{o.zak}</b></td>
+						<td>
+							<!-- cenový zoznam K ZÁKAZKE (#154, časti 1+2) — agregát všetkých odpisov tejto ZAK -->
+							<a
+								href={resolve(`/odpisy/zakazka/${encodeURIComponent(o.zak)}`)}
+								data-testid={`zakazka-link-${o.id}`}
+								title="Cenový zoznam odpísaného materiálu celej zákazky"><b>{o.zak}</b></a
+							>
+						</td>
 						<td>{o.op}</td>
 						<td>{o.zakaznik}</td>
 						<td>
