@@ -38,9 +38,9 @@ const OP260282: PergolaNarezVstup = {
 	pocetPrednychNoh: 4,
 	uchytenie: 'samostatne',
 	pocetZadnychNoh: 4,
-	// Výkres OP260282: zadná konštrukcia horná = 18013 (110×110) → zadná konštrukcia 110.
-	// (Po #205: dĺžka zadnej nohy = plná ZV nezávisí od tohto poľa; 110/140 určuje kaskádu
-	// bočného 110×43 „pod fixom" — massive SS so 110 zadnou = −250.)
+	// Výkres OP260282: zadná konštrukcia = 110×110 (hornyProfilZadnej=110) → kód 18013, dĺžka
+	// zadnej nohy = ZV − 110 = 2680 (#316, Dominik 24.8. kanál 207 msg 1731730). 110/140 určuje
+	// AJ kaskádu bočného 110×43 „pod fixom" — massive SS so 110 zadnou = −250.
 	hornyProfilZadnej: 110,
 	prieckaLight: false,
 	zosilnenyNosnik: true, // výstuha 140×140 prítomná
@@ -101,13 +101,16 @@ describe('OP260282 golden — ODVODITEĽNÉ riadky (presne na výkres)', () => {
 		expect(pf!.vydajTyce).toEqual({ tycMm: TYC_STANDARD_MM, pocet: 1 }); // 2×3220 na 7,5 m → 1 tyč
 	});
 
-	it('r.3 zadné nohy 18017 = plná ZV = 2790, 4 ks (SS; výkres OP260282, nie ZV−profil)', () => {
-		// #205 DIVERGENCIA riešená v prospech výkresu: zadné nohy = plná zadná výška (leg = ZV).
-		// Call citoval ZV−profil (2790−140=2650) — rozdiel je v mieste merania ZV (výkres: ZV =
-		// dĺžka nohy). Na potvrdenie Dominikovi (#198). Kód = stĺp systému (Massive 18017).
+	it('r.3 zadné nohy 18013 = ZV − profil 110 = 2680, 4 ks (SS; Dominik 24.8. rozriešil ZV−profil)', () => {
+		// #316: ZV-protirečenie výkresu (plná ZV 2790) vs call (ZV−profil) rozriešené Dominikom 24.8.
+		// (kanál 207 msg 1731730) v prospech callu: horizontálny profil sedí NA nohách → zadná noha =
+		// ZV − horný profil. OP260282 má hornyProfilZadnej=110 → 2790 − 110 = 2680; kód sleduje horný
+		// profil zadnej (110 → 18013/110×110), nie systém (predtým latentne Massive 18017).
 		const zadna = riadok(r.vypocitane, (p) => /zadná noha/i.test(p.nazov));
 		expect(zadna, 'zadná noha musí byť vo vypocitane pri SS').toBeTruthy();
-		expect(zadna!.dlzkaRezuMm).toBe(2790);
+		expect(zadna!.kod).toBe('18013'); // sleduje hornyProfilZadnej=110 (predtým systémový 18017)
+		expect(zadna!.nazov).toMatch(/110x110/);
+		expect(zadna!.dlzkaRezuMm).toBe(2680); // 2790 − 110
 		expect(zadna!.pocetKs).toBe(4);
 	});
 
