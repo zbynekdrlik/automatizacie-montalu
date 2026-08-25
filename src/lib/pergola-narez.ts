@@ -203,6 +203,11 @@ export interface PergolaNarezVstup {
 	/** #206 (e) — skladba strešného skla (voľný text, napr. „4-4-2číre-8-6stopsol classic
 	 *  grey"). Informatívny údaj zákazky na výkrese, žiadny Money výpočet. */
 	strechaSklo?: string;
+	/** #223 — ZVOLENÝ typ strešného skla z katalógu `SKLO_STRECHA_TYPY` (kanonický názov,
+	 *  napr. „IZO 4.4.2-8-6 číre"). Riadi vzorec šírky (polykarbonát → +34, inak +30) aj
+	 *  cenu (Money TS kód → €/m²). Prázdne/neznáme → sklo sa nepočíta (honest-null). Voľný
+	 *  text `strechaSklo` ostáva samostatná poznámka/coating na výkres. */
+	strechaSkloTyp?: string;
 	/** #206 (e) — obvodové zasklenie (voľný text, napr. „RS STANDARD PLUS 4-8-4číre").
 	 *  Informatívny údaj — Zasklenia má vlastný odpis, tu žiadne prepojenie na engine. */
 	obvodoveZasklenie?: string;
@@ -273,8 +278,9 @@ export function pocetPriecok(sirka: number): number {
 	return Math.ceil(sirka / MAX_ROZOSTUP_PRIECOK) + 1;
 }
 
-/** Platný manuálny počet krovov (≥ 2) alebo `null` (→ fallback). */
-function platnyPocetKrovov(v: PergolaNarezVstup): number | null {
+/** Platný manuálny počet krovov (≥ 2) alebo `null` (→ fallback). Exportované pre
+ *  `pergola-sklo.ts` (#223) — počet polí strešného skla = platný počet krovov − 1. */
+export function platnyPocetKrovov(v: PergolaNarezVstup): number | null {
 	const n = v.pocetKrovov;
 	// Zrkadlí `chybaPergolaNarezVstupu`: celé číslo v rozsahu, žiadne tiché zaokrúhlenie (aby
 	// caller, ktorý obíde validáciu, nedostal iný počet než ktorý prešiel validáciou).

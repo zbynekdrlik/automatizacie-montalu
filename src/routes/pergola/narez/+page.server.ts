@@ -19,6 +19,7 @@ import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
 import { writeOdpis, isLive, blokHlaska, overrideOpts, rawFormEntries } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
+import { strechaSkloCenaPre, type StrechaSkloCena } from '$lib/server/sklo-strecha-cena';
 import { logger } from '$lib/server/log';
 
 const log = logger('pergola:narez');
@@ -54,6 +55,16 @@ function cenyPre(
 	return enrichPolozky(nonzero);
 }
 
+/**
+ * #223 — €/m² strešného skla (display-only, LEN pre interných). Rovnaká obrana do hĺbky ako
+ * `cenyPre`: pre b2b sa cena VÔBEC nedopočíta (nedostane sa do HTML). Money odpis skla sa
+ * NEROBÍ — toto je len jednotková cena zo snapshotu; honest-null keď typ/kód/cena chýba.
+ */
+function strechaCenaPre(user: SessionUser | null, typ: string | null): StrechaSkloCena | null {
+	if (isB2B(user)) return null;
+	return strechaSkloCenaPre(typ);
+}
+
 export const load: PageServerLoad = async () => {
 	// Dátum do rohovej pečiatky výkresu (#194) = SERVEROVÝ čas (rovnaká disciplína
 	// ako /pergola/navrh #138). `live` = TEST vs LIVE Money režim (badge + poistka).
@@ -63,7 +74,7 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions = {
-	spocitat: async ({ request }) => {
+	spocitat: async ({ request, locals }) => {
 		const form = await request.formData();
 		const { vstup, error } = parsePergolaNarezVstup(form);
 		// #233 — ZAK/OP/zákazník zadané skôr v tom istom toku echujeme späť, nech sa v
@@ -72,7 +83,17 @@ export const actions = {
 		// #234 — ručné riadky echujeme cez celý tok (round-trip, prežijú „Späť a upraviť")
 		const { rucne } = parseRucne(form);
 		if (error) return { step: 'form' as const, error, vstup, ident, rucne };
-		return { step: 'vysledok' as const, vstup, ident, rucne, error: null as string | null };
+		// #223 — €/m² strešného skla (LEN interní; b2b nikdy nedostane cenu). Geometria
+		// (šírka/počet tabúľ) sa počíta klientsky z `vstup`; sem patrí len cena zo snapshotu.
+		const strechaSkloCena = strechaCenaPre(locals.user, vstup.strechaSkloTyp ?? null);
+		return {
+			step: 'vysledok' as const,
+			vstup,
+			ident,
+			rucne,
+			strechaSkloCena,
+			error: null as string | null
+		};
 	},
 
 	// „← Späť a upraviť": echo vstupu späť do formulára (nekreslí), rovnaká pasca ako

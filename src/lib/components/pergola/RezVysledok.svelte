@@ -13,12 +13,24 @@
 		type PergolaKomponent
 	} from '$lib/pergola-narez';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
+	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
+
+	// #223 — cena strešného skla je server-počítaná (€/m² zo snapshotu, interní); klientsky
+	// prop nesie len zobrazované polia (bez server typu `StrechaSkloCena`, aby sa $lib/server
+	// neimportoval do klienta).
+	type StrechaSkloCenaProp = {
+		moneyKod: string | null;
+		eurM2: number | null;
+		mena: string;
+	} | null;
 
 	let {
 		vstup,
 		vysledok,
 		komponenty,
 		krov,
+		strechaSklo,
+		strechaSkloCena,
 		spocitaneCount,
 		cakaCount,
 		cakaDlzkaCount,
@@ -30,6 +42,8 @@
 		vysledok: NarezVysledok;
 		komponenty: PergolaKomponent[];
 		krov: KrovUlozenie | null;
+		strechaSklo: StrechaSkloVypocet | null;
+		strechaSkloCena: StrechaSkloCenaProp;
 		spocitaneCount: number;
 		cakaCount: number;
 		cakaDlzkaCount: number;
@@ -302,6 +316,57 @@
 		(šírka − 2×noha) čakajú na potvrdenie.
 	</p>
 </div>
+
+{#if strechaSklo && strechaSklo.typ}
+	<div class="card" data-testid="strecha-sklo-karta">
+		<div class="sec">
+			Strešné sklo
+			<span class="badge">informatívne</span>
+		</div>
+		<div>
+			<div class="row">
+				<span>Typ skla</span><b data-testid="strecha-sklo-typ">{strechaSklo.typ}</b>
+			</div>
+			<div class="row">
+				<span>Počet tabúľ (polí medzi krovmi)</span>
+				<b data-testid="strecha-sklo-pocet"
+					>{strechaSklo.pocetTabul != null ? strechaSklo.pocetTabul : '—'}</b
+				>
+			</div>
+			<div class="row">
+				<span>Šírka tabule (svetlosť + {strechaSklo.sirkaPridavok ?? '—'})</span>
+				<b data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
+			</div>
+			<div class="row">
+				<span>Dĺžka tabule</span>
+				<b data-testid="strecha-sklo-dlzka">— (čaká na vzorec)</b>
+			</div>
+			<div class="row">
+				<span>Money kód (cenník)</span>
+				<b data-testid="strecha-sklo-kod">{strechaSklo.moneyKod ?? '—'}</b>
+			</div>
+			{#if strechaSkloCena}
+				<div class="row">
+					<span>Cena skla</span>
+					<b data-testid="strecha-sklo-cena"
+						>{strechaSkloCena.eurM2 != null
+							? `${String(strechaSkloCena.eurM2).replace('.', ',')} ${strechaSkloCena.mena}/m²`
+							: 'cena nedostupná'}</b
+					>
+				</div>
+			{/if}
+		</div>
+		<ul class="nepodporovane-zoznam">
+			{#each strechaSklo.poznamky as p (p)}
+				<li>{p}</li>
+			{/each}
+		</ul>
+		<p class="sub">
+			Strešné sklo sa do Money odpisu NEzapisuje (samostatné rozhodnutie až po potvrdení vzorca aj
+			variácie). Celkový náklad sa nedopočítava, kým nie je potvrdená dĺžka tabule.
+		</p>
+	</div>
+{/if}
 
 {#if vstup.strechaSklo || vstup.obvodoveZasklenie || vstup.zvodFrezovat}
 	<div class="card">
