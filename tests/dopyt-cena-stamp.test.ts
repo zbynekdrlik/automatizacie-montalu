@@ -235,3 +235,55 @@ describe('#309 uloženie + regen pre stampované varianty', () => {
 		expect(subject).toContain('Orientačná cena:');
 	});
 });
+
+// #318 — VO (veľkoobchodná) pečiatka: opečiatkovaná cena nesie VO hodnotu + typ hladiny
+// (nový stĺpec `cena_hladina`, migrácia v32) → re-download reprodukuje VO cenu aj label historicky.
+describe('#318 VO pečiatka — cena_hladina round-trip + regen', () => {
+	beforeEach(() => db.exec('DELETE FROM dopyt'));
+
+	const CFG_VO = { system: 'Robust', model: 'ROBUST' as const, sirka: 3000, hlbka: 4000, farba: 'RAL 7016' };
+	const zaznam = (cfg: object) => ({
+		konfiguracia: JSON.stringify(cfg),
+		meno: 'VO Zákazník',
+		email: 'vo@x.sk',
+		telefon: '',
+		miesto: '',
+		poznamka: ''
+	});
+
+	it('opeciatkujCenu VO → cena nesie VO hodnotu (< MO) + hladina VO', () => {
+		const vo = opeciatkujCenu(CFG_VO, 'VO');
+		const mo = opeciatkujCenu(CFG_VO, 'MO');
+		expect(vo.cena?.druh).toBe('cena');
+		expect(mo.cena?.druh).toBe('cena');
+		if (vo.cena?.druh === 'cena' && mo.cena?.druh === 'cena') {
+			expect(vo.cena.hladina).toBe('VO');
+			expect(vo.cena.bezDph).toBeLessThan(mo.cena.bezDph); // VO < MO
+		}
+	});
+
+	it('stampNaStlpce VO uloží cena_hladina="VO"; MO → null', () => {
+		expect(stampNaStlpce(opeciatkujCenu(CFG_VO, 'VO')).cena_hladina).toBe('VO');
+		expect(stampNaStlpce(opeciatkujCenu(CFG_VO, 'MO')).cena_hladina).toBe(null);
+	});
+
+	it('insert VO dopyt → getDopyt → cenaZoStampu rekonštruuje VO cenu + hladinu', () => {
+		const stamp = opeciatkujCenu(CFG_VO, 'VO');
+		const id = insertDopyt(zaznam(CFG_VO), stamp);
+		const row = getDopyt(id)!;
+		expect(row.cena_hladina).toBe('VO');
+		const c = cenaZoStampu(row);
+		expect(c?.druh).toBe('cena');
+		if (c?.druh === 'cena') {
+			expect(c.hladina).toBe('VO');
+			if (stamp.cena?.druh === 'cena') expect(c.sDph).toBe(stamp.cena.sDph);
+		}
+	});
+
+	it('regen VO dopytu → PDF metadáta nesú „Veľkoobchodná cena"', async () => {
+		const id = insertDopyt(zaznam(CFG_VO), opeciatkujCenu(CFG_VO, 'VO'));
+		const out = await regeneratePonukaPdf(id);
+		const subject = (await PDFDocument.load(out!.bytes)).getSubject() ?? '';
+		expect(subject).toMatch(/Veľkoobchodná cena:.*€/);
+	});
+});

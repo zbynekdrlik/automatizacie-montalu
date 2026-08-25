@@ -80,6 +80,24 @@ describe('generatePonukaPdf', () => {
 		expect(m.subject).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 	});
 
+	// #318: VO (veľkoobchodný) používateľ dostane PDF s VEĽKOOBCHODNOU cenou. Cena sa odovzdá
+	// cez `opts.cena` s `hladina:'VO'` (rovnaká cesta ako opečiatkovaná cena pri podaní/regen).
+	it('VO cena (opts.cena hladina VO) → PDF nesie „Veľkoobchodná cena" v metadátach (#318)', async () => {
+		const voCena = {
+			druh: 'cena',
+			model: 'ROBUST',
+			bezDph: 1000,
+			sDph: 1230,
+			hlbkaGridM: 4,
+			sirkaGridM: 3,
+			hladina: 'VO'
+		} as const;
+		const bytes = await generatePonukaPdf(FULL, { datum: '23.08.2026', cena: voCena });
+		const m = await meta(bytes);
+		expect(m.subject).toMatch(/Veľkoobchodná cena:.*€/);
+		expect(m.subject).not.toMatch(/Orientačná cena:/);
+	});
+
 	it('embedne validný PNG render (bez pádu) a ostane platné PDF', async () => {
 		const bytes = await generatePonukaPdf(FULL, { renderPng: new Uint8Array(PNG_1x1) });
 		expect(Buffer.from(bytes.slice(0, 5)).toString()).toBe('%PDF-');
