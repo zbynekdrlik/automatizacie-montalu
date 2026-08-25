@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
+	import ReadbackBadge from '$lib/components/ReadbackBadge.svelte';
 	// #313: created_at je SQLite `datetime('now')` (UTC) — cez `sqliteUtcToIso` +
 	// `formatDatumCasSk` na bratislavský lokálny čas (DST-safe, `.claude/rules/timestamps.md`).
 	import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
@@ -31,7 +32,8 @@
 	<p class="sub" data-testid="zakazka-scope">
 		{#if p.scope === 'live'}
 			Do súčtov vstupujú len ostré (● LIVE) odpisy — {p.odpisovVScope} z {p.odpisy
-				.length}.{#if p.odpisy.length > p.odpisovVScope}
+				.length}.{#if p.parkovanych > 0}
+				Vrátane {p.parkovanych} parkovaných ⏳ (ešte nepresunuté do Money importu).{/if}{#if p.odpisy.length > p.odpisovVScope}
 				🧪 TEST odpisy sú v zozname nižšie, do súčtov sa nepočítajú.{/if}
 		{:else}
 			Zákazka nemá žiadny ostrý (LIVE) odpis — zoznam je zo 🧪 TEST odpisov a slúži len na náhľad.
@@ -44,7 +46,9 @@
 				? 'vznikol'
 				: p.bezPoloziek <= 4
 					? 'vznikli'
-					: 'vzniklo'} pred zavedením cenového zoznamu (#154) — ich materiál v zozname nižšie CHÝBA.
+					: 'vzniklo'} pred zavedením cenového zoznamu (#154) — {p.bezPoloziek === 1
+				? 'jeho'
+				: 'ich'} materiál v zozname nižšie CHÝBA.
 		</p>
 	{/if}
 </div>
@@ -56,6 +60,11 @@
 			Overenie voči Money: readback z {formatDatumCasSk(
 				sqliteUtcToIso(data.readbackMeta.generatedAt)
 			)}.
+		</p>
+	{:else}
+		<p class="sub" data-testid="zakazka-readback-stav">
+			Overenie voči Money: readback zatiaľ NEBEŽÍ (nič sa neoverilo) — LIVE odpisy ostávajú
+			„neoverené".
 		</p>
 	{/if}
 	<table data-testid="odpisy-zakazky-tabulka">
@@ -91,34 +100,8 @@
 						{/if}
 					</td>
 					<td class="c">
-						{#if o.readback}
-							{#if o.readback.stav === 'ok'}
-								<span
-									class="badge ok"
-									data-testid={`zak-readback-${o.id}`}
-									title={`Money doklad ${o.readback.dlv} · ${o.readback.moneyPocet} pol. — sedí.`}
-									>✅ overené</span
-								>
-							{:else if o.readback.stav === 'nesulad'}
-								<span
-									class="badge alarm"
-									data-testid={`zak-readback-${o.id}`}
-									title={o.readback.dovod === 'chyba-doklad'
-										? 'Money doklad k tomuto odpisu NEEXISTUJE — skontroluj v Money (detail na /odpisy).'
-										: `Money odpísal ${o.readback.moneyPocet}/${o.readback.riadkov} riadkov (doklad ${o.readback.dlv}) — nesúlad, skontroluj doklad.`}
-									>⛔ {o.readback.dovod === 'chyba-doklad'
-										? 'doklad chýba'
-										: `${o.readback.moneyPocet}/${o.readback.riadkov} pol.`}</span
-								>
-							{:else}
-								<span
-									class="badge wait"
-									data-testid={`zak-readback-${o.id}`}
-									title="Zatiaľ neoverené voči Money DB (readback snapshot ešte nedobehol alebo je starší než odpis)."
-									>⏳ neoverené</span
-								>
-							{/if}
-						{/if}
+						<!-- #298 verdikty voči Money — zdieľaný ReadbackBadge, žiadna inline kópia -->
+						<ReadbackBadge readback={o.readback} testid={`zak-readback-${o.id}`} />
 					</td>
 					<td>{o.created_by}</td>
 					<td class="c noprint">

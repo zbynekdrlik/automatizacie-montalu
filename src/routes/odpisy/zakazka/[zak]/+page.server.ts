@@ -8,6 +8,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { zakazkaPrehlad } from '$lib/server/zakazka-ceny';
 import { enrichPolozky } from '$lib/server/ceny';
+import { detectManualStagingMoves } from '$lib/server/money-presun';
 import {
 	getDlvReadbackMeta,
 	readbackStav,
@@ -19,6 +20,15 @@ import { logger } from '$lib/server/log';
 const log = logger('zakazka-ceny');
 
 export const load: PageServerLoad = async ({ params }) => {
+	// #299: detekuj RUČNÝ presun parkovaných (`caka=1`) odpisov PRED čítaním, aby aj
+	// priamy deep-link na zákazku videl aktuálny stav (📦 marker + readback matching) —
+	// rovnaká čerstvosť ako /odpisy (#154 review 🔵). READ-ONLY, pod rozpočtom (#315);
+	// IO chyba NIKDY nezhodí stránku — degraduje na „nič sa nedetekovalo".
+	try {
+		await detectManualStagingMoves();
+	} catch (e) {
+		log.error('detekcia ručného presunu zlyhala — stránka ostáva funkčná', { error: e });
+	}
 	const prehlad = zakazkaPrehlad(params.zak);
 	if (!prehlad) error(404, 'Zákazka sa nenašla — nemá žiadny odoslaný odpis.');
 

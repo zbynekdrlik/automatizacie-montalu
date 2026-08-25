@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
+	import ReadbackBadge from '$lib/components/ReadbackBadge.svelte';
 	// #313: časy z SQLite `datetime('now')` (created_at/presunute_at) + producentov `…Z` (generatedAt)
 	// sú UTC — bez explicitnej zóny by prod kontajner (bez TZ) ukázal posun o 1-2h / blízko polnoci
 	// zlý deň. `sqliteUtcToIso` premostí SQLite tvar (medzera) aj už-ISO, `formatDatum*Sk` naformátuje
@@ -114,45 +115,9 @@
 						<td class="c">{o.live ? '● LIVE' : '🧪 TEST'}</td>
 						<td class="c">
 							<!-- #298 POST-import readback z Money DB: overí, že Money reálne naimportoval
-							     doklad a sedí počet riadkov. Nesúlad = ČERVENÝ alarm (nie ticho). Len LIVE. -->
-							{#if o.readback}
-								{#if o.readback.stav === 'ok'}
-									<span
-										class="badge ok"
-										data-testid={`readback-${o.id}`}
-										title={`Money doklad ${o.readback.dlv} · ${o.readback.moneyPocet} pol. — sedí.`}
-										>✅ overené</span
-									>
-								{:else if o.readback.stav === 'nesulad' && o.readback.dovod === 'chyba-doklad'}
-									<span
-										class="badge alarm"
-										data-testid={`readback-${o.id}`}
-										title="Money doklad k tomuto odpisu NEEXISTUJE — import ho pravdepodobne ticho zahodil (napr. neznámy kód). Skontroluj v Money a v prípade potreby pošli znova."
-										>⛔ Money doklad chýba</span
-									>
-								{:else if o.readback.stav === 'nesulad' && (o.readback.moneyPocet ?? 0) > o.readback.riadkov}
-									<span
-										class="badge alarm"
-										data-testid={`readback-${o.id}`}
-										title={`Money doklad ${o.readback.dlv} má ${o.readback.moneyPocet} položiek, odoslali sme ${o.readback.riadkov} — VIAC než odoslané, skontroluj doklad (možno zlúčený/cudzí).`}
-										>⛔ {o.readback.moneyPocet}/{o.readback.riadkov} pol. (viac)</span
-									>
-								{:else if o.readback.stav === 'nesulad'}
-									<span
-										class="badge alarm"
-										data-testid={`readback-${o.id}`}
-										title={`Money odpísal len ${o.readback.moneyPocet} z ${o.readback.riadkov} riadkov (doklad ${o.readback.dlv}) — niektorý riadok import preskočil.`}
-										>⛔ len {o.readback.moneyPocet}/{o.readback.riadkov} pol.</span
-									>
-								{:else}
-									<span
-										class="badge wait"
-										data-testid={`readback-${o.id}`}
-										title="Zatiaľ neoverené voči Money DB (readback snapshot ešte nedobehol alebo je starší než odpis)."
-										>⏳ neoverené</span
-									>
-								{/if}
-							{/if}
+							     doklad a sedí počet riadkov. Nesúlad = ČERVENÝ alarm (nie ticho). Len LIVE.
+							     Verdiktové vetvy žijú v zdieľanom ReadbackBadge (#154 review). -->
+							<ReadbackBadge readback={o.readback} testid={`readback-${o.id}`} />
 						</td>
 						<td>{o.created_by}</td>
 						<td class="c">

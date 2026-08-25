@@ -50,6 +50,9 @@ export interface ZakazkaPrehlad {
 	polozky: AgregovanaPolozka[];
 	/** koľko odpisov je v scope súčtov. */
 	odpisovVScope: number;
+	/** scope odpisy stále PARKOVANÉ v „NA ODPIS" (`caka=1`, nepresunuté) — sú v
+	 *  súčtoch (reálny materiál čakajúci na ručný presun), ale UI to musí priznať. */
+	parkovanych: number;
 	/** scope odpisy BEZ uložených položiek (spred fázy 1) — ich materiál v agregáte
 	 *  čestne CHÝBA a UI to musí priznať, nikdy sa tváriť, že zoznam je kompletný. */
 	bezPoloziek: number;
@@ -66,14 +69,23 @@ const round3 = (x: number) => Math.round(x * 1000) / 1000;
 export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 	const zakNorm = normZak(zakRaw);
 	if (!zakNorm) return null;
+	// Legacy pasca (#154 review 🟡): v27 backfill skopíroval `zak_norm = zak` RAW —
+	// len post-v27 `writeOdpis` riadky majú kanonický normZak tvar. Priama rovnosť by
+	// legacy riadok (napr. „zak 2026450") TICHO vynechala z agregátu a jeho vlastný
+	// ZAK link by dal 404. Preto sa DRUHOU podmienkou normalizuje aj DB strana v SQL
+	// (upper+replace ≈ normZak pre ASCII ZAK kódy; SQLite `upper` je ASCII-only, takže
+	// priama rovnosť ostáva pre už-kanonické hodnoty vrátane ne-ASCII). Dedup/ledger
+	// sémantika `zak_norm` sa NEMENÍ — toto je čisto read-side rozšírenie.
 	const odpisy = db
 		.prepare(
 			`SELECT l.id, l.modul, l.zak, l.op, l.zakaznik, l.caka, l.live, l.created_by, l.created_at,
 			        l.presunute_at,
 			        (SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS pocetPoloziek
-			 FROM odpis_log l WHERE l.zak_norm = ? ORDER BY l.id DESC`
+			 FROM odpis_log l
+			 WHERE l.zak_norm = ? OR upper(replace(l.zak_norm, ' ', '')) = ?
+			 ORDER BY l.id DESC`
 		)
-		.all(zakNorm) as ZakazkaOdpisRow[];
+		.all(zakNorm, zakNorm) as ZakazkaOdpisRow[];
 	const najnovsi = odpisy[0];
 	if (!najnovsi) return null;
 
@@ -117,6 +129,7 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 		scope,
 		polozky,
 		odpisovVScope: vScope.length,
+		parkovanych: vScope.filter((o) => o.caka === 1 && o.presunute_at === null).length,
 		bezPoloziek
 	};
 }
