@@ -1697,3 +1697,24 @@ ids 39,44,46,47,53,54 z incidentu), parkovaných 16 (nezmenené). deploy job suc
 **Playbook:** `.claude/rules/money-readback.md` #315 bullet (nikdy sync fs na CIFS staged cesty; async
 + rozpočet + jedna in-flight; testovacia pasca s visiacim readdir + gate cleanup) + oprava starého
 statSync bulletu a referencie modulu (money.ts → money-presun.ts).
+
+
+## 2026-08-25 — lane #161 + #155 + #223 (round 14, worktree-agent-afdba8f0a38a3145f)
+
+**#161 (krov geometria):** Robust nominál = hĺbka/cos(sklon) − 220 (verbatim ch207 1724329:
+výsuv −154,94 masív / −124,94 Robust = rozdiel 30, ukotvené na overený masív bod −250) + lišty
+Robust +30 (1724331); A7 sklon > 9° → uloženie aj dĺžka honest-null (otázka nezodpovedaná);
+0,01 potvrdené mm (1724330). RED efc6885 → GREEN bbbef97. HH 3240,93/3226,2 nefitované (bez
+verbatim pravidla). Masív golden bit-identický.
+**#155 (nárez korekcie):** −60 pri 200×140 ODVOLANÉ Dominikom (1731729) → efektivnaSvetlost
+zmazaná, noha = svetlosť + zvislý rozmer (200×140+zosilnenie 2340→2400; bez zosilnenia vždy
+2215); nové informatívne vystuhaTrcanieMm (95/125/185/235) + svetlostBezVystuhy (golden 2325).
+RED 7906f5f → GREEN db18a04. Ostatné korekcie z 1726205–1726534 už boli dodané (#272/#273/#316).
+**#223 (sklo v streche):** verifikácia proti REÁLNEMU výrobnému výkresu skla OP260282 (ch207
+príloha 10504: 7 ks, 685 × 3259) — počet ✓, šírka ✓ (685,43 → rez 685), korekcia poľa s výstuhou
+VYVRÁTENÁ (všetky tabule rovnaké + „ano nevstupuje"), dĺžka OSTÁVA honest-null (chat krov+40 =
+3279,76 ✗, call HH+20 = 3260,93 ✗ — rozpor zaznamenaný na tickete, žiadny force-fit). Commit
+0e2499e. TS kódy 4 skiel (1725602) už v katalógu.
+**Playbook:** pergola-narez.md (Robust vetva, A7, seating model výstuhy, sklo príloha, ch207
+XML-RPC verbatim recept) + large-file-split watch-list (937 r.). Commit 16602e6.
+Gates lokálne: check 0/0, lint čistý, vitest --coverage 2473/2473 (prahy držia).
