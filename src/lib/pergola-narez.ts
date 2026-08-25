@@ -42,9 +42,12 @@ export const KROV_SIRKA_MM = 50;
 /** okrajové odsadenie [mm] (2×1 mm od kraja) v odpočte svetlosti = 50·n + 2 (Dominik 21.8.). */
 export const KROV_OKRAJ_ODSADENIE_MM = 2;
 /** prídavok [mm] prítlačnej/maskovacích líšt nad nominál krovu (Massive): dĺžka = nominál + 40.
- *  Overené na golden OP260282: 3239,76 + 40 = 3279,76 ≈ výkres 3279,77 (Δ 0,01). Robust (+30/+39)
- *  je NEOVERENÝ (bez Robust golden) → Robust lišta ostáva honest-null. */
+ *  Overené na golden OP260282: 3239,76 + 40 = 3279,76 ≈ výkres 3279,77 (Δ 0,01). */
 export const PRITLACNA_NAD_NOMINAL_MM = 40;
+/** prídavok [mm] líšt nad nominál krovu — ROBUST: dĺžka = nominál + 30. Dominik VERBATIM
+ *  (ch207 msg 1724331): „tu dlžku krovu ktoru vypočítaš z bodu 3 pri robuste je výsledok
+ *  +30 a pri massive +40". Bez Robust goldenu — na potvrdenie pri prvej Robust zákazke. */
+export const PRITLACNA_NAD_NOMINAL_ROBUST_MM = 30;
 /** rozsah manuálneho počtu krovov [ks] — voliteľný vstup (Dominik 21.8. rozhodol manuál). */
 export const POCET_KROVOV_MIN = 2;
 export const POCET_KROVOV_MAX = 50;
@@ -401,12 +404,16 @@ export function prednaNohaDlzkaMm(v: PergolaNarezVstup): number {
 function krovoveListy(
 	krovNominal: number | null,
 	n: number | null,
-	svetlostKrovov: number | null
+	svetlostKrovov: number | null,
+	system: PergolaSystem
 ): PolozkaNarezu[] {
 	const riadky: PolozkaNarezu[] = [];
 	if (krovNominal != null && n != null && n >= 2) {
-		const listaDlzka = R2(krovNominal + PRITLACNA_NAD_NOMINAL_MM);
-		const listaPozn = '= nominál krovu + 40 (Massive)';
+		// prídavok per systém (Dominik ch207 1724331: Robust +30 / Massive +40)
+		const pridavok =
+			system === 'Robust' ? PRITLACNA_NAD_NOMINAL_ROBUST_MM : PRITLACNA_NAD_NOMINAL_MM;
+		const listaDlzka = R2(krovNominal + pridavok);
+		const listaPozn = `= nominál krovu + ${pridavok} (${system})`;
 		riadky.push({
 			kod: '18006',
 			nazov: 'Prítlačná lišta',
@@ -478,14 +485,16 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	const n = platnyPocetKrovov(v);
 	const pocetKrovovAleboFallback = n ?? priecky;
 	const svetlostKrovov = svetlostMedziKrovmi(v.sirka, n);
-	// Nominálna dĺžka krovu (spodná hrana/uloženie), gated na PRESNE overenú konfiguráciu golden
-	// OP260282: −250 = predný profil 140 + zadný 110, overené LEN pre Massive + samostatne stojaca
-	// + zadný profil 110. Pre Robust (predný 110), Massive so zadným 140 (→ 280) alebo na stenu
-	// (iný zadný člen krovu) je rozklad NEOVERENÝ → honest-null (nikdy sa nehádže do Money). Zúženie
-	// čaká na druhú zákazku/potvrdenie Dominikom (majiteľ posúdi). null aj bez sklonu.
-	const krovConfigOverena =
-		v.system === 'Massive' && v.uchytenie === 'samostatne' && v.hornyProfilZadnej === 110;
-	const krovNominal = krovConfigOverena ? krovDlzkaNominal(v.hlbka, v.sklonStrechy) : null;
+	// Nominálna dĺžka krovu (spodná hrana/uloženie). Massive: −250, overené na golden OP260282;
+	// Robust: −220 od 25.8. (Dominik ch207 msg 1724329 — výsuv −154,94 masív / −124,94 Robust =
+	// verbatim rozdiel presne 30; kotva = overený masív bod; bez Robust goldenu → poznámka „na
+	// potvrdenie"). Gate na konfiguráciu KOTVY: samostatne stojaca + zadný profil 110 — Massive
+	// so zadným 140 alebo na stenu ostáva NEOVERENÉ → honest-null (nikdy sa nehádže do Money).
+	// A7: sklon nad 9° vracia null priamo `krovDlzkaNominal`. null aj bez sklonu.
+	const krovConfigOverena = v.uchytenie === 'samostatne' && v.hornyProfilZadnej === 110;
+	const krovNominal = krovConfigOverena
+		? krovDlzkaNominal(v.hlbka, v.sklonStrechy, v.system)
+		: null;
 	// Do MONEY riadku (priečka aj lišty) ide dĺžka LEN keď je zadaný aj MANUÁLNY počet krovov —
 	// bez neho by priečka niesla starý auto-počet ceil(š/700)+1 (ktorý výkres vyvrátil: 9 vs 8)
 	// do rezervácie. Bez n → čestný null (nominál sa do Money nepustí).
@@ -533,7 +542,7 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 		poznamkaDetail:
 			krovDlzkaDoMoney != null
 				? 'Dĺžka = nominálna dĺžka krovu (spodná hrana), meraná po spáde: hĺbka delené kosínusom sklonu, mínus predný a zadný profil. Horná hrana krovu je o ~1 mm vyššie (reálne uloženie) — do rezervácie stačí nominál. Počet = zadaný počet krovov.'
-				: 'Dĺžka priečky = nominálna dĺžka krovu (horná hrana krovu). Počíta sa zatiaľ len pre overenú konfiguráciu (Massive, samostatne stojaca, zadný profil 110) so zadaným sklonom strechy a počtom krovov. Inak ostáva dĺžka čestný null — nič sa nehádže.',
+				: 'Dĺžka priečky = nominálna dĺžka krovu (horná hrana krovu). Počíta sa pre samostatne stojacu so zadným profilom 110 (Massive overené výkresom, Robust podľa pravidla konštruktéra — na potvrdenie pri prvej takej zákazke), so zadaným sklonom strechy do 9° a počtom krovov. Inak ostáva dĺžka čestný null — nič sa nehádže.',
 		vydajTyce:
 			krovDlzkaDoMoney != null
 				? spocitajVydaj(krovDlzkaDoMoney, pocetKrovovAleboFallback, TYC_STANDARD_MM)
@@ -650,7 +659,7 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	// tu ostávajú len flagy pre podmienené „nepodporované" nižšie (aby sa neduplikoval riadok).
 	const listyEmitovane = krovNominal != null && n != null && n >= 2;
 	const zaklapEmitovana = n != null && n >= 2 && svetlostKrovov != null;
-	vypocitane.push(...krovoveListy(krovNominal, n, svetlostKrovov));
+	vypocitane.push(...krovoveListy(krovNominal, n, svetlostKrovov, v.system));
 
 	// #233 — každá položka = krátka veta (`kratky`, do zoznamu) + plné odôvodnenie
 	// (`detail`, do rozklikávacieho <details>). OBE plain slovenčina bez interných
@@ -668,7 +677,7 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 		nepodporovane.push({
 			kratky: 'Priečka (18004) — dĺžka rezu = horná hrana krovu, čaká na vzorec od Dominika.',
 			detail:
-				'Dĺžka priečky = nominálna dĺžka krovu (horná hrana krovu; hĺbka delené kosínusom sklonu, mínus predný a zadný profil). Počíta sa zatiaľ len pre overenú konfiguráciu (Massive, samostatne stojaca, zadný profil 110) so zadaným sklonom strechy a počtom krovov; inak ostáva dĺžka čestný null — nič sa nehádže.'
+				'Dĺžka priečky = nominálna dĺžka krovu (horná hrana krovu; hĺbka delené kosínusom sklonu, mínus predný a zadný profil). Počíta sa pre samostatne stojacu so zadným profilom 110 (Massive overené výkresom, Robust podľa pravidla konštruktéra), so sklonom strechy do 9° a zadaným počtom krovov; inak ostáva dĺžka čestný null — nič sa nehádže.'
 		});
 	}
 	// Prítlačná / maskovacie — LEN keď sa neemitovali (Robust, alebo bez sklonu / počtu krovov).
@@ -677,7 +686,7 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 			kratky:
 				'Prítlačná / maskovacia / maskovacia krajová lišta — dĺžka viazaná na krov, čaká na vzorec.',
 			detail:
-				'Dĺžka = nominálna dĺžka krovu + 40 mm (Massive). Počíta sa len pre Massive so zadaným sklonom a počtom krovov; pri Robust je prídavok zatiaľ nepotvrdený. Inak ostáva čestný null — nič sa nehádže.'
+				'Dĺžka = nominálna dĺžka krovu + 40 mm (Massive) alebo + 30 mm (Robust). Počíta sa pre samostatne stojacu so zadným profilom 110, so sklonom strechy do 9° a zadaným počtom krovov. Inak ostáva čestný null — nič sa nehádže.'
 		});
 	}
 	// Zaklapávacia — LEN keď sa neemitovala (bez zadaného počtu krovov).
