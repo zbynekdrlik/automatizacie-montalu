@@ -5,6 +5,7 @@
 	// (skryté) + serverový rate-limit = anti-spam. Žiadne `console.*` (E2E zero-console).
 	import { enhance } from '$app/forms';
 	import { HONEYPOT_FIELD, type DopytChyby, type DopytVstup } from '$lib/dopyt';
+	import { stiahniPdf } from '$lib/pdf-download';
 	import type { PonukaConfig } from '$lib/ponuka';
 
 	interface Props {
@@ -24,21 +25,6 @@
 	let hodnoty = $state<Partial<DopytVstup>>({});
 
 	const konfiguraciaJson = $derived(JSON.stringify(konfiguracia));
-
-	function stiahniPdf(base64: string, filename: string): void {
-		const bin = atob(base64);
-		const bytes = new Uint8Array(bin.length);
-		for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-		const blob = new Blob([bytes], { type: 'application/pdf' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename || 'Montalu-ponuka.pdf';
-		document.body.appendChild(a);
-		a.click();
-		a.remove();
-		URL.revokeObjectURL(url);
-	}
 </script>
 
 {#if hotovo}

@@ -10,8 +10,11 @@ paths:
   - "src/lib/server/dopyt-cena-stamp.ts"
   - "src/lib/server/fonts/**"
   - "src/lib/components/DopytForm.svelte"
+  - "src/lib/components/ObjednavkaForm.svelte"
+  - "src/lib/pdf-download.ts"
   - "src/routes/dopyty-konfigurator/**"
   - "tests/dopyt-*.test.ts"
+  - "tests/objednavka-*.test.ts"
   - "tests/ponuka*.test.ts"
 ---
 
@@ -117,3 +120,36 @@ re-download PDF). Tri veci, ktoré sa oplatí vedieť pri ďalšej práci:
   schéme funguje aj pri prázdnom zozname (na `Object.keys(row)` by pri 0 riadkoch zmizol).
   AUTH: route je mimo `PUBLIC_PATHS` (anon → login) + v `B2B_FORBIDDEN_PREFIXES` (prefix kryje
   aj `/dopyty-konfigurator/pdf`); GET endpoint má NAVYŠE `isInternal(locals.user)` guard.
+
+## Záväzná objednávka (#319) — dopyt riadok s `je_objednavka=1` (NIE samostatná tabuľka)
+
+Objednávka je **escalácia dopytu**, nie nová entita: ukladá sa do TEJ ISTEJ `dopyt` tabuľky s
+príznakom `je_objednavka=1` + fakturačnými stĺpcami + súhlasom (migrácia **v33** —
+`je_objednavka INTEGER`, `fakt_meno/fakt_adresa/fakt_ico/fakt_dic TEXT`, `suhlas_podmienky INTEGER`).
+Znovupoužije CELÝ Odoo lead pipeline #278 (retry/sweep/in-flight/príloha) aj cenovú pečiatku
+#309/#318 BEZ duplikácie — majiteľov model „objednávka = lead s vyšším stupňom".
+
+- **Zapečatená cena (bod 5) je zadarmo z reuse:** `objednavkaAction` volá TEN ISTÝ
+  `opeciatkujCenu(cfg, cenovaHladina(locals.user))` ako dopyt → MO/VO hladina sa uloží do
+  `cena_*`/`cena_hladina`. Objednaná cena je historicky reprodukovateľná (rovnako ako dopyt).
+- **Lead sa VETVÍ podľa `je_objednavka`** (`odoo-lead.ts` `buildLeadPayload`/`buildDescription`/
+  `leadName`): objednávka → `type:'opportunity'` (vyšší stupeň než `lead` — z inboxu do pipeline) +
+  názov „Pergola – OBJEDNÁVKA: …" + fakturačný blok v popise. **Cena do leadu NEJDE** — Money-guard
+  `odoo-lead.test.ts` skenuje payload na `€|EUR|cena|price`; zapečatená cena žije LEN v DB (viditeľná
+  v internom zozname). Fakturačné hodnoty sa `xmlEscape`'ujú ako miesto/poznámka.
+- **`getDopytForLead`/`leadSelectCols` musia niesť objednávkové stĺpce**, aby ich vetva videla.
+  `getDopyt` (re-download PDF) ich NEnesie (netreba). `suhlas_podmienky` sa píše konštantou `1` —
+  insert je dosiahnuteľný LEN po `validateObjednavka` (súhlas garantovane true).
+- **Pridanie zákazníckej akcie na `/konfigurator` = 4 dotyky** (viď `konfigurator.md §1`): mount v
+  `+page.server.ts`, action-set v `b2b-route-coverage.test.ts` (`['dopyt','objednavka','vypocet']`),
+  **server logiku drž v `dopyt-*` menách** (auto-krytá `dopyt-money-safety` glob `dopyt|ponuka`) a
+  nový klientsky formulár kryje import-graf guard A — pridaj POZITÍVNY assert do
+  `konfigurator-money-safety.test.ts`, že graf REÁLNE dosiahne `ObjednavkaForm` (inak by jeho budúci
+  Money import nezachytil). `objednavkaAction`/`ObjednavkaForm` sú súrodenci `dopytAction`/`DopytForm`.
+- **`stiahniPdf` je zdieľaný v `$lib/pdf-download.ts`** (pure browser, oba formuláre ho importujú —
+  predtým byte-identický duplikát, review 🔵 #319). Je client-reachable → guard A ho prechádza; 0%
+  unit coverage (browser-only, ako `zasklenia-form.ts`), exercuje ho E2E.
+- **Interný zoznam `/dopyty-konfigurator`** rozozná objednávku odznakom „OBJEDNÁVKA"
+  (`hasObjednavkaColumn` feature-detect + `listDopyty` vracia `je_objednavka`).
+- **ŽIADNA platobná brána** (bod 3), Money/sklad NEDOTKNUTÉ (bod 4). Objednávka je záväzná v zmysle
+  „odoslaná firme", nie zaplatená.

@@ -23,11 +23,13 @@ Pridať verejnú route znamená VŠETKY tri:
 2. `tests/b2b-route-coverage.test.ts` → pridať do `ALLOWED` množiny (verejná route je
    top-level, mimo Money-denylist prefixov, takže `b2bRedirectTarget`=null) + pozitívny
    assert. Drift guard inak PADNE.
-3. Akcie routy sú PRESNE `['dopyt','vypocet']` (žiadna Money-zápisová akcia) — `vypocet` =
-   kalkulačka súhrnu, `dopyt` = verejný formulár → PDF ponuka bez cien (#277, Money-neutrálny,
-   viď `.claude/rules/dopyt-ponuka.md`). SvelteKit NEDOVOLÍ `default` + pomenované akcie naraz,
-   preto je aj kalkulačka pomenovaná (`?/vypocet`). Množina akcií je strážená v
-   `b2b-route-coverage.test.ts`.
+3. Akcie routy sú PRESNE `['dopyt','objednavka','vypocet']` (žiadna Money-zápisová akcia) —
+   `vypocet` = kalkulačka súhrnu, `dopyt` = verejný formulár → PDF ponuka (#277), `objednavka`
+   (#319) = záväzná objednávka → uloženie (`je_objednavka=1`) + PDF + Odoo lead ako OPPORTUNITY
+   (viď `.claude/rules/dopyt-ponuka.md`). Všetky Money-neutrálne (žiadny odpis, žiadny `/data`
+   zápis, žiadna platobná brána). SvelteKit NEDOVOLÍ `default` + pomenované akcie naraz, preto sú
+   všetky pomenované. Množina akcií je strážená v `b2b-route-coverage.test.ts` (fail-closed —
+   pridanie akejkoľvek ďalšej akcie ROZBIJE test, kým sa doň nedoplní).
 
 ## 2. HARD hranica: žiadny Money kód / nárez / VO cena (ORIENTAČNÁ cena SMIE — #279 Fáza C)
 

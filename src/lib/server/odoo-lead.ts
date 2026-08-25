@@ -230,42 +230,63 @@ export interface LeadPayload extends Record<string, string> {
 	type: string;
 }
 
-function leadName(meno: string, miesto: string): string {
+function leadName(meno: string, miesto: string, jeObjednavka: boolean): string {
 	const kto = meno || 'neznámy záujemca';
-	return miesto ? `Pergola – dopyt: ${kto} (${miesto})` : `Pergola – dopyt: ${kto}`;
+	// #319: objednávka nesie v NÁZVE „OBJEDNÁVKA" (obchod rozozná objednávku od nezáväzného dopytu
+	// hneď zo zoznamu), dopyt ostáva „dopyt" (byte-identicky s pôvodným tvarom).
+	const label = jeObjednavka ? 'OBJEDNÁVKA' : 'dopyt';
+	return miesto ? `Pergola – ${label}: ${kto} (${miesto})` : `Pergola – ${label}: ${kto}`;
 }
 
 /**
- * Popis leadu: miesto stavby + poznámka zákazníka + súhrn konfigurácie (`zhrnutieRiadky`).
- * Zákaznícke hodnoty HTML-escapujem (`crm.lead.description` je Html pole — obrana proti
- * vloženému markupu); riadky delím literálom `<br>`. ŽIADNA cena (zhrnutieRiadky je bez cien).
+ * Popis leadu: (pri objednávke) hlavička + fakturačný blok, potom miesto stavby + poznámka
+ * zákazníka + súhrn konfigurácie (`zhrnutieRiadky`). Zákaznícke hodnoty HTML-escapujem
+ * (`crm.lead.description` je Html pole — obrana proti vloženému markupu); riadky delím literálom
+ * `<br>`. ŽIADNA cena (zhrnutieRiadky je bez cien; objednaná cena je zapečatená v DB, do leadu
+ * NEJDE — Money-neutralita payloadu, #319 dizajn Prístup 3 zamietnutý).
  */
 function buildDescription(row: DopytLeadRiadok, cfg: PonukaConfig): string {
+	const jeObjednavka = !!row.je_objednavka;
 	const lines: string[] = [];
+	if (jeObjednavka) {
+		lines.push('ZÁVÄZNÁ OBJEDNÁVKA z verejného konfigurátora pergoly.');
+		lines.push('');
+		lines.push('Fakturačné údaje:');
+		if (row.fakt_meno) lines.push(`Meno / firma: ${xmlEscape(row.fakt_meno)}`);
+		if (row.fakt_adresa) lines.push(`Adresa: ${xmlEscape(row.fakt_adresa)}`);
+		if (row.fakt_ico) lines.push(`IČO: ${xmlEscape(row.fakt_ico)}`);
+		if (row.fakt_dic) lines.push(`DIČ: ${xmlEscape(row.fakt_dic)}`);
+		lines.push('');
+	}
 	if (row.miesto) lines.push(`Miesto stavby: ${xmlEscape(row.miesto)}`);
 	if (row.poznamka) lines.push(`Poznámka zákazníka: ${xmlEscape(row.poznamka)}`);
-	if (lines.length) lines.push('');
+	if (row.miesto || row.poznamka) lines.push('');
 	lines.push('Konfigurácia z verejného konfigurátora:');
 	const rows = zhrnutieRiadky(cfg);
 	if (rows.length === 0) lines.push('(bez detailov konfigurácie)');
 	else for (const r of rows) lines.push(`${xmlEscape(r.label)}: ${xmlEscape(r.value)}`);
 	lines.push('');
 	lines.push(
-		'Zdroj: verejný konfigurátor pergoly (app.montalu.cloud). Nezáväzný dopyt, nie cenová ponuka.'
+		jeObjednavka
+			? 'Zdroj: verejný konfigurátor pergoly (app.montalu.cloud). ZÁVÄZNÁ OBJEDNÁVKA (bez online platby) — potvrďte a ozvite sa zákazníkovi.'
+			: 'Zdroj: verejný konfigurátor pergoly (app.montalu.cloud). Nezáväzný dopyt, nie cenová ponuka.'
 	);
 	return lines.join('<br>\n');
 }
 
-/** Postaví `crm.lead` payload z uloženého dopytu (kontakt + konfigurácia). BEZ CIEN. */
+/** Postaví `crm.lead` payload z uloženého dopytu/objednávky (kontakt + konfigurácia). BEZ CIEN.
+ *  #319: objednávka (`je_objednavka=1`) → `type:'opportunity'` (vyšší stupeň v CRM než `lead` —
+ *  z inboxu leadov do pipeline príležitostí) + názov „OBJEDNÁVKA" + fakturačný blok v popise. */
 export function buildLeadPayload(row: DopytLeadRiadok): LeadPayload {
 	const cfg = sanitizePonukaConfig(row.konfiguracia);
+	const jeObjednavka = !!row.je_objednavka;
 	return {
-		name: leadName(row.meno, row.miesto),
+		name: leadName(row.meno, row.miesto, jeObjednavka),
 		contact_name: row.meno,
 		email_from: row.email,
 		phone: row.telefon,
 		description: buildDescription(row, cfg),
-		type: 'lead'
+		type: jeObjednavka ? 'opportunity' : 'lead'
 	};
 }
 
