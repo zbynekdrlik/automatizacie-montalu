@@ -18,8 +18,15 @@ paths:
 
 Modul `/pergola/narez` generuje z rozmerov **materiál (nárez)** (#193) aj **technický
 výkres** (#194). Zdroj pravidiel = analýza callu s Dominikom 13.8.2026 (komentár na
-#155 „Analýza nahrávky callu"). Toto je zberná playbook stránka pre celý pergolový
-nárez/výkres — načítaj ju PRED úpravou ktoréhokoľvek `pergola-narez*` súboru.
+#155 „Analýza nahrávky callu") + **Odoo Discuss kanál 207 („Vyroba automatizacia",
+erp.montalu.cloud)** — Dominikove formulové odpovede ŽIJÚ tam a ticketové súhrny sú
+STRATOVÉ: pred implementáciou vzorca čítaj VERBATIM správy cez XML-RPC read-only
+(login `claude-handover-marek@montalu.local`, kľúč `~/.secrets/montalu-odoo-api-key`;
+POZOR `execute_kw` berie UID z `authenticate()`, nie login string; `mail.message`
+where `model='discuss.channel', res_id=207`; prílohy = `ir.attachment.read` →
+base64 `datas`). NIKDY do Odoo nič neposielaj bez schválenia majiteľa. Toto je
+zberná playbook stránka pre celý pergolový nárez/výkres — načítaj ju PRED úpravou
+ktoréhokoľvek `pergola-narez*` súboru.
 
 ## „len POTVRDENÉ vzorce" — najdôležitejšia disciplína (Money-priľahlé)
 
@@ -63,9 +70,13 @@ ostáva otvorené. Disciplína „len POTVRDENÉ" platí BEZ zmeny:
   nie sínus): `uhol2=IF(UHOL<=7,0,1)`, `uhol3=UHOL−7`, `ls=ps=tan(uhol3)·c+0,01`
   (c=29), `lv=pv=tan(uhol3)·cc+0,01` (cc=37,28). Číselný vektor: 8° → ps=ls=0,52,
   lv=pv=0,66. `< 7°` = „nepodporované" (O5 „prehodenie" bodu dotyku), nezadané =
-  „nezadane", `≥ 9–10°` pridá poznámku o zatváraní drážky (frézovací detail O5),
-  ale offsety ostávajú. NIKDY sa nehádže: pod-7° vetva, priradenie odvesny c/cc
-  prednej/zadnej hrane (O5), jednotka 0,01 (O5b), metrický prepočet (O14).
+  „nezadane". **A7 (25.8.): sklon `> 9°` = NEPODPOROVANÉ** (offsety null + poznámka;
+  presne 9° ešte počíta s varovnou poznámkou) — otázka na pásmo „drážka sa zatvára,
+  výška krovu sa dvíha" ostala v ch207 nezodpovedaná, extrapolácia sa NErobí a
+  `krovDlzkaNominal` nad 9° vracia null tiež. Jednotka 0,01 = POTVRDENÁ mm (ch207
+  msg 1724330 — „pomyslený trojuholník prehadzujúci rovinu bodu uloženia priečkového
+  profilu 105"; bývalá O5b poznámka odstránená). NIKDY sa nehádže: pod-7° vetva,
+  priradenie odvesny c/cc prednej/zadnej hrane (O5), metrický prepočet (O14).
 - **Sklon strechy je SAMOSTATNÝ voliteľný vstup** (`sklonStrechy?`), NIE odvodený z
   výšok/hĺbky — ten vzťah call nepotvrdil (SE má `uhol` oddelene od `výšok`).
   Neodvodzuj sklon zo strechy medzi výškami — to by bol vymyslený rozmer.
@@ -173,8 +184,13 @@ výkresu. **Dva sú POTVRDENÉ číselné vzorce — už NIE sú otvorené, sú 
 
 - **110×43 pod kotviacim (18016) = ZV − 190**, 2 ks, LEN pri NIE-SS (`uchytenie='stena'`) + zasklenej.
   `POD_KOTVIACI_110x43_ODPOCET`. Checkbox „jednoduchá bez zasklenia" (`jednoduchaBezZasklenia`) ho vypína.
-- **výstuha 200×140 → efektívna svetlosť − 60** (`VYSTUHA_200x140_SVETLOST_ODPOCET`, Massive-gate),
-  preteká do prednej nohy (svetlosť + 15) cez `efektivnaSvetlost()`. Výstuha horná odzrkadľuje kód 18022.
+- **−60 pri 200×140 je ODVOLANÉ (Dominik, ch207 msg 1731729: „tých 60 to je asi zle") — `efektivnaSvetlost`
+  aj konštanta ZMAZANÉ (#155, 25.8.).** Platí seating model: výstuha je skovaná 15 mm v žľabe
+  (`VYSTUHA_SKOVANIE_MM`) a TRČÍ (zvislý rozmer − 15) do svetlosti (110→95, 140→125, 200→185,
+  250→235; `vystuhaTrcanieMm`) → **noha = svetlosť + zvislý rozmer výstuhy VŠEOBECNE** (aj 200×140
+  → +200 = 2400 pri 2200 — bez vlastného goldenu, flagnuté na potvrdenie). Informatívne
+  `svetlostBezVystuhy` = svetlosť + trčanie (golden 2200+125 = 2325 = kóta výkresu). Bez zosilnenia
+  VŽDY +15 (aj so zadaným profilom — 2155 bol presak −60). Výstuha horná odzrkadľuje kód 18022.
 - **„2 pod fixom" 110×43 = POČÍTANÉ od #205** (`podFixomOdpocet`, hĺbka − kaskáda; VŠETKY konfigy,
   gated `zasklena`) — DVA riadky 18016 (pod fixom + pod kotviacim), preto `data-testid="polozka-18016"`
   NIE JE unikátny → v E2E filtruj názvom (`.filter({ hasText: 'pod kotviacim'/'pod fixom' })`).
@@ -374,19 +390,22 @@ sú tým ČIASTOČNE prekonané. Aktuálny stav:
 
 ### CONFIG-GATE — najdôležitejšia Money-safety disciplína (single-golden pravidlo)
 
-Vzorec −250 (= predný 140 + zadný 110) je overený LEN na JEDNOM golden bode. Preto engine emituje
-nominál/lišty do Money **iba pre PRESNE overenú konfiguráciu**, nie len pre systém:
+Vzorec −250 je overený na JEDNOM golden bode; **Robust má od 25.8. vlastné pravidlo −220**
+(Dominik verbatim ch207 msg 1724329: „výsuv −154,94 masív / −124,94 Robust" = rozdiel presne
+30 = predný profil 140−110, ukotvené na overený masív bod; lišty Robust = +30, msg 1724331 —
+bez Robust goldenu → riadok nesie poznámku „na potvrdenie"). Engine emituje nominál/lišty do
+Money **iba pre konfiguráciu KOTVY**:
 
 ```
-krovConfigOverena = system === 'Massive' && uchytenie === 'samostatne' && hornyProfilZadnej === 110
-krovNominal       = krovConfigOverena ? krovDlzkaNominal(hĺbka, sklon) : null
+krovConfigOverena = uchytenie === 'samostatne' && hornyProfilZadnej === 110   // OBA systémy
+krovNominal       = krovConfigOverena ? krovDlzkaNominal(hĺbka, sklon, system) : null
 krovDlzkaDoMoney  = krovNominal != null && pocetKrovov != null ? krovNominal : null   // AJ n-gate
 ```
 
 - **Gate na SYSTÉM samotný je PASCA** (review nález): default formulára je `stena` + zadný `140`
-  (VZOR = „9/10 pergol") — `system === 'Massive'` samotné by poslalo neoverené −250 (malo by byť
-  −280 pri zadnom 140; na stene je zadný člen krovu iný) do rezervačného odpisu. Gatuj na presnú
-  overenú konfiguráciu; Robust / Massive-140 / stena ostávajú honest-null.
+  (VZOR = „9/10 pergol") — bez gate by sa neoverené číslo poslalo do rezervačného odpisu.
+  Massive-140-zadná / stena ostávajú honest-null; sklon > 9° vracia null (A7); „výsuv" báza
+  Dominikovej parametrizácie ostáva nedefinovaná (A3) — implementovaný je LEN jej rozdiel.
 - **Money-emitovaná DĹŽKA gatuj aj na MANUÁLNY `n`** — bez neho by priečka niesla starý (výkresom
   vyvrátený) auto-počet do Money. Zaklapávacia potrebuje len `n` (svetlosť je geometria zo šírky).
 - **Záporná svetlosť guard:** priveľa krovov na šírku → svetlosť ≤ 0. `svetlostMedziKrovmi` vráti
@@ -412,9 +431,13 @@ po potvrdení variácie, ticket #223).
   „polykarbon"). Potvrdené A1 (Dominik #198, 21.8.); výstuha 140 do šírky NEvstupuje.
 - **Počet tabúľ = počet polí medzi krovmi = `platnyPocetKrovov(v) − 1`** (`platnyPocetKrovov` je
   odteraz exportovaný z `pergola-narez.ts`). Bez manuálneho počtu krovov → honest-null.
-- **Dĺžka tabule = VŽDY honest-null** — vzorec dĺžky NEpotvrdený (chatové +30/+40 bolo prehodnotené
-  na prítlačnú lištu, #198 21.8. 09:20; HH krovu je aj tak sám honest-null). NEHÁDAŤ dĺžku, ani keď
-  „existujúca logika strechy" (`krovDlzkaNominal`) číslo vie dať — je to iný rozmer, delta nepotvrdená.
+- **Dĺžka tabule = VŽDY honest-null — od 25.8. podložené REÁLNYM kusom.** Výrobný výkres skla
+  OP260282 (ch207 msg 1731731, príloha 10504; „sklo maš pripnute" msg 1739824): 7 ks, 685 × 3259.
+  Šírka aj počet vzorce reprodukujú (685,43 → rez 685 nadol; 7 polí ✓ — prvé overenie proti reálnemu
+  rezu, `tests/pergola-sklo.test.ts` verifikačný describe), ale dĺžku NEreprodukuje ŽIADNE verbatim
+  pravidlo: chat „dĺžka krovu + 40" → 3279,76 ✗ (= presne prítlačná lišta!), call „HH + 20" →
+  3260,93 ✗. NEHÁDAŤ (nominál+20+floor by sedel, ale je to dvojitá domnienka). Korekcia šírky pre
+  „pole s výstuhou" NEEXISTUJE — všetkých 7 tabúľ rovnakých + Dominik „ano nevstupuje" (1725595).
 - **Typ skla = NOVÝ `strechaSkloTyp` select** (14 typov z `SKLO_STRECHA_TYPY`), riadi vzorec (+30/+34)
   aj cenu. Voľný text `strechaSklo` ostal SAMOSTATNE (poznámka/coating/RAL na výkres) — nulová regresia.
 - **Cena = €/m² UNIT zo snapshotu**, server modul `src/lib/server/sklo-strecha-cena.ts`
