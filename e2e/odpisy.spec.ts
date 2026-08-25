@@ -169,6 +169,48 @@ test('odpisy: ručný presun zo staging → 📦 „presunuté ručne" + odpis v
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('odpisy: časy sa zobrazujú v bratislavskom lokálnom čase, nie surové UTC (#313)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	// seeduje LOKÁLNU zdieľanú e2e DB (WAL → preview server to vidí) — proti nasadenému cieľu skip.
+	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	// FIXNÝ zimný UTC timestamp (CET, UTC+1) → Bratislava DETERMINISTICKY, bez DST nejednoznačnosti:
+	// SQLite tvar „2026-01-05 13:32:00" (UTC) = 5.1.2026 14:32 bratislavského času (dátum 5.1.2026).
+	// created_at aj presunute_at seedujeme priamo (nie datetime('now')) → očakávaný výstup je fixný.
+	// caka=1 + presunute_at NOT NULL → detekcia (`presunute_at IS NULL` filter) ho preskočí, odznak
+	// 📦 sa vykreslí z nasedovanej hodnoty. live=1 (presun je LIVE koncept); readback bez money_dlv
+	// dá vedľajší ⛔ badge — nevadí, asserty cielia len na časové bunky.
+	const UTC = '2026-01-05 13:32:00';
+	const db = new Database('./data/e2e.db');
+	try {
+		db.prepare(
+			`INSERT INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, presunute_at, zak_norm, op_norm)
+			 VALUES (90010, 'zasklenia', 'E2E-TZ', 'OP313', 'E2E Zóna', 1, 1, '/t/f.xlsx', 'f.xlsx', 'h313', '{}', 'e2e', ?, ?, 'E2E-TZ', 'OP313')`
+		).run(UTC, UTC);
+	} finally {
+		db.close();
+	}
+	await loginAs(page);
+	await goto(page, '/odpisy');
+
+	// Kedy stĺpec (prvý td riadku) — bratislavský dátum+čas, NIE surový UTC „2026-01-05 13:32:00"
+	const kedy = page.locator('tr', { hasText: 'E2E-TZ' }).first().locator('td').first();
+	await expect(kedy).toHaveText('5.1.2026 14:32');
+	await expect(kedy).not.toContainText('13:32'); // surová UTC hodina preč
+
+	// #299 odznak „presunuté ručne (dátum)" — bratislavský dátum, NIE ISO UTC deň „2026-01-05"
+	await expect(page.getByTestId('presunute-90010')).toContainText('presunuté ručne (5.1.2026)');
+	await expect(page.getByTestId('presunute-90010')).not.toContainText('2026-01-05');
+
+	// detail /odpisy/[id] — „Kedy" v detaile tiež bratislavský lokálny čas
+	await goto(page, '/odpisy/90010');
+	await expect(page.locator('.g')).toContainText('5.1.2026 14:32');
+	await expect(page.locator('.g')).not.toContainText('13:32');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('odhlásenie zmaže session a presmeruje na login', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);

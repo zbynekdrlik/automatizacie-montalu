@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
+	// #313: časy z SQLite `datetime('now')` (created_at/presunute_at) + producentov `…Z` (generatedAt)
+	// sú UTC — bez explicitnej zóny by prod kontajner (bez TZ) ukázal posun o 1-2h / blízko polnoci
+	// zlý deň. `sqliteUtcToIso` premostí SQLite tvar (medzera) aj už-ISO, `formatDatum*Sk` naformátuje
+	// v Europe/Bratislava (DST-safe cez Intl). Viď `.claude/rules/timestamps.md`.
+	import { formatDatumCasSk, formatDatumSk, sqliteUtcToIso } from '$lib/datum';
 	let { data, form } = $props();
 </script>
 
@@ -17,10 +22,10 @@
 	     nebeží, stĺpec „Overenie" ukazuje samé „neoverené" — banner vysvetlí prečo. -->
 	<p class="sub" data-testid="readback-stav">
 		{#if data.readbackMeta?.generatedAt}
-			Overenie voči Money: readback z {data.readbackMeta.generatedAt}{data.readbackMeta.daysOld !=
-			null
-				? ` (${data.readbackMeta.daysOld} dní)`
-				: ''}, {data.readbackMeta.rowCount} dokladov.
+			Overenie voči Money: readback z {formatDatumCasSk(
+				sqliteUtcToIso(data.readbackMeta.generatedAt)
+			)}{data.readbackMeta.daysOld != null ? ` (${data.readbackMeta.daysOld} dní)` : ''}, {data
+				.readbackMeta.rowCount} dokladov.
 		{:else}
 			Overenie voči Money: readback zatiaľ NEBEŽÍ (nič sa neoverilo) — LIVE odpisy ostávajú
 			„neoverené", kým sa nenasadí producent snapshotu.
@@ -64,7 +69,7 @@
 				{#each data.odpisy as o (o.id)}
 					{@const d = o.d}
 					<tr>
-						<td style="white-space:nowrap">{o.created_at}</td>
+						<td style="white-space:nowrap">{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</td>
 						<td
 							>{o.modul === 'zasklenia'
 								? 'Zasklenia'
@@ -90,8 +95,8 @@
 								<span
 									class="badge presun"
 									data-testid={`presunute-${o.id}`}
-									title={`Súbor bol RUČNE presunutý zo staging „NA ODPIS“ do ostrého Money importu — appka to detekovala ${o.presunute_at}. Odpis už nie je parkovaný a vstupuje do overenia voči Money.`}
-									>📦 presunuté ručne ({o.presunute_at.slice(0, 10)})</span
+									title={`Súbor bol RUČNE presunutý zo staging „NA ODPIS“ do ostrého Money importu — appka to detekovala ${formatDatumCasSk(sqliteUtcToIso(o.presunute_at))}. Odpis už nie je parkovaný a vstupuje do overenia voči Money.`}
+									>📦 presunuté ručne ({formatDatumSk(sqliteUtcToIso(o.presunute_at))})</span
 								>
 							{:else if o.caka}
 								<span title="Parkované v „NA ODPIS“ — čaká na ručný presun do Money importu"

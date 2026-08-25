@@ -62,3 +62,25 @@ tá istá UTC pasca ako vyššie, len z iného zdroja. Preto najprv `sqliteUtcTo
 (v `datum.ts`) → `...T...Z` (UTC ISO), až potom `formatDatumCasSk`/`formatDatumSk`. Vstup,
 ktorý už ISO je, vráti nezmenený (most, nie parser). Nový kód, čo zobrazuje SQLite timestamp
 na obrazovke/tlači, MUSÍ ísť cez `sqliteUtcToIso`.
+
+## /odpisy história — VŠETKY časy cez `sqliteUtcToIso` + `formatDatum*Sk` (#313)
+
+`/odpisy` (`+page.svelte`) aj detail `/odpisy/[id]` renderovali časy SUROVO → prod kontajner (UTC)
+ukazoval operátorovi posun o 1-2h a odznak `presunute_at.slice(0,10)` blízko polnoci UTC deň o deň
+vedľa (v ISO tvare). Fix = každý časový render cez `formatDatumCasSk(sqliteUtcToIso(x))` (dátum+čas:
+„Kedy" stĺpec, tooltip presunu, readback riadok) / `formatDatumSk(sqliteUtcToIso(x))` (odznak
+„presunuté ručne (dátum)" — date-only). Zdroj `created_at`/`presunute_at` = SQLite `datetime('now')`.
+
+- **Readback `generatedAt` je DVOJTVAROVÝ → VŽDY cez `sqliteUtcToIso`, nikdy `formatDatumCasSk` priamo.**
+  Prod ho ukladá ako producentov `…Z` ISO (`money-readback.ts` z `dlv-readback.json`), ale #298 e2e
+  seeduje `money_dlv_meta.snapshot_generated_at` cez SQLite `datetime('now')` (tvar s medzerou). `sqliteUtcToIso`
+  premostí OBA (už-ISO prepadne nezmenený, medzera → `…T…Z`); priame `formatDatumCasSk` by na e2e tvare
+  s medzerou dalo posun (JS ho parsuje ako lokálny čas). Toto je NEZREJMÉ — je to jediné miesto, kde tá
+  istá hodnota má v prode a v teste iný string tvar.
+- **RED-first e2e na page-render TZ bug: seeduj FIXNÝ ZIMNÝ UTC timestamp PRIAMO (nie `datetime('now')`).**
+  `e2e/odpisy.spec.ts` seeduje riadok s `created_at`/`presunute_at = '2026-01-05 13:32:00'` (CET, UTC+1,
+  bez DST nejednoznačnosti) → očakávaný výstup je fixný `5.1.2026 14:32` / `5.1.2026`. Assert na
+  naformátovanú hodnotu (`toHaveText('5.1.2026 14:32')`) + `not.toContainText('13:32')`/`'2026-01-05'`.
+  `datetime('now')` by dalo nedeterministický „teraz" → nedá sa assertovať presný string. Fixture:
+  `caka=1` + `presunute_at` NOT NULL → `detectManualStagingMoves` (`presunute_at IS NULL` filter) ho
+  preskočí, odznak 📦 sa vykreslí z nasedovanej hodnoty (viď `money-readback.md` #299).
