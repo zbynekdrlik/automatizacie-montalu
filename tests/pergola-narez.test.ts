@@ -12,12 +12,10 @@ import {
 	spocitajNarez,
 	schemaVykresu,
 	chybaPergolaNarezVstupu,
-	efektivnaSvetlost,
 	SYSTEMY,
 	PREDNA_SVETLOST_STD,
 	PREDNA_NOHA_PRIDAVOK,
 	VYSTUHA_ODPOCET,
-	VYSTUHA_200x140_SVETLOST_ODPOCET,
 	POD_KOTVIACI_110x43_ODPOCET,
 	POCET_BOCNYCH_POD_KOTVIACIM,
 	KOD_PROFIL_110x43,
@@ -126,23 +124,26 @@ describe('#155 A9 — predná noha pri výstuhe = svetlosť + rozmer výstuhy (n
 			}).informativne.prednaNohaDlzka
 		).toBe(2450);
 	});
-	it('200×140 + zosilnený → efektivnaSvetlost + 200 = (2200−60)+200 = 2340 (odvodené, = 140×140 noha)', () => {
-		// A9 nedal 200×140 → ODVODENINA: −60 (efektivnaSvetlost, #206 potvrdené) + výška 200 (#206:
-		// 200×140 je o 60 vyššia = 200) = svetlosť + 140. Geometricky = rovnaká noha ako 140×140.
+	it('200×140 + zosilnený → svetlosť + 200 = 2400 (všeobecné pravidlo; −60 Dominik odvolal)', () => {
+		// Dominik ch207 msg 1731729: „tých 60 to je asi zle … výstuha je tiež 15 mm usadená
+		// v žľabe … noha je svetlosť +15 [bez výstuhy], pri výstuhe o (výška − 15) dlhšia"
+		// → noha = svetlosť + zvislý rozmer výstuhy, VŠEOBECNE (aj 200×140 → +200). Bývalá
+		// odvodenina −60+200 = svetlosť+140 (2340) padla spolu s odvolaným −60.
 		expect(
 			spocitajNarez({ ...VZOR, zosilnenyNosnik: true, vystuhaProfil: '200x140' }).informativne
 				.prednaNohaDlzka
-		).toBe(2340);
+		).toBe(2400);
 	});
-	it('BEZ zosilnenia → +15 (nezmenené): štandard 2215, 200×140-bez-zosilnenia 2155', () => {
+	it('BEZ zosilnenia → +15 VŽDY (aj so zadaným 200×140 profilom): 2215', () => {
 		expect(spocitajNarez({ ...VZOR, prednaSvetlost: 2200 }).informativne.prednaNohaDlzka).toBe(
 			2215
 		);
-		// vystuhaProfil zadaný ale zosilnenyNosnik=false → NIE je výstuha → +15 (existujúci kontrakt)
+		// vystuhaProfil zadaný ale zosilnenyNosnik=false → NIE je výstuha → +15. Bývalých 2155
+		// bol presak odvolaného −60 do bez-výstuhového prípadu (msg 1731729: „to je asi zle").
 		expect(
 			spocitajNarez({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' }).informativne
 				.prednaNohaDlzka
-		).toBe(2155);
+		).toBe(2215);
 	});
 	it('neštandardná svetlosť + zosilnený 140 → svetlosť + 140 (2500 → 2640)', () => {
 		expect(
@@ -256,10 +257,9 @@ describe('spocitajNarez — priečky (počet z max rozostupu 700, dĺžka O1-blo
 	it('dĺžka rezu priečky je NULL (= HH krovu, #161 neodvoditeľné), nie vymyslená', () => {
 		const priecka = spocitajNarez(VZOR).vypocitane.find((p) => /priečk/i.test(p.nazov));
 		expect(priecka!.dlzkaRezuMm).toBeNull();
-		// #205: kótovaný výkres OP260282 dorazil, ale priečka = HH krovu, čo nie je vzorec
-		// zo vstupov (CAD výsledok geometrie krovu) → poznámka odkazuje na HH krovu / #161
-		// #233 — poznámka je plain slovenčina (HH krovu / #161 → „horná hrana krovu")
-		expect(priecka!.poznamka).toMatch(/hrana krovu/i);
+		// #233 — poznámka je plain slovenčina; jednotné pomenovanie = „nominálna dĺžka krovu"
+		// (spodná hrana — review 25.8. zjednotil framing, „horná hrana" bol protirečivý text)
+		expect(priecka!.poznamka).toMatch(/nominálna dĺžka krovu/i);
 	});
 	it('light checkbox → kód priečky 18102, inak 18004', () => {
 		expect(
@@ -301,7 +301,7 @@ describe('spocitajNarez — zatiaľ nepodporované (O-otázky), nič sa nehádž
 		expect(n).toMatch(/čaká na vzorec/i);
 		expect(n).toMatch(/lišt|prítlačn|maskovac/i);
 		expect(n).toMatch(/skl/i);
-		expect(n).toMatch(/hrana krovu/i);
+		expect(n).toMatch(/nominálna dĺžka krovu/i);
 		// #205: žľab (18018/18021) + kotviaci (18019) sa presunuli z „nepodporované" do
 		// „vypocitane" — kótovaný výkres OP260282 potvrdil dĺžku = šírka (O1 čiastočne).
 		expect(
@@ -566,41 +566,47 @@ describe('#205 110×43 „pod fixom" (2 ks) = hĺbka − kaskáda (system × SS/
 	});
 });
 
-// --- #206 (c) — výstuha 200×140 → svetlosť −60; Robust varianty honest-null ----------
-describe('#206 (c) výstuha 200×140 → svetlosť −60 (preteká do prednej nohy)', () => {
-	it('konštanta = 60 (200 − 140); efektívna svetlosť = zadaná − 60 pri 200×140', () => {
-		expect(VYSTUHA_200x140_SVETLOST_ODPOCET).toBe(60);
-		expect(efektivnaSvetlost({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' })).toBe(
-			2140
-		);
-		// bez 200×140 → efektívna = zadaná (žiadny −60)
-		expect(efektivnaSvetlost({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '140x140' })).toBe(
-			2200
-		);
-		expect(efektivnaSvetlost({ ...VZOR, prednaSvetlost: 2200 })).toBe(2200);
+// --- #155 trčanie výstuhy (1731729) — svetlosť bez výstuhy; Robust varianty honest-null ---
+describe('#155 trčanie výstuhy (ch207 1731729) — svetlosť bez výstuhy, −60 ZRUŠENÉ', () => {
+	it('výstuha je skovaná 15 mm v žľabe → trčí (zvislý rozmer − 15): 95/125/185/235', () => {
+		// Dominik VERBATIM (1731729): „výstuha je tiež 15mm usadená v žlabe tak ako aj noha čiže
+		// ked je 110x110 tak výstuha realne trčí von 95mm … ak je vystuha 140x140 tak noha je o
+		// dalších 125mm dlhšia". Kontrola konzistencie: 15 + 95 = 110, 15 + 125 = 140 = presne
+		// A9 prídavky nohy (noha = svetlosť + 15 + trčanie = svetlosť + zvislý rozmer).
+		const t = (v: Partial<PergolaNarezVstup>) =>
+			spocitajNarez({ ...VZOR, zosilnenyNosnik: true, ...v }).informativne.vystuhaTrcanieMm;
+		expect(t({ vystuhaProfil: '140x140' })).toBe(125);
+		expect(t({ system: 'Robust', vystuhaProfil: '110x110' })).toBe(95);
+		expect(t({ vystuhaProfil: '200x140' })).toBe(185);
+		expect(t({ system: 'Robust', vystuhaProfil: '110x250' })).toBe(235);
+		// bez zosilneného nosníka výstuha nie je → trčanie null
+		expect(spocitajNarez({ ...VZOR }).informativne.vystuhaTrcanieMm).toBeNull();
 	});
 
-	it('predná noha pri 200×140 = (svetlosť − 60) + 15 (2200 → 2155), inak nezmenená (2215)', () => {
+	it('svetlosť bez výstuhy = zadaná svetlosť + trčanie (golden OP260282: 2200 + 125 = 2325)', () => {
+		// Výkres OP260282 rozlišuje „svetlosť s výstuhou 2200" (zadávaná) vs „bez výstuhy 2325"
+		// — rozdiel presne 125 (140×140). Model 1731729 to reprodukuje: 2200 + (140−15) = 2325.
+		const r = spocitajNarez({ ...VZOR, prednaSvetlost: 2200, zosilnenyNosnik: true });
+		expect(r.informativne.svetlostBezVystuhy).toBe(2325);
+		// bez výstuhy sa nezobrazuje (null)
+		expect(spocitajNarez({ ...VZOR }).informativne.svetlostBezVystuhy).toBeNull();
+	});
+
+	it('žiadny −60: predná noha 200×140 bez zosilnenia = 2215, výkres kreslí zadanú svetlosť', () => {
 		const r200 = spocitajNarez({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' });
-		expect(r200.informativne.efektivnaSvetlost).toBe(2140);
-		expect(r200.informativne.prednaNohaDlzka).toBe(2155); // (2200−60)+15
-		const noha200 = r200.vypocitane.find((p) => !/zadná/i.test(p.nazov) && /noha/i.test(p.nazov));
-		expect(noha200!.dlzkaRezuMm).toBe(2155);
+		expect(r200.informativne.prednaNohaDlzka).toBe(2215); // +15 (výstuha nie je)
+		const s = schemaVykresu({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' });
+		expect(s.prednaSvetlost).toBe(2200); // kóta = zadaná svetlosť, žiadne tiché −60
+		expect(s.prednaNohaDlzka).toBe(2215);
 
 		const rStd = spocitajNarez({ ...VZOR, prednaSvetlost: 2200 });
 		expect(rStd.informativne.prednaNohaDlzka).toBe(2215); // POTVRDENÝ vektor sa NEMENÍ
 	});
 
-	it('výkres kreslí efektívnu svetlosť (200×140 → 2140), predná noha 2155', () => {
-		const s = schemaVykresu({ ...VZOR, prednaSvetlost: 2200, vystuhaProfil: '200x140' });
-		expect(s.prednaSvetlost).toBe(2140);
-		expect(s.prednaNohaDlzka).toBe(2155);
-	});
-
 	it('Robust varianty výstuhy (110×110 / 110×250) — honest-null (žiadny vymyslený riadok)', () => {
 		const r = spocitajNarez({ ...VZOR, system: 'Robust', vystuhaProfil: '110x250' });
-		// žiadny −60 (to je len 200×140), žiadny vymyslený riadok výstuhy Robust
-		expect(r.informativne.efektivnaSvetlost).toBe(VZOR.prednaSvetlost);
+		// bez zosilnenia žiadna výstuha → svetlosť bez výstuhy sa neukazuje
+		expect(r.informativne.svetlostBezVystuhy).toBeNull();
 		expect(r.nepodporovane.map((x) => x.kratky + ' ' + x.detail).join(' | ')).toMatch(
 			/110×250|110x250/
 		);
@@ -622,10 +628,11 @@ describe('#206 (c) výstuha 200×140 → svetlosť −60 (preteká do prednej no
 		expect(rStd.vypocitane.find((p) => /žľabová výstuha/i.test(p.nazov))!.kod).toBe('18017');
 	});
 
-	it('−60 sa neaplikuje pri Robust + 200×140 (nekonzistentný ručný vstup) — gate na Massive', () => {
-		expect(efektivnaSvetlost({ ...VZOR, system: 'Robust', vystuhaProfil: '200x140' })).toBe(
-			VZOR.prednaSvetlost
-		);
+	it('nekonzistentný ručný vstup Robust + 200×140 bez zosilnenia → noha +15 (žiadne tiché odpočty)', () => {
+		expect(
+			spocitajNarez({ ...VZOR, system: 'Robust', vystuhaProfil: '200x140' }).informativne
+				.prednaNohaDlzka
+		).toBe(VZOR.prednaSvetlost + 15);
 	});
 });
 
@@ -708,12 +715,13 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overen
 		expect(Math.abs((pr.dlzkaRezuMm as number) - NOMINAL)).toBeLessThan(0.02);
 	});
 
-	it('config-gate: nominál sa NEEMITUJE mimo overenej konfigurácie (honest-null do Money)', () => {
-		// Robust (predný 110), Massive so zadným 140, Massive na stenu — každá je NEOVERENÁ → null
+	it('config-gate: nominál sa NEEMITUJE mimo overenej/pravidlom pokrytej konfigurácie (honest-null do Money)', () => {
+		// Massive so zadným 140, Massive na stenu, Robust so zadným 140 — NEOVERENÉ → null.
+		// (Robust + zadná 110 má od 25.8. Dominikovo pravidlo −220 → emituje sa, viď test nižšie.)
 		const konfigy: [string, Partial<PergolaNarezVstup>][] = [
-			['Robust', { system: 'Robust' }],
 			['Massive + zadný 140', { hornyProfilZadnej: 140 }],
-			['Massive na stenu', { uchytenie: 'stena' }]
+			['Massive na stenu', { uchytenie: 'stena' }],
+			['Robust + zadný 140', { system: 'Robust', hornyProfilZadnej: 140 }]
 		];
 		for (const [nazov, over] of konfigy) {
 			const r = spocitajNarez({ ...OVERENA, ...over });
@@ -726,6 +734,36 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overen
 			).toBe(false);
 			expect(r.nepodporovane.map((x) => x.kratky).join(' | ')).toMatch(/prítlačn|maskovac/i);
 		}
+	});
+
+	it('#161 Robust vetva (ch207 1724329/1724331): priečka = hĺbka/cos − 220, lišty = nominál + 30', () => {
+		// Dominik VERBATIM: „pri masíve výsuv −154,94 a pri robuste je to 124,94" (rozdiel presne
+		// 30 = predný profil 140 − 110) → Robust = overená masív kotva (−250) + 30 = −220.
+		// Lišty (1724331): „pri robuste je výsledok +30 a pri massive +40". Gate: samostatne +
+		// zadná 110 (konfigurácia kotvy) + sklon + manuálny počet krovov.
+		const r = spocitajNarez({ ...OVERENA, system: 'Robust' });
+		const NOMINAL_ROBUST = 3690 / Math.cos((6.1 * Math.PI) / 180) - 220;
+		const pr = r.vypocitane.find((p) => /priečk/i.test(p.nazov))!;
+		expect(pr.dlzkaRezuMm).not.toBeNull();
+		expect(Math.abs((pr.dlzkaRezuMm as number) - NOMINAL_ROBUST)).toBeLessThan(0.02);
+		const p6 = r.vypocitane.find((p) => p.kod === '18006')!;
+		expect(p6, 'prítlačná sa pri Robust + zadná 110 emituje').toBeTruthy();
+		expect(Math.abs((p6.dlzkaRezuMm as number) - (NOMINAL_ROBUST + 30))).toBeLessThan(0.02);
+		expect(p6.poznamka).toMatch(/30/); // poznámka nesie Robust prídavok
+		// EMITOVANÉ Robust riadky nesú viditeľnú výhradu (bez Robust goldenu) — review 25.8. 🟡:
+		// výhrada nesmie žiť len v null vetve, ktorá sa pri emitovaní vôbec nezobrazí.
+		expect(p6.poznamkaDetail).toMatch(/na potvrdenie/i);
+		expect(pr.poznamkaDetail).toMatch(/na potvrdenie/i);
+		// Massive emitovaná priečka výhradu NEnesie (overená výkresom)
+		const rM = spocitajNarez(OVERENA);
+		const prM = rM.vypocitane.find((p) => /priečk/i.test(p.nazov))!;
+		expect(prM.poznamkaDetail).not.toMatch(/na potvrdenie/i);
+	});
+
+	it('A7: sklon nad 9° → priečka aj lišty honest-null (pásmo bez vzorca nejde do Money)', () => {
+		const r = spocitajNarez({ ...OVERENA, sklonStrechy: 12 });
+		expect(r.vypocitane.find((p) => /priečk/i.test(p.nazov))!.dlzkaRezuMm).toBeNull();
+		expect(r.vypocitane.some((p) => ['18006', '18007', '18008'].includes(p.kod))).toBe(false);
 	});
 
 	it('overená konfigurácia + n: prítlačná(18006)=n, maskovacia(18007)=n−2, krajová(18008)=2 ks; dĺžka = nominál+40', () => {

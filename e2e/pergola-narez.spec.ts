@@ -28,8 +28,10 @@ test('formulár → materiál: Massive (NIE prvý systém) prežije, predná noh
 	await expect(massiveNoha).toContainText('predná noha');
 	await expect(page.getByTestId('polozka-18013')).toHaveCount(0);
 
-	// priečka (18004) prítomná s počtom, dĺžka „—" (= HH krovu, #161 neodvoditeľné) (#205)
-	await expect(page.getByTestId('polozka-18004')).toContainText('hrana krovu');
+	// priečka (18004) prítomná s počtom, dĺžka honest-null (bez zadaného počtu krovov sa nominál
+	// nepočíta — #161 lane): nová kópia „nominálna dĺžka krovu — zatiaľ sa nepočíta" (#205)
+	await expect(page.getByTestId('polozka-18004')).toContainText('Priečkový profil 105');
+	await expect(page.getByTestId('polozka-18004')).toContainText('zatiaľ sa nepočíta');
 	// #205: žľab (18018) + kotviaci (18019) TERAZ vo vypocitane = šírka 5760, výdaj na 6 m
 	await expect(page.getByTestId('polozka-18018')).toContainText('5760');
 	await expect(page.getByTestId('vydaj-18018')).toContainText('(6 m)');
@@ -362,11 +364,13 @@ test('#205 OP260282 materiál: žľab/kotviaci = šírka 4990 na 6 m tyče, výs
 	await expect(page.getByTestId('narez-tabulka')).toContainText('4710');
 	// #155 A9 (Dominik): predná noha = svetlosť 2200 + výstuha 140 = 2340 (nie starý „vždy +15" = 2215)
 	await expect(page.getByTestId('narez-tabulka')).toContainText('2340');
-	// priečka (18004) dĺžka „—" (HH krovu neodvoditeľné) — nič sa nehádže
-	await expect(page.getByTestId('polozka-18004')).toContainText('hrana krovu');
-	// nepodporované vypisuje HH-krovu (18016 pod fixom je vo vypocitane; „zvislá zadná výstuha"
-	// 2340 je rekonciliovaná na prednú nohu — A9, už nie honest-null)
-	await expect(page.getByTestId('narez-nepodporovane')).toContainText('hrana krovu');
+	// priečka (18004) dĺžka honest-null (bez počtu krovov sa nominál nepočíta) — nič sa nehádže
+	await expect(page.getByTestId('polozka-18004')).toContainText('Priečkový profil 105');
+	await expect(page.getByTestId('polozka-18004')).toContainText('zatiaľ sa nepočíta');
+	// nepodporované vypisuje priečku (18004) — dĺžka = nominálna dĺžka krovu sa zatiaľ nepočíta
+	// (18016 pod fixom je vo vypocitane; „zvislá zadná výstuha" 2340 rekonciliovaná na prednú nohu — A9)
+	await expect(page.getByTestId('narez-nepodporovane')).toContainText('Priečka (18004)');
+	await expect(page.getByTestId('narez-nepodporovane')).toContainText('zatiaľ sa nepočíta');
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -421,9 +425,11 @@ test('#206 (a) jednoduchá bez zasklenia: bočný 110×43 zmizne, ZV pole sa skr
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('#206 (c) výstuha 200×140: svetlosť −60 → predná noha 2155 (2200 − 60 + 15)', async ({
+test('#155 výstuha 200×140 + zosilnenie: noha = svetlosť + 200 (2400), svetlosť bez výstuhy 2385', async ({
 	page
 }) => {
+	// Model 1731729 (Dominik 24.8.): výstuha skovaná 15 mm v žľabe, trčí zvyšok do svetlosti →
+	// noha = svetlosť + zvislý rozmer výstuhy (200×140 → +200); bývalý −60 model odvolaný.
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/pergola/narez');
@@ -432,16 +438,17 @@ test('#206 (c) výstuha 200×140: svetlosť −60 → predná noha 2155 (2200 �
 	await page.locator('#sirka').fill('5000');
 	await page.locator('#pocetPrednychNoh').fill('4');
 	// predná svetlosť ostáva default 2200
+	await page.locator('#zosilnenyNosnik').check();
 	await page.locator('#vystuhaProfil').selectOption('200x140');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
-	// predná noha (18017) = (2200 − 60) + 15 = 2155
-	await expect(page.getByTestId('polozka-18017')).toContainText('2155');
-	// efektívna svetlosť = 2140 (informatívne)
-	await expect(page.getByTestId('info-efektivna-svetlost')).toContainText('2140');
+	// predná noha (18017) = 2200 + 200 = 2400 (všeobecné pravidlo, žiadny −60)
+	await expect(page.getByTestId('polozka-18017')).toContainText('2400');
+	// svetlosť bez výstuhy = 2200 + trčanie 185 = 2385 (informatívne)
+	await expect(page.getByTestId('info-svetlost-bez-vystuhy')).toContainText('2385');
 	await expect(page.getByTestId('info-vystuha-profil')).toContainText('200x140');
-	// výkres spec ukazuje profil výstuhy + −60 poznámku
+	// výkres spec ukazuje profil výstuhy
 	await expect(page.getByTestId('pnr-spec-vystuha')).toContainText('200x140');
 
 	expect(consoleMsgs).toEqual([]);

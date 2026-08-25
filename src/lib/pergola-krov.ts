@@ -24,10 +24,14 @@
 //  - frézovanie drážok (dĺžka/výška/uhol drážok = výrobný list, O5) — Dominikova vlastná
 //    hranica scope: „návrh áno / výrobný list nie".
 //  - priradenie odvesny c/cc prednej/zadnej dotykovej hrane je ODVODENÉ, nie povedané (O5).
-//  - jednotka konštanty „0,01" (O5b — mm predpokladané, Dominik jednotku nepovedal).
-//  - správanie nad ~9–10° (drážka sa zatvára, výška krovu sa dvíha) je frézovací detail
-//    (O5); offsety uloženia z potvrdeného vzorca ostávajú, len sa pridá poznámka.
+//  - pásmo NAD 9° (A7): „nad 9–10° sa drážka zatvára, výška krovu sa dvíha" = zmena režimu;
+//    otázka A7 (ch207 msg 1724259 bod 5) ostala NEZODPOVEDANÁ → uloženie AJ nominálna dĺžka
+//    sa nad 9° nepočítajú (honest-null, nikdy extrapolácia potvrdeného pásma).
 //  - metrický prepočet krovu ako celku (O14 — dohodnuté „vrátiť sa na konci", nedošlo).
+//
+// POTVRDENÉ dodatočne (Dominik, Odoo ch207 21.8., msg 1724330): konštanta 0,01 JE v mm —
+// „je to pomyslený trojuholnik ktorý prehadzuje rovinu bodu uloženia hornej a spodnej
+// hrany prieckoveho profilu 105 (krovu)" (bývalá otvorená otázka O5b je uzavretá).
 
 /** zaokrúhlenie na 0,01 mm — uloženie sú sub-mm hodnoty, SE tabuľka udáva 2 desatinné
  *  (0,52 / 0,66). NIE R1 z pergola-narez.ts (0,1 mm) — tá by 0,52 aj 0,66 zlepila na 0,5. */
@@ -40,21 +44,36 @@ export const KROV_C = 29;
 /** vodorovná odvesna 2 [mm], kóta „37,28". */
 export const KROV_CC = 37.28;
 /** pevný sčítanec [mm] v každom vzorci (kóta „0,01" v bode dotyku) — geometria nikdy
- *  nespadne presne na nulu. Jednotka = O5b (predpoklad mm). */
+ *  nespadne presne na nulu. Jednotka POTVRDENÁ mm (Dominik ch207 msg 1724330): „je to
+ *  pomyslený trojuholnik ktorý prehadzuje rovinu bodu uloženia hornej a spodnej hrany
+ *  prieckoveho profilu 105 (krovu)". */
 export const KROV_KONST = 0.01;
 /** prah sklonu strechy [°] — binárny prepínač roviny uloženia (CAD `uhol2`). */
 export const KROV_PRAH_STUPNE = 7;
 /** odpočet [mm] pre NOMINÁLNU dĺžku krovu = predný profil (140) + zadný (110), odpočítané
  *  po projekcii (meria sa po spáde). OVERENÉ na golden OP260282 (Massive 140, samostatne
  *  stojaca, zadný 110): 3470/cos(6,1°) − 250 = 3239,76.
- *  POZOR — JEDINÝ golden bod: −250 je overené LEN pre presne túto konfiguráciu. Pre Robust
- *  (predný 110), Massive so 140 zadným (→ 280) alebo na stenu (iný zadný člen krovu) je rozklad
- *  NEOVERENÝ, preto `spocitajNarez` emituje nominál LEN pre overenú konfiguráciu (Massive +
- *  samostatne stojaca + zadný 110); všetko ostatné ostáva honest-null (nikdy neoverené číslo do
- *  Money). Zovšeobecnenie čaká na druhú zákazku / potvrdenie Dominikom (majiteľ posúdi). */
+ *  POZOR — JEDINÝ golden bod: −250 je overené LEN pre presne túto konfiguráciu. Robust má
+ *  od 25.8. VLASTNÉ pravidlo (viď `KROV_ODPOCET_ROBUST` = 220, Dominikov verbatim rozdiel 30);
+ *  Massive so 140 zadným a uchytenie na stenu ostávajú NEOVERENÉ → `spocitajNarez` emituje
+ *  nominál len pre samostatne stojacu so zadným 110 (konfigurácia kotvy), všetko ostatné je
+ *  honest-null (nikdy neoverené číslo do Money). Zovšeobecnenie čaká na ďalšiu zákazku /
+ *  potvrdenie Dominikom (majiteľ posúdi). */
 export const KROV_ODPOCET = 250;
-/** sklon [°], nad ktorým Dominik popísal ZMENU správania drážky („nad 9–10° sa drážka
- *  zatvára, výška krovu sa dvíha") — frézovací detail (O5). Nemení potvrdené offsety. */
+/** odpočet [mm] pre NOMINÁLNU dĺžku krovu — ROBUST. Dominik VERBATIM (ch207 msg 1724329):
+ *  krov = „výsuv − 147,94 v predu a v zadu −7 spolu teda pri masíve výsuv −154,94 a pri
+ *  robuste je to 124,94" → rozdiel masív↔Robust je PRESNE 30 mm (154,94 − 124,94 = predný
+ *  profil 140 − 110; predný odpočet 147,94 = profil + 7,94, takže „výsuv" je meraný od
+ *  vonkajšej prednej hrany a od systému nezávislý). Báza „výsuv" nie je vstup appky
+ *  (definícia ostala nezodpovedaná — A3), preto sa implementuje LEN Dominikov rozdiel,
+ *  ukotvený na overený masív bod: Robust = 250 − 30 = 220. BEZ Robust goldenu — riadok
+ *  nesie poznámku „na potvrdenie pri prvej Robust zákazke" (vzor 200×140 z PR #273). */
+export const KROV_ODPOCET_ROBUST = 220;
+/** sklon [°], nad ktorým Dominik popísal ZMENU správania („nad 9–10° sa drážka zatvára,
+ *  výška krovu sa dvíha") — otázka A7 na presné pravidlá pásma ostala NEZODPOVEDANÁ
+ *  (ch207 msg 1724259 bod 5), preto je toto HRANICA PODPORY: nad ňou sa uloženie ani
+ *  nominálna dĺžka NEPOČÍTAJÚ (honest-null); presne 9° ešte počíta (potvrdený režim
+ *  „otvára") a nesie varovnú poznámku o pásme. */
 export const KROV_FREZ_ZMENA_STUPNE = 9;
 
 export type KrovRezim = 'nezadane' | 'nepodporovane' | 'rovnobezne' | 'otvara';
@@ -86,7 +105,7 @@ export interface KrovUlozenie {
 // referencií (#161/O5/O5b ostávajú v komentároch kódu, nie na obrazovke).
 const FREZOVANIE_POZN = 'Frézovanie drážok (dĺžka/výška/uhol) = výrobný list — doplní konštruktér.';
 const ODVESNA_POZN = 'Priradenie odvesny c/cc prednej/zadnej hrane je odvodené, nie potvrdené.';
-const JEDNOTKA_POZN = 'Konštanta 0,01 predpokladá mm (jednotku Dominik nepovedal).';
+// (bývalá poznámka o neistej jednotke 0,01 odstránená — jednotka mm POTVRDENÁ, msg 1724330)
 
 /** Uloženie krovu z uhla sklonu strechy — LEN potvrdené vzorce prahu 7° (#161). Čistá
  *  funkcia, bez vedľajších efektov, bez Money zápisu. Neodvodzuje sklon z výšok/hĺbky
@@ -136,7 +155,29 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 		};
 	}
 
-	// ≥ 7° — POTVRDENÝ režim (číselne overený pri 8°)
+	// NAD 9° (A7) — zmena režimu („drážka sa zatvára, výška krovu sa dvíha") bez potvrdeného
+	// vzorca; otázka A7 ostala nezodpovedaná → honest-null, potvrdené pásmo sa NEextrapoluje.
+	if (s > KROV_FREZ_ZMENA_STUPNE) {
+		return {
+			sklonStupne: s,
+			podporovane: false,
+			rezim: 'nepodporovane',
+			uhol2,
+			uhol3: null,
+			ls: null,
+			ps: null,
+			lv: null,
+			pv: null,
+			konstanty,
+			poznamky: [
+				`Sklon nad ${KROV_FREZ_ZMENA_STUPNE}° — drážka sa zatvára a výška krovu sa dvíha ` +
+					'(iný režim uloženia). Pásmo zatiaľ NIE JE pokryté potvrdeným vzorcom — uloženie sa nepočíta.',
+				FREZOVANIE_POZN
+			]
+		};
+	}
+
+	// 7°–9° — POTVRDENÝ režim (číselne overený pri 8°)
 	const uhol3 = R2(s - KROV_PRAH_STUPNE);
 	const t = Math.tan(rad(s - KROV_PRAH_STUPNE));
 	const ps = R2(t * KROV_C + KROV_KONST); // = ls
@@ -155,12 +196,13 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 		);
 	}
 	if (s >= KROV_FREZ_ZMENA_STUPNE) {
+		// dostane sa sem už len presne 9° (nad 9° vracia vetva vyššie „nepodporované")
 		poznamky.push(
-			`Nad ~${KROV_FREZ_ZMENA_STUPNE}–10° sa drážka zatvára a výška krovu sa dvíha — ` +
-				'frézovací detail; offsety uloženia ostávajú z potvrdeného vzorca.'
+			`Sklon ${KROV_FREZ_ZMENA_STUPNE}° je na hranici pásma, kde sa drážka zatvára a výška ` +
+				'krovu sa dvíha — nad ňou sa uloženie už nepočíta (bez potvrdeného vzorca).'
 		);
 	}
-	poznamky.push(ODVESNA_POZN, JEDNOTKA_POZN, FREZOVANIE_POZN);
+	poznamky.push(ODVESNA_POZN, FREZOVANIE_POZN);
 
 	return {
 		sklonStupne: s,
@@ -190,17 +232,23 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
  *  („nesedí o ~2 mm, nerieš" — Dominik na výkres); +1,17 nemá čistý vzorec, preto sa emituje
  *  NOMINÁL a seating gap sa len dokumentuje (do rezervačného odpisu stačí nominál).
  *
- *  Konštanta `KROV_ODPOCET = 250` je overená len pre Massive 140 / zadný 110 (jediný golden)
- *  — emisiu preto Massive-gatuje `spocitajNarez` (Robust ostáva honest-null). R2 (0,01 mm) =
- *  presnosť výkresu (3240,93). Čistá funkcia, bez vedľajších efektov, bez Money zápisu. */
+ *  Konštanta `KROV_ODPOCET = 250` je overená pre Massive 140 / zadný 110 (jediný golden);
+ *  Robust používa `KROV_ODPOCET_ROBUST = 220` = kotva + Dominikov verbatim rozdiel 30
+ *  (ch207 msg 1724329, viď konštantu) — bez Robust goldenu, preto poznámka „na potvrdenie".
+ *  Emisiu gatuje `spocitajNarez` (samostatne stojaca + zadný profil 110 = konfigurácia
+ *  kotvy). A7: sklon nad 9° (`KROV_FREZ_ZMENA_STUPNE`) → null — „výška krovu sa dvíha",
+ *  pásmo nemá potvrdený vzorec, nič sa nehádže. R2 (0,01 mm) = presnosť výkresu (3240,93).
+ *  Čistá funkcia, bez vedľajších efektov, bez Money zápisu. */
 export function krovDlzkaNominal(
 	hlbkaMm: number,
-	sklonStupne: number | null | undefined
+	sklonStupne: number | null | undefined,
+	system: 'Robust' | 'Massive' = 'Massive'
 ): number | null {
 	const s = typeof sklonStupne === 'number' && Number.isFinite(sklonStupne) ? sklonStupne : null;
 	if (s === null || s <= 0) return null;
+	if (s > KROV_FREZ_ZMENA_STUPNE) return null; // A7 — pásmo nad 9° bez vzorca (honest-null)
 	if (!(typeof hlbkaMm === 'number' && Number.isFinite(hlbkaMm) && hlbkaMm > 0)) return null;
 	const cos = Math.cos(rad(s));
 	if (!(cos > 0)) return null; // obranné (sklon → 90° by delil ~0)
-	return R2(hlbkaMm / cos - KROV_ODPOCET);
+	return R2(hlbkaMm / cos - (system === 'Robust' ? KROV_ODPOCET_ROBUST : KROV_ODPOCET));
 }

@@ -126,6 +126,13 @@ describe('OP260282 golden — ODVODITEĽNÉ riadky (presne na výkres)', () => {
 		expect(noha!.dlzkaRezuMm).toBe(2340); // 2200 + 140 (A9), NIE 2215 (starý „vždy +15" bug)
 		expect(noha!.pocetKs).toBe(4); // počet podľa vstupu (pocetPrednychNoh)
 	});
+
+	it('svetlosť bez výstuhy (informatívne) = 2200 + trčanie 125 = 2325 (kóta výkresu, ch207 1731729)', () => {
+		// Výkres OP260282: „svetlosť s výstuhou 2200" (zadávaná) vs „bez výstuhy 2325" — rozdiel
+		// presne 125 = trčanie výstuhy 140×140 (skovaná 15 mm v žľabe, trčí 140 − 15).
+		expect(r.informativne.vystuhaTrcanieMm).toBe(125);
+		expect(r.informativne.svetlostBezVystuhy).toBe(2325);
+	});
 });
 
 describe('OP260282 golden — KROV cut-list (#161, derivácia 21.8. overená proti výkresu)', () => {

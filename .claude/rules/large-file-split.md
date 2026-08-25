@@ -26,7 +26,7 @@ modules are covered automatically by that walk — nothing to register per file.
 | `src/routes/zasklenia/+page.svelte` | ~1620 | over — split tracked #250 |
 | `src/lib/server/compute.ts` | — | split DONE (#249 → 4 moduly + fasáda) |
 | `src/lib/server/migracie.ts` | ~983 | AT CAP — každá nová migrácia extrahuj blok do migracie-seed (viď `migrations.md`) |
-| `src/lib/pergola-narez.ts` | ~897 | split DONE (#155 → `pergola-komponenty.ts` fasáda) |
+| `src/lib/pergola-narez.ts` | ~937 | approaching — split DONE raz (#155 fasáda), ďalší dotyk zváž ďalšiu extrakciu |
 | `src/lib/components/vizual/Vizual3D.svelte` | ~722 | approaching |
 | `src/lib/components/PergolaNarezVykres.svelte` | ~704 | approaching |
 
