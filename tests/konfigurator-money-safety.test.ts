@@ -237,6 +237,10 @@ function neobsahujeMoneyAniNarez(json: string) {
 function neobsahujeVOaniMaticu(json: string, voHodnoty: number[]) {
 	expect(json).not.toMatch(/"vo"|priceB2B|ve[ľl]koobchod|bezDphVo/i);
 	for (const v of voHodnoty) expect(json).not.toContain(String(v));
+	// #318 review 🔵: ani NÁZOV diskriminátora hladiny (`hladina`/`hladinaLabel`) sa nesmie
+	// dostať do MO odpovede — route regresia pripájajúca `hladina:'MO'` na verejný výstup by
+	// inak prešla (leak-guard je „druhá strana" mapper unit testu `'hladina' in mo === false`).
+	expect(json).not.toMatch(/hladina/);
 	// seed / cenová matica sa NIKDY neserializuje do verejnej odpovede
 	expect(json).not.toMatch(/cennik|update-pergolas|mriezka|verifikaciaDph/i);
 }

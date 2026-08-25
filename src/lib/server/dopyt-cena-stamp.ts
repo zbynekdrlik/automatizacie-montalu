@@ -1,9 +1,9 @@
-// Opečiatkovanie orientačnej ceny + verzie cenníka pri PODANÍ dopytu (#309). Pri podaní sa
-// vypočítaná MO cena a verzia cenníka ULOŽIA do `dopyt` riadka; re-download PDF potom
-// reprodukuje cenu PLATNÚ V ČASE PODANIA (nie prepočet zo živej matice, ktorá sa medzitým
-// zmenila). MONEY-NEUTRÁLNE: LEN maloobchod (MO) cez `naVerejnuCenu` (VO strip) — žiadna VO
-// cena, žiadny Money kód. Súbor matchuje `/dopyt/`, takže je auto-krytý statickým guardom
-// `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola/`/data`).
+// Opečiatkovanie ceny + typu HLADINY + verzie cenníka pri PODANÍ dopytu (#309, #318). Pri podaní sa
+// vypočítaná cena (MO default, alebo VO ak podáva prihlásený veľkoobchodný b2b účet — `opeciatkujCenu`
+// dostane hladinu z `dopyt-action`), typ hladiny (`cena_hladina`) a verzia cenníka ULOŽIA do `dopyt`
+// riadka; re-download PDF potom reprodukuje cenu AJ hladinu PLATNÚ V ČASE PODANIA (nie prepočet zo
+// živej matice). MONEY-NEUTRÁLNE: predajná cena (MO/VO), NIKDY Money kód. Súbor matchuje `/dopyt/`,
+// takže je auto-krytý statickým guardom `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola/`/data`).
 import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
 import type { PonukaConfig } from '$lib/ponuka';
 import type { ModelPergoly, VerejnaCena, CenovaHladina } from '$lib/konfigurator';

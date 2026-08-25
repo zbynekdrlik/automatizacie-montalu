@@ -306,13 +306,12 @@
 			<section class="cena-blok" data-testid="cena" aria-label="Orientačná cena pergoly">
 				{#if cena.druh === 'cena'}
 					<div class="cena-hlavne">
-						<span class="cena-label"
-							>{cena.hladina === 'VO' ? 'Veľkoobchodná cena' : 'Orientačná cena'} — model {cena.model}</span
-						>
-						{#if cena.hladina === 'VO'}
-							<!-- #318: VO (veľkoobchodná) hladina — viditeľná LEN prihlásenému veľkoobchodnému
-							     (b2b) účtu; neprihlásený/MO návštevník tento odznak NIKDY nevidí. -->
-							<span class="cena-vo" data-testid="cena-hladina">veľkoobchodná cena</span>
+						<span class="cena-label">Orientačná cena — model {cena.model}</span>
+						{#if cena.hladinaLabel}
+							<!-- #318: VO hladina — text prichádza zo SERVERA (`hladinaLabel`), komponent nenesie
+							     žiadny VO literál; odznak (a teda náznak VO hladiny) vidí LEN prihlásený veľkoobchodný
+							     (b2b) účet — neprihlásený/MO návštevník ho v DOM ani v bundle NIKDY nevidí. -->
+							<span class="cena-vo" data-testid="cena-hladina">{cena.hladinaLabel}</span>
 						{/if}
 						<span class="cena-sdph" data-testid="cena-sdph">{eur(cena.sDph)}</span>
 						<span class="cena-mena">s DPH</span>
@@ -330,8 +329,8 @@
 				{:else}
 					<div class="cena-individualna" data-testid="cena-individualna">
 						<span class="cena-label">Cena na vyžiadanie — model {cena.model}</span>
-						{#if cena.hladina === 'VO'}
-							<span class="cena-vo" data-testid="cena-hladina">veľkoobchodná cena</span>
+						{#if cena.hladinaLabel}
+							<span class="cena-vo" data-testid="cena-hladina">{cena.hladinaLabel}</span>
 						{/if}
 						<p class="cena-dovod">{cena.dovod} Pripravíme ti individuálnu ponuku.</p>
 					</div>

@@ -71,10 +71,13 @@ export type CenovaHladina = 'MO' | 'VO';
  * „individuálna ponuka" (mimo katalógu). Odvodená serverom z `konfigurator-cena.ts`. Rozmery
  * `hlbkaGridM`/`sirkaGridM` sú katalógové (po zaokrúhlení NAHOR na mriežku).
  *
- * #318: `hladina` je prítomná IBA pri veľkoobchodnej (VO) cene — MO/verejný výstup ju NENESIE
- * (pole chýba), takže verejná odpoveď je byte-identická s pôvodnou (žiadny náznak VO hladiny).
- * VO cena (nižšia než MO) sa serializuje LEN oprávnenému (prihlásenému b2b) používateľovi; do
- * verejnej/MO odpovede sa VO NIKDY nedostane (leak-guard `konfigurator-money-safety.test.ts` C).
+ * #318: `hladina` je typovo `'VO'` (NIE `CenovaHladina`) — MO/verejný výstup ju štrukturálne
+ * NEMÔŽE niesť (`naCenu` MO ju nenastaví a typ 'MO' hodnotu ani nedovolí), takže verejná odpoveď
+ * je byte-identická s pôvodnou (žiadny náznak VO hladiny). VO cena (nižšia než MO) sa serializuje
+ * LEN oprávnenému (prihlásenému b2b) používateľovi; do verejnej/MO odpovede sa VO NIKDY nedostane
+ * (leak-guard `konfigurator-money-safety.test.ts` C). `hladinaLabel` (server-dodaný text, napr.
+ * „veľkoobchodná cena") je tiež prítomný LEN pri VO — klientsky komponent tak NEnesie žiadny VO
+ * literál (label príde zo servera), a MO bundle ostáva bez akéhokoľvek náznaku VO hladiny.
  */
 export type VerejnaCena =
 	| {
@@ -84,9 +87,16 @@ export type VerejnaCena =
 			sDph: number;
 			hlbkaGridM: number;
 			sirkaGridM: number;
-			hladina?: CenovaHladina;
+			hladina?: 'VO';
+			hladinaLabel?: string;
 	  }
-	| { druh: 'individualna-ponuka'; model: ModelPergoly; dovod: string; hladina?: CenovaHladina };
+	| {
+			druh: 'individualna-ponuka';
+			model: ModelPergoly;
+			dovod: string;
+			hladina?: 'VO';
+			hladinaLabel?: string;
+	  };
 
 /** Cena jedného modelu v porovnávacej tabuľke (zrkadlo montalu.sk „ceny modelov vedľa seba"). */
 export interface CenaModelu {

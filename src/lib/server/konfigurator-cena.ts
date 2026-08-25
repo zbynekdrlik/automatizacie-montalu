@@ -6,10 +6,11 @@
 // Money-neutrálny a mimo klientskeho bundle ($lib/server/): NEIMPORTUJE katalóg skla
 // (nesie Money kód), `sklo-cena`, `server/money`, `server/db` — obsahuje interim PREDAJNÉ ceny
 // prevzaté z verejného konfigurátora montalu.sk, nie Money nákupné/odpisové kódy.
-// #279 Fáza C (owner ROZHODNUTÉ): tento modul sa DO VEREJNEJ ODPOVEDE ZAPÁJA — verejná route
-// dostane LEN maloobchod (MO) cez `naVerejnuCenu`/`verejnaCenaPreModel`/`verejneCenyModelov`
-// (VO strip). VO cena / Money kód / matica sa do verejnej odpovede NIKDY nedostanú. Modul je
-// čistý (bez DB/siete), priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
+// #279 Fáza C: modul sa DO ODPOVEDE ZAPÁJA. #318: cena je hladina-aware (`naCenu`/`cenaPreModel`/
+// `cenyModelov`) — MO (default) pre neprihláseného/interného, VO LEN pre prihláseného veľkoobchodného
+// (b2b), pričom hladinu rozhoduje SERVER (`konfigurator-hladina`), nikdy klient. Do MO/verejnej
+// odpovede sa VO cena / Money kód / matica NIKDY nedostanú (leak-guard `konfigurator-money-safety`).
+// Modul je čistý (bez DB/siete), priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
 import { createHash } from 'node:crypto';
 import cennikJson from './cennik-pergola.json';
 // #279 Fáza C: `ModelPergoly` + verejné cenové typy žijú v client-safe `$lib/konfigurator`
@@ -259,8 +260,13 @@ export function dostupneVyplne(model: ModelPergoly): VyplnKluc[] {
  * vetvu (tam ho `CenaVysledok` nenesie); pre `cena` vetvu sa použije `v.model` a `model` MUSÍ byť
  * ten istý, aký dostal `vypocitajCenu`. `cenaPreModel` to garantuje. Nevolaj s nekonzistentným párom.
  */
+/** Server-dodaný VO label (#318 review 🟡): text hladiny sa NEsmie hardkódovať v klientskom
+ *  komponente (inak by verejný bundle niesol VO literál = náznak VO hladiny). Server ho pošle
+ *  LEN pri VO výstupe; klient renderuje `cena.hladinaLabel` bez vlastného VO reťazca. */
+const VO_LABEL = 'veľkoobchodná cena';
+
 export function naCenu(v: CenaVysledok, model: ModelPergoly, hladina: CenovaHladina): VerejnaCena {
-	const vo = hladina === 'VO' ? { hladina } : {};
+	const vo = hladina === 'VO' ? { hladina, hladinaLabel: VO_LABEL } : {};
 	if (v.druh === 'individualna-ponuka')
 		return { druh: 'individualna-ponuka', model, dovod: v.dovod, ...vo };
 	const zl = hladina === 'VO' ? v.vo : v.mo;
@@ -295,8 +301,12 @@ export function cenyModelov(
 	}));
 }
 
-/** Verejná (MO-only) cena — tenký obal nad `naCenu(…, 'MO')`. VO (`vo`) sa NIKDY nedostane do
- *  verejnej odpovede (#279 leak-guard). Ostáva pre spätnú kompatibilitu (dopyt/PDF MO cesta). */
+// #318 review 🔵: tieto tri `verejná*` obaly nemajú PRODUKČNÉHO volateľa (route/dopyt/PDF volajú
+// `cenaPreModel`/`cenyModelov` s hladinou, MO cez default param). Ostávajú LEN aby #279 MO test
+// suite (`konfigurator-cena.test.ts` „verejná cena — LEN MO") bežala nezmenená ako kontrakt, že
+// `naCenu(…, 'MO')` je MO-only. Nemazať bez portu tých testov na `naCenu(…, 'MO')`.
+
+/** MO-only cena — tenký obal nad `naCenu(…, 'MO')`. VO (`vo`) sa NIKDY nedostane do MO odpovede. */
 export function naVerejnuCenu(v: CenaVysledok, model: ModelPergoly): VerejnaCena {
 	return naCenu(v, model, 'MO');
 }
