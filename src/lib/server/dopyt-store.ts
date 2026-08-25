@@ -47,6 +47,49 @@ export function insertDopyt(z: DopytZaznam, stamp?: CenaStamp): number {
 	return Number(info.lastInsertRowid);
 }
 
+// --- Záväzná objednávka (#319/v33) — dopyt riadok s je_objednavka=1 + fakturačné údaje + súhlas. ---
+// STÁLE MONEY-NEUTRÁLNE: CRM/objednávková evidencia, žiadny odpis ani zápis do /data. Objednaná
+// cena je ZAPEČATENÁ rovnakou pečiatkou (`stamp`) ako dopyt (#309/#318 — vrátane MO/VO hladiny).
+
+/** Objednávkový záznam na uloženie — kontakt + konfigurácia (`DopytZaznam`) + fakturačné údaje. */
+export interface ObjednavkaZaznam extends DopytZaznam {
+	faktMeno: string;
+	faktAdresa: string;
+	faktIco: string;
+	faktDic: string;
+}
+
+const insertObjStmt = db.prepare(
+	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka,
+	                    je_objednavka, fakt_meno, fakt_adresa, fakt_ico, fakt_dic, suhlas_podmienky,
+	                    cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m,
+	                    cena_sirka_grid_m, cena_model, cennik_verzia, cena_hladina)
+	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka,
+	         1, @fakt_meno, @fakt_adresa, @fakt_ico, @fakt_dic, 1,
+	         @cena_druh, @cena_bez_dph, @cena_s_dph, @cena_hlbka_grid_m,
+	         @cena_sirka_grid_m, @cena_model, @cennik_verzia, @cena_hladina)`
+);
+
+/** Vloží záväznú objednávku (`je_objednavka=1`, súhlas zaznamenaný, fakturačné údaje), vráti `id`.
+ *  Cena sa zapečatí rovnakou pečiatkou ako dopyt (`stamp` — MO/VO hladina zapečatená, #319 bod 5).
+ *  Odoo lead sa z tohto riadka vytvorí ako objednávka (opportunity) — vetva v `odoo-lead.ts`. */
+export function insertObjednavka(z: ObjednavkaZaznam, stamp?: CenaStamp): number {
+	const info = insertObjStmt.run({
+		konfiguracia: z.konfiguracia,
+		meno: z.meno,
+		email: z.email,
+		telefon: z.telefon,
+		miesto: z.miesto,
+		poznamka: z.poznamka,
+		fakt_meno: z.faktMeno,
+		fakt_adresa: z.faktAdresa,
+		fakt_ico: z.faktIco,
+		fakt_dic: z.faktDic,
+		...stampNaStlpce(stamp)
+	});
+	return Number(info.lastInsertRowid);
+}
+
 /** Cenové stĺpce (#309/v30, #318/v32 `cena_hladina`) — súčasť SELECTu v `getDopyt`/`listDopyty`
  *  (opečiatkovaná cena + typ hladiny MO/VO). */
 const cenaStlpce =
@@ -72,7 +115,8 @@ export function countDopyty(): number {
 // Tvorba leadu (`odoo-lead.ts`) je fire-and-forget + retry — dopyt sa NIKDY nestratí ani
 // keď je Odoo dole. STÁLE MONEY-NEUTRÁLNE: lead metadáta, žiadny odpis/Money/`/data`.
 
-/** Zdroj pre payload leadu — kontakt + kanonická konfigurácia (JSON) + Odoo stav (v26). */
+/** Zdroj pre payload leadu — kontakt + kanonická konfigurácia (JSON) + Odoo stav (v26) +
+ *  objednávkové stĺpce (#319/v33 — lead sa vetví: `je_objednavka=1` → opportunity + fakturačný blok). */
 export interface DopytLeadRiadok {
 	id: number;
 	konfiguracia: string;
@@ -85,10 +129,17 @@ export interface DopytLeadRiadok {
 	odoo_lead_id: number | null;
 	odoo_attempts: number;
 	odoo_last_error: string;
+	// #319/v33 — objednávka: NULL/0 = dopyt, 1 = záväzná objednávka. Fakturačné údaje sa doplnia
+	// do popisu leadu (BEZ ceny — Money-neutralita payloadu ostáva).
+	je_objednavka: number | null;
+	fakt_meno: string | null;
+	fakt_adresa: string | null;
+	fakt_ico: string | null;
+	fakt_dic: string | null;
 }
 
 const leadSelectCols =
-	'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, odoo_lead_id, odoo_attempts, odoo_last_error';
+	'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, odoo_lead_id, odoo_attempts, odoo_last_error, je_objednavka, fakt_meno, fakt_adresa, fakt_ico, fakt_dic';
 
 /** Načíta jeden dopyt na tvorbu Odoo leadu (kontakt + konfigurácia + počet pokusov). */
 export function getDopytForLead(id: number): DopytLeadRiadok | undefined {
@@ -134,6 +185,8 @@ export function markLeadFailed(id: number, error: string): void {
  *  príprava miesta pre Odoo lead bez závislosti na #278 schéme. */
 export interface DopytListRiadok extends DopytRiadok {
 	odoo_lead_id?: number | null;
+	/** #319/v33 — 1 = záväzná objednávka, NULL/0 = dopyt. Kľúč prítomný len keď schéma stĺpec má. */
+	je_objednavka?: number | null;
 }
 
 /** Má tabuľka `dopyt` stĺpec `odoo_lead_id`? (#278 ho pridá v migrácii v26.) Feature-detect
@@ -144,6 +197,13 @@ export function hasOdooLeadColumn(): boolean {
 	return cols.some((c) => c.name === 'odoo_lead_id');
 }
 
+/** Má tabuľka `dopyt` stĺpec `je_objednavka`? (#319 ho pridá v migrácii v33.) Feature-detect na
+ *  SCHÉME — interný zoznam tak vie odlíšiť objednávku od dopytu nezávisle od toho, či #319 landol. */
+export function hasObjednavkaColumn(): boolean {
+	const cols = db.prepare('PRAGMA table_info(dopyt)').all() as { name: string }[];
+	return cols.some((c) => c.name === 'je_objednavka');
+}
+
 /** Stránka dopytov, NAJNOVŠIE HORE (`id DESC` = monotónne, bez `created_at` remíz). `offset`/
  *  `limit` sa clampujú (obrana proti nezmyselnému vstupu z query). Ak schéma má `odoo_lead_id`
  *  (#278/v26), SELECT ho zahrnie a riadok ho nesie; inak kľúč chýba (defenzívne). `hasOdoo`
@@ -151,14 +211,17 @@ export function hasOdooLeadColumn(): boolean {
 export function listDopyty(
 	offset: number,
 	limit: number,
-	hasOdoo: boolean = hasOdooLeadColumn()
+	hasOdoo: boolean = hasOdooLeadColumn(),
+	hasObj: boolean = hasObjednavkaColumn()
 ): DopytListRiadok[] {
 	const off = Math.max(0, Math.trunc(offset));
 	const lim = Math.max(1, Math.trunc(limit));
 	// #309: cenové stĺpce (v30) sú vždy súčasťou zoznamu (opečiatkovaná cena v admin prehľade);
-	// `odoo_lead_id` (v26) sa pridá len keď schéma stĺpec má (feature-detect, defenzívne).
-	const base = `id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, ${cenaStlpce}`;
-	const cols = hasOdoo ? `${base}, odoo_lead_id` : base;
+	// `odoo_lead_id` (v26) a `je_objednavka` (#319/v33) sa pridajú len keď schéma stĺpec má
+	// (feature-detect, defenzívne — nezávisle od toho, ktorá migrácia už landla).
+	let cols = `id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, ${cenaStlpce}`;
+	if (hasOdoo) cols += ', odoo_lead_id';
+	if (hasObj) cols += ', je_objednavka';
 	return db
 		.prepare(`SELECT ${cols} FROM dopyt ORDER BY id DESC LIMIT ? OFFSET ?`)
 		.all(lim, off) as DopytListRiadok[];
