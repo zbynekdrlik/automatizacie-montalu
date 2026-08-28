@@ -161,11 +161,14 @@
 			: {}
 	);
 
-	// krátky € formát pre prilepený cenový panel (celé eurá — „od X €")
+	// krátky € formát pre prilepený cenový panel (celé eurá — „od X €"). #327 review 🔵:
+	// `Math.floor` (nie round) = čestný spodok pre „cena OD"; `minimumFractionDigits: 0`
+	// bráni RangeError na Safari <15 (currency bez min throw-ne).
 	const eurKratko = (n: number) =>
-		Math.round(n).toLocaleString('sk-SK', {
+		Math.floor(n).toLocaleString('sk-SK', {
 			style: 'currency',
 			currency: 'EUR',
+			minimumFractionDigits: 0,
 			maximumFractionDigits: 0
 		});
 
@@ -348,7 +351,7 @@
 			{:else if cena}
 				<div class="konf-cta-cena">
 					<span class="konf-cta-cena-label">Cena</span>
-					<span class="konf-cta-cena-suma malá">na vyžiadanie</span>
+					<span class="konf-cta-cena-suma mala">na vyžiadanie</span>
 				</div>
 				<div class="konf-cta-akcie">
 					<button type="button" class="konf-btn primar" onclick={() => scrollNa('dopyt')}
@@ -500,6 +503,7 @@
 		flex-wrap: wrap;
 		padding: 14px clamp(18px, 4vw, 40px);
 		background: rgba(255, 255, 255, 0.9);
+		-webkit-backdrop-filter: saturate(1.3) blur(10px);
 		backdrop-filter: saturate(1.3) blur(10px);
 		border-top: 1px solid var(--k-line);
 	}
@@ -520,7 +524,7 @@
 		color: var(--k-text);
 		font-variant-numeric: tabular-nums;
 	}
-	.konf-cta-cena-suma.malá {
+	.konf-cta-cena-suma.mala {
 		font-size: 18px;
 		font-weight: 600;
 	}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	// #325 ĽAVÝ 3D stĺpec split-screen konfigurátora + #327 EDGE-TO-EDGE prémiové rámovanie
 	// (Tesla showroom): žiadna karta/rámik/radius — 3D scéna vypĺňa celý ľavý stĺpec na plnú
-	// výšku; caption (rozmer + sklo + RAL) je malý overlay v rohu scény. Scéna (obloha/zem/
+	// výšku; caption (rozmer + sklo) je malý overlay v rohu scény. Scéna (obloha/zem/
 	// tiene/dom) sa renderuje v ZDIEĽANOM `Vizual3D` — tu meníme LEN rámovanie cez scoped
 	// `:global` override (`.konf-vizual …`), takže sa NIČ neprenesie do iných stránok.
 	//
@@ -65,7 +65,8 @@
 	.konf-vizual {
 		position: relative;
 		height: 100%;
-		min-height: 46vh;
+		/* #327 review 🟡: žiadny `min-height: 46vh` — grid riadok/stĺpec (44dvh / 1fr) už dáva
+		   definitívnu výšku, a 46vh vs 44dvh sa bili → orezanie scény + caption na mobile */
 		overflow: hidden;
 		/* jemný vertikálny gradient (svetlá obloha → hmla pri zemi) — fallback počas loadu
 		   aj letterbox okolo scény */
@@ -75,7 +76,7 @@
 	.viz-loading {
 		width: 100%;
 		height: 100%;
-		min-height: 46vh;
+		min-height: 200px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -107,6 +108,7 @@
 		margin: 0;
 		padding: 8px 13px;
 		background: rgba(255, 255, 255, 0.84);
+		-webkit-backdrop-filter: saturate(1.2) blur(8px);
 		backdrop-filter: saturate(1.2) blur(8px);
 		border-radius: 11px;
 		box-shadow: 0 2px 12px rgba(22, 24, 28, 0.1);
@@ -114,9 +116,16 @@
 		line-height: 1.35;
 		color: #16181c;
 	}
+	/* skryjeme len poznámky (v konfigurátore mŕtva vetva) + <br>; ilustračný disclaimer
+	   `.drobne` (#276 „proporcie nesmú lhať") ostáva viditeľný ako vlastný riadok v pille */
 	.konf-vizual :global(.pergola-zak > .caption .poznamka),
-	.konf-vizual :global(.pergola-zak > .caption .drobne),
 	.konf-vizual :global(.pergola-zak > .caption br) {
 		display: none;
+	}
+	.konf-vizual :global(.pergola-zak > .caption .drobne) {
+		display: block;
+		margin-top: 3px;
+		font-size: 10.5px;
+		color: var(--k-muted, #6b7078);
 	}
 </style>

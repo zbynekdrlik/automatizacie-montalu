@@ -132,8 +132,11 @@
 	<section class="konf-sekcia">
 		<span class="konf-label">Rozmery</span>
 		<div class="konf-rozmery">
-			<label class="konf-rozmer">
-				<span class="konf-rozmer-popis">Šírka</span>
+			<!-- #327 review 🔴: obal je <div>, NIE <label> — <label> bez `for` sa viaže na PRVÝ
+			     labelovateľný potomok (mínus tlačidlo), takže klik na popisok by menil hodnotu;
+			     popisok je samostatný <label for> → korektné meno pre input aj čítačku obrazovky -->
+			<div class="konf-rozmer">
+				<label for="konf-sirka" class="konf-rozmer-popis">Šírka</label>
 				<span class="konf-stepper">
 					<button
 						type="button"
@@ -142,6 +145,7 @@
 						onclick={() => (sirka = krokMm(sirka, -STEP_MM, r.sirka.min, r.sirka.max))}>−</button
 					>
 					<input
+						id="konf-sirka"
 						class="konf-cislo"
 						name="sirka"
 						type="number"
@@ -161,10 +165,10 @@
 					>
 					<span class="konf-jednotka">mm</span>
 				</span>
-			</label>
+			</div>
 
-			<label class="konf-rozmer">
-				<span class="konf-rozmer-popis">Hĺbka (výsuv)</span>
+			<div class="konf-rozmer">
+				<label for="konf-hlbka" class="konf-rozmer-popis">Hĺbka (výsuv)</label>
 				<span class="konf-stepper">
 					<button
 						type="button"
@@ -173,6 +177,7 @@
 						onclick={() => (hlbka = krokMm(hlbka, -STEP_MM, r.hlbka.min, r.hlbka.max))}>−</button
 					>
 					<input
+						id="konf-hlbka"
 						class="konf-cislo"
 						name="hlbka"
 						type="number"
@@ -192,10 +197,10 @@
 					>
 					<span class="konf-jednotka">mm</span>
 				</span>
-			</label>
+			</div>
 
-			<label class="konf-rozmer">
-				<span class="konf-rozmer-popis">Výška vpredu</span>
+			<div class="konf-rozmer">
+				<label for="konf-vyska" class="konf-rozmer-popis">Výška vpredu</label>
 				<span class="konf-stepper">
 					<button
 						type="button"
@@ -206,6 +211,7 @@
 						>−</button
 					>
 					<input
+						id="konf-vyska"
 						class="konf-cislo"
 						name="vyskaVpredu"
 						type="number"
@@ -227,7 +233,7 @@
 					>
 					<span class="konf-jednotka">mm</span>
 				</span>
-			</label>
+			</div>
 		</div>
 	</section>
 
@@ -256,6 +262,7 @@
 					step="1"
 					bind:value={sklonDeg}
 					data-testid="sklonDeg"
+					aria-label="Sklon strechy (stupne)"
 					required
 				/>
 				<span class="konf-jednotka">°</span>
@@ -508,7 +515,7 @@
 		border: 0;
 		background: none;
 		text-align: center;
-		font-size: 15px;
+		font-size: 16px; /* #327 review 🟡: 16px = žiadny iOS auto-zoom pri fokuse (mobil-first) */
 		font-family: inherit;
 		font-variant-numeric: tabular-nums;
 		color: var(--k-text);

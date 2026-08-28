@@ -580,6 +580,13 @@ test('konfigurátor: prémiový redizajn — split-screen + swatche/chips namies
 	// segmentové karty modelu (nie <select>)
 	await expect(page.getByTestId('model-ROBUST')).toBeVisible();
 
+	// #327 review 🔴 REGRESIA: popisok rozmeru je <label for> → klik naň FOKUSUJE input, NEMENÍ
+	// hodnotu. (Starý <label>-obal sa viazal na prvý potomok = mínus tlačidlo → klik na text
+	// znižoval hodnotu o 50 mm a cez stale-clear mazal cenu.)
+	await page.getByTestId('sirka').fill('4200');
+	await page.getByText('Šírka', { exact: true }).click();
+	await expect(page.getByTestId('sirka')).toHaveValue('4200');
+
 	// klik na swatch vyberie farbu (aria-pressed prejde na true)
 	const swatch9005 = page.locator('[data-testid="farba-swatch"][data-value="9005"]');
 	await swatch9005.click();

@@ -82,6 +82,7 @@
 		z-index: 30;
 		height: var(--k-hlava-h);
 		background: rgba(250, 250, 248, 0.82);
+		-webkit-backdrop-filter: saturate(1.4) blur(10px);
 		backdrop-filter: saturate(1.4) blur(10px);
 		border-bottom: 1px solid var(--k-line);
 	}
