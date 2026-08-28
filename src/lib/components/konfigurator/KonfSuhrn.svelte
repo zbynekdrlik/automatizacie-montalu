@@ -61,16 +61,19 @@
 
 <style>
 	.suhrn {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 14px;
-		padding: 18px;
-		margin-top: 18px;
+		background: var(--k-surface, #fff);
+		border: 1px solid var(--k-line, #e6e4de);
+		border-radius: var(--k-radius, 16px);
+		padding: 20px 22px;
+		margin-top: 20px;
 	}
 	.suhrn h2 {
-		font-size: 18px;
-		margin: 0 0 14px;
-		color: #0f172a;
+		font-size: 11.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		font-weight: 600;
+		margin: 0 0 12px;
+		color: var(--k-faint, #9a9ea6);
 	}
 	.suhrn dl {
 		margin: 0;
@@ -81,22 +84,27 @@
 		display: flex;
 		justify-content: space-between;
 		gap: 14px;
-		padding: 9px 2px;
-		border-bottom: 1px solid #f1f5f9;
-		font-size: 15px;
+		padding: 10px 2px;
+		border-bottom: 1px solid var(--k-line, #eee);
+		font-size: 14.5px;
+	}
+	.suhrn dl > div:last-child {
+		border-bottom: 0;
 	}
 	.suhrn dt {
-		color: #64748b;
+		color: var(--k-muted, #6b7078);
 	}
 	.suhrn dd {
 		margin: 0;
 		font-weight: 600;
-		color: #0f172a;
+		color: var(--k-text, #16181c);
 		text-align: right;
+		font-variant-numeric: tabular-nums;
 	}
 	.pozn {
-		color: #64748b;
+		color: var(--k-muted, #6b7078);
 		font-size: 13px;
-		margin: 14px 0 0;
+		line-height: 1.5;
+		margin: 16px 0 0;
 	}
 </style>
