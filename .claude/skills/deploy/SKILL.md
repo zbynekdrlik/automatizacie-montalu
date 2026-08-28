@@ -81,6 +81,15 @@ zabudované: layout nastavuje `html[data-hydrated="1"]` a E2E používa
 
 ## Money katalóg — obrázky/rezy profilov a priamy SQL prístup
 
+**POZOR — prístupová cesta nižšie je STALE z dev boxov (overené 28.8.2026):** kľúč
+`~/.ssh/slovnormal_odoo` ani `moneydb.py` na dev1/dev2 neexistujú. Funkčný read-only
+SQL kanál z dev1/dev2 je SSH tunel **`money-ro-thirdparty`** podľa
+`/home/newlevel/devel/montalu/n8n/.claude/skills/money-readonly-sql/SKILL.md`
+(SQL účet `montalu_ro`, `db_datareader` + `db_denydatawriter` — zápis technicky
+nemožný; DB `S4_Agenda_MONT_ALUSro`). Popis nižšie (schéma príloh, retry, n8n
+príkazy mosta) platí — len prístup rob cez ten tunel; `moneydb`/`/opt/montalu-sync`
+cesta je VPS-strana (používa ju n8n na hoste), nie dev boxy.
+
 Money (Solid S4, MSSQL na 192.168.1.200) je dosiahnuteľný LEN cez most na hoste
 **montalu-prod** = `erp.montalu.cloud`. SSH kľúč `~/.ssh/slovnormal_odoo`
 (`root@erp.montalu.cloud`) tam má plný shell; `/opt/montalu-sync/venv` +
