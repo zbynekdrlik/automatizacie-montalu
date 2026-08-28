@@ -1732,3 +1732,20 @@ do `components/konfigurator/{KonfVizual,KonfCena,KonfSuhrn}`. Commity 0ea4218 (f
 fixy). Merge 699f11c → prod 0.24.44, DOM overené, 0 console, split+dom+živý update na prode.
 **Playbook:** konfigurator.md §6 prepísané (živý 3D pri LOAD, hybrid update, split, subkomponenty).
 Gates lokálne: check 0/0, lint čistý, vitest --coverage (Branches 90% / Lines 97,29% — prahy držia).
+
+## #327 — Konfigurátor: prémiový Tesla-style showroom redizajn (2026-08-28)
+
+Owner „uplne trapny dizajn" → kompletný vizuálny redizajn verejného `/konfigurator` (split-screen
+štruktúra z #325 ostáva). Nový `konfigurator/+layout.svelte` (minimal chrome MONTALU + montalu.sk,
+žiadny admin nav, dizajnové tokeny + Inter font); root `+layout.svelte` trojvetva skryje admin nav
+na `/konfigurator*` + zaručí jediný `data-testid="version"`. Ľavý 3D EDGE-TO-EDGE (bez karty, caption
+overlay v rohu; zdieľaný Vizual3D nedotknutý — len scoped `:global`). Nový `KonfOvladace.svelte`
+(7× $bindable): segmentové karty modelu, kruhové RAL swatche (hex z ral.ts), sklo chips, rozmerové
+steppery, sklon slider + číselný twin — namiesto `<select>`/radio. Submit MIMO formu cez
+`form="konf-form"`, prilepený cenový/CTA panel (flex dieťa, nie sticky-overlay). Money-neutralita
+nedotknutá (klient neimportuje katalóg; farba POSTuje RAL kód). E2E aktualizované (chip/swatch/model
+klik, split+swatche+sticky cena asserty, `konfReady` viz-ready sync-point, benígny `loseContext`
+filter). Verzia 0.24.45-dev.2. Gates lokálne: check 0/0, lint čistý, vitest 2498/2498, E2E
+konfigurator + AR + app + vizual3d + zasklenia-zakaznicky všetko zelené. Commity d445196 (bump+font)
++ 8ccb955 (feat). **Playbook:** konfigurator.md §8 (chrome, KonfOvladace, edge-to-edge 3D, E2E timing
+pasce, moneyKod-literal-guard pasca).

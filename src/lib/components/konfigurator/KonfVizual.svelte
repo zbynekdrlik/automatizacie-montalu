@@ -1,15 +1,14 @@
 <script lang="ts">
-	// #325: ĽAVÝ (sticky) stĺpec split-screen konfigurátora — ŽIVÝ 3D náhľad pergoly,
-	// viditeľný HNEĎ pri načítaní (defaultná pergola), driven z aktuálneho stavu
-	// formulára (nie až po submite). Komponent `VizualPergolaZakaznik` sa načíta LAZY
-	// (dynamic import v `onMount`) → three.js ostáva samostatný chunk (chunk-size guard
-	// ≤220KB), len sa spustí pri mounte namiesto pri submite.
+	// #325 ĽAVÝ 3D stĺpec split-screen konfigurátora + #327 EDGE-TO-EDGE prémiové rámovanie
+	// (Tesla showroom): žiadna karta/rámik/radius — 3D scéna vypĺňa celý ľavý stĺpec na plnú
+	// výšku; caption (rozmer + sklo) je malý overlay v rohu scény. Scéna (obloha/zem/
+	// tiene/dom) sa renderuje v ZDIEĽANOM `Vizual3D` — tu meníme LEN rámovanie cez scoped
+	// `:global` override (`.konf-vizual …`), takže sa NIČ neprenesie do iných stránok.
 	//
-	// Živý update (viď +page.svelte): FARBA (RAL) + typ SKLA prúdia LIVE → okamžitý
-	// in-place update materiálu (`prekresliRAL`/`prekresliSklo` vo Vizual3D). ROZMERY
-	// prúdia cez DEBOUNCED snapshot do `{#key vizKluc}` → čistý teardown+mount, ktorý
-	// REFITNE celý scénický rig (kamera/tiene/dekal/stena). Money-neutrálne: berie len
-	// rozmery + `PergolaTypSkla` (odtieň) + RAL kód, žiadny Money kód/katalóg.
+	// Živý update (viď +page.svelte): FARBA (RAL) + typ SKLA prúdia LIVE → in-place update;
+	// ROZMERY cez DEBOUNCED snapshot do `{#key vizKluc}` → refit rigu. Komponent
+	// `VizualPergolaZakaznik` sa načíta LAZY (dynamic import v onMount) → three.js ostáva
+	// samostatný chunk, len sa spustí pri mounte. Money-neutrálne: rozmery + odtieň + RAL kód.
 	import { onMount } from 'svelte';
 	import type { PergolaTypSkla } from '$lib/vizual/pergola-sklo';
 
@@ -64,21 +63,69 @@
 
 <style>
 	.konf-vizual {
-		background: #fff;
-		border: 1px solid #e2e8f0;
-		border-radius: 14px;
-		padding: 12px;
-		box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+		position: relative;
+		height: 100%;
+		/* #327 review 🟡: žiadny `min-height: 46vh` — grid riadok/stĺpec (44dvh / 1fr) už dáva
+		   definitívnu výšku, a 46vh vs 44dvh sa bili → orezanie scény + caption na mobile */
+		overflow: hidden;
+		/* jemný vertikálny gradient (svetlá obloha → hmla pri zemi) — fallback počas loadu
+		   aj letterbox okolo scény */
+		background: linear-gradient(180deg, #eef1f4 0%, #f5f3ef 58%, #eae8e2 100%);
 	}
+
 	.viz-loading {
 		width: 100%;
-		aspect-ratio: 16 / 10;
+		height: 100%;
+		min-height: 200px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: #dfe7ee;
-		border-radius: 10px;
-		color: #64748b;
+		color: var(--k-muted, #6b7078);
 		font-size: 14px;
+	}
+
+	/* ── EDGE-TO-EDGE rámovanie zdieľaného Vizual3D — SCOPED na .konf-vizual, žiadny únik ── */
+	.konf-vizual :global(.pergola-zak) {
+		height: 100%;
+		gap: 0;
+	}
+	.konf-vizual :global(.vizual3d) {
+		flex: 1;
+		height: auto;
+		min-height: 0;
+		aspect-ratio: auto;
+		border-radius: 0;
+		background: transparent;
+	}
+
+	/* caption ako malý overlay v ľavom dolnom rohu scény */
+	.konf-vizual :global(.pergola-zak > .caption) {
+		position: absolute;
+		left: clamp(12px, 2vw, 20px);
+		bottom: clamp(12px, 2vw, 20px);
+		right: auto;
+		max-width: calc(100% - 40px);
+		margin: 0;
+		padding: 8px 13px;
+		background: rgba(255, 255, 255, 0.84);
+		-webkit-backdrop-filter: saturate(1.2) blur(8px);
+		backdrop-filter: saturate(1.2) blur(8px);
+		border-radius: 11px;
+		box-shadow: 0 2px 12px rgba(22, 24, 28, 0.1);
+		font-size: 12px;
+		line-height: 1.35;
+		color: #16181c;
+	}
+	/* skryjeme len poznámky (v konfigurátore mŕtva vetva) + <br>; ilustračný disclaimer
+	   `.drobne` (#276 „proporcie nesmú lhať") ostáva viditeľný ako vlastný riadok v pille */
+	.konf-vizual :global(.pergola-zak > .caption .poznamka),
+	.konf-vizual :global(.pergola-zak > .caption br) {
+		display: none;
+	}
+	.konf-vizual :global(.pergola-zak > .caption .drobne) {
+		display: block;
+		margin-top: 3px;
+		font-size: 10.5px;
+		color: var(--k-muted, #6b7078);
 	}
 </style>

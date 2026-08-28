@@ -171,6 +171,10 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfVizual.svelte'),
 			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfCena.svelte'),
 			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfSuhrn.svelte'),
+			// #327: prémiový ovládací panel — nový klientsky vstup (importuje $lib/vykres/ral
+			// pre hex swatchov); guard (A) MUSÍ prejsť aj jeho graf, aby budúci Money/katalóg
+			// import nezostal nezachytený.
+			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfOvladace.svelte'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];

@@ -12,6 +12,9 @@ const GLB_URL =
 	'/konfigurator/model.glb?sirka=5000&hlbka=4000&vyskaVpredu=2500&vyskaPriStene=2920&sklo=cire&farba=7016';
 
 async function submitKonfig(page: import('@playwright/test').Page) {
+	// #327: počkaj na READY 3D scénu PRED submitom — prémiový edge-to-edge náhľad je ťažší na
+	// softvérovom CI WebGL a stavba scény by inak súperila o hlavné vlákno s enhance callbackom.
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 	await page.getByTestId('sirka').fill('5000');
 	await page.getByTestId('hlbka').fill('4000');
 	await page.getByTestId('vyskaVpredu').fill('2500');

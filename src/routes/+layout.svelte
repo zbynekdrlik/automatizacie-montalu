@@ -7,6 +7,16 @@
 
 	let { data, children } = $props();
 
+	// #327: /konfigurator (+ pod-routy /ar, /model.glb) je VEREJNÁ zákaznícka stránka s
+	// VLASTNÝM minimal chrome (`konfigurator/+layout.svelte`). Interná admin navigácia sa
+	// na nej NEzobrazuje NIKOMU (ani prihlásenému), a pätičku s verziou vlastní konf layout
+	// → root pre túto vetvu nerenderuje nav, `.wrap` ani footer (práve JEDEN
+	// `data-testid="version"` na stránke). `$app/state` `page` je reaktívne + SSR-konzistentné
+	// (žiadny hydration mismatch), nikdy `window.location`.
+	const jeKonfig = $derived(
+		page.url.pathname === '/konfigurator' || page.url.pathname.startsWith('/konfigurator/')
+	);
+
 	// marker pre E2E: hydratácia hotová — pred ním môže fill() na value-bound
 	// inputoch prehrať s hydratáciou, ktorá ich vráti na serverový stav
 	$effect(() => {
@@ -64,7 +74,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{#if data.user}
+{#if data.user && !jeKonfig}
 	<nav class="top">
 		<div class="inner">
 			<span class="brand">MONTALU</span>
@@ -95,6 +105,10 @@
 	<footer class="app login-footer">
 		<span data-testid="version">v{data.version}</span>
 	</footer>
+{:else if jeKonfig}
+	<!-- #327 /konfigurator: full-bleed prémiový showroom — vlastný minimal chrome +
+	     pätička s verziou (data-testid="version") žijú v konfigurator/+layout.svelte -->
+	{@render children()}
 {:else}
 	<div class="wrap">
 		{@render children()}
