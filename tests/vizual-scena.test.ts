@@ -18,7 +18,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { postavGeometrie } from '../src/lib/vizual/builder';
 import { zaskleniaSpec } from '../src/lib/vizual/geo/zasklenia';
-import { vytvorKontaktnyTien, vytvorStenu, vytvorZem } from '../src/lib/vizual/scena';
+import { vytvorDom, vytvorKontaktnyTien, vytvorStenu, vytvorZem } from '../src/lib/vizual/scena';
 import { nastaveniaPreTier } from '../src/lib/vizual/kvalita';
 import { mm } from '../src/lib/vizual/jednotky';
 
@@ -192,5 +192,104 @@ describe('scena — #174 ZNOVUOTVORENÉ: kontaktný tieň sleduje PODLHOVASTÝ p
 		const sirkaM = bb.max.x - bb.min.x;
 		const hlbkaM = bb.max.z - bb.min.z;
 		expect(hlbkaM).toBeLessThanOrEqual(sirkaM);
+	});
+});
+
+// #325 — „dom" pred fasádou (sokel + dvere + okno). Kľúčová owner požiadavka:
+// dvere sú centrované na x=0 a NIKDY nekolidujú s nohou pergoly (krajné stĺpy pri
+// stene sú na x=±S/2). Čistá box-geometria → priamo Node-testovateľné (žiadny canvas
+// potrebný na STAVBU geometrie), rovnako ako ostatné scéna testy vyššie.
+describe('vytvorDom (#325) — dom pred fasádou: dvere centrované, mimo krajných stĺpov', () => {
+	const nast = nastaveniaPreTier('high');
+
+	function detiSBbox(S: number) {
+		const dom = vytvorDom(THREE, nast, S);
+		const prvky = dom.skupina.children.map((c) => {
+			const m = c as InstanceType<typeof THREE.Mesh>;
+			m.geometry.computeBoundingBox();
+			const bb = m.geometry.boundingBox!;
+			return {
+				x: m.position.x,
+				y: m.position.y,
+				h: bb.max.y - bb.min.y,
+				w: bb.max.x - bb.min.x,
+				lavy: m.position.x + bb.min.x,
+				pravy: m.position.x + bb.max.x,
+				spodok: m.position.y + bb.min.y
+			};
+		});
+		return { dom, prvky };
+	}
+
+	it('vráti Group s deťmi + disposables (2 na mesh: geometria + materiál)', () => {
+		const { dom } = detiSBbox(4000);
+		expect(dom.skupina.children.length).toBeGreaterThanOrEqual(5);
+		expect(dom.disposables.length).toBe(dom.skupina.children.length * 2);
+	});
+
+	it.each([2000, 4000, 8000, 12000])(
+		'dvere sú CENTROVANÉ na x=0 a žiaden prvok (okrem sokla) nedosiahne krajný stĺp ±S/2 — S=%i',
+		(S) => {
+			const { prvky } = detiSBbox(S);
+			const stlpX = mm(S / 2);
+			// dvere = najvyšší prvok centrovaný okolo x=0 (krídlo, ~2000 mm)
+			const dvere = prvky
+				.filter((p) => Math.abs(p.x) < mm(1))
+				.reduce((a, b) => (b.h > a.h ? b : a));
+			expect(dvere.h).toBeGreaterThan(mm(1500)); // je to naozaj krídlo dverí
+			expect(dvere.x).toBeCloseTo(0, 6); // centrované na x=0
+			// sokel je jediný prvok, ktorý smie presiahnuť stĺpy (je to pás fasády):
+			// nízky (<400 mm) a širší než S. Všetky OSTATNÉ prvky (dvere/okno) musia
+			// ostať PRÍSNE medzi stĺpmi → dvere nikdy za nohou pergoly.
+			for (const p of prvky) {
+				const jeSokel = p.h < mm(400) && p.w > mm(S);
+				if (jeSokel) continue;
+				expect(p.pravy).toBeLessThan(stlpX);
+				expect(p.lavy).toBeGreaterThan(-stlpX);
+			}
+		}
+	);
+
+	it('krídlo dverí aj sokel stoja na zemi (spodná hrana ~y=0)', () => {
+		const { prvky } = detiSBbox(4000);
+		const dvere = prvky.filter((p) => Math.abs(p.x) < mm(1)).reduce((a, b) => (b.h > a.h ? b : a));
+		expect(dvere.spodok).toBeCloseTo(0, 6); // dvere sú priechodné od zeme
+		const sokel = prvky.find((p) => p.h < mm(400) && p.w > mm(4000));
+		expect(sokel).toBeDefined();
+		expect(sokel!.spodok).toBeCloseTo(0, 6);
+	});
+
+	it('normálna pergola (4000) MÁ okno; najmenšia (2000) ho vynechá (medzera príliš úzka)', () => {
+		const velka = vytvorDom(THREE, nast, 4000);
+		const mala = vytvorDom(THREE, nast, 2000);
+		// okno pridáva 4 prvky (rám + sklo + 2 priečky) → väčšia pergola má viac detí
+		expect(velka.skupina.children.length).toBeGreaterThan(mala.skupina.children.length);
+		expect(velka.skupina.children.length).toBeGreaterThanOrEqual(9); // sokel+4 dvere+4 okno
+	});
+});
+
+describe('vytvorStenu (#325) — fasáda škáluje výšku s pergolou', () => {
+	const nast = nastaveniaPreTier('high');
+
+	it('bez bboxVyskaMm → default výška 2800 mm', () => {
+		const stena = vytvorStenu(THREE, nast, 4200);
+		stena.geometry.computeBoundingBox();
+		const h = stena.geometry.boundingBox!.max.y - stena.geometry.boundingBox!.min.y;
+		expect(h).toBeCloseTo(mm(2800), 6);
+	});
+
+	it('vysoká pergola (SV=3400) → fasáda vyššia než pripojenie (SV + 600 mm)', () => {
+		const stena = vytvorStenu(THREE, nast, 4200, 3400);
+		stena.geometry.computeBoundingBox();
+		const h = stena.geometry.boundingBox!.max.y - stena.geometry.boundingBox!.min.y;
+		expect(h).toBeCloseTo(mm(4000), 6); // max(2800, 3400+600) = 4000
+		expect(h).toBeGreaterThan(mm(3400)); // vždy vyššia než pripojenie pergoly
+	});
+
+	it('nízka pergola (SV=2000) → fasáda ostáva na minime 2800 mm', () => {
+		const stena = vytvorStenu(THREE, nast, 4200, 2000);
+		stena.geometry.computeBoundingBox();
+		const h = stena.geometry.boundingBox!.max.y - stena.geometry.boundingBox!.min.y;
+		expect(h).toBeCloseTo(mm(2800), 6); // max(2800, 2000+600) = 2800
 	});
 });

@@ -24,6 +24,7 @@
 		hdriUrl,
 		nacitajHDRI,
 		nastavKluceoveSvetloTien,
+		vytvorDom,
 		vytvorEnvironment,
 		vytvorKontaktnyTien,
 		vytvorOblohu,
@@ -497,7 +498,8 @@
 		const zemMat = zem.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
 		if (zemMat.map) disposables.push(zemMat.map);
 
-		const stena = vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
+		// #325: fasáda škáluje výšku podľa pergoly (bbox.h = výška pri stene)
+		const stena = vytvorStenu(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h);
 		stena.position.z = -(mm(vysledok.bbox.d) / 2 + 0.05);
 		stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
 		scene.add(stena);
@@ -506,6 +508,13 @@
 		if (stenaMat.map) disposables.push(stenaMat.map);
 		if (stenaMat.roughnessMap && stenaMat.roughnessMap !== stenaMat.map)
 			disposables.push(stenaMat.roughnessMap);
+
+		// #325: dekoratívne prvky domu (sokel + dvere + okno) tesne PRED fasádou.
+		// Dvere sú centrované na x=0 → vždy medzi krajnými stĺpmi (nikdy za nohou).
+		const dom = vytvorDom(THREE, nastavenia, vysledok.bbox.w);
+		dom.skupina.position.z = stena.position.z; // z-offsety prvkov (mm) ich držia pred stenou
+		scene.add(dom.skupina);
+		for (const d of dom.disposables) disposables.push(d);
 
 		const tien = vytvorKontaktnyTien(THREE, vysledok.bbox.w, vysledok.bbox.d, vysledok.bbox.h);
 		scene.add(tien);
