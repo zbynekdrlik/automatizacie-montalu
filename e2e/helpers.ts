@@ -29,6 +29,17 @@ const NESKODNY_MODEL_VIEWER_VZOR = /^rAF timed out in updateSource$/;
 // takže nikdy nezakryje skutočné zlyhanie fetchu (ERR_FAILED / HTTP status).
 const NESKODNY_ABORT_VZOR = /Failed to load resource.*net::ERR_ABORTED/;
 
+// #327: `WebGL: CONTEXT_LOST_WEBGL: loseContext: context lost` je EXPLICITNÝ, SANKCIONOVANÝ
+// teardown WebGL kontextu — prehliadač ho zaloguje VŽDY, keď appka zavolá
+// `WEBGL_lose_context.loseContext()` (three.js `renderer.forceContextLoss()` pri unmounte /
+// `{#key}` remounte 3D náhľadu — vizual3d.md „forceContextLoss je NEVRATNÉ, len pri odchode
+// z komponentu"; a model-viewer robí to isté pri re-inite na /konfigurator/ar). NIE JE to
+// pád GPU/OOM — ten Chrome loguje BEZ prefixu „loseContext:" (iná príčina straty kontextu).
+// Preto je filter zakotvený na doslovný „loseContext: context lost" reťazec: zachytí len
+// zámerný teardown, NIKDY reálnu chybu. Skutočne rozbitý 3D odhalia asserty „netriviálny
+// render" (veľkosť PNG canvasu) + `data-viz-ready`, nie tento benígny warning.
+const NESKODNY_CONTEXT_LOST_VZOR = /CONTEXT_LOST_WEBGL: loseContext: context lost/;
+
 /** Zbiera console errors/warnings — každý test na konci overí, že je prázdne. */
 export function collectConsole(page: Page): string[] {
 	const messages: string[] = [];
@@ -37,6 +48,7 @@ export function collectConsole(page: Page): string[] {
 			if (NESKODNY_GL_DRIVER_VZOR.test(msg.text())) return;
 			if (NESKODNY_MODEL_VIEWER_VZOR.test(msg.text())) return;
 			if (NESKODNY_ABORT_VZOR.test(msg.text())) return;
+			if (NESKODNY_CONTEXT_LOST_VZOR.test(msg.text())) return;
 			messages.push(`[${msg.type()}] ${msg.text()}`);
 		}
 	});

@@ -13,13 +13,24 @@ import { goto, collectConsole, skipAkLive, loginAs } from './helpers';
 // aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
 import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
 
+// #327: prémiový EDGE-TO-EDGE 3D náhľad je ~2.5× ťažší na softvérovom CI WebGL (renderuje na
+// veľkosť kontajnera, viď vizual3d.md „CI softvérový WebGL je pomalší"). Počkaj, kým je scéna
+// READY, PRED interakciou s formulárom — inak (a) enhance callback (cena/súhrn/chyba) mešká za
+// synchrónnou stavbou 3D scény na hlavnom vlákne a (b) debounced `{#key}` remount pretekáva s
+// ešte-mountujúcou scénou → sankcionovaný teardown `forceContextLoss` sa zaloguje. Ten istý
+// sync-point, aký už používajú 3D testy nižšie (`data-viz-ready`), aplikovaný na form-testy.
+async function konfReady(page: import('@playwright/test').Page) {
+	await goto(page, '/konfigurator');
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+}
+
 test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná cena, žiadny Money kód/VO, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 
 	// verejná route — žiadne prihlásenie; NESMIE presmerovať na /login
-	await goto(page, '/konfigurator');
+	await konfReady(page);
 	await expect(page).toHaveURL(/\/konfigurator$/);
 	await expect(page.getByRole('heading', { name: /Navrhni si.*pergolu/i })).toBeVisible();
 
@@ -29,12 +40,12 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	await page.getByTestId('sklonDeg').fill('10');
 
 	// vyber typ skla ZISTENÝ ZA BEHU ako NIE prvý v zozname (nova-stranka disciplína #3 —
-	// aspoň jeden test vyberá non-default hodnotu, aby zachytil prípadný tichý revert)
-	const sklo = page.getByTestId('sklo');
-	const skloOptions = sklo.locator('option');
-	const vybranySklo = (await skloOptions.nth(2).getAttribute('value')) ?? '';
+	// aspoň jeden test vyberá non-default hodnotu, aby zachytil prípadný tichý revert).
+	// #327: sklo je teraz CHIP (button `data-testid="sklo-chip"`), nie <select>.
+	const skloChips = page.getByTestId('sklo-chip');
+	const vybranySklo = (await skloChips.nth(2).getAttribute('data-value')) ?? '';
 	expect(vybranySklo).not.toBe('');
-	await sklo.selectOption(vybranySklo);
+	await skloChips.nth(2).click();
 
 	await page.getByTestId('zobrazit').click();
 
@@ -74,7 +85,7 @@ test('konfigurátor: kombinácia výška+hĺbka+sklon nad rozmedzie → friendly
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
-	await goto(page, '/konfigurator');
+	await konfReady(page);
 
 	// všetky polia v rámci individuálnych min/max (prejdú client validáciou), ale
 	// dopočítaná výška pri stene presiahne max enginu → server vráti friendly chybu
@@ -99,7 +110,7 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 
 	const consoleMsgs = collectConsole(page);
 
-	await goto(page, '/konfigurator');
+	await konfReady(page);
 	await expect(page).toHaveURL(/\/konfigurator$/);
 
 	// 1) nakonfiguruj pergolu → zobraz súhrn
@@ -166,7 +177,7 @@ test('konfigurátor: objednávka (MO) — súhrn → záväzná objednávka → 
 	await skipAkLive(page);
 	const consoleMsgs = collectConsole(page);
 
-	await goto(page, '/konfigurator');
+	await konfReady(page);
 	await page.getByTestId('sirka').fill('4500');
 	await page.getByTestId('hlbka').fill('3500');
 	await page.getByTestId('vyskaVpredu').fill('2800');
@@ -249,7 +260,7 @@ test('konfigurátor: objednávka (VO/b2b) — prihlásený veľkoobchod vidí VO
 	// 2. prihlásenie ako VO/b2b + konfigurácia → VO cena + odznak
 	await odhlas();
 	await loginAs(page, voUser, voPass);
-	await goto(page, '/konfigurator');
+	await konfReady(page);
 	await page.getByTestId('sirka').fill('5000');
 	await page.getByTestId('hlbka').fill('3000');
 	await page.getByTestId('vyskaVpredu').fill('2800');
@@ -299,14 +310,14 @@ test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → indiv
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
-	await goto(page, '/konfigurator');
+	await konfReady(page);
 
 	// 1) konfigurácia s modelom LIGHT (3,0 × 5,0 m) → orientačná cena (€) + porovnanie 3 modelov
 	await page.getByTestId('sirka').fill('5000');
 	await page.getByTestId('hlbka').fill('3000');
 	await page.getByTestId('vyskaVpredu').fill('2500');
 	await page.getByTestId('sklonDeg').fill('6');
-	await page.getByTestId('model-LIGHT').check();
+	await page.getByTestId('model-LIGHT').click();
 	await page.getByTestId('zobrazit').click();
 
 	await expect(page.getByTestId('cena')).toBeVisible();
@@ -319,7 +330,7 @@ test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → indiv
 	await expect(page.getByTestId('porovnanie-MASSIVE')).toBeVisible();
 
 	// 2) prepni na ROBUST → orientačná cena sa ZMENÍ (ROBUST je drahší než LIGHT)
-	await page.getByTestId('model-ROBUST').check();
+	await page.getByTestId('model-ROBUST').click();
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('s-model')).toHaveText('ROBUST');
 	await expect(page.getByTestId('cena-sdph')).toContainText('€');
@@ -327,7 +338,7 @@ test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → indiv
 	expect(robustCena).not.toBe(lightCena);
 
 	// 3) LIGHT nad hĺbku 4 m (5000 mm) → mimo katalógu → „cena na vyžiadanie" (individuálna)
-	await page.getByTestId('model-LIGHT').check();
+	await page.getByTestId('model-LIGHT').click();
 	await page.getByTestId('hlbka').fill('5000');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('cena-individualna')).toBeVisible();
@@ -360,9 +371,10 @@ async function vyplnFormular(page: import('@playwright/test').Page) {
 	await page.getByTestId('hlbka').fill('3800');
 	await page.getByTestId('vyskaVpredu').fill('2800');
 	await page.getByTestId('sklonDeg').fill('8');
-	// non-default sklo (mliečne → matný odtieň) + non-default RAL, nech 3D dostane reálny vstup
-	await page.getByTestId('sklo').selectOption({ label: '4.4.2 mliečne' });
-	await page.getByTestId('farba').selectOption('9005');
+	// non-default sklo (mliečne → matný odtieň) + non-default RAL, nech 3D dostane reálny vstup.
+	// #327: sklo = chip, farba = kruhový swatch (nie <select>) — klik na prvok s daným data-value.
+	await page.locator('[data-testid="sklo-chip"][data-value="4.4.2 mliečne"]').click();
+	await page.locator('[data-testid="farba-swatch"][data-value="9005"]').click();
 }
 
 /** #288 post-processing gate — regresný guard. `data-viz-postproc` MUSÍ byť vždy
@@ -491,7 +503,7 @@ test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); inte
 
 	// vyplň konfigurátor FIXNÝM rozmerom (LIGHT default, v katalógu) a spočítaj → cena s DPH (€ ako number)
 	const spocitajCenu = async (): Promise<number> => {
-		await goto(page, '/konfigurator');
+		await konfReady(page);
 		await page.getByTestId('sirka').fill('5000');
 		await page.getByTestId('hlbka').fill('3000');
 		await page.getByTestId('vyskaVpredu').fill('2800');
@@ -541,5 +553,85 @@ test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); inte
 	await row.getByRole('button', { name: 'Zmazať' }).click();
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
 	await expect(page.locator('tr', { hasText: voUser })).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #327: PRÉMIOVÝ redizajn (Tesla/Apple showroom) — split-screen 3D edge-to-edge, prémiové
+// ovládanie (RAL swatche + sklo chips + segmentové karty modelu) NAMIESTO defaultných
+// <select>/radio, prilepený cenový panel. Display-only (žiadny zápis) → beží aj proti
+// nasadenej appke (BASE_URL), bez skipAkLive. Nula console chýb.
+test('konfigurátor: prémiový redizajn — split-screen + swatche/chips namiesto <select> + sticky cena, nula console chýb (#327)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await konfReady(page);
+
+	// split-screen: 3D náhľad je viditeľný HNEĎ (ľavý stĺpec, bez submitu)
+	await expect(page.getByTestId('konf-viz')).toBeVisible();
+
+	// prémiové ovládanie NAMIESTO defaultných <select> — žiadny <select> pre sklo/farbu
+	expect(await page.locator('select[name="sklo"]').count()).toBe(0);
+	expect(await page.locator('select[name="farba"]').count()).toBe(0);
+
+	// kruhové RAL swatche + sklo chips existujú (a je ich viac než jeden)
+	expect(await page.getByTestId('farba-swatch').count()).toBeGreaterThan(1);
+	expect(await page.getByTestId('sklo-chip').count()).toBeGreaterThan(1);
+
+	// segmentové karty modelu (nie <select>)
+	await expect(page.getByTestId('model-ROBUST')).toBeVisible();
+
+	// #327 review 🔴 REGRESIA: popisok rozmeru je <label for> → klik naň FOKUSUJE input, NEMENÍ
+	// hodnotu. (Starý <label>-obal sa viazal na prvý potomok = mínus tlačidlo → klik na text
+	// znižoval hodnotu o 50 mm a cez stale-clear mazal cenu.)
+	await page.getByTestId('sirka').fill('4200');
+	await page.getByText('Šírka', { exact: true }).click();
+	await expect(page.getByTestId('sirka')).toHaveValue('4200');
+
+	// klik na swatch vyberie farbu (aria-pressed prejde na true)
+	const swatch9005 = page.locator('[data-testid="farba-swatch"][data-value="9005"]');
+	await swatch9005.click();
+	await expect(swatch9005).toHaveAttribute('aria-pressed', 'true');
+
+	// vyplň + submit (sklonDeg cez číselný „twin" — .fill() funguje aj so sliderom)
+	await page.getByTestId('sirka').fill('5000');
+	await page.getByTestId('hlbka').fill('3000');
+	await page.getByTestId('vyskaVpredu').fill('2500');
+	await page.getByTestId('sklonDeg').fill('6');
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+
+	// prilepený cenový panel ukáže orientačnú cenu s DPH
+	await expect(page.getByTestId('cta-cena')).toContainText('€');
+	await expect(page.getByTestId('cta-cena')).toContainText(/Orientačná cena od/i);
+
+	// minimal chrome: žiadna interná admin navigácia na verejnej stránke
+	expect(await page.locator('nav.top').count()).toBe(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #327: prihlásený interný/b2b user NEVIDÍ internú admin navigáciu na zákazníckej stránke
+// /konfigurator (bola tam pred redizajnom) — dostane len decentný „← interná aplikácia"
+// odkaz. Login je read-only (žiadny Money zápis) → beží aj proti prode. Nula console chýb.
+test('konfigurátor: prihlásený user NEVIDÍ admin navigáciu, len „← interná aplikácia" + pätička s verziou (#327)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await konfReady(page);
+
+	// žiadna interná admin navigácia (Optimalizátor/Používatelia/…) na zákazníckej stránke
+	expect(await page.locator('nav.top').count()).toBe(0);
+	await expect(page.getByRole('link', { name: 'Optimalizátor' })).toHaveCount(0);
+
+	// len decentný odkaz späť do internej aplikácie
+	await expect(page.getByRole('link', { name: /interná aplikácia/i })).toBeVisible();
+
+	// pätička s verziou ostáva — práve JEDNA na stránke (version-on-dashboard)
+	await expect(page.getByTestId('version')).toHaveCount(1);
+	await expect(page.getByTestId('version')).toHaveText(
+		/^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$/
+	);
+
 	expect(consoleMsgs).toEqual([]);
 });
