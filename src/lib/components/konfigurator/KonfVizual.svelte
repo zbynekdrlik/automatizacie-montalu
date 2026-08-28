@@ -43,7 +43,7 @@
 	});
 </script>
 
-<div class="konf-vizual" data-testid="konf-viz" aria-label="3D náhľad pergoly">
+<section class="konf-vizual" data-testid="konf-viz" aria-label="3D náhľad pergoly">
 	{#if VizualKomp}
 		{@const Komp = VizualKomp}
 		{#key vizKluc}
@@ -60,7 +60,7 @@
 	{:else}
 		<div class="viz-loading" data-testid="konf-viz-loading">Načítavam 3D náhľad…</div>
 	{/if}
-</div>
+</section>
 
 <style>
 	.konf-vizual {

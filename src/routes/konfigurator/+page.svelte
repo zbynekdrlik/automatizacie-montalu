@@ -12,10 +12,10 @@
 	// berie len rozmery + `typSkla3D(nazov)` + RAL kód (client-safe, žiadny Money kód).
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
-	import { browser } from '$app/environment';
 	import {
 		typSkla3D,
 		vyskaPriStene,
+		fmtMm1,
 		KONF_VYSKA_STENA_MAX,
 		type KonfiguratorSuhrn,
 		type VerejnaCena,
@@ -34,11 +34,15 @@
 	// rozmedzia z data (min/max hinty pre inputy)
 	const r = $derived(data.rozmedzia);
 
-	// vstupné polia = $state + bind: (rozumné východiskové hodnoty — hneď platná pergola)
-	let sirka = $state<number | null>(4000);
-	let hlbka = $state<number | null>(3500);
-	let vyskaVpredu = $state<number | null>(2500);
-	let sklonDeg = $state<number | null>(6);
+	// spoločné východiskové rozmery — JEDEN zdroj pre $state inity AJ pre debounced 3D
+	// snapshot (bez driftu → žiadny 320 ms „zlý náhľad" flash / spurný remount pri loade).
+	const KONF_DEFAULT = { sirka: 4000, hlbka: 3500, vyskaVpredu: 2500, sklon: 6 };
+
+	// vstupné polia = $state + bind: (hneď platná pergola)
+	let sirka = $state<number | null>(KONF_DEFAULT.sirka);
+	let hlbka = $state<number | null>(KONF_DEFAULT.hlbka);
+	let vyskaVpredu = $state<number | null>(KONF_DEFAULT.vyskaVpredu);
+	let sklonDeg = $state<number | null>(KONF_DEFAULT.sklon);
 	let sklo = $state<string>(untrack(() => data.sklaTypy[0] ?? ''));
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
 	let model = $state<string>(untrack(() => data.modely[0]?.kod ?? 'LIGHT'));
@@ -64,16 +68,22 @@
 		return typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 	}
 
+	// podpis CELEJ konfigurácie (všetky voľby tvoriace súhrn/objednávku) — na detekciu,
+	// či sa po submite zmenila (stale-clear effect nižšie).
+	const konfigPodpis = () =>
+		`${sirka}|${hlbka}|${vyskaVpredu}|${sklonDeg}|${model}|${sklo}|${farba}`;
+
 	// DEBOUNCED snapshot rozmerov pre 3D — inicializovaný na východiskové (platné) hodnoty,
-	// takže defaultná pergola sa vykreslí HNEĎ. Mení sa až ~320 ms po ustálení vstupu
-	// (aby sa `{#key}` remount/refit rigu nespúšťal na každú klávesu).
+	// takže defaultná pergola sa vykreslí HNEĎ. Mení sa až ~320 ms po ustálení vstupu.
 	let rozmeryStabilne = $state({
-		sirkaMm: 4000,
-		hlbkaMm: 3500,
-		vyskaVpreduMm: 2500,
-		vyskaPriSteneMm: vyskaPriStene(2500, 6, 3500)
+		sirkaMm: KONF_DEFAULT.sirka,
+		hlbkaMm: KONF_DEFAULT.hlbka,
+		vyskaVpreduMm: KONF_DEFAULT.vyskaVpredu,
+		vyskaPriSteneMm: vyskaPriStene(KONF_DEFAULT.vyskaVpredu, KONF_DEFAULT.sklon, KONF_DEFAULT.hlbka)
 	});
 
+	// $effect beží LEN v prehliadači (Svelte 5) → žiadna SSR vetva; SSR render použije
+	// hardcoded initializer `rozmeryStabilne` vyššie.
 	$effect(() => {
 		const s = sirka;
 		const h = hlbka;
@@ -87,10 +97,6 @@
 		const stena = vyskaPriStene(vv, sk, h);
 		if (stena > KONF_VYSKA_STENA_MAX) return; // dopočítaná výška nad max konštrukcie
 		const next = { sirkaMm: s, hlbkaMm: h, vyskaVpreduMm: vv, vyskaPriSteneMm: stena };
-		if (!browser) {
-			rozmeryStabilne = next;
-			return;
-		}
 		const t = setTimeout(() => (rozmeryStabilne = next), 320);
 		return () => clearTimeout(t);
 	});
@@ -113,7 +119,24 @@
 	let ARKomp = $state<ARKompTyp | null>(null);
 	let arNacitava = false;
 
-	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	// podpis konfigurácie, ktorá vyprodukovala aktuálny `suhrn`/`cena` (nastaví submit).
+	let submitPodpis = $state<string | null>(null);
+
+	// STALE-CLEAR (#325 review 🟡): cena/súhrn ostávajú server-side na submite, no 3D sa
+	// mení živo. Keď zákazník po submite zmení konfiguráciu, cena/súhrn/PDF/OBJEDNÁVKA by
+	// niesli STARÉ hodnoty (objednal by, čo už nevidí). Preto pri odchýlke živej
+	// konfigurácie od submitnutej sa súhrn/cena/AR VYČISTIA → zákazník znova klikne
+	// „Zobraziť cenu a súhrn" a objednávka je vždy konzistentná s tým, čo vidí v 3D.
+	$effect(() => {
+		if (suhrn && submitPodpis !== null && konfigPodpis() !== submitPodpis) {
+			suhrn = null;
+			cena = null;
+			cenyModely = null;
+			arViz = null;
+			submitPodpis = null;
+			chyba = '';
+		}
+	});
 
 	// Konfigurácia pre PDF ponuku — mapovanie súhrnu na PonukaConfig (bez cien/Money kódov).
 	const ponukaCfg = $derived<PonukaConfig>(
@@ -127,9 +150,9 @@
 					vyskaPriStene: suhrn.vyskaPriStene,
 					farba: suhrn.farba,
 					sklo: suhrn.sklo,
-					popis: `Sklon strechy ${fmt(suhrn.sklonDeg)}°, svetlá výška vpredu ${fmt(
+					popis: `Sklon strechy ${fmtMm1(suhrn.sklonDeg)}°, svetlá výška vpredu ${fmtMm1(
 						suhrn.svetlaVyska
-					)} mm, zastrešená plocha ${fmt(suhrn.zastresenaPlochaM2)} m².`
+					)} mm, zastrešená plocha ${fmtMm1(suhrn.zastresenaPlochaM2)} m².`
 				}
 			: {}
 	);
@@ -168,8 +191,10 @@
 				class="karta"
 				use:enhance={() => {
 					spracuva = true;
-					// zachyť odoslaný RAL kód PRI submite (pre AR snapshot)
+					// zachyť odoslaný RAL kód + PODPIS konfigurácie PRI submite (AR snapshot +
+					// stale-clear — cena/súhrn platia presne pre TÚTO odoslanú konfiguráciu)
 					const odoslanaFarba = farba;
+					const odoslanyPodpis = konfigPodpis();
 					return async ({ result }) => {
 						spracuva = false;
 						if (result.type === 'success') {
@@ -177,6 +202,7 @@
 							cena = (result.data?.cena as VerejnaCena | null) ?? null;
 							cenyModely = (result.data?.cenyModely as CenaModelu[] | null) ?? null;
 							chyba = '';
+							submitPodpis = suhrn ? odoslanyPodpis : null;
 							if (suhrn) {
 								arViz = {
 									sirkaMm: suhrn.sirka,
@@ -201,12 +227,14 @@
 							cena = null;
 							cenyModely = null;
 							arViz = null;
+							submitPodpis = null;
 							chyba = (result.data?.error as string | undefined) ?? 'Neplatný vstup.';
 						} else if (result.type === 'error') {
 							suhrn = null;
 							cena = null;
 							cenyModely = null;
 							arViz = null;
+							submitPodpis = null;
 							chyba = 'Nastala chyba pri výpočte. Skús to prosím znova.';
 						}
 						// zámerne NEvoláme update() — vstupy necháme tak, ako ich zákazník zadal

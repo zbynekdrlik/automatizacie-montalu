@@ -202,8 +202,8 @@ describe('scena — #174 ZNOVUOTVORENÉ: kontaktný tieň sleduje PODLHOVASTÝ p
 describe('vytvorDom (#325) — dom pred fasádou: dvere centrované, mimo krajných stĺpov', () => {
 	const nast = nastaveniaPreTier('high');
 
-	function detiSBbox(S: number) {
-		const dom = vytvorDom(THREE, nast, S);
+	function detiSBbox(S: number, SV?: number) {
+		const dom = vytvorDom(THREE, nast, S, SV);
 		const prvky = dom.skupina.children.map((c) => {
 			const m = c as InstanceType<typeof THREE.Mesh>;
 			m.geometry.computeBoundingBox();
@@ -228,29 +228,31 @@ describe('vytvorDom (#325) — dom pred fasádou: dvere centrované, mimo krajn�
 	});
 
 	it.each([2000, 4000, 8000, 12000])(
-		'dvere sú CENTROVANÉ na x=0 a žiaden prvok (okrem sokla) nedosiahne krajný stĺp ±S/2 — S=%i',
+		'dvere sú CENTROVANÉ na x=0 a žiaden prvok (okrem sokla) nedosiahne VNÚTORNÚ hranu krajného stĺpa ±(S/2−50) — S=%i',
 		(S) => {
 			const { prvky } = detiSBbox(S);
-			const stlpX = mm(S / 2);
-			// dvere = najvyšší prvok centrovaný okolo x=0 (krídlo, ~2000 mm)
+			// vnútorná hrana stĺpa = S/2 − STLP_HRUBKA_VIZ_MM/2 (stĺp má 100 mm hrúbku),
+			// prísnejšie než stred stĺpa (S/2) — dvere/okno nesmú dosiahnuť ani hranu nohy.
+			const vnutornaHrana = mm(S / 2 - 50);
+			// najvyšší prvok centrovaný okolo x=0 = RÁM dverí (dvereH+80, ~2080 mm pri norm. výške)
 			const dvere = prvky
 				.filter((p) => Math.abs(p.x) < mm(1))
 				.reduce((a, b) => (b.h > a.h ? b : a));
-			expect(dvere.h).toBeGreaterThan(mm(1500)); // je to naozaj krídlo dverí
+			expect(dvere.h).toBeGreaterThan(mm(1500)); // je to naozaj rám/krídlo dverí
 			expect(dvere.x).toBeCloseTo(0, 6); // centrované na x=0
 			// sokel je jediný prvok, ktorý smie presiahnuť stĺpy (je to pás fasády):
 			// nízky (<400 mm) a širší než S. Všetky OSTATNÉ prvky (dvere/okno) musia
-			// ostať PRÍSNE medzi stĺpmi → dvere nikdy za nohou pergoly.
+			// ostať PRÍSNE medzi vnútornými hranami stĺpov → dvere nikdy za nohou pergoly.
 			for (const p of prvky) {
 				const jeSokel = p.h < mm(400) && p.w > mm(S);
 				if (jeSokel) continue;
-				expect(p.pravy).toBeLessThan(stlpX);
-				expect(p.lavy).toBeGreaterThan(-stlpX);
+				expect(p.pravy).toBeLessThan(vnutornaHrana);
+				expect(p.lavy).toBeGreaterThan(-vnutornaHrana);
 			}
 		}
 	);
 
-	it('krídlo dverí aj sokel stoja na zemi (spodná hrana ~y=0)', () => {
+	it('rám dverí aj sokel stoja na zemi (spodná hrana ~y=0)', () => {
 		const { prvky } = detiSBbox(4000);
 		const dvere = prvky.filter((p) => Math.abs(p.x) < mm(1)).reduce((a, b) => (b.h > a.h ? b : a));
 		expect(dvere.spodok).toBeCloseTo(0, 6); // dvere sú priechodné od zeme
@@ -265,6 +267,19 @@ describe('vytvorDom (#325) — dom pred fasádou: dvere centrované, mimo krajn�
 		// okno pridáva 4 prvky (rám + sklo + 2 priečky) → väčšia pergola má viac detí
 		expect(velka.skupina.children.length).toBeGreaterThan(mala.skupina.children.length);
 		expect(velka.skupina.children.length).toBeGreaterThanOrEqual(9); // sokel+4 dvere+4 okno
+	});
+
+	it('NÍZKA pergola (výška pri stene 2100) → dvere/okno oreznuté POD bočný nosník (žiadna kolízia)', () => {
+		// bočný nosník má spodok ~ SV−190; horný okraj KAŽDÉHO prvku domu musí ostať pod ním.
+		const SV = 2100;
+		const railBottom = mm(SV - 190); // 1910 mm
+		const { prvky } = detiSBbox(4000, SV);
+		for (const p of prvky) {
+			const jeSokel = p.h < mm(400) && p.w > mm(4000);
+			if (jeSokel) continue; // sokel je nízky pás pri zemi, nekoliduje
+			// box je centrovaný → horný okraj = position.y + h/2; musí ostať pod railom
+			expect(p.y + p.h / 2).toBeLessThanOrEqual(railBottom + 1e-9);
+		}
 	});
 });
 

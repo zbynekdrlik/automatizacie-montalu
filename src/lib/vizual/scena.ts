@@ -231,20 +231,25 @@ export function vytvorZem(
 	return new THREE.Mesh(geo, mat);
 }
 
-/** Stena domu — SOLÍDNA fasáda za produktom, 300 mm presahu po stranách nad šírku
- *  bboxu (#325). Výška škáluje s pergolou (`bboxVyskaMm` = výška pri stene; default
- *  2800 mm) tak, aby fasáda bola VŽDY vyššia než pripojenie pergoly — inak by pergola
- *  „prečnievala" nad holú stenu. Dvere/okno rieši samostatný `vytvorDom` (Group PRED
- *  stenou); tu už NIE JE dverný otvor (predošlá diera pri ľavom okraji kolidovala
- *  s nohou pergoly — owner #325). `low` tier nahradí štukovú mapu plochým gradientom. */
+/** Stena domu — rovina za produktom, 300 mm presahu po stranách nad šírku bboxu.
+ *
+ *  DVA režimy (#325):
+ *  - `sDverami = true` (DEFAULT, zasklenia scény — nezmenené správanie): fixná výška
+ *    2800 mm + reálny dverný OTVOR 900×2000 mm ako geometria (pôvodný #170 backdrop).
+ *  - `sDverami = false` (pergola konfigurátor): SOLÍDNA fasáda bez otvoru (dvere/okno
+ *    rieši samostatný `vytvorDom` pred stenou — dvere centrované, nikdy za nohou), výška
+ *    škáluje s pergolou (`bboxVyskaMm` = výška pri stene, min 2800), aby pergola
+ *    „neprečnievala" nad stenu.
+ *  `low` tier nahradí štukovú mapu plochým gradientom. */
 export function vytvorStenu(
 	THREE: ThreeNS,
 	nastavenia: TierNastavenia,
 	bboxSirkaMm: number,
-	bboxVyskaMm?: number
+	bboxVyskaMm?: number,
+	sDverami: boolean = true
 ): InstanceType<ThreeNS['Mesh']> {
 	const PRESAH_MM = 300;
-	// #325: fasáda vždy vyššia než pripojenie pergoly (SV + 600 mm), min 2800 mm.
+	// #325: pri pergole fasáda vždy vyššia než pripojenie (SV + 600 mm); inak fixných 2800.
 	const VYSKA_MM = bboxVyskaMm ? Math.max(2800, Math.round(bboxVyskaMm) + 600) : 2800;
 
 	const w = mm(bboxSirkaMm + 2 * PRESAH_MM);
@@ -256,6 +261,20 @@ export function vytvorStenu(
 	shape.lineTo(w / 2, h);
 	shape.lineTo(-w / 2, h);
 	shape.closePath();
+
+	// zasklenia backdrop (#170): reálny dverný otvor pri ľavom okraji steny (y=0)
+	if (sDverami) {
+		const dw = mm(900);
+		const dh = mm(2000);
+		const dvereX0 = -w / 2 + mm(200);
+		const otvor = new THREE.Path();
+		otvor.moveTo(dvereX0, 0);
+		otvor.lineTo(dvereX0 + dw, 0);
+		otvor.lineTo(dvereX0 + dw, dh);
+		otvor.lineTo(dvereX0, dh);
+		otvor.closePath();
+		shape.holes.push(otvor);
+	}
 
 	const geo = new THREE.ShapeGeometry(shape);
 
@@ -291,18 +310,26 @@ export interface DomPrvky {
  *  (volajúci ho umiestni tesne pred stenu) + `disposables`.
  *
  *  Kľúčové (owner #325): dvere sú CENTROVANÉ na x=0 — teda VŽDY v čistom priestore
- *  medzi krajnými stĺpmi pergoly (stĺpy pri stene sú na x=±S/2, |x|≥1000 mm), takže
- *  otvor/dvere NIKDY nekolidujú s nohou pergoly, sú priechodné a scéna dáva reálny
- *  zmysel (pergola pristavaná k domu, vchod voľný). Okno je odsadené nabok a jeho
- *  pozícia/veľkosť je frakciou šírky S tak, aby aj pri najmenšej pergole ostalo mimo
- *  krajných stĺpov. Čistá box-geometria + ploché materiály (žiadna textúra/canvas) →
- *  priamo Node-testovateľné (`tests/vizual-scena.test.ts` vzor). */
+ *  medzi krajnými stĺpmi pergoly (pri `pocetPoli=1`, čo konfigurátor VŽDY používa, sú
+ *  stĺpy len na x=±S/2, |x|≥1000 mm; vnútorná hrana ±(S/2 − STLP_HRUBKA_VIZ_MM/2)), takže
+ *  dvere NIKDY nekolidujú s nohou pergoly, sú priechodné a scéna dáva reálny zmysel
+ *  (pergola pristavaná k domu, vchod voľný). POZN.: pri `pocetPoli≥2` by `pergolaSpec`
+ *  dal stĺp aj na x=0 — vtedy by centrované dvere neboli bezpečné; konfigurátor to
+ *  nepoužíva. Okno je odsadené do čistej medzery medzi rámom dverí a stĺpom. Výška
+ *  dverí/okna je oreznutá podľa pripojenia pergoly (`bboxVyskaMm` = výška pri stene),
+ *  aby prvky nekolidovali s bočným nosníkom pri nízkej pergole. Čistá box-geometria +
+ *  ploché materiály (žiadna textúra/canvas) → priamo Node-testovateľné. */
 export function vytvorDom(
 	THREE: ThreeNS,
 	nastavenia: TierNastavenia,
-	bboxSirkaMm: number
+	bboxSirkaMm: number,
+	bboxVyskaMm?: number
 ): DomPrvky {
 	const S = Math.max(1, bboxSirkaMm);
+	// horný okraj dverí/okna — pod spodkom bočného nosníka pergoly (~SV−190) s rezervou,
+	// aby ani rám neprečnieval nad pripojenie; pri neznámej výške default 2500.
+	const SV = bboxVyskaMm && bboxVyskaMm > 0 ? bboxVyskaMm : 2800;
+	const stropPrvkov = Math.max(1400, Math.round(SV) - 300);
 	const skupina = new THREE.Group();
 	const disposables: Disposable[] = [];
 	const prijimatiene = nastavenia.tiene;
@@ -335,9 +362,11 @@ export function vytvorDom(
 	// --- sokel (parapetný pás pri zemi) — celá šírka fasády, tmavší kameň ---
 	box(S + 600, 360, 60, 0x8a8175, 0.9, 0, 0, 180, 25);
 
-	// --- vchodové DVERE, CENTROVANÉ na x=0 (medzi krajnými stĺpmi ±S/2) ---
+	// --- vchodové DVERE, CENTROVANÉ na x=0 (medzi krajnými stĺpmi ±S/2). Výška je
+	//     oreznutá tak, aby rám (dvereH+80) neprečnieval nad `stropPrvkov` (pod bočný
+	//     nosník pergoly) — pri nízkej pergole sa dvere zmenšia, nikdy neprepichnú rail. ---
 	const dvereW = clamp(Math.round(0.2 * S), 700, 1000);
-	const dvereH = 2000;
+	const dvereH = Math.min(2000, stropPrvkov - 80);
 	const dvereRamHalf = (dvereW + 120) / 2;
 	box(dvereW + 120, dvereH + 80, 40, 0x22262c, 0.7, 0.05, 0, (dvereH + 80) / 2, 45); // rám
 	box(dvereW, dvereH, 50, 0x39414b, 0.5, 0.05, 0, dvereH / 2, 75); // krídlo (antracit)
@@ -345,15 +374,16 @@ export function vytvorDom(
 	box(46, 190, 40, 0xb8bcc2, 0.35, 0.7, dvereW / 2 - 95, dvereH * 0.45, 105); // kľučka (kov)
 
 	// --- OKNO — v ČISTEJ medzere medzi rámom dverí a krajným stĺpom, aby NIKDY
-	//     nekolidovalo ani s dverami ani so stĺpom. Pri malej pergole, kde sa okno
-	//     s rezervou nezmestí, sa vynechá (dom s dverami je stále platný). ---
+	//     nekolidovalo ani s dverami ani so stĺpom; výška oreznutá pod `stropPrvkov`.
+	//     Pri malej/nízkej pergole, kde sa okno s rezervou nezmestí, sa vynechá (dom
+	//     s dverami je stále platný). Parapet 900 mm; rám hore = 900 + oknoH + 60. ---
 	const medzeraLo = dvereRamHalf + 180; // pravý okraj rámu dverí + rezerva
 	const medzeraHi = stlpX - 150; // ľavý okraj stĺpa − rezerva
-	const medzeraW = medzeraHi - medzeraLo;
-	const oknoW = Math.min(900, Math.round(medzeraW * 0.7));
-	if (oknoW >= 360) {
+	const oknoW = Math.min(900, Math.round((medzeraHi - medzeraLo) * 0.7));
+	const oknoHMax = Math.min(1100, stropPrvkov - 960); // rám okna hore ≤ stropPrvkov
+	if (oknoW >= 360 && oknoHMax >= 500) {
 		const oknoX = (medzeraLo + medzeraHi) / 2;
-		const oknoH = 1100;
+		const oknoH = oknoHMax;
 		const oknoCy = 900 + oknoH / 2; // parapet 900 mm
 		box(oknoW + 120, oknoH + 120, 40, 0xe8e4dc, 0.75, 0, oknoX, oknoCy, 45); // rám (svetlý)
 		box(oknoW, oknoH, 24, 0x9fb8c8, 0.08, 0.0, oknoX, oknoCy, 70); // sklo (nízka drsnosť = odraz env)

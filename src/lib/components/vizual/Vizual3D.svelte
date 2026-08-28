@@ -60,6 +60,7 @@
 		skloVzhlad,
 		preset = $bindable<PresetKluc>(PRESET_DEFAULT),
 		vynutenyTier,
+		zobrazDom = false,
 		pripravene = $bindable(false),
 		aktualnyTier = $bindable<Tier>('high'),
 		posterZaznam
@@ -73,6 +74,10 @@
 		/** testovací hook (`?viz=low`/`?viz=none` v URL) — vynúti tier bez ohľadu
 		 *  na skutočné HW, pre e2e determinizmus (§2.12) */
 		vynutenyTier?: Tier;
+		/** #325: zobraziť dekoratívny „dom" (solídna fasáda + dvere + okno) pred stenou —
+		 *  LEN pergola konfigurátor (VizualPergolaZakaznik). Zasklenia scény ostávajú s
+		 *  pôvodnou stenou (dverný otvor, fixná výška) a bez domu (default false). */
+		zobrazDom?: boolean;
 		/** scéna je postavená a prvý render prebehol (alebo T0 poster je aktívny) —
 		 *  rodič (napr. zákaznícky tlačový list) na toto čaká pred `zachytObrazok()` */
 		pripravene?: boolean;
@@ -498,8 +503,12 @@
 		const zemMat = zem.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
 		if (zemMat.map) disposables.push(zemMat.map);
 
-		// #325: fasáda škáluje výšku podľa pergoly (bbox.h = výška pri stene)
-		const stena = vytvorStenu(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h);
+		// #325: pergola konfigurátor (`zobrazDom`) dostane SOLÍDNU fasádu škálovanú výškou
+		// + dom (dvere/okno); zasklenia scény ostávajú s PÔVODNOU stenou (dverný otvor,
+		// fixná výška) a BEZ domu → žiadna zmena zasklenia náhľadu.
+		const stena = zobrazDom
+			? vytvorStenu(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h, false)
+			: vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
 		stena.position.z = -(mm(vysledok.bbox.d) / 2 + 0.05);
 		stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
 		scene.add(stena);
@@ -509,12 +518,15 @@
 		if (stenaMat.roughnessMap && stenaMat.roughnessMap !== stenaMat.map)
 			disposables.push(stenaMat.roughnessMap);
 
-		// #325: dekoratívne prvky domu (sokel + dvere + okno) tesne PRED fasádou.
-		// Dvere sú centrované na x=0 → vždy medzi krajnými stĺpmi (nikdy za nohou).
-		const dom = vytvorDom(THREE, nastavenia, vysledok.bbox.w);
-		dom.skupina.position.z = stena.position.z; // z-offsety prvkov (mm) ich držia pred stenou
-		scene.add(dom.skupina);
-		for (const d of dom.disposables) disposables.push(d);
+		if (zobrazDom) {
+			// dekoratívne prvky domu (sokel + dvere + okno) tesne PRED fasádou. Dvere sú
+			// centrované na x=0 → vždy medzi krajnými stĺpmi (nikdy za nohou); výška domu je
+			// oreznutá podľa pripojenia pergoly (bbox.h), aby nekolidovala s bočným nosníkom.
+			const dom = vytvorDom(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h);
+			dom.skupina.position.z = stena.position.z; // z-offsety prvkov (mm) ich držia pred stenou
+			scene.add(dom.skupina);
+			for (const d of dom.disposables) disposables.push(d);
+		}
 
 		const tien = vytvorKontaktnyTien(THREE, vysledok.bbox.w, vysledok.bbox.d, vysledok.bbox.h);
 		scene.add(tien);

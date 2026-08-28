@@ -2,11 +2,11 @@
 	// #325: súhrn konfigurácie (extrahované z +page.svelte — large-file-split #239).
 	// Server-autoritatívny súhrn (dopočítané výšky/plocha/sklon) z akcie `vypocet`.
 	// Žiadny Money kód — číta iba `suhrn` (client-safe typ z `$lib/konfigurator`).
-	import type { KonfiguratorSuhrn } from '$lib/konfigurator';
+	import { fmtMm1, type KonfiguratorSuhrn } from '$lib/konfigurator';
 
 	let { suhrn }: { suhrn: KonfiguratorSuhrn } = $props();
 
-	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	const fmt = fmtMm1;
 </script>
 
 <section class="suhrn" data-testid="suhrn">

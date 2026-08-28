@@ -143,6 +143,12 @@ export interface KonfiguratorSuhrn {
 
 const R1 = (x: number) => Math.round(x * 10) / 10;
 
+/** Zobrazovací formát čísla na 1 desatinu s desatinnou ČIARKOU (sk), napr.
+ *  `2810 → "2810"`, `4452.06 → "4452,1"`. Zdieľané +page.svelte/KonfSuhrn (#325). */
+export function fmtMm1(n: number): string {
+	return String(R1(n)).replace('.', ',');
+}
+
 /** Dopočítaná výška pri stene [mm] — pultová strecha stúpa k stene o tan(sklon)·hĺbka. */
 export function vyskaPriStene(vyskaVpredu: number, sklonDeg: number, hlbka: number): number {
 	return R1(vyskaVpredu + Math.tan((sklonDeg * Math.PI) / 180) * hlbka);
