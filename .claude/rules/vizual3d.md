@@ -236,6 +236,18 @@ zasklenia-špecifické. Nová zákaznícka rodina = **reuse, neprepisuj**:
    defaulty pôvodného skla drž v ZDIEĽANÝCH konštantách, aby sa `vytvorSkloMaterial`
    a `nastavSkloVzhlad` nerozišli.
 
+**KRITICKÉ (#325): PRODUKTOVO-ŠPECIFICKÁ scénická výbava sa MUSÍ gatovať za prop —
+`Vizual3D` je ZDIEĽANÝ (pergola `VizualPergolaZakaznik` AJ zasklenia `Vizual3DPanel` +
+`/zasklenia/navrh*`).** #325 pridalo pergola „dom" (dvere/okno) a napojilo `vytvorDom`
+BEZPODMIENEČNE do `postavScenu` → dom sa renderoval aj vo VŠETKÝCH zasklenia scénach a
+fyzicky prenikal cez sklo produktu (chytil to až adversariálny review, NIE testy —
+zasklenia 3D nemá geometrickú kolíznu kontrolu). Vzor opravy: boolean prop na `Vizual3D`
+(`zobrazDom = false`), pravdu posiela LEN produktový wrapper, ktorý tú výbavu chce; a
+zmena zdieľanej factory (`vytvorStenu` dostalo `sDverami` režim) musí ZACHOVAŤ pôvodné
+správanie pre ostatné rodiny (default = staré). Pred pridaním AKEJKOĽVEK ne-generickej
+geometrie do `postavScenu` over `grep -rl Vizual3D src --include=*.svelte` — koľko rodín
+ju zdieľa.
+
 **Sklonený diel (strecha):** box s `rot: {x: alfa}` — `builder.postavGeometrie`
 aplikuje `rotateX` PRED `translate`, takže `alfa = atan((SV−FV)/H)` sklopí `+Z`
 koniec dole (predok, `y=FV`) a `−Z` koniec hore (stena, `y=SV`). `sin(alfa)·roofLen
