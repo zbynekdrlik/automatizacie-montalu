@@ -143,6 +143,7 @@
 		{skloVzhlad}
 		bind:preset
 		vynutenyTier={interneVynutenyTier}
+		zobrazDom={true}
 	>
 		{#snippet posterZaznam()}
 			<div class="poster-fallback" data-testid="pergola-poster-fallback">

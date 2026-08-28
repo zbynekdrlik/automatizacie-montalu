@@ -22,6 +22,13 @@ const NESKODNY_GL_DRIVER_VZOR = /GL Driver Message.*Performance.*GPU stall due t
 // skutočnú aplikačnú chybu.
 const NESKODNY_MODEL_VIEWER_VZOR = /^rAF timed out in updateSource$/;
 
+// #325: /konfigurator teraz montuje 3D náhľad (lazy three.js chunk + HDRI) pri KAŽDOM
+// loade. Keď test naviguje PREČ, kým je chunk/HDRI ešte v lete, prehliadač request ZRUŠÍ
+// a zaloguje `Failed to load resource: net::ERR_ABORTED` — benígny artefakt navigácie
+// (nie serverová chyba: 404/500 majú iný kód). Filter je EXACT na `net::ERR_ABORTED`,
+// takže nikdy nezakryje skutočné zlyhanie fetchu (ERR_FAILED / HTTP status).
+const NESKODNY_ABORT_VZOR = /Failed to load resource.*net::ERR_ABORTED/;
+
 /** Zbiera console errors/warnings — každý test na konci overí, že je prázdne. */
 export function collectConsole(page: Page): string[] {
 	const messages: string[] = [];
@@ -29,6 +36,7 @@ export function collectConsole(page: Page): string[] {
 		if (msg.type() === 'error' || msg.type() === 'warning') {
 			if (NESKODNY_GL_DRIVER_VZOR.test(msg.text())) return;
 			if (NESKODNY_MODEL_VIEWER_VZOR.test(msg.text())) return;
+			if (NESKODNY_ABORT_VZOR.test(msg.text())) return;
 			messages.push(`[${msg.type()}] ${msg.text()}`);
 		}
 	});

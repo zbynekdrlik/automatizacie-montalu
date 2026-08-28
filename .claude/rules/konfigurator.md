@@ -100,33 +100,45 @@ Throttluje sa len drahý POST; GET SSR render je lacný, zámerne bez limitu (ak
 Žiadny zápis (`server/money`/`server/db`/`server/pergola`) → E2E aj unit testy sa smú
 púšťať aj proti nasadenej appke (BASE_URL), žiadny `skipAkLive` (ako `/optimalizator`).
 
-## 6. 3D náhľad na verejnej route (#276 integrácia)
+## 6. ŽIVÝ 3D náhľad na verejnej route (#276 integrácia → #325 split-screen)
 
-Zákaznícky 3D vizuál (`VizualPergolaZakaznik`, `$lib/components/vizual/**`) je
-namontovaný do `+page.svelte` ako predajný „hero" súhrnu (vnútri `{#if suhrn}`,
-nad tabuľkou). Kľúčové vzory pri montáži ĎALŠEJ vizuál/3D schopnosti sem:
+**#325 (owner ROZHODNUTÉ, split-screen ako Tesla/Apple):** 3D náhľad je teraz v ĽAVOM
+STICKY stĺpci `+page.svelte`, viditeľný HNEĎ pri načítaní (defaultná pergola, BEZ submitu),
+a aktualizuje sa ŽIVO pri zmene voľby. PRAVÝ (scrollovací) panel = formulár + cena/súhrn/
+dopyt/objednávka/AR. Split je čistý CSS Grid + `position:sticky` (desktop `@media
+min-width:900px` 2 stĺpce; mobil-first default = 1 stĺpec, vizuál hore sticky-zmenšený).
+Stránka je rozdelená do subkomponentov `src/lib/components/konfigurator/` (`KonfVizual`
+= ľavý 3D stĺpec, `KonfCena`, `KonfSuhrn`) — `+page.svelte` ostáva state/compute HUB
+(large-file-split #239). Kľúčové vzory:
 
 - **Money guard prejde CELÝ vizuál graf.** Guard (A) rekurzívne prechádza import
   graf klientsky dosiahnuteľných súborov — import `VizualPergolaZakaznik` doň vtiahne
-  `Vizual3D` + celý `$lib/vizual/**`. To je BEZPEČNÉ, lebo vizuál strom neobsahuje
-  žiadny `moneyKod`/`sklo-strecha`/`/server/` (má vlastný `vizual-money-guard.test.ts`)
-  a `Vizual3D` neimportuje `Vizual3DPoster`/`ZaskleniaNavrhVykres` (poster ide cez
-  `posterZaznam` snippet). Pred montážou over grep-om, že nová vizuál vetva nenesie
-  zakázaný reťazec — inak guard (A) SPADNE.
-- **Lazy dynamic import** (`import('…VizualPergolaZakaznik.svelte').then(m => VizualKomp = m.default)`
-  v `$state`, spustený v `use:enhance` success callbacku) — 3D/three.js bundle sa
-  nenačíta pred zobrazením náhľadu. Guard (A) `extrahujSpecifikatory` číta aj `import()`.
-- **`viz` SNAPSHOT pri submite**, nie live form-state → 3D je konzistentný so
-  zobrazeným (server-autoritatívnym) súhrnom aj keď zákazník po submite prepíše input.
-- **RAL kód pre 3D = form-state `farba` zachytený PRI submite** (`const odoslanaFarba = farba`
-  v enhance) — `suhrn.farba` je len display label „RAL 7016 ANTRACIT", 3D `ralKod` chce kód „7016".
-- **`{#key}` na rozmeroch** remountne 3D pri zmene rozmerov (nový canvas = sanktimovaný
-  teardown+mount, NIE zakázané `forceContextLoss` na tom istom canvase, viď `vizual3d.md`),
-  aby sa scénický rig (kamera/tiene/dekal, dimenzované raz pri mounte) prefitoval; zmena
-  len skla/RAL pri rovnakých rozmeroch → in-place update komponentu.
+  `Vizual3D` + celý `$lib/vizual/**`, a nové `components/konfigurator/**` sú tiež
+  auto-pokryté (neimportujú `sklo-strecha`/`cena`/`server`). Pred montážou vizuál vetvy
+  grep-ni, že nenesie zakázaný reťazec — inak guard (A) SPADNE.
+- **Lazy dynamic import v `onMount`** (`KonfVizual.svelte`: `import('…VizualPergolaZakaznik
+  .svelte').then(m => VizualKomp = m.default)`) — three.js ostáva SAMOSTATNÝ chunk
+  (chunk-size guard ≤220KB), len sa spustí pri MOUNTE namiesto pri submite (#325: náhľad
+  je viditeľný hneď). Guard (A) `extrahujSpecifikatory` číta aj `import()`.
+- **ŽIVÝ update = hybrid (#325):** FARBA (RAL) + typ SKLA prúdia LIVE ako props → okamžitý
+  in-place update materiálu vo `Vizual3D` (`prekresliRAL`/`prekresliSklo`, žiadny rebuild
+  geometrie). ROZMERY prúdia cez DEBOUNCED (~320 ms) snapshot (`rozmeryStabilne` `$state`
+  aktualizovaný v `$effect` s `setTimeout`+cleanup, LEN pri platnom vstupe) → `{#key vizKluc}`
+  remount, ktorý REFITNE celý scénický rig (kamera/tiene/dekal/stena — dimenzované raz pri
+  mounte, #170/#174). Rozmery do 3D idú z debounced snapshotu (nie live) → žiadny prechodný
+  „stena je užšia než pergola" glitch. Prečo NIE plný in-place refit rigu: to je nevyriešené
+  #170/#174 obmedzenie + veľký blast-radius do zdieľaného `Vizual3D`.
+- **`{#key vizKluc}`** kľúčuje LEN podpis (debounced) rozmerov → remount/refit iba pri zmene
+  rozmeru; zmena skla/RAL pri rovnakých rozmeroch → in-place (žiadny remount). Remount je
+  sankcionovaný teardown+mount (NIE zakázané `forceContextLoss` na tom istom canvase, viď
+  `vizual3d.md`).
+- **RAL kód pre 3D = form-state `farba`** (select `value={f.kod}` = priamo RAL kód „7016").
+  Sklo → `typSkla3D(nazovSkla)` (client-safe odtieň, žiadny katalóg).
+- **CENA/SÚHRN ostávajú SERVER-side na submite** (owner #325 to dovolil — §3 „live kalkulačka
+  = enhance + submit" platí pre CENU, nie pre 3D). AR náhľad ostáva POST-SUBMIT (model-viewer
+  bundle sa nenačíta pri loade); `arViz` = snapshot vstupov PRI submite.
 - **`zobrazOvladanie={false}`** — form ostáva jediný zdroj pravdy (vlastné RAL/sklo čipy
-  komponentu by duplikovali formulár a rozišli sa so súhrnom/PDF #277); drag-to-orbit
-  ostáva (OrbitControls je nezávislý od čipov).
+  komponentu by duplikovali formulár); drag-to-orbit ostáva (OrbitControls nezávislý od čipov).
 - **Mapovanie názov skla → vizuálny odtieň**: `typSkla3D(nazovSkla)` v `konfigurator.ts`
   (číre→cire, mliečne/matné/STADUR→matne, bronz→bronzove, default cire) — pure, testované,
   bez katalógového importu.

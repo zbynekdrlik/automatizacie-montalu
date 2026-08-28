@@ -386,7 +386,7 @@ async function overPostprocGate(page: import('@playwright/test').Page) {
 	if (jeSoftverovyRenderer(info.renderer ?? '')) expect(info.postproc).toBe('false');
 }
 
-test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), nula console chýb, žiaden únik', async ({
+test('konfigurátor: 3D náhľad je viditeľný HNEĎ pri načítaní + živý update (desktop, mid tier), nula console chýb, žiaden únik (#325)', async ({
 	page
 }) => {
 	test.setTimeout(60000); // softvérový WebGL v CI je pomalší (lazy import + stavba scény + HDRI)
@@ -395,24 +395,16 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	await goto(page, '/konfigurator?viz=mid');
 	await expect(page).toHaveURL(/\/konfigurator/);
 
-	await vyplnFormular(page);
-
-	// #276 lazy-load LOCK: PRED submitom 3D vrstva NIE JE aktívna — komponent nie je
-	// namountovaný a žiadny WebGL kontext neexistuje → dôkaz, že 3D/three.js bundle sa
-	// nenačíta pred zobrazením náhľadu (hard constraint konfigurator.md — lazy dynamic import).
-	expect(await page.getByTestId('konf-viz').count()).toBe(0);
-	expect(await page.getByTestId('vizual3d-canvas').count()).toBe(0);
-	expect(
-		await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null)
-	).toBeNull();
-
-	await page.getByTestId('zobrazit').click();
-	await expect(page.getByTestId('suhrn')).toBeVisible();
-
-	// 3D náhľad je „hero" súhrnu — objaví sa nad tabuľkou; lazy komponent + engine ready
+	// #325 split-screen: 3D náhľad (defaultná pergola) je viditeľný HNEĎ, BEZ submitu —
+	// invertuje pôvodný #276 lazy-lock (náhľad bol až po submite). Lazy import three.js
+	// beží v onMount → komponent je namountovaný pri načítaní stránky.
 	await expect(page.getByTestId('konf-viz')).toBeVisible();
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 	await expect(page.getByTestId('vizual3d-canvas')).toBeVisible();
+	// práve JEDEN WebGL kontext (žiaden leak)
+	expect(
+		await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null)
+	).toBe(1);
 
 	const box = await page.getByTestId('vizual3d-canvas').boundingBox();
 	expect(box).not.toBeNull();
@@ -421,11 +413,38 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	// netriviálny obsah (nie prázdny/jednofarebný canvas)
 	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
 
+	// ŽIVÝ UPDATE (#325): zmena rozmerov/skla vo formulári sa prejaví v 3D BEZ submitu.
+	// Caption (vo VizualPergolaZakaznik) číta LIVE props → po debounced remounte rozmerov
+	// ukáže nové rozmery. To dokazuje, že form-state → 3D tečie naživo.
+	const captionRozmer = page.getByTestId('pergola-caption-rozmer');
+	const predRozmer = (await captionRozmer.innerText()).trim();
+	await vyplnFormular(page); // sirka 5000, hlbka 3800, sklo mliečne, RAL 9005
+	await expect
+		.poll(async () => (await captionRozmer.innerText()).trim(), { timeout: 6000 })
+		.not.toBe(predRozmer);
+
+	// 3D ostáva zdravý po živých zmenách — stále JEDEN kontext, netriviálny render
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+	await expect(page.getByTestId('vizual3d-canvas')).toBeVisible();
+	await expect
+		.poll(
+			async () =>
+				await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null),
+			{ timeout: 8000 }
+		)
+		.toBe(1);
+	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
+
 	// #288: post-processing gate (mid tier) — na softvérovom CI rendereri VYPNUTÝ (#290)
 	await overPostprocGate(page);
 
-	// ÚNIK GUARD (redefinovaný, #279 Fáza C) ostáva platný aj s 3D náhľadom: cena SMIE byť,
-	// zakázaný je Money kód (TS###), nárez a VEĽKOOBCHOD (VO) cena.
+	// submit → cena/súhrn v pravom paneli (3D vľavo stále žije). ÚNIK GUARD platí aj tu:
+	// cena SMIE byť (owner ROZHODNUTÉ), zakázaný je Money kód (TS###)/nárez/VEĽKOOBCHOD (VO).
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('suhrn')).toBeVisible();
+	await expect(page.getByTestId('cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('konf-viz')).toBeVisible(); // 3D ostáva viditeľný po submite
+
 	const telo = await page.locator('body').innerText();
 	expect(telo).not.toMatch(/TS\d{3}/);
 	expect(telo).not.toMatch(/nárez/i);
@@ -434,7 +453,7 @@ test('konfigurátor: 3D náhľad sa vyrenderuje po submite (desktop, mid tier), 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('konfigurátor: 3D náhľad na MOBILNOM viewporte 390×844 (low tier fallback), nula console chýb', async ({
+test('konfigurátor: 3D náhľad viditeľný HNEĎ na MOBILNOM viewporte 390×844 (low tier fallback), nula console chýb (#325)', async ({
 	page
 }) => {
 	test.setTimeout(60000);
@@ -442,10 +461,7 @@ test('konfigurátor: 3D náhľad na MOBILNOM viewporte 390×844 (low tier fallba
 	await page.setViewportSize({ width: 390, height: 844 });
 
 	await goto(page, '/konfigurator?viz=low');
-	await vyplnFormular(page);
-	await page.getByTestId('zobrazit').click();
-	await expect(page.getByTestId('suhrn')).toBeVisible();
-
+	// #325 mobil-first: vizuál hore, viditeľný HNEĎ pri načítaní (bez submitu)
 	await expect(page.getByTestId('konf-viz')).toBeVisible();
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 	await expect(page.getByTestId('vizual3d-canvas')).toBeVisible();
