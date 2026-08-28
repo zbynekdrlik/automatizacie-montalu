@@ -165,3 +165,50 @@ exportu + model-viewer sú v `.claude/rules/vizual3d.md` (auto-loaduje sa na
 - **`+server.ts` je server-only ako `+page.server.ts`** — money-safety guard (A)
   `jeKlientskyReachable` ho vylučuje (bez toho by ho bral ako klientsky vstup a spadol
   na jeho legitímnom `$lib/server/*` importe).
+
+## 8. Prémiový showroom redizajn (#327) — chrome, ovládanie, E2E pasce
+
+**Vizuál (owner „uplne trapny dizajn"):** svetlý Tesla-style showroom. Split-screen
+štruktúra z §6 ostáva; mení sa RÁMOVANIE + ovládacie prvky, NIE výpočty/3D scéna.
+
+- **Chrome = 2 vrstvy.** Root `+layout.svelte` má `jeKonfig = $derived(pathname === '/konfigurator'
+  || startsWith('/konfigurator/'))` a TROJVETVU `{#if /login}{:else if jeKonfig}{:else}`: pre
+  `jeKonfig` renderuje LEN `{@render children()}` (žiadny admin nav — `{#if data.user && !jeKonfig}`,
+  žiadny `.wrap`, žiadny root footer). Route `konfigurator/+layout.svelte` dodá vlastný minimal
+  header (MONTALU + montalu.sk; prihlásený → „← interná aplikácia" cez `resolve('/zasklenia')`) +
+  pätičku s JEDINÝM `data-testid="version"`. Root pre konf vetvu footer NErenderuje → práve jeden
+  version testid (E2E strict-mode inak padne). `data-hydrated` `$effect` v roote ostáva (E2E naň čaká).
+- **Dizajnové tokeny na JEDNOM mieste** — `.konf-app` v `konfigurator/+layout.svelte` (`--k-bg`,
+  `--k-ink`, `--k-line`, Inter font), kaskádujú do všetkých konf komponentov cez dedené CSS
+  custom properties. NIKDY do `app.css` (prenieslo by showroom tému do internej admin appky).
+- **Font:** `@fontsource-variable/inter/index.css` (npm, žiadny CDN; `index.css` má latin-ext →
+  slovenčina). Vzor existujúceho `@fontsource-variable/archivo` v `login/+page.svelte`.
+- **Ovládanie = `KonfOvladace.svelte`** (7× `$bindable`), renderované VNÚTRI `<form id="konf-form"
+  use:enhance>` v `+page.svelte` → jeho `name=` inputy sú v POST-e (DOM-based membership, vzor
+  #239). Submit tlačidlo je MIMO formu, spojené cez `form="konf-form"` (prilepený CTA panel dole) —
+  natívne submitne form, enhance ho zachytí. Výsledkové sekcie (DopytForm/ObjednavkaForm = vlastné
+  `<form>`) sú MIMO konf-form (žiadny nested form). **VŠETKY non-submit `<button>` = `type="button"`**
+  (default submit → stepper/chip/swatch by POSToval form). Model = sr-only radio (clip-pattern,
+  fokusovateľný) v labeli; sklo/farba = `<button aria-pressed>` chip/swatch + skrytý `<input
+  name= value>` (POSTuje kód/názov nezmenene). E2E: model/chip/swatch = `.click()`, nie `.check()`/
+  `.selectOption()`.
+- **RAL hex na swatche** ber cez `farbaKonstrukcie()` z `$lib/vykres/ral` (čistý leaf bez moneyKod,
+  UŽ v klientskom grafe cez Vizual3D → guard (A) prejde konštrukčne). Zoznam farieb z `data.farby`
+  (server = zdroj), ral.ts len na hex/`tmavyObrys`. **PASCA (stálo CI cyklus): guard (A) grepuje
+  DOSLOVNÝ reťazec `moneyKod` aj v KOMENTÁROCH** — nepíš `moneyKod` v komentári nového klientskeho
+  súboru, píš „Money kódu".
+- **Sklon = slider + číselný „twin".** `<input type=range>` (bez name/testid) + `<input type=number
+  name="sklonDeg" data-testid="sklonDeg" bind:value>` oba na `sklonDeg`. Playwright `.fill()`
+  NEfunguje na `type=range` → testy mieria na number twin, žiadny helper netreba.
+- **E2E timing pasca:** edge-to-edge 3D náhľad je ~2.5× ťažší na softvérovom CI WebGL (Vizual3D
+  renderuje na veľkosť kontajnera, bez pixel-ratio capu). Form-testy MUSIA počkať na
+  `[data-viz-ready="true"]` PRED interakciou (helper `konfReady`/`submitKonfig`), inak (a) enhance
+  callback (cena/súhrn/chyba) mešká za synchrónnou stavbou 3D scény a (b) `{#key}` remount pretekáva
+  s ešte-mountujúcou scénou → `forceContextLoss`. Benígny warning `CONTEXT_LOST_WEBGL: loseContext:
+  context lost` (explicitný teardown, nie GPU pád — ten Chrome loguje bez „loseContext:") je
+  filtrovaný v `e2e/helpers.ts` `collectConsole`.
+- **Edge-to-edge 3D bez úniku:** KonfVizual mení rámovanie zdieľaného `Vizual3D` LEN cez scoped
+  `:global(.konf-vizual …)` (výška 100%, `aspect-ratio:auto`, caption ako overlay v rohu). Nič sa
+  neprenesie do zasklenia. Layout: čistý CSS grid (mobil 2 riadky 3D-hore/panel-scroll-dole, desktop
+  2 stĺpce), CTA je flex dieťa na spodku panela (NIE sticky-overlay → neprekrýva klikateľný obsah;
+  sticky-overlay 3D/CTA spôsoboval Playwright „scrolling into view" timeout).
