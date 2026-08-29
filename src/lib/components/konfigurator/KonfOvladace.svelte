@@ -99,24 +99,34 @@
 		<div class="konf-modely" role="radiogroup" aria-label="Model konštrukcie" data-testid="modely">
 			{#each data.modely as m (m.kod)}
 				{@const foto = MODEL_FOTA[m.kod]}
-				<label class="konf-model" class:vybrany={model === m.kod} data-testid="model-{m.kod}">
-					<input type="radio" name="model" value={m.kod} bind:group={model} class="konf-sr-only" />
-					<span class="konf-model-hlava">
-						<span class="konf-model-nazov">{m.kod}</span>
-						<span class="konf-model-hlava-p">
-							{#if foto}
-								<KonfInfoKarta
-									nazov="Pergola {m.kod}"
-									popis={foto.popis}
-									obrazok={foto.obrazok}
-									alt="Pergola {m.kod}"
-								/>
-							{/if}
+				<!-- review 🟡: ⓘ karta je SESTRA `<label>`, nie vnútri neho — `<button>` je labelovateľný
+				     prvok, HTML ho vnútri `<label>` zakazuje a jeho text by znečistil accessible name radia -->
+				<div class="konf-model-wrap">
+					<label class="konf-model" class:vybrany={model === m.kod} data-testid="model-{m.kod}">
+						<input
+							type="radio"
+							name="model"
+							value={m.kod}
+							bind:group={model}
+							class="konf-sr-only"
+						/>
+						<span class="konf-model-hlava">
+							<span class="konf-model-nazov">{m.kod}</span>
 							<span class="konf-model-fajka" aria-hidden="true">✓</span>
 						</span>
-					</span>
-					<span class="konf-model-popis">{m.popis}</span>
-				</label>
+						<span class="konf-model-popis">{m.popis}</span>
+					</label>
+					{#if foto}
+						<span class="konf-model-info">
+							<KonfInfoKarta
+								nazov="Pergola {m.kod}"
+								popis={foto.popis}
+								obrazok={foto.obrazok}
+								alt="Pergola {m.kod}"
+							/>
+						</span>
+					{/if}
+				</div>
 			{/each}
 		</div>
 	</section>
@@ -389,15 +399,22 @@
 		box-shadow: inset 0 0 0 1px var(--k-ink);
 		background: var(--k-surface);
 	}
+	.konf-model-wrap {
+		position: relative;
+	}
+	/* ⓘ karta v pravom hornom rohu karty (mimo `<label>`, ale vizuálne v hlavičke) — vľavo od
+	   miesta pre fajku (hlavička má padding-right, aby sa neprekrývali) */
+	.konf-model-info {
+		position: absolute;
+		top: 13px;
+		right: 15px;
+		z-index: 2;
+	}
 	.konf-model-hlava {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-	}
-	.konf-model-hlava-p {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
+		padding-right: 28px;
 	}
 	.konf-model-nazov {
 		font-weight: 650;

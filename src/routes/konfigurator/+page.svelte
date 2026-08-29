@@ -309,6 +309,7 @@
 								vyskaPriSteneMm={a.vyskaPriSteneMm}
 								typSkla={a.typSkla}
 								ralKod={a.ralKod}
+								model={a.model}
 							/>
 						{:else}
 							<div class="ar-loading" data-testid="konf-ar-loading">Načítavam AR náhľad…</div>

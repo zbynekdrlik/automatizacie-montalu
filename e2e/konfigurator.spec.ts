@@ -557,12 +557,19 @@ test('konfigurátor: zákaznícke kategórie skla + info karty + realistický sk
 	const infoBtn = page.getByTestId('konf-info-btn');
 	// 3 modely + 6 skiel = 9 info tlačidiel
 	await expect(infoBtn).toHaveCount(9);
-	const prvaKarta = page.getByTestId('konf-info-karta').first();
-	await expect(prvaKarta).not.toHaveClass(/otvorene/);
-	await infoBtn.first().click();
-	await expect(prvaKarta).toHaveClass(/otvorene/);
-	// tap na ⓘ NEZMENIL výber modelu (default LIGHT ostáva) — karta je len informačná
+	const infoKarta = page.getByTestId('konf-info-karta');
+	// tapni ⓘ NEvybraného modelu ROBUST (nth(1)) — default je LIGHT
 	await expect(page.getByTestId('model-LIGHT')).toHaveClass(/vybrany/);
+	await expect(page.getByTestId('model-ROBUST')).not.toHaveClass(/vybrany/);
+	await expect(infoKarta.nth(1)).not.toHaveClass(/otvorene/);
+	await infoBtn.nth(1).click();
+	await expect(infoKarta.nth(1)).toHaveClass(/otvorene/);
+	// tap na ⓘ ROBUST-u NEVYBRAL model ROBUST (karta je len informačná, nezmení výber)
+	await expect(page.getByTestId('model-ROBUST')).not.toHaveClass(/vybrany/);
+	await expect(page.getByTestId('model-LIGHT')).toHaveClass(/vybrany/);
+	// Escape zatvorí kartu (dismissible)
+	await page.keyboard.press('Escape');
+	await expect(infoKarta.nth(1)).not.toHaveClass(/otvorene/);
 
 	// (4) výber kategórie POSTuje KONKRÉTNY katalógový názov ďalej: klik na „Izolačné sklo —
 	// mliečne" (data-value = katalógový názov s hrúbkou, skrytý v atribúte) → súhrn ukáže

@@ -23,14 +23,40 @@
 	} = $props();
 
 	let otvorene = $state(false);
+	let wrapEl = $state<HTMLElement>();
+	// review 🔵: disclosure ARIA vzor — trigger `aria-controls` + `aria-expanded`, karta má `id`
+	// (žiadny `role="tooltip"`, ktorý sa nemieša s aria-expanded na triggeri). Unikátne id per
+	// inštancia cez `$props.id()` (Svelte 5).
+	const uid = $props.id();
+	const kartaId = `konf-info-${uid}`;
+
+	// review 🟡: otvorená (tap) karta je overlay s `pointer-events:auto` — bez zatvárania by
+	// blokovala prvky pod sebou. Kým je otvorená, zatvor ju klikom mimo alebo Escape (WCAG 1.4.13
+	// dismissible). Listenery žijú LEN počas otvorenia (effect cleanup ich odstráni).
+	$effect(() => {
+		if (!otvorene) return;
+		const naMimo = (e: PointerEvent) => {
+			if (wrapEl && !wrapEl.contains(e.target as Node)) otvorene = false;
+		};
+		const naKlaves = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') otvorene = false;
+		};
+		document.addEventListener('pointerdown', naMimo, true);
+		document.addEventListener('keydown', naKlaves);
+		return () => {
+			document.removeEventListener('pointerdown', naMimo, true);
+			document.removeEventListener('keydown', naKlaves);
+		};
+	});
 </script>
 
-<span class="konf-info">
+<span class="konf-info" bind:this={wrapEl}>
 	<button
 		type="button"
 		class="konf-info-btn"
 		aria-label={`Viac o: ${nazov}`}
 		aria-expanded={otvorene}
+		aria-controls={kartaId}
 		data-testid="konf-info-btn"
 		onclick={(e) => {
 			e.stopPropagation();
@@ -38,7 +64,7 @@
 			otvorene = !otvorene;
 		}}>i</button
 	>
-	<span class="konf-info-karta" class:otvorene role="tooltip" data-testid="konf-info-karta">
+	<span id={kartaId} class="konf-info-karta" class:otvorene data-testid="konf-info-karta">
 		<img class="konf-info-obr" src={`${base}/konfigurator/${obrazok}`} {alt} loading="lazy" />
 		<span class="konf-info-text">
 			<strong>{nazov}</strong>

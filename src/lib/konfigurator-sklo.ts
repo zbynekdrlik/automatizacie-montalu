@@ -4,7 +4,7 @@
 // (`.nazov`), ktorý sa POSTuje ďalej nezmenene → cena/PDF/dopyt/Odoo lead a odoslanie dostávajú
 // presne ten istý katalógový `nazov` ako doteraz, takže NIČ v pipeline sa nemení.
 //
-// CLIENT-SAFE: modul nesie LEN katalógový `nazov` (ten už dnes ide klientovi cez `data.sklaTypy`)
+// CLIENT-SAFE: modul nesie LEN katalógový `nazov` (ten ide klientovi cez `data.sklaKategorie[].katalogNazov`)
 // + zákaznícky label/popis/ikonu — NIKDY Money kód (TS*) ani cenu. Preto ho smie importovať aj
 // klientsky bundle (leak-guard `konfigurator-money-safety` ostáva zelený). Interné stránky
 // (/zasklenia*, /pergola*) ostávajú na PLNOM katalógu `SKLO_STRECHA_TYPY` — táto vrstva je len

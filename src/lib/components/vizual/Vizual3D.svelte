@@ -10,15 +10,11 @@
 	import { base } from '$app/paths';
 	import type { Rola, VizVysledok } from '$lib/vizual/spec';
 	import { mm } from '$lib/vizual/jednotky';
-	import { SKLO_HRUBKA_DEFAULT_MM } from '$lib/vizual/konstanty';
-	import { postavGeometrie, type MergeGeometriesFn } from '$lib/vizual/builder';
-	import {
-		nastavRAL,
-		nastavSkloVzhlad,
-		vytvorHlinikMaterial,
-		vytvorSkloMaterial,
-		type SkloVzhlad
-	} from '$lib/vizual/materialy';
+	import type { MergeGeometriesFn } from '$lib/vizual/builder';
+	// #329 large-file-split: meshe produktu extrahované do samostatného modulu (Vizual3D prekročil
+	// 1000-r. strop). Čisté funkcie (všetky vstupy ako argumenty), volané tu aj v prestavbe geometrie.
+	import { postavProduktMeshe, zlikvidujProduktMeshe } from '$lib/vizual/produkt-meshe';
+	import { nastavRAL, nastavSkloVzhlad, type SkloVzhlad } from '$lib/vizual/materialy';
 	import {
 		disposeVsetko,
 		hdriUrl,
@@ -217,8 +213,10 @@
 	// Produktu/stavba scény). `data-viz-ral` (v `pripravDataZAtributov`) je oproti tomu prop-pass
 	// (mení sa pri každej zmene propu bez ohľadu na prekreslenie). E2E asertuje applied atribúty →
 	// dokáže, že zmena RAL/skla sa naozaj premietla do 3D (regression-test-first pre #329 bug).
+	// review 🔵: podpis nesie viac než len farbaHex — dve vizuálne rodiny by mohli zdieľať hex a
+	// líšiť sa opacity/roughness; tak signál (a e2e) nezmešká reálne prekreslenie ani do budúcna.
 	function skloPodpis(vz: SkloVzhlad): string {
-		return String(vz.farbaHex);
+		return `${vz.farbaHex}|${vz.opacity}|${vz.roughness}`;
 	}
 	function oznacRalApplied() {
 		if (containerEl) containerEl.dataset.vizRalApplied = ralKod;
@@ -346,96 +344,6 @@
 			initMs,
 			contextLostCount
 		});
-	}
-
-	/** Zlikviduje VŠETKY meshe produktu — geometriu KAŽDÉHO a materiál
-	 *  KAŽDÉHO (aj keď sa `hlinik` zdieľa naprieč ram/kolajnica/klucka/klin —
-	 *  opakovaný `.dispose()` na tej istej inštancii je v three.js neškodný
-	 *  no-op, takže sa netreba starať o duplicity). */
-	function zlikvidujProduktMeshe(meshe: InstanceType<ThreeNS['Mesh']>[]) {
-		for (const mesh of meshe) {
-			mesh.geometry.dispose();
-			const mat = mesh.material as unknown as Disposable | Disposable[];
-			for (const m of Array.isArray(mat) ? mat : [mat]) m.dispose();
-		}
-	}
-
-	/** Postaví MESHE PRODUKTU (ram/kolajnica/klucka/klin/sklo/sietka) a pridá ich
-	 *  do `scene` — ODDELENÉ od `postavScenu()`, aby to isté vedela zavolať aj
-	 *  `prestavGeometriuProduktu()` (napr. "Otvoriť") BEZ toho, aby sa dotkla
-	 *  rendereru/kamery/svetiel/zeme/steny/oblohy. `materialy` (ram/kolajnica/
-	 *  klucka/klin, zdieľajú JEDNU `hlinik` inštanciu) je len pre RAL update
-	 *  (`prekresliRAL()`) — dispose ide cez `produktMeshe` (`zlikvidujProduktMeshe`),
-	 *  nie cez tento map (ten sklo/sietka materiály vôbec nedrží). */
-	function postavProduktMeshe(
-		THREE: ThreeNS,
-		mergeGeometries: MergeGeometriesFn,
-		scene: InstanceType<ThreeNS['Scene']>,
-		vysledok: VizVysledok,
-		ralKod: string,
-		nastavenia: ReturnType<typeof nastaveniaPreTier>,
-		skloVzhlad: SkloVzhlad | undefined
-	): {
-		materialy: ZivaScena['materialy'];
-		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
-		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
-	} {
-		const geometrie = postavGeometrie(vysledok.diely, THREE, mergeGeometries);
-		const materialy: ZivaScena['materialy'] = {};
-		const produktMeshe: InstanceType<ThreeNS['Mesh']>[] = [];
-		let skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null = null;
-
-		const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat);
-		for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
-			const geo = geometrie[rola];
-			if (!geo) continue;
-			materialy[rola] = hlinik;
-			const mesh = new THREE.Mesh(geo, hlinik);
-			// #285: hliníková konštrukcia vrhá aj prijíma reálny tieň (mid/high)
-			mesh.castShadow = nastavenia.tiene;
-			mesh.receiveShadow = nastavenia.tiene;
-			scene.add(mesh);
-			produktMeshe.push(mesh);
-		}
-		if (geometrie.sklo) {
-			// review nález 🟡 #4: predtým natvrdo `8` — duplicitné magické číslo
-			// oproti `SKLO_HRUBKA_DEFAULT_MM` (ktoré `geo/zasklenia.ts` už
-			// používa pre samotnú geometriu skla, `tvar.d`). Appka dnes
-			// nezbiera per-objednávku hrúbku skla vo formulári zasklenia-navrh,
-			// takže presná hodnota z `ZaskleniaVizVstup.skloPresne` sa sem
-			// (mimo `vysledok.diely`) nedostane — zdieľaný default aspoň
-			// nevie "rozísť" s geometriou, ak sa `SKLO_HRUBKA_DEFAULT_MM` zmení.
-			const skloMat = vytvorSkloMaterial(
-				THREE,
-				SKLO_HRUBKA_DEFAULT_MM,
-				nastavenia.sklo,
-				skloVzhlad
-			);
-			skloMaterial = skloMat;
-			const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
-			// #285: sklo prijíma tieň, ale NEvrhá (transmisné sklo by vrhalo
-			// nefyzikálny nepriehľadný tieň)
-			mesh.receiveShadow = nastavenia.tiene;
-			scene.add(mesh);
-			produktMeshe.push(mesh);
-		}
-		if (geometrie.sietka) {
-			// sieťkový panel — vizuál, nie katalóg (appka dnes nezbiera samostatné
-			// rozmery sieťky, len boolean prítomnosť — §2.5)
-			const sietkaMat = new THREE.MeshStandardMaterial({
-				color: 0x1e293b,
-				transparent: true,
-				opacity: 0.28,
-				side: THREE.DoubleSide,
-				roughness: 0.7,
-				metalness: 0
-			});
-			const mesh = new THREE.Mesh(geometrie.sietka, sietkaMat);
-			scene.add(mesh);
-			produktMeshe.push(mesh);
-		}
-
-		return { materialy, produktMeshe, skloMaterial };
 	}
 
 	/** V-mieste prestavba LEN geometrie produktu (napr. "Otvoriť"/rozmer) —
