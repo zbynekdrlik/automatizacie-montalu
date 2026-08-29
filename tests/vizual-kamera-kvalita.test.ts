@@ -9,6 +9,7 @@ import {
 	poziciaKamery,
 	PRESET_DEFAULT,
 	PRESETY,
+	PRESETY_DOM,
 	vzdialenostPrePreset
 } from '../src/lib/vizual/kamera';
 import { detekujTier, nastaveniaPreTier } from '../src/lib/vizual/kvalita';
@@ -48,6 +49,45 @@ describe('kamera — presety a fixné "Zvnútra"', () => {
 		expect(vzdialenostPrePreset('zvnutra', fit)).toBe(1.6);
 		expect(vzdialenostPrePreset('troStvrte', fit)).toBe(fit);
 		expect(vzdialenostPrePreset('celny', fit)).toBe(fit);
+	});
+});
+
+describe('kamera — #333 PRESETY_DOM (pergola „z hora", nezasahuje do zdieľaného PRESETY)', () => {
+	it('troStvrte má VÝRAZNE vyššiu eleváciu (28° vs 7°), azimut nezmenený', () => {
+		expect(PRESETY_DOM.troStvrte.elevacia).toBe(28);
+		expect(PRESETY_DOM.troStvrte.azimut).toBe(PRESETY.troStvrte.azimut); // -32
+		expect(PRESETY.troStvrte.elevacia).toBe(7); // zasklenia default NEZMENENÝ (výška oka test)
+	});
+
+	it('celny/zvnutra zhodné s PRESETY (dvíha sa LEN default troStvrte)', () => {
+		expect(PRESETY_DOM.celny).toEqual(PRESETY.celny);
+		expect(PRESETY_DOM.zvnutra).toEqual(PRESETY.zvnutra);
+	});
+
+	it('vyššia elevácia → vyššia svetová Y kamery (dominantne vidno strešné sklo)', () => {
+		const bbox = { w: 4200, h: 2500, d: 3500 };
+		const fit = autoFitVzdialenost(bbox, 16 / 10);
+		const ciel = fitCiel(bbox);
+		const yDom = poziciaKamery(
+			ciel,
+			PRESETY_DOM.troStvrte.azimut,
+			PRESETY_DOM.troStvrte.elevacia,
+			fit
+		).y;
+		const yZasklenia = poziciaKamery(
+			ciel,
+			PRESETY.troStvrte.azimut,
+			PRESETY.troStvrte.elevacia,
+			fit
+		).y;
+		expect(yDom).toBeGreaterThan(yZasklenia);
+	});
+
+	it('default polar (90°−28°) je VNÚTRI orbit limitov [0,4..1,4] rad (netreba meniť clamp)', () => {
+		const lim = orbitLimity(PRESETY_DOM.troStvrte, 10);
+		const polarDefault = Math.PI / 2 - (PRESETY_DOM.troStvrte.elevacia * Math.PI) / 180;
+		expect(polarDefault).toBeGreaterThan(lim.minPolarAngle);
+		expect(polarDefault).toBeLessThan(lim.maxPolarAngle);
 	});
 });
 

@@ -35,6 +35,21 @@ export const PRESETY = {
 export type PresetKluc = keyof typeof PRESETY;
 export const PRESET_DEFAULT: PresetKluc = 'troStvrte';
 
+/** #333 — DOM (pergola konfigurátor) variant presetov: `troStvrte` má VÝRAZNE vyššiu
+ *  eleváciu (28° vs 7°), aby bolo pri načítaní dominantne vidno strešné SKLO pergoly
+ *  „z hora" (owner: „model načítavať z hora, nech je vidno pekné sklo"). Ostatné presety
+ *  zhodné s `PRESETY`. Zámerne SAMOSTATNÁ tabuľka (nie mutácia/spread `PRESETY`):
+ *  `troStvrte` je ZDIEĽANÝ default aj pre zasklenia scénu, kde nižšia elevácia (výška oka
+ *  ~1,5–1,7 m — `tests/vizual-kamera-kvalita.test.ts`) MUSÍ ostať nezmenená. `Vizual3D`
+ *  vyberá tabuľku podľa `zobrazDom` (pergola = DOM). Literál (žiadne zdieľané referencie
+ *  preset objektov medzi tabuľkami). Default polar 90°−28°=62° je vnútri `orbitLimity`
+ *  [0,4..1,4] rad, takže orbit limity netreba upravovať. */
+export const PRESETY_DOM = {
+	troStvrte: { nazov: '3/4 exteriér', azimut: -32, elevacia: 28 },
+	celny: { nazov: 'Čelný', azimut: 0, elevacia: 6 },
+	zvnutra: { nazov: 'Zvnútra', azimut: 152, elevacia: 4 }
+} as const satisfies Record<PresetKluc, Preset>;
+
 /** fov je ZAMKNUTÉ na 35° (§2.8) — žiadna wide-angle deformácia, nikde inde
  *  sa toto číslo nesmie prepisovať. */
 export const FOV_DEG = 35;
