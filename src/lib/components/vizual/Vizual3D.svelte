@@ -35,7 +35,13 @@
 		type PresetKluc,
 		vzdialenostPrePreset
 	} from '$lib/vizual/kamera';
-	import { detekujTier, nastaveniaPreTier, postprocPovoleny, type Tier } from '$lib/vizual/kvalita';
+	import {
+		detekujTier,
+		jeSoftverovyRenderer,
+		nastaveniaPreTier,
+		postprocPovoleny,
+		type Tier
+	} from '$lib/vizual/kvalita';
 	import { snimka as zachytSnimku } from '$lib/vizual/snimka';
 	import type { PostprocModuly } from '$lib/vizual/postproc';
 
@@ -571,7 +577,12 @@
 			// (re)monte = pri každej zmene rozmeru (zmizne po ~2 s).
 			if (zobrazDom && typeof requestAnimationFrame === 'function') {
 				zobrazKotu();
-				if (!introUzBezal) {
+				// Intro glide LEN na HARDVÉROVOM rendereri (ako #285/#288 polish gate): na
+				// SOFTVÉROVOM WebGL (SwiftShader/CI, slabé zariadenia) je každý render ťažkej scény
+				// pomalý → 1,7 s rAF slučka by blokovala hlavné vlákno a robila glide trhaný. Tam sa
+				// scéna rovno ukáže na defaultnom „z hora" presete (žiadny glide). Odstráni to aj
+				// kontenciu hneď po monte, ktorá spomaľovala živý update na softvérovom CI.
+				if (!introUzBezal && !jeSoftverovyRenderer(citajUnmaskedRenderer(gl))) {
 					introUzBezal = true;
 					introKamery();
 				}

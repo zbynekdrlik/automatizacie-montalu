@@ -528,6 +528,13 @@ hodnôt → hrany ostávajú zarovnané; bbox/kóty/`svetlaVyska` sa NEmenia.
   `'start'` (cez `tikaj`), prvá interakcia, `zachytObrazok` (snap na finál) a `cancelAnimationFrame`
   v onDestroy. Per-frame `poziciaKamery`+`controls.update()` (ako `aplikujPreset`), finálny
   `controls.update()` (sync spherical → prvý drag „neskočí").
+- **Intro glide je GATED na HARDVÉROVÝ renderer** (`!jeSoftverovyRenderer(citajUnmaskedRenderer(gl))`,
+  vzor #285/#288 polish gate). Na SOFTVÉROVOM WebGL (SwiftShader/CI) je 1,7 s rAF slučka
+  renderujúca ťažkú scénu KONTENCIA na hlavnom vlákne — vytvorí ~1,7 s okno po monte, ktoré na CI
+  RACE-ovalo s `konfigurator.spec.ts:408` „živý update" testom (debounced remount + caption update
+  pri `vyplnFormular` sa dostali do intro okna → poll `pergola-caption-rozmer` timeout 6000 ms;
+  flake — 40b7da1 CI prešiel keď skoré kroky testu okno prežili, 325e990 nie). Gate to odstráni
+  (na softvéri sa scéna rovno ukáže na defaultnom presete, žiadny trhaný glide).
 - **Vizual3D je ZDIEĽANÝ → NEimportuj `$lib/konfigurator*` doň** (money-guard allowlist §2.13 ich
   nepozná; guard by spadol). Triviálny format (mm→„4,0") inline priamo v komponente, nie import
   `konfigurator-jednotky`.
