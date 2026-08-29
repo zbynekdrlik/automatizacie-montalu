@@ -183,8 +183,8 @@ export function vytvorStrechaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture 
  *  `Math.random` (v teste mockovať + `finally` restore — vizual3d.md). */
 export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
-	const zaklad: [number, number, number] = hexNaRgb('#93a884'); // odsaturovaná svetlá zeleň
-	const tmava: [number, number, number] = hexNaRgb('#7c9070');
+	const zaklad: [number, number, number] = hexNaRgb('#c6cabd'); // bledá odsaturovaná šedozelená (SalesQueze near-white)
+	const tmava: [number, number, number] = hexNaRgb('#b7bdad');
 	const img = ctx.createImageData(rozlisenie, rozlisenie);
 	for (let i = 0; i < img.data.length; i += 4) {
 		let v = 0;
@@ -214,26 +214,52 @@ export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture 
  *  zosilnené na mäkká 0.68 / jadro 0.38 a jadro zúžené (0.32 → 0.24 polomer
  *  textúry), aby "odtlačok" priamo pod pätkou vyzeral ostrejšie/pevnejšie,
  *  nie ako veľká difúzna škvrna. */
-export function vytvorKontaktnyTienTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {
+export function vytvorKontaktnyTienTexturu(
+	THREE: ThreeNS,
+	rozlisenie = 512,
+	/** #333 polish: škáluje NEPRIEHĽADNOSŤ tieňa. Default 1.0 = pôvodné hodnoty (zasklenia
+	 *  scéna NEZMENENÁ, #174 tuning); pergola (`zobrazDom`) posiela ~0.4 → oveľa ľahší tieň
+	 *  (nie tmavá machuľa/diera). Násobenie 1.0 dáva bit-identické reťazce stopov (test #177). */
+	intenzita = 1
+): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
 	const stred = rozlisenie / 2;
+	const a = (v: number) => `rgba(15,23,42,${v * intenzita})`;
 
 	// mäkká vrstva — radiálny gradient cez celú plochu
 	const mekka = ctx.createRadialGradient(stred, stred, 0, stred, stred, stred);
-	mekka.addColorStop(0, 'rgba(15,23,42,0.68)');
-	mekka.addColorStop(0.55, 'rgba(15,23,42,0.34)');
-	mekka.addColorStop(1, 'rgba(15,23,42,0)');
+	mekka.addColorStop(0, a(0.68));
+	mekka.addColorStop(0.55, a(0.34));
+	mekka.addColorStop(1, a(0));
 	ctx.fillStyle = mekka;
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
 
 	// tvrdé jadro — menší, ostrejší tieň v strede (footprint produktu)
 	const jadroR = rozlisenie * 0.24;
 	const jadro = ctx.createRadialGradient(stred, stred, 0, stred, stred, jadroR);
-	jadro.addColorStop(0, 'rgba(15,23,42,0.38)');
-	jadro.addColorStop(0.85, 'rgba(15,23,42,0.3)');
-	jadro.addColorStop(1, 'rgba(15,23,42,0)');
+	jadro.addColorStop(0, a(0.38));
+	jadro.addColorStop(0.85, a(0.3));
+	jadro.addColorStop(1, a(0));
 	ctx.fillStyle = jadro;
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
 
 	return ztexturuj(THREE, canvas);
+}
+
+/** #333 polish — radiálna ALPHA maska (biela stred → čierny okraj) na MÄKKÉ zmiznutie hrany
+ *  terasy do trávnika (žiadna tvrdá hrana „kosého štvorca"). Použije sa ako `alphaMap` na
+ *  dlažbovej terase (transparentný okraj → presvitá trávnik pod ňou). Deterministické. */
+export function vytvorRadialnyAlphaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	const stred = rozlisenie / 2;
+	const grad = ctx.createRadialGradient(stred, stred, 0, stred, stred, stred);
+	// plne nepriehľadné jadro do ~62 %, potom mäkký nábeh do priehľadného okraja
+	grad.addColorStop(0, '#ffffff');
+	grad.addColorStop(0.62, '#ffffff');
+	grad.addColorStop(1, '#000000');
+	ctx.fillStyle = grad;
+	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
+	const tex = ztexturuj(THREE, canvas);
+	tex.colorSpace = THREE.NoColorSpace; // alpha maska nie je sRGB dáta
+	return tex;
 }

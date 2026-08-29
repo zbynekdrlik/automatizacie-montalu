@@ -357,17 +357,32 @@ export function vytvorStenu(
  *     PODLHOVASTÚ elipsu (tvrdé jadro naťahuje pozdĺž X spolu s celou
  *     rovinou), ktorá sleduje tvar koľajnice namiesto kruhu v strede pod
  *     ňou — žiadna zmena textúry potrebná. */
+export interface KontaktnyTienOpts {
+	/** násobok footprintu (default 1.35 = zasklenia). Pergola posiela menší (~1.1) — menšia stopa. */
+	footprintScale?: number;
+	/** násobok nepriehľadnosti tieňa (default 1.0 = zasklenia #174). Pergola ~0.4 = oveľa ľahší. */
+	intenzita?: number;
+}
+
 export function vytvorKontaktnyTien(
 	THREE: ThreeNS,
 	bboxSirkaMm: number,
 	bboxHlbkaMm: number,
-	bboxVyskaMm: number
+	bboxVyskaMm: number,
+	opts?: KontaktnyTienOpts
 ): InstanceType<ThreeNS['Mesh']> {
-	const sirkaM = mm(bboxSirkaMm) * 1.35;
-	const hlbkaM = Math.min(sirkaM, Math.max(mm(bboxHlbkaMm) * 1.35, mm(bboxVyskaMm) * 0.45));
+	// #333 polish: OPT parametre s DEFAULTMI = pôvodné hodnoty → zasklenia scéna NEZMENENÁ;
+	// LEN pergola (`zobrazDom`, cez scena-build.ts) posiela ľahšie/menšie (owner: „tmavá machuľa").
+	const footprintScale = opts?.footprintScale ?? 1.35;
+	const intenzita = opts?.intenzita ?? 1;
+	const sirkaM = mm(bboxSirkaMm) * footprintScale;
+	const hlbkaM = Math.min(
+		sirkaM,
+		Math.max(mm(bboxHlbkaMm) * footprintScale, mm(bboxVyskaMm) * 0.45)
+	);
 	const geo = new THREE.PlaneGeometry(sirkaM, hlbkaM);
 	geo.rotateX(-Math.PI / 2);
-	const tex = vytvorKontaktnyTienTexturu(THREE);
+	const tex = vytvorKontaktnyTienTexturu(THREE, 512, intenzita);
 	const mat = new THREE.MeshBasicMaterial({
 		map: tex,
 		transparent: true,

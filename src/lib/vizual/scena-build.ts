@@ -167,7 +167,14 @@ export function postavScenu(
 		for (const d of dom.disposables) disposables.push(d);
 	}
 
-	const tien = vytvorKontaktnyTien(THREE, vysledok.bbox.w, vysledok.bbox.d, vysledok.bbox.h);
+	const tien = vytvorKontaktnyTien(
+		THREE,
+		vysledok.bbox.w,
+		vysledok.bbox.d,
+		vysledok.bbox.h,
+		// #333 polish: pergola má ĽAHŠÍ + MENŠÍ kontaktný tieň (nie tmavá machuľa); zasklenia default.
+		zobrazDom ? { footprintScale: 1.1, intenzita: 0.4 } : undefined
+	);
 	scene.add(tien);
 	disposables.push(tien.geometry, tien.material as Disposable);
 	const tienMat = tien.material as InstanceType<ThreeNS['MeshBasicMaterial']>;
