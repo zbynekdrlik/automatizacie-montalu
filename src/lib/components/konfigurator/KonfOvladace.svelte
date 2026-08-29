@@ -86,7 +86,6 @@
 			? Math.round(Math.tan((sklonDeg * Math.PI) / 180) * hlbka)
 			: 0
 	);
-
 </script>
 
 <div class="konf-ovladace" class:pracuje={spracuva}>

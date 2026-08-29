@@ -91,11 +91,8 @@
 			onblur={onBlur}
 		/>
 		<span class="rs-jednotka">m</span>
-		<button
-			type="button"
-			class="rs-krok"
-			aria-label={`Zväčšiť ${akuzativ}`}
-			onclick={() => krok(1)}>+</button
+		<button type="button" class="rs-krok" aria-label={`Zväčšiť ${akuzativ}`} onclick={() => krok(1)}
+			>+</button
 		>
 	</span>
 	<!-- POSTuje interné MILIMETRE (cena/PDF/Odoo nezmenené) -->
