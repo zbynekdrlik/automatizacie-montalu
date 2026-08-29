@@ -3,6 +3,11 @@
 // (ponuka-pdf, dopyt-action). Money-neutrálne: iba zákaznícka konfigurácia + orientačná
 // PREDAJNÁ cena (#279 Fáza C) — NIKDY Money nákupné kódy, VO cena ani nárez.
 import { MODELY, type ModelPergoly, type VerejnaCena } from '$lib/konfigurator';
+// #329 časť 4: zákazník NIKDY nevidí hrúbky — v PDF ponuke zobraz zákaznícky label kategórie
+// (napr. „Izolačné sklo — mliečne") namiesto interného katalógového názvu s hrúbkou. `cfg.sklo`
+// (konkrétny nazov) ostáva NEZMENENÝ v uloženej konfigurácii + Odoo leade (pipeline nezmenená);
+// mapuje sa len pri RENDERI riadku. Neznámy (interný/nekategorizovaný) názov → fallback na raw.
+import { konfSkloKategoriaPreNazov } from '$lib/konfigurator-sklo';
 
 /** Platné modely (LIGHT/ROBUST/MASSIVE) — na obranné sparsovanie klientom dodaného `model`. */
 const PLATNE_MODELY = new Set<string>(MODELY.map((m) => m.kod));
@@ -138,7 +143,11 @@ export function zhrnutieRiadky(cfg: PonukaConfig): { label: string; value: strin
 		rows.push({ label: 'Výška pri stene', value: mm(cfg.vyskaPriStene) });
 	if (cfg.pocetPoli !== undefined) rows.push({ label: 'Počet polí', value: String(cfg.pocetPoli) });
 	if (cfg.farba) rows.push({ label: 'Farba konštrukcie', value: cfg.farba });
-	if (cfg.sklo) rows.push({ label: 'Sklo / výplň', value: cfg.sklo });
+	if (cfg.sklo)
+		rows.push({
+			label: 'Sklo / výplň',
+			value: konfSkloKategoriaPreNazov(cfg.sklo)?.label ?? cfg.sklo
+		});
 	if (cfg.popis) rows.push({ label: 'Popis', value: cfg.popis });
 	return rows;
 }

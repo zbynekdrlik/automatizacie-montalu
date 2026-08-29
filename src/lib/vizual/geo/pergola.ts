@@ -24,6 +24,27 @@ import type { DielSpec, VizVysledok } from '../spec';
  *  prednou (SV = FV ⇒ sklon 0). */
 export type PergolaTypStrechy = 'pultova' | 'rovna';
 
+/** #329 časť 2: model konštrukcie ako VIZUÁLNY vstup geometrie (hrúbky profilov). Definovaný TU
+ *  lokálne (nie import z `$lib/konfigurator`), aby vizuál vrstva ostala samostatný leaf bez
+ *  závislosti na wizard module (money-safety import-graf guard). Štrukturálne zhodný s
+ *  `ModelPergoly` v `$lib/konfigurator` — hodnoty sú tie isté string literály. */
+export type PergolaModel = 'LIGHT' | 'ROBUST' | 'MASSIVE';
+
+/** #329 časť 2: škála VIZUÁLNYCH prierezov profilov (stĺpiky/nosníky/krokvy) podľa modelu —
+ *  LIGHT < ROBUST < MASSIVE, viditeľné na prvý pohľad, proporčne uveriteľné. Iba vizuál: NEmení
+ *  žiadnu kótu, cenu ani `svetlaVyska` (tá počíta `konfigurator.ts` z reálneho NOSNIK_HRUBKA_MM
+ *  nezávisle). Neznámy/chýbajúci model → 1.0 (spätná kompatibilita — interné stránky/testy bez
+ *  modelu dostanú nezmenenú geometriu). */
+const MODEL_PROFIL_SKALA: Record<PergolaModel, number> = {
+	LIGHT: 0.8,
+	ROBUST: 1.0,
+	MASSIVE: 1.3
+};
+
+function profilSkala(model: PergolaModel | undefined): number {
+	return model ? (MODEL_PROFIL_SKALA[model] ?? 1) : 1;
+}
+
 export interface PergolaVizVstup {
 	/** celková šírka [mm] */
 	sirkaMm: number;
@@ -43,6 +64,8 @@ export interface PergolaVizVstup {
 	ralKod: string;
 	/** voľný RAL label (pri `RAL_INY_KOD`) */
 	ral?: string;
+	/** #329 časť 2: model konštrukcie → hrúbky profilov v 3D (undefined → 1.0, bez zmeny) */
+	model?: PergolaModel;
 }
 
 // --- vizuálne mm konštanty (vizuál, NIE katalóg — nevstupujú do žiadnej kóty
@@ -100,17 +123,26 @@ export function pergolaSpec(vst: PergolaVizVstup): VizVysledok {
 	const zFront = H / 2;
 	const zWall = -H / 2;
 
+	// #329 časť 2: VIZUÁLNE hrúbky profilov škálované podľa modelu (LIGHT<ROBUST<MASSIVE). Pozície
+	// (predná/horná hrana) sa počítajú z tých istých škálovaných hodnôt → hrany ostávajú zarovnané.
+	const skala = profilSkala(vst.model);
+	const stlpHr = STLP_HRUBKA_VIZ_MM * skala;
+	const nosnikH = NOSNIK_HRUBKA_MM * skala;
+	const nosnikZ = NOSNIK_Z_MM * skala;
+	const krokvaW = KROKVA_W_MM * skala;
+	const krokvaH = KROKVA_H_MM * skala;
+
 	// --- stĺpy: predný rad (výška FV) + rad pri stene (výška SV) ---
 	for (const x of postX) {
 		diely.push({
 			rola: 'ram',
-			tvar: { kind: 'box', w: STLP_HRUBKA_VIZ_MM, h: FV, d: STLP_HRUBKA_VIZ_MM },
-			pos: { x, y: FV / 2, z: zFront - STLP_HRUBKA_VIZ_MM / 2 }
+			tvar: { kind: 'box', w: stlpHr, h: FV, d: stlpHr },
+			pos: { x, y: FV / 2, z: zFront - stlpHr / 2 }
 		});
 		diely.push({
 			rola: 'ram',
-			tvar: { kind: 'box', w: STLP_HRUBKA_VIZ_MM, h: SV, d: STLP_HRUBKA_VIZ_MM },
-			pos: { x, y: SV / 2, z: zWall + STLP_HRUBKA_VIZ_MM / 2 }
+			tvar: { kind: 'box', w: stlpHr, h: SV, d: stlpHr },
+			pos: { x, y: SV / 2, z: zWall + stlpHr / 2 }
 		});
 	}
 
@@ -118,13 +150,13 @@ export function pergolaSpec(vst: PergolaVizVstup): VizVysledok {
 	//     horná hrana zarovnaná s vrcholom stĺpov ---
 	diely.push({
 		rola: 'ram',
-		tvar: { kind: 'box', w: S, h: NOSNIK_HRUBKA_MM, d: NOSNIK_Z_MM },
-		pos: { x: 0, y: FV - NOSNIK_HRUBKA_MM / 2, z: zFront - NOSNIK_Z_MM / 2 }
+		tvar: { kind: 'box', w: S, h: nosnikH, d: nosnikZ },
+		pos: { x: 0, y: FV - nosnikH / 2, z: zFront - nosnikZ / 2 }
 	});
 	diely.push({
 		rola: 'ram',
-		tvar: { kind: 'box', w: S, h: NOSNIK_HRUBKA_MM, d: NOSNIK_Z_MM },
-		pos: { x: 0, y: SV - NOSNIK_HRUBKA_MM / 2, z: zWall + NOSNIK_Z_MM / 2 }
+		tvar: { kind: 'box', w: S, h: nosnikH, d: nosnikZ },
+		pos: { x: 0, y: SV - nosnikH / 2, z: zWall + nosnikZ / 2 }
 	});
 
 	// rovina strechy: y v strede hĺbky (z=0) = priemer výšok; dĺžka pozdĺž spádu
@@ -138,9 +170,9 @@ export function pergolaSpec(vst: PergolaVizVstup): VizVysledok {
 		const x = -S / 2 + (S * j) / panelPocet;
 		diely.push({
 			rola: 'ram',
-			tvar: { kind: 'box', w: KROKVA_W_MM, h: KROKVA_H_MM, d: roofLen },
+			tvar: { kind: 'box', w: krokvaW, h: krokvaH, d: roofLen },
 			rot: { x: alfa, y: 0, z: 0 },
-			pos: { x, y: roofMidY - KROKVA_H_MM / 2, z: 0 }
+			pos: { x, y: roofMidY - krokvaH / 2, z: 0 }
 		});
 	}
 

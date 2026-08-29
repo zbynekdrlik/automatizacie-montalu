@@ -24,7 +24,9 @@ export const KONF_HLBKA_MAX = 6000;
 export const KONF_VYSKA_MIN = 2000; // výška vpredu; > NOSNIK_HRUBKA_MM (190) → svetlá výška > 0
 export const KONF_VYSKA_MAX = 4000;
 export const KONF_SKLON_MIN = 0;
-export const KONF_SKLON_MAX = 30;
+// #329 časť 5: realistický flat-ceiling sklon — max 10° (30° je na reálnej pergole nezmysel a 3D
+// pri veľkých hodnotách vyzeralo prehnane). Výpočet výšok sa nemení, len rozsah/default slidera.
+export const KONF_SKLON_MAX = 10;
 /** Dopočítaná výška pri stene nesmie prekročiť konštrukčné maximum enginu — priame
  *  rozmedzie `pergola-navrh` (VYSKA_MAX). Dolná hranica netreba: výška vpredu je vždy
  *  ≥ KONF_VYSKA_MIN (2000) a stena ≥ výška vpredu, takže nikdy neklesne pod VYSKA_MIN. */
@@ -181,7 +183,7 @@ export function konfiguruj(v: KonfiguratorVstup): KonfiguratorSuhrn {
 /** Mapuje katalógový NÁZOV strešného skla z formulára (napr. „4.4.2 mliečne",
  *  „polykarbonát 16 mm bronz", „STADUR 24 mm", „IZO 5.5.2-8-6") na vizuálny odtieň
  *  3D náhľadu (`cire`/`dymove`/`bronzove`/`matne`). Iba prezentačné mapovanie —
- *  string match na NÁZOV (ktorý je už na klientovi cez `data.sklaTypy`), NIKDY na
+ *  string match na NÁZOV (ktorý je už na klientovi cez `data.sklaKategorie[].katalogNazov`), NIKDY na
  *  cenu ani Money kód. ~15 katalógových názvov → 4 vizuálne rodiny; neznámy alebo
  *  prázdny názov → `cire` (transparentné, konzistentné s PERGOLA_TYP_SKLA_DEFAULT).
  *  - „bronz" → bronzové; „dym*" → dymové (rezerva, katalóg zatiaľ nemá dymové);

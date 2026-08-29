@@ -11,7 +11,7 @@
 	// console errors) — to je scope route/#275.
 	import Vizual3D from './Vizual3D.svelte';
 	import { pergolaSpec, pergolaPngNazov, type PergolaVizVstup } from '$lib/vizual/geo/pergola';
-	import type { PergolaTypStrechy } from '$lib/vizual/geo/pergola';
+	import type { PergolaTypStrechy, PergolaModel } from '$lib/vizual/geo/pergola';
 	import {
 		pergolaSkloVzhlad,
 		PERGOLA_SKLA_NAZVY,
@@ -35,6 +35,7 @@
 		typSkla = $bindable<PergolaTypSkla>(PERGOLA_TYP_SKLA_DEFAULT),
 		ralKod = $bindable(''),
 		ral = undefined,
+		model = undefined,
 		vynutenyTier = undefined,
 		zobrazOvladanie = true
 	}: {
@@ -58,6 +59,8 @@
 		ralKod?: string;
 		/** voľný RAL label (pri `RAL_INY_KOD`) */
 		ral?: string;
+		/** #329 časť 2: model konštrukcie → hrúbky profilov v 3D (undefined → bez škály) */
+		model?: PergolaModel;
 		/** testovací hook (`?viz=low`/`?viz=none`) — preposlaný do Vizual3D pre
 		 *  e2e determinizmus */
 		vynutenyTier?: Tier;
@@ -92,7 +95,8 @@
 		panelPocet,
 		typStrechy,
 		ralKod,
-		ral
+		ral,
+		model
 	});
 
 	let vysledok = $derived(pergolaSpec(vizVstup));

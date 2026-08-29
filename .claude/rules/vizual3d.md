@@ -476,3 +476,40 @@ príslušný košík — inak guard padne FALOŠNE (sčítanie dvoch nezávislý
 každý je pod svojím reálnym stropom). Pozn.: worktree/lane vetva NIKDY nebeží GitHub CI (spúšťa sa
 len na push do `main`/`dev`), takže CI-only guardy sa prvýkrát ukážu AŽ pri integrácii do `dev` —
 over lokálne `npm run build` + guard skript PRED merge, nespoliehaj sa na „lane gates boli zelené".
+
+## `$effect` musí čítať reaktívne vstupy PRED gate-om na NEreaktívnu `ziva` (#329)
+
+Efekty vo `Vizual3D.svelte`, ktoré aplikujú živú zmenu (`prekresliRAL`/`prekresliSklo`),
+volajú funkciu s gate-om `if (!ziva) return`. **`ziva` je obyčajný `let` (NIE `$state`)** a
+napĺňa ho AŽ async `inicializuj()` (dynamic `import('three')` → HDRI → `postavScenu`), ktorý
+dobehne desiatky ms po monte. Svelte 5 `$effect` sleduje LEN reaktívne čítania z POSLEDNÉHO
+behu. Prvý beh efektu (mikrotask po monte) prebehne KÝM `ziva===null` → funkcia sa vráti PRED
+čítaním `ralKod`/`skloVzhlad`/`tier` → efekt **nezaregistruje ŽIADNU závislosť → je navždy
+mŕtvy.** Zmena farby/skla po monte (bez remountu rozmerov) sa už nikdy neaplikuje na materiál
+(`data-viz-ral` prop-pass sa mení, ale scéna nie). Presne toto bol #329 („ked vyberiem farbu
+nic sa nestane").
+
+**Pravidlo: v takej funkcii čítaj reaktívne vstupy do lokálov HNEĎ NA ZAČIATKU, PRED
+`!ziva` (alebo iným NEreaktívnym) gate-om:**
+
+```js
+function prekresliRAL() {
+	const kod = ralKod;   // reaktívne čítanie PRVÉ → efekt ho zaregistruje aj pri prvom behu
+	const t = tier;
+	if (!ziva) return;    // NEreaktívny gate až POTOM
+	… nastavRAL(…, kod, …);
+}
+```
+
+Efekt `$effect(() => prekresliRAL())` tak zaregistruje `ralKod`/`tier` už pri prvom behu
+(ziva===null) → pri každej ďalšej zmene sa spustí, `ziva` už je postavená. Efekt geometrie
+(`geometrickyPodpis(vysledok)`) tým NEtrpí — číta prop `vysledok` PRED gate-om, takže žije
+(to je aj dôkaz kontrastu). Regresný signál: `data-viz-ral-applied`/`data-viz-sklo-applied`
+sa zapisuje LEN v `prekresliRAL`/`prekresliSklo` (miesto mutácie materiálu) — čestný dôkaz
+skutočného prekreslenia, e2e naň asertuje po čistej zmene RAL/skla (nie prop-pass).
+
+**Model → hrúbky profilov (#329 časť 2):** `PergolaModel` je LOKÁLNY typ v `geo/pergola.ts`
+(vizuál leaf), NIE import z `$lib/konfigurator` — inak by `vizual-money-guard` import-graf
+spadol (konfigurator nie je v jeho allowliste). `MODEL_PROFIL_SKALA` škáluje LEN vizuálne
+prierezy (undefined→1.0, spätne kompatibilné); pozície sa počítajú z tých istých škálovaných
+hodnôt → hrany ostávajú zarovnané; bbox/kóty/`svetlaVyska` sa NEmenia.
