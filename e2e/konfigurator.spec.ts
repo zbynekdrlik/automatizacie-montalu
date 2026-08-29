@@ -34,9 +34,9 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	await expect(page).toHaveURL(/\/konfigurator$/);
 	await expect(page.getByRole('heading', { name: /Navrhni si.*pergolu/i })).toBeVisible();
 
-	await page.getByTestId('sirka').fill('5000');
-	await page.getByTestId('hlbka').fill('4000');
-	await page.getByTestId('vyskaVpredu').fill('3000');
+	await page.getByTestId('sirka').fill('5');
+	await page.getByTestId('hlbka').fill('4');
+	await page.getByTestId('vyskaVpredu').fill('3');
 	await page.getByTestId('sklonDeg').fill('10');
 
 	// vyber typ skla ZISTENÝ ZA BEHU ako NIE prvý v zozname (nova-stranka disciplína #3 —
@@ -96,9 +96,9 @@ test('konfigurátor: kombinácia výška+hĺbka+sklon nad rozmedzie → friendly
 	// všetky polia v rámci individuálnych min/max (prejdú client validáciou), ale
 	// dopočítaná výška pri stene presiahne max enginu → server vráti friendly chybu.
 	// #329 časť 5: sklon max je teraz 10° — pri stene stále presiahne max (4000 + tan(10°)·6000 ≈ 5058).
-	await page.getByTestId('sirka').fill('8000');
-	await page.getByTestId('hlbka').fill('6000');
-	await page.getByTestId('vyskaVpredu').fill('4000');
+	await page.getByTestId('sirka').fill('8');
+	await page.getByTestId('hlbka').fill('6');
+	await page.getByTestId('vyskaVpredu').fill('4');
 	await page.getByTestId('sklonDeg').fill('10');
 	await page.getByTestId('zobrazit').click();
 
@@ -121,9 +121,9 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 	await expect(page).toHaveURL(/\/konfigurator$/);
 
 	// 1) nakonfiguruj pergolu → zobraz súhrn
-	await page.getByTestId('sirka').fill('4500');
-	await page.getByTestId('hlbka').fill('3500');
-	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sirka').fill('4.5');
+	await page.getByTestId('hlbka').fill('3.5');
+	await page.getByTestId('vyskaVpredu').fill('2.8');
 	await page.getByTestId('sklonDeg').fill('8');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('suhrn')).toBeVisible();
@@ -185,9 +185,9 @@ test('konfigurátor: objednávka (MO) — súhrn → záväzná objednávka → 
 	const consoleMsgs = collectConsole(page);
 
 	await konfReady(page);
-	await page.getByTestId('sirka').fill('4500');
-	await page.getByTestId('hlbka').fill('3500');
-	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sirka').fill('4.5');
+	await page.getByTestId('hlbka').fill('3.5');
+	await page.getByTestId('vyskaVpredu').fill('2.8');
 	await page.getByTestId('sklonDeg').fill('8');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('suhrn')).toBeVisible();
@@ -268,9 +268,9 @@ test('konfigurátor: objednávka (VO/b2b) — prihlásený veľkoobchod vidí VO
 	await odhlas();
 	await loginAs(page, voUser, voPass);
 	await konfReady(page);
-	await page.getByTestId('sirka').fill('5000');
-	await page.getByTestId('hlbka').fill('3000');
-	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sirka').fill('5');
+	await page.getByTestId('hlbka').fill('3');
+	await page.getByTestId('vyskaVpredu').fill('2.8');
 	await page.getByTestId('sklonDeg').fill('8');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('suhrn')).toBeVisible();
@@ -320,9 +320,9 @@ test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → indiv
 	await konfReady(page);
 
 	// 1) konfigurácia s modelom LIGHT (3,0 × 5,0 m) → orientačná cena (€) + porovnanie 3 modelov
-	await page.getByTestId('sirka').fill('5000');
-	await page.getByTestId('hlbka').fill('3000');
-	await page.getByTestId('vyskaVpredu').fill('2500');
+	await page.getByTestId('sirka').fill('5');
+	await page.getByTestId('hlbka').fill('3');
+	await page.getByTestId('vyskaVpredu').fill('2.5');
 	await page.getByTestId('sklonDeg').fill('6');
 	await page.getByTestId('model-LIGHT').click();
 	await page.getByTestId('zobrazit').click();
@@ -346,7 +346,7 @@ test('konfigurátor: cena — výber modelu mení cenu, mimo katalógu → indiv
 
 	// 3) LIGHT nad hĺbku 4 m (5000 mm) → mimo katalógu → „cena na vyžiadanie" (individuálna)
 	await page.getByTestId('model-LIGHT').click();
-	await page.getByTestId('hlbka').fill('5000');
+	await page.getByTestId('hlbka').fill('5');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('cena-individualna')).toBeVisible();
 	await expect(page.getByTestId('cena-individualna')).toContainText(/vyžiadanie/i);
@@ -374,9 +374,9 @@ async function velkostCanvasPng(page: import('@playwright/test').Page): Promise<
 }
 
 async function vyplnFormular(page: import('@playwright/test').Page) {
-	await page.getByTestId('sirka').fill('5000');
-	await page.getByTestId('hlbka').fill('3800');
-	await page.getByTestId('vyskaVpredu').fill('2800');
+	await page.getByTestId('sirka').fill('5');
+	await page.getByTestId('hlbka').fill('3.8');
+	await page.getByTestId('vyskaVpredu').fill('2.8');
 	await page.getByTestId('sklonDeg').fill('8');
 	// non-default sklo (mliečne → matný odtieň) + non-default RAL, nech 3D dostane reálny vstup.
 	// #327: sklo = chip, farba = kruhový swatch (nie <select>) — klik na prvok s daným data-value.
@@ -671,9 +671,9 @@ test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); inte
 	// vyplň konfigurátor FIXNÝM rozmerom (LIGHT default, v katalógu) a spočítaj → cena s DPH (€ ako number)
 	const spocitajCenu = async (): Promise<number> => {
 		await konfReady(page);
-		await page.getByTestId('sirka').fill('5000');
-		await page.getByTestId('hlbka').fill('3000');
-		await page.getByTestId('vyskaVpredu').fill('2800');
+		await page.getByTestId('sirka').fill('5');
+		await page.getByTestId('hlbka').fill('3');
+		await page.getByTestId('vyskaVpredu').fill('2.8');
 		await page.getByTestId('sklonDeg').fill('8');
 		await page.getByTestId('zobrazit').click();
 		await expect(page.getByTestId('cena-sdph')).toContainText('€');
@@ -749,10 +749,11 @@ test('konfigurátor: prémiový redizajn — split-screen + swatche/chips namies
 
 	// #327 review 🔴 REGRESIA: popisok rozmeru je <label for> → klik naň FOKUSUJE input, NEMENÍ
 	// hodnotu. (Starý <label>-obal sa viazal na prvý potomok = mínus tlačidlo → klik na text
-	// znižoval hodnotu o 50 mm a cez stale-clear mazal cenu.)
-	await page.getByTestId('sirka').fill('4200');
+	// znižoval hodnotu a cez stale-clear mazal cenu.) #333: hodnota je v METROCH (4,2 m);
+	// regex znáša bodku (rozpísaný stav) aj čiarku (znormalizovaný po blure).
+	await page.getByTestId('sirka').fill('4.2');
 	await page.getByText('Šírka', { exact: true }).click();
-	await expect(page.getByTestId('sirka')).toHaveValue('4200');
+	await expect(page.getByTestId('sirka')).toHaveValue(/^4[.,]2$/);
 
 	// klik na swatch vyberie farbu (aria-pressed prejde na true)
 	const swatch9005 = page.locator('[data-testid="farba-swatch"][data-value="9005"]');
@@ -760,9 +761,9 @@ test('konfigurátor: prémiový redizajn — split-screen + swatche/chips namies
 	await expect(swatch9005).toHaveAttribute('aria-pressed', 'true');
 
 	// vyplň + submit (sklonDeg cez číselný „twin" — .fill() funguje aj so sliderom)
-	await page.getByTestId('sirka').fill('5000');
-	await page.getByTestId('hlbka').fill('3000');
-	await page.getByTestId('vyskaVpredu').fill('2500');
+	await page.getByTestId('sirka').fill('5');
+	await page.getByTestId('hlbka').fill('3');
+	await page.getByTestId('vyskaVpredu').fill('2.5');
 	await page.getByTestId('sklonDeg').fill('6');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('suhrn')).toBeVisible();
@@ -799,6 +800,60 @@ test('konfigurátor: prihlásený user NEVIDÍ admin navigáciu, len „← inte
 	await expect(page.getByTestId('version')).toHaveText(
 		/^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$/
 	);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #333: rozmery v METROCH (owner „plus nech pridáva v metroch"), wrap-proof stepper
+// (owner bug: `+` sa zalamoval nad číslo na úzkom viewporte) a viditeľná výzva OTÁČAŤ.
+// Verejná route, žiadny Money zápis → beží aj proti prode. Nula console chýb.
+test('konfigurátor: rozmery v metroch — stepper krok 0,5/0,1 m, žiadne zalomenie na 360 px, výzva otáčať (#333)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await konfReady(page);
+
+	const sirka = page.getByTestId('sirka');
+	// hodnota sa zobrazuje v METROCH s čiarkou (1 desatinné), nie v mm
+	await expect(sirka).toHaveValue(/^\d+,\d$/);
+
+	// stepper: šírka krok 0,5 m (+ pridá, − odoberie); interne ostáva mm (POST cez skrytý input)
+	await sirka.fill('4');
+	await sirka.blur();
+	await expect(sirka).toHaveValue('4,0');
+	await page.getByLabel('Zväčšiť šírku').click();
+	await expect(sirka).toHaveValue('4,5');
+	await page.getByLabel('Zmenšiť šírku').click();
+	await expect(sirka).toHaveValue('4,0');
+
+	// výška krok 0,1 m (rozsah 2–4 m, celý meter by bol nepoužiteľný)
+	const vyska = page.getByTestId('vyskaVpredu');
+	await vyska.fill('2.5');
+	await vyska.blur();
+	await expect(vyska).toHaveValue('2,5');
+	await page.getByLabel('Zväčšiť výšku').click();
+	await expect(vyska).toHaveValue('2,6');
+
+	// ÚZKY viewport (~360 px): stepper − [hodnota] + NIKDY nezalomí `+` nad číslo — všetky tri
+	// prvky (−, input, +) majú zhodný vertikálny stred = jeden riadok (owner-reportovaný bug).
+	await page.setViewportSize({ width: 360, height: 800 });
+	await sirka.scrollIntoViewIfNeeded();
+	const [bMinus, bInput, bPlus] = await Promise.all([
+		page.getByLabel('Zmenšiť šírku').boundingBox(),
+		sirka.boundingBox(),
+		page.getByLabel('Zväčšiť šírku').boundingBox()
+	]);
+	expect(bMinus).not.toBeNull();
+	expect(bInput).not.toBeNull();
+	expect(bPlus).not.toBeNull();
+	const stred = (b: { y: number; height: number }) => b.y + b.height / 2;
+	expect(Math.abs(stred(bMinus!) - stred(bInput!))).toBeLessThan(6);
+	expect(Math.abs(stred(bPlus!) - stred(bInput!))).toBeLessThan(6);
+
+	// viditeľná výzva na otáčanie (desktop AJ mobil) s textom
+	const hint = page.getByTestId('vizual3d-dotyk-overlay');
+	await expect(hint).toBeVisible();
+	await expect(hint).toContainText('Potiahnite a otáčajte');
 
 	expect(consoleMsgs).toEqual([]);
 });

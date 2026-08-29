@@ -15,9 +15,9 @@ async function submitKonfig(page: import('@playwright/test').Page) {
 	// #327: počkaj na READY 3D scénu PRED submitom — prémiový edge-to-edge náhľad je ťažší na
 	// softvérovom CI WebGL a stavba scény by inak súperila o hlavné vlákno s enhance callbackom.
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
-	await page.getByTestId('sirka').fill('5000');
-	await page.getByTestId('hlbka').fill('4000');
-	await page.getByTestId('vyskaVpredu').fill('2500');
+	await page.getByTestId('sirka').fill('5');
+	await page.getByTestId('hlbka').fill('4');
+	await page.getByTestId('vyskaVpredu').fill('2.5');
 	await page.getByTestId('sklonDeg').fill('6');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('suhrn')).toBeVisible();
@@ -127,8 +127,8 @@ test('konfigurátor AR: desktop ukáže QR na AR stránku (regeneruje sa pri re-
 	expect(await page.locator('model-viewer').count()).toBe(0);
 
 	// re-submit s INOU konfiguráciou → QR sa REAKTÍVNE prekreslí na nový odkaz (nie stale)
-	await page.getByTestId('sirka').fill('6000');
-	await page.getByTestId('hlbka').fill('4500');
+	await page.getByTestId('sirka').fill('6');
+	await page.getByTestId('hlbka').fill('4.5');
 	await page.getByTestId('zobrazit').click();
 	await expect(page.getByTestId('suhrn')).toBeVisible();
 	await expect.poll(async () => await img.getAttribute('src'), { timeout: 8000 }).not.toBe(src1);
