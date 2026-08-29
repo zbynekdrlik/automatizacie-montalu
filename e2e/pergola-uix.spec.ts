@@ -123,8 +123,14 @@ test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke rezervač
 	await expect(page.getByTestId('narez-tabulka')).toBeVisible();
 
 	// CELÝ text stránky — textContent zahŕňa aj zbalené <details>, takže žargón sa
-	// neschová do rozklikávacieho detailu
-	const text = (await page.locator('body').textContent()) ?? '';
+	// neschová do rozklikávacieho detailu; <script>/<style> sa VYNECHÁVAJÚ — inline
+	// SvelteKit bootstrap nesie hashovaný názov bundle (napr. „app.98-O9X0v.js"),
+	// ktorý inak náhodne matchne /\bO\d/ podľa lotérie hashu (spadlo na maine, #329)
+	const text = await page.evaluate(() => {
+		const klon = document.body.cloneNode(true) as HTMLElement;
+		klon.querySelectorAll('script, style, noscript').forEach((el) => el.remove());
+		return klon.textContent ?? '';
+	});
 	expect(text.length).toBeGreaterThan(0);
 	// žiadne „#161"/„#206"/… (ticket ref)
 	expect(text).not.toMatch(/#\d/);
