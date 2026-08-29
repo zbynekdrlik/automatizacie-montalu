@@ -513,3 +513,33 @@ skutočného prekreslenia, e2e naň asertuje po čistej zmene RAL/skla (nie prop
 spadol (konfigurator nie je v jeho allowliste). `MODEL_PROFIL_SKALA` škáluje LEN vizuálne
 prierezy (undefined→1.0, spätne kompatibilné); pozície sa počítajú z tých istých škálovaných
 hodnôt → hrany ostávajú zarovnané; bbox/kóty/`svetlaVyska` sa NEmenia.
+
+## Kamera „z hora" + intro glide + profi dom/scéna (#333)
+
+- **NIKDY nemeň globálny `PRESETY.troStvrte` pre pergolu.** Preset je ZDIEĽANÝ so zasklenia scénou +
+  `tests/vizual-kamera-kvalita.test.ts` drží výšku oka 1,3–1,9 m. Pergola „z hora" = SAMOSTATNÁ
+  tabuľka `PRESETY_DOM` (troStvrte elev 28° vs 7°), `Vizual3D` vyberá `presety = zobrazDom ?
+  PRESETY_DOM : PRESETY` (jednorazovo cez `untrack`, `zobrazDom` je fixné). Orbit limity [0,4..1,4]
+  netreba meniť (default polar 62° je vnútri).
+- **Intro glide guard je MODULE-scoped, nie inštančný.** `{#key vizKluc}` remountuje Vizual3D pri
+  KAŽDEJ (debounced) zmene rozmeru → inštančný flag by intro prehral pri každej úprave. `let
+  introUzBezal = false` v `<script module>` prežije remount → glide RAZ za načítanie. Badge kóty
+  naopak MÁ nabehnúť pri každom remounte (inštančné `zobrazKotu()`). Intro ruší OrbitControls
+  `'start'` (cez `tikaj`), prvá interakcia, `zachytObrazok` (snap na finál) a `cancelAnimationFrame`
+  v onDestroy. Per-frame `poziciaKamery`+`controls.update()` (ako `aplikujPreset`), finálny
+  `controls.update()` (sync spherical → prvý drag „neskočí").
+- **Vizual3D je ZDIEĽANÝ → NEimportuj `$lib/konfigurator*` doň** (money-guard allowlist §2.13 ich
+  nepozná; guard by spadol). Triviálny format (mm→„4,0") inline priamo v komponente, nie import
+  `konfigurator-jednotky`.
+- **Dom + okolie = `scena-dom.ts`, stavba scény = `scena-build.ts` (large-file-split).** Pridaním
+  intro/kóty/výzvy Vizual3D prekročil 1000-r. strop → `postavScenu` + `ZivaScena` extrahované do
+  `scena-build.ts` (parameter injection cez `SceneCtx` — reaktívne vstupy + `onStart`/`onChange`
+  callbacky pre OrbitControls). Profi dom (2-podlažná svetlá fasáda + sedlová plechová strecha zo
+  2 naklonených slabov + ŠTÍTOVÉ trojuholníky proti „hollow gable" + raster okien + drevené dvere +
+  sokel) a `vytvorOkolie` (trávnik + dlažbová terasa pod pergolou + odsaturované stromy) sú v
+  `scena-dom.ts`, volané LEN pri `zobrazDom` (#325 vzor — zasklenia scéna netknutá).
+- **DISPOSAL: KAŽDÁ geometria/materiál/TEXTÚRA do `disposables`** (Vizual3D ich pri každom `{#key}`
+  remounte uvoľní) — inak unikne CELÝ dom per zmena rozmeru. Zdieľaný materiál/textúra (obidva
+  sklony strechy) sa pushnú RAZ. `castShadow` len strecha+stromy+pergola (nie okná/priečky —
+  shadow-map budget, low tier opt-out). Všetko procedurálne (žiadny externý asset — Money-guard +
+  bundle). Perf tiery #285 cez `plochyGradientMiestoMap`/`tiene` (low = ploché farby, bez tieňov).
