@@ -66,9 +66,9 @@ describe('parseKonfiguratorVstup — rozmedzia', () => {
 	});
 
 	it('odmietne kombináciu výška+hĺbka+sklon, ktorá pri stene presiahne max enginu', () => {
-		// 4000 + tan(30°)*6000 ≈ 7464 mm >> VYSKA_MAX (4500)
+		// #329 časť 5: sklon max je teraz 10°. 4000 + tan(10°)*6000 ≈ 5058 mm > VYSKA_MAX (4500)
 		const r = parseKonfiguratorVstup(
-			platny({ vyskaVpredu: '4000', hlbka: '6000', sklonDeg: '30' })
+			platny({ vyskaVpredu: '4000', hlbka: '6000', sklonDeg: '10' })
 		);
 		expect('error' in r).toBe(true);
 		if ('error' in r) expect(r.error).toMatch(/stene/i);

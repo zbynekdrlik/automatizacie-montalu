@@ -285,7 +285,9 @@ describe('pergolaPngNazov — názov súboru z rozmerov (bez ceny/kódu)', () =>
 describe('pergolaSpec — model → hrúbky profilov (#329 časť 2, iba vizuál)', () => {
 	// nosník = jediný ram diel s tvar.w === celá šírka S; jeho h = NOSNIK_HRUBKA_MM * škála
 	const nosnikH = (v: PergolaVizVstup): number => {
-		const n = pergolaSpec(v).diely.find((d) => d.rola === 'ram' && d.tvar.w === v.sirkaMm);
+		const n = pergolaSpec(v).diely.find(
+			(d) => d.rola === 'ram' && d.tvar.kind === 'box' && d.tvar.w === v.sirkaMm
+		);
 		if (!n || n.tvar.kind !== 'box') throw new Error('nosník nenájdený');
 		return n.tvar.h;
 	};

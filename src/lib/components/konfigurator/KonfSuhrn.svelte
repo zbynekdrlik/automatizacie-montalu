@@ -3,10 +3,17 @@
 	// Server-autoritatívny súhrn (dopočítané výšky/plocha/sklon) z akcie `vypocet`.
 	// Žiadny Money kód — číta iba `suhrn` (client-safe typ z `$lib/konfigurator`).
 	import { fmtMm1, type KonfiguratorSuhrn } from '$lib/konfigurator';
+	import { konfSkloKategoriaPreNazov } from '$lib/konfigurator-sklo';
 
 	let { suhrn }: { suhrn: KonfiguratorSuhrn } = $props();
 
 	const fmt = fmtMm1;
+
+	// #329 časť 4: zákazník NIKDY nevidí hrúbky — na PAGE súhrne ukáž ZÁKAZNÍCKY label kategórie
+	// (napr. „Izolačné sklo — mliečne"), nie interný katalógový názov s hrúbkou. Pipeline (cena/PDF/
+	// dopyt/Odoo) naďalej dostáva KONKRÉTNY `suhrn.sklo` — to sa nemení. Neznámy názov (crafted POST)
+	// → fallback na raw názov (robustnosť), stále bez Money kódu.
+	const skloLabel = $derived(konfSkloKategoriaPreNazov(suhrn.sklo)?.label ?? suhrn.sklo);
 </script>
 
 <section class="suhrn" data-testid="suhrn">
@@ -46,7 +53,7 @@
 		</div>
 		<div>
 			<dt>Strešné sklo</dt>
-			<dd data-testid="s-sklo">{suhrn.sklo}</dd>
+			<dd data-testid="s-sklo">{skloLabel}</dd>
 		</div>
 		<div>
 			<dt>Farba konštrukcie</dt>

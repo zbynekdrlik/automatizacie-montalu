@@ -41,14 +41,15 @@
 
 	// spoločné východiskové rozmery — JEDEN zdroj pre $state inity AJ pre debounced 3D
 	// snapshot (bez driftu → žiadny 320 ms „zlý náhľad" flash / spurný remount pri loade).
-	const KONF_DEFAULT = { sirka: 4000, hlbka: 3500, vyskaVpredu: 2500, sklon: 6 };
+	// #329 časť 5: default sklon 3° (typický odvod vody pri flat-ceiling pergole; slider max 10°)
+	const KONF_DEFAULT = { sirka: 4000, hlbka: 3500, vyskaVpredu: 2500, sklon: 3 };
 
 	// vstupné polia = $state + bind: (hneď platná pergola)
 	let sirka = $state<number | null>(KONF_DEFAULT.sirka);
 	let hlbka = $state<number | null>(KONF_DEFAULT.hlbka);
 	let vyskaVpredu = $state<number | null>(KONF_DEFAULT.vyskaVpredu);
 	let sklonDeg = $state<number | null>(KONF_DEFAULT.sklon);
-	let sklo = $state<string>(untrack(() => data.sklaTypy[0] ?? ''));
+	let sklo = $state<string>(untrack(() => data.sklaKategorie[0]?.katalogNazov ?? ''));
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
 	let model = $state<string>(untrack(() => data.modely[0]?.kod ?? 'LIGHT'));
 

@@ -14,6 +14,8 @@
 	// KRITICKÉ: VŠETKY non-submit `<button>` = `type="button"` (inak by stepper/chip/swatch
 	// odoslal form). sr-only radio = clip-pattern (fokusovateľný), nie display:none.
 	import { farbaKonstrukcie } from '$lib/vykres/ral';
+	import KonfInfoKarta from './KonfInfoKarta.svelte';
+	import type { KonfSkloKategoria } from '$lib/konfigurator-sklo';
 
 	interface KonfData {
 		rozmedzia: {
@@ -23,9 +25,28 @@
 			sklon: { min: number; max: number };
 		};
 		modely: { kod: string; popis: string }[];
-		sklaTypy: string[];
+		// #329 časť 4: zákaznícke kategórie skla (nie plný katalóg)
+		sklaKategorie: readonly KonfSkloKategoria[];
 		farby: { kod: string; nazov: string }[];
 	}
+
+	// #329 časť 3: fotka + hover/ⓘ popis modelu (z montalu.sk konfigurátora, webp v
+	// static/konfigurator/). Prezentačná mapa keyed na kód modelu — plain SK texty z montalu.sk.
+	const MODEL_FOTA: Record<string, { obrazok: string; popis: string }> = {
+		LIGHT: {
+			obrazok: 'pergola-light.webp',
+			popis:
+				'Odľahčená hliníková pergola pre menšie výsuvy od domu. Vhodná na zakrytie terasy či prístrešok pre auto; kotvená na stenu alebo samostatne stojaca.'
+		},
+		ROBUST: {
+			obrazok: 'pergola-robust.webp',
+			popis: 'Masívna konštrukcia pre väčšie rozpätia — najuniverzálnejší model.'
+		},
+		MASSIVE: {
+			obrazok: 'pergola-massive.webp',
+			popis: 'Vylepšený ROBUST pre najväčšie rozpätia a najnáročnejších zákazníkov.'
+		}
+	};
 
 	let {
 		sirka = $bindable(),
@@ -53,6 +74,14 @@
 
 	const STEP_MM = 50; // krok stepperov rozmerov (mm)
 
+	// #329 časť 5: prevýšenie strechy pri stene [mm] = tan(sklon)·hĺbka — informatívny popisok pri
+	// slideri (koľko cm strecha stúpne k stene pre odvod vody). Iba display, nemení výpočet výšok.
+	const sklonPrevysenieMm = $derived(
+		sklonDeg != null && sklonDeg > 0 && hlbka != null
+			? Math.round(Math.tan((sklonDeg * Math.PI) / 180) * hlbka)
+			: 0
+	);
+
 	function zovri(v: number, lo: number, hi: number): number {
 		return Math.min(hi, Math.max(lo, v));
 	}
@@ -69,11 +98,22 @@
 		<span class="konf-label">Model konštrukcie</span>
 		<div class="konf-modely" role="radiogroup" aria-label="Model konštrukcie" data-testid="modely">
 			{#each data.modely as m (m.kod)}
+				{@const foto = MODEL_FOTA[m.kod]}
 				<label class="konf-model" class:vybrany={model === m.kod} data-testid="model-{m.kod}">
 					<input type="radio" name="model" value={m.kod} bind:group={model} class="konf-sr-only" />
 					<span class="konf-model-hlava">
 						<span class="konf-model-nazov">{m.kod}</span>
-						<span class="konf-model-fajka" aria-hidden="true">✓</span>
+						<span class="konf-model-hlava-p">
+							{#if foto}
+								<KonfInfoKarta
+									nazov="Pergola {m.kod}"
+									popis={foto.popis}
+									obrazok={foto.obrazok}
+									alt="Pergola {m.kod}"
+								/>
+							{/if}
+							<span class="konf-model-fajka" aria-hidden="true">✓</span>
+						</span>
 					</span>
 					<span class="konf-model-popis">{m.popis}</span>
 				</label>
@@ -109,20 +149,25 @@
 		<input type="hidden" name="farba" value={farba} />
 	</section>
 
-	<!-- STREŠNÉ SKLO — chips -->
+	<!-- STREŠNÉ SKLO — zákaznícke kategórie (#329 časť 4): chip = label kategórie + ⓘ/hover karta
+	     (ikona + popis). Skrytý input POSTuje KONKRÉTNY katalógový nazov (k.katalogNazov) → cena/
+	     PDF/dopyt/Odoo dostávajú nezmenený katalógový názov. Zákazník nikdy nevidí hrúbku. -->
 	<section class="konf-sekcia">
 		<span class="konf-label">Strešné sklo</span>
 		<div class="konf-chips" role="group" aria-label="Strešné sklo">
-			{#each data.sklaTypy as t (t)}
-				<button
-					type="button"
-					class="konf-chip"
-					class:vybrany={sklo === t}
-					data-testid="sklo-chip"
-					data-value={t}
-					aria-pressed={sklo === t}
-					onclick={() => (sklo = t)}>{t}</button
-				>
+			{#each data.sklaKategorie as k (k.kluc)}
+				<span class="konf-chip-wrap">
+					<button
+						type="button"
+						class="konf-chip"
+						class:vybrany={sklo === k.katalogNazov}
+						data-testid="sklo-chip"
+						data-value={k.katalogNazov}
+						aria-pressed={sklo === k.katalogNazov}
+						onclick={() => (sklo = k.katalogNazov)}>{k.label}</button
+					>
+					<KonfInfoKarta nazov={k.label} popis={k.popis} obrazok={k.ikona} alt={k.label} />
+				</span>
 			{/each}
 		</div>
 		<input type="hidden" name="sklo" value={sklo} />
@@ -268,6 +313,11 @@
 				<span class="konf-jednotka">°</span>
 			</span>
 		</div>
+		{#if sklonPrevysenieMm > 0}
+			<span class="konf-sklon-info" data-testid="sklon-prevysenie"
+				>Strecha pri stene stúpne o ~{sklonPrevysenieMm} mm (odvod vody).</span
+			>
+		{/if}
 	</section>
 </div>
 
@@ -343,6 +393,11 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+	}
+	.konf-model-hlava-p {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
 	}
 	.konf-model-nazov {
 		font-weight: 650;
@@ -435,6 +490,11 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
+	}
+	.konf-chip-wrap {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
 	}
 	.konf-chip {
 		padding: 9px 15px;
@@ -591,5 +651,11 @@
 	}
 	.konf-cislo-mini {
 		width: 42px;
+	}
+	.konf-sklon-info {
+		display: block;
+		margin-top: 8px;
+		font-size: 12.5px;
+		color: var(--k-muted);
 	}
 </style>

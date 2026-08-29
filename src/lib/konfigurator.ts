@@ -24,7 +24,9 @@ export const KONF_HLBKA_MAX = 6000;
 export const KONF_VYSKA_MIN = 2000; // výška vpredu; > NOSNIK_HRUBKA_MM (190) → svetlá výška > 0
 export const KONF_VYSKA_MAX = 4000;
 export const KONF_SKLON_MIN = 0;
-export const KONF_SKLON_MAX = 30;
+// #329 časť 5: realistický flat-ceiling sklon — max 10° (30° je na reálnej pergole nezmysel a 3D
+// pri veľkých hodnotách vyzeralo prehnane). Výpočet výšok sa nemení, len rozsah/default slidera.
+export const KONF_SKLON_MAX = 10;
 /** Dopočítaná výška pri stene nesmie prekročiť konštrukčné maximum enginu — priame
  *  rozmedzie `pergola-navrh` (VYSKA_MAX). Dolná hranica netreba: výška vpredu je vždy
  *  ≥ KONF_VYSKA_MIN (2000) a stena ≥ výška vpredu, takže nikdy neklesne pod VYSKA_MIN. */

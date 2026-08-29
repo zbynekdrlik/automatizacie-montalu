@@ -41,10 +41,14 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 
 	// vyber typ skla ZISTENÝ ZA BEHU ako NIE prvý v zozname (nova-stranka disciplína #3 —
 	// aspoň jeden test vyberá non-default hodnotu, aby zachytil prípadný tichý revert).
-	// #327: sklo je teraz CHIP (button `data-testid="sklo-chip"`), nie <select>.
+	// #327: sklo je teraz CHIP (button `data-testid="sklo-chip"`). #329 časť 4: chip je ZÁKAZNÍCKA
+	// KATEGÓRIA — jeho VIDITEĽNÝ label (napr. „Izolačné sklo — číre") ide do súhrnu, kým data-value
+	// je KONKRÉTNY katalógový názov, ktorý sa POSTuje ďalej (pipeline).
 	const skloChips = page.getByTestId('sklo-chip');
-	const vybranySklo = (await skloChips.nth(2).getAttribute('data-value')) ?? '';
-	expect(vybranySklo).not.toBe('');
+	const vybranaKategoria = (await skloChips.nth(2).innerText()).trim();
+	const vybranyKatalog = (await skloChips.nth(2).getAttribute('data-value')) ?? '';
+	expect(vybranaKategoria).not.toBe('');
+	expect(vybranyKatalog).not.toBe('');
 	await skloChips.nth(2).click();
 
 	await page.getByTestId('zobrazit').click();
@@ -55,8 +59,10 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	await expect(page.getByTestId('s-plocha')).toHaveText('20 m²'); // 5000·4000 mm = 20 m²
 	await expect(page.getByTestId('s-svetla')).toHaveText('2810 mm'); // 3000 − 190 (nosník)
 	await expect(page.getByTestId('s-sklon')).toContainText('10');
-	// zvolený (non-default) typ skla sa prejaví v súhrne
-	await expect(page.getByTestId('s-sklo')).toHaveText(vybranySklo);
+	// zvolená (non-default) kategória skla sa prejaví v súhrne ZÁKAZNÍCKYM labelom (bez hrúbky),
+	// NIE interným katalógovým názvom (#329 časť 4: zákazník nikdy nevidí hrúbky na stránke)
+	await expect(page.getByTestId('s-sklo')).toHaveText(vybranaKategoria);
+	await expect(page.getByTestId('s-sklo')).not.toContainText(vybranyKatalog);
 	await expect(page.getByTestId('s-farba')).toContainText('RAL 7016');
 
 	// #279 Fáza C: orientačná cena sa zobrazí (default model LIGHT) + súhrn nesie model
@@ -88,11 +94,12 @@ test('konfigurátor: kombinácia výška+hĺbka+sklon nad rozmedzie → friendly
 	await konfReady(page);
 
 	// všetky polia v rámci individuálnych min/max (prejdú client validáciou), ale
-	// dopočítaná výška pri stene presiahne max enginu → server vráti friendly chybu
+	// dopočítaná výška pri stene presiahne max enginu → server vráti friendly chybu.
+	// #329 časť 5: sklon max je teraz 10° — pri stene stále presiahne max (4000 + tan(10°)·6000 ≈ 5058).
 	await page.getByTestId('sirka').fill('8000');
 	await page.getByTestId('hlbka').fill('6000');
 	await page.getByTestId('vyskaVpredu').fill('4000');
-	await page.getByTestId('sklonDeg').fill('30');
+	await page.getByTestId('sklonDeg').fill('10');
 	await page.getByTestId('zobrazit').click();
 
 	await expect(page.getByTestId('chyba')).toBeVisible();
@@ -516,6 +523,61 @@ test('konfigurátor: zmena LEN farby a LEN skla naozaj prekreslí 3D (nie len ca
 	expect(
 		await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null)
 	).toBe(1);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #329 časti 3/4/5: zákaznícke kategórie skla (6, bez hrúbky), info karty (fotka + text) na
+// modeloch aj skle, a realistický sklon (max 10°, default 3°). Display-only, beží aj proti
+// nasadeniu (bez skipAkLive).
+test('konfigurátor: zákaznícke kategórie skla + info karty + realistický sklon, nula console chýb (#329)', async ({
+	page
+}) => {
+	test.setTimeout(60000); // 3D náhľad je na CI softvérovom WebGL ťažší (#327 timing)
+	const consoleMsgs = collectConsole(page);
+	await konfReady(page); // goto + počkaj na [data-viz-ready] pred interakciou s formulárom
+	await expect(page).toHaveURL(/\/konfigurator$/);
+
+	// (4) presne 6 kategórií skla, žiadny label neodhaľuje hrúbku (4.4.2 / -8-6 / mm)
+	const skloChips = page.getByTestId('sklo-chip');
+	await expect(skloChips).toHaveCount(6);
+	const pocetSkla = await skloChips.count();
+	for (let i = 0; i < pocetSkla; i++) {
+		const label = (await skloChips.nth(i).innerText()).trim();
+		expect(label, `label chipu odhaľuje hrúbku: ${label}`).not.toMatch(/\d\.\d\.\d|-\d+-\d+|mm/);
+	}
+
+	// (5) sklon: max 10°, default 3° (číselný twin nesie name+testid)
+	const sklonInput = page.getByTestId('sklonDeg');
+	await expect(sklonInput).toHaveAttribute('max', '10');
+	await expect(sklonInput).toHaveValue('3');
+
+	// (3) info karty: modely aj sklo majú ⓘ tlačidlo; tap ho rozbalí (mobil-safe vzor,
+	// neblokuje výber). Karta je v DOM skrytá, po tape má triedu `otvorene`.
+	const infoBtn = page.getByTestId('konf-info-btn');
+	// 3 modely + 6 skiel = 9 info tlačidiel
+	await expect(infoBtn).toHaveCount(9);
+	const prvaKarta = page.getByTestId('konf-info-karta').first();
+	await expect(prvaKarta).not.toHaveClass(/otvorene/);
+	await infoBtn.first().click();
+	await expect(prvaKarta).toHaveClass(/otvorene/);
+	// tap na ⓘ NEZMENIL výber modelu (default LIGHT ostáva) — karta je len informačná
+	await expect(page.getByTestId('model-LIGHT')).toHaveClass(/vybrany/);
+
+	// (4) výber kategórie POSTuje KONKRÉTNY katalógový názov ďalej: klik na „Izolačné sklo —
+	// mliečne" (data-value = katalógový názov s hrúbkou, skrytý v atribúte) → súhrn ukáže
+	// ZÁKAZNÍCKY label, telo stránky NEUKÁŽE Money kód.
+	const mliecnyChip = page.locator('[data-testid="sklo-chip"][data-value="IZO 4.4.2-8-6 mliečne"]');
+	await expect(mliecnyChip).toHaveText('Izolačné sklo — mliečne');
+	await mliecnyChip.click();
+	await page.getByTestId('zobrazit').click();
+	await expect(page.getByTestId('s-sklo')).toHaveText('Izolačné sklo — mliečne');
+
+	// ÚNIK GUARD: žiadny Money kód (TS###) / nárez / VO na verejnej ploche
+	const telo = await page.locator('body').innerText();
+	expect(telo).not.toMatch(/TS\d{3}/);
+	expect(telo).not.toMatch(/nárez/i);
+	expect(telo).not.toMatch(/priceB2B|ve[ľl]koobchod/i);
 
 	expect(consoleMsgs).toEqual([]);
 });
