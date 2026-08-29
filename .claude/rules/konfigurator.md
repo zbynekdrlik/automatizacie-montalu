@@ -238,3 +238,25 @@ exportu + model-viewer sú v `.claude/rules/vizual3d.md` (auto-loaduje sa na
 - **Sklon:** `KONF_SKLON_MAX` je 10° (nie 30 — flat-ceiling realita), default 3° (`+page.svelte`
   `KONF_DEFAULT.sklon`). Výpočet výšok nezmenený. Testy, čo overujú „nad rozmedzie" chybu, MUSIA
   použiť sklon ≤10 s vysokou výškou vpredu+hĺbkou (napr. 4000+tan(10°)·6000≈5058 > VYSKA_MAX).
+
+## 10. Rozmery v METROCH v stepperi (#333, owner „plus nech pridáva v metroch")
+
+- **Zobrazenie = metre, interné = mm.** `RozmerStepper.svelte` (subkomponent, 3× inštancia v
+  `KonfOvladace`): VIDITEĽNÝ `type=text inputmode=decimal` ukazuje metre („4,0 m", čiarka, 1
+  desatinné) a NEMÁ `name`; SKRYTÝ `<input type=hidden name=sirka value={hodnotaMm}>` POSTuje
+  INTERNÉ mm nezmenene. Cena/PDF/Odoo/AR pipeline dostáva mm ako doteraz — v pipeline sa NIČ nemení.
+- **Čistý prevod modul `$lib/konfigurator-jednotky.ts`** (client-safe, žiadny Money/DOM):
+  `mmNaMetreText` (mm→„4,0"), `parseMetreNaMm` (čiarka AJ bodka → mm, 100 mm mriežka = 1 desatinné,
+  clamp; prázdny/nečíselný → `null`, aby sa hodnota počas mazania neprepísala), `krokMetre`
+  (smerový snap na mriežku kroku). Krok: šírka/hĺbka 0,5 m (500 mm), výška 0,1 m (100 mm; rozsah 2–4 m).
+- **Display-text sync focus-flagom (NIE parse-comparison).** `$effect` číta `hodnotaMm` PRVÉ, potom
+  `if (upravuje) return` (dead-effect pasca `vizual3d.md`); počas fokusu neprepisuje užívateľa, blur
+  normalizuje EXPLICITNE, stepper tlačidlá nastavia text priamo. Parse-comparison padá na
+  ekvivalentných tvaroch („4.0"/„4,0") a klobrce rozpísané „4,".
+- **Layout WRAP-PROOF:** `.rs-stepper` má `flex-wrap:nowrap` + tlačidlá `flex-shrink:0`, riadok
+  `.rs-rozmer` má `flex-wrap:wrap` (label sa smie zalomiť NAD stepper), takže `−[hodnota]+` sa NIKDY
+  nezalomí (owner bug: `+` nad číslom na úzkom viewporte). E2E overuje zhodný vertikálny stred −/input/+
+  na 360 px.
+- **E2E: fills sú v METROCH** (`getByTestId('sirka').fill('4')` / `'2.8'` — dot aj comma OK, parser
+  znáša oboje). `toHaveValue` po blure je čiarková („4,0"); pri rozpísanej hodnote pred blurom je
+  ako sa zadalo. Stepper krok testuj cez `getByLabel('Zväčšiť šírku')`/`'Zmenšiť šírku'`.

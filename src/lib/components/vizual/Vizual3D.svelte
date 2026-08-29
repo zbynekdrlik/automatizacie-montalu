@@ -1,3 +1,11 @@
+<script module lang="ts">
+	// #333: intro kamery (glide „z hora" pri načítaní) sa spustí RAZ za načítanie stránky —
+	// NIE pri každom `{#key vizKluc}` remounte (debounced zmena rozmeru remountuje Vizual3D).
+	// Module-scoped (nie inštančný `$state`) → prežije remount, takže glide nebliká pri každej
+	// úprave rozmeru; badge kóty naopak MÁ nabehnúť pri každom remounte (per-inštančný nižšie).
+	let introUzBezal = false;
+</script>
+
 <script lang="ts">
 	// Zákaznícky 3D náhľad (#170) — <canvas> + onMount + dynamický import('three').
 	// SSR-bezpečné: žiadny dotyk window/document na module top-level, `three` sa
@@ -8,28 +16,14 @@
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { base } from '$app/paths';
-	import type { Rola, VizVysledok } from '$lib/vizual/spec';
-	import { mm } from '$lib/vizual/jednotky';
-	import type { MergeGeometriesFn } from '$lib/vizual/builder';
+	import type { VizVysledok } from '$lib/vizual/spec';
 	// #329 large-file-split: meshe produktu extrahované do samostatného modulu (Vizual3D prekročil
 	// 1000-r. strop). Čisté funkcie (všetky vstupy ako argumenty), volané tu aj v prestavbe geometrie.
 	import { postavProduktMeshe, zlikvidujProduktMeshe } from '$lib/vizual/produkt-meshe';
 	import { nastavRAL, nastavSkloVzhlad, type SkloVzhlad } from '$lib/vizual/materialy';
-	import {
-		disposeVsetko,
-		hdriUrl,
-		nacitajHDRI,
-		nastavKluceoveSvetloTien,
-		vytvorDom,
-		vytvorEnvironment,
-		vytvorKontaktnyTien,
-		vytvorOblohu,
-		vytvorRenderer,
-		vytvorStenu,
-		vytvorSvetla,
-		vytvorZem,
-		type Disposable
-	} from '$lib/vizual/scena';
+	import { disposeVsetko, hdriUrl, nacitajHDRI } from '$lib/vizual/scena';
+	// #333 large-file-split: stavba scény (postavScenu) + ZivaScena typ v scena-build.ts.
+	import { postavScenu, type ZivaScena } from '$lib/vizual/scena-build';
 	import {
 		autoFitVzdialenost,
 		fitCiel,
@@ -37,18 +31,19 @@
 		poziciaKamery,
 		PRESET_DEFAULT,
 		PRESETY,
+		PRESETY_DOM,
 		type PresetKluc,
 		vzdialenostPrePreset
 	} from '$lib/vizual/kamera';
 	import {
 		detekujTier,
+		jeSoftverovyRenderer,
 		nastaveniaPreTier,
-		postprocKonfig,
 		postprocPovoleny,
 		type Tier
 	} from '$lib/vizual/kvalita';
 	import { snimka as zachytSnimku } from '$lib/vizual/snimka';
-	import { vytvorComposer, type PostprocModuly, type ZivyComposer } from '$lib/vizual/postproc';
+	import type { PostprocModuly } from '$lib/vizual/postproc';
 
 	let {
 		vysledok,
@@ -83,14 +78,28 @@
 		posterZaznam?: import('svelte').Snippet;
 	} = $props();
 
+	// #333: pergola (`zobrazDom`) načíta model „z hora" — vlastná preset tabuľka
+	// (`PRESETY_DOM`, troStvrte elev 28° → dominantne vidno strešné sklo). Zasklenia scéna
+	// ostáva na `PRESETY` (elev 7°, výška oka 1,5–1,7 m — `vizual-kamera-kvalita.test.ts`).
+	// `zobrazDom` je fixné počas života komponentu → `untrack` jednorazové čítanie (inak
+	// `state_referenced_locally` warning, ako pri `data`-default v konfigurátore §3).
+	const presety = untrack(() => (zobrazDom ? PRESETY_DOM : PRESETY));
+
 	let canvasEl = $state<HTMLCanvasElement | undefined>();
 	let containerEl = $state<HTMLDivElement | undefined>();
 	// seedne sa z bindable `aktualnyTier` (default 'high') — inak by ESLint
 	// správne varoval, že jeho default sa nikde nečíta pred prepísaním nižšie
 	let tier = $state<Tier>(aktualnyTier);
 	let dotykOverlayViditelny = $state(true);
-	let camAzimutDeg = $state(PRESETY[PRESET_DEFAULT].azimut);
-	let camElevaciaDeg = $state(PRESETY[PRESET_DEFAULT].elevacia);
+	let camAzimutDeg = $state(presety[PRESET_DEFAULT].azimut);
+	let camElevaciaDeg = $state(presety[PRESET_DEFAULT].elevacia);
+
+	// #333 intro glide + in-scene kóta (LEN pergola/`zobrazDom`)
+	let introBezi = false;
+	let introRafId = 0;
+	let kotaText = $state('');
+	let kotaViditelna = $state(false);
+	let kotaTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	// `tier` (interný) sa zrkadlí do bindable `aktualnyTier` (verejný) — rodič
 	// (napr. zákaznícky tlačový list) ho môže čítať bez potreby vlastnej kópie
@@ -99,40 +108,8 @@
 		aktualnyTier = tier;
 	});
 
-	type ThreeNS = typeof import('three');
-	type OrbitControlsCtor =
-		typeof import('three/examples/jsm/controls/OrbitControls.js').OrbitControls;
-	type OrbitControlsInst = InstanceType<OrbitControlsCtor>;
-
-	interface ZivaScena {
-		THREE: ThreeNS;
-		mergeGeometries: MergeGeometriesFn;
-		renderer: InstanceType<ThreeNS['WebGLRenderer']>;
-		scene: InstanceType<ThreeNS['Scene']>;
-		camera: InstanceType<ThreeNS['PerspectiveCamera']>;
-		controls: OrbitControlsInst;
-		materialy: Partial<Record<Rola, InstanceType<ThreeNS['MeshPhysicalMaterial']>>>;
-		/** LEN meshe produktu (ram/sklo/kolajnica/klucka/klin/sietka) — oddelené
-		 *  od `disposables` (scéna/prostredie), aby `prestavGeometriuProduktu()`
-		 *  vedela zmazať/prestavať IBA produkt, bez toho, aby sa dotkla
-		 *  rendereru/kamery/svetiel/zeme/steny/oblohy (viď jeho vlastný komentár
-		 *  — `renderer.forceContextLoss()` je NEVRATNÉ, nesmie sa volať pri
-		 *  bežnej zmene geometrie, len pri skutočnom unmounte). */
-		produktMeshe: InstanceType<ThreeNS['Mesh']>[];
-		/** referencia na sklo materiál (ak scéna má sklo) — pre živú zmenu vzhľadu
-		 *  skla (`prekresliSklo()`) bez rebuildu geometrie (#276). */
-		skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null;
-		/** #288: post-processing composer (GTAO/SMAA/bloom) — `null` na low/none tieri
-		 *  a na SOFTVÉROVOM rendereri (`postprocPovoleny`). Keď existuje, `render()`
-		 *  volá jeho `.render()` namiesto priameho `renderer.render()`. Prežije
-		 *  `prestavGeometriuProduktu` (referuje stabilné `scene`/`camera`; GTAO si
-		 *  re-renderuje G-buffer každý frame, takže vidí nové meshe). */
-		postproc: ZivyComposer | null;
-		disposables: Disposable[];
-		contextLostCount: number;
-		fitVzdialenost: number;
-	}
-
+	// #333: `ZivaScena` + `postavScenu` (stavba scény) presunuté do `scena-build.ts`
+	// (Vizual3D prekročil 1000-r. strop pridaním intro/kóty/výzvy); životný cyklus tu ostáva.
 	let ziva: ZivaScena | null = null;
 	let zruseneVOnMounte = false;
 
@@ -148,13 +125,90 @@
 	 *  `false` (damping dobehol). Toto NIE JE trvalý render loop. */
 	function tikaj() {
 		if (!ziva) return;
+		// #333: akákoľvek interakcia (OrbitControls `'start'` → táto slučka, vrátane wheel-zoomu)
+		// ukončí intro glide (aby dve rAF slučky nefightovali kameru) AJ skryje výzvu otáčať
+		// (review 🔵 #7 — nie len na pointerdown).
+		if (introBezi) zrusIntro();
+		dotykOverlayViditelny = false;
 		const zmenene = ziva.controls.update();
 		render();
 		if (zmenene) requestAnimationFrame(tikaj);
 	}
 
+	/** #333 — zruší prebiehajúci intro glide (užívateľ začal interakciu / export / preset). */
+	function zrusIntro() {
+		introBezi = false;
+		if (introRafId) {
+			cancelAnimationFrame(introRafId);
+			introRafId = 0;
+		}
+	}
+
+	/** #333 — jemný ~1,7 s ease-out glide kamery z mierne odlišného uhla do defaultného
+	 *  presetu (LEN pergola). Naznačí, že scéna je živá/otáčateľná; ŽIADNY nekonečný
+	 *  auto-rotate. Per-frame nastavuje `camera.position` + `controls.update()` (ako
+	 *  `aplikujPreset`), na konci jeden finálny `controls.update()` (sync interného
+	 *  spherical → prvý drag „neskočí"). */
+	function introKamery() {
+		if (!ziva || !containerEl) return;
+		// #333 review 🔵: rešpektuj prefers-reduced-motion — žiadny kamerový glide, scéna už
+		// je na defaultnom presete (postavScenu ju tam nastavila).
+		if (
+			typeof window !== 'undefined' &&
+			window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+		) {
+			return;
+		}
+		const p = presety[preset];
+		const ciel = fitCiel(vysledok.bbox);
+		const vzd = vzdialenostPrePreset(preset, ziva.fitVzdialenost);
+		const az0 = p.azimut + 22; // štart mierne frontálnejšie
+		const el0 = Math.max(6, p.elevacia - 12); // štart mierne nižšie
+		const trvanie = 1700;
+		const t0 = performance.now();
+		introBezi = true;
+		const krok = (now: number) => {
+			if (!ziva || !introBezi) {
+				introBezi = false; // #333 review 🔵 #4: context-lost vetva nesmie nechať introBezi visieť
+				introRafId = 0;
+				return;
+			}
+			const u = Math.min(1, (now - t0) / trvanie);
+			const e = 1 - Math.pow(1 - u, 3); // ease-out cubic
+			const az = az0 + (p.azimut - az0) * e;
+			const el = el0 + (p.elevacia - el0) * e;
+			const poz = poziciaKamery(ciel, az, el, vzd);
+			ziva.camera.position.set(poz.x, poz.y, poz.z);
+			ziva.controls.target.set(ciel.x, ciel.y, ciel.z);
+			ziva.controls.update();
+			render();
+			if (u < 1) {
+				introRafId = requestAnimationFrame(krok);
+			} else {
+				introBezi = false;
+				introRafId = 0;
+				ziva.controls.update();
+			}
+		};
+		introRafId = requestAnimationFrame(krok);
+	}
+
+	/** #333 — decentná in-scene kóta „Š × H m" pri (re)monte scény = pri zmene rozmeru
+	 *  (rodič remountuje `{#key vizKluc}` na debounced rozmery). Zmizne po ~2 s. */
+	function zobrazKotu() {
+		// mm → „4,0" (čiarka, 1 desatinné) — inline, aby zdieľaný Vizual3D neimportoval
+		// konfigurator modul (money-guard allowlist §2.13); rovnaký tvar ako konfigurator-jednotky.
+		const m = (xMm: number) => (xMm / 1000).toFixed(1).replace('.', ',');
+		kotaText = `${m(vysledok.bbox.w)} × ${m(vysledok.bbox.d)} m`;
+		kotaViditelna = true;
+		if (kotaTimeout) clearTimeout(kotaTimeout);
+		kotaTimeout = setTimeout(() => {
+			kotaViditelna = false;
+		}, 2000);
+	}
+
 	function aktualizujCamDataAtributy() {
-		const p = PRESETY[preset];
+		const p = presety[preset];
 		camAzimutDeg = p.azimut;
 		camElevaciaDeg = p.elevacia;
 	}
@@ -169,7 +223,8 @@
 	 *  nezmenil (Svelte efekt sa pri zápise ROVNAKEJ hodnoty znova nespustí). */
 	function aplikujPreset(kluc: PresetKluc, znovaFit = false) {
 		if (!ziva) return;
-		const p = PRESETY[kluc];
+		zrusIntro(); // #333: klik na preset / reset preruší intro glide
+		const p = presety[kluc];
 		if (znovaFit && containerEl) {
 			ziva.fitVzdialenost = autoFitVzdialenost(
 				vysledok.bbox,
@@ -378,193 +433,7 @@
 		render();
 	}
 
-	function postavScenu(
-		THREE: ThreeNS,
-		OrbitControls: OrbitControlsCtor,
-		RoomEnvironment: new () => InstanceType<ThreeNS['Scene']>,
-		mergeGeometries: MergeGeometriesFn,
-		canvas: HTMLCanvasElement,
-		aktualnyTier: Exclude<Tier, 'none'>,
-		hdrTexture: InstanceType<ThreeNS['DataTexture']> | null,
-		postprocModuly: PostprocModuly | null
-	): ZivaScena {
-		const nastavenia = nastaveniaPreTier(aktualnyTier);
-		const disposables: Disposable[] = [];
-
-		const renderer = vytvorRenderer(THREE, canvas, nastavenia);
-		const scene = new THREE.Scene();
-		const environmentTex = vytvorEnvironment(
-			THREE,
-			RoomEnvironment,
-			renderer,
-			nastavenia,
-			hdrTexture
-		);
-		scene.environment = environmentTex;
-		// PMREM environment textúra sa inak NIKDY nezlikviduje — únik GPU pamäte
-		// pri každom opätovnom mount/unmount (SPA navigácia preč a späť) alebo
-		// context-lost/restored cykle.
-		disposables.push(environmentTex);
-
-		const { key, fill } = vytvorSvetla(THREE);
-		// #285: kľúčové svetlo vrhá reálny tieň (mid/high tier) — cieľ + shadow
-		// kamera podľa bboxu; `key.target` MUSÍ byť v scéne, inak three.js tieň
-		// mieri na (0,0,0). Low tier (`tiene===false`) tieň nekonfiguruje.
-		// POZN.: shadow frustum sa dimenzuje RAZ pri mounte podľa počiatočného
-		// bboxu — rovnako ako kontaktný dekal, stena a auto-fit kamery (všetka
-		// „scénická výbava" je mount-time). `prestavGeometriuProduktu` (otvoriť/
-		// zatvoriť) mení len pozície dielov, nie obálku, takže frustum ostáva
-		// platný. Live zmena ROZMEROV bez re-mountu (potenciálne až integrácia
-		// verejnej route #275) by potrebovala prestavať celú túto výbavu spolu —
-		// mimo rozsahu #285 (zdieľané pre-existujúce obmedzenie #170/#174).
-		if (nastavenia.tiene) {
-			nastavKluceoveSvetloTien(
-				THREE,
-				key,
-				vysledok.bbox.w,
-				vysledok.bbox.h,
-				vysledok.bbox.d,
-				nastavenia.shadowMapa
-			);
-			scene.add(key.target);
-		}
-		scene.add(key, fill);
-
-		const obloha = vytvorOblohu(THREE);
-		scene.add(obloha);
-		disposables.push(obloha.geometry, obloha.material as Disposable);
-		const oblohaMat = obloha.material as InstanceType<ThreeNS['MeshBasicMaterial']>;
-		if (oblohaMat.map) disposables.push(oblohaMat.map);
-
-		const zem = vytvorZem(THREE, nastavenia);
-		zem.receiveShadow = nastavenia.tiene; // #285: zem prijíma vrhnutý tieň konštrukcie
-		scene.add(zem);
-		disposables.push(zem.geometry, zem.material as Disposable);
-		const zemMat = zem.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
-		if (zemMat.map) disposables.push(zemMat.map);
-
-		// #325: pergola konfigurátor (`zobrazDom`) dostane SOLÍDNU fasádu škálovanú výškou
-		// + dom (dvere/okno); zasklenia scény ostávajú s PÔVODNOU stenou (dverný otvor,
-		// fixná výška) a BEZ domu → žiadna zmena zasklenia náhľadu.
-		const stena = zobrazDom
-			? vytvorStenu(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h, false)
-			: vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
-		stena.position.z = -(mm(vysledok.bbox.d) / 2 + 0.05);
-		stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
-		scene.add(stena);
-		disposables.push(stena.geometry, stena.material as Disposable);
-		const stenaMat = stena.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
-		if (stenaMat.map) disposables.push(stenaMat.map);
-		if (stenaMat.roughnessMap && stenaMat.roughnessMap !== stenaMat.map)
-			disposables.push(stenaMat.roughnessMap);
-
-		if (zobrazDom) {
-			// dekoratívne prvky domu (sokel + dvere + okno) tesne PRED fasádou. Dvere sú
-			// centrované na x=0 → vždy medzi krajnými stĺpmi (nikdy za nohou); výška domu je
-			// oreznutá podľa pripojenia pergoly (bbox.h), aby nekolidovala s bočným nosníkom.
-			const dom = vytvorDom(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h);
-			dom.skupina.position.z = stena.position.z; // z-offsety prvkov (mm) ich držia pred stenou
-			scene.add(dom.skupina);
-			for (const d of dom.disposables) disposables.push(d);
-		}
-
-		const tien = vytvorKontaktnyTien(THREE, vysledok.bbox.w, vysledok.bbox.d, vysledok.bbox.h);
-		scene.add(tien);
-		disposables.push(tien.geometry, tien.material as Disposable);
-		const tienMat = tien.material as InstanceType<ThreeNS['MeshBasicMaterial']>;
-		if (tienMat.map) disposables.push(tienMat.map);
-
-		// geometria produktu (extrahované do zdieľanej funkcie — volá ju aj
-		// `prestavGeometriuProduktu()` pri "Otvoriť"/zmene rozmerov, bez toho,
-		// aby sa dotkla tohto rendereru/scény/kamery)
-		const { materialy, produktMeshe, skloMaterial } = postavProduktMeshe(
-			THREE,
-			mergeGeometries,
-			scene,
-			vysledok,
-			ralKod,
-			nastavenia,
-			skloVzhlad
-		);
-		// POZOR: `produktMeshe` (geometrie/materiály) sa NEDÁVAJÚ do `disposables`
-		// — tie idú cez `ziva.produktMeshe` + `zlikvidujProduktMeshe()`, lebo
-		// `prestavGeometriuProduktu()` ich priebežne NAHRÁDZA (stará položka v
-		// `disposables` by po prestavbe ukazovala na už zlikvidovaný objekt a
-		// nová by v `disposables` chýbala — pozri `uvolniScenu()`).
-
-		const aspect = (containerEl?.clientWidth ?? 16) / Math.max(1, containerEl?.clientHeight ?? 9);
-		const camera = new THREE.PerspectiveCamera(35, aspect, 0.05, 400);
-		const fitVzdialenost = autoFitVzdialenost(vysledok.bbox, aspect);
-		const ciel = fitCiel(vysledok.bbox);
-		const p = PRESETY[preset];
-		const poz = poziciaKamery(
-			ciel,
-			p.azimut,
-			p.elevacia,
-			vzdialenostPrePreset(preset, fitVzdialenost)
-		);
-		camera.position.set(poz.x, poz.y, poz.z);
-
-		const controls = new OrbitControls(camera, canvas);
-		controls.target.set(ciel.x, ciel.y, ciel.z);
-		controls.enableDamping = true;
-		controls.dampingFactor = 0.08;
-		controls.enablePan = false;
-		controls.rotateSpeed = 0.6;
-		controls.zoomSpeed = 0.7;
-		const lim = orbitLimity(p, fitVzdialenost);
-		controls.minAzimuthAngle = lim.minAzimuthAngle;
-		controls.maxAzimuthAngle = lim.maxAzimuthAngle;
-		controls.minPolarAngle = lim.minPolarAngle;
-		controls.maxPolarAngle = lim.maxPolarAngle;
-		controls.minDistance = lim.minDistance;
-		controls.maxDistance = lim.maxDistance;
-		controls.update();
-		controls.addEventListener('start', tikaj);
-		controls.addEventListener('change', render);
-
-		// #288: post-processing composer (GTAO/SMAA/bloom). Stavia sa LEN keď volajúci
-		// (`inicializuj`) prešiel gate (`postprocPovoleny` = mid/high + hardvér) a dodal
-		// moduly. Konštrukcia v `try/catch` s TICHÝM graceful fallbackom na priamy render
-		// (vzor #285 HDRI — scéna sa nikdy nezhodí kvôli composeru; E2E zero-console drží).
-		let postproc: ZivyComposer | null = null;
-		const ppKonfig = postprocModuly ? postprocKonfig(aktualnyTier) : null;
-		if (postprocModuly && ppKonfig) {
-			try {
-				const wCss = containerEl?.clientWidth ?? 16;
-				const hCss = Math.max(1, containerEl?.clientHeight ?? 9);
-				postproc = vytvorComposer(
-					THREE,
-					postprocModuly,
-					renderer,
-					scene,
-					camera,
-					ppKonfig,
-					wCss,
-					hCss
-				);
-			} catch {
-				// composer sa nepodarilo postaviť (neočakávaný GPU quirk) → priamy render
-				postproc = null;
-			}
-		}
-
-		return {
-			THREE,
-			mergeGeometries,
-			renderer,
-			scene,
-			camera,
-			controls,
-			materialy,
-			produktMeshe,
-			skloMaterial,
-			postproc,
-			disposables,
-			contextLostCount: 0,
-			fitVzdialenost
-		};
-	}
+	// #333: `postavScenu` je v `$lib/vizual/scena-build.ts` (parameter injection cez `SceneCtx`).
 
 	function uvolniScenu() {
 		if (!ziva) return;
@@ -651,7 +520,18 @@
 				canvasEl,
 				tier,
 				hdrTexture,
-				postprocModuly
+				postprocModuly,
+				{
+					vysledok,
+					ralKod,
+					skloVzhlad,
+					preset,
+					presety,
+					zobrazDom,
+					containerEl,
+					onStart: tikaj,
+					onChange: render
+				}
 			);
 			(globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS =
 				((globalThis as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? 0) + 1;
@@ -691,6 +571,21 @@
 			// Jeden odložený re-render po dobehnutí textúr zachytí AA na počiatočnom zábere.
 			if (ziva?.postproc && typeof requestAnimationFrame === 'function') {
 				requestAnimationFrame(() => render());
+			}
+			// #333: LEN pergola. Intro glide „z hora" RAZ za načítanie (module-scoped guard →
+			// nebliká pri každom {#key} remounte rozmerov); in-scene kóta „Š × H m" pri KAŽDOM
+			// (re)monte = pri každej zmene rozmeru (zmizne po ~2 s).
+			if (zobrazDom && typeof requestAnimationFrame === 'function') {
+				zobrazKotu();
+				// Intro glide LEN na HARDVÉROVOM rendereri (ako #285/#288 polish gate): na
+				// SOFTVÉROVOM WebGL (SwiftShader/CI, slabé zariadenia) je každý render ťažkej scény
+				// pomalý → 1,7 s rAF slučka by blokovala hlavné vlákno a robila glide trhaný. Tam sa
+				// scéna rovno ukáže na defaultnom „z hora" presete (žiadny glide). Odstráni to aj
+				// kontenciu hneď po monte, ktorá spomaľovala živý update na softvérovom CI.
+				if (!introUzBezal && !jeSoftverovyRenderer(citajUnmaskedRenderer(gl))) {
+					introUzBezal = true;
+					introKamery();
+				}
 			}
 		} catch (e) {
 			// Nikdy nesmie zostať tichá — chyba počas stavby scény (napr.
@@ -739,6 +634,7 @@
 		};
 		const naPrvyDotyk = () => {
 			dotykOverlayViditelny = false;
+			zrusIntro(); // #333: prvá interakcia ukončí intro glide aj skryje výzvu otáčať
 		};
 		canvasEl?.addEventListener('webglcontextlost', naStrataKontextu, { passive: false });
 		canvasEl?.addEventListener('webglcontextrestored', naObnovuKontextu);
@@ -756,12 +652,16 @@
 			canvasEl?.removeEventListener('webglcontextlost', naStrataKontextu);
 			canvasEl?.removeEventListener('webglcontextrestored', naObnovuKontextu);
 			canvasEl?.removeEventListener('pointerdown', naPrvyDotyk);
+			zrusIntro(); // #333: zruš intro rAF pri unmount/remount
+			if (kotaTimeout) clearTimeout(kotaTimeout);
 			uvolniScenu();
 		};
 	});
 
 	onDestroy(() => {
 		zruseneVOnMounte = true;
+		zrusIntro();
+		if (kotaTimeout) clearTimeout(kotaTimeout);
 		uvolniScenu();
 	});
 
@@ -817,6 +717,12 @@
 	export async function zachytObrazok(sirkaPx?: number, vyskaPx?: number) {
 		if (!ziva) throw new Error('Vizual3D: scéna nie je pripravená');
 		dotykOverlayViditelny = false;
+		// #333: ak intro glide práve beží, zachyť čistý FINÁLNY záber (nie prechodný uhol);
+		// inak zachyť aktuálnu kameru (nezmenené správanie pre zasklenia tlačový list).
+		if (introBezi) {
+			zrusIntro();
+			aplikujPreset(preset);
+		}
 		const blob = await zachytSnimku(ziva.THREE, {
 			renderer: ziva.renderer,
 			scene: ziva.scene,
@@ -853,15 +759,45 @@
 		</div>
 	{/if}
 
+	<!-- #333: výzva OTÁČAŤ. LEN pergola (`zobrazDom`) dostane nový pill (ikona + text, desktop AJ
+	     mobil, jemný pulz, `pointer-events:none` → nikdy neblokuje orbit). ZDIEĽANÁ zasklenia scéna
+	     ostáva na PÔVODNOM overlay (tap-to-dismiss, na desktope skrytý `@media hover`) — review 🟡:
+	     nový pill sa NESMIE preliať do zasklenia náhľadu. Oba miznú pri prvej interakcii. -->
 	{#if dotykOverlayViditelny && tier !== 'none' && pripravene}
-		<button
-			type="button"
-			class="dotyk-overlay"
-			data-testid="vizual3d-dotyk-overlay"
-			onclick={() => (dotykOverlayViditelny = false)}
-		>
-			Ťuknite pre otáčanie
-		</button>
+		{#if zobrazDom}
+			<div class="rotacia-hint" data-testid="vizual3d-dotyk-overlay" aria-hidden="true">
+				<svg class="rotacia-ikona" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+					<path
+						d="M4.5 9a8 8 0 0 1 14-2.5M19.5 15a8 8 0 0 1-14 2.5"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+					/>
+					<path
+						d="M18.5 3.5v3h-3M5.5 20.5v-3h3"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+				<span>Potiahnite a otáčajte</span>
+			</div>
+		{:else}
+			<button
+				type="button"
+				class="dotyk-overlay"
+				data-testid="vizual3d-dotyk-overlay"
+				onclick={() => (dotykOverlayViditelny = false)}
+			>
+				Ťuknite pre otáčanie
+			</button>
+		{/if}
+	{/if}
+
+	<!-- #333: decentná in-scene kóta rozmerov, zmizne po ~2 s (LEN pergola/`zobrazDom`). -->
+	{#if kotaViditelna && zobrazDom && tier !== 'none' && pripravene}
+		<div class="kota-badge" data-testid="vizual3d-kota" aria-hidden="true">{kotaText}</div>
 	{/if}
 </div>
 
@@ -891,6 +827,7 @@
 		background: #fff;
 	}
 
+	/* Pôvodný zasklenia overlay (tap-to-dismiss, na desktope skrytý) — NEZMENENÉ správanie. */
 	.dotyk-overlay {
 		position: absolute;
 		inset: 0;
@@ -903,10 +840,77 @@
 		font-weight: 600;
 		cursor: pointer;
 	}
-
 	@media (hover: hover) {
 		.dotyk-overlay {
 			display: none;
+		}
+	}
+
+	/* #333: výzva otáčať (LEN pergola) — pill dole v strede, NIKDY neblokuje orbit. */
+	.rotacia-hint {
+		position: absolute;
+		left: 50%;
+		bottom: 14px;
+		transform: translateX(-50%);
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 14px;
+		border-radius: 999px;
+		background: rgba(15, 23, 42, 0.55);
+		color: #fff;
+		font-size: 13px;
+		font-weight: 600;
+		white-space: nowrap;
+		pointer-events: none;
+		animation: rotacia-pulz 2s ease-in-out infinite;
+	}
+	.rotacia-ikona {
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+	}
+	@keyframes rotacia-pulz {
+		0%,
+		100% {
+			opacity: 0.78;
+			transform: translateX(-50%) translateY(0);
+		}
+		50% {
+			opacity: 1;
+			transform: translateX(-50%) translateY(-2px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.rotacia-hint {
+			animation: none;
+		}
+	}
+
+	/* #333: in-scene kóta rozmerov — decentný badge vpravo hore, fade in/out. */
+	.kota-badge {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		padding: 5px 11px;
+		border-radius: 8px;
+		background: rgba(15, 23, 42, 0.5);
+		color: #fff;
+		font-size: 12.5px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.02em;
+		pointer-events: none;
+		animation: kota-fade 0.35s ease-out;
+	}
+	@keyframes kota-fade {
+		from {
+			opacity: 0;
+			transform: translateY(-4px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
 		}
 	}
 </style>

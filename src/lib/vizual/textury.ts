@@ -156,6 +156,55 @@ export function vytvorStenuTexturu(
 	};
 }
 
+/** #333 — standing-seam plechová strecha domu (SalesQueze referencia): antracitový
+ *  základ + pravidelné ZVISLÉ falcové švy (tmavšia čiara + tenký svetlý zvýraznok).
+ *  Deterministické (žiadny `Math.random` → v teste netreba mockovať). Volajúci nastaví
+ *  `repeat`/`wrapS`/`wrapT` tak, aby švy bežali DOLE po sklone strechy. */
+export function vytvorStrechaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	ctx.fillStyle = '#3a3f45'; // antracit plech
+	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
+	const pocetSvov = 8; // 8 falcových panelov cez šírku textúry
+	const rozstup = rozlisenie / pocetSvov;
+	for (let i = 0; i <= pocetSvov; i++) {
+		const x = Math.round(i * rozstup);
+		// tmavá ryha švu
+		ctx.fillStyle = '#23272c';
+		ctx.fillRect(x - 1, 0, 2, rozlisenie);
+		// tenký svetlý zvýraznok vedľa švu (kovový lesk)
+		ctx.fillStyle = 'rgba(255,255,255,0.06)';
+		ctx.fillRect(x + 1, 0, 1, rozlisenie);
+	}
+	return ztexturuj(THREE, canvas);
+}
+
+/** #333 — trávnik okolo terasy (SalesQueze: svetlá odsaturovaná zeleň, nesúťaží s
+ *  pergolou). Jemný 2-oktávový šum okolo odsaturovaného zeleného základu. Používa
+ *  `Math.random` (v teste mockovať + `finally` restore — vizual3d.md). */
+export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	const zaklad: [number, number, number] = hexNaRgb('#93a884'); // odsaturovaná svetlá zeleň
+	const tmava: [number, number, number] = hexNaRgb('#7c9070');
+	const img = ctx.createImageData(rozlisenie, rozlisenie);
+	for (let i = 0; i < img.data.length; i += 4) {
+		let v = 0;
+		let vaha = 0;
+		for (let okt = 0; okt < 2; okt++) {
+			const w = 1 / 2 ** okt;
+			v += Math.random() * w;
+			vaha += w;
+		}
+		v /= vaha;
+		const rgb = miesaj(zaklad, tmava, v);
+		img.data[i] = rgb[0];
+		img.data[i + 1] = rgb[1];
+		img.data[i + 2] = rgb[2];
+		img.data[i + 3] = 255;
+	}
+	ctx.putImageData(img, 0, 0);
+	return ztexturuj(THREE, canvas);
+}
+
 /** Dvojvrstvový kontaktný tieň — mäkká vrstva (radiálny gradient) + tvrdé
  *  jadro (samotný pôdorys), oba v JEDNEJ textúre (dve vrstvy nakreslené nad
  *  seba), aplikuje sa na alpha-decal rovinu.
