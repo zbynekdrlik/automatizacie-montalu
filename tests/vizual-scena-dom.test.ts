@@ -101,6 +101,59 @@ describe('vytvorDom (#333) — profi 2-podlažný dom so strechou', () => {
 		expect(dom.skupina.children.length).toBeGreaterThanOrEqual(10);
 		for (const d of dom.disposables) expect(typeof d.dispose).toBe('function');
 	});
+
+	// #325/#333 review 🔴 REGRESIA: prízemné prvky (dvere + spodné okná) sú v priestore pergoly →
+	// NIKDY nesmú prekročiť vnútornú hranu krajného stĺpa (±(S/2−50)) ani pripojenie pergoly
+	// (stropPrvkov). Zmazané #325 clampy sa touto sadou vracajú (predtým dom vypustil clampy a
+	// pri S=2000/SV=2000 okno prepichlo stĺp / dvere prečnievali sklo).
+	function prizemnePrvky(S: number, SV: number) {
+		const PRIZEMIE_H = Math.max(2800, Math.round(SV) + 600);
+		const dom = vytvorDom(THREE, nast, S, SV);
+		return (
+			dom.skupina.children
+				.map((c) => {
+					const m = c as Mesh;
+					m.geometry.computeBoundingBox();
+					const bb = m.geometry.boundingBox!;
+					const w = bb.max.x - bb.min.x;
+					return {
+						// SVETOVÝ stred y (geometria štítu má position.y=0, ale bbox vysoko → nesmie sa
+						// tváriť ako prízemný prvok).
+						cy: m.position.y + (bb.min.y + bb.max.y) / 2,
+						w,
+						vonkajsiaX: Math.abs(m.position.x) + w / 2,
+						hornaY: m.position.y + bb.max.y
+					};
+				})
+				// LEN prízemie (dvere/spodné okná): stred pod prízemím A NIE celofasádny prvok
+				// (fasáda/sokel majú šírku S+600 > S — tie smú presahovať).
+				.filter((p) => p.cy < mm(PRIZEMIE_H) && p.w < mm(S))
+		);
+	}
+
+	it.each([2000, 2600, 3000, 4000, 8000])(
+		'prízemné prvky NEDOSIAHNU vnútornú hranu krajného stĺpa ±(S/2−50) — S=%i (nikdy za nohou)',
+		(S) => {
+			const vnutornaHrana = mm(S / 2 - 50);
+			const prvky = prizemnePrvky(S, 2500);
+			expect(prvky.length).toBeGreaterThan(0); // aspoň dvere
+			for (const p of prvky) expect(p.vonkajsiaX).toBeLessThanOrEqual(vnutornaHrana + 1e-9);
+		}
+	);
+
+	it('NÍZKA pergola (SV=2000) → prízemné prvky OREZANÉ pod pripojenie (stropPrvkov)', () => {
+		const SV = 2000;
+		const stropPrvkov = Math.max(1500, Math.round(SV) - 300); // 1700 mm
+		const prvky = prizemnePrvky(4000, SV);
+		expect(prvky.length).toBeGreaterThan(0);
+		for (const p of prvky) expect(p.hornaY).toBeLessThanOrEqual(mm(stropPrvkov) + 1e-6);
+	});
+
+	it('malá pergola (S=2000) VYNECHÁ spodné okná (medzera príliš úzka), širšia (3000) ich MÁ', () => {
+		// pri S=2000 je medzera dvere↔stĺp príliš úzka (ako #325) → žiadne spodné okno; pri 3000 sa
+		// zmestia → viac prízemných prvkov (dvere + 2 okná × 4 diely).
+		expect(prizemnePrvky(3000, 2500).length).toBeGreaterThan(prizemnePrvky(2000, 2500).length);
+	});
 });
 
 describe('vytvorOkolie (#333) — trávnik + dlažbová terasa + stromy', () => {

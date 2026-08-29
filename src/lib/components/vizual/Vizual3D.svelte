@@ -119,9 +119,11 @@
 	 *  `false` (damping dobehol). Toto NIE JE trvalý render loop. */
 	function tikaj() {
 		if (!ziva) return;
-		// #333: akákoľvek interakcia (OrbitControls `'start'` → táto slučka) ukončí intro
-		// glide, aby dve rAF slučky nefightovali kameru.
+		// #333: akákoľvek interakcia (OrbitControls `'start'` → táto slučka, vrátane wheel-zoomu)
+		// ukončí intro glide (aby dve rAF slučky nefightovali kameru) AJ skryje výzvu otáčať
+		// (review 🔵 #7 — nie len na pointerdown).
 		if (introBezi) zrusIntro();
+		dotykOverlayViditelny = false;
 		const zmenene = ziva.controls.update();
 		render();
 		if (zmenene) requestAnimationFrame(tikaj);
@@ -143,6 +145,14 @@
 	 *  spherical → prvý drag „neskočí"). */
 	function introKamery() {
 		if (!ziva || !containerEl) return;
+		// #333 review 🔵: rešpektuj prefers-reduced-motion — žiadny kamerový glide, scéna už
+		// je na defaultnom presete (postavScenu ju tam nastavila).
+		if (
+			typeof window !== 'undefined' &&
+			window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+		) {
+			return;
+		}
 		const p = presety[preset];
 		const ciel = fitCiel(vysledok.bbox);
 		const vzd = vzdialenostPrePreset(preset, ziva.fitVzdialenost);
@@ -153,6 +163,7 @@
 		introBezi = true;
 		const krok = (now: number) => {
 			if (!ziva || !introBezi) {
+				introBezi = false; // #333 review 🔵 #4: context-lost vetva nesmie nechať introBezi visieť
 				introRafId = 0;
 				return;
 			}
@@ -737,28 +748,40 @@
 		</div>
 	{/if}
 
-	<!-- #333: výzva OTÁČAŤ — malý pill (ikona + text), desktop AJ mobil, jemný pulz,
-	     `pointer-events:none` (nikdy neblokuje orbit — pointerdown ide na canvas → skryje ho).
-	     Mizne pri prvej interakcii (`naPrvyDotyk`). -->
+	<!-- #333: výzva OTÁČAŤ. LEN pergola (`zobrazDom`) dostane nový pill (ikona + text, desktop AJ
+	     mobil, jemný pulz, `pointer-events:none` → nikdy neblokuje orbit). ZDIEĽANÁ zasklenia scéna
+	     ostáva na PÔVODNOM overlay (tap-to-dismiss, na desktope skrytý `@media hover`) — review 🟡:
+	     nový pill sa NESMIE preliať do zasklenia náhľadu. Oba miznú pri prvej interakcii. -->
 	{#if dotykOverlayViditelny && tier !== 'none' && pripravene}
-		<div class="rotacia-hint" data-testid="vizual3d-dotyk-overlay" aria-hidden="true">
-			<svg class="rotacia-ikona" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-				<path
-					d="M4.5 9a8 8 0 0 1 14-2.5M19.5 15a8 8 0 0 1-14 2.5"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-				/>
-				<path
-					d="M18.5 3.5v3h-3M5.5 20.5v-3h3"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				/>
-			</svg>
-			<span>Potiahnite a otáčajte</span>
-		</div>
+		{#if zobrazDom}
+			<div class="rotacia-hint" data-testid="vizual3d-dotyk-overlay" aria-hidden="true">
+				<svg class="rotacia-ikona" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+					<path
+						d="M4.5 9a8 8 0 0 1 14-2.5M19.5 15a8 8 0 0 1-14 2.5"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+					/>
+					<path
+						d="M18.5 3.5v3h-3M5.5 20.5v-3h3"
+						stroke="currentColor"
+						stroke-width="1.8"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+				</svg>
+				<span>Potiahnite a otáčajte</span>
+			</div>
+		{:else}
+			<button
+				type="button"
+				class="dotyk-overlay"
+				data-testid="vizual3d-dotyk-overlay"
+				onclick={() => (dotykOverlayViditelny = false)}
+			>
+				Ťuknite pre otáčanie
+			</button>
+		{/if}
 	{/if}
 
 	<!-- #333: decentná in-scene kóta rozmerov, zmizne po ~2 s (LEN pergola/`zobrazDom`). -->
@@ -793,7 +816,26 @@
 		background: #fff;
 	}
 
-	/* #333: výzva otáčať — pill dole v strede, NIKDY neblokuje orbit (pointer-events:none). */
+	/* Pôvodný zasklenia overlay (tap-to-dismiss, na desktope skrytý) — NEZMENENÉ správanie. */
+	.dotyk-overlay {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border: none;
+		background: rgba(15, 23, 42, 0.28);
+		color: #fff;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	@media (hover: hover) {
+		.dotyk-overlay {
+			display: none;
+		}
+	}
+
+	/* #333: výzva otáčať (LEN pergola) — pill dole v strede, NIKDY neblokuje orbit. */
 	.rotacia-hint {
 		position: absolute;
 		left: 50%;

@@ -82,8 +82,20 @@ export function vytvorDom(
 		disposables.push(g, m);
 	};
 
-	// --- SVETLÁ FASÁDA (prekrytie pred teplou stenou), celé 2 podlažia ---
-	box(FASADA_W, CELKOVA_H, 60, FARBA_FASADA, 0.95, 0, 0, CELKOVA_H / 2, 0);
+	// --- SVETLÁ FASÁDA ako PLANE (nie box → žiadny BOČNÝ z-fight so soklom/oknami rovnakej
+	//     šírky), tesne (5 mm) PRED pôvodnou (teplou) stenou, celé 2 podlažia (orbit je predný,
+	//     zadnú stranu nikdy nevidno → FrontSide stačí). ---
+	const gFasada = new THREE.PlaneGeometry(mm(FASADA_W), mm(CELKOVA_H));
+	const mFasada = new THREE.MeshStandardMaterial({
+		color: FARBA_FASADA,
+		roughness: 0.95,
+		metalness: 0
+	});
+	const fasada = new THREE.Mesh(gFasada, mFasada);
+	fasada.position.set(0, mm(CELKOVA_H / 2), mm(5));
+	fasada.receiveShadow = tiene;
+	skupina.add(fasada);
+	disposables.push(gFasada, mFasada);
 
 	// --- SEDLOVÁ PLECHOVÁ STRECHA (standing-seam) so štítmi a presahom ---
 	const alfa = (20 * Math.PI) / 180; // sklon strechy
@@ -120,7 +132,9 @@ export function vytvorDom(
 		g.rotateX(znamienko * alfa); // +Z okraj dole pri +alfa (predný sklon)
 		const mesh = new THREE.Mesh(g, strechaMat);
 		mesh.position.set(0, mm(CELKOVA_H + rise / 2), mm(zRidge + znamienko * (Dr / 4)));
-		mesh.castShadow = tiene;
+		// castShadow VYPNUTÝ: shadow frustum je dimenzovaný na bbox produktu (~2–4 m), 6 m
+		// strecha by mala orezaný tieň na trávniku (review 🔵 #3). Produkt (pergola) tieň drží.
+		mesh.castShadow = false;
 		mesh.receiveShadow = tiene;
 		skupina.add(mesh);
 		disposables.push(g);
@@ -152,32 +166,62 @@ export function vytvorDom(
 		disposables.push(g);
 	}
 
-	// --- RASTER OKIEN (rám + tónované sklo + priečky) na oboch podlažiach ---
-	const oknoRaster = (cxMm: number, cyMm: number): void => {
-		const w = 820;
-		const h = 1150;
+	// Kolízne clampy (#325, review 🔴): PRÍZEMNÉ prvky (dvere + spodné okná) sú v priestore
+	// PERGOLY, takže MUSIA ostať pod pripojením pergoly a v čistej medzere medzi rámom dverí a
+	// krajným stĺpom (x=±S/2) — inak pri malej/nízkej pergole (S=2000, SV=2000) prepichnú stĺp,
+	// strešné sklo, alebo koplanárne kolidujú s dverami (z-fight). POSCHODOVÉ okná sú NAD pergolou
+	// (y > pripojenie), takže sú bez kolízie a môžu byť plné.
+	const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+	const stlpX = S / 2; // vnútorná hrana krajného stĺpa ≈ stlpX − 50
+	const stropPrvkov = Math.max(1500, Math.round(SV) - 300); // pod bočný nosník pergoly
+
+	const oknoRaster = (cxMm: number, cyMm: number, w: number, h: number): void => {
 		box(w + 120, h + 120, 40, FARBA_OKNO_RAM, 0.8, 0, cxMm, cyMm, 50); // rám
 		box(w, h, 24, FARBA_SKLO, 0.08, 0, cxMm, cyMm, 66); // tónované sklo (nízka drsnosť = odraz)
 		box(w, 44, 30, FARBA_OKNO_RAM, 0.8, 0, cxMm, cyMm, 74); // vodorovná priečka
 		box(44, h, 30, FARBA_OKNO_RAM, 0.8, 0, cxMm, cyMm, 74); // zvislá priečka
 	};
-	// poschodie: 3 okná; prízemie: 2 okná lemujúce dvere (medzi krajnými stĺpmi)
-	const oknoX = Math.min(S * 0.3, FASADA_W / 2 - 700);
-	const yPoschodie = PRIZEMIE_H + POSCHODIE_H * 0.5;
-	const yPrizemie = PRIZEMIE_H * 0.56;
-	oknoRaster(-oknoX, yPoschodie);
-	oknoRaster(0, yPoschodie);
-	oknoRaster(oknoX, yPoschodie);
-	oknoRaster(-oknoX, yPrizemie);
-	oknoRaster(oknoX, yPrizemie);
 
-	// --- DREVENÉ DVERE, centrované na x=0 (priechodné medzi nohami pergoly) ---
-	const dvereW = 1000;
-	const dvereH = 2100;
+	// --- DREVENÉ DVERE, centrované na x=0; výška ORezaná pod pripojenie pergoly ---
+	const dvereW = clamp(Math.round(0.22 * S), 760, 1000);
+	const dvereH = Math.min(2100, stropPrvkov - 100);
+	const dvereRamHalf = (dvereW + 120) / 2;
 	box(dvereW + 120, dvereH + 80, 40, FARBA_DVERE_RAM, 0.7, 0.05, 0, (dvereH + 80) / 2, 50); // rám
 	box(dvereW, dvereH, 60, FARBA_DVERE, 0.6, 0, 0, dvereH / 2, 78); // drevené krídlo
 	box(dvereW - 160, 46, 26, FARBA_DVERE_RAM, 0.6, 0, 0, dvereH * 0.62, 96); // deliaci pruh
-	box(46, 200, 40, FARBA_KLUCKA, 0.35, 0.7, dvereW / 2 - 100, dvereH * 0.45, 100); // kľučka
+	box(
+		46,
+		clamp(200, 120, dvereH * 0.4),
+		40,
+		FARBA_KLUCKA,
+		0.35,
+		0.7,
+		dvereW / 2 - 100,
+		dvereH * 0.45,
+		100
+	); // kľučka
+
+	// --- POSCHODOVÉ okná (nad pergolou, bez kolízie): 3 across, plná veľkosť ---
+	const oknoHornaW = 820;
+	const oknoHornaH = 1150;
+	const oknoHornaX = Math.min(S * 0.3, FASADA_W / 2 - (oknoHornaW / 2 + 120));
+	const yPoschodie = PRIZEMIE_H + POSCHODIE_H * 0.5;
+	oknoRaster(-oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+	oknoRaster(0, yPoschodie, oknoHornaW, oknoHornaH);
+	oknoRaster(oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+
+	// --- PRÍZEMNÉ okná (v pergole → CLAMPnuté): symetricky do čistej medzery rám-dverí↔stĺp,
+	//     vynechané ak sa medzera nezmestí (ako #325 → NIKDY nekolidujú s dverami ani stĺpom). ---
+	const medzeraLo = dvereRamHalf + 180; // pravý okraj rámu dverí + rezerva
+	const medzeraHi = stlpX - 150; // ľavý okraj stĺpa − rezerva
+	const oknoDolnaW = Math.min(760, Math.round((medzeraHi - medzeraLo) * 0.7));
+	const oknoDolnaHMax = Math.min(1050, stropPrvkov - 960); // rám (oknoH+120) hore = 900+oknoH+60 ≤ stropPrvkov
+	if (oknoDolnaW >= 360 && oknoDolnaHMax >= 500) {
+		const oknoDolnaX = (medzeraLo + medzeraHi) / 2;
+		const cy = 900 + oknoDolnaHMax / 2; // parapet 900 mm
+		oknoRaster(-oknoDolnaX, cy, oknoDolnaW, oknoDolnaHMax);
+		oknoRaster(oknoDolnaX, cy, oknoDolnaW, oknoDolnaHMax);
+	}
 
 	// --- SOKEL (parapetný pás pri zemi, tmavší kameň) ---
 	box(FASADA_W, 360, 60, FARBA_SOKEL, 0.9, 0, 0, 180, 55);
@@ -253,7 +297,7 @@ export function vytvorOkolie(
 		});
 		const kmen = new THREE.Mesh(gKmen, mKmen);
 		kmen.position.set(mm(xMm), mm(kmenH / 2), mm(zMm));
-		kmen.castShadow = tiene;
+		kmen.castShadow = false; // mimo shadow frustumu produktu (orezaný tieň) — review 🔵 #3
 		kmen.receiveShadow = tiene;
 		skupina.add(kmen);
 		disposables.push(gKmen, mKmen);
@@ -267,7 +311,7 @@ export function vytvorOkolie(
 		});
 		const koruna = new THREE.Mesh(gKoruna, mKoruna);
 		koruna.position.set(mm(xMm), mm(kmenH + korunaH / 2), mm(zMm));
-		koruna.castShadow = tiene;
+		koruna.castShadow = false; // mimo shadow frustumu produktu (orezaný tieň)
 		koruna.receiveShadow = tiene;
 		skupina.add(koruna);
 		disposables.push(gKoruna, mKoruna);
