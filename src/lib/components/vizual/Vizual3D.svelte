@@ -228,11 +228,19 @@
 	}
 
 	function prekresliRAL() {
+		// #329 root-cause fix: reaktívne vstupy (`ralKod`, `tier`) čítame do lokálov PRED `!ziva`
+		// gate-om. `ziva` je obyčajný `let` (nie `$state`), plnený až async `inicializuj()`; prvý
+		// beh efektu `$effect(() => prekresliRAL())` prebehne kým `ziva===null`. Keby sme gateovali
+		// pred čítaním propu, efekt by v tom behu nezaregistroval žiadnu závislosť a bol by navždy
+		// mŕtvy (zmena farby po monte by 3D neprekreslila). Čítaním PRED gate-om efekt zaregistruje
+		// `ralKod`/`tier` už pri prvom behu → pri každej ďalšej zmene sa spustí a materiál sa zmutuje.
+		const kod = ralKod;
+		const t = tier;
 		if (!ziva) return;
-		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
+		const nastavenia = nastaveniaPreTier(t === 'none' ? 'low' : t);
 		for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
 			const mat = ziva.materialy[rola];
-			if (mat) nastavRAL(ziva.THREE, mat, ralKod, nastavenia.clearcoat);
+			if (mat) nastavRAL(ziva.THREE, mat, kod, nastavenia.clearcoat);
 		}
 		oznacRalApplied();
 		render();
@@ -243,10 +251,15 @@
 	 *  `skloVzhlad` je zadané (pergola zákaznícky režim); pri zasklení
 	 *  (`skloVzhlad === undefined`) je no-op a sklo ostáva pôvodné. */
 	function prekresliSklo() {
-		if (!ziva || !ziva.skloMaterial || !skloVzhlad) return;
-		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
-		nastavSkloVzhlad(ziva.THREE, ziva.skloMaterial, nastavenia.sklo, skloVzhlad);
-		oznacSkloApplied(skloVzhlad);
+		// #329 root-cause fix (rovnako ako prekresliRAL): reaktívne vstupy (`skloVzhlad`, `tier`)
+		// čítame do lokálov PRED `!ziva` gate-om, aby efekt `$effect(() => prekresliSklo())`
+		// zaregistroval závislosť aj pri prvom behu (ziva===null) a spustil sa pri každej zmene skla.
+		const vz = skloVzhlad;
+		const t = tier;
+		if (!ziva || !ziva.skloMaterial || !vz) return;
+		const nastavenia = nastaveniaPreTier(t === 'none' ? 'low' : t);
+		nastavSkloVzhlad(ziva.THREE, ziva.skloMaterial, nastavenia.sklo, vz);
+		oznacSkloApplied(vz);
 		render();
 	}
 
