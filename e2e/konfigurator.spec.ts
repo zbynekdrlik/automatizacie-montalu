@@ -589,6 +589,49 @@ test('konfigurátor: zákaznícke kategórie skla + info karty + realistický sk
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #329 info karta sa zmestí do viewportu a Escape ju zavrie: karta bola ukotvená stredom nad
+// triggerom (`left:50%` + translateX(-50%)) → pri triggeri blízko pravého okraja panela
+// bounding box presiahol viewport (desktop aj mobil). Fix ukotvil kartu PRAVÝM okrajom na
+// trigger — over, že sa vždy zmestí, na desktope aj mobile viewporte, a že Escape zatvorí
+// otvorenú (tap) kartu.
+test('konfigurátor: info karta sa zmestí do viewportu a Escape ju zavrie (#329)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await konfReady(page);
+
+	const trigger = page.locator('button[aria-label="Viac o: Pergola MASSIVE"]');
+	await trigger.click();
+	const karta = page.locator('[data-testid="konf-info-karta"].otvorene');
+
+	// desktop: otvorená karta ostáva CELÁ vo viewporte (žiaden presah cez pravý okraj)
+	const viewportDesktop = page.viewportSize();
+	expect(viewportDesktop).not.toBeNull();
+	let box = await karta.boundingBox();
+	expect(box).not.toBeNull();
+	expect(box!.x).toBeGreaterThanOrEqual(0);
+	expect(box!.x + box!.width).toBeLessThanOrEqual(viewportDesktop!.width);
+
+	// mobil 390×844: znova otvor a over rovnaké ohraničenie
+	await page.setViewportSize({ width: 390, height: 844 });
+	await trigger.click(); // zavrie predchádzajúce otvorenie (toggle)
+	await trigger.click(); // znova otvorí na novom viewporte
+	box = await karta.boundingBox();
+	expect(box).not.toBeNull();
+	expect(box!.x).toBeGreaterThanOrEqual(0);
+	expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+
+	// Escape zatvorí otvorenú (tap) kartu — žiadna info-karta ostáva viditeľná
+	await page.keyboard.press('Escape');
+	const infoKarty = page.getByTestId('konf-info-karta');
+	const pocet = await infoKarty.count();
+	for (let i = 0; i < pocet; i++) {
+		await expect(infoKarty.nth(i)).not.toHaveClass(/otvorene/);
+	}
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('konfigurátor: 3D náhľad viditeľný HNEĎ na MOBILNOM viewporte 390×844 (low tier fallback), nula console chýb (#325)', async ({
 	page
 }) => {
