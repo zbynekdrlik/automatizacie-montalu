@@ -8,7 +8,11 @@
 // (nova-stranka pasca #1). Súčasť #280.
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { SKLO_STRECHA_TYPY } from '$lib/sklo-strecha';
+// #329 časť 4: verejný konfigurátor ukazuje 6 zákazníckych KATEGÓRIÍ skla (nie 14 katalógových
+// typov s hrúbkami). `KONF_SKLO_KATEGORIE` je client-safe (len katalógový `nazov` + label/popis/
+// ikona, žiadny Money kód) — každá kategória sa mapuje na konkrétny katalógový `nazov`, ktorý sa
+// POSTuje ďalej (parser + cena/PDF/dopyt/Odoo dostávajú nezmenený katalógový názov).
+import { KONF_SKLO_KATEGORIE } from '$lib/konfigurator-sklo';
 import { RAL_PALETA } from '$lib/vykres/ral';
 import { KONF_RANGES, MODELY, konfiguruj } from '$lib/konfigurator';
 import { parseKonfiguratorVstup } from '$lib/server/konfigurator-vstup';
@@ -32,7 +36,9 @@ export const load: PageServerLoad = async () => {
 	// LEN názvy skla (`.nazov`, NIKDY Money kód) + RAL možnosti (kód+názov, žiadny Money
 	// údaj) + rozmedzia. Nič z toho neobsahuje cenu ani Money kód → žiadny únik.
 	return {
-		sklaTypy: SKLO_STRECHA_TYPY.map((t) => t.nazov),
+		// #329 časť 4: 6 zákazníckych kategórií skla (label + popis + ikona + KONKRÉTNY katalógový
+		// nazov), namiesto všetkých 14 katalógových typov. Money-neutrálne (žiadny Money kód).
+		sklaKategorie: KONF_SKLO_KATEGORIE,
 		farby: RAL_PALETA.map((r) => ({ kod: r.kod, nazov: r.nazov })),
 		// #279 Fáza C: modely (kód + popis) na výber vo wizarde. LEN popisy, ŽIADNA cena —
 		// cena je rozmerovo závislá a počíta ju akcia `vypocet` pri submite.

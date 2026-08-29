@@ -16,7 +16,7 @@
 // (b) drží to disciplínu „three je mimo vizual/ vždy lazy" (guard:
 // tests/vizual-money-guard.test.ts — statický `three` mimo vizual/ je zakázaný).
 import type { RequestHandler } from './$types';
-import { pergolaSpec } from '$lib/vizual/geo/pergola';
+import { pergolaSpec, type PergolaModel } from '$lib/vizual/geo/pergola';
 import {
 	pergolaSkloVzhlad,
 	PERGOLA_SKLA_NAZVY,
@@ -117,6 +117,13 @@ export const GET: RequestHandler = async ({ url, getClientAddress, request, setH
 	// RAL kód: `farbaKonstrukcie` (vo vnútri postavGlbScenu) gracefully padne na
 	// neutrálnu šeď pri neznámom kóde → nemusíme tvrdo odmietať
 	const ralKod = String(q.get('farba') ?? '').trim();
+	// #329 časť 2: model → hrúbky profilov aj v AR GLB (inak by AR vždy ukázal ROBUST-škálu, kým 3D
+	// náhľad LIGHT/MASSIVE škáluje → nekonzistencia). Neznámy/chýbajúci → undefined (škála 1.0).
+	const modelParam = String(q.get('model') ?? '').trim();
+	const model: PergolaModel | undefined =
+		modelParam === 'LIGHT' || modelParam === 'ROBUST' || modelParam === 'MASSIVE'
+			? modelParam
+			: undefined;
 
 	const vysledok = pergolaSpec({
 		sirkaMm: sirka,
@@ -124,7 +131,8 @@ export const GET: RequestHandler = async ({ url, getClientAddress, request, setH
 		vyskaVpreduMm: vyskaVpredu,
 		vyskaPriSteneMm: vyskaPriStene,
 		typStrechy: 'pultova',
-		ralKod
+		ralKod,
+		model
 	});
 
 	const { THREE, mergeGeometries, GLTFExporter } = await nacitajThree();

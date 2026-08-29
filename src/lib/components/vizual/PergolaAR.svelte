@@ -26,6 +26,7 @@
 		vyskaPriSteneMm,
 		typSkla,
 		ralKod,
+		model = undefined,
 		rezim = 'auto'
 	}: {
 		sirkaMm: number;
@@ -36,6 +37,8 @@
 		typSkla: string;
 		/** RAL kód konštrukcie */
 		ralKod: string;
+		/** #329 časť 2: model (LIGHT/ROBUST/MASSIVE) → hrúbky profilov v GLB (konzistentné s 3D) */
+		model?: string;
 		/** 'auto' = inline (mobil tlačidlo-odkaz, desktop QR); 'viewer' = model-viewer (AR stránka) */
 		rezim?: 'auto' | 'viewer';
 	} = $props();
@@ -48,7 +51,8 @@
 			vyskaVpredu: String(Math.round(vyskaVpreduMm)),
 			vyskaPriStene: String(Math.round(vyskaPriSteneMm)),
 			sklo: typSkla,
-			farba: ralKod
+			farba: ralKod,
+			...(model ? { model } : {})
 		}).toString()
 	);
 	const glbUrl = $derived(`${base}/konfigurator/model.glb?${params}`);

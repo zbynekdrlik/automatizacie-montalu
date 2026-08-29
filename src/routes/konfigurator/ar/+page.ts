@@ -33,6 +33,11 @@ export const load: PageLoad = ({ url }) => {
 	const vyskaPriSteneMm = cislo(q.get('vyskaPriStene'));
 	const typSkla = String(q.get('sklo') ?? '');
 	const ralKod = String(q.get('farba') ?? '');
+	// #329 časť 2: model (LIGHT/ROBUST/MASSIVE) → hrúbky profilov v GLB. Neznámy/chýbajúci → ''
+	// (PergolaAR ho vynechá z query, GLB endpoint → škála 1.0).
+	const modelRaw = String(q.get('model') ?? '').trim();
+	const model =
+		modelRaw === 'LIGHT' || modelRaw === 'ROBUST' || modelRaw === 'MASSIVE' ? modelRaw : '';
 	// ROVNAKÉ rozmedzia ako GLB endpoint (/konfigurator/model.glb) — bez toho by stránka
 	// namontovala model-viewer s neplatnou konfiguráciou, ktorej GLB fetch by 400-nul
 	// (network console error → poruší zero-console). Neplatné → „chýba konfigurácia" hláška.
@@ -42,5 +47,5 @@ export const load: PageLoad = ({ url }) => {
 		vRozmedzi(vyskaVpreduMm, KONF_VYSKA_MIN, KONF_VYSKA_MAX) &&
 		// výška pri stene: nikdy nižšia než vpredu, nikdy nad konštrukčné max enginu
 		vRozmedzi(vyskaPriSteneMm, vyskaVpreduMm, KONF_VYSKA_STENA_MAX);
-	return { sirkaMm, hlbkaMm, vyskaVpreduMm, vyskaPriSteneMm, typSkla, ralKod, platne };
+	return { sirkaMm, hlbkaMm, vyskaVpreduMm, vyskaPriSteneMm, typSkla, ralKod, model, platne };
 };

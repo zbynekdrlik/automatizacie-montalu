@@ -1749,3 +1749,30 @@ filter). Verzia 0.24.45-dev.2. Gates lokálne: check 0/0, lint čistý, vitest 2
 konfigurator + AR + app + vizual3d + zasklenia-zakaznicky všetko zelené. Commity d445196 (bump+font)
 + 8ccb955 (feat). **Playbook:** konfigurator.md §8 (chrome, KonfOvladace, edge-to-edge 3D, E2E timing
 pasce, moneyKod-literal-guard pasca).
+
+## #329 — Konfigurátor iterácia 2 (3D reaguje na výber, fotky/hover, kategórie skla, realistický sklon)
+
+Päť častí. **(1) BUG (RED→GREEN):** RAL/sklo neprekresľovali 3D. Root cause vo `Vizual3D.svelte`:
+`$effect(() => prekresliRAL())`/`prekresliSklo()` volali funkcie s `if (!ziva) return` PRVÝM; `ziva`
+je obyčajný `let` (nie `$state`), plnený async `inicializuj()` → prvý beh efektu (ziva===null) sa
+vrátil pred čítaním `ralKod`/`skloVzhlad` → Svelte 5 efekt bez závislostí = mŕtvy. Fix: čítať
+reaktívne vstupy do lokálov PRED gate-om. Čestný RED signál `data-viz-ral-applied`/`data-viz-sklo-
+applied` (zapísaný LEN v prekresliRAL/prekresliSklo). RED e2e `konfigurátor: zmena LEN farby a LEN
+skla naozaj prekreslí 3D` (commit 19e4ecd) → GREEN 33e89d0. **(2) model→3D:** `model` prúdi LIVE do
+viz reťaze; `geo/pergola.ts` škáluje prierezy profilov LIGHT 0.8/ROBUST 1.0/MASSIVE 1.3× (undefined→
+1.0). `PergolaModel` = lokálny typ vo vizuál leaf (žiadny import konfigurator → money-guard zelený).
+Unit test `vizual-pergola.test.ts` (LIGHT<ROBUST<MASSIVE, bbox/roly nezmenené). **(3) fotky/hover:**
+webp fotky+ikony z montalu.sk do `static/konfigurator/` (cwebp, ~235 KB); reusable
+`KonfInfoKarta.svelte` (hover desktop / tap ⓘ mobil, absolútny overlay neblokujúci výber).
+**(4) kategórie skla:** nový client-safe `src/lib/konfigurator-sklo.ts` (6 kategórií → konkrétny
+katalógový nazov); `+page.server.ts` posiela 6 kategórií; chip POSTuje konkrétny nazov (data-value/
+hidden), pipeline nezmenená; zákazník nevidí hrúbky (chip label + `KonfSuhrn` = kategória, hrúbka
+len v POST payloade). Unit test `konfigurator-sklo.test.ts`. **(5) sklon:** `KONF_SKLON_MAX` 30→10,
+default 6→3; výpočet výšok nezmenený; slider ukazuje mm prevýšenia.
+
+Verzia 0.24.46-dev.1. Gates lokálne: check 0/0, lint (eslint+prettier) čisté celé repo, vitest
+2508/2508, 13/13 konfigurator Playwright E2E zelené (vrátane RED→GREEN #329). Commity: b393395
+(bump) + 19e4ecd (red) + 33e89d0 (green fix) + 0df775b (časť 2) + dfbb898 (časti 3/4/5). Prostredie:
+doinštalované `@fontsource-variable/inter` (stale node_modules) + systémový `cwebp`.
+**Playbook:** `konfigurator.md` (reaktivita Vizual3D efektov — čítať vstupy pred `!ziva` gate) +
+konfigurator-sklo zákaznícka vrstva.

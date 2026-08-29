@@ -11,6 +11,7 @@
 	// samostatný chunk, len sa spustí pri mounte. Money-neutrálne: rozmery + odtieň + RAL kód.
 	import { onMount } from 'svelte';
 	import type { PergolaTypSkla } from '$lib/vizual/pergola-sklo';
+	import type { PergolaModel } from '$lib/vizual/geo/pergola';
 
 	type KonfViz = {
 		sirkaMm: number;
@@ -19,6 +20,7 @@
 		vyskaPriSteneMm: number;
 		typSkla: PergolaTypSkla;
 		ralKod: string;
+		model: PergolaModel;
 	};
 
 	let {
@@ -53,6 +55,7 @@
 				vyskaPriSteneMm={viz.vyskaPriSteneMm}
 				typSkla={viz.typSkla}
 				ralKod={viz.ralKod}
+				model={viz.model}
 				zobrazOvladanie={false}
 			/>
 		{/key}

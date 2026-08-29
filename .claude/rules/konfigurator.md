@@ -2,6 +2,8 @@
 paths:
   - 'src/routes/konfigurator/**'
   - 'src/lib/konfigurator.ts'
+  - 'src/lib/konfigurator-sklo.ts'
+  - 'src/lib/components/konfigurator/**'
   - 'src/lib/server/konfigurator-vstup.ts'
   - 'src/lib/server/public-throttle.ts'
   - 'tests/konfigurator*.test.ts'
@@ -212,3 +214,27 @@ exportu + model-viewer sú v `.claude/rules/vizual3d.md` (auto-loaduje sa na
   neprenesie do zasklenia. Layout: čistý CSS grid (mobil 2 riadky 3D-hore/panel-scroll-dole, desktop
   2 stĺpce), CTA je flex dieťa na spodku panela (NIE sticky-overlay → neprekrýva klikateľný obsah;
   sticky-overlay 3D/CTA spôsoboval Playwright „scrolling into view" timeout).
+
+## 9. Zákaznícke kategórie skla + fotky/hover + realistický sklon (#329 iterácia 2)
+
+- **Zákaznícka vrstva skla `src/lib/konfigurator-sklo.ts` (client-safe).** Verejný konfigurátor
+  ukazuje 6 zákazníckych KATEGÓRIÍ (`KONF_SKLO_KATEGORIE`: label + popis + ikona + KONKRÉTNY
+  katalógový `nazov`), NIE 14 katalógových typov s hrúbkami. Chip POSTuje konkrétny `nazov`
+  (v `data-value` + hidden inpute), takže cena/PDF/dopyt/Odoo pipeline dostáva nezmenený názov.
+  **Zákazník NIKDY nevidí hrúbky:** chip label AJ on-page `KonfSuhrn` (`s-sklo`) ukazujú
+  ZÁKAZNÍCKY label kategórie (`konfSkloKategoriaPreNazov`), hrúbka je len v neviditeľnom POST
+  payloade. Modul nesie LEN katalógový nazov (žiadny Money kód) → klientsky bundle ho smie
+  importovať (leak-guard zelený). Zhoda `katalogNazov` s reálnym `SKLO_STRECHA_TYPY` je overená
+  unit testom `tests/konfigurator-sklo.test.ts` (ten SMIE importovať `sklo-strecha`, nie je klient).
+  Interné stránky (/zasklenia*, /pergola*) ostávajú na PLNOM katalógu — táto vrstva je len pre /konfigurator.
+- **Info karty `KonfInfoKarta.svelte` (fotka + text).** Reusable: desktop HOVER (`@media (hover:hover)`),
+  mobil TAP na ⓘ (`otvorene` stav). Karta je `position:absolute` overlay — NEposúva layout a
+  NEblokuje klik na výber pod ňou. ⓘ tlačidlo má `e.stopPropagation()+preventDefault()`, takže
+  klik naň NEvyberie model/sklo. Obrázky = webp v `static/konfigurator/` (stiahnuté z montalu.sk
+  cez `cwebp`, žiadny CDN/hotlink). Model fotky mapované v `KonfOvladace` (`MODEL_FOTA` keyed na kód).
+- **Model → hrúbky profilov v 3D:** `model` prúdi LIVE do viz reťaze (viz3d → KonfVizual →
+  VizualPergolaZakaznik → `geo/pergola.ts`). Detaily (lokálny `PergolaModel` typ, `MODEL_PROFIL_SKALA`,
+  in-place prestavba) sú vo `vizual3d.md`.
+- **Sklon:** `KONF_SKLON_MAX` je 10° (nie 30 — flat-ceiling realita), default 3° (`+page.svelte`
+  `KONF_DEFAULT.sklon`). Výpočet výšok nezmenený. Testy, čo overujú „nad rozmedzie" chybu, MUSIA
+  použiť sklon ≤10 s vysokou výškou vpredu+hĺbkou (napr. 4000+tan(10°)·6000≈5058 > VYSKA_MAX).

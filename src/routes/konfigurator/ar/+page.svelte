@@ -36,6 +36,7 @@
 				vyskaPriSteneMm={data.vyskaPriSteneMm}
 				typSkla={data.typSkla}
 				ralKod={data.ralKod}
+				model={data.model}
 				rezim="viewer"
 			/>
 		{:else}
