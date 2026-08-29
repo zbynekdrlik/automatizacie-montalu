@@ -246,20 +246,28 @@ export function vytvorKontaktnyTienTexturu(
 	return ztexturuj(THREE, canvas);
 }
 
-/** #333 polish — radiálna ALPHA maska (biela stred → čierny okraj) na MÄKKÉ zmiznutie hrany
- *  terasy do trávnika (žiadna tvrdá hrana „kosého štvorca"). Použije sa ako `alphaMap` na
- *  dlažbovej terase (transparentný okraj → presvitá trávnik pod ňou). Deterministické. */
-export function vytvorRadialnyAlphaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
+/** #333 polish — OBDĹŽNIKOVÁ okrajová ALPHA maska (nie radiálna): plne nepriehľadné JADRO
+ *  (footprint pergoly) + LINEÁRNY fade LEN vo VONKAJŠOM ~10 % okraji každej strany. Radiálna
+ *  maska (pôvodná) rozpúšťala dlažbu UŽ POD krajnými stĺpmi pergoly (review 🔴) — táto drží
+ *  footprint krytý a mäkne LEN vonkajší okraj terasy do trávnika. Použije sa ako `alphaMap` na
+ *  terase (transparentný okraj → presvitá trávnik). Deterministické (žiadny Math.random). */
+export function vytvorTerasaAlphaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
-	const stred = rozlisenie / 2;
-	const grad = ctx.createRadialGradient(stred, stred, 0, stred, stred, stred);
-	// plne nepriehľadné jadro do ~62 %, potom mäkký nábeh do priehľadného okraja
-	grad.addColorStop(0, '#ffffff');
-	grad.addColorStop(0.62, '#ffffff');
-	grad.addColorStop(1, '#000000');
-	ctx.fillStyle = grad;
-	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
+	const pas = 0.1; // vonkajšia frakcia strany, kde alpha klesá na 0 (< min. okraj terasy 12,5 %)
+	const img = ctx.createImageData(rozlisenie, rozlisenie);
+	for (let y = 0; y < rozlisenie; y++) {
+		for (let x = 0; x < rozlisenie; x++) {
+			const u = x / (rozlisenie - 1);
+			const v = y / (rozlisenie - 1);
+			const dOkraj = Math.min(u, 1 - u, v, 1 - v); // vzdialenosť k najbližšej hrane [0..0,5]
+			const alpha = dOkraj >= pas ? 1 : dOkraj / pas; // jadro nepriehľadné, okraj lineárne do 0
+			const i = (y * rozlisenie + x) * 4;
+			img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+			img.data[i + 3] = Math.round(alpha * 255);
+		}
+	}
+	ctx.putImageData(img, 0, 0);
 	const tex = ztexturuj(THREE, canvas);
-	tex.colorSpace = THREE.NoColorSpace; // alpha maska nie je sRGB dáta
+	tex.colorSpace = THREE.NoColorSpace; // alpha maska nie je sRGB dáta (číta sa lineárne)
 	return tex;
 }

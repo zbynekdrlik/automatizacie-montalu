@@ -13,7 +13,7 @@
 import { mm } from './jednotky';
 import {
 	vytvorDlazbuTexturu,
-	vytvorRadialnyAlphaTexturu,
+	vytvorTerasaAlphaTexturu,
 	vytvorStrechaTexturu,
 	vytvorTravnikTexturu
 } from './textury';
@@ -257,7 +257,7 @@ export function vytvorOkolie(
 	gTravnik.rotateX(-Math.PI / 2);
 	let travnikMat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (flat) {
-		travnikMat = new THREE.MeshStandardMaterial({ color: 0xc4c9bd, roughness: 0.95, metalness: 0 });
+		travnikMat = new THREE.MeshStandardMaterial({ color: 0xc6cabd, roughness: 0.95, metalness: 0 }); // parita s trávnik textúrou base
 	} else {
 		const tex = vytvorTravnikTexturu(THREE);
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -271,18 +271,20 @@ export function vytvorOkolie(
 	disposables.push(gTravnik, travnikMat);
 
 	// --- DLAŽBOVÁ TERASA pod pergolou (+ okraj), y=+1 mm nad trávnikom ---
-	const terW = mm(Math.max(1, bboxSirkaMm) + 2000);
-	const terD = mm(Math.max(1, bboxHlbkaMm) + 2000);
+	// +4000 (2 m každá strana): footprint pergoly zaberá vnútro terasy tak, že OKRAJOVÝ 10%
+	// fade alphaMapy (review 🔴) sa nikdy nedotkne krajných stĺpov — tie stoja na plnej dlažbe.
+	const terW = mm(Math.max(1, bboxSirkaMm) + 4000);
+	const terD = mm(Math.max(1, bboxHlbkaMm) + 4000);
 	const gTerasa = new THREE.PlaneGeometry(terW, terD);
 	gTerasa.rotateX(-Math.PI / 2);
 	// #333 polish: radialny ALPHA fade na okraji terasy -> mäkke zmiznutie do travnika (owner:
 	// ziadna tvrda hrana). `map` (dlazba) ma vlastny repeat, `alphaMap` (1x1) fade cez celu plochu.
-	const terasaAlpha = vytvorRadialnyAlphaTexturu(THREE);
+	const terasaAlpha = vytvorTerasaAlphaTexturu(THREE);
 	disposables.push(terasaAlpha);
 	let terasaMat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (flat) {
 		terasaMat = new THREE.MeshStandardMaterial({
-			color: 0xbdc0b7,
+			color: 0xa7a199, // parita s dlažbovou textúrou (base #a7a199) — sivá dlažba je už odsaturovaná
 			roughness: 0.85,
 			metalness: 0,
 			alphaMap: terasaAlpha,
@@ -306,6 +308,9 @@ export function vytvorOkolie(
 	const terasa = new THREE.Mesh(gTerasa, terasaMat);
 	terasa.position.y = mm(1);
 	terasa.receiveShadow = tiene;
+	// #333 review 🔵: explicitné poradie v transparentnom priechode — terasa PRED kontaktným
+	// tieňom (scena-build tien.renderOrder=1), aby jadro terasy nikdy nevymazalo tieň.
+	terasa.renderOrder = 0;
 	skupina.add(terasa);
 	disposables.push(gTerasa, terasaMat);
 
