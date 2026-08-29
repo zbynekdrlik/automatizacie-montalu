@@ -105,14 +105,16 @@
 		outline-offset: 2px;
 	}
 
-	/* karta = absolútny overlay nad triggerom (neposúva layout, neblokuje klik na výber) */
+	/* karta = absolútny overlay nad triggerom (neposúva layout, neblokuje klik na výber).
+	   Ukotvená PRAVÝM okrajom na trigger (nie centrovaná) — otvára sa doľava/dovnútra, nikdy
+	   nepresiahne pravý okraj viewportu (#329 review — trigger býva blízko pravého okraja panela). */
 	.konf-info-karta {
 		position: absolute;
 		bottom: calc(100% + 8px);
-		left: 50%;
-		transform: translateX(-50%) translateY(4px);
+		right: 0;
+		transform: translateY(4px);
 		width: 220px;
-		max-width: 74vw;
+		max-width: min(220px, calc(100vw - 24px));
 		background: var(--k-surface);
 		border: 1px solid var(--k-line);
 		border-radius: var(--k-radius-sm);
@@ -130,7 +132,7 @@
 	.konf-info-karta.otvorene {
 		opacity: 1;
 		visibility: visible;
-		transform: translateX(-50%) translateY(0);
+		transform: translateY(0);
 		pointer-events: auto;
 	}
 	/* desktop (ukazovadlo s hover) — karta sa ukáže pri hover-i triggeru */
@@ -139,7 +141,7 @@
 		.konf-info-btn:focus-visible + .konf-info-karta {
 			opacity: 1;
 			visibility: visible;
-			transform: translateX(-50%) translateY(0);
+			transform: translateY(0);
 			pointer-events: auto;
 		}
 	}
