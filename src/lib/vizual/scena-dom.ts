@@ -11,7 +11,12 @@
 // Disposal: KAŽDÁ geometria/materiál/textúra ide do `disposables` (Vizual3D ich pri každom
 // `{#key}` remounte / unmount uvoľní — inak by unikol celý dom per zmena rozmeru).
 import { mm } from './jednotky';
-import { vytvorDlazbuTexturu, vytvorStrechaTexturu, vytvorTravnikTexturu } from './textury';
+import {
+	vytvorDlazbuTexturu,
+	vytvorTerasaAlphaTexturu,
+	vytvorStrechaTexturu,
+	vytvorTravnikTexturu
+} from './textury';
 import type { TierNastavenia } from './kvalita';
 import type { Disposable } from './scena';
 
@@ -31,8 +36,8 @@ const FARBA_DVERE_RAM = 0x4a3826;
 const FARBA_DVERE = 0x6b4f36; // teplé drevo
 const FARBA_KLUCKA = 0xb8bcc2;
 const FARBA_SOKEL = 0x8a8175;
-const FARBA_KMEN = 0x8b7d6b;
-const FARBA_KORUNA = 0xaebfa2; // bledá odsaturovaná zeleň (nesúťaží s produktom)
+const FARBA_KMEN = 0xa59e90; // bledy sedohnedy kmen
+const FARBA_KORUNA = 0xd7dbd2; // bleda sedozelena koruna (SalesQueze near-white, nesutazi s produktom)
 
 /** Dvojpodlažná fasáda + sedlová plechová strecha + raster okien + drevené dvere + sokel,
  *  umiestnené PRED pôvodnou (teplou) stenou tak, že ju svetlé prekrytie zakryje. Dvere sú
@@ -244,13 +249,15 @@ export function vytvorOkolie(
 	const skupina = new THREE.Group();
 	const disposables: Disposable[] = [];
 
-	// --- TRÁVNIK — veľká rovina (základná zem), y=0 ---
-	const TRAVNIK_M = 40;
+	// --- TRAVNIK — VELKA rovina (zaklad zeme), y=0. 130 m: okraj presiahne oblohovu gulu
+	//     (r=60) -> hrana sa stretne s oblohou nad horizontom a je NEVIDITELNA (owner: ziadna
+	//     tvrda hrana koseho stvorca v zabere). ---
+	const TRAVNIK_M = 130;
 	const gTravnik = new THREE.PlaneGeometry(TRAVNIK_M, TRAVNIK_M);
 	gTravnik.rotateX(-Math.PI / 2);
 	let travnikMat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (flat) {
-		travnikMat = new THREE.MeshStandardMaterial({ color: 0x8ea07f, roughness: 0.95, metalness: 0 });
+		travnikMat = new THREE.MeshStandardMaterial({ color: 0xc6cabd, roughness: 0.95, metalness: 0 }); // parita s trávnik textúrou base
 	} else {
 		const tex = vytvorTravnikTexturu(THREE);
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -264,23 +271,46 @@ export function vytvorOkolie(
 	disposables.push(gTravnik, travnikMat);
 
 	// --- DLAŽBOVÁ TERASA pod pergolou (+ okraj), y=+1 mm nad trávnikom ---
-	const terW = mm(Math.max(1, bboxSirkaMm) + 2000);
-	const terD = mm(Math.max(1, bboxHlbkaMm) + 2000);
+	// +4000 (2 m každá strana): footprint pergoly zaberá vnútro terasy tak, že OKRAJOVÝ 10%
+	// fade alphaMapy (review 🔴) sa nikdy nedotkne krajných stĺpov — tie stoja na plnej dlažbe.
+	const terW = mm(Math.max(1, bboxSirkaMm) + 4000);
+	const terD = mm(Math.max(1, bboxHlbkaMm) + 4000);
 	const gTerasa = new THREE.PlaneGeometry(terW, terD);
 	gTerasa.rotateX(-Math.PI / 2);
+	// #333 polish: radialny ALPHA fade na okraji terasy -> mäkke zmiznutie do travnika (owner:
+	// ziadna tvrda hrana). `map` (dlazba) ma vlastny repeat, `alphaMap` (1x1) fade cez celu plochu.
+	const terasaAlpha = vytvorTerasaAlphaTexturu(THREE);
+	disposables.push(terasaAlpha);
 	let terasaMat: InstanceType<ThreeNS['MeshStandardMaterial']>;
 	if (flat) {
-		terasaMat = new THREE.MeshStandardMaterial({ color: 0xa7a199, roughness: 0.85, metalness: 0 });
+		terasaMat = new THREE.MeshStandardMaterial({
+			color: 0xa7a199, // parita s dlažbovou textúrou (base #a7a199) — sivá dlažba je už odsaturovaná
+			roughness: 0.85,
+			metalness: 0,
+			alphaMap: terasaAlpha,
+			transparent: true,
+			depthWrite: false
+		});
 	} else {
 		const tex = vytvorDlazbuTexturu(THREE);
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 		tex.repeat.set(terW / 0.6, terD / 0.6); // 1 dlaždica = 600 mm (mierkový kľúč scény)
-		terasaMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0 });
+		terasaMat = new THREE.MeshStandardMaterial({
+			map: tex,
+			roughness: 0.85,
+			metalness: 0,
+			alphaMap: terasaAlpha,
+			transparent: true,
+			depthWrite: false
+		});
 		disposables.push(tex);
 	}
 	const terasa = new THREE.Mesh(gTerasa, terasaMat);
 	terasa.position.y = mm(1);
 	terasa.receiveShadow = tiene;
+	// #333 review 🔵: explicitné poradie v transparentnom priechode — terasa PRED kontaktným
+	// tieňom (scena-build tien.renderOrder=1), aby jadro terasy nikdy nevymazalo tieň.
+	terasa.renderOrder = 0;
 	skupina.add(terasa);
 	disposables.push(gTerasa, terasaMat);
 
@@ -288,8 +318,9 @@ export function vytvorOkolie(
 	const S = Math.max(1, bboxSirkaMm);
 	const D = Math.max(1, bboxHlbkaMm);
 	const strom = (xMm: number, zMm: number, vyskaMm: number): void => {
-		const kmenH = vyskaMm * 0.35;
-		const gKmen = new THREE.CylinderGeometry(mm(70), mm(90), mm(kmenH), 6);
+		// STIHLY kmen (listnata proporcia), bledy sedohnedy
+		const kmenH = vyskaMm * 0.4;
+		const gKmen = new THREE.CylinderGeometry(mm(45), mm(60), mm(kmenH), 6);
 		const mKmen = new THREE.MeshStandardMaterial({
 			color: FARBA_KMEN,
 			roughness: 0.9,
@@ -302,15 +333,17 @@ export function vytvorOkolie(
 		skupina.add(kmen);
 		disposables.push(gKmen, mKmen);
 
-		const korunaH = vyskaMm * 0.75;
-		const gKoruna = new THREE.ConeGeometry(mm(vyskaMm * 0.32), mm(korunaH), 8);
+		// LISTNATA koruna = elipsoid/blob (nie vianocny kuzel) — bleda sedozelena, low-poly
+		const korunaR = vyskaMm * 0.34;
+		const gKoruna = new THREE.SphereGeometry(mm(korunaR), 8, 6);
+		gKoruna.scale(1, 1.12, 1); // jemne vajcovita silueta
 		const mKoruna = new THREE.MeshStandardMaterial({
 			color: FARBA_KORUNA,
 			roughness: 0.95,
 			metalness: 0
 		});
 		const koruna = new THREE.Mesh(gKoruna, mKoruna);
-		koruna.position.set(mm(xMm), mm(kmenH + korunaH / 2), mm(zMm));
+		koruna.position.set(mm(xMm), mm(kmenH + korunaR * 0.82), mm(zMm));
 		koruna.castShadow = false; // mimo shadow frustumu produktu (orezaný tieň)
 		koruna.receiveShadow = tiene;
 		skupina.add(koruna);

@@ -183,8 +183,8 @@ export function vytvorStrechaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture 
  *  `Math.random` (v teste mockovať + `finally` restore — vizual3d.md). */
 export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
-	const zaklad: [number, number, number] = hexNaRgb('#93a884'); // odsaturovaná svetlá zeleň
-	const tmava: [number, number, number] = hexNaRgb('#7c9070');
+	const zaklad: [number, number, number] = hexNaRgb('#c6cabd'); // bledá odsaturovaná šedozelená (SalesQueze near-white)
+	const tmava: [number, number, number] = hexNaRgb('#b7bdad');
 	const img = ctx.createImageData(rozlisenie, rozlisenie);
 	for (let i = 0; i < img.data.length; i += 4) {
 		let v = 0;
@@ -214,26 +214,60 @@ export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture 
  *  zosilnené na mäkká 0.68 / jadro 0.38 a jadro zúžené (0.32 → 0.24 polomer
  *  textúry), aby "odtlačok" priamo pod pätkou vyzeral ostrejšie/pevnejšie,
  *  nie ako veľká difúzna škvrna. */
-export function vytvorKontaktnyTienTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {
+export function vytvorKontaktnyTienTexturu(
+	THREE: ThreeNS,
+	rozlisenie = 512,
+	/** #333 polish: škáluje NEPRIEHĽADNOSŤ tieňa. Default 1.0 = pôvodné hodnoty (zasklenia
+	 *  scéna NEZMENENÁ, #174 tuning); pergola (`zobrazDom`) posiela ~0.4 → oveľa ľahší tieň
+	 *  (nie tmavá machuľa/diera). Násobenie 1.0 dáva bit-identické reťazce stopov (test #177). */
+	intenzita = 1
+): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
 	const stred = rozlisenie / 2;
+	const a = (v: number) => `rgba(15,23,42,${v * intenzita})`;
 
 	// mäkká vrstva — radiálny gradient cez celú plochu
 	const mekka = ctx.createRadialGradient(stred, stred, 0, stred, stred, stred);
-	mekka.addColorStop(0, 'rgba(15,23,42,0.68)');
-	mekka.addColorStop(0.55, 'rgba(15,23,42,0.34)');
-	mekka.addColorStop(1, 'rgba(15,23,42,0)');
+	mekka.addColorStop(0, a(0.68));
+	mekka.addColorStop(0.55, a(0.34));
+	mekka.addColorStop(1, a(0));
 	ctx.fillStyle = mekka;
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
 
 	// tvrdé jadro — menší, ostrejší tieň v strede (footprint produktu)
 	const jadroR = rozlisenie * 0.24;
 	const jadro = ctx.createRadialGradient(stred, stred, 0, stred, stred, jadroR);
-	jadro.addColorStop(0, 'rgba(15,23,42,0.38)');
-	jadro.addColorStop(0.85, 'rgba(15,23,42,0.3)');
-	jadro.addColorStop(1, 'rgba(15,23,42,0)');
+	jadro.addColorStop(0, a(0.38));
+	jadro.addColorStop(0.85, a(0.3));
+	jadro.addColorStop(1, a(0));
 	ctx.fillStyle = jadro;
 	ctx.fillRect(0, 0, rozlisenie, rozlisenie);
 
 	return ztexturuj(THREE, canvas);
+}
+
+/** #333 polish — OBDĹŽNIKOVÁ okrajová ALPHA maska (nie radiálna): plne nepriehľadné JADRO
+ *  (footprint pergoly) + LINEÁRNY fade LEN vo VONKAJŠOM ~10 % okraji každej strany. Radiálna
+ *  maska (pôvodná) rozpúšťala dlažbu UŽ POD krajnými stĺpmi pergoly (review 🔴) — táto drží
+ *  footprint krytý a mäkne LEN vonkajší okraj terasy do trávnika. Použije sa ako `alphaMap` na
+ *  terase (transparentný okraj → presvitá trávnik). Deterministické (žiadny Math.random). */
+export function vytvorTerasaAlphaTexturu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	const pas = 0.1; // vonkajšia frakcia strany, kde alpha klesá na 0 (< min. okraj terasy 12,5 %)
+	const img = ctx.createImageData(rozlisenie, rozlisenie);
+	for (let y = 0; y < rozlisenie; y++) {
+		for (let x = 0; x < rozlisenie; x++) {
+			const u = x / (rozlisenie - 1);
+			const v = y / (rozlisenie - 1);
+			const dOkraj = Math.min(u, 1 - u, v, 1 - v); // vzdialenosť k najbližšej hrane [0..0,5]
+			const alpha = dOkraj >= pas ? 1 : dOkraj / pas; // jadro nepriehľadné, okraj lineárne do 0
+			const i = (y * rozlisenie + x) * 4;
+			img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+			img.data[i + 3] = Math.round(alpha * 255);
+		}
+	}
+	ctx.putImageData(img, 0, 0);
+	const tex = ztexturuj(THREE, canvas);
+	tex.colorSpace = THREE.NoColorSpace; // alpha maska nie je sRGB dáta (číta sa lineárne)
+	return tex;
 }

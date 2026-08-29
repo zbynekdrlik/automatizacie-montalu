@@ -24,7 +24,8 @@ import {
 	vytvorDlazbuTexturu,
 	vytvorKontaktnyTienTexturu,
 	vytvorOblohuTexturu,
-	vytvorStenuTexturu
+	vytvorStenuTexturu,
+	vytvorTerasaAlphaTexturu
 } from '../src/lib/vizual/textury';
 import { vytvorStenu, vytvorZem } from '../src/lib/vizual/scena';
 import { nastaveniaPreTier } from '../src/lib/vizual/kvalita';
@@ -313,5 +314,27 @@ describe('nízky-tier flat-color fallback (scena.ts) sa ZHODUJE so ZÁKLADNOU fa
 		const stena = vytvorStenu(THREE, nastaveniaPreTier('low'), 4200);
 		const mat = stena.material as InstanceType<typeof THREE.MeshStandardMaterial>;
 		expect(mat.color.getHexString(THREE.SRGBColorSpace)).toBe('c2ab84');
+	});
+});
+
+describe('vytvorTerasaAlphaTexturu (#333) — obdĺžniková okrajová alpha (jadro opaque, okraj fade)', () => {
+	it('jadro nepriehľadné (alpha 255), rohy priehľadné (alpha 0), biele RGB, NoColorSpace', () => {
+		const R = 256;
+		const tex = vytvorTerasaAlphaTexturu(THREE, R);
+		expect(tex.colorSpace).toBe(THREE.NoColorSpace);
+		const data = fakeCanvasOf(tex).getContext('2d')!.lastImageData!.data;
+		const at = (x: number, y: number) => (y * R + x) * 4;
+		// stred = footprint pergoly → PLNE nepriehľadný (dlažba pod stĺpmi ostáva)
+		const c = at(R / 2, R / 2);
+		expect(data[c + 3]).toBe(255);
+		expect([data[c]!, data[c + 1]!, data[c + 2]!]).toEqual([255, 255, 255]);
+		// rohy/hrany = vonkajší okraj → priehľadné (mäkký prechod do trávnika)
+		expect(data[at(0, 0) + 3]).toBe(0);
+		expect(data[at(R - 1, R / 2) + 3]).toBe(0);
+		// bod tesne vnútri od hrany (d≈0,05 < pás 0,1) je čiastočne priehľadný, nie 0/255
+		const okrajX = Math.round(0.05 * (R - 1));
+		const a = data[at(okrajX, R / 2) + 3]!;
+		expect(a).toBeGreaterThan(0);
+		expect(a).toBeLessThan(255);
 	});
 });
