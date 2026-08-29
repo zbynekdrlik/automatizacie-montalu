@@ -15,6 +15,7 @@
 	// odoslal form). sr-only radio = clip-pattern (fokusovateľný), nie display:none.
 	import { farbaKonstrukcie } from '$lib/vykres/ral';
 	import KonfInfoKarta from './KonfInfoKarta.svelte';
+	import RozmerStepper from './RozmerStepper.svelte';
 	import type { KonfSkloKategoria } from '$lib/konfigurator-sklo';
 
 	interface KonfData {
@@ -72,7 +73,11 @@
 
 	const r = $derived(data.rozmedzia);
 
-	const STEP_MM = 50; // krok stepperov rozmerov (mm)
+	// #333: krok stepperov v METROCH — šírka/hĺbka 0,5 m (500 mm), výška 0,1 m (100 mm;
+	// výška má rozsah len 2–4 m, celý meter by bol nepoužiteľný). Prevod mm↔metre +
+	// smerový snap sú v `konfigurator-jednotky.ts`, používa ich `RozmerStepper`.
+	const KROK_SIRKA_HLBKA_MM = 500;
+	const KROK_VYSKA_MM = 100;
 
 	// #329 časť 5: prevýšenie strechy pri stene [mm] = tan(sklon)·hĺbka — informatívny popisok pri
 	// slideri (koľko cm strecha stúpne k stene pre odvod vody). Iba display, nemení výpočet výšok.
@@ -82,14 +87,6 @@
 			: 0
 	);
 
-	function zovri(v: number, lo: number, hi: number): number {
-		return Math.min(hi, Math.max(lo, v));
-	}
-	/** Posun rozmeru o `delta` mm (stepper), zaokrúhlený na krok a zovretý do rozmedzia. */
-	function krokMm(cur: number | null, delta: number, lo: number, hi: number): number {
-		const zaklad = cur ?? lo;
-		return zovri(Math.round((zaklad + delta) / STEP_MM) * STEP_MM, lo, hi);
-	}
 </script>
 
 <div class="konf-ovladace" class:pracuje={spracuva}>
@@ -183,112 +180,43 @@
 		<input type="hidden" name="sklo" value={sklo} />
 	</section>
 
-	<!-- ROZMERY — number input + −/+ steppery -->
+	<!-- ROZMERY — #333: metre + −/+ steppery (RozmerStepper: viditeľné metre, POSTuje mm) -->
 	<section class="konf-sekcia">
 		<span class="konf-label">Rozmery</span>
 		<div class="konf-rozmery">
-			<!-- #327 review 🔴: obal je <div>, NIE <label> — <label> bez `for` sa viaže na PRVÝ
-			     labelovateľný potomok (mínus tlačidlo), takže klik na popisok by menil hodnotu;
-			     popisok je samostatný <label for> → korektné meno pre input aj čítačku obrazovky -->
-			<div class="konf-rozmer">
-				<label for="konf-sirka" class="konf-rozmer-popis">Šírka</label>
-				<span class="konf-stepper">
-					<button
-						type="button"
-						class="konf-krok"
-						aria-label="Zmenšiť šírku"
-						onclick={() => (sirka = krokMm(sirka, -STEP_MM, r.sirka.min, r.sirka.max))}>−</button
-					>
-					<input
-						id="konf-sirka"
-						class="konf-cislo"
-						name="sirka"
-						type="number"
-						inputmode="numeric"
-						min={r.sirka.min}
-						max={r.sirka.max}
-						step="10"
-						bind:value={sirka}
-						data-testid="sirka"
-						required
-					/>
-					<button
-						type="button"
-						class="konf-krok"
-						aria-label="Zväčšiť šírku"
-						onclick={() => (sirka = krokMm(sirka, STEP_MM, r.sirka.min, r.sirka.max))}>+</button
-					>
-					<span class="konf-jednotka">mm</span>
-				</span>
-			</div>
-
-			<div class="konf-rozmer">
-				<label for="konf-hlbka" class="konf-rozmer-popis">Hĺbka (výsuv)</label>
-				<span class="konf-stepper">
-					<button
-						type="button"
-						class="konf-krok"
-						aria-label="Zmenšiť hĺbku"
-						onclick={() => (hlbka = krokMm(hlbka, -STEP_MM, r.hlbka.min, r.hlbka.max))}>−</button
-					>
-					<input
-						id="konf-hlbka"
-						class="konf-cislo"
-						name="hlbka"
-						type="number"
-						inputmode="numeric"
-						min={r.hlbka.min}
-						max={r.hlbka.max}
-						step="10"
-						bind:value={hlbka}
-						data-testid="hlbka"
-						required
-					/>
-					<button
-						type="button"
-						class="konf-krok"
-						aria-label="Zväčšiť hĺbku"
-						onclick={() => (hlbka = krokMm(hlbka, STEP_MM, r.hlbka.min, r.hlbka.max))}>+</button
-					>
-					<span class="konf-jednotka">mm</span>
-				</span>
-			</div>
-
-			<div class="konf-rozmer">
-				<label for="konf-vyska" class="konf-rozmer-popis">Výška vpredu</label>
-				<span class="konf-stepper">
-					<button
-						type="button"
-						class="konf-krok"
-						aria-label="Zmenšiť výšku"
-						onclick={() =>
-							(vyskaVpredu = krokMm(vyskaVpredu, -STEP_MM, r.vyskaVpredu.min, r.vyskaVpredu.max))}
-						>−</button
-					>
-					<input
-						id="konf-vyska"
-						class="konf-cislo"
-						name="vyskaVpredu"
-						type="number"
-						inputmode="numeric"
-						min={r.vyskaVpredu.min}
-						max={r.vyskaVpredu.max}
-						step="10"
-						bind:value={vyskaVpredu}
-						data-testid="vyskaVpredu"
-						required
-					/>
-					<button
-						type="button"
-						class="konf-krok"
-						aria-label="Zväčšiť výšku"
-						onclick={() =>
-							(vyskaVpredu = krokMm(vyskaVpredu, STEP_MM, r.vyskaVpredu.min, r.vyskaVpredu.max))}
-						>+</button
-					>
-					<span class="konf-jednotka">mm</span>
-				</span>
-			</div>
+			<RozmerStepper
+				bind:hodnotaMm={sirka}
+				min={r.sirka.min}
+				max={r.sirka.max}
+				krokMm={KROK_SIRKA_HLBKA_MM}
+				popis="Šírka"
+				akuzativ="šírku"
+				id="konf-sirka"
+				testid="sirka"
+				name="sirka"
+			/>
+			<RozmerStepper
+				bind:hodnotaMm={hlbka}
+				min={r.hlbka.min}
+				max={r.hlbka.max}
+				krokMm={KROK_SIRKA_HLBKA_MM}
+				popis="Hĺbka (výsuv)"
+				akuzativ="hĺbku"
+				id="konf-hlbka"
+				testid="hlbka"
+				name="hlbka"
+			/>
+			<RozmerStepper
+				bind:hodnotaMm={vyskaVpredu}
+				min={r.vyskaVpredu.min}
+				max={r.vyskaVpredu.max}
+				krokMm={KROK_VYSKA_MM}
+				popis="Výška vpredu"
+				akuzativ="výšku"
+				id="konf-vyska"
+				testid="vyskaVpredu"
+				name="vyskaVpredu"
+			/>
 		</div>
 	</section>
 
@@ -541,52 +469,13 @@
 		outline-offset: 2px;
 	}
 
-	/* ── Rozmery — steppery ── */
+	/* ── Rozmery — steppery (#333: samotný stepper je v RozmerStepper.svelte) ── */
 	.konf-rozmery {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
 	}
-	.konf-rozmer {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-	}
-	.konf-rozmer-popis {
-		font-size: 14px;
-		color: var(--k-text);
-	}
-	.konf-stepper {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		border: 1px solid var(--k-line-2);
-		border-radius: var(--k-radius-pill);
-		padding: 3px 5px 3px 3px;
-		background: var(--k-surface);
-	}
-	.konf-krok {
-		width: 30px;
-		height: 30px;
-		border: 0;
-		border-radius: 999px;
-		background: var(--k-surface-2);
-		color: var(--k-text);
-		font-size: 18px;
-		line-height: 1;
-		cursor: pointer;
-		display: grid;
-		place-items: center;
-		transition: background 0.15s ease;
-	}
-	.konf-krok:hover {
-		background: var(--k-line);
-	}
-	.konf-krok:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 1px;
-	}
+	/* .konf-cislo/.konf-jednotka nižšie sú stále v UŽITÍ sekciou SKLON (číselný twin + „°"). */
 	.konf-cislo {
 		width: 66px;
 		border: 0;
@@ -606,9 +495,6 @@
 	}
 	.konf-cislo:focus {
 		outline: none;
-	}
-	.konf-stepper:focus-within {
-		border-color: var(--k-ink);
 	}
 	.konf-jednotka {
 		font-size: 12px;
