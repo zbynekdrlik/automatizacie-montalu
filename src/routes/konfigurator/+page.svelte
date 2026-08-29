@@ -22,7 +22,8 @@
 		KONF_VYSKA_STENA_MAX,
 		type KonfiguratorSuhrn,
 		type VerejnaCena,
-		type CenaModelu
+		type CenaModelu,
+		type ModelPergoly
 	} from '$lib/konfigurator';
 	import type { PergolaTypSkla } from '$lib/vizual/pergola-sklo';
 	import type { PonukaConfig } from '$lib/ponuka';
@@ -66,6 +67,7 @@
 		vyskaPriSteneMm: number;
 		typSkla: PergolaTypSkla;
 		ralKod: string;
+		model: ModelPergoly;
 	};
 
 	function platnyRozmer(v: number | null, lo: number, hi: number): v is number {
@@ -105,11 +107,14 @@
 		return () => clearTimeout(t);
 	});
 
-	// 3D vstup = DEBOUNCED rozmery + LIVE sklo/RAL (RAL/sklo = okamžitý in-place update)
+	// 3D vstup = DEBOUNCED rozmery + LIVE sklo/RAL/model. RAL/sklo = okamžitý in-place update
+	// materiálu; MODEL mení hrúbky profilov (geometriu) → in-place prestavba produktu vo Vizual3D
+	// (geometrickyPodpis sa zmení), nie remount (#329 časť 2).
 	const viz3d = $derived<Viz3D>({
 		...rozmeryStabilne,
 		typSkla: typSkla3D(sklo),
-		ralKod: farba
+		ralKod: farba,
+		model: model as ModelPergoly
 	});
 	// `{#key}` podpis = len rozmery (debounced) → remount/refit rigu iba pri zmene rozmeru
 	const vizKluc = $derived(
@@ -231,7 +236,8 @@
 									vyskaVpreduMm: suhrn.vyskaVpredu,
 									vyskaPriSteneMm: suhrn.vyskaPriStene,
 									typSkla: typSkla3D(suhrn.sklo),
-									ralKod: odoslanaFarba
+									ralKod: odoslanaFarba,
+									model: suhrn.model
 								};
 								// lazy AR komponent (model-viewer bundle) až pri prvom súhrne
 								if (!ARKomp && !arNacitava) {

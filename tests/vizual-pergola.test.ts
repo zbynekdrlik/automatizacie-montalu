@@ -281,3 +281,56 @@ describe('pergolaPngNazov — názov súboru z rozmerov (bez ceny/kódu)', () =>
 		expect(pergolaPngNazov(zaklad({ sirkaMm: 0.4, hlbkaMm: 0 }))).toBe('pergola-1x1mm.png');
 	});
 });
+
+describe('pergolaSpec — model → hrúbky profilov (#329 časť 2, iba vizuál)', () => {
+	// nosník = jediný ram diel s tvar.w === celá šírka S; jeho h = NOSNIK_HRUBKA_MM * škála
+	const nosnikH = (v: PergolaVizVstup): number => {
+		const n = pergolaSpec(v).diely.find((d) => d.rola === 'ram' && d.tvar.w === v.sirkaMm);
+		if (!n || n.tvar.kind !== 'box') throw new Error('nosník nenájdený');
+		return n.tvar.h;
+	};
+	// stĺp = ram diel so štvorcovým prierezom (w===d) a w < S; w = STLP_HRUBKA_VIZ_MM * škála
+	const stlpW = (v: PergolaVizVstup): number => {
+		const s = pergolaSpec(v).diely.find(
+			(d) =>
+				d.rola === 'ram' && d.tvar.kind === 'box' && d.tvar.w === d.tvar.d && d.tvar.w < v.sirkaMm
+		);
+		if (!s || s.tvar.kind !== 'box') throw new Error('stĺp nenájdený');
+		return s.tvar.w;
+	};
+
+	it('undefined model → nezmenená geometria (spätná kompatibilita, škála 1.0)', () => {
+		expect(nosnikH(zaklad())).toBe(NOSNIK_HRUBKA_MM);
+		expect(stlpW(zaklad())).toBe(STLP_HRUBKA_VIZ_MM);
+	});
+
+	it('ROBUST = referenčná (škála 1.0), zhodná s undefined', () => {
+		expect(nosnikH(zaklad({ model: 'ROBUST' }))).toBe(NOSNIK_HRUBKA_MM);
+		expect(stlpW(zaklad({ model: 'ROBUST' }))).toBe(STLP_HRUBKA_VIZ_MM);
+	});
+
+	it('LIGHT < ROBUST < MASSIVE pre nosník aj stĺp (viditeľne odstupňované)', () => {
+		const nl = nosnikH(zaklad({ model: 'LIGHT' }));
+		const nr = nosnikH(zaklad({ model: 'ROBUST' }));
+		const nm = nosnikH(zaklad({ model: 'MASSIVE' }));
+		expect(nl).toBeLessThan(nr);
+		expect(nr).toBeLessThan(nm);
+		const sl = stlpW(zaklad({ model: 'LIGHT' }));
+		const sr = stlpW(zaklad({ model: 'ROBUST' }));
+		const sm = stlpW(zaklad({ model: 'MASSIVE' }));
+		expect(sl).toBeLessThan(sr);
+		expect(sr).toBeLessThan(sm);
+		// konkrétne škály 0.8 / 1.0 / 1.3
+		expect(nl).toBeCloseTo(NOSNIK_HRUBKA_MM * 0.8, 6);
+		expect(nm).toBeCloseTo(NOSNIK_HRUBKA_MM * 1.3, 6);
+	});
+
+	it('model NEMENÍ bbox ani počet/roly dielov (iba prierezy — proporcie ostávajú čestné)', () => {
+		const bez = pergolaSpec(zaklad());
+		for (const m of ['LIGHT', 'ROBUST', 'MASSIVE'] as const) {
+			const s = pergolaSpec(zaklad({ model: m }));
+			expect(s.bbox).toEqual(bez.bbox);
+			expect(poRolach(s.diely)).toEqual(poRolach(bez.diely));
+		}
+	});
+});
