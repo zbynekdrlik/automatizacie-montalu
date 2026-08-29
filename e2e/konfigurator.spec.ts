@@ -465,6 +465,61 @@ test('konfigurátor: 3D náhľad je viditeľný HNEĎ pri načítaní + živý u
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #329 REGRESSION (RED pred fixom): zmena LEN farby (RAL) / LEN skla — BEZ zmeny rozmeru (žiadny
+// {#key} remount) — MUSÍ skutočne prekresliť 3D scénu, nie len caption. Root cause: prekresliRAL/
+// prekresliSklo efekty vo Vizual3D mali `if (!ziva) return` PRED čítaním ralKod/skloVzhlad → prvý
+// beh efektu (ziva===null, kým beží async stavba scény) sa vrátil pred čítaním reaktívneho vstupu
+// → Svelte 5 efekt nezaregistroval závislosť → mŕtvy efekt → materiál sa pri neskoršej zmene
+// nezmutoval. `data-viz-ral-applied`/`data-viz-sklo-applied` je ČESTNÝ signál skutočného
+// prekreslenia (zapísaný LEN v prekresliRAL/prekresliSklo, kde sa materiál naozaj mutuje), nie
+// prop-pass ako `data-viz-ral`. Owner (29.8.): „ked vyberiem farbu nic sa nestane, ked skla tiež".
+test('konfigurátor: zmena LEN farby a LEN skla naozaj prekreslí 3D (nie len caption), nula console chýb (#329)', async ({
+	page
+}) => {
+	test.setTimeout(60000);
+	const consoleMsgs = collectConsole(page);
+
+	await goto(page, '/konfigurator?viz=mid');
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+	const viz = page.getByTestId('vizual3d');
+
+	// baseline applied atribút (nastavený pri stavbe scény z počiatočného RAL)
+	await expect(viz).toHaveAttribute('data-viz-ral-applied', /.+/, { timeout: 20000 });
+	const ralPred = (await viz.getAttribute('data-viz-ral-applied')) ?? '';
+	expect(ralPred).not.toBe('');
+
+	// --- LEN FARBA: klik na swatch s INÝM RAL kódom, BEZ zmeny rozmeru (žiadny remount) ---
+	const swatche = page.getByTestId('farba-swatch');
+	const pocetSwatchov = await swatche.count();
+	let inaFarba = '';
+	for (let i = 0; i < pocetSwatchov; i++) {
+		const kod = await swatche.nth(i).getAttribute('data-value');
+		if (kod && kod !== ralPred) {
+			inaFarba = kod;
+			break;
+		}
+	}
+	expect(inaFarba).not.toBe('');
+	await page.locator(`[data-testid="farba-swatch"][data-value="${inaFarba}"]`).click();
+	// 3D sa MUSÍ prekresliť na novú farbu — na buggy kóde ostane starý applied → RED
+	await expect(viz).toHaveAttribute('data-viz-ral-applied', inaFarba, { timeout: 6000 });
+
+	// --- LEN SKLO: číre → mliečne (rôzne vizuálne rodiny cire/matne), BEZ zmeny rozmeru ---
+	await page.locator('[data-testid="sklo-chip"][data-value="4.4.2 číre"]').click();
+	await expect(viz).toHaveAttribute('data-viz-sklo-applied', /.+/, { timeout: 6000 });
+	const skloPred = (await viz.getAttribute('data-viz-sklo-applied')) ?? '';
+	await page.locator('[data-testid="sklo-chip"][data-value="4.4.2 mliečne"]').click();
+	// applied signál skla sa MUSÍ zmeniť (mliečne = iná vizuálna rodina) — RED na buggy kóde
+	await expect(viz).not.toHaveAttribute('data-viz-sklo-applied', skloPred, { timeout: 6000 });
+
+	// zmena farby/skla NEROBÍ remount → stále práve JEDEN WebGL kontext (žiaden leak)
+	expect(
+		await page.evaluate(() => (window as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS ?? null)
+	).toBe(1);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('konfigurátor: 3D náhľad viditeľný HNEĎ na MOBILNOM viewporte 390×844 (low tier fallback), nula console chýb (#325)', async ({
 	page
 }) => {

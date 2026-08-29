@@ -212,6 +212,21 @@
 		aplikujPreset(PRESET_DEFAULT, true);
 	}
 
+	// #329 ČESTNÝ signál skutočného prekreslenia (NIE prop-pass): applied atribúty sa zapisujú
+	// LEN v miestach, kde sa materiál naozaj mutuje (prekresliRAL/prekresliSklo/prestavGeometriu-
+	// Produktu/stavba scény). `data-viz-ral` (v `pripravDataZAtributov`) je oproti tomu prop-pass
+	// (mení sa pri každej zmene propu bez ohľadu na prekreslenie). E2E asertuje applied atribúty →
+	// dokáže, že zmena RAL/skla sa naozaj premietla do 3D (regression-test-first pre #329 bug).
+	function skloPodpis(vz: SkloVzhlad): string {
+		return String(vz.farbaHex);
+	}
+	function oznacRalApplied() {
+		if (containerEl) containerEl.dataset.vizRalApplied = ralKod;
+	}
+	function oznacSkloApplied(vz: SkloVzhlad | undefined) {
+		if (containerEl && vz) containerEl.dataset.vizSkloApplied = skloPodpis(vz);
+	}
+
 	function prekresliRAL() {
 		if (!ziva) return;
 		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
@@ -219,6 +234,7 @@
 			const mat = ziva.materialy[rola];
 			if (mat) nastavRAL(ziva.THREE, mat, ralKod, nastavenia.clearcoat);
 		}
+		oznacRalApplied();
 		render();
 	}
 
@@ -230,6 +246,7 @@
 		if (!ziva || !ziva.skloMaterial || !skloVzhlad) return;
 		const nastavenia = nastaveniaPreTier(tier === 'none' ? 'low' : tier);
 		nastavSkloVzhlad(ziva.THREE, ziva.skloMaterial, nastavenia.sklo, skloVzhlad);
+		oznacSkloApplied(skloVzhlad);
 		render();
 	}
 
@@ -435,6 +452,8 @@
 		ziva.materialy = materialy;
 		ziva.produktMeshe = produktMeshe;
 		ziva.skloMaterial = skloMaterial;
+		oznacRalApplied();
+		oznacSkloApplied(skloVzhlad);
 		render();
 	}
 
@@ -733,6 +752,10 @@
 			// stratený/obnovený cyklus by nahromadil ĎALŠIU kópiu tých istých
 			// listenerov na tom istom canvase.
 			aktualizujCamDataAtributy();
+			// #329 baseline applied-atribútov po postavení scény (postavScenu aplikuje aktuálny
+			// ralKod/skloVzhlad na materiály) — čestný počiatočný stav pre E2E prekreslenia.
+			oznacRalApplied();
+			oznacSkloApplied(skloVzhlad);
 			render();
 			pripravene = true;
 			// #288 review 🔵: `pripravene` mení efekt `pripravDataZAtributov` LEN pri
