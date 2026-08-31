@@ -154,6 +154,37 @@ describe('vytvorDom (#333) — profi 2-podlažný dom so strechou', () => {
 		// zmestia → viac prízemných prvkov (dvere + 2 okná × 4 diely).
 		expect(prizemnePrvky(3000, 2500).length).toBeGreaterThan(prizemnePrvky(2000, 2500).length);
 	});
+
+	// #343: dvereW sa clampuje na minimum 760 mm (nezávisle od S) → proud RÁM dverí má FIXNÚ
+	// vonkajšiu šírku (dvereW+70)/2 = 415 mm, zatiaľ čo kolízny budget (S/2−55) KLESÁ s S. Pre
+	// S ≲ 940 mm rám prečnieva cez krajný stĺp — matematicky mimo dosahu konfigurátora (produkt
+	// clampuje S na 2000–12000 mm), ale funkcia `vytvorDom` to sama od seba nevie zaručiť. Fix =
+	// variant (b) (ROZHODNUTÉ, issue #343): presne mirror vzoru latovej bočnice
+	// (`bocnicaVonkajsiaX <= budgetHalfXmm`) — pri prekročení budgetu dvere CELKOM vynechať.
+	it.each([700, 800, 900])(
+		'#343: SUB-produktová šírka S=%i mm (< ~940, konfigurátor ju nedovolí — clampuje na 2000–12000) VYNECHÁ dvere CELKOM (rám by inak prečnieval krajný stĺp)',
+		(S) => {
+			const vnutornaHrana = mm(S / 2 - 50);
+			const prvky = prizemnePrvky(S, 2500);
+			// žiadny prízemný prvok (vrátane rámu dverí) nesmie prečnievať cez krajný stĺp
+			for (const p of prvky) expect(p.vonkajsiaX).toBeLessThanOrEqual(vnutornaHrana + 1e-9);
+			// dvere (krídlo pri x≈0, výška ~2,1 m, stojace na zemi) sú CELKOM vynechané, nielen
+			// zmenšené — presne rovnaký filter ako test „dvere sú CENTROVANÉ na x=0" vyššie.
+			const vsetky = svetoveBboxDeti(vytvorDom(THREE, nast, S, 2500).skupina);
+			const dvere = vsetky.filter(
+				(p) => Math.abs(p.x) < mm(1) && p.h > mm(1900) && p.h < mm(2300) && p.spodnaY < mm(1)
+			);
+			expect(dvere.length).toBe(0);
+		}
+	);
+
+	it('#343: nad prahom (S=1000 mm, stále pod produktovým minimom 2000, ale nad kolíznym prahom ~940) dvere OSTÁVAJÚ (žiadna regresia)', () => {
+		const vsetky = svetoveBboxDeti(vytvorDom(THREE, nast, 1000, 2500).skupina);
+		const dvere = vsetky.filter(
+			(p) => Math.abs(p.x) < mm(1) && p.h > mm(1900) && p.h < mm(2300) && p.spodnaY < mm(1)
+		);
+		expect(dvere.length).toBeGreaterThanOrEqual(1);
+	});
 });
 
 describe('vytvorOkolie (#333) — trávnik + dlažbová terasa + stromy', () => {
