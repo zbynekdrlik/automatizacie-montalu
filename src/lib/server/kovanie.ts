@@ -16,14 +16,15 @@ import type { Polozka } from './money';
 
 /**
  * Kód uzáveru/zámku daného systému — kotva, na ktorej visí počet ďalších položiek
- * (podložka, protikus…). Pri Štandarde je zámok farebne rozdelený na dva RAL kódy
- * (ZASK202531/202532) s IDENTICKÝM `konstPreStyl` — kotva ukazuje na jeden z nich,
- * počet zámkov je farbo-nezávislý (invariant drží config-test), takže je jedno,
- * ktorý variant sa nájde.
+ * (podložka, protikus…). Pri Štandarde AJ Slide (#353) je zámok farebne rozdelený na
+ * dva RAL kódy s IDENTICKÝM `konstPreStyl` — kotva ukazuje na jeden z nich, počet
+ * zámkov je farbo-nezávislý (invariant drží config-test), takže je jedno, ktorý
+ * variant sa nájde. Slide: pôvodná ZASK20254 zrušená (#353), nahradená
+ * ZASK202538 (R7016) / ZASK202537 (R9005) — kotva ukazuje na R7016.
  */
 const KOD_UZAVERU: Record<string, string> = {
 	Robust: 'ZASK00029',
-	Slide: 'ZASK20254',
+	Slide: 'ZASK202538',
 	Štandard: 'ZASK202531'
 };
 

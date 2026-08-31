@@ -276,7 +276,8 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 		// `naUzaverPodlaFab`), naprieč všetkými tabuľkami s farebnými položkami.
 		const tabulky = [
 			['ROBUST', KOMPONENTY_ROBUST],
-			['STANDARD', KOMPONENTY_STANDARD]
+			['STANDARD', KOMPONENTY_STANDARD],
+			['SLIDE', KOMPONENTY_SLIDE]
 		] as const;
 		const baza = (nazov: string) => nazov.replace(/\s*R(9005|7016)\s*$/, '').trim();
 		for (const [meno, tabulka] of tabulky) {
@@ -341,26 +342,30 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 	});
 });
 
-describe('KOMPONENTY_SLIDE — pripravené, ale do Money zatiaľ nejde', () => {
-	const spocitajS = (sysStyl: string) =>
+describe('KOMPONENTY_SLIDE — pripravené (#353), ale do Money zatiaľ nejde', () => {
+	const spocitajS = (sysStyl: string, farba: 'R9005' | 'R7016' = 'R9005') =>
 		pocitajKomponenty(
 			KOMPONENTY_SLIDE,
 			sysStyl,
 			zaklad(sysStyl),
 			pocetUzaverov(
-				KOMPONENTY_SLIDE.find((k) => k.kod === 'ZASK20254')!,
+				KOMPONENTY_SLIDE.find((k) => k.kod === 'ZASK202538')!,
 				sysStyl
-			)
+			),
+			true,
+			farba
 		);
+	const qs = (sysStyl: string, kod: string, farba: 'R9005' | 'R7016' = 'R9005') =>
+		spocitajS(sysStyl, farba).polozky.find((p) => p.kod === kod)?.qty;
 
-	it('Slide je vypnutý, kým 7 kódov nemá v Money skladovú zásobu', () => {
+	it('Slide je pripravený (RAL zámok #353), ale vypnutý, kým sa kódy neoveria v Money', () => {
 		expect(SLIDE_PRIPRAVENY).toBe(false);
 		expect(komponentyPre('Slide')).toBeNull();
 		expect(komponentyPre('Robust')).toBe(KOMPONENTY_ROBUST);
 		expect(komponentyPre('Štandard +')).toBeNull();
 	});
 
-	it('KAŽDÝ Slide štýl sa spočíta bez chyby (aby to po založení zásob len bežalo)', () => {
+	it('KAŽDÝ Slide štýl sa spočíta bez chyby (aby to po overení zásob len bežalo)', () => {
 		for (const s of Object.keys(cfg).filter((x) => x.startsWith('Slide|')))
 			expect({ styl: s, chyby: spocitajS(s).chyby }).toEqual({ styl: s, chyby: [] });
 	});
@@ -376,6 +381,87 @@ describe('KOMPONENTY_SLIDE — pripravené, ale do Money zatiaľ nejde', () => {
 		const kody = KOMPONENTY_SLIDE.map((k) => k.kod);
 		expect(kody).not.toContain('ZASK00038');
 		expect(kody).not.toContain('ZASK00039');
+	});
+
+	it('#353: automatický zámok RAL — R9005 pošle len R9005 kód, R7016 vôbec (a naopak)', () => {
+		const r9 = spocitajS('Slide|2K', 'R9005').polozky.map((p) => p.kod);
+		const r7 = spocitajS('Slide|2K', 'R7016').polozky.map((p) => p.kod);
+		expect(r9).toContain('ZASK202537');
+		expect(r9).not.toContain('ZASK202538');
+		expect(r7).toContain('ZASK202538');
+		expect(r7).not.toContain('ZASK202537');
+	});
+
+	it('#353: zámok je konštanta štýlu (2K→2, 3K→2, 2x2K→3, 2x3K→3), nezávislá od farby', () => {
+		expect(qs('Slide|2K', 'ZASK202537', 'R9005')).toBe(2);
+		expect(qs('Slide|3K', 'ZASK202537', 'R9005')).toBe(2);
+		expect(qs('Slide|2x2K', 'ZASK202537', 'R9005')).toBe(3);
+		expect(qs('Slide|2x3K', 'ZASK202538', 'R7016')).toBe(3);
+	});
+
+	it('#353: položky viazané na zámok — protikus a madlo 1 ks na zámok', () => {
+		const r = spocitajS('Slide|2K'); // 2 zámky
+		expect(qs('Slide|2K', 'ZASK20255')).toBe(2);
+		expect(qs('Slide|2K', 'ZASK20258')).toBe(2);
+		expect(r.chyby).toEqual([]);
+	});
+
+	it('#353: chýbajúca farba → HLASNÁ chyba (nie tichý default), zámok sa neobjaví', () => {
+		const r = pocitajKomponenty(
+			KOMPONENTY_SLIDE,
+			'Slide|2K',
+			zaklad('Slide|2K'),
+			pocetUzaverov(
+				KOMPONENTY_SLIDE.find((k) => k.kod === 'ZASK202538')!,
+				'Slide|2K'
+			)
+			// farbaKovania zámerne vynechaná
+		);
+		expect(r.chyby.map((c) => c.kod)).toEqual(expect.arrayContaining(['ZASK202538', 'ZASK202537']));
+		for (const kod of ['ZASK202538', 'ZASK202537'])
+			expect(r.polozky.find((p) => p.kod === kod)).toBeUndefined();
+		// položky NEZÁVISLÉ na farbe (protikus/madlo potrebujú počet zámkov, ktorý
+		// sa BEZ farby stále vie odvodiť z konstPreStyl priamo) ostávajú fail-loud
+		// len keď skutočne chýba počet — tu je uzáver známy, takže sa spočítajú:
+		expect(r.polozky.find((p) => p.kod === 'ZASK20255')?.qty).toBe(2);
+	});
+
+	it('#353: zasklievacie tesnenie 10 a 12 ostáva 50/50 z rámového profilu (nezmenené oproti Robustu)', () => {
+		const z = zaklad('Slide|2K');
+		const polovica = Math.round((z.dlzkaRamovehoMm / 2 / 1000) * 1000) / 1000;
+		expect(qs('Slide|2K', 'ZASK20241')).toBe(polovica);
+		expect(qs('Slide|2K', 'ZASK20242')).toBe(polovica);
+		expect(qs('Slide|2K', 'ZASK20241')! + qs('Slide|2K', 'ZASK20242')!).toBeCloseTo(
+			z.dlzkaRamovehoMm / 1000,
+			3
+		);
+	});
+
+	it('#353: kefové tesnenie 5x8 = (rámový − nosový) × 2, v metroch a nikdy záporné', () => {
+		const z = zaklad('Slide|2K');
+		const cakane = Math.round((((z.dlzkaRamovehoMm - z.dlzkaNosovehoMm) * 2) / 1000) * 1000) / 1000;
+		expect(qs('Slide|2K', 'ZASK20259')).toBe(cakane);
+		expect(cakane).toBeGreaterThan(0);
+	});
+
+	it('#353: každý kód v tabuľke je overený proti att 14667 (nemenná kontrola zoznamu)', () => {
+		// #353 (Dominikov zoznam, att 14667): pôvodná ZASK20254 ZRUŠENÁ, nahradená
+		// RAL variantmi ZASK202538/ZASK202537. Money skladová zásoba NEBOLA naživo
+		// overená v tomto worktree (chýba SSH kľúč) — viď design komentár na #353.
+		expect(KOMPONENTY_SLIDE.map((k) => k.kod).sort()).toEqual([
+			'ZASK00037',
+			'ZASK00037',
+			'ZASK20241',
+			'ZASK20242',
+			'ZASK20253',
+			'ZASK202537',
+			'ZASK202538',
+			'ZASK20255',
+			'ZASK20256',
+			'ZASK20257',
+			'ZASK20258',
+			'ZASK20259'
+		]);
 	});
 });
 

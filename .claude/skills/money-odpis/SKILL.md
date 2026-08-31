@@ -34,6 +34,28 @@ SELECT Kod, Nazev, Model_UserData FROM Artikly_Artikl WHERE Nazev LIKE N'%Oponov
 Pri odvodení nového štýlu z iného systému prejdi CELÝ jeho BOM a pre KAŽDÝ kód over model —
 odvodenie prenesie kódy zdrojového systému aj tam, kde cieľový má vlastný článok.
 
+**Worktree-izolovaný autopilot worker ČASTO NEMÁ `~/.ssh/slovnormal_odoo`** (#353) — kľúč
+existuje na dev1/hlavnej relácii, ale nový `.claude/worktrees/agent-<id>` checkout ho
+nezdedí automaticky. Skús to (`ssh -i ~/.ssh/slovnormal_odoo … 'echo OK'`), a ak zlyhá
+`Identity file … not accessible`, NEBLOKUJ celý ticket — implementuj podľa dostupných
+zdrojov (Excel, git-sourcené Dominikove citáty), nechaj Money-kód-overenie ako explicitný
+finding na tickete + neflipni žiadny „*_PRIPRAVENY" gate bez naživo overenej zásoby.
+
+## 1c. Nový Dominikov zoznam ODPORUJE staršej, git-sourcenej odpovedi → sourcovaná odpoveď VYHRÁVA (#353)
+
+Keď nový Excel/ticket text tvrdí niečo iné než čo je v kóde ako **dátumovaná, priamo
+citovaná** Dominikova odpoveď (napr. commit message alebo kódový komentár s dátumom),
+ber to ako REÁLNY konflikt, nie ako automatickú aktualizáciu. Príklad: #353 tvrdilo
+„tesnenie 12 vs 10 podľa hrúbky skla", ale `bceba2b` (28.7.) cituje Dominika priamo:
+„nedá sa určiť dopredu ani podľa hrúbky, pri 24mm skle raz 10 raz 12". Rozhodovacie
+kritériá: (1) over, či samotný Excel/podklad k novému tvrdeniu dáva KONKRÉTNY vzorec/prah
+— ak nie (oba riadky majú identický text), tvrdenie je len prozaická poznámka, nie dáta;
+(2) neregeneruj zdieľanú konštantu/pravidlo bez potvrdenia — zmena by tichoso ovplyvnila
+AJ iný, už odoslaný/testovaný systém mimo scope ticketu; (3) zdokumentuj rozpor explicitne
+(design komentár na ticket + kódový komentár), nikdy nevyber ticho jednu stranu. Toto NIE
+je dôvod blokovať celý ticket na user otázku, keď zvyšok tabuľky je jednoznačný — implementuj
+jednoznačné riadky, ponechaj sporný na bezpečnom (už overenom) predvolenom správaní.
+
 ## 1b. Excely od Dominika: „rozmer" ≠ „dĺžka rezu" — a referencia vs. ručná hodnota
 
 Nárezové Excely majú na TEN ISTÝ profil dva rôzne stĺpce a zámena je Money-chyba:
