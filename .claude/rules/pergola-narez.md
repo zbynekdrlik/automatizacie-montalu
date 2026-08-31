@@ -449,3 +449,28 @@ po potvrdení variácie, ticket #223).
   NEimportujú `$lib/server/*` (ani cenový TYP) — prop používa klientsky štrukturálny typ.
 - Round-trip: `strechaSkloTyp` je vo vstupe, reset `$effect` echo, `hidden()` snippete aj `bind:` (select
   je viditeľný vstup → submitne sa priamo vo `form` kroku, hidden je pre ďalšie kroky).
+
+## Tesnenia (gumy) do rezervačného odpisu (#339) — data-driven katalóg + typová Money-zámka
+
+Tri pravidlá z callu 31.8.: tesnenie žľabu = dĺžka žľabu; tesnenie kotviaceho = dĺžka kotviaceho;
+tesnenie na sklá = dĺžka stropného profilu × 4. Žijú v `src/lib/server/pergola-rezervacia.ts`
+(`spocitajTesnenia(NarezVysledok)` + data-driven katalóg `TESNENIA`), zobrazujú sa sekciou
+„Tesnenia (gumy)" v `RezNahlad.svelte`. Vzor, ktorý sa oplatí zopakovať pri ĎALŠEJ položke
+bez potvrdeného Money kódu:
+
+- **`TesnenieRozmer.kod: null` (LITERÁLOVÝ typ) = ŠTRUKTURÁLNA Money-zámka, nie `if`-flag.** Typ
+  s `kod: null` (a bez `qty`) sa nedá priradiť na `Polozka` (`kod: string`), takže položka sa NEDÁ
+  dostať do `job.polozky` — nemožné-typom, nie preskočené-podmienkou. Zámku over KOMPILAČNE:
+  `@ts-expect-error` test (`tests/pergola-tesnenia.test.ts`) padne cez `npm run check`, keď ju
+  niekto oslabí (falsifikovateľné, nie runtime-only).
+- **Nejednoznačný základ vzorca (× 4 na „stropný profil" — prítlačná lišta 18006 vs priečkový
+  profil 18004) = `zakladKody: null` → `stav:'caka'`, NIKDY hádané číslo.** Data-driven: doplnenie
+  Money kódov / potvrdenie základu = úprava poľa `TESNENIA`, nie redizajn (phase 2 = #347). Základ,
+  ktorý nie je v spočítanom náreze (napr. bez krovu), degraduje na `caka` rovnako — honest-null je
+  TRVALÝ stav.
+- **Money kód tesnenia treba dohľadať v Money read-only** (ssh `~/.ssh/slovnormal_odoo` na
+  `root@erp.montalu.cloud` — POZOR: na worktree boxe môže CHÝBAŤ; vtedy je to blocker, ktorý sa
+  rieši otázkou na tiket, nie hádaním). Dominikov písomný zoznam ide do kanála 207.
+- **#233 žargón-sken MUSÍ pokryť aj krok `rez-nahlad`** (nie len `spocitat` výsledok) — nové
+  user-visible stringy tesnení sa renderujú tam. `pergola-uix.spec.ts` sken doťahaj cez
+  `pripravit-rezervaciu` (ČÍTACIE, žiadny zápis).

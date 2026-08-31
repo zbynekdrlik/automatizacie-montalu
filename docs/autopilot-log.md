@@ -1776,3 +1776,22 @@ Verzia 0.24.46-dev.1. Gates lokálne: check 0/0, lint (eslint+prettier) čisté 
 doinštalované `@fontsource-variable/inter` (stale node_modules) + systémový `cwebp`.
 **Playbook:** `konfigurator.md` (reaktivita Vizual3D efektov — čítať vstupy pred `!ziva` gate) +
 konfigurator-sklo zákaznícka vrstva.
+
+## #339 — Pergola: tesnenia (gumy) do rezervačného odpisu (pravidlá z callu 31.8., 2026-08-31)
+
+Tri pravidlá z callu s Dominikom: tesnenie žľabu = dĺžka žľabu; tesnenie kotviaceho = dĺžka
+kotviaceho profilu; tesnenie na sklá = dĺžka stropného profilu × 4. Nová čistá funkcia
+`spocitajTesnenia(NarezVysledok)` + data-driven katalóg `TESNENIA` v `pergola-rezervacia.ts`;
+`RezervaciaRozpis.tesnenia`; sekcia „Tesnenia (gumy)" v `RezNahlad.svelte` s bannerom „čaká na
+Money kódy". #2/#3 spočítané (žľab 18021/18018, kotviaci 18019 = šírka); #1 ODLOŽENÉ (`stav:'caka'`)
+— „stropný profil" je nejednoznačný (prítlačná lišta 18006 vs priečkový 18004), nikdy hádané číslo.
+Money-safety ŠTRUKTURÁLNE: `TesnenieRozmer.kod: null` (literál) → nedá sa priradiť na `Polozka`
+(`kod:string`) → tesnenie nikdy nevojde do `job.polozky`; overené kompilačným `@ts-expect-error`.
+Money kódy tesnení nedohľadateľné (ssh kľúč `slovnormal_odoo` na boxe chýba; Dominik prerába sklad
+komponentov) → čaká na jeho písomný zoznam (kanál 207) → follow-up #347; otázky na Dominika sú na
+#339. Verzia 0.24.53-dev.1. Commity: fb33dd0 (bump) + 98aaa5b (feat) + d5dd0d7 (review 🔵×2).
+Gates lokálne: check 0/0, lint čisté, vitest 2578/2578, Playwright pergola-uix + pergola-rezervacia
+6/6 (zero-console). Review 0 🔴 0 🟡 2 🔵 (obe opravené: kompilačná Money-zámka + #233 sken na
+rez-nahlad). Fable dizajn + review consult (gate OPEN).
+**Playbook:** `pergola-narez.md` (tesnenia rezervácie — data-driven katalóg, `kod:null` typová
+Money-zámka, #1 odložené kým Dominik nepotvrdí „stropný profil").
