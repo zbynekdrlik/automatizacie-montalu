@@ -26,7 +26,8 @@ const {
 	recordZakazkaPushPosted,
 	recordZakazkaPushMissing,
 	getPendingZakazkaPushes,
-	expireStaleZakazkaPushes
+	expireStaleZakazkaPushes,
+	isPendingZakazkaPush
 } = await import('../src/lib/server/odoo-zakazka-store');
 
 let nextId = 90001;
@@ -141,7 +142,38 @@ describe('odoo-zakazka-store — stavový automat', () => {
 			"UPDATE odoo_zakazka_push SET created_at = datetime('now','-100 days') WHERE zak_norm='ZAKEXP'"
 		).run();
 		expireStaleZakazkaPushes(90);
-		expect(row('ZAKEXP', 'OP5')).toMatchObject({ pending: 0, last_error: 'expired-no-order' });
+		expect(row('ZAKEXP', 'OP5')).toMatchObject({ pending: 0, last_error: 'expired' });
+	});
+	it('created_at sa RESETUJE pri 0→1 (review #349 🟡): posted starý riadok → dnes failed → NIE expired, retryovateľný', () => {
+		// riadok bol dávno úspešne postnutý (created_at 200 dní dozadu, pending=0)
+		recordZakazkaPushPosted('ZAKOLD', 'OP99');
+		db.prepare(
+			"UPDATE odoo_zakazka_push SET created_at = datetime('now','-200 days') WHERE zak_norm='ZAKOLD'"
+		).run();
+		// DNES príde ČERSTVÉ genuine zlyhanie tej istej zákazky → epizóda začína teraz
+		recordZakazkaPushFailed('ZAKOLD', 'OP99', 'siet down');
+		// časový strop ho NESMIE hneď expirovať (created_at bol resetnutý na dnes)
+		expireStaleZakazkaPushes(90);
+		expect(row('ZAKOLD', 'OP99')).toMatchObject({ pending: 1, attempts: 1 });
+		// a sweep ho MUSÍ vidieť ako retryovateľný (bez #349 🟡 fixu by bol expirovaný / mimo okna)
+		const pend = getPendingZakazkaPushes(MAX_ATTEMPTS, 90, 20).map((r) => r.zak);
+		expect(pend).toContain('ZAKOLD');
+	});
+	it('created_at sa NEresetuje počas prebiehajúcej epizódy (1→1): zombie strop drží', () => {
+		recordZakazkaPushNoOrder('ZAKEP', 'OP98'); // epizóda štart (pending=1)
+		db.prepare(
+			"UPDATE odoo_zakazka_push SET created_at = datetime('now','-100 days') WHERE zak_norm='ZAKEP'"
+		).run();
+		recordZakazkaPushNoOrder('ZAKEP', 'OP98'); // ďalší no-order v tej istej epizóde → created_at DRŽÍ
+		expireStaleZakazkaPushes(90);
+		expect(row('ZAKEP', 'OP98')).toMatchObject({ pending: 0, last_error: 'expired' });
+	});
+	it('isPendingZakazkaPush: true pre pending riadok, false po vyriešení / pre neznámy kľúč', () => {
+		expect(isPendingZakazkaPush('ZAKIP', 'OP9')).toBe(false); // neexistuje
+		recordZakazkaPushFailed('ZAKIP', 'OP9', 'x');
+		expect(isPendingZakazkaPush('ZAKIP', 'OP9')).toBe(true);
+		recordZakazkaPushPosted('ZAKIP', 'OP9');
+		expect(isPendingZakazkaPush('ZAKIP', 'OP9')).toBe(false);
 	});
 	it('getPendingZakazkaPushes: vylúči vyčerpané (attempts>=MAX) aj staré (mimo okna)', () => {
 		recordZakazkaPushFailed('ZAKA', 'OP6', 'x'); // attempts 1 — pending
@@ -169,7 +201,7 @@ describe('durable záznam pri pushi', () => {
 		queueZakazkaPush('ZAKPF', 'OP10');
 		await waitFor(() => row('ZAKPF', 'OP10')?.pending === 1);
 		expect(row('ZAKPF', 'OP10')).toMatchObject({ pending: 1 });
-		expect(row('ZAKPF', 'OP10')!.attempts).toBeGreaterThanOrEqual(1);
+		expect(row('ZAKPF', 'OP10')!.attempts).toBe(1); // failed nespúšťa sweep → presne 1 pokus
 	});
 	it('no-order push (search []) zaznamená pending bez inkrementu attempts', async () => {
 		enableOdoo();

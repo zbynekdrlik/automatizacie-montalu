@@ -40,12 +40,17 @@ const upsertPosted = db.prepare(`
 `);
 
 // GENUINE zlyhanie (Odoo/sieť): pending=1, inkrementuj poison-pill počítadlo, ulož chybu.
+// `created_at` = ZAČIATOK aktuálnej pending epizódy (nie prvý-ever insert): resetuj ho pri prechode
+// 0→1 (review #349 🟡 — inak by časový strop `expireStaleZakazkaPushes` na starom (>90 dní) riadku
+// hneď „expiroval" ČERSTVÉ zlyhanie zákazky bežiacej mesiace). V `DO UPDATE` je nekvalifikované
+// `pending` STARÁ hodnota riadku → reset len keď bol predtým vyriešený (0), inak epizódu zachovaj.
 const upsertFailed = db.prepare(`
 	INSERT INTO odoo_zakazka_push (zak_norm, op_norm, zak, op, pending, attempts, last_error, updated_at)
 	VALUES (@zak_norm, @op_norm, @zak, @op, 1, 1, @err, datetime('now'))
 	ON CONFLICT(zak_norm, op_norm) DO UPDATE SET
 		pending = 1, attempts = attempts + 1, last_error = @err,
-		updated_at = datetime('now'), zak = excluded.zak, op = excluded.op
+		updated_at = datetime('now'), zak = excluded.zak, op = excluded.op,
+		created_at = CASE WHEN pending = 0 THEN datetime('now') ELSE created_at END
 `);
 
 // `no-order` (Odoo hore, ale `sale.order` ešte neexistuje — objednávka je ešte ponuka / nie je
@@ -57,7 +62,8 @@ const upsertNoOrder = db.prepare(`
 	VALUES (@zak_norm, @op_norm, @zak, @op, 1, 0, @err, datetime('now'))
 	ON CONFLICT(zak_norm, op_norm) DO UPDATE SET
 		pending = 1, last_error = @err, updated_at = datetime('now'),
-		zak = excluded.zak, op = excluded.op
+		zak = excluded.zak, op = excluded.op,
+		created_at = CASE WHEN pending = 0 THEN datetime('now') ELSE created_at END
 `);
 
 // `missing` (odpis medzitým UVOĽNENÝ „Uvoľniť" medzi zlyhaním a retry → zákazka už nemá odpis):
@@ -102,14 +108,27 @@ export function getPendingZakazkaPushes(
 	return pendingStmt.all(maxAttempts, `-${maxAgeDays} days`, limit) as ZakazkaPushRow[];
 }
 
-// Exspiruj no-order zombie: pending riadky staršie než `maxAgeDays` (objednávka sa nikdy neobjavila
-// v Odoo — zrušená ponuka a pod.) prestaň skúšať (pending=0), riadok ostáva pre diagnostiku. Čas,
-// nie počet pokusov — arrival sweep beží podľa nesúvisiacej aktivity, takže attempts by nemeral čas.
+// Exspiruj zaseknuté pending riadky staršie než `maxAgeDays` (epizóda beží už priveľmi dlho —
+// typicky no-order objednávka, ktorá sa nikdy neobjavila v Odoo; alebo poison-pilled riadok, ktorý
+// tu tiež upraceme). Prestaň skúšať (pending=0), riadok ostáva pre diagnostiku. Čas, nie počet
+// pokusov — arrival sweep beží podľa nesúvisiacej aktivity, takže attempts by nemeral čas. NEUTRÁLNY
+// label `expired` (review #349 🔵 — netvrď „no-order" o riadku, čo bol genuine failure/poison-pill).
 const expireStmt = db.prepare(`
 	UPDATE odoo_zakazka_push
-	SET pending = 0, last_error = 'expired-no-order', updated_at = datetime('now')
+	SET pending = 0, last_error = 'expired', updated_at = datetime('now')
 	WHERE pending = 1 AND created_at <= datetime('now', ?)
 `);
 export function expireStaleZakazkaPushes(maxAgeDays: number): void {
 	expireStmt.run(`-${maxAgeDays} days`);
+}
+
+// Je (zak, op) STÁLE pending? Retry sweep to re-checkne PRED (re)postom vo svojom serializovanom
+// tasku — živý arrival push mohol medzitým ten istý kľúč vyriešiť (review #349 🔵 — bez re-checku
+// by sweep zbytočne postol druhý (re-derivovaný) snapshot a minul Odoo volanie).
+const isPendingStmt = db.prepare(
+	'SELECT pending FROM odoo_zakazka_push WHERE zak_norm = ? AND op_norm = ?'
+);
+export function isPendingZakazkaPush(zak: string, op: string): boolean {
+	const r = isPendingStmt.get(normZak(zak), normOp(op)) as { pending: number } | undefined;
+	return r?.pending === 1;
 }

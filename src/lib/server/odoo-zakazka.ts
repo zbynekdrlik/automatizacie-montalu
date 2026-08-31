@@ -30,6 +30,7 @@ import { enrichPolozky, type CenaRiadok, type CenyResult } from './ceny';
 import {
 	expireStaleZakazkaPushes,
 	getPendingZakazkaPushes,
+	isPendingZakazkaPush,
 	recordZakazkaPushFailed,
 	recordZakazkaPushMissing,
 	recordZakazkaPushNoOrder,
@@ -357,24 +358,43 @@ async function pushAndRecord(zak: string, op: string): Promise<ZakazkaPushResult
 	return result;
 }
 
+// Jeden sweep naraz: štartový a arrival sweep môžu vzniknúť súbežne a bez tohto guardu by obidva
+// prečítali tú istú pending množinu a duplikovali prácu (review #349 🔵). Neškodné (re-derivovaný
+// snapshot, last-wins), ale zbytočné Odoo volania — guard ich zlúči.
+let sweepInFlight = false;
+
 /**
  * Retry sweep zaostalých pushov (Odoo bola dole / objednávka pribudla neskôr). Najprv exspiruj
- * no-order zombie (časový strop), potom spracuj pending riadky SEKVENČNE cez ten istý per-kľúč
- * serializer (aby retry nezávodil so živým pushom tej istej zákazky). Vypnuté (chýba env) ⇒ žiadny
- * DB dotaz. Arrival-triggered (po úspešnom pushi = dôkaz že Odoo je hore, vzor #278).
+ * zaseknuté riadky (časový strop), potom spracuj pending riadky SEKVENČNE cez ten istý per-kľúč
+ * serializer (aby retry nezávodil so živým pushom tej istej zákazky). V serializovanom tasku ešte
+ * re-checkne, či je riadok STÁLE pending (živý arrival push ho mohol medzitým vyriešiť). Vypnuté
+ * (chýba env) ⇒ žiadny DB dotaz. Arrival-triggered (po úspešnom pushi = dôkaz že Odoo je hore, #278).
  */
 export async function retryPendingZakazkaPushes(): Promise<void> {
 	if (!odooConfig()) return;
-	expireStaleZakazkaPushes(MAX_NO_ORDER_AGE_DAYS);
-	const pending = getPendingZakazkaPushes(MAX_ATTEMPTS, MAX_NO_ORDER_AGE_DAYS, RETRY_BATCH);
-	if (pending.length === 0) return;
-	log.info('zakazka push retry sweep štart', { pocet: pending.length });
-	let posted = 0;
-	for (const row of pending) {
-		const r = await serializeByKey(pushKey(row.zak, row.op), () => pushAndRecord(row.zak, row.op));
-		if (r === 'posted') posted++;
+	if (sweepInFlight) return;
+	sweepInFlight = true;
+	try {
+		expireStaleZakazkaPushes(MAX_NO_ORDER_AGE_DAYS);
+		const pending = getPendingZakazkaPushes(MAX_ATTEMPTS, MAX_NO_ORDER_AGE_DAYS, RETRY_BATCH);
+		if (pending.length === 0) return;
+		log.info('zakazka push retry sweep štart', { pocet: pending.length });
+		let posted = 0;
+		for (const row of pending) {
+			const r = await serializeByKey(pushKey(row.zak, row.op), async () => {
+				// re-check vnútri zámku: živý arrival push mohol tento kľúč medzitým vyriešiť
+				if (!isPendingZakazkaPush(row.zak, row.op)) return 'skipped' as const;
+				return pushAndRecord(row.zak, row.op);
+			});
+			if (r === 'posted') posted++;
+		}
+		log.info('zakazka push retry sweep hotový', {
+			spracovanych: pending.length,
+			postnutych: posted
+		});
+	} finally {
+		sweepInFlight = false;
 	}
-	log.info('zakazka push retry sweep hotový', { spracovanych: pending.length, postnutych: posted });
 }
 
 /**
