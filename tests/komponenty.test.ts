@@ -15,6 +15,7 @@ import {
 	KOMPONENTY_SLIDE,
 	KOMPONENTY_STANDARD,
 	SLIDE_PRIPRAVENY,
+	KOVANIE_NEUPLNE,
 	komponentyPre
 } from '../src/lib/server/komponenty-cfg';
 import seed from '../src/lib/server/cfg_seed.json';
@@ -269,16 +270,22 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 			expect(r.polozky.find((p) => p.kod === kod)).toBeUndefined();
 	});
 
-	it('každá RAL skupina má PRÁVE obe farby (#338 config invariant, VŠETKY tabuľky)', () => {
+	it('každá RAL skupina má PRÁVE obe farby (#338 config invariant, VŠETKY tabuľky) — #357 vynímka: Slide zámok', () => {
 		// Chráni pred „pridal som len R9005 variant" — jednofarebná skupina by pri druhej
 		// farbe ticho vynechala kovanie (mismatch-skip je zámerne tichý). Zoskup podľa
 		// NÁZVU bez RAL prípony (nie podľa pravidla — kľučka aj krytka majú to isté
 		// `naUzaverPodlaFab`), naprieč všetkými tabuľkami s farebnými položkami.
+		//
+		// #357 VÝNIMKA: Slide „Automaticky zamok RS SLIDE" je ZÁMERNE jednofarebný
+		// (len R7016) — R9005 variant (ZASK202537) má 0 ks skladu a je vynechaný z
+		// KOMPONENTY_SLIDE, viď design komentár na #357. Toto NIE JE náhoda ako
+		// invariant chráni — je to explicitne zdokumentovaná stavová skutočnosť.
 		const tabulky = [
 			['ROBUST', KOMPONENTY_ROBUST],
 			['STANDARD', KOMPONENTY_STANDARD],
 			['SLIDE', KOMPONENTY_SLIDE]
 		] as const;
+		const jednofarebneVynimky = new Set(['SLIDE|Automaticky zamok RS SLIDE']);
 		const baza = (nazov: string) => nazov.replace(/\s*R(9005|7016)\s*$/, '').trim();
 		for (const [meno, tabulka] of tabulky) {
 			const skupiny = new Map<string, Set<string>>();
@@ -287,12 +294,14 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 				if (!skupiny.has(key)) skupiny.set(key, new Set());
 				skupiny.get(key)!.add(k.farba!);
 			}
-			for (const [b, farby] of skupiny)
+			for (const [b, farby] of skupiny) {
+				const ocakavane = jednofarebneVynimky.has(`${meno}|${b}`) ? ['R7016'] : ['R7016', 'R9005'];
 				expect({ tab: meno, baza: b, farby: [...farby].sort() }).toEqual({
 					tab: meno,
 					baza: b,
-					farby: ['R7016', 'R9005']
+					farby: ocakavane
 				});
+			}
 		}
 	});
 
@@ -342,8 +351,8 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 	});
 });
 
-describe('KOMPONENTY_SLIDE — pripravené (#353), ale do Money zatiaľ nejde', () => {
-	const spocitajS = (sysStyl: string, farba: 'R9005' | 'R7016' = 'R9005') =>
+describe('KOMPONENTY_SLIDE — zapnuté (#357), 2 kódy s 0 ks vynechané', () => {
+	const spocitajS = (sysStyl: string, farba: 'R9005' | 'R7016' = 'R7016') =>
 		pocitajKomponenty(
 			KOMPONENTY_SLIDE,
 			sysStyl,
@@ -355,19 +364,19 @@ describe('KOMPONENTY_SLIDE — pripravené (#353), ale do Money zatiaľ nejde', 
 			true,
 			farba
 		);
-	const qs = (sysStyl: string, kod: string, farba: 'R9005' | 'R7016' = 'R9005') =>
+	const qs = (sysStyl: string, kod: string, farba: 'R9005' | 'R7016' = 'R7016') =>
 		spocitajS(sysStyl, farba).polozky.find((p) => p.kod === kod)?.qty;
 
-	it('Slide je pripravený (RAL zámok #353), ale vypnutý, kým sa kódy neoveria v Money', () => {
-		expect(SLIDE_PRIPRAVENY).toBe(false);
-		expect(komponentyPre('Slide')).toBeNull();
+	it('#357: Slide je zapnutý — kódy s potvrdeným skladom idú do Money', () => {
+		expect(SLIDE_PRIPRAVENY).toBe(true);
+		expect(komponentyPre('Slide')).toBe(KOMPONENTY_SLIDE);
 		expect(komponentyPre('Robust')).toBe(KOMPONENTY_ROBUST);
 		expect(komponentyPre('Štandard +')).toBeNull();
 	});
 
-	it('KAŽDÝ Slide štýl sa spočíta bez chyby (aby to po overení zásob len bežalo)', () => {
+	it('KAŽDÝ Slide štýl sa spočíta bez chyby (R7016 — jediný farebný variant v tabuľke)', () => {
 		for (const s of Object.keys(cfg).filter((x) => x.startsWith('Slide|')))
-			expect({ styl: s, chyby: spocitajS(s).chyby }).toEqual({ styl: s, chyby: [] });
+			expect({ styl: s, chyby: spocitajS(s, 'R7016').chyby }).toEqual({ styl: s, chyby: [] });
 	});
 
 	it('ZASK00037 je JEDEN riadok = obvod podľa koľajnice + 4 ks na krídlo', () => {
@@ -383,30 +392,46 @@ describe('KOMPONENTY_SLIDE — pripravené (#353), ale do Money zatiaľ nejde', 
 		expect(kody).not.toContain('ZASK00039');
 	});
 
-	it('#353: automatický zámok RAL — R9005 pošle len R9005 kód, R7016 vôbec (a naopak)', () => {
-		const r9 = spocitajS('Slide|2K', 'R9005').polozky.map((p) => p.kod);
+	it('#357: R9005 zámok (ZASK202537) a madlo 200 (ZASK20258) sú VYNECHANÉ — 0 ks skladu', () => {
+		const kody = KOMPONENTY_SLIDE.map((k) => k.kod);
+		expect(kody).not.toContain('ZASK202537');
+		expect(kody).not.toContain('ZASK20258');
+	});
+
+	it('#357: R9005 už NIE JE platná Slide RAL voľba — jediný farebný kandidát v tabuľke je R7016, takže R9005 triggeruje #354 „žiadna zhoda" poistku (HLASNÁ chyba na úrovni celej objednávky cez kovanieDoOdpisu, viď kovanie-odpis.test.ts); server navyše R9005 z ralPreSystem.Slide vôbec neponúkne (+page.server.ts derivuje z komponentyPre)', () => {
+		const r9 = spocitajS('Slide|2K', 'R9005');
+		expect(r9.polozky.map((p) => p.kod)).not.toContain('ZASK202538'); // R7016 kód, farba sa nezhoduje → absent
+		expect(r9.chyby.map((c) => c.sprava).join(' ')).toMatch(/R9005.*nesedí|nesedí.*R9005/i);
+		// farbo-neutrálne položky (protikus) sa aj tak spočítajú — chyba je LEN o farbe
+		expect(r9.polozky.find((p) => p.kod === 'ZASK20255')?.qty).toBe(2);
+	});
+
+	it('#357: R7016 objednávka DOSTANE zámok — jediný kód, ktorý má sklad', () => {
 		const r7 = spocitajS('Slide|2K', 'R7016').polozky.map((p) => p.kod);
-		expect(r9).toContain('ZASK202537');
-		expect(r9).not.toContain('ZASK202538');
 		expect(r7).toContain('ZASK202538');
-		expect(r7).not.toContain('ZASK202537');
 	});
 
-	it('#353: zámok je konštanta štýlu (2K→2, 3K→2, 2x2K→3, 2x3K→3), nezávislá od farby', () => {
-		expect(qs('Slide|2K', 'ZASK202537', 'R9005')).toBe(2);
-		expect(qs('Slide|3K', 'ZASK202537', 'R9005')).toBe(2);
-		expect(qs('Slide|2x2K', 'ZASK202537', 'R9005')).toBe(3);
-		expect(qs('Slide|2x3K', 'ZASK202538', 'R7016')).toBe(3);
+	it('#357: R7016 zámok je konštanta štýlu (2K→2, 3K→2, 2x2K→3, 2x3K→3)', () => {
+		expect(qs('Slide|2K', 'ZASK202538')).toBe(2);
+		expect(qs('Slide|3K', 'ZASK202538')).toBe(2);
+		expect(qs('Slide|2x2K', 'ZASK202538')).toBe(3);
+		expect(qs('Slide|2x3K', 'ZASK202538')).toBe(3);
 	});
 
-	it('#353: položky viazané na zámok — protikus a madlo 1 ks na zámok', () => {
-		const r = spocitajS('Slide|2K'); // 2 zámky
-		expect(qs('Slide|2K', 'ZASK20255')).toBe(2);
-		expect(qs('Slide|2K', 'ZASK20258')).toBe(2);
-		expect(r.chyby).toEqual([]);
+	it('#357: protikus zamku (ZASK20255) sa počíta z uzáveru bez ohľadu na to, či zámok má Money kód', () => {
+		// ZASK20255 je farbo-neutrálny (žiadny `farba` filter) — kotva (ZASK202538)
+		// dáva počet uzáverov aj pri R9005 objednávke, hoci R9005 sám žiadny zámok
+		// do odpisu nepošle. Protikus sa preto počíta na oboch farbách.
+		expect(qs('Slide|2K', 'ZASK20255', 'R9005')).toBe(2);
+		expect(qs('Slide|2K', 'ZASK20255', 'R7016')).toBe(2);
 	});
 
-	it('#353: chýbajúca farba → HLASNÁ chyba (nie tichý default), zámok sa neobjaví', () => {
+	it('#357: madlo 200 (ZASK20258) sa v odpise NEOBJAVÍ (vynechané, nie 0 ks)', () => {
+		const r = spocitajS('Slide|2K');
+		expect(r.polozky.find((p) => p.kod === 'ZASK20258')).toBeUndefined();
+	});
+
+	it('#353: chýbajúca farba → HLASNÁ chyba (nie tichý default), R7016 zámok sa neobjaví', () => {
 		const r = pocitajKomponenty(
 			KOMPONENTY_SLIDE,
 			'Slide|2K',
@@ -417,12 +442,11 @@ describe('KOMPONENTY_SLIDE — pripravené (#353), ale do Money zatiaľ nejde', 
 			)
 			// farbaKovania zámerne vynechaná
 		);
-		expect(r.chyby.map((c) => c.kod)).toEqual(expect.arrayContaining(['ZASK202538', 'ZASK202537']));
-		for (const kod of ['ZASK202538', 'ZASK202537'])
-			expect(r.polozky.find((p) => p.kod === kod)).toBeUndefined();
-		// položky NEZÁVISLÉ na farbe (protikus/madlo potrebujú počet zámkov, ktorý
-		// sa BEZ farby stále vie odvodiť z konstPreStyl priamo) ostávajú fail-loud
-		// len keď skutočne chýba počet — tu je uzáver známy, takže sa spočítajú:
+		expect(r.chyby.map((c) => c.kod)).toEqual(['ZASK202538']);
+		expect(r.polozky.find((p) => p.kod === 'ZASK202538')).toBeUndefined();
+		// položky NEZÁVISLÉ na farbe (protikus potrebuje počet zámkov, ktorý sa BEZ
+		// farby stále vie odvodiť z konstPreStyl priamo) ostávajú fail-loud len keď
+		// skutočne chýba počet — tu je uzáver známy, takže sa spočíta:
 		expect(r.polozky.find((p) => p.kod === 'ZASK20255')?.qty).toBe(2);
 	});
 
@@ -444,24 +468,37 @@ describe('KOMPONENTY_SLIDE — pripravené (#353), ale do Money zatiaľ nejde', 
 		expect(cakane).toBeGreaterThan(0);
 	});
 
-	it('#353: každý kód v tabuľke je overený proti att 14667 (nemenná kontrola zoznamu)', () => {
-		// #353 (Dominikov zoznam, att 14667): pôvodná ZASK20254 ZRUŠENÁ, nahradená
-		// RAL variantmi ZASK202538/ZASK202537. Money skladová zásoba NEBOLA naživo
-		// overená v tomto worktree (chýba SSH kľúč) — viď design komentár na #353.
+	it('#357: kódová tabuľka je overená — 9/11 kódov (2 s 0 ks vynechané, nemenná kontrola zoznamu)', () => {
+		// #357 (denný snapshot 2026-08-31T14:45Z): ZASK202537/ZASK20258 majú 0 ks,
+		// zvyšok potvrdene naskladnený — viď design komentár na #357.
 		expect(KOMPONENTY_SLIDE.map((k) => k.kod).sort()).toEqual([
 			'ZASK00037',
 			'ZASK00037',
 			'ZASK20241',
 			'ZASK20242',
 			'ZASK20253',
-			'ZASK202537',
 			'ZASK202538',
 			'ZASK20255',
 			'ZASK20256',
 			'ZASK20257',
-			'ZASK20258',
 			'ZASK20259'
 		]);
+	});
+
+	it('#357: KOVANIE_NEUPLNE.Slide upozorňuje na madlo VŽDY, na R9005 zámok len pri R9005', () => {
+		const neuplne = KOVANIE_NEUPLNE.Slide;
+		expect(typeof neuplne).toBe('function');
+		const fn = neuplne as (skloHrubka?: number, farbaKovania?: 'R9005' | 'R7016') => string | null;
+		const r7 = fn(undefined, 'R7016')!;
+		expect(r7).toMatch(/[Mm]adlo/);
+		expect(r7).not.toMatch(/zámok/i);
+		const r9 = fn(undefined, 'R9005')!;
+		expect(r9).toMatch(/[Mm]adlo/);
+		expect(r9).toMatch(/zámok/i);
+		expect(r9).toMatch(/R9005/);
+		// bez zvolenej farby: madlo je mandatórne bez ohľadu na farbu, hláška sa
+		// zobrazí (nie null) — appka farbu vždy pýta skôr inde vo výpočte.
+		expect(fn(undefined, undefined)).toMatch(/[Mm]adlo/);
 	});
 });
 

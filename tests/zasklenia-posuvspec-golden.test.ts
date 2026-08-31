@@ -122,7 +122,12 @@ const JEDEN_POSUV: Record<string, Record<string, string>> = {
 		sklo: '6mm číre',
 		otvaranie: 'L - P',
 		sietka: '1',
-		sietkaUchyt: 'zamok'
+		sietkaUchyt: 'zamok',
+		// #357: Slide kovanie je zapnuté a jeho jediný Money farebný kód je R7016
+		// (R9005 zámok má 0 ks skladu, vynechaný) — default R9005 (fd()) by tu
+		// spustil #354 „žiadna zhoda" poistku (HLASNÁ chyba), rovnaký vzor ako
+		// Deluxe nižšie.
+		farbaKovania: 'R7016'
 	},
 	'deluxe-3K-kolajnica-rucna (kladka/klzný podľa skla)': {
 		zak: 'ZAK-G4',
@@ -191,6 +196,11 @@ const VIAC_POSUVOV: Record<string, Record<string, string>> = {
 		jednostrannaFab: '1',
 		poznamka: 'viacposuvová poznámka',
 		ral: 'RAL 9010',
+		// #357: Slide kovanie je zapnuté a jeho jediný Money farebný kód je R7016
+		// (R9005 zámok má 0 ks skladu, vynechaný) — default R9005 (fd()) by tu
+		// spustil #354 „žiadna zhoda" poistku pre Slide posuv. R7016 sedí aj
+		// Robustu, takže dávka ostáva kompletná (rovnaký vzor ako nižšie).
+		farbaKovania: 'R7016',
 		posuvy: JSON.stringify([
 			{
 				system: 'Robust',

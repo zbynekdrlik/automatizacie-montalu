@@ -252,7 +252,7 @@
 	// ručná dĺžka koľajnice má zmysel len tam, kde je horná a spodná ZVLÁŠŤ
 	// (Deluxe / Štandard + / Štandard); zoznam posiela server z konfigurácie
 	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
-	// kovanie do Money má zatiaľ len Robust (Slide čaká na skladové zásoby v Money)
+	// kovanie do Money má Robust, Štandard, Deluxe aj Slide (#357) — derivované zo servera
 	let maKovanie = $derived(data.systemyKovanie.includes(system));
 	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
 	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv

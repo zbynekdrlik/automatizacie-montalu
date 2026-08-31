@@ -312,7 +312,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		// systémy, kde má zmysel ručná dĺžka koľajnice (majú hornú + spodnú zvlášť):
 		// Deluxe / Štandard + / Štandard. Robust a Slide majú jednu obvodovú (Patrik).
 		systemyKolajnica: systemyRucnaKolajnica(loadCfg()),
-		// systémy, ktoré posielajú kovanie do Money (Slide čaká na skladové zásoby) —
+		// systémy, ktoré posielajú kovanie do Money (Slide zapnuté #357) —
 		// derivuje sa z konfigurácie kovania, aby sa zoznam nemusel držať na dvoch miestach
 		systemyKovanie: systemy.filter((sys) => komponentyPre(sys) !== null),
 		// systémy, ktorých kovanie má RAL farebné varianty (kľučka/krytka/zámok R9005 vs
