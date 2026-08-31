@@ -10,7 +10,7 @@ import { cenySnapshotPath } from '$lib/server/ceny';
 import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
-import { queueZakazkaPush } from '$lib/server/odoo-zakazka';
+import { queueZakazkaPush, runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
 
 const log = logger('http');
 
@@ -47,6 +47,9 @@ let pruneCounter = 0;
 	// #340: po každom úspešnom odpise pushni interný zoznam materiálu zákazky do Odoo
 	// (interná log-note na sale.order, zákazník ju nikdy nevidí). Money-neutrálny observer.
 	setOdpisWrittenHook(queueZakazkaPush);
+	// #349: pri štarte (po migráciách — db.ts modul-load prebehol vyššie cez importy) dopostni
+	// zaostalé zákazka-pushe z minulých výpadkov Odoo. Fire-and-forget, no-op keď chýba ODOO_LEAD_*.
+	runStartupZakazkaSweep();
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
