@@ -190,3 +190,133 @@ describe('vytvorOkolie (#333) — trávnik + dlažbová terasa + stromy', () => 
 		expect(terasaSirka(6000, 4000)).toBeGreaterThan(terasaSirka(3000, 2000));
 	});
 });
+
+describe('#336 — ZAPUSTENÉ realistické otvory (koniec „lego" plochých okien/dverí)', () => {
+	const nast = nastaveniaPreTier('high');
+
+	type M = InstanceType<typeof THREE.Mesh>;
+	const deti = (S: number, SV: number) => vytvorDom(THREE, nast, S, SV).skupina.children as M[];
+	// sklo = mesh s VERTEX-COLOR atribútom (gradient nesie tmavé odrazové sklo)
+	const jeSklo = (m: M) => !!(m.geometry as { attributes?: { color?: unknown } }).attributes?.color;
+	const jeRam = (m: M) => m.geometry.type === 'ExtrudeGeometry';
+	const celoZ = (m: M) => {
+		m.geometry.computeBoundingBox();
+		return m.position.z + m.geometry.boundingBox!.max.z;
+	};
+
+	it('SKLO je ZA čelom proud rámu (paralaxa), ale PRED fasádou (z≥5, nič neokludované)', () => {
+		const meshe = deti(4000, 2500);
+		const skla = meshe.filter(jeSklo);
+		const ramy = meshe.filter(jeRam);
+		// 3 poschodové + 1 prízemné okno + inlay dverí = 5 skiel; 4+ rámov (3+1 okná + dvere)
+		expect(skla.length).toBe(5);
+		expect(ramy.length).toBeGreaterThanOrEqual(4);
+		const skloMaxZ = Math.max(...skla.map((s) => s.position.z));
+		const ramCeloMaxZ = Math.max(...ramy.map(celoZ));
+		expect(skloMaxZ).toBeLessThan(ramCeloMaxZ); // každé sklo je hlbšie než najproudnejšie čelo rámu
+		// KONSTRUKČNÝ invariant: žiadne sklo NIE JE za fasádou (z≥5 mm) — inak by ho nepriehľadná
+		// fasáda okludovala / odhalila starú stenu (#336 zavrhnutá CSG alternatíva).
+		const skloMinZ = Math.min(...skla.map((s) => s.position.z));
+		expect(skloMinZ).toBeGreaterThanOrEqual(mm(5));
+	});
+
+	it('POSCHODOVÉ okná sa NEPREKRÝVAJÚ (review 🟡): úzka pergola má len stredné, široká 3 s rozstupom', () => {
+		// poschodové sklo = vysoké y (nad prízemím, nad pergolou); zoradené podľa x
+		const poschodieX = (S: number) =>
+			deti(S, 2500)
+				.filter((m) => jeSklo(m) && m.position.y > mm(3200))
+				.map((m) => m.position.x)
+				.sort((a, b) => a - b);
+		// susedné stredy ≥ šírka okna (820 mm) → žiadne prekrytie parapetov/rámov
+		const bezPrekrytia = (xs: number[]) => xs.every((x, i) => i === 0 || x - xs[i - 1]! >= mm(820));
+		const uzka = poschodieX(2000);
+		const siroka = poschodieX(4000);
+		expect(uzka).toHaveLength(1); // úzka (2 m): len stredné okno (bočné by sa prekrývali)
+		expect(bezPrekrytia(uzka)).toBe(true);
+		expect(siroka).toHaveLength(3); // široká (4 m): 3 okná
+		expect(bezPrekrytia(siroka)).toBe(true);
+	});
+
+	it('sklo má TMAVÝ vertikálny gradient — horný vrchol SVETLEJŠÍ než dolný (fake odraz oblohy)', () => {
+		const sklo = deti(4000, 2500).find(jeSklo)!;
+		const pos = sklo.geometry.attributes.position!;
+		const col = sklo.geometry.attributes.color!;
+		let horeI = 0;
+		let doleI = 0;
+		for (let i = 1; i < pos.count; i++) {
+			if (pos.getY(i) > pos.getY(horeI)) horeI = i;
+			if (pos.getY(i) < pos.getY(doleI)) doleI = i;
+		}
+		const lum = (i: number) => col.getX(i) + col.getY(i) + col.getZ(i);
+		expect(lum(horeI)).toBeGreaterThan(lum(doleI)); // hore svetlejšie
+		expect(lum(doleI)).toBeGreaterThan(0); // dole NIE čierne (anti-„čierna diera" na low tieri)
+	});
+
+	it('zdieľaný sklo materiál je odrazové sklo (vertexColors, nízka drsnosť, env odraz, dielektrikum)', () => {
+		const sklo = deti(4000, 2500).find(jeSklo)!;
+		const mat = sklo.material as InstanceType<typeof THREE.MeshStandardMaterial>;
+		expect(mat.vertexColors).toBe(true);
+		expect(mat.roughness).toBeLessThanOrEqual(0.1);
+		expect(mat.metalness).toBe(0); // sklo je DIELEKTRIKUM (nie kov)
+		expect(mat.envMapIntensity).toBeGreaterThanOrEqual(1.5);
+	});
+
+	it('dvere tvar (c): oceľová tyčová kľučka pri hrane + drevené krídlo na x=0 + presklený inlay', () => {
+		const meshe = deti(4000, 2500);
+		// oceľová kľučka = jediný mesh s metalness 0.9, pri hrane krídla (x≠0)
+		const klucky = meshe.filter(
+			(m) => (m.material as InstanceType<typeof THREE.MeshStandardMaterial>).metalness === 0.9
+		);
+		expect(klucky).toHaveLength(1);
+		expect(Math.abs(klucky[0]!.position.x)).toBeGreaterThan(mm(1));
+		// drevené krídlo = BoxGeometry na x=0 s textúrou (mapa) — odlíšené od fasády (Plane)
+		const kridlo = meshe.find(
+			(m) =>
+				m.geometry.type === 'BoxGeometry' &&
+				Math.abs(m.position.x) < mm(1) &&
+				m.position.y < mm(2500) && // prízemie (nie strecha — tá je tiež Box+mapa na x=0)
+				!!(m.material as InstanceType<typeof THREE.MeshStandardMaterial>).map
+		)!;
+		expect(kridlo).toBeTruthy();
+		// presklený inlay = vertex-color sklo na ÚROVNI prízemia (nízke y) s malým offsetom x
+		const inlaje = meshe.filter(
+			(m) => jeSklo(m) && m.position.y < mm(2500) && m.position.x > mm(50) && m.position.x < mm(500)
+		);
+		expect(inlaje.length).toBeGreaterThanOrEqual(1);
+	});
+
+	it('latová bočnica dverí (SalesQueze cue): normálna pergola má drevené laty (zdieľaný materiál)', () => {
+		const meshe = deti(4000, 2500);
+		const kridlo = meshe.find(
+			(m) =>
+				m.geometry.type === 'BoxGeometry' &&
+				Math.abs(m.position.x) < mm(1) &&
+				m.position.y < mm(2500) && // prízemie (nie strecha — tá je tiež Box+mapa na x=0)
+				!!(m.material as InstanceType<typeof THREE.MeshStandardMaterial>).map
+		)!;
+		const drevoMat = kridlo.material;
+		const drevoMeshe = meshe.filter((m) => m.material === drevoMat);
+		// krídlo + 5 lát = 6 (bočnica sa zmestí do budgetu pri 4 m pergole)
+		expect(drevoMeshe.length).toBe(6);
+	});
+
+	it('ÚZKA pergola (S=1500): latová bočnica sa VYNECHÁ (nezmestí sa do budgetu, nikdy nekoliduje)', () => {
+		const meshe = deti(1500, 2500);
+		const kridlo = meshe.find(
+			(m) =>
+				m.geometry.type === 'BoxGeometry' &&
+				Math.abs(m.position.x) < mm(1) &&
+				m.position.y < mm(2500) &&
+				!!(m.material as InstanceType<typeof THREE.MeshStandardMaterial>).map
+		)!;
+		const drevoMeshe = meshe.filter((m) => m.material === kridlo.material);
+		expect(drevoMeshe.length).toBe(1); // len krídlo, žiadne laty
+	});
+
+	it('low tier (bez textúr) — dvere/okná sa postavia bez chyby a sklo drží vertex gradient', () => {
+		const dom = vytvorDom(THREE, nastaveniaPreTier('low'), 4000, 2500);
+		const skla = (dom.skupina.children as M[]).filter(jeSklo);
+		expect(skla.length).toBeGreaterThanOrEqual(4);
+		for (const d of dom.disposables) expect(typeof d.dispose).toBe('function');
+	});
+});
