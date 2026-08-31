@@ -107,7 +107,7 @@ púšťať aj proti nasadenej appke (BASE_URL), žiadny `skipAkLive` (ako `/opti
 **#325 (owner ROZHODNUTÉ, split-screen ako Tesla/Apple):** 3D náhľad je teraz v ĽAVOM
 STICKY stĺpci `+page.svelte`, viditeľný HNEĎ pri načítaní (defaultná pergola, BEZ submitu),
 a aktualizuje sa ŽIVO pri zmene voľby. PRAVÝ (scrollovací) panel = formulár + cena/súhrn/
-dopyt/objednávka/AR. Split je čistý CSS Grid + `position:sticky` (desktop `@media
+dopyt/objednávka. Split je čistý CSS Grid + `position:sticky` (desktop `@media
 min-width:900px` 2 stĺpce; mobil-first default = 1 stĺpec, vizuál hore sticky-zmenšený).
 Stránka je rozdelená do subkomponentov `src/lib/components/konfigurator/` (`KonfVizual`
 = ľavý 3D stĺpec, `KonfCena`, `KonfSuhrn`) — `+page.svelte` ostáva state/compute HUB
@@ -137,36 +137,27 @@ Stránka je rozdelená do subkomponentov `src/lib/components/konfigurator/` (`Ko
 - **RAL kód pre 3D = form-state `farba`** (select `value={f.kod}` = priamo RAL kód „7016").
   Sklo → `typSkla3D(nazovSkla)` (client-safe odtieň, žiadny katalóg).
 - **CENA/SÚHRN ostávajú SERVER-side na submite** (owner #325 to dovolil — §3 „live kalkulačka
-  = enhance + submit" platí pre CENU, nie pre 3D). AR náhľad ostáva POST-SUBMIT (model-viewer
-  bundle sa nenačíta pri loade); `arViz` = snapshot vstupov PRI submite.
+  = enhance + submit" platí pre CENU, nie pre 3D).
 - **`zobrazOvladanie={false}`** — form ostáva jediný zdroj pravdy (vlastné RAL/sklo čipy
   komponentu by duplikovali formulár); drag-to-orbit ostáva (OrbitControls nezávislý od čipov).
 - **Mapovanie názov skla → vizuálny odtieň**: `typSkla3D(nazovSkla)` v `konfigurator.ts`
   (číre→cire, mliečne/matné/STADUR→matne, bronz→bronzove, default cire) — pure, testované,
   bez katalógového importu.
 
-## 7. AR náhľad (#286) — nové sub-routy pod /konfigurator
+## 7. AR náhľad — ODOBRATÉ (#337, owner „zapis si issue odobrat ten AR")
 
-`/konfigurator` má AR náhľad („pergola u teba na záhrade" cez telefón). Detaily GLB
-exportu + model-viewer sú v `.claude/rules/vizual3d.md` (auto-loaduje sa na
-`src/lib/vizual/**`); tu je len ROUTE/guard vzor pre túto verejnú plochu:
+**AR bol z konfigurátora KOMPLETNE odstránený (#337).** Bol konfigurátor-only (interné
+/zasklenia/navrh/zakaznicky ho nepoužívali). Zmazané: `PergolaAR.svelte`, sub-routy
+`/konfigurator/ar` + `/konfigurator/model.glb` (GLB endpoint), `src/lib/vizual/glb.ts`,
+`src/lib/server/filereader-polyfill.ts`, deps `@google/model-viewer`+`qrcode`, typ
+model-viewer v `app.d.ts`, a CI model-viewer bundle-gate (`ci.yml`). Guardy
+(`b2b-route-coverage`, `konfigurator-money-safety`) už `/konfigurator/model.glb`
+neuvádzajú.
 
-- **Nové sub-routy sú UŽ verejné cez prefix** — `PUBLIC_PATHS` má `/konfigurator`
-  a match je `startsWith(p + '/')`, takže `/konfigurator/model.glb` aj
-  `/konfigurator/ar` prejdú BEZ pridania do `PUBLIC_PATHS` (na rozdiel od §1, ktoré
-  platí pre TOP-LEVEL verejnú route).
-- **`GET /konfigurator/model.glb` (`+server.ts`)** = serverový GLB endpoint. Je
-  „write-bearing" (má `+server.ts`) → MUSÍ byť v `ALLOWED` v
-  `tests/b2b-route-coverage.test.ts` (inak drift guard padne) A v `SERVEROVE_ROUTY`
-  v `tests/konfigurator-money-safety.test.ts` (B) (money-neutralita). Money-neutrálny:
-  vstup rozmery + typ skla (KĽÚČ cire/dymove/…, nie katalóg) + RAL kód; výstup čistá
-  geometria/materiály (žiadny kód/cena/nárez).
-- **`/konfigurator/ar` (`+page.ts`, NIE `+page.server.ts`)** = samostatná AR viewer
-  stránka. Univerzálny `+page.ts` load ju drží MIMO „write-bearing" množiny b2b guardu
-  (číta len query params, žiadny server) → netreba `ALLOWED` zápis.
-- **`+server.ts` je server-only ako `+page.server.ts`** — money-safety guard (A)
-  `jeKlientskyReachable` ho vylučuje (bez toho by ho bral ako klientsky vstup a spadol
-  na jeho legitímnom `$lib/server/*` importe).
+Ostáva ŽIVÝ 3D náhľad (#276/#325, §6 vyššie) — projektový three@0.185 / KonfVizual /
+Vizual3D. **`+server.ts` je server-only** — money-safety guard (A) `jeKlientskyReachable`
+ho stále vylučuje (platí pre iné endpointy: dopyty-konfigurator/pdf, logout, health).
+Ak by sa AR niekedy vracalo, obnov ROUTE/guard vzor z histórie tohto tiketu.
 
 ## 8. Prémiový showroom redizajn (#327) — chrome, ovládanie, E2E pasce
 
@@ -244,7 +235,7 @@ exportu + model-viewer sú v `.claude/rules/vizual3d.md` (auto-loaduje sa na
 - **Zobrazenie = metre, interné = mm.** `RozmerStepper.svelte` (subkomponent, 3× inštancia v
   `KonfOvladace`): VIDITEĽNÝ `type=text inputmode=decimal` ukazuje metre („4,0 m", čiarka, 1
   desatinné) a NEMÁ `name`; SKRYTÝ `<input type=hidden name=sirka value={hodnotaMm}>` POSTuje
-  INTERNÉ mm nezmenene. Cena/PDF/Odoo/AR pipeline dostáva mm ako doteraz — v pipeline sa NIČ nemení.
+  INTERNÉ mm nezmenene. Cena/PDF/Odoo pipeline dostáva mm ako doteraz — v pipeline sa NIČ nemení.
 - **Čistý prevod modul `$lib/konfigurator-jednotky.ts`** (client-safe, žiadny Money/DOM):
   `mmNaMetreText` (mm→„4,0"), `parseMetreNaMm` (čiarka AJ bodka → mm, 100 mm mriežka = 1 desatinné,
   clamp; prázdny/nečíselný → `null`, aby sa hodnota počas mazania neprepísala), `krokMetre`
