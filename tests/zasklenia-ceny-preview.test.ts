@@ -24,7 +24,7 @@ function nahladEvent(
 	user: typeof B2B_USER | typeof INTERNAL_USER | null
 ) {
 	const fd = new FormData();
-	for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+	for (const [k, v] of Object.entries({ farbaKovania: 'R9005', ...fields })) fd.append(k, v);
 	return {
 		request: new Request('http://x/zasklenia', { method: 'POST', body: fd }),
 		locals: { user }
@@ -37,6 +37,7 @@ function nahladMultiEvent(posuvy: unknown[], user: typeof B2B_USER | typeof INTE
 	fd.append('op', 'O1');
 	fd.append('zakaznik', 'Test');
 	fd.append('posuvy', JSON.stringify(posuvy));
+	fd.append('farbaKovania', 'R9005');
 	return {
 		request: new Request('http://x/zasklenia', { method: 'POST', body: fd }),
 		locals: { user }

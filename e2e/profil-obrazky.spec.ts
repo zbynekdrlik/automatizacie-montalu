@@ -6,7 +6,7 @@
 //
 // Všetko ČÍTACIE („Spočítať"), do Money nejde nič.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 /** riadky karty „Zoznam materiálu — profily": kód + či sa obrázok naozaj načítal */
 async function materialRiadky(page: Page) {
@@ -39,6 +39,7 @@ for (const { system, styl } of PRIPADY) {
 		await page.getByLabel('Štýl').selectOption(styl);
 		await page.locator('#s').fill('2509');
 		await page.locator('#v').fill('1930');
+		await vyberFarbuKovania(page);
 		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 		await waitHydrated(page);
 

@@ -31,6 +31,7 @@ import {
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
 import { komponentyPre } from '$lib/server/komponenty-cfg';
+import type { Farba } from '$lib/komponenty';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import { skloCenaPre, type SkloCenaResult, type SkloPlanVstup } from '$lib/server/sklo-cena';
 import {
@@ -85,6 +86,9 @@ function jobFor(
 			kolajnica: vstup.kolajnica,
 			// jednostranná FAB — MENÍ počet kľučiek/krytiek vložky v odpise
 			jednostrannaFab: vstup.jednostrannaFab,
+			// RAL farba kovania — MENÍ Money kód (kľučka/krytka vložky R9005 vs R7016,
+			// Štandard zámok); do histórie kvôli auditu + „Použiť znova" (#338)
+			farbaKovania: vstup.farbaKovania,
 			// prídavná koľajnica — MENÍ odpis (spodná koľajnica o veľkosť vyššie);
 			// bez nej by „Použiť znova" prebralo zákazku s iným odpisom, než mala
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
@@ -103,8 +107,8 @@ function jobFor(
  * nárezový plán — inak by sa odpis kovania mohol rozísť s tým, čo sa reže.
  * Chyba tu MUSÍ zastaviť odoslanie: radšej žiadny odpis než polovičný.
  */
-function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean) {
-	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab);
+function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?: Farba | null) {
+	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, farbaKovania ?? undefined);
 }
 
 /**
@@ -262,6 +266,8 @@ function jobForMulti(
 			zimnaZahrada: true,
 			pocetPosuvov: r.posuvy.length,
 			jednostrannaFab: vstup.jednostrannaFab,
+			// RAL farba kovania — MENÍ Money kód kovania (#338); audit + „Použiť znova"
+			farbaKovania: vstup.farbaKovania,
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
@@ -309,6 +315,11 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		// systémy, ktoré posielajú kovanie do Money (Slide čaká na skladové zásoby) —
 		// derivuje sa z konfigurácie kovania, aby sa zoznam nemusel držať na dvoch miestach
 		systemyKovanie: systemy.filter((sys) => komponentyPre(sys) !== null),
+		// systémy, ktorých kovanie má RAL farebné varianty (kľučka/krytka/zámok R9005 vs
+		// R7016) → formulár musí ponúknuť voľbu farby kovania (#338). Derivované z configu.
+		systemyFarba: systemy.filter((sys) =>
+			(komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
+		),
 		znova,
 		live: isLive()
 	};
@@ -338,7 +349,7 @@ export const actions = {
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		// kovanie (kusy + tesnenia) — chyba v počtoch zastaví už náhľad, aby sa
 		// nedalo odoslať niečo, čo appka nevie spočítať celé
-		const kov = kovanieFor([spec], vstup.jednostrannaFab);
+		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 		const job = jobFor(vstup, r, '', kov.polozky);
 		return {
@@ -363,7 +374,7 @@ export const actions = {
 			]),
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
-			warn: null as string | null,
+			warn: kov.warn,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -388,7 +399,7 @@ export const actions = {
 		const { r, err, spec } = compute(vstup);
 		if (err || !r || !spec)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
-		const kov = kovanieFor([spec], vstup.jednostrannaFab);
+		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 
 		// ak niekto medzi náhľadom a potvrdením zmenil vzorce (Nastavenia),
@@ -402,7 +413,14 @@ export const actions = {
 				vstup,
 				plan: r,
 				planHash: aktualny,
-				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
+				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
+				warn: [
+					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+					kov.warn
+				]
+					.filter(Boolean)
+					.join(' '),
 				vytvorene,
 				cielInfo: {
 					live: isLive(),
@@ -482,7 +500,7 @@ export const actions = {
 		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
-		const kov = kovanieFor(specs, vstup.jednostrannaFab);
+		const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
 		const job = jobForMulti(vstup, r, '', kov.polozky);
 		return {
@@ -505,7 +523,7 @@ export const actions = {
 				}))
 			),
 			planHash: contentHash(vstup.zak, job.polozky),
-			warn: null as string | null,
+			warn: kov.warn,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -531,7 +549,7 @@ export const actions = {
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 
 		const potvrdene = String(formData.get('planHash') ?? '');
-		const kov = kovanieFor(specs, vstup.jednostrannaFab);
+		const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
 		const job = jobForMulti(vstup, r, locals.user?.username ?? '', kov.polozky);
 		const aktualny = contentHash(vstup.zak, job.polozky);
@@ -541,7 +559,14 @@ export const actions = {
 				multiVstup: vstup,
 				multi: r,
 				planHash: aktualny,
-				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
+				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
+				warn: [
+					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+					kov.warn
+				]
+					.filter(Boolean)
+					.join(' '),
 				vytvorene,
 				cielInfo: {
 					live: isLive(),

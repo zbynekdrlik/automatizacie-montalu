@@ -96,11 +96,12 @@ describe('kovanie stredového okna — Money odpis sa NEMENÍ', () => {
 	const spec = { sysStyl: 'Robust|2x3K', S: 6000, V: 2600, redukciaZero: false };
 
 	it('odpis kovania je rovnaký so stredovou kľučkou aj bez nej', () => {
-		const bez = kovanieDoOdpisu(cfg, [{ ...spec }], false);
+		const bez = kovanieDoOdpisu(cfg, [{ ...spec }], false, 'R9005');
 		const so = kovanieDoOdpisu(
 			cfg,
 			[{ ...spec, kovanieStred: KLUCKA, kovanieStredOkno: 'P' as const }],
-			false
+			false,
+			'R9005'
 		);
 		expect(bez.err).toBeNull();
 		expect(so.err).toBeNull();
@@ -108,10 +109,10 @@ describe('kovanie stredového okna — Money odpis sa NEMENÍ', () => {
 	});
 
 	it('opona má 3 kľučky už z tabuľky uzáverov (preto je pole len informácia)', () => {
-		const { polozky, err } = kovanieDoOdpisu(cfg, [{ ...spec }], false);
+		const { polozky, err } = kovanieDoOdpisu(cfg, [{ ...spec }], false, 'R9005');
 		expect(err).toBeNull();
-		// 3 uzávery × 2 ks (obojstranná FAB) = 6 ks kľučiek
-		expect(polozky.find((p) => p.kod === 'ZASK00030')?.qty).toBe(6);
+		// 3 uzávery × 2 ks (obojstranná FAB) = 6 ks kľučiek R9005 (#338: RAL variant)
+		expect(polozky.find((p) => p.kod === 'ZASK202533')?.qty).toBe(6);
 		expect(polozky.find((p) => p.kod === 'ZASK00029')?.qty).toBe(3);
 	});
 });

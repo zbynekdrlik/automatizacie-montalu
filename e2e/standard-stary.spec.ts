@@ -4,7 +4,7 @@
 //
 // Všetko READ-ONLY — len „Spočítať nárezový plán", nič sa neodosiela do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-STD-${Date.now().toString(36).slice(-5)}`;
 const SKLO = 'Sklo (základ — určuje vzorec)';
@@ -46,6 +46,7 @@ test('2K + float: basic nárezák s rámom ZASP00018 a dorazovým ZASP00021', as
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await zadanie(page, '01', '2K', 'Float sklo 6 mm');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -72,6 +73,7 @@ test('2K + izolačné: IZO nárezák — U profil 21,6 m a spodná koľajnica o 
 	await loginAs(page);
 	await zadanie(page, '02', '2K', 'Izolačné sklo 4.8.4');
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard 2K IZO');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -93,6 +95,7 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ (na rozdiel od Št
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await zadanie(page, '03', '2x3K', 'Izolačné sklo 4.8.4');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 

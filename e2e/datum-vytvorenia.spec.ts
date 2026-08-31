@@ -4,7 +4,14 @@
 // „hotovo"/„hotovoMulti", je viditeľný aj v TLAČI (nie .noprint), a neprekrýva/nerozbíja
 // existujúci poznámka/RAL layout (PR #50).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	skipAkLive,
+	vyberFarbuKovania
+} from './helpers';
 
 const RUN = `E2E-DAT-${Date.now().toString(36).toUpperCase()}`;
 const DATUM_RE = /^🕓 \d{1,2}\.\d{1,2}\.\d{4} \d{2}:\d{2}$/;
@@ -25,6 +32,7 @@ test('single posuv: dátum vytvorenia v hlavičke pri náhľade aj po odoslaní,
 	await page.getByLabel('Výška (mm) *').fill('1930');
 	await page.getByLabel(/Poznámka/).fill('Test poznámky vedľa dátumu');
 	await page.getByLabel(/RAL \(farba\)/).fill('7016');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	// krok „nahlad" — dátum v hlavičke, správny tvar
@@ -67,6 +75,7 @@ test('viac posuvov: dátum vytvorenia v hlavičke pri spoločnom náhľade aj po
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps0-s').fill('2509');
 	await page.locator('#ps0-v').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 
 	// krok „nahladMulti"
@@ -102,6 +111,7 @@ test('opakované „Spočítať" dá dátum zodpovedajúci AKTUÁLNEMU serverov�
 	await page.getByLabel('Zákazník *').fill('E2E Dátum Time');
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	const prvy = await page.getByTestId('vytvorene').textContent();
 	expect(prvy).toMatch(DATUM_RE);
@@ -111,6 +121,7 @@ test('opakované „Spočítať" dá dátum zodpovedajúci AKTUÁLNEMU serverov�
 	// vypočítaný raz na klientovi/pri štarte servera a zamrznutý)
 	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
 	await waitHydrated(page);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	const druhy = await page.getByTestId('vytvorene').textContent();
 	expect(druhy).toMatch(DATUM_RE);

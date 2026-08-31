@@ -6,7 +6,7 @@
 // ON → ZASP00030 (spodná 3K). Cez REÁLNY formulár, presne ako
 // e2e/pridavna-v-sietke.spec.ts.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, skipAkLive } from './helpers';
+import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
 
 const IZO = 'Izolačné sklo 4.8.4';
 const NIE_IZO = 'Float sklo 4 mm';
@@ -31,6 +31,7 @@ test('Štandard + | 2K | IZO sklo: checkbox sa predvyplní zaškrtnutý a odpis 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`E2E-132-A-${Date.now()}`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Prídavná IZO default');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -59,6 +60,7 @@ test('predvyplnenie sa dá ručne odškrtnúť — odpis sa vráti na 2K spodnú
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`E2E-132-B-${Date.now()}`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Prídavná ručné odškrtnutie');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -169,6 +171,7 @@ test('Štandard + | 3K | IZO sklo: predvyplní tiež, odpis ukáže 4K spodnú',
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`E2E-132-C-${Date.now()}`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Prídavná 3K IZO');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -228,6 +231,7 @@ test('zimná záhrada: order-level default z primárneho posuvu upsizne AJ extra
 	await page.locator('#ps0-s').fill('3200');
 	await page.locator('#ps0-v').fill('1900');
 
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -266,6 +270,7 @@ test('„Použiť znova": ručne odškrtnutá IZO objednávka sa po obnovení NE
 	await checkbox.uncheck();
 	await expect(checkbox).not.toBeChecked();
 
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');

@@ -4,7 +4,14 @@
 // konfiguráciu VŽDY vrátia (aj po páde) — inak by menili čísla ostatným testom.
 // Nula console errors/warnings všade.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	skipAkLive,
+	vyberFarbuKovania
+} from './helpers';
 
 const RUN = `E3-${Date.now().toString(36).toUpperCase()}`;
 
@@ -31,6 +38,7 @@ test('zasklenia: „⏳ Čaká" prežije náhľad → odoslanie a zapíše sa do
 		await page.getByLabel('Šírka (mm) *').fill('2509');
 		await page.getByLabel('Výška (mm) *').fill('1930');
 		if (caka) await page.getByLabel(/Čaká na materiál/).check();
+		await vyberFarbuKovania(page);
 		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	};
 

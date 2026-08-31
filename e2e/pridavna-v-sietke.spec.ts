@@ -7,7 +7,7 @@
 // spodná) — Money odpis sa nemení. Náhľad ("Spočítať") nezapisuje do Money → môže
 // bežať aj proti LIVE (rovnaký vzor ako e2e/sietka-standard.spec.ts).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-PVS-${Date.now().toString(36).toUpperCase()}`;
 
@@ -41,6 +41,7 @@ test('Štandard + | 2K | sieťka ON | prídavná ON: hláška hovorí pravdu, ch
 	await expect(checkbox).toBeEnabled();
 	await expect(checkbox).toBeChecked();
 
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -129,6 +130,7 @@ test('zimná záhrada: order-level prídavná × sieťka na EXTRA posuve (nie pr
 	await expect(hint).toBeVisible();
 	await expect(hint).toContainText('3K');
 
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 

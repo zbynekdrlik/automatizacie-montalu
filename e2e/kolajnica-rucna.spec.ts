@@ -4,7 +4,7 @@
 //
 // Všetko READ-ONLY — len „Spočítať", nič sa neodosiela do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-KOL-${Date.now().toString(36).slice(-5)}`;
 const HORNA = 'Koľajnica horná (mm) — prázdne = podľa šírky';
@@ -47,6 +47,7 @@ test('Štandard + 4K: horná 2690 / spodná 2695 sa objaví v rezoch plánu', as
 	await page.getByLabel('Štýl').selectOption('4K');
 	await page.getByLabel(HORNA).fill('2690');
 	await page.getByLabel(SPODNA).fill('2695');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -74,6 +75,7 @@ test('prázdne polia = pôvodný výpočet zo šírky', async ({ page }) => {
 	await zaklad(page, '02');
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('4K');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -97,6 +99,7 @@ test('preklep (26 mm) formulár odmietne so slovenskou chybou', async ({ page })
 		el.value = '26';
 		el.dispatchEvent(new Event('input', { bubbles: true }));
 	});
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -114,6 +117,7 @@ test('zimná záhrada: ručná koľajnica je per posuv a je vidieť pri posuve',
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps0-s').fill('3980');
 	await page.locator('#ps0-v').fill('2162');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 	await waitHydrated(page);
 

@@ -56,8 +56,23 @@ export const KOMPONENTY_ROBUST: Komponent[] = [
 		pravidlo: { typ: 'konstPreStyl', ks: UZAVERY_ROBUST }
 	},
 	// kľučka: „obojstranne 2ks jednostranne 1ks na posledné krídla v krajoch, opona je
-	// ďalšie +1 krídlo" — tie krajné krídla sú tie isté, na ktoré ide uzáver
-	{ kod: 'ZASK00030', nazov: 'Kľučka', mj: 'ks', pravidlo: { typ: 'naUzaverPodlaFab' } },
+	// ďalšie +1 krídlo" — tie krajné krídla sú tie isté, na ktoré ide uzáver.
+	// #338 (31.8.): pôvodná ZASK00030 „Kľučka" ZRUŠENÁ (0 sklad), nahradená RAL
+	// variantami R9005/R7016 — do odpisu ide len variant zvolenej farby kovania.
+	{
+		kod: 'ZASK202533',
+		nazov: 'Kľučka R9005',
+		mj: 'ks',
+		farba: 'R9005',
+		pravidlo: { typ: 'naUzaverPodlaFab' }
+	},
+	{
+		kod: 'ZASK202534',
+		nazov: 'Kľučka R7016',
+		mj: 'ks',
+		farba: 'R7016',
+		pravidlo: { typ: 'naUzaverPodlaFab' }
+	},
 	{ kod: 'ZASK00031', nazov: 'Podložka uzáveru', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 5 } },
 	// POZOR: prvá verzia tabuľky mala 5 ks (copy-paste z podložky) — Dominik opravil na 2
 	{ kod: 'ZASK00032', nazov: 'Protikus uzáveru', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 2 } },
@@ -67,8 +82,22 @@ export const KOMPONENTY_ROBUST: Komponent[] = [
 		mj: 'ks',
 		pravidlo: { typ: 'naUzaver', koef: 2 }
 	},
-	{ kod: 'ZASK00034', nazov: 'Upevňovacia sada', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 1 } },
-	{ kod: 'ZASK00035', nazov: 'Krytka vložky', mj: 'ks', pravidlo: { typ: 'naUzaverPodlaFab' } },
+	// #338: ZASK00034 „Upevňovacia sada" ZRUŠENÁ bez náhrady (0 sklad) — odstránená.
+	// #338: ZASK00035 „Krytka vložky" ZRUŠENÁ (0 sklad) → RAL varianty R9005/R7016.
+	{
+		kod: 'ZASK202535',
+		nazov: 'Krytka vložky R9005',
+		mj: 'ks',
+		farba: 'R9005',
+		pravidlo: { typ: 'naUzaverPodlaFab' }
+	},
+	{
+		kod: 'ZASK202536',
+		nazov: 'Krytka vložky R7016',
+		mj: 'ks',
+		farba: 'R7016',
+		pravidlo: { typ: 'naUzaverPodlaFab' }
+	},
 	{
 		kod: 'ZASK00036',
 		nazov: 'Krytka krídla',
@@ -158,9 +187,72 @@ export const KOMPONENTY_SLIDE: Komponent[] = [
  */
 export const SLIDE_PRIPRAVENY = false;
 
+/**
+ * Automatický zámok Štandard — „1ks na koncové okno" (#338, Dominik 31.8.). Tabuľka
+ * NEVYPÍSALA per-štýl počty; zrkadlíme overený vzor „1ks na krajné/koncové krídlo"
+ * z Robust uzáveru a Slide zámku (jednoduchý posuv = 2 koncové krídla, opona = 3).
+ * IZO variant má rovnaký počet zámkov (IZO je o skle, nie o zámkoch). Zdieľané oboma
+ * RAL variantmi zámku (protikus/podložky čerpajú z toho istého čísla). POČTY NA
+ * POTVRDENIE Dominikom.
+ */
+const ZAMKY_STANDARD: Record<string, number> = {};
+for (const [styl, ks] of Object.entries({
+	'2K': 2,
+	'3K': 2,
+	'4K': 2,
+	'2x2K': 3,
+	'2x3K': 3,
+	'2x4K': 3
+})) {
+	ZAMKY_STANDARD[`Štandard|${styl}`] = ks;
+	ZAMKY_STANDARD[`Štandard|${styl} IZO`] = ks;
+}
+
+/**
+ * Komponenty RS STANDARD (#338, Dominik 31.8.). Overené proti OSTRÉMU Money (31.8.):
+ * všetky kódy existujú, `Deleted=0`, majú skladovú zásobu — preto je Štandard
+ * zapnutý (na rozdiel od Slide). Automatický zámok má RAL varianty R9005/R7016 —
+ * do odpisu ide len variant zvolenej farby kovania.
+ *
+ * NEÚPLNÉ: zasklievacie tesnenia 4/6mm (ZASK00005/00006) a tesniace kefy
+ * (ZASK00007/ZASK202541) tu ZATIAĽ NIE SÚ — chýba jednoznačný vzorec (tesnenia:
+ * „šírka+výška prírezov kladkového/koncového/stredového profilu podľa hrúbky skla",
+ * potrebuje rezné rozmery + hrúbku/IZO, ktoré `ZakladPoctov` nemá; kefy: „viď
+ * obrázok" bez vzorca). Náhľad preto pri Štandarde zobrazí hlášku o neúplnosti a je
+ * na to samostatný follow-up ticket. NEPRIDÁVAŤ bez vzorca od Dominika.
+ */
+export const KOMPONENTY_STANDARD: Komponent[] = [
+	{ kod: 'ZASK00002', nazov: 'Kladka dvojitá', mj: 'ks', pravidlo: { typ: 'naKridlo', koef: 2 } },
+	{ kod: 'ZASK20252', nazov: 'Protikus zamku', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 1 } },
+	{
+		kod: 'ZASK202531',
+		nazov: 'Automaticky zamok R9005',
+		mj: 'ks',
+		farba: 'R9005',
+		pravidlo: { typ: 'konstPreStyl', ks: ZAMKY_STANDARD }
+	},
+	{
+		kod: 'ZASK202532',
+		nazov: 'Automaticky zamok R7016',
+		mj: 'ks',
+		farba: 'R7016',
+		pravidlo: { typ: 'konstPreStyl', ks: ZAMKY_STANDARD }
+	}
+];
+
+/**
+ * Systémy, ktorých kovanie do odpisu je NEÚPLNÉ (chýbajú tesnenia/kefy) a náhľad
+ * na to musí upozorniť (#338). Prázdne = kompletné.
+ */
+export const KOVANIE_NEUPLNE: Record<string, string> = {
+	Štandard:
+		'STANDARD: zasklievacie tesnenia (4/6mm) a tesniace kefy zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).'
+};
+
 /** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
 export function komponentyPre(system: string): Komponent[] | null {
 	if (system === 'Robust') return KOMPONENTY_ROBUST;
 	if (system === 'Slide') return SLIDE_PRIPRAVENY ? KOMPONENTY_SLIDE : null;
+	if (system === 'Štandard') return KOMPONENTY_STANDARD;
 	return null;
 }

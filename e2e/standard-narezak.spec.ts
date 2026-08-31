@@ -3,7 +3,7 @@
 //
 // Všetko READ-ONLY — len „Spočítať nárezový plán", žiadne odoslanie do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-NRZ-${Date.now().toString(36).slice(-5)}`;
 const SKLO = 'Sklo (základ — určuje vzorec)';
@@ -39,6 +39,7 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4.8.4');
 	// formulár rovno povie, ktorý nárezák sa podľa skla ťahá
 	await expect(page.getByTestId('narezak-hint')).toContainText('4K IZO');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -51,6 +52,7 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await expect(page.getByLabel('Štýl')).toHaveValue('4K'); // štýl ostal počtom krídel
 	await page.getByLabel(SKLO).selectOption('Float sklo 6 mm');
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 4K.');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 

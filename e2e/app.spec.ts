@@ -2,7 +2,14 @@
 // duplikát), editor vzorcov (zmena + návrat), verzia v pätičke. Každý test
 // vyžaduje NULA console errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	skipAkLive,
+	vyberFarbuKovania
+} from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
@@ -45,6 +52,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	// hlavička ukazuje OP/OPDL · zákazník (Dominik 2026-07-23: bez „Nárezový plán", OP nie ZAK)
@@ -74,6 +82,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByLabel('Zákazník *').fill('E2E Test');
 	await page.getByLabel('Šírka (mm) *').fill('2000');
 	await page.getByLabel('Výška (mm) *').fill('1800');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
@@ -87,6 +96,7 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByLabel('Zákazník *').fill('E2E Test');
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
 	// rovnaké rozmery ako v kroku 2 → rovnaký obsah odpisu; keďže OP už v názve
@@ -120,6 +130,7 @@ test('nárezový plán: poznámka (pod seba) + RAL veľkým; Money box preč z t
 	await page.getByLabel('Výška (mm) *').fill('1930');
 	await page.getByLabel(/Poznámka/).fill('Pozor na ľavé krídlo\nDodať do piatku\nMontáž 5.8.');
 	await page.getByLabel(/RAL \(farba\)/).fill('7016');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	// poznámka + RAL box na pláne
@@ -167,6 +178,7 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 
 	// --- 10mm sklo → kladka/klzný 10mm (ZASP202417/425) ---
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	// sklo (len plán, nie Money) — 908 × 2318, rovnaké pre 6 aj 10
 	await expect(page.getByTestId('sklo-sirka')).toHaveText('908');
@@ -182,6 +194,7 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 	// --- prepni na 6mm sklo → kladka/klzný 6mm (ZASP202416/424), množstvo ROVNAKÉ ---
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	// teraz 6mm kladka ZASP202416 = 7,2 m (rovnaké množstvo ako 10mm — len iný kód)
 	await expect(page.locator('.row', { hasText: 'ZASP202416' })).toContainText(/(^|\D)7,2 m/);
@@ -220,6 +233,7 @@ test('Štandard + 2K IZO: default „prídavná koľajnica" zaškrtnutý, mechan
 	const pridavna = page.getByLabel(/Prídavná koľajnica/);
 	await expect(pridavna).toBeChecked();
 	await pridavna.uncheck();
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	// sklo (len plán, nie Money) — 1417 × 2265 (šírka +2mm oprava)
@@ -236,6 +250,7 @@ test('Štandard + 2K IZO: default „prídavná koľajnica" zaškrtnutý, mechan
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
 	await page.getByLabel(/Prídavná koľajnica/).check();
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.locator('.row', { hasText: 'ZASP00030' })).toContainText(/(^|\D)7,5 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP00104' })).toHaveCount(0);
@@ -255,6 +270,7 @@ test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľ
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps0-s').fill('2509');
 	await page.locator('#ps0-v').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 
 	// badge ťahá NÁZOV SYSTÉMU, nie paušálne „Zimná záhrada" (Patrik 2026-07-28)
@@ -279,6 +295,7 @@ test('späť a upraviť: formulár si ZACHOVÁ hodnoty (nevynuluje sa)', async (
 	await page.getByLabel('Zákazník *').fill('Späť Test');
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
 	// späť a upraviť → formulár musí byť predvyplnený (nie prázdny)
@@ -303,6 +320,7 @@ test('zimná záhrada: „Späť a upraviť" zachová primárny aj extra posuv',
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps0-s').fill('2509');
 	await page.locator('#ps0-v').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 	await expect(page.getByTestId('odoslat-multi')).toBeVisible();
 
@@ -336,6 +354,7 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await page.getByLabel(/Čaká na materiál/).check();
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
 
@@ -365,6 +384,7 @@ test('zimná záhrada: odoslanie viac-posuvového odpisu do Money + duplikát', 
 		await page.getByRole('button', { name: /Pridať posuv/ }).click();
 		await page.locator('#ps0-s').fill('2509');
 		await page.locator('#ps0-v').fill('1930');
+		await vyberFarbuKovania(page);
 		await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 	};
 	await fillMulti();
@@ -447,6 +467,7 @@ test('validácia: nezmyselné rozmery sa odmietnu', async ({ page }) => {
 	const sirka = page.getByLabel('Šírka (mm) *');
 	await sirka.fill('50');
 	await page.getByLabel('Výška (mm) *').fill('1800');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	// HTML5 min=300 zastaví odoslanie (server má rovnakú kontrolu)
 	const invalid = await sirka.evaluate((el) => !(el as HTMLInputElement).checkValidity());
@@ -484,6 +505,7 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 		await page.getByLabel('Zákazník *').fill('E2E Test');
 		await page.getByLabel('Šírka (mm) *').fill('2509');
 		await page.getByLabel('Výška (mm) *').fill('1930');
+		await vyberFarbuKovania(page);
 		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 		await expect(page.getByTestId('sklo-sirka')).toHaveText('1124');
 	} finally {
@@ -580,6 +602,7 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	// oprava (3K, sklo 1000 mm v limite) → blok zmizne, tlačidlo sa odblokuje
 	await expect(page.getByTestId('b2b-sirka-err')).toHaveCount(0);
 	await expect(page.getByTestId('spocitat')).toBeEnabled();
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
 	await expect(page.getByRole('button', { name: /Tlačiť/ })).toBeVisible();
@@ -591,6 +614,7 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
 	await waitHydrated(page);
 	await page.getByLabel('Výška (mm) *').fill('2700');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('height-warn')).toContainText('BEZ ZÁRUKY');
 	await expect(page.getByTestId('odoslat')).toHaveCount(0);
@@ -642,6 +666,7 @@ test('kaskáda v reze: P-L kreslí N čiar (stupne), opona 2x kreslí 2×N/2 do 
 	await page.getByLabel('Otváranie').selectOption('P - L');
 	await page.getByLabel('Šírka (mm) *').fill('4500');
 	await page.getByLabel('Výška (mm) *').fill('2200');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('kaskada')).toBeVisible();
 	await expect(page.getByTestId('kaskada').locator('rect')).toHaveCount(3);
@@ -655,6 +680,7 @@ test('kaskáda v reze: P-L kreslí N čiar (stupne), opona 2x kreslí 2×N/2 do 
 	await page.getByLabel('Štýl').selectOption('2x2K');
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2200');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('kaskada')).toBeVisible();
 	await expect(page.getByTestId('kaskada').locator('rect')).toHaveCount(4);
@@ -677,6 +703,7 @@ test('Deluxe D46 zámok: náhľad kreslí otvory ⌀46 + zvolenú výšku vŕtan
 	await page.getByLabel('Výška (mm) *').fill('2400');
 	// pole je LEN pri Deluxe — nastav vlastnú výšku vŕtania (nie default 1050)
 	await page.getByLabel(/Výška vŕtania zámku/).fill('1100');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	const svg = page.getByTestId('nahlad-2d');
@@ -704,6 +731,7 @@ test('Robust: žiadne pole výšky vŕtania ani otvory D46 (D46 je len Deluxe)',
 	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Šírka (mm) *').fill('2000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	const svg = page.getByTestId('nahlad-2d');
