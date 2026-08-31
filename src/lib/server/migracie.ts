@@ -19,7 +19,8 @@ import {
 	migrateManualMoveColumn,
 	migrateDopytCenaHladina,
 	migrateObjednavka,
-	migrateDeluxe5KRail
+	migrateDeluxe5KRail,
+	migrateOdooZakazkaPush
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -980,6 +981,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateManualMoveColumn(db, bump); // v30 → v31 (#299); extrahované do migracie-seed (viď docstring)
 	migrateDopytCenaHladina(db, bump); // v31 → v32 (#318); extrahované do migracie-seed (viď docstring)
 	migrateObjednavka(db, bump); // v32 → v33 (#319); extrahované do migracie-seed (viď docstring)
+	migrateOdooZakazkaPush(db, bump); // v33 → v34 (#349); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

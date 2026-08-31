@@ -24,11 +24,30 @@
 // ako ĎALŠIA sekcia bez zmeny štruktúry (#340 zadanie bod 3).
 import { logger } from './log';
 import { authenticate, executeKw, odooConfig, xmlEscape, type OdooConfig } from './odoo-rpc';
-import { normOp } from './money';
+import { normOp, normZak } from './money';
 import { zakazkaPrehlad, type ZakazkaPrehlad } from './zakazka-ceny';
 import { enrichPolozky, type CenaRiadok, type CenyResult } from './ceny';
+import {
+	expireStaleZakazkaPushes,
+	getPendingZakazkaPushes,
+	recordZakazkaPushFailed,
+	recordZakazkaPushMissing,
+	recordZakazkaPushNoOrder,
+	recordZakazkaPushPosted
+} from './odoo-zakazka-store';
 
 const log = logger('odoo-zakazka');
+
+/** Max GENUINE zlyhaní (Odoo/sieť) na jeden (zak, op) — po vyčerpaní sa naň už netlačí donekonečna
+ *  (poison-pill ako #278). `no-order` sa do tohto NEPOČÍTA (viac v store). */
+export const MAX_ATTEMPTS = 5;
+/** Koľko pending pushov spracuje jeden retry sweep (ohraničenie záťaže na Odoo, vzor #278). */
+const RETRY_BATCH = 20;
+/** Časový strop pre `no-order` zombie (objednávka sa nikdy neobjaví v Odoo). Po ňom sa pending
+ *  riadok prestane skúšať — čas, nie počet pokusov (arrival sweep beží podľa nesúvisiacej aktivity). */
+const MAX_NO_ORDER_AGE_DAYS = 90;
+
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 /** eur formát so slovenskou desatinnou čiarkou (poznámka je pre šéfa). */
@@ -196,15 +215,27 @@ async function postInternalNote(
 
 export type ZakazkaPushResult = 'posted' | 'no-order' | 'missing' | 'disabled' | 'failed';
 
+/** Výsledok pushu + (pri `failed`) chybová správa pre durable `last_error` (#349). */
+export interface ZakazkaPushOutcome {
+	result: ZakazkaPushResult;
+	error: string | null;
+}
+
 /**
- * Postne aktuálny interný zoznam materiálu zákazky do Odoo na `sale.order` objednávky `op`.
- * NIKDY nehádže — všetko zachytené a mapované na výsledok (fire-and-forget kontrakt).
+ * Postne aktuálny interný zoznam materiálu zákazky do Odoo na `sale.order` objednávky `op` a vráti
+ * DETAILNÝ výsledok (`{result, error}`) — `error` je vyplnené len pri `failed`, aby ho durable vrstva
+ * (#349) uložila do `last_error`. NIKDY nehádže (fire-and-forget kontrakt). JEDINÁ cesta k
+ * `message_post` (interná `mt_note`) — retry aj arrival ju zdieľajú, takže leak-kontrakt sa NEMÔŽE
+ * rozísť s #340.
  */
-export async function pushZakazkaToOdoo(zak: string, op: string): Promise<ZakazkaPushResult> {
+export async function pushZakazkaToOdooDetailed(
+	zak: string,
+	op: string
+): Promise<ZakazkaPushOutcome> {
 	const cfg = odooConfig();
 	if (!cfg) {
 		log.debug('zakazka push vypnutý (chýba ODOO_LEAD_* env)', { zak, op });
-		return 'disabled';
+		return { result: 'disabled', error: null };
 	}
 	try {
 		// #340 review: zakazkaPrehlad (SQLite read) MUSÍ byť vnútri try — inak by DB chyba
@@ -212,7 +243,7 @@ export async function pushZakazkaToOdoo(zak: string, op: string): Promise<Zakazk
 		const prehlad = zakazkaPrehlad(zak);
 		if (!prehlad) {
 			log.warn('zakazka push: zákazka nemá žiadny odpis — nič neposielam', { zak });
-			return 'missing';
+			return { result: 'missing', error: null };
 		}
 		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
 		const html = buildZakazkaNoteHtml(buildZakazkaNote(prehlad, op, ceny));
@@ -228,7 +259,7 @@ export async function pushZakazkaToOdoo(zak: string, op: string): Promise<Zakazk
 					name
 				}
 			);
-			return 'no-order';
+			return { result: 'no-order', error: null };
 		}
 		if (ids.length > 1)
 			log.warn('zakazka push: viac sale.order s rovnakým name — postnem na všetky', { name, ids });
@@ -241,47 +272,149 @@ export async function pushZakazkaToOdoo(zak: string, op: string): Promise<Zakazk
 				saleOrderId: id
 			});
 		}
-		return 'posted';
+		return { result: 'posted', error: null };
 	} catch (e) {
+		const msg = errMsg(e);
 		log.error('zakazka push zlyhal (odpis JE zapísaný; poznámka sa nepostla)', {
 			zak,
 			op,
-			err: e instanceof Error ? e.message : String(e)
+			err: msg
 		});
-		return 'failed';
+		return { result: 'failed', error: msg };
 	}
 }
 
 /**
- * FIRE-AND-FORGET vstupný bod pre `setOdpisWrittenHook` (money.ts). Synchrónny `void`
- * wrapper — NIKDY neblokuje ani nezhodí volajúceho (`writeOdpis` je už zapísaný). DVOJITÝ
- * guard: vnútorný catch pre async rejection, vonkajší try/catch pre prípadný SYNCHRÓNNY
- * throw pred prvým `await` (aby nič neprebublalo do writeOdpis).
- *
- * MVP hranica (#340 review): fire-and-forget bez durable retry — prechodný výpadok Odoo
- * self-healne na ĎALŠOM odpise zákazky (note je re-derivovateľný snapshot), trvalý výpadok
- * pri POSLEDNOM odpise sa len zaloguje. Durable push-queue + štartový sweep (a per-zak
- * serializácia súbežných pushov, kde poradie doručenia nie je garantované) → follow-up #349
- * (potrebuje schema migráciu, preto nie tu).
+ * Tenký wrapper — vráti len `ZakazkaPushResult` (ZACHOVÁVA pôvodné #340 API + testy). Priamy
+ * volajúci, ktorý nepotrebuje durable stav, používa tento; durable cesta (#349) volá `…Detailed`.
+ */
+export async function pushZakazkaToOdoo(zak: string, op: string): Promise<ZakazkaPushResult> {
+	return (await pushZakazkaToOdooDetailed(zak, op)).result;
+}
+
+// ---- Durable retry + per-kľúč serializácia (#349) -----------------------------------
+
+const pushKey = (zak: string, op: string): string => `${normZak(zak)} ${normOp(op)}`;
+
+/**
+ * Per-kľúč FIFO serializer súbežných pushov tej istej (zak, op). #349 zadanie bod 4: poradie
+ * doručenia dvoch pushov tej istej zákazky nie je garantované — bez serializácie by sa mohol
+ * NAJNOVŠÍ note v chatteri ukázať ako STARŠÍ snapshot (skoršia derivácia doručená neskôr). Chain
+ * `Map<key, tailPromise>`: každý push pre kľúč počká na predchádzajúci a AŽ POTOM re-derivuje +
+ * postne → najčerstvejší snapshot postne POSLEDNÝ (navrchu chattera). Zamietnuté skip-if-in-flight
+ * (#278): preskočenie druhého pushu by stratilo dáta neskoršieho odpisu, ktoré derivácia bežiaceho
+ * pushu nevidela. Single-process (adapter-node) → in-process chain je spoľahlivý per-kľúč zámok.
+ * Guardy: (1) `.then(task, task)` — rejection predchodcu nesmie preskočiť náš task; (2) tail-compare
+ * cleanup (zmaž kľúč len keď sme STÁLE tail, nie novší chained); (3) žiadny cross-key await v tasku
+ * → žiadny deadlock. Rast Mapy je ohraničený frekvenciou odpisov (človekom riadené).
+ */
+const pushChains = new Map<string, Promise<unknown>>();
+function serializeByKey<T>(key: string, task: () => Promise<T>): Promise<T> {
+	const prev = pushChains.get(key) ?? Promise.resolve();
+	const mine = prev.then(task, task);
+	pushChains.set(key, mine);
+	// Handluj OBE vetvy (fulfil aj reject) → žiadny unhandledRejection na uloženom tail-e; cleanup
+	// len keď sme stále tail (novší chained push nesmieme zmazať).
+	const cleanup = (): void => {
+		if (pushChains.get(key) === mine) pushChains.delete(key);
+	};
+	void mine.then(cleanup, cleanup);
+	return mine;
+}
+
+/**
+ * Push + zápis durable stavu (#349). NIKDY nehádže (push nehádže; DB zápis je obalený). Podľa
+ * výsledku: `posted` → vyrieš pending; `failed` → pending + inkrement poison-pill; `no-order` →
+ * pending BEZ inkrementu (časový strop); `missing` → terminálny; `disabled` → netrackuj (feature off).
+ */
+async function pushAndRecord(zak: string, op: string): Promise<ZakazkaPushResult> {
+	const { result, error } = await pushZakazkaToOdooDetailed(zak, op);
+	try {
+		switch (result) {
+			case 'posted':
+				recordZakazkaPushPosted(zak, op);
+				break;
+			case 'failed':
+				recordZakazkaPushFailed(zak, op, error ?? 'neznáma chyba');
+				break;
+			case 'no-order':
+				recordZakazkaPushNoOrder(zak, op);
+				break;
+			case 'missing':
+				recordZakazkaPushMissing(zak, op);
+				break;
+			case 'disabled':
+				break; // feature off — netrackuj (žiadny minutý pokus)
+		}
+	} catch (e) {
+		log.error('zakazka push: zápis durable stavu do DB zlyhal (ignorované)', {
+			zak,
+			op,
+			result,
+			err: errMsg(e)
+		});
+	}
+	return result;
+}
+
+/**
+ * Retry sweep zaostalých pushov (Odoo bola dole / objednávka pribudla neskôr). Najprv exspiruj
+ * no-order zombie (časový strop), potom spracuj pending riadky SEKVENČNE cez ten istý per-kľúč
+ * serializer (aby retry nezávodil so živým pushom tej istej zákazky). Vypnuté (chýba env) ⇒ žiadny
+ * DB dotaz. Arrival-triggered (po úspešnom pushi = dôkaz že Odoo je hore, vzor #278).
+ */
+export async function retryPendingZakazkaPushes(): Promise<void> {
+	if (!odooConfig()) return;
+	expireStaleZakazkaPushes(MAX_NO_ORDER_AGE_DAYS);
+	const pending = getPendingZakazkaPushes(MAX_ATTEMPTS, MAX_NO_ORDER_AGE_DAYS, RETRY_BATCH);
+	if (pending.length === 0) return;
+	log.info('zakazka push retry sweep štart', { pocet: pending.length });
+	let posted = 0;
+	for (const row of pending) {
+		const r = await serializeByKey(pushKey(row.zak, row.op), () => pushAndRecord(row.zak, row.op));
+		if (r === 'posted') posted++;
+	}
+	log.info('zakazka push retry sweep hotový', { spracovanych: pending.length, postnutych: posted });
+}
+
+/**
+ * FIRE-AND-FORGET vstupný bod pre `setOdpisWrittenHook` (money.ts). Synchrónny `void` wrapper —
+ * NIKDY neblokuje ani nezhodí volajúceho (`writeOdpis` je už zapísaný). Push ide cez per-kľúč
+ * serializer (durable stav zaznamenaný v `pushAndRecord`); po ÚSPEŠNOM pushi (dôkaz že Odoo je hore)
+ * sa spustí retry sweep zaostalých z minulých výpadkov (#349, vzor #278). Vonkajší try/catch chytí aj
+ * prípadný SYNCHRÓNNY throw pred prvým `await`.
  */
 export function queueZakazkaPush(zak: string, op: string): void {
 	try {
-		void (async () => {
-			try {
-				await pushZakazkaToOdoo(zak, op);
-			} catch (e) {
-				log.error('zakazka push queue: submit neočakávane hodil', {
-					zak,
-					op,
-					err: e instanceof Error ? e.message : String(e)
-				});
-			}
-		})();
+		void serializeByKey(pushKey(zak, op), () => pushAndRecord(zak, op)).then(
+			(result) => {
+				// Sweep starých pending LEN keď TENTO push uspel (úspech = Odoo je hore) — pri výpadku by
+				// sweep len míňal poison-pill pokusy na starých riadkoch (#278 review).
+				if (result === 'posted')
+					void retryPendingZakazkaPushes().catch((e) =>
+						log.error('zakazka push queue: retry sweep neočakávane hodil', { err: errMsg(e) })
+					);
+			},
+			(e) => log.error('zakazka push queue: submit neočakávane hodil', { zak, op, err: errMsg(e) })
+		);
 	} catch (e) {
 		log.error('zakazka push queue: synchrónne hodil (ignorované — odpis je zapísaný)', {
 			zak,
 			op,
-			err: e instanceof Error ? e.message : String(e)
+			err: errMsg(e)
 		});
 	}
+}
+
+/**
+ * Jednorazový sweep pri ŠTARTE servera (volá `hooks.server.ts` po migráciách). Zotaví pushe, ktoré
+ * čakali na Odoo (Odoo bola dole / objednávka medzitým pribudla) a appka sa reštartovala — inak by
+ * arrival retry čakal až na ĎALŠÍ úspešný push (vzor #278 `runStartupLeadSweep`). Deploy = reštart,
+ * takže pokrýva bežný „Odoo opravené → nasadené". Fire-and-forget; vypnuté (chýba env) ⇒ no-op.
+ */
+export function runStartupZakazkaSweep(): void {
+	if (!odooConfig()) return;
+	void retryPendingZakazkaPushes().catch((e) =>
+		log.error('zakazka push štartový sweep hodil', { err: errMsg(e) })
+	);
 }

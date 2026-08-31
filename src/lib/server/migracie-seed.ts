@@ -258,3 +258,39 @@ export function migrateObjednavka(db: Database.Database, bump: (v: number) => vo
 		bump(33);
 	})();
 }
+
+/**
+ * v33 → v34: durable retry queue pre Odoo zákazka-push (#349, follow-up #340). Nová tabuľka
+ * `odoo_zakazka_push` sleduje stav pushu interného zoznamu materiálu na `sale.order` per
+ * (zákazka, objednávka): či čaká na (re)post (`pending`), počet GENUINE zlyhaní (`attempts` —
+ * poison-pill ako #278; `no-order` sa NEpočíta, je časovo ohraničené cez `created_at`), poslednú
+ * chybu a čas posledného úspešného postu. Umožňuje štartový + arrival sweep dopostnúť zaostalé
+ * pushe pri dlhšom výpadku Odoo (MVP #340 sa self-healol len pri ĎALŠOM odpise zákazky). Retry
+ * NEUKLADÁ telo note — re-derivuje AKTUÁLNY snapshot (`pushZakazkaToOdoo`), takže „posledný vyhráva".
+ * Fresh CREATE (guard `< 34`), žiadny feature-detect (nová tabuľka, nie ALTER existujúcej). Celé v
+ * `db.transaction` (CREATE je v SQLite transakčné → pád sa čisto prehrá). MONEY-NEUTRÁLNE:
+ * CRM/integračná evidencia, žiadny odpis ani zápis do Money. Extrahované sem (large-file-split —
+ * `migracie.ts` je pri 1000-riadkovom strope), vzor `migrateObjednavka`.
+ */
+export function migrateOdooZakazkaPush(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 34) return;
+	db.transaction(() => {
+		db.exec(`
+			CREATE TABLE odoo_zakazka_push (
+				zak_norm TEXT NOT NULL,
+				op_norm TEXT NOT NULL,
+				zak TEXT NOT NULL,
+				op TEXT NOT NULL,
+				pending INTEGER NOT NULL DEFAULT 0,
+				attempts INTEGER NOT NULL DEFAULT 0,
+				last_error TEXT NOT NULL DEFAULT '',
+				posted_at TEXT,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+				PRIMARY KEY (zak_norm, op_norm)
+			);
+			CREATE INDEX idx_odoo_zakazka_push_pending ON odoo_zakazka_push(pending, attempts);
+		`);
+		bump(34);
+	})();
+}
