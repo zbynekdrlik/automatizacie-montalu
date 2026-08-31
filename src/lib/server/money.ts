@@ -20,6 +20,17 @@ import type { MJ } from '$lib/komponenty';
 
 const log = logger('money');
 
+// #340: observer po ÚSPEŠNOM zápise odpisu (`status:'written'`) — dostane číslo zákazky
+// (`zak`) a objednávky (`op`). Registruje ho composition root (`hooks.server.ts` →
+// `queueZakazkaPush`), takže money.ts NEZÁVISÍ od Odoo vrstvy (žiadny cyklický import,
+// money-neutrálne). Volá sa fire-and-forget PO commite + durable zápise a NIKDY nesmie
+// ovplyvniť/zhodiť už-zapísaný odpis (sync-guard v mieste volania).
+export type OdpisWrittenHook = (zak: string, op: string) => void;
+let onOdpisWritten: OdpisWrittenHook | null = null;
+export function setOdpisWrittenHook(fn: OdpisWrittenHook | null): void {
+	onOdpisWritten = fn;
+}
+
 export type Modul = 'zasklenia' | 'bazen' | 'pergola';
 
 export interface Polozka {
@@ -744,6 +755,19 @@ export async function writeOdpis(
 			error: e
 		});
 		throw e;
+	}
+
+	// #340: PO úspešnom + durable zápise odpisu upozorni observera (fire-and-forget push
+	// interného zoznamu materiálu zákazky do Odoo). Sync-guard: ani synchrónny throw
+	// observera nesmie zhodiť už-zapísaný odpis.
+	try {
+		onOdpisWritten?.(job.zak, job.op);
+	} catch (e) {
+		log.error('odpis-written hook hodil (ignorované — odpis je zapísaný)', {
+			zak: job.zak,
+			op: job.op,
+			error: e
+		});
 	}
 
 	return { status: 'written', live: isLive(), target, filename };
