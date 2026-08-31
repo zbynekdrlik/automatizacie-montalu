@@ -80,7 +80,7 @@ CENIK_IZOS = "F4A1DFEE-9298-45D2-9891-1548741B2063"  # IZOS (izolačné sklá TS
 #     polykarbonát MO" (predajný, TypCeniku=0) — to je PREDAJNÁ cena iného významu
 #     než nakupCennik, preto sa do neho ZÁMERNE nemapuje. Ak by šéf chcel bazénovú
 #     PREDAJNÚ cenu zobraziť, je to samostatná úloha (nové pole + potvrdenie), nie
-#     tento snapshot — viď follow-up na #359.
+#     tento snapshot — viď follow-up #364.
 
 QUERY = """
 SELECT
