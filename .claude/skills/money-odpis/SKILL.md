@@ -776,12 +776,50 @@ nemá): odpis by vyzeral kompletne → tichá pod-fakturácia pri KAŽDEJ objedn
 Follow-up ticket na vzorec. Pozor na `warn` KOLÍZIU: stale-formula hláška („Vzorce sa medzitým
 zmenili") a `kov.warn` sa musia SPOJIŤ (`.filter(Boolean).join(' ')`), nie prepísať.
 
-## 2m. E2E: každý zasklenia compute-trigger vyžaduje zvolenú farbu (#338)
+## 2m. E2E: každý zasklenia compute-trigger vyžaduje zvolenú farbu (#338, aktualizované #354)
 
 Po #338 KAŽDÝ Robust/Štandard náhľad potrebuje zvolenú RAL farbu, inak engine chyba a náhľad sa
-nevykreslí → červený celý E2E beh. Compute-trigger má TRI selektory (`getByTestId('spocitat')`,
-`{ name: 'Spočítať nárezový plán' }`, `{ name: /Spočítať spoločný plán/ }`) — `spocitat` testid
-je v ZasklieniaForm AJ v pergola RezForm, takže patchuj len ZASKLENIA specy. Helper
-`vyberFarbuKovania(page)` v `e2e/helpers.ts` je tolerantný (no-op keď farba-select nie je →
-bezpečný na Deluxe/Slide/Štandard +), volaj ho PRED každým trigger klikom. Pri pridaní ďalšieho
-farebného komponentu over VŠETKY tri selektory naprieč specmi (`grep`), nie len button-name.
+nevykreslí → červený celý E2E beh. Od #354 platí to isté aj pre 10mm Deluxe. Compute-trigger má
+TRI selektory (`getByTestId('spocitat')`, `{ name: 'Spočítať nárezový plán' }`,
+`{ name: /Spočítať spoločný plán/ }`) — `spocitat` testid je v ZasklieniaForm AJ v pergola
+RezForm, takže patchuj len ZASKLENIA specy. Helper `vyberFarbuKovania(page)` v `e2e/helpers.ts`
+je no-op keď farba-select nie je na obrazovke (Slide/Štandard +), inak vyberie farbu — od #354
+BEZ explicitného argumentu si sám vyberie PLATNÚ hodnotu z reálnych `<option>` (uprednostní
+`R9005`, ak je v ponuke, inak prvú) namiesto natvrdo `R9005` — Deluxe ho totiž nemá (viď #354n
+nižšie). Volaj ho PRED každým trigger klikom. Pri pridaní ďalšieho farebného komponentu over
+VŠETKY tri selektory naprieč specmi (`grep`), nie len button-name.
+
+## 2n. DVA farebné systémy s ROZDIELNOU RAL dvojicou → zdieľaná `farbaKovania` môže ticho vynechať celú rodinu (#354)
+
+Do #354 mali VŠETKY farebné systémy (Robust, Štandard) tú istú dvojicu R9005/R7016, takže
+"farba sa nezhoduje → absent" (`pocitajKomponenty`) bolo vždy neškodné — zvolená farba VŽDY
+sedela na NEJAKÝ variant každej farebnej položky, dostal sa len ten druhý. #354 pridalo Deluxe
+(10mm krytky) s VLASTNOU dvojicou R9006/R7016 — a keďže `farbaKovania` je JEDNA hodnota pre
+CELÚ dávku (aj naprieč systémami v zimnej záhrade), zvolená farba, ktorá sedí len jednému
+systému, môže na druhom nesedieť ŽIADNEMU jeho variantu → celá farebná rodina (napr. všetkých
+6 krytiek) sa ticho preskočí s `err: null`. Chytilo to až gated Fable review, nie prvý návrh —
+DÔKAZ bol priamo v už-committnutom golden snapshote (default `farbaKovania: 'R9005'` z fixture
+helpera → Deluxe posuv v snapshote mal madlo+kefy, ale ŽIADNE krytky, žiadna chyba).
+
+**Vzor na PRIDANIE ĎALŠIEHO farebne odlišného systému:** `pocitajKomponenty` (`$lib/komponenty.ts`)
+sleduje počas slučky `farebnyKandidatVideny`/`farebnaZhodaNajdena`/`dostupneFarby` (po hrúbkovom
+filtri, aby položka pre inú hrúbku nevynucovala farbu) a na konci — keď mal posuv aspoň jedného
+farebného kandidáta, farba BOLA zvolená, ale NESEDÍ na žiadneho z nich — pridá HLASNÚ chybu.
+Testuj VŽDY zmiešanú dávku (nový systém + existujúci systém, oba farebné) so VŠETKÝMI troma
+farbami — každá musí buď sadnúť OBOM (kompletný odpis), alebo aspoň jednému nesadnúť (chyba) —
+nikdy ticho vynechať položky. Vzor testu: `tests/kovanie-deluxe.test.ts` describe
+„zmiešaná zákazka Robust + Deluxe".
+
+**`KOVANIE_NEUPLNE` môže byť aj FUNKCIA hrúbky skla, nie len pevný text.** Keď je systém
+neúplný LEN pri jednej hrúbke (Deluxe: 6mm krytky chýbajú, 10mm je kompletné), pevný text by
+zbytočne strašil aj kompletné objednávky. Typ je `Record<string, string | ((skloHrubka?: number)
+=> string | null)>`, `kovanie.ts` vyhodnotí `typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka) : neuplneRaw`.
+
+**E2E pasca: `nazov` končiaci ČÍSLICOU (RAL kód, "Madlo D56") sa v `.row` textContente
+zlepí s množstvom BEZ medzery.** `PlanKarty.svelte`/`PlanKartyMulti.svelte` majú
+`<span>{kod} · {nazov}</span><b>{qty} {mj}</b>` bez medzery medzi elementmi — profily
+(`nazov` končí na "mm", text) to neprezradí, ale komponent s RAL kódom v názve
+("Krytka krajná 10 mm R9006") dá textContent "...R90062 ks" a `toContainText(/(^|\D)2 ks/)`
+na to NIKDY nesadne (znak pred "2" je "6", nie nedigit). Rieš locator na IZOLOVANOM `<b>`
+elemente (`riadok(page, kod).locator('b')`) s exaktným `toHaveText('N ks')`, nie regex na
+celý `.row`.
