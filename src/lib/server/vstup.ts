@@ -506,6 +506,12 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 
 import type { BazenVstup } from './bazen';
 
+/** Whitelist modelu bazéna — len 'Premier'|'Exclusive'|'Star'; čokoľvek iné
+ *  (vrátane legacy 'Premier / Exclusive') → 'Premier' (bezpečný smer #355). */
+function normModel(raw: string): string {
+	return raw === 'Star' ? 'Star' : raw === 'Exclusive' ? 'Exclusive' : 'Premier';
+}
+
 export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: string | null } {
 	const num = (k: string, max = 1000) => {
 		const x = parseFloat(String(form.get(k) ?? '').replace(',', '.'));
@@ -519,7 +525,10 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
-		model: String(form.get('model') ?? 'Premier').trim(),
+		// model whitelist (#355): legacy zlúčené 'Premier / Exclusive' (stará karta
+		// v prehliadači, historický vstup_raw) → 'Premier' — bezpečný smer (NEodpíše
+		// EXCLUSIVE spojku M8). Iba explicitné 'Exclusive'/'Star' menia správanie.
+		model: normModel(String(form.get('model') ?? 'Premier').trim()),
 		kolaj: String(form.get('kolaj') ?? 'Jednokolaj').trim(),
 		pocetSekcii: cnt('pocetSekcii'),
 		pocetPriecok: cnt('pocetPriecok'),

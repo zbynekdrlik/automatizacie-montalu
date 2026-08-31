@@ -2,8 +2,8 @@
 // volieb. Zdroj pravidiel = Dominik att 14674 (kanál 207 msg 1768496).
 import { describe, it, expect } from 'vitest';
 import { pocitajBazenKomponenty, type BazenKompVstup } from '../src/lib/bazen-komponenty';
-import { computeBazenAll } from '../src/lib/server/bazen';
-import type { BazenVstup } from '../src/lib/server/bazen';
+import { computeBazenAll, applyEdits } from '../src/lib/server/bazen';
+import type { BazenVstup, BazenPolozka } from '../src/lib/server/bazen';
 
 function v(over: Partial<BazenKompVstup> = {}): BazenKompVstup {
 	return {
@@ -263,5 +263,21 @@ describe('computeBazenAll — profily (BPP) ostávajú + komponenty (BPK) sa pri
 		expect(excl.find((o) => o.kod === 'BPK00108')?.qty).toBe(12);
 		const prem = computeBazenAll(base).out;
 		expect(prem.find((o) => o.kod === 'BPK00108')).toBeUndefined();
+	});
+});
+
+describe('applyEdits — kusová položka (ks) odmietne zlomkovú úpravu (#355)', () => {
+	const rows: BazenPolozka[] = [
+		{ kod: 'BPP202414', nazov: 'profil', qty: 6.6 }, // metrážový (mj undefined)
+		{ kod: 'BPK00074', nazov: 'kladka', qty: 6, mj: 'ks' } // kusový
+	];
+	it('zlomok na ks riadku → chyba, nič neprejde', () => {
+		const r = applyEdits(rows, new Map([['BPK00074', '2,5']]));
+		expect(r.finalOut).toEqual([]);
+		expect(r.error).toContain('celé číslo');
+	});
+	it('celé číslo na ks riadku prejde; zlomok na metrážovom (m) riadku je OK', () => {
+		expect(applyEdits(rows, new Map([['BPK00074', '4']])).error).toBeNull();
+		expect(applyEdits(rows, new Map([['BPP202414', '7,2']])).error).toBeNull();
 	});
 });

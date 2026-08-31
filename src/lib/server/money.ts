@@ -78,7 +78,14 @@ export function applyEdits<T extends Polozka>(
 			return {
 				finalOut: [],
 				zmenene: [],
-				error: `Podozrivo veľké množstvo (${q} m) pri ${o.kod} ${o.nazov}.`
+				error: `Podozrivo veľké množstvo (${q} ${o.mj ?? 'm'}) pri ${o.kod} ${o.nazov}.`
+			};
+		// kusové položky (#355) sú celé kusy — zlomkový výdaj do Money nedáva zmysel
+		if (o.mj === 'ks' && !Number.isInteger(q))
+			return {
+				finalOut: [],
+				zmenene: [],
+				error: `Kusová položka ${o.kod} ${o.nazov} musí byť celé číslo (${q} ks nejde do Money).`
 			};
 		const rq = R(q);
 		if (rq !== o.qty) zmenene.push(o.kod);

@@ -252,12 +252,8 @@ export function kompVstupFromBazen(v: BazenVstup): BazenKompVstup {
 export function computeBazenAll(v: BazenVstup): { out: BazenPolozka[]; error: string | null } {
 	const { out, error } = computeBazen(v);
 	if (error) return { out, error };
-	const komp: BazenPolozka[] = pocitajBazenKomponenty(kompVstupFromBazen(v)).map((k) => ({
-		kod: k.kod,
-		nazov: k.nazov,
-		qty: k.qty,
-		mj: k.mj
-	}));
+	// BazenKomponent ({kod,nazov,qty,mj}) je štrukturálne priraditeľné na BazenPolozka
+	const komp = pocitajBazenKomponenty(kompVstupFromBazen(v));
 	return { out: [...out, ...komp], error: null };
 }
 

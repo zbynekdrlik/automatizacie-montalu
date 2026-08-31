@@ -15,6 +15,23 @@ function fd(extra: Record<string, string>) {
 	return f;
 }
 
+describe('parseBazenVstup — model whitelist (#355)', () => {
+	it('legacy zlúčené "Premier / Exclusive" → "Premier" (NEodpíše EXCLUSIVE spojku)', () => {
+		expect(
+			parseBazenVstup(fd({ pocetSekcii: '3', model: 'Premier / Exclusive' })).vstup.model
+		).toBe('Premier');
+	});
+	it('explicitné Exclusive/Star ostávajú; neznáma hodnota padne na Premier', () => {
+		expect(parseBazenVstup(fd({ pocetSekcii: '3', model: 'Exclusive' })).vstup.model).toBe(
+			'Exclusive'
+		);
+		expect(parseBazenVstup(fd({ pocetSekcii: '3', model: 'Star' })).vstup.model).toBe('Star');
+		expect(parseBazenVstup(fd({ pocetSekcii: '3', model: 'čokoľvek' })).vstup.model).toBe(
+			'Premier'
+		);
+	});
+});
+
 describe('parseBazenVstup — cnt() celé počty (audit #32)', () => {
 	it('zlomkový počet sa zaokrúhli (2,5 → 3; 2,4 → 2) — nikdy nejde zlomok do BOM', () => {
 		expect(parseBazenVstup(fd({ pocetSekcii: '2.5' })).vstup.pocetSekcii).toBe(3);
