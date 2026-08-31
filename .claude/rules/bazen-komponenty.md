@@ -47,3 +47,21 @@ Playwright `.locator('.row', { hasText: kod })` je substring + strict-mode → h
 matchne DVA riadky. Cieľ riadok cez **`${kod} ·`** (kód + medzera + oddeľovač z
 `{o.kod} · {o.nazov}`) — `"BPK20251 ·"` nie je podreťazcom `"BPK202510 · …"` (za prefixom
 je `0`, nie medzera). Viď `e2e/audit3.spec.ts` parity slučku.
+
+## Drift-guard KATALOG proti Dominikovej tabuľke (#368)
+
+`bazen-komponenty.ts` exportuje `BPK_KODY` = `KATALOG.map(([kod]) => kod)` (usporiadaný
+zoznam všetkých BPK kódov, jeden zdroj pravdy). `tests/bazen-komponenty-katalog.test.ts`
+ho zamyká proti **nezávisle prepísanému** 57-kódovému zoznamu z `att 14674` (poradie riadkov
+tabuľky = poradie kódov). Kľúčové: expected list je transkript Z TABUĽKY, NIE odvodený z
+`KATALOG` — inak by bol test tautologický. Test kontroluje množinu + poradie + dosiahnuteľnosť
+(union 12 variantov pokrývajúcich všetky výlučné voľby = presne celá tabuľka). Tichý
+drop/add/reorder kódu padne v CI. Pri zmene katalógu (Dominik dodá revíziu) uprav OBOJE:
+`KATALOG` aj `TABULKA_14674` v teste, a over negatívnou mutáciou (odober 1 kód → test RED).
+
+**Verify-vs-source pasca:** #368 ("overiť/doplniť podľa 98-riadkovej tabuľky") mieril na
+funkciu, ktorú #355 už implementoval z TOHO ISTÉHO `ir.attachment 14674` / `msg 1768496` —
+57/57 kódov, identická množina aj poradie. Kým píšeš nový kód, over MECHANICKY (openpyxl:
+extrahuj `BPK` kódy z xlsx, porovnaj set+poradie s `KATALOG`), či zdroj tiketu nie je ten
+istý súbor ako predošlá implementácia. 98 riadkov ≠ 98 kódov: hlavičky sekcií + viacriadkové
+pravidlá nožičkových krytiek (VELKÁ/STREDNÁ/MALÁ na 3 riadkoch) dávajú 57 skutočných kódov.
