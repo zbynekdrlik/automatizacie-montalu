@@ -51,6 +51,14 @@ test('premenovaný tok „Rezervačný odpis" → potvrdenie → zápis do TEST 
 	await expect(vylucene).toContainText('18004');
 	await expect(vylucene).toContainText('Priečkový');
 
+	// #339 — tesnenia (gumy): dĺžky žľabu/kotviaceho sa zobrazia, ale do Money NEIDÚ
+	const tesnenia = page.getByTestId('rez-tesnenia');
+	await expect(tesnenia).toContainText('Tesnenie žľabu');
+	await expect(tesnenia).toContainText('Tesnenie kotviaceho profilu');
+	await expect(page.getByTestId('rez-tesnenia-banner')).toContainText('NEODOSIELAJÚ');
+	// Money-safety na UI: žiadne „Tesnenie" v Money rozpise (kód chýba, nejde do odpisu)
+	await expect(rozpis).not.toContainText('Tesnenie');
+
 	// explicitné potvrdenie → zápis do TEST priečinka
 	await page.getByTestId('odoslat-rezervaciu').click();
 	await waitHydrated(page);
