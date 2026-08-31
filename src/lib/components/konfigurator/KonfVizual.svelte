@@ -44,7 +44,17 @@
 	});
 </script>
 
-<section class="konf-vizual" data-testid="konf-viz" aria-label="3D náhľad pergoly">
+<!-- #361: deterministický, od GL-frame ODPOJENÝ stavový signál pre E2E. Odráža
+	 APLIKOVANÉ (debounced) rozmery, ktoré tečú do 3D (`viz.*Mm` = `rozmeryStabilne`).
+	 Sedí na STABILNOM section uzle MIMO `{#key vizKluc}` bloku → patchne sa in-place
+	 bez teardownu/detach-window (na rozdiel od caption uzla vnútri keyed remountu),
+	 takže „form-state → 3D" sa dá overiť bez čakania na softvérový GL rebuild. -->
+<section
+	class="konf-vizual"
+	data-testid="konf-viz"
+	data-viz-rozmer={`${viz.sirkaMm}×${viz.hlbkaMm}`}
+	aria-label="3D náhľad pergoly"
+>
 	{#if VizualKomp}
 		{@const Komp = VizualKomp}
 		{#key vizKluc}
