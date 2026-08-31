@@ -246,7 +246,34 @@ describe('pushZakazkaToOdoo', () => {
 		);
 		// postnuté na nájdený sale.order id
 		expect(postedBody).toContain('<value><int>53051</int></value>');
+		// NEGATÍVNY leak kontrakt: žiadny notifikačný kwarg (email_from / subtype_id / follower)
+		expect(postedBody).not.toContain('email_from');
+		expect(postedBody).not.toContain('subtype_id'); // používame subtype_xmlid, nie subtype_id
+		expect(postedBody).not.toMatch(/partner_ids<\/name><value><array><data><value>/); // partner_ids je PRÁZDNE
 	});
+	it('injekcia v názve → na DRÔTE dvojito escapovaná (renderuje ako text, nie tag)', async () => {
+		enableOdoo();
+		seedOdpis({
+			zak: 'ZAKINJ',
+			op: 'OP950',
+			polozky: [{ kod: 'K1', nazov: '<script>alert(1)</script>', qty: 1 }]
+		});
+		let postedBody = '';
+		setOdooTransport(async (_u, body) => {
+			if (body.includes('<methodName>authenticate</methodName>'))
+				return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
+			if (body.includes('<string>search</string>'))
+				return '<methodResponse><params><param><value><array><data><value><int>7</int></value></data></array></value></param></params></methodResponse>';
+			postedBody = body;
+			return '<methodResponse><params><param><value><int>1</int></value></param></params></methodResponse>';
+		});
+		expect(await pushZakazkaToOdoo('ZAKINJ', 'OP950')).toBe('posted');
+		// hodnota html-escapnutá (&lt;script&gt;) a potom XML-escapnutá encoderom → &amp;lt;script na drôte
+		expect(postedBody).toContain('&amp;lt;script&amp;gt;');
+		// surový spustiteľný tag sa na drôte NEOBJAVÍ
+		expect(postedBody).not.toContain('<script>alert(1)</script>');
+	});
+
 	it('>1 zhoda → postne na VŠETKY', async () => {
 		enableOdoo();
 		seedOdpis({ zak: 'ZAKMULTI', op: 'OP700', polozky: [{ kod: 'K1', nazov: 'A', qty: 1 }] });

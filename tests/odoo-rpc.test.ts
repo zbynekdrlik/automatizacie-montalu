@@ -32,6 +32,10 @@ describe('encoder', () => {
 	it('encodes empty array (partner_ids: [])', () => {
 		expect(encodeValue([])).toBe('<value><array><data></data></array></value>');
 	});
+	it('rejects non-finite numbers (NaN/Infinity → invalid XML-RPC)', () => {
+		expect(() => encodeValue(NaN)).toThrow(OdooRpcError);
+		expect(() => encodeValue(Infinity)).toThrow(OdooRpcError);
+	});
 	it('encodes array + nested struct (message_post kwargs shape)', () => {
 		const s = encodeValue({ body: '<b>x</b>', partner_ids: [] });
 		expect(s).toContain('<struct>');
@@ -66,6 +70,9 @@ describe('parseResponse', () => {
 	});
 	it('parses string scalar with unescape', () => {
 		expect(parseResponse(wrapScalar('<string>a&amp;b</string>'))).toBe('a&b');
+	});
+	it('parses double with negative exponent (regex class includes -)', () => {
+		expect(parseResponse(wrapScalar('<double>1.5e-3</double>'))).toBeCloseTo(0.0015, 6);
 	});
 	it('parses array of ints (search result)', () => {
 		const xml = wrapScalar(

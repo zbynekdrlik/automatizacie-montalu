@@ -66,10 +66,14 @@ export function xmlUnescape(s: string): string {
 export function encodeValue(v: XmlRpcValue): string {
 	if (typeof v === 'string') return `<value><string>${xmlEscape(v)}</string></value>`;
 	if (typeof v === 'boolean') return `<value><boolean>${v ? 1 : 0}</boolean></value>`;
-	if (typeof v === 'number')
+	if (typeof v === 'number') {
+		if (!Number.isFinite(v))
+			// NaN/Infinity nie je platný XML-RPC skalár → radšej hoď tu, než poslať rozbitý doklad.
+			throw new OdooRpcError(`XML-RPC: nekonečná/NaN číselná hodnota (${v})`);
 		return Number.isInteger(v)
 			? `<value><int>${v}</int></value>`
 			: `<value><double>${v}</double></value>`;
+	}
 	if (Array.isArray(v))
 		return `<value><array><data>${v.map(encodeValue).join('')}</data></array></value>`;
 	const members = Object.entries(v)
@@ -93,7 +97,7 @@ function scalarFrom(region: string): number | string | boolean | null | undefine
 	if (bv) return bv[1] === '1';
 	const sv = /<string>([\s\S]*?)<\/string>/.exec(region);
 	if (sv) return xmlUnescape(sv[1] ?? '');
-	const dv = /<double>(-?[\d.eE+]+)<\/double>/.exec(region);
+	const dv = /<double>(-?[\d.eE+-]+)<\/double>/.exec(region);
 	if (dv) return parseFloat(dv[1] ?? '0');
 	if (/<nil\s*\/>/.test(region)) return null;
 	return undefined;

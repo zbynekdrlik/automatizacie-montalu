@@ -206,12 +206,14 @@ export async function pushZakazkaToOdoo(zak: string, op: string): Promise<Zakazk
 		log.debug('zakazka push vypnutý (chýba ODOO_LEAD_* env)', { zak, op });
 		return 'disabled';
 	}
-	const prehlad = zakazkaPrehlad(zak);
-	if (!prehlad) {
-		log.warn('zakazka push: zákazka nemá žiadny odpis — nič neposielam', { zak });
-		return 'missing';
-	}
 	try {
+		// #340 review: zakazkaPrehlad (SQLite read) MUSÍ byť vnútri try — inak by DB chyba
+		// prebublala von a porušila „NIKDY nehádže" kontrakt (aj pre budúceho priameho volajúceho).
+		const prehlad = zakazkaPrehlad(zak);
+		if (!prehlad) {
+			log.warn('zakazka push: zákazka nemá žiadny odpis — nič neposielam', { zak });
+			return 'missing';
+		}
 		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
 		const html = buildZakazkaNoteHtml(buildZakazkaNote(prehlad, op, ceny));
 		const uid = await authenticate(cfg);
@@ -255,6 +257,12 @@ export async function pushZakazkaToOdoo(zak: string, op: string): Promise<Zakazk
  * wrapper — NIKDY neblokuje ani nezhodí volajúceho (`writeOdpis` je už zapísaný). DVOJITÝ
  * guard: vnútorný catch pre async rejection, vonkajší try/catch pre prípadný SYNCHRÓNNY
  * throw pred prvým `await` (aby nič neprebublalo do writeOdpis).
+ *
+ * MVP hranica (#340 review): fire-and-forget bez durable retry — prechodný výpadok Odoo
+ * self-healne na ĎALŠOM odpise zákazky (note je re-derivovateľný snapshot), trvalý výpadok
+ * pri POSLEDNOM odpise sa len zaloguje. Durable push-queue + štartový sweep (a per-zak
+ * serializácia súbežných pushov, kde poradie doručenia nie je garantované) → follow-up #349
+ * (potrebuje schema migráciu, preto nie tu).
  */
 export function queueZakazkaPush(zak: string, op: string): void {
 	try {
