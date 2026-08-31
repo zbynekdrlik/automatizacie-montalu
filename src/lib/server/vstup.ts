@@ -10,10 +10,11 @@ import type { Farba } from '$lib/komponenty';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
-/** Zvolená RAL farba kovania z formulára — null = nezvolená (fail-loud v engine). */
+/** Zvolená RAL farba kovania z formulára — null = nezvolená (fail-loud v engine).
+ *  R9006 pridané #354 (Deluxe krytky). */
 export function parseFarba(raw: FormDataEntryValue | null): Farba | null {
 	const v = String(raw ?? '').trim();
-	return v === 'R9005' || v === 'R7016' ? v : null;
+	return v === 'R9005' || v === 'R9006' || v === 'R7016' ? v : null;
 }
 
 /** Štandard +: štýl je LEN počet krídel; „ IZO" (starý formulár / bookmark) sa

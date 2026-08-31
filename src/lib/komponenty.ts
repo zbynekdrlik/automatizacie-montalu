@@ -16,10 +16,11 @@ export type MJ = 'm' | 'ks';
 
 /**
  * Farba kovania (prášková RAL varianta). Niektoré položky existujú v Money ako
- * dva farebné varianty (napr. kľučka R9005 vs R7016) — do odpisu ide LEN variant
- * zvolenej farby, druhý sa vôbec neobjaví (nie „0 ks", ale absent).
+ * dva/tri farebné varianty (napr. kľučka R9005 vs R7016) — do odpisu ide LEN variant
+ * zvolenej farby, ostatné sa vôbec neobjavia (nie „0 ks", ale absent).
+ * `R9006` pridané #354 (Deluxe krytky — 6mm ponúka R9005/R9006, 10mm R9006/R7016).
  */
-export type Farba = 'R9005' | 'R7016';
+export type Farba = 'R9005' | 'R9006' | 'R7016';
 
 /**
  * Vstupy, z ktorých sa počítajú množstvá kovania. Všetko sú veci, ktoré appka už
@@ -36,6 +37,17 @@ export interface ZakladPoctov {
 	dlzkaNosovehoMm: number;
 	/** súčet dĺžok rezov oponového profilu (mm); 0 keď štýl oponu nemá */
 	dlzkaOponovehoMm: number;
+	/**
+	 * súčet dĺžok rezov profilu s „kladkový" v názve (mm), #354. POZOR: NIE je
+	 * exkluzívne Deluxe — Štandard má VLASTNÝ „Kladkový profil" (ZASP202415), takže
+	 * toto pole je nenulové aj pri Štandard posuve; dnes ho žiadny Štandard
+	 * komponent nepoužíva (KOVANIE_NEUPLNE.Štandard čaká na vzorec kefy/tesnenia),
+	 * ale budúci Štandard-kefy vzorec s touto rolou musí počítať.
+	 */
+	dlzkaKladkovehoMm: number;
+	/** súčet dĺžok rezov profilu s „klzný" v názve (mm), #354; 0 mimo Deluxe — žiadny
+	 *  iný systém dnes profil s týmto názvom nemá (over pri pridaní nového systému). */
+	dlzkaKlznehoMm: number;
 }
 
 /**
@@ -64,12 +76,29 @@ export type Pravidlo =
 	 * takže opona 2x3K berie počet 3K koľajnice, nie dvojnásobok.
 	 */
 	| { typ: 'konstPreKolajnicu'; ks: Record<string, number> }
-	/** m = súčet dĺžok danej role profilu (zasklievacie tesnenie = rámový) */
-	| { typ: 'dlzkaProfilu'; role: 'ramovy' | 'nosovy'; koef: number }
+	/**
+	 * m = súčet dĺžok danej role profilu (zasklievacie tesnenie = rámový; Deluxe
+	 * tesniace kefy = kladkový/klzný, #354 — pridané role bez zmeny existujúcich).
+	 */
+	| { typ: 'dlzkaProfilu'; role: 'ramovy' | 'nosovy' | 'kladkovy' | 'klzny'; koef: number }
 	/** m = (nosový + 2 × oponový) — kefové tesnenie 7x3,5 */
 	| { typ: 'dlzkaNosovehoSOponou'; koef: number }
 	/** m = (rámový − nosový) × koef — kefové tesnenie 7x5 / 5x8 */
-	| { typ: 'dlzkaRozdiel'; koef: number };
+	| { typ: 'dlzkaRozdiel'; koef: number }
+	/**
+	 * ks = konštanta, NEZÁVISLE od štýlu (na rozdiel od `konstPreStyl`) — Deluxe
+	 * krytka krajná aj madlo D56, oba „N ks na posuv" bez ohľadu na počet krídel
+	 * (#354; overené z `cfg_seed` — Dorazový profil má `pocetKs=2` na KAŽDOM
+	 * Deluxe štýle vrátane opony).
+	 */
+	| { typ: 'konst'; ks: number }
+	/**
+	 * ks = koef × (počet krídel − 1) — počet stykov medzi susednými krídlami
+	 * (Deluxe krytka stredová L/P, #354). Pri N krídlach je stykov N-1; vid
+	 * design komentár na #354 pre odvodenie z `cfg_seed` geometrie (kladkový +
+	 * klzný profil majú spolu 2N hrán, 2 z nich krajné, zvyšok tvorí N-1 párov).
+	 */
+	| { typ: 'naStyk'; koef: number };
 
 export interface Komponent {
 	kod: string;
@@ -82,6 +111,13 @@ export interface Komponent {
 	 * Nezadaná = položka je farbo-neutrálna (väčšina) a počíta sa vždy.
 	 */
 	farba?: Farba;
+	/**
+	 * Hrúbka skla, pre ktorú tento variant platí (Deluxe krytky majú samostatný
+	 * Money kód per hrúbka×farba, #354). Rovnaká „absent, nie 0" disciplína ako
+	 * `farba` (viď {@link pocitajKomponenty}) — nezadaná = položka je hrúbko-
+	 * neutrálna (madlo, kefy) a počíta sa vždy.
+	 */
+	hrubkaSkla?: 6 | 10;
 }
 
 /** Chyba konfigurácie — vracia sa namiesto množstiev, aby odpis nikdy nešiel polovičný. */
@@ -134,18 +170,53 @@ export function pocitajKomponenty(
 	zaklad: ZakladPoctov,
 	uzavery: number | null,
 	obojstrannaFab = true,
-	farbaKovania?: Farba
+	farbaKovania?: Farba,
+	skloHrubka?: number
 ): { polozky: PolozkaKomponentu[]; chyby: ChybaKomponentu[] } {
 	const polozky: PolozkaKomponentu[] = [];
 	const chyby: ChybaKomponentu[] = [];
+	// #354 review nález (🔴): kým mali VŠETKY farebné systémy tú istú dvojicu
+	// R9005/R7016, „farba sa nezhoduje → absent" bolo vždy neškodné (zvolená
+	// farba VŽDY sedela na NEJAKÝ variant danej položky — dostal sa len ten
+	// druhý). Odkedy má Deluxe VLASTNÚ dvojicu (R9006/R7016), zdieľaná
+	// objednávková `farbaKovania` môže sedieť na Robust/Štandard, ale NA ŽIADEN
+	// Deluxe variant (napr. zmiešaná zimná záhrada, alebo len zlá voľba) —
+	// vtedy by sa VŠETKY krytky tíško preskočili (0 riadkov, žiadna chyba) =
+	// nedopísaný Money odpis, ktorý nikto nevidí. Preto: keď mal tento posuv
+	// ASPOŇ JEDEN farebný kandidát (po hrúbkovom filtri) a zvolená farba
+	// NESEDÍ na ŽIADEN z nich, je to HLASNÁ chyba, nie tichý nulový riadok.
+	let farebnyKandidatVideny = false;
+	let farebnaZhodaNajdena = false;
+	const dostupneFarby = new Set<Farba>();
 
 	for (const k of komponenty) {
+		// Hrúbka skla (Deluxe krytky, #354): rovnaká „absent, nie 0" disciplína
+		// ako farba nižšie — beží PRED farbou, takže položka pre inú hrúbku sa
+		// preskočí skôr, než sa vôbec pýta na RAL (6mm objednávka si nevynúti
+		// voľbu farby kvôli 10mm-only krytke).
+		if (k.hrubkaSkla !== undefined) {
+			// `!skloHrubka` (nie `=== undefined`, ako pri farbe nižšie) je ZÁMER: Deluxe
+			// hrúbka je vždy 6 alebo 10, nikdy legitímne 0 — `0` je ten istý sentinel
+			// „nezadané", aký `skloHrubka ?? 0`/`Number(skloHrubka) || 0` už používa v
+			// celom `compute-profily.ts`. `!skloHrubka` teda chytí AJ `undefined` AJ `0`
+			// ako „chýba", bezpečný smer (nikdy tichý default na jednu hrúbku).
+			if (!skloHrubka) {
+				chyby.push({
+					kod: k.kod,
+					sprava: `${k.nazov} (${k.kod}): má variant pre hrúbku skla (${k.hrubkaSkla} mm), ale hrúbka skla nie je zadaná`
+				});
+				continue;
+			}
+			if (k.hrubkaSkla !== skloHrubka) continue;
+		}
 		// RAL farebný variant: keď má položka `farba`, ale zvolená `farbaKovania`
 		// chýba, je to HLASNÁ chyba (nikdy tichý default na jednu z farieb —
 		// zle zafarbené kovanie do Money). Keď sa farba nezhoduje, položka sa
 		// úplne preskočí (žiadny riadok = „absent", nie „0 ks"). Farbo-neutrálna
 		// položka (bez `farba`) prejde nedotknutá.
 		if (k.farba !== undefined) {
+			farebnyKandidatVideny = true;
+			dostupneFarby.add(k.farba);
 			if (farbaKovania === undefined) {
 				chyby.push({
 					kod: k.kod,
@@ -154,6 +225,7 @@ export function pocitajKomponenty(
 				continue;
 			}
 			if (k.farba !== farbaKovania) continue;
+			farebnaZhodaNajdena = true;
 		}
 
 		let qty: number | null = null;
@@ -201,16 +273,29 @@ export function pocitajKomponenty(
 				}
 				break;
 			}
-			case 'dlzkaProfilu':
-				qty = R3(
-					(p.koef * (p.role === 'ramovy' ? zaklad.dlzkaRamovehoMm : zaklad.dlzkaNosovehoMm)) / 1000
-				);
+			case 'dlzkaProfilu': {
+				const dlzkaMm =
+					p.role === 'ramovy'
+						? zaklad.dlzkaRamovehoMm
+						: p.role === 'nosovy'
+							? zaklad.dlzkaNosovehoMm
+							: p.role === 'kladkovy'
+								? zaklad.dlzkaKladkovehoMm
+								: zaklad.dlzkaKlznehoMm;
+				qty = R3((p.koef * dlzkaMm) / 1000);
 				break;
+			}
 			case 'dlzkaNosovehoSOponou':
 				qty = R3((p.koef * (zaklad.dlzkaNosovehoMm + 2 * zaklad.dlzkaOponovehoMm)) / 1000);
 				break;
 			case 'dlzkaRozdiel':
 				qty = R3((p.koef * (zaklad.dlzkaRamovehoMm - zaklad.dlzkaNosovehoMm)) / 1000);
+				break;
+			case 'konst':
+				qty = p.ks;
+				break;
+			case 'naStyk':
+				qty = p.koef * (zaklad.kridla - 1);
 				break;
 		}
 		if (qty === null) continue;
@@ -223,6 +308,18 @@ export function pocitajKomponenty(
 		}
 		if (qty === 0) continue;
 		polozky.push({ kod: k.kod, nazov: k.nazov, mj: k.mj, qty });
+	}
+
+	// #354 review nález (🔴): zvolená farba SEDÍ na farebný systém (Robust R9005 aj
+	// Deluxe R9006 sú OBE „zadané"), ale na TENTO posuv SEDÍ na ŽIADNU jeho farebnú
+	// položku → bez tejto vetvy by celá farebná rodina (napr. všetkých 6 Deluxe
+	// krytiek) ticho zmizla z odpisu s `err: null`. Musí ostať POSLEDNÉ — existujúce
+	// per-položkové chyby (chýbajúca hrúbka/farba/konfigurácia) majú prednosť.
+	if (farebnyKandidatVideny && farbaKovania !== undefined && !farebnaZhodaNajdena) {
+		chyby.push({
+			kod: '',
+			sprava: `Zvolená farba kovania (${farbaKovania}) nesedí na ŽIADNU farebnú položku tohto posuvu (dostupné: ${[...dostupneFarby].join(', ')}) — skontroluj RAL voľbu, inak by odpis nedostal žiadnu z týchto položiek.`
+		});
 	}
 
 	// Ten istý kód môže byť v tabuľke viackrát s rôznym pravidlom — Slide používa

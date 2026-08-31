@@ -83,10 +83,28 @@ export async function loginAs(page: Page, user = E2E_USER, pass = E2E_PASS) {
 /**
  * #338: kovanie RS Robust/Štandard vyžaduje zvolenú RAL farbu — bez nej engine
  * odmietne odpis a náhľad sa nezobrazí. Tento pomocník zvolí farbu, keď je select
- * na obrazovke (Robust/Štandard, aj cez ďalší posuv), a je NO-OP pri systémoch bez
- * farebného kovania (Deluxe/Slide/Štandard +). Volaj ho PRED „Spočítať".
+ * na obrazovke (Robust/Štandard, aj Deluxe od #354 — jeho 10mm krytky majú tiež
+ * RAL variant), a je NO-OP pri systémoch bez farebného kovania (Slide/Štandard +).
+ * Volaj ho PRED „Spočítať".
+ *
+ * BEZ explicitného `farba` argumentu (VŠETKY existujúce volania v e2e/*.spec.ts)
+ * si zvolí PLATNÚ hodnotu z reálnych `<option>` na obrazovke namiesto natvrdo
+ * `R9005` (#354) — Deluxe ponúka LEN R9006/R7016 (10mm live tabuľka), takže
+ * natvrdo `R9005` by na Deluxe zlyhalo (option neexistuje). Robust/Štandard
+ * naďalej dostanú R9005 (zachovaná spätná kompatibilita — je to prvá platná
+ * možnosť v ich zozname), Deluxe dostane prvú svoju (R9006).
  */
-export async function vyberFarbuKovania(page: Page, farba: 'R9005' | 'R7016' = 'R9005') {
+export async function vyberFarbuKovania(page: Page, farba?: 'R9005' | 'R9006' | 'R7016') {
 	const sel = page.getByTestId('farba-kovania');
-	if ((await sel.count()) > 0) await sel.selectOption(farba);
+	if ((await sel.count()) === 0) return;
+	if (farba) {
+		await sel.selectOption(farba);
+		return;
+	}
+	const hodnoty = (
+		await sel
+			.locator('option')
+			.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value))
+	).filter(Boolean);
+	await sel.selectOption(hodnoty.includes('R9005') ? 'R9005' : hodnoty[0]!);
 }
