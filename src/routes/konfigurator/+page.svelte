@@ -122,27 +122,19 @@
 		`${rozmeryStabilne.sirkaMm}|${rozmeryStabilne.hlbkaMm}|${rozmeryStabilne.vyskaVpreduMm}|${rozmeryStabilne.vyskaPriSteneMm}`
 	);
 
-	// ---- AR náhľad (#286) — ostáva POST-SUBMIT (model-viewer bundle sa nenačíta pri
-	//      loade); `arViz` je snapshot vstupov PRI submite (rozmery/sklo/RAL). ----
-	let arViz = $state<Viz3D | null>(null);
-	type ARKompTyp = (typeof import('$lib/components/vizual/PergolaAR.svelte'))['default'];
-	let ARKomp = $state<ARKompTyp | null>(null);
-	let arNacitava = false;
-
 	// podpis konfigurácie, ktorá vyprodukovala aktuálny `suhrn`/`cena` (nastaví submit).
 	let submitPodpis = $state<string | null>(null);
 
 	// STALE-CLEAR (#325 review 🟡): cena/súhrn ostávajú server-side na submite, no 3D sa
 	// mení živo. Keď zákazník po submite zmení konfiguráciu, cena/súhrn/PDF/OBJEDNÁVKA by
 	// niesli STARÉ hodnoty (objednal by, čo už nevidí). Preto pri odchýlke živej
-	// konfigurácie od submitnutej sa súhrn/cena/AR VYČISTIA → zákazník znova klikne
+	// konfigurácie od submitnutej sa súhrn/cena VYČISTIA → zákazník znova klikne
 	// „Zobraziť cenu a súhrn" a objednávka je vždy konzistentná s tým, čo vidí v 3D.
 	$effect(() => {
 		if (suhrn && submitPodpis !== null && konfigPodpis() !== submitPodpis) {
 			suhrn = null;
 			cena = null;
 			cenyModely = null;
-			arViz = null;
 			submitPodpis = null;
 			chyba = '';
 		}
@@ -218,9 +210,8 @@
 				action="?/vypocet"
 				use:enhance={() => {
 					spracuva = true;
-					// zachyť odoslaný RAL kód + PODPIS konfigurácie PRI submite (AR snapshot +
-					// stale-clear — cena/súhrn platia presne pre TÚTO odoslanú konfiguráciu)
-					const odoslanaFarba = farba;
+					// zachyť PODPIS konfigurácie PRI submite (stale-clear — cena/súhrn platia
+					// presne pre TÚTO odoslanú konfiguráciu)
 					const odoslanyPodpis = konfigPodpis();
 					return async ({ result }) => {
 						spracuva = false;
@@ -230,38 +221,16 @@
 							cenyModely = (result.data?.cenyModely as CenaModelu[] | null) ?? null;
 							chyba = '';
 							submitPodpis = suhrn ? odoslanyPodpis : null;
-							if (suhrn) {
-								arViz = {
-									sirkaMm: suhrn.sirka,
-									hlbkaMm: suhrn.hlbka,
-									vyskaVpreduMm: suhrn.vyskaVpredu,
-									vyskaPriSteneMm: suhrn.vyskaPriStene,
-									typSkla: typSkla3D(suhrn.sklo),
-									ralKod: odoslanaFarba,
-									model: suhrn.model
-								};
-								// lazy AR komponent (model-viewer bundle) až pri prvom súhrne
-								if (!ARKomp && !arNacitava) {
-									arNacitava = true;
-									void import('$lib/components/vizual/PergolaAR.svelte')
-										.then((m) => (ARKomp = m.default))
-										.finally(() => (arNacitava = false));
-								}
-							} else {
-								arViz = null;
-							}
 						} else if (result.type === 'failure') {
 							suhrn = null;
 							cena = null;
 							cenyModely = null;
-							arViz = null;
 							submitPodpis = null;
 							chyba = (result.data?.error as string | undefined) ?? 'Neplatný vstup.';
 						} else if (result.type === 'error') {
 							suhrn = null;
 							cena = null;
 							cenyModely = null;
-							arViz = null;
 							submitPodpis = null;
 							chyba = 'Nastala chyba pri výpočte. Skús to prosím znova.';
 						}
@@ -295,27 +264,6 @@
 				{/if}
 
 				<KonfSuhrn suhrn={s} />
-
-				<!-- AR náhľad — „pergola u teba na záhrade" cez telefón (mobil = odkaz, desktop = QR) -->
-				{#if arViz}
-					{@const a = arViz}
-					<section class="konf-blok ar-sekcia" data-testid="konf-ar" aria-label="AR náhľad pergoly">
-						{#if ARKomp}
-							{@const A = ARKomp}
-							<A
-								sirkaMm={a.sirkaMm}
-								hlbkaMm={a.hlbkaMm}
-								vyskaVpreduMm={a.vyskaVpreduMm}
-								vyskaPriSteneMm={a.vyskaPriSteneMm}
-								typSkla={a.typSkla}
-								ralKod={a.ralKod}
-								model={a.model}
-							/>
-						{:else}
-							<div class="ar-loading" data-testid="konf-ar-loading">Načítavam AR náhľad…</div>
-						{/if}
-					</section>
-				{/if}
 
 				<!-- kontaktný formulár → PDF ponuka s orientačnou cenou (download-first) -->
 				<section class="konf-blok kontakt" id="dopyt" data-testid="dopyt">
@@ -460,7 +408,7 @@
 		margin: 22px 0 0;
 	}
 
-	/* výsledkové bloky (AR/kontakt/objednávka) — prémiové karty */
+	/* výsledkové bloky (kontakt/objednávka) — prémiové karty */
 	.konf-blok {
 		max-width: 520px;
 		background: var(--k-surface);
@@ -485,20 +433,6 @@
 	.objednavka {
 		border-color: var(--k-line-2);
 		background: var(--k-surface-2);
-	}
-	.ar-sekcia {
-		padding: 14px;
-	}
-	.ar-loading {
-		width: 100%;
-		min-height: 120px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--k-surface-2);
-		border-radius: var(--k-radius-sm);
-		color: var(--k-muted);
-		font-size: 14px;
 	}
 
 	/* ── Prilepený cenový/CTA panel — flex dieťa na spodku panela (nie sticky-overlay),
