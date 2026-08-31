@@ -59,7 +59,7 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
-      - name: 3D vizuál chunk gzip — projektový three ≤220KB + model-viewer ≤320KB (#170 §2.13, #286)
+      - name: 3D vizuál chunk gzip — projektový three ≤220KB (#170 §2.13)
         run: |
           node -e "
             const fs = require('fs');
@@ -73,46 +73,28 @@ jobs:
               console.error('::error::build/client/_app/immutable/chunks neexistuje — build layout sa zmenil, over cestu');
               process.exit(1);
             }
-            // DVA NEZÁVISLÉ lazy 3D balíky, KAŽDÝ s vlastným limitom (#286):
-            //  (A) PROJEKTOVÝ three viewer (#276, /konfigurator) — three@0.185 +
-            //      OrbitControls/RoomEnvironment/BufferGeometryUtils v samostatných
-            //      chunkoch (viac markerov, nie len 'PMREMGenerator' — Vite ich delí).
-            //  (B) @google/model-viewer (#286, LEN dedikovaná /konfigurator/ar) —
-            //      VENDORUJE vlastný three (decoupled od projektového three, aby na /ar
-            //      nebol multi-instance THREE warning; viď vizual3d.md). Jeho chunk preto
-            //      zodpovedá three markerom TIEŽ — rozlíšime ho reťazcom 'model-viewer'
-            //      (custom element) a rátame SAMOSTATNE. Bez toho by sa dva nezávislé
-            //      balíky sčítali do jedného limitu (~479KB) a guard by FALOŠNE padal,
-            //      hoci projektový viewer je stále ~198KB a model-viewer ~279KB, každý je
-            //      lazy a načíta sa len na svojej ploche.
+            // PROJEKTOVÝ three viewer (#276, /konfigurator) — three@0.185 +
+            // OrbitControls/RoomEnvironment/BufferGeometryUtils v samostatných
+            // chunkoch (viac markerov, nie len 'PMREMGenerator' — Vite ich delí).
+            // (#337 odobral AR: @google/model-viewer /konfigurator/ar bundle už neexistuje.)
             const MARKERY = ['PMREMGenerator', 'OrbitControls', 'RoomEnvironment', 'mergeGeometries', 'ACESFilmicToneMapping'];
             const KB = 1024;
-            let projTotal = 0, mvTotal = 0;
-            const projHit = [], mvHit = [];
+            let projTotal = 0;
+            const projHit = [];
             for (const f of fs.readdirSync(dir)) {
               if (!f.endsWith('.js')) continue;
               const p = path.join(dir, f);
               const src = fs.readFileSync(p, 'utf8');
-              const jeThree = MARKERY.some((m) => src.includes(m));
-              const jeMV = src.includes('model-viewer');
-              if (!jeThree && !jeMV) continue;
+              if (!MARKERY.some((m) => src.includes(m))) continue;
               const gz = zlib.gzipSync(fs.readFileSync(p)).length;
-              // MV má prednosť: model-viewerov chunk nesie three markery AJ 'model-viewer'.
-              if (jeMV) { mvHit.push([f, gz]); mvTotal += gz; }
-              else { projHit.push([f, gz]); projTotal += gz; }
+              projHit.push([f, gz]); projTotal += gz;
             }
             console.log('projektový three (#276, /konfigurator):', projHit.map(([f, g]) => f + ' ' + (g/KB).toFixed(1) + 'KB').join(', ') || '(žiadne)', '= spolu', (projTotal/KB).toFixed(1) + 'KB (limit 220KB)');
-            console.log('model-viewer (#286, /konfigurator/ar):', mvHit.map(([f, g]) => f + ' ' + (g/KB).toFixed(1) + 'KB').join(', ') || '(žiadne)', '= spolu', (mvTotal/KB).toFixed(1) + 'KB (limit 320KB)');
             if (projHit.length === 0) {
               console.error('::error::žiadny projektový three chunk — guard pravdepodobne rozbitý (dynamic import zmenený?)');
               process.exit(1);
             }
-            if (mvHit.length === 0) {
-              console.error('::error::žiadny model-viewer chunk — AR bundle chýba alebo sa marker zmenil');
-              process.exit(1);
-            }
             if (projTotal > 220 * KB) { console.error('::error::projektový three viewer presiahol 220KB gzip'); process.exit(1); }
-            if (mvTotal > 320 * KB) { console.error('::error::model-viewer (/ar) bundle presiahol 320KB gzip'); process.exit(1); }
           "
       # Cache prehliadačov Playwright — na cache-hit sa preskočí pomalé/nespoľahlivé
       # sťahovanie Chromia (redukuje riziko hung `playwright install`). Kľúč viazaný na

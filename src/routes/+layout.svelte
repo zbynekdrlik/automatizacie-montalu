@@ -7,7 +7,7 @@
 
 	let { data, children } = $props();
 
-	// #327: /konfigurator (+ pod-routy /ar, /model.glb) je VEREJNÁ zákaznícka stránka s
+	// #327: /konfigurator je VEREJNÁ zákaznícka stránka s
 	// VLASTNÝM minimal chrome (`konfigurator/+layout.svelte`). Interná admin navigácia sa
 	// na nej NEzobrazuje NIKOMU (ani prihlásenému), a pätičku s verziou vlastní konf layout
 	// → root pre túto vetvu nerenderuje nav, `.wrap` ani footer (práve JEDEN
