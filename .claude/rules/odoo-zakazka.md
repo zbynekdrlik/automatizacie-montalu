@@ -48,9 +48,39 @@ aj NEGATÍVNE (žiadny `email_from`/`subtype_id`/neprázdny `partner_ids`).
   celé telo raz XML-escapuje na drôte, Odoo raz dekóduje → tagy prežijú, hodnoty text.
 - **Rozšíriteľnosť:** `ZakazkaNote.sekcie[]` (typované). Sklá z nárezákov = ĎALŠIA sekcia,
   bez zmeny štruktúry.
-- **MVP hranica:** fire-and-forget bez durable retry (prechodný výpadok self-healne na
-  ďalšom odpise; trvalý sa loguje). Durable push-queue + startup sweep = **#349**
-  (schema migrácia).
+## Durable retry + startup sweep (#349 — nadväzuje na #340)
+
+`#340` bol fire-and-forget: prechodný výpadok Odoo sa self-heal-ne na ĎALŠOM odpise
+zákazky, no výpadok pri POSLEDNOM odpise = note sa nikdy nedopostol (len zalogoval).
+`#349` to spravil DURABLE:
+
+- **Tabuľka `odoo_zakazka_push`** (migrácia v34), PK `(zak_norm, op_norm)`: `pending`,
+  `attempts`, `last_error`, `posted_at`, `created_at`, `updated_at`. DB vrstva je
+  `odoo-zakazka-store.ts` (vzor `dopyt-store.ts`, importuje LEN `db` + čisté
+  `normZak/normOp` → Money-neutrálne, vlastný guard test).
+- **Retry NEUKLADÁ telo note — RE-DERIVUJE** aktuálny snapshot cez `pushZakazkaToOdoo`
+  (note je re-derivovateľný → „posledný vyhráva" je inherentné; uložené telo by postlo
+  STARŠÍ stav). Tá istá cesta = jediné `message_post` (`mt_note`), takže retry NEMÔŽE
+  rozbiť leak-kontrakt.
+- **Stavový automat:** `posted` → pending=0, attempts=0, posted_at; `failed` (Odoo/sieť)
+  → pending=1, attempts+1 (poison-pill `MAX_ATTEMPTS=5`); `no-order` (objednávka ešte nie
+  je v Odoo) → pending=1 ale attempts sa NEZVYŠUJE; `missing` (odpis medzitým uvoľnený)
+  → terminálny pending=0.
+- **`created_at` = začiatok AKTUÁLNEJ pending epizódy, nie prvý-ever insert** (review 🟡):
+  upsert ho resetuje LEN pri prechode 0→1 (`CASE WHEN pending = 0 THEN datetime('now')
+  ELSE created_at END`). Bez toho by `expireStaleZakazkaPushes` na starom riadku hneď
+  „expiroval" čerstvé zlyhanie zákazky bežiacej mesiace.
+- **Časový strop (90 dní), nie attempts, pre no-order zombie:** arrival sweep beží podľa
+  nesúvisiacej aktivity, takže attempts by nemeral čas; `expireStaleZakazkaPushes` po
+  strope prepne pending=0 (label neutrálny `expired`).
+- **Súbeh (zadanie bod 4):** per-kľúč promise-chain `serializeByKey` (`Map<key,tail>`,
+  tail-compare cleanup, `then(task,task)` handluje rejection predchodcu). Skip-in-flight
+  (#278) je tu NEBEZPEČNÝ (stratí dáta neskoršieho odpisu). Sweep aj arrival idú cez ten
+  istý serializer + `sweepInFlight` guard + re-check `isPendingZakazkaPush` v tasku.
+- **Sweep triggers:** arrival po ÚSPEŠNOM pushi (dôkaz že Odoo je hore, #278) +
+  `runStartupZakazkaSweep()` v `hooks.server.ts` (po migráciách, no-op keď chýba env).
+  Accepted residual: bez periodického timera pending riadok čaká na ďalší deploy/úspešný
+  push (deploy = reštart, per-ticket; interná log-note = nízka cena zastarania).
 
 ## Odoo 19 XML-RPC pasce (pri prieskume handover účtom)
 

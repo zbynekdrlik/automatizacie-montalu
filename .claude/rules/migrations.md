@@ -49,5 +49,12 @@ Tie dva testy overujú EXAKTNÝ zoznam stĺpcov tabuľky (`dopyt` pre v25/v26). 
 pridaj nový stĺpec do oboch `toEqual([...])` polí (na správne miesto — na koniec pridaného poradia).
 Iné migračné fixtures (`v28`/`v29`) tú tabuľku nemajú, netreba ich meniť.
 
+**NOVÁ tabuľka (nie ALTER `dopyt`) → krok 4 SA NETÝKA** (#349 v34 `odoo_zakazka_push`): `CREATE TABLE`
+nemení `dopyt`, takže exaktné v25/v26 zoznamy stĺpcov ostávajú platné. Rovnako `sqlite_master`
+kontroly v `migration-fresh-db`/`dopyt-store` sú `name IN (...)`/`name='dopyt'` scoped (nie
+exhaustívny zoznam tabuliek), takže nová tabuľka ich nerozbije. Stačia kroky 1–3 (funkcia v seede +
+zapojenie + head-bump ~24 testov na novú hlavu) + vlastný `migration-vNN.test.ts` (nová tabuľka +
+stĺpce + index + zapisovateľnosť + prežitie base dát; vzor `migration-v34.test.ts`).
+
 **Overenie:** `npx vitest run --no-file-parallelism tests/migration*.test.ts tests/server-file-size-cap.test.ts`
 (a `--coverage` na celé `npm test`, prahy v `vite.config.ts`).
