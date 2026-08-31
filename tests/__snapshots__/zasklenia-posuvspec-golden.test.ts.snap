@@ -65,6 +65,42 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "sklad": null,
       },
       {
+        "kod": "ZASK202526",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Krytka stredová L 10 mm R7016",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK202528",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Krytka stredová P 10 mm R7016",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK202530",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Krytka krajná 10 mm R7016",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
         "kod": "ZASK00049",
         "marza": null,
         "mena": "EUR",
@@ -128,11 +164,29 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
   },
   "cielInfo": {
-    "filename": "ZAK-G4 - Zákazník G4 [d4c2ef0e].xlsx",
+    "filename": "ZAK-G4 - Zákazník G4 [41c542be].xlsx",
     "live": false,
   },
   "heightWarn": undefined,
   "kovanie": [
+    {
+      "kod": "ZASK202526",
+      "mj": "ks",
+      "nazov": "Krytka stredová L 10 mm R7016",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK202528",
+      "mj": "ks",
+      "nazov": "Krytka stredová P 10 mm R7016",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK202530",
+      "mj": "ks",
+      "nazov": "Krytka krajná 10 mm R7016",
+      "qty": 2,
+    },
     {
       "kod": "ZASK00049",
       "mj": "ks",
@@ -354,7 +408,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "styl": "3K",
     "system": "Deluxe",
   },
-  "planHash": "eddcd292",
+  "planHash": "2aae99c2",
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -380,7 +434,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
   "step": "nahlad",
   "vstup": {
     "caka": false,
-    "farbaKovania": "R9005",
+    "farbaKovania": "R7016",
     "jednostrannaFab": false,
     "klin": null,
     "kolajnica": {
@@ -407,7 +461,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G4",
     "zakaznik": "Zákazník G4",
   },
-  "warn": "DELUXE: 6mm krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); 10mm krytky, madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).",
+  "warn": null,
 }
 `;
 
@@ -4721,6 +4775,42 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "sklad": null,
       },
       {
+        "kod": "ZASK202526",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Krytka stredová L 10 mm R7016",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK202528",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Krytka stredová P 10 mm R7016",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK202530",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Krytka krajná 10 mm R7016",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
         "kod": "ZASK00049",
         "marza": null,
         "mena": "EUR",
@@ -4781,13 +4871,13 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "sklad": null,
       },
       {
-        "kod": "ZASK202533",
+        "kod": "ZASK202534",
         "marza": null,
         "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
-        "nazov": "Kľučka R9005",
+        "nazov": "Kľučka R7016",
         "predajVo": null,
         "qty": 6,
         "sklad": null,
@@ -4829,13 +4919,13 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "sklad": null,
       },
       {
-        "kod": "ZASK202535",
+        "kod": "ZASK202536",
         "marza": null,
         "mena": "EUR",
         "mj": "ks",
         "nakupCennik": null,
         "nakupPoslednaFaktura": null,
-        "nazov": "Krytka vložky R9005",
+        "nazov": "Krytka vložky R7016",
         "predajVo": null,
         "qty": 6,
         "sklad": null,
@@ -4964,11 +5054,29 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     },
   },
   "cielInfo": {
-    "filename": "ZAK-GM2 - Zákazník GM2 [68d13149].xlsx",
+    "filename": "ZAK-GM2 - Zákazník GM2 [5c1ff4bb].xlsx",
     "live": false,
   },
   "heightWarn": undefined,
   "kovanie": [
+    {
+      "kod": "ZASK202526",
+      "mj": "ks",
+      "nazov": "Krytka stredová L 10 mm R7016",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK202528",
+      "mj": "ks",
+      "nazov": "Krytka stredová P 10 mm R7016",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK202530",
+      "mj": "ks",
+      "nazov": "Krytka krajná 10 mm R7016",
+      "qty": 2,
+    },
     {
       "kod": "ZASK00049",
       "mj": "ks",
@@ -5000,9 +5108,9 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       "qty": 3,
     },
     {
-      "kod": "ZASK202533",
+      "kod": "ZASK202534",
       "mj": "ks",
-      "nazov": "Kľučka R9005",
+      "nazov": "Kľučka R7016",
       "qty": 6,
     },
     {
@@ -5024,9 +5132,9 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       "qty": 6,
     },
     {
-      "kod": "ZASK202535",
+      "kod": "ZASK202536",
       "mj": "ks",
-      "nazov": "Krytka vložky R9005",
+      "nazov": "Krytka vložky R7016",
       "qty": 6,
     },
     {
@@ -6123,7 +6231,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
   },
   "multiVstup": {
     "caka": false,
-    "farbaKovania": "R9005",
+    "farbaKovania": "R7016",
     "jednostrannaFab": false,
     "op": "01",
     "posuvy": [
@@ -6188,7 +6296,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "zak": "ZAK-GM2",
     "zakaznik": "Zákazník GM2",
   },
-  "planHash": "50d1306d",
+  "planHash": "c3fe935f",
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -6230,6 +6338,6 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "spolu": 0,
   },
   "step": "nahladMulti",
-  "warn": "DELUXE: 6mm krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); 10mm krytky, madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).",
+  "warn": null,
 }
 `;

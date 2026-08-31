@@ -37,9 +37,16 @@ export interface ZakladPoctov {
 	dlzkaNosovehoMm: number;
 	/** súčet dĺžok rezov oponového profilu (mm); 0 keď štýl oponu nemá */
 	dlzkaOponovehoMm: number;
-	/** súčet dĺžok rezov Deluxe kladkového profilu (mm); 0 mimo Deluxe (#354) */
+	/**
+	 * súčet dĺžok rezov profilu s „kladkový" v názve (mm), #354. POZOR: NIE je
+	 * exkluzívne Deluxe — Štandard má VLASTNÝ „Kladkový profil" (ZASP202415), takže
+	 * toto pole je nenulové aj pri Štandard posuve; dnes ho žiadny Štandard
+	 * komponent nepoužíva (KOVANIE_NEUPLNE.Štandard čaká na vzorec kefy/tesnenia),
+	 * ale budúci Štandard-kefy vzorec s touto rolou musí počítať.
+	 */
 	dlzkaKladkovehoMm: number;
-	/** súčet dĺžok rezov Deluxe klzného profilu (mm); 0 mimo Deluxe (#354) */
+	/** súčet dĺžok rezov profilu s „klzný" v názve (mm), #354; 0 mimo Deluxe — žiadny
+	 *  iný systém dnes profil s týmto názvom nemá (over pri pridaní nového systému). */
 	dlzkaKlznehoMm: number;
 }
 
@@ -168,6 +175,19 @@ export function pocitajKomponenty(
 ): { polozky: PolozkaKomponentu[]; chyby: ChybaKomponentu[] } {
 	const polozky: PolozkaKomponentu[] = [];
 	const chyby: ChybaKomponentu[] = [];
+	// #354 review nález (🔴): kým mali VŠETKY farebné systémy tú istú dvojicu
+	// R9005/R7016, „farba sa nezhoduje → absent" bolo vždy neškodné (zvolená
+	// farba VŽDY sedela na NEJAKÝ variant danej položky — dostal sa len ten
+	// druhý). Odkedy má Deluxe VLASTNÚ dvojicu (R9006/R7016), zdieľaná
+	// objednávková `farbaKovania` môže sedieť na Robust/Štandard, ale NA ŽIADEN
+	// Deluxe variant (napr. zmiešaná zimná záhrada, alebo len zlá voľba) —
+	// vtedy by sa VŠETKY krytky tíško preskočili (0 riadkov, žiadna chyba) =
+	// nedopísaný Money odpis, ktorý nikto nevidí. Preto: keď mal tento posuv
+	// ASPOŇ JEDEN farebný kandidát (po hrúbkovom filtri) a zvolená farba
+	// NESEDÍ na ŽIADEN z nich, je to HLASNÁ chyba, nie tichý nulový riadok.
+	let farebnyKandidatVideny = false;
+	let farebnaZhodaNajdena = false;
+	const dostupneFarby = new Set<Farba>();
 
 	for (const k of komponenty) {
 		// Hrúbka skla (Deluxe krytky, #354): rovnaká „absent, nie 0" disciplína
@@ -175,6 +195,11 @@ export function pocitajKomponenty(
 		// preskočí skôr, než sa vôbec pýta na RAL (6mm objednávka si nevynúti
 		// voľbu farby kvôli 10mm-only krytke).
 		if (k.hrubkaSkla !== undefined) {
+			// `!skloHrubka` (nie `=== undefined`, ako pri farbe nižšie) je ZÁMER: Deluxe
+			// hrúbka je vždy 6 alebo 10, nikdy legitímne 0 — `0` je ten istý sentinel
+			// „nezadané", aký `skloHrubka ?? 0`/`Number(skloHrubka) || 0` už používa v
+			// celom `compute-profily.ts`. `!skloHrubka` teda chytí AJ `undefined` AJ `0`
+			// ako „chýba", bezpečný smer (nikdy tichý default na jednu hrúbku).
 			if (!skloHrubka) {
 				chyby.push({
 					kod: k.kod,
@@ -190,6 +215,8 @@ export function pocitajKomponenty(
 		// úplne preskočí (žiadny riadok = „absent", nie „0 ks"). Farbo-neutrálna
 		// položka (bez `farba`) prejde nedotknutá.
 		if (k.farba !== undefined) {
+			farebnyKandidatVideny = true;
+			dostupneFarby.add(k.farba);
 			if (farbaKovania === undefined) {
 				chyby.push({
 					kod: k.kod,
@@ -198,6 +225,7 @@ export function pocitajKomponenty(
 				continue;
 			}
 			if (k.farba !== farbaKovania) continue;
+			farebnaZhodaNajdena = true;
 		}
 
 		let qty: number | null = null;
@@ -280,6 +308,18 @@ export function pocitajKomponenty(
 		}
 		if (qty === 0) continue;
 		polozky.push({ kod: k.kod, nazov: k.nazov, mj: k.mj, qty });
+	}
+
+	// #354 review nález (🔴): zvolená farba SEDÍ na farebný systém (Robust R9005 aj
+	// Deluxe R9006 sú OBE „zadané"), ale na TENTO posuv SEDÍ na ŽIADNU jeho farebnú
+	// položku → bez tejto vetvy by celá farebná rodina (napr. všetkých 6 Deluxe
+	// krytiek) ticho zmizla z odpisu s `err: null`. Musí ostať POSLEDNÉ — existujúce
+	// per-položkové chyby (chýbajúca hrúbka/farba/konfigurácia) majú prednosť.
+	if (farebnyKandidatVideny && farbaKovania !== undefined && !farebnaZhodaNajdena) {
+		chyby.push({
+			kod: '',
+			sprava: `Zvolená farba kovania (${farbaKovania}) nesedí na ŽIADNU farebnú položku tohto posuvu (dostupné: ${[...dostupneFarby].join(', ')}) — skontroluj RAL voľbu, inak by odpis nedostal žiadnu z týchto položiek.`
+		});
 	}
 
 	// Ten istý kód môže byť v tabuľke viackrát s rôznym pravidlom — Slide používa

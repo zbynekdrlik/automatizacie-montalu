@@ -90,14 +90,15 @@ test('Deluxe 3K 10mm: krajná×2, stredová L×2 + P×2, madlo×2, kefy + upozor
 	// tesniace kefy sú v metroch, kladný počet
 	await expect(mnozstvo(page, 'ZASK00007')).toContainText(/\d+(,\d+)? m/);
 	await expect(mnozstvo(page, 'ZASK202542')).toContainText(/\d+(,\d+)? m/);
-	// 6mm krytky upozornenie je v náhľade viditeľné (0 ks skladu v Money)
-	await expect(page.getByTestId('plan-warn')).toContainText('6');
-	await expect(page.getByTestId('plan-warn')).toContainText('krytk');
+	// 10mm objednávka je KOMPLETNÁ (krytky+madlo+kefy) — žiadne upozornenie na
+	// chýbajúce 6mm (#354 review nález 🟡: predtým sa zobrazovalo aj tu, hoci sa
+	// 10mm objednávky vôbec netýka).
+	await expect(page.getByTestId('plan-warn')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('Deluxe 3K 6mm: madlo + kefy sú v odpise, ŽIADNA krytka (0 ks skladu), farba nie je potrebná', async ({
+test('Deluxe 3K 6mm: madlo + kefy sú v odpise, ŽIADNA krytka (0 ks skladu), farba nie je potrebná, upozornenie viditeľné', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -123,6 +124,9 @@ test('Deluxe 3K 6mm: madlo + kefy sú v odpise, ŽIADNA krytka (0 ks skladu), fa
 		'ZASK202530'
 	])
 		await expect(riadok(page, k)).toHaveCount(0);
+	// 6mm objednávke naozaj CHÝBAJÚ krytky — tu sa upozornenie MÁ zobraziť
+	await expect(page.getByTestId('plan-warn')).toContainText('6');
+	await expect(page.getByTestId('plan-warn')).toContainText('krytk');
 
 	expect(consoleMsgs).toEqual([]);
 });

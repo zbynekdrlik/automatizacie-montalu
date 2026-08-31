@@ -16,7 +16,8 @@ const spec = (sysStyl: string, S = 3000, V = 2200): PosuvSpec => ({
 });
 // #338: Robust/Štandard majú RAL farebné varianty kovania → farba je povinná. Väčšina
 // testov overuje farbo-neutrálne položky, tak default R9005; farbo-špecifické testy nižšie.
-// (Farba typ rozšírený na R9006 v #354 — Deluxe kovanie má vlastný describe blok nižšie.)
+// (Farba typ rozšírený na R9006 v #354 — Deluxe kovanie má vlastný test súbor
+// tests/kovanie-deluxe.test.ts, nie ďalší describe blok tu.)
 const kov = (specs: PosuvSpec[], fab = false, farba: Farba | undefined = 'R9005') =>
 	kovanieDoOdpisu(cfg, specs, fab, farba);
 const qty = (r: { polozky: { kod: string; qty: number }[] }, kod: string) =>
@@ -146,8 +147,8 @@ describe('systémy bez kovania', () => {
 	it('Štandard + kovanie nemá — odpis profilov beží ďalej bez chyby', () => {
 		expect(kov([spec('Štandard +|2K')])).toEqual({ polozky: [], err: null, warn: null });
 	});
-	// Deluxe DOSTALO kovanie v #354 (madlo/kefy/10mm krytky) — vlastný describe blok
-	// nižšie ("Deluxe kovanie (#354)") nahrádza pôvodné "Deluxe kovanie nemá".
+	// Deluxe DOSTALO kovanie v #354 (madlo/kefy/10mm krytky) — testy v
+	// tests/kovanie-deluxe.test.ts nahrádzajú pôvodné "Deluxe kovanie nemá".
 
 	it('zmiešaná zákazka: Robust dá kovanie, Štandard + nie', () => {
 		const r = kov([spec('Robust|2K'), spec('Štandard +|2K')]);

@@ -52,7 +52,11 @@ export function kovanieDoOdpisu(
 		const system = spec.sysStyl.split('|')[0] ?? '';
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
-		const neuplne = KOVANIE_NEUPLNE[system];
+		// KOVANIE_NEUPLNE hodnota je buď pevný text (Štandard), alebo funkcia hrúbky
+		// skla (Deluxe: neúplné len pri 6mm, #354 review nález) — obe tvary tu
+		// vyhodnotíme rovnako, nikdy natvrdo neporovnávaj `system === 'Deluxe'`.
+		const neuplneRaw = KOVANIE_NEUPLNE[system];
+		const neuplne = typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka) : neuplneRaw;
 		if (neuplne) varovania.add(neuplne);
 
 		// VEDOME sa sem neposiela `spec.sietka` — sieťka mení len profily (rám/nos/

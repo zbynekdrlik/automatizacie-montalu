@@ -327,12 +327,20 @@ export const KOMPONENTY_DELUXE: Komponent[] = [
 /**
  * Systémy, ktorých kovanie do odpisu je NEÚPLNÉ (chýbajú tesnenia/kefy) a náhľad
  * na to musí upozorniť (#338). Prázdne = kompletné.
+ *
+ * Hodnota je buď PEVNÝ text (Štandard: neúplné VŽDY, nezávisle od vstupu), alebo
+ * FUNKCIA `(skloHrubka) => text | null` (Deluxe: neúplné LEN pri 6mm — #354 review
+ * nález 🟡, pôvodná pevná hláška sa zobrazovala aj na 10mm objednávkach, kde je
+ * odpis kovania v skutočnosti kompletný a hláška by zmiatla/viedla na zbytočné
+ * ručné doplnenie 6mm položiek, ktoré sa 10mm objednávky vôbec netýkajú).
  */
-export const KOVANIE_NEUPLNE: Record<string, string> = {
+export const KOVANIE_NEUPLNE: Record<string, string | ((skloHrubka?: number) => string | null)> = {
 	Štandard:
 		'STANDARD: zasklievacie tesnenia (4/6mm) a tesniace kefy zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).',
-	Deluxe:
-		'DELUXE: 6mm krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); 10mm krytky, madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'
+	Deluxe: (skloHrubka) =>
+		skloHrubka === 6
+			? 'DELUXE 6mm: krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'
+			: null
 };
 
 /** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
