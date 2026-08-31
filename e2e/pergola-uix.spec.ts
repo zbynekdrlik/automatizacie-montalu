@@ -142,5 +142,24 @@ test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke rezervač
 	// pozitívny protipól — plain náhrady SÚ prítomné (sekcia nepodporované nie je prázdna)
 	await expect(page.getByTestId('narez-nepodporovane')).toContainText('vzorec');
 
+	// #339 — ten istý žargón-sken AJ na kroku rezervačného náhľadu (tam sa renderujú tesnenia +
+	// Money rozpis). „Pripraviť rezervačný odpis" je ČÍTACIE (žiadny zápis do Money) — len náhľad.
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-UIX-Z');
+	await page.getByLabel('OP/OPDL číslo *').fill('OP260998');
+	await page.getByLabel('Zákazník *').fill('E2E UIX');
+	await page.getByTestId('pripravit-rezervaciu').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('rez-tesnenia')).toBeVisible();
+
+	const textNahlad = await page.evaluate(() => {
+		const klon = document.body.cloneNode(true) as HTMLElement;
+		klon.querySelectorAll('script, style, noscript').forEach((el) => el.remove());
+		return klon.textContent ?? '';
+	});
+	expect(textNahlad.length).toBeGreaterThan(0);
+	expect(textNahlad).not.toMatch(/#\d/);
+	expect(textNahlad).not.toMatch(/\bO\d/);
+	expect(textNahlad).not.toMatch(/z callu|callu 13|call s Dominikom/i);
+
 	expect(consoleMsgs).toEqual([]);
 });
