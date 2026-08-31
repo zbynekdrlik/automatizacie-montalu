@@ -102,6 +102,34 @@
 	</div>
 {/if}
 
+{#if rozpis.tesnenia.length}
+	<div class="card">
+		<div class="sec">Tesnenia (gumy) — {rozpis.tesnenia.length}</div>
+		<div class="warn" data-testid="rez-tesnenia-banner">
+			⚠️ Čaká na Money kódy od Dominika — tesnenia sa <b>NEODOSIELAJÚ</b> do odpisu. Dĺžky sú podľa pravidiel
+			od Dominika; doplnia sa, keď príde zoznam kódov.
+		</div>
+		<table class="narez" data-testid="rez-tesnenia">
+			<thead><tr><th>Tesnenie</th><th>Vzorec</th><th>Dĺžka</th></tr></thead>
+			<tbody>
+				{#each rozpis.tesnenia as t (t.id)}
+					<tr>
+						<td>{t.nazov}</td>
+						<td class="sub">{t.vzorec}</td>
+						<td>
+							{#if t.stav === 'ok' && t.dlzkaMm != null}
+								<b>{fmtM(t.dlzkaMm / 1000)} m</b>
+							{:else}
+								<span class="sub">⏳ {t.dovod ?? 'čaká na potvrdenie'}</span>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
+
 <div class="card noprint">
 	<form method="POST" action="?/odoslat" style="display:inline">
 		{@render hidden()}
