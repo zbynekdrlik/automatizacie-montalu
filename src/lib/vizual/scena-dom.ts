@@ -261,7 +261,15 @@ export function vytvorDom(
 	// --- DVERE (tvar c): drevené krídlo + presklený inlay + kľučka + latová bočnica (vľavo) ---
 	const dvereW = clamp(Math.round(0.22 * S), 760, 1000);
 	const dvereH = Math.min(2100, stropPrvkov - 100);
-	pridajDvere(otvorCtx, { krideloWmm: dvereW, krideloHmm: dvereH, budgetHalfXmm, flat });
+	// #343: dvereW má FIXNÉ minimum (760 mm) nezávislé od S → proud RÁM dverí (dvereW+70 vonkajšia
+	// šírka) môže pri veľmi úzkej sub-produktovej pergole (S ≲ 940 mm, mimo dosahu konfigurátora —
+	// ten clampuje S na 2000–12000 mm) prečnievať cez krajný stĺp. Rovnaký vzor ako latová bočnica
+	// (`bocnicaVonkajsiaX <= opts.budgetHalfXmm`, scena-dom-otvory.ts) — pri prekročení kolízneho
+	// budgetu dvere (aj s rámom) CELKOM vynechať, nezmenšovať.
+	const dvereRamVonkajsiaX = (dvereW + 70) / 2;
+	if (dvereRamVonkajsiaX <= budgetHalfXmm) {
+		pridajDvere(otvorCtx, { krideloWmm: dvereW, krideloHmm: dvereH, budgetHalfXmm, flat });
+	}
 
 	// --- POSCHODOVÉ okná (nad pergolou, bez kolízie s pergolou): stredné VŽDY + 2 bočné LEN keď
 	//     sa zmestia BEZ prekrytia (review 🟡 #336: susedné zapustené zostavy sa pri úzkej pergole
