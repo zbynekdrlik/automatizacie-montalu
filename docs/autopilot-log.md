@@ -1795,3 +1795,28 @@ Gates lokálne: check 0/0, lint čisté, vitest 2578/2578, Playwright pergola-ui
 rez-nahlad). Fable dizajn + review consult (gate OPEN).
 **Playbook:** `pergola-narez.md` (tesnenia rezervácie — data-driven katalóg, `kod:null` typová
 Money-zámka, #1 odložené kým Dominik nepotvrdí „stropný profil").
+
+## #353 — RS SLIDE: komponenty odpisu podľa Dominikovho zoznamu (att 14667 + náčrt tesnení 14669, 2026-08-31)
+
+Aktualizoval `KOMPONENTY_SLIDE` na nový zoznam: zrušená `ZASK20254` „Automaticky zamok RS
+SLIDE" nahradená RAL variantmi `ZASK202538` (R7016) / `ZASK202537` (R9005) — rovnaký vzor
+ako Robust kľučka a Standard zámok (#338), počty nezmenené (`ZAMKY_SLIDE`). Zvyšných 8
+riadkov tabuľky (kladka, protikus, madlo, krytka rám. profilu, rohovník zarovnávací,
+rohovník obvodový ×2, kefa 5x8) UŽ dnešný kód počítal presne podľa Excelu — bezo zmeny.
+`KOD_UZAVERU.Slide` v `kovanie.ts` presunutá kotva ZASK20254→ZASK202538.
+
+Tesnenie zasklievacie 10 vs 12: ticket žiadal výber podľa hrúbky skla, čo je v priamom
+rozpore so zdrojovanou Dominikovou odpoveďou (`bceba2b`, 28.7.: „nedá sa určiť dopredu ani
+podľa hrúbky, 24mm dáva oba výsledky"). Ponechaný existujúci 50/50 split (identický ako
+Robust) — rozhodnutie + 3 zvažované prístupy v design komentári na #353. `SLIDE_PRIPRAVENY`
+ostáva `false` — Money zásoba nových RAL kódov sa nedala overiť naživo v tomto worktree
+(chýba SSH kľúč `slovnormal_odoo`) — finding zapísaný na #353, playbook `money-odpis.md §1b/1c`.
+
+Verzia 0.24.58-dev.1. Commit: b660183 (feat, jeden commit — feature s testami, nie bug fix).
+Gates lokálne: check 0/0, lint čisté (prettier auto-format aplikovaný), vitest 2644/2644
+(coverage prahy splnené). Review (Fable, gate OPEN, fresh general-purpose dispatch): 0 🔴
+0 🟡 0 🔵, nezávisle re-verifikoval check/lint/testy. Worktree stop point — supervisor
+integruje z `refs/autopilot-wip/worktree-agent-aa41abb12a30d9210`.
+**Playbook:** `money-odpis.md §1b` (worktree bez SSH kľúča `slovnormal_odoo` — neblokuj,
+zapíš finding) + `§1c` (nová Dominikov zoznam vs staršia sourcovaná odpoveď — sourcovaná
+vyhráva, over či podklad má reálny vzorec).
