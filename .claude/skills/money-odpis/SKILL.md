@@ -735,3 +735,53 @@ dedup-e drž tieto invarianty:
   dev, kým to #300 neopravilo. Obe override cesty (`Povoliť rovnaký` + `Odoslať aj tak`) sú v jednom
   UI toku v `e2e/odpisy.spec.ts` (Vetva A/B) — modulový ledger blok sa renderuje ako
   `OdpisBlok` (`data-testid="blok"` + `odoslat-aj-tak`), NIE `duplikat` (to ostáva pre PURE dedup).
+
+## 2k. RAL farebné VARIANTY komponentu (#338) — jeden fyzický kus, dva Money kódy podľa farby
+
+Keď Money rozdelí jeden komponent na farebné varianty (kľučka `ZASK202533` R9005 vs
+`ZASK202534` R7016; krytka vložky 202535/202536; Štandard automatický zámok 202531/202532),
+farba je ORTOGONÁLNA k počtu — pravidlo hovorí KOĽKO, farba hovorí ČI ide do odpisu. Vzor
+(NErob nový `Pravidlo` typ — zdvojil by union kombinatoricky, a NEfiltruj mimo enginu — oddelí
+sa od fail-loud):
+
+- **`Komponent.farba?: 'R9005'|'R7016'`** (optional, `$lib/komponenty.ts`) — TS union, takže
+  preklep farby v configu je compile error. Nezadaná = farbo-neutrálna položka (väčšina).
+- **`pocitajKomponenty(..., farbaKovania?)`**: komponent s `farba !== farbaKovania` sa ÚPLNE
+  preskočí (žiadny riadok = „absent, not 0"); komponent s `farba` a `farbaKovania===undefined`
+  → `chyby` (HLASNÉ zlyhanie, NIKDY tichý default na jednu farbu — inak by šla do Money zlá
+  farba). R7016 (antracit) je bežná ako R9005, takže default je Money-nebezpečný.
+- **Order-level vstup `farbaKovania`** ide IDENTICKOU trasou ako `jednostrannaFab`
+  (`zasklenia-form.ts` → `vstup.ts` parse ×2 + `parseFarba` → `znova.ts` (stará objednávka →
+  null → vynúť novú voľbu) → `ZasklieniaForm.svelte` select (`required`, `data-testid=
+  "farba-kovania"`) → `+page.svelte` hidden ×2 + `$derived vstup.farbaKovania` → `+page.server`
+  → `kovanie.ts` → `job.detail`). `maFarbu` deriv. zo VŠETKÝCH posuvov, nie len primárneho
+  (multi objednávka s ne-farebným primárnym + farebným ďalším posuvom).
+- **`KOD_UZAVERU` kotva pri farebne-rozdelenom zámku** (Štandard): ukazuje na JEDEN variant
+  (`ZASK202531`); počet je farbo-nezávislý, oba varianty ZDIEĽAJÚ ten istý `konstPreStyl`
+  objekt (`ZAMKY_STANDARD`) — config-test drží `r7.pravidlo` deep-equal `r9.pravidlo`, inak by
+  sa protikus/podložky rozsync-li. `pocetUzaverov` číta počet PRED farebným filtrom, takže
+  R7016 objednávka má správny počet aj keď sa 202531 v slučke preskočí.
+- **Config-invariant test:** každá farebná skupina (podľa NÁZVU bez RAL prípony, nie podľa
+  pravidla — kľučka aj krytka majú `naUzaverPodlaFab`) má PRÁVE obe farby, naprieč VŠETKÝMI
+  tabuľkami — chráni pred „pridal som len R9005 variant" (jednofarebná skupina by pri druhej
+  farbe ticho vynechala kovanie).
+
+## 2l. Čiastočne zapnutý systém kovania → VIDITEĽNÁ hláška, nie tichá neúplnosť (#338)
+
+Keď sa systém zapne do odpisu s NEúplným kovaním (STANDARD má kladku/protikus/zámok, ale
+tesnenia 4/6mm + kefy chýbajú, lebo vzorec „šírka+výška prírezov kladkového/koncového/
+stredového profilu podľa hrúbky skla" potrebuje rezné rozmery + hrúbku/IZO, ktoré `ZakladPoctov`
+nemá): odpis by vyzeral kompletne → tichá pod-fakturácia pri KAŽDEJ objednávke. Vzor:
+`KOVANIE_NEUPLNE[system]` → `kovanieDoOdpisu().warn` → náhľad `plan-warn` („doplniť ručne").
+Follow-up ticket na vzorec. Pozor na `warn` KOLÍZIU: stale-formula hláška („Vzorce sa medzitým
+zmenili") a `kov.warn` sa musia SPOJIŤ (`.filter(Boolean).join(' ')`), nie prepísať.
+
+## 2m. E2E: každý zasklenia compute-trigger vyžaduje zvolenú farbu (#338)
+
+Po #338 KAŽDÝ Robust/Štandard náhľad potrebuje zvolenú RAL farbu, inak engine chyba a náhľad sa
+nevykreslí → červený celý E2E beh. Compute-trigger má TRI selektory (`getByTestId('spocitat')`,
+`{ name: 'Spočítať nárezový plán' }`, `{ name: /Spočítať spoločný plán/ }`) — `spocitat` testid
+je v ZasklieniaForm AJ v pergola RezForm, takže patchuj len ZASKLENIA specy. Helper
+`vyberFarbuKovania(page)` v `e2e/helpers.ts` je tolerantný (no-op keď farba-select nie je →
+bezpečný na Deluxe/Slide/Štandard +), volaj ho PRED každým trigger klikom. Pri pridaní ďalšieho
+farebného komponentu over VŠETKY tri selektory naprieč specmi (`grep`), nie len button-name.

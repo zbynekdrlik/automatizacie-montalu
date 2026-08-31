@@ -4,7 +4,7 @@
 // Väčšina testov je READ-ONLY („Spočítať" / „Späť"); posledný odosiela v TEST režime
 // (MONEY_LIVE nie je 1), takže súbor ide do testovacieho priečinka, nikdy do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-KOV-${Date.now().toString(36).slice(-5)}`;
 const FAB = '🔑 Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)';
@@ -26,6 +26,7 @@ test('Robust 2K: kovanie je v náhľade s kusmi aj tesneniami', async ({ page })
 	await zaklad(page, '01');
 	await page.getByLabel('Systém').selectOption('Robust');
 	await page.getByLabel('Štýl').selectOption('2K');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -33,7 +34,7 @@ test('Robust 2K: kovanie je v náhľade s kusmi aj tesneniami', async ({ page })
 	// 2 krídla → 4 kladky; 2 uzávery → 4 kľučky (obojstranná FAB je predvolená)
 	await expect(riadok(page, 'ZASK00027')).toContainText('4 ks');
 	await expect(riadok(page, 'ZASK00029')).toContainText('2 ks');
-	await expect(riadok(page, 'ZASK00030')).toContainText('4 ks');
+	await expect(riadok(page, 'ZASK202533')).toContainText('4 ks');
 	// rohovník obvodový podľa 2K koľajnice
 	await expect(riadok(page, 'ZASK00037')).toContainText('8 ks');
 	// tesnenie je metrážové
@@ -48,19 +49,21 @@ test('jednostranná FAB zníži kľučky a krytky, ostatné počty nechá', asyn
 	await zaklad(page, '02');
 	await page.getByLabel('Systém').selectOption('Robust');
 	await page.getByLabel('Štýl').selectOption('3K');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
-	await expect(riadok(page, 'ZASK00030')).toContainText('4 ks');
+	await expect(riadok(page, 'ZASK202533')).toContainText('4 ks');
 	const kladky = await riadok(page, 'ZASK00027').textContent();
 
 	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
 	await waitHydrated(page);
 	await page.getByLabel(FAB).check();
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(riadok(page, 'ZASK00030')).toContainText('2 ks');
-	await expect(riadok(page, 'ZASK00035')).toContainText('2 ks');
+	await expect(riadok(page, 'ZASK202533')).toContainText('2 ks');
+	await expect(riadok(page, 'ZASK202535')).toContainText('2 ks');
 	expect(await riadok(page, 'ZASK00027').textContent()).toBe(kladky);
 
 	expect(errs).toEqual([]);
@@ -72,6 +75,7 @@ test('zaškrtnutá FAB prežije „Späť a upraviť"', async ({ page }) => {
 	await zaklad(page, '03');
 	await page.getByLabel('Systém').selectOption('Robust');
 	await page.getByLabel(FAB).check();
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
@@ -87,6 +91,7 @@ test('systémy bez kovania: pole FAB ani karta kovania nie sú', async ({ page }
 	await zaklad(page, '04');
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -106,6 +111,7 @@ test('zimná záhrada: kusy sa sčítajú za oba posuvy', async ({ page }) => {
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps0-s').fill('3500');
 	await page.locator('#ps0-v').fill('2100');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 	await waitHydrated(page);
 
@@ -122,6 +128,7 @@ test('po odoslaní vidno kovanie aj na potvrdzovacej obrazovke', async ({ page }
 	await zaklad(page, '06');
 	await page.getByLabel('Systém').selectOption('Robust');
 	await page.getByLabel('Štýl').selectOption('2K');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 	// TEST režim (MONEY_LIVE nie je 1) — zapisuje sa do testovacieho priečinka, nie do Money

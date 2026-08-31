@@ -6,6 +6,7 @@
 
 import type { Klin } from '$lib/klin';
 import type { Sietka, SietkaUchyt } from '$lib/sietka';
+import type { Farba } from '$lib/komponenty';
 
 // mm → čitateľné (max 3 desatinné, čiarka). Presunuté z +page (#250); display-only.
 export const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
@@ -62,6 +63,7 @@ export type PlanVstup = {
 	caka: boolean;
 	pridavnaKolajnica: boolean;
 	jednostrannaFab: boolean;
+	farbaKovania: Farba | null;
 	klin: Klin | null;
 	kolajnica: { horna?: number; spodna?: number } | null;
 	sietka: Sietka | null;

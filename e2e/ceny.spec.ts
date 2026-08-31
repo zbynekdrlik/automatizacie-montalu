@@ -4,7 +4,7 @@
 // nikdy sem nepíš reálnu Money cenu). Nula console errors/warnings všade.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { collectConsole, loginAs, goto, skipAkLive } from './helpers';
+import { collectConsole, loginAs, goto, skipAkLive, vyberFarbuKovania } from './helpers';
 
 // Robust|2K@2509×1930 — presne ten istý vektor ako tests/money.test.ts (kód
 // ZASP00014 v odpise overený 1:1), aby fixture snapshot nižšie vedel presne, ktoré
@@ -29,6 +29,7 @@ test('bez Money snapshotu appka ukáže "cena neznáma" v náhľade, súčty pri
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await vyplnZasklenie(page, `E2E-CENY-BEZ-${Date.now()}`);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	await expect(page.getByTestId('ceny-tabulka')).toBeVisible();
@@ -83,6 +84,7 @@ test('so seednutým Money snapshotom appka ukáže reálne (vymyslené) ceny + k
 	);
 	await loginAs(page);
 	await vyplnZasklenie(page, `E2E-CENY-OK-${Date.now()}`);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	// Robust vždy pridáva aj kovanie/tesnenia (ZASK* kódy, mimo tejto fixture) —
@@ -104,6 +106,7 @@ test('/odpisy/[id]: detail histórie ukáže položky + ceny KONKRÉTNEHO odpisu
 	await loginAs(page);
 	const zak = `E2E-CENY-DETAIL-${Date.now()}`;
 	await vyplnZasklenie(page, zak);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');

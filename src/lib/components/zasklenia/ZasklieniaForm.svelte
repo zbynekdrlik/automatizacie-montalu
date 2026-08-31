@@ -11,6 +11,7 @@
 	import { posuvySlovom } from '$lib/popis';
 	import { standardPlusRailEligible } from '$lib/styl';
 	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
+	import type { Farba } from '$lib/komponenty';
 	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 	import { KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
@@ -42,6 +43,7 @@
 		cakaS = $bindable(false),
 		pridavnaKolajnicaS = $bindable(false),
 		jednostrannaFabS = $bindable(false),
+		farbaKovaniaS = $bindable(''),
 		kolHS = $bindable(''),
 		kolSS = $bindable(''),
 		klinS = $bindable(false),
@@ -64,6 +66,7 @@
 		jeOpona,
 		jeRobust,
 		maKovanie,
+		maFarbu,
 		maKolajnicu,
 		maSietka,
 		sietkaStranaVal,
@@ -103,6 +106,7 @@
 		cakaS?: boolean;
 		pridavnaKolajnicaS?: boolean;
 		jednostrannaFabS?: boolean;
+		farbaKovaniaS?: '' | Farba;
 		kolHS?: number | string;
 		kolSS?: number | string;
 		klinS?: boolean;
@@ -124,6 +128,7 @@
 		jeOpona: boolean;
 		jeRobust: boolean;
 		maKovanie: boolean;
+		maFarbu: boolean;
 		maKolajnicu: boolean;
 		maSietka: boolean;
 		sietkaStranaVal: 'ľavá' | 'pravá' | null;
@@ -349,6 +354,25 @@
 					/>
 					🔑 Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)
 				</label>
+			</div>
+		{/if}
+		<!-- RAL farba kovania (#338) — vyberá Money kód farebného variantu (kľučka/
+		     krytka vložky / Štandard zámok R9005 vs R7016). Bez voľby engine vyhlási
+		     chybu, aby sa do Money nedostal zlý/žiadny farebný variant. -->
+		{#if maFarbu}
+			<div class="field">
+				<label for="farbaKovania">🎨 Farba kovania (RAL) — MENÍ Money kód</label>
+				<select
+					id="farbaKovania"
+					name="farbaKovania"
+					bind:value={farbaKovaniaS}
+					data-testid="farba-kovania"
+					required
+				>
+					<option value="">— vyber farbu kovania —</option>
+					<option value="R9005">R9005 (čierna)</option>
+					<option value="R7016">R7016 (antracit)</option>
+				</select>
 			</div>
 		{/if}
 		<!-- Ručná dĺžka koľajnice (Patrik 2026-07-28): dielňa občas reže hornú a spodnú

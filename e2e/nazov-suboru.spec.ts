@@ -5,7 +5,7 @@
 // len „ZAK - zákazník [hash].xlsx". Zápisové kroky sú za `skipAkLive`, takže
 // do Money nikdy nič nejde.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, skipAkLive } from './helpers';
+import { collectConsole, loginAs, goto, skipAkLive, vyberFarbuKovania } from './helpers';
 
 const RUN = `NS-${Date.now().toString(36).toUpperCase()}`;
 
@@ -22,6 +22,7 @@ test('zasklenia: názov súboru je „ZAK - zákazník", aj keď do kolónky nap
 	await page.getByLabel('Zákazník *').fill('E2E Nazov');
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('sklo-sirka')).toBeVisible();
 	await page.getByTestId('odoslat').click();

@@ -89,3 +89,14 @@ export async function loginAs(page: Page, user = E2E_USER, pass = E2E_PASS) {
 	await expect(page).toHaveURL(/\/zasklenia/);
 	await page.waitForSelector('html[data-hydrated="1"]', { state: 'attached' });
 }
+
+/**
+ * #338: kovanie RS Robust/Štandard vyžaduje zvolenú RAL farbu — bez nej engine
+ * odmietne odpis a náhľad sa nezobrazí. Tento pomocník zvolí farbu, keď je select
+ * na obrazovke (Robust/Štandard, aj cez ďalší posuv), a je NO-OP pri systémoch bez
+ * farebného kovania (Deluxe/Slide/Štandard +). Volaj ho PRED „Spočítať".
+ */
+export async function vyberFarbuKovania(page: Page, farba: 'R9005' | 'R7016' = 'R9005') {
+	const sel = page.getByTestId('farba-kovania');
+	if ((await sel.count()) > 0) await sel.selectOption(farba);
+}

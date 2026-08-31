@@ -2,7 +2,7 @@
 // správa sa ako obyčajná 6 mm (basic nárezák, žiadny IZO „U" profil). Read-only tok —
 // len „Spočítať nárezový plán", nič sa neodosiela do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const SKLO = 'Sklo (základ — určuje vzorec)';
 const RUN = `E2E-331-${Date.now().toString(36).slice(-5)}`;
@@ -33,6 +33,7 @@ test('Štandard plus: „3.3.1" je v ponuke skla a ťahá basic nárezák (ako 6
 	await page.getByLabel(SKLO).selectOption('3.3.1');
 	// nie je izolačné → ťahá BASIC nárezák, presne ako „Float sklo 6 mm"
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 4K.');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
@@ -56,6 +57,7 @@ test('starý Štandard: „3.3.1" je v ponuke skla a ťahá basic nárezák', as
 	await page.getByLabel('Výška (mm) *').fill('2200');
 	await page.getByLabel(SKLO).selectOption('3.3.1');
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard 2K.');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 

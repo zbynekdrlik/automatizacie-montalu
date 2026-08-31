@@ -173,3 +173,29 @@ describe('computeMulti — kovanie je len prieťahové pole, výpočet nemení',
 		expect(s.material).toEqual(bez.material);
 	});
 });
+
+describe('farbaKovania — parse bez tichého defaultu (#338)', () => {
+	it('platná RAL farba sa uloží (single aj multi, order-level)', () => {
+		expect(parseVstup(fd({ ...zaklad, farbaKovania: 'R9005' })).vstup.farbaKovania).toBe('R9005');
+		expect(parseVstup(fd({ ...zaklad, farbaKovania: 'R7016' })).vstup.farbaKovania).toBe('R7016');
+		const posuvy = JSON.stringify([
+			{ system: 'Robust', styl: '2K', s: '3000', v: '2200', sklo: zaklad.sklo, otvaranie: 'P - L' }
+		]);
+		expect(
+			parseMultiVstup(fd({ zak: 'Z', op: 'O', zakaznik: 'X', posuvy, farbaKovania: 'R7016' })).vstup
+				.farbaKovania
+		).toBe('R7016');
+	});
+
+	it('chýbajúca/neplatná farba → null, NIKDY default na R9005', () => {
+		expect(parseVstup(fd(zaklad)).vstup.farbaKovania).toBeNull();
+		expect(parseVstup(fd({ ...zaklad, farbaKovania: 'R0000' })).vstup.farbaKovania).toBeNull();
+		expect(parseVstup(fd({ ...zaklad, farbaKovania: '' })).vstup.farbaKovania).toBeNull();
+		const posuvy = JSON.stringify([
+			{ system: 'Robust', styl: '2K', s: '3000', v: '2200', sklo: zaklad.sklo, otvaranie: 'P - L' }
+		]);
+		expect(
+			parseMultiVstup(fd({ zak: 'Z', op: 'O', zakaznik: 'X', posuvy })).vstup.farbaKovania
+		).toBeNull();
+	});
+});

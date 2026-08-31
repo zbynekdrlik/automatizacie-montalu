@@ -6,8 +6,15 @@ import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnic
 // Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
 import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 import { jeSietkaUchyt, maSietkaSystem, maSietkaSystemVyber, type Sietka } from '$lib/sietka';
+import type { Farba } from '$lib/komponenty';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
+
+/** Zvolená RAL farba kovania z formulára — null = nezvolená (fail-loud v engine). */
+export function parseFarba(raw: FormDataEntryValue | null): Farba | null {
+	const v = String(raw ?? '').trim();
+	return v === 'R9005' || v === 'R7016' ? v : null;
+}
 
 /** Štandard +: štýl je LEN počet krídel; „ IZO" (starý formulár / bookmark) sa
  *  zahodí — basic/IZO nárezák vyberá zvolené sklo (`sysStylPre`). */
@@ -261,6 +268,10 @@ export interface Vstup {
 	/** jednostranná FAB — výnimka (Dominik: „chodí jeden zo 100"). MENÍ Money odpis:
 	 *  kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. */
 	jednostrannaFab: boolean;
+	/** RAL farba kovania (R9005/R7016) — vyberá farebný variant kovania do Money
+	 *  odpisu (kľučka/krytka vložky, Štandard zámok). null = nezvolená → engine
+	 *  vyhlási chybu, keď systém má farebnú položku (#338). */
+	farbaKovania: Farba | null;
 	/** klín nad posuvom (Patrik) — display-only, do Money odpisu NEJDE; null = žiadny */
 	klin: Klin | null;
 	/** ručne zadané dĺžky koľajníc — MENÍ Money odpis; null = počítaj zo šírky */
@@ -311,6 +322,7 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
 		jednostrannaFab: form.get('jednostrannaFab') === '1',
+		farbaKovania: parseFarba(form.get('farbaKovania')),
 		klin: null,
 		kolajnica: null,
 		sietka: null
@@ -387,6 +399,8 @@ export interface MultiVstup {
 	pridavnaKolajnica: boolean;
 	/** jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks) */
 	jednostrannaFab: boolean;
+	/** RAL farba kovania (R9005/R7016) — spoločná pre celú objednávku (#338) */
+	farbaKovania: Farba | null;
 	posuvy: PosuvVstup[];
 }
 
@@ -407,7 +421,8 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			.slice(0, 40),
 		caka: form.get('caka') === '1',
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
-		jednostrannaFab: form.get('jednostrannaFab') === '1'
+		jednostrannaFab: form.get('jednostrannaFab') === '1',
+		farbaKovania: parseFarba(form.get('farbaKovania'))
 	};
 	let posuvyRaw: unknown;
 	try {

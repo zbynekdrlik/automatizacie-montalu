@@ -8,7 +8,7 @@
 // tento výpis nesmie zmeniť ani jeden riadok odpisu — test to overuje.
 // Všetko čítacie („Spočítať"), do Money nejde nič.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const LAVA = 'Obojstranná kľučka s FAB';
 const PRAVA = 'Jednostranná kľučka z vnútra bez FAB';
@@ -34,6 +34,7 @@ test('jeden posuv: kľučky sú vypísané pod posuvom a Money odpis je NEZMENEN
 
 	// (1) bez kovania — referenčný odpis, karta sa nezobrazuje
 	await zaklad(page, 'E2E-KOVV');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	const bezKovania = await odpisRiadky(page);
@@ -44,6 +45,7 @@ test('jeden posuv: kľučky sú vypísané pod posuvom a Money odpis je NEZMENEN
 	await waitHydrated(page);
 	await page.selectOption('#kovanieL', LAVA);
 	await page.selectOption('#kovanieP', PRAVA);
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -72,6 +74,7 @@ test('viac posuvov: kovanie je vypísané per posuv, posuv bez kovania sa neuvá
 	await page.locator('#ps0-s').fill('4365');
 	await page.locator('#ps0-v').fill('2320');
 	await page.selectOption('#ps0-kovp', PRAVA);
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -105,6 +108,7 @@ test('opona: pole pre stredové okno je len pri 2× štýle a kreslí sa do stre
 	await page.selectOption('#kovanieP', LAVA);
 	await page.selectOption('#kovanieStred', PRAVA);
 	await page.selectOption('#kovanieStredOkno', 'P');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
