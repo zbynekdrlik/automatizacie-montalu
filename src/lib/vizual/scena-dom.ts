@@ -15,12 +15,16 @@ import {
 	vytvorDlazbuTexturu,
 	vytvorTerasaAlphaTexturu,
 	vytvorStrechaTexturu,
-	vytvorTravnikTexturu
+	vytvorTravnikTexturu,
+	vytvorDreveneDrevoTexturu,
+	vytvorOmietkaTexturu
 } from './textury';
+import { pridajOkno, pridajDvere, type OtvorMaterialy } from './scena-dom-otvory';
 import type { TierNastavenia } from './kvalita';
 import type { Disposable } from './scena';
 
 type ThreeNS = typeof import('three');
+type StdMat = InstanceType<ThreeNS['MeshStandardMaterial']>;
 
 export interface DomPrvky {
 	skupina: InstanceType<ThreeNS['Group']>;
@@ -30,14 +34,19 @@ export interface DomPrvky {
 // Svetlá odsaturovaná paleta (SalesQueze) — biela/svetlošedá fasáda, antracit strecha.
 const FARBA_FASADA = 0xe2ddd4; // svetlá omietka (odsaturovaná, nech pergola vynikne)
 const FARBA_STRECHA = 0x3a3f45; // antracit plech (low-tier flat, inak seam textúra)
-const FARBA_OKNO_RAM = 0xf2efe9; // biely rám okna
-const FARBA_SKLO = 0x9fb8c8; // jemne tónované sklo (studený odtieň)
-const FARBA_DVERE_RAM = 0x4a3826;
-const FARBA_DVERE = 0x6b4f36; // teplé drevo
-const FARBA_KLUCKA = 0xb8bcc2;
-const FARBA_SOKEL = 0x8a8175;
+const FARBA_SOKEL = 0x6f6b64; // #336: tmavší sokel (uzemní fasádu proti terase — CE domy ho vždy majú)
 const FARBA_KMEN = 0xa59e90; // bledy sedohnedy kmen
 const FARBA_KORUNA = 0xd7dbd2; // bleda sedozelena koruna (SalesQueze near-white, nesutazi s produktom)
+
+// #336 — paleta ZAPUSTENÝCH otvorov (SalesQueze realizmus). Sklo je TMAVÉ — vertex gradient
+// (biely base × gradient nesie albedo) + env odraz nesú vzhľad; svetlá base by čítala ako
+// plochá pastelová modrá (root cause „lego"). Rám svetlý (jeho vnútorné steny = svetlé ostenie).
+const FARBA_OKNO_RAM = 0xeceae4; // svetlý rám okna/dverí (proud extrude)
+const FARBA_REVEAL_TIEN = 0x565a5e; // tmavý tieňový prúžok pod horným ostením (fake AO)
+const FARBA_PARAPET = 0xcfcabf; // parapet/nadpražie (svetlý kameň)
+const FARBA_DREVO = 0x6e5844; // teplé odsaturované drevo dverí (low-tier flat = mapa base)
+const FARBA_OCEL = 0x9a9c9e; // brúsená oceľ kľučky
+const FARBA_LAT_POZADIE = 0x2b2b28; // tmavé pozadie za latami (tiene medzier)
 
 /** Dvojpodlažná fasáda + sedlová plechová strecha + raster okien + drevené dvere + sokel,
  *  umiestnené PRED pôvodnou (teplou) stenou tak, že ju svetlé prekrytie zakryje. Dvere sú
@@ -91,11 +100,21 @@ export function vytvorDom(
 	//     šírky), tesne (5 mm) PRED pôvodnou (teplou) stenou, celé 2 podlažia (orbit je predný,
 	//     zadnú stranu nikdy nevidno → FrontSide stačí). ---
 	const gFasada = new THREE.PlaneGeometry(mm(FASADA_W), mm(CELKOVA_H));
-	const mFasada = new THREE.MeshStandardMaterial({
-		color: FARBA_FASADA,
-		roughness: 0.95,
-		metalness: 0
-	});
+	// #336: jemná procedurálna OMIETKA (mid/high) proti plochosti; low tier = plochá farba.
+	let mFasada: StdMat;
+	if (flat) {
+		mFasada = new THREE.MeshStandardMaterial({
+			color: FARBA_FASADA,
+			roughness: 0.95,
+			metalness: 0
+		});
+	} else {
+		const omietka = vytvorOmietkaTexturu(THREE);
+		omietka.wrapS = omietka.wrapT = THREE.RepeatWrapping;
+		omietka.repeat.set(mm(FASADA_W) / 1.5, mm(CELKOVA_H) / 1.5); // ~1 dlaždica omietky / 1,5 m
+		mFasada = new THREE.MeshStandardMaterial({ map: omietka, roughness: 0.95, metalness: 0 });
+		disposables.push(omietka);
+	}
 	const fasada = new THREE.Mesh(gFasada, mFasada);
 	fasada.position.set(0, mm(CELKOVA_H / 2), mm(5));
 	fasada.receiveShadow = tiene;
@@ -171,65 +190,99 @@ export function vytvorDom(
 		disposables.push(g);
 	}
 
-	// Kolízne clampy (#325, review 🔴): PRÍZEMNÉ prvky (dvere + spodné okná) sú v priestore
-	// PERGOLY, takže MUSIA ostať pod pripojením pergoly a v čistej medzere medzi rámom dverí a
-	// krajným stĺpom (x=±S/2) — inak pri malej/nízkej pergole (S=2000, SV=2000) prepichnú stĺp,
-	// strešné sklo, alebo koplanárne kolidujú s dverami (z-fight). POSCHODOVÉ okná sú NAD pergolou
-	// (y > pripojenie), takže sú bez kolízie a môžu byť plné.
-	const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-	const stlpX = S / 2; // vnútorná hrana krajného stĺpa ≈ stlpX − 50
-	const stropPrvkov = Math.max(1500, Math.round(SV) - 300); // pod bočný nosník pergoly
-
-	const oknoRaster = (cxMm: number, cyMm: number, w: number, h: number): void => {
-		box(w + 120, h + 120, 40, FARBA_OKNO_RAM, 0.8, 0, cxMm, cyMm, 50); // rám
-		box(w, h, 24, FARBA_SKLO, 0.08, 0, cxMm, cyMm, 66); // tónované sklo (nízka drsnosť = odraz)
-		box(w, 44, 30, FARBA_OKNO_RAM, 0.8, 0, cxMm, cyMm, 74); // vodorovná priečka
-		box(44, h, 30, FARBA_OKNO_RAM, 0.8, 0, cxMm, cyMm, 74); // zvislá priečka
+	// #336 — ZDIEĽANÉ materiály otvorov (vytvorené RAZ, každý do disposables; per-otvor sa
+	// zdieľajú → málo state changes). Sklo: biely base + vertexColors (gradient nesie albedo);
+	// mid/high `scene.environment` pridá reálny odraz, low tier ukáže gradient (nie „čierna diera").
+	// Drevo: mid/high procedurálna kresba, low plochá farba.
+	const skloMat = new THREE.MeshStandardMaterial({
+		color: 0xffffff, // biely base — vertex gradient nesie albedo (tmavé sklo)
+		vertexColors: true,
+		roughness: 0.08,
+		metalness: 0,
+		envMapIntensity: 1.7
+	});
+	disposables.push(skloMat);
+	let drevoMat: StdMat;
+	if (flat) {
+		drevoMat = new THREE.MeshStandardMaterial({
+			color: FARBA_DREVO,
+			roughness: 0.62,
+			metalness: 0
+		});
+	} else {
+		const drevoTex = vytvorDreveneDrevoTexturu(THREE);
+		drevoTex.wrapS = drevoTex.wrapT = THREE.RepeatWrapping;
+		drevoMat = new THREE.MeshStandardMaterial({ map: drevoTex, roughness: 0.62, metalness: 0 });
+		disposables.push(drevoTex);
+	}
+	disposables.push(drevoMat);
+	const otvorMat: OtvorMaterialy = {
+		sklo: skloMat,
+		ram: new THREE.MeshStandardMaterial({ color: FARBA_OKNO_RAM, roughness: 0.6, metalness: 0 }),
+		revealTien: new THREE.MeshStandardMaterial({
+			color: FARBA_REVEAL_TIEN,
+			roughness: 0.95,
+			metalness: 0
+		}),
+		parapet: new THREE.MeshStandardMaterial({
+			color: FARBA_PARAPET,
+			roughness: 0.85,
+			metalness: 0
+		}),
+		drevo: drevoMat,
+		ocel: new THREE.MeshStandardMaterial({ color: FARBA_OCEL, roughness: 0.35, metalness: 0.9 }),
+		latPozadie: new THREE.MeshStandardMaterial({
+			color: FARBA_LAT_POZADIE,
+			roughness: 0.9,
+			metalness: 0
+		})
 	};
+	disposables.push(
+		otvorMat.ram,
+		otvorMat.revealTien,
+		otvorMat.parapet,
+		otvorMat.ocel,
+		otvorMat.latPozadie
+	);
+	const otvorCtx = { THREE, skupina, disposables, tiene, mat: otvorMat, fasadaZmm: 5 };
 
-	// --- DREVENÉ DVERE, centrované na x=0; výška ORezaná pod pripojenie pergoly ---
+	// Kolízne clampy (#325 zachované): PRÍZEMNÉ prvky (dvere + ich latová bočnica + pravé prízemné
+	// okno) sú v priestore PERGOLY → MUSIA ostať pod pripojením pergoly (stropPrvkov) a v |x| ≤
+	// budgetHalfXmm (vnútri krajných stĺpov ±(S/2−50)). POSCHODOVÉ okná sú NAD pergolou (bez clampu).
+	const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+	const stlpX = S / 2;
+	const stropPrvkov = Math.max(1500, Math.round(SV) - 300); // pod bočný nosník pergoly
+	const budgetHalfXmm = stlpX - 55; // 5 mm rezerva pod kolíznu hranicu (S/2 − 50) testu
+
+	// --- DVERE (tvar c): drevené krídlo + presklený inlay + kľučka + latová bočnica (vľavo) ---
 	const dvereW = clamp(Math.round(0.22 * S), 760, 1000);
 	const dvereH = Math.min(2100, stropPrvkov - 100);
-	const dvereRamHalf = (dvereW + 120) / 2;
-	box(dvereW + 120, dvereH + 80, 40, FARBA_DVERE_RAM, 0.7, 0.05, 0, (dvereH + 80) / 2, 50); // rám
-	box(dvereW, dvereH, 60, FARBA_DVERE, 0.6, 0, 0, dvereH / 2, 78); // drevené krídlo
-	box(dvereW - 160, 46, 26, FARBA_DVERE_RAM, 0.6, 0, 0, dvereH * 0.62, 96); // deliaci pruh
-	box(
-		46,
-		clamp(200, 120, dvereH * 0.4),
-		40,
-		FARBA_KLUCKA,
-		0.35,
-		0.7,
-		dvereW / 2 - 100,
-		dvereH * 0.45,
-		100
-	); // kľučka
+	pridajDvere(otvorCtx, { krideloWmm: dvereW, krideloHmm: dvereH, budgetHalfXmm, flat });
 
-	// --- POSCHODOVÉ okná (nad pergolou, bez kolízie): 3 across, plná veľkosť ---
+	// --- POSCHODOVÉ okná (nad pergolou, bez kolízie): 3 zapustené okná ---
 	const oknoHornaW = 820;
 	const oknoHornaH = 1150;
-	const oknoHornaX = Math.min(S * 0.3, FASADA_W / 2 - (oknoHornaW / 2 + 120));
+	const oknoHornaX = Math.min(S * 0.32, FASADA_W / 2 - (oknoHornaW / 2 + 140));
 	const yPoschodie = PRIZEMIE_H + POSCHODIE_H * 0.5;
-	oknoRaster(-oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
-	oknoRaster(0, yPoschodie, oknoHornaW, oknoHornaH);
-	oknoRaster(oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+	pridajOkno(otvorCtx, -oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+	pridajOkno(otvorCtx, 0, yPoschodie, oknoHornaW, oknoHornaH);
+	pridajOkno(otvorCtx, oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
 
-	// --- PRÍZEMNÉ okná (v pergole → CLAMPnuté): symetricky do čistej medzery rám-dverí↔stĺp,
-	//     vynechané ak sa medzera nezmestí (ako #325 → NIKDY nekolidujú s dverami ani stĺpom). ---
-	const medzeraLo = dvereRamHalf + 180; // pravý okraj rámu dverí + rezerva
-	const medzeraHi = stlpX - 150; // ľavý okraj stĺpa − rezerva
-	const oknoDolnaW = Math.min(760, Math.round((medzeraHi - medzeraLo) * 0.7));
-	const oknoDolnaHMax = Math.min(1050, stropPrvkov - 960); // rám (oknoH+120) hore = 900+oknoH+60 ≤ stropPrvkov
+	// --- PRAVÉ PRÍZEMNÉ okno (asymetria ako SalesQueze: vstup + latová bočnica vľavo, okno
+	//     vpravo). Vynechané ak sa medzera nezmestí (malá pergola → NIKDY nekoliduje). ---
+	const oknoLo = dvereW / 2 + 120; // pravý okraj rámu dverí + rezerva
+	const oknoHi = budgetHalfXmm; // pravý okraj parapetu ≤ toto → pod kolíznu hranicu
+	const oknoDolnaHMax = Math.min(1050, stropPrvkov - 960);
+	const oknoDolnaW = Math.min(760, Math.round((oknoHi - oknoLo) * 0.7) - 100); // −100 = presah parapetu
 	if (oknoDolnaW >= 360 && oknoDolnaHMax >= 500) {
-		const oknoDolnaX = (medzeraLo + medzeraHi) / 2;
+		const parapetHalf = (oknoDolnaW + 100) / 2;
+		const oknoDolnaX = clamp((oknoLo + oknoHi) / 2, oknoLo + parapetHalf, oknoHi - parapetHalf);
 		const cy = 900 + oknoDolnaHMax / 2; // parapet 900 mm
-		oknoRaster(-oknoDolnaX, cy, oknoDolnaW, oknoDolnaHMax);
-		oknoRaster(oknoDolnaX, cy, oknoDolnaW, oknoDolnaHMax);
+		pridajOkno(otvorCtx, oknoDolnaX, cy, oknoDolnaW, oknoDolnaHMax);
 	}
 
-	// --- SOKEL (parapetný pás pri zemi, tmavší kameň) ---
-	box(FASADA_W, 360, 60, FARBA_SOKEL, 0.9, 0, 0, 180, 55);
+	// --- SOKEL (tmavší pás pri zemi, uzemní fasádu proti terase) ---
+	box(FASADA_W, 340, 70, FARBA_SOKEL, 0.9, 0, 0, 170, 60);
 
 	return { skupina, disposables };
 }

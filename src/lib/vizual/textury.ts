@@ -205,6 +205,64 @@ export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture 
 	return ztexturuj(THREE, canvas);
 }
 
+/** #336 — ZVISLÁ kresba dreva pre dvere (SalesQueze „profi drevo, nie doska").
+ *  Teplá odsaturovaná základná farba + jemné ZVISLÉ prúžky (per-stĺpec jitter
+ *  svetlosti ±7 % — Fable konzultácia: vysoký kontrast kresby = „tlačený
+ *  plastový vzhľad", preto ZÁMERNE jemný) + riedke tmavšie letokruhové čiary.
+ *  Vertikálna orientácia = kresba beží po výške krídla (`repeat` volajúci nechá
+ *  1×N). Používa `Math.random` (v teste mockovať + `finally` restore). */
+export function vytvorDreveneDrevoTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	const zaklad: [number, number, number] = hexNaRgb('#6e5844'); // teplé odsaturované drevo
+	// per-stĺpec (zvislý prúžok) jemná luminančná variácia
+	for (let x = 0; x < rozlisenie; x++) {
+		const jitter = (Math.random() * 2 - 1) * 0.07; // ±7 % (jemné, nie „plast")
+		const f = zaklad.map((c) => Math.max(0, Math.min(255, c * (1 + jitter)))) as [
+			number,
+			number,
+			number
+		];
+		ctx.fillStyle = `rgb(${f[0] | 0}, ${f[1] | 0}, ${f[2] | 0})`;
+		ctx.fillRect(x, 0, 1, rozlisenie);
+	}
+	// riedke tmavšie zvislé letokruhové čiary (jemný náznak, nízke alpha)
+	const pocetCiar = 10;
+	for (let i = 0; i < pocetCiar; i++) {
+		const x = Math.floor(Math.random() * rozlisenie);
+		ctx.fillStyle = 'rgba(40,28,18,0.10)';
+		ctx.fillRect(x, 0, 1, rozlisenie);
+	}
+	return ztexturuj(THREE, canvas);
+}
+
+/** #336 — svetlá odsaturovaná OMIETKA fasády (SalesQueze: čistá matná takmer-biela
+ *  s JEMNOU štruktúrou, nie plochá farba). 2-oktávový šum okolo bledého základu,
+ *  minimálny kontrast (fasáda nemá súťažiť s pergolou). Mid/high tier only (low
+ *  tier ostáva plochá farba). Používa `Math.random` (v teste mockovať + restore). */
+export function vytvorOmietkaTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	const zaklad: [number, number, number] = hexNaRgb('#e2ddd4'); // svetlá omietka (parita s FARBA_FASADA)
+	const tmava: [number, number, number] = hexNaRgb('#d3cdc2'); // len jemne tmavšia (nízky kontrast)
+	const img = ctx.createImageData(rozlisenie, rozlisenie);
+	for (let i = 0; i < img.data.length; i += 4) {
+		let v = 0;
+		let vaha = 0;
+		for (let okt = 0; okt < 2; okt++) {
+			const w = 1 / 2 ** okt;
+			v += Math.random() * w;
+			vaha += w;
+		}
+		v /= vaha;
+		const rgb = miesaj(zaklad, tmava, v);
+		img.data[i] = rgb[0];
+		img.data[i + 1] = rgb[1];
+		img.data[i + 2] = rgb[2];
+		img.data[i + 3] = 255;
+	}
+	ctx.putImageData(img, 0, 0);
+	return ztexturuj(THREE, canvas);
+}
+
 /** Dvojvrstvový kontaktný tieň — mäkká vrstva (radiálny gradient) + tvrdé
  *  jadro (samotný pôdorys), oba v JEDNEJ textúre (dve vrstvy nakreslené nad
  *  seba), aplikuje sa na alpha-decal rovinu.

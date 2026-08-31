@@ -25,7 +25,9 @@ import {
 	vytvorKontaktnyTienTexturu,
 	vytvorOblohuTexturu,
 	vytvorStenuTexturu,
-	vytvorTerasaAlphaTexturu
+	vytvorTerasaAlphaTexturu,
+	vytvorDreveneDrevoTexturu,
+	vytvorOmietkaTexturu
 } from '../src/lib/vizual/textury';
 import { vytvorStenu, vytvorZem } from '../src/lib/vizual/scena';
 import { nastaveniaPreTier } from '../src/lib/vizual/kvalita';
@@ -336,5 +338,58 @@ describe('vytvorTerasaAlphaTexturu (#333) — obdĺžniková okrajová alpha (ja
 		const a = data[at(okrajX, R / 2) + 3]!;
 		expect(a).toBeGreaterThan(0);
 		expect(a).toBeLessThan(255);
+	});
+});
+
+describe('vytvorDreveneDrevoTexturu (#336) — ZVISLÁ kresba dreva (per-stĺpec prúžky + čiary)', () => {
+	it('canvas 512×512, sRGB, needsUpdate (version>0)', () => {
+		const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+		try {
+			const tex = vytvorDreveneDrevoTexturu(THREE);
+			const canvas = fakeCanvasOf(tex);
+			expect(canvas.width).toBe(512);
+			expect(canvas.height).toBe(512);
+			expect(tex.colorSpace).toBe(THREE.SRGBColorSpace);
+			expect(tex.version).toBeGreaterThan(0);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it('kreslí 512 ZVISLÝCH stĺpcov (w=1, h=512) + 10 letokruhových čiar = 522 fillRectov', () => {
+		const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+		try {
+			const tex = vytvorDreveneDrevoTexturu(THREE);
+			const ctx = fakeCanvasOf(tex).getContext('2d')!;
+			expect(ctx.fillRectCalls).toHaveLength(512 + 10);
+			// prvých 512 = zvislé stĺpce (celá výška, 1 px široké) s rgb() farbou z base 0x6e5844
+			expect(ctx.fillRectCalls[0]).toMatchObject({ x: 0, y: 0, w: 1, h: 512 });
+			expect(String(ctx.fillRectCalls[0]!.fillStyle)).toMatch(/^rgb\(/);
+			// čiary sú polopriehľadné tmavé (rgba) — jemný náznak
+			expect(String(ctx.fillRectCalls[512]!.fillStyle)).toMatch(/^rgba\(40,28,18/);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+});
+
+describe('vytvorOmietkaTexturu (#336) — svetlá odsaturovaná omietka (jemný šum)', () => {
+	it('canvas 512×512, sRGB, version>0, per-pixel šum cez putImageData', () => {
+		const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+		try {
+			const tex = vytvorOmietkaTexturu(THREE);
+			const canvas = fakeCanvasOf(tex);
+			const ctx = canvas.getContext('2d')!;
+			expect(canvas.width).toBe(512);
+			expect(canvas.height).toBe(512);
+			expect(tex.colorSpace).toBe(THREE.SRGBColorSpace);
+			expect(tex.version).toBeGreaterThan(0);
+			expect(ctx.lastImageData).not.toBeNull();
+			expect(ctx.lastImageData!.width).toBe(512);
+			// base je SVETLÝ (near-white omietka) — prvý pixel R kanál vysoký
+			expect(ctx.lastImageData!.data[0]).toBeGreaterThan(200);
+		} finally {
+			spy.mockRestore();
+		}
 	});
 });
