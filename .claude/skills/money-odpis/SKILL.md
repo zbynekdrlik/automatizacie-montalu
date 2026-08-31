@@ -615,9 +615,10 @@ Kovanie (Dominik 2026-07-28) je prvá kusová položka. Čo z toho vyplýva:
   `oversizeCut` / `missingHrubkaProfile`.
 - **Artikel v Money ≠ skladová zásoba.** Kód môže byť v `Artikly_Artikl` (a používateľ ho
   VIDÍ v Katalógu), ale bez riadku v `Sklady_Zasoba` naň nejde zapísať skladový pohyb.
-  Pri overovaní kódu sa preto pýtaj na OBE tabuľky; Slide kovanie je kvôli tomu vypnuté
-  cez `SLIDE_PRIPRAVENY`. (Diagnóza „ten kód v Money neexistuje" bola kvôli tomuto
-  nesprávna — Dominik ho v Katalógu videl.)
+  Pri overovaní kódu sa preto pýtaj na OBE tabuľky. (Diagnóza „ten kód v Money neexistuje"
+  bola kvôli tomuto nesprávna — Dominik ho v Katalógu videl.) `SLIDE_PRIPRAVENY` je od
+  #357 `true` — pozri 2o. nižšie pre flip-vzor + partial-exclusion, keď len NIEKTORÉ
+  kódy majú zásobu.
 - **Vstup, ktorý mení počty, musí prejsť celou cestou** (jednostranná FAB): `parse*Vstup`
   → `Vstup`/`MultiVstup` → `kovanieDoOdpisu` → `job.polozky` + `job.detail` (audit) →
   hidden inputy („Späť a upraviť"). Bez `detail` sa po rokoch nedá zistiť, prečo tá zákazka
@@ -836,6 +837,41 @@ nikdy ticho vynechať položky. Vzor testu: `tests/kovanie-deluxe.test.ts` descr
 neúplný LEN pri jednej hrúbke (Deluxe: 6mm krytky chýbajú, 10mm je kompletné), pevný text by
 zbytočne strašil aj kompletné objednávky. Typ je `Record<string, string | ((skloHrubka?: number)
 => string | null)>`, `kovanie.ts` vyhodnotí `typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka) : neuplneRaw`.
+
+## 2o. Flipnutie `*_PRIPRAVENY` gate keď len NIEKTORÉ kódy majú zásobu (#357)
+
+Keď denný sklad-snapshot potvrdí zásobu pre N/M kódov systému a zvyšné (M-N) ostávajú
+0 ks, vzor je **partial exclusion** (rovnaký, aký #354 zaviedlo pre Deluxe 6mm krytky):
+flipni `*_PRIPRAVENY` na `true`, ale VYNECHAJ konkrétne 0-ks kódy z komponentovej
+tabuľky (nikdy neposielaj ich do Money len preto, že zvyšok systému je hotový), a pridaj
+`KOVANIE_NEUPLNE.<Systém>` funkciu, ktorá operátorovi POVIE, čo chýba a prečo. Toto NIE
+je „počkaj na 100%" — 9/11 hotových kódov je reálna hodnota HNEĎ, zvyšné 2 sa dorobia
+neskôr (druhý PR, malý diff).
+
+**Gotcha #1 — flipnutie zapne farba-požiadavku, ktorú test fixtures doteraz nepotrebovali.**
+Kým bol systém úplne vypnutý (`komponentyPre` vracal `null`), `kovanieDoOdpisu` ho `continue`-ol
+BEZ toho, aby sa `pocitajKomponenty` vôbec zavolalo — takže `farbaKovania` nebola pre tento
+systém nikdy vyžadovaná, aj keby jeho tabuľka farebné položky MALA (Slide mala #353 RAL zámok
+už predtým). Flipnutím zapneš aj TÚTO požiadavku. Každý existujúci test fixture, ktorý
+odosiela objednávku tohto systému bez `farbaKovania`, teraz PADNE na „chýba zvolená farba
+kovania" namiesto na to, čo pôvodne testoval (#357 dopadlo na 4 súbory: `odpis-detail-vstup-raw`,
+`odpis-write-failure`, `zasklenia-detail-sklo`, `zasklenia-posuvspec-golden` — VŠETKY chýbajúce
+`farbaKovania` na Slide fixtures). **Pred flipnutím vyhľadaj VŠETKY fixtures daného systému**
+(`grep -rn "system: '<Systém>'" tests/`) a priprav sa doplniť `farbaKovania` tam, kde ho fixture
+nemá — zvoľ farbu, ktorá má zásobu (nie natvrdo `R9005` z default fixture helpera).
+
+**Gotcha #2 — vynechanie ZVYŠNÉHO jediného farebného kódu spustí #354 „žiadna zhoda" HLASNÚ
+chybu, nie tichý skip.** Keď mal systém DVA RAL varianty (napr. Slide zámok R9005/R7016) a
+odstrániš JEDEN pre 0 ks, `pocitajKomponenty`'s `farebnyKandidatVideny`/`farebnaZhodaNajdena`
+guard (2n. vyššie) teraz vidí LEN jeden farebný kandidát — voľba tej ODSTRÁNENEJ farby už
+NIE JE „farba sa nezhoduje na TENTO kód" (tichý skip), je to „farba sa nezhoduje na ŽIADEN
+kód tejto tabuľky" (HLASNÁ chyba, zastaví CELÝ posuv aj farbo-neutrálne položky). Toto je
+SPRÁVNE pre systém-only objednávku (UI `ralPreSystem`, `+page.server.ts`, je odvodené live
+z `komponentyPre(sys)` farieb, takže odstránená farba prestane byť v selecte ponúkaná —
+žiadna extra UI zmena netreba), ale zostáva DOSIAHNUTEĽNÉ pri zimnej záhrade, ktorá kombinuje
+tento systém s iným, čo danú farbu STÁLE ponúka (`ralOptions` je únia farieb naprieč
+posuvmi v objednávke) — over to testom (vzor: `tests/kovanie-odpis.test.ts` „SLIDE" describe,
+R9005-hard-fail case), nie len R7016-success cestou.
 
 **E2E pasca: `nazov` končiaci ČÍSLICOU (RAL kód, "Madlo D56") sa v `.row` textContente
 zlepí s množstvom BEZ medzery.** `PlanKarty.svelte`/`PlanKartyMulti.svelte` majú

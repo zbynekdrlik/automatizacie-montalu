@@ -34,10 +34,14 @@ function ev(mod: string, body: Record<string, string>) {
 }
 
 // posuvy prídu ako JSON pole (viď parseMultiVstup)
+// #357: Slide kovanie je zapnuté a jediný jeho Money farebný kód je R7016 (R9005
+// zámok má 0 ks skladu, vynechaný) — bez farby by odoslanie padlo skôr, než sa
+// vôbec dostane k testovanému zápisovému zlyhaniu.
 const MULTI = {
 	zak: 'ZAK-F1',
 	op: '01',
 	zakaznik: 'X',
+	farbaKovania: 'R7016',
 	posuvy: JSON.stringify([
 		{
 			system: 'Slide',
@@ -71,7 +75,10 @@ describe('zlyhanie zápisu odpisu — jednoposuv (audit #30)', () => {
 				s: '3000',
 				v: '2000',
 				sklo: 'Izolačné sklo 4/8/4 číre',
-				otvaranie: 'P - L'
+				otvaranie: 'P - L',
+				// #357: bez farby by Slide odpis padol skôr, než sa vôbec dostane
+				// k testovanému zápisovému zlyhaniu.
+				farbaKovania: 'R7016'
 			})
 		);
 		expect(r).toMatchObject({ step: 'form' });

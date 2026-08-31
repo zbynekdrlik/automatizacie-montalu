@@ -192,6 +192,14 @@ const KATALOG: Pravidlo[] = [
 	['BPK202529', 'Krytka krajovej nožičky R9006', (c) => ral(c, 'R9006', c.nozicka(0, 2, 2))]
 ];
 
+/**
+ * Usporiadaný zoznam VŠETKÝCH BPK kódov, ktoré katalóg môže vydať (jeden zdroj pravdy).
+ * Autoritatívny obsah + poradie = Dominikova tabuľka `att 14674` (98 riadkov / 57 kódov,
+ * #355/#368). `tests/bazen-komponenty-katalog.test.ts` ho zamyká proti nezávisle
+ * prepísanému zoznamu z tej tabuľky — tichý drop/pridanie kódu tak padne v CI.
+ */
+export const BPK_KODY: readonly string[] = KATALOG.map(([kod]) => kod);
+
 /** Vráti `qty` len keď sa zvolená RAL zhoduje s variantom riadku, inak 0 (absent). */
 function ral(c: Ctx, variant: RalKrytiek, qty: number): number {
 	return c.ralKrytiek === variant ? qty : 0;

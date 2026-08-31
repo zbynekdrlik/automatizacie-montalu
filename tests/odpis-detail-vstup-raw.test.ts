@@ -118,6 +118,10 @@ describe('zasklenia — jednoposuv: detail.vstupRaw == naparsovaný Vstup 1:1 (#
 		otvaranie: 'P - L',
 		poznamka: 'test poznámka',
 		ral: 'RAL 9016',
+		// #357: Slide kovanie je zapnuté a jediný jeho Money farebný kód je R7016
+		// (R9005 zámok má 0 ks skladu, vynechaný z KOMPONENTY_SLIDE) — bez farby by
+		// odoslanie padlo na chýbajúcej voľbe farby kovania.
+		farbaKovania: 'R7016',
 		klin: '1',
 		klinDlzka: '500',
 		klinSirka: '300',
@@ -157,7 +161,9 @@ describe('zasklenia — viac posuvov: detail.vstupRaw == naparsovaný MultiVstup
 			sietka: { uchyt: 'zamok' }
 		}
 	]);
-	const BODY = { zak: 'ZAK-Z2', op: '01', zakaznik: 'X', posuvy };
+	// #357: Slide kovanie je zapnuté a jediný jeho Money farebný kód je R7016
+	// (R9005 zámok má 0 ks skladu, vynechaný) — bez farby by odoslanie padlo.
+	const BODY = { zak: 'ZAK-Z2', op: '01', zakaznik: 'X', farbaKovania: 'R7016', posuvy };
 
 	it('vstupRaw je hlboko rovný tomu, čo parseMultiVstup naparsuje z tých istých polí (vrátane klin/kolajnica/sietka)', async () => {
 		const { vstup: expected } = parseMultiVstup(fd(BODY));

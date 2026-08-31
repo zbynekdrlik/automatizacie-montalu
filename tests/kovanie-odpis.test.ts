@@ -137,10 +137,21 @@ describe('kovanieDoOdpisu — viac posuvov (zimná záhrada)', () => {
 	});
 });
 
-describe('systémy bez kovania', () => {
-	it('Slide zatiaľ neposiela nič (kódy nemajú v Money skladovú zásobu)', () => {
-		const r = kov([spec('Slide|2K')]);
+describe('kovanieDoOdpisu — SLIDE (#357, zapnuté — 2 z 11 kódov s 0 ks vynechané)', () => {
+	it('R7016 (jediná Slide farba so skladom): kladka, zámok, protikus, tesnenia — bez chyby, s warn o madle', () => {
+		const r = kov([spec('Slide|2K')], false, 'R7016');
 		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK20253')).toBe(4); // kladka 2 ks × 2 krídla
+		expect(qty(r, 'ZASK202538')).toBe(2); // zámok R7016: 2K → 2 ks
+		expect(qty(r, 'ZASK20255')).toBe(2); // protikus zámku 1 ks × 2 zámky
+		expect(r.polozky.find((p) => p.kod === 'ZASK20258')).toBeUndefined(); // madlo — 0 ks, vynechané
+		expect(r.warn).toMatch(/[Mm]adlo/); // #357 upozornenie na chýbajúce madlo
+		expect(r.warn).not.toMatch(/zámok/i); // R7016 zámok odpis DOSTÁVA, hláška ho nespomína
+	});
+
+	it('R9005 (bez skladu) na Slide-only objednávke: HLASNÁ chyba, žiadne kovanie sa neodošle (#354 poistka)', () => {
+		const r = kov([spec('Slide|2K')], false, 'R9005');
+		expect(r.err).toMatch(/Kovanie/);
 		expect(r.polozky).toEqual([]);
 	});
 
