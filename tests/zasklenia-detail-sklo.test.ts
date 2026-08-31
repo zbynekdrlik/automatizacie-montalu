@@ -28,7 +28,10 @@ function odoslat(extra: Record<string, string>) {
 		s: '3000',
 		v: '2000',
 		sklo: 'Izolačné sklo 4/8/4 číre',
-		otvaranie: 'P - L'
+		otvaranie: 'P - L',
+		// #357: Slide kovanie je zapnuté a jediný jeho Money farebný kód je R7016
+		// (R9005 zámok má 0 ks skladu, vynechaný) — bez farby by odoslanie padlo.
+		farbaKovania: 'R7016'
 	};
 	for (const [k, v] of Object.entries({ ...base, ...extra })) fd.append(k, v);
 	return actions.odoslat({

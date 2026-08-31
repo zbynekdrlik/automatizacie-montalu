@@ -4,15 +4,13 @@
 // variantmi ZASK202538/ZASK202537, zvyšok tabuľky nezmenený).
 //
 // MONEY-KRITICKÉ. Robustné položky majú overenú skladovú zásobu na sklade „Materiál"
-// (read-only SQL, 2026-07-28/31). Slide položky (vrátane #353 nových RAL zámkov
-// ZASK202538/ZASK202537) NEBOLI naživo overené v tomto worktree (chýba SSH kľúč
-// `slovnormal_odoo`, viď #353 finding) — preto Slide OSTÁVA vypnutý (`SLIDE_PRIPRAVENY
-// = false`), aby appka neposlala pohyb, ktorý nemá kam sadnúť. Flip až po overení
-// proti ostrému Money.
+// (read-only SQL, 2026-07-28/31). #357 (2026-08-31): denný snapshot potvrdzuje sklad
+// pre 9/11 Slide kódov — Slide je preto ZAPNUTÝ (`SLIDE_PRIPRAVENY = true`); zvyšné 2
+// kódy s 0 ks sú vynechané z `KOMPONENTY_SLIDE`, viď komentár pri poli a pri flagu.
 //
 // Počty NEODVODZUJ z iného systému — Robust a Slide majú vlastné kódy aj vlastné
 // pravidlá (Slide napr. nemá zvlášť rohovník krídla).
-import type { Komponent } from '$lib/komponenty';
+import type { Komponent, Farba } from '$lib/komponenty';
 
 /** Uzáver Robust: jednoduchý systém 2 ks, opona 3 ks (Dominik: 4K-2, 2x3K-3, 2x4K-3). */
 const UZAVERY_ROBUST = {
@@ -25,7 +23,9 @@ const UZAVERY_ROBUST = {
 };
 
 /** Automatický zámok Slide — rovnaký vzor ako uzáver Robust; od #353 farebne
- *  rozdelený na RAL varianty (ZASK202538 R7016 / ZASK202537 R9005), počty nezmenené. */
+ *  rozdelený na RAL varianty (ZASK202538 R7016 / ZASK202537 R9005), počty nezmenené.
+ *  #357: ZASK202537 (R9005) je od 0 ks skladu VYNECHANÝ z `KOMPONENTY_SLIDE` — tento
+ *  počtový vzor (`konstPreStyl`) ostáva platný pre oba varianty, keď sa R9005 vráti. */
 const ZAMKY_SLIDE = {
 	'Slide|2K': 2,
 	'Slide|3K': 2,
@@ -149,6 +149,11 @@ export const KOMPONENTY_SLIDE: Komponent[] = [
 	// #353 (att 14667): pôvodná ZASK20254 „Automaticky zamok RS SLIDE" ZRUŠENÁ,
 	// nahradená RAL variantami R9005/R7016 — rovnaký vzor ako Robust kľučka a
 	// Standard zámok (#338). Počet (konstPreStyl → ZAMKY_SLIDE) NEZMENENÝ.
+	//
+	// #357: ZASK202537 (R9005 variant) MÁ 0 ks skladovej zásoby (overené proti
+	// dennému snapshotu 2026-08-31T14:45Z) — ZÁMERNE VYNECHANÝ, kým nedostane
+	// sklad (rovnaký vzor ako #354 Deluxe 6mm krytky). R9005-farebné objednávky
+	// preto zámok do odpisu nedostanú — pozri KOVANIE_NEUPLNE.Slide nižšie.
 	{
 		kod: 'ZASK202538',
 		nazov: 'Automaticky zamok RS SLIDE R7016',
@@ -156,15 +161,11 @@ export const KOMPONENTY_SLIDE: Komponent[] = [
 		farba: 'R7016',
 		pravidlo: { typ: 'konstPreStyl', ks: ZAMKY_SLIDE }
 	},
-	{
-		kod: 'ZASK202537',
-		nazov: 'Automaticky zamok RS SLIDE R9005',
-		mj: 'ks',
-		farba: 'R9005',
-		pravidlo: { typ: 'konstPreStyl', ks: ZAMKY_SLIDE }
-	},
 	{ kod: 'ZASK20255', nazov: 'Protikus zamku', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 1 } },
-	{ kod: 'ZASK20258', nazov: 'Madlo 200', mj: 'ks', pravidlo: { typ: 'naUzaver', koef: 1 } },
+	// #357: ZASK20258 „Madlo 200" MÁ 0 ks skladovej zásoby (overené proti dennému
+	// snapshotu 2026-08-31T14:45Z) a je MANDATÓRNA položka (naUzaver, bez farba
+	// filtra — počíta sa na KAŽDÚ platnú Slide objednávku bez ohľadu na farbu).
+	// ZÁMERNE VYNECHANÁ, kým nedostane sklad — pozri KOVANIE_NEUPLNE.Slide nižšie.
 	{
 		kod: 'ZASK20256',
 		nazov: 'Krytka ramoveho profilu',
@@ -202,14 +203,16 @@ export const KOMPONENTY_SLIDE: Komponent[] = [
 ];
 
 /**
- * Slide kovanie sa do Money NEPOSIELA, kým jeho kódy (vrátane #353 nových RAL zámkov
- * ZASK202538/ZASK202537) nemajú v Money potvrdenú skladovú zásobu na sklade „Materiál"
- * (2026-07-28 boli pôvodné kódy len artikly; Dominik ich zakladá). Odpis je skladový
- * pohyb — bez zásoby by import zlyhal alebo naviezol špinu. #353: v tomto worktree sa
- * to nedalo overiť naživo (chýba SSH kľúč `slovnormal_odoo`) — flip na `true` až po
- * overení proti ostrému Money (read-only SQL recept, viď money-odpis skill).
+ * Slide kovanie IDE do Money (#357, 2026-08-31) — denný snapshot (2026-08-31T14:45Z)
+ * potvrdzuje skladovú zásobu pre 9/11 kódov v `KOMPONENTY_SLIDE`. Zvyšné 2 kódy
+ * (ZASK202537 zámok R9005, ZASK20258 Madlo 200) MAJÚ 0 ks — sú preto ZÁMERNE
+ * VYNECHANÉ z `KOMPONENTY_SLIDE` vyššie (rovnaký vzor ako #354 Deluxe 6mm krytky:
+ * odpis je skladový pohyb, bez zásoby by naviezol špinu), nie ticho preskočené.
+ * Operátor dostane upozornenie cez `KOVANIE_NEUPLNE.Slide` nižšie a doplní ich
+ * ručne, kým Dominik nenaskladní; keď dostanú sklad, vrátiť ich do zoznamu a
+ * zoštíhliť/odstrániť KOVANIE_NEUPLNE.Slide.
  */
-export const SLIDE_PRIPRAVENY = false;
+export const SLIDE_PRIPRAVENY = true;
 
 /**
  * Automatický zámok Štandard — „1ks na koncové okno" (#338, Dominik 31.8.). Tabuľka
@@ -271,9 +274,10 @@ export const KOMPONENTY_STANDARD: Komponent[] = [
  * `Deleted=0`, názvy sedia s Dominikovou tabuľkou.
  *
  * MONEY-KRITICKÉ nález: 6mm krytky (ZASK202519/202520/202521/202522/202523/202524)
- * majú v Money 0 ks na sklade (všetky sklady spolu) — presne tá istá situácia, ktorá
- * viedla k `SLIDE_PRIPRAVENY = false` vyššie („artikel bez zásoby… appka neposlala
- * pohyb, ktorý nemá kam sadnúť"). Preto sú tu zámerne VYNECHANÉ, kým sklad nepríde —
+ * majú v Money 0 ks na sklade (všetky sklady spolu) — presne tá istá situácia, aká
+ * viedla k vynechaniu ZASK202537/ZASK20258 z `KOMPONENTY_SLIDE` vyššie (#357;
+ * „artikel bez zásoby… appka neposlala pohyb, ktorý nemá kam sadnúť"). Preto sú tu
+ * zámerne VYNECHANÉ, kým sklad nepríde —
  * design komentár na #354 nesie ich úplnú tabuľku aj Money kódy pre budúce doplnenie
  * (mechanizmus `hrubkaSkla` už existuje, doplnenie = 6 riadkov analogických nižšie).
  *
@@ -353,18 +357,30 @@ export const KOMPONENTY_DELUXE: Komponent[] = [
  * na to musí upozorniť (#338). Prázdne = kompletné.
  *
  * Hodnota je buď PEVNÝ text (Štandard: neúplné VŽDY, nezávisle od vstupu), alebo
- * FUNKCIA `(skloHrubka) => text | null` (Deluxe: neúplné LEN pri 6mm — #354 review
- * nález 🟡, pôvodná pevná hláška sa zobrazovala aj na 10mm objednávkach, kde je
- * odpis kovania v skutočnosti kompletný a hláška by zmiatla/viedla na zbytočné
- * ručné doplnenie 6mm položiek, ktoré sa 10mm objednávky vôbec netýkajú).
+ * FUNKCIA `(skloHrubka, farbaKovania) => text | null` (Deluxe: neúplné LEN pri 6mm —
+ * #354 review nález 🟡, pôvodná pevná hláška sa zobrazovala aj na 10mm objednávkach,
+ * kde je odpis kovania v skutočnosti kompletný a hláška by zmiatla/viedla na zbytočné
+ * ručné doplnenie 6mm položiek, ktoré sa 10mm objednávky vôbec netýkajú; Slide, #357:
+ * neúplné VŽDY kvôli madlu, PLUS zámok pri R9005 — druhý parameter `farbaKovania`
+ * pridaný #357, Deluxe funkciu ignoruje, TS bezproblémovo prijme kratší podpis).
  */
-export const KOVANIE_NEUPLNE: Record<string, string | ((skloHrubka?: number) => string | null)> = {
+export const KOVANIE_NEUPLNE: Record<
+	string,
+	string | ((skloHrubka?: number, farbaKovania?: Farba) => string | null)
+> = {
 	Štandard:
 		'STANDARD: zasklievacie tesnenia (4/6mm) a tesniace kefy zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).',
 	Deluxe: (skloHrubka) =>
 		skloHrubka === 6
 			? 'DELUXE 6mm: krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'
-			: null
+			: null,
+	// #357: madlo 200 chýba VŽDY (mandatórna položka, 0 ks); automatický zámok chýba
+	// LEN pri R9005 (R7016 má sklad a odpis dostáva). Bez zvolenej farby (chyba inde
+	// vo výpočte, nie tu) sa zobrazí len madlová veta.
+	Slide: (_skloHrubka, farbaKovania) =>
+		farbaKovania === 'R9005'
+			? 'SLIDE: madlo 200 (ZASK20258) a automatický zámok R9005 (ZASK202537) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). R7016 zámok (ZASK202538) odpis dostáva. Doplniť ručne, kým nedostanú sklad (#357).'
+			: 'SLIDE: madlo 200 (ZASK20258) zatiaľ NIE JE v odpise kovania — Money má na ňom 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). Doplniť ručne, kým nedostane sklad (#357).'
 };
 
 /** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
