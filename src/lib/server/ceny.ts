@@ -274,7 +274,8 @@ export interface OdpisKodyValidacia {
 const SNAPSHOT_MAX_DNI = 7;
 
 /** Písmenový prefix kódu (`ZASP` z `ZASP00014`, `PRP` z `PRP20258`) — určuje, či daný kód
- *  vôbec spadá do rozsahu snapshotu (snapshot ťahá LEN ZASP.../ZASK... + TS..., nie PRP.../BPP...).
+ *  vôbec spadá do rozsahu snapshotu (dnes ZASP.../ZASK.../TS.../PRP.../BPP.../BPK... — reálny
+ *  scope sa berie EMPIRICKY z `snapshotPrefixy()`, nie z tohto zoznamu; #359 pridal bazén BPP/BPK).
  *  POZN.: `kodPrefix` je case-insensitive + trim, ale `getPriceRow` matchuje kód PRESNE (case-sensitive,
  *  bez trimu) — takže kód s inou veľkosťou písmen / medzerami sa síce dostane do scope, ale lookup ho
  *  nenájde → označí sa `neznamy` (blok). To je ZÁMERNE konzervatívne (mangled kód = radšej blok než
@@ -286,7 +287,8 @@ function kodPrefix(kod: string): string {
 }
 
 /** Prefixy, ktoré snapshot REÁLNE obsahuje (empirický scope) — kód s prefixom mimo tejto množiny
- *  sa NEVALIDUJE (nemáme oň dáta), aby pergola/bazén odpisy nepopadali na chýbajúcich PRP.../BPP.... */
+ *  sa NEVALIDUJE (nemáme oň dáta). Odkedy #359 pridal bazén BPP/BPK do snapshotu, bazénové odpisy
+ *  UŽ v scope SÚ (validujú sa); mimo scope ostáva len rodina, ktorú snapshot naozaj neťahá. */
 function snapshotPrefixy(): Set<string> {
 	const rows = db.prepare('SELECT kod FROM material_prices').all() as { kod: string }[];
 	const s = new Set<string>();
