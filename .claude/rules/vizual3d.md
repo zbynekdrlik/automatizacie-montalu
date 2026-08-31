@@ -550,3 +550,38 @@ hodnôt → hrany ostávajú zarovnané; bbox/kóty/`svetlaVyska` sa NEmenia.
   sklony strechy) sa pushnú RAZ. `castShadow` len strecha+stromy+pergola (nie okná/priečky —
   shadow-map budget, low tier opt-out). Všetko procedurálne (žiadny externý asset — Money-guard +
   bundle). Perf tiery #285 cez `plochyGradientMiestoMap`/`tiene` (low = ploché farby, bez tieňov).
+
+## Realistický zapustený dom + dvere (#336) — zapustenie sa faktuje DOPREDU, nie za fasádu
+
+- **Fasáda je NEPRIEHĽADNÁ `PlaneGeometry` 5 mm PRED pôvodnou stenou → NEDÁ sa do nej vyrezať
+  diera ani recesovať čokoľvek ZA ňu.** Diera (ShapeGeometry/CSG) by odhalila starú teplú stenu
+  za svetlým prekrytím; sklo posunuté ZA fasádu (z < 5) by fasáda okludovala. Preto sa zapustenie
+  faktuje DOPREDU: proud `ExtrudeGeometry` RÁM (z = fasáda..+90 mm, plná obruba SPOJENÁ s fasádou —
+  žiadny plávajúci rám; vnútorné steny diery = svetlé ostenie) + SKLO/krídlo posunuté DOZADU k lícu
+  fasády (z ≈ fasáda+12..17). Sklo je tak hlboko ZA čelom rámu → reálna PARALAXA pri otáčaní (najsilnejší
+  cue, funguje AJ na low tieri — geometria, nie tieň), a VŠETKO je z ≥ fasáda (5) → nič neokludované.
+  Regresný invariant: `min(sklo.position.z) ≥ mm(5)` (`vizual-scena-dom.test.ts`). Jeden zdroj pravdy
+  `FASADA_Z_MM` = fasáda mesh `position.z` AJ `otvorCtx.fasadaZmm` (inak sa recess systém rozíde).
+- **Tmavé odrazové sklo bez „čiernej diery" na low tieri = biely base + `vertexColors:true` + vertikálny
+  VERTEX-COLOR gradient** (hore `0x4a5a63` → dole `0x28313a`). `THREE.Color(hex).r/g/b` sú LINEÁRNE
+  (ColorManagement r0.185) a vertex colors sa čítajú lineárne → sadnú bez konverzie; materiál musí mať
+  biely `color` (three násobí color×vertexColor). Mid/high pridá `scene.environment` odraz (`envMapIntensity
+  1.7`, `metalness 0` = dielektrikum, `roughness 0.08`); low tier ukáže samotný gradient (faktuje odraz
+  oblohy). Svetlá pastelová base = plochá modrá „lego" (root cause #336). Krížové delenie okien = dollhouse
+  cue → zrušené (rám + max 1 zvislý mullion).
+- **PASCA: susedné ZAPUSTENÉ okná sa PRENIKAJÚ, ak je rozstup stredov < šírka najširšieho prvku
+  (parapet = okno+100).** Ploché nasadené okná (#333) sa prekrývali neviditeľne; proud extrude rámy z toho
+  spravia 3D artefakt (rám bočného okna renderuje NA skle stredného). Pri rastri okien vždy: stredné vždy,
+  bočné LEN keď `maxX ≥ okno+100` a `|x| ≥ okno+100` (mirror „vynechaj ak sa nezmestí" ako prízemné okno).
+  Chytil to až adversariálny review pri S≈2000–2790, nie prvé testy — pridaj S=2000 no-overlap regresný test.
+- **Kolízne clampy prízemných otvorov (#325) platia na NAJŠIRŠÍ sub-mesh, nie na sklo.** Parapet je okno+100,
+  rám okno+70 → clamp počítaj z `oknoDolnaX + (oknoDolnaW+100)/2 ≤ budgetHalfXmm` (= `S/2−55`, 5 mm rezerva
+  pod testovú hranicu `S/2−50`). Latová bočnica dverí (asymetria SalesQueze: vstup+laty vľavo, okno vpravo)
+  sa VYNECHÁ keď `bocnicaVonkajsiaX > budgetHalfXmm`. Dvere majú min šírku 760 → pri `S < ~930` rám prečnieva
+  stĺp (pre-existujúce, mimo produktového rozsahu, odovzdané #343).
+- **Testovanie domu bez WebGL (Node vitest):** sklo = mesh s `geometry.attributes.color`; rám = `geometry.type
+  === 'ExtrudeGeometry'`; krídlo dverí = BoxGeometry na x=0 s `material.map` a `position.y < mm(2500)` (POZOR:
+  sklony STRECHY sú tiež Box+mapa na x=0 — odlíš nízkym y). Zdieľané materiály over cez `mesh.material ===
+  <shared>` (počet lát/krídla). Nové procedurálne textúry (`vytvorDreveneDrevoTexturu` zvislá kresba,
+  `vytvorOmietkaTexturu`) testuj recording-stub `FakeCtx` + `Math.random` mock v `try/finally` (vzor
+  `vizual-textury.test.ts`).
