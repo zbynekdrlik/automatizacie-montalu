@@ -3,7 +3,7 @@
 // ZNOVA zo surových vstupov + validovaných úprav a zapíše odpis s dedup ochranou.
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
-import { computeBazen, applyEdits } from '$lib/server/bazen';
+import { computeBazenAll, applyEdits } from '$lib/server/bazen';
 import type { BazenVstup, BazenPolozka } from '$lib/server/bazen';
 import { parseBazenVstup } from '$lib/server/vstup';
 import {
@@ -58,7 +58,7 @@ export const actions = {
 	spocitat: async ({ request }) => {
 		const { vstup, error } = parseBazenVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
-		const { out, error: cErr } = computeBazen(vstup);
+		const { out, error: cErr } = computeBazenAll(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
 		return { step: 'kontrola' as const, vstup, out, error: null as string | null };
 	},
@@ -74,7 +74,7 @@ export const actions = {
 		const form = await request.formData();
 		const { vstup, error } = parseBazenVstup(form);
 		if (error) return { step: 'form' as const, error, vstup };
-		const { out, error: cErr } = computeBazen(vstup);
+		const { out, error: cErr } = computeBazenAll(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
 
 		// pri každom re-renderi kontroly sa vracajú ODOSLANÉ hodnoty — užívateľove
