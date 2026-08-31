@@ -15,7 +15,7 @@ process.env.DATABASE_PATH = path.join(tmpRoot, 'test.db');
 const snapshotPath = path.join(tmpRoot, 'ceny.json');
 process.env.CENY_SNAPSHOT_PATH = snapshotPath;
 
-const { maybeImportSnapshot, getSnapshotMeta, enrichPolozky } =
+const { maybeImportSnapshot, getSnapshotMeta, enrichPolozky, validateOdpisKody } =
 	await import('../src/lib/server/ceny');
 const { db } = await import('../src/lib/server/db');
 
@@ -304,5 +304,49 @@ describe('enrichPolozky', () => {
 		]);
 		expect(r.radky[0]!.sklad).toBe(42);
 		expect(r.radky[1]!.sklad).toBeNull();
+	});
+});
+
+describe('#359 — bazén BPP/BPK v snapshote', () => {
+	it('producent ceny-snapshot.py ťahá všetkých 6 rodín vrátane bazénových BPP/BPK', () => {
+		const src = fs.readFileSync(path.resolve('scripts/ceny-snapshot.py'), 'utf8');
+		for (const fam of ['ZASP', 'ZASK', 'TS', 'PRP', 'BPP', 'BPK']) {
+			expect(src).toContain(`a.Kod LIKE '${fam}%'`);
+		}
+	});
+
+	it('BPK/BPP v scope: existujúci kód so skladom prejde validáciou (bazén odpis sa už validuje)', async () => {
+		await tick();
+		const cerstvy = new Date(Date.now() - 3600000).toISOString(); // 1 h dozadu → snapshot použiteľný
+		writeSnapshot(cerstvy, [
+			{ kod: 'BPP-T359', nakupCennik: 9.5, mena: 'EUR', sklad: 120 }, // profil (nákup v NC)
+			{ kod: 'BPK-T359', nakupCennik: 0, mena: 'EUR', sklad: 42 } // komponent (nákup 0 → null), ale má sklad
+		]);
+		maybeImportSnapshot();
+		const v = validateOdpisKody([
+			{ kod: 'BPP-T359', nazov: 'Bazén profil' },
+			{ kod: 'BPK-T359', nazov: 'Bazén kladka' }
+		]);
+		expect(v.snapshotUsable).toBe(true);
+		expect(v.ok).toBe(true);
+		expect(v.problemy).toEqual([]);
+	});
+
+	it('BPK je v scope → BPK kód, ktorý v snapshote CHÝBA, sa označí neznamy (predtým sa bazén nevalidoval)', () => {
+		const v = validateOdpisKody([{ kod: 'BPK-NIET-999', nazov: 'Neznámy bazén diel' }]);
+		expect(v.ok).toBe(false);
+		expect(v.problemy).toHaveLength(1);
+		expect(v.problemy[0]!.kod).toBe('BPK-NIET-999');
+		expect(v.problemy[0]!.dovod).toBe('neznamy');
+	});
+
+	it('BPK v snapshote ale bez skladovej karty (sklad=null) → bez-skladovej-karty', async () => {
+		await tick();
+		const cerstvy = new Date(Date.now() - 3600000).toISOString();
+		writeSnapshot(cerstvy, [{ kod: 'BPK-T359-NOSKLAD', nakupCennik: 3, mena: 'EUR', sklad: null }]);
+		maybeImportSnapshot();
+		const v = validateOdpisKody([{ kod: 'BPK-T359-NOSKLAD', nazov: 'Bazén diel bez karty' }]);
+		expect(v.ok).toBe(false);
+		expect(v.problemy[0]!.dovod).toBe('bez-skladovej-karty');
 	});
 });
