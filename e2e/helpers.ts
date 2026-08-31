@@ -13,15 +13,6 @@ import { expect, test, type Page } from '@playwright/test';
 // nezachytí skutočnú aplikačnú chybu.
 const NESKODNY_GL_DRIVER_VZOR = /GL Driver Message.*Performance.*GPU stall due to ReadPixels/;
 
-// model-viewer (#286, AR náhľad pergoly) vypíše na CPU-hladovanom runneri VLASTNÝ
-// interný self-diagnostický warning "rAF timed out in updateSource" — jeho 500ms
-// rAF-vs-setTimeout poistka v [$updateSource] (node_modules/@google/model-viewer/
-// src/model-viewer-base.ts, `console.warn('rAF timed out in updateSource')`), NIE
-// chyba z APLIKAČNÉHO JS. Funkčné asserty (loaded/modelIsVisible/src/ar-modes)
-// prešli. Filter je EXACT-MATCH (celý reťazec zakotvený ^…$), aby nikdy nezakryl
-// skutočnú aplikačnú chybu.
-const NESKODNY_MODEL_VIEWER_VZOR = /^rAF timed out in updateSource$/;
-
 // #325: /konfigurator teraz montuje 3D náhľad (lazy three.js chunk + HDRI) pri KAŽDOM
 // loade. Keď test naviguje PREČ, kým je chunk/HDRI ešte v lete, prehliadač request ZRUŠÍ
 // a zaloguje `Failed to load resource: net::ERR_ABORTED` — benígny artefakt navigácie
@@ -33,7 +24,7 @@ const NESKODNY_ABORT_VZOR = /Failed to load resource.*net::ERR_ABORTED/;
 // teardown WebGL kontextu — prehliadač ho zaloguje VŽDY, keď appka zavolá
 // `WEBGL_lose_context.loseContext()` (three.js `renderer.forceContextLoss()` pri unmounte /
 // `{#key}` remounte 3D náhľadu — vizual3d.md „forceContextLoss je NEVRATNÉ, len pri odchode
-// z komponentu"; a model-viewer robí to isté pri re-inite na /konfigurator/ar). NIE JE to
+// z komponentu"). NIE JE to
 // pád GPU/OOM — ten Chrome loguje BEZ prefixu „loseContext:" (iná príčina straty kontextu).
 // Preto je filter zakotvený na doslovný „loseContext: context lost" reťazec: zachytí len
 // zámerný teardown, NIKDY reálnu chybu. Skutočne rozbitý 3D odhalia asserty „netriviálny
@@ -46,7 +37,6 @@ export function collectConsole(page: Page): string[] {
 	page.on('console', (msg) => {
 		if (msg.type() === 'error' || msg.type() === 'warning') {
 			if (NESKODNY_GL_DRIVER_VZOR.test(msg.text())) return;
-			if (NESKODNY_MODEL_VIEWER_VZOR.test(msg.text())) return;
 			if (NESKODNY_ABORT_VZOR.test(msg.text())) return;
 			if (NESKODNY_CONTEXT_LOST_VZOR.test(msg.text())) return;
 			messages.push(`[${msg.type()}] ${msg.text()}`);

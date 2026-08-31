@@ -52,13 +52,6 @@ const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 //   server/money, žiadna Money-zápisová akcia (viď popisný test nižšie), BEZ CIEN /
 //   Money kódov / nárezu (guard: tests/konfigurator-money-safety.test.ts). Tu v ALLOWED
 //   je VEDOMÉ potvrdenie (drift guard by inak zlyhal), nie obídenie.
-// - /konfigurator/model.glb — VEREJNÝ GLB endpoint AR náhľadu pergoly (#286). GET
-//   `+server.ts` pod verejným `/konfigurator/` prefixom (mimo Money-denylist), takže
-//   `b2bRedirectTarget` ho NEPRESMERÚVA (dostupný pre všetkých — anonym/interný/b2b).
-//   Money-neutrálny (žiadny import server/money/katalógu; guard:
-//   tests/konfigurator-money-safety.test.ts (B)). Vstup rozmery+typ skla+RAL, výstup
-//   čistá geometria/materiály (bez cien/kódov/nárezu). VEDOMÉ potvrdenie (drift guard
-//   by inak zlyhal). (`/konfigurator/ar` má len `+page.ts` — NIE je write-bearing, sem netreba.)
 const ALLOWED = new Set([
 	'/zasklenia',
 	'/sietka',
@@ -66,7 +59,6 @@ const ALLOWED = new Set([
 	'/zasklenia/navrh',
 	'/zasklenia/navrh/zakaznicky',
 	'/konfigurator',
-	'/konfigurator/model.glb',
 	'/login',
 	'/logout',
 	'/health'
