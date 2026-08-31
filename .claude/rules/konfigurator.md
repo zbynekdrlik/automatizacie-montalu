@@ -200,6 +200,20 @@ Ak by sa AR niekedy vracalo, obnov ROUTE/guard vzor z histórie tohto tiketu.
   s ešte-mountujúcou scénou → `forceContextLoss`. Benígny warning `CONTEXT_LOST_WEBGL: loseContext:
   context lost` (explicitný teardown, nie GPU pád — ten Chrome loguje bez „loseContext:") je
   filtrovaný v `e2e/helpers.ts` `collectConsole`.
+- **ŽIVÝ-UPDATE assert NIKDY nepolluj cez DOM VNÚTRI `{#key vizKluc}` bloku s fixným sub-budgetom
+  (#361 recidíva flaky).** Caption `pergola-caption-rozmer` (vo `VizualPergolaZakaznik`) žije VNÚTRI
+  keyed remountu; pri debounced (~320 ms) zmene rozmerov sa jeho nový text commitne až v rámci
+  rebuild-flushu (`forceContextLoss` + HDRI/scene rebuild), a Playwrightov `expect.poll(innerText,
+  {timeout:6000})` súperí o JEDINÉ hlavné vlákno s tým CPU-viazaným softvérovým GL rebuildom → pod
+  záťažou MAIN behov (nie PR/rerun) občas vyhladovel nad 6 s (blokoval deploy). **Vzor fixu:** vystav
+  od-GL-frame-ODPOJENÝ stavový signál na STABILNOM uzle MIMO `{#key}` bloku — `KonfVizual`
+  `<section data-testid="konf-viz" data-viz-rozmer={`${viz.sirkaMm}×${viz.hlbkaMm}`}>` (patchne sa
+  in-place, žiaden teardown/detach-window) — a test čaká na PRESNÚ hodnotu
+  (`toHaveAttribute('data-viz-rozmer','5000×3800',{timeout:30000})` + caption `toHaveText('Pergola
+  5000 × 3800 mm')`) s VEĽKORYSÝM budgetom v rámci `test.setTimeout(60000)`, NIE arbitrárny fixný
+  poll. `×` = U+00D7 v atribúte AJ v asserte (byte-identické). NIE plný in-place refit kamery
+  (nevyriešené #170/#174, veľký blast-radius — viac vyššie v §6). Determinizmus (presná hodnota) +
+  od-GL odpojený signál je zdôvodnený záver vyšetrenia, nie slepý timeout band-aid.
 - **Edge-to-edge 3D bez úniku:** KonfVizual mení rámovanie zdieľaného `Vizual3D` LEN cez scoped
   `:global(.konf-vizual …)` (výška 100%, `aspect-ratio:auto`, caption ako overlay v rohu). Nič sa
   neprenesie do zasklenia. Layout: čistý CSS grid (mobil 2 riadky 3D-hore/panel-scroll-dole, desktop
