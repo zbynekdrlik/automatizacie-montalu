@@ -209,8 +209,11 @@ export function vytvorTravnikTexturu(THREE: ThreeNS, rozlisenie = 256): Texture 
  *  Teplá odsaturovaná základná farba + jemné ZVISLÉ prúžky (per-stĺpec jitter
  *  svetlosti ±7 % — Fable konzultácia: vysoký kontrast kresby = „tlačený
  *  plastový vzhľad", preto ZÁMERNE jemný) + riedke tmavšie letokruhové čiary.
- *  Vertikálna orientácia = kresba beží po výške krídla (`repeat` volajúci nechá
- *  1×N). Používa `Math.random` (v teste mockovať + `finally` restore). */
+ *  Vertikálna orientácia = kresba beží po výške krídla. Volajúci nastaví len
+ *  `wrapS/wrapT=RepeatWrapping` (default repeat 1×1) — na krídle dverí (~1 m) dá
+ *  512 px dosť jemných zvislých prúžkov; laty (~44 mm) sú z tejto textúry takmer
+ *  jednofarebné (detail lát nesú medzery, nie kresba). Používa `Math.random` (v
+ *  teste mockovať + `finally` restore). */
 export function vytvorDreveneDrevoTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {
 	const { canvas, ctx } = canvas2d(rozlisenie);
 	const zaklad: [number, number, number] = hexNaRgb('#6e5844'); // teplé odsaturované drevo
@@ -236,7 +239,8 @@ export function vytvorDreveneDrevoTexturu(THREE: ThreeNS, rozlisenie = 512): Tex
 }
 
 /** #336 — svetlá odsaturovaná OMIETKA fasády (SalesQueze: čistá matná takmer-biela
- *  s JEMNOU štruktúrou, nie plochá farba). 2-oktávový šum okolo bledého základu,
+ *  s JEMNOU štruktúrou, nie plochá farba). Jemný per-pixel šum okolo bledého základu
+ *  (2 náhodné vzorky s klesajúcou váhou → tlmená amplitúda, nie viac-mierková oktáva),
  *  minimálny kontrast (fasáda nemá súťažiť s pergolou). Mid/high tier only (low
  *  tier ostáva plochá farba). Používa `Math.random` (v teste mockovať + restore). */
 export function vytvorOmietkaTexturu(THREE: ThreeNS, rozlisenie = 512): Texture {

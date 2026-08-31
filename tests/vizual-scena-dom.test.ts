@@ -204,16 +204,37 @@ describe('#336 — ZAPUSTENÉ realistické otvory (koniec „lego" plochých oki
 		return m.position.z + m.geometry.boundingBox!.max.z;
 	};
 
-	it('SKLO je ZA čelom proud rámu (reálna paralaxa, nie plochá nálepka)', () => {
+	it('SKLO je ZA čelom proud rámu (paralaxa), ale PRED fasádou (z≥5, nič neokludované)', () => {
 		const meshe = deti(4000, 2500);
 		const skla = meshe.filter(jeSklo);
 		const ramy = meshe.filter(jeRam);
-		// 3 poschodové + 1 prízemné okno + inlay dverí = ≥5 skiel; 4+ rámov (3+1 okná + dvere)
-		expect(skla.length).toBeGreaterThanOrEqual(4);
+		// 3 poschodové + 1 prízemné okno + inlay dverí = 5 skiel; 4+ rámov (3+1 okná + dvere)
+		expect(skla.length).toBe(5);
 		expect(ramy.length).toBeGreaterThanOrEqual(4);
 		const skloMaxZ = Math.max(...skla.map((s) => s.position.z));
 		const ramCeloMaxZ = Math.max(...ramy.map(celoZ));
 		expect(skloMaxZ).toBeLessThan(ramCeloMaxZ); // každé sklo je hlbšie než najproudnejšie čelo rámu
+		// KONSTRUKČNÝ invariant: žiadne sklo NIE JE za fasádou (z≥5 mm) — inak by ho nepriehľadná
+		// fasáda okludovala / odhalila starú stenu (#336 zavrhnutá CSG alternatíva).
+		const skloMinZ = Math.min(...skla.map((s) => s.position.z));
+		expect(skloMinZ).toBeGreaterThanOrEqual(mm(5));
+	});
+
+	it('POSCHODOVÉ okná sa NEPREKRÝVAJÚ (review 🟡): úzka pergola má len stredné, široká 3 s rozstupom', () => {
+		// poschodové sklo = vysoké y (nad prízemím, nad pergolou); zoradené podľa x
+		const poschodieX = (S: number) =>
+			deti(S, 2500)
+				.filter((m) => jeSklo(m) && m.position.y > mm(3200))
+				.map((m) => m.position.x)
+				.sort((a, b) => a - b);
+		// susedné stredy ≥ šírka okna (820 mm) → žiadne prekrytie parapetov/rámov
+		const bezPrekrytia = (xs: number[]) => xs.every((x, i) => i === 0 || x - xs[i - 1]! >= mm(820));
+		const uzka = poschodieX(2000);
+		const siroka = poschodieX(4000);
+		expect(uzka).toHaveLength(1); // úzka (2 m): len stredné okno (bočné by sa prekrývali)
+		expect(bezPrekrytia(uzka)).toBe(true);
+		expect(siroka).toHaveLength(3); // široká (4 m): 3 okná
+		expect(bezPrekrytia(siroka)).toBe(true);
 	});
 
 	it('sklo má TMAVÝ vertikálny gradient — horný vrchol SVETLEJŠÍ než dolný (fake odraz oblohy)', () => {

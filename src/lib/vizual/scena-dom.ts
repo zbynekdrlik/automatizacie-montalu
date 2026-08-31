@@ -48,6 +48,10 @@ const FARBA_DREVO = 0x6e5844; // teplé odsaturované drevo dverí (low-tier fla
 const FARBA_OCEL = 0x9a9c9e; // brúsená oceľ kľučky
 const FARBA_LAT_POZADIE = 0x2b2b28; // tmavé pozadie za latami (tiene medzier)
 
+// #336: z-pozícia roviny fasády (mm), 5 mm PRED pôvodnou stenou. Správnosť celého zapustenia
+// otvorov závisí od zhody tejto hodnoty na fasáde AJ v `otvorCtx.fasadaZmm` → jeden zdroj pravdy.
+const FASADA_Z_MM = 5;
+
 /** Dvojpodlažná fasáda + sedlová plechová strecha + raster okien + drevené dvere + sokel,
  *  umiestnené PRED pôvodnou (teplou) stenou tak, že ju svetlé prekrytie zakryje. Dvere sú
  *  CENTROVANÉ na x=0 (medzi krajnými stĺpmi pergoly ±S/2 → priechodné, nikdy za nohou).
@@ -116,7 +120,7 @@ export function vytvorDom(
 		disposables.push(omietka);
 	}
 	const fasada = new THREE.Mesh(gFasada, mFasada);
-	fasada.position.set(0, mm(CELKOVA_H / 2), mm(5));
+	fasada.position.set(0, mm(CELKOVA_H / 2), mm(FASADA_Z_MM));
 	fasada.receiveShadow = tiene;
 	skupina.add(fasada);
 	disposables.push(gFasada, mFasada);
@@ -244,7 +248,7 @@ export function vytvorDom(
 		otvorMat.ocel,
 		otvorMat.latPozadie
 	);
-	const otvorCtx = { THREE, skupina, disposables, tiene, mat: otvorMat, fasadaZmm: 5 };
+	const otvorCtx = { THREE, skupina, disposables, tiene, mat: otvorMat, fasadaZmm: FASADA_Z_MM };
 
 	// Kolízne clampy (#325 zachované): PRÍZEMNÉ prvky (dvere + ich latová bočnica + pravé prízemné
 	// okno) sú v priestore PERGOLY → MUSIA ostať pod pripojením pergoly (stropPrvkov) a v |x| ≤
@@ -259,14 +263,21 @@ export function vytvorDom(
 	const dvereH = Math.min(2100, stropPrvkov - 100);
 	pridajDvere(otvorCtx, { krideloWmm: dvereW, krideloHmm: dvereH, budgetHalfXmm, flat });
 
-	// --- POSCHODOVÉ okná (nad pergolou, bez kolízie): 3 zapustené okná ---
+	// --- POSCHODOVÉ okná (nad pergolou, bez kolízie s pergolou): stredné VŽDY + 2 bočné LEN keď
+	//     sa zmestia BEZ prekrytia (review 🟡 #336: susedné zapustené zostavy sa pri úzkej pergole
+	//     prenikali — proud rám bočného okna renderoval na sklo stredného). Min rozstup stredov =
+	//     oknoHornaW+100 (šírka parapetu), max |x| = fasáda − (okno/2+140) aby okno sadlo na fasádu. ---
 	const oknoHornaW = 820;
 	const oknoHornaH = 1150;
-	const oknoHornaX = Math.min(S * 0.32, FASADA_W / 2 - (oknoHornaW / 2 + 140));
+	const minRozstup = oknoHornaW + 100; // susedné okná sa neprekrývajú (parapet = w+100)
+	const maxHornaX = FASADA_W / 2 - (oknoHornaW / 2 + 140);
 	const yPoschodie = PRIZEMIE_H + POSCHODIE_H * 0.5;
-	pridajOkno(otvorCtx, -oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
-	pridajOkno(otvorCtx, 0, yPoschodie, oknoHornaW, oknoHornaH);
-	pridajOkno(otvorCtx, oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+	pridajOkno(otvorCtx, 0, yPoschodie, oknoHornaW, oknoHornaH); // stredné okno vždy
+	if (maxHornaX >= minRozstup) {
+		const oknoHornaX = Math.max(minRozstup, Math.min(S * 0.32, maxHornaX));
+		pridajOkno(otvorCtx, -oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+		pridajOkno(otvorCtx, oknoHornaX, yPoschodie, oknoHornaW, oknoHornaH);
+	}
 
 	// --- PRAVÉ PRÍZEMNÉ okno (asymetria ako SalesQueze: vstup + latová bočnica vľavo, okno
 	//     vpravo). Vynechané ak sa medzera nezmestí (malá pergola → NIKDY nekoliduje). ---
