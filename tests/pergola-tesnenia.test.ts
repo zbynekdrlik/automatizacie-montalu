@@ -12,8 +12,10 @@ import { describe, it, expect } from 'vitest';
 import {
 	spocitajTesnenia,
 	buildRezervaciaRozpis,
-	rezervaciaJob
+	rezervaciaJob,
+	type TesnenieRozmer
 } from '../src/lib/server/pergola-rezervacia';
+import type { Polozka } from '../src/lib/server/money';
 import {
 	spocitajNarez,
 	PREDNA_SVETLOST_STD,
@@ -106,6 +108,15 @@ describe('spocitajTesnenia (#339) — dĺžky tesnení pergoly', () => {
 });
 
 describe('Money-safety (#339) — tesnenia NIKDY nevojdú do Money odpisu', () => {
+	it('KOMPILAČNÁ zámka: TesnenieRozmer (kod:null) sa NEDÁ priradiť na Polozka', () => {
+		// Falsifikovateľný TYPOVÝ invariant (kontroluje `npm run check`): `kod:null` (a chýbajúce
+		// `qty`) blokuje priradenie na Polozka (`kod:string`). Keď niekto oslabí zámku (rozšíri
+		// `kod` na `string|null` a pridá `qty`), tento `@ts-expect-error` zhasne a typecheck padne.
+		// @ts-expect-error — tesnenie sa štrukturálne nesmie dať priradiť na Money Polozka
+		const _lock: Polozka = null as unknown as TesnenieRozmer;
+		expect(_lock).toBeNull();
+	});
+
 	it('tesnenia sú v rozpise (na zobrazenie), ale žiadne v job.polozky', () => {
 		const res = buildRezervaciaRozpis(STD, IDENT);
 		expect(res.rozpis).not.toBeNull();
