@@ -12,7 +12,7 @@
 			zak: '',
 			op: '',
 			zakaznik: '',
-			model: 'Premier / Exclusive',
+			model: 'Premier',
 			kolaj: 'Jednokolaj',
 			pocetSekcii: '' as unknown as number,
 			pocetPriecok: 0,
@@ -27,7 +27,13 @@
 			prieckovy4300: 0,
 			prieckovy6000: 0,
 			vyklopneCelo: 0,
-			caka: false
+			caka: false,
+			aretaciaTyp: 'manualna',
+			aretaciaStrana: 'P',
+			uzamykatelna: false,
+			ralKrytiek: 'R9006',
+			pantFarba: 'ELOX',
+			vetraciaKlapka: false
 		}
 	);
 
@@ -64,6 +70,12 @@
 	{/each}
 	<input type="hidden" name="dlzkaKolajnic" value={vstup.dlzkaKolajnic} />
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
+	<input type="hidden" name="aretaciaTyp" value={vstup.aretaciaTyp} />
+	<input type="hidden" name="aretaciaStrana" value={vstup.aretaciaStrana} />
+	{#if vstup.uzamykatelna}<input type="hidden" name="uzamykatelna" value="1" />{/if}
+	<input type="hidden" name="ralKrytiek" value={vstup.ralKrytiek} />
+	<input type="hidden" name="pantFarba" value={vstup.pantFarba} />
+	{#if vstup.vetraciaKlapka}<input type="hidden" name="vetraciaKlapka" value="1" />{/if}
 {/snippet}
 
 {#if step === 'form'}
@@ -103,7 +115,8 @@
 				<div class="field">
 					<label for="model">Model</label>
 					<select id="model" name="model" value={vstup.model}>
-						<option>Premier / Exclusive</option>
+						<option>Premier</option>
+						<option>Exclusive</option>
 						<option>Star</option>
 					</select>
 				</div>
@@ -167,6 +180,62 @@
 				</div>
 			</div>
 			<div class="grid3">
+				<div class="field">
+					<label for="aretaciaTyp">Aretácia</label>
+					<select id="aretaciaTyp" name="aretaciaTyp" value={vstup.aretaciaTyp}>
+						<option value="manualna">manuálna</option>
+						<option value="automaticka">automatická</option>
+					</select>
+				</div>
+				<div class="field">
+					<label for="aretaciaStrana">Strana aretácie</label>
+					<select id="aretaciaStrana" name="aretaciaStrana" value={vstup.aretaciaStrana}>
+						<option value="P">pravá (P)</option>
+						<option value="L">ľavá (L)</option>
+					</select>
+				</div>
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
+						<input
+							type="checkbox"
+							name="uzamykatelna"
+							value="1"
+							checked={vstup.uzamykatelna}
+							style="width:auto"
+						/>
+						Uzamykateľná páčka
+					</label>
+				</div>
+			</div>
+			<div class="grid3">
+				<div class="field">
+					<label for="ralKrytiek">RAL krytiek</label>
+					<select id="ralKrytiek" name="ralKrytiek" value={vstup.ralKrytiek}>
+						<option value="R9006">R9006</option>
+						<option value="R7016">R7016</option>
+					</select>
+				</div>
+				<div class="field">
+					<label for="pantFarba">Pant výklopného čela</label>
+					<select id="pantFarba" name="pantFarba" value={vstup.pantFarba}>
+						<option value="ELOX">ELOX</option>
+						<option value="9005">9005</option>
+					</select>
+				</div>
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
+						<input
+							type="checkbox"
+							name="vetraciaKlapka"
+							value="1"
+							checked={vstup.vetraciaKlapka}
+							style="width:auto"
+						/>
+						Vetracia klapka
+					</label>
+				</div>
+			</div>
+			<div class="grid3">
 				{#each cisla as [k, label] (k)}
 					<div class="field">
 						<label for={k}>{label}</label>
@@ -206,7 +275,7 @@
 			<table data-testid="kontrola-tabulka">
 				<thead
 					><tr
-						><th></th><th>Kód</th><th>Položka</th><th class="c" style="width:140px">Množstvo (m)</th
+						><th></th><th>Kód</th><th>Položka</th><th class="c" style="width:160px">Množstvo</th
 						></tr
 					></thead
 				>
@@ -225,8 +294,9 @@
 									step="any"
 									value={(form && 'editVals' in form && form.editVals?.[o.kod]) || o.qty}
 									aria-label="Množstvo {o.kod}"
-									style="padding:6px 8px;font-size:14px;text-align:center"
+									style="padding:6px 8px;font-size:14px;text-align:center;width:90px"
 								/>
+								<span style="margin-left:6px;color:#6b7280;font-size:13px">{o.mj ?? 'm'}</span>
 							</td>
 						</tr>
 					{/each}
@@ -272,7 +342,7 @@
 			<div class="row" style="align-items:center;gap:12px">
 				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
 				<span style="flex:1">{o.kod} · {o.nazov}{form.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
-				<b>{fmtM(o.qty)} m</b>
+				<b>{fmtM(o.qty)} {o.mj ?? 'm'}</b>
 			</div>
 		{/each}
 		{#if form.finalOut.some((o) => o.qty <= 0 && form.zmenene.includes(o.kod))}

@@ -115,6 +115,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`
 - pergola nárez/výkres z rozmerov → `.claude/rules/pergola-narez.md`
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` → `.claude/rules/odpis-detail.md`
+- bazén kusové komponenty (BPK*, computeBazenAll, mj ks, model whitelist, E2E prefix kolízia) → `.claude/rules/bazen-komponenty.md`
 - verejný dopyt / PDF ponuka s orientačnou cenou / slovenský text v pdf-lib / DopytForm → `.claude/rules/dopyt-ponuka.md`
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
 - interný zoznam materiálu zákazky → Odoo sale.order log-note (odoo-rpc, mt_note, observer hook, ZAK/OP match) → `.claude/rules/odoo-zakazka.md`

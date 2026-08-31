@@ -506,6 +506,12 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 
 import type { BazenVstup } from './bazen';
 
+/** Whitelist modelu bazéna — len 'Premier'|'Exclusive'|'Star'; čokoľvek iné
+ *  (vrátane legacy 'Premier / Exclusive') → 'Premier' (bezpečný smer #355). */
+function normModel(raw: string): string {
+	return raw === 'Star' ? 'Star' : raw === 'Exclusive' ? 'Exclusive' : 'Premier';
+}
+
 export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: string | null } {
 	const num = (k: string, max = 1000) => {
 		const x = parseFloat(String(form.get(k) ?? '').replace(',', '.'));
@@ -519,7 +525,10 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
-		model: String(form.get('model') ?? 'Premier / Exclusive').trim(),
+		// model whitelist (#355): legacy zlúčené 'Premier / Exclusive' (stará karta
+		// v prehliadači, historický vstup_raw) → 'Premier' — bezpečný smer (NEodpíše
+		// EXCLUSIVE spojku M8). Iba explicitné 'Exclusive'/'Star' menia správanie.
+		model: normModel(String(form.get('model') ?? 'Premier').trim()),
 		kolaj: String(form.get('kolaj') ?? 'Jednokolaj').trim(),
 		pocetSekcii: cnt('pocetSekcii'),
 		pocetPriecok: cnt('pocetPriecok'),
@@ -534,7 +543,14 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 		prieckovy4300: cnt('prieckovy4300'),
 		prieckovy6000: cnt('prieckovy6000'),
 		vyklopneCelo: cnt('vyklopneCelo'),
-		caka: form.get('caka') === '1'
+		caka: form.get('caka') === '1',
+		// --- #355 nové voľby (whitelistované — neznáma hodnota padne na default) ----
+		aretaciaTyp: form.get('aretaciaTyp') === 'automaticka' ? 'automaticka' : 'manualna',
+		aretaciaStrana: form.get('aretaciaStrana') === 'L' ? 'L' : 'P',
+		uzamykatelna: form.get('uzamykatelna') === '1',
+		ralKrytiek: form.get('ralKrytiek') === 'R7016' ? 'R7016' : 'R9006',
+		pantFarba: form.get('pantFarba') === '9005' ? '9005' : 'ELOX',
+		vetraciaKlapka: form.get('vetraciaKlapka') === '1'
 	};
 	let error: string | null = null;
 	const rawDlzka = parseFloat(String(form.get('dlzkaKolajnic') ?? '0').replace(',', '.'));

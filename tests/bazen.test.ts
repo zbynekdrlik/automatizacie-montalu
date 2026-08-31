@@ -24,6 +24,12 @@ function vstup(over: Partial<BazenVstup> = {}): BazenVstup {
 		prieckovy6000: 0,
 		vyklopneCelo: 0,
 		caka: false,
+		aretaciaTyp: 'manualna',
+		aretaciaStrana: 'P',
+		uzamykatelna: false,
+		ralKrytiek: 'R9006',
+		pantFarba: 'ELOX',
+		vetraciaKlapka: false,
 		...over
 	};
 }
