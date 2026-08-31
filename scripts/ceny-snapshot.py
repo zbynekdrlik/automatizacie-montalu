@@ -2,9 +2,9 @@
 """Cenový zoznam materiálu — fáza 1 (#154): READ-ONLY denný snapshot z Money.
 
 Vypíše JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura,
-predajVo, mena, sklad}]}` pre všetky ZASP*/ZASK*/TS*/PRP* Money kódy (profily +
-komponenty/kovanie zasklenia + izolačné sklá #235 + pergolové profily #240).
-Appka tento
+predajVo, mena, sklad}]}` pre všetky ZASP*/ZASK*/TS*/PRP*/BPP*/BPK* Money kódy
+(profily + komponenty/kovanie zasklenia + izolačné sklá #235 + pergolové profily
+#240 + bazénové profily BPP* a kusové komponenty BPK* #359). Appka tento
 súbor sama LAZY naimportuje (`src/lib/server/ceny.ts`) — tento skript do
 appkinej DB nič nezapisuje a do appky sa nijako nenapája.
 
@@ -69,6 +69,19 @@ CENIK_NC = "BA7DA0F8-8086-4963-AAE1-09D2C1C7266C"  # Nákupný cenník
 CENIK_PRF_VO = "AEEF5C92-5B44-4755-8680-F01CE6E4D5C2"  # Profily a príslušenstvo - VO
 CENIK_IZOS = "F4A1DFEE-9298-45D2-9891-1548741B2063"  # IZOS (izolačné sklá TS*, ceny/m²)
 
+# Bazénové rodiny (#359, live overené read-only 2026-08-31):
+#   BPP* (bazénové PROFILY, MJ = m/ks) — sú v NC ako ZASP/PRP (22/25 s reálnou
+#     nákupnou cenou, všetkých 25 má sklad + poslednú faktúru), takže nakupCennik
+#     z existujúceho NC joinu je správny — žiadny CASE navyše netreba.
+#   BPK* (bazénové kusové KOMPONENTY, MJ = ks) — v NC EXISTUJÚ, ale nákupná cena
+#     je pri VŠETKÝCH 0 (nikdy zadaná) → appka ju číta ako „neznáma" (honest-null),
+#     čo je správne (Money reálne nemá nákupnú cenu bazénových komponentov). Sklad
+#     má všetkých 57. Jediná NENULOVÁ cena BPK žije v cenníku PCMO „Predajný cenník
+#     polykarbonát MO" (predajný, TypCeniku=0) — to je PREDAJNÁ cena iného významu
+#     než nakupCennik, preto sa do neho ZÁMERNE nemapuje. Ak by šéf chcel bazénovú
+#     PREDAJNÚ cenu zobraziť, je to samostatná úloha (nové pole + potvrdenie), nie
+#     tento snapshot — viď follow-up #364.
+
 QUERY = """
 SELECT
     a.Kod AS kod,
@@ -87,7 +100,8 @@ LEFT JOIN Ceniky_PolozkaCeniku iz ON iz.Artikl_ID = a.ID AND iz.Cenik_ID = %(iz)
 LEFT JOIN Ceniky_Cenik izc ON izc.ID = iz.Cenik_ID
 LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID)
 LEFT JOIN S5_Artikl_CelkoveMnozstviNaSkladech s ON s.Artikl_ID = a.ID
-WHERE a.Deleted = 0 AND (a.Kod LIKE 'ZASP%' OR a.Kod LIKE 'ZASK%' OR a.Kod LIKE 'TS%' OR a.Kod LIKE 'PRP%')
+WHERE a.Deleted = 0 AND (a.Kod LIKE 'ZASP%' OR a.Kod LIKE 'ZASK%' OR a.Kod LIKE 'TS%'
+                         OR a.Kod LIKE 'PRP%' OR a.Kod LIKE 'BPP%' OR a.Kod LIKE 'BPK%')
 """
 
 
@@ -173,7 +187,10 @@ def main() -> None:
     }
     json.dump(out, sys.stdout, ensure_ascii=False)
     sys.stdout.write("\n")
-    print(f"ceny-snapshot: {len(rows)} riadkov (ZASP*/ZASK*/TS*/PRP*)", file=sys.stderr)
+    print(
+        f"ceny-snapshot: {len(rows)} riadkov (ZASP*/ZASK*/TS*/PRP*/BPP*/BPK*)",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
