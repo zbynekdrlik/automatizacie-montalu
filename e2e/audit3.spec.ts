@@ -130,9 +130,14 @@ test('bazén: každé pole (dvere + 9 profilových) prežije kontrolu → Money 
 	await expect(page.locator('.sec', { hasText: 'Money rozpis' })).toContainText(
 		`${nenulove.length} položiek`
 	);
+	// #355: rozpis teraz nesie aj kusové komponenty (BPK*, jednotka `ks`) popri
+	// metrážových profiloch (`m`) — hodnotová parita ostáva, jednotka je per-riadok.
+	// Riadok cielim cez „<kod> ·" (nie holé `kod`), lebo BPK kódy majú prefixové
+	// kolízie (napr. BPK20251 ⊂ BPK202510) a holý substring by v strict-mode matchol
+	// dva riadky.
 	for (const [kod, val] of nenulove)
-		await expect(page.locator('.row', { hasText: kod }), kod).toContainText(
-			`${fmtM(Number(val))} m`
+		await expect(page.locator('.row', { hasText: `${kod} ·` }), kod).toContainText(
+			fmtM(Number(val))
 		);
 	// žiadna položka nie je označená ✏️ (nič sme neupravovali → auto = odoslané)
 	await expect(page.locator('.row', { hasText: 'BPP20254' })).not.toContainText('✏️');

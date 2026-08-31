@@ -6,12 +6,27 @@
 // Oproti n8n verzii OPRAVENÉ (nálezy auditu): ručné úpravy množstiev sa
 // VALIDUJÚ (záporné/nečíselné sa odmietnu, nie ticho 0) a výsledok ukazuje
 // aj riadky vynulované úpravou.
+//
+// #355: k metrážovým profilom `BPP*` sa PRIPÁJAJÚ kusové komponenty `BPK*`
+// (podvozky, aretácia, krytky, dorazy, panty) — vrstva žije v client-safe
+// module `src/lib/bazen-komponenty.ts`. `computeBazen` (golden vektory) ostáva
+// NEDOTKNUTÝ; kombinovaný rozpis dáva `computeBazenAll`.
+
+import {
+	pocitajBazenKomponenty,
+	type BazenKompVstup,
+	type AretaciaTyp,
+	type Strana,
+	type RalKrytiek,
+	type PantFarba
+} from '../bazen-komponenty';
+import type { MJ } from '../komponenty';
 
 export interface BazenVstup {
 	zak: string;
 	op: string;
 	zakaznik: string;
-	model: string; // 'Premier / Exclusive' | 'Star'
+	model: string; // 'Premier' | 'Exclusive' | 'Star' (#355 rozdelené z 'Premier / Exclusive')
 	kolaj: string; // 'Jednokolaj' | 'Dvojkolaj'
 	pocetSekcii: number;
 	pocetPriecok: number;
@@ -27,12 +42,21 @@ export interface BazenVstup {
 	prieckovy6000: number;
 	vyklopneCelo: number;
 	caka: boolean;
+	// --- #355 nové voľby pre kusové komponenty (BPK*) --------------------------
+	aretaciaTyp: AretaciaTyp; // 'manualna' | 'automaticka'
+	aretaciaStrana: Strana; // 'L' | 'P'
+	uzamykatelna: boolean;
+	ralKrytiek: RalKrytiek; // 'R9006' | 'R7016'
+	pantFarba: PantFarba; // 'ELOX' | '9005'
+	vetraciaKlapka: boolean;
 }
 
 export interface BazenPolozka {
 	kod: string;
 	nazov: string;
 	qty: number;
+	/** jednotka v Money: profily 'm' (default), kusové komponenty 'ks' (#355) */
+	mj?: MJ;
 }
 
 interface BomParams {
@@ -197,6 +221,40 @@ export function computeBazen(v: BazenVstup): { out: BazenPolozka[]; error: strin
 		error = 'Žiadne položky na výstup — skontroluj zadané počty.';
 
 	return { out, error };
+}
+
+/** BazenVstup → vstup pre kusové komponenty (odvodené hodnoty). */
+export function kompVstupFromBazen(v: BazenVstup): BazenKompVstup {
+	const m = v.model.toLowerCase();
+	return {
+		pocetSekcii: v.pocetSekcii,
+		dvojkolaj: v.kolaj.toLowerCase().includes('dvoj'),
+		exclusive: m.includes('exclusive'),
+		dvere: v.dvere,
+		vyklopneCeloOn: v.vyklopneCelo > 0,
+		vetraciaKlapka: v.vetraciaKlapka,
+		aretaciaTyp: v.aretaciaTyp,
+		aretaciaStrana: v.aretaciaStrana,
+		uzamykatelna: v.uzamykatelna,
+		ralKrytiek: v.ralKrytiek,
+		pantFarba: v.pantFarba,
+		velka: v.vs4500 + v.vs6000,
+		stredna: v.ss4500 + v.ss6000,
+		mala: v.ms4500 + v.ms6000
+	};
+}
+
+/**
+ * Kompletný odpisový rozpis bazéna = metrážové profily (`computeBazen`) +
+ * kusové komponenty (`pocitajBazenKomponenty`, #355), v tomto poradí. Profily
+ * ostávajú bit-identické s golden vektormi; komponenty sa len pripoja.
+ */
+export function computeBazenAll(v: BazenVstup): { out: BazenPolozka[]; error: string | null } {
+	const { out, error } = computeBazen(v);
+	if (error) return { out, error };
+	// BazenKomponent ({kod,nazov,qty,mj}) je štrukturálne priraditeľné na BazenPolozka
+	const komp = pocitajBazenKomponenty(kompVstupFromBazen(v));
+	return { out: [...out, ...komp], error: null };
 }
 
 // Ručné úpravy množstiev sú spoločné pre bazén aj pergolu — implementácia žije
