@@ -5,11 +5,12 @@ import { randomBytes } from 'node:crypto';
 import { getSessionUser, isB2B, pruneSessions, SESSION_COOKIE } from '$lib/server/auth';
 import { b2bRedirectTarget } from '$lib/server/b2b-access';
 import { logger } from '$lib/server/log';
-import { moneyConfig } from '$lib/server/money';
+import { moneyConfig, setOdpisWrittenHook } from '$lib/server/money';
 import { cenySnapshotPath } from '$lib/server/ceny';
 import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
+import { queueZakazkaPush } from '$lib/server/odoo-zakazka';
 
 const log = logger('http');
 
@@ -43,6 +44,9 @@ let pruneCounter = 0;
 	// #278: pri štarte zotav dopyty čakajúce na Odoo CRM lead (napr. po deploy/restarte po
 	// výpadku Odoo alebo po doplnení ODOO_LEAD_* env). Fire-and-forget, no-op keď chýba env.
 	runStartupLeadSweep();
+	// #340: po každom úspešnom odpise pushni interný zoznam materiálu zákazky do Odoo
+	// (interná log-note na sale.order, zákazník ju nikdy nevidí). Money-neutrálny observer.
+	setOdpisWrittenHook(queueZakazkaPush);
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
