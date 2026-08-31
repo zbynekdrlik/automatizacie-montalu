@@ -161,29 +161,44 @@ describe('vytvorDom (#333) — profi 2-podlažný dom so strechou', () => {
 	// clampuje S na 2000–12000 mm), ale funkcia `vytvorDom` to sama od seba nevie zaručiť. Fix =
 	// variant (b) (ROZHODNUTÉ, issue #343): presne mirror vzoru latovej bočnice
 	// (`bocnicaVonkajsiaX <= budgetHalfXmm`) — pri prekročení budgetu dvere CELKOM vynechať.
+	//
+	// Helper: PRIAMO z jednej konštrukcie `vytvorDom` vytiahne, či dvere (krídlo pri x≈0, výška
+	// ~2,1 m, stojace na zemi) EXISTUJÚ — rovnaký filter ako test „dvere sú CENTROVANÉ na x=0"
+	// vyššie. Zámerne SAMOSTATNÝ od zdieľanej `prizemnePrvky` (tá počíta `cy` z LOKÁLNEHO
+	// bounding-boxu geometrie — nutné pre asymetrické geometrie ako fasádne hranové prvky;
+	// `svetoveBboxDeti`-only skratka bez tohto prepočtu falošne zarátava také prvky, overené).
+	function maDvere(S: number): boolean {
+		const vsetky = svetoveBboxDeti(vytvorDom(THREE, nast, S, 2500).skupina);
+		return vsetky.some(
+			(p) => Math.abs(p.x) < mm(1) && p.h > mm(1900) && p.h < mm(2300) && p.spodnaY < mm(1)
+		);
+	}
+
 	it.each([700, 800, 900])(
 		'#343: SUB-produktová šírka S=%i mm (< ~940, konfigurátor ju nedovolí — clampuje na 2000–12000) VYNECHÁ dvere CELKOM (rám by inak prečnieval krajný stĺp)',
 		(S) => {
 			const vnutornaHrana = mm(S / 2 - 50);
-			const prvky = prizemnePrvky(S, 2500);
 			// žiadny prízemný prvok (vrátane rámu dverí) nesmie prečnievať cez krajný stĺp
+			const prvky = prizemnePrvky(S, 2500);
 			for (const p of prvky) expect(p.vonkajsiaX).toBeLessThanOrEqual(vnutornaHrana + 1e-9);
-			// dvere (krídlo pri x≈0, výška ~2,1 m, stojace na zemi) sú CELKOM vynechané, nielen
-			// zmenšené — presne rovnaký filter ako test „dvere sú CENTROVANÉ na x=0" vyššie.
-			const vsetky = svetoveBboxDeti(vytvorDom(THREE, nast, S, 2500).skupina);
-			const dvere = vsetky.filter(
-				(p) => Math.abs(p.x) < mm(1) && p.h > mm(1900) && p.h < mm(2300) && p.spodnaY < mm(1)
-			);
-			expect(dvere.length).toBe(0);
+			// dvere sú CELKOM vynechané, nielen zmenšené
+			expect(maDvere(S)).toBe(false);
 		}
 	);
 
+	// Presná `<=` hranica (review 🔵): dvereRamVonkajsiaX=415mm (konšt., dvereW=760 min-clamp pre
+	// S<3454). budgetHalfXmm=S/2−55 ⇒ 415<=S/2−55 ⇔ S>=940. S=939 tesne POD (budget 414,5<415,
+	// vynechané), S=940 PRESNE NA hranici (budget 415==415, `<=` ⇒ ostávajú).
+	it('#343: presná hranica S=939 mm (tesne POD prahom, budget 414,5mm < 415mm) → dvere VYNECHANÉ', () => {
+		expect(maDvere(939)).toBe(false);
+	});
+
+	it('#343: presná hranica S=940 mm (NA prahu, budget 415mm == 415mm, `<=` je vrátane) → dvere OSTÁVAJÚ', () => {
+		expect(maDvere(940)).toBe(true);
+	});
+
 	it('#343: nad prahom (S=1000 mm, stále pod produktovým minimom 2000, ale nad kolíznym prahom ~940) dvere OSTÁVAJÚ (žiadna regresia)', () => {
-		const vsetky = svetoveBboxDeti(vytvorDom(THREE, nast, 1000, 2500).skupina);
-		const dvere = vsetky.filter(
-			(p) => Math.abs(p.x) < mm(1) && p.h > mm(1900) && p.h < mm(2300) && p.spodnaY < mm(1)
-		);
-		expect(dvere.length).toBeGreaterThanOrEqual(1);
+		expect(maDvere(1000)).toBe(true);
 	});
 });
 
