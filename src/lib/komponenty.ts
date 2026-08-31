@@ -15,6 +15,13 @@
 export type MJ = 'm' | 'ks';
 
 /**
+ * Farba kovania (prášková RAL varianta). Niektoré položky existujú v Money ako
+ * dva farebné varianty (napr. kľučka R9005 vs R7016) — do odpisu ide LEN variant
+ * zvolenej farby, druhý sa vôbec neobjaví (nie „0 ks", ale absent).
+ */
+export type Farba = 'R9005' | 'R7016';
+
+/**
  * Vstupy, z ktorých sa počítajú množstvá kovania. Všetko sú veci, ktoré appka už
  * počíta pre nárezový plán — nič nové sa od obsluhy nepýta.
  */
@@ -69,6 +76,12 @@ export interface Komponent {
 	nazov: string;
 	mj: MJ;
 	pravidlo: Pravidlo;
+	/**
+	 * RAL farebný variant. Keď je zadaná, položka ide do odpisu LEN keď sa
+	 * zhoduje so zvolenou `farbaKovania` (viď {@link pocitajKomponenty}).
+	 * Nezadaná = položka je farbo-neutrálna (väčšina) a počíta sa vždy.
+	 */
+	farba?: Farba;
 }
 
 /** Chyba konfigurácie — vracia sa namiesto množstiev, aby odpis nikdy nešiel polovičný. */
@@ -120,12 +133,29 @@ export function pocitajKomponenty(
 	sysStyl: string,
 	zaklad: ZakladPoctov,
 	uzavery: number | null,
-	obojstrannaFab = true
+	obojstrannaFab = true,
+	farbaKovania?: Farba
 ): { polozky: PolozkaKomponentu[]; chyby: ChybaKomponentu[] } {
 	const polozky: PolozkaKomponentu[] = [];
 	const chyby: ChybaKomponentu[] = [];
 
 	for (const k of komponenty) {
+		// RAL farebný variant: keď má položka `farba`, ale zvolená `farbaKovania`
+		// chýba, je to HLASNÁ chyba (nikdy tichý default na jednu z farieb —
+		// zle zafarbené kovanie do Money). Keď sa farba nezhoduje, položka sa
+		// úplne preskočí (žiadny riadok = „absent", nie „0 ks"). Farbo-neutrálna
+		// položka (bez `farba`) prejde nedotknutá.
+		if (k.farba !== undefined) {
+			if (farbaKovania === undefined) {
+				chyby.push({
+					kod: k.kod,
+					sprava: `${k.nazov} (${k.kod}): má RAL variant (${k.farba}), ale nie je zvolená farba kovania`
+				});
+				continue;
+			}
+			if (k.farba !== farbaKovania) continue;
+		}
+
 		let qty: number | null = null;
 		const p = k.pravidlo;
 		switch (p.typ) {

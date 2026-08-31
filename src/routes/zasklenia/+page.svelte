@@ -12,6 +12,7 @@
 	import { popisMulti } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { type Klin } from '$lib/klin';
+	import { type Farba } from '$lib/komponenty';
 	import { maSietkaSystem, sietkaStrana, type Sietka, type SietkaUchyt } from '$lib/sietka';
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
@@ -57,6 +58,8 @@
 			caka: zd?.caka ?? false,
 			pridavnaKolajnica: zd?.pridavnaKolajnica ?? false,
 			jednostrannaFab: zd?.jednostrannaFab ?? false,
+			// RAL farba kovania (#338) — vyberá Money kód farebného variantu
+			farbaKovania: (zd?.farbaKovania ?? null) as Farba | null,
 			klin: (fv?.klin ?? null) as Klin | null,
 			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
 			kolajnica: (fv?.kolajnica ?? null) as { horna?: number; spodna?: number } | null,
@@ -114,6 +117,9 @@
 	let pridavnaKolajnicaOdporucanaPrev = $state(false);
 	// jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks)
 	let jednostrannaFabS = $state(false);
+	// RAL farba kovania (#338) — MENÍ Money kód (kľučka/krytka/zámok R9005 vs R7016).
+	// '' = nezvolená → engine vyhlási chybu pri systéme s farebnou položkou.
+	let farbaKovaniaS = $state<'' | Farba>('');
 	let system = $state('Robust');
 	let styl = $state('2K');
 	let sklo = $state('');
@@ -154,6 +160,8 @@
 		cakaS = zd?.caka ?? false;
 		pridavnaKolajnicaS = zd?.pridavnaKolajnica ?? false;
 		jednostrannaFabS = zd?.jednostrannaFab ?? false;
+		// stará objednávka spred farby → '' → obsluha musí farbu znova zvoliť (#338)
+		farbaKovaniaS = zd?.farbaKovania ?? '';
 		const kl = (fv?.klin ?? null) as Klin | null;
 		klinS = !!kl;
 		klinDlzkaS = kl?.dlzka ?? '';
@@ -246,6 +254,8 @@
 	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
 	// kovanie do Money má zatiaľ len Robust (Slide čaká na skladové zásoby v Money)
 	let maKovanie = $derived(data.systemyKovanie.includes(system));
+	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338)
+	let maFarbu = $derived((data.systemyFarba ?? []).includes(system));
 	let maKolajnicu = $derived(kolajnicaPre(system));
 	$effect(() => {
 		if (!maKolajnicu) {
@@ -481,6 +491,11 @@
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
+	{#if vstup.farbaKovania}<input
+			type="hidden"
+			name="farbaKovania"
+			value={vstup.farbaKovania}
+		/>{/if}
 	{#if vstup.kolajnica?.horna}
 		<input type="hidden" name="kolajnicaHorna" value={vstup.kolajnica.horna} />
 	{/if}
@@ -514,6 +529,11 @@
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
 	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
 	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
+	{#if vstup.farbaKovania}<input
+			type="hidden"
+			name="farbaKovania"
+			value={vstup.farbaKovania}
+		/>{/if}
 {/snippet}
 
 {#if step === 'form'}
@@ -572,6 +592,7 @@
 		bind:cakaS
 		bind:pridavnaKolajnicaS
 		bind:jednostrannaFabS
+		bind:farbaKovaniaS
 		bind:kolHS
 		bind:kolSS
 		bind:klinS
@@ -593,6 +614,7 @@
 		{jeOpona}
 		{jeRobust}
 		{maKovanie}
+		{maFarbu}
 		{maKolajnicu}
 		{maSietka}
 		{sietkaStranaVal}

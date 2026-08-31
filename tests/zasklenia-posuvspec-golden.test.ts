@@ -34,7 +34,7 @@ const { actions } = await import('../src/routes/zasklenia/+page.server');
 
 const fd = (o: Record<string, string>) => {
 	const f = new FormData();
-	for (const [k, v] of Object.entries(o)) f.append(k, v);
+	for (const [k, v] of Object.entries({ farbaKovania: 'R9005', ...o })) f.append(k, v);
 	return f;
 };
 

@@ -13,6 +13,7 @@ import {
 import {
 	KOMPONENTY_ROBUST,
 	KOMPONENTY_SLIDE,
+	KOMPONENTY_STANDARD,
 	SLIDE_PRIPRAVENY,
 	komponentyPre
 } from '../src/lib/server/komponenty-cfg';
@@ -179,7 +180,7 @@ describe('fail-loud: nenakonfigurovaný štýl NESMIE dať tichú nulu', () => {
 
 // ——— OSTRÁ konfigurácia (tabuľky od Dominika + jeho odpovede z 2026-07-28) ———
 describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
-	const spocitajR = (sysStyl: string, obojstrannaFab = true) =>
+	const spocitajR = (sysStyl: string, obojstrannaFab = true, farba: 'R9005' | 'R7016' = 'R9005') =>
 		pocitajKomponenty(
 			KOMPONENTY_ROBUST,
 			sysStyl,
@@ -188,7 +189,8 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 				KOMPONENTY_ROBUST.find((k) => k.kod === 'ZASK00029')!,
 				sysStyl
 			),
-			obojstrannaFab
+			obojstrannaFab,
+			farba
 		);
 	const qr = (sysStyl: string, kod: string, fab = true) =>
 		spocitajR(sysStyl, fab).polozky.find((p) => p.kod === kod)?.qty;
@@ -219,22 +221,64 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 		expect(qr('Robust|2x4K', 'ZASK00037')).toBe(12);
 	});
 
-	it('kľučka a krytka vložky: obojstranná FAB 2 ks, jednostranná 1 ks na uzáver', () => {
-		expect(qr('Robust|2K', 'ZASK00030')).toBe(4); // 2 uzávery × 2
-		expect(qr('Robust|2K', 'ZASK00035')).toBe(4);
-		expect(qr('Robust|2K', 'ZASK00030', false)).toBe(2);
-		expect(qr('Robust|2K', 'ZASK00035', false)).toBe(2);
-		expect(qr('Robust|2x2K', 'ZASK00030')).toBe(6); // opona: 3 uzávery × 2
+	it('kľučka a krytka vložky (RAL R9005): obojstranná FAB 2 ks, jednostranná 1 ks na uzáver', () => {
+		expect(qr('Robust|2K', 'ZASK202533')).toBe(4); // 2 uzávery × 2
+		expect(qr('Robust|2K', 'ZASK202535')).toBe(4);
+		expect(qr('Robust|2K', 'ZASK202533', false)).toBe(2);
+		expect(qr('Robust|2K', 'ZASK202535', false)).toBe(2);
+		expect(qr('Robust|2x2K', 'ZASK202533')).toBe(6); // opona: 3 uzávery × 2
 	});
 
 	it('FAB mení LEN kľučku a krytku vložky, nič iné', () => {
 		const obojstranna = spocitajR('Robust|3K', true).polozky.filter(
-			(p) => !['ZASK00030', 'ZASK00035'].includes(p.kod)
+			(p) => !['ZASK202533', 'ZASK202535'].includes(p.kod)
 		);
 		const jednostranna = spocitajR('Robust|3K', false).polozky.filter(
-			(p) => !['ZASK00030', 'ZASK00035'].includes(p.kod)
+			(p) => !['ZASK202533', 'ZASK202535'].includes(p.kod)
 		);
 		expect(jednostranna).toEqual(obojstranna);
+	});
+
+	it('RAL farba (#338): R9005 pošle len R9005 kľučku/krytku, R7016 vôbec', () => {
+		const r9 = spocitajR('Robust|2K', true, 'R9005').polozky.map((p) => p.kod);
+		const r7 = spocitajR('Robust|2K', true, 'R7016').polozky.map((p) => p.kod);
+		expect(r9).toContain('ZASK202533');
+		expect(r9).toContain('ZASK202535');
+		expect(r9).not.toContain('ZASK202534');
+		expect(r9).not.toContain('ZASK202536');
+		expect(r7).toContain('ZASK202534');
+		expect(r7).toContain('ZASK202536');
+		expect(r7).not.toContain('ZASK202533');
+		expect(r7).not.toContain('ZASK202535');
+	});
+
+	it('chýbajúca farba → HLASNÁ chyba (nie tichý default), farebná položka sa neobjaví', () => {
+		const r = pocitajKomponenty(
+			KOMPONENTY_ROBUST,
+			'Robust|2K',
+			zaklad('Robust|2K'),
+			pocetUzaverov(
+				KOMPONENTY_ROBUST.find((k) => k.kod === 'ZASK00029')!,
+				'Robust|2K'
+			),
+			true
+			// farbaKovania zámerne vynechaná
+		);
+		expect(r.chyby.map((c) => c.kod)).toContain('ZASK202533');
+		for (const kod of ['ZASK202533', 'ZASK202534', 'ZASK202535', 'ZASK202536'])
+			expect(r.polozky.find((p) => p.kod === kod)).toBeUndefined();
+	});
+
+	it('každá RAL skupina má PRÁVE obe farby s identickým pravidlom (#338 config invariant)', () => {
+		const farebne = KOMPONENTY_ROBUST.filter((k) => k.farba);
+		// zoskup podľa pravidla+mj (kľučka vs krytka) — každá skupina musí mať R9005 aj R7016
+		const kluc = (k: (typeof farebne)[number]) => JSON.stringify(k.pravidlo) + '|' + k.mj;
+		const skupiny = new Map<string, Set<string>>();
+		for (const k of farebne) {
+			if (!skupiny.has(kluc(k))) skupiny.set(kluc(k), new Set());
+			skupiny.get(kluc(k))!.add(k.farba!);
+		}
+		for (const [, farby] of skupiny) expect([...farby].sort()).toEqual(['R7016', 'R9005']);
 	});
 
 	it('zasklievacie tesnenie 10 a 12 je 50/50 z rámového profilu (Dominikova dohoda)', () => {
@@ -259,16 +303,14 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 	});
 
 	it('každý kód v tabuľke je overený proti Money (nemenná kontrola zoznamu)', () => {
-		// zoznam overený read-only SQL 2026-07-28: existuje, Deleted=0, zásoba na sklade Materiál
+		// #338 (overené read-only Money 31.8.): ZASK00030/00034/00035 ZRUŠENÉ (0 sklad),
+		// kľučka+krytka vložky rozdelené na RAL varianty (ZASK202533/34/35/36).
 		expect(KOMPONENTY_ROBUST.map((k) => k.kod).sort()).toEqual([
 			'ZASK00027',
 			'ZASK00029',
-			'ZASK00030',
 			'ZASK00031',
 			'ZASK00032',
 			'ZASK00033',
-			'ZASK00034',
-			'ZASK00035',
 			'ZASK00036',
 			'ZASK00037',
 			'ZASK00038',
@@ -276,7 +318,11 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 			'ZASK00041',
 			'ZASK00042',
 			'ZASK20241',
-			'ZASK20242'
+			'ZASK20242',
+			'ZASK202533',
+			'ZASK202534',
+			'ZASK202535',
+			'ZASK202536'
 		]);
 	});
 });
@@ -335,5 +381,65 @@ describe('zlucKomponenty — viac posuvov na jednej zákazke', () => {
 	it('jeden posuv sa zlúčením nezmení', () => {
 		const a = spocitaj('Robust|2K').polozky;
 		expect(zlucKomponenty([a])).toEqual(a);
+	});
+});
+
+// ——— STANDARD (#338, overené proti Money 31.8. — kódy existujú, majú sklad) ———
+describe('KOMPONENTY_STANDARD — ostrá tabuľka', () => {
+	const spocitajS = (sysStyl: string, farba: 'R9005' | 'R7016' = 'R9005') =>
+		pocitajKomponenty(
+			KOMPONENTY_STANDARD,
+			sysStyl,
+			zaklad(sysStyl),
+			pocetUzaverov(
+				KOMPONENTY_STANDARD.find((k) => k.kod === 'ZASK202531')!,
+				sysStyl
+			),
+			true,
+			farba
+		);
+	const qs = (sysStyl: string, kod: string, farba: 'R9005' | 'R7016' = 'R9005') =>
+		spocitajS(sysStyl, farba).polozky.find((p) => p.kod === kod)?.qty;
+
+	it('Štandard je zapnutý (kódy majú v Money skladovú zásobu, na rozdiel od Slide)', () => {
+		expect(komponentyPre('Štandard')).toBe(KOMPONENTY_STANDARD);
+	});
+
+	it('KAŽDÝ Štandard štýl z konfigurácie sa spočíta bez chyby', () => {
+		const styly = Object.keys(cfg).filter((s) => s.startsWith('Štandard|'));
+		expect(styly.length).toBeGreaterThan(0);
+		for (const s of styly)
+			expect({ styl: s, chyby: spocitajS(s).chyby }).toEqual({ styl: s, chyby: [] });
+	});
+
+	it('kladka dvojitá 2 ks/okno, protikus = počet zámkov, zámok RAL', () => {
+		const z = zaklad('Štandard|2K');
+		expect(qs('Štandard|2K', 'ZASK00002')).toBe(2 * z.kridla);
+		expect(qs('Štandard|2K', 'ZASK202531')).toBe(2); // R9005 zámok, 2 koncové okná
+		expect(qs('Štandard|2K', 'ZASK20252')).toBe(2); // protikus = počet zámkov
+	});
+
+	it('protikus vždy sleduje počet zámkov (opona 3)', () => {
+		expect(qs('Štandard|2x3K', 'ZASK202531')).toBe(3);
+		expect(qs('Štandard|2x3K', 'ZASK20252')).toBe(3);
+	});
+
+	it('RAL: R9005 vs R7016 zámok — len zvolený variant, druhý absent', () => {
+		expect(qs('Štandard|3K', 'ZASK202531', 'R9005')).toBe(2);
+		expect(qs('Štandard|3K', 'ZASK202532', 'R9005')).toBeUndefined();
+		expect(qs('Štandard|3K', 'ZASK202532', 'R7016')).toBe(2);
+		expect(qs('Štandard|3K', 'ZASK202531', 'R7016')).toBeUndefined();
+	});
+
+	it('oba RAL varianty zámku majú IDENTICKÉ konstPreStyl (kotva počtu je farbo-nezávislá)', () => {
+		const r9 = KOMPONENTY_STANDARD.find((k) => k.kod === 'ZASK202531')!;
+		const r7 = KOMPONENTY_STANDARD.find((k) => k.kod === 'ZASK202532')!;
+		expect(r7.pravidlo).toEqual(r9.pravidlo);
+	});
+
+	it('tesnenia 4/6mm a kefy zatiaľ NIE sú v tabuľke (čaká sa na vzorec)', () => {
+		const kody = KOMPONENTY_STANDARD.map((k) => k.kod);
+		for (const kod of ['ZASK00005', 'ZASK00006', 'ZASK00007', 'ZASK202541'])
+			expect(kody).not.toContain(kod);
 	});
 });

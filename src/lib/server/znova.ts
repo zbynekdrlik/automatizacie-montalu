@@ -31,6 +31,9 @@ export interface ZnovaVysledok {
 }
 
 const s = (x: unknown): string => (typeof x === 'string' ? x : '');
+// #338: farbu kovania preberáme LEN keď je platná; stará objednávka spred farby →
+// null → obsluha musí farbu znova zvoliť (nikdy tichý default na jednu z farieb).
+const farba = (x: unknown): 'R9005' | 'R7016' | null => (x === 'R9005' || x === 'R7016' ? x : null);
 const n = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
 const b = (x: unknown): boolean => x === true;
 const obj = <T>(x: unknown): T | null => (x && typeof x === 'object' ? (x as T) : null);
@@ -101,7 +104,8 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 		ral: s(d.ral),
 		caka: row.caka === 1,
 		pridavnaKolajnica: b(d.pridavnaKolajnica),
-		jednostrannaFab: b(d.jednostrannaFab)
+		jednostrannaFab: b(d.jednostrannaFab),
+		farbaKovania: farba(d.farbaKovania)
 	};
 
 	if (d.zimnaZahrada === true) {
