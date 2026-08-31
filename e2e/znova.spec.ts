@@ -5,7 +5,7 @@
 // z histórie klikni „Použiť znova" a over, že sa zadanie predvyplnilo a že ZAK/OP/
 // zákazník ostali PRÁZDNE. Test sa preskočí, ak beží proti LIVE inštancii.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, skipAkLive } from './helpers';
+import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
 
 test('odpis z histórie predvyplní formulár, ale ZAK/OP/zákazník ostanú prázdne', async ({
 	page
@@ -26,6 +26,7 @@ test('odpis z histórie predvyplní formulár, ale ZAK/OP/zákazník ostanú pr�
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
 	await page.locator('#poznamka').fill('poznámka z prvej zákazky');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');

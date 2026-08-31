@@ -2,7 +2,7 @@
 // Rovnaký vzor ako e2e/sietka.spec.ts (Robust/Slide), plus #110-špecifický výber
 // SYSTÉMU sieťky, ktorý na Robust/Slide vôbec neexistuje.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string, system = 'Štandard +') {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
@@ -41,6 +41,7 @@ test('Štandard + posuv, rovnaký systém sieťky: 4 krídla v náhľade, presn�
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-STD', 'E2E Sietka standard');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	const bez = await odpisRiadky(page);
@@ -49,6 +50,7 @@ test('Štandard + posuv, rovnaký systém sieťky: 4 krídla v náhľade, presn�
 	await waitHydrated(page);
 	await page.locator('#sietka-on').check();
 	// systém sieťky sa NEMENÍ — ostáva rovnaký ako posuv (predvolené)
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -79,6 +81,7 @@ test('Štandard + posuv + STARÝ systém sieťky: krajová/dorazová idú s cudz
 	await page.locator('#sietka-on').check();
 	await expect(page.locator('#sietka-system')).toBeVisible();
 	await page.locator('#sietka-system').selectOption('Štandard');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -113,6 +116,7 @@ test('výber systému sieťky prežije „← Späť a upraviť"', async ({ page
 	await zaklad(page, 'E2E-SIETKA-BACK', 'E2E Sietka spat');
 	await page.locator('#sietka-on').check();
 	await page.locator('#sietka-system').selectOption('Štandard');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
@@ -135,6 +139,7 @@ test('Štandard + 2K + sieťka: nárezák aj odpis PRIDÁ 3K koľajnicu (hornú 
 
 	await zaklad(page, 'E2E-SIETKA-STD-2K', 'E2E Sietka standard 2K');
 	await page.selectOption('#styl', '2K');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	const bez = await odpisRiadky(page);
@@ -147,6 +152,7 @@ test('Štandard + 2K + sieťka: nárezák aj odpis PRIDÁ 3K koľajnicu (hornú 
 	// hláška MUSÍ hovoriť o dvoch ODLIŠNÝCH koľajniciach (delená), nie „2 ks + 2 ks"
 	await expect(page.getByTestId('sietka-2k-warn')).toContainText('hornú aj spodnú');
 
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('sietka-2k-warn-karta')).toContainText('hornú aj spodnú');
@@ -183,6 +189,7 @@ test('Štandard + 2K + IZO sklo + sieťka: nárezák-hint aj hláška sedia, odp
 	// hláška MUSÍ hovoriť o dvoch ODLIŠNÝCH koľajniciach (delená), rovnako ako bez IZO
 	await expect(page.getByTestId('sietka-2k-warn')).toContainText('hornú aj spodnú');
 
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('sietka-2k-warn-karta')).toContainText('hornú aj spodnú');

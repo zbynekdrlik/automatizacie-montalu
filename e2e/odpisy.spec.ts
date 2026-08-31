@@ -13,7 +13,8 @@ import {
 	waitHydrated,
 	skipAkLive,
 	E2E_USER,
-	E2E_PASS
+	E2E_PASS,
+	vyberFarbuKovania
 } from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
@@ -33,6 +34,7 @@ test('odpisy: ledger blokuje identický re-import; „⚠️ Povoliť rovnaký" 
 		await page.getByLabel('Zákazník *').fill('E2E Uvoľniť');
 		await page.getByLabel('Šírka (mm) *').fill('2509');
 		await page.getByLabel('Výška (mm) *').fill('1930');
+		await vyberFarbuKovania(page);
 		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 		await page.getByTestId('odoslat').click();
 	};

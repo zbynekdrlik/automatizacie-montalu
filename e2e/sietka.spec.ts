@@ -7,7 +7,14 @@
 // počítajú, nezapisujú odpis → dá sa pustiť aj proti nasadenej appke (BASE_URL).
 // Testy, ktoré idú AŽ ZA odoslanie do Money, sú označené a používajú `skipAkLive`.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, goto, skipAkLive } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	goto,
+	skipAkLive,
+	vyberFarbuKovania
+} from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string, styl = '3K') {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
@@ -54,6 +61,7 @@ test('jeden posuv: sieťka pridá presnú deltu do Money odpisu (rám+nos, #86 k
 
 	// (1) najprv BEZ sieťky — referenčný odpis
 	await zaklad(page, 'E2E-SIETKA', 'E2E Sietka');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	const bezSietky = await odpisRiadky(page);
@@ -66,6 +74,7 @@ test('jeden posuv: sieťka pridá presnú deltu do Money odpisu (rám+nos, #86 k
 	await waitHydrated(page);
 	await page.locator('#sietka-on').check();
 	await page.locator('#sietka-uchyt').selectOption('madloVelke');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -115,6 +124,7 @@ test('sieťka na 2K posuve ukáže upozornenie a Money odpis PRIDÁ 3K koľajnic
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-2K', 'E2E Sietka 2K', '2K');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	const bez2k = await odpisRiadky(page);
@@ -124,6 +134,7 @@ test('sieťka na 2K posuve ukáže upozornenie a Money odpis PRIDÁ 3K koľajnic
 	await page.locator('#sietka-on').check();
 	await expect(page.getByTestId('sietka-2k-warn')).toContainText('3K');
 
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('sietka-2k-warn-karta')).toContainText('3K');
@@ -142,6 +153,7 @@ test('sieťka prežije „← Späť a upraviť" (úchyt)', async ({ page }) => 
 	await zaklad(page, 'E2E-SIETKA-B', 'E2E Sietka spat');
 	await page.locator('#sietka-on').check();
 	await page.locator('#sietka-uchyt').selectOption('zamok');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
@@ -163,6 +175,7 @@ test('viac posuvov: sieťka má len ten posuv, ktorý ju má zapnutú', async ({
 	await page.locator('#ps0-v').fill('2320');
 	// sieťka len na DRUHOM posuve (primárny ostáva bez nej)
 	await page.locator('#ps0-sietka-on').check();
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 

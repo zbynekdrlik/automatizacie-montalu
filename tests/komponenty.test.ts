@@ -269,16 +269,30 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 			expect(r.polozky.find((p) => p.kod === kod)).toBeUndefined();
 	});
 
-	it('každá RAL skupina má PRÁVE obe farby s identickým pravidlom (#338 config invariant)', () => {
-		const farebne = KOMPONENTY_ROBUST.filter((k) => k.farba);
-		// zoskup podľa pravidla+mj (kľučka vs krytka) — každá skupina musí mať R9005 aj R7016
-		const kluc = (k: (typeof farebne)[number]) => JSON.stringify(k.pravidlo) + '|' + k.mj;
-		const skupiny = new Map<string, Set<string>>();
-		for (const k of farebne) {
-			if (!skupiny.has(kluc(k))) skupiny.set(kluc(k), new Set());
-			skupiny.get(kluc(k))!.add(k.farba!);
+	it('každá RAL skupina má PRÁVE obe farby (#338 config invariant, VŠETKY tabuľky)', () => {
+		// Chráni pred „pridal som len R9005 variant" — jednofarebná skupina by pri druhej
+		// farbe ticho vynechala kovanie (mismatch-skip je zámerne tichý). Zoskup podľa
+		// NÁZVU bez RAL prípony (nie podľa pravidla — kľučka aj krytka majú to isté
+		// `naUzaverPodlaFab`), naprieč všetkými tabuľkami s farebnými položkami.
+		const tabulky = [
+			['ROBUST', KOMPONENTY_ROBUST],
+			['STANDARD', KOMPONENTY_STANDARD]
+		] as const;
+		const baza = (nazov: string) => nazov.replace(/\s*R(9005|7016)\s*$/, '').trim();
+		for (const [meno, tabulka] of tabulky) {
+			const skupiny = new Map<string, Set<string>>();
+			for (const k of tabulka.filter((x) => x.farba)) {
+				const key = baza(k.nazov);
+				if (!skupiny.has(key)) skupiny.set(key, new Set());
+				skupiny.get(key)!.add(k.farba!);
+			}
+			for (const [b, farby] of skupiny)
+				expect({ tab: meno, baza: b, farby: [...farby].sort() }).toEqual({
+					tab: meno,
+					baza: b,
+					farby: ['R7016', 'R9005']
+				});
 		}
-		for (const [, farby] of skupiny) expect([...farby].sort()).toEqual(['R7016', 'R9005']);
 	});
 
 	it('zasklievacie tesnenie 10 a 12 je 50/50 z rámového profilu (Dominikova dohoda)', () => {

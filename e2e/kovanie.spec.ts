@@ -5,7 +5,7 @@
 // NEZAPISUJÚ odpis ani nemenia konfiguráciu → tieto testy sa dajú pustiť aj proti
 // nasadenej appke (BASE_URL). Tlačidlo „Odoslať odpis" tu nikdy nepadne.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const KOVANIA = [
 	'Jednostranná kľučka z vnútra bez FAB',
@@ -99,6 +99,7 @@ test('jeden posuv: kovanie v náhľade + rozmer skla s mm na kopírovanie', asyn
 	await page.locator('#v').fill('2320');
 	await page.selectOption('#kovanieL', KOVANIA[3]);
 	await page.selectOption('#kovanieP', KOVANIA[0]);
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -136,6 +137,7 @@ test('viac posuvov: každý náhľad má svoje kovanie, tabuľka sklo v mm', asy
 	await page.locator('#ps0-v').fill('2320');
 	await page.selectOption('#ps0-kovl', KOVANIA[1]);
 	await page.selectOption('#ps0-kovp', KOVANIA[2]);
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 

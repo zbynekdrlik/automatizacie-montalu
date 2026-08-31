@@ -7,7 +7,7 @@
 // nezapisujú odpis ani nemenia konfiguráciu → dá sa pustiť aj proti nasadenej
 // appke (BASE_URL). „Odoslať odpis" tu nikdy nepadne.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, skipAkLive } from './helpers';
+import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string) {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
@@ -44,6 +44,7 @@ test('klín: nič sa nepredvypĺňa z posuvu — všetky štyri kóty sú povinn
 	await expect(page.locator('#klin-ks')).toHaveValue('1');
 
 	// a sú POVINNÉ — prázdny klín formulár neodošle, plán sa nespočíta
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await expect(page.locator('.card', { hasText: 'Odpis (do Money)' })).toHaveCount(0);
 	expect(
@@ -57,6 +58,7 @@ test('klín: nič sa nepredvypĺňa z posuvu — všetky štyri kóty sú povinn
 	await page.locator('#klin-sirka').fill('80');
 	await page.locator('#klin-v1').fill('20');
 	await page.locator('#klin-v2').fill('0');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('nahlad-klin')).toContainText('3000');
@@ -76,6 +78,7 @@ test('jeden posuv: klín je v náhľade aj v karte plánu a Money odpis je NEZME
 
 	// (1) najprv BEZ klina — referenčný odpis
 	await zaklad(page, 'E2E-KLIN', 'E2E Klin');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	const bezKlina = await odpisRiadky(page);
@@ -92,6 +95,7 @@ test('jeden posuv: klín je v náhľade aj v karte plánu a Money odpis je NEZME
 	await page.locator('#klin-v1').fill('350');
 	await page.locator('#klin-v2').fill('120');
 	await page.locator('#klin-ks').fill('2');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -129,6 +133,7 @@ test('klín prežije „← Späť a upraviť" (vrátane počtu kusov)', async (
 	await page.locator('#klin-v1').fill('400');
 	await page.locator('#klin-v2').fill('0');
 	await page.locator('#klin-ks').fill('3');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
@@ -160,6 +165,7 @@ test('viac posuvov: klín má len ten posuv, ktorý ho má zapnutý', async ({ p
 	await page.locator('#ps0-klin-v1').fill('300');
 	await page.locator('#ps0-klin-v2').fill('80');
 	await page.locator('#ps0-klin-ks').fill('2');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -193,6 +199,7 @@ test('klín: obídená HTML5 validácia → serverová chyba, plán sa nespočí
 		});
 		await el.fill('0');
 	}
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -224,6 +231,7 @@ test('viac posuvov: klín je vidno AJ po odoslaní odpisu (nie len v náhľade)'
 	await page.locator('#ps0-klin-v1').fill('300');
 	await page.locator('#ps0-klin-v2').fill('80');
 	await page.locator('#ps0-klin-ks').fill('2');
+	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('nahlad-klin')).toHaveCount(1);
@@ -260,6 +268,7 @@ test('viac posuvov: ručná dĺžka koľajnice prežije odoslanie (Money-kritick
 	await page.getByRole('button', { name: /Pridať posuv/ }).click();
 	await page.locator('#ps0-s').fill('3980');
 	await page.locator('#ps0-v').fill('2162');
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('kolajnica-rucne-0')).toContainText('2690');

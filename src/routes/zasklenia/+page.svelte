@@ -254,8 +254,12 @@
 	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
 	// kovanie do Money má zatiaľ len Robust (Slide čaká na skladové zásoby v Money)
 	let maKovanie = $derived(data.systemyKovanie.includes(system));
-	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338)
-	let maFarbu = $derived((data.systemyFarba ?? []).includes(system));
+	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
+	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv
+	// (aj ďalší posuv zimnej záhrady s iným systémom než primárny).
+	let maFarbu = $derived(
+		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFarba ?? []).includes(s))
+	);
 	let maKolajnicu = $derived(kolajnicaPre(system));
 	$effect(() => {
 		if (!maKolajnicu) {

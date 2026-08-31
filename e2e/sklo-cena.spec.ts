@@ -5,7 +5,7 @@
 // je Money kód pre „Izolačné sklo 4/16/4 číre" (v23 seed). Nula console errors všade.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { collectConsole, loginAs, goto } from './helpers';
+import { collectConsole, loginAs, goto, vyberFarbuKovania } from './helpers';
 
 const SKLO = 'Izolačné sklo 4/16/4 číre';
 
@@ -28,6 +28,7 @@ test('bez ceny skla v snapshote appka ukáže „cena nedostupná" (honest-null)
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await vyplnRobust2K(page, `E2E-SKLOCENA-BEZ-${Date.now()}`);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	await expect(page.getByTestId('sklo-cena')).toBeVisible();
@@ -63,6 +64,7 @@ test('so seednutým Money snapshotom appka ukáže reálnu (vymyslenú) cenu skl
 	);
 	await loginAs(page);
 	await vyplnRobust2K(page, `E2E-SKLOCENA-CENA-${Date.now()}`);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	const spolu = page.getByTestId('sklo-cena-spolu-0');
@@ -80,6 +82,7 @@ test('náklad na sklo je NOPRINT — v tlačovom náhľade skrytý (dielňa cenu
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await vyplnRobust2K(page, `E2E-SKLOCENA-PRINT-${Date.now()}`);
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 
 	const blok = page.getByTestId('sklo-cena');

@@ -367,6 +367,7 @@
 					name="farbaKovania"
 					bind:value={farbaKovaniaS}
 					data-testid="farba-kovania"
+					required
 				>
 					<option value="">— vyber farbu kovania —</option>
 					<option value="R9005">R9005 (čierna)</option>

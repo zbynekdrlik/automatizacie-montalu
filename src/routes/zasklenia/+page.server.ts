@@ -413,7 +413,14 @@ export const actions = {
 				vstup,
 				plan: r,
 				planHash: aktualny,
-				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
+				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
+				warn: [
+					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+					kov.warn
+				]
+					.filter(Boolean)
+					.join(' '),
 				vytvorene,
 				cielInfo: {
 					live: isLive(),
@@ -552,7 +559,14 @@ export const actions = {
 				multiVstup: vstup,
 				multi: r,
 				planHash: aktualny,
-				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
+				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
+				warn: [
+					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+					kov.warn
+				]
+					.filter(Boolean)
+					.join(' '),
 				vytvorene,
 				cielInfo: {
 					live: isLive(),
