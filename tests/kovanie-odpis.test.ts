@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildCFG, type PosuvSpec } from '../src/lib/server/compute';
 import { kovanieDoOdpisu } from '../src/lib/server/kovanie';
+import type { Farba } from '../src/lib/komponenty';
 import seed from '../src/lib/server/cfg_seed.json';
 
 const cfg = buildCFG(seed.sys as never, seed.rez as never);
@@ -15,7 +16,9 @@ const spec = (sysStyl: string, S = 3000, V = 2200): PosuvSpec => ({
 });
 // #338: Robust/Štandard majú RAL farebné varianty kovania → farba je povinná. Väčšina
 // testov overuje farbo-neutrálne položky, tak default R9005; farbo-špecifické testy nižšie.
-const kov = (specs: PosuvSpec[], fab = false, farba: 'R9005' | 'R7016' | undefined = 'R9005') =>
+// (Farba typ rozšírený na R9006 v #354 — Deluxe kovanie má vlastný test súbor
+// tests/kovanie-deluxe.test.ts, nie ďalší describe blok tu.)
+const kov = (specs: PosuvSpec[], fab = false, farba: Farba | undefined = 'R9005') =>
 	kovanieDoOdpisu(cfg, specs, fab, farba);
 const qty = (r: { polozky: { kod: string; qty: number }[] }, kod: string) =>
 	r.polozky.find((p) => p.kod === kod)?.qty;
@@ -141,10 +144,11 @@ describe('systémy bez kovania', () => {
 		expect(r.polozky).toEqual([]);
 	});
 
-	it('Štandard + / Deluxe kovanie nemajú — odpis profilov beží ďalej bez chyby', () => {
-		for (const ss of ['Štandard +|2K', 'Deluxe|2K'])
-			expect(kov([spec(ss)])).toEqual({ polozky: [], err: null, warn: null });
+	it('Štandard + kovanie nemá — odpis profilov beží ďalej bez chyby', () => {
+		expect(kov([spec('Štandard +|2K')])).toEqual({ polozky: [], err: null, warn: null });
 	});
+	// Deluxe DOSTALO kovanie v #354 (madlo/kefy/10mm krytky) — testy v
+	// tests/kovanie-deluxe.test.ts nahrádzajú pôvodné "Deluxe kovanie nemá".
 
 	it('zmiešaná zákazka: Robust dá kovanie, Štandard + nie', () => {
 		const r = kov([spec('Robust|2K'), spec('Štandard +|2K')]);

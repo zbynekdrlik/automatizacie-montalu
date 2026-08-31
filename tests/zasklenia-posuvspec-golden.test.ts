@@ -135,7 +135,11 @@ const JEDEN_POSUV: Record<string, Record<string, string>> = {
 		sklo: 'Float kalené 10 mm',
 		otvaranie: 'P - L',
 		kolajnicaHorna: '2690',
-		kolajnicaSpodna: '2695'
+		kolajnicaSpodna: '2695',
+		// #354 review nález: default R9005 (fd()) nesedí na ŽIADEN 10mm Deluxe variant
+		// (len R9006/R7016) — od review opravy je to teraz HLASNÁ chyba, nie tichý
+		// odpis bez krytiek. R7016 je platný pre Deluxe (aj pre Robust nižšie).
+		farbaKovania: 'R7016'
 	},
 	'standard-plus-4K-izo (prídavná koľajnica, sieťka so systémom)': {
 		zak: 'ZAK-G5',
@@ -227,6 +231,11 @@ const VIAC_POSUVOV: Record<string, Record<string, string>> = {
 			jednostrannaFab: '0',
 			poznamka: '',
 			ral: '',
+			// #354 review nález: dávka kombinuje Deluxe (R9006/R7016) a Robust
+			// (R9005/R7016) pod JEDNÝM objednávkovým `farbaKovania` — default R9005
+			// (fd()) by nesedel Deluxe krytkám a od review opravy zastaví CELÝ odpis
+			// chybou. R7016 sedí OBOM systémom, takže dávka ostáva kompletná.
+			farbaKovania: 'R7016',
 			posuvy: JSON.stringify([
 				{
 					system: 'Deluxe',

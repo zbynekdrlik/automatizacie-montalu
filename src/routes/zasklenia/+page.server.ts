@@ -320,6 +320,17 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		systemyFarba: systemy.filter((sys) =>
 			(komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
 		),
+		// platné RAL možnosti PER SYSTÉM (#354) — Deluxe (R9006/R7016, len 10mm je live)
+		// a Robust/Štandard (R9005/R7016) majú ROZDIELNU farebnú množinu; zdieľaný pevný
+		// zoznam by nesprávnu voľbu pre daný systém TICHO preskočil (farba-mismatch nie je
+		// chyba, len absent) namiesto ponuky len platných kombinácií. Derivované z configu,
+		// nie hardcoded — nová farba/systém sa premietne bez úpravy tejto stránky.
+		ralPreSystem: Object.fromEntries(
+			systemy.map((sys) => [
+				sys,
+				[...new Set((komponentyPre(sys) ?? []).map((k) => k.farba).filter((f) => f !== undefined))]
+			])
+		),
 		znova,
 		live: isLive()
 	};

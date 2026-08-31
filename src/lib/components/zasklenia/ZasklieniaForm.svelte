@@ -18,6 +18,14 @@
 	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
 	import type { PosuvRow } from '$lib/zasklenia-form';
 
+	// Display názvy RAL kódov pre <select> (#354) — bežné RAL pomenovania, rovnaký
+	// vzor ako pôvodné hardcoded „(čierna)"/„(antracit)" labely.
+	const RAL_NAZOV: Record<Farba, string> = {
+		R9005: 'čierna',
+		R9006: 'bielohliníková',
+		R7016: 'antracit'
+	};
+
 	let {
 		// ponuky z konfigurácie (jediné, čo z `data` formulár potrebuje)
 		systemy,
@@ -67,6 +75,7 @@
 		jeRobust,
 		maKovanie,
 		maFarbu,
+		ralOptions,
 		maKolajnicu,
 		maSietka,
 		sietkaStranaVal,
@@ -129,6 +138,7 @@
 		jeRobust: boolean;
 		maKovanie: boolean;
 		maFarbu: boolean;
+		ralOptions: Farba[];
 		maKolajnicu: boolean;
 		maSietka: boolean;
 		sietkaStranaVal: 'ľavá' | 'pravá' | null;
@@ -370,8 +380,9 @@
 					required
 				>
 					<option value="">— vyber farbu kovania —</option>
-					<option value="R9005">R9005 (čierna)</option>
-					<option value="R7016">R7016 (antracit)</option>
+					{#each ralOptions as f (f)}
+						<option value={f}>{f} ({RAL_NAZOV[f]})</option>
+					{/each}
 				</select>
 			</div>
 		{/if}
