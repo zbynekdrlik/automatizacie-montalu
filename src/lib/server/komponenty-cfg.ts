@@ -241,12 +241,98 @@ export const KOMPONENTY_STANDARD: Komponent[] = [
 ];
 
 /**
+ * Komponenty BS DELUXE (#354, Dominik — Odoo kanál 207, msg 1767527/att 14668
+ * „KOMPONENTY BS DELUXE.xlsx" + náčrt umiestnenia msg 1767528/att 14670). Overené
+ * ŽIVO proti ostrému Money (read-only SQL, 31.8.2026): všetkých 15 kódov existuje,
+ * `Deleted=0`, názvy sedia s Dominikovou tabuľkou.
+ *
+ * MONEY-KRITICKÉ nález: 6mm krytky (ZASK202519/202520/202521/202522/202523/202524)
+ * majú v Money 0 ks na sklade (všetky sklady spolu) — presne tá istá situácia, ktorá
+ * viedla k `SLIDE_PRIPRAVENY = false` vyššie („artikel bez zásoby… appka neposlala
+ * pohyb, ktorý nemá kam sadnúť"). Preto sú tu zámerne VYNECHANÉ, kým sklad nepríde —
+ * design komentár na #354 nesie ich úplnú tabuľku aj Money kódy pre budúce doplnenie
+ * (mechanizmus `hrubkaSkla` už existuje, doplnenie = 6 riadkov analogických nižšie).
+ *
+ * Krajná/stredová L-P počítacia formula (`konst`/`naStyk`) je odvodená z existujúcej
+ * `cfg_seed` geometrie (Dorazový profil `pocetKs=2` na KAŽDOM Deluxe štýle vrátane
+ * opony; Kladkový aj Klzný profil `pocetKs=N`) — plné odvodenie v design komentári.
+ */
+export const KOMPONENTY_DELUXE: Komponent[] = [
+	// 10mm krytky — RAL R9006 / R7016 (6mm vynechané, viď komentár vyššie).
+	{
+		kod: 'ZASK202525',
+		nazov: 'Krytka stredová L 10 mm R9006',
+		mj: 'ks',
+		hrubkaSkla: 10,
+		farba: 'R9006',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202526',
+		nazov: 'Krytka stredová L 10 mm R7016',
+		mj: 'ks',
+		hrubkaSkla: 10,
+		farba: 'R7016',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202527',
+		nazov: 'Krytka stredová P 10 mm R9006',
+		mj: 'ks',
+		hrubkaSkla: 10,
+		farba: 'R9006',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202528',
+		nazov: 'Krytka stredová P 10 mm R7016',
+		mj: 'ks',
+		hrubkaSkla: 10,
+		farba: 'R7016',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202529',
+		nazov: 'Krytka krajná 10 mm R9006',
+		mj: 'ks',
+		hrubkaSkla: 10,
+		farba: 'R9006',
+		pravidlo: { typ: 'konst', ks: 2 }
+	},
+	{
+		kod: 'ZASK202530',
+		nazov: 'Krytka krajná 10 mm R7016',
+		mj: 'ks',
+		hrubkaSkla: 10,
+		farba: 'R7016',
+		pravidlo: { typ: 'konst', ks: 2 }
+	},
+	// Madlo D56 — 2 ks na posuv, vždy krajné krídlo (Dominik): hrúbko/farbo-neutrálne.
+	{ kod: 'ZASK00049', nazov: 'Madlo D56', mj: 'ks', pravidlo: { typ: 'konst', ks: 2 } },
+	// Tesniace kefy — súčet dĺžok kladkového/klzného profilu × 2 (m): hrúbko/farbo-neutrálne.
+	{
+		kod: 'ZASK00007',
+		nazov: 'Tesniaca kefa 4,8×4 mm',
+		mj: 'm',
+		pravidlo: { typ: 'dlzkaProfilu', role: 'kladkovy', koef: 2 }
+	},
+	{
+		kod: 'ZASK202542',
+		nazov: 'Tesniaca kefa 4,8×7 mm',
+		mj: 'm',
+		pravidlo: { typ: 'dlzkaProfilu', role: 'klzny', koef: 2 }
+	}
+];
+
+/**
  * Systémy, ktorých kovanie do odpisu je NEÚPLNÉ (chýbajú tesnenia/kefy) a náhľad
  * na to musí upozorniť (#338). Prázdne = kompletné.
  */
 export const KOVANIE_NEUPLNE: Record<string, string> = {
 	Štandard:
-		'STANDARD: zasklievacie tesnenia (4/6mm) a tesniace kefy zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).'
+		'STANDARD: zasklievacie tesnenia (4/6mm) a tesniace kefy zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).',
+	Deluxe:
+		'DELUXE: 6mm krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); 10mm krytky, madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'
 };
 
 /** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
@@ -254,5 +340,6 @@ export function komponentyPre(system: string): Komponent[] | null {
 	if (system === 'Robust') return KOMPONENTY_ROBUST;
 	if (system === 'Slide') return SLIDE_PRIPRAVENY ? KOMPONENTY_SLIDE : null;
 	if (system === 'Štandard') return KOMPONENTY_STANDARD;
+	if (system === 'Deluxe') return KOMPONENTY_DELUXE;
 	return null;
 }

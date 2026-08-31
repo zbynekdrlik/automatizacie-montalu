@@ -260,6 +260,24 @@
 	let maFarbu = $derived(
 		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFarba ?? []).includes(s))
 	);
+	// platné RAL možnosti pre RAL <select> (#354) — zjednotenie farieb naprieč systémami
+	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), zo servera odvodených
+	// per-systém množín (Deluxe R9006/R7016 ≠ Robust/Štandard R9005/R7016).
+	let ralOptions = $derived.by(() => {
+		const systemyVHre = [system, ...posuvyExtra.map((p) => p.system)];
+		const zjednotene: Farba[] = [];
+		for (const s of systemyVHre)
+			for (const f of data.ralPreSystem?.[s] ?? []) if (!zjednotene.includes(f)) zjednotene.push(f);
+		return zjednotene;
+	});
+	// zvolená farba, ktorá je pre AKTUÁLNU množinu neplatná (napr. R9005 z Robustu
+	// po prepnutí na Deluxe, ktorý ponúka len R9006/R7016) sa zahodí — inak by
+	// bola vidno v selecte prázdna, ale mohla by v `farbaKovaniaS` ostať trčať
+	// neplatná hodnota (#354; do #354 všetky farebné systémy zdieľali JEDNU
+	// množinu R9005/R7016, takže tento prípad dovtedy nemohol nastať).
+	$effect(() => {
+		if (farbaKovaniaS && !ralOptions.includes(farbaKovaniaS)) farbaKovaniaS = '';
+	});
 	let maKolajnicu = $derived(kolajnicaPre(system));
 	$effect(() => {
 		if (!maKolajnicu) {
@@ -619,6 +637,7 @@
 		{jeRobust}
 		{maKovanie}
 		{maFarbu}
+		{ralOptions}
 		{maKolajnicu}
 		{maSietka}
 		{sietkaStranaVal}

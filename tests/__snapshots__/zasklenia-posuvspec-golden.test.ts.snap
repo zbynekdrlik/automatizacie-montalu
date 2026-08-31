@@ -64,6 +64,42 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "qty": 7.5,
         "sklad": null,
       },
+      {
+        "kod": "ZASK00049",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Madlo D56",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK00007",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "m",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Tesniaca kefa 4,8×4 mm",
+        "predajVo": null,
+        "qty": 8.418,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK202542",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "m",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Tesniaca kefa 4,8×7 mm",
+        "predajVo": null,
+        "qty": 8.418,
+        "sklad": null,
+      },
     ],
     "snapshot": {
       "daysOld": null,
@@ -92,11 +128,30 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
   },
   "cielInfo": {
-    "filename": "ZAK-G4 - Zákazník G4 [4fdb17e9].xlsx",
+    "filename": "ZAK-G4 - Zákazník G4 [d4c2ef0e].xlsx",
     "live": false,
   },
   "heightWarn": undefined,
-  "kovanie": [],
+  "kovanie": [
+    {
+      "kod": "ZASK00049",
+      "mj": "ks",
+      "nazov": "Madlo D56",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00007",
+      "mj": "m",
+      "nazov": "Tesniaca kefa 4,8×4 mm",
+      "qty": 8.418,
+    },
+    {
+      "kod": "ZASK202542",
+      "mj": "m",
+      "nazov": "Tesniaca kefa 4,8×7 mm",
+      "qty": 8.418,
+    },
+  ],
   "plan": {
     "N": 3,
     "S": 4200,
@@ -299,7 +354,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "styl": "3K",
     "system": "Deluxe",
   },
-  "planHash": "40c1e4ed",
+  "planHash": "eddcd292",
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -352,7 +407,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G4",
     "zakaznik": "Zákazník G4",
   },
-  "warn": null,
+  "warn": "DELUXE: 6mm krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); 10mm krytky, madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).",
 }
 `;
 
@@ -4666,6 +4721,42 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "sklad": null,
       },
       {
+        "kod": "ZASK00049",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "ks",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Madlo D56",
+        "predajVo": null,
+        "qty": 2,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK00007",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "m",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Tesniaca kefa 4,8×4 mm",
+        "predajVo": null,
+        "qty": 8.418,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK202542",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "m",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Tesniaca kefa 4,8×7 mm",
+        "predajVo": null,
+        "qty": 8.418,
+        "sklad": null,
+      },
+      {
         "kod": "ZASK00027",
         "marza": null,
         "mena": "EUR",
@@ -4873,11 +4964,29 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     },
   },
   "cielInfo": {
-    "filename": "ZAK-GM2 - Zákazník GM2 [27e1bc44].xlsx",
+    "filename": "ZAK-GM2 - Zákazník GM2 [68d13149].xlsx",
     "live": false,
   },
   "heightWarn": undefined,
   "kovanie": [
+    {
+      "kod": "ZASK00049",
+      "mj": "ks",
+      "nazov": "Madlo D56",
+      "qty": 2,
+    },
+    {
+      "kod": "ZASK00007",
+      "mj": "m",
+      "nazov": "Tesniaca kefa 4,8×4 mm",
+      "qty": 8.418,
+    },
+    {
+      "kod": "ZASK202542",
+      "mj": "m",
+      "nazov": "Tesniaca kefa 4,8×7 mm",
+      "qty": 8.418,
+    },
     {
       "kod": "ZASK00027",
       "mj": "ks",
@@ -6079,7 +6188,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "zak": "ZAK-GM2",
     "zakaznik": "Zákazník GM2",
   },
-  "planHash": "0662c0e8",
+  "planHash": "50d1306d",
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -6121,6 +6230,6 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "spolu": 0,
   },
   "step": "nahladMulti",
-  "warn": null,
+  "warn": "DELUXE: 6mm krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); 10mm krytky, madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).",
 }
 `;

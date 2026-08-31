@@ -16,10 +16,11 @@ export type MJ = 'm' | 'ks';
 
 /**
  * Farba kovania (prášková RAL varianta). Niektoré položky existujú v Money ako
- * dva farebné varianty (napr. kľučka R9005 vs R7016) — do odpisu ide LEN variant
- * zvolenej farby, druhý sa vôbec neobjaví (nie „0 ks", ale absent).
+ * dva/tri farebné varianty (napr. kľučka R9005 vs R7016) — do odpisu ide LEN variant
+ * zvolenej farby, ostatné sa vôbec neobjavia (nie „0 ks", ale absent).
+ * `R9006` pridané #354 (Deluxe krytky — 6mm ponúka R9005/R9006, 10mm R9006/R7016).
  */
-export type Farba = 'R9005' | 'R7016';
+export type Farba = 'R9005' | 'R9006' | 'R7016';
 
 /**
  * Vstupy, z ktorých sa počítajú množstvá kovania. Všetko sú veci, ktoré appka už
@@ -36,6 +37,10 @@ export interface ZakladPoctov {
 	dlzkaNosovehoMm: number;
 	/** súčet dĺžok rezov oponového profilu (mm); 0 keď štýl oponu nemá */
 	dlzkaOponovehoMm: number;
+	/** súčet dĺžok rezov Deluxe kladkového profilu (mm); 0 mimo Deluxe (#354) */
+	dlzkaKladkovehoMm: number;
+	/** súčet dĺžok rezov Deluxe klzného profilu (mm); 0 mimo Deluxe (#354) */
+	dlzkaKlznehoMm: number;
 }
 
 /**
@@ -64,12 +69,29 @@ export type Pravidlo =
 	 * takže opona 2x3K berie počet 3K koľajnice, nie dvojnásobok.
 	 */
 	| { typ: 'konstPreKolajnicu'; ks: Record<string, number> }
-	/** m = súčet dĺžok danej role profilu (zasklievacie tesnenie = rámový) */
-	| { typ: 'dlzkaProfilu'; role: 'ramovy' | 'nosovy'; koef: number }
+	/**
+	 * m = súčet dĺžok danej role profilu (zasklievacie tesnenie = rámový; Deluxe
+	 * tesniace kefy = kladkový/klzný, #354 — pridané role bez zmeny existujúcich).
+	 */
+	| { typ: 'dlzkaProfilu'; role: 'ramovy' | 'nosovy' | 'kladkovy' | 'klzny'; koef: number }
 	/** m = (nosový + 2 × oponový) — kefové tesnenie 7x3,5 */
 	| { typ: 'dlzkaNosovehoSOponou'; koef: number }
 	/** m = (rámový − nosový) × koef — kefové tesnenie 7x5 / 5x8 */
-	| { typ: 'dlzkaRozdiel'; koef: number };
+	| { typ: 'dlzkaRozdiel'; koef: number }
+	/**
+	 * ks = konštanta, NEZÁVISLE od štýlu (na rozdiel od `konstPreStyl`) — Deluxe
+	 * krytka krajná aj madlo D56, oba „N ks na posuv" bez ohľadu na počet krídel
+	 * (#354; overené z `cfg_seed` — Dorazový profil má `pocetKs=2` na KAŽDOM
+	 * Deluxe štýle vrátane opony).
+	 */
+	| { typ: 'konst'; ks: number }
+	/**
+	 * ks = koef × (počet krídel − 1) — počet stykov medzi susednými krídlami
+	 * (Deluxe krytka stredová L/P, #354). Pri N krídlach je stykov N-1; vid
+	 * design komentár na #354 pre odvodenie z `cfg_seed` geometrie (kladkový +
+	 * klzný profil majú spolu 2N hrán, 2 z nich krajné, zvyšok tvorí N-1 párov).
+	 */
+	| { typ: 'naStyk'; koef: number };
 
 export interface Komponent {
 	kod: string;
@@ -82,6 +104,13 @@ export interface Komponent {
 	 * Nezadaná = položka je farbo-neutrálna (väčšina) a počíta sa vždy.
 	 */
 	farba?: Farba;
+	/**
+	 * Hrúbka skla, pre ktorú tento variant platí (Deluxe krytky majú samostatný
+	 * Money kód per hrúbka×farba, #354). Rovnaká „absent, nie 0" disciplína ako
+	 * `farba` (viď {@link pocitajKomponenty}) — nezadaná = položka je hrúbko-
+	 * neutrálna (madlo, kefy) a počíta sa vždy.
+	 */
+	hrubkaSkla?: 6 | 10;
 }
 
 /** Chyba konfigurácie — vracia sa namiesto množstiev, aby odpis nikdy nešiel polovičný. */
@@ -134,12 +163,27 @@ export function pocitajKomponenty(
 	zaklad: ZakladPoctov,
 	uzavery: number | null,
 	obojstrannaFab = true,
-	farbaKovania?: Farba
+	farbaKovania?: Farba,
+	skloHrubka?: number
 ): { polozky: PolozkaKomponentu[]; chyby: ChybaKomponentu[] } {
 	const polozky: PolozkaKomponentu[] = [];
 	const chyby: ChybaKomponentu[] = [];
 
 	for (const k of komponenty) {
+		// Hrúbka skla (Deluxe krytky, #354): rovnaká „absent, nie 0" disciplína
+		// ako farba nižšie — beží PRED farbou, takže položka pre inú hrúbku sa
+		// preskočí skôr, než sa vôbec pýta na RAL (6mm objednávka si nevynúti
+		// voľbu farby kvôli 10mm-only krytke).
+		if (k.hrubkaSkla !== undefined) {
+			if (!skloHrubka) {
+				chyby.push({
+					kod: k.kod,
+					sprava: `${k.nazov} (${k.kod}): má variant pre hrúbku skla (${k.hrubkaSkla} mm), ale hrúbka skla nie je zadaná`
+				});
+				continue;
+			}
+			if (k.hrubkaSkla !== skloHrubka) continue;
+		}
 		// RAL farebný variant: keď má položka `farba`, ale zvolená `farbaKovania`
 		// chýba, je to HLASNÁ chyba (nikdy tichý default na jednu z farieb —
 		// zle zafarbené kovanie do Money). Keď sa farba nezhoduje, položka sa
@@ -201,16 +245,29 @@ export function pocitajKomponenty(
 				}
 				break;
 			}
-			case 'dlzkaProfilu':
-				qty = R3(
-					(p.koef * (p.role === 'ramovy' ? zaklad.dlzkaRamovehoMm : zaklad.dlzkaNosovehoMm)) / 1000
-				);
+			case 'dlzkaProfilu': {
+				const dlzkaMm =
+					p.role === 'ramovy'
+						? zaklad.dlzkaRamovehoMm
+						: p.role === 'nosovy'
+							? zaklad.dlzkaNosovehoMm
+							: p.role === 'kladkovy'
+								? zaklad.dlzkaKladkovehoMm
+								: zaklad.dlzkaKlznehoMm;
+				qty = R3((p.koef * dlzkaMm) / 1000);
 				break;
+			}
 			case 'dlzkaNosovehoSOponou':
 				qty = R3((p.koef * (zaklad.dlzkaNosovehoMm + 2 * zaklad.dlzkaOponovehoMm)) / 1000);
 				break;
 			case 'dlzkaRozdiel':
 				qty = R3((p.koef * (zaklad.dlzkaRamovehoMm - zaklad.dlzkaNosovehoMm)) / 1000);
+				break;
+			case 'konst':
+				qty = p.ks;
+				break;
+			case 'naStyk':
+				qty = p.koef * (zaklad.kridla - 1);
 				break;
 		}
 		if (qty === null) continue;

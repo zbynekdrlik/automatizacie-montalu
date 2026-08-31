@@ -84,7 +84,10 @@ export function kovanieDoOdpisu(
 			zakladPoctov(r),
 			uzaver ? pocetUzaverov(uzaver, spec.sysStyl) : null,
 			!jednostrannaFab,
-			farbaKovania
+			farbaKovania,
+			// Deluxe krytky majú Money kód aj per hrúbka skla (#354) — rovnaký vstup,
+			// ktorý si už berie `computeFlat` vyššie na výber kladkového/klzného profilu.
+			spec.skloHrubka
 		);
 		if (chyby.length)
 			return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${chyby[0]!.sprava}`, warn: null };
