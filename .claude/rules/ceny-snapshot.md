@@ -28,10 +28,21 @@ NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
 
 ## Money cenníky — kde je ktorá cena (overené read-only 2026-08-19)
 
+- **Producent dnes ťahá 6 rodín:** `WHERE Kod LIKE 'ZASP%'/'ZASK%'/'TS%'/'PRP%'/'BPP%'/'BPK%'`
+  (profily/kovanie zasklenia + sklá + pergolové profily + bazénové profily/komponenty —
+  bazén pridal #359). Producent (`scripts/ceny-snapshot.py`) beží na dev2 **priamo z app
+  checkoutu** (`run-snapshot.sh` → `PRODUCER=…/automatizacie-montalu/scripts/ceny-snapshot.py`),
+  takže commit v repe + `git pull` na dev2 ho nasadí (žiadny osobitný deploy krok).
 - **Profily/kovanie (ZASP*/ZASK*):** `nakupCennik` z cenníka **NC** (Nákupný cenník,
-  GUID `BA7DA0F8-…`), `predajVo` z **PRF_VO** (appka `predajVo` nuluje pre ZASK* —
-  veľkoobchodnému cenníku pri komponentoch šéf neverí). To je JEDINÉ, čo producent dnes
-  ťahá (`WHERE Kod LIKE 'ZASP%' OR 'ZASK%'`).
+  GUID `BA7DA0F8-…`), `predajVo` z **PRF_VO** (appka `predajVo` nuluje pre VŠETKY non-ZASP
+  kódy — veľkoobchodnému cenníku pri komponentoch šéf neverí).
+- **Bazén (BPP*/BPK*, #359, live overené 2026-08-31):** **BPP** (profily) sú v NC ako
+  PRP/ZASP → reálny `nakupCennik` (22/25 app kódov > 0). **BPK** (kusové komponenty) sú v NC
+  tiež, ale nákupná cena je pri VŠETKÝCH 0 → honest-null (Money nemá nákupnú cenu bazénových
+  komponentov). Jediná nenulová cena BPK žije v predajnom cenníku **PCMO „Predajný cenník
+  polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) — PREDAJNÁ cena, do `nakupCennik` sa
+  ZÁMERNE nemapuje; jej zobrazenie je follow-up #364. Obe bazénové rodiny majú sklad (57/57
+  BPK, 25/25 BPP). Odkedy sú v snapshote, `validateOdpisKody` (#295) bazén odpisy validuje.
 - **SKLÁ (`TS*` kódy):** cenené LEN v cenníku **IZOS** (`Ceniky_Cenik.Kod='IZOS'`, ID
   `f4a1dfee-9298-45d2-9891-1548741b2063`), **v NC vôbec nie sú** (0 riadkov). Názvy nesú
   kompozíciu, napr. `TS00016 = Izolačné sklo 4/16/4- číre`, `TS00021 = 4/8/4- číre`. Sklo
