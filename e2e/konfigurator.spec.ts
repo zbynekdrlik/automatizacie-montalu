@@ -432,15 +432,21 @@ test('konfigurátor: 3D náhľad je viditeľný HNEĎ pri načítaní + živý u
 	// netriviálny obsah (nie prázdny/jednofarebný canvas)
 	expect(await velkostCanvasPng(page)).toBeGreaterThan(5000);
 
-	// ŽIVÝ UPDATE (#325): zmena rozmerov/skla vo formulári sa prejaví v 3D BEZ submitu.
-	// Caption (vo VizualPergolaZakaznik) číta LIVE props → po debounced remounte rozmerov
-	// ukáže nové rozmery. To dokazuje, že form-state → 3D tečie naživo.
+	// ŽIVÝ UPDATE (#325): zmena rozmerov vo formulári sa prejaví v 3D BEZ submitu.
+	// #361: čakáme na DETERMINISTICKÝ, od GL-frame ODPOJENÝ stavový signál `data-viz-rozmer`
+	// na STABILNOM `konf-viz` uzle (mimo `{#key vizKluc}` bloku) — odráža APLIKOVANÉ (debounced)
+	// rozmery kŕmené do 3D. Nahrádza krehký fixný 6 s text-diff poll: ten na softvérovom CI
+	// WebGL súperil o jediné hlavné vlákno s `forceContextLoss`+scene-rebuildom keyed remountu
+	// a pod záťažou main behov občas vyhladovel `expect.poll` nad 6 s (issue #361). Namiesto
+	// „hocijaká zmena" čakáme na PRESNÚ očakávanú hodnotu s veľkorysým budgetom (v rámci
+	// `test.setTimeout(60000)`) — deterministický dôkaz „form-state → 3D tečie naživo".
 	const captionRozmer = page.getByTestId('pergola-caption-rozmer');
-	const predRozmer = (await captionRozmer.innerText()).trim();
 	await vyplnFormular(page); // sirka 5000, hlbka 3800, sklo mliečne, RAL 9005
-	await expect
-		.poll(async () => (await captionRozmer.innerText()).trim(), { timeout: 6000 })
-		.not.toBe(predRozmer);
+	await expect(page.getByTestId('konf-viz')).toHaveAttribute('data-viz-rozmer', '5000×3800', {
+		timeout: 30000
+	});
+	// caption (vo VizualPergolaZakaznik) tiež ukáže nové rozmery — deterministická PRESNÁ hodnota
+	await expect(captionRozmer).toHaveText('Pergola 5000 × 3800 mm', { timeout: 15000 });
 
 	// 3D ostáva zdravý po živých zmenách — stále JEDEN kontext, netriviálny render
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
