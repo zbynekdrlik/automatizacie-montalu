@@ -64,10 +64,15 @@ jobs:
           #    vylúčenie (nie väčší timeout). Logika #277 (ponuka-pdf/ponuka/dopyt*/datum)
           #    ostáva plne mutovaná.
           #  - server/fonts/** = vendorované base64 font bloby (dáta, nie logika).
+          #  - server/migracie-seed.ts = seed DÁTA + seed funkcie extrahované z migracie.ts
+          #    (#294) — rovnaká kategória: 99 % mutantov je static (module-scope const
+          #    polia skiel), Stryker ich nevie scoped testovať → 183 mutantov / >19 min,
+          #    run 33567427786 cancel na 98 % s 0 preživšími. Rovnaký fix ako migracie.ts:
+          #    vylúčenie, nie väčší timeout.
           CHANGED=$(git diff --name-only origin/main...HEAD \
             | grep -E '^src/lib/.*\.ts$' \
             | grep -vE '\.svelte\.ts$' \
-            | grep -vE '^src/lib/server/migracie\.ts$|^src/lib/server/fonts/' || true)
+            | grep -vE '^src/lib/server/migracie\.ts$|^src/lib/server/migracie-seed\.ts$|^src/lib/server/fonts/' || true)
           SHARDED=$(printf '%s\n' "$CHANGED" | bash scripts/mutation-shard.sh)
           if [ -z "$SHARDED" ]; then
             echo "Shard $SHARD/$SHARDS: žiadne zmenené súbory mu nepatria — mutačný gate nemá čo mutovať, končím zelený."
