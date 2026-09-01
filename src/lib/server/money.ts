@@ -31,7 +31,7 @@ export function setOdpisWrittenHook(fn: OdpisWrittenHook | null): void {
 	onOdpisWritten = fn;
 }
 
-export type Modul = 'zasklenia' | 'bazen' | 'pergola' | 'clip';
+export type Modul = 'zasklenia' | 'bazen' | 'pergola' | 'clip' | 'fix';
 
 export interface Polozka {
 	kod: string;
