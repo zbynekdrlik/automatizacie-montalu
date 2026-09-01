@@ -24,6 +24,7 @@ import {
 	PANEL_MEDZERA_MM,
 	PANEL_TRIM_MM,
 	STLP_HRUBKA_VIZ_MM,
+	NAVRH_SKLON_MAX,
 	type PergolaNavrhVstup
 } from '../src/lib/pergola-navrh';
 
@@ -116,6 +117,50 @@ describe('vypocitajGeometriu — vzorové OP260032 hodnoty', () => {
 		const g2 = vypocitajGeometriu({ ...VZOR, panelSirkaOverride: 700, panelDlzkaOverride: 3000 });
 		expect(g2.panelSirka).toBe(700);
 		expect(g2.panelDlzka).toBe(3000);
+	});
+
+	// #382 — golden OP260282: manuálny sklonStrechy je jediný zdroj pravdy pre
+	// sklonDeg, keď je zadaný (rovnaké číslo ako na /narez, z CAD).
+	it('#382: sklonStrechy zadaný — sklonDeg = manuálna hodnota, nie dopočet z výšok', () => {
+		const g2 = vypocitajGeometriu({
+			...VZOR,
+			hlbka: 3470,
+			vyskaVpredu: 2200,
+			vyskaPriStene: 2790,
+			sklonStrechy: 6.1
+		});
+		expect(g2.sklonDeg).toBe(6.1);
+		// naivný dopočet by dal ~9,65° — manuálna hodnota ho musí nahradiť, nie doplniť
+		expect(g2.sklonDeg).not.toBeCloseTo(9.65, 1);
+	});
+
+	it('#382: sklonStrechy nezadaný — sklonDeg je bit-identický so starým dopočtom (nulová regresia)', () => {
+		const bez = vypocitajGeometriu(VZOR);
+		const sExplicitneUndefined = vypocitajGeometriu({ ...VZOR, sklonStrechy: undefined });
+		expect(sExplicitneUndefined.sklonDeg).toBe(bez.sklonDeg);
+		expect(bez.sklonDeg).toBe(vypocitajSklon(VZOR.vyskaVpredu, VZOR.vyskaPriStene, VZOR.hlbka));
+	});
+});
+
+// #382 — validácia voliteľného manuálneho sklonu
+describe('chybaPergolaNavrhVstupu — sklonStrechy (#382)', () => {
+	it('nezadaný sklonStrechy nie je chyba (voliteľné pole)', () => {
+		expect(chybaPergolaNavrhVstupu(VZOR)).toBeNull();
+	});
+	it('platný sklonStrechy (6,1°, golden) prejde bez chyby', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: 6.1 })).toBeNull();
+	});
+	it('sklonStrechy = 0 alebo záporný = chyba', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: 0 })).toMatch(/sklon/i);
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: -1 })).toMatch(/sklon/i);
+	});
+	it('sklonStrechy nad NAVRH_SKLON_MAX = chyba', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: NAVRH_SKLON_MAX + 1 })).toMatch(
+			/sklon/i
+		);
+	});
+	it('sklonStrechy presne na hranici NAVRH_SKLON_MAX prejde', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: NAVRH_SKLON_MAX })).toBeNull();
 	});
 });
 
