@@ -41,7 +41,9 @@ describe('odvodFixZPergoly — rozmery FIXu z pergoly (#378)', () => {
 
 describe('spocitajFixZPergoly — geometria cez pocitajFix (kontraktové vektory)', () => {
 	it('šikmý FIX 3500/2200/2900, 1 pole → sklon 11,3°, plocha 8,925 m², šikmá 3569,3', () => {
-		const { vykres, error } = spocitajFixZPergoly(fix({ s: 3500, v1: 2200, v2: 2900, polia: [3500] }));
+		const { vykres, error } = spocitajFixZPergoly(
+			fix({ s: 3500, v1: 2200, v2: 2900, polia: [3500] })
+		);
 		expect(error).toBeNull();
 		expect(vykres).not.toBeNull();
 		const r = vykres!;
@@ -140,7 +142,9 @@ describe('parseFixZPergoly — round-trip z formulára', () => {
 	});
 
 	it('rovný fix → v2 skopírované z v1 (poistka pre skriptovaný POST)', () => {
-		const p = parseFixZPergoly(form({ pergolaSFixom: '1', fixTvar: 'rovny', fixSirka: '3000', fixV1: '2500' }));
+		const p = parseFixZPergoly(
+			form({ pergolaSFixom: '1', fixTvar: 'rovny', fixSirka: '3000', fixV1: '2500' })
+		);
 		expect(p.tvar).toBe('rovny');
 		expect(p.v2).toBe(2500);
 		// prázdne fixPolia + kladná šírka → jedno pole cez celú šírku

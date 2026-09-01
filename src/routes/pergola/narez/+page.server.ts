@@ -16,6 +16,10 @@ import {
 } from '$lib/server/pergola-rezervacia';
 import { catalogForClient } from '$lib/server/pergola';
 import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
+// #378 — FIX (bočné pevné zasklenie): parse + odvodenie z pergoly (round-trip echo).
+// DISPLAY-ONLY + Money-neutrálne — FIX NEVSTUPUJE do buildRezervaciaRozpis.
+import { parseFixZPergoly, efektivnyFix, type FixZPergola } from '$lib/pergola-fix';
+import type { PergolaNarezVstup } from '$lib/pergola-narez';
 import { writeOdpis, isLive, blokHlaska, overrideOpts, rawFormEntries } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
@@ -38,6 +42,17 @@ function parseIdent(form: FormData): RezervaciaIdent {
 function parseRucne(form: FormData): { rucne: RucnaPolozka[]; error: string | null } {
 	const { rows, error } = parseRucnePolozky(form.get('rucnePolozky') as string | null);
 	return { rucne: rows, error };
+}
+
+/** #378 — FIX z formulára + odvodenie z pergoly (server je autorita: pri `auto`
+ *  prepočíta rozmery z rozmerov pergoly, nedôveruje klientovi). Echuje sa v každej
+ *  akcii (round-trip). FIX je DISPLAY-ONLY — do Money odpisu NEIDE. */
+function parseFix(form: FormData, vstup: PergolaNarezVstup): FixZPergola {
+	return efektivnyFix(parseFixZPergoly(form), {
+		hlbka: vstup.hlbka,
+		prednaSvetlost: vstup.prednaSvetlost,
+		vyskaZadna: vstup.vyskaZadna
+	});
 }
 
 /**
@@ -82,7 +97,9 @@ export const actions = {
 		const ident = parseIdent(form);
 		// #234 — ručné riadky echujeme cez celý tok (round-trip, prežijú „Späť a upraviť")
 		const { rucne } = parseRucne(form);
-		if (error) return { step: 'form' as const, error, vstup, ident, rucne };
+		// #378 — FIX echujeme cez celý tok (round-trip); DISPLAY-ONLY, do Money NEIDE
+		const fix = parseFix(form, vstup);
+		if (error) return { step: 'form' as const, error, vstup, ident, rucne, fix };
 		// #223 — €/m² strešného skla (LEN interní; b2b nikdy nedostane cenu). Geometria
 		// (šírka/počet tabúľ) sa počíta klientsky z `vstup`; sem patrí len cena zo snapshotu.
 		const strechaSkloCena = strechaCenaPre(locals.user, vstup.strechaSkloTyp ?? null);
@@ -91,6 +108,7 @@ export const actions = {
 			vstup,
 			ident,
 			rucne,
+			fix,
 			strechaSkloCena,
 			error: null as string | null
 		};
@@ -105,7 +123,8 @@ export const actions = {
 		const { vstup } = parsePergolaNarezVstup(form);
 		const ident = parseIdent(form);
 		const { rucne } = parseRucne(form);
-		return { step: 'form' as const, vstup, ident, rucne };
+		const fix = parseFix(form, vstup);
+		return { step: 'form' as const, vstup, ident, rucne, fix };
 	},
 
 	// #221: z rozmerov → Money rozpis rezervácie (BEZ zápisu) → nahlad na potvrdenie.
@@ -114,8 +133,11 @@ export const actions = {
 		const { vstup, error } = parsePergolaNarezVstup(form);
 		const ident = parseIdent(form);
 		const { rucne, error: rucneError } = parseRucne(form);
-		if (error) return { step: 'vysledok' as const, vstup, ident, rucne, rezError: error };
-		if (rucneError) return { step: 'vysledok' as const, vstup, ident, rucne, rezError: rucneError };
+		// #378 — FIX echo (round-trip); DISPLAY-ONLY, NEIDE do buildRezervaciaRozpis
+		const fix = parseFix(form, vstup);
+		if (error) return { step: 'vysledok' as const, vstup, ident, rucne, fix, rezError: error };
+		if (rucneError)
+			return { step: 'vysledok' as const, vstup, ident, rucne, fix, rezError: rucneError };
 		const res = buildRezervaciaRozpis(vstup, ident, rucne);
 		if (!res.rozpis) {
 			log.warn('rezervácia rozpis chyba', {
@@ -123,7 +145,7 @@ export const actions = {
 				op: ident.op,
 				rezError: res.error
 			});
-			return { step: 'vysledok' as const, vstup, ident, rucne, rezError: res.error };
+			return { step: 'vysledok' as const, vstup, ident, rucne, fix, rezError: res.error };
 		}
 		const rozpis = res.rozpis;
 		log.info('rezervácia rozpis', {
@@ -135,7 +157,7 @@ export const actions = {
 		});
 		// cenový blok (#232) — LEN interní; b2b nikdy nedostane `ceny`
 		const ceny = cenyPre(locals.user, rozpis.nonzero);
-		return { step: 'rez-nahlad' as const, vstup, ident, rucne, rozpis, ceny, rezError: null };
+		return { step: 'rez-nahlad' as const, vstup, ident, rucne, fix, rozpis, ceny, rezError: null };
 	},
 
 	// #221: zápis rezervačného odpisu do Money (LEN po explicitnom potvrdení, ten istý
@@ -146,8 +168,11 @@ export const actions = {
 		const { vstup, error } = parsePergolaNarezVstup(form);
 		const ident = parseIdent(form);
 		const { rucne, error: rucneError } = parseRucne(form);
-		if (error) return { step: 'vysledok' as const, vstup, ident, rucne, rezError: error };
-		if (rucneError) return { step: 'vysledok' as const, vstup, ident, rucne, rezError: rucneError };
+		// #378 — FIX echo (round-trip); DISPLAY-ONLY, NEIDE do buildRezervaciaRozpis
+		const fix = parseFix(form, vstup);
+		if (error) return { step: 'vysledok' as const, vstup, ident, rucne, fix, rezError: error };
+		if (rucneError)
+			return { step: 'vysledok' as const, vstup, ident, rucne, fix, rezError: rucneError };
 		const { rozpis, error: rezError } = buildRezervaciaRozpis(vstup, ident, rucne);
 		if (rezError || !rozpis)
 			return {
@@ -155,6 +180,7 @@ export const actions = {
 				vstup,
 				ident,
 				rucne,
+				fix,
 				rezError: rezError ?? 'Rozpis rezervácie sa nepodarilo spočítať.'
 			};
 
@@ -177,6 +203,7 @@ export const actions = {
 					vstup,
 					ident,
 					rucne,
+					fix,
 					rozpis,
 					ceny: cenyBlok(),
 					rezError: `Zákazka ${ident.zak} (OP ${ident.op}) už bola odoslaná (rezervácia alebo odpis) ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv uvoľni záznam v histórii odpisov.`
@@ -188,11 +215,12 @@ export const actions = {
 					blokReason: outcome.reason!,
 					blokAction: '?/odoslat',
 					rawEntries: rawFormEntries(form),
-					// echo vstup/ident/rucne (ako duplikát vetva) — inak reštart-`$effect` zmaže parent
+					// echo vstup/ident/rucne/fix (ako duplikát vetva) — inak reštart-`$effect` zmaže parent
 					// `$state` pri blocked renderi (#300 review 🔵)
 					vstup,
 					ident,
 					rucne,
+					fix,
 					rezError: blokHlaska(outcome, ident.zak, ident.op)
 				};
 			}
@@ -201,7 +229,16 @@ export const actions = {
 				filename: outcome.filename,
 				live: outcome.live
 			});
-			return { step: 'rez-hotovo' as const, vstup, ident, rucne, rozpis, outcome, rezError: null };
+			return {
+				step: 'rez-hotovo' as const,
+				vstup,
+				ident,
+				rucne,
+				fix,
+				rozpis,
+				outcome,
+				rezError: null
+			};
 		} catch (e) {
 			log.error('rezervácia writeOdpis zlyhal', { zak: ident.zak, op: ident.op, error: e });
 			return {
@@ -209,6 +246,7 @@ export const actions = {
 				vstup,
 				ident,
 				rucne,
+				fix,
 				rozpis,
 				ceny: cenyBlok(),
 				rezError:

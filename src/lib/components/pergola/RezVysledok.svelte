@@ -14,6 +14,10 @@
 	} from '$lib/pergola-narez';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
+	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
+	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
+	import { popisTvaru, type FixVykres } from '$lib/fix';
+	import type { FixZPergola } from '$lib/pergola-fix';
 
 	// #223 — cena strešného skla je server-počítaná (€/m² zo snapshotu, interní); klientsky
 	// prop nesie len zobrazované polia (bez server typu `StrechaSkloCena`, aby sa $lib/server
@@ -35,6 +39,9 @@
 		cakaCount,
 		cakaDlzkaCount,
 		cakaPravidloCount,
+		fix,
+		fixVykres,
+		fixError,
 		datumIso,
 		live
 	}: {
@@ -48,6 +55,10 @@
 		cakaCount: number;
 		cakaDlzkaCount: number;
 		cakaPravidloCount: number;
+		// #378 — FIX (bočné pevné zasklenie): efektívny vstup + geometria/chyba
+		fix: FixZPergola;
+		fixVykres: FixVykres | null;
+		fixError: string | null;
 		datumIso: string;
 		live: boolean;
 	} = $props();
@@ -57,6 +68,8 @@
 	const mm = (n: number | null) =>
 		n === null ? '— (čaká na výkres)' : `${String(n).replace('.', ',')} mm`;
 	const mmVal = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} mm`);
+	// #378 — FIX: zaokrúhlenie na 0,1 mm + slovenská čiarka (ako /fix)
+	const fmtFix = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 </script>
 
 <div class="card">
@@ -106,6 +119,80 @@
 	</p>
 	<PergolaNarezVykres {vstup} datum={formatDatumCasSk(datumIso)} />
 </div>
+
+{#if fix.zapnuty}
+	<div class="card" data-testid="fix-karta">
+		<div class="sec">
+			FIX — pevné zasklenie
+			<span class="badge wait" data-testid="fix-money-badge">mimo Money odpisu</span>
+		</div>
+		<p class="sub" style="margin:0 0 8px">
+			Bočné pevné zasklenie k pergole — spočítané a nakreslené ako súčasť tejto zákazky. Do Money
+			odpisu zatiaľ nejde (FIX materiály nemajú Money karty; doplní sa, keď ich Dominik založí).
+		</p>
+		{#if fixError}
+			<div class="err" data-testid="fix-chyba">⚠️ {fixError}</div>
+		{:else if fixVykres}
+			<p class="sub" style="margin:0 0 8px">
+				<span class="badge"
+					>{popisTvaru(fix.tvar)} · {fixVykres.polia.length}
+					{fixVykres.polia.length === 1
+						? 'pole'
+						: fixVykres.polia.length < 5
+							? 'polia'
+							: 'polí'}{fix.zrkadlo ? ' · zrkadlový kus' : ''}</span
+				>
+				{#if fix.sklo}<span class="badge">sklo: {fix.sklo}</span>{/if}
+			</p>
+			<div style="overflow:auto">
+				<FixVykres2D r={fixVykres} zrkadlo={fix.zrkadlo} oznacenie={fix.zrkadlo ? 'P' : 'L'} />
+			</div>
+			<table class="narez" data-testid="fix-tabulka">
+				<thead>
+					{#if fix.tvar === 'rovny'}
+						<tr><th>Pole</th><th>Šírka</th><th>Výška</th><th>Plocha</th></tr>
+					{:else}
+						<tr>
+							<th>Pole</th><th>Šírka</th><th>Výška vpredu</th><th>Výška pri stene</th>
+							<th>Šikmá hrana</th><th>Plocha</th>
+						</tr>
+					{/if}
+				</thead>
+				<tbody>
+					{#each fixVykres.polia as p, i (i)}
+						<tr>
+							<td><b>{fix.zrkadlo ? 'P' : 'L'}{i + 1}</b></td>
+							<td>{fmtFix(p.sirka)} mm</td>
+							{#if fix.tvar === 'rovny'}
+								<td>{fmtFix(p.vLavo)} mm</td>
+							{:else}
+								<td>{fmtFix(p.vLavo)} mm</td>
+								<td>{fmtFix(p.vPravo)} mm</td>
+								<td>{fmtFix(p.sikma)} mm</td>
+							{/if}
+							<td>{String(p.m2).replace('.', ',')} m²</td>
+						</tr>
+					{/each}
+				</tbody>
+				<tfoot>
+					<tr>
+						<td><b>Spolu</b></td>
+						<td><b>{fmtFix(fixVykres.S)} mm</b></td>
+						{#if fix.tvar === 'rovny'}
+							<td><b>{fmtFix(fixVykres.V1)} mm</b></td>
+						{:else}
+							<td colspan="3"><b>sklon {fmtFix(fixVykres.alfa)}°</b></td>
+						{/if}
+						<td><b data-testid="fix-plocha">{String(fixVykres.m2).replace('.', ',')} m²</b></td>
+					</tr>
+				</tfoot>
+			</table>
+			{#if fix.poznamka}
+				<p class="sub" style="margin:8px 0 0">Poznámka: {fix.poznamka}</p>
+			{/if}
+		{/if}
+	</div>
+{/if}
 
 {#if krov}
 	<div class="card">

@@ -7,6 +7,9 @@
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import type { RezervaciaIdent, RezervaciaRozpis } from '$lib/server/pergola-rezervacia';
 	import type { CenyResult } from '$lib/server/ceny';
+	// #378 — FIX (bočné pevné zasklenie): zhrnutie do náhľadu (honest-null Money)
+	import { popisTvaru, type FixVykres } from '$lib/fix';
+	import type { FixZPergola } from '$lib/pergola-fix';
 
 	let {
 		rozpis,
@@ -14,6 +17,9 @@
 		ident,
 		rezError,
 		live,
+		fix,
+		fixVykres,
+		fixError,
 		hidden,
 		hiddenIdent
 	}: {
@@ -22,11 +28,15 @@
 		ident: RezervaciaIdent;
 		rezError: string | null;
 		live: boolean;
+		fix: FixZPergola;
+		fixVykres: FixVykres | null;
+		fixError: string | null;
 		hidden: Snippet;
 		hiddenIdent: Snippet;
 	} = $props();
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
+	const fmtFix = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 </script>
 
 <div class="card">
@@ -127,6 +137,36 @@
 				{/each}
 			</tbody>
 		</table>
+	</div>
+{/if}
+
+{#if fix.zapnuty}
+	<div class="card" data-testid="rez-fix-karta">
+		<div class="sec">FIX — pevné zasklenie</div>
+		<div class="warn" data-testid="rez-fix-banner">
+			ℹ️ FIX sa <b>NEODOSIELA</b> do Money odpisu — FIX materiály (profily + sklo) nemajú v Money karty.
+			Spočíta sa a nakreslí ako súčasť zákazky; do odpisu sa doplní, keď Dominik založí Money karty (rovnako
+			ako tesnenia a strešné sklo).
+		</div>
+		{#if fixError}
+			<div class="err" data-testid="rez-fix-chyba">⚠️ {fixError}</div>
+		{:else if fixVykres}
+			<table class="narez" data-testid="rez-fix-zhrnutie">
+				<thead><tr><th>Tvar</th><th>Rozmery</th><th>Polia</th><th>Plocha</th></tr></thead>
+				<tbody>
+					<tr>
+						<td>{popisTvaru(fix.tvar)}{fix.zrkadlo ? ' · zrkadlový' : ''}</td>
+						<td class="sub">
+							{fmtFix(fixVykres.S)} × {fmtFix(fixVykres.V1)}{fix.tvar === 'rovny'
+								? ''
+								: '/' + fmtFix(fixVykres.V2)} mm
+						</td>
+						<td>{fixVykres.polia.length}</td>
+						<td><b>{String(fixVykres.m2).replace('.', ',')} m²</b></td>
+					</tr>
+				</tbody>
+			</table>
+		{/if}
 	</div>
 {/if}
 
