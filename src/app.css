@@ -1,13 +1,71 @@
-/* Spoločný vzhľad — svetlé karty, systémové písmo, čitateľné aj v tlači. */
+/* Spoločný vzhľad — svetlé karty, čitateľné aj v tlači.
+   #376 stage 1/4 „Fundament": --m-* dizajnové tokeny (súrodenec --k-* z
+   konfigurátora, viď konfigurator/+layout.svelte) + Archivo/Inter Variable písma.
+   Tokeny žijú TU (jediné miesto) a kaskádujú do každej stránky, ktorá stojí na
+   týchto globálnych triedach — viď design komentár na #376 pre plný zdôvodňujúci
+   text (paleta, typografia, architektúra). */
+:root {
+	/* paleta — teplý papier / antracit / bronz */
+	--m-bg: #f7f6f3;
+	--m-surface: #fff;
+	--m-surface-2: #f4f3ef;
+	--m-line: #e7e4dd;
+	--m-ink: #16181c;
+	--m-ink-2: #1b1e23;
+	--m-ink-2-hover: #2c3037;
+	--m-muted: #6b7078;
+	--m-accent: #b07a45;
+	--m-accent-soft: #f5ede2;
+
+	/* sémantické stavy — rovnaká sémantika ako doterajšie .badge.ok/.wait/.alarm/
+	   .rucne/.presun, len tokenizované (žiadna zmena významu ani hodnôt) */
+	--m-ok-bg: #dcfce7;
+	--m-ok: #15803d;
+	--m-warn-bg: #fef3c7;
+	--m-warn: #b45309;
+	--m-danger-bg: #fee2e2;
+	--m-danger: #b91c1c;
+	--m-manual-bg: #ede9fe;
+	--m-manual: #6d28d9;
+
+	/* alert boxy (.err/.warn/.okmsg) — vlastné (svetlejšie) odtiene, tiež
+	   nezmenené hodnoty, len tokenizované */
+	--m-err-bg: #fef2f2;
+	--m-err-border: #fecaca;
+	--m-err-ink: #b91c1c;
+	--m-warnbox-bg: #fffbeb;
+	--m-warnbox-border: #fde68a;
+	--m-warnbox-ink: #92400e;
+	--m-okbox-bg: #f0fdf4;
+	--m-okbox-border: #bbf7d0;
+	--m-okbox-ink: #15803d;
+
+	/* rádiusy — existujúce hodnoty appky (14/10/999px) už sedia s --k-radius */
+	--m-radius: 14px;
+	--m-radius-sm: 10px;
+	--m-radius-pill: 999px;
+
+	/* písma — oba balíčky už v package.json (login = Archivo, konfigurátor = Inter) */
+	--m-font-display: 'Archivo Variable', 'Segoe UI', sans-serif;
+	--m-font-body: 'Inter Variable', -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--m-font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
 * {
 	box-sizing: border-box;
 }
 body {
 	margin: 0;
-	background: #f1f5f9;
-	color: #0f172a;
-	font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+	background: var(--m-bg);
+	color: var(--m-ink);
+	font-family: var(--m-font-body);
 	font-size: 17px;
+}
+/* Reusable utility pre kóty/množstvá/ceny/kódy (tabuľkový mono, #376) — token +
+   trieda sú pripravené v tomto PR; plošná adopcia na jednotlivých stránkach
+   (/odpisy, výkresy) príde s ich vlastnými stage 2-4 PR, viď approach komentár. */
+.mono {
+	font-family: var(--m-font-mono);
+	font-variant-numeric: tabular-nums;
 }
 .wrap {
 	max-width: 1040px;
@@ -15,74 +73,79 @@ body {
 	padding: 20px 16px 40px;
 }
 .card {
-	background: #fff;
-	border-radius: 14px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	background: var(--m-surface);
+	border: 1px solid var(--m-line);
+	border-radius: var(--m-radius);
+	box-shadow: 0 1px 3px rgba(22, 24, 28, 0.06);
 	padding: 26px;
 	margin-bottom: 14px;
 }
 .sec {
-	font-size: 13px;
+	font-family: var(--m-font-display);
+	font-size: 12px;
 	font-weight: 700;
-	color: #64748b;
+	color: var(--m-accent);
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0.08em;
 	margin: 0 0 10px;
 }
 h1 {
-	font-size: 26px;
+	font-family: var(--m-font-display);
+	font-weight: 650;
+	font-size: 28px;
+	color: var(--m-ink);
 	margin: 0;
 }
 .sub {
-	color: #64748b;
+	color: var(--m-muted);
 	font-size: 15px;
 	margin: 4px 0 0;
 }
 .badge {
 	display: inline-block;
-	background: #eff6ff;
-	color: #1d4ed8;
+	background: var(--m-surface-2);
+	color: var(--m-ink-2);
 	font-size: 14px;
 	font-weight: 600;
 	padding: 3px 10px;
-	border-radius: 999px;
+	border-radius: var(--m-radius-pill);
 }
 .badge.test {
-	background: #fef3c7;
-	color: #b45309;
+	background: var(--m-warn-bg);
+	color: var(--m-warn);
 }
 .badge.live {
-	background: #dcfce7;
-	color: #15803d;
+	background: var(--m-ok-bg);
+	color: var(--m-ok);
 }
 /* Stavové odznaky (#222) — spočítané/čaká — postavené na tých istých tokenoch
    ako .badge.live/.badge.test, len sémanticky pomenované pre stav výpočtu. */
 .badge.ok {
-	background: #dcfce7;
-	color: #15803d;
+	background: var(--m-ok-bg);
+	color: var(--m-ok);
 }
 .badge.wait {
-	background: #fef3c7;
-	color: #b45309;
+	background: var(--m-warn-bg);
+	color: var(--m-warn);
 }
 /* #298 — Money readback ALARM (doklad chýba / počet nesedí). Červený odznak na tých istých
    tokenoch ako .badge.ok/.wait — žiadny nový dizajnový jazyk, len sémantika „pozor". */
 .badge.alarm {
-	background: #fee2e2;
-	color: #b91c1c;
+	background: var(--m-danger-bg);
+	color: var(--m-danger);
 }
 /* #239 — ručné položky (#234): fialový odznak, presunutý z pergola/narez/+page.svelte
    pri rozdelení na subkomponenty (zdieľaný RucnePolozky/RezNahlad/RezHotovo). Reuse
    .badge tokenov, žiadny nový dizajnový jazyk. */
 .badge.rucne {
-	background: #ede9fe;
-	color: #6d28d9;
+	background: var(--m-manual-bg);
+	color: var(--m-manual);
 }
 /* #299 — ručne presunutý odpis zo staging „NA ODPIS" do Money importu. Fialový „manual" tón ako
    .badge.rucne (rovnaká sémantika „ručný krok"), reuse .badge tokenov — žiadny nový dizajnový jazyk. */
 .badge.presun {
-	background: #ede9fe;
-	color: #6d28d9;
+	background: var(--m-manual-bg);
+	color: var(--m-manual);
 }
 /* Dátum vytvorenia plánu v tlačenej hlavičke (#114) — display-only, do Money nejde. */
 .vytvorene {
@@ -95,16 +158,16 @@ table {
 }
 th {
 	text-align: left;
-	color: #64748b;
+	color: var(--m-muted);
 	font-weight: 600;
 	font-size: 12.5px;
 	text-transform: uppercase;
-	border-bottom: 2px solid #e2e8f0;
+	border-bottom: 2px solid var(--m-line);
 	padding: 6px 4px;
 }
 td {
 	padding: 10px 6px;
-	border-bottom: 1px solid #eef2f7;
+	border-bottom: 1px solid var(--m-line);
 }
 td.c,
 th.c {
@@ -143,23 +206,23 @@ label {
 	display: block;
 	font-size: 14.5px;
 	font-weight: 600;
-	color: #334155;
+	color: var(--m-ink);
 	margin: 0 0 4px;
 }
 input,
 select {
 	width: 100%;
 	padding: 13px 14px;
-	border: 1px solid #cbd5e1;
-	border-radius: 10px;
+	border: 1px solid var(--m-line);
+	border-radius: var(--m-radius-sm);
 	font-size: 17px;
-	background: #fff;
-	color: #0f172a;
+	background: var(--m-surface);
+	color: var(--m-ink);
 }
 input:focus,
 select:focus {
-	outline: 2px solid #2563eb;
-	border-color: #2563eb;
+	outline: 2px solid var(--m-accent);
+	border-color: var(--m-accent);
 }
 .grid2 {
 	display: grid;
@@ -183,11 +246,12 @@ select:focus {
 .btn {
 	display: block;
 	width: 100%;
-	background: #2563eb;
+	background: var(--m-ink-2);
 	color: #fff;
 	border: 0;
 	border-radius: 12px;
 	padding: 16px;
+	font-family: var(--m-font-display);
 	font-size: 18px;
 	font-weight: 600;
 	cursor: pointer;
@@ -195,37 +259,37 @@ select:focus {
 	text-decoration: none;
 }
 .btn:hover {
-	background: #1d4ed8;
+	background: var(--m-ink-2-hover);
 }
 .btn.secondary {
-	background: #fff;
-	color: #2563eb;
-	border: 2px solid #2563eb;
+	background: var(--m-surface);
+	color: var(--m-ink-2);
+	border: 2px solid var(--m-ink-2);
 	padding: 12px;
 }
 .btn.secondary:hover {
-	background: #eff6ff;
+	background: var(--m-accent-soft);
 }
 .btn.danger {
-	background: #dc2626;
+	background: var(--m-danger);
 }
 .btn + .btn {
 	margin-top: 10px;
 }
 .err {
-	background: #fef2f2;
-	border: 1px solid #fecaca;
-	color: #b91c1c;
-	border-radius: 10px;
+	background: var(--m-err-bg);
+	border: 1px solid var(--m-err-border);
+	color: var(--m-err-ink);
+	border-radius: var(--m-radius-sm);
 	padding: 14px 16px;
 	font-size: 15.5px;
 	margin-bottom: 14px;
 }
 .warn {
-	background: #fffbeb;
-	border: 1px solid #fde68a;
-	color: #92400e;
-	border-radius: 10px;
+	background: var(--m-warnbox-bg);
+	border: 1px solid var(--m-warnbox-border);
+	color: var(--m-warnbox-ink);
+	border-radius: var(--m-radius-sm);
 	padding: 14px 16px;
 	font-size: 15.5px;
 	margin-bottom: 14px;
@@ -271,10 +335,10 @@ select:focus {
 	cursor: not-allowed;
 }
 .okmsg {
-	background: #f0fdf4;
-	border: 1px solid #bbf7d0;
-	color: #15803d;
-	border-radius: 10px;
+	background: var(--m-okbox-bg);
+	border: 1px solid var(--m-okbox-border);
+	color: var(--m-okbox-ink);
+	border-radius: var(--m-radius-sm);
 	padding: 14px 16px;
 	font-size: 15.5px;
 	margin-bottom: 14px;
@@ -306,9 +370,18 @@ select:focus {
 	display: block;
 	font-size: 19px;
 }
+/* #376 stage 1: header/nav re-skin — svetlý papier + blur (vzor konfigurátorovej
+   hlavy), sticky, bronzové podčiarknutie na aktívnom odkaze. Emoji preč z Vzorce/
+   Problém labelov (odstránené v +layout.svelte, žiadny E2E na presný text s emoji). */
 nav.top {
-	background: #0f172a;
-	color: #e2e8f0;
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	background: rgba(247, 246, 243, 0.86);
+	-webkit-backdrop-filter: saturate(1.3) blur(10px);
+	backdrop-filter: saturate(1.3) blur(10px);
+	border-bottom: 1px solid var(--m-line);
+	color: var(--m-ink);
 }
 nav.top .inner {
 	max-width: 1040px;
@@ -320,32 +393,38 @@ nav.top .inner {
 	flex-wrap: wrap;
 }
 nav.top a {
-	color: #cbd5e1;
+	color: var(--m-muted);
 	text-decoration: none;
-	font-size: 17px;
+	font-family: var(--m-font-display);
+	font-size: 15.5px;
 	font-weight: 600;
 	padding: 4px 0;
+	border-bottom: 2px solid transparent;
 }
-nav.top a:hover,
+nav.top a:hover {
+	color: var(--m-ink);
+}
 nav.top a.active {
-	color: #fff;
+	color: var(--m-ink);
+	border-bottom-color: var(--m-accent);
 }
 nav.top .brand {
+	font-family: var(--m-font-display);
 	font-weight: 800;
-	color: #fff;
+	color: var(--m-ink);
 	font-size: 19px;
-	letter-spacing: 0.02em;
+	letter-spacing: 0.1em;
 }
 nav.top .spacer {
 	flex: 1;
 }
 nav.top .user {
 	font-size: 14.5px;
-	color: #94a3b8;
+	color: var(--m-muted);
 }
 footer.app {
 	text-align: center;
-	color: #94a3b8;
+	color: var(--m-muted);
 	font-size: 13.5px;
 	padding: 10px 0 24px;
 }

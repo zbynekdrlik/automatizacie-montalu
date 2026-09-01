@@ -29,6 +29,9 @@ test('login: zlé heslo zobrazí chybu, správne prihlási; verzia v pätičke',
 	await expect(version).toBeVisible();
 	await expect(version).toHaveText(/^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$/);
 	await expect(page.getByTestId('mode')).toBeVisible();
+	// #376 stage 1: header/nav re-skin — nav.top renderuje, brand text nezmenený
+	await expect(page.locator('nav.top')).toBeVisible();
+	await expect(page.locator('nav.top .brand')).toHaveText('MONTALU');
 	expect(consoleMsgs).toEqual([]);
 });
 

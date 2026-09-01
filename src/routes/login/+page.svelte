@@ -254,7 +254,10 @@
 	.znacka {
 		width: 34px;
 		height: 34px;
-		border: 3px solid #f59e0b;
+		/* #376 stage 1: jantár → bronz (var(--m-accent), app.css :root) — jeden akcent
+		   v celej appke (owner design komentár, architektúra bod 2). Fallback hex pre
+		   prípad, že by sa login niekedy vykresľoval bez app.css. */
+		border: 3px solid var(--m-accent, #b07a45);
 		border-radius: 4px;
 		position: relative;
 		flex: 0 0 auto;
@@ -291,7 +294,7 @@
 		font-weight: 600;
 	}
 	.moduly span {
-		color: #f59e0b;
+		color: var(--m-accent, #b07a45);
 		font-family: ui-monospace, monospace;
 		font-size: 12px;
 		margin-right: 10px;
