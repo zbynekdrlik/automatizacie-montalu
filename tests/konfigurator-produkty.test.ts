@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
 	KONF_PRODUKTY,
-	parseProdukt,
 	produktNazov,
 	produktPdfNadpis,
 	produktPodlaKodu
@@ -49,21 +48,20 @@ describe('KONF_PRODUKTY katalóg', () => {
 			expect(fs.existsSync(path.join(dir, p.foto)), `chýba fotka ${p.foto}`).toBe(true);
 		}
 	});
-});
 
-describe('parseProdukt — obranné parsovanie klientom dodaného produktu', () => {
-	it('známy kód sa zachová', () => {
-		expect(parseProdukt('bazen')).toBe('bazen');
-		expect(parseProdukt('pergola')).toBe('pergola');
-		expect(parseProdukt('  tienenie  ')).toBe('tienenie'); // orezáva whitespace
-	});
-
-	it('neznámy / chýbajúci / nezmyselný → default pergola', () => {
-		expect(parseProdukt('nieco-vymyslene')).toBe('pergola');
-		expect(parseProdukt('')).toBe('pergola');
-		expect(parseProdukt(null)).toBe('pergola');
-		expect(parseProdukt(undefined)).toBe('pergola');
-		expect(parseProdukt(42)).toBe('pergola');
+	it('každý LIVE produkt má reálnu route podstránku src/routes/konfigurator/<slug>/+page.svelte', () => {
+		// stráži nekontrolovaný `p.odkaz as LiveRoute` cast v KonfVyber — typo v internom odkaze by
+		// inak skompiloval a 404-oval na prode. Slug = posledný segment `/konfigurator/<slug>`.
+		const routesDir = path.resolve(process.cwd(), 'src/routes/konfigurator');
+		for (const p of KONF_PRODUKTY) {
+			if (p.stav !== 'live') continue;
+			expect(p.odkaz).toMatch(/^\/konfigurator\/[a-z-]+$/);
+			const slug = p.odkaz.replace('/konfigurator/', '');
+			const routeFile = path.join(routesDir, slug, '+page.svelte');
+			expect(fs.existsSync(routeFile), `live produkt ${p.kod}: chýba route ${routeFile}`).toBe(
+				true
+			);
+		}
 	});
 });
 

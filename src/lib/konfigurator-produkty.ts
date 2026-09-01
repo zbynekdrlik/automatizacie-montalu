@@ -5,8 +5,7 @@
 // cena) → leak-guard (A) `konfigurator-money-safety` ho prejde bez porušenia.
 //
 // Rám (PR 1/7) zavádza JEDINÉ pergolové rameno; produktové PR-y (#385–#390) menia `stav` karty
-// na `live`, pridajú svoju podstránku `/konfigurator/<slug>` a rameno do únie `DopytKonfiguracia`.
-import type { PonukaConfig } from './ponuka';
+// na `live` a pridajú svoju podstránku `/konfigurator/<slug>`.
 
 /** Slug produktu = kód v pipeline aj v URL podstránky `/konfigurator/<kod>`. */
 export type KonfProduktKod =
@@ -123,13 +122,6 @@ export function produktPodlaKodu(kod: string | null | undefined): KonfProdukt | 
 	return PODLA_KODU.get(String(kod ?? ''));
 }
 
-/** Obranné parsovanie klientom dodaného `produkt` poľa → známy kód. Neznámy/chýbajúci → 'pergola'
- *  (rám má jediné live rameno; zákaznícky POST nesmie zapísať nezmyselný produkt). */
-export function parseProdukt(raw: unknown): KonfProduktKod {
-	const s = String(raw ?? '').trim();
-	return PODLA_KODU.has(s) ? (s as KonfProduktKod) : 'pergola';
-}
-
 /** Názov produktu v nominatíve pre Odoo lead / admin zoznam (fallback 'Pergola' pre NULL/neznámy —
  *  staré dopyty pred migráciou v35 nemajú `produkt` a sú všetky pergolové). */
 export function produktNazov(kod: string | null | undefined): string {
@@ -141,15 +133,3 @@ export function produktNazov(kod: string | null | undefined): string {
 export function produktPdfNadpis(kod: string | null | undefined): string {
 	return produktPodlaKodu(kod)?.pdfNadpis ?? 'Špecifikácia pergoly';
 }
-
-/**
- * Diskriminovaná únia konfigurácií podľa produktu (#384). Rám zavádza JEDINÉ pergolové rameno;
- * každý produktový PR (#385–#390) pridá svoje rameno (`| BazenKonfiguracia | …`) s vlastným
- * tvarom `konfiguracia` payloadu. `produkt` diskriminátor je voliteľný pre spätnú kompatibilitu
- * so staršími pergolovými dopytmi (bez poľa = pergola).
- */
-export interface PergolaKonfiguracia extends PonukaConfig {
-	produkt?: 'pergola';
-}
-
-export type DopytKonfiguracia = PergolaKonfiguracia;

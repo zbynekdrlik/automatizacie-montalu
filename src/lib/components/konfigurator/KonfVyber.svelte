@@ -21,7 +21,7 @@
 	</header>
 
 	<ul class="mriezka">
-		{#each KONF_PRODUKTY as p (p.kod)}
+		{#each KONF_PRODUKTY as p, i (p.kod)}
 			<li>
 				{#if p.externy}
 					<!-- eslint-disable svelte/no-navigation-without-resolve -- `p.odkaz` je pri
@@ -43,7 +43,8 @@
 								class="foto"
 								src="{base}/konfigurator/vyber/{p.foto}"
 								alt={p.alt}
-								loading="lazy"
+								loading={i === 0 ? 'eager' : 'lazy'}
+								fetchpriority={i === 0 ? 'high' : null}
 								width="1000"
 								height="600"
 							/>
@@ -69,7 +70,8 @@
 								class="foto"
 								src="{base}/konfigurator/vyber/{p.foto}"
 								alt={p.alt}
-								loading="lazy"
+								loading={i === 0 ? 'eager' : 'lazy'}
+								fetchpriority={i === 0 ? 'high' : null}
 								width="1000"
 								height="600"
 							/>

@@ -11,7 +11,13 @@ paths:
   - 'e2e/konfigurator*.spec.ts'
 ---
 
-# Verejný zákaznícky konfigurátor pergoly (`/konfigurator`, #275, tracking #280)
+# Verejný zákaznícky konfigurátor (`/konfigurator`, #275, tracking #280; jednotný rám #384)
+
+> **#384 (etapa 1/7): `/konfigurator` je odteraz VÝBEROVÁ obrazovka produktov; pergolový
+> konfigurátor sa presunul na podstránku `/konfigurator/pergola`.** Sekcie §1–§10 nižšie
+> popisujú PERGOLOVÝ konfigurátor — všetko z nich platí ďalej, len žije na `/konfigurator/pergola`
+> (`+page.svelte` + `+page.server.ts` sa `git mv`-li tam, zdieľaný `konfigurator/+layout.svelte`
+> ostal). Rám + `produkt` diskriminátor = §11. Sesterské produkty (#385–#390) = ďalšie podstránky.
 
 Prvá VEREJNÁ (bez prihlásenia) route v appke. Fáza 1 = zákaznícka vrstva BEZ CIEN nad
 existujúcim jadrom `pergola-navrh.ts`. Sesterské fázy (#276 3D vizuál, #277 PDF+kontakt,
@@ -50,7 +56,8 @@ rozsypaná v ŠIESTICH súboroch, nielen v očividnom leak-guarde** — pred dv�
 áno + VO nie), `e2e/konfigurator.spec.ts` (3 leak bloky + PDF metadáta), `ponuka-pdf.test.ts`
 (PRICE_RE → orientačná cena), `dopyt-pdf-regen.test.ts` (regen PDF cena), `ponuka.test.ts`
 (DISCLAIMER text), `konfigurator-cena.test.ts` (route-import assert). Detaily cenovej vrstvy:
-`.claude/rules/konfigurator-cena.md`.
+`.claude/rules/konfigurator-cena.md`. (#384: pergolový E2E `e2e/konfigurator.spec.ts` sa
+premenoval na `e2e/konfigurator-pergola.spec.ts`; výberová obrazovka má `e2e/konfigurator-vyber.spec.ts`.)
 
 **#318 VO (veľkoobchodná) hladina — presný leak-bar.** Prihlásený b2b vidí VO cenu (konfigurátor +
 PDF ponuka + pečiatka), neprihlásený/interný ostáva MO. Hladinu rozhoduje SERVER
@@ -266,3 +273,40 @@ Ak by sa AR niekedy vracalo, obnov ROUTE/guard vzor z histórie tohto tiketu.
 - **E2E: fills sú v METROCH** (`getByTestId('sirka').fill('4')` / `'2.8'` — dot aj comma OK, parser
   znáša oboje). `toHaveValue` po blure je čiarková („4,0"); pri rozpísanej hodnote pred blurom je
   ako sa zadalo. Stepper krok testuj cez `getByLabel('Zväčšiť šírku')`/`'Zmenšiť šírku'`.
+
+## 11. Jednotný rám — výberová obrazovka + produkt diskriminátor (#384, etapa 1/7)
+
+`/konfigurator` je VÝBEROVÁ obrazovka (grid produktových kariet); každý produkt = vlastná
+podstránka `/konfigurator/<slug>`. Rám (PR 1/7) je pergola-only live; #385–#390 pridávajú produkty.
+
+- **Katalóg = client-safe `src/lib/konfigurator-produkty.ts`** (`KONF_PRODUKTY`: `kod/nazov/pdfNadpis/
+  popis/foto/alt/stav('live'|'pripravujeme')/odkaz/externy`). Nesie LEN prezentačné texty + montalu.sk
+  URL + webp názvy (žiadny Money kód/cena) → leak-guard (A) ho prejde. Fotky = lokálne webp v
+  `static/konfigurator/vyber/` (cwebp z montalu.sk, žiadny hotlink). `pripravujeme` karta = badge +
+  externý odkaz na montalu.sk (žiadny mŕtvy klik, žiadny fake konfigurátor).
+- **Výber = `KonfVyber.svelte`.** Live karta → interná `resolve(p.odkaz as LiveRoute)` navigácia (#99);
+  `LiveRoute` je únia interných route literálov — každý PR čo prepne kartu na `live` sem pridá svoj
+  `/konfigurator/<slug>` (guard: `konfigurator-produkty.test.ts` overuje, že každý live `odkaz` má reálny
+  `src/routes/konfigurator/<slug>/+page.svelte` — typo inak 404-uje). Externý (montalu.sk) href je
+  dynamický → scoped `eslint-disable svelte/no-navigation-without-resolve` LEN na tej vetve. Prvá karta
+  (LCP) = `loading="eager"` + `fetchpriority="high"`, ostatné lazy. Späť z podstránky: `konf-spat-vyber`
+  odkaz v `konfigurator/+layout.svelte` (viditeľný len keď `page.url.pathname !== '/konfigurator'`).
+- **`produkt` je SERVER-AUTORITATÍVNY, NIE klientske pole.** Route pozná svoj produkt a viaže ho pri
+  mountnutí akcie: `dopyt: (e) => dopytAction(e, 'pergola')` / `objednavka: (e) => objednavkaAction(e,
+  'pergola')` (`dopytAction(event, produkt: KonfProduktKod = 'pergola')`). Klient produkt NEPOSIELA
+  (žiadne skryté pole — inak sfalšovateľný → mislabelovaný lead). Produktový PR mountuje svoju akciu s
+  vlastným kódom.
+- **`produkt` stĺpec na `dopyt`** (migrácia **v35** `migrateDopytProdukt`, extrahovaná do
+  `migracie-seed.ts`, feature-detect `dopyt`; `migracie.ts` je na strope). `insertDopyt`/`insertObjednavka`
+  ho píšu; `getDopyt`/`getDopytForLead`/`leadSelectCols` ho čítajú; `listDopyty` feature-detect
+  (`hasProduktColumn`) → interný `/dopyty-konfigurator` zobrazí produkt. Staré riadky = `produkt IS NULL`.
+- **Produkt-aware PDF titul + názov Odoo leadu.** `produktNazov(kod)` (nominatív, lead prefix + admin),
+  `produktPdfNadpis(kod)` (PDF nadpis) — oba fallback na 'Pergola'/'Špecifikácia pergoly' pri NULL/neznámom
+  (byte-identické pre pergolu). `generatePonukaPdf(cfg, { produkt })` (titul + `setTitle`),
+  `leadName`/`buildDescription` v `odoo-lead.ts`. Wiring (nie len pure helpery) je testovaný v
+  `tests/dopyt-produkt-wiring.test.ts`.
+- **b2b-route-coverage:** `/konfigurator/pergola` v `ALLOWED` + self-check poli (picker `/konfigurator`
+  NEMÁ `+page.server.ts` → nie je write-bearing, ale ostáva verejný a nepresmerovaný); akcie routy
+  presne `['dopyt','objednavka','vypocet']` (nezmenené wrapovaním). Money-safety guard (A) recurzuje do
+  pergola podstránky + `KonfVyber`/katalógu (pozitívny reach assert); guard (B/C) preadresované na
+  `konfigurator/pergola/+page.server.ts`.

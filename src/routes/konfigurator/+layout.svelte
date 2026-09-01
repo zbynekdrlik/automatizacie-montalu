@@ -8,8 +8,14 @@
 	// Inter: self-hosted variabilný font (npm, žiadny CDN) — vzor `@fontsource-variable/archivo`.
 	import '@fontsource-variable/inter/index.css';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 
 	let { data, children } = $props();
+
+	// #384: na produktovej PODSTRÁNKE (`/konfigurator/<produkt>`) ponúkni cestu späť na výber;
+	// na samotnej výberovej obrazovke (`/konfigurator`) sa odkaz neukazuje. SSR-konzistentné
+	// cez `$app/state` `page` (žiadny `window.location`, žiadny hydration mismatch).
+	const jePodstranka = $derived(page.url.pathname !== '/konfigurator');
 </script>
 
 <div class="konf-app">
@@ -18,6 +24,11 @@
 			<a class="konf-znacka" href="https://www.montalu.sk" target="_blank" rel="noopener">MONTALU</a
 			>
 			<nav class="konf-hlava-odkazy">
+				{#if jePodstranka}
+					<a class="konf-spat" href={resolve('/konfigurator')} data-testid="konf-spat-vyber"
+						>← Výrobky</a
+					>
+				{/if}
 				{#if data.user}
 					<!-- prihlásený interný/b2b user: decentný návrat do internej appky (nie admin nav) -->
 					<a class="konf-interny" href={resolve('/zasklenia')}>← interná aplikácia</a>
@@ -107,6 +118,7 @@
 		align-items: center;
 		gap: 18px;
 	}
+	.konf-spat,
 	.konf-interny,
 	.konf-web {
 		font-size: 13px;
@@ -114,6 +126,11 @@
 		text-decoration: none;
 		transition: color 0.15s ease;
 	}
+	.konf-spat {
+		font-weight: 600;
+		color: var(--k-text);
+	}
+	.konf-spat:hover,
 	.konf-interny:hover,
 	.konf-web:hover {
 		color: var(--k-text);

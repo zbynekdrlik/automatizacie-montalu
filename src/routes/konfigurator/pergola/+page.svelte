@@ -272,7 +272,7 @@
 						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) s orientačnou cenou na
 						stiahnutie. Presnú cenu pripravíme po obhliadke.
 					</p>
-					<DopytForm konfiguracia={ponukaCfg} produkt="pergola" />
+					<DopytForm konfiguracia={ponukaCfg} />
 				</section>
 
 				<!-- voliteľný krok — ZÁVÄZNÁ OBJEDNÁVKA (Money-neutrálne, bez platobnej brány) -->
@@ -283,7 +283,7 @@
 						online platby — ozveme sa ti, dohodneme obhliadku a presné podmienky. Orientačná cena z
 						konfigurátora sa stane súčasťou objednávky.
 					</p>
-					<ObjednavkaForm konfiguracia={ponukaCfg} produkt="pergola" />
+					<ObjednavkaForm konfiguracia={ponukaCfg} />
 				</section>
 			{/if}
 		</div>

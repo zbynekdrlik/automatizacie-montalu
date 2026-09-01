@@ -211,8 +211,9 @@ export function hasObjednavkaColumn(): boolean {
 	return cols.some((c) => c.name === 'je_objednavka');
 }
 
-/** Má tabuľka `dopyt` stĺpec `produkt`? (#384 ho pridá v migrácii v35.) Feature-detect na SCHÉME —
- *  interný zoznam tak vie zobraziť produktový rad nezávisle od toho, či #384 landol. */
+/** Má tabuľka `dopyt` stĺpec `produkt`? (#384/v35.) Feature-detect na SCHÉME (`PRAGMA table_info`),
+ *  rovnaký defenzívny vzor ako `hasOdooLeadColumn`/`hasObjednavkaColumn` — interný zoznam sa tak
+ *  vykreslí správne aj proti fixture/DB, ktorá stĺpec (ešte) nemá, bez tvrdého SELECT zlyhania. */
 export function hasProduktColumn(): boolean {
 	const cols = db.prepare('PRAGMA table_info(dopyt)').all() as { name: string }[];
 	return cols.some((c) => c.name === 'produkt');

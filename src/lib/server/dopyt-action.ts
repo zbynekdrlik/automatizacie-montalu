@@ -17,7 +17,7 @@ import { cenovaHladina } from './konfigurator-hladina';
 import { queueLeadCreation } from './odoo-lead';
 import { generatePonukaPdf } from './ponuka-pdf';
 import { sanitizePonukaConfig } from '$lib/ponuka';
-import { parseProdukt } from '$lib/konfigurator-produkty';
+import type { KonfProduktKod } from '$lib/konfigurator-produkty';
 import {
 	HONEYPOT_FIELD,
 	jeSpam,
@@ -66,7 +66,7 @@ function filename(prefix = 'ponuka'): string {
 	return `Montalu-${prefix}-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
-export async function dopytAction(event: RequestEvent) {
+export async function dopytAction(event: RequestEvent, produkt: KonfProduktKod = 'pergola') {
 	const form = await event.request.formData();
 	const ip = clientIp(event);
 
@@ -99,9 +99,9 @@ export async function dopytAction(event: RequestEvent) {
 	}
 
 	const cfg = sanitizePonukaConfig(form.get('konfiguracia'));
-	// #384: produktový rad z formulára (obranne sparsovaný na známy kód, default 'pergola') — uloží
-	// sa do dopytu a robí PDF titul + názov Odoo leadu produkt-aware.
-	const produkt = parseProdukt(form.get('produkt'));
+	// #384: produktový rad je SERVER-AUTORITATÍVNY — príde ako argument z routy (`/konfigurator/
+	// <produkt>` vie svoj produkt), NIE z klientom dodaného poľa (to by sa dalo sfalšovať a
+	// mislabelovať lead). Robí PDF titul + názov Odoo leadu produkt-aware.
 	const renderPng = decodeRenderPng(form.get('renderPng'));
 	// #309/#318: opečiatkuj cenu + verziu cenníka PRI PODANÍ — uloží sa do dopytu a PDF ju použije,
 	// takže re-download reprodukuje cenu platnú TERAZ (nie prepočet z neskoršej matice). Hladina sa
@@ -159,7 +159,7 @@ export async function dopytAction(event: RequestEvent) {
  * MONEY-NEUTRÁLNE: žiadny odpis, žiadny zápis do /data; ŽIADNA platobná brána (objednávka je
  * záväzná v zmysle „odoslaná firme", nie zaplatená).
  */
-export async function objednavkaAction(event: RequestEvent) {
+export async function objednavkaAction(event: RequestEvent, produkt: KonfProduktKod = 'pergola') {
 	const form = await event.request.formData();
 	const ip = clientIp(event);
 
@@ -195,7 +195,7 @@ export async function objednavkaAction(event: RequestEvent) {
 	}
 
 	const cfg = sanitizePonukaConfig(form.get('konfiguracia'));
-	const produkt = parseProdukt(form.get('produkt'));
+	// #384: produkt je server-autoritatívny argument z routy (viď dopytAction), nie klientske pole.
 	const renderPng = decodeRenderPng(form.get('renderPng'));
 	// #309/#318: opečiatkuj cenu + MO/VO hladinu PRI PODANÍ — objednaná cena je zapečatená (bod 5).
 	const stamp = opeciatkujCenu(cfg, cenovaHladina(event.locals?.user ?? null));

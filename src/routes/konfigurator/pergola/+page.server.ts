@@ -51,11 +51,14 @@ export const actions = {
 	// #277: verejný dopyt — validácia → rate-limit → honeypot → uloženie (audit) →
 	// PDF ponuka s orientačnou cenou (#279 Fáza C, download-first). Money-neutrálne, žiadna
 	// odpisová cesta (cena = orientačná MO predajná, nie Money nákupná).
-	dopyt: dopytAction,
+	// #384: produkt je SERVER-AUTORITATÍVNY — táto (pergolová) podstránka viaže `'pergola'`, klient
+	// ho nevie sfalšovať (žiadne dôveryhodné klientske pole). Produktové PR-y (#385–#390) mountujú
+	// svoju akciu s vlastným kódom (`(e) => dopytAction(e, 'bazen')`).
+	dopyt: (event) => dopytAction(event, 'pergola'),
 	// #319: záväzná objednávka — kontakt + fakturačné údaje + súhlas → uloženie (je_objednavka=1) +
 	// PDF špecifikácia + Odoo lead ako OPPORTUNITY. Money-neutrálne (ŽIADNA platobná brána, žiadny
 	// odpis); zapečatí objednanú cenu vrátane MO/VO hladiny.
-	objednavka: objednavkaAction,
+	objednavka: (event) => objednavkaAction(event, 'pergola'),
 	// jednotný tvar návratu ({ vysledok, error }, jedno je vždy null) — čistý typ pre
 	// use:enhance callback bez union-narrowingu (vzor /optimalizator).
 	// SvelteKit ZAKAZUJE miešať `default` s pomenovanými akciami (actions.js:221 „When using
