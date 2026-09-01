@@ -4,6 +4,7 @@
 	// odpis sa touto stránkou nedotýka). Rovnaký vzor ako `/fix`: formulár → výkres →
 	// tlač, žiadny zápisový krok.
 	import PergolaNavrhVykres from '$lib/components/PergolaNavrhVykres.svelte';
+	import PergolaModeNav from '$lib/components/PergolaModeNav.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
 	import { resolve } from '$app/paths';
 	import {
@@ -165,6 +166,9 @@
 {/snippet}
 
 {#if step === 'form'}
+	<div class="card">
+		<PergolaModeNav active="navrh" />
+	</div>
 	<div class="card">
 		<h1>Pergola — návrhový výkres</h1>
 		<p class="sub" style="margin-top:6px">

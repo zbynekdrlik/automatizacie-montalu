@@ -6,7 +6,6 @@
 	// Viditeľné vstupy majú `name=` → submitnú sa priamo; `hiddenIdent` (snippet z rodiča) +
 	// inline `rucnePolozky` JSON prežijú `form→vysledok` (round-trip vzor PR #81).
 	import type { Snippet } from 'svelte';
-	import { resolve } from '$app/paths';
 	import {
 		PREDNA_SVETLOST_STD,
 		ZVOD_SH_MAX,
@@ -95,12 +94,6 @@
 		Money už pri zadaní objednávky (aby ti materiál neušiel). Do rezervácie idú LEN spočítané
 		položky, bez +20 % rezervy; odpis až po tvojom potvrdení.
 		{#if !live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
-	</p>
-	<p class="sub">
-		Klasický Money odpis z CAD nárezu je na
-		<a href={resolve('/pergola')} data-testid="link-pergola">pôvodnej stránke Pergola</a>;
-		zákaznícky výkres kreslí
-		<a href={resolve('/pergola/navrh')} data-testid="link-navrh">Pergola návrh</a>.
 	</p>
 </div>
 

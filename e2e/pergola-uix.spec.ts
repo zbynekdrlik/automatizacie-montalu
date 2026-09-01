@@ -163,3 +163,81 @@ test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke rezervač
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #371 — prepínač režimov musí byť dosiahnuteľný z KAŽDEJ pergola stránky, nielen
+// z hubu (owner 1.9.2026: "ked kliknem na rezervaciu alebo nakres tak ma prepne na
+// inu stranku a uz sa neviem lahko prepinat"). Z každej stránky sú OSTATNÉ dva
+// režimy o jeden klik ďalej a aktuálny je vizuálne označený (non-link, .active).
+test('prepínač režimov je dosiahnuteľný z /pergola/narez — CAD aj výkres o jeden klik', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	const rezimy = page.getByTestId('pergola-rezimy');
+	await expect(rezimy).toBeVisible();
+
+	// aktuálna stránka (rezervačný odpis) je označená ako "tu si" a NIE JE odkaz
+	const aktivny = page.getByTestId('link-narez');
+	await expect(aktivny).toHaveClass(/active/);
+	await expect(aktivny).toContainText('tu si');
+	expect(await aktivny.evaluate((el) => el.tagName)).toBe('DIV');
+
+	// formulár rezervačného odpisu ostáva hneď pod prepínačom (nedotknutý)
+	await expect(page.getByLabel('Šírka (mm) *')).toBeVisible();
+
+	// CAD nárez → Money odpis je o jeden klik
+	await expect(page.getByTestId('rezim-cad')).toBeVisible();
+	await page.getByTestId('rezim-cad').click();
+	await waitHydrated(page);
+	await expect(page).toHaveURL(/\/pergola$/);
+	await expect(page.getByLabel('Materiál (CAD nárez) *')).toBeVisible();
+
+	// späť na /pergola/narez a návrhový výkres je o jeden klik
+	await goto(page, '/pergola/narez');
+	await expect(page.getByTestId('link-navrh')).toBeVisible();
+	await page.getByTestId('link-navrh').click();
+	await waitHydrated(page);
+	await expect(page).toHaveURL(/\/pergola\/navrh$/);
+	await expect(page.getByRole('heading', { name: 'Pergola — návrhový výkres' })).toBeVisible();
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('prepínač režimov je dosiahnuteľný z /pergola/navrh — CAD aj rezervácia o jeden klik', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+
+	const rezimy = page.getByTestId('pergola-rezimy');
+	await expect(rezimy).toBeVisible();
+
+	// aktuálna stránka (návrhový výkres) je označená ako "tu si" a NIE JE odkaz
+	const aktivny = page.getByTestId('link-navrh');
+	await expect(aktivny).toHaveClass(/active/);
+	await expect(aktivny).toContainText('tu si');
+	expect(await aktivny.evaluate((el) => el.tagName)).toBe('DIV');
+
+	// formulár návrhového výkresu ostáva hneď pod prepínačom (nedotknutý)
+	await expect(page.getByLabel('OP číslo')).toBeVisible();
+
+	// rezervačný odpis je o jeden klik
+	await expect(page.getByTestId('link-narez')).toBeVisible();
+	await page.getByTestId('link-narez').click();
+	await waitHydrated(page);
+	await expect(page).toHaveURL(/\/pergola\/narez$/);
+	await expect(page.getByRole('heading', { name: 'Rezervačný odpis — pergola' })).toBeVisible();
+
+	// späť na /pergola/navrh a CAD nárez → Money odpis je o jeden klik
+	await goto(page, '/pergola/navrh');
+	await expect(page.getByTestId('rezim-cad')).toBeVisible();
+	await page.getByTestId('rezim-cad').click();
+	await waitHydrated(page);
+	await expect(page).toHaveURL(/\/pergola$/);
+	await expect(page.getByLabel('Materiál (CAD nárez) *')).toBeVisible();
+
+	expect(consoleMsgs).toEqual([]);
+});

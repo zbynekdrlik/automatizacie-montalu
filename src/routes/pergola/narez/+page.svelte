@@ -14,6 +14,7 @@
 	// (RezForm 18× $bindable, RucnePolozky bind:rucneRiadky). Round-trip disciplína
 	// (.claude/rules/pergola-narez.md): `$effect` echo + oba snippety ostávajú TU nezmenené.
 	import { resolve } from '$app/paths';
+	import PergolaModeNav from '$lib/components/PergolaModeNav.svelte';
 	import RezForm from '$lib/components/pergola/RezForm.svelte';
 	import RezVysledok from '$lib/components/pergola/RezVysledok.svelte';
 	import RucnePolozky from '$lib/components/pergola/RucnePolozky.svelte';
@@ -224,6 +225,9 @@
 {/snippet}
 
 {#if step === 'form'}
+	<div class="card">
+		<PergolaModeNav active="narez" />
+	</div>
 	<RezForm
 		live={data.live}
 		error={form && 'error' in form ? form.error : undefined}
