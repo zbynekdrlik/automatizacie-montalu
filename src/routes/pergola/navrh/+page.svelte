@@ -147,18 +147,24 @@
 	<input type="hidden" name="hlbka" value={cislo(hlbkaS)} />
 	<input type="hidden" name="vyskaVpredu" value={cislo(vyskaVpreduS)} />
 	<input type="hidden" name="vyskaPriStene" value={cislo(vyskaPriSteneS)} />
-	{#if sklonStrechyS !== ''}<input
+	<!-- #382 review nález #2: `!== ''` samo osebe NIE JE null-safe — Svelte 5 `bind:value`
+	     na `type="number"` nastaví po vymazaní poľa STATE na `null` (nie `''`,
+	     `to_number: value === '' ? null : +value`), takže bez `!= null` by sa vykreslil
+	     hidden input s `value={cislo(null)}` = "0" → server ho vidí ako zadané "0" a
+	     odmietne (mimo rozsahu). Platí pre VŠETKY tri voliteľné číselné prepisy nižšie —
+	     opravené naraz (review nález, nie len pre nové pole). -->
+	{#if sklonStrechyS !== '' && sklonStrechyS != null}<input
 			type="hidden"
 			name="sklonStrechy"
 			value={cislo(sklonStrechyS)}
 		/>{/if}
 	<input type="hidden" name="panelPocet" value={cislo(panelPocetS)} />
-	{#if panelSirkaOverrideS !== ''}<input
+	{#if panelSirkaOverrideS !== '' && panelSirkaOverrideS != null}<input
 			type="hidden"
 			name="panelSirkaOverride"
 			value={cislo(panelSirkaOverrideS)}
 		/>{/if}
-	{#if panelDlzkaOverrideS !== ''}<input
+	{#if panelDlzkaOverrideS !== '' && panelDlzkaOverrideS != null}<input
 			type="hidden"
 			name="panelDlzkaOverride"
 			value={cislo(panelDlzkaOverrideS)}
@@ -285,19 +291,25 @@
 
 			<!-- #382 — voliteľný manuálny sklon (z CAD, rovnaký zdroj pravdy ako /narez): keď je
 			     zadaný, REZ A ho použije namiesto dopočítaného sklonu z výšok (viď design komentár
-			     na #382 pre root cause). -->
-			<div class="field">
-				<label for="sklonStrechy">Sklon strechy (°) — z CAD (voliteľné)</label>
-				<input
-					id="sklonStrechy"
-					name="sklonStrechy"
-					type="number"
-					min="0.1"
-					max={NAVRH_SKLON_MAX}
-					step="any"
-					bind:value={sklonStrechyS}
-					placeholder="prázdne = dopočíta sa orientačne z výšok (REZ A)"
-				/>
+			     na #382 pre root cause). Vlastná `grid3` (review nález #7) — rovnaký vzor ako
+			     ostatné číselné polia na tejto stránke, nie osamotený `field` mimo mriežky.
+			     ŽIADNY `name` na VIDITEĽNOM vstupe (review nález #2) — presne ako
+			     `panelSirkaOverride`/`panelDlzkaOverride` nižšie: hidden() snippet je JEDINÝ
+			     serializátor voliteľných prepisov, aby nevznikli DVA vstupy s rovnakým `name`
+			     (kolízia by pri nefunkčnom fallbacku na FormData poradie bola krehká). -->
+			<div class="grid3">
+				<div class="field">
+					<label for="sklonStrechy">Sklon strechy (°) — z CAD (voliteľné)</label>
+					<input
+						id="sklonStrechy"
+						type="number"
+						min="0.1"
+						max={NAVRH_SKLON_MAX}
+						step="any"
+						bind:value={sklonStrechyS}
+						placeholder="prázdne = dopočíta sa orientačne z výšok (REZ A)"
+					/>
+				</div>
 			</div>
 
 			<div class="polia-box" data-testid="polia-box">

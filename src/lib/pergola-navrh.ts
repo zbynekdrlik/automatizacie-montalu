@@ -75,11 +75,13 @@ export const VYSKA_MIN = 1500;
 export const VYSKA_MAX = 4500;
 export const PANEL_POCET_MIN = 1;
 export const PANEL_POCET_MAX = 30;
-/** #382 — horná hranica validácie voliteľného `sklonStrechy` — zrkadlí
- *  `SKLON_MAX` v `pergola-narez.ts` (rovnaký fyzický rozsah, nezávislý
- *  modul, žiadny cross-feature import). Dolná hranica je `> 0` (rovnako
- *  ako `krovUlozenie`/`SKLON_MIN` na `/narez`) — appka nikdy nepripustí 0°
- *  ani záporný sklon ako „potvrdený" vstup. */
+/** #382 — dolná/horná hranica validácie voliteľného `sklonStrechy` (review nález #4:
+ *  predtým bola dolná hranica len `> 0`, takže napr. 0,05° by prešlo, hoci chybová
+ *  hláška aj HTML `min` sľubovali 0,1 — TERAZ je hranica JEDNA pomenovaná konštanta,
+ *  nie tri nezávislé miesta). `NAVRH_SKLON_MAX` zrkadlí `SKLON_MAX` v
+ *  `pergola-narez.ts` (rovnaký fyzický rozsah, nezávislý modul, žiadny cross-feature
+ *  import) — appka nikdy nepripustí 0° ani záporný sklon ako „potvrdený" vstup. */
+export const NAVRH_SKLON_MIN = 0.1;
 export const NAVRH_SKLON_MAX = 60;
 
 export type ZvodStrana = 'predna' | 'zadna';
@@ -295,9 +297,12 @@ export function chybaPergolaNavrhVstupu(v: PergolaNavrhVstup): string | null {
 		return 'Ručná šírka strešnej výplne musí byť kladné číslo.';
 	if (v.panelDlzkaOverride !== undefined && !(v.panelDlzkaOverride > 0))
 		return 'Ručná dĺžka strešnej výplne musí byť kladné číslo.';
-	// #382 — voliteľný manuálny sklon; rovnaká disciplína ako /narez SKLON_MIN/MAX
-	// (dolná hranica ostro nad 0, horná NAVRH_SKLON_MAX), keď je vôbec zadaný.
-	if (v.sklonStrechy !== undefined && !(v.sklonStrechy > 0 && v.sklonStrechy <= NAVRH_SKLON_MAX))
+	// #382 (review nález #4) — voliteľný manuálny sklon; hranica JEDNOU konštantou
+	// (NAVRH_SKLON_MIN=0,1) namiesto skoršieho `> 0`, ktoré nesedelo s hláškou/HTML min.
+	if (
+		v.sklonStrechy !== undefined &&
+		!(v.sklonStrechy >= NAVRH_SKLON_MIN && v.sklonStrechy <= NAVRH_SKLON_MAX)
+	)
 		return `Sklon strechy musí byť 0,1–${NAVRH_SKLON_MAX}° (alebo prázdne).`;
 	const postCount = v.polia.length + 1;
 	if (v.zvody.some((z) => z.postIndex < 0 || z.postIndex >= postCount))

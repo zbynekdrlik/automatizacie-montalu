@@ -24,6 +24,7 @@ import {
 	PANEL_MEDZERA_MM,
 	PANEL_TRIM_MM,
 	STLP_HRUBKA_VIZ_MM,
+	NAVRH_SKLON_MIN,
 	NAVRH_SKLON_MAX,
 	type PergolaNavrhVstup
 } from '../src/lib/pergola-navrh';
@@ -161,6 +162,16 @@ describe('chybaPergolaNavrhVstupu — sklonStrechy (#382)', () => {
 	});
 	it('sklonStrechy presne na hranici NAVRH_SKLON_MAX prejde', () => {
 		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: NAVRH_SKLON_MAX })).toBeNull();
+	});
+	// #382 review nález #4 — dolná hranica bola len `> 0` (0,05° by prešlo), teraz
+	// presne NAVRH_SKLON_MIN (0,1°).
+	it('sklonStrechy presne na hranici NAVRH_SKLON_MIN prejde', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: NAVRH_SKLON_MIN })).toBeNull();
+	});
+	it('sklonStrechy tesne pod NAVRH_SKLON_MIN (napr. 0,05°) = chyba', () => {
+		expect(chybaPergolaNavrhVstupu({ ...VZOR, sklonStrechy: NAVRH_SKLON_MIN / 2 })).toMatch(
+			/sklon/i
+		);
 	});
 });
 
