@@ -396,6 +396,26 @@ voči `getByRole('heading', {level: 1})` na všetkých troch cestách — pri PR
 ĎALŠEJ pergola stránky s týmto prepínačom dodrž rovnaký tvar (prepínač-karta PRED
 nadpis-kartou), inak tento test padne.
 
+**Mode-name premenovanie (#379) — kde sa mená DUPLIKUJÚ, keď ich zas budeš meniť.**
+„Rezervačný odpis" → „Pergola z appky" a „CAD nárez → Money odpis" → „Pergola z cadu"
+(prvý krok smerom k zrušeniu CAD režimu, #155). `PergolaModeNav.svelte`-ov `card(...)`
+snippet `title` argument (2× v komponente) je JEDINÝ zdroj pravdy pre prepínač, ale
+**každá stránka svoj vlastný mode-name duplikuje** v h1/`<svelte:head><title>`, takže
+mode-rename = grep + edit na VIACERÝCH miestach naraz:
+`PergolaModeNav.svelte` (title×2) · `RezForm.svelte` (h1) · `RezVysledok.svelte`
+(dynamický h1 s `{vstup.system}`) · `RezNahlad.svelte` (dynamický h1 s
+`{ident.zak}·{zakaznik}` + 2 tlačidlá) · `routes/pergola/narez/+page.svelte`
+(`<title>` + `.sec` sekcia „Odpis do Money" + tlačidlo „Pripraviť odpis") ·
+`routes/pergola/+page.svelte` (`<title>` + `.sec` „Režim ➊ · …"). **Čo ostáva
+ZÁMERNE nezmenené pri mode-rename** (nie je to mode-name, je to popis VSTUPNÉHO
+formátu): label `Materiál (CAD nárez) *`, veta „Vlož CAD nárez (…)" — appka bude
+prijímať CAD export zo Solid Edge bez ohľadu na to, ako appka mode nazýva. Takisto
+nezmenené: Money-doménová terminológia („rezervačný odpis" ako TYP Money
+transakcie, REZ marker v `money.ts`/`pergola-rezervacia.ts`) — logika/Money vrstva,
+mimo scope čisto textového renamu. Akčné tlačidlá, ktoré staré meno len OPAKOVALI
+vo vete (nie ako nadpis), sa pri renamovaní skrátia bez mode-mena — vzor už dávno
+existuje na `/pergola` („Odoslať odpis do Money", bez „CAD" prefixu).
+
 ## Post-deploy na LIVE — v ČISTOM prehliadači (Svelte hydration pasca)
 
 Post-deploy overenie tejto appky rob v **čerstvom prehliadači** (`browser_close` → nový

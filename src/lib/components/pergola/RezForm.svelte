@@ -88,7 +88,7 @@
 </script>
 
 <div class="card">
-	<h1>Rezervačný odpis — pergola</h1>
+	<h1>Pergola z appky</h1>
 	<p class="sub">
 		Zadaj rozmery objednávky — z <b>potvrdených</b> vzorcov spočítam materiál a rezervujem ho v
 		Money už pri zadaní objednávky (aby ti materiál neušiel). Do rezervácie idú LEN spočítané

@@ -175,7 +175,7 @@
 	let cakaCount = $derived(cakaDlzkaCount + cakaPravidloCount);
 </script>
 
-<svelte:head><title>Rezervačný odpis — pergola</title></svelte:head>
+<svelte:head><title>Pergola z appky</title></svelte:head>
 
 {#snippet hidden()}
 	<input type="hidden" name="system" value={systemS} />
@@ -273,7 +273,7 @@
 	<RucnePolozky bind:rucneRiadky catalog={data.catalog ?? []} />
 
 	<div class="card noprint">
-		<div class="sec">Rezervačný odpis do Money</div>
+		<div class="sec">Odpis do Money</div>
 		<p class="sub">
 			Do odpisu idú LEN spočítané položky vyššie (bez +20 % rezervy). Odpis sa odošle až po tvojom
 			potvrdení.
@@ -298,8 +298,7 @@
 					<input id="zakaznik" name="zakaznik" bind:value={zakaznikS} required />
 				</div>
 			</div>
-			<button class="btn" type="submit" data-testid="pripravit-rezervaciu"
-				>Pripraviť rezervačný odpis →</button
+			<button class="btn" type="submit" data-testid="pripravit-rezervaciu">Pripraviť odpis →</button
 			>
 		</form>
 	</div>
