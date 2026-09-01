@@ -15,7 +15,12 @@ describe('fix-cad — Money-write most (opak čistoty enginu)', () => {
 		const src = zdroj('src/lib/server/fix-cad.ts');
 		expect(src).toMatch(/server\/money/);
 		expect(src).toMatch(/server\/pergola/);
-		expect(src).toMatch(/modul: 'fix'/);
+		// Dva samostatné matche namiesto /modul: 'fix'/: Stryker pri mutovaní
+		// fix-cad.ts obalí string literál mutant-switchom, takže susedstvo
+		// `modul:` a `'fix'` sa v inštrumentovanom zdroji rozpadne (dry run
+		// mutation-diff by padol) — literál 'fix' aj kľúč modul: v ňom ostávajú.
+		expect(src).toMatch(/modul:/);
+		expect(src).toMatch(/'fix'/);
 	});
 });
 
