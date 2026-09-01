@@ -25,5 +25,17 @@ describe('Money safety (#85) — zasklenia odpis je byte-identický, FIX modul d
 		const src = fs.readFileSync(new URL('../src/lib/fix.ts', import.meta.url), 'utf8');
 		expect(src).not.toMatch(/from ['"].*server\/compute['"]/);
 		expect(src).not.toMatch(/writeOdpis|MONEY_LIVE/);
+		// #380: „Fix z appky" (kresliaci režim) ostáva Money-CLEAN aj keď „Fix z cadu"
+		// (Money lane) zdieľa /fix prefix — kresliaci engine NEIMPORTUJE Money most/vrstvu.
+		expect(src).not.toMatch(/server\/fix-cad|server\/money|server\/pergola/);
+	});
+
+	it('kresliaci FIX výkres (FixVykres2D) ostáva Money-CLEAN (#380)', async () => {
+		const fs = await import('node:fs');
+		const src = fs.readFileSync(
+			new URL('../src/lib/components/FixVykres2D.svelte', import.meta.url),
+			'utf8'
+		);
+		expect(src).not.toMatch(/server\/fix-cad|server\/money|server\/pergola|writeOdpis|MONEY_LIVE/);
 	});
 });
