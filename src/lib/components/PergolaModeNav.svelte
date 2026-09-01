@@ -8,37 +8,36 @@
 	// ostatné dve sú odkazy. Testid-y ostávajú PRESNE tie, čo už
 	// asertuje e2e/pergola-uix.spec.ts (rezim-cad / link-narez /
 	// link-navrh / wrapper pergola-rezimy), aby sa žiadny existujúci
-	// test nemusel meniť.
+	// test nemusel meniť. Konzumenti: hub `/pergola` ho renderuje VNÚTRI
+	// svojej pôvodnej `.card` (nezmenené); `/pergola/narez` a
+	// `/pergola/navrh` ho zámerne wrapnú do VLASTNEJ `.card` (review
+	// nález #371 — konzistentný card vzhľad na všetkých troch, žiadna
+	// zmena vnútra tejto komponenty).
 	import { resolve } from '$app/paths';
 
 	type Rezim = 'cad' | 'narez' | 'navrh';
 	let { active }: { active: Rezim } = $props();
+
+	// Review nález (#371): pôvodný if/if-else reťazec duplikoval href-resolúciu per
+	// vetva — jedna mapa nahradí 3 vetvy 1 (rezim je uzavretá únia troch stringov,
+	// takže Record je vyčerpávajúci by-construction, TS to vynúti).
+	const CESTY: Record<Rezim, '/pergola' | '/pergola/narez' | '/pergola/navrh'> = {
+		cad: '/pergola',
+		narez: '/pergola/narez',
+		navrh: '/pergola/navrh'
+	};
 </script>
 
 {#snippet card(rezim: Rezim, tag: string, title: string, desc: string, testid: string)}
 	{#if rezim === active}
 		<div class="mode-card active" data-testid={testid}>
-			<span class="mode-tag ok">{tag} · tu si</span>
+			<span class="mode-tag ok">{tag} tu si</span>
 			<span class="mode-title">{title}</span>
 			<span class="mode-desc">{desc}</span>
 			<span class="mode-foot">Formulár je nižšie ↓</span>
 		</div>
-	{:else if rezim === 'cad'}
-		<a class="mode-card" href={resolve('/pergola')} data-testid={testid}>
-			<span class="mode-tag">{tag}</span>
-			<span class="mode-title">{title}</span>
-			<span class="mode-desc">{desc}</span>
-			<span class="mode-foot">Otvoriť →</span>
-		</a>
-	{:else if rezim === 'narez'}
-		<a class="mode-card" href={resolve('/pergola/narez')} data-testid={testid}>
-			<span class="mode-tag">{tag}</span>
-			<span class="mode-title">{title}</span>
-			<span class="mode-desc">{desc}</span>
-			<span class="mode-foot">Otvoriť →</span>
-		</a>
 	{:else}
-		<a class="mode-card" href={resolve('/pergola/navrh')} data-testid={testid}>
+		<a class="mode-card" href={resolve(CESTY[rezim])} data-testid={testid}>
 			<span class="mode-tag">{tag}</span>
 			<span class="mode-title">{title}</span>
 			<span class="mode-desc">{desc}</span>

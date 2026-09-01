@@ -225,7 +225,9 @@
 {/snippet}
 
 {#if step === 'form'}
-	<PergolaModeNav active="narez" />
+	<div class="card">
+		<PergolaModeNav active="narez" />
+	</div>
 	<RezForm
 		live={data.live}
 		error={form && 'error' in form ? form.error : undefined}

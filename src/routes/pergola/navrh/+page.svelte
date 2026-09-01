@@ -166,7 +166,9 @@
 {/snippet}
 
 {#if step === 'form'}
-	<PergolaModeNav active="navrh" />
+	<div class="card">
+		<PergolaModeNav active="navrh" />
+	</div>
 	<div class="card">
 		<h1>Pergola — návrhový výkres</h1>
 		<p class="sub" style="margin-top:6px">
