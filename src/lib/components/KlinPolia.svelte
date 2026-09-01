@@ -38,7 +38,7 @@
 </script>
 
 <div class="field">
-	<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+	<label class="opt">
 		<input
 			type="checkbox"
 			id={`${idPrefix}-on`}
@@ -46,9 +46,8 @@
 			value="1"
 			bind:checked={on}
 			onchange={zapnute}
-			style="width:auto"
 		/>
-		📐 Klín (nad posuvom) — len na plán a do náhľadu, do Money odpisu nejde
+		Klín (nad posuvom) — len na plán a do náhľadu, do Money odpisu nejde
 	</label>
 </div>
 {#if on}

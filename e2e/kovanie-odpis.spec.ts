@@ -7,7 +7,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-KOV-${Date.now().toString(36).slice(-5)}`;
-const FAB = '🔑 Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)';
+const FAB = 'Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)';
 
 async function zaklad(page: Page, op: string) {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-${op}`);

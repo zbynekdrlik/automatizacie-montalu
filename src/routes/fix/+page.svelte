@@ -354,15 +354,9 @@
 			{/if}
 
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input
-						type="checkbox"
-						name="zrkadlo"
-						value="1"
-						bind:checked={zrkadloS}
-						style="width:auto"
-					/>
-					🔁 Zrkadlový kus (druhá strana pergoly)
+				<label class="opt">
+					<input type="checkbox" name="zrkadlo" value="1" bind:checked={zrkadloS} />
+					Zrkadlový kus (druhá strana pergoly)
 				</label>
 			</div>
 			<div class="grid2">

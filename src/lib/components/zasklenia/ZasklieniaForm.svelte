@@ -327,9 +327,9 @@
 			/>
 		</div>
 		<div class="field">
-			<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-				<input type="checkbox" name="caka" value="1" bind:checked={cakaS} style="width:auto" />
-				⏳ Čaká na materiál (odloží import do priečinka NA ODPIS)
+			<label class="opt">
+				<input type="checkbox" name="caka" value="1" bind:checked={cakaS} />
+				Čaká na materiál (odloží import do priečinka NA ODPIS)
 			</label>
 		</div>
 		<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje. Zdieľaný
@@ -337,15 +337,14 @@
 		     `pridavnaKolajnicaDefault` aj `railUpsize` v compute.ts (#134). -->
 		{#if standardPlusRailEligible(system, styl)}
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+				<label class="opt">
 					<input
 						type="checkbox"
 						name="pridavnaKolajnica"
 						value="1"
 						bind:checked={pridavnaKolajnicaS}
-						style="width:auto"
 					/>
-					➕ Prídavná koľajnica (spodná koľajnica o veľkosť väčšia)
+					Prídavná koľajnica (spodná koľajnica o veľkosť väčšia)
 				</label>
 			</div>
 		{/if}
@@ -353,16 +352,15 @@
 		     odpis: kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. -->
 		{#if maKovanie}
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+				<label class="opt">
 					<input
 						type="checkbox"
 						name="jednostrannaFab"
 						value="1"
 						bind:checked={jednostrannaFabS}
-						style="width:auto"
 						data-testid="jednostranna-fab"
 					/>
-					🔑 Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)
+					Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)
 				</label>
 			</div>
 		{/if}
@@ -371,7 +369,7 @@
 		     chybu, aby sa do Money nedostal zlý/žiadny farebný variant. -->
 		{#if maFarbu}
 			<div class="field">
-				<label for="farbaKovania">🎨 Farba kovania (RAL) — MENÍ Money kód</label>
+				<label for="farbaKovania">Farba kovania (RAL) — MENÍ Money kód</label>
 				<select
 					id="farbaKovania"
 					name="farbaKovania"

@@ -189,14 +189,13 @@
 		<!-- #206 (a) jednoduchá pergola bez zasklenia + (c) profil výstuhy -->
 		<div class="grid2">
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+				<label class="opt">
 					<input
 						id="jednoduchaBezZasklenia"
 						type="checkbox"
 						name="jednoduchaBezZasklenia"
 						value="1"
 						bind:checked={jednoduchaBezZaskleniaS}
-						style="width:auto"
 					/>
 					Jednoduchá pergola bez zasklenia (vypne bočné profily 110×43)
 				</label>
@@ -275,26 +274,19 @@
 
 		<div class="grid2">
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input
-						type="checkbox"
-						name="prieckaLight"
-						value="1"
-						bind:checked={prieckaLightS}
-						style="width:auto"
-					/>
+				<label class="opt">
+					<input type="checkbox" name="prieckaLight" value="1" bind:checked={prieckaLightS} />
 					Priečka light (18102 namiesto 18004)
 				</label>
 			</div>
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+				<label class="opt">
 					<input
 						id="zosilnenyNosnik"
 						type="checkbox"
 						name="zosilnenyNosnik"
 						value="1"
 						bind:checked={zosilnenyNosnikS}
-						style="width:auto"
 					/>
 					Zosilnený nosník (profil zatiaľ čaká na vzorec od Dominika)
 				</label>
@@ -345,14 +337,13 @@
 		<!-- #206 (d) ZVOD frézovanie (evidencia/výkres) + (e) sklá zákazky -->
 		<div class="grid3">
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+				<label class="opt">
 					<input
 						id="zvodFrezovat"
 						type="checkbox"
 						name="zvodFrezovat"
 						value="1"
 						bind:checked={zvodFrezovatS}
-						style="width:auto"
 					/>
 					Frézovať zvod (SH)
 				</label>
@@ -422,16 +413,15 @@
 		<!-- #378 — Pergola s FIXom: bočné pevné zasklenie, rozmery odvodené z pergoly
 		     (auto) s možnosťou override. DISPLAY-ONLY + Money-neutrálne. -->
 		<div class="field">
-			<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+			<label class="opt">
 				<input
 					id="pergolaSFixom"
 					type="checkbox"
 					name="pergolaSFixom"
 					value="1"
 					bind:checked={pergolaSFixomS}
-					style="width:auto"
 				/>
-				🪟 Pergola s FIXom (bočné pevné zasklenie)
+				Pergola s FIXom (bočné pevné zasklenie)
 			</label>
 		</div>
 
@@ -447,13 +437,8 @@
 					sa, keď ich Dominik založí (rovnako ako tesnenia a strešné sklo).
 				</p>
 				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-						<input
-							type="checkbox"
-							data-testid="fix-auto"
-							bind:checked={fixAutoS}
-							style="width:auto"
-						/>
+					<label class="opt">
+						<input type="checkbox" data-testid="fix-auto" bind:checked={fixAutoS} />
 						Rozmery odvodiť automaticky z pergoly (hĺbka + výšky)
 					</label>
 					<p class="sub" style="margin:4px 0 0" data-testid="fix-auto-hint">
@@ -517,16 +502,15 @@
 						</select>
 					</div>
 					<div class="field">
-						<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
+						<label class="opt opt-grid">
 							<input
 								id="fixZrkadlo"
 								type="checkbox"
 								name="fixZrkadlo"
 								value="1"
 								bind:checked={fixZrkadloS}
-								style="width:auto"
 							/>
-							🔁 Zrkadlový kus (druhá strana)
+							Zrkadlový kus (druhá strana)
 						</label>
 					</div>
 				</div>

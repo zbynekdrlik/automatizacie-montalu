@@ -40,7 +40,7 @@
 {#snippet qtyRiadok(o: { kod: string; nazov: string; qty: number })}
 	<div class="row" style="align-items:center;gap:12px">
 		<ProfilObrazok kod={o.kod} nazov={o.nazov} />
-		<span style="flex:1">{o.kod} · {o.nazov}</span>
+		<span style="flex:1"><span class="mono">{o.kod}</span> · {o.nazov}</span>
 		<!-- bez min/max — rozsahy stráži server (applyEdits), nech typo dostane
 		     zrozumiteľnú chybu namiesto tichého browser tooltipu -->
 		<input
@@ -122,9 +122,9 @@
 				>
 			</div>
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input type="checkbox" name="caka" value="1" checked={vstup.caka} style="width:auto" />
-					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS/Pergola)
+				<label class="opt">
+					<input type="checkbox" name="caka" value="1" checked={vstup.caka} />
+					Čaká na materiál (odloží import do priečinka NA ODPIS/Pergola)
 				</label>
 			</div>
 			<button class="btn" type="submit">Spočítať rozpis</button>
@@ -257,7 +257,11 @@
 		{#each v.nonzero as o (o.kod)}
 			<div class="row" style="align-items:center;gap:12px">
 				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
-				<span style="flex:1">{o.kod} · {o.nazov}{v.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
+				<span style="flex:1"
+					><span class="mono">{o.kod}</span> · {o.nazov}{v.zmenene.includes(o.kod)
+						? ' ✏️'
+						: ''}</span
+				>
 				<b>{fmtM(o.qty)} m</b>
 			</div>
 		{/each}
