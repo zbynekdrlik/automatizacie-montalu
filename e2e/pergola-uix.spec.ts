@@ -203,10 +203,12 @@ test('prepínač režimov je dosiahnuteľný z /pergola/narez — CAD aj výkres
 	const rezimy = page.getByTestId('pergola-rezimy');
 	await expect(rezimy).toBeVisible();
 
-	// aktuálna stránka (Pergola z appky) je označená ako "tu si" a NIE JE odkaz
+	// aktuálna stránka (Pergola z appky) je označená iba VIZUÁLNE (rámik .active) a NIE JE
+	// odkaz — #398 odstránil redundantný popisok „tu si", aktívny stav nesie rámik + to, že
+	// karta nie je link (nemá CTA „Otvoriť")
 	const aktivny = page.getByTestId('link-narez');
 	await expect(aktivny).toHaveClass(/active/);
-	await expect(aktivny).toContainText('tu si');
+	await expect(aktivny).not.toContainText('Otvoriť');
 	expect(await aktivny.evaluate((el) => el.tagName)).toBe('DIV');
 
 	// formulár Pergoly z appky ostáva hneď pod prepínačom (nedotknutý)
@@ -240,10 +242,12 @@ test('prepínač režimov je dosiahnuteľný z /pergola/navrh — CAD aj rezerv�
 	const rezimy = page.getByTestId('pergola-rezimy');
 	await expect(rezimy).toBeVisible();
 
-	// aktuálna stránka (návrhový výkres) je označená ako "tu si" a NIE JE odkaz
+	// aktuálna stránka (návrhový výkres) je označená iba VIZUÁLNE (rámik .active) a NIE JE
+	// odkaz — #398 odstránil redundantný popisok „tu si", aktívny stav nesie rámik + to, že
+	// karta nie je link (nemá CTA „Otvoriť")
 	const aktivny = page.getByTestId('link-navrh');
 	await expect(aktivny).toHaveClass(/active/);
-	await expect(aktivny).toContainText('tu si');
+	await expect(aktivny).not.toContainText('Otvoriť');
 	expect(await aktivny.evaluate((el) => el.tagName)).toBe('DIV');
 
 	// formulár návrhového výkresu ostáva hneď pod prepínačom (nedotknutý)

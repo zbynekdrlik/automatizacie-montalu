@@ -35,6 +35,15 @@
 	// #223 — strešné sklo: geometria (pure, klientsky $derived); cena príde zo servera (form)
 	import { spocitajStrechaSklo } from '$lib/pergola-sklo';
 	import type { RucnaPolozka } from '$lib/pergola-rucne';
+	// #378 — „pergola s FIXom": odvodenie rozmerov FIXu z pergoly + geometria (pure,
+	// klientsky $derived; Money-neutrálne — FIX materiály nemajú Money karty)
+	import {
+		odvodFixZPergoly,
+		efektivnyFix,
+		spocitajFixZPergoly,
+		type FixZPergola
+	} from '$lib/pergola-fix';
+	import { rovnomernePolia, type FixTvar } from '$lib/fix';
 
 	let { data, form } = $props();
 
@@ -102,10 +111,26 @@
 	let strechaSkloTypS = $state('');
 	let strechaSkloS = $state('');
 	let obvodoveZasklenieS = $state('');
+	// #378 — „pergola s FIXom": bočné pevné zasklenie. Rozmery odvodené z pergoly
+	// (auto) s možnosťou override; DISPLAY-ONLY + Money-neutrálne (FIX materiály
+	// nemajú Money karty). Stav žije v rodičovi (round-trip), bind do RezForm.
+	let pergolaSFixomS = $state(false);
+	let fixAutoS = $state(true);
+	let fixSirkaS = $state<number | string>('');
+	let fixV1S = $state<number | string>('');
+	let fixV2S = $state<number | string>('');
+	let fixTvarS = $state<FixTvar>('sikmy');
+	let fixPocetPoliS = $state(1);
+	let fixZrkadloS = $state(false);
+	let fixSkloS = $state('');
+	let fixPoznamkaS = $state('');
 	// #221 — ident rezervácie (ZAK/OP/zákazník): bind + $state, aby prežili re-render
 	let zakS = $state('');
 	let opS = $state('');
 	let zakaznikS = $state('');
+
+	// number|string políčko → číslo (prázdny input = 0)
+	const cislo = (x: number | string) => (typeof x === 'number' ? x : parseFloat(String(x)) || 0);
 
 	// #234 — ručné („pometrané") položky: zdroj pravdy v rodičovi (serializuje sa do hidden
 	// JSON inputu, round-trip vzor PR #81; server ho prepočíta znova, nedôveruje klientovi).
@@ -145,6 +170,34 @@
 		// #234 — echo ručných riadkov z form (round-trip: prežijú „Späť a upraviť")
 		const rc = form && 'rucne' in form ? form.rucne : null;
 		rucneRiadky = Array.isArray(rc) ? (rc as RucnaPolozka[]) : [];
+		// #378 — echo FIXu z form (číta LEN form, nie vlastné *S — nova-stranka §3)
+		const fx = form && 'fix' in form ? (form.fix as FixZPergola | null) : null;
+		pergolaSFixomS = fx?.zapnuty ?? false;
+		fixAutoS = fx?.auto ?? true;
+		fixSirkaS = fx?.s || '';
+		fixV1S = fx?.v1 || '';
+		fixV2S = fx?.v2 || '';
+		fixTvarS = (fx?.tvar as FixTvar) ?? 'sikmy';
+		fixPocetPoliS = fx?.polia?.length || 1;
+		fixZrkadloS = fx?.zrkadlo ?? false;
+		fixSkloS = fx?.sklo ?? '';
+		fixPoznamkaS = fx?.poznamka ?? '';
+	});
+
+	// #378 — auto-odvodenie rozmerov FIXu z pergoly (keď je FIX zapnutý a `auto`).
+	// Číta rozmery pergoly + fixAuto/pergolaSFixom, zapisuje FIX rozmery — value-compare
+	// guard proti slučke (effect_update_depth_exceeded), vzor /fix `poliaS` efekt.
+	$effect(() => {
+		if (!pergolaSFixomS || !fixAutoS) return;
+		const o = odvodFixZPergoly({
+			hlbka: cislo(hlbkaS),
+			prednaSvetlost: cislo(prednaSvetlostS),
+			vyskaZadna: cislo(vyskaZadnaS)
+		});
+		if (cislo(fixSirkaS) !== o.s) fixSirkaS = o.s;
+		if (cislo(fixV1S) !== o.v1) fixV1S = o.v1;
+		if (cislo(fixV2S) !== o.v2) fixV2S = o.v2;
+		if (fixTvarS !== o.tvar) fixTvarS = o.tvar;
 	});
 
 	let vysledok = $derived(step === 'vysledok' ? spocitajNarez(vstup) : null);
@@ -159,6 +212,35 @@
 	let strechaSklo = $derived(step === 'vysledok' ? spocitajStrechaSklo(vstup) : null);
 	let strechaSkloCena = $derived(
 		form && 'strechaSkloCena' in form ? (form.strechaSkloCena ?? null) : null
+	);
+
+	// #378 — FIX: polia (rovnomerne z počtu), efektívny FIX (auto vs override) a geometria.
+	// Money-neutrálne — spocitajFixZPergoly vracia LEN výkres/chybu, nič do Money.
+	let fixPolia = $derived(pergolaSFixomS ? rovnomernePolia(cislo(fixSirkaS), fixPocetPoliS) : []);
+	let fixPoliaJSON = $derived(JSON.stringify(fixPolia));
+	let fixObj = $derived({
+		zapnuty: pergolaSFixomS,
+		auto: fixAutoS,
+		s: cislo(fixSirkaS),
+		v1: cislo(fixV1S),
+		v2: fixTvarS === 'rovny' ? cislo(fixV1S) : cislo(fixV2S),
+		tvar: fixTvarS,
+		polia: fixPolia,
+		zrkadlo: fixZrkadloS,
+		sklo: fixSkloS,
+		poznamka: fixPoznamkaS
+	} satisfies FixZPergola);
+	let fixEff = $derived(
+		efektivnyFix(fixObj, {
+			hlbka: cislo(hlbkaS),
+			prednaSvetlost: cislo(prednaSvetlostS),
+			vyskaZadna: cislo(vyskaZadnaS)
+		})
+	);
+	let fixVykresRes = $derived(
+		pergolaSFixomS && (step === 'vysledok' || step === 'rez-nahlad')
+			? spocitajFixZPergoly(fixEff)
+			: { vykres: null, error: null }
 	);
 
 	// #222 — stavové zhrnutie na prvý pohľad. Split je PRESNE ten, čo používa
@@ -216,6 +298,17 @@
 		/>{/if}
 	<!-- #234 — ručné položky ako JSON (round-trip cez celý tok, vzor PR #81) -->
 	<input type="hidden" name="rucnePolozky" value={JSON.stringify(rucneRiadky)} />
+	<!-- #378 — FIX (round-trip cez vysledok→rez-nahlad→hotovo) -->
+	{#if pergolaSFixomS}<input type="hidden" name="pergolaSFixom" value="1" />{/if}
+	<input type="hidden" name="fixAuto" value={fixAutoS ? '1' : '0'} />
+	<input type="hidden" name="fixTvar" value={fixTvarS} />
+	<input type="hidden" name="fixSirka" value={fixSirkaS} />
+	<input type="hidden" name="fixV1" value={fixV1S} />
+	<input type="hidden" name="fixV2" value={fixV2S} />
+	<input type="hidden" name="fixPolia" value={fixPoliaJSON} />
+	{#if fixZrkadloS}<input type="hidden" name="fixZrkadlo" value="1" />{/if}
+	<input type="hidden" name="fixSklo" value={fixSkloS} />
+	<input type="hidden" name="fixPoznamka" value={fixPoznamkaS} />
 {/snippet}
 
 {#snippet hiddenIdent()}
@@ -253,6 +346,17 @@
 		bind:strechaSkloTypS
 		bind:strechaSkloS
 		bind:obvodoveZasklenieS
+		{fixPoliaJSON}
+		bind:pergolaSFixomS
+		bind:fixAutoS
+		bind:fixSirkaS
+		bind:fixV1S
+		bind:fixV2S
+		bind:fixTvarS
+		bind:fixPocetPoliS
+		bind:fixZrkadloS
+		bind:fixSkloS
+		bind:fixPoznamkaS
 	/>
 {:else if step === 'vysledok' && vysledok}
 	<RezVysledok
@@ -266,6 +370,9 @@
 		{cakaCount}
 		{cakaDlzkaCount}
 		{cakaPravidloCount}
+		fix={fixEff}
+		fixVykres={fixVykresRes.vykres}
+		fixError={fixVykresRes.error}
 		datumIso={data.datumIso}
 		live={data.live}
 	/>
@@ -319,6 +426,9 @@
 		{ident}
 		rezError={rezError ?? null}
 		live={data.live}
+		fix={fixEff}
+		fixVykres={fixVykresRes.vykres}
+		fixError={fixVykresRes.error}
 		{hidden}
 		{hiddenIdent}
 	/>

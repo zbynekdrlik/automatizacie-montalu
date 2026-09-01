@@ -530,3 +530,34 @@ bez potvrdeného Money kódu:
 - **#233 žargón-sken MUSÍ pokryť aj krok `rez-nahlad`** (nie len `spocitat` výsledok) — nové
   user-visible stringy tesnení sa renderujú tam. `pergola-uix.spec.ts` sken doťahaj cez
   `pripravit-rezervaciu` (ČÍTACIE, žiadny zápis).
+
+## Pergola s FIXom (#378) — bočné pevné zasklenie ako DISPLAY-ONLY vrstva na Pergole z appky
+
+Checkbox „Pergola s FIXom" na `/pergola/narez` rozbalí FIX sekciu (RezForm); rozmery FIXu sa
+odvodia z pergoly (`odvodFixZPergoly`: šírka=hĺbka, výška vpredu=predná svetlosť, výška
+vzadu=ZV) automaticky s override. Výpočet cez existujúce `pocitajFix` (read-only re-use),
+kresba cez `FixVykres2D`. **FIX je DISPLAY-ONLY + Money-HONEST-NULL** — FIX materiály (Cortizo
+COR-60 CE + sklo) nemajú Money karty, takže FIX NEVSTUPUJE do `buildRezervaciaRozpis`/`writeOdpis`
+(pure modul `src/lib/pergola-fix.ts` v `CISTY_ENGINE`; obojsmerná zámka: reverse import guard +
+`@ts-expect-error FixZPergola ≠ Polozka`). Money kódy sú follow-up gated na Dominika (vzor
+tesnenia #339 / strešné sklo #223).
+
+Gotchy (review #378), ktoré stáli čas:
+
+- **`disabled` `<select name="fixTvar">` v auto móde NEODOŠLE hodnotu** — tvar zachraňuje
+  `efektivnyFix`, ktorý ho pri `auto` re-odvodí z výšok. Ak meníš auto/override logiku, over,
+  že tvar nezmizne (readonly inputy ODOŠLÚ, disabled select NIE).
+- **`#fixPocetPoli` zámerne NEMÁ `name`** — počet polí cestuje cez `fixPolia` JSON (jeho dĺžka),
+  nie ako samostatné pole. `fixPolia`/`fixAuto` hidden inputy existujú len vnútri `{#if pergolaSFixomS}`.
+- **Klient re-derivuje FIX pre display (`fixEff`), server má vlastný `form.fix`** — musia sa
+  zhodnúť. ZV (`vyskaZadna`) sa preto zobrazí (`required`) VŽDY keď je FIX zapnutý (podmienka
+  `… || pergolaSFixomS`), inak v konfigurácii stena+jednoducha (ZV skryté → 0) server=0 (trojuholník)
+  vs klient=2900 (reset effect `|| 2900`) divergovali. Bočný 110×43 ostáva gated `zasklena`, takže
+  zobrazenie ZV pri jednoduchej pergole NEZMENÍ pergola materiál.
+- **FIX tabuľka (RezVysledok) MUSÍ čísluvať polia ako výkres `FixVykres2D`** — od VYŠŠEJ strany
+  (`V1≥V2 ? i+1 : n−i`), nie vždy zľava; auto-odvodený FIX má V1(predná 2200) < V2(ZV 2900), takže
+  pri ≥2 poliach by číslovanie zľava protirečilo výkresu (dielňa reže podľa výkresu).
+- **Nový carried-through checkbox potrebuje `id=` ak ho E2E cieli cez `#id`** (`fixZrkadlo` ho
+  najprv nemal → round-trip test padol na `.check()`).
+- **Round-trip E2E je POVINNÝ** (ROUND-TRIP PASCA vyššie): override → Spočítať → „Späť a upraviť"
+  → všetkých 10 FIX polí obnovených; `fix` sa echuje v KAŽDEJ z 12 return vetiev servera.
