@@ -3,7 +3,15 @@
 // založil účet a dostal orezanú rolu. Každý test vyžaduje NULA console
 // errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, E2E_USER } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	E2E_USER,
+	openUserMenu,
+	logout
+} from './helpers';
 
 test('vytvorenie účtu s rolou Interný, plný prístup, zmena roly späť na B2B cez UI + zmazanie', async ({
 	page
@@ -31,18 +39,17 @@ test('vytvorenie účtu s rolou Interný, plný prístup, zmena roly späť na B
 	await expect(page.locator('tr', { hasText: novyUser })).toContainText('Interný');
 
 	// 2. nový účet sa prihlási a má PLNÝ (interný) prístup — nie len Zasklenia
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page, novyUser, novyPass);
 	await expect(page.getByRole('link', { name: 'Zasklenia' })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Pergola' })).toBeVisible();
+	await openUserMenu(page); // #392: Používatelia je v user menu
 	await expect(page.getByRole('link', { name: 'Používatelia' })).toBeVisible();
 	await goto(page, '/pouzivatelia');
 	await expect(page).toHaveURL(/\/pouzivatelia/); // nepresmerovaný preč (na rozdiel od b2b)
 
 	// 3. späť ako pôvodný interný — zmena roly nového účtu na B2B cez UI (select + Zmeniť + confirm)
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 	const row = page.locator('tr', { hasText: novyUser });

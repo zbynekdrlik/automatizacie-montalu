@@ -7,7 +7,7 @@
 // „Žlab 110" (známy katalógový kód pre ručný riadok). Nula console errors všade.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { collectConsole, loginAs, goto, waitHydrated } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated, logout } from './helpers';
 
 const RUN = `PC-${Date.now().toString(36).toUpperCase()}`;
 
@@ -156,8 +156,7 @@ test('b2b: /pergola/narez je presmerovaná preč — cenový blok b2b nikdy neuv
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);
 
 	// priamy prístup na /pergola/narez presmeruje na /zasklenia (celý /pergola prefix
@@ -167,8 +166,7 @@ test('b2b: /pergola/narez je presmerovaná preč — cenový blok b2b nikdy neuv
 	await expect(page.getByTestId('ceny-tabulka')).toHaveCount(0);
 
 	// upratanie
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 	await page.locator('tr', { hasText: b2bUser }).getByRole('button', { name: 'Zmazať' }).click();

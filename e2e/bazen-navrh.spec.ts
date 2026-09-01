@@ -2,7 +2,7 @@
 // pergoly #138/#144/#150/#153 a zaskleniam #162). Všetko ČÍTACIE — modul do
 // Money nič nezapisuje, takže sa dá pustiť aj proti nasadenej appke (BASE_URL).
 import { test, expect, type Page } from '@playwright/test';
-import { goto, loginAs, collectConsole, waitHydrated } from './helpers';
+import { goto, loginAs, collectConsole, waitHydrated, logout } from './helpers';
 
 /** Rovnaká rekurzívna @page-detekcia ako v pergola-navrh.spec.ts/zasklenia-navrh.spec.ts
  *  (#137) — @page je vnorený v @media print bloku, plochý prechod cssRules ho nenájde. */
@@ -292,8 +292,7 @@ test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/z
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);
 
 	await expect(page).toHaveURL(/\/zasklenia$/);
@@ -306,8 +305,7 @@ test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/z
 	await expect(page).toHaveURL(/\/zasklenia$/);
 
 	// upratanie
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 	await page.locator('tr', { hasText: b2bUser }).getByRole('button', { name: 'Zmazať' }).click();

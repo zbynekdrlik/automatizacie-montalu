@@ -2,7 +2,7 @@
 // #138/#144/#150/#153). Všetko ČÍTACIE — modul do Money nič nezapisuje, takže sa
 // dá pustiť aj proti nasadenej appke (BASE_URL).
 import { test, expect, type Page } from '@playwright/test';
-import { goto, loginAs, collectConsole, waitHydrated } from './helpers';
+import { goto, loginAs, collectConsole, waitHydrated, logout } from './helpers';
 
 /** Rovnaká rekurzívna @page-detekcia ako v navrh-vykres.spec.ts/pergola-navrh.spec.ts
  *  (#137) — @page je vnorený v @media print bloku, plochý prechod cssRules ho nenájde. */
@@ -325,8 +325,7 @@ test('b2b: odkaz "→ Návrhový výkres" na /zasklenia, otvorenie a vykreslenie
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);
 
 	await expect(page).toHaveURL(/\/zasklenia$/);
@@ -351,8 +350,7 @@ test('b2b: odkaz "→ Návrhový výkres" na /zasklenia, otvorenie a vykreslenie
 	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
 
 	// upratanie
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 	await page.locator('tr', { hasText: b2bUser }).getByRole('button', { name: 'Zmazať' }).click();

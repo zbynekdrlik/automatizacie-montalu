@@ -15,8 +15,12 @@ až v `npm run build`.
 `src/lib/server/b2b-access.ts` je denylist (nie allowlist — viď `access-control`).
 Drift guard `tests/b2b-route-coverage.test.ts` enumeruje adresáre s `+page.server.ts`
 a padne, kým novú route nepridáš. To je zámer: nová stránka je pre b2b zakázaná, kým
-sa vedome nerozhodne inak. Nezabudni ani na odkaz v `src/routes/+layout.svelte`
-(interné `links`, prípadne aj b2b `links`, ak má stránku vidieť).
+sa vedome nerozhodne inak. Nezabudni ani na odkaz v `src/routes/+layout.svelte` —
+od #392 už nie je jeden plochý `links` zoznam, ale tri polia: `moduleLinks`
+(primárna skupina „Moduly", oba roly — má tam ísť VÄČŠINA nových výpočtových
+modulov), `toolLinks` (sekundárna „Nástroje", len interní) a samostatný
+natvrdo-zapísaný odkaz „Používatelia" v user menu (len admin). Pridaj novú route do
+toho poľa, ktoré sedí (a do OBOCH vetiev `moduleLinks`, ak má stránku vidieť aj b2b).
 
 **Keď b2b MÁ stránku vidieť** (napr. `/sietka`, #89 — Patrik: „hlavne pre externých"),
 route sa jednoducho NEPRIDÁ do `B2B_FORBIDDEN_PREFIXES` — ale drift guard test to

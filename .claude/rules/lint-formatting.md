@@ -59,6 +59,20 @@ is `^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$`, which a bare-SHA fallback
   - `window.location.href = ...` assignments are NOT covered by this rule (it only
     checks `<a href>`, `goto()`, `pushState()`, `replaceState()`) — don't assume every
     navigation-shaped line needs `resolve()`.
+  - **A SHARED `{#snippet}` rendering several nav-link arrays MUST NOT type its param
+    as bare `RouteId`** (#392) — `RouteId` is the union of EVERY route in the app
+    (~24+ members), and `resolve()`'s overloaded per-literal signature fails
+    TypeScript's overload resolution against that full width (`svelte-check`: "Type
+    '[…every route…]' is not assignable to type '[route: "/last-checked-route"]'").
+    A `const links = $derived(cond ? A : B) satisfies {href: RouteId}[]` variable used
+    DIRECTLY in a template `{#each}` is fine (`satisfies` doesn't widen — TS keeps the
+    narrower per-branch literal union) — the trap is only in an EXTRACTED snippet/
+    function whose PARAMETER you annotate with the wide `RouteId` type yourself. Fix:
+    type the snippet param `typeof arrayA | typeof arrayB` (the exact `$derived`
+    variables), not `{ href: RouteId; label: string }[]` — keeps the narrow literal
+    union, `resolve()` typechecks. Same trap hit a standalone helper function
+    (`const isActive = (href: RouteId) => …`) — inline the comparison at each call
+    site instead, or generic-type the helper the same way.
 - `@typescript-eslint/no-explicit-any` is `error`, not `warn` — `npm run lint` has no
   `--max-warnings 0`, so a bare `warn` never fails CI (a warn-only rule with no
   `--max-warnings` gate is toothless). A genuine edge case (e.g. an untyped exceljs

@@ -8,7 +8,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
-import { goto, collectConsole, skipAkLive, loginAs } from './helpers';
+import { goto, collectConsole, skipAkLive, loginAs, logout } from './helpers';
 // #288 review 🔵: kanonický klasifikátor (Node kontext — helper beží mimo page.evaluate),
 // aby sa regresný guard nerozišiel s `SOFTVEROVY_RENDERER_RE` pri jej budúcej zmene.
 import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
@@ -251,9 +251,8 @@ test('konfigurátor: objednávka (VO/b2b) — prihlásený veľkoobchod vidí VO
 	const voPass = 'e2eheslo1';
 
 	const odhlas = async () => {
-		await goto(page, '/zasklenia'); // nav s Odhlásiť je na authed stránke, nie na verejnom /konfigurator
-		await page.getByRole('button', { name: 'Odhlásiť' }).click();
-		await expect(page).toHaveURL(/\/login/);
+		await goto(page, '/zasklenia'); // nav s user menu je na authed stránke, nie na verejnom /konfigurator
+		await logout(page);
 	};
 
 	// 1. interný vytvorí VO/b2b účet (rola defaultne B2B)
@@ -688,9 +687,8 @@ test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); inte
 		return Number(txt.replace(/[^\d,]/g, '').replace(',', '.'));
 	};
 	const odhlas = async () => {
-		await goto(page, '/zasklenia'); // nav s Odhlásiť je na authed stránke, nie na verejnom /konfigurator
-		await page.getByRole('button', { name: 'Odhlásiť' }).click();
-		await expect(page).toHaveURL(/\/login/);
+		await goto(page, '/zasklenia'); // nav s user menu je na authed stránke, nie na verejnom /konfigurator
+		await logout(page);
 	};
 
 	// 1. interný vytvorí VO/b2b účet (rola defaultne B2B)

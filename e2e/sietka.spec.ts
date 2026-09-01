@@ -13,7 +13,8 @@ import {
 	waitHydrated,
 	goto,
 	skipAkLive,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	logout
 } from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string, styl = '3K') {
@@ -281,8 +282,7 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);
 	await expect(page.getByRole('link', { name: 'Sieťka' })).toBeVisible();
 	await goto(page, '/sietka');
@@ -301,8 +301,7 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 	await expect(page.getByRole('button', { name: /Odoslať/ })).toHaveCount(0);
 
 	// upratanie
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 	await page.locator('tr', { hasText: b2bUser }).getByRole('button', { name: 'Zmazať' }).click();
