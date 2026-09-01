@@ -378,11 +378,23 @@ súbore, ktorý upravuješ. Fix: starý duplicitný in-page odkaz zmaž (nová z
 navigácia ho už plne nahrádza) — nikdy nepremenúvaj testid len aby kolízia zmizla (to
 by zase rozbilo test, ktorý ten pôvodný testid asertuje inde).
 
-**Card-wrap konzistencia:** ak hub stránka (`/pergola`) renderuje zdieľanú nav komponentu
-VNÚTRI vlastnej `.card`, subsránky (`/pergola/narez`, `/pergola/navrh`) ju wrapni do
-VLASTNEJ `.card` tiež (nie ako bare blok na pozadí stránky) — inak vznikne vizuálna
-nekonzistencia medzi hubom a subsránkami, ktorú `npm run lint`/`check` neodchytí (nájdené
-až v `/requesting-code-review` pass, #371).
+**Card-wrap konzistencia:** zdieľaná nav komponenta MUSÍ dostať VLASTNÚ `.card` na
+KAŽDEJ stránke, čo ju renderuje (nie ako bare blok na pozadí stránky) — inak vznikne
+vizuálna nekonzistencia, ktorú `npm run lint`/`check` neodchytí (nájdené až v
+`/requesting-code-review` pass, #371).
+
+**Poradie prepínač-vs-nadpis MUSÍ byť ROVNAKÉ na všetkých troch stránkach (#375) —
+prepínač VŽDY NAD nadpisom, vo VLASTNEJ `.card` pred nadpisovou `.card`.** #371 zaviedlo
+komponentu konzistentne na `/pergola/narez` aj `/pergola/navrh` (vlastná `.card` s
+prepínačom, potom vlastná `.card` s `<h1>`), ale hub (`/pergola`) pôvodne nechalo
+`<h1>Pergola</h1>` PRED prepínačom v TEJ ISTEJ karte — pri prepínaní režimov (hub ↔
+podstránka) sa preto nadpis vizuálne „preskočil" (raz hore, raz dole). #375 zjednotilo
+hub na rovnaký tvar (dve karty, prepínač prvý). E2E regresia
+(`e2e/pergola-uix.spec.ts`, test `#375 — prepínač … je na rovnakej pozícii voči
+nadpisu`) porovnáva SKUTOČNÚ vykreslenú `boundingBox().y` prepínača (`pergola-rezimy`)
+voči `getByRole('heading', {level: 1})` na všetkých troch cestách — pri PRIDÁVANÍ
+ĎALŠEJ pergola stránky s týmto prepínačom dodrž rovnaký tvar (prepínač-karta PRED
+nadpis-kartou), inak tento test padne.
 
 ## Post-deploy na LIVE — v ČISTOM prehliadači (Svelte hydration pasca)
 
