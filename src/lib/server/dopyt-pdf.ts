@@ -31,9 +31,11 @@ export async function regeneratePonukaPdf(id: number): Promise<RegenerovanePdf |
 	// → re-download reprodukuje cenu, ktorú zákazník reálne dostal. Neopečiatkovaný (starý) riadok
 	// → `null` → `generatePonukaPdf` prepočíta z cfg (honest-degrade, nezmenené správanie).
 	const cena = cenaZoStampu(row);
+	// #384: produkt-aware nadpis PDF (NULL u starých pergolových riadkov → 'Špecifikácia pergoly').
 	const bytes = await generatePonukaPdf(cfg, {
 		datum: formatDatumSk(iso),
-		cena: cena ?? undefined
+		cena: cena ?? undefined,
+		produkt: row.produkt
 	});
 	// dátum v názve = ROVNAKÝ kalendárny deň ako v pätičke (Europe/Bratislava), nie UTC slice
 	return { bytes, filename: `Montalu-ponuka-dopyt-${id}-${formatDatumIsoSk(iso)}.pdf` };

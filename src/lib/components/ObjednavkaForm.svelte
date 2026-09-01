@@ -9,16 +9,24 @@
 	import { HONEYPOT_FIELD, type ObjednavkaChyby, type ObjednavkaVstup } from '$lib/dopyt';
 	import { stiahniPdf } from '$lib/pdf-download';
 	import type { PonukaConfig } from '$lib/ponuka';
+	import type { KonfProduktKod } from '$lib/konfigurator-produkty';
 
 	interface Props {
 		/** aktuálna konfigurácia z konfigurátora — odošle sa ako skryté JSON pole */
 		konfiguracia: PonukaConfig;
+		/** #384: produktový rad — odošle sa ako skryté pole (produkt-aware PDF titul + názov leadu) */
+		produkt?: KonfProduktKod;
 		/** voliteľný 3D render (base64/data-URL) */
 		renderPngBase64?: string;
 		/** SvelteKit akcia, na ktorú sa POSTuje (route mountuje `objednavka`) */
 		action?: string;
 	}
-	let { konfiguracia, renderPngBase64 = '', action = '?/objednavka' }: Props = $props();
+	let {
+		konfiguracia,
+		produkt = 'pergola',
+		renderPngBase64 = '',
+		action = '?/objednavka'
+	}: Props = $props();
 
 	let odosielam = $state(false);
 	let hotovo = $state(false);
@@ -69,7 +77,8 @@
 			};
 		}}
 	>
-		<!-- skryté: konfigurácia + voliteľný render -->
+		<!-- skryté: produkt + konfigurácia + voliteľný render -->
+		<input type="hidden" name="produkt" value={produkt} />
 		<input type="hidden" name="konfiguracia" value={konfiguraciaJson} />
 		{#if renderPngBase64}
 			<input type="hidden" name="renderPng" value={renderPngBase64} />

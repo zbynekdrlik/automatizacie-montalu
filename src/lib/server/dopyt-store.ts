@@ -14,6 +14,8 @@ export interface DopytZaznam {
 	telefon: string;
 	miesto: string;
 	poznamka: string;
+	/** #384/v35 — produktový rad (kód katalógu `KONF_PRODUKTY`); NULL = starý pergolový dopyt. */
+	produkt?: string;
 }
 
 /** Uložený dopyt riadok + opečiatkovaná cena (#309, migrácia v30 — NULL = neopečiatkovaný). */
@@ -24,10 +26,10 @@ export interface DopytRiadok extends DopytZaznam, DopytCenaStlpce {
 
 // #309: cenové stĺpce (v30) sa vždy zapíšu — NULL keď dopyt neprišiel s pečiatkou (starý caller).
 const insertStmt = db.prepare(
-	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka,
+	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka, produkt,
 	                    cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m,
 	                    cena_sirka_grid_m, cena_model, cennik_verzia, cena_hladina)
-	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka,
+	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka, @produkt,
 	         @cena_druh, @cena_bez_dph, @cena_s_dph, @cena_hlbka_grid_m,
 	         @cena_sirka_grid_m, @cena_model, @cennik_verzia, @cena_hladina)`
 );
@@ -42,6 +44,7 @@ export function insertDopyt(z: DopytZaznam, stamp?: CenaStamp): number {
 		telefon: z.telefon,
 		miesto: z.miesto,
 		poznamka: z.poznamka,
+		produkt: z.produkt ?? null,
 		...stampNaStlpce(stamp)
 	});
 	return Number(info.lastInsertRowid);
@@ -60,11 +63,11 @@ export interface ObjednavkaZaznam extends DopytZaznam {
 }
 
 const insertObjStmt = db.prepare(
-	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka,
+	`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka, produkt,
 	                    je_objednavka, fakt_meno, fakt_adresa, fakt_ico, fakt_dic, suhlas_podmienky,
 	                    cena_druh, cena_bez_dph, cena_s_dph, cena_hlbka_grid_m,
 	                    cena_sirka_grid_m, cena_model, cennik_verzia, cena_hladina)
-	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka,
+	 VALUES (@konfiguracia, @meno, @email, @telefon, @miesto, @poznamka, @produkt,
 	         1, @fakt_meno, @fakt_adresa, @fakt_ico, @fakt_dic, 1,
 	         @cena_druh, @cena_bez_dph, @cena_s_dph, @cena_hlbka_grid_m,
 	         @cena_sirka_grid_m, @cena_model, @cennik_verzia, @cena_hladina)`
@@ -81,6 +84,7 @@ export function insertObjednavka(z: ObjednavkaZaznam, stamp?: CenaStamp): number
 		telefon: z.telefon,
 		miesto: z.miesto,
 		poznamka: z.poznamka,
+		produkt: z.produkt ?? null,
 		fakt_meno: z.faktMeno,
 		fakt_adresa: z.faktAdresa,
 		fakt_ico: z.faktIco,
@@ -99,7 +103,7 @@ const cenaStlpce =
 export function getDopyt(id: number): DopytRiadok | undefined {
 	return db
 		.prepare(
-			`SELECT id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, ${cenaStlpce}
+			`SELECT id, konfiguracia, meno, email, telefon, miesto, poznamka, produkt, created_at, ${cenaStlpce}
 			 FROM dopyt WHERE id = ?`
 		)
 		.get(id) as DopytRiadok | undefined;
@@ -136,10 +140,13 @@ export interface DopytLeadRiadok {
 	fakt_adresa: string | null;
 	fakt_ico: string | null;
 	fakt_dic: string | null;
+	// #384/v35 — produktový rad (kód katalógu); NULL = starý pergolový dopyt. Názov leadu je podľa
+	// neho produkt-aware („Bazénové zastrešenie – dopyt: …" vs „Pergola – dopyt: …").
+	produkt: string | null;
 }
 
 const leadSelectCols =
-	'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, odoo_lead_id, odoo_attempts, odoo_last_error, je_objednavka, fakt_meno, fakt_adresa, fakt_ico, fakt_dic';
+	'id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, odoo_lead_id, odoo_attempts, odoo_last_error, je_objednavka, fakt_meno, fakt_adresa, fakt_ico, fakt_dic, produkt';
 
 /** Načíta jeden dopyt na tvorbu Odoo leadu (kontakt + konfigurácia + počet pokusov). */
 export function getDopytForLead(id: number): DopytLeadRiadok | undefined {
@@ -204,6 +211,13 @@ export function hasObjednavkaColumn(): boolean {
 	return cols.some((c) => c.name === 'je_objednavka');
 }
 
+/** Má tabuľka `dopyt` stĺpec `produkt`? (#384 ho pridá v migrácii v35.) Feature-detect na SCHÉME —
+ *  interný zoznam tak vie zobraziť produktový rad nezávisle od toho, či #384 landol. */
+export function hasProduktColumn(): boolean {
+	const cols = db.prepare('PRAGMA table_info(dopyt)').all() as { name: string }[];
+	return cols.some((c) => c.name === 'produkt');
+}
+
 /** Stránka dopytov, NAJNOVŠIE HORE (`id DESC` = monotónne, bez `created_at` remíz). `offset`/
  *  `limit` sa clampujú (obrana proti nezmyselnému vstupu z query). Ak schéma má `odoo_lead_id`
  *  (#278/v26), SELECT ho zahrnie a riadok ho nesie; inak kľúč chýba (defenzívne). `hasOdoo`
@@ -212,16 +226,18 @@ export function listDopyty(
 	offset: number,
 	limit: number,
 	hasOdoo: boolean = hasOdooLeadColumn(),
-	hasObj: boolean = hasObjednavkaColumn()
+	hasObj: boolean = hasObjednavkaColumn(),
+	hasProd: boolean = hasProduktColumn()
 ): DopytListRiadok[] {
 	const off = Math.max(0, Math.trunc(offset));
 	const lim = Math.max(1, Math.trunc(limit));
 	// #309: cenové stĺpce (v30) sú vždy súčasťou zoznamu (opečiatkovaná cena v admin prehľade);
-	// `odoo_lead_id` (v26) a `je_objednavka` (#319/v33) sa pridajú len keď schéma stĺpec má
-	// (feature-detect, defenzívne — nezávisle od toho, ktorá migrácia už landla).
+	// `odoo_lead_id` (v26), `je_objednavka` (#319/v33) a `produkt` (#384/v35) sa pridajú len keď
+	// schéma stĺpec má (feature-detect, defenzívne — nezávisle od toho, ktorá migrácia už landla).
 	let cols = `id, konfiguracia, meno, email, telefon, miesto, poznamka, created_at, ${cenaStlpce}`;
 	if (hasOdoo) cols += ', odoo_lead_id';
 	if (hasObj) cols += ', je_objednavka';
+	if (hasProd) cols += ', produkt';
 	return db
 		.prepare(`SELECT ${cols} FROM dopyt ORDER BY id DESC LIMIT ? OFFSET ?`)
 		.all(lim, off) as DopytListRiadok[];

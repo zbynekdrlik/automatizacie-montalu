@@ -20,6 +20,7 @@ import {
 	type PonukaConfig
 } from '$lib/ponuka';
 import { cenaZCfg } from './dopyt-cena-stamp';
+import { produktPdfNadpis } from '$lib/konfigurator-produkty';
 import { formatDatumSk } from '$lib/datum';
 // PREDAJNÁ cena. Neopečiatkovaný fallback (`cenaZCfg`, MO default) žije v `dopyt-cena-stamp.ts` —
 // zdieľané so stampovaním (#309); oba server-only, do klienta sa nedostanú. Opečiatkovanú cenu
@@ -100,7 +101,7 @@ function drawMark(ctx: Ctx, x: number, topY: number, scale: number, color: RGB):
 	ctx.page.drawSvgPath(path, { x, y: topY, scale, color });
 }
 
-function drawHeader(ctx: Ctx, cursorTop: number): number {
+function drawHeader(ctx: Ctx, cursorTop: number, nadpis: string): number {
 	const markScale = 1.5; // 24*1.5 = 36 pt vysoká značka
 	drawMark(ctx, MARGIN, cursorTop, markScale, INK);
 	const wordX = MARGIN + 24 * markScale + 10;
@@ -126,8 +127,8 @@ function drawHeader(ctx: Ctx, cursorTop: number): number {
 		thickness: 2,
 		color: ACCENT
 	});
-	// nadpis dokumentu
-	ctx.page.drawText('Špecifikácia pergoly', {
+	// nadpis dokumentu — #384: produkt-aware („Špecifikácia pergoly" / „… bazénového zastrešenia" …)
+	ctx.page.drawText(nadpis, {
 		x: MARGIN,
 		y: ruleY - 26,
 		size: 18,
@@ -299,6 +300,9 @@ export interface PonukaPdfOpts {
 	 *  NAMIESTO prepočtu zo živej matice — tak re-download reprodukuje cenu (a hladinu) platnú pri
 	 *  podaní. `undefined` → prepočet z cfg (`cenaZCfg`, MO) pre neopečiatkované (staré) riadky. */
 	cena?: VerejnaCena;
+	/** #384: produktový rad (kód katalógu) — robí nadpis špecifikácie produkt-aware. Neznámy/NULL
+	 *  → 'Špecifikácia pergoly' (byte-identické so správaním pred #384 pre pergolu a staré riadky). */
+	produkt?: string | null;
 }
 
 /**
@@ -325,8 +329,10 @@ export async function generatePonukaPdf(
 	// prepočtom zo živej matice — tak re-download reprodukuje cenu (a hladinu) platnú pri podaní. Bez
 	// stampu (staré/neopečiatkované) → prepočet z cfg (`null` keď rozmery chýbajú, honest-degrade).
 	const cena = opts.cena ?? cenaZCfg(cfg);
+	// #384: nadpis dokumentu podľa produktu (fallback 'Špecifikácia pergoly' pre NULL/neznámy).
+	const nadpis = produktPdfNadpis(opts.produkt);
 	let cursor = A4_H - MARGIN;
-	cursor = drawHeader(ctx, cursor);
+	cursor = drawHeader(ctx, cursor, nadpis);
 	cursor = drawKonfiguracia(ctx, cfg, cursor);
 	if (cena) cursor = drawCena(ctx, cena, cfg, cursor);
 	cursor = await drawRenderSlot(doc, ctx, opts.renderPng, cursor);
@@ -336,7 +342,7 @@ export async function generatePonukaPdf(
 	// metadáta = testovateľný kanál hodnôt + korektné vlastnosti dokumentu
 	const rows = zhrnutieRiadky(cfg);
 	const cenaMeta = cena ? cenaRiadky(cena, cfg) : null;
-	doc.setTitle('Špecifikácia pergoly — Montalu');
+	doc.setTitle(`${nadpis} — Montalu`);
 	doc.setAuthor(FIRMA.nazov);
 	doc.setCreator(FIRMA.nazov);
 	doc.setProducer('Montalu automatizácie — nezáväzná špecifikácia s orientačnou cenou');

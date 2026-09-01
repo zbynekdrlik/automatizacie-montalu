@@ -34,7 +34,7 @@
 	</main>
 
 	<footer class="konf-pata">
-		<span class="konf-pata-znacka">MONTALU — hliníkové pergoly na mieru</span>
+		<span class="konf-pata-znacka">MONTALU — hliníkové výrobky na mieru</span>
 		<span class="konf-pata-verzia" data-testid="version">v{data.version}</span>
 	</footer>
 </div>

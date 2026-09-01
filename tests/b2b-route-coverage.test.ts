@@ -58,7 +58,10 @@ const ALLOWED = new Set([
 	'/pergola/navrh',
 	'/zasklenia/navrh',
 	'/zasklenia/navrh/zakaznicky',
+	// #384: verejný konfigurátor — root `/konfigurator` je výberová obrazovka (bez +page.server.ts →
+	// nie je write-bearing, ale ostáva verejná a nepresmerovaná), pergola sa presunula na podstránku.
 	'/konfigurator',
+	'/konfigurator/pergola',
 	'/login',
 	'/logout',
 	'/health'
@@ -97,7 +100,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/bazen',
 				'/bazen/navrh',
 				'/clip',
-				'/konfigurator',
+				'/konfigurator/pergola',
 				'/odpisy',
 				'/pergola',
 				'/pergola/navrh',
@@ -145,8 +148,12 @@ describe('b2b route coverage (denylist drift guard)', () => {
 		expect(b2bRedirectTarget('/zasklenia/navrh/zakaznicky')).toBeNull();
 	});
 
-	it('#275: /konfigurator (verejný zákaznícky konfigurátor pergoly) nie je presmerovaný', () => {
+	it('#275: /konfigurator (verejná výberová obrazovka konfigurátora) nie je presmerovaná', () => {
 		expect(b2bRedirectTarget('/konfigurator')).toBeNull();
+	});
+
+	it('#384: /konfigurator/pergola (verejný konfigurátor pergoly, presunutý pod podstránku) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/pergola')).toBeNull();
 	});
 
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
@@ -234,9 +241,11 @@ describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', 
 // VEREJNÁ route (bez auth), takže „žiadna cesta k MONEY odpisu" je tu ešte kritickejšie —
 // tento test stráži, že sa NEPRIDÁ žiadna ĎALŠIA (napr. omylom skopírovaná Money-zápisová)
 // akcia. Pridanie akejkoľvek inej akcie tento test ROZBIJE (fail-closed).
-describe('/konfigurator — žiadna cesta k Money odpisu (#275/#277/#319)', () => {
+describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319/#384)', () => {
 	it('akcie routy sú presne dopyt + objednavka + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/+page.server');
+		// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`; root
+		// `/konfigurator` je výberová obrazovka (bez akcií). Množina akcií ostáva presne tá istá.
+		const { actions } = await import('../src/routes/konfigurator/pergola/+page.server');
 		// `vypocet` = kalkulačka súhrnu; `dopyt` = verejný formulár → PDF ponuka BEZ CIEN;
 		// `objednavka` (#319) = záväzná objednávka → uloženie (je_objednavka=1) + Odoo opportunity.
 		// Všetky pomenované (SvelteKit nedovolí default + pomenované naraz), všetky Money-neutrálne

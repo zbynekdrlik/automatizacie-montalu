@@ -3,11 +3,12 @@ paths:
   - 'src/routes/konfigurator/**'
   - 'src/lib/konfigurator.ts'
   - 'src/lib/konfigurator-sklo.ts'
+  - 'src/lib/konfigurator-produkty.ts'
   - 'src/lib/components/konfigurator/**'
   - 'src/lib/server/konfigurator-vstup.ts'
   - 'src/lib/server/public-throttle.ts'
   - 'tests/konfigurator*.test.ts'
-  - 'e2e/konfigurator.spec.ts'
+  - 'e2e/konfigurator*.spec.ts'
 ---
 
 # Verejný zákaznícky konfigurátor pergoly (`/konfigurator`, #275, tracking #280)

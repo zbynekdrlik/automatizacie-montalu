@@ -174,6 +174,11 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// pre hex swatchov); guard (A) MUSÍ prejsť aj jeho graf, aby budúci Money/katalóg
 			// import nezostal nezachytený.
 			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfOvladace.svelte'),
+			// #384: nový klientsky vstup výberovej obrazovky (root `/konfigurator/+page.svelte`
+			// importuje `KonfVyber`, ten číta client-safe katalóg `konfigurator-produkty`) — guard (A)
+			// MUSÍ prejsť ich graf, inak by ich prípadný budúci Money/katalóg import nezachytil.
+			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfVyber.svelte'),
+			path.join(SRC, 'lib', 'konfigurator-produkty.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -191,7 +196,9 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 // Serverové súbory routy SMÚ importovať katalóg sklo-strecha (na názvy), ale NESMÚ sa
 // dotknúť moneyKod, ani sa viazať na Money zapisovač / cenu / nárez / DB / odpisovú cestu.
 const SERVEROVE_ROUTY = [
-	'src/routes/konfigurator/+page.server.ts',
+	// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`; root
+	// `/konfigurator` je výberová obrazovka (bez +page.server.ts).
+	'src/routes/konfigurator/pergola/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];
@@ -223,7 +230,8 @@ describe('Money safety (B) — serverové súbory routy sa neviažu na Money/cen
 // (C) RUNTIME guard — reálny výstup load() aj akcie
 // --------------------------------------------------------------------------- //
 
-const { load, actions } = await import('../src/routes/konfigurator/+page.server');
+// #384: runtime load/akcia žijú na pergolovej podstránke (root `/konfigurator` = výberová obrazovka).
+const { load, actions } = await import('../src/routes/konfigurator/pergola/+page.server');
 
 // #279 Fáza C — leak-guard REDEFINÍCIA. Owner ROZHODNUTÉ (issuecomment-5396941067, 2026-08-24:
 // „vychádzať z aktuálneho konfigurátora … ceny — montalu.sk/konfigurator") POVOLIL zobraziť

@@ -294,3 +294,23 @@ export function migrateOdooZakazkaPush(db: Database.Database, bump: (v: number) 
 		bump(34);
 	})();
 }
+
+/**
+ * v34 → v35 (#384): stĺpec `produkt` na tabuľke `dopyt` — jednotný verejný konfigurátor ukladá ku
+ * každému dopytu/objednávke produktový rad (kód katalógu `KONF_PRODUKTY`; NULL = starý pergolový
+ * dopyt). Robí PDF titul + názov Odoo leadu produkt-aware a interný zoznam produkt-zobraziteľný.
+ * Additívne + idempotentné (ADD COLUMN TEXT, NULL default). Feature-detect existencie `dopyt`
+ * (minimálne migračné fixtures skáču za v25 bez `dopyt` tabuľky) — vzor `migrateDopytCenaHladina`.
+ */
+export function migrateDopytProdukt(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 35) return;
+	const maDopyt =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dopyt'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maDopyt) {
+			db.exec('ALTER TABLE dopyt ADD COLUMN produkt TEXT;');
+		}
+		bump(35);
+	})();
+}
