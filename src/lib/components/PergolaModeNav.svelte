@@ -68,4 +68,3 @@
 		'link-navrh'
 	)}
 </div>
-<!-- .mode-* štýly zdieľané v src/app.css (#394) -->

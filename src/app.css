@@ -18,6 +18,11 @@
 	--m-ink-2: #1b1e23;
 	--m-ink-2-hover: #2c3037;
 	--m-muted: #6b7078;
+	/* text-safe muted (#376 stage 2 review) — --m-muted is 4.29:1 on --m-accent-soft
+	   and 4.49:1 on --m-surface-2, below WCAG AA 4.5:1 for the mode-card description/
+	   foot TEXT; --m-muted-ink (~5.7:1 on accent-soft, 6.6:1 on white) is the text-safe
+	   variant — same non-text/text split as --m-accent/--m-accent-ink */
+	--m-muted-ink: #585d65;
 	--m-accent: #b07a45;
 	/* text-safe bronze (review finding #5, #376) — --m-accent itself is 3.67:1 on
 	   white, below WCAG AA 4.5:1 for normal-weight small text; use --m-accent for
@@ -257,8 +262,11 @@ select:focus {
 }
 /* #376 stage 2 — checkbox afordancia: natívny checkbox berie globálne
    `input { width: 100% }` (nechcené roztiahnutie) — vrátiť na auto + bronzové
-   zaškrtnutie (accent-color) naprieč celou appkou, žiadny inline `width:auto`. */
-input[type='checkbox'] {
+   zaškrtnutie (accent-color). Scoped na `.wrap` (interná appka) — bare
+   `input[type=checkbox]` by presakoval na /konfigurator consent checkbox
+   (`.suhlas input`, vlastný --k-* svet), presne tá leak-pasca, ktorú
+   redizajn.md dokumentuje pre každý globálny element selektor. */
+.wrap input[type='checkbox'] {
 	width: auto;
 	accent-color: var(--m-accent);
 }
@@ -494,7 +502,7 @@ a.mode-card:hover {
 }
 .mode-desc {
 	font-size: 14px;
-	color: var(--m-muted);
+	color: var(--m-muted-ink);
 	line-height: 1.4;
 }
 .mode-foot {
@@ -504,7 +512,7 @@ a.mode-card:hover {
 	color: var(--m-accent-ink);
 }
 .mode-card.active .mode-foot {
-	color: var(--m-muted);
+	color: var(--m-muted-ink);
 }
 /* #376 stage 1: header/nav re-skin — svetlý papier + blur (vzor konfigurátorovej
    hlavy), sticky, bronzové podčiarknutie na aktívnom odkaze. Emoji preč z Vzorce/

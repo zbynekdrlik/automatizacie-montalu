@@ -189,8 +189,8 @@
 			</div>
 
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:6px">
-					<input type="checkbox" bind:checked={klinZapnutyS} style="width:auto" />
+				<label class="opt">
+					<input type="checkbox" bind:checked={klinZapnutyS} />
 					Klín nad posuvom
 				</label>
 				{#if klinZapnutyS}

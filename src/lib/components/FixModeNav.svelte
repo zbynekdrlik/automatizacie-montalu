@@ -51,4 +51,3 @@
 		'fix-rezim-cad'
 	)}
 </div>
-<!-- .mode-* štýly zdieľané v src/app.css (#394) -->
