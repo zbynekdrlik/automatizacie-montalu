@@ -2,6 +2,7 @@
 // fix-vstup.test.ts.
 import { describe, it, expect } from 'vitest';
 import { parsePergolaNavrhVstup } from '../src/lib/server/pergola-navrh-vstup';
+import { vypocitajGeometriu } from '../src/lib/pergola-navrh';
 
 const fd = (o: Record<string, string>) => {
 	const f = new FormData();
@@ -136,6 +137,60 @@ describe('parsePergolaNavrhVstup', () => {
 			const { vstup, error } = parsePergolaNavrhVstup(fd(zaklad));
 			expect(error).toBeNull();
 			expect(vstup.ralKod).toBe('');
+		});
+	});
+
+	// #382 — golden OP260282: appka DOPOČÍTAVA sklon naivným trojuholníkom z výšok
+	// (9,6°), skutočný/CAD sklon (rovnaký, aký sa manuálne zadáva na /narez) je 6,1°.
+	// Cez FORM-parsing cestu (žiadny priamy typovaný literál `PergolaNavrhVstup` s
+	// `sklonStrechy` — to pole PRED fixom v type ešte NEEXISTUJE), preto TENTO súbor
+	// nikde nekonštruuje `PergolaNavrhVstup` priamo — vždy len cez `parsePergolaNavrhVstup`,
+	// ktoré vracia obyčajný JS objekt bez excess-property kontroly. Presnejšie (review
+	// nález #6, opravené): kľúčový RED/GREEN pár nižšie (dopočítaný vs manuálny sklon)
+	// číta LEN `g.sklonDeg` — ten kompiluje aj beží identicky pred aj po fixe. Dva ďalšie
+	// testy nižšie čítajú `vstup.sklonStrechy` späť — za behu (vitest/esbuild, bez
+	// plného typecheku) vrátia korektne `undefined` aj PRED pridaním poľa do rozhrania
+	// (JS objekt bez kľúča), takže RED/GREEN sa aj tu láme len na runtime asercii; `npm
+	// run check` (svelte-check) na TIETO DVA by pred fixom typovo padol (property
+	// neexistuje na type) — po fixe (GREEN, kde je táto správa) prechádza čisto (overené).
+	describe('#382 — sklonStrechy zjednocuje zdroj pravdy sklonu (golden OP260282)', () => {
+		const golden = {
+			polia: JSON.stringify([4990]),
+			hlbka: '3470',
+			vyskaVpredu: '2200',
+			vyskaPriStene: '2790',
+			panelPocet: '8',
+			op: 'OP260282'
+		};
+
+		it('bez manuálneho sklonu appka dopočíta ~9,6° (dokumentovaný, orientačný fallback — nezmenené)', () => {
+			const { vstup } = parsePergolaNavrhVstup(fd(golden));
+			const g = vypocitajGeometriu(vstup);
+			expect(g.sklonDeg).toBeCloseTo(9.65, 1);
+		});
+
+		it('s manuálnym sklonom 6,1° (rovnaký vstup ako /narez, z CAD) REZ A dopočíta 6,1°, nie 9,6°', () => {
+			const { vstup, error } = parsePergolaNavrhVstup(fd({ ...golden, sklonStrechy: '6.1' }));
+			expect(error).toBeNull();
+			const g = vypocitajGeometriu(vstup);
+			expect(g.sklonDeg).toBeCloseTo(6.1, 5);
+		});
+
+		it('desatinná čiarka v sklonStrechy prejde (rovnaká disciplína ako ostatné číselné polia)', () => {
+			const { vstup } = parsePergolaNavrhVstup(fd({ ...golden, sklonStrechy: '6,1' }));
+			expect(vstup.sklonStrechy).toBe(6.1);
+		});
+
+		it('prázdny sklonStrechy = undefined (nepoužije sa, dopočíta sa fallback)', () => {
+			const { vstup } = parsePergolaNavrhVstup(fd(golden));
+			expect(vstup.sklonStrechy).toBeUndefined();
+		});
+
+		it('sklonStrechy mimo rozsahu (0,60] = chyba', () => {
+			const { error } = parsePergolaNavrhVstup(fd({ ...golden, sklonStrechy: '0' }));
+			expect(error).toMatch(/sklon/i);
+			const { error: error2 } = parsePergolaNavrhVstup(fd({ ...golden, sklonStrechy: '61' }));
+			expect(error2).toMatch(/sklon/i);
 		});
 	});
 });

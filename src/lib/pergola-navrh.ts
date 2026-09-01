@@ -75,6 +75,14 @@ export const VYSKA_MIN = 1500;
 export const VYSKA_MAX = 4500;
 export const PANEL_POCET_MIN = 1;
 export const PANEL_POCET_MAX = 30;
+/** #382 — dolná/horná hranica validácie voliteľného `sklonStrechy` (review nález #4:
+ *  predtým bola dolná hranica len `> 0`, takže napr. 0,05° by prešlo, hoci chybová
+ *  hláška aj HTML `min` sľubovali 0,1 — TERAZ je hranica JEDNA pomenovaná konštanta,
+ *  nie tri nezávislé miesta). `NAVRH_SKLON_MAX` zrkadlí `SKLON_MAX` v
+ *  `pergola-narez.ts` (rovnaký fyzický rozsah, nezávislý modul, žiadny cross-feature
+ *  import) — appka nikdy nepripustí 0° ani záporný sklon ako „potvrdený" vstup. */
+export const NAVRH_SKLON_MIN = 0.1;
+export const NAVRH_SKLON_MAX = 60;
 
 export type ZvodStrana = 'predna' | 'zadna';
 
@@ -93,6 +101,20 @@ export interface PergolaNavrhVstup {
 	vyskaVpredu: number;
 	/** výška pri stene (zadná, vyššia strana spádu) [mm] */
 	vyskaPriStene: number;
+	/** #382 — VOLITEĽNÝ manuálne zadaný/potvrdený sklon strechy [°], rovnaký
+	 *  koncept a meno ako `sklonStrechy` na `/pergola/narez` (z CAD výkresu).
+	 *  Keď je zadaný, JE jediným zdrojom pravdy pre `PergolaGeometria.sklonDeg`
+	 *  (nahrádza dopočítaný sklon z výšok nižšie) a REZ A z neho prepočíta aj
+	 *  nakreslenú výšku „pri stene" (viď `PergolaNavrhVykres.svelte`), aby
+	 *  kresba a popisok ostali navzájom konzistentné. Bez neho appka honestne
+	 *  padne na starý (dokumentovane orientačný) dopočet `vypocitajSklon` —
+	 *  vyskaVpredu/vyskaPriStene sú výšky K STĹPOM/STENE, nie skutočná horná
+	 *  hrana strechy (uloženie na kotviacom/žľabovom profile appka nikde
+	 *  nepozná ani nepotvrdila vzorcom — presne ten istý nepotvrdený vzťah,
+	 *  aký `pergola-krov.ts` už zdokumentovalo pri KROVOVOM uložení). Golden
+	 *  OP260282 (#382, audit #377): appka bez tohto poľa dopočíta ~9,6°,
+	 *  skutočný/CAD sklon (rovnaký ako na `/narez`) je 6,1°. */
+	sklonStrechy?: number;
 	/** počet panelov strešnej výplne */
 	panelPocet: number;
 	/** ručný prepis šírky panelu [mm] — inak dopočítané z celkovej šírky/počtu */
@@ -172,7 +194,10 @@ export function vypocitajGeometriu(v: PergolaNavrhVstup): PergolaGeometria {
 	return {
 		celkovaSirka,
 		postX,
-		sklonDeg: vypocitajSklon(v.vyskaVpredu, v.vyskaPriStene, v.hlbka),
+		// #382 — manuálne zadaný/potvrdený sklon (rovnaký zdroj ako /narez) je
+		// vždy autoritatívny; bez neho honestný (dokumentovane orientačný)
+		// dopočet z výšok, bit-identický so správaním pred #382.
+		sklonDeg: v.sklonStrechy ?? vypocitajSklon(v.vyskaVpredu, v.vyskaPriStene, v.hlbka),
 		svetlaVyska: Math.max(0, R1(v.vyskaVpredu - NOSNIK_HRUBKA_MM)),
 		panelSirka: v.panelSirkaOverride ?? defaultPanelSirka(celkovaSirka, v.panelPocet),
 		panelDlzka: v.panelDlzkaOverride ?? defaultPanelDlzka(v.hlbka)
@@ -272,6 +297,13 @@ export function chybaPergolaNavrhVstupu(v: PergolaNavrhVstup): string | null {
 		return 'Ručná šírka strešnej výplne musí byť kladné číslo.';
 	if (v.panelDlzkaOverride !== undefined && !(v.panelDlzkaOverride > 0))
 		return 'Ručná dĺžka strešnej výplne musí byť kladné číslo.';
+	// #382 (review nález #4) — voliteľný manuálny sklon; hranica JEDNOU konštantou
+	// (NAVRH_SKLON_MIN=0,1) namiesto skoršieho `> 0`, ktoré nesedelo s hláškou/HTML min.
+	if (
+		v.sklonStrechy !== undefined &&
+		!(v.sklonStrechy >= NAVRH_SKLON_MIN && v.sklonStrechy <= NAVRH_SKLON_MAX)
+	)
+		return `Sklon strechy musí byť 0,1–${NAVRH_SKLON_MAX}° (alebo prázdne).`;
 	const postCount = v.polia.length + 1;
 	if (v.zvody.some((z) => z.postIndex < 0 || z.postIndex >= postCount))
 		return 'Neplatná pozícia zvodu.';
