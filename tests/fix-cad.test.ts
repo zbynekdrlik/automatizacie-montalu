@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import ExcelJS from 'exceljs';
 
 // TEST režim + vlastný Money priečinok. `MONEY_TEST_DIR`/`MONEY_LIVE` MUSIA byť nastavené
 // PRED dynamickým importom route/money — vzor tests/clip-odpis.test.ts. DATABASE_PATH by
@@ -13,6 +14,7 @@ process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'export');
 fs.mkdirSync(process.env.MONEY_TEST_DIR, { recursive: true });
 
 const fixCad = await import('../src/lib/server/fix-cad');
+const cadOdpis = await import('../src/lib/server/cad-odpis');
 const route = await import('../src/routes/fix/cad/+page.server');
 const pergolaRoute = await import('../src/routes/pergola/+page.server');
 const { listOdpisy } = await import('../src/lib/server/money');
@@ -36,8 +38,8 @@ function ev(body: Record<string, string>) {
 }
 
 describe('fix-cad modul — čistý tok (bez DB)', () => {
-	it('fixCadView rozparsuje platný CAD nárez bez unresolved kódov', () => {
-		const { error, view } = fixCad.fixCadView({
+	it('cadOdpisView rozparsuje platný CAD nárez bez unresolved kódov', () => {
+		const { error, view } = cadOdpis.cadOdpisView({
 			zak: 'F1',
 			op: 'OP1',
 			zakaznik: 'Z',
@@ -50,7 +52,7 @@ describe('fix-cad modul — čistý tok (bez DB)', () => {
 	});
 
 	it('nenamapovaný CAD kód → TVRDÁ chyba (nikdy tichý výpadok materiálu)', () => {
-		const { error, view } = fixCad.fixCadView({
+		const { error, view } = cadOdpis.cadOdpisView({
 			zak: 'F1',
 			op: 'OP1',
 			zakaznik: 'Z',
@@ -62,7 +64,7 @@ describe('fix-cad modul — čistý tok (bez DB)', () => {
 	});
 
 	it('nezmyselný vstup (zlý formát riadku) → chyba', () => {
-		const { error } = fixCad.fixCadView({
+		const { error } = cadOdpis.cadOdpisView({
 			zak: 'F1',
 			op: 'OP1',
 			zakaznik: 'Z',
@@ -74,7 +76,7 @@ describe('fix-cad modul — čistý tok (bez DB)', () => {
 
 	it('buildFixCadJob nesie modul=fix, cakaSubdir=Fix, popis „FIX OP Zákazník", celý katalóg', () => {
 		const vstup = { zak: 'F1', op: 'OP7', zakaznik: 'Zákazník A', cad: FIX_CAD, caka: false };
-		const { view } = fixCad.fixCadView(vstup);
+		const { view } = cadOdpis.cadOdpisView(vstup);
 		const job = fixCad.buildFixCadJob(vstup, view!, 'tester');
 		expect(job.modul).toBe('fix');
 		expect(job.cakaSubdir).toBe('Fix');
@@ -152,5 +154,24 @@ describe('fix-cad route — odoslat (TEST režim, do ostrého Money NIČ)', () =
 		)) as { step: string };
 		expect(r.step).toBe('form');
 		expect(listOdpisy(500).some((o) => o.zak === 'FIX-BAD')).toBe(false);
+	});
+});
+
+// #393: pergola route odpis nesie SVOJU identitu (popisPrefix='' → „OP Zákazník", BEZ „FIX ").
+// Symetria k `buildFixCadJob` testu vyššie (modul=fix/cakaSubdir=Fix/popis „FIX …"): keby
+// sa PERGOLA_OPTS v route omylom skopírovalo z FIXu (napr. popisPrefix='FIX '), doklad by
+// v Money niesol zlú identitu. Popis žije v xlsx (money.ts) — čítame ho späť ako guard.
+describe('cad-odpis — pergola route identita (PERGOLA_OPTS)', () => {
+	it('pergola odpis má popis „OP Zákazník" bez FIX prefixu (popisPrefix prázdny)', async () => {
+		const r = (await pergolaRoute.actions.odoslat(
+			ev({ zak: 'PERG-POP', op: 'OP7', zakaznik: 'Zákazník A', cad: FIX_CAD })
+		)) as { step: string; outcome: { target: string } };
+		expect(r.step).toBe('hotovo');
+		const wb = new ExcelJS.Workbook();
+		await wb.xlsx.readFile(r.outcome.target);
+		const ws = wb.getWorksheet('Hárok2')!;
+		// popis dokladu = 6. stĺpec (index 5) prvého dátového riadku (money.ts addRow poradie)
+		const popis = (ws.getRow(2).values as unknown[]).slice(1)[5];
+		expect(popis).toBe('OP7 Zákazník A'); // pergola: „OP Zákazník", NIE „FIX OP Zákazník"
 	});
 });

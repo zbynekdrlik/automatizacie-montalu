@@ -10,12 +10,11 @@
 // textový formát ako pergola CAD režim) a vygenerovať z neho FIX odpis do Money.
 import {
 	buildCadJob,
-	cadOdpisView,
 	type CadVstup,
 	type CadView,
 	type CadActionOpts
 } from '$lib/server/cad-odpis';
-import { type OdpisJob } from '$lib/server/money';
+import type { OdpisJob } from '$lib/server/money';
 
 // FIX odpis identita — modul='fix' odlišuje FIX doklad od pergola dokladu; popis
 // „FIX OP Zákazník" marker (pergola má „OP Zákazník") vidí operátor v Money importe.
@@ -27,8 +26,7 @@ export const FIX_CAD_OPTS: CadActionOpts = {
 	logName: 'fix-cad'
 };
 
-// Re-export pre unit test (fix-cad.test.ts): FIX náhľad + build job cez zdieľaný most.
-export const fixCadView = cadOdpisView;
+// FIX build job cez zdieľaný most (unit test fix-cad.test.ts + budúci FIX-špecifický kód).
 export function buildFixCadJob(vstup: CadVstup, v: CadView, createdBy: string): OdpisJob {
 	return buildCadJob(vstup, v, createdBy, FIX_CAD_OPTS);
 }

@@ -50,7 +50,7 @@ export interface CadActionOpts extends CadJobOpts {
 // DVAKRÁT (pergola route + fix-cad.ts) — teraz RAZ tu (#393).
 const CAD_DETAIL_MAX = 20000;
 
-export function parseCadVstup(form: FormData): CadVstup {
+function parseCadVstup(form: FormData): CadVstup {
 	return {
 		zak: String(form.get('zak') ?? '').trim(),
 		op: String(form.get('op') ?? '').trim(),
@@ -146,7 +146,7 @@ export type CadView = NonNullable<ReturnType<typeof cadOdpisView>['view']>;
  * takže sa nikdy nedostane do HTML odpovede. Ceníme presne zobrazené nenulové Money položky
  * (`v.nonzero` — PRP profily); Money odpis sa tým NEMENÍ (goldeny byte-identické).
  */
-export function cadCeny(
+function cadCeny(
 	user: SessionUser | null,
 	polozky: { kod: string; nazov: string; qty: number }[]
 ): CenyResult | undefined {
