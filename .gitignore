@@ -57,3 +57,6 @@ build/
 reports/
 .stryker-tmp/
 stryker.log
+
+# Claude worktree checkouts (never commit)
+.claude/worktrees/
