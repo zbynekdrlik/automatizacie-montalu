@@ -30,6 +30,7 @@ import {
 } from './dopyt-store';
 import type { DopytLeadRiadok } from './dopyt-store';
 import { generatePonukaPdf } from './ponuka-pdf';
+import { produktNazov } from '$lib/konfigurator-produkty';
 import { sanitizePonukaConfig, zhrnutieRiadky, type PonukaConfig } from '$lib/ponuka';
 import {
 	xmlEscape,
@@ -70,12 +71,15 @@ export interface LeadPayload extends Record<string, string> {
 	type: string;
 }
 
-function leadName(meno: string, miesto: string, jeObjednavka: boolean): string {
+function leadName(produktNaz: string, meno: string, miesto: string, jeObjednavka: boolean): string {
 	const kto = meno || 'neznámy záujemca';
 	// #319: objednávka nesie v NÁZVE „OBJEDNÁVKA" (obchod rozozná objednávku od nezáväzného dopytu
-	// hneď zo zoznamu), dopyt ostáva „dopyt" (byte-identicky s pôvodným tvarom).
+	// hneď zo zoznamu), dopyt ostáva „dopyt". #384: prefix je produkt-aware (`produktNaz` — „Pergola",
+	// „Bazénové zastrešenie", …; NULL/starý dopyt → „Pergola", byte-identicky s pôvodným tvarom).
 	const label = jeObjednavka ? 'OBJEDNÁVKA' : 'dopyt';
-	return miesto ? `Pergola – ${label}: ${kto} (${miesto})` : `Pergola – ${label}: ${kto}`;
+	return miesto
+		? `${produktNaz} – ${label}: ${kto} (${miesto})`
+		: `${produktNaz} – ${label}: ${kto}`;
 }
 
 /**
@@ -87,9 +91,11 @@ function leadName(meno: string, miesto: string, jeObjednavka: boolean): string {
  */
 function buildDescription(row: DopytLeadRiadok, cfg: PonukaConfig): string {
 	const jeObjednavka = !!row.je_objednavka;
+	// #384: produkt-aware zdroj/hlavička (NULL/starý pergolový dopyt → „Pergola").
+	const produktNaz = produktNazov(row.produkt);
 	const lines: string[] = [];
 	if (jeObjednavka) {
-		lines.push('ZÁVÄZNÁ OBJEDNÁVKA z verejného konfigurátora pergoly.');
+		lines.push(`ZÁVÄZNÁ OBJEDNÁVKA z verejného konfigurátora Montalu (${produktNaz}).`);
 		lines.push('');
 		lines.push('Fakturačné údaje:');
 		if (row.fakt_meno) lines.push(`Meno / firma: ${xmlEscape(row.fakt_meno)}`);
@@ -108,8 +114,8 @@ function buildDescription(row: DopytLeadRiadok, cfg: PonukaConfig): string {
 	lines.push('');
 	lines.push(
 		jeObjednavka
-			? 'Zdroj: verejný konfigurátor pergoly (app.montalu.cloud). ZÁVÄZNÁ OBJEDNÁVKA (bez online platby) — potvrďte a ozvite sa zákazníkovi.'
-			: 'Zdroj: verejný konfigurátor pergoly (app.montalu.cloud). Nezáväzný dopyt, nie cenová ponuka.'
+			? `Zdroj: verejný konfigurátor Montalu – ${produktNaz} (app.montalu.cloud). ZÁVÄZNÁ OBJEDNÁVKA (bez online platby) — potvrďte a ozvite sa zákazníkovi.`
+			: `Zdroj: verejný konfigurátor Montalu – ${produktNaz} (app.montalu.cloud). Nezáväzný dopyt, nie cenová ponuka.`
 	);
 	return lines.join('<br>\n');
 }
@@ -121,7 +127,7 @@ export function buildLeadPayload(row: DopytLeadRiadok): LeadPayload {
 	const cfg = sanitizePonukaConfig(row.konfiguracia);
 	const jeObjednavka = !!row.je_objednavka;
 	return {
-		name: leadName(row.meno, row.miesto, jeObjednavka),
+		name: leadName(produktNazov(row.produkt), row.meno, row.miesto, jeObjednavka),
 		contact_name: row.meno,
 		email_from: row.email,
 		phone: row.telefon,

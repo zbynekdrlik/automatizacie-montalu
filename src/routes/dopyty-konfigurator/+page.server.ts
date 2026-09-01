@@ -12,9 +12,11 @@ import {
 	countDopyty,
 	hasObjednavkaColumn,
 	hasOdooLeadColumn,
+	hasProduktColumn,
 	listDopyty
 } from '$lib/server/dopyt-store';
 import { cenaZoStampu } from '$lib/server/dopyt-cena-stamp';
+import { produktNazov } from '$lib/konfigurator-produkty';
 import { formatCenaKratko, sanitizePonukaConfig, zhrnutieRiadky } from '$lib/ponuka';
 import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
 
@@ -36,8 +38,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const hasOdooLead = hasOdooLeadColumn();
 	// #319: feature-detect objednávkového stĺpca → interný zoznam odlíši objednávku od dopytu
 	const hasObjednavka = hasObjednavkaColumn();
+	// #384: feature-detect produktového stĺpca → interný zoznam zobrazí produktový rad
+	const hasProdukt = hasProduktColumn();
 	// flagy podané do listDopyty → `PRAGMA table_info` sa spraví raz za request, nie viackrát
-	const dopyty = listDopyty(offset, PER_PAGE, hasOdooLead, hasObjednavka).map((r) => ({
+	const dopyty = listDopyty(offset, PER_PAGE, hasOdooLead, hasObjednavka, hasProdukt).map((r) => ({
 		id: r.id,
 		// #319: 1 = záväzná objednávka, inak nezáväzný dopyt (kľúč prítomný len keď schéma stĺpec má)
 		jeObjednavka: hasObjednavka && r.je_objednavka === 1,
@@ -48,6 +52,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		telefon: r.telefon,
 		miesto: r.miesto,
 		poznamka: r.poznamka,
+		// #384: produktový rad (názov v nominatíve; NULL/starý riadok → „Pergola")
+		produkt: produktNazov(r.produkt),
 		// súhrn konfigurácie (rozmery/typ strechy/sklo/farba…) — znovupoužitý pure helper
 		suhrn: zhrnutieRiadky(sanitizePonukaConfig(r.konfiguracia)),
 		// #309: opečiatkovaná orientačná cena (z podania) — `null` pri starých/neopečiatkovaných
@@ -62,5 +68,14 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		odooLeadId: hasOdooLead ? (r.odoo_lead_id ?? null) : null
 	}));
 
-	return { dopyty, total, page, pageCount, perPage: PER_PAGE, hasOdooLead, hasObjednavka };
+	return {
+		dopyty,
+		total,
+		page,
+		pageCount,
+		perPage: PER_PAGE,
+		hasOdooLead,
+		hasObjednavka,
+		hasProdukt
+	};
 };

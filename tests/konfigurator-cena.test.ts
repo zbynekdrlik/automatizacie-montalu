@@ -71,7 +71,8 @@ describe('seed integrita + Money-neutralita (#279)', () => {
 		// — nikdy z klienta, nikdy sa nedotýka VO zložky (`.vo`) / B2B ceny priamo (o výber MO/VO sa
 		// stará mapper). Tak je bezpečnostná hranica (MO nevidí VO) v cenovom module, nie v route.
 		const route = fs.readFileSync(
-			path.resolve(__dirname, '../src/routes/konfigurator/+page.server.ts'),
+			// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`.
+			path.resolve(__dirname, '../src/routes/konfigurator/pergola/+page.server.ts'),
 			'utf8'
 		);
 		expect(route).toMatch(/cenaPreModel|cenyModelov/);
