@@ -9,7 +9,7 @@
 	import type { CenyResult } from '$lib/server/ceny';
 	// #378 — FIX (bočné pevné zasklenie): zhrnutie do náhľadu (honest-null Money)
 	import { popisTvaru, type FixVykres } from '$lib/fix';
-	import type { FixZPergola } from '$lib/pergola-fix';
+	import { fmtFixMm, type FixZPergola } from '$lib/pergola-fix';
 
 	let {
 		rozpis,
@@ -36,7 +36,7 @@
 	} = $props();
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
-	const fmtFix = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	const fmtFix = fmtFixMm;
 </script>
 
 <div class="card">

@@ -23,7 +23,7 @@ export interface PergolaFixVstup {
 	hlbka: number;
 	/** predná svetlosť [mm] — výška FIXu vpredu */
 	prednaSvetlost: number;
-	/** zadná výška ZV [mm] — výška FIXu pri stene */
+	/** zadná výška ZV [mm] — výška FIXu vzadu */
 	vyskaZadna: number;
 }
 
@@ -33,7 +33,7 @@ export interface FixOdvodenie {
 	s: number;
 	/** výška vpredu [mm] = predná svetlosť */
 	v1: number;
-	/** výška pri stene [mm] = zadná výška ZV */
+	/** výška vzadu [mm] = zadná výška ZV */
 	v2: number;
 	/** tvar — `sikmy` keď sa výšky líšia (strecha má sklon), inak `rovny` */
 	tvar: FixTvar;
@@ -41,10 +41,14 @@ export interface FixOdvodenie {
 
 const R1 = (x: number) => Math.round(x * 10) / 10;
 
+/** Slovenský mm formát FIX rozmerov (0,1 mm, desatinná čiarka) — zdieľané
+ *  RezVysledok/RezNahlad (jeden zdroj namiesto kópie v každom komponente). */
+export const fmtFixMm = (n: number): string => String(R1(n)).replace('.', ',');
+
 /**
  * Odvodí rozmery bočného FIXu z rozmerov pergoly (ROZHODNUTÉ #378, variant 1):
  * šikmý FIX naprieč HĹBKOU pergoly, výšky = predná svetlosť (vpredu) / zadná výška
- * ZV (pri stene). Operátor môže KAŽDÝ rozmer prepísať (override) — toto je len
+ * ZV (vzadu). Operátor môže KAŽDÝ rozmer prepísať (override) — toto je len
  * auto-predvyplnenie. Delenie na polia je samostatná voľba (default 1 pole).
  */
 export function odvodFixZPergoly(v: PergolaFixVstup): FixOdvodenie {

@@ -223,7 +223,10 @@
 		<!-- Výška zadná (ZV): pri samostatne (zadné nohy) alebo stena+zasklená (bočný 110×43
 		     pod kotviacim = ZV − 190, #206 b). Pri „jednoduchej bez zasklenia" na stene sa ZV
 		     nepoužíva → pole skryté. -->
-		{#if uchytenieS === 'samostatne' || (uchytenieS === 'stena' && !jednoduchaBezZaskleniaS)}
+		<!-- ZV je potrebná aj pre bočný FIX (jeho výška pri stene = ZV), preto ju zobraz aj
+		     keď je „Pergola s FIXom" zapnutá (#378) — inak by sa server (0) a klient (2900)
+		     rozišli v konfigurácii stena+jednoduchá+FIX -->
+		{#if uchytenieS === 'samostatne' || (uchytenieS === 'stena' && !jednoduchaBezZaskleniaS) || pergolaSFixomS}
 			<div class="grid3">
 				<div class="field">
 					<label for="vyskaZadna">Výška zadná ZV (mm) *</label>
@@ -455,7 +458,7 @@
 					</label>
 					<p class="sub" style="margin:4px 0 0" data-testid="fix-auto-hint">
 						{fixAutoS
-							? 'šírka = hĺbka, výška vpredu = predná svetlosť, výška pri stene = zadná výška; odškrtni pre ručný override'
+							? 'šírka = hĺbka, výška vpredu = predná svetlosť, výška vzadu = zadná výška (ZV); odškrtni pre ručný override'
 							: 'ručný override — rozmery zadávaš sám'}
 					</p>
 				</div>
@@ -493,7 +496,7 @@
 					</div>
 					{#if fixTvarS !== 'rovny'}
 						<div class="field">
-							<label for="fixV2">Výška pri stene (mm)</label>
+							<label for="fixV2">Výška vzadu / ZV (mm)</label>
 							<input
 								id="fixV2"
 								name="fixV2"
@@ -516,6 +519,7 @@
 					<div class="field">
 						<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
 							<input
+								id="fixZrkadlo"
 								type="checkbox"
 								name="fixZrkadlo"
 								value="1"

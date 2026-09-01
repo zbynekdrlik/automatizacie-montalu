@@ -26,7 +26,7 @@ test('FIX checkbox → sekcia, auto-odvodenie rozmerov z pergoly, výpočet + ho
 	await expect(page.getByTestId('fix-sekcia')).toBeVisible();
 	await expect(page.getByTestId('fix-money-note')).toContainText('Do Money odpisu zatiaľ nejde');
 
-	// auto-odvodenie: šírka = hĺbka, výška vpredu = predná svetlosť, výška pri stene = zadná
+	// auto-odvodenie: šírka = hĺbka, výška vpredu = predná svetlosť, výška vzadu = zadná
 	await expect(page.locator('#fixSirka')).toHaveValue('3500');
 	await expect(page.locator('#fixV1')).toHaveValue('2200');
 	await expect(page.locator('#fixV2')).toHaveValue('2900');
@@ -47,7 +47,7 @@ test('FIX checkbox → sekcia, auto-odvodenie rozmerov z pergoly, výpočet + ho
 	await expect(page.getByTestId('fix-tabulka')).toBeVisible();
 	await expect(page.getByTestId('fix-plocha')).toContainText('8,925');
 
-	expect(consoleMsgs, consoleMsgs.join('\n')).toEqual([]);
+	expect(consoleMsgs).toEqual([]);
 });
 
 test('FIX override — odškrtnutie auto sprístupní rozmery na ručnú úpravu', async ({ page }) => {
@@ -68,5 +68,46 @@ test('FIX override — odškrtnutie auto sprístupní rozmery na ručnú úpravu
 	await page.locator('#fixSirka').fill('4200');
 	await expect(page.locator('#fixSirka')).toHaveValue('4200');
 
-	expect(consoleMsgs, consoleMsgs.join('\n')).toEqual([]);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// ROUND-TRIP (pergola-narez.md „ROUND-TRIP PASCA"): override FIX hodnoty MUSIA prežiť
+// „Spočítať" → „← Späť a upraviť". 10 carried-through polí, hidden inputy na 2 miestach,
+// server echuje `fix` v každej akcii — toto je jediný test, ktorý celý reťazec zamkne.
+test('FIX round-trip — override hodnoty prežijú Spočítať → Späť a upraviť', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#hlbka').fill('3000');
+	await page.locator('#pergolaSFixom').check();
+	// override: vlastné rozmery + počet polí + zrkadlo + texty
+	await page.getByTestId('fix-auto').uncheck();
+	await page.locator('#fixSirka').fill('4200');
+	await page.locator('#fixV1').fill('1800');
+	await page.locator('#fixV2').fill('2600');
+	await page.locator('#fixPocetPoli').selectOption('3');
+	await page.locator('#fixZrkadlo').check();
+	await page.locator('#fixSklo').fill('4-16-4 IZO');
+	await page.locator('#fixPoznamka').fill('ľavý bok');
+
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	// výsledok ukazuje FIX kartu s override rozmermi (šikmý 4200/1800/2600, 3 polia)
+	await expect(page.getByTestId('fix-karta')).toBeVisible();
+
+	// „← Späť a upraviť" → všetkých 10 polí obnovených (round-trip cez server echo)
+	await page.getByTestId('upravit').click();
+	await waitHydrated(page);
+	await expect(page.locator('#pergolaSFixom')).toBeChecked();
+	await expect(page.getByTestId('fix-auto')).not.toBeChecked();
+	await expect(page.locator('#fixSirka')).toHaveValue('4200');
+	await expect(page.locator('#fixV1')).toHaveValue('1800');
+	await expect(page.locator('#fixV2')).toHaveValue('2600');
+	await expect(page.locator('#fixPocetPoli')).toHaveValue('3');
+	await expect(page.locator('#fixZrkadlo')).toBeChecked();
+	await expect(page.locator('#fixSklo')).toHaveValue('4-16-4 IZO');
+	await expect(page.locator('#fixPoznamka')).toHaveValue('ľavý bok');
+
+	expect(consoleMsgs).toEqual([]);
 });

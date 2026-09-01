@@ -10,10 +10,20 @@
 // pure-guardu vypadli, lebo teraz legitímne posielajú odpis.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import type { FixZPergola } from '../src/lib/pergola-fix';
+import type { Polozka } from '../src/lib/server/money';
 
 function zdroj(relPath: string): string {
 	return fs.readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
 }
+
+// #378 — KOMPILAČNÁ Money-zámka FIXu (vzor tesnenia #339): `FixZPergola` nemá `kod`/`qty`,
+// takže sa NEDÁ priradiť na `Polozka` → FIX sa štrukturálne nemôže dostať do `job.polozky`.
+// Padne cez `npm run check` (svelte-check), keď ju niekto oslabí (falsifikovateľné, nie
+// runtime). `type`-only importy sú zmazané v behu, takže money.ts sem runtime nevťahujú.
+// @ts-expect-error FixZPergola nie je Polozka (Money-zámka #378)
+const _fixNieJePolozka: Polozka = null as unknown as FixZPergola;
+void _fixNieJePolozka;
 
 // server/money = Money zápisovač, server/pergola = pergolová Money odpisová cesta
 // (writeOdpis/dlv-import), server/db = odpis_log DB (dedup/claim). Vzorcový engine sa
@@ -74,5 +84,16 @@ describe('/pergola/narez — rezervačný odpis (#221) IDE cez potvrdzovací tok
 		const src = zdroj('src/lib/server/pergola-rezervacia.ts');
 		expect(src).toMatch(/server\/money/);
 		expect(src).toMatch(/server\/pergola/);
+	});
+});
+
+describe('Money-neutralita FIXu je OBOJSMERNE zamknutá (#378)', () => {
+	// Doplnok k CISTY_ENGINE (FIX → Money zakázané) o OPAČNÝ smer: Money cesta
+	// (rezervácia/zapisovač) NESMIE importovať FIX display modul — inak by sa geometria
+	// FIXu mohla dostať do odpisu. Čistý negatívny match (Stryker-safe #380: reťazec
+	// `pergola-fix` sa v týchto súboroch nevyskytuje ani po inštrumentácii).
+	it('pergola-rezervacia.ts ani money.ts neimportujú pergola-fix', () => {
+		expect(zdroj('src/lib/server/pergola-rezervacia.ts')).not.toMatch(/pergola-fix/);
+		expect(zdroj('src/lib/server/money.ts')).not.toMatch(/pergola-fix/);
 	});
 });

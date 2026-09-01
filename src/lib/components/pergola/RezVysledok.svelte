@@ -17,7 +17,7 @@
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
 	import { popisTvaru, type FixVykres } from '$lib/fix';
-	import type { FixZPergola } from '$lib/pergola-fix';
+	import { fmtFixMm, type FixZPergola } from '$lib/pergola-fix';
 
 	// #223 — cena strešného skla je server-počítaná (€/m² zo snapshotu, interní); klientsky
 	// prop nesie len zobrazované polia (bez server typu `StrechaSkloCena`, aby sa $lib/server
@@ -68,8 +68,8 @@
 	const mm = (n: number | null) =>
 		n === null ? '— (čaká na výkres)' : `${String(n).replace('.', ',')} mm`;
 	const mmVal = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} mm`);
-	// #378 — FIX: zaokrúhlenie na 0,1 mm + slovenská čiarka (ako /fix)
-	const fmtFix = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	// #378 — FIX: zaokrúhlenie na 0,1 mm + slovenská čiarka (zdieľané z pergola-fix)
+	const fmtFix = fmtFixMm;
 </script>
 
 <div class="card">
@@ -153,7 +153,7 @@
 						<tr><th>Pole</th><th>Šírka</th><th>Výška</th><th>Plocha</th></tr>
 					{:else}
 						<tr>
-							<th>Pole</th><th>Šírka</th><th>Výška vpredu</th><th>Výška pri stene</th>
+							<th>Pole</th><th>Šírka</th><th>Výška vpredu</th><th>Výška vzadu (ZV)</th>
 							<th>Šikmá hrana</th><th>Plocha</th>
 						</tr>
 					{/if}
@@ -161,7 +161,15 @@
 				<tbody>
 					{#each fixVykres.polia as p, i (i)}
 						<tr>
-							<td><b>{fix.zrkadlo ? 'P' : 'L'}{i + 1}</b></td>
+							<!-- číslovanie polí MUSÍ sedieť s výkresom FixVykres2D (a s /fix tabuľkou):
+							     od VYŠŠEJ strany (V1≥V2 → zľava, inak sprava), nie vždy zľava -->
+							<td
+								><b
+									>{fix.zrkadlo ? 'P' : 'L'}{fixVykres.V1 >= fixVykres.V2
+										? i + 1
+										: fixVykres.polia.length - i}</b
+								></td
+							>
 							<td>{fmtFix(p.sirka)} mm</td>
 							{#if fix.tvar === 'rovny'}
 								<td>{fmtFix(p.vLavo)} mm</td>
