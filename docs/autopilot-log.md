@@ -1853,3 +1853,31 @@ stránku) + card-wrap konzistencia gotcha. Rozšírené `paths:` frontmatter (Pe
 `/pergola`, `/pergola/navrh`, `pergola-uix.spec.ts`).
 
 Verzia 0.24.65-dev.1.
+
+## #372 — CLIP zábradlie: nárez + Money odpis (ČISTÁ ČASŤ; tiket OSTÁVA otvorený)
+
+Nový modul CLIP zábradlie podľa Patrikových šablón (FIX - klasika / FIX - IZO, kanál 207).
+Rozsah = čistá časť: IZO B0–B3 + klasika B0/B1 (ZASP kódy ŽIVO overené v Money — STEP 0,
+Model_UserData='Pevné zasklenie Clip'). Klasika B2/B3 (KM12* kódy neexistujú) + 4 drobné
+položky (K1xxxxx neexistujú → kod:null, honest-null) VYLÚČENÉ, čakajú na Patrika.
+
+- `src/lib/clip.ts` — client-safe compute + katalóg (parametrický vzorec (B6−(19+29N))/N−8,
+  počet tyčí = ROUNDUP(ks/ROUNDDOWN(7500/rozmer)) per riadok, 1:1 parita so šablónou).
+- `src/routes/clip/` — odpis tok (writeOdpis/applyEdits/dedup, vzor bazén); `parseClipVstup`
+  vo vstup.ts; `Modul += 'clip'`; /clip do B2B_FORBIDDEN_PREFIXES + nav.
+- Testy: tests/clip.test.ts (kontraktné vektory z xlsx, 8 sád + 2 hraničné + invariant
+  CLIP_MAX_SIRKA<7500), tests/clip-odpis.test.ts (route TEST režim, dedup, honest-null,
+  neplatný-typ reject), e2e/clip.spec.ts (form→kontrola→TEST odoslať, 0 console).
+- Review (gated Fable, 0 🔴 1 🟡 6 🔵): 🟡 neplatný typ reject (nie tichý 'izo'), 🔵 pocetKs
+  number|null, rename poziciePriecok, invariant test, tautológie → runtime — všetko opravené
+  v tej istej vetve (commit 51bbae5).
+- PR #374 → main (merge bd50745), nasadené v0.24.65, prod-overené (verzia z DOM + /clip
+  compute na LIVE prode: odpis ZASP00116=2/ZASP00125=1/ZASP00119=2, 0 console, BEZ odoslať).
+
+**Playbook:** nový `.claude/rules/clip.md` (paths: clip súbory) — rozsah je zámerne
+čiastočný a rozšírenie po Patrikovi = ZMENA DÁT (katalóg + dostupneVarianty + vektory +
+Money overenie), nie prerábka kódu; T16 šablónová pasca (klasika B2/B3) čaká; ROUNDDOWN zo
+surového rozmeru + CLIP_MAX_SIRKA<7500 invariant; Money-ro bridge beží z dev2 + Model_UserData
+check. + router riadok v CLAUDE.md.
+
+Verzia 0.24.66-dev.1.
