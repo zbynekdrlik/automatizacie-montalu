@@ -47,6 +47,31 @@ test('rozcestník /pergola: tri režimy s popismi, aktívny CAD, funkčné odkaz
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('#375 — prepínač pergola režimov je na rovnakej pozícii voči nadpisu na všetkých troch stránkach', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	// prepínač musí byť VŽDY nad nadpisom stránky (rovnaká vertikálna pozícia voči
+	// nadpisu) na hube AJ na oboch podstránkach — inak sa pri prepnutí obsah „skáče"
+	// (#375). Porovnávame skutočnú vykreslenú pozíciu (boundingBox), nie len poradie
+	// v DOM-e, aby test odhalil aj vizuálny (nie len markup) skok.
+	for (const cesta of ['/pergola', '/pergola/narez', '/pergola/navrh']) {
+		await goto(page, cesta);
+		const rezimyBox = await page.getByTestId('pergola-rezimy').boundingBox();
+		const nadpisBox = await page.getByRole('heading', { level: 1 }).boundingBox();
+		expect(rezimyBox, `${cesta}: prepínač musí byť viditeľný`).not.toBeNull();
+		expect(nadpisBox, `${cesta}: nadpis musí byť viditeľný`).not.toBeNull();
+		expect(
+			rezimyBox!.y,
+			`${cesta}: prepínač (y=${rezimyBox!.y}) musí byť NAD nadpisom (y=${nadpisBox!.y})`
+		).toBeLessThan(nadpisBox!.y);
+	}
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('výstup narezu: stavové zhrnutie (spočítané/čaká) + per-riadkové odznaky + odznaky sekcií', async ({
 	page
 }) => {
