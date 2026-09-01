@@ -5,11 +5,10 @@
 	// #313: created_at je SQLite `datetime('now')` (UTC) — cez `sqliteUtcToIso` +
 	// `formatDatumCasSk` na bratislavský lokálny čas (DST-safe, `.claude/rules/timestamps.md`).
 	import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
+	import { modulNazov } from '$lib/modul-nazov';
 
 	let { data } = $props();
 	const p = $derived(data.prehlad);
-	const modulNazov = (m: string) =>
-		m === 'zasklenia' ? 'Zasklenia' : m === 'bazen' ? 'Bazén' : 'Pergola';
 	const odpisSlovo = (n: number) => (n === 1 ? 'odpis' : n >= 2 && n <= 4 ? 'odpisy' : 'odpisov');
 </script>
 

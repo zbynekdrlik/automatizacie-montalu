@@ -674,3 +674,55 @@ test('#150: tlač zachováva farbu (print-color-adjust: exact na výkresovom há
 	await page.emulateMedia({ media: 'screen' });
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #382 — golden OP260282 (audit #377): REZ A si sklon predtým DOPOČÍTAVAL
+// naivným trojuholníkom z výšok (~9,6°), skutočný/CAD sklon (rovnaký, aký sa
+// manuálne zadáva na /narez) je 6,1°. Zadaním manuálneho sklonu na /navrh musí
+// REZ A ukázať presne 6,1°, nie dopočítaných ~9,6°.
+test('#382: golden OP260282 — manuálny sklon strechy 6,1° sa zobrazí v REZ A namiesto dopočítaných ~9,6°', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await waitHydrated(page);
+
+	await page.getByLabel('OP číslo').fill('OP260282');
+	await page.selectOption('#pocetPoli', '1');
+	await page.getByLabel('Rozpätie 1 (mm)').fill('4990');
+	await page.getByLabel('Hĺbka (mm) *').fill('3470');
+	await page.getByLabel('Výška vpredu (mm) *').fill('2200');
+	await page.getByLabel('Výška pri stene (mm) *').fill('2790');
+	await page.getByLabel('Sklon strechy (°) — z CAD (voliteľné)').fill('6.1');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// presná zhoda (nie substring) — bez fixu appka ukazuje "9,6°"
+	await expect(page.getByTestId('pn-sklon')).toHaveText('6,1°');
+	expect(consoleMsgs).toEqual([]);
+});
+
+// Bez manuálneho sklonu ostáva appka pri starom (dokumentovane orientačnom) dopočte
+// z výšok — golden vstupy tu naschvál dajú presne ten istý ~9,6°, ktorý audit #377
+// nahlásil, aby regresný pár (s/bez manuálneho sklonu) dokazoval, že fallback je
+// nezmenený, nielen že override funguje.
+test('#382: golden OP260282 BEZ manuálneho sklonu — REZ A ukáže dopočítaných ~9,6° (nezmenený fallback)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await waitHydrated(page);
+
+	await page.getByLabel('OP číslo').fill('OP260282');
+	await page.selectOption('#pocetPoli', '1');
+	await page.getByLabel('Rozpätie 1 (mm)').fill('4990');
+	await page.getByLabel('Hĺbka (mm) *').fill('3470');
+	await page.getByLabel('Výška vpredu (mm) *').fill('2200');
+	await page.getByLabel('Výška pri stene (mm) *').fill('2790');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('pn-sklon')).toHaveText('9,6°');
+	expect(consoleMsgs).toEqual([]);
+});

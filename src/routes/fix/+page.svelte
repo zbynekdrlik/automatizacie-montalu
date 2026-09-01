@@ -2,6 +2,7 @@
 	// FIX (pevné zasklenie) — zadanie rozmerov → výkres konštrukcie na tlač.
 	// Do Money nejde nič. Tvar: šikmý (šikmá horná hrana) alebo rovný (obdĺžnik).
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
+	import FixModeNav from '$lib/components/FixModeNav.svelte';
 	import {
 		rovnomernePolia,
 		rozpocitajPodlaPosuvu,
@@ -151,12 +152,13 @@
 {#if step === 'form'}
 	<div class="card">
 		<h1>Fixy — pevné zasklenie</h1>
-		<p class="sub">
+		<p class="sub" style="margin-bottom:16px">
 			Vyber tvar a zadaj rozmery — vykreslím konštrukciu s kótami, dielňa reže podľa výkresu.
 			<b>Šikmý</b> má šikmú hornú hranu (do boku pergoly, dve rôzne výšky),
 			<b>rovný (pravouhlý)</b> je obdĺžnik s jednou výškou.
-			<b>Do Money sa neposiela nič</b> — tento modul len kreslí.
+			<b>Do Money sa neposiela nič</b> — tento režim len kreslí.
 		</p>
+		<FixModeNav active="appka" />
 	</div>
 
 	{#if form?.error}

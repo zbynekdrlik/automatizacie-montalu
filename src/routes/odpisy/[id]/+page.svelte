@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { nazovSystemu } from '$lib/system-nazvy';
+	import { modulNazov } from '$lib/modul-nazov';
 	import { resolve } from '$app/paths';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	// #313: created_at je SQLite `datetime('now')` (UTC) — cez `sqliteUtcToIso` + `formatDatumCasSk`
@@ -28,9 +29,7 @@
 	<div class="g">
 		<div><span>Zákazník</span><b>{o.zakaznik}</b></div>
 		<div>
-			<span>Modul</span><b
-				>{o.modul === 'zasklenia' ? 'Zasklenia' : o.modul === 'bazen' ? 'Bazén' : 'Pergola'}</b
-			>
+			<span>Modul</span><b>{modulNazov(o.modul)}</b>
 		</div>
 		{#if d.system}
 			<div><span>Systém</span><b>{nazovSystemu(String(d.system))} {d.styl}</b></div>

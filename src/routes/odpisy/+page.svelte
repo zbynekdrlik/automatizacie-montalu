@@ -7,6 +7,7 @@
 	// zlý deň. `sqliteUtcToIso` premostí SQLite tvar (medzera) aj už-ISO, `formatDatum*Sk` naformátuje
 	// v Europe/Bratislava (DST-safe cez Intl). Viď `.claude/rules/timestamps.md`.
 	import { formatDatumCasSk, formatDatumSk, sqliteUtcToIso } from '$lib/datum';
+	import { modulNazov } from '$lib/modul-nazov';
 	let { data, form } = $props();
 </script>
 
@@ -71,13 +72,7 @@
 					{@const d = o.d}
 					<tr>
 						<td style="white-space:nowrap">{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</td>
-						<td
-							>{o.modul === 'zasklenia'
-								? 'Zasklenia'
-								: o.modul === 'bazen'
-									? 'Bazén'
-									: 'Pergola'}</td
-						>
+						<td>{modulNazov(o.modul)}</td>
 						<td>
 							<!-- cenový zoznam K ZÁKAZKE (#154, časti 1+2) — agregát všetkých odpisov tejto ZAK -->
 							<a

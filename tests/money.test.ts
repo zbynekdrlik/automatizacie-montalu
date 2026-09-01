@@ -147,8 +147,29 @@ describe('writeOdpis', () => {
 	});
 
 	it('iný MODUL tej istej ZAK+OP prejde (pergola aj bazén aj zasklenia na jednej zákazke)', async () => {
-		const out = await writeOdpis(makeReq('TEST-1', '01', 'bazen'));
+		// #380: cross-modul guard blokuje IDENTICKÝ obsah pod iným modulom (fix↔pergola zdieľajú
+		// pergola katalóg). Reálne moduly (bazén vs zasklenia) majú RÔZNE katalógy → rôzny
+		// content_hash → legitímne koexistujú. `makeReq` stavia zasklenia obsah pre KAŽDÝ modul,
+		// tak bazénu dáme jeho vlastný (iný) obsah, nech fixture odráža realitu — inak by ho guard
+		// (správne) zablokoval ako identický cross-modul odpis. Test naďalej dokazuje pôvodný intent:
+		// iný modul na tej istej ZAK+OP prejde.
+		const bazenJob = makeReq('TEST-1', '01', 'bazen');
+		bazenJob.polozky = [{ kod: 'BPP0001', nazov: 'Bazén profil', qty: 3.2 }];
+		const out = await writeOdpis(bazenJob);
 		expect(out.status).toBe('written');
+	});
+
+	it('cross-modul: IDENTICKÝ obsah pod iným modulom = duplikát (#380 — fix reusuje pergola katalóg)', async () => {
+		const p = await writeOdpis(makeReq('CROSSMOD', '01', 'pergola'));
+		expect(p.status).toBe('written');
+		// fix s IDENTICKÝM obsahom (rovnaké polozky) na tej istej ZAK+OP → cross-modul guard blokuje
+		// dvojitý odpis rovnakého materiálu (bez neho by obišiel dedup/ledger, review 🔴 #380)
+		const f = await writeOdpis(makeReq('CROSSMOD', '01', 'fix'));
+		expect(f.status).toBe('duplicate');
+		// súbor pre fix nevznikol (guard vrátil duplicate PRED zápisom)
+		expect(
+			fs.readdirSync(process.env.MONEY_TEST_DIR!).filter((x) => x.startsWith('CROSSMOD')).length
+		).toBe(1);
 	});
 
 	it('zlyhanie zápisu súboru uvoľní dedup kľúč (kompenzácia)', async () => {

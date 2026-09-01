@@ -15,6 +15,7 @@
 		HLBKA_MAX,
 		VYSKA_MIN,
 		VYSKA_MAX,
+		NAVRH_SKLON_MAX,
 		PANEL_POCET_MIN,
 		PANEL_POCET_MAX,
 		PERGOLA_MAX_POLI,
@@ -39,6 +40,8 @@
 		hlbka: form?.vstup?.hlbka ?? 3500,
 		vyskaVpredu: form?.vstup?.vyskaVpredu ?? 2500,
 		vyskaPriStene: form?.vstup?.vyskaPriStene ?? 2800,
+		// #382 — voliteľný manuálny sklon (rovnaký zdroj pravdy ako /narez)
+		sklonStrechy: form?.vstup?.sklonStrechy,
 		panelPocet: form?.vstup?.panelPocet ?? 8,
 		panelSirkaOverride: form?.vstup?.panelSirkaOverride,
 		panelDlzkaOverride: form?.vstup?.panelDlzkaOverride,
@@ -61,6 +64,8 @@
 	let hlbkaS = $state<number | string>(3500);
 	let vyskaVpreduS = $state<number | string>(2500);
 	let vyskaPriSteneS = $state<number | string>(2800);
+	// #382 — prázdny reťazec = nezadané (rovnaký idiom ako panelSirkaOverrideS nižšie)
+	let sklonStrechyS = $state<number | string>('');
 	let panelPocetS = $state<number | string>(8);
 	let panelSirkaOverrideS = $state<number | string>('');
 	let panelDlzkaOverrideS = $state<number | string>('');
@@ -84,6 +89,7 @@
 		hlbkaS = v?.hlbka || 3500;
 		vyskaVpreduS = v?.vyskaVpredu || 2500;
 		vyskaPriSteneS = v?.vyskaPriStene || 2800;
+		sklonStrechyS = v?.sklonStrechy ?? '';
 		panelPocetS = v?.panelPocet || 8;
 		panelSirkaOverrideS = v?.panelSirkaOverride || '';
 		panelDlzkaOverrideS = v?.panelDlzkaOverride || '';
@@ -141,13 +147,24 @@
 	<input type="hidden" name="hlbka" value={cislo(hlbkaS)} />
 	<input type="hidden" name="vyskaVpredu" value={cislo(vyskaVpreduS)} />
 	<input type="hidden" name="vyskaPriStene" value={cislo(vyskaPriSteneS)} />
+	<!-- #382 review nález #2: `!== ''` samo osebe NIE JE null-safe — Svelte 5 `bind:value`
+	     na `type="number"` nastaví po vymazaní poľa STATE na `null` (nie `''`,
+	     `to_number: value === '' ? null : +value`), takže bez `!= null` by sa vykreslil
+	     hidden input s `value={cislo(null)}` = "0" → server ho vidí ako zadané "0" a
+	     odmietne (mimo rozsahu). Platí pre VŠETKY tri voliteľné číselné prepisy nižšie —
+	     opravené naraz (review nález, nie len pre nové pole). -->
+	{#if sklonStrechyS !== '' && sklonStrechyS != null}<input
+			type="hidden"
+			name="sklonStrechy"
+			value={cislo(sklonStrechyS)}
+		/>{/if}
 	<input type="hidden" name="panelPocet" value={cislo(panelPocetS)} />
-	{#if panelSirkaOverrideS !== ''}<input
+	{#if panelSirkaOverrideS !== '' && panelSirkaOverrideS != null}<input
 			type="hidden"
 			name="panelSirkaOverride"
 			value={cislo(panelSirkaOverrideS)}
 		/>{/if}
-	{#if panelDlzkaOverrideS !== ''}<input
+	{#if panelDlzkaOverrideS !== '' && panelDlzkaOverrideS != null}<input
 			type="hidden"
 			name="panelDlzkaOverride"
 			value={cislo(panelDlzkaOverrideS)}
@@ -269,6 +286,29 @@
 					>
 						{#each Array(PERGOLA_MAX_POLI) as _, i (i)}<option value={i + 1}>{i + 1}</option>{/each}
 					</select>
+				</div>
+			</div>
+
+			<!-- #382 — voliteľný manuálny sklon (z CAD, rovnaký zdroj pravdy ako /narez): keď je
+			     zadaný, REZ A ho použije namiesto dopočítaného sklonu z výšok (viď design komentár
+			     na #382 pre root cause). Vlastná `grid3` (review nález #7) — rovnaký vzor ako
+			     ostatné číselné polia na tejto stránke, nie osamotený `field` mimo mriežky.
+			     ŽIADNY `name` na VIDITEĽNOM vstupe (review nález #2) — presne ako
+			     `panelSirkaOverride`/`panelDlzkaOverride` nižšie: hidden() snippet je JEDINÝ
+			     serializátor voliteľných prepisov, aby nevznikli DVA vstupy s rovnakým `name`
+			     (kolízia by pri nefunkčnom fallbacku na FormData poradie bola krehká). -->
+			<div class="grid3">
+				<div class="field">
+					<label for="sklonStrechy">Sklon strechy (°) — z CAD (voliteľné)</label>
+					<input
+						id="sklonStrechy"
+						type="number"
+						min="0.1"
+						max={NAVRH_SKLON_MAX}
+						step="any"
+						bind:value={sklonStrechyS}
+						placeholder="prázdne = dopočíta sa orientačne z výšok (REZ A)"
+					/>
 				</div>
 			</div>
 
