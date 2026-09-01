@@ -1,5 +1,12 @@
 <script lang="ts">
 	import '../app.css';
+	// #376 stage 1: Archivo (display: h1/nav/tlačidlá) + Inter (body) Variable písma,
+	// wirované raz tu (root layout je spoločný predok pre login/konfigurátor/internú
+	// appku) — tokeny `--m-font-display`/`--m-font-body` v app.css. Oba balíčky sú v
+	// package.json od skôr (login = Archivo, konfigurátor = Inter); duplicitný CSS
+	// import je neškodný (rovnaká URL, prehliadač dedupuje).
+	import '@fontsource-variable/archivo/index.css';
+	import '@fontsource-variable/inter/index.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -62,12 +69,17 @@
 					// samostatný nárezový optimalizátor (#212) — kalkulačka bez Money odpisu,
 					// len pre interných (b2b má /optimalizator v B2B_FORBIDDEN_PREFIXES)
 					{ href: '/optimalizator', label: 'Optimalizátor' },
-					{ href: '/zasklenia/nastavenia', label: '⚙ Vzorce' },
+					// #376 stage 1: emoji preč z nav labelov (Fable design — appka je 13
+					// textových odkazov, ikony netreba). Žiadny E2E neasertuje presný text
+					// s emoji (overené grepom pred úpravou), h1 na /zasklenia/nastavenia
+					// (⚙ Vzorce — nastavenia rezov) je stránkový nadpis, nie nav — mimo
+					// scope stage 1 (stage 2 „formulárové stránky").
+					{ href: '/zasklenia/nastavenia', label: 'Vzorce' },
 					{ href: '/odpisy', label: 'História' },
 					// #282: interný prehľad zákazníckych dopytov z verejného konfigurátora —
 					// len pre interných (b2b má /dopyty-konfigurator v B2B_FORBIDDEN_PREFIXES)
 					{ href: '/dopyty-konfigurator', label: 'Dopyty' },
-					{ href: '/problem', label: '⚠ Problém' },
+					{ href: '/problem', label: 'Problém' },
 					{ href: '/pouzivatelia', label: 'Používatelia' }
 				] satisfies { href: RouteId; label: string }[])
 	);
@@ -94,7 +106,7 @@
 			<form method="POST" action="/logout" style="margin:0">
 				<button
 					type="submit"
-					style="background:none;border:0;color:#94a3b8;cursor:pointer;font-size:12.5px;padding:0"
+					style="background:none;border:0;color:var(--m-muted);cursor:pointer;font-size:12.5px;padding:0"
 					>Odhlásiť</button
 				>
 			</form>
@@ -106,7 +118,7 @@
 	<!-- login je full-bleed (vlastný split layout) — bez .wrap -->
 	{@render children()}
 	<footer class="app login-footer">
-		<span data-testid="version">v{data.version}</span>
+		<span class="mono" data-testid="version">v{data.version}</span>
 	</footer>
 {:else if jeKonfig}
 	<!-- #327 /konfigurator: full-bleed prémiový showroom — vlastný minimal chrome +
@@ -117,7 +129,7 @@
 		{@render children()}
 	</div>
 	<footer class="app">
-		Montalu automatizácie · <span data-testid="version">v{data.version}</span>
+		Montalu automatizácie · <span class="mono" data-testid="version">v{data.version}</span>
 	</footer>
 {/if}
 
@@ -127,7 +139,7 @@
 		bottom: 10px;
 		right: 16px;
 		padding: 0;
-		color: #94a3b8;
+		color: var(--m-muted);
 		z-index: 5;
 	}
 </style>

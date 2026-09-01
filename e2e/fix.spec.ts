@@ -1,8 +1,9 @@
 // Šikmý FIX — výkres konštrukcie (Dominik: šikmé fixy do bokov pergoly).
 // Zadanie: appka kreslí rovnakú konštrukciu ako výrobné výkresy, dielňa reže podľa nej.
 //
-// Všetko ČÍTACIE — modul nikam nezapisuje (nemá a nemôže mať Money odpis), takže
-// tieto testy sa dajú pustiť aj proti nasadenej appke (BASE_URL).
+// Všetko ČÍTACIE — kresliaci režim „Fix z appky" (/fix) do Money nezapisuje, takže
+// tieto testy sa dajú pustiť aj proti nasadenej appke (BASE_URL). (Money lane „Fix z
+// cadu" /fix/cad je testovaná zvlášť v e2e/fix-cad.spec.ts — #380.)
 import { test, expect, type Page } from '@playwright/test';
 import { collectConsole, loginAs, waitHydrated } from './helpers';
 

@@ -420,18 +420,39 @@
 
 <!-- ============================= bočný rez (VIEW A) ============================= -->
 {#snippet section(r: { x: number; y: number; w: number; h: number })}
-	{@const maxV = Math.max(vstup.vyskaVpredu, vstup.vyskaPriStene)}
+	<!-- #382 (review nález #1, opravené) — `vstup.vyskaPriStene` je REÁLNA výška zadnej
+	     konštrukcie (ZV), rovnaká hodnota, akú kreslí AJ izometria (izometriaHrany SV)
+	     a ZVOD kotva — preto ostáva `yWallTop`/stena čiara/jej Kota NEDOTKNUTÁ, presne
+	     ako pred #382 (žiadna zmena, žiadne riziko, žiadny nový nesúlad medzi pohľadmi
+	     na tom istom hárku). Keď je manuálny sklon (vstup.sklonStrechy) zadaný, LEN
+	     ŠTREŠNÝ profil (nie stena) sa nakreslí tak, aby jeho hrana pri stene ležala v
+	     BODE, kam ho dostane potvrdený sklon (`vyskaVpredu + hĺbka·tan(sklon)`) — to je
+	     `roofWallY`, nezávislá premenná od `yWallTop`. Ten bod sa NIKAM nepopisuje novým
+	     číslom (žiadna nová Kota) — len uhlová kóta a popisok sklonu (`pn-sklon`, ktoré
+	     `pergola-navrh.ts` nastaví na TÚ ISTÚ manuálnu hodnotu) sa viažu naň, aby
+	     nakreslená šikmá strecha aj jej vlastný popisok boli navzájom konzistentné
+	     (vykres.md: popisok/kóta musí čítať zo skutočne nakreslenej geometrie — platí
+	     teraz pre KAŽDÝ prvok zvlášť, nie iba pre stenu). Bez manuálneho sklonu ternár v
+	     `wallHeightMm` nižšie vráti SUROVÝ `vstup.vyskaPriStene` (nič sa nedopočítava) →
+	     `roofWallY === yWallTop` identicky by construction — nulová zmena pre existujúce
+	     zákazky. -->
+	{@const wallHeightMm =
+		vstup.sklonStrechy != null
+			? vstup.vyskaVpredu + vstup.hlbka * Math.tan((g.sklonDeg * Math.PI) / 180)
+			: vstup.vyskaPriStene}
+	{@const maxV = Math.max(vstup.vyskaVpredu, vstup.vyskaPriStene, wallHeightMm)}
 	{@const scale = fitScale(vstup.hlbka, maxV, r.w * 0.75, r.h * 0.6)}
 	{@const baseY = r.y + r.h * 0.8}
 	{@const xWall = r.x + r.w * 0.18}
 	{@const xFront = xWall + vstup.hlbka * scale}
 	{@const yWallTop = baseY - vstup.vyskaPriStene * scale}
+	{@const roofWallY = baseY - wallHeightMm * scale}
 	{@const yFrontTop = baseY - vstup.vyskaVpredu * scale}
 	{@const yClearTop = baseY - g.svetlaVyska * scale}
 	{@const roofH = Math.max(1.5, NOSNIK_HRUBKA_MM * scale)}
 	{@const previs = PREVIS_VIZ_MM * scale}
 	{@const postHalfW = stlpHalfW(scale, (xFront - xWall) * 0.15)}
-	{@const arc = angleDimension(xWall, yWallTop, 7, 90, 90 + g.sklonDeg)}
+	{@const arc = angleDimension(xWall, roofWallY, 7, 90, 90 + g.sklonDeg)}
 	<!-- #145: nadpis DNU do panela (rovnaký fix ako elevation vyššie) -->
 	<text
 		x={r.x + r.w * 0.5}
@@ -460,7 +481,7 @@
 	     (rovnaký fyzický prvok, iný pohľad). ŽIADNE crispEdges — táto cesta je šikmá
 	     (sklon strechy), crisp hrany by na diagonále zúbkovali. -->
 	<path
-		d={`M ${xWall} ${yWallTop} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${yWallTop + roofH} Z`}
+		d={`M ${xWall} ${roofWallY} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${roofWallY + roofH} Z`}
 		fill={farebny ? farba.hex : '#eff6ff'}
 		stroke={CIERNA}
 		stroke-width={obrysStroke(roofH)}
@@ -486,27 +507,32 @@
 	     "flag" konvencia), nie voľne plávajúce číslo -->
 	<line
 		x1={xWall}
-		y1={yWallTop}
+		y1={roofWallY}
 		x2={arc.start.x}
 		y2={arc.start.y}
 		stroke={MODRA}
 		stroke-width="0.3"
 	/>
-	<line x1={xWall} y1={yWallTop} x2={arc.end.x} y2={arc.end.y} stroke={MODRA} stroke-width="0.3" />
+	<line x1={xWall} y1={roofWallY} x2={arc.end.x} y2={arc.end.y} stroke={MODRA} stroke-width="0.3" />
 	<path d={arc.arcPath} stroke={MODRA} stroke-width="0.5" fill="none" />
 	<!-- NEUŽÍVAME arc.label — jeho fixný odsah "r+12" (kota.ts) je v tomto malom
 	     kompaktnom náhľade neúmerne veľký (vytláča popisok mimo oblasť rezu), takže
-	     popisok umiestňujeme sami, tesne pri oblúku (viazaný naň radius-čiarami vyššie). -->
+	     popisok umiestňujeme sami, tesne pri oblúku (viazaný naň radius-čiarami vyššie).
+	     #382: pozícia viazaná na `roofWallY` (bod, kde strecha skutočne leží), nie na
+	     `yWallTop` (top steny) — ten istý bod, na ktorom je zavesený samotný oblúk. -->
 	<text
 		x={xWall + 4}
-		y={yWallTop - 2}
+		y={roofWallY - 2}
 		text-anchor="middle"
 		font-size="2.8"
 		fill={MODRA}
 		font-weight="600"
 		data-testid="pn-sklon">{fmtDeg(g.sklonDeg)}</text
 	>
-	<!-- výšky: stena (vonkajšia, ľavá) / svetlá výška (vnútorná, pri predku) -->
+	<!-- výšky: stena (vonkajšia, ľavá) / svetlá výška (vnútorná, pri predku).
+	     #382 (review nález #1): text/pozícia NEDOTKNUTÉ — vždy reálny `vstup.vyskaPriStene`,
+	     rovnaká hodnota ako v izometrii (SV) a ZVOD kotve, takže sa na hárku nikde
+	     neobjavia DVE rôzne čísla pre "výšku pri stene" tej istej zákazky. -->
 	<Kota
 		x0={xWall}
 		y0={baseY}
