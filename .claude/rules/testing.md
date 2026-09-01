@@ -276,3 +276,16 @@ súbory dostane shard a od timingu) — preto raz „prejde" a inokedy nie na to
 `node_modules/.vite`, nedotknutý — zelený `test` job sa nemôže rozbiť. NIKDY namiesto
 toho neznižuj `break` threshold ani nezvyšuj `timeout-minutes` (no-timeout-band-aids) a
 neznižuj Stryker `concurrency` (strata paralelizmu → riziko 20-min stropu).
+
+## Mutácia: source-text regex guard test NESMIE matchovať SUSEDSTVO literálov — Stryker inštrumentácia ho rozbije (#380/PR #399)
+
+Guard test, ktorý číta zdroják cez `fs.readFileSync` a assertuje regexom (vzor
+`pergola-narez-money-safety.test.ts`), padne v mutation-diff DRY RUNE (nie na
+prežívajúcich mutantoch!), keď regex vyžaduje SUSEDSTVO kľúča a string literálu —
+napr. `/modul: 'fix'/`. Stryker mutovaný súbor inštrumentuje: prependne
+`// @ts-nocheck` a KAŽDÝ string literál obalí mutant-switchom, takže `modul:` a
+`'fix'` už nie sú vedľa seba a guard padne na KAŽDOM mutante toho súboru → dry
+run FAIL, celý mutation-diff job červený. **Fix: rozdeľ na samostatné matche** —
+`/modul:/` + `/'fix'/` (pôvodný literál prežíva vo false-vetve switchu). Symptóm:
+mutation-diff padá hneď v dry rune s failnutým guard testom, pričom
+`npx vitest run <guard>` lokálne prechádza.
