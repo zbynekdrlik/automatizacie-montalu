@@ -8,6 +8,50 @@ paths:
 
 # Testing (unit + E2E) — local run gotchas
 
+## Money-safety guard tests: NEGATÍVNY `.not.toMatch()` na NEPRÍTOMNÝ vzor je Stryker-safe — split vzory treba LEN pri POZITÍVNOM matchi na existujúci literál (#380 vs #396)
+
+`fix-cad-money-safety.test.ts`'s split-pattern fix (`/modul:/` + `/'fix'/` namiesto
+`/modul: 'fix'/`, PR 399) je o inom probléme, než na prvý pohľad vyzerá — `ZAKAZANE_VZORY`
+guard vzor v `pergola-narez-money-safety.test.ts`/`pergola-navrh-money-safety.test.ts`
+(`.not.toMatch(/from ['"].*server\/money['"]/)` a pod.) TENTO problém NEMÁ a split
+nepotrebuje:
+
+- **POZITÍVNY match na existujúci literál** (fix-cad prípad): Stryker inštrumentuje
+  `.ts` súbory v `mutate` scope (`stryker.config.json`) tak, že KAŽDÝ mutovateľný
+  string literál obalí mutant-switch kódom — v INŠTRUMENTOVANOM súbore (ten, ktorý
+  `fs.readFileSync` v dry-rune reálne číta) sa tak roztrhne susedstvo dvoch predtým
+  susediacich tokenov (`modul:` a `'fix'`). Toto POTREBUJE split vzory.
+- **NEGATÍVNY match na vzor, ktorý sa v súbore VÔBEC nevyskytuje** (money-safety
+  guardy nad "čistými" enginmi — `pergola-narez`/`pergola-navrh`/`bazen-navrh`/`pergola-fix`):
+  Stryker mutuje LEN existujúce výrazy/literály, nikdy nevkladá NOVÝ text (import
+  deklarácie navyše nie sú mutovateľný cieľ). Keďže hľadaný string (`server/money`,
+  `writeOdpis`, `pergola-fix`, ...) sa v pôvodnom súbore vôbec nenachádza, žiadna
+  inštrumentácia ho nemôže náhodou "poskladať" — `.not.toMatch()` guard prežije
+  Stryker bez rozdelenia (presne to isté zdôvodňuje `pergola-fix`'s vlastný komentár
+  v `pergola-narez-money-safety.test.ts`: "Stryker-safe #380: reťazec sa v týchto
+  súboroch nevyskytuje ani po inštrumentácii").
+
+Pri pridávaní ĎALŠIEHO money-safety guard súboru (nový modul, sesterský vzor) split
+vzory NIE SÚ potrebné, pokiaľ guard ostáva čisto negatívny nad neprítomnými vzormi —
+split je len pre POZITÍVNE assercie na existujúci susediaci literál v mutovanom `.ts`
+súbore (a `.svelte` súbory nie sú v `stryker.config.json`'s `mutate` scope vôbec, takže
+inštrumentácia sa ich netýka).
+
+## Commit message citujúci HISTORICKÝ ticket/PR číslom (`#N`) môže neúmyselne spustiť `block-commit-without-design.sh` guard PRE TEN ticket
+
+`block-commit-without-design.sh` skenuje CELÝ text `git commit` príkazu (nielen
+`Closes #N`) na `#N` referencie a vyžaduje design komentár pre KAŽDÚ nájdenú. Ak commit
+message v prozaickom vysvetlení cituje starší (už zlúčený/uzavretý) PR/issue ako
+`#399` (bežné v tomto repe — money-safety guardy vzájomne odkazujú na predchádzajúce
+PR-y, ktoré fixli podobný problém), hook to interpretuje ako "commit sa týka aj #399" a
+blokuje, kým commit message obsahuje literálne `#399`. Vyhni sa tomu tak, že historické
+referencie v prose píšeš BEZ `#` (`"PR 399"`, `"issue 380"`) — číslo ostáva čitateľné
+pre človeka, ale nezhoduje sa s `design_gate.issue_refs` regexom. Rovnaká pasca platí pre
+`Closes #N` na cudzí ticket — `block-worker-close-trigger.sh` navyše blokuje AJ
+close-keyword tesne pred vlastným `#N` z worktree workera (worker nikdy sám nezatvára
+ticket — supervisor to robí po integrácii); vlastnú referenciu píš do zátvoriek
+(`"(#396)"`) alebo bez close slova (`"Ref #396"`).
+
 ## Manually starting `npm run preview` for a live MCP screenshot needs the SAME env vars as `playwright.config.ts`'s `webServer`
 
 A bare `npm run preview` (no env) serves the build fine (`/health` returns
