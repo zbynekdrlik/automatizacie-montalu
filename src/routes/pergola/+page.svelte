@@ -27,7 +27,7 @@
 	}
 </script>
 
-<svelte:head><title>Pergola — CAD → Money</title></svelte:head>
+<svelte:head><title>Pergola z cadu</title></svelte:head>
 
 {#snippet hiddenVstup()}
 	<input type="hidden" name="zak" value={vstup.zak} />
@@ -88,7 +88,7 @@
 	{/if}
 
 	<div class="card">
-		<div class="sec">Režim ➊ · CAD nárez → Money odpis</div>
+		<div class="sec">Režim ➊ · Pergola z cadu</div>
 		<p class="sub" style="margin:0 0 16px">
 			Vlož CAD nárez (riadky: KÓD NÁZOV KS REZ), ukážem Money rozpis a počty tyčí pre Solid Edge.
 			Odpis sa odošle až po tvojom potvrdení.

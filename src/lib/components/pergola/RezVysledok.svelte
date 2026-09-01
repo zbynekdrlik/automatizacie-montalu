@@ -61,7 +61,7 @@
 
 <div class="card">
 	<h1 data-testid="narez-nadpis">
-		Rezervačný odpis — {vstup.system}
+		Pergola z appky — {vstup.system}
 		{vstup.sirka}×{vstup.hlbka} mm
 	</h1>
 	<p class="sub">

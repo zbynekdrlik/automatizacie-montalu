@@ -50,14 +50,14 @@
 	{@render card(
 		'cad',
 		'➊',
-		'CAD nárez → Money odpis',
+		'Pergola z cadu',
 		'Máš hotový CAD nárez zo Solid Edge — prepíšem ho na Money odpis a počty tyčí.',
 		'rezim-cad'
 	)}
 	{@render card(
 		'narez',
 		'z rozmerov',
-		'Rezervačný odpis',
+		'Pergola z appky',
 		'Ešte nemáš CAD — zarezervuj materiál v Money už z rozmerov objednávky.',
 		'link-narez'
 	)}
