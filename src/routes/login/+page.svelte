@@ -1,6 +1,6 @@
 <script lang="ts">
-	import '@fontsource-variable/archivo/index.css';
-
+	// #376 stage 1: Archivo je odteraz importované raz v root +layout.svelte (spoločný
+	// predok) — tento lokálny import by len duplicoval rovnaké CSS (review finding #8).
 	let { form } = $props();
 </script>
 
@@ -324,7 +324,9 @@
 	}
 	.vitaj {
 		margin: 0 0 4px;
-		color: #2563eb;
+		/* #376 stage 1: jeden akcent v celej appke — bronz namiesto modrej (review
+		   finding #8, dokončuje architektúra bod 2 z design komentára) */
+		color: var(--m-accent, #b07a45);
 		font-size: 13px;
 		font-weight: 700;
 		letter-spacing: 0.22em;
@@ -374,9 +376,9 @@
 	}
 	.pole input:focus {
 		outline: none;
-		border-color: #2563eb;
-		border-bottom-color: #2563eb;
-		box-shadow: 0 6px 18px -8px rgba(37, 99, 235, 0.45);
+		border-color: var(--m-accent, #b07a45);
+		border-bottom-color: var(--m-accent, #b07a45);
+		box-shadow: 0 6px 18px -8px rgba(176, 122, 69, 0.45);
 	}
 	.loginform button {
 		width: 100%;
@@ -400,7 +402,7 @@
 			transform 0.1s ease;
 	}
 	.loginform button:hover {
-		background: #2563eb;
+		background: var(--m-ink-2-hover, #2c3037);
 	}
 	.loginform button:hover .btn-sipka {
 		transform: translateX(4px);

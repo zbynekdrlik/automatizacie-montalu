@@ -118,7 +118,7 @@
 	<!-- login je full-bleed (vlastný split layout) — bez .wrap -->
 	{@render children()}
 	<footer class="app login-footer">
-		<span data-testid="version">v{data.version}</span>
+		<span class="mono" data-testid="version">v{data.version}</span>
 	</footer>
 {:else if jeKonfig}
 	<!-- #327 /konfigurator: full-bleed prémiový showroom — vlastný minimal chrome +
@@ -129,7 +129,7 @@
 		{@render children()}
 	</div>
 	<footer class="app">
-		Montalu automatizácie · <span data-testid="version">v{data.version}</span>
+		Montalu automatizácie · <span class="mono" data-testid="version">v{data.version}</span>
 	</footer>
 {/if}
 

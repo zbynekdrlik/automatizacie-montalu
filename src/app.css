@@ -10,11 +10,20 @@
 	--m-surface: #fff;
 	--m-surface-2: #f4f3ef;
 	--m-line: #e7e4dd;
+	/* control-border tier (review finding #6, #376) — --m-line alone is too faint
+	   (1.27:1 on white) as an input/select border's only affordance; mirrors the
+	   konfigurátor's own --k-line-2 two-tier line family */
+	--m-line-2: #d9d7d0;
 	--m-ink: #16181c;
 	--m-ink-2: #1b1e23;
 	--m-ink-2-hover: #2c3037;
 	--m-muted: #6b7078;
 	--m-accent: #b07a45;
+	/* text-safe bronze (review finding #5, #376) — --m-accent itself is 3.67:1 on
+	   white, below WCAG AA 4.5:1 for normal-weight small text; use --m-accent for
+	   non-text (underlines/borders/focus rings, 3:1 threshold), --m-accent-ink
+	   (≈5.9:1) for the .sec eyebrow TEXT */
+	--m-accent-ink: #8a5a2b;
 	--m-accent-soft: #f5ede2;
 
 	/* sémantické stavy — rovnaká sémantika ako doterajšie .badge.ok/.wait/.alarm/
@@ -40,9 +49,11 @@
 	--m-okbox-border: #bbf7d0;
 	--m-okbox-ink: #15803d;
 
-	/* rádiusy — existujúce hodnoty appky (14/10/999px) už sedia s --k-radius */
+	/* rádiusy — existujúce hodnoty appky (14/10/12/999px) sú blízke --k-radius
+	   konfigurátora (16/11px) — vlastná (nie identická) škála appky */
 	--m-radius: 14px;
 	--m-radius-sm: 10px;
+	--m-radius-btn: 12px;
 	--m-radius-pill: 999px;
 
 	/* písma — oba balíčky už v package.json (login = Archivo, konfigurátor = Inter) */
@@ -84,17 +95,26 @@ body {
 	font-family: var(--m-font-display);
 	font-size: 12px;
 	font-weight: 700;
-	color: var(--m-accent);
+	color: var(--m-accent-ink);
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 	margin: 0 0 10px;
 }
 h1 {
+	margin: 0;
+}
+/* Archivo/28px/650/--m-ink display treatment scoped to the INTERNAL admin shell
+   (`.wrap`, root +layout.svelte) only — a bare `h1` rule here would leak into
+   login's own dark-panel wordmark (own `.brand h1`, no color of its own — it
+   relies on inheriting `.panel`'s light color, which a global h1 color would
+   override) and into /konfigurator's hero heading (own font, review finding
+   #1/#2 on #376). Every internal page (incl. the error page) renders inside
+   `.wrap` — see root +layout.svelte. */
+.wrap h1 {
 	font-family: var(--m-font-display);
 	font-weight: 650;
 	font-size: 28px;
 	color: var(--m-ink);
-	margin: 0;
 }
 .sub {
 	color: var(--m-muted);
@@ -209,11 +229,22 @@ label {
 	color: var(--m-ink);
 	margin: 0 0 4px;
 }
+/* form controls don't inherit font by default (UA stylesheet) — without this,
+   every input/select/textarea/button in the interior app renders in the
+   browser's system font next to Inter labels/tables and Archivo nav/buttons
+   (review finding #3 on #376; the repo's own pages already set this locally
+   in several places — login, konfigurator, KonfOvladace, RozmerStepper). */
+input,
+select,
+textarea,
+button {
+	font-family: inherit;
+}
 input,
 select {
 	width: 100%;
 	padding: 13px 14px;
-	border: 1px solid var(--m-line);
+	border: 1px solid var(--m-line-2);
 	border-radius: var(--m-radius-sm);
 	font-size: 17px;
 	background: var(--m-surface);
@@ -249,7 +280,7 @@ select:focus {
 	background: var(--m-ink-2);
 	color: #fff;
 	border: 0;
-	border-radius: 12px;
+	border-radius: var(--m-radius-btn);
 	padding: 16px;
 	font-family: var(--m-font-display);
 	font-size: 18px;
@@ -377,19 +408,29 @@ nav.top {
 	position: sticky;
 	top: 0;
 	z-index: 30;
-	background: rgba(247, 246, 243, 0.86);
+	background: color-mix(in srgb, var(--m-bg) 86%, transparent);
 	-webkit-backdrop-filter: saturate(1.3) blur(10px);
 	backdrop-filter: saturate(1.3) blur(10px);
 	border-bottom: 1px solid var(--m-line);
 	color: var(--m-ink);
 }
+/* Appka má 13 interných nav odkazov — pod ~1100px šírky sa .inner zalomí na
+   viac riadkov (review finding #4, #376); sticky drží OK jednu-dve zalomené
+   riadky, ale pri hlbšom zalomení (tablet) by sticky vytvorilo veľký trvalo
+   pripnutý pás. Pod prahom preto position:static — appka je dielenský nástroj
+   používaný na desktope, kde sa zmestí do 1-2 riadkov aj priliehavejšie. */
+@media (max-width: 1100px) {
+	nav.top {
+		position: static;
+	}
+}
 nav.top .inner {
 	max-width: 1040px;
 	margin: 0 auto;
-	padding: 16px;
+	padding: 10px 16px;
 	display: flex;
 	align-items: center;
-	gap: 20px;
+	gap: 8px 18px;
 	flex-wrap: wrap;
 }
 nav.top a {
