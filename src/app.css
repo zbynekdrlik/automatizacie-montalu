@@ -255,6 +255,27 @@ select:focus {
 	outline: 2px solid var(--m-accent);
 	border-color: var(--m-accent);
 }
+/* #376 stage 2 — checkbox afordancia: natívny checkbox berie globálne
+   `input { width: 100% }` (nechcené roztiahnutie) — vrátiť na auto + bronzové
+   zaškrtnutie (accent-color) naprieč celou appkou, žiadny inline `width:auto`. */
+input[type='checkbox'] {
+	width: auto;
+	accent-color: var(--m-accent);
+}
+/* Zdieľaný checkbox riadok (#376 stage 2) — predtým 5× duplikovaný inline štýl
+   (`display:flex;align-items:center;gap:8px;font-weight:400`) na formulárových
+   stránkach; teraz jedna trieda. `.opt-grid` = variant v grid bunke, ktorý sa
+   zvislo zarovná so susednými poľami (nahradzuje inline `margin-top:26px`). */
+.opt {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 400;
+	cursor: pointer;
+}
+.opt-grid {
+	margin-top: 26px;
+}
 .grid2 {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -428,9 +449,9 @@ select:focus {
 	text-align: left;
 	text-decoration: none;
 	color: inherit;
-	background: #f8fafc;
-	border: 1px solid #e2e8f0;
-	border-radius: 12px;
+	background: var(--m-surface-2);
+	border: 1px solid var(--m-line-2);
+	border-radius: var(--m-radius-btn);
 	padding: 16px;
 	transition:
 		border-color 0.12s,
@@ -438,48 +459,52 @@ select:focus {
 		background 0.12s;
 }
 a.mode-card:hover {
-	border-color: #2563eb;
-	background: #fff;
-	box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+	border-color: var(--m-accent);
+	background: var(--m-surface);
+	box-shadow: 0 2px 8px rgba(22, 24, 28, 0.08);
 }
 .mode-card.active {
-	background: #eff6ff;
-	border-color: #2563eb;
-	box-shadow: inset 0 0 0 2px #2563eb;
+	background: var(--m-accent-soft);
+	border-color: var(--m-accent);
+	box-shadow: inset 0 0 0 2px var(--m-accent);
 }
 .mode-tag {
 	align-self: flex-start;
+	font-family: var(--m-font-display);
 	font-size: 12px;
 	font-weight: 700;
-	color: #64748b;
-	background: #e2e8f0;
-	border-radius: 999px;
+	color: var(--m-muted);
+	background: var(--m-surface);
+	border: 1px solid var(--m-line);
+	border-radius: var(--m-radius-pill);
 	padding: 2px 9px;
 	margin-bottom: 9px;
 }
 .mode-tag.ok {
-	background: #dcfce7;
-	color: #15803d;
+	background: var(--m-ok-bg);
+	color: var(--m-ok);
+	border-color: transparent;
 }
 .mode-title {
+	font-family: var(--m-font-display);
 	font-size: 17px;
 	font-weight: 700;
-	color: #0f172a;
+	color: var(--m-ink);
 	margin-bottom: 5px;
 }
 .mode-desc {
 	font-size: 14px;
-	color: #475569;
+	color: var(--m-muted);
 	line-height: 1.4;
 }
 .mode-foot {
 	margin-top: 10px;
 	font-size: 13px;
 	font-weight: 600;
-	color: #2563eb;
+	color: var(--m-accent-ink);
 }
 .mode-card.active .mode-foot {
-	color: #475569;
+	color: var(--m-muted);
 }
 /* #376 stage 1: header/nav re-skin — svetlý papier + blur (vzor konfigurátorovej
    hlavy), sticky, bronzové podčiarknutie na aktívnom odkaze. Emoji preč z Vzorce/

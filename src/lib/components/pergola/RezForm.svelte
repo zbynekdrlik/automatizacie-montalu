@@ -517,16 +517,15 @@
 						</select>
 					</div>
 					<div class="field">
-						<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
+						<label class="opt opt-grid">
 							<input
 								id="fixZrkadlo"
 								type="checkbox"
 								name="fixZrkadlo"
 								value="1"
 								bind:checked={fixZrkadloS}
-								style="width:auto"
 							/>
-							🔁 Zrkadlový kus (druhá strana)
+							Zrkadlový kus (druhá strana)
 						</label>
 					</div>
 				</div>

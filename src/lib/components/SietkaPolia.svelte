@@ -64,7 +64,7 @@
 </script>
 
 <div class="field">
-	<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+	<label class="opt">
 		<input
 			type="checkbox"
 			id={`${idPrefix}-on`}
@@ -72,9 +72,8 @@
 			value="1"
 			bind:checked={on}
 			onchange={() => onZmena?.(on)}
-			style="width:auto"
 		/>
-		🦟 So sieťkou (na poslednej koľaji) — pridá rám a nos podľa potvrdeného rozpisu, ide do Money odpisu
+		So sieťkou (na poslednej koľaji) — pridá rám a nos podľa potvrdeného rozpisu, ide do Money odpisu
 	</label>
 </div>
 {#if on}

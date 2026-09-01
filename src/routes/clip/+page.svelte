@@ -135,9 +135,9 @@
 					/>
 				</div>
 				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
-						<input type="checkbox" name="caka" value="1" checked={vstup.caka} style="width:auto" />
-						⏳ Čaká na materiál (odloží do NA ODPIS/Clip)
+					<label class="opt opt-grid">
+						<input type="checkbox" name="caka" value="1" checked={vstup.caka} />
+						Čaká na materiál (odloží do NA ODPIS/Clip)
 					</label>
 				</div>
 			</div>
@@ -274,7 +274,11 @@
 		{#each form.finalOut.filter((o) => o.qty > 0) as o (o.kod)}
 			<div class="row" style="align-items:center;gap:12px">
 				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
-				<span style="flex:1">{o.kod} · {o.nazov}{form.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
+				<span style="flex:1"
+					><span class="mono">{o.kod}</span> · {o.nazov}{form.zmenene.includes(o.kod)
+						? ' ✏️'
+						: ''}</span
+				>
 				<b>{fmt(o.qty)} ks</b>
 			</div>
 		{/each}
