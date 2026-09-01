@@ -38,6 +38,9 @@ const CISTY_ENGINE = [
 	'src/lib/pergola-komponenty.ts',
 	// #223 — strešné sklo (vzorec šírky/počet tabúľ) je Money-NEUTRÁLNE, display-only pure modul
 	'src/lib/pergola-sklo.ts',
+	// #378 — „pergola s FIXom" odvodí rozmery FIXu z pergoly + geometria cez pocitajFix,
+	// DISPLAY-ONLY a Money-NEUTRÁLNE (FIX materiály nemajú Money karty) → nesmie sa viazať na Money
+	'src/lib/pergola-fix.ts',
 	'src/lib/server/pergola-narez-vstup.ts',
 	// #194 — technický výkres z rozmerov je tiež LEN display-only kresba
 	'src/lib/components/PergolaNarezVykres.svelte',
