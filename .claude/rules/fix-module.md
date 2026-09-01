@@ -79,11 +79,14 @@ Od #380 má FIX modul prepínač `FixModeNav.svelte` (vzor `PergolaModeNav`, ale
   dnešný formulár rozmery → výkres konštrukcie. **Do Money NEJDE nič** (kresliaci režim). Ostáva
   Money-clean — guard `tests/fix-money-safety.test.ts` (fix.ts + FixVykres2D nesmú importovať
   `server/fix-cad`/`server/money`/`server/pergola`).
-- **„Fix z cadu" = `/fix/cad`** (`+page.svelte`/`+page.server.ts` + `src/lib/server/fix-cad.ts`) —
-  NOVÝ režim: CAD nárez → Money odpis. `fix-cad.ts` je Money-write MOST (vzor `pergola-rezervacia.ts`),
-  ktorý REUSUJE pergola CAD2DLV engine (`$lib/server/pergola`: `transform`/`CATALOG`/`validatePergola`/
-  `applyCombos`/`buildCopyBack`) — NIE vlastný engine/katalóg. `writeOdpis` s `modul='fix'`,
-  `cakaSubdir='Fix'`, popis „FIX OP Zákazník". Nenamapovaný CAD kód = TVRDÁ chyba (nikdy tichý odpis).
+- **„Fix z cadu" = `/fix/cad`** (`+page.server.ts` + `src/lib/server/fix-cad.ts`) — NOVÝ režim:
+  CAD nárez → Money odpis. **Od #393 je Money-write tok ZDIEĽANÝ v `src/lib/server/cad-odpis.ts`**
+  (spolu s pergola CAD /pergola) — reuse pergola CAD2DLV enginu (`$lib/server/pergola`:
+  `transform`/`CATALOG`/`validatePergola`/`applyCombos`/`buildCopyBack`), NIE vlastný engine/katalóg.
+  `fix-cad.ts` je už len TENKÝ FIX **adaptér**: drží `FIX_CAD_OPTS` (`modul='fix'`, `cakaSubdir='Fix'`,
+  popis prefix „FIX ") + `buildFixCadJob` wrapper pre unit test; route naň deleguje cez
+  `cadSpocitat`/`cadUpravit`/`cadOdoslat`. Detaily zdieľaného toku → `.claude/rules/odpis-detail.md`.
+  Nenamapovaný CAD kód = TVRDÁ chyba (nikdy tichý odpis).
 
 **OTVORENÁ OTÁZKA (gated na vzorku):** FIX formulár používa Cortizo COR-60 CE profily BEZ Money
 kariet (overené 2026-07-27). Či reálny FIX CAD zo Solid Edge používa tie isté kódy alebo zdieľa
