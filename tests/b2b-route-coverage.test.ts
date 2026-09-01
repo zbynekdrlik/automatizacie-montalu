@@ -96,6 +96,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/',
 				'/bazen',
 				'/bazen/navrh',
+				'/clip',
 				'/konfigurator',
 				'/odpisy',
 				'/pergola',
@@ -163,6 +164,14 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	// čitateľné explicitné potvrdenie vedomého rozhodnutia.
 	it('#212: /optimalizator (nárezový optimalizátor, interné-only) JE presmerovaný preč', () => {
 		expect(b2bRedirectTarget('/optimalizator')).toBe('/zasklenia');
+	});
+
+	// #372: CLIP zábradlie — nárez + Money odpis, interný Money-zápisový modul
+	// (ako /bazen). b2b nemá požiadavku → vedome zakázaný (v B2B_FORBIDDEN_PREFIXES).
+	// Generický it.each vyššie to už pokrýva (nie je v ALLOWED); toto je čitateľné
+	// explicitné potvrdenie vedomého rozhodnutia.
+	it('#372: /clip (CLIP zábradlie nárez + Money odpis, interné-only) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/clip')).toBe('/zasklenia');
 	});
 
 	// #282: interný prehľad dopytov z konfigurátora — kontaktné údaje + súhrn + re-download

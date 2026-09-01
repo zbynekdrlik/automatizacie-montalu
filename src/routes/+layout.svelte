@@ -54,6 +54,9 @@
 					{ href: '/pergola', label: 'Pergola' },
 					{ href: '/fix', label: 'Fixy' },
 					{ href: '/bazen', label: 'Bazén' },
+					// CLIP zábradlie nárez + Money odpis (#372) — interný modul (b2b má /clip
+					// v B2B_FORBIDDEN_PREFIXES)
+					{ href: '/clip', label: 'Clip' },
 					{ href: '/zasklenia', label: 'Zasklenia' },
 					{ href: '/sietka', label: 'Sieťka' },
 					// samostatný nárezový optimalizátor (#212) — kalkulačka bez Money odpisu,

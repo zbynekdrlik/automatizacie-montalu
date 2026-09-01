@@ -5,13 +5,17 @@ paths:
   - 'src/lib/server/pergola-narez-vstup.ts'
   - 'src/lib/components/PergolaNarezVykres.svelte'
   - 'src/lib/components/pergola/**'
+  - 'src/lib/components/PergolaModeNav.svelte'
+  - 'src/routes/pergola/+page.svelte'
   - 'src/routes/pergola/narez/**'
+  - 'src/routes/pergola/navrh/**'
   - 'src/lib/server/pergola-rezervacia.ts'
   - 'tests/pergola-narez*.test.ts'
   - 'tests/pergola-rezervacia.test.ts'
   - 'tests/pergola-krov*.test.ts'
   - 'e2e/pergola-narez.spec.ts'
   - 'e2e/pergola-rezervacia.spec.ts'
+  - 'e2e/pergola-uix.spec.ts'
 ---
 
 # Pergola — nárez/výkres z rozmerov (#155 epic) — gotchy a disciplína
@@ -359,6 +363,26 @@ sú scoped v komponente, ktorý ich renderuje — **POZOR na `.sec .badge`** (od
 hlavičke): `.sec` je uppercase, `.sec .badge` to override-ne; MUSÍ byť scoped v KAŽDOM komponente
 s `.sec`-hlavičkovým odznakom (RezVysledok aj RucnePolozky), inak odznak zdedí uppercase (#239
 review nález).
+
+## Zdieľaný prepínač `PergolaModeNav.svelte` (#371) — testid kolízia so starým in-page odkazom
+
+Keď sa zdieľaná nav komponenta (napr. `PergolaModeNav.svelte`, renderovaná hore na
+`/pergola`, `/pergola/narez` aj `/pergola/navrh`) vloží na stránku, ktorá už MALA svoj
+VLASTNÝ starý odkaz s rovnakým `data-testid` smerujúci na to isté miesto (`RezForm.svelte`
+malo pred #371 vlastný in-page odkaz `data-testid="link-navrh"` v úvodnom odstavci), vznikne
+**Playwright strict-mode violation** (`getByTestId(...)` matchne 2 elementy) — `npm run
+check`/`npm run lint` to NEODHALIA, len skutočný beh e2e testu. Pred pridaním zdieľanej
+navigácie na existujúcu stránku **grepni cieľové testid-y aj v komponentoch, ktoré sa na
+tej stránke renderujú POD ňou** (`grep -rn "data-testid=\"link-X\"" src/`), nielen v
+súbore, ktorý upravuješ. Fix: starý duplicitný in-page odkaz zmaž (nová zdieľaná
+navigácia ho už plne nahrádza) — nikdy nepremenúvaj testid len aby kolízia zmizla (to
+by zase rozbilo test, ktorý ten pôvodný testid asertuje inde).
+
+**Card-wrap konzistencia:** ak hub stránka (`/pergola`) renderuje zdieľanú nav komponentu
+VNÚTRI vlastnej `.card`, subsránky (`/pergola/narez`, `/pergola/navrh`) ju wrapni do
+VLASTNEJ `.card` tiež (nie ako bare blok na pozadí stránky) — inak vznikne vizuálna
+nekonzistencia medzi hubom a subsránkami, ktorú `npm run lint`/`check` neodchytí (nájdené
+až v `/requesting-code-review` pass, #371).
 
 ## Post-deploy na LIVE — v ČISTOM prehliadači (Svelte hydration pasca)
 
