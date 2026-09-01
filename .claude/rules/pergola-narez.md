@@ -378,11 +378,43 @@ súbore, ktorý upravuješ. Fix: starý duplicitný in-page odkaz zmaž (nová z
 navigácia ho už plne nahrádza) — nikdy nepremenúvaj testid len aby kolízia zmizla (to
 by zase rozbilo test, ktorý ten pôvodný testid asertuje inde).
 
-**Card-wrap konzistencia:** ak hub stránka (`/pergola`) renderuje zdieľanú nav komponentu
-VNÚTRI vlastnej `.card`, subsránky (`/pergola/narez`, `/pergola/navrh`) ju wrapni do
-VLASTNEJ `.card` tiež (nie ako bare blok na pozadí stránky) — inak vznikne vizuálna
-nekonzistencia medzi hubom a subsránkami, ktorú `npm run lint`/`check` neodchytí (nájdené
-až v `/requesting-code-review` pass, #371).
+**Card-wrap konzistencia:** zdieľaná nav komponenta MUSÍ dostať VLASTNÚ `.card` na
+KAŽDEJ stránke, čo ju renderuje (nie ako bare blok na pozadí stránky) — inak vznikne
+vizuálna nekonzistencia, ktorú `npm run lint`/`check` neodchytí (nájdené až v
+`/requesting-code-review` pass, #371).
+
+**Poradie prepínač-vs-nadpis MUSÍ byť ROVNAKÉ na všetkých troch stránkach (#375) —
+prepínač VŽDY NAD nadpisom, vo VLASTNEJ `.card` pred nadpisovou `.card`.** #371 zaviedlo
+komponentu konzistentne na `/pergola/narez` aj `/pergola/navrh` (vlastná `.card` s
+prepínačom, potom vlastná `.card` s `<h1>`), ale hub (`/pergola`) pôvodne nechalo
+`<h1>Pergola</h1>` PRED prepínačom v TEJ ISTEJ karte — pri prepínaní režimov (hub ↔
+podstránka) sa preto nadpis vizuálne „preskočil" (raz hore, raz dole). #375 zjednotilo
+hub na rovnaký tvar (dve karty, prepínač prvý). E2E regresia
+(`e2e/pergola-uix.spec.ts`, test `#375 — prepínač … je na rovnakej pozícii voči
+nadpisu`) porovnáva SKUTOČNÚ vykreslenú `boundingBox().y` prepínača (`pergola-rezimy`)
+voči `getByRole('heading', {level: 1})` na všetkých troch cestách — pri PRIDÁVANÍ
+ĎALŠEJ pergola stránky s týmto prepínačom dodrž rovnaký tvar (prepínač-karta PRED
+nadpis-kartou), inak tento test padne.
+
+**Mode-name premenovanie (#379) — kde sa mená DUPLIKUJÚ, keď ich zas budeš meniť.**
+„Rezervačný odpis" → „Pergola z appky" a „CAD nárez → Money odpis" → „Pergola z cadu"
+(prvý krok smerom k zrušeniu CAD režimu, #155). `PergolaModeNav.svelte`-ov `card(...)`
+snippet `title` argument (2× v komponente) je JEDINÝ zdroj pravdy pre prepínač, ale
+**každá stránka svoj vlastný mode-name duplikuje** v h1/`<svelte:head><title>`, takže
+mode-rename = grep + edit na VIACERÝCH miestach naraz:
+`PergolaModeNav.svelte` (title×2) · `RezForm.svelte` (h1) · `RezVysledok.svelte`
+(dynamický h1 s `{vstup.system}`) · `RezNahlad.svelte` (dynamický h1 s
+`{ident.zak}·{zakaznik}` + 2 tlačidlá) · `routes/pergola/narez/+page.svelte`
+(`<title>` + `.sec` sekcia „Odpis do Money" + tlačidlo „Pripraviť odpis") ·
+`routes/pergola/+page.svelte` (`<title>` + `.sec` „Režim ➊ · …"). **Čo ostáva
+ZÁMERNE nezmenené pri mode-rename** (nie je to mode-name, je to popis VSTUPNÉHO
+formátu): label `Materiál (CAD nárez) *`, veta „Vlož CAD nárez (…)" — appka bude
+prijímať CAD export zo Solid Edge bez ohľadu na to, ako appka mode nazýva. Takisto
+nezmenené: Money-doménová terminológia („rezervačný odpis" ako TYP Money
+transakcie, REZ marker v `money.ts`/`pergola-rezervacia.ts`) — logika/Money vrstva,
+mimo scope čisto textového renamu. Akčné tlačidlá, ktoré staré meno len OPAKOVALI
+vo vete (nie ako nadpis), sa pri renamovaní skrátia bez mode-mena — vzor už dávno
+existuje na `/pergola` („Odoslať odpis do Money", bez „CAD" prefixu).
 
 ## Post-deploy na LIVE — v ČISTOM prehliadači (Svelte hydration pasca)
 

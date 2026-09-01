@@ -1,5 +1,5 @@
 // Pergola — REZERVAČNÝ ODPIS z rozmerov (#221) cez REÁLNY tok v prehliadači:
-// premenovaná stránka „Rezervačný odpis" → rozmery → materiál → ZAK/OP/zákazník →
+// stránka „Pergola z appky" (#379, predtým „Rezervačný odpis") → rozmery → materiál → ZAK/OP/zákazník →
 // Money rozpis (nahlad) → explicitné potvrdenie → zápis. ZÁPIS je za `skipAkLive`,
 // takže do ostrého Money nikdy nič nejde (test píše do testovacieho priečinka).
 // Overuje: rename, honest-null vylúčenie (priečka NIE je v odpise), REZ marker v
@@ -9,7 +9,7 @@ import { collectConsole, loginAs, goto, waitHydrated, skipAkLive } from './helpe
 
 const RUN = `RZ-${Date.now().toString(36).toUpperCase()}`;
 
-test('premenovaný tok „Rezervačný odpis" → potvrdenie → zápis do TEST priečinka, REZ marker', async ({
+test('tok „Pergola z appky" → potvrdenie → zápis do TEST priečinka, REZ marker', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -17,8 +17,8 @@ test('premenovaný tok „Rezervačný odpis" → potvrdenie → zápis do TEST 
 	await loginAs(page);
 	await goto(page, '/pergola/narez');
 
-	// rename: nadpis formulára + title
-	await expect(page.getByRole('heading', { name: 'Rezervačný odpis — pergola' })).toBeVisible();
+	// rename (#379): nadpis formulára + title
+	await expect(page.getByRole('heading', { name: 'Pergola z appky' })).toBeVisible();
 
 	// rozmery (štandardná pergola z callu): Robust, na stenu, 4 nohy
 	await page.locator('#system').selectOption('Robust');

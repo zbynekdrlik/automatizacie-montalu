@@ -8,11 +8,11 @@
 	// ostatné dve sú odkazy. Testid-y ostávajú PRESNE tie, čo už
 	// asertuje e2e/pergola-uix.spec.ts (rezim-cad / link-narez /
 	// link-navrh / wrapper pergola-rezimy), aby sa žiadny existujúci
-	// test nemusel meniť. Konzumenti: hub `/pergola` ho renderuje VNÚTRI
-	// svojej pôvodnej `.card` (nezmenené); `/pergola/narez` a
-	// `/pergola/navrh` ho zámerne wrapnú do VLASTNEJ `.card` (review
-	// nález #371 — konzistentný card vzhľad na všetkých troch, žiadna
-	// zmena vnútra tejto komponenty).
+	// test nemusel meniť. Konzumenti: VŠETKY tri stránky (`/pergola`,
+	// `/pergola/narez`, `/pergola/navrh`) ho wrapnú do VLASTNEJ `.card`,
+	// VŽDY PRED nadpisovou `.card` (review nález #371 + zjednotenie poradia
+	// #375 — konzistentný card vzhľad AJ poradie voči <h1> na všetkých
+	// troch, žiadna zmena vnútra tejto komponenty).
 	import { resolve } from '$app/paths';
 
 	type Rezim = 'cad' | 'narez' | 'navrh';
@@ -50,14 +50,14 @@
 	{@render card(
 		'cad',
 		'➊',
-		'CAD nárez → Money odpis',
+		'Pergola z cadu',
 		'Máš hotový CAD nárez zo Solid Edge — prepíšem ho na Money odpis a počty tyčí.',
 		'rezim-cad'
 	)}
 	{@render card(
 		'narez',
 		'z rozmerov',
-		'Rezervačný odpis',
+		'Pergola z appky',
 		'Ešte nemáš CAD — zarezervuj materiál v Money už z rozmerov objednávky.',
 		'link-narez'
 	)}

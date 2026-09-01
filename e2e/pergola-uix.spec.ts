@@ -14,8 +14,8 @@ test('rozcestník /pergola: tri režimy s popismi, aktívny CAD, funkčné odkaz
 	// rozcestník je viditeľný a nesie práve tri režimy s názvami
 	const rezimy = page.getByTestId('pergola-rezimy');
 	await expect(rezimy).toBeVisible();
-	await expect(rezimy).toContainText('CAD nárez → Money odpis');
-	await expect(rezimy).toContainText('Rezervačný odpis');
+	await expect(rezimy).toContainText('Pergola z cadu');
+	await expect(rezimy).toContainText('Pergola z appky');
 	await expect(rezimy).toContainText('Návrhový výkres');
 
 	// každý režim má jednovetový popis „kedy použiť" (nie len holý názov)
@@ -29,12 +29,12 @@ test('rozcestník /pergola: tri režimy s popismi, aktívny CAD, funkčné odkaz
 	// CAD formulár ostáva hneď pod rozcestníkom (rýchly tok interných nedotknutý)
 	await expect(page.getByLabel('Materiál (CAD nárez) *')).toBeVisible();
 
-	// odkaz na rezervačný odpis funguje
+	// odkaz na pergolu z appky funguje
 	await expect(page.getByTestId('link-narez')).toBeVisible();
 	await page.getByTestId('link-narez').click();
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/pergola\/narez$/);
-	await expect(page.getByRole('heading', { name: 'Rezervačný odpis — pergola' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Pergola z appky' })).toBeVisible();
 
 	// späť na /pergola a odkaz na návrhový výkres funguje
 	await goto(page, '/pergola');
@@ -43,6 +43,31 @@ test('rozcestník /pergola: tri režimy s popismi, aktívny CAD, funkčné odkaz
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/pergola\/navrh$/);
 	await expect(page.getByRole('heading', { name: 'Pergola — návrhový výkres' })).toBeVisible();
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#375 — prepínač pergola režimov je na rovnakej pozícii voči nadpisu na všetkých troch stránkach', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	// prepínač musí byť VŽDY nad nadpisom stránky (rovnaká vertikálna pozícia voči
+	// nadpisu) na hube AJ na oboch podstránkach — inak sa pri prepnutí obsah „skáče"
+	// (#375). Porovnávame skutočnú vykreslenú pozíciu (boundingBox), nie len poradie
+	// v DOM-e, aby test odhalil aj vizuálny (nie len markup) skok.
+	for (const cesta of ['/pergola', '/pergola/narez', '/pergola/navrh']) {
+		await goto(page, cesta);
+		const rezimyBox = await page.getByTestId('pergola-rezimy').boundingBox();
+		const nadpisBox = await page.getByRole('heading', { level: 1 }).boundingBox();
+		expect(rezimyBox, `${cesta}: prepínač musí byť viditeľný`).not.toBeNull();
+		expect(nadpisBox, `${cesta}: nadpis musí byť viditeľný`).not.toBeNull();
+		expect(
+			rezimyBox!.y,
+			`${cesta}: prepínač (y=${rezimyBox!.y}) musí byť NAD nadpisom (y=${nadpisBox!.y})`
+		).toBeLessThan(nadpisBox!.y);
+	}
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -64,7 +89,7 @@ test('výstup narezu: stavové zhrnutie (spočítané/čaká) + per-riadkové od
 
 	// zjednotený nadpis (žiadne staré „Materiál/nárez")
 	const nadpis = page.getByTestId('narez-nadpis');
-	await expect(nadpis).toContainText('Rezervačný odpis');
+	await expect(nadpis).toContainText('Pergola z appky');
 	await expect(nadpis).toContainText('Robust');
 
 	// stavové zhrnutie navrchu: dve čísla — spočítané a čaká
@@ -101,7 +126,7 @@ test('výstup narezu: stavové zhrnutie (spočítané/čaká) + per-riadkové od
 // (interné question ID typu O2/O5) ani odkaz na call. Skenuje CELÝ textový obsah stránky
 // (aj zbalené <details>, ktoré textContent vracia) na plnom výsledku vrátane krovu,
 // zosilneného nosníka a Robust výstuhy (najviac nepodporovaných položiek). ČÍTACIE.
-test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke rezervačného odpisu', async ({
+test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke pergoly z appky', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -143,7 +168,7 @@ test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke rezervač
 	await expect(page.getByTestId('narez-nepodporovane')).toContainText('vzorec');
 
 	// #339 — ten istý žargón-sken AJ na kroku rezervačného náhľadu (tam sa renderujú tesnenia +
-	// Money rozpis). „Pripraviť rezervačný odpis" je ČÍTACIE (žiadny zápis do Money) — len náhľad.
+	// Money rozpis). „Pripraviť odpis" je ČÍTACIE (žiadny zápis do Money) — len náhľad.
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-UIX-Z');
 	await page.getByLabel('OP/OPDL číslo *').fill('OP260998');
 	await page.getByLabel('Zákazník *').fill('E2E UIX');
@@ -178,16 +203,16 @@ test('prepínač režimov je dosiahnuteľný z /pergola/narez — CAD aj výkres
 	const rezimy = page.getByTestId('pergola-rezimy');
 	await expect(rezimy).toBeVisible();
 
-	// aktuálna stránka (rezervačný odpis) je označená ako "tu si" a NIE JE odkaz
+	// aktuálna stránka (Pergola z appky) je označená ako "tu si" a NIE JE odkaz
 	const aktivny = page.getByTestId('link-narez');
 	await expect(aktivny).toHaveClass(/active/);
 	await expect(aktivny).toContainText('tu si');
 	expect(await aktivny.evaluate((el) => el.tagName)).toBe('DIV');
 
-	// formulár rezervačného odpisu ostáva hneď pod prepínačom (nedotknutý)
+	// formulár Pergoly z appky ostáva hneď pod prepínačom (nedotknutý)
 	await expect(page.getByLabel('Šírka (mm) *')).toBeVisible();
 
-	// CAD nárez → Money odpis je o jeden klik
+	// Pergola z cadu je o jeden klik
 	await expect(page.getByTestId('rezim-cad')).toBeVisible();
 	await page.getByTestId('rezim-cad').click();
 	await waitHydrated(page);
@@ -224,14 +249,14 @@ test('prepínač režimov je dosiahnuteľný z /pergola/navrh — CAD aj rezerv�
 	// formulár návrhového výkresu ostáva hneď pod prepínačom (nedotknutý)
 	await expect(page.getByLabel('OP číslo')).toBeVisible();
 
-	// rezervačný odpis je o jeden klik
+	// pergola z appky je o jeden klik
 	await expect(page.getByTestId('link-narez')).toBeVisible();
 	await page.getByTestId('link-narez').click();
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/pergola\/narez$/);
-	await expect(page.getByRole('heading', { name: 'Rezervačný odpis — pergola' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Pergola z appky' })).toBeVisible();
 
-	// späť na /pergola/navrh a CAD nárez → Money odpis je o jeden klik
+	// späť na /pergola/navrh a Pergola z cadu je o jeden klik
 	await goto(page, '/pergola/navrh');
 	await expect(page.getByTestId('rezim-cad')).toBeVisible();
 	await page.getByTestId('rezim-cad').click();
