@@ -32,13 +32,13 @@
 		</p>
 	{:else}
 		<p class="sub" data-testid="ceny-snapshot-vek">
-			Snapshot cien z Money zatiaľ nebol naimportovaný — všetky ceny nižšie sú „neznáme".
+			Snapshot cien z Money zatiaľ nebol naimportovaný — všetky ceny sú „neznáme".
 		</p>
 	{/if}
 	{#if ceny.snapshot.rejectedCount > 0}
 		<p class="sub neuplne" data-testid="ceny-snapshot-odmietnute">
 			⚠ Posledný import snapshotu zamietol {ceny.snapshot.rejectedCount}
-			{riadokSlovo(ceny.snapshot.rejectedCount)} (chybné dáta z Money) — tie kódy môžu chýbať nižšie.
+			{riadokSlovo(ceny.snapshot.rejectedCount)} (chybné dáta z Money) — tie kódy môžu chýbať.
 		</p>
 	{/if}
 	<table>

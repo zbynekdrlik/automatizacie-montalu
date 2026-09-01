@@ -89,6 +89,38 @@ out on `selectOption`/`getByLabel` waits that made no sense given the source).
 When `BASE_URL` IS set (post-deploy E2E against a live target), the `webServer` is
 `undefined` — no local preview server, no build — so this doesn't apply.
 
+## Paralelní worktree workeri sa bijú o port 4173 — spusti E2E na inom porte cez TEMP config
+
+`playwright.config.ts`'s `webServer` má `reuseExistingServer: false` a HARDCODED
+`http://localhost:4173` (aj `url`, aj `baseURL` default). Worktree-izolovaní workeri
+(fleet dispatch, viac branchov naraz) zdieľajú JEDEN host, takže dvaja, čo naraz púšťajú
+lokálne E2E, kolidujú: druhý padne na `Error: http://localhost:4173/health is already
+used`. NEZABÍJAJ cudzí preview (friendly-fire so súrodencom). Namiesto toho over voľný port
+(`ss -tlnp | grep -E ':4173|:4273'`) a spusti na inom cez DOČASNÝ override config (untracked,
+zmaž po behu — nikdy `git add`):
+
+```ts
+// playwright.tmp4273.config.ts  (v koreni worktree — testDir 'e2e' sa rezolvuje odtiaľ)
+import base from './playwright.config';
+const PORT = 4273;
+const ws = (base as { webServer?: Record<string, unknown> }).webServer;
+export default {
+	...base,
+	use: { ...(base as { use?: Record<string, unknown> }).use, baseURL: `http://localhost:${PORT}` },
+	webServer: {
+		...ws,
+		command:
+			'if [ "$E2E_PREBUILT" = 1 ]; then true; else npm run build; fi && node e2e/reset-e2e-db.mjs && npm run preview -- --port ' + PORT,
+		url: `http://localhost:${PORT}/health`
+	}
+};
+```
+
+`npx playwright test --config=playwright.tmp4273.config.ts e2e/<spec>.ts …`, potom
+`rm -f playwright.tmp4273.config.ts`. `npm run preview -- --port N` prepošle port do
+`vite preview` (default 4173). Musíš prepísať OBOJE — `webServer.url` (readiness check) aj
+`use.baseURL` — inak testy mieria na 4173, kým server beží na N.
+
 ## A LONG-LIVED manual `npm run preview` (for ad-hoc Playwright MCP visual iteration) must be RESTARTED after every rebuild — a fresh build alone is not enough
 
 The section above covers `npx playwright test`'s OWN `webServer` (short-lived, one

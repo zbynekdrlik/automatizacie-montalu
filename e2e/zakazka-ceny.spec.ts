@@ -66,7 +66,9 @@ test('zákazka: agregovaný cenový zoznam cez viac odpisov — súčty, „cena
 	// hlavička + scope: súčty z 2 LIVE odpisov, TEST mimo súčtov
 	await expect(page.getByTestId('zakazka-hlavicka')).toContainText('Zákazka E2E-ZC-AGG');
 	await expect(page.getByTestId('zakazka-scope')).toContainText('odpisy — 2 z 3');
-	await expect(page.getByTestId('zakazka-scope')).toContainText('TEST odpisy sú v zozname nižšie');
+	await expect(page.getByTestId('zakazka-scope')).toContainText(
+		'TEST odpisy sa do súčtov nepočítajú'
+	);
 
 	// zoznam odpisov: všetky 3 (LIVE aj TEST) + readback verdikty LIVE odpisov
 	const tabulka = page.getByTestId('odpisy-zakazky-tabulka');
