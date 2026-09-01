@@ -77,7 +77,31 @@ na `.wrap` (alebo naopak `:not(.konf-app)`-štýl guard, podľa toho, čo je
 Viď `.claude/rules/testing.md` „Playwright MCP browser_take_screenshot píše LEN
 do allowed roots AKTUÁLNEJ session" — v tomto repe (worktree-isolated worker)
 sa screenshot uložil do ZDIEĽANÉHO hlavného checkoutu (`automatizacie-montalu/`),
-nie do worktree. `cp` von funguje (read zo shared tree je OK), ale `rm` toho
-súboru v shared checkoute je worktree-write-guardom BLOKOVANÝ (`block-foreign-
-airuleset-write.sh`) — stray `.png` v hlavnom checkoute sa necháva byť
-(untracked, neprekáža mergu).
+nie do worktree. `cp` von funguje (read zo shared tree je OK); `rm` toho súboru
+v shared checkoute PREŠIEL bez problémov pri #392 (worktree-write-guard sa naň
+nevzťahoval — `block-foreign-airuleset-write.sh` chráni len samotný airuleset
+repo, nie hocijaký súbor v cudzom checkoute) — ak `rm` predsa raz zablokuje,
+stray `.png` v hlavnom checkoute sa necháva byť (untracked, neprekáža mergu).
+
+## Nav dropdown vzor (#392 — Moduly/Nástroje/user menu) — natívny `<details>`, pasce
+
+Tri dropdowny v hornej lište (Moduly-pri-zúžení / Nástroje / user menu) stavajú na
+natívnom `<details>/<summary>` (žiadna JS knižnica) — reuse tento vzor v ďalších stage,
+ak pribudne ďalší dropdown/menu:
+
+- **`<summary>` NIE JE `getByRole('button', …)` v tomto Chromium/Playwright behu**, hoci
+  HTML-AAM ho mapuje na ARIA rolu "button" (naživo overené: dva e2e testy timeoutli na
+  presne tomto). Cieľ vždy cez `data-testid` na `<summary>`, nikdy cez rolu.
+- **Zdieľaná `{#snippet}` šablóna nad viacerými `$derived` poľami s `RouteId` hrefmi**
+  typuj `typeof poleA | typeof poleB` (konkrétne premenné), NIKDY bare
+  `{ href: RouteId; label: string }[]` — `resolve()`'s overloaded signatúra zlyhá proti
+  celej `RouteId` únii (detaily + fix v `.claude/rules/lint-formatting.md`).
+- **Light-dismiss (klik mimo / Escape) natívny `<details>` NEDÁVA zadarmo** — treba
+  `<svelte:window onclick/onkeydown>` (~6 riadkov, žiadna knižnica); klik VNÚTRI
+  `.nav-dropdown` sa musí vynechať (`e.target.closest('details.nav-dropdown')`), inak
+  sa natívny toggle na `<summary>` a tvoj listener pobijú.
+- **Zatváranie po SPA navigácii**: `afterNavigate` z `$app/navigation` (nie ručný
+  `$effect` na `page.url.pathname`) — root layout sa pri route zmene neremountuje,
+  takže `<details open>` by inak ostalo nastavené aj po kliku na odkaz vnútri.
+- **`▾` glyf patrí do `<span aria-hidden="true">`**, nie priamo do textu triggera —
+  inak si accessible name („Moduly ▾") nesie aj názov glyfu pre screen reader.
