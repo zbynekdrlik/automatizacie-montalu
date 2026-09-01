@@ -1,8 +1,10 @@
-// Šikmý FIX (do boku pergoly) — modul kreslí VÝKRES KONŠTRUKCIE, nič viac.
-// Zadanie 2026-07-27: „stačí, že budeš vytvárať rovnakú konštrukciu ako na tých
-// výkresoch a oni už vedia podľa toho rezať." Preto tu NIE JE žiadny zápis do
-// Money: modul nemá (a ani nemôže mať) odpis — karty Cortizo COR-60 CE v Money
-// katalógu neexistujú (overené read-only SQL 2026-07-27).
+// Šikmý FIX „z appky" (do boku pergoly) — TENTO režim (route /fix) kreslí VÝKRES
+// KONŠTRUKCIE, nič viac: do Money odtiaľto NEJDE nič. Zadanie 2026-07-27: „stačí, že
+// budeš vytvárať rovnakú konštrukciu ako na tých výkresoch a oni už vedia podľa toho rezať."
+// Karty Cortizo COR-60 CE v Money katalógu neexistujú (overené read-only SQL 2026-07-27).
+// #380: FIX modul má DRUHÝ režim „Fix z cadu" (route /fix/cad), ktorý z CAD nárezu ZAPISUJE
+// Money odpis (reuse pergola CAD2DLV engine + katalóg, modul='fix'). Tá cesta žije ODDELENE
+// v `$lib/server/fix-cad.ts`; tento formulár ostáva Money-clean (guard fix-money-safety.test.ts).
 import type { Actions } from './$types';
 import { pocitajFix, rovnomernePolia, FIX_MAX_POLI } from '$lib/fix';
 import { parseFixVstup } from '$lib/server/fix-vstup';
