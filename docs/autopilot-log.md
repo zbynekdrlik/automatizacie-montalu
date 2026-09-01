@@ -1820,3 +1820,36 @@ integruje z `refs/autopilot-wip/worktree-agent-aa41abb12a30d9210`.
 **Playbook:** `money-odpis.md §1b` (worktree bez SSH kľúča `slovnormal_odoo` — neblokuj,
 zapíš finding) + `§1c` (nová Dominikov zoznam vs staršia sourcovaná odpoveď — sourcovaná
 vyhráva, over či podklad má reálny vzorec).
+
+## #371 — Pergola: prepínač režimov viditeľný na všetkých pergola stránkach
+
+Salvage dead-workerovej uncommitted práce (HEAD `4269d77` bump 0.24.64-dev.1, uncommitted
+diff PergolaModeNav.svelte + 3 route súbory + e2e). Extrahovaný zdieľaný komponent
+`src/lib/components/PergolaModeNav.svelte` z pôvodného `.mode-grid`/`.mode-card` bloku
+hub route `/pergola`, renderovaný hore na `/pergola`, `/pergola/narez` aj `/pergola/navrh`
+(owner 1.9.2026: „uz sa neviem lahko prepinat"). Testid-y zachované (rezim-cad/link-narez/
+link-navrh/pergola-rezimy), žiadny existujúci test sa nemenil.
+
+Pri lokálnej verifikácii (spustenie NOVÝCH e2e testov zo salvage diffu) objavený a opravený
+reálny bug: `RezForm.svelte` malo vlastný starý `data-testid="link-navrh"` in-page odkaz,
+ktorý po pridaní zdieľaného prepínača kolidoval (Playwright strict-mode violation) —
+odstránený redundantný odsek + nepoužívaný `resolve` import.
+
+Review pass (self-contained fresh-context subagent, `/review`+`/requesting-code-review`)
+0 🔴 0 🟡 4 🔵: bodka navyše v "tu si" popiske (fix), card-wrap nekonzistencia hub vs
+narez/navrh (fix — obe teraz vo vlastnej `.card`), if/else-if reťazec nahradený
+`Record<Rezim,...>` mapou (fix), chýbajúci `aria-current` (ponechané, zhoduje sa s
+pôvodným hub vzorom, nie regresia).
+
+Commity: `bb5e173` (feat), `d748d78` (bump 0.24.64 clean), `7cdfbf2` (review fixes). PR
+#373, merge sha `6361f0f`. CI main zelené (test+deploy). Post-deploy verifikácia (fresh-
+browser subagent, seed user `marek`): switcher viditeľný + funkčný na všetkých 3 stránkach,
+zero console errors, verzia `v0.24.64 (6361f0f)` na footeri všade.
+
+**Playbook:** `.claude/rules/pergola-narez.md` — nová sekcia „Zdieľaný prepínač
+PergolaModeNav.svelte (#371) — testid kolízia so starým in-page odkazom" (grepni cieľové
+testid-y aj v komponentoch POD zdieľanou nav komponentou pred jej pridaním na existujúcu
+stránku) + card-wrap konzistencia gotcha. Rozšírené `paths:` frontmatter (PergolaModeNav.svelte,
+`/pergola`, `/pergola/navrh`, `pergola-uix.spec.ts`).
+
+Verzia 0.24.65-dev.1.
