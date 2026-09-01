@@ -66,8 +66,8 @@ export interface ClipRiadok {
 	kod: string | null;
 	/** dĺžka rezu [mm]; `null` pre spojovník/kolík (pevný počet ks, bez rezu) */
 	rozmer: number | null;
-	/** F — počet kusov/rezov */
-	pocetKs: number;
+	/** F — počet kusov/rezov (profil); `null` pre drobné položky (nie sú rezané kusy) */
+	pocetKs: number | null;
 	/** ROUNDDOWN(7500 / rozmer) — koľko rezov z jednej tyče; `null` pre drobné */
 	zaokruhlene: number | null;
 	/** ROUNDUP(pocetKs / zaokruhlene) — do odpisu; `null` pre drobné */
@@ -91,7 +91,7 @@ export interface ClipVypocet {
 	/** N — počet výplní */
 	pocetVyplni: number;
 	/** pozície priečok od ľavého kraja [mm] (len N≥2) — replikované 1:1 zo šablóny */
-	pozicieePriecok: number[];
+	poziciePriecok: number[];
 	/** celá materiálová tabuľka (nárez) — profily + 4 drobné položky */
 	riadky: ClipRiadok[];
 	/** Money odpis: súčet tyčí per kód (mj 'ks'), poradie rám → priečka → zasklievací */
@@ -171,7 +171,7 @@ export function chybaClipVstupu(vstup: ClipVstup): string | null {
 
 /** Pozície priečok od ľavého kraja [mm] (len N≥2) — replikované 1:1 zo šablóny,
  *  vrátane šablónových offsetov (parita, nie „oprava"). Display-only. */
-function pozicieePriecok(N: number, B6: number): number[] {
+function poziciePriecok(N: number, B6: number): number[] {
 	if (N === 2) return [B6 / 2];
 	if (N === 3) {
 		const p1 = (B6 - 108) / 3 + 39;
@@ -245,7 +245,7 @@ export function computeClip(vstup: ClipVstup): ClipVypocet {
 		m2: R3((B6 * C6) / 1_000_000),
 		vyplnPopis: popisTyp(vstup.typ),
 		pocetVyplni: N,
-		pozicieePriecok: pozicieePriecok(N, B6).map(R1),
+		poziciePriecok: poziciePriecok(N, B6).map(R1),
 		riadky: [...profilRiadky, ...drobne],
 		polozky
 	};
@@ -257,7 +257,7 @@ function drobna(oznacenie: string, mnozstvo: number, mj: 'ks' | 'm', poznamka: s
 		oznacenie,
 		kod: null,
 		rozmer: null,
-		pocetKs: 1,
+		pocetKs: null,
 		zaokruhlene: null,
 		pocetTyci: null,
 		mnozstvo,

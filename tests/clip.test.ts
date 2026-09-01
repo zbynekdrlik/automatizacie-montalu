@@ -13,6 +13,8 @@ import {
 	dostupneVarianty,
 	jeClipTyp,
 	CLIP_MIN_VYPLNE,
+	CLIP_MAX_SIRKA,
+	CLIP_DLZKA_TYCE,
 	type ClipVstup,
 	type ClipTyp
 } from '../src/lib/clip';
@@ -299,12 +301,13 @@ describe('computeClip — 1:1 s Patrikovými šablónami (kontraktné vektory)',
 					expect(dr.kod).toBeNull();
 					expect(dr.poznamka).toMatch(/neodpisuje sa/);
 				}
-				// honest-null: žiadna drobná položka nie je v Money odpise
-				expect(r.polozky.some((p) => p.kod === null)).toBe(false);
+				// honest-null: Money odpis obsahuje LEN overené profilové kódy (ZASP*),
+				// nikdy drobnú položku (runtime check — chytí aj budúci KM12/null leak)
+				expect(r.polozky.every((p) => p.kod.startsWith('ZASP'))).toBe(true);
 			});
 
 			it('pozície priečok (replikované 1:1 zo šablóny)', () => {
-				expect(r.pozicieePriecok).toEqual(v.poz);
+				expect(r.poziciePriecok).toEqual(v.poz);
 			});
 		});
 	}
@@ -349,6 +352,15 @@ describe('chybaClipVstupu — validácia', () => {
 		const e = chybaClipVstupu(vstup({ typ: 'izo', variant: 4, sirka: 300 }));
 		expect(e).toMatch(/šírka jednej výplne/i);
 		expect(CLIP_MIN_VYPLNE).toBe(50);
+	});
+});
+
+describe('invariant — max šírka < dĺžka tyče (ochrana pred 0-tyčí)', () => {
+	// ROUNDDOWN(7500/rozmer)=0 (rozmer > 7500) by dal šablónové IFERROR = 0 tyčí =
+	// tichý podhodnotený odpis. Najväčší rozmer je šírka (hlavný profil čelo), takže
+	// CLIP_MAX_SIRKA musí ostať < CLIP_DLZKA_TYCE aj pri budúcom rozšírení rozsahu.
+	it('CLIP_MAX_SIRKA < CLIP_DLZKA_TYCE', () => {
+		expect(CLIP_MAX_SIRKA).toBeLessThan(CLIP_DLZKA_TYCE);
 	});
 });
 

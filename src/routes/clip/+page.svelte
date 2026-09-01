@@ -158,8 +158,8 @@
 		</p>
 		<p class="sub">
 			Šírka výplne {fmt(v.sirkaVyplne)} mm · výška výplne {fmt(v.vyskaVyplne)} mm · {fmt(v.m2)} m²
-			{#if v.pozicieePriecok.length}
-				· priečky od kraja: {v.pozicieePriecok.map((p) => fmt(p)).join(', ')} mm
+			{#if v.poziciePriecok.length}
+				· priečky od kraja: {v.poziciePriecok.map((p) => fmt(p)).join(', ')} mm
 			{/if}
 		</p>
 		<p class="sub">

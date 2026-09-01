@@ -582,7 +582,8 @@ export function parseClipVstup(form: FormData): { vstup: ClipVstup; error: strin
 		op: String(form.get('op') ?? '').trim(),
 		zakaznik: String(form.get('zakaznik') ?? '').trim(),
 		caka: form.get('caka') === '1',
-		// neznámy typ → bezpečný default 'izo' (chybaClipVstupu aj tak validuje typ×variant)
+		// tvar objektu potrebuje ClipTyp; neplatný `typ` sa dole ODMIETNE chybou
+		// (nie tichý default — izo vs klasika menia zasklievací Money kód, review 🟡)
 		typ: jeClipTyp(rawTyp) ? rawTyp : 'izo',
 		variant: Math.round(num('variant')),
 		sirka: num('sirka'),
@@ -595,5 +596,8 @@ export function parseClipVstup(form: FormData): { vstup: ClipVstup; error: strin
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
+	// skriptovaný POST môže poslať čokoľvek — neplatný typ NIKDY ticho neprepadne na
+	// 'izo' (odpísal by ZASP00119 miesto ZASP202413); radšej hlásna chyba (review 🟡)
+	else if (!jeClipTyp(rawTyp)) error = 'Neplatný typ výplne (očakáva sa „izo" alebo „klasika").';
 	return { vstup, error };
 }

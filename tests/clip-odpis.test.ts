@@ -52,8 +52,8 @@ describe('clip route — spocitat (náhľad, bez zápisu)', () => {
 		r.vypocet.polozky.forEach((p) => (g[p.kod] = p.qty));
 		expect(g).toEqual({ ZASP00116: 2, ZASP00125: 1, ZASP00119: 2 });
 		expect(r.vypocet.polozky.every((p) => p.mj === 'ks')).toBe(true);
-		// honest-null: žiadna položka s null kódom v Money odpise
-		expect(r.vypocet.polozky.some((p) => (p.kod as unknown) === null)).toBe(false);
+		// honest-null: odpis obsahuje LEN overené profilové kódy (ZASP*), nikdy drobnú položku
+		expect(r.vypocet.polozky.every((p) => p.kod.startsWith('ZASP'))).toBe(true);
 		// drobné (kod:null) sú v materiálovej tabuľke, ale nie v odpise
 		const drobne = r.vypocet.riadky.filter((x) => x.kod === null);
 		expect(drobne.map((x) => x.oznacenie)).toEqual([
@@ -90,6 +90,26 @@ describe('clip route — spocitat (náhľad, bez zápisu)', () => {
 		)) as { step: string; error: string };
 		expect(r.step).toBe('form');
 		expect(r.error).toMatch(/B0 a B1/);
+	});
+
+	it('neplatný typ (skriptovaný POST) je ODMIETNUTÝ, NIE ticho prepadnutý na izo (review 🟡)', async () => {
+		// izo vs klasika menia zasklievací Money kód — tichý default 'izo' by odpísal
+		// ZASP00119 miesto ZASP202413; parseClipVstup musí vrátiť chybu
+		const r = (await clip.actions.odoslat(
+			ev({
+				zak: 'CLIP-BADTYP',
+				op: 'OP1',
+				zakaznik: 'X',
+				typ: 'xxx',
+				variant: '2',
+				sirka: '3000',
+				vyska: '1000',
+				ral: ''
+			})
+		)) as { step: string; error: string };
+		expect(r.step).toBe('form');
+		expect(r.error).toMatch(/typ výplne/i);
+		expect(listOdpisy(200).some((o) => o.zak === 'CLIP-BADTYP')).toBe(false);
 	});
 });
 
