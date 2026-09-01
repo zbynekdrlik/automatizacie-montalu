@@ -30,7 +30,7 @@
 </script>
 
 <div class="card">
-	<h1 data-testid="rez-nadpis">Rezervačný odpis — {ident.zak} · {ident.zakaznik}</h1>
+	<h1 data-testid="rez-nadpis">Pergola z appky — {ident.zak} · {ident.zakaznik}</h1>
 	<p class="sub">
 		<span class="badge">Pergola · {rozpis.pocetPolozok} položiek</span>
 		{#if !live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
@@ -135,9 +135,7 @@
 		{@render hidden()}
 		{@render hiddenIdent()}
 		<button class="btn" type="submit" data-testid="odoslat-rezervaciu">
-			{live
-				? '✅ Odoslať rezervačný odpis do Money'
-				: '🧪 Odoslať rezervačný odpis (TEST priečinok)'}
+			{live ? '✅ Odoslať odpis do Money' : '🧪 Odoslať odpis (TEST priečinok)'}
 		</button>
 	</form>
 	<form method="POST" action="?/upravit" style="display:inline">
