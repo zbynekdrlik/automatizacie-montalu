@@ -188,3 +188,13 @@ guard + explicit error + RED→GREEN regression test, not a silencing `!`.
   `x?.[0]?.y`. **svelte-check kryje aj `.ts` TESTY** — takže po pridaní testových asercií s
   optional-chainingom ZNOVA spusti `npm run check` (nie len `vitest`+`lint`); `?.[0].dovod` v teste
   prešlo cez vitest aj eslint, ale svelte-check ho odhalil (chytila to až review).
+
+## Presunutá/premenovaná route → `npm run check` (sync) PRED lintom (#384 integrácia)
+
+`npm run lint` NErobí `svelte-kit sync`. Po merge, ktorý PRESUNIE route súbor
+(`git mv konfigurator/+page.server.ts → konfigurator/pergola/…`), sú `.svelte-kit`
+typy stale — `./$types` pre novú cestu neexistuje → typed eslint vidí error-typed
+importy a vysype KASKÁDU falošných `no-unsafe-*` chýb (14 naraz), hoci kód je OK.
+Fix: `npm run check` (spustí sync) a lint zbehne čisto. Platí aj pre pre-push
+lint hook — pri „unsafe assignment of an error typed value" po route presune
+NAJPRV sync, až potom skúmaj kód.
