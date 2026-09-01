@@ -20,7 +20,7 @@ import { jeSoftverovyRenderer } from '../src/lib/vizual/kvalita';
 // ešte-mountujúcou scénou → sankcionovaný teardown `forceContextLoss` sa zaloguje. Ten istý
 // sync-point, aký už používajú 3D testy nižšie (`data-viz-ready`), aplikovaný na form-testy.
 async function konfReady(page: import('@playwright/test').Page) {
-	await goto(page, '/konfigurator');
+	await goto(page, '/konfigurator/pergola');
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 }
 
@@ -31,7 +31,7 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 
 	// verejná route — žiadne prihlásenie; NESMIE presmerovať na /login
 	await konfReady(page);
-	await expect(page).toHaveURL(/\/konfigurator$/);
+	await expect(page).toHaveURL(/\/konfigurator\/pergola$/);
 	await expect(page.getByRole('heading', { name: /Navrhni si.*pergolu/i })).toBeVisible();
 
 	await page.getByTestId('sirka').fill('5');
@@ -118,7 +118,7 @@ test('konfigurátor: dopyt tok — súhrn → kontaktný formulár → PDF ponuk
 	const consoleMsgs = collectConsole(page);
 
 	await konfReady(page);
-	await expect(page).toHaveURL(/\/konfigurator$/);
+	await expect(page).toHaveURL(/\/konfigurator\/pergola$/);
 
 	// 1) nakonfiguruj pergolu → zobraz súhrn
 	await page.getByTestId('sirka').fill('4.5');
@@ -410,8 +410,8 @@ test('konfigurátor: 3D náhľad je viditeľný HNEĎ pri načítaní + živý u
 	test.setTimeout(60000); // softvérový WebGL v CI je pomalší (lazy import + stavba scény + HDRI)
 	const consoleMsgs = collectConsole(page);
 
-	await goto(page, '/konfigurator?viz=mid');
-	await expect(page).toHaveURL(/\/konfigurator/);
+	await goto(page, '/konfigurator/pergola?viz=mid');
+	await expect(page).toHaveURL(/\/konfigurator\/pergola/);
 
 	// #325 split-screen: 3D náhľad (defaultná pergola) je viditeľný HNEĎ, BEZ submitu —
 	// invertuje pôvodný #276 lazy-lock (náhľad bol až po submite). Lazy import three.js
@@ -491,7 +491,7 @@ test('konfigurátor: zmena LEN farby a LEN skla naozaj prekreslí 3D (nie len ca
 	test.setTimeout(60000);
 	const consoleMsgs = collectConsole(page);
 
-	await goto(page, '/konfigurator?viz=mid');
+	await goto(page, '/konfigurator/pergola?viz=mid');
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 	const viz = page.getByTestId('vizual3d');
 
@@ -541,7 +541,7 @@ test('konfigurátor: zákaznícke kategórie skla + info karty + realistický sk
 	test.setTimeout(60000); // 3D náhľad je na CI softvérovom WebGL ťažší (#327 timing)
 	const consoleMsgs = collectConsole(page);
 	await konfReady(page); // goto + počkaj na [data-viz-ready] pred interakciou s formulárom
-	await expect(page).toHaveURL(/\/konfigurator$/);
+	await expect(page).toHaveURL(/\/konfigurator\/pergola$/);
 
 	// (4) presne 6 kategórií skla, žiadny label neodhaľuje hrúbku (4.4.2 / -8-6 / mm)
 	const skloChips = page.getByTestId('sklo-chip');
@@ -644,7 +644,7 @@ test('konfigurátor: 3D náhľad viditeľný HNEĎ na MOBILNOM viewporte 390×84
 	const consoleMsgs = collectConsole(page);
 	await page.setViewportSize({ width: 390, height: 844 });
 
-	await goto(page, '/konfigurator?viz=low');
+	await goto(page, '/konfigurator/pergola?viz=low');
 	// #325 mobil-first: vizuál hore, viditeľný HNEĎ pri načítaní (bez submitu)
 	await expect(page.getByTestId('konf-viz')).toBeVisible();
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });

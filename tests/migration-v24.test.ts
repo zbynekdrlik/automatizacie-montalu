@@ -46,7 +46,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v23 → v24: audit CHECK delete+seed, história zachovaná (#246)', () => {
 	it('user_version === 24 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(34);
+		expect(db.pragma('user_version', { simple: true })).toBe(35);
 	});
 
 	it('existujúci user_audit riadok (create) prežil recreate tabuľky', () => {
