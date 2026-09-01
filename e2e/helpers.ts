@@ -81,6 +81,35 @@ export async function loginAs(page: Page, user = E2E_USER, pass = E2E_PASS) {
 }
 
 /**
+ * #392: „Používatelia" + „Odhlásiť" žijú v user menu (`<details data-testid=
+ * "user-menu-toggle">`, uzavreté defaultne) — otvor ho pred kontrolou/klikom na
+ * čokoľvek vnútri (nezávislé od dynamického username v summary textu).
+ */
+export async function openUserMenu(page: Page) {
+	await page.getByTestId('user-menu-toggle').click();
+}
+
+/**
+ * #392: „Nástroje" (Optimalizátor/Vzorce/História/Dopyty/Problém) je vždy dropdown
+ * (`<summary data-testid="tools-menu-toggle">`) — testid, nie ARIA rola (naživo overené:
+ * `<summary>` sa v tomto Chromiu/Playwright behu nesprával spoľahlivo ako
+ * `getByRole('button', …)`, hoci HTML-AAM ju mapuje na "button").
+ */
+export async function openTools(page: Page) {
+	await page.getByTestId('tools-menu-toggle').click();
+}
+
+/**
+ * #392: „Odhlásiť" presunuté do user menu — otvor ho, klikni, počkaj na /login.
+ * Nahrádza predošlé priame `page.getByRole('button', { name: 'Odhlásiť' }).click()`.
+ */
+export async function logout(page: Page) {
+	await openUserMenu(page);
+	await page.getByRole('button', { name: 'Odhlásiť' }).click();
+	await expect(page).toHaveURL(/\/login/);
+}
+
+/**
  * #338: kovanie RS Robust/Štandard vyžaduje zvolenú RAL farbu — bez nej engine
  * odmietne odpis a náhľad sa nezobrazí. Tento pomocník zvolí farbu, keď je select
  * na obrazovke (Robust/Štandard, aj Deluxe od #354 — jeho 10mm krytky majú tiež

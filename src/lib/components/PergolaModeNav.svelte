@@ -31,10 +31,9 @@
 {#snippet card(rezim: Rezim, tag: string, title: string, desc: string, testid: string)}
 	{#if rezim === active}
 		<div class="mode-card active" data-testid={testid}>
-			<span class="mode-tag ok">{tag} tu si</span>
+			<span class="mode-tag">{tag}</span>
 			<span class="mode-title">{title}</span>
 			<span class="mode-desc">{desc}</span>
-			<span class="mode-foot">Formulár je nižšie ↓</span>
 		</div>
 	{:else}
 		<a class="mode-card" href={resolve(CESTY[rezim])} data-testid={testid}>
@@ -107,7 +106,9 @@
 	.mode-card.active {
 		background: #eff6ff;
 		border-color: #2563eb;
-		box-shadow: inset 0 0 0 1px #2563eb;
+		/* aktívny stav nesie JEDINE rámik (owner #398: „vidím že je rámček
+		   zamodrený") — 2px inset ring ho robí nezameniteľne „tu si". */
+		box-shadow: inset 0 0 0 2px #2563eb;
 	}
 	.mode-tag {
 		align-self: flex-start;
@@ -118,10 +119,6 @@
 		border-radius: 999px;
 		padding: 2px 9px;
 		margin-bottom: 9px;
-	}
-	.mode-tag.ok {
-		background: #dcfce7;
-		color: #15803d;
 	}
 	.mode-title {
 		font-size: 17px;
@@ -139,8 +136,5 @@
 		font-size: 13px;
 		font-weight: 600;
 		color: #2563eb;
-	}
-	.mode-card.active .mode-foot {
-		color: #475569;
 	}
 </style>

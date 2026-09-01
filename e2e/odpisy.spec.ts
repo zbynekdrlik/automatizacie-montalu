@@ -14,7 +14,8 @@ import {
 	skipAkLive,
 	E2E_USER,
 	E2E_PASS,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	logout
 } from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
@@ -216,8 +217,7 @@ test('odpisy: časy sa zobrazujú v bratislavskom lokálnom čase, nie surové U
 test('odhlásenie zmaže session a presmeruje na login', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	// chránená stránka po odhlásení opäť presmeruje na login
 	await goto(page, '/odpisy');
 	await expect(page).toHaveURL(/\/login/);
