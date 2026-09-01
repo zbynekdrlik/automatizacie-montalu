@@ -1881,3 +1881,45 @@ surového rozmeru + CLIP_MAX_SIRKA<7500 invariant; Money-ro bridge beží z dev2
 check. + router riadok v CLAUDE.md.
 
 Verzia 0.24.66-dev.1.
+
+## #380 — FIX z cadu: nový vstupný režim (CAD nárez → Money odpis)
+
+FIX modul dostal DRUHÝ režim analogicky k pergole. Dizajn (design gate, 3 zvažované prístupy):
+REUSE pergola CAD2DLV engine (`$lib/server/pergola` — 20/20 overený `transform`/`CATALOG`/
+`validatePergola`/`applyCombos`/`buildCopyBack`) — NIE generalizácia enginu ani vlastný FIX
+katalóg (nemáme reálnu FIX CAD vzorku; predčasné by riskovalo pergola goldeny / hádalo kódy).
+
+- `src/lib/server/fix-cad.ts` — FIX-owned Money-write MOST (vzor `pergola-rezervacia.ts`):
+  parseFixCadVstup/fixCadView/fixCadCeny/buildFixCadJob, `modul='fix'`, `cakaSubdir='Fix'`,
+  popis „FIX OP Zákazník".
+- `src/routes/fix/cad/` — thin route (spocitat/upravit/odoslat, load→{live}) + CAD UI (reuse
+  OdpisBlok/CenyTabulka/ProfilObrazok). `FixModeNav.svelte` (vzor PergolaModeNav, 2 karty);
+  `/fix/+page.svelte` dostalo `FixModeNav active="appka"`.
+- `money.ts` `Modul += 'fix'`. `$lib/modul-nazov.ts` — /odpisy label pre fix (aj clip).
+- **Review 🔴 (gated Fable) — cross-modul dvojitý import:** FIX reusuje pergola katalóg →
+  identický CAD dá identický content_hash pod modul='fix' aj 'pergola'; dedup/ledger sú kľúčované
+  na modul, takže presun identického nárezu z /pergola do /fix/cad by obišiel poistku. Fix (commit
+  91b885a): cross-modul identický-obsah dedup guard vo `writeOdpis` (blokuje LEN identický obsah;
+  rôzny obsah = koexistuje, keďže reálne moduly majú rôzne katalógy) + „FIX" popis marker.
+- OTVORENÁ OTÁZKA (na tickete): či reálny FIX CAD používa Cortizo COR-60 CE kódy (bez Money kariet)
+  alebo zdieľa pergola artikle — bez vzorky neisté; doplnenie FIX katalógu = follow-up so vzorkou.
+- Testy: `tests/fix-cad.test.ts` (fixCadView resolve/unresolved-TVRDÁ-chyba, buildFixCadJob modul=fix,
+  route odoslat TEST→written/duplikát, cross-modul identický→duplikát + rôzny→koexistencia),
+  `tests/fix-cad-money-safety.test.ts` (most importuje Money zámerne, akčná množina, b2b /fix/cad→
+  /zasklenia), `tests/fix-money-safety.test.ts` rozšírené (kresliaci FIX Money-clean), `tests/money.test.ts`
+  (cross-modul guard boundary test + realistický „iný modul" fixture), `e2e/fix-cad.spec.ts` (prepínač +
+  oba režimy + 0 console — lokálne 3/3).
+- Lokálne: check 0 chýb, lint clean, vitest 2833/2833, E2E fix-cad + odpisy 10/10.
+- Follow-upy: #393 (zdieľaný cad-odpis.ts extrakcia), #394 (ModeNav CSS zjednotenie).
+- RED→GREEN: cross-modul guard testy (money.test.ts:162 CROSSMOD → duplicate, fix-cad.test.ts:113
+  CROSS-1 → duplikat) — bez guardu by boli GREEN (dvojitý zápis), s guardom red-pred/green-po.
+- Commity: 078c77a (bump 0.24.66-dev.2), f691ba7 (feat), 91b885a (review fix). Branch
+  worktree-agent-a5a86d80ef7f9e669.
+
+**Playbook:** rozšírený `.claude/rules/fix-module.md` (+`fix-cad.ts` v paths) o: DVA FIX režimy
+(appka=Money-clean / cadu=Money odpis cez reuse pergola enginu), cross-modul identický-obsah dedup
+guard (POVINNÝ vzor pri reuse cudzieho katalógu — inak dvojitý import obídením per-modul dedup),
+`$lib/modul-nazov.ts` (label pokrýva každý Modul). Otvorená otázka FIX katalógu (Cortizo bez Money
+kariet) zaznamenaná.
+
+Verzia 0.24.66-dev.2.

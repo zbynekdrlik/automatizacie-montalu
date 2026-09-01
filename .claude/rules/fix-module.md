@@ -2,6 +2,7 @@
 paths:
   - "src/lib/fix.ts"
   - "src/lib/server/fix-vstup.ts"
+  - "src/lib/server/fix-cad.ts"
   - "src/routes/fix/**"
 ---
 
@@ -69,3 +70,44 @@ never assume the general pattern holds at the boundary.** n≥4 turned out to
 match the general pattern (verified: Štandard S=3000 n=6 → `[59, 720.5, 720.5,
 720.5, 720.5, 59]`); n=2 did not. Both had to be checked independently — one
 confirmed as-is, the other required a real code fix.
+
+## FIX má DVA režimy (#380) — „Fix z appky" (výkres, Money-clean) + „Fix z cadu" (Money odpis)
+
+Od #380 má FIX modul prepínač `FixModeNav.svelte` (vzor `PergolaModeNav`, ale 2 karty):
+
+- **„Fix z appky" = `/fix`** (`+page.svelte`/`+page.server.ts` + `fix-vstup.ts` + `$lib/fix.ts`) —
+  dnešný formulár rozmery → výkres konštrukcie. **Do Money NEJDE nič** (kresliaci režim). Ostáva
+  Money-clean — guard `tests/fix-money-safety.test.ts` (fix.ts + FixVykres2D nesmú importovať
+  `server/fix-cad`/`server/money`/`server/pergola`).
+- **„Fix z cadu" = `/fix/cad`** (`+page.svelte`/`+page.server.ts` + `src/lib/server/fix-cad.ts`) —
+  NOVÝ režim: CAD nárez → Money odpis. `fix-cad.ts` je Money-write MOST (vzor `pergola-rezervacia.ts`),
+  ktorý REUSUJE pergola CAD2DLV engine (`$lib/server/pergola`: `transform`/`CATALOG`/`validatePergola`/
+  `applyCombos`/`buildCopyBack`) — NIE vlastný engine/katalóg. `writeOdpis` s `modul='fix'`,
+  `cakaSubdir='Fix'`, popis „FIX OP Zákazník". Nenamapovaný CAD kód = TVRDÁ chyba (nikdy tichý odpis).
+
+**OTVORENÁ OTÁZKA (gated na vzorku):** FIX formulár používa Cortizo COR-60 CE profily BEZ Money
+kariet (overené 2026-07-27). Či reálny FIX CAD zo Solid Edge používa tie isté kódy alebo zdieľa
+pergola artikle, sa BEZ reálnej FIX CAD vzorky od Dominika nedá potvrdiť. Mechanizmus je honest
+(nenamapovaný kód → chyba). Doplnenie FIX-špecifického katalógu/CODE_MAP = follow-up so vzorkou;
+NEHÁDAŤ kódy (Money-safety).
+
+## Cross-modul identický-obsah dedup guard (#380) — POVINNÝ pri reuse cudzieho katalógu
+
+`writeOdpis` dedup aj #294 ledger sú kľúčované na `(modul, zak, op, live)`. Keď JEDEN modul REUSUJE
+katalóg INÉHO (FIX reusuje pergola PRP katalóg), identický CAD nárez dá IDENTICKÝ `content_hash` (a
+teda aj názov súboru) pod OBOMA modulmi → operátor by obišiel dvojitý-import poistku presunom
+identického nárezu z /pergola (Duplikát) do /fix/cad → dvojitý odpis rovnakého materiálu + prepis
+súboru v `dlv-import`. Preto `writeOdpis` má **cross-modul precheck** `WHERE live=? AND zak_norm=?
+AND op_norm=? AND content_hash=? AND modul != ?` → identický obsah pod iným modulom = `duplicate`.
+Blokuje LEN identický obsah; RÔZNY obsah (pergola konštrukcia + fix zasklenie „do boku" na tej
+istej ZAK+OP) má rôzny hash → legitímne koexistuje (paralela `money-readback.md`: viac modulov na
+jednej zákazke je normálne). Reálne moduly majú rôzne katalógy → guard fíruje len fix↔pergola.
+**Ak pridáš ďalší modul reusujúci cudzí katalóg, tento guard ho už pokrýva — nespoliehaj sa na
+per-modul dedup samotný.**
+
+## `$lib/modul-nazov.ts` — /odpisy label MUSÍ pokrývať KAŽDÝ `Modul` (#380)
+
+`/odpisy` (história/detail/zákazka) predtým zobrazovali modul cez ternár `… : 'Pergola'` (fallback),
+takže fix AJ clip sa tvárili ako „Pergola". Od #380 je jeden client-safe `modulNazov` (`$lib/modul-nazov.ts`,
+`Record<string,string>`). Pri pridaní nového modulu do `Modul` únie (`money.ts`) DOPLŇ ho aj sem
+(neznámy → surový kód `?? m`, čestný fallback).
