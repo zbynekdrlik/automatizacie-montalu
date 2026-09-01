@@ -5,6 +5,9 @@ const B2B_FORBIDDEN_PREFIXES = [
 	'/pergola',
 	'/fix',
 	'/bazen',
+	// CLIP zábradlie nárez + Money odpis (#372) — interný Money-zápisový modul,
+	// b2b nemá požiadavku; drift guard: tests/b2b-route-coverage.test.ts
+	'/clip',
 	'/odpisy',
 	'/problem',
 	'/pouzivatelia',

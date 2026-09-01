@@ -7,6 +7,7 @@ import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnic
 import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 import { jeSietkaUchyt, maSietkaSystem, maSietkaSystemVyber, type Sietka } from '$lib/sietka';
 import type { Farba } from '$lib/komponenty';
+import { jeClipTyp, type ClipVstup } from '$lib/clip';
 
 export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 
@@ -561,5 +562,38 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 	else if (!(vstup.pocetSekcii > 0)) error = 'Zadaj počet sekcií (väčší ako 0).';
 	else if (Number.isFinite(rawDlzka) && rawDlzka > 200000)
 		error = 'Dĺžka koľajníc mimo rozsahu (max 200 000 mm) — skontroluj zadanie.';
+	return { vstup, error };
+}
+
+/**
+ * CLIP zábradlie (#372) — parse hlavičky + parametrov. Rozsahovú/whitelist
+ * validáciu (typ×variant, šírka výplne) rieši `chybaClipVstupu` v `$lib/clip`
+ * (client-safe, volaná v route po tomto parse). Tu len povinné polia + tvary.
+ * `ral` je capnutý (odpis-detail.md — bound every text field going into `detail`).
+ */
+export function parseClipVstup(form: FormData): { vstup: ClipVstup; error: string | null } {
+	const num = (k: string) => {
+		const x = parseFloat(String(form.get(k) ?? '').replace(',', '.'));
+		return Number.isFinite(x) ? x : 0;
+	};
+	const rawTyp = String(form.get('typ') ?? '').trim();
+	const vstup: ClipVstup = {
+		zak: String(form.get('zak') ?? '').trim(),
+		op: String(form.get('op') ?? '').trim(),
+		zakaznik: String(form.get('zakaznik') ?? '').trim(),
+		caka: form.get('caka') === '1',
+		// neznámy typ → bezpečný default 'izo' (chybaClipVstupu aj tak validuje typ×variant)
+		typ: jeClipTyp(rawTyp) ? rawTyp : 'izo',
+		variant: Math.round(num('variant')),
+		sirka: num('sirka'),
+		vyska: num('vyska'),
+		ral: String(form.get('ral') ?? '')
+			.trim()
+			.slice(0, 40)
+	};
+	let error: string | null = null;
+	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
+	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
+	else if (!vstup.zakaznik) error = 'Chýba zákazník.';
 	return { vstup, error };
 }
