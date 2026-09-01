@@ -403,7 +403,9 @@ select:focus {
 }
 /* #376 stage 1: header/nav re-skin — svetlý papier + blur (vzor konfigurátorovej
    hlavy), sticky, bronzové podčiarknutie na aktívnom odkaze. Emoji preč z Vzorce/
-   Problém labelov (odstránené v +layout.svelte, žiadny E2E na presný text s emoji). */
+   Problém labelov (odstránené v +layout.svelte, žiadny E2E na presný text s emoji).
+   #392: informačná architektúra — Moduly (primárna, plochá)/Nástroje (sekundárna,
+   dropdown)/user menu (Používatelia+Odhlásiť), pozri design komentár na #392. */
 nav.top {
 	position: sticky;
 	top: 0;
@@ -414,11 +416,9 @@ nav.top {
 	border-bottom: 1px solid var(--m-line);
 	color: var(--m-ink);
 }
-/* Appka má 13 interných nav odkazov — pod ~1100px šírky sa .inner zalomí na
-   viac riadkov (review finding #4, #376); sticky drží OK jednu-dve zalomené
-   riadky, ale pri hlbšom zalomení (tablet) by sticky vytvorilo veľký trvalo
-   pripnutý pás. Pod prahom preto position:static — appka je dielenský nástroj
-   používaný na desktope, kde sa zmestí do 1-2 riadkov aj priliehavejšie. */
+/* #376 review finding #4: pod ~1100px šírky by sticky vytvorilo veľký trvalo
+   pripnutý pás pri hlbšom zalomení (appka je dielenský nástroj používaný na
+   desktope) — NEDOTKNUTÉ #392 zoskupením, samostatný účel od breakpointu nižšie. */
 @media (max-width: 1100px) {
 	nav.top {
 		position: static;
@@ -459,8 +459,108 @@ nav.top .brand {
 nav.top .spacer {
 	flex: 1;
 }
-nav.top .user {
+/* #392: primárna „Moduly" skupina — plochá na desktope, nahradená dropdownom
+   pod 900px (samostatný, užší breakpoint od #376 stage-1 1100px sticky pravidla
+   vyššie — ten rieši iný problém, tento len šírku samotnej skupiny odkazov).
+   Playwright getByRole ignoruje display:none uzly (accessibility tree), takže
+   duplicitné odkazy v oboch blokoch nikdy nekolidujú (žiadny strict-mode konflikt). */
+nav.top .nav-group {
+	display: flex;
+	align-items: center;
+	gap: 8px 18px;
+}
+nav.top .nav-modules-drop {
+	display: none;
+}
+@media (max-width: 900px) {
+	nav.top .nav-modules-flat {
+		display: none;
+	}
+	nav.top .nav-modules-drop {
+		display: inline-block;
+	}
+}
+/* natívny <details>/<summary> dropdown — Moduly (pri zúžení) / Nástroje / user menu.
+   Žiadna vlastná JS knižnica (design komentár #392 Prístup 1); <summary> má natívnu
+   ARIA rolu "button". */
+nav.top .nav-dropdown {
+	position: relative;
+}
+nav.top .nav-dropdown summary {
+	cursor: pointer;
+	list-style: none;
+	color: var(--m-muted);
+	font-family: var(--m-font-display);
+	font-size: 15.5px;
+	font-weight: 600;
+	padding: 4px 0;
+	user-select: none;
+}
+nav.top .nav-dropdown summary::-webkit-details-marker {
+	display: none;
+}
+nav.top .nav-dropdown summary::marker {
+	content: '';
+}
+nav.top .nav-dropdown summary:hover,
+nav.top .nav-dropdown[open] summary {
+	color: var(--m-ink);
+}
+nav.top .nav-dropdown.active summary {
+	color: var(--m-ink);
+	border-bottom: 2px solid var(--m-accent);
+}
+/* sekundárna skupina „Nástroje" — vizuálne menej výrazná (menší/ľahší font) ako
+   primárne Moduly a user menu (owner: „menej výrazná") */
+nav.top .nav-tools summary {
+	font-size: 14px;
+	font-weight: 500;
+}
+nav.top .nav-dropdown-menu {
+	position: absolute;
+	top: calc(100% + 10px);
+	left: 0;
+	display: flex;
+	flex-direction: column;
+	min-width: 190px;
+	background: var(--m-surface);
+	border: 1px solid var(--m-line-2);
+	border-radius: var(--m-radius-sm);
+	box-shadow: 0 10px 28px rgba(22, 24, 28, 0.12);
+	padding: 6px;
+	z-index: 40;
+}
+nav.top .nav-dropdown-menu-right {
+	left: auto;
+	right: 0;
+}
+nav.top .nav-dropdown-menu a,
+nav.top .nav-dropdown-menu button {
+	display: block;
+	width: 100%;
+	text-align: left;
+	color: var(--m-ink-2);
+	background: none;
+	border: 0;
+	border-bottom: none;
+	text-decoration: none;
+	font-family: var(--m-font-body);
 	font-size: 14.5px;
+	font-weight: 500;
+	padding: 8px 10px;
+	border-radius: var(--m-radius-sm);
+	cursor: pointer;
+}
+nav.top .nav-dropdown-menu a:hover,
+nav.top .nav-dropdown-menu button:hover,
+nav.top .nav-dropdown-menu a.active {
+	background: var(--m-accent-soft);
+	color: var(--m-ink);
+}
+/* user menu trigger — nahradil pôvodný statický .user span (#392) */
+nav.top .nav-user summary {
+	font-size: 14.5px;
+	font-weight: 500;
 	color: var(--m-muted);
 }
 footer.app {

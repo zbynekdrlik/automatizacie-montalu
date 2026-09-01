@@ -8,7 +8,10 @@ import {
 	goto,
 	waitHydrated,
 	skipAkLive,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	openUserMenu,
+	openTools,
+	logout
 } from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
@@ -32,6 +35,64 @@ test('login: zlé heslo zobrazí chybu, správne prihlási; verzia v pätičke',
 	// #376 stage 1: header/nav re-skin — nav.top renderuje, brand text nezmenený
 	await expect(page.locator('nav.top')).toBeVisible();
 	await expect(page.locator('nav.top .brand')).toHaveText('MONTALU');
+	// #392: logo je teraz odkaz domov (/ redirectuje na /zasklenia pre oba roly)
+	await expect(page.locator('nav.top .brand')).toHaveAttribute('href', '/zasklenia');
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #392: horná lišta zoskupená na Moduly (primárna, plochá)/Nástroje (sekundárna,
+// dropdown)/user menu (Používatelia+Odhlásiť) — sama osebe nová funkcia, vlastný test
+// (e2e-real-user-testing). Overuje: dropdowny sú defaultne zatvorené, otvoria sa
+// klikom, zatvoria sa po SPA navigácii (root layout sa neremountuje), a pod 900px
+// „Moduly" nahradí dropdown bez horizontálneho scrollu.
+test('#392: horná lišta — Moduly/Nástroje/user menu sa otvárajú a zatvárajú, responsive bez horizontálneho scrollu', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	// primárna skupina „Moduly" je na desktope plochá — priamo viditeľné odkazy
+	await expect(page.getByRole('link', { name: 'Pergola', exact: true })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Zasklenia', exact: true })).toBeVisible();
+
+	// sekundárna skupina „Nástroje" je dropdown, zatvorený defaultne
+	await expect(page.getByRole('link', { name: 'História', exact: true })).toHaveCount(0);
+	await openTools(page);
+	await expect(page.getByRole('link', { name: 'História', exact: true })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Optimalizátor' })).toBeVisible();
+	// druhý klik na „Nástroje" (toggle) ho zase zatvorí
+	await openTools(page);
+	await expect(page.getByRole('link', { name: 'História', exact: true })).toHaveCount(0);
+
+	// user menu — Používatelia + Odhlásiť zatvorené defaultne
+	await expect(page.getByRole('link', { name: 'Používatelia' })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Odhlásiť' })).toHaveCount(0);
+	await openUserMenu(page);
+	await expect(page.getByRole('link', { name: 'Používatelia' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Odhlásiť' })).toBeVisible();
+
+	// navigácia (klik na odkaz v Nástroje) zatvorí VŠETKY dropdowny — layout sa
+	// pri route zmene neremountuje, takže bez close-on-navigate by ostali otvorené
+	await openTools(page);
+	await page.getByRole('link', { name: 'Vzorce' }).click();
+	await waitHydrated(page);
+	await expect(page.getByRole('link', { name: 'Vzorce' })).toHaveCount(0);
+	await expect(page.getByRole('link', { name: 'Používatelia' })).toHaveCount(0);
+
+	// pod 900px zmizne plochý zoznam Modulov, nahradí ho dropdown „Moduly" — a stále
+	// bez horizontálneho scrollu (responzívna požiadavka #392)
+	await goto(page, '/zasklenia');
+	await page.setViewportSize({ width: 480, height: 900 });
+	await expect(page.getByRole('link', { name: 'Pergola', exact: true })).toHaveCount(0);
+	await expect(page.getByTestId('modules-menu-toggle')).toBeVisible();
+	await page.getByTestId('modules-menu-toggle').click();
+	await expect(page.getByRole('link', { name: 'Pergola', exact: true })).toBeVisible();
+	const maScroll = await page.evaluate(
+		() => document.documentElement.scrollWidth > document.documentElement.clientWidth
+	);
+	expect(maScroll).toBe(false);
+	await page.setViewportSize({ width: 1280, height: 720 });
+
 	expect(consoleMsgs).toEqual([]);
 });
 
@@ -108,7 +169,9 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await expect(page.getByTestId('vysledok')).toContainText(`${RUN} - E2E Test [`);
 	expect(await page.getByTestId('vysledok').textContent()).not.toBe(suborOP01);
 
-	// 5. história odpisov obsahuje oba záznamy
+	// 5. história odpisov obsahuje oba záznamy — „História" je v #392 sekundárnej
+	// „Nástroje" skupine (dropdown), najprv ju otvor
+	await openTools(page);
 	await page.getByRole('link', { name: 'História', exact: true }).click();
 	await expect(page.getByTestId('odpisy-tabulka')).toContainText(RUN);
 	expect(consoleMsgs).toEqual([]);
@@ -545,8 +608,9 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	const b2bUser = `e2e-b2b-${Date.now().toString(36)}`;
 	const b2bPass = 'e2eheslo1';
 
-	// 1. interný vidí nav odkaz Používatelia a vytvorí B2B účet cez /pouzivatelia
+	// 1. interný vidí odkaz Používatelia (#392: v user menu) a vytvorí B2B účet cez /pouzivatelia
 	await loginAs(page);
+	await openUserMenu(page);
 	await expect(page.getByRole('link', { name: 'Používatelia' })).toBeVisible();
 	await goto(page, '/pouzivatelia');
 	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
@@ -556,8 +620,7 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await expect(page.locator('tr', { hasText: b2bUser })).toContainText('B2B');
 
 	// 2. odhlásenie + prihlásenie ako čerstvo vytvorený B2B účet
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);
 
 	// 3. B2B: nav ukazuje Zasklenia + Sieťka + Pergola návrh + Zasklenia návrh
@@ -623,8 +686,7 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await expect(page.getByTestId('odoslat')).toHaveCount(0);
 
 	// 7. upratanie: odhlásenie B2B, prihlásenie interný, zmazanie throwaway účtu
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
-	await expect(page).toHaveURL(/\/login/);
+	await logout(page);
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 	const row = page.locator('tr', { hasText: b2bUser });
