@@ -95,6 +95,9 @@ export function parsePergolaNavrhVstup(form: FormData): {
 		hlbka,
 		vyskaVpredu: num(form, 'vyskaVpredu'),
 		vyskaPriStene: num(form, 'vyskaPriStene'),
+		// #382 — voliteľný manuálny sklon (rovnaký zdroj pravdy ako /narez); rovnaký
+		// parsovací vzor ako panelSirkaOverride/panelDlzkaOverride nižšie.
+		sklonStrechy: numOrUndefined(form, 'sklonStrechy'),
 		panelPocet: Math.round(num(form, 'panelPocet')) || 0,
 		panelSirkaOverride: numOrUndefined(form, 'panelSirkaOverride'),
 		panelDlzkaOverride: numOrUndefined(form, 'panelDlzkaOverride'),

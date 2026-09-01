@@ -15,6 +15,7 @@
 		HLBKA_MAX,
 		VYSKA_MIN,
 		VYSKA_MAX,
+		NAVRH_SKLON_MAX,
 		PANEL_POCET_MIN,
 		PANEL_POCET_MAX,
 		PERGOLA_MAX_POLI,
@@ -39,6 +40,8 @@
 		hlbka: form?.vstup?.hlbka ?? 3500,
 		vyskaVpredu: form?.vstup?.vyskaVpredu ?? 2500,
 		vyskaPriStene: form?.vstup?.vyskaPriStene ?? 2800,
+		// #382 — voliteľný manuálny sklon (rovnaký zdroj pravdy ako /narez)
+		sklonStrechy: form?.vstup?.sklonStrechy,
 		panelPocet: form?.vstup?.panelPocet ?? 8,
 		panelSirkaOverride: form?.vstup?.panelSirkaOverride,
 		panelDlzkaOverride: form?.vstup?.panelDlzkaOverride,
@@ -61,6 +64,8 @@
 	let hlbkaS = $state<number | string>(3500);
 	let vyskaVpreduS = $state<number | string>(2500);
 	let vyskaPriSteneS = $state<number | string>(2800);
+	// #382 — prázdny reťazec = nezadané (rovnaký idiom ako panelSirkaOverrideS nižšie)
+	let sklonStrechyS = $state<number | string>('');
 	let panelPocetS = $state<number | string>(8);
 	let panelSirkaOverrideS = $state<number | string>('');
 	let panelDlzkaOverrideS = $state<number | string>('');
@@ -84,6 +89,7 @@
 		hlbkaS = v?.hlbka || 3500;
 		vyskaVpreduS = v?.vyskaVpredu || 2500;
 		vyskaPriSteneS = v?.vyskaPriStene || 2800;
+		sklonStrechyS = v?.sklonStrechy ?? '';
 		panelPocetS = v?.panelPocet || 8;
 		panelSirkaOverrideS = v?.panelSirkaOverride || '';
 		panelDlzkaOverrideS = v?.panelDlzkaOverride || '';
@@ -141,6 +147,11 @@
 	<input type="hidden" name="hlbka" value={cislo(hlbkaS)} />
 	<input type="hidden" name="vyskaVpredu" value={cislo(vyskaVpreduS)} />
 	<input type="hidden" name="vyskaPriStene" value={cislo(vyskaPriSteneS)} />
+	{#if sklonStrechyS !== ''}<input
+			type="hidden"
+			name="sklonStrechy"
+			value={cislo(sklonStrechyS)}
+		/>{/if}
 	<input type="hidden" name="panelPocet" value={cislo(panelPocetS)} />
 	{#if panelSirkaOverrideS !== ''}<input
 			type="hidden"
@@ -270,6 +281,23 @@
 						{#each Array(PERGOLA_MAX_POLI) as _, i (i)}<option value={i + 1}>{i + 1}</option>{/each}
 					</select>
 				</div>
+			</div>
+
+			<!-- #382 — voliteľný manuálny sklon (z CAD, rovnaký zdroj pravdy ako /narez): keď je
+			     zadaný, REZ A ho použije namiesto dopočítaného sklonu z výšok (viď design komentár
+			     na #382 pre root cause). -->
+			<div class="field">
+				<label for="sklonStrechy">Sklon strechy (°) — z CAD (voliteľné)</label>
+				<input
+					id="sklonStrechy"
+					name="sklonStrechy"
+					type="number"
+					min="0.1"
+					max={NAVRH_SKLON_MAX}
+					step="any"
+					bind:value={sklonStrechyS}
+					placeholder="prázdne = dopočíta sa orientačne z výšok (REZ A)"
+				/>
 			</div>
 
 			<div class="polia-box" data-testid="polia-box">

@@ -420,12 +420,26 @@
 
 <!-- ============================= bočný rez (VIEW A) ============================= -->
 {#snippet section(r: { x: number; y: number; w: number; h: number })}
-	{@const maxV = Math.max(vstup.vyskaVpredu, vstup.vyskaPriStene)}
+	<!-- #382 — keď je manuálny sklon (vstup.sklonStrechy) zadaný, výška „pri stene"
+	     nakreslená v REZ A sa dopočíta priamo z NEHO (vyskaVpredu + hĺbka·tan(sklon)),
+	     nie zo surového `vyskaPriStene` — aby nakreslená šikmá strecha, uhlová kóta AJ
+	     jej popisok (`g.sklonDeg`, ktoré `pergola-navrh.ts` nastaví na TÚ ISTÚ manuálnu
+	     hodnotu) boli navzájom konzistentné (vykres.md: kóta musí čítať zo skutočne
+	     nakreslenej geometrie). Bez manuálneho sklonu je to matematicky identické so
+	     starým správaním (round-trip tan(atan(x))=x) — nulová zmena pre existujúce
+	     zákazky. `vyskaPriStene` samo osebe ostáva nezmenené všade INDE (izometria
+	     zadných stĺpov, ZVOD kotva, mierka hárku) — je to nezávislá reálna výška zadnej
+	     konštrukcie (ZV), nie vec REZ A sklonu. -->
+	{@const wallHeightMm =
+		vstup.sklonStrechy != null
+			? vstup.vyskaVpredu + vstup.hlbka * Math.tan((g.sklonDeg * Math.PI) / 180)
+			: vstup.vyskaPriStene}
+	{@const maxV = Math.max(vstup.vyskaVpredu, vstup.vyskaPriStene, wallHeightMm)}
 	{@const scale = fitScale(vstup.hlbka, maxV, r.w * 0.75, r.h * 0.6)}
 	{@const baseY = r.y + r.h * 0.8}
 	{@const xWall = r.x + r.w * 0.18}
 	{@const xFront = xWall + vstup.hlbka * scale}
-	{@const yWallTop = baseY - vstup.vyskaPriStene * scale}
+	{@const yWallTop = baseY - wallHeightMm * scale}
 	{@const yFrontTop = baseY - vstup.vyskaVpredu * scale}
 	{@const yClearTop = baseY - g.svetlaVyska * scale}
 	{@const roofH = Math.max(1.5, NOSNIK_HRUBKA_MM * scale)}
@@ -506,14 +520,19 @@
 		font-weight="600"
 		data-testid="pn-sklon">{fmtDeg(g.sklonDeg)}</text
 	>
-	<!-- výšky: stena (vonkajšia, ľavá) / svetlá výška (vnútorná, pri predku) -->
+	<!-- výšky: stena (vonkajšia, ľavá) / svetlá výška (vnútorná, pri predku).
+	     #382: text = wallHeightMm (presne to, čo je nakreslené — viď komentár vyššie),
+	     nie surový vstup.vyskaPriStene, keď je manuálny sklon zadaný (inak by kóta
+	     merala niečo iné, než ukazuje jej vlastná dĺžka — rovnaká pasca ako vykres.md
+	     "Ručný override MUSÍ posunúť aj POZÍCIU"). Bez manuálneho sklonu je wallHeightMm
+	     === vyskaPriStene (round-trip), takže text je nezmenený. -->
 	<Kota
 		x0={xWall}
 		y0={baseY}
 		x1={xWall}
 		y1={yWallTop}
 		perpOffset={-(r.w * 0.1)}
-		text={fmtMm(vstup.vyskaPriStene)}
+		text={fmtMm(wallHeightMm)}
 		color={MODRA}
 		fontSize={3}
 	/>
