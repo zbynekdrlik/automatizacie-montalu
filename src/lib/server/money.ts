@@ -1,5 +1,5 @@
 // Zápis odpisu do Money importu — GENERICKÁ vrstva pre všetky moduly
-// (zasklenia, bazén, pergola). Money auto-importuje .xlsx z /data/dlv-import
+// (zasklenia, bazén, pergola, clip, fix). Money auto-importuje .xlsx z /data/dlv-import
 // (LEN root, nie rekurzívne — NA ODPIS/* podpriečinky sú odkladacie; overené
 // produkčnou prevádzkou), archívuje do DONE a zdroj zmaže. TEST režim píše
 // do ODPIS EXPORT — do Money NIKDY nejde nič testovacie.
@@ -101,7 +101,7 @@ export interface OdpisJob {
 	zakaznik: string;
 	caka: boolean;
 	createdBy: string;
-	/** podpriečinok v NA ODPIS pre čaká-režim (Robust/Slide/Bazen/Pergola) */
+	/** podpriečinok v NA ODPIS pre čaká-režim (Robust/Slide/Bazen/Pergola/Clip/Fix) */
 	cakaSubdir: string;
 	/** Popis dokladu v PRVOM riadku xlsx (formát per modul — 1:1 s n8n verziou) */
 	popis: string;
@@ -563,6 +563,38 @@ export async function writeOdpis(
 	// (#294) APPEND-ONLY ledger safety-net — identický obsah tej istej zákazky (per-order tuple +
 	// content_hash) už bol importovaný do Money a nebol RE-autorizovaný override-om (`povolitReimport`).
 	// Toto je poistka, ktorú „Uvoľniť" NEZMAŽE: releaseOdpis maže len `odpis_log`, ledger ostáva.
+	const crossDup = db
+		.prepare(
+			'SELECT modul, created_at FROM odpis_log WHERE live = ? AND zak_norm = ? AND op_norm = ? AND content_hash = ? AND modul != ?'
+		)
+		.get(live, zakNorm, opNorm, ledgerHash, job.modul) as
+		{ modul: string; created_at: string } | undefined;
+	if (crossDup) {
+		// (#380) CROSS-MODUL identický-obsah dedup — FIX z CADu (modul='fix') reusuje presne pergola
+		// katalóg, takže identický CAD nárez dá identický content_hash (a názov súboru) pod modul='fix'
+		// aj modul='pergola'. Dedup aj ledger sú kľúčované na modul, takže bez tejto poistky by operátor
+		// obišiel dedup presunutím identického nárezu z /pergola (Duplikát) do /fix/cad → dvojitý odpis
+		// rovnakého materiálu + prepis súboru v import priečinku. RÔZNY obsah (pergola + fix na tej istej
+		// ZAK+OP) má RÔZNY hash → NEblokuje sa (legitímna koexistencia). Kľúč = (live,zak,op,hash) bez modulu.
+		log.warn('odpis duplikát — identický obsah už zapísaný pod iným modulom, nič sa nezapisuje', {
+			modul: job.modul,
+			existujuciModul: crossDup.modul,
+			zak: job.zak,
+			op: job.op,
+			zakNorm,
+			opNorm,
+			live: isLive(),
+			existingCreatedAt: crossDup.created_at
+		});
+		return {
+			status: 'duplicate',
+			live: isLive(),
+			target,
+			filename,
+			duplicateCreatedAt: crossDup.created_at
+		};
+	}
+
 	const led = ledgerCounts(job.modul, zakNorm, opNorm, live, ledgerHash);
 	const ledgerWouldBlock = led.imports > led.overrides;
 	if (ledgerWouldBlock && opts.overrideLedger !== true) {

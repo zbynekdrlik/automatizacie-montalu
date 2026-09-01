@@ -149,8 +149,9 @@ export function buildFixCadJob(vstup: FixCadVstup, v: FixCadViewOk, createdBy: s
 		caka: vstup.caka,
 		createdBy,
 		cakaSubdir: 'Fix',
-		// popis 1:1 s pergolou/n8n: „OP Zákazník"
-		popis: (vstup.op + ' ' + vstup.zakaznik).trim(),
+		// popis „FIX OP Zákazník" — marker „FIX" odlíši FIX doklad od pergola dokladu v Money
+		// (pergola má „OP Zákazník"); operátor v Money importe hneď vidí, že ide o FIX odpis.
+		popis: ('FIX ' + vstup.op + ' ' + vstup.zakaznik).trim(),
 		// Money rozpis: VŠETKÝCH 25 katalógových riadkov (aj nulové) — ako pergola
 		polozky: v.polozky,
 		detail: {

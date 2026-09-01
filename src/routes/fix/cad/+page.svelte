@@ -254,6 +254,15 @@
 		{#if v.zmenene.length}
 			<p class="sub">✏️ = množstvo si upravil ručne pred odoslaním.</p>
 		{/if}
+		{#if v.nulove.some((o) => v.zmenene.includes(o.kod))}
+			<p class="sub">
+				Vynulované úpravou (v odpise nie sú):
+				{v.nulove
+					.filter((o) => v.zmenene.includes(o.kod))
+					.map((o) => o.kod)
+					.join(', ')}
+			</p>
+		{/if}
 	</div>
 
 	<div class="card noprint">
