@@ -33,7 +33,7 @@
 			Do súčtov vstupujú len ostré (● LIVE) odpisy — {p.odpisovVScope} z {p.odpisy
 				.length}.{#if p.parkovanych > 0}
 				Vrátane {p.parkovanych} parkovaných ⏳ (ešte nepresunuté do Money importu).{/if}{#if p.odpisy.length > p.odpisovVScope}
-				🧪 TEST odpisy sú v zozname nižšie, do súčtov sa nepočítajú.{/if}
+				🧪 TEST odpisy sa do súčtov nepočítajú.{/if}
 		{:else}
 			Zákazka nemá žiadny ostrý (LIVE) odpis — zoznam je zo 🧪 TEST odpisov a slúži len na náhľad.
 		{/if}
@@ -47,7 +47,7 @@
 					? 'vznikli'
 					: 'vzniklo'} pred zavedením cenového zoznamu (#154) — {p.bezPoloziek === 1
 				? 'jeho'
-				: 'ich'} materiál v zozname nižšie CHÝBA.
+				: 'ich'} materiál v zozname CHÝBA.
 		</p>
 	{/if}
 </div>

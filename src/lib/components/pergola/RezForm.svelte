@@ -20,6 +20,8 @@
 	// #223 — katalóg typov strešného skla (výber pre vzorec šírky + cenu)
 	import { SKLO_STRECHA_TYPY } from '$lib/sklo-strecha';
 	import type { RucnaPolozka } from '$lib/pergola-rucne';
+	// #378 — FIX (bočné pevné zasklenie): tvar + limity polí/rozmeru
+	import { FIX_MAX_POLI, FIX_MAX, type FixTvar } from '$lib/fix';
 
 	let {
 		live,
@@ -45,7 +47,20 @@
 		zvodFrezovanieSHmmS = $bindable(''),
 		strechaSkloTypS = $bindable(''),
 		strechaSkloS = $bindable(''),
-		obvodoveZasklenieS = $bindable('')
+		obvodoveZasklenieS = $bindable(''),
+		// #378 — „pergola s FIXom": bočné pevné zasklenie (auto-odvodenie rozmerov z
+		// pergoly s override); DISPLAY-ONLY + Money-neutrálne
+		fixPoliaJSON = '[]',
+		pergolaSFixomS = $bindable(false),
+		fixAutoS = $bindable(true),
+		fixSirkaS = $bindable(''),
+		fixV1S = $bindable(''),
+		fixV2S = $bindable(''),
+		fixTvarS = $bindable('sikmy'),
+		fixPocetPoliS = $bindable(1),
+		fixZrkadloS = $bindable(false),
+		fixSkloS = $bindable(''),
+		fixPoznamkaS = $bindable('')
 	}: {
 		live: boolean;
 		error?: string | null;
@@ -71,6 +86,17 @@
 		strechaSkloTypS?: string;
 		strechaSkloS?: string;
 		obvodoveZasklenieS?: string;
+		fixPoliaJSON?: string;
+		pergolaSFixomS?: boolean;
+		fixAutoS?: boolean;
+		fixSirkaS?: number | string;
+		fixV1S?: number | string;
+		fixV2S?: number | string;
+		fixTvarS?: FixTvar;
+		fixPocetPoliS?: number;
+		fixZrkadloS?: boolean;
+		fixSkloS?: string;
+		fixPoznamkaS?: string;
 	} = $props();
 
 	// #161 — živý náhľad svetlosti medzi krovmi pre zadaný počet (Dominik podľa nej pridá/uberie
@@ -197,7 +223,10 @@
 		<!-- Výška zadná (ZV): pri samostatne (zadné nohy) alebo stena+zasklená (bočný 110×43
 		     pod kotviacim = ZV − 190, #206 b). Pri „jednoduchej bez zasklenia" na stene sa ZV
 		     nepoužíva → pole skryté. -->
-		{#if uchytenieS === 'samostatne' || (uchytenieS === 'stena' && !jednoduchaBezZaskleniaS)}
+		<!-- ZV je potrebná aj pre bočný FIX (jeho výška pri stene = ZV), preto ju zobraz aj
+		     keď je „Pergola s FIXom" zapnutá (#378) — inak by sa server (0) a klient (2900)
+		     rozišli v konfigurácii stena+jednoduchá+FIX -->
+		{#if uchytenieS === 'samostatne' || (uchytenieS === 'stena' && !jednoduchaBezZaskleniaS) || pergolaSFixomS}
 			<div class="grid3">
 				<div class="field">
 					<label for="vyskaZadna">Výška zadná ZV (mm) *</label>
@@ -390,6 +419,153 @@
 			</div>
 		</div>
 
+		<!-- #378 — Pergola s FIXom: bočné pevné zasklenie, rozmery odvodené z pergoly
+		     (auto) s možnosťou override. DISPLAY-ONLY + Money-neutrálne. -->
+		<div class="field">
+			<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+				<input
+					id="pergolaSFixom"
+					type="checkbox"
+					name="pergolaSFixom"
+					value="1"
+					bind:checked={pergolaSFixomS}
+					style="width:auto"
+				/>
+				🪟 Pergola s FIXom (bočné pevné zasklenie)
+			</label>
+		</div>
+
+		{#if pergolaSFixomS}
+			<div class="fix-box" data-testid="fix-sekcia">
+				<!-- fixAuto ako hidden (checkbox by pri override neposlal nič → server by videl
+				     default auto); fixPolia = JSON z rodiča (počet × šírka) -->
+				<input type="hidden" name="fixAuto" value={fixAutoS ? '1' : '0'} />
+				<input type="hidden" name="fixPolia" value={fixPoliaJSON} />
+				<p class="sub" style="margin:0 0 10px" data-testid="fix-money-note">
+					FIX sa spočíta a nakreslí ako súčasť tejto zákazky.
+					<b>Do Money odpisu zatiaľ nejde</b> — FIX materiály (profily + sklo) nemajú v Money karty, doplní
+					sa, keď ich Dominik založí (rovnako ako tesnenia a strešné sklo).
+				</p>
+				<div class="field">
+					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
+						<input
+							type="checkbox"
+							data-testid="fix-auto"
+							bind:checked={fixAutoS}
+							style="width:auto"
+						/>
+						Rozmery odvodiť automaticky z pergoly (hĺbka + výšky)
+					</label>
+					<p class="sub" style="margin:4px 0 0" data-testid="fix-auto-hint">
+						{fixAutoS
+							? 'šírka = hĺbka, výška vpredu = predná svetlosť, výška vzadu = zadná výška (ZV); odškrtni pre ručný override'
+							: 'ručný override — rozmery zadávaš sám'}
+					</p>
+				</div>
+				<div class="field">
+					<label for="fixTvar">Tvar FIXu</label>
+					<select id="fixTvar" name="fixTvar" bind:value={fixTvarS} disabled={fixAutoS}>
+						<option value="sikmy">Šikmý (šikmá horná hrana)</option>
+						<option value="rovny">Rovný (pravouhlý)</option>
+					</select>
+				</div>
+				<div class="grid3">
+					<div class="field">
+						<label for="fixSirka">Šírka FIXu (mm)</label>
+						<input
+							id="fixSirka"
+							name="fixSirka"
+							type="number"
+							step="any"
+							max={FIX_MAX}
+							bind:value={fixSirkaS}
+							readonly={fixAutoS}
+						/>
+					</div>
+					<div class="field">
+						<label for="fixV1">Výška vpredu (mm)</label>
+						<input
+							id="fixV1"
+							name="fixV1"
+							type="number"
+							step="any"
+							max={FIX_MAX}
+							bind:value={fixV1S}
+							readonly={fixAutoS}
+						/>
+					</div>
+					{#if fixTvarS !== 'rovny'}
+						<div class="field">
+							<label for="fixV2">Výška vzadu / ZV (mm)</label>
+							<input
+								id="fixV2"
+								name="fixV2"
+								type="number"
+								step="any"
+								max={FIX_MAX}
+								bind:value={fixV2S}
+								readonly={fixAutoS}
+							/>
+						</div>
+					{/if}
+				</div>
+				<div class="grid3">
+					<div class="field">
+						<label for="fixPocetPoli">Počet polí FIXu</label>
+						<select id="fixPocetPoli" bind:value={fixPocetPoliS}>
+							{#each Array(FIX_MAX_POLI) as _, i (i)}<option value={i + 1}>{i + 1}</option>{/each}
+						</select>
+					</div>
+					<div class="field">
+						<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
+							<input
+								id="fixZrkadlo"
+								type="checkbox"
+								name="fixZrkadlo"
+								value="1"
+								bind:checked={fixZrkadloS}
+								style="width:auto"
+							/>
+							🔁 Zrkadlový kus (druhá strana)
+						</label>
+					</div>
+				</div>
+				<div class="grid2">
+					<div class="field">
+						<label for="fixSklo">FIX — sklo (na výkres)</label>
+						<input
+							id="fixSklo"
+							name="fixSklo"
+							type="text"
+							maxlength="120"
+							placeholder="napr. 4-8-4 IZO číre"
+							bind:value={fixSkloS}
+						/>
+					</div>
+					<div class="field">
+						<label for="fixPoznamka">FIX — poznámka (na výkres)</label>
+						<input
+							id="fixPoznamka"
+							name="fixPoznamka"
+							type="text"
+							maxlength="300"
+							bind:value={fixPoznamkaS}
+						/>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<button class="btn" type="submit" data-testid="spocitat">Spočítať materiál</button>
 	</form>
 </div>
+
+<style>
+	.fix-box {
+		border: 1px solid #bfdbfe;
+		background: #f8fbff;
+		border-radius: 10px;
+		padding: 12px 14px 4px;
+		margin-bottom: 12px;
+	}
+</style>

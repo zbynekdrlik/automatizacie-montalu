@@ -10,6 +10,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { afterNavigate } from '$app/navigation';
 	import type { RouteId } from '$app/types';
 
 	let { data, children } = $props();
@@ -30,19 +31,22 @@
 		document.documentElement.dataset.hydrated = '1';
 	});
 
-	// B2B vidí Zasklenia + Sieťka + (od #144) display-only Pergola návrh + (od #162)
-	// display-only Zasklenia návrh — zvyšné odkazy (vrátane Vzorce/Nastavenia, ktoré
-	// sú mimo /zasklenia) sú interné. Používatelia je nový odkaz len pre interných.
-	// href je typovaný ako RouteId (z $app/types) a šablóna nižšie ho vždy volá cez
-	// resolve(l.href) — to spĺňa svelte/no-navigation-without-resolve (#99).
+	// #392: interný ≠ b2b — použité aj na gate admin odkazu (user menu) aj tools skupinu.
+	const isInterny = $derived(data.user?.role !== 'b2b');
+
+	// #392 (predtým jeden plochý `links` zoznam — owner 1.9.: „ta horna lista je uplne
+	// hrozna"): rozdelené na PRIMÁRNU skupinu „Moduly" (rovnaká gating logika ako predtým,
+	// len prerozdelená). B2B vidí Zasklenia + Sieťka + (od #144) display-only Pergola
+	// návrh + (od #162) display-only Zasklenia návrh. href je typovaný ako RouteId (z
+	// $app/types) a šablóna nižšie ho vždy volá cez resolve(l.href) — svelte/no-navigation-
+	// without-resolve (#99).
 	//
-	// Interné menu #162 review nález (deep review): /zasklenia/navrh NEDOSTÁVA
-	// vlastný top-nav odkaz pre interných (rovnaká disciplína ako pergola — pozri
-	// #144 komentár nižšie), lebo interní ju už dosiahnu jedným klikom z vnútra
-	// /zasklenia (in-page odkaz „→ Návrhový výkres" pridaný v #162). B2B naopak MÁ
-	// tento odkaz priamo v (krátkom, len 3-položkovom) menu — presne to isté
-	// zdôvodnenie, aké #144 dalo pergole.
-	const links = $derived(
+	// Interné menu #162 review nález (deep review): /zasklenia/navrh NEDOSTÁVA vlastný
+	// top-nav odkaz pre interných (rovnaká disciplína ako pergola — pozri #144 komentár
+	// nižšie), lebo interní ju už dosiahnu jedným klikom z vnútra /zasklenia (in-page
+	// odkaz „→ Návrhový výkres" pridaný v #162). B2B naopak MÁ tento odkaz priamo v
+	// (krátkom) menu — presne to isté zdôvodnenie, aké #144 dalo pergole.
+	const moduleLinks = $derived(
 		data.user?.role === 'b2b'
 			? ([
 					{ href: '/zasklenia', label: 'Zasklenia' },
@@ -65,51 +69,138 @@
 					// v B2B_FORBIDDEN_PREFIXES)
 					{ href: '/clip', label: 'Clip' },
 					{ href: '/zasklenia', label: 'Zasklenia' },
-					{ href: '/sietka', label: 'Sieťka' },
-					// samostatný nárezový optimalizátor (#212) — kalkulačka bez Money odpisu,
-					// len pre interných (b2b má /optimalizator v B2B_FORBIDDEN_PREFIXES)
-					{ href: '/optimalizator', label: 'Optimalizátor' },
-					// #376 stage 1: emoji preč z nav labelov (Fable design — appka je 13
-					// textových odkazov, ikony netreba). Žiadny E2E neasertuje presný text
-					// s emoji (overené grepom pred úpravou), h1 na /zasklenia/nastavenia
-					// (⚙ Vzorce — nastavenia rezov) je stránkový nadpis, nie nav — mimo
-					// scope stage 1 (stage 2 „formulárové stránky").
-					{ href: '/zasklenia/nastavenia', label: 'Vzorce' },
-					{ href: '/odpisy', label: 'História' },
-					// #282: interný prehľad zákazníckych dopytov z verejného konfigurátora —
-					// len pre interných (b2b má /dopyty-konfigurator v B2B_FORBIDDEN_PREFIXES)
-					{ href: '/dopyty-konfigurator', label: 'Dopyty' },
-					{ href: '/problem', label: 'Problém' },
-					{ href: '/pouzivatelia', label: 'Používatelia' }
+					{ href: '/sietka', label: 'Sieťka' }
 				] satisfies { href: RouteId; label: string }[])
 	);
+
+	// #392: SEKUNDÁRNA skupina „Nástroje" — vždy dropdown, menej výrazný font. Len pre
+	// interných (b2b má tieto routy v B2B_FORBIDDEN_PREFIXES, rovnako ako predtým).
+	const toolLinks = $derived(
+		isInterny
+			? ([
+					// samostatný nárezový optimalizátor (#212) — kalkulačka bez Money odpisu
+					{ href: '/optimalizator', label: 'Optimalizátor' },
+					// #376 stage 1: emoji preč z nav labelov. Žiadny E2E neasertuje presný text
+					// s emoji (overené grepom pred úpravou #376), h1 na /zasklenia/nastavenia
+					// (⚙ Vzorce — nastavenia rezov) je stránkový nadpis, nie nav.
+					{ href: '/zasklenia/nastavenia', label: 'Vzorce' },
+					{ href: '/odpisy', label: 'História' },
+					// #282: interný prehľad zákazníckych dopytov z verejného konfigurátora
+					{ href: '/dopyty-konfigurator', label: 'Dopyty' },
+					{ href: '/problem', label: 'Problém' }
+				] satisfies { href: RouteId; label: string }[])
+			: []
+	);
+
+	// #392: tri natívne <details> dropdowny (Moduly-pri-zúžení / Nástroje / user menu) —
+	// viď design komentár na #392 (Prístup 1: natívny <details>/<summary>, žiadna nová JS
+	// závislosť). Zatváranie: (1) po SPA navigácii cez afterNavigate — root layout sa pri
+	// route zmene NEremountuje, takže natívny `open` atribút by inak ostal nastavený aj
+	// po kliku na odkaz vnútri dropdownu; (2) light-dismiss (klik mimo / Escape) — review
+	// nález #392 🟡, natívny <details> sám osebe nezatvára ani jedno z toho.
+	let modulesOpen = $state(false);
+	let toolsOpen = $state(false);
+	let userOpen = $state(false);
+
+	function zavriMenu() {
+		modulesOpen = false;
+		toolsOpen = false;
+		userOpen = false;
+	}
+
+	afterNavigate(() => {
+		zavriMenu();
+	});
 </script>
+
+{#snippet navLinks(list: typeof moduleLinks | typeof toolLinks)}
+	{#each list as l (l.href)}
+		<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}>{l.label}</a>
+	{/each}
+{/snippet}
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<!-- #392 review nález 🟡: light-dismiss pre nav dropdowny — natívny <details> sám
+     osebe nezatvára pri kliku mimo ani na Escape. Klik VNÚTRI ktoréhokoľvek
+     .nav-dropdown necháme prejsť (natívny toggle na summary sa postará sám). -->
+<svelte:window
+	onclick={(e) => {
+		if (!(e.target instanceof Element) || !e.target.closest('details.nav-dropdown')) zavriMenu();
+	}}
+	onkeydown={(e) => {
+		if (e.key === 'Escape') zavriMenu();
+	}}
+/>
+
 {#if data.user && !jeKonfig}
 	<nav class="top">
 		<div class="inner">
-			<span class="brand">MONTALU</span>
-			{#each links as l (l.href)}
-				<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}>{l.label}</a>
-			{/each}
+			<a href={resolve('/zasklenia')} class="brand">MONTALU</a>
+
+			<!-- primárna skupina „Moduly" — plochá na desktope; pod 900px ju nahradí
+			     dropdown nižšie (rovnaké moduleLinks pole, CSS display toggle — #392) -->
+			<div class="nav-group nav-modules-flat">
+				{@render navLinks(moduleLinks)}
+			</div>
+			<details
+				class="nav-dropdown nav-modules-drop"
+				class:active={moduleLinks.some((l) => page.url.pathname === resolve(l.href))}
+				bind:open={modulesOpen}
+			>
+				<summary data-testid="modules-menu-toggle">Moduly <span aria-hidden="true">▾</span></summary
+				>
+				<div class="nav-dropdown-menu">
+					{@render navLinks(moduleLinks)}
+				</div>
+			</details>
+
+			{#if toolLinks.length}
+				<details
+					class="nav-dropdown nav-tools"
+					class:active={toolLinks.some((l) => page.url.pathname === resolve(l.href))}
+					bind:open={toolsOpen}
+				>
+					<summary data-testid="tools-menu-toggle"
+						>Nástroje <span aria-hidden="true">▾</span></summary
+					>
+					<div class="nav-dropdown-menu">
+						{@render navLinks(toolLinks)}
+					</div>
+				</details>
+			{/if}
+
 			<span class="spacer"></span>
+
 			{#if !data.live}
 				<span class="badge test" data-testid="mode">🧪 TEST režim</span>
 			{:else}
 				<span class="badge live" data-testid="mode">● LIVE</span>
 			{/if}
-			<span class="user">{data.user.username}</span>
-			<form method="POST" action="/logout" style="margin:0">
-				<button
-					type="submit"
-					style="background:none;border:0;color:var(--m-muted);cursor:pointer;font-size:12.5px;padding:0"
-					>Odhlásiť</button
+
+			<!-- #392: Používatelia + Odhlásiť zoskupené do user menu -->
+			<details
+				class="nav-dropdown nav-user"
+				class:active={isInterny && page.url.pathname === resolve('/pouzivatelia')}
+				bind:open={userOpen}
+			>
+				<summary data-testid="user-menu-toggle"
+					>{data.user.username} <span aria-hidden="true">▾</span></summary
 				>
-			</form>
+				<div class="nav-dropdown-menu nav-dropdown-menu-right">
+					{#if isInterny}
+						<a
+							href={resolve('/pouzivatelia')}
+							class:active={page.url.pathname === resolve('/pouzivatelia')}>Používatelia</a
+						>
+					{/if}
+					<form method="POST" action="/logout">
+						<button type="submit">Odhlásiť</button>
+					</form>
+				</div>
+			</details>
 		</div>
 	</nav>
 {/if}
