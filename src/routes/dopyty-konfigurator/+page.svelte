@@ -11,7 +11,7 @@
 <div class="card">
 	<h1>Dopyty z konfigurátora</h1>
 	<p class="sub">
-		Zákaznícke dopyty odoslané z verejného konfigurátora pergoly — najnovšie hore. Pre každý dopyt
+		Zákaznícke dopyty odoslané z verejného konfigurátora Montalu — najnovšie hore. Pre každý dopyt
 		sa dá znova stiahnuť PDF špecifikácia (s orientačnou cenou). Spolu {data.total}
 		{data.total === 1 ? 'dopyt' : data.total >= 2 && data.total <= 4 ? 'dopyty' : 'dopytov'}.
 	</p>
@@ -25,6 +25,7 @@
 			<thead>
 				<tr>
 					<th>Dátum/čas</th>
+					{#if data.hasProdukt}<th>Produkt</th>{/if}
 					<th>Meno</th>
 					<th>E-mail</th>
 					<th>Telefón</th>
@@ -40,6 +41,7 @@
 				{#each data.dopyty as d (d.id)}
 					<tr data-testid="dopyt-{d.id}">
 						<td style="white-space:nowrap">{d.datum}</td>
+						{#if data.hasProdukt}<td data-testid="produkt-{d.id}">{d.produkt}</td>{/if}
 						<td>
 							{#if d.jeObjednavka}<span class="obj-badge" data-testid="obj-badge-{d.id}"
 									>OBJEDNÁVKA</span
