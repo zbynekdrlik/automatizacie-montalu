@@ -10,6 +10,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
+	import { afterNavigate } from '$app/navigation';
 	import type { RouteId } from '$app/types';
 
 	let { data, children } = $props();
@@ -93,25 +94,46 @@
 
 	// #392: tri natívne <details> dropdowny (Moduly-pri-zúžení / Nástroje / user menu) —
 	// viď design komentár na #392 (Prístup 1: natívny <details>/<summary>, žiadna nová JS
-	// závislosť). Jediná pridaná logika je zatvorenie po SPA navigácii nižšie — root
-	// layout sa pri route zmene NEremountuje, takže natívny `open` atribút by inak ostal
-	// nastavený aj po kliku na odkaz vnútri dropdownu.
+	// závislosť). Zatváranie: (1) po SPA navigácii cez afterNavigate — root layout sa pri
+	// route zmene NEremountuje, takže natívny `open` atribút by inak ostal nastavený aj
+	// po kliku na odkaz vnútri dropdownu; (2) light-dismiss (klik mimo / Escape) — review
+	// nález #392 🟡, natívny <details> sám osebe nezatvára ani jedno z toho.
 	let modulesOpen = $state(false);
 	let toolsOpen = $state(false);
 	let userOpen = $state(false);
 
-	$effect(() => {
-		// eslint no-unused-expressions: čítanie do premennej, nie bare expression statement
-		const _pathname = page.url.pathname;
+	function zavriMenu() {
 		modulesOpen = false;
 		toolsOpen = false;
 		userOpen = false;
+	}
+
+	afterNavigate(() => {
+		zavriMenu();
 	});
 </script>
+
+{#snippet navLinks(list: typeof moduleLinks | typeof toolLinks)}
+	{#each list as l (l.href)}
+		<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}>{l.label}</a>
+	{/each}
+{/snippet}
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<!-- #392 review nález 🟡: light-dismiss pre nav dropdowny — natívny <details> sám
+     osebe nezatvára pri kliku mimo ani na Escape. Klik VNÚTRI ktoréhokoľvek
+     .nav-dropdown necháme prejsť (natívny toggle na summary sa postará sám). -->
+<svelte:window
+	onclick={(e) => {
+		if (!(e.target instanceof Element) || !e.target.closest('details.nav-dropdown')) zavriMenu();
+	}}
+	onkeydown={(e) => {
+		if (e.key === 'Escape') zavriMenu();
+	}}
+/>
 
 {#if data.user && !jeKonfig}
 	<nav class="top">
@@ -121,20 +143,17 @@
 			<!-- primárna skupina „Moduly" — plochá na desktope; pod 900px ju nahradí
 			     dropdown nižšie (rovnaké moduleLinks pole, CSS display toggle — #392) -->
 			<div class="nav-group nav-modules-flat">
-				{#each moduleLinks as l (l.href)}
-					<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}
-						>{l.label}</a
-					>
-				{/each}
+				{@render navLinks(moduleLinks)}
 			</div>
-			<details class="nav-dropdown nav-modules-drop" bind:open={modulesOpen}>
-				<summary data-testid="modules-menu-toggle">Moduly ▾</summary>
+			<details
+				class="nav-dropdown nav-modules-drop"
+				class:active={moduleLinks.some((l) => page.url.pathname === resolve(l.href))}
+				bind:open={modulesOpen}
+			>
+				<summary data-testid="modules-menu-toggle">Moduly <span aria-hidden="true">▾</span></summary
+				>
 				<div class="nav-dropdown-menu">
-					{#each moduleLinks as l (l.href)}
-						<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}
-							>{l.label}</a
-						>
-					{/each}
+					{@render navLinks(moduleLinks)}
 				</div>
 			</details>
 
@@ -144,13 +163,11 @@
 					class:active={toolLinks.some((l) => page.url.pathname === resolve(l.href))}
 					bind:open={toolsOpen}
 				>
-					<summary data-testid="tools-menu-toggle">Nástroje ▾</summary>
+					<summary data-testid="tools-menu-toggle"
+						>Nástroje <span aria-hidden="true">▾</span></summary
+					>
 					<div class="nav-dropdown-menu">
-						{#each toolLinks as l (l.href)}
-							<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}
-								>{l.label}</a
-							>
-						{/each}
+						{@render navLinks(toolLinks)}
 					</div>
 				</details>
 			{/if}
@@ -164,8 +181,14 @@
 			{/if}
 
 			<!-- #392: Používatelia + Odhlásiť zoskupené do user menu -->
-			<details class="nav-dropdown nav-user" bind:open={userOpen}>
-				<summary data-testid="user-menu-toggle">{data.user.username} ▾</summary>
+			<details
+				class="nav-dropdown nav-user"
+				class:active={isInterny && page.url.pathname === resolve('/pouzivatelia')}
+				bind:open={userOpen}
+			>
+				<summary data-testid="user-menu-toggle"
+					>{data.user.username} <span aria-hidden="true">▾</span></summary
+				>
 				<div class="nav-dropdown-menu nav-dropdown-menu-right">
 					{#if isInterny}
 						<a

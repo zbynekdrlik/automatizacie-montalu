@@ -418,10 +418,17 @@ nav.top {
 }
 /* #376 review finding #4: pod ~1100px šírky by sticky vytvorilo veľký trvalo
    pripnutý pás pri hlbšom zalomení (appka je dielenský nástroj používaný na
-   desktope) — NEDOTKNUTÉ #392 zoskupením, samostatný účel od breakpointu nižšie. */
+   desktope) — NEDOTKNUTÉ #392 zoskupením, samostatný účel od breakpointu nižšie.
+   #392 review nález 🔵: `relative`, NIE `static` — `static` ignoruje z-index, takže
+   nav.top (backdrop-filter vytvára vlastný stacking context) by sa vykresľoval v
+   tree-order vrstve namiesto svojej z-index:30 vrstvy — neskorší `position`ovaný
+   prvok na stránke (napr. transform/filter na 3D náhľade) by mohol prekresliť
+   otvorený dropdown menu (z-index:40 v rámci nav.top). `relative` bez `top` offsetu
+   sa v layoute správa identicky ako `static` (zámer „nie sticky" ostáva), len
+   rešpektuje z-index. */
 @media (max-width: 1100px) {
 	nav.top {
-		position: static;
+		position: relative;
 	}
 }
 nav.top .inner {
@@ -481,8 +488,10 @@ nav.top .nav-modules-drop {
 	}
 }
 /* natívny <details>/<summary> dropdown — Moduly (pri zúžení) / Nástroje / user menu.
-   Žiadna vlastná JS knižnica (design komentár #392 Prístup 1); <summary> má natívnu
-   ARIA rolu "button". */
+   Žiadna vlastná JS knižnica (design komentár #392 Prístup 1). <summary> je natívne
+   fokusovateľné a Enter/Space ho togglujú (HTML-AAM ho mapuje na ARIA rolu "button"),
+   ALE Playwright ho ako "button" NEexponuje (naživo overené, review nález #392) —
+   preto testid na triggeroch (e2e/helpers.ts), nikdy getByRole('button', …) na summary. */
 nav.top .nav-dropdown {
 	position: relative;
 }
@@ -494,6 +503,9 @@ nav.top .nav-dropdown summary {
 	font-size: 15.5px;
 	font-weight: 600;
 	padding: 4px 0;
+	/* baseline pre .active nižšie (mení len farbu, nie hrúbku) — inak by aktívny
+	   trigger „naskočil" o 2px oproti súrodencom (review nález #392 🔵) */
+	border-bottom: 2px solid transparent;
 	user-select: none;
 }
 nav.top .nav-dropdown summary::-webkit-details-marker {
@@ -508,7 +520,7 @@ nav.top .nav-dropdown[open] summary {
 }
 nav.top .nav-dropdown.active summary {
 	color: var(--m-ink);
-	border-bottom: 2px solid var(--m-accent);
+	border-bottom-color: var(--m-accent);
 }
 /* sekundárna skupina „Nástroje" — vizuálne menej výrazná (menší/ľahší font) ako
    primárne Moduly a user menu (owner: „menej výrazná") */

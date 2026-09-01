@@ -60,8 +60,9 @@ test('#392: horná lišta — Moduly/Nástroje/user menu sa otvárajú a zatvár
 	await openTools(page);
 	await expect(page.getByRole('link', { name: 'História', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Optimalizátor' })).toBeVisible();
-	// druhý klik na „Nástroje" (toggle) ho zase zatvorí
-	await openTools(page);
+	// druhý klik na ten istý trigger (toggle) ho zase zatvorí — priamo cez testid,
+	// openTools() je „otvor" helper (review nález #392 🔵: nepoužívaj ho na zatváranie)
+	await page.getByTestId('tools-menu-toggle').click();
 	await expect(page.getByRole('link', { name: 'História', exact: true })).toHaveCount(0);
 
 	// user menu — Používatelia + Odhlásiť zatvorené defaultne
