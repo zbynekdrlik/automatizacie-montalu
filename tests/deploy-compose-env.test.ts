@@ -55,18 +55,20 @@ describe('#278 — compose forwarduje ODOO_LEAD_* env do containera', () => {
 
 // #5822: base path + iframe env musia byť v compose, inak sidecar deploy pod `/automatizacie/`
 // zlyhá (base sa nebakuje / healthcheck 404 → restart loop / iframe ostane blokovaný).
+// Poznámka: `APP_BASE_PATH: ${APP_BASE_PATH:-}` je ZÁMERNE na DVOCH miestach — v `build.args`
+// (bake `kit.paths.base` pri builde) AJ v `environment` (runtime pre healthcheck). Preto
+// countujem výskyty (===2) namiesto jednej `toMatch` — inak by zmazanie jednej z dvoch línií
+// nechalo test zelený (falzifikovateľnosť, #2905/3d).
+const occ = (block: string, re: RegExp): number => (block.match(re) ?? []).length;
+
 describe('#5822 — compose má base-path + iframe env (default prázdne ⇒ live VPS nezmenený)', () => {
-	it('build.args: APP_BASE_PATH ako ${APP_BASE_PATH:-} (bake pri builde)', () => {
-		expect(app).toMatch(/^\s*APP_BASE_PATH:\s*\$\{APP_BASE_PATH:-\}\s*$/m);
+	it('APP_BASE_PATH: ${APP_BASE_PATH:-} je PRÁVE 2× (build.args bake + environment runtime)', () => {
+		expect(occ(app, /^\s*APP_BASE_PATH:\s*\$\{APP_BASE_PATH:-\}\s*$/gm)).toBe(2);
 	});
 
-	it.each(['APP_BASE_PATH', 'APP_FRAME_ANCESTORS'])(
-		'environment: forwarduje %s ako ${%s:-} (runtime)',
-		(v) => {
-			const re = new RegExp('^\\s*' + v + ':\\s*\\$\\{' + v + ':-\\}\\s*$', 'm');
-			expect(app, `compose environment: neforwarduje ${v}`).toMatch(re);
-		}
-	);
+	it('APP_FRAME_ANCESTORS: ${APP_FRAME_ANCESTORS:-} je PRÁVE 1× (len environment runtime)', () => {
+		expect(occ(app, /^\s*APP_FRAME_ANCESTORS:\s*\$\{APP_FRAME_ANCESTORS:-\}\s*$/gm)).toBe(1);
+	});
 
 	it('healthcheck prefixuje base z process.env.APP_BASE_PATH (nie holé /health)', () => {
 		expect(app).toMatch(/process\.env\.APP_BASE_PATH/);

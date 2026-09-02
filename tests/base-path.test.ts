@@ -4,7 +4,30 @@
 // denylist ostávajú base-LESS a nezmenené); `frameGuardHeaders` = env-gated
 // `frame-ancestors` CSP vs dnešný `X-Frame-Options: DENY`.
 import { describe, it, expect } from 'vitest';
-import { stripBase, frameGuardHeaders } from '../src/lib/base-path';
+import { stripBase, frameGuardHeaders, normalizeBasePath } from '../src/lib/base-path';
+
+describe('#5822 normalizeBasePath — STRICT validácia APP_BASE_PATH (fail loudly pri builde)', () => {
+	it('unset / "" / "/" → "" (koreň, dnešný VPS)', () => {
+		expect(normalizeBasePath(undefined)).toBe('');
+		expect(normalizeBasePath('')).toBe('');
+		expect(normalizeBasePath('  ')).toBe('');
+		expect(normalizeBasePath('/')).toBe('');
+	});
+
+	it('kanonická koreňová cesta prejde nezmenená', () => {
+		expect(normalizeBasePath('/automatizacie')).toBe('/automatizacie');
+		expect(normalizeBasePath('  /automatizacie  ')).toBe('/automatizacie');
+		expect(normalizeBasePath('/a/b-c_d.e')).toBe('/a/b-c_d.e');
+	});
+
+	it('NEkanonický tvar HODÍ (nie tiché auto-opravenie — healthcheck by sa rozišiel s buildom)', () => {
+		expect(() => normalizeBasePath('/automatizacie/')).toThrow(/APP_BASE_PATH/); // koncový '/'
+		expect(() => normalizeBasePath('automatizacie')).toThrow(/APP_BASE_PATH/); // bez začiatočného '/'
+		expect(() => normalizeBasePath('/automatizacie//x')).toThrow(/APP_BASE_PATH/); // dvojitý '/'
+		expect(() => normalizeBasePath('/a b')).toThrow(/APP_BASE_PATH/); // medzera
+		expect(() => normalizeBasePath('/a?b')).toThrow(/APP_BASE_PATH/); // query
+	});
+});
 
 describe('#5822 stripBase — base-relatívna appka cesta', () => {
 	it('base="" (dnešný koreň) → pathname nezmenený (byte-identicky)', () => {

@@ -14,6 +14,27 @@
  * takže `base="/app"` NEodreže `/application` (klasický prefix-false-match, fail-safe).
  * Cesta mimo base (v prode sa nestane — nginx routuje len `base/*`) sa vráti nezmenená.
  */
+/**
+ * Znormalizuje + VALIDUJE `APP_BASE_PATH` (build-time) na tvar, ktorý kit akceptuje AJ
+ * na ktorý sa dá bezpečne spoľahnúť u RAW runtime konzumentov (healthcheck / HEALTH_URL
+ * skladajú `<base>/health` z holej env, bez re-normalizácie). Preto STRICT: prijme len
+ * `''` (koreň) alebo kanonickú koreňovú cestu `^/seg(/seg)*` (začiatočný `/`, BEZ koncového
+ * `/`, len path segmenty) — čokoľvek iné (napr. `/automatizacie/` s koncovým `/`, ktoré by
+ * dalo healthcheck `//health` → 404 → restart loop) HODÍ pri BUILDE (fail loudly), nie
+ * ticho auto-opraví (build a healthcheck by sa inak rozišli). `'/'` = koreň → `''`.
+ */
+export function normalizeBasePath(raw: string | undefined): '' | `/${string}` {
+	const v = (raw ?? '').trim();
+	if (v === '' || v === '/') return '';
+	if (!/^\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(v)) {
+		throw new Error(
+			`APP_BASE_PATH musí byť '' alebo kanonická koreňová cesta ako '/automatizacie' ` +
+				`(začiatočný '/', BEZ koncového '/', len path segmenty) — dostal ${JSON.stringify(v)}`
+		);
+	}
+	return v as `/${string}`;
+}
+
 export function stripBase(pathname: string, base: string): string {
 	if (base) {
 		if (pathname === base) return '/';

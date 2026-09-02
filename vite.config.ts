@@ -6,6 +6,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, coverageConfigDefaults } from 'vitest/config';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { normalizeBasePath } from './src/lib/base-path';
 
 // verzia zobrazená v pätičke — deploy job posiela APP_VERSION="<package.json verzia>
 // (<sha7>)" (viď .github/workflows/ci.yml). Lokálny beh a CI `test` job (npm run build
@@ -23,19 +24,6 @@ if (!version) {
 	} catch {
 		version = 'dev';
 	}
-}
-
-// #5822: base path pre beh pod `/automatizacie/` (same-origin s Odoo → iframe). Bakuje sa
-// pri BUILDE z `APP_BASE_PATH` (kit.paths.base = build-time konštanta). Default '' =
-// dnešný koreň origin (samostatný VPS) → byte-identicky. Znormalizuj na tvar, ktorý kit
-// akceptuje: '' alebo cesta so začiatočným '/' bez koncového '/'.
-function normBase(raw: string | undefined): '' | `/${string}` {
-	if (!raw) return '';
-	let b = raw.trim();
-	if (b === '' || b === '/') return '';
-	if (!b.startsWith('/')) b = '/' + b;
-	b = b.replace(/\/+$/, ''); // odstráň koncové '/'
-	return b as `/${string}`; // po `startsWith('/')` guarde vždy začína '/'
 }
 
 export default defineConfig({
@@ -62,7 +50,7 @@ export default defineConfig({
 			},
 			// #5822: `kit.paths.base` inline (repo nemá `svelte.config.js`). SvelteKit split_config
 			// posunie top-level `kit_options` kľúč `paths` do `kit.paths`. Bakuje sa pri builde.
-			paths: { base: normBase(process.env.APP_BASE_PATH) },
+			paths: { base: normalizeBasePath(process.env.APP_BASE_PATH) },
 			adapter: adapter()
 		})
 	],

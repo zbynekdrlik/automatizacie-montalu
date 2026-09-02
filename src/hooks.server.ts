@@ -110,6 +110,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// (script/style) — three.js/inline štýly Svelte = riziko rozbitia (#251); `frame-ancestors`
 	// sám nič z toho neriadi.
 	const frame = frameGuardHeaders(process.env.APP_FRAME_ANCESTORS);
+	// `set` (nie `append`): appka nemá `kit.csp` nakonfigurované, takže odpoveď žiadne CSP
+	// nenesie — toto je JEDINÝ zdroj CSP. `append` by pri budúcom `kit.csp` pridal DRUHÚ CSP
+	// hlavičku a prehliadač aplikuje ich PRIENIK (najprísnejšie `frame-ancestors`), čo by mohlo
+	// iframe naopak zablokovať; `set` drží práve jednu `frame-ancestors` direktívu.
 	if (frame.csp) response.headers.set('Content-Security-Policy', frame.csp);
 	if (frame.xFrameOptions) response.headers.set('X-Frame-Options', frame.xFrameOptions);
 	response.headers.set('X-Content-Type-Options', 'nosniff');

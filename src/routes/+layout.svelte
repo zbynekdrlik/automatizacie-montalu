@@ -12,7 +12,8 @@
 	import '@fontsource-variable/inter/index.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
+	import { resolve, base } from '$app/paths';
+	import { stripBase } from '$lib/base-path';
 	import { afterNavigate } from '$app/navigation';
 	import type { RouteId } from '$app/types';
 
@@ -24,12 +25,14 @@
 	// → root pre túto vetvu nerenderuje nav, `.wrap` ani footer (práve JEDEN
 	// `data-testid="version"` na stránke). `$app/state` `page` je reaktívne + SSR-konzistentné
 	// (žiadny hydration mismatch), nikdy `window.location`.
-	// #5822: `page.route.id` (base-agnostické, rovnaké na SSR aj klientovi) namiesto
-	// `page.url.pathname` (nesie base) — porovnanie s literálom by pod base zlyhalo, a
-	// `resolve()` je na SSR relatívny → SSR/klient mismatch. route.id je pattern (`[produkt]`).
-	const jeKonfig = $derived(
-		page.route.id === '/konfigurator' || (page.route.id?.startsWith('/konfigurator/') ?? false)
-	);
+	// #5822: matchnutá route → `page.route.id` (base-agnostické, rovnaké na SSR aj klientovi;
+	// `page.url.pathname` nesie base a `resolve()` je na SSR relatívny → obe by dali mismatch).
+	// Nematchnutá route (404 pod `/konfigurator/*`, route.id null) → fallback na base-stripped
+	// pathname, nech je jeKonfig BYTE-IDENTICKÝ s pôvodným pathname-porovnaním pri base=''.
+	// route.id sub-page je pattern (`/konfigurator/[produkt]`), pathname je konkrétny — oba
+	// začínajú `/konfigurator/`, takže `.startsWith` funguje pre obe.
+	const konfPath = $derived(page.route.id ?? stripBase(page.url.pathname, base));
+	const jeKonfig = $derived(konfPath === '/konfigurator' || konfPath.startsWith('/konfigurator/'));
 
 	// marker pre E2E: hydratácia hotová — pred ním môže fill() na value-bound
 	// inputoch prehrať s hydratáciou, ktorá ich vráti na serverový stav

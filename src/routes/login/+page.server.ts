@@ -15,16 +15,23 @@ import {
 } from '$lib/server/login-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
 import { base } from '$app/paths';
+import { stripBase } from '$lib/base-path';
 
 function lockMessage(remainingMs: number): string {
 	const mins = Math.max(1, Math.ceil(remainingMs / 60000));
 	return `Príliš veľa neúspešných pokusov. Skúste to znova o ${mins} min.`;
 }
 
+// #5822: `next` z hooks je base-LESS; `base + safeNext(next)` dá správny same-origin Location.
+// Hardening: ak by `next` prišiel base-carrying (bookmark / ručne), odrežem base PRED safeNext,
+// nech sa base nezdvojí (`/automatizacie/automatizacie/…`). null ostáva null (fallback v safeNext).
+const nextRedirect = (next: string | null): string =>
+	base + safeNext(next === null ? null : stripBase(next, base));
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	// #5822: `safeNext` vracia base-LESS cestu (`next` je base-LESS, alebo fallback
 	// `/zasklenia`); base pridám tu → same-origin absolútny Location aj pod `/automatizacie/`.
-	if (locals.user) redirect(303, base + safeNext(url.searchParams.get('next')));
+	if (locals.user) redirect(303, nextRedirect(url.searchParams.get('next')));
 	return {};
 };
 
@@ -96,6 +103,6 @@ export const actions = {
 			secure: url.protocol === 'https:',
 			maxAge: 30 * 24 * 3600
 		});
-		redirect(303, base + safeNext(url.searchParams.get('next')));
+		redirect(303, nextRedirect(url.searchParams.get('next')));
 	}
 } satisfies Actions;
