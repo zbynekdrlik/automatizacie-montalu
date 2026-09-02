@@ -74,6 +74,7 @@ describe('spocitajStrechaSklo — golden OP260282 (Massive, n=8, IZO 4.4.2-8-6 �
 		expect(r.typ).toBe('IZO 4.4.2-8-6 číre');
 		expect(r.jePolykarbonat).toBe(false);
 		expect(r.sirkaPridavok).toBe(30);
+		expect(r.dlzkaPridavok).toBe(20); // Massive → +20
 	});
 	it('počet tabúľ = počet polí medzi krovmi = n − 1 = 7', () => {
 		expect(r.pocetTabul).toBe(7);
@@ -84,8 +85,7 @@ describe('spocitajStrechaSklo — golden OP260282 (Massive, n=8, IZO 4.4.2-8-6 �
 	it('dĺžka tabule = dĺžka hornej hrany krovu 3239,76 + 20 (masív) = 3259,76 mm', () => {
 		expect(r.dlzkaMm).toBe(3259.76);
 	});
-	it('plocha tabule = 685,43 × 3259,76 = 2,23 m²; celková plocha × 7 tabúľ = 15,64 m²', () => {
-		expect(r.plochaTabuleM2).toBe(2.23);
+	it('celková plocha skiel = 685,43 × 3259,76 × 7 tabúľ = 15,64 m² (nezaokr. súčin)', () => {
 		expect(r.plochaCelkomM2).toBe(15.64);
 	});
 	it('Money kód = TS00014 (potvrdené mapovanie, #274)', () => {
@@ -155,6 +155,7 @@ describe('spocitajStrechaSklo — Robust vetva + polykarbonát +34 + dĺžka +10
 	});
 	it('dĺžka = dĺžka hornej hrany krovu Robust 3269,76 + 10 = 3279,76 mm', () => {
 		// Robust nominál = 3470/cos(6,1°) − 220 = 3269,76; Robust prídavok dĺžky = +10.
+		expect(r.dlzkaPridavok).toBe(10); // Robust → +10
 		expect(r.dlzkaMm).toBe(3279.76);
 	});
 	it('celková plocha = 773,6 × 3279,76 × 5 tabúľ = 12,69 m²', () => {
@@ -202,8 +203,11 @@ describe('spocitajStrechaSklo — dĺžka honest-null keď krov nominál nie je 
 	it('uchytenie na stenu → dĺžka null (odpočet krovu neoverený pre stenu)', () => {
 		const r = spocitajStrechaSklo({ ...OP260282, uchytenie: 'stena' });
 		expect(r.dlzkaMm).toBeNull();
+		expect(r.plochaCelkomM2).toBeNull(); // bez dĺžky niet ani plochy → ani celkovej ceny
+		expect(r.dlzkaPridavok).toBe(20); // prídavok (podľa systému) sa v štítku ukáže aj tak
 		expect(r.sirkaMm).toBe(685.43); // šírka je čistá geometria — ostáva
 		expect(r.pocetTabul).toBe(7);
+		expect(r.poznamky.some((p) => /samostatne stojacu.*110/i.test(p))).toBe(true);
 	});
 	it('zadný profil 140 (nie 110) → dĺžka null (neoverená konfigurácia)', () => {
 		const r = spocitajStrechaSklo({ ...OP260282, hornyProfilZadnej: 140 });

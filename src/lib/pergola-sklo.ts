@@ -12,9 +12,11 @@
 // rezervovanie materialu sklo je osadene na ploche ktora nieje nikde kotovana" — teda ~2 mm
 // drift voči reálnemu rezu sa NErieši (návrhová presnosť na rezerváciu materiálu).
 //
-// Base „dĺžka hornej hrany" = appkin NOMINÁL krovu (`krovDlzkaNominalOverena`) — nominál JE
-// horná hrana so waivnutým ~1,17 mm seating detailom (presne ten „detail", čo Dominik povedal
-// nechať tak). Golden OP260282 (masív): 3239,76 + 20 = 3259,76 → reálny rez skla 3259 mm
+// Base „dĺžka hornej hrany" = appkin NOMINÁL krovu (`krovDlzkaNominalOverena`). Nominál je
+// SPODNÁ hrana/uloženie (viď pergola-krov.ts); horná hrana krovu je o ~1,17 mm vyššie
+// (reálne uloženie, bez čistého vzorca) — a to je práve ten „detail", ktorý Dominik povedal
+// neriešiť, takže nominál sa použije ako APROXIMÁCIA hornej hrany (Δ ~1,17 mm, v pásme ~2 mm
+// waiveru). Golden OP260282 (masív): 3239,76 + 20 = 3259,76 → reálny rez skla 3259 mm
 // (príloha 10504), Δ 0,76 mm — v pásme „~2 mm NErieši" (a bližšie než skoršie kandidáty
 // „HH+20"=3260,93 / „krov+40"=3279,76, ktoré reál vyvracal). Config-gate: nominál sa emituje
 // LEN pre overenú konfiguráciu kotvy (samostatne + zadný 110); pri stene/zadnom 140/bez sklonu
@@ -92,12 +94,15 @@ export interface StrechaSkloVypocet {
 	pocetTabul: number | null;
 	/** šírka tabule [mm] = svetlosť medzi krovmi + prídavok; `null` keď typ/počet krovov chýba */
 	sirkaMm: number | null;
+	/** prídavok k dĺžke tabule [mm] podľa systému (Robust 10 / Massive 20); `null` keď typ nevybraný.
+	 *  Určený systémom, preto sa dá zobraziť v štítku aj keď `dlzkaMm` je honest-null (neoverená kotva). */
+	dlzkaPridavok:
+		typeof SKLO_STRECHA_DLZKA_PRIDAVOK_ROBUST | typeof SKLO_STRECHA_DLZKA_PRIDAVOK_MASSIVE | null;
 	/** dĺžka tabule [mm] = dĺžka hornej hrany krovu + prídavok (Robust 10 / Massiv 20); `null` keď
 	 *  krov nominál nie je overený (stena / zadný profil ≠ 110 / bez sklonu / sklon nad 9°) */
 	dlzkaMm: number | null;
-	/** plocha jednej tabule [m²] = šírka × dĺžka; `null` keď šírka alebo dĺžka chýba */
-	plochaTabuleM2: number | null;
-	/** celková plocha skiel [m²] = plocha tabule × počet tabúľ; `null` keď plocha/počet chýba */
+	/** celková plocha skiel [m²] = plocha tabule (šírka × dĺžka) × počet tabúľ; `null` keď rozmer/počet
+	 *  chýba. Z nej sa počíta celková cena skiel (× €/m²) v server module `sklo-strecha-cena`. */
 	plochaCelkomM2: number | null;
 	/** Money TS kód (cenník IZOS) pre cenu, alebo `null` = žiadny potvrdený kód → „cena neznáma" */
 	moneyKod: string | null;
@@ -126,8 +131,8 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 			sirkaPridavok: null,
 			pocetTabul: null,
 			sirkaMm: null,
+			dlzkaPridavok: null,
 			dlzkaMm: null,
-			plochaTabuleM2: null,
 			plochaCelkomM2: null,
 			moneyKod: null,
 			poznamky: ['Vyber typ strešného skla pre výpočet šírky a ceny.']
@@ -151,14 +156,17 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 	const krovNom = krovDlzkaNominalOverena(v);
 	const dlzkaPridavok = strechaSkloDlzkaPridavok(v.system);
 	const dlzkaMm = krovNom != null ? R2(krovNom + dlzkaPridavok) : null;
-	// Plocha [m²]: jednej tabule = šírka × dĺžka; celková = plocha tabule × počet tabúľ. null,
-	// keď ktorýkoľvek rozmer/počet chýba (honest-null — celková cena skiel sa potom nespočíta).
-	const plochaTabuleM2 =
-		sirkaMm != null && dlzkaMm != null ? R2((sirkaMm * dlzkaMm) / 1_000_000) : null;
+	// Celková plocha skiel [m²] = plocha tabule (šírka × dĺžka) × počet tabúľ. null, keď rozmer/
+	// počet chýba (honest-null — celková cena skiel sa potom nespočíta). Zaokrúhlené z NEZAOKR.
+	// súčinu (žiadne dvojité zaokrúhlenie cez medzikrok plochy tabule).
 	const plochaCelkomM2 =
 		sirkaMm != null && dlzkaMm != null && pocetTabul != null
 			? R2((sirkaMm * dlzkaMm * pocetTabul) / 1_000_000)
 			: null;
+
+	// Overená kotva krovu (pre presnú príčinu honest-null dĺžky nižšie) — bez duplikácie gate-u:
+	// keď je konfigurácia OK a dĺžka je aj tak null, chýba už len sklon (alebo je nad 9°).
+	const kotvaOverena = v.uchytenie === 'samostatne' && v.hornyProfilZadnej === 110;
 
 	const poznamky: string[] = [];
 	if (n == null) {
@@ -167,12 +175,19 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 	if (dlzkaMm != null) {
 		poznamky.push(
 			`Dĺžka tabule = dĺžka hornej hrany krovu + ${dlzkaPridavok} mm (návrhový rozmer na ` +
-				'rezerváciu materiálu; ~2 mm odchýlka oproti výrobnému rezu).'
+				'rezerváciu materiálu; ~2 mm odchýlka oproti výrobnému rezu).' +
+				(v.system === 'Robust'
+					? ' Robust odpočet dĺžky krovu je podľa pravidla konštruktéra — na potvrdenie pri prvej Robust zákazke.'
+					: '')
+		);
+	} else if (!kotvaOverena) {
+		poznamky.push(
+			'Dĺžka tabule sa počíta len pre samostatne stojacu pergolu so zadným profilom 110 ' +
+				'(pre inú konštrukciu nie je dĺžka krovu overená) — teraz sa nepočíta.'
 		);
 	} else {
 		poznamky.push(
-			'Dĺžka tabule sa počíta zo sklonenej dĺžky krovu — zadaj sklon strechy (do 9°) pri ' +
-				'samostatne stojacej pergole so zadným profilom 110. Inak sa dĺžka nepočíta.'
+			'Zadaj sklon strechy (do 9°), aby sa spočítala dĺžka tabule — bez neho sa dĺžka nepočíta.'
 		);
 	}
 	if (moneyKod == null) {
@@ -185,8 +200,8 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 		sirkaPridavok,
 		pocetTabul,
 		sirkaMm,
+		dlzkaPridavok,
 		dlzkaMm,
-		plochaTabuleM2,
 		plochaCelkomM2,
 		moneyKod,
 		poznamky

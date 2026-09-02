@@ -26,6 +26,7 @@
 	type StrechaSkloCenaProp = {
 		moneyKod: string | null;
 		eurM2: number | null;
+		cenaSpolu: number | null;
 		mena: string;
 	} | null;
 
@@ -73,16 +74,8 @@
 	const fmtFix = fmtFixMm;
 	// #381 — pozičné čísla dielov (Poz.) previazané s pohľadmi vo výkrese (balóniky)
 	const diely = $derived(pozicujDiely(vysledok.vypocitane));
-	// #223 — plocha v m² (slovenská čiarka) + celková cena strešného skla = celková plocha × €/m²
+	// #223 — plocha v m² so slovenskou čiarkou (celkovú cenu skiel počíta server, `cenaSpolu`)
 	const m2Val = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} m²`);
-	const strechaCenaSpolu = $derived(
-		strechaSklo &&
-			strechaSkloCena &&
-			strechaSklo.plochaCelkomM2 != null &&
-			strechaSkloCena.eurM2 != null
-			? Math.round(strechaSklo.plochaCelkomM2 * strechaSkloCena.eurM2 * 100) / 100
-			: null
-	);
 </script>
 
 <div class="card">
@@ -449,7 +442,7 @@
 				<b data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
 			</div>
 			<div class="row">
-				<span>Dĺžka tabule (horná hrana + 10/20)</span>
+				<span>Dĺžka tabule (horná hrana + {strechaSklo.dlzkaPridavok ?? '—'})</span>
 				<b data-testid="strecha-sklo-dlzka">{mmVal(strechaSklo.dlzkaMm)}</b>
 			</div>
 			<div class="row">
@@ -469,11 +462,11 @@
 							: 'cena nedostupná'}</b
 					>
 				</div>
-				{#if strechaCenaSpolu != null}
+				{#if strechaSkloCena.cenaSpolu != null}
 					<div class="row">
 						<span>Cena skiel spolu ({m2Val(strechaSklo.plochaCelkomM2)})</span>
 						<b data-testid="strecha-sklo-cena-spolu"
-							>{`${String(strechaCenaSpolu).replace('.', ',')} ${strechaSkloCena.mena}`}</b
+							>{`${String(strechaSkloCena.cenaSpolu).replace('.', ',')} ${strechaSkloCena.mena}`}</b
 						>
 					</div>
 				{/if}
