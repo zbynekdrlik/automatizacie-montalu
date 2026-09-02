@@ -310,3 +310,42 @@ podstránka `/konfigurator/<slug>`. Rám (PR 1/7) je pergola-only live; #385–#
   presne `['dopyt','objednavka','vypocet']` (nezmenené wrapovaním). Money-safety guard (A) recurzuje do
   pergola podstránky + `KonfVyber`/katalógu (pozitívny reach assert); guard (B/C) preadresované na
   `konfigurator/pergola/+page.server.ts`.
+
+## 12. Nový PRODUKTOVÝ konfigurátor (podstránka `/konfigurator/<slug>`, #385 bazén = vzor)
+
+Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/`. Checklist (paralela §1):
+
+- **Client-safe zákaznícky modul `src/lib/konfigurator-<produkt>.ts`** (vzor `konfigurator-bazen.ts` /
+  `konfigurator-sklo.ts`): modely/varianty/rozmedzia + pure súhrn + `<produkt>PonukaConfig()`. **NIKDY
+  neimportuje interný Money katalóg** (`bazen-komponenty` nesie BPK*, `sklo-strecha` moneyKod,
+  `server/*`) — zákaznícka vrstva je ODDELENÁ od odpisovej. Importuje LEN `import type { PonukaConfig }`.
+- **`/konfigurator/<slug>/+page.server.ts`**: `load` (client-safe katalóg + `RAL_PALETA`) + akcia
+  `dopyt: (e) => dopytAction(e, '<slug>')` (produkt SERVER-autoritatívny). Množinu akcií zamkne
+  `b2b-route-coverage` describe (bazén = presne `['dopyt']`; pergola má navyše `vypocet`/`objednavka`).
+- **`KONF_PRODUKTY`**: kartu prepni `stav:'live'` + `odkaz:'/konfigurator/<slug>'` + `externy:false` +
+  `cenovyZdroj` (viď honest-null nižšie). `KonfVyber.svelte` `LiveRoute` úniu rozšír o `/konfigurator/<slug>`.
+- **Guardy** (fail-closed): `b2b-route-coverage` (ALLOWED + self-check + action-set describe + „nie je
+  presmerovaný"), `konfigurator-produkty.test` (`live` set), `konfigurator-money-safety` (A pozitívny
+  reach na nové client súbory + B server route + **C runtime `load()` assert**).
+- **HONEST-NULL cena (kľúčové) — cenový gate je PRODUKTOVÝ, nie rozmerový.** Ak produkt NEMÁ overený
+  cenový zdroj (bazén ho nemá — montalu.sk `POST /konfigurator/update-pools` existuje /419/, ale jeho
+  vyťaženie do matice je práca v rozsahu #279 = samostatný follow-up), NEVYMÝŠĽAJ ceny. Gate =
+  `KonfProdukt.cenovyZdroj` + `maCenovyZdroj(kod)` (`konfigurator-produkty`), zapojený v `dopyt-cena-stamp`
+  `opeciatkujCenuPreProdukt` (stamp = `{cena:null, cennikVerzia:null}`) A v `ponuka-pdf` (`opts.cena ??
+  (maCenovyZdroj(produkt) ? cenaZCfg(cfg) : null)`). **Bez oboch by `opeciatkujCenu`/`cenaZCfg` spočítalo
+  z rozmerov produktu nesprávnu PERGOLOVÚ cenu — na submite AJ na re-downloade** (`regeneratePonukaPdf`).
+  `maCenovyZdroj(null)=true` = pergola default (staré dopyty pred v35); neznámy NEPRÁZDNY kód → `false`
+  (odobraný produkt nesmie ticho získať cenu). **PDF PROSE tiež honest-null:** podnadpis/`DISCLAIMER`/
+  keyword/placeholder/tagline v `ponuka-pdf` sú cena+produkt-aware (pergola cesta BYTE-IDENTICKÁ).
+- **`PonukaConfig` mapovanie = NEUTRÁLNE polia** (zvolené tak, aby PDF nebolo zavádzajúce): model →
+  `system`; **hlavný rozmer DĹŽKA → `dlzka`** (nové neutrálne pole → `zhrnutieRiadky` vykreslí „Rozmery
+  (d × š)"), NIE pergolová `hlbka` (tá renderuje „š × h" a poradie by sa líšilo od stránky); výška/koľaj/
+  segmenty/plocha → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/`model`/`pocetPoli`) NEPOUŽÍVAJ.
+- **Money-safety (A) obsahový grep chytá LEN literál `moneyKod`** — nový Money kód (BPK*/BPP* ako holé
+  stringy) potrebuje VLASTNÝ vzor: pridaj `/(^|\/)<katalog>$/` do `KLIENT_ZAKAZANE_SPEC` (import) +
+  obsahový regex (napr. `\bBP[KP]\d{5}\b`) do (A) grafu aj (B). Inak by import Money katalógu prešiel.
+- **Rozmery = `RozmerStepper`** (metre, #333 owner directive; zdieľaj so pergolou — `bind:hodnotaMm`,
+  funguje aj bez `<form>`). Podmienka: rozmer na 100 mm mriežke (1 desatinné metre) — krok 250 mm sa
+  nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty) = `<select>` (constrained → súhrn/
+  dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
+  (žiadny server round-trip netreba); pergolový `vypocet` submit je potrebný LEN kvôli server-cene.
