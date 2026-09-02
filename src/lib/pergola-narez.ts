@@ -801,6 +801,11 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	};
 }
 
+// #381 VÝROBNÁ varianta hárku (pozičné čísla, reťazové kóty priečok, tolerancie) je
+// vyčlenená do `$lib/pergola-vyroba.ts` (large-file split — tento súbor prekročil 1000 r.).
+// Konzumenti importujú tie funkcie priamo z `$lib/pergola-vyroba` (acyklický import: vyroba
+// → narez, nikdy naopak). Sem sa NEre-exportuje (žiadny cyklus).
+
 // --- Geometria pre technický výkres (#194) ---------------------------------------
 // Čistá geometria pre výkresovú vrstvu (`PergolaNarezVykres.svelte`) — rovnaká
 // disciplína ako `vypocitajGeometriu` v pergola-navrh.ts / `sekciePozicie` v

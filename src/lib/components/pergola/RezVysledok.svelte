@@ -12,6 +12,7 @@
 		type NarezVysledok,
 		type PergolaKomponent
 	} from '$lib/pergola-narez';
+	import { pozicujDiely } from '$lib/pergola-vyroba';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
@@ -70,6 +71,8 @@
 	const mmVal = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} mm`);
 	// #378 — FIX: zaokrúhlenie na 0,1 mm + slovenská čiarka (zdieľané z pergola-fix)
 	const fmtFix = fmtFixMm;
+	// #381 — pozičné čísla dielov (Poz.) previazané s pohľadmi vo výkrese (balóniky)
+	const diely = $derived(pozicujDiely(vysledok.vypocitane));
 </script>
 
 <div class="card">
@@ -264,6 +267,7 @@
 	<table class="narez" data-testid="narez-tabulka">
 		<thead>
 			<tr
+				><th class="poz-col" title="Pozičné číslo dielu — vo výkrese je v krúžku pri diele">Poz.</th
 				><th class="stav-col">Stav</th><th>Kód</th><th>Názov</th><th>Dĺžka rezu</th><th>Počet ks</th
 				><th>Výdaj</th></tr
 			>
@@ -271,9 +275,11 @@
 		<tbody>
 			<!-- POZOR: jeden kód môže mať VIAC riadkov (napr. 18016 pod fixom + pod kotviacim;
 			     18017 predná + zadná noha pri SS), takže data-testid="polozka-{kód}" NIE JE
-			     unikátny — v teste filtruj podľa textu riadku (`.filter({ hasText: '…' })`). -->
-			{#each vysledok.vypocitane as p (p.kod + p.nazov)}
+			     unikátny — v teste filtruj podľa textu riadku (`.filter({ hasText: '…' })`).
+			     #381 — Poz. = pozičné číslo (pozicujDiely), previazané s balónikmi vo výkrese. -->
+			{#each diely as p (p.kod + p.nazov)}
 				<tr data-testid="polozka-{p.kod}">
+					<td class="poz-col"><b data-testid="poz-{p.cislo}">{p.cislo}</b></td>
 					<td class="stav-col">
 						<!-- rovnaká podmienka ako spocitaneCount / narezToCadRows (do rezervácie
 						     ide `dlzkaRezuMm != null && pocetKs > 0`) — per-riadkový odznak sa tak
@@ -567,6 +573,12 @@
 	}
 	.stav-col {
 		width: 96px;
+		white-space: nowrap;
+	}
+	/* #381 — Poz. (pozičné číslo dielu) — úzky vycentrovaný stĺpec, previazaný s balónikmi vo výkrese */
+	.poz-col {
+		width: 40px;
+		text-align: center;
 		white-space: nowrap;
 	}
 
