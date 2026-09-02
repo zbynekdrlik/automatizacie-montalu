@@ -3,6 +3,8 @@
 // že: (a) bez per-user kredenciálu je NULA Odoo callov a QuoteAuthError (nikdy zdieľaný kľúč); (b) payload
 // sedí; (c) quote_id je deterministický + user-scoped.
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
 	setCallKwTransport,
 	QuoteAuthError,
@@ -211,7 +213,11 @@ describe('saveQuoteToOdoo — validácia vstupu (NULA Odoo callov)', () => {
 		['chýba modul', { modul: '' }],
 		['prázdne lines', { lines: [] }],
 		['nekladné qty', { lines: [{ kod: 'A', nazov: 'B', qty: 0, priceUnit: 1 }] }],
-		['záporná cena', { lines: [{ kod: 'A', nazov: 'B', qty: 1, priceUnit: -1 }] }]
+		['záporná cena', { lines: [{ kod: 'A', nazov: 'B', qty: 1, priceUnit: -1 }] }],
+		// #446 „0 €" trieda — NaN sa NESMIE ticho scoercovať na 0
+		['NaN qty', { lines: [{ kod: 'A', nazov: 'B', qty: NaN, priceUnit: 1 }] }],
+		['NaN cena', { lines: [{ kod: 'A', nazov: 'B', qty: 1, priceUnit: NaN }] }],
+		['NaN zľava', { lines: [{ kod: 'A', nazov: 'B', qty: 1, priceUnit: 1, discount: NaN }] }]
 	];
 	for (const [label, over] of cases) {
 		it(`${label} → QuoteInputError, žiadny call`, async () => {
@@ -268,4 +274,26 @@ describe('saveQuoteToOdoo — validácia vstupu (NULA Odoo callov)', () => {
 			saveQuoteToOdoo(validInput({ attachments: atts }), SID, odooUser)
 		).rejects.toBeInstanceOf(QuoteInputError);
 	});
+});
+
+// #5960 review 🟡-5: mock-only testy nezachytia regresiu, ktorá pridá json2/shared-key fallback (má
+// vlastný transport). Uzamkni invariant MECHANICKY nad zdrojom (vzor konfigurator-money-safety):
+// per-user save cesta sa NESMIE viazať na `odoo-json2`/`odoo-rpc`/`odoo-backend`, `json2Config`, ani
+// `ODOO_API_KEY`. Komentáre (kde je `ODOO_API_KEY` spomenutý v próze) sa pred kontrolou odstránia.
+describe('shared-key invariant (mechanický zámok nad zdrojom)', () => {
+	const stripComments = (src: string): string =>
+		src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+	const files = [
+		'src/lib/server/odoo-quote.ts',
+		'src/lib/server/odoo-call-kw.ts',
+		'src/routes/ulozit-ponuku/+server.ts'
+	];
+	for (const rel of files) {
+		it(`${rel} sa neviaže na zdieľaný kľúč / json2 / xml-rpc`, () => {
+			const code = stripComments(fs.readFileSync(path.resolve(process.cwd(), rel), 'utf8'));
+			expect(code).not.toMatch(/odoo-(json2|rpc|backend)/);
+			expect(code).not.toMatch(/json2Config/);
+			expect(code).not.toMatch(/ODOO_API_KEY/);
+		});
+	}
 });

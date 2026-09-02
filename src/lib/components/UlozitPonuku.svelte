@@ -7,7 +7,7 @@
 	//
 	// Tlačidlo je počas volania DISABLED (bráni dvojkliku); idempotencia je na Odoo strane
 	// (rovnaké quote_id → `created:false`), takže re-klik po chybe/timeoute je BEZPEČNÝ.
-	import { base, resolve } from '$app/paths';
+	import { base } from '$app/paths';
 	import { saveQuoteRequest, type SaveQuoteClientInput } from '$lib/ulozit-ponuku-client';
 
 	let { input, label = 'Uložiť ponuku do Odoo' }: { input: SaveQuoteClientInput; label?: string } =
@@ -17,8 +17,12 @@
 		| { k: 'idle' }
 		| { k: 'saving' }
 		| { k: 'ok'; created: boolean; name: string; url: string }
-		| { k: 'chyba'; sprava: string; reLogin: boolean };
+		| { k: 'chyba'; sprava: string; code: string };
 	let stav = $state<Stav>({ k: 'idle' });
+
+	// re-klik je BEZPEČNÝ (idempotencia na Odoo strane) len pri prechodných chybách; odoo/input/toobig/
+	// auth sa zopakujú → hint neukazuj. session-expired → obnov stránku (parent webclient sa re-loginne).
+	const RETRY_SAFE = new Set(['transport', 'network', 'unknown']);
 
 	async function uloz() {
 		if (stav.k === 'saving') return;
@@ -27,7 +31,7 @@
 		if (r.ok) {
 			stav = { k: 'ok', created: r.created, name: r.name, url: r.url };
 		} else {
-			stav = { k: 'chyba', sprava: r.error, reLogin: r.code === 'auth' };
+			stav = { k: 'chyba', sprava: r.error, code: r.code };
 		}
 	}
 </script>
@@ -54,9 +58,9 @@
 	{:else if stav.k === 'chyba'}
 		<p class="vysledok chyba" data-testid="ulozit-ponuku-chyba">
 			⛔ {stav.sprava}
-			{#if stav.reLogin}
-				<a href={resolve('/login')}>Prihlásiť sa znova</a>
-			{:else}
+			{#if stav.code === 'session-expired'}
+				<span class="hint">Obnov stránku a skús znova.</span>
+			{:else if RETRY_SAFE.has(stav.code)}
 				<span class="hint">(Skús kliknúť znova — duplikát nevznikne.)</span>
 			{/if}
 		</p>

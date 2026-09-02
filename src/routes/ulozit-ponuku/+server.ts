@@ -1,15 +1,16 @@
 // #5960: POST seam pre „Uložiť ponuku" → Odoo `sale.order.create_quote_from_app` PER-USER kredenciálom.
 // AUTH je globálne v `hooks.server.ts` (neprihlásený → /login); TU navyše belt-and-suspenders:
 //  - explicitný SAME-ORIGIN check (`Origin` / `Sec-Fetch-Site`) — moja ruta je state-changing per-user
-//    akcia z cookie kredenciálu, a SvelteKit built-in origin check kryje LEN form actions, nie
-//    `+server.ts` (Fable dizajn-konzult #5960).
+//    akcia z cookie kredenciálu. SvelteKit built-in `csrf.checkOrigin` chráni len telá s FORM
+//    content-type (`application/x-www-form-urlencoded`/`multipart`/`text/plain`), NIE `application/json`
+//    (to je CORS-preflightované) — takže tento JSON POST vlastnú Origin-kontrolu potrebuje (#5960 review).
 //  - `saveQuoteToOdoo` gatuje `user.source==='odoo'` ∧ platné `session_id` cookie a NIKDY nesiahne
 //    na zdieľaný `ODOO_API_KEY`.
 // Chyby sa mapujú na HTTP statusy; deep-link objednávky staviam APP-SIDE zo známeho public base
 // (`ssoConfig().host`), nikdy z Odoo-echa. Rotované Odoo `session_id` (Set-Cookie) propagujem browseru,
 // inak by sa session desynchronizovala a používateľa by to odhlásilo.
 import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { ssoConfig } from '$lib/server/odoo-sso';
+import { ssoConfig, evictSsoCache, ODOO_SESSION_COOKIE } from '$lib/server/odoo-sso';
 import {
 	saveQuoteToOdoo,
 	QuoteInputError,
@@ -39,17 +40,18 @@ function parseAttachments(raw: unknown): QuoteAttachment[] {
 	if (!Array.isArray(raw)) throw new QuoteInputError('Neplatný formát príloh.');
 	return raw.map((a): QuoteAttachment => {
 		const o = (a ?? {}) as { name?: unknown; mimetype?: unknown; datasBase64?: unknown };
-		const b64 = typeof o.datasBase64 === 'string' ? o.datasBase64 : '';
-		let bytes: Uint8Array;
-		try {
-			bytes = new Uint8Array(Buffer.from(b64, 'base64'));
-		} catch {
-			throw new QuoteInputError('Prílohu sa nepodarilo dekódovať.');
+		const name = typeof o.name === 'string' ? o.name : '';
+		const b64 = typeof o.datasBase64 === 'string' ? o.datasBase64.replace(/\s+/g, '') : '';
+		// `Buffer.from(...,'base64')` NEHÁDŽE — neplatné znaky ticho zahodí → garbage bajty. Preto tvar
+		// base64 overíme SAMI a junk odmietneme (Odoo re-validuje mimetype, toto je 1. app-side hranica).
+		if (b64 && !/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) {
+			throw new QuoteInputError(`Príloha „${name}" má neplatné dáta.`);
 		}
+		const buf = Buffer.from(b64, 'base64');
 		return {
-			name: typeof o.name === 'string' ? o.name : '',
+			name,
 			mimetype: typeof o.mimetype === 'string' ? o.mimetype : '',
-			bytes
+			bytes: new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
 		};
 	});
 }
@@ -92,6 +94,16 @@ export const POST: RequestHandler = async ({ request, url, locals, cookies }) =>
 	if (!locals.user) error(401, 'Vyžaduje sa prihlásenie.');
 	if (!isInternal(locals.user)) error(403, 'Prístup len pre interných používateľov.');
 
+	// #5960 review 🔵-g: credential-shape gate PRED parsovaním (nedekóduj base64 prílohy neautorizovaného
+	// tela). `saveQuoteToOdoo` to isté re-gatuje (defense-in-depth, jediná autorita).
+	const sid = cookies.get(ODOO_SESSION_COOKIE);
+	if (locals.user.source !== 'odoo' || !sid) {
+		return json(
+			{ ok: false, code: 'auth', error: 'Uloženie ponuky do Odoo vyžaduje prihlásenie cez Odoo.' },
+			{ status: 401 }
+		);
+	}
+
 	let input: SaveQuoteInput;
 	try {
 		input = parseInput(await request.json());
@@ -101,16 +113,16 @@ export const POST: RequestHandler = async ({ request, url, locals, cookies }) =>
 		return json({ ok: false, code: 'input', error: 'Neplatné telo požiadavky.' }, { status: 400 });
 	}
 
-	const sid = cookies.get('session_id');
 	try {
 		const res = await saveQuoteToOdoo(input, sid, locals.user);
-		// rotované session_id z Odoo → propaguj browseru (inak desync/logout).
+		// rotované session_id z Odoo → propaguj browseru (inak desync/logout); zachovaj Max-Age.
 		if (res.rotatedSid && res.rotatedSid !== sid) {
-			cookies.set('session_id', res.rotatedSid, {
+			cookies.set(ODOO_SESSION_COOKIE, res.rotatedSid, {
 				path: '/',
 				httpOnly: true,
 				sameSite: 'lax',
-				secure: url.protocol === 'https:'
+				secure: url.protocol === 'https:',
+				...(res.rotatedMaxAge ? { maxAge: res.rotatedMaxAge } : {})
 			});
 		}
 		const host = ssoConfig()?.host ?? 'erp.montalu.cloud';
@@ -123,6 +135,12 @@ export const POST: RequestHandler = async ({ request, url, locals, cookies }) =>
 		});
 	} catch (e) {
 		if (e instanceof QuoteAuthError) {
+			if (e.sessionExpired) {
+				// ŽIVÁ Odoo session vypršala (code-100) → evict SSO cache, inak `hooks.server.ts` servuje
+				// stale pozitívny verdikt až ~5 min (POS_TTL) a každý ďalší call zlyhá; UI má „obnov stránku".
+				evictSsoCache(sid);
+				return json({ ok: false, code: 'session-expired', error: e.message }, { status: 401 });
+			}
 			return json({ ok: false, code: 'auth', error: e.message }, { status: 401 });
 		}
 		if (e instanceof QuoteInputError) {

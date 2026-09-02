@@ -78,10 +78,13 @@ export class QuoteInputError extends Error {
 
 // ---- Prílohy: limity presne podľa zmergnutého kontraktu #5818 --------------------------
 
-const ATT_MAX_BYTES = 15 * 1024 * 1024; // 15 MB / kus
+const ATT_MAX_BYTES = 15 * 1024 * 1024; // 15 MB / kus (horný strop podľa kontraktu #5818)
 const ATT_MAX_COUNT = 12;
-/** App-side agregátny raw cap — 413-ni čisto PRED Odoo/nginx (adapter-node BODY_SIZE_LIMIT / Odoo
- *  `web.max_file_upload_size` / nginx `client_max_body_size`); base64 nafúkne ~1.37×. */
+/** App-side agregátny SANITY cap. POZOR (#5960 review): produkčný `adapter-node BODY_SIZE_LIMIT` je
+ *  `1M` (`deploy/docker-compose.yml`) — a public `/konfigurator` sa naň spolieha ako na DoS strop
+ *  (`dopyt-action.ts`) — takže telo > ~750 kB raw dnes padne 413 v adaptéri EŠTE PRED touto validáciou.
+ *  Preto tento cap NIE JE zosúladený s adaptérom; skutočnú stratégiu príloh (server-side build ponuky
+ *  vs zdvihnutie BODY_SIZE_LIMIT + per-route Content-Length gate) rieši go-live #5820. */
 const ATT_MAX_TOTAL_BYTES = 90 * 1024 * 1024;
 const ATT_MIME_WHITELIST = new Set<string>([
 	'application/pdf',
@@ -155,11 +158,17 @@ function validateLines(lines: QuoteLine[]): void {
 		throw new QuoteInputError('Ponuka nemá žiadne položky.');
 	}
 	for (const ln of lines) {
-		if (num6(ln.qty) <= 0) {
-			throw new QuoteInputError(`Položka „${str(ln.nazov) || str(ln.kod)}" má nekladné množstvo.`);
+		const meno = (): string => str(ln.nazov) || str(ln.kod);
+		// #446 „0 €" trieda: NaN/nečíselné qty/cena/zľava sa NESMIE ticho scoercovať na 0 (num6 to robí)
+		// — odmietni PRED coercion, inak by chýbajúca cena prešla ako `price_unit: 0` do Odoo.
+		if (!Number.isFinite(ln.qty) || num6(ln.qty) <= 0) {
+			throw new QuoteInputError(`Položka „${meno()}" má neplatné alebo nekladné množstvo.`);
 		}
-		if (num6(ln.priceUnit) < 0) {
-			throw new QuoteInputError(`Položka „${str(ln.nazov) || str(ln.kod)}" má zápornú cenu.`);
+		if (!Number.isFinite(ln.priceUnit) || num6(ln.priceUnit) < 0) {
+			throw new QuoteInputError(`Položka „${meno()}" má neplatnú alebo zápornú cenu.`);
+		}
+		if (ln.discount !== undefined && !Number.isFinite(ln.discount)) {
+			throw new QuoteInputError(`Položka „${meno()}" má neplatnú zľavu.`);
 		}
 	}
 }
@@ -208,9 +217,9 @@ function mapZakaznik(z: QuoteCustomer): Record<string, OdooJson> {
 	return out;
 }
 
-/** base64 z bajtov (Buffer je v Node/SSR dostupný). */
+/** base64 z bajtov (Buffer je v Node/SSR dostupný). VIEW nad ArrayBuffer (bez zbytočnej kópie). */
 function toBase64(bytes: Uint8Array): string {
-	return Buffer.from(bytes).toString('base64');
+	return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
 }
 
 /** Postaví `create_quote_from_app` kwargs zo `SaveQuoteInput` (validované) + identity. */
@@ -268,6 +277,7 @@ export interface SaveQuoteResult {
 	created: boolean;
 	quoteId: string;
 	rotatedSid?: string;
+	rotatedMaxAge?: number;
 }
 
 /**
@@ -304,6 +314,7 @@ export async function saveQuoteToOdoo(
 		name: res.name,
 		created: res.created,
 		quoteId,
-		rotatedSid: res.rotatedSid
+		rotatedSid: res.rotatedSid,
+		rotatedMaxAge: res.rotatedMaxAge
 	};
 }

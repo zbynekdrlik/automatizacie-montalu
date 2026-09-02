@@ -74,6 +74,15 @@ export async function saveQuoteRequest(
 			error: 'Nepodarilo sa spojiť so serverom. Skontroluj pripojenie a skús znova.'
 		};
 	}
+	// #5960 review 🟡: adapter-node `BODY_SIZE_LIMIT` vráti holé (ne-JSON) 413 EŠTE pred endpointom —
+	// 413 sa DETERMINISTICKY zopakuje, takže žiaden „skús znova" hint (kód `toobig` ho v UI potlačí).
+	if (res.status === 413) {
+		return {
+			ok: false,
+			code: 'toobig',
+			error: 'Prílohy sú príliš veľké — zmenši ich a skús znova.'
+		};
+	}
 	let data: unknown;
 	try {
 		data = await res.json();

@@ -129,14 +129,30 @@ describe('createQuoteAsUser — request shape', () => {
 		const res = await createQuoteAsUser({}, SID);
 		expect(res.rotatedSid).toBeUndefined();
 	});
+	it('Max-Age rotovaného cookie sa zachová (persistencia)', async () => {
+		mockTransport(
+			ok({ id: 1, name: 'A', created: true }, ['session_id=NEW; Max-Age=604800; HttpOnly'])
+		);
+		const res = await createQuoteAsUser({}, SID);
+		expect(res.rotatedSid).toBe('NEW');
+		expect(res.rotatedMaxAge).toBe(604800);
+	});
 });
 
 describe('createQuoteAsUser — klasifikácia chýb', () => {
-	it('code 100 → QuoteAuthError (re-login)', async () => {
+	it('code 100 → QuoteAuthError so sessionExpired=true (živá session vypršala)', async () => {
 		mockTransport(
 			rpcErr({ name: 'odoo.http.SessionExpiredException', message: 'Session expired' }, 100)
 		);
-		await expect(createQuoteAsUser({}, SID)).rejects.toBeInstanceOf(QuoteAuthError);
+		const e = await createQuoteAsUser({}, SID).catch((x) => x);
+		expect(e).toBeInstanceOf(QuoteAuthError);
+		expect((e as QuoteAuthError).sessionExpired).toBe(true);
+	});
+	it('SSO vypnuté gate → QuoteAuthError so sessionExpired=false (žiaden reload nepomôže)', async () => {
+		disableSso();
+		const e = await createQuoteAsUser({}, SID).catch((x) => x);
+		expect(e).toBeInstanceOf(QuoteAuthError);
+		expect((e as QuoteAuthError).sessionExpired).toBe(false);
 	});
 	it('SessionExpiredException podľa name (aj bez code 100) → QuoteAuthError', async () => {
 		mockTransport(rpcErr({ name: 'odoo.http.SessionExpiredException' }, 200));

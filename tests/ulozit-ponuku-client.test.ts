@@ -71,4 +71,14 @@ describe('saveQuoteRequest', () => {
 		const r = await saveQuoteRequest(input, { fetchImpl: f });
 		expect(r).toMatchObject({ ok: false, code: 'network' });
 	});
+	it('413 (adapter-node BODY_SIZE_LIMIT, holé telo) → {ok:false, code:toobig}', async () => {
+		const { f } = fetchStub({
+			status: 413,
+			json: async () => {
+				throw new Error('not json');
+			}
+		});
+		const r = await saveQuoteRequest(input, { fetchImpl: f });
+		expect(r).toMatchObject({ ok: false, code: 'toobig' });
+	});
 });

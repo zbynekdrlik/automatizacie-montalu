@@ -48,15 +48,21 @@ export interface OdooQuoteResult {
 	odooUrl?: string;
 	/** Rotované `session_id` z Odoo `Set-Cookie` (endpoint ho propaguje do browsera). */
 	rotatedSid?: string;
+	/** `Max-Age` (s) rotovaného cookie — aby si endpoint zachoval Odoo persistenciu (nie session-only). */
+	rotatedMaxAge?: number;
 }
 
 // ---- Typované chyby ---------------------------------------------------------------------
 
 /** Chýbajúci / expirovaný per-user kredenciál → UI má poslať používateľa na (re)login. */
 export class QuoteAuthError extends Error {
-	constructor(message: string) {
+	/** true = ŽIVÁ Odoo session vypršala (HTTP 200 + code-100) → endpoint má evict-núť SSO cache a UI
+	 *  má povedať „obnov stránku"; false = SSO vypnuté / nie je Odoo používateľ (žiaden reload nepomôže). */
+	readonly sessionExpired: boolean;
+	constructor(message: string, sessionExpired = false) {
 		super(message);
 		this.name = 'QuoteAuthError';
+		this.sessionExpired = sessionExpired;
 	}
 }
 
@@ -203,9 +209,9 @@ function throwFromRpcError(err: JsonRpcError): never {
 	const data = err.data ?? {};
 	const name = asStr(data.name);
 	const code = err.code;
-	// Expirovaná/neplatná session: HTTP 200 + code 100 + SessionExpiredException.
+	// Expirovaná/neplatná session: HTTP 200 + code 100 + SessionExpiredException → sessionExpired=true.
 	if (code === 100 || /SessionExpiredException/i.test(name)) {
-		throw new QuoteAuthError('Odoo session vypršala — prihlás sa znova a skús to ešte raz.');
+		throw new QuoteAuthError('Odoo session vypršala — obnov stránku a skús to ešte raz.', true);
 	}
 	// Bezpečné-ukázať chyby: doslovná hláška z `error.data.message` (fallback arguments[0]).
 	const args = Array.isArray(data.arguments) ? data.arguments : [];
@@ -251,21 +257,26 @@ function parseResult(res: CallKwResponse): OdooQuoteResult {
 	if (!id || !name) {
 		throw new QuoteTransportError('Odoo nevrátilo id/číslo objednávky.');
 	}
-	const rotatedSid = extractRotatedSid(res.setCookie);
+	const rot = extractRotatedSid(res.setCookie);
 	return {
 		id,
 		name,
 		created: o.created === true,
 		odooUrl: asStr(o.url) || undefined,
-		rotatedSid
+		rotatedSid: rot?.sid,
+		rotatedMaxAge: rot?.maxAge
 	};
 }
 
-/** Z Odoo `Set-Cookie` vytiahni prípadné rotované `session_id` (endpoint ho pošle browseru). */
-function extractRotatedSid(setCookie: string[]): string | undefined {
+/** Z Odoo `Set-Cookie` vytiahni prípadné rotované `session_id` + jeho `Max-Age` (endpoint ho pošle
+ *  browseru so zachovanou persistenciou). Iné cookie sa ignorujú. */
+function extractRotatedSid(setCookie: string[]): { sid: string; maxAge?: number } | undefined {
 	for (const c of setCookie) {
 		const m = /^session_id=([^;]+)/.exec(c);
-		if (m && m[1]) return m[1];
+		if (m && m[1]) {
+			const ma = /(?:^|;)\s*Max-Age=(\d+)/i.exec(c);
+			return { sid: m[1], maxAge: ma ? Number(ma[1]) : undefined };
+		}
 	}
 	return undefined;
 }
