@@ -185,6 +185,30 @@ Zdroj kódov je rovnaký pre skript aj test: `pergola.ts` + `bazen.ts` +
 `cfg_seed.json`. Kód pridaný LEN v editore vzorcov (ostrá DB) tam nie je — vtedy
 ho pridaj aj do seedu, inak mu rez nikto nestiahne.
 
+**TRETIA pasca (#432): oprava Money KÓDU cez `git mv <starýKod>.webp → <novýKod>.webp`
+NEZARUČUJE správny prierez — starý (chybný) kód mohol mať ŠTANDARDNÝ/cudzí rez.**
+Živý prípad: PR 296 opravil Delux 5K hornú koľajnicu `ZASP202434 → ZASP202427` a obrázok
+„preniesol" cez `git mv` s predpokladom „fyzický prierez sa nemení". Lenže `ZASP202434`
+mal v Money IDENTICKÝ prierez ako štandardná `ZASP202433` (obe md5 `be9e8a3d`), takže Delux
+5K rail od vtedy ukazoval prierez ŠTANDARDNEJ koľajnice (Patrik: „dáva 5K koľaj hornú zo
+štandardu … kód sedí, ale obrázok je zlý"). `profil-obrazky.test.ts` (zoznam==súbory) ani
+`e2e` (naturalWidth) to NEchytili — obrázok bol platný, len ZLÝ.
+- **Pri Money-KÓD oprave koľajnice/profilu NIKDY neprenášaj obrázok `git mv`-om naslepo** —
+  stiahni kanonický prierez NOVÉHO kódu priamo z Money (`sync-profil-obrazky.sh` SQL,
+  read-only dvojskok cez gatekeeper: `ssh gatekeeper@100.90.94.41 "ssh montalu-prod '…'"`)
+  a nahraď obsah `static/profil/<novýKod>.webp`. Optimalizuj tou istou PIL pipeline ako
+  skript (RGB → autocrop bbox +12px → thumbnail 480×480 LANCZOS → WEBP q=84 method=6).
+- **Zámka:** pridaj bajtový regresný test, že dva FYZICKY RÔZNE profily nemajú identický
+  obrázok (`tests/profil-obrazky.test.ts` #432: `readFileSync(A).equals(readFileSync(B))`
+  === false). Blanket „žiadne dva obrázky identické" NEROB — 13 legitímnych skupín
+  (PRP/BPP zdieľa fyzický prierez naprieč dĺžkami tyče) by falošne červenalo; cieli na
+  konkrétnu dvojicu rôznych rezov.
+- **Live cfg overuj v ostrej DB, nie len v cfg_seed:** Money KÓD na prode over cez
+  `ssh -i ~/.ssh/n8n_montalu_ed25519 root@167.233.125.9 'docker exec automatizacie-montalu
+  node -e "…better-sqlite3(/data/app/app.db,{readonly}).prepare(SELECT … FROM cfg_rez …)"'`
+  — `migrateDeluxe5KRail`-style `>= N return` migrácia beží RAZ, takže neskorší editor edit
+  (§3d) sa cez ňu už neprejaví; kód môže byť správny/zlý nezávisle od cfg_seed.
+
 ## 2b. Ručný ROZMER rezu od obsluhy (koľajnica) — MENÍ odpis, patrí do compute
 
 Dielňa občas reže profil na inú dĺžku než dá vzorec (Patrik 2026-07-28: horná koľajnica
