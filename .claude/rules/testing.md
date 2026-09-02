@@ -393,3 +393,22 @@ lane posunie prah.
   (`DOPYT_MAX_PER_WINDOW: '1000'`) — rovnaký test-env vzor ako `ENABLE_TEST_ERROR_ROUTE`/
   `MONEY_LIVE=0`. PROD/VPS env NIKDY nenastavuje → default 8, prod NEZMENENÝ; throttle je
   ďalej pokrytý `tests/dopyt-throttle.test.ts`. NIKDY nezvyšuj test timeout ani `test.skip`.
+
+## E2E: rozmer prírezu (mm) čítaj z NÁREZ riadka `Rez profilu <KOD>`, NIE z odpis karty (#416)
+
+Keď e2e overuje konkrétny ROZMER rezu (napr. sieťková cross-delta 959/969 mm), tá
+hodnota je v NÁREZ tabuľke ako bunka `6×952 mm + 2×969 mm`, NIE v karte „Odpis (do
+Money)" — tá ukazuje len Money kód + CELKOVÉ metre (`ZASP202415 · … 10,8 m`) + ks, bez
+jednotlivých rozmerov. `odpisRiadky(page)` (číta `.card` „Odpis (do Money)") teda na
+rozmer nikdy nesadne — assertuj na nárez riadok:
+
+```ts
+await expect(page.getByRole('row', { name: /Rez profilu ZASP202415/ })).toContainText('969');
+```
+
+PASCA: `getByRole('row', { name: /ZASP202415/ })` (bez `Rez profilu` prefixu) padne na
+strict-mode violation — ten istý kód má DVA riadky: nárez riadok (name začína `Rez
+profilu <KOD>`, z alt textu tlačidla v prvej bunke) AJ riadok v `ceny-tabulka`
+(`getByTestId('ceny-tabulka')`, name `<KOD> Kladkový profil`). Prefix `Rez profilu <KOD>`
+identifikuje nárez riadok jednoznačne. Kódy (nie rozmery) v odpis karte overuj ďalej cez
+`odpisRiadky(...).join(' | ')` + `toContain('ZASP00018')` — tam sú.
