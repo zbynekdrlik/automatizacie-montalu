@@ -24,6 +24,7 @@ input serialization in `src/lib/server/`:
 | `sietka` | `sietka-samostatna.ts` | Standalone insect-screen quote + odpis |
 | `optimalizator` | `optimalizator.ts`, `optimalizator-vstup.ts` | Cut optimization |
 | `odpisy` | `money.ts` | Money odpis log + the sanctioned "Uvoľniť" release |
+| `ulozit-ponuku` (#5960) | `odoo-quote.ts`, `odoo-call-kw.ts`, `ulozit-ponuku-client.ts` | "Uložiť ponuku" → Odoo `sale.order` as the logged-in Odoo user (SSO session forwarded via `call_kw`, never a shared key); `UlozitPonuku.svelte` button seam wired per calculator at go-live #5820 |
 | `pouzivatelia`, `login`, `logout` | `auth.ts`, `b2b-access.ts` | Auth, roles (internal / b2b), route gating |
 | `vykresy`, `problem`, `health` | `db.ts`, `migracie.ts`, `ceny.ts`, `sklo-cena.ts` | Drawings, feedback, health/version, prices, DB + migrations |
 
