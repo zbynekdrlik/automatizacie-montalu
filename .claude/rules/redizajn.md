@@ -29,6 +29,53 @@ globálnom `:root`).
   vzor, 1.49:1) = input/select border, kde potrebuješ viditeľnú afordanciu poľa.
 Nikdy nepoužiť `--m-accent`/`--m-line` tam, kde patrí `-ink`/`-2` variant.
 
+## Stage 2 (Formulárové stránky) DOKONČENÝ (#376, 0.24.72)
+
+Čo pribudlo do `app.css` a ako sa aplikuje na formulárových stránkach:
+
+- **`.opt` / `.opt-grid` checkbox-riadok trieda** — nahradila 5× duplikovaný inline
+  `style="display:flex;align-items:center;gap:8px;font-weight:400[;margin-top:26px]"`.
+  `.opt` = flex riadok (prebíja globálny `label{display:block}`), `.opt-grid` = variant
+  s `margin-top:26px` (checkbox v grid bunke, zarovná sa so susednými poľami). Nový
+  checkbox riadok = `<label class="opt">` (alebo `class="opt opt-grid"` v grid bunke),
+  žiadny inline štýl, žiadny inline `width:auto` na inpute.
+- **`.wrap input[type=checkbox] { width:auto; accent-color: var(--m-accent) }`** —
+  bronzové zaškrtnutie + zrušenie globálneho `input{width:100%}` roztiahnutia. **MUSÍ
+  byť scoped na `.wrap`** (interná appka) — bare `input[type=checkbox]` presakuje na
+  `/konfigurator` consent checkbox (`.suhlas input`, vlastný `--k-*` svet) — presne tá
+  istá leak-pasca ako `h1` (nižšie). Preto sa inline `width:auto` z checkboxov smie
+  zmazať LEN keď sú vnútri `.wrap` (všetky interné formuláre sú).
+- **`--m-muted-ink` (#585d65)** = TRETÍ text/non-text token pár (po `--m-accent`/`-ink`).
+  `--m-muted` (#6b7078) na `--m-accent-soft`/`--m-surface-2` padá WCAG AA 4.5:1 pre TEXT
+  (4.29 / 4.49); `--m-muted-ink` (~5.7:1 na accent-soft, 6.6:1 na bielej) je text-safe.
+  Používaj ho pre muted TEXT na tónovanom podklade (mode-karta popis/foot); `--m-muted`
+  ostáva pre muted text na bielej/neutrále.
+- **`.mode-*` prepínač tokenizovaný na `--m-*` bronz** (+ `.mode-grid.cols-2` modifikátor
+  pre 2-kartové navy — Fix). Konsolidované z per-komponent scoped CSS (#394).
+- **`.mono` adoptované** na článkové kódy `{o.kod}` v odpisových kartách
+  (bazen/clip/pergola/fix-cad/zasklenia PlanKarty) — kód mono, názov body. Množstvá/ceny
+  v result `.g`/`.row`/`<b>` ešte mono NEmajú (stage 3/4).
+
+### E2E-coupling pasca pri zmene TEXTU labelu / tlačidla (KRITICKÉ pre stage 3/4)
+
+Form input LABEL text je E2E KONTRAKT — testy cielia cez `page.getByLabel('<presný>')`,
+`getByLabel(/regex/)`, `getByRole('button',{name:'<emoji>'})`, `getByText('<emoji>')`.
+**PRED zmenou akéhokoľvek user-visible textu (odstránenie emoji, preformulovanie) GREPNI
+`e2e/` na ten text:**
+
+- **regex-matchovaný label** (`getByLabel(/Čaká na materiál/)`, `/Prídavná koľajnica/`) →
+  strip emoji je SAFE (regex matchne aj bez prefixu).
+- **id/name-targetovaný checkbox** (`#sietka-on`, `#klin-on`, `#fixZrkadlo`,
+  `input[name="zrkadlo"]`, `#pergolaSFixom`, `#zvodFrezovat`) → label text nie je
+  selektor, zmena SAFE.
+- **exact-matchovaný label** (`getByLabel(FAB)` s `const FAB='🔑 …'`) → strip emoji ROZBIJE
+  spec; ZOSYNCHRONIZUJ konštantu v spec súbore (v tomto PR `kovanie-odpis.spec.ts`).
+- **NEDOTÝKAJ sa result/status odznakov ani akčných tlačidiel v stage 2** — `✅ v odpise`,
+  `⏳ čaká`, `🧪 TEST`, history `⏳`, `✏️` (edited marker), `🖨 Tlačiť`, `➕ Pridať posuv` sú
+  asertované ~10 spec-mi PRESNÝM textom AJ patria do stage 3/4 (result/CTA/print reštruktúra).
+- `app.css` je ~891 r. (approaching 1000-strop) — split pred stage 3, viď
+  `large-file-split.md` watch-list.
+
 ## PASCA: bare `h1`/`nav`/… selektor v `app.css` LEAKUJE na login aj konfigurátor
 
 `app.css` je importované GLOBÁLNE (cez root `+layout.svelte`) — platí pre
@@ -59,10 +106,10 @@ na `.wrap` (alebo naopak `:not(.konf-app)`-štýl guard, podľa toho, čo je
   h1/.wrap h1 .sub`), header/nav, `.mono` utility (infra, zatiaľ aplikovaná len
   na verziu v pätičke), login 2× accent + zvyšné 3 modré miesta (`.vitaj`,
   focus, hover) — VŠETKO dokončené vrátane review nálezov.
-- **Stage 2 (formulárové stránky):** zasklenia/pergola/bazen/fix/clip/sietka/
-  optimalizator — field grid, checkbox riadky, emoji preč z LABELOV (nie len
-  nav), sekčné eyebrows. TU sa prvý raz plošne adoptuje `.mono` na
-  rozmery/kódy/ceny v týchto formulároch.
+- **Stage 2 (formulárové stránky) — HOTOVO (0.24.72):** `.opt`/`.opt-grid` checkbox
+  riadky + `.wrap input[type=checkbox]` bronzový accent, `.mode-*` na `--m-*` bronz,
+  emoji preč z INPUT labelov, `.mono` na článkové kódy. Detail + pasce nižšie
+  („## Stage 2 DOKONČENÝ").
 - **Stage 3 (história + tabuľky):** `/odpisy` (akčné tlačidlá jednej rodiny,
   badge), dopyty, používatelia, problém, vzorce/nastavenia. TU sa `table`/`td`
   štruktúrne prerába (stage 1 nechalo `table`/`td` farebne tokenizované, ale

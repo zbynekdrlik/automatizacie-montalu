@@ -26,15 +26,18 @@ const _fixNieJePolozka: Polozka = null as unknown as FixZPergola;
 void _fixNieJePolozka;
 
 // server/money = Money zápisovač, server/pergola = pergolová Money odpisová cesta
-// (writeOdpis/dlv-import), server/db = odpis_log DB (dedup/claim). Vzorcový engine sa
-// nesmie dotknúť ani jedného — inak by sa display výpočet ticho zviazal na Money.
+// (writeOdpis/dlv-import), server/db = odpis_log DB (dedup/claim), server/cad-odpis =
+// zdieľaný CAD→Money most (#393). Vzorcový engine sa nesmie dotknúť ani jedného — inak
+// by sa display výpočet ticho zviazal na Money.
 const ZAKAZANE_VZORY = [
 	/from ['"].*server\/money['"]/,
 	/from ['"].*server\/pergola['"]/,
 	/from ['"].*server\/db['"]/,
+	/from ['"].*server\/cad-odpis['"]/,
 	/import\(\s*['"`].*server\/money['"`]/,
 	/import\(\s*['"`].*server\/pergola['"`]/,
 	/import\(\s*['"`].*server\/db['"`]/,
+	/import\(\s*['"`].*server\/cad-odpis['"`]/,
 	/writeOdpis|MONEY_LIVE/
 ];
 

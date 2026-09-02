@@ -195,7 +195,9 @@
 <div class="card">
 	<div class="sec">Odpis (do Money)</div>
 	{#each p.odpis.filter((o) => o.metre > 0) as o (o.kod)}
-		<div class="row"><span>{o.kod} · {o.nazov}</span><b>{fmtM(o.metre)} m</b></div>
+		<div class="row">
+			<span><span class="mono">{o.kod}</span> · {o.nazov}</span><b>{fmtM(o.metre)} m</b>
+		</div>
 	{/each}
 </div>
 

@@ -18,6 +18,11 @@
 	--m-ink-2: #1b1e23;
 	--m-ink-2-hover: #2c3037;
 	--m-muted: #6b7078;
+	/* text-safe muted (#376 stage 2 review) — --m-muted is 4.29:1 on --m-accent-soft
+	   and 4.49:1 on --m-surface-2, below WCAG AA 4.5:1 for the mode-card description/
+	   foot TEXT; --m-muted-ink (~5.7:1 on accent-soft, 6.6:1 on white) is the text-safe
+	   variant — same non-text/text split as --m-accent/--m-accent-ink */
+	--m-muted-ink: #585d65;
 	--m-accent: #b07a45;
 	/* text-safe bronze (review finding #5, #376) — --m-accent itself is 3.67:1 on
 	   white, below WCAG AA 4.5:1 for normal-weight small text; use --m-accent for
@@ -255,6 +260,30 @@ select:focus {
 	outline: 2px solid var(--m-accent);
 	border-color: var(--m-accent);
 }
+/* #376 stage 2 — checkbox afordancia: natívny checkbox berie globálne
+   `input { width: 100% }` (nechcené roztiahnutie) — vrátiť na auto + bronzové
+   zaškrtnutie (accent-color). Scoped na `.wrap` (interná appka) — bare
+   `input[type=checkbox]` by presakoval na /konfigurator consent checkbox
+   (`.suhlas input`, vlastný --k-* svet), presne tá leak-pasca, ktorú
+   redizajn.md dokumentuje pre každý globálny element selektor. */
+.wrap input[type='checkbox'] {
+	width: auto;
+	accent-color: var(--m-accent);
+}
+/* Zdieľaný checkbox riadok (#376 stage 2) — predtým 5× duplikovaný inline štýl
+   (`display:flex;align-items:center;gap:8px;font-weight:400`) na formulárových
+   stránkach; teraz jedna trieda. `.opt-grid` = variant v grid bunke, ktorý sa
+   zvislo zarovná so susednými poľami (nahradzuje inline `margin-top:26px`). */
+.opt {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 400;
+	cursor: pointer;
+}
+.opt-grid {
+	margin-top: 26px;
+}
 .grid2 {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -400,6 +429,90 @@ select:focus {
 .g div b {
 	display: block;
 	font-size: 19px;
+}
+/* #394 — zdieľaný prepínač režimov (PergolaModeNav + FixModeNav), zjednotený z
+   per-komponent scoped CSS do jednej definície (vzor #239 table.narez → app.css).
+   Počet stĺpcov per-komponent cez modifikátor .cols-2 (Fix 2 karty) vs default 3
+   (Pergola). Aktívny ring zjednotený na 2px (predtým Fix 1px — neúmyselná
+   divergencia). Fix-only .mode-tag.ok + .mode-card.active .mode-foot sú tu tiež
+   (Pergola ich nerenderuje → naň neúčinkujú). Tokenizované na --m-* v #376 stage 2. */
+.mode-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 12px;
+	margin-bottom: 14px;
+}
+.mode-grid.cols-2 {
+	grid-template-columns: repeat(2, 1fr);
+}
+@media (max-width: 720px) {
+	.mode-grid,
+	.mode-grid.cols-2 {
+		grid-template-columns: 1fr;
+	}
+}
+.mode-card {
+	display: flex;
+	flex-direction: column;
+	text-align: left;
+	text-decoration: none;
+	color: inherit;
+	background: var(--m-surface-2);
+	border: 1px solid var(--m-line-2);
+	border-radius: var(--m-radius-btn);
+	padding: 16px;
+	transition:
+		border-color 0.12s,
+		box-shadow 0.12s,
+		background 0.12s;
+}
+a.mode-card:hover {
+	border-color: var(--m-accent);
+	background: var(--m-surface);
+	box-shadow: 0 2px 8px rgba(22, 24, 28, 0.08);
+}
+.mode-card.active {
+	background: var(--m-accent-soft);
+	border-color: var(--m-accent);
+	box-shadow: inset 0 0 0 2px var(--m-accent);
+}
+.mode-tag {
+	align-self: flex-start;
+	font-family: var(--m-font-display);
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--m-muted);
+	background: var(--m-surface);
+	border: 1px solid var(--m-line);
+	border-radius: var(--m-radius-pill);
+	padding: 2px 9px;
+	margin-bottom: 9px;
+}
+.mode-tag.ok {
+	background: var(--m-ok-bg);
+	color: var(--m-ok);
+	border-color: transparent;
+}
+.mode-title {
+	font-family: var(--m-font-display);
+	font-size: 17px;
+	font-weight: 700;
+	color: var(--m-ink);
+	margin-bottom: 5px;
+}
+.mode-desc {
+	font-size: 14px;
+	color: var(--m-muted-ink);
+	line-height: 1.4;
+}
+.mode-foot {
+	margin-top: 10px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--m-accent-ink);
+}
+.mode-card.active .mode-foot {
+	color: var(--m-muted-ink);
 }
 /* #376 stage 1: header/nav re-skin — svetlý papier + blur (vzor konfigurátorovej
    hlavy), sticky, bronzové podčiarknutie na aktívnom odkaze. Emoji preč z Vzorce/

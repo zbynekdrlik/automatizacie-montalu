@@ -167,14 +167,8 @@
 					/>
 				</div>
 				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
-						<input
-							type="checkbox"
-							name="dvere"
-							value="1"
-							checked={vstup.dvere}
-							style="width:auto"
-						/>
+					<label class="opt opt-grid">
+						<input type="checkbox" name="dvere" value="1" checked={vstup.dvere} />
 						Dvere
 					</label>
 				</div>
@@ -195,14 +189,8 @@
 					</select>
 				</div>
 				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
-						<input
-							type="checkbox"
-							name="uzamykatelna"
-							value="1"
-							checked={vstup.uzamykatelna}
-							style="width:auto"
-						/>
+					<label class="opt opt-grid">
+						<input type="checkbox" name="uzamykatelna" value="1" checked={vstup.uzamykatelna} />
 						Uzamykateľná páčka
 					</label>
 				</div>
@@ -223,14 +211,8 @@
 					</select>
 				</div>
 				<div class="field">
-					<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px">
-						<input
-							type="checkbox"
-							name="vetraciaKlapka"
-							value="1"
-							checked={vstup.vetraciaKlapka}
-							style="width:auto"
-						/>
+					<label class="opt opt-grid">
+						<input type="checkbox" name="vetraciaKlapka" value="1" checked={vstup.vetraciaKlapka} />
 						Vetracia klapka
 					</label>
 				</div>
@@ -244,9 +226,9 @@
 				{/each}
 			</div>
 			<div class="field">
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400">
-					<input type="checkbox" name="caka" value="1" checked={vstup.caka} style="width:auto" />
-					⏳ Čaká na materiál (odloží import do priečinka NA ODPIS/Bazen)
+				<label class="opt">
+					<input type="checkbox" name="caka" value="1" checked={vstup.caka} />
+					Čaká na materiál (odloží import do priečinka NA ODPIS/Bazen)
 				</label>
 			</div>
 			<button class="btn" type="submit">Spočítať rozpis</button>
@@ -341,7 +323,11 @@
 		{#each form.finalOut.filter((o) => o.qty > 0) as o (o.kod)}
 			<div class="row" style="align-items:center;gap:12px">
 				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
-				<span style="flex:1">{o.kod} · {o.nazov}{form.zmenene.includes(o.kod) ? ' ✏️' : ''}</span>
+				<span style="flex:1"
+					><span class="mono">{o.kod}</span> · {o.nazov}{form.zmenene.includes(o.kod)
+						? ' ✏️'
+						: ''}</span
+				>
 				<b>{fmtM(o.qty)} {o.mj ?? 'm'}</b>
 			</div>
 		{/each}
