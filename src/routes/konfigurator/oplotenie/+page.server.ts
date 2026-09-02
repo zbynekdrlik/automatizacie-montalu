@@ -26,6 +26,9 @@ import {
 	cenyModelovOplotenie
 } from '$lib/server/konfigurator-oplotenie-cena';
 import { cenovaHladina } from '$lib/server/konfigurator-hladina';
+// #427: per-typ cenníkové rozmerové obálky (LEN rozmery, žiadna cena) — vystavené klientovi cez `load`,
+// aby zákazník videl PLATNÝ katalógový rozsah zvoleného typu namiesto „nemej steny" individuálnej ponuky.
+import { OPLOTENIE_OBALKY } from '$lib/server/konfigurator-obalky';
 import { parseOplotenieCenaVstup } from '$lib/server/konfigurator-oplotenie-vstup';
 import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
@@ -39,6 +42,9 @@ export const load: PageServerLoad = async () => {
 		// RAL farby (kód + názov, žiadny Money údaj) — rovnaký tvar ako bazénová podstránka.
 		farby: RAL_PALETA.map((r) => ({ kod: r.kod, nazov: r.nazov })),
 		rozmedzia: OPLOTENIE_RANGES,
+		// #427: per-typ cenníkové obálky (rozmery s katalógovou cenou) — klient z nich zobrazí „cenníkový
+		// rozsah" a čestnú „mimo rozsah = na vyžiadanie" hlášku. LEN rozmery, žiadna cena/VO/Money.
+		obalky: OPLOTENIE_OBALKY,
 		// východiskové voľby (aby SSR render aj klient vychádzali z rovnakého platného stavu)
 		defaulty: {
 			typ: OPLOTENIE_TYP_DEFAULT,

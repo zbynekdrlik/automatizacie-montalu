@@ -96,5 +96,5 @@ navyše asertuje, že aspoň jedna hranica v seede EXISTUJE (inak by test half-u
 
 Toto je INTERIM orientačná cena (zrkadlo montalu.sk), NIE finálny cenník od šéfa (#279 = marže/práca/
 montáž, samostatné). Owner otázky #279/#356/#369/#372/#378/#398 sú PENDING (finálne cenotvorné pravidlá)
-— sem NEZASAHUJÚ (interim). Možný follow-up: per-typ rozmerové obálky na stránke (clamp ako #389 tienenie),
-aby zákazník nevidel individuálnu-ponuku pri väčšine šírok plotového dielu — interim to nepotrebuje.
+— sem NEZASAHUJÚ (interim). Per-typ rozmerové obálky na stránke = DONE (#427, HYBRID nie clamp): obálka
+sa vystaví ako „cenníkový rozsah" + čestná mimo-hláška, generózne steppery ostávajú → `.claude/rules/konfigurator-obalky.md`.

@@ -31,6 +31,9 @@ import { dopytAction, objednavkaAction } from '$lib/server/dopyt-action';
 // nikdy nedostane, guard konfigurator-money-safety). Hladina (MO/VO) rozhoduje SERVER, nikdy klient.
 import { cenaPreModelBazen, cenyModelovBazen } from '$lib/server/konfigurator-bazen-cena';
 import { cenovaHladina } from '$lib/server/konfigurator-hladina';
+// #427: per-model cenníkové rozmerové obálky (LEN rozmery, žiadna cena) — vystavené klientovi cez
+// `load`, aby zákazník videl PLATNÝ katalógový rozsah zvoleného modelu namiesto „nemej steny".
+import { BAZEN_OBALKY } from '$lib/server/konfigurator-obalky';
 import { parseBazenCenaVstup } from '$lib/server/konfigurator-bazen-vstup';
 import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
@@ -45,6 +48,9 @@ export const load: PageServerLoad = async () => {
 		// RAL farby (kód + názov, žiadny Money údaj) — rovnaký tvar ako pergolová podstránka.
 		farby: RAL_PALETA.map((r) => ({ kod: r.kod, nazov: r.nazov })),
 		rozmedzia: BAZEN_RANGES,
+		// #427: per-model cenníkové obálky (rozmery s katalógovou cenou) — klient z nich zobrazí
+		// „cenníkový rozsah" a čestnú „mimo rozsah = na vyžiadanie" hlášku. LEN rozmery, žiadna cena.
+		obalky: BAZEN_OBALKY,
 		// východiskové voľby (aby SSR render aj klient vychádzali z rovnakého platného stavu)
 		defaulty: {
 			model: BAZEN_MODEL_DEFAULT,
