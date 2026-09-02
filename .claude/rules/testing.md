@@ -365,3 +365,31 @@ run FAIL, celý mutation-diff job červený. **Fix: rozdeľ na samostatné match
 `/modul:/` + `/'fix'/` (pôvodný literál prežíva vo false-vetve switchu). Symptóm:
 mutation-diff padá hneď v dry rune s failnutým guard testom, pričom
 `npx vitest run <guard>` lokálne prechádza.
+
+## In-memory per-IP throttle nazbiera naprieč CELOU E2E suite (jeden proces, jedna IP) → posledný spec padne (#390)
+
+`dopyt-throttle` (`allowDopyt`) je in-memory `Map` v SERVEROVOM procese a inkrementuje
+sa pri KAŽDOM odoslaní (nie len pri neúspechu — na rozdiel od `login-throttle`, ktorý
+`recordSuccess` počítadlo VYNULUJE, preto sa `loginAs` naprieč spec-mi nehromadí). E2E
+preview je JEDEN dlho-žijúci proces a všetky spec-y POSTujú z JEDNEJ IP (`127.0.0.1`),
+takže per-IP okno zbiera naprieč NESÚVISIACIMI spec-mi. Okno je 10 min > ~8 min beh
+suite → NIKDY sa neresetuje. `MAX_PER_WINDOW=8`, a abecedne je 9. `allowDopyt` POST
+posledný konfigurátorový dopyt (zimná záhrada; poradie: bazén, oplotenie, pergola
+`dopyt`+2×`objednávka`, prístrešok, tienenie, zasklenie = 8) → `fail(429)` bez
+`pdfBase64` → `DopytForm` nespustí download → `waitForEvent('download')` 30 s timeout.
+Zákerné: 299 ostatných zelených, padne LEN posledný; pridanie ďalšej dopyt/objednávka
+lane posunie prah.
+
+- **Diagnóza:** server LOGuje `dopyt-throttle: dopyt rate-limit count=8` (pipe
+  `webServer` stdout/stderr v temp configu). `expect(response.ok()).toBe(true)` PREJDE aj
+  pri 429 — SvelteKit `use:enhance` akcia vráti HTTP 200 a `{type:'failure',status}` je v
+  JSON tele, nie v HTTP statuse; preto padá až download-wait, nie `response.ok()`.
+- **Reprodukcia:** spusti VŠETKY dopyt/objednávka spec-y v abecednom poradí `--workers=1`
+  v JEDNOM procese (nie dvojicu — tá prah nedosiahne). `--shard` ich rozdelí do rôznych
+  procesov → prah sa RESETUJE → bug zmizne (falošné GREEN); faithful RED je celá dávka
+  v jednom procese.
+- **Fix (NIE band-aid):** limit je env-konfigurovateľný (`Number(process.env.DOPYT_MAX_PER_WINDOW) || 8`,
+  pure `resolveMaxPerWindow`), `playwright.config.ts` `webServer.env` ho zvýši
+  (`DOPYT_MAX_PER_WINDOW: '1000'`) — rovnaký test-env vzor ako `ENABLE_TEST_ERROR_ROUTE`/
+  `MONEY_LIVE=0`. PROD/VPS env NIKDY nenastavuje → default 8, prod NEZMENENÝ; throttle je
+  ďalej pokrytý `tests/dopyt-throttle.test.ts`. NIKDY nezvyšuj test timeout ani `test.skip`.
