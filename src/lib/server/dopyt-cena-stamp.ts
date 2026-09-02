@@ -5,9 +5,12 @@
 // živej matice). MONEY-NEUTRÁLNE: predajná cena (MO/VO), NIKDY Money kód. Súbor matchuje `/dopyt/`,
 // takže je auto-krytý statickým guardom `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola/`/data`).
 import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
+// #404: bazénová cenová matica (produkt-aware dispatch nižšie) + whitelist bazénového modelu.
+import { CENNIK_VERZIA_BAZEN, cenaPreModelBazen } from './konfigurator-bazen-cena';
+import { bazenModel } from '$lib/konfigurator-bazen';
 import { maCenovyZdroj, type KonfProduktKod } from '$lib/konfigurator-produkty';
 import type { PonukaConfig } from '$lib/ponuka';
-import type { ModelPergoly, VerejnaCena, CenovaHladina } from '$lib/konfigurator';
+import type { VerejnaCena, CenovaHladina } from '$lib/konfigurator';
 
 /** Orientačná cena z konfigurácie v danej HLADINE (LEN keď sú prítomné oba rozmery); inak `null`
  *  (honest-degrade — bez rozmerov cenu neurčíme). Zdieľané s `ponuka-pdf` (prepočet bez stampu).
@@ -16,6 +19,33 @@ import type { ModelPergoly, VerejnaCena, CenovaHladina } from '$lib/konfigurator
 export function cenaZCfg(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): VerejnaCena | null {
 	if (!(cfg.sirka && cfg.sirka > 0) || !(cfg.hlbka && cfg.hlbka > 0)) return null;
 	return cenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model }, hladina);
+}
+
+/** #404: orientačná cena z cfg PODĽA PRODUKTU (v danej hladine) — produkt-aware dispatch nad
+ *  cenovými maticami. `bazen` → bazénová matica (dĺžka `cfg.dlzka` + šírka `cfg.sirka` + model
+ *  `cfg.systemKod`; bez `systemKod` — starý neopečiatkovaný riadok — vráti `null`, honest-degrade,
+ *  aby sa starému honest-null bazén dopytu ticho nepriradila default cena). Ostatné (pergola/NULL/
+ *  neznámy pergolový fallback) → pergolová `cenaZCfg`. Zdieľané s `ponuka-pdf` (prepočet bez stampu).
+ *  Produkt-gate (`maCenovyZdroj`) rieši volajúci (`opeciatkujCenuPreProdukt` / `ponuka-pdf`). */
+export function cenaZCfgProdukt(
+	cfg: PonukaConfig,
+	produkt: string | null | undefined,
+	hladina: CenovaHladina = 'MO'
+): VerejnaCena | null {
+	if (produkt === 'bazen') {
+		if (!cfg.systemKod || !(cfg.dlzka && cfg.dlzka > 0) || !(cfg.sirka && cfg.sirka > 0))
+			return null;
+		return cenaPreModelBazen(
+			{ dlzkaMm: cfg.dlzka, sirkaMm: cfg.sirka, model: bazenModel(cfg.systemKod) },
+			hladina
+		);
+	}
+	return cenaZCfg(cfg, hladina);
+}
+
+/** #404: verzia cenníka podľa produktu (bazén má vlastnú maticu → vlastnú verziu). */
+function cennikVerziaProdukt(produkt: string | null | undefined): string {
+	return produkt === 'bazen' ? CENNIK_VERZIA_BAZEN : CENNIK_VERZIA;
 }
 
 /** Pečiatka ceny na uloženie do `dopyt` (#309): vypočítaná verejná (MO) cena + verzia cenníka.
@@ -46,7 +76,12 @@ export function opeciatkujCenuPreProdukt(
 	hladina: CenovaHladina = 'MO'
 ): CenaStamp {
 	if (!maCenovyZdroj(produkt)) return { cena: null, cennikVerzia: null };
-	return opeciatkujCenu(cfg, hladina);
+	// #404: produkt-aware — pergola z pergolovej matice, bazén z bazénovej (`cenaZCfgProdukt`),
+	// s verziou cenníka daného produktu (`cennikVerziaProdukt`).
+	return {
+		cena: cenaZCfgProdukt(cfg, produkt, hladina),
+		cennikVerzia: cennikVerziaProdukt(produkt)
+	};
 }
 
 /** Uložené cenové stĺpce `dopyt` riadka (migrácia v30, #318 rozšírené o `cena_hladina` v32).
@@ -125,7 +160,8 @@ export function stampNaStlpce(stamp?: CenaStamp): DopytCenaStlpce {
 export function cenaZoStampu(row: DopytCenaStlpce): VerejnaCena | null {
 	// neopečiatkovaný riadok (alebo obranne: opečiatkovaný bez modelu) → null = prepočet zo živej
 	if (row.cena_druh === null || row.cena_model === null) return null;
-	const model = row.cena_model as ModelPergoly;
+	// #404: `VerejnaCena.model` je `string` (pergola i bazén, len label) — bez pergolového castu.
+	const model: string = row.cena_model;
 	// #318: rekonštruuj hladinu z `cena_hladina` — 'VO' pole doplní (label „veľkoobchod"), inak
 	// (NULL/'MO' = starý/MO riadok) sa `hladina` NEnastaví (byte-identicky s pôvodným MO tvarom).
 	const vo = row.cena_hladina === 'VO' ? { hladina: 'VO' as const } : {};

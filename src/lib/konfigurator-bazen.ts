@@ -153,6 +153,9 @@ export function konfigurujBazen(v: BazenVstup): BazenSuhrn {
 export function bazenPonukaConfig(s: BazenSuhrn): PonukaConfig {
 	return {
 		system: `Bazénové zastrešenie — ${s.model}`,
+		// #404: neutrálny cenotvorný kód = bazénový model — server (`cenaZCfgProdukt`/`opeciatkujCenuPreProdukt`)
+		// z neho + dlzka/sirka spočíta orientačnú cenu; deterministicky reprodukovateľné pri re-downloade.
+		systemKod: s.model,
 		dlzka: s.dlzka,
 		sirka: s.sirka,
 		farba: s.farba,

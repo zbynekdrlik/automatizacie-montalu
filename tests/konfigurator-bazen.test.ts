@@ -1,7 +1,7 @@
-// #385 — verejný konfigurátor bazénových zastrešení: client-safe zákaznícky modul (modely/koľaj/
-// výplne/rozmedzia/súhrn/PonukaConfig) + honest-null cenový gate (bazén NEDOSTANE cenu — ani
-// opečiatkovanú, ani prepočítanú v PDF). Money-neutralita import-grafu stráži
-// `konfigurator-money-safety.test.ts` (A); TU overujeme SPRÁVNOSŤ + honest-null kontrakt.
+// #385/#404 — verejný konfigurátor bazénových zastrešení: client-safe zákaznícky modul (modely/koľaj/
+// výplne/rozmedzia/súhrn/PonukaConfig) + orientačná cena (#404: matica odblokovaná — bazén dostane
+// cenu z BAZÉNOVÝCH polí, izolovane od pergoly). Money-neutralita import-grafu stráži
+// `konfigurator-money-safety.test.ts` (A); TU overujeme SPRÁVNOSŤ + cenový kontrakt.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import {
@@ -19,6 +19,7 @@ import {
 	type BazenVstup
 } from '../src/lib/konfigurator-bazen';
 import { opeciatkujCenuPreProdukt } from '../src/lib/server/dopyt-cena-stamp';
+import { CENNIK_VERZIA_BAZEN } from '../src/lib/server/konfigurator-bazen-cena';
 import { generatePonukaPdf } from '../src/lib/server/ponuka-pdf';
 import { db } from '../src/lib/server/db';
 import { insertDopyt, getDopyt } from '../src/lib/server/dopyt-store';
@@ -126,24 +127,28 @@ describe('#385 konfigurujBazen (súhrn) + bazenPonukaConfig (mapovanie na dopyt)
 });
 
 // --------------------------------------------------------------------------- //
-// HONEST-NULL cenový kontrakt — bazén NIKDY nedostane cenu (ani opečiatkovanú, ani prepočítanú),
-// aj keď má rozmery. Pergola áno (regresná istota, že sme cenu pergole nerozbili).
+// ORIENTAČNÁ CENA (#404) — bazén TERAZ dostane cenu (matica odblokovaná), ale IZOLOVANE od pergoly:
+// cena sa počíta z BAZÉNOVÝCH polí (systemKod+dlzka+sirka), NIE z pergolových (hlbka+model). Pergola
+// ostáva nerozbitá (regresná istota). Netautologický gate (vzor #388/#389).
 // --------------------------------------------------------------------------- //
-describe('#385 honest-null cena — bazén bez ceny, pergola s cenou', () => {
-	// CFG nesie `hlbka`+`model` = CENOTVORNÝ vstup (keby gate NEbol, `cenaZCfg` by cenu spočítalo);
-	// bez `hlbka` by `cenaZCfg` vrátilo null aj bez gate → assercie by boli vákuové (review #389 🟡).
-	const CFG_ROZMERY = {
-		system: 'Bazénové zastrešenie — Premier',
-		sirka: 4000,
-		dlzka: 8000,
-		hlbka: 3500,
-		model: 'LIGHT' as const
-	};
+describe('#404 orientačná cena — bazén dostane cenu (izolovaná od pergoly)', () => {
+	// riadny BAZÉNOVÝ cfg (systemKod='Premier' + dlzka + sirka) — cenotvorný vstup bazénovej vetvy.
+	const cfgBazen = bazenPonukaConfig(konfigurujBazen(VSTUP));
 
-	it('opeciatkujCenuPreProdukt(bazen) → cena null + verzia null AJ pri cenotvornom cfg (gate drží)', () => {
-		const s = opeciatkujCenuPreProdukt(CFG_ROZMERY, 'bazen');
+	it('opeciatkujCenuPreProdukt(bazen) → BAZÉNOVÁ cena + bazénová verzia cenníka (odblokované #404)', () => {
+		const s = opeciatkujCenuPreProdukt(cfgBazen, 'bazen');
+		expect(s.cena).not.toBeNull();
+		expect(s.cena!.druh).toBe('cena');
+		expect(s.cennikVerzia).toBe(CENNIK_VERZIA_BAZEN);
+	});
+
+	it('pergolotvarová cfg (hlbka+model, bez systemKod/dlzka) pod „bazen" → cena null (NEDOSTANE pergolovú cenu)', () => {
+		// keby bazénová vetva čítala pergolové polia, tento cfg by dostal pergolovú cenu — nesmie.
+		const s = opeciatkujCenuPreProdukt(
+			{ system: 'Bazén', sirka: 4000, hlbka: 3500, model: 'LIGHT' as const },
+			'bazen'
+		);
 		expect(s.cena).toBeNull();
-		expect(s.cennikVerzia).toBeNull();
 	});
 
 	it('opeciatkujCenuPreProdukt(pergola) → cena opečiatkovaná (nerozbité pergola pricing)', () => {
@@ -153,12 +158,13 @@ describe('#385 honest-null cena — bazén bez ceny, pergola s cenou', () => {
 		expect(s.cennikVerzia).not.toBeNull();
 	});
 
-	it('generatePonukaPdf(produkt=bazen) → PDF NENESIE žiadnu cenu, aj s rozmermi (subject+keywords)', async () => {
-		const bytes = await generatePonukaPdf(CFG_ROZMERY, { produkt: 'bazen', datum: '1. 1. 2026' });
+	it('generatePonukaPdf(produkt=bazen) → PDF NESIE orientačnú (MO) cenu, žiadny VO leak', async () => {
+		const bytes = await generatePonukaPdf(cfgBazen, { produkt: 'bazen', datum: '1. 1. 2026' });
 		const doc = await PDFDocument.load(bytes);
-		// subject aj keywords — case-insensitive (keyword je lowercase „orientačná cena")
 		const meta = `${doc.getSubject() ?? ''} ${(doc.getKeywords() ?? '').toString()}`;
-		expect(meta).not.toMatch(/orientačná cena|veľkoobchodná cena|€/i);
+		// MO cena JE v metadátach; VO („veľkoobchodná cena") NIE
+		expect(meta).toMatch(/orientačná cena/i);
+		expect(meta).not.toMatch(/veľkoobchodná cena/i);
 		// nadpis dokumentu je bazénový (produkt-aware)
 		expect(doc.getTitle() ?? '').toContain('bazénového zastrešenia');
 	});
@@ -171,13 +177,13 @@ describe('#385 honest-null cena — bazén bez ceny, pergola s cenou', () => {
 	});
 });
 
-// DB round-trip: uložený bazén dopyt nesie NULOVÚ cenu (cena_druh aj cennik_verzia null) a jeho
-// re-download (regeneratePonukaPdf) reprodukuje PDF BEZ ceny — honest-null prežije celý tok
-// submit → uloženie → re-download (#385 review 🔵).
-describe('#385 honest-null DB round-trip — bazén dopyt bez ceny, re-download bez ceny', () => {
+// DB round-trip: uložený bazén dopyt nesie OPEČIATKOVANÚ bazénovú cenu (cena_druh 'cena' + bazénová
+// verzia) a jeho re-download (regeneratePonukaPdf) reprodukuje PDF S orientačnou cenou — cena prežije
+// celý tok submit → uloženie → re-download (#404).
+describe('#404 DB round-trip — bazén dopyt s cenou, re-download s cenou', () => {
 	beforeEach(() => db.exec('DELETE FROM dopyt'));
 
-	it('insert bazén dopyt (honest-null pečiatka) → cena_druh+cennik_verzia null → regen PDF bez ceny', async () => {
+	it('insert bazén dopyt (opečiatkovaná cena) → cena_druh cena + bazénová verzia → regen PDF nesie cenu', async () => {
 		const cfg = bazenPonukaConfig(konfigurujBazen(VSTUP));
 		const stamp = opeciatkujCenuPreProdukt(cfg, 'bazen');
 		const id = insertDopyt(
@@ -194,14 +200,14 @@ describe('#385 honest-null DB round-trip — bazén dopyt bez ceny, re-download 
 		);
 		const row = getDopyt(id)!;
 		expect(row.produkt).toBe('bazen');
-		expect(row.cena_druh).toBeNull();
-		expect(row.cennik_verzia).toBeNull();
+		expect(row.cena_druh).toBe('cena');
+		expect(row.cennik_verzia).toBe(CENNIK_VERZIA_BAZEN);
 
 		const out = await regeneratePonukaPdf(id);
 		expect(out).not.toBeNull();
 		const doc = await PDFDocument.load(out!.bytes);
 		const meta = `${doc.getSubject() ?? ''} ${(doc.getKeywords() ?? '').toString()}`;
-		expect(meta).not.toMatch(/orientačná cena|veľkoobchodná cena|€/i);
+		expect(meta).toMatch(/orientačná cena/i);
 		expect(doc.getTitle() ?? '').toContain('bazénového zastrešenia');
 	});
 });

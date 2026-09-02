@@ -18,6 +18,9 @@ import { SKLO_STRECHA_TYPY } from '../src/lib/sklo-strecha';
 // #279 Fáza C: interný cenový modul (MO + VO) — na overenie, že verejná odpoveď nesie MO,
 // ale VO (veľkoobchod) je z nej ODSTRÁNENÉ.
 import { vypocitajCenu } from '../src/lib/server/konfigurator-cena';
+// #404: bazénový cenový modul — nezávislá referencia MO/VO na overenie, že bazénová `vypocet` akcia
+// nesie MO, ale VO (veľkoobchod) je z verejnej odpovede ODSTRÁNENÝ.
+import { vypocitajCenuBazen } from '../src/lib/server/konfigurator-bazen-cena';
 
 const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
@@ -413,24 +416,90 @@ describe('Money safety (C) — runtime výstup: cena SMIE, VO/Money/nárez/matic
 });
 
 // --------------------------------------------------------------------------- //
-// (C) RUNTIME guard — bazénová podstránka (#385): load() nesie LEN prezentačné dáta, žiadny Money
-// kód (BPK*/BPP* z odpisu), žiadna cena (honest-null — bazén nemá cenový zdroj).
+// (C) RUNTIME guard — bazénová podstránka (#385/#404): load() nesie LEN prezentačné dáta (žiadna
+// cena — tá je až v akcii `vypocet`), akcia `vypocet` SMIE MO cenu, ale VO/Money/matica NIE.
 // --------------------------------------------------------------------------- //
-const { load: bazenLoad } = await import('../src/routes/konfigurator/bazen/+page.server');
+const { load: bazenLoad, actions: bazenActions } =
+	await import('../src/routes/konfigurator/bazen/+page.server');
 
-describe('Money safety (C) — bazénová route: žiadny Money kód, žiadna cena (#385)', () => {
-	it('load() posiela modely/koľaj/výplne/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+/** VO hodnoty (net + s DPH) VŠETKÝCH 3 bazénových modelov pre daný rozmer — response nesie
+ *  `cenyModely` pre všetky 3, takže guard overuje absenciu VO každého (parita s pergolou). */
+function voHodnotyVsetkychModelovBazen(dlzkaMm: number, sirkaMm: number): number[] {
+	const out: number[] = [];
+	for (const model of ['Premier', 'Star', 'Exclusive'] as const) {
+		const c = vypocitajCenuBazen({ dlzkaMm, sirkaMm, model });
+		if (c.druh === 'cena') out.push(c.vo.bezDph, c.vo.sDph);
+	}
+	return out;
+}
+
+describe('Money safety (C) — bazénová route: cena SMIE (MO), VO/Money NIE (#385/#404)', () => {
+	it('load() posiela modely/koľaj/výplne/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadna cena (tá je až v akcii vypocet)', async () => {
 		const data = await bazenLoad({} as Parameters<typeof bazenLoad>[0]);
 		const json = JSON.stringify(data);
 		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
 		neobsahujeMoneyAniNarez(json);
 		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
-		// honest-null: žiadna cena / € vo verejnej bazénovej odpovedi
+		// load NEMÁ cenu (tá je až v akcii vypocet, #404) → bez € aj bez slova „cena"
 		expect(json).not.toMatch(/€|EUR\b/);
 		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
 		// pozitívne: dáta naozaj prešli (modely + koľaj), aby test nebol vákuový
 		expect(json).toContain('Premier');
 		expect(json).toContain('Jednokoľajové');
+	});
+
+	it('akcia vypocet vráti orientačnú MO cenu (€), ale NIKDY VO / Money kód / nárez / maticu (#404)', async () => {
+		const fd = new FormData();
+		fd.append('model', 'Premier');
+		fd.append('dlzka', '6000');
+		fd.append('sirka', '4000');
+		const event = {
+			request: new Request('http://x/konfigurator/bazen', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.20'
+		} as unknown as Parameters<typeof bazenActions.vypocet>[0];
+
+		const r = await bazenActions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		// interná cena (MO + VO) pre presne tento rozmer/model — nezávislá referencia
+		const interne = vypocitajCenuBazen({ dlzkaMm: 6000, sirkaMm: 4000, model: 'Premier' });
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// pozitívne: orientačná MO cena (net + s DPH) JE v odpovedi (cena sa smie zobraziť)
+			expect(json).toContain(String(interne.mo.bezDph));
+			expect(json).toContain(String(interne.mo.sDph));
+			// negatívne: VO hodnoty VŠETKÝCH 3 modelov (response nesie cenyModely) NIE SÚ v odpovedi
+			neobsahujeVOaniMaticu(json, voHodnotyVsetkychModelovBazen(6000, 4000));
+		}
+		neobsahujeMoneyAniNarez(json);
+		// pozitívne: „ceny modelov vedľa seba" naozaj prišli (model marker)
+		expect(json).toContain('Exclusive');
+	});
+
+	it('prihlásený b2b (VO) → akcia vypocet vráti VO cenu + hladinu VO; Money kód/nárez stále NIE (#318/#404)', async () => {
+		const fd = new FormData();
+		fd.append('model', 'Premier');
+		fd.append('dlzka', '6000');
+		fd.append('sirka', '4000');
+		const event = {
+			request: new Request('http://x/konfigurator/bazen', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.21',
+			locals: { user: { id: 1, username: 'obchod@phsplus.cz', role: 'b2b' } }
+		} as unknown as Parameters<typeof bazenActions.vypocet>[0];
+
+		const r = await bazenActions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		const interne = vypocitajCenuBazen({ dlzkaMm: 6000, sirkaMm: 4000, model: 'Premier' });
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// VO cena vybraného modelu JE v odpovedi pre b2b (net + s DPH) + hladina marker
+			expect(json).toContain(String(interne.vo.bezDph));
+			expect(json).toContain(String(interne.vo.sDph));
+			expect(json).toMatch(/"hladina":"VO"/);
+		}
+		// Money kód / nárez sú zakázané aj pre VO výstup (VO je cena, nie Money kód)
+		neobsahujeMoneyAniNarez(json);
 	});
 });
 

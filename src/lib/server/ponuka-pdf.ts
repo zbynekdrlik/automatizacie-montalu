@@ -20,7 +20,7 @@ import {
 	zhrnutieRiadky,
 	type PonukaConfig
 } from '$lib/ponuka';
-import { cenaZCfg } from './dopyt-cena-stamp';
+import { cenaZCfgProdukt } from './dopyt-cena-stamp';
 import { produktPdfNadpis, maCenovyZdroj } from '$lib/konfigurator-produkty';
 import { cislaCiarka } from '$lib/konfigurator-jednotky';
 import { formatDatumSk } from '$lib/datum';
@@ -78,9 +78,12 @@ function cenaNadpis(cena: VerejnaCena): string {
  *  review 🟡 — inak by cena „nesedela" so zadanými rozmermi). */
 function cenaRiadky(cena: VerejnaCena, cfg: PonukaConfig): { hlavny: string; podriadok: string } {
 	if (cena.druh === 'cena') {
+		// #404: grid-note porovnaj LEN keď je príslušný cfg rozmer prítomný. Pergola nesie `sirka`+
+		// `hlbka` → správanie byte-identické; bazén nemá `hlbka` (má `dlzka`) a rozmery sú už na mriežke
+		// → note sa nevykreslí (žiadny zavádzajúci pergolový „š × h" label pre bazén).
 		const liseSa =
-			Math.round(cena.sirkaGridM * 1000) !== cfg.sirka ||
-			Math.round(cena.hlbkaGridM * 1000) !== cfg.hlbka;
+			(cfg.sirka !== undefined && Math.round(cena.sirkaGridM * 1000) !== cfg.sirka) ||
+			(cfg.hlbka !== undefined && Math.round(cena.hlbkaGridM * 1000) !== cfg.hlbka);
 		const grid = liseSa
 			? ` · katalógový rozmer ${mPlain(cena.sirkaGridM)} × ${mPlain(cena.hlbkaGridM)} m`
 			: '';
@@ -357,7 +360,9 @@ export async function generatePonukaPdf(
 	// #385: honest-degrade prepočet je LEN pre produkt s cenovým zdrojom (pergola; NULL/neznámy produkt
 	// = starý pergolový riadok = má zdroj). Bazén/ostatné → cena null (žiadny prepočet pergolovej ceny
 	// z rozmerov zastrešenia), takže re-download bazén dopytu neukáže vymyslenú cenu.
-	const cena = opts.cena ?? (maCenovyZdroj(opts.produkt) ? cenaZCfg(cfg) : null);
+	// #404: produkt-aware prepočet (pergola → pergolová matica, bazen → bazénová; ostatné honest-null).
+	const cena =
+		opts.cena ?? (maCenovyZdroj(opts.produkt) ? cenaZCfgProdukt(cfg, opts.produkt) : null);
 	// #384: nadpis dokumentu podľa produktu (fallback 'Špecifikácia pergoly' pre NULL/neznámy).
 	const nadpis = produktPdfNadpis(opts.produkt);
 	const maCena = cena !== null;

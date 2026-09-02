@@ -23,6 +23,11 @@ export interface PonukaConfig {
 	/** model konštrukcie (LIGHT/ROBUST/MASSIVE) — cenotvorný vstup (#279 Fáza C). Cenu z neho
 	 *  počíta SERVER (`ponuka-pdf`), NIE klient (klient posiela len tento string). */
 	model?: ModelPergoly;
+	/** #404: NEUTRÁLNY produktový cenotvorný kód (napr. bazénový model 'Premier'/'Star'/'Exclusive').
+	 *  Pergola ho nepoužíva (má `model:ModelPergoly`); bazénová cesta ho číta v `cenaZCfgProdukt`
+	 *  ako model. Je v uloženom cfg JSON → deterministicky dostupný pri re-downloade (žiadny
+	 *  string-parse zo `system`). Cenu server-side; klient len posiela výber. */
+	systemKod?: string;
 	sirka?: number;
 	hlbka?: number;
 	/** #385: DĹŽKA [mm] — neutrálne pole pre produkty, kde je hlavný rozmer dĺžka, nie hĺbka
@@ -79,6 +84,10 @@ export function sanitizePonukaConfig(raw: unknown): PonukaConfig {
 	// injekcia). Cena sa z neho počíta server-side, klientom dodaná hodnota je len výberom.
 	const model = optStr(obj.model);
 	if (model && PLATNE_MODELY.has(model)) out.model = model as ModelPergoly;
+	// #404: neutrálny produktový cenotvorný kód (bazénový model) — obranne orezaný string; hodnotu
+	// (Premier/Star/Exclusive) validuje bazénová cenová vetva whitelistom (`bazenModel`).
+	const systemKod = optStr(obj.systemKod);
+	if (systemKod) out.systemKod = systemKod;
 	const sirka = optPosNum(obj.sirka);
 	if (sirka !== undefined) out.sirka = sirka;
 	const hlbka = optPosNum(obj.hlbka);

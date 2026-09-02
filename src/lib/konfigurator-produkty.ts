@@ -64,9 +64,10 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		stav: 'live',
 		odkaz: '/konfigurator/bazen',
 		externy: false,
-		// #385: bazén NEMÁ overený interim cenový zdroj (montalu.sk `update-pools` existuje, ale jeho
-		// vyťaženie do matice je práca v rozsahu #279 — samostatný follow-up). Honest-null → bez ceny.
-		cenovyZdroj: false
+		// #404: bazén MÁ vyťažený interim cenový zdroj (matica montalu.sk `update-pools` v
+		// `cennik-bazen.json`, server modul `konfigurator-bazen-cena.ts`) → orientačná cena je
+		// odblokovaná (gate `maCenovyZdroj` → dopyt/PDF/`vypocet` akcia dostanú bazénovú cenu).
+		cenovyZdroj: true
 	},
 	{
 		kod: 'zimna-zahrada',

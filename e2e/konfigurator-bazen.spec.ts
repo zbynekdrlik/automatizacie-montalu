@@ -1,13 +1,13 @@
-// #385: verejný konfigurátor bazénových zastrešení (`/konfigurator/bazen`) — E2E cez reálny
+// #385/#404: verejný konfigurátor bazénových zastrešení (`/konfigurator/bazen`) — E2E cez reálny
 // prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (model/rozmery/koľaj/farba/výplň)
-// sa počíta klientsky a zobrazí súhrn; HONEST-NULL — žiadna orientačná cena (bazén nemá cenový
-// zdroj); dopyt tok → PDF špecifikácia (bez ceny) na stiahnutie. GET je Money-neutrálny (číta sa aj
-// proti LIVE prode); dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú
-// testovacie dopyty. Každý test = NULA console chýb (× = U+00D7 byte-identické).
+// sa počíta klientsky a zobrazí súhrn; #404 ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`,
+// Money-neutrálna — bez zápisu); dopyt tok → PDF špecifikácia na stiahnutie. GET aj `vypocet` sú
+// Money-neutrálne (číta sa aj proti LIVE prode); dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech
+// proti prode nepribúdajú testovacie dopyty. Každý test = NULA console chýb (× = U+00D7 byte-identické).
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
 
-test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (žiadna cena), nula console chýb', async ({
+test('bazén konfigurátor: verejná route bez auth — súhrn + orientačná cena po kliku, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -23,9 +23,16 @@ test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (ž
 	await expect(page.getByTestId('bazen-suhrn')).toBeVisible();
 	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveText('6000 × 4000 mm');
 
-	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
-	await expect(page.getByTestId('bazen-cena-info')).toContainText('Cena na vyžiadanie');
+	// #404: orientačná cena je na KLIK (server-počítaná) — pred klikom je len tlačidlo, žiadny € na stránke
+	await expect(page.getByTestId('bazen-cena-zobrazit')).toBeVisible();
 	await expect(page.locator('body')).not.toContainText('€');
+
+	// klik → server vráti orientačnú MO cenu → cena (s DPH, €) + porovnanie modelov sa zobrazia
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+	await expect(page.getByTestId('bazen-cena')).toContainText('Orientačná cena');
+	await expect(page.getByTestId('bazen-cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('bazen-porovnanie')).toBeVisible();
 
 	expect(consoleMsgs).toEqual([]);
 });

@@ -9,6 +9,7 @@
 	// `konfigurator-bazen` + DopytForm (guard: konfigurator-money-safety). Žiadne `console.*`.
 	import { untrack } from 'svelte';
 	import { base } from '$app/paths';
+	import { enhance } from '$app/forms';
 	import DopytForm from '$lib/components/DopytForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
 	import { cislaCiarka } from '$lib/konfigurator-jednotky';
@@ -22,6 +23,9 @@
 		type BazenVstup
 	} from '$lib/konfigurator-bazen';
 	import type { PonukaConfig } from '$lib/ponuka';
+	// #404: typy orientačnej ceny (server-počítanej `vypocet` akciou). LEN typy → žiadny import
+	// cenového/Money modulu do klientskeho bundle (leak-guard A ostáva zelený).
+	import type { VerejnaCena, CenaModelu } from '$lib/konfigurator';
 
 	let { data } = $props();
 
@@ -68,6 +72,24 @@
 	const platny = $derived(bazenVstupPlatny(vstup));
 	const suhrn = $derived(platny ? konfigurujBazen(vstup) : null);
 	const ponukaCfg = $derived<PonukaConfig>(suhrn ? bazenPonukaConfig(suhrn) : {});
+
+	// #404: orientačná cena — server-počítaná (`vypocet` akcia, enhance submit, žiadny reload). Zobrazí
+	// sa až po kliku „Zobraziť orientačnú cenu" (vzor pergolovej `vypocet`); pri zmene modelu/rozmerov
+	// sa výsledok považuje za neaktuálny (`cenaAktualna`), takže sa NIKDY neukáže cena pre iný rozmer.
+	let cenaVysledok = $state<{ cena: VerejnaCena; cenyModely: CenaModelu[] } | null>(null);
+	let cenaError = $state<string | null>(null);
+	let cenaNacitava = $state(false);
+	let poslednyKluc = $state<string | null>(null);
+	const cenaKluc = $derived(`${vstup.model}|${dlzka ?? 0}|${sirka ?? 0}`);
+	const cenaAktualna = $derived(cenaVysledok !== null && poslednyKluc === cenaKluc);
+
+	const eur = (n: number) =>
+		n.toLocaleString('sk-SK', {
+			style: 'currency',
+			currency: 'EUR',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
 
 	function scrollNa(id: string) {
 		document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -262,14 +284,107 @@
 					</dl>
 				</section>
 
-				<!-- CENA je na DOPYT (honest-null: bazén nemá orientačný cenník) -->
-				<section class="baz-cena-info" data-testid="bazen-cena-info">
-					<strong>Cena na vyžiadanie</strong>
-					<p>
-						Bazénové zastrešenie ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme
-						cenovú ponuku po obhliadke miesta.
-					</p>
-					<button type="button" class="baz-btn primar" onclick={() => scrollNa('dopyt')}>
+				<!-- ORIENTAČNÁ CENA (#404) — server-počítaná bazénovou maticou montalu.sk (enhance submit) -->
+				<section class="baz-cena" data-testid="bazen-cena-sekcia">
+					{#if cenaAktualna && cenaVysledok}
+						{@const c = cenaVysledok.cena}
+						<div class="baz-cena-blok" data-testid="bazen-cena">
+							{#if c.druh === 'cena'}
+								<span class="baz-cena-label">Orientačná cena — model {c.model}</span>
+								{#if c.hladinaLabel}
+									<span class="baz-cena-vo" data-testid="bazen-cena-hladina">{c.hladinaLabel}</span>
+								{/if}
+								<div class="baz-cena-hlavne">
+									<span class="baz-cena-sdph" data-testid="bazen-cena-sdph">{eur(c.sDph)}</span>
+									<span class="baz-cena-mena">s DPH</span>
+								</div>
+								<div class="baz-cena-bezdph" data-testid="bazen-cena-bezdph">
+									{eur(c.bezDph)} bez DPH
+								</div>
+							{:else}
+								<span class="baz-cena-label">Cena na vyžiadanie — model {c.model}</span>
+								{#if c.hladinaLabel}
+									<span class="baz-cena-vo" data-testid="bazen-cena-hladina">{c.hladinaLabel}</span>
+								{/if}
+								<p class="baz-cena-dovod" data-testid="bazen-cena-individualna">
+									{c.dovod} Pripravíme ti individuálnu ponuku.
+								</p>
+							{/if}
+							<p class="baz-cena-pozn">
+								Orientačná cena vychádza z aktuálneho cenníka pre zvolený model a rozmery. Presnú,
+								záväznú cenu pripravíme po obhliadke miesta.
+							</p>
+						</div>
+
+						{#if cenaVysledok.cenyModely}
+							<div class="baz-porovnanie" data-testid="bazen-porovnanie">
+								<h3>Porovnanie modelov (orientačne, s DPH)</h3>
+								<ul>
+									{#each cenaVysledok.cenyModely as cm (cm.model)}
+										<li
+											class:vybrany={cm.model === c.model}
+											data-testid="bazen-porovnanie-{cm.model}"
+										>
+											<span class="p-model">{cm.model}</span>
+											<span class="p-cena">
+												{cm.cena.druh === 'cena' ? eur(cm.cena.sDph) : 'na vyžiadanie'}
+											</span>
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+					{:else}
+						<form
+							method="POST"
+							action="?/vypocet"
+							class="baz-cena-form"
+							use:enhance={() => {
+								const submitted = cenaKluc;
+								cenaNacitava = true;
+								cenaError = null;
+								return ({ result }) => {
+									cenaNacitava = false;
+									if (result.type === 'success') {
+										const d = result.data as
+											{ cena: VerejnaCena; cenyModely: CenaModelu[] } | undefined;
+										if (d?.cena) {
+											cenaVysledok = { cena: d.cena, cenyModely: d.cenyModely };
+											poslednyKluc = submitted;
+										}
+									} else if (result.type === 'failure') {
+										const d = result.data as { error?: string } | undefined;
+										cenaError = d?.error ?? 'Cenu sa nepodarilo spočítať.';
+									}
+								};
+							}}
+						>
+							<input type="hidden" name="model" value={vstup.model} />
+							<input type="hidden" name="dlzka" value={dlzka ?? 0} />
+							<input type="hidden" name="sirka" value={sirka ?? 0} />
+							<strong>Orientačná cena</strong>
+							<p>
+								Zobraz si orientačnú cenu zvoleného modelu a porovnanie modelov. Presnú, záväznú
+								cenu pripravíme po obhliadke miesta.
+							</p>
+							{#if cenaError}
+								<p class="baz-cena-chyba" data-testid="bazen-cena-chyba">{cenaError}</p>
+							{/if}
+							<button
+								type="submit"
+								class="baz-btn primar"
+								data-testid="bazen-cena-zobrazit"
+								disabled={cenaNacitava}
+							>
+								{cenaNacitava
+									? 'Počítam…'
+									: cenaVysledok
+										? 'Prepočítať orientačnú cenu →'
+										: 'Zobraziť orientačnú cenu →'}
+							</button>
+						</form>
+					{/if}
+					<button type="button" class="baz-btn druhotny" onclick={() => scrollNa('dopyt')}>
 						Nezáväzný dopyt →
 					</button>
 				</section>
@@ -462,7 +577,6 @@
 		gap: 16px;
 	}
 	.baz-suhrn,
-	.baz-cena-info,
 	.baz-blok-kontakt {
 		border: 1px solid var(--k-line);
 		border-radius: var(--k-radius);
@@ -506,21 +620,142 @@
 		text-align: right;
 	}
 
-	.baz-cena-info {
-		background: var(--k-surface-2);
-		border-color: var(--k-line-2);
+	/* ORIENTAČNÁ CENA (#404) */
+	.baz-cena {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
-	.baz-cena-info strong {
+	.baz-cena-form {
+		border: 1px solid var(--k-line-2);
+		border-radius: var(--k-radius);
+		background: var(--k-surface-2);
+		padding: 20px 22px;
+	}
+	.baz-cena-form strong {
 		display: block;
 		font-size: 17px;
 		color: var(--k-text);
 		margin-bottom: 6px;
 	}
-	.baz-cena-info p {
+	.baz-cena-form p {
 		margin: 0 0 14px;
 		font-size: 13.5px;
 		line-height: 1.5;
 		color: var(--k-muted);
+	}
+	.baz-cena-chyba {
+		color: #a3261c;
+		font-weight: 600;
+	}
+	/* prémiový antracitový cenový panel (tmavá karta, Tesla-style — zhoda s pergolovým KonfCena) */
+	.baz-cena-blok {
+		background: var(--k-ink, #1b1e23);
+		color: #fff;
+		border-radius: var(--k-radius);
+		padding: 20px 22px;
+	}
+	.baz-cena-label {
+		display: block;
+		color: rgba(255, 255, 255, 0.62);
+		font-size: 12px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 600;
+	}
+	.baz-cena-vo {
+		display: inline-block;
+		margin-top: 8px;
+		padding: 2px 9px;
+		border-radius: 999px;
+		background: var(--k-accent, #b07a45);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.baz-cena-hlavne {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.baz-cena-sdph {
+		font-size: clamp(28px, 7vw, 38px);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+	}
+	.baz-cena-mena {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+	}
+	.baz-cena-bezdph {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+		margin-top: 4px;
+	}
+	.baz-cena-dovod {
+		color: rgba(255, 255, 255, 0.72);
+		font-size: 13.5px;
+		margin: 8px 0 0;
+	}
+	.baz-cena-pozn {
+		color: rgba(255, 255, 255, 0.5);
+		font-size: 12px;
+		line-height: 1.45;
+		margin: 14px 0 0;
+	}
+	.baz-porovnanie {
+		border: 1px solid var(--k-line);
+		border-radius: var(--k-radius);
+		background: var(--k-surface);
+		padding: 16px 20px;
+	}
+	.baz-porovnanie h3 {
+		font-size: 11.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		font-weight: 600;
+		margin: 0 0 12px;
+		color: var(--k-faint, #9a9ea6);
+	}
+	.baz-porovnanie ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 2px;
+	}
+	.baz-porovnanie li {
+		display: flex;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 9px 10px;
+		border-radius: 9px;
+		font-size: 15px;
+	}
+	.baz-porovnanie li.vybrany {
+		background: var(--k-accent-soft, #f5ede2);
+		font-weight: 700;
+	}
+	.baz-porovnanie .p-model {
+		color: var(--k-muted, #6b7078);
+	}
+	.baz-porovnanie .p-cena {
+		color: var(--k-text, #16181c);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+	.baz-btn.druhotny {
+		background: var(--k-surface);
+		color: var(--k-text);
+		border-color: var(--k-line-2);
+	}
+	.baz-btn.druhotny:hover {
+		border-color: var(--k-ink);
 	}
 
 	.baz-uvod {
