@@ -51,4 +51,18 @@ describe('rezy profilov (static/profil)', () => {
 	it('neznámy kód nemá rez (UI ho vynechá, nikdy nezobrazí rozbitý obrázok)', () => {
 		expect(maObrazok('ZASP-NEEXISTUJE')).toBe(false);
 	});
+
+	// #432: Delux 5K horná koľajnica (ZASP202427, „…6000 mm") a Štandard +/Štandard
+	// 5K horná koľajnica (ZASP202433, „…7500 mm") sú FYZICKY RÔZNE profily — Money má
+	// pre každý vlastný prierez. #296 opravil Money KÓD (ZASP202434 → ZASP202427), ale
+	// obrázok preniesol cez `git mv ZASP202434.webp → ZASP202427.webp` s predpokladom
+	// rovnakého prierezu; ZASP202434 mal však v Money identický prierez ako štandardná
+	// ZASP202433, takže Delux 5K rail od vtedy ukazoval ŠTANDARDNÝ rez (Patrik #432:
+	// „dáva 5K koľaj hornú zo štandardu … kód sedí, ale obrázok je zlý"). Zámka proti
+	// takej zámene obrázka — profil-obrazky.test.ts inak kontroluje len zoznam==súbory.
+	it('Delux 5K horná koľajnica má vlastný rez, nie prierez štandardnej 5K (#432)', () => {
+		const bajty = (kod: string) =>
+			fs.readFileSync(path.join(KOR, 'static', 'profil', `${kod}.webp`));
+		expect(bajty('ZASP202427').equals(bajty('ZASP202433'))).toBe(false);
+	});
 });
