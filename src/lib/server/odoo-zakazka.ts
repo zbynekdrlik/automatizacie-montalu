@@ -23,7 +23,16 @@
 // ROZŠÍRITEĽNÉ: `sekcie[]` — dnes „Profily a komponenty"; sklá z nárezákov pribudnú neskôr
 // ako ĎALŠIA sekcia bez zmeny štruktúry (#340 zadanie bod 3).
 import { logger } from './log';
-import { authenticate, executeKw, odooConfig, xmlEscape, type OdooConfig } from './odoo-rpc';
+import {
+	authenticate,
+	createRecord,
+	executeKw,
+	odooConfig,
+	xmlEscape,
+	type OdooConfig,
+	type XmlRpcValue
+} from './odoo-rpc';
+import { generateZakazkaPdfBase64, zakazkaPdfFilename } from './zakazka-pdf';
 import { normOp, normZak } from './money';
 import { zakazkaPrehlad, type ZakazkaPrehlad } from './zakazka-ceny';
 import { enrichPolozky, type CenaRiadok, type CenyResult } from './ceny';
@@ -199,19 +208,65 @@ async function findSaleOrderIds(cfg: OdooConfig, uid: number, name: string): Pro
 	return Array.isArray(res) ? res.filter((x): x is number => typeof x === 'number') : [];
 }
 
-/** Postne INTERNÚ log-note (mt_note) na daný `sale.order`. Zákazník ju NIKDY nevidí. */
+/**
+ * Postne INTERNÚ log-note (mt_note) na daný `sale.order`. Zákazník ju NIKDY nevidí.
+ * #418: voliteľné `attachmentIds` naviažu PDF prílohu(y) NA TÚTO internú správu — príloha tak DEDÍ
+ * neúnikovú garanciu #340 (internal=true message → viditeľné LEN interným Odoo používateľom, nikdy
+ * portál/e-mail/tlač/zákazník). `attachment_ids` kwarg pribudne LEN keď je čo naviazať (prázdny stav
+ * = byte-identická #340 správa).
+ */
 async function postInternalNote(
 	cfg: OdooConfig,
 	uid: number,
 	saleOrderId: number,
-	html: string
+	html: string,
+	attachmentIds: number[] = []
 ): Promise<void> {
-	await executeKw(cfg, uid, 'sale.order', 'message_post', [[saleOrderId]], {
+	const kwargs: Record<string, XmlRpcValue> = {
 		body: html,
 		subtype_xmlid: 'mail.mt_note', // internal=true → interné, nikdy k zákazníkovi
 		message_type: 'comment',
 		partner_ids: [] // explicitne prázdne — žiadny follower/notifikácia
-	});
+	};
+	if (attachmentIds.length > 0) kwargs.attachment_ids = attachmentIds;
+	await executeKw(cfg, uid, 'sale.order', 'message_post', [[saleOrderId]], kwargs);
+}
+
+/**
+ * #418: BEST-EFFORT PDF príloha rozpisu materiálu k `sale.order` ako `ir.attachment` (`datas` = base64,
+ * `ir.attachment.datas` je Binary = base64 string — dokázaný vzor `odoo-lead.ts`). Vráti id-čka na
+ * naviazanie do internej note (`postInternalNote`). Pád prílohy NEZHODÍ push — note ide aj bez nej
+ * (note je primárny durable záznam #349, PDF je vylepšenie). `public` sa NENASTAVUJE → default `False`
+ * (druhá vrstva k naviazaniu na internú správu).
+ */
+async function createZakazkaPdfAttachment(
+	cfg: OdooConfig,
+	uid: number,
+	saleOrderId: number,
+	pdfBase64: string,
+	filename: string,
+	zak: string,
+	op: string
+): Promise<number[]> {
+	try {
+		const attId = await createRecord(cfg, uid, 'ir.attachment', {
+			name: filename,
+			datas: pdfBase64,
+			res_model: 'sale.order',
+			res_id: saleOrderId,
+			mimetype: 'application/pdf',
+			type: 'binary'
+		});
+		return [attId];
+	} catch (e) {
+		log.warn('zakazka push: pripojenie PDF prílohy zlyhalo (note ide bez prílohy)', {
+			zak,
+			op,
+			saleOrderId,
+			err: errMsg(e)
+		});
+		return [];
+	}
 }
 
 export type ZakazkaPushResult = 'posted' | 'no-order' | 'missing' | 'disabled' | 'failed';
@@ -247,7 +302,23 @@ export async function pushZakazkaToOdooDetailed(
 			return { result: 'missing', error: null };
 		}
 		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
-		const html = buildZakazkaNoteHtml(buildZakazkaNote(prehlad, op, ceny));
+		const note = buildZakazkaNote(prehlad, op, ceny);
+		const html = buildZakazkaNoteHtml(note);
+		// #418: PDF rozpisu materiálu (best-effort — pád generovania NEZHODÍ note; note je primárny
+		// durable záznam #349, PDF je vylepšenie). Zabalené v try/catch, aby ani chyba pdf-lib
+		// neprebublala von a neporušila „NIKDY nehádže" kontrakt.
+		let pdfBase64: string | null = null;
+		let pdfFilename = 'Rozpis-materialu.pdf';
+		try {
+			pdfBase64 = await generateZakazkaPdfBase64(note);
+			pdfFilename = zakazkaPdfFilename(note);
+		} catch (e) {
+			log.warn('zakazka push: generovanie PDF rozpisu zlyhalo (note ide bez prílohy)', {
+				zak,
+				op,
+				err: errMsg(e)
+			});
+		}
 		const uid = await authenticate(cfg);
 		const name = normOp(op);
 		const ids = await findSaleOrderIds(cfg, uid, name);
@@ -265,12 +336,17 @@ export async function pushZakazkaToOdooDetailed(
 		if (ids.length > 1)
 			log.warn('zakazka push: viac sale.order s rovnakým name — postnem na všetky', { name, ids });
 		for (const id of ids) {
-			await postInternalNote(cfg, uid, id, html);
+			// #418: príloha sa vytvorí PER sale.order a naviaže sa NA TÚTO internú note (best-effort).
+			const attachmentIds = pdfBase64
+				? await createZakazkaPdfAttachment(cfg, uid, id, pdfBase64, pdfFilename, zak, op)
+				: [];
+			await postInternalNote(cfg, uid, id, html, attachmentIds);
 			log.info('zakazka push: interná poznámka zapísaná na sale.order', {
 				zak,
 				op,
 				name,
-				saleOrderId: id
+				saleOrderId: id,
+				prilohaPripnuta: attachmentIds.length > 0
 			});
 		}
 		return { result: 'posted', error: null };
