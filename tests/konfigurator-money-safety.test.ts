@@ -252,8 +252,9 @@ const SERVEROVE_ROUTY = [
 	// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`; root
 	// `/konfigurator` je výberová obrazovka (bez +page.server.ts).
 	'src/routes/konfigurator/pergola/+page.server.ts',
-	// #385: bazénová podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
-	// `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	// #385/#422: bazénová podstránka — serverová route (load + `dopyt`/`objednavka`/`vypocet`
+	// akcie). Importuje client-safe `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL —
+	// NIKDY money/cena/pergola/moneyKod.
 	'src/routes/konfigurator/bazen/+page.server.ts',
 	// #387: zasklenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
 	// `konfigurator-zasklenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/ZASP*/ZASK*.
