@@ -72,8 +72,8 @@
 
 <div class="pris">
 	<!-- HERO -->
-	<section class="pris-hero">
-		<div class="pris-hero-foto">
+	<section class="kp-hero">
+		<div class="kp-hero-foto">
 			<img
 				src="{base}/konfigurator/vyber/pristresok.webp"
 				alt="Hliníkový prístrešok na auto Montalu"
@@ -83,8 +83,8 @@
 				fetchpriority="high"
 			/>
 		</div>
-		<div class="pris-hero-text">
-			<span class="pris-label">Konfigurátor prístreškov a altánkov</span>
+		<div class="kp-hero-text">
+			<span class="kp-label">Konfigurátor prístreškov a altánkov</span>
 			<h1>Navrhni si prístrešok alebo altánok</h1>
 			<p>
 				Vyber typ, rozmery a vyhotovenie — pripravíme ti nezáväznú špecifikáciu (PDF) a ozveme sa s
@@ -93,33 +93,33 @@
 		</div>
 	</section>
 
-	<div class="pris-grid">
+	<div class="kp-grid">
 		<!-- OVLÁDANIE -->
-		<div class="pris-ovladanie">
+		<div class="kp-ovladanie">
 			<!-- TYP -->
-			<fieldset class="pris-blok">
+			<fieldset class="kp-blok">
 				<legend>Typ výrobku</legend>
-				<div class="pris-karty">
+				<div class="kp-karty">
 					{#each data.typy as t (t.kod)}
 						<button
 							type="button"
-							class="pris-karta"
+							class="kp-karta"
 							class:vybrana={typ === t.kod}
 							aria-pressed={typ === t.kod}
 							data-testid="pristresok-typ-{t.kod}"
 							onclick={() => (typ = t.kod)}
 						>
-							<span class="pris-karta-nazov">{t.nazov}</span>
-							<span class="pris-karta-popis">{t.popis}</span>
+							<span class="kp-karta-nazov">{t.nazov}</span>
+							<span class="kp-karta-popis">{t.popis}</span>
 						</button>
 					{/each}
 				</div>
 			</fieldset>
 
 			<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou/bazénom) -->
-			<fieldset class="pris-blok">
+			<fieldset class="kp-blok">
 				<legend>Rozmery</legend>
-				<div class="pris-steppery">
+				<div class="kp-steppery">
 					<RozmerStepper
 						bind:hodnotaMm={dlzka}
 						min={r.dlzka.min}
@@ -157,10 +157,10 @@
 			</fieldset>
 
 			<!-- KRYTINA + FARBA -->
-			<fieldset class="pris-blok">
+			<fieldset class="kp-blok">
 				<legend>Vyhotovenie</legend>
-				<div class="pris-rozmery">
-					<label class="pris-pole">
+				<div class="kp-rozmery">
+					<label class="kp-pole">
 						<span>Krytina / výplň strechy</span>
 						<select bind:value={krytina} data-testid="pristresok-krytina">
 							{#each data.krytiny as k (k.nazov)}
@@ -168,7 +168,7 @@
 							{/each}
 						</select>
 					</label>
-					<label class="pris-pole">
+					<label class="kp-pole">
 						<span>Farba konštrukcie</span>
 						<select bind:value={farba} data-testid="pristresok-farba">
 							{#each data.farby as f (f.kod)}
@@ -181,10 +181,10 @@
 		</div>
 
 		<!-- SÚHRN + CENA-INFO + DOPYT -->
-		<div class="pris-panel">
+		<div class="kp-panel">
 			{#if suhrn}
 				{@const s = suhrn}
-				<section class="pris-suhrn" data-testid="pristresok-suhrn">
+				<section class="kp-suhrn" data-testid="pristresok-suhrn">
 					<h2>Tvoja konfigurácia</h2>
 					<dl>
 						<div>
@@ -215,20 +215,20 @@
 				</section>
 
 				<!-- CENA je na DOPYT (honest-null: prístrešky nemajú orientačný cenník) -->
-				<section class="pris-cena-info" data-testid="pristresok-cena-info">
+				<section class="kp-cena-info" data-testid="pristresok-cena-info">
 					<strong>Cena na vyžiadanie</strong>
 					<p>
 						Prístrešok ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme cenovú ponuku
 						po obhliadke miesta.
 					</p>
-					<button type="button" class="pris-btn primar" onclick={() => scrollNa('dopyt')}>
+					<button type="button" class="kp-btn primar" onclick={() => scrollNa('dopyt')}>
 						Nezáväzný dopyt →
 					</button>
 				</section>
 
-				<section class="pris-blok-kontakt" id="dopyt" data-testid="dopyt">
+				<section class="kp-blok-kontakt" id="dopyt" data-testid="dopyt">
 					<h2>Máš záujem o tento prístrešok?</h2>
-					<p class="pris-uvod">
+					<p class="kp-uvod">
 						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
 						pripravíme individuálne po obhliadke.
 					</p>
@@ -238,7 +238,7 @@
 					/>
 				</section>
 			{:else}
-				<p class="pris-chyba" data-testid="pristresok-chyba">
+				<p class="kp-chyba" data-testid="pristresok-chyba">
 					⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
 				</p>
 			{/if}
@@ -247,273 +247,7 @@
 </div>
 
 <style>
-	.pris {
-		max-width: 1100px;
-		margin: 0 auto;
-		padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) clamp(40px, 6vw, 72px);
-	}
-
-	/* HERO */
-	.pris-hero {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: clamp(16px, 3vw, 28px);
-		margin-bottom: clamp(24px, 4vw, 40px);
-	}
-	.pris-hero-foto {
-		border-radius: var(--k-radius);
-		overflow: hidden;
-		aspect-ratio: 5 / 3;
-		background: var(--k-surface-2);
-		box-shadow: var(--k-shadow);
-	}
-	.pris-hero-foto img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-	.pris-label {
-		display: block;
-		font-size: 11.5px;
-		font-weight: 600;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--k-accent);
-		margin-bottom: 10px;
-	}
-	.pris-hero-text h1 {
-		margin: 0 0 12px;
-		font-size: clamp(1.8rem, 4vw, 2.7rem);
-		font-weight: 700;
-		line-height: 1.06;
-		letter-spacing: -0.02em;
-		color: var(--k-text);
-	}
-	.pris-hero-text p {
-		margin: 0;
-		font-size: 15.5px;
-		line-height: 1.55;
-		color: var(--k-muted);
-		max-width: 560px;
-	}
-
-	/* LAYOUT: mobil 1 stĺpec, desktop ovládanie + panel */
-	.pris-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: clamp(18px, 3vw, 32px);
-		align-items: start;
-	}
-
-	.pris-blok {
-		border: 1px solid var(--k-line);
-		border-radius: var(--k-radius);
-		background: var(--k-surface);
-		padding: 18px 18px 20px;
-		margin: 0 0 16px;
-	}
-	.pris-blok legend {
-		font-size: 12px;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--k-accent);
-		padding: 0 6px;
-	}
-
-	.pris-karty {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 10px;
-		margin-top: 6px;
-	}
-	.pris-karta {
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-		text-align: left;
-		padding: 12px 13px;
-		border: 1.5px solid var(--k-line);
-		border-radius: var(--k-radius-sm);
-		background: var(--k-surface);
-		cursor: pointer;
-		font-family: inherit;
-		transition:
-			border-color 0.15s ease,
-			background 0.15s ease;
-	}
-	.pris-karta:hover {
-		border-color: var(--k-line-2);
-	}
-	.pris-karta.vybrana {
-		border-color: var(--k-ink);
-		background: var(--k-accent-soft);
-	}
-	.pris-karta:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 2px;
-	}
-	.pris-karta-nazov {
-		font-size: 15px;
-		font-weight: 650;
-		color: var(--k-text);
-	}
-	.pris-karta-popis {
-		font-size: 12.5px;
-		line-height: 1.4;
-		color: var(--k-muted);
-	}
-
-	.pris-rozmery {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 12px;
-		margin-top: 6px;
-	}
-	/* metrové steppery (RozmerStepper) stohované pod sebou */
-	.pris-steppery {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-top: 6px;
-	}
-	.pris-pole {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-	.pris-pole span {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--k-text);
-	}
-	.pris-pole select {
-		padding: 9px 11px;
-		border: 1px solid var(--k-line-2);
-		border-radius: var(--k-radius-sm);
-		font: inherit;
-		background: var(--k-surface);
-		color: var(--k-text);
-	}
-	.pris-pole select:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 1px;
-	}
-
-	/* PANEL: súhrn + cena-info + dopyt */
-	.pris-panel {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-	.pris-suhrn,
-	.pris-cena-info,
-	.pris-blok-kontakt {
-		border: 1px solid var(--k-line);
-		border-radius: var(--k-radius);
-		background: var(--k-surface);
-		padding: 20px 22px;
-	}
-	.pris-suhrn h2,
-	.pris-blok-kontakt h2 {
-		margin: 0 0 12px;
-		font-size: 18px;
-		font-weight: 650;
-		letter-spacing: -0.01em;
-		color: var(--k-text);
-	}
-	.pris-suhrn dl {
-		margin: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.pris-suhrn dl > div {
-		display: flex;
-		justify-content: space-between;
-		gap: 14px;
-		border-bottom: 1px solid var(--k-line);
-		padding-bottom: 8px;
-	}
-	.pris-suhrn dl > div:last-child {
-		border-bottom: 0;
-		padding-bottom: 0;
-	}
-	.pris-suhrn dt {
-		font-size: 13.5px;
-		color: var(--k-muted);
-	}
-	.pris-suhrn dd {
-		margin: 0;
-		font-size: 13.5px;
-		font-weight: 600;
-		color: var(--k-text);
-		text-align: right;
-	}
-
-	.pris-cena-info {
-		background: var(--k-surface-2);
-		border-color: var(--k-line-2);
-	}
-	.pris-cena-info strong {
-		display: block;
-		font-size: 17px;
-		color: var(--k-text);
-		margin-bottom: 6px;
-	}
-	.pris-cena-info p {
-		margin: 0 0 14px;
-		font-size: 13.5px;
-		line-height: 1.5;
-		color: var(--k-muted);
-	}
-
-	.pris-uvod {
-		color: var(--k-muted);
-		font-size: 14px;
-		line-height: 1.5;
-		margin: 0 0 16px;
-	}
-
-	.pris-btn {
-		font-family: inherit;
-		font-size: 14px;
-		font-weight: 600;
-		border-radius: var(--k-radius-pill);
-		padding: 11px 20px;
-		cursor: pointer;
-		border: 1px solid transparent;
-	}
-	.pris-btn.primar {
-		background: var(--k-ink);
-		color: #fff;
-	}
-	.pris-btn.primar:hover {
-		background: var(--k-ink-hover);
-	}
-	.pris-btn:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 2px;
-	}
-
-	.pris-chyba {
-		color: #a3261c;
-		background: #fbeeec;
-		border: 1px solid #f2cfc9;
-		border-radius: var(--k-radius-sm);
-		padding: 14px 16px;
-		font-size: 14px;
-		margin: 0;
-	}
-
-	@media (min-width: 900px) {
-		.pris-hero {
-			grid-template-columns: 1.1fr 0.9fr;
-			align-items: center;
-		}
-		.pris-grid {
-			grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-		}
+	.kp-karty {
+		--kp-karta-min: 200px;
 	}
 </style>

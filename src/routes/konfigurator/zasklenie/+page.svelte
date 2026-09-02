@@ -97,8 +97,8 @@
 
 <div class="zas">
 	<!-- HERO -->
-	<section class="zas-hero">
-		<div class="zas-hero-foto">
+	<section class="kp-hero">
+		<div class="kp-hero-foto">
 			<img
 				src="{base}/konfigurator/vyber/zasklenie.webp"
 				alt="Zasklenie terasy Montalu"
@@ -108,8 +108,8 @@
 				fetchpriority="high"
 			/>
 		</div>
-		<div class="zas-hero-text">
-			<span class="zas-label">Konfigurátor zasklenia terás a balkónov</span>
+		<div class="kp-hero-text">
+			<span class="kp-label">Konfigurátor zasklenia terás a balkónov</span>
 			<h1>Navrhni si zasklenie</h1>
 			<p>
 				Vyber umiestnenie, systém, rozmery a vyhotovenie — pripravíme ti nezáväznú špecifikáciu
@@ -118,53 +118,53 @@
 		</div>
 	</section>
 
-	<div class="zas-grid">
+	<div class="kp-grid">
 		<!-- OVLÁDANIE -->
-		<div class="zas-ovladanie">
+		<div class="kp-ovladanie">
 			<!-- UMIESTNENIE -->
-			<fieldset class="zas-blok">
+			<fieldset class="kp-blok">
 				<legend>Umiestnenie</legend>
-				<div class="zas-karty dvoj">
+				<div class="kp-karty dvoj">
 					{#each data.umiestnenia as um (um)}
 						<button
 							type="button"
-							class="zas-karta"
+							class="kp-karta"
 							class:vybrana={umiestnenie === um}
 							aria-pressed={umiestnenie === um}
 							data-testid="zasklenie-umiestnenie-{um}"
 							onclick={() => vyberUmiestnenie(um)}
 						>
-							<span class="zas-karta-nazov">{um}</span>
+							<span class="kp-karta-nazov">{um}</span>
 						</button>
 					{/each}
 				</div>
 			</fieldset>
 
 			<!-- MODEL (filtrovaný podľa umiestnenia) -->
-			<fieldset class="zas-blok">
+			<fieldset class="kp-blok">
 				<legend>Systém zasklenia</legend>
-				<div class="zas-karty">
+				<div class="kp-karty">
 					{#each modelyPreU as m (m.kod)}
 						<button
 							type="button"
-							class="zas-karta"
+							class="kp-karta"
 							class:vybrana={model === m.kod}
 							aria-pressed={model === m.kod}
 							data-testid="zasklenie-model-{m.kod}"
 							onclick={() => (model = m.kod)}
 						>
-							<span class="zas-karta-nazov">{m.kod}</span>
-							<span class="zas-karta-system">{m.system}</span>
-							<span class="zas-karta-popis">{m.popis}</span>
+							<span class="kp-karta-nazov">{m.kod}</span>
+							<span class="kp-karta-system">{m.system}</span>
+							<span class="kp-karta-popis">{m.popis}</span>
 						</button>
 					{/each}
 				</div>
 			</fieldset>
 
 			<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou/bazénom) -->
-			<fieldset class="zas-blok">
+			<fieldset class="kp-blok">
 				<legend>Rozmery</legend>
-				<div class="zas-steppery">
+				<div class="kp-steppery">
 					<RozmerStepper
 						bind:hodnotaMm={sirka}
 						min={r.sirka.min}
@@ -187,7 +187,7 @@
 						testid="zasklenie-vyska"
 						name="vyska"
 					/>
-					<label class="zas-pole zas-kridla">
+					<label class="kp-pole kp-kridla">
 						<span>Počet krídel</span>
 						<select bind:value={kridla} data-testid="zasklenie-kridla">
 							{#each kridlaOpts as n (n)}
@@ -199,10 +199,10 @@
 			</fieldset>
 
 			<!-- FARBA + VÝPLŇ -->
-			<fieldset class="zas-blok">
+			<fieldset class="kp-blok">
 				<legend>Vyhotovenie</legend>
-				<div class="zas-rozmery">
-					<label class="zas-pole">
+				<div class="kp-rozmery">
+					<label class="kp-pole">
 						<span>Farba konštrukcie</span>
 						<select bind:value={farba} data-testid="zasklenie-farba">
 							{#each data.farby as f (f.kod)}
@@ -210,7 +210,7 @@
 							{/each}
 						</select>
 					</label>
-					<label class="zas-pole">
+					<label class="kp-pole">
 						<span>Sklo / výplň</span>
 						<select bind:value={vypln} data-testid="zasklenie-vypln">
 							{#each data.vyplne as v (v.nazov)}
@@ -223,10 +223,10 @@
 		</div>
 
 		<!-- SÚHRN + CENA-INFO + DOPYT -->
-		<div class="zas-panel">
+		<div class="kp-panel">
 			{#if suhrn}
 				{@const s = suhrn}
-				<section class="zas-suhrn" data-testid="zasklenie-suhrn">
+				<section class="kp-suhrn" data-testid="zasklenie-suhrn">
 					<h2>Tvoja konfigurácia</h2>
 					<dl>
 						<div>
@@ -261,20 +261,20 @@
 				</section>
 
 				<!-- CENA je na DOPYT (honest-null: zasklenie nemá orientačný cenník) -->
-				<section class="zas-cena-info" data-testid="zasklenie-cena-info">
+				<section class="kp-cena-info" data-testid="zasklenie-cena-info">
 					<strong>Cena na vyžiadanie</strong>
 					<p>
 						Zasklenie ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme cenovú ponuku po
 						obhliadke miesta.
 					</p>
-					<button type="button" class="zas-btn primar" onclick={() => scrollNa('dopyt')}>
+					<button type="button" class="kp-btn primar" onclick={() => scrollNa('dopyt')}>
 						Nezáväzný dopyt →
 					</button>
 				</section>
 
-				<section class="zas-blok-kontakt" id="dopyt" data-testid="dopyt">
+				<section class="kp-blok-kontakt" id="dopyt" data-testid="dopyt">
 					<h2>Máš záujem o toto zasklenie?</h2>
-					<p class="zas-uvod">
+					<p class="kp-uvod">
 						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
 						pripravíme individuálne po obhliadke.
 					</p>
@@ -284,7 +284,7 @@
 					/>
 				</section>
 			{:else}
-				<p class="zas-chyba" data-testid="zasklenie-chyba">
+				<p class="kp-chyba" data-testid="zasklenie-chyba">
 					⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
 				</p>
 			{/if}
@@ -293,286 +293,17 @@
 </div>
 
 <style>
-	.zas {
-		max-width: 1100px;
-		margin: 0 auto;
-		padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) clamp(40px, 6vw, 72px);
+	.kp-karty {
+		--kp-karta-min: 160px;
 	}
-
-	/* HERO */
-	.zas-hero {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: clamp(16px, 3vw, 28px);
-		margin-bottom: clamp(24px, 4vw, 40px);
-	}
-	.zas-hero-foto {
-		border-radius: var(--k-radius);
-		overflow: hidden;
-		aspect-ratio: 5 / 3;
-		background: var(--k-surface-2);
-		box-shadow: var(--k-shadow);
-	}
-	.zas-hero-foto img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-	.zas-label {
-		display: block;
-		font-size: 11.5px;
-		font-weight: 600;
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--k-accent);
-		margin-bottom: 10px;
-	}
-	.zas-hero-text h1 {
-		margin: 0 0 12px;
-		font-size: clamp(1.8rem, 4vw, 2.7rem);
-		font-weight: 700;
-		line-height: 1.06;
-		letter-spacing: -0.02em;
-		color: var(--k-text);
-	}
-	.zas-hero-text p {
-		margin: 0;
-		font-size: 15.5px;
-		line-height: 1.55;
-		color: var(--k-muted);
-		max-width: 560px;
-	}
-
-	/* LAYOUT: mobil 1 stĺpec, desktop ovládanie + panel */
-	.zas-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: clamp(18px, 3vw, 32px);
-		align-items: start;
-	}
-
-	.zas-blok {
-		border: 1px solid var(--k-line);
-		border-radius: var(--k-radius);
-		background: var(--k-surface);
-		padding: 18px 18px 20px;
-		margin: 0 0 16px;
-	}
-	.zas-blok legend {
-		font-size: 12px;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--k-accent);
-		padding: 0 6px;
-	}
-
-	.zas-karty {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 10px;
-		margin-top: 6px;
-	}
-	.zas-karty.dvoj {
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-	}
-	.zas-karta {
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-		text-align: left;
-		padding: 12px 13px;
-		border: 1.5px solid var(--k-line);
-		border-radius: var(--k-radius-sm);
-		background: var(--k-surface);
-		cursor: pointer;
-		font-family: inherit;
-		transition:
-			border-color 0.15s ease,
-			background 0.15s ease;
-	}
-	.zas-karta:hover {
-		border-color: var(--k-line-2);
-	}
-	.zas-karta.vybrana {
-		border-color: var(--k-ink);
-		background: var(--k-accent-soft);
-	}
-	.zas-karta:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 2px;
-	}
-	.zas-karta-nazov {
-		font-size: 15px;
-		font-weight: 650;
-		color: var(--k-text);
-	}
-	.zas-karta-system {
+	.kp-karta-system {
 		font-size: 11.5px;
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
 		color: var(--k-accent);
 	}
-	.zas-karta-popis {
-		font-size: 12.5px;
-		line-height: 1.4;
-		color: var(--k-muted);
-	}
-
-	.zas-rozmery {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 12px;
-		margin-top: 6px;
-	}
-	/* metrové steppery (RozmerStepper) stohované pod sebou + počet krídel select */
-	.zas-steppery {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-top: 6px;
-	}
-	.zas-kridla {
+	.kp-kridla {
 		max-width: 220px;
-	}
-	.zas-pole {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-	.zas-pole span {
-		font-size: 13px;
-		font-weight: 600;
-		color: var(--k-text);
-	}
-	.zas-pole select {
-		padding: 9px 11px;
-		border: 1px solid var(--k-line-2);
-		border-radius: var(--k-radius-sm);
-		font: inherit;
-		background: var(--k-surface);
-		color: var(--k-text);
-	}
-	.zas-pole select:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 1px;
-	}
-
-	/* PANEL: súhrn + cena-info + dopyt */
-	.zas-panel {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-	.zas-suhrn,
-	.zas-cena-info,
-	.zas-blok-kontakt {
-		border: 1px solid var(--k-line);
-		border-radius: var(--k-radius);
-		background: var(--k-surface);
-		padding: 20px 22px;
-	}
-	.zas-suhrn h2,
-	.zas-blok-kontakt h2 {
-		margin: 0 0 12px;
-		font-size: 18px;
-		font-weight: 650;
-		letter-spacing: -0.01em;
-		color: var(--k-text);
-	}
-	.zas-suhrn dl {
-		margin: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-	}
-	.zas-suhrn dl > div {
-		display: flex;
-		justify-content: space-between;
-		gap: 14px;
-		border-bottom: 1px solid var(--k-line);
-		padding-bottom: 8px;
-	}
-	.zas-suhrn dl > div:last-child {
-		border-bottom: 0;
-		padding-bottom: 0;
-	}
-	.zas-suhrn dt {
-		font-size: 13.5px;
-		color: var(--k-muted);
-	}
-	.zas-suhrn dd {
-		margin: 0;
-		font-size: 13.5px;
-		font-weight: 600;
-		color: var(--k-text);
-		text-align: right;
-	}
-
-	.zas-cena-info {
-		background: var(--k-surface-2);
-		border-color: var(--k-line-2);
-	}
-	.zas-cena-info strong {
-		display: block;
-		font-size: 17px;
-		color: var(--k-text);
-		margin-bottom: 6px;
-	}
-	.zas-cena-info p {
-		margin: 0 0 14px;
-		font-size: 13.5px;
-		line-height: 1.5;
-		color: var(--k-muted);
-	}
-
-	.zas-uvod {
-		color: var(--k-muted);
-		font-size: 14px;
-		line-height: 1.5;
-		margin: 0 0 16px;
-	}
-
-	.zas-btn {
-		font-family: inherit;
-		font-size: 14px;
-		font-weight: 600;
-		border-radius: var(--k-radius-pill);
-		padding: 11px 20px;
-		cursor: pointer;
-		border: 1px solid transparent;
-	}
-	.zas-btn.primar {
-		background: var(--k-ink);
-		color: #fff;
-	}
-	.zas-btn.primar:hover {
-		background: var(--k-ink-hover);
-	}
-	.zas-btn:focus-visible {
-		outline: 2px solid var(--k-ink);
-		outline-offset: 2px;
-	}
-
-	.zas-chyba {
-		color: #a3261c;
-		background: #fbeeec;
-		border: 1px solid #f2cfc9;
-		border-radius: var(--k-radius-sm);
-		padding: 14px 16px;
-		font-size: 14px;
-		margin: 0;
-	}
-
-	@media (min-width: 900px) {
-		.zas-hero {
-			grid-template-columns: 1.1fr 0.9fr;
-			align-items: center;
-		}
-		.zas-grid {
-			grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-		}
 	}
 </style>
