@@ -86,10 +86,11 @@ export function zaskleniModelyPre(u: ZaskleniUmiestnenie): readonly ZaskleniMode
 	return ZASKLENIE_MODELY.filter((m) => m.umiestnenie === u);
 }
 
-/** Default model pre umiestnenie (prvý v poradí — terasa STANDARD PLUS je najpoužívanejšie,
- *  ale poradie určuje pole; bezpečný fallback ROBUST/STANDARD ak by sa poradie zmenilo). */
+/** Default model pre umiestnenie = prvý model v poradí daného umiestnenia (terasa ROBUST,
+ *  balkón STANDARD). Fallback (ak by umiestnenie nemalo žiadny model — nemôže nastať) je tiež
+ *  placement-aware, nikdy terasový model pre balkón. */
 export function zaskleniModelDefault(u: ZaskleniUmiestnenie): ZaskleniModel {
-	return zaskleniModelyPre(u)[0]?.kod ?? 'ROBUST';
+	return zaskleniModelyPre(u)[0]?.kod ?? (u === 'Balkón' ? 'STANDARD' : 'ROBUST');
 }
 
 /** Zákaznícke kategórie výplne (sklo) — LEN prezentačné názvy, žiadny Money kód. Tečú nezmenené
@@ -187,6 +188,9 @@ function vRozmedzi(v: number, lo: number, hi: number): boolean {
 /** Je vstup celý v platných rozmedziach? (na zobrazenie súhrnu / povolenie dopytu). */
 export function zaskleniVstupPlatny(v: ZaskleniVstup): boolean {
 	return (
+		// model MUSÍ patriť k zvolenému umiestneniu (flat `ZaskleniModel` únia by inak pripustila
+		// napr. Terasa×LUX → prázdny `system` + zavádzajúci „Zasklenie terasy — LUX ()")
+		zaskleniModelyPre(v.umiestnenie).some((m) => m.kod === v.model) &&
 		vRozmedzi(v.sirka, ZASKLENIE_SIRKA_MIN, ZASKLENIE_SIRKA_MAX) &&
 		vRozmedzi(v.vyska, ZASKLENIE_VYSKA_MIN, ZASKLENIE_VYSKA_MAX) &&
 		Number.isInteger(v.kridla) &&

@@ -114,6 +114,14 @@ describe('#387 zaskleniVstupPlatny', () => {
 		expect(zaskleniVstupPlatny({ ...VSTUP, kridla: 1 })).toBe(false);
 		expect(zaskleniVstupPlatny({ ...VSTUP, kridla: 99 })).toBe(false);
 	});
+	it('model nepatriaci k umiestneniu → false (Terasa×LUX, Balkón×SLIDE)', () => {
+		// LUX je balkónový → pre Terasu nevalidný (inak by `system` bol prázdny a súhrn zavádzajúci)
+		expect(zaskleniVstupPlatny({ ...VSTUP, umiestnenie: 'Terasa', model: 'LUX' })).toBe(false);
+		// SLIDE je terasový → pre Balkón nevalidný
+		expect(zaskleniVstupPlatny({ ...VSTUP, umiestnenie: 'Balkón', model: 'SLIDE' })).toBe(false);
+		// platná balkónová kombinácia ostáva true
+		expect(zaskleniVstupPlatny({ ...VSTUP, umiestnenie: 'Balkón', model: 'STANDARD' })).toBe(true);
+	});
 });
 
 describe('#387 konfigurujZasklenie (súhrn) + zaskleniePonukaConfig (mapovanie na dopyt)', () => {

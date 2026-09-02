@@ -34,6 +34,13 @@ test('zasklenie konfigurátor: verejná route bez auth — súhrn + umiestnenie 
 	);
 	await expect(page.getByTestId('zasklenie-model-LUX')).toBeVisible();
 	await expect(page.getByTestId('zasklenie-model-ROBUST')).toHaveCount(0);
+	// model sa RESETUJE na default balkóna (STANDARD, aria-pressed) — page-specific reaktívne pravidlo
+	await expect(page.getByTestId('zasklenie-model-STANDARD')).toHaveAttribute(
+		'aria-pressed',
+		'true'
+	);
+	// súhrn „Systém" riadok nasleduje reset (STANDARD rámový posuvný)
+	await expect(page.getByTestId('zasklenie-suhrn')).toContainText('STANDARD (Rámový posuvný)');
 
 	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
 	await expect(page.getByTestId('zasklenie-cena-info')).toContainText('Cena na vyžiadanie');

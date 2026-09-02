@@ -40,14 +40,18 @@
 	let vyska = $state<number | null>(2500);
 	let kridla = $state<number>(4);
 
-	// modely dostupné pre zvolené umiestnenie (klient si filtruje z client-safe katalógu)
-	const modelyPreU = $derived(data.modely.filter((m) => m.umiestnenie === umiestnenie));
+	// whitelistované umiestnenie (jediný zdroj pravdy pre os umiestnenia — karty aj súhrn ho
+	// používajú, takže sa nemôžu rozísť; raw `umiestnenie` je vždy platné z tlačidla/servera).
+	const u = $derived(zaskleniUmiestnenie(umiestnenie));
+
+	// modely dostupné pre zvolené umiestnenie (klient si filtruje z client-safe katalógu podľa `u`)
+	const modelyPreU = $derived(data.modely.filter((m) => m.umiestnenie === u));
 
 	// zmena umiestnenia RESETUJE model na prvý model daného umiestnenia (žiadny effect → žiadna
 	// dead-effect pasca; reset žije priamo v onclick handleri, jedinom mieste zmeny umiestnenia).
-	function vyberUmiestnenie(u: string) {
-		umiestnenie = u;
-		model = data.modely.find((m) => m.umiestnenie === u)?.kod ?? '';
+	function vyberUmiestnenie(um: string) {
+		umiestnenie = um;
+		model = data.modely.find((m) => m.umiestnenie === um)?.kod ?? '';
 	}
 
 	// možnosti počtu krídel (2..8) — select nikdy nevráti mimo-rozmedzia/null hodnotu
@@ -63,8 +67,6 @@
 		const f = data.farby.find((x) => x.kod === farba);
 		return f ? `RAL ${f.kod} ${f.nazov}` : farba;
 	});
-
-	const u = $derived(zaskleniUmiestnenie(umiestnenie));
 
 	const vstup = $derived<ZaskleniVstup>({
 		umiestnenie: u,
