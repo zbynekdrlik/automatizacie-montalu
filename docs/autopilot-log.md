@@ -1937,3 +1937,21 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   `.narez`!), WCAG kontrast muted textu na zebre → `--m-muted-ink`, button/row hover kolízia,
   clip Množstvo mono, print zebra reset. 2897 unit + 54 E2E specov zelené.
 - NEmergnuté (worktree fleet — supervisor integruje). Stage 4 = výsledky/výkresy/.g/.row/print audit.
+
+## #390 — Konfigurátor prístreškov a altánkov (etapa 7/7 rámu #384, worktree-agent-a5fc90fa885250075)
+- Verzia 0.24.75-dev.1 (bump cf6e29b). Commity: 313c528 (feat) + 1d520f4 (review 🔵×3).
+- Vzor `/konfigurator/bazen` (#385): nová verejná podstránka `/konfigurator/pristresok` — client-safe
+  `src/lib/konfigurator-pristresok.ts` (5 typov podľa členenia montalu.sk: auto/terasa/altánok/skleník/
+  sauna; 4 krytiny polykarbonát/izolačné/bezpečnostné sklo/ISODOMUS; rozmery mm; whitelist parsery) +
+  route (`load` + `dopyt` server-autoritatívny `'pristresok'`) + jednostĺpcová stránka (--k-* tokeny).
+- **3D NErob** (dispatch). **Honest-null** cena (`cenovyZdroj:false` → `maCenovyZdroj` gate → žiadna cena
+  submit/re-download, „Cena na vyžiadanie"). **Žiadna migrácia** (produkt stĺpec v35 existuje).
+- Karta prepnutá na live; KonfVyber `LiveRoute` únia. Guardy: money-safety (A reach + B route + C load),
+  b2b-route-coverage (ALLOWED + not-redirected + action-set `['dopyt']`), produkty (live set 3). Nový unit
+  `konfigurator-pristresok.test.ts` + E2E `konfigurator-pristresok.spec.ts` (+ vyber pristresok live assert).
+- Fable review 0🔴/0🟡/4🔵 → 3 fixnuté v 1d520f4 (typNazov rename, „Pôdorysná plocha", render-path guard);
+  4. 🔵 (zdieľaná CSS kostra, cross-cutting) = follow-up, už sledované #411 + #409 (pristresok = 3. konzument).
+- Playbook: konfigurator.md §12 + pasca `sklo` render-cesty (`zhrnutieRiadky`→`konfSkloKategoriaPreNazov`
+  kolízia — dôležité pre #387 zasklenia = sklo).
+- 210 unit súborov / 2965 testov zelené (coverage 94.41/89.36/97.32/95.39), E2E pristresok+vyber 4/4,
+  vizuálne overené naživo (screenshot). NEmergnuté (worktree — supervisor integruje sériovo). #384 ostáva otvorený.
