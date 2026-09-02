@@ -177,11 +177,17 @@ export async function createLeadViaXmlRpc(
 }
 
 /** Regeneruje PDF z uloženej konfigurácie (retry cesta — pôvodný render sa neukladá).
- *  Best-effort: pád regenerácie ⇒ `undefined` (lead vznikne bez prílohy). */
-async function regeneratePdfBase64(konfiguraciaJson: string): Promise<string | undefined> {
+ *  Best-effort: pád regenerácie ⇒ `undefined` (lead vznikne bez prílohy). #404: `produkt` sa
+ *  MUSÍ zaniesť — inak by príloha retry-leadu (a) mala pergolový nadpis pre bazén a (b) sfalšovaná
+ *  bazénová cfg s pergolovými poľami (`hlbka`+`model`) by cez `maCenovyZdroj(null)=true` dostala
+ *  NESPRÁVNU pergolovú cenu; s `produkt` sa cena počíta produkt-aware (`cenaZCfgProdukt`). */
+async function regeneratePdfBase64(
+	konfiguraciaJson: string,
+	produkt: string | null
+): Promise<string | undefined> {
 	try {
 		const cfg = sanitizePonukaConfig(konfiguraciaJson);
-		const bytes = await generatePonukaPdf(cfg);
+		const bytes = await generatePonukaPdf(cfg, { produkt });
 		return Buffer.from(bytes).toString('base64');
 	} catch (e) {
 		log.warn('lead retry: regenerácia PDF zlyhala (príloha sa vynechá)', {
@@ -225,7 +231,7 @@ export async function submitDopytLead(
 
 	try {
 		const payload = buildLeadPayload(row);
-		const pdf = pdfBase64 ?? (await regeneratePdfBase64(row.konfiguracia));
+		const pdf = pdfBase64 ?? (await regeneratePdfBase64(row.konfiguracia, row.produkt));
 		try {
 			const leadId = await createLeadViaXmlRpc(cfg, payload, pdf, leadFilename(row.created_at));
 			markLeadCreated(dopytId, leadId);

@@ -148,11 +148,14 @@ export function konfigurujBazen(v: BazenVstup): BazenSuhrn {
  *  polia, ktoré čítajú správne aj pre zastrešenie: model → `system`, DĹŽKA → `dlzka` + šírka →
  *  `sirka` (→ „Rozmery (d × š)", zhodné poradie so zákazníckou stránkou AJ PDF), výška+koľaj+
  *  segmenty+plocha → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/`model`/`pocetPoli`) sa
- *  NEPOUŽIJÚ, aby PDF nebolo zavádzajúce. BEZ ceny, BEZ Money kódu — cena je honest-null (bazén nemá
- *  overený cenový zdroj; gate `maCenovyZdroj` v `konfigurator-produkty`). */
+ *  NEPOUŽIJÚ, aby PDF nebolo zavádzajúce. BEZ Money kódu — cenu (orientačnú MO, #404) počíta SERVER
+ *  produkt-aware z `systemKod`+`dlzka`+`sirka` (`cenaZCfgProdukt`), nikdy klient. */
 export function bazenPonukaConfig(s: BazenSuhrn): PonukaConfig {
 	return {
 		system: `Bazénové zastrešenie — ${s.model}`,
+		// #404: neutrálny cenotvorný kód = bazénový model — server (`cenaZCfgProdukt`/`opeciatkujCenuPreProdukt`)
+		// z neho + dlzka/sirka spočíta orientačnú cenu; deterministicky reprodukovateľné pri re-downloade.
+		systemKod: s.model,
 		dlzka: s.dlzka,
 		sirka: s.sirka,
 		farba: s.farba,

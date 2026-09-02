@@ -1,9 +1,10 @@
-// #385: verejný konfigurátor bazénových zastrešení (`/konfigurator/bazen`) — E2E cez reálny
+// #385/#404/#405: verejný konfigurátor bazénových zastrešení (`/konfigurator/bazen`) — E2E cez reálny
 // prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (model/rozmery/koľaj/farba/výplň)
-// sa počíta klientsky a zobrazí súhrn; HONEST-NULL — žiadna orientačná cena (bazén nemá cenový
-// zdroj); dopyt tok → PDF špecifikácia (bez ceny) na stiahnutie. GET je Money-neutrálny (číta sa aj
-// proti LIVE prode); dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú
-// testovacie dopyty. Každý test = NULA console chýb (× = U+00D7 byte-identické).
+// sa počíta klientsky a zobrazí súhrn; #404 ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`,
+// Money-neutrálna — bez zápisu); dopyt tok → PDF špecifikácia s orientačnou cenou na stiahnutie. GET
+// aj `vypocet` sú Money-neutrálne (číta sa aj proti LIVE prode); dopyt je ZÁPIS (audit riadok) →
+// `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý test = NULA console chýb
+// (× = U+00D7 byte-identické).
 //
 // #405: pribudol ŽIVÝ 3D náhľad oblúkových segmentov (split-screen, ľavý sticky stĺpec). Form-testy
 // čakajú na `[data-viz-ready="true"]` (helper `bazenReady`) PRED interakciou — sync-point ako pri
@@ -21,7 +22,7 @@ async function bazenReady(page: import('@playwright/test').Page) {
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 }
 
-test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (žiadna cena) + 3D náhľad, nula console chýb', async ({
+test('bazén konfigurátor: verejná route bez auth — súhrn + orientačná cena po kliku + 3D náhľad, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -43,9 +44,42 @@ test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (ž
 		'Bazénové zastrešenie 6000 × 4000 mm'
 	);
 
-	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
-	await expect(page.getByTestId('bazen-cena-info')).toContainText('Cena na vyžiadanie');
+	// #404: orientačná cena je na KLIK (server-počítaná) — pred klikom je len tlačidlo, žiadny € na stránke
+	await expect(page.getByTestId('bazen-cena-zobrazit')).toBeVisible();
 	await expect(page.locator('body')).not.toContainText('€');
+
+	// klik → server vráti orientačnú MO cenu → cena (s DPH, €) + porovnanie modelov sa zobrazia
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+	await expect(page.getByTestId('bazen-cena')).toContainText('Orientačná cena');
+	await expect(page.getByTestId('bazen-cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('bazen-porovnanie')).toBeVisible();
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('bazén cena: zmena rozmeru zneaktuálni zobrazenú cenu → „Prepočítať" → nová cena, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	// klik na cenu až po viz-ready (split-screen 3D beží aj tu — enhance inak preteká s 3D scénou)
+	await bazenReady(page);
+
+	// zobraz orientačnú cenu pre default (6000 × 4000)
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+
+	// zmeň dĺžku → cena sa považuje za NEAKTUÁLNU (nikdy neukáž cenu pre iný rozmer): blok zmizne,
+	// tlačidlo sa vráti ako „Prepočítať" (#404 `cenaAktualna` gating)
+	await page.getByTestId('bazen-dlzka').fill('9');
+	await page.getByTestId('bazen-dlzka').blur();
+	await expect(page.getByTestId('bazen-cena')).toHaveCount(0);
+	await expect(page.getByTestId('bazen-cena-zobrazit')).toContainText('Prepočítať');
+
+	// prepočítaj → nová orientačná cena pre 9000 × 4000
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+	await expect(page.getByTestId('bazen-cena-sdph')).toContainText('€');
 
 	expect(consoleMsgs).toEqual([]);
 });

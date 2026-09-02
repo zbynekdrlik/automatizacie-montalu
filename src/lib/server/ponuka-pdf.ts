@@ -20,7 +20,7 @@ import {
 	zhrnutieRiadky,
 	type PonukaConfig
 } from '$lib/ponuka';
-import { cenaZCfg } from './dopyt-cena-stamp';
+import { cenaZCfgProdukt } from './dopyt-cena-stamp';
 import { produktPdfNadpis, maCenovyZdroj } from '$lib/konfigurator-produkty';
 import { cislaCiarka } from '$lib/konfigurator-jednotky';
 import { formatDatumSk } from '$lib/datum';
@@ -78,11 +78,19 @@ function cenaNadpis(cena: VerejnaCena): string {
  *  review 🟡 — inak by cena „nesedela" so zadanými rozmermi). */
 function cenaRiadky(cena: VerejnaCena, cfg: PonukaConfig): { hlavny: string; podriadok: string } {
 	if (cena.druh === 'cena') {
+		// #404: grid-note je PRODUKT-AWARE. `hlbkaGridM` nesie DRUHÝ rozmer (pergola: hĺbka; bazén:
+		// dĺžka — do neho ho mapuje `naCenuBazen`), takže porovnávame proti `cfg.hlbka ?? cfg.dlzka`.
+		// Zadané rozmery NEMUSIA byť na 0,5 m mriežke (metrový stepper píše na 100 mm mriežku), takže
+		// note SMIE fungovať aj pre bazén — ale v poradí „d × š" (zhodne so stránkou a PDF súhrnom),
+		// nie pergolovým „š × h". Pergola (bez `cfg.dlzka`) ostáva byte-identická.
+		const druhyRozmer = cfg.hlbka ?? cfg.dlzka;
 		const liseSa =
-			Math.round(cena.sirkaGridM * 1000) !== cfg.sirka ||
-			Math.round(cena.hlbkaGridM * 1000) !== cfg.hlbka;
+			(cfg.sirka !== undefined && Math.round(cena.sirkaGridM * 1000) !== cfg.sirka) ||
+			(druhyRozmer !== undefined && Math.round(cena.hlbkaGridM * 1000) !== druhyRozmer);
 		const grid = liseSa
-			? ` · katalógový rozmer ${mPlain(cena.sirkaGridM)} × ${mPlain(cena.hlbkaGridM)} m`
+			? cfg.dlzka !== undefined
+				? ` · katalógový rozmer ${mPlain(cena.hlbkaGridM)} × ${mPlain(cena.sirkaGridM)} m`
+				: ` · katalógový rozmer ${mPlain(cena.sirkaGridM)} × ${mPlain(cena.hlbkaGridM)} m`
 			: '';
 		return {
 			hlavny: `${formatEur(cena.sDph)} s DPH`,
@@ -357,7 +365,9 @@ export async function generatePonukaPdf(
 	// #385: honest-degrade prepočet je LEN pre produkt s cenovým zdrojom (pergola; NULL/neznámy produkt
 	// = starý pergolový riadok = má zdroj). Bazén/ostatné → cena null (žiadny prepočet pergolovej ceny
 	// z rozmerov zastrešenia), takže re-download bazén dopytu neukáže vymyslenú cenu.
-	const cena = opts.cena ?? (maCenovyZdroj(opts.produkt) ? cenaZCfg(cfg) : null);
+	// #404: produkt-aware prepočet (pergola → pergolová matica, bazen → bazénová; ostatné honest-null).
+	const cena =
+		opts.cena ?? (maCenovyZdroj(opts.produkt) ? cenaZCfgProdukt(cfg, opts.produkt) : null);
 	// #384: nadpis dokumentu podľa produktu (fallback 'Špecifikácia pergoly' pre NULL/neznámy).
 	const nadpis = produktPdfNadpis(opts.produkt);
 	const maCena = cena !== null;

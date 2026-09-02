@@ -328,8 +328,8 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   presmerovaný"), `konfigurator-produkty.test` (`live` set), `konfigurator-money-safety` (A pozitívny
   reach na nové client súbory + B server route + **C runtime `load()` assert**).
 - **HONEST-NULL cena (kľúčové) — cenový gate je PRODUKTOVÝ, nie rozmerový.** Ak produkt NEMÁ overený
-  cenový zdroj (bazén ho nemá — montalu.sk `POST /konfigurator/update-pools` existuje /419/, ale jeho
-  vyťaženie do matice je práca v rozsahu #279 = samostatný follow-up), NEVYMÝŠĽAJ ceny. Gate =
+  cenový zdroj (rady bez vyťaženej matice; pergola #279 + bazén #404 UŽ zdroj MAJÚ — bazénová matica
+  `update-pools` je vyťažená, viď `.claude/rules/konfigurator-bazen-cena.md`), NEVYMÝŠĽAJ ceny. Gate =
   `KonfProdukt.cenovyZdroj` + `maCenovyZdroj(kod)` (`konfigurator-produkty`), zapojený v `dopyt-cena-stamp`
   `opeciatkujCenuPreProdukt` (stamp = `{cena:null, cennikVerzia:null}`) A v `ponuka-pdf` (`opts.cena ??
   (maCenovyZdroj(produkt) ? cenaZCfg(cfg) : null)`). **Bez oboch by `opeciatkujCenu`/`cenaZCfg` spočítalo
