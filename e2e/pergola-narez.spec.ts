@@ -208,6 +208,17 @@ test('výkres: predný pohľad + bokorys + pôdorys sa vykreslia z potvrdených 
 	await expect(page.getByTestId('pnr-spec-nohy')).toContainText('1920');
 	await expect(page.getByTestId('pnr-spec-money')).toContainText('/pergola');
 
+	// #381 — výrobná varianta na stenu BEZ zadaného počtu krovov: 2 pozičné balóniky (predná
+	// noha + žľab; zadná noha aj priečka sú honest-null → balónik sa nekreslí). Priečky ani
+	// reťazová kóta sa BEZ potvrdeného počtu krovov NEKRESLIA (honest-null — schematické
+	// delenie sa do výrobných kót nedáva). Montážne tolerancie hĺbky (CAD konštanty) + Poz.
+	await expect(page.getByTestId(/^pnr-poz-\d+$/)).toHaveCount(2);
+	await expect(page.getByTestId('pnr-pod-priecky')).toHaveCount(0);
+	await expect(page.getByTestId('pnr-pod-retaz')).toHaveCount(0);
+	await expect(page.getByTestId('pnr-spec-tolerancie')).toContainText('montáž');
+	await expect(page.getByTestId('pnr-spec-tolerancie')).toContainText('+2 / +3 / +12');
+	await expect(page.getByTestId('poz-1')).toBeVisible();
+
 	expect(consoleMsgs).toEqual([]);
 });
 
@@ -225,6 +236,8 @@ test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse
 	await page.locator('#vyskaZadna').fill('2900');
 	await page.locator('#pocetZadnychNoh').fill('3');
 	await page.locator('#hornyProfilZadnej').selectOption('140');
+	// #381 — zadaný počet krovov odblokuje POTVRDENÉ priečky + reťazovú kótu v pôdoryse
+	await page.locator('#pocetKrovov').fill('8');
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
 
@@ -236,6 +249,14 @@ test('výkres samostatne stojaca: zadné nohy sa objavia v bokoryse aj pôdoryse
 	await expect(page.getByTestId('pnr-bok-strecha')).toHaveCount(1);
 	// #316: spec ukazuje CUT dĺžku zadnej nohy = ZV − horný profil = 2900 − 140 = 2760 (Dominik 24.8.)
 	await expect(page.getByTestId('pnr-spec-uchytenie')).toContainText('2760');
+
+	// #381 — samostatne stojaca so ZADANÝM počtom krovov (8): 4 pozičné balóniky (predná +
+	// zadná noha + priečka + žľab). Priečky v pôdoryse = POTVRDENÝ počet krovov (8 čiar,
+	// NIE schematické delenie), reťazová kóta ich rozstupov sa vykreslí, montážne tolerancie.
+	await expect(page.getByTestId(/^pnr-poz-\d+$/)).toHaveCount(4);
+	await expect(page.getByTestId('pnr-pod-priecky').locator('line')).toHaveCount(8);
+	await expect(page.getByTestId('pnr-pod-retaz').locator('text')).not.toHaveCount(0);
+	await expect(page.getByTestId('pnr-spec-tolerancie')).toContainText('+2 / +3 / +12');
 
 	expect(consoleMsgs).toEqual([]);
 });

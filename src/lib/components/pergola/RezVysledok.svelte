@@ -8,11 +8,11 @@
 	import { formatDatumCasSk } from '$lib/datum';
 	import {
 		MAX_ROZOSTUP_PRIECOK,
-		pozicujDiely,
 		type PergolaNarezVstup,
 		type NarezVysledok,
 		type PergolaKomponent
 	} from '$lib/pergola-narez';
+	import { pozicujDiely } from '$lib/pergola-vyroba';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)

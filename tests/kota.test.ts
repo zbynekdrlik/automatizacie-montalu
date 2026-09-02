@@ -437,4 +437,13 @@ describe('retazoveKoty — reťazová (chain) kóta z hraníc (#381 časť 3)', 
 		expect(retazoveKoty([])).toEqual([]);
 		expect(retazoveKoty([100])).toEqual([]);
 	});
+
+	it('zhodné susedné hranice → nulový segment sa VYNECHÁ (žiadny degenerát <Kota>)', () => {
+		// duplicitná hranica (100) by dala dĺžku 0 → <Kota> s totožnými koncami = each_key_duplicate
+		expect(retazoveKoty([0, 100, 100, 250])).toEqual([
+			{ od: 0, koniec: 100, dlzka: 100 },
+			{ od: 100, koniec: 250, dlzka: 150 }
+		]);
+		expect(retazoveKoty([50, 50])).toEqual([]);
+	});
 });

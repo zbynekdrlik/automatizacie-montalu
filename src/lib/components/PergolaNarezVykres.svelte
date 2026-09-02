@@ -28,11 +28,14 @@
 	import {
 		schemaVykresu,
 		spocitajNarez,
-		pozicieVoVykrese,
-		MONTAZNE_TOLERANCIE_HLBKA_MM,
 		MAX_ROZOSTUP_PRIECOK,
 		type PergolaNarezVstup
 	} from '$lib/pergola-narez';
+	import {
+		pozicieVoVykrese,
+		prieckyOsiPotvrdene,
+		MONTAZNE_TOLERANCIE_HLBKA_MM
+	} from '$lib/pergola-vyroba';
 	import { krovUlozenie, type KrovUlozenie } from '$lib/pergola-krov';
 
 	let {
@@ -67,6 +70,10 @@
 	// z toho istého vstupu (`spocitajNarez` je pure display engine v CISTY_ENGINE), takže
 	// balóniky vždy sedia s materiálovou tabuľkou. `null` rola = balónik sa nekreslí.
 	let pozicie = $derived(pozicieVoVykrese(spocitajNarez(vstup).vypocitane));
+	// #381 — POTVRDENÉ osové pozície priečok (krovov) v pôdoryse z manuálneho počtu krovov +
+	// svetlosti. `null` bez potvrdeného počtu → reťazová kóta ani priečky sa nekreslia
+	// (honest-null: schematické rovnomerné delenie sa do VÝROBNÝCH kót nikdy nedáva).
+	let prieckyOsi = $derived(prieckyOsiPotvrdene(vstup));
 	// #381 — montážne tolerancie hĺbky = CAD konštanty (View A/B), poznámka pri kóte hĺbky.
 	const tolerancieText =
 		'montáž ' + MONTAZNE_TOLERANCIE_HLBKA_MM.map((t) => `+${t}`).join(' / ') + ' mm';
@@ -97,6 +104,8 @@
 		const rows: [string, string, string][] = [
 			['SYSTÉM', 'system', vstup.system],
 			['ROZMER', 'rozmer', `${fmtMm(s.sirka)} × ${fmtMm(s.hlbka)} mm`],
+			// #381 — montážne tolerancie (CAD konštanty View A/B, hĺbka); šírka bez tolerancie
+			['TOLERANCIE', 'tolerancie', `hĺbka · ${tolerancieText}`],
 			['PREDNÁ SVETLOSŤ', 'svetlost', `${fmtMm(s.prednaSvetlost)} mm`],
 			[
 				'PREDNÉ NOHY',
@@ -461,16 +470,6 @@
 		color={MODRA}
 		fontSize={MIN_DIM_FONT}
 	/>
-	<!-- #381 — montážne tolerancie hĺbky (CAD konštanty View A/B; pri celkovej hĺbke). Nie
-	     sú odvodené z rozmerov, nič sa nehádže; šírka toleranciu nemá. -->
-	<text
-		x={(xBack + xFront) / 2}
-		y={baseY + r.h * 0.24}
-		text-anchor="middle"
-		font-size={MIN_SPEC_FONT}
-		fill={SIVA}
-		data-testid="pnr-bok-tolerancie">{tolerancieText}</text
-	>
 	<Kota
 		x0={xFront}
 		y0={baseY}
@@ -534,13 +533,17 @@
 		stroke-width={obrysStroke(Math.min(X(s.sirka) - X(0), y1 - y0), REZ_STROKE)}
 		data-testid="pnr-pod-obrys"
 	/>
-	<!-- #381 — priečky (krokvy) ako zvislé čiary v smere hĺbky; ich rozostup kótuje
-	     reťazová kóta nižšie. Len vnútorné (krajné sadnú na obrys), presne ako predný pohľad. -->
-	<g stroke={SIVA} stroke-width={POHLAD_STROKE} data-testid="pnr-pod-priecky">
-		{#each s.priecky.pozicieX as px, i (i)}
-			<line x1={X(px)} y1={y0} x2={X(px)} y2={y1} />
-		{/each}
-	</g>
+	<!-- #381 — priečky (krokvy) ako zvislé čiary v smere hĺbky, na POTVRDENÝCH osových
+	     pozíciách (počet krovov + svetlosť). Bez potvrdeného počtu krovov sa NEKRESLIA
+	     (honest-null) — schematické rovnomerné delenie sa do výrobného pôdorysu nikdy nedáva.
+	     Ich rozostup kótuje reťazová kóta nižšie. -->
+	{#if prieckyOsi}
+		<g stroke={SIVA} stroke-width={POHLAD_STROKE} data-testid="pnr-pod-priecky">
+			{#each prieckyOsi as px, i (i)}
+				<line x1={X(px)} y1={y0} x2={X(px)} y2={y1} />
+			{/each}
+		</g>
+	{/if}
 	<!-- predné nohy — štvorčeky na PREDNEJ hrane (dole, y1) -->
 	{#each s.prednaNohyX as px, i (i)}
 		<rect
@@ -597,26 +600,29 @@
 		fontSize={MIN_DIM_FONT}
 	/>
 	<!-- #381 — reťazová (rozstupová) kóta priečok po šírke, nad horným okrajom pôdorysu.
-	     Hranice = kraje + naše vnútorné pozície priečok; kreslí sa LEN to, čo engine počíta
-	     (rovnomerné rozostupy) — Dominikove CAD hodnoty sa NEHARDCODUJÚ. -->
-	{@const hranicePriecok = [0, ...s.priecky.pozicieX, s.sirka]}
-	<g data-testid="pnr-pod-retaz">
-		{#each retazoveKoty(hranicePriecok) as seg, i (i)}
-			<Kota
-				x0={X(seg.od)}
-				{y0}
-				x1={X(seg.koniec)}
-				y1={y0}
-				perpOffset={-(r.h * 0.1)}
-				text={fmtMm(seg.dlzka)}
-				color={MODRA}
-				fontSize={MIN_DIM_FONT}
-			/>
-		{/each}
-	</g>
-	<!-- #381 — pozičný balónik priečky (na prvej priečke, inak v strede šírky) -->
-	{@const prieckaCx = s.priecky.pozicieX.length > 0 ? X(s.priecky.pozicieX[0]!) : X(s.sirka * 0.5)}
-	{@render pozBalon(prieckaCx, (y0 + y1) / 2, pozicie.priecka)}
+	     Hranice = kraje + POTVRDENÉ osové pozície krovov (rozstup = 50 + svetlosť medzi
+	     krovmi). Kreslí sa LEN pri potvrdenom počte krovov — honest-null inak, nič sa
+	     nehádže (Dominikove CAD hodnoty sa tiež NEHARDCODUJÚ). -->
+	{#if prieckyOsi}
+		{@const hranicePriecok = [0, ...prieckyOsi, s.sirka]}
+		<g data-testid="pnr-pod-retaz">
+			{#each retazoveKoty(hranicePriecok) as seg, i (i)}
+				<Kota
+					x0={X(seg.od)}
+					{y0}
+					x1={X(seg.koniec)}
+					y1={y0}
+					perpOffset={-(r.h * 0.055)}
+					text={fmtMm(seg.dlzka)}
+					color={MODRA}
+					fontSize={MIN_DIM_FONT}
+					opts={{ labelOffset: 3 }}
+				/>
+			{/each}
+		</g>
+		<!-- #381 — pozičný balónik priečky na prvej (potvrdenej) priečke -->
+		{@render pozBalon(X(prieckyOsi[0]!), (y0 + y1) / 2, pozicie.priecka)}
+	{/if}
 {/snippet}
 
 <!-- ============================= krov — uloženie / poznámka (#161) ================= -->
@@ -762,13 +768,13 @@
 {#snippet pozBalon(cx: number, cy: number, cislo: number | null)}
 	{#if cislo != null}
 		<g data-testid="pnr-poz-{cislo}">
-			<circle {cx} {cy} r="2.6" fill="#fff" stroke={CIERNA} stroke-width="0.35" />
+			<circle {cx} {cy} r="3" fill="#fff" stroke={CIERNA} stroke-width="0.35" />
 			<text
 				x={cx}
 				y={cy}
 				text-anchor="middle"
 				dominant-baseline="central"
-				font-size="2.8"
+				font-size={MIN_DIM_FONT}
 				font-weight="700"
 				fill={CIERNA}>{cislo}</text
 			>
