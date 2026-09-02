@@ -199,7 +199,7 @@
 									aria-label="Počet tyčí {o.kod}"
 									style="padding:6px 8px;font-size:14px;text-align:center;width:90px"
 								/>
-								<span style="margin-left:6px;color:#6b7280;font-size:13px">ks</span>
+								<span style="margin-left:6px;color:var(--m-muted-ink);font-size:13px">ks</span>
 							</td>
 						</tr>
 					{/each}
@@ -224,8 +224,9 @@
 							<td class="c mono">{r.rozmer === null ? '—' : r.pocetKs}</td>
 							<td class="c mono">{r.pocetTyci ?? '—'}</td>
 							<td class="c">
-								{fmt(r.mnozstvo)}
-								{r.mj}
+								<!-- #376 stage 3: číslo+mj v .mono (konzistentne so susednými kódovými/číselnými
+								     bunkami), poznámka .hint ostáva mimo mono (body font). -->
+								<span class="mono">{fmt(r.mnozstvo)} {r.mj}</span>
 								{#if r.poznamka}<span class="hint" title={r.poznamka}>· neodpisuje sa</span>{/if}
 							</td>
 						</tr>
@@ -310,10 +311,11 @@
 	.hint {
 		display: block;
 		margin-top: 4px;
-		color: #6b7280;
+		/* #376 stage 3: WCAG-safe muted na zebra/hover riadkoch (viď app.css .hint) */
+		color: var(--m-muted-ink);
 		font-size: 12.5px;
 	}
 	tr.drobna td {
-		color: #6b7280;
+		color: var(--m-muted-ink);
 	}
 </style>

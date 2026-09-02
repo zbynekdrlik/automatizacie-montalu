@@ -40,6 +40,11 @@
 	table {
 		font-size: 10.5px;
 	}
+	/* #376 stage 3: zebra pruhovanie riadkov (`--m-surface-2` na even) sa NIKDY netlačí,
+	   aj keď používateľ zapne „tlač pozadí" — tlačový výstup (nárezový plán) ostáva čistý. */
+	table tbody tr {
+		background: transparent !important;
+	}
 	td {
 		padding: 3px 5px;
 	}
