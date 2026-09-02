@@ -316,6 +316,19 @@ export function svetlostMedziKrovmi(sirka: number, n: number | null): number | n
 	return s > 0 ? s : null;
 }
 
+/** Nominálna dĺžka krovu (= „dĺžka hornej hrany") LEN pre OVERENÚ konfiguráciu kotvy
+ *  (samostatne stojaca + zadný profil 110); inak `null`. Config-gate je Money-safety +
+ *  honest-null disciplína: odpočet nominálu (250 masív / 220 Robust = predný+zadný profil)
+ *  je overený LEN pre túto kotvu (jediný golden OP260282) — pri stene / zadnom 140 je
+ *  neoverený, preto sa nominál NEEMITUJE (nikdy sa nehádže rozmer). `krovDlzkaNominal` sám
+ *  ešte gatuje sklon (bez sklonu / nad 9° → null). Zdieľaný zdroj pravdy „overený nominál"
+ *  pre `spocitajNarez` (rez krovu do rezervácie) aj `pergola-sklo` (#223 — dĺžka strešného
+ *  skla = dĺžka hornej hrany + prídavok). */
+export function krovDlzkaNominalOverena(v: PergolaNarezVstup): number | null {
+	const krovConfigOverena = v.uchytenie === 'samostatne' && v.hornyProfilZadnej === 110;
+	return krovConfigOverena ? krovDlzkaNominal(v.hlbka, v.sklonStrechy, v.system) : null;
+}
+
 /** Počet surových tyčí (`tycMm`) na `pocetKs` kusov dĺžky `dlzkaKusu` [mm] — výdaj
  *  materiálu (bin-packing). Rovnaké kusy → first-fit = `ceil(pocetKs / kusovNaTyc)`.
  *  ČISTÁ funkcia — replikuje pattern z `$lib/server/pergola.ts` (Money odpisová cesta),
@@ -609,11 +622,10 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	// verbatim rozdiel presne 30; kotva = overený masív bod; bez Robust goldenu → poznámka „na
 	// potvrdenie"). Gate na konfiguráciu KOTVY: samostatne stojaca + zadný profil 110 — Massive
 	// so zadným 140 alebo na stenu ostáva NEOVERENÉ → honest-null (nikdy sa nehádže do Money).
-	// A7: sklon nad 9° vracia null priamo `krovDlzkaNominal`. null aj bez sklonu.
-	const krovConfigOverena = v.uchytenie === 'samostatne' && v.hornyProfilZadnej === 110;
-	const krovNominal = krovConfigOverena
-		? krovDlzkaNominal(v.hlbka, v.sklonStrechy, v.system)
-		: null;
+	// A7: sklon nad 9° vracia null priamo `krovDlzkaNominal`. null aj bez sklonu. Config-gate
+	// (samostatne + zadný 110) je vyčlenený do `krovDlzkaNominalOverena` — zdieľaný so strešným
+	// sklom (#223), rovnaká hodnota ako predtým (golden OP260282 to dokazuje bit-identicky).
+	const krovNominal = krovDlzkaNominalOverena(v);
 	// Do MONEY riadku (priečka aj lišty) ide dĺžka LEN keď je zadaný aj MANUÁLNY počet krovov —
 	// bez neho by priečka niesla starý auto-počet ceil(š/700)+1 (ktorý výkres vyvrátil: 9 vs 8)
 	// do rezervácie. Bez n → čestný null (nominál sa do Money nepustí).

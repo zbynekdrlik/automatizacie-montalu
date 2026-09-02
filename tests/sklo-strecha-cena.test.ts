@@ -81,3 +81,64 @@ describe('strechaSkloCenaPre — €/m² zo snapshotu, honest-null', () => {
 		expect(r!.eurM2).toBeNull();
 	});
 });
+
+describe('strechaSkloCenaPre — celková cena skiel (cenaSpolu = plocha × €/m², #223)', () => {
+	it('€/m² aj plocha známe → cenaSpolu = plocha × €/m² (VYMYSLENÁ cena)', async () => {
+		await tick();
+		writeSnapshot([
+			{
+				kod: 'TS00014',
+				nakupCennik: 55,
+				nakupPoslednaFaktura: null,
+				predajVo: null,
+				mena: 'EUR',
+				sklad: null
+			}
+		]);
+		// golden OP260282: celková plocha 15,64 m² × 55 €/m² = 860,20 €
+		const r = strechaSkloCenaPre('IZO 4.4.2-8-6 číre', 15.64);
+		expect(r!.eurM2).toBe(55);
+		expect(r!.cenaSpolu).toBe(860.2);
+	});
+
+	it('plocha zadaná, ale €/m² chýba (kód nie v snapshote) → cenaSpolu null (honest-null)', async () => {
+		await tick();
+		// snapshot má INÝ kód (TS00070), TS00014 v ňom NIE JE → €/m² null → cenaSpolu null
+		writeSnapshot([
+			{
+				kod: 'TS00070',
+				nakupCennik: 40,
+				nakupPoslednaFaktura: null,
+				predajVo: null,
+				mena: 'EUR',
+				sklad: null
+			}
+		]);
+		const r = strechaSkloCenaPre('IZO 4.4.2-8-6 číre', 15.64); // TS00014 nie je v snapshote
+		expect(r!.eurM2).toBeNull();
+		expect(r!.cenaSpolu).toBeNull();
+	});
+
+	it('€/m² známe, ale plocha nezadaná (honest-null dĺžka) → cenaSpolu null', async () => {
+		await tick();
+		writeSnapshot([
+			{
+				kod: 'TS00014',
+				nakupCennik: 55,
+				nakupPoslednaFaktura: null,
+				predajVo: null,
+				mena: 'EUR',
+				sklad: null
+			}
+		]);
+		const r = strechaSkloCenaPre('IZO 4.4.2-8-6 číre'); // plocha default null
+		expect(r!.eurM2).toBe(55);
+		expect(r!.cenaSpolu).toBeNull();
+	});
+
+	it('typ bez TS kódu (polykarbonát) + plocha → cenaSpolu null (žiadny hádaný náklad)', () => {
+		const r = strechaSkloCenaPre('polykarbonát 16 mm číry', 20);
+		expect(r!.moneyKod).toBeNull();
+		expect(r!.cenaSpolu).toBeNull();
+	});
+});

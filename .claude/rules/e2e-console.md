@@ -58,6 +58,16 @@ ZAKÁZANÝ je capability/env-skip (secure-context, clipboard, feature-detect): n
 preskočenia asertuj predpoklad a nechaj test PADNÚŤ — napr. `expect(secure, '…').toBe(true)`
 (localhost aj CI preview sú vždy bezpečný kontext). Guard toto stráži.
 
+**POZOR — NOVÝ `test.skip(!!process.env.BASE_URL)` riadok BLOKUJE integračný push (#223).**
+Sankcionovaný BASE_URL skip je OK pre EXISTUJÚCE specy (hook skenuje len PRIDANÉ riadky),
+ale `block-test-skips.sh` NEMÁ výnimku pre BASE_URL — takže PRIDANIE nového takého skipu
+(napr. nový fixture-seedovaný E2E, kde sa cena zapíše len pri lokálnom preview) matchne
+`\btest\.skip\(` a supervízorov push do dev padne. Riešenie: netlač novú cenu/fixture cez
+E2E — pokry logiku SERVER-SIDE unit testom (vzor `sklo-strecha-cena.test.ts` cenaSpolu:
+`writeSnapshot([...]) → strechaSkloCenaPre(typ, plocha)`), render server-počítanej hodnoty
+je triviálny. Bypass hooku (`# airuleset:test-skip-ok`) je logovaný a je na pushera, nie na
+worktree workera — nespoliehaj sa naň.
+
 ## PASCA: `block-test-skips.sh` false-block na META/guard testoch
 
 Pre-push hook `block-test-skips.sh` matchne `\btest\.skip\(` v PRIDANÝCH riadkoch
