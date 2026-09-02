@@ -298,3 +298,19 @@ sám o sebe layout konzumenta nijako neobmedzuje/nekliparuje. Ďalší podobný
 "hárkový" (nie kresebný) prvok pridávaj rovnakým vzorom: nová opt-in prop na
 `VykresovyHarok`, vlastný malý komponent v `$lib/components/vykres/`, default
 `false` (existujúci konzumenti sa nemenia).
+
+## Reťazová (viac-segmentová) kóta pri okraji — daj ju NAD obrys a `labelOffset` otoč k obrysu (#381)
+
+Reťazová kóta (`retazoveKoty` v `kota.ts` → N `<Kota>` segmentov, napr. rozstupy priečok v
+pôdoryse) sa NEZMESTÍ na SPODNÝ okraj vedľa už existujúcej celkovej kóty (šírka/hĺbka) —
+segmentové popisky sa prekryjú s tou celkovou (`witness` presah 3 mm + popisky nižšie od
+kótovej čiary → kolízia; overené súradnicami, nie okom). **Daj reťazec NAD horný okraj
+pôdorysu**, medzi nadpis pohľadu a obrys.
+
+- **`labelOffset` znamienko pri HORNEJ (záporný `perpOffset`) vodorovnej kóte je opačné než
+  default.** `lineDimension` default `labelOffset = -4` posunie popisok o `ny*(-4)`; pri hornej
+  kóte (`perpOffset < 0`, `ny=1`) to tlačí popisok HORE, do nadpisu (nadpis „PÔDORYS" zmizne).
+  Použi **`opts={{ labelOffset: +3 }}`** — popisok ide k obrysu (dole), kótová čiara ostane
+  najvyšší prvok, jasne pod nadpisom. Over SÚRADNICAMI (`getBoundingClientRect` cez Playwright:
+  `retaz.top > title.bottom`), nie okom — 1 px prekryv nadpisu je z fotky neviditeľný.
+- Malý `perpOffset` (~`-r.h*0.055`) drží reťazec pri obryse; väčší (~`-0.1`) vylezie do nadpisu.
