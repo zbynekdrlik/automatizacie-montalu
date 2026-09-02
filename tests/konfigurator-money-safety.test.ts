@@ -21,6 +21,10 @@ import { vypocitajCenu } from '../src/lib/server/konfigurator-cena';
 // #404: bazénový cenový modul — nezávislá referencia MO/VO na overenie, že bazénová `vypocet` akcia
 // nesie MO, ale VO (veľkoobchod) je z verejnej odpovede ODSTRÁNENÝ.
 import { vypocitajCenuBazen } from '../src/lib/server/konfigurator-bazen-cena';
+import {
+	vypocitajCenuOplotenie,
+	OPLOTENIE_CENOVE_MODELY
+} from '../src/lib/server/konfigurator-oplotenie-cena';
 
 const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
@@ -571,24 +575,112 @@ describe('Money safety (C) — route zimnej záhrady: žiadny Money kód, žiadn
 });
 
 // --------------------------------------------------------------------------- //
-// (C) RUNTIME guard — oplotenie podstránka (#388): load() nesie LEN prezentačné dáta, žiadny Money
-// kód, žiadna cena (honest-null — oplotenie nemá cenový zdroj).
+// (C) RUNTIME guard — oplotenie podstránka (#388/#410): load() nesie LEN prezentačné dáta, žiadny
+// Money kód, žiadna cena. Orientačná cena (#410) sa počíta až v akcii `vypocet` (server-only cenový
+// modul), NIKDY nie je v `load` odpovedi (a nikdy VO na verejnej/MO ploche — hladina-aware modul).
 // --------------------------------------------------------------------------- //
-const { load: oplotenieLoad } = await import('../src/routes/konfigurator/oplotenie/+page.server');
+const { load: oplotenieLoad, actions: oplotenieActions } =
+	await import('../src/routes/konfigurator/oplotenie/+page.server');
 
-describe('Money safety (C) — oplotenie route: žiadny Money kód, žiadna cena (#388)', () => {
+/** VO hodnoty (net + s DPH) VŠETKÝCH cenových modelov oplotenia pre daný typ/rozmer/počet —
+ *  response nesie `cenyModely` pre všetkých 6, takže guard overuje absenciu VO každého (parita s bazénom). */
+function voHodnotyVsetkychModelovOplotenie(
+	typ: Parameters<typeof vypocitajCenuOplotenie>[0]['typ'],
+	vyskaMm: number,
+	sirkaMm: number,
+	pocet: number
+): number[] {
+	const out: number[] = [];
+	for (const model of OPLOTENIE_CENOVE_MODELY) {
+		const c = vypocitajCenuOplotenie({ typ, model, vyskaMm, sirkaMm, pocet });
+		if (c.druh === 'cena') out.push(c.vo.bezDph, c.vo.sDph);
+	}
+	return out;
+}
+
+describe('Money safety (C) — oplotenie route: žiadny Money kód, žiadna cena v load (#388/#410)', () => {
 	it('load() posiela typy/modely/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
 		const data = await oplotenieLoad({} as Parameters<typeof oplotenieLoad>[0]);
 		const json = JSON.stringify(data);
 		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
 		neobsahujeMoneyAniNarez(json);
 		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
-		// honest-null: žiadna cena / € vo verejnej oplotenie odpovedi
+		// honest-null: žiadna cena / € vo verejnej oplotenie odpovedi (cena je až v akcii vypocet)
 		expect(json).not.toMatch(/€|EUR\b/);
 		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
 		// pozitívne: dáta naozaj prešli (typ + model), aby test nebol vákuový
 		expect(json).toContain('Plotový diel');
 		expect(json).toContain('ARIEL');
+	});
+
+	it('akcia vypocet vráti orientačnú MO cenu (€), ale NIKDY VO / Money kód / nárez / maticu (#410)', async () => {
+		const fd = new FormData();
+		fd.append('typ', 'posuvna');
+		fd.append('model', 'REA');
+		fd.append('vyska', '1600');
+		fd.append('sirka', '4000');
+		fd.append('pocet', '1');
+		const event = {
+			request: new Request('http://x/konfigurator/oplotenie', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.40'
+		} as unknown as Parameters<typeof oplotenieActions.vypocet>[0];
+
+		const r = await oplotenieActions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		// interná cena (MO + VO) pre presne tento typ/rozmer/model — nezávislá referencia
+		const interne = vypocitajCenuOplotenie({
+			typ: 'posuvna',
+			model: 'REA',
+			vyskaMm: 1600,
+			sirkaMm: 4000,
+			pocet: 1
+		});
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// pozitívne: orientačná MO cena (net + s DPH) JE v odpovedi (cena sa smie zobraziť)
+			expect(json).toContain(String(interne.mo.bezDph));
+			expect(json).toContain(String(interne.mo.sDph));
+			// negatívne: VO hodnoty VŠETKÝCH 6 modelov (response nesie cenyModely) NIE SÚ v odpovedi
+			neobsahujeVOaniMaticu(json, voHodnotyVsetkychModelovOplotenie('posuvna', 1600, 4000, 1));
+		}
+		neobsahujeMoneyAniNarez(json);
+		// pozitívne: „ceny modelov vedľa seba" naozaj prišli (iný model marker)
+		expect(json).toContain('ARIEL');
+	});
+
+	it('prihlásený b2b (VO) → akcia vypocet vráti VO cenu + hladinu VO; Money kód/nárez stále NIE (#318/#410)', async () => {
+		const fd = new FormData();
+		fd.append('typ', 'posuvna');
+		fd.append('model', 'REA');
+		fd.append('vyska', '1600');
+		fd.append('sirka', '4000');
+		fd.append('pocet', '1');
+		const event = {
+			request: new Request('http://x/konfigurator/oplotenie', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.41',
+			locals: { user: { id: 1, username: 'obchod@phsplus.cz', role: 'b2b' } }
+		} as unknown as Parameters<typeof oplotenieActions.vypocet>[0];
+
+		const r = await oplotenieActions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		const interne = vypocitajCenuOplotenie({
+			typ: 'posuvna',
+			model: 'REA',
+			vyskaMm: 1600,
+			sirkaMm: 4000,
+			pocet: 1
+		});
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// VO cena vybraného modelu JE v odpovedi pre b2b (net + s DPH) + hladina marker
+			expect(json).toContain(String(interne.vo.bezDph));
+			expect(json).toContain(String(interne.vo.sDph));
+			expect(json).toMatch(/"hladina":"VO"/);
+		}
+		// Money kód / nárez sú zakázané aj pre VO výstup (VO je cena, nie Money kód)
+		neobsahujeMoneyAniNarez(json);
 	});
 });
 

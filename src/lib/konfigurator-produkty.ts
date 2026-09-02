@@ -109,9 +109,10 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		stav: 'live',
 		odkaz: '/konfigurator/oplotenie',
 		externy: false,
-		// #388: oplotenie NEMÁ overený interim cenový zdroj (montalu.sk `update-fencings` existuje /419/,
-		// ale jeho vyťaženie do matice je práca v rozsahu #279 — samostatný follow-up). Honest-null → bez ceny.
-		cenovyZdroj: false
+		// #410: oplotenie MÁ vyťažený interim cenový zdroj (matica montalu.sk `update-fencings` v
+		// `cennik-oplotenie.json`, server modul `konfigurator-oplotenie-cena.ts`) → orientačná cena je
+		// odblokovaná (gate `maCenovyZdroj` → dopyt/PDF/`vypocet` akcia dostanú oplotenie cenu).
+		cenovyZdroj: true
 	},
 	{
 		kod: 'tienenie',

@@ -101,23 +101,26 @@ describe('produkt-aware názvy pre lead / PDF', () => {
 	});
 });
 
-describe('#385/#404 cenový zdroj (honest-null gate)', () => {
-	// rady s OVERENÝM interim cenníkom (matica montalu.sk): pergola (#279) + bazén (#404).
-	const S_CENNIKOM = new Set(['pergola', 'bazen']);
+describe('#385/#404/#410 cenový zdroj (honest-null gate)', () => {
+	// rady s OVERENÝM interim cenníkom (matica montalu.sk): pergola (#279) + bazén (#404) + oplotenie (#410).
+	const S_CENNIKOM = new Set(['pergola', 'bazen', 'oplotenie']);
 
-	it('pergola + bazén majú cenovyZdroj=true; zvyšné rady false', () => {
+	it('pergola + bazén + oplotenie majú cenovyZdroj=true; zvyšné rady false', () => {
 		expect(produktPodlaKodu('pergola')?.cenovyZdroj).toBe(true);
 		expect(produktPodlaKodu('bazen')?.cenovyZdroj).toBe(true);
+		expect(produktPodlaKodu('oplotenie')?.cenovyZdroj).toBe(true);
 		// každý iný rad (bez vyťaženej matice) je bez zdroja → honest-null
 		for (const p of KONF_PRODUKTY.filter((x) => !S_CENNIKOM.has(x.kod))) {
 			expect(p.cenovyZdroj, `${p.kod} nemá mať cenový zdroj`).toBe(false);
 		}
 	});
 
-	it('maCenovyZdroj: pergola+bazén true, ostatné false; NULL → true (v35 default); neznámy NEPRÁZDNY → false', () => {
+	it('maCenovyZdroj: pergola+bazén+oplotenie true, ostatné false; NULL → true (v35 default); neznámy NEPRÁZDNY → false', () => {
 		expect(maCenovyZdroj('pergola')).toBe(true);
 		expect(maCenovyZdroj('bazen')).toBe(true);
-		expect(maCenovyZdroj('oplotenie')).toBe(false);
+		expect(maCenovyZdroj('oplotenie')).toBe(true);
+		// iný rad bez zdroja → false (honest-null)
+		expect(maCenovyZdroj('tienenie')).toBe(false);
 		// NULL/undefined = starý pergolový dopyt pred v35 → true (honest-degrade prepočet ostáva)
 		expect(maCenovyZdroj(null)).toBe(true);
 		expect(maCenovyZdroj(undefined)).toBe(true);

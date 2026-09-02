@@ -1971,3 +1971,25 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   kolízia — dôležité pre #387 zasklenia = sklo).
 - 210 unit súborov / 2965 testov zelené (coverage 94.41/89.36/97.32/95.39), E2E pristresok+vyber 4/4,
   vizuálne overené naživo (screenshot). NEmergnuté (worktree — supervisor integruje sériovo). #384 ostáva otvorený.
+
+## #410 — Oplotenie: interim orientačná cenotvorba (matica montalu.sk `update-fencings`) — bump 0.24.77-dev.1
+
+- Odblokovaná orientačná cena oplotenia (`cenovyZdroj` false→true) — zrkadlo bazén #404, zvýšený rozsah osí.
+- Reverzné odvodenie (Playwright network capture na živom montalu.sk): request `type[N]` × `count[N]` ×
+  `height[N]`/`width[N]` (metre) + `calculate[]`; cena = f(typ, model, výška, šírka) × počet (lineárne),
+  NEZÁVISLÁ od farby/warranty. 5 typov × 6 modelov (PANDORA = montalu kód PLBP00001) + ATYP (na mieru →
+  individuálna). Per-typ katalógová obálka (diel š≤3,5 m, bránka š≤1,5 m, všetky výška ≤2,0 m).
+- NOVÉ: `scripts/konfigurator-oplotenie-cennik-fetch.mjs` (940 volaní, 3690 buniek, auto-nájdená DPH
+  half-up hranica posuvna/BIANCA 1,5×4,5 → 4931,69) → seed `src/lib/server/cennik-oplotenie.json`;
+  server modul `konfigurator-oplotenie-cena.ts` (snap + obálka + DPH half-up + MO/VO hladina +
+  `cenaOplotenieZCfg`); parser `konfigurator-oplotenie-vstup.ts`; drift skript; playbook rule.
+- CFG kľúč = kompozitný `systemKod="${typKod}|${model}|${vyskaMm}|${pocet}"` + `cfg.sirka` → ZERO zmien
+  v zdieľanom `ponuka.ts` (rendered riadky ostali `[Systém, Šírka, Farba, Popis]`). Aditívne rameno v
+  `cenaZCfgProdukt`/`cennikVerziaProdukt` (paralelný #408 = iný riadok, čistý merge). Flip
+  `cenovyZdroj:true`. Stránka: `vypocet` akcia + on-page cena cez `use:enhance` (akcie `['dopyt','vypocet']`).
+- Testy: `konfigurator-oplotenie-cena.test.ts` (DPH parita vrátane hranice, plná parita 3690 buniek,
+  netautologický produkt-izolovaný dispatch gate, hladina MO/VO, honest-null obálka/ATYP, počet lineárny,
+  parser); `konfigurator-oplotenie.test.ts` prepísaný honest-null → cena kontrakt; guardy b2b/produkty/
+  money-safety(C)/E2E aktualizované. Full suite 218 súborov / 3148 testov zelené (coverage 94.33/88.63/
+  97.34/95.28). Live overené na dev serveri: diel/ARIEL 1,5×2,0 → 1 134 net → 1 394,82 € s DPH (exakt),
+  6 modelov v porovnaní, žiadny VO leak. NEmergnuté (worktree — supervisor integruje sériovo).

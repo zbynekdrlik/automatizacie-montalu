@@ -1,13 +1,13 @@
-// #388: verejný konfigurátor hliníkového oplotenia a brán (`/konfigurator/oplotenie`) — E2E cez reálny
-// prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (typ/model/rozmery/farba) sa počíta
-// klientsky a zobrazí súhrn; HONEST-NULL — žiadna orientačná cena (oplotenie nemá cenový zdroj); dopyt
-// tok → PDF špecifikácia (bez ceny) na stiahnutie. GET je Money-neutrálny (číta sa aj proti LIVE prode);
-// dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý
-// test = NULA console chýb (× = U+00D7 byte-identické).
+// #388/#410: verejný konfigurátor hliníkového oplotenia a brán (`/konfigurator/oplotenie`) — E2E cez
+// reálny prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (typ/model/rozmery/farba) sa
+// počíta klientsky a zobrazí súhrn; #410 ORIENTAČNÁ cena — server-počítaná (`vypocet` akcia, enhance
+// submit) po kliku, s porovnaním modelov; dopyt tok → PDF špecifikácia (s orientačnou cenou) na
+// stiahnutie. GET aj `vypocet` sú Money-neutrálne (čítajú sa aj proti LIVE prode — žiadny zápis); dopyt
+// je ZÁPIS (audit riadok) → `skipAkLive`. Každý test = NULA console chýb (× = U+00D7 byte-identické).
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
 
-test('oplotenie konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (žiadna cena), nula console chýb', async ({
+test('oplotenie konfigurátor: verejná route bez auth — súhrn + ORIENTAČNÁ cena na klik (porovnanie modelov), nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -21,9 +21,49 @@ test('oplotenie konfigurátor: verejná route bez auth — súhrn + HONEST-NULL 
 	await expect(page.getByTestId('oplotenie-suhrn')).toBeVisible();
 	await expect(page.getByTestId('oplotenie-suhrn-rozmery')).toHaveText('1500 × 2000 mm');
 
-	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
-	await expect(page.getByTestId('oplotenie-cena-info')).toContainText('Cena na vyžiadanie');
-	await expect(page.locator('body')).not.toContainText('€');
+	// #410: orientačná cena sa zobrazí AŽ po kliku (server-počítaná, Money-neutrálna — read-only)
+	await expect(page.getByTestId('oplotenie-cena')).toHaveCount(0);
+	const responsePromise = page.waitForResponse(
+		(r) => r.request().method() === 'POST' && r.url().includes('vypocet')
+	);
+	await page.getByTestId('oplotenie-cena-zobrazit').click();
+	await responsePromise;
+
+	// cena + s DPH suma (€) + porovnanie 6 modelov
+	await expect(page.getByTestId('oplotenie-cena')).toBeVisible();
+	await expect(page.getByTestId('oplotenie-cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('oplotenie-porovnanie')).toBeVisible();
+	await expect(page.getByTestId('oplotenie-porovnanie-ARIEL')).toBeVisible();
+	await expect(page.getByTestId('oplotenie-porovnanie-REA')).toBeVisible();
+	// deterministická default cena (diel/ARIEL 1,5×2,0 = MO 1134 net → 1 394,82 € s DPH). Regex kvôli
+	// sk-SK tisícovej medzere (úzka nezlomiteľná — `\s` ju pokryje), nie krehký presný string.
+	await expect(page.getByTestId('oplotenie-cena-sdph')).toHaveText(/1\s*394,82\s*€/);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('oplotenie cena: zmena typu zneaktuálni zobrazenú cenu → „Prepočítať" → nová cena, nula console chýb', async ({
+	page
+}) => {
+	// #410 review 🟡: 5-vstupový cenový kľúč (typ|model|výška|šírka|počet) — over `cenaAktualna` gating,
+	// aby sa NIKDY nezobrazila cena pre iný vstup. Read-only (`vypocet`), žiadny zápis → bez skipAkLive.
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/oplotenie');
+
+	// zobraz orientačnú cenu pre default (diel, ARIEL, 1500 × 2000)
+	await page.getByTestId('oplotenie-cena-zobrazit').click();
+	await expect(page.getByTestId('oplotenie-cena')).toBeVisible();
+
+	// zmeň TYP → cena sa považuje za NEAKTUÁLNU (nikdy neukáž cenu pre iný vstup): blok zmizne,
+	// tlačidlo sa vráti ako „Prepočítať" (#410 `cenaAktualna` gating)
+	await page.getByTestId('oplotenie-typ-posuvna').click();
+	await expect(page.getByTestId('oplotenie-cena')).toHaveCount(0);
+	await expect(page.getByTestId('oplotenie-cena-zobrazit')).toContainText('Prepočítať');
+
+	// prepočítaj → nová orientačná cena pre posuvnú bránu
+	await page.getByTestId('oplotenie-cena-zobrazit').click();
+	await expect(page.getByTestId('oplotenie-cena')).toBeVisible();
+	await expect(page.getByTestId('oplotenie-cena-sdph')).toContainText('€');
 
 	expect(consoleMsgs).toEqual([]);
 });

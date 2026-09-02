@@ -7,6 +7,8 @@
 import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
 // #404: bazénová cenová matica (produkt-aware dispatch nižšie) + whitelist bazénového modelu.
 import { CENNIK_VERZIA_BAZEN, cenaPreModelBazen } from './konfigurator-bazen-cena';
+// #410: oplotenie cenová matica (produkt-aware dispatch nižšie) — cenotvorný kľúč je v `cfg.systemKod`.
+import { CENNIK_VERZIA_OPLOTENIE, cenaOplotenieZCfg } from './konfigurator-oplotenie-cena';
 import { bazenModel } from '$lib/konfigurator-bazen';
 import { maCenovyZdroj, type KonfProduktKod } from '$lib/konfigurator-produkty';
 import type { PonukaConfig } from '$lib/ponuka';
@@ -40,12 +42,17 @@ export function cenaZCfgProdukt(
 			hladina
 		);
 	}
+	// #410: oplotenie — kompozitný `cfg.systemKod` (typ|model|výška|počet) + šírka; modul si ho rozparsuje
+	// (honest-degrade na null pri starom riadku bez systemKod / chýbajúcej šírke).
+	if (produkt === 'oplotenie') return cenaOplotenieZCfg(cfg, hladina);
 	return cenaZCfg(cfg, hladina);
 }
 
 /** #404: verzia cenníka podľa produktu (bazén má vlastnú maticu → vlastnú verziu). */
 function cennikVerziaProdukt(produkt: string | null | undefined): string {
-	return produkt === 'bazen' ? CENNIK_VERZIA_BAZEN : CENNIK_VERZIA;
+	if (produkt === 'bazen') return CENNIK_VERZIA_BAZEN;
+	if (produkt === 'oplotenie') return CENNIK_VERZIA_OPLOTENIE;
+	return CENNIK_VERZIA;
 }
 
 /** Pečiatka ceny na uloženie do `dopyt` (#309): vypočítaná verejná (MO) cena + verzia cenníka.
