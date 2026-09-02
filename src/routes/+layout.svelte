@@ -1,5 +1,8 @@
 <script lang="ts">
 	import '../app.css';
+	// #376 stage 3: tlačový @media print blok presunutý z app.css (blížil sa 1000-r.
+	// stropu) — hneď za app.css, aby kaskáda ostala nezmenená (byte-identické pravidlá).
+	import '../print.css';
 	// #376 stage 1: Archivo (display: h1/nav/tlačidlá) + Inter (body) Variable písma,
 	// wirované raz tu (root layout je spoločný predok pre login/konfigurátor/internú
 	// appku) — tokeny `--m-font-display`/`--m-font-body` v app.css. Oba balíčky sú v

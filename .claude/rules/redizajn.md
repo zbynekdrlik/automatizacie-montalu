@@ -76,6 +76,52 @@ Form input LABEL text je E2E KONTRAKT — testy cielia cez `page.getByLabel('<pr
 - `app.css` je ~891 r. (approaching 1000-strop) — split pred stage 3, viď
   `large-file-split.md` watch-list.
 
+## Stage 3 (História + tabuľky) DOKONČENÝ (#376, 0.24.74)
+
+Čo pribudlo do `app.css`/`print.css` a ako sa aplikuje na tabuľkových/histórie stránkach:
+
+- **`@media print` blok presunutý do `src/print.css`** (app.css bol 891 r., blízko 1000-strop).
+  Importuje sa v root `+layout.svelte` HNEĎ za `import '../app.css'` — kaskáda ostáva
+  nezmenená (pravidlá byte-identické). app.css klesol na ~805 r.; stage-3 CSS ho zdvihlo
+  na ~869 (stále pod stropom). Vzor pre ďalší rast: extrahuj tematický blok do vlastného
+  `.css` importovaného za app.css.
+- **Zebra + hover** pre výsledkové/histórie tabuľky = `.wrap table:not(.narez):not(.rezy)
+  tbody tr:nth-child(even)` (zebra `--m-surface-2`) + `:hover` (`--m-accent-soft`). MUSÍ byť
+  scoped na `.wrap` (leak-pasca nižšie — login/konfigurátor sú full-bleed BEZ `.wrap`).
+- **`.mono` na kódy + čísla** vo výsledkových/histórie tabuľkách (kódy, ZAK/OP, rozmery/
+  metre). Meno/popis ostáva body font — „kód/číslo mono, názov body" (kóta z výkresu).
+- **`.tbl-akcie` + `.btn … sm` + `.btn.danger.outline`** = kompaktný rad outline akčných
+  tlačidiel jednej rodiny (/odpisy). `.btn` je inak block/100%-width CTA; `.sm` (definované
+  PO `.btn.secondary`) ho spraví `inline-flex; width:auto; border-width:1px`.
+
+### PASCE stage 3 (každá stála čas / bola review nález)
+
+- **`table.narez` NIE JE jediná stage-4 tabuľka — `RozpisRezov.svelte` je `<table class="rezy">`.**
+  Globálne `.wrap table` pravidlo (zebra/hover) MUSÍ vylúčiť OBE: `:not(.narez):not(.rezy)`.
+  `.rezy` je kompaktný TLAČOVÝ rozpis rezov (vlastný dizajn, renderovaný v zasklenia
+  PlanKartách + optimalizátore, tiež pod `.wrap`) — `:not(.narez)` samotné ho nechá presiaknuť
+  (review 🟡). Pred pridaním akéhokoľvek globálneho `.wrap table` pravidla vygrepni VŠETKY
+  `<table class="…">` a vylúč každú stage-4/input tabuľku (`.narez`, `.rezy`; `.kusy`
+  optimalizátor je input-only, zebra tam neškodí).
+- **Tónované pozadie riadku (zebra/hover) ZHORŠUJE kontrast existujúceho muted textu pod WCAG
+  AA** — presne tá istá pasca ako `--m-muted` na mode-karte v stage 2. Sivé texty `#6b7280`/
+  `#64748b`, ktoré prešli na bielej, padnú pod 4.5:1 na `--m-surface-2`/`--m-accent-soft`. Fix:
+  `var(--m-muted-ink)` (5.7:1) — zároveň „hexy → tokeny". Skontroluj VŠETKY muted texty vnútri
+  tabuliek, ktoré dostávajú zebra/hover (`.hint`, `tr.drobna`, `mj` span, `.suhrn .lbl`).
+- **`.hint` (a iné muted) môžu ODdediť `.mono`, ak je bunka `<td class="… mono">`** —
+  monuj len samotné číslo (`<span class="mono">{n} {mj}</span>`), nie celú bunku s poznámkou.
+- **`.akcie` je UŽ obsadené** 3 scoped komponentmi (optimalizator/vizual) — pre nový globálny
+  akčný rad použi `.tbl-akcie`, nikdy `.akcie` (kolízia so scoped štýlmi).
+- **Hover tlačidla musí ostať odlíšiteľný od hoveru RIADKU** — `.btn.secondary:hover` aj row
+  hover boli `--m-accent-soft` → afordancia tlačidla splynula. Kompaktné secondary v tabuľke:
+  `.btn.sm.secondary:hover { background:var(--m-surface); border-color:var(--m-accent) }`.
+- **Zebra sa nesmie tlačiť** — pridaj do `print.css` `table tbody tr { background: transparent
+  !important }` (inak sa even-row pozadie vytlačí, keď používateľ zapne „tlač pozadí").
+- **E2E-bezpečnosť /odpisy akcií:** testy cielia tlačidlá cez ROLU+TEXT
+  (`getByRole('button',{name:'Uvoľniť'})`, `getByRole('link',{name:/Použiť znova/})`) alebo
+  TESTID (`povolit-reimport-`, `detail-`) — NIKDY cez triedu/DOM štruktúru. Wrapper `<div>` +
+  zmena tried je bezpečná, kým `<a>` ostane link, `<button>` button, a text/testid sa nemení.
+
 ## PASCA: bare `h1`/`nav`/… selektor v `app.css` LEAKUJE na login aj konfigurátor
 
 `app.css` je importované GLOBÁLNE (cez root `+layout.svelte`) — platí pre
@@ -110,10 +156,10 @@ na `.wrap` (alebo naopak `:not(.konf-app)`-štýl guard, podľa toho, čo je
   riadky + `.wrap input[type=checkbox]` bronzový accent, `.mode-*` na `--m-*` bronz,
   emoji preč z INPUT labelov, `.mono` na článkové kódy. Detail + pasce nižšie
   („## Stage 2 DOKONČENÝ").
-- **Stage 3 (história + tabuľky):** `/odpisy` (akčné tlačidlá jednej rodiny,
-  badge), dopyty, používatelia, problém, vzorce/nastavenia. TU sa `table`/`td`
-  štruktúrne prerába (stage 1 nechalo `table`/`td` farebne tokenizované, ale
-  ŽIADNU štruktúrnu zmenu — bezpečné pokračovať).
+- **Stage 3 (história + tabuľky) — HOTOVO (0.24.74):** zebra/hover (`.wrap
+  table:not(.narez):not(.rezy)`), `.mono` kódy/čísla vo výsledkových+histórie
+  tabuľkách, /odpisy akčná rodina (`.tbl-akcie`+`.btn … sm`+`.btn.danger.outline`),
+  `@media print` split → `print.css`. Detail + pasce vyššie („## Stage 3 DOKONČENÝ").
 - **Stage 4 (výsledky + výkresy):** nárezové plány, náhľady (ink-on-paper +
   bronzové kóty), CTA stack, print audit. `.g/.row/.ral-val/.poznamka-*/.kov-*/
   .posuv-*/table.narez/@media print` boli VEDOME nedotknuté v stage 1-3 — tu sa

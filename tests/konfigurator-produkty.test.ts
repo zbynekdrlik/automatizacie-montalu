@@ -9,7 +9,8 @@ import {
 	KONF_PRODUKTY,
 	produktNazov,
 	produktPdfNadpis,
-	produktPodlaKodu
+	produktPodlaKodu,
+	maCenovyZdroj
 } from '../src/lib/konfigurator-produkty';
 
 describe('KONF_PRODUKTY katalóg', () => {
@@ -17,11 +18,11 @@ describe('KONF_PRODUKTY katalóg', () => {
 		expect(KONF_PRODUKTY).toHaveLength(7);
 	});
 
-	it('pergola je PRVÁ a jediná live; ostatné sú „pripravujeme"', () => {
+	it('pergola je PRVÁ a live; #385 pridal bazén ako live (ostatné „pripravujeme")', () => {
 		expect(KONF_PRODUKTY[0]!.kod).toBe('pergola');
 		expect(KONF_PRODUKTY[0]!.stav).toBe('live');
 		const live = KONF_PRODUKTY.filter((p) => p.stav === 'live');
-		expect(live.map((p) => p.kod)).toEqual(['pergola']);
+		expect(live.map((p) => p.kod)).toEqual(['pergola', 'bazen']);
 	});
 
 	it('kódy sú unikátne', () => {
@@ -84,5 +85,26 @@ describe('produkt-aware názvy pre lead / PDF', () => {
 		expect(produktPodlaKodu('xxx')).toBeUndefined();
 		expect(produktPodlaKodu(null)).toBeUndefined();
 		expect(produktPodlaKodu('pergola')?.kod).toBe('pergola');
+	});
+});
+
+describe('#385 cenový zdroj (honest-null gate)', () => {
+	it('LEN pergola má cenovyZdroj=true; bazén a ostatné false', () => {
+		expect(produktPodlaKodu('pergola')?.cenovyZdroj).toBe(true);
+		expect(produktPodlaKodu('bazen')?.cenovyZdroj).toBe(false);
+		// každý iný rad (pripravujeme) je tiež bez zdroja
+		for (const p of KONF_PRODUKTY.filter((x) => x.kod !== 'pergola')) {
+			expect(p.cenovyZdroj, `${p.kod} nemá mať cenový zdroj`).toBe(false);
+		}
+	});
+
+	it('maCenovyZdroj: pergola true, bazén false; NULL → true (v35 default); neznámy NEPRÁZDNY → false', () => {
+		expect(maCenovyZdroj('pergola')).toBe(true);
+		expect(maCenovyZdroj('bazen')).toBe(false);
+		// NULL/undefined = starý pergolový dopyt pred v35 → true (honest-degrade prepočet ostáva)
+		expect(maCenovyZdroj(null)).toBe(true);
+		expect(maCenovyZdroj(undefined)).toBe(true);
+		// neznámy NEPRÁZDNY kód (odobraný/premenovaný produkt) → false (honest-null, nie pergolová cena)
+		expect(maCenovyZdroj('xxx')).toBe(false);
 	});
 });

@@ -41,6 +41,10 @@ const KLIENT_ZAKAZANE_SPEC = [
 	/(^|\/)sklo-strecha$/,
 	/(^|\/)sklo-cena$/,
 	/(^|\/)pergola-narez$/,
+	// #385: bazénový Money katalóg — `bazen-komponenty` (BPK* kusové odpisové kódy) je `$lib/`
+	// (klientsky rozlíšiteľný) a NESIE Money kódy ako obyčajné stringy (nie slovo `moneyKod`), takže
+	// obsahový grep nižšie by sám import nezachytil — preto ho blokujeme priamo ako zakázaný špecifikátor.
+	/(^|\/)bazen-komponenty$/,
 	/\/server\//,
 	/(^|\/)server$/,
 	/server\/money$/,
@@ -112,8 +116,10 @@ function prejdiKlientskyGraf(vstupy: string[]): { porusenia: Porusenie[]; videne
 		if (videne.has(subor)) continue;
 		videne.add(subor);
 		const src = fs.readFileSync(subor, 'utf8');
-		if (/moneyKod|skloStrechaMoneyKod/.test(src))
-			porusenia.push({ subor, detail: 'referencuje moneyKod' });
+		// #385: aj HOLÝ Money kód (BPK*/BPP* z bazénového odpisu, TS* zo skla) je únik, nielen slovo
+		// `moneyKod` — bazén kusové/metrážové kódy sa v katalógu nesú ako stringy `'BPK00108'`.
+		if (/moneyKod|skloStrechaMoneyKod|\bBP[KP]\d{5}\b/.test(src))
+			porusenia.push({ subor, detail: 'referencuje Money kód (moneyKod / BPK*/BPP*)' });
 		for (const spec of extrahujSpecifikatory(src)) {
 			for (const vzor of KLIENT_ZAKAZANE_SPEC)
 				if (vzor.test(spec)) porusenia.push({ subor, detail: `zakázaný import '${spec}'` });
@@ -158,7 +164,7 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
 	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
 	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
-	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty, ponuka, dopyt)', () => {
+	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén, ponuka, dopyt)', () => {
 		const { videne } = prejdiKlientskyGraf(konfVstupy());
 		const musiaByt = [
 			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
@@ -179,6 +185,11 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// MUSÍ prejsť ich graf, inak by ich prípadný budúci Money/katalóg import nezachytil.
 			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfVyber.svelte'),
 			path.join(SRC, 'lib', 'konfigurator-produkty.ts'),
+			// #385: bazénová podstránka (`konfigurator/bazen/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-bazen` — guard (A) MUSÍ prejsť jeho graf, aby jeho
+			// prípadný budúci Money import zachytil: `bazen-komponenty`/`server/bazen` import je v
+			// `KLIENT_ZAKAZANE_SPEC`, a holý BPK*/BPP* kód v obsahu chytá rozšírený obsahový grep vyššie.
+			path.join(SRC, 'lib', 'konfigurator-bazen.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -199,6 +210,9 @@ const SERVEROVE_ROUTY = [
 	// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`; root
 	// `/konfigurator` je výberová obrazovka (bez +page.server.ts).
 	'src/routes/konfigurator/pergola/+page.server.ts',
+	// #385: bazénová podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/bazen/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];
@@ -210,7 +224,10 @@ const SERVER_ZAKAZANE = [
 	/from ['"].*server\/db['"]/,
 	/from ['"].*server\/pergola['"]/,
 	/from ['"].*pergola-narez['"]/,
-	/moneyKod|skloStrechaMoneyKod|writeOdpis|MONEY_LIVE/
+	// #385: bazénová odpisová cesta (BPK/BPP kusové/metrážové kódy) — verejná route ju NESMIE importovať.
+	/from ['"].*server\/bazen['"]/,
+	/from ['"].*bazen-komponenty['"]/,
+	/moneyKod|skloStrechaMoneyKod|writeOdpis|MONEY_LIVE|\bBP[KP]\d{5}\b/
 ];
 
 describe('Money safety (B) — serverové súbory routy sa neviažu na Money/cenu/nárez (#275)', () => {
@@ -346,5 +363,27 @@ describe('Money safety (C) — runtime výstup: cena SMIE, VO/Money/nárez/matic
 		}
 		// Money kód / nárez sú zakázané aj pre VO výstup (VO je cena, nie Money kód)
 		neobsahujeMoneyAniNarez(json);
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — bazénová podstránka (#385): load() nesie LEN prezentačné dáta, žiadny Money
+// kód (BPK*/BPP* z odpisu), žiadna cena (honest-null — bazén nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: bazenLoad } = await import('../src/routes/konfigurator/bazen/+page.server');
+
+describe('Money safety (C) — bazénová route: žiadny Money kód, žiadna cena (#385)', () => {
+	it('load() posiela modely/koľaj/výplne/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await bazenLoad({} as Parameters<typeof bazenLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej bazénovej odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (modely + koľaj), aby test nebol vákuový
+		expect(json).toContain('Premier');
+		expect(json).toContain('Jednokoľajové');
 	});
 });

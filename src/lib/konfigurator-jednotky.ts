@@ -10,6 +10,13 @@
  *  (žiadne „4,3" pri internom 4250) a že min/max (vždy násobky 100) ostanú na mriežke. */
 const MRIEZKA_MM = 100;
 
+/** Číslo → text s desatinnou ČIARKOU (sk), napr. `31.5 → "31,5"`, `32 → "32"`. Zdieľaný jednoduchý
+ *  formátovač (bazén plocha m², súhrn, PDF „katalógový rozmer") — jeden zdroj pravdy namiesto
+ *  rozsypaného `String(n).replace('.', ',')` (#385 review 🔵). Client-safe, čistý. */
+export function cislaCiarka(n: number): string {
+	return String(n).replace('.', ',');
+}
+
 /** mm → zákaznícky text v metroch s 1 desatinným miestom a ČIARKOU („4000" → „4,0").
  *  `null` (prázdna hodnota) → prázdny reťazec (input ostane prázdny, nie „0,0"). */
 export function mmNaMetreText(mm: number | null): string {
