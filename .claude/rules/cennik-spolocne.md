@@ -2,6 +2,7 @@
 paths:
   - 'src/lib/server/cennik-spolocne.ts'
   - 'src/lib/server/konfigurator-cena-akcia.ts'
+  - 'src/lib/server/client-ip.ts'
   - 'src/lib/server/konfigurator-cena.ts'
   - 'src/lib/server/konfigurator-bazen-cena.ts'
   - 'src/lib/server/konfigurator-zimna-zahrada-cena.ts'
@@ -63,3 +64,17 @@ Testy: `tests/konfigurator-cena-akcia.test.ts` (obe vetvy + retry-after + poradi
 - **PLNÝ `vypocetAction(event, parse, cenaFn)`** — 4 akcie majú RÔZNE návratové tvary (pergola nesie
   `vysledok`, zimná záhrada nemá `cenyModely`) + rôzne parsery; plná únifikácia by MENILA tvary
   odpovedí (behaviorálna zmena). Zdieľa sa LEN identická throttle predohra.
+
+## Review pasce (reusable pre ďalší zdieľaný server helper)
+
+- **Zdieľaný helper vracajúci `fail()` MUSÍ byť generický na dátovom tvare, inak zabije route typ.**
+  `cenaThrottle(...): ReturnType<typeof fail>` = `ActionFailure<unknown>` — v route `./$types`
+  `ActionData` to KOLABUJE 429 vetvu na `{}` (svelte-check ostane 0/0 len kým sú `use:enhance`
+  neanotované, ale prvá `SubmitFunction`/`form.error` anotácia padne). Píš
+  `f<P extends Record<string, null>>(event, prazdno: P): ActionFailure<P & { error: string }> | null`.
+- **Klientska IP (CF-aware) žije v `client-ip.ts` `clientIp(event)`** — zdieľaná `cenaThrottle` +
+  `dopyt-action`. NEROB 4. inline kópiu (`getClientAddress` try/catch → `resolveClientIp`); importuj
+  `clientIp`. (`login/+page.server.ts` má vlastnú inline verziu — security path, mimo tohto scope.)
+- **Presun Money-adjacentnej logiky do NOVÉHO `$lib/server/` súboru = pridaj ho do `SERVEROVE_ROUTY`**
+  (`konfigurator-money-safety.test.ts` B guard). Existujúce guardy skenujú len route súbory / vlastný
+  modul — presunutý kód inak ticho vypadne z Money-safety siete.
