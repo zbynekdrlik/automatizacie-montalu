@@ -11,7 +11,10 @@ import {
 	oplotenieObalka,
 	bazenObalka
 } from '../src/lib/server/konfigurator-obalky';
-import { vypocitajCenuOplotenie } from '../src/lib/server/konfigurator-oplotenie-cena';
+import {
+	vypocitajCenuOplotenie,
+	OPLOTENIE_CENOVE_MODELY
+} from '../src/lib/server/konfigurator-oplotenie-cena';
 import { vypocitajCenuBazen } from '../src/lib/server/konfigurator-bazen-cena';
 import type { OplotenieTypKod } from '../src/lib/konfigurator-oplotenie';
 import type { BazenModel } from '../src/lib/konfigurator-bazen';
@@ -43,57 +46,60 @@ describe('#427 obálky — presné hranice odvodené zo seedu', () => {
 	});
 });
 
-// ANTI-DRIFT: obálka musí zodpovedať REÁLNEMU správaniu cenových modulov. Pre KAŽDÝ typ/model:
+// ANTI-DRIFT: obálka musí zodpovedať REÁLNEMU správaniu cenových modulov. Pre KAŽDÝ typ:
 //  - roh (min×min) aj (maxV×maxŠ) MÁ cenu (obálka nesľubuje viac, než katalóg naozaj má),
 //  - o krok ZA maxom (šírka +500 mm / výška +100 mm) je individuálna ponuka (obálka nie je príliš úzka).
-// Tak zmena seedu buď posunie obálku AJ toto správanie spolu, alebo test spadne.
-const OPL_CENOVY_MODEL = 'ARIEL'; // ktorýkoľvek cenový model (obálka je model-nezávislá)
-
-describe('#427 obálky — anti-drift proti vypocitajCenuOplotenie', () => {
+// Slučka cez VŠETKY cenové modely (nielen jeden) stráži aj MODEL-NEZÁVISLOSŤ per-typ obálky (#427
+// review 🔵): obálka je ÚNIA naprieč modelmi, takže KAŽDÝ model musí pokryť celú úniu — ak by budúci
+// seed spravil niektorý model užší než únia, jeho „maxŠ roh má cenu" spadne (UI inak over-promiscuje
+// rozsah, ktorý daný model nemá). Zmena seedu tak posunie obálku AJ toto správanie spolu, alebo test spadne.
+describe('#427 obálky — anti-drift proti vypocitajCenuOplotenie (všetky cenové modely)', () => {
 	for (const typ of Object.keys(OPLOTENIE_OBALKY) as OplotenieTypKod[]) {
 		const o = OPLOTENIE_OBALKY[typ];
-		it(`${typ}: rohy obálky majú cenu, o krok za maxom individuálna`, () => {
-			// min×min roh má cenu
-			expect(
-				vypocitajCenuOplotenie({
-					typ,
-					model: OPL_CENOVY_MODEL,
-					vyskaMm: o.vyska.minMm,
-					sirkaMm: o.sirka.minMm,
-					pocet: 1
-				}).druh
-			).toBe('cena');
-			// maxV×maxŠ roh má cenu
-			expect(
-				vypocitajCenuOplotenie({
-					typ,
-					model: OPL_CENOVY_MODEL,
-					vyskaMm: o.vyska.maxMm,
-					sirkaMm: o.sirka.maxMm,
-					pocet: 1
-				}).druh
-			).toBe('cena');
-			// o 500 mm širšie než max šírka → individuálna
-			expect(
-				vypocitajCenuOplotenie({
-					typ,
-					model: OPL_CENOVY_MODEL,
-					vyskaMm: o.vyska.maxMm,
-					sirkaMm: o.sirka.maxMm + 500,
-					pocet: 1
-				}).druh
-			).toBe('individualna-ponuka');
-			// o 100 mm vyššie než max výška → individuálna
-			expect(
-				vypocitajCenuOplotenie({
-					typ,
-					model: OPL_CENOVY_MODEL,
-					vyskaMm: o.vyska.maxMm + 100,
-					sirkaMm: o.sirka.maxMm,
-					pocet: 1
-				}).druh
-			).toBe('individualna-ponuka');
-		});
+		for (const model of OPLOTENIE_CENOVE_MODELY) {
+			it(`${typ}/${model}: rohy únie majú cenu, o krok za maxom individuálna`, () => {
+				// min×min roh má cenu
+				expect(
+					vypocitajCenuOplotenie({
+						typ,
+						model,
+						vyskaMm: o.vyska.minMm,
+						sirkaMm: o.sirka.minMm,
+						pocet: 1
+					}).druh
+				).toBe('cena');
+				// maxV×maxŠ roh má cenu (dôkaz, že TENTO model pokrýva celú per-typ úniu)
+				expect(
+					vypocitajCenuOplotenie({
+						typ,
+						model,
+						vyskaMm: o.vyska.maxMm,
+						sirkaMm: o.sirka.maxMm,
+						pocet: 1
+					}).druh
+				).toBe('cena');
+				// o 500 mm širšie než max šírka → individuálna
+				expect(
+					vypocitajCenuOplotenie({
+						typ,
+						model,
+						vyskaMm: o.vyska.maxMm,
+						sirkaMm: o.sirka.maxMm + 500,
+						pocet: 1
+					}).druh
+				).toBe('individualna-ponuka');
+				// o 100 mm vyššie než max výška → individuálna
+				expect(
+					vypocitajCenuOplotenie({
+						typ,
+						model,
+						vyskaMm: o.vyska.maxMm + 100,
+						sirkaMm: o.sirka.maxMm,
+						pocet: 1
+					}).druh
+				).toBe('individualna-ponuka');
+			});
+		}
 	}
 });
 

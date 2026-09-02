@@ -139,6 +139,9 @@ test('oplotenie obálka (#427): cenníkový rozsah per-typ + „mimo rozsah" hl�
 	await expect(obalka).toContainText('šírka 1,0');
 	await expect(obalka).toContainText('3,5 m');
 	await expect(page.getByTestId('oplotenie-obalka-mimo')).toHaveCount(0);
+	// info vetva (v rozsahu) — celá veta vrátane oddeľovacej medzery pred inline spanom
+	// (stráži {#if}-whitespace pascu, testing.md: „Svelte prehltne medzeru okolo {#if}")
+	await expect(obalka).toContainText('m. Väčšie rozmery pripravíme ako cenu na vyžiadanie.');
 
 	// prepni na vchodovú bránku (užšia obálka, šírka do 1,5 m) → rozsah sa zmení; default šírka 2,0 m je
 	// NAD ním → čestná „mimo rozsah = na vyžiadanie" hláška sa zobrazí (namiesto nemej individuálnej steny)

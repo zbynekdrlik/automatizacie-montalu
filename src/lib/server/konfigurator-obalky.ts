@@ -36,7 +36,8 @@ export interface BazenObalka {
 }
 
 // Seedy sú vnorené mapy s metrovými string kľúčmi; tu ich čítame len na odvodenie min/max PRÍTOMNÝCH
-// rozmerových kľúčov (hodnoty buniek = ceny sa NEČÍTAJÚ). Presné vrstvenie kľúčov → žiadne `as` cast-y.
+// rozmerových kľúčov (hodnoty buniek = ceny sú `unknown` a NEČÍTAJÚ sa). Presné vrstvenie kľúčov nižšie
+// znamená ŽIADNE per-bunkové cast-y (jediný cast je top-level tvar seedu `as { cennik: … }`).
 type SirkaMap = Record<string, unknown>; // šírkový kľúč → bunka (cena — nečítame ju)
 type OplCennik = Record<string, Record<string, Record<string, SirkaMap>>>; // typ → model → výška → šírka
 type BazenCennik = Record<string, Record<string, SirkaMap>>; // model → dĺžka → šírka

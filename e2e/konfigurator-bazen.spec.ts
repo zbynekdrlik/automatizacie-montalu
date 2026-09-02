@@ -254,6 +254,9 @@ test('bazén obálka (#427): cenníkový rozsah per-model + „mimo rozsah" hlá
 	await expect(obalka).toContainText('šírka 2,0');
 	await expect(obalka).toContainText('6,0 m');
 	await expect(page.getByTestId('bazen-obalka-mimo')).toHaveCount(0);
+	// info vetva (v rozsahu) — celá veta vrátane oddeľovacej medzery pred inline spanom
+	// (stráži {#if}-whitespace pascu, testing.md: „Svelte prehltne medzeru okolo {#if}")
+	await expect(obalka).toContainText('m. Väčšie rozmery pripravíme ako cenu na vyžiadanie.');
 
 	// prepni na Star (užšia obálka, šírka do 4,5 m) → rozsah sa zmení
 	await page.getByTestId('bazen-model-Star').click();
