@@ -17,6 +17,9 @@ services:
       context: ./src
       args:
         APP_VERSION: ${APP_VERSION:-dev}
+        # #5822: base path sa BAKUJE pri builde (kit.paths.base). Prázdny default = koreň
+        # origin (dnešný VPS, byte-identicky); nastaví ho odoo-side sidecar na `/automatizacie`.
+        APP_BASE_PATH: ${APP_BASE_PATH:-}
     container_name: automatizacie-montalu
     restart: unless-stopped
     # Rotácia logov — default json-file bez limitu môže zaplniť disk VPS.
@@ -27,13 +30,16 @@ services:
         max-file: '5'
     # Runtime image node:24-*-slim NEMÁ curl → health cez node global fetch.
     # App počúva vnútri kontajnera na 3000 (verejne cez Caddy na 8090/443).
+    # #5822: pod bakovaným base kit vráti 404 na `/health` (mimo base) PRED hooks → kontajner
+    # unhealthy → restart loop. Healthcheck preto prefixuje base z RUNTIME env (`APP_BASE_PATH`
+    # nižšie); base='' ⇒ `/health` dnes byte-identicky.
     healthcheck:
       test:
         [
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:3000/health').then(r=>r.json()).then(j=>process.exit(j.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:3000'+(process.env.APP_BASE_PATH||'')+'/health').then(r=>r.json()).then(j=>process.exit(j.ok?0:1)).catch(()=>process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
@@ -45,6 +51,12 @@ services:
       DATABASE_PATH: /data/app/app.db
       MONEY_LIVE: ${MONEY_LIVE:-0}
       SEED_USERS: ${SEED_USERS:-}
+      # #5822: RUNTIME base (healthcheck ho číta; kit.paths.base je už bakované z build-arg
+      # vyššie). `APP_FRAME_ANCESTORS` = env-gated iframe povolenie (hooks.server.ts): prázdne
+      # ⇒ dnešné `X-Frame-Options: DENY`; nastavené ⇒ `CSP: frame-ancestors <hodnota>` (odoo
+      # iframe). Oba prázdne default ⇒ live VPS byte-identicky; sidecar ich nastaví.
+      APP_BASE_PATH: ${APP_BASE_PATH:-}
+      APP_FRAME_ANCESTORS: ${APP_FRAME_ANCESTORS:-}
       # #278: Odoo lead integrácia (src/lib/server/odoo-lead.ts) číta tieto štyri
       # výhradne z runtime env — bez forwardu je na prode ticho vypnutá. Hodnoty v
       # /opt/automatizacie-montalu/.env; prázdny default = "chýba ktorákoľvek ⇒ vypnuté".

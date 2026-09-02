@@ -6,6 +6,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, coverageConfigDefaults } from 'vitest/config';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { normalizeBasePath } from './src/lib/base-path';
 
 // verzia zobrazená v pätičke — deploy job posiela APP_VERSION="<package.json verzia>
 // (<sha7>)" (viď .github/workflows/ci.yml). Lokálny beh a CI `test` job (npm run build
@@ -47,6 +48,9 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
+			// #5822: `kit.paths.base` inline (repo nemá `svelte.config.js`). SvelteKit split_config
+			// posunie top-level `kit_options` kľúč `paths` do `kit.paths`. Bakuje sa pri builde.
+			paths: { base: normalizeBasePath(process.env.APP_BASE_PATH) },
 			adapter: adapter()
 		})
 	],

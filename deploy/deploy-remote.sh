@@ -24,7 +24,11 @@ COMPOSE_DIR="${COMPOSE_DIR:-/opt/automatizacie-montalu}"
 CONTAINER="${CONTAINER:-automatizacie-montalu}"
 IMAGE="${IMAGE:-automatizacie-montalu}"
 SERVICE="${SERVICE:-app}" # názov compose služby (pre migrate_ownership `compose run`)
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090/health}"
+# #5822: HEALTH_URL default sa skladá base-aware AŽ PO `cd "$COMPOSE_DIR"` (nižšie) — pod
+# bakovaným base je health route na `${APP_BASE_PATH}/health` a APP_BASE_PATH žije v .env
+# COMPOSE_DIR (rovnaký zdroj, ktorý compose interpoluje), nie nutne v shell env deploy jobu.
+# Explicitne zadaný HEALTH_URL sa vždy rešpektuje.
+HEALTH_URL="${HEALTH_URL:-}"
 POLL_TRIES="${POLL_TRIES:-20}"
 POLL_SLEEP="${POLL_SLEEP:-3}"
 KEEP_IMAGES="${KEEP_IMAGES:-5}" # koľko najnovších :sha7 obrazov ponechať (retencia)
@@ -35,6 +39,15 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"  # relatívne k COMPOSE_DIR (
 export APP_VERSION SHA7
 
 cd "$COMPOSE_DIR"
+
+# #5822: base-aware HEALTH_URL default — APP_BASE_PATH býva len v .env (COMPOSE_DIR), rovnaký
+# zdroj, ktorý compose interpoluje do build-arg AJ runtime env; ak ho shell env deploy jobu
+# nemá, dober ho z .env, nech HEALTH_URL sedí s tým, čo compose bakuje (inak by base build +
+# holý /health poll → 404 → rollback pri každom deployi). base='' (dnešný VPS) ⇒ `…/health`.
+if [ -z "${APP_BASE_PATH:-}" ] && [ -f .env ]; then
+	APP_BASE_PATH="$(sed -n 's/^APP_BASE_PATH=//p' .env | tail -1)"
+fi
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090${APP_BASE_PATH:-}/health}"
 
 # poll_health <mode>: "sha" = forward deploy (vyžaduje ok:true AND SHA7 vo verzii),
 # "live" = rollback (stačí ok:true — starý build má iný SHA). Návrat 0 pri úspechu.

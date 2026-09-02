@@ -11,8 +11,16 @@ import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
 import { queueZakazkaPush, runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
+import { base } from '$app/paths';
+import { stripBase, frameGuardHeaders } from '$lib/base-path';
 
 const log = logger('http');
+
+// #5822: `base` je bakovaná konštanta (`APP_BASE_PATH`), ale v runtime je to `let`, ktorý
+// SvelteKit počas renderu prepíše na relatívnu hodnotu a po ňom resetuje. Render je
+// default synchrónny, takže `handle`/loads/actions vidia bakovanú hodnotu — zachytíme ju
+// na module-scope, nech je to imúnne voči budúcemu `experimental.async` opt-inu.
+const APP_BASE = base;
 
 // #275: /konfigurator je VEREJNÝ zákaznícky konfigurátor pergoly (fáza 1) — EXPLICITNÁ
 // allowlist výnimka z auth brány (brána ostáva bránou, pridáva sa jeden verejný prefix,
@@ -57,26 +65,33 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	event.locals.user = getSessionUser(event.cookies.get(SESSION_COOKIE));
 
-	const isPublic = PUBLIC_PATHS.some(
-		(p) => event.url.pathname === p || event.url.pathname.startsWith(p + '/')
-	);
+	// #5822: `event.url.pathname` NESIE base (napr. `/automatizacie/zasklenia`). Auth brána
+	// (PUBLIC_PATHS) aj b2b denylist porovnávajú s base-LESS cestami, preto najprv odrežem
+	// base — konštanty (PUBLIC_PATHS, B2B_*) ostávajú base-LESS a nezmenené; base sa pridá
+	// späť až pri tvorbe redirect Location. Pri base='' je appPath === pathname (dnešné).
+	const appPath = stripBase(event.url.pathname, APP_BASE);
+
+	const isPublic = PUBLIC_PATHS.some((p) => appPath === p || appPath.startsWith(p + '/'));
 	if (!isPublic && !event.locals.user) {
-		log.debug('neprihlásený redirect na login', { path: event.url.pathname });
+		log.debug('neprihlásený redirect na login', { path: appPath });
 		// pathname + search — deep link s parametrami (napr. ?sysStyl=…) sa po
-		// prihlásení nesmie stratiť, inak editor otvorí iný štýl než užívateľ čakal
-		redirect(303, '/login?next=' + encodeURIComponent(event.url.pathname + event.url.search));
+		// prihlásení nesmie stratiť, inak editor otvorí iný štýl než užívateľ čakal.
+		// `next` je base-LESS (appPath); base pridá login handler pri redirecte.
+		redirect(303, APP_BASE + '/login?next=' + encodeURIComponent(appPath + event.url.search));
 	}
 
 	// B2B smie len /zasklenia — presmeruj z ostatných stránok (denylist, assety prejdú).
 	if (isB2B(event.locals.user)) {
-		const target = b2bRedirectTarget(event.url.pathname);
-		if (target && event.url.pathname !== target) {
+		const target = b2bRedirectTarget(appPath);
+		// guard MUSÍ porovnávať appPath (base-LESS) s targetom (base-LESS) — inak by pod base
+		// `/automatizacie/zasklenia !== '/zasklenia'` bolo vždy true → nekonečný 303 loop.
+		if (target && appPath !== target) {
 			log.debug('b2b denylist redirect', {
 				username: event.locals.user?.username,
-				from: event.url.pathname,
+				from: appPath,
 				to: target
 			});
-			redirect(303, target);
+			redirect(303, APP_BASE + target);
 		}
 	}
 
@@ -88,9 +103,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// redirecty (throw z redirect()) sem neprídu — nemajú framovateľný obsah.
 	// Permissions-Policy je ZÁMERNE minimálny — vypína len nepoužívané invazívne
 	// funkcie (kamera/mikrofón/poloha); WebGL/three.js Permissions-Policy neriadi.
-	// BEZ Content-Security-Policy v tomto tickete (#251) — three.js/inline štýly
-	// Svelte = riziko rozbitia; CSP sa rieši samostatne ak sa ukáže bezpečné.
-	response.headers.set('X-Frame-Options', 'DENY');
+	// #5822: iframe povolenie env-gated (`APP_FRAME_ANCESTORS`, runtime). Unset ⇒ dnešné
+	// `X-Frame-Options: DENY` (byte-identicky); nastavené ⇒ `Content-Security-Policy:
+	// frame-ancestors <hodnota>` (same-origin Odoo iframe) a ŽIADNE X-Frame-Options (práve
+	// jedna z hlavičiek naraz, aby nekonfliktovali). Stále BEZ ostatných CSP direktív
+	// (script/style) — three.js/inline štýly Svelte = riziko rozbitia (#251); `frame-ancestors`
+	// sám nič z toho neriadi.
+	const frame = frameGuardHeaders(process.env.APP_FRAME_ANCESTORS);
+	// `set` (nie `append`): appka nemá `kit.csp` nakonfigurované, takže odpoveď žiadne CSP
+	// nenesie — toto je JEDINÝ zdroj CSP. `append` by pri budúcom `kit.csp` pridal DRUHÚ CSP
+	// hlavičku a prehliadač aplikuje ich PRIENIK (najprísnejšie `frame-ancestors`), čo by mohlo
+	// iframe naopak zablokovať; `set` drží práve jednu `frame-ancestors` direktívu.
+	if (frame.csp) response.headers.set('Content-Security-Policy', frame.csp);
+	if (frame.xFrameOptions) response.headers.set('X-Frame-Options', frame.xFrameOptions);
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');

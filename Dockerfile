@@ -18,6 +18,12 @@ RUN npm ci || (echo 'npm ci #1 zlyhalo, skúšam znova o 5s' && sleep 5 && npm c
 COPY . .
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
+# #5822: base path sa BAKUJE do buildu (kit.paths.base = build-time konštanta). Default ''
+# = koreň origin (dnešný VPS, byte-identicky); `/automatizacie` pri odoo-side sidecar builde.
+# Runtime env `APP_BASE_PATH` (healthcheck) sa dodáva cez compose environment — build a
+# runtime stage sú oddelené `FROM`, takže táto ENV do runtime obrazu neprechádza.
+ARG APP_BASE_PATH=""
+ENV APP_BASE_PATH=$APP_BASE_PATH
 RUN npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim
