@@ -10,7 +10,7 @@
  * v Slide, a tam majú 4/8/4 mliečne aj 4/8/4 číre `redukcia_zero = 1` — takže
  * zmena predvoľby nemení ani jeden odpisový riadok. Overené testom.
  */
-export function defaultSklo(skla: string[]): string {
+export function defaultSklo(skla: string[], _system?: string): string {
 	return skla.find((g) => g.toLowerCase().includes('číre')) ?? skla[0] ?? '';
 }
 

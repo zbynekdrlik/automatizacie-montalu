@@ -50,9 +50,16 @@ describe('defaultSklo — predvoľba je vždy číre', () => {
 		expect(defaultSklo(KATALOG.Slide!.map((g) => g.nazov))).toBe('Izolačné sklo 4/8/4 číre');
 	});
 
-	it('systém bez „číre" v názvoch → prvé sklo v katalógu (Deluxe, Štandard +)', () => {
-		expect(defaultSklo(KATALOG.Deluxe!.map((g) => g.nazov))).toBe('Float kalené 6 mm');
-		expect(defaultSklo(KATALOG['Štandard +']!.map((g) => g.nazov))).toBe('Float sklo 4 mm');
+	it('Deluxe: primárne sklo 10 mm (Patrik #431 — predtým prvé v poradí = 6 mm)', () => {
+		const zoznam = KATALOG.Deluxe!.map((g) => g.nazov);
+		expect(zoznam[0]).toBe('Float kalené 6 mm'); // prvé v poradí (pôvodná predvoľba)
+		expect(defaultSklo(zoznam, 'Deluxe')).toBe('Float kalené 10 mm');
+	});
+
+	it('systém bez „číre" a bez Deluxe-pravidla → prvé sklo v katalógu (Štandard +)', () => {
+		expect(defaultSklo(KATALOG['Štandard +']!.map((g) => g.nazov), 'Štandard +')).toBe(
+			'Float sklo 4 mm'
+		);
 	});
 
 	it('prázdny zoznam nespadne (vráti prázdny string)', () => {
@@ -77,15 +84,21 @@ describe('Money-neutralita: nová predvoľba nemení ani jeden odpisový riadok'
 		const katalog = KATALOG[system!];
 		if (!katalog) continue;
 		const stare = katalog[0]!;
-		const nove = katalog.find((g) => g.nazov === defaultSklo(katalog.map((x) => x.nazov)))!;
+		const nove = katalog.find((g) => g.nazov === defaultSklo(katalog.map((x) => x.nazov), system))!;
 
-		it(`${sysStyl}: odpis pri „${stare.nazov}" == odpis pri „${nove.nazov}"`, () => {
+		it(`${sysStyl}: predvoľba nemení odpis${system === 'Deluxe' ? ' (Deluxe #431: predvoľba = 10 mm, odpis sa ZÁMERNE líši)' : ` (predvoľba „${nove.nazov}")`}`, () => {
 			for (const [S, V] of rozmery) {
+				// Deluxe: predvoľba sa #431 (Patrik 2026-09-02) presunula z prvého skla
+				// (6 mm) na 10 mm. 10 mm VYBERÁ iný kladka/klzný profil A pridá 10 mm
+				// krytky, takže odpis sa oproti 6 mm ZÁMERNE líši — Money-neutralita
+				// „predvoľba nemení odpis" pre Deluxe už neplatí (obsluha stále volí sklo;
+				// odpis pre KONKRÉTNE sklo je nezmenený). Over len, že predvoľba je 10 mm.
+				if (system === 'Deluxe') {
+					expect(nove.nazov).toBe('Float kalené 10 mm');
+					continue;
+				}
 				const a = computeFlat(cfg, sysStyl, S, V, stare.redukciaZero, stare.hrubka);
 				const b = computeFlat(cfg, sysStyl, S, V, nove.redukciaZero, nove.hrubka);
-				// Deluxe: hrúbka skla VYBERÁ kladku/klzný profil, takže tam sa 6 vs 10 mm
-				// líšiť MÔŽE — predvoľba však ostáva prvé sklo (6 mm), teda tá istá.
-				if (system === 'Deluxe') expect(nove.nazov).toBe(stare.nazov);
 				expect(a === null).toBe(b === null);
 				if (!a || !b) continue;
 				expect(b.odpis, `${sysStyl} ${S}×${V}`).toEqual(a.odpis);

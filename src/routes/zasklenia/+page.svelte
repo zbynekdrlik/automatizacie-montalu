@@ -303,7 +303,7 @@
 		// už zvolené sklo si drž, kým je v ponuke (zmena počtu krídel nesmie
 		// prepísať voľbu obsluhy); inak predvoľba = vždy ČÍRE, ak ho systém má
 		const chcene = untrack(() => sklo) || prim()?.sklo;
-		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam);
+		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam, system);
 	});
 
 	// #132 (Patrik, Odoo 207 #1646652: „vždy dávame pri štandardoch IZO spodnú
@@ -389,7 +389,7 @@
 		const st = stylyForSystem(p.system);
 		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
-		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk);
+		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {
