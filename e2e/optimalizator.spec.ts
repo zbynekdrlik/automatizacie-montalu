@@ -47,6 +47,10 @@ test('optimalizátor: tyč 6000 + kusy zo screenshotu → 4 tyče, grafický roz
 	// zmestí sa do 10 tyčí → žiadne varovanie
 	await expect(page.getByTestId('varovanie')).toHaveCount(0);
 
+	// #417: jednomateriálový optimalizátor NEUKAZUJE „Odpad spolu" súčet (gate ≥2 profily) —
+	// má vlastný „Celkový odpad" riadok; negatívna strana gate-u proti regresii > → >=
+	await expect(page.getByTestId('odpad-spolu')).toHaveCount(0);
+
 	// verzia v pätičke (version-on-dashboard)
 	await expect(page.getByTestId('version')).toHaveText(
 		/^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$/

@@ -4,16 +4,33 @@
 # (System_Attachment.FileImage, prepojené cez System_ObjectAttachmentLink na
 # Artikly_Artikl podľa kódu). Spusti len keď pribudne/zmení sa profil.
 #
-# Prístup: SSH kľúč ~/.ssh/slovnormal_odoo na root@erp.montalu.cloud
-# (host montalu-prod, má read-only most na Money S4 cez /opt/montalu-sync/venv).
+# Prístup (#425 — ~/.ssh/slovnormal_odoo na dev boxoch UŽ NEEXISTUJE, odstránený
+# old-key-removal sweepom, odoo-erp #1183/#3629): dvojskok cez gatekeeper box.
+# Gatekeeper (100.90.94.41) má vo VLASTNOM ~/.ssh/config alias `montalu-prod`,
+# ktorý používa dedikovaný `gatekeeper_prod` kľúč na ten istý host
+# (erp.montalu.cloud / 178.104.63.220) — dev boxy priamy kľúč na Money bridge
+# nemajú a nemajú mať. Preto KAŽDÝ ssh/scp na Money bridge ide cez gatekeeper
+# ako autentizovaný prostredník (nie ako holý TCP proxy — jeho vlastný kľúč
+# robí druhý hop), nikdy priamo z dev1/dev2.
 #
 # Použitie:  scripts/sync-profil-obrazky.sh
 set -euo pipefail
 
-KEY="${MONEY_SSH_KEY:-$HOME/.ssh/slovnormal_odoo}"
-HOST="${MONEY_SSH_HOST:-root@erp.montalu.cloud}"
+GATEKEEPER="${MONEY_GATEKEEPER:-gatekeeper@100.90.94.41}"
+REMOTE_ALIAS="${MONEY_REMOTE_ALIAS:-montalu-prod}"  # alias v ~/.ssh/config NA gatekeeperovi, nie tu
+SSH_OPTS=(-o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=15)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/static/profil"
+
+# Spusti príkaz NA montalu-prod cez dvojskok (gatekeeper vlastným kľúčom robí
+# druhý hop). Argument je jeden reťazec, ktorý bude bežať v shelli na montalu-prod;
+# vstavané apostrofy sa bezpečne escapujú (POSIX '\'' idiom), takže argument môže
+# obsahovať `'`. Volajúci môže presmerovať stdin/stdout normálne (`remote '...' <
+# subor`, `remote '...' | ...`) — funkcia ich len prenesie do ssh.
+remote() {
+	local escaped=${1//\'/\'\\\'\'}
+	ssh "${SSH_OPTS[@]}" "$GATEKEEPER" "ssh ${SSH_OPTS[*]} $REMOTE_ALIAS '$escaped'"
+}
 
 # kódy, ku ktorým chceme obrázok = všetky kódy z compute modulov
 CODES=$(grep -rhoE "(PRP|BPP|ZASP)[0-9]+" "$ROOT/src/lib/server/pergola.ts" \
@@ -47,15 +64,24 @@ if miss: print('BEZ OBRAZKA:', ' '.join(miss))
 PYEOF
 
 echo "→ sťahujem z Money (retry na flaky bridge)…"
-scp -q -i "$KEY" /tmp/codes.txt /tmp/money_img_dump.py "$HOST":/tmp/
+# Nahraj oba súbory na montalu-prod cez dvojskok — obsah ide surovo cez stdin
+# (žiadne base64 potrebné, testované 2026-09-02 vrátane binárneho tar prenosu
+# naspäť). `remote()` len zloží príkaz — presmerovanie stdin/stdout robí volajúci.
+remote 'cat > /tmp/codes.txt' < /tmp/codes.txt
+remote 'cat > /tmp/money_img_dump.py' < /tmp/money_img_dump.py
+OK=0
 for i in 1 2 3 4 5; do
-	if ssh -o BatchMode=yes -i "$KEY" "$HOST" 'rm -rf /tmp/profil-obrazky; /opt/montalu-sync/venv/bin/python /tmp/money_img_dump.py' 2>/tmp/sync.err; then break; fi
+	if remote 'rm -rf /tmp/profil-obrazky; /opt/montalu-sync/venv/bin/python /tmp/money_img_dump.py' 2>/tmp/sync.err; then OK=1; break; fi
 	echo "  bridge nedostupný (pokus $i), čakám 20s…"; sleep 20
 done
-ssh -o BatchMode=yes -i "$KEY" "$HOST" 'cat /tmp/profil-obrazky/../<(true)' >/dev/null 2>&1 || true
+if [ "$OK" -ne 1 ]; then
+	echo "→ CHYBA: Money bridge zlyhal aj po 5 pokusoch, viď /tmp/sync.err — nesťahujem stale dáta." >&2
+	cat /tmp/sync.err >&2 2>/dev/null || true
+	exit 1
+fi
 
 TMP=$(mktemp -d)
-scp -q -i "$KEY" -r "$HOST":/tmp/profil-obrazky "$TMP/"
+remote 'tar -czf - -C /tmp profil-obrazky' | tar -xzf - -C "$TMP"
 
 echo "→ optimalizujem na webp…"
 mkdir -p "$OUT"
@@ -95,5 +121,5 @@ open(ts, 'w').write(novy)
 print('webp:', len(kods), '→ zapisane do', ts)
 PYEOF
 
-echo "→ hotovo. Skontroluj `git status` (nove .webp + prepisany zoznam) a pusti: npx vitest run tests/profil-obrazky.test.ts"
+echo "→ hotovo. Skontroluj 'git status' (nove .webp + prepisany zoznam) a pusti: npx vitest run tests/profil-obrazky.test.ts"
 rm -rf "$TMP"

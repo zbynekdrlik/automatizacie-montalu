@@ -4,6 +4,8 @@ paths:
   - 'src/lib/pergola-krov.ts'
   - 'src/lib/server/pergola-narez-vstup.ts'
   - 'src/lib/components/PergolaNarezVykres.svelte'
+  - 'src/lib/pergola-expedicia.ts'
+  - 'tests/pergola-expedicia.test.ts'
   - 'src/lib/components/pergola/**'
   - 'src/lib/components/PergolaModeNav.svelte'
   - 'src/routes/pergola/+page.svelte'
@@ -537,9 +539,11 @@ bez potvrdeného Money kódu:
   Money kódov / potvrdenie základu = úprava poľa `TESNENIA`, nie redizajn (phase 2 = #347). Základ,
   ktorý nie je v spočítanom náreze (napr. bez krovu), degraduje na `caka` rovnako — honest-null je
   TRVALÝ stav.
-- **Money kód tesnenia treba dohľadať v Money read-only** (ssh `~/.ssh/slovnormal_odoo` na
-  `root@erp.montalu.cloud` — POZOR: na worktree boxe môže CHÝBAŤ; vtedy je to blocker, ktorý sa
-  rieši otázkou na tiket, nie hádaním). Dominikov písomný zoznam ide do kanála 207.
+- **Money kód tesnenia treba dohľadať v Money read-only** — prístup je #425 gatekeeper
+  dvojskok (`ssh gatekeeper@100.90.94.41` → jeho vlastný alias `montalu-prod`, viď
+  `.claude/skills/money-odpis/SKILL.md`; `~/.ssh/slovnormal_odoo` UŽ NEEXISTUJE). Ak aj
+  dvojskok zlyhá, je to blocker, ktorý sa rieši otázkou na tiket, nie hádaním. Dominikov
+  písomný zoznam ide do kanála 207.
 - **#233 žargón-sken MUSÍ pokryť aj krok `rez-nahlad`** (nie len `spocitat` výsledok) — nové
   user-visible stringy tesnení sa renderujú tam. `pergola-uix.spec.ts` sken doťahaj cez
   `pripravit-rezervaciu` (ČÍTACIE, žiadny zápis).
@@ -602,3 +606,30 @@ split — `pergola-narez.ts` prekročilo 1000-r. strop; acyklický import: `perg
   Per-view rozklad (View A +2 / View B +3/+12) sa nereprodukuje (jeden bočný pohľad) — poznámka
   v spec bloku „TOLERANCIE: hĺbka · montáž +2 / +3 / +12 mm".
 - Časti 2 (Detail C/D uloženia) + 5 (rezný náčrt krovu s uhlami) ostávajú viazané na #161.
+
+## Expedičný zoznam (#419) — TRANSFORM vypočítaných dát, nie nový výpočet
+
+Výdajová listina hotových kusov žije v **`src/lib/pergola-expedicia.ts`**
+(`expedicnyZoznam(vysledok, komponenty)`) — čistý TRANSFORM UŽ vypočítaných dát nárezu,
+NIE nový výpočet a NIE nový vstup. Vzor je identický s `pozicujDiely`/`komponentyPergoly`/
+`spocitajStrechaSklo`: samostatný pure modul (acyklický import `pergola-expedicia →
+pergola-narez` (typy) + `pergola-vyroba` (`pozicujDiely`), NIKDY naopak; pridaný do
+`CISTY_ENGINE` money-safety guardu), v `RezVysledok` sa počíta `$derived` a renderuje ako
+karta. Keď treba ĎALŠÍ výdajovo/expedične orientovaný pohľad, sklad ho z existujúcich dát
+takto — neduplikuj engine, nepridávaj vstup/perzistenciu.
+
+- **Profily** = `pozicujDiely(vysledok.vypocitane)` → reálne Money-overené počty + pozičné
+  číslo (rovnaké ako Materiál/výkresové balóniky). **Komponenty** = `komponentyPergoly` →
+  honest-null počty „—". Honest-null dĺžka profilu (čaká na vzorec) sa MUSÍ odlíšiť od
+  komponentu (bez dĺžky): profil = `mm()` („— (čaká na výkres)"), komponent = holé „—" —
+  inak na papieri vyzerá nehotový kus ako hotový.
+
+## TLAČENÝ hárok: čestný kontext NESMIE byť v `.noprint` (print.css ho skryje)
+
+`src/print.css` (`@media print`) skrýva `.noprint`. Preto keď karta produkuje TLAČENÝ
+artefakt, na ktorom sa reálne pracuje (expedičný zoznam — dielňa naň odškrtáva, nakladá
+podľa neho), load-bearing vysvetlivky a čestné upozornenia (čo znamená „—", že položky
+čakajúce na pravidlo v zozname NIE SÚ) MUSIA byť v TLAČITEĽNOM `.sub` (bez `noprint`),
+nie len v obrazovkovej `.noprint` próze — inak vytlačený hárok tvrdí „toto je všetko" bez
+kontextu (#419 review 🟡). Dlhé obrazovkové vysvetlenie môže ostať `noprint`; tlačiteľná
+verzia nesie krátku legendu + upozornenie na neúplnosť (`cakaPravidloCount`).

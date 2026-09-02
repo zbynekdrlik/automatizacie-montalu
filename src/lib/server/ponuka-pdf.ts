@@ -9,8 +9,7 @@
 // komentár na #277. Layout je ručný (štruktúrovaný spec-sheet): hlavička so značkou
 // MontAlu, súhrn konfigurácie, slot pre 3D render (#276 dodá PNG neskôr), firma, disclaimer.
 import { PDFDocument, rgb, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
+import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, embedDejavu } from './pdf-common';
 import {
 	DISCLAIMER,
 	DISCLAIMER_BEZ_CENY,
@@ -30,35 +29,11 @@ import { formatDatumSk } from '$lib/datum';
 // (regen / submit, MO alebo VO podľa `opts.cena.hladina`, #318) preferuje `opts.cena` nižšie.
 import type { VerejnaCena } from '$lib/konfigurator';
 
-// A4 na body (pt) + jednotný okraj.
-const A4_W = 595.28;
-const A4_H = 841.89;
-const MARGIN = 48;
-const CONTENT_W = A4_W - 2 * MARGIN;
-
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
 const ACCENT = rgb(0.11, 0.31, 0.85); // #1d4ed8
 const BORDER = rgb(0.8, 0.84, 0.88);
 const SLOT_BG = rgb(0.95, 0.96, 0.98);
-
-/** Zalom text na riadky, ktoré sa zmestia do `maxWidth` pri danom fonte/veľkosti. */
-function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
-	const words = text.split(/\s+/).filter(Boolean);
-	const lines: string[] = [];
-	let cur = '';
-	for (const w of words) {
-		const candidate = cur ? `${cur} ${w}` : w;
-		if (font.widthOfTextAtSize(candidate, size) <= maxWidth || !cur) {
-			cur = candidate;
-		} else {
-			lines.push(cur);
-			cur = w;
-		}
-	}
-	if (cur) lines.push(cur);
-	return lines;
-}
 
 const mPlain = cislaCiarka;
 
@@ -363,9 +338,7 @@ export async function generatePonukaPdf(
 	opts: PonukaPdfOpts = {}
 ): Promise<Uint8Array> {
 	const doc = await PDFDocument.create();
-	doc.registerFontkit(fontkit);
-	const reg = await doc.embedFont(Buffer.from(DEJAVU_SANS_REGULAR_B64, 'base64'), { subset: true });
-	const bold = await doc.embedFont(Buffer.from(DEJAVU_SANS_BOLD_B64, 'base64'), { subset: true });
+	const { reg, bold } = await embedDejavu(doc);
 	const page = doc.addPage([A4_W, A4_H]);
 	const ctx: Ctx = { page, reg, bold };
 

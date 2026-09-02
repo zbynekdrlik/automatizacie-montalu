@@ -13,6 +13,8 @@ test('prístrešok konfigurátor: verejná route bez auth — súhrn + HONEST-NU
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/pristresok');
 	await expect(page).toHaveURL(/\/konfigurator\/pristresok$/);
+	// dokument má SEO titul (#411 shell: <svelte:head> cez `titul` prop, nie prázdna záložka)
+	await expect(page).toHaveTitle(/prístrešok alebo altánok.*Montalu/);
 
 	// stránka sa načíta bez prihlásenia (verejná route)
 	await expect(

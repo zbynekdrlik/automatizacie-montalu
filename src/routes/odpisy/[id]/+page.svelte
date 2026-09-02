@@ -35,9 +35,9 @@
 			<div><span>Systém</span><b>{nazovSystemu(String(d.system))} {d.styl}</b></div>
 		{/if}
 		{#if d.s}
-			<div><span>Rozmer</span><b>{d.s}×{d.v} mm</b></div>
+			<div><span>Rozmer</span><b class="mono">{d.s}×{d.v} mm</b></div>
 		{/if}
-		<div><span>Kedy</span><b>{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</b></div>
+		<div><span>Kedy</span><b class="mono">{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</b></div>
 		<div><span>Kto</span><b>{o.created_by || '—'}</b></div>
 		<div><span>Režim</span><b>{o.live ? '● LIVE' : '🧪 TEST'}</b></div>
 		<div><span>Súbor</span><b style="font-size:13px">{o.filename}</b></div>

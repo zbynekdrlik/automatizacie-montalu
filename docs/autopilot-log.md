@@ -1993,3 +1993,42 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   money-safety(C)/E2E aktualizované. Full suite 218 súborov / 3148 testov zelené (coverage 94.33/88.63/
   97.34/95.28). Live overené na dev serveri: diel/ARIEL 1,5×2,0 → 1 134 net → 1 394,82 € s DPH (exakt),
   6 modelov v porovnaní, žiadny VO leak. NEmergnuté (worktree — supervisor integruje sériovo).
+## #425 — Money bridge: slovnormal_odoo SSH kľúč mŕtvy → gatekeeper dvojskok (worktree-agent-a0af3c1257e8c5336)
+- Verzia 0.24.78-dev.1 (bump e22828c). Commity: f06195c (fix) + 16653e8 (review 2🟡+3🔵 fix).
+- Príčina: `~/.ssh/slovnormal_odoo` odstránený z dev boxov old-key-removal sweepom (odoo-erp #1183/#3629).
+  `money-odpis`/`deploy` skills + `sync-profil-obrazky.sh` stále predpisovali priamy jednoskokový SSH.
+- Fix: dvojskok `ssh gatekeeper@100.90.94.41` (default `newlevel` identita) → jeho vlastný `~/.ssh/config`
+  alias `montalu-prod` (dedikovaný `gatekeeper_prod` kľúč) na skutočný Money bridge host. `sync-profil-
+  obrazky.sh` prepísaný na `remote()` helper (POSIX-escapovaný) + raw stdin/stdout piping cez nested SSH
+  (žiadny priamy scp/kľúč na dev boxoch). Zamietnutá alternatíva: `~/devel/montalu/n8n/` vlastný
+  `money-ro-thirdparty` tunel — cudzie, gitignorované credentials iného projektu, nekríženo-závislé.
+- Review našiel 4. mŕtvu referenciu mimo pôvodne menovaných 3 súborov (`.claude/rules/pergola-narez.md`)
+  + retry-exhaustion silent fallthrough bug (opravené `exit 1`) — oba fixnuté v 16653e8.
+- Overené naživo: SELECT TOP 1 z Artikly_Artikl cez nový dvojskok (STRICTLY READ-ONLY), binárny tar
+  round-trip (md5sum), `remote()` s vstavaným `'`/exit-status/stdin/stdout — všetko cez skutočný
+  gatekeeper/montalu-prod double-hop. `npm run check` 0/0, `npm run lint` čisté, 217/217 test files
+  (3116 testov) zelené, shellcheck čistý (okrem zámerného SC2029 info).
+- Playbook: money-odpis.md §1 prepísané na gatekeeper cestu + nová poznámka „grepni CELÝ .claude/ strom
+  pri oprave zastaranej prístupovej cesty" (4. mŕtve miesto by inak ostalo). NEmergnuté (worktree —
+  supervisor integruje sériovo).
+
+## #409 + #411 — Konfigurátor: zdieľaná showroom CSS + shell `KonfProduktStranka` (worktree-agent-ad358b3a621ebe0b8, batch)
+
+- Čisto ŠTRUKTURÁLNY refaktor 5 jednostĺpcových showroom podstránok {tienenie, pristresok, zasklenie,
+  zimna-zahrada, oplotenie} — nula zmien správania (existujúce E2E specy NEZMENENÉ). STEP-0: pergola/bazén
+  sú split-screen 3D (`.konf-*`/`.baz-*`, 9–27 % CSS podobnosť) → MIMO shellu, nedotknuté.
+- **#409 (commit 852db95):** ~271–400-riadkový, 96–98 % identický `<style>` blok z každej z 5 stránok →
+  JEDEN `:global(.konf-app .kp-*)` blok v `konfigurator/+layout.svelte` (vedľa `--k-*` tokenov, `.konf-app`
+  scoping = bez úniku do admin appky). Prefix tried `tie-/pris-/zas-/zz-/opl-` → `kp-` (len v `class="…"`,
+  testid/id nezmenené). Per-produkt: šírka kariet cez `--kp-karta-min`/`--kp-karta-min-dvoj` var + utility
+  triedy v per-page `<style>`. -1736/+564 r.
+- **#411 (commit 6726079):** kostra (hero + grid + ovládanie/panel) → `KonfProduktStranka.svelte`
+  (props `titul/popis/foto/alt/label/nadpis/lead` + snippet props `ovladacie`+`panel`). Snippet meno
+  `ovladacie` (NIE `ovladanie` — koliduje s `let ovladanie` state v tienenie). Identický DOM.
+- **Review (Fable, gate OPEN) → fix commit 634afe0:** 🔴 `<svelte:head>` (title+meta) dropnutý v shell
+  migrácii (žil NAD `<div class="kp">`) → obnovený cez shell `titul`/`popis` props + 5 `toHaveTitle`
+  E2E guardov; 🔴 oplotenie `.kp-porovnanie` (7 pravidiel) dropnuté pri CSS presune → obnovené; 🟡
+  zasklenie karty base 150 / `.dvoj` 160 (nie 200) cez `--kp-karta-min-dvoj`; 🔵 `.kp-cena-grid`
+  `margin: 8px 0 0`. Playbook: konfigurator.md §13 (shell vzor + 2 pasce).
+- svelte-check + lint + 3212 unit testov + VŠETKY konfigurator E2E (showroom+vyber+pergola+bazén+dopyty)
+  zelené. NEmergnuté (worktree — supervisor integruje).

@@ -13,6 +13,8 @@
 		type PergolaKomponent
 	} from '$lib/pergola-narez';
 	import { pozicujDiely } from '$lib/pergola-vyroba';
+	// #419 — expedičný zoznam: čistý transform vypočítaných dát (hotové profily + komponenty)
+	import { expedicnyZoznam } from '$lib/pergola-expedicia';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
@@ -76,6 +78,8 @@
 	const diely = $derived(pozicujDiely(vysledok.vypocitane));
 	// #223 — plocha v m² so slovenskou čiarkou (celkovú cenu skiel počíta server, `cenaSpolu`)
 	const m2Val = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} m²`);
+	// #419 — expedičný zoznam (výdajová listina): hotové profily z nárezu + kusové komponenty
+	const expedicia = $derived(expedicnyZoznam(vysledok, komponenty));
 </script>
 
 <div class="card">
@@ -222,7 +226,7 @@
 				konštruktérovi.
 			</p>
 			<div data-testid="krov-ulozenie">
-				<div class="row"><span>Sklon strechy</span><b>{krov.sklonStupne}°</b></div>
+				<div class="row"><span>Sklon strechy</span><b class="mono">{krov.sklonStupne}°</b></div>
 				<div class="row">
 					<span>Rovina uloženia</span>
 					<b
@@ -232,15 +236,15 @@
 					>
 				</div>
 				<div class="row">
-					<span>uhol2 / uhol3 (SE model)</span><b>{krov.uhol2} / {krov.uhol3}°</b>
+					<span>uhol2 / uhol3 (SE model)</span><b class="mono">{krov.uhol2} / {krov.uhol3}°</b>
 				</div>
 				<div class="row">
 					<span>Odvesna c = 29 mm → ps = ls</span>
-					<b data-testid="krov-ps">{krov.ps} mm</b>
+					<b class="mono" data-testid="krov-ps">{krov.ps} mm</b>
 				</div>
 				<div class="row">
 					<span>Odvesna cc = 37,28 mm → lv = pv</span>
-					<b data-testid="krov-lv">{krov.lv} mm</b>
+					<b class="mono" data-testid="krov-lv">{krov.lv} mm</b>
 				</div>
 			</div>
 		{:else}
@@ -356,32 +360,87 @@
 	{/if}
 </div>
 
+<div class="card" data-testid="expedicia-karta">
+	<div class="sec">
+		Expedičný zoznam
+		<span class="badge" data-testid="expedicia-spolu"
+			>{expedicia.spoluKusov} ks · {expedicia.pocetProfilov} profilov · {expedicia.pocetKomponentov}
+			komponentov</span
+		>
+	</div>
+	<p class="sub noprint">
+		Výdajová listina — hotové kusy, ktoré idú na expedíciu z tejto zákazky. Odškrtni pri nakládke.
+		Počty profilov sú z nárezu (isté); komponenty (spojky, krytky) čakajú na tabuľky od Dominika,
+		preto majú počet „—".
+	</p>
+	<!-- tlačiteľné vysvetlivky + čestné upozornenie: tlačený hárok (na ňom sa reálne odškrtáva)
+	     musí niesť zmysel „—" AJ to, že položky čakajúce na pravidlo v zozname NIE SÚ -->
+	<p class="sub" data-testid="expedicia-legenda">
+		Vysvetlivky: „☐" odškrtni pri nakládke · „—" = údaj zatiaľ neznámy (nevymýšľa sa).
+	</p>
+	{#if cakaPravidloCount}
+		<p class="sub" data-testid="expedicia-neuplne">
+			Pozor: {cakaPravidloCount} položiek ešte čaká na pravidlo a v tomto zozname NIE SÚ.
+		</p>
+	{/if}
+	{#if expedicia.polozky.length === 0}
+		<p class="sub" data-testid="expedicia-prazdne">Zatiaľ žiadne položky na expedíciu.</p>
+	{:else}
+		<table class="narez" data-testid="expedicia-tabulka">
+			<thead>
+				<tr
+					><th class="check-col">Naložené</th><th class="poz-col">Poz.</th><th>Skupina</th><th
+						>Kód</th
+					><th>Názov</th><th>Dĺžka</th><th>Počet ks</th></tr
+				>
+			</thead>
+			<tbody>
+				<!-- kľúč = kód (alebo názov) + index i — jeden kód sa môže vyskytnúť viackrát
+				     (18016 pod fixom + pod kotviacim; 18017 predná + zadná noha), preto index -->
+				{#each expedicia.polozky as p, i ((p.kod ?? p.nazov) + '·' + i)}
+					<tr data-testid="expedicia-riadok">
+						<td class="check-col"><span class="check-box" aria-hidden="true">☐</span></td>
+						<td class="poz-col">{p.poz ?? '—'}</td>
+						<td>{p.skupina === 'profil' ? 'Profil' : 'Komponent'}</td>
+						<td>{p.kod ?? '—'}</td>
+						<td>{p.nazov}</td>
+						<!-- profil bez známej dĺžky = „— (čaká na výkres)" (rovnako ako Materiál),
+						     komponent nemá dĺžku = „—" — dva rôzne stavy sa na hárku NEZLEJÚ (#419 review) -->
+						<td>{p.skupina === 'profil' ? mm(p.dlzkaRezuMm) : '—'}</td>
+						<td><b>{p.pocetKs ?? '—'}</b></td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	{/if}
+</div>
+
 <div class="card">
 	<div class="sec">Informatívne výpočty</div>
 	<div data-testid="narez-informativne">
 		<div class="row">
-			<span>Predná svetlosť</span><b>{vysledok.informativne.prednaSvetlost} mm</b>
+			<span>Predná svetlosť</span><b class="mono">{vysledok.informativne.prednaSvetlost} mm</b>
 		</div>
 		{#if vysledok.informativne.svetlostBezVystuhy != null}
 			<div class="row" data-testid="info-svetlost-bez-vystuhy">
 				<span>Svetlosť bez výstuhy (výstuha trčí {vysledok.informativne.vystuhaTrcanieMm} mm)</span>
-				<b>{vysledok.informativne.svetlostBezVystuhy} mm</b>
+				<b class="mono">{vysledok.informativne.svetlostBezVystuhy} mm</b>
 			</div>
 		{/if}
 		{#if vysledok.informativne.vystuhaProfil}
 			<div class="row" data-testid="info-vystuha-profil">
-				<span>Profil výstuhy</span><b>{vysledok.informativne.vystuhaProfil}</b>
+				<span>Profil výstuhy</span><b class="mono">{vysledok.informativne.vystuhaProfil}</b>
 			</div>
 		{/if}
 		<div class="row">
 			<span
 				>Predná noha (svetlosť + {vysledok.informativne.prednaNohaDlzka -
 					vysledok.informativne.prednaSvetlost})</span
-			><b>{vysledok.informativne.prednaNohaDlzka} mm</b>
+			><b class="mono">{vysledok.informativne.prednaNohaDlzka} mm</b>
 		</div>
 		<div class="row">
 			<span>Zadná noha</span>
-			<b
+			<b class="mono"
 				>{vysledok.informativne.zadnaNohaDlzka === null
 					? '— (na stenu)'
 					: `${vysledok.informativne.zadnaNohaDlzka} mm`}</b
@@ -389,7 +448,7 @@
 		</div>
 		<div class="row">
 			<span>Rozostup predných nôh (dopočítaný)</span>
-			<b
+			<b class="mono"
 				>{vysledok.informativne.rozostupPrednychNoh === null
 					? '—'
 					: `${vysledok.informativne.rozostupPrednychNoh} mm`}</b
@@ -397,22 +456,22 @@
 		</div>
 		{#if vysledok.informativne.pocetKrovov != null}
 			<div class="row" data-testid="info-pocet-krovov">
-				<span>Počet krovov (zadaný)</span><b>{vysledok.informativne.pocetKrovov}</b>
+				<span>Počet krovov (zadaný)</span><b class="mono">{vysledok.informativne.pocetKrovov}</b>
 			</div>
 			<div class="row" data-testid="info-svetlost-krovov">
 				<span>Svetlosť medzi krovmi</span>
-				<b>{mmVal(vysledok.informativne.svetlostMedziKrovmi)}</b>
+				<b class="mono">{mmVal(vysledok.informativne.svetlostMedziKrovmi)}</b>
 			</div>
 		{:else}
 			<div class="row">
-				<span>Počet priečok (max rozostup {MAX_ROZOSTUP_PRIECOK} mm)</span><b
+				<span>Počet priečok (max rozostup {MAX_ROZOSTUP_PRIECOK} mm)</span><b class="mono"
 					>{vysledok.informativne.pocetPriecok}</b
 				>
 			</div>
 		{/if}
 		<div class="row">
 			<span>Výstuha medzi nohami (šírka − 280)</span>
-			<b data-testid="vystuha-rez">{vysledok.informativne.vystuhaRezMm} mm</b>
+			<b class="mono" data-testid="vystuha-rez">{vysledok.informativne.vystuhaRezMm} mm</b>
 		</div>
 	</div>
 	<p class="sub">
@@ -433,13 +492,13 @@
 			</div>
 			<div class="row">
 				<span>Počet tabúľ (polí medzi krovmi)</span>
-				<b data-testid="strecha-sklo-pocet"
+				<b class="mono" data-testid="strecha-sklo-pocet"
 					>{strechaSklo.pocetTabul != null ? strechaSklo.pocetTabul : '—'}</b
 				>
 			</div>
 			<div class="row">
 				<span>Šírka tabule (svetlosť + {strechaSklo.sirkaPridavok ?? '—'})</span>
-				<b data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
+				<b class="mono" data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
 			</div>
 			<div class="row">
 				<span>Dĺžka tabule (horná hrana + {strechaSklo.dlzkaPridavok ?? '—'})</span>
@@ -451,12 +510,12 @@
 			</div>
 			<div class="row">
 				<span>Money kód (cenník)</span>
-				<b data-testid="strecha-sklo-kod">{strechaSklo.moneyKod ?? '—'}</b>
+				<b class="mono" data-testid="strecha-sklo-kod">{strechaSklo.moneyKod ?? '—'}</b>
 			</div>
 			{#if strechaSkloCena}
 				<div class="row">
 					<span>Cena skla</span>
-					<b data-testid="strecha-sklo-cena"
+					<b class="mono" data-testid="strecha-sklo-cena"
 						>{strechaSkloCena.eurM2 != null
 							? `${String(strechaSkloCena.eurM2).replace('.', ',')} ${strechaSkloCena.mena}/m²`
 							: 'cena nedostupná'}</b
@@ -497,7 +556,7 @@
 			{/if}
 			<div class="row">
 				<span>ZVOD — frézovanie SH</span>
-				<b
+				<b class="mono"
 					>{vstup.zvodFrezovat && vstup.zvodFrezovanieSHmm != null
 						? `${vstup.zvodFrezovanieSHmm} mm`
 						: 'nefrézovať'}</b
@@ -596,6 +655,17 @@
 		width: 40px;
 		text-align: center;
 		white-space: nowrap;
+	}
+
+	/* #419 — expedičný zoznam: odškrtávací stĺpec (papierový checkbox, žiaden stav sa neukladá) */
+	.check-col {
+		width: 72px;
+		text-align: center;
+		white-space: nowrap;
+	}
+	.check-box {
+		font-size: 18px;
+		color: #475569;
 	}
 
 	/* #233 — čistá bunka NÁZOV: hlavný názov + krátka šedá poznámka + rozklikávací detail;

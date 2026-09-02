@@ -19,6 +19,9 @@
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import DopytForm from '$lib/components/DopytForm.svelte';
+	// #422 (vzor pergolovej #319): voliteľný krok „záväzne objednať" — MIMO dopyt formu, zdieľaný
+	// komponent (fakturačné údaje + povinný súhlas), akciu `objednavka` mountuje +page.server.ts.
+	import ObjednavkaForm from '$lib/components/ObjednavkaForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
 	import KonfBazenVizual from '$lib/components/konfigurator/KonfBazenVizual.svelte';
 	import { cislaCiarka } from '$lib/konfigurator-jednotky';
@@ -454,6 +457,18 @@
 						</p>
 						<DopytForm konfiguracia={ponukaCfg} />
 					</section>
+
+					<!-- #422 (vzor pergolovej #319): voliteľný krok — ZÁVÄZNÁ OBJEDNÁVKA (Money-neutrálne,
+					     bez platobnej brány), MIMO dopyt formu -->
+					<section class="baz-blok-kontakt objednavka" data-testid="objednavka">
+						<h2>Chceš si toto zastrešenie záväzne objednať?</h2>
+						<p class="baz-uvod">
+							Vyplň kontakt a fakturačné údaje a odošli firme <strong>záväznú objednávku</strong>.
+							Bez online platby — ozveme sa ti, dohodneme obhliadku a presné podmienky. Orientačná
+							cena z konfigurátora sa stane súčasťou objednávky.
+						</p>
+						<ObjednavkaForm konfiguracia={ponukaCfg} />
+					</section>
 				{:else}
 					<p class="baz-chyba" data-testid="bazen-chyba">
 						⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
@@ -637,6 +652,11 @@
 		border-radius: var(--k-radius);
 		background: var(--k-surface);
 		padding: 20px 22px;
+	}
+	/* #422: objednávková sekcia jemne odlíšená od dopytovej (vzor pergolového .objednavka) */
+	.baz-blok-kontakt.objednavka {
+		border-color: var(--k-line-2);
+		background: var(--k-surface-2);
 	}
 	.baz-suhrn h2,
 	.baz-blok-kontakt h2 {

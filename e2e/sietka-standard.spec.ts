@@ -92,6 +92,41 @@ test('Štandard + posuv + STARÝ systém sieťky: krajová/dorazová idú s cudz
 	// kódy, ktoré Štandard + posuv sám o sebe nikdy nemá
 	expect(odpis).toContain('ZASP00018');
 	expect(odpis).toContain('ZASP00021');
+	// nárez šírky prírezov (ZASP202415, zdieľaná z posuvu) má cross-systémovú deltu
+	// +16,5mm → 942,5+16,5 = 959 (Patrikovo doslovné číslo z #110) navyše k 943×6
+	await expect(page.getByRole('row', { name: /Rez profilu ZASP202415/ })).toContainText('959');
+
+	expect(errs).toEqual([]);
+});
+
+test('OPAČNÝ smer — STARÝ posuv + Štandard+ systém sieťky: šírka prírezov je TIEŽ +16,5mm VÄČŠIA (#416)', async ({
+	page
+}) => {
+	// #416 (Patrik, kanál 207 msg 1777560): kríž systémov Štandard + × starý Štandard
+	// → sieťka +16mm VÄČŠIA v OBOCH smeroch. Reverzný smer (starý posuv, plus sieťka)
+	// predtým rátal −16,5mm (menšiu) ako nepotvrdený symetrický predpoklad z #110.
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	// posuv = STARÝ Štandard, sieťka = Štandard + (opačne než confirmed test vyššie)
+	await zaklad(page, 'E2E-SIETKA-REV', 'E2E Sietka reverz', 'Štandard');
+	await page.locator('#sietka-on').check();
+	await expect(page.locator('#sietka-system')).toBeVisible();
+	await page.locator('#sietka-system').selectOption('Štandard +');
+	await vyberFarbuKovania(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('sietka-system')).toHaveText('Štandard +');
+
+	const odpis = (await odpisRiadky(page)).join(' | ');
+	// plus-systémové kódy (koncový ZASP20244, dorazová ZASP202419) sa objavia ako
+	// cudzie riadky — starý Štandard posuv ich sám o sebe nemá
+	expect(odpis).toContain('ZASP20244');
+	expect(odpis).toContain('ZASP202419');
+	// nárez šírky prírezov (ZASP202415): základných 952×6 + 2 ks s +16,5mm →
+	// round(952,33+16,5) = 969 (VÄČŠIA, nie 936 ako pôvodný symetrický −16,5)
+	await expect(page.getByRole('row', { name: /Rez profilu ZASP202415/ })).toContainText('969');
 
 	expect(errs).toEqual([]);
 });

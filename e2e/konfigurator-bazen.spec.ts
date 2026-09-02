@@ -1,10 +1,11 @@
-// #385/#404/#405: verejný konfigurátor bazénových zastrešení (`/konfigurator/bazen`) — E2E cez reálny
-// prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (model/rozmery/koľaj/farba/výplň)
-// sa počíta klientsky a zobrazí súhrn; #404 ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`,
-// Money-neutrálna — bez zápisu); dopyt tok → PDF špecifikácia s orientačnou cenou na stiahnutie. GET
-// aj `vypocet` sú Money-neutrálne (číta sa aj proti LIVE prode); dopyt je ZÁPIS (audit riadok) →
-// `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý test = NULA console chýb
-// (× = U+00D7 byte-identické).
+// #385/#404/#405/#422: verejný konfigurátor bazénových zastrešení (`/konfigurator/bazen`) — E2E cez
+// reálny prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (model/rozmery/koľaj/farba/
+// výplň) sa počíta klientsky a zobrazí súhrn; #404 ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`,
+// Money-neutrálna — bez zápisu); dopyt tok → PDF špecifikácia s orientačnou cenou na stiahnutie; #422
+// ZÁVÄZNÁ OBJEDNÁVKA (vzor pergolovej #319, MIMO dopyt formu) → fakturačné údaje + súhlas → PDF na
+// stiahnutie. GET aj `vypocet` sú Money-neutrálne (číta sa aj proti LIVE prode); dopyt/objednávka sú
+// ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty/objednávky.
+// Každý test = NULA console chýb (× = U+00D7 byte-identické).
 //
 // #405: pribudol ŽIVÝ 3D náhľad oblúkových segmentov (split-screen, ľavý sticky stĺpec). Form-testy
 // čakajú na `[data-viz-ready="true"]` (helper `bazenReady`) PRED interakciou — sync-point ako pri
@@ -178,6 +179,61 @@ test('bazén konfigurátor: zmena modelu + rozmeru → súhrn sa aktualizuje →
 
 	const download = await downloadPromise; // PDF sa reálne stiahol
 	expect(download.suggestedFilename()).toMatch(/^Montalu-ponuka-\d{4}-\d{2}-\d{2}\.pdf$/);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #422 (vzor pergolovej #319): ZÁVÄZNÁ OBJEDNÁVKA (MO, neprihlásený). Súhrn → objednávková sekcia
+// (MIMO dopyt formu) → kontakt + fakturačné údaje + súhlas → PDF na stiahnutie + potvrdenie.
+// Zápisový tok (uloží objednávku) → proti LIVE prode preskočiť (skipAkLive), nech nepribúdajú
+// testovacie objednávky. Money-neutrálne (žiadna platobná brána, žiadny odpis), nula console chýb.
+test('bazén konfigurátor: objednávka (MO) — súhrn → záväzná objednávka → PDF na stiahnutie, nula console chýb', async ({
+	page
+}) => {
+	await skipAkLive(page);
+	const consoleMsgs = collectConsole(page);
+	await bazenReady(page);
+
+	// zmeň model + rozmery → súhrn LIVE reaguje (klientsky $derived)
+	await page.getByTestId('bazen-model-Exclusive').click();
+	await page.getByTestId('bazen-dlzka').fill('9');
+	await page.getByTestId('bazen-dlzka').blur();
+	await page.getByTestId('bazen-sirka').fill('5');
+	await page.getByTestId('bazen-sirka').blur();
+	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveText('9000 × 5000 mm');
+
+	// objednávková sekcia (voliteľný krok „záväzne objednať", mimo dopyt formu)
+	const objednavka = page.getByTestId('objednavka');
+	await expect(objednavka).toBeVisible();
+	await expect(objednavka.getByRole('heading', { name: /záväzne objednať/i })).toBeVisible();
+
+	// kontakt — JASNE OZNAČENÁ testovacia objednávka (honeypot `firma_web` nechávame prázdny)
+	await objednavka.getByLabel(/Meno a priezvisko/).fill('TEST E2E — ignorovať');
+	await objednavka.getByLabel(/^E-mail/).fill('test-e2e@example.com');
+	await objednavka.getByLabel(/Telefón/).fill('+421900000000');
+	await objednavka.getByLabel(/Miesto stavby/).fill('83101 Bratislava');
+	// fakturačné údaje
+	await objednavka.getByLabel(/Meno alebo firma/).fill('TEST E2E s.r.o.');
+	await objednavka.getByLabel(/Fakturačná adresa/).fill('Testovacia 1, 83101 Bratislava');
+	await objednavka.getByLabel(/^IČO/).fill('12345678');
+	await objednavka.getByLabel(/DIČ/).fill('SK1234567890');
+	// súhlas s podmienkami je POVINNÝ — bez neho server objednávku odmietne
+	await objednavka.getByTestId('objednavka-suhlas').check();
+
+	const responsePromise = page.waitForResponse(
+		(r) => r.request().method() === 'POST' && r.url().includes('objednavka')
+	);
+	const downloadPromise = page.waitForEvent('download');
+	await objednavka.getByTestId('objednavka-odoslat').click();
+
+	const response = await responsePromise;
+	expect(response.ok()).toBe(true);
+	const download = await downloadPromise; // PDF špecifikácia objednávky sa reálne stiahla
+	expect(download.suggestedFilename()).toMatch(/^Montalu-objednavka-\d{4}-\d{2}-\d{2}\.pdf$/);
+
+	// potvrdenie úspechu (formulár nahradený poďakovaním)
+	await expect(page.getByTestId('objednavka-ok')).toBeVisible();
+	await expect(page.getByText('Ďakujeme! Objednávku sme prijali.')).toBeVisible();
 
 	expect(consoleMsgs).toEqual([]);
 });

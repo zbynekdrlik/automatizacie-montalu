@@ -45,19 +45,19 @@
 <div class="card">
 	<div class="sec">Rozmery</div>
 	<div class="g">
-		<div><span>Šírka</span><b>{p.S} mm</b></div>
-		<div><span>Výška</span><b>{p.V} mm</b></div>
-		<div><span>Plocha</span><b>{fmtM(p.m2)} m²</b></div>
+		<div><span>Šírka</span><b class="mono">{p.S} mm</b></div>
+		<div><span>Výška</span><b class="mono">{p.V} mm</b></div>
+		<div><span>Plocha</span><b class="mono">{fmtM(p.m2)} m²</b></div>
 		{#if vstup.kolajnica?.horna}
 			<div>
 				<span>Koľajnica horná (ručne)</span>
-				<b data-testid="kolajnica-horna">{vstup.kolajnica.horna} mm</b>
+				<b class="mono" data-testid="kolajnica-horna">{vstup.kolajnica.horna} mm</b>
 			</div>
 		{/if}
 		{#if vstup.kolajnica?.spodna}
 			<div>
 				<span>Koľajnica spodná (ručne)</span>
-				<b data-testid="kolajnica-spodna">{vstup.kolajnica.spodna} mm</b>
+				<b class="mono" data-testid="kolajnica-spodna">{vstup.kolajnica.spodna} mm</b>
 			</div>
 		{/if}
 	</div>
@@ -100,11 +100,13 @@
 	<div class="card" data-testid="klin-karta">
 		<div class="sec">Klín</div>
 		<div class="g">
-			<div><span>Dĺžka</span><b data-testid="klin-dlzka">{vstup.klin.dlzka} mm</b></div>
-			<div><span>Šírka (hĺbka)</span><b>{vstup.klin.sirka} mm</b></div>
-			<div><span>Výška 1</span><b>{vstup.klin.v1} mm</b></div>
-			<div><span>Výška 2</span><b>{vstup.klin.v2} mm</b></div>
-			<div><span>Počet</span><b>{vstup.klin.ks} ks</b></div>
+			<div>
+				<span>Dĺžka</span><b class="mono" data-testid="klin-dlzka">{vstup.klin.dlzka} mm</b>
+			</div>
+			<div><span>Šírka (hĺbka)</span><b class="mono">{vstup.klin.sirka} mm</b></div>
+			<div><span>Výška 1</span><b class="mono">{vstup.klin.v1} mm</b></div>
+			<div><span>Výška 2</span><b class="mono">{vstup.klin.v2} mm</b></div>
+			<div><span>Počet</span><b class="mono">{vstup.klin.ks} ks</b></div>
 		</div>
 	</div>
 {/if}
@@ -125,8 +127,9 @@
 				</div>
 			{/if}
 			<div>
-				<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b data-testid="sietka-rozmer"
-					>{fmtM(rozmer.sirka)} × {fmtM(rozmer.vyska)} mm</b
+				<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b
+					class="mono"
+					data-testid="sietka-rozmer">{fmtM(rozmer.sirka)} × {fmtM(rozmer.vyska)} mm</b
 				>
 			</div>
 			<div><span>Úchyt</span><b>{uchytLabel(vstup.sietka.uchyt)}</b></div>
@@ -157,12 +160,12 @@
 <div class="card">
 	<div class="sec">Sklo (mm)</div>
 	<div class="g">
-		<div><span>Šírka</span><b data-testid="sklo-sirka">{fmtM(p.sklo.sirka)}</b></div>
-		<div><span>Výška</span><b data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
-		<div><span>Počet</span><b>{p.sklo.pocet} ks</b></div>
+		<div><span>Šírka</span><b class="mono" data-testid="sklo-sirka">{fmtM(p.sklo.sirka)}</b></div>
+		<div><span>Výška</span><b class="mono" data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
+		<div><span>Počet</span><b class="mono">{p.sklo.pocet} ks</b></div>
 		<div><span>Typ</span><b style="font-size:13px">{vstup.skloPresne || vstup.sklo}</b></div>
 		<div>
-			<span>Rozmer (na objednávku skla)</span><b data-testid="sklo-rozmer"
+			<span>Rozmer (na objednávku skla)</span><b class="mono" data-testid="sklo-rozmer"
 				>{fmtSkloRozmer(p.sklo.sirka, p.sklo.vyska)}</b
 			>
 		</div>
@@ -196,7 +199,8 @@
 	<div class="sec">Odpis (do Money)</div>
 	{#each p.odpis.filter((o) => o.metre > 0) as o (o.kod)}
 		<div class="row">
-			<span><span class="mono">{o.kod}</span> · {o.nazov}</span><b>{fmtM(o.metre)} m</b>
+			<span><span class="mono">{o.kod}</span> · {o.nazov}</span><b class="mono">{fmtM(o.metre)} m</b
+			>
 		</div>
 	{/each}
 </div>
@@ -206,7 +210,9 @@
 		<div class="sec">Kovanie a tesnenia (do Money)</div>
 		{#each kovanie as k (k.kod)}
 			<div class="row">
-				<span>{k.kod} · {k.nazov}</span><b>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b>
+				<span>{k.kod} · {k.nazov}</span><b class="mono"
+					>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b
+				>
 			</div>
 		{/each}
 	</div>
