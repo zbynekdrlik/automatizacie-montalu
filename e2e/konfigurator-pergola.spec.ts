@@ -780,6 +780,8 @@ test('konfigurátor: prémiový redizajn — split-screen + swatche/chips namies
 	// prilepený cenový panel ukáže orientačnú cenu s DPH
 	await expect(page.getByTestId('cta-cena')).toContainText('€');
 	await expect(page.getByTestId('cta-cena')).toContainText(/Orientačná cena od/i);
+	// #434: CTA cenový teaser nesie .mono na číselnú sumu (review 🔵)
+	await expect(page.getByTestId('cta-cena').locator('.konf-cta-cena-suma')).toHaveClass(/mono/);
 
 	// minimal chrome: žiadna interná admin navigácia na verejnej stránke
 	expect(await page.locator('nav.top').count()).toBe(0);
