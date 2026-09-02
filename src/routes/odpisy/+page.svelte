@@ -33,6 +33,16 @@
 			„neoverené", kým sa nenasadí producent snapshotu.
 		{/if}
 	</p>
+	<!-- #5825: backlog pushov odpisu do Odoo modelu — viditeľný LEN keď je model push zapnutý a niečo
+	     čaká/zlyhalo (inak by týždeň zlyhaní bol neviditeľný, kým si to nevšimne klient). -->
+	{#if data.odooOdpis?.model && (data.odooOdpis.pending > 0 || data.odooOdpis.failed > 0)}
+		<p class="sub" data-testid="odoo-odpis-backlog">
+			Odpis → Odoo: <strong>{data.odooOdpis.pending}</strong> čaká na odoslanie,
+			<strong>{data.odooOdpis.failed}</strong> zlyhalo{data.odooOdpis.failed > 0
+				? ' (vyžaduje pozornosť)'
+				: ''}.
+		</p>
+	{/if}
 </div>
 
 {#if form?.uvolnene}

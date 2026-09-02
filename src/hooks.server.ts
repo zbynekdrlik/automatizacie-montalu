@@ -6,12 +6,18 @@ import { getSessionUser, isB2B, pruneSessions, SESSION_COOKIE } from '$lib/serve
 import { resolveOdooSso, ssoEnabled, ODOO_SESSION_COOKIE } from '$lib/server/odoo-sso';
 import { b2bRedirectTarget } from '$lib/server/b2b-access';
 import { logger } from '$lib/server/log';
-import { moneyConfig, setOdpisWrittenHook } from '$lib/server/money';
+import { moneyConfig, setOdpisWrittenHook, setOdpisReleasedHook } from '$lib/server/money';
 import { cenySnapshotPath } from '$lib/server/ceny';
 import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
-import { queueZakazkaPush, runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
+import { runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
+import {
+	dispatchOdpisImport,
+	dispatchOdpisRelease,
+	runStartupOdpisSweep,
+	startOdpisTimerSweep
+} from '$lib/server/odoo-odpis';
 import { base } from '$app/paths';
 import { stripBase, frameGuardHeaders } from '$lib/base-path';
 
@@ -53,12 +59,18 @@ let pruneCounter = 0;
 	// #278: pri štarte zotav dopyty čakajúce na Odoo CRM lead (napr. po deploy/restarte po
 	// výpadku Odoo alebo po doplnení ODOO_LEAD_* env). Fire-and-forget, no-op keď chýba env.
 	runStartupLeadSweep();
-	// #340: po každom úspešnom odpise pushni interný zoznam materiálu zákazky do Odoo
-	// (interná log-note na sale.order, zákazník ju nikdy nevidí). Money-neutrálny observer.
-	setOdpisWrittenHook(queueZakazkaPush);
-	// #349: pri štarte (po migráciách — db.ts modul-load prebehol vyššie cez importy) dopostni
-	// zaostalé zákazka-pushe z minulých výpadkov Odoo. Fire-and-forget, no-op keď chýba ODOO_LEAD_*.
+	// #5825: router po každom úspešnom odpise (ODOO_ODPIS_MODE=note|model|both). `note` (default) =
+	// mt_note interná poznámka na sale.order (#340, zákazník ju nikdy nevidí), BYTE-IDENTICKÉ s dneškom;
+	// `model`/`both` navyše pushne štruktúrovaný záznam do montalu.material.odpis (#5825, „aj-aj").
+	setOdpisWrittenHook(dispatchOdpisImport);
+	// #5825: router po UVOĽNENÍ odpisu → Odoo create_from_app(action='release') (len model/both mode).
+	setOdpisReleasedHook(dispatchOdpisRelease);
+	// #349: pri štarte (po migráciách) dopostni zaostalé zákazka mt_note pushe z minulých výpadkov.
+	// #5825: odpis-model startup sweep + periodický timer sweep (arrival-only by nechal posledný odpis
+	// dňa zaseknutý). Fire-and-forget, no-op keď je mode note / chýba ODOO env.
 	runStartupZakazkaSweep();
+	runStartupOdpisSweep();
+	startOdpisTimerSweep();
 }
 
 export const handle: Handle = async ({ event, resolve }) => {

@@ -37,13 +37,20 @@ function makeReq(zak: string, op: string): OdpisJob {
 afterEach(() => setOdpisWrittenHook(null));
 
 describe('setOdpisWrittenHook — observer po zápise odpisu', () => {
-	it('zavolá sa so (zak, op) po ÚSPEŠNOM zápise', async () => {
+	it('zavolá sa s eventom {job, contentHash, live, odpisLogId} po ÚSPEŠNOM zápise (#5825)', async () => {
 		const spy = vi.fn();
 		setOdpisWrittenHook(spy);
 		const out = await writeOdpis(makeReq('ZAKHOOK1', 'OP501'), {});
 		expect(out.status).toBe('written');
 		expect(spy).toHaveBeenCalledTimes(1);
-		expect(spy).toHaveBeenCalledWith('ZAKHOOK1', 'OP501');
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				job: expect.objectContaining({ zak: 'ZAKHOOK1', op: 'OP501' }),
+				contentHash: expect.any(String),
+				live: false,
+				odpisLogId: expect.any(Number)
+			})
+		);
 	});
 
 	it('NEZAVOLÁ sa pri duplicite (rovnaká zak+op+live)', async () => {

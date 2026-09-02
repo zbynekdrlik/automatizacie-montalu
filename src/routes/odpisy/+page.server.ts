@@ -7,6 +7,8 @@ import {
 	type ReadbackVysledok
 } from '$lib/server/money-readback';
 import type { DlvReadbackMeta } from '$lib/server/money-readback';
+import { odpisBacklogCounts } from '$lib/server/odoo-odpis-store';
+import { odpisPushMode } from '$lib/server/odoo-odpis';
 import { logger } from '$lib/server/log';
 
 const log = logger('odpisy');
@@ -51,9 +53,18 @@ export const load: PageServerLoad = async () => {
 	} catch (e) {
 		log.error('readback zlyhal — degradujem na „neoverené", stránka ostáva funkčná', { error: e });
 	}
+	// #5825: backlog push-u odpisu do Odoo modelu (len keď je model mode zapnutý). Degraduje na 0,
+	// NIKDY nezhodí /odpisy (hostí „Uvoľniť").
+	let odooOdpis = { model: false, pending: 0, failed: 0 };
+	try {
+		odooOdpis = { model: odpisPushMode().model, ...odpisBacklogCounts() };
+	} catch (e) {
+		log.error('odpis→Odoo backlog počet zlyhal — /odpisy ostáva funkčné', { error: e });
+	}
 	return {
 		odpisy: odpisy.map((o) => ({ ...o, readback: stav.get(o.id) ?? null })),
-		readbackMeta
+		readbackMeta,
+		odooOdpis
 	};
 };
 

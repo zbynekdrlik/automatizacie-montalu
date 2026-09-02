@@ -314,3 +314,41 @@ export function migrateDopytProdukt(db: Database.Database, bump: (v: number) => 
 		bump(35);
 	})();
 }
+
+/**
+ * v35 → v36 (#5825): durable APPEND-ONLY log pushov odpisu do Odoo modelu `montalu.material.odpis`
+ * (`/json/2 create_from_app`, epic #5808 „aj-aj" cutover). NA ROZDIEL od `odoo_zakazka_push` (v34,
+ * upsert per (zak,op)) je toto append-only log — každý import/release/reimport toho istého
+ * `content_hash` je NOVÝ riadok, replay STRIKTNE v poradí `id` per hash (`povolitReimport` robí
+ * import→release→import legitímnym; upsert+re-arm by zbalil históriu a rozišiel Odoo stav s Money).
+ * `id INTEGER PRIMARY KEY AUTOINCREMENT` = monotónne, nikdy nerecyklované id. ŽIADEN poison-pill drop,
+ * žiaden časový strop — odpis sa nesmie stratiť; retry cez `next_attempt_at` (exponenciálny backoff),
+ * `pending=0` len pri úspechu alebo payload-permanentnej chybe (riadok ostáva pre audit/surface).
+ * CREATE je v SQLite transakčné (pád sa čisto prehrá). MONEY-NEUTRÁLNE (len SQLite).
+ */
+export function migrateOdooOdpisPush(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 36) return;
+	db.transaction(() => {
+		db.exec(`
+			CREATE TABLE odoo_odpis_push (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				content_hash TEXT NOT NULL,
+				action TEXT NOT NULL,
+				payload TEXT NOT NULL,
+				payload_version INTEGER NOT NULL DEFAULT 1,
+				pending INTEGER NOT NULL DEFAULT 1,
+				attempts INTEGER NOT NULL DEFAULT 0,
+				next_attempt_at TEXT,
+				last_error TEXT NOT NULL DEFAULT '',
+				odoo_id INTEGER,
+				sale_order_id INTEGER,
+				posted_at TEXT,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX idx_odoo_odpis_push_pending ON odoo_odpis_push(pending, next_attempt_at);
+			CREATE INDEX idx_odoo_odpis_push_hash ON odoo_odpis_push(content_hash, id);
+		`);
+		bump(36);
+	})();
+}

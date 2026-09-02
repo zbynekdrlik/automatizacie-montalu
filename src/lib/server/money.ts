@@ -16,20 +16,23 @@ import { randomBytes } from 'node:crypto';
 import { db } from './db';
 import { logger } from './log';
 import { validateOdpisKody, type KodProblem } from './ceny';
+import { fireOdpisWritten, fireOdpisReleased } from './odpis-write-hooks';
 import type { MJ } from '$lib/komponenty';
 
 const log = logger('money');
 
-// #340: observer po ÚSPEŠNOM zápise odpisu (`status:'written'`) — dostane číslo zákazky
-// (`zak`) a objednávky (`op`). Registruje ho composition root (`hooks.server.ts` →
-// `queueZakazkaPush`), takže money.ts NEZÁVISÍ od Odoo vrstvy (žiadny cyklický import,
-// money-neutrálne). Volá sa fire-and-forget PO commite + durable zápise a NIKDY nesmie
-// ovplyvniť/zhodiť už-zapísaný odpis (sync-guard v mieste volania).
-export type OdpisWrittenHook = (zak: string, op: string) => void;
-let onOdpisWritten: OdpisWrittenHook | null = null;
-export function setOdpisWrittenHook(fn: OdpisWrittenHook | null): void {
-	onOdpisWritten = fn;
-}
+// #340/#5825: observery po ZÁPISE / UVOĽNENÍ odpisu (registrácia + fire + typy) žijú v
+// `odpis-write-hooks.ts` (large-file-split — pridanie odpis→Odoo hookov pretlačilo money.ts cez strop).
+// money.ts ich len FÍRUJE (`fireOdpisWritten`/`fireOdpisReleased`, fire-and-forget, money-neutrálne) a
+// RE-EXPORTUJE registráciu + typy pre composition root (`hooks.server.ts`) a testy.
+export {
+	setOdpisWrittenHook,
+	setOdpisReleasedHook,
+	type OdpisWrittenEvent,
+	type OdpisWrittenHook,
+	type OdpisReleasedEvent,
+	type OdpisReleasedHook
+} from './odpis-write-hooks';
 
 export type Modul = 'zasklenia' | 'bazen' | 'pergola' | 'clip' | 'fix';
 
@@ -799,15 +802,7 @@ export async function writeOdpis(
 	// #340: PO úspešnom + durable zápise odpisu upozorni observera (fire-and-forget push
 	// interného zoznamu materiálu zákazky do Odoo). Sync-guard: ani synchrónny throw
 	// observera nesmie zhodiť už-zapísaný odpis.
-	try {
-		onOdpisWritten?.(job.zak, job.op);
-	} catch (e) {
-		log.error('odpis-written hook hodil (ignorované — odpis je zapísaný)', {
-			zak: job.zak,
-			op: job.op,
-			error: e
-		});
-	}
+	fireOdpisWritten({ job, contentHash: ledgerHash, live: isLive(), odpisLogId: Number(rowId) });
 
 	return { status: 'written', live: isLive(), target, filename };
 }
@@ -846,11 +841,30 @@ export function listOdpisy(limit = 200): OdpisLogRow[] {
  */
 export function releaseOdpis(id: number, username: string): boolean {
 	const row = db
-		.prepare('SELECT modul, zak, op, live, filename FROM odpis_log WHERE id = ?')
+		.prepare('SELECT modul, zak, op, live, filename, content_hash FROM odpis_log WHERE id = ?')
 		.get(id) as
-		{ modul: string; zak: string; op: string; live: number; filename: string } | undefined;
+		| {
+				modul: string;
+				zak: string;
+				op: string;
+				live: number;
+				filename: string;
+				content_hash: string;
+		  }
+		| undefined;
 	if (!row) return false;
 	db.transaction(() => {
+		// #5825: fíruj release hook PRED DELETE, v tej istej transakcii → durable enqueue release-pushu
+		// (Odoo `create_from_app action='release'`) je ATOMICKÝ s uvoľnením. `fireOdpisReleased` má
+		// vlastný sync-guard (throw konzumenta nezablokuje uvoľnenie — primárny efekt).
+		fireOdpisReleased({
+			contentHash: row.content_hash,
+			zak: row.zak,
+			op: row.op,
+			modul: row.modul,
+			live: !!row.live,
+			actor: username
+		});
 		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(id);
 		db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
 			username,
@@ -904,6 +918,17 @@ export function povolitReimport(id: number, username: string): boolean {
 		| undefined;
 	if (!row) return false;
 	db.transaction(() => {
+		// #5825: povolitReimport uvoľní app dedup kľúč (odpis sa dá re-importovať) → Odoo záznam sa
+		// prepne na `released`, aby stav sedel s ledgerom appky (ticket #5825); následný re-write
+		// pošle import znova. Hook PRED DELETE, atomicky (`fireOdpisReleased` má vlastný sync-guard).
+		fireOdpisReleased({
+			contentHash: row.content_hash,
+			zak: row.zak,
+			op: row.op,
+			modul: row.modul,
+			live: !!row.live,
+			actor: username
+		});
 		db.prepare(
 			`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor, reason)
 			 VALUES (?, ?, ?, ?, ?, 'override', ?, ?, ?)`
