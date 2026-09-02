@@ -343,15 +343,15 @@ describe('/konfigurator/zimna-zahrada — žiadna cesta k Money odpisu (#386/#40
 	});
 });
 
-// #388, rovnaká disciplína ako bazén — oplotenie podstránka má PRESNE jedinú akciu `dopyt` (verejný
-// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
-// čisto klientsky, honest-null — oplotenie nemá cenový zdroj), žiadna Money/odpisová zápisová akcia.
+// #388/#410, rovnaká disciplína ako bazén — oplotenie podstránka má PRESNE akcie `dopyt` + `vypocet`
+// (verejný kontaktný formulár → PDF špecifikácia s orientačnou cenou + Odoo lead; `vypocet` = orientačná
+// MO cena z matice montalu.sk). Žiadna Money/odpisová ZÁPISOVÁ akcia (cena je len read-only výpočet).
 // VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
 // tento test ROZBIJE (fail-closed).
-describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388)', () => {
-	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388/#410)', () => {
+	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/oplotenie/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
 

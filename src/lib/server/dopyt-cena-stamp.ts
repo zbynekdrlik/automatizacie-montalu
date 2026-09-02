@@ -7,6 +7,8 @@
 import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
 // #404: bazénová cenová matica (produkt-aware dispatch nižšie) + whitelist bazénového modelu.
 import { CENNIK_VERZIA_BAZEN, cenaPreModelBazen } from './konfigurator-bazen-cena';
+// #410: oplotenie cenová matica (produkt-aware dispatch nižšie) — cenotvorný kľúč je v `cfg.systemKod`.
+import { CENNIK_VERZIA_OPLOTENIE, cenaOplotenieZCfg } from './konfigurator-oplotenie-cena';
 import { bazenModel } from '$lib/konfigurator-bazen';
 // #408: cenová matica zimnej záhrady (produkt-aware dispatch nižšie) + whitelist modelu (display label).
 import { CENNIK_VERZIA_ZZ, cenaPreZz } from './konfigurator-zimna-zahrada-cena';
@@ -24,11 +26,13 @@ export function cenaZCfg(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): Vere
 	return cenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model }, hladina);
 }
 
-/** #404: orientačná cena z cfg PODĽA PRODUKTU (v danej hladine) — produkt-aware dispatch nad
+/** #404/#408/#410: orientačná cena z cfg PODĽA PRODUKTU (v danej hladine) — produkt-aware dispatch nad
  *  cenovými maticami. `bazen` → bazénová matica (dĺžka `cfg.dlzka` + šírka `cfg.sirka` + model
  *  `cfg.systemKod`; bez `systemKod` — starý neopečiatkovaný riadok — vráti `null`, honest-degrade,
- *  aby sa starému honest-null bazén dopytu ticho nepriradila default cena). Ostatné (pergola/NULL/
- *  neznámy pergolový fallback) → pergolová `cenaZCfg`. Zdieľané s `ponuka-pdf` (prepočet bez stampu).
+ *  aby sa starému honest-null bazén dopytu ticho nepriradila default cena). `zimna-zahrada` (#408) →
+ *  matica zimnej záhrady (hĺbka+šírka+sklo, systemKod ako honest-null strážca); `oplotenie` (#410) →
+ *  matica oplotenia (kompozitný systemKod + šírka). Ostatné (pergola/NULL/neznámy pergolový
+ *  fallback) → pergolová `cenaZCfg`. Zdieľané s `ponuka-pdf` (prepočet bez stampu).
  *  Produkt-gate (`maCenovyZdroj`) rieši volajúci (`opeciatkujCenuPreProdukt` / `ponuka-pdf`). */
 export function cenaZCfgProdukt(
 	cfg: PonukaConfig,
@@ -60,13 +64,18 @@ export function cenaZCfgProdukt(
 			hladina
 		);
 	}
+	// #410: oplotenie — kompozitný `cfg.systemKod` (typ|model|výška|počet) + šírka; modul si ho rozparsuje
+	// (honest-degrade na null pri starom riadku bez systemKod / chýbajúcej šírke).
+	if (produkt === 'oplotenie') return cenaOplotenieZCfg(cfg, hladina);
 	return cenaZCfg(cfg, hladina);
 }
 
-/** #404/#408: verzia cenníka podľa produktu (bazén a zimná záhrada majú vlastnú maticu → vlastnú verziu). */
+/** #404/#408/#410: verzia cenníka podľa produktu (bazén, zimná záhrada a oplotenie majú vlastnú
+ *  maticu → vlastnú verziu). */
 function cennikVerziaProdukt(produkt: string | null | undefined): string {
 	if (produkt === 'bazen') return CENNIK_VERZIA_BAZEN;
 	if (produkt === 'zimna-zahrada') return CENNIK_VERZIA_ZZ;
+	if (produkt === 'oplotenie') return CENNIK_VERZIA_OPLOTENIE;
 	return CENNIK_VERZIA;
 }
 

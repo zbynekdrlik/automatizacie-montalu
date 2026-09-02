@@ -1,9 +1,10 @@
-// Verejný zákaznícky konfigurátor hliníkového oplotenia a brán (#388, etapa 5 jednotného rámu #384) —
-// ČISTÝ, CLIENT-SAFE modul. Display-only, BEZ CIEN (honest-null — oplotenie nemá overený cenový zdroj;
-// montalu.sk `POST /konfigurator/update-fencings` existuje /419/, ale vyťaženie matice je #279-scale
-// follow-up), BEZ interných Money kódov. Na rozdiel od bazéna oplotenie NEMÁ žiadny interný odpisový
-// modul, takže tu niet čo izolovať — modul je z princípu čistý. Nesie LEN prezentačné texty +
-// rozmerové rozmedzia → leak-guard (A) `konfigurator-money-safety` ho prejde. Priamo unit-testovateľný.
+// Verejný zákaznícky konfigurátor hliníkového oplotenia a brán (#388, etapa 5 jednotného rámu #384;
+// #410 orientačná cena) — ČISTÝ, CLIENT-SAFE modul. Nesie LEN prezentačné texty + rozmerové rozmedzia
+// (žiadny Money kód, žiadna cenová matica — tá je server-only v `konfigurator-oplotenie-cena`). #410:
+// interim orientačná cena je vyťažená z matice montalu.sk (`update-fencings`) do server-only cenníka;
+// cenotvorný kľúč nesie NEUTRÁLNE pole `systemKod` (`oploteniePonukaConfig` nižšie), cenu počíta SERVER.
+// Na rozdiel od bazéna oplotenie NEMÁ žiadny interný odpisový modul, takže tu niet čo izolovať — modul
+// je z princípu čistý → leak-guard (A) `konfigurator-money-safety` ho prejde. Priamo unit-testovateľný.
 import type { PonukaConfig } from '$lib/ponuka';
 
 /** Typ oplotenia/prvku (slug kód — testid/POST-safe; `nazov` = zákaznícky display). Zrkadlí reálnu
@@ -163,11 +164,18 @@ export function konfigurujOplotenie(v: OplotenieVstup): OplotenieSuhrn {
  *  polia, ktoré čítajú správne aj pre oplotenie: typ → `system`, šírka → `sirka` (→ riadok „Šírka"),
  *  farba → `farba`, model/dizajn + výška + počet → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/
  *  `model`/`dlzka`) sa NEPOUŽIJÚ — výška do `vyskaVpredu` by renderovalo zavádzajúce „Výška vpredu".
- *  `typNazov` je LEN v `system` (nie zdvojený v `popis` — review #388 🔵). BEZ ceny, BEZ Money kódu —
- *  cena je honest-null (oplotenie nemá overený cenový zdroj; gate `maCenovyZdroj` v `konfigurator-produkty`). */
+ *  `typNazov` je LEN v `system` (nie zdvojený v `popis` — review #388 🔵). Rendered riadky ostávajú
+ *  `[Systém, Šírka, Farba konštrukcie, Popis]`.
+ *
+ *  #410: ORIENTAČNÁ cena (interim, matica montalu.sk) — cenotvorný kľúč nesie NEUTRÁLNE pole
+ *  `systemKod = "${typKod}|${model}|${vyskaMm}|${pocet}"` (typKod/model neobsahujú `|`; string cap 120).
+ *  Cenu z neho + `sirka` počíta SERVER (`cenaZCfgProdukt`/`cenaOplotenieZCfg` v `dopyt-cena-stamp`/
+ *  `konfigurator-oplotenie-cena`), NIKDY klient — deterministicky reprodukovateľné pri re-downloade
+ *  (`systemKod` prežije `sanitizePonukaConfig`). BEZ Money kódu (montalu cenové modely, nie Money ERP). */
 export function oploteniePonukaConfig(s: OplotenieSuhrn): PonukaConfig {
 	return {
 		system: `Hliníkové oplotenie — ${s.typNazov}`,
+		systemKod: `${s.typ}|${s.model}|${s.vyska}|${s.pocet}`,
 		sirka: s.sirka,
 		farba: s.farba,
 		popis: `Dizajn výplne ${s.model} · výška ${s.vyska} mm · počet ${s.pocet} ks.`

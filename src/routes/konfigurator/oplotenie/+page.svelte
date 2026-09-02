@@ -1,13 +1,15 @@
 <script lang="ts">
-	// Verejný zákaznícky konfigurátor hliníkového oplotenia a brán (#388, etapa 5 jednotného rámu #384).
-	// JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D — dispatch: 3D NErob, tier B) a BEZ ORIENTAČNEJ
-	// CENY (honest-null: oplotenie nemá overený cenový zdroj — cena sa nevymýšľa). Konfigurácia
-	// (typ/model/výška/šírka/počet/farba) sa počíta ČISTO klientsky (`$derived`, žiadny server round-trip
-	// — netreba, nie je cena) a tečie do zdieľaného DopytForm (#277) → PDF špecifikácia (bez ceny) + Odoo
-	// lead. Zdieľané `--k-*` tokeny z `konfigurator/+layout.svelte`. Money-neutralita: importuje LEN
-	// client-safe `konfigurator-oplotenie` + DopytForm (guard: konfigurator-money-safety). Žiadne `console.*`.
+	// Verejný zákaznícky konfigurátor hliníkového oplotenia a brán (#388, etapa 5 jednotného rámu #384;
+	// #410 orientačná cena). JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D — dispatch: 3D NErob, tier B).
+	// Konfigurácia (typ/model/výška/šírka/počet/farba) sa počíta ČISTO klientsky (`$derived`); ORIENTAČNÚ
+	// cenu (#410) počíta SERVER na klik (`vypocet` akcia, enhance submit — cenový modul je server-only, do
+	// klienta sa nedostane) a všetko tečie do zdieľaného DopytForm (#277) → PDF špecifikácia s orientačnou
+	// cenou + Odoo lead. Zdieľané `--k-*` tokeny z `konfigurator/+layout.svelte`. Money-neutralita:
+	// importuje LEN client-safe `konfigurator-oplotenie` + DopytForm + LEN TYPY ceny (guard:
+	// konfigurator-money-safety). Žiadne `console.*`.
 	import { untrack } from 'svelte';
 	import { base } from '$app/paths';
+	import { enhance } from '$app/forms';
 	import DopytForm from '$lib/components/DopytForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
 	import {
@@ -19,6 +21,9 @@
 		type OplotenieVstup
 	} from '$lib/konfigurator-oplotenie';
 	import type { PonukaConfig } from '$lib/ponuka';
+	// #410: typy orientačnej ceny (server-počítanej `vypocet` akciou). LEN typy → žiadny import
+	// cenového/Money modulu do klientskeho bundle (leak-guard A ostáva zelený).
+	import type { VerejnaCena, CenaModelu } from '$lib/konfigurator';
 
 	let { data } = $props();
 
@@ -31,11 +36,11 @@
 	let model = $state<string>(untrack(() => data.defaulty.model));
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
 	// rozmery = RozmerStepper (metre, #333 vzor) — clamp na [min,max], NIKDY null (súhrn/dopyt tak pri
-	// editovaní rozmerov nezmizne); počet ks = <select> (1..20, tiež nikdy null).
+	// editovaní rozmerov nezmizne); počet ks = <select> (1..40, tiež nikdy null).
 	let vyska = $state<number | null>(1500);
 	let sirka = $state<number | null>(2000);
 	let pocet = $state<number>(1);
-	// možnosti počtu kusov (1..20) — select nikdy nevráti mimo-rozmedzia/null hodnotu
+	// možnosti počtu kusov (1..40) — select nikdy nevráti mimo-rozmedzia/null hodnotu
 	const pocetOpts = $derived(
 		Array.from(
 			{ length: data.rozmedzia.pocet.max - data.rozmedzia.pocet.min + 1 },
@@ -62,6 +67,25 @@
 	const suhrn = $derived(platny ? konfigurujOplotenie(vstup) : null);
 	const ponukaCfg = $derived<PonukaConfig>(suhrn ? oploteniePonukaConfig(suhrn) : {});
 
+	// #410: orientačná cena — server-počítaná (`vypocet` akcia, enhance submit, žiadny reload). Zobrazí
+	// sa až po kliku „Zobraziť orientačnú cenu" (vzor bazénovej `vypocet`); pri zmene ktoréhokoľvek
+	// cenotvorného vstupu sa výsledok považuje za neaktuálny (`cenaAktualna`), takže sa NIKDY neukáže
+	// cena pre iný typ/model/rozmer/počet.
+	let cenaVysledok = $state<{ cena: VerejnaCena; cenyModely: CenaModelu[] } | null>(null);
+	let cenaError = $state<string | null>(null);
+	let cenaNacitava = $state(false);
+	let poslednyKluc = $state<string | null>(null);
+	const cenaKluc = $derived(`${vstup.typ}|${vstup.model}|${vyska ?? 0}|${sirka ?? 0}|${pocet}`);
+	const cenaAktualna = $derived(cenaVysledok !== null && poslednyKluc === cenaKluc);
+
+	const eur = (n: number) =>
+		n.toLocaleString('sk-SK', {
+			style: 'currency',
+			currency: 'EUR',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
+
 	function scrollNa(id: string) {
 		document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
@@ -71,7 +95,7 @@
 	<title>Navrhni si hliníkové oplotenie a brány — Montalu</title>
 	<meta
 		name="description"
-		content="Zostav si hliníkové oplotenie na mieru — vyber typ (plotový diel, krídlová, posuvná či samonosná brána, vchodová bránka), model výplne, rozmery a farbu a pošli nezáväzný dopyt so špecifikáciou v PDF."
+		content="Zostav si hliníkové oplotenie na mieru — vyber typ (plotový diel, krídlová, posuvná či samonosná brána, vchodová bránka), model výplne, rozmery a farbu, zobraz si orientačnú cenu a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	/>
 </svelte:head>
 
@@ -92,8 +116,9 @@
 			<span class="opl-label">Konfigurátor oplotenia a brán</span>
 			<h1>Navrhni si hliníkové oplotenie</h1>
 			<p>
-				Vyber typ prvku, dizajn výplne, rozmery a farbu — pripravíme ti nezáväznú špecifikáciu (PDF)
-				a ozveme sa s cenovou ponukou po obhliadke. Bez registrácie.
+				Vyber typ prvku, dizajn výplne, rozmery a farbu — zobraz si orientačnú cenu a pošli
+				nezáväzný dopyt so špecifikáciou (PDF). Presnú, záväznú cenu pripravíme po obhliadke. Bez
+				registrácie.
 			</p>
 		</div>
 	</section>
@@ -194,7 +219,7 @@
 			</fieldset>
 		</div>
 
-		<!-- SÚHRN + CENA-INFO + DOPYT -->
+		<!-- SÚHRN + CENA + DOPYT -->
 		<div class="opl-panel">
 			{#if suhrn}
 				{@const s = suhrn}
@@ -224,14 +249,126 @@
 					</dl>
 				</section>
 
-				<!-- CENA je na DOPYT (honest-null: oplotenie nemá orientačný cenník) -->
-				<section class="opl-cena-info" data-testid="oplotenie-cena-info">
-					<strong>Cena na vyžiadanie</strong>
-					<p>
-						Oplotenie ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme cenovú ponuku po
-						obhliadke miesta.
-					</p>
-					<button type="button" class="opl-btn primar" onclick={() => scrollNa('dopyt')}>
+				<!-- ORIENTAČNÁ CENA (#410) — server-počítaná oplotenie maticou montalu.sk (enhance submit) -->
+				<section class="opl-cena" data-testid="oplotenie-cena-sekcia">
+					{#if cenaAktualna && cenaVysledok}
+						{@const c = cenaVysledok.cena}
+						<div class="opl-cena-blok" data-testid="oplotenie-cena">
+							{#if c.druh === 'cena'}
+								<span class="opl-cena-label">Orientačná cena — model {c.model} · {s.pocet} ks</span>
+								{#if c.hladinaLabel}
+									<span class="opl-cena-vo" data-testid="oplotenie-cena-hladina"
+										>{c.hladinaLabel}</span
+									>
+								{/if}
+								<div class="opl-cena-hlavne">
+									<span class="opl-cena-sdph" data-testid="oplotenie-cena-sdph">{eur(c.sDph)}</span>
+									<span class="opl-cena-mena">s DPH</span>
+								</div>
+								<div class="opl-cena-bezdph" data-testid="oplotenie-cena-bezdph">
+									{eur(c.bezDph)} bez DPH
+								</div>
+								<!-- #410 review 🟡: šírka sa zaokrúhľuje na katalógovú mriežku (0,5 m); keď sa líši
+								     od zadanej, čestne to doplň (cena platí pre najbližší katalógový rozmer). -->
+								{#if Math.round(c.sirkaGridM * 1000) !== (sirka ?? 0)}
+									<p class="opl-cena-grid" data-testid="oplotenie-cena-grid">
+										Cena platí pre najbližší katalógový rozmer šírky {String(c.sirkaGridM).replace(
+											'.',
+											','
+										)} m.
+									</p>
+								{/if}
+							{:else}
+								<span class="opl-cena-label">Cena na vyžiadanie — model {c.model}</span>
+								{#if c.hladinaLabel}
+									<span class="opl-cena-vo" data-testid="oplotenie-cena-hladina"
+										>{c.hladinaLabel}</span
+									>
+								{/if}
+								<p class="opl-cena-dovod" data-testid="oplotenie-cena-individualna">
+									{c.dovod} Pripravíme ti individuálnu ponuku.
+								</p>
+							{/if}
+							<p class="opl-cena-pozn">
+								Orientačná cena vychádza z aktuálneho cenníka pre zvolený typ, model a rozmery.
+								Presnú, záväznú cenu pripravíme po obhliadke miesta.
+							</p>
+						</div>
+
+						{#if cenaVysledok.cenyModely}
+							<div class="opl-porovnanie" data-testid="oplotenie-porovnanie">
+								<h3>Porovnanie modelov (orientačne, s DPH)</h3>
+								<ul>
+									{#each cenaVysledok.cenyModely as cm (cm.model)}
+										<li
+											class:vybrany={cm.model === c.model}
+											data-testid="oplotenie-porovnanie-{cm.model}"
+										>
+											<span class="p-model">{cm.model}</span>
+											<span class="p-cena">
+												{cm.cena.druh === 'cena' ? eur(cm.cena.sDph) : 'na vyžiadanie'}
+											</span>
+										</li>
+									{/each}
+								</ul>
+							</div>
+						{/if}
+					{:else}
+						<form
+							method="POST"
+							action="?/vypocet"
+							class="opl-cena-form"
+							use:enhance={() => {
+								const submitted = cenaKluc;
+								cenaNacitava = true;
+								cenaError = null;
+								return ({ result }) => {
+									cenaNacitava = false;
+									if (result.type === 'success') {
+										const d = result.data as
+											{ cena: VerejnaCena; cenyModely: CenaModelu[] } | undefined;
+										if (d?.cena) {
+											cenaVysledok = { cena: d.cena, cenyModely: d.cenyModely };
+											poslednyKluc = submitted;
+										}
+									} else if (result.type === 'failure') {
+										const d = result.data as { error?: string } | undefined;
+										cenaError = d?.error ?? 'Cenu sa nepodarilo spočítať.';
+									} else if (result.type === 'error') {
+										// sieťová/serverová výnimka — nenechaj tlačidlo „visieť" bez odozvy
+										cenaError = 'Cenu sa nepodarilo spočítať, skús to prosím o chvíľu znova.';
+									}
+								};
+							}}
+						>
+							<input type="hidden" name="typ" value={vstup.typ} />
+							<input type="hidden" name="model" value={vstup.model} />
+							<input type="hidden" name="vyska" value={vyska ?? 0} />
+							<input type="hidden" name="sirka" value={sirka ?? 0} />
+							<input type="hidden" name="pocet" value={pocet} />
+							<strong>Orientačná cena</strong>
+							<p>
+								Zobraz si orientačnú cenu zvoleného typu a modelu a porovnanie modelov. Presnú,
+								záväznú cenu pripravíme po obhliadke miesta.
+							</p>
+							{#if cenaError}
+								<p class="opl-cena-chyba" data-testid="oplotenie-cena-chyba">{cenaError}</p>
+							{/if}
+							<button
+								type="submit"
+								class="opl-btn primar"
+								data-testid="oplotenie-cena-zobrazit"
+								disabled={cenaNacitava}
+							>
+								{cenaNacitava
+									? 'Počítam…'
+									: cenaVysledok
+										? 'Prepočítať orientačnú cenu →'
+										: 'Zobraziť orientačnú cenu →'}
+							</button>
+						</form>
+					{/if}
+					<button type="button" class="opl-btn druhotny" onclick={() => scrollNa('dopyt')}>
 						Nezáväzný dopyt →
 					</button>
 				</section>
@@ -239,13 +376,10 @@
 				<section class="opl-blok-kontakt" id="dopyt" data-testid="dopyt">
 					<h2>Máš záujem o toto oplotenie?</h2>
 					<p class="opl-uvod">
-						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
-						pripravíme individuálne po obhliadke.
+						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) s orientačnou cenou na
+						stiahnutie. Presnú, záväznú cenu pripravíme po obhliadke miesta.
 					</p>
-					<DopytForm
-						konfiguracia={ponukaCfg}
-						disclaimer="Špecifikácia je nezáväzná. Cenu pripravíme individuálne po obhliadke miesta stavby."
-					/>
+					<DopytForm konfiguracia={ponukaCfg} />
 				</section>
 			{:else}
 				<p class="opl-chyba" data-testid="oplotenie-chyba">
@@ -414,14 +548,13 @@
 		outline-offset: 1px;
 	}
 
-	/* PANEL: súhrn + cena-info + dopyt */
+	/* PANEL: súhrn + cena + dopyt */
 	.opl-panel {
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
 	}
 	.opl-suhrn,
-	.opl-cena-info,
 	.opl-blok-kontakt {
 		border: 1px solid var(--k-line);
 		border-radius: var(--k-radius);
@@ -465,21 +598,140 @@
 		text-align: right;
 	}
 
-	.opl-cena-info {
-		background: var(--k-surface-2);
-		border-color: var(--k-line-2);
+	/* ORIENTAČNÁ CENA (#410) — zrkadlo bazénového cenového panela */
+	.opl-cena {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
-	.opl-cena-info strong {
+	.opl-cena-form {
+		border: 1px solid var(--k-line-2);
+		border-radius: var(--k-radius);
+		background: var(--k-surface-2);
+		padding: 20px 22px;
+	}
+	.opl-cena-form strong {
 		display: block;
 		font-size: 17px;
 		color: var(--k-text);
 		margin-bottom: 6px;
 	}
-	.opl-cena-info p {
+	.opl-cena-form p {
 		margin: 0 0 14px;
 		font-size: 13.5px;
 		line-height: 1.5;
 		color: var(--k-muted);
+	}
+	.opl-cena-chyba {
+		color: #a3261c;
+		font-weight: 600;
+	}
+	/* prémiový antracitový cenový panel (tmavá karta, Tesla-style — zhoda s bazénom/pergolou) */
+	.opl-cena-blok {
+		background: var(--k-ink, #1b1e23);
+		color: #fff;
+		border-radius: var(--k-radius);
+		padding: 20px 22px;
+	}
+	.opl-cena-label {
+		display: block;
+		color: rgba(255, 255, 255, 0.62);
+		font-size: 12px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 600;
+	}
+	.opl-cena-vo {
+		display: inline-block;
+		margin-top: 8px;
+		padding: 2px 9px;
+		border-radius: 999px;
+		background: var(--k-accent, #b07a45);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.opl-cena-hlavne {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.opl-cena-sdph {
+		font-size: clamp(28px, 7vw, 38px);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+	}
+	.opl-cena-mena {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+	}
+	.opl-cena-bezdph {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+		margin-top: 4px;
+	}
+	.opl-cena-grid {
+		color: rgba(255, 255, 255, 0.55);
+		font-size: 12px;
+		line-height: 1.4;
+		margin: 8px 0 0;
+	}
+	.opl-cena-dovod {
+		color: rgba(255, 255, 255, 0.72);
+		font-size: 13.5px;
+		margin: 8px 0 0;
+	}
+	.opl-cena-pozn {
+		color: rgba(255, 255, 255, 0.5);
+		font-size: 12px;
+		line-height: 1.45;
+		margin: 14px 0 0;
+	}
+	.opl-porovnanie {
+		border: 1px solid var(--k-line);
+		border-radius: var(--k-radius);
+		background: var(--k-surface);
+		padding: 16px 20px;
+	}
+	.opl-porovnanie h3 {
+		font-size: 11.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		font-weight: 600;
+		margin: 0 0 12px;
+		color: var(--k-faint, #9a9ea6);
+	}
+	.opl-porovnanie ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 2px;
+	}
+	.opl-porovnanie li {
+		display: flex;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 9px 10px;
+		border-radius: 9px;
+		font-size: 15px;
+	}
+	.opl-porovnanie li.vybrany {
+		background: var(--k-accent-soft, #f5ede2);
+		font-weight: 700;
+	}
+	.opl-porovnanie .p-model {
+		color: var(--k-muted, #6b7078);
+	}
+	.opl-porovnanie .p-cena {
+		color: var(--k-text, #16181c);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.opl-uvod {
@@ -504,6 +756,14 @@
 	}
 	.opl-btn.primar:hover {
 		background: var(--k-ink-hover);
+	}
+	.opl-btn.druhotny {
+		background: var(--k-surface);
+		color: var(--k-text);
+		border-color: var(--k-line-2);
+	}
+	.opl-btn.druhotny:hover {
+		border-color: var(--k-ink);
 	}
 	.opl-btn:focus-visible {
 		outline: 2px solid var(--k-ink);
