@@ -6,35 +6,26 @@
 // `vypocetAction(event, parse, cenaFn)` by buď menil tvary odpovedí (behaviorálna zmena) alebo pridal
 // viac indirekcie než odstráni — viď design komentár #428.
 import { fail } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
+import type { ActionFailure, RequestEvent } from '@sveltejs/kit';
 import { allowRequest, KONF_WINDOW_MS } from './public-throttle';
-import { resolveClientIp } from './client-ip';
+import { clientIp } from './client-ip';
 
 /**
  * Per-IP rate-limit predohra cenovej `vypocet` akcie. Vráti `null` keď je požiadavka POVOLENÁ
- * (volateľ pokračuje parse → cena), alebo `fail(429, …)` ActionFailure keď je zaškrtená (volateľ ho
+ * (volateľ pokračuje parse → cena), alebo `fail(429, …)` `ActionFailure` keď je zaškrtená (volateľ ho
  * rovno vráti). `prazdno` = prázdne dátové polia návratového tvaru DANEJ akcie (napr.
  * `{ cena: null, cenyModely: null }` / `{ vysledok: null }`), aby 429 telo `{ ...prazdno, error }`
  * malo rovnaký tvar (vrátane poradia kľúčov) ako úspešná/400 vetva tej istej akcie — byte-identické s
- * pôvodným inline kódom.
+ * pôvodným inline kódom. Generický `P` DRŽÍ presný typ návratu (`ActionFailure<P & { error }>`), takže
+ * generovaný route `./$types` `ActionData` nestratí tvar 429 vetvy (nekolabuje na `{}`).
  *
- * Reálna klientska IP za Cloudflare (#264): `getClientAddress()` (XFF_DEPTH=1) vracia CF edge IP,
- * `resolveClientIp` z nej + `Cf-Connecting-Ip` odvodí reálneho klienta (spoof-safe aj CF-down-safe).
- * `getClientAddress()` môže hodiť (ADDRESS_HEADER nastavený + hlavička chýba) — nesmie zhodiť endpoint
- * kvôli rate-limit kľúču.
+ * Reálna klientska IP za Cloudflare (#264) sa odvodí zdieľaným `clientIp(event)` (`client-ip.ts`).
  */
-export function cenaThrottle(
+export function cenaThrottle<P extends Record<string, null>>(
 	event: Pick<RequestEvent, 'request' | 'getClientAddress' | 'setHeaders'>,
-	prazdno: Record<string, null>
-): ReturnType<typeof fail> | null {
-	let edgeIp: string | undefined;
-	try {
-		edgeIp = event.getClientAddress();
-	} catch {
-		edgeIp = undefined;
-	}
-	const ip = resolveClientIp(edgeIp, event.request.headers.get('cf-connecting-ip'));
-	if (!allowRequest(ip)) {
+	prazdno: P
+): ActionFailure<P & { error: string }> | null {
+	if (!allowRequest(clientIp(event))) {
 		event.setHeaders({ 'retry-after': String(Math.ceil(KONF_WINDOW_MS / 1000)) });
 		return fail(429, { ...prazdno, error: 'Priveľa požiadaviek. Skús to prosím o chvíľu.' });
 	}

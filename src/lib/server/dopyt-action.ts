@@ -9,7 +9,7 @@
 // (audit) → vygenerovanie PDF → návrat PDF ako base64 v ActionData (download-first; komponent
 // spustí stiahnutie). MONEY-NEUTRÁLNE: žiadny import money/pergola, žiadny zápis do /data.
 import { fail, type RequestEvent } from '@sveltejs/kit';
-import { resolveClientIp } from './client-ip';
+import { clientIp } from './client-ip';
 import { allowDopyt } from './dopyt-throttle';
 import { insertDopyt, insertObjednavka } from './dopyt-store';
 import { opeciatkujCenuPreProdukt } from './dopyt-cena-stamp';
@@ -35,17 +35,6 @@ const log = logger('dopyt-action');
  *  deploy `BODY_SIZE_LIMIT: 1M` (adapter 413-ne väčšie telo skôr, než sa sem dostane; base64
  *  render ~1 MB tela ≈ 750 KB dekódovaných). Pri #276 (reálne rendery) prehodnotiť oba stropy. */
 const MAX_RENDER_BYTES = 768 * 1024;
-
-/** Klientska IP (CF-aware) pre rate-limit + log; `getClientAddress` hádže, keď chýba XFF. */
-function clientIp(event: RequestEvent): string | undefined {
-	let edge: string | undefined;
-	try {
-		edge = event.getClientAddress();
-	} catch {
-		edge = undefined;
-	}
-	return resolveClientIp(edge, event.request.headers.get('cf-connecting-ip'));
-}
 
 /** Voliteľný 3D render: raw base64 alebo data URL; nevalidný/priveľký → undefined (placeholder). */
 function decodeRenderPng(v: FormDataEntryValue | null): Uint8Array | undefined {
