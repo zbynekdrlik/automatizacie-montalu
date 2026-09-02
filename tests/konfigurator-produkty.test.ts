@@ -18,11 +18,19 @@ describe('KONF_PRODUKTY katalóg', () => {
 		expect(KONF_PRODUKTY).toHaveLength(7);
 	});
 
-	it('pergola je PRVÁ a live; #385 pridal bazén ako live (ostatné „pripravujeme")', () => {
+	it('všetkých 7 radov je live (#385–#390 dokončili jednotný konfigurátor); pergola je PRVÁ', () => {
 		expect(KONF_PRODUKTY[0]!.kod).toBe('pergola');
 		expect(KONF_PRODUKTY[0]!.stav).toBe('live');
 		const live = KONF_PRODUKTY.filter((p) => p.stav === 'live');
-		expect(live.map((p) => p.kod)).toEqual(['pergola', 'bazen']);
+		expect(live.map((p) => p.kod)).toEqual([
+			'pergola',
+			'bazen',
+			'zimna-zahrada',
+			'zasklenie',
+			'oplotenie',
+			'tienenie',
+			'pristresok'
+		]);
 	});
 
 	it('kódy sú unikátne', () => {
@@ -69,6 +77,9 @@ describe('KONF_PRODUKTY katalóg', () => {
 describe('produkt-aware názvy pre lead / PDF', () => {
 	it('produktNazov: známy → nominatív, NULL/neznámy → Pergola', () => {
 		expect(produktNazov('bazen')).toBe('Bazénové zastrešenie');
+		expect(produktNazov('zasklenie')).toBe('Zasklenie terasy a balkóna');
+		// #388: oplotenie prefix Odoo leadu („Hliníkové oplotenie – dopyt: …") + admin zoznam
+		expect(produktNazov('oplotenie')).toBe('Hliníkové oplotenie');
 		expect(produktNazov('pergola')).toBe('Pergola');
 		expect(produktNazov(null)).toBe('Pergola');
 		expect(produktNazov('xxx')).toBe('Pergola');
@@ -76,6 +87,8 @@ describe('produkt-aware názvy pre lead / PDF', () => {
 
 	it('produktPdfNadpis: známy → nadpis, NULL/neznámy → Špecifikácia pergoly', () => {
 		expect(produktPdfNadpis('bazen')).toBe('Špecifikácia bazénového zastrešenia');
+		expect(produktPdfNadpis('zasklenie')).toBe('Špecifikácia zasklenia');
+		expect(produktPdfNadpis('oplotenie')).toBe('Špecifikácia oplotenia');
 		expect(produktPdfNadpis('pergola')).toBe('Špecifikácia pergoly');
 		expect(produktPdfNadpis(null)).toBe('Špecifikácia pergoly');
 		expect(produktPdfNadpis('xxx')).toBe('Špecifikácia pergoly');
@@ -98,9 +111,10 @@ describe('#385 cenový zdroj (honest-null gate)', () => {
 		}
 	});
 
-	it('maCenovyZdroj: pergola true, bazén false; NULL → true (v35 default); neznámy NEPRÁZDNY → false', () => {
+	it('maCenovyZdroj: pergola true, bazén/oplotenie false; NULL → true (v35 default); neznámy NEPRÁZDNY → false', () => {
 		expect(maCenovyZdroj('pergola')).toBe(true);
 		expect(maCenovyZdroj('bazen')).toBe(false);
+		expect(maCenovyZdroj('oplotenie')).toBe(false);
 		// NULL/undefined = starý pergolový dopyt pred v35 → true (honest-degrade prepočet ostáva)
 		expect(maCenovyZdroj(null)).toBe(true);
 		expect(maCenovyZdroj(undefined)).toBe(true);

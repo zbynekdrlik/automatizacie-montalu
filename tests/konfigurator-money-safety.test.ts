@@ -118,8 +118,14 @@ function prejdiKlientskyGraf(vstupy: string[]): { porusenia: Porusenie[]; videne
 		const src = fs.readFileSync(subor, 'utf8');
 		// #385: aj HOLÝ Money kód (BPK*/BPP* z bazénového odpisu, TS* zo skla) je únik, nielen slovo
 		// `moneyKod` — bazén kusové/metrážové kódy sa v katalógu nesú ako stringy `'BPK00108'`.
-		if (/moneyKod|skloStrechaMoneyKod|\bBP[KP]\d{5}\b/.test(src))
-			porusenia.push({ subor, detail: 'referencuje Money kód (moneyKod / BPK*/BPP*)' });
+		// #387: interné zasklenie moduly nesú Money kódy rodiny ZAS-P/ZAS-K ako holé stringy
+		// (`ZAS[PK]` + číslo, napr. v `sklo`/`komponenty-cfg`). Vzor je case-sensitive → NEmatchuje
+		// slovenské slovo „zasklievacie"/„ZASKLIEVACIE" (za `ZASK` je písmeno, nie číslica).
+		if (/moneyKod|skloStrechaMoneyKod|\bBP[KP]\d{5}\b|\bZAS[PK]\d{4,}\b/.test(src))
+			porusenia.push({
+				subor,
+				detail: 'referencuje Money kód (moneyKod / BPK*/BPP* / ZASP*/ZASK*)'
+			});
 		for (const spec of extrahujSpecifikatory(src)) {
 			for (const vzor of KLIENT_ZAKAZANE_SPEC)
 				if (vzor.test(spec)) porusenia.push({ subor, detail: `zakázaný import '${spec}'` });
@@ -164,7 +170,7 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
 	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
 	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
-	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén, ponuka, dopyt)', () => {
+	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén + #386 zimná záhrada + #387 zasklenie + #388 oplotenie, ponuka, dopyt)', () => {
 		const { videne } = prejdiKlientskyGraf(konfVstupy());
 		const musiaByt = [
 			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
@@ -190,6 +196,30 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// prípadný budúci Money import zachytil: `bazen-komponenty`/`server/bazen` import je v
 			// `KLIENT_ZAKAZANE_SPEC`, a holý BPK*/BPP* kód v obsahu chytá rozšírený obsahový grep vyššie.
 			path.join(SRC, 'lib', 'konfigurator-bazen.ts'),
+			// #387: zasklenie podstránka (`konfigurator/zasklenie/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-zasklenie` — guard (A) MUSÍ prejsť jeho graf, aby jeho
+			// prípadný budúci Money import zachytil (holý ZASP*/ZASK* kód chytá rozšírený obsahový grep vyššie).
+			path.join(SRC, 'lib', 'konfigurator-zasklenie.ts'),
+			// #386: podstránka zimnej záhrady (`konfigurator/zimna-zahrada/+page.svelte`) je nový klientsky
+			// vstup a importuje client-safe `konfigurator-zimna-zahrada` — guard (A) MUSÍ prejsť jeho graf,
+			// aby jeho prípadný budúci Money/katalóg import zachytil (žiadny Money katalóg zimných záhrad
+			// neexistuje, ale pokrytie budúcich importov musí byť garantované rovnako ako pri bazéne).
+			path.join(SRC, 'lib', 'konfigurator-zimna-zahrada.ts'),
+			// #388: oplotenie podstránka (`konfigurator/oplotenie/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-oplotenie` — guard (A) MUSÍ prejsť jeho graf, aby jeho
+			// prípadný budúci Money import zachytil. Oplotenie NEMÁ interný Money katalóg (na rozdiel od
+			// bazéna), takže modul je z princípu čistý — obsahový `moneyKod`/`BP[KP]\d{5}` grep aj tak beží.
+			path.join(SRC, 'lib', 'konfigurator-oplotenie.ts'),
+			// #389: tienenie podstránka (`konfigurator/tienenie/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-tienenie` — guard (A) MUSÍ prejsť jeho graf, aby jeho
+			// prípadný budúci Money import zachytil (tienenie nemá interný Money modul, ale pozitívny
+			// reach assert stráži, že graf nie je mimo a budúci zakázaný import by SPADOL).
+			path.join(SRC, 'lib', 'konfigurator-tienenie.ts'),
+			// #390: prístrešková podstránka (`konfigurator/pristresok/+page.svelte`) je nový klientsky
+			// vstup a importuje client-safe `konfigurator-pristresok` — guard (A) MUSÍ prejsť jeho graf.
+			// Prístrešky nemajú interný Money katalóg (žiadny BPK-ekvivalent), takže postačuje generický
+			// obsahový grep (moneyKod / BPK*/BPP*) — netreba nový zakázaný špecifikátor.
+			path.join(SRC, 'lib', 'konfigurator-pristresok.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -213,6 +243,21 @@ const SERVEROVE_ROUTY = [
 	// #385: bazénová podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
 	// `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
 	'src/routes/konfigurator/bazen/+page.server.ts',
+	// #387: zasklenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-zasklenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/ZASP*/ZASK*.
+	'src/routes/konfigurator/zasklenie/+page.server.ts',
+	// #386: podstránka zimnej záhrady — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-zimna-zahrada` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/zimna-zahrada/+page.server.ts',
+	// #388: oplotenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-oplotenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/oplotenie/+page.server.ts',
+	// #389: tienenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-tienenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/tienenie/+page.server.ts',
+	// #390: prístrešková podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-pristresok` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/pristresok/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];
@@ -227,7 +272,8 @@ const SERVER_ZAKAZANE = [
 	// #385: bazénová odpisová cesta (BPK/BPP kusové/metrážové kódy) — verejná route ju NESMIE importovať.
 	/from ['"].*server\/bazen['"]/,
 	/from ['"].*bazen-komponenty['"]/,
-	/moneyKod|skloStrechaMoneyKod|writeOdpis|MONEY_LIVE|\bBP[KP]\d{5}\b/
+	// #387: interné zasklenie Money kódy rodiny ZAS-P/ZAS-K (holý string) — verejná route ich NESMIE niesť.
+	/moneyKod|skloStrechaMoneyKod|writeOdpis|MONEY_LIVE|\bBP[KP]\d{5}\b|\bZAS[PK]\d{4,}\b/
 ];
 
 describe('Money safety (B) — serverové súbory routy sa neviažu na Money/cenu/nárez (#275)', () => {
@@ -385,5 +431,117 @@ describe('Money safety (C) — bazénová route: žiadny Money kód, žiadna cen
 		// pozitívne: dáta naozaj prešli (modely + koľaj), aby test nebol vákuový
 		expect(json).toContain('Premier');
 		expect(json).toContain('Jednokoľajové');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — tienenie podstránka (#389): load() nesie LEN prezentačné dáta (typy/ovládanie/
+// rozmedzia/RAL), žiadny Money kód, žiadna cena (honest-null — tienenie nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: tienenieLoad } = await import('../src/routes/konfigurator/tienenie/+page.server');
+
+describe('Money safety (C) — tienenie route: žiadny Money kód, žiadna cena (#389)', () => {
+	it('load() posiela typy/ovládanie/farby/rozmedzia — žiadny BP[KP]*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await tienenieLoad({} as Parameters<typeof tienenieLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej tienenie odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (reálne modely z montalu.sk), aby test nebol vákuový
+		expect(json).toContain('XLINE');
+		expect(json).toContain('ZIPLINE');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — zasklenie podstránka (#387): load() nesie LEN prezentačné dáta, žiadny Money
+// kód (holý ZASP*/ZASK* z odpisu), žiadna cena (honest-null — zasklenie nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: zaskleniLoad } = await import('../src/routes/konfigurator/zasklenie/+page.server');
+
+describe('Money safety (C) — zasklenie route: žiadny Money kód, žiadna cena (#387)', () => {
+	it('load() posiela umiestnenia/modely/výplne/farby/rozmedzia — žiadny ZASP*/ZASK*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await zaskleniLoad({} as Parameters<typeof zaskleniLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý ZAS[PK]/BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bZAS[PK]\d{4,}\b/);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej zasklenie odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (umiestnenie + model), aby test nebol vákuový
+		expect(json).toContain('Terasa');
+		expect(json).toContain('SLIDE');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — podstránka zimnej záhrady (#386): load() nesie LEN prezentačné dáta, žiadny
+// Money kód, žiadna cena (honest-null — zimná záhrada nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: zzLoad } = await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
+
+describe('Money safety (C) — route zimnej záhrady: žiadny Money kód, žiadna cena (#386)', () => {
+	it('load() posiela modely/zasklenia/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await zzLoad({} as Parameters<typeof zzLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej odpovedi zimnej záhrady
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (modely + zasklenie), aby test nebol vákuový
+		expect(json).toContain('ROBUST');
+		expect(json).toContain('Izolačné sklo');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — oplotenie podstránka (#388): load() nesie LEN prezentačné dáta, žiadny Money
+// kód, žiadna cena (honest-null — oplotenie nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: oplotenieLoad } = await import('../src/routes/konfigurator/oplotenie/+page.server');
+
+describe('Money safety (C) — oplotenie route: žiadny Money kód, žiadna cena (#388)', () => {
+	it('load() posiela typy/modely/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await oplotenieLoad({} as Parameters<typeof oplotenieLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej oplotenie odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (typ + model), aby test nebol vákuový
+		expect(json).toContain('Plotový diel');
+		expect(json).toContain('ARIEL');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — prístrešková podstránka (#390): load() nesie LEN prezentačné dáta, žiadny
+// Money kód, žiadna cena (honest-null — prístrešky nemajú cenový zdroj). Prístrešky nemajú ani
+// interný Money odpisový modul, takže obsahový guard je čisto generický (moneyKod / BPK*/BPP*).
+// --------------------------------------------------------------------------- //
+const { load: pristresokLoad } = await import('../src/routes/konfigurator/pristresok/+page.server');
+
+describe('Money safety (C) — prístrešková route: žiadny Money kód, žiadna cena (#390)', () => {
+	it('load() posiela typy/krytiny/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await pristresokLoad({} as Parameters<typeof pristresokLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej prístreškovej odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (typy + krytina), aby test nebol vákuový
+		expect(json).toContain('prístrešok na auto');
+		expect(json).toContain('Polykarbonát');
 	});
 });

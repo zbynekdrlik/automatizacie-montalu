@@ -66,6 +66,23 @@ const ALLOWED = new Set([
 	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
 	// inak zlyhal), nie obídenie.
 	'/konfigurator/bazen',
+	// #387: zasklenie podstránka jednotného konfigurátora — VEREJNÁ (bez auth), Money-neutrálna
+	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
+	// inak zlyhal), nie obídenie.
+	'/konfigurator/zasklenie',
+	// #386: zimná záhrada — VEREJNÁ (bez auth), Money-neutrálna (akcia iba `dopyt` → audit + PDF bez
+	// ceny, žiadny odpis). Vedomé potvrdenie (drift guard by inak zlyhal), nie obídenie.
+	'/konfigurator/zimna-zahrada',
+	// #388: oplotenie podstránka jednotného konfigurátora — rovnaká disciplína ako bazén: VEREJNÁ
+	// (bez auth), Money-neutrálna (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis).
+	'/konfigurator/oplotenie',
+	// #389: tienenie (markízy + screenové rolety) podstránka — VEREJNÁ (bez auth), Money-neutrálna
+	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie, nie obídenie.
+	'/konfigurator/tienenie',
+	// #390: prístrešková podstránka jednotného konfigurátora — VEREJNÁ (bez auth), Money-neutrálna
+	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
+	// inak zlyhal), nie obídenie.
+	'/konfigurator/pristresok',
 	'/login',
 	'/logout',
 	'/health'
@@ -105,7 +122,12 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/bazen/navrh',
 				'/clip',
 				'/konfigurator/bazen',
+				'/konfigurator/oplotenie',
 				'/konfigurator/pergola',
+				'/konfigurator/pristresok',
+				'/konfigurator/tienenie',
+				'/konfigurator/zasklenie',
+				'/konfigurator/zimna-zahrada',
 				'/odpisy',
 				'/pergola',
 				'/pergola/navrh',
@@ -163,6 +185,26 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('#385: /konfigurator/bazen (verejný konfigurátor bazénových zastrešení) nie je presmerovaný', () => {
 		expect(b2bRedirectTarget('/konfigurator/bazen')).toBeNull();
+	});
+
+	it('#387: /konfigurator/zasklenie (verejný konfigurátor zasklenia terás a balkónov) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/zasklenie')).toBeNull();
+	});
+
+	it('#386: /konfigurator/zimna-zahrada (verejný konfigurátor zimných záhrad) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/zimna-zahrada')).toBeNull();
+	});
+
+	it('#388: /konfigurator/oplotenie (verejný konfigurátor oplotenia a brán) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/oplotenie')).toBeNull();
+	});
+
+	it('#389: /konfigurator/tienenie (verejný konfigurátor tienenia) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/tienenie')).toBeNull();
+	});
+
+	it('#390: /konfigurator/pristresok (verejný konfigurátor prístreškov a altánkov) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/pristresok')).toBeNull();
 	});
 
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
@@ -271,6 +313,66 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385)', () => {
 	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #387, rovnaká disciplína — zasklenie podstránka má PRESNE jedinú akciu `dopyt` (verejný kontaktný
+// formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je čisto
+// klientsky, honest-null — zasklenie nemá cenový zdroj), žiadna Money/odpisová zápisová akcia. VEREJNÁ
+// route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
+// tento test ROZBIJE (fail-closed).
+describe('/konfigurator/zasklenie — žiadna cesta k Money odpisu (#387)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/zasklenie/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #386, rovnaká disciplína — podstránka zimnej záhrady má PRESNE jedinú akciu `dopyt` (verejný
+// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
+// čisto klientsky, honest-null — zimná záhrada nemá cenový zdroj), žiadna Money/odpisová zápisová
+// akcia. VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek
+// ďalšej akcie tento test ROZBIJE (fail-closed).
+describe('/konfigurator/zimna-zahrada — žiadna cesta k Money odpisu (#386)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #388, rovnaká disciplína ako bazén — oplotenie podstránka má PRESNE jedinú akciu `dopyt` (verejný
+// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
+// čisto klientsky, honest-null — oplotenie nemá cenový zdroj), žiadna Money/odpisová zápisová akcia.
+// VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
+// tento test ROZBIJE (fail-closed).
+describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/oplotenie/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #389, rovnaká disciplína — tienenie podstránka má PRESNE jedinú akciu `dopyt` (verejný kontaktný
+// formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je čisto
+// klientsky, honest-null — tienenie nemá cenový zdroj), žiadna Money/odpisová zápisová akcia. VEREJNÁ
+// route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie tento
+// test ROZBIJE (fail-closed).
+describe('/konfigurator/tienenie — žiadna cesta k Money odpisu (#389)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/tienenie/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #390, rovnaká disciplína — prístrešková podstránka má PRESNE jedinú akciu `dopyt` (verejný
+// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
+// čisto klientsky, honest-null — prístrešky nemajú cenový zdroj), žiadna Money/odpisová zápisová
+// akcia. VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek
+// ďalšej akcie tento test ROZBIJE (fail-closed).
+describe('/konfigurator/pristresok — žiadna cesta k Money odpisu (#390)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/pristresok/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });

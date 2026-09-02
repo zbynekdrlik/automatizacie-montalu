@@ -75,9 +75,13 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Hliníkové zimné záhrady ROBUST a MASSIVE s presklením na mieru.',
 		foto: 'zimna-zahrada.webp',
 		alt: 'Hliníková zimná záhrada Montalu Robust',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/zimne-zahrady',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/zimna-zahrada',
+		externy: false,
+		// #386: honest-null pre TÚTO PR — montalu.sk MÁ cenový zdroj pre zimné záhrady
+		// (`montalu.sk/konfigurator/zimne-zahrady`, karta „od 5 364,29 € bez DPH", rovnaký tvar ako
+		// pergolový/bazénový konfigurátor), ale jeho vyťaženie do interim matice je práca v rozsahu #279
+		// = samostatný follow-up #408. Do vtedy bez orientačnej ceny (nevymýšľame cenu bez overenej matice).
 		cenovyZdroj: false
 	},
 	{
@@ -87,9 +91,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Bezrámové aj rámové posuvné zasklenia terás a balkónov.',
 		foto: 'zasklenie.webp',
 		alt: 'Moderné zasklenie terasy Montalu Slide',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/zasklenia',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/zasklenie',
+		externy: false,
+		// #387: zasklenie NEMÁ overený interim cenový zdroj (matica montalu.sk pre zasklenie nie je
+		// reverzne odvodená — samostatný follow-up v rozsahu #279). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{
@@ -99,9 +105,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Dizajnové hliníkové ploty a brány — krídlové, posuvné aj samonosné.',
 		foto: 'oplotenie.webp',
 		alt: 'Dizajnové hliníkové oplotenie Montalu Narvi',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/oplotenie',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/oplotenie',
+		externy: false,
+		// #388: oplotenie NEMÁ overený interim cenový zdroj (montalu.sk `update-fencings` existuje /419/,
+		// ale jeho vyťaženie do matice je práca v rozsahu #279 — samostatný follow-up). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{
@@ -111,9 +119,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Markízy XLINE a XLIGHT a screenové rolety ZIPLINE.',
 		foto: 'tienenie.webp',
 		alt: 'Hliníková markíza Montalu XLINE',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/tienenie',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/tienenie',
+		externy: false,
+		// #389: tienenie NEMÁ overený interim cenový zdroj (montalu.sk cenu markíz nevystavuje ako
+		// jednoduchý endpoint pergoly `update-pergolas`; vyťaženie = práca v rozsahu #279). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{
@@ -123,9 +133,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Hliníkové prístrešky na auto, altánky, skleníky aj vonkajšie sauny.',
 		foto: 'pristresok.webp',
 		alt: 'Hliníkový prístrešok na auto Montalu',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/hlinikove-pristresky-a-altanky',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/pristresok',
+		externy: false,
+		// #390: prístrešky NEMAJÚ overený interim cenový zdroj (montalu.sk ich vôbec nemá vo svojom
+		// cenovom konfigurátore) → honest-null, konfigurátor beží bez ceny (cena na vyžiadanie).
 		cenovyZdroj: false
 	}
 ];

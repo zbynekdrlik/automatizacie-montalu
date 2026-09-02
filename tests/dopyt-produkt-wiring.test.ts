@@ -67,6 +67,19 @@ describe('produkt wiring — Odoo lead názov je produkt-aware', () => {
 		});
 		const payloadP = buildLeadPayload(getDopytForLead(idP)!);
 		expect(payloadP.name).toBe('Pergola – dopyt: Ján Pergola');
+
+		// #389: tienenie produkt → lead name s prefixom „Tienenie"
+		const idT = insertDopyt({
+			konfiguracia: JSON.stringify(cfg),
+			meno: 'Ján Tienenie',
+			email: 'lead-tienenie@example.com',
+			telefon: '',
+			miesto: 'Trnava',
+			poznamka: '',
+			produkt: 'tienenie'
+		});
+		const payloadT = buildLeadPayload(getDopytForLead(idT)!);
+		expect(payloadT.name).toBe('Tienenie – dopyt: Ján Tienenie (Trnava)');
 	});
 });
 

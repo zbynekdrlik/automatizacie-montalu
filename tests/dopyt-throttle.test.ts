@@ -3,12 +3,34 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
 	allowDopyt,
 	_resetDopytThrottle,
+	resolveMaxPerWindow,
+	DEFAULT_MAX_PER_WINDOW,
 	MAX_PER_WINDOW,
 	WINDOW_MS,
 	MAX_TRACKED
 } from '../src/lib/server/dopyt-throttle';
 
 beforeEach(() => _resetDopytThrottle());
+
+// #390: `MAX_PER_WINDOW` je env-konfigurovateľné (`DOPYT_MAX_PER_WINDOW`) — E2E preview ho zvýši,
+// lebo celá suite odosiela z jednej IP v jednom procese (per-IP okno by inak nazbieralo naprieč
+// nesúvisiacimi spec-mi → 9. dopyt 429 → download timeout). PROD ho NIKDY nenastavuje (default 8).
+// `MAX_PER_WINDOW` sa číta pri module-loade, preto parsovanie testujeme cez pure `resolveMaxPerWindow`.
+describe('resolveMaxPerWindow (E2E env override)', () => {
+	it('default keď env chýba / prázdne / nevalidné / nula', () => {
+		expect(resolveMaxPerWindow(undefined)).toBe(DEFAULT_MAX_PER_WINDOW);
+		expect(resolveMaxPerWindow('')).toBe(DEFAULT_MAX_PER_WINDOW);
+		expect(resolveMaxPerWindow('abc')).toBe(DEFAULT_MAX_PER_WINDOW);
+		expect(resolveMaxPerWindow('0')).toBe(DEFAULT_MAX_PER_WINDOW);
+	});
+	it('rešpektuje platné číslo (E2E preview zvýši limit, PROD nie)', () => {
+		expect(resolveMaxPerWindow('1000')).toBe(1000);
+	});
+	it('bez env (unit beh) ostáva na PROD defaulte 8', () => {
+		expect(DEFAULT_MAX_PER_WINDOW).toBe(8);
+		expect(MAX_PER_WINDOW).toBe(8);
+	});
+});
 
 describe('allowDopyt', () => {
 	it('povolí prvých MAX_PER_WINDOW, ďalší zamietne s retryAfter', () => {

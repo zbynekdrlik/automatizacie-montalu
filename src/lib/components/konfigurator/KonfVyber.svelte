@@ -10,8 +10,15 @@
 	// Interné (live) karty vedú na typovanú `resolve()` navigáciu (#99). `odkaz` je v katalógu
 	// `string` (rovnaké pole nesie aj externé montalu.sk URL), tu ho pre live vetvu zúžime na
 	// KONKRÉTNE interné route literály — každý produktový PR (#385–#390), čo prepne kartu na `live`,
-	// sem pridá svoj `/konfigurator/<slug>` literál (#385: pridaný bazén).
-	type LiveRoute = '/konfigurator/pergola' | '/konfigurator/bazen';
+	// sem pridá svoj `/konfigurator/<slug>` literál (#385–#390: všetkých 7 radov je live).
+	type LiveRoute =
+		| '/konfigurator/pergola'
+		| '/konfigurator/bazen'
+		| '/konfigurator/zasklenie'
+		| '/konfigurator/zimna-zahrada'
+		| '/konfigurator/oplotenie'
+		| '/konfigurator/tienenie'
+		| '/konfigurator/pristresok';
 </script>
 
 <section class="vyber" data-testid="konf-vyber">

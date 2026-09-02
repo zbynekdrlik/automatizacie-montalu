@@ -261,7 +261,7 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
   (rollback zdravého kvôli flaky tunelu by bol horší).
 
 - **Post-deploy E2E = krok v deploy jobe** (NIE nový job — `tests/ci-docker-
-  hardening.test.ts` tvrdí presne 3 joby). Po health OK: SSH tunel
+  hardening.test.ts` tvrdí presnú množinu jobov). Po health OK: SSH tunel
   `-L 18091:127.0.0.1:8090`, `DEPLOY_SHA7=<sha7> BASE_URL=http://localhost:18091
   npx playwright test post-deploy.spec.ts` (`E2E_USER`/`E2E_PASS` zo secrets env
   `production`). `e2e/post-deploy.spec.ts` je BY CONSTRUCTION read-only (login +
@@ -280,10 +280,13 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
 Tri mechanické guardy tvarujú, ako sa deploy job smie meniť — nezistíš ich, kým
 ťa nezablokujú pri integrácii:
 
-- **`tests/ci-docker-hardening.test.ts` tvrdí PRESNE 3 joby** (`deploy/test/
-  version-check`). Post-deploy overenie preto MUSÍ byť KROK v `deploy` jobe, nie
-  nový job (4. job rozbije `parser vidí všetky tri joby`). Guard tiež žiada
-  `timeout-minutes` na KAŽDOM jobe a SHA-pin na KAŽDEJ `uses:` akcii.
+- **`tests/ci-docker-hardening.test.ts` tvrdí PRESNÚ MNOŽINU jobov** (dnes 4:
+  `deploy/publish-image/test/version-check` — `publish-image` = ghcr publish
+  pridaný gatekeeperom 3b9c358, odoo-erp #5821). Post-deploy overenie preto MUSÍ
+  byť KROK v `deploy` jobe, nie nový job — PRIDANIE akéhokoľvek ĎALŠIEHO jobu
+  rozbije `parser vidí všetky štyri joby`, kým ho do tej množiny nedoplníš (to je
+  zámer — fail-closed). Guard tiež žiada `timeout-minutes` na KAŽDOM jobe a SHA-pin
+  na KAŽDEJ `uses:` akcii.
 - **`not.toMatch(/continue-on-error/)` matchne aj v KOMENTÁRI.** Nepíš doslovný
   reťazec „continue-on-error" ani do vysvetľujúceho YAML komentára — guard padne.
 - **GitHub Actions: vlastný step-level `if:` dostane IMPLICITNE `success() &&`.**
@@ -402,7 +405,8 @@ Kontajner beží ako **`USER node` (uid 1000)** a CI deploy sa prihlasuje ako **
 - **`ci-docker-hardening.test.ts` guard (#256):** tvrdí `USER node` v runtime stage (za
   POSLEDNÝM `FROM`), `chown node:node /data/app` PRED `USER`, deploy job bez `root@` a s
   `deploy@`, `migrate_ownership` + `chown -R 1000:1000 /data/app` v deploy-remote.sh. Guard
-  z #244 (`presne 3 joby`) NEZMENENÝ — nepribudol job.
+  z #244 (vtedy 3 joby; dnes 4 vrátane `publish-image` — gatekeeper ghcr) #256 NEZMENIL —
+  nepribudol job.
 
 - **UNVERIFIED (over pri prvom deployi na VPS):** n8n uid (`docker inspect --format
   '{{.Config.User}}' <n8n-kontajner>`) — predpoklad 1000 (oficiálny n8nio/n8n image beží ako

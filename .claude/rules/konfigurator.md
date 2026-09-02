@@ -341,11 +341,70 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   `system`; **hlavný rozmer DĹŽKA → `dlzka`** (nové neutrálne pole → `zhrnutieRiadky` vykreslí „Rozmery
   (d × š)"), NIE pergolová `hlbka` (tá renderuje „š × h" a poradie by sa líšilo od stránky); výška/koľaj/
   segmenty/plocha → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/`model`/`pocetPoli`) NEPOUŽÍVAJ.
+- **PASCA `sklo` render-cesta (#390):** `PonukaConfig.sklo` sa v `zhrnutieRiadky` (PDF/lead riadok
+  „Sklo / výplň") prepúšťa cez `konfSkloKategoriaPreNazov(cfg.sklo)` — teda ak názov výplne/krytiny
+  PRESNE sedí s pergolovým katalógovým `katalogNazov` skla, riadok sa TICHO premenuje na zákaznícky
+  label kategórie (nie na to, čo zákazník vybral). Dnes bazén (polykarbonáty) ani prístrešok (4
+  krytiny) nekolidujú → renderujú RAW. Ale **#387 zasklenia = SKLO** → vysoké riziko kolízie: pri
+  novom produkte over render-cestu testom `expect(zhrnutieRiadky(cfg)).toContainEqual({ label: 'Sklo
+  / výplň', value: <názov> })` PRE KAŽDÝ názov výplne (nie len `cfg.sklo` dátové pole — tá regresia by
+  ostala zelená). Pri reálnej kolízii daj výplni disjunktný názov alebo mapuj do iného poľa.
 - **Money-safety (A) obsahový grep chytá LEN literál `moneyKod`** — nový Money kód (BPK*/BPP* ako holé
   stringy) potrebuje VLASTNÝ vzor: pridaj `/(^|\/)<katalog>$/` do `KLIENT_ZAKAZANE_SPEC` (import) +
-  obsahový regex (napr. `\bBP[KP]\d{5}\b`) do (A) grafu aj (B). Inak by import Money katalógu prešiel.
+  obsahový regex do (A) grafu aj (B). Inak by import Money katalógu prešiel. Vzory doteraz:
+  `\bBP[KP]\d{5}\b` (bazén #385), `\bZAS[PK]\d{4,}\b` (zasklenie #387 — case-sensitive, aby
+  NEmatchol slovenské „zasklievacie"/`ZASKLENIE_*` konštanty). **PASCA (stálo #387 fix-kolo): nový
+  obsahový vzor si zachytí AJ VLASTNÝ klientsky modul, ak má v KOMENTÁRI/príklade literálny Money
+  kód** (napr. `konfigurator-zasklenie.ts` mal v hlavičke „…ZASP00116, ZASK202538" → guard (A) ho
+  označil za únik). Do komentárov nového client modulu píš rodinu bez čísla („kódy rodiny ZAS-P /
+  ZAS-K", „BPK*") — NIKDY konkrétny `ZASP00116`/`BPK00108`. Guard beží aj nad novým modulom (je v
+  klientskom grafe).
 - **Rozmery = `RozmerStepper`** (metre, #333 owner directive; zdieľaj so pergolou — `bind:hodnotaMm`,
   funguje aj bez `<form>`). Podmienka: rozmer na 100 mm mriežke (1 desatinné metre) — krok 250 mm sa
-  nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty) = `<select>` (constrained → súhrn/
-  dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
+  nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty/kusy) = `<select>` (constrained →
+  súhrn/dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
   (žiadny server round-trip netreba); pergolový `vypocet` submit je potrebný LEN kvôli server-cene.
+- **Varianty over RAW DOM-om, NIE WebFetch súhrnom (#386 pasca).** „VARIANTY NEVYMÝŠĽAJ" =
+  over KAŽDÝ model/zasklenie/terminológiu proti DOSLOVNÉMU obsahu montalu.sk. WebFetch (malý
+  sumarizačný model) si na #386 VYMYSLEL zasklievacie termíny („izolačné dvojsklo/trojsklo"),
+  ktoré `curl … | grep -oi` na živej stránke mal 0× — použi len termíny s reálnym hitom (na #386
+  to boli „polykarbonát, bezpečnostné sklo, izolačné sklo, panel ISODOMUS"). Grep literálne reťazce,
+  needôveruj prozaickému súhrnu.
+- **Cenový zdroj over PRED honest-null zdôvodnením (#386 pasca).** Nepíš „montalu.sk nemá cenník"
+  bez overenia — VÄČŠINA radov cenu MÁ: `montalu.sk/konfigurator` má produktové karty „od X € bez
+  DPH" a per-produkt konfigurátor `montalu.sk/konfigurator/<produkt>` (napr. `…/zimne-zahrady`, HTTP
+  200). Honest-null (`cenovyZdroj:false`) je aj tak správny pre PR (vyťaženie matice = #279-scale
+  follow-up, vzor bazén #404, zimná záhrada #408) — ale ZDÔVODNENIE je „zdroj existuje, vyťaženie je
+  samostatná práca", nie „zdroj neexistuje".
+- **HONEST-NULL testy sú TAUTOLOGICKÉ, ak cfg nemá `hlbka`+`model` (#388 review 🟡 — pasca pre KAŽDÝ
+  ďalší honest-null produkt).** `cenaZCfg`/`opeciatkujCenu` vráti `null`, keď cfg NEMÁ `hlbka`+`model`
+  (bez rozmerov cenu neurčí), takže „PDF/pečiatka bez ceny" prejde AJ keby sa gate `maCenovyZdroj(<produkt>)`
+  rozbil — test nič nestráži. Testuj FORGED CENOTVORNOU cfg (`{ model:'LIGHT', sirka:4000, hlbka:3500 }`)
+  pod svojím produktom → dokáže, že PRODUKTOVÝ gate blokuje cenu, hoci rozmery+model by ju vedeli dať
+  (submit AJ DB re-download cez `regeneratePonukaPdf`, ktorý threadne `produkt`); + KONTROLA že TÁ ISTÁ
+  cfg pod `'pergola'` cenu DOSTANE (inak je gate potenciálny no-op). Toto je aj cesta, ktorú vie klient
+  sfalšovať v POST `konfiguracia`.
+- **Zavádzajúci label over na RENDER vrstve, nie ako absenciu poľa (#388 review 🔵).** „PonukaConfig
+  nemá `vyskaVpredu`" je slabé — assertni `zhrnutieRiadky(cfg).map(r=>r.label)` na PRESNÚ množinu
+  (napr. oplotenie = `[Systém, Šírka, Farba konštrukcie, Popis]`), aby budúca zmena logiky riadkov v
+  `ponuka.ts` (reinterpretácia `sirka`/`dlzka`) zavádzajúci pergolový label zachytila.
+- **montalu.sk cenový endpoint má NEOČAKÁVANÝ anglický slug** — pergola `update-pergolas`, bazén
+  `update-pools`, oplotenie **`update-fencings`** (konfigurátor na `/konfigurator/oplotenia`, nie
+  `-oplotenie`). Nájdeš ho v HTML konfigurátora daného radu (`data-update="…update-<slug>"`); 419 =
+  existuje (CSRF), 404 = neexistuje. Vyťaženie matice je vždy #279-scale follow-up (honest-null v PR).
+- **PER-MODEL limity = FUNKCIA modelu, NIE jedna konštanta (#389 tienenie, review 🟡).** Keď má produkt
+  varianty s RÔZNYMI reálnymi rozmerovými maximami (markíza XLINE š7500/v6000, XLIGHT 6000/5000, roleta
+  ZIPLINE 4000/v3000), NEROB jeden „generózny" `RANGES` const — vytvorí to nemožné konfigurácie
+  (ZIPLINE výška 6000 pri reálnom max 3000) a PDF/lead by ich zapísal. Honest-null rieši CENU, nie SPEC.
+  Vzor: limit na `<Produkt>ModelInfo` (`sirka`/`rozmer2` `{min,max}`), `<produkt>Ranges(model)` funkcia,
+  `r = $derived(<produkt>Ranges(model))` v stránke, a `$effect` čo pri prepnutí typu CLAMPne rozmery do
+  nových limitov (zápis rovnakej hodnoty = no-op, žiadna slučka). To isté pre voľby dostupné len pri
+  niektorých modeloch (tienenie: „Ručné" LEN XLIGHT — filtruj katalóg per model + resetni pri prepnutí).
+- **Reálnu ponuku OVER na webe, nič nevymýšľaj (#389).** Rozmerové maximá, dostupné varianty aj
+  ovládanie ťahaj z montalu.sk produktovej stránky (per model), nie z pamäte. Farbu, ktorú web ponúka
+  len „podľa vzorkovníka" (tienenie látka), NEROB ako fixný picker s vymyslenými kódmi — poznámka do
+  súhrnu/PDF. ASCII `id` pre voľby s diakritikou v `kod` (E2E testid stabilita, review 🔵).
+- **Honest-null test NESMIE byť vákuový (#389 review 🟡).** `cenaZCfg` vráti null bez `hlbka` v cfg
+  BEZ OHĽADU na gate — takže test s `{system,sirka}` by prešiel aj keby gate NEBOL. Testuj gate FORGED
+  pergola-tvarom (`hlbka`+`model` — `sanitizePonukaConfig` ho prijme) + pozitívnou kontrolou, že ten
+  istý cfg s `'pergola'` cenu MÁ.
