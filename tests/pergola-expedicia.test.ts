@@ -88,7 +88,14 @@ describe('#419 — expedičný zoznam: kontrakt transformu', () => {
 
 	it('komponent s null kodCad ostáva null (nikdy sa kód nedopĺňa)', () => {
 		const kompNull: PergolaKomponent[] = [
-			{ typ: 'Krytka', kdePouzity: 'x', systemy: ['Massive'], kodCad: null, zdroj: 't', pocetKs: null }
+			{
+				typ: 'Krytka',
+				kdePouzity: 'x',
+				systemy: ['Massive'],
+				kodCad: null,
+				zdroj: 't',
+				pocetKs: null
+			}
 		];
 		const e = expedicnyZoznam(vys, kompNull);
 		expect(e.polozky[2]!.kod).toBeNull();
@@ -107,7 +114,10 @@ describe('#419 — expedičný zoznam: kontrakt transformu', () => {
 describe('#419 — expedičný zoznam: integrácia s reálnym enginom (honest, žiaden vymyslený údaj)', () => {
 	const configy: Array<[string, PergolaNarezVstup]> = [
 		['Massive na stenu', BASE],
-		['Robust samostatne', { ...BASE, system: 'Robust', uchytenie: 'samostatne', hornyProfilZadnej: 110 }]
+		[
+			'Robust samostatne',
+			{ ...BASE, system: 'Robust', uchytenie: 'samostatne', hornyProfilZadnej: 110 }
+		]
 	];
 
 	for (const [meno, v] of configy) {

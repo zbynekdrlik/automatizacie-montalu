@@ -610,3 +610,44 @@ test('#223 strešné sklo — polykarbonát: šírka = svetlosť + 34, kód hone
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('#419 — expedičný zoznam: hotové profily (reálne počty) + komponenty („—") + odškrtávací stĺpec', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('5760');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// karta + tabuľka expedičného zoznamu sú prítomné
+	const karta = page.getByTestId('expedicia-karta');
+	await expect(karta).toBeVisible();
+	const tab = page.getByTestId('expedicia-tabulka');
+	await expect(tab).toBeVisible();
+
+	// súhrnný odznak = súčet ZNÁMYCH počtov kusov profilov (číslo > 0, plain formát)
+	await expect(page.getByTestId('expedicia-spolu')).toContainText(/Spolu \d+ ks profilov/);
+
+	// hotový profil (predná noha 18017) je v zozname s REÁLNYM počtom 4 ks a dĺžkou 2215 mm
+	const nohaRiadok = page.getByTestId('expedicia-riadok').filter({ hasText: 'predná noha' });
+	await expect(nohaRiadok).toContainText('18017');
+	await expect(nohaRiadok).toContainText('2215');
+	await expect(nohaRiadok).toContainText('Profil');
+	// počet v poslednej bunke = presne 4 ks (nie substring z názvu „140x140")
+	await expect(nohaRiadok.locator('td').last()).toHaveText('4');
+
+	// komponent (spojka U) je v zozname s honest-null počtom „—" (nikdy vymyslený počet)
+	const spojkaRiadok = page.getByTestId('expedicia-riadok').filter({ hasText: 'Spojka U' });
+	await expect(spojkaRiadok).toContainText('Komponent');
+	await expect(spojkaRiadok.locator('td').last()).toHaveText('—');
+
+	// odškrtávací stĺpec (papierový checkbox) je pri každom riadku
+	await expect(tab.locator('.check-box').first()).toContainText('☐');
+
+	expect(consoleMsgs).toEqual([]);
+});

@@ -13,6 +13,8 @@
 		type PergolaKomponent
 	} from '$lib/pergola-narez';
 	import { pozicujDiely } from '$lib/pergola-vyroba';
+	// #419 — expedičný zoznam: čistý transform vypočítaných dát (hotové profily + komponenty)
+	import { expedicnyZoznam } from '$lib/pergola-expedicia';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
@@ -73,6 +75,8 @@
 	const fmtFix = fmtFixMm;
 	// #381 — pozičné čísla dielov (Poz.) previazané s pohľadmi vo výkrese (balóniky)
 	const diely = $derived(pozicujDiely(vysledok.vypocitane));
+	// #419 — expedičný zoznam (výdajová listina): hotové profily z nárezu + kusové komponenty
+	const expedicia = $derived(expedicnyZoznam(vysledok, komponenty));
 </script>
 
 <div class="card">
@@ -353,6 +357,49 @@
 	{/if}
 </div>
 
+<div class="card" data-testid="expedicia-karta">
+	<div class="sec">
+		Expedičný zoznam
+		<span class="badge ok" data-testid="expedicia-spolu"
+			>Spolu {expedicia.spoluKusov} ks profilov</span
+		>
+	</div>
+	<p class="sub noprint">
+		Výdajová listina — hotové kusy, ktoré idú na expedíciu z tejto zákazky. Odškrtni pri nakládke.
+		Počty profilov sú z nárezu (isté); komponenty (spojky, krytky) čakajú na tabuľky od Dominika,
+		preto majú počet „—".
+	</p>
+	{#if expedicia.polozky.length === 0}
+		<p class="sub" data-testid="expedicia-prazdne">
+			Zatiaľ žiadne položky na expedíciu — zadaj rozmery a spočítaj materiál.
+		</p>
+	{:else}
+		<table class="narez" data-testid="expedicia-tabulka">
+			<thead>
+				<tr
+					><th class="check-col">Naložené</th><th>Skupina</th><th>Kód</th><th>Názov</th><th
+						>Dĺžka</th
+					><th>Počet ks</th></tr
+				>
+			</thead>
+			<tbody>
+				<!-- kľúč nesie index i — jeden kód sa môže vyskytnúť viackrát (18016 pod fixom + pod
+				     kotviacim; 18017 predná + zadná noha), takže kód/názov samy o sebe nie sú unikátne -->
+				{#each expedicia.polozky as p, i (p.skupina + '·' + (p.kod ?? '') + '·' + p.nazov + '·' + i)}
+					<tr data-testid="expedicia-riadok">
+						<td class="check-col"><span class="check-box" aria-hidden="true">☐</span></td>
+						<td>{p.skupina === 'profil' ? 'Profil' : 'Komponent'}</td>
+						<td>{p.kod ?? '—'}</td>
+						<td>{p.nazov}</td>
+						<td>{mmVal(p.dlzkaRezuMm)}</td>
+						<td><b>{p.pocetKs ?? '—'}</b></td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	{/if}
+</div>
+
 <div class="card">
 	<div class="sec">Informatívne výpočty</div>
 	<div data-testid="narez-informativne">
@@ -580,6 +627,17 @@
 		width: 40px;
 		text-align: center;
 		white-space: nowrap;
+	}
+
+	/* #419 — expedičný zoznam: odškrtávací stĺpec (papierový checkbox, žiaden stav sa neukladá) */
+	.check-col {
+		width: 72px;
+		text-align: center;
+		white-space: nowrap;
+	}
+	.check-box {
+		font-size: 18px;
+		color: #475569;
 	}
 
 	/* #233 — čistá bunka NÁZOV: hlavný názov + krátka šedá poznámka + rozklikávací detail;
