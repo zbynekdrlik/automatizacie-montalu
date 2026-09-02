@@ -33,6 +33,12 @@ je to iná/opustená testovacia agenda).
 0-sklad kód NEBLOKUJE odpis (napr. nosový ZASP00010) — dôležité je, že je to SPRÁVNY
 aktuálny článok, nie sklad.
 
+**Pri oprave zastaranej prístupovej cesty grepni CELÝ `.claude/` strom, nielen tikety
+menované súbory** (#425): `slovnormal_odoo` cesta bola predpísaná na 4 miestach, tiket
+menoval 3 (`money-odpis`, `deploy` skill, `sync-profil-obrazky.sh`) — `.claude/rules/
+pergola-narez.md` mal svoj vlastný, nezávislý odkaz, ktorý by inak ostal mŕtvy aj po
+„dokončenej" oprave.
+
 **Rovnaký NÁZOV profilu existuje vo viacerých systémoch — rozlišuj podľa `Model_UserData`.**
 Money má napr. DVA „Oponový profil surový 7500 mm": `ZASP00006` s `Model_UserData =
 'Zasklenie Robust'` (FINAL, 2021) a `ZASP20249` s `'Zasklenie Slide'` (Cortizo, 2024).

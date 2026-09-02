@@ -1971,3 +1971,22 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   kolízia — dôležité pre #387 zasklenia = sklo).
 - 210 unit súborov / 2965 testov zelené (coverage 94.41/89.36/97.32/95.39), E2E pristresok+vyber 4/4,
   vizuálne overené naživo (screenshot). NEmergnuté (worktree — supervisor integruje sériovo). #384 ostáva otvorený.
+
+## #425 — Money bridge: slovnormal_odoo SSH kľúč mŕtvy → gatekeeper dvojskok (worktree-agent-a0af3c1257e8c5336)
+- Verzia 0.24.78-dev.1 (bump e22828c). Commity: f06195c (fix) + 16653e8 (review 2🟡+3🔵 fix).
+- Príčina: `~/.ssh/slovnormal_odoo` odstránený z dev boxov old-key-removal sweepom (odoo-erp #1183/#3629).
+  `money-odpis`/`deploy` skills + `sync-profil-obrazky.sh` stále predpisovali priamy jednoskokový SSH.
+- Fix: dvojskok `ssh gatekeeper@100.90.94.41` (default `newlevel` identita) → jeho vlastný `~/.ssh/config`
+  alias `montalu-prod` (dedikovaný `gatekeeper_prod` kľúč) na skutočný Money bridge host. `sync-profil-
+  obrazky.sh` prepísaný na `remote()` helper (POSIX-escapovaný) + raw stdin/stdout piping cez nested SSH
+  (žiadny priamy scp/kľúč na dev boxoch). Zamietnutá alternatíva: `~/devel/montalu/n8n/` vlastný
+  `money-ro-thirdparty` tunel — cudzie, gitignorované credentials iného projektu, nekríženo-závislé.
+- Review našiel 4. mŕtvu referenciu mimo pôvodne menovaných 3 súborov (`.claude/rules/pergola-narez.md`)
+  + retry-exhaustion silent fallthrough bug (opravené `exit 1`) — oba fixnuté v 16653e8.
+- Overené naživo: SELECT TOP 1 z Artikly_Artikl cez nový dvojskok (STRICTLY READ-ONLY), binárny tar
+  round-trip (md5sum), `remote()` s vstavaným `'`/exit-status/stdin/stdout — všetko cez skutočný
+  gatekeeper/montalu-prod double-hop. `npm run check` 0/0, `npm run lint` čisté, 217/217 test files
+  (3116 testov) zelené, shellcheck čistý (okrem zámerného SC2029 info).
+- Playbook: money-odpis.md §1 prepísané na gatekeeper cestu + nová poznámka „grepni CELÝ .claude/ strom
+  pri oprave zastaranej prístupovej cesty" (4. mŕtve miesto by inak ostalo). NEmergnuté (worktree —
+  supervisor integruje sériovo).
