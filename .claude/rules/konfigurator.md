@@ -353,8 +353,8 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   klientskom grafe).
 - **Rozmery = `RozmerStepper`** (metre, #333 owner directive; zdieľaj so pergolou — `bind:hodnotaMm`,
   funguje aj bez `<form>`). Podmienka: rozmer na 100 mm mriežke (1 desatinné metre) — krok 250 mm sa
-  nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty) = `<select>` (constrained → súhrn/
-  dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
+  nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty/kusy) = `<select>` (constrained →
+  súhrn/dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
   (žiadny server round-trip netreba); pergolový `vypocet` submit je potrebný LEN kvôli server-cene.
 - **Varianty over RAW DOM-om, NIE WebFetch súhrnom (#386 pasca).** „VARIANTY NEVYMÝŠĽAJ" =
   over KAŽDÝ model/zasklenie/terminológiu proti DOSLOVNÉMU obsahu montalu.sk. WebFetch (malý
@@ -368,3 +368,19 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   200). Honest-null (`cenovyZdroj:false`) je aj tak správny pre PR (vyťaženie matice = #279-scale
   follow-up, vzor bazén #404, zimná záhrada #408) — ale ZDÔVODNENIE je „zdroj existuje, vyťaženie je
   samostatná práca", nie „zdroj neexistuje".
+- **HONEST-NULL testy sú TAUTOLOGICKÉ, ak cfg nemá `hlbka`+`model` (#388 review 🟡 — pasca pre KAŽDÝ
+  ďalší honest-null produkt).** `cenaZCfg`/`opeciatkujCenu` vráti `null`, keď cfg NEMÁ `hlbka`+`model`
+  (bez rozmerov cenu neurčí), takže „PDF/pečiatka bez ceny" prejde AJ keby sa gate `maCenovyZdroj(<produkt>)`
+  rozbil — test nič nestráži. Testuj FORGED CENOTVORNOU cfg (`{ model:'LIGHT', sirka:4000, hlbka:3500 }`)
+  pod svojím produktom → dokáže, že PRODUKTOVÝ gate blokuje cenu, hoci rozmery+model by ju vedeli dať
+  (submit AJ DB re-download cez `regeneratePonukaPdf`, ktorý threadne `produkt`); + KONTROLA že TÁ ISTÁ
+  cfg pod `'pergola'` cenu DOSTANE (inak je gate potenciálny no-op). Toto je aj cesta, ktorú vie klient
+  sfalšovať v POST `konfiguracia`.
+- **Zavádzajúci label over na RENDER vrstve, nie ako absenciu poľa (#388 review 🔵).** „PonukaConfig
+  nemá `vyskaVpredu`" je slabé — assertni `zhrnutieRiadky(cfg).map(r=>r.label)` na PRESNÚ množinu
+  (napr. oplotenie = `[Systém, Šírka, Farba konštrukcie, Popis]`), aby budúca zmena logiky riadkov v
+  `ponuka.ts` (reinterpretácia `sirka`/`dlzka`) zavádzajúci pergolový label zachytila.
+- **montalu.sk cenový endpoint má NEOČAKÁVANÝ anglický slug** — pergola `update-pergolas`, bazén
+  `update-pools`, oplotenie **`update-fencings`** (konfigurátor na `/konfigurator/oplotenia`, nie
+  `-oplotenie`). Nájdeš ho v HTML konfigurátora daného radu (`data-update="…update-<slug>"`); 419 =
+  existuje (CSRF), 404 = neexistuje. Vyťaženie matice je vždy #279-scale follow-up (honest-null v PR).

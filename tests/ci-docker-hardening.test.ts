@@ -42,6 +42,8 @@ describe('#244 — CI hardening (.github/workflows/ci.yml)', () => {
 	const jobs = childBlocks(ci, 'jobs', 2);
 
 	it('parser vidí všetky štyri joby', () => {
+		// `publish-image` = ghcr publish job (gatekeeper 3b9c358, odoo-erp #5821) — beží PARALELNE s
+		// `deploy` z push do `main`. Pridaný do CI bez update tohto štruktúrneho testu → doplnené.
 		expect(Object.keys(jobs).sort()).toEqual(['deploy', 'publish-image', 'test', 'version-check']);
 	});
 

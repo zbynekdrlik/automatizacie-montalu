@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole } from './helpers';
 
-test('výberová obrazovka: grid kariet + pergola, bazén, zimná záhrada & zasklenie live vedú interne, „pripravujeme" (oplotenie) externe', async ({
+test('výberová obrazovka: grid kariet + pergola, bazén, zimná záhrada, zasklenie & oplotenie live vedú interne, „pripravujeme" (tienenie) externe', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -33,18 +33,24 @@ test('výberová obrazovka: grid kariet + pergola, bazén, zimná záhrada & zas
 	await expect(zasklenie).toHaveAttribute('data-stav', 'live');
 	await expect(zasklenie).toHaveAttribute('href', /\/konfigurator\/zasklenie$/);
 
+	// #388: oplotenie = live karta → interná podstránka `/konfigurator/oplotenie` (už nie „pripravujeme")
+	const oplotenie = page.getByTestId('konf-produkt-oplotenie');
+	await expect(oplotenie).toBeVisible();
+	await expect(oplotenie).toHaveAttribute('data-stav', 'live');
+	await expect(oplotenie).toHaveAttribute('href', /\/konfigurator\/oplotenie$/);
+
 	// #386: zimná záhrada = live karta → interná podstránka `/konfigurator/zimna-zahrada` (už nie „pripravujeme")
 	const zz = page.getByTestId('konf-produkt-zimna-zahrada');
 	await expect(zz).toBeVisible();
 	await expect(zz).toHaveAttribute('data-stav', 'live');
 	await expect(zz).toHaveAttribute('href', /\/konfigurator\/zimna-zahrada$/);
 
-	// „pripravujeme" karta (oplotenie) = stále externý odkaz na montalu.sk (nový tab)
-	const oplotenie = page.getByTestId('konf-produkt-oplotenie');
-	await expect(oplotenie).toBeVisible();
-	await expect(oplotenie).toHaveAttribute('data-stav', 'pripravujeme');
-	await expect(oplotenie).toHaveAttribute('href', /montalu\.sk\/produkty\/oplotenie$/);
-	await expect(oplotenie).toHaveAttribute('target', '_blank');
+	// „pripravujeme" karta (tienenie) = stále externý odkaz na montalu.sk (nový tab)
+	const tienenie = page.getByTestId('konf-produkt-tienenie');
+	await expect(tienenie).toBeVisible();
+	await expect(tienenie).toHaveAttribute('data-stav', 'pripravujeme');
+	await expect(tienenie).toHaveAttribute('href', /montalu\.sk\/produkty\/tienenie$/);
+	await expect(tienenie).toHaveAttribute('target', '_blank');
 
 	// všetkých 7 produktových kariet je prítomných (parita so 6 kategóriami montalu.sk + prístrešky)
 	await expect(page.locator('[data-testid^="konf-produkt-"]')).toHaveCount(7);
