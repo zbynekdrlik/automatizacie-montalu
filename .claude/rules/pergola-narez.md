@@ -561,3 +561,31 @@ Gotchy (review #378), ktoré stáli čas:
   najprv nemal → round-trip test padol na `.check()`).
 - **Round-trip E2E je POVINNÝ** (ROUND-TRIP PASCA vyššie): override → Spočítať → „Späť a upraviť"
   → všetkých 10 FIX polí obnovených; `fix` sa echuje v KAŽDEJ z 12 return vetiev servera.
+
+## Výrobná varianta hárku (#381) — `pergola-vyroba.ts`, VÝROBNÉ kóty LEN z potvrdených pozícií
+
+Podmnožina 1+3+4 (#381): pozičné čísla dielov (kusovník ↔ pohľady), reťazové kóty priečok
+v pôdoryse, montážne tolerancie. Funkcie žijú v **`src/lib/pergola-vyroba.ts`** (large-file
+split — `pergola-narez.ts` prekročilo 1000-r. strop; acyklický import: `pergola-vyroba` →
+`pergola-narez`, NIKDY naopak; pridané do `CISTY_ENGINE` money-safety guardu). Konzumenti
+(`RezVysledok`, `PergolaNarezVykres`, testy) importujú tie funkcie priamo z `$lib/pergola-vyroba`.
+
+- **VÝROBNÉ kóty priečok/krovov sa kreslia LEN z POTVRDENÝCH pozícií, NIKDY zo schematického
+  `pocetPriecok`.** `schemaVykresu().priecky.pozicieX` je len SCHEMATICKÉ rovnomerné delenie
+  (`ceil(š/700)+1`, deliace čiary predného pohľadu) — dať ho do reťazovej kóty výrobného
+  hárku je „hádanie na výkrese", ktoré PROTIREČÍ kusovníku (počet krovov je MANUÁLNY vstup,
+  napr. 8 vs schéma 9) aj Dominikovmu výkresu (review nález #381). Použi `prieckyOsiPotvrdene(v)`
+  — osi z počtu krovov + `svetlostMedziKrovmi` (rozstup = `KROV_SIRKA_MM` + svetlosť = 705,4 na
+  OP260282, presne Dominikova hodnota). **Bez zadaného počtu krovov → `null` = honest-null**
+  (reťazová kóta ani priečky sa v pôdoryse VÔBEC nekreslia; presne ako `krovDlzkaDoMoney`).
+  Dominikove konkrétne CAD reťazcové hodnoty (0/151/606,4…) sa NEHARDCODUJÚ.
+- **Pozičné balóniky** = `pozicieVoVykrese(vypocitane)` mapuje rolu (predná/zadná noha, žľab,
+  priečka) na jej pozičné číslo z `pozicujDiely`; `null` rola (napr. zadná noha na stenu, alebo
+  priečka bez potvrdeného počtu krovov) → balónik sa nekreslí. `pozicujDiely` = stĺpec „Poz."
+  v `RezVysledok` (`cislo = index+1`). Roly sa hľadajú predikátmi na názve/kóde — testuj cez
+  KÓD (18017/18013/18018/18004), nie re-aplikáciou toho istého predikátu (bola by to tautológia).
+- **Tolerancie** `MONTAZNE_TOLERANCIE_HLBKA_MM = [2,3,12]` = CAD KONŠTANTY (#377 grounding),
+  nezávislé od rozmerov → zobrazujú sa pre všetky konfigurácie; šírka toleranciu NEDOSTÁVA.
+  Per-view rozklad (View A +2 / View B +3/+12) sa nereprodukuje (jeden bočný pohľad) — poznámka
+  v spec bloku „TOLERANCIE: hĺbka · montáž +2 / +3 / +12 mm".
+- Časti 2 (Detail C/D uloženia) + 5 (rezný náčrt krovu s uhlami) ostávajú viazané na #161.

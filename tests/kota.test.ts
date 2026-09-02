@@ -15,6 +15,7 @@ import {
 	angleDimension,
 	fitScale,
 	viewBoxAttr,
+	retazoveKoty,
 	type Box
 } from '../src/lib/vykres/kota';
 
@@ -402,5 +403,47 @@ describe('fitScale', () => {
 describe('viewBoxAttr', () => {
 	it('formátuje "0 0 w h"', () => {
 		expect(viewBoxAttr(297, 210)).toBe('0 0 297 210');
+	});
+});
+
+describe('retazoveKoty — reťazová (chain) kóta z hraníc (#381 časť 3)', () => {
+	it('vráti po sebe idúce segmenty od→koniec s dĺžkou', () => {
+		expect(retazoveKoty([0, 100, 250])).toEqual([
+			{ od: 0, koniec: 100, dlzka: 100 },
+			{ od: 100, koniec: 250, dlzka: 150 }
+		]);
+	});
+
+	it('zoradí neusporiadané hranice vzostupne pred segmentáciou', () => {
+		expect(retazoveKoty([250, 0, 100])).toEqual([
+			{ od: 0, koniec: 100, dlzka: 100 },
+			{ od: 100, koniec: 250, dlzka: 150 }
+		]);
+	});
+
+	it('súčet dĺžok segmentov = celkové rozpätie (max − min)', () => {
+		const hranice = [0, 600, 1250, 4990];
+		const seg = retazoveKoty(hranice);
+		const sucet = seg.reduce((a, s) => a + s.dlzka, 0);
+		expect(sucet).toBe(4990);
+		expect(seg.length).toBe(hranice.length - 1);
+	});
+
+	it('zaokrúhli dĺžku na 1 desatinné miesto', () => {
+		expect(retazoveKoty([0, 655.43])).toEqual([{ od: 0, koniec: 655.43, dlzka: 655.4 }]);
+	});
+
+	it('< 2 hranice → prázdne pole (žiadny segment)', () => {
+		expect(retazoveKoty([])).toEqual([]);
+		expect(retazoveKoty([100])).toEqual([]);
+	});
+
+	it('zhodné susedné hranice → nulový segment sa VYNECHÁ (žiadny degenerát <Kota>)', () => {
+		// duplicitná hranica (100) by dala dĺžku 0 → <Kota> s totožnými koncami = each_key_duplicate
+		expect(retazoveKoty([0, 100, 100, 250])).toEqual([
+			{ od: 0, koniec: 100, dlzka: 100 },
+			{ od: 100, koniec: 250, dlzka: 150 }
+		]);
+		expect(retazoveKoty([50, 50])).toEqual([]);
 	});
 });

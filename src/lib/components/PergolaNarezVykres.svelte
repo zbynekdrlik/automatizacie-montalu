@@ -15,7 +15,7 @@
 	// bokorys (bočný rez), pôdorys (mriežka nôh).
 	import VykresovyHarok from '$lib/components/vykres/VykresovyHarok.svelte';
 	import Kota from '$lib/components/vykres/Kota.svelte';
-	import { fmtMm, fmtDeg } from '$lib/vykres/kota';
+	import { fmtMm, fmtDeg, retazoveKoty } from '$lib/vykres/kota';
 	import { vypocitajMierku } from '$lib/vykres/mierka';
 	import {
 		sharedFitScale,
@@ -25,7 +25,17 @@
 		MIN_DIM_FONT,
 		type FitResult
 	} from '$lib/vykres/kompozicia';
-	import { schemaVykresu, MAX_ROZOSTUP_PRIECOK, type PergolaNarezVstup } from '$lib/pergola-narez';
+	import {
+		schemaVykresu,
+		spocitajNarez,
+		MAX_ROZOSTUP_PRIECOK,
+		type PergolaNarezVstup
+	} from '$lib/pergola-narez';
+	import {
+		pozicieVoVykrese,
+		prieckyOsiPotvrdene,
+		MONTAZNE_TOLERANCIE_HLBKA_MM
+	} from '$lib/pergola-vyroba';
 	import { krovUlozenie, type KrovUlozenie } from '$lib/pergola-krov';
 
 	let {
@@ -56,6 +66,18 @@
 
 	let s = $derived(schemaVykresu(vstup));
 
+	// #381 — pozičné čísla dielov previazané s pohľadmi (balóniky). Kusovník sa dopočíta
+	// z toho istého vstupu (`spocitajNarez` je pure display engine v CISTY_ENGINE), takže
+	// balóniky vždy sedia s materiálovou tabuľkou. `null` rola = balónik sa nekreslí.
+	let pozicie = $derived(pozicieVoVykrese(spocitajNarez(vstup).vypocitane));
+	// #381 — POTVRDENÉ osové pozície priečok (krovov) v pôdoryse z manuálneho počtu krovov +
+	// svetlosti. `null` bez potvrdeného počtu → reťazová kóta ani priečky sa nekreslia
+	// (honest-null: schematické rovnomerné delenie sa do VÝROBNÝCH kót nikdy nedáva).
+	let prieckyOsi = $derived(prieckyOsiPotvrdene(vstup));
+	// #381 — montážne tolerancie hĺbky = CAD konštanty (View A/B), poznámka pri kóte hĺbky.
+	const tolerancieText =
+		'montáž ' + MONTAZNE_TOLERANCIE_HLBKA_MM.map((t) => `+${t}`).join(' / ') + ' mm';
+
 	// #161 — krov uloženie z POTVRDENÝCH vzorcov (prah 7°). Počíta sa LEN keď je sklon
 	// strechy zadaný; inak (a pri sklone < 7°, ktorý engine hlási ako „nepodporované")
 	// ostáva krov len čestnou poznámkou → #161, presne ako doteraz (#194). NIKDY sa
@@ -82,6 +104,8 @@
 		const rows: [string, string, string][] = [
 			['SYSTÉM', 'system', vstup.system],
 			['ROZMER', 'rozmer', `${fmtMm(s.sirka)} × ${fmtMm(s.hlbka)} mm`],
+			// #381 — montážne tolerancie (CAD konštanty View A/B, hĺbka); šírka bez tolerancie
+			['TOLERANCIE', 'tolerancie', `hĺbka · ${tolerancieText}`],
 			['PREDNÁ SVETLOSŤ', 'svetlost', `${fmtMm(s.prednaSvetlost)} mm`],
 			[
 				'PREDNÉ NOHY',
@@ -296,6 +320,10 @@
 			data-testid="pnr-fe-noha-{i}"
 		/>
 	{/each}
+	<!-- #381 — pozičné balóniky: predná noha (na ľavej nohe), žľab (na hornom nosníku).
+	     Číslo zodpovedá stĺpcu „Poz." v materiálovej tabuľke. -->
+	{@render pozBalon(X(s.prednaNohyX[0] ?? 0), topY + (baseY - topY) * 0.14, pozicie.prednaNoha)}
+	{@render pozBalon(X(0) + (X(s.sirka) - X(0)) * 0.14, topY - zlabH / 2, pozicie.zlab)}
 	<!-- kóty: rozostupy nôh (medzi susednými), celková šírka, predná svetlá výška -->
 	{#each s.prednaNohyX.slice(0, -1) as px, i (i)}
 		<Kota
@@ -409,6 +437,8 @@
 			shape-rendering="crispEdges"
 			data-testid="pnr-bok-zadna-noha"
 		/>
+		<!-- #381 — pozičný balónik zadnej nohy (len samostatne stojaca; na stenu je null) -->
+		{@render pozBalon(xBack, yBackTop + (baseY - yBackTop) * 0.14, pozicie.zadnaNoha)}
 	{:else}
 		<line
 			x1={xBack}
@@ -503,6 +533,17 @@
 		stroke-width={obrysStroke(Math.min(X(s.sirka) - X(0), y1 - y0), REZ_STROKE)}
 		data-testid="pnr-pod-obrys"
 	/>
+	<!-- #381 — priečky (krokvy) ako zvislé čiary v smere hĺbky, na POTVRDENÝCH osových
+	     pozíciách (počet krovov + svetlosť). Bez potvrdeného počtu krovov sa NEKRESLIA
+	     (honest-null) — schematické rovnomerné delenie sa do výrobného pôdorysu nikdy nedáva.
+	     Ich rozostup kótuje reťazová kóta nižšie. -->
+	{#if prieckyOsi}
+		<g stroke={SIVA} stroke-width={POHLAD_STROKE} data-testid="pnr-pod-priecky">
+			{#each prieckyOsi as px, i (i)}
+				<line x1={X(px)} y1={y0} x2={X(px)} y2={y1} />
+			{/each}
+		</g>
+	{/if}
 	<!-- predné nohy — štvorčeky na PREDNEJ hrane (dole, y1) -->
 	{#each s.prednaNohyX as px, i (i)}
 		<rect
@@ -558,6 +599,30 @@
 		color={MODRA}
 		fontSize={MIN_DIM_FONT}
 	/>
+	<!-- #381 — reťazová (rozstupová) kóta priečok po šírke, nad horným okrajom pôdorysu.
+	     Hranice = kraje + POTVRDENÉ osové pozície krovov (rozstup = 50 + svetlosť medzi
+	     krovmi). Kreslí sa LEN pri potvrdenom počte krovov — honest-null inak, nič sa
+	     nehádže (Dominikove CAD hodnoty sa tiež NEHARDCODUJÚ). -->
+	{#if prieckyOsi}
+		{@const hranicePriecok = [0, ...prieckyOsi, s.sirka]}
+		<g data-testid="pnr-pod-retaz">
+			{#each retazoveKoty(hranicePriecok) as seg, i (i)}
+				<Kota
+					x0={X(seg.od)}
+					{y0}
+					x1={X(seg.koniec)}
+					y1={y0}
+					perpOffset={-(r.h * 0.055)}
+					text={fmtMm(seg.dlzka)}
+					color={MODRA}
+					fontSize={MIN_DIM_FONT}
+					opts={{ labelOffset: 3 }}
+				/>
+			{/each}
+		</g>
+		<!-- #381 — pozičný balónik priečky na prvej (potvrdenej) priečke -->
+		{@render pozBalon(X(prieckyOsi[0]!), (y0 + y1) / 2, pozicie.priecka)}
+	{/if}
 {/snippet}
 
 <!-- ============================= krov — uloženie / poznámka (#161) ================= -->
@@ -695,4 +760,24 @@
 			data-testid="pnr-spec-money">Display-only · Money odpis: /pergola</text
 		>
 	</g>
+{/snippet}
+
+<!-- ============================= pozičný balónik (#381) ============================= -->
+<!-- Malé číslo v krúžku pri nakreslenom diele; hodnota = stĺpec „Poz." materiálovej
+     tabuľky (pozicujDiely). `cislo == null` (diel v kusovníku nie je) → nekreslí sa. -->
+{#snippet pozBalon(cx: number, cy: number, cislo: number | null)}
+	{#if cislo != null}
+		<g data-testid="pnr-poz-{cislo}">
+			<circle {cx} {cy} r="3" fill="#fff" stroke={CIERNA} stroke-width="0.35" />
+			<text
+				x={cx}
+				y={cy}
+				text-anchor="middle"
+				dominant-baseline="central"
+				font-size={MIN_DIM_FONT}
+				font-weight="700"
+				fill={CIERNA}>{cislo}</text
+			>
+		</g>
+	{/if}
 {/snippet}
