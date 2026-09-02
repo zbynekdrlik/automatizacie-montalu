@@ -33,6 +33,39 @@ Bump MECHANICS (tab-preserving edit, never `JSON.stringify` — #161) and the re
 when a `-dev.N` already landed on `main` (#98/#174 `sort -V`) → auto-loads
 `.claude/rules/version-bump.md` on `package.json` / `.github/workflows/ci.yml`.
 
+## Working in this repo as a montalu4 sub-dev stream
+
+This repo is developed by the **owner** directly (the sections above describe the owner's
+dev→main release flow). A **montalu4 sub-dev stream** (an odoo-erp sidecar-integration
+worker, epic odoo-erp#5808) also lands app-side changes here, with a DIFFERENT contract:
+
+- **Access = a per-repo GitHub App token** (`~/.config/gh-app-tokens/zbynekdrlik__automatizacie-montalu`),
+  delivered to the subdev box. `git` picks it up via the credential helper; `gh` needs it
+  explicitly (`GH_TOKEN="$(gh-app-token zbynekdrlik/automatizacie-montalu)" gh -R zbynekdrlik/automatizacie-montalu …`).
+  Run all git/gh from a **clone** in your own scratch dir (never the odoo-erp checkout).
+- **Stream PRs target `dev` and STOP at the green PR — NEVER merge.** The merge/deploy
+  decision (and the `dev→main` release + version-bump-to-clean-`X.Y.Z`) is the OWNER's —
+  `main` = live VPS deploy (167.233.125.9). Do not merge, do not push `main`.
+- **There is NO PR-triggered CI** — `ci.yml` runs only on push to `dev`/`main`. A "clean"/
+  green PR proves nothing on its own. So run the CI-equivalent gates **locally before
+  pushing** and cite the results: `npm run lint`, `npm run check`, `npm test`, **and
+  `npm run build`** (yes, locally — the owner's "vite build = CI only" rule above assumes
+  PR-CI, which a stream branch never gets), plus a Playwright E2E run.
+- **The App token has no `workflows` permission** — any `.github/workflows/**` change is
+  rejected on push. Deliver a workflow change as a `git format-patch` inside a
+  `GATEKEEPER-ACTION:` comment on the odoo-erp ticket, not a push here.
+- **Version: bump only when the version-check needs it.** The gate is `dev` version >
+  `main` version. If `dev` is already ahead of `main` (the usual case), a stream PR needs
+  **no** bump — resolve `package.json` to `dev`'s current `-dev.N` on re-sync. (The owner's
+  "bump `-dev.N` first every ticket" above is the dev→main release cadence, not per stream PR.)
+- **Re-sync with `origin/dev` right before pushing** — the owner develops concurrently, so
+  `dev` moves under you; confirm `git diff --stat origin/dev HEAD` shows ONLY your files.
+- **Env-gated, live-safe changes.** A change that alters serving/deploy (base path, headers,
+  cookies) MUST be env-gated with defaults that keep today's live behaviour byte-identical,
+  and land atomically in one PR (the live app is used daily). Ticket odoo-erp#5822 is the
+  reference: `APP_BASE_PATH` (build-time base path, default `''`) + `APP_FRAME_ANCESTORS`
+  (runtime CSP `frame-ancestors`, default = keep `X-Frame-Options: DENY`).
+
 ## Local build policy (Tier 0)
 
 - Before pushing, run the cheap gates locally: `npm run check` (svelte-check = tsc, no
