@@ -38,10 +38,12 @@ const baseNote: ZakazkaNote = {
 };
 
 describe('generateZakazkaPdf', () => {
-	it('vyprodukuje platný PDF (%PDF hlavička)', async () => {
+	it('vyprodukuje platný PDF (%PDF hlavička), malý rozpis = 1 strana', async () => {
 		const bytes = await generateZakazkaPdf(baseNote, NOW);
 		expect(bytes.length).toBeGreaterThan(1000);
+		expect(bytes.length).toBeLessThan(300_000);
 		expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-');
+		expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
 	});
 
 	it('metadáta nesú zak/op/počet položiek/scope/cenu (testovateľný kanál)', async () => {
@@ -94,7 +96,8 @@ describe('generateZakazkaPdf', () => {
 		}));
 		const n: ZakazkaNote = { ...baseNote, sekcie: [{ nadpis: 'Veľa', polozky: many }] };
 		const doc = await PDFDocument.load(await generateZakazkaPdf(n, NOW));
-		expect(doc.getPageCount()).toBeGreaterThan(1);
+		expect(doc.getPageCount()).toBeGreaterThan(2);
+		expect(doc.getPageCount()).toBeLessThan(12);
 		expect(doc.getSubject() ?? '').toContain('Položiek: 120');
 	});
 
@@ -123,13 +126,15 @@ describe('generateZakazkaPdfBase64', () => {
 });
 
 describe('zakazkaPdfFilename', () => {
-	it('deterministický, bezpečný pre Odoo, nesie ZAK', () => {
-		expect(zakazkaPdfFilename(baseNote)).toBe('Rozpis-materialu-ZAK123.pdf');
+	it('nesie ZAK aj sortovateľnú pečiatku (Europe/Bratislava)', () => {
+		// NOW = 2026-09-02T08:30:00Z → CEST (UTC+2) → 10:30 → 20260902-1030
+		expect(zakazkaPdfFilename(baseNote, NOW)).toBe('Rozpis-materialu-ZAK123-20260902-1030.pdf');
 	});
-	it('sanitizuje nebezpečné znaky v ZAK', () => {
-		const fn = zakazkaPdfFilename({ ...baseNote, zak: 'ZAK 12/34#x' });
-		expect(fn).toBe('Rozpis-materialu-ZAK_12_34_x.pdf');
-		expect(fn).not.toMatch(/[ /#]/);
+	it('sanitizuje nebezpečné znaky v ZAK (pečiatka ostáva)', () => {
+		const fn = zakazkaPdfFilename({ ...baseNote, zak: 'ZAK 12/34#x' }, NOW);
+		expect(fn).toBe('Rozpis-materialu-ZAK_12_34_x-20260902-1030.pdf');
+		// nebezpečné znaky len v ZAK časti (pomlčky v pečiatke sú v poriadku)
+		expect(fn.slice('Rozpis-materialu-'.length, -'.pdf'.length)).not.toMatch(/[ /#]/);
 	});
 });
 
@@ -160,6 +165,12 @@ describe('Money-neutralita (zakazka-pdf zdroj)', () => {
 		expect(src).not.toMatch(/writeOdpis\s*\(/);
 		expect(src).not.toMatch(/fs\.(write|append|mkdir|rename|open)/);
 		expect(src).not.toMatch(/process\.env\.MONEY_LIVE|isLive\s*\(/);
+	});
+	it('nekreslí do PDF tela emoji, ktoré DejaVu subset nemá (⚠️/⏳ → tofu) — #418 review', () => {
+		// custom-font glyfy sa z PDF tela nečítajú, takže tofu chytíme na úrovni ZDROJA: telo nesmie
+		// niesť U+26A0 (⚠️) ani U+23F3 (⏳); honesty riadky používajú textovú predponu „POZOR:".
+		expect(src).not.toMatch(/\u26A0|\u23F3/);
+		expect(src).toContain('POZOR:');
 	});
 	it('z `money` neimportuje runtime hodnotu — `ZakazkaNote` je iba `import type`', () => {
 		// runtime import z ./money by pridal money závislosť; povolený je LEN `import type`.

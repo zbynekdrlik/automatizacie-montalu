@@ -8,18 +8,16 @@
 // žiadna runtime závislosť na `money`.
 //
 // Knižnica: pdf-lib (+ @pdf-lib/fontkit) s vendorovaným DejaVu Sans subsetom (slovenské mäkčene,
-// `fonts/dejavu.ts`) — presne vzor `ponuka-pdf.ts`, self-contained, žiadny runtime asset/network.
-// Hodnoty sa vykreslia AJ zapíšu do metadát (Title/Subject/Keywords) — testovateľný kanál (custom-font
-// glyfy sa z PDF tela nedajú spoľahlivo prečítať, viď `dopyt-ponuka.md`).
+// `fonts/dejavu.ts` cez zdieľaný `pdf-common.ts`) — vzor `ponuka-pdf.ts`, self-contained, žiadny
+// runtime asset/network. Hodnoty sa vykreslia AJ zapíšu do metadát (Title/Subject/Keywords) —
+// testovateľný kanál (custom-font glyfy sa z PDF tela nedajú spoľahlivo prečítať, `dopyt-ponuka.md`).
+//
+// #418 review: DejaVu subset NEOBSAHUJE varovné emoji (U+26A0 „warning", U+23F3 „hourglass") → v tele
+// PDF sa NEPOUŽÍVAJÚ (kreslili by sa ako „tofu" prázdne štvorčeky); honesty riadky nesú textovú predponu
+// „POZOR:". HTML note (`odoo-zakazka.ts`) si emoji ponecháva (prehliadač ich vykreslí).
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
-import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
 import type { ZakazkaNote } from './odoo-zakazka';
-
-const A4_W = 595.28;
-const A4_H = 841.89;
-const MARGIN = 48;
-const CONTENT_W = A4_W - 2 * MARGIN;
+import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, ellipsize, embedDejavu } from './pdf-common';
 
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
@@ -33,6 +31,7 @@ const FS_SEC = 11;
 const FS_ROW = 9;
 const LINE = 12; // riadkovanie v bunke
 const ROW_PAD = 4;
+const MAX_NAZOV_LINES = 6; // strop zalomenia názvu položky (dlhší názov sa oreže „…")
 
 // Stĺpce tabuľky (x zľava; qty/cena zarovnané doprava k svojmu pravému okraju).
 const COL_KOD = MARGIN; // 48
@@ -40,10 +39,28 @@ const COL_NAZOV = MARGIN + 66; // 114
 const COL_QTY_R = MARGIN + 372; // pravý okraj množstva
 const COL_MJ = MARGIN + 380;
 const COL_CENA_R = MARGIN + CONTENT_W; // pravý okraj ceny (547.28)
+const KOD_W = COL_NAZOV - COL_KOD - 6; // šírka Kód stĺpca (oreže dlhý kód)
 const NAZOV_W = COL_QTY_R - COL_NAZOV - 44; // šírka názvu (necháva medzeru pred qty)
 
 /** eur formát so slovenskou desatinnou čiarkou (rozpis je interný, pre šéfa/dielňu). */
 const fmtEur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
+/** množstvo zaokrúhlené na 3 des. (mm/kusy stačia) — bez toho by float šum (0.1+0.2) pretiekol stĺpec. */
+const fmtQty = (n: number) => String(Math.round(n * 1000) / 1000);
+
+/** YYYYMMDD-HHMM v Europe/Bratislava — sortovateľná pečiatka do názvu prílohy (odlíši viac verzií). */
+function stampSk(now: Date): string {
+	const parts = new Intl.DateTimeFormat('sv-SE', {
+		timeZone: 'Europe/Bratislava',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		hour12: false
+	}).formatToParts(now);
+	const g = (t: string) => parts.find((x) => x.type === t)?.value ?? '';
+	return `${g('year')}${g('month')}${g('day')}-${g('hour')}${g('minute')}`;
+}
 
 interface Ctx {
 	doc: PDFDocument;
@@ -51,25 +68,6 @@ interface Ctx {
 	reg: PDFFont;
 	bold: PDFFont;
 	cursor: number;
-}
-
-/** Zalom text na riadky, ktoré sa zmestia do `maxWidth` pri danom fonte/veľkosti (vzor `ponuka-pdf`). */
-function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
-	const words = text.split(/\s+/).filter(Boolean);
-	if (words.length === 0) return [''];
-	const lines: string[] = [];
-	let cur = '';
-	for (const w of words) {
-		const candidate = cur ? `${cur} ${w}` : w;
-		if (font.widthOfTextAtSize(candidate, size) <= maxWidth || !cur) {
-			cur = candidate;
-		} else {
-			lines.push(cur);
-			cur = w;
-		}
-	}
-	if (cur) lines.push(cur);
-	return lines;
 }
 
 function newPage(ctx: Ctx): void {
@@ -158,11 +156,26 @@ function drawRow(
 }
 
 function drawParagraph(ctx: Ctx, text: string, size: number, font: PDFFont, color = INK): void {
-	for (const ln of wrapText(font, text, size, CONTENT_W)) {
+	const lines = wrapText(font, text, size, CONTENT_W);
+	for (const ln of lines.length > 0 ? lines : ['']) {
 		ensureSpace(ctx, LINE);
 		ctx.page.drawText(ln, { x: MARGIN, y: ctx.cursor - size, size, font, color });
 		ctx.cursor -= LINE;
 	}
+}
+
+/** Zalom + orež názov na `MAX_NAZOV_LINES` riadkov (posledný s „…" ak sa nezmestí zvyšok). */
+function nazovLinesFor(font: PDFFont, nazov: string): string[] {
+	const lines = wrapText(font, nazov, FS_ROW, NAZOV_W);
+	if (lines.length <= MAX_NAZOV_LINES) return lines.length > 0 ? lines : [''];
+	const capped = lines.slice(0, MAX_NAZOV_LINES);
+	capped[MAX_NAZOV_LINES - 1] = ellipsize(
+		font,
+		`${capped[MAX_NAZOV_LINES - 1]} …`,
+		FS_ROW,
+		NAZOV_W
+	);
+	return capped;
 }
 
 /** Počet položiek naprieč všetkými sekciami (metadátový/hlavičkový údaj). */
@@ -173,16 +186,15 @@ export function pocetPoloziek(note: ZakazkaNote): number {
 /**
  * Vygeneruje PDF rozpisu materiálu zákazky z `ZakazkaNote`. Súhrn (zak/op/počet položiek/cena) sa
  * vykreslí AJ zapíše do metadát (Title/Subject/Keywords) — to je testovateľný kanál. `now` je
- * injektovateľné pre testy (deterministická „Stav k …" pečiatka; Europe/Bratislava kvôli UTC pasci).
+ * injektovateľné pre testy (deterministická „Stav k …" pečiatka; Europe/Bratislava kvôli UTC pasci) —
+ * volajúci (`odoo-zakazka.ts`) posiela ROVNAKÉ `now` do note aj PDF, aby sa pečiatky nelíšili.
  */
 export async function generateZakazkaPdf(
 	note: ZakazkaNote,
 	now: Date = new Date()
 ): Promise<Uint8Array> {
 	const doc = await PDFDocument.create();
-	doc.registerFontkit(fontkit);
-	const reg = await doc.embedFont(Buffer.from(DEJAVU_SANS_REGULAR_B64, 'base64'), { subset: true });
-	const bold = await doc.embedFont(Buffer.from(DEJAVU_SANS_BOLD_B64, 'base64'), { subset: true });
+	const { reg, bold } = await embedDejavu(doc);
 	const ctx: Ctx = { doc, page: doc.addPage([A4_W, A4_H]), reg, bold, cursor: A4_H - MARGIN };
 
 	// hlavička
@@ -213,7 +225,7 @@ export async function generateZakazkaPdf(
 	if (note.scope === 'test')
 		drawParagraph(
 			ctx,
-			'⚠️ Sumár z TEST odpisov (zákazka nemá žiadny ostrý odpis).',
+			'POZOR: sumár z TEST odpisov (zákazka nemá žiadny ostrý odpis).',
 			FS_META,
 			bold,
 			INK
@@ -222,7 +234,9 @@ export async function generateZakazkaPdf(
 
 	// sekcie s tabuľkami
 	for (const sekcia of note.sekcie) {
-		ensureSpace(ctx, FS_SEC + LINE + ROW_PAD * 2);
+		// #418 review: rezervuj priestor na nadpis + hlavičku + PRVÝ riadok, inak by nadpis/hlavička
+		// osirel na konci strany a tabuľka pokračovala až na ďalšej.
+		ensureSpace(ctx, FS_SEC + 6 + (LINE + ROW_PAD) + (LINE + ROW_PAD));
 		ctx.page.drawText(sekcia.nadpis, {
 			x: MARGIN,
 			y: ctx.cursor - FS_SEC,
@@ -238,8 +252,14 @@ export async function generateZakazkaPdf(
 		}
 		drawTableHeader(ctx);
 		for (const p of sekcia.polozky) {
-			const nazovLines = wrapText(reg, p.nazov, FS_ROW, NAZOV_W);
-			drawRow(ctx, p.kod, nazovLines, String(p.qty), p.mj, p.cena !== null ? fmtEur(p.cena) : '—');
+			drawRow(
+				ctx,
+				ellipsize(reg, p.kod, FS_ROW, KOD_W),
+				nazovLinesFor(reg, p.nazov),
+				fmtQty(p.qty),
+				p.mj,
+				p.cena !== null ? fmtEur(p.cena) : '—'
+			);
 		}
 		ctx.cursor -= 8;
 	}
@@ -277,7 +297,7 @@ export async function generateZakazkaPdf(
 	if (note.bezPoloziek > 0)
 		drawParagraph(
 			ctx,
-			`⚠️ ${note.bezPoloziek} odpisov bez uložených položiek (spred fázy 1) — ich materiál v zozname CHÝBA.`,
+			`POZOR: ${note.bezPoloziek} odpisov bez uložených položiek (spred fázy 1) — ich materiál v zozname CHÝBA.`,
 			FS_META,
 			reg,
 			MUTED
@@ -318,8 +338,8 @@ export async function generateZakazkaPdfBase64(note: ZakazkaNote, now?: Date): P
 	return Buffer.from(bytes).toString('base64');
 }
 
-/** Názov PDF súboru pripnutého k zákazke (deterministický, bezpečný pre Odoo). */
-export function zakazkaPdfFilename(note: ZakazkaNote): string {
+/** Názov PDF súboru pripnutého k zákazke — nesie ZAK aj sortovateľnú časovú pečiatku (odlíši verzie). */
+export function zakazkaPdfFilename(note: ZakazkaNote, now: Date = new Date()): string {
 	const safe = (note.zak || 'zakazka').replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 40);
-	return `Rozpis-materialu-${safe}.pdf`;
+	return `Rozpis-materialu-${safe}-${stampSk(now)}.pdf`;
 }

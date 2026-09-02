@@ -269,6 +269,30 @@ async function createZakazkaPdfAttachment(
 	}
 }
 
+/**
+ * #418 review: best-effort odviazanie osirelej prílohy (`ir.attachment.unlink`), keď `message_post`
+ * zlyhal PO vytvorení prílohy — inak by ostala na zázname bez naviazania na správu. Pád unlinku sa LEN
+ * zaloguje (upratovanie nie je kritické; ďalší úspešný push aj tak nahradí snapshot).
+ */
+async function unlinkAttachments(
+	cfg: OdooConfig,
+	uid: number,
+	attachmentIds: number[],
+	zak: string,
+	op: string
+): Promise<void> {
+	try {
+		await executeKw(cfg, uid, 'ir.attachment', 'unlink', [attachmentIds]);
+	} catch (e) {
+		log.warn('zakazka push: odviazanie osirelej prílohy zlyhalo (ostane na upratanie)', {
+			zak,
+			op,
+			attachmentIds,
+			err: errMsg(e)
+		});
+	}
+}
+
 export type ZakazkaPushResult = 'posted' | 'no-order' | 'missing' | 'disabled' | 'failed';
 
 /** Výsledok pushu + (pri `failed`) chybová správa pre durable `last_error` (#349). */
@@ -302,23 +326,10 @@ export async function pushZakazkaToOdooDetailed(
 			return { result: 'missing', error: null };
 		}
 		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
+		// #418 review: JEDNO `now` pre note aj PDF → ich „Stav k …" pečiatky sa nelíšia.
+		const now = new Date();
 		const note = buildZakazkaNote(prehlad, op, ceny);
-		const html = buildZakazkaNoteHtml(note);
-		// #418: PDF rozpisu materiálu (best-effort — pád generovania NEZHODÍ note; note je primárny
-		// durable záznam #349, PDF je vylepšenie). Zabalené v try/catch, aby ani chyba pdf-lib
-		// neprebublala von a neporušila „NIKDY nehádže" kontrakt.
-		let pdfBase64: string | null = null;
-		let pdfFilename = 'Rozpis-materialu.pdf';
-		try {
-			pdfBase64 = await generateZakazkaPdfBase64(note);
-			pdfFilename = zakazkaPdfFilename(note);
-		} catch (e) {
-			log.warn('zakazka push: generovanie PDF rozpisu zlyhalo (note ide bez prílohy)', {
-				zak,
-				op,
-				err: errMsg(e)
-			});
-		}
+		const html = buildZakazkaNoteHtml(note, now);
 		const uid = await authenticate(cfg);
 		const name = normOp(op);
 		const ids = await findSaleOrderIds(cfg, uid, name);
@@ -333,6 +344,21 @@ export async function pushZakazkaToOdooDetailed(
 			);
 			return { result: 'no-order', error: null };
 		}
+		// #418: PDF rozpisu materiálu (best-effort — pád generovania NEZHODÍ note; note je primárny
+		// durable záznam #349). AŽ po no-order kontrole (review 🔵: no-order výsledok by inak zbytočne
+		// pálil font-embed render). Zabalené v try/catch, aby ani chyba pdf-lib neprebublala von.
+		let pdfBase64: string | null = null;
+		let pdfFilename = 'Rozpis-materialu.pdf';
+		try {
+			pdfBase64 = await generateZakazkaPdfBase64(note, now);
+			pdfFilename = zakazkaPdfFilename(note, now);
+		} catch (e) {
+			log.warn('zakazka push: generovanie PDF rozpisu zlyhalo (note ide bez prílohy)', {
+				zak,
+				op,
+				err: errMsg(e)
+			});
+		}
 		if (ids.length > 1)
 			log.warn('zakazka push: viac sale.order s rovnakým name — postnem na všetky', { name, ids });
 		for (const id of ids) {
@@ -340,7 +366,15 @@ export async function pushZakazkaToOdooDetailed(
 			const attachmentIds = pdfBase64
 				? await createZakazkaPdfAttachment(cfg, uid, id, pdfBase64, pdfFilename, zak, op)
 				: [];
-			await postInternalNote(cfg, uid, id, html, attachmentIds);
+			try {
+				await postInternalNote(cfg, uid, id, html, attachmentIds);
+			} catch (e) {
+				// #418 review: note post zlyhal → príloha by ostala NENAVIAZANÁ na žiadnu správu (record-level
+				// = nie dokázateľne interná). Odviaž ju (best-effort), nech neostane osirelá; chybu prehoď von
+				// → outer catch → 'failed' → #349 retry.
+				if (attachmentIds.length > 0) await unlinkAttachments(cfg, uid, attachmentIds, zak, op);
+				throw e;
+			}
 			log.info('zakazka push: interná poznámka zapísaná na sale.order', {
 				zak,
 				op,
@@ -371,7 +405,7 @@ export async function pushZakazkaToOdoo(zak: string, op: string): Promise<Zakazk
 
 // ---- Durable retry + per-kľúč serializácia (#349) -----------------------------------
 
-const pushKey = (zak: string, op: string): string => `${normZak(zak)} ${normOp(op)}`;
+const pushKey = (zak: string, op: string): string => `${normZak(zak)}\0${normOp(op)}`;
 
 /**
  * Per-kľúč FIFO serializer súbežných pushov tej istej (zak, op). #349 zadanie bod 4: poradie

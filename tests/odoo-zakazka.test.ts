@@ -19,6 +19,7 @@ const { setOdooTransport } = await import('../src/lib/server/odoo-rpc');
 const { buildZakazkaNote, buildZakazkaNoteHtml, pushZakazkaToOdoo, queueZakazkaPush } =
 	await import('../src/lib/server/odoo-zakazka');
 const { zakazkaPrehlad } = await import('../src/lib/server/zakazka-ceny');
+const zakazkaPdf = await import('../src/lib/server/zakazka-pdf');
 
 let nextId = 70001;
 function seedOdpis(opts: {
@@ -340,6 +341,33 @@ describe('pushZakazkaToOdoo', () => {
 		expect(postedBody).toContain('<string>mail.mt_note</string>');
 		expect(postedBody).not.toContain('attachment_ids');
 		expect(postedBody).toContain('<value><int>77</int></value>');
+	});
+	it('best-effort: keď PDF-gen zlyhá, note sa AJ TAK postne (posted, žiadna príloha)', async () => {
+		enableOdoo();
+		seedOdpis({ zak: 'ZAKPDF', op: 'OP930', polozky: [{ kod: 'K1', nazov: 'A', qty: 1 }] });
+		vi.spyOn(zakazkaPdf, 'generateZakazkaPdfBase64').mockRejectedValue(new Error('pdf boom'));
+		let postedBody = '';
+		let sawAttach = false;
+		setOdooTransport(async (_u, body) => {
+			if (body.includes('<methodName>authenticate</methodName>'))
+				return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
+			if (body.includes('<string>search</string>'))
+				return '<methodResponse><params><param><value><array><data><value><int>55</int></value></data></array></value></param></params></methodResponse>';
+			if (body.includes('<string>ir.attachment</string>')) {
+				sawAttach = true;
+				return '<methodResponse><params><param><value><int>1</int></value></param></params></methodResponse>';
+			}
+			if (body.includes('<string>message_post</string>')) {
+				postedBody = body;
+				return '<methodResponse><params><param><value><int>1</int></value></param></params></methodResponse>';
+			}
+			throw new Error('unexpected');
+		});
+		expect(await pushZakazkaToOdoo('ZAKPDF', 'OP930')).toBe('posted');
+		// PDF zlyhal → žiadna príloha sa netvorí, ale note (primárny záznam) ide
+		expect(sawAttach).toBe(false);
+		expect(postedBody).toContain('<string>mail.mt_note</string>');
+		expect(postedBody).not.toContain('attachment_ids');
 	});
 	it('NIKDY nehádže — transport chyba → failed', async () => {
 		enableOdoo();
