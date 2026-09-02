@@ -11,14 +11,25 @@ Overené prípady: bazén `BPP00046`→`BPP202414`, Deluxe 2x3K spodná koľajni
 (2K, workbook preklep) → `ZASP00030` (3K). Pred pridaním/zmenou článku over v Money:
 kód existuje, `Deleted=false`, názov sedí s profilom (rodina + dĺžka tyče v názve).
 
-**Read-only Money recept** (NIKDY zápis do Money):
+**Read-only Money recept** (NIKDY zápis do Money) — #425: `~/.ssh/slovnormal_odoo` na
+dev boxoch UŽ NEEXISTUJE (odstránený old-key-removal sweepom, odoo-erp #1183/#3629).
+Funkčná cesta je dvojskok cez **gatekeeper** box (`gatekeeper@100.90.94.41`, default
+`newlevel` identita — funguje z KAŽDÉHO worktree checkoutu, žiadny per-projektový kľúč
+netreba), ktorý má vo VLASTNOM `~/.ssh/config` alias `montalu-prod` s dedikovaným
+`gatekeeper_prod` kľúčom na ten istý host (`erp.montalu.cloud` / `178.104.63.220`):
 ```bash
 # query.py: sys.path.insert(0,"/opt/montalu-sync/scripts/import-montalu"); import moneydb
 #   conn=moneydb.connect(); moneydb.query(conn, sql)   # SQL literály N'...'
 #   Artikly_Artikl (Kod/Nazev/ID/Deleted); sklad: S5_Artikl_CelkoveMnozstviNaSkladech (s.Artikl_ID=ar.ID)
-scp -i ~/.ssh/slovnormal_odoo query.py root@erp.montalu.cloud:/tmp/
-ssh -i ~/.ssh/slovnormal_odoo root@erp.montalu.cloud '/opt/montalu-sync/venv/bin/python /tmp/query.py'
+ssh gatekeeper@100.90.94.41 "ssh montalu-prod 'cat > /tmp/query.py'" < query.py
+ssh gatekeeper@100.90.94.41 "ssh montalu-prod '/opt/montalu-sync/venv/bin/python /tmp/query.py'"
 ```
+(`montalu-prod` je alias definovaný LEN v `~/.ssh/config` na gatekeeperovi — z dev1/dev2
+sa naň nedá pripojiť priamo, vždy len cez gatekeeperov druhý hop.) `moneydb.query()` má
+vstavaný retry (6× exponenciálny backoff) na flaky wg-money tunel, netreba obaľovať
+vlastnou retry slučkou. Agenda je `S4_Agenda_MONT_ALUSro` (S podčiarkovníkom — bez neho
+je to iná/opustená testovacia agenda).
+
 0-sklad kód NEBLOKUJE odpis (napr. nosový ZASP00010) — dôležité je, že je to SPRÁVNY
 aktuálny článok, nie sklad.
 
@@ -34,12 +45,14 @@ SELECT Kod, Nazev, Model_UserData FROM Artikly_Artikl WHERE Nazev LIKE N'%Oponov
 Pri odvodení nového štýlu z iného systému prejdi CELÝ jeho BOM a pre KAŽDÝ kód over model —
 odvodenie prenesie kódy zdrojového systému aj tam, kde cieľový má vlastný článok.
 
-**Worktree-izolovaný autopilot worker ČASTO NEMÁ `~/.ssh/slovnormal_odoo`** (#353) — kľúč
-existuje na dev1/hlavnej relácii, ale nový `.claude/worktrees/agent-<id>` checkout ho
-nezdedí automaticky. Skús to (`ssh -i ~/.ssh/slovnormal_odoo … 'echo OK'`), a ak zlyhá
-`Identity file … not accessible`, NEBLOKUJ celý ticket — implementuj podľa dostupných
-zdrojov (Excel, git-sourcené Dominikove citáty), nechaj Money-kód-overenie ako explicitný
-finding na tickete + neflipni žiadny „*_PRIPRAVENY" gate bez naživo overenej zásoby.
+**#425 (2026-09-02): `~/.ssh/slovnormal_odoo` je preč ÚPLNE, nielen z worktree
+checkoutov** — nahradilo ho vyššie zdokumentované gatekeeper dvojskok, ktorý funguje
+z KAŽDÉHO worktree/hlavnej relácie rovnako (default `newlevel` identita, žiadny
+per-projektový kľúč sa nededí ani netreba). Ak aj tak zlyhá dvojskok samotný
+(`ssh gatekeeper@100.90.94.41 'echo OK'` alebo druhý hop na `montalu-prod`), NEBLOKUJ
+celý ticket — implementuj podľa dostupných zdrojov (Excel, git-sourcené Dominikove
+citáty), nechaj Money-kód-overenie ako explicitný finding na tickete + neflipni žiadny
+„*_PRIPRAVENY" gate bez naživo overenej zásoby.
 
 ## 1c. Nový Dominikov zoznam ODPORUJE staršej, git-sourcenej odpovedi → sourcovaná odpoveď VYHRÁVA (#353)
 

@@ -81,19 +81,34 @@ zabudované: layout nastavuje `html[data-hydrated="1"]` a E2E používa
 
 ## Money katalóg — obrázky/rezy profilov a priamy SQL prístup
 
-**POZOR — prístupová cesta nižšie je STALE z dev boxov (overené 28.8.2026):** kľúč
-`~/.ssh/slovnormal_odoo` ani `moneydb.py` na dev1/dev2 neexistujú. Funkčný read-only
-SQL kanál z dev1/dev2 je SSH tunel **`money-ro-thirdparty`** podľa
-`/home/newlevel/devel/montalu/n8n/.claude/skills/money-readonly-sql/SKILL.md`
-(SQL účet `montalu_ro`, `db_datareader` + `db_denydatawriter` — zápis technicky
-nemožný; DB `S4_Agenda_MONT_ALUSro`). Popis nižšie (schéma príloh, retry, n8n
-príkazy mosta) platí — len prístup rob cez ten tunel; `moneydb`/`/opt/montalu-sync`
-cesta je VPS-strana (používa ju n8n na hoste), nie dev boxy.
+**Prístup (#425, overené naživo 2026-09-02): dvojskok cez gatekeeper box.** Kľúč
+`~/.ssh/slovnormal_odoo` na dev1/dev2 UŽ NEEXISTUJE (odstránený old-key-removal
+sweepom, odoo-erp #1183/#3629) a bol na `montalu-prod` nahradený dedikovaným
+`gatekeeper_prod` kľúčom, ktorý žije LEN na gatekeeper boxe. Funkčná cesta z
+dev1/dev2 (aj z KTORÉHOKOĽVEK worktree checkoutu — funguje s default `newlevel`
+identitou, žiadny per-projektový kľúč sa nededí ani netreba):
+
+```bash
+ssh gatekeeper@100.90.94.41 "ssh montalu-prod '<príkaz na montalu-prod>'"
+```
+
+`montalu-prod` je alias definovaný LEN v `~/.ssh/config` NA gatekeeperovi (nie
+lokálne) — priamy SSH z dev1/dev2 na montalu-prod nie je možný, vždy len cez
+gatekeeperov druhý hop (jeho vlastný `gatekeeper_prod` kľúč robí autentizáciu,
+gatekeeper teda funguje ako autentizovaný prostredník, nie holý TCP proxy).
+Súborový prenos (namiesto priameho `scp`) ide surovo cez stdin/stdout oboma
+hopmi — `cat > súbor` na nahratie, `tar -czf - -C dir . | tar -xzf -` na
+binárny adresár späť (recept + živé overenie v `scripts/sync-profil-obrazky.sh`).
+
+*(Iný projekt — `~/devel/montalu/n8n/` — má vlastný, samostatný read-only tunel
+`money-ro-thirdparty` cez `money-readonly-sql` skill s vlastnými, do TOHTO repa
+NEpatriacimi credentials; automatizacie-montalu ho nepoužíva, aby nezáviselo od
+cudzích, gitignorovaných tajomstiev iného projektu.)*
 
 Money (Solid S4, MSSQL na 192.168.1.200) je dosiahnuteľný LEN cez most na hoste
-**montalu-prod** = `erp.montalu.cloud`. SSH kľúč `~/.ssh/slovnormal_odoo`
-(`root@erp.montalu.cloud`) tam má plný shell; `/opt/montalu-sync/venv` +
-`moneydb` modul (`/opt/montalu-sync/scripts/import-montalu/moneydb.py`) robia
+**montalu-prod** = `erp.montalu.cloud` (`178.104.63.220`). Na montalu-prod (root
+shell dosiahnuteľný LEN cez gatekeeperov dvojskok vyššie) `/opt/montalu-sync/venv`
++ `moneydb` modul (`/opt/montalu-sync/scripts/import-montalu/moneydb.py`) robia
 read-only SQL. `moneydb.connect()` sa pripája na agendu `S4_Agenda_MONT_ALUSro`
 (POZOR: bez podčiarkovníka `S4_Agenda_MONTALUSro` je iná/stará agenda).
 
@@ -106,11 +121,14 @@ read-only SQL. `moneydb.connect()` sa pripája na agendu `S4_Agenda_MONT_ALUSro`
   kódy z compute modulov, optimalizuje na webp do `static/profil/`, potom ručne
   aktualizuj `PROFIL_S_OBRAZKOM` v `src/lib/profil-obrazky.ts`).
 - **Money bridge je flaky** (SQL server 192.168.1.200 občas „Adaptive Server
-  unavailable", ~25 % — to je aj nález auditu): VŽDY retry (5×, 20 s) okolo
-  každého SQL behu. Ten istý flaky bridge používa n8n „Denný prehľad platieb".
+  unavailable", ~25 % — to je aj nález auditu): `moneydb.query()` má vstavaný
+  retry (6× exponenciálny backoff, `_TRANSIENT_DBLIB_CODES`), navyše
+  `scripts/sync-profil-obrazky.sh` obaľuje celý beh vlastnou 5×20s retry
+  slučkou pre výpadky na SSH/bridge vrstve. Ten istý flaky bridge používa n8n
+  „Denný prehľad platieb".
 - **paid-orders / order-map** = hotové príkazy mosta (`/opt/money-bridge/dispatch.sh`
   cez `SSH_ORIGINAL_COMMAND`) — n8n ich volá SSH nodom; nové read-only dotazy
-  spustíš vlastným .py cez `venv/bin/python`.
+  spustíš vlastným .py cez `venv/bin/python` (cez gatekeeper dvojskok vyššie).
 
 ## Záloha DB (`odpis_log` dedup ledger) — #253
 
