@@ -73,6 +73,16 @@
 	const fmtFix = fmtFixMm;
 	// #381 — pozičné čísla dielov (Poz.) previazané s pohľadmi vo výkrese (balóniky)
 	const diely = $derived(pozicujDiely(vysledok.vypocitane));
+	// #223 — plocha v m² (slovenská čiarka) + celková cena strešného skla = celková plocha × €/m²
+	const m2Val = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} m²`);
+	const strechaCenaSpolu = $derived(
+		strechaSklo &&
+			strechaSkloCena &&
+			strechaSklo.plochaCelkomM2 != null &&
+			strechaSkloCena.eurM2 != null
+			? Math.round(strechaSklo.plochaCelkomM2 * strechaSkloCena.eurM2 * 100) / 100
+			: null
+	);
 </script>
 
 <div class="card">
@@ -439,8 +449,12 @@
 				<b data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
 			</div>
 			<div class="row">
-				<span>Dĺžka tabule</span>
-				<b data-testid="strecha-sklo-dlzka">— (čaká na vzorec)</b>
+				<span>Dĺžka tabule (horná hrana + 10/20)</span>
+				<b data-testid="strecha-sklo-dlzka">{mmVal(strechaSklo.dlzkaMm)}</b>
+			</div>
+			<div class="row">
+				<span>Plocha skiel spolu</span>
+				<b data-testid="strecha-sklo-plocha">{m2Val(strechaSklo.plochaCelkomM2)}</b>
 			</div>
 			<div class="row">
 				<span>Money kód (cenník)</span>
@@ -455,6 +469,14 @@
 							: 'cena nedostupná'}</b
 					>
 				</div>
+				{#if strechaCenaSpolu != null}
+					<div class="row">
+						<span>Cena skiel spolu ({m2Val(strechaSklo.plochaCelkomM2)})</span>
+						<b data-testid="strecha-sklo-cena-spolu"
+							>{`${String(strechaCenaSpolu).replace('.', ',')} ${strechaSkloCena.mena}`}</b
+						>
+					</div>
+				{/if}
 			{/if}
 		</div>
 		<ul class="nepodporovane-zoznam">
@@ -463,8 +485,9 @@
 			{/each}
 		</ul>
 		<p class="sub">
-			Strešné sklo sa do Money odpisu NEzapisuje (samostatné rozhodnutie až po potvrdení vzorca aj
-			variácie). Celkový náklad sa nedopočítava, kým nie je potvrdená dĺžka tabule.
+			Strešné sklo sa do Money odpisu NEzapisuje (rozhodnutie až po potvrdení variácie skla — karty
+			do cenníka zakladá Dominik). Dĺžka aj celková cena sú návrhové (na rezerváciu materiálu, ~2 mm
+			presnosť); reálnu cenu variácie Dominik po potvrdení prepíše.
 		</p>
 	</div>
 {/if}
