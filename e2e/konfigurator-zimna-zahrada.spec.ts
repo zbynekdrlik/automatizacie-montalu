@@ -14,6 +14,8 @@ test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + orient
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/zimna-zahrada');
 	await expect(page).toHaveURL(/\/konfigurator\/zimna-zahrada$/);
+	// dokument má SEO titul (#411 shell: <svelte:head> cez `titul` prop, nie prázdna záložka)
+	await expect(page).toHaveTitle(/zimnú záhradu.*Montalu/);
 
 	// stránka sa načíta bez prihlásenia (verejná route)
 	await expect(page.getByRole('heading', { name: /Navrhni si zimnú záhradu/ })).toBeVisible();

@@ -157,4 +157,395 @@
 		font-variant-numeric: tabular-nums;
 		letter-spacing: 0.02em;
 	}
+
+	/* ── #409/#411: ZDIEĽANÁ showroom CSS produktových podstránok konfigurátora
+	   (`.kp-*` = KonfProduktStranka). Jedno miesto namiesto ~280-riadkovej kópie na
+	   každej z 5 jednostĺpcových podstránok {tienenie, pristresok, zasklenie,
+	   zimna-zahrada, oplotenie}. `:global(.konf-app .kp-…)` = narieknuté cez `.konf-app`
+	   (žiadny únik do internej admin appky, rovnako ako `--k-*` tokeny vyššie), aplikuje
+	   sa aj na markup vyrenderovaný v scope stránky (snippet obsah shellu). Split-screen
+	   pergola/bazén (`.konf-*`/`.baz-*`) tieto triedy nepoužívajú → nedotknuté.
+	   Per-produkt odlišnosti (šírka kariet cez `--kp-karta-min`, utility ako
+	   `.kp-latka-info`) žijú v `<style>` danej podstránky. ── */
+	:global(.konf-app .kp) {
+		max-width: 1100px;
+		margin: 0 auto;
+		padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) clamp(40px, 6vw, 72px);
+	}
+
+	/* HERO */
+	:global(.konf-app .kp-hero) {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: clamp(16px, 3vw, 28px);
+		margin-bottom: clamp(24px, 4vw, 40px);
+	}
+	:global(.konf-app .kp-hero-foto) {
+		border-radius: var(--k-radius);
+		overflow: hidden;
+		aspect-ratio: 5 / 3;
+		background: var(--k-surface-2);
+		box-shadow: var(--k-shadow);
+	}
+	:global(.konf-app .kp-hero-foto img) {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	:global(.konf-app .kp-label) {
+		display: block;
+		font-size: 11.5px;
+		font-weight: 600;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--k-accent);
+		margin-bottom: 10px;
+	}
+	:global(.konf-app .kp-hero-text h1) {
+		margin: 0 0 12px;
+		font-size: clamp(1.8rem, 4vw, 2.7rem);
+		font-weight: 700;
+		line-height: 1.06;
+		letter-spacing: -0.02em;
+		color: var(--k-text);
+	}
+	:global(.konf-app .kp-hero-text p) {
+		margin: 0;
+		font-size: 15.5px;
+		line-height: 1.55;
+		color: var(--k-muted);
+		max-width: 560px;
+	}
+
+	/* LAYOUT: mobil 1 stĺpec, desktop ovládanie + panel */
+	:global(.konf-app .kp-grid) {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: clamp(18px, 3vw, 32px);
+		align-items: start;
+	}
+
+	:global(.konf-app .kp-blok) {
+		border: 1px solid var(--k-line);
+		border-radius: var(--k-radius);
+		background: var(--k-surface);
+		padding: 18px 18px 20px;
+		margin: 0 0 16px;
+	}
+	:global(.konf-app .kp-blok legend) {
+		font-size: 12px;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--k-accent);
+		padding: 0 6px;
+	}
+
+	/* karty: šírka mriežky per-produkt cez CSS premenné — base `--kp-karta-min` (default
+	   150px), `.dvoj` `--kp-karta-min-dvoj` (default 200px). Stránka, ktorá sa líši, nastaví
+	   premennú vo svojom `<style>` (napr. zasklenie `.dvoj` = 160px). */
+	:global(.konf-app .kp-karty) {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(var(--kp-karta-min, 150px), 1fr));
+		gap: 10px;
+		margin-top: 6px;
+	}
+	:global(.konf-app .kp-karty.dvoj) {
+		grid-template-columns: repeat(auto-fit, minmax(var(--kp-karta-min-dvoj, 200px), 1fr));
+	}
+	:global(.konf-app .kp-karta) {
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+		text-align: left;
+		padding: 12px 13px;
+		border: 1.5px solid var(--k-line);
+		border-radius: var(--k-radius-sm);
+		background: var(--k-surface);
+		cursor: pointer;
+		font-family: inherit;
+		transition:
+			border-color 0.15s ease,
+			background 0.15s ease;
+	}
+	:global(.konf-app .kp-karta:hover) {
+		border-color: var(--k-line-2);
+	}
+	:global(.konf-app .kp-karta.vybrana) {
+		border-color: var(--k-ink);
+		background: var(--k-accent-soft);
+	}
+	:global(.konf-app .kp-karta:focus-visible) {
+		outline: 2px solid var(--k-ink);
+		outline-offset: 2px;
+	}
+	:global(.konf-app .kp-karta-nazov) {
+		font-size: 15px;
+		font-weight: 650;
+		color: var(--k-text);
+	}
+	:global(.konf-app .kp-karta-popis) {
+		font-size: 12.5px;
+		line-height: 1.4;
+		color: var(--k-muted);
+	}
+
+	:global(.konf-app .kp-rozmery) {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 12px;
+		margin-top: 6px;
+	}
+	/* metrové steppery (RozmerStepper) stohované pod sebou */
+	:global(.konf-app .kp-steppery) {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 6px;
+	}
+	:global(.konf-app .kp-pole) {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	:global(.konf-app .kp-pole span) {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--k-text);
+	}
+	:global(.konf-app .kp-pole select) {
+		padding: 9px 11px;
+		border: 1px solid var(--k-line-2);
+		border-radius: var(--k-radius-sm);
+		font: inherit;
+		background: var(--k-surface);
+		color: var(--k-text);
+	}
+	:global(.konf-app .kp-pole select:focus-visible) {
+		outline: 2px solid var(--k-ink);
+		outline-offset: 1px;
+	}
+
+	/* PANEL: súhrn + cena (honest-null `.kp-cena-info` / cenová forma `.kp-cena*`) + dopyt */
+	:global(.konf-app .kp-panel) {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+	:global(.konf-app .kp-suhrn),
+	:global(.konf-app .kp-cena-info),
+	:global(.konf-app .kp-blok-kontakt) {
+		border: 1px solid var(--k-line);
+		border-radius: var(--k-radius);
+		background: var(--k-surface);
+		padding: 20px 22px;
+	}
+	:global(.konf-app .kp-suhrn h2),
+	:global(.konf-app .kp-blok-kontakt h2) {
+		margin: 0 0 12px;
+		font-size: 18px;
+		font-weight: 650;
+		letter-spacing: -0.01em;
+		color: var(--k-text);
+	}
+	:global(.konf-app .kp-suhrn dl) {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	:global(.konf-app .kp-suhrn dl > div) {
+		display: flex;
+		justify-content: space-between;
+		gap: 14px;
+		border-bottom: 1px solid var(--k-line);
+		padding-bottom: 8px;
+	}
+	:global(.konf-app .kp-suhrn dl > div:last-child) {
+		border-bottom: 0;
+		padding-bottom: 0;
+	}
+	:global(.konf-app .kp-suhrn dt) {
+		font-size: 13.5px;
+		color: var(--k-muted);
+	}
+	:global(.konf-app .kp-suhrn dd) {
+		margin: 0;
+		font-size: 13.5px;
+		font-weight: 600;
+		color: var(--k-text);
+		text-align: right;
+	}
+
+	/* CENA — honest-null statická karta (tienenie/pristresok/zasklenie) */
+	:global(.konf-app .kp-cena-info) {
+		background: var(--k-surface-2);
+		border-color: var(--k-line-2);
+	}
+	:global(.konf-app .kp-cena-info strong) {
+		display: block;
+		font-size: 17px;
+		color: var(--k-text);
+		margin-bottom: 6px;
+	}
+	:global(.konf-app .kp-cena-info p) {
+		margin: 0 0 14px;
+		font-size: 13.5px;
+		line-height: 1.5;
+		color: var(--k-muted);
+	}
+
+	/* CENA — orientačná cena (zimna-zahrada #408 / oplotenie #410), vzor bazén/pergola */
+	:global(.konf-app .kp-cena) {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+	:global(.konf-app .kp-cena-form) {
+		border: 1px solid var(--k-line-2);
+		border-radius: var(--k-radius);
+		background: var(--k-surface-2);
+		padding: 20px 22px;
+	}
+	:global(.konf-app .kp-cena-form strong) {
+		display: block;
+		font-size: 17px;
+		color: var(--k-text);
+		margin-bottom: 6px;
+	}
+	:global(.konf-app .kp-cena-form p) {
+		margin: 0 0 14px;
+		font-size: 13.5px;
+		line-height: 1.5;
+		color: var(--k-muted);
+	}
+	:global(.konf-app .kp-cena-chyba) {
+		color: #a3261c;
+		font-weight: 600;
+	}
+	/* prémiový antracitový cenový panel (tmavá karta — zhoda s pergolovým/bazénovým) */
+	:global(.konf-app .kp-cena-blok) {
+		background: var(--k-ink, #1b1e23);
+		color: #fff;
+		border-radius: var(--k-radius);
+		padding: 20px 22px;
+	}
+	:global(.konf-app .kp-cena-label) {
+		display: block;
+		color: rgba(255, 255, 255, 0.62);
+		font-size: 12px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 600;
+	}
+	:global(.konf-app .kp-cena-vo) {
+		display: inline-block;
+		margin-top: 8px;
+		padding: 2px 9px;
+		border-radius: 999px;
+		background: var(--k-accent, #b07a45);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	:global(.konf-app .kp-cena-hlavne) {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	:global(.konf-app .kp-cena-sdph) {
+		font-size: clamp(28px, 7vw, 38px);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+	}
+	:global(.konf-app .kp-cena-mena) {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+	}
+	:global(.konf-app .kp-cena-bezdph) {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+		margin-top: 4px;
+	}
+	:global(.konf-app .kp-cena-grid) {
+		color: rgba(255, 255, 255, 0.55);
+		font-size: 12px;
+		line-height: 1.4;
+		/* `margin: 8px 0 0` (nie `margin-top`) — oplotenie `.kp-cena-grid` je `<p>` s UA
+		   `margin-bottom`, ktorý treba vynulovať; zz je `<div>` bez defaultu. Pôvodné oba. */
+		margin: 8px 0 0;
+	}
+	:global(.konf-app .kp-cena-dovod) {
+		color: rgba(255, 255, 255, 0.72);
+		font-size: 13.5px;
+		margin: 8px 0 0;
+	}
+	:global(.konf-app .kp-cena-pozn) {
+		color: rgba(255, 255, 255, 0.5);
+		font-size: 12px;
+		line-height: 1.45;
+		margin: 14px 0 0;
+	}
+
+	:global(.konf-app .kp-uvod) {
+		color: var(--k-muted);
+		font-size: 14px;
+		line-height: 1.5;
+		margin: 0 0 16px;
+	}
+
+	:global(.konf-app .kp-btn) {
+		font-family: inherit;
+		font-size: 14px;
+		font-weight: 600;
+		border-radius: var(--k-radius-pill);
+		padding: 11px 20px;
+		cursor: pointer;
+		border: 1px solid transparent;
+	}
+	:global(.konf-app .kp-btn.primar) {
+		background: var(--k-ink);
+		color: #fff;
+	}
+	:global(.konf-app .kp-btn.primar:hover) {
+		background: var(--k-ink-hover);
+	}
+	:global(.konf-app .kp-btn.druhotny) {
+		background: var(--k-surface);
+		color: var(--k-text);
+		border-color: var(--k-line-2);
+	}
+	:global(.konf-app .kp-btn.druhotny:hover) {
+		border-color: var(--k-ink);
+	}
+	:global(.konf-app .kp-btn:focus-visible) {
+		outline: 2px solid var(--k-ink);
+		outline-offset: 2px;
+	}
+
+	:global(.konf-app .kp-chyba) {
+		color: #a3261c;
+		background: #fbeeec;
+		border: 1px solid #f2cfc9;
+		border-radius: var(--k-radius-sm);
+		padding: 14px 16px;
+		font-size: 14px;
+		margin: 0;
+	}
+
+	@media (min-width: 900px) {
+		:global(.konf-app .kp-hero) {
+			grid-template-columns: 1.1fr 0.9fr;
+			align-items: center;
+		}
+		:global(.konf-app .kp-grid) {
+			grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+		}
+	}
 </style>

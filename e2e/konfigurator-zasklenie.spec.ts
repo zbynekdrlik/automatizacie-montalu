@@ -14,6 +14,8 @@ test('zasklenie konfigurátor: verejná route bez auth — súhrn + umiestnenie 
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/zasklenie');
 	await expect(page).toHaveURL(/\/konfigurator\/zasklenie$/);
+	// dokument má SEO titul (#411 shell: <svelte:head> cez `titul` prop, nie prázdna záložka)
+	await expect(page).toHaveTitle(/zasklenie terasy alebo balkóna.*Montalu/);
 
 	// stránka sa načíta bez prihlásenia (verejná route)
 	await expect(page.getByRole('heading', { name: /Navrhni si zasklenie/ })).toBeVisible();

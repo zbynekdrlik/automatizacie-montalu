@@ -15,6 +15,8 @@ test('tienenie: verejná route bez auth — XLINE markíza (Výsun, len motorick
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/tienenie');
 	await expect(page).toHaveURL(/\/konfigurator\/tienenie$/);
+	// dokument má SEO titul (#411 shell: <svelte:head> cez `titul` prop, nie prázdna záložka)
+	await expect(page).toHaveTitle(/Navrhni si tienenie.*Montalu/);
 
 	// stránka sa načíta bez prihlásenia (verejná route)
 	await expect(
