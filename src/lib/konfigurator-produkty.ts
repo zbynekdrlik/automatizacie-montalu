@@ -87,9 +87,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Bezrámové aj rámové posuvné zasklenia terás a balkónov.',
 		foto: 'zasklenie.webp',
 		alt: 'Moderné zasklenie terasy Montalu Slide',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/zasklenia',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/zasklenie',
+		externy: false,
+		// #387: zasklenie NEMÁ overený interim cenový zdroj (matica montalu.sk pre zasklenie nie je
+		// reverzne odvodená — samostatný follow-up v rozsahu #279). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{

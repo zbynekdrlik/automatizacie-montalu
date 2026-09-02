@@ -18,11 +18,11 @@ describe('KONF_PRODUKTY katalóg', () => {
 		expect(KONF_PRODUKTY).toHaveLength(7);
 	});
 
-	it('pergola je PRVÁ a live; #385 pridal bazén ako live (ostatné „pripravujeme")', () => {
+	it('pergola je PRVÁ a live; #385 pridal bazén, #387 zasklenie ako live (ostatné „pripravujeme")', () => {
 		expect(KONF_PRODUKTY[0]!.kod).toBe('pergola');
 		expect(KONF_PRODUKTY[0]!.stav).toBe('live');
 		const live = KONF_PRODUKTY.filter((p) => p.stav === 'live');
-		expect(live.map((p) => p.kod)).toEqual(['pergola', 'bazen']);
+		expect(live.map((p) => p.kod)).toEqual(['pergola', 'bazen', 'zasklenie']);
 	});
 
 	it('kódy sú unikátne', () => {
@@ -69,6 +69,7 @@ describe('KONF_PRODUKTY katalóg', () => {
 describe('produkt-aware názvy pre lead / PDF', () => {
 	it('produktNazov: známy → nominatív, NULL/neznámy → Pergola', () => {
 		expect(produktNazov('bazen')).toBe('Bazénové zastrešenie');
+		expect(produktNazov('zasklenie')).toBe('Zasklenie terasy a balkóna');
 		expect(produktNazov('pergola')).toBe('Pergola');
 		expect(produktNazov(null)).toBe('Pergola');
 		expect(produktNazov('xxx')).toBe('Pergola');
@@ -76,6 +77,7 @@ describe('produkt-aware názvy pre lead / PDF', () => {
 
 	it('produktPdfNadpis: známy → nadpis, NULL/neznámy → Špecifikácia pergoly', () => {
 		expect(produktPdfNadpis('bazen')).toBe('Špecifikácia bazénového zastrešenia');
+		expect(produktPdfNadpis('zasklenie')).toBe('Špecifikácia zasklenia');
 		expect(produktPdfNadpis('pergola')).toBe('Špecifikácia pergoly');
 		expect(produktPdfNadpis(null)).toBe('Špecifikácia pergoly');
 		expect(produktPdfNadpis('xxx')).toBe('Špecifikácia pergoly');
