@@ -2,8 +2,9 @@
 // pergolou/fixom: „Zápis do Money" vs. „Návrhový výkres" namiesto malého redirect
 // odkazu (owner 2.9.). Všetko ČÍTACIE (len navigácia + kontrola UI), nič do Money
 // nezapisuje → dá sa pustiť aj proti nasadenej appke (BASE_URL). Overuje obe voľby
-// na OBOCH stránkach rodiny, prepínanie oboma smermi, že aktívna kachlička nie je
-// odkaz, a že návrhová cesta neponúka žiadne odoslanie do Money.
+// na OBOCH stránkach rodiny, prepínanie oboma smermi, a že aktívna kachlička nie je
+// odkaz. (Že návrhová cesta reálne NIČ nezapíše do Money — žiadne „Odoslať" po
+// vykreslení — strážia existujúce zasklenia-navrh.spec.ts / bazen-navrh.spec.ts.)
 import { test, expect, type Page } from '@playwright/test';
 import { goto, loginAs, collectConsole, waitHydrated } from './helpers';
 
@@ -34,8 +35,6 @@ test('#423 zasklenia — kachličky „Zápis do Money" / „Návrhový výkres"
 	await expect(page.getByTestId('zasklenia-rezim-navrh')).toHaveClass(/active/);
 	expect(await tagName(page, 'zasklenia-rezim-navrh')).toBe('DIV');
 	expect(await tagName(page, 'zasklenia-rezim-odpis')).toBe('A');
-	// „iba návrhový výkres" nesmie ponúkať žiadne odoslanie do Money
-	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
 
 	// klik späť na „Zápis do Money" → /zasklenia
 	await page.getByTestId('zasklenia-rezim-odpis').click();
@@ -69,8 +68,6 @@ test('#423 bazén — kachličky „Zápis do Money" / „Návrhový výkres" na
 	await expect(page.getByTestId('bazen-rezim-navrh')).toHaveClass(/active/);
 	expect(await tagName(page, 'bazen-rezim-navrh')).toBe('DIV');
 	expect(await tagName(page, 'bazen-rezim-odpis')).toBe('A');
-	// „iba návrhový výkres" nesmie ponúkať žiadne odoslanie do Money
-	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
 
 	// klik späť na „Zápis do Money" → /bazen
 	await page.getByTestId('bazen-rezim-odpis').click();

@@ -16,7 +16,11 @@
 
 	type Modul = 'zasklenia' | 'bazen';
 	type Rezim = 'odpis' | 'navrh';
-	let { modul, active }: { modul: Modul; active: Rezim } = $props();
+	// `b2b`: b2b účet vidí LEN /zasklenia (nárezák + PDF, ŽIADNY odpis do Money —
+	// access-control.md), a stránka svoje Money znenie pre b2b cielene skrýva
+	// (`{#if !isB2B}…`). Kachlička preto b2b nesmie sľubovať Money. Bazén nie je
+	// b2b-dostupný, takže sa to týka iba modulu zasklenia; default false.
+	let { modul, active, b2b = false }: { modul: Modul; active: Rezim; b2b?: boolean } = $props();
 
 	// Cesty ako ÚZKA únia literálov (nie bare `RouteId`) — `resolve()`'s overloaded
 	// signatúra prepadne na plnej ~24-člennej `RouteId` únii, ale úzku explicitnú
@@ -53,6 +57,18 @@
 			navrh: { cesta: '/bazen/navrh', tag: 'bez Money', title: 'Návrhový výkres', desc: NAVRH_DESC }
 		}
 	};
+
+	// b2b variant „zápisovej" kachličky pre zasklenia — bez Money sľubu (b2b odpis do
+	// Money nemá). Znenie 1:1 s tým, čo stránka b2b už ukazuje namiesto Money vety.
+	const ZASKLENIA_B2B_ODPIS: Kachlicka = {
+		cesta: '/zasklenia',
+		tag: 'nárez',
+		title: 'Nárezový plán',
+		desc: 'Zadaj rozmery — ukážem nárezový plán s náhľadom.'
+	};
+	const odpisKachlicka = $derived(
+		modul === 'zasklenia' && b2b ? ZASKLENIA_B2B_ODPIS : KONFIG[modul].odpis
+	);
 </script>
 
 {#snippet card(k: Kachlicka, aktivna: boolean, testid: string)}
@@ -73,6 +89,6 @@
 {/snippet}
 
 <div class="mode-grid cols-2" data-testid="{modul}-rezimy">
-	{@render card(KONFIG[modul].odpis, active === 'odpis', `${modul}-rezim-odpis`)}
+	{@render card(odpisKachlicka, active === 'odpis', `${modul}-rezim-odpis`)}
 	{@render card(KONFIG[modul].navrh, active === 'navrh', `${modul}-rezim-navrh`)}
 </div>

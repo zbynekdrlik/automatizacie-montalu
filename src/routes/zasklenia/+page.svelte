@@ -561,7 +561,7 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<OdpisNavrhNav modul="zasklenia" active="odpis" />
+		<OdpisNavrhNav modul="zasklenia" active="odpis" b2b={isB2B} />
 	</div>
 	<div class="card">
 		<h1>Zasklenia — nárezový plán</h1>

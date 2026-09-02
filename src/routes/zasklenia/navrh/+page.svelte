@@ -133,7 +133,7 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<OdpisNavrhNav modul="zasklenia" active="navrh" />
+		<OdpisNavrhNav modul="zasklenia" active="navrh" b2b={data.user?.role === 'b2b'} />
 	</div>
 	<div class="card">
 		<h1>Zasklenia — návrhový výkres</h1>

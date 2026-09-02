@@ -297,7 +297,7 @@ test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/z
 
 	await expect(page).toHaveURL(/\/zasklenia$/);
 	// b2b menu neobsahuje /bazen vôbec (bazén nie je b2b modul) — a teda ani jeho
-	// odkaz "→ Návrhový výkres"
+	// kachličku „Návrhový výkres" (#423)
 	await expect(page.getByRole('link', { name: 'Bazén' })).toHaveCount(0);
 
 	// priamy prístup na /bazen/navrh presmeruje preč (rovnaká vrstva ako /bazen samotné)
@@ -314,7 +314,7 @@ test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/z
 	expect(errs).toEqual([]);
 });
 
-test('internal: odkaz "→ Návrhový výkres" na /bazen vedie na /bazen/navrh, žiadne tlačidlo odoslania do Money', async ({
+test('internal: kachlička „Návrhový výkres" (#423) na /bazen vedie na /bazen/navrh, žiadne tlačidlo odoslania do Money', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);

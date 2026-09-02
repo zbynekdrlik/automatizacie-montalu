@@ -308,8 +308,8 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 
 // #162 bod 5: b2b — dostupná AUTOMATICKY (na rozdiel od pergoly nepotrebuje výnimku
 // v B2B_ALLOWED_EXCEPTIONS, lebo /zasklenia/* nie je v B2B_FORBIDDEN_PREFIXES) —
-// odkaz na stránke /zasklenia (obe role ju vidia), otvorenie a vykreslenie funguje.
-test('b2b: odkaz "→ Návrhový výkres" na /zasklenia, otvorenie a vykreslenie funguje (#162)', async ({
+// kachlička na stránke /zasklenia (obe role ju vidia), otvorenie a vykreslenie funguje.
+test('b2b: kachlička „Návrhový výkres" (#423) na /zasklenia, otvorenie a vykreslenie funguje (#162)', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
@@ -334,6 +334,8 @@ test('b2b: odkaz "→ Návrhový výkres" na /zasklenia, otvorenie a vykreslenie
 	await expect(page.getByRole('link', { name: 'Zasklenia návrh' })).toBeVisible();
 	// #423 — kachlička „Návrhový výkres" v prepínači režimov nahradila malý odkaz
 	await expect(page.getByTestId('zasklenia-rezim-navrh')).toBeVisible();
+	// #423 — b2b nemá odpis do Money, takže „zápisová" kachlička nesmie sľubovať Money
+	await expect(page.getByTestId('zasklenia-rezim-odpis')).not.toContainText('Money');
 	await page.getByTestId('zasklenia-rezim-navrh').click();
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/zasklenia\/navrh$/);
