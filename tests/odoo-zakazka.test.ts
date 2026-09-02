@@ -19,6 +19,7 @@ const { setOdooTransport } = await import('../src/lib/server/odoo-rpc');
 const { buildZakazkaNote, buildZakazkaNoteHtml, pushZakazkaToOdoo, queueZakazkaPush } =
 	await import('../src/lib/server/odoo-zakazka');
 const { zakazkaPrehlad } = await import('../src/lib/server/zakazka-ceny');
+const zakazkaPdf = await import('../src/lib/server/zakazka-pdf');
 
 let nextId = 70001;
 function seedOdpis(opts: {
@@ -51,14 +52,26 @@ function seedOdpis(opts: {
 	return id;
 }
 
-/** Mock Odoo transport: routuje podľa metódy; zaznamenáva message_post volania. */
-function mockOdoo(opts: { searchIds: number[]; onPost?: (body: string) => void }): OdooTransport {
+/** Mock Odoo transport: routuje podľa metódy; zaznamenáva message_post a ir.attachment create. */
+function mockOdoo(opts: {
+	searchIds: number[];
+	onPost?: (body: string) => void;
+	onAttach?: (body: string) => void;
+	attachThrows?: boolean; // ir.attachment create hodí fault (best-effort test)
+	attId?: number;
+}): OdooTransport {
 	return async (_url, body) => {
 		if (body.includes('<methodName>authenticate</methodName>'))
 			return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
 		if (body.includes('<string>search</string>')) {
 			const items = opts.searchIds.map((n) => `<value><int>${n}</int></value>`).join('');
 			return `<methodResponse><params><param><value><array><data>${items}</data></array></value></param></params></methodResponse>`;
+		}
+		if (body.includes('<string>ir.attachment</string>')) {
+			opts.onAttach?.(body);
+			if (opts.attachThrows)
+				return '<methodResponse><fault><value><struct><member><name>faultCode</name><value><int>1</int></value></member><member><name>faultString</name><value><string>attach denied</string></value></member></struct></value></fault></methodResponse>';
+			return `<methodResponse><params><param><value><int>${opts.attId ?? 8801}</int></value></param></params></methodResponse>`;
 		}
 		if (body.includes('<string>message_post</string>')) {
 			opts.onPost?.(body);
@@ -212,7 +225,7 @@ describe('pushZakazkaToOdoo', () => {
 		setOdooTransport(mockOdoo({ searchIds: [] }));
 		expect(await pushZakazkaToOdoo('ZAKNOORD', 'OP900')).toBe('no-order');
 	});
-	it('posted → message_post s mt_note/comment/partner_ids=[] na správnom sale.order id, name=normOp', async () => {
+	it('posted → note + PDF príloha (ir.attachment) naviazaná na internú mt_note, leak drží', async () => {
 		enableOdoo();
 		seedOdpis({
 			zak: 'ZAKPOST',
@@ -222,12 +235,17 @@ describe('pushZakazkaToOdoo', () => {
 		});
 		let postedBody = '';
 		let searchBody = '';
+		let attachBody = '';
 		setOdooTransport(async (_u, body) => {
 			if (body.includes('<methodName>authenticate</methodName>'))
 				return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
 			if (body.includes('<string>search</string>')) {
 				searchBody = body;
 				return '<methodResponse><params><param><value><array><data><value><int>53051</int></value></data></array></value></param></params></methodResponse>';
+			}
+			if (body.includes('<string>ir.attachment</string>')) {
+				attachBody = body;
+				return '<methodResponse><params><param><value><int>8801</int></value></param></params></methodResponse>';
 			}
 			if (body.includes('<string>message_post</string>')) {
 				postedBody = body;
@@ -238,15 +256,29 @@ describe('pushZakazkaToOdoo', () => {
 		expect(await pushZakazkaToOdoo('ZAKPOST', '260439')).toBe('posted');
 		// match na sale.order.name = OP260439 (normOp z bare čísla)
 		expect(searchBody).toContain('<string>OP260439</string>');
+		// ir.attachment create: base64 PDF (datas), naviazané na sale.order 53051, binary/pdf
+		expect(attachBody).toContain('<string>ir.attachment</string>');
+		expect(attachBody).toContain('<string>create</string>');
+		expect(attachBody).toMatch(/<name>datas<\/name><value><string>[A-Za-z0-9+/=]{40,}<\/string>/);
+		expect(attachBody).toContain('<name>res_model</name><value><string>sale.order</string>');
+		expect(attachBody).toContain('<name>res_id</name><value><int>53051</int>');
+		expect(attachBody).toContain('<name>type</name><value><string>binary</string>');
+		expect(attachBody).toContain('<name>mimetype</name><value><string>application/pdf</string>');
+		// príloha NIE JE public (druhá vrstva k naviazaniu na internú note); <name>public</name> je base64-safe
+		expect(attachBody).not.toContain('<name>public</name>');
 		// interná log-note kontrakt (zákazník to NIKDY nevidí)
 		expect(postedBody).toContain('<string>mail.mt_note</string>');
 		expect(postedBody).toContain('<name>message_type</name><value><string>comment</string>');
 		expect(postedBody).toContain(
 			'<name>partner_ids</name><value><array><data></data></array></value>'
 		);
+		// PDF príloha je NAVIAZANÁ na TÚTO internú správu → dedí neúnikovú garanciu #340
+		expect(postedBody).toContain(
+			'<name>attachment_ids</name><value><array><data><value><int>8801</int></value></data></array></value>'
+		);
 		// postnuté na nájdený sale.order id
 		expect(postedBody).toContain('<value><int>53051</int></value>');
-		// NEGATÍVNY leak kontrakt: žiadny notifikačný kwarg (email_from / subtype_id / follower)
+		// NEGATÍVNY leak kontrakt: žiadny notifikačný kwarg
 		expect(postedBody).not.toContain('email_from');
 		expect(postedBody).not.toContain('subtype_id'); // používame subtype_xmlid, nie subtype_id
 		expect(postedBody).not.toMatch(/partner_ids<\/name><value><array><data><value>/); // partner_ids je PRÁZDNE
@@ -264,6 +296,8 @@ describe('pushZakazkaToOdoo', () => {
 				return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
 			if (body.includes('<string>search</string>'))
 				return '<methodResponse><params><param><value><array><data><value><int>7</int></value></data></array></value></param></params></methodResponse>';
+			if (body.includes('<string>ir.attachment</string>'))
+				return '<methodResponse><params><param><value><int>5</int></value></param></params></methodResponse>';
 			postedBody = body;
 			return '<methodResponse><params><param><value><int>1</int></value></param></params></methodResponse>';
 		});
@@ -283,6 +317,8 @@ describe('pushZakazkaToOdoo', () => {
 				return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
 			if (body.includes('<string>search</string>'))
 				return '<methodResponse><params><param><value><array><data><value><int>11</int></value><value><int>22</int></value></data></array></value></param></params></methodResponse>';
+			if (body.includes('<string>ir.attachment</string>'))
+				return '<methodResponse><params><param><value><int>5</int></value></param></params></methodResponse>';
 			if (body.includes('<string>message_post</string>')) {
 				const m = /message_post<\/string>[\s\S]*?<int>(\d+)<\/int>/.exec(body);
 				if (m) posts.push(Number(m[1]));
@@ -292,6 +328,46 @@ describe('pushZakazkaToOdoo', () => {
 		});
 		expect(await pushZakazkaToOdoo('ZAKMULTI', 'OP700')).toBe('posted');
 		expect(posts).toEqual([11, 22]);
+	});
+	it('best-effort: keď ir.attachment create zlyhá, note sa AJ TAK postne (bez attachment_ids)', async () => {
+		enableOdoo();
+		seedOdpis({ zak: 'ZAKATT', op: 'OP940', polozky: [{ kod: 'K1', nazov: 'A', qty: 1 }] });
+		let postedBody = '';
+		setOdooTransport(
+			mockOdoo({ searchIds: [77], attachThrows: true, onPost: (b) => (postedBody = b) })
+		);
+		expect(await pushZakazkaToOdoo('ZAKATT', 'OP940')).toBe('posted');
+		// note ide aj bez prílohy — attachment_ids sa NEUVÁDZA (leak-kontrakt aj tak drží)
+		expect(postedBody).toContain('<string>mail.mt_note</string>');
+		expect(postedBody).not.toContain('attachment_ids');
+		expect(postedBody).toContain('<value><int>77</int></value>');
+	});
+	it('best-effort: keď PDF-gen zlyhá, note sa AJ TAK postne (posted, žiadna príloha)', async () => {
+		enableOdoo();
+		seedOdpis({ zak: 'ZAKPDF', op: 'OP930', polozky: [{ kod: 'K1', nazov: 'A', qty: 1 }] });
+		vi.spyOn(zakazkaPdf, 'generateZakazkaPdfBase64').mockRejectedValue(new Error('pdf boom'));
+		let postedBody = '';
+		let sawAttach = false;
+		setOdooTransport(async (_u, body) => {
+			if (body.includes('<methodName>authenticate</methodName>'))
+				return '<methodResponse><params><param><value><int>252</int></value></param></params></methodResponse>';
+			if (body.includes('<string>search</string>'))
+				return '<methodResponse><params><param><value><array><data><value><int>55</int></value></data></array></value></param></params></methodResponse>';
+			if (body.includes('<string>ir.attachment</string>')) {
+				sawAttach = true;
+				return '<methodResponse><params><param><value><int>1</int></value></param></params></methodResponse>';
+			}
+			if (body.includes('<string>message_post</string>')) {
+				postedBody = body;
+				return '<methodResponse><params><param><value><int>1</int></value></param></params></methodResponse>';
+			}
+			throw new Error('unexpected');
+		});
+		expect(await pushZakazkaToOdoo('ZAKPDF', 'OP930')).toBe('posted');
+		// PDF zlyhal → žiadna príloha sa netvorí, ale note (primárny záznam) ide
+		expect(sawAttach).toBe(false);
+		expect(postedBody).toContain('<string>mail.mt_note</string>');
+		expect(postedBody).not.toContain('attachment_ids');
 	});
 	it('NIKDY nehádže — transport chyba → failed', async () => {
 		enableOdoo();

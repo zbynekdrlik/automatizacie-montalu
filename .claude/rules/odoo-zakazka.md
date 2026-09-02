@@ -32,6 +32,25 @@ BEZ `email_from`/notif kwargov. `partner_ids=[]` = žiadny follower/notifikácia
 ceny (predaj/nákup) smú ísť LEN do tejto log-note. Test to stráži POZITÍVNE (kwargy sú)
 aj NEGATÍVNE (žiadny `email_from`/`subtype_id`/neprázdny `partner_ids`).
 
+## PDF príloha rozpisu materiálu (#418 — rozšírenie #340)
+
+- **Príloha MUSÍ visieť na INTERNEJ `mt_note` správe, nie samostatne na zázname.** PDF rozpisu
+  (`zakazka-pdf.ts`, tie isté dáta ako note) sa pripína cez `message_post(..., attachment_ids=[attId])`
+  — príloha tak DEDÍ jedinú *dokázateľnú* neúnikovú garanciu #340 (internal=true message → nikdy
+  portál/zákazník). Samostatný `ir.attachment` s `res_model=sale.order` BEZ naviazania na správu NIE je
+  dokázateľná garancia (závisí od view/portál konfigurácie) — vždy naviazať na note.
+- **`public` sa NIKDY nenastavuje** (default `False`) — druhá vrstva. Test stráži `<name>public</name>`
+  neprítomnosť (base64-collision-safe, base64 abeceda nemá `<`/`>`).
+- **XML-RPC tvary:** `attachment_ids` = plochý int list `[attId]` (Odoo si `(4,id)` príkazy urobí sám);
+  `datas` = base64 STRING cez `<string>` encoder (`ir.attachment.datas` je Binary=base64, dokázaná
+  `crm.lead` cesta z #278). `type='binary'`, `mimetype='application/pdf'`, `res_model/res_id` na order.
+- **Best-effort:** pád generovania PDF ANI `ir.attachment` create NEZHODÍ push — note (primárny durable
+  záznam #349) ide aj bez prílohy. Keď `message_post` zlyhá PO vytvorení prílohy, `unlinkAttachments`
+  ju odviaže (inak by ostala osirelá, record-level), a chyba ide von → `failed` → #349 retry.
+- **PDF telo NEobsahuje emoji** (DejaVu subset nemá U+26A0/U+23F3 → „tofu") — honesty riadky používajú
+  textovú predponu „POZOR:"; HTML note si emoji ponecháva. Zdieľané PDF pomôcky (A4 rozmery, `wrapText`,
+  `ellipsize`, `embedDejavu`) žijú v `pdf-common.ts` (zdieľané s `ponuka-pdf.ts`).
+
 ## Architektúra
 
 - **`odoo-rpc.ts` = zdieľaný low-level XML-RPC klient** (encoder + scalar/**array**/fault
