@@ -62,9 +62,10 @@ const ALLOWED = new Set([
 	// nie je write-bearing, ale ostáva verejná a nepresmerovaná), pergola sa presunula na podstránku.
 	'/konfigurator',
 	'/konfigurator/pergola',
-	// #385: bazénová podstránka jednotného konfigurátora — VEREJNÁ (bez auth), Money-neutrálna
-	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
-	// inak zlyhal), nie obídenie.
+	// #385/#404/#422: bazénová podstránka jednotného konfigurátora — VEREJNÁ (bez auth),
+	// Money-neutrálna (dopyt/objednávka → audit + PDF s orientačnou cenou, vypocet = display-only
+	// kalkulačka, žiadny odpis, žiadna platobná brána). Vedomé potvrdenie (drift guard by inak
+	// zlyhal), nie obídenie.
 	'/konfigurator/bazen',
 	// #387: zasklenie podstránka jednotného konfigurátora — VEREJNÁ (bez auth), Money-neutrálna
 	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
@@ -305,16 +306,18 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 	});
 });
 
-// #385/#404, rovnaká disciplína — bazénová podstránka má PRESNE `dopyt` (verejný kontaktný formulár →
-// PDF špecifikácia s orientačnou cenou + Odoo lead) + `vypocet` (#404: orientačná cena, display-only —
-// pridanie ceny odblokovalo cenovú kalkulačku, presne ako pergolová `vypocet`). Žiadna Money/odpisová
-// ZÁPISOVÁ akcia (cena je LEN orientačná MO predajná, nie Money odpis; `vypocet` nič nezapisuje). VEREJNÁ
-// route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ĎALŠEJ akcie ROZBIJE
-// test (fail-closed).
-describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385/#404)', () => {
-	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
+// #385/#404/#422, rovnaká disciplína — bazénová podstránka má PRESNE `dopyt` (verejný kontaktný
+// formulár → PDF špecifikácia s orientačnou cenou + Odoo lead) + `objednavka` (#422: záväzná
+// objednávka — kontakt + fakturačné údaje + súhlas → uloženie je_objednavka=1 + PDF + Odoo
+// opportunity, vzor pergolovej #319) + `vypocet` (#404: orientačná cena, display-only — pridanie
+// ceny odblokovalo cenovú kalkulačku, presne ako pergolová `vypocet`). Žiadna Money/odpisová
+// ZÁPISOVÁ akcia (cena je LEN orientačná MO predajná, nie Money odpis; objednávka nemá platobnú
+// bránu; `vypocet` nič nezapisuje). VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je
+// kritické; pridanie akejkoľvek ĎALŠEJ akcie ROZBIJE test (fail-closed).
+describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385/#404/#422)', () => {
+	it('akcie routy sú presne dopyt + objednavka + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'objednavka', 'vypocet']);
 	});
 });
 
