@@ -18,6 +18,7 @@ import {
 	oploteniePonukaConfig,
 	type OplotenieVstup
 } from '../src/lib/konfigurator-oplotenie';
+import { zhrnutieRiadky } from '../src/lib/ponuka';
 import { opeciatkujCenuPreProdukt } from '../src/lib/server/dopyt-cena-stamp';
 import { generatePonukaPdf } from '../src/lib/server/ponuka-pdf';
 import { db } from '../src/lib/server/db';
@@ -132,6 +133,21 @@ describe('#388 konfigurujOplotenie (súhrn) + oploteniePonukaConfig (mapovanie n
 		expect(cfg).not.toHaveProperty('vyskaPriStene');
 		expect(cfg).not.toHaveProperty('sklo');
 	});
+
+	// #388 review 🔵: overuj kontrakt „žiadny zavádzajúci label" NA RENDER VRSTVE (`zhrnutieRiadky`),
+	// nielen ako absenciu poľa na cfg — inak by budúca zmena poradia/logiky riadkov v `ponuka.ts`
+	// (napr. reinterpretácia `sirka`) prešla nezachytená. Šírka → „Šírka" (nie „Výška vpredu").
+	it('zhrnutieRiadky(cfg) renderuje presne Systém/Šírka/Farba/Popis — žiadny zavádzajúci pergolový label', () => {
+		const cfg = oploteniePonukaConfig(konfigurujOplotenie(VSTUP));
+		const rows = zhrnutieRiadky(cfg);
+		expect(rows.map((r) => r.label)).toEqual(['Systém', 'Šírka', 'Farba konštrukcie', 'Popis']);
+		const sirkaRow = rows.find((r) => r.label === 'Šírka');
+		expect(sirkaRow?.value).toBe('4000 mm');
+		// žiadny pergolový výškový/hĺbkový/rozmerový-pár label
+		expect(rows.map((r) => r.label)).not.toContain('Výška vpredu');
+		expect(rows.map((r) => r.label)).not.toContain('Rozmery (š × h)');
+		expect(rows.map((r) => r.label)).not.toContain('Rozmery (d × š)');
+	});
 });
 
 // --------------------------------------------------------------------------- //
@@ -139,23 +155,33 @@ describe('#388 konfigurujOplotenie (súhrn) + oploteniePonukaConfig (mapovanie n
 // aj keď má rozmery. Pergola áno (regresná istota, že sme cenu pergole nerozbili).
 // --------------------------------------------------------------------------- //
 describe('#388 honest-null cena — oplotenie bez ceny, pergola s cenou', () => {
-	const CFG_ROZMERY = { system: 'Hliníkové oplotenie — Brána posuvná', sirka: 4000 };
+	// FORGED cfg s pergolovými cenotvornými poľami (`model`+`hlbka`) — TAKÁ cfg BY dala cenu, keby
+	// nebola blokovaná PRODUKTOVÝM gate-om. Používame ju zámerne, aby test NEBOL tautologický: bez
+	// `hlbka`/`model` by `cenaZCfg` vrátilo null pre KAŽDÝ produkt (aj pergolu), takže „žiadna cena"
+	// by prešlo aj keby sa gate `maCenovyZdroj('oplotenie')` rozbil. Toto je presne cesta, ktorú
+	// klient môže sfalšovať v POST `konfiguracia` — gate musí zablokovať cenu na submite AJ re-downloade.
+	const CFG_FORGED_PRICE = {
+		system: 'Hliníkové oplotenie — Brána posuvná',
+		model: 'LIGHT' as const,
+		sirka: 4000,
+		hlbka: 3500
+	};
 
-	it('opeciatkujCenuPreProdukt(oplotenie) → cena null + verzia null (žiadna pergolová cena)', () => {
-		const s = opeciatkujCenuPreProdukt(CFG_ROZMERY, 'oplotenie');
-		expect(s.cena).toBeNull();
+	it('opeciatkujCenuPreProdukt(oplotenie) → cena null + verzia null AJ pri cenotvornej (forged) cfg', () => {
+		const s = opeciatkujCenuPreProdukt(CFG_FORGED_PRICE, 'oplotenie');
+		expect(s.cena).toBeNull(); // PRODUKTOVÝ gate blokuje, hoci rozmery+model by cenu vedeli dať
 		expect(s.cennikVerzia).toBeNull();
 	});
 
-	it('opeciatkujCenuPreProdukt(pergola) → cena opečiatkovaná (nerozbité pergola pricing)', () => {
-		const s = opeciatkujCenuPreProdukt({ model: 'LIGHT', sirka: 4000, hlbka: 3500 }, 'pergola');
-		expect(s.cena).not.toBeNull();
+	it('KONTROLA: rovnaká cfg pod produktom pergola → cena OPEČIATKOVANÁ (test nie je tautologický)', () => {
+		const s = opeciatkujCenuPreProdukt(CFG_FORGED_PRICE, 'pergola');
+		expect(s.cena).not.toBeNull(); // dôkaz, že cfg JE cenotvorná — oplotenie ju napriek tomu nedostane
 		expect(s.cena!.druh).toBe('cena');
 		expect(s.cennikVerzia).not.toBeNull();
 	});
 
-	it('generatePonukaPdf(produkt=oplotenie) → PDF NENESIE žiadnu cenu, aj s rozmermi (subject+keywords)', async () => {
-		const bytes = await generatePonukaPdf(CFG_ROZMERY, {
+	it('generatePonukaPdf(produkt=oplotenie, forged cenotvorná cfg) → PDF NENESIE žiadnu cenu (subject+keywords)', async () => {
+		const bytes = await generatePonukaPdf(CFG_FORGED_PRICE, {
 			produkt: 'oplotenie',
 			datum: '1. 1. 2026'
 		});
@@ -166,6 +192,15 @@ describe('#388 honest-null cena — oplotenie bez ceny, pergola s cenou', () => 
 		// nadpis dokumentu je oplotenie (produkt-aware)
 		expect(doc.getTitle() ?? '').toContain('oplotenia');
 	});
+
+	it('KONTROLA: generatePonukaPdf(produkt=pergola, TÁ ISTÁ cfg) → PDF NESIE orientačnú cenu (gate nie je no-op)', async () => {
+		const bytes = await generatePonukaPdf(CFG_FORGED_PRICE, {
+			produkt: 'pergola',
+			datum: '1. 1. 2026'
+		});
+		const doc = await PDFDocument.load(bytes);
+		expect(doc.getSubject() ?? '').toContain('Orientačná cena');
+	});
 });
 
 // DB round-trip: uložený oplotenie dopyt nesie NULOVÚ cenu (cena_druh aj cennik_verzia null) a jeho
@@ -174,8 +209,15 @@ describe('#388 honest-null cena — oplotenie bez ceny, pergola s cenou', () => 
 describe('#388 honest-null DB round-trip — oplotenie dopyt bez ceny, re-download bez ceny', () => {
 	beforeEach(() => db.exec('DELETE FROM dopyt'));
 
-	it('insert oplotenie dopyt (honest-null pečiatka) → cena_druh+cennik_verzia null → regen PDF bez ceny', async () => {
-		const cfg = oploteniePonukaConfig(konfigurujOplotenie(VSTUP));
+	it('insert oplotenie dopyt (FORGED cenotvorná cfg, honest-null pečiatka) → cena_druh+cennik_verzia null → regen PDF bez ceny', async () => {
+		// FORGED cfg s pergolovými cenotvornými poľami (`model`+`hlbka`) uložená pod produktom
+		// 'oplotenie' — dokazuje, že sfalšovaná POST `konfiguracia` nedostane cenu ani na re-downloade
+		// (nie len že reálna oplotenie cfg cenu nemá). Bez tohto by bol round-trip test tautologický.
+		const cfg = {
+			...oploteniePonukaConfig(konfigurujOplotenie(VSTUP)),
+			model: 'LIGHT' as const,
+			hlbka: 3500
+		};
 		const stamp = opeciatkujCenuPreProdukt(cfg, 'oplotenie');
 		const id = insertDopyt(
 			{

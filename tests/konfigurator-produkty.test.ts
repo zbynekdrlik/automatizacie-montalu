@@ -69,6 +69,8 @@ describe('KONF_PRODUKTY katalóg', () => {
 describe('produkt-aware názvy pre lead / PDF', () => {
 	it('produktNazov: známy → nominatív, NULL/neznámy → Pergola', () => {
 		expect(produktNazov('bazen')).toBe('Bazénové zastrešenie');
+		// #388: oplotenie prefix Odoo leadu („Hliníkové oplotenie – dopyt: …") + admin zoznam
+		expect(produktNazov('oplotenie')).toBe('Hliníkové oplotenie');
 		expect(produktNazov('pergola')).toBe('Pergola');
 		expect(produktNazov(null)).toBe('Pergola');
 		expect(produktNazov('xxx')).toBe('Pergola');
@@ -76,6 +78,7 @@ describe('produkt-aware názvy pre lead / PDF', () => {
 
 	it('produktPdfNadpis: známy → nadpis, NULL/neznámy → Špecifikácia pergoly', () => {
 		expect(produktPdfNadpis('bazen')).toBe('Špecifikácia bazénového zastrešenia');
+		expect(produktPdfNadpis('oplotenie')).toBe('Špecifikácia oplotenia');
 		expect(produktPdfNadpis('pergola')).toBe('Špecifikácia pergoly');
 		expect(produktPdfNadpis(null)).toBe('Špecifikácia pergoly');
 		expect(produktPdfNadpis('xxx')).toBe('Špecifikácia pergoly');

@@ -78,7 +78,9 @@ export const OPLOTENIE_VYSKA_MAX = 2200;
 export const OPLOTENIE_SIRKA_MIN = 1000;
 export const OPLOTENIE_SIRKA_MAX = 6000;
 export const OPLOTENIE_POCET_MIN = 1;
-export const OPLOTENIE_POCET_MAX = 20;
+// 40 = pohodlne pokryje obvod bežného pozemku plotovými dielmi (najčastejší typ) — 20 by hlavný
+// produktový typ umelo obmedzilo (review #388 🔵); väčší počet ide do poznámky dopytu.
+export const OPLOTENIE_POCET_MAX = 40;
 
 /** Rozmedzia pre klienta (input min/max/krok hinty) — žiadny Money údaj. */
 export const OPLOTENIE_RANGES = {
@@ -161,13 +163,13 @@ export function konfigurujOplotenie(v: OplotenieVstup): OplotenieSuhrn {
  *  polia, ktoré čítajú správne aj pre oplotenie: typ → `system`, šírka → `sirka` (→ riadok „Šírka"),
  *  farba → `farba`, model/dizajn + výška + počet → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/
  *  `model`/`dlzka`) sa NEPOUŽIJÚ — výška do `vyskaVpredu` by renderovalo zavádzajúce „Výška vpredu".
- *  BEZ ceny, BEZ Money kódu — cena je honest-null (oplotenie nemá overený cenový zdroj; gate
- *  `maCenovyZdroj` v `konfigurator-produkty`). */
+ *  `typNazov` je LEN v `system` (nie zdvojený v `popis` — review #388 🔵). BEZ ceny, BEZ Money kódu —
+ *  cena je honest-null (oplotenie nemá overený cenový zdroj; gate `maCenovyZdroj` v `konfigurator-produkty`). */
 export function oploteniePonukaConfig(s: OplotenieSuhrn): PonukaConfig {
 	return {
 		system: `Hliníkové oplotenie — ${s.typNazov}`,
 		sirka: s.sirka,
 		farba: s.farba,
-		popis: `Dizajn výplne ${s.model} · výška ${s.vyska} mm · počet ${s.pocet} ks (${s.typNazov}).`
+		popis: `Dizajn výplne ${s.model} · výška ${s.vyska} mm · počet ${s.pocet} ks.`
 	};
 }
