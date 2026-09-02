@@ -213,7 +213,7 @@ export function sietkaSlideExtra(
  *  pre `ExtraRez[]` (sieťková delta). Väčšina extra kusov má IDENTICKÚ dĺžku ako
  *  existujúci riadok toho istého systému, ktorý `oversizeCut` už overil — GAP je
  *  cross-systémová šírka prírezov (#110), kde sa k základnej dĺžke pripočíta
- *  Patrikova ±16,5 mm konštanta a mohla by (tesne pri hranici tyče) preklopiť
+ *  Patrikova +16,5 mm konštanta a mohla by (tesne pri hranici tyče) preklopiť
  *  kus, ktorý bez delty ešte sedel, na kus, ktorý sa už nezmestí. */
 function extraOversizeErr(extra: ExtraRez[]): string | null {
 	for (const e of extra) {
@@ -260,7 +260,7 @@ export function sietkaChyba(
  *  oba dali identický odpis. Rovnaký kód → pripočíta sa do existujúceho riadku
  *  (rovnaký `rozmer` → zlúči sa do JEDNÉHO `rezy` riadku — presne ako Patrikov
  *  nárezák ukazuje „8 ks", nie „6 ks" + „2 ks" osobitne; iný `rozmer`, napr.
- *  cross-systémová šírka prírezov s ±16,5 mm, ostáva vlastný riadok). Cudzí kód
+ *  cross-systémová šírka prírezov s +16,5 mm, ostáva vlastný riadok). Cudzí kód
  *  (cross-systémová sieťka #110) → pridá sa nový riadok. Vracia NOVÝ zoznam,
  *  pôvodný nemutuje. */
 export function mergeExtraCuts(
