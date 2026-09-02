@@ -349,3 +349,19 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty) = `<select>` (constrained → súhrn/
   dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
   (žiadny server round-trip netreba); pergolový `vypocet` submit je potrebný LEN kvôli server-cene.
+- **PER-MODEL limity = FUNKCIA modelu, NIE jedna konštanta (#389 tienenie, review 🟡).** Keď má produkt
+  varianty s RÔZNYMI reálnymi rozmerovými maximami (markíza XLINE š7500/v6000, XLIGHT 6000/5000, roleta
+  ZIPLINE 4000/v3000), NEROB jeden „generózny" `RANGES` const — vytvorí to nemožné konfigurácie
+  (ZIPLINE výška 6000 pri reálnom max 3000) a PDF/lead by ich zapísal. Honest-null rieši CENU, nie SPEC.
+  Vzor: limit na `<Produkt>ModelInfo` (`sirka`/`rozmer2` `{min,max}`), `<produkt>Ranges(model)` funkcia,
+  `r = $derived(<produkt>Ranges(model))` v stránke, a `$effect` čo pri prepnutí typu CLAMPne rozmery do
+  nových limitov (zápis rovnakej hodnoty = no-op, žiadna slučka). To isté pre voľby dostupné len pri
+  niektorých modeloch (tienenie: „Ručné" LEN XLIGHT — filtruj katalóg per model + resetni pri prepnutí).
+- **Reálnu ponuku OVER na webe, nič nevymýšľaj (#389).** Rozmerové maximá, dostupné varianty aj
+  ovládanie ťahaj z montalu.sk produktovej stránky (per model), nie z pamäte. Farbu, ktorú web ponúka
+  len „podľa vzorkovníka" (tienenie látka), NEROB ako fixný picker s vymyslenými kódmi — poznámka do
+  súhrnu/PDF. ASCII `id` pre voľby s diakritikou v `kod` (E2E testid stabilita, review 🔵).
+- **Honest-null test NESMIE byť vákuový (#389 review 🟡).** `cenaZCfg` vráti null bez `hlbka` v cfg
+  BEZ OHĽADU na gate — takže test s `{system,sirka}` by prešiel aj keby gate NEBOL. Testuj gate FORGED
+  pergola-tvarom (`hlbka`+`model` — `sanitizePonukaConfig` ho prijme) + pozitívnou kontrolou, že ten
+  istý cfg s `'pergola'` cenu MÁ.

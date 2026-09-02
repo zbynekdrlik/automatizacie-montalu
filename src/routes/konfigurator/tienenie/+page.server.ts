@@ -10,7 +10,6 @@ import type { Actions, PageServerLoad } from './$types';
 import {
 	TIENENIE_MODELY,
 	TIENENIE_OVLADANIE,
-	TIENENIE_RANGES,
 	TIENENIE_MODEL_DEFAULT,
 	TIENENIE_OVLADANIE_DEFAULT
 } from '$lib/konfigurator-tienenie';
@@ -19,15 +18,16 @@ import { RAL_PALETA } from '$lib/vykres/ral';
 // iba naimportuje a namountuje s produktom `'tienenie'` (server-autoritatívny). Money-NEUTRÁLNA.
 import { dopytAction } from '$lib/server/dopyt-action';
 
-// GET (SSR render) nie je rate-limitovaný — lacný statický katalóg + rozmedzia (rovnaká politika
-// ako ostatné podstránky); drahý POST (dopyt) je throttlovaný vo `dopyt-action`.
+// GET (SSR render) nie je rate-limitovaný — lacný statický katalóg (rovnaká politika ako ostatné
+// podstránky); drahý POST (dopyt) je throttlovaný vo `dopyt-action`. Rozmerové limity + dostupné
+// ovládanie sú per model (nesie ich `TIENENIE_MODELY`), klient si ich odvodí z vybraného typu.
 export const load: PageServerLoad = async () => {
 	return {
 		modely: TIENENIE_MODELY,
+		// katalóg ovládania (kód + ASCII id + popis) — ktoré je dostupné, hovorí model
 		ovladanie: TIENENIE_OVLADANIE,
 		// RAL farby (kód + názov, žiadny Money údaj) — rovnaký tvar ako ostatné podstránky.
 		farby: RAL_PALETA.map((r) => ({ kod: r.kod, nazov: r.nazov })),
-		rozmedzia: TIENENIE_RANGES,
 		// východiskové voľby (aby SSR render aj klient vychádzali z rovnakého platného stavu)
 		defaulty: {
 			model: TIENENIE_MODEL_DEFAULT,

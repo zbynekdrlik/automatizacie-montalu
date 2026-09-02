@@ -16,6 +16,7 @@
 		tienenieModel,
 		tienenieOvladanie,
 		tienenieModelInfo,
+		tienenieRanges,
 		rozmer2Popis,
 		rozmer2Akuzativ,
 		tienenieVstupPlatny,
@@ -26,8 +27,6 @@
 	import type { PonukaConfig } from '$lib/ponuka';
 
 	let { data } = $props();
-
-	const r = $derived(data.rozmedzia);
 
 	// východiskové voľby zo servera + rozumné stredové rozmery (v platných rozmedziach → súhrn hneď).
 	// `untrack` v $state initializeri (vzor bazén/pergola +page.svelte) — inak Svelte varuje
@@ -40,10 +39,34 @@
 	let sirka = $state<number | null>(4000);
 	let rozmer2 = $state<number | null>(3000);
 
-	// druh zvoleného modelu (markíza → výsun / roleta → výška) — riadi label druhého rozmeru + súhrnu.
-	const druh = $derived(tienenieModelInfo(tienenieModel(model)).druh);
+	// info + rozmedzia + druh zvoleného modelu. Limity SÚ per model (review #389 🟡 — nič nevymýšľaj):
+	// `r` sa mení pri prepnutí typu, RozmerStepper dostane nové min/max. `druh` (markíza/roleta) riadi
+	// label druhého rozmeru (výsun/výška) + súhrn.
+	const modelInfo = $derived(tienenieModelInfo(tienenieModel(model)));
+	const r = $derived(tienenieRanges(tienenieModel(model)));
+	const druh = $derived(modelInfo.druh);
 	const rozmer2Label = $derived(rozmer2Popis(druh)); // „Výsun" | „Výška"
 	const rozmer2Akuz = $derived(rozmer2Akuzativ(druh)); // „výsun" | „výšku"
+	// ovládanie dostupné PRE MODEL (montalu.sk: ZIPLINE/XLINE motorické, XLIGHT aj ručné) — katalóg
+	// (`data.ovladanie`) prefiltrovaný na to, čo model reálne ponúka.
+	const ovladaceModelu = $derived(
+		data.ovladanie.filter((o) => modelInfo.ovladanie.includes(o.kod))
+	);
+
+	// pri prepnutí typu: clampni rozmery do NOVÝCH per-model limitov (nech súhrn nezmizne) a normalizuj
+	// ovládanie na to, čo model ponúka. Zápis rovnakej hodnoty je no-op (žiadna slučka).
+	$effect(() => {
+		const rng = tienenieRanges(tienenieModel(model));
+		if (sirka != null) {
+			const c = Math.min(rng.sirka.max, Math.max(rng.sirka.min, sirka));
+			if (c !== sirka) sirka = c;
+		}
+		if (rozmer2 != null) {
+			const c = Math.min(rng.rozmer2.max, Math.max(rng.rozmer2.min, rozmer2));
+			if (c !== rozmer2) rozmer2 = c;
+		}
+		ovladanie = tienenieOvladanie(ovladanie, tienenieModel(model));
+	});
 
 	// display label farby („RAL 7016 ANTRACIT") — do dopytu/PDF ide label, nie holý kód (vzor parseru)
 	const farbaLabel = $derived.by(() => {
@@ -53,7 +76,7 @@
 
 	const vstup = $derived<TienenieVstup>({
 		model: tienenieModel(model),
-		ovladanie: tienenieOvladanie(ovladanie),
+		ovladanie: tienenieOvladanie(ovladanie, tienenieModel(model)),
 		sirka: sirka ?? 0,
 		rozmer2: rozmer2 ?? 0,
 		farba: farbaLabel
@@ -122,17 +145,17 @@
 				</div>
 			</fieldset>
 
-			<!-- OVLÁDANIE -->
+			<!-- OVLÁDANIE — len to, čo model reálne ponúka (montalu.sk); testid je ASCII `id`. -->
 			<fieldset class="tie-blok">
 				<legend>Ovládanie</legend>
 				<div class="tie-karty dvoj">
-					{#each data.ovladanie as o (o.kod)}
+					{#each ovladaceModelu as o (o.kod)}
 						<button
 							type="button"
 							class="tie-karta"
 							class:vybrana={ovladanie === o.kod}
 							aria-pressed={ovladanie === o.kod}
-							data-testid="tienenie-ovladanie-{o.kod}"
+							data-testid="tienenie-ovladanie-{o.id}"
 							onclick={() => (ovladanie = o.kod)}
 						>
 							<span class="tie-karta-nazov">{o.kod}</span>

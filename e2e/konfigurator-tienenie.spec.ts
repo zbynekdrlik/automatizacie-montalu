@@ -1,14 +1,15 @@
 // #389: verejný konfigurátor tienenia — markízy + screenové rolety (`/konfigurator/tienenie`) — E2E
 // cez reálny prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (typ/rozmery/ovládanie/
 // farba) sa počíta klientsky a zobrazí súhrn; druhý rozmer je VÝSUN (markíza) / VÝŠKA (roleta) — label
-// sa mení podľa typu; HONEST-NULL — žiadna orientačná cena (tienenie nemá cenový zdroj); dopyt tok →
-// PDF špecifikácia (bez ceny) na stiahnutie. GET je Money-neutrálny (číta sa aj proti LIVE prode);
-// dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý
-// test = NULA console chýb.
+// AJ stepper aria-label sa menia podľa typu; ovládanie je PER MODEL (XLIGHT ručné+motorické, XLINE/
+// ZIPLINE len motorické); limity sú PER MODEL (ZIPLINE šírka do 4000/výška do 3000); HONEST-NULL —
+// žiadna orientačná cena (tienenie nemá cenový zdroj); dopyt tok → PDF špecifikácia (bez ceny) na
+// stiahnutie. GET je Money-neutrálny (číta sa aj proti LIVE prode); dopyt je ZÁPIS (audit riadok) →
+// `skipAkLive`. Každý test = NULA console chýb.
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
 
-test('tienenie konfigurátor: verejná route bez auth — súhrn (markíza = Výsun) + HONEST-NULL (žiadna cena), nula console chýb', async ({
+test('tienenie: verejná route bez auth — XLINE markíza (Výsun, len motorické) + HONEST-NULL, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -26,6 +27,13 @@ test('tienenie konfigurátor: verejná route bez auth — súhrn (markíza = Vý
 	await expect(page.getByTestId('tienenie-suhrn-rozmer2')).toHaveText('3000 mm');
 	await expect(page.getByTestId('tienenie-suhrn')).toContainText('Výsun');
 
+	// adaptívny label je aj na stepperi (aria-label), nielen v súhrne
+	await expect(page.getByRole('button', { name: 'Zväčšiť výsun' })).toBeVisible();
+
+	// XLINE ponúka LEN motorické ovládanie (montalu.sk) — práve jedna ovládanie karta, „Ručné" nie je
+	await expect(page.getByTestId('tienenie-ovladanie-elektricke')).toBeVisible();
+	await expect(page.getByTestId('tienenie-ovladanie-rucne')).toHaveCount(0);
+
 	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
 	await expect(page.getByTestId('tienenie-cena-info')).toContainText('Cena na vyžiadanie');
 	await expect(page.locator('body')).not.toContainText('€');
@@ -33,7 +41,7 @@ test('tienenie konfigurátor: verejná route bez auth — súhrn (markíza = Vý
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('tienenie konfigurátor: prepnutie na roletu (Výška) + zmena rozmerov → súhrn sa aktualizuje → dopyt → PDF na stiahnutie, nula console chýb', async ({
+test('tienenie: XLIGHT ovládanie (Ručné) → ZIPLINE (Výška, motorické-only reset) + ZIPLINE-platné rozmery → dopyt → PDF, nula console chýb', async ({
 	page
 }) => {
 	// zápisový tok (audit riadok do `dopyt`) — proti LIVE prode preskočiť (vzor bazén/pergola dopyt test).
@@ -42,18 +50,29 @@ test('tienenie konfigurátor: prepnutie na roletu (Výška) + zmena rozmerov →
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/tienenie');
 
-	// prepni typ na screenovú roletu ZIPLINE → druhý rozmer sa zmení na „Výška" (druh = roleta)
+	// XLIGHT ponúka aj ručné ovládanie → prepni a over v súhrne
+	await page.getByTestId('tienenie-model-XLIGHT').click();
+	await expect(page.getByTestId('tienenie-model-XLIGHT')).toHaveAttribute('aria-pressed', 'true');
+	await page.getByTestId('tienenie-ovladanie-rucne').click();
+	await expect(page.getByTestId('tienenie-suhrn')).toContainText('Ručné');
+
+	// prepni na screenovú roletu ZIPLINE → druhý rozmer „Výška", ovládanie sa RESETNE na motorické
+	// (ZIPLINE „Ručné" neponúka — žiadny vymyslený variant), stepper aria-label sa zmení na „výšku"
 	await page.getByTestId('tienenie-model-ZIPLINE').click();
 	await expect(page.getByTestId('tienenie-model-ZIPLINE')).toHaveAttribute('aria-pressed', 'true');
 	await expect(page.getByTestId('tienenie-suhrn')).toContainText('Výška');
+	await expect(page.getByTestId('tienenie-suhrn')).toContainText('Elektrické'); // ovládanie resetnuté
+	await expect(page.getByTestId('tienenie-ovladanie-rucne')).toHaveCount(0); // ZIPLINE ho neponúka
+	await expect(page.getByRole('button', { name: 'Zväčšiť výšku' })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Zväčšiť výsun' })).toHaveCount(0);
 
-	// zmeň rozmery → súhrn LIVE reaguje (klientsky $derived). Rozmerové polia sú METROVÉ steppery
-	// (#333 RozmerStepper): fill je v METROCH („6" = 6000 mm), súhrn ostáva v mm.
-	await page.getByTestId('tienenie-sirka').fill('6');
+	// zmeň rozmery na ZIPLINE-platné (šírka do 4000, výška do 3000). Rozmerové polia sú METROVÉ steppery
+	// (#333): fill je v METROCH; súhrn ostáva v mm.
+	await page.getByTestId('tienenie-sirka').fill('4');
 	await page.getByTestId('tienenie-sirka').blur();
 	await page.getByTestId('tienenie-rozmer2').fill('2.5');
 	await page.getByTestId('tienenie-rozmer2').blur();
-	await expect(page.getByTestId('tienenie-suhrn-sirka')).toHaveText('6000 mm');
+	await expect(page.getByTestId('tienenie-suhrn-sirka')).toHaveText('4000 mm');
 	await expect(page.getByTestId('tienenie-suhrn-rozmer2')).toHaveText('2500 mm');
 
 	// dopyt formulár je viditeľný (súhrn platný)
