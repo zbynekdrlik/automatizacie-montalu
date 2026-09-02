@@ -19,6 +19,7 @@
 // zoznam z https://www.cloudflare.com/ips/; Node builtiny (`node:net` na validáciu rodiny,
 // uint32 pre v4, BigInt pre v6) to pokryjú presne.
 import { isIP } from 'node:net';
+import type { RequestEvent } from '@sveltejs/kit';
 
 /** Oficiálne Cloudflare IPv4 rozsahy — https://www.cloudflare.com/ips-v4 */
 const CF_IPV4 = [
@@ -138,4 +139,23 @@ export function resolveClientIp(
 		if (cf && isIP(cf) !== 0) return cf;
 	}
 	return edgeIp;
+}
+
+/**
+ * Klientska IP (CF-aware) z `RequestEvent` pre rate-limit + log. `getClientAddress()` (XFF_DEPTH=1)
+ * HÁDŽE, keď chýba XFF hlavička (ADDRESS_HEADER nastavený + hlavička chýba — napr. priamy hit) —
+ * NESMIE zhodiť endpoint kvôli rate-limit kľúču, preto try/catch → `undefined` → bucket „-". Reálneho
+ * klienta za Cloudflare odvodí `resolveClientIp` z edge IP + `Cf-Connecting-Ip`. Zdieľané: cenové
+ * `vypocet` akcie (`konfigurator-cena-akcia`) aj `dopyt-action`.
+ */
+export function clientIp(
+	event: Pick<RequestEvent, 'request' | 'getClientAddress'>
+): string | undefined {
+	let edge: string | undefined;
+	try {
+		edge = event.getClientAddress();
+	} catch {
+		edge = undefined;
+	}
+	return resolveClientIp(edge, event.request.headers.get('cf-connecting-ip'));
 }

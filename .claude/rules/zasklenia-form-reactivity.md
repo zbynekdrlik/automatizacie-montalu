@@ -1,6 +1,8 @@
 ---
 paths:
   - "src/routes/zasklenia/+page.svelte"
+  - "src/routes/zasklenia/+page.server.ts"
+  - "src/lib/sklo.ts"
 ---
 
 # `+page.svelte` (zasklenia) — reaktívne gotchas nad rámec `nova-stranka` §3
@@ -99,3 +101,37 @@ strome nerenderuje; `.badge` je len v `<p class="sub">` nahlad/hotovo hlavičiek
 hodnôt, všetky `name=` atribúty formulára, `action=`/`formaction=` a `KlinPolia`/`SietkaPolia`/
 `Nahlad2D` bindingy MUSIA ostať identické (`diff` origin vs nový); E2E `zasklenia*.spec.ts` +
 `app.spec.ts` v CI je konečná sieť.
+
+## Config-derivované form gaty (viditeľnosť polí) — odvoď z konfigurácie, nie z názvu systému
+
+Viditeľnosť polí formulára, ktoré závisia od SYSTÉMU, sa NEgate-uje hardcodom
+`system === 'X'` — derivuje sa zo servera z konfigurácie kovania. Server (`+page.server.ts`
+`load()`) vracia množiny systémov, klient (`+page.svelte`) z nich robí `$derived` gate
+(úniou naprieč posuvmi, keď je pole na úrovni objednávky — ako farba/FAB):
+
+| Pole | server množina | odvodené z | klient gate |
+|---|---|---|---|
+| „Jednostranná FAB" | `systemyFab` | kovanie má položku `pravidlo.typ==='naUzaverPodlaFab'` (kľučka/krytka vložky — **dnes iba Robust**) | `maFab` (únia posuvov) |
+| „Farba kovania (RAL)" | `systemyFarba` | kovanie má položku s `.farba` | `maFarbu` (únia posuvov) |
+| ručná koľajnica | `systemyKolajnica` | `systemyRucnaKolajnica(cfg)` | `maKolajnicu` (primárny) |
+
+**Dôsledok (#431):** FAB checkbox sa NEriadi „má systém kovanie?" — Deluxe/Slide/Štandard
+kovanie DO Money majú, ale FAB položky (`naUzaverPodlaFab`) NIE, takže tam checkbox nič
+nemenil a je skrytý. Starý gate `maKovanie`/`systemyKovanie` (= `komponentyPre(sys)!==null`)
+bol nahradený `maFab`/`systemyFab`. Pri PRIDANÍ nového systému s kľučkou/krytkou vložky sa
+FAB checkbox objaví AUTOMATICKY (žiadna úprava stránky). Order-level pole ⇒ **únia naprieč
+posuvmi** (inak mixed objednávka primárny-Deluxe + ďalší-posuv-Robust o FAB pre Robust
+príde — testuj to e2e cez `#ps0-sys`, viď `e2e/kovanie-odpis.spec.ts`). Skryté order-level
+pole vynuluj reset-`$effect`om `if (!maX) hodnotaS = false` (vzor `maKolajnicu`).
+
+## Predvolené sklo je system-aware — `defaultSklo(skla, system)`, nie migrácia poradia
+
+Per-systém predvoľba skla žije v `src/lib/sklo.ts` `defaultSklo(skla, system?)` (display-only,
+nič odtiaľ nejde do Money): číre pre väčšinu, **Deluxe = „10 mm"** (#431, Patrik). Nový
+per-systém default pridaj TAM (guardovaný `system === '<X>'`, graceful fallback na spoločné
+pravidlo), NIE zmenou `poradie` v glass_types seede (to je migrácia na prod + mení poradie
+v `<select>`). Volá sa z `+page.svelte` na dvoch miestach (primárny sklo-effect + `fixPosuv`)
+— obom posielaj `system`/`p.system`. POZOR: predvoľba je Money-neutrálna len „pre dané sklo"
+— zmena Deluxe defaultu 6→10 mm zmení KTORÉ sklo je prednastavené a 10 mm dáva iný (úplnejší)
+odpis; sklo→odpis kanály sú tri: Slide (`redukcia_zero`), Deluxe (`hrubka`), Štandard IZO
+(`sysStylPre`) — viď `.claude/rules/glass-catalog.md`.

@@ -11,14 +11,16 @@
 // (b2b), pričom hladinu rozhoduje SERVER (`konfigurator-hladina`), nikdy klient. Do MO/verejnej
 // odpovede sa VO cena / Money kód / matica NIKDY nedostanú (leak-guard `konfigurator-money-safety`).
 // Modul je čistý (bez DB/siete), priamo unit-testovateľný (parity: `tests/konfigurator-cena.test.ts`).
-import { createHash } from 'node:crypto';
 import cennikJson from './cennik-pergola.json';
+import { EPS, VO_LABEL, cennikHash, dphNaPct, zlozka as zlozkaSpolocna } from './cennik-spolocne';
+import type { CenaZlozka, Mriezka } from './cennik-spolocne';
 // #279 Fáza C: `ModelPergoly` + verejné cenové typy žijú v client-safe `$lib/konfigurator`
 // (jeden zdroj pravdy — vidí ich aj wizard). Tu ich importujeme (server-only lookup) a
 // `ModelPergoly` RE-EXPORTUJEME, aby existujúce importy z tohto modulu (parity test) fungovali.
 import { MODELY, MODEL_DEFAULT } from '$lib/konfigurator';
 import type { ModelPergoly, VerejnaCena, CenaModelu, CenovaHladina } from '$lib/konfigurator';
 export type { ModelPergoly };
+export type { CenaZlozka };
 
 /** Kľúč strešnej výplne (mapuje na montalu.sk roofing slug v seed `vyplne`). */
 export type VyplnKluc =
@@ -27,12 +29,6 @@ export type VyplnKluc =
 	| 'bezpecnostne-sklo-442'
 	| 'izolacne-sklo-24'
 	| 'panel-izo-24';
-
-interface Mriezka {
-	min: number;
-	max: number;
-	krok: number;
-}
 
 /** Bunka matice = [MO net, VO net] v EUR (bez DPH). */
 type Bunka = [number, number];
@@ -80,17 +76,12 @@ const SEED = cennikJson as unknown as CennikSeed;
 /** Obsahový hash CENOTVORNÝCH častí seedu (matica + príplatky + DPH + mriezka) — zmení sa pri
  *  AKOMKOĽVEK cenovom drifte (aj ručnej úprave bez zmeny `vytazene`). Časová značka `vytazene`
  *  sama nestačí ako verzia (je len metadáta a mení sa aj bez zmeny cien). */
-const CENNIK_HASH = createHash('sha256')
-	.update(
-		JSON.stringify({
-			cennik: SEED.cennik,
-			priplatky: SEED.priplatky,
-			dph: SEED.meta.dph,
-			mriezka: SEED.meta.mriezka
-		})
-	)
-	.digest('hex')
-	.slice(0, 12);
+const CENNIK_HASH = cennikHash({
+	cennik: SEED.cennik,
+	priplatky: SEED.priplatky,
+	dph: SEED.meta.dph,
+	mriezka: SEED.meta.mriezka
+});
 
 /** Verzia cenníka pri opečiatkovaní ceny (#309) — čitateľný čas vyťaženia + obsahový hash
  *  cenotvorných častí. Pri PODANÍ dopytu sa uloží (`dopyt.cennik_verzia`), aby sa dalo dohľadať,
@@ -107,22 +98,9 @@ export const PRIPLATKY = {
 /** Katalógová mriežka (metre). */
 export const MRIEZKA = SEED.meta.mriezka;
 
-const EPS = 1e-9;
-/** DPH ako celé percentá (23) — na EXAKTNÚ celocentovú aritmetiku (bez FP driftu). */
-const DPH_PCT = Math.round(DPH * 100);
-
-/** Zaokrúhli EUR sumu na 2 desatiny (celé centy). */
-function eur2(net: number): number {
-	return Math.round(net * 100) / 100;
-}
-
-/** Suma s DPH v EUR = round(net × (1 + DPH), 2), počítané v celých centoch, aby sa
- *  presne (bez FP driftu na .xx5 hraniciach) zhodovalo s PHP `round()` na montalu.sk.
- *  net (v centoch) × (100 + DPH_PCT) / 100, zaokrúhlené half-up na celé centy. */
-function sDphEur(net: number): number {
-	const centy = Math.round(net * 100);
-	return Math.round((centy * (100 + DPH_PCT)) / 100) / 100;
-}
+/** DPH pergoly v celých percentách (23) — pre zdieľanú `sDphEur`/`zlozka` (celocentová aritmetika,
+ *  `cennik-spolocne`). */
+const DPH_PCT = dphNaPct(DPH);
 
 export interface CenaVstup {
 	/** hĺbka (výsuv od domu) [mm] */
@@ -138,13 +116,6 @@ export interface CenaVstup {
 	komin?: boolean;
 	/** predĺženie záruky na 5 rokov (+600 € net) */
 	zaruka5r?: boolean;
-}
-
-export interface CenaZlozka {
-	/** cena bez DPH [EUR] */
-	bezDph: number;
-	/** cena s DPH [EUR] = round(bezDph × (1 + DPH), 2) */
-	sDph: number;
 }
 
 export interface CenaOk {
@@ -181,8 +152,9 @@ export function zaokruhliNahor(hodnotaM: number, m: Mriezka): number | null {
 const kD = (d: number) => d.toFixed(1);
 const kW = (w: number) => w.toFixed(2);
 
+/** Cenová zložka {bezDph, sDph} pergoly — tenký obal nad zdieľanou `zlozka` s DPH_PCT pergoly. */
 function zlozka(net: number): CenaZlozka {
-	return { bezDph: eur2(net), sDph: sDphEur(net) };
+	return zlozkaSpolocna(net, DPH_PCT);
 }
 
 /**
@@ -260,11 +232,6 @@ export function dostupneVyplne(model: ModelPergoly): VyplnKluc[] {
  * vetvu (tam ho `CenaVysledok` nenesie); pre `cena` vetvu sa použije `v.model` a `model` MUSÍ byť
  * ten istý, aký dostal `vypocitajCenu`. `cenaPreModel` to garantuje. Nevolaj s nekonzistentným párom.
  */
-/** Server-dodaný VO label (#318 review 🟡): text hladiny sa NEsmie hardkódovať v klientskom
- *  komponente (inak by verejný bundle niesol VO literál = náznak VO hladiny). Server ho pošle
- *  LEN pri VO výstupe; klient renderuje `cena.hladinaLabel` bez vlastného VO reťazca. */
-const VO_LABEL = 'veľkoobchodná cena';
-
 export function naCenu(v: CenaVysledok, model: ModelPergoly, hladina: CenovaHladina): VerejnaCena {
 	const vo = hladina === 'VO' ? { hladina, hladinaLabel: VO_LABEL } : {};
 	if (v.druh === 'individualna-ponuka')

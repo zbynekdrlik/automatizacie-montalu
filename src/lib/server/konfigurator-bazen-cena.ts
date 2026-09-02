@@ -13,17 +13,12 @@
 // `cenyModelovBazen`) — MO (default) pre neprihláseného/interného, VO LEN pre prihláseného
 // veľkoobchodného; hladinu rozhoduje SERVER, VO sa do MO odpovede NIKDY nedostane. Čistý (bez DB/
 // siete), priamo unit-testovateľný (parity: `tests/konfigurator-bazen-cena.test.ts`).
-import { createHash } from 'node:crypto';
 import cennikJson from './cennik-bazen.json';
+import { EPS, VO_LABEL, cennikHash, dphNaPct, zlozka as zlozkaSpolocna } from './cennik-spolocne';
+import type { CenaZlozka, Mriezka } from './cennik-spolocne';
 import { BAZEN_MODELY, BAZEN_MODEL_DEFAULT } from '$lib/konfigurator-bazen';
 import type { BazenModel } from '$lib/konfigurator-bazen';
 import type { VerejnaCena, CenaModelu, CenovaHladina } from '$lib/konfigurator';
-
-interface Mriezka {
-	min: number;
-	max: number;
-	krok: number;
-}
 
 /** Bunka matice = [MO net, VO net] v EUR (bez DPH). */
 type Bunka = [number, number];
@@ -61,16 +56,11 @@ const SEED = cennikJson as unknown as CennikSeed;
 
 /** Obsahový hash CENOTVORNÝCH častí seedu (matica + DPH + mriezka) — zmení sa pri AKOMKOĽVEK cenovom
  *  drifte (aj ručnej úprave bez zmeny `vytazene`). */
-const CENNIK_HASH = createHash('sha256')
-	.update(
-		JSON.stringify({
-			cennik: SEED.cennik,
-			dph: SEED.meta.dph,
-			mriezka: SEED.meta.mriezka
-		})
-	)
-	.digest('hex')
-	.slice(0, 12);
+const CENNIK_HASH = cennikHash({
+	cennik: SEED.cennik,
+	dph: SEED.meta.dph,
+	mriezka: SEED.meta.mriezka
+});
 
 /** Verzia bazénového cenníka pri opečiatkovaní ceny (#309) — čas vyťaženia + obsahový hash. */
 export const CENNIK_VERZIA_BAZEN = `${SEED.meta.vytazene}#${CENNIK_HASH}`;
@@ -80,22 +70,9 @@ export const DPH_BAZEN = SEED.meta.dph;
 /** Katalógová mriežka (metre). */
 export const MRIEZKA_BAZEN = SEED.meta.mriezka;
 
-const EPS = 1e-9;
-/** DPH ako celé percentá (23) — na EXAKTNÚ celocentovú aritmetiku (bez FP driftu). */
-const DPH_PCT = Math.round(DPH_BAZEN * 100);
-
-/** Zaokrúhli EUR sumu na 2 desatiny (celé centy). */
-function eur2(net: number): number {
-	return Math.round(net * 100) / 100;
-}
-
-/** Suma s DPH v EUR = round(net × (1 + DPH), 2), počítané v celých centoch, aby sa presne (bez FP
- *  driftu na .xx5 hraniciach) zhodovalo s PHP `round()` na montalu.sk. Overené proti reálnym montalu
- *  reťazcom (`verifikaciaDph` v seede). */
-function sDphEur(net: number): number {
-	const centy = Math.round(net * 100);
-	return Math.round((centy * (100 + DPH_PCT)) / 100) / 100;
-}
+/** DPH bazéna v celých percentách (23) — pre zdieľanú `sDphEur`/`zlozka` (celocentová aritmetika,
+ *  `cennik-spolocne`). */
+const DPH_PCT = dphNaPct(DPH_BAZEN);
 
 export interface CenaBazenVstup {
 	/** dĺžka zastrešenia (pozdĺž bazéna) [mm] → montalu `length` */
@@ -104,11 +81,6 @@ export interface CenaBazenVstup {
 	sirkaMm: number;
 	/** model bazénového zastrešenia — default Premier */
 	model?: BazenModel;
-}
-
-interface CenaZlozka {
-	bezDph: number;
-	sDph: number;
 }
 
 export interface CenaBazenOk {
@@ -149,8 +121,9 @@ export function zaokruhliNaMriezku(hodnotaM: number, m: Mriezka): number | null 
 
 const k1 = (m: number) => m.toFixed(1);
 
+/** Cenová zložka {bezDph, sDph} bazéna — tenký obal nad zdieľanou `zlozka` s DPH_PCT bazéna. */
 function zlozka(net: number): CenaZlozka {
-	return { bezDph: eur2(net), sDph: sDphEur(net) };
+	return zlozkaSpolocna(net, DPH_PCT);
 }
 
 /**
@@ -201,10 +174,6 @@ export function vypocitajCenuBazen(v: CenaBazenVstup): CenaBazenVysledok {
 // Cena pre klienta podľa HLADINY (#318). MO = verejná/maloobchod (default); VO = veľkoobchod (LEN    //
 // pre prihlásených b2b). VO sa NIKDY nedostane do MO/verejnej odpovede — o hladine rozhoduje server. //
 // --------------------------------------------------------------------------- //
-
-/** Server-dodaný VO label — text hladiny sa NEsmie hardkódovať v klientskom komponente. Server ho
- *  pošle LEN pri VO výstupe; klient renderuje `cena.hladinaLabel`. */
-const VO_LABEL = 'veľkoobchodná cena';
 
 /**
  * Zmapuje interný výsledok (`CenaBazenVysledok` s MO **aj** VO) na cenu pre klienta v danej HLADINE.

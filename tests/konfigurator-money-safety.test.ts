@@ -272,7 +272,12 @@ const SERVEROVE_ROUTY = [
 	// `konfigurator-pristresok` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
 	'src/routes/konfigurator/pristresok/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
-	'src/lib/server/public-throttle.ts'
+	'src/lib/server/public-throttle.ts',
+	// #426/#428: zdieľaný cenový LEAF (DPH/EUR/hash aritmetika) + vypocet throttle shell — Money-kritická
+	// aritmetika sa presunula sem zo 4 cenových modulov, throttle predohra zo 4 route; guard ich preto
+	// MUSÍ skenovať (inak by budúci Money import v novom súbore prešiel bez povšimnutia).
+	'src/lib/server/cennik-spolocne.ts',
+	'src/lib/server/konfigurator-cena-akcia.ts'
 ];
 
 const SERVER_ZAKAZANE = [

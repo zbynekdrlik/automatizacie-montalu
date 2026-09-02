@@ -24,8 +24,9 @@ import { dopytAction } from '$lib/server/dopyt-action';
 import { cenaPreZz } from '$lib/server/konfigurator-zimna-zahrada-cena';
 import { cenovaHladina } from '$lib/server/konfigurator-hladina';
 import { parseZzCenaVstup } from '$lib/server/konfigurator-zimna-zahrada-vstup';
-import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
-import { resolveClientIp } from '$lib/server/client-ip';
+// #428: zdieľaná throttle predohra cenových `vypocet` akcií (rule-of-four) — nahrádza inline per-IP
+// rate-limit (public-throttle + client-ip); tie modul `konfigurator-cena-akcia` importuje sám.
+import { cenaThrottle } from '$lib/server/konfigurator-cena-akcia';
 
 // GET (SSR render) nie je rate-limitovaný — lacný statický katalóg + rozmedzia (rovnaká politika
 // ako pergolová/bazénová podstránka); drahý POST (dopyt) je throttlovaný vo `dopyt-action`.
@@ -52,18 +53,11 @@ export const actions = {
 	// #408: orientačná cena zvoleného configu. SvelteKit ZAKAZUJE miešať `default` s pomenovanými
 	// akciami, preto je aj `dopyt` pomenovaná (sveltekit-actions.md). Vzor pergolovej/bazénovej
 	// `vypocet` — per-IP throttle → parse → cena v hladine odvodenej SERVER-SIDE z používateľa.
-	vypocet: async ({ request, getClientAddress, setHeaders, locals }) => {
-		let edgeIp: string | undefined;
-		try {
-			edgeIp = getClientAddress();
-		} catch {
-			edgeIp = undefined;
-		}
-		const ip = resolveClientIp(edgeIp, request.headers.get('cf-connecting-ip'));
-		if (!allowRequest(ip)) {
-			setHeaders({ 'retry-after': String(Math.ceil(KONF_WINDOW_MS / 1000)) });
-			return fail(429, { cena: null, error: 'Priveľa požiadaviek. Skús to prosím o chvíľu.' });
-		}
+	vypocet: async (event) => {
+		// #428: zdieľaná throttle predohra; `prazdno` = prázdne dátové pole návratu zimnej záhrady.
+		const throttled = cenaThrottle(event, { cena: null });
+		if (throttled) return throttled;
+		const { request, locals } = event;
 
 		const parsed = parseZzCenaVstup(await request.formData());
 		if ('error' in parsed) return fail(400, { cena: null, error: parsed.error });

@@ -253,8 +253,21 @@
 	// ručná dĺžka koľajnice má zmysel len tam, kde je horná a spodná ZVLÁŠŤ
 	// (Deluxe / Štandard + / Štandard); zoznam posiela server z konfigurácie
 	const kolajnicaPre = (sys: string) => data.systemyKolajnica.includes(sys);
-	// kovanie do Money má Robust, Štandard, Deluxe aj Slide (#357) — derivované zo servera
-	let maKovanie = $derived(data.systemyKovanie.includes(system));
+	// „Jednostranná FAB" checkbox má zmysel len tam, kde ho kovanie reálne používa
+	// (položky s pravidlom `naUzaverPodlaFab` — dnes iba Robust); pri Deluxe/Slide/
+	// Štandard nič nerobí, tak ho skryjeme (#431). FAB je vstup na úrovni objednávky
+	// (ako `maFarbu` nižšie), takže stačí, aby ho potreboval HOCIKTORÝ posuv — inak by
+	// mixed objednávka (primárny Deluxe + ďalší posuv Robust) o FAB pre Robust prišla.
+	let maFab = $derived(
+		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFab ?? []).includes(s))
+	);
+	// keď žiadny posuv v hre nemá FAB položky, checkbox je skrytý — vynuluj hodnotu,
+	// aby zaseknuté „1" (napr. z „Použiť znova" Robust objednávky) neostalo trčať v
+	// skrytom stave (rovnaký vzor ako `maKolajnicu` nižšie). Money-bezpečné: bez FAB
+	// položiek by hodnota aj tak nič nemenila.
+	$effect(() => {
+		if (!maFab) jednostrannaFabS = false;
+	});
 	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
 	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv
 	// (aj ďalší posuv zimnej záhrady s iným systémom než primárny).
@@ -303,7 +316,7 @@
 		// už zvolené sklo si drž, kým je v ponuke (zmena počtu krídel nesmie
 		// prepísať voľbu obsluhy); inak predvoľba = vždy ČÍRE, ak ho systém má
 		const chcene = untrack(() => sklo) || prim()?.sklo;
-		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam);
+		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam, system);
 	});
 
 	// #132 (Patrik, Odoo 207 #1646652: „vždy dávame pri štandardoch IZO spodnú
@@ -389,7 +402,7 @@
 		const st = stylyForSystem(p.system);
 		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
-		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk);
+		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {
@@ -635,7 +648,7 @@
 		{narezakHint}
 		{jeOpona}
 		{jeRobust}
-		{maKovanie}
+		{maFab}
 		{maFarbu}
 		{ralOptions}
 		{maKolajnicu}

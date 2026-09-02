@@ -237,3 +237,36 @@ test('bazén konfigurátor: objednávka (MO) — súhrn → záväzná objednáv
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('bazén obálka (#427): cenníkový rozsah per-model + „mimo rozsah" hláška, nula console chýb', async ({
+	page
+}) => {
+	// #427: per-model cenníková obálka vystavená do UI (namiesto „nemej steny"). Read-only (žiadny POST),
+	// takže bez `skipAkLive`. `bazenReady` = sync-point na 3D viz (split-screen), inak interakcia preteká.
+	const consoleMsgs = collectConsole(page);
+	await bazenReady(page);
+
+	// default model = Premier → cenníkový rozsah (šírka do 6,0 m) je HNEĎ viditeľný; default rozmery
+	// (6,0 × 4,0 m) sú v ňom → žiadna „mimo rozsah" hláška
+	const obalka = page.getByTestId('bazen-obalka');
+	await expect(obalka).toBeVisible();
+	await expect(obalka).toContainText('Premier');
+	await expect(obalka).toContainText('šírka 2,0');
+	await expect(obalka).toContainText('6,0 m');
+	await expect(page.getByTestId('bazen-obalka-mimo')).toHaveCount(0);
+	// info vetva (v rozsahu) — celá veta vrátane oddeľovacej medzery pred inline spanom
+	// (stráži {#if}-whitespace pascu, testing.md: „Svelte prehltne medzeru okolo {#if}")
+	await expect(obalka).toContainText('m. Väčšie rozmery pripravíme ako cenu na vyžiadanie.');
+
+	// prepni na Star (užšia obálka, šírka do 4,5 m) → rozsah sa zmení
+	await page.getByTestId('bazen-model-Star').click();
+	await expect(obalka).toContainText('Star');
+	await expect(obalka).toContainText('4,5 m');
+
+	// zadaj šírku 5,0 m (NAD Star obálku 4,5 m) → čestná „mimo rozsah = na vyžiadanie" hláška
+	await page.getByTestId('bazen-sirka').fill('5');
+	await page.getByTestId('bazen-sirka').blur();
+	await expect(page.getByTestId('bazen-obalka-mimo')).toBeVisible();
+
+	expect(consoleMsgs).toEqual([]);
+});

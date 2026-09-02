@@ -98,6 +98,8 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - interim cenotvorba bazéna (update-pools endpoint, produkt-aware cena dispatch, systemKod, DPH boundary) → `.claude/rules/konfigurator-bazen-cena.md`
 - interim cenotvorba zimnej záhrady (update-winter-gardens, length=hĺbka pasca, round-UP mriezka, systemKod display-only, model≠cenotvorná os) → `.claude/rules/konfigurator-zimna-zahrada-cena.md`
 - interim cenotvorba oplotenia (update-fencings endpoint, typ×model×výška×šírka×počet, kompozitný systemKod, per-typ obálka, DPH boundary) → `.claude/rules/konfigurator-oplotenie-cena.md`
+- cenníkové rozmerové OBÁLKY do UI (per-typ oplotenie / per-model bazén; odvodenie zo seedu, mimo-obálky hláška, anti-drift, rozšírenie na ďalší produkt) → `.claude/rules/konfigurator-obalky.md`
+- zdieľané cenové helpery 4 modulov (cennik-spolocne.ts DPH/EUR/hash/label + cenaThrottle vypocet throttle shell; pri 5. produkte IMPORTUJ, nekopíruj) → `.claude/rules/cennik-spolocne.md`
 - SvelteKit form actions (`default` vs pomenované — nedajú sa miešať) → `.claude/rules/sveltekit-actions.md`
 - login brute-force throttle / timing oracle / bezpečnostné hlavičky / getClientAddress za Caddy → `.claude/rules/login-hardening.md`
 - unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
@@ -114,7 +116,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`
 - štruktúrovaný logger (`log.ts`) / handleError / chybová stránka / testovanie logov → `.claude/rules/logging.md`
 - three.js 3D náhľad (vizual) → `.claude/rules/vizual3d.md`
-- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt poradie → `.claude/rules/zasklenia-form-reactivity.md`
+- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt / config-derivované form gaty (maFab/maFarbu) / system-aware `defaultSklo` → `.claude/rules/zasklenia-form-reactivity.md`
 - kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`
 - pergola nárez/výkres z rozmerov → `.claude/rules/pergola-narez.md`
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` → `.claude/rules/odpis-detail.md`
