@@ -524,9 +524,11 @@ bez potvrdeného Money kódu:
   Money kódov / potvrdenie základu = úprava poľa `TESNENIA`, nie redizajn (phase 2 = #347). Základ,
   ktorý nie je v spočítanom náreze (napr. bez krovu), degraduje na `caka` rovnako — honest-null je
   TRVALÝ stav.
-- **Money kód tesnenia treba dohľadať v Money read-only** (ssh `~/.ssh/slovnormal_odoo` na
-  `root@erp.montalu.cloud` — POZOR: na worktree boxe môže CHÝBAŤ; vtedy je to blocker, ktorý sa
-  rieši otázkou na tiket, nie hádaním). Dominikov písomný zoznam ide do kanála 207.
+- **Money kód tesnenia treba dohľadať v Money read-only** — prístup je #425 gatekeeper
+  dvojskok (`ssh gatekeeper@100.90.94.41` → jeho vlastný alias `montalu-prod`, viď
+  `.claude/skills/money-odpis/SKILL.md`; `~/.ssh/slovnormal_odoo` UŽ NEEXISTUJE). Ak aj
+  dvojskok zlyhá, je to blocker, ktorý sa rieši otázkou na tiket, nie hádaním. Dominikov
+  písomný zoznam ide do kanála 207.
 - **#233 žargón-sken MUSÍ pokryť aj krok `rez-nahlad`** (nie len `spocitat` výsledok) — nové
   user-visible stringy tesnení sa renderujú tam. `pergola-uix.spec.ts` sken doťahaj cez
   `pripravit-rezervaciu` (ČÍTACIE, žiadny zápis).

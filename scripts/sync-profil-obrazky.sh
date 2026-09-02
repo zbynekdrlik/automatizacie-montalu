@@ -18,14 +18,18 @@ set -euo pipefail
 
 GATEKEEPER="${MONEY_GATEKEEPER:-gatekeeper@100.90.94.41}"
 REMOTE_ALIAS="${MONEY_REMOTE_ALIAS:-montalu-prod}"  # alias v ~/.ssh/config NA gatekeeperovi, nie tu
-SSH_OPTS=(-o BatchMode=yes -o LogLevel=ERROR)
+SSH_OPTS=(-o BatchMode=yes -o LogLevel=ERROR -o ConnectTimeout=15)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/static/profil"
 
 # Spusti príkaz NA montalu-prod cez dvojskok (gatekeeper vlastným kľúčom robí
-# druhý hop). Argument je jeden reťazec, ktorý bude bežať v shelli na montalu-prod.
+# druhý hop). Argument je jeden reťazec, ktorý bude bežať v shelli na montalu-prod;
+# vstavané apostrofy sa bezpečne escapujú (POSIX '\'' idiom), takže argument môže
+# obsahovať `'`. Volajúci môže presmerovať stdin/stdout normálne (`remote '...' <
+# subor`, `remote '...' | ...`) — funkcia ich len prenesie do ssh.
 remote() {
-	ssh "${SSH_OPTS[@]}" "$GATEKEEPER" "ssh ${SSH_OPTS[*]} $REMOTE_ALIAS '$1'"
+	local escaped=${1//\'/\'\\\'\'}
+	ssh "${SSH_OPTS[@]}" "$GATEKEEPER" "ssh ${SSH_OPTS[*]} $REMOTE_ALIAS '$escaped'"
 }
 
 # kódy, ku ktorým chceme obrázok = všetky kódy z compute modulov
@@ -61,17 +65,23 @@ PYEOF
 
 echo "→ sťahujem z Money (retry na flaky bridge)…"
 # Nahraj oba súbory na montalu-prod cez dvojskok — obsah ide surovo cez stdin
-# (žiadne base64/escapovanie potrebné, testované 2026-09-02 vrátane binárneho
-# tar prenosu naspäť).
-ssh "${SSH_OPTS[@]}" "$GATEKEEPER" "ssh ${SSH_OPTS[*]} $REMOTE_ALIAS 'cat > /tmp/codes.txt'" < /tmp/codes.txt
-ssh "${SSH_OPTS[@]}" "$GATEKEEPER" "ssh ${SSH_OPTS[*]} $REMOTE_ALIAS 'cat > /tmp/money_img_dump.py'" < /tmp/money_img_dump.py
+# (žiadne base64 potrebné, testované 2026-09-02 vrátane binárneho tar prenosu
+# naspäť). `remote()` len zloží príkaz — presmerovanie stdin/stdout robí volajúci.
+remote 'cat > /tmp/codes.txt' < /tmp/codes.txt
+remote 'cat > /tmp/money_img_dump.py' < /tmp/money_img_dump.py
+OK=0
 for i in 1 2 3 4 5; do
-	if remote 'rm -rf /tmp/profil-obrazky; /opt/montalu-sync/venv/bin/python /tmp/money_img_dump.py' 2>/tmp/sync.err; then break; fi
+	if remote 'rm -rf /tmp/profil-obrazky; /opt/montalu-sync/venv/bin/python /tmp/money_img_dump.py' 2>/tmp/sync.err; then OK=1; break; fi
 	echo "  bridge nedostupný (pokus $i), čakám 20s…"; sleep 20
 done
+if [ "$OK" -ne 1 ]; then
+	echo "→ CHYBA: Money bridge zlyhal aj po 5 pokusoch, viď /tmp/sync.err — nesťahujem stale dáta." >&2
+	cat /tmp/sync.err >&2 2>/dev/null || true
+	exit 1
+fi
 
 TMP=$(mktemp -d)
-ssh "${SSH_OPTS[@]}" "$GATEKEEPER" "ssh ${SSH_OPTS[*]} $REMOTE_ALIAS 'tar -czf - -C /tmp profil-obrazky'" | tar -xzf - -C "$TMP"
+remote 'tar -czf - -C /tmp profil-obrazky' | tar -xzf - -C "$TMP"
 
 echo "→ optimalizujem na webp…"
 mkdir -p "$OUT"
