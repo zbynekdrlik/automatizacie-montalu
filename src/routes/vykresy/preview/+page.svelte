@@ -87,18 +87,18 @@
 				y={y0}
 				width={x1 - x0}
 				height={y1 - y0}
-				fill="#eff6ff"
+				fill="#f4f3ef"
 				stroke="#0f172a"
 				stroke-width="0.5"
 				data-testid="demo-geometria"
 			/>
-			<!-- modré kóty (vodorovná, zvislá, uhlová) cez zdieľaný Kota.svelte — perpOffset
+			<!-- bronzové kóty (vodorovná, zvislá, uhlová) cez zdieľaný Kota.svelte — perpOffset
 			     posúva kótovú čiaru MIMO geometrie a zapína aj odkazové (witness) čiary -->
 			<Kota {x0} y0={y1} {x1} {y1} perpOffset={9} text={`${REAL_W} mm`} />
 			<Kota {x0} {y0} x1={x0} {y1} perpOffset={9} text={`${REAL_H} mm`} />
 			<path
 				d={arc.arcPath}
-				stroke="#1d4ed8"
+				stroke="#8a5a2b"
 				stroke-width="0.4"
 				fill="none"
 				data-testid="demo-uhol-oblúk"
@@ -108,7 +108,7 @@
 				y={arc.label.y}
 				text-anchor="middle"
 				font-size="3"
-				fill="#1d4ed8"
+				fill="#8a5a2b"
 				font-weight="600"
 				data-testid="demo-uhol-popis">{fmtDeg(REAL_SKLON)}</text
 			>

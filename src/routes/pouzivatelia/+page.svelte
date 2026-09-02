@@ -84,7 +84,7 @@
 								</select>
 								<button
 									type="submit"
-									style="background:none;border:1px solid #93c5fd;color:#2563eb;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px"
+									style="background:none;border:1px solid var(--m-line-2);color:var(--m-accent-ink);border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px"
 									>Zmeniť</button
 								>
 							</form>

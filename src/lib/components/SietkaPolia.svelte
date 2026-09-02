@@ -126,7 +126,7 @@
 	.sietka-hint {
 		margin: 0 0 8px;
 		font-size: 12px;
-		color: #0369a1;
+		color: var(--m-muted-ink);
 	}
 	.sietka-warn {
 		margin: 0 0 8px;
@@ -135,8 +135,8 @@
 		color: #92400e;
 	}
 	.sietka-box {
-		border: 1px solid #7dd3fc;
-		background: #f0f9ff;
+		border: 1px solid var(--m-line-2);
+		background: var(--m-surface-2);
 		border-radius: 10px;
 		padding: 10px 12px 2px;
 		margin-bottom: 12px;

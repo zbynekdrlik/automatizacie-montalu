@@ -225,10 +225,10 @@ table.narez th,
 table.narez td {
 	text-align: left;
 	padding: 7px 10px;
-	border-bottom: 1px solid #e2e8f0;
+	border-bottom: 1px solid var(--m-line);
 }
 table.narez th {
-	color: #475569;
+	color: var(--m-muted-ink);
 	font-weight: 600;
 	font-size: 13px;
 }
@@ -433,7 +433,7 @@ select:focus {
 .b2b-blok {
 	display: block;
 	margin-top: 5px;
-	color: #dc2626;
+	color: var(--m-danger);
 	font-size: 13px;
 	font-weight: 600;
 }
@@ -449,7 +449,7 @@ select:focus {
 .b2b-upoz {
 	display: block;
 	margin-top: 5px;
-	color: #b45309;
+	color: var(--m-warn);
 	font-size: 13px;
 	font-weight: 600;
 }
@@ -470,11 +470,11 @@ select:focus {
 	display: flex;
 	justify-content: space-between;
 	padding: 10px 2px;
-	border-bottom: 1px solid #e2e8f0;
+	border-bottom: 1px solid var(--m-line);
 	font-size: 15.5px;
 }
 .row span {
-	color: #334155;
+	color: var(--m-muted-ink);
 }
 .row b {
 	white-space: nowrap;
@@ -485,7 +485,7 @@ select:focus {
 	flex-wrap: wrap;
 }
 .g div span {
-	color: #64748b;
+	color: var(--m-muted-ink);
 	font-size: 14px;
 	display: block;
 }
@@ -493,6 +493,11 @@ select:focus {
 	display: block;
 	font-size: 19px;
 }
+/* #376 stage 4 pozn.: výsledkové hodnoty (`.row`/`.g` value `<b>`) sú ZMIEŠANÉ
+   text/číslo (mená zákazníkov, moduly, poznámky vs. rozmery/ceny/počty), takže
+   tabuľkový mono sa NEaplikuje plošne cez selektor — číselné hodnoty dostanú
+   `.mono` per-hodnotu (stage-3 vzor „monuj len samotné číslo, nie celú bunku").
+   `.ral-val` (RAL kód) mono má, je to kód. Plná per-hodnotová adopcia = follow-up. */
 /* #394 — zdieľaný prepínač režimov (PergolaModeNav + FixModeNav), zjednotený z
    per-komponent scoped CSS do jednej definície (vzor #239 table.narez → app.css).
    Počet stĺpcov per-komponent cez modifikátor .cols-2 (Fix 2 karty) vs default 3
@@ -770,7 +775,7 @@ footer.app {
 }
 .poznamka-ral .pr-ral {
 	flex: 0 0 auto;
-	border-left: 1px solid #e2e8f0;
+	border-left: 1px solid var(--m-line);
 	padding-left: 22px;
 	display: flex;
 	flex-direction: column;
@@ -785,7 +790,7 @@ footer.app {
 }
 .poznamka-plan {
 	font-weight: 600;
-	color: #334155;
+	color: var(--m-ink-2);
 	font-size: 15px;
 	margin: 0;
 	white-space: pre-wrap;
@@ -795,9 +800,12 @@ footer.app {
 .ral-val {
 	font-size: 40px;
 	font-weight: 800;
-	color: #0f172a;
+	color: var(--m-ink);
 	line-height: 1.05;
 	margin-top: 2px;
+	/* #376 stage 4: RAL kód/hodnota v tabuľkovom mono (kóta z výkresu) */
+	font-family: var(--m-font-mono);
+	font-variant-numeric: tabular-nums;
 	/* dlhý RAL (max 40 znakov) radšej zalomiť ako pretiecť rámček */
 	word-break: break-word;
 }
@@ -811,23 +819,23 @@ footer.app {
 }
 /* ďalší posuv (zimná záhrada) vo formulári */
 .posuv-box {
-	border: 1px dashed #cbd5e1;
+	border: 1px dashed var(--m-line-2);
 	border-radius: 10px;
 	padding: 12px 14px;
 	margin: 10px 0;
-	background: #f8fafc;
+	background: var(--m-surface-2);
 }
 .posuv-hd {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
 	margin-bottom: 8px;
-	color: #334155;
+	color: var(--m-ink-2);
 }
 .link-del {
 	background: none;
 	border: none;
-	color: #dc2626;
+	color: var(--m-danger);
 	cursor: pointer;
 	font-size: 13px;
 	padding: 2px 6px;
@@ -851,7 +859,7 @@ footer.app {
 .posuv-nahlad-hd {
 	font-size: 12px;
 	font-weight: 700;
-	color: #475569;
+	color: var(--m-muted-ink);
 	margin-bottom: 4px;
 }
 /* Výpis kovania (kľučky/FAB) po stranách — Patrik 2026-07-31: v kresbe je to
@@ -859,11 +867,11 @@ footer.app {
 .kov-posuv + .kov-posuv {
 	margin-top: 10px;
 	padding-top: 8px;
-	border-top: 1px solid #e2e8f0;
+	border-top: 1px solid var(--m-line);
 }
 .kov-hd {
 	font-size: 12px;
 	font-weight: 700;
-	color: #475569;
+	color: var(--m-muted-ink);
 	margin-bottom: 2px;
 }

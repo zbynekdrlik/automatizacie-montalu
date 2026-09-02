@@ -62,8 +62,8 @@
 			box-shadow 0.12s ease;
 	}
 	.thumb:hover {
-		border-color: #2563eb;
-		box-shadow: 0 4px 12px -6px rgba(37, 99, 235, 0.5);
+		border-color: var(--m-accent);
+		box-shadow: 0 4px 12px -6px rgba(176, 122, 69, 0.5);
 	}
 	.thumb img {
 		max-width: 100%;

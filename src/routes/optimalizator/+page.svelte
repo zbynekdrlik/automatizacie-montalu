@@ -241,7 +241,7 @@
 		background: #e2e8f0;
 	}
 	.spocitaj {
-		background: #2563eb;
+		background: var(--m-ink-2);
 		color: #fff;
 		border: 0;
 		border-radius: 8px;
@@ -251,7 +251,7 @@
 		font-weight: 600;
 	}
 	.spocitaj:hover {
-		background: #1d4ed8;
+		background: var(--m-ink-2-hover);
 	}
 	.spocitaj:disabled {
 		opacity: 0.6;
