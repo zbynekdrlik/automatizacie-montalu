@@ -5,6 +5,7 @@
 // živej matice). MONEY-NEUTRÁLNE: predajná cena (MO/VO), NIKDY Money kód. Súbor matchuje `/dopyt/`,
 // takže je auto-krytý statickým guardom `tests/dopyt-money-safety.test.ts` (žiadny import money/pergola/`/data`).
 import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
+import { maCenovyZdroj, type KonfProduktKod } from '$lib/konfigurator-produkty';
 import type { PonukaConfig } from '$lib/ponuka';
 import type { ModelPergoly, VerejnaCena, CenovaHladina } from '$lib/konfigurator';
 
@@ -22,7 +23,9 @@ export function cenaZCfg(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): Vere
  *  z ktorej matice bol dopyt podaný). */
 export interface CenaStamp {
 	cena: VerejnaCena | null;
-	cennikVerzia: string;
+	/** #385: `null` pre produkt bez cenového zdroja (bazén, …) — honest-null, do `dopyt.cennik_verzia`
+	 *  sa uloží NULL (žiadna pergolová verzia sa bazénu nepriradí). Pergola → aktuálna `CENNIK_VERZIA`. */
+	cennikVerzia: string | null;
 }
 
 /** Opečiatkuj cenu pri podaní: spočíta cenu z cfg v danej HLADINE (#318 — default MO; VO pri
@@ -30,6 +33,20 @@ export interface CenaStamp {
  *  sa opečiatkuje do `cena.hladina` (VO) → `stampNaStlpce` ho uloží do `cena_hladina`. */
 export function opeciatkujCenu(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): CenaStamp {
 	return { cena: cenaZCfg(cfg, hladina), cennikVerzia: CENNIK_VERZIA };
+}
+
+/** #385: opečiatkuj cenu IBA pre produkt s OVERENÝM cenovým zdrojom (interim matica montalu.sk).
+ *  Produkt bez zdroja (bazén a ostatné rady zatiaľ) → honest-null pečiatka `{ cena: null,
+ *  cennikVerzia: null }` — inak by `opeciatkujCenu` spočítalo z rozmerov NESPRÁVNU PERGOLOVÚ cenu a
+ *  uložilo/zobrazilo ju bazénu (pergola pricing je jediný cenník). `produkt` je SERVER-autoritatívny
+ *  argument z routy (`dopytAction`/`objednavkaAction`), nikdy null v tejto vetve. */
+export function opeciatkujCenuPreProdukt(
+	cfg: PonukaConfig,
+	produkt: KonfProduktKod,
+	hladina: CenovaHladina = 'MO'
+): CenaStamp {
+	if (!maCenovyZdroj(produkt)) return { cena: null, cennikVerzia: null };
+	return opeciatkujCenu(cfg, hladina);
 }
 
 /** Uložené cenové stĺpce `dopyt` riadka (migrácia v30, #318 rozšírené o `cena_hladina` v32).

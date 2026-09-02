@@ -25,6 +25,10 @@ export interface PonukaConfig {
 	model?: ModelPergoly;
 	sirka?: number;
 	hlbka?: number;
+	/** #385: DĹŽKA [mm] — neutrálne pole pre produkty, kde je hlavný rozmer dĺžka, nie hĺbka
+	 *  (bazénové zastrešenie: „d × š"). Keď je prítomná, `zhrnutieRiadky` vykreslí „Rozmery (d × š)"
+	 *  namiesto pergolového „Rozmery (š × h)" (pergola `dlzka` nenastaví → byte-identická). */
+	dlzka?: number;
 	vyskaVpredu?: number;
 	vyskaPriStene?: number;
 	farba?: string;
@@ -79,6 +83,8 @@ export function sanitizePonukaConfig(raw: unknown): PonukaConfig {
 	if (sirka !== undefined) out.sirka = sirka;
 	const hlbka = optPosNum(obj.hlbka);
 	if (hlbka !== undefined) out.hlbka = hlbka;
+	const dlzka = optPosNum(obj.dlzka);
+	if (dlzka !== undefined) out.dlzka = dlzka;
 	const vyskaVpredu = optPosNum(obj.vyskaVpredu);
 	if (vyskaVpredu !== undefined) out.vyskaVpredu = vyskaVpredu;
 	const vyskaPriStene = optPosNum(obj.vyskaPriStene);
@@ -128,8 +134,13 @@ export function zhrnutieRiadky(cfg: PonukaConfig): { label: string; value: strin
 	if (cfg.system) rows.push({ label: 'Systém', value: cfg.system });
 	if (cfg.model) rows.push({ label: 'Model', value: cfg.model });
 	if (cfg.typStrechy) rows.push({ label: 'Typ strechy', value: cfg.typStrechy });
-	if (cfg.sirka !== undefined && cfg.hlbka !== undefined)
+	// #385: produkt s hlavným rozmerom DĹŽKA (bazén) → „Rozmery (d × š)" (poradie zhodné so
+	// zákazníckou stránkou); pergola (bez `dlzka`) padne na pôvodné „Rozmery (š × h)" nezmenené.
+	if (cfg.dlzka !== undefined && cfg.sirka !== undefined)
+		rows.push({ label: 'Rozmery (d × š)', value: `${Math.round(cfg.dlzka)} × ${mm(cfg.sirka)}` });
+	else if (cfg.sirka !== undefined && cfg.hlbka !== undefined)
 		rows.push({ label: 'Rozmery (š × h)', value: `${Math.round(cfg.sirka)} × ${mm(cfg.hlbka)}` });
+	else if (cfg.dlzka !== undefined) rows.push({ label: 'Dĺžka', value: mm(cfg.dlzka) });
 	else if (cfg.sirka !== undefined) rows.push({ label: 'Šírka', value: mm(cfg.sirka) });
 	else if (cfg.hlbka !== undefined) rows.push({ label: 'Hĺbka', value: mm(cfg.hlbka) });
 	if (cfg.vyskaVpredu !== undefined && cfg.vyskaPriStene !== undefined)
@@ -169,6 +180,12 @@ export const DISCLAIMER =
 	'Uvedená cena je ORIENTAČNÁ (informatívna), nie záväzná cenová ponuka. Presnú cenu ' +
 	'pripravíme po obhliadke miesta stavby. Uvedené rozmery a prvky vychádzajú z vašej ' +
 	'konfigurácie a môžu sa po zameraní upresniť.';
+
+/** #385: disclaimer pre špecifikáciu BEZ ceny (produkt bez cenového zdroja — honest-null). NESMIE
+ *  tvrdiť, že dokument nesie orientačnú cenu (bazén ju nemá). Presnú cenu pripravíme individuálne. */
+export const DISCLAIMER_BEZ_CENY =
+	'Táto špecifikácia je nezáväzná. Presnú cenu pripravíme individuálne po obhliadke miesta ' +
+	'stavby. Uvedené rozmery a prvky vychádzajú z vašej konfigurácie a môžu sa po zameraní upresniť.';
 
 /** Neprázdne kontaktné riadky firmy (na vykreslenie do PDF). Param kvôli testovateľnosti
  *  (default = `FIRMA`); prázdne polia sa vynechajú, aby PDF neukázalo vymyslené dáta. */

@@ -13,6 +13,7 @@ import fontkit from '@pdf-lib/fontkit';
 import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
 import {
 	DISCLAIMER,
+	DISCLAIMER_BEZ_CENY,
 	FIRMA,
 	firmaRiadky,
 	formatEur,
@@ -20,7 +21,8 @@ import {
 	type PonukaConfig
 } from '$lib/ponuka';
 import { cenaZCfg } from './dopyt-cena-stamp';
-import { produktPdfNadpis } from '$lib/konfigurator-produkty';
+import { produktPdfNadpis, maCenovyZdroj } from '$lib/konfigurator-produkty';
+import { cislaCiarka } from '$lib/konfigurator-jednotky';
 import { formatDatumSk } from '$lib/datum';
 // PREDAJNÁ cena. Neopečiatkovaný fallback (`cenaZCfg`, MO default) žije v `dopyt-cena-stamp.ts` —
 // zdieľané so stampovaním (#309); oba server-only, do klienta sa nedostanú. Opečiatkovanú cenu
@@ -57,7 +59,13 @@ function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): 
 	return lines;
 }
 
-const mPlain = (n: number) => String(n).replace('.', ',');
+const mPlain = cislaCiarka;
+
+/** #385: podnadpis/pätička/placeholder produkt-aware — bazén (bez ceny) NESMIE tvrdiť „pergola" ani
+ *  „s orientačnou cenou". Pergola / NULL produkt ostáva byte-identický. */
+function jePergola(produkt: string | null | undefined): boolean {
+	return produkt == null || produkt === 'pergola';
+}
 
 /** Nadpis cenovej sekcie podľa hladiny (#318): veľkoobchod (VO) → „Veľkoobchodná cena",
  *  inak maloobchod → „Orientačná cena" (nezmenené pre verejný/MO výstup). */
@@ -101,7 +109,13 @@ function drawMark(ctx: Ctx, x: number, topY: number, scale: number, color: RGB):
 	ctx.page.drawSvgPath(path, { x, y: topY, scale, color });
 }
 
-function drawHeader(ctx: Ctx, cursorTop: number, nadpis: string): number {
+function drawHeader(
+	ctx: Ctx,
+	cursorTop: number,
+	nadpis: string,
+	maCena: boolean,
+	produkt: string | null | undefined
+): number {
 	const markScale = 1.5; // 24*1.5 = 36 pt vysoká značka
 	drawMark(ctx, MARGIN, cursorTop, markScale, INK);
 	const wordX = MARGIN + 24 * markScale + 10;
@@ -112,7 +126,8 @@ function drawHeader(ctx: Ctx, cursorTop: number, nadpis: string): number {
 		font: ctx.bold,
 		color: INK
 	});
-	ctx.page.drawText('pergoly na mieru', {
+	// #385: značková podpiska produkt-aware (pergola byte-identická „pergoly na mieru").
+	ctx.page.drawText(jePergola(produkt) ? 'pergoly na mieru' : 'hliníkové výrobky na mieru', {
 		x: wordX,
 		y: cursorTop - 36,
 		size: 9,
@@ -135,13 +150,17 @@ function drawHeader(ctx: Ctx, cursorTop: number, nadpis: string): number {
 		font: ctx.bold,
 		color: INK
 	});
-	ctx.page.drawText('Nezáväzná špecifikácia s orientačnou cenou', {
-		x: MARGIN,
-		y: ruleY - 42,
-		size: 10,
-		font: ctx.reg,
-		color: MUTED
-	});
+	// #385: podnadpis tvrdí „s orientačnou cenou" LEN keď PDF cenu naozaj nesie (honest-null).
+	ctx.page.drawText(
+		maCena ? 'Nezáväzná špecifikácia s orientačnou cenou' : 'Nezáväzná špecifikácia',
+		{
+			x: MARGIN,
+			y: ruleY - 42,
+			size: 10,
+			font: ctx.reg,
+			color: MUTED
+		}
+	);
 	return ruleY - 66;
 }
 
@@ -206,7 +225,8 @@ async function drawRenderSlot(
 	doc: PDFDocument,
 	ctx: Ctx,
 	renderPng: Uint8Array | undefined,
-	cursorTop: number
+	cursorTop: number,
+	produkt: string | null | undefined
 ): Promise<number> {
 	// #279 Fáza C review 🔵: pridané Model + cenové riadky posúvajú kurzor nižšie. Zmenši slot,
 	// aby firma/disclaimer (~150 pt) ostali nad pätičkou aj pri plnej konfigurácii + max popise
@@ -237,16 +257,22 @@ async function drawRenderSlot(
 			});
 		} catch {
 			// nevalidný PNG → nespadni, ukáž placeholder text
-			drawSlotPlaceholder(ctx, y, slotH);
+			drawSlotPlaceholder(ctx, y, slotH, produkt);
 		}
 	} else {
-		drawSlotPlaceholder(ctx, y, slotH);
+		drawSlotPlaceholder(ctx, y, slotH, produkt);
 	}
 	return y - 20;
 }
 
-function drawSlotPlaceholder(ctx: Ctx, y: number, slotH: number): void {
-	const txt = '3D náhľad pergoly — doplní sa';
+function drawSlotPlaceholder(
+	ctx: Ctx,
+	y: number,
+	slotH: number,
+	produkt: string | null | undefined
+): void {
+	// #385: bazén placeholder nesmie tvrdiť „pergoly" (pergola/NULL byte-identická).
+	const txt = jePergola(produkt) ? '3D náhľad pergoly — doplní sa' : '3D náhľad — doplní sa';
 	const size = 11;
 	const w = ctx.reg.widthOfTextAtSize(txt, size);
 	ctx.page.drawText(txt, {
@@ -258,7 +284,7 @@ function drawSlotPlaceholder(ctx: Ctx, y: number, slotH: number): void {
 	});
 }
 
-function drawFirmaADisclaimer(ctx: Ctx, cursorTop: number): void {
+function drawFirmaADisclaimer(ctx: Ctx, cursorTop: number, maCena: boolean): void {
 	let y = cursorTop;
 	// firma
 	ctx.page.drawText(FIRMA.nazov, { x: MARGIN, y, size: 11, font: ctx.bold, color: INK });
@@ -268,8 +294,8 @@ function drawFirmaADisclaimer(ctx: Ctx, cursorTop: number): void {
 		y -= 12;
 	}
 	y -= 10;
-	// disclaimer (zalomený)
-	for (const ln of wrapText(ctx.reg, DISCLAIMER, 9.5, CONTENT_W)) {
+	// #385: disclaimer bez ceny pre honest-null produkt (nesmie tvrdiť „uvedená cena je orientačná").
+	for (const ln of wrapText(ctx.reg, maCena ? DISCLAIMER : DISCLAIMER_BEZ_CENY, 9.5, CONTENT_W)) {
 		ctx.page.drawText(ln, { x: MARGIN, y, size: 9.5, font: ctx.reg, color: MUTED });
 		y -= 13;
 	}
@@ -328,15 +354,19 @@ export async function generatePonukaPdf(
 	// PREDAJNÁ cena. #309/#318: OPEČIATKOVANÁ cena (`opts.cena`, MO alebo VO) má prednosť pred
 	// prepočtom zo živej matice — tak re-download reprodukuje cenu (a hladinu) platnú pri podaní. Bez
 	// stampu (staré/neopečiatkované) → prepočet z cfg (`null` keď rozmery chýbajú, honest-degrade).
-	const cena = opts.cena ?? cenaZCfg(cfg);
+	// #385: honest-degrade prepočet je LEN pre produkt s cenovým zdrojom (pergola; NULL/neznámy produkt
+	// = starý pergolový riadok = má zdroj). Bazén/ostatné → cena null (žiadny prepočet pergolovej ceny
+	// z rozmerov zastrešenia), takže re-download bazén dopytu neukáže vymyslenú cenu.
+	const cena = opts.cena ?? (maCenovyZdroj(opts.produkt) ? cenaZCfg(cfg) : null);
 	// #384: nadpis dokumentu podľa produktu (fallback 'Špecifikácia pergoly' pre NULL/neznámy).
 	const nadpis = produktPdfNadpis(opts.produkt);
+	const maCena = cena !== null;
 	let cursor = A4_H - MARGIN;
-	cursor = drawHeader(ctx, cursor, nadpis);
+	cursor = drawHeader(ctx, cursor, nadpis, maCena, opts.produkt);
 	cursor = drawKonfiguracia(ctx, cfg, cursor);
 	if (cena) cursor = drawCena(ctx, cena, cfg, cursor);
-	cursor = await drawRenderSlot(doc, ctx, opts.renderPng, cursor);
-	drawFirmaADisclaimer(ctx, cursor);
+	cursor = await drawRenderSlot(doc, ctx, opts.renderPng, cursor, opts.produkt);
+	drawFirmaADisclaimer(ctx, cursor, maCena);
 	drawFooter(ctx, datum);
 
 	// metadáta = testovateľný kanál hodnôt + korektné vlastnosti dokumentu
@@ -363,7 +393,8 @@ export async function generatePonukaPdf(
 	doc.setKeywords([
 		...rows.map((r) => r.value),
 		...(cenaMeta ? [cenaMeta.hlavny] : []),
-		cena?.hladina === 'VO' ? 'veľkoobchodná cena' : 'orientačná cena',
+		// #385: cenový keyword LEN keď PDF cenu nesie (honest-null bazén nemá žiadny cenový marker).
+		...(cena ? [cena.hladina === 'VO' ? 'veľkoobchodná cena' : 'orientačná cena'] : []),
 		'nezáväzná špecifikácia'
 	]);
 	doc.setCreationDate(new Date());
