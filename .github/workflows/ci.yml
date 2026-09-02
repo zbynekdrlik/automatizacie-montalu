@@ -219,3 +219,70 @@ jobs:
           name: post-deploy-playwright-report
           path: playwright-report
           retention-days: 7
+  publish-image:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Publikuje hotový obraz do ghcr PO zelených testoch, LEN z push do `main`
+    # (release, nie surový dev — odoo-erp #5808 chce najnovší release tag; a push-only
+    # guard drží tag `:<verzia>` NEMENNÝ — `workflow_dispatch` na main by inak
+    # re-pushol ten istý tag s iným digestom, ktorý odoo-erp pinuje). Beží PARALELNE
+    # s `deploy` (VPS rsync+build) = „aj-aj" do go-live (odoo-erp #5821/#5820); po
+    # presune na montalu-prod sa `deploy` job odstráni. Tag = package.json verzia +
+    # `latest`; odoo-erp #5815 compose služba `automatizacie` ho ťahá cez
+    # `ghcr.io/zbynekdrlik/automatizacie-montalu:${AUTOMATIZACIE_VERSION:-latest}`.
+    #
+    # BASE PATH: tento job NEBUILDÍ s `APP_BASE_PATH` build-argom zámerne. Obraz
+    # servuje pod root `/`. Base-path (obraz pod `/automatizacie/` pre Odoo iframe)
+    # je ATOMICKÁ zmena odoo-erp #5822 — svelte.config konzumácia `APP_BASE_PATH` +
+    # Dockerfile runtime `ENV APP_BASE_PATH` + PRIDANIE `APP_BASE_PATH=/automatizacie`
+    # do `build-args` NIŽŠIE musia landnúť SPOLU (inak healthcheck-probe a served base
+    # nesedia — pozri Dockerfile HEALTHCHECK komentár). #5822 to spraví jedným patchom.
+    #
+    # VIDITEĽNOSŤ BALÍKA: prvý push cez GITHUB_TOKEN vytvorí ghcr balík ako PRIVATE.
+    # NECHAJ HO PRIVATE (obsahuje kompilovaný interný server bundle — Money odpis,
+    # Odoo integrácia, auth/B2B logika). Go-live (odoo-erp #5820): daj odoo-erp deploy
+    # identite PULL právo (Package settings -> Manage Actions access -> pridať
+    # `zbynekdrlik/odoo-erp`, alebo `read:packages` PAT na PROD hoste pre
+    # `docker compose pull`). NEROB balík public.
+    permissions:
+      contents: read
+      packages: write
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Verzia + APP_VERSION (rovnaký tvar ako deploy job)
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SHA7=${GITHUB_SHA::7}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "app_version=$VERSION ($SHA7)" >> "$GITHUB_OUTPUT"
+      - name: Login do ghcr
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build + push (verzia + latest)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          # provenance:false -> jednoduchý single-arch image manifest (nie OCI index
+          # s attestation), aby `docker pull` + `docker run` + `docker inspect` na
+          # odoo-erp deploy runneri fungovali klasicky (acceptance).
+          provenance: false
+          tags: |
+            ghcr.io/zbynekdrlik/automatizacie-montalu:${{ steps.meta.outputs.version }}
+            ghcr.io/zbynekdrlik/automatizacie-montalu:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.app_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
