@@ -57,7 +57,7 @@
 		<tbody>
 			{#each ceny.radky as r (r.kod)}
 				<tr>
-					<td>{r.kod}</td>
+					<td class="mono">{r.kod}</td>
 					<td>{r.nazov}</td>
 					<td class="c">{r.qty} {r.mj}</td>
 					<td class="c" data-testid={`cena-nakup-cennik-${r.kod}`}

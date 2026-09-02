@@ -109,7 +109,8 @@
 		max-width: 320px;
 	}
 	.suhrn .lbl {
-		color: #64748b;
+		/* #376 stage 3: WCAG-safe muted na zebra/hover riadkoch (viď app.css .hint) */
+		color: var(--m-muted-ink);
 	}
 	.cena {
 		white-space: nowrap;
