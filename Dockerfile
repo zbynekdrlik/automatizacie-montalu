@@ -40,4 +40,13 @@ COPY --from=build /app/package.json .
 RUN mkdir -p /data/app /data/money-log && chown node:node /data/app /data/money-log
 USER node
 EXPOSE 3000
+# HEALTHCHECK (odoo-erp #5821): self-verujúci obraz pre ghcr publish +
+# štandalón `docker pull ... latest && docker run` (acceptance). Node stdlib
+# `fetch` (Node ≥18) — image ZÁMERNE nemá curl/wget. 127.0.0.1 (NIE localhost:
+# Node 17-19 resolvuje localhost na ::1, kým adapter-node bindne IPv4). Číta
+# runtime APP_BASE_PATH (root default) → dopredu-kompatibilné s #5822 base
+# path; kontroluje HTTP 200 (r.ok), nie DB-seed `ok` pole v tele. V PROD
+# compose (#5815) je tento HEALTHCHECK override-nutý vlastným /automatizacie/health.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "const b=process.env.APP_BASE_PATH||'';fetch('http://127.0.0.1:3000'+b+'/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "build"]
