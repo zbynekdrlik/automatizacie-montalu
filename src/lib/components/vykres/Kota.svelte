@@ -13,7 +13,8 @@
 		perpOffset = 0,
 		text,
 		// #376 stage 4: bronz default (predtým modrá #1d4ed8) — --m-accent-ink,
-		// text-safe 5.9:1; reálne volania farbu aj tak prebíjajú (BRONZ konštanta)
+		// text-safe 5.9:1; návrhové výkresy prebíjajú BRONZ konštantou, /vykresy/preview
+		// (demo) používa tento default
 		color = '#8a5a2b',
 		fontSize = 11,
 		opts = {}

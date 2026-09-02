@@ -433,7 +433,7 @@ select:focus {
 .b2b-blok {
 	display: block;
 	margin-top: 5px;
-	color: #dc2626;
+	color: var(--m-danger);
 	font-size: 13px;
 	font-weight: 600;
 }
@@ -449,7 +449,7 @@ select:focus {
 .b2b-upoz {
 	display: block;
 	margin-top: 5px;
-	color: #b45309;
+	color: var(--m-warn);
 	font-size: 13px;
 	font-weight: 600;
 }
@@ -476,13 +476,8 @@ select:focus {
 .row span {
 	color: var(--m-muted-ink);
 }
-/* #376 stage 4: výsledkové hodnoty v tabuľkovom mono — „každé číslo je kóta
-   z výkresu" (owner design). Value uzly (`b`), NIE labely (`span`, ostávajú body).
-   Font-only, nula zmeny textu/`data-testid` (E2E číta text, nie font). */
 .row b {
 	white-space: nowrap;
-	font-family: var(--m-font-mono);
-	font-variant-numeric: tabular-nums;
 }
 .g {
 	display: flex;
@@ -497,9 +492,12 @@ select:focus {
 .g div b {
 	display: block;
 	font-size: 19px;
-	font-family: var(--m-font-mono);
-	font-variant-numeric: tabular-nums;
 }
+/* #376 stage 4 pozn.: výsledkové hodnoty (`.row`/`.g` value `<b>`) sú ZMIEŠANÉ
+   text/číslo (mená zákazníkov, moduly, poznámky vs. rozmery/ceny/počty), takže
+   tabuľkový mono sa NEaplikuje plošne cez selektor — číselné hodnoty dostanú
+   `.mono` per-hodnotu (stage-3 vzor „monuj len samotné číslo, nie celú bunku").
+   `.ral-val` (RAL kód) mono má, je to kód. Plná per-hodnotová adopcia = follow-up. */
 /* #394 — zdieľaný prepínač režimov (PergolaModeNav + FixModeNav), zjednotený z
    per-komponent scoped CSS do jednej definície (vzor #239 table.narez → app.css).
    Počet stĺpcov per-komponent cez modifikátor .cols-2 (Fix 2 karty) vs default 3

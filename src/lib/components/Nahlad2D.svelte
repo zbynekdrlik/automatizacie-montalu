@@ -430,7 +430,7 @@
 				stroke-width="0.8"
 				stroke-dasharray="4 3"
 			/>
-			<text x={sietkaGeo.cx} y={sietkaGeo.y + 18} text-anchor="middle" font-size="11" fill="#64748b"
+			<text x={sietkaGeo.cx} y={sietkaGeo.y + 18} text-anchor="middle" font-size="11" fill="#585d65"
 				>{N + 1}</text
 			>
 			<text
@@ -438,7 +438,7 @@
 				y={sietkaGeo.y + sietkaGeo.h / 2}
 				text-anchor="middle"
 				font-size="10"
-				fill="#64748b"
+				fill="#585d65"
 				font-weight="700"
 				transform="rotate(-90 {sietkaGeo.cx} {sietkaGeo.y + sietkaGeo.h / 2})">sieťka</text
 			>

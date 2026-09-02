@@ -229,7 +229,7 @@
 		transform: translate(-50%, -50%);
 		font-size: 12.5px;
 		font-weight: 700;
-		color: #16181c;
+		color: var(--m-ink);
 		white-space: nowrap;
 		pointer-events: none;
 	}
