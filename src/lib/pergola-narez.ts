@@ -801,6 +801,59 @@ export function spocitajNarez(v: PergolaNarezVstup): NarezVysledok {
 	};
 }
 
+// --- #381 VÝROBNÁ varianta hárku — pozičné čísla + montážne tolerancie ------------
+// Podmnožina 1+3+4 (pozičné čísla dielov, reťazové kóty priečok, tolerancie). Časti 2
+// (Detail C/D) a 5 (rezný náčrt krovu) sú viazané na #161 — NIE SÚ tu. Reťazové kóty
+// samotné sú generický helper `retazoveKoty` v `$lib/vykres/kota.ts`; tu je len to, čo
+// je pergola-špecifické. Všetko čisté funkcie (money-clean, unit-testovateľné).
+
+/** Diel kusovníka s POZIČNÝM číslom (#381). `cislo` = poradie v Pláne rezov. */
+export interface DielSPoziciou extends PolozkaNarezu {
+	cislo: number;
+}
+
+/** Pozičné čísla dielov (#381 časť 1): kusovník + stabilné `cislo = index + 1` v poradí,
+ *  v akom `spocitajNarez` buduje `vypocitane` (poradie Plánu rezov). Súvislé, žiadne
+ *  preskakovanie. Čistá funkcia — pre stĺpec „Poz." v materiálovej tabuľke aj previazanie
+ *  pohľadov s kusovníkom. */
+export function pozicujDiely(vypocitane: PolozkaNarezu[]): DielSPoziciou[] {
+	return vypocitane.map((p, i) => ({ ...p, cislo: i + 1 }));
+}
+
+/** Pozičné čísla NAKRESLENÝCH dielov (#381 časť 1) pre balóniky vo výkrese — rola → jej
+ *  pozičné číslo z `pozicujDiely`. `null` keď diel v kusovníku nie je (napr. zadná noha
+ *  pri uchytení na stenu) → balónik sa nekreslí (honest-null). Roly sa hľadajú TÝMI
+ *  ISTÝMI predikátmi, aké používa golden test (`tests/pergola-narez-op260282.test.ts`):
+ *  názov obsahuje „predná noha" / „zadná noha", názov končí na „žľab", kód = priečkový
+ *  profil. */
+export interface PoziciePohladov {
+	prednaNoha: number | null;
+	zadnaNoha: number | null;
+	zlab: number | null;
+	priecka: number | null;
+}
+
+export function pozicieVoVykrese(vypocitane: PolozkaNarezu[]): PoziciePohladov {
+	const cislo = (pred: (p: PolozkaNarezu) => boolean): number | null => {
+		const i = vypocitane.findIndex(pred);
+		return i >= 0 ? i + 1 : null;
+	};
+	return {
+		prednaNoha: cislo((p) => p.nazov.includes('predná noha')),
+		zadnaNoha: cislo((p) => p.nazov.includes('zadná noha')),
+		zlab: cislo((p) => p.nazov.endsWith('žľab')),
+		priecka: cislo((p) => p.kod === KOD_PRIECKA_NORMAL || p.kod === KOD_PRIECKA_LIGHT)
+	};
+}
+
+/** Montážne tolerancie HĹBKY [mm] (#381 časť 4) — CAD KONŠTANTY z výkresu OP260282
+ *  (audit #377): View A (+2), View B (+3/+12), všetky pri celkovej hĺbke 3470. Podľa
+ *  validácie NIE sú odvodené z rozmerov (platia ako montážna vôľa nezávisle od hĺbky) a
+ *  NEHÁDAJÚ sa — mimo týchto overených hodnôt sa žiadna tolerancia nezobrazuje (ŠÍRKA
+ *  toleranciu nemá, grounding pri nej žiadnu neuvádza). Náš jediný bočný pohľad (bokorys)
+ *  zlučuje CAD View A+B, preto sa per-view rozklad nereprodukuje; hodnoty ostávajú presné. */
+export const MONTAZNE_TOLERANCIE_HLBKA_MM = [2, 3, 12] as const;
+
 // --- Geometria pre technický výkres (#194) ---------------------------------------
 // Čistá geometria pre výkresovú vrstvu (`PergolaNarezVykres.svelte`) — rovnaká
 // disciplína ako `vypocitajGeometriu` v pergola-navrh.ts / `sekciePozicie` v

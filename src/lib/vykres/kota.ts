@@ -305,3 +305,26 @@ export function fitScale(mmW: number, mmH: number, pxW: number, pxH: number): nu
 export function viewBoxAttr(w: number, h: number): string {
 	return `0 0 ${w} ${h}`;
 }
+
+/** Jeden segment reťazovej (chain) kóty: úsek od `od` po `koniec` s dĺžkou `dlzka`
+ *  (zaokrúhlenou na 1 desatinné miesto). `koniec` namiesto `do` — `do` je rezervované
+ *  kľúčové slovo JS. */
+export interface RetazovySegment {
+	od: number;
+	koniec: number;
+	dlzka: number;
+}
+
+/** Reťazová (chain) kóta z hraníc (#381): zoradí `hranice` vzostupne a vráti po sebe
+ *  idúce segmenty (susedné hranice → úsek + dĺžka). Prázdne pole pri menej než 2
+ *  hraniciach. GENERICKÉ — konzument dodá hranice (napr. `[0, ...priecky.pozicieX, sirka]`
+ *  v pôdoryse pergoly). Kreslí sa vždy len to, čo volajúci reálne počíta — nič sa
+ *  neodvodzuje ani nehádže. */
+export function retazoveKoty(hranice: number[]): RetazovySegment[] {
+	const h = [...hranice].sort((a, b) => a - b);
+	const seg: RetazovySegment[] = [];
+	for (let i = 0; i + 1 < h.length; i++) {
+		seg.push({ od: h[i]!, koniec: h[i + 1]!, dlzka: Math.round((h[i + 1]! - h[i]!) * 10) / 10 });
+	}
+	return seg;
+}
