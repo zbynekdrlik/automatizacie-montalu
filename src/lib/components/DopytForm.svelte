@@ -15,8 +15,16 @@
 		renderPngBase64?: string;
 		/** SvelteKit akcia, na ktorú sa POSTuje (route #275 mountuje `dopyt`) */
 		action?: string;
+		/** #385: text disclaimeru pod tlačidlom. Default = pergola (PDF s orientačnou cenou); produkt
+		 *  BEZ ceny (bazén — honest-null) posiela vlastný text, aby netvrdil, že PDF nesie cenu. */
+		disclaimer?: string;
 	}
-	let { konfiguracia, renderPngBase64 = '', action = '?/dopyt' }: Props = $props();
+	let {
+		konfiguracia,
+		renderPngBase64 = '',
+		action = '?/dopyt',
+		disclaimer = 'Špecifikácia je nezáväzná, s orientačnou cenou. Presnú cenu pripravíme po obhliadke.'
+	}: Props = $props();
 
 	let odosielam = $state(false);
 	let hotovo = $state(false);
@@ -132,9 +140,7 @@
 		<button type="submit" disabled={odosielam}>
 			{odosielam ? 'Odosielam…' : 'Odoslať dopyt a stiahnuť špecifikáciu'}
 		</button>
-		<p class="disclaimer">
-			Špecifikácia je nezáväzná, s orientačnou cenou. Presnú cenu pripravíme po obhliadke.
-		</p>
+		<p class="disclaimer">{disclaimer}</p>
 	</form>
 {/if}
 

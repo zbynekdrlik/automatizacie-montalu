@@ -84,7 +84,7 @@
 				<tr>
 					<td style="white-space:nowrap">{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</td>
 					<td>{modulNazov(o.modul)}</td>
-					<td>{o.op}</td>
+					<td class="mono">{o.op}</td>
 					<td class="c">{o.pocetPoloziek > 0 ? o.pocetPoloziek : '—'}</td>
 					<td class="c">
 						{o.live ? '● LIVE' : '🧪 TEST'}

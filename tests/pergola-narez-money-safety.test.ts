@@ -46,6 +46,9 @@ const ZAKAZANE_VZORY = [
 // posielať rezervačný odpis (cez most `pergola-rezervacia.ts`).
 const CISTY_ENGINE = [
 	'src/lib/pergola-narez.ts',
+	// #381 — výrobná varianta hárku (pozičné čísla, reťazové kóty priečok, tolerancie) —
+	// pure display engine vyčlenený z pergola-narez.ts (large-file split), Money-clean
+	'src/lib/pergola-vyroba.ts',
 	// #161 — krov uloženie engine je tiež LEN potvrdené vzorce, display-only
 	'src/lib/pergola-krov.ts',
 	'src/lib/pergola-komponenty.ts',
