@@ -73,7 +73,7 @@
 		narezakHint,
 		jeOpona,
 		jeRobust,
-		maKovanie,
+		maFab,
 		maFarbu,
 		ralOptions,
 		maKolajnicu,
@@ -136,7 +136,7 @@
 		narezakHint: string;
 		jeOpona: boolean;
 		jeRobust: boolean;
-		maKovanie: boolean;
+		maFab: boolean;
 		maFarbu: boolean;
 		ralOptions: Farba[];
 		maKolajnicu: boolean;
@@ -349,8 +349,9 @@
 			</div>
 		{/if}
 		<!-- Jednostranná FAB (Dominik 2026-07-28: „chodí jeden zo 100") — MENÍ Money
-		     odpis: kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. -->
-		{#if maKovanie}
+		     odpis: kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. Zobrazí sa
+		     len pri systémoch, kde kovanie tieto položky reálne má (dnes Robust) — #431. -->
+		{#if maFab}
 			<div class="field">
 				<label class="opt">
 					<input

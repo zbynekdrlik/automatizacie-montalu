@@ -115,7 +115,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`
 - štruktúrovaný logger (`log.ts`) / handleError / chybová stránka / testovanie logov → `.claude/rules/logging.md`
 - three.js 3D náhľad (vizual) → `.claude/rules/vizual3d.md`
-- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt poradie → `.claude/rules/zasklenia-form-reactivity.md`
+- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt / config-derivované form gaty (maFab/maFarbu) / system-aware `defaultSklo` → `.claude/rules/zasklenia-form-reactivity.md`
 - kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`
 - pergola nárez/výkres z rozmerov → `.claude/rules/pergola-narez.md`
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` → `.claude/rules/odpis-detail.md`
