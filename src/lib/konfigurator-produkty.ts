@@ -123,9 +123,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Hliníkové prístrešky na auto, altánky, skleníky aj vonkajšie sauny.',
 		foto: 'pristresok.webp',
 		alt: 'Hliníkový prístrešok na auto Montalu',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/hlinikove-pristresky-a-altanky',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/pristresok',
+		externy: false,
+		// #390: prístrešky NEMAJÚ overený interim cenový zdroj (montalu.sk ich vôbec nemá vo svojom
+		// cenovom konfigurátore) → honest-null, konfigurátor beží bez ceny (cena na vyžiadanie).
 		cenovyZdroj: false
 	}
 ];

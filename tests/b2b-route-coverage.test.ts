@@ -66,6 +66,10 @@ const ALLOWED = new Set([
 	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
 	// inak zlyhal), nie obídenie.
 	'/konfigurator/bazen',
+	// #390: prístrešková podstránka jednotného konfigurátora — VEREJNÁ (bez auth), Money-neutrálna
+	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
+	// inak zlyhal), nie obídenie.
+	'/konfigurator/pristresok',
 	'/login',
 	'/logout',
 	'/health'
@@ -106,6 +110,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/clip',
 				'/konfigurator/bazen',
 				'/konfigurator/pergola',
+				'/konfigurator/pristresok',
 				'/odpisy',
 				'/pergola',
 				'/pergola/navrh',
@@ -163,6 +168,10 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('#385: /konfigurator/bazen (verejný konfigurátor bazénových zastrešení) nie je presmerovaný', () => {
 		expect(b2bRedirectTarget('/konfigurator/bazen')).toBeNull();
+	});
+
+	it('#390: /konfigurator/pristresok (verejný konfigurátor prístreškov a altánkov) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/pristresok')).toBeNull();
 	});
 
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
@@ -271,6 +280,18 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385)', () => {
 	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #390, rovnaká disciplína — prístrešková podstránka má PRESNE jedinú akciu `dopyt` (verejný
+// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
+// čisto klientsky, honest-null — prístrešky nemajú cenový zdroj), žiadna Money/odpisová zápisová
+// akcia. VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek
+// ďalšej akcie tento test ROZBIJE (fail-closed).
+describe('/konfigurator/pristresok — žiadna cesta k Money odpisu (#390)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/pristresok/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });

@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole } from './helpers';
 
-test('výberová obrazovka: grid kariet + pergola & bazén live vedú interne, zimná záhrada „pripravujeme" externe', async ({
+test('výberová obrazovka: grid kariet + pergola/bazén/prístrešky live vedú interne, zimná záhrada „pripravujeme" externe', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -26,6 +26,12 @@ test('výberová obrazovka: grid kariet + pergola & bazén live vedú interne, z
 	await expect(bazen).toBeVisible();
 	await expect(bazen).toHaveAttribute('data-stav', 'live');
 	await expect(bazen).toHaveAttribute('href', /\/konfigurator\/bazen$/);
+
+	// #390: prístrešky = live karta → interná podstránka `/konfigurator/pristresok`
+	const pristresok = page.getByTestId('konf-produkt-pristresok');
+	await expect(pristresok).toBeVisible();
+	await expect(pristresok).toHaveAttribute('data-stav', 'live');
+	await expect(pristresok).toHaveAttribute('href', /\/konfigurator\/pristresok$/);
 
 	// zimná záhrada = stále „pripravujeme" → externý odkaz na montalu.sk (nový tab)
 	const zz = page.getByTestId('konf-produkt-zimna-zahrada');

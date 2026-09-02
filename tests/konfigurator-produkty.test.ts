@@ -18,11 +18,11 @@ describe('KONF_PRODUKTY katalóg', () => {
 		expect(KONF_PRODUKTY).toHaveLength(7);
 	});
 
-	it('pergola je PRVÁ a live; #385 pridal bazén ako live (ostatné „pripravujeme")', () => {
+	it('pergola je PRVÁ a live; #385 bazén + #390 prístrešky live (ostatné „pripravujeme")', () => {
 		expect(KONF_PRODUKTY[0]!.kod).toBe('pergola');
 		expect(KONF_PRODUKTY[0]!.stav).toBe('live');
 		const live = KONF_PRODUKTY.filter((p) => p.stav === 'live');
-		expect(live.map((p) => p.kod)).toEqual(['pergola', 'bazen']);
+		expect(live.map((p) => p.kod)).toEqual(['pergola', 'bazen', 'pristresok']);
 	});
 
 	it('kódy sú unikátne', () => {
