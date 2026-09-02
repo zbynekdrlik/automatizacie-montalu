@@ -265,7 +265,7 @@
 					{#each form.out as o (o.kod)}
 						<tr>
 							<td style="width:52px"><ProfilObrazok kod={o.kod} nazov={o.nazov} /></td>
-							<td class="c">{o.kod}</td>
+							<td class="c mono">{o.kod}</td>
 							<td>{o.nazov}</td>
 							<td class="c">
 								<!-- bez min/max — rozsahy stráži server (applyEdits), nech typo dostane
@@ -278,7 +278,9 @@
 									aria-label="Množstvo {o.kod}"
 									style="padding:6px 8px;font-size:14px;text-align:center;width:90px"
 								/>
-								<span style="margin-left:6px;color:#6b7280;font-size:13px">{o.mj ?? 'm'}</span>
+								<span style="margin-left:6px;color:var(--m-muted-ink);font-size:13px"
+									>{o.mj ?? 'm'}</span
+								>
 							</td>
 						</tr>
 					{/each}

@@ -1923,3 +1923,17 @@ guard (POVINNÝ vzor pri reuse cudzieho katalógu — inak dvojitý import obíd
 kariet) zaznamenaná.
 
 Verzia 0.24.66-dev.2.
+
+## #376 stage 3/4 — redizajn história+tabuľky (0.24.74-dev.1)
+
+Celoplošný redizajn #376 STAGE 3 (OSTÁVA OTVORENÝ). Commits: bump addc3e7 →
+impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/data-testid).
+
+- `@media print` (86 r.) → `src/print.css` (import v +layout.svelte za app.css); app.css 891→869.
+- zebra/hover `.wrap table:not(.narez):not(.rezy)` (scoped, stage-4 narez AJ rezy vylúčené).
+- `.mono` kódy/čísla vo výsledkových+histórie tabuľkách (fix prod nálezu /bazen td.c bez mono);
+  /odpisy akčná rodina (`.tbl-akcie`+`.btn … sm`+`.btn.danger.outline`, hexy→tokeny).
+- Fable review 0🔴/2🟡/4🔵 → všetko fixnuté v 15fdc23: `.rezy` exclusion (RozpisRezov nie je
+  `.narez`!), WCAG kontrast muted textu na zebre → `--m-muted-ink`, button/row hover kolízia,
+  clip Množstvo mono, print zebra reset. 2897 unit + 54 E2E specov zelené.
+- NEmergnuté (worktree fleet — supervisor integruje). Stage 4 = výsledky/výkresy/.g/.row/print audit.
