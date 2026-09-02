@@ -327,7 +327,7 @@
 					</div>
 					<div class="row">
 						<span
-							>Súčet polí: <b data-testid="sucet-poli">{fmt(sucetPoli)} mm</b>
+							>Súčet polí: <b class="mono" data-testid="sucet-poli">{fmt(sucetPoli)} mm</b>
 							{#if !sedíSucet}<span class="nesedi">
 									⛔ nesedí so šírkou {fmt(sirkaNum)} mm</span
 								>{/if}
@@ -418,7 +418,7 @@
 			{#if vstup.poznamka}<div class="row">
 					<span>Poznámka</span><b style="white-space:pre-wrap">{vstup.poznamka}</b>
 				</div>{/if}
-			{#if vstup.ral}<div class="row"><span>RAL</span><b>{vstup.ral}</b></div>{/if}
+			{#if vstup.ral}<div class="row"><span>RAL</span><b class="mono">{vstup.ral}</b></div>{/if}
 			{#if vstup.sklo}<div class="row"><span>Sklo</span><b>{vstup.sklo}</b></div>{/if}
 		</div>
 	{/if}
