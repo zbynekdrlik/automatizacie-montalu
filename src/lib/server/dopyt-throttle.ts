@@ -7,8 +7,27 @@ import { logger } from './log';
 
 const log = logger('dopyt-throttle');
 
-/** Max. odoslaní z jednej IP v okne. Reálny zákazník odošle 1–3×; 8 znesie aj preklepy/opravy. */
-export const MAX_PER_WINDOW = 8;
+/** Default max. odoslaní z jednej IP v okne. Reálny zákazník odošle 1–3×; 8 znesie aj preklepy/opravy. */
+export const DEFAULT_MAX_PER_WINDOW = 8;
+
+/**
+ * Rozparsuje limit z env (`DOPYT_MAX_PER_WINDOW`). PROD ho NIKDY nenastavuje → default 8.
+ * Vyčlenené ako pure helper kvôli testovateľnosti — `MAX_PER_WINDOW` sa číta pri MODULE-LOADE,
+ * takže env sa v ňom v unit teste ťažko prepisuje; helper otestuje samotné parsovanie.
+ * Nevalidná/prázdna/nulová hodnota → default (rovnaká `Number(...) || X` disciplína ako inde v repe).
+ */
+export function resolveMaxPerWindow(raw: string | undefined): number {
+	return Number(raw) || DEFAULT_MAX_PER_WINDOW;
+}
+
+/**
+ * Max. odoslaní z jednej IP v okne. Env-konfigurovateľné (`DOPYT_MAX_PER_WINDOW`): PROD nikdy
+ * nenastavuje → 8. E2E preview ho zvýši, lebo CELÁ suite odosiela dopyty z JEDNEJ IP (127.0.0.1)
+ * v JEDNOM preview procese — per-IP okno (10 min > ~8 min beh) by inak nazbieralo naprieč
+ * NESÚVISIACIMI spec-mi a 9. dopyt (posledný produkt abecedne) by dostal 429 (žiadny PDF →
+ * download timeout). Samotné throttlovanie je pokryté `tests/dopyt-throttle.test.ts` (unit).
+ */
+export const MAX_PER_WINDOW = resolveMaxPerWindow(process.env.DOPYT_MAX_PER_WINDOW);
 /** Fixné okno od PRVÉHO pokusu — po ňom sa počítadlo resetuje. */
 export const WINDOW_MS = 10 * 60 * 1000; // 10 min
 /** Strop sledovaných IP (obrana proti memory DoS cez rotáciu IP), ako `login-throttle`. */

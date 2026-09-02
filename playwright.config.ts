@@ -68,7 +68,14 @@ export default defineConfig({
 					DLV_READBACK_PATH: './data/e2e-dlv-readback.json',
 					// #245: zapne test-only /__test-error route (inak 404) — E2E overí chybovú
 					// stránku + errorId. VPS toto env NIKDY nemá, takže route je tam skrytá.
-					ENABLE_TEST_ERROR_ROUTE: '1'
+					ENABLE_TEST_ERROR_ROUTE: '1',
+					// #390: CELÁ E2E suite odosiela dopyty/objednávky z JEDNEJ IP (127.0.0.1) v JEDNOM
+					// preview procese, takže per-IP dopyt-throttle okno (default 8 / 10 min, a beh je
+					// ~8 min → okno sa NERESETUJE) nazbiera naprieč NESÚVISIACIMI spec-mi a 9. dopyt
+					// (posledný produkt abecedne = zimná záhrada) dostane 429 → žiadny PDF → download
+					// timeout. Zvýš limit pre E2E; PROD toto env NIKDY nemá (default 8 platí). Samotný
+					// throttle je pokrytý `tests/dopyt-throttle.test.ts`.
+					DOPYT_MAX_PER_WINDOW: '1000'
 				}
 			}
 });
