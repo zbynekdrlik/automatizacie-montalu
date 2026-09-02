@@ -5,6 +5,7 @@
 	// `/pergola/navrh`: formulár → výkres → tlač, žiadny zápisový krok.
 	import ZaskleniaNavrhVykres from '$lib/components/ZaskleniaNavrhVykres.svelte';
 	import Vizual3DPanel from '$lib/components/vizual/Vizual3DPanel.svelte';
+	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -132,12 +133,14 @@
 
 {#if step === 'form'}
 	<div class="card">
+		<OdpisNavrhNav modul="zasklenia" active="navrh" b2b={data.user?.role === 'b2b'} />
+	</div>
+	<div class="card">
 		<h1>Zasklenia — návrhový výkres</h1>
 		<p class="sub">
 			Zadaj rozmery — vykreslím zákaznícky návrhový výkres v štýle pergolového výkresu (obrysové
-			profily, kóty, RAL variant). <b>Do Money sa neposiela nič</b> — tento modul len kreslí.
-			Nárezový plán a Money odpis ostávajú na
-			<a href={resolve('/zasklenia')}>pôvodnej stránke Zasklenia</a>.
+			profily, kóty, RAL variant). <b>Do Money sa neposiela nič</b> — tento modul len kreslí; na nárezový
+			plán a zápis do Money prepni kachličku „Zápis do Money" hore.
 		</p>
 	</div>
 

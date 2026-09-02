@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
+	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -80,14 +81,13 @@
 
 {#if step === 'form'}
 	<div class="card">
+		<OdpisNavrhNav modul="bazen" active="odpis" />
+	</div>
+	<div class="card">
 		<h1>Bazén — odpis materiálu do Money</h1>
 		<p class="sub">
 			Zadaj parametre krytu, rozpis si skontroluješ a upravíš pred odoslaním.
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
-		</p>
-		<p class="sub">
-			📐 Potrebuješ zákaznícky návrhový výkres namiesto Money odpisu?
-			<a href={resolve('/bazen/navrh')} data-testid="link-navrh">→ Návrhový výkres</a>
 		</p>
 	</div>
 

@@ -5,6 +5,7 @@
 	// Rovnaký vzor ako `/pergola/navrh`/`/zasklenia/navrh`: formulár → výkres →
 	// tlač, žiadny zápisový krok.
 	import BazenNavrhVykres from '$lib/components/BazenNavrhVykres.svelte';
+	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
 	import { resolve } from '$app/paths';
 	import {
@@ -158,13 +159,16 @@
 
 {#if step === 'form'}
 	<div class="card">
+		<OdpisNavrhNav modul="bazen" active="navrh" />
+	</div>
+	<div class="card">
 		<h1>Bazén — návrhový výkres</h1>
 		<p class="sub">
 			Zadaj rozmery — vykreslím zákaznícky návrhový výkres (bokorys, pôdorys, textový popis,
 			pečiatka). Priečny rez sekciou (VIEW A) appka zámerne nekreslí — tvar oblúka sa nedá odvodiť z
 			kót bez ďalších dát od konštruktéra (#163).
-			<b>Do Money sa neposiela nič</b> — tento modul len kreslí. Money odpis ostáva na
-			<a href={resolve('/bazen')}>pôvodnej stránke Bazén</a>.
+			<b>Do Money sa neposiela nič</b> — tento modul len kreslí; na zápis do Money prepni kachličku „Zápis
+			do Money" hore.
 		</p>
 	</div>
 

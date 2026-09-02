@@ -37,6 +37,19 @@ Hiding a button is not security. The b2b Money-write lock is 3 layers:
 Test the boundary with a **forged POST** (call the action directly with a b2b
 `locals.user`), not just "button hidden" — see `tests/b2b-money-reject.test.ts`.
 
+**b2b vidí `/zasklenia`, takže aj UI COPY (nielen write-tlačidlá) tam musí byť
+role-aware (#423).** `/zasklenia` je jediná stránka, ktorú b2b otvorí, a cielene si
+pre b2b SKRÝVA Money znenie (`{#if !isB2B}Odpis sa do Money odošle…{/if}`, odoslat
+formuláre `{#if !isB2B}`). Nová/ZDIEĽANÁ komponenta, ktorá sa na `/zasklenia`
+renderuje (prepínač režimov, banner, karta), NESMIE byť role-blind — inak b2b znovu
+uvidí Money sľub, ktorý pre neho neplatí (živý nález: `OdpisNavrhNav` kachlička
+„Zápis do Money … odpíšem materiál do Money" sa b2b zobrazovala). Vzor: prop
+`b2b?: boolean` (stránka odovzdá `data.user?.role === 'b2b'`) + b2b variant textu
+bez Money („Nárezový plán … nárezový plán s náhľadom"); bazén sa netýka (nie je
+b2b-dostupný). Je to UI-copy vrstva, NIE bezpečnosť — write-boundary ostáva
+3-vrstvová server-side vyššie; over e2e assertom `not.toContainText('Money')` na
+b2b variante.
+
 **`/pouzivatelia` `pridat` reads `role` from the form (#142)** — this stopped being a
 trust boundary the moment `pridat` started gating `isB2B(locals.user)` as its FIRST
 statement (before the form is even parsed): a b2b actor never reaches the `role` field
