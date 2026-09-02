@@ -187,7 +187,7 @@
 					{#each v.polozky as o (o.kod)}
 						<tr>
 							<td style="width:52px"><ProfilObrazok kod={o.kod} nazov={o.nazov} /></td>
-							<td class="c">{o.kod}</td>
+							<td class="c mono">{o.kod}</td>
 							<td>{o.nazov}</td>
 							<td class="c">
 								<!-- bez min/max — rozsahy stráži server (applyEdits) -->
@@ -219,10 +219,10 @@
 					{#each v.riadky as r, i (i)}
 						<tr class:drobna={r.kod === null}>
 							<td>{r.oznacenie}</td>
-							<td class="c">{r.kod ?? '—'}</td>
-							<td class="c">{r.rozmer === null ? '—' : `${fmt(r.rozmer)} mm`}</td>
-							<td class="c">{r.rozmer === null ? '—' : r.pocetKs}</td>
-							<td class="c">{r.pocetTyci ?? '—'}</td>
+							<td class="c mono">{r.kod ?? '—'}</td>
+							<td class="c mono">{r.rozmer === null ? '—' : `${fmt(r.rozmer)} mm`}</td>
+							<td class="c mono">{r.rozmer === null ? '—' : r.pocetKs}</td>
+							<td class="c mono">{r.pocetTyci ?? '—'}</td>
 							<td class="c">
 								{fmt(r.mnozstvo)}
 								{r.mj}

@@ -78,10 +78,11 @@
 							<a
 								href={resolve(`/odpisy/zakazka/${encodeURIComponent(o.zak)}`)}
 								data-testid={`zakazka-link-${o.id}`}
-								title="Cenový zoznam odpísaného materiálu celej zákazky"><b>{o.zak}</b></a
+								title="Cenový zoznam odpísaného materiálu celej zákazky"
+								><b class="mono">{o.zak}</b></a
 							>
 						</td>
-						<td>{o.op}</td>
+						<td class="mono">{o.op}</td>
 						<td>{o.zakaznik}</td>
 						<td>
 							{[
@@ -115,62 +116,68 @@
 							<ReadbackBadge readback={o.readback} testid={`readback-${o.id}`} />
 						</td>
 						<td>{o.created_by}</td>
-						<td class="c">
-							<!-- cenový detail (#154) — položky + ich ceny k tomuto konkrétnemu odpisu -->
-							<a
-								class="btn secondary"
-								href={resolve(`/odpisy/${o.id}`)}
-								data-testid={`detail-${o.id}`}>💶 Detail</a
-							>
-							{#if o.modul === 'zasklenia'}
-								<!-- „Použiť znova" (Patrik 2026-07-31): viacerí zákazníci si objednávajú to
-								     isté. Je to LEN odkaz, ktorý predvyplní formulár — nič sa tým neodpisuje. -->
+						<td>
+							<!-- #376 stage 3: akcie ako JEDEN rad kompaktných outline tlačidiel jednej
+							     rodiny (`.tbl-akcie` + `.btn … sm`) — nahrádza 4 rôzne štýly (2× full-width
+							     block + 2× inline hardcoded hex) = pôvodné ~250px riadky. Element typy,
+							     texty aj data-testid NEZMENENÉ (E2E cieli cez rolu+text/testid). -->
+							<div class="tbl-akcie">
+								<!-- cenový detail (#154) — položky + ich ceny k tomuto konkrétnemu odpisu -->
 								<a
-									class="btn secondary"
-									href={resolve(`/zasklenia?znova=${o.id}`)}
-									data-testid={`znova-${o.id}`}>♻️ Použiť znova</a
+									class="btn secondary sm"
+									href={resolve(`/odpisy/${o.id}`)}
+									data-testid={`detail-${o.id}`}>💶 Detail</a
 								>
-							{/if}
-							<form
-								method="POST"
-								action="?/uvolnit"
-								onsubmit={(e) => {
-									if (!confirm(`Uvoľniť ${o.zak} OP${o.op}? Zákazku bude možné poslať znova.`))
-										e.preventDefault();
-								}}
-							>
-								<input type="hidden" name="id" value={o.id} />
-								<button
-									type="submit"
-									style="background:none;border:1px solid #cbd5e1;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px;color:#64748b"
-									title="Zmaže záznam — použi len po zmazaní chybného importu v Money. Rovnaký obsah zostane zablokovaný proti dvojitému importu."
-									>Uvoľniť</button
+								{#if o.modul === 'zasklenia'}
+									<!-- „Použiť znova" (Patrik 2026-07-31): viacerí zákazníci si objednávajú to
+									     isté. Je to LEN odkaz, ktorý predvyplní formulár — nič sa tým neodpisuje. -->
+									<a
+										class="btn secondary sm"
+										href={resolve(`/zasklenia?znova=${o.id}`)}
+										data-testid={`znova-${o.id}`}>♻️ Použiť znova</a
+									>
+								{/if}
+								<form
+									method="POST"
+									action="?/uvolnit"
+									onsubmit={(e) => {
+										if (!confirm(`Uvoľniť ${o.zak} OP${o.op}? Zákazku bude možné poslať znova.`))
+											e.preventDefault();
+									}}
 								>
-							</form>
-							<!-- OVERRIDE (#294): re-import IDENTICKÉHO obsahu. Bežné „Uvoľniť" identický obsah
-							     blokuje ako poistku; TOTO ho povolí (jeden raz) — použi LEN keď si import
-							     v Money naozaj zmazal a treba poslať znova to isté. Auditované. -->
-							<form
-								method="POST"
-								action="?/povolitReimport"
-								onsubmit={(e) => {
-									if (
-										!confirm(
-											`Povoliť RE-IMPORT rovnakého obsahu pre ${o.zak} OP${o.op}?\n\nPouži LEN ak si import v Money NAOZAJ zmazal — inak vznikne dvojitý zápis.`
+									<input type="hidden" name="id" value={o.id} />
+									<button
+										type="submit"
+										class="btn secondary sm"
+										title="Zmaže záznam — použi len po zmazaní chybného importu v Money. Rovnaký obsah zostane zablokovaný proti dvojitému importu."
+										>Uvoľniť</button
+									>
+								</form>
+								<!-- OVERRIDE (#294): re-import IDENTICKÉHO obsahu. Bežné „Uvoľniť" identický obsah
+								     blokuje ako poistku; TOTO ho povolí (jeden raz) — použi LEN keď si import
+								     v Money naozaj zmazal a treba poslať znova to isté. Auditované. -->
+								<form
+									method="POST"
+									action="?/povolitReimport"
+									onsubmit={(e) => {
+										if (
+											!confirm(
+												`Povoliť RE-IMPORT rovnakého obsahu pre ${o.zak} OP${o.op}?\n\nPouži LEN ak si import v Money NAOZAJ zmazal — inak vznikne dvojitý zápis.`
+											)
 										)
-									)
-										e.preventDefault();
-								}}
-							>
-								<input type="hidden" name="id" value={o.id} />
-								<button
-									type="submit"
-									data-testid={`povolit-reimport-${o.id}`}
-									style="background:none;border:1px solid #fca5a5;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px;color:#b91c1c"
-									title="Povolí opätovný import ROVNAKÉHO obsahu (jeden raz) — len po zmazaní importu v Money"
-									>⚠️ Povoliť rovnaký</button
+											e.preventDefault();
+									}}
 								>
-							</form>
+									<input type="hidden" name="id" value={o.id} />
+									<button
+										type="submit"
+										data-testid={`povolit-reimport-${o.id}`}
+										class="btn danger outline sm"
+										title="Povolí opätovný import ROVNAKÉHO obsahu (jeden raz) — len po zmazaní importu v Money"
+										>⚠️ Povoliť rovnaký</button
+									>
+								</form>
+							</div>
 						</td>
 					</tr>
 				{/each}

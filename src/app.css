@@ -198,6 +198,18 @@ td.c,
 th.c {
 	text-align: center;
 }
+/* #376 stage 3 — zebra pruhovanie + hover pre výsledkové/histórie tabuľky
+   (skenovateľnosť dlhých zoznamov: /odpisy, dopyty, používatelia, modulové
+   výsledky). Scoped na `.wrap` = interná appka — login aj `/konfigurator` sú
+   full-bleed BEZ `.wrap`, takže sa sem farby (`--m-accent-soft` bronz) NIKDY
+   nepresiaknu (rovnaká leak-pasca ako h1/checkbox v stage 1/2). `table.narez`
+   (stage 4) je vylúčená cez `:not(.narez)`. */
+.wrap table:not(.narez) tbody tr:nth-child(even) {
+	background: var(--m-surface-2);
+}
+.wrap table:not(.narez) tbody tr:hover {
+	background: var(--m-accent-soft);
+}
 /* #239 — kompaktná tabuľka „narez" (materiál / komponenty / rozpis / ručné položky),
    presunutá z pergola/narez/+page.svelte pri rozdelení na subkomponenty. Zdieľaná
    RezVysledok/RucnePolozky/RezNahlad/RezHotovo; `.narez` sa používa LEN na tejto route.
@@ -332,6 +344,47 @@ select:focus {
 }
 .btn.danger {
 	background: var(--m-danger);
+}
+/* #376 stage 3 — kompaktné akčné tlačidlo jednej rodiny pre tabuľkové akcie
+   (/odpisy rad „Detail / Použiť znova / Uvoľniť / Povoliť rovnaký"). `.btn` je inak
+   block/100%-width CTA; `.sm` ho spraví inline auto-width kompaktný, nech akcie sedia
+   v JEDNOM rade namiesto vertikálneho stacku (owner: riadky ~250px = najkrikľavejšie
+   miesto). Definované PO `.btn.secondary`, takže prebije jeho padding/border-width. */
+.btn.sm {
+	display: inline-flex;
+	width: auto;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	font-size: 13px;
+	border-width: 1px;
+	border-radius: var(--m-radius-sm);
+}
+/* danger-OUTLINE variant (posledná akcia radu „Povoliť rovnaký") — červený okraj/text
+   na papieri, nie plná červená (plná `.btn.danger` ostáva pre CTA). Nahrádza pôvodné
+   inline hardcoded hexy (#fca5a5/#b91c1c) mimo dizajn systému. */
+.btn.danger.outline {
+	background: var(--m-surface);
+	color: var(--m-danger);
+	border: 1px solid var(--m-danger);
+}
+.btn.danger.outline:hover {
+	background: var(--m-danger-bg);
+}
+/* akčná bunka /odpisy — jeden rad, zalomí sa na úzkych obrazovkách. Vlastný názov
+   (`.akcie` je už obsadené 3 scoped komponentmi — optimalizator/vizual). Ruší
+   vertikálny `.btn + .btn` margin (flex gap ho nahrádza) + form margin. */
+.tbl-akcie {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+}
+.tbl-akcie form {
+	margin: 0;
+}
+.tbl-akcie .btn + .btn {
+	margin-top: 0;
 }
 .btn + .btn {
 	margin-top: 10px;
@@ -801,91 +854,4 @@ footer.app {
 	font-weight: 700;
 	color: #475569;
 	margin-bottom: 2px;
-}
-@media print {
-	/* celý nárezový plán na JEDNU A4 — kompaktné rozostupy, menšie písmo */
-	@page {
-		size: A4 portrait;
-		margin: 8mm;
-	}
-	body {
-		background: #fff;
-		font-size: 11px;
-	}
-	.wrap {
-		padding: 0;
-		max-width: none;
-	}
-	.card {
-		box-shadow: none;
-		border: 1px solid #cbd5e1;
-		border-radius: 8px;
-		padding: 8px 12px;
-		margin-bottom: 6px;
-		page-break-inside: avoid;
-	}
-	h1 {
-		font-size: 15px;
-	}
-	.sub {
-		font-size: 10px;
-	}
-	.sec {
-		font-size: 10px;
-		margin-bottom: 5px;
-	}
-	.g div b {
-		font-size: 13px;
-	}
-	table {
-		font-size: 10.5px;
-	}
-	td {
-		padding: 3px 5px;
-	}
-	.row {
-		padding: 3px 2px;
-		font-size: 11px;
-	}
-	/* poznámka + RAL kompaktne na A4 — RAL stále výrazne väčšie ako 11px telo */
-	.poznamka-ral {
-		gap: 14px;
-	}
-	.poznamka-ral .pr-ral {
-		padding-left: 14px;
-	}
-	.poznamka-plan {
-		font-size: 11px;
-		line-height: 1.35;
-	}
-	.ral-val {
-		font-size: 26px;
-	}
-	nav.top,
-	footer.app,
-	.noprint {
-		display: none !important;
-	}
-	/* čelný pohľad je pekný, ale na tlači berie veľa miesta — zmenšíme,
-	   nech sa plán aj s rezmi profilov zmestí na jednu A4 */
-	[data-testid='nahlad-2d'] {
-		max-height: 62mm;
-		width: auto;
-		display: block;
-		margin: 0 auto;
-	}
-	/* rezy profilov v tabuľke ostávajú (kompaktné) */
-	.thumb {
-		width: 30px !important;
-		height: 30px !important;
-	}
-	/* číselné polia (bazén kontrola) v tlači ako čistý text, bez rámika */
-	input[type='number'] {
-		border: none !important;
-		padding: 0 !important;
-		font-size: 10.5px !important;
-		background: transparent;
-		-webkit-appearance: none;
-		appearance: none;
-	}
 }

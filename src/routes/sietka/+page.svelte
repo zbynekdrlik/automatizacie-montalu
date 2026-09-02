@@ -227,10 +227,12 @@
 				<tbody>
 					{#each r.material as m (m.kod)}
 						<tr>
-							<td class="c">{m.kod}</td>
+							<td class="c mono">{m.kod}</td>
 							<td>{m.nazov}</td>
-							<td>{m.rezy.map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ')}</td>
-							<td class="c"><b>{fmtM(r.odpis.find((o) => o.kod === m.kod)?.metre ?? 0)} m</b></td>
+							<td class="mono">{m.rezy.map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ')}</td>
+							<td class="c mono"
+								><b>{fmtM(r.odpis.find((o) => o.kod === m.kod)?.metre ?? 0)} m</b></td
+							>
 						</tr>
 					{/each}
 				</tbody>

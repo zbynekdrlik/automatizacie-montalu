@@ -265,7 +265,7 @@
 					{#each form.out as o (o.kod)}
 						<tr>
 							<td style="width:52px"><ProfilObrazok kod={o.kod} nazov={o.nazov} /></td>
-							<td class="c">{o.kod}</td>
+							<td class="c mono">{o.kod}</td>
 							<td>{o.nazov}</td>
 							<td class="c">
 								<!-- bez min/max — rozsahy stráži server (applyEdits), nech typo dostane
