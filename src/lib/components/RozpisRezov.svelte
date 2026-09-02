@@ -4,6 +4,7 @@
 	// každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci.
 	// Rezy na 45° (zošikmená čiara) — pri zaskleniach všetko okrem nosového.
 	import type { MaterialRow } from '$lib/server/compute';
+	import { sumaOdpad } from '$lib/odpad';
 	import ProfilObrazok from './ProfilObrazok.svelte';
 
 	let {
@@ -14,6 +15,10 @@
 	}: { material: MaterialRow[]; bar?: number; viacPosuvov?: boolean; kerf?: number } = $props();
 
 	const fmt = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+	// kumulatívny odpad naprieč profilmi (#417, display-only) — vykreslí sa LEN keď
+	// je profilov (s tyce>0) ≥2; pri 1 profile je súčet totožný s per-profil hlavičkou
+	// (napr. /optimalizator má jediný profil a vlastný „Celkový odpad" riadok).
+	const spolu = $derived(sumaOdpad(material));
 	// uhol rezu (45° vs rovný 90°) rozhoduje server per profil (m.sikmyRez):
 	// Deluxe + Štandard + = všetko 90°; Robust/Slide = 90° nosový/oponový, zvyšok 45°
 
@@ -163,6 +168,15 @@
 			</table>
 		</div>
 	{/each}
+
+	<!-- kumulatívny odpad naprieč profilmi (#417) — len pri ≥2 profiloch -->
+	{#if spolu.profily > 1}
+		<div class="odpad-spolu" data-testid="odpad-spolu">
+			Odpad spolu (naprieč {spolu.profily} profilmi): <b>{fmt(spolu.odpadMm)} mm</b> ({fmt(
+				spolu.odpadPct
+			)} %)
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -170,6 +184,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: 18px;
+	}
+	.odpad-spolu {
+		margin-top: -4px;
+		padding-top: 12px;
+		border-top: 1px solid #e2e8f0;
+		color: #475569;
+		font-size: 13px;
 	}
 	.profil {
 		border: 1px solid #e2e8f0;

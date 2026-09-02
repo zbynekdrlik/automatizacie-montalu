@@ -46,6 +46,13 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await expect(page.getByTestId('plan-badge')).toContainText('Štandard plus 4K IZO');
 	await expect(page.locator('.row', { hasText: U_PROFIL })).toHaveCount(1);
 
+	// #417: viacprofilový nárez ukáže kumulatívny „Odpad spolu" súčet naprieč profilmi
+	// (per-profil odpad je v hlavičkách rozpisu; toto je jeho súčet za celý nárez)
+	const odpadSpolu = page.getByTestId('odpad-spolu');
+	await expect(odpadSpolu).toBeVisible();
+	await expect(odpadSpolu).toContainText('Odpad spolu');
+	await expect(odpadSpolu).toContainText('mm');
+
 	// to isté zadanie, len float sklo → basic nárezák bez „U" profilu
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
