@@ -130,9 +130,17 @@ describe('#385 konfigurujBazen (súhrn) + bazenPonukaConfig (mapovanie na dopyt)
 // aj keď má rozmery. Pergola áno (regresná istota, že sme cenu pergole nerozbili).
 // --------------------------------------------------------------------------- //
 describe('#385 honest-null cena — bazén bez ceny, pergola s cenou', () => {
-	const CFG_ROZMERY = { system: 'Bazénové zastrešenie — Premier', sirka: 4000, dlzka: 8000 };
+	// CFG nesie `hlbka`+`model` = CENOTVORNÝ vstup (keby gate NEbol, `cenaZCfg` by cenu spočítalo);
+	// bez `hlbka` by `cenaZCfg` vrátilo null aj bez gate → assercie by boli vákuové (review #389 🟡).
+	const CFG_ROZMERY = {
+		system: 'Bazénové zastrešenie — Premier',
+		sirka: 4000,
+		dlzka: 8000,
+		hlbka: 3500,
+		model: 'LIGHT' as const
+	};
 
-	it('opeciatkujCenuPreProdukt(bazen) → cena null + verzia null (žiadna pergolová cena)', () => {
+	it('opeciatkujCenuPreProdukt(bazen) → cena null + verzia null AJ pri cenotvornom cfg (gate drží)', () => {
 		const s = opeciatkujCenuPreProdukt(CFG_ROZMERY, 'bazen');
 		expect(s.cena).toBeNull();
 		expect(s.cennikVerzia).toBeNull();

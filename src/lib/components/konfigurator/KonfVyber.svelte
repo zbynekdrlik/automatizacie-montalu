@@ -11,13 +11,14 @@
 	// `string` (rovnaké pole nesie aj externé montalu.sk URL), tu ho pre live vetvu zúžime na
 	// KONKRÉTNE interné route literály — každý produktový PR (#385–#390), čo prepne kartu na `live`,
 	// sem pridá svoj `/konfigurator/<slug>` literál (#385: bazén, #386: zimná záhrada, #387: zasklenie,
-	// #388: oplotenie).
+	// #388: oplotenie, #389: tienenie).
 	type LiveRoute =
 		| '/konfigurator/pergola'
 		| '/konfigurator/bazen'
 		| '/konfigurator/zasklenie'
 		| '/konfigurator/zimna-zahrada'
-		| '/konfigurator/oplotenie';
+		| '/konfigurator/oplotenie'
+		| '/konfigurator/tienenie';
 </script>
 
 <section class="vyber" data-testid="konf-vyber">
