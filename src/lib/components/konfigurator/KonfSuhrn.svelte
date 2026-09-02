@@ -25,31 +25,31 @@
 		</div>
 		<div>
 			<dt>Šírka</dt>
-			<dd data-testid="s-sirka">{fmt(suhrn.sirka)} mm</dd>
+			<dd data-testid="s-sirka" class="mono">{fmt(suhrn.sirka)} mm</dd>
 		</div>
 		<div>
 			<dt>Hĺbka</dt>
-			<dd data-testid="s-hlbka">{fmt(suhrn.hlbka)} mm</dd>
+			<dd data-testid="s-hlbka" class="mono">{fmt(suhrn.hlbka)} mm</dd>
 		</div>
 		<div>
 			<dt>Výška vpredu</dt>
-			<dd data-testid="s-vyska-vpredu">{fmt(suhrn.vyskaVpredu)} mm</dd>
+			<dd data-testid="s-vyska-vpredu" class="mono">{fmt(suhrn.vyskaVpredu)} mm</dd>
 		</div>
 		<div>
 			<dt>Výška pri stene</dt>
-			<dd data-testid="s-vyska-stena">{fmt(suhrn.vyskaPriStene)} mm</dd>
+			<dd data-testid="s-vyska-stena" class="mono">{fmt(suhrn.vyskaPriStene)} mm</dd>
 		</div>
 		<div>
 			<dt>Sklon strechy</dt>
-			<dd data-testid="s-sklon">{fmt(suhrn.sklonDeg)}°</dd>
+			<dd data-testid="s-sklon" class="mono">{fmt(suhrn.sklonDeg)}°</dd>
 		</div>
 		<div>
 			<dt>Svetlá výška vpredu</dt>
-			<dd data-testid="s-svetla">{fmt(suhrn.svetlaVyska)} mm</dd>
+			<dd data-testid="s-svetla" class="mono">{fmt(suhrn.svetlaVyska)} mm</dd>
 		</div>
 		<div>
 			<dt>Zastrešená plocha</dt>
-			<dd data-testid="s-plocha">{fmt(suhrn.zastresenaPlochaM2)} m²</dd>
+			<dd data-testid="s-plocha" class="mono">{fmt(suhrn.zastresenaPlochaM2)} m²</dd>
 		</div>
 		<div>
 			<dt>Strešné sklo</dt>

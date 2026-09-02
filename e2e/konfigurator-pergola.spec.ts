@@ -59,6 +59,9 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	await expect(page.getByTestId('s-plocha')).toHaveText('20 m²'); // 5000·4000 mm = 20 m²
 	await expect(page.getByTestId('s-svetla')).toHaveText('2810 mm'); // 3000 − 190 (nosník)
 	await expect(page.getByTestId('s-sklon')).toContainText('10');
+	// #434: číselné súhrnné hodnoty nesú .mono (rozmery/mm/°), meno modelu nie (text)
+	await expect(page.getByTestId('s-plocha')).toHaveClass(/mono/);
+	await expect(page.getByTestId('s-model')).not.toHaveClass(/mono/);
 	// zvolená (non-default) kategória skla sa prejaví v súhrne ZÁKAZNÍCKYM labelom (bez hrúbky),
 	// NIE interným katalógovým názvom (#329 časť 4: zákazník nikdy nevidí hrúbky na stránke)
 	await expect(page.getByTestId('s-sklo')).toHaveText(vybranaKategoria);
@@ -70,6 +73,8 @@ test('konfigurátor: verejný flow BEZ prihlásenia → súhrn + orientačná ce
 	await expect(page.getByTestId('cena')).toBeVisible();
 	await expect(page.getByTestId('cena-sdph')).toContainText('€');
 	await expect(page.getByTestId('cena-bezdph')).toContainText('bez DPH');
+	// #434: redizajn #376/#421 dokončený aj na verejnej karte — cenová hodnota nesie .mono
+	await expect(page.getByTestId('cena-sdph')).toHaveClass(/mono/);
 	// #318: neprihlásený návštevník je MO — NIKDY nevidí VO odznak (ani náznak VO hladiny)
 	await expect(page.getByTestId('cena-hladina')).toHaveCount(0);
 
