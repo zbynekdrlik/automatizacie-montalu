@@ -8,7 +8,7 @@
 	// Money-neutralita: importuje LEN client-safe `konfigurator-zasklenie` + DopytForm (guard:
 	// konfigurator-money-safety). Žiadne `console.*`.
 	import { untrack } from 'svelte';
-	import { base } from '$app/paths';
+	import KonfProduktStranka from '$lib/components/konfigurator/KonfProduktStranka.svelte';
 	import DopytForm from '$lib/components/DopytForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
 	import { cislaCiarka } from '$lib/konfigurator-jednotky';
@@ -87,210 +87,182 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Navrhni si zasklenie terasy alebo balkóna — Montalu</title>
-	<meta
-		name="description"
-		content="Zostav si zasklenie terasy alebo balkóna na mieru — vyber systém, rozmery, počet krídel, farbu a sklo a pošli nezáväzný dopyt so špecifikáciou v PDF."
-	/>
-</svelte:head>
-
-<div class="zas">
-	<!-- HERO -->
-	<section class="kp-hero">
-		<div class="kp-hero-foto">
-			<img
-				src="{base}/konfigurator/vyber/zasklenie.webp"
-				alt="Zasklenie terasy Montalu"
-				width="1000"
-				height="600"
-				loading="eager"
-				fetchpriority="high"
-			/>
-		</div>
-		<div class="kp-hero-text">
-			<span class="kp-label">Konfigurátor zasklenia terás a balkónov</span>
-			<h1>Navrhni si zasklenie</h1>
-			<p>
-				Vyber umiestnenie, systém, rozmery a vyhotovenie — pripravíme ti nezáväznú špecifikáciu
-				(PDF) a ozveme sa s cenovou ponukou po obhliadke. Bez registrácie.
-			</p>
-		</div>
-	</section>
-
-	<div class="kp-grid">
-		<!-- OVLÁDANIE -->
-		<div class="kp-ovladanie">
-			<!-- UMIESTNENIE -->
-			<fieldset class="kp-blok">
-				<legend>Umiestnenie</legend>
-				<div class="kp-karty dvoj">
-					{#each data.umiestnenia as um (um)}
-						<button
-							type="button"
-							class="kp-karta"
-							class:vybrana={umiestnenie === um}
-							aria-pressed={umiestnenie === um}
-							data-testid="zasklenie-umiestnenie-{um}"
-							onclick={() => vyberUmiestnenie(um)}
-						>
-							<span class="kp-karta-nazov">{um}</span>
-						</button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<!-- MODEL (filtrovaný podľa umiestnenia) -->
-			<fieldset class="kp-blok">
-				<legend>Systém zasklenia</legend>
-				<div class="kp-karty">
-					{#each modelyPreU as m (m.kod)}
-						<button
-							type="button"
-							class="kp-karta"
-							class:vybrana={model === m.kod}
-							aria-pressed={model === m.kod}
-							data-testid="zasklenie-model-{m.kod}"
-							onclick={() => (model = m.kod)}
-						>
-							<span class="kp-karta-nazov">{m.kod}</span>
-							<span class="kp-karta-system">{m.system}</span>
-							<span class="kp-karta-popis">{m.popis}</span>
-						</button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou/bazénom) -->
-			<fieldset class="kp-blok">
-				<legend>Rozmery</legend>
-				<div class="kp-steppery">
-					<RozmerStepper
-						bind:hodnotaMm={sirka}
-						min={r.sirka.min}
-						max={r.sirka.max}
-						krokMm={r.sirka.krok}
-						popis="Šírka"
-						akuzativ="šírku"
-						id="zas-sirka"
-						testid="zasklenie-sirka"
-						name="sirka"
-					/>
-					<RozmerStepper
-						bind:hodnotaMm={vyska}
-						min={r.vyska.min}
-						max={r.vyska.max}
-						krokMm={r.vyska.krok}
-						popis="Výška"
-						akuzativ="výšku"
-						id="zas-vyska"
-						testid="zasklenie-vyska"
-						name="vyska"
-					/>
-					<label class="kp-pole kp-kridla">
-						<span>Počet krídel</span>
-						<select bind:value={kridla} data-testid="zasklenie-kridla">
-							{#each kridlaOpts as n (n)}
-								<option value={n}>{n}</option>
-							{/each}
-						</select>
-					</label>
-				</div>
-			</fieldset>
-
-			<!-- FARBA + VÝPLŇ -->
-			<fieldset class="kp-blok">
-				<legend>Vyhotovenie</legend>
-				<div class="kp-rozmery">
-					<label class="kp-pole">
-						<span>Farba konštrukcie</span>
-						<select bind:value={farba} data-testid="zasklenie-farba">
-							{#each data.farby as f (f.kod)}
-								<option value={f.kod}>RAL {f.kod} — {f.nazov}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="kp-pole">
-						<span>Sklo / výplň</span>
-						<select bind:value={vypln} data-testid="zasklenie-vypln">
-							{#each data.vyplne as v (v.nazov)}
-								<option value={v.nazov}>{v.nazov}</option>
-							{/each}
-						</select>
-					</label>
-				</div>
-			</fieldset>
-		</div>
-
-		<!-- SÚHRN + CENA-INFO + DOPYT -->
-		<div class="kp-panel">
-			{#if suhrn}
-				{@const s = suhrn}
-				<section class="kp-suhrn" data-testid="zasklenie-suhrn">
-					<h2>Tvoja konfigurácia</h2>
-					<dl>
-						<div>
-							<dt>Umiestnenie</dt>
-							<dd>{s.umiestnenie}</dd>
-						</div>
-						<div>
-							<dt>Systém</dt>
-							<dd>{s.model} ({s.system})</dd>
-						</div>
-						<div>
-							<dt>Rozmery (š × v)</dt>
-							<dd data-testid="zasklenie-suhrn-rozmery">{s.sirka} × {s.vyska} mm</dd>
-						</div>
-						<div>
-							<dt>Počet krídel</dt>
-							<dd>{s.kridla}</dd>
-						</div>
-						<div>
-							<dt>Zasklená plocha</dt>
-							<dd>{cislaCiarka(s.plochaM2)} m²</dd>
-						</div>
-						<div>
-							<dt>Farba</dt>
-							<dd>{s.farba}</dd>
-						</div>
-						<div>
-							<dt>Sklo / výplň</dt>
-							<dd>{s.vypln}</dd>
-						</div>
-					</dl>
-				</section>
-
-				<!-- CENA je na DOPYT (honest-null: zasklenie nemá orientačný cenník) -->
-				<section class="kp-cena-info" data-testid="zasklenie-cena-info">
-					<strong>Cena na vyžiadanie</strong>
-					<p>
-						Zasklenie ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme cenovú ponuku po
-						obhliadke miesta.
-					</p>
-					<button type="button" class="kp-btn primar" onclick={() => scrollNa('dopyt')}>
-						Nezáväzný dopyt →
+<KonfProduktStranka
+	foto="zasklenie.webp"
+	alt="Zasklenie terasy Montalu"
+	label="Konfigurátor zasklenia terás a balkónov"
+	nadpis="Navrhni si zasklenie"
+	lead="Vyber umiestnenie, systém, rozmery a vyhotovenie — pripravíme ti nezáväznú špecifikáciu (PDF) a ozveme sa s cenovou ponukou po obhliadke. Bez registrácie."
+>
+	{#snippet ovladacie()}
+		<!-- UMIESTNENIE -->
+		<fieldset class="kp-blok">
+			<legend>Umiestnenie</legend>
+			<div class="kp-karty dvoj">
+				{#each data.umiestnenia as um (um)}
+					<button
+						type="button"
+						class="kp-karta"
+						class:vybrana={umiestnenie === um}
+						aria-pressed={umiestnenie === um}
+						data-testid="zasklenie-umiestnenie-{um}"
+						onclick={() => vyberUmiestnenie(um)}
+					>
+						<span class="kp-karta-nazov">{um}</span>
 					</button>
-				</section>
+				{/each}
+			</div>
+		</fieldset>
 
-				<section class="kp-blok-kontakt" id="dopyt" data-testid="dopyt">
-					<h2>Máš záujem o toto zasklenie?</h2>
-					<p class="kp-uvod">
-						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
-						pripravíme individuálne po obhliadke.
-					</p>
-					<DopytForm
-						konfiguracia={ponukaCfg}
-						disclaimer="Špecifikácia je nezáväzná. Cenu pripravíme individuálne po obhliadke miesta stavby."
-					/>
-				</section>
-			{:else}
-				<p class="kp-chyba" data-testid="zasklenie-chyba">
-					⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
+		<!-- MODEL (filtrovaný podľa umiestnenia) -->
+		<fieldset class="kp-blok">
+			<legend>Systém zasklenia</legend>
+			<div class="kp-karty">
+				{#each modelyPreU as m (m.kod)}
+					<button
+						type="button"
+						class="kp-karta"
+						class:vybrana={model === m.kod}
+						aria-pressed={model === m.kod}
+						data-testid="zasklenie-model-{m.kod}"
+						onclick={() => (model = m.kod)}
+					>
+						<span class="kp-karta-nazov">{m.kod}</span>
+						<span class="kp-karta-system">{m.system}</span>
+						<span class="kp-karta-popis">{m.popis}</span>
+					</button>
+				{/each}
+			</div>
+		</fieldset>
+
+		<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou/bazénom) -->
+		<fieldset class="kp-blok">
+			<legend>Rozmery</legend>
+			<div class="kp-steppery">
+				<RozmerStepper
+					bind:hodnotaMm={sirka}
+					min={r.sirka.min}
+					max={r.sirka.max}
+					krokMm={r.sirka.krok}
+					popis="Šírka"
+					akuzativ="šírku"
+					id="zas-sirka"
+					testid="zasklenie-sirka"
+					name="sirka"
+				/>
+				<RozmerStepper
+					bind:hodnotaMm={vyska}
+					min={r.vyska.min}
+					max={r.vyska.max}
+					krokMm={r.vyska.krok}
+					popis="Výška"
+					akuzativ="výšku"
+					id="zas-vyska"
+					testid="zasklenie-vyska"
+					name="vyska"
+				/>
+				<label class="kp-pole kp-kridla">
+					<span>Počet krídel</span>
+					<select bind:value={kridla} data-testid="zasklenie-kridla">
+						{#each kridlaOpts as n (n)}
+							<option value={n}>{n}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+		</fieldset>
+
+		<!-- FARBA + VÝPLŇ -->
+		<fieldset class="kp-blok">
+			<legend>Vyhotovenie</legend>
+			<div class="kp-rozmery">
+				<label class="kp-pole">
+					<span>Farba konštrukcie</span>
+					<select bind:value={farba} data-testid="zasklenie-farba">
+						{#each data.farby as f (f.kod)}
+							<option value={f.kod}>RAL {f.kod} — {f.nazov}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="kp-pole">
+					<span>Sklo / výplň</span>
+					<select bind:value={vypln} data-testid="zasklenie-vypln">
+						{#each data.vyplne as v (v.nazov)}
+							<option value={v.nazov}>{v.nazov}</option>
+						{/each}
+					</select>
+				</label>
+			</div>
+		</fieldset>
+	{/snippet}
+
+	{#snippet panel()}
+		{#if suhrn}
+			{@const s = suhrn}
+			<section class="kp-suhrn" data-testid="zasklenie-suhrn">
+				<h2>Tvoja konfigurácia</h2>
+				<dl>
+					<div>
+						<dt>Umiestnenie</dt>
+						<dd>{s.umiestnenie}</dd>
+					</div>
+					<div>
+						<dt>Systém</dt>
+						<dd>{s.model} ({s.system})</dd>
+					</div>
+					<div>
+						<dt>Rozmery (š × v)</dt>
+						<dd data-testid="zasklenie-suhrn-rozmery">{s.sirka} × {s.vyska} mm</dd>
+					</div>
+					<div>
+						<dt>Počet krídel</dt>
+						<dd>{s.kridla}</dd>
+					</div>
+					<div>
+						<dt>Zasklená plocha</dt>
+						<dd>{cislaCiarka(s.plochaM2)} m²</dd>
+					</div>
+					<div>
+						<dt>Farba</dt>
+						<dd>{s.farba}</dd>
+					</div>
+					<div>
+						<dt>Sklo / výplň</dt>
+						<dd>{s.vypln}</dd>
+					</div>
+				</dl>
+			</section>
+
+			<!-- CENA je na DOPYT (honest-null: zasklenie nemá orientačný cenník) -->
+			<section class="kp-cena-info" data-testid="zasklenie-cena-info">
+				<strong>Cena na vyžiadanie</strong>
+				<p>
+					Zasklenie ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme cenovú ponuku po
+					obhliadke miesta.
 				</p>
-			{/if}
-		</div>
-	</div>
-</div>
+				<button type="button" class="kp-btn primar" onclick={() => scrollNa('dopyt')}>
+					Nezáväzný dopyt →
+				</button>
+			</section>
+
+			<section class="kp-blok-kontakt" id="dopyt" data-testid="dopyt">
+				<h2>Máš záujem o toto zasklenie?</h2>
+				<p class="kp-uvod">
+					Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
+					pripravíme individuálne po obhliadke.
+				</p>
+				<DopytForm
+					konfiguracia={ponukaCfg}
+					disclaimer="Špecifikácia je nezáväzná. Cenu pripravíme individuálne po obhliadke miesta stavby."
+				/>
+			</section>
+		{:else}
+			<p class="kp-chyba" data-testid="zasklenie-chyba">
+				⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
+			</p>
+		{/if}
+	{/snippet}
+</KonfProduktStranka>
 
 <style>
 	.kp-karty {
