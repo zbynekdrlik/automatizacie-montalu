@@ -18,7 +18,7 @@ describe('KONF_PRODUKTY katalóg', () => {
 		expect(KONF_PRODUKTY).toHaveLength(7);
 	});
 
-	it('pergola je PRVÁ a live; #385–#389 pridali bazén, zimnú záhradu, zasklenie, oplotenie a tienenie (ostatné „pripravujeme")', () => {
+	it('všetkých 7 radov je live (#385–#390 dokončili jednotný konfigurátor); pergola je PRVÁ', () => {
 		expect(KONF_PRODUKTY[0]!.kod).toBe('pergola');
 		expect(KONF_PRODUKTY[0]!.stav).toBe('live');
 		const live = KONF_PRODUKTY.filter((p) => p.stav === 'live');
@@ -28,7 +28,8 @@ describe('KONF_PRODUKTY katalóg', () => {
 			'zimna-zahrada',
 			'zasklenie',
 			'oplotenie',
-			'tienenie'
+			'tienenie',
+			'pristresok'
 		]);
 	});
 

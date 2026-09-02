@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole } from './helpers';
 
-test('výberová obrazovka: grid kariet + 6 live produktov vedie interne, „pripravujeme" (prístrešky) externe', async ({
+test('výberová obrazovka: grid kariet + všetkých 7 live produktov vedie interne', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -45,21 +45,17 @@ test('výberová obrazovka: grid kariet + 6 live produktov vedie interne, „pri
 	await expect(tienenie).toHaveAttribute('data-stav', 'live');
 	await expect(tienenie).toHaveAttribute('href', /\/konfigurator\/tienenie$/);
 
+	// #390: prístrešky = live karta → interná podstránka `/konfigurator/pristresok`
+	const pristresok = page.getByTestId('konf-produkt-pristresok');
+	await expect(pristresok).toBeVisible();
+	await expect(pristresok).toHaveAttribute('data-stav', 'live');
+	await expect(pristresok).toHaveAttribute('href', /\/konfigurator\/pristresok$/);
+
 	// #386: zimná záhrada = live karta → interná podstránka `/konfigurator/zimna-zahrada` (už nie „pripravujeme")
 	const zz = page.getByTestId('konf-produkt-zimna-zahrada');
 	await expect(zz).toBeVisible();
 	await expect(zz).toHaveAttribute('data-stav', 'live');
 	await expect(zz).toHaveAttribute('href', /\/konfigurator\/zimna-zahrada$/);
-
-	// „pripravujeme" karta (prístrešky) = stále externý odkaz na montalu.sk (nový tab)
-	const pristresok = page.getByTestId('konf-produkt-pristresok');
-	await expect(pristresok).toBeVisible();
-	await expect(pristresok).toHaveAttribute('data-stav', 'pripravujeme');
-	await expect(pristresok).toHaveAttribute(
-		'href',
-		/montalu\.sk\/produkty\/hlinikove-pristresky-a-altanky$/
-	);
-	await expect(pristresok).toHaveAttribute('target', '_blank');
 
 	// všetkých 7 produktových kariet je prítomných (parita so 6 kategóriami montalu.sk + prístrešky)
 	await expect(page.locator('[data-testid^="konf-produkt-"]')).toHaveCount(7);

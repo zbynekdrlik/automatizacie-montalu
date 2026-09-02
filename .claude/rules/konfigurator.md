@@ -341,6 +341,14 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   `system`; **hlavný rozmer DĹŽKA → `dlzka`** (nové neutrálne pole → `zhrnutieRiadky` vykreslí „Rozmery
   (d × š)"), NIE pergolová `hlbka` (tá renderuje „š × h" a poradie by sa líšilo od stránky); výška/koľaj/
   segmenty/plocha → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/`model`/`pocetPoli`) NEPOUŽÍVAJ.
+- **PASCA `sklo` render-cesta (#390):** `PonukaConfig.sklo` sa v `zhrnutieRiadky` (PDF/lead riadok
+  „Sklo / výplň") prepúšťa cez `konfSkloKategoriaPreNazov(cfg.sklo)` — teda ak názov výplne/krytiny
+  PRESNE sedí s pergolovým katalógovým `katalogNazov` skla, riadok sa TICHO premenuje na zákaznícky
+  label kategórie (nie na to, čo zákazník vybral). Dnes bazén (polykarbonáty) ani prístrešok (4
+  krytiny) nekolidujú → renderujú RAW. Ale **#387 zasklenia = SKLO** → vysoké riziko kolízie: pri
+  novom produkte over render-cestu testom `expect(zhrnutieRiadky(cfg)).toContainEqual({ label: 'Sklo
+  / výplň', value: <názov> })` PRE KAŽDÝ názov výplne (nie len `cfg.sklo` dátové pole — tá regresia by
+  ostala zelená). Pri reálnej kolízii daj výplni disjunktný názov alebo mapuj do iného poľa.
 - **Money-safety (A) obsahový grep chytá LEN literál `moneyKod`** — nový Money kód (BPK*/BPP* ako holé
   stringy) potrebuje VLASTNÝ vzor: pridaj `/(^|\/)<katalog>$/` do `KLIENT_ZAKAZANE_SPEC` (import) +
   obsahový regex do (A) grafu aj (B). Inak by import Money katalógu prešiel. Vzory doteraz:
