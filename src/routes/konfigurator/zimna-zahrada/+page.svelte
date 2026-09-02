@@ -1,14 +1,16 @@
 <script lang="ts">
-	// Verejný zákaznícky konfigurátor zimných záhrad (#386, etapa 3 jednotného rámu #384).
-	// JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D — geometria zimnej záhrady zatiaľ neexistuje,
-	// viď design komentár + follow-up) a BEZ ORIENTAČNEJ CENY (honest-null: zimná záhrada nemá overený
-	// cenový zdroj — cena sa nevymýšľa). Konfigurácia (model/rozmery/farba/zasklenie) sa počíta ČISTO
-	// klientsky (`$derived`, žiadny server round-trip — netreba, nie je cena) a tečie do zdieľaného
-	// DopytForm (#277) → PDF špecifikácia (bez ceny) + Odoo lead. Zdieľané `--k-*` tokeny z
+	// Verejný zákaznícky konfigurátor zimných záhrad (#386, etapa 3 jednotného rámu #384; #408
+	// orientačná cena). JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D — geometria zimnej záhrady
+	// zatiaľ neexistuje). Konfigurácia (model/rozmery/farba/zasklenie) sa počíta ČISTO klientsky
+	// (`$derived`); ORIENTAČNÚ cenu (#408) počíta SERVER na klik (`vypocet` akcia, enhance submit —
+	// cenový modul je server-only, do klienta sa nedostane) a všetko tečie do zdieľaného DopytForm
+	// (#277) → PDF špecifikácia s orientačnou cenou + Odoo lead. Zdieľané `--k-*` tokeny z
 	// `konfigurator/+layout.svelte`. Money-neutralita: importuje LEN client-safe
-	// `konfigurator-zimna-zahrada` + DopytForm (guard: konfigurator-money-safety). Žiadne `console.*`.
+	// `konfigurator-zimna-zahrada` + DopytForm + LEN typy ceny (guard: konfigurator-money-safety).
+	// Žiadne `console.*`.
 	import { untrack } from 'svelte';
 	import { base } from '$app/paths';
+	import { enhance } from '$app/forms';
 	import DopytForm from '$lib/components/DopytForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
 	import { cislaCiarka } from '$lib/konfigurator-jednotky';
@@ -21,6 +23,9 @@
 		type ZzVstup
 	} from '$lib/konfigurator-zimna-zahrada';
 	import type { PonukaConfig } from '$lib/ponuka';
+	// #408: typy orientačnej ceny (server-počítanej `vypocet` akciou). LEN typy → žiadny import
+	// cenového/Money modulu do klientskeho bundle (leak-guard A ostáva zelený).
+	import type { VerejnaCena } from '$lib/konfigurator';
 
 	let { data } = $props();
 
@@ -56,6 +61,27 @@
 	const platny = $derived(zzVstupPlatny(vstup));
 	const suhrn = $derived(platny ? konfigurujZimnaZahradu(vstup) : null);
 	const ponukaCfg = $derived<PonukaConfig>(suhrn ? zimnaZahradaPonukaConfig(suhrn) : {});
+
+	// #408: orientačná cena — server-počítaná (`vypocet` akcia, enhance submit, žiadny reload). Zobrazí
+	// sa až po kliku „Zobraziť orientačnú cenu" (vzor pergolovej/bazénovej `vypocet`); pri zmene
+	// rozmerov/zasklenia/modelu sa výsledok považuje za neaktuálny (`cenaAktualna`), takže sa NIKDY
+	// neukáže cena pre iný config.
+	let cenaVysledok = $state<{ cena: VerejnaCena } | null>(null);
+	let cenaError = $state<string | null>(null);
+	let cenaNacitava = $state(false);
+	let poslednyKluc = $state<string | null>(null);
+	const cenaKluc = $derived(
+		`${zzModel(model)}|${hlbka ?? 0}|${sirka ?? 0}|${zzZasklenie(zasklenie)}`
+	);
+	const cenaAktualna = $derived(cenaVysledok !== null && poslednyKluc === cenaKluc);
+
+	const eur = (n: number) =>
+		n.toLocaleString('sk-SK', {
+			style: 'currency',
+			currency: 'EUR',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
 
 	function scrollNa(id: string) {
 		document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -214,14 +240,100 @@
 					</dl>
 				</section>
 
-				<!-- CENA je na DOPYT (honest-null: zimná záhrada nemá orientačný cenník) -->
-				<section class="zz-cena-info" data-testid="zz-cena-info">
-					<strong>Cena na vyžiadanie</strong>
-					<p>
-						Zimnú záhradu ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme cenovú
-						ponuku po obhliadke miesta.
-					</p>
-					<button type="button" class="zz-btn primar" onclick={() => scrollNa('dopyt')}>
+				<!-- ORIENTAČNÁ CENA (#408) — server-počítaná maticou montalu.sk (enhance submit) -->
+				<section class="zz-cena" data-testid="zz-cena-sekcia">
+					{#if cenaAktualna && cenaVysledok}
+						{@const c = cenaVysledok.cena}
+						<div class="zz-cena-blok" data-testid="zz-cena">
+							{#if c.druh === 'cena'}
+								<span class="zz-cena-label">Orientačná cena</span>
+								{#if c.hladinaLabel}
+									<span class="zz-cena-vo" data-testid="zz-cena-hladina">{c.hladinaLabel}</span>
+								{/if}
+								<div class="zz-cena-hlavne">
+									<span class="zz-cena-sdph" data-testid="zz-cena-sdph">{eur(c.sDph)}</span>
+									<span class="zz-cena-mena">s DPH</span>
+								</div>
+								<div class="zz-cena-bezdph" data-testid="zz-cena-bezdph">
+									{eur(c.bezDph)} bez DPH
+								</div>
+								<!-- montalu zaokrúhľuje rozmer NAHOR na katalóg — čestne to doplň, keď sa líši od zadaného -->
+								{#if Math.round(c.sirkaGridM * 1000) !== sirka || Math.round(c.hlbkaGridM * 1000) !== hlbka}
+									<div class="zz-cena-grid" data-testid="zz-cena-grid">
+										Cena platí pre najbližší katalógový rozmer {cislaCiarka(c.sirkaGridM)} × {cislaCiarka(
+											c.hlbkaGridM
+										)} m.
+									</div>
+								{/if}
+							{:else}
+								<span class="zz-cena-label">Cena na vyžiadanie</span>
+								{#if c.hladinaLabel}
+									<span class="zz-cena-vo" data-testid="zz-cena-hladina">{c.hladinaLabel}</span>
+								{/if}
+								<p class="zz-cena-dovod" data-testid="zz-cena-individualna">
+									{c.dovod} Pripravíme ti individuálnu ponuku.
+								</p>
+							{/if}
+							<p class="zz-cena-pozn">
+								Orientačná cena vychádza z rozmerov a zvoleného zasklenia pri základnom vyhotovení
+								konštrukcie. Presné vyhotovenie (model, zasklenie stien) a záväznú cenu pripravíme
+								po obhliadke miesta.
+							</p>
+						</div>
+					{:else}
+						<form
+							method="POST"
+							action="?/vypocet"
+							class="zz-cena-form"
+							use:enhance={() => {
+								const submitted = cenaKluc;
+								cenaNacitava = true;
+								cenaError = null;
+								return ({ result }) => {
+									cenaNacitava = false;
+									if (result.type === 'success') {
+										const d = result.data as { cena: VerejnaCena } | undefined;
+										if (d?.cena) {
+											cenaVysledok = { cena: d.cena };
+											poslednyKluc = submitted;
+										}
+									} else if (result.type === 'failure') {
+										const d = result.data as { error?: string } | undefined;
+										cenaError = d?.error ?? 'Cenu sa nepodarilo spočítať.';
+									} else if (result.type === 'error') {
+										// sieťová/serverová výnimka — nenechaj tlačidlo „visieť" bez odozvy
+										cenaError = 'Cenu sa nepodarilo spočítať, skús to prosím o chvíľu znova.';
+									}
+								};
+							}}
+						>
+							<input type="hidden" name="model" value={vstup.model} />
+							<input type="hidden" name="hlbka" value={hlbka ?? 0} />
+							<input type="hidden" name="sirka" value={sirka ?? 0} />
+							<input type="hidden" name="zasklenie" value={vstup.zasklenie} />
+							<strong>Orientačná cena</strong>
+							<p>
+								Zobraz si orientačnú cenu pre zvolené rozmery a zasklenie. Presnú, záväznú cenu
+								pripravíme po obhliadke miesta.
+							</p>
+							{#if cenaError}
+								<p class="zz-cena-chyba" data-testid="zz-cena-chyba">{cenaError}</p>
+							{/if}
+							<button
+								type="submit"
+								class="zz-btn primar"
+								data-testid="zz-cena-zobrazit"
+								disabled={cenaNacitava}
+							>
+								{cenaNacitava
+									? 'Počítam…'
+									: cenaVysledok
+										? 'Prepočítať orientačnú cenu →'
+										: 'Zobraziť orientačnú cenu →'}
+							</button>
+						</form>
+					{/if}
+					<button type="button" class="zz-btn druhotny" onclick={() => scrollNa('dopyt')}>
 						Nezáväzný dopyt →
 					</button>
 				</section>
@@ -229,13 +341,10 @@
 				<section class="zz-blok-kontakt" id="dopyt" data-testid="dopyt">
 					<h2>Máš záujem o túto zimnú záhradu?</h2>
 					<p class="zz-uvod">
-						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
-						pripravíme individuálne po obhliadke.
+						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) s orientačnou cenou na
+						stiahnutie. Presnú, záväznú cenu pripravíme po obhliadke miesta.
 					</p>
-					<DopytForm
-						konfiguracia={ponukaCfg}
-						disclaimer="Špecifikácia je nezáväzná. Cenu pripravíme individuálne po obhliadke miesta stavby."
-					/>
+					<DopytForm konfiguracia={ponukaCfg} />
 				</section>
 			{:else}
 				<p class="zz-chyba" data-testid="zz-chyba">
@@ -411,7 +520,6 @@
 		gap: 16px;
 	}
 	.zz-suhrn,
-	.zz-cena-info,
 	.zz-blok-kontakt {
 		border: 1px solid var(--k-line);
 		border-radius: var(--k-radius);
@@ -455,21 +563,107 @@
 		text-align: right;
 	}
 
-	.zz-cena-info {
-		background: var(--k-surface-2);
-		border-color: var(--k-line-2);
+	/* ORIENTAČNÁ CENA (#408) — vzor bazénového `.baz-cena*` */
+	.zz-cena {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
-	.zz-cena-info strong {
+	.zz-cena-form {
+		border: 1px solid var(--k-line-2);
+		border-radius: var(--k-radius);
+		background: var(--k-surface-2);
+		padding: 20px 22px;
+	}
+	.zz-cena-form strong {
 		display: block;
 		font-size: 17px;
 		color: var(--k-text);
 		margin-bottom: 6px;
 	}
-	.zz-cena-info p {
+	.zz-cena-form p {
 		margin: 0 0 14px;
 		font-size: 13.5px;
 		line-height: 1.5;
 		color: var(--k-muted);
+	}
+	.zz-cena-chyba {
+		color: #a3261c;
+		font-weight: 600;
+	}
+	/* prémiový antracitový cenový panel (tmavá karta — zhoda s pergolovým/bazénovým) */
+	.zz-cena-blok {
+		background: var(--k-ink, #1b1e23);
+		color: #fff;
+		border-radius: var(--k-radius);
+		padding: 20px 22px;
+	}
+	.zz-cena-label {
+		display: block;
+		color: rgba(255, 255, 255, 0.62);
+		font-size: 12px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 600;
+	}
+	.zz-cena-vo {
+		display: inline-block;
+		margin-top: 8px;
+		padding: 2px 9px;
+		border-radius: 999px;
+		background: var(--k-accent, #b07a45);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.zz-cena-hlavne {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.zz-cena-sdph {
+		font-size: clamp(28px, 7vw, 38px);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+	}
+	.zz-cena-mena {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+	}
+	.zz-cena-bezdph {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+		margin-top: 4px;
+	}
+	.zz-cena-grid {
+		color: rgba(255, 255, 255, 0.55);
+		font-size: 12px;
+		line-height: 1.4;
+		margin-top: 8px;
+	}
+	.zz-cena-dovod {
+		color: rgba(255, 255, 255, 0.72);
+		font-size: 13.5px;
+		margin: 8px 0 0;
+	}
+	.zz-cena-pozn {
+		color: rgba(255, 255, 255, 0.5);
+		font-size: 12px;
+		line-height: 1.45;
+		margin: 14px 0 0;
+	}
+	.zz-btn.druhotny {
+		background: var(--k-surface);
+		color: var(--k-text);
+		border-color: var(--k-line-2);
+	}
+	.zz-btn.druhotny:hover {
+		border-color: var(--k-ink);
 	}
 
 	.zz-uvod {

@@ -117,16 +117,30 @@ describe('#386 konfigurujZimnaZahradu (súhrn) + zimnaZahradaPonukaConfig (mapov
 });
 
 // --------------------------------------------------------------------------- //
-// HONEST-NULL cenový kontrakt — zimná záhrada NIKDY nedostane cenu (ani opečiatkovanú, ani
-// prepočítanú), aj keď má rozmery. Pergola áno (regresná istota, že sme cenu pergole nerozbili).
+// #408 ORIENTAČNÁ cena — zimná záhrada TERAZ dostane cenu (matica montalu.sk, systemKod-gated).
+// Pergola nezmenená (regresná istota). Honest-degrade: cfg BEZ systemKod (starý riadok pred #408)
+// → null (starému honest-null dopytu sa ticho nepriradí cena).
 // --------------------------------------------------------------------------- //
-describe('#386 honest-null cena — zimná záhrada bez ceny, pergola s cenou', () => {
-	const CFG_ROZMERY = { system: 'Zimná záhrada — ROBUST', sirka: 5000, hlbka: 4000 };
+describe('#408 orientačná cena — zimná záhrada s cenou, pergola nezmenená', () => {
+	// cfg z reálneho mapovania (nesie systemKod='ROBUST' + hlbka + sirka + sklo → cenotvorné pre modul)
+	const CFG = zimnaZahradaPonukaConfig(konfigurujZimnaZahradu(VSTUP));
 
-	it('opeciatkujCenuPreProdukt(zimna-zahrada) → cena null + verzia null (žiadna pergolová cena)', () => {
-		const s = opeciatkujCenuPreProdukt(CFG_ROZMERY, 'zimna-zahrada');
+	it('opeciatkujCenuPreProdukt(zimna-zahrada) → cena opečiatkovaná + verzia cenníka zimnej záhrady', () => {
+		const s = opeciatkujCenuPreProdukt(CFG, 'zimna-zahrada');
+		expect(s.cena).not.toBeNull();
+		expect(s.cena!.druh).toBe('cena');
+		expect(s.cennikVerzia).not.toBeNull();
+	});
+
+	it('opeciatkujCenuPreProdukt(zimna-zahrada) bez systemKod (starý riadok) → cena null (honest-degrade); verzia je audit', () => {
+		// starý honest-null zimná dopyt (pred #408) nemá systemKod → cena sa NEspočíta (cena null →
+		// re-download honest-degrade nedostane cenu). `cennikVerzia` je LEN audit (z ktorej matice bol
+		// dopyt podaný) — cena_druh ostáva NULL, takže žiadna cena sa nezobrazí (vzor bazén/pergola).
+		const s = opeciatkujCenuPreProdukt(
+			{ system: 'Zimná záhrada — ROBUST', sirka: 5000, hlbka: 4000 },
+			'zimna-zahrada'
+		);
 		expect(s.cena).toBeNull();
-		expect(s.cennikVerzia).toBeNull();
 	});
 
 	it('opeciatkujCenuPreProdukt(pergola) → cena opečiatkovaná (nerozbité pergola pricing)', () => {
@@ -136,17 +150,19 @@ describe('#386 honest-null cena — zimná záhrada bez ceny, pergola s cenou', 
 		expect(s.cennikVerzia).not.toBeNull();
 	});
 
-	it('generatePonukaPdf(produkt=zimna-zahrada) → PDF NENESIE žiadnu cenu, aj s rozmermi (subject+keywords)', async () => {
-		const bytes = await generatePonukaPdf(CFG_ROZMERY, {
+	it('generatePonukaPdf(produkt=zimna-zahrada) → PDF NESIE orientačnú cenu, VO/Money NIE (subject+keywords)', async () => {
+		const bytes = await generatePonukaPdf(CFG, {
 			produkt: 'zimna-zahrada',
 			datum: '1. 1. 2026'
 		});
 		const doc = await PDFDocument.load(bytes);
-		// subject aj keywords — case-insensitive (keyword je lowercase „orientačná cena")
-		const meta = `${doc.getSubject() ?? ''} ${(doc.getKeywords() ?? '').toString()}`;
-		expect(meta).not.toMatch(/orientačná cena|veľkoobchodná cena|€/i);
+		// PDF nesie orientačnú (MO) cenu
+		expect(doc.getSubject() ?? '').toContain('Orientačná cena');
 		// nadpis dokumentu je zimno-záhradový (produkt-aware)
 		expect(doc.getTitle() ?? '').toContain('zimnej záhrady');
+		// VO cena / Money kód sa na verejnú plochu NIKDY nedostanú
+		const meta = `${doc.getSubject() ?? ''} ${(doc.getKeywords() ?? '').toString()}`;
+		expect(meta).not.toMatch(/veľkoobchodná cena|priceB2B/i);
 	});
 
 	it('generatePonukaPdf(produkt=pergola / NULL) → PDF NESIE orientačnú cenu (honest-degrade zachovaný)', async () => {
@@ -157,13 +173,13 @@ describe('#386 honest-null cena — zimná záhrada bez ceny, pergola s cenou', 
 	});
 });
 
-// DB round-trip: uložený dopyt zimnej záhrady nesie NULOVÚ cenu (cena_druh aj cennik_verzia null) a
-// jeho re-download (regeneratePonukaPdf) reprodukuje PDF BEZ ceny — honest-null prežije celý tok
-// submit → uloženie → re-download (#385 review 🔵 vzor).
-describe('#386 honest-null DB round-trip — dopyt zimnej záhrady bez ceny, re-download bez ceny', () => {
+// DB round-trip (#408): uložený dopyt zimnej záhrady nesie OPEČIATKOVANÚ cenu (cena_druh='cena' +
+// cennik_verzia) a jeho re-download (regeneratePonukaPdf) reprodukuje PDF S orientačnou cenou platnou
+// pri podaní — priced kontrakt prežije celý tok submit → uloženie → re-download (#385/#404 vzor).
+describe('#408 DB round-trip — dopyt zimnej záhrady s cenou, re-download s cenou', () => {
 	beforeEach(() => db.exec('DELETE FROM dopyt'));
 
-	it('insert dopyt zimnej záhrady (honest-null pečiatka) → cena_druh+cennik_verzia null → regen PDF bez ceny', async () => {
+	it('insert dopyt zimnej záhrady (opečiatkovaná cena) → cena_druh=cena + cennik_verzia → regen PDF s cenou', async () => {
 		const cfg = zimnaZahradaPonukaConfig(konfigurujZimnaZahradu(VSTUP));
 		const stamp = opeciatkujCenuPreProdukt(cfg, 'zimna-zahrada');
 		const id = insertDopyt(
@@ -180,14 +196,16 @@ describe('#386 honest-null DB round-trip — dopyt zimnej záhrady bez ceny, re-
 		);
 		const row = getDopyt(id)!;
 		expect(row.produkt).toBe('zimna-zahrada');
-		expect(row.cena_druh).toBeNull();
-		expect(row.cennik_verzia).toBeNull();
+		expect(row.cena_druh).toBe('cena');
+		expect(row.cennik_verzia).not.toBeNull();
 
 		const out = await regeneratePonukaPdf(id);
 		expect(out).not.toBeNull();
 		const doc = await PDFDocument.load(out!.bytes);
+		// re-download reprodukuje orientačnú (MO) cenu; VO/Money kód NIKDY
+		expect(doc.getSubject() ?? '').toContain('Orientačná cena');
 		const meta = `${doc.getSubject() ?? ''} ${(doc.getKeywords() ?? '').toString()}`;
-		expect(meta).not.toMatch(/orientačná cena|veľkoobchodná cena|€/i);
+		expect(meta).not.toMatch(/veľkoobchodná cena|priceB2B/i);
 		expect(doc.getTitle() ?? '').toContain('zimnej záhrady');
 	});
 });
