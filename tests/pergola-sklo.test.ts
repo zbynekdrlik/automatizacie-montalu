@@ -84,6 +84,10 @@ describe('spocitajStrechaSklo — golden OP260282 (Massive, n=8, IZO 4.4.2-8-6 �
 	it('dĺžka tabule = dĺžka hornej hrany krovu 3239,76 + 20 (masív) = 3259,76 mm', () => {
 		expect(r.dlzkaMm).toBe(3259.76);
 	});
+	it('plocha tabule = 685,43 × 3259,76 = 2,23 m²; celková plocha × 7 tabúľ = 15,64 m²', () => {
+		expect(r.plochaTabuleM2).toBe(2.23);
+		expect(r.plochaCelkomM2).toBe(15.64);
+	});
 	it('Money kód = TS00014 (potvrdené mapovanie, #274)', () => {
 		expect(r.moneyKod).toBe('TS00014');
 	});
@@ -152,6 +156,9 @@ describe('spocitajStrechaSklo — Robust vetva + polykarbonát +34 + dĺžka +10
 	it('dĺžka = dĺžka hornej hrany krovu Robust 3269,76 + 10 = 3279,76 mm', () => {
 		// Robust nominál = 3470/cos(6,1°) − 220 = 3269,76; Robust prídavok dĺžky = +10.
 		expect(r.dlzkaMm).toBe(3279.76);
+	});
+	it('celková plocha = 773,6 × 3279,76 × 5 tabúľ = 12,69 m²', () => {
+		expect(r.plochaCelkomM2).toBe(12.69);
 	});
 	it('polykarbonát 16 mm nemá potvrdený Money kód → honest-null', () => {
 		expect(r.moneyKod).toBeNull();

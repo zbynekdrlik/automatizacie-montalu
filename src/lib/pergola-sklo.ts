@@ -5,16 +5,26 @@
 // 16 mm). Stredová výstuha 140×140 do šírky skla NEvstupuje (Dominik to explicitne
 // potvrdil). Počet tabúľ = počet polí medzi krovmi = počet krovov − 1.
 //
-// DĹŽKA tabule je ZÁMERNE honest-null — a od 25.8. je to podložené REÁLNYM kusom:
-// výrobný výkres skla OP260282 (Dominik ho pripol do ch207, msg 1731731, príloha 10504)
-// má tabuľu 685 × 3259 mm, 7 ks. Šírku aj počet vzorce reprodukujú (685,43 → rez 685;
-// 7 polí ✓), ale dĺžku NEreprodukuje ŽIADNE verbatim pravidlo: chat „dĺžka skla = dĺžka
-// krovu + 30/+40" (ch207 1725597–1725599) dáva 3239,76 + 40 = 3279,76 ✗ (Δ +20,76 —
-// zhodou okolností presne dĺžka prítlačnej lišty), call 19.8. „dĺžka hornej hrany + 20
-// (masív)" dáva 3240,93 + 20 = 3260,93 ✗ (Δ +1,93). Hypotéza „nominál + 20 zaokrúhlené
-// nadol" (= 3259) by sedela, ale sú to dve neoverené domnienky naraz → force-fit. Kým
-// Dominik rozpor nerozsekne, dĺžka sa NEPOČÍTA — nikdy sa nehádže neoverený rozmer
-// (rovnaká disciplína ako celý pergola-narez engine).
+// POTVRDENÁ DĹŽKA (Dominik 2.9.2026, discuss.channel_393 msg 1777597): dĺžka strešného
+// skla = „dĺžka hornej hrany" krovu + 10 mm (Robust) / + 20 mm (Massiv), meria sa z hornej
+// hrany. Verbatim: „4 pri robuste + 10 a massiv +20 dlzka … meria sa to z dlžky hornej
+// hrany tieto detaile prosím nerieš nerobíme vyrobný výkres ale navrhový výkres na
+// rezervovanie materialu sklo je osadene na ploche ktora nieje nikde kotovana" — teda ~2 mm
+// drift voči reálnemu rezu sa NErieši (návrhová presnosť na rezerváciu materiálu).
+//
+// Base „dĺžka hornej hrany" = appkin NOMINÁL krovu (`krovDlzkaNominalOverena`) — nominál JE
+// horná hrana so waivnutým ~1,17 mm seating detailom (presne ten „detail", čo Dominik povedal
+// nechať tak). Golden OP260282 (masív): 3239,76 + 20 = 3259,76 → reálny rez skla 3259 mm
+// (príloha 10504), Δ 0,76 mm — v pásme „~2 mm NErieši" (a bližšie než skoršie kandidáty
+// „HH+20"=3260,93 / „krov+40"=3279,76, ktoré reál vyvracal). Config-gate: nominál sa emituje
+// LEN pre overenú konfiguráciu kotvy (samostatne + zadný 110); pri stene/zadnom 140/bez sklonu
+// → dĺžka honest-null (nikdy sa nehádže neoverený rozmer, rovnaká disciplína ako rez krovu).
+//
+// PLOCHA + CELKOVÁ CENA (Palohova požiadavka „aby to tam započítalo aj ceny skiel"): keď je
+// dĺžka známa, plocha = šírka × dĺžka a celkové m² = plocha × počet tabúľ. €/m² (server,
+// `sklo-strecha-cena`) × celkové m² dáva celkovú cenu skiel v karte. Money ODPIS skla sa
+// stále NEROBÍ (ticket #223: až po potvrdení vzorca AJ variácie; karty skiel = #235) — sklo
+// ostáva Money-NEUTRÁLNE.
 //
 // PURE modul — importuje LEN pure moduly (`sklo-strecha`, `pergola-narez`), žiadny
 // server/DB. Strešné sklo je Money-NEUTRÁLNE (display-only): NIKDY nevstupuje do
@@ -22,7 +32,12 @@
 // (vzor `komponentyPergoly`), aby golden `spocitajNarez`/OP260282 ostali bit-identické.
 // Money-safety guard (`tests/pergola-narez-money-safety.test.ts`) drží čistotu.
 import { SKLO_STRECHA_TYPY, skloStrechaMoneyKod } from './sklo-strecha';
-import { svetlostMedziKrovmi, platnyPocetKrovov, type PergolaNarezVstup } from './pergola-narez';
+import {
+	svetlostMedziKrovmi,
+	platnyPocetKrovov,
+	krovDlzkaNominalOverena,
+	type PergolaNarezVstup
+} from './pergola-narez';
 
 /** zaokrúhlenie na 0,01 mm — rovnaká presnosť ako `svetlostMedziKrovmi` (výkres OP260282
  *  udáva 0,01 mm), aby šírka = svetlosť + prídavok neprišla o presnosť. */
@@ -32,6 +47,20 @@ const R2 = (x: number) => Math.round(x * 100) / 100;
 export const SKLO_STRECHA_SIRKA_PRIDAVOK_SKLO = 30;
 /** Prídavok k svetlosti pre šírku strešného skla [mm] — polykarbonát 16 mm (A1, iný vzorec). */
 export const SKLO_STRECHA_SIRKA_PRIDAVOK_POLYKARBONAT = 34;
+
+/** Prídavok k dĺžke hornej hrany krovu pre dĺžku tabule [mm] — ROBUST (Dominik 2.9., msg 1777597). */
+export const SKLO_STRECHA_DLZKA_PRIDAVOK_ROBUST = 10;
+/** Prídavok k dĺžke hornej hrany krovu pre dĺžku tabule [mm] — MASSIVE (Dominik 2.9., msg 1777597). */
+export const SKLO_STRECHA_DLZKA_PRIDAVOK_MASSIVE = 20;
+
+/** Prídavok k dĺžke tabule podľa systému pergoly [mm]: Robust → 10, Massive → 20 (Dominik 2.9.). */
+export function strechaSkloDlzkaPridavok(
+	system: PergolaNarezVstup['system']
+): typeof SKLO_STRECHA_DLZKA_PRIDAVOK_ROBUST | typeof SKLO_STRECHA_DLZKA_PRIDAVOK_MASSIVE {
+	return system === 'Robust'
+		? SKLO_STRECHA_DLZKA_PRIDAVOK_ROBUST
+		: SKLO_STRECHA_DLZKA_PRIDAVOK_MASSIVE;
+}
 
 /** Je daný typ strešného skla polykarbonát (16 mm)? Polykarbonát má INÝ prídavok šírky
  *  (+34 namiesto +30). STADUR 24 mm sa správa ako sklo (+30), nie ako polykarbonát. */
@@ -63,8 +92,13 @@ export interface StrechaSkloVypocet {
 	pocetTabul: number | null;
 	/** šírka tabule [mm] = svetlosť medzi krovmi + prídavok; `null` keď typ/počet krovov chýba */
 	sirkaMm: number | null;
-	/** dĺžka tabule [mm] — VŽDY `null` (vzorec dĺžky nepotvrdený, honest-null) */
+	/** dĺžka tabule [mm] = dĺžka hornej hrany krovu + prídavok (Robust 10 / Massiv 20); `null` keď
+	 *  krov nominál nie je overený (stena / zadný profil ≠ 110 / bez sklonu / sklon nad 9°) */
 	dlzkaMm: number | null;
+	/** plocha jednej tabule [m²] = šírka × dĺžka; `null` keď šírka alebo dĺžka chýba */
+	plochaTabuleM2: number | null;
+	/** celková plocha skiel [m²] = plocha tabule × počet tabúľ; `null` keď plocha/počet chýba */
+	plochaCelkomM2: number | null;
 	/** Money TS kód (cenník IZOS) pre cenu, alebo `null` = žiadny potvrdený kód → „cena neznáma" */
 	moneyKod: string | null;
 	/** krátke plain-slovenské poznámky (bez interných referencií) — honest-null vysvetlenia na obrazovku */
@@ -78,8 +112,9 @@ function jeKatalogovyTyp(nazov: string): boolean {
 
 /** Výpočet strešného skla z rozmerov pergoly + zvoleného typu (#223). Honest-null disciplína:
  *  - bez zvoleného (katalógového) typu → všetko `null` (výzva vybrať typ);
- *  - bez počtu krovov → `pocetTabul`/`sirkaMm` `null` (výzva zadať počet krovov);
- *  - dĺžka tabule VŽDY `null` (vzorec nepotvrdený);
+ *  - bez počtu krovov → `pocetTabul`/`sirkaMm`/`plochaCelkomM2` `null` (výzva zadať počet krovov);
+ *  - dĺžka tabule = dĺžka hornej hrany krovu + prídavok LEN pre overenú konfiguráciu kotvy,
+ *    inak `null` (stena / zadný profil ≠ 110 / bez sklonu / sklon nad 9°);
  *  - bez Money kódu → `moneyKod` `null` (cena nedostupná).
  *  Čistá funkcia — bez vedľajších efektov, bez Money zápisu (Money-neutrálne, display-only). */
 export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
@@ -92,6 +127,8 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 			pocetTabul: null,
 			sirkaMm: null,
 			dlzkaMm: null,
+			plochaTabuleM2: null,
+			plochaCelkomM2: null,
 			moneyKod: null,
 			poznamky: ['Vyber typ strešného skla pre výpočet šírky a ceny.']
 		};
@@ -108,13 +145,36 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 	// krovy do šírky nezmestia (backstop v `svetlostMedziKrovmi`).
 	const svetlost = svetlostMedziKrovmi(v.sirka, n);
 	const sirkaMm = svetlost != null ? R2(svetlost + sirkaPridavok) : null;
+	// Dĺžka tabule = dĺžka hornej hrany krovu (= overený nominál krovu) + prídavok (Robust 10 /
+	// Massiv 20, Dominik 2.9.). `krovDlzkaNominalOverena` je null pri neoverenej kotve / bez
+	// sklonu / nad 9° → dĺžka honest-null. Nezávisí od počtu krovov (je to per-poľová dĺžka).
+	const krovNom = krovDlzkaNominalOverena(v);
+	const dlzkaPridavok = strechaSkloDlzkaPridavok(v.system);
+	const dlzkaMm = krovNom != null ? R2(krovNom + dlzkaPridavok) : null;
+	// Plocha [m²]: jednej tabule = šírka × dĺžka; celková = plocha tabule × počet tabúľ. null,
+	// keď ktorýkoľvek rozmer/počet chýba (honest-null — celková cena skiel sa potom nespočíta).
+	const plochaTabuleM2 =
+		sirkaMm != null && dlzkaMm != null ? R2((sirkaMm * dlzkaMm) / 1_000_000) : null;
+	const plochaCelkomM2 =
+		sirkaMm != null && dlzkaMm != null && pocetTabul != null
+			? R2((sirkaMm * dlzkaMm * pocetTabul) / 1_000_000)
+			: null;
 
 	const poznamky: string[] = [];
 	if (n == null) {
 		poznamky.push('Zadaj počet krovov, aby sa spočítala šírka tabule a počet tabúľ.');
 	}
-	// Dĺžka tabule ostáva honest-null vždy (vzorec dĺžky zatiaľ nepotvrdený).
-	poznamky.push('Dĺžka tabule strešného skla zatiaľ čaká na vzorec od Dominika — nepočíta sa.');
+	if (dlzkaMm != null) {
+		poznamky.push(
+			`Dĺžka tabule = dĺžka hornej hrany krovu + ${dlzkaPridavok} mm (návrhový rozmer na ` +
+				'rezerváciu materiálu; ~2 mm odchýlka oproti výrobnému rezu).'
+		);
+	} else {
+		poznamky.push(
+			'Dĺžka tabule sa počíta zo sklonenej dĺžky krovu — zadaj sklon strechy (do 9°) pri ' +
+				'samostatne stojacej pergole so zadným profilom 110. Inak sa dĺžka nepočíta.'
+		);
+	}
 	if (moneyKod == null) {
 		poznamky.push('Karta v Money zatiaľ pre tento typ skla neexistuje — cena nedostupná.');
 	}
@@ -125,7 +185,9 @@ export function spocitajStrechaSklo(v: PergolaNarezVstup): StrechaSkloVypocet {
 		sirkaPridavok,
 		pocetTabul,
 		sirkaMm,
-		dlzkaMm: null,
+		dlzkaMm,
+		plochaTabuleM2,
+		plochaCelkomM2,
 		moneyKod,
 		poznamky
 	};
