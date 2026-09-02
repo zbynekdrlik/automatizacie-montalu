@@ -548,6 +548,37 @@ test('#161 krov cut-list (OP260282): počet krovov 8 → svetlosť 655,43, prie�
 	expect(consoleMsgs).toEqual([]);
 });
 
+// --- #415 prítlačná lišta (Robust): prídavok potvrdený, odpočet krovu ostáva samostatne na potvrdenie ---
+test('#415 Robust prítlačná lišta: poznámka hovorí „prídavok … potvrdený", odpočet krovu ostáva „na potvrdenie" samostatne', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Robust');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.locator('#uchytenie').selectOption('samostatne');
+	await page.locator('#vyskaZadna').fill('2790');
+	await page.locator('#pocetZadnychNoh').fill('4');
+	await page.locator('#hornyProfilZadnej').selectOption('110');
+	await page.locator('#sklonStrechy').fill('6.1');
+	await page.locator('#pocetKrovov').fill('8');
+
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// prídavok (+30) je teraz opísaný ako potvrdený — appka už nesmie tvrdiť, že čaká
+	const pritlacna = page.getByTestId('polozka-18006');
+	await expect(pritlacna).toContainText('priamo potvrdený');
+	// základná dĺžka krovu (odpočet) je SAMOSTATNÁ, stále neoverená hodnota — výhrada ostáva
+	await expect(pritlacna).toContainText('na potvrdenie');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 // --- #223 strešné sklo: výber typu → karta (šírka = svetlosť + 30/34, honest-null dĺžka) ------
 test('#223 strešné sklo (OP260282): typ IZO 4.4.2-8-6 číre, n=8 → 7 tabúľ, šírka 685,43, dĺžka „—", kód TS00014', async ({
 	page
