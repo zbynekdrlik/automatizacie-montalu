@@ -18,6 +18,7 @@ import {
 	CENNIK_VERZIA_ZZ
 } from '../src/lib/server/konfigurator-zimna-zahrada-cena';
 import { cenaZCfgProdukt, opeciatkujCenuPreProdukt } from '../src/lib/server/dopyt-cena-stamp';
+import { parseZzCenaVstup } from '../src/lib/server/konfigurator-zimna-zahrada-vstup';
 import { maCenovyZdroj } from '../src/lib/konfigurator-produkty';
 import { ZZ_ZASKLENIA } from '../src/lib/konfigurator-zimna-zahrada';
 
@@ -135,6 +136,67 @@ describe('hladina MO/VO', () => {
 		if (mo.druh === 'cena' && vo.druh === 'cena') {
 			expect(vo.hladina).toBe('VO');
 			expect(vo.bezDph).toBeLessThan(mo.bezDph);
+		}
+	});
+
+	it('mimo katalógu + VO → individuálna ponuka nesie model + hladinu VO + label (naCenuZz VO vetva)', () => {
+		const c = cenaPreZz({ hlbkaMm: 4000, sirkaMm: 8000, model: 'MASSIVE' }, 'VO');
+		expect(c.druh).toBe('individualna-ponuka');
+		expect(c.model).toBe('MASSIVE');
+		if (c.druh === 'individualna-ponuka') {
+			expect(c.hladina).toBe('VO');
+			expect(c.hladinaLabel).toBeTruthy();
+			expect(c.dovod).toMatch(/individuálna/i);
+		}
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// Parser vstupu (`vypocet` akcia) — rozmery mimo rozmedzia → error; whitelist zasklenia/modelu
+// --------------------------------------------------------------------------- //
+describe('parseZzCenaVstup', () => {
+	function fd(o: Record<string, string>): FormData {
+		const f = new FormData();
+		for (const [k, v] of Object.entries(o)) f.append(k, v);
+		return f;
+	}
+
+	it('platný vstup (mm, medzery v čísle sa ignorujú) → typovaný ZzCenaVstup', () => {
+		// parser berie MM (skryté inputy stránky POSTujú mm); „4 000" = 4000 mm (medzery = oddeľovač tisícok)
+		const r = parseZzCenaVstup(
+			fd({ hlbka: '4 000', sirka: '3000', zasklenie: 'Polykarbonát', model: 'MASSIVE' })
+		);
+		expect('vstup' in r).toBe(true);
+		if ('vstup' in r) {
+			expect(r.vstup.hlbkaMm).toBe(4000);
+			expect(r.vstup.sirkaMm).toBe(3000);
+			expect(r.vstup.zasklenie).toBe('Polykarbonát');
+			expect(r.vstup.model).toBe('MASSIVE');
+		}
+	});
+
+	it('hĺbka mimo rozmedzia → error', () => {
+		expect('error' in parseZzCenaVstup(fd({ hlbka: '1000', sirka: '3000' }))).toBe(true);
+		expect('error' in parseZzCenaVstup(fd({ hlbka: '9000', sirka: '3000' }))).toBe(true);
+	});
+
+	it('šírka mimo rozmedzia → error', () => {
+		expect('error' in parseZzCenaVstup(fd({ hlbka: '4000', sirka: '1000' }))).toBe(true);
+		expect('error' in parseZzCenaVstup(fd({ hlbka: '4000', sirka: '9000' }))).toBe(true);
+	});
+
+	it('nečíselný rozmer → error', () => {
+		expect('error' in parseZzCenaVstup(fd({ hlbka: 'abc', sirka: '3000' }))).toBe(true);
+	});
+
+	it('neznáme zasklenie/model → whitelist default (Izolačné sklo / ROBUST)', () => {
+		const r = parseZzCenaVstup(
+			fd({ hlbka: '4000', sirka: '3000', zasklenie: 'xxx', model: 'yyy' })
+		);
+		expect('vstup' in r).toBe(true);
+		if ('vstup' in r) {
+			expect(r.vstup.zasklenie).toBe('Izolačné sklo');
+			expect(r.vstup.model).toBe('ROBUST');
 		}
 	});
 });

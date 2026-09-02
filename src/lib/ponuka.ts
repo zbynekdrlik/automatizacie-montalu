@@ -196,6 +196,15 @@ export const DISCLAIMER_BEZ_CENY =
 	'Táto špecifikácia je nezáväzná. Presnú cenu pripravíme individuálne po obhliadke miesta ' +
 	'stavby. Uvedené rozmery a prvky vychádzajú z vašej konfigurácie a môžu sa po zameraní upresniť.';
 
+/** #408: disclaimer pre zimnú záhradu — orientačná cena je pre ZÁKLADNÉ vyhotovenie konštrukcie
+ *  (interim matica montalu.sk NEpremieta model ROBUST/MASSIVE ani zasklenie stien do ceny, tie sa
+ *  upresnia po obhliadke). Nesmie navodiť, že cena zodpovedá presne zvolenému modelu/zaskleniu stien. */
+export const DISCLAIMER_ZZ =
+	'Uvedená cena je ORIENTAČNÁ (informatívna) pre ZÁKLADNÉ vyhotovenie konštrukcie, nie záväzná ' +
+	'cenová ponuka. Presné vyhotovenie (model, zasklenie stien) a záväznú cenu pripravíme po ' +
+	'obhliadke miesta stavby. Uvedené rozmery a prvky vychádzajú z vašej konfigurácie a môžu sa ' +
+	'po zameraní upresniť.';
+
 /** Neprázdne kontaktné riadky firmy (na vykreslenie do PDF). Param kvôli testovateľnosti
  *  (default = `FIRMA`); prázdne polia sa vynechajú, aby PDF neukázalo vymyslené dáta. */
 export function firmaRiadky(

@@ -257,6 +257,14 @@
 								<div class="zz-cena-bezdph" data-testid="zz-cena-bezdph">
 									{eur(c.bezDph)} bez DPH
 								</div>
+								<!-- montalu zaokrúhľuje rozmer NAHOR na katalóg — čestne to doplň, keď sa líši od zadaného -->
+								{#if Math.round(c.sirkaGridM * 1000) !== sirka || Math.round(c.hlbkaGridM * 1000) !== hlbka}
+									<div class="zz-cena-grid" data-testid="zz-cena-grid">
+										Cena platí pre najbližší katalógový rozmer {cislaCiarka(c.sirkaGridM)} × {cislaCiarka(
+											c.hlbkaGridM
+										)} m.
+									</div>
+								{/if}
 							{:else}
 								<span class="zz-cena-label">Cena na vyžiadanie</span>
 								{#if c.hladinaLabel}
@@ -631,6 +639,12 @@
 		color: rgba(255, 255, 255, 0.66);
 		font-size: 14px;
 		margin-top: 4px;
+	}
+	.zz-cena-grid {
+		color: rgba(255, 255, 255, 0.55);
+		font-size: 12px;
+		line-height: 1.4;
+		margin-top: 8px;
 	}
 	.zz-cena-dovod {
 		color: rgba(255, 255, 255, 0.72);
