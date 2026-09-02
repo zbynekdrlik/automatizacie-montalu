@@ -431,17 +431,19 @@
 	<div class="card">
 		<div class="sec">Rozmery konštrukcie</div>
 		<div class="g">
-			<div><span>Šírka</span><b>{fmt(r.S)} mm</b></div>
+			<div><span>Šírka</span><b class="mono">{fmt(r.S)} mm</b></div>
 			{#if vstup.tvar === 'rovny'}
-				<div><span>Výška</span><b>{fmt(r.V1)} mm</b></div>
+				<div><span>Výška</span><b class="mono">{fmt(r.V1)} mm</b></div>
 			{:else}
-				<div><span>Výška vľavo</span><b>{fmt(r.V1)} mm</b></div>
-				<div><span>Výška vpravo</span><b>{fmt(r.V2)} mm</b></div>
-				<div><span>Sklon</span><b data-testid="uhol-sklonu">{fmt(r.alfa)}°</b></div>
-				<div><span>Šikmá hrana</span><b>{fmt(r.sikmaCelkom)} mm</b></div>
-				<div><span>Uhly konštrukcie</span><b>{fmt(r.uholOstry)}° / {fmt(r.uholTupy)}°</b></div>
+				<div><span>Výška vľavo</span><b class="mono">{fmt(r.V1)} mm</b></div>
+				<div><span>Výška vpravo</span><b class="mono">{fmt(r.V2)} mm</b></div>
+				<div><span>Sklon</span><b class="mono" data-testid="uhol-sklonu">{fmt(r.alfa)}°</b></div>
+				<div><span>Šikmá hrana</span><b class="mono">{fmt(r.sikmaCelkom)} mm</b></div>
+				<div>
+					<span>Uhly konštrukcie</span><b class="mono">{fmt(r.uholOstry)}° / {fmt(r.uholTupy)}°</b>
+				</div>
 			{/if}
-			<div><span>Plocha</span><b>{String(r.m2).replace('.', ',')} m²</b></div>
+			<div><span>Plocha</span><b class="mono">{String(r.m2).replace('.', ',')} m²</b></div>
 		</div>
 		{#if vstup.delenie === 'posuv'}
 			<p class="sub" data-testid="posuv-info-vykres" style="margin-top:10px">

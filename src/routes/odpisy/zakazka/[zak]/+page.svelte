@@ -26,7 +26,9 @@
 	</p>
 	<div class="g">
 		<div><span>Zákazník</span><b>{p.zakaznik}</b></div>
-		<div><span>Odpisy</span><b>{p.odpisy.length} {odpisSlovo(p.odpisy.length)}</b></div>
+		<div>
+			<span>Odpisy</span><b class="mono">{p.odpisy.length} {odpisSlovo(p.odpisy.length)}</b>
+		</div>
 	</div>
 	<p class="sub" data-testid="zakazka-scope">
 		{#if p.scope === 'live'}

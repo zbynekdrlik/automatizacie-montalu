@@ -194,9 +194,9 @@
 	<div class="card">
 		<div class="sec">Otvor</div>
 		<div class="g">
-			<div><span>Šírka</span><b>{fmtM(vstup.otvorS)} mm</b></div>
-			<div><span>Výška</span><b>{fmtM(vstup.otvorV)} mm</b></div>
-			<div><span>Počet krídel posuvu</span><b>{r.N}</b></div>
+			<div><span>Šírka</span><b class="mono">{fmtM(vstup.otvorS)} mm</b></div>
+			<div><span>Výška</span><b class="mono">{fmtM(vstup.otvorV)} mm</b></div>
+			<div><span>Počet krídel posuvu</span><b class="mono">{r.N}</b></div>
 		</div>
 	</div>
 
@@ -205,10 +205,11 @@
 			Sieťka — {isB2B ? 'do nárezáka, do Money odpisu nejde' : 'do Money odpisu'}
 		</div>
 		<div class="g">
-			<div><span>Rámový profil</span><b data-testid="ram-profil">2 ks + 2 ks</b></div>
-			<div><span>Nosový profil</span><b data-testid="nos-profil">1 ks</b></div>
+			<div><span>Rámový profil</span><b class="mono" data-testid="ram-profil">2 ks + 2 ks</b></div>
+			<div><span>Nosový profil</span><b class="mono" data-testid="nos-profil">1 ks</b></div>
 			<div>
 				<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b
+					class="mono"
 					data-testid="sietka-samostatna-rozmer"
 					>{fmtM(r.rozmerSietoviny.sirka)} × {fmtM(r.rozmerSietoviny.vyska)} mm</b
 				>

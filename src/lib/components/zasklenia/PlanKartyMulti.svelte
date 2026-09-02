@@ -192,7 +192,8 @@
 	<div class="sec">Odpis (do Money) — spoločný za celú zákazku</div>
 	{#each m.odpis.filter((o) => o.metre > 0) as o (o.kod)}
 		<div class="row">
-			<span><span class="mono">{o.kod}</span> · {o.nazov}</span><b>{fmtM(o.metre)} m</b>
+			<span><span class="mono">{o.kod}</span> · {o.nazov}</span><b class="mono">{fmtM(o.metre)} m</b
+			>
 		</div>
 	{/each}
 </div>
@@ -202,7 +203,9 @@
 		<div class="sec">Kovanie a tesnenia (do Money)</div>
 		{#each kovanie as k (k.kod)}
 			<div class="row">
-				<span>{k.kod} · {k.nazov}</span><b>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b>
+				<span>{k.kod} · {k.nazov}</span><b class="mono"
+					>{k.mj === 'ks' ? k.qty : fmtM(k.qty)} {k.mj}</b
+				>
 			</div>
 		{/each}
 	</div>

@@ -219,7 +219,7 @@
 				konštruktérovi.
 			</p>
 			<div data-testid="krov-ulozenie">
-				<div class="row"><span>Sklon strechy</span><b>{krov.sklonStupne}°</b></div>
+				<div class="row"><span>Sklon strechy</span><b class="mono">{krov.sklonStupne}°</b></div>
 				<div class="row">
 					<span>Rovina uloženia</span>
 					<b
@@ -229,15 +229,15 @@
 					>
 				</div>
 				<div class="row">
-					<span>uhol2 / uhol3 (SE model)</span><b>{krov.uhol2} / {krov.uhol3}°</b>
+					<span>uhol2 / uhol3 (SE model)</span><b class="mono">{krov.uhol2} / {krov.uhol3}°</b>
 				</div>
 				<div class="row">
 					<span>Odvesna c = 29 mm → ps = ls</span>
-					<b data-testid="krov-ps">{krov.ps} mm</b>
+					<b class="mono" data-testid="krov-ps">{krov.ps} mm</b>
 				</div>
 				<div class="row">
 					<span>Odvesna cc = 37,28 mm → lv = pv</span>
-					<b data-testid="krov-lv">{krov.lv} mm</b>
+					<b class="mono" data-testid="krov-lv">{krov.lv} mm</b>
 				</div>
 			</div>
 		{:else}
@@ -357,28 +357,28 @@
 	<div class="sec">Informatívne výpočty</div>
 	<div data-testid="narez-informativne">
 		<div class="row">
-			<span>Predná svetlosť</span><b>{vysledok.informativne.prednaSvetlost} mm</b>
+			<span>Predná svetlosť</span><b class="mono">{vysledok.informativne.prednaSvetlost} mm</b>
 		</div>
 		{#if vysledok.informativne.svetlostBezVystuhy != null}
 			<div class="row" data-testid="info-svetlost-bez-vystuhy">
 				<span>Svetlosť bez výstuhy (výstuha trčí {vysledok.informativne.vystuhaTrcanieMm} mm)</span>
-				<b>{vysledok.informativne.svetlostBezVystuhy} mm</b>
+				<b class="mono">{vysledok.informativne.svetlostBezVystuhy} mm</b>
 			</div>
 		{/if}
 		{#if vysledok.informativne.vystuhaProfil}
 			<div class="row" data-testid="info-vystuha-profil">
-				<span>Profil výstuhy</span><b>{vysledok.informativne.vystuhaProfil}</b>
+				<span>Profil výstuhy</span><b class="mono">{vysledok.informativne.vystuhaProfil}</b>
 			</div>
 		{/if}
 		<div class="row">
 			<span
 				>Predná noha (svetlosť + {vysledok.informativne.prednaNohaDlzka -
 					vysledok.informativne.prednaSvetlost})</span
-			><b>{vysledok.informativne.prednaNohaDlzka} mm</b>
+			><b class="mono">{vysledok.informativne.prednaNohaDlzka} mm</b>
 		</div>
 		<div class="row">
 			<span>Zadná noha</span>
-			<b
+			<b class="mono"
 				>{vysledok.informativne.zadnaNohaDlzka === null
 					? '— (na stenu)'
 					: `${vysledok.informativne.zadnaNohaDlzka} mm`}</b
@@ -386,7 +386,7 @@
 		</div>
 		<div class="row">
 			<span>Rozostup predných nôh (dopočítaný)</span>
-			<b
+			<b class="mono"
 				>{vysledok.informativne.rozostupPrednychNoh === null
 					? '—'
 					: `${vysledok.informativne.rozostupPrednychNoh} mm`}</b
@@ -394,22 +394,22 @@
 		</div>
 		{#if vysledok.informativne.pocetKrovov != null}
 			<div class="row" data-testid="info-pocet-krovov">
-				<span>Počet krovov (zadaný)</span><b>{vysledok.informativne.pocetKrovov}</b>
+				<span>Počet krovov (zadaný)</span><b class="mono">{vysledok.informativne.pocetKrovov}</b>
 			</div>
 			<div class="row" data-testid="info-svetlost-krovov">
 				<span>Svetlosť medzi krovmi</span>
-				<b>{mmVal(vysledok.informativne.svetlostMedziKrovmi)}</b>
+				<b class="mono">{mmVal(vysledok.informativne.svetlostMedziKrovmi)}</b>
 			</div>
 		{:else}
 			<div class="row">
-				<span>Počet priečok (max rozostup {MAX_ROZOSTUP_PRIECOK} mm)</span><b
+				<span>Počet priečok (max rozostup {MAX_ROZOSTUP_PRIECOK} mm)</span><b class="mono"
 					>{vysledok.informativne.pocetPriecok}</b
 				>
 			</div>
 		{/if}
 		<div class="row">
 			<span>Výstuha medzi nohami (šírka − 280)</span>
-			<b data-testid="vystuha-rez">{vysledok.informativne.vystuhaRezMm} mm</b>
+			<b class="mono" data-testid="vystuha-rez">{vysledok.informativne.vystuhaRezMm} mm</b>
 		</div>
 	</div>
 	<p class="sub">
@@ -430,13 +430,13 @@
 			</div>
 			<div class="row">
 				<span>Počet tabúľ (polí medzi krovmi)</span>
-				<b data-testid="strecha-sklo-pocet"
+				<b class="mono" data-testid="strecha-sklo-pocet"
 					>{strechaSklo.pocetTabul != null ? strechaSklo.pocetTabul : '—'}</b
 				>
 			</div>
 			<div class="row">
 				<span>Šírka tabule (svetlosť + {strechaSklo.sirkaPridavok ?? '—'})</span>
-				<b data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
+				<b class="mono" data-testid="strecha-sklo-sirka">{mmVal(strechaSklo.sirkaMm)}</b>
 			</div>
 			<div class="row">
 				<span>Dĺžka tabule</span>
@@ -444,12 +444,12 @@
 			</div>
 			<div class="row">
 				<span>Money kód (cenník)</span>
-				<b data-testid="strecha-sklo-kod">{strechaSklo.moneyKod ?? '—'}</b>
+				<b class="mono" data-testid="strecha-sklo-kod">{strechaSklo.moneyKod ?? '—'}</b>
 			</div>
 			{#if strechaSkloCena}
 				<div class="row">
 					<span>Cena skla</span>
-					<b data-testid="strecha-sklo-cena"
+					<b class="mono" data-testid="strecha-sklo-cena"
 						>{strechaSkloCena.eurM2 != null
 							? `${String(strechaSkloCena.eurM2).replace('.', ',')} ${strechaSkloCena.mena}/m²`
 							: 'cena nedostupná'}</b
@@ -481,7 +481,7 @@
 			{/if}
 			<div class="row">
 				<span>ZVOD — frézovanie SH</span>
-				<b
+				<b class="mono"
 					>{vstup.zvodFrezovat && vstup.zvodFrezovanieSHmm != null
 						? `${vstup.zvodFrezovanieSHmm} mm`
 						: 'nefrézovať'}</b
