@@ -16,6 +16,7 @@ process.env.CENY_SNAPSHOT_PATH = path.join(tmpRoot, 'neexistuje.json');
 
 const { db } = await import('../src/lib/server/db');
 const { setOdooTransport } = await import('../src/lib/server/odoo-rpc');
+const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
 const { buildZakazkaNote, buildZakazkaNoteHtml, pushZakazkaToOdoo, queueZakazkaPush } =
 	await import('../src/lib/server/odoo-zakazka');
 const { zakazkaPrehlad } = await import('../src/lib/server/zakazka-ceny');
@@ -326,5 +327,47 @@ describe('Money-neutralita', () => {
 		expect(src).not.toMatch(/writeOdpis\s*\(/); // žiadne VOLANIE writeOdpis
 		expect(src).not.toMatch(/fs\.(write|append|mkdir|rename|open)/);
 		expect(src).not.toMatch(/process\.env\.MONEY_LIVE|isLive\s*\(/); // žiadny prístup k MONEY_LIVE
+	});
+});
+
+// #5824 review W2: zakazka push na JSON-2 backende — leak kontrakt (mt_note/comment/partner_ids=[]/
+// žiadny email_from) na go-live wire, nielen na XML-RPC.
+describe('#5824 review W2 — zakazka push na json2 backende', () => {
+	it('posted → message_post JSON telo: mt_note/comment/partner_ids=[], žiadny email_from leak', async () => {
+		enableOdoo();
+		vi.stubEnv('ODOO_URL', 'https://json2.test');
+		vi.stubEnv('ODOO_API_KEY', 'k');
+		seedOdpis({
+			zak: 'ZAKPOSTJ',
+			op: '260440',
+			zakaznik: 'ACME',
+			polozky: [{ kod: 'K1', nazov: 'Profil', qty: 2 }]
+		});
+		let searchBody: Record<string, unknown> = {};
+		let postedBody: Record<string, unknown> = {};
+		setJson2Transport(async (url, bodyJson) => {
+			if (url.endsWith('/json/2/sale.order/search')) {
+				searchBody = JSON.parse(bodyJson);
+				return { status: 200, text: '[53052]' };
+			}
+			if (url.endsWith('/json/2/sale.order/message_post')) {
+				postedBody = JSON.parse(bodyJson);
+				return { status: 200, text: 'true' };
+			}
+			throw new Error('unexpected json2 url ' + url);
+		});
+		try {
+			expect(await pushZakazkaToOdoo('ZAKPOSTJ', '260440')).toBe('posted');
+			expect(JSON.stringify(searchBody)).toContain('OP260440'); // normOp match
+			expect(postedBody.ids).toEqual([53052]); // postnuté na nájdený sale.order
+			expect(postedBody.subtype_xmlid).toBe('mail.mt_note'); // interné, zákazník to nevidí
+			expect(postedBody.message_type).toBe('comment');
+			expect(postedBody.partner_ids).toEqual([]); // PRÁZDNE — žiadny follower/notifikácia
+			// NEGATÍVNY leak kontrakt na json2 wire
+			expect(JSON.stringify(postedBody)).not.toContain('email_from');
+			expect(JSON.stringify(postedBody)).not.toContain('subtype_id');
+		} finally {
+			setJson2Transport(null);
+		}
 	});
 });

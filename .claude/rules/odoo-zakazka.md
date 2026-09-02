@@ -9,6 +9,11 @@ paths:
 
 # Interný zoznam materiálu zákazky → Odoo `sale.order` log-note (#340)
 
+> **#5824 — /json/2 seam:** RPC ide cez `OdooBackend` (`odoo-backend.ts`) — json2 (`ODOO_URL`+
+> `ODOO_API_KEY`) prednostne, inak XML-RPC fallback (`ODOO_LEAD_*`, `odoo-rpc.ts` nezmenené). Leak
+> kontrakt (`mt_note`/`comment`/`partner_ids=[]`/žiadny `email_from`) je testovaný na OBOCH wire
+> (XML-RPC aj json2). XML-RPC odstránenie = go-live follow-up #5891.
+
 ## Odoo mapovanie (overené na PROD, read-only handover účtom)
 
 - **Zákazky žijú v `sale.order`** (~22 tis.). Potvrdená objednávka má `name` = číslo

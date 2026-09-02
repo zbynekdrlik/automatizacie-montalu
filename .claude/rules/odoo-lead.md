@@ -17,6 +17,12 @@ Credentials LEN z runtime env (`ODOO_LEAD_URL/DB/LOGIN/API_KEY`, na VPS
 (dopyt ostáva pending na neskorší retry). Stav zrkadlenia = stĺpce
 `odoo_lead_id`/`odoo_attempts`/`odoo_last_error` na `dopyt` (migrácia v26).
 
+**#5824 — /json/2 seam:** RPC transport ide cez `OdooBackend` seam (`odoo-backend.ts`): json2
+(`/json/2` bearer, `ODOO_URL`+`ODOO_API_KEY`) prednostne, inak XML-RPC fallback (`ODOO_LEAD_*`,
+`odoo-rpc.ts` NEZMENENÉ). Kontrola „je feature zapnutá" = `odooBackendConfigured()` (ktorýkoľvek
+backend). Live appka má dnes len `ODOO_LEAD_*` → ostáva na XML-RPC, kým sidecar nedodá nový env.
+Odstránenie XML-RPC fallbacku = go-live follow-up #5891.
+
 ## Runtime env MUSÍ byť aj v compose `environment:` whiteliste (#278 reopened)
 
 `.env` na VPS NESTAČÍ. Docker Compose neforwarduje hostiteľské env automaticky —

@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import { insertDopyt, getDopytForLead, countDopyty } from '../src/lib/server/dopyt-store';
+import { setJson2Transport } from '../src/lib/server/odoo-json2';
 import {
 	buildLeadPayload,
 	submitDopytLead,
@@ -373,5 +374,42 @@ describe('retryPendingLeads — sweep zotaví dopyt po výpadku (vrátane regene
 		_setLeadTransport(mock.transport);
 		await retryPendingLeads();
 		expect(mock.calls.length).toBe(0);
+	});
+});
+
+// #5824 review W2: lead flow (crm.lead + ir.attachment) na JSON-2 backende — go-live wire.
+describe('#5824 review W2 — lead flow na json2 backende', () => {
+	beforeEach(() => {
+		process.env.ODOO_URL = 'https://json2.test';
+		process.env.ODOO_API_KEY = 'k';
+	});
+	afterEach(() => {
+		delete process.env.ODOO_URL;
+		delete process.env.ODOO_API_KEY;
+		setJson2Transport(null);
+	});
+
+	it("'created' cez /json/2: crm.lead + ir.attachment, žiadny authenticate", async () => {
+		const urls: string[] = [];
+		setJson2Transport(async (url) => {
+			urls.push(url);
+			return { status: 200, text: '77' };
+		});
+		const id = vlozDopyt();
+		const r = await submitDopytLead(id, FAKE_PDF_B64);
+		expect(r).toBe('created');
+		expect(urls).toContain('https://json2.test/json/2/crm.lead/create');
+		expect(urls).toContain('https://json2.test/json/2/ir.attachment/create');
+		expect(urls.every((u) => !u.includes('/json/2/common') && !u.includes('/xmlrpc/'))).toBe(true);
+	});
+
+	it("json2 5xx → 'failed' (never-throw kontrakt, dopyt ostáva na retry)", async () => {
+		setJson2Transport(async () => ({
+			status: 500,
+			text: '{"name":"odoo.exceptions.UserError","message":"boom"}'
+		}));
+		const id = vlozDopyt();
+		const r = await submitDopytLead(id, FAKE_PDF_B64);
+		expect(r).toBe('failed');
 	});
 });

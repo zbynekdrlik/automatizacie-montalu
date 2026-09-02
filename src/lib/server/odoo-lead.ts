@@ -16,6 +16,10 @@
 // viď dizajn komentár #278). Encoder pokrýva int/string/bool/struct/array; decoder skalár
 // (int uid/id) + fault — presne to, čo reálne konzumujeme (authenticate → uid, create → id).
 //
+// #5824: RPC transport ide cez `OdooBackend` seam (`odoo-backend.ts`) — json2 (`ODOO_URL`+
+// `ODOO_API_KEY`) prednostne, inak XML-RPC fallback (nižšie popísaný). XML-RPC odstránenie po
+// nasadení json2 env = go-live follow-up #5891.
+//
 // CREDENTIALS: LEN runtime env (`ODOO_LEAD_URL`/`ODOO_LEAD_DB`/`ODOO_LEAD_LOGIN`/
 // `ODOO_LEAD_API_KEY`), NIKDY v gite, žiadny default s tajomstvom — chýba ktorákoľvek ⇒ vypnuté.
 //

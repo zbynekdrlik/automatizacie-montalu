@@ -1,5 +1,9 @@
 // Zdieľaný minimalistický XML-RPC klient pre Montalu Odoo (`erp.montalu.cloud`).
 //
+// #5824: toto je teraz XML-RPC FALLBACK — hlavná cesta je `/json/2` (`odoo-json2.ts`) cez
+// `OdooBackend` seam (`odoo-backend.ts`). Ponechané NEZMENENÉ počas aj-aj cutoveru; odstránenie po
+// nasadení json2 env = go-live follow-up #5891.
+//
 // Extrahované z `odoo-lead.ts` (#340), aby ho zdieľali OBE Odoo integrácie:
 //   • `odoo-lead.ts`  — verejný dopyt → `crm.lead` (#278)
 //   • `odoo-zakazka.ts` — interný zoznam materiálu zákazky → `sale.order` log-note (#340)

@@ -145,3 +145,38 @@ describe('#5824 default transport — Authorization: bearer', () => {
 		}
 	});
 });
+
+describe('#5824 review W1 — C0 control-char scrub (#278 poison-pill parita)', () => {
+	it('NUL/C0 znaky v string hodnotách tela sa vyčistia PRED odoslaním (tab ostáva)', async () => {
+		const calls = mockTransport({ status: 200, text: '1' });
+		const nul = String.fromCharCode(0);
+		const bel = String.fromCharCode(7);
+		const tab = String.fromCharCode(9);
+		await odooJson2(CFG, 'crm.lead', 'create', {
+			vals_list: [{ name: `J${nul}a${bel}n`, email_from: 'a@b', keep: `x${tab}y` }]
+		});
+		expect(calls[0]!.body).toEqual({
+			vals_list: [{ name: 'Jan', email_from: 'a@b', keep: `x${tab}y` }]
+		});
+	});
+});
+
+describe('#5824 review S1 — error/parse robustnosť', () => {
+	it('prázdny Odoo message → fallback na debug', async () => {
+		mockTransport({
+			status: 500,
+			text: JSON.stringify({
+				name: 'odoo.exceptions.ValidationError',
+				message: '',
+				debug: 'real trace here'
+			})
+		});
+		await expect(odooJson2(CFG, 'crm.lead', 'create', {})).rejects.toThrow(/real trace here/);
+	});
+	it('200 s ne-JSON telom (proxy HTML) → OdooJson2Error, nie holý SyntaxError', async () => {
+		mockTransport({ status: 200, text: '<html>502 bad gateway</html>' });
+		const e = await odooJson2(CFG, 'x', 'y', {}).catch((err) => err);
+		expect(e).toBeInstanceOf(OdooJson2Error);
+		expect(String(e)).toMatch(/neplatný JSON/);
+	});
+});

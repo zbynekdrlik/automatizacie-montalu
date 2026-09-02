@@ -17,11 +17,14 @@ import {
 } from './odoo-rpc';
 import { json2Config, odooJson2, OdooJson2Error, type Json2Config } from './odoo-json2';
 
+/** Transport-neutrálny alias — seam sa neviaže na legacy XML-RPC názov (#5824 review S3). */
+export type OdooValue = XmlRpcValue;
+
 /** Operácie, ktoré obe integrácie reálne konzumujú (create / search / message_post). */
 export interface OdooBackend {
-	create(model: string, values: Record<string, XmlRpcValue>): Promise<number>;
-	search(model: string, domain: XmlRpcValue[], limit: number): Promise<number[]>;
-	messagePost(model: string, id: number, kwargs: Record<string, XmlRpcValue>): Promise<void>;
+	create(model: string, values: Record<string, OdooValue>): Promise<number>;
+	search(model: string, domain: OdooValue[], limit: number): Promise<number[]>;
+	messagePost(model: string, id: number, kwargs: Record<string, OdooValue>): Promise<void>;
 }
 
 const asIntArray = (res: unknown): number[] =>
@@ -38,15 +41,15 @@ class XmlRpcBackend implements OdooBackend {
 		if (this.uid === null) this.uid = await authenticate(this.cfg);
 		return this.uid;
 	}
-	async create(model: string, values: Record<string, XmlRpcValue>): Promise<number> {
+	async create(model: string, values: Record<string, OdooValue>): Promise<number> {
 		return createRecord(this.cfg, await this.ensureUid(), model, values);
 	}
-	async search(model: string, domain: XmlRpcValue[], limit: number): Promise<number[]> {
+	async search(model: string, domain: OdooValue[], limit: number): Promise<number[]> {
 		return asIntArray(
 			await executeKw(this.cfg, await this.ensureUid(), model, 'search', [domain], { limit })
 		);
 	}
-	async messagePost(model: string, id: number, kwargs: Record<string, XmlRpcValue>): Promise<void> {
+	async messagePost(model: string, id: number, kwargs: Record<string, OdooValue>): Promise<void> {
 		await executeKw(this.cfg, await this.ensureUid(), model, 'message_post', [[id]], kwargs);
 	}
 }
@@ -54,16 +57,22 @@ class XmlRpcBackend implements OdooBackend {
 // ---- JSON-2 backend (bearer, žiadny uid) ---------------------------------------------
 /** Vytiahne id z návratu `create` — json2 môže vrátiť skalár, `[id]` alebo `{id}`. */
 function extractId(res: unknown): number | null {
-	if (typeof res === 'number') return res;
-	if (Array.isArray(res) && typeof res[0] === 'number') return res[0];
-	if (res && typeof res === 'object' && typeof (res as { id?: unknown }).id === 'number')
-		return (res as { id: number }).id;
-	return null;
+	const n =
+		typeof res === 'number'
+			? res
+			: Array.isArray(res) && typeof res[0] === 'number'
+				? res[0]
+				: res && typeof res === 'object' && typeof (res as { id?: unknown }).id === 'number'
+					? (res as { id: number }).id
+					: null;
+	// #5824 review S2: rovnaká parita ako createRecord (odoo-rpc.ts) — 0/negatívne NIE je platné id
+	// (inak by sa `0` uložilo cez markLeadCreated a dopyt sa navždy preskočil).
+	return typeof n === 'number' && n > 0 ? n : null;
 }
 
 class Json2Backend implements OdooBackend {
 	constructor(private readonly cfg: Json2Config) {}
-	async create(model: string, values: Record<string, XmlRpcValue>): Promise<number> {
+	async create(model: string, values: Record<string, OdooValue>): Promise<number> {
 		// `create` je @api.model_create_multi → `vals_list` je POLE dictov (jeden záznam).
 		const res = await odooJson2(this.cfg, model, 'create', { vals_list: [values] });
 		const id = extractId(res);
@@ -71,10 +80,10 @@ class Json2Backend implements OdooBackend {
 			throw new OdooJson2Error(`create ${model} nevrátil id (dostal: ${JSON.stringify(res)})`);
 		return id;
 	}
-	async search(model: string, domain: XmlRpcValue[], limit: number): Promise<number[]> {
+	async search(model: string, domain: OdooValue[], limit: number): Promise<number[]> {
 		return asIntArray(await odooJson2(this.cfg, model, 'search', { domain, limit }));
 	}
-	async messagePost(model: string, id: number, kwargs: Record<string, XmlRpcValue>): Promise<void> {
+	async messagePost(model: string, id: number, kwargs: Record<string, OdooValue>): Promise<void> {
 		// instance metóda → záznam ide cez rezervované `ids`; ostatné (body/subtype/…) sú pomenované.
 		await odooJson2(this.cfg, model, 'message_post', { ids: [id], ...kwargs });
 	}

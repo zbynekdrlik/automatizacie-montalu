@@ -93,6 +93,23 @@ export function setJson2Transport(t: Json2Transport | null): void {
  * parsnutú JSON návratovú hodnotu metódy (bez `{result}` obálky). Chyba 4xx/5xx → `OdooJson2Error`
  * s Odoo `name`/`message` z JSON error objektu (fallback na surový text). Prázdna 200 odpoveď → `null`.
  */
+// #5824 review W1 (#278 parita): XML-RPC path strippuje C0 control znaky z KAŽDÉHO stringu na
+// drôte (xmlEscape v encodeValue) — poison-pill obrana. json2 `JSON.stringify` prepustí `\u0000`
+// → psycopg2 „string literal cannot contain NUL" → 500 → lead sa nikdy nezrkadlí. Vyčisti string
+// listy tela (okrem \t\n\r) PRED serializáciou, byte-zhodne s xmlEscape C0 strip.
+function scrubControlChars(v: Json2Value): Json2Value {
+	if (typeof v === 'string')
+		// eslint-disable-next-line no-control-regex
+		return v.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+	if (Array.isArray(v)) return v.map(scrubControlChars);
+	if (v && typeof v === 'object') {
+		const out: { [k: string]: Json2Value } = {};
+		for (const [k, val] of Object.entries(v)) out[k] = scrubControlChars(val);
+		return out;
+	}
+	return v;
+}
+
 export async function odooJson2(
 	cfg: Json2Config,
 	model: string,
@@ -100,15 +117,24 @@ export async function odooJson2(
 	body: Record<string, Json2Value>
 ): Promise<Json2Value> {
 	const url = `${trimSlash(cfg.url)}/json/2/${model}/${method}`;
-	const { status, text } = await transport(url, JSON.stringify(body), cfg.apiKey);
+	const scrubbed = scrubControlChars(body) as Record<string, Json2Value>;
+	const { status, text } = await transport(url, JSON.stringify(scrubbed), cfg.apiKey);
 	if (status >= 400) {
 		let name = 'OdooJson2Error';
 		let msg = text.slice(0, 400);
 		try {
-			const err = JSON.parse(text) as { name?: string; message?: string };
+			const err = JSON.parse(text) as {
+				name?: string;
+				message?: string;
+				debug?: string;
+				arguments?: unknown;
+			};
 			if (err && typeof err === 'object') {
-				name = err.name ?? name;
-				msg = err.message ?? msg;
+				name = err.name || name;
+				// #5824 review S1: Odoo `message` BÝVA PRÁZDNE (skutočný text je v `debug`) → fallback,
+				// inak `odoo_last_error` = „Odoo crm.lead.create 500: " bez info.
+				msg =
+					err.message || err.debug || (err.arguments ? JSON.stringify(err.arguments) : '') || msg;
 			}
 		} catch {
 			// nie JSON — nechaj surový text ako správu
@@ -116,5 +142,13 @@ export async function odooJson2(
 		throw new OdooJson2Error(`Odoo ${model}.${method} ${status}: ${msg}`, name);
 	}
 	if (!text) return null;
-	return JSON.parse(text) as Json2Value;
+	try {
+		return JSON.parse(text) as Json2Value;
+	} catch {
+		// #5824 review S1: 200 s ne-JSON telom (napr. proxy HTML) → obal ako OdooJson2Error,
+		// nie holý SyntaxError (retry vrstva očakáva OdooJson2Error).
+		throw new OdooJson2Error(
+			`Odoo ${model}.${method} 200: neplatný JSON v odpovedi: ${text.slice(0, 200)}`
+		);
+	}
 }

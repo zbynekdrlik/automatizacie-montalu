@@ -144,3 +144,13 @@ describe('#5824 XmlRpcBackend lazy uid', () => {
 		expect(auths).toBe(1); // jedna operačná skupina = jedna authenticate
 	});
 });
+
+describe('#5824 review S2 — extractId parita s createRecord (>0)', () => {
+	it('create vráti 0 alebo záporné → hodí (nie tichý markLeadCreated(0))', async () => {
+		setJson2Env();
+		mockJson2({ status: 200, text: '0' });
+		await expect(odooBackend()!.create('m', {})).rejects.toThrow(/nevrátil id/);
+		mockJson2({ status: 200, text: '-3' });
+		await expect(odooBackend()!.create('m', {})).rejects.toThrow(/nevrátil id/);
+	});
+});
