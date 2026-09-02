@@ -23,6 +23,8 @@ test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + orient
 	// default konfigurácia → súhrn je hneď viditeľný (4000 × 3500 mm)
 	await expect(page.getByTestId('zz-suhrn')).toBeVisible();
 	await expect(page.getByTestId('zz-suhrn-rozmery')).toHaveText('4000 × 3500 mm');
+	// #434: redizajn #376/#421 dokončený aj na verejnej karte — číselná rozmerová hodnota nesie .mono
+	await expect(page.getByTestId('zz-suhrn-rozmery')).toHaveClass(/mono/);
 
 	// #408: orientačná cena je na KLIK (server-počítaná) — pred klikom je len tlačidlo, žiadny € na stránke
 	await expect(page.getByTestId('zz-cena-zobrazit')).toBeVisible();
@@ -33,6 +35,7 @@ test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + orient
 	await expect(page.getByTestId('zz-cena')).toBeVisible();
 	await expect(page.getByTestId('zz-cena')).toContainText('Orientačná cena');
 	await expect(page.getByTestId('zz-cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('zz-cena-sdph')).toHaveClass(/mono/);
 
 	expect(consoleMsgs).toEqual([]);
 });

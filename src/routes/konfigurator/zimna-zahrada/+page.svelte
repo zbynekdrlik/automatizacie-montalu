@@ -194,15 +194,15 @@
 					</div>
 					<div>
 						<dt>Rozmery (š × h)</dt>
-						<dd data-testid="zz-suhrn-rozmery">{s.sirka} × {s.hlbka} mm</dd>
+						<dd data-testid="zz-suhrn-rozmery" class="mono">{s.sirka} × {s.hlbka} mm</dd>
 					</div>
 					<div>
 						<dt>Výška</dt>
-						<dd>{s.vyska} mm</dd>
+						<dd class="mono">{s.vyska} mm</dd>
 					</div>
 					<div>
 						<dt>Zastavaná plocha</dt>
-						<dd>{cislaCiarka(s.plochaM2)} m²</dd>
+						<dd class="mono">{cislaCiarka(s.plochaM2)} m²</dd>
 					</div>
 					<div>
 						<dt>Farba</dt>
@@ -226,11 +226,11 @@
 								<span class="kp-cena-vo" data-testid="zz-cena-hladina">{c.hladinaLabel}</span>
 							{/if}
 							<div class="kp-cena-hlavne">
-								<span class="kp-cena-sdph" data-testid="zz-cena-sdph">{eur(c.sDph)}</span>
+								<span class="kp-cena-sdph mono" data-testid="zz-cena-sdph">{eur(c.sDph)}</span>
 								<span class="kp-cena-mena">s DPH</span>
 							</div>
 							<div class="kp-cena-bezdph" data-testid="zz-cena-bezdph">
-								{eur(c.bezDph)} bez DPH
+								<span class="mono">{eur(c.bezDph)}</span> bez DPH
 							</div>
 							<!-- montalu zaokrúhľuje rozmer NAHOR na katalóg — čestne to doplň, keď sa líši od zadaného -->
 							{#if Math.round(c.sirkaGridM * 1000) !== sirka || Math.round(c.hlbkaGridM * 1000) !== hlbka}

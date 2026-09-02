@@ -293,7 +293,7 @@
 			{#if cena && cena.druh === 'cena'}
 				<div class="konf-cta-cena" data-testid="cta-cena">
 					<span class="konf-cta-cena-label">Orientačná cena od</span>
-					<span class="konf-cta-cena-suma">{eurKratko(cena.sDph)}</span>
+					<span class="konf-cta-cena-suma mono">{eurKratko(cena.sDph)}</span>
 					<span class="konf-cta-cena-dph">s DPH</span>
 				</div>
 				<div class="konf-cta-akcie">
@@ -307,7 +307,7 @@
 			{:else if cena}
 				<div class="konf-cta-cena">
 					<span class="konf-cta-cena-label">Cena</span>
-					<span class="konf-cta-cena-suma mala">na vyžiadanie</span>
+					<span class="konf-cta-cena-suma mala mono">na vyžiadanie</span>
 				</div>
 				<div class="konf-cta-akcie">
 					<button type="button" class="konf-btn primar" onclick={() => scrollNa('dopyt')}

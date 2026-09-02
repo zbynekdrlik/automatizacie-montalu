@@ -22,6 +22,8 @@ test('oplotenie konfigurátor: verejná route bez auth — súhrn + ORIENTAČNÁ
 	// default konfigurácia → súhrn je hneď viditeľný (výška 1500 × šírka 2000 mm)
 	await expect(page.getByTestId('oplotenie-suhrn')).toBeVisible();
 	await expect(page.getByTestId('oplotenie-suhrn-rozmery')).toHaveText('1500 × 2000 mm');
+	// #434: redizajn #376/#421 dokončený aj na verejnej karte — číselná rozmerová hodnota nesie .mono
+	await expect(page.getByTestId('oplotenie-suhrn-rozmery')).toHaveClass(/mono/);
 
 	// #410: orientačná cena sa zobrazí AŽ po kliku (server-počítaná, Money-neutrálna — read-only)
 	await expect(page.getByTestId('oplotenie-cena')).toHaveCount(0);
@@ -34,6 +36,7 @@ test('oplotenie konfigurátor: verejná route bez auth — súhrn + ORIENTAČNÁ
 	// cena + s DPH suma (€) + porovnanie 6 modelov
 	await expect(page.getByTestId('oplotenie-cena')).toBeVisible();
 	await expect(page.getByTestId('oplotenie-cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('oplotenie-cena-sdph')).toHaveClass(/mono/);
 	await expect(page.getByTestId('oplotenie-porovnanie')).toBeVisible();
 	await expect(page.getByTestId('oplotenie-porovnanie-ARIEL')).toBeVisible();
 	await expect(page.getByTestId('oplotenie-porovnanie-REA')).toBeVisible();

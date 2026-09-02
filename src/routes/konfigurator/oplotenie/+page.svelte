@@ -249,11 +249,11 @@
 					</div>
 					<div>
 						<dt>Rozmery (v × š)</dt>
-						<dd data-testid="oplotenie-suhrn-rozmery">{s.vyska} × {s.sirka} mm</dd>
+						<dd data-testid="oplotenie-suhrn-rozmery" class="mono">{s.vyska} × {s.sirka} mm</dd>
 					</div>
 					<div>
 						<dt>Počet kusov</dt>
-						<dd>{s.pocet}</dd>
+						<dd class="mono">{s.pocet}</dd>
 					</div>
 					<div>
 						<dt>Farba</dt>
@@ -274,11 +274,13 @@
 								>
 							{/if}
 							<div class="kp-cena-hlavne">
-								<span class="kp-cena-sdph" data-testid="oplotenie-cena-sdph">{eur(c.sDph)}</span>
+								<span class="kp-cena-sdph mono" data-testid="oplotenie-cena-sdph"
+									>{eur(c.sDph)}</span
+								>
 								<span class="kp-cena-mena">s DPH</span>
 							</div>
 							<div class="kp-cena-bezdph" data-testid="oplotenie-cena-bezdph">
-								{eur(c.bezDph)} bez DPH
+								<span class="mono">{eur(c.bezDph)}</span> bez DPH
 							</div>
 							<!-- #410 review 🟡: šírka sa zaokrúhľuje na katalógovú mriežku (0,5 m); keď sa líši
 								     od zadanej, čestne to doplň (cena platí pre najbližší katalógový rozmer). -->
@@ -316,7 +318,7 @@
 										data-testid="oplotenie-porovnanie-{cm.model}"
 									>
 										<span class="p-model">{cm.model}</span>
-										<span class="p-cena">
+										<span class="p-cena mono">
 											{cm.cena.druh === 'cena' ? eur(cm.cena.sDph) : 'na vyžiadanie'}
 										</span>
 									</li>

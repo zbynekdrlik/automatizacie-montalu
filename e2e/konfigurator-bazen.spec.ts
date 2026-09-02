@@ -38,6 +38,8 @@ test('bazén konfigurátor: verejná route bez auth — súhrn + orientačná ce
 	// default konfigurácia → súhrn je hneď viditeľný (6000 × 4000 mm)
 	await expect(page.getByTestId('bazen-suhrn')).toBeVisible();
 	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveText('6000 × 4000 mm');
+	// #434: redizajn #376/#421 dokončený aj na verejnej karte — číselná rozmerová hodnota nesie .mono
+	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveClass(/mono/);
 
 	// #405: 3D náhľad je pripravený a deterministický signál odráža default rozmery (dĺžka×šírka)
 	await expect(page.getByTestId('konf-baz-viz')).toHaveAttribute('data-viz-rozmer', '6000×4000');
@@ -54,6 +56,7 @@ test('bazén konfigurátor: verejná route bez auth — súhrn + orientačná ce
 	await expect(page.getByTestId('bazen-cena')).toBeVisible();
 	await expect(page.getByTestId('bazen-cena')).toContainText('Orientačná cena');
 	await expect(page.getByTestId('bazen-cena-sdph')).toContainText('€');
+	await expect(page.getByTestId('bazen-cena-sdph')).toHaveClass(/mono/);
 	await expect(page.getByTestId('bazen-porovnanie')).toBeVisible();
 
 	expect(consoleMsgs).toEqual([]);
