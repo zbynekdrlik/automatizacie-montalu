@@ -360,8 +360,9 @@
 <div class="card" data-testid="expedicia-karta">
 	<div class="sec">
 		Expedičný zoznam
-		<span class="badge ok" data-testid="expedicia-spolu"
-			>Spolu {expedicia.spoluKusov} ks profilov</span
+		<span class="badge" data-testid="expedicia-spolu"
+			>{expedicia.spoluKusov} ks · {expedicia.pocetProfilov} profilov · {expedicia.pocetKomponentov}
+			komponentov</span
 		>
 	</div>
 	<p class="sub noprint">
@@ -369,29 +370,40 @@
 		Počty profilov sú z nárezu (isté); komponenty (spojky, krytky) čakajú na tabuľky od Dominika,
 		preto majú počet „—".
 	</p>
-	{#if expedicia.polozky.length === 0}
-		<p class="sub" data-testid="expedicia-prazdne">
-			Zatiaľ žiadne položky na expedíciu — zadaj rozmery a spočítaj materiál.
+	<!-- tlačiteľné vysvetlivky + čestné upozornenie: tlačený hárok (na ňom sa reálne odškrtáva)
+	     musí niesť zmysel „—" AJ to, že položky čakajúce na pravidlo v zozname NIE SÚ -->
+	<p class="sub" data-testid="expedicia-legenda">
+		Vysvetlivky: „☐" odškrtni pri nakládke · „—" = údaj zatiaľ neznámy (nevymýšľa sa).
+	</p>
+	{#if cakaPravidloCount}
+		<p class="sub" data-testid="expedicia-neuplne">
+			Pozor: {cakaPravidloCount} položiek ešte čaká na pravidlo a v tomto zozname NIE SÚ.
 		</p>
+	{/if}
+	{#if expedicia.polozky.length === 0}
+		<p class="sub" data-testid="expedicia-prazdne">Zatiaľ žiadne položky na expedíciu.</p>
 	{:else}
 		<table class="narez" data-testid="expedicia-tabulka">
 			<thead>
 				<tr
-					><th class="check-col">Naložené</th><th>Skupina</th><th>Kód</th><th>Názov</th><th
-						>Dĺžka</th
-					><th>Počet ks</th></tr
+					><th class="check-col">Naložené</th><th class="poz-col">Poz.</th><th>Skupina</th><th
+						>Kód</th
+					><th>Názov</th><th>Dĺžka</th><th>Počet ks</th></tr
 				>
 			</thead>
 			<tbody>
-				<!-- kľúč nesie index i — jeden kód sa môže vyskytnúť viackrát (18016 pod fixom + pod
-				     kotviacim; 18017 predná + zadná noha), takže kód/názov samy o sebe nie sú unikátne -->
-				{#each expedicia.polozky as p, i (p.skupina + '·' + (p.kod ?? '') + '·' + p.nazov + '·' + i)}
+				<!-- kľúč = kód (alebo názov) + index i — jeden kód sa môže vyskytnúť viackrát
+				     (18016 pod fixom + pod kotviacim; 18017 predná + zadná noha), preto index -->
+				{#each expedicia.polozky as p, i ((p.kod ?? p.nazov) + '·' + i)}
 					<tr data-testid="expedicia-riadok">
 						<td class="check-col"><span class="check-box" aria-hidden="true">☐</span></td>
+						<td class="poz-col">{p.poz ?? '—'}</td>
 						<td>{p.skupina === 'profil' ? 'Profil' : 'Komponent'}</td>
 						<td>{p.kod ?? '—'}</td>
 						<td>{p.nazov}</td>
-						<td>{mmVal(p.dlzkaRezuMm)}</td>
+						<!-- profil bez známej dĺžky = „— (čaká na výkres)" (rovnako ako Materiál),
+						     komponent nemá dĺžku = „—" — dva rôzne stavy sa na hárku NEZLEJÚ (#419 review) -->
+						<td>{p.skupina === 'profil' ? mm(p.dlzkaRezuMm) : '—'}</td>
 						<td><b>{p.pocetKs ?? '—'}</b></td>
 					</tr>
 				{/each}

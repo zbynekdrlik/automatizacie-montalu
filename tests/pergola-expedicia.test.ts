@@ -1,8 +1,8 @@
 // Pergola — expedičný zoznam (#419). Čistý transform už vypočítaných dát nárezu
 // (`spocitajNarez().vypocitane` = hotové profily s reálnymi počtami; `komponentyPergoly`
 // = kusové komponenty s honest-null počtami) na výdajovo-orientovaný pohľad. Testuje sa
-// KONTRAKT transformu (honest-null profagácia, súčet len známych počtov, poradie) +
-// integrácia s reálnym enginom (žiadny vymyslený počet/dĺžka).
+// KONTRAKT transformu (honest-null propagácia, pozičné číslo, súčet len známych počtov,
+// poradie) + integrácia s reálnym enginom (žiadny vymyslený počet/dĺžka).
 import { describe, it, expect } from 'vitest';
 import {
 	spocitajNarez,
@@ -29,7 +29,7 @@ const BASE: PergolaNarezVstup = {
 
 describe('#419 — expedičný zoznam: kontrakt transformu', () => {
 	// syntetický NarezVysledok s riadeným `vypocitane` (zvyšok zo skutočného enginu, aby
-	// bol typ platný) — profil s reálnou dĺžkou aj honest-null dĺžkou + nulový počet.
+	// bol typ platný) — profil s reálnou dĺžkou aj profil s honest-null dĺžkou.
 	const bazaVys = spocitajNarez(BASE);
 	const vys: NarezVysledok = {
 		...bazaVys,
@@ -56,23 +56,27 @@ describe('#419 — expedičný zoznam: kontrakt transformu', () => {
 		expect(e.polozky[2]!.nazov).toBe('Spojka U 100×50');
 	});
 
-	it('profil nesie reálny počet + kód + dĺžku; honest-null dĺžka ostáva null', () => {
+	it('profil nesie reálny počet + kód + dĺžku + pozičné číslo; honest-null dĺžka ostáva null', () => {
 		const e = expedicnyZoznam(vys, komp);
 		expect(e.polozky[0]).toMatchObject({
 			skupina: 'profil',
+			poz: 1,
 			kod: '18017',
 			pocetKs: 4,
 			dlzkaRezuMm: 2340
 		});
+		// pozičné číslo = poradie v Pláne rezov (pozicujDiely: cislo = index + 1)
+		expect(e.polozky[1]!.poz).toBe(2);
 		// honest-null dĺžka sa NEVYMÝŠĽA — ostáva null
 		expect(e.polozky[1]!.dlzkaRezuMm).toBeNull();
 		expect(e.polozky[1]!.pocetKs).toBe(2);
 	});
 
-	it('komponent má honest-null počet, dĺžku null a len CAD kód (nie vymyslený Money kód)', () => {
+	it('komponent má honest-null počet, dĺžku null, poz null a len CAD kód (nie vymyslený Money kód)', () => {
 		const e = expedicnyZoznam(vys, komp);
 		expect(e.polozky[2]).toMatchObject({
 			skupina: 'komponent',
+			poz: null,
 			kod: '24007',
 			pocetKs: null,
 			dlzkaRezuMm: null
@@ -126,7 +130,7 @@ describe('#419 — expedičný zoznam: integrácia s reálnym enginom (honest, �
 			const komponenty = komponentyPergoly(v);
 			const e = expedicnyZoznam(vysledok, komponenty);
 
-			// profily 1:1 s `vypocitane` (poradie + počet + kód + dĺžka), žiaden vymyslený riadok
+			// profily 1:1 s `vypocitane` (poradie + počet + kód + dĺžka + poz), žiaden vymyslený riadok
 			const profily = e.polozky.filter((p) => p.skupina === 'profil');
 			expect(profily.length).toBe(vysledok.vypocitane.length);
 			profily.forEach((p, i) => {
@@ -134,6 +138,8 @@ describe('#419 — expedičný zoznam: integrácia s reálnym enginom (honest, �
 				expect(p.kod).toBe(src.kod);
 				expect(p.pocetKs).toBe(src.pocetKs);
 				expect(p.dlzkaRezuMm).toBe(src.dlzkaRezuMm);
+				// pozičné číslo = poradie v náreze (previazané s balónikmi vo výkrese)
+				expect(p.poz).toBe(i + 1);
 			});
 
 			// komponenty 1:1 s katalógom pre systém, počty honest-null (nikdy vymyslené)

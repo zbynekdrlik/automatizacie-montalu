@@ -630,16 +630,30 @@ test('#419 — expedičný zoznam: hotové profily (reálne počty) + komponenty
 	const tab = page.getByTestId('expedicia-tabulka');
 	await expect(tab).toBeVisible();
 
-	// súhrnný odznak = súčet ZNÁMYCH počtov kusov profilov (číslo > 0, plain formát)
-	await expect(page.getByTestId('expedicia-spolu')).toContainText(/Spolu \d+ ks profilov/);
+	// súhrnný odznak nesie počet kusov, profilov aj komponentov (plain formát)
+	const spolu = page.getByTestId('expedicia-spolu');
+	await expect(spolu).toContainText(/\d+ ks/);
+	await expect(spolu).toContainText('profilov');
+	await expect(spolu).toContainText('komponentov');
 
-	// hotový profil (predná noha 18017) je v zozname s REÁLNYM počtom 4 ks a dĺžkou 2215 mm
+	// tlačiteľné čestné upozornenie: položky čakajúce na pravidlo v zozname NIE SÚ
+	await expect(page.getByTestId('expedicia-neuplne')).toContainText('NIE SÚ');
+
+	// hotový profil (predná noha 18017) je v zozname s pozičným číslom, REÁLNYM počtom 4 ks
+	// a dĺžkou 2215 mm
 	const nohaRiadok = page.getByTestId('expedicia-riadok').filter({ hasText: 'predná noha' });
 	await expect(nohaRiadok).toContainText('18017');
 	await expect(nohaRiadok).toContainText('2215');
 	await expect(nohaRiadok).toContainText('Profil');
+	// pozičné číslo (Poz.) = to isté ako v Materiáli/výkrese, previazané s balónikmi
+	await expect(nohaRiadok.locator('.poz-col')).toHaveText(/^\d+$/);
 	// počet v poslednej bunke = presne 4 ks (nie substring z názvu „140x140")
 	await expect(nohaRiadok.locator('td').last()).toHaveText('4');
+
+	// profil s ešte neznámou dĺžkou rezu (priečka 18004, bez počtu krovov) NIE JE hotový kus —
+	// Dĺžka nesie čestné „— (čaká na výkres)", nezlieva sa s komponentovým „—" (#419 review 🟡)
+	const prieckaRiadok = page.getByTestId('expedicia-riadok').filter({ hasText: '18004' });
+	await expect(prieckaRiadok).toContainText('čaká');
 
 	// komponent (spojka U) je v zozname s honest-null počtom „—" (nikdy vymyslený počet)
 	const spojkaRiadok = page.getByTestId('expedicia-riadok').filter({ hasText: 'Spojka U' });
