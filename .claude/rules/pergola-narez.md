@@ -158,7 +158,11 @@ bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu
 - **NULL (nikdy sa nehádže):** `HH krovu` (3240.9) NIE JE vzorec zo vstupov — je to CAD
   výsledok geometrie krovu (#161, `pergola-krov.ts` počíta uloženie, NIE dĺžku HH). Preto
   priečka dĺžka (= HH krovu) a prítlačná/maskovacie (18006/18007/18008 = HH krovu + 40)
-  ostávajú čestný null (#161/#198). Robust prítlačná HH krovu + 39 = NEPOTVRDENÉ (O18).
+  ostávajú čestný null (#161/#198), TAK AKO BOLO V ČASE PÔVODNEJ analýzy tohto výkresu.
+  **PREKONANÉ (25.8./#415):** priečka+lišty sú odvtedy IMPLEMENTOVANÉ pre overenú
+  konfiguráciu (viď „Krov cut-list (#161)" nižšie) — Robust prítlačná NIE JE +39 (pôvodný
+  neoverený návrh), je POTVRDENÁ na +30 (Dominik ch207 msg 1724331, znovu priamo
+  potvrdené #415 msg 1777597, 2.9.); Massive ostáva +40.
 - **Počet priečok:** engine `ceil(šírka/700)+1 = 9`, výkres 8 (rám < žľab, presah O1/#196).
   Confirmed vzorec sa NEMENÍ; rozdiel je zdokumentovaný v `nepodporovane[]`.
 - **#205 DORIEŠENÉ (dva z troch už POČÍTANÉ, jeden ostáva NULL):**
@@ -448,9 +452,12 @@ sú tým ČIASTOČNE prekonané. Aktuálny stav:
 
 Vzorec −250 je overený na JEDNOM golden bode; **Robust má od 25.8. vlastné pravidlo −220**
 (Dominik verbatim ch207 msg 1724329: „výsuv −154,94 masív / −124,94 Robust" = rozdiel presne
-30 = predný profil 140−110, ukotvené na overený masív bod; lišty Robust = +30, msg 1724331 —
-bez Robust goldenu → riadok nesie poznámku „na potvrdenie"). Engine emituje nominál/lišty do
-Money **iba pre konfiguráciu KOTVY**:
+30 = predný profil 140−110, ukotvené na overený masív bod; lišty Robust = +30, msg 1724331).
+**#415 (2.9.): prídavok +30/+40 je odvtedy DVOJMO potvrdený priamo (msg 1777597) — riadok
+už NEsie „na potvrdenie" na prídavku.** Zostáva SAMOSTATNE neoverená len základná dĺžka
+krovu (odpočet −220, bez vlastného Robust golden výkresu) — jej výhrada na riadku ostáva,
+oddelene od prídavku (viď `krovoveListy` v `pergola-narez.ts`). Engine emituje nominál/lišty
+do Money **iba pre konfiguráciu KOTVY**:
 
 ```
 krovConfigOverena = uchytenie === 'samostatne' && hornyProfilZadnej === 110   // OBA systémy

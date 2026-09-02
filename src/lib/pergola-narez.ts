@@ -45,8 +45,12 @@ export const KROV_OKRAJ_ODSADENIE_MM = 2;
  *  Overené na golden OP260282: 3239,76 + 40 = 3279,76 ≈ výkres 3279,77 (Δ 0,01). */
 export const PRITLACNA_NAD_NOMINAL_MM = 40;
 /** prídavok [mm] líšt nad nominál krovu — ROBUST: dĺžka = nominál + 30. Dominik VERBATIM
- *  (ch207 msg 1724331): „tu dlžku krovu ktoru vypočítaš z bodu 3 pri robuste je výsledok
- *  +30 a pri massive +40". Bez Robust goldenu — na potvrdenie pri prvej Robust zákazke. */
+ *  (ch207 msg 1724331, 25.8.): „tu dlžku krovu ktoru vypočítaš z bodu 3 pri robuste je
+ *  výsledok +30 a pri massive +40". POTVRDENÉ ZNOVA, priamo (issue 415, 2.9., vlákno
+ *  „Pergola krov — otázky výroba", msg 1777597): „2 pri robuste + 30 a pri massive +40" —
+ *  prídavok samotný je odteraz DVOJMO potvrdený. Základná dĺžka krovu (odpočet, viď
+ *  `KROV_ODPOCET_ROBUST` v pergola-krov.ts) ostáva SAMOSTATNE neoverená — na potvrdenie
+ *  pri prvej Robust zákazke; nepliesť si tieto dve hodnoty (viď `krovoveListy` poznámka). */
 export const PRITLACNA_NAD_NOMINAL_ROBUST_MM = 30;
 /** rozsah manuálneho počtu krovov [ks] — voliteľný vstup (Dominik 21.8. rozhodol manuál). */
 export const POCET_KROVOV_MIN = 2;
@@ -417,16 +421,19 @@ function krovoveListy(
 ): PolozkaNarezu[] {
 	const riadky: PolozkaNarezu[] = [];
 	if (krovNominal != null && n != null && n >= 2) {
-		// prídavok per systém (Dominik ch207 1724331: Robust +30 / Massive +40)
+		// prídavok per systém — POTVRDENÉ, dvojmo (Dominik ch207 1724331 25.8., znovu priamo
+		// potvrdené vlákno „Pergola krov — otázky výroba" msg 1777597 2.9.): Robust +30 / Massive +40
 		const pridavok =
 			system === 'Robust' ? PRITLACNA_NAD_NOMINAL_ROBUST_MM : PRITLACNA_NAD_NOMINAL_MM;
 		const listaDlzka = R2(krovNominal + pridavok);
 		const listaPozn = `= nominál krovu + ${pridavok} (${system})`;
-		// Robust čísla (odpočet −220 aj prídavok +30) sú podľa pravidla konštruktéra bez
-		// vlastného overovacieho výkresu → emitovaný riadok nesie viditeľnú výhradu.
+		// #415: prídavok (+30/+40) JE potvrdený — výhrada sa vzťahuje LEN na základnú dĺžku
+		// krovu (odpočet, KROV_ODPOCET_ROBUST), ktorá je SAMOSTATNÁ, stále neoverená hodnota
+		// (#161, bez vlastného Robust golden výkresu). Nikdy nespájaj obe do jednej vety —
+		// spájanie tvrdilo, že aj potvrdený prídavok ešte čaká na potvrdenie (nepravda).
 		const listaDetail =
 			system === 'Robust'
-				? 'Prídavok +30 aj odpočet dĺžky krovu pri Robust sú podľa pravidla konštruktéra — na potvrdenie pri prvej Robust zákazke.'
+				? 'Prídavok +30 mm je priamo potvrdený od konštruktéra. Základná dĺžka krovu (odpočet pri Robust) je podľa jeho pravidla — na potvrdenie pri prvej Robust zákazke.'
 				: undefined;
 		riadky.push({
 			kod: '18006',
