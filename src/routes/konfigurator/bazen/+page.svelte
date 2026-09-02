@@ -10,6 +10,8 @@
 	import { untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import DopytForm from '$lib/components/DopytForm.svelte';
+	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
+	import { cislaCiarka } from '$lib/konfigurator-jednotky';
 	import {
 		bazenModel,
 		bazenKolaj,
@@ -32,10 +34,19 @@
 	let kolaj = $state<string>(untrack(() => data.defaulty.kolaj));
 	let vypln = $state<string>(untrack(() => data.defaulty.vypln));
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
+	// rozmery = RozmerStepper (metre, #333 vzor) — clamp na [min,max], NIKDY null (súhrn/dopyt tak
+	// pri editovaní rozmerov nezmizne, #385 review 🔵); segmenty = <select> (2..8, tiež nikdy null).
 	let dlzka = $state<number | null>(6000);
 	let sirka = $state<number | null>(4000);
 	let vyska = $state<number | null>(1200);
-	let segmenty = $state<number | null>(4);
+	let segmenty = $state<number>(4);
+	// možnosti počtu segmentov (2..8) — select nikdy nevráti mimo-rozmedzia/null hodnotu
+	const segmentyOpts = $derived(
+		Array.from(
+			{ length: data.rozmedzia.segmenty.max - data.rozmedzia.segmenty.min + 1 },
+			(_, i) => data.rozmedzia.segmenty.min + i
+		)
+	);
 
 	// display label farby („RAL 7016 ANTRACIT") — do dopytu/PDF ide label, nie holý kód (vzor parseru)
 	const farbaLabel = $derived.by(() => {
@@ -49,7 +60,7 @@
 		dlzka: dlzka ?? 0,
 		sirka: sirka ?? 0,
 		vyska: vyska ?? 0,
-		segmenty: segmenty ?? 0,
+		segmenty,
 		vypln: bazenVypln(vypln),
 		farba: farbaLabel
 	});
@@ -137,61 +148,50 @@
 				</div>
 			</fieldset>
 
-			<!-- ROZMERY -->
+			<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou) -->
 			<fieldset class="baz-blok">
 				<legend>Rozmery</legend>
-				<div class="baz-rozmery">
-					<label class="baz-pole">
-						<span>Dĺžka (mm)</span>
-						<input
-							type="number"
-							inputmode="numeric"
-							bind:value={dlzka}
-							min={r.dlzka.min}
-							max={r.dlzka.max}
-							step={r.dlzka.krok}
-							data-testid="bazen-dlzka"
-						/>
-						<small>{r.dlzka.min}–{r.dlzka.max} mm</small>
-					</label>
-					<label class="baz-pole">
-						<span>Šírka (mm)</span>
-						<input
-							type="number"
-							inputmode="numeric"
-							bind:value={sirka}
-							min={r.sirka.min}
-							max={r.sirka.max}
-							step={r.sirka.krok}
-							data-testid="bazen-sirka"
-						/>
-						<small>{r.sirka.min}–{r.sirka.max} mm</small>
-					</label>
-					<label class="baz-pole">
-						<span>Výška (mm)</span>
-						<input
-							type="number"
-							inputmode="numeric"
-							bind:value={vyska}
-							min={r.vyska.min}
-							max={r.vyska.max}
-							step={r.vyska.krok}
-							data-testid="bazen-vyska"
-						/>
-						<small>{r.vyska.min}–{r.vyska.max} mm</small>
-					</label>
-					<label class="baz-pole">
+				<div class="baz-steppery">
+					<RozmerStepper
+						bind:hodnotaMm={dlzka}
+						min={r.dlzka.min}
+						max={r.dlzka.max}
+						krokMm={r.dlzka.krok}
+						popis="Dĺžka"
+						akuzativ="dĺžku"
+						id="baz-dlzka"
+						testid="bazen-dlzka"
+						name="dlzka"
+					/>
+					<RozmerStepper
+						bind:hodnotaMm={sirka}
+						min={r.sirka.min}
+						max={r.sirka.max}
+						krokMm={r.sirka.krok}
+						popis="Šírka"
+						akuzativ="šírku"
+						id="baz-sirka"
+						testid="bazen-sirka"
+						name="sirka"
+					/>
+					<RozmerStepper
+						bind:hodnotaMm={vyska}
+						min={r.vyska.min}
+						max={r.vyska.max}
+						krokMm={r.vyska.krok}
+						popis="Výška"
+						akuzativ="výšku"
+						id="baz-vyska"
+						testid="bazen-vyska"
+						name="vyska"
+					/>
+					<label class="baz-pole baz-segmenty">
 						<span>Počet segmentov</span>
-						<input
-							type="number"
-							inputmode="numeric"
-							bind:value={segmenty}
-							min={r.segmenty.min}
-							max={r.segmenty.max}
-							step={r.segmenty.krok}
-							data-testid="bazen-segmenty"
-						/>
-						<small>{r.segmenty.min}–{r.segmenty.max}</small>
+						<select bind:value={segmenty} data-testid="bazen-segmenty">
+							{#each segmentyOpts as n (n)}
+								<option value={n}>{n}</option>
+							{/each}
+						</select>
 					</label>
 				</div>
 			</fieldset>
@@ -249,7 +249,7 @@
 						</div>
 						<div>
 							<dt>Zastrešená plocha</dt>
-							<dd>{String(s.plochaM2).replace('.', ',')} m²</dd>
+							<dd>{cislaCiarka(s.plochaM2)} m²</dd>
 						</div>
 						<div>
 							<dt>Farba</dt>
@@ -422,6 +422,16 @@
 		gap: 12px;
 		margin-top: 6px;
 	}
+	/* metrové steppery (RozmerStepper) stohované pod sebou + segmenty select */
+	.baz-steppery {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin-top: 6px;
+	}
+	.baz-segmenty {
+		max-width: 220px;
+	}
 	.baz-pole {
 		display: flex;
 		flex-direction: column;
@@ -432,7 +442,6 @@
 		font-weight: 600;
 		color: var(--k-text);
 	}
-	.baz-pole input,
 	.baz-pole select {
 		padding: 9px 11px;
 		border: 1px solid var(--k-line-2);
@@ -441,14 +450,9 @@
 		background: var(--k-surface);
 		color: var(--k-text);
 	}
-	.baz-pole input:focus-visible,
 	.baz-pole select:focus-visible {
 		outline: 2px solid var(--k-ink);
 		outline-offset: 1px;
-	}
-	.baz-pole small {
-		font-size: 11.5px;
-		color: var(--k-faint);
 	}
 
 	/* PANEL: súhrn + cena-info + dopyt */

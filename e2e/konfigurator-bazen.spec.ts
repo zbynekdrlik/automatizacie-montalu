@@ -43,9 +43,12 @@ test('bazén konfigurátor: zmena modelu + rozmeru → súhrn sa aktualizuje →
 	await page.getByTestId('bazen-model-Exclusive').click();
 	await expect(page.getByTestId('bazen-model-Exclusive')).toHaveAttribute('aria-pressed', 'true');
 
-	// zmeň rozmery → súhrn LIVE reaguje (klientsky $derived)
-	await page.getByTestId('bazen-dlzka').fill('9000');
-	await page.getByTestId('bazen-sirka').fill('5000');
+	// zmeň rozmery → súhrn LIVE reaguje (klientsky $derived). Rozmerové polia sú METROVÉ steppery
+	// (#333 RozmerStepper): fill je v METROCH („9" = 9000 mm), súhrn ostáva v mm.
+	await page.getByTestId('bazen-dlzka').fill('9');
+	await page.getByTestId('bazen-dlzka').blur();
+	await page.getByTestId('bazen-sirka').fill('5');
+	await page.getByTestId('bazen-sirka').blur();
 	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveText('9000 × 5000 mm');
 
 	// dopyt formulár je viditeľný (súhrn platný)

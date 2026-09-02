@@ -151,10 +151,15 @@ export function produktPdfNadpis(kod: string | null | undefined): string {
 
 /** #385: má produkt OVERENÝ interim cenový zdroj (a teda smie dostať orientačnú/opečiatkovanú cenu)?
  *  Gate pre dopyt/PDF cenu — produkt bez zdroja (bazén, …) je honest-null (cena sa NEopečiatkuje ani
- *  neprepočíta). **NULL/neznámy → `true` (pergola)** — historický default: dopyty pred migráciou v35
- *  nemajú `produkt` a sú všetky pergolové s cenníkom (#279), takže ich re-download honest-degrade
- *  prepočet zo živej matice ostáva zachovaný. Známy non-pergola produkt s `cenovyZdroj:false` → `false`. */
+ *  neprepočíta). Fail-safe smery:
+ *  - **`null`/`undefined` → `true` (pergola)**: LEN historický default — dopyty pred migráciou v35
+ *    nemajú `produkt` a sú všetky pergolové s cenníkom (#279), takže ich re-download honest-degrade
+ *    prepočet zo živej matice ostáva zachovaný.
+ *  - **známy produkt → jeho `cenovyZdroj`** (pergola true, bazén/ostatné false).
+ *  - **neznámy NEPRÁZDNY kód → `false`** (#385 review 🟡): produkt neskôr odobraný/premenovaný z
+ *    `KONF_PRODUKTY` NESMIE ticho znovu získať pergolovú cenu na re-downloade — honest-null je
+ *    bezpečný default pre čokoľvek, čo NIE JE explicitne pergola so zdrojom. */
 export function maCenovyZdroj(kod: string | null | undefined): boolean {
-	const p = produktPodlaKodu(kod);
-	return p ? p.cenovyZdroj : true;
+	if (kod == null) return true;
+	return produktPodlaKodu(kod)?.cenovyZdroj ?? false;
 }

@@ -5,6 +5,7 @@
 // LEN prezentačné texty + rozmerové rozmedzia (žiadny Money kód, žiadna cena) → leak-guard (A)
 // `konfigurator-money-safety` ho prejde bez porušenia. Priamo unit-testovateľný.
 import type { PonukaConfig } from '$lib/ponuka';
+import { cislaCiarka } from '$lib/konfigurator-jednotky';
 
 /** Model bazénového zastrešenia (whitelist — zrkadlí interný `parseBazenVstup` #355:
  *  'Premier' | 'Exclusive' | 'Star'). Sú to LEN string literály, žiadny Money kód. */
@@ -18,7 +19,7 @@ export interface BazenModelInfo {
 
 /** Modely na výber (poradie = zákaznícky rebríček). LEN popisy, ŽIADNA cena. */
 export const BAZEN_MODELY: readonly BazenModelInfo[] = [
-	{ kod: 'Premier', popis: 'Obľúbené zastrešenie s výborným pomerom ceny a výbavy.' },
+	{ kod: 'Premier', popis: 'Obľúbené zastrešenie so spoľahlivou konštrukciou a výbavou.' },
 	{ kod: 'Exclusive', popis: 'Prémiové vyhotovenie s vyšším komfortom prechodu.' },
 	{ kod: 'Star', popis: 'Dizajnová rada s čistými líniami a moderným profilom.' }
 ];
@@ -47,6 +48,7 @@ export const BAZEN_DLZKA_MIN = 3000;
 export const BAZEN_DLZKA_MAX = 15000;
 export const BAZEN_SIRKA_MIN = 2000;
 export const BAZEN_SIRKA_MAX = 7000;
+// krok 500 mm (0,5 m) — na 100 mm mriežke zákazníckeho metrového stepera (#333 RozmerStepper).
 export const BAZEN_VYSKA_MIN = 700;
 export const BAZEN_VYSKA_MAX = 2500;
 export const BAZEN_SEGMENTY_MIN = 2;
@@ -55,7 +57,7 @@ export const BAZEN_SEGMENTY_MAX = 8;
 /** Rozmedzia pre klienta (input min/max/krok hinty) — žiadny Money údaj. */
 export const BAZEN_RANGES = {
 	dlzka: { min: BAZEN_DLZKA_MIN, max: BAZEN_DLZKA_MAX, krok: 500 },
-	sirka: { min: BAZEN_SIRKA_MIN, max: BAZEN_SIRKA_MAX, krok: 250 },
+	sirka: { min: BAZEN_SIRKA_MIN, max: BAZEN_SIRKA_MAX, krok: 500 },
 	vyska: { min: BAZEN_VYSKA_MIN, max: BAZEN_VYSKA_MAX, krok: 100 },
 	segmenty: { min: BAZEN_SEGMENTY_MIN, max: BAZEN_SEGMENTY_MAX, krok: 1 }
 } as const;
@@ -142,25 +144,21 @@ export function konfigurujBazen(v: BazenVstup): BazenSuhrn {
 	};
 }
 
-/** Číslo s desatinnou ČIARKOU (sk), napr. `31.5 → "31,5"`, `32 → "32"`. */
-function fmtCiarka(n: number): string {
-	return String(n).replace('.', ',');
-}
-
 /** Zmapuje bazén súhrn na zdieľaný `PonukaConfig` pre dopyt/PDF (#277 tok). Používa LEN NEUTRÁLNE
- *  polia, ktoré čítajú správne aj pre zastrešenie: model → `system`, rozmery → `sirka`/`hlbka`,
- *  výška+koľaj+segmenty+plocha → `popis` (pergola-špecifické popisky ako „Výška vpredu"/„Počet polí"
- *  sa NEPOUŽIJÚ, aby PDF nebolo zavádzajúce). BEZ ceny, BEZ Money kódu — cena je honest-null (bazén
- *  nemá overený cenový zdroj; gate `maCenovyZdroj` v `konfigurator-produkty`). */
+ *  polia, ktoré čítajú správne aj pre zastrešenie: model → `system`, DĹŽKA → `dlzka` + šírka →
+ *  `sirka` (→ „Rozmery (d × š)", zhodné poradie so zákazníckou stránkou AJ PDF), výška+koľaj+
+ *  segmenty+plocha → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/`model`/`pocetPoli`) sa
+ *  NEPOUŽIJÚ, aby PDF nebolo zavádzajúce. BEZ ceny, BEZ Money kódu — cena je honest-null (bazén nemá
+ *  overený cenový zdroj; gate `maCenovyZdroj` v `konfigurator-produkty`). */
 export function bazenPonukaConfig(s: BazenSuhrn): PonukaConfig {
 	return {
 		system: `Bazénové zastrešenie — ${s.model}`,
+		dlzka: s.dlzka,
 		sirka: s.sirka,
-		hlbka: s.dlzka,
 		farba: s.farba,
 		sklo: s.vypln,
 		popis:
 			`Výška zastrešenia ${s.vyska} mm · ${s.kolaj} · počet segmentov ${s.segmenty}` +
-			` · zastrešená plocha ${fmtCiarka(s.plochaM2)} m².`
+			` · zastrešená plocha ${cislaCiarka(s.plochaM2)} m².`
 	};
 }
