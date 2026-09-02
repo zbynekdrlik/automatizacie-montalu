@@ -9,7 +9,7 @@
 //
 // Money-neutrálny a mimo klientskeho bundle ($lib/server/): obsahuje interim PREDAJNÉ ceny prevzaté
 // z verejného konfigurátora montalu.sk (montalu CENOVÉ kľúče PBPPP/PBSPP/PBEPP), NIE Money ERP kódy
-// (moneyKod / BPK*/BPP* odpisové kódy). #318 hladina-aware (`naCenuBazen`/`cenaPreModelBazen`/
+// (Money kód / kusové-metrážové odpisové kódy). #318 hladina-aware (`naCenuBazen`/`cenaPreModelBazen`/
 // `cenyModelovBazen`) — MO (default) pre neprihláseného/interného, VO LEN pre prihláseného
 // veľkoobchodného; hladinu rozhoduje SERVER, VO sa do MO odpovede NIKDY nedostane. Čistý (bez DB/
 // siete), priamo unit-testovateľný (parity: `tests/konfigurator-bazen-cena.test.ts`).
@@ -131,18 +131,20 @@ export interface CenaBazenIndividualna {
 
 export type CenaBazenVysledok = CenaBazenOk | CenaBazenIndividualna;
 
-/** Zaokrúhli hodnotu [m] na NAJBLIŽŠÍ bod katalógovej mriežky (krok 0,5 m; zhoda so montalu length
- *  round-nearest, a keďže enumerujeme presne v 0,5 m bodoch, je exaktné pre naše mriežkové vstupy).
+/** Zaokrúhli hodnotu [m] na NAJBLIŽŠÍ bod katalógovej mriežky (krok 0,5 m). Seed enumerujeme PRESNE
+ *  v 0,5 m bodoch, takže pre hodnoty NA mriežke (naše steppery krokujú tlačidlami po 500 mm) je lookup
+ *  EXAKTNÝ. Pre mimo-mriežkové vstupy (metrový textový stepper píše na 100 mm mriežku, `parseMetreNaMm`)
+ *  sa hodnota prilepí na najbližší 0,5 m bod — montalu length zaokrúhľuje na najbližší, width floorom na
+ *  0,25, takže off-grid hodnota je APROXIMÁCIA (nie doslovné zrkadlo montalu.sk pre daný presný rozmer);
+ *  smer je preto skôr NADhodnotenie (bezpečné pre ORIENTAČNÚ cenu — nezaskočí nižšou definitívnou).
  *  Pod minimum ⇒ minimum (prilepí sa, montalu tiež klampuje). Nad maximum ⇒ null (mimo katalógu →
  *  individuálna ponuka). */
 export function zaokruhliNaMriezku(hodnotaM: number, m: Mriezka): number | null {
 	if (!Number.isFinite(hodnotaM)) return null;
 	if (hodnotaM <= m.min) return m.min;
 	if (hodnotaM > m.max + EPS) return null;
-	const g = Math.round(hodnotaM / m.krok) * m.krok;
-	const gr = Math.round(g * 100) / 100;
-	// zaokrúhlenie nahor cez max (napr. 14,8 → 15,0) je stále v katalógu; nad max → null (vetva vyššie).
-	return gr <= m.max + EPS ? gr : m.max;
+	// v rozsahu (min, max] → najbližší bod mriežky nikdy neprekročí max (max je sám na mriežke).
+	return Math.round(Math.round(hodnotaM / m.krok) * m.krok * 100) / 100;
 }
 
 const k1 = (m: number) => m.toFixed(1);

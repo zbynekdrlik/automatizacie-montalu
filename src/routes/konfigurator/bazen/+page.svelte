@@ -1,12 +1,13 @@
 <script lang="ts">
-	// Verejný zákaznícky konfigurátor bazénových zastrešení (#385, etapa 2 jednotného rámu #384).
-	// JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D split-screenu — bazénová 3D geometria zatiaľ
-	// neexistuje, viď design komentár + follow-up) a BEZ ORIENTAČNEJ CENY (honest-null: bazén nemá
-	// overený cenový zdroj — cena sa nevymýšľa). Konfigurácia (model/rozmery/segmenty/koľaj/farba/
-	// výplň) sa počíta ČISTO klientsky (`$derived`, žiadny server round-trip — netreba, nie je cena)
-	// a tečie do zdieľaného DopytForm (#277) → PDF špecifikácia (bez ceny) + Odoo lead. Zdieľané
-	// `--k-*` tokeny z `konfigurator/+layout.svelte`. Money-neutralita: importuje LEN client-safe
-	// `konfigurator-bazen` + DopytForm (guard: konfigurator-money-safety). Žiadne `console.*`.
+	// Verejný zákaznícky konfigurátor bazénových zastrešení (#385, etapa 2 jednotného rámu #384;
+	// #404 orientačná cena). JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D split-screenu —
+	// bazénová 3D geometria zatiaľ neexistuje). Konfigurácia (model/rozmery/segmenty/koľaj/farba/
+	// výplň) sa počíta ČISTO klientsky (`$derived`); ORIENTAČNÚ cenu (#404) počíta SERVER na klik
+	// (`vypocet` akcia, enhance submit — cenový modul je server-only, do klienta sa nedostane) a
+	// tečie do zdieľaného DopytForm (#277) → PDF špecifikácia s orientačnou cenou + Odoo lead.
+	// Zdieľané `--k-*` tokeny z `konfigurator/+layout.svelte`. Money-neutralita: importuje LEN
+	// client-safe `konfigurator-bazen` + DopytForm + LEN typy ceny (guard: konfigurator-money-safety).
+	// Žiadne `console.*`.
 	import { untrack } from 'svelte';
 	import { base } from '$app/paths';
 	import { enhance } from '$app/forms';
@@ -355,6 +356,9 @@
 									} else if (result.type === 'failure') {
 										const d = result.data as { error?: string } | undefined;
 										cenaError = d?.error ?? 'Cenu sa nepodarilo spočítať.';
+									} else if (result.type === 'error') {
+										// sieťová/serverová výnimka — nenechaj tlačidlo „visieť" bez odozvy
+										cenaError = 'Cenu sa nepodarilo spočítať, skús to prosím o chvíľu znova.';
 									}
 								};
 							}}
@@ -392,13 +396,10 @@
 				<section class="baz-blok-kontakt" id="dopyt" data-testid="dopyt">
 					<h2>Máš záujem o toto zastrešenie?</h2>
 					<p class="baz-uvod">
-						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
-						pripravíme individuálne po obhliadke.
+						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) s orientačnou cenou na
+						stiahnutie. Presnú, záväznú cenu pripravíme po obhliadke miesta.
 					</p>
-					<DopytForm
-						konfiguracia={ponukaCfg}
-						disclaimer="Špecifikácia je nezáväzná. Cenu pripravíme individuálne po obhliadke miesta stavby."
-					/>
+					<DopytForm konfiguracia={ponukaCfg} />
 				</section>
 			{:else}
 				<p class="baz-chyba" data-testid="bazen-chyba">

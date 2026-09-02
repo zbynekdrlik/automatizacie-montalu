@@ -31,11 +31,14 @@ const DLZKY = []; // 3.0 .. 15.0 krok 0.5 (montalu `length`)
 for (let d = 30; d <= 150; d += 5) DLZKY.push(d / 10);
 const SIRKY = []; // 2.0 .. 7.0 krok 0.5 (montalu `width`)
 for (let w = 20; w <= 70; w += 5) SIRKY.push(w / 10);
-// referenčné bunky na vzorku DPH (montalu vlastný zaokrúhlený reťazec s DPH)
+// referenčné bunky na vzorku DPH (montalu vlastný zaokrúhlený reťazec s DPH). Premier 8,5×6,0 je
+// zámerne HRANIČNÁ bunka half-up: VO net 13732,5 → s DPH 16 890,98 (naivné FP `net*1.23` dá 16 890,97),
+// takže parity test na nej odlíši celocentový half-up od naivného zaokrúhlenia.
 const DPH_VZORKY = [
 	[4, 3],
 	[6, 4],
-	[8, 5]
+	[8, 5],
+	[8.5, 6]
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

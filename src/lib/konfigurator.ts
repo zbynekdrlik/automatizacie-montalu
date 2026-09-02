@@ -70,8 +70,11 @@ export type CenovaHladina = 'MO' | 'VO';
 
 /**
  * Verejná (client-safe) orientačná cena — bez DPH + s DPH. Buď konkrétna cena, alebo
- * „individuálna ponuka" (mimo katalógu). Odvodená serverom z `konfigurator-cena.ts`. Rozmery
- * `hlbkaGridM`/`sirkaGridM` sú katalógové (po zaokrúhlení NAHOR na mriežku).
+ * „individuálna ponuka" (mimo katalógu). Odvodená serverom (`konfigurator-cena.ts` pergola,
+ * `konfigurator-bazen-cena.ts` bazén). `hlbkaGridM`/`sirkaGridM` sú katalógové mriežkové rozmery po
+ * zaokrúhlení na mriežku — pergola NAHOR (hĺbka×šírka), bazén na NAJBLIŽŠÍ bod (dĺžka do `hlbkaGridM`,
+ * šírka do `sirkaGridM`); DB stĺpec `cena_hlbka_grid_m` tak pri bazéne nesie DĹŽKU. Len interné/audit
+ * (grid-note v PDF je produkt-aware, viď `cenaRiadky`).
  *
  * #318: `hladina` je typovo `'VO'` (NIE `CenovaHladina`) — MO/verejný výstup ju štrukturálne
  * NEMÔŽE niesť (`naCenu` MO ju nenastaví a typ 'MO' hodnotu ani nedovolí), takže verejná odpoveď

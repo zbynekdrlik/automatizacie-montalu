@@ -4,6 +4,8 @@
 // aware dispatch test je NETAUTOLOGICKÝ (vzor #388/#389): dokazuje, že bazénová cfg dostane bazénovú
 // cenu, pergolotvarová cfg pod „bazen" NEDOSTANE cenu, a tá istá cfg pod „pergola" cenu DOSTANE.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import cennik from '../src/lib/server/cennik-bazen.json';
 import {
 	vypocitajCenuBazen,
@@ -146,6 +148,72 @@ describe('produkt-aware dispatch (dopyt-cena-stamp)', () => {
 	it('TÁ ISTÁ pergolotvarová cfg pod „pergola" DOSTANE cenu (gate nie je no-op)', () => {
 		const c = cenaZCfgProdukt({ model: 'LIGHT', hlbka: 3500, sirka: 4000 }, 'pergola');
 		expect(c?.druh).toBe('cena');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// Plná parita: KAŽDÁ bunka seedu → modul vráti presne tú istú MO/VO net (pergolový vzor — nie len
+// jedna bunka). Dokazuje, že modul číta CELÚ maticu bez posunu kľúčov/zaokrúhlenia na mriežkových
+// bodoch.
+// --------------------------------------------------------------------------- //
+describe('plná parita matice (každá bunka seedu)', () => {
+	it('vypocitajCenuBazen vráti seed MO/VO net pre KAŽDÚ bunku', () => {
+		// JSON bunky sa inferujú ako `number[]` (nie tuple) → cez `unknown` na jednotný tvar.
+		const matica = cennik.cennik as unknown as Record<
+			string,
+			Record<string, Record<string, number[]>>
+		>;
+		let buniek = 0;
+		for (const [model, dlzky] of Object.entries(matica)) {
+			for (const [dK, riadok] of Object.entries(dlzky)) {
+				for (const [wK, par] of Object.entries(riadok)) {
+					const r = vypocitajCenuBazen({
+						dlzkaMm: Number(dK) * 1000,
+						sirkaMm: Number(wK) * 1000,
+						model: model as BazenModel
+					});
+					expect(r.druh, `${model} ${dK}×${wK}`).toBe('cena');
+					if (r.druh === 'cena') {
+						expect([r.mo.bezDph, r.vo.bezDph], `${model} ${dK}×${wK}`).toEqual(par);
+						expect(r.vo.bezDph).toBeLessThan(r.mo.bezDph); // VO vždy < MO
+					}
+					buniek++;
+				}
+			}
+		}
+		expect(buniek).toBeGreaterThan(400); // sanity: matica nie je prázdna
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// Money-neutralita seedu + modulu (pergolový vzor `konfigurator-cena.test.ts`): žiadny Money ERP kód
+// (moneyKod / BPK*/BPP* odpisové kódy — montalu CENOVÉ kľúče PBPPP/PBSPP/PBEPP nie sú Money kódy),
+// žiadny import katalógu skla / Money zapisovača / DB / bazénového odpisu.
+// --------------------------------------------------------------------------- //
+describe('seed + modul sú Money-neutrálne (#404)', () => {
+	it('seed + modul neobsahujú moneyKod ani BPK*/BPP* odpisové kódy, modul neimportuje Money/DB/katalóg', () => {
+		const seedTxt = fs.readFileSync(
+			path.resolve(__dirname, '../src/lib/server/cennik-bazen.json'),
+			'utf8'
+		);
+		const modulTxt = fs.readFileSync(
+			path.resolve(__dirname, '../src/lib/server/konfigurator-bazen-cena.ts'),
+			'utf8'
+		);
+		const vstupTxt = fs.readFileSync(
+			path.resolve(__dirname, '../src/lib/server/konfigurator-bazen-vstup.ts'),
+			'utf8'
+		);
+		const zakazane = /moneyKod|\bBP[KP]\d{5}\b|\bTS\d{3,}|\bPRP\d{3,}/;
+		expect(seedTxt).not.toMatch(zakazane);
+		expect(modulTxt).not.toMatch(zakazane);
+		expect(vstupTxt).not.toMatch(zakazane);
+		// modul neimportuje Money zapisovač / DB / katalóg skla / bazénový odpis (BPK/BPP)
+		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/money['"]/);
+		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/db['"]/);
+		expect(modulTxt).not.toMatch(/from ['"][^'"]*sklo-strecha['"]/);
+		expect(modulTxt).not.toMatch(/from ['"][^'"]*server\/bazen['"]/);
+		expect(modulTxt).not.toMatch(/from ['"][^'"]*bazen-komponenty['"]/);
 	});
 });
 

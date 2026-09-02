@@ -1,11 +1,12 @@
-// Verejný zákaznícky konfigurátor bazénových zastrešení (#385, etapa 2 jednotného rámu #384) —
-// VEREJNÁ route (bez auth; `/konfigurator` prefix je v PUBLIC_PATHS → `/konfigurator/bazen`
-// prechádza cez `startsWith`). Display-only, BEZ CIEN (honest-null — bazén nemá overený cenový
-// zdroj, viď design komentár #385), BEZ Money kódov. `load` posiela klientovi LEN client-safe
-// katalóg z `konfigurator-bazen` (modely/koľaj/výplne/rozmedzia) + RAL farby — žiadny Money kód,
-// žiadna cena. `actions.dopyt` = verejný kontaktný formulár → PDF špecifikácia (BEZ ceny, honest-
-// null gate v pipeline) + Odoo lead, produkt SERVER-AUTORITATÍVNY (`'bazen'`, klient ho nefalšuje).
-// Money-neutrálne (guard: tests/konfigurator-money-safety.test.ts + tests/dopyt-money-safety.test.ts).
+// Verejný zákaznícky konfigurátor bazénových zastrešení (#385, etapa 2 jednotného rámu #384;
+// #404 orientačná cena) — VEREJNÁ route (bez auth; `/konfigurator` prefix je v PUBLIC_PATHS →
+// `/konfigurator/bazen` prechádza cez `startsWith`). BEZ Money kódov, BEZ VEĽKOOBCHODNEJ (VO) ceny.
+// `load` posiela klientovi LEN client-safe katalóg z `konfigurator-bazen` (modely/koľaj/výplne/
+// rozmedzia) + RAL farby — žiadny Money kód, žiadna cena (cena je až v akcii `vypocet`). `actions`:
+// `vypocet` = orientačná MO cena (#404, server-počítaná bazénovou maticou); `dopyt` = verejný
+// kontaktný formulár → PDF špecifikácia s orientačnou cenou + Odoo lead, produkt SERVER-AUTORITATÍVNY
+// (`'bazen'`, klient ho nefalšuje). Money-neutrálne (žiadny odpis/`/data` zápis; guard:
+// tests/konfigurator-money-safety.test.ts + tests/dopyt-money-safety.test.ts).
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import {

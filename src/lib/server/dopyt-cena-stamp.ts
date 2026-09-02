@@ -53,8 +53,9 @@ function cennikVerziaProdukt(produkt: string | null | undefined): string {
  *  z ktorej matice bol dopyt podaný). */
 export interface CenaStamp {
 	cena: VerejnaCena | null;
-	/** #385: `null` pre produkt bez cenového zdroja (bazén, …) — honest-null, do `dopyt.cennik_verzia`
-	 *  sa uloží NULL (žiadna pergolová verzia sa bazénu nepriradí). Pergola → aktuálna `CENNIK_VERZIA`. */
+	/** #385/#404: `null` pre produkt bez cenového zdroja (rady bez vyťaženej matice) — honest-null,
+	 *  do `dopyt.cennik_verzia` sa uloží NULL. Pergola → `CENNIK_VERZIA`, bazén → `CENNIK_VERZIA_BAZEN`
+	 *  (produkt-aware, `cennikVerziaProdukt`). */
 	cennikVerzia: string | null;
 }
 
@@ -65,11 +66,11 @@ export function opeciatkujCenu(cfg: PonukaConfig, hladina: CenovaHladina = 'MO')
 	return { cena: cenaZCfg(cfg, hladina), cennikVerzia: CENNIK_VERZIA };
 }
 
-/** #385: opečiatkuj cenu IBA pre produkt s OVERENÝM cenovým zdrojom (interim matica montalu.sk).
- *  Produkt bez zdroja (bazén a ostatné rady zatiaľ) → honest-null pečiatka `{ cena: null,
- *  cennikVerzia: null }` — inak by `opeciatkujCenu` spočítalo z rozmerov NESPRÁVNU PERGOLOVÚ cenu a
- *  uložilo/zobrazilo ju bazénu (pergola pricing je jediný cenník). `produkt` je SERVER-autoritatívny
- *  argument z routy (`dopytAction`/`objednavkaAction`), nikdy null v tejto vetve. */
+/** #385/#404: opečiatkuj cenu IBA pre produkt s OVERENÝM cenovým zdrojom (interim matica montalu.sk).
+ *  Pergola + bazén (#404) majú zdroj → cena sa spočíta produkt-aware (`cenaZCfgProdukt`: bazén z
+ *  bazénovej matice, ostatné z pergolovej). Rad bez zdroja → honest-null pečiatka `{ cena: null,
+ *  cennikVerzia: null }` — inak by z rozmerov dostal NESPRÁVNU cenu iného radu. `produkt` je
+ *  SERVER-autoritatívny argument z routy (`dopytAction`/`objednavkaAction`), nikdy null v tejto vetve. */
 export function opeciatkujCenuPreProdukt(
 	cfg: PonukaConfig,
 	produkt: KonfProduktKod,

@@ -37,6 +37,31 @@ test('bazén konfigurátor: verejná route bez auth — súhrn + orientačná ce
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('bazén cena: zmena rozmeru zneaktuálni zobrazenú cenu → „Prepočítať" → nová cena, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/bazen');
+
+	// zobraz orientačnú cenu pre default (6000 × 4000)
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+
+	// zmeň dĺžku → cena sa považuje za NEAKTUÁLNU (nikdy neukáž cenu pre iný rozmer): blok zmizne,
+	// tlačidlo sa vráti ako „Prepočítať" (#404 `cenaAktualna` gating)
+	await page.getByTestId('bazen-dlzka').fill('9');
+	await page.getByTestId('bazen-dlzka').blur();
+	await expect(page.getByTestId('bazen-cena')).toHaveCount(0);
+	await expect(page.getByTestId('bazen-cena-zobrazit')).toContainText('Prepočítať');
+
+	// prepočítaj → nová orientačná cena pre 9000 × 4000
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+	await expect(page.getByTestId('bazen-cena-sdph')).toContainText('€');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('bazén konfigurátor: zmena modelu + rozmeru → súhrn sa aktualizuje → dopyt → PDF na stiahnutie, nula console chýb', async ({
 	page
 }) => {
