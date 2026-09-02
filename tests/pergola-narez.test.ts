@@ -760,6 +760,26 @@ describe('#161 — nominálna dĺžka krovu (priečka) + krovové lišty (overen
 		expect(prM.poznamkaDetail).not.toMatch(/na potvrdenie/i);
 	});
 
+	it('#415 prítlačná lišta (Robust): PRÍDAVOK +30 je potvrdený (Dominik priamo), odpočet dĺžky krovu ostáva samostatne na potvrdenie', () => {
+		// Dominik 2.9. priamo potvrdil prídavok (+30 Robust/+40 Massive) — appka nesmie na
+		// obrazovke naďalej tvrdiť, že prídavok čaká na potvrdenie (bola by to zavádzajúca
+		// informácia). Odpočet dĺžky krovu (KROV_ODPOCET_ROBUST, #161) je SAMOSTATNÁ,
+		// stále neoverená hodnota — jej výhrada musí zostať, len oddelene od prídavku.
+		const r = spocitajNarez({ ...OVERENA, system: 'Robust' });
+		const p6 = r.vypocitane.find((p) => p.kod === '18006')!;
+		expect(p6.poznamkaDetail, 'prídavok musí byť opísaný ako potvrdený').toMatch(
+			/prídavok[^.]*potvrden/i
+		);
+		expect(
+			p6.poznamkaDetail,
+			'prídavok už nesmie byť spárovaný s „na potvrdenie" v tej istej vete'
+		).not.toMatch(/prídavok[^.]*na potvrdenie/i);
+		expect(
+			p6.poznamkaDetail,
+			'odpočet dĺžky krovu (samostatná hodnota, #161) ostáva na potvrdenie'
+		).toMatch(/(odpočet|dĺžka krovu)[^.]*na potvrdenie/i);
+	});
+
 	it('A7: sklon nad 9° → priečka aj lišty honest-null (pásmo bez vzorca nejde do Money)', () => {
 		const r = spocitajNarez({ ...OVERENA, sklonStrechy: 12 });
 		expect(r.vypocitane.find((p) => /priečk/i.test(p.nazov))!.dlzkaRezuMm).toBeNull();

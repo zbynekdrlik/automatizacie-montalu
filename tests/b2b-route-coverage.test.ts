@@ -330,27 +330,28 @@ describe('/konfigurator/zasklenie — žiadna cesta k Money odpisu (#387)', () =
 	});
 });
 
-// #386, rovnaká disciplína — podstránka zimnej záhrady má PRESNE jedinú akciu `dopyt` (verejný
-// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
-// čisto klientsky, honest-null — zimná záhrada nemá cenový zdroj), žiadna Money/odpisová zápisová
-// akcia. VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek
-// ďalšej akcie tento test ROZBIJE (fail-closed).
-describe('/konfigurator/zimna-zahrada — žiadna cesta k Money odpisu (#386)', () => {
-	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+// #386/#408, rovnaká disciplína ako bazén — podstránka zimnej záhrady má PRESNE `dopyt` (verejný
+// kontaktný formulár → PDF špecifikácia s orientačnou cenou + Odoo lead) + `vypocet` (#408: orientačná
+// cena, display-only — vyťaženie cenovej matice odblokovalo cenovú kalkulačku, presne ako bazénová
+// `vypocet`). Žiadna Money/odpisová ZÁPISOVÁ akcia (cena je LEN orientačná MO predajná, nie Money odpis;
+// `vypocet` nič nezapisuje). VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie
+// akejkoľvek ďalšej akcie tento test ROZBIJE (fail-closed).
+describe('/konfigurator/zimna-zahrada — žiadna cesta k Money odpisu (#386/#408)', () => {
+	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
 
-// #388, rovnaká disciplína ako bazén — oplotenie podstránka má PRESNE jedinú akciu `dopyt` (verejný
-// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
-// čisto klientsky, honest-null — oplotenie nemá cenový zdroj), žiadna Money/odpisová zápisová akcia.
+// #388/#410, rovnaká disciplína ako bazén — oplotenie podstránka má PRESNE akcie `dopyt` + `vypocet`
+// (verejný kontaktný formulár → PDF špecifikácia s orientačnou cenou + Odoo lead; `vypocet` = orientačná
+// MO cena z matice montalu.sk). Žiadna Money/odpisová ZÁPISOVÁ akcia (cena je len read-only výpočet).
 // VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
 // tento test ROZBIJE (fail-closed).
-describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388)', () => {
-	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388/#410)', () => {
+	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/oplotenie/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
 

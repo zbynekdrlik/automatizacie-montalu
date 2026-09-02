@@ -9,6 +9,7 @@ import {
 	formatEur,
 	FIRMA,
 	DISCLAIMER,
+	DISCLAIMER_ZZ,
 	type PonukaConfig
 } from '../src/lib/ponuka';
 
@@ -144,6 +145,12 @@ describe('firmaRiadky + konštanty', () => {
 		expect(DISCLAIMER).toMatch(/orientačná/i);
 		expect(DISCLAIMER).toMatch(/nie záväzná cenová ponuka/i);
 		expect(FIRMA.nazov).toBe('Montalu');
+	});
+
+	it('#408 DISCLAIMER_ZZ hovorí, že cena je pre ZÁKLADNÉ vyhotovenie + upresnenie po obhliadke', () => {
+		expect(DISCLAIMER_ZZ).toMatch(/orientačná/i);
+		expect(DISCLAIMER_ZZ).toMatch(/základné vyhotovenie/i);
+		expect(DISCLAIMER_ZZ).toMatch(/obhliadke/i);
 	});
 });
 

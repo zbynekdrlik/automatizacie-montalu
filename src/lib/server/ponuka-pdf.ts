@@ -14,6 +14,7 @@ import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
 import {
 	DISCLAIMER,
 	DISCLAIMER_BEZ_CENY,
+	DISCLAIMER_ZZ,
 	FIRMA,
 	firmaRiadky,
 	formatEur,
@@ -292,7 +293,12 @@ function drawSlotPlaceholder(
 	});
 }
 
-function drawFirmaADisclaimer(ctx: Ctx, cursorTop: number, maCena: boolean): void {
+function drawFirmaADisclaimer(
+	ctx: Ctx,
+	cursorTop: number,
+	maCena: boolean,
+	produkt: string | null | undefined
+): void {
 	let y = cursorTop;
 	// firma
 	ctx.page.drawText(FIRMA.nazov, { x: MARGIN, y, size: 11, font: ctx.bold, color: INK });
@@ -303,7 +309,14 @@ function drawFirmaADisclaimer(ctx: Ctx, cursorTop: number, maCena: boolean): voi
 	}
 	y -= 10;
 	// #385: disclaimer bez ceny pre honest-null produkt (nesmie tvrdiť „uvedená cena je orientačná").
-	for (const ln of wrapText(ctx.reg, maCena ? DISCLAIMER : DISCLAIMER_BEZ_CENY, 9.5, CONTENT_W)) {
+	// #408: zimná záhrada s cenou → disclaimer o ZÁKLADNOM vyhotovení (interim cena nepremieta model/
+	// zasklenie stien) — inak by MASSIVE zákazník dostal ROBUST-bázovú cenu bez upozornenia v PDF.
+	const disclaimer = !maCena
+		? DISCLAIMER_BEZ_CENY
+		: produkt === 'zimna-zahrada'
+			? DISCLAIMER_ZZ
+			: DISCLAIMER;
+	for (const ln of wrapText(ctx.reg, disclaimer, 9.5, CONTENT_W)) {
 		ctx.page.drawText(ln, { x: MARGIN, y, size: 9.5, font: ctx.reg, color: MUTED });
 		y -= 13;
 	}
@@ -376,7 +389,7 @@ export async function generatePonukaPdf(
 	cursor = drawKonfiguracia(ctx, cfg, cursor);
 	if (cena) cursor = drawCena(ctx, cena, cfg, cursor);
 	cursor = await drawRenderSlot(doc, ctx, opts.renderPng, cursor, opts.produkt);
-	drawFirmaADisclaimer(ctx, cursor, maCena);
+	drawFirmaADisclaimer(ctx, cursor, maCena, opts.produkt);
 	drawFooter(ctx, datum);
 
 	// metadáta = testovateľný kanál hodnôt + korektné vlastnosti dokumentu

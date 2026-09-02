@@ -20,6 +20,7 @@ import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
 // DISPLAY-ONLY + Money-neutrálne — FIX NEVSTUPUJE do buildRezervaciaRozpis.
 import { parseFixZPergoly, efektivnyFix, type FixZPergola } from '$lib/pergola-fix';
 import type { PergolaNarezVstup } from '$lib/pergola-narez';
+import { spocitajStrechaSklo } from '$lib/pergola-sklo';
 import { writeOdpis, isLive, blokHlaska, overrideOpts, rawFormEntries } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
@@ -71,13 +72,19 @@ function cenyPre(
 }
 
 /**
- * #223 — €/m² strešného skla (display-only, LEN pre interných). Rovnaká obrana do hĺbky ako
- * `cenyPre`: pre b2b sa cena VÔBEC nedopočíta (nedostane sa do HTML). Money odpis skla sa
- * NEROBÍ — toto je len jednotková cena zo snapshotu; honest-null keď typ/kód/cena chýba.
+ * #223 — cena strešného skla (display-only, LEN pre interných): €/m² zo snapshotu + celková cena
+ * skiel (celková plocha × €/m²). Rovnaká obrana do hĺbky ako `cenyPre`: pre b2b sa cena VÔBEC
+ * nedopočíta (nedostane sa do HTML). Celková plocha sa berie z `spocitajStrechaSklo(vstup)` (tá istá
+ * čistá geometria, akú klient renderuje) — honest-null keď dĺžka/počet/kód/cena chýba. Money odpis
+ * skla sa NEROBÍ.
  */
-function strechaCenaPre(user: SessionUser | null, typ: string | null): StrechaSkloCena | null {
+function strechaCenaPre(
+	user: SessionUser | null,
+	vstup: PergolaNarezVstup
+): StrechaSkloCena | null {
 	if (isB2B(user)) return null;
-	return strechaSkloCenaPre(typ);
+	const geo = spocitajStrechaSklo(vstup);
+	return strechaSkloCenaPre(vstup.strechaSkloTyp ?? null, geo.plochaCelkomM2);
 }
 
 export const load: PageServerLoad = async () => {
@@ -100,9 +107,9 @@ export const actions = {
 		// #378 — FIX echujeme cez celý tok (round-trip); DISPLAY-ONLY, do Money NEIDE
 		const fix = parseFix(form, vstup);
 		if (error) return { step: 'form' as const, error, vstup, ident, rucne, fix };
-		// #223 — €/m² strešného skla (LEN interní; b2b nikdy nedostane cenu). Geometria
-		// (šírka/počet tabúľ) sa počíta klientsky z `vstup`; sem patrí len cena zo snapshotu.
-		const strechaSkloCena = strechaCenaPre(locals.user, vstup.strechaSkloTyp ?? null);
+		// #223 — cena strešného skla €/m² + celková cena (LEN interní; b2b nikdy nedostane cenu).
+		// Geometria sa renderuje klientsky, ale server si celkovú plochu re-počíta pre cenu.
+		const strechaSkloCena = strechaCenaPre(locals.user, vstup);
 		return {
 			step: 'vysledok' as const,
 			vstup,

@@ -548,6 +548,37 @@ test('#161 krov cut-list (OP260282): počet krovov 8 → svetlosť 655,43, prie�
 	expect(consoleMsgs).toEqual([]);
 });
 
+// --- #415 prítlačná lišta (Robust): prídavok potvrdený, odpočet krovu ostáva samostatne na potvrdenie ---
+test('#415 Robust prítlačná lišta: poznámka hovorí „prídavok … potvrdený", odpočet krovu ostáva „na potvrdenie" samostatne', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Robust');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
+	await page.locator('#pocetPrednychNoh').fill('4');
+	await page.locator('#uchytenie').selectOption('samostatne');
+	await page.locator('#vyskaZadna').fill('2790');
+	await page.locator('#pocetZadnychNoh').fill('4');
+	await page.locator('#hornyProfilZadnej').selectOption('110');
+	await page.locator('#sklonStrechy').fill('6.1');
+	await page.locator('#pocetKrovov').fill('8');
+
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// prídavok (+30) je teraz opísaný ako potvrdený — appka už nesmie tvrdiť, že čaká
+	const pritlacna = page.getByTestId('polozka-18006');
+	await expect(pritlacna).toContainText('priamo potvrdený');
+	// základná dĺžka krovu (odpočet) je SAMOSTATNÁ, stále neoverená hodnota — výhrada ostáva
+	await expect(pritlacna).toContainText('na potvrdenie');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 // --- #223 strešné sklo: výber typu → karta (šírka = svetlosť + 30/34, honest-null dĺžka) ------
 test('#223 strešné sklo (OP260282): typ IZO 4.4.2-8-6 číre, n=8 → 7 tabúľ, šírka 685,43, dĺžka „—", kód TS00014', async ({
 	page
@@ -568,7 +599,9 @@ test('#223 strešné sklo (OP260282): typ IZO 4.4.2-8-6 číre, n=8 → 7 tabú�
 	await expect(page.getByTestId('strecha-sklo-typ')).toContainText('IZO 4.4.2-8-6 číre');
 	await expect(page.getByTestId('strecha-sklo-pocet')).toHaveText('7'); // n − 1
 	await expect(page.getByTestId('strecha-sklo-sirka')).toContainText('685,43'); // 655,43 + 30
-	await expect(page.getByTestId('strecha-sklo-dlzka')).toContainText('—'); // honest-null
+	// dĺžka honest-null „—": default konfigurácia (stena, bez sklonu) nie je overená kotva krovu;
+	// dĺžka sa počíta až pri samostatne+110+sklone (viď samostatný #223 test nižšie)
+	await expect(page.getByTestId('strecha-sklo-dlzka')).toContainText('—');
 	await expect(page.getByTestId('strecha-sklo-kod')).toHaveText('TS00014');
 
 	expect(consoleMsgs).toEqual([]);
@@ -607,6 +640,35 @@ test('#223 strešné sklo — polykarbonát: šírka = svetlosť + 34, kód hone
 
 	await expect(page.getByTestId('strecha-sklo-sirka')).toContainText('689,43'); // 655,43 + 34
 	await expect(page.getByTestId('strecha-sklo-kod')).toHaveText('—'); // polykarbonát bez TS kódu
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #223 — POTVRDENÁ dĺžka (Dominik 2.9.): dĺžka hornej hrany krovu + 10/20; emituje sa LEN pre
+// overenú konfiguráciu kotvy (samostatne + zadný 110 + sklon). Plná OP260282 konfigurácia →
+// masív 3239,76 + 20 = 3259,76 (reálny rez skla 3259 mm), celková plocha 7 tabúľ = 15,64 m².
+test('#223 strešné sklo — overená konfigurácia (Massive, samostatne, zadný 110, sklon 6,1°) → dĺžka 3259,76 + plocha 15,64 m²', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Massive');
+	await page.locator('#sirka').fill('4990');
+	await page.locator('#hlbka').fill('3470');
+	await page.locator('#uchytenie').selectOption('samostatne');
+	// #hornyProfilZadnej sa renderuje AŽ po výbere „samostatne" (podmienené pole) — Playwright
+	// locator si naň počká, kým sa objaví.
+	await page.locator('#hornyProfilZadnej').selectOption('110');
+	await page.locator('#sklonStrechy').fill('6.1');
+	await page.locator('#pocetKrovov').fill('8');
+	await page.locator('#strechaSkloTyp').selectOption('IZO 4.4.2-8-6 číre');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('strecha-sklo-dlzka')).toContainText('3259,76');
+	await expect(page.getByTestId('strecha-sklo-plocha')).toContainText('15,64');
 
 	expect(consoleMsgs).toEqual([]);
 });

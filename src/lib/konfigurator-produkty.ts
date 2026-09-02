@@ -79,11 +79,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		stav: 'live',
 		odkaz: '/konfigurator/zimna-zahrada',
 		externy: false,
-		// #386: honest-null pre TÚTO PR — montalu.sk MÁ cenový zdroj pre zimné záhrady
-		// (`montalu.sk/konfigurator/zimne-zahrady`, karta „od 5 364,29 € bez DPH", rovnaký tvar ako
-		// pergolový/bazénový konfigurátor), ale jeho vyťaženie do interim matice je práca v rozsahu #279
-		// = samostatný follow-up #408. Do vtedy bez orientačnej ceny (nevymýšľame cenu bez overenej matice).
-		cenovyZdroj: false
+		// #408: zimná záhrada MÁ vyťažený interim cenový zdroj (matica montalu.sk `update-winter-gardens`
+		// v `cennik-zimna-zahrada.json`, server modul `konfigurator-zimna-zahrada-cena.ts`) → orientačná
+		// cena je odblokovaná (gate `maCenovyZdroj` → dopyt/PDF/`vypocet` akcia dostanú cenu z matice
+		// hĺbka × šírka × strešné zasklenie pri bázovom systéme stien; model ROBUST/MASSIVE = display spec).
+		cenovyZdroj: true
 	},
 	{
 		kod: 'zasklenie',
@@ -109,9 +109,10 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		stav: 'live',
 		odkaz: '/konfigurator/oplotenie',
 		externy: false,
-		// #388: oplotenie NEMÁ overený interim cenový zdroj (montalu.sk `update-fencings` existuje /419/,
-		// ale jeho vyťaženie do matice je práca v rozsahu #279 — samostatný follow-up). Honest-null → bez ceny.
-		cenovyZdroj: false
+		// #410: oplotenie MÁ vyťažený interim cenový zdroj (matica montalu.sk `update-fencings` v
+		// `cennik-oplotenie.json`, server modul `konfigurator-oplotenie-cena.ts`) → orientačná cena je
+		// odblokovaná (gate `maCenovyZdroj` → dopyt/PDF/`vypocet` akcia dostanú oplotenie cenu).
+		cenovyZdroj: true
 	},
 	{
 		kod: 'tienenie',

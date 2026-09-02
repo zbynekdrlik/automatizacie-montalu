@@ -158,7 +158,11 @@ bez ďalšieho potvrdenia — zvyšok si na výkrese PROTIREČÍ, nefituj nasilu
 - **NULL (nikdy sa nehádže):** `HH krovu` (3240.9) NIE JE vzorec zo vstupov — je to CAD
   výsledok geometrie krovu (#161, `pergola-krov.ts` počíta uloženie, NIE dĺžku HH). Preto
   priečka dĺžka (= HH krovu) a prítlačná/maskovacie (18006/18007/18008 = HH krovu + 40)
-  ostávajú čestný null (#161/#198). Robust prítlačná HH krovu + 39 = NEPOTVRDENÉ (O18).
+  ostávajú čestný null (#161/#198), TAK AKO BOLO V ČASE PÔVODNEJ analýzy tohto výkresu.
+  **PREKONANÉ (25.8./#415):** priečka+lišty sú odvtedy IMPLEMENTOVANÉ pre overenú
+  konfiguráciu (viď „Krov cut-list (#161)" nižšie) — Robust prítlačná NIE JE +39 (pôvodný
+  neoverený návrh), je POTVRDENÁ na +30 (Dominik ch207 msg 1724331, znovu priamo
+  potvrdené #415 msg 1777597, 2.9.); Massive ostáva +40.
 - **Počet priečok:** engine `ceil(šírka/700)+1 = 9`, výkres 8 (rám < žľab, presah O1/#196).
   Confirmed vzorec sa NEMENÍ; rozdiel je zdokumentovaný v `nepodporovane[]`.
 - **#205 DORIEŠENÉ (dva z troch už POČÍTANÉ, jeden ostáva NULL):**
@@ -448,9 +452,12 @@ sú tým ČIASTOČNE prekonané. Aktuálny stav:
 
 Vzorec −250 je overený na JEDNOM golden bode; **Robust má od 25.8. vlastné pravidlo −220**
 (Dominik verbatim ch207 msg 1724329: „výsuv −154,94 masív / −124,94 Robust" = rozdiel presne
-30 = predný profil 140−110, ukotvené na overený masív bod; lišty Robust = +30, msg 1724331 —
-bez Robust goldenu → riadok nesie poznámku „na potvrdenie"). Engine emituje nominál/lišty do
-Money **iba pre konfiguráciu KOTVY**:
+30 = predný profil 140−110, ukotvené na overený masív bod; lišty Robust = +30, msg 1724331).
+**#415 (2.9.): prídavok +30/+40 je odvtedy DVOJMO potvrdený priamo (msg 1777597) — riadok
+už NEsie „na potvrdenie" na prídavku.** Zostáva SAMOSTATNE neoverená len základná dĺžka
+krovu (odpočet −220, bez vlastného Robust golden výkresu) — jej výhrada na riadku ostáva,
+oddelene od prídavku (viď `krovoveListy` v `pergola-narez.ts`). Engine emituje nominál/lišty
+do Money **iba pre konfiguráciu KOTVY**:
 
 ```
 krovConfigOverena = uchytenie === 'samostatne' && hornyProfilZadnej === 110   // OBA systémy
@@ -487,19 +494,25 @@ po potvrdení variácie, ticket #223).
   „polykarbon"). Potvrdené A1 (Dominik #198, 21.8.); výstuha 140 do šírky NEvstupuje.
 - **Počet tabúľ = počet polí medzi krovmi = `platnyPocetKrovov(v) − 1`** (`platnyPocetKrovov` je
   odteraz exportovaný z `pergola-narez.ts`). Bez manuálneho počtu krovov → honest-null.
-- **Dĺžka tabule = VŽDY honest-null — od 25.8. podložené REÁLNYM kusom.** Výrobný výkres skla
-  OP260282 (ch207 msg 1731731, príloha 10504; „sklo maš pripnute" msg 1739824): 7 ks, 685 × 3259.
-  Šírka aj počet vzorce reprodukujú (685,43 → rez 685 nadol; 7 polí ✓ — prvé overenie proti reálnemu
-  rezu, `tests/pergola-sklo.test.ts` verifikačný describe), ale dĺžku NEreprodukuje ŽIADNE verbatim
-  pravidlo: chat „dĺžka krovu + 40" → 3279,76 ✗ (= presne prítlačná lišta!), call „HH + 20" →
-  3260,93 ✗. NEHÁDAŤ (nominál+20+floor by sedel, ale je to dvojitá domnienka). Korekcia šírky pre
-  „pole s výstuhou" NEEXISTUJE — všetkých 7 tabúľ rovnakých + Dominik „ano nevstupuje" (1725595).
+- **Dĺžka tabule = POTVRDENÁ (Dominik 2.9., discuss.channel_393 msg 1777597): dĺžka hornej hrany
+  krovu + 10 (Robust) / + 20 (Massiv), ~2 mm drift sa NErieši** („tieto detaile prosím nerieš …
+  návrhový výkres na rezervovanie materiálu … sklo je osadené na ploche ktorá nie je nikde
+  kótovaná"). Base = appkin nominál krovu (`krovDlzkaNominalOverena` v `pergola-narez.ts` — spodná
+  hrana ≈ horná hrana so waivnutým ~1,17 mm seatingom) → golden OP260282 masív 3239,76 + 20 =
+  3259,76 = reálny rez 3259 (Δ 0,76 mm, v pásme ~2 mm). Skoršie protirečivé kandidáty (chat
+  „krov+40"→3279,76, call „HH+20"→3260,93) sú tým prekonané. **Config-gate:** dĺžka sa emituje LEN
+  pre overenú kotvu (samostatne + zadný 110 + sklon do 9°) — stena/zadný 140/bez sklonu →
+  honest-null (rovnaká disciplína ako rez krovu; default formulára stena → dĺžka „—"). Korekcia
+  šírky „pole s výstuhou" NEEXISTUJE (7 tabúľ rovnakých + Dominik „ano nevstupuje" 1725595).
 - **Typ skla = NOVÝ `strechaSkloTyp` select** (14 typov z `SKLO_STRECHA_TYPY`), riadi vzorec (+30/+34)
   aj cenu. Voľný text `strechaSklo` ostal SAMOSTATNE (poznámka/coating/RAL na výkres) — nulová regresia.
-- **Cena = €/m² UNIT zo snapshotu**, server modul `src/lib/server/sklo-strecha-cena.ts`
-  (`strechaSkloCenaPre` → `skloStrechaMoneyKod` → `cenaZaM2`), interní gate `!isB2B` v `spocitat`
-  (vzor `cenyPre`). **ŽIADNY total** (plocha = šírka × DĹŽKA × počet, dĺžka null → plocha neznáma).
-  Typ bez TS kódu (8/14) → „karta v Money zatiaľ neexistuje" (honest-null), NIKDY hádaný kód.
+- **Cena = €/m² UNIT + CELKOVÁ cena skiel** (Palohova požiadavka „aby to tam započítalo aj ceny
+  skiel"), server modul `src/lib/server/sklo-strecha-cena.ts` (`strechaSkloCenaPre(typ,
+  plochaCelkomM2)` → `eurM2` + `cenaSpolu = plocha × €/m²`), interní gate `!isB2B` v `spocitat`
+  (vzor `cenyPre`). Celková plocha príde z `spocitajStrechaSklo(vstup).plochaCelkomM2` (server ju
+  re-počíta z tej istej čistej geometrie, ako klient — vzor `fixEff` #378). `cenaSpolu` je
+  honest-null keď €/m² alebo plocha (honest-null dĺžka) chýba; typ bez TS kódu (8/14) → „karta v
+  Money zatiaľ neexistuje", NIKDY hádaný kód. Money ODPIS skla sa stále NEROBÍ (až po variácii, #235).
 - **Rozdelenie klient/server:** geometria je klientsky `$derived spocitajStrechaSklo(vstup)` (ako
   `vysledok`/`komponenty`); cena príde zo servera (`form.strechaSkloCena`). `RezVysledok`/`+page.svelte`
   NEimportujú `$lib/server/*` (ani cenový TYP) — prop používa klientsky štrukturálny typ.
