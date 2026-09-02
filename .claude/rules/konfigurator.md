@@ -321,7 +321,15 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   `server/*`) — zákaznícka vrstva je ODDELENÁ od odpisovej. Importuje LEN `import type { PonukaConfig }`.
 - **`/konfigurator/<slug>/+page.server.ts`**: `load` (client-safe katalóg + `RAL_PALETA`) + akcia
   `dopyt: (e) => dopytAction(e, '<slug>')` (produkt SERVER-autoritatívny). Množinu akcií zamkne
-  `b2b-route-coverage` describe (bazén = presne `['dopyt']`; pergola má navyše `vypocet`/`objednavka`).
+  `b2b-route-coverage` describe — čerstvý produkt bez cenového zdroja štartuje na presne `['dopyt']`.
+- **`vypocet`/`objednavka` sú NÁSLEDNÉ tikety, nie súčasť tohto checklistu** — mountujú sa AŽ KEĎ
+  produkt dostane `cenovyZdroj:true` (viď honest-null nižšie), lebo `objednavkaAction`/`vypocet`
+  zapečaťujú CENU a bez matice by pečiatkovali nezmyselnú hodnotu. Poradie overené 2×: pergola
+  (#279 cena → #319 objednávka) aj bazén (#404 cena → #422 objednávka, PR #422 „krok 4"). Keď
+  produkt dostane maticu, `vypocet` + `objednavka` sú ČISTÁ REPLIKÁCIA existujúceho vzoru (mount
+  `objednavkaAction(e, '<slug>')` + `<ObjednavkaForm>` sekcia MIMO dopyt formu, akcia-set assert
+  `['dopyt','objednavka','vypocet']`) — žiadny nový dizajn, žiadne prekvapenia (2 nezávislé
+  implementácie, obe 0 🔴 0 🟡 0 🔵 review).
 - **`KONF_PRODUKTY`**: kartu prepni `stav:'live'` + `odkaz:'/konfigurator/<slug>'` + `externy:false` +
   `cenovyZdroj` (viď honest-null nižšie). `KonfVyber.svelte` `LiveRoute` úniu rozšír o `/konfigurator/<slug>`.
 - **Guardy** (fail-closed): `b2b-route-coverage` (ALLOWED + self-check + action-set describe + „nie je
