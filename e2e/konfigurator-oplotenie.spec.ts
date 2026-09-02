@@ -122,3 +122,35 @@ test('oplotenie konfigurátor: zmena typu + modelu + rozmeru → súhrn sa aktua
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('oplotenie obálka (#427): cenníkový rozsah per-typ + „mimo rozsah" hláška + ATYP na mieru, nula console chýb', async ({
+	page
+}) => {
+	// #427: per-typ cenníková obálka vystavená do UI (namiesto „nemej steny"). Read-only (žiadny POST →
+	// žiadny zápis), takže bez `skipAkLive` — beží aj proti LIVE prode.
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/oplotenie');
+
+	// default typ = plotový diel → cenníkový rozsah (šírka do 3,5 m) je HNEĎ viditeľný a default rozmery
+	// (1,5 × 2,0 m) sú v ňom → žiadna „mimo rozsah" hláška
+	const obalka = page.getByTestId('oplotenie-obalka');
+	await expect(obalka).toBeVisible();
+	await expect(obalka).toContainText('plotový diel');
+	await expect(obalka).toContainText('šírka 1,0');
+	await expect(obalka).toContainText('3,5 m');
+	await expect(page.getByTestId('oplotenie-obalka-mimo')).toHaveCount(0);
+
+	// prepni na vchodovú bránku (užšia obálka, šírka do 1,5 m) → rozsah sa zmení; default šírka 2,0 m je
+	// NAD ním → čestná „mimo rozsah = na vyžiadanie" hláška sa zobrazí (namiesto nemej individuálnej steny)
+	await page.getByTestId('oplotenie-typ-branka').click();
+	await expect(obalka).toContainText('vchodová bránka');
+	await expect(obalka).toContainText('1,5 m');
+	await expect(page.getByTestId('oplotenie-obalka-mimo')).toBeVisible();
+
+	// ATYP výplň = oplotenie na mieru → obálka sa nahradí hláškou o individuálnej cene (žiadny rozsah)
+	await page.getByTestId('oplotenie-model-ATYP').click();
+	await expect(obalka).toContainText('na mieru');
+	await expect(page.getByTestId('oplotenie-obalka-mimo')).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});

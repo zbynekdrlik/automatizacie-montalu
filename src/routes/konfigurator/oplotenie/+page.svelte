@@ -12,9 +12,11 @@
 	import { enhance } from '$app/forms';
 	import DopytForm from '$lib/components/DopytForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
+	import { mmNaMetreText } from '$lib/konfigurator-jednotky';
 	import {
 		oplotenieTyp,
 		oplotenieModel,
+		oplotenieTypNazov,
 		oplotenieVstupPlatny,
 		konfigurujOplotenie,
 		oploteniePonukaConfig,
@@ -66,6 +68,21 @@
 	const platny = $derived(oplotenieVstupPlatny(vstup));
 	const suhrn = $derived(platny ? konfigurujOplotenie(vstup) : null);
 	const ponukaCfg = $derived<PonukaConfig>(suhrn ? oploteniePonukaConfig(suhrn) : {});
+
+	// #427: cenníková rozmerová obálka zvoleného TYPU (per-typ; server ju posiela v `data.obalky` — LEN
+	// rozmery, žiadna cena). Zákazník tak vidí PLATNÝ katalógový rozsah namiesto „nemej steny", a keď je
+	// zadaný rozmer mimo obálky, čestne to povieme (cena na vyžiadanie). ATYP = výplň na mieru (bez obálky).
+	const typNazov = $derived(oplotenieTypNazov(oplotenieTyp(typ)));
+	const jeAtyp = $derived(oplotenieModel(model) === 'ATYP');
+	const obalka = $derived(data.obalky[oplotenieTyp(typ)]);
+	// „mimo obálky" = rozmer prekročí max o VIAC než pol katalógovej mriežky (r.krok), teda by sa
+	// zaokrúhlil ZA obálku a cena by bola na vyžiadanie. Pod-flagujeme (bezpečný smer): pri hraničnom
+	// rozmere radšej hlášku nezobrazíme, než by sme falošne tvrdili „mimo" pri rozmere, čo cenu ešte dostane.
+	const mimoObalky = $derived(
+		!jeAtyp &&
+			((sirka ?? 0) > obalka.sirka.maxMm + r.sirka.krok / 2 ||
+				(vyska ?? 0) > obalka.vyska.maxMm + r.vyska.krok / 2)
+	);
 
 	// #410: orientačná cena — server-počítaná (`vypocet` akcia, enhance submit, žiadny reload). Zobrazí
 	// sa až po kliku „Zobraziť orientačnú cenu" (vzor bazénovej `vypocet`); pri zmene ktoréhokoľvek
@@ -176,6 +193,28 @@
 					</select>
 				</label>
 			</div>
+
+			<!-- #427: cenníkový rozmerový rozsah zvoleného typu (namiesto „nemej steny" individuálnej ponuky) -->
+			{#if jeAtyp}
+				<p class="kp-obalka" data-testid="oplotenie-obalka">
+					Výplň na mieru (ATYP) — presnú cenu pripravíme individuálne po zameraní.
+				</p>
+			{:else}
+				<p class="kp-obalka" class:mimo={mimoObalky} data-testid="oplotenie-obalka">
+					Cenníkový rozsah pre {typNazov.toLowerCase()}: výška {mmNaMetreText(
+						obalka.vyska.minMm
+					)}–{mmNaMetreText(obalka.vyska.maxMm)} m, šírka {mmNaMetreText(
+						obalka.sirka.minMm
+					)}–{mmNaMetreText(obalka.sirka.maxMm)} m.
+					{#if mimoObalky}
+						<span class="kp-obalka-mimo" data-testid="oplotenie-obalka-mimo"
+							>Zadané rozmery presahujú cenníkový rozsah — cenu pripravíme na vyžiadanie.</span
+						>
+					{:else}
+						<span class="kp-obalka-info">Väčšie rozmery pripravíme ako cenu na vyžiadanie.</span>
+					{/if}
+				</p>
+			{/if}
 		</fieldset>
 
 		<!-- FARBA -->
@@ -367,6 +406,22 @@
 	}
 	.kp-pocet {
 		max-width: 220px;
+	}
+	/* #427: cenníkový rozmerový rozsah zvoleného typu (pod steppermi) */
+	.kp-obalka {
+		margin: 14px 0 0;
+		font-size: 12.5px;
+		line-height: 1.5;
+		color: var(--k-muted, #6b7078);
+	}
+	.kp-obalka-info {
+		color: var(--k-faint, #9a9ea6);
+	}
+	.kp-obalka-mimo {
+		display: block;
+		margin-top: 4px;
+		color: #a3261c;
+		font-weight: 600;
 	}
 	/* Porovnanie modelov (oplotenie-špecifické; bazén má vlastné `.baz-porovnanie`) */
 	.kp-porovnanie {

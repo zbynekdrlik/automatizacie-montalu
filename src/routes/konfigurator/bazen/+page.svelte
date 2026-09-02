@@ -24,7 +24,7 @@
 	import ObjednavkaForm from '$lib/components/ObjednavkaForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
 	import KonfBazenVizual from '$lib/components/konfigurator/KonfBazenVizual.svelte';
-	import { cislaCiarka } from '$lib/konfigurator-jednotky';
+	import { cislaCiarka, mmNaMetreText } from '$lib/konfigurator-jednotky';
 	import {
 		bazenModel,
 		bazenKolaj,
@@ -88,6 +88,17 @@
 	const platny = $derived(bazenVstupPlatny(vstup));
 	const suhrn = $derived(platny ? konfigurujBazen(vstup) : null);
 	const ponukaCfg = $derived<PonukaConfig>(suhrn ? bazenPonukaConfig(suhrn) : {});
+
+	// #427: cenníková rozmerová obálka zvoleného MODELU (per-model — Premier/Star/Exclusive sa líšia
+	// šírkou; výška nie je cenotvorná). Server ju posiela v `data.obalky` (LEN rozmery). Zákazník tak vidí
+	// PLATNÝ katalógový rozsah namiesto „nemej steny", a keď zadá rozmer mimo, čestne to povieme.
+	const obalka = $derived(data.obalky[bazenModel(model)]);
+	// „mimo obálky" = rozmer prekročí max o VIAC než pol katalógovej mriežky (r.krok) → zaokrúhlil by sa
+	// ZA obálku (cena na vyžiadanie). Pod-flagujeme (bezpečný smer, žiadne falošné „mimo").
+	const mimoObalky = $derived(
+		(dlzka ?? 0) > obalka.dlzka.maxMm + r.dlzka.krok / 2 ||
+			(sirka ?? 0) > obalka.sirka.maxMm + r.sirka.krok / 2
+	);
 
 	// ---- ŽIVÝ 3D náhľad (#405) ----
 	function platnyRozmer(v: number | null, lo: number, hi: number): v is number {
@@ -269,6 +280,22 @@
 							</select>
 						</label>
 					</div>
+
+					<!-- #427: cenníkový rozmerový rozsah zvoleného modelu (namiesto „nemej steny") -->
+					<p class="baz-obalka" class:mimo={mimoObalky} data-testid="bazen-obalka">
+						Cenníkový rozsah pre model {model}: dĺžka {mmNaMetreText(
+							obalka.dlzka.minMm
+						)}–{mmNaMetreText(obalka.dlzka.maxMm)} m, šírka {mmNaMetreText(
+							obalka.sirka.minMm
+						)}–{mmNaMetreText(obalka.sirka.maxMm)} m.
+						{#if mimoObalky}
+							<span class="baz-obalka-mimo" data-testid="bazen-obalka-mimo"
+								>Zadané rozmery presahujú cenníkový rozsah — cenu pripravíme na vyžiadanie.</span
+							>
+						{:else}
+							<span class="baz-obalka-info">Väčšie rozmery pripravíme ako cenu na vyžiadanie.</span>
+						{/if}
+					</p>
 				</fieldset>
 
 				<!-- FARBA + VÝPLŇ -->
@@ -616,6 +643,22 @@
 	}
 	.baz-segmenty {
 		max-width: 220px;
+	}
+	/* #427: cenníkový rozmerový rozsah zvoleného modelu (pod steppermi) */
+	.baz-obalka {
+		margin: 14px 0 0;
+		font-size: 12.5px;
+		line-height: 1.5;
+		color: var(--k-muted, #6b7078);
+	}
+	.baz-obalka-info {
+		color: var(--k-faint, #9a9ea6);
+	}
+	.baz-obalka-mimo {
+		display: block;
+		margin-top: 4px;
+		color: #a3261c;
+		font-weight: 600;
 	}
 	.baz-pole {
 		display: flex;
