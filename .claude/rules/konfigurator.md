@@ -408,3 +408,38 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   BEZ OHĽADU na gate — takže test s `{system,sirka}` by prešiel aj keby gate NEBOL. Testuj gate FORGED
   pergola-tvarom (`hlbka`+`model` — `sanitizePonukaConfig` ho prijme) + pozitívnou kontrolou, že ten
   istý cfg s `'pergola'` cenu MÁ.
+
+## 13. Jednostĺpcová showroom podstránka = shell `KonfProduktStranka` (#409/#411)
+
+**5 JEDNOSTĹPCOVÝCH showroom podstránok** {tienenie, pristresok, zasklenie, zimna-zahrada,
+oplotenie} zdieľa kostru cez `src/lib/components/konfigurator/KonfProduktStranka.svelte` —
+NEKOPÍRUJ hero/grid/panel markup ani `<style>` do novej takej stránky. Split-screen 3D stránky
+(pergola/bazén, `.konf-*`/`.baz-*`, ľavý 3D stĺpec) shell NEpoužívajú (iná kostra).
+
+- **Nová jednostĺpcová podstránka:** `<KonfProduktStranka titul= popis= foto= alt= label= nadpis=
+  lead=>` + `{#snippet ovladacie()}…fieldset-y…{/snippet}` + `{#snippet panel()}{#if suhrn}súhrn +
+  cena + dopyt{:else}chyba{/if}{/snippet}`. Snippety sú súčasťou stránky → `bind`/`use:enhance`/
+  `onclick`/`$state` fungujú v nich normálne. NEobaľuj snippet obsah do `.kp-ovladanie`/`.kp-panel`
+  (to renderuje shell). `foto` = len názov webp (shell zloží `{base}/konfigurator/vyber/{foto}`).
+- **Snippet meno `ovladacie` (NIE `ovladanie`)** — `{#snippet X()}` vytvorí v stránke binding `X`;
+  tienenie má `let ovladanie` state, takže snippet `ovladanie` by KOLIDOVAL. Pri novej stránke over,
+  že snippet meno nekoliduje s premennou.
+- **Zdieľaná showroom CSS žije v `konfigurator/+layout.svelte`** ako `:global(.konf-app .kp-*)`
+  (vedľa `--k-*` tokenov; `.konf-app` scoping = žiadny únik do admin appky; #239 vzor). Aplikuje sa
+  aj na snippet obsah renderovaný v scope stránky. Per-produkt odlišnosti sú v `<style>` stránky:
+  šírka kariet cez CSS var (`.kp-karty { --kp-karta-min: Npx; }` base default 150; `.dvoj` cez
+  `--kp-karta-min-dvoj` default 200 — SET custom property, NIE `grid-template-columns`, aby nebol
+  specificity súboj s globálnym pravidlom) + produkt-unikátne utility (`.kp-latka-info`,
+  `.kp-karta-system`, `.kp-porovnanie`…).
+
+**PASCA 1 (stálo review kolo #411): `<svelte:head>` žije NAD `<div class="kp">`.** Skriptový
+markup-refaktor, ktorý prepisuje od `<div class="kp">`, TICHO DROPNE `<svelte:head>` (title + meta
+description) → verejná stránka bez `<title>`. Shell ho renderuje cez `titul`/`popis` props
+(child-komponentový `<svelte:head>` sa hoistuje). Regresný guard = `toHaveTitle` v každom
+`konfigurator-*.spec.ts` (existujúce specy title NEasertovali → drop prešiel zeleno).
+
+**PASCA 2 (stálo review kolo #409): pri extrakcii zdieľanej CSS ENUMERUJ VŠETKY per-page triedy,
+nielen tie „očividné".** oplotenie malo navyše `.opl-porovnanie` (+ 6 sub-pravidiel „Porovnanie
+modelov"), ktoré neboli ani v zdieľanom bloku ani medzi helper triedami → dropli sa a blok renderoval
+holý. Over pokrytie skriptom: pre každú stránku {pôvodné `.X-*` triedy} ⊆ {zdieľaný `.kp-*` blok} ∪
+{per-page `<style>`}; E2E to nechytí (asertuje viditeľnosť, nie CSS).
