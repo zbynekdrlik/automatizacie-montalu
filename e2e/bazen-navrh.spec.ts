@@ -320,8 +320,9 @@ test('internal: odkaz "→ Návrhový výkres" na /bazen vedie na /bazen/navrh, 
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/bazen');
-	await expect(page.getByTestId('link-navrh')).toBeVisible();
-	await page.getByTestId('link-navrh').click();
+	// #423 — kachlička „Návrhový výkres" v prepínači režimov nahradila malý odkaz
+	await expect(page.getByTestId('bazen-rezim-navrh')).toBeVisible();
+	await page.getByTestId('bazen-rezim-navrh').click();
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/bazen\/navrh$/);
 

@@ -332,8 +332,9 @@ test('b2b: odkaz "→ Návrhový výkres" na /zasklenia, otvorenie a vykreslenie
 	// #162 review nález: top-nav odkaz (b2b menu, rovnaká disciplína ako "Pergola
 	// návrh" #144) AJ in-page odkaz na /zasklenia — obe cesty musia fungovať
 	await expect(page.getByRole('link', { name: 'Zasklenia návrh' })).toBeVisible();
-	await expect(page.getByTestId('link-navrh')).toBeVisible();
-	await page.getByTestId('link-navrh').click();
+	// #423 — kachlička „Návrhový výkres" v prepínači režimov nahradila malý odkaz
+	await expect(page.getByTestId('zasklenia-rezim-navrh')).toBeVisible();
+	await page.getByTestId('zasklenia-rezim-navrh').click();
 	await waitHydrated(page);
 	await expect(page).toHaveURL(/\/zasklenia\/navrh$/);
 
