@@ -330,7 +330,7 @@
 						? ' ✏️'
 						: ''}</span
 				>
-				<b>{fmtM(o.qty)} {o.mj ?? 'm'}</b>
+				<b class="mono">{fmtM(o.qty)} {o.mj ?? 'm'}</b>
 			</div>
 		{/each}
 		{#if form.finalOut.some((o) => o.qty <= 0 && form.zmenene.includes(o.kod))}

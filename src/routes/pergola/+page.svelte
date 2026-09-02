@@ -60,7 +60,7 @@
 		<div class="card">
 			<div class="sec">Výstup pre Solid Edge — počet tyčí</div>
 			{#each v.copyLines as l (l.code)}
-				<div class="row"><span>{l.code} {l.name}</span><b>{l.barsStr}</b></div>
+				<div class="row"><span>{l.code} {l.name}</span><b class="mono">{l.barsStr}</b></div>
 			{/each}
 			{#if withCopy}
 				<div style="height:12px"></div>
@@ -262,7 +262,7 @@
 						? ' ✏️'
 						: ''}</span
 				>
-				<b>{fmtM(o.qty)} m</b>
+				<b class="mono">{fmtM(o.qty)} m</b>
 			</div>
 		{/each}
 		{#if v.zmenene.length}
