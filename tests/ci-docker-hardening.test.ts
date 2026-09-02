@@ -41,8 +41,8 @@ function childBlocks(text: string, parentKey: string, childIndent: number): Reco
 describe('#244 — CI hardening (.github/workflows/ci.yml)', () => {
 	const jobs = childBlocks(ci, 'jobs', 2);
 
-	it('parser vidí všetky tri joby', () => {
-		expect(Object.keys(jobs).sort()).toEqual(['deploy', 'test', 'version-check']);
+	it('parser vidí všetky štyri joby', () => {
+		expect(Object.keys(jobs).sort()).toEqual(['deploy', 'publish-image', 'test', 'version-check']);
 	});
 
 	it('KAŽDÝ job má timeout-minutes (fail-fast, žiadny 6h zombie)', () => {

@@ -343,7 +343,14 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   segmenty/plocha → `popis`. Pergolové polia (`hlbka`/`vyskaVpredu`/`model`/`pocetPoli`) NEPOUŽÍVAJ.
 - **Money-safety (A) obsahový grep chytá LEN literál `moneyKod`** — nový Money kód (BPK*/BPP* ako holé
   stringy) potrebuje VLASTNÝ vzor: pridaj `/(^|\/)<katalog>$/` do `KLIENT_ZAKAZANE_SPEC` (import) +
-  obsahový regex (napr. `\bBP[KP]\d{5}\b`) do (A) grafu aj (B). Inak by import Money katalógu prešiel.
+  obsahový regex do (A) grafu aj (B). Inak by import Money katalógu prešiel. Vzory doteraz:
+  `\bBP[KP]\d{5}\b` (bazén #385), `\bZAS[PK]\d{4,}\b` (zasklenie #387 — case-sensitive, aby
+  NEmatchol slovenské „zasklievacie"/`ZASKLENIE_*` konštanty). **PASCA (stálo #387 fix-kolo): nový
+  obsahový vzor si zachytí AJ VLASTNÝ klientsky modul, ak má v KOMENTÁRI/príklade literálny Money
+  kód** (napr. `konfigurator-zasklenie.ts` mal v hlavičke „…ZASP00116, ZASK202538" → guard (A) ho
+  označil za únik). Do komentárov nového client modulu píš rodinu bez čísla („kódy rodiny ZAS-P /
+  ZAS-K", „BPK*") — NIKDY konkrétny `ZASP00116`/`BPK00108`. Guard beží aj nad novým modulom (je v
+  klientskom grafe).
 - **Rozmery = `RozmerStepper`** (metre, #333 owner directive; zdieľaj so pergolou — `bind:hodnotaMm`,
   funguje aj bez `<form>`). Podmienka: rozmer na 100 mm mriežke (1 desatinné metre) — krok 250 mm sa
   nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty) = `<select>` (constrained → súhrn/
