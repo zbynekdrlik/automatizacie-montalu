@@ -141,3 +141,33 @@ test('po odoslaní vidno kovanie aj na potvrdzovacej obrazovke', async ({ page }
 
 	expect(errs).toEqual([]);
 });
+
+test('Deluxe: FAB skryté (nemá FAB položky), kovanie ide, predvolené sklo 10 mm (#431)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '07');
+
+	// Robust má FAB položky (kľučka/krytka vložky, `naUzaverPodlaFab`) → checkbox JE —
+	// pozitívna kontrola, aby test odlíšil „vždy skryté" od „správne skryté".
+	await page.getByLabel('Systém').selectOption('Robust');
+	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(1);
+
+	// Deluxe kovanie FAB položky NEMÁ (krytky sú naStyk/konst, madlo) → checkbox NIE JE
+	// (Patrik #431 „Delux odstrániť ... Jednostranná FAB").
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
+	// predvolené sklo pre Deluxe = 10 mm (predtým prvé v poradí = 6 mm) — Patrik #431
+	await expect(page.getByLabel('Sklo (základ — určuje vzorec)')).toHaveValue('Float kalené 10 mm');
+
+	// ...ale Deluxe kovanie DO Money IDE — karta kovania sa po výpočte zobrazí (skrytie
+	// FAB checkboxu nesmie skryť samotné kovanie, to gate-uje `kovanie?.length`, nie FAB).
+	await page.getByLabel('Štýl').selectOption('3K');
+	await vyberFarbuKovania(page, 'R9006');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('kovanie-karta')).toBeVisible();
+
+	expect(errs).toEqual([]);
+});

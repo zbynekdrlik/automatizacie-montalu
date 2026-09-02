@@ -312,9 +312,15 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		// systémy, kde má zmysel ručná dĺžka koľajnice (majú hornú + spodnú zvlášť):
 		// Deluxe / Štandard + / Štandard. Robust a Slide majú jednu obvodovú (Patrik).
 		systemyKolajnica: systemyRucnaKolajnica(loadCfg()),
-		// systémy, ktoré posielajú kovanie do Money (Slide zapnuté #357) —
-		// derivuje sa z konfigurácie kovania, aby sa zoznam nemusel držať na dvoch miestach
-		systemyKovanie: systemy.filter((sys) => komponentyPre(sys) !== null),
+		// systémy, kde má „Jednostranná FAB" checkbox zmysel — t.j. ich kovanie má
+		// aspoň jednu položku riadenú pravidlom `naUzaverPodlaFab` (kľučka/krytka
+		// vložky), ktorú FAB reálne polovičkuje. Dnes iba Robust; Deluxe/Slide/
+		// Štandard tieto položky nemajú, takže FAB tam nič nerobí (#431, Patrik:
+		// „Delux odstrániť ... Jednostranná FAB"). Derivované z configu — nový systém
+		// s FAB položkou checkbox dostane automaticky, bez úpravy tejto stránky.
+		systemyFab: systemy.filter((sys) =>
+			(komponentyPre(sys) ?? []).some((k) => k.pravidlo.typ === 'naUzaverPodlaFab')
+		),
 		// systémy, ktorých kovanie má RAL farebné varianty (kľučka/krytka/zámok R9005 vs
 		// R7016) → formulár musí ponúknuť voľbu farby kovania (#338). Derivované z configu.
 		systemyFarba: systemy.filter((sys) =>

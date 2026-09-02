@@ -1,11 +1,13 @@
-// Predvolené sklo = vždy ČÍRE (Patrik 2026-07-27) + formát rozmeru skla na
-// objednávku („1050mm × 2115mm").
+// Predvolené sklo = vždy ČÍRE (Patrik 2026-07-27), Deluxe = 10 mm (Patrik #431)
+// + formát rozmeru skla na objednávku („1050mm × 2115mm").
 //
-// Kľúčová vec, ktorú test STRÁŽI: zmena predvoľby NESMIE zmeniť Money odpis.
-// Sklo vstupuje do výpočtu jediným kanálom — `redukciaZero` (sklozávislé riadky),
-// plus `hrubka` pri Deluxe. Test preto pre KAŽDÝ systém+štýl porovná odpis
-// spočítaný pôvodnou predvoľbou (prvé sklo v katalógu) s odpisom spočítaným
-// novou predvoľbou (číre) a musia byť IDENTICKÉ.
+// Kľúčová vec, ktorú test STRÁŽI: zmena predvoľby NESMIE zmeniť Money odpis —
+// PLATÍ pre všetky systémy OKREM Deluxe. Sklo vstupuje do výpočtu jediným kanálom
+// — `redukciaZero` (sklozávislé riadky), plus `hrubka` pri Deluxe. Test preto pre
+// KAŽDÝ systém+štýl porovná odpis spočítaný pôvodnou predvoľbou (prvé sklo) s
+// odpisom novou predvoľbou (číre) a musia byť IDENTICKÉ. VÝNIMKA Deluxe (#431):
+// predvoľba sa zámerne presunula 6→10 mm a 10 mm dáva INÝ (úplnejší) odpis, takže
+// pre Deluxe neutralita neplatí — over sa len, že predvoľba je naozaj 10 mm.
 import { describe, it, expect } from 'vitest';
 import { defaultSklo, fmtSkloRozmer } from '../src/lib/sklo';
 import { buildCFG, computeFlat, type SysRow, type RezRow } from '../src/lib/server/compute';
@@ -57,9 +59,12 @@ describe('defaultSklo — predvoľba je vždy číre', () => {
 	});
 
 	it('systém bez „číre" a bez Deluxe-pravidla → prvé sklo v katalógu (Štandard +)', () => {
-		expect(defaultSklo(KATALOG['Štandard +']!.map((g) => g.nazov), 'Štandard +')).toBe(
-			'Float sklo 4 mm'
-		);
+		expect(
+			defaultSklo(
+				KATALOG['Štandard +']!.map((g) => g.nazov),
+				'Štandard +'
+			)
+		).toBe('Float sklo 4 mm');
 	});
 
 	it('prázdny zoznam nespadne (vráti prázdny string)', () => {
@@ -84,7 +89,14 @@ describe('Money-neutralita: nová predvoľba nemení ani jeden odpisový riadok'
 		const katalog = KATALOG[system!];
 		if (!katalog) continue;
 		const stare = katalog[0]!;
-		const nove = katalog.find((g) => g.nazov === defaultSklo(katalog.map((x) => x.nazov), system))!;
+		const nove = katalog.find(
+			(g) =>
+				g.nazov ===
+				defaultSklo(
+					katalog.map((x) => x.nazov),
+					system
+				)
+		)!;
 
 		it(`${sysStyl}: predvoľba nemení odpis${system === 'Deluxe' ? ' (Deluxe #431: predvoľba = 10 mm, odpis sa ZÁMERNE líši)' : ` (predvoľba „${nove.nazov}")`}`, () => {
 			for (const [S, V] of rozmery) {
