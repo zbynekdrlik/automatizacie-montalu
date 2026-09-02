@@ -158,7 +158,7 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
 	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
 	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
-	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty, ponuka, dopyt)', () => {
+	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén, ponuka, dopyt)', () => {
 		const { videne } = prejdiKlientskyGraf(konfVstupy());
 		const musiaByt = [
 			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
@@ -179,6 +179,11 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// MUSÍ prejsť ich graf, inak by ich prípadný budúci Money/katalóg import nezachytil.
 			path.join(SRC, 'lib', 'components', 'konfigurator', 'KonfVyber.svelte'),
 			path.join(SRC, 'lib', 'konfigurator-produkty.ts'),
+			// #385: bazénová podstránka (`konfigurator/bazen/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-bazen` — guard (A) MUSÍ prejsť jeho graf, inak by jeho
+			// prípadný budúci Money/katalóg import (napr. omylom `bazen-komponenty`/`server/bazen`) zostal
+			// nezachytený.
+			path.join(SRC, 'lib', 'konfigurator-bazen.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -199,6 +204,9 @@ const SERVEROVE_ROUTY = [
 	// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`; root
 	// `/konfigurator` je výberová obrazovka (bez +page.server.ts).
 	'src/routes/konfigurator/pergola/+page.server.ts',
+	// #385: bazénová podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/bazen/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];

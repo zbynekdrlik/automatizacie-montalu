@@ -30,6 +30,12 @@ export interface KonfProdukt {
 	odkaz: string;
 	/** `true` keď `odkaz` smeruje na montalu.sk (otvor v novej karte) */
 	externy: boolean;
+	/** #385: má produkt OVERENÝ interim cenový zdroj (matica montalu.sk)? Iba pergola (#279) — ostatné
+	 *  rady zatiaľ NEMAJÚ cenník → honest-null (verejný konfigurátor bez orientačnej ceny, dopyt bez
+	 *  ceny). Produkt bez zdroja NESMIE dostať opečiatkovanú/prepočítanú cenu (inak by mu pipeline
+	 *  priradila nesprávnu PERGOLOVÚ cenu z rozmerov). Nový produkt to prepne na `true`, keď doňho
+	 *  pribudne overený cenník. Server-side gate: `maCenovyZdroj` (nižšie). */
+	cenovyZdroj: boolean;
 }
 
 /** Katalóg produktových radov (parita so 6 kategóriami web-konfigurátora montalu.sk + prístrešky).
@@ -45,7 +51,8 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		alt: 'Bioklimatická pergola Montalu pri bazéne',
 		stav: 'live',
 		odkaz: '/konfigurator/pergola',
-		externy: false
+		externy: false,
+		cenovyZdroj: true
 	},
 	{
 		kod: 'bazen',
@@ -54,9 +61,12 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Jedno- a dvojkoľajové zastrešenia bazénov aj vírivky.',
 		foto: 'bazen.webp',
 		alt: 'Bazénové zastrešenie Montalu Premier',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/zastresenie-bazenov',
-		externy: true
+		stav: 'live',
+		odkaz: '/konfigurator/bazen',
+		externy: false,
+		// #385: bazén NEMÁ overený interim cenový zdroj (montalu.sk `update-pools` existuje, ale jeho
+		// vyťaženie do matice je práca v rozsahu #279 — samostatný follow-up). Honest-null → bez ceny.
+		cenovyZdroj: false
 	},
 	{
 		kod: 'zimna-zahrada',
@@ -67,7 +77,8 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		alt: 'Hliníková zimná záhrada Montalu Robust',
 		stav: 'pripravujeme',
 		odkaz: 'https://montalu.sk/produkty/zimne-zahrady',
-		externy: true
+		externy: true,
+		cenovyZdroj: false
 	},
 	{
 		kod: 'zasklenie',
@@ -78,7 +89,8 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		alt: 'Moderné zasklenie terasy Montalu Slide',
 		stav: 'pripravujeme',
 		odkaz: 'https://montalu.sk/produkty/zasklenia',
-		externy: true
+		externy: true,
+		cenovyZdroj: false
 	},
 	{
 		kod: 'oplotenie',
@@ -89,7 +101,8 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		alt: 'Dizajnové hliníkové oplotenie Montalu Narvi',
 		stav: 'pripravujeme',
 		odkaz: 'https://montalu.sk/produkty/oplotenie',
-		externy: true
+		externy: true,
+		cenovyZdroj: false
 	},
 	{
 		kod: 'tienenie',
@@ -100,7 +113,8 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		alt: 'Hliníková markíza Montalu XLINE',
 		stav: 'pripravujeme',
 		odkaz: 'https://montalu.sk/produkty/tienenie',
-		externy: true
+		externy: true,
+		cenovyZdroj: false
 	},
 	{
 		kod: 'pristresok',
@@ -111,7 +125,8 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		alt: 'Hliníkový prístrešok na auto Montalu',
 		stav: 'pripravujeme',
 		odkaz: 'https://montalu.sk/produkty/hlinikove-pristresky-a-altanky',
-		externy: true
+		externy: true,
+		cenovyZdroj: false
 	}
 ];
 
@@ -132,4 +147,14 @@ export function produktNazov(kod: string | null | undefined): string {
  *  správaním pred #384 pre pergolu aj staré neopečiatkované riadky). */
 export function produktPdfNadpis(kod: string | null | undefined): string {
 	return produktPodlaKodu(kod)?.pdfNadpis ?? 'Špecifikácia pergoly';
+}
+
+/** #385: má produkt OVERENÝ interim cenový zdroj (a teda smie dostať orientačnú/opečiatkovanú cenu)?
+ *  Gate pre dopyt/PDF cenu — produkt bez zdroja (bazén, …) je honest-null (cena sa NEopečiatkuje ani
+ *  neprepočíta). **NULL/neznámy → `true` (pergola)** — historický default: dopyty pred migráciou v35
+ *  nemajú `produkt` a sú všetky pergolové s cenníkom (#279), takže ich re-download honest-degrade
+ *  prepočet zo živej matice ostáva zachovaný. Známy non-pergola produkt s `cenovyZdroj:false` → `false`. */
+export function maCenovyZdroj(kod: string | null | undefined): boolean {
+	const p = produktPodlaKodu(kod);
+	return p ? p.cenovyZdroj : true;
 }

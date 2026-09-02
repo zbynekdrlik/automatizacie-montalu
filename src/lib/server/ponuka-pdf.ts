@@ -20,7 +20,7 @@ import {
 	type PonukaConfig
 } from '$lib/ponuka';
 import { cenaZCfg } from './dopyt-cena-stamp';
-import { produktPdfNadpis } from '$lib/konfigurator-produkty';
+import { produktPdfNadpis, maCenovyZdroj } from '$lib/konfigurator-produkty';
 import { formatDatumSk } from '$lib/datum';
 // PREDAJNÁ cena. Neopečiatkovaný fallback (`cenaZCfg`, MO default) žije v `dopyt-cena-stamp.ts` —
 // zdieľané so stampovaním (#309); oba server-only, do klienta sa nedostanú. Opečiatkovanú cenu
@@ -328,7 +328,10 @@ export async function generatePonukaPdf(
 	// PREDAJNÁ cena. #309/#318: OPEČIATKOVANÁ cena (`opts.cena`, MO alebo VO) má prednosť pred
 	// prepočtom zo živej matice — tak re-download reprodukuje cenu (a hladinu) platnú pri podaní. Bez
 	// stampu (staré/neopečiatkované) → prepočet z cfg (`null` keď rozmery chýbajú, honest-degrade).
-	const cena = opts.cena ?? cenaZCfg(cfg);
+	// #385: honest-degrade prepočet je LEN pre produkt s cenovým zdrojom (pergola; NULL/neznámy produkt
+	// = starý pergolový riadok = má zdroj). Bazén/ostatné → cena null (žiadny prepočet pergolovej ceny
+	// z rozmerov zastrešenia), takže re-download bazén dopytu neukáže vymyslenú cenu.
+	const cena = opts.cena ?? (maCenovyZdroj(opts.produkt) ? cenaZCfg(cfg) : null);
 	// #384: nadpis dokumentu podľa produktu (fallback 'Špecifikácia pergoly' pre NULL/neznámy).
 	const nadpis = produktPdfNadpis(opts.produkt);
 	let cursor = A4_H - MARGIN;

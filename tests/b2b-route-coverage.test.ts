@@ -62,6 +62,10 @@ const ALLOWED = new Set([
 	// nie je write-bearing, ale ostáva verejná a nepresmerovaná), pergola sa presunula na podstránku.
 	'/konfigurator',
 	'/konfigurator/pergola',
+	// #385: bazénová podstránka jednotného konfigurátora — VEREJNÁ (bez auth), Money-neutrálna
+	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
+	// inak zlyhal), nie obídenie.
+	'/konfigurator/bazen',
 	'/login',
 	'/logout',
 	'/health'
@@ -100,6 +104,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/bazen',
 				'/bazen/navrh',
 				'/clip',
+				'/konfigurator/bazen',
 				'/konfigurator/pergola',
 				'/odpisy',
 				'/pergola',
@@ -154,6 +159,10 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('#384: /konfigurator/pergola (verejný konfigurátor pergoly, presunutý pod podstránku) nie je presmerovaný', () => {
 		expect(b2bRedirectTarget('/konfigurator/pergola')).toBeNull();
+	});
+
+	it('#385: /konfigurator/bazen (verejný konfigurátor bazénových zastrešení) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/bazen')).toBeNull();
 	});
 
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
@@ -251,5 +260,17 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 		// Všetky pomenované (SvelteKit nedovolí default + pomenované naraz), všetky Money-neutrálne
 		// (žiadny odpis, žiadny zápis do /data — strážené dopyt-money-safety.test.ts).
 		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'objednavka', 'vypocet']);
+	});
+});
+
+// #385, rovnaká disciplína — bazénová podstránka má PRESNE jedinú akciu `dopyt` (verejný kontaktný
+// formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je čisto
+// klientsky, honest-null — bazén nemá cenový zdroj), žiadna Money/odpisová zápisová akcia. VEREJNÁ
+// route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
+// tento test ROZBIJE (fail-closed).
+describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });

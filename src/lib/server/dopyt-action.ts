@@ -12,7 +12,7 @@ import { fail, type RequestEvent } from '@sveltejs/kit';
 import { resolveClientIp } from './client-ip';
 import { allowDopyt } from './dopyt-throttle';
 import { insertDopyt, insertObjednavka } from './dopyt-store';
-import { opeciatkujCenu } from './dopyt-cena-stamp';
+import { opeciatkujCenuPreProdukt } from './dopyt-cena-stamp';
 import { cenovaHladina } from './konfigurator-hladina';
 import { queueLeadCreation } from './odoo-lead';
 import { generatePonukaPdf } from './ponuka-pdf';
@@ -107,7 +107,9 @@ export async function dopytAction(event: RequestEvent, produkt: KonfProduktKod =
 	// takže re-download reprodukuje cenu platnú TERAZ (nie prepočet z neskoršej matice). Hladina sa
 	// určí SERVER-SIDE z prihláseného používateľa: veľkoobchodný (b2b) → VO cena + typ hladiny,
 	// inak MO (verejný dopyt). `locals` je pri reálnom requeste vždy prítomné (`?.` obranné).
-	const stamp = opeciatkujCenu(cfg, cenovaHladina(event.locals?.user ?? null));
+	// #385: cena sa opečiatkuje IBA pre produkt s cenovým zdrojom (pergola). Bazén/ostatné →
+	// honest-null (žiadna cena) — inak by dostali nesprávnu pergolovú cenu z rozmerov.
+	const stamp = opeciatkujCenuPreProdukt(cfg, produkt, cenovaHladina(event.locals?.user ?? null));
 
 	// audit trail (Money-neutrálne) — ukladáme kanonický JSON konfigurácie + opečiatkovanú cenu
 	const id = insertDopyt(
@@ -198,7 +200,8 @@ export async function objednavkaAction(event: RequestEvent, produkt: KonfProdukt
 	// #384: produkt je server-autoritatívny argument z routy (viď dopytAction), nie klientske pole.
 	const renderPng = decodeRenderPng(form.get('renderPng'));
 	// #309/#318: opečiatkuj cenu + MO/VO hladinu PRI PODANÍ — objednaná cena je zapečatená (bod 5).
-	const stamp = opeciatkujCenu(cfg, cenovaHladina(event.locals?.user ?? null));
+	// #385: iba produkt s cenovým zdrojom (pergola) dostane cenu; ostatné → honest-null.
+	const stamp = opeciatkujCenuPreProdukt(cfg, produkt, cenovaHladina(event.locals?.user ?? null));
 
 	const id = insertObjednavka(
 		{
