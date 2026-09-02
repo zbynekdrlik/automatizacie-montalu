@@ -121,16 +121,18 @@ describe('#110 — sieťka INÉHO systému (Štandard ↔ Štandard +), Patrikov
 		]);
 	});
 
-	it('opačný smer (plus sieťka na starom posuve) je SYMETRICKÝ (−16,5mm) — NEPOTVRDENÉ Patrikom, viď #110 „Otvorené"', () => {
+	it('opačný smer (plus sieťka na starom posuve) je tiež +16,5mm VÄČŠIA — POTVRDENÉ Patrikom (#416, kanál 207 msg 1777560: „štandard + a starý štandard … sieťka musí byť +16mm väčšia"), NIE symetrický −16,5', () => {
 		const so = computeFlat(cfg, 'Štandard|3K', 3000, 1850, false, 0, false, undefined, {
 			uchyt: 'ziadny',
 			system: 'Štandard +'
 		})!;
 		const rezy = (kod: string) => so.material.find((m) => m.kod === kod)?.rezy;
-		// starého posuvu vlastná šírka (952 = round((3000-143)/3)) + 2 ks −16,5mm
+		// starého posuvu vlastná šírka (952 = round((3000-143)/3)) + 2 ks +16,5mm →
+		// round(952,33+16,5) = 969. Patrikova výroba: kríž systémov = sieťka VŽDY
+		// väčšia, v OBOCH smeroch (nie menšia ako pôvodný nepotvrdený symetrický −16,5).
 		expect(rezy('ZASP202415')).toEqual([
 			{ rozmer: 952, ks: 6 },
-			{ rozmer: 936, ks: 2 }
+			{ rozmer: 969, ks: 2 }
 		]);
 		expect(rezy('ZASP20244')).toEqual([{ rozmer: 1817, ks: 1 }]); // plus koncový, nový riadok
 		expect(rezy('ZASP202419')).toEqual([{ rozmer: 1841, ks: 1 }]); // plus doraz, nový riadok
