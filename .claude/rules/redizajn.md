@@ -122,6 +122,54 @@ Form input LABEL text je E2E KONTRAKT — testy cielia cez `page.getByLabel('<pr
   TESTID (`povolit-reimport-`, `detail-`) — NIKDY cez triedu/DOM štruktúru. Wrapper `<div>` +
   zmena tried je bezpečná, kým `<a>` ostane link, `<button>` button, a text/testid sa nemení.
 
+## Stage 4 (Výsledky + výkresy) DOKONČENÝ (#376, 0.24.76) — POSLEDNÝ stage
+
+Čisto prezentačný re-skin posledných VEDOME nedotknutých plôch (výkresy/náhľady +
+zdieľané výsledkové triedy). Nula zmeny geometrie/výpočtov/Money/`data-testid`.
+
+- **Výkresové kóty modrá → bronz:** 4 návrhové/nárezové výkresy (`PergolaNavrhVykres`/
+  `ZaskleniaNavrhVykres`/`BazenNavrhVykres`/`PergolaNarezVykres`) mali každý lokálny
+  `const MODRA = '#1d4ed8'` použitý ako `color={…}` na ~30 `<Kota>` volaniach + zdieľaný
+  `Kota.svelte` default. Premenované na `const BRONZ = '#8a5a2b'` (`--m-accent-ink`) + Kota
+  default. **Prečo `#8a5a2b` a NIE `--m-accent` #b07a45:** `<Kota color>` farbí kótovú čiaru
+  AJ číselný popisok, takže musí byť TEXT-safe (5.9:1) — `--m-accent` (3.67:1) padá WCAG AA
+  pre text. Rename cez `replace_all` (svelte-check chytí missed ref; `.svelte` nie sú v
+  stryker mutate scope). `#eff6ff` studená konštrukčná výplň → `#f4f3ef` (teplý papier
+  `--m-surface-2`); RAL materiálové farby (`$lib/vykres/ral.ts`, `farebny ? farba.hex`)
+  NEDOTKNUTÉ (sémantické produktové farby, nie chrome).
+- **Ďalšie výkresové/route modré → ink/bronz/neutrál:** `TitleBlock` MIERKA, `Nahlad2D`
+  sklo (neutrálna šeď `#e9edf0`) / sklo-rozmer + kaskáda (bronz) / sieťka (šeď),
+  `FixVykres2D`, `RozpisRezov` (segment `#f5ede2`, `.seg-label` `--m-ink`), `vykresy/preview`,
+  `optimalizator` CTA (`--m-ink-2`), `+error`/`pouzivatelia`/`ProfilObrazok`,
+  `.polia-box`/`.fix-box`/`.sietka-box`.
+- **Výsledkové `app.css` triedy hex → `--m-*`:** muted texty → `--m-muted-ink`,
+  `.poznamka-plan`/`.posuv-hd` → `--m-ink-2`, `.ral-val` → `--m-ink` (+ mono, RAL=kód),
+  bordery → `--m-line`, `.posuv-box` → `--m-surface-2`/`--m-line-2`, `.link-del`/`.b2b-blok`
+  → `--m-danger`, `.b2b-upoz` → `--m-warn`.
+- **CTA stack + print:** hierarchia „Odoslať do Money = plné antracitové `.btn`, tlač/späť
+  `.btn.secondary`" bola UŽ splnená zo stage 1 (nič nové). Emoji na CTA (`🖨`/`✅`/`➕`) =
+  samostatné #398, NEfoldovať sem. `@media print` (print.css) NEDOTKNUTÉ; re-skin je
+  color-only → tlač ostáva ČB-safe (bronz `#8a5a2b` v ČB = čitateľná stredná šeď — over
+  print-media screenshotom, nie len logikou).
+
+### PASCE stage 4 (review nálezy)
+
+- **Plošný `.row b`/`.g div b { mono }` cez SELEKTOR je ZLÝ — obe triedy sú ZMIEŠANÉ
+  text/číslo.** `.g` súhrn: odpisy detail `.g` je metadátový (meno zákazníka/modul/systém/
+  kto/režim/súbor = TEXT), sietka/PlanKarty `.g` číselné. `.row`: materiálové riadky majú
+  číslo AJ text (poznámky, placeholdery „čaká na vzorec", mená kovania). Plošný mono monoval
+  mená/poznámky A prenieslo by sa do tlačeného nárezového plánu. **Pravidlo: výsledkové čísla
+  monuj PER-HODNOTU** (`class="mono"` na číselný `<b>`, stage-3 vzor „monuj len samotné
+  číslo"), NIKDY plošným selektorom na `.row b`/`.g div b`. `.ral-val` mono je OK (kód). Plná
+  per-hodnotová adopcia = #421.
+- **SVG `<text>` kontrast sa počíta voči SKUTOČNÉMU `fill`-u pod ním, NIE voči bielej.**
+  `Nahlad2D` sieťka label + index text sedia na `fill="#e2e8f0"` (sieťka rect), nie na
+  papieri — `#64748b` tam padá na 3.86:1 (< AA 4.5:1). Fix: text `#585d65` (`--m-muted-ink`,
+  5.38:1 na `#e2e8f0`); pattern line + rect STROKES ostávajú `#64748b` (non-text, 3:1 stačí).
+  Pri zmene farby SVG textu vždy over kontrast voči jeho podkladovému `fill`.
+- **`app.css` po stage 4 = 879 r.** — stále pod stropom, `nav.*` extrakcia
+  (large-file-split.md watch) NEBOLA potrebná (tokenizácia je takmer line-neutrálna).
+
 ## PASCA: bare `h1`/`nav`/… selektor v `app.css` LEAKUJE na login aj konfigurátor
 
 `app.css` je importované GLOBÁLNE (cez root `+layout.svelte`) — platí pre
@@ -160,10 +208,11 @@ na `.wrap` (alebo naopak `:not(.konf-app)`-štýl guard, podľa toho, čo je
   table:not(.narez):not(.rezy)`), `.mono` kódy/čísla vo výsledkových+histórie
   tabuľkách, /odpisy akčná rodina (`.tbl-akcie`+`.btn … sm`+`.btn.danger.outline`),
   `@media print` split → `print.css`. Detail + pasce vyššie („## Stage 3 DOKONČENÝ").
-- **Stage 4 (výsledky + výkresy):** nárezové plány, náhľady (ink-on-paper +
-  bronzové kóty), CTA stack, print audit. `.g/.row/.ral-val/.poznamka-*/.kov-*/
-  .posuv-*/table.narez/@media print` boli VEDOME nedotknuté v stage 1-3 — tu sa
-  prerábajú prvý raz.
+- **Stage 4 (výsledky + výkresy) — HOTOVO (0.24.76):** modré kóty → bronz
+  (`MODRA`→`BRONZ` `#8a5a2b`), `#eff6ff` → teplý papier, výsledkové triedy hex →
+  `--m-*`, výkresové/route modré → ink/bronz/neutrál. CTA hierarchia už zo stage 1,
+  print ČB-safe (color-only), emoji CTA = #398. Detail + pasce vyššie
+  („## Stage 4 DOKONČENÝ"). ROLLOUT #376 KOMPLETNÝ.
 
 ## Playwright MCP screenshoty pri visuálnej verifikácii z worktree
 
