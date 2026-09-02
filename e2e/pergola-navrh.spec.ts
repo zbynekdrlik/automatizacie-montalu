@@ -348,11 +348,13 @@ test('#150/#153: technický režim (default) — konštrukcia svetlá s čiernym
 	await page.getByTestId('nakreslit').click();
 	await waitHydrated(page);
 
-	expect(await attr(page, 'pn-elevation-strecha', 'fill')).toBe('#eff6ff');
+	// #376 stage 4: konštrukčná výplň prepnutá zo studenej bledomodrej #eff6ff na
+	// teplý papier #f4f3ef (--m-surface-2) — „atrament na papieri", modrá zmizla úplne
+	expect(await attr(page, 'pn-elevation-strecha', 'fill')).toBe('#f4f3ef');
 	expect(await attr(page, 'pn-elevation-post-0', 'fill')).toBe('#fff');
 	// #153: predtým '#0f172a' (plný čierny silueta) — teraz rovnaká svetlá fill ako
 	// elevation (rovnaký fyzický prvok, iný pohľad) + VŽDY viditeľný čierny obrys
-	expect(await attr(page, 'pn-section-strecha', 'fill')).toBe('#eff6ff');
+	expect(await attr(page, 'pn-section-strecha', 'fill')).toBe('#f4f3ef');
 	expect(await attr(page, 'pn-section-predok', 'fill')).toBe('#fff');
 	expect(await attr(page, 'pn-section-predok', 'stroke')).toBe('#0f172a');
 	expect(await attr(page, 'pn-iso-hrany', 'stroke')).toBe('#0f172a');

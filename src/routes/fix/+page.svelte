@@ -504,8 +504,8 @@
 
 <style>
 	.polia-box {
-		border: 1px solid #bfdbfe;
-		background: #f8fbff;
+		border: 1px solid var(--m-line-2);
+		background: var(--m-surface-2);
 		border-radius: 10px;
 		padding: 10px 12px 2px;
 		margin-bottom: 12px;

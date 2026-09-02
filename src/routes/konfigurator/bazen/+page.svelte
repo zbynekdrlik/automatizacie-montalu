@@ -1,16 +1,26 @@
 <script lang="ts">
-	// Verejný zákaznícky konfigurátor bazénových zastrešení (#385, etapa 2 jednotného rámu #384).
-	// JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D split-screenu — bazénová 3D geometria zatiaľ
-	// neexistuje, viď design komentár + follow-up) a BEZ ORIENTAČNEJ CENY (honest-null: bazén nemá
-	// overený cenový zdroj — cena sa nevymýšľa). Konfigurácia (model/rozmery/segmenty/koľaj/farba/
-	// výplň) sa počíta ČISTO klientsky (`$derived`, žiadny server round-trip — netreba, nie je cena)
-	// a tečie do zdieľaného DopytForm (#277) → PDF špecifikácia (bez ceny) + Odoo lead. Zdieľané
-	// `--k-*` tokeny z `konfigurator/+layout.svelte`. Money-neutralita: importuje LEN client-safe
-	// `konfigurator-bazen` + DopytForm (guard: konfigurator-money-safety). Žiadne `console.*`.
+	// Verejný zákaznícky konfigurátor bazénových zastrešení (#385, etapa 2 rámu #384;
+	// #405 SPLIT-SCREEN + ŽIVÝ 3D náhľad; #404 orientačná cena). ĽAVÝ sticky stĺpec = ŽIVÝ 3D
+	// náhľad oblúkových segmentov (viditeľný HNEĎ pri načítaní, defaultná konfigurácia); PRAVÝ
+	// scroll panel = ovládanie (model/koľaj/rozmery/vyhotovenie) + súhrn + ORIENTAČNÁ CENA (#404,
+	// server na klik) + dopyt. Konfigurácia (model/rozmery/segmenty/koľaj/farba/výplň) sa počíta
+	// ČISTO klientsky (`$derived`); ORIENTAČNÚ cenu (#404) počíta SERVER na klik (`vypocet` akcia,
+	// enhance submit — cenový modul je server-only, do klienta sa nedostane) a všetko tečie do
+	// zdieľaného DopytForm (#277) → PDF špecifikácia s orientačnou cenou + Odoo lead.
+	//
+	// Živý update 3D (#405, vzor #325): FARBA (RAL) + kategória VÝPLNE prúdia LIVE →
+	// okamžitý in-place update materiálu; POČET SEGMENTOV prúdi LIVE → in-place
+	// prestavba geometrie (bbox nezmenený); ROZMERY prúdia cez DEBOUNCED snapshot
+	// (~320 ms) do `{#key}` remountu 3D → čistý refit scénického rigu. Money-neutralita
+	// nezmenená: 3D berie len rozmery + segmenty + kategóriu výplne (názov) + RAL kód
+	// (client-safe, žiadny Money kód). Importuje LEN client-safe `konfigurator-bazen`
+	// + `KonfBazenVizual` (lazy three.js chunk) + DopytForm + LEN typy ceny (guard:
+	// konfigurator-money-safety).
 	import { untrack } from 'svelte';
-	import { base } from '$app/paths';
+	import { enhance } from '$app/forms';
 	import DopytForm from '$lib/components/DopytForm.svelte';
 	import RozmerStepper from '$lib/components/konfigurator/RozmerStepper.svelte';
+	import KonfBazenVizual from '$lib/components/konfigurator/KonfBazenVizual.svelte';
 	import { cislaCiarka } from '$lib/konfigurator-jednotky';
 	import {
 		bazenModel,
@@ -22,10 +32,17 @@
 		type BazenVstup
 	} from '$lib/konfigurator-bazen';
 	import type { PonukaConfig } from '$lib/ponuka';
+	// #404: typy orientačnej ceny (server-počítanej `vypocet` akciou). LEN typy → žiadny import
+	// cenového/Money modulu do klientskeho bundle (leak-guard A ostáva zelený).
+	import type { VerejnaCena, CenaModelu } from '$lib/konfigurator';
 
 	let { data } = $props();
 
 	const r = $derived(data.rozmedzia);
+
+	// spoločné východiskové rozmery — JEDEN zdroj pre $state inity AJ pre debounced 3D
+	// snapshot (bez driftu → žiadny 320 ms „zlý náhľad" flash pri loade).
+	const BAZ_DEFAULT = { dlzka: 6000, sirka: 4000, vyska: 1200 };
 
 	// východiskové voľby zo servera + rozumné stredové rozmery (v platných rozmedziach → súhrn hneď).
 	// `untrack` v $state initializeri (rovnaký vzor ako pergola +page.svelte) — inak Svelte varuje
@@ -36,9 +53,9 @@
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
 	// rozmery = RozmerStepper (metre, #333 vzor) — clamp na [min,max], NIKDY null (súhrn/dopyt tak
 	// pri editovaní rozmerov nezmizne, #385 review 🔵); segmenty = <select> (2..8, tiež nikdy null).
-	let dlzka = $state<number | null>(6000);
-	let sirka = $state<number | null>(4000);
-	let vyska = $state<number | null>(1200);
+	let dlzka = $state<number | null>(BAZ_DEFAULT.dlzka);
+	let sirka = $state<number | null>(BAZ_DEFAULT.sirka);
+	let vyska = $state<number | null>(BAZ_DEFAULT.vyska);
 	let segmenty = $state<number>(4);
 	// možnosti počtu segmentov (2..8) — select nikdy nevráti mimo-rozmedzia/null hodnotu
 	const segmentyOpts = $derived(
@@ -69,6 +86,68 @@
 	const suhrn = $derived(platny ? konfigurujBazen(vstup) : null);
 	const ponukaCfg = $derived<PonukaConfig>(suhrn ? bazenPonukaConfig(suhrn) : {});
 
+	// ---- ŽIVÝ 3D náhľad (#405) ----
+	function platnyRozmer(v: number | null, lo: number, hi: number): v is number {
+		return typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+	}
+
+	// DEBOUNCED snapshot rozmerov pre 3D — inicializovaný na východiskové (platné) hodnoty,
+	// takže defaultné zastrešenie sa vykreslí HNEĎ. Mení sa až ~320 ms po ustálení vstupu.
+	let rozmeryStabilne = $state({
+		sirkaMm: BAZ_DEFAULT.sirka,
+		dlzkaMm: BAZ_DEFAULT.dlzka,
+		vyskaMm: BAZ_DEFAULT.vyska
+	});
+
+	// $effect beží LEN v prehliadači (Svelte 5) → žiadna SSR vetva; SSR render použije
+	// hardcoded initializer `rozmeryStabilne` vyššie.
+	$effect(() => {
+		const d = dlzka;
+		const s = sirka;
+		const v = vyska;
+		// len PLATNÝ vstup posúva 3D (mid-typing/nevalidný stav → drž posledný platný náhľad)
+		if (!platnyRozmer(d, r.dlzka.min, r.dlzka.max)) return;
+		if (!platnyRozmer(s, r.sirka.min, r.sirka.max)) return;
+		if (!platnyRozmer(v, r.vyska.min, r.vyska.max)) return;
+		const next = { sirkaMm: s, dlzkaMm: d, vyskaMm: v };
+		const t = setTimeout(() => (rozmeryStabilne = next), 320);
+		return () => clearTimeout(t);
+	});
+
+	// 3D vstup = DEBOUNCED rozmery + LIVE segmenty/koľaj/výplň/RAL. Segmenty menia geometriu
+	// (počet oblúkov) → in-place prestavba produktu vo Vizual3D; výplň/RAL = in-place materiál.
+	const viz = $derived({
+		sirkaMm: rozmeryStabilne.sirkaMm,
+		dlzkaMm: rozmeryStabilne.dlzkaMm,
+		vyskaMm: rozmeryStabilne.vyskaMm,
+		segmenty,
+		dvojkolaj: bazenKolaj(kolaj) === 'Dvojkoľajové',
+		vyplnNazov: bazenVypln(vypln),
+		ralKod: farba
+	});
+	// `{#key}` podpis = len rozmery (debounced) → remount/refit rigu iba pri zmene rozmeru
+	const vizKluc = $derived(
+		`${rozmeryStabilne.sirkaMm}|${rozmeryStabilne.dlzkaMm}|${rozmeryStabilne.vyskaMm}`
+	);
+
+	// #404: orientačná cena — server-počítaná (`vypocet` akcia, enhance submit, žiadny reload). Zobrazí
+	// sa až po kliku „Zobraziť orientačnú cenu" (vzor pergolovej `vypocet`); pri zmene modelu/rozmerov
+	// sa výsledok považuje za neaktuálny (`cenaAktualna`), takže sa NIKDY neukáže cena pre iný rozmer.
+	let cenaVysledok = $state<{ cena: VerejnaCena; cenyModely: CenaModelu[] } | null>(null);
+	let cenaError = $state<string | null>(null);
+	let cenaNacitava = $state(false);
+	let poslednyKluc = $state<string | null>(null);
+	const cenaKluc = $derived(`${vstup.model}|${dlzka ?? 0}|${sirka ?? 0}`);
+	const cenaAktualna = $derived(cenaVysledok !== null && poslednyKluc === cenaKluc);
+
+	const eur = (n: number) =>
+		n.toLocaleString('sk-SK', {
+			style: 'currency',
+			currency: 'EUR',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		});
+
 	function scrollNa(id: string) {
 		document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
@@ -78,248 +157,348 @@
 	<title>Navrhni si bazénové zastrešenie — Montalu</title>
 	<meta
 		name="description"
-		content="Zostav si bazénové zastrešenie na mieru — vyber model, rozmery, koľajový systém, farbu a výplň a pošli nezáväzný dopyt so špecifikáciou v PDF."
+		content="Zostav si bazénové zastrešenie na mieru — vyber model, rozmery, koľajový systém, farbu a výplň, rovno naživo vidíš svoje zastrešenie v 3D a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	/>
 </svelte:head>
 
-<div class="baz">
-	<!-- HERO -->
-	<section class="baz-hero">
-		<div class="baz-hero-foto">
-			<img
-				src="{base}/konfigurator/vyber/bazen.webp"
-				alt="Bazénové zastrešenie Montalu"
-				width="1000"
-				height="600"
-				loading="eager"
-				fetchpriority="high"
-			/>
-		</div>
-		<div class="baz-hero-text">
-			<span class="baz-label">Konfigurátor bazénových zastrešení</span>
-			<h1>Navrhni si bazénové zastrešenie</h1>
-			<p>
-				Vyber model, rozmery a vyhotovenie — pripravíme ti nezáväznú špecifikáciu (PDF) a ozveme sa
-				s cenovou ponukou po obhliadke. Bez registrácie.
-			</p>
-		</div>
-	</section>
+<div class="baz-split">
+	<!-- ĽAVÝ stĺpec: ŽIVÝ 3D náhľad edge-to-edge (sticky) -->
+	<div class="baz-vizual-col">
+		<KonfBazenVizual {viz} {vizKluc} />
+	</div>
 
-	<div class="baz-grid">
-		<!-- OVLÁDANIE -->
-		<div class="baz-ovladanie">
-			<!-- MODEL -->
-			<fieldset class="baz-blok">
-				<legend>Model</legend>
-				<div class="baz-karty">
-					{#each data.modely as m (m.kod)}
-						<button
-							type="button"
-							class="baz-karta"
-							class:vybrana={model === m.kod}
-							aria-pressed={model === m.kod}
-							data-testid="bazen-model-{m.kod}"
-							onclick={() => (model = m.kod)}
-						>
-							<span class="baz-karta-nazov">{m.kod}</span>
-							<span class="baz-karta-popis">{m.popis}</span>
-						</button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<!-- KOĽAJ -->
-			<fieldset class="baz-blok">
-				<legend>Koľajový systém</legend>
-				<div class="baz-karty dvoj">
-					{#each data.kolaje as k (k.kod)}
-						<button
-							type="button"
-							class="baz-karta"
-							class:vybrana={kolaj === k.kod}
-							aria-pressed={kolaj === k.kod}
-							data-testid="bazen-kolaj-{k.kod}"
-							onclick={() => (kolaj = k.kod)}
-						>
-							<span class="baz-karta-nazov">{k.kod}</span>
-							<span class="baz-karta-popis">{k.popis}</span>
-						</button>
-					{/each}
-				</div>
-			</fieldset>
-
-			<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou) -->
-			<fieldset class="baz-blok">
-				<legend>Rozmery</legend>
-				<div class="baz-steppery">
-					<RozmerStepper
-						bind:hodnotaMm={dlzka}
-						min={r.dlzka.min}
-						max={r.dlzka.max}
-						krokMm={r.dlzka.krok}
-						popis="Dĺžka"
-						akuzativ="dĺžku"
-						id="baz-dlzka"
-						testid="bazen-dlzka"
-						name="dlzka"
-					/>
-					<RozmerStepper
-						bind:hodnotaMm={sirka}
-						min={r.sirka.min}
-						max={r.sirka.max}
-						krokMm={r.sirka.krok}
-						popis="Šírka"
-						akuzativ="šírku"
-						id="baz-sirka"
-						testid="bazen-sirka"
-						name="sirka"
-					/>
-					<RozmerStepper
-						bind:hodnotaMm={vyska}
-						min={r.vyska.min}
-						max={r.vyska.max}
-						krokMm={r.vyska.krok}
-						popis="Výška"
-						akuzativ="výšku"
-						id="baz-vyska"
-						testid="bazen-vyska"
-						name="vyska"
-					/>
-					<label class="baz-pole baz-segmenty">
-						<span>Počet segmentov</span>
-						<select bind:value={segmenty} data-testid="bazen-segmenty">
-							{#each segmentyOpts as n (n)}
-								<option value={n}>{n}</option>
-							{/each}
-						</select>
-					</label>
-				</div>
-			</fieldset>
-
-			<!-- FARBA + VÝPLŇ -->
-			<fieldset class="baz-blok">
-				<legend>Vyhotovenie</legend>
-				<div class="baz-rozmery">
-					<label class="baz-pole">
-						<span>Farba konštrukcie</span>
-						<select bind:value={farba} data-testid="bazen-farba">
-							{#each data.farby as f (f.kod)}
-								<option value={f.kod}>RAL {f.kod} — {f.nazov}</option>
-							{/each}
-						</select>
-					</label>
-					<label class="baz-pole">
-						<span>Výplň</span>
-						<select bind:value={vypln} data-testid="bazen-vypln">
-							{#each data.vyplne as v (v.nazov)}
-								<option value={v.nazov}>{v.nazov}</option>
-							{/each}
-						</select>
-					</label>
-				</div>
-			</fieldset>
-		</div>
-
-		<!-- SÚHRN + CENA-INFO + DOPYT -->
-		<div class="baz-panel">
-			{#if suhrn}
-				{@const s = suhrn}
-				<section class="baz-suhrn" data-testid="bazen-suhrn">
-					<h2>Tvoja konfigurácia</h2>
-					<dl>
-						<div>
-							<dt>Model</dt>
-							<dd>{s.model}</dd>
-						</div>
-						<div>
-							<dt>Koľajový systém</dt>
-							<dd>{s.kolaj}</dd>
-						</div>
-						<div>
-							<dt>Rozmery (d × š)</dt>
-							<dd data-testid="bazen-suhrn-rozmery">{s.dlzka} × {s.sirka} mm</dd>
-						</div>
-						<div>
-							<dt>Výška</dt>
-							<dd>{s.vyska} mm</dd>
-						</div>
-						<div>
-							<dt>Počet segmentov</dt>
-							<dd>{s.segmenty}</dd>
-						</div>
-						<div>
-							<dt>Zastrešená plocha</dt>
-							<dd>{cislaCiarka(s.plochaM2)} m²</dd>
-						</div>
-						<div>
-							<dt>Farba</dt>
-							<dd>{s.farba}</dd>
-						</div>
-						<div>
-							<dt>Výplň</dt>
-							<dd>{s.vypln}</dd>
-						</div>
-					</dl>
-				</section>
-
-				<!-- CENA je na DOPYT (honest-null: bazén nemá orientačný cenník) -->
-				<section class="baz-cena-info" data-testid="bazen-cena-info">
-					<strong>Cena na vyžiadanie</strong>
-					<p>
-						Bazénové zastrešenie ti naceníme individuálne — pošli nezáväzný dopyt a pripravíme
-						cenovú ponuku po obhliadke miesta.
-					</p>
-					<button type="button" class="baz-btn primar" onclick={() => scrollNa('dopyt')}>
-						Nezáväzný dopyt →
-					</button>
-				</section>
-
-				<section class="baz-blok-kontakt" id="dopyt" data-testid="dopyt">
-					<h2>Máš záujem o toto zastrešenie?</h2>
-					<p class="baz-uvod">
-						Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) na stiahnutie. Cenu
-						pripravíme individuálne po obhliadke.
-					</p>
-					<DopytForm
-						konfiguracia={ponukaCfg}
-						disclaimer="Špecifikácia je nezáväzná. Cenu pripravíme individuálne po obhliadke miesta stavby."
-					/>
-				</section>
-			{:else}
-				<p class="baz-chyba" data-testid="bazen-chyba">
-					⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
+	<!-- PRAVÝ stĺpec: ovládanie + súhrn/cena/dopyt — scrolluje -->
+	<div class="baz-panel-col">
+		<div class="baz-panel-scroll">
+			<header class="baz-hero">
+				<span class="baz-label">Konfigurátor bazénových zastrešení</span>
+				<h1>Navrhni si bazénové zastrešenie</h1>
+				<p>
+					Vyber model, rozmery a vyhotovenie — zastrešenie vidíš naživo v 3D vedľa. Pripravíme ti
+					nezáväznú špecifikáciu (PDF) a ozveme sa s cenovou ponukou po obhliadke. Bez registrácie.
 				</p>
-			{/if}
+			</header>
+
+			<div class="baz-ovladanie">
+				<!-- MODEL -->
+				<fieldset class="baz-blok">
+					<legend>Model</legend>
+					<div class="baz-karty">
+						{#each data.modely as m (m.kod)}
+							<button
+								type="button"
+								class="baz-karta"
+								class:vybrana={model === m.kod}
+								aria-pressed={model === m.kod}
+								data-testid="bazen-model-{m.kod}"
+								onclick={() => (model = m.kod)}
+							>
+								<span class="baz-karta-nazov">{m.kod}</span>
+								<span class="baz-karta-popis">{m.popis}</span>
+							</button>
+						{/each}
+					</div>
+				</fieldset>
+
+				<!-- KOĽAJ -->
+				<fieldset class="baz-blok">
+					<legend>Koľajový systém</legend>
+					<div class="baz-karty dvoj">
+						{#each data.kolaje as k (k.kod)}
+							<button
+								type="button"
+								class="baz-karta"
+								class:vybrana={kolaj === k.kod}
+								aria-pressed={kolaj === k.kod}
+								data-testid="bazen-kolaj-{k.kod}"
+								onclick={() => (kolaj = k.kod)}
+							>
+								<span class="baz-karta-nazov">{k.kod}</span>
+								<span class="baz-karta-popis">{k.popis}</span>
+							</button>
+						{/each}
+					</div>
+				</fieldset>
+
+				<!-- ROZMERY — metrové steppery (#333 RozmerStepper, zhodné so zákazníckou pergolou) -->
+				<fieldset class="baz-blok">
+					<legend>Rozmery</legend>
+					<div class="baz-steppery">
+						<RozmerStepper
+							bind:hodnotaMm={dlzka}
+							min={r.dlzka.min}
+							max={r.dlzka.max}
+							krokMm={r.dlzka.krok}
+							popis="Dĺžka"
+							akuzativ="dĺžku"
+							id="baz-dlzka"
+							testid="bazen-dlzka"
+							name="dlzka"
+						/>
+						<RozmerStepper
+							bind:hodnotaMm={sirka}
+							min={r.sirka.min}
+							max={r.sirka.max}
+							krokMm={r.sirka.krok}
+							popis="Šírka"
+							akuzativ="šírku"
+							id="baz-sirka"
+							testid="bazen-sirka"
+							name="sirka"
+						/>
+						<RozmerStepper
+							bind:hodnotaMm={vyska}
+							min={r.vyska.min}
+							max={r.vyska.max}
+							krokMm={r.vyska.krok}
+							popis="Výška"
+							akuzativ="výšku"
+							id="baz-vyska"
+							testid="bazen-vyska"
+							name="vyska"
+						/>
+						<label class="baz-pole baz-segmenty">
+							<span>Počet segmentov</span>
+							<select bind:value={segmenty} data-testid="bazen-segmenty">
+								{#each segmentyOpts as n (n)}
+									<option value={n}>{n}</option>
+								{/each}
+							</select>
+						</label>
+					</div>
+				</fieldset>
+
+				<!-- FARBA + VÝPLŇ -->
+				<fieldset class="baz-blok">
+					<legend>Vyhotovenie</legend>
+					<div class="baz-rozmery">
+						<label class="baz-pole">
+							<span>Farba konštrukcie</span>
+							<select bind:value={farba} data-testid="bazen-farba">
+								{#each data.farby as f (f.kod)}
+									<option value={f.kod}>RAL {f.kod} — {f.nazov}</option>
+								{/each}
+							</select>
+						</label>
+						<label class="baz-pole">
+							<span>Výplň</span>
+							<select bind:value={vypln} data-testid="bazen-vypln">
+								{#each data.vyplne as v (v.nazov)}
+									<option value={v.nazov}>{v.nazov}</option>
+								{/each}
+							</select>
+						</label>
+					</div>
+				</fieldset>
+			</div>
+
+			<!-- SÚHRN + CENA-INFO + DOPYT -->
+			<div class="baz-panel">
+				{#if suhrn}
+					{@const s = suhrn}
+					<section class="baz-suhrn" data-testid="bazen-suhrn">
+						<h2>Tvoja konfigurácia</h2>
+						<dl>
+							<div>
+								<dt>Model</dt>
+								<dd>{s.model}</dd>
+							</div>
+							<div>
+								<dt>Koľajový systém</dt>
+								<dd>{s.kolaj}</dd>
+							</div>
+							<div>
+								<dt>Rozmery (d × š)</dt>
+								<dd data-testid="bazen-suhrn-rozmery">{s.dlzka} × {s.sirka} mm</dd>
+							</div>
+							<div>
+								<dt>Výška</dt>
+								<dd>{s.vyska} mm</dd>
+							</div>
+							<div>
+								<dt>Počet segmentov</dt>
+								<dd>{s.segmenty}</dd>
+							</div>
+							<div>
+								<dt>Zastrešená plocha</dt>
+								<dd>{cislaCiarka(s.plochaM2)} m²</dd>
+							</div>
+							<div>
+								<dt>Farba</dt>
+								<dd>{s.farba}</dd>
+							</div>
+							<div>
+								<dt>Výplň</dt>
+								<dd>{s.vypln}</dd>
+							</div>
+						</dl>
+					</section>
+
+					<!-- ORIENTAČNÁ CENA (#404) — server-počítaná bazénovou maticou montalu.sk (enhance submit) -->
+					<section class="baz-cena" data-testid="bazen-cena-sekcia">
+						{#if cenaAktualna && cenaVysledok}
+							{@const c = cenaVysledok.cena}
+							<div class="baz-cena-blok" data-testid="bazen-cena">
+								{#if c.druh === 'cena'}
+									<span class="baz-cena-label">Orientačná cena — model {c.model}</span>
+									{#if c.hladinaLabel}
+										<span class="baz-cena-vo" data-testid="bazen-cena-hladina"
+											>{c.hladinaLabel}</span
+										>
+									{/if}
+									<div class="baz-cena-hlavne">
+										<span class="baz-cena-sdph" data-testid="bazen-cena-sdph">{eur(c.sDph)}</span>
+										<span class="baz-cena-mena">s DPH</span>
+									</div>
+									<div class="baz-cena-bezdph" data-testid="bazen-cena-bezdph">
+										{eur(c.bezDph)} bez DPH
+									</div>
+								{:else}
+									<span class="baz-cena-label">Cena na vyžiadanie — model {c.model}</span>
+									{#if c.hladinaLabel}
+										<span class="baz-cena-vo" data-testid="bazen-cena-hladina"
+											>{c.hladinaLabel}</span
+										>
+									{/if}
+									<p class="baz-cena-dovod" data-testid="bazen-cena-individualna">
+										{c.dovod} Pripravíme ti individuálnu ponuku.
+									</p>
+								{/if}
+								<p class="baz-cena-pozn">
+									Orientačná cena vychádza z aktuálneho cenníka pre zvolený model a rozmery. Presnú,
+									záväznú cenu pripravíme po obhliadke miesta.
+								</p>
+							</div>
+
+							{#if cenaVysledok.cenyModely}
+								<div class="baz-porovnanie" data-testid="bazen-porovnanie">
+									<h3>Porovnanie modelov (orientačne, s DPH)</h3>
+									<ul>
+										{#each cenaVysledok.cenyModely as cm (cm.model)}
+											<li
+												class:vybrany={cm.model === c.model}
+												data-testid="bazen-porovnanie-{cm.model}"
+											>
+												<span class="p-model">{cm.model}</span>
+												<span class="p-cena">
+													{cm.cena.druh === 'cena' ? eur(cm.cena.sDph) : 'na vyžiadanie'}
+												</span>
+											</li>
+										{/each}
+									</ul>
+								</div>
+							{/if}
+						{:else}
+							<form
+								method="POST"
+								action="?/vypocet"
+								class="baz-cena-form"
+								use:enhance={() => {
+									const submitted = cenaKluc;
+									cenaNacitava = true;
+									cenaError = null;
+									return ({ result }) => {
+										cenaNacitava = false;
+										if (result.type === 'success') {
+											const d = result.data as
+												{ cena: VerejnaCena; cenyModely: CenaModelu[] } | undefined;
+											if (d?.cena) {
+												cenaVysledok = { cena: d.cena, cenyModely: d.cenyModely };
+												poslednyKluc = submitted;
+											}
+										} else if (result.type === 'failure') {
+											const d = result.data as { error?: string } | undefined;
+											cenaError = d?.error ?? 'Cenu sa nepodarilo spočítať.';
+										} else if (result.type === 'error') {
+											// sieťová/serverová výnimka — nenechaj tlačidlo „visieť" bez odozvy
+											cenaError = 'Cenu sa nepodarilo spočítať, skús to prosím o chvíľu znova.';
+										}
+									};
+								}}
+							>
+								<input type="hidden" name="model" value={vstup.model} />
+								<input type="hidden" name="dlzka" value={dlzka ?? 0} />
+								<input type="hidden" name="sirka" value={sirka ?? 0} />
+								<strong>Orientačná cena</strong>
+								<p>
+									Zobraz si orientačnú cenu zvoleného modelu a porovnanie modelov. Presnú, záväznú
+									cenu pripravíme po obhliadke miesta.
+								</p>
+								{#if cenaError}
+									<p class="baz-cena-chyba" data-testid="bazen-cena-chyba">{cenaError}</p>
+								{/if}
+								<button
+									type="submit"
+									class="baz-btn primar"
+									data-testid="bazen-cena-zobrazit"
+									disabled={cenaNacitava}
+								>
+									{cenaNacitava
+										? 'Počítam…'
+										: cenaVysledok
+											? 'Prepočítať orientačnú cenu →'
+											: 'Zobraziť orientačnú cenu →'}
+								</button>
+							</form>
+						{/if}
+						<button type="button" class="baz-btn druhotny" onclick={() => scrollNa('dopyt')}>
+							Nezáväzný dopyt →
+						</button>
+					</section>
+
+					<section class="baz-blok-kontakt" id="dopyt" data-testid="dopyt">
+						<h2>Máš záujem o toto zastrešenie?</h2>
+						<p class="baz-uvod">
+							Nechaj nám kontakt a pripravíme ti nezáväznú špecifikáciu (PDF) s orientačnou cenou na
+							stiahnutie. Presnú, záväznú cenu pripravíme po obhliadke miesta.
+						</p>
+						<DopytForm konfiguracia={ponukaCfg} />
+					</section>
+				{:else}
+					<p class="baz-chyba" data-testid="bazen-chyba">
+						⚠ Skontroluj zadané rozmery — musia byť v uvedených rozmedziach.
+					</p>
+				{/if}
+			</div>
 		</div>
 	</div>
 </div>
 
 <style>
-	.baz {
-		max-width: 1100px;
-		margin: 0 auto;
-		padding: clamp(20px, 4vw, 44px) clamp(16px, 4vw, 40px) clamp(40px, 6vw, 72px);
-	}
-
-	/* HERO */
-	.baz-hero {
+	/* ── Split-screen: mobil-first — 3D HORE (pevná výška), panel scrolluje POD ním vo
+	   VLASTNEJ oblasti (žiadny sticky-overlay ⇒ žiadne prekrytie klikateľného obsahu).
+	   Rovnaký čistý flex-column vzor ako zákaznícka pergola (#325/#327), len bazén. ── */
+	.baz-split {
 		display: grid;
 		grid-template-columns: 1fr;
-		gap: clamp(16px, 3vw, 28px);
-		margin-bottom: clamp(24px, 4vw, 40px);
+		grid-template-rows: 42dvh minmax(0, 1fr);
+		height: calc(100dvh - var(--k-hlava-h));
 	}
-	.baz-hero-foto {
-		border-radius: var(--k-radius);
+
+	.baz-vizual-col {
+		background: var(--k-bg);
+		min-height: 0;
 		overflow: hidden;
-		aspect-ratio: 5 / 3;
-		background: var(--k-surface-2);
-		box-shadow: var(--k-shadow);
 	}
-	.baz-hero-foto img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
+
+	.baz-panel-col {
+		display: flex;
+		flex-direction: column;
+		background: var(--k-surface);
+		min-width: 0;
+		min-height: 0;
+		overflow: hidden;
+	}
+	.baz-panel-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		padding: clamp(20px, 4vw, 40px) clamp(16px, 4vw, 36px) 32px;
+	}
+
+	.baz-hero {
+		max-width: 560px;
+		margin: 0 0 24px;
 	}
 	.baz-label {
 		display: block;
@@ -330,28 +509,19 @@
 		color: var(--k-accent);
 		margin-bottom: 10px;
 	}
-	.baz-hero-text h1 {
+	.baz-hero h1 {
 		margin: 0 0 12px;
-		font-size: clamp(1.8rem, 4vw, 2.7rem);
+		font-size: clamp(1.7rem, 3.6vw, 2.5rem);
 		font-weight: 700;
 		line-height: 1.06;
 		letter-spacing: -0.02em;
 		color: var(--k-text);
 	}
-	.baz-hero-text p {
+	.baz-hero p {
 		margin: 0;
-		font-size: 15.5px;
+		font-size: 15px;
 		line-height: 1.55;
 		color: var(--k-muted);
-		max-width: 560px;
-	}
-
-	/* LAYOUT: mobil 1 stĺpec, desktop ovládanie + panel */
-	.baz-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: clamp(18px, 3vw, 32px);
-		align-items: start;
 	}
 
 	.baz-blok {
@@ -462,7 +632,6 @@
 		gap: 16px;
 	}
 	.baz-suhrn,
-	.baz-cena-info,
 	.baz-blok-kontakt {
 		border: 1px solid var(--k-line);
 		border-radius: var(--k-radius);
@@ -506,21 +675,142 @@
 		text-align: right;
 	}
 
-	.baz-cena-info {
-		background: var(--k-surface-2);
-		border-color: var(--k-line-2);
+	/* ORIENTAČNÁ CENA (#404) */
+	.baz-cena {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
-	.baz-cena-info strong {
+	.baz-cena-form {
+		border: 1px solid var(--k-line-2);
+		border-radius: var(--k-radius);
+		background: var(--k-surface-2);
+		padding: 20px 22px;
+	}
+	.baz-cena-form strong {
 		display: block;
 		font-size: 17px;
 		color: var(--k-text);
 		margin-bottom: 6px;
 	}
-	.baz-cena-info p {
+	.baz-cena-form p {
 		margin: 0 0 14px;
 		font-size: 13.5px;
 		line-height: 1.5;
 		color: var(--k-muted);
+	}
+	.baz-cena-chyba {
+		color: #a3261c;
+		font-weight: 600;
+	}
+	/* prémiový antracitový cenový panel (tmavá karta, Tesla-style — zhoda s pergolovým KonfCena) */
+	.baz-cena-blok {
+		background: var(--k-ink, #1b1e23);
+		color: #fff;
+		border-radius: var(--k-radius);
+		padding: 20px 22px;
+	}
+	.baz-cena-label {
+		display: block;
+		color: rgba(255, 255, 255, 0.62);
+		font-size: 12px;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 600;
+	}
+	.baz-cena-vo {
+		display: inline-block;
+		margin-top: 8px;
+		padding: 2px 9px;
+		border-radius: 999px;
+		background: var(--k-accent, #b07a45);
+		color: #fff;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.baz-cena-hlavne {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin-top: 8px;
+	}
+	.baz-cena-sdph {
+		font-size: clamp(28px, 7vw, 38px);
+		font-weight: 700;
+		line-height: 1.05;
+		letter-spacing: -0.02em;
+		font-variant-numeric: tabular-nums;
+	}
+	.baz-cena-mena {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+	}
+	.baz-cena-bezdph {
+		color: rgba(255, 255, 255, 0.66);
+		font-size: 14px;
+		margin-top: 4px;
+	}
+	.baz-cena-dovod {
+		color: rgba(255, 255, 255, 0.72);
+		font-size: 13.5px;
+		margin: 8px 0 0;
+	}
+	.baz-cena-pozn {
+		color: rgba(255, 255, 255, 0.5);
+		font-size: 12px;
+		line-height: 1.45;
+		margin: 14px 0 0;
+	}
+	.baz-porovnanie {
+		border: 1px solid var(--k-line);
+		border-radius: var(--k-radius);
+		background: var(--k-surface);
+		padding: 16px 20px;
+	}
+	.baz-porovnanie h3 {
+		font-size: 11.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		font-weight: 600;
+		margin: 0 0 12px;
+		color: var(--k-faint, #9a9ea6);
+	}
+	.baz-porovnanie ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 2px;
+	}
+	.baz-porovnanie li {
+		display: flex;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 9px 10px;
+		border-radius: 9px;
+		font-size: 15px;
+	}
+	.baz-porovnanie li.vybrany {
+		background: var(--k-accent-soft, #f5ede2);
+		font-weight: 700;
+	}
+	.baz-porovnanie .p-model {
+		color: var(--k-muted, #6b7078);
+	}
+	.baz-porovnanie .p-cena {
+		color: var(--k-text, #16181c);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+	.baz-btn.druhotny {
+		background: var(--k-surface);
+		color: var(--k-text);
+		border-color: var(--k-line-2);
+	}
+	.baz-btn.druhotny:hover {
+		border-color: var(--k-ink);
 	}
 
 	.baz-uvod {
@@ -561,13 +851,15 @@
 		margin: 0;
 	}
 
+	/* ── Desktop: split-screen — vľavo edge-to-edge 3D (plná výška), vpravo scroll panel
+	   (rovnaký flex-column vzor ako mobil, len horizontálne: 2 stĺpce, 1 riadok) ── */
 	@media (min-width: 900px) {
-		.baz-hero {
-			grid-template-columns: 1.1fr 0.9fr;
-			align-items: center;
+		.baz-split {
+			grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+			grid-template-rows: minmax(0, 1fr);
 		}
-		.baz-grid {
-			grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+		.baz-panel-col {
+			border-left: 1px solid var(--k-line);
 		}
 	}
 </style>

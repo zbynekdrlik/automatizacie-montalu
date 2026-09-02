@@ -222,7 +222,7 @@
 		border: none;
 		padding: 0;
 		margin-left: 6px;
-		color: #1d4ed8;
+		color: var(--m-accent-ink);
 		text-decoration: underline;
 		cursor: pointer;
 		font-size: inherit;

@@ -70,8 +70,11 @@ export type CenovaHladina = 'MO' | 'VO';
 
 /**
  * Verejná (client-safe) orientačná cena — bez DPH + s DPH. Buď konkrétna cena, alebo
- * „individuálna ponuka" (mimo katalógu). Odvodená serverom z `konfigurator-cena.ts`. Rozmery
- * `hlbkaGridM`/`sirkaGridM` sú katalógové (po zaokrúhlení NAHOR na mriežku).
+ * „individuálna ponuka" (mimo katalógu). Odvodená serverom (`konfigurator-cena.ts` pergola,
+ * `konfigurator-bazen-cena.ts` bazén). `hlbkaGridM`/`sirkaGridM` sú katalógové mriežkové rozmery po
+ * zaokrúhlení na mriežku — pergola NAHOR (hĺbka×šírka), bazén na NAJBLIŽŠÍ bod (dĺžka do `hlbkaGridM`,
+ * šírka do `sirkaGridM`); DB stĺpec `cena_hlbka_grid_m` tak pri bazéne nesie DĹŽKU. Len interné/audit
+ * (grid-note v PDF je produkt-aware, viď `cenaRiadky`).
  *
  * #318: `hladina` je typovo `'VO'` (NIE `CenovaHladina`) — MO/verejný výstup ju štrukturálne
  * NEMÔŽE niesť (`naCenu` MO ju nenastaví a typ 'MO' hodnotu ani nedovolí), takže verejná odpoveď
@@ -81,10 +84,15 @@ export type CenovaHladina = 'MO' | 'VO';
  * „veľkoobchodná cena") je tiež prítomný LEN pri VO — klientsky komponent tak NEnesie žiadny VO
  * literál (label príde zo servera), a MO bundle ostáva bez akéhokoľvek náznaku VO hladiny.
  */
+// #404: `model` je `string` (nie `ModelPergoly`) — zdieľaný cenový typ nesie AJ bazénové modely
+// (Premier/Star/Exclusive z `konfigurator-bazen-cena.ts`). Pergola priraďuje `ModelPergoly` (podmnožina
+// string, bezpečné); consumers `model` len renderujú/porovnávajú ako label. `hlbkaGridM`/`sirkaGridM`
+// ostávajú číselné mriežkové rozmery (pergola: hĺbka×šírka; bazén: dĺžka×šírka — grid-note sa pre bazén
+// nevykreslí, viď guard v renderi na prítomnosť cfg poľa).
 export type VerejnaCena =
 	| {
 			druh: 'cena';
-			model: ModelPergoly;
+			model: string;
 			bezDph: number;
 			sDph: number;
 			hlbkaGridM: number;
@@ -94,15 +102,16 @@ export type VerejnaCena =
 	  }
 	| {
 			druh: 'individualna-ponuka';
-			model: ModelPergoly;
+			model: string;
 			dovod: string;
 			hladina?: 'VO';
 			hladinaLabel?: string;
 	  };
 
-/** Cena jedného modelu v porovnávacej tabuľke (zrkadlo montalu.sk „ceny modelov vedľa seba"). */
+/** Cena jedného modelu v porovnávacej tabuľke (zrkadlo montalu.sk „ceny modelov vedľa seba").
+ *  `model` je `string` (#404) — pergola i bazén, len label. */
 export interface CenaModelu {
-	model: ModelPergoly;
+	model: string;
 	cena: VerejnaCena;
 }
 

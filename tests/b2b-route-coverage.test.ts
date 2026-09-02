@@ -305,15 +305,16 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 	});
 });
 
-// #385, rovnaká disciplína — bazénová podstránka má PRESNE jedinú akciu `dopyt` (verejný kontaktný
-// formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je čisto
-// klientsky, honest-null — bazén nemá cenový zdroj), žiadna Money/odpisová zápisová akcia. VEREJNÁ
-// route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
-// tento test ROZBIJE (fail-closed).
-describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385)', () => {
-	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+// #385/#404, rovnaká disciplína — bazénová podstránka má PRESNE `dopyt` (verejný kontaktný formulár →
+// PDF špecifikácia s orientačnou cenou + Odoo lead) + `vypocet` (#404: orientačná cena, display-only —
+// pridanie ceny odblokovalo cenovú kalkulačku, presne ako pergolová `vypocet`). Žiadna Money/odpisová
+// ZÁPISOVÁ akcia (cena je LEN orientačná MO predajná, nie Money odpis; `vypocet` nič nezapisuje). VEREJNÁ
+// route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ĎALŠEJ akcie ROZBIJE
+// test (fail-closed).
+describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385/#404)', () => {
+	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
 

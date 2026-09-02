@@ -546,8 +546,8 @@
 
 <style>
 	.fix-box {
-		border: 1px solid #bfdbfe;
-		background: #f8fbff;
+		border: 1px solid var(--m-line-2);
+		background: var(--m-surface-2);
 		border-radius: 10px;
 		padding: 12px 14px 4px;
 		margin-bottom: 12px;

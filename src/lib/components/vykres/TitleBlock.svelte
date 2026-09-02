@@ -185,7 +185,7 @@
 			y={y3 - 1.5}
 			font-size="3.4"
 			font-weight="600"
-			fill="#1d4ed8"
+			fill="#8a5a2b"
 			data-testid="tb-mierka">{mierka}</text
 		>
 	</g>

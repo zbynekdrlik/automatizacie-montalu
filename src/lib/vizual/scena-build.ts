@@ -69,6 +69,10 @@ export interface SceneCtx {
 	presety: Record<PresetKluc, Preset>;
 	/** #325: pergola scéna (dom + okolie); zasklenia = false */
 	zobrazDom: boolean;
+	/** #405: zobraziť stenu ZA produktom (pergola/zasklenia = true; bazénové
+	 *  zastrešenie je FREESTANDING → false, žiadna stena). Default (v komponente)
+	 *  = true, takže existujúce rodiny sa nemenia. */
+	zobrazStena: boolean;
 	containerEl: HTMLDivElement | undefined;
 	/** OrbitControls `'start'` (krátkodobá rAF slučka komponentu) */
 	onStart: () => void;
@@ -87,7 +91,8 @@ export function postavScenu(
 	postprocModuly: PostprocModuly | null,
 	ctx: SceneCtx
 ): ZivaScena {
-	const { vysledok, ralKod, skloVzhlad, preset, presety, zobrazDom, containerEl } = ctx;
+	const { vysledok, ralKod, skloVzhlad, preset, presety, zobrazDom, zobrazStena, containerEl } =
+		ctx;
 	const nastavenia = nastaveniaPreTier(aktualnyTier);
 	const disposables: Disposable[] = [];
 
@@ -145,24 +150,30 @@ export function postavScenu(
 
 	// #325: pergola (`zobrazDom`) dostane SOLÍDNU fasádu škálovanú výškou; zasklenia scény
 	// ostávajú s PÔVODNOU stenou (dverný otvor, fixná výška) → žiadna zmena zasklenia náhľadu.
-	const stena = zobrazDom
-		? vytvorStenu(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h, false)
-		: vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
-	stena.position.z = -(mm(vysledok.bbox.d) / 2 + 0.05);
-	stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
-	scene.add(stena);
-	disposables.push(stena.geometry, stena.material as Disposable);
-	const stenaMat = stena.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
-	if (stenaMat.map) disposables.push(stenaMat.map);
-	if (stenaMat.roughnessMap && stenaMat.roughnessMap !== stenaMat.map)
-		disposables.push(stenaMat.roughnessMap);
+	// #405: bazénové zastrešenie je FREESTANDING (`zobrazStena=false`) → žiadna stena za
+	// produktom (stena za voľne stojacim zastrešením by pôsobila zavádzajúco). Dom (zobrazDom)
+	// si stenu-fasádu vždy vyžaduje, takže sa kreslí pri `zobrazDom || zobrazStena`.
+	const stenaZ = -(mm(vysledok.bbox.d) / 2 + 0.05);
+	if (zobrazDom || zobrazStena) {
+		const stena = zobrazDom
+			? vytvorStenu(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h, false)
+			: vytvorStenu(THREE, nastavenia, vysledok.bbox.w);
+		stena.position.z = stenaZ;
+		stena.receiveShadow = nastavenia.tiene; // #285: stena prijíma vrhnutý tieň
+		scene.add(stena);
+		disposables.push(stena.geometry, stena.material as Disposable);
+		const stenaMat = stena.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
+		if (stenaMat.map) disposables.push(stenaMat.map);
+		if (stenaMat.roughnessMap && stenaMat.roughnessMap !== stenaMat.map)
+			disposables.push(stenaMat.roughnessMap);
+	}
 
 	if (zobrazDom) {
 		// #333: profi 2-podlažný dom (svetlá fasáda + sedlová plechová strecha so štítmi + raster
 		// okien + drevené dvere + sokel) PRED fasádou. Dvere centrované na x=0 → vždy medzi krajnými
 		// stĺpmi (nikdy za nohou); strecha vysoko nad pergolou, presah mimo strešného skla pergoly.
 		const dom = vytvorDom(THREE, nastavenia, vysledok.bbox.w, vysledok.bbox.h);
-		dom.skupina.position.z = stena.position.z;
+		dom.skupina.position.z = stenaZ;
 		scene.add(dom.skupina);
 		for (const d of dom.disposables) disposables.push(d);
 	}

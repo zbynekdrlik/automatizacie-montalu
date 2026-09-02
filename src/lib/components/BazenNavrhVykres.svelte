@@ -112,7 +112,9 @@
 	});
 
 	const CIERNA = '#0f172a';
-	const MODRA = '#1d4ed8';
+	// #376 stage 4: bronz — kótovacia/anotačná farba (predtým modrá #1d4ed8);
+	// --m-accent-ink, text-safe 5.9:1 (Kota farbí čiaru AJ číselný popisok)
+	const BRONZ = '#8a5a2b';
 	const CERVENA = '#dc2626';
 	const ORANZOVA = '#f97316';
 
@@ -333,7 +335,7 @@
 			y={sy1}
 			width={Math.max(0.3, sx1 - sx0)}
 			height={baseY - sy1}
-			fill={farebny ? farba.hex : '#eff6ff'}
+			fill={farebny ? farba.hex : '#f4f3ef'}
 			stroke={CIERNA}
 			stroke-width={obrysStroke(Math.min(sx1 - sx0, baseY - sy1) * 0.5)}
 			shape-rendering="crispEdges"
@@ -354,7 +356,7 @@
 		y1={baseY - vysky[0]! * fit.scale}
 		perpOffset={-(r.w * 0.05)}
 		text={fmtMm(vysky[0]!)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<Kota
@@ -364,7 +366,7 @@
 		y1={baseY - vysky[vysky.length - 1]! * fit.scale}
 		perpOffset={r.w * 0.05}
 		text={fmtMm(vysky[vysky.length - 1]!)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<!-- šírka prvej sekcie — LEN keď je ručne zadaná (appka nehádže vnorenie) -->
@@ -377,7 +379,7 @@
 				y1={baseY + r.h * 0.06}
 				perpOffset={r.h * 0.05}
 				text={fmtMm(vstup.sirkaSekcieOverride)}
-				color={MODRA}
+				color={BRONZ}
 				fontSize={MIN_DIM_FONT}
 			/>
 		</g>
@@ -390,7 +392,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.16}
 		text={fmtMm(vstup.zatvorenaDlzka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 	<g data-testid="bn-bokorys-presah">
@@ -401,7 +403,7 @@
 			y1={baseY}
 			perpOffset={r.h * 0.16}
 			text={fmtMm(presah)}
-			color={MODRA}
+			color={BRONZ}
 			fontSize={MIN_DIM_FONT}
 		/>
 	</g>
@@ -412,7 +414,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.28}
 		text={fmtMm(vstup.dlzkaKolajiska)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 {/snippet}
@@ -519,7 +521,7 @@
 		{y1}
 		perpOffset={-(r.w * 0.05)}
 		text={fmtMm(vstup.hlbka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<Kota
@@ -529,7 +531,7 @@
 		{y1}
 		perpOffset={r.h * 0.14}
 		text={fmtMm(vstup.zatvorenaDlzka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 {/snippet}
