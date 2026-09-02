@@ -103,12 +103,17 @@ function najdiRolu(g: CfgGroup, re: RegExp): RezRow | undefined {
  * celý zmysel výberu #110, napr. starý „Rámový profil"/„Dorazový profil" na
  * plus posuve). Šírka prírezov sa číta z POSUVU (kód ZASP202415 je zdieľaný
  * oboma systémami) a keď je sieťka INÉHO systému než posuv, pripočíta sa
- * Patrikova PEVNÁ konštanta ±16,5 mm (#1616282/#1616285) — jeho DOSLOVNÉ číslo,
+ * Patrikova PEVNÁ konštanta +16,5 mm (#1616282/#1616285) — jeho DOSLOVNÉ číslo,
  * nie prepočet vzorcom cudzieho systému (ten by dal iné číslo — overené ručne:
  * (3000−143)/3 = 952,33 mm, nie 942,5+16,5 = 959 mm, ktoré uviedol on).
- * Smer „starý sieťka na plus posuve" (+16,5) je doslovne potvrdený; opačný smer
- * „plus sieťka na starom posuve" (−16,5) je SYMETRICKÝ, zatiaľ NEPOTVRDENÝ
- * (pozri #110 „Otvorené" — treba dať Patrikovi potvrdiť pred reálnou zákazkou).
+ * Delta je +16,5 mm v OBOCH krížových smeroch (sieťka je vždy VÄČŠIA), nie
+ * symetrická ±16,5. Smer „starý sieťka na plus posuve" (+16,5) bol doslovne
+ * potvrdený už v #110; opačný smer „plus sieťka na starom posuve" bol pôvodne
+ * nepotvrdený PREDPOKLAD zapísaný symetricky (−16,5), no Patrikova výroba ho
+ * v #416 (kanál 207, msg 1777560: „štandard + a starý štandard … sieťka musí byť
+ * +16mm väčšia") potvrdila ako TIEŽ +16,5 väčší — teda konštantné +16,5, nie ±.
+ * (Presná magnitúda 16 vs 16,5 čaká na Patrikovo potvrdenie — #416 needs-answer;
+ * ponechaná potvrdená hodnota 16,5 z #110, nie casual „16" z novej správy.)
  */
 export function sietkaStandardExtra(
 	cfg: Cfg,
@@ -142,7 +147,7 @@ export function sietkaStandardExtra(
 			rezy: [],
 			err: 'Konfigurácia sieťky nemá všetky potrebné profily (šírka/krajová/nos/dorazová).'
 		};
-	const sirkaDelta = sietkaSystem === posuvSystem ? 0 : sietkaSystem === 'Štandard' ? 16.5 : -16.5;
+	const sirkaDelta = sietkaSystem === posuvSystem ? 0 : 16.5;
 	// delta sa pripočíta PRED zaokrúhlením (nie na už zaokrúhlené číslo) — inak by
 	// 942,5 + 16,5 dalo 943 + 16,5 = 959,5 namiesto Patrikovho doslovného 959
 	// (#1616282/#1616285: 942,5 + 16,5 = 959).
