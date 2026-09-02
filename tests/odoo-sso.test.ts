@@ -4,7 +4,7 @@
 // disciplína ako `odoo-json2.ts`. env sa nastavuje za behu (ssoConfig číta lazy).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import http from 'node:http';
-import type { AddressInfo } from 'node:net';
+import net, { type AddressInfo } from 'node:net';
 import {
 	resolveOdooSso,
 	evictSsoCache,
@@ -92,11 +92,15 @@ describe('resolveOdooSso — acceptance gate', () => {
 		mockTransport(ok({ uid: 9, is_internal_user: false, username: 'portal@x.sk' }));
 		expect(await resolveOdooSso(SID)).toBeNull();
 	});
-	it('uid falsy/0/nekladné → null', async () => {
-		mockTransport(ok({ uid: 0, is_internal_user: true, username: 'x' }));
-		expect(await resolveOdooSso(SID)).toBeNull();
-		_clearSsoCacheForTests();
-		mockTransport(ok({ uid: false, is_internal_user: true, username: 'x' }));
+	it('uid falsy/0/záporné/necelé → null', async () => {
+		for (const uid of [0, false, -1, 7.5]) {
+			_clearSsoCacheForTests();
+			mockTransport(ok({ uid, is_internal_user: true, username: 'x' }));
+			expect(await resolveOdooSso(SID)).toBeNull();
+		}
+	});
+	it('chýbajúci is_internal_user → null (gate je === true, nie !== false)', async () => {
+		mockTransport(ok({ uid: 5, username: 'x' })); // is_internal_user chýba
 		expect(await resolveOdooSso(SID)).toBeNull();
 	});
 	it('prázdny/nestringový username → null', async () => {
@@ -220,10 +224,49 @@ describe('DEFAULT transport (node:http) — forwardne LEN session_id + konfiguro
 	});
 });
 
-// dôkaz že mock je aktívny (inak by testy bežali proti reálnemu node:http a padli/viseli)
-it('sanity: setSsoTransport mock je aktívny', async () => {
-	const calls = mockTransport(ok({ uid: 1, is_internal_user: true, username: 'x' }));
-	await resolveOdooSso(SID);
-	expect(calls).toHaveLength(1);
-	vi.clearAllMocks();
+describe('resolveOdooSso — deadline (nikdy-settlujúci transport NEPINNE inflight) [#5823 review 🔴]', () => {
+	it('transport ktorý nikdy nesettluje → null v rámci deadline; inflight sa uvoľní', async () => {
+		vi.useFakeTimers();
+		try {
+			let calls = 0;
+			setSsoTransport(() => {
+				calls++;
+				return new Promise<SsoResponse>(() => {}); // NIKDY nesettluje
+			});
+			const p = resolveOdooSso(SID);
+			await vi.advanceTimersByTimeAsync(3600); // > SSO_TIMEOUT_MS+500
+			expect(await p).toBeNull(); // settle na null, NIE hang
+			expect(calls).toBe(1);
+			// inflight uvoľnený? Evikuj negatívnu cache → ďalší call MUSÍ spustiť NOVÝ transport (keby bol
+			// inflight stále pinnutý, ďalší call by čakal na pinnutý promise, nie na nový transport).
+			evictSsoCache(SID);
+			const p2 = resolveOdooSso(SID);
+			await vi.advanceTimersByTimeAsync(3600);
+			expect(await p2).toBeNull();
+			expect(calls).toBe(2); // nový transport = inflight bol uvoľnený
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('DEFAULT transport: truncated Content-Length (socket zavretý mid-body) → null, NIE hang', async () => {
+		const server = net.createServer((sock) => {
+			sock.on('data', () => {
+				// hlavičky sľubujú 100 bajtov tela, pošli len 10 a zavri socket (Odoo worker zabitý mid-write)
+				sock.write(
+					'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"result":'
+				);
+				sock.destroy();
+			});
+		});
+		await new Promise<void>((r) => server.listen(0, r));
+		const port = (server.address() as AddressInfo).port;
+		try {
+			setSsoTransport(null); // reálny node:http default transport
+			enableSso(`http://127.0.0.1:${port}`, 'erp.montalu.cloud');
+			expect(await resolveOdooSso(SID)).toBeNull(); // settle, nie nekonečný hang (starý transport visel)
+		} finally {
+			server.close();
+		}
+	}, 8000);
 });

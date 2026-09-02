@@ -38,7 +38,11 @@ const log = logger('odoo-sso');
 export const ODOO_SESSION_COOKIE = 'session_id';
 
 const SSO_TIMEOUT_MS = 3_000; // request hot-path — nesmie visieť
-const POS_TTL_MS = 5 * 60 * 1000; // platná identita
+// Pozitívny TTL: platná identita cachnutá ~5 min. TRADE-OFF (#5823 review 🔵): Odoo-side deaktivácia /
+// zmena hesla (ktorá zneplatní `check_security`) sa prejaví v appke až po ≤5 min; bežný logout je krytý
+// rotáciou `sid` v Odoo (nová session = iný sid = cache miss), takže revocation-lag sa týka len týchto
+// admin-side zásahov (prijateľné pre interný nástroj).
+const POS_TTL_MS = 5 * 60 * 1000;
 const NEG_TTL_MS = 45 * 1000; // pád/expirácia/non-internal — bráni hameraniu Odoo pri výpadku
 const CACHE_MAX = 500; // LRU strop — bez neho je striekanie náhodných session_id memory-DoS
 /** `session_id` (Odoo) je URL-safe base64-ish token; ohraničí cache kľúč + bráni header-injection. */
@@ -88,6 +92,20 @@ function defaultTransport(
 	const lib = u.protocol === 'https:' ? https : http;
 	const body = JSON.stringify({ jsonrpc: '2.0', method: 'call', params: {} });
 	return new Promise<SsoResponse>((resolve, reject) => {
+		// #5823 review 🔴: promise MUSÍ VŽDY settlnúť — inak pinne `inflight` navždy → per-user hang.
+		// node:http NEEMITUJE 'end' ani req 'error' keď server zavrie socket po hlavičkách + čiastočnom
+		// tele (truncated Content-Length — Odoo worker zabitý mid-write pri deploy reštarte, práve keď
+		// sú SSO používatelia aktívni v iframe): emituje 'aborted'/'close'/'error' na `res`. + HARD
+		// wall-clock deadline (`setTimeout`), lebo socket-IDLE `timeout` na už-zatvorenom sockete nefíruje.
+		let settled = false;
+		// `finish` je hoisted funkcia (vidí `deadline` const nižšie); volaná až async po jeho priradení.
+		function finish(err: Error | null, val?: SsoResponse): void {
+			if (settled) return;
+			settled = true;
+			clearTimeout(deadline);
+			if (err) reject(err);
+			else resolve(val as SsoResponse);
+		}
 		const req = lib.request(
 			{
 				protocol: u.protocol,
@@ -103,18 +121,23 @@ function defaultTransport(
 					// LEN session_id — nikdy surová prichodzia Cookie (nesie am_session).
 					Cookie: `${ODOO_SESSION_COOKIE}=${sid}`,
 					'User-Agent': 'automatizacie-montalu/5823-sso'
-				},
-				timeout: timeoutMs
+				}
 			},
 			(res) => {
 				let data = '';
 				res.setEncoding('utf8');
 				res.on('data', (c) => (data += c));
-				res.on('end', () => resolve({ status: res.statusCode ?? 0, text: data }));
+				res.on('end', () => finish(null, { status: res.statusCode ?? 0, text: data }));
+				res.on('aborted', () => finish(new Error('sso response aborted (truncated)')));
+				res.on('error', (e) => finish(e));
+				res.on('close', () => finish(new Error('sso response closed before end')));
 			}
 		);
-		req.on('timeout', () => req.destroy(new Error('sso get_session_info timeout')));
-		req.on('error', reject);
+		req.on('error', (e) => finish(e));
+		const deadline = setTimeout(() => {
+			req.destroy(new Error('sso get_session_info deadline'));
+			finish(new Error('sso get_session_info deadline'));
+		}, timeoutMs);
 		req.write(body);
 		req.end();
 	});
@@ -170,10 +193,12 @@ export async function resolveOdooSso(sid: string | undefined): Promise<SessionUs
 			return hit.user;
 		}
 		const existing = inflight.get(key);
-		if (existing) return existing; // in-flight dedup (thundering herd pri prvom painte iframe)
+		// #5823 review 🔵: `return await` (nie `return <promise>`) — rejekcia vráteného promisu inak uniká
+		// z `try/catch`; `await` drží exception-proof kontrakt štrukturálne (doResolve dnes nerejektuje).
+		if (existing) return await existing; // in-flight dedup (thundering herd pri prvom painte iframe)
 		const p = doResolve(cfg, sid, key).finally(() => inflight.delete(key));
 		inflight.set(key, p);
-		return p;
+		return await p;
 	} catch (e) {
 		log.error('sso resolve neočakávane hodil (ignorované — prejde na lokálny login)', {
 			err: e instanceof Error ? e.message : String(e)
@@ -188,12 +213,29 @@ interface SessionInfo {
 	username?: unknown;
 }
 
+/**
+ * #5823 review 🔴 (2. vrstva): poistka, aby ŽIADEN transport (ani injektovaný test mock, ani budúca
+ * regresia default transportu) nemohol pinnúť `inflight` — tvrdý deadline nezávislý od transportu.
+ */
+function withDeadline<T>(p: Promise<T>, ms: number): Promise<T> {
+	let t: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<never>((_, rej) => {
+		t = setTimeout(() => rej(new Error('sso resolve deadline')), ms);
+	});
+	return Promise.race([p.finally(() => clearTimeout(t)), timeout]);
+}
+
 async function doResolve(cfg: SsoConfig, sid: string, key: string): Promise<SessionUser | null> {
 	const url = `${trimSlash(cfg.internalUrl)}/web/session/get_session_info`;
 	try {
-		const { status, text } = await transport(url, cfg.host, sid, SSO_TIMEOUT_MS);
+		const { status, text } = await withDeadline(
+			transport(url, cfg.host, sid, SSO_TIMEOUT_MS),
+			SSO_TIMEOUT_MS + 500
+		);
 		if (status !== 200) {
-			log.debug('sso: non-200', { status });
+			// #5823 review 🔵: „Odoo nedostupné → SSO degradované na lokálny login" je prevádzkovo warn
+			// (negatívny TTL ohraničuje na ≤1 riadok/45 s/sid).
+			log.warn('sso: non-200 z Odoo (degradujem na lokálny login)', { status });
 			cacheStore(key, null, NEG_TTL_MS);
 			return null;
 		}
@@ -233,8 +275,9 @@ async function doResolve(cfg: SsoConfig, sid: string, key: string): Promise<Sess
 		log.info('sso ok', { uid, login: username });
 		return user;
 	} catch (e) {
-		// timeout / sieťový pád → negatívna cache (bráni per-request 3 s visení pri Odoo výpadku)
-		log.debug('sso: transport chyba (prejde na lokálny login)', {
+		// timeout / deadline / sieťový pád → negatívna cache (bráni per-request visení pri Odoo výpadku).
+		// #5823 review 🔵: Odoo nedostupné je prevádzkovo warn (negatívny TTL ohraničuje na ≤1/45 s/sid).
+		log.warn('sso: transport chyba (degradujem na lokálny login)', {
 			err: e instanceof Error ? e.message : String(e)
 		});
 		cacheStore(key, null, NEG_TTL_MS);

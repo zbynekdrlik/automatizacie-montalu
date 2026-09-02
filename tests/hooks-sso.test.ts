@@ -88,6 +88,26 @@ async function userAfterHandle(cookies: { am?: string; sid?: string }): Promise<
 	return event.locals.user;
 }
 
+/** Spustí handle na CHRÁNENEJ ceste `/`; vráti `{ user, redirect }` (redirect zachytený z throw). */
+async function runProtected(cookies: {
+	am?: string;
+	sid?: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+}): Promise<{ user: any; redirect: { status: number; location: string } | null }> {
+	const event = fakeEvent('/', cookies);
+	try {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		await handle({ event, resolve: okResolve } as any);
+		return { user: event.locals.user, redirect: null };
+	} catch (e) {
+		const r = e as { status?: number; location?: string };
+		return {
+			user: event.locals.user,
+			redirect: { status: r.status ?? 0, location: r.location ?? '' }
+		};
+	}
+}
+
 describe('handle — SSO cez Odoo session', () => {
 	it('SSO-first: platná Odoo session → efemérna Odoo identita (source=odoo), aj popri am_session', async () => {
 		const calls = mock(okInternal(7, 'marek@montalu.sk'));
@@ -134,5 +154,22 @@ describe('handle — SSO cez Odoo session', () => {
 		mock({ status: 500, text: 'boom' });
 		const user = await userAfterHandle({ sid: SID });
 		expect(user).toBeNull();
+	});
+
+	// #5823 review 🟡: primárny outcome feature — SSO identita PREJDE auth bránou na CHRÁNENEJ ceste.
+	// (Keby sa SSO riadok presunul POD redirect check, feature by v prode padla so všetkými testami zelenými.)
+	it('SSO na CHRÁNENEJ ceste prejde auth bránou (bez redirectu), identita source=odoo', async () => {
+		mock(okInternal(7, 'marek@montalu.sk'));
+		const { user, redirect } = await runProtected({ sid: SID });
+		expect(redirect).toBeNull();
+		expect(user).toMatchObject({ username: 'marek@montalu.sk', role: 'internal', source: 'odoo' });
+	});
+
+	it('CHRÁNENÁ cesta + neplatná Odoo session + žiadna am_session → redirect na /login', async () => {
+		mock({ status: 200, text: JSON.stringify({ error: { message: 'expired' } }) });
+		const { user, redirect } = await runProtected({ sid: SID });
+		expect(user).toBeNull();
+		expect(redirect?.status).toBe(303);
+		expect(redirect?.location).toMatch(/^\/login/);
 	});
 });
