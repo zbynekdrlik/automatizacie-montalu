@@ -92,6 +92,8 @@
 </script>
 
 <KonfProduktStranka
+	titul="Navrhni si hliníkové oplotenie a brány — Montalu"
+	popis="Zostav si hliníkové oplotenie na mieru — vyber typ (plotový diel, krídlová, posuvná či samonosná brána, vchodová bránka), model výplne, rozmery a farbu, zobraz si orientačnú cenu a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	foto="oplotenie.webp"
 	alt="Dizajnové hliníkové oplotenie Montalu"
 	label="Konfigurátor oplotenia a brán"
@@ -365,5 +367,47 @@
 	}
 	.kp-pocet {
 		max-width: 220px;
+	}
+	/* Porovnanie modelov (oplotenie-špecifické; bazén má vlastné `.baz-porovnanie`) */
+	.kp-porovnanie {
+		border: 1px solid var(--k-line);
+		border-radius: var(--k-radius);
+		background: var(--k-surface);
+		padding: 16px 20px;
+	}
+	.kp-porovnanie h3 {
+		font-size: 11.5px;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		font-weight: 600;
+		margin: 0 0 12px;
+		color: var(--k-faint, #9a9ea6);
+	}
+	.kp-porovnanie ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 2px;
+	}
+	.kp-porovnanie li {
+		display: flex;
+		justify-content: space-between;
+		gap: 14px;
+		padding: 9px 10px;
+		border-radius: 9px;
+		font-size: 15px;
+	}
+	.kp-porovnanie li.vybrany {
+		background: var(--k-accent-soft, #f5ede2);
+		font-weight: 700;
+	}
+	.kp-porovnanie .p-model {
+		color: var(--k-muted, #6b7078);
+	}
+	.kp-porovnanie .p-cena {
+		color: var(--k-text, #16181c);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
 	}
 </style>

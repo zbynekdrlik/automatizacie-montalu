@@ -92,6 +92,8 @@
 </script>
 
 <KonfProduktStranka
+	titul="Navrhni si tienenie — markízy a rolety — Montalu"
+	popis="Zostav si markízu alebo screenovú roletu na mieru — vyber typ, rozmery, ovládanie a farbu a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	foto="tienenie.webp"
 	alt="Hliníková markíza Montalu"
 	label="Konfigurátor tienenia"

@@ -15,6 +15,8 @@
 	import type { Snippet } from 'svelte';
 
 	let {
+		titul,
+		popis,
 		foto,
 		alt,
 		label,
@@ -23,6 +25,10 @@
 		ovladacie,
 		panel
 	}: {
+		/** `<title>` dokumentu (SEO/záložka), napr. `'Navrhni si tienenie … — Montalu'` */
+		titul: string;
+		/** `<meta name="description">` dokumentu (SEO) */
+		popis: string;
 		/** názov webp v `static/konfigurator/vyber/` (napr. `'tienenie.webp'`) */
 		foto: string;
 		/** alt text hero fotky */
@@ -39,6 +45,11 @@
 		panel: Snippet;
 	} = $props();
 </script>
+
+<svelte:head>
+	<title>{titul}</title>
+	<meta name="description" content={popis} />
+</svelte:head>
 
 <div class="kp">
 	<!-- HERO -->

@@ -13,6 +13,8 @@ test('oplotenie konfigurátor: verejná route bez auth — súhrn + ORIENTAČNÁ
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/oplotenie');
 	await expect(page).toHaveURL(/\/konfigurator\/oplotenie$/);
+	// dokument má SEO titul (#411 shell: <svelte:head> cez `titul` prop, nie prázdna záložka)
+	await expect(page).toHaveTitle(/oplotenie a brány.*Montalu/);
 
 	// stránka sa načíta bez prihlásenia (verejná route)
 	await expect(page.getByRole('heading', { name: /Navrhni si hliníkové oplotenie/ })).toBeVisible();

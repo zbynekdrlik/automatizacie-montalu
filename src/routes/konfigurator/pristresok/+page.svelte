@@ -63,6 +63,8 @@
 </script>
 
 <KonfProduktStranka
+	titul="Navrhni si prístrešok alebo altánok — Montalu"
+	popis="Zostav si hliníkový prístrešok, altánok, skleník či vonkajšiu saunu na mieru — vyber typ, rozmery, krytinu strechy a farbu a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	foto="pristresok.webp"
 	alt="Hliníkový prístrešok na auto Montalu"
 	label="Konfigurátor prístreškov a altánkov"

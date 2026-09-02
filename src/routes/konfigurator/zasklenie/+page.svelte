@@ -88,6 +88,8 @@
 </script>
 
 <KonfProduktStranka
+	titul="Navrhni si zasklenie terasy alebo balkóna — Montalu"
+	popis="Zostav si zasklenie terasy alebo balkóna na mieru — vyber systém, rozmery, počet krídel, farbu a sklo a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	foto="zasklenie.webp"
 	alt="Zasklenie terasy Montalu"
 	label="Konfigurátor zasklenia terás a balkónov"
@@ -265,8 +267,10 @@
 </KonfProduktStranka>
 
 <style>
+	/* Systém-zasklenia karty ostávajú na 150 px (default); Umiestnenie (.dvoj) je 160 px
+	   (nie zdieľaných 200) — pôvodné `.zas-karty` 150 / `.zas-karty.dvoj` 160. */
 	.kp-karty {
-		--kp-karta-min: 160px;
+		--kp-karta-min-dvoj: 160px;
 	}
 	.kp-karta-system {
 		font-size: 11.5px;

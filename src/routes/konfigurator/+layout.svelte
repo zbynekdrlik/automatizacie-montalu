@@ -242,7 +242,9 @@
 		padding: 0 6px;
 	}
 
-	/* karty: šírka mriežky per-produkt cez `--kp-karta-min` (default 150px); `.dvoj` = 200px */
+	/* karty: šírka mriežky per-produkt cez CSS premenné — base `--kp-karta-min` (default
+	   150px), `.dvoj` `--kp-karta-min-dvoj` (default 200px). Stránka, ktorá sa líši, nastaví
+	   premennú vo svojom `<style>` (napr. zasklenie `.dvoj` = 160px). */
 	:global(.konf-app .kp-karty) {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(var(--kp-karta-min, 150px), 1fr));
@@ -250,7 +252,7 @@
 		margin-top: 6px;
 	}
 	:global(.konf-app .kp-karty.dvoj) {
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(var(--kp-karta-min-dvoj, 200px), 1fr));
 	}
 	:global(.konf-app .kp-karta) {
 		display: flex;
@@ -475,7 +477,9 @@
 		color: rgba(255, 255, 255, 0.55);
 		font-size: 12px;
 		line-height: 1.4;
-		margin-top: 8px;
+		/* `margin: 8px 0 0` (nie `margin-top`) — oplotenie `.kp-cena-grid` je `<p>` s UA
+		   `margin-bottom`, ktorý treba vynulovať; zz je `<div>` bez defaultu. Pôvodné oba. */
+		margin: 8px 0 0;
 	}
 	:global(.konf-app .kp-cena-dovod) {
 		color: rgba(255, 255, 255, 0.72);
