@@ -25,7 +25,11 @@ const B2B_FORBIDDEN_PREFIXES = [
 	// #282: interný prehľad zákazníckych dopytov z konfigurátora — INTERNÉ-only
 	// (kontaktné údaje + súhrn + re-download PDF). Pokrýva aj /dopyty-konfigurator/pdf
 	// (GET endpoint) prefixom. b2b sem nemá prístup; drift guard to vynúti.
-	'/dopyty-konfigurator'
+	'/dopyty-konfigurator',
+	// #5960: „Uložiť ponuku" → Odoo sale.order per-user Odoo kredenciálom. Len pre interných
+	// Odoo používateľov (`source:'odoo'`); b2b (lokálny `role:'b2b'`) sem nemá čo robiť — a
+	// endpoint by ho beztak odmietol. Drift guard (tests/b2b-route-coverage.test.ts) to vynúti.
+	'/ulozit-ponuku'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —
