@@ -161,7 +161,7 @@ zdieľané výsledkové triedy). Nula zmeny geometrie/výpočtov/Money/`data-tes
   mená/poznámky A prenieslo by sa do tlačeného nárezového plánu. **Pravidlo: výsledkové čísla
   monuj PER-HODNOTU** (`class="mono"` na číselný `<b>`, stage-3 vzor „monuj len samotné
   číslo"), NIKDY plošným selektorom na `.row b`/`.g div b`. `.ral-val` mono je OK (kód). Plná
-  per-hodnotová adopcia = #421.
+  per-hodnotová adopcia = #421 (DOKONČENÉ, viď nižšie).
 - **SVG `<text>` kontrast sa počíta voči SKUTOČNÉMU `fill`-u pod ním, NIE voči bielej.**
   `Nahlad2D` sieťka label + index text sedia na `fill="#e2e8f0"` (sieťka rect), nie na
   papieri — `#64748b` tam padá na 3.86:1 (< AA 4.5:1). Fix: text `#585d65` (`--m-muted-ink`,
@@ -169,6 +169,31 @@ zdieľané výsledkové triedy). Nula zmeny geometrie/výpočtov/Money/`data-tes
   Pri zmene farby SVG textu vždy over kontrast voči jeho podkladovému `fill`.
 - **`app.css` po stage 4 = 879 r.** — stále pod stropom, `nav.*` extrakcia
   (large-file-split.md watch) NEBOLA potrebná (tokenizácia je takmer line-neutrálna).
+
+## #421 DOKONČENÝ (per-hodnotová `.mono` adopcia na `.row`/`.g` — stage 4 follow-up)
+
+Klasifikačné pravidlo, ktoré sa osvedčilo pri per-hodnotovom sweepe (žiadna nová CSS,
+len `class="mono"` priamo na numerický `<b>`):
+
+- **MONO:** čisté rozmery/uhly/počty/ceny/kódy — mm/°/m²/ks, Money kód, dátum, ZAK/OP-štýl
+  kódy, profilové kódy typu „140x140". **Krátky em-dash „—" honest-null fallback V TOM ISTOM
+  numerickom slote ostáva súčasťou mono `<b>`** (napr. `{x === null ? '— (na stenu)' :
+  \`${x} mm\`}`) — je to ten istý číselný údaj, len bez hodnoty, nie textová poznámka. Platí
+  aj keď fallback je celá fráza namiesto pomlčky (napr. „cena nedostupná" pri cene skla) —
+  POKIAĽ je to fallback TOHO ISTÉHO číselného poľa, nie samostatná poznámka.
+- **BODY (nezmenené):** mená/popisy, CELÉ VETY zložené z čísel+slov (napr. `klinPopis()`/
+  `sietkaPopis()` — „2× klín 100 × 50 mm, výška 10 → 20 mm"; mono by tu zvýraznilo aj slová),
+  a TRVALÉ placeholder texty ktoré nikdy nie sú číslom (napr. „— (čaká na vzorec)").
+- **Literálne count+jednotka texty** (napr. hardcoded „2 ks + 2 ks", „1 ks") sú MONO — čisto
+  numerický obsah, aj keď je to string literál, nie premenná.
+- **RAL kód = mono i keď je vstup free-text input** (konzistencia s `.ral-val` triedou
+  v `PoznamkaRal.svelte`, ktorá RAL vždy traktuje ako „kód" bez ohľadu na typ vstupu).
+- **Pasca (chytená až v review, nie v prvom prejazde): numerický `<b>` MIMO finálneho
+  „Výsledok" kroku sa dá ľahko prehliadnuť.** `fix/+page.svelte` má DVE numerické mm
+  hodnoty v `.row` — „Rozmery konštrukcie" (finálny krok) AJ „Súčet polí" (live-počítaný
+  súčet PRI ZADÁVANÍ polí, formulárový krok) — prvý prejazd domonoval len finálny krok.
+  **Pri sweepe grepni CELÝ súbor na `.row`/`.g` `<b>`, nielen sekciu, ktorá „vyzerá ako
+  výsledok".**
 
 ## PASCA: bare `h1`/`nav`/… selektor v `app.css` LEAKUJE na login aj konfigurátor
 
