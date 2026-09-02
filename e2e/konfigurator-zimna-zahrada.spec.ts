@@ -1,13 +1,14 @@
-// #386: verejný konfigurátor zimných záhrad (`/konfigurator/zimna-zahrada`) — E2E cez reálny
+// #386/#408: verejný konfigurátor zimných záhrad (`/konfigurator/zimna-zahrada`) — E2E cez reálny
 // prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (model/rozmery/farba/zasklenie) sa
-// počíta klientsky a zobrazí súhrn; HONEST-NULL — žiadna orientačná cena (zimná záhrada nemá cenový
-// zdroj); dopyt tok → PDF špecifikácia (bez ceny) na stiahnutie. GET je Money-neutrálny (číta sa aj
-// proti LIVE prode); dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú
-// testovacie dopyty. Každý test = NULA console chýb (× = U+00D7 byte-identické).
+// počíta klientsky a zobrazí súhrn; #408 ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`, matica
+// montalu.sk, Money-neutrálna — bez zápisu); dopyt tok → PDF špecifikácia s orientačnou cenou na
+// stiahnutie. GET aj `vypocet` sú Money-neutrálne (číta sa aj proti LIVE prode); dopyt je ZÁPIS (audit
+// riadok) → `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý test = NULA console
+// chýb (× = U+00D7 byte-identické).
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
 
-test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (žiadna cena), nula console chýb', async ({
+test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + orientačná cena po kliku, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -21,9 +22,45 @@ test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + HONEST
 	await expect(page.getByTestId('zz-suhrn')).toBeVisible();
 	await expect(page.getByTestId('zz-suhrn-rozmery')).toHaveText('4000 × 3500 mm');
 
-	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
-	await expect(page.getByTestId('zz-cena-info')).toContainText('Cena na vyžiadanie');
+	// #408: orientačná cena je na KLIK (server-počítaná) — pred klikom je len tlačidlo, žiadny € na stránke
+	await expect(page.getByTestId('zz-cena-zobrazit')).toBeVisible();
 	await expect(page.locator('body')).not.toContainText('€');
+
+	// klik → server vráti orientačnú MO cenu → cena (s DPH, €) sa zobrazí
+	await page.getByTestId('zz-cena-zobrazit').click();
+	await expect(page.getByTestId('zz-cena')).toBeVisible();
+	await expect(page.getByTestId('zz-cena')).toContainText('Orientačná cena');
+	await expect(page.getByTestId('zz-cena-sdph')).toContainText('€');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('zimná záhrada cena: zmena zasklenia/rozmeru zneaktuálni zobrazenú cenu → „Prepočítať" → nová cena, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/zimna-zahrada');
+
+	// zobraz orientačnú cenu pre default (4000 × 3500, Izolačné sklo)
+	await page.getByTestId('zz-cena-zobrazit').click();
+	await expect(page.getByTestId('zz-cena')).toBeVisible();
+
+	// zmeň ZASKLENIE → cena sa považuje za NEAKTUÁLNU (cenaKluc obsahuje zasklenie): blok zmizne,
+	// tlačidlo sa vráti ako „Prepočítať" (#408 `cenaAktualna` gating — nikdy neukáž cenu pre iný config)
+	await page.getByTestId('zz-zasklenie').selectOption('Polykarbonát');
+	await expect(page.getByTestId('zz-cena')).toHaveCount(0);
+	await expect(page.getByTestId('zz-cena-zobrazit')).toContainText('Prepočítať');
+
+	// prepočítaj → nová orientačná cena pre Polykarbonát
+	await page.getByTestId('zz-cena-zobrazit').click();
+	await expect(page.getByTestId('zz-cena')).toBeVisible();
+	await expect(page.getByTestId('zz-cena-sdph')).toContainText('€');
+
+	// aj zmena rozmeru zneaktuálni cenu (cenaKluc obsahuje hĺbku aj šírku)
+	await page.getByTestId('zz-hlbka').fill('5');
+	await page.getByTestId('zz-hlbka').blur();
+	await expect(page.getByTestId('zz-cena')).toHaveCount(0);
+	await expect(page.getByTestId('zz-cena-zobrazit')).toContainText('Prepočítať');
 
 	expect(consoleMsgs).toEqual([]);
 });

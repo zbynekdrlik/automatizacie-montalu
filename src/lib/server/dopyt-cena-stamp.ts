@@ -8,6 +8,9 @@ import { CENNIK_VERZIA, cenaPreModel } from './konfigurator-cena';
 // #404: bazénová cenová matica (produkt-aware dispatch nižšie) + whitelist bazénového modelu.
 import { CENNIK_VERZIA_BAZEN, cenaPreModelBazen } from './konfigurator-bazen-cena';
 import { bazenModel } from '$lib/konfigurator-bazen';
+// #408: cenová matica zimnej záhrady (produkt-aware dispatch nižšie) + whitelist modelu (display label).
+import { CENNIK_VERZIA_ZZ, cenaPreZz } from './konfigurator-zimna-zahrada-cena';
+import { zzModel } from '$lib/konfigurator-zimna-zahrada';
 import { maCenovyZdroj, type KonfProduktKod } from '$lib/konfigurator-produkty';
 import type { PonukaConfig } from '$lib/ponuka';
 import type { VerejnaCena, CenovaHladina } from '$lib/konfigurator';
@@ -40,12 +43,31 @@ export function cenaZCfgProdukt(
 			hladina
 		);
 	}
+	// #408: zimná záhrada — cena z `hlbka`(→length) + `sirka`(→width) + `sklo`(zasklenie→roofing);
+	// `systemKod` (model ROBUST/MASSIVE) je LEN display label (cenu nemení), ale jeho PRÍTOMNOSŤ
+	// odlišuje NOVÝ (opečiatkovateľný) riadok od STARÉHO honest-null dopytu pred #408 — bez neho vráť
+	// `null` (honest-degrade, aby starý honest-null zimná dopyt nedostal ticho cenu; vzor bazén).
+	if (produkt === 'zimna-zahrada') {
+		if (!cfg.systemKod || !(cfg.hlbka && cfg.hlbka > 0) || !(cfg.sirka && cfg.sirka > 0))
+			return null;
+		return cenaPreZz(
+			{
+				hlbkaMm: cfg.hlbka,
+				sirkaMm: cfg.sirka,
+				zasklenie: cfg.sklo,
+				model: zzModel(cfg.systemKod)
+			},
+			hladina
+		);
+	}
 	return cenaZCfg(cfg, hladina);
 }
 
-/** #404: verzia cenníka podľa produktu (bazén má vlastnú maticu → vlastnú verziu). */
+/** #404/#408: verzia cenníka podľa produktu (bazén a zimná záhrada majú vlastnú maticu → vlastnú verziu). */
 function cennikVerziaProdukt(produkt: string | null | undefined): string {
-	return produkt === 'bazen' ? CENNIK_VERZIA_BAZEN : CENNIK_VERZIA;
+	if (produkt === 'bazen') return CENNIK_VERZIA_BAZEN;
+	if (produkt === 'zimna-zahrada') return CENNIK_VERZIA_ZZ;
+	return CENNIK_VERZIA;
 }
 
 /** Pečiatka ceny na uloženie do `dopyt` (#309): vypočítaná verejná (MO) cena + verzia cenníka.

@@ -132,15 +132,19 @@ export function konfigurujZimnaZahradu(v: ZzVstup): ZzSuhrn {
 }
 
 /** Zmapuje súhrn zimnej záhrady na zdieľaný `PonukaConfig` pre dopyt/PDF (#277 tok). Používa LEN
- *  NEUTRÁLNE polia: model → `system`; šírka → `sirka` + hĺbka → `hlbka` (→ „Rozmery (š × h)",
- *  poradie zhodné so zákazníckou stránkou AJ PDF — zimná záhrada je izbového tvaru š × h, na rozdiel
- *  od dĺžkovo-dominantného bazéna, ktorý používa neutrálne `dlzka`); výška + plocha → `popis`;
- *  zasklenie → `sklo`. Pergolové polia (`vyskaVpredu`/`vyskaPriStene`/`model`/`pocetPoli`) sa
- *  NEPOUŽIJÚ, aby PDF nebolo zavádzajúce. BEZ ceny, BEZ Money kódu — cena je honest-null (zimná
- *  záhrada nemá overený cenový zdroj; gate `maCenovyZdroj` v `konfigurator-produkty`). */
+ *  NEUTRÁLNE polia: model → `system` + neutrálny `systemKod` (#408 — display label ROBUST/MASSIVE
+ *  uložený deterministicky do cfg, aby ho re-download cenovej pečiatky videl, vzor bazén); šírka →
+ *  `sirka` + hĺbka → `hlbka` (→ „Rozmery (š × h)", poradie zhodné so zákazníckou stránkou AJ PDF —
+ *  zimná záhrada je izbového tvaru š × h, na rozdiel od dĺžkovo-dominantného bazéna, ktorý používa
+ *  neutrálne `dlzka`); výška + plocha → `popis`; zasklenie → `sklo`. Pergolové polia
+ *  (`vyskaVpredu`/`vyskaPriStene`/`model`/`pocetPoli`) sa NEPOUŽIJÚ, aby PDF nebolo zavádzajúce.
+ *  BEZ Money kódu. #408: cena je interim orientačná (matica montalu.sk, gate `maCenovyZdroj('zimna-zahrada')`
+ *  = true) — počíta ju SERVER z `hlbka`+`sirka`+`sklo`(zasklenie→roofing); `systemKod` (model) je LEN
+ *  display label vo `VerejnaCena.model` (cenu nemení — presné zasklenie stien sa upresní po obhliadke). */
 export function zimnaZahradaPonukaConfig(s: ZzSuhrn): PonukaConfig {
 	return {
 		system: `Zimná záhrada — ${s.model}`,
+		systemKod: s.model,
 		sirka: s.sirka,
 		hlbka: s.hlbka,
 		farba: s.farba,

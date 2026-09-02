@@ -21,6 +21,9 @@ import { vypocitajCenu } from '../src/lib/server/konfigurator-cena';
 // #404: bazénový cenový modul — nezávislá referencia MO/VO na overenie, že bazénová `vypocet` akcia
 // nesie MO, ale VO (veľkoobchod) je z verejnej odpovede ODSTRÁNENÝ.
 import { vypocitajCenuBazen } from '../src/lib/server/konfigurator-bazen-cena';
+// #408: cenový modul zimnej záhrady — nezávislá referencia MO/VO na overenie, že `vypocet` akcia
+// zimnej záhrady nesie MO, ale VO (veľkoobchod) je z verejnej odpovede ODSTRÁNENÝ.
+import { vypocitajCenuZz } from '../src/lib/server/konfigurator-zimna-zahrada-cena';
 
 const ROOT = path.resolve(process.cwd());
 const SRC = path.join(ROOT, 'src');
@@ -549,24 +552,96 @@ describe('Money safety (C) — zasklenie route: žiadny Money kód, žiadna cena
 });
 
 // --------------------------------------------------------------------------- //
-// (C) RUNTIME guard — podstránka zimnej záhrady (#386): load() nesie LEN prezentačné dáta, žiadny
-// Money kód, žiadna cena (honest-null — zimná záhrada nemá cenový zdroj).
+// (C) RUNTIME guard — podstránka zimnej záhrady (#386/#408): load() nesie LEN prezentačné dáta (žiadna
+// cena — tá je až v akcii `vypocet`), akcia `vypocet` SMIE MO cenu, ale VO/Money/matica NIE.
 // --------------------------------------------------------------------------- //
-const { load: zzLoad } = await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
+const { load: zzLoad, actions: zzActions } =
+	await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
 
-describe('Money safety (C) — route zimnej záhrady: žiadny Money kód, žiadna cena (#386)', () => {
-	it('load() posiela modely/zasklenia/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+/** VO hodnoty (net + s DPH) zvoleného configu zimnej záhrady — response nesie JEDNU cenu (nie „modely
+ *  vedľa seba"), takže guard overuje absenciu VO tejto ceny (parita s pergolou/bazénom). */
+function voHodnotyZz(hlbkaMm: number, sirkaMm: number, zasklenie: string): number[] {
+	const c = vypocitajCenuZz({ hlbkaMm, sirkaMm, zasklenie, model: 'ROBUST' });
+	return c.druh === 'cena' ? [c.vo.bezDph, c.vo.sDph] : [];
+}
+
+describe('Money safety (C) — route zimnej záhrady: cena SMIE (MO), VO/Money NIE (#386/#408)', () => {
+	it('load() posiela modely/zasklenia/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadna cena (tá je až v akcii vypocet)', async () => {
 		const data = await zzLoad({} as Parameters<typeof zzLoad>[0]);
 		const json = JSON.stringify(data);
 		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
 		neobsahujeMoneyAniNarez(json);
 		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
-		// honest-null: žiadna cena / € vo verejnej odpovedi zimnej záhrady
+		// load NEMÁ cenu (tá je až v akcii vypocet, #408) → bez € aj bez slova „cena"
 		expect(json).not.toMatch(/€|EUR\b/);
 		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
 		// pozitívne: dáta naozaj prešli (modely + zasklenie), aby test nebol vákuový
 		expect(json).toContain('ROBUST');
 		expect(json).toContain('Izolačné sklo');
+	});
+
+	it('akcia vypocet vráti orientačnú MO cenu (€), ale NIKDY VO / Money kód / nárez / maticu (#408)', async () => {
+		const fd = new FormData();
+		fd.append('model', 'ROBUST');
+		fd.append('hlbka', '4000');
+		fd.append('sirka', '3000');
+		fd.append('zasklenie', 'Izolačné sklo');
+		const event = {
+			request: new Request('http://x/konfigurator/zimna-zahrada', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.30'
+		} as unknown as Parameters<typeof zzActions.vypocet>[0];
+
+		const r = await zzActions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		// interná cena (MO + VO) pre presne tento config — nezávislá referencia
+		const interne = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			model: 'ROBUST'
+		});
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// pozitívne: orientačná MO cena (net + s DPH) JE v odpovedi (cena sa smie zobraziť)
+			expect(json).toContain(String(interne.mo.bezDph));
+			expect(json).toContain(String(interne.mo.sDph));
+			// negatívne: VO hodnoty configu NIE SÚ v odpovedi
+			neobsahujeVOaniMaticu(json, voHodnotyZz(4000, 3000, 'Izolačné sklo'));
+		}
+		neobsahujeMoneyAniNarez(json);
+	});
+
+	it('prihlásený b2b (VO) → akcia vypocet vráti VO cenu + hladinu VO; Money kód/nárez stále NIE (#318/#408)', async () => {
+		const fd = new FormData();
+		fd.append('model', 'ROBUST');
+		fd.append('hlbka', '4000');
+		fd.append('sirka', '3000');
+		fd.append('zasklenie', 'Izolačné sklo');
+		const event = {
+			request: new Request('http://x/konfigurator/zimna-zahrada', { method: 'POST', body: fd }),
+			getClientAddress: () => '203.0.113.31',
+			locals: { user: { id: 1, username: 'obchod@phsplus.cz', role: 'b2b' } }
+		} as unknown as Parameters<typeof zzActions.vypocet>[0];
+
+		const r = await zzActions.vypocet(event);
+		const json = JSON.stringify(r);
+
+		const interne = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			model: 'ROBUST'
+		});
+		expect(interne.druh).toBe('cena');
+		if (interne.druh === 'cena') {
+			// VO cena JE v odpovedi pre b2b (net + s DPH) + hladina marker
+			expect(json).toContain(String(interne.vo.bezDph));
+			expect(json).toContain(String(interne.vo.sDph));
+			expect(json).toMatch(/"hladina":"VO"/);
+		}
+		// Money kód / nárez sú zakázané aj pre VO výstup (VO je cena, nie Money kód)
+		neobsahujeMoneyAniNarez(json);
 	});
 });
 
