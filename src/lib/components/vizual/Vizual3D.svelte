@@ -755,7 +755,7 @@
 </script>
 
 <div bind:this={containerEl} class="vizual3d" data-testid="vizual3d">
-	<canvas bind:this={canvasEl} data-testid="vizual3d-canvas" aria-label="3D náhľad zasklenia"
+	<canvas bind:this={canvasEl} data-testid="vizual3d-canvas" aria-label="3D náhľad produktu"
 	></canvas>
 
 	{#if tier === 'none' && pripravene}

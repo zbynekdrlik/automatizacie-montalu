@@ -36,10 +36,17 @@ export interface BazenVizVstup {
 // --- vizuálne mm konštanty (vizuál, NIE katalóg — nevstupujú do žiadnej kóty
 //     ani Money výstupu; zdroj pravdy pre skutočné rozmery je vždy vstup appky) ---
 
+/** horný strop počtu segmentov (zrkadlí BAZEN_SEGMENTY_MAX zákazníckeho rozsahu) [—]. */
+const SEGMENTY_MAX = 8;
 /** počet vzorkových bodov na semi-elipsu oblúka (polygonálna aproximácia) [—]. */
 const OBLUK_BODY = 22;
 /** radiálna hrúbka výplne (polykarbonát) [mm] — vizuál. */
 const VYPLN_HRUBKA_MM = 16;
+/** radiálne odsadenie výplne PONÚKA (dovnútra) od vonkajšieho líca oblúka [mm] —
+ *  výplň sadí do hliníkového profilu (kanála), NIE na jeho vonkajšie líce; drží
+ *  ju radiálne VNÚTRI rebra (rebro ju z vonkajšej strany prekrýva → sklo sa
+ *  nekreslí NA rebro). */
+const VYPLN_ODSADENIE_MM = 25;
 /** radiálna hrúbka rebra (hliníkový oblúkový profil) [mm] — vizuál. */
 const REBRO_HRUBKA_MM = 95;
 /** hĺbka rebra v smere Z (dĺžky) [mm] — vizuál. */
@@ -102,7 +109,7 @@ export function bazenSpec(vst: BazenVizVstup): VizVysledok {
 	const S = Math.max(1, vst.sirkaMm);
 	const D = Math.max(1, vst.dlzkaMm);
 	const V = Math.max(1, vst.vyskaMm);
-	const n = Math.max(2, Math.round(vst.segmenty));
+	const n = Math.min(SEGMENTY_MAX, Math.max(2, Math.round(vst.segmenty)));
 	const rx = S / 2;
 
 	// teleskopická kaskáda výšok — per-krok pokles odvodený ilustračne z JEDNEJ
@@ -118,18 +125,22 @@ export function bazenSpec(vst: BazenVizVstup): VizVysledok {
 	const poznamky: string[] = [];
 
 	// --- výplne (sklo/polykarbonát): jeden oblúkový pás na segment, klesajúca
-	//     výška = teleskopický stupňový vzhľad; báza na y=0 (pos.y=0) ---
+	//     výška = teleskopický stupňový vzhľad; báza na y=0 (pos.y=0). Výplň je
+	//     radiálne ODSADENÁ dovnútra (`VYPLN_ODSADENIE_MM`) → sadí do hliníkového
+	//     profilu a rebro ju z vonkajšej strany prekrýva (sklo sa NEKRESLÍ na rebro). ---
 	for (let i = 0; i < n; i++) {
 		const z0 = hranice[i]!; // hranice.length === n+1
 		const z1 = hranice[i + 1]!;
 		const stred = (z0 + z1) / 2;
 		const hlbka = Math.max(1, z1 - z0 - SEGMENT_MEDZERA_MM);
 		const ry = vysky[i]!; // vysky.length === n
+		const rxV = Math.max(1, rx - VYPLN_ODSADENIE_MM);
+		const ryV = Math.max(1, ry - VYPLN_ODSADENIE_MM);
 		diely.push({
 			rola: 'sklo',
 			tvar: {
 				kind: 'extrude',
-				obrys: oblukPasObrys(rx, ry, VYPLN_HRUBKA_MM, OBLUK_BODY),
+				obrys: oblukPasObrys(rxV, ryV, VYPLN_HRUBKA_MM, OBLUK_BODY),
 				dlzka: hlbka
 			},
 			pos: { x: 0, y: 0, z: stred }
@@ -159,9 +170,9 @@ export function bazenSpec(vst: BazenVizVstup): VizVysledok {
 	// --- spodné koľajnice (kolajnica): pozdĺž oboch dlhých strán (X=±rx), po celej
 	//     dĺžke; dvojkoľaj = 2 koľajnice na stranu (2. posunutá dovnútra). Vrch
 	//     koľajnice prekryje spodok pätiek oblúka (pätka zapadá do koľajnice). ---
-	const koľajníNaStranu = vst.dvojkolaj ? 2 : 1;
+	const kolajnicNaStranu = vst.dvojkolaj ? 2 : 1;
 	for (const strana of [-1, 1] as const) {
-		for (let r = 0; r < koľajníNaStranu; r++) {
+		for (let r = 0; r < kolajnicNaStranu; r++) {
 			const xr = strana * (rx - KOLAJNICA_W_MM / 2 - r * KOLAJNICA_ROZTEC_MM);
 			diely.push({
 				rola: 'kolajnica',

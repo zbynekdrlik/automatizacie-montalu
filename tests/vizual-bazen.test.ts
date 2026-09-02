@@ -54,23 +54,33 @@ describe('bazenSpec — oblúkové segmenty (#405)', () => {
 		).toHaveLength(2);
 	});
 
-	it('teleskopická kaskáda: výšky segmentov klesajú a sedia so `sekcieVysky` (reuse appkového helpera)', () => {
+	it('teleskopická kaskáda: výšky segmentov klesajú a KROKY sedia so `sekcieVysky` (reuse appkového helpera)', () => {
 		const r = bazenSpec(ZAKLAD);
-		const sklo = r.diely.filter((d) => d.rola === 'sklo');
-		const vysky = sklo.map(vrcholY);
-		// prvý (najvyšší) segment === zadaná výška
-		expect(vysky[0]!).toBeCloseTo(1200, 0);
+		const vysky = r.diely.filter((d) => d.rola === 'sklo').map(vrcholY);
+		// prvý (najvyšší) segment je tesne pod zadanou výškou (radiálne odsadenie výplne do profilu)
+		expect(vysky[0]!).toBeLessThan(1200);
+		expect(vysky[0]!).toBeGreaterThan(1100);
 		// striktne klesajúce
 		for (let i = 1; i < vysky.length; i++) expect(vysky[i]!).toBeLessThan(vysky[i - 1]!);
-		// zhoda s appkovým `sekcieVysky` (krok = clamp(1200*0.06,60,150)=72 → min 984)
+		// KROKY kaskády sedia s appkovým `sekcieVysky` (odsadenie výplne je konštanta →
+		// rozdiely medzi segmentmi sú invariantné). Krok = clamp(1200*0.06,60,150)=72 → min 984.
 		const ocakavane = sekcieVysky(4, 1200, 984);
-		for (let i = 0; i < vysky.length; i++) expect(vysky[i]!).toBeCloseTo(ocakavane[i]!, 0);
+		for (let i = 1; i < vysky.length; i++) {
+			expect(vysky[i - 1]! - vysky[i]!).toBeCloseTo(ocakavane[i - 1]! - ocakavane[i]!, 0);
+		}
 	});
 
-	it('rozpon oblúka = šírka/2 pre všetky výplne (segmenty rozpäté cez celú šírku)', () => {
+	it('rebrá rozpäté cez celú šírku (rozpon = šírka/2); KAŽDÁ výplň je radiálne VNÚTRI svojho rebra (🟡 review — sklo sa nekreslí NA rebro)', () => {
 		const r = bazenSpec(ZAKLAD);
-		for (const d of r.diely.filter((d) => d.rola === 'sklo')) {
-			expect(rozponX(d)).toBeCloseTo(2000, 0);
+		const sklo = r.diely.filter((d) => d.rola === 'sklo'); // segment i
+		const ram = r.diely.filter((d) => d.rola === 'ram'); // hranica j (výška = koplanárne rebro)
+		// rebrá = štrukturálny oblúk cez celú šírku
+		for (const d of ram) expect(rozponX(d)).toBeCloseTo(2000, 0);
+		// výplň segmentu i je radiálne (rozpon AJ vrchol) VNÚTRI koplanárneho rebra ram[i+1]
+		// (rovnaká výška vysky[i]) → menšia elipsa je celá vnútri väčšej ⇒ žiadny koplanárny povrch.
+		for (let i = 0; i < sklo.length; i++) {
+			expect(rozponX(sklo[i]!)).toBeLessThan(rozponX(ram[i + 1]!));
+			expect(vrcholY(sklo[i]!)).toBeLessThan(vrcholY(ram[i + 1]!));
 		}
 	});
 
@@ -99,9 +109,13 @@ describe('bazenSpec — oblúkové segmenty (#405)', () => {
 		expect(kolaj.some((d) => d.pos.x > 0)).toBe(true);
 	});
 
-	it('segmenty sa orežú na minimum 2 (žiadny degenerovaný 0/1-segmentový model)', () => {
-		const r = bazenSpec({ ...ZAKLAD, segmenty: 1 });
-		expect(r.diely.filter((d) => d.rola === 'sklo')).toHaveLength(2);
+	it('segmenty sa orežú na rozsah 2..8 (min aj max)', () => {
+		expect(
+			bazenSpec({ ...ZAKLAD, segmenty: 1 }).diely.filter((d) => d.rola === 'sklo')
+		).toHaveLength(2);
+		expect(
+			bazenSpec({ ...ZAKLAD, segmenty: 50 }).diely.filter((d) => d.rola === 'sklo')
+		).toHaveLength(8);
 	});
 
 	it('viac segmentov = viac výplní; každý oblúkový pás je uzavretý (2×(body+1) bodov)', () => {

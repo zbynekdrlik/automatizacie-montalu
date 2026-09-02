@@ -6,7 +6,6 @@ import {
 	bazenVyplnTyp,
 	bazenVyplnVzhlad,
 	bazenVyplnVzhladZNazvu,
-	BAZEN_VYPLN_NAZVY,
 	BAZEN_VYPLN_TYP_DEFAULT,
 	type BazenVyplnTyp
 } from '$lib/vizual/bazen-vypln';
@@ -64,9 +63,5 @@ describe('bazenVyplnVzhlad — typ → SkloVzhlad (#405)', () => {
 		expect(bazenVyplnVzhladZNazvu('Dymový (bronzový) polykarbonát')).toEqual(
 			bazenVyplnVzhlad('dymove')
 		);
-	});
-
-	it('BAZEN_VYPLN_NAZVY má práve 3 zákaznícke názvy', () => {
-		expect(Object.keys(BAZEN_VYPLN_NAZVY)).toHaveLength(3);
 	});
 });

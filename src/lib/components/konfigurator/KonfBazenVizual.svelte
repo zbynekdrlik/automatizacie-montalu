@@ -126,19 +126,15 @@
 		line-height: 1.35;
 		color: #16181c;
 	}
-	/* skryjeme len poznámky-<br>; ilustračný disclaimer `.drobne` ostáva viditeľný */
-	.konf-baz-vizual :global(.bazen-zak > .caption br) {
+	/* poznámka (`spec.ts` povinná ilustračná veta) je jediný disclaimer v pille;
+	   generický `.drobne` „Ilustračný perspektívny náhľad." skryjeme (duplicita), aj <br> */
+	.konf-baz-vizual :global(.bazen-zak > .caption br),
+	.konf-baz-vizual :global(.bazen-zak > .caption .drobne) {
 		display: none;
 	}
 	.konf-baz-vizual :global(.bazen-zak > .caption .poznamka) {
 		display: block;
 		margin-top: 3px;
 		color: #b45309;
-	}
-	.konf-baz-vizual :global(.bazen-zak > .caption .drobne) {
-		display: block;
-		margin-top: 3px;
-		font-size: 10.5px;
-		color: var(--k-muted, #6b7078);
 	}
 </style>

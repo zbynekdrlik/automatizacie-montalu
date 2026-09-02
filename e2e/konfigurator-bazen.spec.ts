@@ -82,6 +82,20 @@ test('bazén konfigurátor: zmena rozmerov → ŽIVÝ 3D náhľad sa aktualizuje
 	// 3D ostáva pripravený po refit-remounte
 	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
 
+	// #405 in-place update (bez remountu): zmena počtu segmentov mení GEOMETRIU (počet oblúkov) →
+	// caption sa aktualizuje cez geometrickyPodpis prestavbu; zmena výplne mení len materiál.
+	await page.getByTestId('bazen-segmenty').selectOption('6');
+	await expect(page.getByTestId('bazen-caption')).toContainText('6 segmentov', { timeout: 30000 });
+	await page.getByTestId('bazen-vypln').selectOption('Opálový (mliečny) polykarbonát');
+	await expect(page.getByTestId('bazen-caption')).toContainText('Opálový', { timeout: 30000 });
+
+	// leak guard: presne 1 živý WebGL kontext po {#key} remounte + in-place zmenách — priamy dôkaz,
+	// že reštrukturalizovaný wall-disposal blok (zobrazStena gate) + nová rodina nenechajú kontext unikať.
+	const vizKontexty = await page.evaluate(
+		() => (window as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS
+	);
+	expect(vizKontexty).toBe(1);
+
 	expect(consoleMsgs).toEqual([]);
 });
 

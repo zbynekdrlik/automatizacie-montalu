@@ -11,13 +11,6 @@ export type BazenVyplnTyp = 'cire' | 'opalove' | 'dymove';
 
 export const BAZEN_VYPLN_TYP_DEFAULT: BazenVyplnTyp = 'cire';
 
-/** Ľudský (slovenský) názov typu výplne pre popisok pod obrázkom (nikdy do rastra). */
-export const BAZEN_VYPLN_NAZVY: Record<BazenVyplnTyp, string> = {
-	cire: 'Číry polykarbonát',
-	opalove: 'Opálový polykarbonát',
-	dymove: 'Dymový polykarbonát'
-};
-
 // Vzhľady jednotlivých typov. Polykarbonát je opticky o niečo menej číry než sklo
 // (vyššia drsnosť povrchu, mierne vyššia opacita). `transmission` režim (mid/high)
 // číta `farbaHex`/`attenuationHex`/`attenuationDistanceM`, `falosne` (low) číta
