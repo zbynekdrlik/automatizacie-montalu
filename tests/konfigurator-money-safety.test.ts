@@ -164,7 +164,7 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
 	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
 	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
-	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén, ponuka, dopyt)', () => {
+	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén + #388 oplotenie, ponuka, dopyt)', () => {
 		const { videne } = prejdiKlientskyGraf(konfVstupy());
 		const musiaByt = [
 			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
@@ -190,6 +190,11 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// prípadný budúci Money import zachytil: `bazen-komponenty`/`server/bazen` import je v
 			// `KLIENT_ZAKAZANE_SPEC`, a holý BPK*/BPP* kód v obsahu chytá rozšírený obsahový grep vyššie.
 			path.join(SRC, 'lib', 'konfigurator-bazen.ts'),
+			// #388: oplotenie podstránka (`konfigurator/oplotenie/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-oplotenie` — guard (A) MUSÍ prejsť jeho graf, aby jeho
+			// prípadný budúci Money import zachytil. Oplotenie NEMÁ interný Money katalóg (na rozdiel od
+			// bazéna), takže modul je z princípu čistý — obsahový `moneyKod`/`BP[KP]\d{5}` grep aj tak beží.
+			path.join(SRC, 'lib', 'konfigurator-oplotenie.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -213,6 +218,9 @@ const SERVEROVE_ROUTY = [
 	// #385: bazénová podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
 	// `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
 	'src/routes/konfigurator/bazen/+page.server.ts',
+	// #388: oplotenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-oplotenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/oplotenie/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];
@@ -385,5 +393,27 @@ describe('Money safety (C) — bazénová route: žiadny Money kód, žiadna cen
 		// pozitívne: dáta naozaj prešli (modely + koľaj), aby test nebol vákuový
 		expect(json).toContain('Premier');
 		expect(json).toContain('Jednokoľajové');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — oplotenie podstránka (#388): load() nesie LEN prezentačné dáta, žiadny Money
+// kód, žiadna cena (honest-null — oplotenie nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: oplotenieLoad } = await import('../src/routes/konfigurator/oplotenie/+page.server');
+
+describe('Money safety (C) — oplotenie route: žiadny Money kód, žiadna cena (#388)', () => {
+	it('load() posiela typy/modely/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await oplotenieLoad({} as Parameters<typeof oplotenieLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej oplotenie odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (typ + model), aby test nebol vákuový
+		expect(json).toContain('Plotový diel');
+		expect(json).toContain('ARIEL');
 	});
 });

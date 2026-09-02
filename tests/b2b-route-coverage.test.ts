@@ -66,6 +66,9 @@ const ALLOWED = new Set([
 	// (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis). Vedomé potvrdenie (drift guard by
 	// inak zlyhal), nie obídenie.
 	'/konfigurator/bazen',
+	// #388: oplotenie podstránka jednotného konfigurátora — rovnaká disciplína ako bazén: VEREJNÁ
+	// (bez auth), Money-neutrálna (akcia iba `dopyt` → audit + PDF bez ceny, žiadny odpis).
+	'/konfigurator/oplotenie',
 	'/login',
 	'/logout',
 	'/health'
@@ -105,6 +108,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 				'/bazen/navrh',
 				'/clip',
 				'/konfigurator/bazen',
+				'/konfigurator/oplotenie',
 				'/konfigurator/pergola',
 				'/odpisy',
 				'/pergola',
@@ -163,6 +167,10 @@ describe('b2b route coverage (denylist drift guard)', () => {
 
 	it('#385: /konfigurator/bazen (verejný konfigurátor bazénových zastrešení) nie je presmerovaný', () => {
 		expect(b2bRedirectTarget('/konfigurator/bazen')).toBeNull();
+	});
+
+	it('#388: /konfigurator/oplotenie (verejný konfigurátor oplotenia a brán) nie je presmerovaný', () => {
+		expect(b2bRedirectTarget('/konfigurator/oplotenie')).toBeNull();
 	});
 
 	// #139: opačný prípad ako riadok vyššie — /bazen/navrh je NÁVRHOVÝ výkres, ale
@@ -271,6 +279,18 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385)', () => {
 	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
 		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
+		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
+	});
+});
+
+// #388, rovnaká disciplína ako bazén — oplotenie podstránka má PRESNE jedinú akciu `dopyt` (verejný
+// kontaktný formulár → PDF špecifikácia BEZ ceny + Odoo lead). Žiadna cena/výpočtová akcia (súhrn je
+// čisto klientsky, honest-null — oplotenie nemá cenový zdroj), žiadna Money/odpisová zápisová akcia.
+// VEREJNÁ route bez auth → „žiadna cesta k Money odpisu" je kritické; pridanie akejkoľvek ďalšej akcie
+// tento test ROZBIJE (fail-closed).
+describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388)', () => {
+	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
+		const { actions } = await import('../src/routes/konfigurator/oplotenie/+page.server');
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });

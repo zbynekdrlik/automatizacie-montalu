@@ -99,9 +99,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Dizajnové hliníkové ploty a brány — krídlové, posuvné aj samonosné.',
 		foto: 'oplotenie.webp',
 		alt: 'Dizajnové hliníkové oplotenie Montalu Narvi',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/oplotenie',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/oplotenie',
+		externy: false,
+		// #388: oplotenie NEMÁ overený interim cenový zdroj (montalu.sk `update-fencings` existuje /419/,
+		// ale jeho vyťaženie do matice je práca v rozsahu #279 — samostatný follow-up). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{
