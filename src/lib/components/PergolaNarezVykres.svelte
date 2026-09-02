@@ -154,7 +154,9 @@
 	});
 
 	const CIERNA = '#0f172a';
-	const MODRA = '#1d4ed8';
+	// #376 stage 4: bronz — kótovacia/anotačná farba (predtým modrá #1d4ed8);
+	// --m-accent-ink, text-safe 5.9:1 (Kota farbí čiaru AJ číselný popisok)
+	const BRONZ = '#8a5a2b';
 	const SIVA = '#64748b';
 
 	// #204 — CAD konvencia hrúbky čiar: rezová/hlavná obrysová čiara (cut line) je hrubšia
@@ -293,7 +295,7 @@
 		y={topY - zlabH}
 		width={X(s.sirka) - X(0) + 2 * previs}
 		height={zlabH}
-		fill="#eff6ff"
+		fill="#f4f3ef"
 		stroke={CIERNA}
 		stroke-width={obrysStroke(zlabH, REZ_STROKE)}
 		shape-rendering="crispEdges"
@@ -333,7 +335,7 @@
 			y1={baseY}
 			perpOffset={r.h * 0.06}
 			text={fmtMm(s.prednaNohyX[i + 1]! - px)}
-			color={MODRA}
+			color={BRONZ}
 			fontSize={MIN_DIM_FONT}
 		/>
 	{/each}
@@ -344,7 +346,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.16}
 		text={fmtMm(s.sirka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 	<Kota
@@ -354,7 +356,7 @@
 		y1={topY}
 		perpOffset={-(r.w * 0.05)}
 		text={fmtMm(s.prednaSvetlost)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={MIN_DIM_FONT}
 	/>
 {/snippet}
@@ -406,7 +408,7 @@
 		y={yFrontTop - zlabH}
 		width={halfW * 2}
 		height={zlabH}
-		fill="#eff6ff"
+		fill="#f4f3ef"
 		stroke={CIERNA}
 		stroke-width={obrysStroke(zlabH, REZ_STROKE)}
 		shape-rendering="crispEdges"
@@ -467,7 +469,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.16}
 		text={fmtMm(s.hlbka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={MIN_DIM_FONT}
 	/>
 	<Kota
@@ -477,7 +479,7 @@
 		y1={yFrontTop}
 		perpOffset={r.w * 0.06}
 		text={fmtMm(s.prednaSvetlost)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={MIN_DIM_FONT}
 	/>
 	{#if samostatne}
@@ -488,7 +490,7 @@
 			y1={yBackTop}
 			perpOffset={-(r.w * 0.06)}
 			text={fmtMm(vyskaZadna)}
-			color={MODRA}
+			color={BRONZ}
 			fontSize={MIN_DIM_FONT}
 		/>
 	{/if}
@@ -586,7 +588,7 @@
 		{y1}
 		perpOffset={r.h * 0.16}
 		text={fmtMm(s.sirka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 	<Kota
@@ -596,7 +598,7 @@
 		{y1}
 		perpOffset={-(r.w * 0.05)}
 		text={fmtMm(s.hlbka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={MIN_DIM_FONT}
 	/>
 	<!-- #381 — reťazová (rozstupová) kóta priečok po šírke, nad horným okrajom pôdorysu.
@@ -614,7 +616,7 @@
 					y1={y0}
 					perpOffset={-(r.h * 0.055)}
 					text={fmtMm(seg.dlzka)}
-					color={MODRA}
+					color={BRONZ}
 					fontSize={MIN_DIM_FONT}
 					opts={{ labelOffset: 3 }}
 				/>
@@ -709,7 +711,7 @@
 	{@const triX0 = r.x + pad + 2}
 	{@const triW = Math.min(26, r.w - 2 * pad - 30)}
 	{@const triH = 6}
-	<g data-testid="pnr-krov-trojuholnik" stroke={MODRA} stroke-width="0.4" fill="none">
+	<g data-testid="pnr-krov-trojuholnik" stroke={BRONZ} stroke-width="0.4" fill="none">
 		<polygon points="{triX0},{triY} {triX0 + triW},{triY} {triX0 + triW},{triY - triH}" />
 	</g>
 	<g font-size={MIN_SPEC_FONT} fill={SIVA}>

@@ -156,7 +156,7 @@
 	data-testid="fix-vykres"
 >
 	<!-- obrys konštrukcie -->
-	<polygon points={obrys} fill="#e0f2fe" stroke="#0f172a" stroke-width="1.8" />
+	<polygon points={obrys} fill="#e9edf0" stroke="#0f172a" stroke-width="1.8" />
 
 	<!-- polia: stĺpiky + označenie + výška na stĺpiku -->
 	{#each r.polia as p, i (i)}
@@ -181,7 +181,7 @@
 				y={Y(p.vPravo / 2)}
 				text-anchor="middle"
 				font-size="11"
-				fill="#1d4ed8"
+				fill="#8a5a2b"
 				font-weight="600"
 				stroke="#fff"
 				stroke-width="3"

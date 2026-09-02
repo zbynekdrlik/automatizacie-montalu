@@ -130,7 +130,7 @@
 							{#each segs as seg (seg.body)}
 								<polygon
 									points={seg.body}
-									fill={seg.odpad ? 'url(#odpad-hatch)' : '#dbeafe'}
+									fill={seg.odpad ? 'url(#odpad-hatch)' : '#f5ede2'}
 									stroke="#475569"
 									stroke-width="1"
 									vector-effect="non-scaling-stroke"
@@ -229,7 +229,7 @@
 		transform: translate(-50%, -50%);
 		font-size: 12.5px;
 		font-weight: 700;
-		color: #1e3a8a;
+		color: #16181c;
 		white-space: nowrap;
 		pointer-events: none;
 	}

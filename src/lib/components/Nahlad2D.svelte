@@ -375,8 +375,8 @@
 			y={M.top + frame}
 			width={panelW - 2 * frame}
 			height={h - 2 * frame}
-			fill="#dbeafe"
-			stroke="#93c5fd"
+			fill="#e9edf0"
+			stroke="#a7adb4"
 			stroke-width="0.6"
 		/>
 		<!-- odlesk skla -->
@@ -385,7 +385,7 @@
 			y1={M.top + frame + (h - 2 * frame) * 0.75}
 			x2={x + frame + (panelW - 2 * frame) * 0.55}
 			y2={M.top + frame + (h - 2 * frame) * 0.15}
-			stroke="#bfdbfe"
+			stroke="#c8ccd0"
 			stroke-width="2.5"
 			stroke-linecap="round"
 			opacity="0.8"
@@ -408,7 +408,7 @@
 					patternTransform="rotate(45)"
 					patternUnits="userSpaceOnUse"
 				>
-					<line x1="0" y1="0" x2="0" y2="6" stroke="#0369a1" stroke-width="1" opacity="0.5" />
+					<line x1="0" y1="0" x2="0" y2="6" stroke="#64748b" stroke-width="1" opacity="0.5" />
 				</pattern>
 			</defs>
 			<rect
@@ -426,7 +426,7 @@
 				width={Math.max(0, sietkaGeo.w - 2 * frame)}
 				height={Math.max(0, sietkaGeo.h - 2 * frame)}
 				fill="url(#sietka-mriezka-{uid})"
-				stroke="#0369a1"
+				stroke="#64748b"
 				stroke-width="0.8"
 				stroke-dasharray="4 3"
 			/>
@@ -438,7 +438,7 @@
 				y={sietkaGeo.y + sietkaGeo.h / 2}
 				text-anchor="middle"
 				font-size="10"
-				fill="#0369a1"
+				fill="#64748b"
 				font-weight="700"
 				transform="rotate(-90 {sietkaGeo.cx} {sietkaGeo.y + sietkaGeo.h / 2})">sieťka</text
 			>
@@ -532,7 +532,7 @@
 		y={M.top + h / 2 - 8}
 		text-anchor="middle"
 		font-size="12"
-		fill="#1d4ed8"
+		fill="#8a5a2b"
 		font-weight="600">sklo</text
 	>
 	<text
@@ -540,7 +540,7 @@
 		y={M.top + h / 2 + 9}
 		text-anchor="middle"
 		font-size="12"
-		fill="#1d4ed8"
+		fill="#8a5a2b"
 		font-weight="700"
 		data-testid="nahlad-sklo-rozmer">{fmtSkloRozmer(skloS, skloV)}</text
 	>
@@ -573,7 +573,7 @@
 					width={c.w}
 					height={CAS_BAR}
 					rx={CAS_BAR / 2}
-					fill="#2563eb"
+					fill="#8a5a2b"
 					opacity="0.9"
 				/>
 			{/each}

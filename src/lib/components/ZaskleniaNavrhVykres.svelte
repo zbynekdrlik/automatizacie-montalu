@@ -56,7 +56,9 @@
 	let farba = $derived(farbaKonstrukcie(vstup.ralKod));
 
 	const CIERNA = '#0f172a';
-	const MODRA = '#1d4ed8';
+	// #376 stage 4: bronz — kótovacia/anotačná farba (predtým modrá #1d4ed8);
+	// --m-accent-ink, text-safe 5.9:1 (Kota farbí čiaru AJ číselný popisok)
+	const BRONZ = '#8a5a2b';
 	const CERVENA = '#dc2626';
 
 	// hrúbka rámu / deliaceho stĺpika V KRESBE [mm] — LEN vizuálne konštanty
@@ -191,7 +193,7 @@
 			{x1}
 			y1={base + 6}
 			text={`${k.ks}× klín ${fmtMm(k.dlzka)} × ${fmtMm(k.sirka)} mm`}
-			color={MODRA}
+			color={BRONZ}
 			fontSize={3}
 		/>
 		<text
@@ -199,10 +201,10 @@
 			y={y1 - 2}
 			text-anchor="end"
 			font-size={MIN_DIM_FONT}
-			fill={MODRA}
+			fill={BRONZ}
 			data-testid="zn-klin-v1">v1 {fmtMm(k.v1)} mm</text
 		>
-		<text x={x1 + 2} y={y2 - 2} font-size={MIN_DIM_FONT} fill={MODRA} data-testid="zn-klin-v2"
+		<text x={x1 + 2} y={y2 - 2} font-size={MIN_DIM_FONT} fill={BRONZ} data-testid="zn-klin-v2"
 			>v2 {fmtMm(k.v2)} mm</text
 		>
 	{/if}
@@ -261,7 +263,7 @@
 			y={topY + ramMm * scale}
 			width={gx1 - gx0}
 			height={gh}
-			fill="#eff6ff"
+			fill="#f4f3ef"
 			stroke={CIERNA}
 			stroke-width={obrysStroke(Math.min(gx1 - gx0, gh) * 0.5)}
 			data-testid={`zn-kridlo-${i}`}
@@ -296,7 +298,7 @@
 			y1={baseY}
 			perpOffset={r.h * 0.06}
 			text={fmtMm(stlpiky[i + 1]! - stlpiky[i]!)}
-			color={MODRA}
+			color={BRONZ}
 			fontSize={3}
 		/>
 	{/each}
@@ -307,7 +309,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.13}
 		text={fmtMm(vstup.s)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 	<Kota
@@ -317,7 +319,7 @@
 		y1={topY}
 		perpOffset={-(r.w * 0.06)}
 		text={fmtMm(vstup.v)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 {/snippet}

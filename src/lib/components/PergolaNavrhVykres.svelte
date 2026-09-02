@@ -102,7 +102,9 @@
 	});
 
 	const CIERNA = '#0f172a';
-	const MODRA = '#1d4ed8';
+	// #376 stage 4: bronz — kótovacia/anotačná farba (predtým modrá #1d4ed8);
+	// --m-accent-ink, text-safe 5.9:1 (Kota farbí čiaru AJ číselný popisok)
+	const BRONZ = '#8a5a2b';
 	const CERVENA = '#dc2626';
 
 	// #146 bod 2/3, prekalibrované #153: hierarchia hrúbok čiar — konštrukčné obrysy
@@ -243,7 +245,7 @@
 		y={y0}
 		width={x1 - x0}
 		height={y1 - y0}
-		fill="#eff6ff"
+		fill="#f4f3ef"
 		stroke={CIERNA}
 		stroke-width="0.6"
 		data-testid="pn-panel-obrys"
@@ -279,7 +281,7 @@
 		opts={{ tick: 1, labelOffset: 0 }}
 		text={fmtMm(g.panelDlzka)}
 		fontSize={3}
-		color={MODRA}
+		color={BRONZ}
 	/>
 	<Kota
 		{x0}
@@ -289,7 +291,7 @@
 		perpOffset={8}
 		text={fmtMm(g.panelSirka)}
 		fontSize={3}
-		color={MODRA}
+		color={BRONZ}
 	/>
 	<text
 		x={captionX}
@@ -334,7 +336,7 @@
 		y={topY - roofH}
 		width={X(g.celkovaSirka) - X(0) + 2 * previs}
 		height={roofH}
-		fill={farebny ? farba.hex : '#eff6ff'}
+		fill={farebny ? farba.hex : '#f4f3ef'}
 		stroke={CIERNA}
 		stroke-width={obrysStroke(roofH)}
 		shape-rendering="crispEdges"
@@ -371,7 +373,7 @@
 			y1={baseY}
 			perpOffset={r.h * 0.06}
 			text={fmtMm(p)}
-			color={MODRA}
+			color={BRONZ}
 			fontSize={3}
 		/>
 	{/each}
@@ -382,7 +384,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.16}
 		text={fmtMm(g.celkovaSirka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 	<!-- výšky: vpredu (vľavo, celá) / svetlá výška (vpravo, po spodok nosníka) -->
@@ -393,7 +395,7 @@
 		y1={topY}
 		perpOffset={-(r.w * 0.06)}
 		text={fmtMm(vstup.vyskaVpredu)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<Kota
@@ -403,7 +405,7 @@
 		y1={baseY - g.svetlaVyska * scale}
 		perpOffset={r.w * 0.06}
 		text={fmtMm(g.svetlaVyska)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<!-- smer rezu A -->
@@ -482,7 +484,7 @@
 	     (sklon strechy), crisp hrany by na diagonále zúbkovali. -->
 	<path
 		d={`M ${xWall} ${roofWallY} L ${xFront + previs} ${yFrontTop} L ${xFront + previs} ${yFrontTop + roofH} L ${xWall} ${roofWallY + roofH} Z`}
-		fill={farebny ? farba.hex : '#eff6ff'}
+		fill={farebny ? farba.hex : '#f4f3ef'}
 		stroke={CIERNA}
 		stroke-width={obrysStroke(roofH)}
 		data-testid="pn-section-strecha"
@@ -510,11 +512,11 @@
 		y1={roofWallY}
 		x2={arc.start.x}
 		y2={arc.start.y}
-		stroke={MODRA}
+		stroke={BRONZ}
 		stroke-width="0.3"
 	/>
-	<line x1={xWall} y1={roofWallY} x2={arc.end.x} y2={arc.end.y} stroke={MODRA} stroke-width="0.3" />
-	<path d={arc.arcPath} stroke={MODRA} stroke-width="0.5" fill="none" />
+	<line x1={xWall} y1={roofWallY} x2={arc.end.x} y2={arc.end.y} stroke={BRONZ} stroke-width="0.3" />
+	<path d={arc.arcPath} stroke={BRONZ} stroke-width="0.5" fill="none" />
 	<!-- NEUŽÍVAME arc.label — jeho fixný odsah "r+12" (kota.ts) je v tomto malom
 	     kompaktnom náhľade neúmerne veľký (vytláča popisok mimo oblasť rezu), takže
 	     popisok umiestňujeme sami, tesne pri oblúku (viazaný naň radius-čiarami vyššie).
@@ -525,7 +527,7 @@
 		y={roofWallY - 2}
 		text-anchor="middle"
 		font-size="2.8"
-		fill={MODRA}
+		fill={BRONZ}
 		font-weight="600"
 		data-testid="pn-sklon">{fmtDeg(g.sklonDeg)}</text
 	>
@@ -540,7 +542,7 @@
 		y1={yWallTop}
 		perpOffset={-(r.w * 0.1)}
 		text={fmtMm(vstup.vyskaPriStene)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<Kota
@@ -550,7 +552,7 @@
 		y1={yClearTop}
 		perpOffset={r.w * 0.06}
 		text={fmtMm(g.svetlaVyska)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3}
 	/>
 	<Kota
@@ -560,7 +562,7 @@
 		y1={baseY}
 		perpOffset={r.h * 0.14}
 		text={fmtMm(vstup.hlbka)}
-		color={MODRA}
+		color={BRONZ}
 		fontSize={3.2}
 	/>
 	<text
@@ -655,7 +657,7 @@
 			x={r.x}
 			y={r.y + 4}
 			font-size="3.2"
-			fill={MODRA}
+			fill={BRONZ}
 			font-weight="600"
 			style="white-space:pre"
 			data-testid="pn-text-vyplne">{vstup.textVyplne}</text

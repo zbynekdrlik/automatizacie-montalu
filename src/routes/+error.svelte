@@ -51,7 +51,7 @@
 		margin: 0 0 20px;
 	}
 	.back {
-		color: #2563eb;
+		color: var(--m-accent-ink);
 		text-decoration: none;
 	}
 </style>

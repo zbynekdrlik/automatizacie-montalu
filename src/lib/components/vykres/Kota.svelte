@@ -12,7 +12,9 @@
 		y1,
 		perpOffset = 0,
 		text,
-		color = '#1d4ed8',
+		// #376 stage 4: bronz default (predtým modrá #1d4ed8) — --m-accent-ink,
+		// text-safe 5.9:1; reálne volania farbu aj tak prebíjajú (BRONZ konštanta)
+		color = '#8a5a2b',
 		fontSize = 11,
 		opts = {}
 	}: {
