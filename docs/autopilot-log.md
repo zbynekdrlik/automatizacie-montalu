@@ -2,6 +2,22 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-09-02 — Bazénová interim orientačná cena (#404, worktree — supervisor integruje)
+
+- Reverse-engineer montalu.sk `POST /konfigurator/update-pools` (Playwright network capture): request
+  `length`/`width`(m) + `segments_length` + `calculate[]` model kódy PBPPP/PBSPP/PBEPP; odpoveď MO/VO
+  net per model. Diskrétna mriežka (nie vzorec); cena = model×dlzka×sirka (segments=standardna).
+- Seed `cennik-bazen.json` (460 buniek, dlzka 3–12,5 / sirka per-model envelope) + server modul
+  `konfigurator-bazen-cena.ts` (grid lookup, DPH half-up v centoch, hladina MO/VO) + fetch/drift `.mjs`.
+- Produkt-aware cena: `PonukaConfig.systemKod` (bazén model), `VerejnaCena.model`→`string`,
+  `dopyt-cena-stamp.cenaZCfgProdukt` (bazen→bazénová matica, inak pergola), `ponuka-pdf` grid-note
+  produkt-aware (d×š), `odoo-lead` retry threading produkt. `cenovyZdroj:true`. Bazén podstránka:
+  `vypocet` akcia + on-page cena (enhance, `cenaAktualna` gating). Krok 4 (objednávka) = #422.
+- Review (Fable): 0 🔴, 5 🟡 opravené (grid-note d×š, Odoo produkt, DPH .xx5 kotva Premier 8,5×6,0,
+  enhance error vetva, cena-aware copy). Playbook: `.claude/rules/konfigurator-bazen-cena.md`.
+- Commity: version bump `0.24.76-dev.1`; feat 8f831ab; review 8caa1ed. 215 súborov / 3098 testov
+  zelené; check 0 chýb, lint clean; bazén E2E 3/3 (nula console chýb). NEmergnuté (worktree).
+
 ## 2026-08-24 — Integrácia: post-processing leštenie 3D (GTAO+SMAA+bloom tier-gated) (#288)
 
 - **Integrácia** lane `worktree-agent-a2b84ab372af0df27` (HEAD 9458e5e) do `dev` — serial
