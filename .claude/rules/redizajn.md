@@ -195,6 +195,37 @@ len `class="mono"` priamo na numerický `<b>`):
   **Pri sweepe grepni CELÝ súbor na `.row`/`.g` `<b>`, nielen sekciu, ktorá „vyzerá ako
   výsledok".**
 
+## #434 DOKONČENÝ (per-hodnotová `.mono` adopcia na VEREJNÝCH `/konfigurator` kartách — 4/7 produktov)
+
+`#421` pokryl len INTERNÉ moduly; verejná showroom vrstva (`--k-*` tokeny, `KonfCena`/
+`KonfSuhrn`/inline karty) mala nulovú `.mono` adopciu. `#434` ju dodal presne pre 4
+produkty pomenované v ticketovom titulku — **bazén, pergola, zimná záhrada, oplotenie**
+— na "karta ceny" (sdph/bezdph/porovnanie modelov/pergolový sticky CTA teaser) AJ
+"súhrn" (numerické `<dd>` — rozmery/výška/plocha/segmenty/kusy/sklon/svetlá výška).
+**3 sesterské showroom produkty {pristresok, tienenie, zasklenie} OSTÁVAJÚ un-mono'd**
+(review 🔵 na #434 — mimo scope, lebo ticket ich nemenoval) — pri ich rade použi
+identický vzor (nižšie), žiadny nový dizajn.
+
+- **`.mono` (globálna trieda, `src/app.css`) funguje BEZ ÚPRAVY aj v `.konf-app` (`--k-*`)
+  svete** — nastavuje LEN `font-family`/`font-variant-numeric`, žiadnu `color`, takže je
+  bezpečná aj na tmavom antracitovom `KonfCena` paneli (`color:#fff` sa kaskáduje ďalej
+  nedotknutá). Netreba žiadny `--k-*`-scoped ekvivalent.
+- **Vzor `bez DPH`/`s DPH` riadku (mixed value+label na JEDNOM elemente):** keď je
+  hodnota+label V TOM ISTOM elemente (`{eur(c.bezDph)} bez DPH`), obaľ LEN hodnotu do
+  vnoreného `<span class="mono">` — label ostáva mimo (`<span
+  class="mono">{eur(c.bezDph)}</span> bez DPH`). Keď je hodnota vo VLASTNOM elemente
+  vedľa sibling labelu (`sdph` span + samostatný `mena` span "s DPH"), `class="mono"`
+  ide priamo na hodnotový span. Svelte kompilátor ZACHOVÁVA medzeru pred nasledujúcim
+  textom po `</span>` — overené priamo cez `svelte/compiler`, žiadna regresia medzery.
+- **Porovnanie modelov (`.p-cena`) a honest-null fallback ("na vyžiadanie") v TOM ISTOM
+  cenovom slote → mono CELÝ element** (rovnaké pravidlo ako #421: fallback toho istého
+  číselného poľa ostáva v mono slote, aj keď je to celá fráza, nie pomlčka).
+- **Model/typ/farba/sklo mená a plnovetné hlášky (napr. „Cena platí pre najbližší
+  katalógový rozmer X × Y m.", „Cenníkový rozsah pre model: …") ostávajú BODY font** —
+  identická klasifikácia ako #421 (mixed text+čísla vo vete = nie mono).
+- **E2E asercia = `toHaveClass(/mono/)` na existujúci testid**, žiadny nový testid
+  netreba — vzor `expect(page.getByTestId('bazen-cena-sdph')).toHaveClass(/mono/)`.
+
 ## PASCA: bare `h1`/`nav`/… selektor v `app.css` LEAKUJE na login aj konfigurátor
 
 `app.css` je importované GLOBÁLNE (cez root `+layout.svelte`) — platí pre

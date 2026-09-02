@@ -38,10 +38,12 @@
 				<!-- #318: VO hladina — text zo SERVERA; odznak vidí LEN prihlásený b2b -->
 				<span class="cena-vo" data-testid="cena-hladina">{cena.hladinaLabel}</span>
 			{/if}
-			<span class="cena-sdph" data-testid="cena-sdph">{eur(cena.sDph)}</span>
+			<span class="cena-sdph mono" data-testid="cena-sdph">{eur(cena.sDph)}</span>
 			<span class="cena-mena">s DPH</span>
 		</div>
-		<div class="cena-bezdph" data-testid="cena-bezdph">{eur(cena.bezDph)} bez DPH</div>
+		<div class="cena-bezdph" data-testid="cena-bezdph">
+			<span class="mono">{eur(cena.bezDph)}</span> bez DPH
+		</div>
 		{#if Math.round(cena.sirkaGridM * 1000) !== sirka || Math.round(cena.hlbkaGridM * 1000) !== hlbka}
 			<div class="cena-grid" data-testid="cena-grid">
 				Cena platí pre najbližší katalógový rozmer {fmtM(cena.sirkaGridM)} × {fmtM(cena.hlbkaGridM)} m.
@@ -69,7 +71,7 @@
 			{#each cenyModely as c (c.model)}
 				<li class:vybrany={c.model === cena.model} data-testid="porovnanie-{c.model}">
 					<span class="p-model">{c.model}</span>
-					<span class="p-cena">
+					<span class="p-cena mono">
 						{c.cena.druh === 'cena' ? eur(c.cena.sDph) : 'na vyžiadanie'}
 					</span>
 				</li>

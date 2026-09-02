@@ -339,19 +339,19 @@
 							</div>
 							<div>
 								<dt>Rozmery (d × š)</dt>
-								<dd data-testid="bazen-suhrn-rozmery">{s.dlzka} × {s.sirka} mm</dd>
+								<dd data-testid="bazen-suhrn-rozmery" class="mono">{s.dlzka} × {s.sirka} mm</dd>
 							</div>
 							<div>
 								<dt>Výška</dt>
-								<dd>{s.vyska} mm</dd>
+								<dd class="mono">{s.vyska} mm</dd>
 							</div>
 							<div>
 								<dt>Počet segmentov</dt>
-								<dd>{s.segmenty}</dd>
+								<dd class="mono">{s.segmenty}</dd>
 							</div>
 							<div>
 								<dt>Zastrešená plocha</dt>
-								<dd>{cislaCiarka(s.plochaM2)} m²</dd>
+								<dd class="mono">{cislaCiarka(s.plochaM2)} m²</dd>
 							</div>
 							<div>
 								<dt>Farba</dt>
@@ -377,11 +377,13 @@
 										>
 									{/if}
 									<div class="baz-cena-hlavne">
-										<span class="baz-cena-sdph" data-testid="bazen-cena-sdph">{eur(c.sDph)}</span>
+										<span class="baz-cena-sdph mono" data-testid="bazen-cena-sdph"
+											>{eur(c.sDph)}</span
+										>
 										<span class="baz-cena-mena">s DPH</span>
 									</div>
 									<div class="baz-cena-bezdph" data-testid="bazen-cena-bezdph">
-										{eur(c.bezDph)} bez DPH
+										<span class="mono">{eur(c.bezDph)}</span> bez DPH
 									</div>
 								{:else}
 									<span class="baz-cena-label">Cena na vyžiadanie — model {c.model}</span>
@@ -410,7 +412,7 @@
 												data-testid="bazen-porovnanie-{cm.model}"
 											>
 												<span class="p-model">{cm.model}</span>
-												<span class="p-cena">
+												<span class="p-cena mono">
 													{cm.cena.druh === 'cena' ? eur(cm.cena.sDph) : 'na vyžiadanie'}
 												</span>
 											</li>
