@@ -32,8 +32,9 @@ import { dopytAction, objednavkaAction } from '$lib/server/dopyt-action';
 import { cenaPreModelBazen, cenyModelovBazen } from '$lib/server/konfigurator-bazen-cena';
 import { cenovaHladina } from '$lib/server/konfigurator-hladina';
 import { parseBazenCenaVstup } from '$lib/server/konfigurator-bazen-vstup';
-import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
-import { resolveClientIp } from '$lib/server/client-ip';
+// #428: zdieľaná throttle predohra cenových `vypocet` akcií (rule-of-four) — nahrádza inline per-IP
+// rate-limit (public-throttle + client-ip); tie modul `konfigurator-cena-akcia` importuje sám.
+import { cenaThrottle } from '$lib/server/konfigurator-cena-akcia';
 
 // GET (SSR render) nie je rate-limitovaný — lacný statický katalóg + rozmedzia (rovnaká politika
 // ako pergolová podstránka); drahý POST (dopyt) je throttlovaný vo `dopyt-action`.
@@ -67,22 +68,11 @@ export const actions = {
 	// #404: orientačná cena zvoleného modelu + „ceny modelov vedľa seba". SvelteKit ZAKAZUJE miešať
 	// `default` s pomenovanými akciami, preto je aj `dopyt` pomenovaná (sveltekit-actions.md). Vzor
 	// pergolovej `vypocet` — per-IP throttle → parse → cena v hladine odvodenej SERVER-SIDE z používateľa.
-	vypocet: async ({ request, getClientAddress, setHeaders, locals }) => {
-		let edgeIp: string | undefined;
-		try {
-			edgeIp = getClientAddress();
-		} catch {
-			edgeIp = undefined;
-		}
-		const ip = resolveClientIp(edgeIp, request.headers.get('cf-connecting-ip'));
-		if (!allowRequest(ip)) {
-			setHeaders({ 'retry-after': String(Math.ceil(KONF_WINDOW_MS / 1000)) });
-			return fail(429, {
-				cena: null,
-				cenyModely: null,
-				error: 'Priveľa požiadaviek. Skús to prosím o chvíľu.'
-			});
-		}
+	vypocet: async (event) => {
+		// #428: zdieľaná throttle predohra; `prazdno` = prázdne dátové polia bazénového návratu.
+		const throttled = cenaThrottle(event, { cena: null, cenyModely: null });
+		if (throttled) return throttled;
+		const { request, locals } = event;
 
 		const parsed = parseBazenCenaVstup(await request.formData());
 		if ('error' in parsed) return fail(400, { cena: null, cenyModely: null, error: parsed.error });

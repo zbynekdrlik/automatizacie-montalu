@@ -22,8 +22,9 @@ import { parseKonfiguratorVstup } from '$lib/server/konfigurator-vstup';
 import { cenaPreModel, cenyModelov } from '$lib/server/konfigurator-cena';
 // #318: cenová hladina sa rozhoduje SERVER-SIDE z prihláseného používateľa (nikdy z klienta).
 import { cenovaHladina } from '$lib/server/konfigurator-hladina';
-import { allowRequest, KONF_WINDOW_MS } from '$lib/server/public-throttle';
-import { resolveClientIp } from '$lib/server/client-ip';
+// #428: zdieľaná throttle predohra cenových `vypocet` akcií (rule-of-four). Nahrádza inline
+// per-IP rate-limit (public-throttle + client-ip); tie modul `konfigurator-cena-akcia` importuje sám.
+import { cenaThrottle } from '$lib/server/konfigurator-cena-akcia';
 // #277: verejný dopyt (kontaktný formulár → PDF ponuka BEZ CIEN). Táto route ju iba
 // naimportuje a namountuje ako pomenovanú akciu `dopyt` — Money-NEUTRÁLNA (žiadny import
 // money/pergola, zápis len do audit tabuľky `dopyt`, guard: tests/dopyt-money-safety.test.ts).
@@ -64,26 +65,12 @@ export const actions = {
 	// SvelteKit ZAKAZUJE miešať `default` s pomenovanými akciami (actions.js:221 „When using
 	// named actions, the default action cannot be used"). Keďže #277 pridal pomenovanú
 	// `dopyt`, kalkulačka MUSÍ byť tiež pomenovaná — `vypocet` (formulár POSTuje `?/vypocet`).
-	vypocet: async ({ request, getClientAddress, setHeaders, locals }) => {
-		// per-IP rate-limit verejného endpointu — reálna klientska IP za Cloudflare (#264):
-		// getClientAddress() (XFF_DEPTH=1) vracia CF edge IP, resolveClientIp z nej +
-		// Cf-Connecting-Ip odvodí reálneho klienta (spoof-safe aj CF-down-safe).
-		// getClientAddress() môže hodiť (ADDRESS_HEADER nastavený + hlavička chýba) — nesmie
-		// zhodiť endpoint kvôli rate-limit kľúču.
-		let edgeIp: string | undefined;
-		try {
-			edgeIp = getClientAddress();
-		} catch {
-			edgeIp = undefined;
-		}
-		const ip = resolveClientIp(edgeIp, request.headers.get('cf-connecting-ip'));
-		if (!allowRequest(ip)) {
-			setHeaders({ 'retry-after': String(Math.ceil(KONF_WINDOW_MS / 1000)) });
-			return fail(429, {
-				vysledok: null,
-				error: 'Priveľa požiadaviek. Skús to prosím o chvíľu.'
-			});
-		}
+	vypocet: async (event) => {
+		// per-IP rate-limit verejného endpointu (reálna klientska IP za Cloudflare, #264) — zdieľaná
+		// throttle predohra `cenaThrottle`; `prazdno` = prázdne dátové pole pergolového návratu.
+		const throttled = cenaThrottle(event, { vysledok: null });
+		if (throttled) return throttled;
+		const { request, locals } = event;
 
 		const parsed = parseKonfiguratorVstup(await request.formData());
 		if ('error' in parsed)
