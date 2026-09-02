@@ -189,7 +189,7 @@
 					<dl>
 						<div>
 							<dt>Typ výrobku</dt>
-							<dd>{s.typ}</dd>
+							<dd>{s.typNazov}</dd>
 						</div>
 						<div>
 							<dt>Krytina / strecha</dt>
@@ -204,7 +204,7 @@
 							<dd>{s.vyska} mm</dd>
 						</div>
 						<div>
-							<dt>Zastrešená plocha</dt>
+							<dt>Pôdorysná plocha</dt>
 							<dd>{cislaCiarka(s.plochaM2)} m²</dd>
 						</div>
 						<div>

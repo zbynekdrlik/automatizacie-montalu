@@ -17,6 +17,7 @@ import {
 	pristresokPonukaConfig,
 	type PristresokVstup
 } from '../src/lib/konfigurator-pristresok';
+import { zhrnutieRiadky } from '../src/lib/ponuka';
 import { opeciatkujCenuPreProdukt } from '../src/lib/server/dopyt-cena-stamp';
 import { generatePonukaPdf } from '../src/lib/server/ponuka-pdf';
 import { db } from '../src/lib/server/db';
@@ -96,7 +97,7 @@ describe('#390 pristresokVstupPlatny', () => {
 describe('#390 konfigurujPristresok (súhrn) + pristresokPonukaConfig (mapovanie na dopyt)', () => {
 	it('typ → nominatívny názov; plocha = dĺžka × šírka [m²] zaokrúhlená na 1 desatinu', () => {
 		const s = konfigurujPristresok(VSTUP);
-		expect(s.typ).toBe('Hliníkový prístrešok na auto');
+		expect(s.typNazov).toBe('Hliníkový prístrešok na auto');
 		// 6000 × 3000 mm = 18,0 m²
 		expect(s.plochaM2).toBe(18);
 		const s2 = konfigurujPristresok({ ...VSTUP, dlzka: 5000, sirka: 3500 }); // 17,5 m²
@@ -125,6 +126,19 @@ describe('#390 konfigurujPristresok (súhrn) + pristresokPonukaConfig (mapovanie
 		expect(cfg).not.toHaveProperty('vyskaVpredu');
 		expect(cfg).not.toHaveProperty('vyskaPriStene');
 		expect(cfg).not.toHaveProperty('pocetPoli');
+	});
+
+	// #390 review 🔵: overuj RENDER cestu, nie len `cfg.sklo`. `zhrnutieRiadky` prepúšťa `sklo` cez
+	// `konfSkloKategoriaPreNazov` (presná zhoda katalógového názvu skla). Dnes ani jedna zo 4 krytín
+	// nekoliduje s katalógom skla → riadok „Sklo / výplň" renderuje krytinu RAW. Keby budúca sklo
+	// kategória dostala kolízny názov (napr. „Polykarbonát"), PDF/lead riadok by sa ticho premenoval
+	// — tento test to zachytí (regresný poistný pás na render, nie na dátové pole).
+	it('render „Sklo / výplň" zobrazí každú krytinu RAW (žiadna kolízia s katalógom skla)', () => {
+		for (const k of PRISTRESOK_KRYTINY) {
+			const cfg = pristresokPonukaConfig(konfigurujPristresok({ ...VSTUP, krytina: k.nazov }));
+			const riadky = zhrnutieRiadky(cfg);
+			expect(riadky).toContainEqual({ label: 'Sklo / výplň', value: k.nazov });
+		}
 	});
 });
 

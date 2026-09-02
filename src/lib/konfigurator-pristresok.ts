@@ -119,8 +119,8 @@ export interface PristresokVstup {
 }
 
 export interface PristresokSuhrn {
-	/** zákaznícky NÁZOV typu (display / `system`) */
-	typ: string;
+	/** zákaznícky NÁZOV typu (display / `system`) — pozor: `PristresokVstup.typ` je KÓD, tu je NÁZOV */
+	typNazov: string;
 	krytina: string;
 	dlzka: number;
 	sirka: number;
@@ -148,7 +148,7 @@ export function pristresokVstupPlatny(v: PristresokVstup): boolean {
 /** Zostaví zákaznícky súhrn konfigurácie (display-only, BEZ ceny, BEZ Money kódu). */
 export function konfigurujPristresok(v: PristresokVstup): PristresokSuhrn {
 	return {
-		typ: pristresokTypNazov(v.typ),
+		typNazov: pristresokTypNazov(v.typ),
 		krytina: v.krytina,
 		dlzka: v.dlzka,
 		sirka: v.sirka,
@@ -166,11 +166,11 @@ export function konfigurujPristresok(v: PristresokVstup): PristresokSuhrn {
  *  v `konfigurator-produkty`). */
 export function pristresokPonukaConfig(s: PristresokSuhrn): PonukaConfig {
 	return {
-		system: s.typ,
+		system: s.typNazov,
 		dlzka: s.dlzka,
 		sirka: s.sirka,
 		farba: s.farba,
 		sklo: s.krytina,
-		popis: `Výška ${s.vyska} mm · zastrešená plocha ${cislaCiarka(s.plochaM2)} m².`
+		popis: `Výška ${s.vyska} mm · pôdorysná plocha ${cislaCiarka(s.plochaM2)} m².`
 	};
 }
