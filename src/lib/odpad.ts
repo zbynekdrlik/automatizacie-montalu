@@ -25,7 +25,12 @@ export interface OdpadSpolu {
  * len zovšeobecnený na viac dĺžok tyčí. Prázdny vstup → samé nuly.
  */
 export function sumaOdpad(material: MaterialRow[]): OdpadSpolu {
-	const pouzite = material.filter((m) => m.tyce > 0);
+	// barLen aj odpadMm sú v MaterialRow povinné, ale RozpisRezov ich číta obranne
+	// (`m.barLen ?? bar`) — držíme rovnakú obranu: nekonečný/NaN riadok vylúčime,
+	// aby jeden pokazený profil nevyrobil „NaN mm" v súčte (radšej honest under-report).
+	const pouzite = material.filter(
+		(m) => m.tyce > 0 && Number.isFinite(m.barLen) && Number.isFinite(m.odpadMm)
+	);
 	const odpadMm = Math.round(pouzite.reduce((s, m) => s + m.odpadMm, 0));
 	const materialMm = pouzite.reduce((s, m) => s + m.tyce * m.barLen, 0);
 	const odpadPct = materialMm > 0 ? Math.round((odpadMm / materialMm) * 1000) / 10 : 0;

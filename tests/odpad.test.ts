@@ -54,4 +54,13 @@ describe('sumaOdpad (#417)', () => {
 		const r = sumaOdpad([mk({ tyce: 0, odpadMm: 500 }), mk({ tyce: 0, odpadMm: 100 })]);
 		expect(r).toEqual({ profily: 0, odpadMm: 0, materialMm: 0, odpadPct: 0 });
 	});
+
+	it('profil s NaN barLen sa vylúči — žiadny NaN v súčte (obrana ako RozpisRezov)', () => {
+		const r = sumaOdpad([
+			mk({ tyce: 2, barLen: 7500, odpadMm: 300 }),
+			{ ...mk({ tyce: 1, odpadMm: 100 }), barLen: NaN }
+		]);
+		expect(r).toEqual({ profily: 1, odpadMm: 300, materialMm: 15000, odpadPct: 2 });
+		expect(Number.isFinite(r.odpadPct)).toBe(true);
+	});
 });
