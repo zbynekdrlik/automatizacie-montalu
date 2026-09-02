@@ -50,9 +50,7 @@ describe('#5822 frameGuardHeaders — env-gated iframe povolenie', () => {
 
 	it('nastavené → Content-Security-Policy: frame-ancestors <hodnota>, žiadne X-Frame-Options', () => {
 		const h = frameGuardHeaders("'self' https://erp.montalu.cloud https://*.newlevel.media");
-		expect(h.csp).toBe(
-			"frame-ancestors 'self' https://erp.montalu.cloud https://*.newlevel.media"
-		);
+		expect(h.csp).toBe("frame-ancestors 'self' https://erp.montalu.cloud https://*.newlevel.media");
 		expect(h.xFrameOptions).toBeUndefined();
 	});
 
@@ -75,6 +73,8 @@ describe('#5822 frameGuardHeaders — env-gated iframe povolenie', () => {
 
 	it('okolité/nadbytočné medzery sa normalizujú a orežú', () => {
 		expect(frameGuardHeaders('   \t  ')).toEqual({ xFrameOptions: 'DENY' });
-		expect(frameGuardHeaders("  'self'   https://a  ").csp).toBe("frame-ancestors 'self' https://a");
+		expect(frameGuardHeaders("  'self'   https://a  ").csp).toBe(
+			"frame-ancestors 'self' https://a"
+		);
 	});
 });

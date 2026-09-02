@@ -15,7 +15,8 @@
 	// #384: na produktovej PODSTRÁNKE (`/konfigurator/<produkt>`) ponúkni cestu späť na výber;
 	// na samotnej výberovej obrazovke (`/konfigurator`) sa odkaz neukazuje. SSR-konzistentné
 	// cez `$app/state` `page` (žiadny `window.location`, žiadny hydration mismatch).
-	const jePodstranka = $derived(page.url.pathname !== '/konfigurator');
+	// #5822: `page.route.id` (base-agnostické, SSR==klient) namiesto `page.url.pathname` (nesie base).
+	const jePodstranka = $derived(page.route.id !== '/konfigurator');
 </script>
 
 <div class="konf-app">

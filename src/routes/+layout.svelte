@@ -21,8 +21,11 @@
 	// → root pre túto vetvu nerenderuje nav, `.wrap` ani footer (práve JEDEN
 	// `data-testid="version"` na stránke). `$app/state` `page` je reaktívne + SSR-konzistentné
 	// (žiadny hydration mismatch), nikdy `window.location`.
+	// #5822: `page.route.id` (base-agnostické, rovnaké na SSR aj klientovi) namiesto
+	// `page.url.pathname` (nesie base) — porovnanie s literálom by pod base zlyhalo, a
+	// `resolve()` je na SSR relatívny → SSR/klient mismatch. route.id je pattern (`[produkt]`).
 	const jeKonfig = $derived(
-		page.url.pathname === '/konfigurator' || page.url.pathname.startsWith('/konfigurator/')
+		page.route.id === '/konfigurator' || (page.route.id?.startsWith('/konfigurator/') ?? false)
 	);
 
 	// marker pre E2E: hydratácia hotová — pred ním môže fill() na value-bound
@@ -196,7 +199,7 @@
 							class:active={page.url.pathname === resolve('/pouzivatelia')}>Používatelia</a
 						>
 					{/if}
-					<form method="POST" action="/logout">
+					<form method="POST" action={resolve('/logout')}>
 						<button type="submit">Odhlásiť</button>
 					</form>
 				</div>
@@ -205,8 +208,8 @@
 	</nav>
 {/if}
 
-{#if page.url.pathname === '/login'}
-	<!-- login je full-bleed (vlastný split layout) — bez .wrap -->
+{#if page.route.id === '/login'}
+	<!-- login je full-bleed (vlastný split layout) — bez .wrap; #5822: route.id (base-agnostické) -->
 	{@render children()}
 	<footer class="app login-footer">
 		<span class="mono" data-testid="version">v{data.version}</span>

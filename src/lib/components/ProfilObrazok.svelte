@@ -1,6 +1,9 @@
 <script lang="ts">
 	// Rez profilu z Money katalógu. Malý náhľad v riadku; klik → zväčšenie.
 	import { maObrazok, obrazokUrl } from '$lib/profil-obrazky';
+	// #5822: `asset()` prefixne base → pod `/automatizacie/` `<img>` neukazuje na Odoo koreň
+	// (404). `obrazokUrl` ostáva base-LESS (pinuje ho tests/profil-obrazky.test.ts).
+	import { asset } from '$app/paths';
 
 	let {
 		kod,
@@ -21,7 +24,7 @@
 		title="Zväčšiť rez profilu {kod}"
 		aria-label="Rez profilu {kod}"
 	>
-		<img src={obrazokUrl(kod)} alt="Rez profilu {kod}" loading="lazy" />
+		<img src={asset(obrazokUrl(kod))} alt="Rez profilu {kod}" loading="lazy" />
 	</button>
 
 	{#if otvorene}
@@ -38,7 +41,7 @@
 						>✕</button
 					>
 				</div>
-				<img src={obrazokUrl(kod)} alt="Rez profilu {kod}" />
+				<img src={asset(obrazokUrl(kod))} alt="Rez profilu {kod}" />
 			</div>
 		</div>
 	{/if}

@@ -52,3 +52,26 @@ describe('#278 — compose forwarduje ODOO_LEAD_* env do containera', () => {
 		expect(app, `compose environment: neforwarduje ${v} (chýba \`${v}: \${${v}:-}\`)`).toMatch(re);
 	});
 });
+
+// #5822: base path + iframe env musia byť v compose, inak sidecar deploy pod `/automatizacie/`
+// zlyhá (base sa nebakuje / healthcheck 404 → restart loop / iframe ostane blokovaný).
+describe('#5822 — compose má base-path + iframe env (default prázdne ⇒ live VPS nezmenený)', () => {
+	it('build.args: APP_BASE_PATH ako ${APP_BASE_PATH:-} (bake pri builde)', () => {
+		expect(app).toMatch(/^\s*APP_BASE_PATH:\s*\$\{APP_BASE_PATH:-\}\s*$/m);
+	});
+
+	it.each(['APP_BASE_PATH', 'APP_FRAME_ANCESTORS'])(
+		'environment: forwarduje %s ako ${%s:-} (runtime)',
+		(v) => {
+			const re = new RegExp('^\\s*' + v + ':\\s*\\$\\{' + v + ':-\\}\\s*$', 'm');
+			expect(app, `compose environment: neforwarduje ${v}`).toMatch(re);
+		}
+	);
+
+	it('healthcheck prefixuje base z process.env.APP_BASE_PATH (nie holé /health)', () => {
+		expect(app).toMatch(/process\.env\.APP_BASE_PATH/);
+		expect(app, 'healthcheck stále fetchuje holé /health — pod base 404').not.toMatch(
+			/fetch\('http:\/\/127\.0\.0\.1:3000\/health'/
+		);
+	});
+});

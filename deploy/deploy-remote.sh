@@ -24,7 +24,10 @@ COMPOSE_DIR="${COMPOSE_DIR:-/opt/automatizacie-montalu}"
 CONTAINER="${CONTAINER:-automatizacie-montalu}"
 IMAGE="${IMAGE:-automatizacie-montalu}"
 SERVICE="${SERVICE:-app}" # názov compose služby (pre migrate_ownership `compose run`)
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090/health}"
+# #5822: base-aware default — pod bakovaným base je health route na `${APP_BASE_PATH}/health`.
+# base='' (dnešný VPS, APP_BASE_PATH unset) ⇒ `…:8090/health` (nezmenené); caller ktorý
+# deployuje pod base exportuje APP_BASE_PATH. HEALTH_URL sa dá vždy prebiť explicitne.
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090${APP_BASE_PATH:-}/health}"
 POLL_TRIES="${POLL_TRIES:-20}"
 POLL_SLEEP="${POLL_SLEEP:-3}"
 KEEP_IMAGES="${KEEP_IMAGES:-5}" # koľko najnovších :sha7 obrazov ponechať (retencia)

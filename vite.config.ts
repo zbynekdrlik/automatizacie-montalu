@@ -25,6 +25,19 @@ if (!version) {
 	}
 }
 
+// #5822: base path pre beh pod `/automatizacie/` (same-origin s Odoo → iframe). Bakuje sa
+// pri BUILDE z `APP_BASE_PATH` (kit.paths.base = build-time konštanta). Default '' =
+// dnešný koreň origin (samostatný VPS) → byte-identicky. Znormalizuj na tvar, ktorý kit
+// akceptuje: '' alebo cesta so začiatočným '/' bez koncového '/'.
+function normBase(raw: string | undefined): '' | `/${string}` {
+	if (!raw) return '';
+	let b = raw.trim();
+	if (b === '' || b === '/') return '';
+	if (!b.startsWith('/')) b = '/' + b;
+	b = b.replace(/\/+$/, ''); // odstráň koncové '/'
+	return b as `/${string}`; // po `startsWith('/')` guarde vždy začína '/'
+}
+
 export default defineConfig({
 	// #291: pod StrykerJS beží N paralelných vitest test-runner procesov, každý vo vlastnom
 	// sandboxe so SYMLINKNUTÝM node_modules → všetky zdieľajú ten istý reálny
@@ -47,6 +60,9 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
+			// #5822: `kit.paths.base` inline (repo nemá `svelte.config.js`). SvelteKit split_config
+			// posunie top-level `kit_options` kľúč `paths` do `kit.paths`. Bakuje sa pri builde.
+			paths: { base: normBase(process.env.APP_BASE_PATH) },
 			adapter: adapter()
 		})
 	],

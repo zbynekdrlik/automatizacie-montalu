@@ -8,7 +8,8 @@
 
 	function vyberStyl(e: Event) {
 		const v = (e.target as HTMLSelectElement).value;
-		window.location.href = `/zasklenia/nastavenia?sysStyl=${encodeURIComponent(v)}`;
+		// #5822: `resolve()` (klient = absolútna base cesta) pre beh pod `/automatizacie/`.
+		window.location.href = `${resolve('/zasklenia/nastavenia')}?sysStyl=${encodeURIComponent(v)}`;
 	}
 </script>
 

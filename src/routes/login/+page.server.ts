@@ -14,6 +14,7 @@ import {
 	recordSuccess
 } from '$lib/server/login-throttle';
 import { resolveClientIp } from '$lib/server/client-ip';
+import { base } from '$app/paths';
 
 function lockMessage(remainingMs: number): string {
 	const mins = Math.max(1, Math.ceil(remainingMs / 60000));
@@ -21,7 +22,9 @@ function lockMessage(remainingMs: number): string {
 }
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	if (locals.user) redirect(303, safeNext(url.searchParams.get('next')));
+	// #5822: `safeNext` vracia base-LESS cestu (`next` je base-LESS, alebo fallback
+	// `/zasklenia`); base pridám tu → same-origin absolútny Location aj pod `/automatizacie/`.
+	if (locals.user) redirect(303, base + safeNext(url.searchParams.get('next')));
 	return {};
 };
 
@@ -85,12 +88,14 @@ export const actions = {
 		}
 		recordSuccess(username, ip); // úspech → vyčisti počítadlo (žiadny zvyškový lock)
 		cookies.set(SESSION_COOKIE, token, {
-			path: '/',
+			// #5822: scope cookie na base (`/automatizacie`) → same-origin iframe cookies fungujú
+			// (SameSite=Lax stačí), a app session cookie sa neposiela na Odoo cesty. base='' ⇒ '/'.
+			path: base || '/',
 			httpOnly: true,
 			sameSite: 'lax',
 			secure: url.protocol === 'https:',
 			maxAge: 30 * 24 * 3600
 		});
-		redirect(303, safeNext(url.searchParams.get('next')));
+		redirect(303, base + safeNext(url.searchParams.get('next')));
 	}
 } satisfies Actions;

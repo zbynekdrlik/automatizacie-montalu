@@ -9,10 +9,11 @@
 // (rovnaký vzor ako `pouzivatelia`/`zasklenia/nastavenia`).
 import { redirect } from '@sveltejs/kit';
 import { isB2B } from '$lib/server/auth';
+import { base } from '$app/paths';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (isB2B(locals.user)) redirect(303, '/zasklenia');
+	if (isB2B(locals.user)) redirect(303, base + '/zasklenia'); // #5822: base-prefix
 	// Dátum = SERVEROVÝ čas (rovnaká disciplína ako #114 na nárezáku) — nepočíta sa
 	// na klientovi, aby neuplávalo, keby stránka ostala otvorená.
 	return { datumIso: new Date().toISOString() };

@@ -2,10 +2,16 @@
 // mimo repa → defense-in-depth). `handle` po resolve() pridá X-Frame-Options,
 // X-Content-Type-Options, Referrer-Policy a minimálny Permissions-Policy —
 // ale ZÁMERNE ŽIADNE CSP (three.js/inline štýly, riziko rozbitia — per ticket).
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+
+// #5822: iframe povolenie je env-gated (`APP_FRAME_ANCESTORS`, čítané v handle za behu) —
+// každý test si ho nastaví/zmaže; default (unset) = dnešné X-Frame-Options: DENY.
+afterEach(() => {
+	delete process.env.APP_FRAME_ANCESTORS;
+});
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-sec-headers-'));
 process.env.DATABASE_PATH = path.join(tmpRoot, 'headers.db');
@@ -47,8 +53,33 @@ describe('bezpečnostné hlavičky (SEC-3)', () => {
 		expect(res.headers.get('x-content-type-options')).toBe('nosniff');
 	});
 
-	it('ZÁMERNE bez Content-Security-Policy (per #251 — CSP riešené samostatne)', async () => {
+	it('bez APP_FRAME_ANCESTORS (default): žiadne CSP + X-Frame-Options: DENY (dnešný stav)', async () => {
 		const res = await callHandle('/login');
+		expect(res.headers.get('content-security-policy')).toBeNull();
+		expect(res.headers.get('x-frame-options')).toBe('DENY');
+	});
+});
+
+// #5822: keď je APP_FRAME_ANCESTORS nastavené, iframe z Odoo je povolený cez CSP
+// frame-ancestors a X-Frame-Options ZMIZNE (práve jedna z hlavičiek naraz).
+describe('#5822 iframe povolenie cez APP_FRAME_ANCESTORS', () => {
+	it('set → Content-Security-Policy: frame-ancestors <hodnota>, ŽIADNE X-Frame-Options', async () => {
+		process.env.APP_FRAME_ANCESTORS = "'self' https://erp.montalu.cloud https://*.newlevel.media";
+		// verejná cesta (/login) — neredirectuje, takže sa dostaneme k hlavičkám (rovnako ako
+		// ostatné testy vyššie); frame-guard je aplikovaný na KAŽDÚ vyrenderovanú odpoveď.
+		const res = await callHandle('/login');
+		expect(res.headers.get('content-security-policy')).toBe(
+			"frame-ancestors 'self' https://erp.montalu.cloud https://*.newlevel.media"
+		);
+		expect(res.headers.get('x-frame-options')).toBeNull();
+		// ostatné obranné hlavičky ostávajú
+		expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+	});
+
+	it('prázdna/whitespace hodnota → naspäť X-Frame-Options: DENY (žiadne CSP)', async () => {
+		process.env.APP_FRAME_ANCESTORS = '   ';
+		const res = await callHandle('/login');
+		expect(res.headers.get('x-frame-options')).toBe('DENY');
 		expect(res.headers.get('content-security-policy')).toBeNull();
 	});
 });
