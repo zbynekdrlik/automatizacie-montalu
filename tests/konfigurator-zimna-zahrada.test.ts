@@ -27,7 +27,7 @@ const VSTUP: ZzVstup = {
 	sirka: 5000,
 	hlbka: 4000,
 	vyska: 2800,
-	zasklenie: 'Izolačné trojsklo',
+	zasklenie: 'Bezpečnostné sklo',
 	farba: 'RAL 7016 ANTRACIT'
 };
 
@@ -37,13 +37,13 @@ describe('#386 katalóg modelov / zasklenie', () => {
 		expect(ZZ_MODEL_DEFAULT).toBe('ROBUST');
 	});
 
-	it('zasklenie = 4 zákaznícke kategórie (montalu.sk terminológia)', () => {
+	it('zasklenie = 4 zákaznícke kategórie (DOSLOVNÁ montalu.sk terminológia — žiadne vymyslené „dvojsklo/trojsklo")', () => {
 		expect(ZZ_ZASKLENIA.length).toBe(4);
 		expect(ZZ_ZASKLENIA.map((z) => z.nazov)).toEqual([
-			'Izolačné dvojsklo',
-			'Izolačné trojsklo',
+			'Izolačné sklo',
 			'Bezpečnostné sklo',
-			'Polykarbonát'
+			'Polykarbonát',
+			'Panel ISODOMUS'
 		]);
 	});
 
@@ -64,10 +64,10 @@ describe('#386 whitelist parsery (neznámy → bezpečný default)', () => {
 		expect(zzModel('')).toBe('ROBUST');
 		expect(zzModel(null)).toBe('ROBUST');
 	});
-	it('zzZasklenie: platný → zachovaný; inak Izolačné dvojsklo', () => {
-		expect(zzZasklenie('Izolačné trojsklo')).toBe('Izolačné trojsklo');
+	it('zzZasklenie: platný → zachovaný; inak Izolačné sklo', () => {
+		expect(zzZasklenie('Panel ISODOMUS')).toBe('Panel ISODOMUS');
 		expect(zzZasklenie('Bezpečnostné sklo')).toBe('Bezpečnostné sklo');
-		expect(zzZasklenie('injekcia<script>')).toBe('Izolačné dvojsklo');
+		expect(zzZasklenie('injekcia<script>')).toBe('Izolačné sklo');
 	});
 });
 
@@ -97,7 +97,7 @@ describe('#386 konfigurujZimnaZahradu (súhrn) + zimnaZahradaPonukaConfig (mapov
 		expect(cfg.sirka).toBe(5000); // šírka → `sirka`
 		expect(cfg.hlbka).toBe(4000); // hĺbka → `hlbka` → „Rozmery (š × h)" (izbový tvar)
 		expect(cfg.farba).toBe('RAL 7016 ANTRACIT');
-		expect(cfg.sklo).toBe('Izolačné trojsklo');
+		expect(cfg.sklo).toBe('Bezpečnostné sklo');
 		expect(cfg.popis).toContain('Výška 2800 mm');
 		expect(cfg.popis).toContain('20 m²');
 	});

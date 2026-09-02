@@ -31,15 +31,20 @@ export const ZZ_MODELY: readonly ZzModelInfo[] = [
 export const ZZ_MODEL_DEFAULT: ZzModel = 'ROBUST';
 
 /** Zákaznícke kategórie zasklenia — LEN prezentačné názvy, žiadny Money kód. Tečú nezmenené do PDF
- *  špecifikácie / dopytu (pipeline dostáva reťazec). Terminológia z montalu.sk (izolačné dvojsklo /
- *  trojsklo / bezpečnostné sklo / polykarbonát). */
+ *  špecifikácie / dopytu (pipeline dostáva reťazec). Terminológia DOSLOVNE z montalu.sk (produktová
+ *  stránka zimných záhrad menuje zasklievacie materiály „polykarbonát, bezpečnostné sklo, izolačné
+ *  sklo či panel ISODOMUS"; zimná záhrada = „hliníková pergola + kvalitné zasklenie"). Nevymyslené —
+ *  žiadne „dvojsklo/trojsklo", ktoré montalu.sk neuvádza (#386 review 🟡). */
 export const ZZ_ZASKLENIA: readonly { nazov: string; popis: string }[] = [
-	{ nazov: 'Izolačné dvojsklo', popis: 'Štandardné izolačné dvojsklo pre celoročné využitie.' },
-	{ nazov: 'Izolačné trojsklo', popis: 'Vyššia tepelná izolácia pre náročné podmienky.' },
+	{
+		nazov: 'Izolačné sklo',
+		popis: 'Zasklenie s dobrou tepelnou izoláciou pre celoročné využitie.'
+	},
 	{ nazov: 'Bezpečnostné sklo', popis: 'Kalené / vrstvené sklo pre vyššiu bezpečnosť.' },
-	{ nazov: 'Polykarbonát', popis: 'Ľahká presvetlená výplň — najmä pre strešnú časť.' }
+	{ nazov: 'Polykarbonát', popis: 'Ľahká presvetlená výplň — najmä pre strešnú časť.' },
+	{ nazov: 'Panel ISODOMUS', popis: 'Sendvičový panel s vysokou tepelnou izoláciou.' }
 ];
-export const ZZ_ZASKLENIE_DEFAULT = 'Izolačné dvojsklo';
+export const ZZ_ZASKLENIE_DEFAULT = 'Izolačné sklo';
 
 // Zákaznícke rozmerové rozmedzia (mm) — ORIENTAČNÉ, na dopyt (žiadna cenotvorná mriežka; presné
 // rozmery sa upresnia po zameraní). Interné = mm, jednotný tvar { min, max, krok }. Zimná záhrada =
@@ -67,7 +72,7 @@ export function zzModel(raw: string | null | undefined): ZzModel {
 	const s = String(raw ?? '').trim();
 	return MODEL_SET.has(s) ? (s as ZzModel) : ZZ_MODEL_DEFAULT;
 }
-/** Zasklenie z reťazca (whitelist; neznámy → default Izolačné dvojsklo). */
+/** Zasklenie z reťazca (whitelist; neznámy → default Izolačné sklo). */
 export function zzZasklenie(raw: string | null | undefined): string {
 	const s = String(raw ?? '').trim();
 	return ZASKLENIE_SET.has(s) ? s : ZZ_ZASKLENIE_DEFAULT;

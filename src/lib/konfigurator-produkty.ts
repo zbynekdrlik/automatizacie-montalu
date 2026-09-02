@@ -78,8 +78,10 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		stav: 'live',
 		odkaz: '/konfigurator/zimna-zahrada',
 		externy: false,
-		// #386: zimná záhrada NEMÁ overený interim cenový zdroj (montalu.sk pre zimné záhrady nemá
-		// verejnú cenovú maticu ani `update-*` endpoint — produkt je čisto „na mieru"). Honest-null → bez ceny.
+		// #386: honest-null pre TÚTO PR — montalu.sk MÁ cenový zdroj pre zimné záhrady
+		// (`montalu.sk/konfigurator/zimne-zahrady`, karta „od 5 364,29 € bez DPH", rovnaký tvar ako
+		// pergolový/bazénový konfigurátor), ale jeho vyťaženie do interim matice je práca v rozsahu #279
+		// = samostatný follow-up #408. Do vtedy bez orientačnej ceny (nevymýšľame cenu bez overenej matice).
 		cenovyZdroj: false
 	},
 	{

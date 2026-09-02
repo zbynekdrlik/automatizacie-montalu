@@ -414,6 +414,6 @@ describe('Money safety (C) — route zimnej záhrady: žiadny Money kód, žiadn
 		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
 		// pozitívne: dáta naozaj prešli (modely + zasklenie), aby test nebol vákuový
 		expect(json).toContain('ROBUST');
-		expect(json).toContain('Izolačné dvojsklo');
+		expect(json).toContain('Izolačné sklo');
 	});
 });
