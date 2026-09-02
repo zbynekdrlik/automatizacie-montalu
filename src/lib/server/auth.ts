@@ -30,6 +30,10 @@ export interface SessionUser {
 	id: number;
 	username: string;
 	role: UserRole;
+	// #5823: pôvod identity. Lokálny login (users tabuľka) ho NEnastavuje (undefined) → lokálna cesta
+	// byte-identická. `'odoo'` = efemérna SSO identita z Odoo session (nikdy v DB) → SSO-špecifické
+	// správanie (napr. skryť inertný app logout) číta `user.source === 'odoo'`, nie záporné `id`.
+	source?: 'odoo';
 }
 
 export function login(username: string, password: string, ip?: string): string | null {

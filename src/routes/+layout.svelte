@@ -205,9 +205,13 @@
 							class:active={page.url.pathname === resolve('/pouzivatelia')}>Používatelia</a
 						>
 					{/if}
-					<form method="POST" action={resolve('/logout')}>
-						<button type="submit">Odhlásiť</button>
-					</form>
+					<!-- #5823: pre SSO (Odoo) identitu je app logout inertný (ambientná Odoo session
+						 re-autentikuje) → skry ho; odhlásenie prebieha v Odoo. Lokálny login ho vidí. -->
+					{#if data.user?.source !== 'odoo'}
+						<form method="POST" action={resolve('/logout')}>
+							<button type="submit">Odhlásiť</button>
+						</form>
+					{/if}
 				</div>
 			</details>
 		</div>

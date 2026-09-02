@@ -3,6 +3,7 @@
 import { redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
 import { randomBytes } from 'node:crypto';
 import { getSessionUser, isB2B, pruneSessions, SESSION_COOKIE } from '$lib/server/auth';
+import { resolveOdooSso, ssoEnabled, ODOO_SESSION_COOKIE } from '$lib/server/odoo-sso';
 import { b2bRedirectTarget } from '$lib/server/b2b-access';
 import { logger } from '$lib/server/log';
 import { moneyConfig, setOdpisWrittenHook } from '$lib/server/money';
@@ -63,7 +64,17 @@ let pruneCounter = 0;
 export const handle: Handle = async ({ event, resolve }) => {
 	if (++pruneCounter % 100 === 1) pruneSessions();
 
-	event.locals.user = getSessionUser(event.cookies.get(SESSION_COOKIE));
+	// #5823: SSO cez Odoo session. Keď je SSO zapnuté (`ODOO_SSO_ENABLED` + `ODOO_INTERNAL_URL`) a
+	// request nesie Odoo `session_id` cookie (same-origin `/automatizacie/`), overí ju voči Odoo a
+	// mapuje na efemérnu internú identitu (`source:'odoo'`). SSO-FIRST: vnútri Odoo iframe MUSÍ byť
+	// identita Odoo používateľ kvôli auditnej integrite (createdBy) — inak by stará lokálna session
+	// (možno iná osoba / b2b) atribuovala odpisy. `resolveOdooSso` je exception-proof (`null` pri
+	// akejkoľvek chybe/výpadku Odoo) → fallback na lokálnu `am_session`. SSO VYPNUTÉ (default) ⇒ `sid`
+	// je `undefined` ⇒ SSO vetva sa nevykoná ⇒ správanie byte-identické s dneškom. b2b/verejnosť Odoo
+	// `session_id` nenesú → vždy lokálny login.
+	const sid = ssoEnabled() ? event.cookies.get(ODOO_SESSION_COOKIE) : undefined;
+	event.locals.user =
+		(sid ? await resolveOdooSso(sid) : null) ?? getSessionUser(event.cookies.get(SESSION_COOKIE));
 
 	// #5822: `event.url.pathname` NESIE base (napr. `/automatizacie/zasklenia`). Auth brána
 	// (PUBLIC_PATHS) aj b2b denylist porovnávajú s base-LESS cestami, preto najprv odrežem
