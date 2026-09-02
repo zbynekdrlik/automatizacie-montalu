@@ -2032,3 +2032,22 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   `margin: 8px 0 0`. Playbook: konfigurator.md §13 (shell vzor + 2 pasce).
 - svelte-check + lint + 3212 unit testov + VŠETKY konfigurator E2E (showroom+vyber+pergola+bazén+dopyty)
   zelené. NEmergnuté (worktree — supervisor integruje).
+
+## 2026-09-02 — Zjednotenie DPH/mriežkovej aritmetiky + vypocet throttle shell (#426 + #428, worktree — supervisor integruje)
+
+- **#426 + #428 (bundle, 1 lane):** ČISTO ŠTRUKTURÁLNY refaktor — extrakcia zdieľaných cenových
+  helperov 4 modulov (pergola/bazén/zimná záhrada/oplotenie). ŽIADNA zmena ceny (parity kotvy = dôkaz).
+- Nový pure LEAF `src/lib/server/cennik-spolocne.ts`: `Mriezka`/`CenaZlozka`/`EPS`/`VO_LABEL`/`eur2`/
+  `dphNaPct`/`sDphEur(net,dphPct)`/`zlozka(net,dphPct)`/`cennikHash`. `sDphEur`/`zlozka` parametrizované
+  DPH-percentom; 4 moduly importujú + tenký lokálny `zlozka(net)` obal → call-sites NEZMENENÉ.
+  Inline `CENNIK_HASH` builder → `cennikHash({...})` so ZACHOVANÝM poradím kľúčov (pergola +priplatky).
+- Nový `src/lib/server/konfigurator-cena-akcia.ts` `cenaThrottle(event, prazdno)`: zdieľaná per-IP
+  throttle predohra 4 `vypocet` akcií (rule-of-four); `{...prazdno, error}` 429 byte-identické.
+  Odstránený inline throttle (public-throttle+client-ip) zo 4 route.
+- **#428 čiastočný scope (evidencia):** PLNÝ `vypocetAction` NEEXTRAHOVANÝ (4 akcie majú RÔZNE návratové
+  tvary — pergola `vysledok`, zimná záhrada bez `cenyModely`); grid rounding ostáva per-modul (#426).
+- Nové testy: `cennik-spolocne.test.ts` (.xx5 DPH kotvy, cennikHash poradie) +
+  `konfigurator-cena-akcia.test.ts` (obe throttle vetvy + retry-after + poradie kľúčov). Playbook: nová
+  `.claude/rules/cennik-spolocne.md` (paths auto-load, 5. produkt = IMPORTUJ nie kopíruj) + router.
+- svelte-check 0/0 + lint + **3266 unit testov (0 fail, coverage nad prahmi)** + 26 konfigurator E2E
+  (cena + VO/b2b + re-price, 0 console) ZELENÉ. NEmergnuté (worktree — supervisor integruje).
