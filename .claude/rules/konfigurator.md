@@ -356,3 +356,15 @@ Sesterský produkt (#385–#390) = nová podstránka. Vzor: `konfigurator/bazen/
   nezmestí do metrového displeja, drž 500/100 mm. Počty (segmenty) = `<select>` (constrained → súhrn/
   dopyt sa pri editovaní neodmontuje). Súhrn je čisto klientsky `$derived` keď produkt NEMÁ cenu
   (žiadny server round-trip netreba); pergolový `vypocet` submit je potrebný LEN kvôli server-cene.
+- **Varianty over RAW DOM-om, NIE WebFetch súhrnom (#386 pasca).** „VARIANTY NEVYMÝŠĽAJ" =
+  over KAŽDÝ model/zasklenie/terminológiu proti DOSLOVNÉMU obsahu montalu.sk. WebFetch (malý
+  sumarizačný model) si na #386 VYMYSLEL zasklievacie termíny („izolačné dvojsklo/trojsklo"),
+  ktoré `curl … | grep -oi` na živej stránke mal 0× — použi len termíny s reálnym hitom (na #386
+  to boli „polykarbonát, bezpečnostné sklo, izolačné sklo, panel ISODOMUS"). Grep literálne reťazce,
+  needôveruj prozaickému súhrnu.
+- **Cenový zdroj over PRED honest-null zdôvodnením (#386 pasca).** Nepíš „montalu.sk nemá cenník"
+  bez overenia — VÄČŠINA radov cenu MÁ: `montalu.sk/konfigurator` má produktové karty „od X € bez
+  DPH" a per-produkt konfigurátor `montalu.sk/konfigurator/<produkt>` (napr. `…/zimne-zahrady`, HTTP
+  200). Honest-null (`cenovyZdroj:false`) je aj tak správny pre PR (vyťaženie matice = #279-scale
+  follow-up, vzor bazén #404, zimná záhrada #408) — ale ZDÔVODNENIE je „zdroj existuje, vyťaženie je
+  samostatná práca", nie „zdroj neexistuje".

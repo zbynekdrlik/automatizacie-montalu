@@ -75,9 +75,13 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Hliníkové zimné záhrady ROBUST a MASSIVE s presklením na mieru.',
 		foto: 'zimna-zahrada.webp',
 		alt: 'Hliníková zimná záhrada Montalu Robust',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/zimne-zahrady',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/zimna-zahrada',
+		externy: false,
+		// #386: honest-null pre TÚTO PR — montalu.sk MÁ cenový zdroj pre zimné záhrady
+		// (`montalu.sk/konfigurator/zimne-zahrady`, karta „od 5 364,29 € bez DPH", rovnaký tvar ako
+		// pergolový/bazénový konfigurátor), ale jeho vyťaženie do interim matice je práca v rozsahu #279
+		// = samostatný follow-up #408. Do vtedy bez orientačnej ceny (nevymýšľame cenu bez overenej matice).
 		cenovyZdroj: false
 	},
 	{

@@ -170,7 +170,7 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 	// #277: nový klientsky vstup do grafu je DopytForm.svelte (verejný kontaktný formulár) +
 	// jeho pure závislosti ponuka.ts / dopyt.ts. Tento test dokazuje, že guard (A) ich REÁLNE
 	// prechádza (nie sú mimo grafu) — inak by ich prípadný budúci Money import nezachytil.
-	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén + #387 zasklenie, ponuka, dopyt)', () => {
+	it('graf REÁLNE prechádza klientsky-dosiahnuteľné súbory (DopytForm + #319 ObjednavkaForm + #325 Konf* komponenty + #385 bazén + #386 zimná záhrada + #387 zasklenie, ponuka, dopyt)', () => {
 		const { videne } = prejdiKlientskyGraf(konfVstupy());
 		const musiaByt = [
 			path.join(SRC, 'lib', 'components', 'DopytForm.svelte'),
@@ -200,6 +200,11 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// importuje client-safe `konfigurator-zasklenie` — guard (A) MUSÍ prejsť jeho graf, aby jeho
 			// prípadný budúci Money import zachytil (holý ZASP*/ZASK* kód chytá rozšírený obsahový grep vyššie).
 			path.join(SRC, 'lib', 'konfigurator-zasklenie.ts'),
+			// #386: podstránka zimnej záhrady (`konfigurator/zimna-zahrada/+page.svelte`) je nový klientsky
+			// vstup a importuje client-safe `konfigurator-zimna-zahrada` — guard (A) MUSÍ prejsť jeho graf,
+			// aby jeho prípadný budúci Money/katalóg import zachytil (žiadny Money katalóg zimných záhrad
+			// neexistuje, ale pokrytie budúcich importov musí byť garantované rovnako ako pri bazéne).
+			path.join(SRC, 'lib', 'konfigurator-zimna-zahrada.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -226,6 +231,9 @@ const SERVEROVE_ROUTY = [
 	// #387: zasklenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
 	// `konfigurator-zasklenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/ZASP*/ZASK*.
 	'src/routes/konfigurator/zasklenie/+page.server.ts',
+	// #386: podstránka zimnej záhrady — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-zimna-zahrada` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/zimna-zahrada/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];
@@ -422,5 +430,27 @@ describe('Money safety (C) — zasklenie route: žiadny Money kód, žiadna cena
 		// pozitívne: dáta naozaj prešli (umiestnenie + model), aby test nebol vákuový
 		expect(json).toContain('Terasa');
 		expect(json).toContain('SLIDE');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — podstránka zimnej záhrady (#386): load() nesie LEN prezentačné dáta, žiadny
+// Money kód, žiadna cena (honest-null — zimná záhrada nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: zzLoad } = await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
+
+describe('Money safety (C) — route zimnej záhrady: žiadny Money kód, žiadna cena (#386)', () => {
+	it('load() posiela modely/zasklenia/farby/rozmedzia — žiadny BPK*/BPP*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await zzLoad({} as Parameters<typeof zzLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej odpovedi zimnej záhrady
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (modely + zasklenie), aby test nebol vákuový
+		expect(json).toContain('ROBUST');
+		expect(json).toContain('Izolačné sklo');
 	});
 });
