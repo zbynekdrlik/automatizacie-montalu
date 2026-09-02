@@ -23,7 +23,8 @@
 // ROZŠÍRITEĽNÉ: `sekcie[]` — dnes „Profily a komponenty"; sklá z nárezákov pribudnú neskôr
 // ako ĎALŠIA sekcia bez zmeny štruktúry (#340 zadanie bod 3).
 import { logger } from './log';
-import { authenticate, executeKw, odooConfig, xmlEscape, type OdooConfig } from './odoo-rpc';
+import { xmlEscape } from './odoo-rpc';
+import { odooBackend, odooBackendConfigured, type OdooBackend } from './odoo-backend';
 import { normOp, normZak } from './money';
 import { zakazkaPrehlad, type ZakazkaPrehlad } from './zakazka-ceny';
 import { enrichPolozky, type CenaRiadok, type CenyResult } from './ceny';
@@ -192,21 +193,13 @@ export function buildZakazkaNoteHtml(note: ZakazkaNote, now: Date = new Date()):
 // ---- Odoo operácie -----------------------------------------------------------------
 
 /** Nájde `sale.order` id-čka podľa `name === normOp(op)` (objednávka `OP…`/`OPDL…`). */
-async function findSaleOrderIds(cfg: OdooConfig, uid: number, name: string): Promise<number[]> {
-	const res = await executeKw(cfg, uid, 'sale.order', 'search', [[['name', '=', name]]], {
-		limit: 10
-	});
-	return Array.isArray(res) ? res.filter((x): x is number => typeof x === 'number') : [];
+async function findSaleOrderIds(be: OdooBackend, name: string): Promise<number[]> {
+	return be.search('sale.order', [['name', '=', name]], 10);
 }
 
 /** Postne INTERNÚ log-note (mt_note) na daný `sale.order`. Zákazník ju NIKDY nevidí. */
-async function postInternalNote(
-	cfg: OdooConfig,
-	uid: number,
-	saleOrderId: number,
-	html: string
-): Promise<void> {
-	await executeKw(cfg, uid, 'sale.order', 'message_post', [[saleOrderId]], {
+async function postInternalNote(be: OdooBackend, saleOrderId: number, html: string): Promise<void> {
+	await be.messagePost('sale.order', saleOrderId, {
 		body: html,
 		subtype_xmlid: 'mail.mt_note', // internal=true → interné, nikdy k zákazníkovi
 		message_type: 'comment',
@@ -233,9 +226,9 @@ export async function pushZakazkaToOdooDetailed(
 	zak: string,
 	op: string
 ): Promise<ZakazkaPushOutcome> {
-	const cfg = odooConfig();
-	if (!cfg) {
-		log.debug('zakazka push vypnutý (chýba ODOO_LEAD_* env)', { zak, op });
+	const be = odooBackend();
+	if (!be) {
+		log.debug('zakazka push vypnutý (chýba Odoo env)', { zak, op });
 		return { result: 'disabled', error: null };
 	}
 	try {
@@ -248,9 +241,8 @@ export async function pushZakazkaToOdooDetailed(
 		}
 		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
 		const html = buildZakazkaNoteHtml(buildZakazkaNote(prehlad, op, ceny));
-		const uid = await authenticate(cfg);
 		const name = normOp(op);
-		const ids = await findSaleOrderIds(cfg, uid, name);
+		const ids = await findSaleOrderIds(be, name);
 		if (ids.length === 0) {
 			log.info(
 				'zakazka push: sale.order sa nenašiel (objednávka nie je v Odoo / je ešte ponuka) — preskakujem',
@@ -265,7 +257,7 @@ export async function pushZakazkaToOdooDetailed(
 		if (ids.length > 1)
 			log.warn('zakazka push: viac sale.order s rovnakým name — postnem na všetky', { name, ids });
 		for (const id of ids) {
-			await postInternalNote(cfg, uid, id, html);
+			await postInternalNote(be, id, html);
 			log.info('zakazka push: interná poznámka zapísaná na sale.order', {
 				zak,
 				op,
@@ -371,7 +363,7 @@ let sweepInFlight = false;
  * (chýba env) ⇒ žiadny DB dotaz. Arrival-triggered (po úspešnom pushi = dôkaz že Odoo je hore, #278).
  */
 export async function retryPendingZakazkaPushes(): Promise<void> {
-	if (!odooConfig()) return;
+	if (!odooBackendConfigured()) return;
 	if (sweepInFlight) return;
 	sweepInFlight = true;
 	try {
@@ -433,7 +425,7 @@ export function queueZakazkaPush(zak: string, op: string): void {
  * takže pokrýva bežný „Odoo opravené → nasadené". Fire-and-forget; vypnuté (chýba env) ⇒ no-op.
  */
 export function runStartupZakazkaSweep(): void {
-	if (!odooConfig()) return;
+	if (!odooBackendConfigured()) return;
 	void retryPendingZakazkaPushes().catch((e) =>
 		log.error('zakazka push štartový sweep hodil', { err: errMsg(e) })
 	);

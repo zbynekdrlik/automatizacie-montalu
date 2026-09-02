@@ -35,12 +35,11 @@ import { sanitizePonukaConfig, zhrnutieRiadky, type PonukaConfig } from '$lib/po
 import {
 	xmlEscape,
 	setOdooTransport,
-	authenticate,
-	createRecord,
 	odooConfig,
 	type OdooConfig,
 	type OdooTransport
 } from './odoo-rpc';
+import { odooBackend, odooBackendConfigured, type OdooBackend } from './odoo-backend';
 
 const log = logger('odoo-lead');
 
@@ -147,17 +146,17 @@ function leadFilename(createdAt: string): string {
  * Vytvorí `crm.lead` a (best-effort) pripojí PDF ako `ir.attachment`. Pád PRÍLOHY NEZHODÍ
  * lead (lead už existuje) — len sa zaloguje. Vracia `leadId`.
  */
-export async function createLeadViaXmlRpc(
-	cfg: LeadConfig,
+export async function createLeadViaOdoo(
+	be: OdooBackend,
 	payload: LeadPayload,
 	pdfBase64?: string,
 	filename = 'Montalu-ponuka.pdf'
 ): Promise<number> {
-	const uid = await authenticate(cfg);
-	const leadId = await createRecord(cfg, uid, 'crm.lead', payload);
+	// #5824: cez `OdooBackend` seam (json2 alebo XML-RPC fallback); auth/uid rieši backend interne.
+	const leadId = await be.create('crm.lead', payload);
 	if (pdfBase64) {
 		try {
-			await createRecord(cfg, uid, 'ir.attachment', {
+			await be.create('ir.attachment', {
 				name: filename,
 				datas: pdfBase64,
 				res_model: 'crm.lead',
@@ -208,8 +207,8 @@ export async function submitDopytLead(
 	dopytId: number,
 	pdfBase64?: string
 ): Promise<LeadSubmitResult> {
-	const cfg = leadConfig();
-	if (!cfg) {
+	const be = odooBackend();
+	if (!be) {
 		log.debug('Odoo lead vypnutý (chýba env) — dopyt ostáva pending', { dopytId });
 		return 'disabled';
 	}
@@ -227,7 +226,7 @@ export async function submitDopytLead(
 		const payload = buildLeadPayload(row);
 		const pdf = pdfBase64 ?? (await regeneratePdfBase64(row.konfiguracia));
 		try {
-			const leadId = await createLeadViaXmlRpc(cfg, payload, pdf, leadFilename(row.created_at));
+			const leadId = await createLeadViaOdoo(be, payload, pdf, leadFilename(row.created_at));
 			markLeadCreated(dopytId, leadId);
 			log.info('dopyt zrkadlený do Odoo CRM leadu', {
 				dopytId,
@@ -255,7 +254,7 @@ export async function submitDopytLead(
  * (netlačíme na Odoo naraz), ohraničené `RETRY_BATCH`. Vypnuté (chýba env) ⇒ žiadny DB dotaz.
  */
 export async function retryPendingLeads(): Promise<void> {
-	if (!leadConfig()) return;
+	if (!odooBackendConfigured()) return;
 	const pending = getPendingLeadDopyty(MAX_ATTEMPTS, RETRY_BATCH);
 	if (pending.length === 0) return;
 	log.info('lead retry sweep štart', { pocet: pending.length });
@@ -305,7 +304,7 @@ export function queueLeadCreation(dopytId: number, pdfBase64?: string): void {
  * Fire-and-forget, chyby zachytené; vypnuté (chýba env) ⇒ okamžite no-op.
  */
 export function runStartupLeadSweep(): void {
-	if (!leadConfig()) return;
+	if (!odooBackendConfigured()) return;
 	void retryPendingLeads().catch((e) =>
 		log.error('lead štartový sweep hodil', {
 			err: e instanceof Error ? e.message : String(e)

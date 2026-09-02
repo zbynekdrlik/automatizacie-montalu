@@ -64,6 +64,11 @@ services:
       ODOO_LEAD_DB: ${ODOO_LEAD_DB:-}
       ODOO_LEAD_LOGIN: ${ODOO_LEAD_LOGIN:-}
       ODOO_LEAD_API_KEY: ${ODOO_LEAD_API_KEY:-}
+      # #5824: nový /json/2 Odoo klient (src/lib/server/odoo-json2.ts) — aktivuje sa keď sú
+      # OBA nastavené; inak fallback na legacy XML-RPC (ODOO_LEAD_* vyššie). Prázdny default =
+      # live VPS ostáva na XML-RPC, kým odoo sidecar nedodá tieto nové premenné.
+      ODOO_URL: ${ODOO_URL:-}
+      ODOO_API_KEY: ${ODOO_API_KEY:-}
       BODY_SIZE_LIMIT: 1M
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host

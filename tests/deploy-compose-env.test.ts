@@ -77,3 +77,12 @@ describe('#5822 — compose má base-path + iframe env (default prázdne ⇒ liv
 		);
 	});
 });
+
+// #5824: nový /json/2 klient sa aktivuje cez ODOO_URL + ODOO_API_KEY — musia byť forwardnuté do
+// containera, inak by go-live sidecar nevedel prepnúť z XML-RPC na json2.
+describe('#5824 — compose forwarduje json2 env (ODOO_URL + ODOO_API_KEY)', () => {
+	it.each(['ODOO_URL', 'ODOO_API_KEY'])('environment: forwarduje %s ako ${%s:-}', (v) => {
+		const re = new RegExp('^\\s*' + v + ':\\s*\\$\\{' + v + ':-\\}\\s*$', 'm');
+		expect(app, `compose environment: neforwarduje ${v}`).toMatch(re);
+	});
+});
