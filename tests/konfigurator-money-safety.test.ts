@@ -190,6 +190,11 @@ describe('Money safety (A) — rekurzívny import-graf klientskeho bundlu verejn
 			// prípadný budúci Money import zachytil: `bazen-komponenty`/`server/bazen` import je v
 			// `KLIENT_ZAKAZANE_SPEC`, a holý BPK*/BPP* kód v obsahu chytá rozšírený obsahový grep vyššie.
 			path.join(SRC, 'lib', 'konfigurator-bazen.ts'),
+			// #389: tienenie podstránka (`konfigurator/tienenie/+page.svelte`) je nový klientsky vstup a
+			// importuje client-safe `konfigurator-tienenie` — guard (A) MUSÍ prejsť jeho graf, aby jeho
+			// prípadný budúci Money import zachytil (tienenie nemá interný Money modul, ale pozitívny
+			// reach assert stráži, že graf nie je mimo a budúci zakázaný import by SPADOL).
+			path.join(SRC, 'lib', 'konfigurator-tienenie.ts'),
 			path.join(SRC, 'lib', 'ponuka.ts'),
 			path.join(SRC, 'lib', 'dopyt.ts')
 		];
@@ -213,6 +218,9 @@ const SERVEROVE_ROUTY = [
 	// #385: bazénová podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
 	// `konfigurator-bazen` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
 	'src/routes/konfigurator/bazen/+page.server.ts',
+	// #389: tienenie podstránka — serverová route (load + `dopyt` akcia). Importuje client-safe
+	// `konfigurator-tienenie` + zdieľanú `dopyt-action` + RAL — NIKDY money/cena/pergola/moneyKod.
+	'src/routes/konfigurator/tienenie/+page.server.ts',
 	'src/lib/server/konfigurator-vstup.ts',
 	'src/lib/server/public-throttle.ts'
 ];
@@ -385,5 +393,27 @@ describe('Money safety (C) — bazénová route: žiadny Money kód, žiadna cen
 		// pozitívne: dáta naozaj prešli (modely + koľaj), aby test nebol vákuový
 		expect(json).toContain('Premier');
 		expect(json).toContain('Jednokoľajové');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// (C) RUNTIME guard — tienenie podstránka (#389): load() nesie LEN prezentačné dáta (typy/ovládanie/
+// rozmedzia/RAL), žiadny Money kód, žiadna cena (honest-null — tienenie nemá cenový zdroj).
+// --------------------------------------------------------------------------- //
+const { load: tienenieLoad } = await import('../src/routes/konfigurator/tienenie/+page.server');
+
+describe('Money safety (C) — tienenie route: žiadny Money kód, žiadna cena (#389)', () => {
+	it('load() posiela typy/ovládanie/farby/rozmedzia — žiadny BP[KP]*/moneyKod, žiadny € ani „cena"', async () => {
+		const data = await tienenieLoad({} as Parameters<typeof tienenieLoad>[0]);
+		const json = JSON.stringify(data);
+		// žiadny Money kód (holý BPK/BPP ani slovo moneyKod), žiadny nárez
+		neobsahujeMoneyAniNarez(json);
+		expect(json).not.toMatch(/\bBP[KP]\d{5}\b/);
+		// honest-null: žiadna cena / € vo verejnej tienenie odpovedi
+		expect(json).not.toMatch(/€|EUR\b/);
+		expect(json).not.toMatch(/cena|priceB2B|cennik/i);
+		// pozitívne: dáta naozaj prešli (reálne modely z montalu.sk), aby test nebol vákuový
+		expect(json).toContain('XLINE');
+		expect(json).toContain('ZIPLINE');
 	});
 });

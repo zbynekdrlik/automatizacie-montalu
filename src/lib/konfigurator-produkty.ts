@@ -111,9 +111,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Markízy XLINE a XLIGHT a screenové rolety ZIPLINE.',
 		foto: 'tienenie.webp',
 		alt: 'Hliníková markíza Montalu XLINE',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/tienenie',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/tienenie',
+		externy: false,
+		// #389: tienenie NEMÁ overený interim cenový zdroj (montalu.sk cenu markíz nevystavuje ako
+		// jednoduchý endpoint pergoly `update-pergolas`; vyťaženie = práca v rozsahu #279). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{

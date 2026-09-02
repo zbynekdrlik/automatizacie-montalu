@@ -27,6 +27,12 @@ test('výberová obrazovka: grid kariet + pergola & bazén live vedú interne, z
 	await expect(bazen).toHaveAttribute('data-stav', 'live');
 	await expect(bazen).toHaveAttribute('href', /\/konfigurator\/bazen$/);
 
+	// #389: tienenie = live karta → interná podstránka `/konfigurator/tienenie` (už nie „pripravujeme")
+	const tienenie = page.getByTestId('konf-produkt-tienenie');
+	await expect(tienenie).toBeVisible();
+	await expect(tienenie).toHaveAttribute('data-stav', 'live');
+	await expect(tienenie).toHaveAttribute('href', /\/konfigurator\/tienenie$/);
+
 	// zimná záhrada = stále „pripravujeme" → externý odkaz na montalu.sk (nový tab)
 	const zz = page.getByTestId('konf-produkt-zimna-zahrada');
 	await expect(zz).toBeVisible();
