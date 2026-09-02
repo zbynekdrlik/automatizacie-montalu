@@ -14,17 +14,12 @@
 // (MO default pre neprihláseného/interného, VO LEN pre prihláseného veľkoobchodného; hladinu rozhoduje
 // SERVER, VO sa do MO odpovede NIKDY nedostane). Čistý (bez DB/siete), priamo unit-testovateľný
 // (parita: `tests/konfigurator-zimna-zahrada-cena.test.ts`).
-import { createHash } from 'node:crypto';
 import cennikJson from './cennik-zimna-zahrada.json';
+import { EPS, VO_LABEL, cennikHash, dphNaPct, zlozka as zlozkaSpolocna } from './cennik-spolocne';
+import type { CenaZlozka, Mriezka } from './cennik-spolocne';
 import { ZZ_MODEL_DEFAULT, ZZ_ZASKLENIE_DEFAULT } from '$lib/konfigurator-zimna-zahrada';
 import type { ZzModel } from '$lib/konfigurator-zimna-zahrada';
 import type { VerejnaCena, CenovaHladina } from '$lib/konfigurator';
-
-interface Mriezka {
-	min: number;
-	max: number;
-	krok: number;
-}
 
 /** Bunka matice = [MO net, VO net] v EUR (bez DPH). */
 type Bunka = [number, number];
@@ -62,16 +57,11 @@ const SEED = cennikJson as unknown as CennikSeed;
 
 /** Obsahový hash CENOTVORNÝCH častí seedu (matica + DPH + mriezka) — zmení sa pri AKOMKOĽVEK cenovom
  *  drifte (aj ručnej úprave bez zmeny `vytazene`). */
-const CENNIK_HASH = createHash('sha256')
-	.update(
-		JSON.stringify({
-			cennik: SEED.cennik,
-			dph: SEED.meta.dph,
-			mriezka: SEED.meta.mriezka
-		})
-	)
-	.digest('hex')
-	.slice(0, 12);
+const CENNIK_HASH = cennikHash({
+	cennik: SEED.cennik,
+	dph: SEED.meta.dph,
+	mriezka: SEED.meta.mriezka
+});
 
 /** Verzia cenníka zimnej záhrady pri opečiatkovaní ceny (#309) — čas vyťaženia + obsahový hash. */
 export const CENNIK_VERZIA_ZZ = `${SEED.meta.vytazene}#${CENNIK_HASH}`;
@@ -83,9 +73,9 @@ export const MRIEZKA_ZZ = SEED.meta.mriezka;
 /** Bázový systém stien, na ktorom je matica vyťažená (pre honest poznámku). */
 export const BAZOVY_GLAZING_ZZ = SEED.meta.bazovyGlazing;
 
-const EPS = 1e-9;
-/** DPH ako celé percentá (23) — na EXAKTNÚ celocentovú aritmetiku (bez FP driftu). */
-const DPH_PCT = Math.round(DPH_ZZ * 100);
+/** DPH zimnej záhrady v celých percentách (23) — pre zdieľanú `sDphEur`/`zlozka` (celocentová
+ *  aritmetika, `cennik-spolocne`). */
+const DPH_PCT = dphNaPct(DPH_ZZ);
 
 /** Mapovanie zákazníckej kategórie zasklenia (ZZ_ZASKLENIA nazov) → montalu `roofing` slug (kľúč
  *  matice). Test `konfigurator-zimna-zahrada-cena.test.ts` overuje, že KAŽDÝ ZZ_ZASKLENIA nazov tu má
@@ -104,19 +94,6 @@ export function roofingPreZasklenie(zasklenie: string | null | undefined): strin
 	return ZASKLENIE_ROOFING[String(zasklenie ?? '').trim()] ?? ROOFING_DEFAULT;
 }
 
-/** Zaokrúhli EUR sumu na 2 desatiny (celé centy). */
-function eur2(net: number): number {
-	return Math.round(net * 100) / 100;
-}
-
-/** Suma s DPH v EUR = round(net × (1 + DPH), 2), počítané v celých centoch, aby sa presne (bez FP
- *  driftu na .xx5 hraniciach) zhodovalo s PHP `round()` na montalu.sk. Overené proti reálnym montalu
- *  reťazcom vrátane .xx5 hraníc (`verifikaciaDph` v seede). */
-function sDphEur(net: number): number {
-	const centy = Math.round(net * 100);
-	return Math.round((centy * (100 + DPH_PCT)) / 100) / 100;
-}
-
 export interface CenaZzVstup {
 	/** hĺbka (vysunutie od steny) [mm] → montalu `length` (dominantná cenotvorná os) */
 	hlbkaMm: number;
@@ -126,11 +103,6 @@ export interface CenaZzVstup {
 	zasklenie?: string;
 	/** model konštrukcie (ROBUST/MASSIVE) — LEN DISPLAY label do `VerejnaCena.model` (cenu nemení) */
 	model?: ZzModel;
-}
-
-interface CenaZlozka {
-	bezDph: number;
-	sDph: number;
 }
 
 export interface CenaZzOk {
@@ -170,8 +142,9 @@ export function zaokruhliNahor(hodnotaM: number, m: Mriezka): number | null {
 
 const k1 = (m: number) => m.toFixed(1);
 
+/** Cenová zložka {bezDph, sDph} zimnej záhrady — tenký obal nad zdieľanou `zlozka` s DPH_PCT ZZ. */
 function zlozka(net: number): CenaZlozka {
-	return { bezDph: eur2(net), sDph: sDphEur(net) };
+	return zlozkaSpolocna(net, DPH_PCT);
 }
 
 /**
@@ -223,9 +196,6 @@ export function vypocitajCenuZz(v: CenaZzVstup): CenaZzVysledok {
 // Cena pre klienta podľa HLADINY (#318). MO = verejná/maloobchod (default); VO = veľkoobchod (LEN    //
 // pre prihlásených b2b). VO sa NIKDY nedostane do MO/verejnej odpovede — o hladine rozhoduje server. //
 // --------------------------------------------------------------------------- //
-
-/** Server-dodaný VO label — text hladiny sa NEsmie hardkódovať v klientskom komponente. */
-const VO_LABEL = 'veľkoobchodná cena';
 
 /**
  * Zmapuje interný výsledok (`CenaZzVysledok` s MO **aj** VO) na cenu pre klienta v danej HLADINE.

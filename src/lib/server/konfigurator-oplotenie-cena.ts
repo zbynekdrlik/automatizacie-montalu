@@ -14,8 +14,9 @@
 // `cenyModelovOplotenie`) — MO (default) pre neprihláseného/interného, VO LEN pre prihláseného
 // veľkoobchodného; hladinu rozhoduje SERVER, VO sa do MO odpovede NIKDY nedostane. Čistý (bez DB/
 // siete), priamo unit-testovateľný (parity: `tests/konfigurator-oplotenie-cena.test.ts`).
-import { createHash } from 'node:crypto';
 import cennikJson from './cennik-oplotenie.json';
+import { EPS, VO_LABEL, cennikHash, dphNaPct, zlozka as zlozkaSpolocna } from './cennik-spolocne';
+import type { CenaZlozka, Mriezka } from './cennik-spolocne';
 import {
 	OPLOTENIE_MODELY,
 	OPLOTENIE_MODEL_DEFAULT,
@@ -27,12 +28,6 @@ import {
 import type { OplotenieTypKod, OplotenieModel } from '$lib/konfigurator-oplotenie';
 import type { VerejnaCena, CenaModelu, CenovaHladina } from '$lib/konfigurator';
 import type { PonukaConfig } from '$lib/ponuka';
-
-interface Mriezka {
-	min: number;
-	max: number;
-	krok: number;
-}
 
 /** Bunka matice = [MO net, VO net] v EUR za JEDEN KUS (bez DPH). */
 type Bunka = [number, number];
@@ -73,16 +68,11 @@ const SEED = cennikJson as unknown as CennikSeed;
 
 /** Obsahový hash CENOTVORNÝCH častí seedu (matica + DPH + mriezka) — zmení sa pri AKOMKOĽVEK cenovom
  *  drifte (aj ručnej úprave bez zmeny `vytazene`). */
-const CENNIK_HASH = createHash('sha256')
-	.update(
-		JSON.stringify({
-			cennik: SEED.cennik,
-			dph: SEED.meta.dph,
-			mriezka: SEED.meta.mriezka
-		})
-	)
-	.digest('hex')
-	.slice(0, 12);
+const CENNIK_HASH = cennikHash({
+	cennik: SEED.cennik,
+	dph: SEED.meta.dph,
+	mriezka: SEED.meta.mriezka
+});
 
 /** Verzia oplotenieho cenníka pri opečiatkovaní ceny (#309) — čas vyťaženia + obsahový hash. */
 export const CENNIK_VERZIA_OPLOTENIE = `${SEED.meta.vytazene}#${CENNIK_HASH}`;
@@ -97,22 +87,9 @@ export const OPLOTENIE_CENOVE_MODELY: readonly OplotenieModel[] = OPLOTENIE_MODE
 	(m) => m.kod !== 'ATYP'
 ).map((m) => m.kod);
 
-const EPS = 1e-9;
-/** DPH ako celé percentá (23) — na EXAKTNÚ celocentovú aritmetiku (bez FP driftu). */
-const DPH_PCT = Math.round(DPH_OPLOTENIE * 100);
-
-/** Zaokrúhli EUR sumu na 2 desatiny (celé centy). */
-function eur2(net: number): number {
-	return Math.round(net * 100) / 100;
-}
-
-/** Suma s DPH v EUR = round(net × (1 + DPH), 2), počítané v celých centoch, aby sa presne (bez FP
- *  driftu na .xx5 hraniciach) zhodovalo s PHP `round()` na montalu.sk. Overené proti reálnym montalu
- *  reťazcom (`verifikaciaDph` v seede — vrátane half-up hranice). Identická aritmetika ako pergola/bazén. */
-function sDphEur(net: number): number {
-	const centy = Math.round(net * 100);
-	return Math.round((centy * (100 + DPH_PCT)) / 100) / 100;
-}
+/** DPH oplotenia v celých percentách (23) — pre zdieľanú `sDphEur`/`zlozka` (celocentová aritmetika,
+ *  `cennik-spolocne`). */
+const DPH_PCT = dphNaPct(DPH_OPLOTENIE);
 
 export interface CenaOplotenieVstup {
 	/** typ prvku (plotový diel / brána / bránka) */
@@ -125,11 +102,6 @@ export interface CenaOplotenieVstup {
 	sirkaMm: number;
 	/** počet kusov (celé číslo ≥ 1) — cena je lineárna, seed je za 1 kus */
 	pocet: number;
-}
-
-interface CenaZlozka {
-	bezDph: number;
-	sDph: number;
 }
 
 export interface CenaOplotenieOk {
@@ -173,8 +145,9 @@ export function zaokruhliNaMriezku(hodnotaM: number, m: Mriezka): number | null 
 
 const k1 = (m: number) => m.toFixed(1);
 
+/** Cenová zložka {bezDph, sDph} oplotenia — tenký obal nad zdieľanou `zlozka` s DPH_PCT oplotenia. */
 function zlozka(net: number): CenaZlozka {
-	return { bezDph: eur2(net), sDph: sDphEur(net) };
+	return zlozkaSpolocna(net, DPH_PCT);
 }
 
 /**
@@ -243,10 +216,6 @@ export function vypocitajCenuOplotenie(v: CenaOplotenieVstup): CenaOplotenieVysl
 // Cena pre klienta podľa HLADINY (#318). MO = verejná/maloobchod (default); VO = veľkoobchod (LEN    //
 // pre prihlásených b2b). VO sa NIKDY nedostane do MO/verejnej odpovede — o hladine rozhoduje server. //
 // --------------------------------------------------------------------------- //
-
-/** Server-dodaný VO label — text hladiny sa NEsmie hardkódovať v klientskom komponente. Server ho
- *  pošle LEN pri VO výstupe; klient renderuje `cena.hladinaLabel`. */
-const VO_LABEL = 'veľkoobchodná cena';
 
 /**
  * Zmapuje interný výsledok (`CenaOplotenieVysledok` s MO **aj** VO) na cenu pre klienta v danej HLADINE.
