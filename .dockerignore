@@ -3,6 +3,8 @@ build
 .svelte-kit
 data
 *.db
+.env
+.env.*
 test-results
 playwright-report
 .git
