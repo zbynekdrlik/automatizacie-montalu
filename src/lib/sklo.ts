@@ -13,8 +13,9 @@
  * zo ZVOLENÉHO skla, takže odpis pre KONKRÉTNE sklo je nezmenený. POZOR: pri
  * Deluxe posun predvoľby 6→10 mm mení, KTORÉ sklo je prednastavené (10 mm dáva
  * úplnejší odpis — 10 mm krytky sú v Money, 6 mm sú vynechané pre 0 ks sklad,
- * #354). Sklozávislé riadky sú len Slide (redukcia) a Deluxe (hrúbka vyberá
- * kladka/klzný profil). Overené testom (`tests/sklo-default.test.ts`).
+ * #354). Sklo vplýva na odpis troma kanálmi: Slide (`redukcia_zero`), Deluxe
+ * (`hrubka` vyberá kladka/klzný profil) a Štandard +/Štandard (IZO sklo prepína
+ * nárezák cez `sysStylPre`). Overené testom (`tests/sklo-default.test.ts`).
  */
 export function defaultSklo(skla: string[], system?: string): string {
 	// Deluxe: primárne 10 mm (#431). Bez tejto vetvy by predvoľba padla na prvé

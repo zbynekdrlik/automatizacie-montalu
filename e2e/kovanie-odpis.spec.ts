@@ -171,3 +171,29 @@ test('Deluxe: FAB skryté (nemá FAB položky), kovanie ide, predvolené sklo 10
 
 	expect(errs).toEqual([]);
 });
+
+test('mixed objednávka Deluxe + Robust posuv: FAB sa vráti (order-level únia), späť skryté (#431)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '08');
+
+	// primárny Deluxe → FAB skryté (Deluxe nemá FAB položky)
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
+
+	// pridaj ďalší posuv a nastav ho na Robust → FAB sa MUSÍ zobraziť. `maFab` je únia
+	// naprieč posuvmi (ako `maFarbu`): inak by mixed objednávka o FAB pre Robust posuv
+	// prišla — presne tá regresia, ktorej sa únia bráni (nie primary-only gate).
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps0-sys').selectOption('Robust');
+	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(1);
+
+	// extra posuv späť na Deluxe → žiadny posuv v hre nemá FAB položky → skryté
+	// (kryje aj reset $effect, ktorý vynuluje prípadnú zaseknutú hodnotu).
+	await page.locator('#ps0-sys').selectOption('Deluxe');
+	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
+
+	expect(errs).toEqual([]);
+});

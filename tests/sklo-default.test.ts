@@ -2,12 +2,13 @@
 // + formát rozmeru skla na objednávku („1050mm × 2115mm").
 //
 // Kľúčová vec, ktorú test STRÁŽI: zmena predvoľby NESMIE zmeniť Money odpis —
-// PLATÍ pre všetky systémy OKREM Deluxe. Sklo vstupuje do výpočtu jediným kanálom
-// — `redukciaZero` (sklozávislé riadky), plus `hrubka` pri Deluxe. Test preto pre
-// KAŽDÝ systém+štýl porovná odpis spočítaný pôvodnou predvoľbou (prvé sklo) s
-// odpisom novou predvoľbou (číre) a musia byť IDENTICKÉ. VÝNIMKA Deluxe (#431):
-// predvoľba sa zámerne presunula 6→10 mm a 10 mm dáva INÝ (úplnejší) odpis, takže
-// pre Deluxe neutralita neplatí — over sa len, že predvoľba je naozaj 10 mm.
+// PLATÍ pre všetky systémy OKREM Deluxe. Sklo vplýva na odpis troma kanálmi:
+// `redukciaZero` (Slide), `hrubka` (Deluxe) a IZO sklo → nárezák cez `sysStylPre`
+// (Štandard +/Štandard). Predvoľba (číre / prvé) drží tie kanály konštantné, takže
+// test pre KAŽDÝ systém+štýl porovná odpis pôvodnou predvoľbou (prvé sklo) s novou
+// a musia byť IDENTICKÉ. VÝNIMKA Deluxe (#431): predvoľba sa zámerne presunula
+// 6→10 mm a 10 mm dáva INÝ (úplnejší) odpis — pre Deluxe neutralita neplatí, tak sa
+// over, že predvoľba je 10 mm A že sa odpis oproti 6 mm naozaj líši.
 import { describe, it, expect } from 'vitest';
 import { defaultSklo, fmtSkloRozmer } from '../src/lib/sklo';
 import { buildCFG, computeFlat, type SysRow, type RezRow } from '../src/lib/server/compute';
@@ -99,18 +100,22 @@ describe('Money-neutralita: nová predvoľba nemení ani jeden odpisový riadok'
 		)!;
 
 		it(`${sysStyl}: predvoľba nemení odpis${system === 'Deluxe' ? ' (Deluxe #431: predvoľba = 10 mm, odpis sa ZÁMERNE líši)' : ` (predvoľba „${nove.nazov}")`}`, () => {
+			// Deluxe: predvoľba je 10 mm (#431), NIE prvé sklo — over raz mimo slučky.
+			if (system === 'Deluxe') expect(nove.nazov).toBe('Float kalené 10 mm');
 			for (const [S, V] of rozmery) {
-				// Deluxe: predvoľba sa #431 (Patrik 2026-09-02) presunula z prvého skla
-				// (6 mm) na 10 mm. 10 mm VYBERÁ iný kladka/klzný profil A pridá 10 mm
-				// krytky, takže odpis sa oproti 6 mm ZÁMERNE líši — Money-neutralita
-				// „predvoľba nemení odpis" pre Deluxe už neplatí (obsluha stále volí sklo;
-				// odpis pre KONKRÉTNE sklo je nezmenený). Over len, že predvoľba je 10 mm.
-				if (system === 'Deluxe') {
-					expect(nove.nazov).toBe('Float kalené 10 mm');
-					continue;
-				}
 				const a = computeFlat(cfg, sysStyl, S, V, stare.redukciaZero, stare.hrubka);
 				const b = computeFlat(cfg, sysStyl, S, V, nove.redukciaZero, nove.hrubka);
+				// Deluxe: predvoľba sa #431 presunula z 6 mm (prvé) na 10 mm. 10 mm VYBERÁ
+				// iný kladka/klzný profil A pridá 10 mm krytky, takže odpis sa oproti 6 mm
+				// ZÁMERNE LÍŠI — Money-neutralita pre Deluxe už neplatí. Nestačí overiť
+				// názov predvoľby: over, že sa odpis 10 mm naozaj líši od 6 mm (inak by
+				// test prešiel aj pri tichom zlyhaní, kde by 10 mm dalo ten istý odpis).
+				if (system === 'Deluxe') {
+					expect(a, `${sysStyl} ${S}×${V} (6 mm)`).not.toBeNull();
+					expect(b, `${sysStyl} ${S}×${V} (10 mm)`).not.toBeNull();
+					expect(b!.odpis, `${sysStyl} ${S}×${V}`).not.toEqual(a!.odpis);
+					continue;
+				}
 				expect(a === null).toBe(b === null);
 				if (!a || !b) continue;
 				expect(b.odpis, `${sysStyl} ${S}×${V}`).toEqual(a.odpis);
