@@ -75,9 +75,11 @@ export const KONF_PRODUKTY: KonfProdukt[] = [
 		popis: 'Hliníkové zimné záhrady ROBUST a MASSIVE s presklením na mieru.',
 		foto: 'zimna-zahrada.webp',
 		alt: 'Hliníková zimná záhrada Montalu Robust',
-		stav: 'pripravujeme',
-		odkaz: 'https://montalu.sk/produkty/zimne-zahrady',
-		externy: true,
+		stav: 'live',
+		odkaz: '/konfigurator/zimna-zahrada',
+		externy: false,
+		// #386: zimná záhrada NEMÁ overený interim cenový zdroj (montalu.sk pre zimné záhrady nemá
+		// verejnú cenovú maticu ani `update-*` endpoint — produkt je čisto „na mieru"). Honest-null → bez ceny.
 		cenovyZdroj: false
 	},
 	{

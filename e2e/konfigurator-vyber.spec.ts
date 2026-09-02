@@ -6,7 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole } from './helpers';
 
-test('výberová obrazovka: grid kariet + pergola & bazén live vedú interne, zimná záhrada „pripravujeme" externe', async ({
+test('výberová obrazovka: grid kariet + pergola, bazén & zimná záhrada live vedú interne, „pripravujeme" (zasklenie) externe', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -27,12 +27,18 @@ test('výberová obrazovka: grid kariet + pergola & bazén live vedú interne, z
 	await expect(bazen).toHaveAttribute('data-stav', 'live');
 	await expect(bazen).toHaveAttribute('href', /\/konfigurator\/bazen$/);
 
-	// zimná záhrada = stále „pripravujeme" → externý odkaz na montalu.sk (nový tab)
+	// #386: zimná záhrada = live karta → interná podstránka `/konfigurator/zimna-zahrada` (už nie „pripravujeme")
 	const zz = page.getByTestId('konf-produkt-zimna-zahrada');
 	await expect(zz).toBeVisible();
-	await expect(zz).toHaveAttribute('data-stav', 'pripravujeme');
-	await expect(zz).toHaveAttribute('href', /montalu\.sk\/produkty\/zimne-zahrady$/);
-	await expect(zz).toHaveAttribute('target', '_blank');
+	await expect(zz).toHaveAttribute('data-stav', 'live');
+	await expect(zz).toHaveAttribute('href', /\/konfigurator\/zimna-zahrada$/);
+
+	// „pripravujeme" karta (zasklenie) = stále externý odkaz na montalu.sk (nový tab)
+	const zasklenie = page.getByTestId('konf-produkt-zasklenie');
+	await expect(zasklenie).toBeVisible();
+	await expect(zasklenie).toHaveAttribute('data-stav', 'pripravujeme');
+	await expect(zasklenie).toHaveAttribute('href', /montalu\.sk\/produkty\/zasklenia$/);
+	await expect(zasklenie).toHaveAttribute('target', '_blank');
 
 	// všetkých 7 produktových kariet je prítomných (parita so 6 kategóriami montalu.sk + prístrešky)
 	await expect(page.locator('[data-testid^="konf-produkt-"]')).toHaveCount(7);
