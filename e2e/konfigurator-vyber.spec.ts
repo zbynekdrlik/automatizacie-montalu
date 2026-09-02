@@ -55,7 +55,10 @@ test('výberová obrazovka: grid kariet + 6 live produktov vedie interne, „pri
 	const pristresok = page.getByTestId('konf-produkt-pristresok');
 	await expect(pristresok).toBeVisible();
 	await expect(pristresok).toHaveAttribute('data-stav', 'pripravujeme');
-	await expect(pristresok).toHaveAttribute('href', /montalu\.sk\/produkty\/hlinikove-pristresky-a-altanky$/);
+	await expect(pristresok).toHaveAttribute(
+		'href',
+		/montalu\.sk\/produkty\/hlinikove-pristresky-a-altanky$/
+	);
 	await expect(pristresok).toHaveAttribute('target', '_blank');
 
 	// všetkých 7 produktových kariet je prítomných (parita so 6 kategóriami montalu.sk + prístrešky)
