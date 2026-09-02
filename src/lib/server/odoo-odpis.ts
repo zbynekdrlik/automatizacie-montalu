@@ -13,10 +13,11 @@
 //
 // MONEY-NEUTRÁLNE: NEPÍŠE do `/data`, NEMENÍ dedup/`MONEY_LIVE`. Znovupoužíva PROVEN vzor
 // `odoo-zakazka.ts` (per-key serializer, sweep) + `/json/2` klient `odoo-json2.ts` (#5824).
+import { createHash } from 'node:crypto';
 import { logger } from './log';
 import { queueZakazkaPush } from './odoo-zakazka';
 import { json2Config, odooJson2, OdooJson2Error, type Json2Value } from './odoo-json2';
-import type { OdpisWrittenEvent, OdpisReleasedEvent } from './money';
+import { normZak, normOp, type OdpisWrittenEvent, type OdpisReleasedEvent } from './money';
 import {
 	enqueueOdpisPush,
 	markOdpisPushPosted,
@@ -25,6 +26,7 @@ import {
 	pendingDueOdpisPushes,
 	anyOdpisPushPending,
 	isOdpisPushPending,
+	hasEarlierPendingOdpisPush,
 	type OdpisPushRow
 } from './odoo-odpis-store';
 
@@ -45,6 +47,8 @@ export interface OdpisPushMode {
 	model: boolean;
 }
 
+const warnedModes = new Set<string>(); // #5825 review 🔵: warn LEN raz per hodnota (volá sa per write/load)
+
 /** `ODOO_ODPIS_MODE`: `note` (default = dnešné) | `model` | `both`. Neznáma hodnota → `note` + warn
  *  (Money-safety sa vzťahuje aj na parse configu — NIKDY throw). */
 export function odpisPushMode(): OdpisPushMode {
@@ -57,16 +61,40 @@ export function odpisPushMode(): OdpisPushMode {
 		case 'both':
 			return { note: true, model: true };
 		default:
-			log.warn('ODOO_ODPIS_MODE neznáma hodnota — použijem note (dnešné správanie)', { raw });
+			if (!warnedModes.has(raw)) {
+				warnedModes.add(raw);
+				log.warn('ODOO_ODPIS_MODE neznáma hodnota — použijem note (dnešné správanie)', { raw });
+			}
 			return { note: true, model: false };
 	}
 }
 
 const allowNonLive = (): boolean => process.env.ODOO_ODPIS_ALLOW_NONLIVE === '1';
 
-// ---- Payload builders (tvar = #5817 create_from_app kontrakt) ------------------------
+// ---- Idempotency key + payload builders (tvar = #5817 create_from_app kontrakt) -----
 
-function buildImportPayload(ev: OdpisWrittenEvent): Record<string, unknown> {
+/**
+ * #5825 review 🔴: appkin `contentHash` (`ledgerHash`) je 32-bit DJB2 LEN nad obsahom (`zak|kod:qty`),
+ * bez `op`/`modul`/`live`. Appka ho scopuje `(modul, zak_norm, op_norm, live)` (`odpis_imported`), ale
+ * Odoo model (#5817) ho robí GLOBÁLNYM UniqueIndex + globálnym `sudo().search` → dve RÔZNE odpisy s
+ * rovnakým obsahom no iným OP (dve identické objednávky pod jednou zákazkou / rezervácia vs CAD) by
+ * skolabovali do JEDNÉHO Odoo záznamu (druhý `created=false`, OP link/polozky nikdy nevzniknú), plus
+ * 2^32 birthday kolízie. Preto ako Odoo dedup kľúč posielame SILNÚ per-odpis identitu
+ * `sha256(modul|normZak(zak)|normOp(op)|live|ledgerHash)` — Odoo ju berie ako opaque; appkin
+ * `ledgerHash` ostáva nedotknutý. Import aj release toho istého odpisu dajú ROVNAKÝ kľúč (matchnú sa).
+ */
+function strongOdpisKey(
+	modul: string,
+	zak: string,
+	op: string,
+	live: boolean,
+	ledgerHash: string
+): string {
+	const sig = [modul, normZak(zak), normOp(op), live ? '1' : '0', ledgerHash].join('\x1f');
+	return createHash('sha256').update(sig).digest('hex');
+}
+
+function buildImportPayload(ev: OdpisWrittenEvent, key: string): Record<string, unknown> {
 	const j = ev.job;
 	return {
 		modul: j.modul,
@@ -77,7 +105,8 @@ function buildImportPayload(ev: OdpisWrittenEvent): Record<string, unknown> {
 		caka: j.caka,
 		rezervacia: j.rezervacia ?? false,
 		detail: j.detail,
-		content_hash: ev.contentHash,
+		live: ev.live, // #5825 review 🔵: informatívne v raw_payload (model ho neukladá ako pole)
+		content_hash: key, // #5825 review 🔴: silná per-odpis identita (nie appkin content-only ledgerHash)
 		app_user: j.createdBy,
 		source: 'app',
 		action: 'import',
@@ -85,17 +114,18 @@ function buildImportPayload(ev: OdpisWrittenEvent): Record<string, unknown> {
 	};
 }
 
-function buildReleasePayload(ev: OdpisReleasedEvent): Record<string, unknown> {
+function buildReleasePayload(ev: OdpisReleasedEvent, key: string): Record<string, unknown> {
 	// Minimálny release payload — len identity (bez polozky); `released_without_import` edge-case
-	// vie linkovať sale.order z op/zak.
+	// vie linkovať sale.order z op/zak. `content_hash` = ROVNAKÝ silný kľúč ako import (matchne sa).
 	return {
-		content_hash: ev.contentHash,
+		content_hash: key,
 		action: 'release',
 		source: 'app',
 		app_user: ev.actor,
 		zak: ev.zak,
 		op: ev.op,
-		modul: ev.modul
+		modul: ev.modul,
+		live: ev.live
 	};
 }
 
@@ -103,10 +133,13 @@ function buildReleasePayload(ev: OdpisReleasedEvent): Record<string, unknown> {
 
 function classifyError(e: unknown): 'transient' | 'permanent' {
 	if (e instanceof OdooJson2Error) {
-		// payload-permanentné Odoo výnimky (retry by VŽDY zlyhal) → prestaň skúšať, surface na /odpisy.
-		if (/ValidationError|UserError|TypeError|ValueError/i.test(e.odooName)) return 'permanent';
+		// LEN genuine payload defekty (ValidationError/UserError) sú permanentné → prestaň skúšať,
+		// surface na /odpisy. #5825 review 🟡: TypeError/ValueError bývajú DEPLOY/schema skew (appka
+		// nasadená pred modelom → „Invalid field" ValueError; nový kwarg na staršej metóde) — to je
+		// PRECHODNÉ (fixne sa nasadením modelu), NIE payload defekt → TRANSIENT (1 h cap ohraničí záťaž).
+		if (/ValidationError|UserError/i.test(e.odooName)) return 'permanent';
 	}
-	// sieť/timeout/5xx/401-403/AccessError/„model or method not found" → TRANSIENT (retry, no data loss).
+	// sieť/timeout/5xx/401-403/AccessError/„model or method not found"/TypeError/ValueError → TRANSIENT.
 	return 'transient';
 }
 
@@ -199,27 +232,39 @@ function serializeByKey<T>(key: string, task: () => Promise<T>): Promise<T> {
 // ---- Sweep --------------------------------------------------------------------------
 
 let sweepInFlight = false;
+let rerunRequested = false;
 
 /**
- * Spracuje splatné pending riadky v poradí `id` (per-hash FIFO + STOP-ON-FIRST-FAILURE per hash —
- * release nesmie predbehnúť ešte-pending import toho istého hashu, inak Odoo vytvorí stub a import
- * trafí idempotentnú vetvu a polozky nepristanú). Global guard proti prekrytiu (startup/arrival/timer).
+ * Spracuje splatné pending riadky v poradí `id` s per-hash FIFO ordering: riadok sa NESPRACUJE, kým
+ * existuje SKORŠÍ pending riadok toho istého hashu (`hasEarlierPendingOdpisPush`). To drží poradie AJ
+ * NAPRIEČ sweepmi — import po zlyhaní ostane pending v backoffe (NIE je v `pendingDue`), ale jeho
+ * release (NULL next_attempt_at) v `pendingDue` je, a bez tejto kontroly by ho arrival sweep počas
+ * import-backoffu poslal SKÔR → Odoo stub → import trafí idempotentnú vetvu a polozky sa stratia.
+ * (PERMANENT-failed import — `pending=0` — už NEblokuje svoj release → Odoo dostane stub zámerne.)
+ * Global guard proti prekrytiu (startup/arrival/timer sweep); arrival počas in-flight sweepu sa
+ * NEZAHODÍ (`rerunRequested` → jedno ďalšie kolo v `finally`, #5825 review 🔵). Per-hash serializer
+ * proti súbehu so živým pushom.
  */
 export async function runOdpisSweep(): Promise<void> {
-	if (sweepInFlight) return;
+	if (sweepInFlight) {
+		rerunRequested = true;
+		return;
+	}
 	sweepInFlight = true;
 	try {
-		const rows = pendingDueOdpisPushes(RETRY_BATCH);
-		if (rows.length === 0) return;
-		const failedHashes = new Set<string>();
-		for (const row of rows) {
-			if (failedHashes.has(row.content_hash)) continue; // skorší riadok tohto hashu zlyhal → poradie
-			const ok = await serializeByKey(row.content_hash, async () => {
-				if (!isOdpisPushPending(row.id)) return true; // súbežný push ho už posted-ol
-				return pushOneRow(row);
-			});
-			if (!ok) failedHashes.add(row.content_hash);
-		}
+		do {
+			rerunRequested = false;
+			const rows = pendingDueOdpisPushes(RETRY_BATCH);
+			for (const row of rows) {
+				// skorší pending súrodenec (import v backoffe / spracúvaný skôr) MUSÍ ísť prvý — inak by
+				// release/neskorší import predbehol → rozbité poradie (aj cez pass-y, viď docstring).
+				if (hasEarlierPendingOdpisPush(row.id, row.content_hash)) continue;
+				await serializeByKey(row.content_hash, async () => {
+					if (!isOdpisPushPending(row.id)) return; // súbežný push ho už posted-ol
+					await pushOneRow(row);
+				});
+			}
+		} while (rerunRequested);
 	} finally {
 		sweepInFlight = false;
 	}
@@ -247,8 +292,9 @@ export function dispatchOdpisImport(ev: OdpisWrittenEvent): void {
 		});
 		return;
 	}
+	const key = strongOdpisKey(ev.job.modul, ev.job.zak, ev.job.op, ev.live, ev.contentHash);
 	try {
-		enqueueOdpisPush(ev.contentHash, 'import', buildImportPayload(ev)); // SYNCHRÓNNY durable enqueue
+		enqueueOdpisPush(key, 'import', buildImportPayload(ev, key)); // SYNCHRÓNNY durable enqueue
 	} catch (e) {
 		log.error('odpis push enqueue zlyhal (ignorované — odpis JE v Money)', {
 			zak: ev.job.zak,
@@ -268,7 +314,8 @@ export function dispatchOdpisRelease(ev: OdpisReleasedEvent): void {
 		log.info('odpis release → Odoo skip: nie live', { zak: ev.zak, op: ev.op });
 		return;
 	}
-	enqueueOdpisPush(ev.contentHash, 'release', buildReleasePayload(ev)); // synchrónny, v transakcii
+	const key = strongOdpisKey(ev.modul, ev.zak, ev.op, ev.live, ev.contentHash);
+	enqueueOdpisPush(key, 'release', buildReleasePayload(ev, key)); // synchrónny, v transakcii
 	scheduleSweep(); // beží až po commite transakcie (queueMicrotask)
 }
 
@@ -276,16 +323,19 @@ export function dispatchOdpisRelease(ev: OdpisReleasedEvent): void {
 
 /** Jednorazový sweep pri ŠTARTE (dopostne zaostalé pushe z minulých výpadkov). Vypnuté (mode!=model). */
 export function runStartupOdpisSweep(): void {
-	if (!odpisPushMode().model) return;
+	// #5825 review 🔵: draine aj leftover backlog po mode flipe model→note (dispatch enqueuje len v
+	// model mode, takže v čistom note móde niet čo drainovať; ale prechod nesmie strandnúť riadky).
+	if (!odpisPushMode().model && !anyOdpisPushPending()) return;
 	void runOdpisSweep().catch((e) => log.error('odpis štartový sweep hodil', { err: errMsg(e) }));
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
 /** Periodický timer sweep (single-flight, len keď je čo, `unref`-ed) — arrival-only sweep by nechal
- *  POSLEDNÝ odpis dňa zaseknutý do zajtra/reštartu. Vypnuté (mode!=model). */
+ *  POSLEDNÝ odpis dňa zaseknutý do zajtra/reštartu. Self-gatuje na `anyPending`, takže draine backlog
+ *  aj po mode flipe model→note (#5825 review 🔵); v čistom note móde je no-op (nikto neenqueuuje). */
 export function startOdpisTimerSweep(): void {
-	if (timer || !odpisPushMode().model) return;
+	if (timer) return;
 	timer = setInterval(() => {
 		if (!anyOdpisPushPending()) return; // lacný check — sweep len keď je pending riadok
 		void runOdpisSweep().catch((e) => log.error('odpis timer sweep hodil', { err: errMsg(e) }));

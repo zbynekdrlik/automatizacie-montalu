@@ -320,7 +320,8 @@ export function migrateDopytProdukt(db: Database.Database, bump: (v: number) => 
  * (`/json/2 create_from_app`, epic #5808 „aj-aj" cutover). NA ROZDIEL od `odoo_zakazka_push` (v34,
  * upsert per (zak,op)) je toto append-only log — každý import/release/reimport toho istého
  * `content_hash` je NOVÝ riadok, replay STRIKTNE v poradí `id` per hash (`povolitReimport` robí
- * import→release→import legitímnym; upsert+re-arm by zbalil históriu a rozišiel Odoo stav s Money).
+ * import→release→import legitímnym; upsert+re-arm by APP-SIDE zbalil históriu; celková zhoda Odoo=Money
+ * po reimporte navyše závisí od monotónneho modelu #5817 — flag, viď `odoo-odpis-store.ts` docstring).
  * `id INTEGER PRIMARY KEY AUTOINCREMENT` = monotónne, nikdy nerecyklované id. ŽIADEN poison-pill drop,
  * žiaden časový strop — odpis sa nesmie stratiť; retry cez `next_attempt_at` (exponenciálny backoff),
  * `pending=0` len pri úspechu alebo payload-permanentnej chybe (riadok ostáva pre audit/surface).

@@ -94,11 +94,12 @@ interface StoreRow {
 	odoo_id: number | null;
 	posted_at: string | null;
 	payload: string;
+	content_hash: string;
 }
 const rows = (): StoreRow[] =>
 	db
 		.prepare(
-			'SELECT pending, action, attempts, odoo_id, posted_at, payload FROM odoo_odpis_push ORDER BY id'
+			'SELECT pending, action, attempts, odoo_id, posted_at, payload, content_hash FROM odoo_odpis_push ORDER BY id'
 		)
 		.all() as StoreRow[];
 
@@ -147,7 +148,7 @@ describe('dispatchOdpisImport — router + push', () => {
 			zak: 'ZAK1',
 			op: 'OP100',
 			zakaznik: 'Test Zákazník',
-			content_hash: 'HASH1',
+			content_hash: expect.stringMatching(/^[0-9a-f]{64}$/), // silný sha256 kľúč (nie appkin ledgerHash)
 			app_user: 'marek@montalu.sk',
 			source: 'app',
 			action: 'import',
@@ -244,7 +245,7 @@ describe('dispatchOdpisRelease', () => {
 		expect(rows()[0]!.pending).toBe(0);
 		const payload = JSON.parse(calls[0]!.body);
 		expect(payload).toMatchObject({
-			content_hash: 'HASH1',
+			content_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
 			action: 'release',
 			app_user: 'marek@montalu.sk'
 		});
@@ -272,20 +273,39 @@ describe('sweep — per-hash STOP-ON-FIRST-FAILURE (release nepredbehne pending 
 		expect(rr[1]!.pending).toBe(1); // release NEspracovaný (poradie držané)
 		expect(rr[1]!.attempts).toBe(0); // ani sa nepokúsil
 	});
+
+	it('cross-pass ordering: release sa NEpošle skôr než pending import ani v INOM sweepe (arrival počas backoffu)', async () => {
+		mockJson2({ status: 500, text: 'down' });
+		dispatchOdpisImport(makeEvent()); // id1 import
+		dispatchOdpisRelease(makeRelease()); // id2 release (rovnaký hash)
+		await runOdpisSweep(); // import zlyhá (backoff), release blokovaný
+		expect(rows()[1]!.attempts).toBe(0);
+
+		// arrival sweep POČAS import-backoffu: import NIE je due, release (NULL next_attempt_at) je →
+		// bez cross-pass kontroly by release predbehol. hasEarlierPending ho drží.
+		mockJson2(okCreated());
+		await runOdpisSweep();
+		expect(rows()[1]!.attempts).toBe(0); // release STÁLE nepošle (skorší import je pending)
+
+		// import splatný → import prejde, POTOM release
+		db.prepare(
+			"UPDATE odoo_odpis_push SET next_attempt_at = datetime('now','-1 hour') WHERE action='import'"
+		).run();
+		await runOdpisSweep();
+		const rr = rows();
+		expect(rr[0]!.pending).toBe(0); // import posted
+		expect(rr[1]!.pending).toBe(0); // release posted AŽ PO importe
+	});
 });
 
 describe('startup + timer sweep', () => {
-	it('runStartupOdpisSweep: note mode = no-op; model mode spracuje pending', async () => {
+	it('runStartupOdpisSweep drainuje pending backlog AJ v note mode (leftover po mode flipe #5825 review 🔵)', async () => {
 		mockJson2(okCreated());
 		store.enqueueOdpisPush('HS', 'import', { content_hash: 'HS', action: 'import' });
-		process.env.ODOO_ODPIS_MODE = 'note';
+		process.env.ODOO_ODPIS_MODE = 'note'; // aj v note móde sa leftover backlog dopostne (nestrandne)
 		runStartupOdpisSweep();
 		await new Promise((r) => setImmediate(r));
-		expect(rows()[0]!.pending).toBe(1); // note → nespracované
-		process.env.ODOO_ODPIS_MODE = 'model';
-		runStartupOdpisSweep();
-		await new Promise((r) => setImmediate(r));
-		expect(rows()[0]!.pending).toBe(0); // model → dopostnuté
+		expect(rows()[0]!.pending).toBe(0); // dopostnuté (drain regardless of mode)
 	});
 
 	it('startOdpisTimerSweep timer dopostne pending; start/stop sú idempotentné', async () => {
@@ -303,5 +323,37 @@ describe('startup + timer sweep', () => {
 			stopOdpisTimerSweep(); // poistka aj pri zlyhaní assertu (timer nesmie leaknúť medzi testy)
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe('idempotency key — silný per-odpis kľúč [#5825 review 🔴]', () => {
+	it('rovnaký ledgerHash, INÝ op → RÔZNY Odoo content_hash (žiadny collapse dvoch odpisov)', () => {
+		const ev1 = makeEvent({ contentHash: 'SAME' }); // op OP100
+		const ev2 = makeEvent({ contentHash: 'SAME' });
+		ev2.job = { ...ev2.job, op: 'OP999' }; // ten istý obsah, iná objednávka
+		dispatchOdpisImport(ev1);
+		dispatchOdpisImport(ev2);
+		const hs = rows().map((r) => r.content_hash);
+		expect(hs[0]).toMatch(/^[0-9a-f]{64}$/);
+		expect(hs[0]).not.toBe(hs[1]); // rôzny OP → rôzny kľúč (inak by v Odoo skolabovali)
+	});
+
+	it('rovnaký odpis (import + release) → ROVNAKÝ kľúč (release matchne import v Odoo)', () => {
+		dispatchOdpisImport(makeEvent({ contentHash: 'X' }));
+		dispatchOdpisRelease(makeRelease({ contentHash: 'X' }));
+		const hs = rows().map((r) => r.content_hash);
+		expect(hs[0]).toBe(hs[1]);
+	});
+});
+
+describe('error klasifikácia [#5825 review 🟡]', () => {
+	it('TypeError/ValueError (deploy/schema skew) → TRANSIENT (nie permanent — fixne sa nasadením modelu)', async () => {
+		mockJson2({
+			status: 500,
+			text: JSON.stringify({ name: 'builtins.ValueError', message: 'Invalid field xyz on model' })
+		});
+		dispatchOdpisImport(makeEvent());
+		await runOdpisSweep();
+		expect(rows()[0]!.pending).toBe(1); // transient → retry
 	});
 });

@@ -7,8 +7,8 @@ import {
 	type ReadbackVysledok
 } from '$lib/server/money-readback';
 import type { DlvReadbackMeta } from '$lib/server/money-readback';
-import { odpisBacklogCounts } from '$lib/server/odoo-odpis-store';
-import { odpisPushMode } from '$lib/server/odoo-odpis';
+import { odpisBacklogCounts, rearmFailedOdpisPushes } from '$lib/server/odoo-odpis-store';
+import { odpisPushMode, runOdpisSweep } from '$lib/server/odoo-odpis';
 import { logger } from '$lib/server/log';
 
 const log = logger('odpisy');
@@ -88,5 +88,13 @@ export const actions = {
 		if (!Number.isInteger(id) || id <= 0) return { error: 'Neplatný záznam.' };
 		const ok = povolitReimport(id, locals.user?.username ?? '');
 		return ok ? { reimportPovoleny: true } : { error: 'Záznam sa nenašiel.' };
+	},
+
+	// #5825 review 🟡: operátorský re-arm PAYLOAD-permanentných zlyhaní push-u odpisu do Odoo (napr. po
+	// oprave/nasadení modelu). Znova ich zaradí do fronty a spustí sweep (fire-and-forget).
+	retryOdooOdpis: async () => {
+		const retried = rearmFailedOdpisPushes();
+		if (retried > 0) void runOdpisSweep().catch(() => {});
+		return { odpisRetried: retried };
 	}
 } satisfies Actions;
