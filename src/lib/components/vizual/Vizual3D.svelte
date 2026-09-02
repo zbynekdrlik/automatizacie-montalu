@@ -52,6 +52,7 @@
 		preset = $bindable<PresetKluc>(PRESET_DEFAULT),
 		vynutenyTier,
 		zobrazDom = false,
+		zobrazStena = true,
 		pripravene = $bindable(false),
 		aktualnyTier = $bindable<Tier>('high'),
 		posterZaznam
@@ -69,6 +70,9 @@
 		 *  LEN pergola konfigurátor (VizualPergolaZakaznik). Zasklenia scény ostávajú s
 		 *  pôvodnou stenou (dverný otvor, fixná výška) a bez domu (default false). */
 		zobrazDom?: boolean;
+		/** #405: zobraziť stenu ZA produktom (pergola/zasklenia = true; bazénové
+		 *  zastrešenie je FREESTANDING → false). Default true → existujúce rodiny nezmenené. */
+		zobrazStena?: boolean;
 		/** scéna je postavená a prvý render prebehol (alebo T0 poster je aktívny) —
 		 *  rodič (napr. zákaznícky tlačový list) na toto čaká pred `zachytObrazok()` */
 		pripravene?: boolean;
@@ -528,6 +532,7 @@
 					preset,
 					presety,
 					zobrazDom,
+					zobrazStena,
 					containerEl,
 					onStart: tikaj,
 					onChange: render
@@ -750,7 +755,7 @@
 </script>
 
 <div bind:this={containerEl} class="vizual3d" data-testid="vizual3d">
-	<canvas bind:this={canvasEl} data-testid="vizual3d-canvas" aria-label="3D náhľad zasklenia"
+	<canvas bind:this={canvasEl} data-testid="vizual3d-canvas" aria-label="3D náhľad produktu"
 	></canvas>
 
 	{#if tier === 'none' && pripravene}

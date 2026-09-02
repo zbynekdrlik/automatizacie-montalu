@@ -542,3 +542,44 @@ hodnôt → hrany ostávajú zarovnané; bbox/kóty/`svetlaVyska` sa NEmenia.
   <shared>` (počet lát/krídla). Nové procedurálne textúry (`vytvorDreveneDrevoTexturu` zvislá kresba,
   `vytvorOmietkaTexturu`) testuj recording-stub `FakeCtx` + `Math.random` mock v `try/finally` (vzor
   `vizual-textury.test.ts`).
+
+## Bazénové zastrešenie — nová FREESTANDING rodina + oblúkové segmenty (#405)
+
+Tretia zákaznícka rodina (`geo/bazen.ts` + `VizualBazenZakaznik` + `KonfBazenVizual`) — čistý reuse
+generického pipeline (0 zmien `spec.ts`/`builder.ts`/`produkt-meshe.ts`), roly `ram`/`sklo`/
+`kolajnica`. Rozmery/kaskáda z appkových helperov `sekcieVysky`/`sekciePozicie` (`$lib/bazen-navrh`,
+už v money-guard allowliste). `presnost:'ilustracna'` (spec.ts to anticipuje: „neznámy oblúk bazéna").
+
+- **FREESTANDING rodina = `zobrazStena={false}` na `Vizual3D` (#405, vzor #325).** `scena-build.ts`
+  kreslila stenu ZA produktom BEZPODMIENEČNE (dobré pre zasklenia „pri stene" aj pergolový dom, ZLÉ
+  pre voľne stojace bazénové zastrešenie — stena za ním pôsobí zavádzajúco). Nový prop `zobrazStena`
+  (default `true` → pergola/zasklenia NEZMENENÉ) gatuje stenu: kreslí sa pri `zobrazDom || zobrazStena`
+  (dom si fasádu vždy vyžaduje). `dom.skupina.position.z` číta samostatné `stenaZ` (nie `stena.position.z`,
+  ktorá teraz žije vnútri podmieneného bloku). Toto je DRUHÝ family-gated scenery prepínač po `zobrazDom`
+  — každá NE-generická scénická výbava do `postavScenu` MUSÍ byť za takýmto propom (Vizual3D je zdieľaný).
+- **Oblúk = extrudovaný semi-eliptický ANULUS (pás), NIE zlepené tetivové boxy.** `oblukPasObrys(rx, ry,
+  hrubka, body)`: vonkajšia semi-elipsa θ 0→π, potom vnútorná π→0 (uzavrie `builder` cez `closePath` →
+  dve päty otvorené = arch shell). Hrúbka klampovaná `min(hrubka, 0.45rx, 0.45ry)` (inner < outer). Extrude
+  pozdĺž Z (dĺžky), žiadna rotácia (X-Y profil je už v rovine). Menšia elipsa je CELÁ vnútri väčšej — to je
+  kľúč pre vnorenie výplne (nižšie).
+- **PASCA (🟡 review): výplň a rebro NESMÚ zdieľať vonkajšie líce oblúka — koplanárne povrchy → sklo sa
+  kreslí NA rebro.** Rebrá (`ram`) sú na hraniciach segmentov, výplň (`sklo`) v strede — ale ak oba použijú
+  `oblukPasObrys(rx, ry, …)`, ich vonkajší povrch je byte-identický v Z-pásme prekryvu (najmä krajné rebrá
+  ~37,5 mm) → transparentné sklo blenduje cez hliník. FIX: výplň radiálne ODSAĎ dovnútra
+  (`oblukPasObrys(rx − VYPLN_ODSADENIE_MM, ry − VYPLN_ODSADENIE_MM, …)`, ~25 mm) — sklo sadí do profilu
+  (kanála), rebro ho z vonkajšej strany prekrýva. Zamkni unit testom `rozponX/vrcholY(sklo[i]) <
+  rozponX/vrcholY(ram[i+1])` (koplanárne rebro segmentu i je ram[i+1], rovnaká výška `vysky[i]`).
+- **Teleskopická kaskáda = KLESAJÚCA výška (nie klesajúca šírka).** V ZATVORENOM stave segmenty utesnia
+  bazén po celej dĺžke → plná šírka `S` pre všetky; výškový krok (cez `sekcieVysky`, ilustračný `vyskaMin`
+  z per-krok poklesu) je čestný teleskopický cue. Krok šírky by nechal medzery ku koľajniciam (zamietnuté v
+  review). `vysky[0]=V` (najvyšší = zadaná výška), bbox `{S, V, D}`.
+- **Živý update:** ROZMERY (vrátane výšky — mení bbox.h → treba refit) = DEBOUNCED snapshot → `{#key vizKluc}`
+  remount; POČET SEGMENTOV = LIVE prop → mení `diely` → `geometrickyPodpis` effect → in-place
+  `prestavGeometriuProduktu` (bbox nezmenený, žiadny remount); VÝPLŇ/RAL = in-place materiál. Deterministický
+  E2E signál `data-viz-rozmer` na stabilnom `konf-baz-viz` uzle MIMO `{#key}` (vzor #361); leak guard
+  `__VIZ_CONTEXTS===1` po remounte (stráži reštrukturalizovaný wall-disposal blok).
+- **Segmenty clamp OBOJSTRANNE** (2..8) — spodný `Math.max(2,…)` NESTAČÍ, JSDoc sľubuje rozsah; `Math.min(8,…)`.
+- `Vizual3D.svelte` narástol pridaním `zobrazStena` na ~921 r. (watch-list `large-file-split.md` hlási ~722,
+  je stale) — pri ďalšom väčšom dotyku zváž split (intro/kóta/dom-vetvy sú kandidáti na extrakciu).
+- Canvas `aria-label` bol natvrdo „3D náhľad zasklenia" pre VŠETKY rodiny → zmenené na rodinovo-neutrálne
+  „3D náhľad produktu".

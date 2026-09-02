@@ -4,14 +4,28 @@
 // zdroj); dopyt tok → PDF špecifikácia (bez ceny) na stiahnutie. GET je Money-neutrálny (číta sa aj
 // proti LIVE prode); dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú
 // testovacie dopyty. Každý test = NULA console chýb (× = U+00D7 byte-identické).
+//
+// #405: pribudol ŽIVÝ 3D náhľad oblúkových segmentov (split-screen, ľavý sticky stĺpec). Form-testy
+// čakajú na `[data-viz-ready="true"]` (helper `bazenReady`) PRED interakciou — sync-point ako pri
+// pergole (softvérový CI WebGL je ~2.5× ťažší). Zero-console drží cez filtre v `helpers.ts`
+// (GL-driver stall / net::ERR_ABORTED / CONTEXT_LOST_WEBGL loseContext — sankcionovaný teardown).
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
 
-test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (žiadna cena), nula console chýb', async ({
+/** goto na bazén konfigurátor + počkaj na hydratáciu a pripravený 3D náhľad (rovnaký
+ *  sync-point ako `konfReady` v pergolovom spec-e) — inak enhance/interakcia preteká s
+ *  ešte-stavajúcou 3D scénou. */
+async function bazenReady(page: import('@playwright/test').Page) {
+	await goto(page, '/konfigurator/bazen');
+	await expect(page.getByTestId('konf-baz-viz')).toBeVisible();
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+}
+
+test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (žiadna cena) + 3D náhľad, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
-	await goto(page, '/konfigurator/bazen');
+	await bazenReady(page);
 	await expect(page).toHaveURL(/\/konfigurator\/bazen$/);
 
 	// stránka sa načíta bez prihlásenia (verejná route)
@@ -23,9 +37,64 @@ test('bazén konfigurátor: verejná route bez auth — súhrn + HONEST-NULL (ž
 	await expect(page.getByTestId('bazen-suhrn')).toBeVisible();
 	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveText('6000 × 4000 mm');
 
+	// #405: 3D náhľad je pripravený a deterministický signál odráža default rozmery (dĺžka×šírka)
+	await expect(page.getByTestId('konf-baz-viz')).toHaveAttribute('data-viz-rozmer', '6000×4000');
+	await expect(page.getByTestId('bazen-caption-rozmer')).toHaveText(
+		'Bazénové zastrešenie 6000 × 4000 mm'
+	);
+
 	// HONEST-NULL: žiadna orientačná cena — „Cena na vyžiadanie" + NIKDE na stránke € symbol
 	await expect(page.getByTestId('bazen-cena-info')).toContainText('Cena na vyžiadanie');
 	await expect(page.locator('body')).not.toContainText('€');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('bazén konfigurátor: zmena rozmerov → ŽIVÝ 3D náhľad sa aktualizuje (debounced signál + caption), nula console chýb', async ({
+	page
+}) => {
+	test.setTimeout(60000); // softvérový CI WebGL rebuild pri {#key} remounte je pomalý
+
+	const consoleMsgs = collectConsole(page);
+	await bazenReady(page);
+
+	// štartová hodnota deterministického signálu (dĺžka×šírka, × = U+00D7)
+	await expect(page.getByTestId('konf-baz-viz')).toHaveAttribute('data-viz-rozmer', '6000×4000');
+
+	// zmeň dĺžku → 3D sa DEBOUNCED (~320 ms) prekreslí. Rozmerové pole je METROVÝ stepper
+	// (#333 RozmerStepper): fill je v METROCH („9" = 9000 mm).
+	await page.getByTestId('bazen-dlzka').fill('9');
+	await page.getByTestId('bazen-dlzka').blur();
+
+	// súhrn (klientsky $derived) reaguje hneď
+	await expect(page.getByTestId('bazen-suhrn-rozmery')).toHaveText('9000 × 4000 mm');
+
+	// #361 vzor: čakáme na DETERMINISTICKÝ, od-GL-frame ODPOJENÝ signál `data-viz-rozmer` na
+	// STABILNOM `konf-baz-viz` uzle (mimo `{#key}` bloku) + caption vnútri remountu, oboje s
+	// veľkorysým budgetom (nie arbitrárny fixný poll).
+	await expect(page.getByTestId('konf-baz-viz')).toHaveAttribute('data-viz-rozmer', '9000×4000', {
+		timeout: 30000
+	});
+	await expect(page.getByTestId('bazen-caption-rozmer')).toHaveText(
+		'Bazénové zastrešenie 9000 × 4000 mm',
+		{ timeout: 30000 }
+	);
+	// 3D ostáva pripravený po refit-remounte
+	await expect(page.locator('[data-viz-ready="true"]')).toBeVisible({ timeout: 20000 });
+
+	// #405 in-place update (bez remountu): zmena počtu segmentov mení GEOMETRIU (počet oblúkov) →
+	// caption sa aktualizuje cez geometrickyPodpis prestavbu; zmena výplne mení len materiál.
+	await page.getByTestId('bazen-segmenty').selectOption('6');
+	await expect(page.getByTestId('bazen-caption')).toContainText('6 segmentov', { timeout: 30000 });
+	await page.getByTestId('bazen-vypln').selectOption('Opálový (mliečny) polykarbonát');
+	await expect(page.getByTestId('bazen-caption')).toContainText('Opálový', { timeout: 30000 });
+
+	// leak guard: presne 1 živý WebGL kontext po {#key} remounte + in-place zmenách — priamy dôkaz,
+	// že reštrukturalizovaný wall-disposal blok (zobrazStena gate) + nová rodina nenechajú kontext unikať.
+	const vizKontexty = await page.evaluate(
+		() => (window as unknown as { __VIZ_CONTEXTS?: number }).__VIZ_CONTEXTS
+	);
+	expect(vizKontexty).toBe(1);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -37,7 +106,7 @@ test('bazén konfigurátor: zmena modelu + rozmeru → súhrn sa aktualizuje →
 	await skipAkLive(page);
 
 	const consoleMsgs = collectConsole(page);
-	await goto(page, '/konfigurator/bazen');
+	await bazenReady(page);
 
 	// zmeň model na Exclusive (segmentová karta) → aria-pressed sa prepne
 	await page.getByTestId('bazen-model-Exclusive').click();
