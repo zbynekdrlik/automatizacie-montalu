@@ -47,8 +47,14 @@ export const actions = {
 		// sklá tohto systému. Save zapisuje `WHERE id=?`, takže rovnaké meno v inom systéme
 		// („3.3.1" je Slide aj Štandard +) sa nikdy nedotkne.
 		const glassRedukcia = new Map<number, boolean>();
-		for (const g of glassTypesForSystem(systemFromSysStyl(sysStyl)))
+		// #440: per-sklo korekcia rozmeru — mapa kľúčovaná row `id` (rovnako ako redukcia). Prázdne
+		// pole = NULL (zruš override → systémový skloOffset), NIE 0 (0 je legitímna explicitná hodnota).
+		const glassKorekcia = new Map<number, number | null>();
+		for (const g of glassTypesForSystem(systemFromSysStyl(sysStyl))) {
 			glassRedukcia.set(g.id, form.get(`glass_${g.id}`) === '1');
+			const raw = String(form.get(`korekcia_${g.id}`) ?? '').trim();
+			glassKorekcia.set(g.id, raw === '' ? null : num(raw));
+		}
 
 		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je
 		// hrúbko-závislý (6/10) — bez zvolenej hrúbky by z náhľadu vypadol, tak zvoľ
@@ -63,7 +69,8 @@ export const actions = {
 			username: locals.user?.username ?? '',
 			offsets,
 			skloOffset,
-			glassRedukcia
+			glassRedukcia,
+			glassKorekcia
 		});
 		if (error) return { error, sysStyl };
 

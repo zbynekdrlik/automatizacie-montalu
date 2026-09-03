@@ -48,7 +48,10 @@ export function computeFlat(
 	skloHrubka = 0,
 	pridavnaKolajnica = false,
 	rucnaKolajnica?: KolajnicaRucne,
-	sietka?: Sietka | null
+	sietka?: Sietka | null,
+	// #440: per-sklo ABSOLÚTNY override korekcie rozmeru skla; NULL = systémový `g.skloOffset`
+	// (bit-identické doterajšie správanie). PRIPOJENÝ NA KONIEC, aby sa nepohli pozičné volania.
+	skloKorekcia: number | null = null
 ): ComputeResult | null {
 	const g = cfg[sysStyl];
 	if (!g || !g.rez.length) return null;
@@ -111,8 +114,9 @@ export function computeFlat(
 		sklo: {
 			// sklo sa objednáva na CELÉ milimetre (Dominik: 904,578 → 905) — zaokrúhli
 			// na najbližší mm. Sklo NIE je v Money odpise, takže je to len rozmer na plán/objednávku.
-			sirka: Math.round(val(ss, S, V, N, true) - g.skloOffset),
-			vyska: Math.round(val(sv, S, V, N, true) - g.skloOffset),
+			// #440: per-sklo override korekcie (NULL → systémový skloOffset).
+			sirka: Math.round(val(ss, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
+			vyska: Math.round(val(sv, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
 			pocet: N
 		}
 	};
@@ -167,7 +171,10 @@ export function safeCompute(
 	skloHrubka = 0,
 	pridavnaKolajnica = false,
 	rucnaKolajnica?: KolajnicaRucne,
-	sietka?: Sietka | null
+	sietka?: Sietka | null,
+	// #440: per-sklo override korekcie rozmeru skla (NULL → systémový skloOffset). Prevlečie sa
+	// do `undersizeCut` (sklo-guard konzistentný s computeFlat) aj do `computeFlat`.
+	skloKorekcia: number | null = null
 ): { r: ComputeResult | null; err: string | null } {
 	if (!validSys(cfg, sysStyl))
 		return { r: null, err: 'Konfigurácia systému je neúplná alebo chybná.' };
@@ -185,7 +192,8 @@ export function safeCompute(
 		redukciaZero,
 		skloHrubka,
 		rucnaKolajnica,
-		!!sietka
+		!!sietka,
+		skloKorekcia
 	);
 	if (underErr) return { r: null, err: underErr };
 	const g = cfg[sysStyl];
@@ -202,7 +210,8 @@ export function safeCompute(
 		skloHrubka,
 		pridavnaKolajnica,
 		rucnaKolajnica,
-		sietka
+		sietka,
+		skloKorekcia
 	);
 	if (!r || !r.odpis.length || !r.odpis.every((o) => Number.isFinite(o.metre) && o.metre >= 0))
 		return { r: null, err: 'Výpočet zlyhal — skontroluj konfiguráciu vzorcov.' };
@@ -219,6 +228,9 @@ export interface PosuvSpec {
 	redukciaZero: boolean;
 	/** hrúbka zvoleného skla (mm) — vyberá Deluxe kladka/klzný profil (6/10); 0 = n/a */
 	skloHrubka?: number;
+	/** #440: per-sklo ABSOLÚTNY override korekcie rozmeru skla (NULL/undefined = systémový
+	 *  `cfg_sys.sklo_offset`). Umožňuje solo korekciu 16 mm vs 6 mm skla v Slide. */
+	skloKorekcia?: number | null;
 	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
 	pridavnaKolajnica?: boolean;
 	/** ručne zadaná dĺžka hornej / spodnej koľajnice — MENÍ odpis (Patrik 2026-07-28) */
@@ -413,8 +425,9 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			N,
 			m2: R((p.S * p.V) / 1e6),
 			sklo: {
-				sirka: Math.round(val(ss, p.S, p.V, N, true) - g.skloOffset),
-				vyska: Math.round(val(sv, p.S, p.V, N, true) - g.skloOffset),
+				// #440: per-sklo override korekcie (NULL/undefined → systémový skloOffset).
+				sirka: Math.round(val(ss, p.S, p.V, N, true) - (p.skloKorekcia ?? g.skloOffset)),
+				vyska: Math.round(val(sv, p.S, p.V, N, true) - (p.skloKorekcia ?? g.skloOffset)),
 				pocet: N
 			},
 			otvaranie: p.otvaranie,
@@ -486,7 +499,8 @@ export function safeComputeMulti(
 			p.redukciaZero,
 			p.skloHrubka ?? 0,
 			p.kolajnica,
-			!!p.sietka
+			!!p.sietka,
+			p.skloKorekcia ?? null
 		);
 		if (underErr) return { r: null, err: `Posuv ${i + 1}: ${underErr}` };
 		const g = cfg[p.sysStyl];

@@ -7,7 +7,12 @@
 // pokrytý `tests/compute.test.ts`, ktorý ostáva bez zmeny.
 import { describe, it, expect } from 'vitest';
 import { loadCfg } from '../src/lib/server/db';
-import { computeFlat, computeMulti, safeCompute, sietkaSamostatnaVypocet } from '../src/lib/server/compute';
+import {
+	computeFlat,
+	computeMulti,
+	safeCompute,
+	sietkaSamostatnaVypocet
+} from '../src/lib/server/compute';
 
 const SYS = 'Slide|2K';
 const S = 2551;

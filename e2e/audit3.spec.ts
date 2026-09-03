@@ -389,3 +389,48 @@ test('editor: po uložení a návrate formulár drží novú hodnotu (nie starú
 	await expect(page.getByLabel('Sklo — konečné zmenšenie (mm)')).toHaveValue(povodna);
 	expect(consoleMsgs).toEqual([]);
 });
+
+// ── #440 editor: per-sklo číselná korekcia rozmeru skla (reálny POST) ──────────
+// Korekcia je nastaviteľná per SKLO (16 mm vs 6 mm). Prázdne pole = systémová korekcia;
+// zadaná hodnota sa uloží a prežije reload, prázdne pole override zruší.
+test('editor: číselná korekcia rozmeru skla sa uloží, prežije reload a prázdne pole ju zruší (#440)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await goto(page, SLIDE_STYL);
+
+	// prvý korekčný input (per sklo), meno korekcia_<id>; názov skla čítame z labelu
+	const kor = page.locator('input[name^="korekcia_"]').first();
+	await expect(kor).toBeVisible();
+	const name = (await kor.getAttribute('name'))!; // korekcia_<id>
+	const nazov = (await page.locator(`label[for="${name}"]`).innerText())
+		.replace('— korekcia rozmeru', '')
+		.trim();
+
+	try {
+		// zadaj korekciu 55 → uloženie vypíše „systémová → 55" pre TOTO sklo
+		await kor.fill('55');
+		await page.getByTestId('ulozit-vzorce').click();
+		await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
+		await expect(page.getByText(`Sklo „${nazov}" korekcia rozmeru`)).toBeVisible();
+		await expect(page.locator('.row', { hasText: 'korekcia rozmeru' })).toContainText('55');
+
+		// po návrate má input NOVÚ hodnotu (perzistované v DB)
+		await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
+		await waitHydrated(page);
+		await expect(page.locator(`input[name="${name}"]`)).toHaveValue('55');
+	} finally {
+		// VŽDY vráť pôvodný stav (prázdne = systémová) — inak by Slide odpis počítal iné čísla
+		await goto(page, SLIDE_STYL);
+		await page.locator(`input[name="${name}"]`).fill('');
+		await page.getByTestId('ulozit-vzorce').click();
+		await page.getByTestId('nastavenia-ulozene').waitFor();
+	}
+
+	// prázdne pole zrušilo override → po reload je input prázdny (systémová korekcia)
+	await goto(page, SLIDE_STYL);
+	await expect(page.locator(`input[name="${name}"]`)).toHaveValue('');
+	expect(consoleMsgs).toEqual([]);
+});

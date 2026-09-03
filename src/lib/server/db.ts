@@ -108,25 +108,33 @@ export interface GlassType {
 	system: string;
 	/** hrúbka skla (mm): Deluxe Float kalené = 6/10 (vyberá kladka/klzný profil); inak 0 */
 	hrubka: number;
+	/** per-sklo ABSOLÚTNY override korekcie rozmeru skla (#440): NULL = použiť systémový
+	 *  `cfg_sys.sklo_offset` (bit-identické doterajšie správanie); číslo = odčíta sa NAMIESTO neho.
+	 *  Umožňuje solo korekciu 16 mm vs 6 mm skla v Slide (Patrik msg 1783582). */
+	skloKorekcia: number | null;
 }
 
 export function listGlassTypes(): GlassType[] {
 	return (
 		db
-			.prepare('SELECT id, nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
+			.prepare(
+				'SELECT id, nazov, redukcia_zero, system, hrubka, sklo_korekcia FROM glass_types ORDER BY poradie'
+			)
 			.all() as {
 			id: number;
 			nazov: string;
 			redukcia_zero: number;
 			system: string;
 			hrubka: number;
+			sklo_korekcia: number | null;
 		}[]
 	).map((r) => ({
 		id: r.id,
 		nazov: r.nazov,
 		redukciaZero: !!r.redukcia_zero,
 		system: r.system,
-		hrubka: r.hrubka
+		hrubka: r.hrubka,
+		skloKorekcia: r.sklo_korekcia
 	}));
 }
 

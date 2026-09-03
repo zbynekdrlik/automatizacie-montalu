@@ -137,7 +137,10 @@ export function undersizeCut(
 	redukciaZero: boolean,
 	skloHrubka: number,
 	rucnaKolajnica?: KolajnicaRucne,
-	sietkaOn = false
+	sietkaOn = false,
+	// #440: per-sklo override korekcie rozmeru skla (NULL → systémový skloOffset) — MUSÍ byť
+	// identický ako v computeFlat, inak by sklo-guard testoval iný rozmer než sa reálne vypočíta.
+	skloKorekcia: number | null = null
 ): string | null {
 	const g = cfg[sysStyl];
 	if (!g) return null;
@@ -158,11 +161,12 @@ export function undersizeCut(
 		if (dlzka <= 0)
 			return `Rozmer ${S}×${V} mm je pri systéme ${system} priMALÝ — profil ${r.nazov} by vyšiel ${Math.round(dlzka)} mm (≤ 0) a odpis by bol neúplný. Zväčši rozmer alebo zvoľ iný systém.`;
 	}
-	// Sklo — rovnaká geometria ako `computeFlat` (`Math.round(val(...) - skloOffset)`).
+	// Sklo — rovnaká geometria ako `computeFlat` (`Math.round(val(...) - korekcia)`).
+	// #440: per-sklo override (NULL → systémový skloOffset) — MUSÍ byť rovnaký ako v computeFlat.
 	for (const key of ['s', 'v'] as const) {
 		const sr = g.sklo[key];
 		if (!sr) continue;
-		const dim = Math.round(val(sr, S, V, g.N, true) - Number(g.skloOffset));
+		const dim = Math.round(val(sr, S, V, g.N, true) - (skloKorekcia ?? Number(g.skloOffset)));
 		if (dim <= 0)
 			return `Rozmer ${S}×${V} mm je pri systéme ${system} priMALÝ — sklo by malo rozmer ≤ 0 mm. Zväčši rozmer alebo zvoľ iný systém.`;
 	}

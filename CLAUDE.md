@@ -105,7 +105,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - unit/E2E test behy, lokálna Playwright verifikácia → `.claude/rules/testing.md`
 - štruktúrovaný logger (`log.ts`), handleError, chybová stránka, testovanie logov → `.claude/rules/logging.md`
 - SQLite/Money durability (synchronous pin, fsync zápis, v24 audit) → `.claude/rules/db-durability.md`
-- pridanie novej SQLite migrácie (seed-extrakcia, 1000-r. strop, head-bump ~23 testov, v25/v26 stĺpce) → `.claude/rules/migrations.md`
+- pridanie novej SQLite migrácie (seed-extrakcia, 1000-r. strop, head-bump ~26 testov, v25/v26 stĺpce) → `.claude/rules/migrations.md`
 - pridanie nového `writeOdpis` block-reason (audited-override 6-touch checklist) → `.claude/rules/money-block-reason.md`
 - katalóg skiel, pridanie/zmena skla, Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
