@@ -58,7 +58,7 @@ test('izo B1 — odoslať zapíše odpis (TEST režim; na LIVE sa preskočí)', 
 	expect(errs).toEqual([]);
 });
 
-test('klasika B3 (N=4) je odmietnutá — mimo whitelistu (KM12 kódy nie sú v Money)', async ({
+test('klasika B3 (N=4) — kontrola: ZASP kódy (nie KM12), Patrik #372 potvrdil', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
@@ -69,9 +69,15 @@ test('klasika B3 (N=4) je odmietnutá — mimo whitelistu (KM12 kódy nie sú v 
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page); // po natívnej POST navigácii na krok „kontrola"
 
-	await expect(page.getByTestId('form-error')).toBeVisible();
-	await expect(page.getByTestId('form-error')).toContainText('B0 a B1');
+	// odpis = kontraktný vektor klasika B3 3000×1000: ZASP00116=2, ZASP00125=1, ZASP202413=2
+	await expect(page.getByTestId('kontrola-tabulka')).toBeVisible();
+	await expect(page.locator('input[name="qty_ZASP00116"]')).toHaveValue('2');
+	await expect(page.locator('input[name="qty_ZASP00125"]')).toHaveValue('1');
+	await expect(page.locator('input[name="qty_ZASP202413"]')).toHaveValue('2');
+	// KM12* kódy zo šablóny sa nepoužívajú (Patrik #372: „Ano tie kody sú všade rovnaké")
+	await expect(page.getByTestId('kontrola-tabulka')).not.toContainText('KM12');
 
 	expect(errs).toEqual([]);
 });

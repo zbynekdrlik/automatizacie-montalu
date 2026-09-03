@@ -75,7 +75,7 @@ describe('clip route — spocitat (náhľad, bez zápisu)', () => {
 		expect(r.error).toMatch(/ZAK/i);
 	});
 
-	it('klasika B3 (N=4) je odmietnutá — mimo whitelistu (KM12 kódy v Money nie sú)', async () => {
+	it('klasika B3 (N=4) → kontrola; odpis ZASP202413 (klasika), nikdy KM12 (Patrik #372)', async () => {
 		const r = (await clip.actions.spocitat(
 			ev({
 				zak: 'Z1',
@@ -87,9 +87,14 @@ describe('clip route — spocitat (náhľad, bez zápisu)', () => {
 				vyska: '1000',
 				ral: ''
 			})
-		)) as { step: string; error: string };
-		expect(r.step).toBe('form');
-		expect(r.error).toMatch(/B0 a B1/);
+		)) as { step: string; vypocet: import('../src/lib/clip').ClipVypocet };
+		expect(r.step).toBe('kontrola');
+		const g: Record<string, number> = {};
+		r.vypocet.polozky.forEach((p) => (g[p.kod] = p.qty));
+		// kontraktný vektor klasika B3 3000×1000 (viď tests/clip.test.ts): ZASP00116:2,
+		// ZASP00125:1, ZASP202413:2 — KM12* zo šablóny sa nepoužívajú
+		expect(g).toEqual({ ZASP00116: 2, ZASP00125: 1, ZASP202413: 2 });
+		expect(r.vypocet.polozky.every((p) => !p.kod.startsWith('KM12'))).toBe(true);
 	});
 
 	it('neplatný typ (skriptovaný POST) je ODMIETNUTÝ, NIE ticho prepadnutý na izo (review 🟡)', async () => {

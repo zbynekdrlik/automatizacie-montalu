@@ -4,7 +4,8 @@
 // úprav a zapíše odpis s dedup ochranou. Formulárová disciplína podľa FIX (echo
 // `upravit`), odpisový tok podľa bazéna (writeOdpis, blokHlaska, overrideOpts).
 // Money-bezpečnosť: dedup UNIQUE(zak,op,live) v money.ts NEDOTKNUTÝ; mimo MONEY_LIVE=1
-// nič nejde do živého importu; ticket #372 ostáva OTVORENÝ (len čistá časť).
+// nič nejde do živého importu; ticket #372 ostáva OTVORENÝ (len 4 drobné položky —
+// kódy čaká Dominik).
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
 import { computeClip, chybaClipVstupu, type ClipPolozka } from '$lib/clip';

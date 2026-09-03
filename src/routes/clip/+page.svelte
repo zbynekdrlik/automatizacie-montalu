@@ -94,7 +94,6 @@
 						<option value="3">B2 — 3 výplne</option>
 						<option value="4">B3 — 4 výplne</option>
 					</select>
-					<span class="hint">Pre klasiku sú zatiaľ dostupné len B0/B1 (B2/B3 čakajú na kódy).</span>
 				</div>
 				<div class="field">
 					<label for="ral">RAL farba (informačná)</label>
