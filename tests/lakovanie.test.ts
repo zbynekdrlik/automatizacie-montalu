@@ -85,9 +85,25 @@ describe('computeLakovanie (#369)', () => {
 		expect(res.spotrebaSpolu).toBe(0.75); // len profil so známym rozvinom
 	});
 
-	it("profil v 'ks' (nie dĺžka v m) sa nelakuje — rozvin×dĺžka potrebuje bm", () => {
+	it("profil v 'ks' (nie dĺžka v m) → honest-null riadok + kompletne=false (nie tiché zahodenie, napr. CLIP)", () => {
 		const res = computeLakovanie([{ kod: 'BPP00001', nazov: 'x', qty: 2, mj: 'ks', rozvin: 0.4 }]);
-		expect(res.radky).toHaveLength(0);
+		expect(res.radky).toHaveLength(1);
+		expect(res.radky[0]).toMatchObject({ kod: 'BPP00001', mj: 'ks', plocha: null, spotreba: null });
+		expect(res.radky[0]!.rozvin).toBe(0.4); // rozvin poznáme, len plochu z ks nevieme
+		expect(res.kompletne).toBe(false);
+		expect(res.spotrebaSpolu).toBe(0);
+	});
+
+	it('zaokrúhlenie na 3 desatinné + súčet = Σ zaokrúhlených riadkov', () => {
+		// rozvin 0,431 × 7,2 = 3,1032 → round3 3,103 m²; × 0,15 = 0,46545 → 0,465 kg
+		const res = computeLakovanie([
+			{ kod: 'ZASP00001', nazov: 'A', qty: 7.2, mj: 'm', rozvin: 0.431 },
+			{ kod: 'PRP00001', nazov: 'B', qty: 3.3, mj: 'm', rozvin: 0.702 } // 2,3166→2,317; ×0,15=0,34755→0,348
+		]);
+		expect(res.radky[0]).toMatchObject({ plocha: 3.103, spotreba: 0.465 });
+		expect(res.radky[1]).toMatchObject({ plocha: 2.317, spotreba: 0.348 });
+		expect(res.plochaSpolu).toBe(5.42); // 3,103 + 2,317
+		expect(res.spotrebaSpolu).toBe(0.813); // 0,465 + 0,348 (Σ zaokrúhlených)
 	});
 
 	it('nulové/záporné množstvo sa preskočí (žiadny riadok, žiadny neúplný flag)', () => {

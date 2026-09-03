@@ -93,4 +93,17 @@ describe('migrácia v37 → v38: rozvin do material_prices (#369)', () => {
 		});
 		expect(db.pragma('user_version', { simple: true })).toBe(38);
 	});
+
+	it('feature-detect: DB bez material_prices → bump(38) bez ALTER (minimálne fixtúry nepadnú)', () => {
+		const mini = new Database(':memory:');
+		mini.pragma('user_version = 37');
+		let bumped: number | null = null;
+		migrateMaterialRozvin(mini, (v) => {
+			mini.pragma(`user_version = ${v}`);
+			bumped = v;
+		});
+		expect(bumped).toBe(38);
+		expect(mini.pragma('user_version', { simple: true })).toBe(38);
+		mini.close();
+	});
 });

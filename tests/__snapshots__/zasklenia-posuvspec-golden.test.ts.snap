@@ -11,6 +11,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00081",
+          "mj": "m",
           "nazov": "Koľajnica horná 3K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -19,6 +20,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00030",
+          "mj": "m",
           "nazov": "Koľajnica spodná 3K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -27,6 +29,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.2,
           "kod": "ZASP202417",
+          "mj": "m",
           "nazov": "Kladkový profil 10 mm Surový 3600 mm",
           "plocha": null,
           "rozvin": null,
@@ -35,6 +38,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.2,
           "kod": "ZASP202425",
+          "mj": "m",
           "nazov": "Klzný profil 10 mm Surový 3600 mm",
           "plocha": null,
           "rozvin": null,
@@ -43,6 +47,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00021",
+          "mj": "m",
           "nazov": "Dorazový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -535,6 +540,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 15,
           "kod": "ZASP00016",
+          "mj": "m",
           "nazov": "Koľajnica 3K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -543,6 +549,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 30,
           "kod": "ZASP00002",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -551,6 +558,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00010",
+          "mj": "m",
           "nazov": "Nosový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1194,6 +1202,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 15,
           "kod": "ZASP00014",
+          "mj": "m",
           "nazov": "Koľajnica 2K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1202,6 +1211,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 37.5,
           "kod": "ZASP00002",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1210,6 +1220,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00006",
+          "mj": "m",
           "nazov": "Oponový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1218,6 +1229,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 15,
           "kod": "ZASP00010",
+          "mj": "m",
           "nazov": "Nosový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1926,6 +1938,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 15,
           "kod": "ZASP00100",
+          "mj": "m",
           "nazov": "Koľajnica 3K Slide Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1934,6 +1947,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 30,
           "kod": "ZASP00088",
+          "mj": "m",
           "nazov": "Rámový profil Slide Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1942,6 +1956,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 15,
           "kod": "ZASP202410",
+          "mj": "m",
           "nazov": "Nosový profil Slide Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1950,6 +1965,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 22.5,
           "kod": "ZASP00091",
+          "mj": "m",
           "nazov": "Redukcia 6mm Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -1958,6 +1974,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP20252",
+          "mj": "m",
           "nazov": "Redukcia pre sieťku Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -2671,6 +2688,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00107",
+          "mj": "m",
           "nazov": "Koľajnica horná 2K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -2679,6 +2697,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00104",
+          "mj": "m",
           "nazov": "Koľajnica spodná 2K  Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -2687,6 +2706,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.2,
           "kod": "ZASP202415",
+          "mj": "m",
           "nazov": "Kladkový profil Surový 3600mm",
           "plocha": null,
           "rozvin": null,
@@ -2695,6 +2715,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00018",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -2703,6 +2724,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00024",
+          "mj": "m",
           "nazov": "Rámový profil stredový Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -2711,6 +2733,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00021",
+          "mj": "m",
           "nazov": "Dorazový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3186,6 +3209,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00036",
+          "mj": "m",
           "nazov": "Koľajnica horná 4K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3194,6 +3218,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP202432",
+          "mj": "m",
           "nazov": "Koľajnica spodná 5K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3202,6 +3227,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 14.4,
           "kod": "ZASP202415",
+          "mj": "m",
           "nazov": "Kladkový profil Surový 3600mm",
           "plocha": null,
           "rozvin": null,
@@ -3210,6 +3236,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP20244",
+          "mj": "m",
           "nazov": "Koncový profil (PLUS) surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3218,6 +3245,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 22.5,
           "kod": "ZASP00024",
+          "mj": "m",
           "nazov": "Rámový profil stredový Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3226,6 +3254,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP202419",
+          "mj": "m",
           "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3234,6 +3263,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 28.8,
           "kod": "ZASP202439",
+          "mj": "m",
           "nazov": "Rozširujúci profil Surový 3600 mm",
           "plocha": null,
           "rozvin": null,
@@ -3242,6 +3272,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00018",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3250,6 +3281,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         {
           "dlzka": 7.5,
           "kod": "ZASP00021",
+          "mj": "m",
           "nazov": "Dorazový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3972,6 +4004,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 15,
           "kod": "ZASP00016",
+          "mj": "m",
           "nazov": "Koľajnica 3K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3980,6 +4013,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 30,
           "kod": "ZASP00002",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3988,6 +4022,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00010",
+          "mj": "m",
           "nazov": "Nosový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -3996,6 +4031,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 15,
           "kod": "ZASP00100",
+          "mj": "m",
           "nazov": "Koľajnica 3K Slide Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -4004,6 +4040,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 30,
           "kod": "ZASP00088",
+          "mj": "m",
           "nazov": "Rámový profil Slide Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -4012,6 +4049,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 15,
           "kod": "ZASP202410",
+          "mj": "m",
           "nazov": "Nosový profil Slide Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -4020,6 +4058,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 22.5,
           "kod": "ZASP00091",
+          "mj": "m",
           "nazov": "Redukcia 6mm Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -4028,6 +4067,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP20252",
+          "mj": "m",
           "nazov": "Redukcia pre sieťku Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5333,6 +5373,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00081",
+          "mj": "m",
           "nazov": "Koľajnica horná 3K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5341,6 +5382,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00030",
+          "mj": "m",
           "nazov": "Koľajnica spodná 3K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5349,6 +5391,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.2,
           "kod": "ZASP202417",
+          "mj": "m",
           "nazov": "Kladkový profil 10 mm Surový 3600 mm",
           "plocha": null,
           "rozvin": null,
@@ -5357,6 +5400,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.2,
           "kod": "ZASP202425",
+          "mj": "m",
           "nazov": "Klzný profil 10 mm Surový 3600 mm",
           "plocha": null,
           "rozvin": null,
@@ -5365,6 +5409,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00021",
+          "mj": "m",
           "nazov": "Dorazový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5373,6 +5418,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00036",
+          "mj": "m",
           "nazov": "Koľajnica horná 4K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5381,6 +5427,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP202432",
+          "mj": "m",
           "nazov": "Koľajnica spodná 5K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5389,6 +5436,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 14.4,
           "kod": "ZASP202415",
+          "mj": "m",
           "nazov": "Kladkový profil Surový 3600mm",
           "plocha": null,
           "rozvin": null,
@@ -5397,6 +5445,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP20244",
+          "mj": "m",
           "nazov": "Koncový profil (PLUS) surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5405,6 +5454,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 22.5,
           "kod": "ZASP00024",
+          "mj": "m",
           "nazov": "Rámový profil stredový Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5413,6 +5463,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP202419",
+          "mj": "m",
           "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5421,6 +5472,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 28.8,
           "kod": "ZASP202439",
+          "mj": "m",
           "nazov": "Rozširujúci profil Surový 3600 mm",
           "plocha": null,
           "rozvin": null,
@@ -5429,6 +5481,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00018",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5437,6 +5490,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 15,
           "kod": "ZASP00014",
+          "mj": "m",
           "nazov": "Koľajnica 2K Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5445,6 +5499,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 37.5,
           "kod": "ZASP00002",
+          "mj": "m",
           "nazov": "Rámový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5453,6 +5508,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 7.5,
           "kod": "ZASP00006",
+          "mj": "m",
           "nazov": "Oponový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,
@@ -5461,6 +5517,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         {
           "dlzka": 15,
           "kod": "ZASP00010",
+          "mj": "m",
           "nazov": "Nosový profil Surový 7500 mm",
           "plocha": null,
           "rozvin": null,

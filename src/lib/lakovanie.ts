@@ -41,13 +41,16 @@ export interface LakovaniePolozka {
 export interface LakovanieRiadok {
 	kod: string;
 	nazov: string;
-	/** dĺžka [bm]. */
+	/** množstvo z odpisu (dĺžka [bm] keď `mj='m'`, inak počet [ks] a pod.). */
 	dlzka: number;
+	/** jednotka množstva (`mj`) — plochu vieme spočítať LEN pri `'m'`. */
+	mj: string;
 	/** rozvin [m²/bm]; `null` = Money ho pre kód nemá. */
 	rozvin: number | null;
-	/** plocha na lakovanie [m²] = rozvin × dĺžka; `null` keď rozvin neznámy. */
+	/** plocha na lakovanie [m²] = rozvin × dĺžka; `null` keď sa nedá spočítať
+	 *  (rozvin neznámy, alebo `mj` nie je v bežných metroch). */
 	plocha: number | null;
-	/** spotreba farby [kg] = plocha × 0,150; `null` keď rozvin neznámy. */
+	/** spotreba farby [kg] = plocha × 0,150; `null` keď sa plocha nedá spočítať. */
 	spotreba: number | null;
 }
 
@@ -72,11 +75,14 @@ function jeLakovanyProfil(kod: string): boolean {
 
 /**
  * Display-only výpočet spotreby farby na lakovanie profilov (#369). Vstup =
- * položky odpisu (kód/názov/qty/mj + rozvin zo snapshotu). Vráti LEN lakované
- * profilové riadky (rodiny ZASP/PRP/BPP, `mj='m'`, mimo Dominikových výnimiek)
- * so spotrebou kg + súčty. Chýbajúci rozvin lakovaného profilu → `kompletne=false`
- * (honest-null, súčet sa prizná ako neúplný). Kovanie/komponenty/výnimky sa
- * ignorujú (do sekcie sa nedostanú). €-náklad ostáva `null` (čaká na RAL sadzby).
+ * položky odpisu (kód/názov/qty/mj + rozvin zo snapshotu). Vráti lakované
+ * profilové riadky (rodiny ZASP/PRP/BPP, mimo Dominikových výnimiek) so spotrebou
+ * kg + súčty. Spotreba sa spočíta LEN keď je rozvin známy A množstvo je v bežných
+ * metroch (`mj='m'`). Lakovaný profil, ktorý sa spočítať nedá — chýbajúci rozvin,
+ * ALEBO množstvo v kusoch (napr. CLIP #372 posiela profily ako `mj='ks'`) — sa NIE
+ * ticho zahodí, ale pridá ako honest-null riadok a `kompletne=false` (súčet sa
+ * prizná ako neúplný — „priznáva medzeru", nie skryje ju). Kovanie/komponenty
+ * (nie profilová rodina) a výnimky sa ignorujú. €-náklad ostáva `null` (RAL sadzby).
  */
 export function computeLakovanie(polozky: LakovaniePolozka[]): LakovanieResult {
 	const radky: LakovanieRiadok[] = [];
@@ -86,26 +92,28 @@ export function computeLakovanie(polozky: LakovaniePolozka[]): LakovanieResult {
 	for (const p of polozky) {
 		if (!jeLakovanyProfil(p.kod)) continue; // kovanie/komponenty — nelakuje sa
 		if (LAKOVANIE_VYNIMKY.has(p.kod)) continue; // Dominikove výnimky
-		if (p.mj !== 'm') continue; // rozvin × dĺžka vyžaduje dĺžku v bežných metroch
 		if (!(p.qty > 0)) continue; // nulové/neplatné množstvo — nič nelakujeme
-		if (p.rozvin === null || !(p.rozvin > 0)) {
-			// lakovaný profil, ale Money preň rozvin nemá → priznaj neúplnosť
+		const rozvin = p.rozvin !== null && p.rozvin > 0 ? p.rozvin : null;
+		// plochu vieme len z DĹŽKY v bežných metroch × rozvin; ks/iné jednotky nevieme
+		// (nemáme dĺžku tyče) → honest-null, nie tiché zahodenie lakovaného profilu
+		if (p.mj === 'm' && rozvin !== null) {
+			const plocha = round3(rozvin * p.qty);
+			const spotreba = round3(plocha * LAKOVANIE_KOEF_KG_M2);
+			plochaSpolu += plocha;
+			spotrebaSpolu += spotreba;
+			radky.push({ kod: p.kod, nazov: p.nazov, dlzka: p.qty, mj: p.mj, rozvin, plocha, spotreba });
+		} else {
 			kompletne = false;
 			radky.push({
 				kod: p.kod,
 				nazov: p.nazov,
 				dlzka: p.qty,
-				rozvin: null,
+				mj: p.mj,
+				rozvin,
 				plocha: null,
 				spotreba: null
 			});
-			continue;
 		}
-		const plocha = round3(p.rozvin * p.qty);
-		const spotreba = round3(plocha * LAKOVANIE_KOEF_KG_M2);
-		plochaSpolu += plocha;
-		spotrebaSpolu += spotreba;
-		radky.push({ kod: p.kod, nazov: p.nazov, dlzka: p.qty, rozvin: p.rozvin, plocha, spotreba });
 	}
 	return {
 		radky,

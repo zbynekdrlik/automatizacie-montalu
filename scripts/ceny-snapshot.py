@@ -162,10 +162,18 @@ def fetch_rows(conn) -> list[dict]:
     cur = conn.cursor(as_dict=True)
     cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO, "iz": CENIK_IZOS, "m2": JEDNOTKA_M2})
     rows = []
+    seen: set[str] = set()
     for r in cur.fetchall():
         kod = (r.get("kod") or "").strip()
         if not kod:
             continue
+        # Defenzívny dedupe podľa kódu: pridané LEFT JOIN-y (m2 merná jednotka #369)
+        # sú 1:1 (overené: žiadny profil nemá >1 aktívny `m2` riadok), no keby v Money
+        # niekedy pribudol druhý aktívny riadok, JOIN by kód zdvojil (nafúknutý
+        # row_count + nejednoznačný upsert). Prvý riadok vyhráva.
+        if kod in seen:
+            continue
+        seen.add(kod)
         rows.append(
             {
                 "kod": kod,

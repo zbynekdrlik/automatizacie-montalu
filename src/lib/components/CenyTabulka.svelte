@@ -20,10 +20,12 @@
 	const skladBunka = (n: number | null) => (n === null ? 'neznáme' : String(n));
 	const dniSlovo = (n: number) => (n === 1 ? 'deň' : n >= 2 && n <= 4 ? 'dni' : 'dní');
 	const riadokSlovo = (n: number) => (n === 1 ? 'riadok' : n >= 2 && n <= 4 ? 'riadky' : 'riadkov');
-	// Lakovanie (#369) — čísla 3 desatinné miesta; „neznámy" keď Money rozvin nemá.
+	// Lakovanie (#369) — čísla 3 desatinné miesta; „neznáme" keď sa nedá spočítať
+	// (Money rozvin chýba, alebo profil nie je v bežných metroch). „neznáme" =
+	// rovnaká neutrálna forma ako skladBunka (naprieč rodmi stĺpcov).
 	const fmtNum = (n: number, jed: string) =>
 		n.toLocaleString('sk-SK', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + jed;
-	const lakBunka = (n: number | null, jed: string) => (n === null ? 'neznámy' : fmtNum(n, jed));
+	const lakBunka = (n: number | null, jed: string) => (n === null ? 'neznáme' : fmtNum(n, jed));
 </script>
 
 <div class="card" data-testid="ceny-tabulka">
@@ -112,9 +114,11 @@
 			</tr>
 		</tfoot>
 	</table>
+</div>
 
-	{#if ceny.lakovanie.radky.length > 0}
-		<div class="sec lak-sec">Lakovanie</div>
+{#if ceny.lakovanie.radky.length > 0}
+	<div class="card" data-testid="lakovanie-card">
+		<div class="sec">Lakovanie</div>
 		<p class="sub">
 			Spotreba farby na rozvin profilov (0,150 kg/m²) — orientačné, len interné. Náklad v € čaká na
 			sadzby (Money cenník lakovania) a nezobrazuje sa.
@@ -124,7 +128,7 @@
 				<tr>
 					<th>Kód</th>
 					<th>Názov</th>
-					<th class="c">Dĺžka</th>
+					<th class="c">Množstvo</th>
 					<th class="c">Rozvin</th>
 					<th class="c">Plocha</th>
 					<th class="c">Spotreba farby</th>
@@ -136,7 +140,7 @@
 					<tr>
 						<td class="mono">{r.kod}</td>
 						<td>{r.nazov}</td>
-						<td class="c">{fmtNum(r.dlzka, 'm')}</td>
+						<td class="c">{r.dlzka} {r.mj}</td>
 						<td class="c" data-testid={`lak-rozvin-${r.kod}`}>{lakBunka(r.rozvin, 'm²/bm')}</td>
 						<td class="c">{lakBunka(r.plocha, 'm²')}</td>
 						<td class="c" data-testid={`lak-spotreba-${r.kod}`}>{lakBunka(r.spotreba, 'kg')}</td>
@@ -152,7 +156,7 @@
 						<b>{fmtNum(ceny.lakovanie.spotrebaSpolu, 'kg')}</b>{#if !ceny.lakovanie.kompletne}
 							<span
 								class="neuplne"
-								title="Niektorý lakovaný profil nemá v Money rozvin — súčet je neúplný"
+								title="Niektorý lakovaný profil nemá rozvin, alebo nie je v bežných metroch — súčet je neúplný"
 								>⚠ neúplné</span
 							>
 						{/if}
@@ -161,8 +165,8 @@
 				</tr>
 			</tfoot>
 		</table>
-	{/if}
-</div>
+	</div>
+{/if}
 
 <style>
 	.neuplne {
@@ -170,8 +174,5 @@
 		font-size: 11px;
 		color: #b45309;
 		font-weight: 600;
-	}
-	.lak-sec {
-		margin-top: 18px;
 	}
 </style>
