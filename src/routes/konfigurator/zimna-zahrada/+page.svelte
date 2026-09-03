@@ -94,7 +94,7 @@
 
 <KonfProduktStranka
 	titul="Navrhni si zimnú záhradu — Montalu"
-	popis="Zostav si hliníkovú zimnú záhradu na mieru — vyber model, rozmery, farbu a typ zasklenia a pošli nezáväzný dopyt so špecifikáciou v PDF."
+	popis="Zostav si hliníkovú zimnú záhradu na mieru — vyber model, rozmery, systém stien, farbu a typ zasklenia a pošli nezáväzný dopyt so špecifikáciou v PDF."
 	foto="zimna-zahrada.webp"
 	alt="Hliníková zimná záhrada Montalu"
 	label="Konfigurátor zimných záhrad"

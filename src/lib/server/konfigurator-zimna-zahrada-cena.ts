@@ -78,7 +78,11 @@ export const CENNIK_VERZIA_ZZ = `${SEED.meta.vytazene}#${CENNIK_HASH}`;
 export const DPH_ZZ = SEED.meta.dph;
 /** Katalógová mriežka (metre). */
 export const MRIEZKA_ZZ = SEED.meta.mriezka;
-/** Bázový systém stien, na ktorom je matica vyťažená (pre honest poznámku). */
+/** #429: DEFAULT (UI) systém stien montalu glazing slug — od #429 NIE JE to jediný vyťažený systém
+ *  (matica má všetkých 6), len default voľba vo výberníku (`ZZ_SYSTEM_STIEN_DEFAULT`, non-breaking
+ *  báza z #408). Test `konfigurator-zimna-zahrada-cena.test.ts` PIN-uje
+ *  `glazingPreSystemStien(ZZ_SYSTEM_STIEN_DEFAULT) === BAZOVY_GLAZING_ZZ`, aby zmena defaultu na
+ *  jednej strane (fetch skript vs whitelist) nikdy nerozišla bez toho, aby to test odhalil. */
 export const BAZOVY_GLAZING_ZZ = SEED.meta.bazovyGlazing;
 
 /** DPH zimnej záhrady v celých percentách (23) — pre zdieľanú `sDphEur`/`zlozka` (celocentová

@@ -139,11 +139,15 @@ async function main() {
 					if (par) {
 						(cennik[glazing][roofing][k1(d)] ??= {})[k1(w)] = par;
 						// DPH vzorka: montalu vlastné zaokrúhlené reťazce s DPH — vezmi hraničné (.xx5) bunky,
-						// aby parity test odlíšil celocentový half-up od naivného FP.
+						// aby parity test odlíšil celocentový half-up od naivného FP. #429 review 🔵: glazing je
+						// TERAZ vonkajšia slučka, takže bez per-glazing stropu by prvých 6 nájdených .xx5 kotiev
+						// prišlo VŠETKY z JEDNÉHO glazingu (skutočne sa to stalo) — cap NAJVIAC 1 kotva na
+						// glazing (6 glazingov × 1 = rovnaký celkový strop 6, ale kotvy sa rozprestrú naprieč osou).
 						const moNet = par[0];
 						const moCent = Math.round(moNet * 100);
 						const jeHranica = (moCent * 23) % 100 === 50; // net*0.23 končí na .xx5 → half-up NAHOR
-						if (jeHranica && verifikaciaDph.length < 6) {
+						const kotievPreGlazing = verifikaciaDph.filter((v) => v.glazing === glazing).length;
+						if (jeHranica && verifikaciaDph.length < 6 && kotievPreGlazing < 1) {
 							verifikaciaDph.push({
 								glazing,
 								roofing,

@@ -18,7 +18,8 @@ import {
 	roofingPreZasklenie,
 	glazingPreSystemStien,
 	DPH_ZZ,
-	CENNIK_VERZIA_ZZ
+	CENNIK_VERZIA_ZZ,
+	BAZOVY_GLAZING_ZZ
 } from '../src/lib/server/konfigurator-zimna-zahrada-cena';
 import { cenaZCfgProdukt, opeciatkujCenuPreProdukt } from '../src/lib/server/dopyt-cena-stamp';
 import { parseZzCenaVstup } from '../src/lib/server/konfigurator-zimna-zahrada-vstup';
@@ -190,6 +191,14 @@ describe('roofing mapping (zasklenie → matica)', () => {
 			);
 		}
 	});
+
+	// review 🔵 (#429): `toContain(roofing)` samo osebe je VÁKUOVÉ — preklep v `nazov` spadne na
+	// bázový roofing (vždy prítomný v seede), takže test by prešiel aj pri kolízii dvoch mien na
+	// ten istý roofing. Dokáž, že KAŽDÝ nazov mapuje na VLASTNÝ (RÔZNY) roofing slug.
+	it('KAŽDÝ ZZ_ZASKLENIA nazov mapuje na RÔZNY roofing (žiadna kolízia dvoch mien na jeden slug)', () => {
+		const roofingy = new Set(ZZ_ZASKLENIA.map((z) => roofingPreZasklenie(z.nazov)));
+		expect(roofingy.size).toBe(ZZ_ZASKLENIA.length);
+	});
 });
 
 // --------------------------------------------------------------------------- //
@@ -205,6 +214,21 @@ describe('#429 systém stien mapping (systém stien → matica)', () => {
 				'cena'
 			);
 		}
+	});
+
+	// review 🔵 (#429): `toContain(glazing)` samo osebe je VÁKUOVÉ — preklep v `nazov` spadne na
+	// bázový glazing (vždy prítomný), takže test by prešiel aj pri kolízii dvoch mien na ten istý
+	// slug. Dokáž, že KAŽDÝCH 6 mien mapuje na 6 RÔZNYCH glazing slugov.
+	it('KAŽDÝ ZZ_SYSTEMY_STIEN nazov mapuje na RÔZNY glazing (žiadna kolízia dvoch mien na jeden slug)', () => {
+		const glazingy = new Set(ZZ_SYSTEMY_STIEN.map((s) => glazingPreSystemStien(s.nazov)));
+		expect(glazingy.size).toBe(ZZ_SYSTEMY_STIEN.length);
+	});
+
+	// review 🔵 (#429): komentár v `konfigurator-zimna-zahrada.ts` aj v playbooku tvrdí, že delimiter
+	// `|` je bezpečný, lebo ho ŽIADEN ZZ_SYSTEMY_STIEN nazov neobsahuje — over to PRIAMO (predtým to
+	// bola len neoverená prozaická poznámka).
+	it('ŽIADEN ZZ_SYSTEMY_STIEN nazov neobsahuje delimiter „|" (bezpečný pre kompozitný systemKod)', () => {
+		for (const s of ZZ_SYSTEMY_STIEN) expect(s.nazov).not.toContain('|');
 	});
 });
 
@@ -440,4 +464,12 @@ describe('metadáta cenníka', () => {
 	it('DPH je 0,23', () => expect(DPH_ZZ).toBe(0.23));
 	it('CENNIK_VERZIA_ZZ má tvar <iso>#<12hex>', () =>
 		expect(CENNIK_VERZIA_ZZ).toMatch(/^.+#[0-9a-f]{12}$/));
+
+	// review 🔵 (#429): DVA nezávislé zdroje pravdy pre bázový glazing — seedový `BAZOVY_GLAZING_ZZ`
+	// (`meta.bazovyGlazing`, čo fetch skript naozaj poslal ako default) a kódový `GLAZING_DEFAULT`
+	// (odvodený z `ZZ_SYSTEM_STIEN_DEFAULT` cez whitelist, s `??` fallbackom, ktorý by tichoticho
+	// zamaskoval budúci rename). PIN ich drží zosúladené — zmena jednej strany bez druhej tu PADNE.
+	it('#429: default systém stien (whitelist) ukazuje na TEN ISTÝ glazing ako seedový bázový default', () => {
+		expect(glazingPreSystemStien(ZZ_SYSTEM_STIEN_DEFAULT)).toBe(BAZOVY_GLAZING_ZZ);
+	});
 });
