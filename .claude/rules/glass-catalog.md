@@ -11,7 +11,7 @@ paths:
 
 ## Sklá sú DÁTA, nie kód
 
-Voľby skla sú riadky v `glass_types(nazov, redukcia_zero, poradie, system, hrubka, money_kod, sklo_korekcia)`,
+Voľby skla sú riadky v `glass_types(nazov, redukcia_zero, poradie, system, hrubka, money_kod, sklo_korekcia, hrubka_trieda)`,
 seedované sekvenčnými `PRAGMA user_version` migráciami v `src/lib/server/migracie.ts`.
 **Pridať / zmeniť sklo = MIGRÁCIA, nikdy vetva v kóde.** Katalóg pre systém dáva
 `glassTypesForSystem(system)` v `db.ts`.
@@ -31,6 +31,47 @@ sietkaSamostatnaVypocet); override sa prevlieka tým istým kanálom ako `redukc
 vzor; **prázdne pole = NULL zruší override, 0 je legitímna explicitná hodnota**). **Money-neutrálne:**
 mení sa LEN vypočítaný rozmer skla (plán/objednávka), Money odpis/dedup nedotknutý. Rozšírenie na
 ĎALŠIE per-sklo číselné pole = rovnaký kanál; NIKDY nehľadaj sklo len podľa názvu (kľúč row `id`).
+
+## Korekcia + varianta nárezáku PODĽA TRIEDY skladby (`hrubka_trieda`/`cfg_sklo_trieda`, #443)
+
+Nasledovník #440: pri desiatkach/stovkách skiel z Odoo je per-sklo korekcia neudržateľná — Patrik
+(msg 1789477/1789479) chce ju nastaviť RAZ na (systém × trieda skladby 6mm/16mm), nie per sklo.
+
+- **`glass_types.hrubka_trieda INTEGER`** (nullable, migrácia v37) = `6 | 16 | NULL` — TRIEDA
+  SKLADBY posuvu (6 = jednoduché sklo, 16 = izolačné dvojsklo), **NIE fyzická hrúbka** — nekoliduje
+  s existujúcim `hrubka` (Deluxe-only 6/10 mm, vyberá kladka/klzný profil cez `cfg_rez.sklo_hrubka`).
+  `NULL` = trieda sa neuplatňuje (Deluxe, Robust, spoločné `'ALL'` sklá — správanie nezmenené).
+  Backfill je z KURÁTOROVANÝCH dát, nikdy z názvu naslepo: Slide z `redukcia_zero` (1→16, 0→6,
+  presné Patrikovo zoskupenie), Štandard + z existujúceho `jeIzoSklo(nazov)` regexu (jednorazové
+  zrkadlo). `GlassType.hrubkaTrieda` je `6 | 16 | null` (nie plain `number`).
+- **`cfg_sklo_trieda(system, trieda, korekcia)`** (nová tabuľka, PK `(system, trieda)`) — korekcia
+  nastavená RAZ na (systém × trieda), čítaná/písaná cez `resolveGlassSystem` (ten istý alias ako
+  `glassTypesForSystem` — starý „Štandard" a „Štandard +" čítajú/píšu TEN ISTÝ riadok).
+- **Reťaz precedencie** (rieši sa NA HRANICI `zasklenia/+page.server.ts`, compute vrstva sa
+  NEMENÍ): `efektivnaKorekcia(g, system)` = `g.skloKorekcia` (#440, per-sklo, ostáva ako výnimka)
+  `?? triedaKorekcia(system, g.hrubkaTrieda)` (#443, per trieda) `?? null` (padne ďalej na
+  systémovú `cfg_sys.sklo_offset`, fallback `?? g.skloOffset` ostáva VO compute vrstve,
+  `compute-odpis.ts`/`compute-profily.ts`/`compute-sietka.ts`, nedotknuté).
+- **`efektivnaRedukciaZero(g)`** — pre KLASIFIKOVANÉ Slide sklo (`g.system === 'Slide' &&
+  g.hrubkaTrieda !== null`) sa `redukcia_zero` DERIVUJE z triedy (`trieda === 16`), inak sa číta
+  uložený stĺpec. Gate na `system === 'Slide'` je POVINNÝ — derivovanie pre iný systém by zmenilo
+  `PosuvSpec.redukciaZero` mimo Slide (kde je dnes inertné) a rozbilo `zasklenia-posuvspec-golden`
+  snapshot. Editor: redukcia checkbox sa pre klasifikované sklo VÔBEC nerenderuje (filtrovaný na
+  `hrubkaTrieda === null`) — server akcia preto MUSÍ iterovať TEN ISTÝ filtrovaný set, nikdy
+  všetky sklá systému (HTML checkbox nevie odlíšiť „nerenderované" od „odškrtnuté" — inak by
+  neodoslaný checkbox klasifikovaného skla ticho prepísal jeho `redukcia_zero` na `false`).
+- **`jeIzoTrieda(trieda, nazov)`** (`styl.ts`) = trieda-first (`trieda === 16`), regex `jeIzoSklo`
+  len fallback pre `trieda == null`. `sysStylPre`/`sklaDoPonuky`/`pridavnaKolajnicaDefault` majú
+  VOLITEĽNÝ `trieda` parameter — SERVER (skutočný compute + B2B pred-check v `nahlad`/
+  `nahladMulti`, cez `skloPre`'s `g.hrubkaTrieda`) ho vždy vypĺňa; KLIENT (`+page.svelte`) ho
+  zámerne nevypĺňa (design #443: parita pre všetky dnešné sklá je dokázaná testom, klient je
+  len UI-hint, nie Money-cesta) — `data.skla[].trieda` existuje pre budúce klientske využitie.
+- **Promócia jednotných #440 per-sklo hodnôt pri migrácii v37** — pre každú (system, trieda), ak
+  KAŽDÉ jej sklo malo ROVNAKÚ non-NULL `sklo_korekcia`, povýši sa na `cfg_sklo_trieda` a per-sklo
+  hodnoty sa vynulujú (bit-parita — efektívne číslo sa nemení). Nejednotné skupiny NEDOTKNUTÉ.
+  Dôsledok pre editor: per-sklo korekcia grid (#440) je teraz FILTROVANÝ na existujúce overridy
+  (`skloKorekcia !== null`) — dá sa len zrušiť/upraviť, NIE založiť nový (Patrik: „zbytočné tie
+  korekcie jednotlivo" — trieda je teraz primárny kanál, per-sklo ostáva len ako výnimka).
 
 ## Kľúč je (nazov, system), NIE globálne unikátny názov (od v22, #214)
 

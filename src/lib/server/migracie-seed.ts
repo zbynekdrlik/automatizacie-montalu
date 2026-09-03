@@ -7,6 +7,7 @@
 import type Database from 'better-sqlite3';
 import seed from './cfg_seed.json';
 import { logger } from './log';
+import { jeIzoSklo } from '../styl';
 
 const log = logger('migrate');
 
@@ -343,5 +344,95 @@ export function migrateGlassKorekcia(db: Database.Database, bump: (v: number) =>
 				db.exec('ALTER TABLE glass_types ADD COLUMN sklo_korekcia INTEGER;');
 		}
 		bump(36);
+	})();
+}
+
+/**
+ * v36 → v37 (#443): trieda skladby posuvu podľa HRÚBKY skla (6 mm vs 16 mm) namiesto
+ * per-sklo korekcie. Patrik (Odoo msg 1789477/1789479): pri 50–100 skladbách z Odoo je
+ * per-sklo os (#440) neudržateľná — pre nárezák je podstatná LEN trieda skladby (6mm/16mm),
+ * nie konkrétne sklo. Nový nullable stĺpec `glass_types.hrubka_trieda` (6|16|NULL — trieda
+ * SKLADBY, nekoliduje s `hrubka` — Deluxe-only fyzická 6/10 mm) + nová tabuľka
+ * `cfg_sklo_trieda(system, trieda, korekcia)` — korekcia sa nastaví RAZ na (systém × trieda).
+ *
+ * Backfill zo SKUTOČNE KURÁTOROVANÝCH dát, nikdy z názvu naslepo:
+ *  - Slide: z `redukcia_zero` (1 = IZO 4/8/4 = trieda 16, presne Patrikovo zoskupenie).
+ *  - Štandard +: z `jeIzoSklo(nazov)` — ten istý regex, ktorý dnes vyberá basic/IZO
+ *    nárezák (jednorazové zrkadlo pri migrácii, jediný zdroj pravdy).
+ *  - Robust / Deluxe / 'ALL': honest-null — trieda sa neuplatňuje, správanie nezmenené.
+ *
+ * Promócia jednotných per-sklo `sklo_korekcia` (#440) na triedu — bit-parity (Patrik mohol
+ * hodnoty od 1.9. nastaviť): pre každú (system, trieda) skupinu, ak KAŽDÉ jej sklo má
+ * ROVNAKÚ non-NULL korekciu, povýš na `cfg_sklo_trieda` a vynuluj per-sklo overridy
+ * (efektívne číslo sa nemení — reťaz `skloKorekcia ?? triedaKorekcia ?? systémová` dá to
+ * isté). Nejednotné skupiny sa NEDOTKNÚ — ostanú ako viditeľný per-sklo override.
+ *
+ * Celé v `db.transaction` (ALTER/CREATE sú v SQLite transakčné → pád sa čisto prehrá).
+ * Feature-detect `glass_types` (vzor v36 `migrateGlassKorekcia`) — minimálne migračné
+ * fixtures, ktoré ju nestavajú, ALTER/backfill preskočia; reálna prod DB ju má od v1.
+ * MONEY-NEUTRÁLNE: mení sa len vypočítaný rozmer skla + výber basic/IZO nárezáku pri
+ * KLASIFIKOVANOM skle, žiadny Money kód/dedup sa nedotýka. Design komentár + zamietnuté
+ * alternatívy na #443. Extrahované sem (large-file-split — `migracie.ts` je pri
+ * 1000-riadkovom strope), vzor `migrateGlassKorekcia`.
+ */
+export function migrateHrubkaTrieda(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 37) return;
+	const maGlass =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='glass_types'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maGlass) {
+			const cols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map(
+				(c) => c.name
+			);
+			if (!cols.includes('hrubka_trieda'))
+				db.exec('ALTER TABLE glass_types ADD COLUMN hrubka_trieda INTEGER;');
+		}
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS cfg_sklo_trieda (
+				system TEXT NOT NULL,
+				trieda INTEGER NOT NULL CHECK (trieda IN (6, 16)),
+				korekcia INTEGER NOT NULL,
+				PRIMARY KEY (system, trieda)
+			);
+		`);
+		if (maGlass) {
+			// 1) Slide: kurátorovaná os je `redukcia_zero` — NIKDY odvodenie z názvu.
+			db.exec(`
+				UPDATE glass_types SET hrubka_trieda = CASE WHEN redukcia_zero = 1 THEN 16 ELSE 6 END
+				WHERE system = 'Slide';
+			`);
+			// 2) Štandard +: IZO-nosť podľa toho istého regexu, ktorý dnes vyberá basic/IZO
+			// nárezák (jeIzoSklo) — jediný zdroj pravdy, jednorazové zrkadlo pri migrácii.
+			const std = db
+				.prepare("SELECT id, nazov FROM glass_types WHERE system = 'Štandard +'")
+				.all() as { id: number; nazov: string }[];
+			const updTrieda = db.prepare('UPDATE glass_types SET hrubka_trieda = ? WHERE id = ?');
+			for (const g of std) updTrieda.run(jeIzoSklo(g.nazov) ? 16 : 6, g.id);
+			// 3) Robust / Deluxe / 'ALL' → honest-null (nedotknuté, žiadna klasifikácia).
+
+			// 4) Promócia jednotných per-sklo `sklo_korekcia` na triedu (parity-safe).
+			const insTrieda = db.prepare(
+				'INSERT OR REPLACE INTO cfg_sklo_trieda (system, trieda, korekcia) VALUES (?, ?, ?)'
+			);
+			const nullKorekcia = db.prepare(
+				'UPDATE glass_types SET sklo_korekcia = NULL WHERE system = ? AND hrubka_trieda = ?'
+			);
+			for (const system of ['Slide', 'Štandard +']) {
+				for (const trieda of [6, 16] as const) {
+					const rows = db
+						.prepare('SELECT sklo_korekcia FROM glass_types WHERE system = ? AND hrubka_trieda = ?')
+						.all(system, trieda) as { sklo_korekcia: number | null }[];
+					if (rows.length === 0) continue;
+					const prva = rows[0]!.sklo_korekcia;
+					const jednotna = rows.every((r) => r.sklo_korekcia === prva) ? prva : null;
+					if (jednotna !== null) {
+						insTrieda.run(system, trieda, jednotna);
+						nullKorekcia.run(system, trieda);
+					}
+				}
+			}
+		}
+		bump(37);
 	})();
 }

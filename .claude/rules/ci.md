@@ -453,3 +453,13 @@ gh api repos/zbynekdrlik/automatizacie-montalu/branches/main/protection   # over
 Test **`tests/branch-protection-script.test.ts`** (vitest, mock `gh` na PATH — žiadne reálne API)
 pripína payload aj odvodenie shardov (fixture `SHARDS: 6` → 6 mutation contexts), takže regresia v
 skripte padne.
+
+## Push spúšťa DVA workflow-y (CI + Mutation) — pred `gh run cancel` VŽDY over `workflowName`
+
+Každý push na `dev` spustí `CI` **aj** `Mutation` (mutation-diff shardy, na PR sú to
+required checks). `gh run list` ukazuje OBA s rovnakým `displayTitle` (titulok commitu)
+a rovnakou SHA — vyzerajú ako duplikát, ale NIE sú. Incident (3.9., release 0.24.82):
+run Mutation workflow-u bol zrušený ako „duplikát CI" → mutation-diff shardy na PR #441
+skončili fail a PR ostal BLOCKED; oprava = `gh run rerun <id>`. Pravidlo: pred cancelom
+čítaj `gh run view <id> --json workflowName` — cancel len pri ZHODNOM workflowName na
+tej istej SHA (skutočný duplikát; aj ten sa vyskytuje, CI sa občas spustí 2× na jeden push).

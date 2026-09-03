@@ -47,7 +47,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v27 → v28: Deluxe 5K vrchná koľajnica ZASP202434 → ZASP202427 (#296, prečíslované z v27 kvôli kolízii s ledgerom #294)', () => {
 	it('user_version === 28 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(36);
+		expect(db.pragma('user_version', { simple: true })).toBe(37);
 	});
 
 	it('Deluxe|5K vrchná koľajnica (poradie 10) má opravený kód ZASP202427', () => {

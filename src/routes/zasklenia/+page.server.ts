@@ -4,7 +4,14 @@
 
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
-import { loadCfg, listSysStyly, listGlassTypes, glassTypesForSystem } from '$lib/server/db';
+import {
+	loadCfg,
+	listSysStyly,
+	listGlassTypes,
+	glassTypesForSystem,
+	efektivnaKorekcia,
+	efektivnaRedukciaZero
+} from '$lib/server/db';
 import {
 	safeCompute,
 	safeComputeMulti,
@@ -17,7 +24,7 @@ import {
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { znovaZOdpisu } from '$lib/server/znova';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
-import { sysStylPre, sklaDoPonuky, type ExistujeSysStyl } from '$lib/styl';
+import { sysStylPre, sklaDoPonuky, type ExistujeSysStyl, type TriedaZaNazov } from '$lib/styl';
 import {
 	writeOdpis,
 	isLive,
@@ -137,14 +144,20 @@ const existujeVCfg =
 	(s) =>
 		!!cfg[s];
 
-/** Sklo musí patriť k systému AJ k štýlu (napr. Štandard + opona nemá IZO skladbu). */
+/** Sklo musí patriť k systému AJ k štýlu (napr. Štandard + opona nemá IZO skladbu).
+ *  #443: `sklaDoPonuky` dostáva trieda-lookup (`platne` je práve TENTO systém, takže
+ *  `find` podľa mena je jednoznačný) — basic/IZO filter sa rozhoduje primárne triedou,
+ *  regex `jeIzoSklo` ostáva fallback len pre neklasifikované sklo. */
 function skloPre(cfg: ReturnType<typeof loadCfg>, system: string, styl: string, sklo: string) {
 	const platne = glassTypesForSystem(system);
+	const triedaZa: TriedaZaNazov = (nazov) =>
+		platne.find((g) => g.nazov === nazov)?.hrubkaTrieda ?? null;
 	const povolene = sklaDoPonuky(
 		system,
 		styl,
 		platne.map((g) => g.nazov),
-		existujeVCfg(cfg)
+		existujeVCfg(cfg),
+		triedaZa
 	);
 	return povolene.includes(sklo) ? (platne.find((g) => g.nazov === sklo) ?? null) : null;
 }
@@ -161,17 +174,20 @@ function compute(vstup: Vstup): {
 	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém a štýl.', spec: null };
 	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
 	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
-	// sysStylPre: v Štandard + vyberá basic/IZO nárezák ZVOLENÉ SKLO (Patrik)
+	// sysStylPre: v Štandard + vyberá basic/IZO nárezák ZVOLENÁ TRIEDA skla (#443,
+	// regex jeIzoSklo len fallback pre neklasifikované sklo)
 	// #109: zdieľaný builder pre OBE cesty (compute() aj computeMultiFrom()) — nové
 	// pole PosuvSpec, ktoré tu chýba, je teraz kompilačná chyba, nie tichá diera.
 	const spec: PosuvSpec = buildPosuvSpec({
-		sysStyl: sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg)),
+		sysStyl: sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg), g.hrubkaTrieda),
 		S: vstup.s,
 		V: vstup.v,
-		redukciaZero: g.redukciaZero,
+		// #443: pre klasifikované Slide sklo DERIVOVANÉ z triedy (efektivnaRedukciaZero);
+		// inak uložený stĺpec (honest-null fallback)
+		redukciaZero: efektivnaRedukciaZero(g),
 		skloHrubka: g.hrubka,
-		// #440: per-sklo override korekcie rozmeru skla (NULL = systémový skloOffset)
-		skloKorekcia: g.skloKorekcia,
+		// #443: reťaz precedencie per-sklo (#440) → trieda (systém × 6/16) → systémová
+		skloKorekcia: efektivnaKorekcia(g, vstup.system),
 		pridavnaKolajnica: vstup.pridavnaKolajnica,
 		// ručná dĺžka koľajnice (Patrik): mení rez → mení metre v odpise
 		kolajnica: vstup.kolajnica ?? undefined,
@@ -223,13 +239,14 @@ function computeMultiFrom(vstup: MultiVstup) {
 		// komentár na tickete).
 		specs.push(
 			buildPosuvSpec({
-				sysStyl: sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg)),
+				sysStyl: sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg), g.hrubkaTrieda),
 				S: p.s,
 				V: p.v,
-				redukciaZero: g.redukciaZero,
+				// #443: pre klasifikované Slide sklo DERIVOVANÉ z triedy; inak uložený stĺpec
+				redukciaZero: efektivnaRedukciaZero(g),
 				skloHrubka: g.hrubka,
-				// #440: per-sklo override korekcie rozmeru skla (NULL = systémový skloOffset)
-				skloKorekcia: g.skloKorekcia,
+				// #443: reťaz precedencie per-sklo (#440) → trieda (systém × 6/16) → systémová
+				skloKorekcia: efektivnaKorekcia(g, p.system),
 				otvaranie: p.otvaranie,
 				sklo: p.sklo,
 				kovanieL: p.kovanieL,
@@ -309,8 +326,14 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		systemy,
 		styly, // len existujúce kombinácie — neplatná voľba sa nedá odoslať
 		// sklá s príslušnosťou k systému — klient ponúkne len platné pre zvolený
-		// systém (Robust = 4/16/4, Slide = 4/8/4)
-		skla: listGlassTypes().map((g) => ({ nazov: g.nazov, system: g.system })),
+		// systém (Robust = 4/16/4, Slide = 4/8/4). `trieda` (#443) — trieda skladby
+		// (6/16/NULL); server-side selekcia nárezáku je autoritatívna (compute()),
+		// toto pole je zatiaľ len prenesené dáta pre budúce klientske využitie.
+		skla: listGlassTypes().map((g) => ({
+			nazov: g.nazov,
+			system: g.system,
+			trieda: g.hrubkaTrieda
+		})),
 		otvarania: OTVARANIA,
 		// kovanie krídla — zoznam pre selecty (len Robust), display-only
 		kovania: KOVANIA,
@@ -360,7 +383,11 @@ export const actions = {
 		let heightWarn: string | undefined;
 		if (isB2B(locals.user)) {
 			const cfg = loadCfg();
-			const sysStyl = sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg));
+			// #443 review: trieda-aware, rovnako ako compute() — inak by tento pred-check
+			// mohol pri novom neklasifikovanom Odoo skle vybrať iný sysStyl (a teda iné B2B
+			// medze) než skutočný výpočet nižšie.
+			const trieda = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo)?.hrubkaTrieda;
+			const sysStyl = sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg), trieda);
 			const wErr = checkB2BWidth(cfg, sysStyl, vstup.s);
 			if (wErr) return { step: 'form' as const, error: wErr, vstup };
 			heightWarn = checkB2BHeight(sysStyl, vstup.v) ?? undefined;
@@ -510,7 +537,9 @@ export const actions = {
 			const cfg = loadCfg();
 			const warns: string[] = [];
 			for (const p of vstup.posuvy) {
-				const sysStyl = sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg));
+				// #443 review: trieda-aware, rovnako ako computeMultiFrom() nižšie.
+				const trieda = skloPre(cfg, p.system, p.styl, p.sklo)?.hrubkaTrieda;
+				const sysStyl = sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg), trieda);
 				const wErr = checkB2BWidth(cfg, sysStyl, p.s);
 				if (wErr) return { step: 'form' as const, error: wErr, multiVstup: vstup };
 				const hW = checkB2BHeight(sysStyl, p.v);

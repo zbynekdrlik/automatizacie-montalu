@@ -22,7 +22,8 @@ import {
 	migrateDeluxe5KRail,
 	migrateOdooZakazkaPush,
 	migrateDopytProdukt,
-	migrateGlassKorekcia
+	migrateGlassKorekcia,
+	migrateHrubkaTrieda
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -986,6 +987,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateOdooZakazkaPush(db, bump); // v33 → v34 (#349); extrahované do migracie-seed (viď docstring)
 	migrateDopytProdukt(db, bump); // v34 → v35 (#384); extrahované do migracie-seed (viď docstring)
 	migrateGlassKorekcia(db, bump); // v35 → v36 (#440); extrahované do migracie-seed (viď docstring)
+	migrateHrubkaTrieda(db, bump); // v36 → v37 (#443); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

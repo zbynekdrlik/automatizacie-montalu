@@ -126,6 +126,26 @@ h1 {
 	font-size: 15px;
 	margin: 4px 0 0;
 }
+/* #444 — vysvetľujúce „prečo sa to robí" texty pri nastaveniach (POZNAMKY), jemne
+   odlíšené od .sub (tá popisuje MECHANIKU poľa — čo robí; .pozn nesie DÔVOD — prečo
+   existuje), aby obsluha rozumela nastaveniam aj bez Patrika. */
+.pozn {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+	background: var(--m-accent-soft);
+	border-left: 3px solid var(--m-accent);
+	color: var(--m-muted-ink);
+	font-size: 14px;
+	line-height: 1.5;
+	padding: 8px 12px;
+	margin: 6px 0 10px;
+	border-radius: var(--m-radius-sm);
+}
+.pozn::before {
+	content: 'ℹ️';
+	flex: none;
+}
 .badge {
 	display: inline-block;
 	background: var(--m-surface-2);

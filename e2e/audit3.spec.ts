@@ -19,10 +19,15 @@ const RUN = `E3-${Date.now().toString(36).toUpperCase()}`;
 const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
 const STYL = '/zasklenia/nastavenia?sysStyl=Robust%7C2K';
-// #438: prepínač „nuluje Redukciu 6mm" má zaškrtnuté sklá iba v systéme Slide (4/8/4),
-// takže glass-toggle test beží proti Slide stránke, nie Robustu.
+// #443: klasifikácia (hrubka_trieda 6/16) sa backfillla na VŠETKY sklá Slide (z
+// redukcia_zero) aj Štandard + (z jeIzoSklo) — editor preto tieto dve sekcie
+// nerenderuje pre ANI JEDNO ich sklo (redukcia checkbox aj per-sklo korekcia grid sú
+// filtrované na `hrubkaTrieda === null`/`skloKorekcia !== null`). Glass-toggle test
+// preto beží proti Robustu (own sklá ostávajú honest-null, #443, presne ako predtým),
+// Slide/Štandard + slúžia na overenie klasifikácie + novej triedovej korekcie.
 const SLIDE_STYL = '/zasklenia/nastavenia?sysStyl=Slide%7C2K';
 const STD_STYL = `/zasklenia/nastavenia?sysStyl=${encodeURIComponent('Štandard +|2K')}`;
+const DELUXE_STYL = '/zasklenia/nastavenia?sysStyl=Deluxe%7C2K';
 
 // ── #15 zasklenia „⏳ Čaká" celým UI vrátane skrytého round-tripu ──────────────
 // „Späť a upraviť" round-trip je krytý inde; TU ide o cestu náhľad → odoslať:
@@ -258,54 +263,77 @@ test('editor: hodnota mimo ±500 obídená v prehliadači → chybový banner a 
 	expect(consoleMsgs).toEqual([]);
 });
 
-// ── #22 editor: odškrtnutie skla (reálny POST) prepne nulovanie Redukcie 6mm ──
-test('editor: odškrtnutie skla vypne nulovanie Redukcie 6mm a zaškrtnutie ho vráti', async ({
+// ── #22/#443 editor: klasifikované sklo nemá redukcia checkbox; trieda-NULL sklo ho
+// má a toggle funguje ako predtým ─────────────────────────────────────────────────
+// Nahrádza pôvodný Slide-based toggle test — #443 klasifikovalo VŠETKY Slide sklá
+// (hrubka_trieda 6/16, backfill z redukcia_zero), takže editor pre ANI JEDNO z nich
+// redukcia checkbox už NErenderuje (`efektivnaRedukciaZero` derivuje hodnotu z triedy).
+test('editor: klasifikované sklo (Slide) nemá redukcia checkbox; trieda-NULL sklo (Robust) ho má a toggle funguje', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
-	await goto(page, SLIDE_STYL);
 
-	// prvé zaškrtnuté sklo (redukcia_zero = 1) — v Slide sú to 4/8/4 sklá. #438: meno
-	// poľa je teraz glass_<id> (stabilné cez reload), názov skla čítame z labelu.
-	const label = page.locator('label:has(input[type="checkbox"][name^="glass_"]:checked)').first();
+	// Slide: VŠETKY sklá klasifikované → sekcia „nulovanie Redukcie 6mm" je prázdna.
+	await goto(page, SLIDE_STYL);
+	await expect(page.locator('input[type="checkbox"][name^="glass_"]')).toHaveCount(0);
+
+	// Robust: vlastné sklá ostávajú honest-null (#443) → checkbox sekcia funguje ako
+	// predtým (#438). meno poľa je glass_<id> (stabilné cez reload), názov skla z labelu.
+	await goto(page, STYL);
+	const label = page.locator('label:has(input[type="checkbox"][name^="glass_"])').first();
 	await expect(label).toBeVisible();
 	const box = label.locator('input[type="checkbox"]');
 	const name = (await box.getAttribute('name'))!; // glass_<id>
 	const nazov = (await label.innerText()).trim();
+	const bolZaskrtnuty = await box.isChecked();
 
 	try {
-		// odškrtni → uloženie vypíše zmenu 1 → 0
-		await box.uncheck();
+		// prepni → uloženie vypíše zmenu opačným smerom, než je pôvodný stav
+		if (bolZaskrtnuty) await box.uncheck();
+		else await box.check();
 		await page.getByTestId('ulozit-vzorce').click();
 		await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
 		await expect(page.getByText(`Sklo „${nazov}" nuluje Redukciu 6mm`)).toBeVisible();
-		await expect(page.locator('.row', { hasText: `Sklo „${nazov}"` })).toContainText('1 → 0');
+		await expect(page.locator('.row', { hasText: `Sklo „${nazov}"` })).toContainText(
+			bolZaskrtnuty ? '1 → 0' : '0 → 1'
+		);
 
-		// po návrate je checkbox naozaj odškrtnutý (perzistované v DB)
+		// po návrate je checkbox naozaj prepnutý (perzistované v DB)
 		await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
 		await waitHydrated(page);
-		await expect(page.locator(`input[name="${name}"]`)).not.toBeChecked();
+		if (bolZaskrtnuty) await expect(page.locator(`input[name="${name}"]`)).not.toBeChecked();
+		else await expect(page.locator(`input[name="${name}"]`)).toBeChecked();
 	} finally {
-		// VŽDY vráť pôvodný stav — inak by Slide odpis počítal iné čísla ostatným testom
-		await goto(page, SLIDE_STYL);
-		await page.locator(`input[name="${name}"]`).check();
+		// VŽDY vráť pôvodný stav — inak by Robust odpis počítal iné čísla ostatným testom
+		await goto(page, STYL);
+		if (bolZaskrtnuty) await page.locator(`input[name="${name}"]`).check();
+		else await page.locator(`input[name="${name}"]`).uncheck();
 		await page.getByTestId('ulozit-vzorce').click();
 		await page.getByTestId('nastavenia-ulozene').waitFor();
 	}
 
-	await expect(page.locator('.row', { hasText: `Sklo „${nazov}"` })).toContainText('0 → 1');
-	await goto(page, SLIDE_STYL);
-	await expect(page.locator(`input[name="${name}"]`)).toBeChecked();
+	await expect(page.locator('.row', { hasText: `Sklo „${nazov}"` })).toContainText(
+		bolZaskrtnuty ? '0 → 1' : '1 → 0'
+	);
+	await goto(page, STYL);
+	if (bolZaskrtnuty) await expect(page.locator(`input[name="${name}"]`)).toBeChecked();
+	else await expect(page.locator(`input[name="${name}"]`)).not.toBeChecked();
 	expect(consoleMsgs).toEqual([]);
 });
 
-// ── #438 editor: sekcia skiel ukáže LEN sklá vybraného systému ────────────────
-// „3.3.1" žije v Slide aj Štandard +; „Float sklo 4 mm" je len Štandard +. Cross-
-// systémový render + save (WHERE nazov=?) prehadzoval redukciu obidvom (prod cfg_audit
-// 16). Po oprave sekcia ukazuje len sklá zvoleného systému.
-test('editor: sekcia skiel je scoped na vybraný systém (#438)', async ({ page }) => {
+// ── #438/#443 editor: sekcia skiel ukáže LEN sklá vybraného systému ───────────
+// Pôvodne: „3.3.1" žije v Slide aj Štandard +; „Float sklo 4 mm" je len Štandard +.
+// Cross-systémový render + save (WHERE nazov=?) prehadzoval redukciu obidvom (prod
+// cfg_audit 16). #443 klasifikovalo VŠETKY sklá OBOCH systémov (Slide z redukcia_zero,
+// Štandard + z jeIzoSklo) — redukcia checkbox sekcia je preto na oboch teraz PRÁZDNA
+// (žiadne trieda-NULL sklo im ostalo), takže glass-name enumeráciu už z nej nemožno
+// čítať pre TIETO dva systémy. Sekcia ostáva funkčná a scoped pre systémy, ktoré
+// klasifikáciu nemajú (Robust/Deluxe, honest-null, #443) — test beží proti nim.
+test('editor: sekcia skiel je scoped na vybraný systém (#438); Slide/Štandard + majú po #443 klasifikáciu, sekcia je prázdna', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
@@ -315,17 +343,24 @@ test('editor: sekcia skiel je scoped na vybraný systém (#438)', async ({ page 
 			(t) => t.trim()
 		);
 
-	// Slide stránka: Slide sklá SÚ, Štandard + „Float sklo 4 mm" NIE JE.
-	await goto(page, SLIDE_STYL);
-	const slide = await glassLabely();
-	expect(slide).toContain('3.3.1');
-	expect(slide).not.toContain('Float sklo 4 mm');
+	// Robust stránka: Robust sklá SÚ, Deluxe „Float kalené 6 mm" NIE JE.
+	await goto(page, STYL);
+	const robust = await glassLabely();
+	expect(robust).toContain('Izolačné sklo 4/16/4 mliečne');
+	expect(robust).not.toContain('Float kalené 6 mm');
 
-	// Štandard + stránka: „Float sklo 4 mm" JE, Slide „6mm číre" NIE JE.
+	// Deluxe stránka: „Float kalené 6 mm" JE, Robust „Izolačné sklo 4/16/4 mliečne" NIE JE.
+	await goto(page, DELUXE_STYL);
+	const deluxe = await glassLabely();
+	expect(deluxe).toContain('Float kalené 6 mm');
+	expect(deluxe).not.toContain('Izolačné sklo 4/16/4 mliečne');
+
+	// Slide aj Štandard + majú po #443 klasifikáciu — sekcia je prázdna na oboch (nie
+	// je čo scopovať, lebo neostalo žiadne trieda-NULL sklo).
+	await goto(page, SLIDE_STYL);
+	expect(await glassLabely()).toEqual([]);
 	await goto(page, STD_STYL);
-	const standard = await glassLabely();
-	expect(standard).toContain('Float sklo 4 mm');
-	expect(standard).not.toContain('6mm číre');
+	expect(await glassLabely()).toEqual([]);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -390,10 +425,14 @@ test('editor: po uložení a návrate formulár drží novú hodnotu (nie starú
 	expect(consoleMsgs).toEqual([]);
 });
 
-// ── #440 editor: per-sklo číselná korekcia rozmeru skla (reálny POST) ──────────
-// Korekcia je nastaviteľná per SKLO (16 mm vs 6 mm). Prázdne pole = systémová korekcia;
+// ── #440/#443 editor: korekcia rozmeru skla PER TRIEDA (reálny POST) ───────────
+// #443 nahradilo per-sklo korekciu (#440) triedovou (6mm/16mm, cfg_sklo_trieda) —
+// nastavuje sa RAZ pre celý systém × triedu, nie per sklo. Migrácia v37 POVÝŠILA
+// jednotné #440 per-sklo hodnoty na triedu a vynulovala ich, takže per-sklo grid je
+// dnes FILTROVANÝ len na existujúce overridy a na čerstvej DB je PRÁZDNY (nemá čo
+// zobraziť — žiadne sklo override nemá). Prázdne pole triedy = systémová korekcia;
 // zadaná hodnota sa uloží a prežije reload, prázdne pole override zruší.
-test('editor: číselná korekcia rozmeru skla sa uloží, prežije reload a prázdne pole ju zruší (#440)', async ({
+test('editor: trieda korekcia rozmeru skla sa uloží, prežije reload a prázdne pole ju zruší (#440/#443)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -401,36 +440,37 @@ test('editor: číselná korekcia rozmeru skla sa uloží, prežije reload a pr�
 	await loginAs(page);
 	await goto(page, SLIDE_STYL);
 
-	// prvý korekčný input (per sklo), meno korekcia_<id>; názov skla čítame z labelu
-	const kor = page.locator('input[name^="korekcia_"]').first();
-	await expect(kor).toBeVisible();
-	const name = (await kor.getAttribute('name'))!; // korekcia_<id>
-	const nazov = (await page.locator(`label[for="${name}"]`).innerText())
-		.replace('— korekcia rozmeru', '')
-		.trim();
+	// #443 filtrovaný grid: na čerstvej DB nemá žiadne sklo per-sklo override → prázdny.
+	await expect(page.locator('input[name^="korekcia_"]')).toHaveCount(0);
+
+	const trieda16 = page.getByLabel('Trieda 16 mm — korekcia rozmeru (mm)');
+	await expect(trieda16).toBeVisible();
+	await expect(trieda16).toHaveValue('');
 
 	try {
-		// zadaj korekciu 55 → uloženie vypíše „systémová → 55" pre TOTO sklo
-		await kor.fill('55');
+		// zadaj korekciu 55 → uloženie vypíše „systémová → 55" pre triedu 16 mm
+		await trieda16.fill('55');
 		await page.getByTestId('ulozit-vzorce').click();
 		await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
-		await expect(page.getByText(`Sklo „${nazov}" korekcia rozmeru`)).toBeVisible();
-		await expect(page.locator('.row', { hasText: 'korekcia rozmeru' })).toContainText('55');
+		await expect(page.getByText('Korekcia skla — trieda 16 mm')).toBeVisible();
+		await expect(page.locator('.row', { hasText: 'trieda 16 mm' })).toContainText('55');
 
-		// po návrate má input NOVÚ hodnotu (perzistované v DB)
+		// po návrate má input NOVÚ hodnotu (perzistované v cfg_sklo_trieda)
 		await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
 		await waitHydrated(page);
-		await expect(page.locator(`input[name="${name}"]`)).toHaveValue('55');
+		await expect(page.getByLabel('Trieda 16 mm — korekcia rozmeru (mm)')).toHaveValue('55');
 	} finally {
 		// VŽDY vráť pôvodný stav (prázdne = systémová) — inak by Slide odpis počítal iné čísla
 		await goto(page, SLIDE_STYL);
-		await page.locator(`input[name="${name}"]`).fill('');
+		await page.getByLabel('Trieda 16 mm — korekcia rozmeru (mm)').fill('');
 		await page.getByTestId('ulozit-vzorce').click();
 		await page.getByTestId('nastavenia-ulozene').waitFor();
 	}
 
 	// prázdne pole zrušilo override → po reload je input prázdny (systémová korekcia)
 	await goto(page, SLIDE_STYL);
-	await expect(page.locator(`input[name="${name}"]`)).toHaveValue('');
+	await expect(page.getByLabel('Trieda 16 mm — korekcia rozmeru (mm)')).toHaveValue('');
+	// per-sklo grid ostáva prázdny — trieda korekcia ho nezaložila
+	await expect(page.locator('input[name^="korekcia_"]')).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });

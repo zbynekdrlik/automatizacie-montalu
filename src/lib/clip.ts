@@ -5,19 +5,28 @@
 // každá 4 hárky Clip varianta B0–B3 (variant = počet výplní 1–4). Plná extrakcia
 // vzorcov: `~/.claude/work-products/ch207-att-2026-09-01/clip-vektory.md`.
 //
-// ROZSAH (čistá časť, #372 ostáva OTVORENÝ): implementuje sa IZO B0–B3 + klasika
-// B0/B1 — ich Money kódy (ZASP*) sú ŽIVO overené (existencia, Deleted=false,
-// skladová karta, Model_UserData='Pevné zasklenie Clip' — design komentár + STEP 0).
-// VYLÚČENÉ (čakajú na Patrikove odpovede — data-driven whitelist `dostupneVarianty`):
-//   - klasika B2/B3 — šablóna používa kódy `KM12 Z516`/`KM12Z518`/`K-M12Z517`, ktoré
-//     v Money NEEXISTUJÚ (copy-paste zo staršej šablóny). `dostupneVarianty('klasika')`
-//     = [1,2]. Po potvrdení kódov: doplniť do katalógu + rozšíriť whitelist na [1..4]
-//     + kontraktné vektory pre 2 nové hárky. ŽIADNA zmena compute/route.
+// ROZSAH (#372 ostáva OTVORENÝ kvôli bodu nižšie): implementuje sa IZO B0–B3 +
+// klasika B0–B3 — Money kódy (ZASP*) sú ŽIVO overené (existencia, Deleted=false,
+// skladová karta, Model_UserData='Pevné zasklenie Clip' — design komentár + STEP 0)
+// a Patrik (3.9.2026, msg 1789480) potvrdil, že B2/B3 klasika používa TIE ISTÉ ZASP
+// kódy ako B0/B1 — šablónové `KM12 Z516`/`KM12Z518`/`K-M12Z517` sa NEPOUŽÍVAJÚ.
+// VYLÚČENÉ (čaká na Dominikovu odpoveď — Patrik „zajtra prezistim u dominika"):
 //   - 4 drobné položky (vnút./vonk. tesnenie, spojovník priečky, kolík 6x12) — ich
 //     kódy (`K120518`/`K120540`/`K12518`/`K80376015`) v Money NEEXISTUJÚ, preto majú
 //     `kod: null`: v kontrole sa ZOBRAZIA s množstvom a štítkom „neodpisuje sa", do
 //     Money odpisu NEVSTUPUJÚ (honest-null disciplína z `bazen-komponenty.ts`). Po
 //     doplnení kódu do katalógu (null → skutočný kód) začnú vstupovať automaticky.
+//
+// T16 pasca (šablónová chyba, Patrik potvrdil „Bude chyba"): „FIX - klasika.xlsx"
+// mala v B2/B3 hárkoch bunku T16 (počet ks pre delenie priečkovej tyče) napevno =1
+// namiesto =F16 (počet priečok = N-1, ako v IZO). Táto appka šablónu nikdy
+// bunka-po-bunke neimplementovala — `computeClip` nižšie vždy použije SKUTOČNÝ počet
+// priečok (N-1), takže T16 pascu nikdy nezdedila (pozri `poziciePriecok`/riadok
+// `priečka` — pin proti regresii je `klasika B3 (N=4) 3000×2600` v `clip.test.ts`).
+//
+// appka nemá pre zábradlie žiadnu inú UI voľbu než CLIP — Patrikov „druhý druh" je
+// fyzický katalóg mimo appky (dopredaj bez matríc), nikdy neimplementovaný; `/fix` je
+// odlišný produkt (pevné zasklenie), nie zábradlie.
 //
 // Jednotný parametrický vzorec (šablóny sú JEDNA rodina, nie 8 nezávislých hárkov):
 //   šírka výplne (B10) = (B6 − (19 + 29·N)) / N − 8   (N = počet výplní)
@@ -129,12 +138,14 @@ export function jeClipTyp(x: unknown): x is ClipTyp {
 
 /**
  * Data-driven whitelist dostupných variantov (počet výplní N) pre daný typ.
- * izo → 1..4 (všetky kódy overené); klasika → 1..2 (B2/B3 čakajú na Patrikove
- * kódy — pozri hlavičku). Rozšírenie po odpovedi = zmena TOHTO poľa + katalógu,
- * NIE compute/route.
+ * Po Patrikovej odpovedi (3.9.2026, msg 1789480 — „Ano tie kody sú všade rovnaké")
+ * je whitelist rovnaký pre OBA typy: 1..4 (izo aj klasika, všetky kódy ŽIVO
+ * overené — pozri hlavičku). Parameter `typ` ostáva v podpise (volané ako
+ * `dostupneVarianty(vstup.typ)`) pre volaciu kompatibilitu a prípadnú budúcu
+ * typ-špecifickú reštrikciu — dnes bez rozdielu.
  */
-export function dostupneVarianty(typ: ClipTyp): number[] {
-	return typ === 'izo' ? [1, 2, 3, 4] : [1, 2];
+export function dostupneVarianty(_typ: ClipTyp): number[] {
+	return [1, 2, 3, 4];
 }
 
 /** Popis výplne pre hlavičku/tlač (informačný). */
@@ -156,9 +167,7 @@ export function chybaClipVstupu(vstup: ClipVstup): string | null {
 	const { typ, variant: N, sirka, vyska } = vstup;
 	if (!jeClipTyp(typ)) return 'Neplatný typ výplne.';
 	if (!Number.isInteger(N) || !dostupneVarianty(typ).includes(N))
-		return typ === 'klasika'
-			? 'Pre klasiku sú zatiaľ dostupné len B0 a B1 (1–2 výplne) — B2/B3 čakajú na potvrdenie kódov od Patrika.'
-			: `Neplatný počet výplní (${N}) — povolené 1–4.`;
+		return `Neplatný počet výplní (${N}) — povolené 1–4.`;
 	if (!(sirka >= CLIP_MIN_SIRKA && sirka <= CLIP_MAX_SIRKA))
 		return `Šírka zábradlia musí byť ${CLIP_MIN_SIRKA}–${CLIP_MAX_SIRKA} mm.`;
 	if (!(vyska >= CLIP_MIN_VYSKA && vyska <= CLIP_MAX_VYSKA))

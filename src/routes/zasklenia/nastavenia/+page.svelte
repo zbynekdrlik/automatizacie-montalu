@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { nazovSysStyl } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
+	import { POZNAMKY } from '$lib/nastavenia-poznamky';
 
 	let { data, form } = $props();
 
@@ -116,12 +117,55 @@
 				/>
 			</div>
 
+			{#if data.maTrieda6 || data.maTrieda16}
+				<div class="sec" style="margin-top:16px">Korekcia skla podľa triedy (6mm / 16mm)</div>
+				<p class="pozn">{POZNAMKY.korekcia}</p>
+				<p class="sub" style="margin-bottom:10px">
+					Nastav RAZ pre celú triedu — platí pre všetky sklá tej triedy v systéme {data.system}.
+					<b>Prázdne pole = systémová korekcia</b> („Sklo — konečné zmenšenie" vyššie).
+				</p>
+				<div class="grid2">
+					{#if data.maTrieda6}
+						<div class="field">
+							<label for="trieda_6">Trieda 6 mm — korekcia rozmeru (mm)</label>
+							<input
+								id="trieda_6"
+								name="trieda_6"
+								type="number"
+								step="1"
+								min="0"
+								max="500"
+								value={data.trieda6Korekcia ?? ''}
+								placeholder="systémová"
+							/>
+						</div>
+					{/if}
+					{#if data.maTrieda16}
+						<div class="field">
+							<label for="trieda_16">Trieda 16 mm — korekcia rozmeru (mm)</label>
+							<input
+								id="trieda_16"
+								name="trieda_16"
+								type="number"
+								step="1"
+								min="0"
+								max="500"
+								value={data.trieda16Korekcia ?? ''}
+								placeholder="systémová"
+							/>
+						</div>
+					{/if}
+				</div>
+			{/if}
+
 			<div class="sec" style="margin-top:16px">Sklá — nulovanie Redukcie 6mm</div>
+			<p class="pozn">{POZNAMKY.redukcia}</p>
 			<p class="sub" style="margin-bottom:10px">
 				Zaškrtnuté sklo znamená: pri tomto skle sa Redukcia 6mm do odpisu NEpočíta. Platí len pre
-				systém {data.system} (Redukcia 6mm má vplyv iba v systéme Slide).
+				systém {data.system} (Redukcia 6mm má vplyv iba v systéme Slide). Sklá s klasifikovanou triedou
+				(6mm/16mm vyššie) tu nie sú — ich redukcia sa odvodzuje z triedy automaticky.
 			</p>
-			{#each data.glass as g (g.id)}
+			{#each data.glass.filter((g) => g.hrubkaTrieda === null) as g (g.id)}
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
 						<input
@@ -136,27 +180,29 @@
 				</div>
 			{/each}
 
-			<div class="sec" style="margin-top:16px">Sklá — korekcia rozmeru skla (mm)</div>
-			<p class="sub" style="margin-bottom:10px">
-				Korekcia rozmeru skla pre KONKRÉTNE sklo (napr. solo pre 16 mm vs 6 mm sklo).
-				<b>Prázdne pole = systémová korekcia</b> („Sklo — konečné zmenšenie" vyššie). Platí len pre
-				systém {data.system}.
-			</p>
-			{#each data.glass as g (g.id)}
-				<div class="field">
-					<label for="korekcia_{g.id}">{g.nazov} — korekcia rozmeru</label>
-					<input
-						id="korekcia_{g.id}"
-						name="korekcia_{g.id}"
-						type="number"
-						step="1"
-						min="0"
-						max="500"
-						value={g.skloKorekcia ?? ''}
-						placeholder="systémová"
-					/>
-				</div>
-			{/each}
+			{#if data.glass.some((g) => g.skloKorekcia !== null)}
+				<div class="sec" style="margin-top:16px">Sklá — per-sklo výnimka korekcie (mm)</div>
+				<p class="sub" style="margin-bottom:10px">
+					Staršia korekcia pre KONKRÉTNE sklo (#440) — dnes výnimka nad triedovou korekciou vyššie.
+					Zobrazujú sa len sklá, ktoré override reálne majú.
+					<b>Prázdne pole = zruš výnimku</b> (padne na triedovú/systémovú korekciu).
+				</p>
+				{#each data.glass.filter((g) => g.skloKorekcia !== null) as g (g.id)}
+					<div class="field">
+						<label for="korekcia_{g.id}">{g.nazov} — korekcia rozmeru</label>
+						<input
+							id="korekcia_{g.id}"
+							name="korekcia_{g.id}"
+							type="number"
+							step="1"
+							min="0"
+							max="500"
+							value={g.skloKorekcia ?? ''}
+							placeholder="systémová"
+						/>
+					</div>
+				{/each}
+			{/if}
 
 			<div class="sec" style="margin-top:16px">Kontrolné rozmery pre náhľad odpisu</div>
 			<div class="grid2">

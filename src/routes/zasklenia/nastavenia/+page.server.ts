@@ -2,7 +2,13 @@
 // old→new náhľad odpisu na kontrolných rozmeroch.
 
 import type { Actions, PageServerLoad } from './$types';
-import { loadCfg, listSysStyly, glassTypesForSystem, systemFromSysStyl } from '$lib/server/db';
+import {
+	loadCfg,
+	listSysStyly,
+	glassTypesForSystem,
+	systemFromSysStyl,
+	triedaKorekcia
+} from '$lib/server/db';
 import {
 	getEditableRows,
 	saveCfgChanges,
@@ -20,12 +26,20 @@ export const load: PageServerLoad = async ({ url }) => {
 	// prehadzoval redukciu obidvom. glassTypesForSystem rieši alias starý Štandard →
 	// Štandard +. Identita checkboxu je row `id`, aby sa rovnaké názvy nikdy nekolidovali.
 	const system = systemFromSysStyl(sysStyl);
+	const glass = glassTypesForSystem(system);
+	// #443: dva inputy trieda_6/trieda_16 sa zobrazia LEN keď má systém KLASIFIKOVANÉ
+	// sklo tej triedy (inak by editor ponúkal korekciu pre triedu, ktorú tento systém
+	// vôbec nemá — napr. trieda 16 pri Deluxe, kde je hrubkaTrieda vždy NULL).
 	return {
 		styly,
 		sysStyl,
 		system,
 		editable,
-		glass: glassTypesForSystem(system),
+		glass,
+		maTrieda6: glass.some((g) => g.hrubkaTrieda === 6),
+		maTrieda16: glass.some((g) => g.hrubkaTrieda === 16),
+		trieda6Korekcia: triedaKorekcia(system, 6),
+		trieda16Korekcia: triedaKorekcia(system, 16),
 		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) as CfgZmena[] }))
 	};
 };
@@ -50,15 +64,35 @@ export const actions = {
 		// #440: per-sklo korekcia rozmeru — mapa kľúčovaná row `id` (rovnako ako redukcia). Prázdne
 		// pole = NULL (zruš override → systémový skloOffset), NIE 0 (0 je legitímna explicitná hodnota).
 		const glassKorekcia = new Map<number, number | null>();
-		for (const g of glassTypesForSystem(systemFromSysStyl(sysStyl))) {
+		const glass = glassTypesForSystem(systemFromSysStyl(sysStyl));
+		// #443: redukcia checkbox sa v editore renderuje LEN pre trieda-NULL sklá (klasifikované
+		// sklo má redukciu DERIVOVANÚ z triedy). HTML checkbox nevie odlíšiť „nerenderované" od
+		// „renderované a odškrtnuté" (oboje sa jednoducho nepošle) — preto server iteruje TEN
+		// ISTÝ filtrovaný set, aký UI zobrazilo, nikdy VŠETKY sklá systému (inak by neodoslaný
+		// checkbox klasifikovaného skla ticho prepísal jeho uložený stĺpec na false pri uložení).
+		for (const g of glass.filter((g) => g.hrubkaTrieda === null)) {
 			glassRedukcia.set(g.id, form.get(`glass_${g.id}`) === '1');
+		}
+		for (const g of glass) {
 			// LEN keď je pole reálne v POST-e (form.has). Chýbajúce pole (stará karta pred nasadením
-			// bez korekčných inputov / skriptovaný POST) sa NErovná „prázdne = zruš override" —
-			// vynecháme ho z mapy → saveCfgChanges ho nechá bez zmeny. Prítomné prázdne pole = NULL.
+			// bez korekčných inputov / skriptovaný POST, alebo #443 filtrovaný grid ukazujúci LEN
+			// existujúce overridy) sa NErovná „prázdne = zruš override" — vynecháme ho z mapy →
+			// saveCfgChanges ho nechá bez zmeny. Prítomné prázdne pole = NULL.
 			if (form.has(`korekcia_${g.id}`)) {
 				const raw = String(form.get(`korekcia_${g.id}`) ?? '').trim();
 				glassKorekcia.set(g.id, raw === '' ? null : num(raw));
 			}
+		}
+		// #443: korekcia PER TRIEDA (6/16) — rovnaký form.has() guard (chýbajúce pole = bez
+		// zmeny; prítomné prázdne pole = NULL = zruš override → systémová).
+		const triedaKorekciaVstup = new Map<6 | 16, number | null>();
+		if (form.has('trieda_6')) {
+			const raw = String(form.get('trieda_6') ?? '').trim();
+			triedaKorekciaVstup.set(6, raw === '' ? null : num(raw));
+		}
+		if (form.has('trieda_16')) {
+			const raw = String(form.get('trieda_16') ?? '').trim();
+			triedaKorekciaVstup.set(16, raw === '' ? null : num(raw));
 		}
 
 		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je
@@ -75,7 +109,8 @@ export const actions = {
 			offsets,
 			skloOffset,
 			glassRedukcia,
-			glassKorekcia
+			glassKorekcia,
+			triedaKorekcia: triedaKorekciaVstup
 		});
 		if (error) return { error, sysStyl };
 
