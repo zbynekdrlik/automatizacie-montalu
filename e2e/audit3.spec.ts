@@ -19,6 +19,10 @@ const RUN = `E3-${Date.now().toString(36).toUpperCase()}`;
 const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
 const STYL = '/zasklenia/nastavenia?sysStyl=Robust%7C2K';
+// #438: prepínač „nuluje Redukciu 6mm" má zaškrtnuté sklá iba v systéme Slide (4/8/4),
+// takže glass-toggle test beží proti Slide stránke, nie Robustu.
+const SLIDE_STYL = '/zasklenia/nastavenia?sysStyl=Slide%7C2K';
+const STD_STYL = `/zasklenia/nastavenia?sysStyl=${encodeURIComponent('Štandard +|2K')}`;
 
 // ── #15 zasklenia „⏳ Čaká" celým UI vrátane skrytého round-tripu ──────────────
 // „Späť a upraviť" round-trip je krytý inde; TU ide o cestu náhľad → odoslať:
@@ -261,12 +265,15 @@ test('editor: odškrtnutie skla vypne nulovanie Redukcie 6mm a zaškrtnutie ho v
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
-	await goto(page, STYL);
+	await goto(page, SLIDE_STYL);
 
-	// prvé zaškrtnuté sklo (redukcia_zero = 1) — meno poľa je glass_<názov>
-	const box = page.locator('input[type="checkbox"][name^="glass_"]:checked').first();
-	await expect(box).toBeVisible();
-	const nazov = (await box.getAttribute('name'))!.slice('glass_'.length);
+	// prvé zaškrtnuté sklo (redukcia_zero = 1) — v Slide sú to 4/8/4 sklá. #438: meno
+	// poľa je teraz glass_<id> (stabilné cez reload), názov skla čítame z labelu.
+	const label = page.locator('label:has(input[type="checkbox"][name^="glass_"]:checked)').first();
+	await expect(label).toBeVisible();
+	const box = label.locator('input[type="checkbox"]');
+	const name = (await box.getAttribute('name'))!; // glass_<id>
+	const nazov = (await label.innerText()).trim();
 
 	try {
 		// odškrtni → uloženie vypíše zmenu 1 → 0
@@ -279,18 +286,47 @@ test('editor: odškrtnutie skla vypne nulovanie Redukcie 6mm a zaškrtnutie ho v
 		// po návrate je checkbox naozaj odškrtnutý (perzistované v DB)
 		await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
 		await waitHydrated(page);
-		await expect(page.locator(`input[name="glass_${nazov}"]`)).not.toBeChecked();
+		await expect(page.locator(`input[name="${name}"]`)).not.toBeChecked();
 	} finally {
 		// VŽDY vráť pôvodný stav — inak by Slide odpis počítal iné čísla ostatným testom
-		await goto(page, STYL);
-		await page.locator(`input[name="glass_${nazov}"]`).check();
+		await goto(page, SLIDE_STYL);
+		await page.locator(`input[name="${name}"]`).check();
 		await page.getByTestId('ulozit-vzorce').click();
 		await page.getByTestId('nastavenia-ulozene').waitFor();
 	}
 
 	await expect(page.locator('.row', { hasText: `Sklo „${nazov}"` })).toContainText('0 → 1');
-	await goto(page, STYL);
-	await expect(page.locator(`input[name="glass_${nazov}"]`)).toBeChecked();
+	await goto(page, SLIDE_STYL);
+	await expect(page.locator(`input[name="${name}"]`)).toBeChecked();
+	expect(consoleMsgs).toEqual([]);
+});
+
+// ── #438 editor: sekcia skiel ukáže LEN sklá vybraného systému ────────────────
+// „3.3.1" žije v Slide aj Štandard +; „Float sklo 4 mm" je len Štandard +. Cross-
+// systémový render + save (WHERE nazov=?) prehadzoval redukciu obidvom (prod cfg_audit
+// 16). Po oprave sekcia ukazuje len sklá zvoleného systému.
+test('editor: sekcia skiel je scoped na vybraný systém (#438)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+
+	const glassLabely = async () =>
+		(await page.locator('label:has(input[type="checkbox"][name^="glass_"])').allInnerTexts()).map(
+			(t) => t.trim()
+		);
+
+	// Slide stránka: Slide sklá SÚ, Štandard + „Float sklo 4 mm" NIE JE.
+	await goto(page, SLIDE_STYL);
+	const slide = await glassLabely();
+	expect(slide).toContain('3.3.1');
+	expect(slide).not.toContain('Float sklo 4 mm');
+
+	// Štandard + stránka: „Float sklo 4 mm" JE, Slide „6mm číre" NIE JE.
+	await goto(page, STD_STYL);
+	const standard = await glassLabely();
+	expect(standard).toContain('Float sklo 4 mm');
+	expect(standard).not.toContain('6mm číre');
+
 	expect(consoleMsgs).toEqual([]);
 });
 

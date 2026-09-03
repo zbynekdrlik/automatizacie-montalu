@@ -79,6 +79,12 @@ export function loadCfg(): Cfg {
 	return buildCFG(sys, rez);
 }
 
+/** Systémová časť `sysStyl` (pred prvým „|"), napr. „Slide|2K" → „Slide". Jediné miesto,
+ *  kde sa `sysStyl` rozparsuje na systém (load/action/save editora, #438). */
+export function systemFromSysStyl(sysStyl: string): string {
+	return sysStyl.split('|')[0] ?? '';
+}
+
 export function listSysStyly(): { sysStyl: string; system: string; styl: string; N: number }[] {
 	return (
 		db.prepare('SELECT sys_styl, n FROM cfg_sys ORDER BY sys_styl').all() as {
@@ -87,13 +93,16 @@ export function listSysStyly(): { sysStyl: string; system: string; styl: string;
 		}[]
 	).map((r) => ({
 		sysStyl: r.sys_styl,
-		system: r.sys_styl.split('|')[0] ?? '',
+		system: systemFromSysStyl(r.sys_styl),
 		styl: r.sys_styl.split('|')[1] ?? '',
 		N: r.n
 	}));
 }
 
 export interface GlassType {
+	/** riadok `glass_types.id` — stabilná identita skla (nazov je unikátny len v rámci
+	 *  systému, #214/#438); editor ho používa ako identitu checkboxu. */
+	id: number;
 	nazov: string;
 	redukciaZero: boolean;
 	system: string;
@@ -104,9 +113,16 @@ export interface GlassType {
 export function listGlassTypes(): GlassType[] {
 	return (
 		db
-			.prepare('SELECT nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
-			.all() as { nazov: string; redukcia_zero: number; system: string; hrubka: number }[]
+			.prepare('SELECT id, nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
+			.all() as {
+			id: number;
+			nazov: string;
+			redukcia_zero: number;
+			system: string;
+			hrubka: number;
+		}[]
 	).map((r) => ({
+		id: r.id,
 		nazov: r.nazov,
 		redukciaZero: !!r.redukcia_zero,
 		system: r.system,
