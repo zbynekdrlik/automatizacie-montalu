@@ -96,7 +96,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`
 - interim cenotvorba pergoly (matica montalu.sk, endpoint, DPH half-up, seed/parity/drift) → `.claude/rules/konfigurator-cena.md`
 - interim cenotvorba bazéna (update-pools endpoint, produkt-aware cena dispatch, systemKod, DPH boundary) → `.claude/rules/konfigurator-bazen-cena.md`
-- interim cenotvorba zimnej záhrady (update-winter-gardens, length=hĺbka pasca, round-UP mriezka, systemKod display-only, model≠cenotvorná os) → `.claude/rules/konfigurator-zimna-zahrada-cena.md`
+- interim cenotvorba zimnej záhrady (update-winter-gardens, length=hĺbka pasca, round-UP mriezka, KOMPOZITNÝ systemKod=model+systém stien #429, model≠cenotvorná os, systém stien JE cenotvorný) → `.claude/rules/konfigurator-zimna-zahrada-cena.md`
 - interim cenotvorba oplotenia (update-fencings endpoint, typ×model×výška×šírka×počet, kompozitný systemKod, per-typ obálka, DPH boundary) → `.claude/rules/konfigurator-oplotenie-cena.md`
 - cenníkové rozmerové OBÁLKY do UI (per-typ oplotenie / per-model bazén; odvodenie zo seedu, mimo-obálky hláška, anti-drift, rozšírenie na ďalší produkt) → `.claude/rules/konfigurator-obalky.md`
 - zdieľané cenové helpery 4 modulov (cennik-spolocne.ts DPH/EUR/hash/label + cenaThrottle vypocet throttle shell; pri 5. produkte IMPORTUJ, nekopíruj) → `.claude/rules/cennik-spolocne.md`

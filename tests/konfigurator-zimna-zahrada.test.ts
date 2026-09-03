@@ -1,16 +1,23 @@
-// #386 — verejný konfigurátor zimných záhrad: client-safe zákaznícky modul (modely/zasklenia/
-// rozmedzia/súhrn/PonukaConfig) + honest-null cenový gate (zimná záhrada NEDOSTANE cenu — ani
+// #386 — verejný konfigurátor zimných záhrad: client-safe zákaznícky modul (modely/zasklenia/systémy
+// stien/rozmedzia/súhrn/PonukaConfig) + honest-null cenový gate (zimná záhrada NEDOSTANE cenu — ani
 // opečiatkovanú, ani prepočítanú v PDF). Money-neutralita import-grafu stráži
 // `konfigurator-money-safety.test.ts` (A); TU overujeme SPRÁVNOSŤ + honest-null kontrakt.
+// #429: systém stien je TERAZ cenotvorný — pack/unpack (`zzSystemKod`/`parseZzSystemKod`) sa testuje
+// tu, presná cenová parita v `konfigurator-zimna-zahrada-cena.test.ts`.
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import {
 	ZZ_MODELY,
 	ZZ_MODEL_DEFAULT,
 	ZZ_ZASKLENIA,
+	ZZ_SYSTEMY_STIEN,
+	ZZ_SYSTEM_STIEN_DEFAULT,
 	ZZ_RANGES,
 	zzModel,
 	zzZasklenie,
+	zzSystemStien,
+	zzSystemKod,
+	parseZzSystemKod,
 	zzVstupPlatny,
 	konfigurujZimnaZahradu,
 	zimnaZahradaPonukaConfig,
@@ -28,6 +35,7 @@ const VSTUP: ZzVstup = {
 	hlbka: 4000,
 	vyska: 2800,
 	zasklenie: 'Bezpečnostné sklo',
+	systemStien: 'Robust - 24mm IZO sklo',
 	farba: 'RAL 7016 ANTRACIT'
 };
 
@@ -54,6 +62,21 @@ describe('#386 katalóg modelov / zasklenie', () => {
 			expect(rng.krok).toBeGreaterThan(0);
 		}
 	});
+
+	it('#429 systém stien = 6 kombinácií (DOSLOVNÁ montalu.sk cenového konfigurátora terminológia — network capture)', () => {
+		expect(ZZ_SYSTEMY_STIEN.length).toBe(6);
+		expect(ZZ_SYSTEMY_STIEN.map((s) => s.nazov)).toEqual([
+			'Deluxe bezrámový - 10mm sklo',
+			'Štandard plus - 6mm sklo',
+			'Štandard plus - 16mm sklo',
+			'Slide - 6mm sklo',
+			'Slide - 16mm sklo',
+			'Robust - 24mm IZO sklo'
+		]);
+		// default = dnešná (#408) báza — non-breaking
+		expect(ZZ_SYSTEM_STIEN_DEFAULT).toBe('Slide - 16mm sklo');
+		expect(ZZ_SYSTEMY_STIEN.map((s) => s.nazov)).toContain(ZZ_SYSTEM_STIEN_DEFAULT);
+	});
 });
 
 describe('#386 whitelist parsery (neznámy → bezpečný default)', () => {
@@ -68,6 +91,54 @@ describe('#386 whitelist parsery (neznámy → bezpečný default)', () => {
 		expect(zzZasklenie('Panel ISODOMUS')).toBe('Panel ISODOMUS');
 		expect(zzZasklenie('Bezpečnostné sklo')).toBe('Bezpečnostné sklo');
 		expect(zzZasklenie('injekcia<script>')).toBe('Izolačné sklo');
+	});
+	it('#429 zzSystemStien: platný → zachovaný; neznámy/prázdny → báza Slide 16mm', () => {
+		expect(zzSystemStien('Robust - 24mm IZO sklo')).toBe('Robust - 24mm IZO sklo');
+		expect(zzSystemStien('Deluxe bezrámový - 10mm sklo')).toBe('Deluxe bezrámový - 10mm sklo');
+		expect(zzSystemStien('injekcia<script>')).toBe('Slide - 16mm sklo');
+		expect(zzSystemStien('')).toBe('Slide - 16mm sklo');
+		expect(zzSystemStien(null)).toBe('Slide - 16mm sklo');
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// #429 kompozitný `systemKod` pack/unpack — vzor #410 oplotenie. Model (DISPLAY) + systém stien
+// (CENOTVORNÝ) zbalené do jedného neutrálneho `PonukaConfig.systemKod` poľa.
+// --------------------------------------------------------------------------- //
+describe('#429 zzSystemKod / parseZzSystemKod (kompozitný systemKod)', () => {
+	it('zbalí a rozbalí model + systém stien bezstratovo', () => {
+		const kod = zzSystemKod('MASSIVE', 'Robust - 24mm IZO sklo');
+		expect(kod).toBe('MASSIVE|Robust - 24mm IZO sklo');
+		expect(parseZzSystemKod(kod)).toEqual({
+			model: 'MASSIVE',
+			systemStien: 'Robust - 24mm IZO sklo'
+		});
+	});
+
+	it('STARÝ riadok (spred #429, LEN model, žiadny „|") sa degraduje na bázový systém stien', () => {
+		// presne to, čo `zimnaZahradaPonukaConfig` písalo pred #429 (`systemKod: s.model`)
+		expect(parseZzSystemKod('ROBUST')).toEqual({
+			model: 'ROBUST',
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
+	});
+
+	it('neznámy model/systém stien v kompozitnom kóde → whitelist honest-degrade na oboch stranách', () => {
+		expect(parseZzSystemKod('HACK|neznamy systém')).toEqual({
+			model: ZZ_MODEL_DEFAULT,
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
+	});
+
+	it('prázdny/undefined systemKod → default model + default systém stien', () => {
+		expect(parseZzSystemKod('')).toEqual({
+			model: ZZ_MODEL_DEFAULT,
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
+		expect(parseZzSystemKod(undefined)).toEqual({
+			model: ZZ_MODEL_DEFAULT,
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
 	});
 });
 
@@ -91,15 +162,18 @@ describe('#386 konfigurujZimnaZahradu (súhrn) + zimnaZahradaPonukaConfig (mapov
 		expect(s2.plochaM2).toBe(15.8);
 	});
 
-	it('PonukaConfig: model v `system`, rozmery (š=sirka, h=hlbka → „Rozmery (š × h)"), výška+plocha v popise, zasklenie v `sklo`', () => {
+	it('PonukaConfig: model v `system`, KOMPOZITNÝ systemKod (model+systém stien, #429), rozmery (š=sirka, h=hlbka → „Rozmery (š × h)"), výška+plocha+systém stien v popise, zasklenie v `sklo`', () => {
 		const cfg = zimnaZahradaPonukaConfig(konfigurujZimnaZahradu(VSTUP));
 		expect(cfg.system).toBe('Zimná záhrada — ROBUST');
+		// #429: systemKod je TERAZ kompozitný "model|systémStien" (vzor #410 oplotenie)
+		expect(cfg.systemKod).toBe('ROBUST|Robust - 24mm IZO sklo');
 		expect(cfg.sirka).toBe(5000); // šírka → `sirka`
 		expect(cfg.hlbka).toBe(4000); // hĺbka → `hlbka` → „Rozmery (š × h)" (izbový tvar)
 		expect(cfg.farba).toBe('RAL 7016 ANTRACIT');
 		expect(cfg.sklo).toBe('Bezpečnostné sklo');
 		expect(cfg.popis).toContain('Výška 2800 mm');
 		expect(cfg.popis).toContain('20 m²');
+		expect(cfg.popis).toContain('Robust - 24mm IZO sklo');
 	});
 
 	it('PonukaConfig NENESIE žiadnu cenu, `dlzka`, ani pergola-špecifické polia', () => {

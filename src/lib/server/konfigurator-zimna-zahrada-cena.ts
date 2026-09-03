@@ -1,23 +1,28 @@
-// Interim cenotvorba zimných záhrad (#408) — SERVER-ONLY cenový modul. Lookup do vyťaženej matice
-// montalu.sk (`cennik-zimna-zahrada.json`, Fáza A) so zaokrúhlením rozmeru NAHOR na katalógovú mriežku
-// a obálkou dostupnosti. Mimo katalógu / nedostupná kombinácia ⇒ 'individualna-ponuka' (NIKDY
-// neextrapoluje — nevymýšľa cenu).
+// Interim cenotvorba zimných záhrad (#408 + #429 systém stien) — SERVER-ONLY cenový modul. Lookup do
+// vyťaženej matice montalu.sk (`cennik-zimna-zahrada.json`) so zaokrúhlením rozmeru NAHOR na
+// katalógovú mriežku a obálkou dostupnosti. Mimo katalógu / nedostupná kombinácia ⇒
+// 'individualna-ponuka' (NIKDY neextrapoluje — nevymýšľa cenu).
 //
 // Zrkadlo pergolového/bazénového cenového modulu, parametrizované na osi zimnej záhrady (viď design
-// komentár #408). Cenotvorné osi replikované v seede: **hĺbka (montalu `length`) × šírka (montalu
-// `width`) × strešné zasklenie (`roofing`)** pri BÁZOVOM systéme stien (`slide|izolacne-sklo-16-mm`),
-// bázovom `glass_add`, neutrálnej farbe. Model ROBUST/MASSIVE ani systém stien NIE sú cenotvorné osi
-// montalu — sú DISPLAY spec (upresnia sa po obhliadke); interim cena reaguje na rozmery + zasklenie.
+// komentár #408 + #429). Cenotvorné osi replikované v seede: **hĺbka (montalu `length`) × šírka
+// (montalu `width`) × systém stien (`glazing`, #429) × strešné zasklenie (`roofing`)**. Default systém
+// stien = báza `slide|izolacne-sklo-16-mm` (#408 non-breaking default), `glass_add`, neutrálna farba.
+// Model ROBUST/MASSIVE NIE JE cenotvorná os montalu — je DISPLAY spec (upresní sa po obhliadke);
+// systém stien JE cenotvorný (#429 — predtým #408 Prístup 3 ho fixoval, teraz je to reálna voľba).
 //
 // Money-neutrálny a mimo klientskeho bundle ($lib/server/): interim PREDAJNÉ ceny prevzaté z verejného
-// konfigurátora montalu.sk (montalu cenové kľúče — roofing slugy), NIE Money ERP kódy. #318 hladina-aware
-// (MO default pre neprihláseného/interného, VO LEN pre prihláseného veľkoobchodného; hladinu rozhoduje
-// SERVER, VO sa do MO odpovede NIKDY nedostane). Čistý (bez DB/siete), priamo unit-testovateľný
-// (parita: `tests/konfigurator-zimna-zahrada-cena.test.ts`).
+// konfigurátora montalu.sk (montalu cenové kľúče — glazing/roofing slugy), NIE Money ERP kódy. #318
+// hladina-aware (MO default pre neprihláseného/interného, VO LEN pre prihláseného veľkoobchodného;
+// hladinu rozhoduje SERVER, VO sa do MO odpovede NIKDY nedostane). Čistý (bez DB/siete), priamo
+// unit-testovateľný (parita: `tests/konfigurator-zimna-zahrada-cena.test.ts`).
 import cennikJson from './cennik-zimna-zahrada.json';
 import { EPS, VO_LABEL, cennikHash, dphNaPct, zlozka as zlozkaSpolocna } from './cennik-spolocne';
 import type { CenaZlozka, Mriezka } from './cennik-spolocne';
-import { ZZ_MODEL_DEFAULT, ZZ_ZASKLENIE_DEFAULT } from '$lib/konfigurator-zimna-zahrada';
+import {
+	ZZ_MODEL_DEFAULT,
+	ZZ_ZASKLENIE_DEFAULT,
+	ZZ_SYSTEM_STIEN_DEFAULT
+} from '$lib/konfigurator-zimna-zahrada';
 import type { ZzModel } from '$lib/konfigurator-zimna-zahrada';
 import type { VerejnaCena, CenovaHladina } from '$lib/konfigurator';
 
@@ -28,7 +33,9 @@ type SirkaMap = Record<string, Bunka>;
 /** hĺbkový kľúč ("4.0") → šírkový riadok */
 type HlbkaMap = Record<string, SirkaMap>;
 /** roofing slug → hĺbkový blok */
-type CennikMap = Record<string, HlbkaMap>;
+type RoofingMap = Record<string, HlbkaMap>;
+/** #429: glazing (systém stien) slug → roofing blok */
+type CennikMap = Record<string, RoofingMap>;
 
 interface CennikSeed {
 	meta: {
@@ -43,6 +50,7 @@ interface CennikSeed {
 	};
 	cennik: CennikMap;
 	verifikaciaDph: Array<{
+		glazing: string;
 		roofing: string;
 		hlbkaM: number;
 		sirkaM: number;
@@ -70,7 +78,11 @@ export const CENNIK_VERZIA_ZZ = `${SEED.meta.vytazene}#${CENNIK_HASH}`;
 export const DPH_ZZ = SEED.meta.dph;
 /** Katalógová mriežka (metre). */
 export const MRIEZKA_ZZ = SEED.meta.mriezka;
-/** Bázový systém stien, na ktorom je matica vyťažená (pre honest poznámku). */
+/** #429: DEFAULT (UI) systém stien montalu glazing slug — od #429 NIE JE to jediný vyťažený systém
+ *  (matica má všetkých 6), len default voľba vo výberníku (`ZZ_SYSTEM_STIEN_DEFAULT`, non-breaking
+ *  báza z #408). Test `konfigurator-zimna-zahrada-cena.test.ts` PIN-uje
+ *  `glazingPreSystemStien(ZZ_SYSTEM_STIEN_DEFAULT) === BAZOVY_GLAZING_ZZ`, aby zmena defaultu na
+ *  jednej strane (fetch skript vs whitelist) nikdy nerozišla bez toho, aby to test odhalil. */
 export const BAZOVY_GLAZING_ZZ = SEED.meta.bazovyGlazing;
 
 /** DPH zimnej záhrady v celých percentách (23) — pre zdieľanú `sDphEur`/`zlozka` (celocentová
@@ -94,6 +106,26 @@ export function roofingPreZasklenie(zasklenie: string | null | undefined): strin
 	return ZASKLENIE_ROOFING[String(zasklenie ?? '').trim()] ?? ROOFING_DEFAULT;
 }
 
+/** #429: mapovanie zákazníckeho systému stien (ZZ_SYSTEMY_STIEN nazov) → montalu `glazing` slug (kľúč
+ *  matice). Test overuje, že KAŽDÝ ZZ_SYSTEMY_STIEN nazov tu má záznam (drift guard). Neznámy systém
+ *  stien → bázový glazing (honest-degrade, non-breaking default = #408 pôvodná báza). */
+const SYSTEM_STIEN_GLAZING: Record<string, string> = {
+	'Deluxe bezrámový - 10mm sklo': 'delux|kalene-sklo-10-mm',
+	'Štandard plus - 6mm sklo': 'standard-plus|rezane-sklo-6-mm',
+	'Štandard plus - 16mm sklo': 'standard-plus|izolacne-sklo-16-mm',
+	'Slide - 6mm sklo': 'slide|rezane-sklo-6-mm',
+	'Slide - 16mm sklo': 'slide|izolacne-sklo-16-mm',
+	'Robust - 24mm IZO sklo': 'robust|izolacne-sklo-24-mm'
+};
+/** Bázový glazing (zodpovedá ZZ_SYSTEM_STIEN_DEFAULT „Slide - 16mm sklo" — #408 pôvodná non-breaking báza). */
+const GLAZING_DEFAULT =
+	SYSTEM_STIEN_GLAZING[ZZ_SYSTEM_STIEN_DEFAULT] ?? 'slide|izolacne-sklo-16-mm';
+
+/** glazing slug z názvu systému stien (whitelist; neznámy → bázový). Exportované pre test drift-guardu. */
+export function glazingPreSystemStien(systemStien: string | null | undefined): string {
+	return SYSTEM_STIEN_GLAZING[String(systemStien ?? '').trim()] ?? GLAZING_DEFAULT;
+}
+
 export interface CenaZzVstup {
 	/** hĺbka (vysunutie od steny) [mm] → montalu `length` (dominantná cenotvorná os) */
 	hlbkaMm: number;
@@ -101,6 +133,8 @@ export interface CenaZzVstup {
 	sirkaMm: number;
 	/** kategória strešného zasklenia (ZZ_ZASKLENIA nazov) → roofing; default „Izolačné sklo" */
 	zasklenie?: string;
+	/** #429: systém stien (ZZ_SYSTEMY_STIEN nazov) → glazing; CENOTVORNÝ; default báza „Slide - 16mm sklo" */
+	systemStien?: string;
 	/** model konštrukcie (ROBUST/MASSIVE) — LEN DISPLAY label do `VerejnaCena.model` (cenu nemení) */
 	model?: ZzModel;
 }
@@ -149,8 +183,9 @@ function zlozka(net: number): CenaZlozka {
 
 /**
  * Vypočíta interim predajnú cenu zimnej záhrady (MO + VO, net + s DPH) lookupom do matice montalu.sk.
- * Rozmer sa zaokrúhli NAHOR na mriežku; nedostupná kombinácia rozmer×roofing alebo mimo katalógu ⇒
- * 'individualna-ponuka' (NIKDY neextrapoluje).
+ * Rozmer sa zaokrúhli NAHOR na mriežku; nedostupná kombinácia rozmer×systém stien×roofing alebo mimo
+ * katalógu ⇒ 'individualna-ponuka' (NIKDY neextrapoluje). #429: `systemStien` je TERAZ cenotvorný
+ * (chýbajúci/neznámy → bázový, honest-degrade — non-breaking pre volania spred #429).
  */
 export function vypocitajCenuZz(v: CenaZzVstup): CenaZzVysledok {
 	const model = v.model ?? ZZ_MODEL_DEFAULT;
@@ -174,12 +209,14 @@ export function vypocitajCenuZz(v: CenaZzVstup): CenaZzVysledok {
 			dovod: `Šírka presahuje katalóg (max ${MRIEZKA_ZZ.sirkaM.max} m) — individuálna ponuka.`
 		};
 
+	const glazing = glazingPreSystemStien(v.systemStien);
 	const roofing = roofingPreZasklenie(v.zasklenie);
-	const bunka = SEED.cennik[roofing]?.[k1(hlbkaGridM)]?.[k1(sirkaGridM)];
+	const bunka = SEED.cennik[glazing]?.[roofing]?.[k1(hlbkaGridM)]?.[k1(sirkaGridM)];
 	if (!bunka)
 		return {
 			druh: 'individualna-ponuka',
-			dovod: 'Kombinácia rozmeru a zasklenia nie je v katalógu — individuálna ponuka.'
+			dovod:
+				'Kombinácia rozmeru, systému stien a zasklenia nie je v katalógu — individuálna ponuka.'
 		};
 
 	return {
