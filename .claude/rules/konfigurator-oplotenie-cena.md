@@ -78,6 +78,22 @@ navyše asertuje, že aspoň jedna hranica v seede EXISTUJE (inak by test half-u
 
 ## Review pasce (reusable pre ĎALŠÍ produktový cenový modul)
 
+- **Whitelist-mapping drift guard (`nazov → montalu slug`) čo LEN `toContain(mapovanaHodnota)` je
+  VÁKUOVÝ (#429 review 🔵).** Vzor `roofingPreZasklenie`/`glazingPreSystemStien`: preklep v `nazov`
+  (alebo kolízia dvoch mien na jeden slug) sa TICHO degraduje na bázový slug — a bázový slug je VŽDY
+  prítomný v seede, takže `expect(Object.keys(seed), nazov).toContain(mapovanaHodnota)` prejde AJ
+  keby whitelist mapoval DVE rôzne mená na TEN ISTÝ slug (drift by nič nechytilo). Skutočný drift
+  guard musí dokázať RÔZNOSŤ, nie len prítomnosť: `expect(new Set(katalog.map(nazov =>
+  mapujFn(nazov))).size).toBe(katalog.length)` — kolízia zmenší veľkosť množiny a test padne.
+  Aplikuj pri KAŽDOM novom whitelist-mapping teste (zasklenie→roofing, systém stien→glazing, typ→slug…).
+- **Fetch skript, ktorý zbiera .xx5 DPH-hraničné kotvy s CELKOVÝM stropom, ich pri viac-osovej matici
+  môže poslať VŠETKY z jednej hodnoty vonkajšej osi (#429 review 🔵).** Keď je nová os (napr. `glazing`
+  #429) VONKAJŠIA slučka a kotva-hľadanie má len jeden globálny counter (`verifikaciaDph.length < N`),
+  prvých N nájdených .xx5 buniek príde z PRVEJ hodnoty tej osi (živý dôkaz: 6/6 kotiev bolo len z
+  `delux|kalene-sklo-10-mm`) — DPH aritmetika je síce osovo-nezávislá (matematicky to nevadí), ale
+  parity test tak nikdy neoverí .xx5 hranicu pre ostatné hodnoty tej osi. Pridaj PER-HODNOTA cap
+  (`kotievPreOs = verifikaciaDph.filter(v => v.os === hodnota).length; ... && kotievPreOs < 1`) vedľa
+  celkového stropu, aby kotvy pri regenerácii pokryli KAŽDÚ hodnotu novej osi.
 - **Ohranič KAŽDÝ forgeovateľný cenotvorný násobiteľ v `systemKod`, nielen rozmery (#410 review 🟡).**
   Rozmery idú cez `zaokruhliNaMriezku` → null nad max, ale POČET je čistý násobiteľ — klient ho vie
   sfalšovať v POST `konfiguracia` (`sanitizePonukaConfig` cap 120 nekontroluje HODNOTU). Neohraničený
