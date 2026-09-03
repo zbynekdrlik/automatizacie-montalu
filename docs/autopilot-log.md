@@ -2051,3 +2051,29 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   `.claude/rules/cennik-spolocne.md` (paths auto-load, 5. produkt = IMPORTUJ nie kopíruj) + router.
 - svelte-check 0/0 + lint + **3266 unit testov (0 fail, coverage nad prahmi)** + 26 konfigurator E2E
   (cena + VO/b2b + re-price, 0 console) ZELENÉ. NEmergnuté (worktree — supervisor integruje).
+
+## 2026-09-04 — Zimná záhrada: systém stien vystavený ako cenotvorná os (#429, worktree — supervisor integruje)
+
+- Owner smernica ("rob čo vieš robiť") schválila ticketom odporúčaný Prístup 1: expozícia systému
+  stien (montalu `glazing`, predtým fixovaný na báze #408 Prístup 3) — cena naň TERAZ reaguje.
+  Live network capture potvrdil 6 kombinácií systém×sklo (delux/standard-plus×2/slide×2/robust),
+  rozptyl ±~2000 € pri hĺbke 4 m — presne to, čo ticket predpokladal.
+- Matica `cennik-zimna-zahrada.json` rozšírená na 4 úrovne (`glazing × roofing × hĺbka × šírka`,
+  2592 buniek, live fetch); fetch/drift skripty rozšírené o glazing sweep.
+- `konfigurator-zimna-zahrada-cena.ts`: `glazingPreSystemStien` whitelist (vzor `roofingPreZasklenie`),
+  `vypocitajCenuZz` prijíma `systemStien` (default = báza Slide 16mm, byte-identický s #408 — DÔKAZ:
+  starý seed base blok vs nový base blok 432/432 buniek identické).
+- `konfigurator-zimna-zahrada.ts` (client-safe): `ZZ_SYSTEMY_STIEN` katalóg + `zzSystemKod`/
+  `parseZzSystemKod` — KOMPOZITNÝ `PonukaConfig.systemKod = "model|systémStien"` (vzor #410
+  oplotenie composite-systemKod), model DISPLAY-only, systém stien CENOTVORNÝ. Starý (pred-#429)
+  riadok bez `|` degraduje na bázový systém stien (honest-degrade, nie tiché prepočítanie).
+- Nový selector „Systém stien" v `+page.svelte` (default = báza, non-breaking), `cenaKluc`
+  invaliduje cenu pri zmene, `dopyt-cena-stamp.ts` zz vetva parsuje kompozitný systemKod.
+- Gated Fable review (fable-gate OPEN 86%, `general-purpose` dispatch): 0 🔴 0 🟡 5 🔵 — všetky
+  opravené v tej istej vetve (vákuové drift-guard testy → distinctness assercie; stale
+  `BAZOVY_GLAZING_ZZ` komentár → opravený + pin test; DPH .xx5 kotvy skreslené na 1 glazing → per-
+  glazing cap vo fetch skripte; copy dolaďená). Nová `Review pasce` sekcia v
+  `konfigurator-oplotenie-cena.md` (reusable pre ďalší produktový cenový modul).
+- svelte-check 0/0 + lint (eslint+prettier) čisté + **3408 unit testov (0 fail, coverage nad
+  prahmi)** + 3/3 zz E2E (vrátane novej „systém stien invaliduje + prepočíta cenu" asercie), 0
+  console chýb. NEmergnuté (worktree — supervisor integruje).

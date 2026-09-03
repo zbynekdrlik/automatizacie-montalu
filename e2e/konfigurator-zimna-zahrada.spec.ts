@@ -1,10 +1,11 @@
-// #386/#408: verejný konfigurátor zimných záhrad (`/konfigurator/zimna-zahrada`) — E2E cez reálny
-// prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia (model/rozmery/farba/zasklenie) sa
-// počíta klientsky a zobrazí súhrn; #408 ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`, matica
-// montalu.sk, Money-neutrálna — bez zápisu); dopyt tok → PDF špecifikácia s orientačnou cenou na
-// stiahnutie. GET aj `vypocet` sú Money-neutrálne (číta sa aj proti LIVE prode); dopyt je ZÁPIS (audit
-// riadok) → `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý test = NULA console
-// chýb (× = U+00D7 byte-identické).
+// #386/#408/#429: verejný konfigurátor zimných záhrad (`/konfigurator/zimna-zahrada`) — E2E cez
+// reálny prehliadač. Kľúčové: VEREJNÝ flow BEZ prihlásenia; konfigurácia
+// (model/rozmery/farba/zasklenie/systém stien) sa počíta klientsky a zobrazí súhrn; #408/#429
+// ORIENTAČNÁ CENA na klik (server-počítaná `vypocet`, matica montalu.sk, Money-neutrálna — bez
+// zápisu) — #429 systém stien je TERAZ reálna cenotvorná voľba; dopyt tok → PDF špecifikácia s
+// orientačnou cenou na stiahnutie. GET aj `vypocet` sú Money-neutrálne (číta sa aj proti LIVE prode);
+// dopyt je ZÁPIS (audit riadok) → `skipAkLive`, nech proti prode nepribúdajú testovacie dopyty. Každý
+// test = NULA console chýb (× = U+00D7 byte-identické).
 import { test, expect } from '@playwright/test';
 import { goto, collectConsole, skipAkLive } from './helpers';
 
@@ -40,13 +41,13 @@ test('zimná záhrada konfigurátor: verejná route bez auth — súhrn + orient
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('zimná záhrada cena: zmena zasklenia/rozmeru zneaktuálni zobrazenú cenu → „Prepočítať" → nová cena, nula console chýb', async ({
+test('zimná záhrada cena: zmena zasklenia/systému stien/rozmeru zneaktuálni zobrazenú cenu → „Prepočítať" → nová cena, nula console chýb', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await goto(page, '/konfigurator/zimna-zahrada');
 
-	// zobraz orientačnú cenu pre default (4000 × 3500, Izolačné sklo)
+	// zobraz orientačnú cenu pre default (4000 × 3500, Izolačné sklo, báza Slide 16mm systém stien)
 	await page.getByTestId('zz-cena-zobrazit').click();
 	await expect(page.getByTestId('zz-cena')).toBeVisible();
 
@@ -56,10 +57,21 @@ test('zimná záhrada cena: zmena zasklenia/rozmeru zneaktuálni zobrazenú cenu
 	await expect(page.getByTestId('zz-cena')).toHaveCount(0);
 	await expect(page.getByTestId('zz-cena-zobrazit')).toContainText('Prepočítať');
 
-	// prepočítaj → nová orientačná cena pre Polykarbonát
+	// prepočítaj → nová orientačná cena pre Polykarbonát (báza Slide 16mm systém stien)
 	await page.getByTestId('zz-cena-zobrazit').click();
 	await expect(page.getByTestId('zz-cena')).toBeVisible();
 	await expect(page.getByTestId('zz-cena-sdph')).toContainText('€');
+	const polykarbonatBazaCena = await page.getByTestId('zz-cena-sdph').innerText();
+
+	// #429: zmena SYSTÉMU STIEN (rovnaké rozmery+zasklenie) tiež zneaktuálni cenu (cenaKluc ho
+	// obsahuje) → prepočítaj → INÁ cena (systém stien JE TERAZ cenotvorný, nie len display)
+	await page.getByTestId('zz-system-stien').selectOption('Robust - 24mm IZO sklo');
+	await expect(page.getByTestId('zz-cena')).toHaveCount(0);
+	await expect(page.getByTestId('zz-cena-zobrazit')).toContainText('Prepočítať');
+	await page.getByTestId('zz-cena-zobrazit').click();
+	await expect(page.getByTestId('zz-cena')).toBeVisible();
+	const robustCena = await page.getByTestId('zz-cena-sdph').innerText();
+	expect(robustCena).not.toBe(polykarbonatBazaCena);
 
 	// aj zmena rozmeru zneaktuálni cenu (cenaKluc obsahuje hĺbku aj šírku)
 	await page.getByTestId('zz-hlbka').fill('5');

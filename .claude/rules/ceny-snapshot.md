@@ -21,10 +21,20 @@ paths:
 Producent `scripts/ceny-snapshot.py` beží **mimo repa na dev2**
 (`/home/newlevel/montalu-ceny/run-snapshot.sh`, cron 05:30) → číta Money read-only cez
 tunel → JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura, predajVo,
-mena, sklad}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
+mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
 **lazy** naimportuje (`ceny.ts` `maybeImportSnapshot`, gejtuje na mtime) do
 `material_prices` (kľúč = Money `kod`). Chýbajúca/nulová cena = **`null`** („neznáma"),
 NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
+
+**`rozvin` (#369, migrácia v38, `material_prices.rozvin REAL`):** m²/bm = merná jednotka
+`m2` na Money artikli (`Artikly_ArtiklJednotka.Mnozstvi`, `Jednotka_ID=44EC8AD6-…`) = obvod
+prierezu v metroch. Ťahaný LEFT JOIN-om (1:1 — žiadny profil nemá >1 aktívny `m2` riadok,
++ defenzívny dedupe podľa kódu vo `fetch_rows`). Kovanie/tesnenie (ZASK) `m2` NEMÁ (0/138),
+takže je to spoľahlivý signál lakovaného profilu. Konzument = `computeLakovanie`
+(`src/lib/lakovanie.ts`) → sekcia „Lakovanie" v `CenyTabulka` (spotreba farby
+`rozvin × dĺžka × 0,150 kg/m²`; €-náklad honest-null, čaká na RAL sadzby). Producent na dev2
+potrebuje `git pull` + jeden beh, kým sa rozvin objaví — dovtedy je pri profiloch `null`
+(sekcia ukáže „neúplné").
 
 ## Money cenníky — kde je ktorá cena (overené read-only 2026-08-19)
 

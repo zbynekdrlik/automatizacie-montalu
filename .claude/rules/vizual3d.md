@@ -583,3 +583,47 @@ už v money-guard allowliste). `presnost:'ilustracna'` (spec.ts to anticipuje: �
   je stale) — pri ďalšom väčšom dotyku zváž split (intro/kóta/dom-vetvy sú kandidáti na extrakciu).
 - Canvas `aria-label` bol natvrdo „3D náhľad zasklenia" pre VŠETKY rodiny → zmenené na rodinovo-neutrálne
   „3D náhľad produktu".
+
+## Procedurálne PBR mikro-reliéf mapy — normal/roughness (#356)
+
+`textury.ts` vie okrem albedo CanvasTextur generovať aj tileable NORMAL mapy z výškového
+poľa (`normalMapaZVysky`, centrálna diferencia) + lineárne grayscale roughness mapy
+(`linearnaGrayMapa`). Vzor rozšírenia realizmu BEZ binárnych assetov (owner §5.3, #356) —
+hliník práškovaný orange-peel, dlažba zapustené škáry, sklo `clearcoatNormalMap`. Wiring:
+`materialy.ts` (voliteľné mapy, spätne kompatibilné), `produkt-meshe.ts` (mid/high, dispose),
+`scena.ts::vytvorZem` + `scena-dom.ts::vytvorOkolie` (zem/terasa normal). Tri PASCE, ktoré
+chytil až adversariálny review (nie prvé testy):
+
+### `CanvasTexture.flipY=true` → ZELENÝ (Y) kanál normal mapy má OPAČNÉ znamienko
+
+`CanvasTexture` má default `flipY=true`, takže canvas riadok 0 (hore) sa nahráva na `v=1`
+(`v = 1 - y/N`, `dv/dy = -1/N`). three TBN kladie zelený kanál pozdĺž +v, takže
+`normal.y = -dh/dv = +N·dh/dy ∝ +(h[y+1] - h[y-1]) = (hDole - hHore)`. Naivné `ny =
+-(h[y+1]-h[y-1])` (bez flipY korekcie) je INVERTOVANÉ → horizontálne ryhy sa vykreslia ako
+HREBENE namiesto žliabkov (klasický DirectX-vs-OpenGL green-flip; vertikálne ryhy / X kanál
+sú OK, flipY horizontálny smer netrápi). **Chytí to LEN sign test** (obe steny žliabku musia
+mieriť DO stredu: horná stena horizontálnej škáry `G<128`, dolná `G>128`; ľavá stena
+vertikálnej `R>128`, pravá `R<128`) — amplitúdový test (`|G-128|>0`) prejde aj pri inverzii.
+POZOR: „oprava" prepísaním `-(hu-hd)` na `(hHore-hDole)` je NO-OP (algebraicky totožné) —
+over znamienko RE-DERIVÁCIOU + sign testom, nie premenovaním premenných. Normal/roughness
+mapy MUSIA mať `colorSpace = NoColorSpace` (lineárne dáta, nie sRGB).
+
+### `BoxGeometry` UV je 0..1 NA PLOCHU → mapa sa natiahne na tenkom profile ~70:1
+
+Default `BoxGeometry` UV mapuje 0..1 na KAŽDÚ plochu bez ohľadu na jej fyzický pomer strán.
+Na tenkom hliníkovom profile (4200×50 mm) to natiahne textúru ~70:1 pozdĺž dĺžky → pri
+`anisotropy=1` sa mapa mip-uje NA PLOCHO (reliéf zmizne), pri anizotropii ukáže smerové
+pruhy. `builder.ts::metreUvBox` prepíše box UV na METRE (fyzická veľkosť plochy: px/nx→(d,h),
+py/ny→(w,d), pz/nz→(w,h), poradie plôch three r0.185 px,nx,py,ny,pz,nz), potom `texture.repeat
+= dlaždice/meter` tiluje svetovo-rovnomerne cez všetky plochy. Zjednocuje s `ExtrudeGeometry`
+(tá už má svetové UV zo shape v mm→m). Neškodné pre materiály bez mapy (UV nečítajú). Dôsledok:
+KAŽDÁ mapa na box-mesh potrebuje `RepeatWrapping` + `repeat` v dlaždice/m (default ClampToEdge
+by metre-UV roztiahol/prilepil).
+
+### Amplitúda normal mapy — meraj SKLON, nie byte-odchýlku
+
+Práškovaný orange-peel má reálny sklon ~1–3°; vyššie číta hammered/plast (#276/#336 analógia).
+`normalMapaZVysky` `sila` + material `normalScale` spolu určujú sklon — over MERANÍM
+(priem. `atan(|nxy|/nz)` cez mapu), nie odhadom. #356 kalibrácia: hliník sila 0.2 + scale 0.7
+≈ 3° priem. Dlažba grout môže byť strmšia (reálna škára). Sklo `clearcoatNormalMap` len na
+clearcoat vrstve → číra transmisia/priehľad skla NEDOTKNUTÝ (žiadne matnenie).

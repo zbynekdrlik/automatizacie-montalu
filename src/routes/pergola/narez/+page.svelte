@@ -382,7 +382,7 @@
 	<div class="card noprint">
 		<div class="sec">Odpis do Money</div>
 		<p class="sub">
-			Do odpisu idú LEN spočítané položky vyššie (bez +20 % rezervy). Odpis sa odošle až po tvojom
+			Do odpisu idú LEN spočítané položky (bez +20 % rezervy). Odpis sa odošle až po tvojom
 			potvrdení.
 			{#if !data.live}<b>🧪 TEST režim — do Money nejde nič.</b>{/if}
 		</p>

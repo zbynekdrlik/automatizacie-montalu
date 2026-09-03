@@ -1,8 +1,8 @@
-// Parser + validácia vstupu pre `vypocet` akciu zimnej záhrady (#408) — hĺbka + šírka + zasklenie +
-// model na výpočet orientačnej ceny. Žije mimo +page.server.ts (SvelteKit dovolí exportovať len
-// load/actions/…), takže sa dá priamo unit-testovať (nova-stranka pasca #1). Server-only ($lib/server/):
-// importuje LEN client-safe `konfigurator-zimna-zahrada` (rozmedzia + whitelist, žiadny Money kód,
-// žiadna cena).
+// Parser + validácia vstupu pre `vypocet` akciu zimnej záhrady (#408 + #429 systém stien) — hĺbka +
+// šírka + zasklenie + systém stien + model na výpočet orientačnej ceny. Žije mimo +page.server.ts
+// (SvelteKit dovolí exportovať len load/actions/…), takže sa dá priamo unit-testovať (nova-stranka
+// pasca #1). Server-only ($lib/server/): importuje LEN client-safe `konfigurator-zimna-zahrada`
+// (rozmedzia + whitelist, žiadny Money kód, žiadna cena).
 import {
 	ZZ_SIRKA_MIN,
 	ZZ_SIRKA_MAX,
@@ -10,6 +10,7 @@ import {
 	ZZ_HLBKA_MAX,
 	zzModel,
 	zzZasklenie,
+	zzSystemStien,
 	type ZzModel
 } from '$lib/konfigurator-zimna-zahrada';
 
@@ -29,12 +30,14 @@ export interface ZzCenaVstup {
 	sirkaMm: number;
 	/** kategória strešného zasklenia (whitelist nazov) */
 	zasklenie: string;
+	/** #429: systém stien (whitelist nazov) — CENOTVORNÝ */
+	systemStien: string;
 	/** model konštrukcie (whitelist) — display label */
 	model: ZzModel;
 }
 
 /** Sparsuje FormData na typovaný cenový vstup zimnej záhrady, alebo vráti { error } (slovenčina).
- *  Rozmery mimo rozmedzia → odmietnuté; zasklenie/model cez whitelist (neznámy → default). */
+ *  Rozmery mimo rozmedzia → odmietnuté; zasklenie/systém stien/model cez whitelist (neznámy → default). */
 export function parseZzCenaVstup(fd: FormData): { vstup: ZzCenaVstup } | { error: string } {
 	const hlbkaMm = cislo(fd.get('hlbka'));
 	if (!Number.isFinite(hlbkaMm) || hlbkaMm < ZZ_HLBKA_MIN || hlbkaMm > ZZ_HLBKA_MAX)
@@ -45,7 +48,8 @@ export function parseZzCenaVstup(fd: FormData): { vstup: ZzCenaVstup } | { error
 		return { error: `Šírka musí byť ${ZZ_SIRKA_MIN}–${ZZ_SIRKA_MAX} mm.` };
 
 	const zasklenie = zzZasklenie(fd.get('zasklenie') ? String(fd.get('zasklenie')) : '');
+	const systemStien = zzSystemStien(fd.get('systemStien') ? String(fd.get('systemStien')) : '');
 	const model = zzModel(fd.get('model') ? String(fd.get('model')) : '');
 
-	return { vstup: { hlbkaMm, sirkaMm, zasklenie, model } };
+	return { vstup: { hlbkaMm, sirkaMm, zasklenie, systemStien, model } };
 }

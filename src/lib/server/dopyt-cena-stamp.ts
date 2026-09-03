@@ -11,8 +11,9 @@ import { CENNIK_VERZIA_BAZEN, cenaPreModelBazen } from './konfigurator-bazen-cen
 import { CENNIK_VERZIA_OPLOTENIE, cenaOplotenieZCfg } from './konfigurator-oplotenie-cena';
 import { bazenModel } from '$lib/konfigurator-bazen';
 // #408: cenová matica zimnej záhrady (produkt-aware dispatch nižšie) + whitelist modelu (display label).
+// #429: `parseZzSystemKod` rozbaľuje kompozitný `systemKod` (model + CENOTVORNÝ systém stien).
 import { CENNIK_VERZIA_ZZ, cenaPreZz } from './konfigurator-zimna-zahrada-cena';
-import { zzModel } from '$lib/konfigurator-zimna-zahrada';
+import { parseZzSystemKod } from '$lib/konfigurator-zimna-zahrada';
 import { maCenovyZdroj, type KonfProduktKod } from '$lib/konfigurator-produkty';
 import type { PonukaConfig } from '$lib/ponuka';
 import type { VerejnaCena, CenovaHladina } from '$lib/konfigurator';
@@ -26,14 +27,15 @@ export function cenaZCfg(cfg: PonukaConfig, hladina: CenovaHladina = 'MO'): Vere
 	return cenaPreModel({ hlbkaMm: cfg.hlbka, sirkaMm: cfg.sirka, model: cfg.model }, hladina);
 }
 
-/** #404/#408/#410: orientačná cena z cfg PODĽA PRODUKTU (v danej hladine) — produkt-aware dispatch nad
- *  cenovými maticami. `bazen` → bazénová matica (dĺžka `cfg.dlzka` + šírka `cfg.sirka` + model
+/** #404/#408/#410/#429: orientačná cena z cfg PODĽA PRODUKTU (v danej hladine) — produkt-aware dispatch
+ *  nad cenovými maticami. `bazen` → bazénová matica (dĺžka `cfg.dlzka` + šírka `cfg.sirka` + model
  *  `cfg.systemKod`; bez `systemKod` — starý neopečiatkovaný riadok — vráti `null`, honest-degrade,
- *  aby sa starému honest-null bazén dopytu ticho nepriradila default cena). `zimna-zahrada` (#408) →
- *  matica zimnej záhrady (hĺbka+šírka+sklo, systemKod ako honest-null strážca); `oplotenie` (#410) →
- *  matica oplotenia (kompozitný systemKod + šírka). Ostatné (pergola/NULL/neznámy pergolový
- *  fallback) → pergolová `cenaZCfg`. Zdieľané s `ponuka-pdf` (prepočet bez stampu).
- *  Produkt-gate (`maCenovyZdroj`) rieši volajúci (`opeciatkujCenuPreProdukt` / `ponuka-pdf`). */
+ *  aby sa starému honest-null bazén dopytu ticho nepriradila default cena). `zimna-zahrada` (#408 +
+ *  #429) → matica zimnej záhrady (hĺbka+šírka+sklo, KOMPOZITNÝ systemKod = model+CENOTVORNÝ systém
+ *  stien, `parseZzSystemKod`; systemKod ako honest-null strážca); `oplotenie` (#410) → matica
+ *  oplotenia (kompozitný systemKod + šírka). Ostatné (pergola/NULL/neznámy pergolový fallback) →
+ *  pergolová `cenaZCfg`. Zdieľané s `ponuka-pdf` (prepočet bez stampu). Produkt-gate (`maCenovyZdroj`)
+ *  rieši volajúci (`opeciatkujCenuPreProdukt` / `ponuka-pdf`). */
 export function cenaZCfgProdukt(
 	cfg: PonukaConfig,
 	produkt: string | null | undefined,
@@ -47,19 +49,24 @@ export function cenaZCfgProdukt(
 			hladina
 		);
 	}
-	// #408: zimná záhrada — cena z `hlbka`(→length) + `sirka`(→width) + `sklo`(zasklenie→roofing);
-	// `systemKod` (model ROBUST/MASSIVE) je LEN display label (cenu nemení), ale jeho PRÍTOMNOSŤ
-	// odlišuje NOVÝ (opečiatkovateľný) riadok od STARÉHO honest-null dopytu pred #408 — bez neho vráť
-	// `null` (honest-degrade, aby starý honest-null zimná dopyt nedostal ticho cenu; vzor bazén).
+	// #408/#429: zimná záhrada — cena z `hlbka`(→length) + `sirka`(→width) + `sklo`(zasklenie→roofing)
+	// + `systemKod`(→ #429 systém stien→glazing, CENOTVORNÝ). `systemKod` je kompozitný
+	// `"${model}|${systemStien}"` (`zzSystemKod`/`parseZzSystemKod`, vzor #410 oplotenie) — model časť
+	// je LEN display label (cenu nemení). Jeho PRÍTOMNOSŤ odlišuje NOVÝ (opečiatkovateľný) riadok od
+	// STARÉHO honest-null dopytu pred #408 — bez neho vráť `null` (honest-degrade, aby starý honest-null
+	// zimná dopyt nedostal ticho cenu; vzor bazén). Starý riadok BEZ `|` (spred #429) sa degraduje na
+	// bázový systém stien (`parseZzSystemKod` fallback) — presne to, čo bolo v čase podania jediné cenené.
 	if (produkt === 'zimna-zahrada') {
 		if (!cfg.systemKod || !(cfg.hlbka && cfg.hlbka > 0) || !(cfg.sirka && cfg.sirka > 0))
 			return null;
+		const { model, systemStien } = parseZzSystemKod(cfg.systemKod);
 		return cenaPreZz(
 			{
 				hlbkaMm: cfg.hlbka,
 				sirkaMm: cfg.sirka,
 				zasklenie: cfg.sklo,
-				model: zzModel(cfg.systemKod)
+				systemStien,
+				model
 			},
 			hladina
 		);

@@ -4,6 +4,23 @@ import { mm } from './jednotky';
 
 type ThreeNS = typeof import('three');
 type Material = InstanceType<ThreeNS['MeshPhysicalMaterial']>;
+type Textura = InstanceType<ThreeNS['Texture']>;
+
+// #356: sila (Vector2 scale) mikro-reliéfnych máp — ZÁMERNE JEMNÁ (#276/#336: vysoký
+// kontrast = plastový vzhľad). Normal mapa sama je už nízkoamplitúdová (textury.ts);
+// tento scale ju ešte ďalej krotí.
+const HLINIK_NORMAL_SCALE = 0.7;
+const SKLO_CLEARCOAT_NORMAL_SCALE = 0.15;
+
+/** #356 — voliteľné procedurálne PBR mapy hliníka (mid/high tier). `undefined`
+ *  (low tier / default) = pôvodný PLOCHÝ materiál (spätne kompatibilné, kryté #285
+ *  testami). Textúry vyrába `textury.ts` (`vytvorHlinikNormalMapu`/`…RoughMapu`);
+ *  volajúci (`postavProduktMeshe`) ich vytvorí, nastaví repeat a zaregistruje na
+ *  dispose. */
+export interface HlinikMapy {
+	normalMap?: Textura;
+	roughnessMap?: Textura;
+}
 
 /** Hliníková konštrukcia — `MeshPhysicalMaterial` podľa §2.6.
  *
@@ -22,7 +39,8 @@ type Material = InstanceType<ThreeNS['MeshPhysicalMaterial']>;
 export function vytvorHlinikMaterial(
 	THREE: ThreeNS,
 	ralKod: string,
-	clearcoatPovoleny: boolean
+	clearcoatPovoleny: boolean,
+	mapy?: HlinikMapy
 ): Material {
 	const farba = farbaKonstrukcie(ralKod);
 	const mat = new THREE.MeshPhysicalMaterial({
@@ -39,6 +57,15 @@ export function vytvorHlinikMaterial(
 		mat.clearcoatRoughness = 0.1;
 		mat.envMapIntensity = 1.15;
 	}
+	// #356: procedurálny mikro-reliéf práškovaného povrchu (mid/high). Normal mapa
+	// NEMENÍ base farbu (RAL vernosť ostáva); roughnessMap MULTIPLIKUJE `roughness`
+	// (mapa je centrovaná ~1.0, takže len jemne moduluje lesk). `nastavRAL` sa týchto
+	// máp NEdotýka → prežijú živú zmenu RAL.
+	if (mapy?.normalMap) {
+		mat.normalMap = mapy.normalMap;
+		mat.normalScale = new THREE.Vector2(HLINIK_NORMAL_SCALE, HLINIK_NORMAL_SCALE);
+	}
+	if (mapy?.roughnessMap) mat.roughnessMap = mapy.roughnessMap;
 	return mat;
 }
 
@@ -134,11 +161,17 @@ export function vytvorSkloMaterial(
 	THREE: ThreeNS,
 	skloHrubkaMm: number,
 	rezim: 'transmission' | 'falosne',
-	vzhlad?: SkloVzhlad
+	vzhlad?: SkloVzhlad,
+	/** #356: voliteľná jemná `clearcoatNormalMap` (mid/high) — rozbije zrkadlový
+	 *  odraz clearcoat vrstvy, aby sklo nebolo dokonalé zrkadlo. Aplikuje sa LEN na
+	 *  clearcoat → číra priehľadnosť/transmisia skla ostáva NEDOTKNUTÁ. `undefined`
+	 *  (low tier / default) = pôvodné sklo (kryté #174/#276 testami). */
+	odrazMapa?: Textura
 ): Material {
 	const clearcoatSpolocne = { clearcoat: 0.85, clearcoatRoughness: 0.04 };
+	let mat: Material;
 	if (rezim === 'falosne') {
-		return new THREE.MeshPhysicalMaterial({
+		mat = new THREE.MeshPhysicalMaterial({
 			transparent: true,
 			// #174 3. kolo: 2. kolo (opacity 0.32, farba 0x3fae8c) vizuálne
 			// čítalo ako SÝTE zelené sklo, nie "jemný modrozelený nádych" zo
@@ -155,31 +188,43 @@ export function vytvorSkloMaterial(
 			specularColor: new THREE.Color(0xffffff),
 			...clearcoatSpolocne
 		});
+	} else {
+		mat = new THREE.MeshPhysicalMaterial({
+			transmission: 1,
+			ior: 1.5,
+			roughness: vzhlad?.roughness ?? SKLO_TRANSM_DEF.roughness,
+			thickness: mm(skloHrubkaMm),
+			metalness: 0,
+			transparent: false,
+			// takmer neutrálna — tint nesie hlavne attenuationColor (Beer–Lambert),
+			// `color` by pri sýtej hodnote útlm len duplicitne prehĺbil
+			color: new THREE.Color(vzhlad?.farbaHex ?? SKLO_TRANSM_DEF.farbaHex),
+			// #174 3. kolo: 2. kolo (attenuationDistance 0.02) čítalo naživo ako
+			// SÝTE zelené sklo, nie "jemný modrozelený nádych" zo zadania. Väčšia
+			// attenuationDistance (0.035) pri rovnakej sýtej `attenuationColor`
+			// dáva jemnejší, ale stále jasne VIDITEĽNÝ tón — overené screenshotom
+			// AJ `tests/vizual-materialy.test.ts` (skutočná Beer–Lambert
+			// transmitancia po kanáli, viď funkcie vlastný header komentár vyššie
+			// pre presnú formulu a upozornenie na lineárny vs. sRGB priestor).
+			attenuationColor: new THREE.Color(vzhlad?.attenuationHex ?? SKLO_TRANSM_DEF.attenuationHex),
+			attenuationDistance: vzhlad?.attenuationDistanceM ?? SKLO_TRANSM_DEF.attenuationDistanceM,
+			envMapIntensity: 1.6,
+			specularIntensity: 1.3,
+			specularColor: new THREE.Color(0xffffff),
+			...clearcoatSpolocne
+		});
 	}
-	return new THREE.MeshPhysicalMaterial({
-		transmission: 1,
-		ior: 1.5,
-		roughness: vzhlad?.roughness ?? SKLO_TRANSM_DEF.roughness,
-		thickness: mm(skloHrubkaMm),
-		metalness: 0,
-		transparent: false,
-		// takmer neutrálna — tint nesie hlavne attenuationColor (Beer–Lambert),
-		// `color` by pri sýtej hodnote útlm len duplicitne prehĺbil
-		color: new THREE.Color(vzhlad?.farbaHex ?? SKLO_TRANSM_DEF.farbaHex),
-		// #174 3. kolo: 2. kolo (attenuationDistance 0.02) čítalo naživo ako
-		// SÝTE zelené sklo, nie "jemný modrozelený nádych" zo zadania. Väčšia
-		// attenuationDistance (0.035) pri rovnakej sýtej `attenuationColor`
-		// dáva jemnejší, ale stále jasne VIDITEĽNÝ tón — overené screenshotom
-		// AJ `tests/vizual-materialy.test.ts` (skutočná Beer–Lambert
-		// transmitancia po kanáli, viď funkcie vlastný header komentár vyššie
-		// pre presnú formulu a upozornenie na lineárny vs. sRGB priestor).
-		attenuationColor: new THREE.Color(vzhlad?.attenuationHex ?? SKLO_TRANSM_DEF.attenuationHex),
-		attenuationDistance: vzhlad?.attenuationDistanceM ?? SKLO_TRANSM_DEF.attenuationDistanceM,
-		envMapIntensity: 1.6,
-		specularIntensity: 1.3,
-		specularColor: new THREE.Color(0xffffff),
-		...clearcoatSpolocne
-	});
+	// #356: jemná clearcoat normal mapa (mid/high) — rozbije zrkadlový odraz clearcoat
+	// vrstvy bez dotyku číreho priehľadu/transmisie skla. `nastavSkloVzhlad` sa mapy
+	// NEdotýka → prežije živú zmenu typu skla.
+	if (odrazMapa) {
+		mat.clearcoatNormalMap = odrazMapa;
+		mat.clearcoatNormalScale = new THREE.Vector2(
+			SKLO_CLEARCOAT_NORMAL_SCALE,
+			SKLO_CLEARCOAT_NORMAL_SCALE
+		);
+	}
+	return mat;
 }
 
 /** Prepíše vzhľad skla na UŽ EXISTUJÚCEJ inštancii materiálu (živá zmena typu

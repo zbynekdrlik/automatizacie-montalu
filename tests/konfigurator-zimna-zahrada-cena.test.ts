@@ -1,10 +1,12 @@
-// Interim cenotvorba zimných záhrad (#408) — parity + jednotkové testy cenového modulu.
-// DPH parita je kotvená NEZÁVISLE na montalu.sk vlastných zaokrúhlených reťazcoch s DPH
+// Interim cenotvorba zimných záhrad (#408 + #429 systém stien) — parity + jednotkové testy cenového
+// modulu. DPH parita je kotvená NEZÁVISLE na montalu.sk vlastných zaokrúhlených reťazcoch s DPH
 // (`verifikaciaDph` v seede — montalu PHP `round()`), nie na našej vlastnej aritmetike (vrátane .xx5
 // hraníc, aby test odlíšil celocentový half-up od naivného FP driftu). Product-aware dispatch test je
 // NETAUTOLOGICKÝ (vzor #388/#389): dokazuje, že cfg zimnej záhrady dostane cenu zimnej záhrady,
 // pergolotvarová cfg bez systemKod pod „zimna-zahrada" NEDOSTANE cenu (honest-degrade), a tá istá cfg
-// pod „pergola" cenu DOSTANE (gate nie je no-op).
+// pod „pergola" cenu DOSTANE (gate nie je no-op). #429: systém stien je TERAZ 4. cenotvorná os
+// (`cennik[glazing][roofing][hĺbka][šírka]`) — default (chýbajúci `systemStien`) je non-breaking
+// (byte-identický s #408 pôvodnou bázou Slide 16mm).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,13 +16,20 @@ import {
 	cenaPreZz,
 	zaokruhliNahor,
 	roofingPreZasklenie,
+	glazingPreSystemStien,
 	DPH_ZZ,
-	CENNIK_VERZIA_ZZ
+	CENNIK_VERZIA_ZZ,
+	BAZOVY_GLAZING_ZZ
 } from '../src/lib/server/konfigurator-zimna-zahrada-cena';
 import { cenaZCfgProdukt, opeciatkujCenuPreProdukt } from '../src/lib/server/dopyt-cena-stamp';
 import { parseZzCenaVstup } from '../src/lib/server/konfigurator-zimna-zahrada-vstup';
 import { maCenovyZdroj } from '../src/lib/konfigurator-produkty';
-import { ZZ_ZASKLENIA } from '../src/lib/konfigurator-zimna-zahrada';
+import {
+	ZZ_ZASKLENIA,
+	ZZ_SYSTEMY_STIEN,
+	ZZ_SYSTEM_STIEN_DEFAULT,
+	zzSystemKod
+} from '../src/lib/konfigurator-zimna-zahrada';
 
 /** montalu reťazec „5 234,98" → 5234.98 (medzery = tisícky, čiarka = desatinná). */
 const parseCena = (s: string) => Number(s.replace(/\s/g, '').replace(',', '.'));
@@ -36,14 +45,19 @@ describe('DPH half-up parita voči montalu.sk (verifikaciaDph)', () => {
 		expect(hranicna).toBe(true);
 	});
 	for (const v of cennik.verifikaciaDph) {
-		it(`${v.roofing} ${v.hlbkaM}×${v.sirkaM} m: MO net ${v.moNet} → ${v.moDph}; VO net ${v.voNet} → ${v.voDph}`, () => {
-			// nájdi zasklenie nazov, ktorý mapuje na tento roofing (na vstup do modulu)
+		it(`${v.glazing} / ${v.roofing} ${v.hlbkaM}×${v.sirkaM} m: MO net ${v.moNet} → ${v.moDph}; VO net ${v.voNet} → ${v.voDph}`, () => {
+			// nájdi zasklenie/systém stien nazov, ktorý mapuje na tento roofing/glazing (na vstup do modulu)
 			const zasklenie = ZZ_ZASKLENIA.find((z) => roofingPreZasklenie(z.nazov) === v.roofing)?.nazov;
+			const systemStien = ZZ_SYSTEMY_STIEN.find(
+				(s) => glazingPreSystemStien(s.nazov) === v.glazing
+			)?.nazov;
 			expect(zasklenie).toBeTruthy();
+			expect(systemStien).toBeTruthy();
 			const r = vypocitajCenuZz({
 				hlbkaMm: v.hlbkaM * 1000,
 				sirkaMm: v.sirkaM * 1000,
-				zasklenie
+				zasklenie,
+				systemStien
 			});
 			expect(r.druh).toBe('cena');
 			if (r.druh === 'cena') {
@@ -60,13 +74,13 @@ describe('DPH half-up parita voči montalu.sk (verifikaciaDph)', () => {
 // Grid lookup + honest-null (nevymýšľa cenu mimo katalógu)
 // --------------------------------------------------------------------------- //
 describe('grid lookup + honest-null', () => {
-	it('bunka v matici vráti seed hodnotu (MO/VO net) + grid rozmery', () => {
+	it('bunka v matici vráti seed hodnotu (MO/VO net) + grid rozmery — default systemStien = báza', () => {
 		const r = vypocitajCenuZz({ hlbkaMm: 4000, sirkaMm: 3000, zasklenie: 'Izolačné sklo' });
 		expect(r.druh).toBe('cena');
 		if (r.druh === 'cena') {
 			// literálny kľúč (nie premenná) — strict index JSON typu (noUncheckedIndexedAccess)
 			expect([r.mo.bezDph, r.vo.bezDph]).toEqual(
-				cennik.cennik['izolacne-sklo-24-mm']!['4.0']!['3.0']
+				cennik.cennik['slide|izolacne-sklo-16-mm']!['izolacne-sklo-24-mm']!['4.0']!['3.0']
 			);
 			expect(r.hlbkaGridM).toBe(4);
 			expect(r.sirkaGridM).toBe(3);
@@ -98,6 +112,59 @@ describe('grid lookup + honest-null', () => {
 	});
 });
 
+// --------------------------------------------------------------------------- //
+// #429 systém stien — TERAZ cenotvorná os. Chýbajúci/default vstup = byte-identický s #408 pôvodnou
+// bázou (non-breaking); rôzny systém stien = rôzna (nie rovnaká) cena; neznámy → honest-degrade.
+// --------------------------------------------------------------------------- //
+describe('#429 systém stien — cenotvorná os', () => {
+	it('vynechaný systemStien = byte-identický s explicitnou bázou „Slide - 16mm sklo" (non-breaking default)', () => {
+		const bezVstupu = vypocitajCenuZz({ hlbkaMm: 4000, sirkaMm: 3000, zasklenie: 'Izolačné sklo' });
+		const sBazou = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
+		expect(bezVstupu).toEqual(sBazou);
+	});
+
+	it('iný systém stien pri rovnakých rozmeroch+zasklení dá INÚ cenu (os REÁLNE cenotvorná, ±desiatky-tisíce €)', () => {
+		const bazova = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: 'Slide - 16mm sklo'
+		});
+		const robust = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: 'Robust - 24mm IZO sklo'
+		});
+		expect(bazova.druh).toBe('cena');
+		expect(robust.druh).toBe('cena');
+		if (bazova.druh === 'cena' && robust.druh === 'cena') {
+			expect(robust.mo.bezDph).not.toBe(bazova.mo.bezDph);
+		}
+	});
+
+	it('neznámy systém stien → bázový glazing (Slide 16mm) — honest-degrade', () => {
+		const r = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: 'čosi neznáme'
+		});
+		const ref = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
+		expect(r).toEqual(ref);
+	});
+});
+
 describe('zaokruhliNahor (montalu „najbližší väčší rozmer")', () => {
 	const m = { min: 2, max: 6, krok: 0.5 };
 	it('pod minimum → minimum', () => expect(zaokruhliNahor(1.5, m)).toBe(2));
@@ -111,15 +178,57 @@ describe('zaokruhliNahor (montalu „najbližší väčší rozmer")', () => {
 // roofing mapping drift guard — KAŽDÝ ZZ_ZASKLENIA nazov musí mať záznam v matici (inak lookup padne)
 // --------------------------------------------------------------------------- //
 describe('roofing mapping (zasklenie → matica)', () => {
-	it('KAŽDÝ ZZ_ZASKLENIA nazov mapuje na roofing prítomný v seede', () => {
+	it('KAŽDÝ ZZ_ZASKLENIA nazov mapuje na roofing prítomný v seede (pri báze systému stien)', () => {
 		for (const z of ZZ_ZASKLENIA) {
 			const roofing = roofingPreZasklenie(z.nazov);
-			expect(Object.keys(cennik.cennik), z.nazov).toContain(roofing);
+			// #429: roofing je TERAZ pod glazing blokom — over v BÁZOVOM (default) glazing bloku
+			const bazaGlazing = glazingPreSystemStien(ZZ_SYSTEM_STIEN_DEFAULT);
+			const cennikMap = cennik.cennik as unknown as Record<string, Record<string, unknown>>;
+			expect(Object.keys(cennikMap[bazaGlazing]!), z.nazov).toContain(roofing);
 			// a reálne vráti cenu pre bežný rozmer (nie individuálna)
 			expect(vypocitajCenuZz({ hlbkaMm: 4000, sirkaMm: 3000, zasklenie: z.nazov }).druh).toBe(
 				'cena'
 			);
 		}
+	});
+
+	// review 🔵 (#429): `toContain(roofing)` samo osebe je VÁKUOVÉ — preklep v `nazov` spadne na
+	// bázový roofing (vždy prítomný v seede), takže test by prešiel aj pri kolízii dvoch mien na
+	// ten istý roofing. Dokáž, že KAŽDÝ nazov mapuje na VLASTNÝ (RÔZNY) roofing slug.
+	it('KAŽDÝ ZZ_ZASKLENIA nazov mapuje na RÔZNY roofing (žiadna kolízia dvoch mien na jeden slug)', () => {
+		const roofingy = new Set(ZZ_ZASKLENIA.map((z) => roofingPreZasklenie(z.nazov)));
+		expect(roofingy.size).toBe(ZZ_ZASKLENIA.length);
+	});
+});
+
+// --------------------------------------------------------------------------- //
+// #429 systém stien mapping drift guard — KAŽDÝ ZZ_SYSTEMY_STIEN nazov musí mať záznam v matici
+// --------------------------------------------------------------------------- //
+describe('#429 systém stien mapping (systém stien → matica)', () => {
+	it('KAŽDÝ ZZ_SYSTEMY_STIEN nazov mapuje na glazing prítomný v seede', () => {
+		for (const s of ZZ_SYSTEMY_STIEN) {
+			const glazing = glazingPreSystemStien(s.nazov);
+			expect(Object.keys(cennik.cennik), s.nazov).toContain(glazing);
+			// a reálne vráti cenu pre bežný rozmer (nie individuálna)
+			expect(vypocitajCenuZz({ hlbkaMm: 4000, sirkaMm: 3000, systemStien: s.nazov }).druh).toBe(
+				'cena'
+			);
+		}
+	});
+
+	// review 🔵 (#429): `toContain(glazing)` samo osebe je VÁKUOVÉ — preklep v `nazov` spadne na
+	// bázový glazing (vždy prítomný), takže test by prešiel aj pri kolízii dvoch mien na ten istý
+	// slug. Dokáž, že KAŽDÝCH 6 mien mapuje na 6 RÔZNYCH glazing slugov.
+	it('KAŽDÝ ZZ_SYSTEMY_STIEN nazov mapuje na RÔZNY glazing (žiadna kolízia dvoch mien na jeden slug)', () => {
+		const glazingy = new Set(ZZ_SYSTEMY_STIEN.map((s) => glazingPreSystemStien(s.nazov)));
+		expect(glazingy.size).toBe(ZZ_SYSTEMY_STIEN.length);
+	});
+
+	// review 🔵 (#429): komentár v `konfigurator-zimna-zahrada.ts` aj v playbooku tvrdí, že delimiter
+	// `|` je bezpečný, lebo ho ŽIADEN ZZ_SYSTEMY_STIEN nazov neobsahuje — over to PRIAMO (predtým to
+	// bola len neoverená prozaická poznámka).
+	it('ŽIADEN ZZ_SYSTEMY_STIEN nazov neobsahuje delimiter „|" (bezpečný pre kompozitný systemKod)', () => {
+		for (const s of ZZ_SYSTEMY_STIEN) expect(s.nazov).not.toContain('|');
 	});
 });
 
@@ -164,13 +273,20 @@ describe('parseZzCenaVstup', () => {
 	it('platný vstup (mm, medzery v čísle sa ignorujú) → typovaný ZzCenaVstup', () => {
 		// parser berie MM (skryté inputy stránky POSTujú mm); „4 000" = 4000 mm (medzery = oddeľovač tisícok)
 		const r = parseZzCenaVstup(
-			fd({ hlbka: '4 000', sirka: '3000', zasklenie: 'Polykarbonát', model: 'MASSIVE' })
+			fd({
+				hlbka: '4 000',
+				sirka: '3000',
+				zasklenie: 'Polykarbonát',
+				systemStien: 'Robust - 24mm IZO sklo',
+				model: 'MASSIVE'
+			})
 		);
 		expect('vstup' in r).toBe(true);
 		if ('vstup' in r) {
 			expect(r.vstup.hlbkaMm).toBe(4000);
 			expect(r.vstup.sirkaMm).toBe(3000);
 			expect(r.vstup.zasklenie).toBe('Polykarbonát');
+			expect(r.vstup.systemStien).toBe('Robust - 24mm IZO sklo');
 			expect(r.vstup.model).toBe('MASSIVE');
 		}
 	});
@@ -189,13 +305,14 @@ describe('parseZzCenaVstup', () => {
 		expect('error' in parseZzCenaVstup(fd({ hlbka: 'abc', sirka: '3000' }))).toBe(true);
 	});
 
-	it('neznáme zasklenie/model → whitelist default (Izolačné sklo / ROBUST)', () => {
+	it('neznáme zasklenie/systém stien/model → whitelist default (Izolačné sklo / Slide 16mm / ROBUST)', () => {
 		const r = parseZzCenaVstup(
-			fd({ hlbka: '4000', sirka: '3000', zasklenie: 'xxx', model: 'yyy' })
+			fd({ hlbka: '4000', sirka: '3000', zasklenie: 'xxx', systemStien: 'xxx', model: 'yyy' })
 		);
 		expect('vstup' in r).toBe(true);
 		if ('vstup' in r) {
 			expect(r.vstup.zasklenie).toBe('Izolačné sklo');
+			expect(r.vstup.systemStien).toBe(ZZ_SYSTEM_STIEN_DEFAULT);
 			expect(r.vstup.model).toBe('ROBUST');
 		}
 	});
@@ -205,11 +322,22 @@ describe('parseZzCenaVstup', () => {
 // Product-aware dispatch (#408) — NETAUTOLOGICKÝ gate test (vzor #388/#389)
 // --------------------------------------------------------------------------- //
 describe('produkt-aware dispatch (dopyt-cena-stamp)', () => {
-	const zzCfg = { systemKod: 'ROBUST', hlbka: 4000, sirka: 3000, sklo: 'Izolačné sklo' };
+	// #429: systemKod je TERAZ kompozitný "model|systémStien" (`zzSystemKod`, vzor #410 oplotenie).
+	const zzCfg = {
+		systemKod: zzSystemKod('ROBUST', 'Robust - 24mm IZO sklo'),
+		hlbka: 4000,
+		sirka: 3000,
+		sklo: 'Izolačné sklo'
+	};
 
-	it('cfg zimnej záhrady pod „zimna-zahrada" → cena zimnej záhrady (zhoda s modulom)', () => {
+	it('cfg zimnej záhrady pod „zimna-zahrada" → cena zimnej záhrady (zhoda s modulom, systém stien z kompozitného systemKod)', () => {
 		const c = cenaZCfgProdukt(zzCfg, 'zimna-zahrada');
-		const ref = vypocitajCenuZz({ hlbkaMm: 4000, sirkaMm: 3000, zasklenie: 'Izolačné sklo' });
+		const ref = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: 'Robust - 24mm IZO sklo'
+		});
 		expect(c?.druh).toBe('cena');
 		if (c?.druh === 'cena' && ref.druh === 'cena') expect(c.bezDph).toBe(ref.mo.bezDph);
 	});
@@ -240,6 +368,21 @@ describe('produkt-aware dispatch (dopyt-cena-stamp)', () => {
 		const c = cenaZCfgProdukt({ model: 'LIGHT', hlbka: 3500, sirka: 4000 }, 'pergola');
 		expect(c?.druh).toBe('cena');
 	});
+
+	// #429: spätná kompatibilita — STARÝ riadok (spred #429, systemKod = LEN model, žiadny „|")
+	// dostane cenu pri BÁZOVOM systéme stien (presne to, čo bolo v čase podania jediné cenené).
+	it('STARÝ (pred-#429) riadok systemKod="ROBUST" (bez „|") → cena pri báze Slide 16mm, nie honest-null', () => {
+		const staryCfg = { systemKod: 'ROBUST', hlbka: 4000, sirka: 3000, sklo: 'Izolačné sklo' };
+		const c = cenaZCfgProdukt(staryCfg, 'zimna-zahrada');
+		const ref = vypocitajCenuZz({
+			hlbkaMm: 4000,
+			sirkaMm: 3000,
+			zasklenie: 'Izolačné sklo',
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
+		});
+		expect(c?.druh).toBe('cena');
+		if (c?.druh === 'cena' && ref.druh === 'cena') expect(c.bezDph).toBe(ref.mo.bezDph);
+	});
 });
 
 // --------------------------------------------------------------------------- //
@@ -247,35 +390,45 @@ describe('produkt-aware dispatch (dopyt-cena-stamp)', () => {
 // maticu bez posunu kľúčov/zaokrúhlenia na mriežkových bodoch.
 // --------------------------------------------------------------------------- //
 describe('plná parita matice (každá bunka seedu)', () => {
-	it('vypocitajCenuZz vráti seed MO/VO net pre KAŽDÚ bunku', () => {
+	it('vypocitajCenuZz vráti seed MO/VO net pre KAŽDÚ bunku (glazing × roofing × hĺbka × šírka)', () => {
 		const matica = cennik.cennik as unknown as Record<
 			string,
-			Record<string, Record<string, number[]>>
+			Record<string, Record<string, Record<string, number[]>>>
 		>;
-		// roofing slug → zasklenie nazov (na vstup do modulu)
+		// roofing slug → zasklenie nazov, glazing slug → systém stien nazov (na vstup do modulu)
 		const nazovPreRoofing = new Map<string, string>();
 		for (const z of ZZ_ZASKLENIA) nazovPreRoofing.set(roofingPreZasklenie(z.nazov), z.nazov);
+		const nazovPreGlazing = new Map<string, string>();
+		for (const s of ZZ_SYSTEMY_STIEN) nazovPreGlazing.set(glazingPreSystemStien(s.nazov), s.nazov);
 		let buniek = 0;
-		for (const [roofing, hlbky] of Object.entries(matica)) {
-			const zasklenie = nazovPreRoofing.get(roofing);
-			expect(zasklenie, roofing).toBeTruthy();
-			for (const [dK, riadok] of Object.entries(hlbky)) {
-				for (const [wK, par] of Object.entries(riadok)) {
-					const r = vypocitajCenuZz({
-						hlbkaMm: Number(dK) * 1000,
-						sirkaMm: Number(wK) * 1000,
-						zasklenie
-					});
-					expect(r.druh, `${roofing} ${dK}×${wK}`).toBe('cena');
-					if (r.druh === 'cena') {
-						expect([r.mo.bezDph, r.vo.bezDph], `${roofing} ${dK}×${wK}`).toEqual(par);
-						expect(r.vo.bezDph).toBeLessThan(r.mo.bezDph); // VO vždy < MO
+		for (const [glazing, roofingBlok] of Object.entries(matica)) {
+			const systemStien = nazovPreGlazing.get(glazing);
+			expect(systemStien, glazing).toBeTruthy();
+			for (const [roofing, hlbky] of Object.entries(roofingBlok)) {
+				const zasklenie = nazovPreRoofing.get(roofing);
+				expect(zasklenie, roofing).toBeTruthy();
+				for (const [dK, riadok] of Object.entries(hlbky)) {
+					for (const [wK, par] of Object.entries(riadok)) {
+						const r = vypocitajCenuZz({
+							hlbkaMm: Number(dK) * 1000,
+							sirkaMm: Number(wK) * 1000,
+							zasklenie,
+							systemStien
+						});
+						expect(r.druh, `${glazing} / ${roofing} ${dK}×${wK}`).toBe('cena');
+						if (r.druh === 'cena') {
+							expect([r.mo.bezDph, r.vo.bezDph], `${glazing} / ${roofing} ${dK}×${wK}`).toEqual(
+								par
+							);
+							expect(r.vo.bezDph).toBeLessThan(r.mo.bezDph); // VO vždy < MO
+						}
+						buniek++;
 					}
-					buniek++;
 				}
 			}
 		}
-		expect(buniek).toBeGreaterThan(400); // sanity: matica nie je prázdna (4×9×12 = 432)
+		// sanity: matica nie je prázdna (6 glazing × 4 roofing × 9 hĺbka × 12 šírka = 2592)
+		expect(buniek).toBeGreaterThan(2500);
 	});
 });
 
@@ -311,4 +464,12 @@ describe('metadáta cenníka', () => {
 	it('DPH je 0,23', () => expect(DPH_ZZ).toBe(0.23));
 	it('CENNIK_VERZIA_ZZ má tvar <iso>#<12hex>', () =>
 		expect(CENNIK_VERZIA_ZZ).toMatch(/^.+#[0-9a-f]{12}$/));
+
+	// review 🔵 (#429): DVA nezávislé zdroje pravdy pre bázový glazing — seedový `BAZOVY_GLAZING_ZZ`
+	// (`meta.bazovyGlazing`, čo fetch skript naozaj poslal ako default) a kódový `GLAZING_DEFAULT`
+	// (odvodený z `ZZ_SYSTEM_STIEN_DEFAULT` cez whitelist, s `??` fallbackom, ktorý by tichoticho
+	// zamaskoval budúci rename). PIN ich drží zosúladené — zmena jednej strany bez druhej tu PADNE.
+	it('#429: default systém stien (whitelist) ukazuje na TEN ISTÝ glazing ako seedový bázový default', () => {
+		expect(glazingPreSystemStien(ZZ_SYSTEM_STIEN_DEFAULT)).toBe(BAZOVY_GLAZING_ZZ);
+	});
 });

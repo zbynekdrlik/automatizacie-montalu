@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// #408 — ONLINE drift-check: porovná uložený seed `src/lib/server/cennik-zimna-zahrada.json` so ŽIVÝM
-// montalu.sk konfigurátorom zimných záhrad. Upozorní, keď montalu.sk zmení cenník (seed treba
-// regenerovať cez `scripts/konfigurator-zimna-zahrada-cennik-fetch.mjs`). Read-only (číta len cenový
-// endpoint, žiadny submit/objednávka). Politický delay medzi volaniami.
+// #408 + #429 — ONLINE drift-check: porovná uložený seed `src/lib/server/cennik-zimna-zahrada.json`
+// so ŽIVÝM montalu.sk konfigurátorom zimných záhrad. Upozorní, keď montalu.sk zmení cenník (seed
+// treba regenerovať cez `scripts/konfigurator-zimna-zahrada-cennik-fetch.mjs`). Read-only (číta len
+// cenový endpoint, žiadny submit/objednávka). Politický delay medzi volaniami.
 //
 // NIKDY v CI (externá sieť). Spustenie: `node scripts/konfigurator-zimna-zahrada-cennik-drift.mjs`
 // Výstup: nenulový exit kód pri zistenom drifte.
@@ -20,7 +20,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const seed = JSON.parse(
 	fs.readFileSync(path.join(root, 'src', 'lib', 'server', 'cennik-zimna-zahrada.json'), 'utf8')
 );
-const BASE_GLAZING = seed.meta.bazovyGlazing ?? 'slide|izolacne-sklo-16-mm';
 const BASE_GLASS_ADD = seed.meta.glassAdd ?? 'Bez úpravy';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -41,7 +40,7 @@ async function ziskajKontext() {
 	return { token, validFrom, cookie };
 }
 
-async function ceny(ctx, hlbkaM, sirkaM, roofing) {
+async function ceny(ctx, hlbkaM, sirkaM, glazing, roofing) {
 	const fd = new FormData();
 	fd.append('_token', ctx.token);
 	fd.append('valid_from', ctx.validFrom);
@@ -49,7 +48,7 @@ async function ceny(ctx, hlbkaM, sirkaM, roofing) {
 	fd.append('configurator_id', 'winter-gardens');
 	fd.append('length', String(hlbkaM)); // montalu length = HĹBKA
 	fd.append('width', String(sirkaM)); // montalu width = ŠÍRKA
-	fd.append('glazing', BASE_GLAZING);
+	fd.append('glazing', glazing);
 	fd.append('roofing', roofing);
 	fd.append('color', 'Antracit');
 	fd.append('warranty', '');
@@ -61,7 +60,8 @@ async function ceny(ctx, hlbkaM, sirkaM, roofing) {
 		body: fd,
 		headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': ctx.token, Cookie: ctx.cookie }
 	});
-	if (!res.ok) throw new Error(`POST ${hlbkaM}x${sirkaM} ${roofing} → HTTP ${res.status}`);
+	if (!res.ok)
+		throw new Error(`POST ${hlbkaM}x${sirkaM} ${glazing} ${roofing} → HTTP ${res.status}`);
 	const j = await res.json();
 	const mo = num(j.price);
 	const vo = num(j.priceB2B);
@@ -96,20 +96,25 @@ async function main() {
 	const ctx = await ziskajKontext();
 	let drift = 0;
 	let checked = 0;
-	for (const [roofing, rows] of Object.entries(seed.cennik)) {
-		for (const [dK, wK] of vzorka(rows)) {
-			const stored = rows[dK][wK];
-			const live = await ceny(ctx, Number(dK), Number(wK), roofing);
-			checked++;
-			const bad =
-				!live || Math.abs(live.mo - stored[0]) > TOL || Math.abs(live.vo - stored[1]) > TOL;
-			if (bad) {
-				drift++;
-				console.log(
-					`DRIFT ${roofing} ${dK}×${wK}: seed [${stored}] vs live ${live ? `[${live.mo},${live.vo}]` : 'nedostupné'}`
-				);
+	// #429: matica má TERAZ 4 úrovne (glazing × roofing × hĺbka × šírka) — 6× viac roofing blokov než
+	// #408, takže vzorka je per (glazing, roofing) blok (rohy + pár vnútorných buniek), rovnako ako
+	// predtým per roofing blok — celkový počet volaní ostáva v rozsahu #408 drift-checku.
+	for (const [glazing, roofingBlok] of Object.entries(seed.cennik)) {
+		for (const [roofing, rows] of Object.entries(roofingBlok)) {
+			for (const [dK, wK] of vzorka(rows)) {
+				const stored = rows[dK][wK];
+				const live = await ceny(ctx, Number(dK), Number(wK), glazing, roofing);
+				checked++;
+				const bad =
+					!live || Math.abs(live.mo - stored[0]) > TOL || Math.abs(live.vo - stored[1]) > TOL;
+				if (bad) {
+					drift++;
+					console.log(
+						`DRIFT ${glazing} / ${roofing} ${dK}×${wK}: seed [${stored}] vs live ${live ? `[${live.mo},${live.vo}]` : 'nedostupné'}`
+					);
+				}
+				await sleep(DELAY_MS);
 			}
-			await sleep(DELAY_MS);
 		}
 	}
 	console.log(`\nSkontrolovaných ${checked} buniek, drift v ${drift}.`);

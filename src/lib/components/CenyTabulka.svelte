@@ -20,6 +20,12 @@
 	const skladBunka = (n: number | null) => (n === null ? 'neznáme' : String(n));
 	const dniSlovo = (n: number) => (n === 1 ? 'deň' : n >= 2 && n <= 4 ? 'dni' : 'dní');
 	const riadokSlovo = (n: number) => (n === 1 ? 'riadok' : n >= 2 && n <= 4 ? 'riadky' : 'riadkov');
+	// Lakovanie (#369) — čísla 3 desatinné miesta; „neznáme" keď sa nedá spočítať
+	// (Money rozvin chýba, alebo profil nie je v bežných metroch). „neznáme" =
+	// rovnaká neutrálna forma ako skladBunka (naprieč rodmi stĺpcov).
+	const fmtNum = (n: number, jed: string) =>
+		n.toLocaleString('sk-SK', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' ' + jed;
+	const lakBunka = (n: number | null, jed: string) => (n === null ? 'neznáme' : fmtNum(n, jed));
 </script>
 
 <div class="card" data-testid="ceny-tabulka">
@@ -109,6 +115,58 @@
 		</tfoot>
 	</table>
 </div>
+
+{#if ceny.lakovanie.radky.length > 0}
+	<div class="card" data-testid="lakovanie-card">
+		<div class="sec">Lakovanie</div>
+		<p class="sub">
+			Spotreba farby na rozvin profilov (0,150 kg/m²) — orientačné, len interné. Náklad v € čaká na
+			sadzby (Money cenník lakovania) a nezobrazuje sa.
+		</p>
+		<table data-testid="lakovanie-tabulka">
+			<thead>
+				<tr>
+					<th>Kód</th>
+					<th>Názov</th>
+					<th class="c">Množstvo</th>
+					<th class="c">Rozvin</th>
+					<th class="c">Plocha</th>
+					<th class="c">Spotreba farby</th>
+					<th class="c">Náklad</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each ceny.lakovanie.radky as r (r.kod)}
+					<tr>
+						<td class="mono">{r.kod}</td>
+						<td>{r.nazov}</td>
+						<td class="c">{r.dlzka} {r.mj}</td>
+						<td class="c" data-testid={`lak-rozvin-${r.kod}`}>{lakBunka(r.rozvin, 'm²/bm')}</td>
+						<td class="c">{lakBunka(r.plocha, 'm²')}</td>
+						<td class="c" data-testid={`lak-spotreba-${r.kod}`}>{lakBunka(r.spotreba, 'kg')}</td>
+						<td class="c">čaká na sadzby</td>
+					</tr>
+				{/each}
+			</tbody>
+			<tfoot>
+				<tr>
+					<td colspan="4"><b>Spolu</b></td>
+					<td class="c"><b>{fmtNum(ceny.lakovanie.plochaSpolu, 'm²')}</b></td>
+					<td class="c" data-testid="lakovanie-sucet-spotreba">
+						<b>{fmtNum(ceny.lakovanie.spotrebaSpolu, 'kg')}</b>{#if !ceny.lakovanie.kompletne}
+							<span
+								class="neuplne"
+								title="Niektorý lakovaný profil nemá rozvin, alebo nie je v bežných metroch — súčet je neúplný"
+								>⚠ neúplné</span
+							>
+						{/if}
+					</td>
+					<td class="c" data-testid="lakovanie-naklad-eur">čaká na sadzby</td>
+				</tr>
+			</tfoot>
+		</table>
+	</div>
+{/if}
 
 <style>
 	.neuplne {

@@ -13,6 +13,7 @@
 import { mm } from './jednotky';
 import {
 	vytvorDlazbuTexturu,
+	vytvorDlazbuNormalMapu,
 	vytvorTerasaAlphaTexturu,
 	vytvorStrechaTexturu,
 	vytvorTravnikTexturu,
@@ -367,15 +368,20 @@ export function vytvorOkolie(
 		const tex = vytvorDlazbuTexturu(THREE);
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 		tex.repeat.set(terW / 0.6, terD / 0.6); // 1 dlaždica = 600 mm (mierkový kľúč scény)
+		// #356: normal mapa dlažby (zapustené škáry + tooth) — IDENTICKÝ repeat ako albedo.
+		const normal = vytvorDlazbuNormalMapu(THREE);
+		normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
+		normal.repeat.set(terW / 0.6, terD / 0.6);
 		terasaMat = new THREE.MeshStandardMaterial({
 			map: tex,
+			normalMap: normal,
 			roughness: 0.85,
 			metalness: 0,
 			alphaMap: terasaAlpha,
 			transparent: true,
 			depthWrite: false
 		});
-		disposables.push(tex);
+		disposables.push(tex, normal);
 	}
 	const terasa = new THREE.Mesh(gTerasa, terasaMat);
 	terasa.position.y = mm(1);
