@@ -220,8 +220,11 @@ describe('editor vzorcov', () => {
 	});
 
 	it('prepínač skla (redukcia_zero) sa uloží a audituje', () => {
-		const glass = listGlassTypes();
-		const cieľ = glass[0]!.nazov;
+		// #438: prepínač je PER SYSTÉM — cieľ MUSÍ byť sklo TOHTO systému. Predtým test bral
+		// listGlassTypes()[0] (Robust sklo „Izolačné 4/16/4 mliečne") a menil ho zo stránky
+		// Slide|2K, čo prešlo len vďaka cross-systémovému leaku (WHERE nazov=?), ktorý #438
+		// práve opravuje. Vezmi prvé Slide sklo s redukcia_zero=0 (napr. „6mm číre").
+		const cieľ = glassTypesForSystem('Slide').find((g) => !g.redukciaZero)!.nazov;
 		const { zmeny, error } = saveCfgChanges({
 			sysStyl: 'Slide|2K',
 			username: 'tester',

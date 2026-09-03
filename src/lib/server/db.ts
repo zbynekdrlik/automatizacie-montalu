@@ -94,6 +94,9 @@ export function listSysStyly(): { sysStyl: string; system: string; styl: string;
 }
 
 export interface GlassType {
+	/** riadok `glass_types.id` — stabilná identita skla (nazov je unikátny len v rámci
+	 *  systému, #214/#438); editor ho používa ako identitu checkboxu. */
+	id: number;
 	nazov: string;
 	redukciaZero: boolean;
 	system: string;
@@ -104,9 +107,16 @@ export interface GlassType {
 export function listGlassTypes(): GlassType[] {
 	return (
 		db
-			.prepare('SELECT nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
-			.all() as { nazov: string; redukcia_zero: number; system: string; hrubka: number }[]
+			.prepare('SELECT id, nazov, redukcia_zero, system, hrubka FROM glass_types ORDER BY poradie')
+			.all() as {
+			id: number;
+			nazov: string;
+			redukcia_zero: number;
+			system: string;
+			hrubka: number;
+		}[]
 	).map((r) => ({
+		id: r.id,
 		nazov: r.nazov,
 		redukciaZero: !!r.redukcia_zero,
 		system: r.system,
