@@ -29,6 +29,22 @@ export function jeIzoSklo(sklo: string): boolean {
 	return /izola[čc]n/i.test(sklo);
 }
 
+/** Lookup „meno skla → trieda skladby" (#443) — server má glass record priamo
+ *  (`skloPre`), klient ho stavia z `data.skla`. */
+export type TriedaZaNazov = (nazov: string) => 6 | 16 | null;
+
+/**
+ * Je toto sklo IZO-skladba? (#443) — TRIEDA (6 mm / 16 mm) je teraz PRIMÁRNY zdroj
+ * pravdy: `trieda === 16` ⇒ IZO, `trieda === 6` ⇒ basic. Meno-regex `jeIzoSklo` je
+ * FALLBACK len pre neklasifikované sklo (`trieda == null` — Robust/Deluxe/'ALL', alebo
+ * ešte-neklasifikovaný Odoo import). Pre všetky dnešné klasifikované sklá dáva trieda
+ * ROVNAKÝ výsledok ako regex (parity test #443) — rozdiel sa prejaví len na NOVOM
+ * Odoo dvojskle, ktorého názov by regex uhádol nesprávne.
+ */
+export function jeIzoTrieda(trieda: 6 | 16 | null | undefined, nazov: string): boolean {
+	return trieda != null ? trieda === 16 : jeIzoSklo(nazov);
+}
+
 /** Štýl bez prípony „ IZO" — v ponuke je len počet krídel. */
 export function zakladnyStyl(styl: string): string {
 	return styl.replace(/\s*IZO\s*$/i, '').trim();
@@ -72,8 +88,13 @@ export function standardPlusRailEligible(system: string, styl: string): boolean 
  * `src/routes/zasklenia/+page.svelte`, `pridavnaKolajnicaOdporucana` +
  * susedný `$effect`.
  */
-export function pridavnaKolajnicaDefault(system: string, styl: string, sklo: string): boolean {
-	return standardPlusRailEligible(system, styl) && jeIzoSklo(sklo);
+export function pridavnaKolajnicaDefault(
+	system: string,
+	styl: string,
+	sklo: string,
+	trieda?: 6 | 16 | null
+): boolean {
+	return standardPlusRailEligible(system, styl) && jeIzoTrieda(trieda, sklo);
 }
 
 /**
@@ -85,12 +106,13 @@ export function sysStylPre(
 	system: string,
 	styl: string,
 	sklo: string,
-	existuje: ExistujeSysStyl
+	existuje: ExistujeSysStyl,
+	trieda?: 6 | 16 | null
 ): string {
 	if (!skloVyberaIzo(system)) return `${system}|${styl}`;
 	const base = `${system}|${zakladnyStyl(styl)}`;
 	const izo = `${base} IZO`;
-	return jeIzoSklo(sklo) && existuje(izo) ? izo : base;
+	return jeIzoTrieda(trieda, sklo) && existuje(izo) ? izo : base;
 }
 
 /** Štýly do ponuky: štandardy ukážu len počty krídel (IZO variant vyberá sklo). */
@@ -99,14 +121,17 @@ export function stylyDoPonuky(system: string, styly: string[]): string[] {
 	return [...new Set(styly.map(zakladnyStyl))];
 }
 
-/** Sklá do ponuky: izolačné len tam, kde pre daný štýl IZO nárezák existuje. */
+/** Sklá do ponuky: izolačné len tam, kde pre daný štýl IZO nárezák existuje.
+ *  `triedaZa` (#443) — voliteľný lookup „meno skla → trieda", ktorý IZO-nosť rozhoduje
+ *  primárne cez triedu (regex `jeIzoSklo` len pre neklasifikované/chýbajúce meno). */
 export function sklaDoPonuky(
 	system: string,
 	styl: string,
 	skla: string[],
-	existuje: ExistujeSysStyl
+	existuje: ExistujeSysStyl,
+	triedaZa?: TriedaZaNazov
 ): string[] {
 	if (!skloVyberaIzo(system)) return skla;
 	if (existuje(`${system}|${zakladnyStyl(styl)} IZO`)) return skla;
-	return skla.filter((g) => !jeIzoSklo(g));
+	return skla.filter((g) => !jeIzoTrieda(triedaZa?.(g), g));
 }

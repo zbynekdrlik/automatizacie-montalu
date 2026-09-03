@@ -112,13 +112,18 @@ export interface GlassType {
 	 *  `cfg_sys.sklo_offset` (bit-identické doterajšie správanie); číslo = odčíta sa NAMIESTO neho.
 	 *  Umožňuje solo korekciu 16 mm vs 6 mm skla v Slide (Patrik msg 1783582). */
 	skloKorekcia: number | null;
+	/** trieda skladby posuvu (#443): 6 = jednoduché sklo, 16 = izolačné dvojsklo, NULL =
+	 *  trieda sa neuplatňuje (Deluxe, Robust, spoločné 'ALL' sklá — správanie ako doteraz).
+	 *  Nie je fyzická hrúbka — je to trieda SKLADBY (kolíduje s `hrubka`, ktorá je
+	 *  Deluxe-only 6/10 mm fyzická hrúbka pre výber kladka/klzný profil). */
+	hrubkaTrieda: 6 | 16 | null;
 }
 
 export function listGlassTypes(): GlassType[] {
 	return (
 		db
 			.prepare(
-				'SELECT id, nazov, redukcia_zero, system, hrubka, sklo_korekcia FROM glass_types ORDER BY poradie'
+				'SELECT id, nazov, redukcia_zero, system, hrubka, sklo_korekcia, hrubka_trieda FROM glass_types ORDER BY poradie'
 			)
 			.all() as {
 			id: number;
@@ -127,6 +132,7 @@ export function listGlassTypes(): GlassType[] {
 			system: string;
 			hrubka: number;
 			sklo_korekcia: number | null;
+			hrubka_trieda: number | null;
 		}[]
 	).map((r) => ({
 		id: r.id,
@@ -134,7 +140,8 @@ export function listGlassTypes(): GlassType[] {
 		redukciaZero: !!r.redukcia_zero,
 		system: r.system,
 		hrubka: r.hrubka,
-		skloKorekcia: r.sklo_korekcia
+		skloKorekcia: r.sklo_korekcia,
+		hrubkaTrieda: r.hrubka_trieda === 6 || r.hrubka_trieda === 16 ? r.hrubka_trieda : null
 	}));
 }
 
@@ -146,6 +153,15 @@ export function listGlassTypes(): GlassType[] {
  *  starý Štandard sem cez tento alias zámerne smeruje. Preto sa sklo NIKDY nesmie
  *  hľadať len podľa názvu naprieč systémami — vždy cez `glassTypesForSystem(system)`. */
 const GLASS_SYSTEM_ALIAS: Record<string, string> = { Štandard: 'Štandard +' };
+
+/** Kanonický systém pre katalóg skiel A pre triedovú korekciu (#443) — rovnaký alias ako
+ *  `glassTypesForSystem`/`glassMoneyKod`. Starý „Štandard" zdieľa so „Štandard +" nielen
+ *  katalóg skiel, ale aj `cfg_sklo_trieda` riadky — inak by editor zapisoval Štandard a
+ *  Štandard + do NEZÁVISLÝCH riadkov, hoci obe čítajú TEN ISTÝ glass_types katalóg.
+ *  Exportované, aby `cfg-editor.ts` použil rovnaký alias pri zápise. */
+export function resolveGlassSystem(system: string): string {
+	return GLASS_SYSTEM_ALIAS[system] ?? system;
+}
 
 /** Sklá platné pre daný systém. Deluxe: LEN vlastné (Float kalené 6/10, hrúbka
  *  vyberá profil) — spoločné 'ALL' sklá (Kalené 8mm/10mm) nemajú Deluxe profil.
@@ -177,6 +193,38 @@ export function glassMoneyKod(system: string, nazov: string): string | null {
 		)
 		.get(nazov, sys) as { money_kod: string | null } | undefined;
 	return row?.money_kod ?? null;
+}
+
+/** Korekcia rozmeru skla nastavená RAZ na (systém × trieda 6/16) — #443, `cfg_sklo_trieda`.
+ *  `null` = žiadny override pre túto triedu (padne ďalej na systémovú `cfg_sys.sklo_offset`
+ *  — ten fallback ostáva VO compute vrstve, `?? g.skloOffset`, nedotknutý). Rieši alias
+ *  starý Štandard → Štandard + (`resolveGlassSystem`), rovnako ako `glassTypesForSystem`. */
+export function triedaKorekcia(system: string, trieda: 6 | 16): number | null {
+	const row = db
+		.prepare('SELECT korekcia FROM cfg_sklo_trieda WHERE system = ? AND trieda = ?')
+		.get(resolveGlassSystem(system), trieda) as { korekcia: number } | undefined;
+	return row?.korekcia ?? null;
+}
+
+/** Efektívna korekcia rozmeru skla pre dané sklo (#443) — reťaz precedencie:
+ *  per-sklo override (#440, legacy, ostáva ako výnimka) → triedová korekcia (systém ×
+ *  6/16) → (systémová `cfg_sys.sklo_offset`, fallback VO compute vrstve, nedotknutý). */
+export function efektivnaKorekcia(g: GlassType, system: string): number | null {
+	if (g.skloKorekcia !== null) return g.skloKorekcia;
+	if (g.hrubkaTrieda === null) return null;
+	return triedaKorekcia(system, g.hrubkaTrieda);
+}
+
+/** Efektívna hodnota „nuluje Redukciu 6mm" (#443). Pre KLASIFIKOVANÉ Slide sklo sa
+ *  DERIVUJE z triedy (16 mm IZO 4/8/4 → true, 6 mm → false) — bit-identické so seedom
+ *  (IZO 4/8/4 = redukcia_zero 1 = trieda 16; 6mm/3.3.1 = 0 = trieda 6). Gate na
+ *  `system === 'Slide'` je POVINNÝ: derivovanie mimo Slide by zmenilo
+ *  `PosuvSpec.redukciaZero` na systémoch, kde je dnes inertné pre výpočet, ale rozbilo
+ *  by golden snapshot `zasklenia-posuvspec-golden`. Inak (iný systém, alebo Slide sklo
+ *  bez triedy) sa použije uložený stĺpec — honest-null fallback. */
+export function efektivnaRedukciaZero(g: GlassType): boolean {
+	if (g.system === 'Slide' && g.hrubkaTrieda !== null) return g.hrubkaTrieda === 16;
+	return g.redukciaZero;
 }
 
 // ---- user-admin (interné + B2B veľkoobchodné účty) ----

@@ -38,7 +38,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v35 → v36: stĺpec sklo_korekcia na glass_types (#440)', () => {
 	it('user_version === 36 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(36);
+		expect(db.pragma('user_version', { simple: true })).toBe(37);
 	});
 
 	it('tabuľka glass_types má nový stĺpec sklo_korekcia', () => {
