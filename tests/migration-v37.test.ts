@@ -63,7 +63,7 @@ const trieda = (system: string, t: number) =>
 
 describe('migrácia v36 → v37: trieda skladby posuvu podľa hrúbky skla (#443)', () => {
 	it('user_version === 37 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(37);
+		expect(db.pragma('user_version', { simple: true })).toBe(38);
 	});
 
 	it('tabuľka glass_types má nový stĺpec hrubka_trieda', () => {
@@ -123,6 +123,6 @@ describe('migrácia v36 → v37: trieda skladby posuvu podľa hrúbky skla (#443
 			before
 		);
 		expect(db.prepare('SELECT * FROM glass_types ORDER BY id').all()).toEqual(beforeGlass);
-		expect(db.pragma('user_version', { simple: true })).toBe(37);
+		expect(db.pragma('user_version', { simple: true })).toBe(38);
 	});
 });

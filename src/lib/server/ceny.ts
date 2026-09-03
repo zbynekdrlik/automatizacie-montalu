@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import { db } from './db';
 import { logger } from './log';
+import { computeLakovanie, type LakovanieResult } from '$lib/lakovanie';
 
 const log = logger('ceny');
 
@@ -19,6 +20,10 @@ export interface PriceRow {
 	/** `null` = Money pre tento kód vôbec nemá skladovú kartu (neznáme); 0/záporné
 	 *  sú REÁLNE hodnoty (vypredané / rezervované nad rámec skladu). */
 	sklad: number | null;
+	/** rozvin [m²/bm] pre lakovanie (#369) — merná jednotka `m2` na Money artikli
+	 *  (m² povrchu na 1 bežný meter = obvod prierezu). `null` = Money ho pre kód
+	 *  nemá (nelakovaný, alebo ešte nezadaný). Kladné číslo ⇒ hodnota; 0 ⇒ `null`. */
+	rozvin: number | null;
 }
 
 const snapshotPath = () => process.env.CENY_SNAPSHOT_PATH || '/data/ceny/ceny.json';
@@ -95,7 +100,10 @@ function validateRow(raw: unknown, idx: number, log: (m: string) => void): Price
 		nakupPoslednaFaktura: priceOrNull(r.nakupPoslednaFaktura, 'nakupPoslednaFaktura', rowLog),
 		predajVo,
 		mena,
-		sklad
+		sklad,
+		// rozvin (#369): kladné m²/bm, alebo `null`. `priceOrNull` sa hodí 1:1 —
+		// 0/chýba/neplatné ⇒ „neznámy" (rovnaká sémantika ako pri cenách: 0 = nikdy zadané).
+		rozvin: priceOrNull(r.rozvin, 'rozvin', rowLog)
 	};
 }
 
@@ -158,14 +166,15 @@ export function maybeImportSnapshot(): ImportResult {
 	});
 
 	const upsert = db.prepare(`
-		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, mena, sklad, updated_at)
-		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @mena, @sklad, datetime('now'))
+		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, mena, sklad, rozvin, updated_at)
+		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @mena, @sklad, @rozvin, datetime('now'))
 		ON CONFLICT(kod) DO UPDATE SET
 			nakup_cennik = excluded.nakup_cennik,
 			nakup_posledna_faktura = excluded.nakup_posledna_faktura,
 			predaj_vo = excluded.predaj_vo,
 			mena = excluded.mena,
 			sklad = excluded.sklad,
+			rozvin = excluded.rozvin,
 			updated_at = excluded.updated_at
 	`);
 	const upsertMeta = db.prepare(`
@@ -232,7 +241,7 @@ function getPriceRow(kod: string): PriceRow | undefined {
 	const row = db
 		.prepare(
 			`SELECT kod, nakup_cennik AS nakupCennik, nakup_posledna_faktura AS nakupPoslednaFaktura,
-			        predaj_vo AS predajVo, mena, sklad
+			        predaj_vo AS predajVo, mena, sklad, rozvin
 			 FROM material_prices WHERE kod = ?`
 		)
 		.get(kod) as
@@ -243,6 +252,7 @@ function getPriceRow(kod: string): PriceRow | undefined {
 				predajVo: number | null;
 				mena: string;
 				sklad: number | null;
+				rozvin: number | null;
 		  }
 		| undefined;
 	return row;
@@ -379,6 +389,8 @@ export interface CenaRiadok {
 	/** mena zdrojovej ceny (z Money price-booku); `EUR`, keď appka o kóde vôbec
 	 *  nemá cenové dáta — nemá čo inak zobraziť. */
 	mena: string;
+	/** rozvin [m²/bm] pre lakovanie (#369); `null` = Money ho pre kód nemá. */
+	rozvin: number | null;
 }
 
 export interface CenySucet {
@@ -396,6 +408,8 @@ export interface CenyResult {
 		predajVo: CenySucet;
 		marza: CenySucet;
 	};
+	/** spotreba farby na lakovanie profilov (#369) — display-only, €-náklad honest-null. */
+	lakovanie: LakovanieResult;
 	snapshot: SnapshotMeta;
 }
 
@@ -448,9 +462,13 @@ export function enrichPolozky(
 			predajVo,
 			marza,
 			sklad: price?.sklad ?? null,
-			mena: price?.mena ?? 'EUR'
+			mena: price?.mena ?? 'EUR',
+			rozvin: price?.rozvin ?? null
 		};
 	});
 	for (const s of Object.values(sucty)) s.suma = round2(s.suma);
-	return { radky, sucty, snapshot: readSnapshotMetaFromDb() };
+	// Lakovanie (#369): spotreba farby na rozvin profilov — display-only, počítané
+	// z tých istých riadkov (rozvin + dĺžka). €-náklad ostáva honest-null.
+	const lakovanie = computeLakovanie(radky);
+	return { radky, sucty, lakovanie, snapshot: readSnapshotMetaFromDb() };
 }

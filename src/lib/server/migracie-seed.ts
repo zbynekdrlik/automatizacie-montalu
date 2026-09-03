@@ -436,3 +436,29 @@ export function migrateHrubkaTrieda(db: Database.Database, bump: (v: number) => 
 		bump(37);
 	})();
 }
+
+/**
+ * v37 → v38 (#369): rozvin profilu do cenového snapshotu — pre výpočet spotreby
+ * farby na lakovanie (`spotreba [kg] = rozvin [m²/bm] × dĺžka [bm] × 0,150`).
+ * Rozvin = merná jednotka `m2` na Money artikli (m² povrchu na 1 bm), doťahovaný
+ * `ceny-snapshot.py`; appka ho importuje do `material_prices.rozvin`. Aditívny
+ * nullable stĺpec (O(1), neprepíše žiadny riadok — `database-migrations.md`),
+ * feature-detect tabuľky (minimálne migračné fixtúry `material_prices` nemajú).
+ * Money-NEUTRÁLNE — čisto display-only, žiadny odpis/write sa nemení.
+ */
+export function migrateMaterialRozvin(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 38) return;
+	const maMaterial =
+		db
+			.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='material_prices'")
+			.get() !== undefined;
+	db.transaction(() => {
+		if (maMaterial) {
+			const cols = (
+				db.prepare('PRAGMA table_info(material_prices)').all() as { name: string }[]
+			).map((c) => c.name);
+			if (!cols.includes('rozvin')) db.exec('ALTER TABLE material_prices ADD COLUMN rozvin REAL;');
+		}
+		bump(38);
+	})();
+}

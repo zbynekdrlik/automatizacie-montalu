@@ -121,6 +121,33 @@ test('/odpisy/[id]: detail histórie ukáže položky + ceny KONKRÉTNEHO odpisu
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('Lakovanie (#369): sekcia sa zobrazí pre zasklenie — honest-null bez Money rozvinu, náklad čaká na sadzby', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	// bez fixture snapshotu → material_prices nemá rozvin → honest-null cesta (compute
+	// so seednutým rozvinom je pokrytý server-side v tests/ceny.test.ts + lakovanie.test.ts;
+	// nezavádzam nový BASE_URL test.skip, ktorý by blokoval integračný push — viď e2e-console.md)
+	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
+	await loginAs(page);
+	await vyplnZasklenie(page, `E2E-LAK-${Date.now()}`);
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	// Lakovanie je VLASTNÁ karta MIMO ceny-tabulka (#369 review 🔴 — inak by profilové
+	// riadky duplikovali ceny-tabulka lokátory). ZASP profil bez rozvinu → honest-null.
+	const lak = page.getByTestId('lakovanie-tabulka');
+	await expect(lak).toBeVisible();
+	await expect(page.getByTestId('lak-rozvin-ZASP00014')).toHaveText('neznáme');
+	await expect(page.getByTestId('lak-spotreba-ZASP00014')).toHaveText('neznáme');
+	// súčet neúplný (lakovaný profil bez rozvinu) + €-náklad vždy honest-null
+	await expect(page.getByTestId('lakovanie-sucet-spotreba')).toContainText('neúplné');
+	await expect(page.getByTestId('lakovanie-naklad-eur')).toHaveText('čaká na sadzby');
+	// kovanie (ZASK) sa do lakovania NEDOSTANE (nie je profilová rodina)
+	await expect(lak).not.toContainText('ZASK');
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('/odpisy/[id]: neexistujúci odpis vráti 404, nie prázdnu/rozbitú stránku', async ({
 	page
 }) => {
