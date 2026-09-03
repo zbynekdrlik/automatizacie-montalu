@@ -23,9 +23,13 @@ seedované sekvenčnými `PRAGMA user_version` migráciami v `src/lib/server/mig
   môže legitímne existovať vo viacerých systémoch pod tým istým názvom (napr. „3.3.1" je
   Slide aj Štandard +).
 - **NIKDY nehľadaj sklo len podľa názvu naprieč systémami** — vždy cez
-  `glassTypesForSystem(system)`. Miesta, čo čítajú sklá GLOBÁLNE po názve (cfg-editor
-  redukcia toggle, `nastavenia/+page.server.ts` render) MUSIA deduplikovať po názve
-  (dnes `GROUP BY nazov, MAX(redukcia_zero)`; tie-break musí sedieť medzi render a save).
+  `glassTypesForSystem(system)`. Editor vzorcov (`nastavenia/+page.server.ts` render +
+  action + `cfg-editor` redukcia toggle) je od **#438 PER SYSTÉM**: load ukazuje LEN sklá
+  vybraného systému (`glassTypesForSystem(systemFromSysStyl(sysStyl))`, bez dedup-by-name),
+  checkbox identita je **row `id`** (`name=glass_<id>`) a save zapisuje `WHERE id = ?`
+  (jednoznačný riadok). Pôvodný `GROUP BY nazov, MAX(redukcia_zero)` + `WHERE nazov = ?`
+  bol cross-systémový leak (prod `cfg_audit` id 16: úprava „3.3.1" v jednom systéme
+  prehodila to isté meno aj v druhom) — **už ho nepoužívaj, kľúčuj vždy row `id`.**
 - Štandard + a **starý Štandard zdieľajú JEDEN katalóg**: riadky sú uložené pod
   `system='Štandard +'`, starý „Štandard" k nim smeruje cez `GLASS_SYSTEM_ALIAS`
   (server `glassTypesForSystem`) a cez `sklaForSystem` (klient `zasklenia/+page.svelte`).

@@ -220,14 +220,18 @@ describe('editor vzorcov', () => {
 	});
 
 	it('prepínač skla (redukcia_zero) sa uloží a audituje', () => {
-		const glass = listGlassTypes();
-		const cieľ = glass[0]!.nazov;
+		// #438: prepínač je PER SYSTÉM — cieľ MUSÍ byť sklo TOHTO systému. Predtým test bral
+		// listGlassTypes()[0] (Robust sklo „Izolačné 4/16/4 mliečne") a menil ho zo stránky
+		// Slide|2K, čo prešlo len vďaka cross-systémovému leaku (WHERE nazov=?), ktorý #438
+		// práve opravuje. Vezmi prvé Slide sklo s redukcia_zero=0 (napr. „6mm číre").
+		const cieľGlass = glassTypesForSystem('Slide').find((g) => !g.redukciaZero)!;
+		const cieľ = cieľGlass.nazov;
 		const { zmeny, error } = saveCfgChanges({
 			sysStyl: 'Slide|2K',
 			username: 'tester',
 			offsets: new Map(),
 			skloOffset: getEditableRows('Slide|2K')!.skloOffset,
-			glassRedukcia: new Map([[cieľ, true]])
+			glassRedukcia: new Map([[cieľGlass.id, true]])
 		});
 		expect(error).toBeNull();
 		expect(zmeny.some((z) => z.pole.includes(cieľ))).toBe(true);
@@ -243,7 +247,7 @@ describe('editor vzorcov', () => {
 			username: 'tester',
 			offsets: new Map(),
 			skloOffset: getEditableRows('Slide|2K')!.skloOffset,
-			glassRedukcia: new Map([[cieľ, false]])
+			glassRedukcia: new Map([[cieľGlass.id, false]])
 		});
 		expect(listGlassTypes().find((g) => g.nazov === cieľ)!.redukciaZero).toBe(false);
 	});

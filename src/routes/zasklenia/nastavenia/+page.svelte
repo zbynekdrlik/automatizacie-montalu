@@ -116,17 +116,17 @@
 				/>
 			</div>
 
-			<div class="sec" style="margin-top:16px">Sklá — nulovanie Redukcie 6mm (Slide)</div>
+			<div class="sec" style="margin-top:16px">Sklá — nulovanie Redukcie 6mm</div>
 			<p class="sub" style="margin-bottom:10px">
-				Zaškrtnuté sklo znamená: pri tomto skle sa Redukcia 6mm do odpisu NEpočíta. Platí pre všetky
-				štýly.
+				Zaškrtnuté sklo znamená: pri tomto skle sa Redukcia 6mm do odpisu NEpočíta. Platí len pre
+				systém {data.system} (Redukcia 6mm má vplyv iba v systéme Slide).
 			</p>
-			{#each data.glass as g (g.nazov)}
+			{#each data.glass as g (g.id)}
 				<div class="field">
 					<label style="display:flex;align-items:center;gap:8px;font-weight:400">
 						<input
 							type="checkbox"
-							name="glass_{g.nazov}"
+							name="glass_{g.id}"
 							value="1"
 							checked={g.redukciaZero}
 							style="width:auto"
