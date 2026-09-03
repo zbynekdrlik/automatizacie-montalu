@@ -122,6 +122,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` → `.claude/rules/odpis-detail.md`
 - bazén kusové komponenty (BPK*, computeBazenAll, mj ks, model whitelist, E2E prefix kolízia) → `.claude/rules/bazen-komponenty.md`
 - CLIP zábradlie nárez + Money odpis (#372, parametrický vzorec, honest-null, whitelist, rozšírenie po Dominikovi = dáta) → `.claude/rules/clip.md`
+- lakovanie (spotreba farby z rozvinu profilov #369, rozvin=Money `m2` merná jednotka, honest-null €/„čaká na sadzby", vlastná karta mimo ceny-tabulka, rozšírenie = RAL dáta) → `.claude/rules/lakovanie.md`
 - odpad z nárezov (offcut/zvyšky tyčí — zdroj `ffdPack`, per-profil v `RozpisRezov`, súčet `sumaOdpad`, len zasklenia; Money-neutrálne) → `.claude/rules/odpad.md`
 - verejný dopyt / PDF ponuka s orientačnou cenou / slovenský text v pdf-lib / DopytForm → `.claude/rules/dopyt-ponuka.md`
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
