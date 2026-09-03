@@ -89,15 +89,21 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 			error: `Sklo odsadenie musí byť ${BOUNDS.skloOffset.min}–${BOUNDS.skloOffset.max} mm.`
 		};
 
-	// #440: per-sklo korekcia — rovnaké medze ako systémový skloOffset (0–500). NULL (zrušenie
-	// override) sa NEvaliduje. Preklep sa odmietne skôr, než sa čohokoľvek dotkne.
+	// #440: per-sklo korekcia — rovnaké medze ako systémový skloOffset (0–500) a CELÉ číslo
+	// (stĺpec je INTEGER; 12,5 by SQLite ticho uložil ako REAL). NULL (zrušenie override) sa
+	// NEvaliduje. Preklep sa odmietne skôr, než sa čohokoľvek dotkne.
 	if (input.glassKorekcia) {
 		for (const [, kor] of input.glassKorekcia) {
 			if (kor === null) continue;
-			if (!Number.isFinite(kor) || kor < BOUNDS.skloOffset.min || kor > BOUNDS.skloOffset.max)
+			if (
+				!Number.isFinite(kor) ||
+				!Number.isInteger(kor) ||
+				kor < BOUNDS.skloOffset.min ||
+				kor > BOUNDS.skloOffset.max
+			)
 				return {
 					zmeny: [],
-					error: `Korekcia rozmeru skla musí byť ${BOUNDS.skloOffset.min}–${BOUNDS.skloOffset.max} mm (alebo prázdne pole = systémová).`
+					error: `Korekcia rozmeru skla musí byť celé číslo ${BOUNDS.skloOffset.min}–${BOUNDS.skloOffset.max} mm (alebo prázdne pole = systémová).`
 				};
 		}
 	}
@@ -146,13 +152,13 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 	const glassKorekciaZmeny: { id: number; nova: number | null }[] = [];
 	if (input.glassKorekcia) {
 		for (const g of glassTypesForSystem(systemFromSysStyl(input.sysStyl))) {
-			const cur = g.skloKorekcia; // number | null
+			const curKor = g.skloKorekcia; // number | null (curKor, nie `cur` — ten je EditableRows vyššie)
 			const want = input.glassKorekcia.get(g.id);
-			if (want !== undefined && want !== cur) {
+			if (want !== undefined && want !== curKor) {
 				glassKorekciaZmeny.push({ id: g.id, nova: want });
 				zmeny.push({
 					pole: `Sklo „${g.nazov}" korekcia rozmeru`,
-					stara: cur ?? 'systémová',
+					stara: curKor ?? 'systémová',
 					nova: want ?? 'systémová'
 				});
 			}

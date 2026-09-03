@@ -52,8 +52,13 @@ export const actions = {
 		const glassKorekcia = new Map<number, number | null>();
 		for (const g of glassTypesForSystem(systemFromSysStyl(sysStyl))) {
 			glassRedukcia.set(g.id, form.get(`glass_${g.id}`) === '1');
-			const raw = String(form.get(`korekcia_${g.id}`) ?? '').trim();
-			glassKorekcia.set(g.id, raw === '' ? null : num(raw));
+			// LEN keď je pole reálne v POST-e (form.has). Chýbajúce pole (stará karta pred nasadením
+			// bez korekčných inputov / skriptovaný POST) sa NErovná „prázdne = zruš override" —
+			// vynecháme ho z mapy → saveCfgChanges ho nechá bez zmeny. Prítomné prázdne pole = NULL.
+			if (form.has(`korekcia_${g.id}`)) {
+				const raw = String(form.get(`korekcia_${g.id}`) ?? '').trim();
+				glassKorekcia.set(g.id, raw === '' ? null : num(raw));
+			}
 		}
 
 		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je

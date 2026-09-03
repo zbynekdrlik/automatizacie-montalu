@@ -89,6 +89,14 @@ schéma) do CREATE bloku dotknutých fixtúr — `UPDATE` nad prázdnou tabuľko
 aserzie fixtúry ostanú nezmenené. Migráciu NEguarduj `if (tabuľka existuje)` — reálna
 prod DB tabuľku vždy má (vzor v12/v15 tiež neguarduje); neúplná je fixtúra, nie prod.
 
+**Výnimka — ADD COLUMN feature-detect JE v poriadku (v31/v36 vzor):** vyššie „NEguarduj"
+platí pre UPDATE/data migrácie (v27), kde guard skryje diery vo fixtúre. Additívna
+`ALTER … ADD COLUMN` migrácia v `migracie-seed.ts` NAOPAK feature-detektuje EXISTENCIU
+tabuľky (`SELECT 1 FROM sqlite_master WHERE name='…'`) — tak to predpisuje `migrations.md`
+§1 a robia to všetky v30–v35 (`dopyt`), v31 `migrateManualMoveColumn` (`odpis_log`) aj v36
+`migrateGlassKorekcia` (`glass_types`), aby minimálne fixtúry bez tej tabuľky ALTER
+preskočili namiesto crashu. Reálna prod DB `glass_types` ju má od v1/v22, takže ALTER prebehne.
+
 ## Recreate tabuľky v migrácii (zmena constraintu)
 
 SQLite nevie ALTER-nuť UNIQUE → recreate: `CREATE glass_types_new (... UNIQUE(...))` →

@@ -11,7 +11,8 @@ import {
 	computeFlat,
 	computeMulti,
 	safeCompute,
-	sietkaSamostatnaVypocet
+	sietkaSamostatnaVypocet,
+	undersizeCut
 } from '../src/lib/server/compute';
 
 const SYS = 'Slide|2K';
@@ -65,5 +66,16 @@ describe('#440 per-sklo korekcia rozmeru skla — compute override', () => {
 		const bez = sietkaSamostatnaVypocet(cfg, 'Slide', '3K', 3500, 2001, null).r!;
 		const so = sietkaSamostatnaVypocet(cfg, 'Slide', '3K', 3500, 2001, KOR).r!;
 		expect(so.sklo.sirka).toBe(bez.sklo.sirka + (off - KOR));
+	});
+
+	it('undersizeCut sklo-guard používa TEN ISTÝ override ako computeFlat (invariant)', () => {
+		// s NULL je rozmer skla > 0 (žiadna chyba); override VÄČŠÍ než surová hodnota skla ho stlačí
+		// na ≤ 0 → guard MUSÍ vrátiť chybu, inak by computeFlat spočítal záporný rozmer bez varovania.
+		const rawS = computeFlat(cfg, SYS, S, V, false)!.sklo.sirka + skloOffset; // ≈ val(ss)
+		const bigKor = rawS + 100; // override > surová hodnota → sklo rozmer ≤ 0
+		expect(undersizeCut(cfg, SYS, S, V, false, 0, undefined, false, null)).toBeNull();
+		const err = undersizeCut(cfg, SYS, S, V, false, 0, undefined, false, bigKor);
+		expect(err).not.toBeNull();
+		expect(err).toContain('sklo');
 	});
 });

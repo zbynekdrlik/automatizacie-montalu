@@ -459,7 +459,9 @@ export function sietkaSamostatnaVypocet(
 	S: number,
 	V: number,
 	// #440: per-sklo override korekcie referenčného rozmeru skla (NULL → systémový skloOffset).
-	// Samostatná sieťka nemá výber skla, takže volajúci (routa) posiela NULL → bit-identické.
+	// Samostatná sieťka (`/sietka`) NEMÁ výber skla, takže routa param NEPOSIELA → default NULL →
+	// referenčný rozmer skla ostáva bit-identický ako pred #440. (Param je tu kvôli jednote 4
+	// vzorcových miest a pripravenosti, keby /sietka niekedy dostala výber skla — followup.)
 	skloKorekcia: number | null = null
 ): { r: SietkaSamostatnaOdpis | null; err: string | null } {
 	// opona (2x*) — rovnaký gate ako `jeSietkaMoneyRelevant` pre in-posuv sieťku:
