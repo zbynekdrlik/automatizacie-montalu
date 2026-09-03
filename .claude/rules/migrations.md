@@ -34,8 +34,10 @@ riadok (`database-migrations.md`). NIKDY needituj/nedropuj migráciu, čo už be
 
 ## 3. Bumpni HLAVU vo VŠETKÝCH migračných testoch (najčastejší zabudnutý krok)
 
-**26 migračných test súborov** (aktualizované #440, 2026-09-03 — reálny počet cez
-`grep -rln "user_version" tests/ | while read f; do grep -q "toBe(<oldhead>)" "$f" && echo "$f"; done | wc -l`)
+**28 migračných test súborov** (aktualizované #443, 2026-09-03 — reálny počet cez
+`grep -rln "user_version" tests/ | while read f; do grep -q "toBe(<oldhead>)" "$f" && echo "$f"; done | wc -l`
+— tento počet rastie s KAŽDOU migráciou, ktorá dotýka existujúcu `user_version` asserciu +
+pridá si vlastný nový `migration-vNN.test.ts`; neber ho ako fixné číslo, vždy prepočítaj)
 tvrdí HLAVU po `migrate()`:
 `expect(db.pragma('user_version', { simple: true })).toBe(<oldhead>)`. Nová migrácia zvýši hlavu →
 VŠETKY treba prepnúť na `<newhead>`. Recept (scoped na `user_version` riadok, nie slepý sed):

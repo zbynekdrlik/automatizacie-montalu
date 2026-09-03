@@ -383,7 +383,11 @@ export const actions = {
 		let heightWarn: string | undefined;
 		if (isB2B(locals.user)) {
 			const cfg = loadCfg();
-			const sysStyl = sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg));
+			// #443 review: trieda-aware, rovnako ako compute() — inak by tento pred-check
+			// mohol pri novom neklasifikovanom Odoo skle vybrať iný sysStyl (a teda iné B2B
+			// medze) než skutočný výpočet nižšie.
+			const trieda = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo)?.hrubkaTrieda;
+			const sysStyl = sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg), trieda);
 			const wErr = checkB2BWidth(cfg, sysStyl, vstup.s);
 			if (wErr) return { step: 'form' as const, error: wErr, vstup };
 			heightWarn = checkB2BHeight(sysStyl, vstup.v) ?? undefined;
@@ -533,7 +537,9 @@ export const actions = {
 			const cfg = loadCfg();
 			const warns: string[] = [];
 			for (const p of vstup.posuvy) {
-				const sysStyl = sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg));
+				// #443 review: trieda-aware, rovnako ako computeMultiFrom() nižšie.
+				const trieda = skloPre(cfg, p.system, p.styl, p.sklo)?.hrubkaTrieda;
+				const sysStyl = sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg), trieda);
 				const wErr = checkB2BWidth(cfg, sysStyl, p.s);
 				if (wErr) return { step: 'form' as const, error: wErr, multiVstup: vstup };
 				const hW = checkB2BHeight(sysStyl, p.v);
