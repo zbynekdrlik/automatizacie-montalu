@@ -44,7 +44,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v28 → v29: POST-import readback z Money DB (#298)', () => {
 	it('user_version === 29 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(35);
+		expect(db.pragma('user_version', { simple: true })).toBe(36);
 	});
 
 	it('nová tabuľka money_dlv existuje so správnymi stĺpcami', () => {

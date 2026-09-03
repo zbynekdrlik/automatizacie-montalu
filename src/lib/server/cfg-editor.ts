@@ -14,8 +14,11 @@ export interface EditRow {
 
 export interface CfgZmena {
 	pole: string;
-	stara: number;
-	nova: number;
+	// #440: `string` variant nesie per-sklo korekciu, kde NULL = „systémová" (bez override).
+	// Číselné polia (offset/skloOffset/redukcia 0-1) ostávajú číslami; display `{stara} → {nova}`
+	// funguje pre oba.
+	stara: number | string;
+	nova: number | string;
 }
 
 // „Kladkový profil 6 mm Surový 3600 mm" → „Kladkový profil" — základná rola profilu
@@ -60,6 +63,9 @@ export interface SaveInput {
 	offsets: Map<number, number>; // row id → nový offset
 	skloOffset: number;
 	glassRedukcia?: Map<number, boolean>; // row id skla → nuluje Redukciu?
+	// #440: row id skla → per-sklo korekcia rozmeru (číslo = absolútny override, NULL = zruš
+	// override → systémový skloOffset). Prázdne pole v editore MUSÍ mapovať na NULL, NIE 0.
+	glassKorekcia?: Map<number, number | null>;
 }
 
 export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: string | null } {
@@ -82,6 +88,25 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 			zmeny: [],
 			error: `Sklo odsadenie musí byť ${BOUNDS.skloOffset.min}–${BOUNDS.skloOffset.max} mm.`
 		};
+
+	// #440: per-sklo korekcia — rovnaké medze ako systémový skloOffset (0–500) a CELÉ číslo
+	// (stĺpec je INTEGER; 12,5 by SQLite ticho uložil ako REAL). NULL (zrušenie override) sa
+	// NEvaliduje. Preklep sa odmietne skôr, než sa čohokoľvek dotkne.
+	if (input.glassKorekcia) {
+		for (const [, kor] of input.glassKorekcia) {
+			if (kor === null) continue;
+			if (
+				!Number.isFinite(kor) ||
+				!Number.isInteger(kor) ||
+				kor < BOUNDS.skloOffset.min ||
+				kor > BOUNDS.skloOffset.max
+			)
+				return {
+					zmeny: [],
+					error: `Korekcia rozmeru skla musí byť celé číslo ${BOUNDS.skloOffset.min}–${BOUNDS.skloOffset.max} mm (alebo prázdne pole = systémová).`
+				};
+		}
+	}
 
 	const zmeny: CfgZmena[] = [];
 	for (const r of cur.rows) {
@@ -119,6 +144,27 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		}
 	}
 
+	// #440: per-sklo korekcia rozmeru skla — rovnaký per-systém, ROW-ID kľúčovaný princíp ako
+	// redukcia vyššie (to isté meno skla môže žiť vo viacerých systémoch — UNIQUE(nazov, system);
+	// zapisujeme `WHERE id=?`, takže rovnaký názov v inom systéme sa nikdy nedotkne). NULL = zruš
+	// override (systémový skloOffset), 0 je legitímna explicitná hodnota — preto porovnávame
+	// identitou (číslo vs NULL), nie truthiness.
+	const glassKorekciaZmeny: { id: number; nova: number | null }[] = [];
+	if (input.glassKorekcia) {
+		for (const g of glassTypesForSystem(systemFromSysStyl(input.sysStyl))) {
+			const curKor = g.skloKorekcia; // number | null (curKor, nie `cur` — ten je EditableRows vyššie)
+			const want = input.glassKorekcia.get(g.id);
+			if (want !== undefined && want !== curKor) {
+				glassKorekciaZmeny.push({ id: g.id, nova: want });
+				zmeny.push({
+					pole: `Sklo „${g.nazov}" korekcia rozmeru`,
+					stara: curKor ?? 'systémová',
+					nova: want ?? 'systémová'
+				});
+			}
+		}
+	}
+
 	if (!zmeny.length) return { zmeny: [], error: null };
 
 	// všetky profil riadky (vrátane skrytého 10mm dvojčaťa) — na zrkadlenie 6→10 offsetu
@@ -132,6 +178,7 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 	);
 	const updSys = db.prepare('UPDATE cfg_sys SET sklo_offset = ? WHERE sys_styl = ?');
 	const updGlass = db.prepare('UPDATE glass_types SET redukcia_zero = ? WHERE id = ?');
+	const updGlassKorekcia = db.prepare('UPDATE glass_types SET sklo_korekcia = ? WHERE id = ?');
 	const insAudit = db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)');
 
 	try {
@@ -154,6 +201,8 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 			}
 			updSys.run(input.skloOffset, input.sysStyl);
 			for (const g of glassZmeny) updGlass.run(g.nova, g.id);
+			// #440: NULL sa zapíše ako SQL NULL (better-sqlite3 viaže JS null → NULL) → zruší override
+			for (const g of glassKorekciaZmeny) updGlassKorekcia.run(g.nova, g.id);
 			insAudit.run(input.username, input.sysStyl, JSON.stringify(zmeny));
 
 			// invariant: hrúbko-závislé dvojča (6/10) MUSÍ mať rovnaký offset — inak by

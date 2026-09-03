@@ -34,7 +34,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v24 → v25: tabuľka dopyt (#277)', () => {
 	it('user_version === 26 (migruje po najnovšiu) po v25 migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(35);
+		expect(db.pragma('user_version', { simple: true })).toBe(36);
 	});
 
 	it('existujúci user (palo) prežil migráciu (žiadna strata dát)', () => {

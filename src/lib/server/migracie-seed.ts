@@ -314,3 +314,34 @@ export function migrateDopytProdukt(db: Database.Database, bump: (v: number) => 
 		bump(35);
 	})();
 }
+
+/**
+ * v35 → v36 (#440, HOTFIX): per-sklo korekcia rozmeru skla. Nový nullable stĺpec
+ * `sklo_korekcia` na `glass_types` — ABSOLÚTNY override systémovej korekcie `cfg_sys.sklo_offset`
+ * (NULL = použiť systémový offset, čo je bit-identické doterajšie správanie). Umožňuje Patrikovi
+ * nastaviť korekciu solo pre 16 mm vs 6 mm sklo v Slide (msg 1783582), namiesto jednej hodnoty
+ * na celý systém. ADD COLUMN INTEGER BEZ default → všetky existujúce riadky ostanú NULL (žiadna
+ * zmena čísel; kontraktové compute vektory nedotknuté). Idempotentné: PRAGMA table_info kontrola,
+ * ALTER len ak stĺpec chýba. Feature-detect existencie `glass_types` (vzor `migrateManualMoveColumn`
+ * pre `odpis_log`): minimálne migračné fixtures, ktoré `glass_types` nestavajú, ALTER preskočia;
+ * reálna prod DB ju má od v1 (recreate vo v22). Celé v `db.transaction` (ALTER je v SQLite transakčné
+ * → pád sa čisto prehrá). MONEY-NEUTRÁLNE: mení sa len vypočítaný rozmer skla pri nastavenom override,
+ * mechanika Money zápisu/dedup nedotknutá. Extrahované sem (large-file-split — `migracie.ts` je pri
+ * 1000-riadkovom strope), vzor `migrateDopytProdukt`.
+ */
+export function migrateGlassKorekcia(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 36) return;
+	const maGlass =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='glass_types'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maGlass) {
+			const cols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map(
+				(c) => c.name
+			);
+			if (!cols.includes('sklo_korekcia'))
+				db.exec('ALTER TABLE glass_types ADD COLUMN sklo_korekcia INTEGER;');
+		}
+		bump(36);
+	})();
+}

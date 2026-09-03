@@ -77,7 +77,7 @@ const nazvy = (sys: string) => glassTypesForSystem(sys).map((g) => g.nazov);
 
 describe('migrácia v21 → v22: sklo „3.3.1" pre Štandard plus a starý Štandard (#214)', () => {
 	it('user_version = 22 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(35);
+		expect(db.pragma('user_version', { simple: true })).toBe(36);
 	});
 
 	it('„3.3.1" je ponúknuté pre Štandard plus (system=„Štandard +")', () => {
