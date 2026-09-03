@@ -20,19 +20,21 @@ describe('#438 editor vzorcov: prepínač skla je scoped per systém', () => {
 		expect(slideSysStyl, 'Slide systém musí existovať').toBeTruthy();
 
 		// „3.3.1" existuje v OBOCH systémoch (predpoklad testu).
-		const stdBefore = redukcia('Štandard +', '3.3.1');
-		const slideBefore = redukcia('Slide', '3.3.1');
-		expect(stdBefore, '3.3.1 musí byť v Štandard +').not.toBeUndefined();
-		expect(slideBefore, '3.3.1 musí byť v Slide').not.toBeUndefined();
+		const std331 = glassTypesForSystem('Štandard +').find((g) => g.nazov === '3.3.1');
+		const slide331 = glassTypesForSystem('Slide').find((g) => g.nazov === '3.3.1');
+		expect(std331, '3.3.1 musí byť v Štandard +').toBeTruthy();
+		expect(slide331, '3.3.1 musí byť v Slide').toBeTruthy();
+		const stdBefore = std331!.redukciaZero;
+		const slideBefore = slide331!.redukciaZero;
 
-		// Prepni redukciu 3.3.1 na stránke Štandard +.
+		// Prepni redukciu 3.3.1 na stránke Štandard + — mapa je kľúčovaná ROW ID daného skla.
 		const skloOffset = getEditableRows(stdSysStyl!)!.skloOffset;
 		const { error } = saveCfgChanges({
 			sysStyl: stdSysStyl!,
 			username: 'tester',
 			offsets: new Map(),
 			skloOffset,
-			glassRedukcia: new Map([['3.3.1', !stdBefore]])
+			glassRedukcia: new Map([[std331!.id, !stdBefore]])
 		});
 		expect(error).toBeNull();
 

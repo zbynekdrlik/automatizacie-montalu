@@ -2,7 +2,7 @@
 // old→new náhľad odpisu na kontrolných rozmeroch.
 
 import type { Actions, PageServerLoad } from './$types';
-import { loadCfg, listSysStyly, glassTypesForSystem } from '$lib/server/db';
+import { loadCfg, listSysStyly, glassTypesForSystem, systemFromSysStyl } from '$lib/server/db';
 import {
 	getEditableRows,
 	saveCfgChanges,
@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	// žije v Slide aj Štandard + (UNIQUE(nazov, system)); cross-systémový render + save
 	// prehadzoval redukciu obidvom. glassTypesForSystem rieši alias starý Štandard →
 	// Štandard +. Identita checkboxu je row `id`, aby sa rovnaké názvy nikdy nekolidovali.
-	const system = sysStyl.split('|')[0] ?? '';
+	const system = systemFromSysStyl(sysStyl);
 	return {
 		styly,
 		sysStyl,
@@ -43,12 +43,12 @@ export const actions = {
 		}
 		const skloOffset = num(form.get('skloOffset'));
 
-		// #438: checkbox identita = row `id` (glass_<id>); mapujeme na nazov-keyed mapu
-		// LEN pre sklá tohto systému (v rámci systému je nazov↔id bijekcia, save scopuje
-		// zápis na (nazov, system)).
-		const glassRedukcia = new Map<string, boolean>();
-		for (const g of glassTypesForSystem(sysStyl.split('|')[0] ?? ''))
-			glassRedukcia.set(g.nazov, form.get(`glass_${g.id}`) === '1');
+		// #438: checkbox identita = row `id` (glass_<id>); mapa je kľúčovaná row id LEN pre
+		// sklá tohto systému. Save zapisuje `WHERE id=?`, takže rovnaké meno v inom systéme
+		// („3.3.1" je Slide aj Štandard +) sa nikdy nedotkne.
+		const glassRedukcia = new Map<number, boolean>();
+		for (const g of glassTypesForSystem(systemFromSysStyl(sysStyl)))
+			glassRedukcia.set(g.id, form.get(`glass_${g.id}`) === '1');
 
 		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je
 		// hrúbko-závislý (6/10) — bez zvolenej hrúbky by z náhľadu vypadol, tak zvoľ

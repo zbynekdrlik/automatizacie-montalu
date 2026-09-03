@@ -1,6 +1,6 @@
 // Editor vzorcov: zmeny sa aplikujú v JEDNEJ transakcii (žiadny polovičný
 // update), každá zmena sa loguje do cfg_audit (kto/kedy/čo, staré → nové).
-import { db, loadCfg, glassTypesForSystem } from './db';
+import { db, loadCfg, glassTypesForSystem, systemFromSysStyl } from './db';
 import { BOUNDS, validSys, inBounds } from './compute';
 
 export interface EditRow {
@@ -59,7 +59,7 @@ export interface SaveInput {
 	username: string;
 	offsets: Map<number, number>; // row id → nový offset
 	skloOffset: number;
-	glassRedukcia?: Map<string, boolean>; // nazov skla → nuluje Redukciu? (v rámci TOHTO systému)
+	glassRedukcia?: Map<number, boolean>; // row id skla → nuluje Redukciu?
 }
 
 export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: string | null } {
@@ -96,23 +96,23 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 	if (input.skloOffset !== cur.skloOffset)
 		zmeny.push({ pole: 'Sklo — konečné zmenšenie', stara: cur.skloOffset, nova: input.skloOffset });
 
-	const glassZmeny: { nazov: string; system: string; stara: number; nova: number }[] = [];
+	const glassZmeny: { id: number; nazov: string; stara: number; nova: number }[] = [];
 	if (input.glassRedukcia) {
-		// #438: prepínač redukcie je PER SYSTÉM. To isté sklo môže žiť vo viacerých
-		// systémoch pod tým istým názvom (napr. „3.3.1" je Slide aj Štandard +, #214,
-		// UNIQUE(nazov, system)). Iterujeme LEN sklá tohto systému (glassTypesForSystem
-		// rieši alias starý Štandard → Štandard +); `g.system` je reálny uložený systém
-		// riadka, takže zápis nižšie beží `WHERE nazov=? AND system=?` a rovnaké meno v
-		// inom systéme sa nedotkne (predtým GROUP BY nazov + WHERE nazov=? prehodil obidva).
-		const system = input.sysStyl.split('|')[0] ?? '';
-		for (const g of glassTypesForSystem(system)) {
-			const cur = g.redukciaZero ? 1 : 0;
-			const want = input.glassRedukcia.get(g.nazov);
-			if (want !== undefined && (want ? 1 : 0) !== cur) {
-				glassZmeny.push({ nazov: g.nazov, system: g.system, stara: cur, nova: want ? 1 : 0 });
+		// #438: prepínač redukcie je PER SYSTÉM a kľúčovaný ROW ID (nie názvom). To isté
+		// sklo môže žiť vo viacerých systémoch pod tým istým názvom (napr. „3.3.1" je Slide
+		// aj Štandard +, #214, UNIQUE(nazov, system)). Iterujeme LEN sklá tohto systému
+		// (glassTypesForSystem rieši alias starý Štandard → Štandard +) a zapisujeme
+		// `WHERE id=?` — jednoznačná identita riadka, takže rovnaké meno v inom systéme
+		// (ani prípadné budúce 'ALL' sklo s kolidujúcim názvom) sa nikdy nedotkne (predtým
+		// GROUP BY nazov + WHERE nazov=? prehodil obidva riadky, prod cfg_audit 16).
+		for (const g of glassTypesForSystem(systemFromSysStyl(input.sysStyl))) {
+			const curVal = g.redukciaZero ? 1 : 0;
+			const want = input.glassRedukcia.get(g.id);
+			if (want !== undefined && (want ? 1 : 0) !== curVal) {
+				glassZmeny.push({ id: g.id, nazov: g.nazov, stara: curVal, nova: want ? 1 : 0 });
 				zmeny.push({
 					pole: `Sklo „${g.nazov}" nuluje Redukciu 6mm`,
-					stara: cur,
+					stara: curVal,
 					nova: want ? 1 : 0
 				});
 			}
@@ -131,9 +131,7 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		`UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND typ = 'sklo' AND dim = ?`
 	);
 	const updSys = db.prepare('UPDATE cfg_sys SET sklo_offset = ? WHERE sys_styl = ?');
-	const updGlass = db.prepare(
-		'UPDATE glass_types SET redukcia_zero = ? WHERE nazov = ? AND system = ?'
-	);
+	const updGlass = db.prepare('UPDATE glass_types SET redukcia_zero = ? WHERE id = ?');
 	const insAudit = db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)');
 
 	try {
@@ -155,7 +153,7 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 				}
 			}
 			updSys.run(input.skloOffset, input.sysStyl);
-			for (const g of glassZmeny) updGlass.run(g.nova, g.nazov, g.system);
+			for (const g of glassZmeny) updGlass.run(g.nova, g.id);
 			insAudit.run(input.username, input.sysStyl, JSON.stringify(zmeny));
 
 			// invariant: hrúbko-závislé dvojča (6/10) MUSÍ mať rovnaký offset — inak by

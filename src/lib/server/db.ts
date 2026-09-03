@@ -79,6 +79,12 @@ export function loadCfg(): Cfg {
 	return buildCFG(sys, rez);
 }
 
+/** Systémová časť `sysStyl` (pred prvým „|"), napr. „Slide|2K" → „Slide". Jediné miesto,
+ *  kde sa `sysStyl` rozparsuje na systém (load/action/save editora, #438). */
+export function systemFromSysStyl(sysStyl: string): string {
+	return sysStyl.split('|')[0] ?? '';
+}
+
 export function listSysStyly(): { sysStyl: string; system: string; styl: string; N: number }[] {
 	return (
 		db.prepare('SELECT sys_styl, n FROM cfg_sys ORDER BY sys_styl').all() as {
@@ -87,7 +93,7 @@ export function listSysStyly(): { sysStyl: string; system: string; styl: string;
 		}[]
 	).map((r) => ({
 		sysStyl: r.sys_styl,
-		system: r.sys_styl.split('|')[0] ?? '',
+		system: systemFromSysStyl(r.sys_styl),
 		styl: r.sys_styl.split('|')[1] ?? '',
 		N: r.n
 	}));
