@@ -136,6 +136,28 @@
 				</div>
 			{/each}
 
+			<div class="sec" style="margin-top:16px">Sklá — korekcia rozmeru skla (mm)</div>
+			<p class="sub" style="margin-bottom:10px">
+				Korekcia rozmeru skla pre KONKRÉTNE sklo (napr. solo pre 16 mm vs 6 mm sklo).
+				<b>Prázdne pole = systémová korekcia</b> („Sklo — konečné zmenšenie" vyššie). Platí len pre
+				systém {data.system}.
+			</p>
+			{#each data.glass as g (g.id)}
+				<div class="field">
+					<label for="korekcia_{g.id}">{g.nazov} — korekcia rozmeru</label>
+					<input
+						id="korekcia_{g.id}"
+						name="korekcia_{g.id}"
+						type="number"
+						step="1"
+						min="0"
+						max="500"
+						value={g.skloKorekcia ?? ''}
+						placeholder="systémová"
+					/>
+				</div>
+			{/each}
+
 			<div class="sec" style="margin-top:16px">Kontrolné rozmery pre náhľad odpisu</div>
 			<div class="grid2">
 				<div class="field">
@@ -161,7 +183,7 @@
 					<span style="color:#64748b">
 						{a.zmeny
 							.map(
-								(z: { pole: string; stara: number; nova: number }) =>
+								(z: { pole: string; stara: number | string; nova: number | string }) =>
 									`${z.pole}: ${z.stara} → ${z.nova}`
 							)
 							.join(' · ')}

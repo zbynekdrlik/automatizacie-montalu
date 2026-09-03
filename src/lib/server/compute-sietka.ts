@@ -457,7 +457,12 @@ export function sietkaSamostatnaVypocet(
 	system: string,
 	styl: string,
 	S: number,
-	V: number
+	V: number,
+	// #440: per-sklo override korekcie referenčného rozmeru skla (NULL → systémový skloOffset).
+	// Samostatná sieťka (`/sietka`) NEMÁ výber skla, takže routa param NEPOSIELA → default NULL →
+	// referenčný rozmer skla ostáva bit-identický ako pred #440. (Param je tu kvôli jednote 4
+	// vzorcových miest a pripravenosti, keby /sietka niekedy dostala výber skla — followup.)
+	skloKorekcia: number | null = null
 ): { r: SietkaSamostatnaOdpis | null; err: string | null } {
 	// opona (2x*) — rovnaký gate ako `jeSietkaMoneyRelevant` pre in-posuv sieťku:
 	// Patrikov popis aj strana sieťky (`sietkaStrana('Opona')===null`) platia len
@@ -519,8 +524,9 @@ export function sietkaSamostatnaVypocet(
 		sv = g.sklo.v;
 	if (!ss || !sv) return { r: null, err: 'Konfigurácia nemá sklo pre tento nárezák.' };
 	const sklo = {
-		sirka: Math.round(val(ss, S, V, N, true) - g.skloOffset),
-		vyska: Math.round(val(sv, S, V, N, true) - g.skloOffset)
+		// #440: per-sklo override korekcie (NULL → systémový skloOffset).
+		sirka: Math.round(val(ss, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
+		vyska: Math.round(val(sv, S, V, N, true) - (skloKorekcia ?? g.skloOffset))
 	};
 	return {
 		r: {

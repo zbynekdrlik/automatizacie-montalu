@@ -170,6 +170,8 @@ function compute(vstup: Vstup): {
 		V: vstup.v,
 		redukciaZero: g.redukciaZero,
 		skloHrubka: g.hrubka,
+		// #440: per-sklo override korekcie rozmeru skla (NULL = systémový skloOffset)
+		skloKorekcia: g.skloKorekcia,
 		pridavnaKolajnica: vstup.pridavnaKolajnica,
 		// ručná dĺžka koľajnice (Patrik): mení rez → mení metre v odpise
 		kolajnica: vstup.kolajnica ?? undefined,
@@ -197,7 +199,8 @@ function compute(vstup: Vstup): {
 		spec.skloHrubka,
 		spec.pridavnaKolajnica,
 		spec.kolajnica,
-		spec.sietka
+		spec.sietka,
+		spec.skloKorekcia
 	);
 	return { ...out, spec };
 }
@@ -225,6 +228,8 @@ function computeMultiFrom(vstup: MultiVstup) {
 				V: p.v,
 				redukciaZero: g.redukciaZero,
 				skloHrubka: g.hrubka,
+				// #440: per-sklo override korekcie rozmeru skla (NULL = systémový skloOffset)
+				skloKorekcia: g.skloKorekcia,
 				otvaranie: p.otvaranie,
 				sklo: p.sklo,
 				kovanieL: p.kovanieL,
