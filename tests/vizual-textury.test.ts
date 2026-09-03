@@ -27,7 +27,11 @@ import {
 	vytvorStenuTexturu,
 	vytvorTerasaAlphaTexturu,
 	vytvorDreveneDrevoTexturu,
-	vytvorOmietkaTexturu
+	vytvorOmietkaTexturu,
+	vytvorHlinikNormalMapu,
+	vytvorHlinikRoughMapu,
+	vytvorDlazbuNormalMapu,
+	vytvorSkloOdrazMapu
 } from '../src/lib/vizual/textury';
 import { vytvorStenu, vytvorZem } from '../src/lib/vizual/scena';
 import { nastaveniaPreTier } from '../src/lib/vizual/kvalita';
@@ -391,5 +395,132 @@ describe('vytvorOmietkaTexturu (#336) — svetlá odsaturovaná omietka (jemný 
 		} finally {
 			spy.mockRestore();
 		}
+	});
+});
+
+// ── #356: procedurálne PBR mikro-reliéf mapy ─────────────────────────────────
+// Rovnaký recording-stub prístup (`fakeCanvasOf` + `lastImageData`) — overuje
+// SKUTOČNÝ obsah (normal = tangent-space, plochá plocha ~RGB(128,128,255);
+// roughness = lineárna grayscale centrovaná ~1.0). `colorSpace = NoColorSpace`
+// je load-bearing: normal/roughness dáta sú LINEÁRNE, nie sRGB — sRGB by three
+// interpretoval nesprávne a reliéf/lesk by „driftol".
+
+/** Prečíta RGBA jedného pixelu z nahratého `lastImageData`. */
+function pixel(
+	ctx: { lastImageData: { data: Uint8ClampedArray; width: number } | null },
+	x: number,
+	y: number
+): [number, number, number, number] {
+	const im = ctx.lastImageData!;
+	const i = (y * im.width + x) * 4;
+	return [im.data[i]!, im.data[i + 1]!, im.data[i + 2]!, im.data[i + 3]!];
+}
+
+describe('vytvorHlinikNormalMapu (#356) — jemný práškovaný mikro-reliéf', () => {
+	it('NoColorSpace, version>0, plochý povrch ~RGB(128,128,255), Z kanál dominantný', () => {
+		const tex = vytvorHlinikNormalMapu(THREE);
+		const ctx = fakeCanvasOf(tex).getContext('2d')!;
+		expect(tex.colorSpace).toBe(THREE.NoColorSpace);
+		expect(tex.version).toBeGreaterThan(0);
+		expect(ctx.lastImageData).not.toBeNull();
+		expect(ctx.lastImageData!.width).toBe(256);
+		// zrno je nízkoamplitúdové → normály sú blízko (0,0,1) = RGB ~(128,128,255).
+		// Preveríme, že MODRÝ (Z) kanál je jednoznačne dominantný (skoro-plochá normála)
+		// a X/Y ostávajú okolo stredu 128 (jemný, nie hrboľatý reliéf).
+		let maxOdchylkaXY = 0;
+		let minB = 255;
+		for (let y = 0; y < 256; y += 37) {
+			for (let x = 0; x < 256; x += 37) {
+				const [r, g, b] = pixel(ctx, x, y);
+				maxOdchylkaXY = Math.max(maxOdchylkaXY, Math.abs(r - 128), Math.abs(g - 128));
+				minB = Math.min(minB, b);
+			}
+		}
+		expect(maxOdchylkaXY).toBeGreaterThan(0); // NIE je to plochá (128,128,255) mapa
+		expect(maxOdchylkaXY).toBeLessThan(60); // ale jemná (nie hrboľatý plast)
+		expect(minB).toBeGreaterThan(200); // Z kanál stále dominantný
+	});
+});
+
+describe('vytvorHlinikRoughMapu (#356) — jemné rozbitie lesku, centrované ~1.0', () => {
+	it('NoColorSpace, grayscale, hodnoty v [0.84,1.0]·255 ≈ [214,255]', () => {
+		const tex = vytvorHlinikRoughMapu(THREE);
+		const ctx = fakeCanvasOf(tex).getContext('2d')!;
+		expect(tex.colorSpace).toBe(THREE.NoColorSpace);
+		let minV = 255;
+		let maxV = 0;
+		for (let y = 0; y < 256; y += 29) {
+			for (let x = 0; x < 256; x += 29) {
+				const [r, g, b] = pixel(ctx, x, y);
+				expect(r).toBe(g); // grayscale
+				expect(g).toBe(b);
+				minV = Math.min(minV, r);
+				maxV = Math.max(maxV, r);
+			}
+		}
+		// roughnessMap MULTIPLIKUJE base roughness → musí byť blízko 1.0 (nie 0.5),
+		// inak by drasticky znížila drsnosť. Centrovaná 0.92, rozsah ~±0.08.
+		expect(minV).toBeGreaterThan(200); // ~0.84·255 = 214 (istá rezerva na sampling)
+		expect(maxV).toBeLessThanOrEqual(255);
+		expect(maxV).toBeGreaterThan(minV); // je tam VARIÁCIA (nie plochá)
+	});
+});
+
+describe('vytvorDlazbuNormalMapu (#356) — zapustené škáry, zladené s albedom', () => {
+	it('NoColorSpace; škára sa reliéfne líši od stredu dlaždice', () => {
+		const N = 512;
+		const mriezka = 4;
+		const bunka = N / mriezka; // 128
+		const tex = vytvorDlazbuNormalMapu(THREE, N, mriezka);
+		const ctx = fakeCanvasOf(tex).getContext('2d')!;
+		expect(tex.colorSpace).toBe(THREE.NoColorSpace);
+		// stred dlaždice (ďaleko od škár) — takmer plochý reliéf (Z dominantný)
+		const stred = pixel(ctx, Math.round(bunka / 2), Math.round(bunka / 2));
+		expect(stred[2]).toBeGreaterThan(220);
+		// TESNE pri mriežkovej čiare (x≈bunka, kde je špára) — normála sa výrazne
+		// nakloní (X kanál odbočí od 128, lebo výška padá do zapustenej škáry)
+		const priSkare = pixel(ctx, bunka - 1, Math.round(bunka / 2));
+		expect(Math.abs(priSkare[0] - 128)).toBeGreaterThan(Math.abs(stred[0] - 128));
+	});
+
+	it('ZNAMIENKO reliéfu: obe steny každej škáry sa nakláňajú DO žliabku (nie hrebeň) — flipY green-flip guard', () => {
+		// spara = round((12/600)·128) = 3; škára centrovaná na hranici bunky (x/y = 0,128,256…).
+		// Žliabok (zapustený) → obe steny musia mieriť DO stredu škáry. Zamyká 🔴 green-flip
+		// (opačné znamienko ny by z horizontálnych škár spravilo HREBENE).
+		const N = 512; // bunka = N/4 = 128; škára centrovaná na x/y = 0,128,256…
+		const ctx = fakeCanvasOf(vytvorDlazbuNormalMapu(THREE, N, 4)).getContext('2d')!;
+		// HORIZONTÁLNA škára pri y=128: horná stena (y=126) klesá do stredu → G<128;
+		// dolná stena (y=130) stúpa zo stredu → G>128.
+		expect(pixel(ctx, 64, 126)[1]).toBeLessThan(128);
+		expect(pixel(ctx, 64, 130)[1]).toBeGreaterThan(128);
+		// VERTIKÁLNA škára pri x=128 (X kanál — flipY ho netrápi): ľavá stena (x=126) → R>128,
+		// pravá stena (x=130) → R<128.
+		expect(pixel(ctx, 126, 64)[0]).toBeGreaterThan(128);
+		expect(pixel(ctx, 130, 64)[0]).toBeLessThan(128);
+	});
+
+	it('TILEABLE: vertikálna škára je SPOJITÁ cez wrap seam x=0/512 (bezšvíkové opakovanie)', () => {
+		const N = 512;
+		const ctx = fakeCanvasOf(vytvorDlazbuNormalMapu(THREE, N, 4)).getContext('2d')!;
+		// škára centrovaná na x=0 (≡512): pravá strana wrapu (x=511, ľavá stena) → R>128,
+		// stred (x=0) ≈128, ľavá strana wrapu (x=1, pravá stena) → R<128 — zrkadlo interiérovej
+		// škáry, čo dokazuje spojitosť cez okraj (žiadna viditeľná švíka pri RepeatWrapping).
+		expect(pixel(ctx, 511, 64)[0]).toBeGreaterThan(140);
+		expect(Math.abs(pixel(ctx, 0, 64)[0] - 128)).toBeLessThanOrEqual(6);
+		expect(pixel(ctx, 1, 64)[0]).toBeLessThan(116);
+	});
+});
+
+describe('vytvorSkloOdrazMapu (#356) — jemné rozbitie clearcoat odrazu', () => {
+	it('NoColorSpace, version>0, veľmi jemná (Z takmer 255)', () => {
+		const tex = vytvorSkloOdrazMapu(THREE);
+		const ctx = fakeCanvasOf(tex).getContext('2d')!;
+		expect(tex.colorSpace).toBe(THREE.NoColorSpace);
+		expect(tex.version).toBeGreaterThan(0);
+		let minB = 255;
+		for (let y = 0; y < 256; y += 41) {
+			for (let x = 0; x < 256; x += 41) minB = Math.min(minB, pixel(ctx, x, y)[2]);
+		}
+		expect(minB).toBeGreaterThan(230); // minimálna amplitúda → priehľad ostáva čistý
 	});
 });

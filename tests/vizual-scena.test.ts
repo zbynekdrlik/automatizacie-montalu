@@ -90,6 +90,22 @@ describe('scena — #174 ZNOVUOTVORENÉ: svetové Y spodku jednotky/zeme/steny/t
 		expect(zem.geometry.boundingBox!.max.y).toBeCloseTo(0, 10);
 	});
 
+	it('zem (vytvorZem) — #356: normal mapa dlažby LEN na mid/high (low ostáva plochý)', () => {
+		// mid/high (plochyGradientMiestoMap=false) → dlažba dostane albedo `map` + `normalMap`
+		const zemHigh = vytvorZem(THREE, nastaveniaPreTier('high'));
+		const matHigh = zemHigh.material as InstanceType<typeof THREE.MeshStandardMaterial>;
+		expect(matHigh.map).not.toBeNull();
+		expect(matHigh.normalMap).not.toBeNull();
+		// normal mapa má IDENTICKÝ repeat ako albedo (škáry sadnú na dlaždice)
+		expect(matHigh.normalMap!.repeat.x).toBeCloseTo(matHigh.map!.repeat.x, 5);
+		expect(matHigh.normalMap!.repeat.y).toBeCloseTo(matHigh.map!.repeat.y, 5);
+		// low (plochyGradientMiestoMap=true) → plochá farba, žiadna mapa
+		const zemLow = vytvorZem(THREE, nastaveniaPreTier('low'));
+		const matLow = zemLow.material as InstanceType<typeof THREE.MeshStandardMaterial>;
+		expect(matLow.map).toBeNull();
+		expect(matLow.normalMap).toBeNull();
+	});
+
 	it('stena (vytvorStenu) — základňa (spodná hrana) je na y=0, nezávisle od Z posunu', () => {
 		const nastavenia = nastaveniaPreTier('high'); // reálna cesta cez canvas textúru (polyfillovaná vyššie)
 		const stena = vytvorStenu(THREE, nastavenia, 4200);

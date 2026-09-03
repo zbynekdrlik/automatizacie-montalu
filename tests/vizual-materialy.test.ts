@@ -5,7 +5,12 @@
 // precedens ako `tests/vizual-builder.test.ts`.
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { nastavRAL, vytvorHlinikMaterial, vytvorSkloMaterial } from '../src/lib/vizual/materialy';
+import {
+	nastavRAL,
+	nastavSkloVzhlad,
+	vytvorHlinikMaterial,
+	vytvorSkloMaterial
+} from '../src/lib/vizual/materialy';
 import { mm } from '../src/lib/vizual/jednotky';
 
 describe('materialy — vytvorSkloMaterial (#174 tier-based sklo)', () => {
@@ -144,5 +149,92 @@ describe('materialy — vytvorHlinikMaterial (RAL 7016 = tmavá anodizácia)', (
 		// interné `.version`, nie čitateľný boolean) — `.version` je overiteľný
 		// dôkaz, že `nastavRAL` naozaj označila materiál na GPU re-upload.
 		expect(mat.version).toBeGreaterThan(verziaPredZmenou);
+	});
+});
+
+// ── #356: procedurálne PBR mapy na materiáloch (aditívna, spätne kompatibilná vetva) ──
+// Materiály sú čisté JS objekty → SKUTOČNÝ `three` v Node; mapy nahrádzam holými
+// `new THREE.Texture()` inštanciami (identita stačí — WebGL netreba). Kľúčové
+// invarianty: (1) bez `mapy`/`odrazMapa` = pôvodné PLOCHÉ správanie (spätná
+// kompatibilita); (2) `nastavRAL` NESMIE zhodiť mapy (živá zmena RAL ich zachová).
+describe('materialy — #356 hliník mikro-reliéf mapy', () => {
+	it('bez `mapy` (default / low tier) = žiadny normalMap/roughnessMap (spätná kompatibilita)', () => {
+		const mat = vytvorHlinikMaterial(THREE, '7016', true) as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		expect(mat.normalMap).toBeNull();
+		expect(mat.roughnessMap).toBeNull();
+	});
+
+	it('s `mapy` (mid/high) = normalMap + roughnessMap sa aplikujú, normalScale jemná (0.7)', () => {
+		const normalMap = new THREE.Texture();
+		const roughnessMap = new THREE.Texture();
+		const mat = vytvorHlinikMaterial(THREE, '7016', true, {
+			normalMap,
+			roughnessMap
+		}) as InstanceType<typeof THREE.MeshPhysicalMaterial>;
+		expect(mat.normalMap).toBe(normalMap);
+		expect(mat.roughnessMap).toBe(roughnessMap);
+		expect(mat.normalScale.x).toBeCloseTo(0.7, 5);
+		expect(mat.normalScale.y).toBeCloseTo(0.7, 5);
+		expect(mat.metalness).toBe(0); // dielektrikum #285 nedotknuté mapami
+	});
+
+	it('nastavRAL NEZHODÍ mapy — normalMap/roughnessMap prežijú živú zmenu RAL, len farba sa mení', () => {
+		const normalMap = new THREE.Texture();
+		const roughnessMap = new THREE.Texture();
+		const mat = vytvorHlinikMaterial(THREE, '7016', true, {
+			normalMap,
+			roughnessMap
+		}) as InstanceType<typeof THREE.MeshPhysicalMaterial>;
+		const farbaPred = mat.color.getHex();
+		nastavRAL(THREE, mat, '9010', true); // svetlý RAL — iná luminancia
+		expect(mat.color.getHex()).not.toBe(farbaPred); // farba sa zmenila
+		expect(mat.normalMap).toBe(normalMap); // mapy PREŽILI
+		expect(mat.roughnessMap).toBe(roughnessMap);
+	});
+});
+
+describe('materialy — #356 sklo clearcoat odraz mapa', () => {
+	it('bez `odrazMapa` (default / low tier) = žiadny clearcoatNormalMap (spätná kompatibilita)', () => {
+		const mat = vytvorSkloMaterial(THREE, 8, 'transmission') as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		expect(mat.clearcoatNormalMap).toBeNull();
+	});
+
+	it('s `odrazMapa` (mid/high) = clearcoatNormalMap sa aplikuje, scale minimálny (0.15), priehľad nedotknutý', () => {
+		const odraz = new THREE.Texture();
+		const mat = vytvorSkloMaterial(THREE, 8, 'transmission', undefined, odraz) as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		expect(mat.clearcoatNormalMap).toBe(odraz);
+		expect(mat.clearcoatNormalScale.x).toBeCloseTo(0.15, 5);
+		expect(mat.transmission).toBe(1); // transmisia/priehľad NEDOTKNUTÉ (len clearcoat vrstva)
+		expect(mat.map).toBeNull();
+	});
+
+	it('`falosne` režim tiež prijme odrazMapu', () => {
+		const odraz = new THREE.Texture();
+		const mat = vytvorSkloMaterial(THREE, 8, 'falosne', undefined, odraz) as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		expect(mat.clearcoatNormalMap).toBe(odraz);
+		expect(mat.transmission).toBe(0);
+	});
+
+	it('nastavSkloVzhlad NEZHODÍ clearcoatNormalMap — mapa prežije živú zmenu typu skla', () => {
+		const odraz = new THREE.Texture();
+		const mat = vytvorSkloMaterial(THREE, 8, 'transmission', undefined, odraz) as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		const attPred = mat.attenuationDistance;
+		nastavSkloVzhlad(THREE, mat, 'transmission', {
+			attenuationHex: 0x336655,
+			attenuationDistanceM: 0.02,
+			roughness: 0.1
+		});
+		expect(mat.attenuationDistance).not.toBe(attPred); // vzhľad sa zmenil
+		expect(mat.clearcoatNormalMap).toBe(odraz); // mapa PREŽILA
 	});
 });
