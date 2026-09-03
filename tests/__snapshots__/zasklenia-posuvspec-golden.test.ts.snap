@@ -3,6 +3,54 @@
 exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > deluxe-3K-kolajnica-rucna (kladka/klzný podľa skla) — plan/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00081",
+          "nazov": "Koľajnica horná 3K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00030",
+          "nazov": "Koľajnica spodná 3K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.2,
+          "kod": "ZASP202417",
+          "nazov": "Kladkový profil 10 mm Surový 3600 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.2,
+          "kod": "ZASP202425",
+          "nazov": "Klzný profil 10 mm Surový 3600 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00021",
+          "nazov": "Dorazový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00081",
@@ -14,6 +62,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica horná 3K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -26,6 +75,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica spodná 3K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -38,6 +88,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladkový profil 10 mm Surový 3600 mm",
         "predajVo": null,
         "qty": 7.2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -50,6 +101,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Klzný profil 10 mm Surový 3600 mm",
         "predajVo": null,
         "qty": 7.2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -62,6 +114,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -74,6 +127,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka stredová L 10 mm R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -86,6 +140,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka stredová P 10 mm R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -98,6 +153,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka krajná 10 mm R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -110,6 +166,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Madlo D56",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -122,6 +179,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesniaca kefa 4,8×4 mm",
         "predajVo": null,
         "qty": 8.418,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -134,6 +192,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesniaca kefa 4,8×7 mm",
         "predajVo": null,
         "qty": 8.418,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -468,6 +527,38 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
 exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > robust-2K-plny (klin+sietka+kovanie+FAB obojstranná) — plan/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 15,
+          "kod": "ZASP00016",
+          "nazov": "Koľajnica 3K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 30,
+          "kod": "ZASP00002",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00010",
+          "nazov": "Nosový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00016",
@@ -479,6 +570,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica 3K Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -491,6 +583,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 30,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -503,6 +596,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Nosový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -515,6 +609,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladka RS ROBUST",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -527,6 +622,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Uzáver RS ROBSUT",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -539,6 +635,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kľučka R9005",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -551,6 +648,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Podložka uzáveru",
         "predajVo": null,
         "qty": 10,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -563,6 +661,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Protikus uzáveru",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -575,6 +674,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Protikus uzáveru podložka",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -587,6 +687,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka vložky R9005",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -599,6 +700,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka krídla",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -611,6 +713,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník obvodový",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -623,6 +726,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník krídla",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -635,6 +739,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník zarovnávací",
         "predajVo": null,
         "qty": 16,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -647,6 +752,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesnenie zasklievacie 12",
         "predajVo": null,
         "qty": 9.164,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -659,6 +765,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesnenie zasklievacie 10",
         "predajVo": null,
         "qty": 9.164,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -671,6 +778,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kefové tesnenie 7x,3,5",
         "predajVo": null,
         "qty": 4.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -683,6 +791,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kefové tesnenie 7x5,00",
         "predajVo": null,
         "qty": 27.656,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -1077,6 +1186,46 @@ riadok 2",
 exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > robust-2x2K-opona (kovanieStred, jednostranná FAB) — plan/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 15,
+          "kod": "ZASP00014",
+          "nazov": "Koľajnica 2K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 37.5,
+          "kod": "ZASP00002",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00006",
+          "nazov": "Oponový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 15,
+          "kod": "ZASP00010",
+          "nazov": "Nosový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00014",
@@ -1088,6 +1237,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica 2K Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1100,6 +1250,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 37.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1112,6 +1263,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Oponový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1124,6 +1276,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Nosový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1136,6 +1289,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladka RS ROBUST",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1148,6 +1302,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Uzáver RS ROBSUT",
         "predajVo": null,
         "qty": 3,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1160,6 +1315,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kľučka R9005",
         "predajVo": null,
         "qty": 3,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1172,6 +1328,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Podložka uzáveru",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1184,6 +1341,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Protikus uzáveru",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1196,6 +1354,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Protikus uzáveru podložka",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1208,6 +1367,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka vložky R9005",
         "predajVo": null,
         "qty": 3,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1220,6 +1380,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka krídla",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1232,6 +1393,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník obvodový",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1244,6 +1406,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník krídla",
         "predajVo": null,
         "qty": 16,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1256,6 +1419,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník zarovnávací",
         "predajVo": null,
         "qty": 32,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1268,6 +1432,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesnenie zasklievacie 12",
         "predajVo": null,
         "qty": 13.8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1280,6 +1445,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesnenie zasklievacie 10",
         "predajVo": null,
         "qty": 13.8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1292,6 +1458,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kefové tesnenie 7x,3,5",
         "predajVo": null,
         "qty": 12.78,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1304,6 +1471,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kefové tesnenie 7x5,00",
         "predajVo": null,
         "qty": 38.16,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -1750,6 +1918,54 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
 exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > slide-3K-6mm (sieťka, redukcia) — plan/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 15,
+          "kod": "ZASP00100",
+          "nazov": "Koľajnica 3K Slide Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 30,
+          "kod": "ZASP00088",
+          "nazov": "Rámový profil Slide Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 15,
+          "kod": "ZASP202410",
+          "nazov": "Nosový profil Slide Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 22.5,
+          "kod": "ZASP00091",
+          "nazov": "Redukcia 6mm Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP20252",
+          "nazov": "Redukcia pre sieťku Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00100",
@@ -1761,6 +1977,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica 3K Slide Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1773,6 +1990,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil Slide Surový 7500 mm",
         "predajVo": null,
         "qty": 30,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1785,6 +2003,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Nosový profil Slide Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1797,6 +2016,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Redukcia 6mm Surový 7500 mm",
         "predajVo": null,
         "qty": 22.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1809,6 +2029,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Redukcia pre sieťku Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1821,6 +2042,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladka RS SLIDE",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1833,6 +2055,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Automaticky zamok RS SLIDE R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1845,6 +2068,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Protikus zamku",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1857,6 +2081,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Krytka ramoveho profilu",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1869,6 +2094,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovnik zarovnavaci",
         "predajVo": null,
         "qty": 24,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1881,6 +2107,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rohovník obvodový",
         "predajVo": null,
         "qty": 20,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1893,6 +2120,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesnenie zasklievacie 12",
         "predajVo": null,
         "qty": 9.744,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1905,6 +2133,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Tesnenie zasklievacie 10",
         "predajVo": null,
         "qty": 9.744,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -1917,6 +2146,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kefové tesnenie 5x8",
         "predajVo": null,
         "qty": 22.696,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -2433,6 +2663,62 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
 exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > standard-2K-basic (minimálny vektor, žiadne voliteľné polia) — plan/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00107",
+          "nazov": "Koľajnica horná 2K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00104",
+          "nazov": "Koľajnica spodná 2K  Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.2,
+          "kod": "ZASP202415",
+          "nazov": "Kladkový profil Surový 3600mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00018",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00024",
+          "nazov": "Rámový profil stredový Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00021",
+          "nazov": "Dorazový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00107",
@@ -2444,6 +2730,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica horná 2K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2456,6 +2743,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica spodná 2K  Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2468,6 +2756,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladkový profil Surový 3600mm",
         "predajVo": null,
         "qty": 7.2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2480,6 +2769,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2492,6 +2782,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil stredový Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2504,6 +2795,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2516,6 +2808,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladka dvojitá",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2528,6 +2821,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Protikus zamku",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2540,6 +2834,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Automaticky zamok R9005",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -2883,6 +3178,86 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
 exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom PosuvSpec builderu > standard-plus-4K-izo (prídavná koľajnica, sieťka so systémom) — plan/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00036",
+          "nazov": "Koľajnica horná 4K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP202432",
+          "nazov": "Koľajnica spodná 5K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 14.4,
+          "kod": "ZASP202415",
+          "nazov": "Kladkový profil Surový 3600mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP20244",
+          "nazov": "Koncový profil (PLUS) surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 22.5,
+          "kod": "ZASP00024",
+          "nazov": "Rámový profil stredový Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP202419",
+          "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 28.8,
+          "kod": "ZASP202439",
+          "nazov": "Rozširujúci profil Surový 3600 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00018",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00021",
+          "nazov": "Dorazový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00036",
@@ -2894,6 +3269,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica horná 4K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2906,6 +3282,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koľajnica spodná 5K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2918,6 +3295,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Kladkový profil Surový 3600mm",
         "predajVo": null,
         "qty": 14.4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2930,6 +3308,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Koncový profil (PLUS) surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2942,6 +3321,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil stredový Surový 7500 mm",
         "predajVo": null,
         "qty": 22.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2954,6 +3334,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2966,6 +3347,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rozširujúci profil Surový 3600 mm",
         "predajVo": null,
         "qty": 28.8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2978,6 +3360,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -2990,6 +3373,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -3580,6 +3964,78 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
 exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom PosuvSpec builderu > 2 posuvy: robust-2K (klin+sietka+kovanie) + slide-3K-6mm (sieťka) — multi/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 15,
+          "kod": "ZASP00016",
+          "nazov": "Koľajnica 3K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 30,
+          "kod": "ZASP00002",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00010",
+          "nazov": "Nosový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 15,
+          "kod": "ZASP00100",
+          "nazov": "Koľajnica 3K Slide Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 30,
+          "kod": "ZASP00088",
+          "nazov": "Rámový profil Slide Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 15,
+          "kod": "ZASP202410",
+          "nazov": "Nosový profil Slide Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 22.5,
+          "kod": "ZASP00091",
+          "nazov": "Redukcia 6mm Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP20252",
+          "nazov": "Redukcia pre sieťku Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00016",
@@ -3591,6 +4047,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica 3K Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3603,6 +4060,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 30,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3615,6 +4073,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Nosový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3627,6 +4086,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica 3K Slide Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3639,6 +4099,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rámový profil Slide Surový 7500 mm",
         "predajVo": null,
         "qty": 30,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3651,6 +4112,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Nosový profil Slide Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3663,6 +4125,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Redukcia 6mm Surový 7500 mm",
         "predajVo": null,
         "qty": 22.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3675,6 +4138,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Redukcia pre sieťku Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3687,6 +4151,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kladka RS ROBUST",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3699,6 +4164,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Uzáver RS ROBSUT",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3711,6 +4177,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kľučka R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3723,6 +4190,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Podložka uzáveru",
         "predajVo": null,
         "qty": 10,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3735,6 +4203,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Protikus uzáveru",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3747,6 +4216,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Protikus uzáveru podložka",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3759,6 +4229,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka vložky R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3771,6 +4242,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka krídla",
         "predajVo": null,
         "qty": 4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3783,6 +4255,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovník obvodový",
         "predajVo": null,
         "qty": 28,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3795,6 +4268,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovník krídla",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3807,6 +4281,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovník zarovnávací",
         "predajVo": null,
         "qty": 16,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3819,6 +4294,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Tesnenie zasklievacie 12",
         "predajVo": null,
         "qty": 18.908,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3831,6 +4307,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Tesnenie zasklievacie 10",
         "predajVo": null,
         "qty": 18.908,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3843,6 +4320,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kefové tesnenie 7x,3,5",
         "predajVo": null,
         "qty": 4.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3855,6 +4333,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kefové tesnenie 7x5,00",
         "predajVo": null,
         "qty": 27.656,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3867,6 +4346,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kladka RS SLIDE",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3879,6 +4359,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Automaticky zamok RS SLIDE R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3891,6 +4372,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Protikus zamku",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3903,6 +4385,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka ramoveho profilu",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3915,6 +4398,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovnik zarovnavaci",
         "predajVo": null,
         "qty": 24,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -3927,6 +4411,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kefové tesnenie 5x8",
         "predajVo": null,
         "qty": 22.696,
+        "rozvin": null,
         "sklad": null,
       },
     ],
@@ -4840,6 +5325,150 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
 exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom PosuvSpec builderu > 3 posuvy: deluxe-3K (kolajnica) + standard-plus-4K-izo (sieťka+prídavná koľajnica) + robust-2x2K-opona — multi/kovanie/planHash nezmenené 1`] = `
 {
   "ceny": {
+    "lakovanie": {
+      "eurSpolu": null,
+      "kompletne": false,
+      "plochaSpolu": 0,
+      "radky": [
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00081",
+          "nazov": "Koľajnica horná 3K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00030",
+          "nazov": "Koľajnica spodná 3K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.2,
+          "kod": "ZASP202417",
+          "nazov": "Kladkový profil 10 mm Surový 3600 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.2,
+          "kod": "ZASP202425",
+          "nazov": "Klzný profil 10 mm Surový 3600 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00021",
+          "nazov": "Dorazový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00036",
+          "nazov": "Koľajnica horná 4K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP202432",
+          "nazov": "Koľajnica spodná 5K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 14.4,
+          "kod": "ZASP202415",
+          "nazov": "Kladkový profil Surový 3600mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP20244",
+          "nazov": "Koncový profil (PLUS) surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 22.5,
+          "kod": "ZASP00024",
+          "nazov": "Rámový profil stredový Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP202419",
+          "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 28.8,
+          "kod": "ZASP202439",
+          "nazov": "Rozširujúci profil Surový 3600 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00018",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 15,
+          "kod": "ZASP00014",
+          "nazov": "Koľajnica 2K Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 37.5,
+          "kod": "ZASP00002",
+          "nazov": "Rámový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 7.5,
+          "kod": "ZASP00006",
+          "nazov": "Oponový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+        {
+          "dlzka": 15,
+          "kod": "ZASP00010",
+          "nazov": "Nosový profil Surový 7500 mm",
+          "plocha": null,
+          "rozvin": null,
+          "spotreba": null,
+        },
+      ],
+      "spotrebaSpolu": 0,
+    },
     "radky": [
       {
         "kod": "ZASP00081",
@@ -4851,6 +5480,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica horná 3K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4863,6 +5493,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica spodná 3K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4875,6 +5506,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kladkový profil 10 mm Surový 3600 mm",
         "predajVo": null,
         "qty": 7.2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4887,6 +5519,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Klzný profil 10 mm Surový 3600 mm",
         "predajVo": null,
         "qty": 7.2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4899,6 +5532,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Dorazový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4911,6 +5545,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica horná 4K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4923,6 +5558,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica spodná 5K Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4935,6 +5571,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kladkový profil Surový 3600mm",
         "predajVo": null,
         "qty": 14.4,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4947,6 +5584,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koncový profil (PLUS) surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4959,6 +5597,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rámový profil stredový Surový 7500 mm",
         "predajVo": null,
         "qty": 22.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4971,6 +5610,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4983,6 +5623,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rozširujúci profil Surový 3600 mm",
         "predajVo": null,
         "qty": 28.8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -4995,6 +5636,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5007,6 +5649,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Koľajnica 2K Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5019,6 +5662,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rámový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 37.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5031,6 +5675,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Oponový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 7.5,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5043,6 +5688,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Nosový profil Surový 7500 mm",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5055,6 +5701,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka stredová L 10 mm R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5067,6 +5714,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka stredová P 10 mm R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5079,6 +5727,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka krajná 10 mm R7016",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5091,6 +5740,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Madlo D56",
         "predajVo": null,
         "qty": 2,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5103,6 +5753,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Tesniaca kefa 4,8×4 mm",
         "predajVo": null,
         "qty": 8.418,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5115,6 +5766,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Tesniaca kefa 4,8×7 mm",
         "predajVo": null,
         "qty": 8.418,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5127,6 +5779,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kladka RS ROBUST",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5139,6 +5792,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Uzáver RS ROBSUT",
         "predajVo": null,
         "qty": 3,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5151,6 +5805,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kľučka R7016",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5163,6 +5818,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Podložka uzáveru",
         "predajVo": null,
         "qty": 15,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5175,6 +5831,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Protikus uzáveru",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5187,6 +5844,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Protikus uzáveru podložka",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5199,6 +5857,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka vložky R7016",
         "predajVo": null,
         "qty": 6,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5211,6 +5870,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Krytka krídla",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5223,6 +5883,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovník obvodový",
         "predajVo": null,
         "qty": 8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5235,6 +5896,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovník krídla",
         "predajVo": null,
         "qty": 16,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5247,6 +5909,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Rohovník zarovnávací",
         "predajVo": null,
         "qty": 32,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5259,6 +5922,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Tesnenie zasklievacie 12",
         "predajVo": null,
         "qty": 13.8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5271,6 +5935,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Tesnenie zasklievacie 10",
         "predajVo": null,
         "qty": 13.8,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5283,6 +5948,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kefové tesnenie 7x,3,5",
         "predajVo": null,
         "qty": 12.78,
+        "rozvin": null,
         "sklad": null,
       },
       {
@@ -5295,6 +5961,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "nazov": "Kefové tesnenie 7x5,00",
         "predajVo": null,
         "qty": 38.16,
+        "rozvin": null,
         "sklad": null,
       },
     ],

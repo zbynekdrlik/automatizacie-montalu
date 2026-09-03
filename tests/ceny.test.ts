@@ -242,7 +242,8 @@ describe('enrichPolozky', () => {
 				predajVo: null,
 				marza: null,
 				sklad: null,
-				mena: 'EUR'
+				mena: 'EUR',
+				rozvin: null
 			}
 		]);
 		expect(r.sucty.nakupCennik).toEqual({ suma: 0, kompletne: false });
@@ -348,5 +349,62 @@ describe('#359 — bazén BPP/BPK v snapshote', () => {
 		const v = validateOdpisKody([{ kod: 'BPK-T359-NOSKLAD', nazov: 'Bazén diel bez karty' }]);
 		expect(v.ok).toBe(false);
 		expect(v.problemy[0]!.dovod).toBe('bez-skladovej-karty');
+	});
+});
+
+describe('#369 — rozvin + lakovanie v snapshote a enrichPolozky', () => {
+	it('producent ceny-snapshot.py ťahá rozvin z `m2` mernej jednotky', () => {
+		const src = fs.readFileSync(path.resolve('scripts/ceny-snapshot.py'), 'utf8');
+		expect(src).toContain('AS rozvin');
+		expect(src).toContain('Artikly_ArtiklJednotka');
+		expect(src).toContain('%(m2)s');
+	});
+
+	it('rozvin sa naimportuje do material_prices (0/chýba ⇒ null)', async () => {
+		await tick();
+		writeSnapshot('2026-09-03T00:00:00Z', [
+			{ kod: 'ZASP-LAK-A', mena: 'EUR', sklad: 5, rozvin: 0.5 },
+			{ kod: 'ZASP-LAK-B', mena: 'EUR', sklad: 5, rozvin: 0 }, // 0 ⇒ neznámy (null)
+			{ kod: 'ZASP-LAK-C', mena: 'EUR', sklad: 5 } // rozvin chýba ⇒ null
+		]);
+		maybeImportSnapshot();
+		const get = (kod: string) =>
+			(db.prepare('SELECT rozvin FROM material_prices WHERE kod = ?').get(kod) as {
+				rozvin: number | null;
+			}) ?? { rozvin: undefined };
+		expect(get('ZASP-LAK-A').rozvin).toBe(0.5);
+		expect(get('ZASP-LAK-B').rozvin).toBeNull();
+		expect(get('ZASP-LAK-C').rozvin).toBeNull();
+	});
+
+	it('enrichPolozky vystaví ceny.lakovanie: spotreba, súčty, honest-null €', () => {
+		// ZASP-LAK-A má rozvin 0,5 → plocha 0,5×10=5 m², spotreba 5×0,15=0,75 kg
+		const r = enrichPolozky([
+			{ kod: 'ZASP-LAK-A', nazov: 'Lakovaný profil', qty: 10, mj: 'm' },
+			{ kod: 'ZASP-LAK-C', nazov: 'Profil bez rozvinu', qty: 4, mj: 'm' }
+		]);
+		expect(r.radky.find((x) => x.kod === 'ZASP-LAK-A')!.rozvin).toBe(0.5);
+		const lak = r.lakovanie;
+		expect(lak.radky).toHaveLength(2);
+		expect(lak.radky.find((x) => x.kod === 'ZASP-LAK-A')).toMatchObject({
+			plocha: 5,
+			spotreba: 0.75
+		});
+		expect(lak.radky.find((x) => x.kod === 'ZASP-LAK-C')!.spotreba).toBeNull();
+		expect(lak.spotrebaSpolu).toBe(0.75);
+		expect(lak.kompletne).toBe(false); // ZASP-LAK-C nemá rozvin
+		expect(lak.eurSpolu).toBeNull(); // €-náklad honest-null (čaká na sadzby)
+	});
+
+	it('výnimka (Dominik) sa do lakovania nedostane ani s rozvinom', async () => {
+		await tick();
+		writeSnapshot('2026-09-03T01:00:00Z', [
+			{ kod: 'PRP00047', mena: 'EUR', sklad: 5, rozvin: 0.4 } // Dominikova výnimka
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'PRP00047', nazov: 'Výnimka', qty: 5, mj: 'm' }]);
+		expect(r.lakovanie.radky).toHaveLength(0);
+		expect(r.lakovanie.spotrebaSpolu).toBe(0);
+		expect(r.lakovanie.kompletne).toBe(true);
 	});
 });

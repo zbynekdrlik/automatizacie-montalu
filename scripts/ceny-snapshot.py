@@ -2,7 +2,7 @@
 """Cenový zoznam materiálu — fáza 1 (#154): READ-ONLY denný snapshot z Money.
 
 Vypíše JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura,
-predajVo, mena, sklad}]}` pre všetky ZASP*/ZASK*/TS*/PRP*/BPP*/BPK* Money kódy
+predajVo, mena, sklad, rozvin}]}` pre všetky ZASP*/ZASK*/TS*/PRP*/BPP*/BPK* Money kódy
 (profily + komponenty/kovanie zasklenia + izolačné sklá #235 + pergolové profily
 #240 + bazénové profily BPP* a kusové komponenty BPK* #359). Appka tento
 súbor sama LAZY naimportuje (`src/lib/server/ceny.ts`) — tento skript do
@@ -69,6 +69,13 @@ CENIK_NC = "BA7DA0F8-8086-4963-AAE1-09D2C1C7266C"  # Nákupný cenník
 CENIK_PRF_VO = "AEEF5C92-5B44-4755-8680-F01CE6E4D5C2"  # Profily a príslušenstvo - VO
 CENIK_IZOS = "F4A1DFEE-9298-45D2-9891-1548741B2063"  # IZOS (izolačné sklá TS*, ceny/m²)
 
+# Merná jednotka `m2` (Ciselniky_Jednotka.ID) — overené live read-only 2026-09-03.
+# Jej koeficient (Artikly_ArtiklJednotka.Mnozstvi) je pri profiloch ROZVIN = m² povrchu
+# na 1 bežný meter (= obvod prierezu v metroch), pre výpočet spotreby farby na lakovanie
+# (#369). Kovanie/tesnenie (ZASK) túto jednotku nemá (0/138), takže je to spoľahlivý
+# signál lakovaného profilu. Žiadny profil nemá >1 aktívny `m2` riadok (overené) → 1:1 join.
+JEDNOTKA_M2 = "44EC8AD6-D6EF-4713-9F6A-D929206D4D03"
+
 # Bazénové rodiny (#359, live overené read-only 2026-08-31):
 #   BPP* (bazénové PROFILY, MJ = m/ks) — sú v NC ako ZASP/PRP (22/25 s reálnou
 #     nákupnou cenou, všetkých 25 má sklad + poslednú faktúru), takže nakupCennik
@@ -89,7 +96,8 @@ SELECT
     ad.PosledniCena AS nakupPoslednaFaktura,
     vo.Cena AS predajVo,
     ISNULL(m.Kod, 'EUR') AS mena,
-    s.CelkoveDostupneMnozstviNaSkladech AS sklad
+    s.CelkoveDostupneMnozstviNaSkladech AS sklad,
+    r.Mnozstvi AS rozvin
 FROM Artikly_Artikl a
 LEFT JOIN Artikly_ArtiklDodavatel ad ON ad.ID = a.HlavniDodavatel_ID
 LEFT JOIN Ceniky_PolozkaCeniku nc ON nc.Artikl_ID = a.ID AND nc.Cenik_ID = %(nc)s AND nc.Deleted = 0
@@ -100,6 +108,8 @@ LEFT JOIN Ceniky_PolozkaCeniku iz ON iz.Artikl_ID = a.ID AND iz.Cenik_ID = %(iz)
 LEFT JOIN Ceniky_Cenik izc ON izc.ID = iz.Cenik_ID
 LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID)
 LEFT JOIN S5_Artikl_CelkoveMnozstviNaSkladech s ON s.Artikl_ID = a.ID
+LEFT JOIN Artikly_ArtiklJednotka r ON r.Parent_ID = a.ID AND r.Deleted = 0
+                                  AND r.Jednotka_ID = %(m2)s
 WHERE a.Deleted = 0 AND (a.Kod LIKE 'ZASP%' OR a.Kod LIKE 'ZASK%' OR a.Kod LIKE 'TS%'
                          OR a.Kod LIKE 'PRP%' OR a.Kod LIKE 'BPP%' OR a.Kod LIKE 'BPK%')
 """
@@ -150,7 +160,7 @@ def _num(v: object) -> float | None:
 
 def fetch_rows(conn) -> list[dict]:
     cur = conn.cursor(as_dict=True)
-    cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO, "iz": CENIK_IZOS})
+    cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO, "iz": CENIK_IZOS, "m2": JEDNOTKA_M2})
     rows = []
     for r in cur.fetchall():
         kod = (r.get("kod") or "").strip()
@@ -169,6 +179,10 @@ def fetch_rows(conn) -> list[dict]:
                 # keď nulovú) dostupnosť, nie ako "neznáme". `or 0.0` by tieto dva
                 # stavy nerozoznateľne zmiešalo.
                 "sklad": _num(r.get("sklad")),
+                # rozvin [m²/bm] pre lakovanie (#369) — `m2` merná jednotka artikla;
+                # `None` (profil túto jednotku nemá) MUSÍ ostať `null` — appka ho číta
+                # ako „rozvin neznámy" (nelakuje sa / nezapočíta sa do súčtu spotreby).
+                "rozvin": _num(r.get("rozvin")),
             }
         )
     rows.sort(key=lambda x: x["kod"])
