@@ -146,6 +146,7 @@ export function postavScenu(
 		disposables.push(zem.geometry, zem.material as Disposable);
 		const zemMat = zem.material as InstanceType<ThreeNS['MeshStandardMaterial']>;
 		if (zemMat.map) disposables.push(zemMat.map);
+		if (zemMat.normalMap) disposables.push(zemMat.normalMap); // #356
 	}
 
 	// #325: pergola (`zobrazDom`) dostane SOLÍDNU fasádu škálovanú výškou; zasklenia scény

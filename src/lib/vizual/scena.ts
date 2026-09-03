@@ -5,6 +5,7 @@
 // z `onMount` PO dynamickom `import('three')`.
 import { mm } from './jednotky';
 import {
+	vytvorDlazbuNormalMapu,
 	vytvorDlazbuTexturu,
 	vytvorKontaktnyTienTexturu,
 	vytvorOblohuTexturu,
@@ -226,7 +227,18 @@ export function vytvorZem(
 		tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
 		const opakovani = ROZMER_M / 0.6; // 1 dlaždica = 600 mm
 		tex.repeat.set(opakovani, opakovani);
-		mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0 });
+		// #356: normal mapa dlažby (zapustené škáry + jemný tooth) — IDENTICKÝ repeat
+		// ako albedo, aby škáry sadli presne na dlaždice. Dispose: `scena-build.ts`
+		// (`zemMat.normalMap`).
+		const normal = vytvorDlazbuNormalMapu(THREE, nastavenia.dlazba);
+		normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
+		normal.repeat.set(opakovani, opakovani);
+		mat = new THREE.MeshStandardMaterial({
+			map: tex,
+			normalMap: normal,
+			roughness: 0.85,
+			metalness: 0
+		});
 	}
 	return new THREE.Mesh(geo, mat);
 }

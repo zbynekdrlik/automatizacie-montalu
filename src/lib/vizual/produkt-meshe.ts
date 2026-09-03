@@ -7,11 +7,26 @@
 import type { Rola, VizVysledok } from '$lib/vizual/spec';
 import { SKLO_HRUBKA_DEFAULT_MM } from '$lib/vizual/konstanty';
 import { postavGeometrie, type MergeGeometriesFn } from '$lib/vizual/builder';
-import { vytvorHlinikMaterial, vytvorSkloMaterial, type SkloVzhlad } from '$lib/vizual/materialy';
+import {
+	vytvorHlinikMaterial,
+	vytvorSkloMaterial,
+	type HlinikMapy,
+	type SkloVzhlad
+} from '$lib/vizual/materialy';
+import {
+	vytvorHlinikNormalMapu,
+	vytvorHlinikRoughMapu,
+	vytvorSkloOdrazMapu
+} from '$lib/vizual/textury';
 import type { nastaveniaPreTier } from '$lib/vizual/kvalita';
 import type { Disposable } from '$lib/vizual/scena';
 
 type ThreeNS = typeof import('three');
+
+// #356: koľkokrát sa hliníková mikro-reliéf mapa opakuje na per-face UV (0..1)
+// mergnutej geometrie — vyššie číslo = jemnejšie zrno na väčších plochách. Zrno je
+// izotropné + nízkoamplitúdové, takže per-face UV orientácia je nepodstatná.
+const HLINIK_MAP_REPEAT = 3;
 
 /** Materiály konštrukcie (ram/kolajnica/klucka/klin zdieľajú JEDNU `hlinik` inštanciu) — pre RAL
  *  update (`prekresliRAL`). Sklo/sieťka materiály tento map nedrží (dispose ide cez produktMeshe). */
@@ -27,7 +42,21 @@ export function zlikvidujProduktMeshe(meshe: InstanceType<ThreeNS['Mesh']>[]) {
 	for (const mesh of meshe) {
 		mesh.geometry.dispose();
 		const mat = mesh.material as unknown as Disposable | Disposable[];
-		for (const m of Array.isArray(mat) ? mat : [mat]) m.dispose();
+		for (const m of Array.isArray(mat) ? mat : [mat]) {
+			// #356: Material.dispose() sám NEuvoľní svoje textúry (three ich zdieľa) —
+			// mikro-reliéf mapy by inak unikli pri každom prestavGeometriuProduktu/remount.
+			// Dispose je idempotentný → zdieľaný hliník (1 inštancia na 4 meshe) znesie
+			// viacnásobné volanie bez ujmy.
+			const mapy = m as unknown as {
+				normalMap?: Disposable | null;
+				roughnessMap?: Disposable | null;
+				clearcoatNormalMap?: Disposable | null;
+			};
+			mapy.normalMap?.dispose();
+			mapy.roughnessMap?.dispose();
+			mapy.clearcoatNormalMap?.dispose();
+			m.dispose();
+		}
 	}
 }
 
@@ -50,7 +79,21 @@ export function postavProduktMeshe(
 	const produktMeshe: InstanceType<ThreeNS['Mesh']>[] = [];
 	let skloMaterial: InstanceType<ThreeNS['MeshPhysicalMaterial']> | null = null;
 
-	const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat);
+	// #356: mikro-reliéf mapy LEN na mid/high (`plochyGradientMiestoMap` je low-tier
+	// flag) — low tier ostáva PLOCHÝ (perf + spätne kompatibilné s #285/#170 testami).
+	const bohateMaterialy = !nastavenia.plochyGradientMiestoMap;
+	let hlinikMapy: HlinikMapy | undefined;
+	if (bohateMaterialy) {
+		const normalMap = vytvorHlinikNormalMapu(THREE);
+		const roughnessMap = vytvorHlinikRoughMapu(THREE);
+		for (const t of [normalMap, roughnessMap]) {
+			t.wrapS = t.wrapT = THREE.RepeatWrapping;
+			t.repeat.set(HLINIK_MAP_REPEAT, HLINIK_MAP_REPEAT);
+		}
+		hlinikMapy = { normalMap, roughnessMap };
+	}
+
+	const hlinik = vytvorHlinikMaterial(THREE, ralKod, nastavenia.clearcoat, hlinikMapy);
 	for (const rola of ['ram', 'kolajnica', 'klucka', 'klin'] as const) {
 		const geo = geometrie[rola];
 		if (!geo) continue;
@@ -68,7 +111,17 @@ export function postavProduktMeshe(
 		// `tvar.d`). Appka dnes nezbiera per-objednávku hrúbku skla vo formulári zasklenia-navrh,
 		// takže presná hodnota z `ZaskleniaVizVstup.skloPresne` sa sem (mimo `vysledok.diely`)
 		// nedostane — zdieľaný default aspoň nevie "rozísť" s geometriou, ak sa zmení.
-		const skloMat = vytvorSkloMaterial(THREE, SKLO_HRUBKA_DEFAULT_MM, nastavenia.sklo, skloVzhlad);
+		// #356: jemná clearcoat normal mapa (mid/high) — rozbije zrkadlový odraz bez
+		// dotyku číreho priehľadu skla. Vytvorená AŽ TU (len keď sklo existuje), aby
+		// neunikla pri produktoch bez skla; dispose ide cez `zlikvidujProduktMeshe`.
+		const skloOdraz = bohateMaterialy ? vytvorSkloOdrazMapu(THREE) : undefined;
+		const skloMat = vytvorSkloMaterial(
+			THREE,
+			SKLO_HRUBKA_DEFAULT_MM,
+			nastavenia.sklo,
+			skloVzhlad,
+			skloOdraz
+		);
 		skloMaterial = skloMat;
 		const mesh = new THREE.Mesh(geometrie.sklo, skloMat);
 		// #285: sklo prijíma tieň, ale NEvrhá (transmisné sklo by vrhalo nefyzikálny nepriehľadný tieň)

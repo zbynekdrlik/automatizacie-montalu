@@ -333,3 +333,153 @@ export function vytvorTerasaAlphaTexturu(THREE: ThreeNS, rozlisenie = 256): Text
 	tex.colorSpace = THREE.NoColorSpace; // alpha maska nie je sRGB dáta (číta sa lineárne)
 	return tex;
 }
+
+// ── #356: procedurálne PBR mikro-reliéf mapy (normal + roughness) ──────────────
+// Owner §3 (Architektúra komentár na #356): rozdiel realizmu voči mooore demu NIE
+// je vo svetle (HDRI/postproc/tiene sú už na/nad úrovni dema), ale v REÁLNYCH
+// TEXTÚROVÝCH MAPÁCH — „my procedurálne CanvasTextures, oni 2K albedo/bump/normal".
+// Náš hliník bol PLOCHÝ materiál BEZ mapy → najviditeľnejší povrch produktu čítal
+// plastovo/plocho, lebo nelámal svetlo mikro-reliéfom. Tieto generátory dodajú
+// chýbajúci prvok — normal (bump) + roughness mapu — PROCEDURÁLNE (rovnaká pipeline
+// ako 9 existujúcich CanvasTextur; §4 „žiaden binárny obrázok v repe" ostáva, žiaden
+// externý fetch → money-guard zelený). Normal mapa NEMENÍ base farbu (RAL vernosť
+// #285 zachovaná), len perturbuje normály pre lom svetla; roughness mapa moduluje
+// lesk. Amplitúdy sú ZÁMERNE JEMNÉ (#276/#336 poučenie: vysoký kontrast textúry =
+// „tlačený plastový vzhľad"). Aplikujú sa LEN na mid/high tier (low ostáva plochý).
+
+/** Tileable normal mapa z výškového poľa: finite-difference gradient → tangent-space
+ *  normála (OpenGL Y+ konvencia, plochý povrch = RGB ~(128,128,255)). `vyska(x,y)` je
+ *  ľubovoľná deterministická (alebo `Math.random`-závislá → test mockuje) výšková
+ *  funkcia; `sila` škáluje amplitúdu reliéfu. Susedné vzorky sa berú s WRAP indexom →
+ *  mapa je bezšvíkovo opakovateľná (`RepeatWrapping`). `colorSpace = NoColorSpace` —
+ *  normal dáta sú LINEÁRNE, nie sRGB (rovnaká disciplína ako `vytvorTerasaAlphaTexturu`;
+ *  sRGB by three interpretoval nesprávne a reliéf by „driftol"). */
+function normalMapaZVysky(
+	THREE: ThreeNS,
+	rozlisenie: number,
+	vyska: (x: number, y: number) => number,
+	sila: number
+): Texture {
+	const N = rozlisenie;
+	const h = new Float32Array(N * N);
+	for (let y = 0; y < N; y++) {
+		for (let x = 0; x < N; x++) h[y * N + x] = vyska(x, y);
+	}
+	const { canvas, ctx } = canvas2d(N);
+	const img = ctx.createImageData(N, N);
+	for (let y = 0; y < N; y++) {
+		for (let x = 0; x < N; x++) {
+			// indexy sú garantovane v [0, N*N) (modulo wrap) → `!` je bezpečné
+			// (noUncheckedIndexedAccess robí z typed-array prístupu `number | undefined`)
+			const hl = h[y * N + ((x - 1 + N) % N)]!;
+			const hr = h[y * N + ((x + 1) % N)]!;
+			const hd = h[((y - 1 + N) % N) * N + x]!;
+			const hu = h[((y + 1) % N) * N + x]!;
+			let nx = -(hr - hl) * sila;
+			let ny = -(hu - hd) * sila;
+			let nz = 1;
+			const len = Math.hypot(nx, ny, nz) || 1;
+			nx /= len;
+			ny /= len;
+			nz /= len;
+			const i = (y * N + x) * 4;
+			img.data[i] = Math.round((nx * 0.5 + 0.5) * 255);
+			img.data[i + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+			img.data[i + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+			img.data[i + 3] = 255;
+		}
+	}
+	ctx.putImageData(img, 0, 0);
+	const tex = ztexturuj(THREE, canvas);
+	tex.colorSpace = THREE.NoColorSpace;
+	return tex;
+}
+
+/** Tileable LINEÁRNA grayscale mapa (roughness/AO dáta — číta sa lineárne, nie sRGB).
+ *  `hodnota(x,y)` vracia 0..1; zapíše sa do všetkých troch kanálov (three roughnessMap
+ *  číta zelený kanál). */
+function linearnaGrayMapa(
+	THREE: ThreeNS,
+	rozlisenie: number,
+	hodnota: (x: number, y: number) => number
+): Texture {
+	const { canvas, ctx } = canvas2d(rozlisenie);
+	const img = ctx.createImageData(rozlisenie, rozlisenie);
+	for (let y = 0; y < rozlisenie; y++) {
+		for (let x = 0; x < rozlisenie; x++) {
+			const g = Math.max(0, Math.min(255, Math.round(hodnota(x, y) * 255)));
+			const i = (y * rozlisenie + x) * 4;
+			img.data[i] = img.data[i + 1] = img.data[i + 2] = g;
+			img.data[i + 3] = 255;
+		}
+	}
+	ctx.putImageData(img, 0, 0);
+	const tex = ztexturuj(THREE, canvas);
+	tex.colorSpace = THREE.NoColorSpace;
+	return tex;
+}
+
+/** Jemné izotropné „orange-peel" zrno povrchu — súčet CELOČÍSELNÝCH (tileable)
+ *  sínusových súčinov s vysokou frekvenciou. Deterministické (žiadny `Math.random`
+ *  → v teste netreba mockovať). Vracia ~[-1,1]. Zdieľané hliníkom (práškovanie =
+ *  jemná izotropná štruktúra laku, NIE smerové brúsenie — smerové by pri per-face
+ *  UV mergnutej geometrie malo náhodný smer na každej ploche; izotropné zrno je
+ *  smer-agnostické a zodpovedá REÁLNemu práškovanému povrchu, §285 „dielektrikum"). */
+function zrnoPovrchu(x: number, y: number, N: number): number {
+	const u = (x / N) * Math.PI * 2;
+	const v = (y / N) * Math.PI * 2;
+	let s = 0;
+	s += Math.sin(u * 17 + 0.7) * Math.sin(v * 19 + 1.3) * 0.5;
+	s += Math.sin(u * 23 + 2.1) * Math.sin(v * 29 + 0.4) * 0.3;
+	s += Math.sin(u * 37 + 1.1) * Math.sin(v * 31 + 2.7) * 0.2;
+	return s;
+}
+
+/** #356 — hliník: jemná práškovaná mikro-reliéfna NORMAL mapa (orange-peel zrno).
+ *  Nízka `sila` → jemný lom svetla (nie hrboľatý plast). Volajúci nastaví
+ *  `wrapS/wrapT=RepeatWrapping` + `repeat` podľa mierky profilu. */
+export function vytvorHlinikNormalMapu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	// sila ZÁMERNE nízka (0.45) — práškovaný povrch má JEMNÝ mikro-reliéf, nie hrboľatý
+	// plast (#276/#336). `HLINIK_NORMAL_SCALE` v materiáli ho ešte ďalej krotí.
+	return normalMapaZVysky(THREE, rozlisenie, (x, y) => zrnoPovrchu(x, y, rozlisenie), 0.45);
+}
+
+/** #356 — hliník: jemná ROUGHNESS mapa (rozbitie lesku práškovania). Centrovaná
+ *  blízko 1.0 (roughnessMap MULTIPLIKUJE `material.roughness`), takže len JEMNE
+ *  moduluje base drsnosť ±, nikdy ju drasticky nezníži. */
+export function vytvorHlinikRoughMapu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	return linearnaGrayMapa(THREE, rozlisenie, (x, y) => {
+		const z = zrnoPovrchu(x, y, rozlisenie); // ~[-1,1]
+		return 0.92 + z * 0.08; // ~[0.84, 1.0] → efektívna roughness 0.29..0.35
+	});
+}
+
+/** #356 — dlažba/terasa: NORMAL mapa zladená s `vytvorDlazbuTexturu` (rovnaká
+ *  `mriezka`, rovnaká 12 mm špára) — škáry sú ZAPUSTENÉ (kanáliky), líce dlaždice má
+ *  jemný „tooth". Volajúci nastaví `repeat` IDENTICKY ako albedo (`map`), aby normal
+ *  sadol na dlaždice. */
+export function vytvorDlazbuNormalMapu(THREE: ThreeNS, rozlisenie = 512, mriezka = 4): Texture {
+	const bunka = rozlisenie / mriezka;
+	const spara = Math.max(1, Math.round((12 / 600) * bunka)); // rovnako ako vytvorDlazbuTexturu
+	const vyska = (x: number, y: number): number => {
+		const dx = Math.min(x % bunka, bunka - (x % bunka));
+		const dy = Math.min(y % bunka, bunka - (y % bunka));
+		const dMin = Math.min(dx, dy);
+		if (dMin < spara) return (dMin / spara) * 0.85; // rampa z dna špáry (0) na líce (0.85)
+		return 0.85 + zrnoPovrchu(x, y, rozlisenie) * 0.05; // líce dlaždice + jemný tooth
+	};
+	return normalMapaZVysky(THREE, rozlisenie, vyska, 1.4);
+}
+
+/** #356 — sklo: veľmi jemná nízkofrekvenčná NORMAL mapa pre `clearcoatNormalMap`
+ *  (rozbitie zrkadlového odrazu, aby sklo nebolo dokonalé zrkadlo). Aplikuje sa LEN
+ *  na clearcoat vrstvu → priehľadnosť/číra transmisia skla ostáva NEDOTKNUTÁ (žiadne
+ *  matnenie priehľadu). Zámerne minimálna amplitúda. */
+export function vytvorSkloOdrazMapu(THREE: ThreeNS, rozlisenie = 256): Texture {
+	const vlna = (x: number, y: number): number => {
+		const u = (x / rozlisenie) * Math.PI * 2;
+		const v = (y / rozlisenie) * Math.PI * 2;
+		return Math.sin(u * 3 + 0.5) * Math.sin(v * 4 + 1.1) * 0.6 + Math.sin(u * 5 + 2.0) * 0.4;
+	};
+	return normalMapaZVysky(THREE, rozlisenie, vlna, 0.35);
+}
