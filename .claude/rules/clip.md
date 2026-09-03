@@ -14,30 +14,40 @@ Money. Vzor: `bazen-komponenty.ts` (katalóg + honest-null) + FIX (formulár) +
 bazén (odpisový tok). Zdroj: Patrikove šablóny „FIX - klasika / FIX - IZO",
 kanál 207; extrahované vzorce `~/.claude/work-products/ch207-att-2026-09-01/clip-vektory.md`.
 
-## Rozsah je zámerne ČIASTOČNÝ — #372 OSTÁVA OTVORENÝ
+## Rozsah — #372 OSTÁVA OTVORENÝ (len 4 drobné položky)
 
-Implementovaná je len **ČISTÁ ČASŤ**: `dostupneVarianty` = izo [1,2,3,4] + klasika
-[1,2]. VYLÚČENÉ (čakajú na Patrikove odpovede — draft otázok na tickete #372):
+`dostupneVarianty` = izo [1,2,3,4] + klasika [1,2,3,4] (od 3.9.2026, Patrik msg
+1789480 potvrdil, že B2/B3 klasika používa TIE ISTÉ ZASP kódy ako B0/B1 — pozri
+`clip.ts` hlavička). VYLÚČENÉ (čaká na Dominikovu odpoveď — Patrik „zajtra
+prezistim u dominika", 3.9.2026):
 
-- **klasika B2/B3** — šablóna má `KM12 Z516`/`KM12Z518`/`K-M12Z517`, ktoré v Money
-  NEEXISTUJÚ (copy-paste zo staršej šablóny).
 - **4 drobné položky** (vnút./vonk. tesnenie, spojovník priečky, kolík 6x12) — kódy
   `K120518`/`K120540`/`K12518`/`K80376015` v Money NEEXISTUJÚ → v katalógu `kod:null`
   (zobrazené s množstvom + „neodpisuje sa", do odpisu NEVSTUPUJÚ — honest-null).
 
-## Rozšírenie = ZMENA DÁT, nie prerábka kódu (design je na to postavený)
+**Len CLIP (žiadna druhá zábradlie varianta v appke):** Patrik potvrdil (msg 1789480),
+že appka má riešiť LEN CLIP — druhý fyzický typ zábradlia je dopredaj starých zásob
+bez matríc a appka ho nikdy neimplementovala. `/fix` (Fixy) je ODLIŠNÝ produkt (pevné
+zasklenie, Cortizo) — žiadna prekrývajúca sa voľba, nič sa nemení.
 
-Keď Patrik odpovie:
+## Rozšírenie 4 drobných položiek = ZMENA DÁT, nie prerábka kódu
 
-- **klasika B2/B3:** doplniť potvrdené kódy do katalógu (`KOD_*` v `clip.ts`) + rozšíriť
-  `dostupneVarianty('klasika')` na [1,2,3,4] + pridať 2 kontraktné vektory do
-  `tests/clip.test.ts` + ŽIVO overiť kódy v Money. ZERO zmien v compute/route. Vtedy sa
-  rieši aj **T16 pasca** (šablónová chyba: v `klasika` B2/B3 sa delenie tyče priečky
-  nescaluje s N — `T16=1` napevno namiesto `F16`; v IZO je opravené). Dnes ju vylúčenie
-  variantov úplne obchádza (T16==F16 pre všetky implementované hárky).
-- **4 drobné položky:** vyplniť `kod` v `drobne` (null → skutočný kód) + Money overenie →
-  začnú vstupovať do odpisu automaticky (množstvá už sú: tesnenie bm, spojovník 2N+2,
-  kolík 4N).
+Keď Dominik odpovie: vyplniť `kod` v `drobne` (`clip.ts`, null → skutočný kód) + Money
+overenie → začnú vstupovať do odpisu automaticky (množstvá už sú: tesnenie bm,
+spojovník 2N+2, kolík 4N). ZERO zmien v compute/route.
+
+## T16 pasca (šablónová chyba) — appka ju NIKDY nezdedila, dnes overená pinom
+
+Šablóna „FIX - klasika.xlsx" mala v B2/B3 hárkoch `T16` (počet ks pre delenie
+priečkovej tyče) napevno `=1` namiesto `=F16` (počet priečok = N-1, ako v IZO) —
+Patrik potvrdil „Bude chyba" (msg 1789480). appka NIKDY neimplementovala šablónu
+bunka-po-bunke: `computeClip` je JEDEN parametrický vzorec zdieľaný pre všetky
+typy×varianty, priečka vždy dostáva skutočný `pocetKs = N - 1` — takže T16 pascu
+appka nikdy nezdedila, ani keď bola klasika B2/B3 vylúčená whitelistom. Anti-
+regresný pin: `klasika B3 (N=4) 3000×2600` v `tests/clip.test.ts` (priečka rozmer
+2552 mm → `zaokruhlene=2`; BROKEN T16=1 by dal `ROUNDUP(1/2)=1 tyč`, SPRÁVNE
+T16=F16=3 dáva `ROUNDUP(3/2)=2 tyče`) — nikdy nezníž bez re-overenia proti tejto
+matematike.
 
 ## Jednotný parametrický vzorec (8 hárkov = 1 rodina, nie 8 nezávislých)
 
