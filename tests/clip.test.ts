@@ -200,6 +200,81 @@ const VEKTORY: Vec[] = [
 		kolik: 8,
 		poz: [1500]
 	},
+	// Patrik (3.9.2026, msg 1789480, issue #372): B2/B3 klasika používa TIE ISTÉ ZASP
+	// kódy ako B0/B1 (KM12* zo šablóny sa nepoužijú) — vektory zrkadlia izo B2/B3
+	// vyššie (formula je zdieľaná, líši sa len zasklievací kód ZK namiesto ZI).
+	{
+		nazov: 'klasika B2 (N=3) 3000×1000',
+		typ: 'klasika',
+		N: 3,
+		sirka: 3000,
+		vyska: 1000,
+		B10: 956.7,
+		C10: 944,
+		m2: 3,
+		riadky: [
+			['hlavný profil – čelo', R, 3000, 2, 2, 1],
+			['hlavný profil – výška', R, 952, 2, 7, 1],
+			['priečka', P, 952, 2, 7, 1],
+			['zasklievací profil – čelo', ZK, 964.7, 6, 7, 1],
+			['zasklievací profil – výška', ZK, 920, 6, 8, 1]
+		],
+		odpis: { [R]: 2, [P]: 1, [ZK]: 2 },
+		tes: 11.404,
+		spoj: 8,
+		kolik: 12,
+		poz: [1003, 1997]
+	},
+	{
+		nazov: 'klasika B3 (N=4) 3000×1000',
+		typ: 'klasika',
+		N: 4,
+		sirka: 3000,
+		vyska: 1000,
+		B10: 708.3,
+		C10: 944,
+		m2: 3,
+		riadky: [
+			['hlavný profil – čelo', R, 3000, 2, 2, 1],
+			['hlavný profil – výška', R, 952, 2, 7, 1],
+			['priečka', P, 952, 3, 7, 1],
+			['zasklievací profil – čelo', ZK, 716.3, 8, 10, 1],
+			['zasklievací profil – výška', ZK, 920, 8, 8, 1]
+		],
+		odpis: { [R]: 2, [P]: 1, [ZK]: 2 },
+		tes: 13.218,
+		spoj: 10,
+		kolik: 16,
+		poz: [755.3, 1500.5, 2245.8]
+	},
+	// T16 pasca (issue #372, Patrik: „Bude chyba") — šablóna mala v klasika B2/B3
+	// T16 (počet ks vstupujúci do delenia priečkovej tyče) NAPEVNO =1 namiesto
+	// správneho =F16 (počet priečok = N-1, ako v IZO). Tento vstup má priečkový
+	// rozmer, kde sa BROKEN (T16=1 → ROUNDUP(1/2)=1 tyč) a SPRÁVNE (T16=N-1=3 →
+	// ROUNDUP(3/2)=2 tyče) správanie reálne rozchádzajú — pin proti znovu-zavedeniu
+	// hardcodovaného T16=1.
+	{
+		nazov: 'klasika B3 (N=4) 3000×2600 — T16 pasca (priečka delenie = N-1, nie napevno 1)',
+		typ: 'klasika',
+		N: 4,
+		sirka: 3000,
+		vyska: 2600,
+		B10: 708.3,
+		C10: 2544,
+		m2: 7.8,
+		riadky: [
+			['hlavný profil – čelo', R, 3000, 2, 2, 1],
+			['hlavný profil – výška', R, 2552, 2, 2, 1],
+			['priečka', P, 2552, 3, 2, 2],
+			['zasklievací profil – čelo', ZK, 716.3, 8, 10, 1],
+			['zasklievací profil – výška', ZK, 2520, 8, 2, 4]
+		],
+		odpis: { [R]: 2, [P]: 2, [ZK]: 5 },
+		tes: 26.018,
+		spoj: 10,
+		kolik: 16,
+		poz: [755.3, 1500.5, 2245.8]
+	},
 	// hraničný prípad — ROUNDDOWN/ROUNDUP reálne láme (rozmer > 7500/2 → 1 rez/tyč,
 	// 2 kusy → 2 tyče; zasklievací výška 1920 → 3 rezy, 4 kusy → 2 tyče)
 	{
@@ -313,12 +388,12 @@ describe('computeClip — 1:1 s Patrikovými šablónami (kontraktné vektory)',
 	}
 });
 
-describe('dostupneVarianty — klasika B2/B3 vylúčené (KM12 kódy v Money neexistujú)', () => {
+describe('dostupneVarianty — izo aj klasika → 1..4 (Patrik #372: B2/B3 klasika = rovnaké ZASP kódy)', () => {
 	it('izo → 1..4', () => {
 		expect(dostupneVarianty('izo')).toEqual([1, 2, 3, 4]);
 	});
-	it('klasika → len 1..2', () => {
-		expect(dostupneVarianty('klasika')).toEqual([1, 2]);
+	it('klasika → 1..4 (KM12 kódy zo šablóny sa nepoužívajú, platia ZASP)', () => {
+		expect(dostupneVarianty('klasika')).toEqual([1, 2, 3, 4]);
 	});
 });
 
@@ -326,15 +401,15 @@ describe('chybaClipVstupu — validácia', () => {
 	it('neplatný typ', () => {
 		expect(chybaClipVstupu(vstup({ typ: 'xxx' as ClipTyp }))).toMatch(/typ/i);
 	});
-	it('klasika B2 (N=3) je odmietnutá (mimo whitelistu)', () => {
-		expect(chybaClipVstupu(vstup({ typ: 'klasika', variant: 3 }))).toMatch(/B0 a B1/);
+	it('neplatný počet výplní je odmietnutý (mimo whitelistu)', () => {
+		expect(chybaClipVstupu(vstup({ typ: 'klasika', variant: 5 }))).toMatch(/počet výplní/i);
+		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 0 }))).toMatch(/počet výplní/i);
 	});
-	it('klasika B3 (N=4) je odmietnutá', () => {
-		expect(chybaClipVstupu(vstup({ typ: 'klasika', variant: 4 }))).toMatch(/B0 a B1/);
-	});
-	it('izo B2/B3 sú povolené', () => {
+	it('izo aj klasika B2/B3 sú povolené', () => {
 		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 3 }))).toBeNull();
 		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 4 }))).toBeNull();
+		expect(chybaClipVstupu(vstup({ typ: 'klasika', variant: 3 }))).toBeNull();
+		expect(chybaClipVstupu(vstup({ typ: 'klasika', variant: 4 }))).toBeNull();
 	});
 	it('neceločíselný variant je odmietnutý', () => {
 		expect(chybaClipVstupu(vstup({ variant: 2.5 }))).toMatch(/počet výplní/i);
