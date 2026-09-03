@@ -116,7 +116,7 @@
 	</div>
 	<p class="sub" style="margin-top:12px">
 		Do rezervácie idú LEN spočítané položky (s dĺžkou rezu); „čaká na vzorec" sa NEZAHŔŇA — nikdy
-		vymyslené číslo. Odpis sa odošle až po tvojom potvrdení nižšie.
+		vymyslené číslo.
 		{#if !live}<b>🧪 TEST režim — do Money nejde nič.</b>{/if}
 	</p>
 </div>
