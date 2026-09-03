@@ -1,13 +1,13 @@
 <script lang="ts">
 	// Verejný zákaznícky konfigurátor zimných záhrad (#386, etapa 3 jednotného rámu #384; #408
-	// orientačná cena). JEDNODUCHÁ jednostĺpcová stránka (zámerne bez 3D — geometria zimnej záhrady
-	// zatiaľ neexistuje). Konfigurácia (model/rozmery/farba/zasklenie) sa počíta ČISTO klientsky
-	// (`$derived`); ORIENTAČNÚ cenu (#408) počíta SERVER na klik (`vypocet` akcia, enhance submit —
-	// cenový modul je server-only, do klienta sa nedostane) a všetko tečie do zdieľaného DopytForm
-	// (#277) → PDF špecifikácia s orientačnou cenou + Odoo lead. Zdieľané `--k-*` tokeny z
-	// `konfigurator/+layout.svelte`. Money-neutralita: importuje LEN client-safe
-	// `konfigurator-zimna-zahrada` + DopytForm + LEN typy ceny (guard: konfigurator-money-safety).
-	// Žiadne `console.*`.
+	// orientačná cena; #429 systém stien ako cenotvorná voľba). JEDNODUCHÁ jednostĺpcová stránka
+	// (zámerne bez 3D — geometria zimnej záhrady zatiaľ neexistuje). Konfigurácia
+	// (model/rozmery/farba/zasklenie/systém stien) sa počíta ČISTO klientsky (`$derived`); ORIENTAČNÚ
+	// cenu (#408/#429) počíta SERVER na klik (`vypocet` akcia, enhance submit — cenový modul je
+	// server-only, do klienta sa nedostane) a všetko tečie do zdieľaného DopytForm (#277) → PDF
+	// špecifikácia s orientačnou cenou + Odoo lead. Zdieľané `--k-*` tokeny z `konfigurator/+layout.svelte`.
+	// Money-neutralita: importuje LEN client-safe `konfigurator-zimna-zahrada` + DopytForm + LEN typy
+	// ceny (guard: konfigurator-money-safety). Žiadne `console.*`.
 	import { untrack } from 'svelte';
 	import KonfProduktStranka from '$lib/components/konfigurator/KonfProduktStranka.svelte';
 	import { enhance } from '$app/forms';
@@ -17,6 +17,7 @@
 	import {
 		zzModel,
 		zzZasklenie,
+		zzSystemStien,
 		zzVstupPlatny,
 		konfigurujZimnaZahradu,
 		zimnaZahradaPonukaConfig,
@@ -36,6 +37,8 @@
 	// varuje „state_referenced_locally" pri čítaní `data` mimo derived.
 	let model = $state<string>(untrack(() => data.defaulty.model));
 	let zasklenie = $state<string>(untrack(() => data.defaulty.zasklenie));
+	// #429: systém stien — TERAZ cenotvorná voľba; default = dnešná (#408) báza (non-breaking).
+	let systemStien = $state<string>(untrack(() => data.defaulty.systemStien));
 	let farba = $state<string>(untrack(() => data.farby[0]?.kod ?? ''));
 	// rozmery = RozmerStepper (metre, #333 vzor) — clamp na [min,max], NIKDY null (súhrn/dopyt tak
 	// pri editovaní rozmerov nezmizne, #385 review 🔵).
@@ -55,6 +58,7 @@
 		hlbka: hlbka ?? 0,
 		vyska: vyska ?? 0,
 		zasklenie: zzZasklenie(zasklenie),
+		systemStien: zzSystemStien(systemStien),
 		farba: farbaLabel
 	});
 
@@ -71,7 +75,7 @@
 	let cenaNacitava = $state(false);
 	let poslednyKluc = $state<string | null>(null);
 	const cenaKluc = $derived(
-		`${zzModel(model)}|${hlbka ?? 0}|${sirka ?? 0}|${zzZasklenie(zasklenie)}`
+		`${zzModel(model)}|${hlbka ?? 0}|${sirka ?? 0}|${zzZasklenie(zasklenie)}|${zzSystemStien(systemStien)}`
 	);
 	const cenaAktualna = $derived(cenaVysledok !== null && poslednyKluc === cenaKluc);
 
@@ -95,7 +99,7 @@
 	alt="Hliníková zimná záhrada Montalu"
 	label="Konfigurátor zimných záhrad"
 	nadpis="Navrhni si zimnú záhradu"
-	lead="Vyber model, rozmery a zasklenie — pripravíme ti nezáväznú špecifikáciu (PDF) a ozveme sa s cenovou ponukou po obhliadke. Bez registrácie."
+	lead="Vyber model, rozmery, systém stien a zasklenie — pripravíme ti nezáväznú špecifikáciu (PDF) a ozveme sa s cenovou ponukou po obhliadke. Bez registrácie."
 >
 	{#snippet ovladacie()}
 		<!-- MODEL -->
@@ -158,7 +162,7 @@
 			</div>
 		</fieldset>
 
-		<!-- FARBA + ZASKLENIE -->
+		<!-- FARBA + ZASKLENIE + SYSTÉM STIEN -->
 		<fieldset class="kp-blok">
 			<legend>Vyhotovenie</legend>
 			<div class="kp-rozmery">
@@ -175,6 +179,15 @@
 					<select bind:value={zasklenie} data-testid="zz-zasklenie">
 						{#each data.zasklenia as z (z.nazov)}
 							<option value={z.nazov}>{z.nazov}</option>
+						{/each}
+					</select>
+				</label>
+				<!-- #429: systém stien — TERAZ reálna cenotvorná voľba (predtým fixný báza pri #408) -->
+				<label class="kp-pole">
+					<span>Systém stien</span>
+					<select bind:value={systemStien} data-testid="zz-system-stien">
+						{#each data.systemyStien as s (s.nazov)}
+							<option value={s.nazov}>{s.nazov}</option>
 						{/each}
 					</select>
 				</label>
@@ -211,6 +224,10 @@
 					<div>
 						<dt>Zasklenie</dt>
 						<dd>{s.zasklenie}</dd>
+					</div>
+					<div>
+						<dt>Systém stien</dt>
+						<dd data-testid="zz-suhrn-system-stien">{s.systemStien}</dd>
 					</div>
 				</dl>
 			</section>
@@ -250,9 +267,8 @@
 							</p>
 						{/if}
 						<p class="kp-cena-pozn">
-							Orientačná cena vychádza z rozmerov a zvoleného zasklenia pri základnom vyhotovení
-							konštrukcie. Presné vyhotovenie (model, zasklenie stien) a záväznú cenu pripravíme po
-							obhliadke miesta.
+							Orientačná cena vychádza z rozmerov, zvoleného systému stien a strešného zasklenia.
+							Presné vyhotovenie (model konštrukcie) a záväznú cenu pripravíme po obhliadke miesta.
 						</p>
 					</div>
 				{:else}
@@ -286,10 +302,11 @@
 						<input type="hidden" name="hlbka" value={hlbka ?? 0} />
 						<input type="hidden" name="sirka" value={sirka ?? 0} />
 						<input type="hidden" name="zasklenie" value={vstup.zasklenie} />
+						<input type="hidden" name="systemStien" value={vstup.systemStien} />
 						<strong>Orientačná cena</strong>
 						<p>
-							Zobraz si orientačnú cenu pre zvolené rozmery a zasklenie. Presnú, záväznú cenu
-							pripravíme po obhliadke miesta.
+							Zobraz si orientačnú cenu pre zvolené rozmery, systém stien a zasklenie. Presnú,
+							záväznú cenu pripravíme po obhliadke miesta.
 						</p>
 						{#if cenaError}
 							<p class="kp-cena-chyba" data-testid="zz-cena-chyba">{cenaError}</p>

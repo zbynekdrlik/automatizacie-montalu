@@ -11,9 +11,11 @@ import type { Actions, PageServerLoad } from './$types';
 import {
 	ZZ_MODELY,
 	ZZ_ZASKLENIA,
+	ZZ_SYSTEMY_STIEN,
 	ZZ_RANGES,
 	ZZ_MODEL_DEFAULT,
-	ZZ_ZASKLENIE_DEFAULT
+	ZZ_ZASKLENIE_DEFAULT,
+	ZZ_SYSTEM_STIEN_DEFAULT
 } from '$lib/konfigurator-zimna-zahrada';
 import { RAL_PALETA } from '$lib/vykres/ral';
 // #277: zdieľaná verejná dopyt akcia (kontaktný formulár → PDF ponuka + Odoo lead). Táto route ju
@@ -34,13 +36,17 @@ export const load: PageServerLoad = async () => {
 	return {
 		modely: ZZ_MODELY,
 		zasklenia: ZZ_ZASKLENIA,
+		// #429: systém stien — TERAZ cenotvorná voľba (predtým fixný báza).
+		systemyStien: ZZ_SYSTEMY_STIEN,
 		// RAL farby (kód + názov, žiadny Money údaj) — rovnaký tvar ako pergolová/bazénová podstránka.
 		farby: RAL_PALETA.map((r) => ({ kod: r.kod, nazov: r.nazov })),
 		rozmedzia: ZZ_RANGES,
 		// východiskové voľby (aby SSR render aj klient vychádzali z rovnakého platného stavu)
 		defaulty: {
 			model: ZZ_MODEL_DEFAULT,
-			zasklenie: ZZ_ZASKLENIE_DEFAULT
+			zasklenie: ZZ_ZASKLENIE_DEFAULT,
+			// #429: default = dnešná (#408) BÁZA, non-breaking pre kohokoľvek, kto voľbu nezmení.
+			systemStien: ZZ_SYSTEM_STIEN_DEFAULT
 		}
 	};
 };
@@ -70,6 +76,7 @@ export const actions = {
 				hlbkaMm: vstup.hlbkaMm,
 				sirkaMm: vstup.sirkaMm,
 				zasklenie: vstup.zasklenie,
+				systemStien: vstup.systemStien,
 				model: vstup.model
 			},
 			hladina
