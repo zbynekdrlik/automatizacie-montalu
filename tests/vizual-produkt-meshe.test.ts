@@ -88,9 +88,9 @@ describe('postavProduktMeshe — #356 mikro-reliéf mapy podľa tieru', () => {
 		expect(skloMaterial!.clearcoatNormalMap).toBeNull();
 	});
 
-	it('zlikvidujProduktMeshe UVOĽNÍ mikro-reliéf mapy (inak leak per prestav/remount)', () => {
+	it('zlikvidujProduktMeshe UVOĽNÍ VŠETKY mikro-reliéf mapy vrátane clearcoatNormalMap (inak leak per prestav/remount)', () => {
 		const scene = new THREE.Scene();
-		const { materialy, produktMeshe } = postavProduktMeshe(
+		const { materialy, skloMaterial, produktMeshe } = postavProduktMeshe(
 			THREE,
 			mergeGeometries,
 			scene,
@@ -101,8 +101,10 @@ describe('postavProduktMeshe — #356 mikro-reliéf mapy podľa tieru', () => {
 		);
 		const normalSpy = vi.spyOn(materialy.ram!.normalMap!, 'dispose');
 		const roughSpy = vi.spyOn(materialy.ram!.roughnessMap!, 'dispose');
+		const clearcoatSpy = vi.spyOn(skloMaterial!.clearcoatNormalMap!, 'dispose');
 		zlikvidujProduktMeshe(produktMeshe);
 		expect(normalSpy).toHaveBeenCalled();
 		expect(roughSpy).toHaveBeenCalled();
+		expect(clearcoatSpy).toHaveBeenCalled();
 	});
 });

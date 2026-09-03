@@ -347,13 +347,22 @@ export function vytvorTerasaAlphaTexturu(THREE: ThreeNS, rozlisenie = 256): Text
 // lesk. Amplitúdy sú ZÁMERNE JEMNÉ (#276/#336 poučenie: vysoký kontrast textúry =
 // „tlačený plastový vzhľad"). Aplikujú sa LEN na mid/high tier (low ostáva plochý).
 
-/** Tileable normal mapa z výškového poľa: finite-difference gradient → tangent-space
- *  normála (OpenGL Y+ konvencia, plochý povrch = RGB ~(128,128,255)). `vyska(x,y)` je
+/** Tileable normal mapa z výškového poľa: centrálno-diferenčný gradient → tangent-space
+ *  normála (three OpenGL konvencia, plochý povrch = RGB ~(128,128,255)). `vyska(x,y)` je
  *  ľubovoľná deterministická (alebo `Math.random`-závislá → test mockuje) výšková
  *  funkcia; `sila` škáluje amplitúdu reliéfu. Susedné vzorky sa berú s WRAP indexom →
  *  mapa je bezšvíkovo opakovateľná (`RepeatWrapping`). `colorSpace = NoColorSpace` —
  *  normal dáta sú LINEÁRNE, nie sRGB (rovnaká disciplína ako `vytvorTerasaAlphaTexturu`;
- *  sRGB by three interpretoval nesprávne a reliéf by „driftol"). */
+ *  sRGB by three interpretoval nesprávne a reliéf by „driftol").
+ *
+ *  ZELENÝ (Y) KANÁL — pozor na `CanvasTexture.flipY = true` (three default): canvas riadok
+ *  0 (hore) sa nahráva na `v = 1`, takže `v = 1 - y/N` (dv/dy = -1/N) a three TBN kladie
+ *  zelený kanál pozdĺž +v. Normála.y = `-dh/dv = -(dh/dy · dy/dv) = +N·dh/dy` ∝
+ *  `+(hDole - hHore)`, kde `hHore = h[y-1]` (canvas riadok NAD), `hDole = h[y+1]` (canvas
+ *  riadok POD). Opačné znamienko (napr. „pôvodné" `-(h[y+1]-h[y-1])`) by robilo z
+ *  horizontálnych ryh HREBENE namiesto žliabkov — klasický DirectX-vs-OpenGL green-flip
+ *  artefakt; zamknuté sign testom v `tests/vizual-textury.test.ts`. X (červený) kanál
+ *  `flipY` netrápi (horizontálny smer sa nemení). */
 function normalMapaZVysky(
 	THREE: ThreeNS,
 	rozlisenie: number,
@@ -373,10 +382,13 @@ function normalMapaZVysky(
 			// (noUncheckedIndexedAccess robí z typed-array prístupu `number | undefined`)
 			const hl = h[y * N + ((x - 1 + N) % N)]!;
 			const hr = h[y * N + ((x + 1) % N)]!;
-			const hd = h[((y - 1 + N) % N) * N + x]!;
-			const hu = h[((y + 1) % N) * N + x]!;
+			const hHore = h[((y - 1 + N) % N) * N + x]!; // canvas riadok NAD (väčšie v pri flipY)
+			const hDole = h[((y + 1) % N) * N + x]!; // canvas riadok POD (menšie v pri flipY)
 			let nx = -(hr - hl) * sila;
-			let ny = -(hu - hd) * sila;
+			// ny = -dh/dv. Pri flipY=true je v = 1 - y/N (dv/dy = -1/N), takže
+			// -dh/dv ∝ +dh/dy_canvas ∝ +(hDole - hHore). (Viď header komentár; opačné
+			// znamienko by robilo z horizontálnych žliabkov hrebene — zamknuté sign testom.)
+			let ny = (hDole - hHore) * sila;
 			let nz = 1;
 			const len = Math.hypot(nx, ny, nz) || 1;
 			nx /= len;
@@ -439,9 +451,10 @@ function zrnoPovrchu(x: number, y: number, N: number): number {
  *  Nízka `sila` → jemný lom svetla (nie hrboľatý plast). Volajúci nastaví
  *  `wrapS/wrapT=RepeatWrapping` + `repeat` podľa mierky profilu. */
 export function vytvorHlinikNormalMapu(THREE: ThreeNS, rozlisenie = 256): Texture {
-	// sila ZÁMERNE nízka (0.45) — práškovaný povrch má JEMNÝ mikro-reliéf, nie hrboľatý
-	// plast (#276/#336). `HLINIK_NORMAL_SCALE` v materiáli ho ešte ďalej krotí.
-	return normalMapaZVysky(THREE, rozlisenie, (x, y) => zrnoPovrchu(x, y, rozlisenie), 0.45);
+	// sila 0.2 — meraný sklon ~3° priem. (pri `HLINIK_NORMAL_SCALE` 0.7), čo zodpovedá
+	// REÁLNemu práškovanému orange-peel (~1–3°); vyššie hodnoty čítajú hammered/plast
+	// (#276/#336 — normal-map analógia „plastového" zlyhania). Review-meraná kalibrácia.
+	return normalMapaZVysky(THREE, rozlisenie, (x, y) => zrnoPovrchu(x, y, rozlisenie), 0.2);
 }
 
 /** #356 — hliník: jemná ROUGHNESS mapa (rozbitie lesku práškovania). Centrovaná
@@ -461,11 +474,19 @@ export function vytvorHlinikRoughMapu(THREE: ThreeNS, rozlisenie = 256): Texture
 export function vytvorDlazbuNormalMapu(THREE: ThreeNS, rozlisenie = 512, mriezka = 4): Texture {
 	const bunka = rozlisenie / mriezka;
 	const spara = Math.max(1, Math.round((12 / 600) * bunka)); // rovnako ako vytvorDlazbuTexturu
+	// vzdialenosť do LÍCA dlaždice (albedo líce = [spara, bunka-spara) — PRESNE zladené,
+	// bez off-by-one): 0 v strede špáry, `spara` na líci. Mimo špáry vracia `spara`.
+	const doLica = (m: number): number => {
+		if (m < spara) return m; // špára pri začiatku bunky
+		if (m >= bunka - spara) return bunka - m; // špára na konci bunky (bunka-m ∈ (0, spara])
+		return spara; // plné líce dlaždice
+	};
 	const vyska = (x: number, y: number): number => {
-		const dx = Math.min(x % bunka, bunka - (x % bunka));
-		const dy = Math.min(y % bunka, bunka - (y % bunka));
-		const dMin = Math.min(dx, dy);
-		if (dMin < spara) return (dMin / spara) * 0.85; // rampa z dna špáry (0) na líce (0.85)
+		const g = Math.min(
+			doLica(((x % bunka) + bunka) % bunka),
+			doLica(((y % bunka) + bunka) % bunka)
+		);
+		if (g < spara) return (g / spara) * 0.85; // rampa z dna špáry (0) na líce (0.85)
 		return 0.85 + zrnoPovrchu(x, y, rozlisenie) * 0.05; // líce dlaždice + jemný tooth
 	};
 	return normalMapaZVysky(THREE, rozlisenie, vyska, 1.4);

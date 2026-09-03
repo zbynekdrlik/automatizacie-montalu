@@ -24,13 +24,43 @@ export type MergeGeometriesFn = (
 	useGroups?: boolean
 ) => BufferGeometry;
 
+/** #356 — prepíše `BoxGeometry` UV z default 0..1 per plocha na METRE (fyzická veľkosť
+ *  plochy), aby textúrové mapy (#356 hliník/sklo mikro-reliéf) tilovali rovnomerne cez
+ *  VŠETKY plochy pri `RepeatWrapping` + `repeat = dlaždice/meter` — bez toho by tenký
+ *  profil (napr. 4200×50 mm) natiahol mapu ~70:1 a reliéf by sa buď mip-oval na plocho,
+ *  alebo ukázal ako smerové pruhy (review 🟡). BoxGeometry poradie plôch (three r0.185):
+ *  px,nx,py,ny,pz,nz; U/V každej plochy = (`buildPlane` width, height):
+ *  px/nx → (d,h), py/ny → (w,d), pz/nz → (w,h). Neškodné pre materiály bez mapy
+ *  (sietka/plné farby UV nečítajú), viditeľné len pre #356 mapy. */
+function metreUvBox(geo: BufferGeometry, wM: number, hM: number, dM: number): void {
+	const uv = geo.attributes.uv;
+	if (!uv) return;
+	const spanU = [dM, dM, wM, wM, wM, wM]; // px,nx,py,ny,pz,nz
+	const spanV = [hM, hM, dM, dM, hM, hM];
+	for (let f = 0; f < 6; f++) {
+		for (let k = 0; k < 4; k++) {
+			// 4 vrcholy na plochu (1 segment) — poradie zhodné s addGroup poradím
+			const idx = f * 4 + k;
+			uv.setXY(idx, uv.getX(idx) * spanU[f]!, uv.getY(idx) * spanV[f]!);
+		}
+	}
+	uv.needsUpdate = true;
+}
+
 /** Postaví lokálnu geometriu jedného dielu (bez posunu) — box priamo THREE-ovým
  *  `BoxGeometry` (centrovaný v strede, presne sedí s `DielSpec.pos` = stred),
  *  extrude cez `Shape` + `ExtrudeGeometry` centrovanú pozdĺž extrúznej osi (Z),
  *  takže `pos` má rovnaký význam ("stred") pre oba druhy tvaru. */
 function lokalnaGeometria(tvar: Tvar, THREE: ThreeNS): BufferGeometry {
 	if (tvar.kind === 'box') {
-		return new THREE.BoxGeometry(mm(tvar.w), mm(tvar.h), mm(tvar.d));
+		const wM = mm(tvar.w);
+		const hM = mm(tvar.h);
+		const dM = mm(tvar.d);
+		const geo = new THREE.BoxGeometry(wM, hM, dM);
+		// #356: UV na METRE → textúrové mapy tilujú svetovo-rovnomerne (viď metreUvBox).
+		// Zjednocuje s ExtrudeGeometry (tá už má svetové UV zo shape súradníc v mm→m).
+		metreUvBox(geo, wM, hM, dM);
+		return geo;
 	}
 	const shape = new THREE.Shape();
 	const [prvy, ...ostatne] = tvar.obrys; // extrude tvar má vždy neprázdny obrys

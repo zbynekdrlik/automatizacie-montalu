@@ -23,10 +23,12 @@ import type { Disposable } from '$lib/vizual/scena';
 
 type ThreeNS = typeof import('three');
 
-// #356: koľkokrát sa hliníková mikro-reliéf mapa opakuje na per-face UV (0..1)
-// mergnutej geometrie — vyššie číslo = jemnejšie zrno na väčších plochách. Zrno je
-// izotropné + nízkoamplitúdové, takže per-face UV orientácia je nepodstatná.
-const HLINIK_MAP_REPEAT = 3;
+// #356: hustota mikro-reliéf máp v DLAŽDICIACH NA METER (builder.ts robí UV v metroch,
+// viď metreUvBox) → svetovo-rovnomerné tilovanie na VŠETKÝCH plochách bez natiahnutia
+// (review 🟡). Hliník: 8/m ≈ 12,5 cm dlaždica (jemné práškované zrno); sklo: nízka
+// hustota (nízkofrekvenčná vlna, len rozbitie odrazu).
+const HLINIK_MAP_DLAZDICE_NA_M = 8;
+const SKLO_MAP_DLAZDICE_NA_M = 1.5;
 
 /** Materiály konštrukcie (ram/kolajnica/klucka/klin zdieľajú JEDNU `hlinik` inštanciu) — pre RAL
  *  update (`prekresliRAL`). Sklo/sieťka materiály tento map nedrží (dispose ide cez produktMeshe). */
@@ -88,7 +90,7 @@ export function postavProduktMeshe(
 		const roughnessMap = vytvorHlinikRoughMapu(THREE);
 		for (const t of [normalMap, roughnessMap]) {
 			t.wrapS = t.wrapT = THREE.RepeatWrapping;
-			t.repeat.set(HLINIK_MAP_REPEAT, HLINIK_MAP_REPEAT);
+			t.repeat.set(HLINIK_MAP_DLAZDICE_NA_M, HLINIK_MAP_DLAZDICE_NA_M);
 		}
 		hlinikMapy = { normalMap, roughnessMap };
 	}
@@ -114,7 +116,13 @@ export function postavProduktMeshe(
 		// #356: jemná clearcoat normal mapa (mid/high) — rozbije zrkadlový odraz bez
 		// dotyku číreho priehľadu skla. Vytvorená AŽ TU (len keď sklo existuje), aby
 		// neunikla pri produktoch bez skla; dispose ide cez `zlikvidujProduktMeshe`.
+		// UV skla je teraz v metroch (metreUvBox) → nutný RepeatWrapping + hustota/m,
+		// inak by ClampToEdge default mapu roztiahol/prilepil cez celú tabuľu.
 		const skloOdraz = bohateMaterialy ? vytvorSkloOdrazMapu(THREE) : undefined;
+		if (skloOdraz) {
+			skloOdraz.wrapS = skloOdraz.wrapT = THREE.RepeatWrapping;
+			skloOdraz.repeat.set(SKLO_MAP_DLAZDICE_NA_M, SKLO_MAP_DLAZDICE_NA_M);
+		}
 		const skloMat = vytvorSkloMaterial(
 			THREE,
 			SKLO_HRUBKA_DEFAULT_MM,

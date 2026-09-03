@@ -482,6 +482,33 @@ describe('vytvorDlazbuNormalMapu (#356) — zapustené škáry, zladené s albed
 		const priSkare = pixel(ctx, bunka - 1, Math.round(bunka / 2));
 		expect(Math.abs(priSkare[0] - 128)).toBeGreaterThan(Math.abs(stred[0] - 128));
 	});
+
+	it('ZNAMIENKO reliéfu: obe steny každej škáry sa nakláňajú DO žliabku (nie hrebeň) — flipY green-flip guard', () => {
+		// spara = round((12/600)·128) = 3; škára centrovaná na hranici bunky (x/y = 0,128,256…).
+		// Žliabok (zapustený) → obe steny musia mieriť DO stredu škáry. Zamyká 🔴 green-flip
+		// (opačné znamienko ny by z horizontálnych škár spravilo HREBENE).
+		const N = 512; // bunka = N/4 = 128; škára centrovaná na x/y = 0,128,256…
+		const ctx = fakeCanvasOf(vytvorDlazbuNormalMapu(THREE, N, 4)).getContext('2d')!;
+		// HORIZONTÁLNA škára pri y=128: horná stena (y=126) klesá do stredu → G<128;
+		// dolná stena (y=130) stúpa zo stredu → G>128.
+		expect(pixel(ctx, 64, 126)[1]).toBeLessThan(128);
+		expect(pixel(ctx, 64, 130)[1]).toBeGreaterThan(128);
+		// VERTIKÁLNA škára pri x=128 (X kanál — flipY ho netrápi): ľavá stena (x=126) → R>128,
+		// pravá stena (x=130) → R<128.
+		expect(pixel(ctx, 126, 64)[0]).toBeGreaterThan(128);
+		expect(pixel(ctx, 130, 64)[0]).toBeLessThan(128);
+	});
+
+	it('TILEABLE: vertikálna škára je SPOJITÁ cez wrap seam x=0/512 (bezšvíkové opakovanie)', () => {
+		const N = 512;
+		const ctx = fakeCanvasOf(vytvorDlazbuNormalMapu(THREE, N, 4)).getContext('2d')!;
+		// škára centrovaná na x=0 (≡512): pravá strana wrapu (x=511, ľavá stena) → R>128,
+		// stred (x=0) ≈128, ľavá strana wrapu (x=1, pravá stena) → R<128 — zrkadlo interiérovej
+		// škáry, čo dokazuje spojitosť cez okraj (žiadna viditeľná švíka pri RepeatWrapping).
+		expect(pixel(ctx, 511, 64)[0]).toBeGreaterThan(140);
+		expect(Math.abs(pixel(ctx, 0, 64)[0] - 128)).toBeLessThanOrEqual(6);
+		expect(pixel(ctx, 1, 64)[0]).toBeLessThan(116);
+	});
 });
 
 describe('vytvorSkloOdrazMapu (#356) — jemné rozbitie clearcoat odrazu', () => {

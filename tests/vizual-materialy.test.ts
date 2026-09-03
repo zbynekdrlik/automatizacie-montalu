@@ -5,7 +5,12 @@
 // precedens ako `tests/vizual-builder.test.ts`.
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { nastavRAL, vytvorHlinikMaterial, vytvorSkloMaterial } from '../src/lib/vizual/materialy';
+import {
+	nastavRAL,
+	nastavSkloVzhlad,
+	vytvorHlinikMaterial,
+	vytvorSkloMaterial
+} from '../src/lib/vizual/materialy';
 import { mm } from '../src/lib/vizual/jednotky';
 
 describe('materialy — vytvorSkloMaterial (#174 tier-based sklo)', () => {
@@ -216,5 +221,20 @@ describe('materialy — #356 sklo clearcoat odraz mapa', () => {
 		>;
 		expect(mat.clearcoatNormalMap).toBe(odraz);
 		expect(mat.transmission).toBe(0);
+	});
+
+	it('nastavSkloVzhlad NEZHODÍ clearcoatNormalMap — mapa prežije živú zmenu typu skla', () => {
+		const odraz = new THREE.Texture();
+		const mat = vytvorSkloMaterial(THREE, 8, 'transmission', undefined, odraz) as InstanceType<
+			typeof THREE.MeshPhysicalMaterial
+		>;
+		const attPred = mat.attenuationDistance;
+		nastavSkloVzhlad(THREE, mat, 'transmission', {
+			attenuationHex: 0x336655,
+			attenuationDistanceM: 0.02,
+			roughness: 0.1
+		});
+		expect(mat.attenuationDistance).not.toBe(attPred); // vzhľad sa zmenil
+		expect(mat.clearcoatNormalMap).toBe(odraz); // mapa PREŽILA
 	});
 });

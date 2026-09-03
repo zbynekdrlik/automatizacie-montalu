@@ -80,3 +80,37 @@ describe('postavGeometrie — mm → m hranica a merge per rola', () => {
 		expect(bb.max.z - bb.min.z).toBeCloseTo(0.2, 3);
 	});
 });
+
+describe('postavGeometrie — #356 box UV v METROCH (svetová hustota textúr)', () => {
+	it('BoxGeometry UV nie sú 0..1 na plochu, ale škálované na fyzickú veľkosť plochy (m)', () => {
+		const diely: DielSpec[] = [
+			{ rola: 'ram', tvar: { kind: 'box', w: 2000, h: 2000, d: 60 }, pos: { x: 0, y: 0, z: 0 } }
+		];
+		const out = postavGeometrie(diely, THREE, mergeGeometries);
+		const uv = out.ram!.attributes.uv!;
+		let maxU = 0;
+		let maxV = 0;
+		for (let i = 0; i < uv.count; i++) {
+			maxU = Math.max(maxU, uv.getX(i));
+			maxV = Math.max(maxV, uv.getY(i));
+		}
+		// najväčšia plocha (pz/py: w=2 m) → U/V dosiahne ~2.0 m, nie default 1.0
+		expect(maxU).toBeCloseTo(2.0, 5);
+		expect(maxV).toBeCloseTo(2.0, 5);
+	});
+
+	it('tenký profil: úzka os plochy má malú UV šírku (žiadne 70:1 natiahnutie mapy)', () => {
+		// 4200×50×60 mm profil: px/nx plocha U=d=0.06 m, V=h=0.05 m (obe malé) — mapa
+		// s repeat=dlaždice/m tiluje rovnomerne, nie natiahnuto pozdĺž dĺžky.
+		const diely: DielSpec[] = [
+			{ rola: 'ram', tvar: { kind: 'box', w: 4200, h: 50, d: 60 }, pos: { x: 0, y: 0, z: 0 } }
+		];
+		const out = postavGeometrie(diely, THREE, mergeGeometries);
+		const uv = out.ram!.attributes.uv!;
+		let maxU = 0;
+		for (let i = 0; i < uv.count; i++) maxU = Math.max(maxU, uv.getX(i));
+		// najdlhšia os (w=4.2 m) je na py/ny/pz/nz ploche U; pri per-face 0..1 by tu bola 1,
+		// pri metroch je to 4.2 → mapa nie je zlisovaná do 1 plochy
+		expect(maxU).toBeCloseTo(4.2, 4);
+	});
+});
