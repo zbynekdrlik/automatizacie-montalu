@@ -4,6 +4,7 @@
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { resolve } from '$app/paths';
+	import { untrack } from 'svelte';
 
 	let { data, form } = $props();
 
@@ -39,6 +40,12 @@
 			vyklopneCeloOn: false
 		}
 	);
+
+	// #450: dropdown „Pant výklopného čela" sa zobrazí LEN pri zaškrtnutom
+	// checkboxe „Výklopné čelo" — plná stránková navigácia (formulár nemá
+	// use:enhance) vytvorí pri každom kroku ČERSTVÚ inštanciu komponentu, takže
+	// jednorazové seedovanie z `vstup` (server-rendered) je bezpečné.
+	let vyklopneCeloOn = $state(untrack(() => vstup.vyklopneCeloOn));
 
 	let step = $derived(form?.step ?? 'form');
 	// #448 predodpisové skladové varovanie (bazén — b2b sa na túto route nedostane)
@@ -210,17 +217,19 @@
 				</div>
 				<div class="field">
 					<label class="opt opt-grid">
-						<input type="checkbox" name="vyklopneCeloOn" value="1" checked={vstup.vyklopneCeloOn} />
+						<input type="checkbox" name="vyklopneCeloOn" value="1" bind:checked={vyklopneCeloOn} />
 						Výklopné čelo
 					</label>
 				</div>
-				<div class="field">
-					<label for="pantFarba">Pant výklopného čela</label>
-					<select id="pantFarba" name="pantFarba" value={vstup.pantFarba}>
-						<option value="ELOX">ELOX</option>
-						<option value="9005">9005</option>
-					</select>
-				</div>
+				{#if vyklopneCeloOn}
+					<div class="field">
+						<label for="pantFarba">Pant výklopného čela</label>
+						<select id="pantFarba" name="pantFarba" value={vstup.pantFarba}>
+							<option value="ELOX">ELOX</option>
+							<option value="9005">9005</option>
+						</select>
+					</div>
+				{/if}
 			</div>
 			<div class="field">
 				<label class="opt">
