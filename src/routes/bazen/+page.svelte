@@ -2,6 +2,7 @@
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
+	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
@@ -50,6 +51,9 @@
 	let step = $derived(form?.step ?? 'form');
 	// #448 predodpisové skladové varovanie (bazén — b2b sa na túto route nedostane)
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
+	// #454 náhľad cien materiálu pred odoslaním (materiálová cena z denného Money
+	// snapshotu; BPK* kusové komponenty honest-null → súčet sa prizná ako neúplný)
+	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
 
 	// poradie kvôli grid3 rozloženiu: prvý riadok VS/SS/MS do 4500,
 	// druhý riadok to isté do 6000 (Dominik)
@@ -326,6 +330,12 @@
 			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
 		</form>
 	</div>
+
+	<!-- #454: náhľad cien materiálu PRED odoslaním do Money — čisto orientačné (denný
+	     snapshot), odpis sa neposiela; klient „pozrie koľko bazén stojí a neodpíše to". -->
+	{#if ceny}
+		<CenyTabulka {ceny} />
+	{/if}
 {:else if step === 'hotovo' && form && 'finalOut' in form && form.finalOut && form.outcome}
 	<div class="card">
 		<h1>Hotovo — {vstup.zak} · {vstup.zakaznik}</h1>

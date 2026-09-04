@@ -14,7 +14,25 @@ import {
 	rawFormEntries,
 	type OdpisJob
 } from '$lib/server/money';
-import { skladoveVarovania } from '$lib/server/ceny';
+import { skladoveVarovania, enrichPolozky } from '$lib/server/ceny';
+
+/**
+ * Predodpisový náhľad (#454 ceny materiálu + #448 sklad) — čisto ČÍTANIE denného
+ * Money snapshotu: `enrichPolozky`/`skladoveVarovania` volajú idempotentný lazy
+ * `maybeImportSnapshot` (žiadny zápis, žiadny riadok v `odpis_log`, žiadny súbor).
+ * Ceníme LEN nenulové položky (vzor pergola `nonzero` v narez/+page.server.ts).
+ * b2b sa na túto route nedostane (hook denylist redirect PRED akciou) — preto bez
+ * `cenyPre`-štýl gate, presne ako existujúce `skladoveVarovania` na tejto route.
+ * BPK* kusové komponenty majú v snapshote nákupnú cenu VŠETKY null → súčet je
+ * honest-neúplný (Money nemá nákupnú cenu bazénových komponentov, follow-up #364);
+ * `CenyTabulka` to priznáva (`CenySucet.kompletne=false`).
+ */
+function nahladCien(out: BazenPolozka[]) {
+	return {
+		skladVarovania: skladoveVarovania(out.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))),
+		ceny: enrichPolozky(out.filter((o) => o.qty > 0))
+	};
+}
 
 function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -65,8 +83,8 @@ export const actions = {
 			step: 'kontrola' as const,
 			vstup,
 			out,
-			// #448 predodpisové skladové varovanie (bazén je b2b-forbidden route → bez gate)
-			skladVarovania: skladoveVarovania(out.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))),
+			// #448 sklad + #454 ceny materiálu — predodpisový náhľad, len čítanie snapshotu
+			...nahladCien(out),
 			error: null as string | null
 		};
 	},
@@ -94,8 +112,8 @@ export const actions = {
 			vstup,
 			out,
 			editVals,
-			// #448 predodpisové skladové varovanie (bazén je b2b-forbidden route → bez gate)
-			skladVarovania: skladoveVarovania(out.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))),
+			// #448 sklad + #454 ceny materiálu — predodpisový náhľad, len čítanie snapshotu
+			...nahladCien(out),
 			error: err
 		});
 
