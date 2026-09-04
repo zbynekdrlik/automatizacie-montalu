@@ -221,12 +221,12 @@
 						<option value="9005">9005</option>
 					</select>
 				</div>
-				<div class="field">
-					<label class="opt opt-grid">
-						<input type="checkbox" name="vetraciaKlapka" value="1" checked={vstup.vetraciaKlapka} />
-						Vetracia klapka
-					</label>
-				</div>
+			</div>
+			<div class="field">
+				<label class="opt">
+					<input type="checkbox" name="vetraciaKlapka" value="1" checked={vstup.vetraciaKlapka} />
+					Vetracia klapka
+				</label>
 			</div>
 			<div class="grid3">
 				{#each cisla as [k, label] (k)}
