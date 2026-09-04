@@ -35,7 +35,8 @@
 			uzamykatelna: false,
 			ralKrytiek: 'R9006',
 			pantFarba: 'ELOX',
-			vetraciaKlapka: false
+			vetraciaKlapka: false,
+			vyklopneCeloOn: false
 		}
 	);
 
@@ -80,6 +81,7 @@
 	<input type="hidden" name="ralKrytiek" value={vstup.ralKrytiek} />
 	<input type="hidden" name="pantFarba" value={vstup.pantFarba} />
 	{#if vstup.vetraciaKlapka}<input type="hidden" name="vetraciaKlapka" value="1" />{/if}
+	{#if vstup.vyklopneCeloOn}<input type="hidden" name="vyklopneCeloOn" value="1" />{/if}
 {/snippet}
 
 {#if step === 'form'}
@@ -205,6 +207,17 @@
 						<option value="R9006">R9006</option>
 						<option value="R7016">R7016</option>
 					</select>
+				</div>
+				<div class="field">
+					<label class="opt opt-grid">
+						<input
+							type="checkbox"
+							name="vyklopneCeloOn"
+							value="1"
+							checked={vstup.vyklopneCeloOn}
+						/>
+						Výklopné čelo
+					</label>
 				</div>
 				<div class="field">
 					<label for="pantFarba">Pant výklopného čela</label>

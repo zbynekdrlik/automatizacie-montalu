@@ -34,7 +34,16 @@ Bazénový odpis má DVE compute vrstvy, ktoré sa NESMÚ zlúčiť do jednej:
 
 - `kolaj` (jedno/dvoj), `dvere`, `pocetSekcii` a veľkosti sekcií (`vs/ss/ms` → veľká=
   `vs4500+vs6000`, stredná=`ss*`, malá=`ms*`) sú EXISTUJÚCE vstupy — napájaj na ne, neduplikuj.
-- Výklopné čelo „zapnuté" = existujúci `vyklopneCelo (počet) > 0` (žiadny nový boolean).
+- **Výklopné čelo „zapnuté" = SAMOSTATNÝ checkbox `vyklopneCeloOn` (#450), NIE odvodené
+  z počtu.** Do #450 platilo „`vyklopneCelo (počet) > 0`, žiadny nový boolean" — Dominik
+  (screenshot formulára) chcel EXPLICITNÝ prepínač, lebo dropdown „Pant výklopného čela"
+  pôsobil ako vždy aktívny. `vyklopneCeloOn` (form checkbox, presne ako `vetraciaKlapka`)
+  je odteraz JEDINÝ zdroj pravdy pre Madlo/Pant ELOX/Pant 9005/Krídlová matica
+  (BPK202514/516/517/520). Číselné pole „Výklopné čelo (počet)" (`vyklopneCelo`) ostáva
+  NEZÁVISLÉ — poháňa LEN metrážový profil BPP00083 (surový materiál), nič v BPK vrstve.
+  Obe polia môžu byť nastavené nezávisle (checkbox zapnutý s počtom 0, alebo naopak) —
+  to je ZÁMER, nie chyba: BPK a BPP sú oddelené vrstvy, presne ako táto rules-hlavička
+  zdôrazňuje vyššie.
 - `model` je **whitelist** v `parseBazenVstup` (`'Premier'|'Exclusive'|'Star'`, iné →
   `Premier`) — EXCLUSIVE = `model.includes('exclusive')`. POZOR: legacy zlúčené
   `'Premier / Exclusive'` obsahuje `exclusive` → bez whitelistu by odpísalo spojku M8
