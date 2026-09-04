@@ -412,3 +412,42 @@ profilu <KOD>`, z alt textu tlačidla v prvej bunke) AJ riadok v `ceny-tabulka`
 (`getByTestId('ceny-tabulka')`, name `<KOD> Kladkový profil`). Prefix `Rez profilu <KOD>`
 identifikuje nárez riadok jednoznačne. Kódy (nie rozmery) v odpis karte overuj ďalej cez
 `odpisRiadky(...).join(' | ')` + `toContain('ZASP00018')` — tam sú.
+
+### DRUHÝ tvar tej istej kolízie — bazén ROZPIS riadok vs `ceny-tabulka` riadok (#454)
+
+Odkedy `#454` pridal `enrichPolozky` + `CenyTabulka` náhľad ceny AJ na bazén Kontrola
+obrazovku (viď `ceny-snapshot.md`), ten istý článkový kód žije v DVOCH `<tr>` na TEJ
+ISTEJ obrazovke: v **kontrolnom rozpise** (má `<input name="qty_<KOD>">`) AJ v
+`ceny-tabulka` (`<td class="mono">{r.kod}</td>`, BEZ inputu). `page.locator('tr', {
+hasText: '<KOD>' })` je substring + strict-mode → matchne OBA → violation (živý pád
+`bazen-komponenty.spec.ts:82` na `BPK00074`). Scopuj na rozpis riadok cez qty input,
+ktorý má LEN on:
+
+```ts
+const kompRow = page.locator('tr', { has: page.locator('input[name="qty_BPK00074"]') });
+```
+
+(alebo naopak z ceny-tabulka riadku cez `getByTestId('ceny-tabulka').locator('tr', …)`).
+Je to tá istá „kód sa objaví aj v ceny-tabulka riadku" pasca ako `#416` vyššie — platí
+na KAŽDEJ odpisovej Kontrola obrazovke, ktorá renderuje `CenyTabulka` (pergola/zasklenia/
+bazén). Pred `hasText: '<KOD>'` na Kontrola obrazovke vždy over, či cieľový riadok
+nekoliduje s ceny-tabulka riadkom.
+
+## Unit test na DOM-event logiku BEZ jsdom (repo ho zámerne nemá) — duck-type, netestuj cez `instanceof`
+
+Repo beží vitest v `'node'` prostredí (žiadny jsdom v `package.json`) — `document`/
+`HTMLElement`/`Event` globals V RUNTIME NEEXISTUJÚ mimo skutočného prehliadača/E2E.
+Keď píšeš čistú funkciu, ktorá spracúva DOM event (`event.target`, klávesnica, wheel,
+...), NEPÍŠ ju cez `target instanceof HTMLElement` ani nečítaj `document.activeElement`
+priamo v tej istej funkcii — v `node` teste by to hodilo `ReferenceError` (identifikátor
+neexistuje vôbec, nielenže vráti `false`).
+
+Namiesto toho použi **duck-typed kontrolu** cez vlastnosti (`tagName`/`type`/`typeof
+x.blur === 'function'`, …) — funkcia je čistá, testovateľná s obyčajným mock objektom
+(`{ tagName: 'INPUT', type: 'number', blur: vi.fn() }`), bez `globalThis` stubovania.
+Skutočný DOM element v prehliadači tento tvar prirodzene spĺňa, takže produkčné
+správanie je identické. Príklad: `src/lib/wheel-guard.ts` (#453 — wheel-nad-number-inputom
+guard) + `tests/wheel-guard.test.ts`. Keď funkcia GENUINELY potrebuje niečo zložitejšie
+z `document`/canvas (napr. `document.createElement('canvas').getContext('2d')`), NIE
+duck-typing — pozri `tests/vizual-textury.test.ts`'s ručný `(globalThis as unknown as
+{ document: unknown }).document = { ... }` stub namiesto inštalácie jsdom.

@@ -15,6 +15,11 @@
 	import { resolve } from '$app/paths';
 	import { afterNavigate } from '$app/navigation';
 	import type { RouteId } from '$app/types';
+	// #453 (Patrik, Odoo ch207 msg 1792131): koliesko myši nad zaostreným
+	// <input type="number"> nebezpečne mení hodnotu namiesto scrollovania —
+	// pripojené CELOPLOŠNE tu (jediné miesto pre všetky routy vrátane
+	// /konfigurator), detail + zdôvodnenie v src/lib/wheel-guard.ts.
+	import { odfokusujCisloInputPriWheeli } from '$lib/wheel-guard';
 
 	let { data, children } = $props();
 
@@ -136,6 +141,7 @@
 	onkeydown={(e) => {
 		if (e.key === 'Escape') zavriMenu();
 	}}
+	onwheel={odfokusujCisloInputPriWheeli}
 />
 
 {#if data.user && !jeKonfig}
