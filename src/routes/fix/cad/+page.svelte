@@ -4,6 +4,7 @@
 	// prepínač režimov `FixModeNav`.
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
+	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import FixModeNav from '$lib/components/FixModeNav.svelte';
 	import { resolve } from '$app/paths';
@@ -17,6 +18,8 @@
 	let v = $derived(form && 'v' in form ? form.v : null);
 	// cenový blok (display-only) — LEN interní; b2b nikdy nedostane `ceny`
 	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
+	// #448 predodpisové skladové varovanie — LEN interní; b2b dostane [] (server)
+	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
 
 	let copyBtnText = $state('📋 Kopírovať počet tyčí');
 	async function kopiruj() {
@@ -148,6 +151,9 @@
 			mieste.
 		</div>
 	{/if}
+
+	<!-- #448: predodpisové skladové varovanie pri odpise (LEN interní; server pre b2b vráti []) -->
+	<SkladVarovania varovania={skladVarovania ?? undefined} />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">

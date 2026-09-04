@@ -4,6 +4,7 @@ import { detectManualStagingMoves } from '$lib/server/money-presun';
 import {
 	getDlvReadbackMeta,
 	readbackStav,
+	agregujReadbackAlarmy,
 	type ReadbackVysledok
 } from '$lib/server/money-readback';
 import type { DlvReadbackMeta } from '$lib/server/money-readback';
@@ -51,9 +52,14 @@ export const load: PageServerLoad = async () => {
 	} catch (e) {
 		log.error('readback zlyhal — degradujem na „neoverené", stránka ostáva funkčná', { error: e });
 	}
+	const odpisyView = odpisy.map((o) => ({ ...o, readback: stav.get(o.id) ?? null }));
 	return {
-		odpisy: odpisy.map((o) => ({ ...o, readback: stav.get(o.id) ?? null })),
-		readbackMeta
+		odpisy: odpisyView,
+		readbackMeta,
+		// #448: súhrn LIVE readback alarmov (Money doklad chýba / počet nesedí) pre červený banner na
+		// vrchu stránky — z UŽ vypočítaného `stav`, žiadny nový dotaz. Zviditeľní tichý Money drop bez
+		// scrollovania na konkrétny riadok (Patrik: „hodilo do dopisu … nie je v Money").
+		readbackAlarmy: agregujReadbackAlarmy(odpisyView)
 	};
 };
 

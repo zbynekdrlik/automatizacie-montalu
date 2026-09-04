@@ -24,7 +24,8 @@ import {
 	type Modul
 } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
-import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
+import { enrichPolozky, skladoveVarovania, type CenyResult } from '$lib/server/ceny';
+import type { SkladVarovanie } from '$lib/server/ceny';
 
 export interface CadVstup {
 	zak: string;
@@ -155,6 +156,19 @@ function cadCeny(
 }
 
 /**
+ * Predodpisové skladové varovanie (#448) — LEN pre interných (sklad je interná dáta, tá istá
+ * access-control hranica ako `cadCeny`). Pre b2b `[]`. Vstup = zobrazené nenulové Money položky
+ * (`v.nonzero`); honest signál, nie blok.
+ */
+function cadSklad(
+	user: SessionUser | null,
+	polozky: { kod: string; nazov: string; qty: number }[]
+): SkladVarovanie[] {
+	if (isB2B(user)) return [];
+	return skladoveVarovania(polozky.map((p) => ({ kod: p.kod, mnozstvo: p.qty })));
+}
+
+/**
  * Postaví `OdpisJob` s modulovo-špecifickou identitou (`opts`). `polozky` = VŠETKÝCH 25
  * katalógových riadkov (aj nulové) — 1:1 ako pergola/n8n. `createdBy` z prihláseného
  * používateľa (route).
@@ -203,6 +217,8 @@ export function cadSpocitat(form: FormData, user: SessionUser | null) {
 		vstup,
 		v,
 		ceny: v ? cadCeny(user, v.nonzero) : undefined,
+		// #448 predodpisové skladové varovanie (LEN interní; b2b → [])
+		skladVarovania: v ? cadSklad(user, v.nonzero) : [],
 		error: null as string | null
 	};
 }
@@ -221,8 +237,17 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 	// bloku, tak ho nepočítame zbytočne — len keď sa vraciame do „nahlad" s chybou. Zavolá sa
 	// nanajvýš raz (vetvy sú return).
 	const cenyBlok = () => (v ? cadCeny(user, v.nonzero) : undefined);
+	const skladBlok = () => (v ? cadSklad(user, v.nonzero) : []);
 	// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
-	if (editError) return { step: 'nahlad' as const, vstup, v, ceny: cenyBlok(), error: editError };
+	if (editError)
+		return {
+			step: 'nahlad' as const,
+			vstup,
+			v,
+			ceny: cenyBlok(),
+			skladVarovania: skladBlok(),
+			error: editError
+		};
 
 	// posledná poistka pred zápisom do Money — nikdy záporné/nekonečné metre
 	if (v!.polozky.some((o) => o.qty < 0 || !Number.isFinite(o.qty)))
@@ -231,6 +256,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			vstup,
 			v,
 			ceny: cenyBlok(),
+			skladVarovania: skladBlok(),
 			error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
 		};
 
@@ -263,6 +289,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			vstup,
 			v,
 			ceny: cenyBlok(),
+			skladVarovania: skladBlok(),
 			error:
 				'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 		};

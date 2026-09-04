@@ -129,6 +129,12 @@ test('odpisy: Money readback badge — ✅ overené aj ⛔ chýba doklad sa vykr
 	await expect(page.getByTestId('readback-90001')).toContainText('overené');
 	await expect(page.getByTestId('readback-90002')).toContainText('chýba');
 	await expect(page.getByTestId('readback-stav')).toContainText('readback z');
+	// #448: súhrnný ČERVENÝ alarm banner na vrchu — LIVE odpis 90002 (chýbajúci DLV) sa v ňom objaví,
+	// overený odpis 90001 (ok) NIE. Zviditeľní tichý Money drop bez scrollovania na konkrétny riadok.
+	await expect(page.getByTestId('readback-alarm-banner')).toBeVisible();
+	await expect(page.getByTestId('readback-alarm-banner')).toContainText('Money');
+	await expect(page.getByTestId('readback-alarm-90002')).toContainText('E2E-RB-MISS');
+	await expect(page.getByTestId('readback-alarm-90001')).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
 

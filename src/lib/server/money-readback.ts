@@ -530,7 +530,8 @@ export function agregujReadbackAlarmy(
 		id: number;
 		zak: string;
 		op: string;
-		live: boolean;
+		// `live` je v odpis_log INTEGER 0/1 (nie boolean) — akceptuj oboje, guard používa truthiness
+		live: number | boolean;
 		readback: ReadbackVysledok | null;
 	}[]
 ): ReadbackAlarmySuhrn {

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
+	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		popisTyp,
@@ -33,6 +34,8 @@
 	);
 
 	let step = $derived(form?.step ?? 'form');
+	// #448 predodpisové skladové varovanie (clip — b2b sa na túto route nedostane)
+	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
 </script>
 
 <svelte:head><title>CLIP zábradlie — odpis materiálu</title></svelte:head>
@@ -170,6 +173,9 @@
 	{#if form?.error}
 		<div class="err" data-testid="kontrola-error">⚠️ {form.error}</div>
 	{/if}
+
+	<!-- #448: predodpisové skladové varovanie pri odpise -->
+	<SkladVarovania varovania={skladVarovania ?? undefined} />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">
