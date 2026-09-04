@@ -77,8 +77,12 @@ test('bazén: nové voľby → kusové komponenty (ks) v kontrolnom rozpise', as
 	// krytka čelovej nožičky R7016 (V1+S1+M1 = 2+1+2 = 5)
 	expect(rozpis['BPK202526']).toBe('5');
 
-	// jednotka `ks` je viditeľná v tabuľke (kusový komponent)
-	const kompRow = page.locator('tr', { hasText: 'BPK00074' });
+	// jednotka `ks` je viditeľná v kontrolnom rozpise (kusový komponent).
+	// #454 pasca: `hasText: 'BPK00074'` matchne DVA riadky — rozpis riadok
+	// (má qty input) AJ nový ceny-tabulka riadok (`<td class="mono">BPK00074`,
+	// bez inputu) → strict-mode violation. Scopuj cez qty input, ktorý má LEN
+	// rozpis riadok (viď `.claude/rules/testing.md` #454 kolízia).
+	const kompRow = page.locator('tr', { has: page.locator('input[name="qty_BPK00074"]') });
 	await expect(kompRow).toContainText('ks');
 
 	// #454: náhľad ceny materiálu je na Kontrola obrazovke (pred odoslaním do Money)
