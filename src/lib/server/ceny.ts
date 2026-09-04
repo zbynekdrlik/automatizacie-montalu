@@ -472,3 +472,45 @@ export function enrichPolozky(
 	const lakovanie = computeLakovanie(radky);
 	return { radky, sucty, lakovanie, snapshot: readSnapshotMetaFromDb() };
 }
+
+// ---- predodpisové skladové varovanie (#448) ----
+
+/** Jedno skladové varovanie pred odpisom (#448): kód, ktorého denný Money snapshot hlási nižší
+ *  sklad než požadované množstvo. Honest signál — NIE blok (appka sklad nevlastní, snapshot je stale). */
+export interface SkladVarovanie {
+	kod: string;
+	/** dostupný sklad zo snapshotu (non-null, < požadované). */
+	sklad: number;
+	/** požadované množstvo (SÚČET za kód v tomto odpise). */
+	mnozstvo: number;
+}
+
+/**
+ * Predodpisové SKLADOVÉ VAROVANIE (#448) — pre položky odpisu vráti varovanie za KAŽDÝ kód, ktorého
+ * denný Money snapshot hlási `sklad != null && sklad < požadované`. Presná rovnosť (`sklad ===
+ * mnozstvo`), `sklad === null` (Money nemá skladovú kartu), kód mimo snapshotu (Money ho nepozná)
+ * aj nulové/záporné množstvo → žiadne varovanie: appka sklad NEVLASTNÍ, záporný sklad je v Money
+ * legitímny a snapshot je 1×denne stale, takže tvrdý blok by dával falošné poplachy (settled dizajn
+ * #448 — na rozdiel od `validateOdpisKody`, ktoré unknown-kod/bez-skladovej-karty BLOKUJE). Množstvo
+ * sa AGREGUJE za kód (Money kontroluje sklad na CELKOVÝ dopyt kódu v doklade). Sám si spustí lazy
+ * import snapshotu (idempotentný), rovnako ako `validateOdpisKody`/`enrichPolozky`.
+ */
+export function skladoveVarovania(polozky: { kod: string; mnozstvo: number }[]): SkladVarovanie[] {
+	maybeImportSnapshot();
+	// súčet požadovaného množstva za kód (LEN kladné — nulová položka nič nežiada); Map insertion
+	// order určuje poradie výstupu = deterministické podľa prvého výskytu kódu
+	const dopyt = new Map<string, number>();
+	for (const p of polozky) {
+		if (!p.kod || typeof p.mnozstvo !== 'number' || !Number.isFinite(p.mnozstvo) || p.mnozstvo <= 0)
+			continue;
+		dopyt.set(p.kod, (dopyt.get(p.kod) ?? 0) + p.mnozstvo);
+	}
+	const out: SkladVarovanie[] = [];
+	for (const [kod, mnozstvo] of dopyt) {
+		const price = getPriceRow(kod);
+		if (price && price.sklad !== null && price.sklad < mnozstvo) {
+			out.push({ kod, sklad: price.sklad, mnozstvo });
+		}
+	}
+	return out;
+}
