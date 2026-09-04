@@ -12,6 +12,8 @@
 
 	// #448 Slovak plural pre alarm banner ("1 odpis / 2 odpisy / 5 odpisov")
 	const odpisSlovo = (n: number) => (n === 1 ? 'odpis' : n >= 2 && n <= 4 ? 'odpisy' : 'odpisov');
+	// objektové zámeno ("Money ho/ich nenaimportoval") — pre singular vs plural
+	const objZamen = (n: number) => (n === 1 ? 'ho' : 'ich');
 </script>
 
 <svelte:head><title>História odpisov — Montalu</title></svelte:head>
@@ -23,7 +25,9 @@
 	<div class="err" data-testid="readback-alarm-banner" role="alert">
 		⛔ <b
 			>{data.readbackAlarmy.pocet}
-			{odpisSlovo(data.readbackAlarmy.pocet)} appka odoslala, ale Money ich NENAIMPORTOVAL</b
+			{odpisSlovo(data.readbackAlarmy.pocet)} appka odoslala, ale Money {objZamen(
+				data.readbackAlarmy.pocet
+			)} NENAIMPORTOVAL</b
 		>
 		(doklad chýba alebo nesedí počet). Odpis „prešiel" v appke, ale v Money nie je — skontroluj v Money
 		a v prípade potreby pošli znova:

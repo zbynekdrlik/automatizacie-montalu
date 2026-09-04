@@ -506,7 +506,11 @@ export function skladoveVarovania(polozky: { kod: string; mnozstvo: number }[]):
 		dopyt.set(p.kod, (dopyt.get(p.kod) ?? 0) + p.mnozstvo);
 	}
 	const out: SkladVarovanie[] = [];
-	for (const [kod, mnozstvo] of dopyt) {
+	for (const [kod, rawMnozstvo] of dopyt) {
+		// zaokrúhli agregát na 3 desatinné (mm presnosť) — FP akumulácia (napr. 0,1+0,2=0,30000…4) by
+		// inak spravila FALOŠNÉ varovanie pri koncepčne ROVNOM sklade (design: presná rovnosť = žiadne
+		// varovanie). Vzor `round2` v `enrichPolozky` — tam sa súčty tiež zaokrúhľujú pred zobrazením.
+		const mnozstvo = Math.round(rawMnozstvo * 1000) / 1000;
 		const price = getPriceRow(kod);
 		if (price && price.sklad !== null && price.sklad < mnozstvo) {
 			out.push({ kod, sklad: price.sklad, mnozstvo });
