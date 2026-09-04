@@ -14,6 +14,7 @@ import {
 	rawFormEntries,
 	type OdpisJob
 } from '$lib/server/money';
+import { skladoveVarovania } from '$lib/server/ceny';
 
 function jobFor(vstup: BazenVstup, finalOut: BazenPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -60,7 +61,14 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, vstup };
 		const { out, error: cErr } = computeBazenAll(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
-		return { step: 'kontrola' as const, vstup, out, error: null as string | null };
+		return {
+			step: 'kontrola' as const,
+			vstup,
+			out,
+			// #448 predodpisové skladové varovanie (bazén je b2b-forbidden route → bez gate)
+			skladVarovania: skladoveVarovania(out.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))),
+			error: null as string | null
+		};
 	},
 
 	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
@@ -86,6 +94,8 @@ export const actions = {
 			vstup,
 			out,
 			editVals,
+			// #448 predodpisové skladové varovanie (bazén je b2b-forbidden route → bez gate)
+			skladVarovania: skladoveVarovania(out.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))),
 			error: err
 		});
 

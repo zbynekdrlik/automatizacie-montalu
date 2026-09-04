@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
+	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { resolve } from '$app/paths';
 
@@ -39,6 +40,8 @@
 	);
 
 	let step = $derived(form?.step ?? 'form');
+	// #448 predodpisové skladové varovanie (bazén — b2b sa na túto route nedostane)
+	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
 
 	// poradie kvôli grid3 rozloženiu: prvý riadok VS/SS/MS do 4500,
 	// druhý riadok to isté do 6000 (Dominik)
@@ -250,6 +253,9 @@
 	{#if form?.error}
 		<div class="err" data-testid="kontrola-error">⚠️ {form.error}</div>
 	{/if}
+
+	<!-- #448: predodpisové skladové varovanie pri odpise -->
+	<SkladVarovania varovania={skladVarovania ?? undefined} />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">
