@@ -210,12 +210,7 @@
 				</div>
 				<div class="field">
 					<label class="opt opt-grid">
-						<input
-							type="checkbox"
-							name="vyklopneCeloOn"
-							value="1"
-							checked={vstup.vyklopneCeloOn}
-						/>
+						<input type="checkbox" name="vyklopneCeloOn" value="1" checked={vstup.vyklopneCeloOn} />
 						Výklopné čelo
 					</label>
 				</div>
