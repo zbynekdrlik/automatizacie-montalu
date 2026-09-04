@@ -81,5 +81,9 @@ test('bazén: nové voľby → kusové komponenty (ks) v kontrolnom rozpise', as
 	const kompRow = page.locator('tr', { hasText: 'BPK00074' });
 	await expect(kompRow).toContainText('ks');
 
+	// #454: náhľad ceny materiálu je na Kontrola obrazovke (pred odoslaním do Money)
+	await expect(page.getByTestId('ceny-tabulka')).toBeVisible();
+	await expect(page.getByTestId('ceny-tabulka')).toContainText('Ceny materiálu');
+
 	expect(consoleMsgs).toEqual([]);
 });
