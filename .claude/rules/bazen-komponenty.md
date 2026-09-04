@@ -2,6 +2,7 @@
 paths:
   - 'src/lib/bazen-komponenty.ts'
   - 'src/lib/server/bazen.ts'
+  - 'src/routes/bazen/+page.svelte'
   - 'tests/bazen-komponenty.test.ts'
   - 'e2e/bazen-komponenty.spec.ts'
 ---
@@ -48,6 +49,27 @@ Bazénový odpis má DVE compute vrstvy, ktoré sa NESMÚ zlúčiť do jednej:
   `Premier`) — EXCLUSIVE = `model.includes('exclusive')`. POZOR: legacy zlúčené
   `'Premier / Exclusive'` obsahuje `exclusive` → bez whitelistu by odpísalo spojku M8
   `BPK00108` aj Premier zákazke (preto whitelist mapuje legacy → `Premier`, bezpečný smer).
+
+## Testovacia pasca: `computeBazen` (BPP*) NIKDY nevynecháva riadky — `computeBazenAll` výstup testuj podľa `qty`, nie podľa prítomnosti (#450)
+
+`computeBazen`'s `out` = **CELÝ** BOM (`BOM.map(...)`, bez filtra) — aj riadky s `qty: 0`
+zostávajú v poli (komentár priamo v kóde: „celý rozpis (aj nulové položky) — kontrolná
+stránka ukáže všetko editovateľné"). Toto je OPAČNÉ ako `pocitajBazenKomponenty` (BPK*),
+ktorá 0/záporné qty VYNECHÁVA (vyššie). Pri písaní testu nad `computeBazenAll(...).out`,
+ktorý overuje, že istý BPP kód „sa neodpíše": `out.find(o => o.kod==='BPP0008X')` VŽDY
+nájde záznam — assertuj `?.qty` na `0` (alebo `toBe(0)`), NIE `toBeUndefined()`. Zámena
+stála prvý red-run kolo pri #450 (test čakal `toBeUndefined()`, dostal `{qty:0}`).
+
+## `.grid3` (3-stĺpcový) riadok — pridanie 4. poľa osirotí posledné pole na samote (#450)
+
+`app.css` `.grid3` je `grid-template-columns: 1fr 1fr 1fr` — 4. `<div class="field">`
+vloženého do existujúceho 3-poľového `.grid3` riadku sa NEZALOMÍ pekne, len presunie
+POSLEDNÉ pôvodné pole samo do nového riadku s 2 prázdnymi bunkami vedľa (review 🔵 pri
+#450, checkbox „Výklopné čelo" pridaný medzi RAL krytiek a Pant dropdown). Fix: NEcpi 4.
+pole do existujúceho grid3 — buď rozdeľ na dva grid3 riadky s presne 3 poľami každý,
+alebo (keď je 4. pole logicky nezávislé od zvyšných 3, ako tu Vetracia klapka) vytiahni
+ho mimo grid úplne, ako **plain `<div class="field">`** (vzor „Čaká na materiál" nižšie
+v tom istom formulári — `class="opt"` bez `opt-grid`, žiadny grid wrapper).
 
 ## E2E pasca — `BPK*` kódy majú PREFIXOVÉ kolízie
 
