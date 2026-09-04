@@ -412,3 +412,22 @@ profilu <KOD>`, z alt textu tlačidla v prvej bunke) AJ riadok v `ceny-tabulka`
 (`getByTestId('ceny-tabulka')`, name `<KOD> Kladkový profil`). Prefix `Rez profilu <KOD>`
 identifikuje nárez riadok jednoznačne. Kódy (nie rozmery) v odpis karte overuj ďalej cez
 `odpisRiadky(...).join(' | ')` + `toContain('ZASP00018')` — tam sú.
+
+## Unit test na DOM-event logiku BEZ jsdom (repo ho zámerne nemá) — duck-type, netestuj cez `instanceof`
+
+Repo beží vitest v `'node'` prostredí (žiadny jsdom v `package.json`) — `document`/
+`HTMLElement`/`Event` globals V RUNTIME NEEXISTUJÚ mimo skutočného prehliadača/E2E.
+Keď píšeš čistú funkciu, ktorá spracúva DOM event (`event.target`, klávesnica, wheel,
+...), NEPÍŠ ju cez `target instanceof HTMLElement` ani nečítaj `document.activeElement`
+priamo v tej istej funkcii — v `node` teste by to hodilo `ReferenceError` (identifikátor
+neexistuje vôbec, nielenže vráti `false`).
+
+Namiesto toho použi **duck-typed kontrolu** cez vlastnosti (`tagName`/`type`/`typeof
+x.blur === 'function'`, …) — funkcia je čistá, testovateľná s obyčajným mock objektom
+(`{ tagName: 'INPUT', type: 'number', blur: vi.fn() }`), bez `globalThis` stubovania.
+Skutočný DOM element v prehliadači tento tvar prirodzene spĺňa, takže produkčné
+správanie je identické. Príklad: `src/lib/wheel-guard.ts` (#453 — wheel-nad-number-inputom
+guard) + `tests/wheel-guard.test.ts`. Keď funkcia GENUINELY potrebuje niečo zložitejšie
+z `document`/canvas (napr. `document.createElement('canvas').getContext('2d')`), NIE
+duck-typing — pozri `tests/vizual-textury.test.ts`'s ručný `(globalThis as unknown as
+{ document: unknown }).document = { ... }` stub namiesto inštalácie jsdom.
