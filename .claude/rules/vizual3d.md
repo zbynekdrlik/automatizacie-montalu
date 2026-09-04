@@ -627,3 +627,43 @@ Práškovaný orange-peel má reálny sklon ~1–3°; vyššie číta hammered/p
 (priem. `atan(|nxy|/nz)` cez mapu), nie odhadom. #356 kalibrácia: hliník sila 0.2 + scale 0.7
 ≈ 3° priem. Dlažba grout môže byť strmšia (reálna škára). Sklo `clearcoatNormalMap` len na
 clearcoat vrstve → číra transmisia/priehľad skla NEDOTKNUTÝ (žiadne matnenie).
+
+## CAD-mesh (.obj → GLB+Draco) konverzný reťazec — OVERENÝ, NIE integrovaný (#356)
+
+**Kontext:** #356 skúma CAD-exportovanú geometriu (Dominikov Solid Edge) ako budúcu
+doplnkovú vrstvu k procedurálnej geometrii (zakrivené/organické produkty — bazénové
+zastrešenie, zimné záhrady — kde boxy/ExtrudeGeometry nestačia; pergola OSTÁVA
+procedurálna kvôli plynulej parametrizácii). Toto NIE JE integrované do appky —
+žiadny `GLTFLoader`/`DRACOLoader` v kóde, žiadny nový chunk. Je to overený recept
+pre budúci integračný follow-up, keď Dominik dodá vzorový export.
+
+**Overený pipeline (spike na 16 reálnych CAD meshoch z mooore bazénového dema,
+`pergola-demo.mooore.sk/models/03_export/*.obj`, 3ds Max Wavefront export):**
+
+```
+npm install obj2gltf gltf-pipeline gltf-validator   # scratch/dev-only, NIE zatiaľ v package.json
+obj2gltf -i model.obj -o model.glb --binary
+gltf-pipeline -i model.glb -o model.draco.glb --draco.compressMeshes --draco.compressionLevel=10
+```
+
+Namerané na 16 meshoch (1,35 MB OBJ spolu): **GLB = 54 % OBJ, GLB+Draco = 6,0 % OBJ
+(16,7× redukcia)**, 15,3 s konverzia+kompresia spolu (offline/build-time krok, nie
+runtime). `gltf-validator` (oficiálny Khronos conformance nástroj) hlásil 0 chýb/0
+varovaní na všetkých 32 výstupoch — `KHR_draco_mesh_compression` required extension,
+`hasTextures:false` (demo OBJ/MTL nesú len plochú farbu, žiadny `map_Kd` — textúrovanie
+je v deme oddelené od geometrie).
+
+**Nástrojová voľba:** priamy OBJ→GLB pipeline stačí — Dominikovo Solid Edge exportuje
+OBJ priamo (potvrdené), žiadny FBX/Blender-headless/assimp most netreba (FBX cesta
+existuje ako `fbx2gltf` npm balík, len teoreticky overená dostupnosť, neinštalovaná).
+
+**Integračná poznámka pre budúci follow-up:** `three@0.185.1` (pripnutá verzia)
+obsahuje `examples/jsm/loaders/GLTFLoader.js` + `DRACOLoader.js` (core loadery, žiaden
+extra bundle mimo three). `DRACOLoader` v tejto verzii **NEMÁ default CDN cestu** pre
+WASM dekóder — treba `setDecoderPath()` na vlastný origin (vzor ako HDRI #285,
+`static/hdri`), inak žiadny externý fetch, money-guard/CSP nedotknuté. Pridanie
+loaderov je reálny bundle-size zásah → treba upraviť CI chunk-guard (§ vyššie,
+projektový three ≤220 KB jednokošíkový).
+
+Plné meranie + tabuľka per-súbor: GitHub #356 komentár 4.9.2026 (SPIKE — konverzný
+reťazec).
