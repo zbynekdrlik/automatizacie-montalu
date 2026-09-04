@@ -473,6 +473,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Deluxe",
   },
   "planHash": "2aae99c2",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -1129,6 +1130,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Robust",
   },
   "planHash": "f891b809",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -1874,6 +1876,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Robust",
   },
   "planHash": "51f494bf",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -2622,6 +2625,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Slide",
   },
   "planHash": "89e37d88",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -3145,6 +3149,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Štandard",
   },
   "planHash": "6fb2d95a",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -3934,6 +3939,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "system": "Štandard +",
   },
   "planHash": "1d3cd3d2",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -5326,6 +5332,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "zakaznik": "Zákazník GM1",
   },
   "planHash": "c8a22222",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [
@@ -7292,6 +7299,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "zakaznik": "Zákazník GM2",
   },
   "planHash": "c3fe935f",
+  "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
     "radky": [

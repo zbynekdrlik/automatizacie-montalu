@@ -499,3 +499,47 @@ export function readbackStav(odpisLogIds: number[]): Map<number, ReadbackVysledo
 	}
 	return out;
 }
+
+// ---- súhrn readback alarmov pre /odpisy banner (#448) ----
+
+/** Jeden LIVE odpis, ktorý Money podľa readbacku NEnaimportoval (alarm) — pre súhrnný červený banner
+ *  na vrchu /odpisy. `dovod`: `chyba-doklad` (Money doklad chýba) alebo `pocet` (počet položiek
+ *  nesedí). */
+export interface ReadbackAlarm {
+	id: number;
+	zak: string;
+	op: string;
+	dovod: ReadbackDovod;
+}
+
+export interface ReadbackAlarmySuhrn {
+	/** počet LIVE odpisov s readback alarmom (`nesulad`). */
+	pocet: number;
+	polozky: ReadbackAlarm[];
+}
+
+/**
+ * Agreguje UŽ vypočítané `readbackStav()` výsledky do súhrnu pre červený banner na vrchu /odpisy
+ * (#448). Alarm = LIVE odpis so `stav === 'nesulad'` (Money doklad chýba / počet nesedí). `ok`,
+ * `caka` (vrátane parkovaných `caka=1` a odpisov mimo readback okna) aj non-live (do Money nešli) sa
+ * VYLUČUJÚ. Čistá funkcia nad tým, čo `/odpisy` load už načítal — žiadny nový dotaz do DB, banner sa
+ * vykreslí SSR pri načítaní stránky (nie až po scrollnutí na konkrétny riadok, Patrikov #448 problém).
+ */
+export function agregujReadbackAlarmy(
+	odpisy: {
+		id: number;
+		zak: string;
+		op: string;
+		// `live` je v odpis_log INTEGER 0/1 (nie boolean) — akceptuj oboje, guard používa truthiness
+		live: number | boolean;
+		readback: ReadbackVysledok | null;
+	}[]
+): ReadbackAlarmySuhrn {
+	const polozky: ReadbackAlarm[] = [];
+	for (const o of odpisy) {
+		if (o.live && o.readback && o.readback.stav === 'nesulad') {
+			polozky.push({ id: o.id, zak: o.zak, op: o.op, dovod: o.readback.dovod });
+		}
+	}
+	return { pocet: polozky.length, polozky };
+}

@@ -6,6 +6,7 @@
 	// 2026-08-02); b2b vidí len výpočet/tabuľku (existujúce pravidlo — bez zápisu).
 	import { SIETKA_UCHYTY, uchytLabel, type SietkaUchyt } from '$lib/sietka';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
+	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -26,6 +27,8 @@
 		poznamka: form?.vstup?.poznamka ?? ''
 	});
 	let r = $derived(form && 'r' in form ? form.r : null);
+	// #448 predodpisové skladové varovanie — LEN interní (server pre b2b vráti [])
+	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
 	let potrebuje3K = $derived(form && 'potrebuje3K' in form ? form.potrebuje3K : false);
 	let planHash = $derived(form && 'planHash' in form ? form.planHash : '');
 	let cielInfo = $derived(form && 'cielInfo' in form ? form.cielInfo : null);
@@ -260,6 +263,11 @@
 				<div><span>Súbor</span><b style="font-size:12px">{cielInfo.filename}</b></div>
 			</div>
 		</div>
+	{/if}
+
+	{#if step === 'vysledok' && !isB2B}
+		<!-- #448: predodpisové skladové varovanie pri odpise (LEN interní) -->
+		<SkladVarovania varovania={skladVarovania ?? undefined} />
 	{/if}
 
 	<div class="card noprint">

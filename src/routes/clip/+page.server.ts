@@ -20,6 +20,7 @@ import {
 	applyEdits,
 	type OdpisJob
 } from '$lib/server/money';
+import { skladoveVarovania } from '$lib/server/ceny';
 
 function jobFor(vstup: ClipVstup, finalOut: ClipPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -64,7 +65,16 @@ export const actions = {
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
 		const vypocet = computeClip(vstup);
-		return { step: 'kontrola' as const, vstup, vypocet, error: null as string | null };
+		return {
+			step: 'kontrola' as const,
+			vstup,
+			vypocet,
+			// #448 predodpisové skladové varovanie (clip je b2b-forbidden route → bez gate)
+			skladVarovania: skladoveVarovania(
+				vypocet.polozky.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))
+			),
+			error: null as string | null
+		};
 	},
 
 	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
@@ -91,6 +101,10 @@ export const actions = {
 			vstup,
 			vypocet,
 			editVals,
+			// #448 predodpisové skladové varovanie (clip je b2b-forbidden route → bez gate)
+			skladVarovania: skladoveVarovania(
+				vypocet.polozky.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))
+			),
 			error: err
 		});
 

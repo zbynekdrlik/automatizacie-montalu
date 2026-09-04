@@ -22,6 +22,7 @@
 	import PlanKarty from '$lib/components/zasklenia/PlanKarty.svelte';
 	import PlanKartyMulti from '$lib/components/zasklenia/PlanKartyMulti.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
+	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 
 	let { data, form } = $props();
@@ -691,6 +692,9 @@
 
 	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
+	<!-- #448: predodpisové skladové varovanie pri tlačidle odpisu (LEN interní; server pre b2b vráti []) -->
+	<SkladVarovania varovania={form?.skladVarovania} />
+
 	<div class="card noprint">
 		{#if !isB2B}
 			<form method="POST" action="?/odoslat">
@@ -765,6 +769,9 @@
 		ceny={form?.ceny}
 		skloCeny={form?.skloCeny}
 	/>
+
+	<!-- #448: predodpisové skladové varovanie pri tlačidle odpisu (LEN interní; server pre b2b vráti []) -->
+	<SkladVarovania varovania={form?.skladVarovania} />
 
 	<div class="card noprint">
 		{#if !isB2B}

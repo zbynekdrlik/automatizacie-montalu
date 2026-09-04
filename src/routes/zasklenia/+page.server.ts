@@ -39,7 +39,8 @@ import {
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
 import { komponentyPre } from '$lib/server/komponenty-cfg';
 import type { Farba } from '$lib/komponenty';
-import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
+import { enrichPolozky, skladoveVarovania, type CenyResult } from '$lib/server/ceny';
+import type { SkladVarovanie } from '$lib/server/ceny';
 import { skloCenaPre, type SkloCenaResult, type SkloPlanVstup } from '$lib/server/sklo-cena';
 import {
 	parseVstup,
@@ -127,6 +128,19 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?:
 function cenyPre(user: SessionUser | null, polozky: OdpisJob['polozky']): CenyResult | undefined {
 	if (isB2B(user)) return undefined;
 	return enrichPolozky(polozky);
+}
+
+/**
+ * Predodpisové skladové varovanie (#448) — LEN pre interných (sklad je interná dáta, tá istá
+ * access-control hranica ako `cenyPre`). Pre b2b vráti `[]` (b2b vidí náhľad, ale sklad ani odpis
+ * nesmie). Vstup = Money položky odpisu (profily + kovanie); `qty` → `mnozstvo`.
+ */
+function skladVarovaniaPre(
+	user: SessionUser | null,
+	polozky: OdpisJob['polozky']
+): SkladVarovanie[] {
+	if (isB2B(user)) return [];
+	return skladoveVarovania(polozky.map((p) => ({ kod: p.kod, mnozstvo: p.qty })));
 }
 
 /**
@@ -409,6 +423,8 @@ export const actions = {
 			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; undefined pre
 			// b2b, takže sa nedostane ani do HTML odpovede (obrana do hĺbky)
 			ceny: cenyPre(locals.user, job.polozky),
+			// predodpisové skladové varovanie (#448) — LEN pre interných; honest signál, nie blok
+			skladVarovania: skladVarovaniaPre(locals.user, job.polozky),
 			// náklad na sklo (display-only, #225) — LEN pre interných, undefined pre b2b;
 			// plocha reálnych tabúľ × cena/m² zo snapshotu, honest-null keď cena chýba
 			skloCeny: skloCenyPre(locals.user, [
@@ -561,6 +577,8 @@ export const actions = {
 			kovanie: kov.polozky,
 			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných (viď nahlad vyššie)
 			ceny: cenyPre(locals.user, job.polozky),
+			// predodpisové skladové varovanie (#448) — LEN pre interných; honest signál, nie blok
+			skladVarovania: skladVarovaniaPre(locals.user, job.polozky),
 			// náklad na sklo per posuv + súhrn (display-only, #225) — LEN pre interných
 			skloCeny: skloCenyPre(
 				locals.user,
