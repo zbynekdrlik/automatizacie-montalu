@@ -121,3 +121,26 @@ snapshot) — použitý napr. na lookup názvov všetkých 149 TS kódov (#235, 
 
 Použiteľné pre ďalšie cenové/kódové lookupy bez potreby nového prístupu; v logu/výstupe
 NIKDY heslo (grep overený).
+
+## `enrichPolozky` náhľad ceny je AJ na odpisovej Kontrola obrazovke, nielen na /odpisy/zakazka (#454)
+
+`enrichPolozky` + `CenyTabulka` (materiálová cena z denného snapshotu) sa zobrazuje na
+**predodpisovom náhľade/Kontrole** viacerých modulov, NIE len na `/odpisy/zakazka` (po
+importe): `/pergola` (`+page.svelte:231`), `/zasklenia` náhľad, a od #454 aj `/bazen`
+Kontrola. Ide o „pozrieť koľko to bude stáť a NEODPÍSAŤ to" — čisto čítanie snapshotu,
+odoslanie do Money sa nemení.
+
+- **Rozšírenie na ĎALŠÍ odpisový modul = ten istý vzor:** v `spocitat` (a `odoslat`-error
+  re-renderi Kontroly) spočítaj `enrichPolozky(nenulové položky)`, vráť ako `ceny`, a na
+  stránke `<CenyTabulka {ceny} />`. Ceníme LEN nenulové (`out.filter(o => o.qty > 0)`, vzor
+  pergola `nonzero`). Na route s viacerými náhľadovými poľami (sklad + ceny) zabaľ ich do
+  JEDNÉHO helpera (bazén `nahladCien(out)` → `{skladVarovania, ceny}`) a spreadni ho do oboch
+  akcií — nekopíruj inline.
+- **b2b gate:** ceny odhaľujú nákupnú cenu/maržu (interné). Ak je route b2b-forbidden
+  (`B2B_FORBIDDEN_PREFIXES` v `b2b-access.ts`, fail-closed test `b2b-route-coverage`) —
+  napr. `/bazen` — gate NETREBA (b2b sa na akciu nedostane; konzistentné s tamojším
+  `skladVarovania`). Na route DOSTUPNEJ b2b (`/zasklenia`) MUSÍ byť `cenyPre`-štýl gate
+  (`if (isB2B(user)) return undefined`) — druhá vrstva obrany, dáta sa vôbec nedopočítajú.
+- **Bazén honest-null:** BPK* kusové komponenty majú v snapshote nákup=null → súčet
+  `CenySucet.kompletne=false` (priznaný neúplný). To je zámer (Money nemá nákup BPK, PCMO
+  predajná = follow-up #364), nie chyba testu.
