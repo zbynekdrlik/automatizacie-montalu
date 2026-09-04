@@ -239,7 +239,8 @@ describe('computeBazenAll — profily (BPP) ostávajú + komponenty (BPK) sa pri
 		uzamykatelna: false,
 		ralKrytiek: 'R9006',
 		pantFarba: 'ELOX',
-		vetraciaKlapka: false
+		vetraciaKlapka: false,
+		vyklopneCeloOn: false
 	};
 
 	it('BPP profil má mj undefined (=m), BPK komponent má mj=ks; oba sú v rozpise', () => {
@@ -263,6 +264,31 @@ describe('computeBazenAll — profily (BPP) ostávajú + komponenty (BPK) sa pri
 		expect(excl.find((o) => o.kod === 'BPK00108')?.qty).toBe(12);
 		const prem = computeBazenAll(base).out;
 		expect(prem.find((o) => o.kod === 'BPK00108')).toBeUndefined();
+	});
+
+	// #450 — Dominik: checkbox „Výklopné čelo" je odteraz JEDINÝ zdroj pravdy pre
+	// pánt ELOX/9005 (BPK202516/517), NEZÁVISLE od číselného poľa vyklopneCelo
+	// (počet), ktoré ostáva zdrojom LEN pre metrážový profil BPP00083.
+	it('vyklopneCeloOn=true s počtom 0 → pant ELOX SA odpisuje, BPP00083 (surový materiál) qty=0', () => {
+		const { out } = computeBazenAll({ ...base, vyklopneCeloOn: true, vyklopneCelo: 0 });
+		expect(out.find((o) => o.kod === 'BPK202516')?.qty).toBe(3); // pant ELOX
+		// BPP* profily (na rozdiel od BPK*) NEfiltrujú 0-riadky — kontrolná
+		// stránka ich ukáže editovateľné aj s qty 0 (viď computeBazen komentár).
+		expect(out.find((o) => o.kod === 'BPP00083')?.qty).toBe(0); // 0×6=0
+	});
+	it('vyklopneCeloOn=false s počtom > 0 → BPP00083 SA odpisuje, pant NIE (rozdielne vrstvy)', () => {
+		const { out } = computeBazenAll({ ...base, vyklopneCeloOn: false, vyklopneCelo: 2 });
+		expect(out.find((o) => o.kod === 'BPP00083')?.qty).toBe(12); // 2×6
+		expect(out.find((o) => o.kod === 'BPK202516')).toBeUndefined();
+		expect(out.find((o) => o.kod === 'BPK202517')).toBeUndefined();
+		expect(out.find((o) => o.kod === 'BPK202514')).toBeUndefined(); // madlo
+		expect(out.find((o) => o.kod === 'BPK202520')).toBeUndefined(); // krídlová matica
+	});
+	it('ani checkbox ani počet → ani pant (BPK vynechá 0-riadky), ani BPP00083 (qty=0)', () => {
+		const { out } = computeBazenAll(base);
+		expect(out.find((o) => o.kod === 'BPP00083')?.qty).toBe(0);
+		expect(out.find((o) => o.kod === 'BPK202516')).toBeUndefined();
+		expect(out.find((o) => o.kod === 'BPK202517')).toBeUndefined();
 	});
 });
 

@@ -463,3 +463,18 @@ run Mutation workflow-u bol zrušený ako „duplikát CI" → mutation-diff sha
 skončili fail a PR ostal BLOCKED; oprava = `gh run rerun <id>`. Pravidlo: pred cancelom
 čítaj `gh run view <id> --json workflowName` — cancel len pri ZHODNOM workflowName na
 tej istej SHA (skutočný duplikát; aj ten sa vyskytuje, CI sa občas spustí 2× na jeden push).
+
+## npm audit 503 (registry outage) na main — composite waiter, probe VŽDY z repo adresára
+
+Job `test` krok „Audit prod závislostí" padá, keď npmjs advisory endpoint vracia 503
+(`npm warn audit 503 Service Unavailable … npm error audit endpoint returned an error`).
+Je to infra výpadok registry, nie kód — stalo sa 3.9. AJ 4.9. (runy 33817475882,
+33850837457; dev prešiel identický strom minúty predtým). Postup (nikdy slepý druhý rerun):
+
+1. JEDEN background composite waiter: lokálny probe `npm audit --omit=dev --audit-level=high`
+   každých 5 min, kým 503 nezmizne. **Probe MUSÍ bežať v repo adresári** — mimo neho
+   (`cd /tmp`) padne na `ENOLOCK: This command requires an existing lockfile`, čo waiter
+   zmätie ako „REAL_AUDIT_ISSUE" a ukončí sa bez rerunnu (incident 4.9.).
+2. Po `REGISTRY_OK` → `gh run rerun <run-id> --failed` (jediný sankcionovaný rerun — príčina
+   je dokázaná infra).
+3. Pokračuj DEPLOYED classifierom (#588 deploy-set green, nie run-terminal).

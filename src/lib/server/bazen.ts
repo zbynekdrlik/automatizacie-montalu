@@ -49,6 +49,10 @@ export interface BazenVstup {
 	ralKrytiek: RalKrytiek; // 'R9006' | 'R7016'
 	pantFarba: PantFarba; // 'ELOX' | '9005'
 	vetraciaKlapka: boolean;
+	/** #450: samostatný checkbox „Výklopné čelo" — jediný zdroj pravdy pre pánt
+	 *  ELOX/9005 + Madlo + Krídlová matica. NEZÁVISLÝ od `vyklopneCelo` (počet),
+	 *  ktoré ostáva zdrojom len pre metrážový profil BPP00083 (surový materiál). */
+	vyklopneCeloOn: boolean;
 }
 
 export interface BazenPolozka {
@@ -231,7 +235,9 @@ export function kompVstupFromBazen(v: BazenVstup): BazenKompVstup {
 		dvojkolaj: v.kolaj.toLowerCase().includes('dvoj'),
 		exclusive: m.includes('exclusive'),
 		dvere: v.dvere,
-		vyklopneCeloOn: v.vyklopneCelo > 0,
+		// #450: checkbox je odteraz jediný zdroj pravdy (predtým odvodené z počtu
+		// vyklopneCelo > 0) — počet ostáva nezávislý, poháňa len BPP00083.
+		vyklopneCeloOn: v.vyklopneCeloOn,
 		vetraciaKlapka: v.vetraciaKlapka,
 		aretaciaTyp: v.aretaciaTyp,
 		aretaciaStrana: v.aretaciaStrana,

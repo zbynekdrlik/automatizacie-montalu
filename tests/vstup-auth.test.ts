@@ -84,6 +84,21 @@ describe('parseBazenVstup — serverové parsovanie bazén formulára', () => {
 		expect(vstup.caka).toBe(true);
 	});
 
+	// #450: „Výklopné čelo" checkbox je NEZÁVISLÝ boolean vstup (nie odvodený
+	// z počtu vyklopneCelo) — nezaškrtnutý default false, chýbajúci vôbec = false.
+	it('vyklopneCeloOn checkbox parsuje nezávisle od počtu vyklopneCelo', () => {
+		expect(parseBazenVstup(bfd()).vstup.vyklopneCeloOn).toBe(false);
+		const form = bfd({ vyklopneCelo: '3' });
+		form.set('vyklopneCeloOn', '1');
+		expect(parseBazenVstup(form).vstup.vyklopneCeloOn).toBe(true);
+		// zaškrtnuté bez počtu — checkbox ostáva pravdivý, počet ostáva 0
+		const form2 = bfd();
+		form2.set('vyklopneCeloOn', '1');
+		const r2 = parseBazenVstup(form2).vstup;
+		expect(r2.vyklopneCeloOn).toBe(true);
+		expect(r2.vyklopneCelo).toBe(0);
+	});
+
 	it('záporné a nečíselné počty sa orežú na 0 (a sekcie=0 padnú na validácii)', () => {
 		const { vstup, error } = parseBazenVstup(bfd({ pocetSekcii: '-5' }));
 		expect(vstup.pocetSekcii).toBe(0);
