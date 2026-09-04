@@ -34,7 +34,8 @@ export interface BazenKompVstup {
 	exclusive: boolean;
 	/** sú dvere */
 	dvere: boolean;
-	/** je vyplnené výklopné čelo (počet > 0) */
+	/** samostatný checkbox „Výklopné čelo" (#450) — NEZÁVISLÝ od číselného poľa
+	 *  vyklopneCelo (počet), ktoré poháňa len metrážový profil BPP00083. */
 	vyklopneCeloOn: boolean;
 	/** vetracia klapka (trecí pant) */
 	vetraciaKlapka: boolean;

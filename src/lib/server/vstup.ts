@@ -552,7 +552,10 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 		uzamykatelna: form.get('uzamykatelna') === '1',
 		ralKrytiek: form.get('ralKrytiek') === 'R7016' ? 'R7016' : 'R9006',
 		pantFarba: form.get('pantFarba') === '9005' ? '9005' : 'ELOX',
-		vetraciaKlapka: form.get('vetraciaKlapka') === '1'
+		vetraciaKlapka: form.get('vetraciaKlapka') === '1',
+		// #450: samostatný checkbox „Výklopné čelo" — NEZÁVISLÝ od číselného poľa
+		// vyklopneCelo (počet), ktoré ostáva zdrojom LEN pre metrážový profil BPP00083.
+		vyklopneCeloOn: form.get('vyklopneCeloOn') === '1'
 	};
 	let error: string | null = null;
 	const rawDlzka = parseFloat(String(form.get('dlzkaKolajnic') ?? '0').replace(',', '.'));

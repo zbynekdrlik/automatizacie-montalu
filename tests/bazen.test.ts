@@ -30,6 +30,7 @@ function vstup(over: Partial<BazenVstup> = {}): BazenVstup {
 		ralKrytiek: 'R9006',
 		pantFarba: 'ELOX',
 		vetraciaKlapka: false,
+		vyklopneCeloOn: false,
 		...over
 	};
 }

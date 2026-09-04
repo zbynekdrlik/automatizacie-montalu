@@ -25,6 +25,9 @@ test('bazén: nové voľby → kusové komponenty (ks) v kontrolnom rozpise', as
 	await page.getByLabel('Strana aretácie').selectOption('L');
 	await page.getByLabel('Uzamykateľná páčka').check();
 	await page.getByLabel('RAL krytiek').selectOption('R7016');
+	// #450: „Výklopné čelo" checkbox je NEZÁVISLÝ zdroj pravdy pre pant ELOX/9005 —
+	// label je substring "Výklopné čelo (počet)" labelu, takže exact: true je nutné.
+	await page.getByLabel('Výklopné čelo', { exact: true }).check();
 	await page.getByLabel('Pant výklopného čela').selectOption('9005');
 	await page.getByLabel('Vetracia klapka').check();
 	await page.getByLabel('Výklopné čelo (počet)').fill('1');
