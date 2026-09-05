@@ -21,6 +21,12 @@ async function materialRiadky(page: Page) {
 	);
 }
 
+/** riadky bez načítaného rezu (prázdne pole = všetko OK) — na opakovaný poll */
+async function bezRezu(page: Page) {
+	const riadky = await materialRiadky(page);
+	return riadky.filter((r) => !r.nacitany).map((r) => `${r.kod} ${r.nazov}`);
+}
+
 const PRIPADY = [
 	{ system: 'Štandard', styl: '2K' },
 	{ system: 'Štandard +', styl: '3K' },
@@ -45,8 +51,12 @@ for (const { system, styl } of PRIPADY) {
 
 		const riadky = await materialRiadky(page);
 		expect(riadky.length).toBeGreaterThan(2);
-		const bez = riadky.filter((r) => !r.nacitany).map((r) => `${r.kod} ${r.nazov}`);
-		expect(bez, `bez rezu: ${bez.join(' | ')}`).toEqual([]);
+		// Obrázky sa dopĺňajú asynchrónne (fetch) — najmä cez pomalý SSH tunel k prod
+		// vieme byť tesne po hydratácii ešte pred ich doťahaním (#466). Ohraničený poll
+		// namiesto jednorazového čítania: re-čítame DOM, kým každý riadok nemá
+		// naozaj načítaný obrázok (naturalWidth > 0), alebo kým nevyprší timeout —
+		// rozbitý/chýbajúci obrázok naďalej padne (naturalWidth ostane 0 navždy).
+		await expect.poll(() => bezRezu(page), { timeout: 20_000, message: 'bez rezu' }).toEqual([]);
 
 		expect(errs).toEqual([]);
 	});
