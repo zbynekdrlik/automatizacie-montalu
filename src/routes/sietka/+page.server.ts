@@ -23,7 +23,7 @@ import {
 	rawFormEntries,
 	type OdpisJob
 } from '$lib/server/money';
-import { skladoveVarovania } from '$lib/server/ceny';
+import { skladoveVarovania, getSnapshotMeta } from '$lib/server/ceny';
 
 export const load: PageServerLoad = async () => {
 	// opona (2x*) nie je podporovaná (rovnaký gate ako sietkaSamostatnaVypocet) —
@@ -52,11 +52,14 @@ export const actions = {
 			vstup,
 			r,
 			potrebuje3K: potrebuje3KKolajnicu(vstup.styl),
-			// #448 predodpisové skladové varovanie — LEN interní (b2b vidí tabuľku, ale nie sklad
-			// ani tlačidlo Odoslať); sklad je interná dáta (rovnaká hranica ako inde v appke)
+			// #448/#451 predodpisové skladové varovanie + odobrať — LEN interní (b2b vidí tabuľku,
+			// ale nie sklad ani tlačidlo Odoslať); sklad je interná dáta (rovnaká hranica ako inde)
 			skladVarovania: isB2B(locals.user)
 				? []
-				: skladoveVarovania(r.odpis.map((o) => ({ kod: o.kod, mnozstvo: o.metre }))),
+				: skladoveVarovania(
+						r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
+					),
+			snapshotDatum: getSnapshotMeta().generatedAt,
 			planHash: contentHash(vstup.zak, job.polozky),
 			cielInfo: {
 				live: isLive(),
@@ -102,8 +105,11 @@ export const actions = {
 				vstup,
 				r,
 				potrebuje3K: potrebuje3KKolajnicu(vstup.styl),
-				// #448 predodpisové skladové varovanie — interní (b2b je v odoslat odmietnutý vyššie)
-				skladVarovania: skladoveVarovania(r.odpis.map((o) => ({ kod: o.kod, mnozstvo: o.metre }))),
+				// #448/#451 predodpisové skladové varovanie + odobrať — interní (b2b odmietnutý vyššie)
+				skladVarovania: skladoveVarovania(
+					r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
 				planHash: aktualny,
 				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
 				cielInfo: {

@@ -20,7 +20,7 @@ import {
 	applyEdits,
 	type OdpisJob
 } from '$lib/server/money';
-import { skladoveVarovania } from '$lib/server/ceny';
+import { skladoveVarovania, getSnapshotMeta } from '$lib/server/ceny';
 
 function jobFor(vstup: ClipVstup, finalOut: ClipPolozka[], createdBy: string): OdpisJob {
 	return {
@@ -69,10 +69,11 @@ export const actions = {
 			step: 'kontrola' as const,
 			vstup,
 			vypocet,
-			// #448 predodpisové skladové varovanie (clip je b2b-forbidden route → bez gate)
+			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
 			skladVarovania: skladoveVarovania(
-				vypocet.polozky.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))
+				vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 			),
+			snapshotDatum: getSnapshotMeta().generatedAt,
 			error: null as string | null
 		};
 	},
@@ -101,10 +102,11 @@ export const actions = {
 			vstup,
 			vypocet,
 			editVals,
-			// #448 predodpisové skladové varovanie (clip je b2b-forbidden route → bez gate)
+			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
 			skladVarovania: skladoveVarovania(
-				vypocet.polozky.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))
+				vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 			),
+			snapshotDatum: getSnapshotMeta().generatedAt,
 			error: err
 		});
 

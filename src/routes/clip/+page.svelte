@@ -34,8 +34,9 @@
 	);
 
 	let step = $derived(form?.step ?? 'form');
-	// #448 predodpisové skladové varovanie (clip — b2b sa na túto route nedostane)
+	// #448/#451 predodpisové skladové varovanie + odobrať (clip — b2b sa na túto route nedostane)
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
+	let snapshotDatum = $derived(form && 'snapshotDatum' in form ? form.snapshotDatum : null);
 </script>
 
 <svelte:head><title>CLIP zábradlie — odpis materiálu</title></svelte:head>
@@ -174,8 +175,8 @@
 		<div class="err" data-testid="kontrola-error">⚠️ {form.error}</div>
 	{/if}
 
-	<!-- #448: predodpisové skladové varovanie pri odpise -->
-	<SkladVarovania varovania={skladVarovania ?? undefined} />
+	<!-- #448/#451: predodpisové skladové varovanie + odobrať pri odpise -->
+	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">

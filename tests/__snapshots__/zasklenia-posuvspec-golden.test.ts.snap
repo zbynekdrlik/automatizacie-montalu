@@ -496,6 +496,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -1153,6 +1154,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -1899,6 +1901,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -2648,6 +2651,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -3172,6 +3176,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -3962,6 +3967,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahlad",
   "vstup": {
     "caka": false,
@@ -5364,6 +5370,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahladMulti",
   "warn": "SLIDE: madlo 200 (ZASK20258) zatiaľ NIE JE v odpise kovania — Money má na ňom 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). Doplniť ručne, kým nedostane sklad (#357).",
 }
@@ -7340,6 +7347,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     },
     "spolu": 0,
   },
+  "snapshotDatum": null,
   "step": "nahladMulti",
   "warn": null,
 }

@@ -24,7 +24,12 @@ import {
 	type Modul
 } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
-import { enrichPolozky, skladoveVarovania, type CenyResult } from '$lib/server/ceny';
+import {
+	enrichPolozky,
+	skladoveVarovania,
+	getSnapshotMeta,
+	type CenyResult
+} from '$lib/server/ceny';
 import type { SkladVarovanie } from '$lib/server/ceny';
 
 export interface CadVstup {
@@ -165,7 +170,7 @@ function cadSklad(
 	polozky: { kod: string; nazov: string; qty: number }[]
 ): SkladVarovanie[] {
 	if (isB2B(user)) return [];
-	return skladoveVarovania(polozky.map((p) => ({ kod: p.kod, mnozstvo: p.qty })));
+	return skladoveVarovania(polozky.map((p) => ({ kod: p.kod, nazov: p.nazov, mnozstvo: p.qty })));
 }
 
 /**
@@ -217,8 +222,9 @@ export function cadSpocitat(form: FormData, user: SessionUser | null) {
 		vstup,
 		v,
 		ceny: v ? cadCeny(user, v.nonzero) : undefined,
-		// #448 predodpisové skladové varovanie (LEN interní; b2b → [])
+		// #448/#451 predodpisové skladové varovanie + odobrať (LEN interní; b2b → [])
 		skladVarovania: v ? cadSklad(user, v.nonzero) : [],
+		snapshotDatum: getSnapshotMeta().generatedAt,
 		error: null as string | null
 	};
 }
@@ -238,6 +244,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 	// nanajvýš raz (vetvy sú return).
 	const cenyBlok = () => (v ? cadCeny(user, v.nonzero) : undefined);
 	const skladBlok = () => (v ? cadSklad(user, v.nonzero) : []);
+	const snapDatum = () => getSnapshotMeta().generatedAt;
 	// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
 	if (editError)
 		return {
@@ -246,6 +253,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			v,
 			ceny: cenyBlok(),
 			skladVarovania: skladBlok(),
+			snapshotDatum: snapDatum(),
 			error: editError
 		};
 
@@ -257,6 +265,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			v,
 			ceny: cenyBlok(),
 			skladVarovania: skladBlok(),
+			snapshotDatum: snapDatum(),
 			error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
 		};
 
@@ -290,6 +299,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			v,
 			ceny: cenyBlok(),
 			skladVarovania: skladBlok(),
+			snapshotDatum: snapDatum(),
 			error:
 				'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 		};
