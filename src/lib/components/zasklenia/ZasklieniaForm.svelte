@@ -9,7 +9,7 @@
 	// `data.kovania`→`kovania`). `posuvyJSON` hidden input serializuje ďalšie posuvy.
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { posuvySlovom } from '$lib/popis';
-	import { standardPlusRailEligible } from '$lib/styl';
+	import { plusRailEligible, SYSTEMY_OBVODOVA } from '$lib/styl';
 	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
 	import type { Farba } from '$lib/komponenty';
 	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -332,10 +332,10 @@
 				Čaká na materiál (odloží import do priečinka NA ODPIS)
 			</label>
 		</div>
-		<!-- 6K nemá väčšiu koľajnicu (7K neexistuje) → checkbox sa skryje. Zdieľaný
-		     predikát `standardPlusRailEligible` (styl.ts) — rovnaký gate ako
-		     `pridavnaKolajnicaDefault` aj `railUpsize` v compute.ts (#134). -->
-		{#if standardPlusRailEligible(system, styl)}
+		<!-- Najväčšia K koľajnica nemá +1 → checkbox sa skryje. Gate `plusRailEligible`
+		     (styl.ts) — #456 rozšírenie pôvodného `standardPlusRailEligible` (#134)
+		     na Slide/Deluxe/Robust. `pridavnaKolajnicaDefault` (auto-IZO) ostáva Štandard+. -->
+		{#if plusRailEligible(system, styl)}
 			<div class="field">
 				<label class="opt">
 					<input
@@ -344,7 +344,8 @@
 						value="1"
 						bind:checked={pridavnaKolajnicaS}
 					/>
-					Prídavná koľajnica (spodná koľajnica o veľkosť väčšia)
+					Prídavná koľajnica ({SYSTEMY_OBVODOVA.has(system) ? 'koľajnica' : 'spodná koľajnica'} o veľkosť
+					väčšia)
 				</label>
 			</div>
 		{/if}

@@ -82,7 +82,7 @@ export function computeFlat(
 		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * c.barLen)) * 1000) / 10 : 0;
 		// Deluxe + Štandard + = všetko rovný 90°; inak podľa názvu profilu (nosový/oponový 90°)
 		const sikmyRez = !systemRovnyRez(system) && jeSikmyRez(c.nazov);
-		// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +)
+		// prídavná koľajnica: koľajnica o 1 väčšia (#456: Štandard+/Deluxe/Slide/Robust)
 		const up = railUpsize(system, styl, pridavnaKolajnica, c.kod, c.nazov);
 		// sieťka na 2K: celá koľajnica sa mení na 3K variant (#87)
 		const sk = sietkaKolajnicaSwap(cfg, system, styl, sietkaOn, up.kod, up.nazov);
@@ -231,7 +231,7 @@ export interface PosuvSpec {
 	/** #440: per-sklo ABSOLÚTNY override korekcie rozmeru skla (NULL/undefined = systémový
 	 *  `cfg_sys.sklo_offset`). Umožňuje solo korekciu 16 mm vs 6 mm skla v Slide. */
 	skloKorekcia?: number | null;
-	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
+	/** prídavná koľajnica — koľajnica o 1 väčšia (#456: Štandard+/Deluxe/Slide/Robust) */
 	pridavnaKolajnica?: boolean;
 	/** ručne zadaná dĺžka hornej / spodnej koľajnice — MENÍ odpis (Patrik 2026-07-28) */
 	kolajnica?: KolajnicaRucne;
@@ -390,7 +390,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			i + 1
 		);
 		for (const c of cuts) {
-			// prídavná koľajnica: spodná koľajnica o 1 väčšia (len Štandard +) — swap
+			// prídavná koľajnica: koľajnica o 1 väčšia (#456) — swap
 			// PRED poolovaním, aby sa metre pooli pod správnym (väčším) kódom.
 			const up = railUpsize(system, styl, p.pridavnaKolajnica ?? false, c.kod, c.nazov);
 			// sieťka na 2K: celá koľajnica sa mení na 3K variant (#87) — swap PRED

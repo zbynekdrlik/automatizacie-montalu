@@ -10,7 +10,7 @@
 //   Deluxe: zdieľa spodné kódy so Štandard + (ZASP00104→…), gate otvorený
 import { describe, it, expect } from 'vitest';
 import { plusRailEligible } from '../src/lib/styl';
-import { railUpsize, RAIL_UPSIZE } from '../src/lib/server/compute';
+import { railUpsize } from '../src/lib/server/compute';
 
 const SYSTEMY = ['Robust', 'Slide', 'Štandard', 'Štandard +', 'Deluxe'];
 const STYLY = ['2K', '3K', '4K', '5K', '6K', '2x2K', '2x3K', '2x4K'];
@@ -110,7 +110,13 @@ describe('railUpsize — Slide/Deluxe/Robust kódy (#456)', () => {
 	});
 
 	it('Štandard + — existujúce správanie nezmenené', () => {
-		const up = railUpsize('Štandard +', '2K', true, 'ZASP00104', 'Koľajnica spodná 2K Surový 7500 mm');
+		const up = railUpsize(
+			'Štandard +',
+			'2K',
+			true,
+			'ZASP00104',
+			'Koľajnica spodná 2K Surový 7500 mm'
+		);
 		expect(up.kod).toBe('ZASP00030');
 	});
 });
