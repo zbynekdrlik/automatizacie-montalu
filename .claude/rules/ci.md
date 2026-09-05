@@ -269,7 +269,7 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
   - `test.skip(!!process.env.BASE_URL, ...)` — DB-fixture testy (seed lokálnej DB)
     PLUS honest-null cenové testy (#466): prod MÁ reálny Money snapshot → „cena
     neznáma"/„nebol naimportovaný" je preview-only stav. 4 testy: `ceny.spec.ts:23`
-    (bez snapshotu), `ceny.spec.ts:124` (lak honest-null), `pergola-ceny.spec.ts:44`
+    (bez snapshotu), `ceny.spec.ts:129` (lak honest-null), `pergola-ceny.spec.ts:44`
     (PRP honest-null), `sklo-cena.spec.ts:24` (sklo honest-null).
   - `testIgnore` v playwright.config.ts — `error-stranka.spec.ts` (test-only route)
   Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu.
