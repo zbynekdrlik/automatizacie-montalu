@@ -140,3 +140,31 @@ test('#462 clip: „Späť a upraviť zadanie" zachová celé zadanie', async ({
 
 	expect(errs).toEqual([]);
 });
+
+// #464: clip RAL metadata field — fill → assert rendered in badge
+test('#464: clip RAL metadata zobrazí sa v badge', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/clip');
+	await waitHydrated(page);
+
+	// fill header
+	await page.locator('#zak').fill('E2E-CLIP-RAL');
+	await page.locator('#op').fill('OP1');
+	await page.locator('#zakaznik').fill('E2E CLIP RAL');
+
+	// fill RAL
+	await page.locator('#ral').fill('RAL 9005');
+
+	// fill sizes + compute
+	await page.getByTestId('typ').selectOption('izo');
+	await page.getByTestId('variant').selectOption('1');
+	await page.locator('#sirka').fill('3000');
+	await page.locator('#vyska').fill('1000');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+
+	// RAL badge should appear
+	await expect(page.locator('.badge', { hasText: 'RAL: RAL 9005' })).toBeVisible();
+	expect(errs).toEqual([]);
+});

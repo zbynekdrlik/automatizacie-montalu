@@ -76,5 +76,32 @@ test('optimalizátor: kusy sa nezmestia do zadaného počtu tyčí → varovanie
 	await expect(page.getByTestId('varovanie')).toContainText(/nezmest/i);
 	expect(consoleMsgs).toEqual([]);
 });
+// #464: „x" Odobrať riadok tlačidlo
+test('optimalizátor: „x" Odobrať riadok odoberie kus zo zoznamu', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/optimalizator');
+
+	await page.getByLabel('Dĺžka tyče (mm)').fill('6000');
+	await page.getByLabel('Počet tyčí').fill('10');
+	// pridaj 2 riadky (spolu s default = 3)
+	await page.getByRole('button', { name: 'Pridať kus' }).click();
+	await page.getByRole('button', { name: 'Pridať kus' }).click();
+	await expect(page.getByTestId('kus-dlzka')).toHaveCount(3);
+
+	// odobrať posledný riadok
+	const removeButtons = page.getByRole('button', { name: /odobrať/i });
+	await removeButtons.last().click();
+	await expect(page.getByTestId('kus-dlzka')).toHaveCount(2);
+
+	// odobrať ešte jeden
+	await page
+		.getByRole('button', { name: /odobrať/i })
+		.last()
+		.click();
+	await expect(page.getByTestId('kus-dlzka')).toHaveCount(1);
+
+	expect(consoleMsgs).toEqual([]);
+});
 // (b2b neprístupnosť /optimalizator overuje unit drift-guard tests/b2b-route-coverage.test.ts —
 //  autoritatívne cez b2bRedirectTarget; e2e sa sústredí na funkčné vykreslenie stránky)

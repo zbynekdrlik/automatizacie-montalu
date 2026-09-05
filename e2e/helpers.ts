@@ -110,6 +110,29 @@ export async function logout(page: Page) {
 }
 
 /**
+ * #464: Stub `window.print()` — injektuje script PRED navigáciou, ktorý nahradí
+ * `window.print` počítadlom. Volaj PRED `goto`/`loginAs`. Po kliku na print
+ * tlačidlo zavolaj vrátený `assertPrintCalled()` na overenie, že `window.print`
+ * bol volaný aspoň raz.
+ */
+export async function stubWindowPrint(page: Page) {
+	await page.addInitScript(() => {
+		(window as unknown as Record<string, number>).__printCallCount = 0;
+		window.print = () => {
+			(window as unknown as Record<string, number>).__printCallCount++;
+		};
+	});
+	return {
+		async assertPrintCalled() {
+			const count = await page.evaluate(
+				() => (window as unknown as Record<string, number>).__printCallCount
+			);
+			expect(count).toBeGreaterThan(0);
+		}
+	};
+}
+
+/**
  * #338: kovanie RS Robust/Štandard vyžaduje zvolenú RAL farbu — bez nej engine
  * odmietne odpis a náhľad sa nezobrazí. Tento pomocník zvolí farbu, keď je select
  * na obrazovke (Robust/Štandard, aj Deluxe od #354 — jeho 10mm krytky majú tiež

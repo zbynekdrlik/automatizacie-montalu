@@ -114,3 +114,35 @@ test('žiadne "odoslať" (Money) tlačidlo na zákazníckom tlačovom liste', as
 	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #464: „← Späť na návrh" link po úspešnom zachytení
+test('zákaznícky list: „← Späť na návrh" link naviguje späť', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	test.setTimeout(60000);
+	await loginAs(page);
+	await vyplnAOtvorZakaznickyList(page);
+	await pockajNaObrazok(page);
+
+	const backLink = page.getByRole('link', { name: '← Späť na návrh' });
+	await expect(backLink).toBeVisible();
+	await backLink.click();
+	await expect(page).toHaveURL(/\/zasklenia\/navrh$/);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: zákaznícky „návrhovej stránke" link (without prior drawing → jasná správa)
+test('zákaznícky list: „návrhovej stránke" link naviguje na /zasklenia/navrh', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/zasklenia/navrh/zakaznicky');
+	await waitHydrated(page);
+
+	// bez predchádzajúceho vykreslenia — jasná správa
+	await expect(page.getByText('Najprv vykresli zasklenie')).toBeVisible();
+	const link = page.getByRole('link', { name: 'návrhovej stránke' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/zasklenia\/navrh$/);
+	expect(consoleMsgs).toEqual([]);
+});

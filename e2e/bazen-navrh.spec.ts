@@ -336,3 +336,44 @@ test('internal: kachlička „Návrhový výkres" (#423) na /bazen vedie na /baz
 	await expect(page.getByRole('button', { name: /odoslať/i })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #464: bazen navrh metadata fields — revizia/vypracoval/vyplna
+test('#464: bazén navrh metadata → pečiatka (revizia/vypracoval) + vyplna', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/bazen/navrh');
+	await waitHydrated(page);
+
+	// fill minimal form
+	await page.getByLabel('Zatvorená dĺžka (mm) *').fill('4200');
+	await page.getByLabel('Hĺbka (mm) *').fill('1700');
+	await page.getByLabel('Dĺžka koľajiska (mm) *').fill('5500');
+	await page.getByLabel('Výška najvyššej sekcie (mm) *').fill('2400');
+	await page.getByLabel('Výška najnižšej sekcie (mm) *').fill('1900');
+	await page.getByLabel('Počet sekcií *').fill('4');
+	await page.getByLabel('Koľaj', { exact: true }).selectOption('jednokolaj');
+	await page.getByLabel('Smer posuvu').selectOption('vpravo');
+	await page.getByLabel('Smer dverí').selectOption('vlavo');
+	await page.getByLabel('Výška čela (mm) *').fill('200');
+
+	// metadata
+	await page.getByLabel('Revízia').fill('R1');
+	await page.getByLabel('Vypracoval').fill('E2E');
+	// Výplň text
+	const vyplna = page.getByLabel('Výplň');
+	if ((await vyplna.count()) > 0) {
+		await vyplna.fill('Skúšobná výplň');
+	}
+
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('tb-revizia')).toContainText('R1');
+
+	// „➕ Nový výkres" link
+	const link = page.getByRole('link', { name: '➕ Nový výkres' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/bazen\/navrh$/);
+	expect(consoleMsgs).toEqual([]);
+});
