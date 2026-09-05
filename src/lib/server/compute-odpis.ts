@@ -245,8 +245,9 @@ export interface PosuvSpec {
 	kovanieStred?: string;
 	/** ktoré stredové krídlo ju nesie: 'L' ľavé, 'P' pravé */
 	kovanieStredOkno?: 'L' | 'P';
-	/** klín nad posuvom — len na plán/náhľad, do Money odpisu NEJDE */
-	klin?: Klin | null;
+	/** klíny nad posuvom (#472 viac RÔZNYCH naraz) — len na plán/náhľad, do Money
+	 *  odpisu NEJDE */
+	kliny?: Klin[];
 	/** sieťka na posuve (#86–#90) — len na plán/náhľad, do Money odpisu NEJDE */
 	sietka?: Sietka | null;
 }
@@ -312,7 +313,8 @@ export interface PosuvInfo {
 	kovanieP?: string;
 	kovanieStred?: string;
 	kovanieStredOkno?: 'L' | 'P';
-	klin?: Klin | null;
+	/** klíny nad posuvom (#472 viac RÔZNYCH naraz) */
+	kliny?: Klin[];
 	/** ručne zadané dĺžky koľajníc tohto posuvu — na plán/tlač (výpočet ich už použil) */
 	kolajnica?: KolajnicaRucne | null;
 	/** sieťka tohto posuvu (#86–#90) — na plán/tlač, do Money odpisu NEJDE */
@@ -436,7 +438,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			kovanieP: p.kovanieP,
 			kovanieStred: p.kovanieStred,
 			kovanieStredOkno: p.kovanieStredOkno,
-			klin: p.klin ?? null,
+			kliny: p.kliny ?? [],
 			kolajnica: p.kolajnica ?? null,
 			sietka: p.sietka ?? null
 		});

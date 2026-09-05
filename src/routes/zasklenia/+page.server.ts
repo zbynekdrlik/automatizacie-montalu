@@ -104,8 +104,8 @@ function jobFor(
 			kovanieStredOkno: vstup.kovanieStredOkno,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
-			// klín — len záznam do histórie/plánu, do Money položiek nejde
-			klin: vstup.klin,
+			// klíny (#472 viac naraz) — len záznam do histórie/plánu, do Money položiek nejde
+			kliny: vstup.kliny,
 			// sieťka (#86–#90) — len záznam do histórie/plánu, do Money položiek nejde
 			sietka: vstup.sietka,
 			// ručne zadané koľajnice — MENIA odpis, preto do histórie (audit prečo
@@ -237,7 +237,7 @@ function compute(vstup: Vstup): {
 		kovanieP: undefined,
 		kovanieStred: undefined,
 		kovanieStredOkno: undefined,
-		klin: undefined
+		kliny: undefined
 	});
 	const out = safeCompute(
 		cfg,
@@ -286,7 +286,7 @@ function computeMultiFrom(vstup: MultiVstup) {
 				kovanieP: p.kovanieP,
 				kovanieStred: p.kovanieStred,
 				kovanieStredOkno: p.kovanieStredOkno,
-				klin: p.klin,
+				kliny: p.kliny,
 				// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
 				pridavnaKolajnica: vstup.pridavnaKolajnica,
 				// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
@@ -339,7 +339,7 @@ function jobForMulti(
 				kovanieP: vstup.posuvy[i]?.kovanieP,
 				kovanieStred: vstup.posuvy[i]?.kovanieStred,
 				kovanieStredOkno: vstup.posuvy[i]?.kovanieStredOkno,
-				klin: vstup.posuvy[i]?.klin ?? null,
+				kliny: vstup.posuvy[i]?.kliny ?? [],
 				kolajnica: vstup.posuvy[i]?.kolajnica ?? null,
 				sietka: vstup.posuvy[i]?.sietka ?? null
 			})),

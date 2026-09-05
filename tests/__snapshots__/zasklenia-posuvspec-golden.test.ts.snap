@@ -502,7 +502,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "caka": false,
     "farbaKovania": "R7016",
     "jednostrannaFab": false,
-    "klin": null,
+    "kliny": [],
     "kolajnica": {
       "horna": 2690,
       "spodna": 2695,
@@ -1160,13 +1160,15 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "caka": false,
     "farbaKovania": "R9005",
     "jednostrannaFab": false,
-    "klin": {
-      "dlzka": 4645,
-      "ks": 2,
-      "sirka": 250,
-      "v1": 120,
-      "v2": 0,
-    },
+    "kliny": [
+      {
+        "dlzka": 4645,
+        "ks": 2,
+        "sirka": 250,
+        "v1": 120,
+        "v2": 0,
+      },
+    ],
     "kolajnica": null,
     "kovanieL": "Obojstranná kľučka s FAB",
     "kovanieP": "Obojstranná kľučka s FAB",
@@ -1907,7 +1909,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "caka": false,
     "farbaKovania": "R9005",
     "jednostrannaFab": true,
-    "klin": null,
+    "kliny": [],
     "kolajnica": null,
     "kovanieL": "",
     "kovanieP": "",
@@ -2657,7 +2659,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "caka": false,
     "farbaKovania": "R7016",
     "jednostrannaFab": false,
-    "klin": null,
+    "kliny": [],
     "kolajnica": null,
     "kovanieL": "",
     "kovanieP": "",
@@ -3182,7 +3184,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "caka": false,
     "farbaKovania": "R9005",
     "jednostrannaFab": false,
-    "klin": null,
+    "kliny": [],
     "kolajnica": null,
     "kovanieL": "",
     "kovanieP": "",
@@ -3973,7 +3975,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "caka": false,
     "farbaKovania": "R9005",
     "jednostrannaFab": false,
-    "klin": null,
+    "kliny": [],
     "kolajnica": {
       "horna": 2690,
       "spodna": 2695,
@@ -5232,13 +5234,15 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "N": 2,
         "S": 4645,
         "V": 2320,
-        "klin": {
-          "dlzka": 4645,
-          "ks": 2,
-          "sirka": 250,
-          "v1": 120,
-          "v2": 0,
-        },
+        "kliny": [
+          {
+            "dlzka": 4645,
+            "ks": 2,
+            "sirka": 250,
+            "v1": 120,
+            "v2": 0,
+          },
+        ],
         "kolajnica": null,
         "kovanieL": "Obojstranná kľučka s FAB",
         "kovanieP": "Obojstranná kľučka s FAB",
@@ -5262,7 +5266,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "N": 3,
         "S": 3600,
         "V": 2100,
-        "klin": null,
+        "kliny": [],
         "kolajnica": null,
         "kovanieL": "",
         "kovanieP": "",
@@ -5291,13 +5295,15 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "op": "01",
     "posuvy": [
       {
-        "klin": {
-          "dlzka": 4645,
-          "ks": 2,
-          "sirka": 250,
-          "v1": 120,
-          "v2": 0,
-        },
+        "kliny": [
+          {
+            "dlzka": 4645,
+            "ks": 2,
+            "sirka": 250,
+            "v1": 120,
+            "v2": 0,
+          },
+        ],
         "kolajnica": null,
         "kovanieL": "Obojstranná kľučka s FAB",
         "kovanieP": "Obojstranná kľučka s FAB",
@@ -5314,7 +5320,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "v": 2320,
       },
       {
-        "klin": null,
+        "kliny": [],
         "kolajnica": null,
         "kovanieL": "",
         "kovanieP": "",
@@ -7165,7 +7171,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "N": 3,
         "S": 4200,
         "V": 2250,
-        "klin": null,
+        "kliny": [],
         "kolajnica": {
           "horna": 2690,
           "spodna": 2695,
@@ -7190,7 +7196,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "N": 4,
         "S": 4800,
         "V": 2100,
-        "klin": null,
+        "kliny": [],
         "kolajnica": {
           "horna": 2690,
           "spodna": 2695,
@@ -7218,7 +7224,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "N": 4,
         "S": 5200,
         "V": 2200,
-        "klin": null,
+        "kliny": [],
         "kolajnica": null,
         "kovanieL": "",
         "kovanieP": "",
@@ -7245,7 +7251,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "op": "01",
     "posuvy": [
       {
-        "klin": null,
+        "kliny": [],
         "kolajnica": {
           "horna": 2690,
           "spodna": 2695,
@@ -7263,7 +7269,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "v": 2250,
       },
       {
-        "klin": null,
+        "kliny": [],
         "kolajnica": {
           "horna": 2690,
           "spodna": 2695,
@@ -7284,7 +7290,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "v": 2100,
       },
       {
-        "klin": null,
+        "kliny": [],
         "kolajnica": null,
         "kovanieL": "",
         "kovanieP": "",

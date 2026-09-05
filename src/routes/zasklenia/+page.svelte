@@ -11,7 +11,7 @@
 	} from '$lib/styl';
 	import { popisMulti } from '$lib/popis';
 	import { nazovSystemu } from '$lib/system-nazvy';
-	import { type Klin } from '$lib/klin';
+	import { type Klin, type KlinVstup } from '$lib/klin';
 	import { type Farba } from '$lib/komponenty';
 	import { maSietkaSystem, sietkaStrana, type Sietka, type SietkaUchyt } from '$lib/sietka';
 	import { resolve } from '$app/paths';
@@ -62,7 +62,7 @@
 			jednostrannaFab: zd?.jednostrannaFab ?? false,
 			// RAL farba kovania (#338) — vyberá Money kód farebného variantu
 			farbaKovania: (zd?.farbaKovania ?? null) as Farba | null,
-			klin: (fv?.klin ?? null) as Klin | null,
+			kliny: (fv?.kliny ?? []) as Klin[],
 			// ručné dĺžky koľajníc — MENIA odpis; null = počítané zo šírky
 			kolajnica: (fv?.kolajnica ?? null) as { horna?: number; spodna?: number } | null,
 			// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide jednom behu krídel
@@ -134,13 +134,8 @@
 	let sirka = $state<number | string>('');
 	let vyska = $state<number | string>('');
 	let vrtanieZamkuS = $state<number | string>(1050);
-	// klín primárneho posuvu (Patrik 2026-07-27) — display-only, do Money nejde
-	let klinS = $state(false);
-	let klinDlzkaS = $state<number | string>('');
-	let klinSirkaS = $state<number | string>('');
-	let klinV1S = $state<number | string>('');
-	let klinV2S = $state<number | string>('');
-	let klinKsS = $state<number | string>(1);
+	// klíny primárneho posuvu (Patrik 2026-07-27, MULTI #472) — display-only, do Money nejde
+	let klinyS = $state<KlinVstup[]>([]);
 	// sieťka primárneho posuvu (#86–#90, KOREKCIA 2026-08-02) — rozmer sa už nezadáva
 	let sietkaS = $state(false);
 	let sietkaUchytS = $state<SietkaUchyt>('ziadny');
@@ -164,13 +159,7 @@
 		jednostrannaFabS = zd?.jednostrannaFab ?? false;
 		// stará objednávka spred farby → '' → obsluha musí farbu znova zvoliť (#338)
 		farbaKovaniaS = zd?.farbaKovania ?? '';
-		const kl = (fv?.klin ?? null) as Klin | null;
-		klinS = !!kl;
-		klinDlzkaS = kl?.dlzka ?? '';
-		klinSirkaS = kl?.sirka ?? '';
-		klinV1S = kl?.v1 ?? '';
-		klinV2S = kl?.v2 ?? '';
-		klinKsS = kl?.ks ?? 1;
+		klinyS = ((fv?.kliny ?? []) as Klin[]).map((k) => ({ ...k }));
 		const sk = (fv?.sietka ?? null) as Sietka | null;
 		sietkaS = !!sk;
 		sietkaUchytS = sk?.uchyt ?? 'ziadny';
@@ -202,12 +191,7 @@
 			...x,
 			kovanieStred: x.kovanieStred ?? '',
 			kovanieStredOkno: (x.kovanieStredOkno ?? 'L') as 'L' | 'P',
-			klin: !!x.klin,
-			klinDlzka: x.klin?.dlzka ?? '',
-			klinSirka: x.klin?.sirka ?? '',
-			klinV1: x.klin?.v1 ?? '',
-			klinV2: x.klin?.v2 ?? '',
-			klinKs: x.klin?.ks ?? 1,
+			kliny: (x.kliny ?? []).map((k) => ({ ...k })),
 			kolajnicaHorna: x.kolajnica?.horna ?? '',
 			kolajnicaSpodna: x.kolajnica?.spodna ?? '',
 			sietka: !!x.sietka,
@@ -359,12 +343,7 @@
 				kovanieP: kovaniePS,
 				kovanieStred: kovanieStredS,
 				kovanieStredOkno: kovanieStredOknoS,
-				klin: klinS ? '1' : '',
-				klinDlzka: klinDlzkaS,
-				klinSirka: klinSirkaS,
-				klinV1: klinV1S,
-				klinV2: klinV2S,
-				klinKs: klinKsS,
+				kliny: klinyS,
 				kolajnicaHorna: kolHS,
 				kolajnicaSpodna: kolSS,
 				sietka: sietkaS ? '1' : '',
@@ -382,12 +361,7 @@
 				kovanieP: p.kovanieP,
 				kovanieStred: p.kovanieStred,
 				kovanieStredOkno: p.kovanieStredOkno,
-				klin: p.klin ? '1' : '',
-				klinDlzka: p.klinDlzka,
-				klinSirka: p.klinSirka,
-				klinV1: p.klinV1,
-				klinV2: p.klinV2,
-				klinKs: p.klinKs,
+				kliny: p.kliny,
 				kolajnicaHorna: p.kolajnicaHorna,
 				kolajnicaSpodna: p.kolajnicaSpodna,
 				sietka: p.sietka ? '1' : '',
@@ -434,12 +408,7 @@
 				kovanieP: kovaniePS,
 				kovanieStred: '',
 				kovanieStredOkno: 'L',
-				klin: false,
-				klinDlzka: '',
-				klinSirka: '',
-				klinV1: '',
-				klinV2: '',
-				klinKs: 1,
+				kliny: [],
 				kolajnicaHorna: '',
 				kolajnicaSpodna: '',
 				sietka: false,
@@ -543,13 +512,8 @@
 	{#if vstup.kolajnica?.spodna}
 		<input type="hidden" name="kolajnicaSpodna" value={vstup.kolajnica.spodna} />
 	{/if}
-	{#if vstup.klin}
-		<input type="hidden" name="klin" value="1" />
-		<input type="hidden" name="klinDlzka" value={vstup.klin.dlzka} />
-		<input type="hidden" name="klinSirka" value={vstup.klin.sirka} />
-		<input type="hidden" name="klinV1" value={vstup.klin.v1} />
-		<input type="hidden" name="klinV2" value={vstup.klin.v2} />
-		<input type="hidden" name="klinKs" value={vstup.klin.ks} />
+	{#if vstup.kliny.length}
+		<input type="hidden" name="kliny" value={JSON.stringify(vstup.kliny)} />
 	{/if}
 	{#if vstup.sietka}
 		<input type="hidden" name="sietka" value="1" />
@@ -635,12 +599,7 @@
 		bind:farbaKovaniaS
 		bind:kolHS
 		bind:kolSS
-		bind:klinS
-		bind:klinDlzkaS
-		bind:klinSirkaS
-		bind:klinV1S
-		bind:klinV2S
-		bind:klinKsS
+		bind:klinyS
 		bind:sietkaS
 		bind:sietkaUchytS
 		bind:sietkaSystemS

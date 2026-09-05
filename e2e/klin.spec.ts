@@ -149,6 +149,72 @@ test('klín prežije „← Späť a upraviť" (vrátane počtu kusov)', async (
 	expect(errs).toEqual([]);
 });
 
+test('#472: jeden posuv môže mať DVA RÔZNE kliny naraz — obaja v náhľade aj v karte, Money odpis nezmenený', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	// (1) referenčný odpis BEZ klina
+	await zaklad(page, 'E2E-KLIN-MULTI', 'E2E Klin multi-riadok');
+	await vyberFarbuKovania(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	const bezKlina = await odpisRiadky(page);
+	expect(bezKlina.length).toBeGreaterThan(0);
+
+	// (2) to isté zadanie s DVOMA rôznymi klinmi na tom istom posuve
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await page.locator('#klin-on').check();
+	await page.locator('#klin-dlzka').fill('3000');
+	await page.locator('#klin-sirka').fill('80');
+	await page.locator('#klin-v1').fill('20');
+	await page.locator('#klin-v2').fill('0');
+	await page.locator('#klin-ks').fill('1');
+
+	await page.getByRole('button', { name: '+ Pridať ďalší klín' }).click();
+	await page.locator('#klin-dlzka-1').fill('1500');
+	await page.locator('#klin-sirka-1').fill('60');
+	await page.locator('#klin-v1-1').fill('15');
+	await page.locator('#klin-v2-1').fill('5');
+	await page.locator('#klin-ks-1').fill('2');
+
+	await vyberFarbuKovania(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// OBA kliny v náhľade — pôvodný testid `nahlad-klin` (riadok 0) + `nahlad-klin-1`
+	await expect(page.getByTestId('nahlad-klin')).toContainText('3000');
+	await expect(page.getByTestId('nahlad-klin-1')).toBeVisible();
+	await expect(page.getByTestId('nahlad-klin-1')).toContainText('1500');
+
+	// OBA kliny v karte plánu, s nadpisom „Klín 1"/„Klín 2" (viac než 1 klín)
+	const karta = page.getByTestId('klin-karta');
+	await expect(karta).toContainText('Klíny');
+	await expect(karta).toContainText('Klín 1');
+	await expect(karta).toContainText('Klín 2');
+	await expect(karta).toContainText('3000 mm');
+	await expect(karta).toContainText('1500 mm');
+
+	// MONEY-NEUTRALITA: ani druhý klín nezmení odpisové riadky
+	expect(await odpisRiadky(page)).toEqual(bezKlina);
+
+	// prežije „← Späť a upraviť" — OBIDVA riadky
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	await expect(page.locator('#klin-dlzka')).toHaveValue('3000');
+	await expect(page.locator('#klin-dlzka-1')).toHaveValue('1500');
+	await expect(page.locator('#klin-ks-1')).toHaveValue('2');
+
+	// odobratie druhého riadku vráti appku na presne 1 klín
+	await page.getByRole('button', { name: '✕ Odobrať tento klín' }).last().click();
+	await expect(page.locator('#klin-dlzka-1')).toHaveCount(0);
+	await expect(page.locator('#klin-dlzka')).toHaveValue('3000');
+
+	expect(errs).toEqual([]);
+});
+
 test('viac posuvov: klín má len ten posuv, ktorý ho má zapnutý', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);

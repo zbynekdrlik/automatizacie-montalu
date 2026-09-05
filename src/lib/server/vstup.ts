@@ -1,6 +1,6 @@
 // Parsovanie a serverová validácia vstupu zasklenia formulára — jediný
 // serverový strážca rozsahov (HTML5 min/max vie skriptovaný POST obísť).
-import { KLIN_MAX_KS, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
+import { KLIN_MAX_KS, KLIN_MAX_POCET, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 // Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
@@ -103,6 +103,59 @@ export function parseKlin(raw: KlinRaw): { klin: Klin | null; error: string | nu
 	else if (!(klin.ks >= 1 && klin.ks <= KLIN_MAX_KS))
 		error = `Klín: počet kusov musí byť 1–${KLIN_MAX_KS}.`;
 	return { klin, error };
+}
+
+/**
+ * Rozbalí SUROVÉ pole klinov posuvu (#472 — viac RÔZNYCH klinov naraz). `kliny` je
+ * buď už pole objektov (round-trip cez `posuvy` JSON — server sám naposielal presne
+ * TENTO tvar naspäť) alebo JSON reťazec (hidden input z KlinPolia). Keď chýba/je
+ * neplatné, spadne na STARÝ jednoklinový tvar (`legacy`, viď `klinRaw`) — spätná
+ * kompatibilita pre historické záznamy („Použiť znova" z DB pred #472) aj prípadný
+ * starý klient, ktorý ešte plochý formulár posiela.
+ */
+function rozbalKliny(kliny: unknown, legacy: KlinRaw): unknown[] {
+	if (Array.isArray(kliny)) return kliny;
+	if (typeof kliny === 'string' && kliny) {
+		try {
+			const parsed: unknown = JSON.parse(kliny);
+			if (Array.isArray(parsed)) return parsed;
+		} catch {
+			// padne na legacy tvar nižšie
+		}
+	}
+	const on = legacy.on === '1' || legacy.on === true || legacy.on === 'true';
+	return on ? [legacy] : [];
+}
+
+/**
+ * Naparsuje POLE klinov (#472) — každý riadok tou istou validáciou ako `parseKlin`.
+ * Prázdne pole = žiadny klín (nahradzuje pôvodné `null`). Chyba PRVÉHO neplatného
+ * riadku zastaví celý parse (rovnaká „radšej žiadny odpis než polovičný" disciplína
+ * ako pri jednom kline) — pri viac než jednom kline sa hláška opýta poradovým číslom.
+ */
+export function parseKliny(rawArr: unknown[]): { kliny: Klin[]; error: string | null } {
+	if (rawArr.length > KLIN_MAX_POCET)
+		return { kliny: [], error: `Klín: priveľa klinov na posuv (max ${KLIN_MAX_POCET}).` };
+	const kliny: Klin[] = [];
+	for (let i = 0; i < rawArr.length; i++) {
+		const o = (rawArr[i] ?? {}) as Record<string, unknown>;
+		const { klin, error } = parseKlin({
+			on: '1',
+			dlzka: o.dlzka,
+			sirka: o.sirka,
+			v1: o.v1,
+			v2: o.v2,
+			ks: o.ks
+		});
+		if (error) {
+			return {
+				kliny: [],
+				error: rawArr.length > 1 ? `Klín ${i + 1} — ${error.replace(/^Klín: /, '')}` : error
+			};
+		}
+		if (klin) kliny.push(klin);
+	}
+	return { kliny, error: null };
 }
 
 /** Surové polia sieťky — z plochého formulára aj z JSON riadku posuvu (multi).
@@ -274,8 +327,9 @@ export interface Vstup {
 	 *  odpisu (kľučka/krytka vložky, Štandard zámok). null = nezvolená → engine
 	 *  vyhlási chybu, keď systém má farebnú položku (#338). */
 	farbaKovania: Farba | null;
-	/** klín nad posuvom (Patrik) — display-only, do Money odpisu NEJDE; null = žiadny */
-	klin: Klin | null;
+	/** klíny nad posuvom (Patrik, #472 viac RÔZNYCH naraz) — display-only, do Money
+	 *  odpisu NEJDE; prázdne pole = žiadny */
+	kliny: Klin[];
 	/** ručne zadané dĺžky koľajníc — MENÍ Money odpis; null = počítaj zo šírky */
 	kolajnica: KolajnicaRucne | null;
 	/** sieťka na posuve (#86–#90) — display-only, do Money odpisu NEJDE; null = žiadna */
@@ -325,13 +379,13 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		pridavnaKolajnica: form.get('pridavnaKolajnica') === '1',
 		jednostrannaFab: form.get('jednostrannaFab') === '1',
 		farbaKovania: parseFarba(form.get('farbaKovania')),
-		klin: null,
+		kliny: [],
 		kolajnica: null,
 		sietka: null
 	};
 	const kol = parseKolajnica(form.get('kolajnicaHorna'), form.get('kolajnicaSpodna'));
 	vstup.kolajnica = kol.kolajnica;
-	const k = parseKlin({
+	const kRaw = rozbalKliny(form.get('kliny'), {
 		on: form.get('klin'),
 		dlzka: form.get('klinDlzka'),
 		sirka: form.get('klinSirka'),
@@ -339,7 +393,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		v2: form.get('klinV2'),
 		ks: form.get('klinKs')
 	});
-	vstup.klin = k.klin;
+	const k = parseKliny(kRaw);
+	vstup.kliny = k.kliny;
 	const sk = parseSietka({
 		on: form.get('sietka'),
 		uchyt: form.get('sietkaUchyt'),
@@ -381,8 +436,9 @@ export interface PosuvVstup {
 	kovanieStred: string;
 	/** ktoré stredové krídlo ju nesie: 'L' ľavé, 'P' pravé */
 	kovanieStredOkno: 'L' | 'P';
-	/** klín nad TÝMTO posuvom — display-only, do Money odpisu NEJDE; null = žiadny */
-	klin: Klin | null;
+	/** klíny nad TÝMTO posuvom (#472 viac RÔZNYCH naraz) — display-only, do Money
+	 *  odpisu NEJDE; prázdne pole = žiadny */
+	kliny: Klin[];
 	/** ručné dĺžky koľajníc TOHOTO posuvu — MENÍ Money odpis; null = zo šírky */
 	kolajnica: KolajnicaRucne | null;
 	/** sieťka TOHOTO posuvu (#86–#90) — display-only, do Money odpisu NEJDE; null = žiadna */
@@ -445,7 +501,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			const p = (posuvyRaw[i] ?? {}) as Record<string, unknown>;
 			const s = parseFloat(String(p.s ?? '').replace(',', '.'));
 			const v = parseFloat(String(p.v ?? '').replace(',', '.'));
-			const k = parseKlin(klinRaw(p));
+			const k = parseKliny(rozbalKliny(p.kliny, klinRaw(p)));
 			const kol = parseKolajnica(...kolajnicaRaw(p));
 			const sk = parseSietka(sietkaRaw(p));
 			const posuvSystem = String(p.system ?? '').trim();
@@ -460,7 +516,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				kovanieP: sanitizeKovanie(posuvSystem, p.kovanieP),
 				kovanieStred: '',
 				kovanieStredOkno: sanitizeStredOkno(p.kovanieStredOkno),
-				klin: k.klin,
+				kliny: k.kliny,
 				kolajnica: kol.kolajnica,
 				sietka: sanitizeSietka(posuvSystem, sk.sietka)
 			};
