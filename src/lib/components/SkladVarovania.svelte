@@ -62,8 +62,10 @@
 				<b>Money pri chýbajúcom materiáli TICHO ZAHODÍ CELÝ odpis</b>
 				{#if varovania.length === 1}
 					— 1 položka má nedostatočný sklad
-				{:else}
+				{:else if varovania.length >= 2 && varovania.length <= 4}
 					— {varovania.length} položky majú nedostatočný sklad
+				{:else}
+					— {varovania.length} položiek má nedostatočný sklad
 				{/if}
 				<span class="sklad-blok-datum">(sklad k {fmtDatum(snapshotDatum)})</span>
 			</div>
