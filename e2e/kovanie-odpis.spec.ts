@@ -108,7 +108,7 @@ test('zimná záhrada: kusy sa sčítajú za oba posuvy', async ({ page }) => {
 	await zaklad(page, '05');
 	await page.getByLabel('Systém').selectOption('Robust');
 	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('3500');
 	await page.locator('#ps0-v').fill('2100');
 	await vyberFarbuKovania(page);
@@ -187,7 +187,7 @@ test('mixed objednávka Deluxe + Robust posuv: FAB sa vráti (order-level únia)
 	// pridaj ďalší posuv a nastav ho na Robust → FAB sa MUSÍ zobraziť. `maFab` je únia
 	// naprieč posuvmi (ako `maFarbu`): inak by mixed objednávka o FAB pre Robust posuv
 	// prišla — presne tá regresia, ktorej sa únia bráni (nie primary-only gate).
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-sys').selectOption('Robust');
 	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(1);
 

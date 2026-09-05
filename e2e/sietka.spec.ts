@@ -171,7 +171,7 @@ test('viac posuvov: sieťka má len ten posuv, ktorý ju má zapnutú', async ({
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-M', 'E2E Sietka multi');
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await page.locator('#ps0-s').fill('4365');
 	await page.locator('#ps0-v').fill('2320');
 	// sieťka len na DRUHOM posuve (primárny ostáva bez nej)
@@ -182,8 +182,8 @@ test('viac posuvov: sieťka má len ten posuv, ktorý ju má zapnutú', async ({
 
 	await expect(page.getByTestId('nahlad-sietka')).toHaveCount(1);
 	const karta = page.getByTestId('sietka-karta-multi');
-	await expect(karta).toContainText('Posuv 2');
-	await expect(karta).not.toContainText('Posuv 1 ');
+	await expect(karta).toContainText('Zasklenie 2');
+	await expect(karta).not.toContainText('Zasklenie 1 ');
 
 	expect(errs).toEqual([]);
 });

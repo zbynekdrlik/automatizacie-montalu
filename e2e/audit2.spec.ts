@@ -46,7 +46,7 @@ test('#13 extra posuv: zmena jeho systému snapne jeho štýl/sklo/otváranie (p
 
 	await page.selectOption('#system', 'Robust');
 	await page.selectOption('#styl', '2x4K');
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 
 	// nový posuv sa naklonuje z primárneho → Robust 2x4K
 	await expect(page.locator('#ps0-sys')).toHaveValue('Robust');
