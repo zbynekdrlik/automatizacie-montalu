@@ -104,3 +104,55 @@ test('tienenie: XLIGHT ovládanie (Ručné) → ZIPLINE (Výška, motorické-onl
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('tienenie: farba select + stepper +/− KLIKNUTIE + default XLINE tam-späť + scroll-CTA, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/tienenie');
+
+	// farba select
+	const farbaSelect = page.getByTestId('tienenie-farba');
+	await expect(farbaSelect).toBeVisible();
+	const farbaOpts = await farbaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(farbaOpts.length).toBeGreaterThan(1);
+	await farbaSelect.selectOption(farbaOpts[1]!);
+	await expect(farbaSelect).toHaveValue(farbaOpts[1]!);
+
+	// stepper +/− KLIK (doteraz len visibility, nikdy kliknuté) — šírka
+	const sirkaInput = page.getByTestId('tienenie-sirka');
+	const initialSirka = await sirkaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť šírku' }).click();
+	const afterIncSirka = await sirkaInput.inputValue();
+	expect(afterIncSirka).not.toBe(initialSirka);
+	await page.getByRole('button', { name: 'Zmenšiť šírku' }).click();
+	await expect(sirkaInput).toHaveValue(initialSirka);
+
+	// výsun/výška stepper (adaptívny label podľa modelu — XLINE default = „Výsun")
+	const vysunBtn = page.getByRole('button', { name: /Zväčšiť (výsun|výšku)/ });
+	const zmenBtn = page.getByRole('button', { name: /Zmenšiť (výsun|výšku)/ });
+	const rozmer2Input = page.getByTestId('tienenie-rozmer2');
+	const initialRozmer2 = await rozmer2Input.inputValue();
+	await vysunBtn.click();
+	const afterIncRozmer2 = await rozmer2Input.inputValue();
+	expect(afterIncRozmer2).not.toBe(initialRozmer2);
+	await zmenBtn.click();
+	await expect(rozmer2Input).toHaveValue(initialRozmer2);
+
+	// default XLINE tam-späť (PARTIAL requirement #463)
+	await page.getByTestId('tienenie-model-XLIGHT').click();
+	await expect(page.getByTestId('tienenie-model-XLIGHT')).toHaveAttribute('aria-pressed', 'true');
+	await page.getByTestId('tienenie-model-XLINE').click();
+	await expect(page.getByTestId('tienenie-model-XLINE')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('tienenie-model-XLIGHT')).toHaveAttribute('aria-pressed', 'false');
+
+	// scroll-CTA „Nezáväzný dopyt →"
+	const scrollCta = page.getByText(/Nezáväzný dopyt/).first();
+	await expect(scrollCta).toBeVisible();
+	await scrollCta.click();
+	await expect(page.getByTestId('dopyt')).toBeInViewport();
+
+	expect(consoleMsgs).toEqual([]);
+});

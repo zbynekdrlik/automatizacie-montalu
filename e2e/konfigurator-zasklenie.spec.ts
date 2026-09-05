@@ -99,3 +99,70 @@ test('zasklenie konfigurátor: zmena modelu + rozmeru → súhrn sa aktualizuje 
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('zasklenie: model DELUX + default ROBUST tam-späť + farba + krídla + výplň selecty + stepper +/− + scroll-CTA, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/zasklenie');
+
+	// model DELUX — klikni, over aria-pressed
+	await page.getByTestId('zasklenie-model-DELUX').click();
+	await expect(page.getByTestId('zasklenie-model-DELUX')).toHaveAttribute('aria-pressed', 'true');
+
+	// default ROBUST tam-späť (PARTIAL requirement #463)
+	await page.getByTestId('zasklenie-model-ROBUST').click();
+	await expect(page.getByTestId('zasklenie-model-ROBUST')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('zasklenie-model-DELUX')).toHaveAttribute('aria-pressed', 'false');
+
+	// farba select
+	const farbaSelect = page.getByTestId('zasklenie-farba');
+	await expect(farbaSelect).toBeVisible();
+	const farbaOpts = await farbaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(farbaOpts.length).toBeGreaterThan(1);
+	await farbaSelect.selectOption(farbaOpts[1]!);
+	await expect(farbaSelect).toHaveValue(farbaOpts[1]!);
+
+	// krídla select
+	const kridlaSelect = page.getByTestId('zasklenie-kridla');
+	await expect(kridlaSelect).toBeVisible();
+	const kridlaOpts = await kridlaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(kridlaOpts.length).toBeGreaterThan(0);
+	if (kridlaOpts.length > 1) {
+		await kridlaSelect.selectOption(kridlaOpts[1]!);
+		await expect(kridlaSelect).toHaveValue(kridlaOpts[1]!);
+	}
+
+	// výplň select
+	const vyplnSelect = page.getByTestId('zasklenie-vypln');
+	await expect(vyplnSelect).toBeVisible();
+	const vyplnOpts = await vyplnSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(vyplnOpts.length).toBeGreaterThan(0);
+	if (vyplnOpts.length > 1) {
+		await vyplnSelect.selectOption(vyplnOpts[1]!);
+		await expect(vyplnSelect).toHaveValue(vyplnOpts[1]!);
+	}
+
+	// stepper výška +/−
+	const vyskaInput = page.getByTestId('zasklenie-vyska');
+	const initialVyska = await vyskaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť výšku' }).click();
+	const afterIncVyska = await vyskaInput.inputValue();
+	expect(afterIncVyska).not.toBe(initialVyska);
+	await page.getByRole('button', { name: 'Zmenšiť výšku' }).click();
+	await expect(vyskaInput).toHaveValue(initialVyska);
+
+	// scroll-CTA „Nezáväzný dopyt →"
+	const scrollCta = page.getByText(/Nezáväzný dopyt/).first();
+	await expect(scrollCta).toBeVisible();
+	await scrollCta.click();
+	await expect(page.getByTestId('dopyt')).toBeInViewport();
+
+	expect(consoleMsgs).toEqual([]);
+});

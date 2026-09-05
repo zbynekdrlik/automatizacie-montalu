@@ -273,3 +273,106 @@ test('bazén obálka (#427): cenníkový rozsah per-model + „mimo rozsah" hlá
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('bazén: farba select + koľaj tlačidlá + výška stepper + default Premier tam-späť, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await bazenReady(page);
+
+	// farba select — vyber nedefaultnú RAL hodnotu
+	const farbaSelect = page.getByTestId('bazen-farba');
+	await expect(farbaSelect).toBeVisible();
+	const farbaOpts = await farbaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(farbaOpts.length).toBeGreaterThan(1);
+	await farbaSelect.selectOption(farbaOpts[1]!);
+	await expect(farbaSelect).toHaveValue(farbaOpts[1]!);
+
+	// koľaj tlačidlá — klikni prvé dostupné, over aria-pressed
+	const kolajBtns = page.locator('[data-testid^="bazen-kolaj-"]');
+	const kolajCount = await kolajBtns.count();
+	expect(kolajCount).toBeGreaterThan(0);
+	if (kolajCount > 1) {
+		// klikni druhé (nedefaultné)
+		await kolajBtns.nth(1).click();
+		await expect(kolajBtns.nth(1)).toHaveAttribute('aria-pressed', 'true');
+		await expect(kolajBtns.nth(0)).toHaveAttribute('aria-pressed', 'false');
+		// vráť na prvé
+		await kolajBtns.nth(0).click();
+		await expect(kolajBtns.nth(0)).toHaveAttribute('aria-pressed', 'true');
+	}
+
+	// výška stepper: prečítaj, klikni +, over zmenu, klikni −, over návrat
+	const vyskaInput = page.getByTestId('bazen-vyska');
+	await expect(vyskaInput).toBeVisible();
+	const initialVyska = await vyskaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť výšku' }).click();
+	const afterIncVyska = await vyskaInput.inputValue();
+	expect(afterIncVyska).not.toBe(initialVyska);
+	await page.getByRole('button', { name: 'Zmenšiť výšku' }).click();
+	await expect(vyskaInput).toHaveValue(initialVyska);
+
+	// default model Premier tam-späť (PARTIAL requirement #463)
+	const premierBtn = page.getByTestId('bazen-model-Premier');
+	if ((await premierBtn.count()) > 0) {
+		await page.getByTestId('bazen-model-Star').click();
+		await expect(page.getByTestId('bazen-model-Star')).toHaveAttribute('aria-pressed', 'true');
+		await premierBtn.click();
+		await expect(premierBtn).toHaveAttribute('aria-pressed', 'true');
+	}
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('bazén: stepper dĺžka +/− + scroll-CTA + dotyk-overlay klik (ne-pergola = button dismiss), nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await bazenReady(page);
+
+	// stepper dĺžka +/− (bazén má dĺžku, nie hĺbku)
+	const dlzkaInput = page.getByTestId('bazen-dlzka');
+	const initialDlzka = await dlzkaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť dĺžku' }).click();
+	const afterIncDlzka = await dlzkaInput.inputValue();
+	expect(afterIncDlzka).not.toBe(initialDlzka);
+	await page.getByRole('button', { name: 'Zmenšiť dĺžku' }).click();
+	await expect(dlzkaInput).toHaveValue(initialDlzka);
+
+	// vizual3d-dotyk-overlay klikacie tlačidlo (ne-pergola scéna = zobrazDom false →
+	// overlay je <button>, nie neinteraktívny div) — klikni, over že zmizne
+	const dotykoverlej = page.getByTestId('vizual3d-dotyk-overlay');
+	if ((await dotykoverlej.count()) > 0 && (await dotykoverlej.isVisible())) {
+		await dotykoverlej.click();
+		await expect(dotykoverlej).not.toBeVisible();
+	}
+
+	// scroll-CTA „Nezáväzný dopyt →"
+	const scrollCta = page.getByText(/Nezáväzný dopyt/).first();
+	await expect(scrollCta).toBeVisible();
+	await scrollCta.click();
+	await expect(page.getByTestId('dopyt')).toBeInViewport();
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('bazén: ObjednavkaForm poznámka textarea — vyplniť a overiť, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await bazenReady(page);
+
+	// orientačná cena musí byť zobrazená, aby objednavka sekcia bola viditeľná
+	await page.getByTestId('bazen-cena-zobrazit').click();
+	await expect(page.getByTestId('bazen-cena')).toBeVisible();
+
+	// ObjednavkaForm poznámka textarea
+	const poznamka = page.locator('#obj-poznamka');
+	await expect(poznamka).toBeVisible();
+	await poznamka.fill('TEST E2E poznámka — automatický test');
+	await expect(poznamka).toHaveValue('TEST E2E poznámka — automatický test');
+
+	expect(consoleMsgs).toEqual([]);
+});
