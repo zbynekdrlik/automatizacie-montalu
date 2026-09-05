@@ -608,7 +608,7 @@ export const actions = {
 			skloCeny: skloCenyPre(
 				locals.user,
 				r.posuvy.map((p, i) => ({
-					label: 'Posuv ' + (i + 1),
+					label: 'Zasklenie ' + (i + 1),
 					system: p.system,
 					variant: vstup.posuvy[i]?.sklo ?? '',
 					sirka: p.sklo.sirka,

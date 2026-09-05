@@ -78,7 +78,7 @@
 	<div class="posuv-nahlady">
 		{#each m.posuvy as pv, i (i)}
 			<div class="posuv-nahlad">
-				<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
+				<div class="posuv-nahlad-hd">Zasklenie {i + 1}</div>
 				<Nahlad2D
 					S={pv.S}
 					V={pv.V}
@@ -144,7 +144,7 @@
 				)}
 				<div class="row">
 					<span
-						>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
+						>Zasklenie {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
 							· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
 					><b>{sietkaPopis(pv.sietka, rozmer)}</b>
 				</div>
