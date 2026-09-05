@@ -130,9 +130,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     # Deploy (build + rollback + health) + inštalácia Playwright + post-deploy E2E
-    # cez SSH tunel. Bez limitu visí default 6 h; 20 min pokrýva build+poll (~5) +
-    # npm ci + playwright install (~5) + E2E (cap 10) s rezervou.
-    timeout-minutes: 20
+    # cez SSH tunel. Bez limitu visí default 6 h; 30 min pokrýva build+poll (~5) +
+    # npm ci + playwright install (~5) + E2E (cap 15, celá read-only sada) s rezervou.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -195,13 +195,16 @@ jobs:
       - name: Playwright browser install
         if: success() && steps.e2e_secrets.outputs.present == 'true'
         run: timeout 360 npx playwright install --with-deps chromium || npx playwright install chromium
-      - name: Post-deploy E2E (SSH tunel, verzia z DOM, read-only)
-        # PO úspešnom health polle: read-only smoke proti nasadenej appke cez tunel
-        # (login + [data-testid=version] == SHA7 + stránky bez console chýb). Zlyhanie
-        # = červený job (ALARM), ale rollback sa TU NEROBÍ — nová verzia je zdravá.
+      - name: Post-deploy E2E (SSH tunel, celá read-only sada)
+        # PO úspešnom health polle: CELÁ E2E sada proti nasadenej appke cez tunel.
+        # Zápisové testy sa preskočia automaticky (skipAkLive v helpers.ts číta
+        # /health live:true; BASE_URL skip pre DB-fixture testy; testIgnore pre
+        # error-stranka). Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu.
+        # Zlyhanie = červený job (ALARM), ale rollback sa TU NEROBÍ — nová verzia
+        # je zdravá (health poll prešiel). Cap 15 min = celá sada workers:1 cez tunel.
         id: postdeploy_e2e
         if: success() && steps.e2e_secrets.outputs.present == 'true'
-        timeout-minutes: 10
+        timeout-minutes: 15
         env:
           E2E_USER: ${{ secrets.E2E_USER }}
           E2E_PASS: ${{ secrets.E2E_PASS }}
@@ -210,7 +213,7 @@ jobs:
           # tunel: localhost:18091 → VPS 127.0.0.1:8090 (8091 býva obsadený presenterom)
           ssh -f -N -L 18091:127.0.0.1:8090 -i ~/.ssh/deploy_key -o ExitOnForwardFailure=yes deploy@167.233.125.9
           for _ in $(seq 1 15); do curl -sf --max-time 5 -o /dev/null http://localhost:18091/health && break || sleep 1; done
-          DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 npx playwright test post-deploy.spec.ts
+          DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 npx playwright test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         # always() lebo pri zlyhaní E2E je job vo `failure` stave a implicitné
         # `success() &&` by tento krok preskočilo → padnutý report by sa nenahral.

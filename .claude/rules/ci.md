@@ -263,11 +263,14 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
 - **Post-deploy E2E = krok v deploy jobe** (NIE nový job — `tests/ci-docker-
   hardening.test.ts` tvrdí presnú množinu jobov). Po health OK: SSH tunel
   `-L 18091:127.0.0.1:8090`, `DEPLOY_SHA7=<sha7> BASE_URL=http://localhost:18091
-  npx playwright test post-deploy.spec.ts` (`E2E_USER`/`E2E_PASS` zo secrets env
-  `production`). `e2e/post-deploy.spec.ts` je BY CONSTRUCTION read-only (login +
-  `[data-testid=version]`==SHA7 + navigácia, žiadny odpis) — nikdy sa nedotkne
-  Money. Beží aj lokálne v `test` jobe proti preview (SHA kontrola sa preskočí,
-  keď `DEPLOY_SHA7` nie je).
+  npx playwright test` (CELÁ E2E sada, `E2E_USER`/`E2E_PASS` zo secrets env
+  `production`). Zápisové testy sa automaticky preskočia (3 vrstvy ochrany):
+  - `skipAkLive` (helpers.ts) — v tele testu overí /health `live:true` → skip
+  - `test.skip(!!process.env.BASE_URL, ...)` — DB-fixture testy (seed lokálnej DB)
+  - `testIgnore` v playwright.config.ts — `error-stranka.spec.ts` (test-only route)
+  Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu. Cap 15 min (workers:1
+  cez SSH tunel). `post-deploy.spec.ts` naďalej beží ako súčasť sady (overuje SHA7
+  z DOM, keď `DEPLOY_SHA7` env je nastavené).
 
 - **E2E secrets:** `E2E_USER`+`E2E_PASS` treba pridať do GitHub environment
   `production` (užívateľ/supervisor — agent secrets nepridáva). Kým chýbajú, krok

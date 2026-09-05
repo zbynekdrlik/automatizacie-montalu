@@ -1,10 +1,10 @@
 // Kovanie do Money odpisu (Dominik 2026-07-28) v prehliadači: dielňa musí vidieť
 // kusy pred odoslaním a jednostranná FAB musí naozaj zmeniť počty.
 //
-// Väčšina testov je READ-ONLY („Spočítať" / „Späť"); posledný odosiela v TEST režime
-// (MONEY_LIVE nie je 1), takže súbor ide do testovacieho priečinka, nikdy do Money.
+// Väčšina testov je READ-ONLY („Spočítať" / „Späť"); zápisový test „po odoslaní"
+// je za `skipAkLive`, takže proti ostrej appke (MONEY_LIVE=1) sa preskočí.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, skipAkLive } from './helpers';
 
 const RUN = `E2E-KOV-${Date.now().toString(36).slice(-5)}`;
 const FAB = 'Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)';
@@ -125,6 +125,7 @@ test('zimná záhrada: kusy sa sčítajú za oba posuvy', async ({ page }) => {
 test('po odoslaní vidno kovanie aj na potvrdzovacej obrazovke', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
+	await skipAkLive(page);
 	await zaklad(page, '06');
 	await page.getByLabel('Systém').selectOption('Robust');
 	await page.getByLabel('Štýl').selectOption('2K');
