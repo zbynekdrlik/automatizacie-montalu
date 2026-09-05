@@ -8,12 +8,14 @@
 // kódy čaká Dominik).
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
-import { computeClip, chybaClipVstupu, type ClipPolozka } from '$lib/clip';
+import { computeClip, computeClipMulti, chybaClipVstupu, type ClipPolozka } from '$lib/clip';
 import type { ClipVstup } from '$lib/clip';
-import { parseClipVstup } from '$lib/server/vstup';
+import { parseClipVstup, parseClipMultiVstup } from '$lib/server/vstup';
+import type { ClipMultiVstup } from '$lib/server/vstup';
 import {
 	writeOdpis,
 	isLive,
+	contentHash,
 	blokHlaska,
 	overrideOpts,
 	rawFormEntries,
@@ -34,6 +36,30 @@ function parseVyluceneKody(form: FormData): Set<string> {
 function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
 	if (vylucene.size === 0) return job;
 	return { ...job, polozky: job.polozky.filter((p) => !vylucene.has(p.kod)) };
+}
+
+function jobForMulti(vstup: ClipMultiVstup, finalOut: ClipPolozka[], createdBy: string): OdpisJob {
+	return {
+		modul: 'clip',
+		zak: vstup.zak,
+		op: vstup.op,
+		zakaznik: vstup.zakaznik,
+		caka: vstup.caka,
+		createdBy,
+		cakaSubdir: 'Clip',
+		popis: (vstup.op + ' ' + vstup.zakaznik).trim(),
+		polozky: finalOut,
+		detail: {
+			multiClip: true,
+			kusy: vstup.kusy.map((k) => ({
+				typ: k.typ,
+				variant: k.variant,
+				sirka: k.sirka,
+				vyska: k.vyska,
+				ral: k.ral
+			}))
+		}
+	};
 }
 
 function jobFor(vstup: ClipVstup, finalOut: ClipPolozka[], createdBy: string): OdpisJob {
@@ -161,6 +187,160 @@ export const actions = {
 			return kontrola(
 				'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			);
+		}
+	},
+
+	// ---- Multi CLIP (#468 fáza 2): viac kusov v jednom odpise ----
+
+	upravitMulti: async ({ request }) => {
+		const { vstup } = parseClipMultiVstup(await request.formData());
+		return { step: 'form' as const, multiVstup: vstup };
+	},
+
+	spocitatMulti: async ({ request }) => {
+		const { vstup, error } = parseClipMultiVstup(await request.formData());
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		// validuj každý kus
+		for (let i = 0; i < vstup.kusy.length; i++) {
+			const kus = vstup.kusy[i]!;
+			const cErr = chybaClipVstupu(kus);
+			if (cErr)
+				return { step: 'form' as const, error: `Zasklenie ${i + 1}: ${cErr}`, multiVstup: vstup };
+		}
+		const multi = computeClipMulti(vstup.kusy);
+		const job = jobForMulti(vstup, multi.polozky, '');
+		return {
+			step: 'kontrolaMulti' as const,
+			multiVstup: vstup,
+			multi,
+			skladVarovania: skladoveVarovania(
+				multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+			),
+			snapshotDatum: getSnapshotMeta().generatedAt,
+			planHash: contentHash(vstup.zak, job.polozky),
+			error: null as string | null
+		};
+	},
+
+	odoslatMulti: async ({ request, locals }) => {
+		const formData = await request.formData();
+		const { vstup, error } = parseClipMultiVstup(formData);
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		for (let i = 0; i < vstup.kusy.length; i++) {
+			const kus = vstup.kusy[i]!;
+			const cErr = chybaClipVstupu(kus);
+			if (cErr)
+				return { step: 'form' as const, error: `Zasklenie ${i + 1}: ${cErr}`, multiVstup: vstup };
+		}
+		const multi = computeClipMulti(vstup.kusy);
+		const job = jobForMulti(vstup, multi.polozky, locals.user?.username ?? '');
+		const potvrdene = String(formData.get('planHash') ?? '');
+		const aktualny = contentHash(vstup.zak, job.polozky);
+		if (potvrdene && potvrdene !== aktualny) {
+			return {
+				step: 'kontrolaMulti' as const,
+				multiVstup: vstup,
+				multi,
+				skladVarovania: skladoveVarovania(
+					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				planHash: aktualny,
+				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				error: null as string | null
+			};
+		}
+		const vylucene = parseVyluceneKody(formData);
+		const edits = editsFrom(formData);
+		const { finalOut, zmenene, error: eErr } = applyEdits(multi.polozky, edits);
+		if (eErr) {
+			return {
+				step: 'kontrolaMulti' as const,
+				multiVstup: vstup,
+				multi,
+				editVals: Object.fromEntries(edits),
+				skladVarovania: skladoveVarovania(
+					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				planHash: aktualny,
+				error: eErr
+			};
+		}
+		if (finalOut.some((o) => o.qty < 0)) {
+			return {
+				step: 'kontrolaMulti' as const,
+				multiVstup: vstup,
+				multi,
+				editVals: Object.fromEntries(edits),
+				skladVarovania: skladoveVarovania(
+					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				planHash: aktualny,
+				error: 'Rozpis obsahuje záporné množstvo — skontroluj zadanie.'
+			};
+		}
+		if (finalOut.every((o) => o.qty <= 0)) {
+			return {
+				step: 'kontrolaMulti' as const,
+				multiVstup: vstup,
+				multi,
+				editVals: Object.fromEntries(edits),
+				skladVarovania: skladoveVarovania(
+					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				planHash: aktualny,
+				error: 'Po úpravách neostala žiadna položka — skontroluj množstvá.'
+			};
+		}
+		const finalJob = vylucPolozky({ ...job, polozky: finalOut }, vylucene);
+		try {
+			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
+			if (outcome.status === 'duplicate') {
+				return {
+					step: 'duplikat' as const,
+					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a uvoľni záznam v histórii odpisov.`,
+					multiVstup: vstup
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslatMulti',
+					rawEntries: rawFormEntries(formData),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
+					multiVstup: vstup
+				};
+			}
+			return {
+				step: 'hotovoMulti' as const,
+				multiVstup: vstup,
+				multi,
+				finalOut,
+				outcome,
+				zmenene
+			};
+		} catch (e) {
+			logger('clip').error('writeOdpis (multi) zlyhal', {
+				zak: vstup.zak,
+				op: vstup.op,
+				error: e
+			});
+			return {
+				step: 'kontrolaMulti' as const,
+				multiVstup: vstup,
+				multi,
+				skladVarovania: skladoveVarovania(
+					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				planHash: aktualny,
+				error:
+					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
+			};
 		}
 	}
 } satisfies Actions;
