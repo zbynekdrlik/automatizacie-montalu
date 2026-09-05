@@ -368,11 +368,19 @@ test('bazén: ObjednavkaForm poznámka textarea — vyplniť a overiť, nula con
 	await page.getByTestId('bazen-cena-zobrazit').click();
 	await expect(page.getByTestId('bazen-cena')).toBeVisible();
 
-	// ObjednavkaForm poznámka textarea
+	// ObjednavkaForm poznámka textarea — vyplň a over, že hodnota PREŽIJE reaktívny flush
+	// (nie len fill→readback tautológia; 2× rAF + opätovný assert stráži, že Svelte
+	// neprepisuje hodnotu späť — vzor e2e-console.md „Stabilita bez sleepu")
 	const poznamka = page.locator('#obj-poznamka');
 	await expect(poznamka).toBeVisible();
 	await poznamka.fill('TEST E2E poznámka — automatický test');
 	await expect(poznamka).toHaveValue('TEST E2E poznámka — automatický test');
+	await page.evaluate(
+		() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+	);
+	await expect(poznamka).toHaveValue('TEST E2E poznámka — automatický test', {
+		timeout: 2000
+	});
 
 	expect(consoleMsgs).toEqual([]);
 });
