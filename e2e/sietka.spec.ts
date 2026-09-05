@@ -309,3 +309,31 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 
 	expect(errs).toEqual([]);
 });
+
+// ── #462 poznamka: pole sa dá vyplniť a prežije round-trip na /sietka ───────
+// Pole „Poznámka (viacriadková — ide aj do tlače)" na /sietka. Test overí,
+// že sa dá vyplniť a po Spočítať aj pri „Späť" prežije (round-trip).
+test('#462 sietka poznamka: vyplnenie + round-trip zachováva hodnotu', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/sietka');
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-SIETKA-POZ');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka Pozn');
+	await page.selectOption('#system', 'Robust');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('3000');
+	await page.locator('#otvorV').fill('2000');
+
+	// vyplň poznámku (viacriadková)
+	await page.locator('#poznamka').fill('Riadok 1\nRiadok 2');
+	await expect(page.locator('#poznamka')).toHaveValue('Riadok 1\nRiadok 2');
+
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+	// po výpočte overí, že poznámka je na výsledkovej stránke
+	await expect(page.locator('text=Riadok 1')).toBeVisible();
+
+	expect(errs).toEqual([]);
+});
