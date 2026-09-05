@@ -3,8 +3,8 @@
 // riadok Money odpisu. Tu strážime parsovanie, rozsahy (skriptovaný POST obíde
 // HTML5 min/max) a Money-neutralitu výpočtu.
 import { describe, it, expect } from 'vitest';
-import { parseVstup, parseMultiVstup, parseKlin } from '../src/lib/server/vstup';
-import { klinPopis, KLIN_MAX_ROZMER, KLIN_MAX_KS } from '../src/lib/klin';
+import { parseVstup, parseMultiVstup, parseKlin, parseKliny } from '../src/lib/server/vstup';
+import { klinPopis, KLIN_MAX_ROZMER, KLIN_MAX_KS, KLIN_MAX_POCET } from '../src/lib/klin';
 import { buildCFG, computeMulti, type SysRow, type RezRow } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
 
@@ -83,13 +83,13 @@ describe('parseVstup — klín jedného posuvu', () => {
 	it('zapnutý klín sa uloží', () => {
 		const { vstup, error } = parseVstup(fd({ ...zaklad, ...klinFd }));
 		expect(error).toBeNull();
-		expect(vstup.klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
+		expect(vstup.kliny).toEqual([{ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 }]);
 	});
 
-	it('bez klina je vstup platný a klín je null', () => {
+	it('bez klina je vstup platný a kliny je prázdne pole', () => {
 		const { vstup, error } = parseVstup(fd(zaklad));
 		expect(error).toBeNull();
-		expect(vstup.klin).toBeNull();
+		expect(vstup.kliny).toEqual([]);
 	});
 
 	it('zapnutý klín s nezmyselným rozmerom zablokuje celý vstup', () => {
@@ -100,7 +100,45 @@ describe('parseVstup — klín jedného posuvu', () => {
 	it('rozmery klina bez zapínača sa ignorujú (checkbox je vypnutý)', () => {
 		const { vstup, error } = parseVstup(fd({ ...zaklad, ...klinFd, klin: '' }));
 		expect(error).toBeNull();
-		expect(vstup.klin).toBeNull();
+		expect(vstup.kliny).toEqual([]);
+	});
+
+	it('#472: nové JSON pole `kliny` — VIAC RÔZNYCH klinov naraz', () => {
+		const kliny = [
+			{ dlzka: 3000, sirka: 80, v1: 20, v2: 0, ks: 1 },
+			{ dlzka: 2000, sirka: 60, v1: 15, v2: 5, ks: 3 }
+		];
+		const { vstup, error } = parseVstup(fd({ ...zaklad, kliny: JSON.stringify(kliny) }));
+		expect(error).toBeNull();
+		expect(vstup.kliny).toEqual(kliny);
+	});
+
+	it('#472: `kliny` JSON má prednosť pred starým plochým tvarom, keď oba prídu', () => {
+		const kliny = [{ dlzka: 111, sirka: 22, v1: 3, v2: 4, ks: 5 }];
+		const { vstup, error } = parseVstup(fd({ ...zaklad, ...klinFd, kliny: JSON.stringify(kliny) }));
+		expect(error).toBeNull();
+		expect(vstup.kliny).toEqual(kliny);
+	});
+
+	it('#472: druhý klín s nezmyselným rozmerom pomenuje jeho poradie v chybe', () => {
+		const kliny = [
+			{ dlzka: 3000, sirka: 80, v1: 20, v2: 0, ks: 1 },
+			{ dlzka: 0, sirka: 80, v1: 20, v2: 0, ks: 1 }
+		];
+		const { error } = parseVstup(fd({ ...zaklad, kliny: JSON.stringify(kliny) }));
+		expect(error).toMatch(/^Klín 2 — dĺžka/);
+	});
+
+	it('#472: viac klinov než KLIN_MAX_POCET je odmietnuté', () => {
+		const kliny = Array.from({ length: KLIN_MAX_POCET + 1 }, () => ({
+			dlzka: 100,
+			sirka: 50,
+			v1: 10,
+			v2: 0,
+			ks: 1
+		}));
+		const { error } = parseVstup(fd({ ...zaklad, kliny: JSON.stringify(kliny) }));
+		expect(error).toMatch(/priveľa klinov/);
 	});
 });
 
@@ -130,8 +168,8 @@ describe('parseMultiVstup — klín je PER POSUV', () => {
 			posuv()
 		]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0]!.klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
-		expect(vstup.posuvy[1]!.klin).toBeNull();
+		expect(vstup.posuvy[0]!.kliny).toEqual([{ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 }]);
+		expect(vstup.posuvy[1]!.kliny).toEqual([]);
 	});
 
 	it('nezmyselný klín na 2. zasklení pomenuje zasklenie v chybe (#468)', () => {
@@ -141,13 +179,59 @@ describe('parseMultiVstup — klín je PER POSUV', () => {
 		]);
 		expect(error).toBe('Zasklenie 2: klín — zadaj aspoň jednu výšku.');
 	});
+
+	it('#472: posuv môže mať VIAC RÔZNYCH klinov naraz cez `kliny` pole', () => {
+		const { vstup, error } = multi([
+			posuv({
+				kliny: [
+					{ dlzka: 2000, sirka: 200, v1: 300, v2: 80, ks: 2 },
+					{ dlzka: 1500, sirka: 150, v1: 200, v2: 0, ks: 1 }
+				]
+			})
+		]);
+		expect(error).toBeNull();
+		expect(vstup.posuvy[0]!.kliny).toEqual([
+			{ dlzka: 2000, sirka: 200, v1: 300, v2: 80, ks: 2 },
+			{ dlzka: 1500, sirka: 150, v1: 200, v2: 0, ks: 1 }
+		]);
+	});
+});
+
+describe('parseKliny — validácia poľa (#472)', () => {
+	it('prázdne pole → prázdny výsledok bez chyby', () => {
+		expect(parseKliny([])).toEqual({ kliny: [], error: null });
+	});
+
+	it('jeden platný riadok → chyba bez indexu (rovnaká hláška ako pri 1 kline pred #472)', () => {
+		const r = parseKliny([{ dlzka: '0', sirka: '250', v1: '10', v2: '0', ks: '1' }]);
+		expect(r.kliny).toEqual([]);
+		expect(r.error).toBe(`Klín: dĺžka musí byť 1–${KLIN_MAX_ROZMER} mm.`);
+	});
+
+	it('viac riadkov → chyba nesie poradové číslo neplatného riadku', () => {
+		const r = parseKliny([
+			{ dlzka: '3000', sirka: '80', v1: '20', v2: '0', ks: '1' },
+			{ dlzka: '0', sirka: '80', v1: '20', v2: '0', ks: '1' }
+		]);
+		expect(r.kliny).toEqual([]);
+		expect(r.error).toBe(`Klín 2 — dĺžka musí byť 1–${KLIN_MAX_ROZMER} mm.`);
+	});
+
+	it(`viac než ${KLIN_MAX_POCET} klinov je odmietnuté`, () => {
+		const rows = Array.from({ length: KLIN_MAX_POCET + 1 }, () => ({
+			dlzka: '100',
+			sirka: '50',
+			v1: '10',
+			v2: '0',
+			ks: '1'
+		}));
+		expect(parseKliny(rows).error).toMatch(/priveľa klinov/);
+	});
 });
 
 describe('MONEY-NEUTRALITA — klín nesmie zmeniť odpis ani materiál', () => {
 	const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
-	const spec = (
-		klin: { dlzka: number; sirka: number; v1: number; v2: number; ks: number } | null
-	) => [
+	const spec = (kliny: { dlzka: number; sirka: number; v1: number; v2: number; ks: number }[]) => [
 		{
 			sysStyl: 'Robust|3K',
 			S: 4645,
@@ -156,17 +240,31 @@ describe('MONEY-NEUTRALITA — klín nesmie zmeniť odpis ani materiál', () => 
 			skloHrubka: 0,
 			otvaranie: 'P - L',
 			sklo: 'Izolačné sklo 4/16/4 číre',
-			klin
+			kliny
 		}
 	];
 
 	it('odpis aj materiál sú identické s klinom a bez neho; klín sa vráti pre náhľad', () => {
-		const bez = computeMulti(cfg, spec(null))!;
-		const s = computeMulti(cfg, spec({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 }))!;
+		const bez = computeMulti(cfg, spec([]))!;
+		const s = computeMulti(cfg, spec([{ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 }]))!;
 		expect(s.odpis).toEqual(bez.odpis);
 		expect(s.material).toEqual(bez.material);
-		expect(s.posuvy[0]!.klin).toEqual({ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 });
-		expect(bez.posuvy[0]!.klin).toBeNull();
+		expect(s.posuvy[0]!.kliny).toEqual([{ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 }]);
+		expect(bez.posuvy[0]!.kliny).toEqual([]);
+	});
+
+	it('#472: DVA rôzne kliny na jednom posuve sú tiež Money-neutrálne', () => {
+		const bez = computeMulti(cfg, spec([]))!;
+		const s = computeMulti(
+			cfg,
+			spec([
+				{ dlzka: 4645, sirka: 250, v1: 350, v2: 120, ks: 2 },
+				{ dlzka: 1000, sirka: 80, v1: 20, v2: 0, ks: 1 }
+			])
+		)!;
+		expect(s.odpis).toEqual(bez.odpis);
+		expect(s.material).toEqual(bez.material);
+		expect(s.posuvy[0]!.kliny).toHaveLength(2);
 	});
 });
 

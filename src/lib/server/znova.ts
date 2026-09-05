@@ -37,6 +37,13 @@ const farba = (x: unknown): 'R9005' | 'R7016' | null => (x === 'R9005' || x === 
 const n = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
 const b = (x: unknown): boolean => x === true;
 const obj = <T>(x: unknown): T | null => (x && typeof x === 'object' ? (x as T) : null);
+// #472: historické záznamy majú `klin: {...}|null` (jeden klín); nové majú `kliny: [...]`.
+// Prečítaj NOVÝ tvar, so spätným prevodom starého jedného klina na pole s 1 prvkom.
+const objArr = <T>(x: unknown): T[] => {
+	if (Array.isArray(x)) return x as T[];
+	const single = obj<T>(x);
+	return single ? [single] : [];
+};
 
 /** sklo, ktoré daný systém stále ponúka; inak '' + záznam do `chybajuce` */
 function platneSklo(system: string, sklo: string, chybajuce: string[], kde: string): string {
@@ -71,7 +78,9 @@ function posuvZDetailu(
 		kovanieP: s(d.kovanieP),
 		kovanieStred: s(d.kovanieStred),
 		kovanieStredOkno: d.kovanieStredOkno === 'P' ? 'P' : 'L',
-		klin: obj<Klin>(d.klin),
+		// nové záznamy: d.kliny (pole); staré (pred #472): d.klin (jeden klín) — objArr
+		// pokryje oba tvary
+		kliny: objArr<Klin>(d.kliny ?? d.klin),
 		kolajnica: obj<KolajnicaRucne>(d.kolajnica),
 		sietka: obj<Sietka>(d.sietka)
 	};

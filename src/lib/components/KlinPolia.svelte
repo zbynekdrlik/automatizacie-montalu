@@ -1,40 +1,51 @@
 <script lang="ts">
-	// Polia klina pre JEDEN posuv (Patrik 2026-07-27): zapínač + 4 kóty + počet ks.
-	// Rovnaký blok používa primárny posuv (posiela sa aj ako plochý formulár, preto
-	// `names`) aj každý ďalší posuv zimnej záhrady (ten ide len cez JSON `posuvy`).
-	import { KLIN_MAX_KS, KLIN_MAX_ROZMER } from '$lib/klin';
+	// Klíny nad JEDNÝM posuvom (Patrik 2026-07-27, MULTI #472): zapínač + 1..N riadkov,
+	// každý so 4 kótami + počtom ks. Rovnaký blok používa primárny posuv (posiela sa aj
+	// ako plochý formulár, preto `names` — JEDEN hidden JSON pole `kliny`) aj každý ďalší
+	// posuv zimnej záhrady (ten ide len cez JSON `posuvy`, `kliny` je tam už samotné pole,
+	// bez ďalšieho JSON-vrstvenia — viď `zasklenia-form.ts`'s `PosuvRow.kliny`).
+	//
+	// Prvý riadok (index 0) drží PÔVODNÉ id-čka bez suffixu (`${idPrefix}-dlzka`, …) —
+	// spätná kompatibilita s existujúcimi e2e testami napísanými pred #472. Ďalšie
+	// riadky (index ≥1) dostanú `${idPrefix}-dlzka-${i}`, …
+	import { KLIN_MAX_KS, KLIN_MAX_POCET, KLIN_MAX_ROZMER, type KlinVstup } from '$lib/klin';
 
 	let {
 		idPrefix = 'klin',
 		names = false,
-		on = $bindable(false),
-		dlzka = $bindable(''),
-		sirka = $bindable(''),
-		v1 = $bindable(''),
-		v2 = $bindable(''),
-		ks = $bindable(1)
+		kliny = $bindable<KlinVstup[]>([])
 	}: {
 		/** predpona id-čiek (unikátna per posuv) */
 		idPrefix?: string;
-		/** true = polia sa posielajú aj ako name= (plochý formulár primárneho posuvu) */
+		/** true = appka pošle aj skryté `name="kliny"` pole (plochý formulár primárneho posuvu) */
 		names?: boolean;
-		on?: boolean;
-		dlzka?: number | string;
-		sirka?: number | string;
-		v1?: number | string;
-		v2?: number | string;
-		ks?: number | string;
+		kliny?: KlinVstup[];
 	} = $props();
 
 	const nm = (k: string) => (names ? k : undefined);
-	// Patrik 2026-07-27: „nechcem to úplne hronit, že automaticky šírka klinu podľa
-	// koľajnice, lebo nie vždy to je pravidlo… tiež nie je pravidlo, že dĺžka klinu
-	// musí byť na celú dĺžku posuvu" → NIČ sa neodvodzuje z posuvu ani z koľajnice,
-	// všetky štyri kóty zadáva dielňa ručne (polia sú `required`). Predvyplní sa len
-	// počet kusov, ktorý je takmer vždy 1.
-	function zapnute() {
-		if (on && !ks) ks = 1;
+
+	/** prázdny riadok klina — obsluha vyplní všetky 4 kóty ručne (žiadny smart default,
+	 *  Patrik: „nechcem to úplne hronit"), predvyplní sa len počet kusov 1 */
+	function prazdnyKlin(): KlinVstup {
+		return { dlzka: '', sirka: '', v1: '', v2: '', ks: 1 };
 	}
+
+	function zapnut() {
+		kliny = [prazdnyKlin()];
+	}
+	function vypnut() {
+		kliny = [];
+	}
+	function pridajRiadok() {
+		if (kliny.length >= KLIN_MAX_POCET) return;
+		kliny = [...kliny, prazdnyKlin()];
+	}
+	function odoberRiadok(i: number) {
+		kliny = kliny.filter((_, j) => j !== i);
+	}
+	/** id-čko konkrétneho riadku — riadok 0 ostáva BEZ suffixu (spätná kompatibilita) */
+	const idFor = (field: string, i: number) =>
+		i === 0 ? `${idPrefix}-${field}` : `${idPrefix}-${field}-${i}`;
 </script>
 
 <div class="field">
@@ -44,86 +55,97 @@
 			id={`${idPrefix}-on`}
 			name={nm('klin')}
 			value="1"
-			bind:checked={on}
-			onchange={zapnute}
+			checked={kliny.length > 0}
+			onchange={(e) => (e.currentTarget.checked ? zapnut() : vypnut())}
 		/>
 		Klín (nad posuvom) — len na plán a do náhľadu, do Money odpisu nejde
 	</label>
 </div>
-{#if on}
+{#if kliny.length > 0}
 	<div class="klin-box" data-testid={`${idPrefix}-box`}>
 		<p class="klin-hint" data-testid={`${idPrefix}-hint`}>
 			Zadaj skutočné rozmery klina — <b>nemusí</b> byť po celej dĺžke posuvu ani mať šírku podľa koľajnice.
 		</p>
-		<div class="grid2">
-			<div class="field">
-				<label for={`${idPrefix}-dlzka`}>Klín — dĺžka (mm) *</label>
-				<input
-					id={`${idPrefix}-dlzka`}
-					name={nm('klinDlzka')}
-					type="number"
-					min="1"
-					max={KLIN_MAX_ROZMER}
-					step="any"
-					bind:value={dlzka}
-					required
-				/>
+		{#each kliny as k, i (i)}
+			<div class="klin-riadok" data-testid={`${idPrefix}-riadok-${i}`}>
+				{#if kliny.length > 1}<p class="klin-riadok-hd">Klín {i + 1}</p>{/if}
+				<div class="grid2">
+					<div class="field">
+						<label for={idFor('dlzka', i)}>Klín — dĺžka (mm) *</label>
+						<input
+							id={idFor('dlzka', i)}
+							type="number"
+							min="1"
+							max={KLIN_MAX_ROZMER}
+							step="any"
+							bind:value={k.dlzka}
+							required
+						/>
+					</div>
+					<div class="field">
+						<label for={idFor('sirka', i)}>Klín — šírka / hĺbka (mm) *</label>
+						<input
+							id={idFor('sirka', i)}
+							type="number"
+							min="1"
+							max={KLIN_MAX_ROZMER}
+							step="any"
+							bind:value={k.sirka}
+							required
+						/>
+					</div>
+				</div>
+				<div class="grid3">
+					<div class="field">
+						<label for={idFor('v1', i)}>Klín — výška 1 (mm) *</label>
+						<input
+							id={idFor('v1', i)}
+							type="number"
+							min="0"
+							max={KLIN_MAX_ROZMER}
+							step="any"
+							bind:value={k.v1}
+							required
+						/>
+					</div>
+					<div class="field">
+						<label for={idFor('v2', i)}>Klín — výška 2 (mm) *</label>
+						<input
+							id={idFor('v2', i)}
+							type="number"
+							min="0"
+							max={KLIN_MAX_ROZMER}
+							step="any"
+							bind:value={k.v2}
+							required
+						/>
+					</div>
+					<div class="field">
+						<label for={idFor('ks', i)}>Klín — počet (ks)</label>
+						<input
+							id={idFor('ks', i)}
+							type="number"
+							min="1"
+							max={KLIN_MAX_KS}
+							step="1"
+							bind:value={k.ks}
+						/>
+					</div>
+				</div>
+				{#if kliny.length > 1}
+					<button type="button" class="klin-odober" onclick={() => odoberRiadok(i)}
+						>✕ Odobrať tento klín</button
+					>
+				{/if}
 			</div>
-			<div class="field">
-				<label for={`${idPrefix}-sirka`}>Klín — šírka / hĺbka (mm) *</label>
-				<input
-					id={`${idPrefix}-sirka`}
-					name={nm('klinSirka')}
-					type="number"
-					min="1"
-					max={KLIN_MAX_ROZMER}
-					step="any"
-					bind:value={sirka}
-					required
-				/>
-			</div>
-		</div>
-		<div class="grid3">
-			<div class="field">
-				<label for={`${idPrefix}-v1`}>Klín — výška 1 (mm) *</label>
-				<input
-					id={`${idPrefix}-v1`}
-					name={nm('klinV1')}
-					type="number"
-					min="0"
-					max={KLIN_MAX_ROZMER}
-					step="any"
-					bind:value={v1}
-					required
-				/>
-			</div>
-			<div class="field">
-				<label for={`${idPrefix}-v2`}>Klín — výška 2 (mm) *</label>
-				<input
-					id={`${idPrefix}-v2`}
-					name={nm('klinV2')}
-					type="number"
-					min="0"
-					max={KLIN_MAX_ROZMER}
-					step="any"
-					bind:value={v2}
-					required
-				/>
-			</div>
-			<div class="field">
-				<label for={`${idPrefix}-ks`}>Klín — počet (ks)</label>
-				<input
-					id={`${idPrefix}-ks`}
-					name={nm('klinKs')}
-					type="number"
-					min="1"
-					max={KLIN_MAX_KS}
-					step="1"
-					bind:value={ks}
-				/>
-			</div>
-		</div>
+		{/each}
+		{#if kliny.length < KLIN_MAX_POCET}
+			<button type="button" class="klin-pridaj" onclick={pridajRiadok}>+ Pridať ďalší klín</button>
+		{/if}
 	</div>
+	{#if names}
+		<input type="hidden" name="kliny" value={JSON.stringify(kliny)} />
+	{/if}
 {/if}
 
 <style>
@@ -138,5 +160,41 @@
 		border-radius: 10px;
 		padding: 10px 12px 2px;
 		margin-bottom: 12px;
+	}
+	.klin-riadok {
+		border-top: 1px dashed #fcd34d;
+		padding-top: 8px;
+		margin-top: 4px;
+	}
+	.klin-riadok:first-of-type {
+		border-top: none;
+		padding-top: 0;
+		margin-top: 0;
+	}
+	.klin-riadok-hd {
+		margin: 0 0 6px;
+		font-weight: 600;
+		font-size: 12px;
+		color: #92400e;
+	}
+	.klin-odober {
+		margin: 0 0 10px;
+		font-size: 12px;
+		background: none;
+		border: 1px solid #fcd34d;
+		border-radius: 6px;
+		padding: 3px 8px;
+		cursor: pointer;
+		color: #92400e;
+	}
+	.klin-pridaj {
+		margin: 0 0 10px;
+		font-size: 12px;
+		background: none;
+		border: 1px dashed #b45309;
+		border-radius: 6px;
+		padding: 4px 10px;
+		cursor: pointer;
+		color: #92400e;
 	}
 </style>

@@ -21,7 +21,7 @@
 		kovanieP = '',
 		kovanieStred = '',
 		kovanieStredOkno = 'L',
-		klin = null,
+		kliny = [],
 		sietka = null
 	}: {
 		S: number;
@@ -42,8 +42,9 @@
 		kovanieStred?: string;
 		/** ktoré z dvoch stredových krídel kľučku nesie: 'L' = ľavé, 'P' = pravé */
 		kovanieStredOkno?: 'L' | 'P';
-		/** klín nad posuvom (Patrik) — trapéz s kótami nad rámom; null = žiadny */
-		klin?: Klin | null;
+		/** klíny nad posuvom (Patrik, #472 viac RÔZNYCH naraz) — trapéz s kótami nad rámom
+		 *  na posuv, kreslené vedľa seba zľava (kumulatívny x-posun); prázdne pole = žiadny */
+		kliny?: Klin[];
 		/** sieťka na posuve (#86–#90) — vyznačí sa mimo rámu na strane podľa smeru posuvu */
 		sietka?: Sietka | null;
 	} = $props();
@@ -57,7 +58,7 @@
 	const KLIN_BASE = 96; // y spodnej hrany klina (nad kótou šírky okna na M.top-24)
 	const KLIN_KOTA_Y = 24; // y kótovej línie dĺžky klina
 	const M0 = { top: 46, right: 26, bottom: 64, left: 62 }; // miesto na kóty
-	let M = $derived({ ...M0, top: M0.top + (klin ? KLIN_PAS : 0) });
+	let M = $derived({ ...M0, top: M0.top + (kliny.length ? KLIN_PAS : 0) });
 	const CAS_ROW = 14; // kaskáda: px na jedno krídlo (odsadenie do hĺbky/koľajnice)
 	const CAS_BAR = 6; // kaskáda: hrúbka pruhu krídla
 	const CAS_PAD = 12; // kaskáda: vnútorný okraj rámčeka
@@ -217,32 +218,47 @@
 		});
 	});
 
-	// Klín nad posuvom: trapéz s dlhou hornou hranou (dĺžka), ľavou výškou v1 a
-	// pravou v2. Dĺžka je v MIERKE okna (klín kratší ako okno je aj v kresbe
-	// kratší, zarovnaný vľavo); výšky sa škálujú na KLIN_KRESBA, aby bola kresba
-	// čitateľná aj pri nízkom kline — čísla v kótach sú vždy tie zadané.
-	let klinGeo = $derived.by(() => {
-		if (!klin) return null;
-		const maxV = Math.max(klin.v1, klin.v2, 1);
-		const w = Math.max(24, Math.min(W - M.left - M.right, klin.dlzka * scale));
-		const x0 = M.left;
-		const x1 = x0 + w;
+	// Klíny nad posuvom (#472 viac RÔZNYCH naraz): každý trapéz s dlhou hornou hranou
+	// (dĺžka), ľavou výškou v1 a pravou v2. Dĺžka je v MIERKE okna (klín kratší ako
+	// okno je aj v kresbe kratší); výšky sa škálujú na KLIN_KRESBA per klín, aby bola
+	// kresba čitateľná aj pri nízkom kline — čísla v kótach sú vždy tie zadané. Viac
+	// klinov sa kreslí VEDĽA SEBA zľava (kumulatívny x-posun, rovnaká logika ako
+	// `geo/zasklenia.ts`'s `x0 += klin.dlzka` v 3D náhľade) — pri PRESNE 1 kline je
+	// geometria byte-identická s pôvodným jednoklinovým výpočtom (regresná parita).
+	let klinGeos = $derived.by(() => {
+		if (!kliny.length) return [];
 		const base = KLIN_BASE; // spodná hrana klina (nad kótou šírky okna)
-		return {
-			x0,
-			x1,
-			base,
-			y1: base - (klin.v1 / maxV) * KLIN_KRESBA,
-			y2: base - (klin.v2 / maxV) * KLIN_KRESBA,
-			body: [
-				[x0, base],
-				[x0, base - (klin.v1 / maxV) * KLIN_KRESBA],
-				[x1, base - (klin.v2 / maxV) * KLIN_KRESBA],
-				[x1, base]
-			]
-				.map(([x, y]) => `${Math.round(x! * 10) / 10},${Math.round(y! * 10) / 10}`)
-				.join(' ')
-		};
+		const avail = W - M.left - M.right;
+		const widths = kliny.map((k) => Math.max(24, Math.min(avail, k.dlzka * scale)));
+		// Kumulatívny presah: viac dlhých klinov by pretieklo za pravý okraj SVG,
+		// preto sa pri pretečení zmenšia VŠETKY proporčne (súčet = kresliaca šírka).
+		// Pri 1 kline je súčet ≤ avail, faktor 1 → parita s pôvodnou kresbou.
+		const total = widths.reduce((a, b) => a + b, 0);
+		const f = total > avail ? avail / total : 1;
+		let cursor = M.left;
+		return kliny.map((k, i) => {
+			const maxV = Math.max(k.v1, k.v2, 1);
+			const w = (widths[i] ?? 24) * f;
+			const x0 = cursor;
+			const x1 = x0 + w;
+			cursor = x1;
+			return {
+				klin: k,
+				x0,
+				x1,
+				base,
+				y1: base - (k.v1 / maxV) * KLIN_KRESBA,
+				y2: base - (k.v2 / maxV) * KLIN_KRESBA,
+				body: [
+					[x0, base],
+					[x0, base - (k.v1 / maxV) * KLIN_KRESBA],
+					[x1, base - (k.v2 / maxV) * KLIN_KRESBA],
+					[x1, base]
+				]
+					.map(([x, y]) => `${Math.round(x! * 10) / 10},${Math.round(y! * 10) / 10}`)
+					.join(' ')
+			};
+		});
 	});
 
 	// Sieťka (#86–#90, KOREKCIA 2026-08-02): sieťka je ĎALŠIE krídlo tohto posuvu,
@@ -270,48 +286,50 @@
 	aria-label="Náhľad zasklenia {S}×{V} mm, {N} polí{sietkaGeo ? ' + sieťka' : ''}"
 	data-testid="nahlad-2d"
 >
-	<!-- KLÍN nad posuvom (len keď je zadaný): trapéz + kóty dĺžky, oboch výšok,
-	     hĺbky a počtu kusov. Display-only prvok — do Money odpisu nevstupuje. -->
-	{#if klin && klinGeo}
-		<g data-testid="nahlad-klin">
-			<polygon points={klinGeo.body} fill="#fef3c7" stroke="#b45309" stroke-width="1.2" />
+	<!-- KLÍNY nad posuvom (#472 viac RÔZNYCH naraz, len keď je zadaný aspoň jeden):
+	     per klín trapéz + kóty dĺžky, oboch výšok, hĺbky a počtu kusov, vedľa seba
+	     zľava. Display-only prvok — do Money odpisu nevstupuje. Riadok 0 si drží
+	     BEZ suffixu testid `nahlad-klin` (spätná kompatibilita s e2e pred #472). -->
+	{#each klinGeos as g, i (i)}
+		<g data-testid={i === 0 ? 'nahlad-klin' : `nahlad-klin-${i}`}>
+			<polygon points={g.body} fill="#fef3c7" stroke="#b45309" stroke-width="1.2" />
 			<!-- kóta dĺžky nad klinom -->
 			<g stroke="#b45309" stroke-width="0.9" fill="none">
-				<line x1={klinGeo.x0} y1={KLIN_KOTA_Y} x2={klinGeo.x1} y2={KLIN_KOTA_Y} />
-				<line x1={klinGeo.x0} y1={KLIN_KOTA_Y - 5} x2={klinGeo.x0} y2={KLIN_KOTA_Y + 5} />
-				<line x1={klinGeo.x1} y1={KLIN_KOTA_Y - 5} x2={klinGeo.x1} y2={KLIN_KOTA_Y + 5} />
+				<line x1={g.x0} y1={KLIN_KOTA_Y} x2={g.x1} y2={KLIN_KOTA_Y} />
+				<line x1={g.x0} y1={KLIN_KOTA_Y - 5} x2={g.x0} y2={KLIN_KOTA_Y + 5} />
+				<line x1={g.x1} y1={KLIN_KOTA_Y - 5} x2={g.x1} y2={KLIN_KOTA_Y + 5} />
 			</g>
 			<text
-				x={(klinGeo.x0 + klinGeo.x1) / 2}
+				x={(g.x0 + g.x1) / 2}
 				y={KLIN_KOTA_Y - 6}
 				text-anchor="middle"
 				font-size="11"
 				fill="#92400e"
-				font-weight="600">klín — dĺžka {fmt(klin.dlzka)} mm</text
+				font-weight="600">klín — dĺžka {fmt(g.klin.dlzka)} mm</text
 			>
 			<!-- výšky na oboch stranách -->
 			<text
-				x={klinGeo.x0 - 6}
-				y={klinGeo.y1 - 4}
+				x={g.x0 - 6}
+				y={g.y1 - 4}
 				text-anchor="start"
 				font-size="10"
 				fill="#92400e"
-				font-weight="600">v1 {fmt(klin.v1)}</text
+				font-weight="600">v1 {fmt(g.klin.v1)}</text
 			>
 			<text
-				x={klinGeo.x1 - 2}
-				y={klinGeo.y2 - 4}
+				x={g.x1 - 2}
+				y={g.y2 - 4}
 				text-anchor="end"
 				font-size="10"
 				fill="#92400e"
-				font-weight="600">v2 {fmt(klin.v2)}</text
+				font-weight="600">v2 {fmt(g.klin.v2)}</text
 			>
 			<!-- hĺbka + počet kusov pod klinom -->
-			<text x={klinGeo.x0 + 4} y={klinGeo.base + 12} font-size="10" fill="#92400e"
-				>šírka (hĺbka) {fmt(klin.sirka)} mm · {klin.ks} ks</text
+			<text x={g.x0 + 4} y={g.base + 12} font-size="10" fill="#92400e"
+				>šírka (hĺbka) {fmt(g.klin.sirka)} mm · {g.klin.ks} ks</text
 			>
 		</g>
-	{/if}
+	{/each}
 
 	<!-- kóta šírky hore -->
 	<g stroke="#94a3b8" stroke-width="1" fill="none">

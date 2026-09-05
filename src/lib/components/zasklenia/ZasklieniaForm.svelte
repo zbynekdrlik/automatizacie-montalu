@@ -17,6 +17,7 @@
 	import KlinPolia from '$lib/components/KlinPolia.svelte';
 	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
 	import type { PosuvRow } from '$lib/zasklenia-form';
+	import type { KlinVstup } from '$lib/klin';
 
 	// Display názvy RAL kódov pre <select> (#354) — bežné RAL pomenovania, rovnaký
 	// vzor ako pôvodné hardcoded „(čierna)"/„(antracit)" labely.
@@ -54,12 +55,7 @@
 		farbaKovaniaS = $bindable(''),
 		kolHS = $bindable(''),
 		kolSS = $bindable(''),
-		klinS = $bindable(false),
-		klinDlzkaS = $bindable(''),
-		klinSirkaS = $bindable(''),
-		klinV1S = $bindable(''),
-		klinV2S = $bindable(''),
-		klinKsS = $bindable(1),
+		klinyS = $bindable<KlinVstup[]>([]),
 		sietkaS = $bindable(false),
 		sietkaUchytS = $bindable('ziadny'),
 		sietkaSystemS = $bindable(''),
@@ -118,12 +114,7 @@
 		farbaKovaniaS?: '' | Farba;
 		kolHS?: number | string;
 		kolSS?: number | string;
-		klinS?: boolean;
-		klinDlzkaS?: number | string;
-		klinSirkaS?: number | string;
-		klinV1S?: number | string;
-		klinV2S?: number | string;
-		klinKsS?: number | string;
+		klinyS?: KlinVstup[];
 		sietkaS?: boolean;
 		sietkaUchytS?: SietkaUchyt;
 		sietkaSystemS?: string;
@@ -421,16 +412,7 @@
 		{/if}
 		<!-- Klín nad posuvom (Patrik): zapínač + dĺžka/šírka/výška 1/výška 2 + ks.
 		     Display-only — kreslí sa v náhľade, do Money odpisu nevstupuje. -->
-		<KlinPolia
-			idPrefix="klin"
-			names={true}
-			bind:on={klinS}
-			bind:dlzka={klinDlzkaS}
-			bind:sirka={klinSirkaS}
-			bind:v1={klinV1S}
-			bind:v2={klinV2S}
-			bind:ks={klinKsS}
-		/>
+		<KlinPolia idPrefix="klin" names={true} bind:kliny={klinyS} />
 		<!-- Sieťka (#86–#90, KOREKCIA 2026-08-02, #110 systém sieťky): zapínač + úchyt.
 		     Len na systémoch, kde ju appka ponúka (Robust/Slide/Štandard/Štandard +).
 		     Rám/nos/redukcia IDE do Money odpisu (úchyt display-only). -->
@@ -577,15 +559,7 @@
 						</div>
 					</div>
 				{/if}
-				<KlinPolia
-					idPrefix={`ps${i}-klin`}
-					bind:on={p.klin}
-					bind:dlzka={p.klinDlzka}
-					bind:sirka={p.klinSirka}
-					bind:v1={p.klinV1}
-					bind:v2={p.klinV2}
-					bind:ks={p.klinKs}
-				/>
+				<KlinPolia idPrefix={`ps${i}-klin`} bind:kliny={p.kliny} />
 				{#if maSietkaSystem(p.system)}
 					<SietkaPolia
 						idPrefix={`ps${i}-sietka`}

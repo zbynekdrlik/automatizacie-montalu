@@ -78,7 +78,7 @@
 		kovanieP={vstup.kovanieP}
 		kovanieStred={vstup.kovanieStred}
 		kovanieStredOkno={vstup.kovanieStredOkno}
-		klin={vstup.klin}
+		kliny={vstup.kliny}
 		sietka={vstup.sietka}
 	/>
 </div>
@@ -96,18 +96,23 @@
 	</div>
 {/if}
 
-{#if vstup.klin}
+{#if vstup.kliny.length}
 	<div class="card" data-testid="klin-karta">
-		<div class="sec">Klín</div>
-		<div class="g">
-			<div>
-				<span>Dĺžka</span><b class="mono" data-testid="klin-dlzka">{vstup.klin.dlzka} mm</b>
+		<div class="sec">{vstup.kliny.length > 1 ? 'Klíny' : 'Klín'}</div>
+		{#each vstup.kliny as k, i (i)}
+			{#if vstup.kliny.length > 1}<p class="hint"><b>Klín {i + 1}</b></p>{/if}
+			<div class="g" data-testid={`klin-riadok-${i}`}>
+				<div>
+					<span>Dĺžka</span><b class="mono" data-testid={i === 0 ? 'klin-dlzka' : `klin-dlzka-${i}`}
+						>{k.dlzka} mm</b
+					>
+				</div>
+				<div><span>Šírka (hĺbka)</span><b class="mono">{k.sirka} mm</b></div>
+				<div><span>Výška 1</span><b class="mono">{k.v1} mm</b></div>
+				<div><span>Výška 2</span><b class="mono">{k.v2} mm</b></div>
+				<div><span>Počet</span><b class="mono">{k.ks} ks</b></div>
 			</div>
-			<div><span>Šírka (hĺbka)</span><b class="mono">{vstup.klin.sirka} mm</b></div>
-			<div><span>Výška 1</span><b class="mono">{vstup.klin.v1} mm</b></div>
-			<div><span>Výška 2</span><b class="mono">{vstup.klin.v2} mm</b></div>
-			<div><span>Počet</span><b class="mono">{vstup.klin.ks} ks</b></div>
-		</div>
+		{/each}
 	</div>
 {/if}
 

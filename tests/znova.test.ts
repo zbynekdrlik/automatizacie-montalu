@@ -69,7 +69,8 @@ describe('znovaZOdpisu — jeden posuv', () => {
 		expect(v!.kovanieL).toBe('Kľučka');
 		expect(v!.poznamka).toBe('poznámka\nna dva riadky');
 		expect(v!.ral).toBe('7016');
-		expect(v!.klin).toEqual({ dlzka: 500, sirka: 100, v1: 200, v2: 300, ks: 2 });
+		// staré záznamy (pred #472) majú `klin: {...}` (jeden) → objArr ho zabalí do poľa
+		expect(v!.kliny).toEqual([{ dlzka: 500, sirka: 100, v1: 200, v2: 300, ks: 2 }]);
 		expect(v!.vrtanieZamku).toBe(1200);
 	});
 
