@@ -25,6 +25,20 @@ import {
 } from '$lib/server/money';
 import { skladoveVarovania, getSnapshotMeta } from '$lib/server/ceny';
 
+/** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
+ *  ako comma-separated string v hidden inpute `vylucene_kody`. */
+function parseVyluceneKody(form: FormData): Set<string> {
+	const raw = String(form.get('vylucene_kody') ?? '');
+	if (!raw) return new Set();
+	return new Set(raw.split(',').filter(Boolean));
+}
+
+/** #461: vyfiltruj vylúčené položky z odpisu — volaj pred writeOdpis. */
+function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
+	if (vylucene.size === 0) return job;
+	return { ...job, polozky: job.polozky.filter((p) => !vylucene.has(p.kod)) };
+}
+
 export const load: PageServerLoad = async () => {
 	// opona (2x*) nie je podporovaná (rovnaký gate ako sietkaSamostatnaVypocet) —
 	// nenúkaj ju vôbec v selecte, nech sa scriptovaný POST nemusí odmietať v akcii
@@ -119,8 +133,11 @@ export const actions = {
 				}
 			};
 		}
+		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
+		const vylucene = parseVyluceneKody(formData);
+		const finalJob = vylucPolozky(job, vylucene);
 		try {
-			const outcome = await writeOdpis(job, overrideOpts(formData));
+			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,

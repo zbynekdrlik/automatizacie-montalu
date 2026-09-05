@@ -56,6 +56,9 @@
 	// snapshotu; BPK* kusové komponenty honest-null → súčet sa prizná ako neúplný)
 	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
 
+	// #461: vylúčené kódy z SkladVarovania — bindable, ide do hidden inputu vo formulári
+	let vyluceneKody = $state('');
+
 	// poradie kvôli grid3 rozloženiu: prvý riadok VS/SS/MS do 4500,
 	// druhý riadok to isté do 6000 (Dominik)
 	const cisla: [keyof typeof vstup, string][] = [
@@ -277,11 +280,12 @@
 	{/if}
 
 	<!-- #448: predodpisové skladové varovanie pri odpise -->
-	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
+	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">
 			{@render hiddenVstup()}
+			<input type="hidden" name="vylucene_kody" value={vyluceneKody} />
 			<table data-testid="kontrola-tabulka">
 				<thead
 					><tr

@@ -11,13 +11,17 @@
 	let {
 		varovania,
 		snapshotDatum,
-		testid = 'sklad-varovania'
+		testid = 'sklad-varovania',
+		vyluceneKody = $bindable('')
 	}: {
 		varovania: SkladVarovanie[] | undefined;
 		/** dátum generovania denného Money snapshotu (ISO string, napr. '2026-09-05T05:30:00Z') —
 		 *  zobrazí sa v upozornení pre transparentnosť čerstvosti dát. */
 		snapshotDatum?: string | null;
 		testid?: string;
+		/** Zoznam odobratých kódov (comma-separated) — bindable, rodič ho vloží do
+		 *  hidden inputu vo formulári. Synced z interného `odobrate` Setu cez $effect. */
+		vyluceneKody?: string;
 	} = $props();
 
 	/** Sformátuje snapshot dátum na „D.M.YYYY" (slovenský formát). */
@@ -30,6 +34,11 @@
 
 	/** Kód, ktorý bol v tejto session odobraný (klient-side, len vizuálny stav). */
 	let odobrate = $state<Set<string>>(new Set());
+
+	// #461: sync odobrate → vyluceneKody (bindable pre rodičovský hidden input)
+	$effect(() => {
+		vyluceneKody = [...odobrate].join(',');
+	});
 
 	/** Odobrať položku z odpisu — nastaví qty input na 0 a vizuálne označí ako odobratú. */
 	function odobrat(kod: string) {

@@ -458,6 +458,10 @@
 	let multi = $derived(form && 'multi' in form ? form.multi : null);
 	let multiVstup = $derived(form?.multiVstup ?? null);
 
+	// #461: vylúčené kódy z SkladVarovania — bindable, ide do hidden inputu vo formulári
+	let vyluceneKodySingle = $state('');
+	let vyluceneKodyMulti = $state('');
+
 	// b2b HNEĎ pri zadávaní: šírka na sklo mimo limitu = blok (nedá sa vyrobiť),
 	// výška nad limit = nezáväzné upozornenie. LEN pre b2b (interní bez obmedzení).
 	// Server checkB2BWidth/checkB2BHeight ostáva (obrana do hĺbky). data.styly nesie N.
@@ -693,13 +697,18 @@
 	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
 	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
-	<SkladVarovania varovania={form?.skladVarovania} snapshotDatum={form?.snapshotDatum} />
+	<SkladVarovania
+		varovania={form?.skladVarovania}
+		snapshotDatum={form?.snapshotDatum}
+		bind:vyluceneKody={vyluceneKodySingle}
+	/>
 
 	<div class="card noprint">
 		{#if !isB2B}
 			<form method="POST" action="?/odoslat">
 				{@render hiddenVstup()}
 				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
+				<input type="hidden" name="vylucene_kody" value={vyluceneKodySingle} />
 				<button class="btn" type="submit" data-testid="odoslat">
 					{data.live
 						? vstup.caka
@@ -771,13 +780,18 @@
 	/>
 
 	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
-	<SkladVarovania varovania={form?.skladVarovania} snapshotDatum={form?.snapshotDatum} />
+	<SkladVarovania
+		varovania={form?.skladVarovania}
+		snapshotDatum={form?.snapshotDatum}
+		bind:vyluceneKody={vyluceneKodyMulti}
+	/>
 
 	<div class="card noprint">
 		{#if !isB2B}
 			<form method="POST" action="?/odoslatMulti">
 				{@render hiddenMulti()}
 				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
+				<input type="hidden" name="vylucene_kody" value={vyluceneKodyMulti} />
 				<button class="btn" type="submit" data-testid="odoslat-multi">
 					{data.live
 						? vstup.caka

@@ -22,6 +22,20 @@ import {
 } from '$lib/server/money';
 import { skladoveVarovania, getSnapshotMeta } from '$lib/server/ceny';
 
+/** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
+ *  ako comma-separated string v hidden inpute `vylucene_kody`. */
+function parseVyluceneKody(form: FormData): Set<string> {
+	const raw = String(form.get('vylucene_kody') ?? '');
+	if (!raw) return new Set();
+	return new Set(raw.split(',').filter(Boolean));
+}
+
+/** #461: vyfiltruj vylúčené položky z odpisu — volaj pred writeOdpis. */
+function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
+	if (vylucene.size === 0) return job;
+	return { ...job, polozky: job.polozky.filter((p) => !vylucene.has(p.kod)) };
+}
+
 function jobFor(vstup: ClipVstup, finalOut: ClipPolozka[], createdBy: string): OdpisJob {
 	return {
 		modul: 'clip',
@@ -117,11 +131,13 @@ export const actions = {
 		if (finalOut.every((o) => o.qty <= 0))
 			return kontrola('Po úpravách neostala žiadna položka — skontroluj množstvá.');
 
+		const job = jobFor(vstup, finalOut, locals.user?.username ?? '');
+		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
+		const vylucene = parseVyluceneKody(form);
+		const finalJob = vylucPolozky(job, vylucene);
+
 		try {
-			const outcome = await writeOdpis(
-				jobFor(vstup, finalOut, locals.user?.username ?? ''),
-				overrideOpts(form)
-			);
+			const outcome = await writeOdpis(finalJob, overrideOpts(form));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,
