@@ -462,3 +462,31 @@ export function migrateMaterialRozvin(db: Database.Database, bump: (v: number) =
 		bump(38);
 	})();
 }
+
+/** #417 faza 2: per-profil odpad (offcut) z narezov ulozeny pri odpise, aby ho Odoo note builder
+ *  vedel precitat pri re-derivacii / retry (#349). FK CASCADE na odpis_log — uvolnenie odpisu
+ *  zmaze aj odpad. Len zasklenia a sietka maju ffdPack waste data; moduly bez offcut (pergola,
+ *  bazen, clip) tabulku nepouzivaju. Money-NEUTRALNE. */
+export function migrateOdpisOdpad(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 39) return;
+	const maOdpisLog =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='odpis_log'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maOdpisLog) {
+			db.exec(`
+				CREATE TABLE IF NOT EXISTS odpis_odpad (
+					id INTEGER PRIMARY KEY,
+					odpis_log_id INTEGER NOT NULL REFERENCES odpis_log(id) ON DELETE CASCADE,
+					profil_kod TEXT NOT NULL,
+					profil_nazov TEXT NOT NULL,
+					odpad_mm INTEGER NOT NULL,
+					material_mm INTEGER NOT NULL,
+					tyce INTEGER NOT NULL
+				);
+				CREATE INDEX IF NOT EXISTS idx_odpis_odpad_log ON odpis_odpad(odpis_log_id);
+			`);
+		}
+		bump(39);
+	})();
+}

@@ -19,8 +19,14 @@ import { parseRucnePolozky, type RucnaPolozka } from '$lib/pergola-rucne';
 // #378 — FIX (bočné pevné zasklenie): parse + odvodenie z pergoly (round-trip echo).
 // DISPLAY-ONLY + Money-neutrálne — FIX NEVSTUPUJE do buildRezervaciaRozpis.
 import { parseFixZPergoly, efektivnyFix, type FixZPergola } from '$lib/pergola-fix';
+import { spocitajFixZPergoly } from '$lib/pergola-fix';
 import type { PergolaNarezVstup } from '$lib/pergola-narez';
+import { spocitajNarez, komponentyPergoly } from '$lib/pergola-narez';
 import { spocitajStrechaSklo } from '$lib/pergola-sklo';
+// #419 extended scope — expedičný zoznam + Odoo push
+import { pushExpediciaToOdoo } from '$lib/server/expedicia-odoo';
+import { spocitajTesnenia } from '$lib/pergola-tesnenia';
+import { expedicnyZoznam } from '$lib/pergola-expedicia';
 import { writeOdpis, isLive, blokHlaska, overrideOpts, rawFormEntries } from '$lib/server/money';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
@@ -260,5 +266,64 @@ export const actions = {
 					'Zápis rezervácie zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};
 		}
+	},
+
+	// #419 extended scope: expedičný zoznam → Odoo sale.order log-note (one-shot).
+	// Money-NEUTRÁLNE — neposiela do Money, len PDF prílohu na internú note.
+	odoslatExpediciuDoOdoo: async ({ request, locals }) => {
+		const form = await request.formData();
+		const { vstup, error } = parsePergolaNarezVstup(form);
+		const ident = parseIdent(form);
+		const { rucne } = parseRucne(form);
+		const fix = parseFix(form, vstup);
+		if (error || !ident.zak || !ident.op || !ident.zakaznik) {
+			return {
+				step: 'vysledok' as const,
+				vstup,
+				ident,
+				rucne,
+				fix,
+				strechaSkloCena: strechaCenaPre(locals.user, vstup),
+				error: error ?? 'Vyplň ZAK, OP a zákazníka.',
+				odooResult: null
+			};
+		}
+		const vysledok = spocitajNarez(vstup);
+		const komponenty = komponentyPergoly(vstup);
+		const strechaSklo = spocitajStrechaSklo(vstup);
+		const fixResult = spocitajFixZPergoly(fix);
+		const tesnenia = spocitajTesnenia(vysledok);
+		const zoznam = expedicnyZoznam(vysledok, komponenty, {
+			strechaSklo,
+			fix: fix.zapnuty
+				? {
+						zapnuty: fix.zapnuty,
+						zrkadlo: fix.zrkadlo,
+						vykres: fixResult.vykres
+					}
+				: null,
+			tesnenia
+		});
+		const odooResult = await pushExpediciaToOdoo(zoznam, {
+			zak: ident.zak,
+			op: ident.op,
+			zakaznik: ident.zakaznik
+		});
+		log.info('expedicia do Odoo', {
+			zak: ident.zak,
+			op: ident.op,
+			result: odooResult.result,
+			poloziek: zoznam.polozky.length
+		});
+		return {
+			step: 'vysledok' as const,
+			vstup,
+			ident,
+			rucne,
+			fix,
+			strechaSkloCena: strechaCenaPre(locals.user, vstup),
+			error: null as string | null,
+			odooResult
+		};
 	}
 } satisfies Actions;

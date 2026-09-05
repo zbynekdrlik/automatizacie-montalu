@@ -165,7 +165,8 @@ const baseNote: ZakazkaNote = {
 	cenaSpolu: 12.5,
 	cenaKompletna: true,
 	cenaNakupSpolu: 8,
-	nakupKompletna: true
+	nakupKompletna: true,
+	odpad: []
 };
 
 describe('buildZakazkaNoteHtml', () => {

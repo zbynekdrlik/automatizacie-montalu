@@ -38,7 +38,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v34 → v35: stĺpec produkt na dopyt (#384)', () => {
 	it('user_version === 35 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(38);
+		expect(db.pragma('user_version', { simple: true })).toBe(39);
 	});
 
 	it('tabuľka dopyt má nový stĺpec produkt', () => {

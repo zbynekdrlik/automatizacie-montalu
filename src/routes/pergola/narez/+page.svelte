@@ -58,6 +58,10 @@
 	let rezError = $derived(form && 'rezError' in form ? form.rezError : null);
 	// cenový blok (#232, display-only) — LEN interní; b2b nikdy nedostane `ceny`
 	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
+	// #419 extended scope — výsledok Odoo push expedičného zoznamu
+	let odooResult = $derived(
+		form && 'odooResult' in form ? (form as { odooResult: unknown }).odooResult : null
+	);
 
 	// vstup na výpočet výsledku (display-only). Merge form?.vstup s predvolenými hodnotami
 	// — rovnaká disciplína ako /bazen/navrh.
@@ -407,7 +411,27 @@
 			</div>
 			<button class="btn" type="submit" data-testid="pripravit-rezervaciu">Pripraviť odpis →</button
 			>
+			<button
+				class="btn secondary"
+				type="submit"
+				formaction="?/odoslatExpediciuDoOdoo"
+				data-testid="odoslat-expedicia-odoo">Odoslať expedíciu do Odoo</button
+			>
 		</form>
+		{#if odooResult}
+			{@const r = odooResult as { result: string; error?: string }}
+			<div class="sub" data-testid="odoo-expedicia-vysledok" style="margin-top:8px">
+				{#if r.result === 'posted'}
+					<span class="badge ok">Expedičný zoznam odoslaný do Odoo.</span>
+				{:else if r.result === 'no-order'}
+					<span class="badge wait">Objednávka sa v Odoo nenašla — expedícia neodoslaná.</span>
+				{:else if r.result === 'disabled'}
+					<span class="badge wait">Odoo integrácia je vypnutá (chýba konfigurácia).</span>
+				{:else if r.result === 'failed'}
+					<span class="badge wait">Odoslanie zlyhalo: {r.error ?? 'neznáma chyba'}</span>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<div class="card noprint">

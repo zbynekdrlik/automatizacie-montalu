@@ -3,6 +3,7 @@ paths:
   - 'src/lib/odpad.ts'
   - 'src/lib/components/RozpisRezov.svelte'
   - 'src/lib/server/optimalizator.ts'
+  - 'src/lib/server/odpad-store.ts'
 ---
 
 # Odpad z nárezov (offcut / zvyšky tyčí) — #417
@@ -31,5 +32,10 @@ zakaždým odznova hľadať:
   `m.barLen ?? bar` v komponente).
 - **Money-neutrálne:** odpad je čisto display — žiadny `writeOdpis`, žiadny import
   `server/money`, žiadne katalógové kódy/ceny. `odpad.ts` sa preto NESMIE dotknúť Money.
-- **Otvorené (needs-answer na #417):** perzistencia/report odpadu (DB tabuľka + report
-  za obdobie/sklad, väzba na inventúru) — čaká na ownera, NEIMPLEMENTUJ špekulatívne.
+- **Odoo evidencia (#417 fáza 2) = `odpis_odpad` DB tabuľka + sekcia v Odoo log-note.**
+  Form akcia zasklenia po úspešnom `writeOdpis` zavolá `saveOdpisOdpad(zak, op, material)`
+  (`odpad-store.ts`), ktorý uloží per-profil offcut do tabuľky `odpis_odpad` (FK CASCADE
+  na `odpis_log`). Note builder (`pushZakazkaToOdoo` v `odoo-zakazka.ts`) ich agreguje cez
+  `getOdpadForOdpisy` a vykreslí sekciu „Odpad z nárezov" v HTML log-note (tabuľka per profil
+  + súčet). Retry/sweep (#349) funguje — dáta sú v DB, re-derivácia ich vždy nájde.
+  `money.ts` sa NEMENÍ (odpad sa ukladá z form akcie, nie z writeOdpis).

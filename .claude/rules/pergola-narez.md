@@ -607,22 +607,41 @@ split — `pergola-narez.ts` prekročilo 1000-r. strop; acyklický import: `perg
   v spec bloku „TOLERANCIE: hĺbka · montáž +2 / +3 / +12 mm".
 - Časti 2 (Detail C/D uloženia) + 5 (rezný náčrt krovu s uhlami) ostávajú viazané na #161.
 
-## Expedičný zoznam (#419) — TRANSFORM vypočítaných dát, nie nový výpočet
+## Expedičný zoznam (#419, rozšírený scope) — KOMPLETNÝ TRANSFORM + PDF + Odoo príloha
 
 Výdajová listina hotových kusov žije v **`src/lib/pergola-expedicia.ts`**
-(`expedicnyZoznam(vysledok, komponenty)`) — čistý TRANSFORM UŽ vypočítaných dát nárezu,
-NIE nový výpočet a NIE nový vstup. Vzor je identický s `pozicujDiely`/`komponentyPergoly`/
-`spocitajStrechaSklo`: samostatný pure modul (acyklický import `pergola-expedicia →
-pergola-narez` (typy) + `pergola-vyroba` (`pozicujDiely`), NIKDY naopak; pridaný do
-`CISTY_ENGINE` money-safety guardu), v `RezVysledok` sa počíta `$derived` a renderuje ako
-karta. Keď treba ĎALŠÍ výdajovo/expedične orientovaný pohľad, sklad ho z existujúcich dát
-takto — neduplikuj engine, nepridávaj vstup/perzistenciu.
+(`expedicnyZoznam(vysledok, komponenty, opts?)`) — čistý TRANSFORM UŽ vypočítaných dát
+nárezu, NIE nový výpočet a NIE nový vstup. Od rozšírenia scope (5.9.2026) pokrýva 6 skupín:
+profily, kusové komponenty, strešné sklá, FIX výplne, tesnenia, drobný materiál. Vzor je
+identický s `pozicujDiely`/`komponentyPergoly`/`spocitajStrechaSklo`: samostatný pure modul
+(acyklický import `pergola-expedicia → pergola-narez` (typy) + `pergola-vyroba` +
+`pergola-tesnenia` + `fix` (typy), NIKDY naopak; pridaný do `CISTY_ENGINE` money-safety
+guardu), v `RezVysledok` sa počíta `$derived` a renderuje ako karta.
 
 - **Profily** = `pozicujDiely(vysledok.vypocitane)` → reálne Money-overené počty + pozičné
   číslo (rovnaké ako Materiál/výkresové balóniky). **Komponenty** = `komponentyPergoly` →
   honest-null počty „—". Honest-null dĺžka profilu (čaká na vzorec) sa MUSÍ odlíšiť od
   komponentu (bez dĺžky): profil = `mm()` („— (čaká na výkres)"), komponent = holé „—" —
   inak na papieri vyzerá nehotový kus ako hotový.
+- **Strešné sklá** = `opts.strechaSklo` (z `spocitajStrechaSklo`) → počet tabúľ + rozmer
+  (šírka × dĺžka, honest-null keď dĺžka krovu neoverená).
+- **FIX výplne** = `opts.fix.vykres.polia` → per-pole sklo; **`zrkadlo` NEDVOJÍ kusy**
+  (tá istá konštrukcia otočená L/P, nie druhý kus — review nález #419).
+- **Tesnenia** = `opts.tesnenia` (z `spocitajTesnenia`, `pergola-tesnenia.ts`) → len
+  s `stav === 'ok'` a `dlzkaMm != null`; merané dĺžkou (nie kusmi → `pocetKs = null`).
+- **Drobný materiál** = catch-all honest-null riadok (skrutky/matice/kotvy — appka ich
+  nepočíta; NIKDY vymyslené počty).
+
+**Tesnenia extrakcia (#419):** `spocitajTesnenia` bola EXTRAHOVANÁ z
+`server/pergola-rezervacia.ts` do client-safe `src/lib/pergola-tesnenia.ts` (čistá funkcia,
+závisí len na `NarezVysledok`, žiadne Money/server importy; v `CISTY_ENGINE`). Server modul
+ju re-importuje + re-exportuje pre backward compat.
+
+**PDF + Odoo príloha:** `src/lib/server/expedicia-pdf.ts` (vzor `zakazka-pdf.ts`, DejaVu
+Sans) + `src/lib/server/expedicia-odoo.ts` (one-shot push na `sale.order` internú log-note,
+vzor `odoo-zakazka.ts` bez durable retry). Standalone tlačidlo „Odoslať expedíciu do Odoo"
+(`formaction="?/odoslatExpediciuDoOdoo"`), nezávislé od Money. Customer-leak kontrakt:
+`mt_note`, `partner_ids=[]`, orphan-attachment unlink pri message_post failure.
 
 ## TLAČENÝ hárok: čestný kontext NESMIE byť v `.noprint` (print.css ho skryje)
 
