@@ -11,8 +11,8 @@ import { collectConsole, loginAs, skipAkLive, vyberFarbuKovania } from './helper
 
 const RUN = `VYLUC-${Date.now().toString(36).toUpperCase()}`;
 
-// ZASP00018 = rámový profil Robust (vždy prítomný v Robust zasklenia compute)
-const KOD_SKLAD_0 = 'ZASP00018';
+// ZASP00002 = rámový profil Robust (vždy prítomný v Robust 2K zasklenia compute)
+const KOD_SKLAD_0 = 'ZASP00002';
 
 test('zasklenia: odobrať z odpisu NAOZAJ vylúči položku z Money xlsx (nie len vizuálne)', async ({
 	page
