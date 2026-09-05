@@ -45,7 +45,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v26 → v27: ochrany proti dvojitému importu (#294)', () => {
 	it('user_version === 28 po migrácii (v27 ledger + v28 cfg no-op na prázdnom cfg_rez)', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(38);
+		expect(db.pragma('user_version', { simple: true })).toBe(39);
 	});
 
 	it('nová append-only tabuľka odpis_imported existuje s kind CHECK', () => {

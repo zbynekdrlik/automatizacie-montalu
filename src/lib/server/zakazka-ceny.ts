@@ -9,6 +9,7 @@
 // honest-null „cena neznáma"). Read-only — do Money sa odtiaľto NIČ nepíše.
 import { db } from './db';
 import { normZak } from './money';
+import { getOdpadForOdpisy, type OdpadRow } from './odpad-store';
 
 export interface ZakazkaOdpisRow {
 	id: number;
@@ -56,6 +57,9 @@ export interface ZakazkaPrehlad {
 	/** scope odpisy BEZ uložených položiek (spred fázy 1) — ich materiál v agregáte
 	 *  čestne CHÝBA a UI to musí priznať, nikdy sa tváriť, že zoznam je kompletný. */
 	bezPoloziek: number;
+	/** #417 faza 2: per-profil odpad z narezov agregovany napriec scope odpisy.
+	 *  Prazdne pole ak ziadne odpisy nemaju odpadove data (moduly bez ffdPack: pergola, bazen, clip). */
+	odpad: OdpadRow[];
 }
 
 /** float šum zo sčítania qty (0.1+0.2) — zaokrúhlenie na 3 des. (mm/kusy stačia). */
@@ -121,6 +125,9 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 		.map((p) => ({ ...p, qty: round3(p.qty) }))
 		.sort((a, b) => a.kod.localeCompare(b.kod, 'sk'));
 
+	// #417 faza 2: per-profil odpad z narezov agregovany napriec scope odpisy
+	const odpad = getOdpadForOdpisy(vScope.map((o) => o.id));
+
 	return {
 		zak: najnovsi.zak,
 		zakNorm,
@@ -130,6 +137,7 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 		polozky,
 		odpisovVScope: vScope.length,
 		parkovanych: vScope.filter((o) => o.caka === 1 && o.presunute_at === null).length,
-		bezPoloziek
+		bezPoloziek,
+		odpad
 	};
 }

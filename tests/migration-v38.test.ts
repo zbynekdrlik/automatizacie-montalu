@@ -51,7 +51,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v37 → v38: rozvin do material_prices (#369)', () => {
 	it('user_version === 38 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(38);
+		expect(db.pragma('user_version', { simple: true })).toBe(39);
 	});
 
 	it('material_prices má nový stĺpec rozvin (aditívne, na konci)', () => {
@@ -91,7 +91,7 @@ describe('migrácia v37 → v38: rozvin do material_prices (#369)', () => {
 		migrateMaterialRozvin(db, () => {
 			throw new Error('bump sa nesmie zavolať znova — guard >= 38 mal vrátiť skôr');
 		});
-		expect(db.pragma('user_version', { simple: true })).toBe(38);
+		expect(db.pragma('user_version', { simple: true })).toBe(39);
 	});
 
 	it('feature-detect: DB bez material_prices → bump(38) bez ALTER (minimálne fixtúry nepadnú)', () => {

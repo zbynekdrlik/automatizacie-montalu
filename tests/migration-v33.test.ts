@@ -63,7 +63,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v32 → v33: objednávkové stĺpce na dopyt (#319)', () => {
 	it('user_version === 33 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(38);
+		expect(db.pragma('user_version', { simple: true })).toBe(39);
 	});
 
 	it('existujúci dopyt (Eva) prežil migráciu (žiadna strata dát)', () => {
