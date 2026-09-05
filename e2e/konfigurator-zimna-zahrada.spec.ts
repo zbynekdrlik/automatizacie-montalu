@@ -130,3 +130,45 @@ test('zimná záhrada konfigurátor: zmena modelu + rozmeru → súhrn sa aktual
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('zimná záhrada: farba select + výška stepper +/− + default ROBUST tam-späť + scroll-CTA, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/zimna-zahrada');
+
+	// farba select
+	const farbaSelect = page.getByTestId('zz-farba');
+	await expect(farbaSelect).toBeVisible();
+	const farbaOpts = await farbaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(farbaOpts.length).toBeGreaterThan(1);
+	await farbaSelect.selectOption(farbaOpts[1]!);
+	await expect(farbaSelect).toHaveValue(farbaOpts[1]!);
+
+	// výška stepper +/−
+	const vyskaInput = page.getByTestId('zz-vyska');
+	await expect(vyskaInput).toBeVisible();
+	const initialVyska = await vyskaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť výšku' }).click();
+	const afterIncVyska = await vyskaInput.inputValue();
+	expect(afterIncVyska).not.toBe(initialVyska);
+	await page.getByRole('button', { name: 'Zmenšiť výšku' }).click();
+	await expect(vyskaInput).toHaveValue(initialVyska);
+
+	// default ROBUST tam-späť (PARTIAL requirement #463)
+	await page.getByTestId('zz-model-MASSIVE').click();
+	await expect(page.getByTestId('zz-model-MASSIVE')).toHaveAttribute('aria-pressed', 'true');
+	await page.getByTestId('zz-model-ROBUST').click();
+	await expect(page.getByTestId('zz-model-ROBUST')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('zz-model-MASSIVE')).toHaveAttribute('aria-pressed', 'false');
+
+	// scroll-CTA „Nezáväzný dopyt →"
+	const scrollCta = page.getByText(/Nezáväzný dopyt/).first();
+	await expect(scrollCta).toBeVisible();
+	await scrollCta.click();
+	await expect(page.getByTestId('dopyt')).toBeInViewport();
+
+	expect(consoleMsgs).toEqual([]);
+});

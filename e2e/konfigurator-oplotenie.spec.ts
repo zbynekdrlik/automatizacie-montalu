@@ -160,3 +160,117 @@ test('oplotenie obálka (#427): cenníkový rozsah per-typ + „mimo rozsah" hl�
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('oplotenie počet: zmena počtu kusov → iná cena (cenotvorná os typ×model×výška×šírka×počet), nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/oplotenie');
+
+	// zobraz orientačnú cenu pre default (1 ks, diel, ARIEL, 1500×2000)
+	await page.getByTestId('oplotenie-cena-zobrazit').click();
+	await expect(page.getByTestId('oplotenie-cena')).toBeVisible();
+	const cena1ks = await page.getByTestId('oplotenie-cena-sdph').textContent();
+	expect(cena1ks).toMatch(/\d.*€/);
+
+	// zmeň počet na 2 ks → cena sa zneaktuální (gating)
+	await page.getByTestId('oplotenie-pocet').selectOption('2');
+	await expect(page.getByTestId('oplotenie-cena')).toHaveCount(0);
+	await expect(page.getByTestId('oplotenie-cena-zobrazit')).toContainText('Prepočítať');
+
+	// prepočítaj → nová cena
+	await page.getByTestId('oplotenie-cena-zobrazit').click();
+	await expect(page.getByTestId('oplotenie-cena')).toBeVisible();
+	const cena2ks = await page.getByTestId('oplotenie-cena-sdph').textContent();
+	expect(cena2ks).toMatch(/\d.*€/);
+
+	// cena 2 ks sa MUSÍ líšiť od 1 ks (počet je cenotvorná os)
+	expect(cena2ks).not.toBe(cena1ks);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('oplotenie: typy krídlová/samonosná + modely BIANCA/LUNA/NARVI/REA + default ARIEL tam-späť + farba select, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/oplotenie');
+
+	// krídlová brána → aria-pressed
+	await page.getByTestId('oplotenie-typ-kridlova').click();
+	await expect(page.getByTestId('oplotenie-typ-kridlova')).toHaveAttribute('aria-pressed', 'true');
+
+	// samonosná brána → aria-pressed + predošlý typ odtlačený
+	await page.getByTestId('oplotenie-typ-samonosna').click();
+	await expect(page.getByTestId('oplotenie-typ-samonosna')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('oplotenie-typ-kridlova')).toHaveAttribute('aria-pressed', 'false');
+
+	// vráť na diel (default) pre model testy
+	const typDiel = page.getByTestId('oplotenie-typ-diel');
+	if ((await typDiel.count()) > 0) {
+		await typDiel.click();
+		await expect(typDiel).toHaveAttribute('aria-pressed', 'true');
+	}
+
+	// modely BIANCA, LUNA, NARVI, REA — klikni, over aria-pressed
+	for (const model of ['BIANCA', 'LUNA', 'NARVI', 'REA']) {
+		await page.getByTestId(`oplotenie-model-${model}`).click();
+		await expect(page.getByTestId(`oplotenie-model-${model}`)).toHaveAttribute(
+			'aria-pressed',
+			'true'
+		);
+	}
+
+	// default ARIEL tam-späť (PARTIAL requirement #463)
+	await page.getByTestId('oplotenie-model-ARIEL').click();
+	await expect(page.getByTestId('oplotenie-model-ARIEL')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('oplotenie-model-REA')).toHaveAttribute('aria-pressed', 'false');
+
+	// farba select — vyber nedefaultnú RAL hodnotu, over že sa zmení
+	const farbaSelect = page.getByTestId('oplotenie-farba');
+	await expect(farbaSelect).toBeVisible();
+	const farbaOpts = await farbaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(farbaOpts.length).toBeGreaterThan(1);
+	await farbaSelect.selectOption(farbaOpts[1]!);
+	await expect(farbaSelect).toHaveValue(farbaOpts[1]!);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('oplotenie: stepper +/− tlačidlá (výška + šírka) + scroll-CTA „Nezáväzný dopyt →", nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/oplotenie');
+
+	// výška stepper: prečítaj default, klikni +, over zmenu, klikni −, over návrat
+	const vyskaInput = page.getByTestId('oplotenie-vyska');
+	const initialVyska = await vyskaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť výšku' }).click();
+	const afterIncVyska = await vyskaInput.inputValue();
+	expect(afterIncVyska).not.toBe(initialVyska);
+	await page.getByRole('button', { name: 'Zmenšiť výšku' }).click();
+	await expect(vyskaInput).toHaveValue(initialVyska);
+
+	// šírka stepper: analogicky
+	const sirkaInput = page.getByTestId('oplotenie-sirka');
+	const initialSirka = await sirkaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť šírku' }).click();
+	const afterIncSirka = await sirkaInput.inputValue();
+	expect(afterIncSirka).not.toBe(initialSirka);
+	await page.getByRole('button', { name: 'Zmenšiť šírku' }).click();
+	await expect(sirkaInput).toHaveValue(initialSirka);
+
+	// súhrn odráža rozmer (štandardný default: 1500 × 2000 mm)
+	await expect(page.getByTestId('oplotenie-suhrn-rozmery')).toHaveText(/\d+ × \d+ mm/);
+
+	// scroll-CTA „Nezáväzný dopyt →" — klikni, over že dopyt sekcia je vo viewporte
+	const scrollCta = page.getByText(/Nezáväzný dopyt/).first();
+	await expect(scrollCta).toBeVisible();
+	await scrollCta.click();
+	await expect(page.getByTestId('dopyt')).toBeInViewport();
+
+	expect(consoleMsgs).toEqual([]);
+});

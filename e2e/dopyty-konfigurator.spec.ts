@@ -88,3 +88,54 @@ test('neprihlásený používateľ je z /dopyty-konfigurator presmerovaný na lo
 	await expect(page).toHaveURL(/next=.*dopyty-konfigurator/);
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('dopyty pager: >50 riadkov → stránkovanie „← Novšie / Staršie →" funguje', async ({
+	page
+}) => {
+	test.skip(!!process.env.BASE_URL, 'seed cez lokálny DB súbor — len preview beh');
+	const consoleMsgs = collectConsole(page);
+
+	// seed 55 dopytov do DB (stránkovanie po 50 riadkoch)
+	const db = new Database(DB_PATH);
+	try {
+		const stmt = db.prepare(
+			`INSERT INTO dopyt (konfiguracia, meno, email, telefon, miesto, poznamka)
+			 VALUES (?, ?, ?, ?, ?, ?)`
+		);
+		for (let i = 0; i < 55; i++) {
+			stmt.run(
+				JSON.stringify({ system: 'Robust', sirka: 3000, hlbka: 4000 }),
+				`Pager Test ${i}`,
+				`pager-${i}@example.com`,
+				'+421900000000',
+				'Bratislava',
+				`E2E pager test riadok ${i}`
+			);
+		}
+	} finally {
+		db.close();
+	}
+
+	await loginAs(page);
+	await goto(page, '/dopyty-konfigurator');
+
+	// pager je viditeľný (viac ako 50 riadkov → 2+ strany)
+	const pager = page.getByTestId('pager');
+	await expect(pager).toBeVisible();
+
+	// „Staršie →" odkaz — klikni, over navigáciu na stranu 2
+	const starsie = pager.getByText('Staršie →');
+	await expect(starsie).toBeVisible();
+	await starsie.click();
+	await expect(page).toHaveURL(/page=2/);
+
+	// na strane 2: „← Novšie" je aktívny odkaz
+	const novsie = page.getByTestId('pager').getByText('← Novšie');
+	await expect(novsie).toBeVisible();
+
+	// klikni späť na stranu 1
+	await novsie.click();
+	await expect(page).not.toHaveURL(/page=2/);
+
+	expect(consoleMsgs).toEqual([]);
+});

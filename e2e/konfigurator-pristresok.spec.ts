@@ -80,3 +80,68 @@ test('prístrešok konfigurátor: zmena typu + rozmeru → súhrn sa aktualizuje
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('prístrešok: typy terasa/skleník/sauna + default altánok tam-späť + farba + krytina + výška stepper +/− + scroll-CTA, nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await goto(page, '/konfigurator/pristresok');
+
+	// typ terasa → aria-pressed
+	await page.getByTestId('pristresok-typ-terasa').click();
+	await expect(page.getByTestId('pristresok-typ-terasa')).toHaveAttribute('aria-pressed', 'true');
+
+	// typ skleník → aria-pressed + predošlý odtlačený
+	await page.getByTestId('pristresok-typ-sklenik').click();
+	await expect(page.getByTestId('pristresok-typ-sklenik')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('pristresok-typ-terasa')).toHaveAttribute('aria-pressed', 'false');
+
+	// typ sauna
+	await page.getByTestId('pristresok-typ-sauna').click();
+	await expect(page.getByTestId('pristresok-typ-sauna')).toHaveAttribute('aria-pressed', 'true');
+
+	// default altánok tam-späť (PARTIAL requirement #463)
+	await page.getByTestId('pristresok-typ-altanok').click();
+	await expect(page.getByTestId('pristresok-typ-altanok')).toHaveAttribute('aria-pressed', 'true');
+	await expect(page.getByTestId('pristresok-typ-sauna')).toHaveAttribute('aria-pressed', 'false');
+
+	// farba select
+	const farbaSelect = page.getByTestId('pristresok-farba');
+	await expect(farbaSelect).toBeVisible();
+	const farbaOpts = await farbaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(farbaOpts.length).toBeGreaterThan(1);
+	await farbaSelect.selectOption(farbaOpts[1]!);
+	await expect(farbaSelect).toHaveValue(farbaOpts[1]!);
+
+	// krytina select
+	const krytinaSelect = page.getByTestId('pristresok-krytina');
+	await expect(krytinaSelect).toBeVisible();
+	const krytinaOpts = await krytinaSelect
+		.locator('option')
+		.evaluateAll((els) => els.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	expect(krytinaOpts.length).toBeGreaterThan(0);
+	if (krytinaOpts.length > 1) {
+		await krytinaSelect.selectOption(krytinaOpts[1]!);
+		await expect(krytinaSelect).toHaveValue(krytinaOpts[1]!);
+	}
+
+	// výška stepper +/−
+	const vyskaInput = page.getByTestId('pristresok-vyska');
+	await expect(vyskaInput).toBeVisible();
+	const initialVyska = await vyskaInput.inputValue();
+	await page.getByRole('button', { name: 'Zväčšiť výšku' }).click();
+	const afterIncVyska = await vyskaInput.inputValue();
+	expect(afterIncVyska).not.toBe(initialVyska);
+	await page.getByRole('button', { name: 'Zmenšiť výšku' }).click();
+	await expect(vyskaInput).toHaveValue(initialVyska);
+
+	// scroll-CTA „Nezáväzný dopyt →"
+	const scrollCta = page.getByText(/Nezáväzný dopyt/).first();
+	await expect(scrollCta).toBeVisible();
+	await scrollCta.click();
+	await expect(page.getByTestId('dopyt')).toBeInViewport();
+
+	expect(consoleMsgs).toEqual([]);
+});
