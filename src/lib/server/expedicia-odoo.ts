@@ -12,7 +12,8 @@ import {
 	createRecord,
 	odooConfig,
 	xmlEscape,
-	type OdooConfig
+	type OdooConfig,
+	type XmlRpcValue
 } from './odoo-rpc';
 import { generateExpediciaPdfBase64, expediciaPdfFilename } from './expedicia-pdf';
 import { normOp } from './money';
@@ -72,22 +73,52 @@ export async function pushExpediciaToOdoo(
 
 		for (const orderId of ids) {
 			// Vytvor prílohu
-			const attId = await createRecord(cfg, uid, 'ir.attachment', {
-				name: filename,
-				datas: pdfBase64,
-				res_model: 'sale.order',
-				res_id: orderId,
-				mimetype: 'application/pdf',
-				type: 'binary'
-			});
-			// Postni internú log-note s prílohou
-			await executeKw(cfg, uid, 'sale.order', 'message_post', [[orderId]], {
-				body: htmlBody,
-				subtype_xmlid: 'mail.mt_note',
-				message_type: 'comment',
-				partner_ids: [],
-				attachment_ids: [attId]
-			});
+			let attIds: number[] = [];
+			try {
+				const attId = await createRecord(cfg, uid, 'ir.attachment', {
+					name: filename,
+					datas: pdfBase64,
+					res_model: 'sale.order',
+					res_id: orderId,
+					mimetype: 'application/pdf',
+					type: 'binary'
+				});
+				attIds = [attId];
+			} catch (e) {
+				log.warn('expedicia push: pripojenie PDF prilohy zlyhalo (note ide bez prilohy)', {
+					zak: ident.zak,
+					op: ident.op,
+					saleOrderId: orderId,
+					err: errMsg(e)
+				});
+			}
+			// Postni internú log-note (s prílohou ak sa podarila, inak bez)
+			try {
+				const kwargs: Record<string, XmlRpcValue> = {
+					body: htmlBody,
+					subtype_xmlid: 'mail.mt_note',
+					message_type: 'comment',
+					partner_ids: []
+				};
+				if (attIds.length > 0) kwargs.attachment_ids = attIds;
+				await executeKw(cfg, uid, 'sale.order', 'message_post', [[orderId]], kwargs);
+			} catch (e) {
+				// message_post zlyhal PO vytvorení prílohy → best-effort odviazanie osirelej
+				// prílohy (vzor #418 review, odoo-zakazka.ts unlinkAttachments)
+				if (attIds.length > 0) {
+					try {
+						await executeKw(cfg, uid, 'ir.attachment', 'unlink', [attIds]);
+					} catch (unlinkErr) {
+						log.warn('expedicia push: odviazanie osirelej prilohy zlyhalo', {
+							zak: ident.zak,
+							op: ident.op,
+							attIds,
+							err: errMsg(unlinkErr)
+						});
+					}
+				}
+				throw e; // prepadne do vonkajšieho catch → 'failed'
+			}
 			log.info('expedicia push: interna poznamka zapisana na sale.order', {
 				zak: ident.zak,
 				op: ident.op,

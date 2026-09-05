@@ -405,7 +405,7 @@
 				<tr
 					><th class="check-col">Naložené</th><th class="poz-col">Poz.</th><th>Skupina</th><th
 						>Kód</th
-					><th>Názov</th><th>Dĺžka</th><th>Počet ks</th></tr
+					><th>Názov</th><th>Rozmer/Dĺžka</th><th>Počet ks</th></tr
 				>
 			</thead>
 			<tbody>

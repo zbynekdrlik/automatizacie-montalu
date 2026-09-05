@@ -148,7 +148,8 @@ export function expedicnyZoznam(
 		const polia = fx.vykres.polia;
 		for (let i = 0; i < polia.length; i++) {
 			const pole = polia[i]!;
-			const ks = fx.zrkadlo ? 2 : 1;
+			// zrkadlový FIX je tá ISTÁ konštrukcia otočená (L/P), nie DRUHÝ kus
+			const ks = 1;
 			const rozmer = `${fmtMm(pole.sirka)} × ${fmtMm(pole.vLavo)}`;
 			fixy.push({
 				skupina: 'fix-vypln',
@@ -195,7 +196,7 @@ export function expedicnyZoznam(
 			rozmerInfo: null
 		}
 	];
-	honestNullSkupiny.push('drobny material');
+	honestNullSkupiny.push('drobný materiál');
 
 	const polozky = [...profily, ...komp, ...skla, ...fixy, ...tesn, ...drobny];
 

@@ -270,21 +270,20 @@ export const actions = {
 
 	// #419 extended scope: expedičný zoznam → Odoo sale.order log-note (one-shot).
 	// Money-NEUTRÁLNE — neposiela do Money, len PDF prílohu na internú note.
-	odoslatExpediciuDoOdoo: async ({ request }) => {
+	odoslatExpediciuDoOdoo: async ({ request, locals }) => {
 		const form = await request.formData();
 		const { vstup, error } = parsePergolaNarezVstup(form);
 		const ident = parseIdent(form);
 		const { rucne } = parseRucne(form);
 		const fix = parseFix(form, vstup);
 		if (error || !ident.zak || !ident.op || !ident.zakaznik) {
-			const strechaSkloCena = null;
 			return {
 				step: 'vysledok' as const,
 				vstup,
 				ident,
 				rucne,
 				fix,
-				strechaSkloCena,
+				strechaSkloCena: strechaCenaPre(locals.user, vstup),
 				error: error ?? 'Vyplň ZAK, OP a zákazníka.',
 				odooResult: null
 			};
@@ -322,7 +321,7 @@ export const actions = {
 			ident,
 			rucne,
 			fix,
-			strechaSkloCena: null,
+			strechaSkloCena: strechaCenaPre(locals.user, vstup),
 			error: null as string | null,
 			odooResult
 		};

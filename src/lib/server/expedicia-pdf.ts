@@ -8,8 +8,7 @@
 //
 // DejaVu subset NEOBSAHUJE varovné emoji (U+26A0, U+23F3, U+2611 „ballot box with check") →
 // v tele PDF sa NEPOUŽÍVAJÚ (kreslili by sa ako „tofu" prázdne štvorčeky); honesty riadky
-// nesú textovú predponu „POZOR:". HTML note v `expedicia-odoo.ts` si emoji ponecháva
-// (prehliadač ich vykreslí).
+// nesú textovú predponu „POZOR:".
 //
 // Hodnoty sa vykreslia AJ zapíšu do metadát (Title/Subject/Keywords) — testovateľný kanál
 // (custom-font glyfy sa z PDF tela nedajú spoľahlivo prečítať, rovnaká disciplína ako
