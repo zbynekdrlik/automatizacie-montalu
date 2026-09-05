@@ -13,8 +13,9 @@
 		type PergolaKomponent
 	} from '$lib/pergola-narez';
 	import { pozicujDiely } from '$lib/pergola-vyroba';
-	// #419 — expedičný zoznam: čistý transform vypočítaných dát (hotové profily + komponenty)
+	// #419 — expedičný zoznam: čistý transform vypočítaných dát (profily + komponenty + extras)
 	import { expedicnyZoznam } from '$lib/pergola-expedicia';
+	import { spocitajTesnenia } from '$lib/pergola-tesnenia';
 	import type { KrovUlozenie } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
@@ -78,8 +79,14 @@
 	const diely = $derived(pozicujDiely(vysledok.vypocitane));
 	// #223 — plocha v m² so slovenskou čiarkou (celkovú cenu skiel počíta server, `cenaSpolu`)
 	const m2Val = (n: number | null) => (n === null ? '—' : `${String(n).replace('.', ',')} m²`);
-	// #419 — expedičný zoznam (výdajová listina): hotové profily z nárezu + kusové komponenty
-	const expedicia = $derived(expedicnyZoznam(vysledok, komponenty));
+	// #419 — expedičný zoznam (výdajová listina): profily + komponenty + sklo + FIX + tesnenia
+	const expedicia = $derived(
+		expedicnyZoznam(vysledok, komponenty, {
+			strechaSklo,
+			fix: fix.zapnuty ? { zapnuty: fix.zapnuty, zrkadlo: fix.zrkadlo, vykres: fixVykres } : null,
+			tesnenia: spocitajTesnenia(vysledok)
+		})
+	);
 </script>
 
 <div class="card">
@@ -365,19 +372,26 @@
 		Expedičný zoznam
 		<span class="badge" data-testid="expedicia-spolu"
 			>{expedicia.spoluKusov} ks · {expedicia.pocetProfilov} profilov · {expedicia.pocetKomponentov}
-			komponentov</span
+			komponentov · {expedicia.pocetSkiel} skiel · {expedicia.pocetFixov} FIX · {expedicia.pocetTesneni}
+			tesneni</span
 		>
 	</div>
 	<p class="sub noprint">
 		Výdajová listina — hotové kusy, ktoré idú na expedíciu z tejto zákazky. Odškrtni pri nakládke.
 		Počty profilov sú z nárezu (isté); komponenty (spojky, krytky) čakajú na tabuľky od Dominika,
-		preto majú počet „—".
+		preto majú počet „—". Tesnenia sú merané dĺžkou (nie kusmi). Drobný materiál je zberná položka —
+		appka ho nepočíta.
 	</p>
 	<!-- tlačiteľné vysvetlivky + čestné upozornenie: tlačený hárok (na ňom sa reálne odškrtáva)
 	     musí niesť zmysel „—" AJ to, že položky čakajúce na pravidlo v zozname NIE SÚ -->
 	<p class="sub" data-testid="expedicia-legenda">
 		Vysvetlivky: „☐" odškrtni pri nakládke · „—" = údaj zatiaľ neznámy (nevymýšľa sa).
 	</p>
+	{#if expedicia.honestNullSkupiny.length > 0}
+		<p class="sub" data-testid="expedicia-honest-null">
+			Skupiny s neurčitými údajmi (—): {expedicia.honestNullSkupiny.join(', ')}.
+		</p>
+	{/if}
 	{#if cakaPravidloCount}
 		<p class="sub" data-testid="expedicia-neuplne">
 			Pozor: {cakaPravidloCount} položiek ešte čaká na pravidlo a v tomto zozname NIE SÚ.
@@ -391,7 +405,7 @@
 				<tr
 					><th class="check-col">Naložené</th><th class="poz-col">Poz.</th><th>Skupina</th><th
 						>Kód</th
-					><th>Názov</th><th>Dĺžka</th><th>Počet ks</th></tr
+					><th>Názov</th><th>Rozmer/Dĺžka</th><th>Počet ks</th></tr
 				>
 			</thead>
 			<tbody>
@@ -401,12 +415,31 @@
 					<tr data-testid="expedicia-riadok">
 						<td class="check-col"><span class="check-box" aria-hidden="true">☐</span></td>
 						<td class="poz-col">{p.poz ?? '—'}</td>
-						<td>{p.skupina === 'profil' ? 'Profil' : 'Komponent'}</td>
+						<td
+							>{p.skupina === 'profil'
+								? 'Profil'
+								: p.skupina === 'komponent'
+									? 'Komponent'
+									: p.skupina === 'stresne-sklo'
+										? 'Strešné sklo'
+										: p.skupina === 'fix-vypln'
+											? 'FIX výplň'
+											: p.skupina === 'tesnenie'
+												? 'Tesnenie'
+												: 'Drobný mat.'}</td
+						>
 						<td>{p.kod ?? '—'}</td>
 						<td>{p.nazov}</td>
-						<!-- profil bez známej dĺžky = „— (čaká na výkres)" (rovnako ako Materiál),
-						     komponent nemá dĺžku = „—" — dva rôzne stavy sa na hárku NEZLEJÚ (#419 review) -->
-						<td>{p.skupina === 'profil' ? mm(p.dlzkaRezuMm) : '—'}</td>
+						<!-- rozmer/dlzka: rozmerInfo ak je, inak profil mm(), tesnenie mm(), ostatne '—' -->
+						<td
+							>{p.rozmerInfo
+								? p.rozmerInfo
+								: p.skupina === 'profil'
+									? mm(p.dlzkaRezuMm)
+									: p.skupina === 'tesnenie'
+										? mm(p.dlzkaRezuMm)
+										: '—'}</td
+						>
 						<td><b>{p.pocetKs ?? '—'}</b></td>
 					</tr>
 				{/each}
