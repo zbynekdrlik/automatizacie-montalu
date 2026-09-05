@@ -2,7 +2,7 @@
 // položku z Money odpisu. Na súčasnom kóde (bez fixu) tlačidlo odobrat len vizuálne
 // označí položku, ale v odpise ostáva → Money celý doklad ticho zahodí.
 //
-// Fixture: ZASP00018 (rámový profil Robust) so sklad=0 → SkladVarovania varovanie.
+// Fixture: ZASP00002 (rámový profil Robust) so sklad=0 → SkladVarovania varovanie.
 // Zápisové kroky za skipAkLive, do Money nikdy nič nejde.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
