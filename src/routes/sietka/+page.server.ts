@@ -8,9 +8,17 @@
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
 import { loadCfg, listSysStyly } from '$lib/server/db';
-import { parseSietkaSamostatnaVstup } from '$lib/server/sietka-samostatna';
+import {
+	parseSietkaSamostatnaVstup,
+	parseSietkaMultiVstup,
+	type SietkaMultiVstup
+} from '$lib/server/sietka-samostatna';
 import { SIETKA_SAMOSTATNA_SYSTEMY, potrebuje3KKolajnicu } from '$lib/sietka';
-import { sietkaSamostatnaVypocet } from '$lib/server/compute';
+import {
+	sietkaSamostatnaVypocet,
+	sietkaSamostatnaMultiVypocet,
+	type SietkaSamostatnaMultiOdpis
+} from '$lib/server/compute';
 import { isB2B } from '$lib/server/auth';
 import {
 	writeOdpis,
@@ -173,6 +181,114 @@ export const actions = {
 				vstup
 			};
 		}
+	},
+
+	// ---- Multi (#473): viac dodatočných sieťok naraz v jednom odpise ----
+
+	upravitMulti: async ({ request }) => {
+		const { vstup } = parseSietkaMultiVstup(await request.formData());
+		return { step: 'form' as const, multiVstup: vstup };
+	},
+
+	vypocitatMulti: async ({ request, locals }) => {
+		const { vstup, error } = parseSietkaMultiVstup(await request.formData());
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		const { r, err } = sietkaSamostatnaMultiVypocet(loadCfg(), vstup.kusy);
+		if (err || !r)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+		const job = jobForMulti(vstup, r, '');
+		return {
+			step: 'vysledokMulti' as const,
+			multiVstup: vstup,
+			multi: r,
+			// #448/#451 predodpisové skladové varovanie + odobrať — LEN interní (rovnaký vzor ako single)
+			skladVarovania: isB2B(locals.user)
+				? []
+				: skladoveVarovania(
+						r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
+					),
+			snapshotDatum: getSnapshotMeta().generatedAt,
+			planHash: contentHash(vstup.zak, job.polozky),
+			cielInfo: {
+				live: isLive(),
+				filename: filenameFor(job),
+				dir: targetDirFor('Sietka', false)
+			}
+		};
+	},
+
+	// Odoslať odpis do Money — LEN interní (rovnaká obrana do hĺbky ako single `odoslat`).
+	odoslatMulti: async ({ request, locals }) => {
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemôže odpisovať do Money.' };
+		}
+		const formData = await request.formData();
+		const { vstup, error } = parseSietkaMultiVstup(formData);
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		const { r, err } = sietkaSamostatnaMultiVypocet(loadCfg(), vstup.kusy);
+		if (err || !r)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+		const job = jobForMulti(vstup, r, locals.user?.username ?? '');
+		// rovnaký "medzitým sa zmenili vzorce" guard ako single `odoslat`
+		const potvrdene = String(formData.get('planHash') ?? '');
+		const aktualny = contentHash(vstup.zak, job.polozky);
+		if (potvrdene && potvrdene !== aktualny) {
+			return {
+				step: 'vysledokMulti' as const,
+				multiVstup: vstup,
+				multi: r,
+				skladVarovania: skladoveVarovania(
+					r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
+				),
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				planHash: aktualny,
+				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				cielInfo: {
+					live: isLive(),
+					filename: filenameFor(job),
+					dir: targetDirFor('Sietka', false)
+				}
+			};
+		}
+		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
+		const vylucene = parseVyluceneKody(formData);
+		const finalJob = vylucPolozky(job, vylucene);
+		try {
+			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
+			if (outcome.status === 'duplicate') {
+				return {
+					step: 'duplikatMulti' as const,
+					error: `Zákazka ${vstup.zak} (OP ${vstup.op}) už bola odoslaná ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv zmaž starý import v Money a záznam v histórii odpisov.`,
+					multiVstup: vstup,
+					// duplikátna vetva zdieľa render blok s vysledokMulti (gejtovaný na `multi`) —
+					// bez neho by duplikát zobrazil prázdnu stránku (rovnaká pasca ako PR #108)
+					multi: r
+				};
+			}
+			if (outcome.status === 'blocked') {
+				return {
+					step: 'blocked' as const,
+					blokReason: outcome.reason!,
+					blokAction: '?/odoslatMulti',
+					rawEntries: rawFormEntries(formData),
+					error: blokHlaska(outcome, vstup.zak, vstup.op),
+					multiVstup: vstup
+				};
+			}
+			return { step: 'hotovoMulti' as const, multiVstup: vstup, multi: r, outcome };
+		} catch (e) {
+			logger('sietka').error('writeOdpis (multi sieťka) zlyhal', {
+				zak: vstup.zak,
+				op: vstup.op,
+				error: e
+			});
+			return {
+				step: 'form' as const,
+				error:
+					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.',
+				multiVstup: vstup
+			};
+		}
 	}
 } satisfies Actions;
 
@@ -201,6 +317,38 @@ function jobFor(
 			rozmerSietoviny: r.rozmerSietoviny,
 			uchyt: vstup.sietka.uchyt,
 			potrebuje3K: r.potrebuje3K,
+			poznamka: vstup.poznamka
+		}
+	};
+}
+
+/** #473 — jeden odpis pre VIAC sieťok naraz: `caka` ostáva `false` (rovnako ako
+ *  jednokusová /sietka nemá „čaká na materiál" voľbu), `cakaSubdir` je preto len
+ *  informačný (nikdy sa nepoužije, keďže caka=false → `targetDirFor` ho ignoruje). */
+function jobForMulti(
+	vstup: SietkaMultiVstup,
+	r: SietkaSamostatnaMultiOdpis,
+	createdBy: string
+): OdpisJob {
+	return {
+		modul: 'zasklenia',
+		zak: vstup.zak,
+		op: vstup.op,
+		zakaznik: vstup.zakaznik,
+		caka: false,
+		createdBy,
+		cakaSubdir: 'Sietka',
+		popis: (vstup.op + ' : ' + vstup.zakaznik + ' (sieťka multi)').trim(),
+		polozky: r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })),
+		detail: {
+			sietkaSamostatnaMulti: true,
+			kusy: vstup.kusy.map((k) => ({
+				system: k.system,
+				styl: k.styl,
+				otvorS: k.otvorS,
+				otvorV: k.otvorV,
+				uchyt: k.sietka.uchyt
+			})),
 			poznamka: vstup.poznamka
 		}
 	};

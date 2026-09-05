@@ -542,3 +542,55 @@ export function sietkaSamostatnaVypocet(
 		err: null
 	};
 }
+
+// --- MULTI (viac dodatočných sieťok naraz) — #473 ---
+
+/** Vstupný riadok pre viackusový výpočet (`sietkaSamostatnaMultiVypocet`) — len polia,
+ *  ktoré `sietkaSamostatnaVypocet` skutočne potrebuje (system/štýl/rozmery otvoru).
+ *  `SietkaSamostatnaVstup` (server/sietka-samostatna.ts) je štrukturálne širší nadtyp
+ *  — volajúci ho môže poslať priamo, bez mapovania (žiadny cirkulárny import). */
+export interface SietkaSamostatnaKus {
+	system: string;
+	styl: string;
+	otvorS: number;
+	otvorV: number;
+}
+
+export interface SietkaSamostatnaMultiOdpis {
+	/** per-kus výpočty (zachovávajú 1:1 paritu s jednokusovým `sietkaSamostatnaVypocet`) */
+	kusy: SietkaSamostatnaOdpis[];
+	/** spoločný Money odpis: metre SČÍTANÉ per kód naprieč kusmi */
+	odpis: OdpisRow[];
+}
+
+/**
+ * Viackusová dodatočná sieťka (#473, Patrik: viac rôznych otvorov v JEDNOM odpise).
+ * Každý kus sa počíta NEZÁVISLE cez `sietkaSamostatnaVypocet` (rovnaká fyzika,
+ * vlastné čerstvé balenie tyčí per kus — pozri komentár tejto funkcie prečo NIE
+ * diff/spoločné balenie) a výsledné METRE sa SČÍTAJÚ per Money kód. ŽIADNY
+ * bin-packing naprieč kusmi — rovnaký kontrakt ako `computeClipMulti` (clip.ts,
+ * #468 fáza 2): 2× identický kus = presne 2× metre, N=1 = bit-identické s
+ * jednokusovým výpočtom (regresná parita).
+ */
+export function sietkaSamostatnaMultiVypocet(
+	cfg: Cfg,
+	kusy: SietkaSamostatnaKus[]
+): { r: SietkaSamostatnaMultiOdpis | null; err: string | null } {
+	const vysledky: SietkaSamostatnaOdpis[] = [];
+	for (let i = 0; i < kusy.length; i++) {
+		const k = kusy[i]!;
+		const { r, err } = sietkaSamostatnaVypocet(cfg, k.system, k.styl, k.otvorS, k.otvorV);
+		if (err || !r) return { r: null, err: `Sieťka ${i + 1}: ${err ?? 'Výpočet zlyhal.'}` };
+		vysledky.push(r);
+	}
+	// zoskup metre per Money kód naprieč kusmi (poradie prvého výskytu)
+	const odpis: OdpisRow[] = [];
+	for (const kus of vysledky) {
+		for (const o of kus.odpis) {
+			const existing = odpis.find((m) => m.kod === o.kod);
+			if (existing) existing.metre = R(existing.metre + o.metre);
+			else odpis.push({ ...o });
+		}
+	}
+	return { r: { kusy: vysledky, odpis }, err: null };
+}
