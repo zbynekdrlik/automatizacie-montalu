@@ -65,7 +65,9 @@ const CISTY_ENGINE = [
 	// #234 — ručné položky modul je pure + client-imported (+page.svelte); Money-priľahlý
 	// (validuje Money kódy, emituje množstvá), MUSÍ ostať čistý, aby sa server kód
 	// nezaviezol do klientského bundlu (validácia dostáva katalóg ako parameter).
-	'src/lib/pergola-rucne.ts'
+	'src/lib/pergola-rucne.ts',
+	// #419 — tesnenia extrahované do client-safe pure modulu (pôvodne v server/pergola-rezervacia)
+	'src/lib/pergola-tesnenia.ts'
 ];
 
 describe('Money safety — vzorcový engine nárezu z rozmerov ostáva čistý (#155/#221)', () => {
@@ -82,9 +84,15 @@ describe('Money safety — vzorcový engine nárezu z rozmerov ostáva čistý (
 });
 
 describe('/pergola/narez — rezervačný odpis (#221) IDE cez potvrdzovací tok', () => {
-	it('akcie routy = form (spocitat/upravit) + rezervácia (rezervovat/odoslat), nič viac', async () => {
+	it('akcie routy = form + rezervácia + expedícia do Odoo, nič viac', async () => {
 		const { actions } = await import('../src/routes/pergola/narez/+page.server');
-		expect(Object.keys(actions).sort()).toEqual(['odoslat', 'rezervovat', 'spocitat', 'upravit']);
+		expect(Object.keys(actions).sort()).toEqual([
+			'odoslat',
+			'odoslatExpediciuDoOdoo',
+			'rezervovat',
+			'spocitat',
+			'upravit'
+		]);
 	});
 
 	it('most pergola-rezervacia napája engine na Money zámerne (opak čistoty enginu)', () => {

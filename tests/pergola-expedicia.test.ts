@@ -49,9 +49,14 @@ describe('#419 — expedičný zoznam: kontrakt transformu', () => {
 		}
 	];
 
-	it('profily idú prvé, komponenty za nimi (poradie zachované)', () => {
+	it('profily idú prvé, komponenty za nimi, drobný materiál na konci (poradie zachované)', () => {
 		const e = expedicnyZoznam(vys, komp);
-		expect(e.polozky.map((p) => p.skupina)).toEqual(['profil', 'profil', 'komponent']);
+		expect(e.polozky.map((p) => p.skupina)).toEqual([
+			'profil',
+			'profil',
+			'komponent',
+			'drobny-material'
+		]);
 		expect(e.polozky[0]!.nazov).toBe('Predná noha');
 		expect(e.polozky[2]!.nazov).toBe('Spojka U 100×50');
 	});
@@ -105,10 +110,12 @@ describe('#419 — expedičný zoznam: kontrakt transformu', () => {
 		expect(e.polozky[2]!.kod).toBeNull();
 	});
 
-	it('prázdny vstup → prázdny zoznam, spoluKusov 0, žiaden pád', () => {
+	it('prázdny vstup → len drobný materiál, spoluKusov 0, žiaden pád', () => {
 		const prazdny: NarezVysledok = { ...bazaVys, vypocitane: [] };
 		const e = expedicnyZoznam(prazdny, []);
-		expect(e.polozky).toEqual([]);
+		// aj bez profilov/komponentov je tam vždy catch-all drobný materiál
+		expect(e.polozky.length).toBe(1);
+		expect(e.polozky[0]!.skupina).toBe('drobny-material');
 		expect(e.spoluKusov).toBe(0);
 		expect(e.pocetProfilov).toBe(0);
 		expect(e.pocetKomponentov).toBe(0);
