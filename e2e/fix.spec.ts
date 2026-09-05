@@ -206,14 +206,13 @@ test('server odmietne nezmyselné zadanie aj po obídení HTML5 validácie', asy
 test('#464: fix „➕ Nový výkres" naviguje na /fix', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
-	await page.goto('/fix');
-	await waitHydrated(page);
 
 	await hlavicka(page, 'E2E-FIX-NAV', 'OP-NAV');
 	await page.locator('#s').fill('1200');
-	await page.locator('#v1').fill('600');
+	await page.locator('#v1').fill('800');
 	await page.locator('#v2').fill('600');
-	await page.locator('#pocet').selectOption('2');
+	// 1 pole = šírka = s, žiadne manuálne polia
+	await page.locator('#pocet').selectOption('1');
 	await page.getByTestId('nakreslit').click();
 	await waitHydrated(page);
 

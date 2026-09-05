@@ -350,17 +350,17 @@ test('#464: bazén navrh metadata → pečiatka (revizia/vypracoval) + vyplna', 
 	await page.getByLabel('Dĺžka koľajiska (mm) *').fill('5500');
 	await page.getByLabel('Výška najvyššej sekcie (mm) *').fill('2400');
 	await page.getByLabel('Výška najnižšej sekcie (mm) *').fill('1900');
-	await page.getByLabel('Počet sekcií *').selectOption('4');
-	await page.getByLabel('Koľaj', { exact: true }).selectOption('jednoduchá');
-	await page.getByLabel('Smer posuvu').selectOption('P');
-	await page.getByLabel('Smer dverí').selectOption('P');
+	await page.getByLabel('Počet sekcií *').fill('4');
+	await page.getByLabel('Koľaj', { exact: true }).selectOption('jednokolaj');
+	await page.getByLabel('Smer posuvu').selectOption('vpravo');
+	await page.getByLabel('Smer dverí').selectOption('vlavo');
 	await page.getByLabel('Výška čela (mm) *').fill('200');
 
 	// metadata
-	await page.getByLabel('Revízia (voliteľné)').fill('R1');
-	await page.getByLabel('Vypracoval (voliteľné)').fill('E2E');
+	await page.getByLabel('Revízia').fill('R1');
+	await page.getByLabel('Vypracoval').fill('E2E');
 	// Výplň text
-	const vyplna = page.getByLabel('Text výplne / etapy (modrý text)', { exact: false });
+	const vyplna = page.getByLabel('Výplň');
 	if ((await vyplna.count()) > 0) {
 		await vyplna.fill('Skúšobná výplň');
 	}

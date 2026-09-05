@@ -741,11 +741,11 @@ test('#464: pergola navrh metadata → pečiatka (nazov/revizia/varianta/vypraco
 	await page.getByLabel('Hĺbka (mm) *').fill('4000');
 	await page.getByLabel('Výška vpredu (mm) *').fill('2200');
 	await page.getByLabel('Výška pri stene (mm) *').fill('2700');
-	// metadata fields
-	await page.getByLabel('Názov výkresu (voliteľné)').fill('Test Pergola Meta');
-	await page.getByLabel('Revízia (voliteľné)').fill('R3');
-	await page.getByLabel('Varianta (voliteľné)').fill('A2');
-	await page.getByLabel('Vypracoval (voliteľné)').fill('E2E Tester');
+	// metadata fields (labels without "(voliteľné)" suffix in pergola navrh)
+	await page.getByLabel('Názov výkresu').fill('Test Pergola Meta');
+	await page.getByLabel('Revízia').fill('R3');
+	await page.getByLabel('Varianta').fill('A2');
+	await page.getByLabel('Vypracoval').fill('E2E Tester');
 
 	await page.getByTestId('nakreslit').click();
 	await waitHydrated(page);

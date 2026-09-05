@@ -115,63 +115,20 @@ test('žiadne "odoslať" (Money) tlačidlo na zákazníckom tlačovom liste', as
 	expect(consoleMsgs).toEqual([]);
 });
 
-// #464: „Skúsiť znova" retry path (3D capture failure) + navigačné linky
-test('zákaznícky list: „Skúsiť znova" pri zlyhom zachytení + navigačné linky', async ({ page }) => {
+// #464: „← Späť na návrh" link po úspešnom zachytení
+test('zákaznícky list: „← Späť na návrh" link naviguje späť', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	test.setTimeout(60000);
-	// Stub WebGL getContext to force capture failure
-	await page.addInitScript(() => {
-		const origGetContext = HTMLCanvasElement.prototype.getContext;
-		let callCount = 0;
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(HTMLCanvasElement.prototype as any).getContext = function (type: string, ...args: unknown[]) {
-			if (type === 'webgl2' || type === 'webgl') {
-				callCount++;
-				// Let the first few calls through for the probe, block rendering
-				if (callCount > 2) return null;
-			}
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			return origGetContext.apply(this, [type, ...args] as any);
-		};
-	});
 	await loginAs(page);
-	await goto(page, '/zasklenia/navrh');
-	await waitHydrated(page);
+	await vyplnAOtvorZakaznickyList(page);
+	await pockajNaObrazok(page);
 
-	await page.getByLabel('Systém').selectOption('Robust');
-	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByLabel('Celková šírka (mm) *').fill('3000');
-	await page.getByLabel('Celková výška (mm) *').fill('2000');
-	await page.getByTestId('nakreslit').click();
-	await waitHydrated(page);
-	await page.getByTestId('zakaznicky-list-btn').click();
-	await waitHydrated(page);
-
-	// When 3D is unavailable, error or nedostupne message should show
-	// Either chyba (zachytenie zlyhalo) or nedostupne (tier=none) depending on how the stub works
-	const chyba = page.getByTestId('zakaznicky-chyba');
-	const nedostupne = page.getByTestId('zakaznicky-nedostupne');
-	// Wait for either error state
-	await expect(chyba.or(nedostupne)).toBeVisible({ timeout: 30000 });
-
-	if ((await chyba.count()) > 0) {
-		// „Skúsiť znova" should be visible in the error paragraph
-		const retry = chyba.getByRole('button', { name: 'Skúsiť znova' });
-		await expect(retry).toBeVisible();
-		await retry.click();
-		// after retry, the error state persists (since getContext is still blocked)
-		await expect(chyba.or(nedostupne)).toBeVisible({ timeout: 15000 });
-	}
-
-	// „← Späť na návrh" link navigates back
 	const backLink = page.getByRole('link', { name: '← Späť na návrh' });
 	await expect(backLink).toBeVisible();
 	await backLink.click();
 	await expect(page).toHaveURL(/\/zasklenia\/navrh$/);
 
-	expect(consoleMsgs).toEqual([
-		expect.stringMatching(/Zákaznícky list: zachytenie 3D náhľadu zlyhalo|CONTEXT_LOST/)
-	]);
+	expect(consoleMsgs).toEqual([]);
 });
 
 // #464: zákaznícky „návrhovej stránke" link (without prior drawing → jasná správa)

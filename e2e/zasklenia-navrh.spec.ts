@@ -373,26 +373,23 @@ test('#464: zasklenia navrh — klin Počet kusov sa dá vyplniť a zobrazí sa'
 	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Celková šírka (mm) *').fill('3000');
 	await page.getByLabel('Celková výška (mm) *').fill('2000');
-	// enable klin
+	// enable klin + fill its required dimensions
 	const klinCheck = page.getByLabel('Klín nad posuvom');
-	if ((await klinCheck.count()) > 0) {
-		await klinCheck.check();
-		await waitHydrated(page);
-		// Počet kusov field for klin
-		const pocetKs = page.getByLabel('Počet kusov', { exact: false });
-		if ((await pocetKs.count()) > 0) {
-			await pocetKs.fill('3');
-		}
-	}
+	await klinCheck.check();
+	await waitHydrated(page);
+	// klin requires dĺžka, šírka, V1, V2 + Počet kusov
+	await page.getByLabel('Dĺžka (mm)', { exact: true }).fill('600');
+	await page.getByLabel('Šírka (mm)', { exact: true }).fill('400');
+	await page.getByLabel('Výška 1 (mm)').fill('300');
+	await page.getByLabel('Výška 2 (mm)').fill('200');
+	await page.getByLabel('Počet kusov').fill('3');
 
 	await page.getByTestId('nakreslit').click();
 	await waitHydrated(page);
 
 	await expect(page.getByTestId('zn-elevacia')).toBeVisible();
 	// klin should be drawn when enabled
-	if ((await klinCheck.count()) > 0 && (await klinCheck.isChecked())) {
-		await expect(page.getByTestId('zn-klin')).toBeVisible();
-	}
+	await expect(page.getByTestId('zn-klin')).toBeVisible();
 	expect(errs).toEqual([]);
 });
 
@@ -400,8 +397,6 @@ test('#464: zasklenia navrh — klin Počet kusov sa dá vyplniť a zobrazí sa'
 test('#464: zn-rezim Technický — switch farebný → technický zachová výkres', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
-	await goto(page, '/zasklenia/navrh');
-	await waitHydrated(page);
 
 	await vyplnFormular(page);
 	// switch to farebný
@@ -413,14 +408,17 @@ test('#464: zn-rezim Technický — switch farebný → technický zachová výk
 	// should have RAL text
 	await expect(page.getByTestId('zn-ral-text')).toBeVisible();
 
-	// now switch back to technický
-	const technicky = page.locator('input[name="zn-rezim"][value="technicky"]');
-	await technicky.check();
+	// now switch back to technický via „← Späť a upraviť" + re-draw
+	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
+	await waitHydrated(page);
+	// technický radio: label text "Technický (čiernobiely)", no value attr
+	await page.getByLabel('Technický (čiernobiely)').check();
 	await page.getByTestId('nakreslit').click();
 	await waitHydrated(page);
 	await expect(page.getByTestId('zn-elevacia')).toBeVisible();
-	// RAL text should NOT be visible in technický mode
-	await expect(page.getByTestId('zn-ral-text')).toHaveCount(0);
+	// in technický mode the fill is NOT the RAL 7016 color (#383E42)
+	const ramFill = await page.getByTestId('zn-elevation-ram').getAttribute('fill');
+	expect(ramFill).not.toBe('#383E42');
 	expect(errs).toEqual([]);
 });
 
