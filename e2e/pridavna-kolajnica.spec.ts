@@ -14,7 +14,10 @@ test('checkbox viditeľný pre Slide 2K, skrytý pre Slide 3K', async ({ page })
 	const cb = page.locator('input[name="pridavnaKolajnica"]');
 	await expect(cb).toBeVisible();
 	// label hovorí "koľajnica" (nie "spodná koľajnica" — Slide má obvodovú)
-	await expect(page.getByText('koľajnica o veľkosť väčšia')).toBeVisible();
+	const labelLoc = page.locator('label', { hasText: 'koľajnica o veľkosť väčšia' });
+	await expect(labelLoc).toBeVisible();
+	// 🟡 review nález: substring-match by prešiel aj pre "spodná koľajnica" — falsifikovať
+	await expect(labelLoc).not.toContainText('spodná');
 
 	// 3K = max pre Slide → checkbox sa skryje
 	await page.getByLabel('Štýl').selectOption('3K');
@@ -71,12 +74,11 @@ test('Slide 2K + pridavna ON → Kontrola ukazuje 3K koľajnicu (ZASP00100)', as
 	await page.locator('#s').fill('3000');
 	await page.locator('#v').fill('2000');
 	await page.locator('input[name="pridavnaKolajnica"]').check();
-	// Slide vyžaduje RAL farbu kovania — vyber prvú dostupnú
-	const farbaOptions = await page.locator('#farbaKovania option[value]:not([value=""])').all();
-	if (farbaOptions.length > 0) {
-		const val = await farbaOptions[0].getAttribute('value');
-		if (val) await page.locator('#farbaKovania').selectOption(val);
-	}
+	// Slide vyžaduje RAL farbu kovania — vyber prvú dostupnú (unconditional, #456 review 🔵)
+	const farbaOpts = page.locator('#farbaKovania option[value]:not([value=""])');
+	await expect(farbaOpts.first()).toBeAttached();
+	const farbaVal = await farbaOpts.first().getAttribute('value');
+	await page.locator('#farbaKovania').selectOption(farbaVal!);
 	await page.getByLabel('Číslo objednávky').fill('ZAK-TEST456');
 	await page.getByLabel('OP/OPDL').fill('01');
 	await page.getByLabel('Zákazník').fill('Test 456');
