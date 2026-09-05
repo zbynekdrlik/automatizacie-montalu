@@ -33,6 +33,8 @@
 	let potrebuje3K = $derived(form && 'potrebuje3K' in form ? form.potrebuje3K : false);
 	let planHash = $derived(form && 'planHash' in form ? form.planHash : '');
 	let cielInfo = $derived(form && 'cielInfo' in form ? form.cielInfo : null);
+	// #461: vylúčené kódy z SkladVarovania — bindable, ide do hidden inputu vo formulári
+	let vyluceneKody = $state('');
 	let outcome = $derived(form && 'outcome' in form ? form.outcome : null);
 
 	// všetky editovateľné polia sú $state (bind) — jednosmerné value={} by sa pri
@@ -268,7 +270,7 @@
 
 	{#if step === 'vysledok' && !isB2B}
 		<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní) -->
-		<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
+		<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
 	{/if}
 
 	<div class="card noprint">
@@ -278,6 +280,7 @@
 				<form method="POST" action="?/odoslat" style="display:inline">
 					{@render hidden()}
 					<input type="hidden" name="planHash" value={planHash} />
+					<input type="hidden" name="vylucene_kody" value={vyluceneKody} />
 					<button class="btn" type="submit" data-testid="odoslat-sietku"
 						>✅ Odoslať odpis do Money</button
 					>

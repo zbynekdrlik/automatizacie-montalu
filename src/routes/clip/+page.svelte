@@ -37,6 +37,9 @@
 	// #448/#451 predodpisové skladové varovanie + odobrať (clip — b2b sa na túto route nedostane)
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
 	let snapshotDatum = $derived(form && 'snapshotDatum' in form ? form.snapshotDatum : null);
+
+	// #461: vylúčené kódy z SkladVarovania — bindable, ide do hidden inputu vo formulári
+	let vyluceneKody = $state('');
 </script>
 
 <svelte:head><title>CLIP zábradlie — odpis materiálu</title></svelte:head>
@@ -176,11 +179,12 @@
 	{/if}
 
 	<!-- #448/#451: predodpisové skladové varovanie + odobrať pri odpise -->
-	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
+	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">
 			{@render hiddenVstup()}
+			<input type="hidden" name="vylucene_kody" value={vyluceneKody} />
 			<div class="sec">Odpis do Money (počet tyčí 7500 mm)</div>
 			<table data-testid="kontrola-tabulka">
 				<thead
