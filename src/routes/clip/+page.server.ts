@@ -315,7 +315,14 @@ export const actions = {
 					multiVstup: vstup
 				};
 			}
-			return { step: 'hotovoMulti' as const, multiVstup: vstup, multi, outcome, zmenene };
+			return {
+				step: 'hotovoMulti' as const,
+				multiVstup: vstup,
+				multi,
+				finalOut,
+				outcome,
+				zmenene
+			};
 		} catch (e) {
 			logger('clip').error('writeOdpis (multi) zlyhal', {
 				zak: vstup.zak,

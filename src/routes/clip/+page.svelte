@@ -618,7 +618,7 @@
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<a class="btn secondary" href={resolve('/clip')}>➕ Nový rozpis</a>
 	</div>
-{:else if step === 'hotovoMulti' && form && 'multi' in form && form.multi && form.outcome}
+{:else if step === 'hotovoMulti' && form && 'multi' in form && form.multi && 'finalOut' in form && form.finalOut && form.outcome}
 	{@const mv = form.multiVstup as { zak: string; zakaznik: string; caka: boolean }}
 	<div class="card">
 		<h1>Hotovo — {mv.zak} · {mv.zakaznik}</h1>
@@ -640,9 +640,9 @@
 
 	<div class="card">
 		<div class="sec">
-			Money rozpis — {form.multi.polozky.filter((o) => o.qty > 0).length} položiek (spolu)
+			Money rozpis — {form.finalOut.filter((o) => o.qty > 0).length} položiek (spolu)
 		</div>
-		{#each form.multi.polozky.filter((o) => o.qty > 0) as o (o.kod)}
+		{#each form.finalOut.filter((o) => o.qty > 0) as o (o.kod)}
 			<div class="row" style="align-items:center;gap:12px">
 				<ProfilObrazok kod={o.kod} nazov={o.nazov} />
 				<span style="flex:1"
