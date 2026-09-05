@@ -2,6 +2,15 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-09-05 — Post-deploy E2E timeout + honest-null failures (#466, worktree)
+
+- bump: a054893 (0.24.91-dev.2)
+- fix: ee76d25 — BASE_URL skip guards on 4 honest-null cenovy E2E tests (ceny:23/129, pergola-ceny:44, sklo-cena:24) + post-deploy step timeout 15→16 min (measured 10.8 min, 48% margin), deploy job 30→35 min
+- docs: cc38b4f — fix stale line ref ci.md + add honest-null E2E guard gotcha to ceny-snapshot.md
+- Root cause: prod has real Money snapshot → tests asserting "no snapshot" honest-null paths fail; timeout too short for 324 tests via SSH tunnel
+- Decision: keep post-deploy E2E as a step in deploy job (not a separate job) — ci-docker-hardening.test.ts guards exact 4-job set
+- All 4 failures were preview-only fixture tests, not prod regressions
+
 ## 2026-09-02 — Bazénová interim orientačná cena (#404, worktree — supervisor integruje)
 
 - Reverse-engineer montalu.sk `POST /konfigurator/update-pools` (Playwright network capture): request
