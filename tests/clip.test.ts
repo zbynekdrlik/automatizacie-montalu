@@ -12,6 +12,7 @@ import {
 	chybaClipVstupu,
 	dostupneVarianty,
 	jeClipTyp,
+	CLIP_MIN_SIRKA,
 	CLIP_MIN_VYPLNE,
 	CLIP_MAX_SIRKA,
 	CLIP_DLZKA_TYCE,
@@ -423,10 +424,64 @@ describe('chybaClipVstupu — validácia', () => {
 		expect(chybaClipVstupu(vstup({ vyska: 5000 }))).toMatch(/Výška/);
 	});
 	it('príliš úzke zábradlie pri veľkom N (šírka výplne < min)', () => {
-		// izo N=4, sirka tesne nad min: (300-135)/4-8 = 33.25 < CLIP_MIN_VYPLNE (50)
+		// izo N=4, sirka tesne nad min: (300-135)/4-8 = 33.25 < CLIP_MIN_VYPLNE
 		const e = chybaClipVstupu(vstup({ typ: 'izo', variant: 4, sirka: 300 }));
 		expect(e).toMatch(/šírka jednej výplne/i);
-		expect(CLIP_MIN_VYPLNE).toBe(50);
+	});
+});
+
+describe('(#467) CLIP B0 (N=1) min šírka 80 mm — Patrik 5.9.', () => {
+	it('CLIP_MIN_SIRKA je 80 (nie 200)', () => {
+		expect(CLIP_MIN_SIRKA).toBe(80);
+	});
+
+	it('CLIP_MIN_VYPLNE je 20 (nie 50)', () => {
+		expect(CLIP_MIN_VYPLNE).toBe(20);
+	});
+
+	it('B0 (N=1) sirka=80 mm prechádza validáciou', () => {
+		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 1, sirka: 80 }))).toBeNull();
+		expect(chybaClipVstupu(vstup({ typ: 'klasika', variant: 1, sirka: 80 }))).toBeNull();
+	});
+
+	it('B0 (N=1) sirka=80 mm — compute dáva kladné rozmery', () => {
+		const r = computeClip(vstup({ typ: 'izo', variant: 1, sirka: 80, vyska: 500 }));
+		// B10 = (80 - 48) / 1 - 8 = 24 mm
+		expect(r.sirkaVyplne).toBe(24);
+		expect(r.vyskaVyplne).toBe(444);
+		// všetky rozmerové riadky kladné
+		for (const row of r.riadky) {
+			if (row.rozmer !== null) expect(row.rozmer).toBeGreaterThan(0);
+		}
+		// odpis dáva nenulové tyče
+		expect(r.polozky.length).toBeGreaterThan(0);
+		for (const p of r.polozky) {
+			expect(p.qty).toBeGreaterThan(0);
+		}
+	});
+
+	it('B1 (N=2) sirka=80 mm je ODMIETNUTÉ (záporná šírka výplne)', () => {
+		const e = chybaClipVstupu(vstup({ typ: 'izo', variant: 2, sirka: 80 }));
+		expect(e).toMatch(/šírka jednej výplne/i);
+	});
+
+	it('N=2 prechádza od sirka=133+ (výplň=20 mm = MIN_VYPLNE)', () => {
+		// (133 - 77) / 2 - 8 = 28 - 8 = 20 mm >= CLIP_MIN_VYPLNE(20)
+		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 2, sirka: 133 }))).toBeNull();
+		// 132 → (132-77)/2 - 8 = 27.5 - 8 = 19.5 < 20 → odmietne
+		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 2, sirka: 132 }))).toMatch(
+			/šírka jednej výplne/i
+		);
+	});
+
+	it('B0 (N=1) sirka=100..199 mm prechádza (predtým blokované plošným min 200)', () => {
+		for (const s of [100, 150, 199]) {
+			expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 1, sirka: s }))).toBeNull();
+		}
+	});
+
+	it('sirka pod 80 je stále odmietnutá', () => {
+		expect(chybaClipVstupu(vstup({ typ: 'izo', variant: 1, sirka: 79 }))).toMatch(/Šírka/);
 	});
 });
 
