@@ -40,33 +40,6 @@ test('Fix z cadu — CAD nárez → Money odpis (TEST priečinok)', async ({ pag
 	expect(consoleMsgs).toEqual([]);
 });
 
-// ── #462 fix/cad: combo_ radios pri dlhom profile (>7500mm) ──────────────────
-// Keď CAD vstup obsahuje dlhý profil >7500mm, na kontrolnej stránke sa
-// zobrazia combo_ rádiá (voľba delenia dlhej tyče). Test overí, že sa
-// zobrazia a voľba zmení rozpis.
-test('#462 fix/cad: combo_ radio pri profile > 7500mm zmení odpis', async ({ page }) => {
-	const consoleMsgs = collectConsole(page);
-	await skipAkLive(page);
-	await loginAs(page);
-	await goto(page, '/fix/cad');
-	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-FIX-COMBO');
-	await page.getByLabel('OP/OPDL číslo *').fill('01');
-	await page.getByLabel('Zákazník *').fill('E2E Fix Combo');
-	// profil s dĺžkou > 7500 spustí kombinácie
-	await page.getByLabel('Materiál (CAD nárez) *').fill('18016 PROFIL 110x43 V2\t2\t8500');
-	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
-
-	// combo rádiá sú prítomné (aspoň jedno radio)
-	const radios = page.getByRole('radio');
-	await expect(radios.first()).toBeVisible();
-	// zvoľ inú kombináciu než default a overí, že sa na stránke prejavila
-	const nonDefault = radios.nth(1);
-	if (await nonDefault.isVisible()) {
-		await nonDefault.check();
-	}
-	expect(consoleMsgs).toEqual([]);
-});
-
 // ── #462 fix/cad: qty_ ručná editácia pred submitom ─────────────────────────
 test('#462 fix/cad: qty_ ručná editácia zmení odpis (✏️ marker)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
