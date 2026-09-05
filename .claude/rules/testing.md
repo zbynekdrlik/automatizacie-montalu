@@ -451,3 +451,24 @@ guard) + `tests/wheel-guard.test.ts`. Keď funkcia GENUINELY potrebuje niečo zl
 z `document`/canvas (napr. `document.createElement('canvas').getContext('2d')`), NIE
 duck-typing — pozri `tests/vizual-textury.test.ts`'s ručný `(globalThis as unknown as
 { document: unknown }).document = { ... }` stub namiesto inštalácie jsdom.
+
+## E2E per-page form gotchy (#464 census)
+
+- **Fix page šikmý tvar (default) vyžaduje `v1 !== v2`** — rovnaké výšky spustia
+  varovanie „Výšky sú rovnaké — vyber rovný" a formulár sa neodošle. E2E test pre
+  šikmý musí zadať rôzne v1/v2 (napr. 800/600).
+- **Bazén navrh `Počet sekcií` je `<input type="number">`, NIE `<select>`** — použij
+  `.fill('4')`, nie `.selectOption('4')`. Koľaj/Smer posuvu/Smer dverí SÚ selecty
+  (hodnoty: `jednokolaj`/`dvojkolaj`, `vpravo`/`vlavo`).
+- **Zasklenia navrh radio `zn-rezim` nemá `value` atribút** — Svelte radios používajú
+  `checked` + `onchange` bez HTML `value`. Selektor
+  `input[name="zn-rezim"][value="technicky"]` NEFUNGUJE. Použi
+  `page.getByLabel('Technický (čiernobiely)')` (viditeľný text labelu). Farebný
+  radio má testid `rezim-farebny-radio`.
+- **`window.print()` stub pre E2E:** helper `stubWindowPrint(page)` v
+  `e2e/helpers.ts` — volaj PRED `loginAs`/`goto` (injektuje cez `addInitScript`).
+  Vracia `{ assertPrintCalled() }`. Vzor: `app.spec.ts` print test.
+- **`addInitScript` WebGL blok ovplyvní CELÚ session** — ak zablokuješ
+  `getContext('webgl2')`, ovplyvní to aj stránky PRED cieľovou (napr. navrh page
+  s 3D náhľadom). Preto sa zakaznícky „Skúsiť znova" retry path nedá spoľahlivo
+  testovať cez session-wide WebGL stub (navrh page sa nepostaví).
