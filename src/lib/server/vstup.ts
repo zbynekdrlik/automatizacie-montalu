@@ -265,7 +265,7 @@ export interface Vstup {
 	 *  v tlači). Len na plán/tlač — do Money odpisu NEJDE. */
 	ral: string;
 	caka: boolean;
-	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
+	/** prídavná koľajnica — koľajnica o 1 väčšia (Štandard +, Deluxe, Slide, Robust; #456) */
 	pridavnaKolajnica: boolean;
 	/** jednostranná FAB — výnimka (Dominik: „chodí jeden zo 100"). MENÍ Money odpis:
 	 *  kľučka a krytka vložky idú 1 ks namiesto 2 ks na uzáver. */
@@ -397,7 +397,7 @@ export interface MultiVstup {
 	/** RAL farba — samostatné pole, veľkým na pláne/tlači; do Money NEJDE */
 	ral: string;
 	caka: boolean;
-	/** prídavná koľajnica — spodná koľajnica o 1 väčšia (len Štandard +) */
+	/** prídavná koľajnica — koľajnica o 1 väčšia (Štandard +, Deluxe, Slide, Robust; #456) */
 	pridavnaKolajnica: boolean;
 	/** jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks) */
 	jednostrannaFab: boolean;

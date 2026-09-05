@@ -2,7 +2,7 @@
 // (oversize/undersize/hrúbka) + „prídavná koľajnica" (rail upsize). Rozdelené
 // z compute.ts (#249). Importuj verejné cez fasádu `$lib/server/compute`.
 import { rolaKolajnice, type KolajnicaRucne } from '$lib/kolajnica';
-import { standardPlusRailEligible } from '$lib/styl';
+import { plusRailEligible } from '$lib/styl';
 import {
 	BAR,
 	KOTUC,
@@ -191,16 +191,27 @@ export function missingHrubkaProfile(cfg: Cfg, sysStyl: string, skloHrubka: numb
 	return `Pre zvolenú hrúbku skla (${sh} mm) tento systém nemá kladka/klzný profil — vyber platné sklo (6 alebo 10 mm).`;
 }
 
-// „Prídavná koľajnica" (Dominik 2026-07-15): checkbox → spodná koľajnica o 1 veľkosť
-// vyššia. LEN Štandard + (tieto kódy zdieľa s Deluxe, preto sa swap GEJTUJE na systém).
+// „Prídavná koľajnica" (Dominik 2026-07-15, rozšírené #456 Patrik 2026-09-05):
+// checkbox → koľajnica o 1 veľkosť vyššia. Pôvodne LEN Štandard + (spodná), od #456
+// rozšírené na Deluxe (zdieľa spodné kódy), Slide a Robust (obvodová koľajnica).
 // Dĺžka tyče je rovnaká (7500 mm) → metre v odpise ostávajú, mení sa len KÓD + názov.
 // NEZÁVISLÉ od typu skla (IZO aj obyčajné — Dominik: „to že je IZO nie je podmienka").
 export const RAIL_UPSIZE: Record<string, { kod: string; nazov: string }> = {
+	// Štandard + / Deluxe — spodná koľajnica (hornú nemení)
 	ZASP00104: { kod: 'ZASP00030', nazov: 'Koľajnica spodná 3K Surový 7500 mm' },
 	ZASP00030: { kod: 'ZASP00033', nazov: 'Koľajnica spodná 4K Surový 7500 mm' },
 	ZASP00033: { kod: 'ZASP202432', nazov: 'Koľajnica spodná 5K Surový 7500 mm' },
-	ZASP202432: { kod: 'ZASP202437', nazov: 'Koľajnica spodná 6K Surový 7500 mm' }
+	ZASP202432: { kod: 'ZASP202437', nazov: 'Koľajnica spodná 6K Surový 7500 mm' },
 	// 6K (ZASP202437) nemá +1 — 7K koľajnica neexistuje.
+
+	// Slide — obvodová koľajnica (jedna, rezaná na šírku aj výšku)
+	ZASP00097: { kod: 'ZASP00100', nazov: 'Koľajnica 3K Slide Surový 7500 mm' },
+	// 3K Slide (ZASP00100) nemá +1 — 4K Slide neexistuje.
+
+	// Robust — obvodová koľajnica (jedna, rezaná na šírku aj výšku)
+	ZASP00014: { kod: 'ZASP00016', nazov: 'Koľajnica 3K Surový 7500 mm' },
+	ZASP00016: { kod: 'ZASP20254', nazov: 'Koľajnica 4K Surový 7500mm' }
+	// 4K Robust (ZASP20254) nemá +1 — 5K Robust neexistuje.
 };
 export function railUpsize(
 	system: string,
@@ -209,11 +220,10 @@ export function railUpsize(
 	kod: string,
 	nazov: string
 ): { kod: string; nazov: string } {
-	// Gate zjednotený s checkbox visibility (+page.svelte) a `pridavnaKolajnicaDefault`
-	// (styl.ts) cez `standardPlusRailEligible` (#134). Bez-styl-checku (len `system`)
-	// bol donedávna náhodne bezpečný LEN preto, že RAIL_UPSIZE nemá záznam pre 6K kód
-	// (ZASP202437) — teraz je to explicitná súčasť podmienky, nie vedľajší efekt tabuľky.
-	if (pridavna && standardPlusRailEligible(system, styl) && RAIL_UPSIZE[kod]) {
+	// Gate zjednotený s checkbox visibility (+page.svelte) cez `plusRailEligible`
+	// (#134 → #456: rozšírenie na Slide/Deluxe/Robust). `pridavnaKolajnicaDefault`
+	// (auto-default IZO) ostáva len pre Štandard + (`standardPlusRailEligible`).
+	if (pridavna && plusRailEligible(system, styl) && RAIL_UPSIZE[kod]) {
 		return RAIL_UPSIZE[kod];
 	}
 	return { kod, nazov };

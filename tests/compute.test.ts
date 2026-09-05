@@ -892,11 +892,11 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			expect(spodna(soSietkouAPridavnou)).toBe(spodna(lenPridavna));
 		});
 
-		it('prídavná koľajnica sa NEaplikuje mimo Štandard + (Deluxe zdieľa ZASP00104 — Money guard)', () => {
-			// Deluxe 2K spodná = ZASP00104; checkbox NESMIE zmeniť Deluxe odpis
+		it('prídavná koľajnica SA aplikuje aj na Deluxe (#456 — zdieľa spodné kódy so Štandard +)', () => {
+			// Deluxe 2K spodná = ZASP00104 → s pridavnou = ZASP00030 (3K spodná)
 			const d = computeFlat(cfg, 'Deluxe|2K', 5000, 2000, false, 10, true)!;
-			expect(d.odpis.some((o) => o.kod === 'ZASP00104')).toBe(true);
-			expect(d.odpis.some((o) => o.kod === 'ZASP00030')).toBe(false);
+			expect(d.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
+			expect(d.odpis.some((o) => o.kod === 'ZASP00104')).toBe(false);
 		});
 
 		// computeMulti (zimná záhrada) + prídavná koľajnica — Money-kritická cesta
@@ -918,7 +918,7 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 			expect(r.odpis.some((o) => o.kod === 'ZASP00104')).toBe(false);
 		});
 
-		it('computeMulti mixed Deluxe+Štandard + prídavná koľajnica: Deluxe koľajnica OSTÁVA ZASP00104 (Money guard)', () => {
+		it('computeMulti mixed Deluxe+Štandard + prídavná koľajnica: OBA zväčšené na ZASP00030 (#456)', () => {
 			const r = computeMulti(cfg, [
 				{
 					sysStyl: 'Deluxe|2K',
@@ -930,10 +930,10 @@ describe('Štandard + — basic/IZO/opona (nový systém, formuly overené proti
 				},
 				{ sysStyl: 'Štandard +|2K', S: 3000, V: 2400, redukciaZero: false, pridavnaKolajnica: true }
 			])!;
-			// Deluxe posuv (system!=='Štandard +') → koľajnica NEZVÄČŠENÁ, ostáva ZASP00104
-			expect(r.odpis.some((o) => o.kod === 'ZASP00104')).toBe(true);
-			// Štandard posuv → zväčšená na ZASP00030 (samostatný pool entry)
+			// #456: Deluxe AJ Štandard+ zdieľajú spodné kódy → OBA zväčšené na ZASP00030
 			expect(r.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true);
+			// ZASP00104 (2K spodná) NIE je prítomné — oba systémy ho zväčšili
+			expect(r.odpis.some((o) => o.kod === 'ZASP00104')).toBe(false);
 		});
 
 		// drift-guard: názvy väčších koľajníc v RAIL_UPSIZE musia sedieť s Money katalógom
