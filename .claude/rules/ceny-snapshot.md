@@ -144,3 +144,24 @@ odoslanie do Money sa nemení.
 - **Bazén honest-null:** BPK* kusové komponenty majú v snapshote nákup=null → súčet
   `CenySucet.kompletne=false` (priznaný neúplný). To je zámer (Money nemá nákup BPK, PCMO
   predajná = follow-up #364), nie chyba testu.
+
+## `SkladVarovania.svelte` — výrazný blok + akcia „Odobrať z odpisu" (#451)
+
+`SkladVarovania` komponent (pôvodne #448 advisory) je od #451 **výrazný červený blok**
+s per-položka tlačidlom „Odobrať z odpisu" (owner directive: Money pri jednej položke
+s nedostatočným skladom ticho zahodí CELÝ doklad — ZAK2026493, 57 položiek zahodených
+kvôli 1 krytke BPK202535 so skladom 0).
+
+- **`SkladVarovanie` interface** (`ceny.ts`): `{kod, nazov, sklad, mnozstvo}` — `nazov`
+  pridaný #451 (ľudsky čitateľný názov položky v upozornení). `skladoveVarovania()` vstup
+  rozšírený na `{kod, nazov, mnozstvo}` — VŠETCI volajúci (6 modulov) majú `nazov` na
+  položkových objektoch, len pridaj do mapy.
+- **`snapshotDatum` prop** (`SkladVarovania.svelte`): dátum snapshotu pre transparentnosť
+  čerstvosti dát, čerpaný z `getSnapshotMeta().generatedAt`. Slovenský formát D.M.YYYY.
+- **„Odobrať z odpisu" mechanizmus:** klient-side `odobrat(kod)` nájde
+  `document.querySelector('input[name="qty_${kod}"]')` (konvencia `qty_{o.kod}` konzistentná
+  naprieč VŠETKÝMI 6 modulmi), natívny setter + `input`/`change` event (Svelte 5 bindingy),
+  vizuálny flash na inpute. Žiadna nová server akcia — používateľ klikne normálne „Odoslať"
+  s qty=0 pre odobratú položku.
+- **Slovak plurály:** 3 tvary — 1="položka má", 2-4="položky majú", 5+="položiek má". Vždy
+  pri slovenských počítadlách v UI.
