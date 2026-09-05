@@ -424,8 +424,8 @@ describe('chybaClipVstupu — validácia', () => {
 		expect(chybaClipVstupu(vstup({ vyska: 5000 }))).toMatch(/Výška/);
 	});
 	it('príliš úzke zábradlie pri veľkom N (šírka výplne < min)', () => {
-		// izo N=4, sirka tesne nad min: (300-135)/4-8 = 33.25 < CLIP_MIN_VYPLNE
-		const e = chybaClipVstupu(vstup({ typ: 'izo', variant: 4, sirka: 300 }));
+		// izo N=4, sirka=200: (200-135)/4-8 = 8.25 < CLIP_MIN_VYPLNE (20)
+		const e = chybaClipVstupu(vstup({ typ: 'izo', variant: 4, sirka: 200 }));
 		expect(e).toMatch(/šírka jednej výplne/i);
 	});
 });
