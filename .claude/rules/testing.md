@@ -8,6 +8,18 @@ paths:
 
 # Testing (unit + E2E) — local run gotchas
 
+## User-facing label rename MUST update `e2e/` in the SAME commit — local gates never catch it (#468)
+
+A rename of user-facing text (button/badge/error-message labels) that only touches
+`src/` + `tests/*.test.ts` compiles clean and passes `npm run check`/`npm test` locally
+— `e2e/**/*.spec.ts` locators/assertions on the OLD label are invisible to every local
+gate, because E2E runs ONLY in CI (`npm run lint`/`npm run check`/vitest never touch
+`e2e/`). Incident: #468's "posuv" → "zasklenie" rename shipped two dev commits (label
+rename + a review-found follow-up) with zero `e2e/` changes → dev CI failed 22 E2E
+tests (button/text locators timing out on the old label). Grep `e2e/**/*.spec.ts` for
+every old label BEFORE pushing any rename, and update matched button-name/text
+locators in the SAME commit as the rename.
+
 ## Money-safety guard tests: NEGATÍVNY `.not.toMatch()` na NEPRÍTOMNÝ vzor je Stryker-safe — split vzory treba LEN pri POZITÍVNOM matchi na existujúci literál (#380 vs #396)
 
 `fix-cad-money-safety.test.ts`'s split-pattern fix (`/modul:/` + `/'fix'/` namiesto

@@ -236,7 +236,7 @@ test('zimná záhrada: order-level default z primárneho posuvu upsizne AJ extra
 
 	// extra posuv = TIEŽ Štandard + | 2K, ale s NE-izolačným sklom (vlastný default
 	// by ho NEzaškrtol, keby bol per-posuv — dôkaz, že pole je naozaj zdieľané)
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-sys').selectOption('Štandard +');
 	await page.locator('#ps0-styl').selectOption('2K');
 	await page.locator('#ps0-sklo').selectOption(NIE_IZO);

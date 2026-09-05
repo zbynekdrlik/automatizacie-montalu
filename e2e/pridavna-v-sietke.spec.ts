@@ -118,7 +118,7 @@ test('zimná záhrada: order-level prídavná × sieťka na EXTRA posuve (nie pr
 	await page.getByLabel(/Prídavná koľajnica/).check();
 
 	// extra posuv — tiež Štandard + | 2K, so zapnutou sieťkou
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-sys').selectOption('Štandard +');
 	await page.locator('#ps0-styl').selectOption('2K');
 	await page.locator('#ps0-s').fill('3000');

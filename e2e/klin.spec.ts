@@ -154,7 +154,7 @@ test('viac posuvov: klín má len ten posuv, ktorý ho má zapnutý', async ({ p
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-KLIN-M', 'E2E Klin multi');
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await page.locator('#ps0-s').fill('4365');
 	await page.locator('#ps0-v').fill('2320');
 	// klín len na DRUHOM posuve (primárny ostáva bez klina)
@@ -173,10 +173,10 @@ test('viac posuvov: klín má len ten posuv, ktorý ho má zapnutý', async ({ p
 	await expect(page.getByTestId('nahlad-klin')).toHaveCount(1);
 	await expect(page.getByTestId('nahlad-klin')).toContainText('2000');
 
-	// súhrnná karta klinov pomenuje posuv
+	// súhrnná karta klinov pomenuje zasklenie (#468 rename)
 	const karta = page.getByTestId('klin-karta-multi');
-	await expect(karta).toContainText('Posuv 2');
-	await expect(karta).not.toContainText('Posuv 1');
+	await expect(karta).toContainText('Zasklenie 2');
+	await expect(karta).not.toContainText('Zasklenie 1');
 	await expect(karta).toContainText('2× klín 2000 × 200 mm, výška 300 → 80 mm');
 
 	expect(errs).toEqual([]);
@@ -222,7 +222,7 @@ test('viac posuvov: klín je vidno AJ po odoslaní odpisu (nie len v náhľade)'
 	await loginAs(page);
 
 	await zaklad(page, `E2E-KLIN-ODO-${Date.now().toString(36)}`, 'E2E Klin po odoslani');
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await page.locator('#ps0-s').fill('4365');
 	await page.locator('#ps0-v').fill('2320');
 	await page.locator('#ps0-klin-on').check();
@@ -244,7 +244,7 @@ test('viac posuvov: klín je vidno AJ po odoslaní odpisu (nie len v náhľade)'
 	await expect(page.getByTestId('nahlad-klin')).toHaveCount(1);
 	await expect(page.getByTestId('nahlad-klin')).toContainText('2000');
 	const karta = page.getByTestId('klin-karta-multi');
-	await expect(karta).toContainText('Posuv 2');
+	await expect(karta).toContainText('Zasklenie 2');
 	await expect(karta).toContainText('2× klín 2000 × 200 mm, výška 300 → 80 mm');
 
 	expect(errs).toEqual([]);
@@ -265,7 +265,7 @@ test('viac posuvov: ručná dĺžka koľajnice prežije odoslanie (Money-kritick
 	await page.locator('#v').fill('1930');
 	await page.getByLabel(/Koľajnica horná \(mm\)/).fill('2690');
 	await page.getByLabel(/Koľajnica spodná \(mm\)/).fill('2695');
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('3980');
 	await page.locator('#ps0-v').fill('2162');
 	await vyberFarbuKovania(page);

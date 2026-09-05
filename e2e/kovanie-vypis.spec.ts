@@ -50,7 +50,7 @@ test('jeden posuv: kľučky sú vypísané pod posuvom a Money odpis je NEZMENEN
 	await waitHydrated(page);
 
 	const karta = page.getByTestId('kovanie-strany');
-	await expect(karta).toContainText('Posuv 1');
+	await expect(karta).toContainText('Zasklenie 1');
 	await expect(karta).toContainText('ľavá strana');
 	await expect(karta).toContainText(LAVA);
 	await expect(karta).toContainText('pravá strana');
@@ -70,7 +70,7 @@ test('viac posuvov: kovanie je vypísané per posuv, posuv bez kovania sa neuvá
 
 	await zaklad(page, 'E2E-KOVV-M');
 	await page.selectOption('#kovanieL', LAVA);
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await page.locator('#ps0-s').fill('4365');
 	await page.locator('#ps0-v').fill('2320');
 	await page.selectOption('#ps0-kovp', PRAVA);
@@ -79,9 +79,9 @@ test('viac posuvov: kovanie je vypísané per posuv, posuv bez kovania sa neuvá
 	await waitHydrated(page);
 
 	const karta = page.getByTestId('kovanie-strany-multi');
-	await expect(karta).toContainText('Posuv 1');
+	await expect(karta).toContainText('Zasklenie 1');
 	await expect(karta).toContainText(LAVA);
-	await expect(karta).toContainText('Posuv 2');
+	await expect(karta).toContainText('Zasklenie 2');
 	await expect(karta).toContainText(PRAVA);
 	// posuv 1 nemá pravú kľučku, posuv 2 nemá ľavú → prázdna strana je pomlčka
 	await expect(karta).toContainText('—');
@@ -139,7 +139,7 @@ test('#462 extra posuv: ps0-kovs/ps0-kovso stredové selecty pri 2× štýle', a
 
 	await zaklad(page, 'E2E-KOVPS');
 	// základ je 3K; pridaj posuv
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await page.locator('#ps0-s').fill('4000');
 	await page.locator('#ps0-v').fill('2000');
 	// nastav extra posuv na opona (2x2K) → ps0-kovs/ps0-kovso sa objavia
@@ -172,7 +172,7 @@ test('#462 extra posuv: ps0-kovs/ps0-kovso stredové selecty pri 2× štýle', a
 
 	// výsledný výpis multi-posuv kovania musí obsahovať info z oboch posuvov
 	const karta = page.getByTestId('kovanie-strany-multi');
-	await expect(karta).toContainText('Posuv 2');
+	await expect(karta).toContainText('Zasklenie 2');
 
 	expect(errs).toEqual([]);
 });

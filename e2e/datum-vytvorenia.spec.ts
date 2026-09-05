@@ -72,7 +72,7 @@ test('viac posuvov: dátum vytvorenia v hlavičke pri spoločnom náhľade aj po
 	await page.getByLabel('Zákazník *').fill('E2E Dátum Multi');
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('2509');
 	await page.locator('#ps0-v').fill('1930');
 	await vyberFarbuKovania(page);
