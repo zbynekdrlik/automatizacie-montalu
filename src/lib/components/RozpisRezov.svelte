@@ -145,7 +145,7 @@
 						{#each segs as seg (seg.body)}
 							{#if !seg.skryLabel}
 								<span class="lbl" class:odp={seg.odpad} style="left:{seg.labelPct}%"
-									>{#if viacPosuvov && seg.posuv}<span class="pbadge">P{seg.posuv}</span>
+									>{#if viacPosuvov && seg.posuv}<span class="pbadge">Z{seg.posuv}</span>
 									{/if}{seg.text}</span
 								>
 							{/if}

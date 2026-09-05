@@ -264,7 +264,7 @@ function computeMultiFrom(vstup: MultiVstup) {
 		if (!g)
 			return {
 				r: null,
-				err: `Posuv ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.`,
+				err: `Zasklenie ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.`,
 				specs: []
 			};
 		// #109: rovnaký zdieľaný builder ako compute() vyššie — na tejto ceste sú
@@ -319,6 +319,7 @@ function jobForMulti(
 		polozky: [...r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, qty: o.metre })), ...kovanie],
 		detail: {
 			zimnaZahrada: true,
+			multiZasklenie: true,
 			pocetPosuvov: r.posuvy.length,
 			jednostrannaFab: vstup.jednostrannaFab,
 			// RAL farba kovania — MENÍ Money kód kovania (#338); audit + „Použiť znova"

@@ -437,8 +437,9 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 	if (!base.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!base.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!base.zakaznik) error = 'Chýba zákazník.';
-	else if (!Array.isArray(posuvyRaw) || posuvyRaw.length < 1) error = 'Zadaj aspoň jeden posuv.';
-	else if (posuvyRaw.length > 12) error = 'Priveľa posuvov (max 12).';
+	else if (!Array.isArray(posuvyRaw) || posuvyRaw.length < 1)
+		error = 'Zadaj aspoň jedno zasklenie.';
+	else if (posuvyRaw.length > 12) error = 'Priveľa zasklení (max 12).';
 	else {
 		for (let i = 0; i < posuvyRaw.length; i++) {
 			const p = (posuvyRaw[i] ?? {}) as Record<string, unknown>;
@@ -464,38 +465,38 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				sietka: sanitizeSietka(posuvSystem, sk.sietka)
 			};
 			if (!posuv.system || !posuv.styl) {
-				error = `Posuv ${i + 1}: vyber systém a štýl.`;
+				error = `Zasklenie ${i + 1}: vyber systém a štýl.`;
 				break;
 			}
 			// 2x štýly sú vždy opona (serverové vynútenie, viď parseVstup)
 			if (posuv.styl.startsWith('2x')) posuv.otvaranie = 'Opona';
 			posuv.kovanieStred = sanitizeKovanieStred(posuv.system, posuv.styl, p.kovanieStred);
 			if (!(posuv.s >= S_MIN && posuv.s <= S_MAX)) {
-				error = `Posuv ${i + 1}: šírka musí byť ${S_MIN}–${S_MAX} mm.`;
+				error = `Zasklenie ${i + 1}: šírka musí byť ${S_MIN}–${S_MAX} mm.`;
 				break;
 			}
 			if (!(posuv.v >= V_MIN && posuv.v <= V_MAX)) {
-				error = `Posuv ${i + 1}: výška musí byť ${V_MIN}–${V_MAX} mm.`;
+				error = `Zasklenie ${i + 1}: výška musí byť ${V_MIN}–${V_MAX} mm.`;
 				break;
 			}
 			if (!posuv.sklo) {
-				error = `Posuv ${i + 1}: vyber sklo.`;
+				error = `Zasklenie ${i + 1}: vyber sklo.`;
 				break;
 			}
 			if (!OTVARANIA.includes(posuv.otvaranie)) {
-				error = `Posuv ${i + 1}: vyber otváranie.`;
+				error = `Zasklenie ${i + 1}: vyber otváranie.`;
 				break;
 			}
 			if (kol.error) {
-				error = `Posuv ${i + 1}: ${kol.error.replace(/^Koľajnica /, 'koľajnica ')}`;
+				error = `Zasklenie ${i + 1}: ${kol.error.replace(/^Koľajnica /, 'koľajnica ')}`;
 				break;
 			}
 			if (k.error) {
-				error = `Posuv ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
+				error = `Zasklenie ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
 				break;
 			}
 			if (maSietkaSystem(posuv.system) && sk.error) {
-				error = `Posuv ${i + 1}: ${sk.error.replace(/^Sieťka: /, 'sieťka — ')}`;
+				error = `Zasklenie ${i + 1}: ${sk.error.replace(/^Sieťka: /, 'sieťka — ')}`;
 				break;
 			}
 			posuvy.push(posuv);

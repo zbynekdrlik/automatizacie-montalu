@@ -8,7 +8,7 @@
 	// rodičovi, aby markup ostal 1:1 (jediná zmena: `data.systemy`→`systemy`,
 	// `data.kovania`→`kovania`). `posuvyJSON` hidden input serializuje ďalšie posuvy.
 	import { nazovSystemu } from '$lib/system-nazvy';
-	import { posuvySlovom } from '$lib/popis';
+	import { zaskleniaSlovom } from '$lib/popis';
 	import { plusRailEligible, SYSTEMY_OBVODOVA } from '$lib/styl';
 	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
 	import type { Farba } from '$lib/komponenty';
@@ -447,12 +447,12 @@
 				bind:sietkaSystem={sietkaSystemS}
 			/>
 		{/if}
-		<!-- Zimná záhrada: ďalšie posuvy sa zoptimalizujú do zdieľaných tyčí -->
+		<!-- Ďalšie zasklenia sa zoptimalizujú do zdieľaných tyčí (#468) -->
 		<input type="hidden" name="posuvy" value={posuvyJSON} />
 		{#each posuvyExtra as p, i (i)}
 			<div class="posuv-box">
 				<div class="posuv-hd">
-					<b>Posuv {i + 2}</b>
+					<b>Zasklenie {i + 2}</b>
 					<button type="button" class="link-del" onclick={() => removePosuv(i)}>✕ odobrať</button>
 				</div>
 				<div class="grid2">
@@ -607,7 +607,7 @@
 				{/if}
 			</div>
 		{/each}
-		<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať posuv</button>
+		<button type="button" class="btn secondary" onclick={addPosuv}>➕ Pridať zasklenie</button>
 		<button
 			class="btn"
 			type="submit"
@@ -616,7 +616,7 @@
 			data-testid="spocitat"
 		>
 			{jeMulti
-				? `Spočítať spoločný plán (${posuvySlovom(posuvyExtra.length + 1)})`
+				? `Spočítať spoločný plán (${zaskleniaSlovom(posuvyExtra.length + 1)})`
 				: 'Spočítať nárezový plán'}
 		</button>
 	</form>
