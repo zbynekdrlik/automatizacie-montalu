@@ -126,9 +126,7 @@ describe('#419 extended scope — strešné sklo, FIX výplne, tesnenia, drobný
 	const bazaVys = spocitajNarez(BASE);
 	const vys: NarezVysledok = {
 		...bazaVys,
-		vypocitane: [
-			{ kod: '18017', nazov: 'Predná noha', dlzkaRezuMm: 2340, pocetKs: 4 }
-		]
+		vypocitane: [{ kod: '18017', nazov: 'Predná noha', dlzkaRezuMm: 2340, pocetKs: 4 }]
 	};
 	const komp: PergolaKomponent[] = [];
 
@@ -168,9 +166,7 @@ describe('#419 extended scope — strešné sklo, FIX výplne, tesnenia, drobný
 				zapnuty: true,
 				zrkadlo: false,
 				vykres: {
-					polia: [
-						{ sirka: 3500, vLavo: 2200, vPravo: 2900, sikma: 3600, m2: 8.9 }
-					],
+					polia: [{ sirka: 3500, vLavo: 2200, vPravo: 2900, sikma: 3600, m2: 8.9 }],
 					S: 3500,
 					V1: 2200,
 					V2: 2900,
@@ -237,9 +233,33 @@ describe('#419 extended scope — strešné sklo, FIX výplne, tesnenia, drobný
 	it('tesnenia s stav ok sa objavia s dĺžkou a skupinou tesnenie', () => {
 		const e = expedicnyZoznam(vys, komp, {
 			tesnenia: [
-				{ id: 'zlab', nazov: 'Tesnenie žľabu', dlzkaMm: 5760, stav: 'ok', koef: 1, vzorec: '', kod: null },
-				{ id: 'kotviaci', nazov: 'Tesnenie kotviaceho', dlzkaMm: 5760, stav: 'ok', koef: 1, vzorec: '', kod: null },
-				{ id: 'na-skla', nazov: 'Tesnenie na sklá', dlzkaMm: null, stav: 'caka', koef: 4, vzorec: '', kod: null }
+				{
+					id: 'zlab',
+					nazov: 'Tesnenie žľabu',
+					dlzkaMm: 5760,
+					stav: 'ok',
+					koef: 1,
+					vzorec: '',
+					kod: null
+				},
+				{
+					id: 'kotviaci',
+					nazov: 'Tesnenie kotviaceho',
+					dlzkaMm: 5760,
+					stav: 'ok',
+					koef: 1,
+					vzorec: '',
+					kod: null
+				},
+				{
+					id: 'na-skla',
+					nazov: 'Tesnenie na sklá',
+					dlzkaMm: null,
+					stav: 'caka',
+					koef: 4,
+					vzorec: '',
+					kod: null
+				}
 			]
 		});
 		const tesn = e.polozky.filter((p) => p.skupina === 'tesnenie');
@@ -268,9 +288,18 @@ describe('#419 extended scope — strešné sklo, FIX výplne, tesnenia, drobný
 				zrkadlo: false,
 				vykres: {
 					polia: [{ sirka: 3000, vLavo: 2000, vPravo: 2500, sikma: 3100, m2: 7 }],
-					S: 3000, V1: 2000, V2: 2500, alfa: 9, klesaVpravo: true,
-					sikmaCelkom: 3100, uholOstry: 81, uholTupy: 99,
-					kumulSirka: [3000], kumulSikma: [3100], vyskyStlpikov: [0, 2000], m2: 7
+					S: 3000,
+					V1: 2000,
+					V2: 2500,
+					alfa: 9,
+					klesaVpravo: true,
+					sikmaCelkom: 3100,
+					uholOstry: 81,
+					uholTupy: 99,
+					kumulSirka: [3000],
+					kumulSikma: [3100],
+					vyskyStlpikov: [0, 2000],
+					m2: 7
 				}
 			},
 			tesnenia: [
