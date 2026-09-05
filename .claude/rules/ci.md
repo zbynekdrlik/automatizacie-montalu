@@ -267,10 +267,18 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
   `production`). Zápisové testy sa automaticky preskočia (3 vrstvy ochrany):
   - `skipAkLive` (helpers.ts) — v tele testu overí /health `live:true` → skip
   - `test.skip(!!process.env.BASE_URL, ...)` — DB-fixture testy (seed lokálnej DB)
+    PLUS honest-null cenové testy (#466): prod MÁ reálny Money snapshot → „cena
+    neznáma"/„nebol naimportovaný" je preview-only stav. 4 testy: `ceny.spec.ts:23`
+    (bez snapshotu), `ceny.spec.ts:124` (lak honest-null), `pergola-ceny.spec.ts:44`
+    (PRP honest-null), `sklo-cena.spec.ts:24` (sklo honest-null).
   - `testIgnore` v playwright.config.ts — `error-stranka.spec.ts` (test-only route)
-  Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu. Cap 15 min (workers:1
-  cez SSH tunel). `post-deploy.spec.ts` naďalej beží ako súčasť sady (overuje SHA7
-  z DOM, keď `DEPLOY_SHA7` env je nastavené).
+  Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu.
+  **Cap 16 min** (workers:1 cez SSH tunel). NAMERANÉ 10.8 min / 324 testov (263 passed,
+  57 skipped, 4 honest-null fixture-only skipped) z dev1 2026-09-05 (#466). Timeout
+  zdvihnutý z pôvodných 15 min (odhad, stihol len ~160 testov) s 48 % rezervou na
+  pomalší GitHub runner. Deploy job timeout = 35 min (build+poll ~5 + npm ci + playwright
+  install ~5 + E2E cap 16 + rezerva). `post-deploy.spec.ts` naďalej beží ako súčasť
+  sady (overuje SHA7 z DOM, keď `DEPLOY_SHA7` env je nastavené).
 
 - **E2E secrets:** `E2E_USER`+`E2E_PASS` treba pridať do GitHub environment
   `production` (užívateľ/supervisor — agent secrets nepridáva). Kým chýbajú, krok

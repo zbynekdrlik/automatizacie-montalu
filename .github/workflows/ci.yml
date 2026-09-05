@@ -130,9 +130,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     # Deploy (build + rollback + health) + inštalácia Playwright + post-deploy E2E
-    # cez SSH tunel. Bez limitu visí default 6 h; 30 min pokrýva build+poll (~5) +
-    # npm ci + playwright install (~5) + E2E (cap 15, celá read-only sada) s rezervou.
-    timeout-minutes: 30
+    # cez SSH tunel. Bez limitu visí default 6 h; 35 min pokrýva build+poll (~5) +
+    # npm ci + playwright install (~5) + E2E (cap 16, celá read-only sada, NAMERANÉ
+    # 10.8 min / 324 testov cez tunel workers:1 z dev1 2026-09-05 — #466) s rezervou.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -201,10 +202,15 @@ jobs:
         # /health live:true; BASE_URL skip pre DB-fixture testy; testIgnore pre
         # error-stranka). Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu.
         # Zlyhanie = červený job (ALARM), ale rollback sa TU NEROBÍ — nová verzia
-        # je zdravá (health poll prešiel). Cap 15 min = celá sada workers:1 cez tunel.
+        # je zdravá (health poll prešiel).
+        # Cap 16 min = celá sada workers:1 cez tunel. NAMERANÉ 10.8 min / 324 testov
+        # (263 passed + 57 skipped + 4 honest-null fixture-only skipped) z dev1
+        # 2026-09-05 (#466). 16 min = nameraných ~11 min + 48 % rezerva na pomalší
+        # GitHub runner vs dev1. Timeout zdvihnutý z pôvodných 15 min (odhad, stihol
+        # len ~160 testov) na základe merania (no-timeout-band-aids).
         id: postdeploy_e2e
         if: success() && steps.e2e_secrets.outputs.present == 'true'
-        timeout-minutes: 15
+        timeout-minutes: 16
         env:
           E2E_USER: ${{ secrets.E2E_USER }}
           E2E_PASS: ${{ secrets.E2E_PASS }}
