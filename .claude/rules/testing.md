@@ -321,6 +321,24 @@ cleanup. Dôsledky pre písanie testov:
   kontenciu a default 5 s strop sa prekročí (`Test timed out`, nie assertion fail). Timeout
   rieši len trpezlivosť harnessu; TVRDENIE testu sa tým nemení.
 
+## E2E: `img.naturalWidth` čítaný hneď po hydratácii je RACE — assertuj cez bounded `expect.poll` (issue 466, run 33969675716)
+
+`naturalWidth > 0` cez `evaluateAll` HNEĎ po `waitHydrated()` preteká s fetchmi
+obrázkov — DOM je hotový, ale obrázky sa ešte sťahujú. Lokálny preview to nikdy
+netrafí (obrázky prídu okamžite); cez pomalý SSH tunel (post-deploy E2E) padne
+náhodná podmnožina riadkov ako „bez rezu", hoci súbory sú na prode 200 a
+byte-zhodné. Fix NIE JE `waitForTimeout` (guard-banned) — je to bounded poll na
+celú podmienku:
+
+```ts
+await expect.poll(() => bezRezu(page), { timeout: 20_000, message: 'bez rezu' }).toEqual([]);
+```
+
+kde `bezRezu()` vráti zoznam riadkov s nenačítaným obrázkom (prázdne pole = OK).
+Reálne rozbitý obrázok stále padne (naturalWidth ostane 0 aj po timeoute) — fixuje
+sa len race. Vzor: `e2e/profil-obrazky.spec.ts` (merge 09f51a2). Každý nový E2E
+assert na `naturalWidth`/`complete`/iný async-load stav píš rovno ako `expect.poll`.
+
 ## E2E: globalSetup beží AŽ PO boote webServera — NIKDY nemaž v ňom DB, ktorú si server drží otvorenú (#291)
 
 Playwright spúšťa `globalSetup` **až po tom**, čo je `webServer` hotový (readiness
