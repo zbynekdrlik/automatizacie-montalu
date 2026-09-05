@@ -18,8 +18,9 @@
 	let v = $derived(form && 'v' in form ? form.v : null);
 	// cenový blok (display-only) — LEN interní; b2b nikdy nedostane `ceny`
 	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
-	// #448 predodpisové skladové varovanie — LEN interní; b2b dostane [] (server)
+	// #448/#451 predodpisové skladové varovanie + odobrať — LEN interní; b2b dostane [] (server)
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
+	let snapshotDatum = $derived(form && 'snapshotDatum' in form ? form.snapshotDatum : null);
 
 	let copyBtnText = $state('📋 Kopírovať počet tyčí');
 	async function kopiruj() {
@@ -152,8 +153,8 @@
 		</div>
 	{/if}
 
-	<!-- #448: predodpisové skladové varovanie pri odpise (LEN interní; server pre b2b vráti []) -->
-	<SkladVarovania varovania={skladVarovania ?? undefined} />
+	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
+	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">

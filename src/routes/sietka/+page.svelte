@@ -27,8 +27,9 @@
 		poznamka: form?.vstup?.poznamka ?? ''
 	});
 	let r = $derived(form && 'r' in form ? form.r : null);
-	// #448 predodpisové skladové varovanie — LEN interní (server pre b2b vráti [])
+	// #448/#451 predodpisové skladové varovanie + odobrať — LEN interní (server pre b2b vráti [])
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
+	let snapshotDatum = $derived(form && 'snapshotDatum' in form ? form.snapshotDatum : null);
 	let potrebuje3K = $derived(form && 'potrebuje3K' in form ? form.potrebuje3K : false);
 	let planHash = $derived(form && 'planHash' in form ? form.planHash : '');
 	let cielInfo = $derived(form && 'cielInfo' in form ? form.cielInfo : null);
@@ -266,8 +267,8 @@
 	{/if}
 
 	{#if step === 'vysledok' && !isB2B}
-		<!-- #448: predodpisové skladové varovanie pri odpise (LEN interní) -->
-		<SkladVarovania varovania={skladVarovania ?? undefined} />
+		<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní) -->
+		<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
 	{/if}
 
 	<div class="card noprint">

@@ -476,9 +476,13 @@ export function enrichPolozky(
 // ---- predodpisové skladové varovanie (#448) ----
 
 /** Jedno skladové varovanie pred odpisom (#448): kód, ktorého denný Money snapshot hlási nižší
- *  sklad než požadované množstvo. Honest signál — NIE blok (appka sklad nevlastní, snapshot je stale). */
+ *  sklad než požadované množstvo. Honest signál — NIE blok (appka sklad nevlastní, snapshot je stale).
+ *  #451: `nazov` pridaný pre UI — výrazné varovanie s akciou „Odobrať z odpisu" musí ukázať
+ *  ČO je za daným kódom, nielen číslo artiklu. */
 export interface SkladVarovanie {
 	kod: string;
+	/** ľudsky čitateľný názov položky (z odpisu). */
+	nazov: string;
 	/** dostupný sklad zo snapshotu (non-null, < požadované). */
 	sklad: number;
 	/** požadované množstvo (SÚČET za kód v tomto odpise). */
@@ -495,25 +499,31 @@ export interface SkladVarovanie {
  * sa AGREGUJE za kód (Money kontroluje sklad na CELKOVÝ dopyt kódu v doklade). Sám si spustí lazy
  * import snapshotu (idempotentný), rovnako ako `validateOdpisKody`/`enrichPolozky`.
  */
-export function skladoveVarovania(polozky: { kod: string; mnozstvo: number }[]): SkladVarovanie[] {
+export function skladoveVarovania(
+	polozky: { kod: string; nazov: string; mnozstvo: number }[]
+): SkladVarovanie[] {
 	maybeImportSnapshot();
 	// súčet požadovaného množstva za kód (LEN kladné — nulová položka nič nežiada); Map insertion
 	// order určuje poradie výstupu = deterministické podľa prvého výskytu kódu
-	const dopyt = new Map<string, number>();
+	const dopyt = new Map<string, { mnozstvo: number; nazov: string }>();
 	for (const p of polozky) {
 		if (!p.kod || typeof p.mnozstvo !== 'number' || !Number.isFinite(p.mnozstvo) || p.mnozstvo <= 0)
 			continue;
-		dopyt.set(p.kod, (dopyt.get(p.kod) ?? 0) + p.mnozstvo);
+		const existing = dopyt.get(p.kod);
+		dopyt.set(p.kod, {
+			mnozstvo: (existing?.mnozstvo ?? 0) + p.mnozstvo,
+			nazov: existing?.nazov ?? p.nazov
+		});
 	}
 	const out: SkladVarovanie[] = [];
-	for (const [kod, rawMnozstvo] of dopyt) {
+	for (const [kod, { mnozstvo: rawMnozstvo, nazov }] of dopyt) {
 		// zaokrúhli agregát na 3 desatinné (mm presnosť) — FP akumulácia (napr. 0,1+0,2=0,30000…4) by
 		// inak spravila FALOŠNÉ varovanie pri koncepčne ROVNOM sklade (design: presná rovnosť = žiadne
 		// varovanie). Vzor `round2` v `enrichPolozky` — tam sa súčty tiež zaokrúhľujú pred zobrazením.
 		const mnozstvo = Math.round(rawMnozstvo * 1000) / 1000;
 		const price = getPriceRow(kod);
 		if (price && price.sklad !== null && price.sklad < mnozstvo) {
-			out.push({ kod, sklad: price.sklad, mnozstvo });
+			out.push({ kod, nazov, sklad: price.sklad, mnozstvo });
 		}
 	}
 	return out;

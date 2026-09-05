@@ -41,36 +41,36 @@ beforeEach(() => {
 });
 
 describe('#448 skladoveVarovania — predodpisové skladové varovanie', () => {
-	it('sklad < požadované → varovanie {kod, sklad, mnozstvo}', async () => {
+	it('sklad < požadované → varovanie {kod, nazov, sklad, mnozstvo}', async () => {
 		await seed([{ kod: 'ZASP20244', sklad: 6.82 }]);
-		expect(skladoveVarovania([{ kod: 'ZASP20244', mnozstvo: 15 }])).toEqual([
-			{ kod: 'ZASP20244', sklad: 6.82, mnozstvo: 15 }
-		]);
+		expect(
+			skladoveVarovania([{ kod: 'ZASP20244', nazov: 'Kladkový profil', mnozstvo: 15 }])
+		).toEqual([{ kod: 'ZASP20244', nazov: 'Kladkový profil', sklad: 6.82, mnozstvo: 15 }]);
 	});
 
 	it('sklad == požadované → žiadne varovanie (presná rovnosť)', async () => {
 		await seed([{ kod: 'ZASP1', sklad: 10 }]);
-		expect(skladoveVarovania([{ kod: 'ZASP1', mnozstvo: 10 }])).toEqual([]);
+		expect(skladoveVarovania([{ kod: 'ZASP1', nazov: 'Test', mnozstvo: 10 }])).toEqual([]);
 	});
 
 	it('sklad > požadované → žiadne varovanie', async () => {
 		await seed([{ kod: 'ZASP1', sklad: 100 }]);
-		expect(skladoveVarovania([{ kod: 'ZASP1', mnozstvo: 15 }])).toEqual([]);
+		expect(skladoveVarovania([{ kod: 'ZASP1', nazov: 'Test', mnozstvo: 15 }])).toEqual([]);
 	});
 
 	it('sklad === null (Money nemá skladovú kartu) → žiadne varovanie', async () => {
 		await seed([{ kod: 'ZASP1', sklad: null }]);
-		expect(skladoveVarovania([{ kod: 'ZASP1', mnozstvo: 5 }])).toEqual([]);
+		expect(skladoveVarovania([{ kod: 'ZASP1', nazov: 'Test', mnozstvo: 5 }])).toEqual([]);
 	});
 
 	it('kód mimo snapshotu (Money ho nepozná) → žiadne varovanie', async () => {
 		await seed([{ kod: 'ZASP1', sklad: 1 }]);
-		expect(skladoveVarovania([{ kod: 'NEZNAMY', mnozstvo: 5 }])).toEqual([]);
+		expect(skladoveVarovania([{ kod: 'NEZNAMY', nazov: 'Test', mnozstvo: 5 }])).toEqual([]);
 	});
 
 	it('nulové množstvo → žiadne varovanie aj pri zápornom sklade', async () => {
 		await seed([{ kod: 'ZASP1', sklad: -5 }]);
-		expect(skladoveVarovania([{ kod: 'ZASP1', mnozstvo: 0 }])).toEqual([]);
+		expect(skladoveVarovania([{ kod: 'ZASP1', nazov: 'Test', mnozstvo: 0 }])).toEqual([]);
 	});
 
 	it('viac kódov: len tie s sklad < mnozstvo (zvyšok vynechá)', async () => {
@@ -81,23 +81,23 @@ describe('#448 skladoveVarovania — predodpisové skladové varovanie', () => {
 		]);
 		expect(
 			skladoveVarovania([
-				{ kod: 'A', mnozstvo: 5 },
-				{ kod: 'B', mnozstvo: 5 },
-				{ kod: 'C', mnozstvo: 1 }
+				{ kod: 'A', nazov: 'Profil A', mnozstvo: 5 },
+				{ kod: 'B', nazov: 'Profil B', mnozstvo: 5 },
+				{ kod: 'C', nazov: 'Profil C', mnozstvo: 1 }
 			])
 		).toEqual([
-			{ kod: 'A', sklad: 2, mnozstvo: 5 },
-			{ kod: 'C', sklad: 0, mnozstvo: 1 }
+			{ kod: 'A', nazov: 'Profil A', sklad: 2, mnozstvo: 5 },
+			{ kod: 'C', nazov: 'Profil C', sklad: 0, mnozstvo: 1 }
 		]);
 	});
 
-	it('rovnaký kód viackrát → množstvo sa agreguje (celkový dopyt kódu)', async () => {
+	it('rovnaký kód viackrát → množstvo sa agreguje, názov z prvého výskytu', async () => {
 		await seed([{ kod: 'A', sklad: 7 }]);
 		expect(
 			skladoveVarovania([
-				{ kod: 'A', mnozstvo: 4 },
-				{ kod: 'A', mnozstvo: 5 }
+				{ kod: 'A', nazov: 'Profil A', mnozstvo: 4 },
+				{ kod: 'A', nazov: 'Profil A dup', mnozstvo: 5 }
 			])
-		).toEqual([{ kod: 'A', sklad: 7, mnozstvo: 9 }]);
+		).toEqual([{ kod: 'A', nazov: 'Profil A', sklad: 7, mnozstvo: 9 }]);
 	});
 });

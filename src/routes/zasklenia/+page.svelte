@@ -692,8 +692,8 @@
 
 	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
-	<!-- #448: predodpisové skladové varovanie pri tlačidle odpisu (LEN interní; server pre b2b vráti []) -->
-	<SkladVarovania varovania={form?.skladVarovania} />
+	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
+	<SkladVarovania varovania={form?.skladVarovania} snapshotDatum={form?.snapshotDatum} />
 
 	<div class="card noprint">
 		{#if !isB2B}
@@ -770,8 +770,8 @@
 		skloCeny={form?.skloCeny}
 	/>
 
-	<!-- #448: predodpisové skladové varovanie pri tlačidle odpisu (LEN interní; server pre b2b vráti []) -->
-	<SkladVarovania varovania={form?.skladVarovania} />
+	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
+	<SkladVarovania varovania={form?.skladVarovania} snapshotDatum={form?.snapshotDatum} />
 
 	<div class="card noprint">
 		{#if !isB2B}
