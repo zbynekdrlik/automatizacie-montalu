@@ -93,6 +93,17 @@ test('multi: 1 kus = presne rovnaký odpis ako jednokusový formulár (regresná
 	await waitHydrated(page);
 	await expect(page.getByTestId('ram-profil')).toHaveText('2 ks + 2 ks');
 	const solo = (await page.locator('table').last().innerText()).replace(/\s+/g, ' ');
+	// falzifikovateľná parita (review nález issue 473 — predošlý `toContain('15')` matchol
+	// takmer čokoľvek): odčítaj SKUTOČNÚ metre hodnotu ZASP00002 riadku zo SOLO tabuľky
+	// (posledná bunka `td` — Money-formátovaná `fmtM(...) m`), kým je solo výsledok ešte
+	// na obrazovke — nižšie ju porovnáme so zodpovedajúcou bunkou v MULTI tabuľke.
+	const soloMetre = (
+		await page
+			.getByRole('row', { name: /ZASP00002/ })
+			.locator('td')
+			.last()
+			.innerText()
+	).trim();
 
 	// (2) multi s JEDNÝM rovnakým kusom — musí dať identický riadok kódov/metrov
 	await hlavicka(page, 'E2E-SIETKA-PARITA-MULTI');
@@ -104,9 +115,15 @@ test('multi: 1 kus = presne rovnaký odpis ako jednokusový formulár (regresná
 	await waitHydrated(page);
 	const multiOdpis = (await page.locator('table').last().innerText()).replace(/\s+/g, ' ');
 
-	// rovnaké kódy + rovnaké metre (odpis tabuľka má rovnaký formát Kód/Názov/Metre)
+	// rovnaké kódy + PRESNE rovnaká metre hodnota ako v solo tabuľke (nie len ľubovoľná
+	// podreťazcová zhoda) — toto je falzifikovateľné: iná metráž v multi vetve padne.
 	expect(multiOdpis).toContain('ZASP00002');
-	expect(multiOdpis).toContain('15');
+	await expect(
+		page
+			.getByRole('row', { name: /ZASP00002/ })
+			.locator('td')
+			.last()
+	).toHaveText(soloMetre);
 	expect(solo).toContain('ZASP00002');
 
 	expect(errs).toEqual([]);

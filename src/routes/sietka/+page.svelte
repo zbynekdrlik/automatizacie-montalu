@@ -149,6 +149,26 @@
 			}))
 		)
 	);
+
+	// server-echo JSON pre výsledkovú (vysledokMulti) stránku — SSR HTML sa vykreslí
+	// PRED tým, než klientský $effect (vyššie) stihne kusy naplníť z multiVstup, takže
+	// kusyJSON by v tom okne niesol default jednoriadkový stav. hiddenMulti() preto
+	// preferuje TENTO derived (priamo z form-echa), nikdy kusyJSON — inak by
+	// pred-hydratačný klik na „Odoslať“/„Späť a upraviť“ poslal zlé/prázdne kusy
+	// (review nález issue 473).
+	let multiVstupKusyJSON = $derived(
+		multiVstup
+			? JSON.stringify(
+					multiVstup.kusy.map((k) => ({
+						system: k.system,
+						styl: k.styl,
+						otvorS: k.otvorS,
+						otvorV: k.otvorV,
+						sietkaUchyt: k.sietka.uchyt
+					}))
+				)
+			: ''
+	);
 </script>
 
 <svelte:head><title>Sieťka — dodatočná objednávka</title></svelte:head>
@@ -170,7 +190,7 @@
 	<input type="hidden" name="op" value={multiVstup?.op ?? mOp} />
 	<input type="hidden" name="zakaznik" value={multiVstup?.zakaznik ?? mZakaznik} />
 	<input type="hidden" name="poznamka" value={multiVstup?.poznamka ?? mPoznamka} />
-	<input type="hidden" name="sietkaKusy" value={kusyJSON} />
+	<input type="hidden" name="sietkaKusy" value={multiVstup ? multiVstupKusyJSON : kusyJSON} />
 {/snippet}
 
 {#if step === 'form'}
