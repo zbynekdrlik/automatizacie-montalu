@@ -74,6 +74,21 @@ Overenie cez `money-ro-thirdparty` bridge z **dev2** (`~/devel/montalu/n8n/`, tu
 CLIP profil od rovnomenného profilu iného systému (money-odpis skill §1). Bridge NEbeží z
 dev1 (kľúč je len na dev2).
 
+## Multi režim (#468 fáza 2) — batch výroba viacerých CLIP kusov
+
+`computeClipMulti(vstupy)` počíta každý kus NEZÁVISLE cez `computeClip` (per-riadkový
+ROUNDUP, 1:1 parita s Excelom) a výsledné tyče per Money kód SČÍTA naprieč kusmi.
+ŽIADNY bin-packing — 2× identický kus = presne 2× tyče (kontraktné testy v
+`tests/clip-multi.test.ts`). Server akcie `spocitatMulti`/`odoslatMulti`/`upravitMulti`
+v `+page.server.ts`; parser `parseClipMultiVstup` v `vstup.ts` (JSON pole kusov z
+hidden inputu `clipKusy`, max 12 kusov). `jobForMulti` produkuje jeden OdpisJob so
+spoločnou zak/op hlavičkou; dedup `UNIQUE(zak,op,live)` NEDOTKNUTÝ.
+
+UI vzor: toggle checkbox „Viac kusov naraz" na formulári; spoločné zak/op/zakaznik/caka
++ per-kus typ/variant/sirka/vyska/ral. Kontrolná obrazovka: per-kus nárezová tabuľka +
+spoločná odpisová tabuľka s editovateľnými množstvami. Úspešná obrazovka: `finalOut`
+(po užívateľových úpravách), NIE originálne polozky (review nález #468).
+
 ## Money-bezpečnosť + validácia
 
 - `parseClipVstup` (`vstup.ts`) ODMIETNE neplatný `typ` chybou — NIKDY ticho neprepadne na
