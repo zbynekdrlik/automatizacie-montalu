@@ -4,7 +4,7 @@
 // modul len drží TYPY a čistý formátovač, ktoré potrebujú AJ deti (`ZasklieniaForm`
 // pre loop-binding typ `PosuvRow`, `PlanKarty`/`PlanKartyMulti` pre `fmtM` a `PlanVstup`).
 
-import type { Klin } from '$lib/klin';
+import type { Klin, KlinVstup } from '$lib/klin';
 import type { Sietka, SietkaUchyt } from '$lib/sietka';
 import type { Farba } from '$lib/komponenty';
 
@@ -12,7 +12,8 @@ import type { Farba } from '$lib/komponenty';
 export const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
 // Riadok ĎALŠIEHO posuvu (zimná záhrada) — ploché polia rovnakého tvaru ako primárny
-// posuv; do JSON-u idú tak, ako ich parsuje server (klin='1' + 4 rozmery + ks).
+// posuv; do JSON-u idú tak, ako ich parsuje server. `kliny` (#472) je JEDINÉ pole,
+// ktoré nie je ploché — je to už samotné pole `Klin[]` (KlinPolia ho spravuje priamo).
 export type PosuvRow = {
 	system: string;
 	styl: string;
@@ -24,12 +25,9 @@ export type PosuvRow = {
 	kovanieP: string;
 	kovanieStred: string;
 	kovanieStredOkno: 'L' | 'P';
-	klin: boolean;
-	klinDlzka: number | string;
-	klinSirka: number | string;
-	klinV1: number | string;
-	klinV2: number | string;
-	klinKs: number | string;
+	// klíny TOHOTO posuvu (#472 viac RÔZNYCH naraz) — editovateľné riadky (hodnoty
+	// smú byť prázdny reťazec), prázdne pole = žiadny
+	kliny: KlinVstup[];
 	// ručné dĺžky koľajníc TOHOTO posuvu — prázdne = počítaj zo šírky (mení odpis)
 	kolajnicaHorna: number | string;
 	kolajnicaSpodna: number | string;
@@ -64,7 +62,7 @@ export type PlanVstup = {
 	pridavnaKolajnica: boolean;
 	jednostrannaFab: boolean;
 	farbaKovania: Farba | null;
-	klin: Klin | null;
+	kliny: Klin[];
 	kolajnica: { horna?: number; spodna?: number } | null;
 	sietka: Sietka | null;
 };

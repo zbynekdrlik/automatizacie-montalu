@@ -41,7 +41,7 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 	it('prvý parse (z formulára) klín aj koľajnicu prečíta', () => {
 		const { vstup, error } = znovuPosli([POSUV_PLOCHY]);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0]!.klin).toEqual({ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 });
+		expect(vstup.posuvy[0]!.kliny).toEqual([{ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 }]);
 		expect(vstup.posuvy[0]!.kolajnica).toEqual({ horna: 2690, spodna: 2695 });
 	});
 
@@ -50,14 +50,14 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 		// náhľad posiela sparsovaný tvar späť na server
 		const { vstup, error } = znovuPosli(prvy.posuvy);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0]!.klin).toEqual(prvy.posuvy[0]!.klin);
+		expect(vstup.posuvy[0]!.kliny).toEqual(prvy.posuvy[0]!.kliny);
 		expect(vstup.posuvy[0]!.kolajnica).toEqual(prvy.posuvy[0]!.kolajnica);
 	});
 
 	it('opakovaný round-trip (späť a upraviť → znova náhľad → odoslať) drží hodnoty', () => {
 		let v = znovuPosli([POSUV_PLOCHY]).vstup;
 		for (let i = 0; i < 3; i++) v = znovuPosli(v.posuvy).vstup;
-		expect(v.posuvy[0]!.klin).toEqual({ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 });
+		expect(v.posuvy[0]!.kliny).toEqual([{ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 }]);
 		expect(v.posuvy[0]!.kolajnica).toEqual({ horna: 2690, spodna: 2695 });
 	});
 
@@ -75,10 +75,10 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 				kolajnicaSpodna: ''
 			}
 		]).vstup;
-		expect(prvy.posuvy[0]!.klin).toBeNull();
+		expect(prvy.posuvy[0]!.kliny).toEqual([]);
 		const { vstup, error } = znovuPosli(prvy.posuvy);
 		expect(error).toBeNull();
-		expect(vstup.posuvy[0]!.klin).toBeNull();
+		expect(vstup.posuvy[0]!.kliny).toEqual([]);
 		expect(vstup.posuvy[0]!.kolajnica).toBeNull();
 	});
 
@@ -87,6 +87,22 @@ describe('parseMultiVstup — druhý parse (odoslať / späť) nesmie stratiť k
 			{ ...POSUV_PLOCHY, klin: { dlzka: 0, sirka: 250, v1: 120, v2: 0, ks: 1 }, kolajnica: null }
 		]);
 		expect(error).toBe('Zasklenie 1: klín — dĺžka musí byť 1–20000 mm.');
+	});
+
+	it('#472: sparsovaný RIADOK VIACERÝCH klinov (`kliny` pole) prežije round-trip', () => {
+		const prvy = znovuPosli([
+			{
+				...POSUV_PLOCHY,
+				kliny: [
+					{ dlzka: 2509, sirka: 250, v1: 120, v2: 0, ks: 2 },
+					{ dlzka: 1000, sirka: 80, v1: 20, v2: 0, ks: 1 }
+				]
+			}
+		]).vstup;
+		expect(prvy.posuvy[0]!.kliny).toHaveLength(2);
+		const { vstup, error } = znovuPosli(prvy.posuvy);
+		expect(error).toBeNull();
+		expect(vstup.posuvy[0]!.kliny).toEqual(prvy.posuvy[0]!.kliny);
 	});
 });
 

@@ -136,7 +136,7 @@ describe('zasklenia — jednoposuv: detail.vstupRaw == naparsovaný Vstup 1:1 (#
 
 	it('vstupRaw je hlboko rovný tomu, čo parseVstup naparsuje z tých istých polí (vrátane klin/kolajnica/sietka)', async () => {
 		const { vstup: expected } = parseVstup(fd(BODY));
-		expect(expected.klin).not.toBeNull();
+		expect(expected.kliny).not.toEqual([]);
 		expect(expected.kolajnica).not.toBeNull();
 		expect(expected.sietka).not.toBeNull();
 		const r = await zasklenia.actions.odoslat(ev('zasklenia', BODY));
@@ -167,7 +167,7 @@ describe('zasklenia — viac posuvov: detail.vstupRaw == naparsovaný MultiVstup
 
 	it('vstupRaw je hlboko rovný tomu, čo parseMultiVstup naparsuje z tých istých polí (vrátane klin/kolajnica/sietka)', async () => {
 		const { vstup: expected } = parseMultiVstup(fd(BODY));
-		expect(expected.posuvy[0]!.klin).not.toBeNull();
+		expect(expected.posuvy[0]!.kliny).not.toEqual([]);
 		expect(expected.posuvy[0]!.kolajnica).not.toBeNull();
 		expect(expected.posuvy[0]!.sietka).not.toBeNull();
 		const r = await zasklenia.actions.odoslatMulti(ev('zasklenia', BODY));

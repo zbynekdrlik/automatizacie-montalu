@@ -38,12 +38,15 @@ export {
 	sietkaChyba,
 	sietkaKolajnicaSwap,
 	sietkaKolajnicaVzorecChyba,
-	sietkaSamostatnaVypocet
+	sietkaSamostatnaVypocet,
+	sietkaSamostatnaMultiVypocet
 } from './compute-sietka';
 export type {
 	ExtraRez,
 	SietkaSamostatnaMaterialRow,
-	SietkaSamostatnaOdpis
+	SietkaSamostatnaOdpis,
+	SietkaSamostatnaKus,
+	SietkaSamostatnaMultiOdpis
 } from './compute-sietka';
 
 export {

@@ -91,7 +91,7 @@
 					kovanieP={pv.kovanieP ?? ''}
 					kovanieStred={pv.kovanieStred ?? ''}
 					kovanieStredOkno={(pv.kovanieStredOkno ?? 'L') as 'L' | 'P'}
-					klin={pv.klin ?? null}
+					kliny={pv.kliny ?? []}
 					sietka={pv.sietka ?? null}
 				/>
 			</div>
@@ -119,13 +119,13 @@
 	</div>
 {/if}
 
-{#if m.posuvy.some((pv) => pv.klin)}
+{#if m.posuvy.some((pv) => pv.kliny?.length)}
 	<div class="card" data-testid="klin-karta-multi">
 		<div class="sec">Klíny</div>
 		{#each m.posuvy as pv, i (i)}
-			{#if pv.klin}
-				<div class="row"><span>Zasklenie {i + 1}</span><b>{klinPopis(pv.klin)}</b></div>
-			{/if}
+			{#each pv.kliny ?? [] as k, j (j)}
+				<div class="row"><span>Zasklenie {i + 1}</span><b>{klinPopis(k)}</b></div>
+			{/each}
 		{/each}
 	</div>
 {/if}

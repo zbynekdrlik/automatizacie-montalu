@@ -78,3 +78,24 @@ describe('b2b Money-write server reject — /sietka odoslat (forged POST, obchá
 		expect((r as { error?: string })?.error ?? '').not.toMatch(/Veľkoobchodný/);
 	});
 });
+
+// #473 — multi-kus /sietka dostala VLASTNÚ `odoslatMulti` akciu (rovnaká vrstva ako
+// jednokusová `odoslat`) — rovnaký forged-POST dôkaz.
+describe('b2b Money-write server reject — /sietka odoslatMulti (forged POST, obchádza UI)', () => {
+	it('odoslatMulti odmietne b2b PRED parsom/výpočtom/zápisom — aj s neplatnými dátami', async () => {
+		const r = await sietkaActions.odoslatMulti(
+			b2bSietkaEvent({ zak: '1', op: '1', zakaznik: 'x' })
+		);
+		expect(r).toMatchObject({ step: 'form' });
+		expect((r as { error?: string })?.error).toMatch(/Veľkoobchodný/);
+	});
+
+	it('interný účet nie je zablokovaný týmto rejectom (odmietnutie je b2b-špecifické)', async () => {
+		const internalEvent = {
+			request: new Request('http://x/sietka', { method: 'POST', body: new FormData() }),
+			locals: { user: { id: 2, username: 'admin', role: 'internal' } }
+		} as Parameters<typeof sietkaActions.odoslatMulti>[0];
+		const r = await sietkaActions.odoslatMulti(internalEvent);
+		expect((r as { error?: string })?.error ?? '').not.toMatch(/Veľkoobchodný/);
+	});
+});
