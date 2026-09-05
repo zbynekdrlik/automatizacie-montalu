@@ -87,7 +87,7 @@
 	<div class="card" data-testid="kovanie-strany">
 		<div class="sec">Kovanie — kľučky a FAB</div>
 		<KovanieStrany
-			nadpis="Posuv 1"
+			nadpis="Zasklenie 1"
 			lava={vstup.kovanieL}
 			prava={vstup.kovanieP}
 			stred={vstup.kovanieStred}

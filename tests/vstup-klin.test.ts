@@ -134,12 +134,12 @@ describe('parseMultiVstup — klín je PER POSUV', () => {
 		expect(vstup.posuvy[1]!.klin).toBeNull();
 	});
 
-	it('nezmyselný klín na 2. posuve pomenuje posuv v chybe', () => {
+	it('nezmyselný klín na 2. zasklení pomenuje zasklenie v chybe (#468)', () => {
 		const { error } = multi([
 			posuv(),
 			posuv({ klin: '1', klinDlzka: '4645', klinSirka: '250', klinV1: '0', klinV2: '0' })
 		]);
-		expect(error).toBe('Posuv 2: klín — zadaj aspoň jednu výšku.');
+		expect(error).toBe('Zasklenie 2: klín — zadaj aspoň jednu výšku.');
 	});
 });
 

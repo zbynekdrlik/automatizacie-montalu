@@ -108,17 +108,17 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 		farbaKovania: farba(d.farbaKovania)
 	};
 
-	if (d.zimnaZahrada === true) {
+	if (d.zimnaZahrada === true || d.multiZasklenie === true) {
 		const posuvy = Array.isArray(d.posuvy) ? (d.posuvy as Record<string, unknown>[]) : [];
 		if (!posuvy.length) return null;
 		const multiVstup: MultiVstup = {
 			...spolocne,
-			posuvy: posuvy.map((p, i) => posuvZDetailu(p, styly, chybajuce, `Posuv ${i + 1}`))
+			posuvy: posuvy.map((p, i) => posuvZDetailu(p, styly, chybajuce, `Zasklenie ${i + 1}`))
 		};
 		return { zdroj, chybajuce, multiVstup };
 	}
 
-	const p = posuvZDetailu(d, styly, chybajuce, 'Posuv');
+	const p = posuvZDetailu(d, styly, chybajuce, 'Zasklenie');
 	const vstup: Vstup = {
 		...spolocne,
 		...p,

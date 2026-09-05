@@ -5344,7 +5344,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "radky": [
       {
         "eurM2": null,
-        "label": "Posuv 1",
+        "label": "Zasklenie 1",
         "m2": 9.29,
         "mena": "EUR",
         "spolu": null,
@@ -5353,7 +5353,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       },
       {
         "eurM2": null,
-        "label": "Posuv 2",
+        "label": "Zasklenie 2",
         "m2": 6.62,
         "mena": "EUR",
         "spolu": null,
@@ -7312,7 +7312,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
     "radky": [
       {
         "eurM2": null,
-        "label": "Posuv 1",
+        "label": "Zasklenie 1",
         "m2": 9.1,
         "mena": "EUR",
         "spolu": null,
@@ -7321,7 +7321,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       },
       {
         "eurM2": null,
-        "label": "Posuv 2",
+        "label": "Zasklenie 2",
         "m2": 8.98,
         "mena": "EUR",
         "spolu": null,
@@ -7330,7 +7330,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
       },
       {
         "eurM2": null,
-        "label": "Posuv 3",
+        "label": "Zasklenie 3",
         "m2": 9.46,
         "mena": "EUR",
         "spolu": null,

@@ -345,7 +345,7 @@
 
 	// viac-posuvový režim: aktívny keď je pridaný aspoň jeden ďalší posuv
 	let jeMulti = $derived(posuvyExtra.length > 0);
-	// celý zoznam posuvov (primárny + ďalšie) → JSON pre multi submit
+	// celý zoznam zasklení (primárny + ďalšie) → JSON pre multi submit
 	let posuvyJSON = $derived(
 		JSON.stringify([
 			{
