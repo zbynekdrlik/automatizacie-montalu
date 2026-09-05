@@ -727,3 +727,103 @@ test('#419 — expedičný zoznam: hotové profily (reálne počty) + komponenty
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// ── #462 prieckaLight checkbox: Money kód 18102 vs 18004 ────────────────────
+// Checkbox „Priečka light" voľí Money kód priečky: unchecked = 18004 (normal),
+// checked = 18102 (light). Test overuje, že polozka-18102 / polozka-18004 sa
+// prepína podľa stavu checkboxu — efekt na ROZPIS, nie len viditeľnosť.
+test('#462 prieckaLight: unchecked → 18004, checked → 18102 v rozpise', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Robust');
+	await page.locator('#sirka').fill('5000');
+	await page.locator('#pocetPrednychNoh').fill('3');
+	// prieckaLight je defaultne UNchecked → normálna priečka 18004
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('polozka-18004')).toBeVisible();
+	await expect(page.getByTestId('polozka-18102')).toHaveCount(0);
+
+	// Späť → zapni prieckaLight → 18102 namiesto 18004
+	await page.getByTestId('upravit').click();
+	await waitHydrated(page);
+	await page.locator('input[name="prieckaLight"]').check();
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('polozka-18102')).toBeVisible();
+	await expect(page.getByTestId('polozka-18102')).toContainText('light');
+	await expect(page.getByTestId('polozka-18004')).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// ── #462 fixTvar select: šikmý vs rovný mení odpis/výkres ──────────────────
+// fixTvar select na pergola náreze (v sekcii „Pergola s FIXom") je disabled
+// v auto režime. Test overuje, že v override režime sa dá zvoliť tvar a
+// prepočet ho zohľadní — presne ten efekt, ktorý issue pýta (nie len disabled stav).
+test('#462 fixTvar select: override mód zmení tvar FIXu v rozpise', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Robust');
+	await page.locator('#sirka').fill('4000');
+	await page.locator('#hlbka').fill('3000');
+	await page.locator('#vyskaZadna').fill('2500');
+	// zapni FIX
+	await page.locator('#pergolaSFixom').check();
+	await waitHydrated(page);
+	// fixTvar by mal byť v auto disabled stave — vypni auto
+	const fixAutoBox = page.getByTestId('fix-auto');
+	if (await fixAutoBox.isChecked()) {
+		await fixAutoBox.uncheck();
+		await waitHydrated(page);
+	}
+	// teraz je fixTvar enabled — zvoľ 'rovny'
+	const fixTvar = page.locator('#fixTvar');
+	await expect(fixTvar).toBeEnabled();
+	await fixTvar.selectOption('rovny');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+	// FIX sekcia vo výsledku musí obsahovať 'rovný' (efekt override voľby)
+	await expect(page.locator('.card', { hasText: 'Pevné zasklenie' })).toContainText('rovný');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// ── #462 RucnePolozky: pridaj → odober → v rozpise riadok zmizne ────────────
+// rucne-odober (data-testid) na manuálnych položkách. Test pridá riadok,
+// overí počet, odoberie ho a overí, že rozpis riadok stratil.
+test('#462 RucnePolozky: pridaj → odober → riadok zmizne z tabuľky', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/narez');
+
+	await page.locator('#system').selectOption('Robust');
+	await page.locator('#sirka').fill('5000');
+	await page.locator('#pocetPrednychNoh').fill('3');
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// pridaj ručnú položku
+	const karta = page.getByTestId('rucne-karta');
+	await karta.locator('#rucneKod').fill('ZASP99999');
+	await karta.locator('#rucneNazov').fill('E2E Test Rucna');
+	await karta.locator('#rucneMnozstvo').fill('5,5');
+	await karta.locator('#rucneMj').selectOption('m');
+	await page.getByTestId('rucne-pridat').click();
+
+	// overí, že sa riadok objavil
+	const riadky = page.getByTestId('rucne-riadok');
+	await expect(riadky).toHaveCount(1);
+	await expect(riadky.first()).toContainText('ZASP99999');
+	await expect(riadky.first()).toContainText('5,5');
+
+	// odoberanie — klikni rucne-odober
+	await page.getByTestId('rucne-odober').click();
+	await expect(page.getByTestId('rucne-riadok')).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});

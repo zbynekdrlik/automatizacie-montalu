@@ -128,5 +128,6 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
 - interný zoznam materiálu zákazky → Odoo sale.order log-note (odoo-rpc, mt_note, observer hook, ZAK/OP match) → `.claude/rules/odoo-zakazka.md`
 - 1000-r. strop pre celé `src/**` (split vzory) → `.claude/rules/large-file-split.md`
+- SkladVarovania cross-module wiring (bindable prop, vylucene_kody, dva mechanizmy odobratia) → `.claude/rules/sklad-varovania.md`
 - e2e zero-console assert + guard (`e2e/**`, `tests/e2e-console-guard.test.ts`) → `.claude/rules/e2e-console.md`
 - celoplošný vizuálny redizajn (`--m-*` tokeny, h1/app.css leak pasca, stage rollout) → `.claude/rules/redizajn.md`

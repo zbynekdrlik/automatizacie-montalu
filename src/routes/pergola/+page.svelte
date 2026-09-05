@@ -19,6 +19,9 @@
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
 	let snapshotDatum = $derived(form && 'snapshotDatum' in form ? form.snapshotDatum : null);
 
+	// #461: vylúčené kódy z SkladVarovania — bindable, ide do hidden inputu vo formulári
+	let vyluceneKody = $state('');
+
 	let copyBtnText = $state('📋 Kopírovať počet tyčí');
 	async function kopiruj() {
 		const t = v?.cadLastCol ?? '';
@@ -155,11 +158,12 @@
 	{/if}
 
 	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
-	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
+	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">
 			{@render hiddenVstup()}
+			<input type="hidden" name="vylucene_kody" value={vyluceneKody} />
 
 			{#if v.kombinacie.length}
 				<div class="sec noprint">Výber kombinácií tyčí (podľa polohy nohy)</div>

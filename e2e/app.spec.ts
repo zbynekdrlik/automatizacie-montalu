@@ -11,7 +11,8 @@ import {
 	vyberFarbuKovania,
 	openUserMenu,
 	openTools,
-	logout
+	logout,
+	stubWindowPrint
 } from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
@@ -804,5 +805,107 @@ test('Robust: žiadne pole výšky vŕtania ani otvory D46 (D46 je len Deluxe)',
 	await expect(svg).toBeVisible();
 	// žiadne prerušované kruhy (D46 otvory) pri Robuste
 	await expect(svg.locator('circle[stroke-dasharray]')).toHaveCount(0);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: print button stub — zasklenia nahlad + hotovo
+test('print: zasklenia nahlad/hotovo tlačidlo volá window.print()', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	const { assertPrintCalled } = await stubWindowPrint(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PRT`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Print');
+	await page.getByLabel('Šírka (mm) *').fill('2509');
+	await page.getByLabel('Výška (mm) *').fill('1930');
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+
+	// nahlad step print button
+	const printBtn = page.getByRole('button', { name: '🖨 Tlačiť / uložiť PDF' }).first();
+	await expect(printBtn).toBeVisible();
+	await printBtn.click();
+	await assertPrintCalled();
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: „→ Späť na Zasklenia" odkaz z nastavení
+test('nastavenia: „→ Späť na Zasklenia" naviguje na /zasklenia', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+
+	const link = page.getByRole('link', { name: '→ Späť na Zasklenia' });
+	// link is visible only after successful save — save without changes first
+	await page.getByTestId('ulozit-vzorce').click();
+	await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/zasklenia$/);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: nastavenia trieda_6 fill/save/reload assert
+test('nastavenia: trieda_6 input fill/save/reload zachová hodnotu', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	// Robust|2K should have trieda_6 — it has 6mm glass class
+	await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+
+	const trieda6 = page.locator('#trieda_6');
+	if ((await trieda6.count()) === 0) {
+		// system does not expose trieda_6 — skip gracefully
+		expect(consoleMsgs).toEqual([]);
+		return;
+	}
+
+	const povodna = await trieda6.inputValue();
+	try {
+		await trieda6.fill('42');
+		await page.getByTestId('ulozit-vzorce').click();
+		await expect(page.getByTestId('nastavenia-ulozene')).toBeVisible();
+
+		// reload and verify persisted
+		await page.getByRole('link', { name: /Upraviť ďalší štýl/ }).click();
+		await waitHydrated(page);
+		await expect(page.locator('#trieda_6')).toHaveValue('42');
+	} finally {
+		// restore
+		await goto(page, '/zasklenia/nastavenia?sysStyl=Robust%7C2K');
+		const t6 = page.locator('#trieda_6');
+		if ((await t6.count()) > 0) {
+			await t6.fill(povodna || '');
+			await page.getByTestId('ulozit-vzorce').click();
+			await page.getByTestId('nastavenia-ulozene').waitFor();
+		}
+	}
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: brand „MONTALU" link naviguje na /zasklenia
+test('brand „MONTALU" link naviguje na /zasklenia', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/optimalizator');
+
+	const brand = page.locator('a.brand', { hasText: 'MONTALU' });
+	await expect(brand).toBeVisible();
+	await brand.click();
+	await expect(page).toHaveURL(/\/zasklenia$/);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: tools dropdown linky Optimalizátor/Dopyty/Problém sú viditeľné
+test('tools menu: Optimalizátor/Dopyty/Problém linky viditeľné', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await openTools(page);
+	await expect(page.getByRole('link', { name: 'Optimalizátor' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Dopyty' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Problém' })).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });

@@ -200,7 +200,11 @@ Ak by sa AR niekedy vracalo, obnov ROUTE/guard vzor z histórie tohto tiketu.
   súboru, píš „Money kódu".
 - **Sklon = slider + číselný „twin".** `<input type=range>` (bez name/testid) + `<input type=number
   name="sklonDeg" data-testid="sklonDeg" bind:value>` oba na `sklonDeg`. Playwright `.fill()`
-  NEfunguje na `type=range` → testy mieria na number twin, žiadny helper netreba.
+  NEfunguje na `type=range` → testy mieria na number twin, žiadny helper netreba. Na priame
+  testovanie RANGE slidera (#463) použi `evaluate` s natívnym value setterom:
+  `rangeSlider.evaluate((el, val) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,
+  'value')!.set!.call(el, val); el.dispatchEvent(new Event('input', {bubbles:true}));
+  el.dispatchEvent(new Event('change', {bubbles:true})); }, newVal)` — number twin sa synchronizuje.
 - **E2E timing pasca:** edge-to-edge 3D náhľad je ~2.5× ťažší na softvérovom CI WebGL (Vizual3D
   renderuje na veľkosť kontajnera, bez pixel-ratio capu). Form-testy MUSIA počkať na
   `[data-viz-ready="true"]` PRED interakciou (helper `konfReady`/`submitKonfig`), inak (a) enhance

@@ -106,6 +106,16 @@ neskoršom spece netvrď virgin-DB hlášku; testuj honest-null, ktorý platí V
 NIE JE v žiadnom seede (pergolové `PRP*` nie sú v žiadnom ceny/sklo seede), ukáže „cena
 neznáma". Reprodukuj poradie lokálne: `npx playwright test e2e/ceny.spec.ts e2e/<tvoj>.spec.ts`.
 
+**Honest-null E2E testy MUSIA mať `test.skip(!!process.env.BASE_URL)` guard (#466).** Test,
+ktorý assertuje „cena neznáma" / „nebol naimportovaný" / „cena nedostupná" (honest-null
+cestu), testuje stav PRÁZDNEJ DB bez Money snapshotu — ten stav existuje LEN pri lokálnom
+preview (zmazaný fixture súbor). Prod MÁ reálny denný snapshot s cenami → test by padol.
+Guard je ROVNAKÝ ako pri seeded-fixture testoch (`test.skip(!!process.env.BASE_URL, ...)`)
+ale z INÉHO dôvodu: fixture testy nemôžu ZAPÍSAŤ do vzdialeného kontajnera; honest-null testy
+assertujú STAV, ktorý na prode neexistuje. Oba tvary sú sankcionované per `e2e-console.md`.
+4 existujúce: `ceny.spec.ts:23`, `ceny.spec.ts:129`, `pergola-ceny.spec.ts:44`,
+`sklo-cena.spec.ts:24`. Pri pridávaní NOVÉHO honest-null cenového testu nezabudni na guard.
+
 ## dev2 Money read-only kanál — snapshot AJ ad-hoc dotazy (NIKDY credentials v repe)
 
 Producent snapshotu beží na **dev2** v checkoute `~/montalu-ceny/` (cron `run-snapshot.sh`,

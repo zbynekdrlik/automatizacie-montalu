@@ -201,3 +201,54 @@ test('server odmietne nezmyselné zadanie aj po obídení HTML5 validácie', asy
 
 	expect(errs).toEqual([]);
 });
+
+// ── #462 rozdelit-btn: klik prepočíta šírky polí podľa zvoleného delenia ────
+// Tlačidlo „Rozdeliť rovnomerne" / „Rozdeliť podľa posuvu" prepočíta pole0/pole1
+// z celkovej šírky. Test overuje, že klik ZMENÍ hodnoty polí (efekt, nie len label).
+test('#462 rozdelit-btn: klik prepočíta polia na rovnomerné z celkovej šírky', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-FIX-R', 'OPRDL');
+	await page.locator('#s').fill('3000');
+	await page.locator('#v1').fill('1500');
+	await page.locator('#v2').fill('300');
+	await page.selectOption('#pocet', '3');
+
+	// ručne zmeň jedno pole na nerovnomernú hodnotu
+	await page.locator('#pole0').fill('900');
+	const pred = await page.locator('#pole0').inputValue();
+	expect(pred).toBe('900');
+
+	// klikni rozdelit-btn → pole0 sa prepočíta na rovnomerné (3000/3 = 1000)
+	await page.getByTestId('rozdelit-btn').click();
+	const po = await page.locator('#pole0').inputValue();
+	expect(Number(po)).toBe(1000);
+
+	// pole1 a pole2 tiež 1000
+	expect(Number(await page.locator('#pole1').inputValue())).toBe(1000);
+	expect(Number(await page.locator('#pole2').inputValue())).toBe(1000);
+
+	expect(errs).toEqual([]);
+});
+
+// #464: fix „➕ Nový výkres" navigačný link
+test('#464: fix „➕ Nový výkres" naviguje na /fix', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await hlavicka(page, 'E2E-FIX-NAV', 'OP-NAV');
+	await page.locator('#s').fill('1200');
+	await page.locator('#v1').fill('800');
+	await page.locator('#v2').fill('600');
+	// 1 pole = šírka = s, žiadne manuálne polia
+	await page.locator('#pocet').selectOption('1');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('fix-vykres')).toBeVisible();
+	const link = page.getByRole('link', { name: '➕ Nový výkres' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/fix$/);
+	expect(errs).toEqual([]);
+});

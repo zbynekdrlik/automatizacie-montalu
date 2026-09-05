@@ -868,3 +868,40 @@ test('konfigurátor: rozmery v metroch — stepper krok 0,5/0,1 m, žiadne zalom
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+test('pergola: info-karta click-outside dismiss + sklon range slider (posuvník), nula console chýb', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await konfReady(page);
+
+	// info-karta click-outside dismiss: otvor kartu tapom na ⓘ, potom klikni MIMO ňu
+	const infoBtn = page.getByTestId('konf-info-btn').first();
+	await expect(infoBtn).toBeVisible();
+	await infoBtn.click();
+	const infoKarta = page.getByTestId('konf-info-karta').first();
+	await expect(infoKarta).toBeVisible();
+	// klikni mimo kartu → karta sa zavrie (pointerdown capture na document)
+	// info karta je absolútne pozicionovaná nad formulárom; klikneme na footer (vždy
+	// mimo overlay — je na spodku stránky, ďaleko od info kariet hore)
+	await page.getByTestId('version').click({ force: true });
+	await expect(infoKarta).not.toBeVisible();
+
+	// sklon range slider — type=range nemá testid, ale má aria-label; number twin = sklonDeg
+	const rangeSlider = page.locator('input[type="range"][aria-label="Sklon strechy (posuvník)"]');
+	await expect(rangeSlider).toBeVisible();
+	const numberTwin = page.getByTestId('sklonDeg');
+	const initialSklon = await numberTwin.inputValue();
+	// nastav inú hodnotu cez evaluate (Playwright .fill() nefunguje na type=range)
+	const newSklon = initialSklon === '5' ? '8' : '5';
+	await rangeSlider.evaluate((el: HTMLInputElement, val: string) => {
+		const nativeSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+		nativeSet.call(el, val);
+		el.dispatchEvent(new Event('input', { bubbles: true }));
+		el.dispatchEvent(new Event('change', { bubbles: true }));
+	}, newSklon);
+	// number twin sa synchronizuje s novým sklonom
+	await expect(numberTwin).toHaveValue(newSklon);
+
+	expect(consoleMsgs).toEqual([]);
+});

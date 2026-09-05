@@ -451,3 +451,51 @@ guard) + `tests/wheel-guard.test.ts`. Keď funkcia GENUINELY potrebuje niečo zl
 z `document`/canvas (napr. `document.createElement('canvas').getContext('2d')`), NIE
 duck-typing — pozri `tests/vizual-textury.test.ts`'s ručný `(globalThis as unknown as
 { document: unknown }).document = { ... }` stub namiesto inštalácie jsdom.
+
+## OdpisBlok `confirm()` dialog v E2E — `page.on('dialog')` PRED klikom (#462)
+
+OdpisBlok (`odoslat-aj-tak` testid) spustí natívny `window.confirm()` pri kliku.
+V Playwright E2E MUSÍŠ nastaviť `page.on('dialog', (d) => d.accept())` **PRED**
+klikom na `odoslat-aj-tak` — inak dialog blokuje a test timeoutne. Vzor:
+
+```ts
+page.on('dialog', (d) => d.accept());
+await page.getByTestId('odoslat-aj-tak').click();
+```
+
+Rovnaký vzor aj pre sietka duplikát (`sietka.spec.ts`) a konfigurátor dopyt delete.
+
+## `{@render hidden()}` v DVOCH formách na výsledkovej stránke → `.first()` (#462)
+
+Na mnohých výsledkových stránkach (sietka, zasklenia, clip...) sa snippet `hidden()`
+renderuje v dvoch `<form>` elementoch (`?/odoslat` + `?/upravit`), takže
+`page.locator('input[name="X"]')` matchne DVA hidden inputy a Playwright strict-mode
+ho odmietne. Scopuj cez `.first()` alebo cez parent form:
+`page.locator('form[action*="odoslat"] input[name="X"]')`.
+
+## combo_ rádiá (>7500mm tyče) sú PERGOLA-only v praxi (#462)
+
+`comboCases` logika žije v zdieľanom `server/pergola.ts` (`transform`), ale /fix/cad
+profily sa mapujú cez CODE_MAP na „surový 7500mm" tyče — tie absorbujú aj >7500mm rezy
+bez combo voľby. Combo test preto píš na /pergola (`parita.spec.ts`), nie na /fix/cad.
+
+## E2E per-page form gotchy (#464 census)
+
+- **Fix page šikmý tvar (default) vyžaduje `v1 !== v2`** — rovnaké výšky spustia
+  varovanie „Výšky sú rovnaké — vyber rovný" a formulár sa neodošle. E2E test pre
+  šikmý musí zadať rôzne v1/v2 (napr. 800/600).
+- **Bazén navrh `Počet sekcií` je `<input type="number">`, NIE `<select>`** — použij
+  `.fill('4')`, nie `.selectOption('4')`. Koľaj/Smer posuvu/Smer dverí SÚ selecty
+  (hodnoty: `jednokolaj`/`dvojkolaj`, `vpravo`/`vlavo`).
+- **Zasklenia navrh radio `zn-rezim` nemá `value` atribút** — Svelte radios používajú
+  `checked` + `onchange` bez HTML `value`. Selektor
+  `input[name="zn-rezim"][value="technicky"]` NEFUNGUJE. Použi
+  `page.getByLabel('Technický (čiernobiely)')` (viditeľný text labelu). Farebný
+  radio má testid `rezim-farebny-radio`.
+- **`window.print()` stub pre E2E:** helper `stubWindowPrint(page)` v
+  `e2e/helpers.ts` — volaj PRED `loginAs`/`goto` (injektuje cez `addInitScript`).
+  Vracia `{ assertPrintCalled() }`. Vzor: `app.spec.ts` print test.
+- **`addInitScript` WebGL blok ovplyvní CELÚ session** — ak zablokuješ
+  `getContext('webgl2')`, ovplyvní to aj stránky PRED cieľovou (napr. navrh page
+  s 3D náhľadom). Preto sa zakaznícky „Skúsiť znova" retry path nedá spoľahlivo
+  testovať cez session-wide WebGL stub (navrh page sa nepostaví).

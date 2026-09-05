@@ -32,6 +32,20 @@ import {
 } from '$lib/server/ceny';
 import type { SkladVarovanie } from '$lib/server/ceny';
 
+/** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
+ *  ako comma-separated string v hidden inpute `vylucene_kody`. */
+function parseVyluceneKody(form: FormData): Set<string> {
+	const raw = String(form.get('vylucene_kody') ?? '');
+	if (!raw) return new Set();
+	return new Set(raw.split(',').filter(Boolean));
+}
+
+/** #461: vyfiltruj vylúčené položky z odpisu — volaj pred writeOdpis. */
+function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
+	if (vylucene.size === 0) return job;
+	return { ...job, polozky: job.polozky.filter((p) => !vylucene.has(p.kod)) };
+}
+
 export interface CadVstup {
 	zak: string;
 	op: string;
@@ -270,9 +284,12 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 		};
 
 	const job = buildCadJob(vstup, v!, user?.username ?? '', opts);
+	// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
+	const vylucene = parseVyluceneKody(form);
+	const finalJob = vylucPolozky(job, vylucene);
 
 	try {
-		const outcome = await writeOdpis(job, overrideOpts(form));
+		const outcome = await writeOdpis(finalJob, overrideOpts(form));
 		if (outcome.status === 'duplicate') {
 			return {
 				step: 'duplikat' as const,

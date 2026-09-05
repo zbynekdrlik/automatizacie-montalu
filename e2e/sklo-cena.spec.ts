@@ -22,9 +22,14 @@ async function vyplnRobust2K(page: import('@playwright/test').Page, zak: string,
 }
 
 test('bez ceny skla v snapshote appka ukáže „cena nedostupná" (honest-null)', async ({ page }) => {
+	// #466: prod má reálny Money snapshot so sklami (TS kódy) → cena je dostupná, test
+	// by padol. Honest-null cestu overujeme len na lokálnom preview bez fixture.
+	test.skip(
+		!!process.env.BASE_URL,
+		'post-deploy: prod má reálny Money snapshot so sklami — honest-null cesta neplatí'
+	); // airuleset:test-skip-ok sanctioned BASE_URL guard per ci.md (#466)
 	const consoleMsgs = collectConsole(page);
-	// lokálny beh: istota, že žiadny predošlý test nezanechal fixture (post-deploy beh
-	// proti BASE_URL na tento súbor nemá prístup — no-op)
+	// lokálny beh: istota, že žiadny predošlý test nezanechal fixture
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await vyplnRobust2K(page, `E2E-SKLOCENA-BEZ-${Date.now()}`);

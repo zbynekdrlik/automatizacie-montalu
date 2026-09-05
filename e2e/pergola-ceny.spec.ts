@@ -42,6 +42,12 @@ async function doRozpisu(page: import('@playwright/test').Page, zak: string) {
 }
 
 test('kód bez ceny v snapshote → „cena neznáma", súčet neúplný (honest-null)', async ({ page }) => {
+	// #466: prod Money snapshot UŽ obsahuje PRP kódy (od #359 bazénového rozšírenia
+	// producenta) → test by padol. Honest-null cestu overujeme len na lokálnom preview.
+	test.skip(
+		!!process.env.BASE_URL,
+		'post-deploy: prod má reálny Money snapshot s PRP kódmi — honest-null cesta neplatí'
+	); // airuleset:test-skip-ok sanctioned BASE_URL guard per ci.md (#466)
 	const consoleMsgs = collectConsole(page);
 	// lokálny beh: zmaž fixture (post-deploy beh proti BASE_URL naň nemá prístup — no-op).
 	// POZN.: E2E DB je ZDIEĽANÁ medzi spec súbormi — zmazanie SÚBORU nevynuluje už

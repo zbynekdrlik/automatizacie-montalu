@@ -56,6 +56,20 @@ import {
 	type MultiVstup
 } from '$lib/server/vstup';
 
+/** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
+ *  ako comma-separated string v hidden inpute `vylucene_kody`. */
+function parseVyluceneKody(form: FormData): Set<string> {
+	const raw = String(form.get('vylucene_kody') ?? '');
+	if (!raw) return new Set();
+	return new Set(raw.split(',').filter(Boolean));
+}
+
+/** #461: vyfiltruj vylúčené položky z odpisu — volaj pred writeOdpis. */
+function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
+	if (vylucene.size === 0) return job;
+	return { ...job, polozky: job.polozky.filter((p) => !vylucene.has(p.kod)) };
+}
+
 function jobFor(
 	vstup: Vstup,
 	r: ComputeResult,
@@ -500,8 +514,11 @@ export const actions = {
 				}
 			};
 		}
+		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
+		const vylucene = parseVyluceneKody(formData);
+		const finalJob = vylucPolozky(job, vylucene);
 		try {
-			const outcome = await writeOdpis(job, overrideOpts(formData));
+			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
 				// 200 render (nie fail(409)) — non-2xx na form POST loguje v prehliadači
 				// console error a porušuje zero-console-errors; blokovanie drží DB constraint
@@ -651,8 +668,11 @@ export const actions = {
 				}
 			};
 		}
+		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
+		const vyluceneMulti = parseVyluceneKody(formData);
+		const finalJobMulti = vylucPolozky(job, vyluceneMulti);
 		try {
-			const outcome = await writeOdpis(job, overrideOpts(formData));
+			const outcome = await writeOdpis(finalJobMulti, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
 				return {
 					step: 'duplikat' as const,
