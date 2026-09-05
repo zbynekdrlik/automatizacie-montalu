@@ -14,7 +14,7 @@ import {
 	rawFormEntries,
 	type OdpisJob
 } from '$lib/server/money';
-import { skladoveVarovania, enrichPolozky } from '$lib/server/ceny';
+import { skladoveVarovania, enrichPolozky, getSnapshotMeta } from '$lib/server/ceny';
 
 /**
  * Predodpisový náhľad (#454 ceny materiálu + #448 sklad) — čisto ČÍTANIE denného
@@ -29,7 +29,10 @@ import { skladoveVarovania, enrichPolozky } from '$lib/server/ceny';
  */
 function nahladCien(out: BazenPolozka[]) {
 	return {
-		skladVarovania: skladoveVarovania(out.map((o) => ({ kod: o.kod, mnozstvo: o.qty }))),
+		skladVarovania: skladoveVarovania(
+			out.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+		),
+		snapshotDatum: getSnapshotMeta().generatedAt,
 		ceny: enrichPolozky(out.filter((o) => o.qty > 0))
 	};
 }

@@ -49,8 +49,9 @@
 	let vyklopneCeloOn = $state(untrack(() => vstup.vyklopneCeloOn));
 
 	let step = $derived(form?.step ?? 'form');
-	// #448 predodpisové skladové varovanie (bazén — b2b sa na túto route nedostane)
+	// #448/#451 predodpisové skladové varovanie + odobrať (bazén — b2b sa na túto route nedostane)
 	let skladVarovania = $derived(form && 'skladVarovania' in form ? form.skladVarovania : null);
+	let snapshotDatum = $derived(form && 'snapshotDatum' in form ? form.snapshotDatum : null);
 	// #454 náhľad cien materiálu pred odoslaním (materiálová cena z denného Money
 	// snapshotu; BPK* kusové komponenty honest-null → súčet sa prizná ako neúplný)
 	let ceny = $derived(form && 'ceny' in form ? form.ceny : null);
@@ -276,7 +277,7 @@
 	{/if}
 
 	<!-- #448: predodpisové skladové varovanie pri odpise -->
-	<SkladVarovania varovania={skladVarovania ?? undefined} />
+	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} />
 
 	<div class="card">
 		<form method="POST" action="?/odoslat">
