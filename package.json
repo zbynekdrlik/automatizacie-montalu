@@ -1,7 +1,7 @@
 {
 	"name": "automatizacie-montalu",
 	"private": true,
-	"version": "0.24.91-dev.4",
+	"version": "0.24.91",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
