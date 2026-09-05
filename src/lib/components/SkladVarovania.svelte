@@ -12,6 +12,7 @@
 		varovania,
 		snapshotDatum,
 		testid = 'sklad-varovania',
+		// eslint-disable-next-line no-useless-assignment -- $bindable rune: default + two-way binding
 		vyluceneKody = $bindable('')
 	}: {
 		varovania: SkladVarovanie[] | undefined;

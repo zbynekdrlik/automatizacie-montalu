@@ -270,11 +270,7 @@
 
 	{#if step === 'vysledok' && !isB2B}
 		<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní) -->
-		<SkladVarovania
-			varovania={skladVarovania ?? undefined}
-			{snapshotDatum}
-			bind:vyluceneKody
-		/>
+		<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
 	{/if}
 
 	<div class="card noprint">
