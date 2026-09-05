@@ -15,7 +15,8 @@ import {
 	E2E_USER,
 	E2E_PASS,
 	vyberFarbuKovania,
-	logout
+	logout,
+	stubWindowPrint
 } from './helpers';
 
 const RUN = `E2E-${Date.now().toString(36).toUpperCase()}`;
@@ -260,12 +261,7 @@ test('login: po zlom hesle ostane meno predvyplnené', async ({ page }) => {
 test('odpis detail: print button + „← Späť na históriu"', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
-	await page.addInitScript(() => {
-		(window as unknown as Record<string, number>).__printCallCount = 0;
-		window.print = () => {
-			(window as unknown as Record<string, number>).__printCallCount++;
-		};
-	});
+	const { assertPrintCalled } = await stubWindowPrint(page);
 	const db = new Database('./data/e2e.db');
 	try {
 		db.prepare(
@@ -281,10 +277,7 @@ test('odpis detail: print button + „← Späť na históriu"', async ({ page }
 	// print button
 	await expect(page.getByTestId('odpis-detail-tlac')).toBeVisible();
 	await page.getByTestId('odpis-detail-tlac').click();
-	const count = await page.evaluate(
-		() => (window as unknown as Record<string, number>).__printCallCount
-	);
-	expect(count).toBeGreaterThan(0);
+	await assertPrintCalled();
 
 	// „← Späť na históriu" naviguje
 	const link = page.getByRole('link', { name: '← Späť na históriu' });

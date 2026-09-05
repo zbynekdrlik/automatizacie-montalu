@@ -10,7 +10,7 @@
 // ktorý nie je v žiadnom seede.
 import { test, expect } from '@playwright/test';
 import Database from 'better-sqlite3';
-import { collectConsole, loginAs, goto, waitHydrated } from './helpers';
+import { collectConsole, loginAs, goto, waitHydrated, stubWindowPrint } from './helpers';
 
 test('zákazka: agregovaný cenový zoznam cez viac odpisov — súčty, „cena neznáma", TEST mimo súčtov, readback, tlač (#154)', async ({
 	page
@@ -131,12 +131,7 @@ test('zákazka bez LIVE odpisu: 🧪 TEST fallback s explicitným označením (#
 test('zákazka: print button volá window.print()', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
-	await page.addInitScript(() => {
-		(window as unknown as Record<string, number>).__printCallCount = 0;
-		window.print = () => {
-			(window as unknown as Record<string, number>).__printCallCount++;
-		};
-	});
+	const { assertPrintCalled } = await stubWindowPrint(page);
 	// seed a minimal odpis for the zakazka page
 	const db = new Database('./data/e2e.db');
 	try {
@@ -154,10 +149,7 @@ test('zákazka: print button volá window.print()', async ({ page }) => {
 	await goto(page, '/odpisy/zakazka/E2E-ZC-PRINT');
 	await expect(page.getByTestId('zakazka-tlac')).toBeVisible();
 	await page.getByTestId('zakazka-tlac').click();
-	const count = await page.evaluate(
-		() => (window as unknown as Record<string, number>).__printCallCount
-	);
-	expect(count).toBeGreaterThan(0);
+	await assertPrintCalled();
 	expect(consoleMsgs).toEqual([]);
 });
 

@@ -11,7 +11,8 @@ import {
 	vyberFarbuKovania,
 	openUserMenu,
 	openTools,
-	logout
+	logout,
+	stubWindowPrint
 } from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
@@ -810,14 +811,7 @@ test('Robust: žiadne pole výšky vŕtania ani otvory D46 (D46 je len Deluxe)',
 // #464: print button stub — zasklenia nahlad + hotovo
 test('print: zasklenia nahlad/hotovo tlačidlo volá window.print()', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
-	const { stubWindowPrint: _unusedImport } = await import('./helpers');
-	// stub must be added before navigation
-	await page.addInitScript(() => {
-		(window as unknown as Record<string, number>).__printCallCount = 0;
-		window.print = () => {
-			(window as unknown as Record<string, number>).__printCallCount++;
-		};
-	});
+	const { assertPrintCalled } = await stubWindowPrint(page);
 	await loginAs(page);
 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-PRT`);
@@ -833,10 +827,7 @@ test('print: zasklenia nahlad/hotovo tlačidlo volá window.print()', async ({ p
 	const printBtn = page.getByRole('button', { name: '🖨 Tlačiť / uložiť PDF' }).first();
 	await expect(printBtn).toBeVisible();
 	await printBtn.click();
-	const count = await page.evaluate(
-		() => (window as unknown as Record<string, number>).__printCallCount
-	);
-	expect(count).toBeGreaterThan(0);
+	await assertPrintCalled();
 	expect(consoleMsgs).toEqual([]);
 });
 
