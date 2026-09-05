@@ -61,14 +61,47 @@ export function skloVyberaIzo(system: string): boolean {
 }
 
 /**
- * Jediný zdroj pravdy pre „je toto Štandard + s koľajnicou, ktorá sa DÁ
- * zväčšiť" (#134 — predtým trojnásobne duplikovaný literál: `railUpsize`
- * v compute.ts, checkbox visibility v +page.svelte, a `pridavnaKolajnicaDefault`
- * nižšie). `Štandard +`, mimo 6K — 6K koľajnica nemá +1 (7K neexistuje,
- * pozri `RAIL_UPSIZE` v compute.ts).
+ * Pôvodný gate LEN pre Štandard + (#134) — zachovaný pre `pridavnaKolajnicaDefault`
+ * (auto-default IZO ostáva len pre Štandard +, Patrik msg #1646652).
+ * Pre VIDITEĽNOSŤ checkboxu a pre `railUpsize` používaj `plusRailEligible` (#456).
  */
 export function standardPlusRailEligible(system: string, styl: string): boolean {
 	return system === STANDARD_PLUS && !styl.startsWith('6K');
+}
+
+/**
+ * Najvyššia K veľkosť koľajnice, pre ktorú +1 variant NEEXISTUJE v Money.
+ * Checkbox sa pre tento (a vyšší) štýl NEZOBRAZÍ — presne rovnaká logika
+ * ako pôvodný `!styl.startsWith('6K')` u Štandardu +, len per systém.
+ *
+ * Slide: 3K Slide (ZASP00100) → 4K Slide neexistuje
+ * Robust: 4K (ZASP20254) → 5K Robust neexistuje
+ * Štandard +/Deluxe: 6K (ZASP202437) → 7K neexistuje
+ */
+const RAIL_MAX_K: Record<string, string> = {
+	'Štandard +': '6K',
+	Deluxe: '6K',
+	Slide: '3K',
+	Robust: '4K'
+};
+
+/** Systémy s jednou obvodovou koľajnicou (nie horná + spodná). */
+export const SYSTEMY_OBVODOVA = new Set(['Slide', 'Robust']);
+
+/**
+ * Je tento systém + štýl spôsobilý pre checkbox „Prídavná koľajnica"?
+ * Generalizácia pôvodného `standardPlusRailEligible` (#134) na Slide, Deluxe
+ * a Robust (#456). Gate pre VIDITEĽNOSŤ checkboxu aj pre `railUpsize` swap.
+ *
+ * K-level sa extrahuje aj z opona štýlov: 2x3K → 3K (koľajnica je podľa
+ * čísla za 2x). IZO prípona sa ignoruje (`zakladnyStyl`).
+ */
+export function plusRailEligible(system: string, styl: string): boolean {
+	const maxK = RAIL_MAX_K[system];
+	if (!maxK) return false;
+	// 2x3K → 3K, 3K IZO → 3K
+	const k = zakladnyStyl(styl).replace(/^2x/, '');
+	return k !== maxK;
 }
 
 /**
