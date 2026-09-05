@@ -228,10 +228,17 @@
 	let klinGeos = $derived.by(() => {
 		if (!kliny.length) return [];
 		const base = KLIN_BASE; // spodná hrana klina (nad kótou šírky okna)
+		const avail = W - M.left - M.right;
+		const widths = kliny.map((k) => Math.max(24, Math.min(avail, k.dlzka * scale)));
+		// Kumulatívny presah: viac dlhých klinov by pretieklo za pravý okraj SVG,
+		// preto sa pri pretečení zmenšia VŠETKY proporčne (súčet = kresliaca šírka).
+		// Pri 1 kline je súčet ≤ avail, faktor 1 → parita s pôvodnou kresbou.
+		const total = widths.reduce((a, b) => a + b, 0);
+		const f = total > avail ? avail / total : 1;
 		let cursor = M.left;
-		return kliny.map((k) => {
+		return kliny.map((k, i) => {
 			const maxV = Math.max(k.v1, k.v2, 1);
-			const w = Math.max(24, Math.min(W - M.left - M.right, k.dlzka * scale));
+			const w = (widths[i] ?? 24) * f;
 			const x0 = cursor;
 			const x1 = x0 + w;
 			cursor = x1;

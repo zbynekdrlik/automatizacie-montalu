@@ -548,7 +548,7 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				break;
 			}
 			if (k.error) {
-				error = `Zasklenie ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
+				error = `Zasklenie ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ').replace(/^Klín /, 'klín ')}`;
 				break;
 			}
 			if (maSietkaSystem(posuv.system) && sk.error) {
