@@ -121,6 +121,14 @@ test('prepnutie skla PREČ z IZO odškrtne default (žiadny IZO dôvod neostáva
 // zvoleným IZO sklom je opäť nová hrana a znova zaškrtne, presne ako pri prepnutí
 // SKLA (test vyššie). Bez tohto testu bol scenár len odôvodnený v komentároch, nie
 // overený behom.
+//
+// (#456) Robust je odvtedy TIEŽ `plusRailEligible` (2K/3K majú +1 koľajnicový
+// variant) — checkbox teda na Robuste NEZMIZNE z DOM, ako to bolo pred #456
+// (vtedy ho iný systém vôbec neponúkal). Auto-IZO default
+// (`pridavnaKolajnicaDefault`/`standardPlusRailEligible`) ale OSTÁVA len pre
+// Štandard + (#456 design — Patrik msg #1646652), takže odchod zo Štandard +
+// je STÁLE hrana (odporúčaná hodnota true→false), len teraz s iným viditeľným
+// výsledkom: checkbox ostáva vo DOM, viditeľný, no odškrtnutý — nie preč.
 test('prepnutie SYSTÉMU preč z Štandard + a späť: ručný override nezostane naveky, nová voľba IZO skla znova zaškrtne', async ({
 	page
 }) => {
@@ -136,12 +144,16 @@ test('prepnutie SYSTÉMU preč z Štandard + a späť: ručný override nezostan
 	await checkbox.uncheck(); // deliberatívny override
 	await expect(checkbox).not.toBeChecked();
 
-	// odchod zo Štandard + → checkbox v UI vôbec nie je (iný systém ho neponúka)
+	// odchod zo Štandard + na Robust: checkbox OSTÁVA viditeľný (#456 — Robust
+	// 2K je plusRailEligible), ale auto-IZO default platí len pre Štandard + →
+	// hranový tracker prepne odporúčanú hodnotu na false a checkbox je odškrtnutý
+	// (reálne overené behom, nie len odvodené z kódu)
 	await page.getByLabel('Systém').selectOption('Robust');
-	await expect(page.getByLabel(/Prídavná koľajnica/)).toHaveCount(0);
+	await expect(page.getByLabel(/Prídavná koľajnica/)).toBeVisible();
+	await expect(page.getByLabel(/Prídavná koľajnica/)).not.toBeChecked();
 
 	// návrat na Štandard + | 2K — sklo sa automaticky prepnutím systému zresetuje
-	// na NE-izolačné (Robustové IZO sklo tu nie je platné), checkbox je späť
+	// na NE-izolačné (Robustové IZO sklo tu nie je platné), checkbox ostáva
 	// viditeľný, ale NEzaškrtnutý (žiadny IZO dôvod)
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
