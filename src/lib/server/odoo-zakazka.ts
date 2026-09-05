@@ -36,6 +36,7 @@ import { generateZakazkaPdfBase64, zakazkaPdfFilename } from './zakazka-pdf';
 import { normOp, normZak } from './money';
 import { zakazkaPrehlad, type ZakazkaPrehlad } from './zakazka-ceny';
 import { enrichPolozky, type CenaRiadok, type CenyResult } from './ceny';
+import type { OdpadRow } from './odpad-store';
 import {
 	expireStaleZakazkaPushes,
 	getPendingZakazkaPushes,
@@ -95,6 +96,9 @@ export interface ZakazkaNote {
 	/** interný nákupný súčet (cenník) — pre šéfa; `null` = nedostupné. */
 	cenaNakupSpolu: number | null;
 	nakupKompletna: boolean;
+	/** #417 faza 2: per-profil odpad z narezov (agregovany napriec scope odpisy).
+	 *  Prazdne pole = zakazka nema odpadove data (moduly bez ffdPack). */
+	odpad: OdpadRow[];
 }
 
 /** Postaví typovaný model poznámky z agregátu zákazky + (voliteľných) cien. Čistá funkcia. */
@@ -127,7 +131,8 @@ export function buildZakazkaNote(
 		cenaSpolu: ceny ? ceny.sucty.predajVo.suma : null,
 		cenaKompletna: ceny ? ceny.sucty.predajVo.kompletne : false,
 		cenaNakupSpolu: ceny ? ceny.sucty.nakupCennik.suma : null,
-		nakupKompletna: ceny ? ceny.sucty.nakupCennik.kompletne : false
+		nakupKompletna: ceny ? ceny.sucty.nakupCennik.kompletne : false,
+		odpad: prehlad.odpad
 	};
 }
 
@@ -187,6 +192,33 @@ export function buildZakazkaNoteHtml(note: ZakazkaNote, now: Date = new Date()):
 		const nekompl = note.nakupKompletna ? '' : ' (neúplná)';
 		out.push(`<p>Nákup (cenník): ${e(fmtEur(note.cenaNakupSpolu))}${nekompl}</p>`);
 	}
+	// #417 faza 2: sekcia odpad z narezov (len ked existuju odpadove data)
+	if (note.odpad.length > 0) {
+		const odpadMmSpolu = note.odpad.reduce((s, r) => s + r.odpadMm, 0);
+		const materialMmSpolu = note.odpad.reduce((s, r) => s + r.materialMm, 0);
+		const odpadPctSpolu =
+			materialMmSpolu > 0 ? Math.round((odpadMmSpolu / materialMmSpolu) * 1000) / 10 : 0;
+		out.push(`<p><strong>${e('Odpad z nárezov')}</strong></p>`);
+		out.push(
+			'<table border="1" cellpadding="4" cellspacing="0">' +
+				'<tr><th>Profil</th><th>Kód</th><th>Odpad (mm)</th><th>Materiál (mm)</th>' +
+				'<th>Tyče</th><th>Odpad (%)</th></tr>'
+		);
+		for (const r of note.odpad) {
+			const pct = r.materialMm > 0 ? Math.round((r.odpadMm / r.materialMm) * 1000) / 10 : 0;
+			out.push(
+				`<tr><td>${e(r.profilNazov)}</td><td>${e(r.profilKod)}</td>` +
+					`<td>${e(String(r.odpadMm))}</td><td>${e(String(r.materialMm))}</td>` +
+					`<td>${e(String(r.tyce))}</td><td>${e(String(pct))} %</td></tr>`
+			);
+		}
+		out.push('</table>');
+		out.push(
+			`<p>Odpad spolu: <strong>${e(String(odpadMmSpolu))} mm</strong> ` +
+				`(${e(String(odpadPctSpolu))} %) z ${e(String(materialMmSpolu))} mm materiálu.</p>`
+		);
+	}
+
 	if (note.parkovanych > 0)
 		out.push(`<p>Vrátane ${note.parkovanych} parkovaných odpisov ⏳ (čakajú na ručný presun).</p>`);
 	if (note.bezPoloziek > 0)

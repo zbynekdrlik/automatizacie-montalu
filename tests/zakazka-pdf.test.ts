@@ -34,7 +34,8 @@ const baseNote: ZakazkaNote = {
 	cenaSpolu: 37.5,
 	cenaKompletna: false,
 	cenaNakupSpolu: 20,
-	nakupKompletna: true
+	nakupKompletna: true,
+	odpad: []
 };
 
 describe('generateZakazkaPdf', () => {

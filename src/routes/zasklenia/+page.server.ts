@@ -55,6 +55,7 @@ import {
 	type Vstup,
 	type MultiVstup
 } from '$lib/server/vstup';
+import { saveOdpisOdpad } from '$lib/server/odpad-store';
 
 /** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
  *  ako comma-separated string v hidden inpute `vylucene_kody`. */
@@ -539,6 +540,17 @@ export const actions = {
 					vstup
 				};
 			}
+			// #417 faza 2: uloz per-profil odpad (offcut) z narezov pre Odoo note builder.
+			// Best-effort — pad nesmie zhodit uz-zapisany odpis (rovnaky kontrakt ako Odoo observer).
+			try {
+				saveOdpisOdpad(vstup.zak, vstup.op, r.material);
+			} catch (e) {
+				logger('zasklenia').warn('saveOdpisOdpad zlyhal (ignorované)', {
+					zak: vstup.zak,
+					op: vstup.op,
+					error: e
+				});
+			}
 			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome, vytvorene };
 		} catch (e) {
 			logger('zasklenia').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
@@ -690,6 +702,16 @@ export const actions = {
 					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					multiVstup: vstup
 				};
+			}
+			// #417 faza 2: uloz per-profil odpad pre Odoo note builder (multi-posuv).
+			try {
+				saveOdpisOdpad(vstup.zak, vstup.op, r.material);
+			} catch (e) {
+				logger('zasklenia').warn('saveOdpisOdpad (multi) zlyhal (ignorované)', {
+					zak: vstup.zak,
+					op: vstup.op,
+					error: e
+				});
 			}
 			return {
 				step: 'hotovoMulti',

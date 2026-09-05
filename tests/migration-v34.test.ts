@@ -34,7 +34,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v33 → v34: durable retry queue pre Odoo zákazka-push (#349)', () => {
 	it('user_version === 34 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(38);
+		expect(db.pragma('user_version', { simple: true })).toBe(39);
 	});
 
 	it('vznikla tabuľka odoo_zakazka_push s očakávanými stĺpcami', () => {
