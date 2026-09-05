@@ -40,6 +40,62 @@ test('Fix z cadu — CAD nárez → Money odpis (TEST priečinok)', async ({ pag
 	expect(consoleMsgs).toEqual([]);
 });
 
+// ── #462 fix/cad: qty_ ručná editácia pred submitom ─────────────────────────
+test('#462 fix/cad: qty_ ručná editácia zmení odpis (✏️ marker)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await goto(page, '/fix/cad');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`E2E-FIX-QTY-${Date.now().toString(36)}`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Fix Qty');
+	await page.getByLabel('Materiál (CAD nárez) *').fill(FIX_CAD);
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+
+	// nájdi qty input a zmeň
+	const qty = page.locator('input[name^="qty_"]').first();
+	const povodna = await qty.inputValue();
+	await qty.fill(String(Number(povodna) + 3));
+
+	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	// ✏️ marker indikuje ručnú úpravu
+	await expect(page.locator('.row', { hasText: '✏️' })).toHaveCount(1);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// ── #462 fix/cad: kopiruj-tyce tlačidlo ─────────────────────────────────────
+test('#462 fix/cad: „Kopírovať počet tyčí" dá potvrdenie a do schránky stĺpec', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+	await loginAs(page);
+	await goto(page, '/fix/cad');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-FIX-KOP');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Fix Kopiruj');
+	await page.getByLabel('Materiál (CAD nárez) *').fill(FIX_CAD);
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+
+	// kopiruj-tyce tlačidlo
+	const kopiruj = page.getByTestId('kopiruj-tyce');
+	await expect(kopiruj).toHaveText(/Kopírovať počet tyčí/);
+	const secure = await page.evaluate(() => window.isSecureContext && !!navigator.clipboard);
+	expect(secure, 'clipboard API nedostupné').toBe(true);
+
+	await kopiruj.click();
+	await expect(kopiruj).toHaveText(/Skopírované/);
+	const schranka = await page.evaluate(() => navigator.clipboard.readText());
+	expect(schranka.length).toBeGreaterThan(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('Fix z appky — výkres konštrukcie z rozmerov (bez Money)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);

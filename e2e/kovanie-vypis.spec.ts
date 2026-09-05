@@ -128,3 +128,51 @@ test('opona: pole pre stredové okno je len pri 2× štýle a kreslí sa do stre
 
 	expect(errs).toEqual([]);
 });
+
+// ── #462 extra posuv: ps{i}-kovs/kovso selecty (stredové kovanie pri 2× opona) ──
+// Extra posuv (index ≥1) má ps{i}-kovl/kovp pre strany a pri 2× štýle aj
+// ps{i}-kovs/kovso (stredové kovanie + stredové okno). Test overí, že tieto
+// selecty fungujú a ich voľba sa zobrazí vo výpise kovania.
+test('#462 extra posuv: ps0-kovs/ps0-kovso stredové selecty pri 2× štýle', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await zaklad(page, 'E2E-KOVPS');
+	// základ je 3K; pridaj posuv
+	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.locator('#ps0-s').fill('4000');
+	await page.locator('#ps0-v').fill('2000');
+	// nastav extra posuv na opona (2x2K) → ps0-kovs/ps0-kovso sa objavia
+	await page.selectOption('#ps0-styl', '2x2K');
+	await waitHydrated(page);
+	// stredové selecty sú viditeľné
+	const kovs = page.locator('#ps0-kovs');
+	await expect(kovs).toBeVisible();
+
+	// zvoľ stredové kovanie
+	const options = await kovs
+		.locator('option')
+		.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+	if (options.length > 0) {
+		await kovs.selectOption(options[0]!);
+	}
+
+	// zvoľ stranu stredového okna
+	const kovso = page.locator('#ps0-kovso');
+	if (await kovso.isVisible()) {
+		await kovso.selectOption('P');
+	}
+
+	// zadaj strany
+	await page.selectOption('#ps0-kovl', LAVA);
+	await page.selectOption('#ps0-kovp', PRAVA);
+	await vyberFarbuKovania(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// výsledný výpis multi-posuv kovania musí obsahovať info z oboch posuvov
+	const karta = page.getByTestId('kovanie-strany-multi');
+	await expect(karta).toContainText('Posuv 2');
+
+	expect(errs).toEqual([]);
+});

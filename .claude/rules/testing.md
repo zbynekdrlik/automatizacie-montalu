@@ -451,3 +451,30 @@ guard) + `tests/wheel-guard.test.ts`. Keď funkcia GENUINELY potrebuje niečo zl
 z `document`/canvas (napr. `document.createElement('canvas').getContext('2d')`), NIE
 duck-typing — pozri `tests/vizual-textury.test.ts`'s ručný `(globalThis as unknown as
 { document: unknown }).document = { ... }` stub namiesto inštalácie jsdom.
+
+## OdpisBlok `confirm()` dialog v E2E — `page.on('dialog')` PRED klikom (#462)
+
+OdpisBlok (`odoslat-aj-tak` testid) spustí natívny `window.confirm()` pri kliku.
+V Playwright E2E MUSÍŠ nastaviť `page.on('dialog', (d) => d.accept())` **PRED**
+klikom na `odoslat-aj-tak` — inak dialog blokuje a test timeoutne. Vzor:
+
+```ts
+page.on('dialog', (d) => d.accept());
+await page.getByTestId('odoslat-aj-tak').click();
+```
+
+Rovnaký vzor aj pre sietka duplikát (`sietka.spec.ts`) a konfigurátor dopyt delete.
+
+## `{@render hidden()}` v DVOCH formách na výsledkovej stránke → `.first()` (#462)
+
+Na mnohých výsledkových stránkach (sietka, zasklenia, clip...) sa snippet `hidden()`
+renderuje v dvoch `<form>` elementoch (`?/odoslat` + `?/upravit`), takže
+`page.locator('input[name="X"]')` matchne DVA hidden inputy a Playwright strict-mode
+ho odmietne. Scopuj cez `.first()` alebo cez parent form:
+`page.locator('form[action*="odoslat"] input[name="X"]')`.
+
+## combo_ rádiá (>7500mm tyče) sú PERGOLA-only v praxi (#462)
+
+`comboCases` logika žije v zdieľanom `server/pergola.ts` (`transform`), ale /fix/cad
+profily sa mapujú cez CODE_MAP na „surový 7500mm" tyče — tie absorbujú aj >7500mm rezy
+bez combo voľby. Combo test preto píš na /pergola (`parita.spec.ts`), nie na /fix/cad.

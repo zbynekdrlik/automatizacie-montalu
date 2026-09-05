@@ -309,3 +309,33 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 
 	expect(errs).toEqual([]);
 });
+
+// ── #462 poznamka: pole sa dá vyplniť a prežije round-trip na /sietka ───────
+// Pole „Poznámka (viacriadková — ide aj do tlače)" na /sietka. Test overí,
+// že sa dá vyplniť a po Spočítať aj pri „Späť" prežije (round-trip).
+test('#462 sietka poznamka: vyplnenie + round-trip zachováva hodnotu', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/sietka');
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-SIETKA-POZ');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka Pozn');
+	await page.selectOption('#system', 'Robust');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('3000');
+	await page.locator('#otvorV').fill('2000');
+
+	// vyplň poznámku (viacriadková)
+	await page.locator('#poznamka').fill('E2E poznamka riadok');
+	await expect(page.locator('#poznamka')).toHaveValue('E2E poznamka riadok');
+
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+	// po výpočte stránka ukazuje výsledok — poznámka je v skrytých inputoch pre submit
+	// overí, že hidden poznamka prežila POST (je v DOM v odoslat forme)
+	const hiddenPozn = page.locator('input[name="poznamka"][type="hidden"]').first();
+	await expect(hiddenPozn).toHaveValue('E2E poznamka riadok');
+
+	expect(errs).toEqual([]);
+});

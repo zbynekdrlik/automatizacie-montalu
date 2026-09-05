@@ -132,3 +132,38 @@ test('zimná záhrada: ručná koľajnica je per posuv a je vidieť pri posuve',
 
 	expect(errs).toEqual([]);
 });
+
+// ── #462 extra posuv: ručné dĺžky koľajníc per posuv (ps{i}-kolh) ──────────
+// Extra posuv pri systémoch s hornou+spodnou má VLASTNÉ koľajnicové polia
+// (ps0-kolh = horná, ps0-kols = spodná). Test overí, že tieto vstupy fungujú
+// a zadané dĺžky sa objavia v rez-pláne (nie len absencia displeja).
+test('#462 extra posuv: ps0-kolh/kols ručné dĺžky koľajníc zmenia rezy', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '05');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('4K');
+	// base posuv koľajnice necháme default (zo šírky)
+	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.locator('#ps0-s').fill('4200');
+	await page.locator('#ps0-v').fill('2100');
+	// ručné koľajnice pre extra posuv
+	const kolh = page.locator('#ps0-kolh');
+	const kols = page.locator('#ps0-kols');
+	// polia sa zobrazia pre Štandard + (má hornú+spodnú)
+	await expect(kolh).toBeVisible();
+	await kolh.fill('3800');
+	await kols.fill('3805');
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
+	await waitHydrated(page);
+
+	// posuv 2 má ručné koľajnice 3800/3805
+	await expect(page.getByTestId('kolajnica-rucne-1')).toContainText('horná 3800 mm');
+	await expect(page.getByTestId('kolajnica-rucne-1')).toContainText('spodná 3805 mm');
+	// rezy obsahujú 3800 (posuv 2 ručne), nie 4200 (zo šírky posuvu 2)
+	const hornaRow = page.locator('tr', { hasText: 'Koľajnica horná' }).first();
+	await expect(hornaRow).toContainText('3800 mm');
+
+	expect(errs).toEqual([]);
+});
