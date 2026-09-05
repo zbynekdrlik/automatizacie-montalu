@@ -28,7 +28,7 @@ test('predvolené sklo je vždy číre (Robust aj Slide), po prepnutí systému 
 
 	// nový posuv sa klonuje z primárneho → tiež číre
 	await page.selectOption('#system', 'Robust');
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await expect(page.locator('#ps0-sklo')).toHaveValue('Izolačné sklo 4/16/4 číre');
 	// a po prepnutí systému posuvu ostane číre pre nový systém
 	await page.selectOption('#ps0-sys', 'Slide');
@@ -70,7 +70,7 @@ test('kovanie je pri každom posuve sólo (primárny sa nemieša s ďalším)', 
 	await page.selectOption('#system', 'Robust');
 	await page.selectOption('#kovanieL', KOVANIA[3]); // Obojstranná + FAB
 	await page.selectOption('#kovanieP', KOVANIA[0]); // Jednostranná z vnútra bez FAB
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 
 	// posuv sa klonuje z primárneho, ale mení sa NEZÁVISLE
 	await expect(page.locator('#ps0-kovl')).toHaveValue(KOVANIA[3]);
@@ -132,7 +132,7 @@ test('viac posuvov: každý náhľad má svoje kovanie, tabuľka sklo v mm', asy
 	await page.selectOption('#kovanieL', KOVANIA[3]);
 	await page.selectOption('#kovanieP', KOVANIA[0]);
 
-	await page.getByRole('button', { name: '➕ Pridať posuv' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
 	await page.locator('#ps0-s').fill('4365');
 	await page.locator('#ps0-v').fill('2320');
 	await page.selectOption('#ps0-kovl', KOVANIA[1]);

@@ -437,8 +437,9 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 	if (!base.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!base.op) error = 'Chýba OP/OPDL číslo.';
 	else if (!base.zakaznik) error = 'Chýba zákazník.';
-	else if (!Array.isArray(posuvyRaw) || posuvyRaw.length < 1) error = 'Zadaj aspoň jeden posuv.';
-	else if (posuvyRaw.length > 12) error = 'Priveľa posuvov (max 12).';
+	else if (!Array.isArray(posuvyRaw) || posuvyRaw.length < 1)
+		error = 'Zadaj aspoň jedno zasklenie.';
+	else if (posuvyRaw.length > 12) error = 'Priveľa zasklení (max 12).';
 	else {
 		for (let i = 0; i < posuvyRaw.length; i++) {
 			const p = (posuvyRaw[i] ?? {}) as Record<string, unknown>;
@@ -464,38 +465,38 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				sietka: sanitizeSietka(posuvSystem, sk.sietka)
 			};
 			if (!posuv.system || !posuv.styl) {
-				error = `Posuv ${i + 1}: vyber systém a štýl.`;
+				error = `Zasklenie ${i + 1}: vyber systém a štýl.`;
 				break;
 			}
 			// 2x štýly sú vždy opona (serverové vynútenie, viď parseVstup)
 			if (posuv.styl.startsWith('2x')) posuv.otvaranie = 'Opona';
 			posuv.kovanieStred = sanitizeKovanieStred(posuv.system, posuv.styl, p.kovanieStred);
 			if (!(posuv.s >= S_MIN && posuv.s <= S_MAX)) {
-				error = `Posuv ${i + 1}: šírka musí byť ${S_MIN}–${S_MAX} mm.`;
+				error = `Zasklenie ${i + 1}: šírka musí byť ${S_MIN}–${S_MAX} mm.`;
 				break;
 			}
 			if (!(posuv.v >= V_MIN && posuv.v <= V_MAX)) {
-				error = `Posuv ${i + 1}: výška musí byť ${V_MIN}–${V_MAX} mm.`;
+				error = `Zasklenie ${i + 1}: výška musí byť ${V_MIN}–${V_MAX} mm.`;
 				break;
 			}
 			if (!posuv.sklo) {
-				error = `Posuv ${i + 1}: vyber sklo.`;
+				error = `Zasklenie ${i + 1}: vyber sklo.`;
 				break;
 			}
 			if (!OTVARANIA.includes(posuv.otvaranie)) {
-				error = `Posuv ${i + 1}: vyber otváranie.`;
+				error = `Zasklenie ${i + 1}: vyber otváranie.`;
 				break;
 			}
 			if (kol.error) {
-				error = `Posuv ${i + 1}: ${kol.error.replace(/^Koľajnica /, 'koľajnica ')}`;
+				error = `Zasklenie ${i + 1}: ${kol.error.replace(/^Koľajnica /, 'koľajnica ')}`;
 				break;
 			}
 			if (k.error) {
-				error = `Posuv ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
+				error = `Zasklenie ${i + 1}: ${k.error.replace(/^Klín: /, 'klín — ')}`;
 				break;
 			}
 			if (maSietkaSystem(posuv.system) && sk.error) {
-				error = `Posuv ${i + 1}: ${sk.error.replace(/^Sieťka: /, 'sieťka — ')}`;
+				error = `Zasklenie ${i + 1}: ${sk.error.replace(/^Sieťka: /, 'sieťka — ')}`;
 				break;
 			}
 			posuvy.push(posuv);
@@ -603,4 +604,72 @@ export function parseClipVstup(form: FormData): { vstup: ClipVstup; error: strin
 	// 'izo' (odpísal by ZASP00119 miesto ZASP202413); radšej hlásna chyba (review 🟡)
 	else if (!jeClipTyp(rawTyp)) error = 'Neplatný typ výplne (očakáva sa „izo" alebo „klasika").';
 	return { vstup, error };
+}
+
+// --- CLIP multi (#468 fáza 2) ---
+
+export interface ClipMultiVstup {
+	zak: string;
+	op: string;
+	zakaznik: string;
+	caka: boolean;
+	kusy: ClipVstup[];
+}
+
+/**
+ * Parsuje multi CLIP vstupy z FormData — vzor `parseMultiVstup` pre zasklenia.
+ * Kusy prichádzajú ako JSON pole v hidden inpute `clipKusy`.
+ */
+export function parseClipMultiVstup(form: FormData): {
+	vstup: ClipMultiVstup;
+	error: string | null;
+} {
+	const base = {
+		zak: String(form.get('zak') ?? '').trim(),
+		op: String(form.get('op') ?? '').trim(),
+		zakaznik: String(form.get('zakaznik') ?? '').trim(),
+		caka: form.get('caka') === '1'
+	};
+	let kusyRaw: unknown;
+	try {
+		kusyRaw = JSON.parse(String(form.get('clipKusy') ?? '[]'));
+	} catch {
+		kusyRaw = null;
+	}
+	const kusy: ClipVstup[] = [];
+	let error: string | null = null;
+	if (!base.zak) error = 'Chýba číslo objednávky (ZAK).';
+	else if (!base.op) error = 'Chýba OP/OPDL číslo.';
+	else if (!base.zakaznik) error = 'Chýba zákazník.';
+	else if (!Array.isArray(kusyRaw) || kusyRaw.length < 1)
+		error = 'Zadaj aspoň jedno zasklenie CLIP.';
+	else if (kusyRaw.length > 12) error = 'Priveľa kusov (max 12).';
+	else {
+		const num = (v: unknown) => {
+			const x = parseFloat(String(v ?? '').replace(',', '.'));
+			return Number.isFinite(x) ? x : 0;
+		};
+		for (let i = 0; i < kusyRaw.length; i++) {
+			const k = (kusyRaw[i] ?? {}) as Record<string, unknown>;
+			const rawTyp = String(k.typ ?? '').trim();
+			kusy.push({
+				zak: base.zak,
+				op: base.op,
+				zakaznik: base.zakaznik,
+				caka: base.caka,
+				typ: jeClipTyp(rawTyp) ? rawTyp : 'izo',
+				variant: Math.round(num(k.variant)),
+				sirka: num(k.sirka),
+				vyska: num(k.vyska),
+				ral: String(k.ral ?? '')
+					.trim()
+					.slice(0, 40)
+			});
+			if (!jeClipTyp(rawTyp)) {
+				error = `Zasklenie ${i + 1}: neplatný typ výplne (očakáva sa „izo" alebo „klasika").`;
+				break;
+			}
+		}
+	}
+	return { vstup: { ...base, kusy }, error };
 }

@@ -273,11 +273,14 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
     (PRP honest-null), `sklo-cena.spec.ts:24` (sklo honest-null).
   - `testIgnore` v playwright.config.ts — `error-stranka.spec.ts` (test-only route)
   Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu.
-  **Cap 16 min** (workers:1 cez SSH tunel). NAMERANÉ 10.8 min / 324 testov (263 passed,
-  57 skipped, 4 honest-null fixture-only skipped) z dev1 2026-09-05 (#466). Timeout
-  zdvihnutý z pôvodných 15 min (odhad, stihol len ~160 testov) s 48 % rezervou na
-  pomalší GitHub runner. Deploy job timeout = 35 min (build+poll ~5 + npm ci + playwright
-  install ~5 + E2E cap 16 + rezerva). `post-deploy.spec.ts` naďalej beží ako súčasť
+  **Cap 30 min** (workers:1 cez SSH tunel). NAMERANÉ na ostrom GH runneri 2026-09-05
+  (run 33966432945, release 0.24.91): ~20 testov/min cez tunel, 373 testov ≈ 19 min —
+  pôvodný cap 16 min (meraný z dev1 na 324 testoch, #466) nestačil, lebo release sám
+  pridal ~49 E2E testov (#462–#464) a dev1 meranie podhodnotilo tempo GH runnera.
+  30 min = ~19 min + ~55 % rezerva na rast sady (census #459). Deploy job timeout =
+  45 min (build+poll ~5 + npm ci + playwright install ~5 + E2E cap 30 + rezerva).
+  Pri ďalšom prekročení: NAJPRV odmeraj tempo z logu behu (počet testov / čas), až
+  potom hýb capom (no-timeout-band-aids). `post-deploy.spec.ts` naďalej beží ako súčasť
   sady (overuje SHA7 z DOM, keď `DEPLOY_SHA7` env je nastavené).
 
 - **E2E secrets:** `E2E_USER`+`E2E_PASS` treba pridať do GitHub environment

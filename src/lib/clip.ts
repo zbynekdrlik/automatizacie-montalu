@@ -111,14 +111,15 @@ export interface ClipVypocet {
 /** dĺžka tyče [mm] — napevno pre všetky CLIP profily (šablóna). Katalógový údaj:
  *  iná dĺžka je neskôr len ďalší dátový záznam, nie konštanta v kóde. */
 export const CLIP_DLZKA_TYCE = 7500;
-export const CLIP_MIN_SIRKA = 200;
+export const CLIP_MIN_SIRKA = 80;
 /** < 7500, aby rozmer hlavného profilu (= šírka) nikdy nedal ROUNDDOWN(7500/rozmer)=0
  *  (šablónový IFERROR by vrátil 0 tyčí — tichý podhodnotený odpis). */
 export const CLIP_MAX_SIRKA = 7000;
 export const CLIP_MIN_VYSKA = 100;
 export const CLIP_MAX_VYSKA = 3000;
-/** minimálna šírka JEDNEJ výplne [mm] — pri veľkom N je zábradlie príliš úzke */
-export const CLIP_MIN_VYPLNE = 50;
+/** minimálna šírka JEDNEJ výplne [mm] — pri veľkom N je zábradlie príliš úzke.
+ *  Znížené z 50 na 20 (#467): Patrik žiada B0/N=1 od 80 mm (výplň = 24 mm). */
+export const CLIP_MIN_VYPLNE = 20;
 
 // --- Money katalóg (kódy + názvy ŽIVO overené v Money — STEP 0) ------------------
 const KOD_RAM = { kod: 'ZASP00116', nazov: 'Rámový profil Surový 7500 mm' };
@@ -273,6 +274,37 @@ function drobna(oznacenie: string, mnozstvo: number, mj: 'ks' | 'm', poznamka: s
 		mj,
 		poznamka
 	};
+}
+
+// --- MULTI (batch) výpočet (#468 fáza 2) ---
+
+/** Výsledok multi CLIP výpočtu — per-kus detail + spoločný odpis. */
+export interface ClipMultiVypocet {
+	/** per-kus výpočty (zachovávajú 1:1 paritu s Patrikovým Excelom) */
+	kusy: ClipVypocet[];
+	/** Money odpis: súčet tyčí per kód NAPRIEČ kusmi (mj 'ks') */
+	polozky: ClipPolozka[];
+}
+
+/**
+ * Batch CLIP výpočet — viac kusov v jednom odpise/nárezáku (#468).
+ * Každý kus sa spočíta NEZÁVISLE cez `computeClip` (per-riadkový ROUNDUP,
+ * 1:1 parita so šablónou). Výsledné tyče per Money kód sa SČÍTAJÚ naprieč
+ * kusmi — bezpečné: 2× identický kus = presne 2× tyče. NIKDY bin-packing
+ * naprieč kusmi (mení paritu, zamietnutý prístup).
+ */
+export function computeClipMulti(vstupy: ClipVstup[]): ClipMultiVypocet {
+	const kusy = vstupy.map((v) => computeClip(v));
+	// zoskupiť polozky per Money kód naprieč kusmi (poradie prvého výskytu)
+	const merged: ClipPolozka[] = [];
+	for (const kus of kusy) {
+		for (const p of kus.polozky) {
+			const exist = merged.find((m) => m.kod === p.kod);
+			if (exist) exist.qty += p.qty;
+			else merged.push({ ...p });
+		}
+	}
+	return { kusy, polozky: merged };
 }
 
 /** Zoskupí počet tyčí profilov per Money kód (poradie prvého výskytu). Názov z katalógu. */

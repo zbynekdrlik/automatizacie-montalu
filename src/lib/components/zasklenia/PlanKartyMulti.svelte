@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Spoločný nárezový plán viacerých posuvov (zimná záhrada; kroky nahladMulti/hotovoMulti).
+	// Spoločný nárezový plán viacerých zasklení (kroky nahladMulti/hotovoMulti; #468 rename).
 	// Čistá prezentácia — stav + výpočty prídu ako propy z +page (#250, vzor #239). `multi` je
 	// aliasovaný na `m`, aby vyčlenený markup ostal 1:1. Triedy globálne v app.css.
 	import Nahlad2D from '$lib/components/Nahlad2D.svelte';
@@ -44,7 +44,7 @@
 
 <PoznamkaRal poznamka={vstup.poznamka} ral={vstup.ral} />
 <div class="card">
-	<div class="sec">Posuvy ({m.posuvy.length}) — spolu {fmtM(m.m2)} m²</div>
+	<div class="sec">Zasklenia ({m.posuvy.length}) — spolu {fmtM(m.m2)} m²</div>
 	<table>
 		<thead
 			><tr><th></th><th>Systém</th><th>Rozmer</th><th>Sklo (mm)</th><th>Otváranie</th></tr></thead
@@ -52,7 +52,7 @@
 		<tbody>
 			{#each m.posuvy as pv, i (i)}
 				<tr>
-					<td class="c"><b>Posuv {i + 1}</b></td>
+					<td class="c"><b>Zasklenie {i + 1}</b></td>
 					<td>{nazovSystemu(pv.system)} {pv.styl}</td>
 					<td
 						>{pv.S} × {pv.V} mm{#if popisRucnejKolajnice(pv.kolajnica)}<span
@@ -74,11 +74,11 @@
 </div>
 
 <div class="card">
-	<div class="sec">Náhľady posuvov</div>
+	<div class="sec">Náhľady zasklení</div>
 	<div class="posuv-nahlady">
 		{#each m.posuvy as pv, i (i)}
 			<div class="posuv-nahlad">
-				<div class="posuv-nahlad-hd">Posuv {i + 1}</div>
+				<div class="posuv-nahlad-hd">Zasklenie {i + 1}</div>
 				<Nahlad2D
 					S={pv.S}
 					V={pv.V}
@@ -108,7 +108,7 @@
 		{#each m.posuvy as pv, i (i)}
 			{#if pv.kovanieL || pv.kovanieP || pv.kovanieStred}
 				<KovanieStrany
-					nadpis={`Posuv ${i + 1}`}
+					nadpis={`Zasklenie ${i + 1}`}
 					lava={pv.kovanieL ?? ''}
 					prava={pv.kovanieP ?? ''}
 					stred={pv.kovanieStred ?? ''}
@@ -124,7 +124,7 @@
 		<div class="sec">Klíny</div>
 		{#each m.posuvy as pv, i (i)}
 			{#if pv.klin}
-				<div class="row"><span>Posuv {i + 1}</span><b>{klinPopis(pv.klin)}</b></div>
+				<div class="row"><span>Zasklenie {i + 1}</span><b>{klinPopis(pv.klin)}</b></div>
 			{/if}
 		{/each}
 	</div>
@@ -144,20 +144,20 @@
 				)}
 				<div class="row">
 					<span
-						>Posuv {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
+						>Zasklenie {i + 1}{#if sietkaStrana(pv.otvaranie ?? '')}
 							· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
 					><b>{sietkaPopis(pv.sietka, rozmer)}</b>
 				</div>
 				{#if potrebuje3KKolajnicu(pv.styl)}
 					<p class="sub" data-testid={`sietka-2k-warn-multi-${i}`}>
-						⚠ Posuv {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
+						⚠ Zasklenie {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
 							pv.system
 						)}.
 					</p>
 				{/if}
 				{#if pridavnaHint}
 					<p class="sub" data-testid={`pridavna-v-sietke-multi-${i}`}>
-						ℹ Posuv {i + 1}: {pridavnaHint}
+						ℹ Zasklenie {i + 1}: {pridavnaHint}
 					</p>
 				{/if}
 			{/if}
@@ -166,7 +166,7 @@
 {/if}
 
 <div class="card">
-	<div class="sec">Zoznam materiálu — spoločný (naprieč posuvmi)</div>
+	<div class="sec">Zoznam materiálu — spoločný (naprieč zaskleniami)</div>
 	<table data-testid="material-tabulka">
 		<thead><tr><th></th><th>Profil</th><th>Kód</th><th>Rezy</th><th class="c">Tyče</th></tr></thead>
 		<tbody>
@@ -222,9 +222,9 @@
 {/if}
 
 <div class="card">
-	<div class="sec">Rozpis rezov na tyče — pre pílu (posuvy zdieľajú tyče)</div>
+	<div class="sec">Rozpis rezov na tyče — pre pílu (zasklenia zdieľajú tyče)</div>
 	<p class="sub" style="margin-bottom:14px">
-		Rezy z rôznych posuvov sú v jednej tyči — pri každom reze je číslo posuvu (P1/P2/…).
+		Rezy z rôznych zasklení sú v jednej tyči — pri každom reze je číslo zasklenia (Z1/Z2/…).
 	</p>
 	<RozpisRezov material={m.material} viacPosuvov={true} />
 </div>

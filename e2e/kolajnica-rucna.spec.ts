@@ -114,7 +114,7 @@ test('zimná záhrada: ručná koľajnica je per posuv a je vidieť pri posuve',
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel(HORNA).fill('2690');
 	await page.getByLabel(SPODNA).fill('2695');
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('3980');
 	await page.locator('#ps0-v').fill('2162');
 	await vyberFarbuKovania(page);
@@ -144,7 +144,7 @@ test('#462 extra posuv: ps0-kolh/kols ručné dĺžky koľajníc zmenia rezy', a
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('4K');
 	// base posuv koľajnice necháme default (zo šírky)
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('4200');
 	await page.locator('#ps0-v').fill('2100');
 	// ručné koľajnice pre extra posuv

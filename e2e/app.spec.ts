@@ -335,19 +335,19 @@ test('zimná záhrada: viac posuvov → spoločný plán s posuv labelmi (náhľ
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
 	// pridaj druhý posuv a vyplň jeho rozmery (id ps0-*)
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('2509');
 	await page.locator('#ps0-v').fill('1930');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: /Spočítať spoločný plán/ }).click();
 
 	// badge ťahá NÁZOV SYSTÉMU, nie paušálne „Zimná záhrada" (Patrik 2026-07-28)
-	await expect(page.getByTestId('plan-badge')).toHaveText('Robust · 2 posuvy');
+	await expect(page.getByTestId('plan-badge')).toHaveText('Robust · 2 zasklenia');
 
-	// súhrn posuvov + spoločný odpis + rozpis so značkami P1/P2
-	// (Posuv 1/2 je aj v tabuľke aj v náhľade → .first())
-	await expect(page.getByText('Posuv 1').first()).toBeVisible();
-	await expect(page.getByText('Posuv 2').first()).toBeVisible();
+	// súhrn zasklení + spoločný odpis + rozpis so značkami Z1/Z2 (#468 rename)
+	// (Zasklenie 1/2 je aj v tabuľke aj v náhľade → .first())
+	await expect(page.getByText('Zasklenie 1').first()).toBeVisible();
+	await expect(page.getByText('Zasklenie 2').first()).toBeVisible();
 	await expect(page.locator('.row', { hasText: 'ZASP00002' })).toBeVisible();
 	await expect(page.locator('.pbadge').first()).toBeVisible();
 	// je tam tlačidlo na odoslanie (ale my ho v teste NEklikáme)
@@ -385,7 +385,7 @@ test('zimná záhrada: „Späť a upraviť" zachová primárny aj extra posuv',
 	await page.getByLabel('Zákazník *').fill('E2E Multi Späť');
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('2509');
 	await page.locator('#ps0-v').fill('1930');
 	await vyberFarbuKovania(page);
@@ -449,7 +449,7 @@ test('zimná záhrada: odoslanie viac-posuvového odpisu do Money + duplikát', 
 		await page.getByLabel('Zákazník *').fill('E2E Multi Odoslať');
 		await page.getByLabel('Šírka (mm) *').fill('5000');
 		await page.getByLabel('Výška (mm) *').fill('2000');
-		await page.getByRole('button', { name: /Pridať posuv/ }).click();
+		await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 		await page.locator('#ps0-s').fill('2509');
 		await page.locator('#ps0-v').fill('1930');
 		await vyberFarbuKovania(page);
@@ -480,13 +480,13 @@ test('zimná záhrada: odobratie posuvu zachová správne indexy a prepne späť
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
 	// dva extra posuvy: ps0 = 2509, ps1 = 3000
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-s').fill('2509');
-	await page.getByRole('button', { name: /Pridať posuv/ }).click();
+	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps1-s').fill('3000');
-	// tlačidlo ukazuje 3 posuvy (primárny + 2)
+	// tlačidlo ukazuje 3 zasklenia (primárny + 2)
 	await expect(
-		page.getByRole('button', { name: /Spočítať spoločný plán \(3 posuvy\)/ })
+		page.getByRole('button', { name: /Spočítať spoločný plán \(3 zasklenia\)/ })
 	).toBeVisible();
 
 	// odober PRVÝ extra (2509) → zostane ten s 3000 ako nový ps0 (nie 2509)
@@ -496,7 +496,7 @@ test('zimná záhrada: odobratie posuvu zachová správne indexy a prepne späť
 		.click();
 	await expect(page.locator('#ps0-s')).toHaveValue('3000');
 	await expect(
-		page.getByRole('button', { name: /Spočítať spoločný plán \(2 posuvy\)/ })
+		page.getByRole('button', { name: /Spočítať spoločný plán \(2 zasklenia\)/ })
 	).toBeVisible();
 
 	// odober aj druhý → späť na jednoposuvový režim
