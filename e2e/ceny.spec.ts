@@ -23,9 +23,14 @@ async function vyplnZasklenie(page: import('@playwright/test').Page, zak: string
 test('bez Money snapshotu appka ukáže "cena neznáma" v náhľade, súčty priznané ako neúplné', async ({
 	page
 }) => {
+	// #466: prod MÁ reálny Money snapshot → ceny sú známe, test by padol. Honest-null
+	// cestu overujeme len proti lokálnemu preview s vymazaným fixture súborom.
+	test.skip(
+		!!process.env.BASE_URL,
+		'post-deploy: prod má reálny Money snapshot — honest-null cesta neplatí'
+	); // airuleset:test-skip-ok sanctioned BASE_URL guard per ci.md (#466)
 	const consoleMsgs = collectConsole(page);
 	// lokálny beh: istota, že žiadny predošlý test/beh nezanechal fixture súbor
-	// (post-deploy beh proti BASE_URL nemá k tomuto súboru vôbec prístup, preto no-op)
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await vyplnZasklenie(page, `E2E-CENY-BEZ-${Date.now()}`);
@@ -124,10 +129,14 @@ test('/odpisy/[id]: detail histórie ukáže položky + ceny KONKRÉTNEHO odpisu
 test('Lakovanie (#369): sekcia sa zobrazí pre zasklenie — honest-null bez Money rozvinu, náklad čaká na sadzby', async ({
 	page
 }) => {
+	// #466: prod má reálny Money snapshot s rozvinmi → honest-null test by padol.
+	// Compute so seednutým rozvinom pokrytý server-side (tests/ceny.test.ts + lakovanie.test.ts).
+	test.skip(
+		!!process.env.BASE_URL,
+		'post-deploy: prod má reálny Money snapshot s rozvinmi — honest-null cesta neplatí'
+	); // airuleset:test-skip-ok sanctioned BASE_URL guard per ci.md (#466)
 	const consoleMsgs = collectConsole(page);
-	// bez fixture snapshotu → material_prices nemá rozvin → honest-null cesta (compute
-	// so seednutým rozvinom je pokrytý server-side v tests/ceny.test.ts + lakovanie.test.ts;
-	// nezavádzam nový BASE_URL test.skip, ktorý by blokoval integračný push — viď e2e-console.md)
+	// bez fixture snapshotu → material_prices nemá rozvin → honest-null cesta
 	if (!process.env.BASE_URL) fs.rmSync('./data/e2e-ceny.json', { force: true });
 	await loginAs(page);
 	await vyplnZasklenie(page, `E2E-LAK-${Date.now()}`);
