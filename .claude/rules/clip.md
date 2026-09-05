@@ -78,8 +78,11 @@ dev1 (kľúč je len na dev2).
 
 - `parseClipVstup` (`vstup.ts`) ODMIETNE neplatný `typ` chybou — NIKDY ticho neprepadne na
   'izo' (izo vs klasika menia zasklievací kód → zlý odpis). `chybaClipVstupu` (client-safe
-  v `clip.ts`) stráži rozsahy + whitelist + odvodenú šírku výplne > 0 (skriptovaný POST
-  obíde HTML5 min/max).
+  v `clip.ts`) stráži rozsahy + whitelist + odvodenú šírku výplne >= CLIP_MIN_VYPLNE
+  (skriptovaný POST obíde HTML5 min/max). Validácia je VARIANT-AWARE by design: plošný
+  `CLIP_MIN_SIRKA` je absolútna spodná hranica, odvodená kontrola šírky výplne z N
+  automaticky odmietne malé šírky pri veľkom N (#467: min. šírka 200→80, min. výplne
+  50→20 — Patrik B0/N=1 od 80 mm).
 - `/clip` je v `B2B_FORBIDDEN_PREFIXES` — `handle` hook presmeruje b2b PRED akciou (ako
   /bazen), takže akcia nepotrebuje vlastný `isB2B` guard. Drift guard:
   `tests/b2b-route-coverage.test.ts`.
