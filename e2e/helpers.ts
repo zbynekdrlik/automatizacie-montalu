@@ -123,6 +123,29 @@ export async function logout(page: Page) {
  * naďalej dostanú R9005 (zachovaná spätná kompatibilita — je to prvá platná
  * možnosť v ich zozname), Deluxe dostane prvú svoju (R9006).
  */
+/**
+ * #464: Stub `window.print()` — injektuje script PRED navigáciou, ktorý nahradí
+ * `window.print` počítadlom. Volaj PRED `goto`/`loginAs`. Po kliku na print
+ * tlačidlo zavolaj vrátený `assertPrintCalled()` na overenie, že `window.print`
+ * bol volaný aspoň raz.
+ */
+export async function stubWindowPrint(page: Page) {
+	await page.addInitScript(() => {
+		(window as unknown as Record<string, number>).__printCallCount = 0;
+		window.print = () => {
+			(window as unknown as Record<string, number>).__printCallCount++;
+		};
+	});
+	return {
+		async assertPrintCalled() {
+			const count = await page.evaluate(
+				() => (window as unknown as Record<string, number>).__printCallCount
+			);
+			expect(count).toBeGreaterThan(0);
+		}
+	};
+}
+
 export async function vyberFarbuKovania(page: Page, farba?: 'R9005' | 'R9006' | 'R7016') {
 	const sel = page.getByTestId('farba-kovania');
 	if ((await sel.count()) === 0) return;

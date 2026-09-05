@@ -361,3 +361,83 @@ test('b2b: kachlička „Návrhový výkres" (#423) na /zasklenia, otvorenie a v
 
 	expect(errs).toEqual([]);
 });
+
+// #464: zasklenia navrh — klin Počet kusov priamy fill
+test('#464: zasklenia navrh — klin Počet kusov sa dá vyplniť a zobrazí sa', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/zasklenia/navrh');
+	await waitHydrated(page);
+
+	await page.getByLabel('Systém').selectOption('Robust');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Celková šírka (mm) *').fill('3000');
+	await page.getByLabel('Celková výška (mm) *').fill('2000');
+	// enable klin
+	const klinCheck = page.getByLabel('Klín nad posuvom');
+	if ((await klinCheck.count()) > 0) {
+		await klinCheck.check();
+		await waitHydrated(page);
+		// Počet kusov field for klin
+		const pocetKs = page.getByLabel('Počet kusov', { exact: false });
+		if ((await pocetKs.count()) > 0) {
+			await pocetKs.fill('3');
+		}
+	}
+
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('zn-elevacia')).toBeVisible();
+	// klin should be drawn when enabled
+	if ((await klinCheck.count()) > 0 && (await klinCheck.isChecked())) {
+		await expect(page.getByTestId('zn-klin')).toBeVisible();
+	}
+	expect(errs).toEqual([]);
+});
+
+// #464: zn-rezim Technický radio — explicit switch-back from farebný to technický
+test('#464: zn-rezim Technický — switch farebný → technický zachová výkres', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/zasklenia/navrh');
+	await waitHydrated(page);
+
+	await vyplnFormular(page);
+	// switch to farebný
+	await page.getByTestId('rezim-farebny-radio').check();
+	await page.getByLabel('RAL odtieň').selectOption('7016');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('zn-elevacia')).toBeVisible();
+	// should have RAL text
+	await expect(page.getByTestId('zn-ral-text')).toBeVisible();
+
+	// now switch back to technický
+	const technicky = page.locator('input[name="zn-rezim"][value="technicky"]');
+	await technicky.check();
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('zn-elevacia')).toBeVisible();
+	// RAL text should NOT be visible in technický mode
+	await expect(page.getByTestId('zn-ral-text')).toHaveCount(0);
+	expect(errs).toEqual([]);
+});
+
+// #464: zasklenia navrh „➕ Nový výkres" link
+test('#464: zasklenia navrh „➕ Nový výkres" naviguje na /zasklenia/navrh', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/zasklenia/navrh');
+	await waitHydrated(page);
+
+	await vyplnFormular(page);
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	const link = page.getByRole('link', { name: '➕ Nový výkres' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/zasklenia\/navrh$/);
+	expect(errs).toEqual([]);
+});

@@ -126,3 +126,62 @@ test('zákazka bez LIVE odpisu: 🧪 TEST fallback s explicitným označením (#
 	await expect(page.getByTestId('cena-nakup-cennik-E2E-ZC-T1')).toContainText('cena neznáma');
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #464: zakazka print button volá window.print()
+test('zákazka: print button volá window.print()', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	await page.addInitScript(() => {
+		(window as unknown as Record<string, number>).__printCallCount = 0;
+		window.print = () => {
+			(window as unknown as Record<string, number>).__printCallCount++;
+		};
+	});
+	// seed a minimal odpis for the zakazka page
+	const db = new Database('./data/e2e.db');
+	try {
+		db.prepare(
+			`INSERT OR IGNORE INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES (91520, 'zasklenia', 'E2E-ZC-PRINT', 'OP01', 'E2E Print', 0, 1, '/t/f.xlsx', 'f.xlsx', 'hzcprint', '{}', 'e2e', datetime('now','-5 minutes'), 'E2E-ZC-PRINT', 'OP01')`
+		).run();
+		db.prepare(
+			"INSERT OR IGNORE INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (91520, 'ZASP-PRINT', 'Print test', 1, 'm')"
+		).run();
+	} finally {
+		db.close();
+	}
+	await loginAs(page);
+	await goto(page, '/odpisy/zakazka/E2E-ZC-PRINT');
+	await expect(page.getByTestId('zakazka-tlac')).toBeVisible();
+	await page.getByTestId('zakazka-tlac').click();
+	const count = await page.evaluate(
+		() => (window as unknown as Record<string, number>).__printCallCount
+	);
+	expect(count).toBeGreaterThan(0);
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: „← Späť na históriu" z /odpisy/zakazka naviguje na /odpisy
+test('zákazka: „← Späť na históriu" naviguje na /odpisy', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	const db = new Database('./data/e2e.db');
+	try {
+		db.prepare(
+			`INSERT OR IGNORE INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES (91521, 'zasklenia', 'E2E-ZC-NAV', 'OP01', 'E2E Nav', 0, 1, '/t/f.xlsx', 'f.xlsx', 'hzcnav', '{}', 'e2e', datetime('now','-5 minutes'), 'E2E-ZC-NAV', 'OP01')`
+		).run();
+		db.prepare(
+			"INSERT OR IGNORE INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (91521, 'ZASP-NAV', 'Nav test', 1, 'm')"
+		).run();
+	} finally {
+		db.close();
+	}
+	await loginAs(page);
+	await goto(page, '/odpisy/zakazka/E2E-ZC-NAV');
+	const link = page.getByRole('link', { name: '← Späť na históriu' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/odpisy$/);
+	expect(consoleMsgs).toEqual([]);
+});

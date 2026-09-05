@@ -255,3 +255,41 @@ test('login: po zlom hesle ostane meno predvyplnené', async ({ page }) => {
 	await expect(page.getByLabel('Meno')).toHaveValue('e2e');
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #464: odpis detail print button + „← Späť na históriu"
+test('odpis detail: print button + „← Späť na históriu"', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	await page.addInitScript(() => {
+		(window as unknown as Record<string, number>).__printCallCount = 0;
+		window.print = () => {
+			(window as unknown as Record<string, number>).__printCallCount++;
+		};
+	});
+	const db = new Database('./data/e2e.db');
+	try {
+		db.prepare(
+			`INSERT OR IGNORE INTO odpis_log (id, modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, created_at, zak_norm, op_norm)
+			 VALUES (91530, 'zasklenia', 'E2E-OD-PRINT', 'OP01', 'E2E Print', 0, 1, '/t/f.xlsx', 'f.xlsx', 'hodprint', '{}', 'e2e', datetime('now','-5 minutes'), 'E2E-OD-PRINT', 'OP01')`
+		).run();
+	} finally {
+		db.close();
+	}
+	await loginAs(page);
+	await goto(page, '/odpisy/91530');
+
+	// print button
+	await expect(page.getByTestId('odpis-detail-tlac')).toBeVisible();
+	await page.getByTestId('odpis-detail-tlac').click();
+	const count = await page.evaluate(
+		() => (window as unknown as Record<string, number>).__printCallCount
+	);
+	expect(count).toBeGreaterThan(0);
+
+	// „← Späť na históriu" naviguje
+	const link = page.getByRole('link', { name: '← Späť na históriu' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/odpisy$/);
+	expect(consoleMsgs).toEqual([]);
+});

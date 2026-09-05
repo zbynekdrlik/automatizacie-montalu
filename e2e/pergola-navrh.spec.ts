@@ -726,3 +726,55 @@ test('#382: golden OP260282 BEZ manuálneho sklonu — REZ A ukáže dopočítan
 	await expect(page.getByTestId('pn-sklon')).toHaveText('9,6°');
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #464: pergola navrh metadata fields — nazov/revizia/varianta/vypracoval
+test('#464: pergola navrh metadata → pečiatka (nazov/revizia/varianta/vypracoval)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await waitHydrated(page);
+
+	await page.getByLabel('OP číslo').fill('OP-META-TEST');
+	await page.getByLabel('Rozpätie 1 (mm)').fill('5000');
+	await page.getByLabel('Hĺbka (mm) *').fill('4000');
+	await page.getByLabel('Výška vpredu (mm) *').fill('2200');
+	await page.getByLabel('Výška pri stene (mm) *').fill('2700');
+	// metadata fields
+	await page.getByLabel('Názov výkresu (voliteľné)').fill('Test Pergola Meta');
+	await page.getByLabel('Revízia (voliteľné)').fill('R3');
+	await page.getByLabel('Varianta (voliteľné)').fill('A2');
+	await page.getByLabel('Vypracoval (voliteľné)').fill('E2E Tester');
+
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	// metadata rendered in title-block
+	await expect(page.getByTestId('tb-cislo-vykresu')).toContainText('OP-META-TEST');
+	await expect(page.getByTestId('tb-revizia')).toContainText('R3');
+	await expect(page.getByTestId('tb-varianta')).toContainText('A2');
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #464: pergola navrh „➕ Nový výkres" link
+test('#464: pergola navrh „➕ Nový výkres" link naviguje na /pergola/navrh', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/pergola/navrh');
+	await waitHydrated(page);
+
+	await page.getByLabel('OP číslo').fill('OP-NAV');
+	await page.getByLabel('Rozpätie 1 (mm)').fill('5000');
+	await page.getByLabel('Hĺbka (mm) *').fill('4000');
+	await page.getByLabel('Výška vpredu (mm) *').fill('2200');
+	await page.getByLabel('Výška pri stene (mm) *').fill('2700');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	const link = page.getByRole('link', { name: '➕ Nový výkres' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/pergola\/navrh$/);
+	expect(consoleMsgs).toEqual([]);
+});

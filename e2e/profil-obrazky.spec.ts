@@ -51,3 +51,43 @@ for (const { system, styl } of PRIPADY) {
 		expect(errs).toEqual([]);
 	});
 }
+
+// #464: ProfilObrazok lightbox — thumb klik otvorí, backdrop + ✕ zavrie
+test('ProfilObrazok lightbox: otvorenie a zatvorenie (backdrop + ✕)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-LB');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Lightbox');
+	await page.getByLabel('Systém').selectOption('Štandard');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.locator('#s').fill('2509');
+	await page.locator('#v').fill('1930');
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+
+	// thumb je viditeľný (aria-label na ProfilObrazok)
+	const thumb = page.locator('button.thumb').first();
+	await expect(thumb).toBeVisible();
+
+	// klik otvorí lightbox
+	await thumb.click();
+	const lightbox = page.locator('.lightbox');
+	await expect(lightbox).toBeVisible();
+	await expect(page.locator('.lb-card')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Zavrieť' })).toBeVisible();
+
+	// ✕ zatvorí lightbox
+	await page.getByRole('button', { name: 'Zavrieť' }).click();
+	await expect(lightbox).toHaveCount(0);
+
+	// znova otvorenie + backdrop klik zatvorí
+	await thumb.click();
+	await expect(lightbox).toBeVisible();
+	await lightbox.click({ position: { x: 5, y: 5 } }); // backdrop, nie lb-card
+	await expect(lightbox).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});

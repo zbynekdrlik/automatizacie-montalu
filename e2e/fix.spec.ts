@@ -201,3 +201,26 @@ test('server odmietne nezmyselné zadanie aj po obídení HTML5 validácie', asy
 
 	expect(errs).toEqual([]);
 });
+
+// #464: fix „➕ Nový výkres" navigačný link
+test('#464: fix „➕ Nový výkres" naviguje na /fix', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await page.goto('/fix');
+	await waitHydrated(page);
+
+	await hlavicka(page, 'E2E-FIX-NAV', 'OP-NAV');
+	await page.locator('#s').fill('1200');
+	await page.locator('#v1').fill('600');
+	await page.locator('#v2').fill('600');
+	await page.locator('#pocet').selectOption('2');
+	await page.getByTestId('nakreslit').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('fix-vykres')).toBeVisible();
+	const link = page.getByRole('link', { name: '➕ Nový výkres' });
+	await expect(link).toBeVisible();
+	await link.click();
+	await expect(page).toHaveURL(/\/fix$/);
+	expect(errs).toEqual([]);
+});
