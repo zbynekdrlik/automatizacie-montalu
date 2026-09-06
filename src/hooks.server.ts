@@ -11,6 +11,7 @@ import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
 import { queueZakazkaPush, runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
+import { queueNarezakUpload } from '$lib/server/odoo-narezak-upload';
 
 const log = logger('http');
 
@@ -46,7 +47,11 @@ let pruneCounter = 0;
 	runStartupLeadSweep();
 	// #340: po každom úspešnom odpise pushni interný zoznam materiálu zákazky do Odoo
 	// (interná log-note na sale.order, zákazník ju nikdy nevidí). Money-neutrálny observer.
-	setOdpisWrittenHook(queueZakazkaPush);
+	// #6385: + upload nárezového PDF na zákazku cez montalu_narezak_upload (/json/2).
+	setOdpisWrittenHook((zak: string, op: string) => {
+		queueZakazkaPush(zak, op);
+		queueNarezakUpload(zak, op);
+	});
 	// #349: pri štarte (po migráciách — db.ts modul-load prebehol vyššie cez importy) dopostni
 	// zaostalé zákazka-pushe z minulých výpadkov Odoo. Fire-and-forget, no-op keď chýba ODOO_LEAD_*.
 	runStartupZakazkaSweep();
