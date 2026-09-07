@@ -2,12 +2,12 @@
 // Nová stránka /plan-rezov: paste CAD tabuľku → zoskupenie profilov → FFD
 // optimalizácia → výsledok. Money-NEUTRÁLNE.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs } from './helpers';
+import { collectConsole, goto, loginAs } from './helpers';
 
 test('stránka /plan-rezov sa načíta a zobrazí nadpis', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	await page.goto('/plan-rezov');
+	await goto(page, '/plan-rezov');
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Plán rezov');
 	await expect(page.getByTestId('cad-input')).toBeVisible();
 	await expect(page.getByTestId('spocitaj')).toBeVisible();
@@ -17,7 +17,7 @@ test('stránka /plan-rezov sa načíta a zobrazí nadpis', async ({ page }) => {
 test('optimalizácia z CAD tabuľky zobrazí výsledok s profilmi', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	await page.goto('/plan-rezov');
+	await goto(page, '/plan-rezov');
 
 	// vloží vzorové dáta — 2 profily (jednoduchý test)
 	const cadText = [
@@ -40,7 +40,7 @@ test('optimalizácia z CAD tabuľky zobrazí výsledok s profilmi', async ({ pag
 test('prázdny vstup zobrazí chybu', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	await page.goto('/plan-rezov');
+	await goto(page, '/plan-rezov');
 
 	await page.getByTestId('spocitaj').click();
 
@@ -53,7 +53,7 @@ test('prázdny vstup zobrazí chybu', async ({ page }) => {
 test('zmena dĺžky tyče na 7500 funguje', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	await page.goto('/plan-rezov');
+	await goto(page, '/plan-rezov');
 
 	await page.getByTestId('dlzka-tyce').selectOption('7500');
 	await page.getByTestId('cad-input').fill('PROFIL A\t3\t2000');
