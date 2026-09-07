@@ -94,6 +94,30 @@ pergola artikle, sa BEZ reálnej FIX CAD vzorky od Dominika nedá potvrdiť. Mec
 (nenamapovaný kód → chyba). Doplnenie FIX-špecifického katalógu/CODE_MAP = follow-up so vzorkou;
 NEHÁDAŤ kódy (Money-safety).
 
+## Výrobné odpočty zo zamerania (#469) — `prepocitajFixNaVyrobu`
+
+`pocitajFix()` počíta geometriu z rozmerov KONŠTRUKCIE. Operátor však zadáva rozmery
+OTVORU (zameranie). `prepocitajFixNaVyrobu()` (od #469) transformuje zameranie na
+konštrukčné rozmery: odpočíta profilové šírky (24mm/stranu = `FIX_PROFIL_ODPOCET`),
+V1/V2 prenáša nezmenené (dv sa zachováva cez zúženú šírku).
+
+- **Šírkový odpočet je PRESNÝ** (podklady att-15390..92, 7.9.2026):
+  `hypot(1530, 89) = 1532.6` a `atan(89/1530) = 3.3°` — obe presne sedí s výkresom.
+  Konštanta 24mm/stranu je z jedného príkladu; ak príde ďalší s iným odpočtom,
+  refaktoruj na systém-závislú (Record<FixSystem, number>).
+- **DVE OTVORENÉ OTÁZKY (Dominikov hovor):**
+  1. **Vertikálny offset:** výkresové výšky 136.2/55.5 sú na DETAIL A/B referenčných
+     bodoch profilových prierezov, nie na rohoch lichobežníka. V1/V2 prechádzajú
+     nezmenené (dv zachovaný); čo presne sú tie DETAIL referencie, objasní Dominik.
+  2. **Multi-field zúženie:** z jedného príkladu (1 pole) sa nedá potvrdiť, či je
+     proporčné (pomer zachovaný) alebo shift-based (krajné −odpočet, vnútorné bez
+     zmeny — analógia `.claude/rules/fix-module.md` n=2 lesson). Proporčné je zatiaľ
+     predpoklad — NEEXTRAPOLUJ bez overenia (tá istá pasca ako #85 n=2).
+- **Funkcia zatiaľ NIE JE zapojená v UI** — `/fix` stále volá `pocitajFix()` priamo.
+  Zapojenie je gated na Dominikove odpovede.
+- Test vektor: `tests/fix-vyroba.test.ts` — kontraktový pre šírku, uhol a šikmú hranu
+  (presné hodnoty). Vertikálny offset a multi-field model sa ZMENIA po Dominikovi.
+
 ## Cross-modul identický-obsah dedup guard (#380) — POVINNÝ pri reuse cudzieho katalógu
 
 `writeOdpis` dedup aj #294 ledger sú kľúčované na `(modul, zak, op, live)`. Keď JEDEN modul REUSUJE

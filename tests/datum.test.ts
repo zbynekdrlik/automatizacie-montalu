@@ -6,7 +6,41 @@
 // videla čas posunutý o 1-2h), takže výsledok je deterministický bez ohľadu na TZ CI runnera.
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { transpileModule, ModuleKind, ScriptTarget } from 'typescript';
 import { formatDatumCasSk, formatDatumSk, sqliteUtcToIso } from '../src/lib/datum';
+
+// #6427: `node --experimental-strip-types` (spúšťané nižšie na ČERSTVOM procese) je flag,
+// ktorý Node 20 vôbec nepozná ("bad option") — pridaný až v Node 22.6, takže tento istý test
+// bol na Node 20 (subdev box montalu1) vždy červený, kým na CI (Node 22) bol zelený. NIE je to
+// Intl/TZ rozdiel medzi verziami — je to holá nekompatibilita flagu. Fix: TS zdroj transpilovať
+// PRED spustením (cez `typescript` balík, ktorý je devDependency), spustiť ČERSTVÝ proces s
+// obyčajným plain-JS súborom — žiadny node-verzia-špecifický flag, funguje identicky na Node 20
+// aj Node 22 (a na akejkoľvek budúcej verzii).
+function spustFreshProces(volanie: string): string {
+	const zdroj = readFileSync(new URL('../src/lib/datum.ts', import.meta.url), 'utf8');
+	const { outputText } = transpileModule(zdroj, {
+		compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 }
+	});
+	const dir = mkdtempSync(join(tmpdir(), 'datum-test-'));
+	const subor = join(dir, 'datum.mjs');
+	writeFileSync(subor, outputText);
+	try {
+		return execFileSync(
+			process.execPath,
+			[
+				'-e',
+				`import(${JSON.stringify(pathToFileURL(subor).href)}).then(m => console.log(${volanie}))`
+			],
+			{ env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
+		).trim();
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+}
 
 describe('formatDatumCasSk — slovenský tvar D.M.YYYY HH:MM', () => {
 	it('bežný dátum — deň/mesiac bez nuly, čas so nulou', () => {
@@ -43,15 +77,7 @@ describe('formatDatumCasSk — slovenský tvar D.M.YYYY HH:MM', () => {
 	// output NEOVPLYVNILA). Jediný spoľahlivý spôsob overiť „nezávisí od TZ procesu" je spustiť
 	// ČERSTVÝ node proces s TZ=UTC nastaveným PRED štartom (presne ako v Dockeri) a porovnať.
 	it('výsledok NEZÁVISÍ od TZ procesu — ČERSTVÝ proces s TZ=UTC (ako Docker) dá rovnaký čas', () => {
-		const vystup = execFileSync(
-			process.execPath,
-			[
-				'--experimental-strip-types',
-				'-e',
-				"import('./src/lib/datum.ts').then(m => console.log(m.formatDatumCasSk('2026-08-05T12:32:00.000Z')))"
-			],
-			{ cwd: import.meta.dirname + '/..', env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
-		).trim();
+		const vystup = spustFreshProces("m.formatDatumCasSk('2026-08-05T12:32:00.000Z')");
 		// pod TZ=UTC bez explicitnej zóny by toto bolo „5.8.2026 12:32" (UTC, nie Bratislava) —
 		// dôkaz spustený priamo proti tomuto testu: odstránenie `timeZone` z datum.ts dá 12:32
 		expect(vystup).toBe('5.8.2026 14:32');
@@ -69,15 +95,7 @@ describe('formatDatumSk — slovenský dátum D.M.YYYY (bez času, #277 pätičk
 	});
 
 	it('výsledok NEZÁVISÍ od TZ procesu — ČERSTVÝ proces s TZ=UTC (ako Docker) dá rovnaký deň', () => {
-		const vystup = execFileSync(
-			process.execPath,
-			[
-				'--experimental-strip-types',
-				'-e',
-				"import('./src/lib/datum.ts').then(m => console.log(m.formatDatumSk('2026-07-05T22:30:00.000Z')))"
-			],
-			{ cwd: import.meta.dirname + '/..', env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
-		).trim();
+		const vystup = spustFreshProces("m.formatDatumSk('2026-07-05T22:30:00.000Z')");
 		// pod TZ=UTC bez explicitnej zóny by toto bolo „5.7.2026" (UTC deň) — dôkaz, že
 		// pätička PDF ukáže bratislavský deň aj v prod kontajneri (UTC)
 		expect(vystup).toBe('6.7.2026');
@@ -116,15 +134,7 @@ describe('sqliteUtcToIso — most SQLite/UTC → ISO (#313 /odpisy kontrakt)', (
 	});
 
 	it('výsledok NEZÁVISÍ od TZ procesu — ČERSTVÝ proces s TZ=UTC (ako Docker) dá bratislavský čas', () => {
-		const vystup = execFileSync(
-			process.execPath,
-			[
-				'--experimental-strip-types',
-				'-e',
-				"import('./src/lib/datum.ts').then(m => console.log(m.formatDatumCasSk(m.sqliteUtcToIso('2026-01-05 13:32:00'))))"
-			],
-			{ cwd: import.meta.dirname + '/..', env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
-		).trim();
+		const vystup = spustFreshProces("m.formatDatumCasSk(m.sqliteUtcToIso('2026-01-05 13:32:00'))");
 		// pod TZ=UTC bez explicitnej zóny by /odpisy ukázalo „5.1.2026 13:32" (UTC) — dôkaz, že
 		// prod kontajner (UTC) ukáže bratislavský čas
 		expect(vystup).toBe('5.1.2026 14:32');

@@ -1,9 +1,11 @@
 // BS DELUXE komponenty do Money odpisu (#354, Dominik — att 14668/14670) v
 // prehliadači. Money-korektnosť množstiev je pokrytá unit testom
-// (tests/kovanie-deluxe.test.ts); toto overuje LEN prehliadačovú vrstvu — RAL
-// select ponúka len platnú množinu (nie natvrdo R9005/R7016 pre KAŽDÝ farebný
-// systém), neplatná farba sa pri prepnutí systému zahodí, a náhľad naozaj
-// zobrazí krajnú/stredovú krytku + madlo + kefy + upozornenie na 6mm.
+// (tests/kovanie-deluxe.test.ts); toto overuje LEN prehliadačovú vrstvu — Deluxe
+// má od #6413 (att 14955, Patrik/Dominik) PEVNÚ farbu kovania (nerezová mušľa
+// R9006), takže formulár namiesto RAL selectu zobrazí info text; prepnutie
+// z farebného systému (Robust) na Deluxe zahodí neplatnú farbu z predošlého
+// systému (#354 spirit), a náhľad naozaj zobrazí krajnú/stredovú krytku + madlo
+// + kefy + upozornenie na 6mm.
 //
 // Všetko READ-ONLY („Spočítať" / „Späť"), nič sa nezapisuje do Money.
 import { test, expect, type Page } from '@playwright/test';
@@ -30,24 +32,26 @@ const riadok = (page: Page, kod: string) =>
 // text, nie číslica). Exaktný text na IZOLOVANOM `<b>` elementu je jednoznačný.
 const mnozstvo = (page: Page, kod: string) => riadok(page, kod).locator('b');
 
-test('Deluxe: RAL select ponúka len R9006/R7016 (10mm live tabuľka), nie R9005', async ({
+test('Deluxe: farba kovania je PEVNÁ (nerezová mušľa R9006), žiadny RAL select (#6413)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
 	await page.getByLabel('Systém').selectOption('Deluxe');
-	const sel = page.getByTestId('farba-kovania');
-	await expect(sel).toBeVisible();
-	const hodnoty = await sel
-		.locator('option')
-		.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
-	expect(hodnoty.sort()).toEqual(['', 'R7016', 'R9006'].sort());
+	// #6413 att 14955: server vylúčil Deluxe zo `systemyFarba` (má defaultFarba) →
+	// formulár namiesto RAL selectu zobrazí pevný info text.
+	await expect(page.getByTestId('farba-kovania-fixed')).toBeVisible();
+	await expect(page.getByTestId('farba-kovania-fixed')).toContainText('nerezová mušľa');
+	await expect(page.getByTestId('farba-kovania-fixed')).toContainText('R9006');
+	await expect(page.getByTestId('farba-kovania')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('prepnutie Robust (R9005) → Deluxe zahodí neplatnú farbu (#354)', async ({ page }) => {
+test('prepnutie Robust (R9005) → Deluxe zobrazí pevnú farbu; návrat na Robust nezachová neplatnú R9005 (#354, #6413)', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
@@ -55,11 +59,20 @@ test('prepnutie Robust (R9005) → Deluxe zahodí neplatnú farbu (#354)', async
 	await vyberFarbuKovania(page, 'R9005');
 	await expect(page.getByTestId('farba-kovania')).toHaveValue('R9005');
 
-	// Deluxe neponúka R9005 — hranový $effect musí neplatnú hodnotu zahodiť,
-	// inak by sa v selecte zobrazila prázdna, ale `farbaKovaniaS` by mohla ostať
-	// zaseknutá na neplatnej hodnote (do #354 všetky farebné systémy zdieľali
-	// JEDNU množinu, takže tento prípad dovtedy nemohol nastať).
+	// Deluxe nemá RAL select vôbec (#6413) — kovanie tam má pevnú farbu R9006
+	// (nerezová mušľa). Hranový $effect naďalej zahadzuje hodnotu, ktorá nie je
+	// v aktuálnych `ralOptions` (R9005 nie je platná pre Deluxe) — presne ten istý
+	// mechanizmus ako pred #6413, len sa teraz prejaví zmiznutím selectu namiesto
+	// prázdnej hodnoty v ňom.
 	await page.getByLabel('Systém').selectOption('Deluxe');
+	await expect(page.getByTestId('farba-kovania')).toHaveCount(0);
+	await expect(page.getByTestId('farba-kovania-fixed')).toBeVisible();
+	await expect(page.getByTestId('farba-kovania-fixed')).toContainText('R9006');
+
+	// späť na Robust: select sa vráti, ale neplatná R9005 NEPRETRVÁ (bola zahodená
+	// počas Deluxe interlude) — inak by engine mohol dostať zaseknutú neplatnú
+	// hodnotu namiesto vynúteného nového výberu (#354 spirit).
+	await page.getByLabel('Systém').selectOption('Robust');
 	await expect(page.getByTestId('farba-kovania')).toHaveValue('');
 
 	expect(consoleMsgs).toEqual([]);

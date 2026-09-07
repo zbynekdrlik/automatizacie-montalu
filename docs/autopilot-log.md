@@ -2,6 +2,16 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-09-07 — Štandard Drevo|4K system for Drevostavby firm (#445, worktree)
+
+- Version bump: 247deb9 (0.24.96-dev.1)
+- Feature: 146ad73 — data-driven sysStyl "Štandard Drevo|4K" with 10 profil + 2 sklo rez entries, priečka via koef=0.5
+- Review fix: 9fb07d5 — client glass alias for Štandard Drevo (Yellow 1), bump(40) instead of pragma (Blue 1), test narrowing (Blue 2)
+- Playbook: 96f501e — .claude/rules/novy-system.md peripheral checklist (9 touch-points for new systems)
+- Tests: compute-drevostavby.test.ts (22 vectors), migration-v40.test.ts (5 assertions), 30 head-bumps
+- Decision: 1K sheet (K-M codes) out of scope — needs Money verification
+- Findings: ZASP00113 placeholder image needs sync-profil-obrazky.sh; glass count N=4 vs actual 3 (Money-neutral)
+
 ## 2026-09-05 — Post-deploy E2E timeout + honest-null failures (#466, worktree)
 
 - bump: a054893 (0.24.91-dev.2)
@@ -2086,3 +2096,10 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
 - svelte-check 0/0 + lint (eslint+prettier) čisté + **3408 unit testov (0 fail, coverage nad
   prahmi)** + 3/3 zz E2E (vrátane novej „systém stien invaliduje + prepočíta cenu" asercie), 0
   console chýb. NEmergnuté (worktree — supervisor integruje).
+- **#469 FIX výrobné odpočty zo zamerania** — `prepocitajFixNaVyrobu()` v `src/lib/fix.ts`:
+  šírkový odpočet 24mm/stranu (`FIX_PROFIL_ODPOCET`), V1/V2 nezmenené (dv zachovaný cez
+  zúženú šírku — review H1 fix: `hypot(1530,89)=1532.6`, `atan(89/1530)=3.3°` presne sedí
+  s výkresom). RED 717af53 → GREEN f8c786b → review fix 560e916. Dva otvorené otázky pre
+  Dominika: (1) vertikálny offset (DETAIL A/B referencie), (2) multi-field zúženie
+  (proporčné vs shift). Funkcia NIE JE zapojená v UI (gated na Dominika). 9 nových testov,
+  57 FIX testov celkovo green. NEmergnuté (worktree — supervisor integruje).

@@ -4,10 +4,15 @@
 // je Money dosiahnuteľné) + rsync na VPS (viď design komentár na tikete pre celý
 // dátový tok). Chýbajúca cena je vždy `null` ("cena neznáma"), nikdy 0 — Money má
 // reálne kódy, kde `Cena=0` znamená "nikdy zadané", nie "zadarmo" (overené live).
+//
+// #5808 noha 3: pri `ODOO_PRICES_ENABLED=1` sa ceny čítajú z Odoo cez json/2
+// (`get_prices`) namiesto snapshot súboru. Odoo nevracia `rozvin` — ostáva `null`
+// (honest-null, `computeLakovanie` to zvládne). Fallback na snapshot pri chybe.
 import fs from 'node:fs';
 import { db } from './db';
 import { logger } from './log';
 import { computeLakovanie, type LakovanieResult } from '$lib/lakovanie';
+import { isOdooPricesEnabled, fetchOdooPrices, type OdooPricesResponse } from './odoo-prices';
 
 const log = logger('ceny');
 
@@ -123,6 +128,10 @@ export interface ImportResult {
  * zablokovať aktualizáciu cien pre všetky ostatné položky — viď design komentár).
  */
 export function maybeImportSnapshot(): ImportResult {
+	// #5808: pri Odoo móde triggeruj async refresh na pozadí (fire-and-forget).
+	// Sync flow pokračuje z SQLite cache (vždy obsahuje POSLEDNÉ dáta).
+	triggerOdooRefreshIfNeeded();
+
 	const p = snapshotPath();
 	let stat: fs.Stats;
 	try {
@@ -201,6 +210,133 @@ export function maybeImportSnapshot(): ImportResult {
 		rejectedCount: rejected,
 		generatedAt
 	};
+}
+
+// ---- #5808 noha 3: import z Odoo json/2 -----------------------------------------
+
+export interface OdooImportResult {
+	imported: boolean;
+	reason: 'disabled' | 'no-config' | 'fetch-error' | 'ok';
+	rowCount?: number;
+	generatedAt?: string | null;
+}
+
+/**
+ * Stiahne aktuálne ceny z Odoo cez json/2 `get_prices` a naimportuje ich do
+ * SQLite `material_prices` (rovnaký upsert ako `maybeImportSnapshot`).
+ *
+ * ASYNC — volá sa zo startup hookov a z `maybeRefreshPrices` (lazy refresh).
+ * Odoo nevracia `rozvin` (#369) — ostáva `null` (honest-null).
+ *
+ * Vráti `null` namiesto hodunia — zlyhanie sa len zaloguje, volajúci
+ * fallbackne na existujúci snapshot v SQLite.
+ */
+export async function importFromOdoo(): Promise<OdooImportResult> {
+	if (!isOdooPricesEnabled()) {
+		return { imported: false, reason: 'disabled' };
+	}
+	const data = await fetchOdooPrices();
+	if (!data) {
+		return { imported: false, reason: data === null ? 'fetch-error' : 'no-config' };
+	}
+	return importOdooPricesData(data);
+}
+
+/**
+ * Naimportuje už-stiahnuté Odoo ceny do SQLite. Čistá DB operácia (žiadny HTTP).
+ * Exportovaná pre testy.
+ */
+export function importOdooPricesData(data: OdooPricesResponse): OdooImportResult {
+	const valid: PriceRow[] = [];
+	let rejected = 0;
+	for (let i = 0; i < data.rows.length; i++) {
+		const r = data.rows[i];
+		if (!r || !r.kod) {
+			rejected++;
+			continue;
+		}
+		// rozvin nie je v Odoo response — vždy null (#5808 GAP)
+		const row = validateRow({ ...r, rozvin: null }, i, (m) => log.warn(`odoo-prices: ${m}`));
+		if (!row) {
+			rejected++;
+			continue;
+		}
+		valid.push(row);
+	}
+
+	const upsert = db.prepare(`
+		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, mena, sklad, rozvin, updated_at)
+		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @mena, @sklad, @rozvin, datetime('now'))
+		ON CONFLICT(kod) DO UPDATE SET
+			nakup_cennik = excluded.nakup_cennik,
+			nakup_posledna_faktura = excluded.nakup_posledna_faktura,
+			predaj_vo = excluded.predaj_vo,
+			mena = excluded.mena,
+			sklad = excluded.sklad,
+			rozvin = excluded.rozvin,
+			updated_at = excluded.updated_at
+	`);
+	const upsertMeta = db.prepare(`
+		INSERT INTO material_prices_meta (id, snapshot_generated_at, snapshot_file_mtime_ms, imported_at, row_count, rejected_count)
+		VALUES (1, ?, NULL, datetime('now'), ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			snapshot_generated_at = excluded.snapshot_generated_at,
+			snapshot_file_mtime_ms = NULL,
+			imported_at = excluded.imported_at,
+			row_count = excluded.row_count,
+			rejected_count = excluded.rejected_count
+	`);
+	db.transaction(() => {
+		for (const row of valid) upsert.run(row);
+		upsertMeta.run(data.generatedAt, valid.length, rejected);
+	})();
+
+	log.info('odoo-prices: naimportované z Odoo', { rows: valid.length, rejected });
+	return {
+		imported: true,
+		reason: 'ok',
+		rowCount: valid.length,
+		generatedAt: data.generatedAt
+	};
+}
+
+// ---- Odoo refresh cache (throttled, async) -----------------------------------
+
+/** Posledný čas úspešného Odoo importu (ms). `null` = ešte nikdy (snapshot mód). */
+let lastOdooImportMs: number | null = null;
+
+/** Min. interval medzi Odoo pull-mi (ms) — default 5 min. */
+const ODOO_REFRESH_INTERVAL_MS = parseInt(process.env.ODOO_PRICES_REFRESH_MS || '300000', 10);
+
+/**
+ * Lazy async refresh: keď je Odoo mód zapnutý a uplynul interval od posledného
+ * pull-u, stiahne čerstvé ceny na pozadí. Volá sa z `maybeImportSnapshot` ako
+ * fire-and-forget (existujúci sync flow sa NEMENÍ — SQLite cache vždy obsahuje
+ * POSLEDNÉ naimportované dáta, či už zo snapshotu alebo z Odoo).
+ */
+export function triggerOdooRefreshIfNeeded(): void {
+	if (!isOdooPricesEnabled()) return;
+	const now = Date.now();
+	if (lastOdooImportMs !== null && now - lastOdooImportMs < ODOO_REFRESH_INTERVAL_MS) return;
+	// Nastav HNEĎ aby sa ďalšie volania nespustili duplicitne (fire-and-forget)
+	lastOdooImportMs = now;
+	void importFromOdoo()
+		.then((r) => {
+			if (r.imported) {
+				lastOdooImportMs = Date.now();
+				log.info('odoo-prices: lazy refresh hotový', { rows: r.rowCount });
+			}
+		})
+		.catch((e) => {
+			log.error('odoo-prices: lazy refresh zlyhal', {
+				err: e instanceof Error ? e.message : String(e)
+			});
+		});
+}
+
+/** Test helper: reset internal state. */
+export function _resetOdooRefreshState(): void {
+	lastOdooImportMs = null;
 }
 
 export interface SnapshotMeta {

@@ -95,8 +95,8 @@
 			styl,
 			data.skla
 				.filter((g) =>
-					sys === 'Deluxe' || sys === 'Štandard +' || sys === 'Štandard'
-						? g.system === (sys === 'Štandard' ? 'Štandard +' : sys)
+					sys === 'Deluxe' || sys === 'Štandard +' || sys === 'Štandard' || sys === 'Štandard Drevo'
+						? g.system === (sys === 'Štandard' || sys === 'Štandard Drevo' ? 'Štandard +' : sys)
 						: g.system === sys || g.system === 'ALL'
 				)
 				.map((g) => g.nazov),
@@ -256,9 +256,12 @@
 	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
 	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv
 	// (aj ďalší posuv zimnej záhrady s iným systémom než primárny).
+	// #6413: systémy s defaultnou farbou (Deluxe) sú VYLÚČENÉ zo `systemyFarba` serverom.
 	let maFarbu = $derived(
 		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFarba ?? []).includes(s))
 	);
+	// #6413 att 14955: Deluxe má pevnú farbu „nerezová mušľa" (R9006) → info text namiesto selectu
+	let defaultFarbaInfo = $derived(data.defaultFarbaPreSystem?.[system] ?? null);
 	// platné RAL možnosti pre RAL <select> (#354) — zjednotenie farieb naprieč systémami
 	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), zo servera odvodených
 	// per-systém množín (Deluxe R9006/R7016 ≠ Robust/Štandard R9005/R7016).
@@ -615,6 +618,7 @@
 		{maFab}
 		{maFarbu}
 		{ralOptions}
+		{defaultFarbaInfo}
 		{maKolajnicu}
 		{maSietka}
 		{sietkaStranaVal}
