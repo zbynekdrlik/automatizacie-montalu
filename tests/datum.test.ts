@@ -31,7 +31,10 @@ function spustFreshProces(volanie: string): string {
 	try {
 		return execFileSync(
 			process.execPath,
-			['-e', `import(${JSON.stringify(pathToFileURL(subor).href)}).then(m => console.log(${volanie}))`],
+			[
+				'-e',
+				`import(${JSON.stringify(pathToFileURL(subor).href)}).then(m => console.log(${volanie}))`
+			],
 			{ env: { ...process.env, TZ: 'UTC' }, encoding: 'utf8' }
 		).trim();
 	} finally {

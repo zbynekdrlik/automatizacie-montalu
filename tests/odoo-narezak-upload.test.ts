@@ -20,7 +20,11 @@ vi.mock('../src/lib/server/zakazka-pdf', () => ({
 	zakazkaPdfFilename: () => 'test.pdf'
 }));
 
-import { buildDocId, uploadNarezakToOdoo, queueNarezakUpload } from '../src/lib/server/odoo-narezak-upload';
+import {
+	buildDocId,
+	uploadNarezakToOdoo,
+	queueNarezakUpload
+} from '../src/lib/server/odoo-narezak-upload';
 
 afterEach(() => {
 	vi.unstubAllEnvs();

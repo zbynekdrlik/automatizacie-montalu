@@ -94,8 +94,22 @@ describe('_parseOdooPricesResponse', () => {
 		const result = _parseOdooPricesResponse({
 			generatedAt: null,
 			rows: [
-				{ kod: '', nakupCennik: 1, nakupPoslednaFaktura: null, predajVo: null, mena: 'EUR', sklad: null },
-				{ kod: 'ZASP001', nakupCennik: 2, nakupPoslednaFaktura: null, predajVo: null, mena: 'EUR', sklad: null },
+				{
+					kod: '',
+					nakupCennik: 1,
+					nakupPoslednaFaktura: null,
+					predajVo: null,
+					mena: 'EUR',
+					sklad: null
+				},
+				{
+					kod: 'ZASP001',
+					nakupCennik: 2,
+					nakupPoslednaFaktura: null,
+					predajVo: null,
+					mena: 'EUR',
+					sklad: null
+				},
 				null,
 				42
 			],
@@ -109,7 +123,16 @@ describe('_parseOdooPricesResponse', () => {
 	it('defaults mena to EUR when empty', () => {
 		const result = _parseOdooPricesResponse({
 			generatedAt: null,
-			rows: [{ kod: 'ZASP001', nakupCennik: null, nakupPoslednaFaktura: null, predajVo: null, mena: '', sklad: null }],
+			rows: [
+				{
+					kod: 'ZASP001',
+					nakupCennik: null,
+					nakupPoslednaFaktura: null,
+					predajVo: null,
+					mena: '',
+					sklad: null
+				}
+			],
 			total: 1
 		});
 
@@ -152,11 +175,11 @@ describe('fetchOdooPrices', () => {
 			total: 1
 		};
 
-		setJson2Transport(async () =>
-			new Response(
-				JSON.stringify({ jsonrpc: '2.0', id: 1, result: mockResponse }),
-				{ status: 200 }
-			)
+		setJson2Transport(
+			async () =>
+				new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: mockResponse }), {
+					status: 200
+				})
 		);
 
 		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
@@ -177,11 +200,12 @@ describe('fetchOdooPrices', () => {
 	});
 
 	it('returns null on Odoo error response (graceful fallback)', async () => {
-		setJson2Transport(async () =>
-			new Response(
-				JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: 403, message: 'AccessDenied' } }),
-				{ status: 200 }
-			)
+		setJson2Transport(
+			async () =>
+				new Response(
+					JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: 403, message: 'AccessDenied' } }),
+					{ status: 200 }
+				)
 		);
 
 		const result = await fetchOdooPrices({ url: 'https://erp.test', apiKey: 'key' });

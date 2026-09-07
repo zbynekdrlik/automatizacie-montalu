@@ -66,12 +66,14 @@ async function main() {
 	const db = new Database(dbPath, { readonly: true });
 
 	// Zober unikátne (zak, op) páry z odpis_log2 — LEN LIVE odpisy (live=1).
-	const query = limit > 0
-		? `SELECT DISTINCT zak, op, zakaznik FROM odpis_log2 WHERE live = 1 ORDER BY created_at DESC LIMIT ?`
-		: `SELECT DISTINCT zak, op, zakaznik FROM odpis_log2 WHERE live = 1 ORDER BY created_at DESC`;
-	const rows: OdpisRow[] = limit > 0
-		? (db.prepare(query).all(limit) as OdpisRow[])
-		: (db.prepare(query).all() as OdpisRow[]);
+	const query =
+		limit > 0
+			? `SELECT DISTINCT zak, op, zakaznik FROM odpis_log2 WHERE live = 1 ORDER BY created_at DESC LIMIT ?`
+			: `SELECT DISTINCT zak, op, zakaznik FROM odpis_log2 WHERE live = 1 ORDER BY created_at DESC`;
+	const rows: OdpisRow[] =
+		limit > 0
+			? (db.prepare(query).all(limit) as OdpisRow[])
+			: (db.prepare(query).all() as OdpisRow[]);
 
 	console.log(`Nájdených ${rows.length} unikátnych (zak, op) párov s live odpismi.`);
 	console.log();
@@ -96,12 +98,7 @@ async function main() {
 
 			// For this backfill script, we'll call the Odoo endpoint directly using fetch,
 			// generating the PDF inline. This avoids SvelteKit alias resolution issues.
-			const result = await uploadSingle(
-				{ url: odooUrl, apiKey: odooKey },
-				db,
-				zak,
-				op
-			);
+			const result = await uploadSingle({ url: odooUrl, apiKey: odooKey }, db, zak, op);
 
 			if (result === 'uploaded') {
 				console.log(`[OK] ${zak} / ${op}`);
@@ -144,14 +141,18 @@ async function uploadSingle(
 	op: string
 ): Promise<string> {
 	// Zober najnovší odpis pre túto zákazku
-	const polozky = db.prepare(`
+	const polozky = db
+		.prepare(
+			`
 		SELECT p.kod, p.nazov, SUM(p.qty) as qty, p.mj
 		FROM odpis_polozky p
 		JOIN odpis_log2 l ON p.odpis_log_id = l.id
 		WHERE l.zak = ? AND l.live = 1
 		GROUP BY p.kod
 		ORDER BY p.nazov
-	`).all(zak) as Array<{ kod: string; nazov: string; qty: number; mj: string }>;
+	`
+		)
+		.all(zak) as Array<{ kod: string; nazov: string; qty: number; mj: string }>;
 
 	if (polozky.length === 0) {
 		return 'missing';
@@ -168,17 +169,29 @@ async function uploadSingle(
 	let y = height - 50;
 
 	page.drawText(`Rozpis materialu - zakazka ${zak}`, {
-		x: 50, y, size: 14, font: boldFont, color: rgb(0, 0, 0)
+		x: 50,
+		y,
+		size: 14,
+		font: boldFont,
+		color: rgb(0, 0, 0)
 	});
 	y -= 20;
 
 	const opNorm = op.toUpperCase().replace(/\s+/g, '');
 	page.drawText(`Objednavka: ${opNorm}`, {
-		x: 50, y, size: 10, font, color: rgb(0.3, 0.3, 0.3)
+		x: 50,
+		y,
+		size: 10,
+		font,
+		color: rgb(0.3, 0.3, 0.3)
 	});
 	y -= 10;
 	page.drawText(`Generovane: ${new Date().toISOString().slice(0, 19)} (backfill)`, {
-		x: 50, y, size: 8, font, color: rgb(0.5, 0.5, 0.5)
+		x: 50,
+		y,
+		size: 8,
+		font,
+		color: rgb(0.5, 0.5, 0.5)
 	});
 	y -= 25;
 
@@ -208,7 +221,13 @@ async function uploadSingle(
 	const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
 
 	// Doc ID — stabilný per zákazka
-	const docId = `rozpis-${zak.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 33) || 'x'}`;
+	const docId = `rozpis-${
+		zak
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '_')
+			.replace(/^_|_$/g, '')
+			.slice(0, 33) || 'x'
+	}`;
 
 	// Upload cez /json/2
 	const url = `${cfg.url.replace(/\/+$/, '')}/json/2/sale.order/montalu_narezak_upload`;
@@ -242,7 +261,10 @@ async function uploadSingle(
 	const parsed = JSON.parse(text);
 	if (parsed.error) {
 		// montalu_order_not_found = zákazka nie je v Odoo (normálne pre staré zákazky)
-		if (typeof parsed.error.message === 'string' && parsed.error.message.includes('montalu_order_not_found')) {
+		if (
+			typeof parsed.error.message === 'string' &&
+			parsed.error.message.includes('montalu_order_not_found')
+		) {
 			return 'missing';
 		}
 		throw new Error(`Odoo error: ${parsed.error.message}`);

@@ -105,37 +105,32 @@ describe('callJson2', () => {
 		setJson2Transport(async (input, init) => {
 			capturedUrl = typeof input === 'string' ? input : (input as Request).url;
 			capturedBody = init?.body as string;
-			return new Response(
-				JSON.stringify({ jsonrpc: '2.0', id: 1, result: { total: 42 } }),
-				{ status: 200 }
-			);
+			return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { total: 42 } }), {
+				status: 200
+			});
 		});
 
-		const result = await callJson2(
-			CFG,
-			'montalu.automatizacie.catalog',
-			'get_prices',
-			{ codes: ['ZASP001'] }
-		);
+		const result = await callJson2(CFG, 'montalu.automatizacie.catalog', 'get_prices', {
+			codes: ['ZASP001']
+		});
 
-		expect(capturedUrl).toBe(
-			'https://erp.test/json/2/montalu.automatizacie.catalog/get_prices'
-		);
+		expect(capturedUrl).toBe('https://erp.test/json/2/montalu.automatizacie.catalog/get_prices');
 		const body = JSON.parse(capturedBody);
 		expect(body.params.codes).toEqual(['ZASP001']);
 		expect(result).toEqual({ total: 42 });
 	});
 
 	it('returns result on success', async () => {
-		setJson2Transport(async () =>
-			new Response(
-				JSON.stringify({
-					jsonrpc: '2.0',
-					id: 1,
-					result: { attachment_id: 42, order_id: 7, version: 1, replaced: false }
-				}),
-				{ status: 200 }
-			)
+		setJson2Transport(
+			async () =>
+				new Response(
+					JSON.stringify({
+						jsonrpc: '2.0',
+						id: 1,
+						result: { attachment_id: 42, order_id: 7, version: 1, replaced: false }
+					}),
+					{ status: 200 }
+				)
 		);
 
 		const result = await callJson2(CFG, 'sale.order', 'montalu_narezak_upload', {});
@@ -143,8 +138,8 @@ describe('callJson2', () => {
 	});
 
 	it('throws OdooJson2Error on HTTP error', async () => {
-		setJson2Transport(async () =>
-			new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
+		setJson2Transport(
+			async () => new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
 		);
 
 		await expect(callJson2(CFG, 'sale.order', 'test', {})).rejects.toThrow(OdooJson2Error);
@@ -152,15 +147,16 @@ describe('callJson2', () => {
 	});
 
 	it('throws OdooJson2Error on JSON-RPC error response', async () => {
-		setJson2Transport(async () =>
-			new Response(
-				JSON.stringify({
-					jsonrpc: '2.0',
-					id: 1,
-					error: { code: 200, message: 'montalu_order_not_found: objednavka nie je v Odoo' }
-				}),
-				{ status: 200 }
-			)
+		setJson2Transport(
+			async () =>
+				new Response(
+					JSON.stringify({
+						jsonrpc: '2.0',
+						id: 1,
+						error: { code: 200, message: 'montalu_order_not_found: objednavka nie je v Odoo' }
+					}),
+					{ status: 200 }
+				)
 		);
 
 		await expect(callJson2(CFG, 'sale.order', 'montalu_narezak_upload', {})).rejects.toThrow(

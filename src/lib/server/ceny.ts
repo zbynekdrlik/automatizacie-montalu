@@ -256,11 +256,7 @@ export function importOdooPricesData(data: OdooPricesResponse): OdooImportResult
 			continue;
 		}
 		// rozvin nie je v Odoo response — vždy null (#5808 GAP)
-		const row = validateRow(
-			{ ...r, rozvin: null },
-			i,
-			(m) => log.warn(`odoo-prices: ${m}`)
-		);
+		const row = validateRow({ ...r, rozvin: null }, i, (m) => log.warn(`odoo-prices: ${m}`));
 		if (!row) {
 			rejected++;
 			continue;
@@ -332,7 +328,9 @@ export function triggerOdooRefreshIfNeeded(): void {
 			}
 		})
 		.catch((e) => {
-			log.error('odoo-prices: lazy refresh zlyhal', { err: e instanceof Error ? e.message : String(e) });
+			log.error('odoo-prices: lazy refresh zlyhal', {
+				err: e instanceof Error ? e.message : String(e)
+			});
 		});
 }
 

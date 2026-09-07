@@ -32,10 +32,7 @@ export interface NarezakUploadOutcome {
  * `doc_id` je stabilný identifikátor: `rozpis-<normZak>` (jeden rozpis per zákazka,
  * opakovaný upload ho aktualizuje, nikdy nezduplikuje).
  */
-export async function uploadNarezakToOdoo(
-	zak: string,
-	op: string
-): Promise<NarezakUploadOutcome> {
+export async function uploadNarezakToOdoo(zak: string, op: string): Promise<NarezakUploadOutcome> {
 	if (!isNarezUploadEnabled()) {
 		log.debug('narezak upload vypnutý (ODOO_NAREZ_UPLOAD_ENABLED !== 1)', { zak, op });
 		return { result: 'disabled' };
