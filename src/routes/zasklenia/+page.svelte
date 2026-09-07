@@ -120,7 +120,8 @@
 	// jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks)
 	let jednostrannaFabS = $state(false);
 	// RAL farba kovania (#338) — MENÍ Money kód (kľučka/krytka/zámok R9005 vs R7016).
-	// '' = nezvolená → engine vyhlási chybu pri systéme s farebnou položkou.
+	// '' = nezvolená → engine vyhlási chybu pri systéme BEZ defaultnej farby;
+	// systémy s defaultom (Deluxe=R9006) ju nepotrebujú (#6413 bounce 🔵3).
 	let farbaKovaniaS = $state<'' | Farba>('');
 	let system = $state('Robust');
 	let styl = $state('2K');

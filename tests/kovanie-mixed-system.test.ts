@@ -2,7 +2,6 @@
 // per-spec (defaultFarba systému, formulárová farba len pre systémy bez defaultu).
 import { describe, it, expect } from 'vitest';
 import { kovanieDoOdpisu } from '../src/lib/server/kovanie';
-import { defaultFarba } from '../src/lib/server/komponenty-cfg';
 import { buildCFG, type PosuvSpec } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
 

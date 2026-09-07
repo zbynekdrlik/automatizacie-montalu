@@ -42,7 +42,7 @@ describe('defaultFarba — #6413 att 14955 (Deluxe = nerezová mušľa)', () => 
 		expect(r.polozky.some((p) => p.kod === 'ZASK202526')).toBe(false); // stredová L R7016
 	});
 
-	it('Deluxe odpis s farba=undefined vyhlási chybu (defense in depth)', () => {
+	it('Deluxe odpis s farba=undefined: per-spec default R9006 (#6413 bounce)', () => {
 		const spec: PosuvSpec = {
 			sysStyl: 'Deluxe|2K',
 			S: 3000,
@@ -50,7 +50,22 @@ describe('defaultFarba — #6413 att 14955 (Deluxe = nerezová mušľa)', () => 
 			redukciaZero: false,
 			skloHrubka: 10
 		};
-		// Bez farby engine MUSÍ vyhlásit chybu (farbo-závislé položky nemajú variant)
+		// #6413 bounce 🟡1: kovanieDoOdpisu rieši default PER SPEC — Deluxe
+		// dostane R9006 aj keď farbaKovania je undefined (nerezová mušľa)
+		const r = kovanieDoOdpisu(cfg, [spec], false, undefined);
+		expect(r.err).toBeNull();
+		expect(r.polozky.some((p) => p.kod === 'ZASK202525')).toBe(true);
+	});
+
+	it('Robust odpis s farba=undefined vyhlási chybu (defense in depth)', () => {
+		const spec: PosuvSpec = {
+			sysStyl: 'Robust|2K',
+			S: 3000,
+			V: 2200,
+			redukciaZero: false,
+			skloHrubka: 6
+		};
+		// Robust nemá default → bez farby engine MUSÍ vyhlásit chybu
 		const r = kovanieDoOdpisu(cfg, [spec], false, undefined);
 		expect(r.err).not.toBeNull();
 	});

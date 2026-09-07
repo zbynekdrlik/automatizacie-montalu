@@ -11,7 +11,7 @@
 import { pocitajKomponenty, pocetUzaverov, zlucKomponenty } from '$lib/komponenty';
 import type { PolozkaKomponentu, Farba } from '$lib/komponenty';
 import { computeFlat, zakladPoctov, type Cfg, type PosuvSpec } from './compute';
-import { komponentyPre, KOVANIE_NEUPLNE } from './komponenty-cfg';
+import { komponentyPre, KOVANIE_NEUPLNE, defaultFarba } from './komponenty-cfg';
 import type { Polozka } from './money';
 
 /**
@@ -51,6 +51,9 @@ export function kovanieDoOdpisu(
 
 	for (const [i, spec] of specs.entries()) {
 		const system = spec.sysStyl.split('|')[0] ?? '';
+		// #6413 bounce 🟡1: farba PER SPEC — systém s defaultom (Deluxe=R9006) používa
+		// default; systém bez defaultu (Robust, Slide, Štandard) dostane formulárovú farbu.
+		const efektivnaFarba = defaultFarba(system) ?? farbaKovania;
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
 		// KOVANIE_NEUPLNE hodnota je buď pevný text (Štandard), alebo funkcia hrúbky
@@ -59,7 +62,7 @@ export function kovanieDoOdpisu(
 		// nikdy natvrdo neporovnávaj `system === 'Deluxe'`/`'Slide'`.
 		const neuplneRaw = KOVANIE_NEUPLNE[system];
 		const neuplne =
-			typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka, farbaKovania) : neuplneRaw;
+			typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka, efektivnaFarba) : neuplneRaw;
 		if (neuplne) varovania.add(neuplne);
 
 		// VEDOME sa sem neposiela `spec.sietka` — sieťka mení len profily (rám/nos/
@@ -91,7 +94,7 @@ export function kovanieDoOdpisu(
 			zakladPoctov(r),
 			uzaver ? pocetUzaverov(uzaver, spec.sysStyl) : null,
 			!jednostrannaFab,
-			farbaKovania,
+			efektivnaFarba,
 			// Deluxe krytky majú Money kód aj per hrúbka skla (#354) — rovnaký vstup,
 			// ktorý si už berie `computeFlat` vyššie na výber kladkového/klzného profilu.
 			spec.skloHrubka

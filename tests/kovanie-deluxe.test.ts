@@ -171,10 +171,12 @@ describe('tesniace kefy — súčet dĺžky kladkového/klzného × 2 (#354)', (
 });
 
 describe('RAL × hrúbka skla — fail-loud disciplína (#354)', () => {
-	it('10mm objednávka bez zvolenej farby → HLASNÁ chyba (krytka to potrebuje)', () => {
+	it('10mm objednávka bez zvolenej farby → per-spec default R9006 (#6413 bounce)', () => {
+		// #6413 bounce 🟡1: kovanieDoOdpisu rieši defaultFarba per spec — Deluxe
+		// dostane R9006 automaticky, takže žiadna farba v objednávke nie je chyba.
 		const r = kovD([specD('Deluxe|3K', 10)]);
-		expect(r.polozky).toEqual([]);
-		expect(r.err).toMatch(/farb/i);
+		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK202525')).toBeGreaterThan(0); // stredová L R9006
 	});
 
 	it('chýbajúca hrúbka skla (undefined) → HLASNÁ chyba, nikdy tichý default na 0', () => {
@@ -183,14 +185,13 @@ describe('RAL × hrúbka skla — fail-loud disciplína (#354)', () => {
 		expect(r.err).toMatch(/hrúbk/i);
 	});
 
-	it('R9005 (Robust/Štandard farba) pre 10mm Deluxe → HLASNÁ chyba, NIE tichý odpis bez krytiek (#354 review nález)', () => {
-		// R9005 nesedí na ŽIADEN 10mm Deluxe variant (len R9006/R7016) — pred review
-		// opravou by toto ticho vynechalo všetkých 6 krytiek s `err: null` (presne
-		// nedopísaný Money odpis, ktorý nikto nevidí). Musí byť chyba, nie absent.
+	it('R9005 formulárová pre 10mm Deluxe → Deluxe ignoruje, použije default R9006 (#6413 bounce)', () => {
+		// #6413 bounce 🟡1: per-spec default — Deluxe VŽDY použije R9006 (nerezová
+		// mušľa) bez ohľadu na formulárovú farbu. R9005 by sa uplatnila len pre
+		// systém bez defaultu (Robust/Štandard).
 		const r = kovD([specD('Deluxe|3K', 10)], 'R9005');
-		expect(r.polozky).toEqual([]);
-		expect(r.err).toMatch(/farb/i);
-		expect(r.err).toMatch(/R9005/);
+		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK202525')).toBeGreaterThan(0); // stredová L R9006
 	});
 
 	it('R9005 pre 6mm Deluxe → v poriadku (žiadny farebný kandidát po hrúbkovom filtri)', () => {
@@ -208,23 +209,24 @@ describe('RAL × hrúbka skla — fail-loud disciplína (#354)', () => {
 		expect(qty(r, 'ZASK202526')).toBeUndefined(); // stredová L R7016
 	});
 
-	it('R7016 pošle len R7016 variant, R9006 vôbec', () => {
+	it('R7016 formulárová pre Deluxe → Deluxe ignoruje, použije default R9006 (#6413 bounce)', () => {
+		// #6413 bounce 🟡1: Deluxe per-spec default R9006 má prednosť pred
+		// formulárovou R7016 — stredové krytky sú R9006, nie R7016.
 		const r = kovD([specD('Deluxe|3K', 10)], 'R7016');
-		expect(qty(r, 'ZASK202526')).toBeGreaterThan(0); // stredová L R7016
-		expect(qty(r, 'ZASK202525')).toBeUndefined(); // stredová L R9006
+		expect(qty(r, 'ZASK202525')).toBeGreaterThan(0); // stredová L R9006
+		expect(qty(r, 'ZASK202526')).toBeUndefined(); // stredová L R7016 — NIE
 	});
 });
 
-describe('zmiešaná zákazka Robust + Deluxe — JEDNA farbaKovania (#354 review nález 🔴)', () => {
-	// Robust používa R9005/R7016, 10mm Deluxe R9006/R7016 — DVE rôzne farebné
-	// dvojice zdieľajú jedno objednávkové pole `farbaKovania` (Robust+Standard mali
-	// do #354 tú istú dvojicu, takže tento konflikt nemohol nastať). Zvolená farba,
-	// ktorá sedí LEN jednému systému, musí zastaviť CELÝ odpis chybou — nikdy ho
-	// nesmie poslať s tichy vynechanou farebnou rodinou druhého systému.
-	it('R9005 (sedí Robustu, nesedí 10mm Deluxe) → chyba, žiadny riadok', () => {
+describe('zmiešaná zákazka Robust + Deluxe — per-spec farba (#6413 bounce 🟡1)', () => {
+	// #6413 bounce 🟡1: per-spec defaultFarba — Deluxe VŽDY dostane R9006 (nerezová
+	// mušľa), Robust dostane formulárovú farbu. Jedno objednávkové pole farbaKovania
+	// sa aplikuje LEN na systémy bez defaultu; systémy s defaultom ho ignorujú.
+	it('R9005 (sedí Robustu, Deluxe má default R9006) → OK, per-spec (#6413 bounce)', () => {
+		// #6413 bounce 🟡1: per-spec — Robust dostane R9005 (formulárová), Deluxe R9006 (default)
 		const r = kovD([specD('Robust|2K', undefined), specD('Deluxe|3K', 10)], 'R9005');
-		expect(r.polozky).toEqual([]);
-		expect(r.err).toMatch(/farb/i);
+		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK202525')).toBeGreaterThan(0); // Deluxe stredová L R9006
 	});
 
 	it('R9006 (sedí Deluxe, nesedí Robustu) → chyba, žiadny riadok', () => {
@@ -233,11 +235,13 @@ describe('zmiešaná zákazka Robust + Deluxe — JEDNA farbaKovania (#354 revie
 		expect(r.err).toMatch(/farb/i);
 	});
 
-	it('R7016 (sedí OBOM) → kompletný odpis, žiadna chyba', () => {
+	it('R7016 pre Robust + Deluxe → Robust=R7016, Deluxe=R9006 per-spec (#6413 bounce)', () => {
+		// #6413 bounce 🟡1: Robust dostane R7016 (formulárová), Deluxe R9006 (default)
 		const r = kovD([specD('Robust|2K', undefined), specD('Deluxe|3K', 10)], 'R7016');
 		expect(r.err).toBeNull();
 		expect(qty(r, 'ZASK202534')).toBeGreaterThan(0); // Robust kľučka R7016
-		expect(qty(r, 'ZASK202526')).toBeGreaterThan(0); // Deluxe stredová L R7016
+		expect(qty(r, 'ZASK202525')).toBeGreaterThan(0); // Deluxe stredová L R9006 (nie R7016)
+		expect(qty(r, 'ZASK202526')).toBeUndefined(); // Deluxe stredová L R7016 — NIE
 	});
 });
 

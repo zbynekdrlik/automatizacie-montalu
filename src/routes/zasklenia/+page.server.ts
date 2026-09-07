@@ -115,7 +115,8 @@ function jobFor(
 			// jednostranná FAB — MENÍ počet kľučiek/krytiek vložky v odpise
 			jednostrannaFab: vstup.jednostrannaFab,
 			// RAL farba kovania — MENÍ Money kód (kľučka/krytka vložky R9005 vs R7016,
-			// Štandard zámok); do histórie kvôli auditu + „Použiť znova" (#338)
+			// Štandard zámok); do histórie kvôli auditu + „Použiť znova" (#338).
+			// Systémy s defaultom (Deluxe=R9006) formulárovú farbu ignorujú (#6413).
 			farbaKovania: vstup.farbaKovania,
 			// prídavná koľajnica — MENÍ odpis (spodná koľajnica o veľkosť vyššie);
 			// bez nej by „Použiť znova" prebralo zákazku s iným odpisom, než mala
@@ -136,12 +137,10 @@ function jobFor(
  * Chyba tu MUSÍ zastaviť odoslanie: radšej žiadny odpis než polovičný.
  */
 function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?: Farba | null) {
-	// #6413: keď farbaKovania nie je zadaná (Deluxe nemá RAL dropdown), použi
-	// defaultnú farbu systému — výpočet nedostane undefined pre systém s farbou.
-	const efektivnaFarba =
-		farbaKovania ??
-		(specs.length ? defaultFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
-	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
+	// #6413 bounce 🟡1: defaultFarba sa rieši PER SPEC vnútri kovanieDoOdpisu —
+	// sem stačí posunúť surovú formulárovú farbu; systém s defaultom (Deluxe=R9006)
+	// ju ignoruje, systém bez defaultu (Robust, Štandard) ju použije.
+	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, farbaKovania ?? undefined);
 }
 
 /**

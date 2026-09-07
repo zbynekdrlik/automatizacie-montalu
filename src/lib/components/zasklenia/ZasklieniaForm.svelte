@@ -362,13 +362,16 @@
 		<!-- RAL farba kovania (#338) — vyberá Money kód farebného variantu (kľučka/
 		     krytka vložky / Štandard zámok R9005 vs R7016). Bez voľby engine vyhlási
 		     chybu, aby sa do Money nedostal zlý/žiadny farebný variant.
-		     #6413 att 14955: Deluxe má pevnú farbu (nerezová mušľa) → info text namiesto selectu. -->
+		     #6413 att 14955: Deluxe má pevnú farbu (nerezová mušľa) → info text.
+		     #6413 bounce 🟡1: zmiešané systémy — info text A select sa zobrazujú
+		     súčasne (Deluxe info + Robust select), nie výlučne. -->
 		{#if defaultFarbaInfo}
 			<div class="field" data-testid="farba-kovania-fixed">
 				<strong>Farba kovania</strong>
 				<span class="hint">nerezová mušľa ({defaultFarbaInfo})</span>
 			</div>
-		{:else if maFarbu}
+		{/if}
+		{#if maFarbu}
 			<div class="field">
 				<label for="farbaKovania">Farba kovania (RAL) — MENÍ Money kód</label>
 				<select
