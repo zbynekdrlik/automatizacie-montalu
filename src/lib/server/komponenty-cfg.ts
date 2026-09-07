@@ -383,6 +383,21 @@ export const KOVANIE_NEUPLNE: Record<
 			: 'SLIDE: madlo 200 (ZASK20258) zatiaľ NIE JE v odpise kovania — Money má na ňom 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). Doplniť ručne, kým nedostane sklad (#357).'
 };
 
+/** Systémy, kde farba kovania je PEVNE DANÁ (žiadny výber pre operátora) — Deluxe:
+ *  „pri deluxe odstrániť, len nerezová mušľa" (Patrik/Dominik, att 14955, #6413).
+ *  R9006 (bielohliníková) = nerezový look, jedina ponúkaná variant na Deluxe.
+ *  Keď tu systém je, formulár RAL dropdown SKRÝVA a engine používa túto farbu
+ *  automaticky, bez vstupu od operátora. Iné systémy (Robust/Slide/Štandard) si
+ *  farbu vyberajú v RAL selecte — sem NEPATRIA. */
+export const DEFAULT_FARBA: Partial<Record<string, Farba>> = {
+	Deluxe: 'R9006'
+};
+
+/** Defaultná farba kovania pre systém, alebo `undefined` keď systém farbu vyberá. */
+export function defaultFarba(system: string): Farba | undefined {
+	return DEFAULT_FARBA[system];
+}
+
 /** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
 export function komponentyPre(system: string): Komponent[] | null {
 	if (system === 'Robust') return KOMPONENTY_ROBUST;

@@ -37,7 +37,7 @@ import {
 	type OdpisJob
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
-import { komponentyPre } from '$lib/server/komponenty-cfg';
+import { komponentyPre, defaultFarba } from '$lib/server/komponenty-cfg';
 import type { Farba } from '$lib/komponenty';
 import {
 	enrichPolozky,
@@ -136,7 +136,11 @@ function jobFor(
  * Chyba tu MUSÍ zastaviť odoslanie: radšej žiadny odpis než polovičný.
  */
 function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?: Farba | null) {
-	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, farbaKovania ?? undefined);
+	// #6413: keď farbaKovania nie je zadaná (Deluxe nemá RAL dropdown), použi
+	// defaultnú farbu systému — výpočet nedostane undefined pre systém s farbou.
+	const efektivnaFarba =
+		farbaKovania ?? (specs.length ? defaultFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
+	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
 }
 
 /**
@@ -385,9 +389,16 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			(komponentyPre(sys) ?? []).some((k) => k.pravidlo.typ === 'naUzaverPodlaFab')
 		),
 		// systémy, ktorých kovanie má RAL farebné varianty (kľučka/krytka/zámok R9005 vs
-		// R7016) → formulár musí ponúknuť voľbu farby kovania (#338). Derivované z configu.
-		systemyFarba: systemy.filter((sys) =>
-			(komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
+		// R7016) A NEMAJÚ pevnú defaultnú farbu → formulár ponúkne voľbu farby kovania
+		// (#338, #6413 att 14955: Deluxe má defaultFarba R9006 → RAL dropdown sa skrýva).
+		systemyFarba: systemy.filter(
+			(sys) =>
+				!defaultFarba(sys) && (komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
+		),
+		// systémy s PEVNOU farbou kovania → formulár zobrazí info text namiesto selectu
+		// (#6413 att 14955 Patrik/Dominik: „pri deluxe odstrániť, len nerezová mušľa").
+		defaultFarbaPreSystem: Object.fromEntries(
+			systemy.filter((sys) => defaultFarba(sys)).map((sys) => [sys, defaultFarba(sys)!])
 		),
 		// platné RAL možnosti PER SYSTÉM (#354) — Deluxe (R9006/R7016, len 10mm je live)
 		// a Robust/Štandard (R9005/R7016) majú ROZDIELNU farebnú množinu; zdieľaný pevný
