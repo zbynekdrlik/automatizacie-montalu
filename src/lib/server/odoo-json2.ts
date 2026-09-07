@@ -118,7 +118,13 @@ export async function callJson2(
 			);
 		}
 		log.debug('json/2 volanie OK', { model, method });
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'result' in parsed && Object.keys(parsed).length === 1) {
+		if (
+			parsed &&
+			typeof parsed === 'object' &&
+			!Array.isArray(parsed) &&
+			'result' in parsed &&
+			('jsonrpc' in parsed || Object.keys(parsed).length === 1)
+		) {
 			return parsed.result;
 		}
 		return parsed as unknown;
