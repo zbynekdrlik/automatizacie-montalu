@@ -8,11 +8,7 @@
 // Výšky: lineárna interpolácia na zúžených hranách (x=24, x=1554).
 // V2 diskrepancia (48→55.5 vo výkrese) je OTVORENÁ — test overuje len šírku a uhol.
 import { describe, it, expect } from 'vitest';
-import {
-	prepocitajFixNaVyrobu,
-	FIX_PROFIL_ODPOCET,
-	type FixVyrobaVstup
-} from '../src/lib/fix';
+import { prepocitajFixNaVyrobu, FIX_PROFIL_ODPOCET, type FixVyrobaVstup } from '../src/lib/fix';
 
 describe('FIX výrobné odpočty — podklady att-15390/15391/15392 (issue 469)', () => {
 	const vstup: FixVyrobaVstup = {
