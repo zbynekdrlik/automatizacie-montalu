@@ -52,6 +52,10 @@ services:
       ODOO_LEAD_DB: ${ODOO_LEAD_DB:-}
       ODOO_LEAD_LOGIN: ${ODOO_LEAD_LOGIN:-}
       ODOO_LEAD_API_KEY: ${ODOO_LEAD_API_KEY:-}
+      # #6385: nárezový PDF upload cez /json/2 — env-gated (default OFF); hodnoty z .env na VPS
+      ODOO_JSON2_URL: ${ODOO_JSON2_URL:-}
+      ODOO_JSON2_API_KEY: ${ODOO_JSON2_API_KEY:-}
+      ODOO_NAREZ_UPLOAD_ENABLED: ${ODOO_NAREZ_UPLOAD_ENABLED:-0}
       BODY_SIZE_LIMIT: 1M
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
