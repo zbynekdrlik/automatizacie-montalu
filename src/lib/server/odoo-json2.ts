@@ -110,7 +110,13 @@ export async function callJson2(
 		// /json/2 success body = the method's return value DIRECTLY (no {result} wrapper);
 		// errors arrive as HTTP 4xx/5xx (handled above). Keep the legacy {result}/{error}
 		// shape tolerated for any JSON-RPC-style proxy in front of Odoo.
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && 'error' in parsed && parsed.error) {
+		if (
+			parsed &&
+			typeof parsed === 'object' &&
+			!Array.isArray(parsed) &&
+			'error' in parsed &&
+			parsed.error
+		) {
 			const errData = parsed.error;
 			throw new OdooJson2Error(
 				`Odoo JSON-2 error ${errData.code}: ${errData.message}`,
