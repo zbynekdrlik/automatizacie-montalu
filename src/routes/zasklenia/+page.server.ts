@@ -139,7 +139,8 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?:
 	// #6413: keď farbaKovania nie je zadaná (Deluxe nemá RAL dropdown), použi
 	// defaultnú farbu systému — výpočet nedostane undefined pre systém s farbou.
 	const efektivnaFarba =
-		farbaKovania ?? (specs.length ? defaultFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
+		farbaKovania ??
+		(specs.length ? defaultFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
 	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
 }
 
@@ -392,8 +393,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		// R7016) A NEMAJÚ pevnú defaultnú farbu → formulár ponúkne voľbu farby kovania
 		// (#338, #6413 att 14955: Deluxe má defaultFarba R9006 → RAL dropdown sa skrýva).
 		systemyFarba: systemy.filter(
-			(sys) =>
-				!defaultFarba(sys) && (komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
+			(sys) => !defaultFarba(sys) && (komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
 		),
 		// systémy s PEVNOU farbou kovania → formulár zobrazí info text namiesto selectu
 		// (#6413 att 14955 Patrik/Dominik: „pri deluxe odstrániť, len nerezová mušľa").
