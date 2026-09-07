@@ -37,6 +37,7 @@ import {
 	type OdpisJob
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
+import { computeTesnenie, computeTesneniePooled } from '$lib/tesnenie';
 import { komponentyPre, predvolenaFarba } from '$lib/server/komponenty-cfg';
 import type { Farba } from '$lib/komponenty';
 import {
@@ -455,6 +456,8 @@ export const actions = {
 		// nedalo odoslať niečo, čo appka nevie spočítať celé
 		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
+		// #342: tesnenie — dĺžka z existujúcich profilov, honest-null 4/6mm
+		const tesnenieInfo = computeTesnenie(r.material, r.system);
 		const job = jobFor(vstup, r, '', kov.polozky);
 		return {
 			step: 'nahlad' as const,
@@ -481,7 +484,8 @@ export const actions = {
 			]),
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
-			warn: kov.warn,
+			// #342: kombinuj kovanie warn + tesnenie honest-null
+			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' '),
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -515,6 +519,8 @@ export const actions = {
 		const job = jobFor(vstup, r, locals.user?.username ?? '', kov.polozky);
 		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
+			// #342: tesnenie — dĺžka z existujúcich profilov
+			const tesnenieInfo = computeTesnenie(r.material, r.system);
 			return {
 				step: 'nahlad' as const,
 				vstup,
@@ -524,7 +530,8 @@ export const actions = {
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
 				warn: [
 					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
-					kov.warn
+					kov.warn,
+					tesnenieInfo?.honestNull
 				]
 					.filter(Boolean)
 					.join(' '),
@@ -625,6 +632,11 @@ export const actions = {
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 		const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
+		// #342: tesnenie z poolovaného materiálu (všetky systémy naprieč posuvmi)
+		const tesnenieInfo = computeTesneniePooled(
+			r.material,
+			r.posuvy.map((p) => p.system)
+		);
 		const job = jobForMulti(vstup, r, '', kov.polozky);
 		return {
 			step: 'nahladMulti' as const,
@@ -649,7 +661,8 @@ export const actions = {
 				}))
 			),
 			planHash: contentHash(vstup.zak, job.polozky),
-			warn: kov.warn,
+			// #342: kombinuj kovanie warn + tesnenie honest-null
+			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' '),
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -680,6 +693,11 @@ export const actions = {
 		const job = jobForMulti(vstup, r, locals.user?.username ?? '', kov.polozky);
 		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
+			// #342: tesnenie z poolovaného materiálu
+			const tesnenieInfo = computeTesneniePooled(
+				r.material,
+				r.posuvy.map((p) => p.system)
+			);
 			return {
 				step: 'nahladMulti' as const,
 				multiVstup: vstup,
@@ -689,7 +707,8 @@ export const actions = {
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
 				warn: [
 					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
-					kov.warn
+					kov.warn,
+					tesnenieInfo?.honestNull
 				]
 					.filter(Boolean)
 					.join(' '),
