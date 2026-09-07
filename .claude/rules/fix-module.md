@@ -94,6 +94,23 @@ pergola artikle, sa BEZ reálnej FIX CAD vzorky od Dominika nedá potvrdiť. Mec
 (nenamapovaný kód → chyba). Doplnenie FIX-špecifického katalógu/CODE_MAP = follow-up so vzorkou;
 NEHÁDAŤ kódy (Money-safety).
 
+## Výrobné odpočty zo zamerania (#469) — `prepocitajFixNaVyrobu`
+
+`pocitajFix()` počíta geometriu z rozmery KONŠTRUKCIE. Operátor však zadáva rozmery
+OTVORU (zameranie). `prepocitajFixNaVyrobu()` (od #469) transformuje zameranie na
+konštrukčné rozmery: odpočíta profilové šírky (24mm/stranu = `FIX_PROFIL_ODPOCET`),
+interpoluje výšky na zúžených hranách a proporčne zúži polia.
+
+- **Konštanta je z jedného reálneho príkladu** (podklady att-15390..92, 7.9.2026):
+  zameranie 1578 → výroba 1530 = 48mm odpočet. Ak príde ďalší príklad s iným
+  odpočtom, konštantu treba refaktorovať na systém-závislú (Record<FixSystem, number>).
+- **OTVORENÁ OTÁZKA V2:** výška na pravej (nižšej) strane v podkladoch RASTIE zo
+  zamerania (48) na výkres (55.5) — lineárna interpolácia to nevysvetľuje (dá ~49.4).
+  Dominikov hovor to objasní; dovtedy appka interpoluje lineárne (sedí na ~0.5mm
+  pre vyššiu stranu, nesedí pre nižšiu).
+- Test vektor: `tests/fix-vyroba.test.ts` — KONTRAKTOVÝ (ako compute.test.ts),
+  nemeň bez re-overenia podkladov.
+
 ## Cross-modul identický-obsah dedup guard (#380) — POVINNÝ pri reuse cudzieho katalógu
 
 `writeOdpis` dedup aj #294 ledger sú kľúčované na `(modul, zak, op, live)`. Keď JEDEN modul REUSUJE
