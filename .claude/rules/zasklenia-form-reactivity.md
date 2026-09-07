@@ -115,6 +115,15 @@ Viditeľnosť polí formulára, ktoré závisia od SYSTÉMU, sa NEgate-uje hardc
 | „Farba kovania (RAL)" | `systemyFarba` | kovanie má položku s `.farba` | `maFarbu` (únia posuvov) |
 | ručná koľajnica | `systemyKolajnica` | `systemyRucnaKolajnica(cfg)` | `maKolajnicu` (primárny) |
 
+**Predvolená farba (#431 bod 1):** `predvolenaFarbaPreSystem` (server, z `PREDVOLENA_FARBA` v
+`komponenty-cfg.ts`) nesie NAVODNÚ predvoľbu pre RAL select — dnes len `{ Deluxe: 'R9006' }`.
+RAL select ostáva VIDITEĽNÝ (krytky majú 2 farebné Money kódy); predvoľba sa predvyplní
+v `$effect` na `+page.svelte` keď je `farbaKovaniaS` prázdna (prepnutie systému / čerstvý
+štart). Operátor ju môže kedykoľvek zmeniť na R7016. `kovanieMuslaHint` (hint „nerezová
+mušľa" vedľa RAL selectu) je derivovaný z existencie `predvolenaFarbaPreSystem[system]`.
+`kovanieFor()` v `+page.server.ts` má defense fallback na `predvolenaFarba()` — loguje
+warn keď sa použije (stale tab / forged POST).
+
 **Dôsledok (#431):** FAB checkbox sa NEriadi „má systém kovanie?" — Deluxe/Slide/Štandard
 kovanie DO Money majú, ale FAB položky (`naUzaverPodlaFab`) NIE, takže tam checkbox nič
 nemenil a je skrytý. Starý gate `maKovanie`/`systemyKovanie` (= `komponentyPre(sys)!==null`)
