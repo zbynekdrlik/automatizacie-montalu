@@ -127,7 +127,7 @@ export async function callJson2(
 		) {
 			return parsed.result;
 		}
-		return parsed as unknown;
+		return parsed;
 	} finally {
 		clearTimeout(timer);
 	}
