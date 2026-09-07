@@ -25,7 +25,10 @@ const B2B_FORBIDDEN_PREFIXES = [
 	// #282: interný prehľad zákazníckych dopytov z konfigurátora — INTERNÉ-only
 	// (kontaktné údaje + súhrn + re-download PDF). Pokrýva aj /dopyty-konfigurator/pdf
 	// (GET endpoint) prefixom. b2b sem nemá prístup; drift guard to vynúti.
-	'/dopyty-konfigurator'
+	'/dopyty-konfigurator',
+	// plán rezov (#482) — univerzálny optimalizátor rezov z CAD tabuľky,
+	// interný nástroj (Dominik — brány), bez Money odpisu; drift guard
+	'/plan-rezov'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —

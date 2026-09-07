@@ -88,6 +88,8 @@
 			? ([
 					// samostatný nárezový optimalizátor (#212) — kalkulačka bez Money odpisu
 					{ href: '/optimalizator', label: 'Optimalizátor' },
+					// plán rezov (#482) — univerzálny optimalizátor z CAD tabuľky, bez Money
+					{ href: '/plan-rezov', label: 'Plán rezov' },
 					// #376 stage 1: emoji preč z nav labelov. Žiadny E2E neasertuje presný text
 					// s emoji (overené grepom pred úpravou #376), h1 na /zasklenia/nastavenia
 					// (⚙ Vzorce — nastavenia rezov) je stránkový nadpis, nie nav.

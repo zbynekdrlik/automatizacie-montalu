@@ -90,7 +90,7 @@
 </svg>
 
 <div class="rozpis">
-	{#each material.filter((m) => m.tyce > 0) as m (m.kod)}
+	{#each material.filter((m) => m.tyce > 0) as m (m.kod || m.nazov)}
 		<!-- m.sikmyRez rozhoduje server per profil; `?? true` je obranný fallback pre
 		     prípadné staré dáta bez tohto poľa (45° = historický default väčšiny profilov) -->
 		{@const sikmy = m.sikmyRez ?? true}
