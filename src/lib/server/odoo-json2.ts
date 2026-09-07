@@ -1,4 +1,4 @@
-// Odoo 19 External JSON-2 API klient (#6385 noha 2).
+// Odoo 19 External JSON-2 API klient (#6385 noha 2, #5808 noha 3).
 //
 // ODOO_JSON2_URL       — base URL Odoo inštancie (napr. https://erp.montalu.cloud)
 // ODOO_JSON2_API_KEY   — bearer API kľúč (api-key z Odoo Settings → API Keys)
@@ -9,12 +9,21 @@
 //
 // BEZSTAVOVÝ: žiadny uid cache, žiadna session — každý request nesie bearer hlavičku.
 // Timeout 15 s (rovnaký rad ako XML-RPC klient v odoo-rpc.ts).
+//
+// Reusable pre VŠETKY json/2 volania (get_prices, narezak_upload, budúca migrácia).
+import { logger } from './log';
+
+const log = logger('odoo-json2');
+
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 export interface OdooJson2Config {
 	url: string;
 	apiKey: string;
 }
+
+/** Backward-compat alias pre #5808 (odoo-prices.ts). */
+export type Json2Config = OdooJson2Config;
 
 /** Prečíta JSON-2 env; chýba ktorákoľvek → `null` (integrácia vypnutá). */
 export function odooJson2Config(): OdooJson2Config | null {
@@ -24,6 +33,9 @@ export function odooJson2Config(): OdooJson2Config | null {
 	return { url, apiKey };
 }
 
+/** Backward-compat alias pre #5808. */
+export const json2Config = odooJson2Config;
+
 /** Feature flag pre nárezák upload — default OFF kým sa na PROD neuvedie. */
 export function isNarezUploadEnabled(): boolean {
 	return process.env.ODOO_NAREZ_UPLOAD_ENABLED === '1';
@@ -31,7 +43,7 @@ export function isNarezUploadEnabled(): boolean {
 
 export class OdooJson2Error extends Error {
 	status: number;
-	constructor(message: string, status: number) {
+	constructor(message: string, status: number = 0) {
 		super(message);
 		this.name = 'OdooJson2Error';
 		this.status = status;
@@ -103,6 +115,7 @@ export async function callJson2(
 				errData.code
 			);
 		}
+		log.debug('json/2 volanie OK', { model, method });
 		return parsed.result;
 	} finally {
 		clearTimeout(timer);

@@ -2,10 +2,12 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
 	callJson2,
 	odooJson2Config,
+	json2Config,
 	isNarezUploadEnabled,
 	setJson2Transport,
 	OdooJson2Error,
-	type OdooJson2Config
+	type OdooJson2Config,
+	type Json2Config
 } from '../src/lib/server/odoo-json2';
 
 const CFG: OdooJson2Config = { url: 'https://erp.test', apiKey: 'test-key-123' };
@@ -33,6 +35,12 @@ describe('odooJson2Config', () => {
 		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
 		vi.stubEnv('ODOO_JSON2_API_KEY', '');
 		expect(odooJson2Config()).toBeNull();
+	});
+
+	it('json2Config alias works identically', () => {
+		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
+		vi.stubEnv('ODOO_JSON2_API_KEY', 'abc');
+		expect(json2Config()).toEqual(odooJson2Config());
 	});
 });
 
@@ -88,6 +96,34 @@ describe('callJson2', () => {
 		expect(body.params.order_number).toBe('OP2024001');
 		expect(body.params.doc_id).toBe('plan-1');
 		expect(body.params.kind).toBe('narezak');
+	});
+
+	it('sends get_prices request correctly (#5808)', async () => {
+		let capturedUrl = '';
+		let capturedBody = '';
+
+		setJson2Transport(async (input, init) => {
+			capturedUrl = typeof input === 'string' ? input : (input as Request).url;
+			capturedBody = init?.body as string;
+			return new Response(
+				JSON.stringify({ jsonrpc: '2.0', id: 1, result: { total: 42 } }),
+				{ status: 200 }
+			);
+		});
+
+		const result = await callJson2(
+			CFG,
+			'montalu.automatizacie.catalog',
+			'get_prices',
+			{ codes: ['ZASP001'] }
+		);
+
+		expect(capturedUrl).toBe(
+			'https://erp.test/json/2/montalu.automatizacie.catalog/get_prices'
+		);
+		const body = JSON.parse(capturedBody);
+		expect(body.params.codes).toEqual(['ZASP001']);
+		expect(result).toEqual({ total: 42 });
 	});
 
 	it('returns result on success', async () => {
@@ -146,5 +182,19 @@ describe('callJson2', () => {
 	it('throws on invalid JSON response', async () => {
 		setJson2Transport(async () => new Response('not json at all', { status: 200 }));
 		await expect(callJson2(CFG, 'sale.order', 'test', {})).rejects.toThrow(/nevalidný JSON/);
+	});
+
+	it('OdooJson2Error.status defaults to 0', () => {
+		const err = new OdooJson2Error('test');
+		expect(err.status).toBe(0);
+		expect(err.message).toBe('test');
+	});
+});
+
+describe('backward-compat types (#5808)', () => {
+	it('Json2Config is assignable to OdooJson2Config', () => {
+		const cfg: Json2Config = { url: 'https://erp.test', apiKey: 'k' };
+		const _check: OdooJson2Config = cfg;
+		expect(_check.url).toBe('https://erp.test');
 	});
 });
