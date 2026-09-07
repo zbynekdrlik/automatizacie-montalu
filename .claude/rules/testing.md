@@ -8,6 +8,22 @@ paths:
 
 # Testing (unit + E2E) — local run gotchas
 
+## E2E: ALWAYS use `goto(page, '/path')` from `e2e/helpers.ts`, NEVER bare `page.goto('/path')` (#482)
+
+Every `page.goto()` in an E2E spec MUST go through the `goto(page, path)` helper from
+`e2e/helpers.ts` — it calls `waitHydrated()` after navigation. Bare `page.goto()` skips
+the hydration wait. In CI (local preview build, fast loopback) this never matters — JS
+loads instantly. Over a slow SSH tunnel (post-deploy E2E against `BASE_URL`), the JS
+bundle arrives late, and without `waitHydrated()`:
+- `use:enhance` is NOT yet attached → form submits do a full POST → full-page reload
+  resets local `$state` → `vysledok`/`chyba` testids never appear.
+- Svelte `bind:value` wipes filled inputs back to their initial `$state` default.
+
+This caused 3 of 4 plan-rezov E2E tests to fail ONLY against live prod (CI run
+34124362550). The fix was importing `goto` from helpers and replacing all bare
+`page.goto()` calls. The pattern is `loginAs(page)` (which already uses the helper
+internally) followed by `goto(page, '/target-route')` — never `page.goto('/...')`.
+
 ## User-facing label rename MUST update `e2e/` in the SAME commit — local gates never catch it (#468)
 
 A rename of user-facing text (button/badge/error-message labels) that only touches
