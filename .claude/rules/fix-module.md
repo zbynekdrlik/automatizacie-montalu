@@ -96,20 +96,27 @@ NEHÁDAŤ kódy (Money-safety).
 
 ## Výrobné odpočty zo zamerania (#469) — `prepocitajFixNaVyrobu`
 
-`pocitajFix()` počíta geometriu z rozmery KONŠTRUKCIE. Operátor však zadáva rozmery
+`pocitajFix()` počíta geometriu z rozmerov KONŠTRUKCIE. Operátor však zadáva rozmery
 OTVORU (zameranie). `prepocitajFixNaVyrobu()` (od #469) transformuje zameranie na
 konštrukčné rozmery: odpočíta profilové šírky (24mm/stranu = `FIX_PROFIL_ODPOCET`),
-interpoluje výšky na zúžených hranách a proporčne zúži polia.
+V1/V2 prenáša nezmenené (dv sa zachováva cez zúženú šírku).
 
-- **Konštanta je z jedného reálneho príkladu** (podklady att-15390..92, 7.9.2026):
-  zameranie 1578 → výroba 1530 = 48mm odpočet. Ak príde ďalší príklad s iným
-  odpočtom, konštantu treba refaktorovať na systém-závislú (Record<FixSystem, number>).
-- **OTVORENÁ OTÁZKA V2:** výška na pravej (nižšej) strane v podkladoch RASTIE zo
-  zamerania (48) na výkres (55.5) — lineárna interpolácia to nevysvetľuje (dá ~49.4).
-  Dominikov hovor to objasní; dovtedy appka interpoluje lineárne (sedí na ~0.5mm
-  pre vyššiu stranu, nesedí pre nižšiu).
-- Test vektor: `tests/fix-vyroba.test.ts` — KONTRAKTOVÝ (ako compute.test.ts),
-  nemeň bez re-overenia podkladov.
+- **Šírkový odpočet je PRESNÝ** (podklady att-15390..92, 7.9.2026):
+  `hypot(1530, 89) = 1532.6` a `atan(89/1530) = 3.3°` — obe presne sedí s výkresom.
+  Konštanta 24mm/stranu je z jedného príkladu; ak príde ďalší s iným odpočtom,
+  refaktoruj na systém-závislú (Record<FixSystem, number>).
+- **DVE OTVORENÉ OTÁZKY (Dominikov hovor):**
+  1. **Vertikálny offset:** výkresové výšky 136.2/55.5 sú na DETAIL A/B referenčných
+     bodoch profilových prierezov, nie na rohoch lichobežníka. V1/V2 prechádzajú
+     nezmenené (dv zachovaný); čo presne sú tie DETAIL referencie, objasní Dominik.
+  2. **Multi-field zúženie:** z jedného príkladu (1 pole) sa nedá potvrdiť, či je
+     proporčné (pomer zachovaný) alebo shift-based (krajné −odpočet, vnútorné bez
+     zmeny — analógia `.claude/rules/fix-module.md` n=2 lesson). Proporčné je zatiaľ
+     predpoklad — NEEXTRAPOLUJ bez overenia (tá istá pasca ako #85 n=2).
+- **Funkcia zatiaľ NIE JE zapojená v UI** — `/fix` stále volá `pocitajFix()` priamo.
+  Zapojenie je gated na Dominikove odpovede.
+- Test vektor: `tests/fix-vyroba.test.ts` — kontraktový pre šírku, uhol a šikmú hranu
+  (presné hodnoty). Vertikálny offset a multi-field model sa ZMENIA po Dominikovi.
 
 ## Cross-modul identický-obsah dedup guard (#380) — POVINNÝ pri reuse cudzieho katalógu
 

@@ -325,32 +325,26 @@ export interface FixVyrobaVstup {
  * Prepočíta zameranie (rozmery otvoru) na VÝROBNÉ rozmery konštrukcie.
  *
  * Šírka: S_vyr = S − 2×odpočet (profily z oboch strán).
- * Výšky: lineárna interpolácia pôvodnej šikmej hrany na zúžených hranách:
- *   konštrukcia začína na x=odpočet a končí na x=S−odpočet (v súradnicovom
- *   systéme zamerania), takže V na krajoch konštrukcie = V_interp(odpočet)
- *   a V_interp(S−odpočet).
- * Polia: proporčne zúžené na nový S_vyr.
+ * Výšky: V1, V2 sa prenášajú NEZMENENÉ — výškový rozdiel (dv = V2 − V1) sa
+ *   zachováva cez zúženú šírku. Podklady (att-15392) to potvrdzujú presne:
+ *   hypot(1530, 89) = 1532.6 a atan(89/1530) = 3.3° — obe PRESNE sedí
+ *   s výrobným výkresom, na rozdiel od interpolácie (1532.4 / 3.2°).
+ *   Výkresové výšky 136.2/55.5 sú merané k DETAIL A/B referenčným bodom
+ *   profilových prierezov, NIE k rohom lichobežníka — vertikálny offset
+ *   je OTVORENÁ OTÁZKA pre Dominikov hovor.
  *
- * OTVORENÁ OTÁZKA (issue 469): výškový odpočet je z jedného príkladu
- * neúplne determinovaný — V2 zo zamerania (48) → výkres (55.5) rastie,
- * čo lineárna interpolácia nevysvetľuje. Dominikov hovor to objasní.
- * Zatiaľ interpolácia — sedí na ~0.5mm pre V1, nesedí pre V2.
+ * Polia: proporčne zúžené na nový S_vyr. OTVORENÁ OTÁZKA (issue 469):
+ *   z jedného príkladu (1 pole) sa nedá potvrdiť, či multi-field zúženie
+ *   je proporčné (zachováva pomery) alebo shift-based (krajné −odpočet,
+ *   vnútorné nezmenené — analógia s rozpocitajPodlaPosuvu). Dominikov hovor.
+ *
+ * Predpoklady (caller-validated): odpocet ≥ 0, S > 2×odpocet.
  */
 export function prepocitajFixNaVyrobu(vstup: FixVyrobaVstup): FixVykres {
 	const { S, V1, V2, polia, odpocet = FIX_PROFIL_ODPOCET } = vstup;
 
-	if (odpocet <= 0) {
-		// žiadny odpočet — passthrough na čistú geometriu
-		return pocitajFix(S, V1, V2, polia);
-	}
-
 	// výrobná šírka
 	const S_vyr = R1(S - 2 * odpocet);
-
-	// výšky na krajoch zúženej konštrukcie (lineárna interpolácia)
-	const dv = V2 - V1;
-	const V1_vyr = R1(V1 + (dv * odpocet) / S);
-	const V2_vyr = R1(V1 + (dv * (S - odpocet)) / S);
 
 	// polia: proporčné zúženie (zachováme pomer šírok)
 	const sucet = polia.reduce((a, b) => a + b, 0);
@@ -368,5 +362,6 @@ export function prepocitajFixNaVyrobu(vstup: FixVyrobaVstup): FixVykres {
 		}
 	}
 
-	return pocitajFix(S_vyr, V1_vyr, V2_vyr, poliaVyr);
+	// V1, V2 nezmenené — dv sa zachováva cez zúženú šírku (review H1, presný match)
+	return pocitajFix(S_vyr, V1, V2, poliaVyr);
 }
