@@ -22,7 +22,7 @@ export interface PlanRezovVstup {
 
 // Horné stropy — prevencia OOM (ffdPack rozbaľuje ks na kusy, O(n^2))
 const MAX_RIADKOV = 5_000;
-const MAX_KUSOV_SPOLU = 50_000;
+const MAX_KUSOV_SPOLU = 20_000; // rovnaký strop ako /optimalizator (ffdPack O(n^2))
 const MAX_DLZKA_REZU = 1_000_000; // mm (1 km)
 
 /** Číslo z textu: čiarka → bodka, medzery preč (napr. "6 000" → 6000, "2834,5" → 2834.5). */
@@ -79,11 +79,10 @@ export function parsePlanRezov(text: string): { riadky: PlanRezovRiadok[]; presk
  * Tab-separovaný riadok. Stĺpce môžu byť:
  *   Číslo Názov | ks | Rez [mm] | výdaj (m) — extra stĺpce ignorované
  *   Číslo | Názov | ks | Rez [mm] | ...
- * Heuristika: hľadáme DVA SUSEDNÉ tab-stĺpce, ktoré sú obe čísla, kde
- * prvý z nich (ks) je „malý" (≤ 5000) a druhý (rez mm) > 0. Skenujeme od
- * konca a nájdeme POSLEDNÝ taký pár — tým preskočíme číslo v názve profilu
- * (napr. "10001 STABILIZAČNÝ PROFIL 100X50") a ignorujeme extra stĺpce za rezom.
- * Všetko pred ks stĺpcom je názov.
+ * Heuristika: skenujeme od indexu 1 (index 0 = názov, môže obsahovať číslo ako
+ * "10001 STABILIZAČNÝ PROFIL 100X50") a hľadáme PRVÝ pár susedných stĺpcov, kde
+ * oba sú kladné čísla a prvý (ks) je celý. Stĺpce za rezom (výdaj materiálu) sa
+ * ignorujú. Všetko pred ks stĺpcom je názov.
  */
 function parseTsvRiadok(parts: string[]): PlanRezovRiadok | null {
 	if (parts.length < 2) return null;
@@ -149,10 +148,10 @@ function parseSpaceRiadok(line: string): PlanRezovRiadok | null {
 	return { nazov, ks, rezMm };
 }
 
-/** Validácia FormData → PlanRezovVstup alebo chybová hláška. */
+/** Validácia FormData → PlanRezovVstup + preskočené riadky, alebo chybová hláška. */
 export function parsePlanRezovFormData(
 	fd: FormData
-): { vstup: PlanRezovVstup } | { error: string } {
+): { vstup: PlanRezovVstup; preskocene: string[] } | { error: string } {
 	const dlzkaTyceRaw = String(fd.get('dlzkaTyce') ?? '').trim();
 	const dlzkaTyce = cislo(dlzkaTyceRaw);
 	if (!Number.isFinite(dlzkaTyce) || dlzkaTyce <= 0) {
@@ -202,5 +201,5 @@ export function parsePlanRezovFormData(
 		}
 	}
 
-	return { vstup: { dlzkaTyce, reznaMedzera, riadky } };
+	return { vstup: { dlzkaTyce, reznaMedzera, riadky }, preskocene };
 }

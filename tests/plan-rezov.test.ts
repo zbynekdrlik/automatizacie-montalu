@@ -146,7 +146,7 @@ describe('spocitajPlanRezov — vzorové dáta z brán (6000 mm tyče)', () => {
 		expect(p.material.tyce).toBe(2);
 	});
 
-	it('AL_50x30x2 — 4 tyče pri 6000 mm (rezy do ~2000 = max 3 per tyč)', () => {
+	it('AL_50x30x2 — 3 tyče pri 6000 mm (rezy do ~2000 = max 3 per tyč)', () => {
 		const v = spocitajPlanRezov({ dlzkaTyce: 6000, reznaMedzera: 4, riadky });
 		const p = v.profily[2]!;
 		// 8 ks: 4×1975 + 4×1865; FFD desc: 1975,1975,1975,1975,1865,1865,1865,1865
@@ -181,10 +181,27 @@ describe('spocitajPlanRezov — 7500 mm tyče', () => {
 		{ nazov: '10001 STABILIZAČNÝ PROFIL 100X50', ks: 2, rezMm: 1350 }
 	];
 
-	it('7500 mm tyče = menej tyčí ako 6000', () => {
+	it('6000 mm = 6 tyčí, 7500 mm = 5 tyčí (exact FFD vectors)', () => {
 		const v6 = spocitajPlanRezov({ dlzkaTyce: 6000, reznaMedzera: 4, riadky });
 		const v7 = spocitajPlanRezov({ dlzkaTyce: 7500, reznaMedzera: 4, riadky });
-		expect(v7.tyceSpolu).toBeLessThanOrEqual(v6.tyceSpolu);
+		expect(v6.tyceSpolu).toBe(6);
+		expect(v7.tyceSpolu).toBe(5);
+	});
+});
+
+describe('spocitajPlanRezov — zoskupenie rovnakých rezov', () => {
+	it('dva riadky s rovnakým profilom a dĺžkou sa zlúčia (2+3 = 5 ks)', () => {
+		const riadky = [
+			{ nazov: 'PROFIL X', ks: 2, rezMm: 1500 },
+			{ nazov: 'PROFIL X', ks: 3, rezMm: 1500 }
+		];
+		const v = spocitajPlanRezov({ dlzkaTyce: 6000, reznaMedzera: 4, riadky });
+		expect(v.profily.length).toBe(1);
+		const p = v.profily[0]!;
+		// rezy pole má len 1 záznam (zlúčené)
+		expect(p.material.rezy.length).toBe(1);
+		expect(p.material.rezy[0]!.ks).toBe(5);
+		expect(p.material.rezy[0]!.rozmer).toBe(1500);
 	});
 });
 
