@@ -243,6 +243,13 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	it('#282: /dopyty-konfigurator/pdf (PDF endpoint) JE presmerovaný preč', () => {
 		expect(b2bRedirectTarget('/dopyty-konfigurator/pdf')).toBe('/zasklenia');
 	});
+
+	// #482: plán rezov — univerzálny optimalizátor rezov z CAD tabuľky, interné-only
+	// (Dominik, brány), bez Money odpisu. V B2B_FORBIDDEN_PREFIXES → generický it.each
+	// vyššie to už pokrýva; toto je čitateľné explicitné potvrdenie.
+	it('#482: /plan-rezov (plán rezov z CAD, interné-only) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/plan-rezov')).toBe('/zasklenia');
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k

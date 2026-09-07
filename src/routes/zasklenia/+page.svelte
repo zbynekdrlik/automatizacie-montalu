@@ -256,12 +256,14 @@
 	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
 	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv
 	// (aj ďalší posuv zimnej záhrady s iným systémom než primárny).
-	// #6413: systémy s defaultnou farbou (Deluxe) sú VYLÚČENÉ zo `systemyFarba` serverom.
+	// #431 bod 1: Deluxe JE zahrnutý (krytky majú 2 farebné Money kódy R9006/R7016).
 	let maFarbu = $derived(
 		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFarba ?? []).includes(s))
 	);
-	// #6413 att 14955: Deluxe má pevnú farbu „nerezová mušľa" (R9006) → info text namiesto selectu
-	let defaultFarbaInfo = $derived(data.defaultFarbaPreSystem?.[system] ?? null);
+	// #431 bod 1: kovanie Deluxe = nerezová mušľa (hint vedľa RAL selectu)
+	let kovanieMuslaHint = $derived(
+		data.predvolenaFarbaPreSystem?.[system] ? 'nerezová mušľa' : null
+	);
 	// platné RAL možnosti pre RAL <select> (#354) — zjednotenie farieb naprieč systémami
 	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), zo servera odvodených
 	// per-systém množín (Deluxe R9006/R7016 ≠ Robust/Štandard R9005/R7016).
@@ -275,10 +277,15 @@
 	// zvolená farba, ktorá je pre AKTUÁLNU množinu neplatná (napr. R9005 z Robustu
 	// po prepnutí na Deluxe, ktorý ponúka len R9006/R7016) sa zahodí — inak by
 	// bola vidno v selecte prázdna, ale mohla by v `farbaKovaniaS` ostať trčať
-	// neplatná hodnota (#354; do #354 všetky farebné systémy zdieľali JEDNU
-	// množinu R9005/R7016, takže tento prípad dovtedy nemohol nastať).
+	// neplatná hodnota (#354). Po vyčistení sa predvyplní predvolená farba systému
+	// (#431 bod 1: R9006 pre Deluxe — krytky majú 2 farby, kovanie = nerez mušľa).
 	$effect(() => {
 		if (farbaKovaniaS && !ralOptions.includes(farbaKovaniaS)) farbaKovaniaS = '';
+		// predvyplň predvolenú farbu keď je prázdna (prepnutie systému / čerstvý štart)
+		if (!farbaKovaniaS) {
+			const sugg = data.predvolenaFarbaPreSystem?.[system];
+			if (sugg && ralOptions.includes(sugg)) farbaKovaniaS = sugg;
+		}
 	});
 	let maKolajnicu = $derived(kolajnicaPre(system));
 	$effect(() => {
@@ -618,7 +625,7 @@
 		{maFab}
 		{maFarbu}
 		{ralOptions}
-		{defaultFarbaInfo}
+		{kovanieMuslaHint}
 		{maKolajnicu}
 		{maSietka}
 		{sietkaStranaVal}

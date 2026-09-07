@@ -32,6 +32,11 @@ zakaždým odznova hľadať:
   `m.barLen ?? bar` v komponente).
 - **Money-neutrálne:** odpad je čisto display — žiadny `writeOdpis`, žiadny import
   `server/money`, žiadne katalógové kódy/ceny. `odpad.ts` sa preto NESMIE dotknúť Money.
+- **RozpisRezov each-key: `(m.kod || m.nazov)` (#482 review nález).** `{#each}` je
+  kľúčovaný cez `(m.kod || m.nazov)`. Konzument s prázdnym `kod` (display-only modul
+  bez Money kódov, napr. `/plan-rezov`) a 2+ profilmi by bez fallbacku na `nazov` hodil
+  Svelte `each_key_duplicate` v prode. Existujúci Money konzumenti (zasklenia, pergola,
+  optimalizátor) majú vždy neprázdny `kod`, takže fallback na `nazov` sa u nich neuplatní.
 - **Odoo evidencia (#417 fáza 2) = `odpis_odpad` DB tabuľka + sekcia v Odoo log-note.**
   Form akcia zasklenia po úspešnom `writeOdpis` zavolá `saveOdpisOdpad(zak, op, material)`
   (`odpad-store.ts`), ktorý uloží per-profil offcut do tabuľky `odpis_odpad` (FK CASCADE

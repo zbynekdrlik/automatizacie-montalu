@@ -37,7 +37,7 @@ import {
 	type OdpisJob
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
-import { komponentyPre, defaultFarba } from '$lib/server/komponenty-cfg';
+import { komponentyPre, predvolenaFarba } from '$lib/server/komponenty-cfg';
 import type { Farba } from '$lib/komponenty';
 import {
 	enrichPolozky,
@@ -136,11 +136,19 @@ function jobFor(
  * Chyba tu MUSÍ zastaviť odoslanie: radšej žiadny odpis než polovičný.
  */
 function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?: Farba | null) {
-	// #6413: keď farbaKovania nie je zadaná (Deluxe nemá RAL dropdown), použi
-	// defaultnú farbu systému — výpočet nedostane undefined pre systém s farbou.
+	// #431: defense fallback — ak farbaKovania nie je zadaná, použi predvolenú farbu
+	// systému (R9006 pre Deluxe). Normálne formulár farbu pošle (RAL select je
+	// viditeľný), toto je len ochrana proti chybe (stale tab / forged POST).
 	const efektivnaFarba =
 		farbaKovania ??
-		(specs.length ? defaultFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
+		(specs.length ? predvolenaFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
+	if (!farbaKovania && efektivnaFarba) {
+		const sys = specs[0]!.sysStyl.split('|')[0] ?? '';
+		logger('zasklenia').warn('kovanie fallback: farbaKovania chýba, použitá predvolená', {
+			system: sys,
+			predvolena: efektivnaFarba
+		});
+	}
 	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
 }
 
@@ -390,15 +398,16 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			(komponentyPre(sys) ?? []).some((k) => k.pravidlo.typ === 'naUzaverPodlaFab')
 		),
 		// systémy, ktorých kovanie má RAL farebné varianty (kľučka/krytka/zámok R9005 vs
-		// R7016) A NEMAJÚ pevnú defaultnú farbu → formulár ponúkne voľbu farby kovania
-		// (#338, #6413 att 14955: Deluxe má defaultFarba R9006 → RAL dropdown sa skrýva).
-		systemyFarba: systemy.filter(
-			(sys) => !defaultFarba(sys) && (komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
+		// R7016) → formulár ponúkne voľbu farby kovania (#338). Derivované z configu.
+		// #431 bod 1: Deluxe JE zahrnutý — krytky majú 2 farebné Money kódy (R9006/R7016),
+		// aj keď kovanie (mušľa) je nerez. Predvolená farba je len PREDVOĽBA v selecte.
+		systemyFarba: systemy.filter((sys) =>
+			(komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
 		),
-		// systémy s PEVNOU farbou kovania → formulár zobrazí info text namiesto selectu
-		// (#6413 att 14955 Patrik/Dominik: „pri deluxe odstrániť, len nerezová mušľa").
-		defaultFarbaPreSystem: Object.fromEntries(
-			systemy.filter((sys) => defaultFarba(sys)).map((sys) => [sys, defaultFarba(sys)!])
+		// systémy s PREDVOLENOU farbou → klient predvyplní RAL select (nie fixne skryje)
+		// (#431 bod 1, Patrik msg 1801337: krytky = 2 farby, kovanie = len nerezová mušľa).
+		predvolenaFarbaPreSystem: Object.fromEntries(
+			systemy.filter((sys) => predvolenaFarba(sys)).map((sys) => [sys, predvolenaFarba(sys)!])
 		),
 		// platné RAL možnosti PER SYSTÉM (#354) — Deluxe (R9006/R7016, len 10mm je live)
 		// a Robust/Štandard (R9005/R7016) majú ROZDIELNU farebnú množinu; zdieľaný pevný
