@@ -478,7 +478,7 @@ export function migrateDrevostavby(db: Database.Database, bump: (v: number) => v
 		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cfg_rez'").get() !==
 		undefined;
 	if (!maCfgSys || !maCfgRez) {
-		db.pragma('user_version = 40');
+		bump(40);
 		return;
 	}
 	const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');

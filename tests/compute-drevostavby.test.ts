@@ -38,7 +38,8 @@ describe('Štandard Drevo|4K — cfg_seed formulas vs Excel template', () => {
 		expect(result).not.toBeNull();
 	});
 
-	if (!result) return; // TS narrowing
+	// TS narrowing — throw ensures the 12 tests below always register
+	if (!result) throw new Error('computeFlat returned null — tests cannot continue');
 
 	it('sklo dimensions match Excel (priečka-split height)', () => {
 		// Excel: šírka skla = 1323.5 → rounded to 1324 (whole mm)
