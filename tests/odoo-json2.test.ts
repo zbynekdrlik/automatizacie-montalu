@@ -118,7 +118,7 @@ describe('callJson2', () => {
 
 		expect(capturedUrl).toBe('https://erp.test/json/2/montalu.automatizacie.catalog/get_prices');
 		const body = JSON.parse(capturedBody);
-		expect(body.params.codes).toEqual(['ZASP001']);
+		expect(body.codes).toEqual(['ZASP001']);
 		expect(result).toEqual({ total: 42 });
 	});
 
