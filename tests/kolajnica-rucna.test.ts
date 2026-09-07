@@ -43,8 +43,13 @@ describe('rolaKolajnice — rola profilu z jeho názvu', () => {
 });
 
 describe('systemyRucnaKolajnica — kde to má zmysel', () => {
-	it('LEN systémy s oddelenou hornou + spodnou: Deluxe, Štandard +, Štandard', () => {
-		expect(systemyRucnaKolajnica(cfg).sort()).toEqual(['Deluxe', 'Štandard', 'Štandard +']);
+	it('LEN systémy s oddelenou hornou + spodnou: Deluxe, Štandard +, Štandard, Štandard Drevo', () => {
+		expect(systemyRucnaKolajnica(cfg).sort()).toEqual([
+			'Deluxe',
+			'Štandard',
+			'Štandard +',
+			'Štandard Drevo'
+		]);
 	});
 
 	it('Robust ani Slide tam nie sú (jedna obvodová koľajnica) — Patrik', () => {

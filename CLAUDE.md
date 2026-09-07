@@ -91,6 +91,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - version bump mechanics (tabs/#161) + `-dev`-on-`main` recovery (#98/#174) → `.claude/rules/version-bump.md`
 - deploy / post-deploy E2E / LIVE flip → skill `.claude/skills/deploy`
 - Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
+- pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`

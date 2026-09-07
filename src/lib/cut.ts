@@ -8,7 +8,10 @@ export const jeSikmyRez = (nazov: string): boolean => !/nos[oó]v|opon/i.test(na
 // sa jeSikmyRez neaplikuje. Deluxe (Zbynek) + Štandard + (Dominik/Marek:
 // „štandard sa reže všetko na 90"). Uhol je len na nákrese — Money odpis nemení.
 export const systemRovnyRez = (system: string): boolean =>
-	system === 'Deluxe' || system === 'Štandard +' || system === 'Štandard';
+	system === 'Deluxe' ||
+	system === 'Štandard +' ||
+	system === 'Štandard' ||
+	system === 'Štandard Drevo';
 
 // Reálny presah susedných posuvných krídel (mm) per systém — Dominik 2026-07-14:
 // Robust 70, Slide 50, Štandard + 40 (Deluxe zatiaľ 50, nepotvrdené). Používa
@@ -23,6 +26,8 @@ export const OVERLAP_MM: Record<string, number> = {
 	// starší „Štandard" = tá istá rodina posuvov ako Štandard + (líši sa rámovým a
 	// dorazovým profilom) → rovnaký presah; len náhľad, Money nemení
 	Štandard: 40,
-	Deluxe: 50
+	Deluxe: 50,
+	// Drevostavby = rovnaká rodina posuvov ako Štandard → rovnaký presah
+	'Štandard Drevo': 40
 };
 export const overlapMm = (system: string): number => OVERLAP_MM[system] ?? OVERLAP_DEFAULT;

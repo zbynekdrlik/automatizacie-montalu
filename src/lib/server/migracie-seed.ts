@@ -463,6 +463,57 @@ export function migrateMaterialRozvin(db: Database.Database, bump: (v: number) =
 	})();
 }
 
+/** #445: Štandard Drevo — second Standard nárezák for firm Drevostavby. 4K variant with priečka
+ *  (ZASP00113 priečkový profil) + U-profiles (ZASP202439 in 3 roles: šírka, výška priečka,
+ *  výška plný). Spodná koľajnica ZASP202432 (same as IZO). Centered priečka expressed via
+ *  koef=0.5 on V dimension. Money-RELEVANT (new ZASP codes in odpis). Aditívne + idempotentné
+ *  (hasSys guard). Sklá NEseedujeme — Drevo zdieľa katalóg cez glassTypesForSystem alias. */
+export function migrateDrevostavby(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 40) return;
+	// Feature-detect: minimálne migračné fixtures (v29 a pod.) nemajú cfg_sys/cfg_rez
+	const maCfgSys =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cfg_sys'").get() !==
+		undefined;
+	const maCfgRez =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='cfg_rez'").get() !==
+		undefined;
+	if (!maCfgSys || !maCfgRez) {
+		bump(40);
+		return;
+	}
+	const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');
+	const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
+	const insRez = db.prepare(
+		`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	);
+	db.transaction(() => {
+		for (const s of seed.sys) {
+			if (!s.sysStyl.startsWith('Štandard Drevo|')) continue;
+			if (hasSys.get(s.sysStyl)) continue;
+			insSys.run(s.sysStyl, s.N, s.skloOffset);
+			for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+				insRez.run(
+					r.sysStyl,
+					r.poradie,
+					r.typ,
+					r.kod,
+					r.nazov,
+					r.dim,
+					r.koef,
+					r.offset,
+					r.delitN,
+					r.kerf,
+					r.pocetKs,
+					r.sklozavisle,
+					(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500,
+					(r as { skloHrubka?: number }).skloHrubka ?? 0
+				);
+		}
+		bump(40);
+	})();
+}
+
 /** #417 faza 2: per-profil odpad (offcut) z narezov ulozeny pri odpise, aby ho Odoo note builder
  *  vedel precitat pri re-derivacii / retry (#349). FK CASCADE na odpis_log — uvolnenie odpisu
  *  zmaze aj odpad. Len zasklenia a sietka maju ffdPack waste data; moduly bez offcut (pergola,

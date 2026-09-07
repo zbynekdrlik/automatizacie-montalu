@@ -16,7 +16,8 @@
 /** Kľúč systému (ten, čo je v cfg/DB) → čo z neho vidí obsluha. */
 const NAZVY: Record<string, string> = {
 	'Štandard +': 'Štandard plus',
-	Štandard: 'Starý štandard'
+	Štandard: 'Starý štandard',
+	'Štandard Drevo': 'Drevostavby'
 };
 
 /** Názov systému pre človeka. Neznámy systém sa vráti nezmenený. */

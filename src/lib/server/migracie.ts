@@ -25,7 +25,8 @@ import {
 	migrateGlassKorekcia,
 	migrateHrubkaTrieda,
 	migrateMaterialRozvin,
-	migrateOdpisOdpad
+	migrateOdpisOdpad,
+	migrateDrevostavby
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -992,6 +993,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateHrubkaTrieda(db, bump); // v36 → v37 (#443); extrahované do migracie-seed (viď docstring)
 	migrateMaterialRozvin(db, bump); // v37 → v38 (#369); extrahované do migracie-seed (viď docstring)
 	migrateOdpisOdpad(db, bump); // v38 → v39 (#417 faza 2); extrahované do migracie-seed (viď docstring)
+	migrateDrevostavby(db, bump); // v39 → v40 (#445); extrahované do migracie-seed (viď docstring)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

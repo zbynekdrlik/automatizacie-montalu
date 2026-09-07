@@ -2,6 +2,16 @@
 
 Terse per-ticket log of autopilot/autonomous-worker runs: issue #, commits, tests, decisions, PR.
 
+## 2026-09-07 — Štandard Drevo|4K system for Drevostavby firm (#445, worktree)
+
+- Version bump: 247deb9 (0.24.96-dev.1)
+- Feature: 146ad73 — data-driven sysStyl "Štandard Drevo|4K" with 10 profil + 2 sklo rez entries, priečka via koef=0.5
+- Review fix: 9fb07d5 — client glass alias for Štandard Drevo (Yellow 1), bump(40) instead of pragma (Blue 1), test narrowing (Blue 2)
+- Playbook: 96f501e — .claude/rules/novy-system.md peripheral checklist (9 touch-points for new systems)
+- Tests: compute-drevostavby.test.ts (22 vectors), migration-v40.test.ts (5 assertions), 30 head-bumps
+- Decision: 1K sheet (K-M codes) out of scope — needs Money verification
+- Findings: ZASP00113 placeholder image needs sync-profil-obrazky.sh; glass count N=4 vs actual 3 (Money-neutral)
+
 ## 2026-09-05 — Post-deploy E2E timeout + honest-null failures (#466, worktree)
 
 - bump: a054893 (0.24.91-dev.2)
