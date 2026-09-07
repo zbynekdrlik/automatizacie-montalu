@@ -138,10 +138,17 @@ function jobFor(
 function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?: Farba | null) {
 	// #431: defense fallback — ak farbaKovania nie je zadaná, použi predvolenú farbu
 	// systému (R9006 pre Deluxe). Normálne formulár farbu pošle (RAL select je
-	// viditeľný), toto je len ochrana proti chybe.
+	// viditeľný), toto je len ochrana proti chybe (stale tab / forged POST).
 	const efektivnaFarba =
 		farbaKovania ??
 		(specs.length ? predvolenaFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
+	if (!farbaKovania && efektivnaFarba) {
+		const sys = specs[0]!.sysStyl.split('|')[0] ?? '';
+		logger('zasklenia').warn('kovanie fallback: farbaKovania chýba, použitá predvolená', {
+			system: sys,
+			predvolena: efektivnaFarba
+		});
+	}
 	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
 }
 
