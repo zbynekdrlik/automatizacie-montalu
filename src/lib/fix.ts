@@ -287,3 +287,86 @@ export function chybaFixVstupu(
 		return `Súčet šírok polí (${R1(sucet)} mm) sa nerovná celkovej šírke (${R1(S)} mm).`;
 	return null;
 }
+
+// ---------------------------------------------------------------------------
+// Výrobné odpočty zo zamerania (issue #469)
+//
+// Zameranie = rozmery OTVORU v stavbe. Výrobná konštrukcia je UŽŠIA —
+// bočné profily zaberajú priestor. Táto vrstva transformuje zameranie na
+// konštrukčné rozmery a deleguje na pocitajFix().
+//
+// Podklady: att-15390/15391/15392 (7.9.2026), reálny prípad:
+//   zameranie S=1578/V1=137/V2=48 → výrobný výkres S=1530 (odpočet 48mm)
+// ---------------------------------------------------------------------------
+
+/**
+ * Profilový odpočet [mm] NA JEDNU STRANU — vzdialenosť, o ktorú sa konštrukcia
+ * zúži oproti otvoru z každej strany. Odvodené z podkladov: 1578 − 1530 = 48mm
+ * celkovo → 24mm/stranu. Hodnota je KONŠTANTNÁ pre COR-60 CE systém; ak sa
+ * v budúcnosti ukáže závislosť na systéme, refaktoruj na Record<FixSystem, number>.
+ */
+export const FIX_PROFIL_ODPOCET = 24;
+
+/** Vstup pre výrobnú transformáciu. */
+export interface FixVyrobaVstup {
+	/** celková šírka otvoru zo zamerania [mm] */
+	S: number;
+	/** výška otvoru na ľavom kraji [mm] */
+	V1: number;
+	/** výška otvoru na pravom kraji [mm] */
+	V2: number;
+	/** šírky polí [mm] — vzťahujú sa k zameranej šírke S */
+	polia: number[];
+	/** profilový odpočet na jednu stranu [mm] (default FIX_PROFIL_ODPOCET) */
+	odpocet?: number;
+}
+
+/**
+ * Prepočíta zameranie (rozmery otvoru) na VÝROBNÉ rozmery konštrukcie.
+ *
+ * Šírka: S_vyr = S − 2×odpočet (profily z oboch strán).
+ * Výšky: lineárna interpolácia pôvodnej šikmej hrany na zúžených hranách:
+ *   konštrukcia začína na x=odpočet a končí na x=S−odpočet (v súradnicovom
+ *   systéme zamerania), takže V na krajoch konštrukcie = V_interp(odpočet)
+ *   a V_interp(S−odpočet).
+ * Polia: proporčne zúžené na nový S_vyr.
+ *
+ * OTVORENÁ OTÁZKA (issue 469): výškový odpočet je z jedného príkladu
+ * neúplne determinovaný — V2 zo zamerania (48) → výkres (55.5) rastie,
+ * čo lineárna interpolácia nevysvetľuje. Dominikov hovor to objasní.
+ * Zatiaľ interpolácia — sedí na ~0.5mm pre V1, nesedí pre V2.
+ */
+export function prepocitajFixNaVyrobu(vstup: FixVyrobaVstup): FixVykres {
+	const { S, V1, V2, polia, odpocet = FIX_PROFIL_ODPOCET } = vstup;
+
+	if (odpocet <= 0) {
+		// žiadny odpočet — passthrough na čistú geometriu
+		return pocitajFix(S, V1, V2, polia);
+	}
+
+	// výrobná šírka
+	const S_vyr = R1(S - 2 * odpocet);
+
+	// výšky na krajoch zúženej konštrukcie (lineárna interpolácia)
+	const dv = V2 - V1;
+	const V1_vyr = R1(V1 + (dv * odpocet) / S);
+	const V2_vyr = R1(V1 + (dv * (S - odpocet)) / S);
+
+	// polia: proporčné zúženie (zachováme pomer šírok)
+	const sucet = polia.reduce((a, b) => a + b, 0);
+	const pomer = sucet > 0 ? S_vyr / sucet : 1;
+	const poliaVyr: number[] = [];
+	let kum = 0;
+	for (const [i, w] of polia.entries()) {
+		if (i < polia.length - 1) {
+			const nw = R1(w * pomer);
+			poliaVyr.push(nw);
+			kum += nw;
+		} else {
+			// posledné pole dostane zvyšok (invariant sum === S_vyr)
+			poliaVyr.push(R1(S_vyr - kum));
+		}
+	}
+
+	return pocitajFix(S_vyr, V1_vyr, V2_vyr, poliaVyr);
+}
