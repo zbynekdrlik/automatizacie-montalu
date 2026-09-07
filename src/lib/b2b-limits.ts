@@ -17,7 +17,9 @@ export const B2B_LIMITS: Record<string, { minPanel: number; maxPanel: number; ma
 		'Štandard +': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
 		// starší „Štandard" — zatiaľ rovnaké limity ako Štandard + (rovnaká rodina);
 		// reálne výrobné limity potvrdiť s Dominikom
-		Štandard: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
+		Štandard: { minPanel: 800, maxPanel: 1000, maxHeight: 2500 },
+		// Drevostavby — rovnaká rodina ako Štandard (rovnaké profily/koľajnice)
+		'Štandard Drevo': { minPanel: 800, maxPanel: 1000, maxHeight: 2500 }
 	};
 
 // Rodina štýlu: dvojité (opona) začínajú „2x", ostatné sú jednoduché. Návrh štýlu

@@ -90,7 +90,8 @@ export const PROFIL_S_OBRAZKOM = new Set<string>([
 	'ZASP202439',
 	'ZASP20244',
 	'ZASP20249',
-	'ZASP20254'
+	'ZASP20254',
+	'ZASP00113'
 ]);
 
 export const maObrazok = (kod: string): boolean => PROFIL_S_OBRAZKOM.has(kod);

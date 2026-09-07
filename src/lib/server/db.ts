@@ -152,7 +152,10 @@ export function listGlassTypes(): GlassType[] {
  *  vo viacerých systémoch — napr. „3.3.1" je aj Slide aj Štandard +), ale preto, že
  *  starý Štandard sem cez tento alias zámerne smeruje. Preto sa sklo NIKDY nesmie
  *  hľadať len podľa názvu naprieč systémami — vždy cez `glassTypesForSystem(system)`. */
-const GLASS_SYSTEM_ALIAS: Record<string, string> = { Štandard: 'Štandard +' };
+const GLASS_SYSTEM_ALIAS: Record<string, string> = {
+	Štandard: 'Štandard +',
+	'Štandard Drevo': 'Štandard +'
+};
 
 /** Kanonický systém pre katalóg skiel A pre triedovú korekciu (#443) — rovnaký alias ako
  *  `glassTypesForSystem`/`glassMoneyKod`. Starý „Štandard" zdieľa so „Štandard +" nielen
