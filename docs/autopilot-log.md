@@ -2103,3 +2103,10 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   Dominika: (1) vertikálny offset (DETAIL A/B referencie), (2) multi-field zúženie
   (proporčné vs shift). Funkcia NIE JE zapojená v UI (gated na Dominika). 9 nových testov,
   57 FIX testov celkovo green. NEmergnuté (worktree — supervisor integruje).
+
+- **#482 post-deploy E2E fix** (0013541→fff7e0e): `e2e/plan-rezov.spec.ts` used bare
+  `page.goto('/plan-rezov')` instead of helper `goto(page, '/plan-rezov')` with
+  `waitHydrated()`. Over SSH tunnel (post-deploy), hydration not complete → `use:enhance`
+  not attached + `bind:value` wiped inputs. 3/4 tests failed on prod, all passed in CI.
+  Fix: import+use `goto` helper. Playbook: added mandatory `goto` helper rule to
+  `.claude/rules/testing.md`. NEmergnuté (worktree — supervisor integruje).
