@@ -4,7 +4,7 @@ import {
 	fetchOdooPrices,
 	_parseOdooPricesResponse
 } from '../src/lib/server/odoo-prices';
-import { setJson2Transport, type Json2Config } from '../src/lib/server/odoo-json2';
+import { setJson2Transport } from '../src/lib/server/odoo-json2';
 
 afterEach(() => {
 	setJson2Transport(null);

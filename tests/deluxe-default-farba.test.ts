@@ -1,7 +1,7 @@
 // #6413 att 14955: Deluxe má pevnú farbu kovania „nerezová mušľa" (R9006) —
 // RAL dropdown sa nezobrazuje, server používa defaultnú farbu automaticky.
 import { describe, it, expect } from 'vitest';
-import { defaultFarba, DEFAULT_FARBA, komponentyPre } from '../src/lib/server/komponenty-cfg';
+import { defaultFarba } from '../src/lib/server/komponenty-cfg';
 import { kovanieDoOdpisu } from '../src/lib/server/kovanie';
 import { buildCFG, type PosuvSpec } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
