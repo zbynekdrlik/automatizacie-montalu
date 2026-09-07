@@ -90,12 +90,14 @@ describe('callJson2', () => {
 		expect(capturedHeaders['Authorization']).toBe('bearer test-key-123');
 		expect(capturedHeaders['Content-Type']).toBe('application/json');
 
+		// /json/2: body = the kwargs object itself, NO JSON-RPC envelope (odoo-erp #6385:
+		// the envelope made Odoo see jsonrpc/method/params as kwargs -> 422 order_number).
 		const body = JSON.parse(capturedBody);
-		expect(body.jsonrpc).toBe('2.0');
-		expect(body.method).toBe('call');
-		expect(body.params.order_number).toBe('OP2024001');
-		expect(body.params.doc_id).toBe('plan-1');
-		expect(body.params.kind).toBe('narezak');
+		expect(body.jsonrpc).toBeUndefined();
+		expect(body.params).toBeUndefined();
+		expect(body.order_number).toBe('OP2024001');
+		expect(body.doc_id).toBe('plan-1');
+		expect(body.kind).toBe('narezak');
 	});
 
 	it('sends get_prices request correctly (#5808)', async () => {
