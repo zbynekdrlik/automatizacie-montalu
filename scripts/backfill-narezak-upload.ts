@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 // #6385 noha 2: jednorazový backfill — nahrá historické nárezové PDF na zákazky do Odoo.
 //
-// Prejde všetky UNIKÁTNE (zak, op) páry z odpis_log2, regeneruje PDF rozpisu materiálu
+// Prejde všetky UNIKÁTNE (zak, op) páry z odpis_log, regeneruje PDF rozpisu materiálu
 // a uploadne cez montalu_narezak_upload (/json/2). Idempotentný — opakovaný beh prepíše
 // existujúcu prílohu (endpoint je xmlid-idempotentný).
 //
@@ -65,11 +65,11 @@ async function main() {
 
 	const db = new Database(dbPath, { readonly: true });
 
-	// Zober unikátne (zak, op) páry z odpis_log2 — LEN LIVE odpisy (live=1).
+	// Zober unikátne (zak, op) páry z odpis_log — LEN LIVE odpisy (live=1).
 	const query =
 		limit > 0
-			? `SELECT DISTINCT zak, op, zakaznik FROM odpis_log2 WHERE live = 1 ORDER BY created_at DESC LIMIT ?`
-			: `SELECT DISTINCT zak, op, zakaznik FROM odpis_log2 WHERE live = 1 ORDER BY created_at DESC`;
+			? `SELECT DISTINCT zak, op, zakaznik FROM odpis_log WHERE live = 1 ORDER BY created_at DESC LIMIT ?`
+			: `SELECT DISTINCT zak, op, zakaznik FROM odpis_log WHERE live = 1 ORDER BY created_at DESC`;
 	const rows: OdpisRow[] =
 		limit > 0
 			? (db.prepare(query).all(limit) as OdpisRow[])
@@ -146,7 +146,7 @@ async function uploadSingle(
 			`
 		SELECT p.kod, p.nazov, SUM(p.qty) as qty, p.mj
 		FROM odpis_polozky p
-		JOIN odpis_log2 l ON p.odpis_log_id = l.id
+		JOIN odpis_log l ON p.odpis_log_id = l.id
 		WHERE l.zak = ? AND l.live = 1
 		GROUP BY p.kod
 		ORDER BY p.nazov

@@ -76,12 +76,11 @@ export async function callJson2(
 	kwargs: Record<string, unknown> = {}
 ): Promise<unknown> {
 	const url = `${cfg.url.replace(/\/+$/, '')}/json/2/${model}/${method}`;
-	const body = JSON.stringify({
-		jsonrpc: '2.0',
-		method: 'call',
-		id: 1,
-		params: kwargs
-	});
+	// /json/2 (Odoo 19 External JSON-2 API): the request body IS the kwargs object —
+	// NO JSON-RPC 2.0 envelope. Wrapping in {jsonrpc, method, params} made Odoo receive
+	// the keys jsonrpc/method/id/params as kwargs and every named arg as missing
+	// (PROD 7.9.: 422 "Chýba order_number"). Refs odoo-erp #6385.
+	const body = JSON.stringify(kwargs);
 
 	const ctrl = new AbortController();
 	const timer = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT_MS);
@@ -108,7 +107,16 @@ export async function callJson2(
 		} catch {
 			throw new OdooJson2Error(`Odoo JSON-2: nevalidný JSON v odpovedi: ${text.slice(0, 300)}`, 0);
 		}
-		if (parsed.error) {
+		// /json/2 success body = the method's return value DIRECTLY (no {result} wrapper);
+		// errors arrive as HTTP 4xx/5xx (handled above). Keep the legacy {result}/{error}
+		// shape tolerated for any JSON-RPC-style proxy in front of Odoo.
+		if (
+			parsed &&
+			typeof parsed === 'object' &&
+			!Array.isArray(parsed) &&
+			'error' in parsed &&
+			parsed.error
+		) {
 			const errData = parsed.error;
 			throw new OdooJson2Error(
 				`Odoo JSON-2 error ${errData.code}: ${errData.message}`,
@@ -116,7 +124,16 @@ export async function callJson2(
 			);
 		}
 		log.debug('json/2 volanie OK', { model, method });
-		return parsed.result;
+		if (
+			parsed &&
+			typeof parsed === 'object' &&
+			!Array.isArray(parsed) &&
+			'result' in parsed &&
+			('jsonrpc' in parsed || Object.keys(parsed).length === 1)
+		) {
+			return parsed.result;
+		}
+		return parsed;
 	} finally {
 		clearTimeout(timer);
 	}
