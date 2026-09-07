@@ -2086,3 +2086,10 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
 - svelte-check 0/0 + lint (eslint+prettier) čisté + **3408 unit testov (0 fail, coverage nad
   prahmi)** + 3/3 zz E2E (vrátane novej „systém stien invaliduje + prepočíta cenu" asercie), 0
   console chýb. NEmergnuté (worktree — supervisor integruje).
+- **#469 FIX výrobné odpočty zo zamerania** — `prepocitajFixNaVyrobu()` v `src/lib/fix.ts`:
+  šírkový odpočet 24mm/stranu (`FIX_PROFIL_ODPOCET`), V1/V2 nezmenené (dv zachovaný cez
+  zúženú šírku — review H1 fix: `hypot(1530,89)=1532.6`, `atan(89/1530)=3.3°` presne sedí
+  s výkresom). RED 717af53 → GREEN f8c786b → review fix 560e916. Dva otvorené otázky pre
+  Dominika: (1) vertikálny offset (DETAIL A/B referencie), (2) multi-field zúženie
+  (proporčné vs shift). Funkcia NIE JE zapojená v UI (gated na Dominika). 9 nových testov,
+  57 FIX testov celkovo green. NEmergnuté (worktree — supervisor integruje).
