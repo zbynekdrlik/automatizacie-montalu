@@ -152,10 +152,12 @@ describe('fetchOdooPrices', () => {
 			total: 1
 		};
 
-		setJson2Transport(async () => ({
-			status: 200,
-			text: JSON.stringify({ result: mockResponse })
-		}));
+		setJson2Transport(async () =>
+			new Response(
+				JSON.stringify({ jsonrpc: '2.0', id: 1, result: mockResponse }),
+				{ status: 200 }
+			)
+		);
 
 		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
 		vi.stubEnv('ODOO_JSON2_API_KEY', 'key');
@@ -175,10 +177,12 @@ describe('fetchOdooPrices', () => {
 	});
 
 	it('returns null on Odoo error response (graceful fallback)', async () => {
-		setJson2Transport(async () => ({
-			status: 200,
-			text: JSON.stringify({ error: { message: 'AccessDenied' } })
-		}));
+		setJson2Transport(async () =>
+			new Response(
+				JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: 403, message: 'AccessDenied' } }),
+				{ status: 200 }
+			)
+		);
 
 		const result = await fetchOdooPrices({ url: 'https://erp.test', apiKey: 'key' });
 		expect(result).toBeNull();

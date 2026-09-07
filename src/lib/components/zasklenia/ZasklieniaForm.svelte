@@ -72,6 +72,7 @@
 		maFab,
 		maFarbu,
 		ralOptions,
+		defaultFarbaInfo,
 		maKolajnicu,
 		maSietka,
 		sietkaStranaVal,
@@ -130,6 +131,7 @@
 		maFab: boolean;
 		maFarbu: boolean;
 		ralOptions: Farba[];
+		defaultFarbaInfo: string | null;
 		maKolajnicu: boolean;
 		maSietka: boolean;
 		sietkaStranaVal: 'ľavá' | 'pravá' | null;
@@ -359,8 +361,14 @@
 		{/if}
 		<!-- RAL farba kovania (#338) — vyberá Money kód farebného variantu (kľučka/
 		     krytka vložky / Štandard zámok R9005 vs R7016). Bez voľby engine vyhlási
-		     chybu, aby sa do Money nedostal zlý/žiadny farebný variant. -->
-		{#if maFarbu}
+		     chybu, aby sa do Money nedostal zlý/žiadny farebný variant.
+		     #6413 att 14955: Deluxe má pevnú farbu (nerezová mušľa) → info text namiesto selectu. -->
+		{#if defaultFarbaInfo}
+			<div class="field" data-testid="farba-kovania-fixed">
+				<strong>Farba kovania</strong>
+				<span class="hint">nerezová mušľa ({defaultFarbaInfo})</span>
+			</div>
+		{:else if maFarbu}
 			<div class="field">
 				<label for="farbaKovania">Farba kovania (RAL) — MENÍ Money kód</label>
 				<select

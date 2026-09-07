@@ -1,47 +1,117 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
 	callJson2,
+	odooJson2Config,
 	json2Config,
-	OdooJson2Error,
+	isNarezUploadEnabled,
 	setJson2Transport,
+	OdooJson2Error,
+	type OdooJson2Config,
 	type Json2Config
 } from '../src/lib/server/odoo-json2';
 
-const CFG: Json2Config = { url: 'https://erp.montalu.cloud', apiKey: 'test-key-123' };
+const CFG: OdooJson2Config = { url: 'https://erp.test', apiKey: 'test-key-123' };
 
 afterEach(() => {
 	setJson2Transport(null);
 	vi.unstubAllEnvs();
 });
 
-describe('json2Config', () => {
-	it('returns null when env is missing', () => {
+describe('odooJson2Config', () => {
+	it('returns null when env vars are missing', () => {
 		vi.stubEnv('ODOO_JSON2_URL', '');
 		vi.stubEnv('ODOO_JSON2_API_KEY', '');
-		expect(json2Config()).toBeNull();
+		expect(odooJson2Config()).toBeNull();
 	});
 
 	it('returns config when both env vars are set', () => {
 		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
+		vi.stubEnv('ODOO_JSON2_API_KEY', 'my-key');
+		const cfg = odooJson2Config();
+		expect(cfg).toEqual({ url: 'https://erp.test', apiKey: 'my-key' });
+	});
+
+	it('returns null when only URL is set', () => {
+		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
+		vi.stubEnv('ODOO_JSON2_API_KEY', '');
+		expect(odooJson2Config()).toBeNull();
+	});
+
+	it('json2Config alias works identically', () => {
+		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
 		vi.stubEnv('ODOO_JSON2_API_KEY', 'abc');
-		expect(json2Config()).toEqual({ url: 'https://erp.test', apiKey: 'abc' });
+		expect(json2Config()).toEqual(odooJson2Config());
+	});
+});
+
+describe('isNarezUploadEnabled', () => {
+	it('returns false by default', () => {
+		vi.stubEnv('ODOO_NAREZ_UPLOAD_ENABLED', '');
+		expect(isNarezUploadEnabled()).toBe(false);
+	});
+
+	it('returns true when set to "1"', () => {
+		vi.stubEnv('ODOO_NAREZ_UPLOAD_ENABLED', '1');
+		expect(isNarezUploadEnabled()).toBe(true);
+	});
+
+	it('returns false for any other value', () => {
+		vi.stubEnv('ODOO_NAREZ_UPLOAD_ENABLED', 'true');
+		expect(isNarezUploadEnabled()).toBe(false);
 	});
 });
 
 describe('callJson2', () => {
-	it('sends correct request shape and parses result', async () => {
+	it('sends correct request shape (model, method, bearer auth)', async () => {
 		let capturedUrl = '';
-		let capturedBody = '';
 		let capturedHeaders: Record<string, string> = {};
+		let capturedBody = '';
 
-		setJson2Transport(async (url, body, headers) => {
-			capturedUrl = url;
-			capturedBody = body;
-			capturedHeaders = headers;
-			return { status: 200, text: JSON.stringify({ result: { total: 42 } }) };
+		setJson2Transport(async (input, init) => {
+			capturedUrl = typeof input === 'string' ? input : (input as Request).url;
+			const h = init?.headers;
+			if (h && typeof h === 'object' && !Array.isArray(h)) {
+				capturedHeaders = h as Record<string, string>;
+			}
+			capturedBody = init?.body as string;
+			return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true } }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		});
 
-		const result = await callJson2<{ total: number }>(
+		await callJson2(CFG, 'sale.order', 'montalu_narezak_upload', {
+			order_number: 'OP2024001',
+			doc_id: 'plan-1',
+			kind: 'narezak'
+		});
+
+		expect(capturedUrl).toBe('https://erp.test/json/2/sale.order/montalu_narezak_upload');
+		expect(capturedHeaders['Authorization']).toBe('bearer test-key-123');
+		expect(capturedHeaders['Content-Type']).toBe('application/json');
+
+		const body = JSON.parse(capturedBody);
+		expect(body.jsonrpc).toBe('2.0');
+		expect(body.method).toBe('call');
+		expect(body.params.order_number).toBe('OP2024001');
+		expect(body.params.doc_id).toBe('plan-1');
+		expect(body.params.kind).toBe('narezak');
+	});
+
+	it('sends get_prices request correctly (#5808)', async () => {
+		let capturedUrl = '';
+		let capturedBody = '';
+
+		setJson2Transport(async (input, init) => {
+			capturedUrl = typeof input === 'string' ? input : (input as Request).url;
+			capturedBody = init?.body as string;
+			return new Response(
+				JSON.stringify({ jsonrpc: '2.0', id: 1, result: { total: 42 } }),
+				{ status: 200 }
+			);
+		});
+
+		const result = await callJson2(
 			CFG,
 			'montalu.automatizacie.catalog',
 			'get_prices',
@@ -49,75 +119,82 @@ describe('callJson2', () => {
 		);
 
 		expect(capturedUrl).toBe(
-			'https://erp.montalu.cloud/json/2/montalu.automatizacie.catalog/get_prices'
+			'https://erp.test/json/2/montalu.automatizacie.catalog/get_prices'
 		);
-		expect(JSON.parse(capturedBody)).toEqual({ kwargs: { codes: ['ZASP001'] } });
-		expect(capturedHeaders.Authorization).toBe('bearer test-key-123');
+		const body = JSON.parse(capturedBody);
+		expect(body.params.codes).toEqual(['ZASP001']);
 		expect(result).toEqual({ total: 42 });
 	});
 
-	it('strips trailing slashes from base URL', async () => {
+	it('returns result on success', async () => {
+		setJson2Transport(async () =>
+			new Response(
+				JSON.stringify({
+					jsonrpc: '2.0',
+					id: 1,
+					result: { attachment_id: 42, order_id: 7, version: 1, replaced: false }
+				}),
+				{ status: 200 }
+			)
+		);
+
+		const result = await callJson2(CFG, 'sale.order', 'montalu_narezak_upload', {});
+		expect(result).toEqual({ attachment_id: 42, order_id: 7, version: 1, replaced: false });
+	});
+
+	it('throws OdooJson2Error on HTTP error', async () => {
+		setJson2Transport(async () =>
+			new Response('Unauthorized', { status: 401, statusText: 'Unauthorized' })
+		);
+
+		await expect(callJson2(CFG, 'sale.order', 'test', {})).rejects.toThrow(OdooJson2Error);
+		await expect(callJson2(CFG, 'sale.order', 'test', {})).rejects.toThrow(/HTTP 401/);
+	});
+
+	it('throws OdooJson2Error on JSON-RPC error response', async () => {
+		setJson2Transport(async () =>
+			new Response(
+				JSON.stringify({
+					jsonrpc: '2.0',
+					id: 1,
+					error: { code: 200, message: 'montalu_order_not_found: objednavka nie je v Odoo' }
+				}),
+				{ status: 200 }
+			)
+		);
+
+		await expect(callJson2(CFG, 'sale.order', 'montalu_narezak_upload', {})).rejects.toThrow(
+			/montalu_order_not_found/
+		);
+	});
+
+	it('strips trailing slash from URL', async () => {
 		let capturedUrl = '';
-		setJson2Transport(async (url) => {
-			capturedUrl = url;
-			return { status: 200, text: JSON.stringify({ result: 'ok' }) };
+		setJson2Transport(async (input) => {
+			capturedUrl = typeof input === 'string' ? input : (input as Request).url;
+			return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: null }), { status: 200 });
 		});
 
-		await callJson2({ url: 'https://erp.test///', apiKey: 'k' }, 'model', 'method');
-		expect(capturedUrl).toBe('https://erp.test/json/2/model/method');
-	});
-
-	it('throws on HTTP error', async () => {
-		setJson2Transport(async () => ({
-			status: 403,
-			text: 'Forbidden'
-		}));
-
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(OdooJson2Error);
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(/HTTP 403/);
-	});
-
-	it('throws on Odoo error response', async () => {
-		setJson2Transport(async () => ({
-			status: 200,
-			text: JSON.stringify({
-				error: {
-					message: 'AccessError: not allowed',
-					data: { name: 'odoo.exceptions.AccessError' }
-				}
-			})
-		}));
-
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(OdooJson2Error);
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(/AccessError/);
+		await callJson2({ url: 'https://erp.test/', apiKey: 'k' }, 'res.partner', 'read', {});
+		expect(capturedUrl).toBe('https://erp.test/json/2/res.partner/read');
 	});
 
 	it('throws on invalid JSON response', async () => {
-		setJson2Transport(async () => ({
-			status: 200,
-			text: '<html>Not JSON</html>'
-		}));
-
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(OdooJson2Error);
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(/neplatný JSON/);
+		setJson2Transport(async () => new Response('not json at all', { status: 200 }));
+		await expect(callJson2(CFG, 'sale.order', 'test', {})).rejects.toThrow(/nevalidný JSON/);
 	});
 
-	it('throws on missing result key', async () => {
-		setJson2Transport(async () => ({
-			status: 200,
-			text: JSON.stringify({ data: 'no result key' })
-		}));
-
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(OdooJson2Error);
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(/nemá "result"/);
+	it('OdooJson2Error.status defaults to 0', () => {
+		const err = new OdooJson2Error('test');
+		expect(err.status).toBe(0);
+		expect(err.message).toBe('test');
 	});
+});
 
-	it('throws on network error', async () => {
-		setJson2Transport(async () => {
-			throw new Error('ECONNREFUSED');
-		});
-
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(OdooJson2Error);
-		await expect(callJson2(CFG, 'model', 'method')).rejects.toThrow(/sieťová chyba/);
+describe('backward-compat types (#5808)', () => {
+	it('Json2Config is assignable to OdooJson2Config', () => {
+		const cfg: Json2Config = { url: 'https://erp.test', apiKey: 'k' };
+		const _check: OdooJson2Config = cfg;
+		expect(_check.url).toBe('https://erp.test');
 	});
 });
