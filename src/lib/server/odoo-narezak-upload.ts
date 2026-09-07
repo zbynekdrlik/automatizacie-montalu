@@ -7,12 +7,7 @@
 // Transport: /json/2 + bearer (odoo-json2.ts), NIE legacy XML-RPC.
 // Zákazku matchuje cez sale.order.name === normOp(op) (rovnaký vzor ako odoo-zakazka.ts).
 import { logger } from './log';
-import {
-	callJson2,
-	odooJson2Config,
-	isNarezUploadEnabled,
-	type OdooJson2Config
-} from './odoo-json2';
+import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
 import { generateZakazkaPdfBase64, zakazkaPdfFilename } from './zakazka-pdf';
 import { normOp } from './money';
 import { zakazkaPrehlad } from './zakazka-ceny';

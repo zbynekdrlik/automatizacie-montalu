@@ -9,10 +9,6 @@
 //
 // BEZSTAVOVÝ: žiadny uid cache, žiadna session — každý request nesie bearer hlavičku.
 // Timeout 15 s (rovnaký rad ako XML-RPC klient v odoo-rpc.ts).
-import { logger } from './log';
-
-const log = logger('odoo-json2');
-
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 export interface OdooJson2Config {
