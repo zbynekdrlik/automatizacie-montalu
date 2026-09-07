@@ -1,11 +1,11 @@
 // BS DELUXE komponenty do Money odpisu (#354, Dominik — att 14668/14670) v
 // prehliadači. Money-korektnosť množstiev je pokrytá unit testom
 // (tests/kovanie-deluxe.test.ts); toto overuje LEN prehliadačovú vrstvu — Deluxe
-// má od #6413 (att 14955, Patrik/Dominik) PEVNÚ farbu kovania (nerezová mušľa
-// R9006), takže formulár namiesto RAL selectu zobrazí info text; prepnutie
-// z farebného systému (Robust) na Deluxe zahodí neplatnú farbu z predošlého
-// systému (#354 spirit), a náhľad naozaj zobrazí krajnú/stredovú krytku + madlo
-// + kefy + upozornenie na 6mm.
+// má RAL select (krytky = 2 farebné Money kódy R9006/R7016, #431 bod 1, Patrik
+// msg 1801337), s PREDVOLENOU farbou R9006 a hintom „nerezová mušľa" (kovanie
+// je nerez, krytky podľa zvolenej farby). Prepnutie z farebného systému (Robust)
+// na Deluxe zahodí neplatnú farbu z predošlého systému (#354 spirit) a predvyplní
+// R9006, a náhľad naozaj zobrazí krajnú/stredovú krytku + madlo + kefy.
 //
 // Všetko READ-ONLY („Spočítať" / „Späť"), nič sa nezapisuje do Money.
 import { test, expect, type Page } from '@playwright/test';
@@ -32,24 +32,33 @@ const riadok = (page: Page, kod: string) =>
 // text, nie číslica). Exaktný text na IZOLOVANOM `<b>` elementu je jednoznačný.
 const mnozstvo = (page: Page, kod: string) => riadok(page, kod).locator('b');
 
-test('Deluxe: farba kovania je PEVNÁ (nerezová mušľa R9006), žiadny RAL select (#6413)', async ({
+test('Deluxe: RAL select viditeľný s R9006/R7016, predvolená R9006, hint nerezová mušľa (#431)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
 	await page.getByLabel('Systém').selectOption('Deluxe');
-	// #6413 att 14955: server vylúčil Deluxe zo `systemyFarba` (má defaultFarba) →
-	// formulár namiesto RAL selectu zobrazí pevný info text.
-	await expect(page.getByTestId('farba-kovania-fixed')).toBeVisible();
-	await expect(page.getByTestId('farba-kovania-fixed')).toContainText('nerezová mušľa');
-	await expect(page.getByTestId('farba-kovania-fixed')).toContainText('R9006');
-	await expect(page.getByTestId('farba-kovania')).toHaveCount(0);
+	// #431 bod 1: RAL select je VIDITEĽNÝ pre Deluxe (krytky majú 2 farebné varianty)
+	const sel = page.getByTestId('farba-kovania');
+	await expect(sel).toBeVisible();
+	// predvolená farba R9006 (nerezová mušľa — Patrik msg 1801337)
+	await expect(sel).toHaveValue('R9006');
+	// ponúka len R9006/R7016 (nie R9005)
+	const hodnoty = await sel
+		.locator('option')
+		.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter((v) => v));
+	expect(hodnoty.sort()).toEqual(['R7016', 'R9006'].sort());
+	// hint „nerezová mušľa" vedľa selectu
+	await expect(page.getByTestId('kovanie-musla-hint')).toBeVisible();
+	await expect(page.getByTestId('kovanie-musla-hint')).toContainText('nerezová mušľa');
+	// fixný div z 0f3dd88 NEEXISTUJE
+	await expect(page.getByTestId('farba-kovania-fixed')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('prepnutie Robust (R9005) → Deluxe zobrazí pevnú farbu; návrat na Robust nezachová neplatnú R9005 (#354, #6413)', async ({
+test('prepnutie Robust (R9005) → Deluxe predvyplní R9006; návrat na Robust vymaže neplatnú (#354, #431)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -59,21 +68,19 @@ test('prepnutie Robust (R9005) → Deluxe zobrazí pevnú farbu; návrat na Robu
 	await vyberFarbuKovania(page, 'R9005');
 	await expect(page.getByTestId('farba-kovania')).toHaveValue('R9005');
 
-	// Deluxe nemá RAL select vôbec (#6413) — kovanie tam má pevnú farbu R9006
-	// (nerezová mušľa). Hranový $effect naďalej zahadzuje hodnotu, ktorá nie je
-	// v aktuálnych `ralOptions` (R9005 nie je platná pre Deluxe) — presne ten istý
-	// mechanizmus ako pred #6413, len sa teraz prejaví zmiznutím selectu namiesto
-	// prázdnej hodnoty v ňom.
+	// Deluxe: R9005 nie je platná → zahodí sa, predvyplní sa R9006
 	await page.getByLabel('Systém').selectOption('Deluxe');
-	await expect(page.getByTestId('farba-kovania')).toHaveCount(0);
-	await expect(page.getByTestId('farba-kovania-fixed')).toBeVisible();
-	await expect(page.getByTestId('farba-kovania-fixed')).toContainText('R9006');
+	await expect(page.getByTestId('farba-kovania')).toHaveValue('R9006');
+	// hint viditeľný
+	await expect(page.getByTestId('kovanie-musla-hint')).toBeVisible();
 
-	// späť na Robust: select sa vráti, ale neplatná R9005 NEPRETRVÁ (bola zahodená
-	// počas Deluxe interlude) — inak by engine mohol dostať zaseknutú neplatnú
-	// hodnotu namiesto vynúteného nového výberu (#354 spirit).
+	// späť na Robust: select sa vráti, R9006 ostáva platná pre Robust? Nie —
+	// Robust má R9005/R7016, ale R9006 nie je v Robust množine, takže sa zahodí
+	// a predvolená (žiadna pre Robust) sa nenastaví → prázdna hodnota.
 	await page.getByLabel('Systém').selectOption('Robust');
 	await expect(page.getByTestId('farba-kovania')).toHaveValue('');
+	// hint zmizne (Robust nemá predvolenú farbu)
+	await expect(page.getByTestId('kovanie-musla-hint')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -104,7 +111,7 @@ test('Deluxe 3K 10mm: krajná×2, stredová L×2 + P×2, madlo×2, kefy + upozor
 	await expect(mnozstvo(page, 'ZASK00007')).toContainText(/\d+(,\d+)? m/);
 	await expect(mnozstvo(page, 'ZASK202542')).toContainText(/\d+(,\d+)? m/);
 	// 10mm objednávka je KOMPLETNÁ (krytky+madlo+kefy) — žiadne upozornenie na
-	// chýbajúce 6mm (#354 review nález 🟡: predtým sa zobrazovalo aj tu, hoci sa
+	// chýbajúce 6mm (#354 review nález: predtým sa zobrazovalo aj tu, hoci sa
 	// 10mm objednávky vôbec netýka).
 	await expect(page.getByTestId('plan-warn')).toHaveCount(0);
 
