@@ -38,9 +38,14 @@ describe('computeTesnenie', () => {
 	describe('Štandard Drevo|4K (S=5500, V=2132)', () => {
 		const result = computeFlat(cfg, 'Štandard Drevo|4K', 5500, 2132, false);
 		if (!result) throw new Error('computeFlat returned null');
-		const tesnenie = computeTesnenie(result.material, 'Štandard');
+		// computeFlat returns system = sysStyl.split('|')[0] = 'Štandard Drevo'
+		const tesnenie = computeTesnenie(result.material, result.system);
 
-		it('vracia výsledok pre Štandard', () => {
+		it('system = Štandard Drevo', () => {
+			expect(result.system).toBe('Štandard Drevo');
+		});
+
+		it('vracia výsledok pre Štandard Drevo', () => {
 			expect(tesnenie).not.toBeNull();
 		});
 
@@ -52,8 +57,8 @@ describe('computeTesnenie', () => {
 			expect(tesnenie!.dlzkaM).toBe(27.5);
 		});
 
-		it('system = Štandard', () => {
-			expect(tesnenie!.system).toBe('Štandard');
+		it('system = Štandard Drevo', () => {
+			expect(tesnenie!.system).toBe('Štandard Drevo');
 		});
 
 		it('honestNull obsahuje čaká na spresnenie', () => {
@@ -65,9 +70,8 @@ describe('computeTesnenie', () => {
 
 	// Štandard +|3K — S=3000, V=2100
 	// Profily:
-	//   ZASP202415 (kladkový, 3600mm tyč): pocetKs=6, rozmer = (3000 - 21.5 - 157)/3 + 2 = 942.5 → 943 (round)
-	//     Wait, let me verify: koef=1, delitN=1, offset per 3K = -172.5 (from spec)
-	//     val = (1*3000 + (-172.5)) / 3 = 2827.5 / 3 = 942.5 → 943 (Math.round, kerf=0)
+	//   ZASP202415 (kladkový, 3600mm tyč): pocetKs=6, koef=1, delitN=1, offset=-172.5
+	//     val = (1*3000 + (-172.5)) / 3 = 942.5 → 943 (Math.round, kerf=0)
 	//     6 ks × 943 = 5658 mm
 	//   ZASP00024 (nos, 7500mm tyč): pocetKs=4 (2*(3-1)=4), rozmer = V-33 = 2067
 	//     4 ks × 2067 = 8268 mm
@@ -120,8 +124,7 @@ describe('computeTesnenie', () => {
 			expect(tesnenie!.dlzkaMm).toBeGreaterThan(0);
 		});
 
-		// ZASP202415: pocetKs=4, rozmer = (2000 - 21.5 - 130)/2 + 2 = 1848.5/2 + 2 = 926.25 → 926
-		//   Wait: offset for 2K is -147.5, val = (2000 + (-147.5))/2 = 926.25 → 926
+		// ZASP202415: pocetKs=4, offset=-147.5, val = (2000 + (-147.5))/2 = 926.25 → 926
 		//   4 ks × 926 = 3704
 		// ZASP00024 (nos): pocetKs=2 (2*(2-1)=2), rozmer = 2000-33 = 1967
 		//   2 ks × 1967 = 3934
@@ -164,7 +167,7 @@ describe('computeTesneniePooled', () => {
 });
 
 describe('TESNENIE_SYSTEMY', () => {
-	it('obsahuje len Štandard a Štandard +', () => {
-		expect(TESNENIE_SYSTEMY).toEqual(['Štandard', 'Štandard +']);
+	it('obsahuje Štandard, Štandard + a Štandard Drevo', () => {
+		expect(TESNENIE_SYSTEMY).toEqual(['Štandard', 'Štandard +', 'Štandard Drevo']);
 	});
 });

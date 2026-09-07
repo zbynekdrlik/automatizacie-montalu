@@ -3206,7 +3206,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G6",
     "zakaznik": "Zákazník G6",
   },
-  "warn": "STANDARD: tesniace kefy (ZASK00007/ZASK202541) zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika). Dĺžka tesnenia je spočítaná (viď hláška nižšie), ale výber 4/6 mm kódu ešte nie je určený. Tesnenie: 12.4 m — čaká na spresnenie (4 mm ZASK00005 alebo 6 mm ZASK00006 podľa skla). Tesniace kefy (ZASK00007/ZASK202541) zatiaľ bez vzorca.",
+  "warn": "STANDARD: dĺžka tesnenia je spočítaná, ale výber 4/6 mm kódu ešte nie je určený. Tesniace kefy (ZASK00007/ZASK202541) zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika). Tesnenie: 12.4 m — čaká na spresnenie (4 mm ZASK00005 alebo 6 mm ZASK00006 podľa skla). Tesniace kefy (ZASK00007/ZASK202541) zatiaľ bez vzorca.",
 }
 `;
 

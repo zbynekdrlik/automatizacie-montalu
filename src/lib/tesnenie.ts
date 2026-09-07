@@ -26,8 +26,9 @@ const KOD_NOS = 'ZASP00024';
 const KOD_KRAJOVA_PLUS = 'ZASP20244';
 const KOD_KRAJOVA_KLASIK = 'ZASP00018';
 
-/** Systémy, pre ktoré sa tesnenie počíta. */
-export const TESNENIE_SYSTEMY: readonly string[] = ['Štandard', 'Štandard +'];
+/** Systémy, pre ktoré sa tesnenie počíta. Štandard Drevo (#445) zdieľa rovnaký
+ *  profilový trojuholník (ZASP202415/ZASP00024/ZASP00018) ako klasický Štandard. */
+export const TESNENIE_SYSTEMY: readonly string[] = ['Štandard', 'Štandard +', 'Štandard Drevo'];
 
 /** Vráti kód krajovej podľa systému (PLUS vs klasik). */
 function kodKrajovejPre(system: string): string {

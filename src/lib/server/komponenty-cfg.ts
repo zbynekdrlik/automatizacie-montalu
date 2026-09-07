@@ -369,7 +369,7 @@ export const KOVANIE_NEUPLNE: Record<
 	string | ((skloHrubka?: number, farbaKovania?: Farba) => string | null)
 > = {
 	Štandard:
-		'STANDARD: tesniace kefy (ZASK00007/ZASK202541) zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika). Dĺžka tesnenia je spočítaná (viď hláška nižšie), ale výber 4/6 mm kódu ešte nie je určený.',
+		'STANDARD: dĺžka tesnenia je spočítaná, ale výber 4/6 mm kódu ešte nie je určený. Tesniace kefy (ZASK00007/ZASK202541) zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).',
 	Deluxe: (skloHrubka) =>
 		skloHrubka === 6
 			? 'DELUXE 6mm: krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'
