@@ -42,18 +42,16 @@ export function isOdooPricesEnabled(): boolean {
  * @returns Rozparsovaná odpoveď v snapshot tvare, alebo `null` pri chybe
  *          (volajúci fallbackne na lokálny snapshot).
  */
-export async function fetchOdooPrices(cfgOverride?: Json2Config): Promise<OdooPricesResponse | null> {
+export async function fetchOdooPrices(
+	cfgOverride?: Json2Config
+): Promise<OdooPricesResponse | null> {
 	const cfg = cfgOverride ?? json2Config();
 	if (!cfg) {
 		log.debug('odoo-prices vypnuté (chýba ODOO_JSON2_URL/ODOO_JSON2_API_KEY)');
 		return null;
 	}
 	try {
-		const raw = await callJson2<unknown>(
-			cfg,
-			'montalu.automatizacie.catalog',
-			'get_prices'
-		);
+		const raw = await callJson2(cfg, 'montalu.automatizacie.catalog', 'get_prices');
 		return parseOdooPricesResponse(raw);
 	} catch (e) {
 		const msg = e instanceof Error ? e.message : String(e);

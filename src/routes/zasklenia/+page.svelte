@@ -95,12 +95,8 @@
 			styl,
 			data.skla
 				.filter((g) =>
-					sys === 'Deluxe' ||
-					sys === 'Štandard +' ||
-					sys === 'Štandard' ||
-					sys === 'Štandard Drevo'
-						? g.system ===
-							(sys === 'Štandard' || sys === 'Štandard Drevo' ? 'Štandard +' : sys)
+					sys === 'Deluxe' || sys === 'Štandard +' || sys === 'Štandard' || sys === 'Štandard Drevo'
+						? g.system === (sys === 'Štandard' || sys === 'Štandard Drevo' ? 'Štandard +' : sys)
 						: g.system === sys || g.system === 'ALL'
 				)
 				.map((g) => g.nazov),
