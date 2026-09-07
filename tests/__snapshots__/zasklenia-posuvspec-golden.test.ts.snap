@@ -527,7 +527,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G4",
     "zakaznik": "Zákazník G4",
   },
-  "warn": "",
+  "warn": null,
 }
 `;
 
@@ -1193,7 +1193,7 @@ riadok 2",
     "zak": "ZAK-G1",
     "zakaznik": "Zákazník G1",
   },
-  "warn": "",
+  "warn": null,
 }
 `;
 
@@ -1931,7 +1931,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G2",
     "zakaznik": "Zákazník G2",
   },
-  "warn": "",
+  "warn": null,
 }
 `;
 

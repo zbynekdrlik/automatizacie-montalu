@@ -485,7 +485,7 @@ export const actions = {
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
 			// #342: kombinuj kovanie warn + tesnenie honest-null
-			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' '),
+			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' ') || null,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -662,7 +662,7 @@ export const actions = {
 			),
 			planHash: contentHash(vstup.zak, job.polozky),
 			// #342: kombinuj kovanie warn + tesnenie honest-null
-			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' '),
+			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' ') || null,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
