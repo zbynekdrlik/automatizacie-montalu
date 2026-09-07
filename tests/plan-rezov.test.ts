@@ -258,3 +258,158 @@ describe('parsePlanRezovFormData', () => {
 		}
 	});
 });
+
+// ──── Parser — okrajové vetvy tolerancie (coverage gate #482) ────
+
+describe('parsePlanRezov — TSV riadok s prázdnym (medzerovým) stĺpcom', () => {
+	it('prázdny stĺpec medzi názvom a ks sa preskočí, riadok sa sparsuje z ďalšieho páru', () => {
+		const text = '10001 PROFIL\t \t3\t2000';
+		const { riadky, preskocene } = parsePlanRezov(text);
+		expect(riadky.length).toBe(1);
+		expect(preskocene.length).toBe(0);
+		expect(riadky[0]).toEqual({ nazov: '10001 PROFIL', ks: 3, rezMm: 2000 });
+	});
+});
+
+describe('parsePlanRezov — TSV riadok s nenumerickým rezom sa preskočí', () => {
+	it('rez "XYZ" (nie číslo) => celý riadok preskočený', () => {
+		const text = 'PROFIL\t3\tXYZ';
+		const { riadky, preskocene } = parsePlanRezov(text);
+		expect(riadky.length).toBe(0);
+		expect(preskocene).toEqual(['PROFIL\t3\tXYZ']);
+	});
+});
+
+describe('parsePlanRezov — TSV riadok s neceločíselným ks sa preskočí', () => {
+	it('ks 3,5 (nie celé číslo, ks musí byť počet kusov) => riadok preskočený', () => {
+		const text = 'PROFIL\t3,5\t2000';
+		const { riadky, preskocene } = parsePlanRezov(text);
+		expect(riadky.length).toBe(0);
+		expect(preskocene).toEqual(['PROFIL\t3,5\t2000']);
+	});
+});
+
+describe('parsePlanRezov — space-separovaný riadok s nenumerickým rezom/ks', () => {
+	it('posledný token (rez) nie je číslo => riadok preskočený', () => {
+		const { riadky, preskocene } = parsePlanRezov('lat 80x19 22 abc');
+		expect(riadky.length).toBe(0);
+		expect(preskocene).toEqual(['lat 80x19 22 abc']);
+	});
+
+	it('predposledný token (ks) nie je číslo => riadok preskočený', () => {
+		const { riadky, preskocene } = parsePlanRezov('lat 80x19 abc 1252');
+		expect(riadky.length).toBe(0);
+		expect(preskocene).toEqual(['lat 80x19 abc 1252']);
+	});
+});
+
+describe('parsePlanRezovFormData — okrajové vetvy validácie', () => {
+	it('chýbajúce pole dlzkaTyce (nikdy nenastavené vo FormData) = chyba', () => {
+		const fd = new FormData();
+		fd.set('cad', 'PROFIL\t2\t1500');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/dĺžku tyče/);
+	});
+
+	it('dĺžka tyče nad stropom (> 1 000 000 mm) = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '2000000');
+		fd.set('cad', 'PROFIL\t2\t1500');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/príliš veľká/);
+	});
+
+	it('záporná rezná medzera = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		fd.set('reznaMedzera', '-1');
+		fd.set('cad', 'PROFIL\t2\t1500');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/Rezná medzera/);
+	});
+
+	it('chýbajúce pole cad (nikdy nenastavené vo FormData) = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/Vlož CAD tabuľku/);
+	});
+
+	it('CAD text nad stropom (> 500 000 znakov) = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		fd.set('cad', 'x'.repeat(500_001));
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/príliš veľký/);
+	});
+
+	it('žiadny riadok sa nepodarilo rozpoznať => chyba s ukážkou preskočených riadkov', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		fd.set('cad', 'toto je hlavicka bez cisiel\ndalsi riadok tiez bez cisiel');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) {
+			expect(result.error).toMatch(/Nepodarilo sa nájsť žiadne platné riadky/);
+			expect(result.error).toMatch(/Preskočené riadky:/);
+		}
+	});
+
+	it('viac ako 5000 riadkov = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		const rows = Array.from({ length: 5001 }, (_, i) => `PROFIL${i}\t1\t100`);
+		fd.set('cad', rows.join('\n'));
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/Príliš veľa riadkov/);
+	});
+
+	it('rez jedného riadku nad stropom (> 1 000 000 mm) = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		fd.set('cad', 'PROFIL\t1\t2000000');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) {
+			expect(result.error).toMatch(/príliš veľký/);
+			expect(result.error).toMatch(/PROFIL/);
+		}
+	});
+
+	it('spolu príliš veľa kusov na výpočet (> 20 000) = chyba', () => {
+		const fd = new FormData();
+		fd.set('dlzkaTyce', '6000');
+		fd.set('cad', 'PROFIL\t25000\t2000');
+		const result = parsePlanRezovFormData(fd);
+		expect('error' in result).toBe(true);
+		if ('error' in result) expect(result.error).toMatch(/príliš veľa kusov/);
+	});
+});
+
+// ──── spocitajPlanRezov — okrajové vetvy (coverage gate #482) ────
+
+describe('spocitajPlanRezov — tooLong zoskupenie viacerých kusov rovnakého profilu', () => {
+	it('2 kusy toho istého dlhého profilu sa zoskupia do JEDNÉHO varovania', () => {
+		const riadky = [{ nazov: 'PROFIL', ks: 2, rezMm: 7000 }];
+		const v = spocitajPlanRezov({ dlzkaTyce: 6000, reznaMedzera: 4, riadky });
+		expect(v.tooLong.length).toBe(2);
+		expect(v.varovania.length).toBe(1);
+		expect(v.varovania[0]).toMatch(/2 kus\(ov\) profilu "PROFIL"/);
+	});
+});
+
+describe('spocitajPlanRezov — preskočené riadky sa premietnu do varovaní', () => {
+	it('preskocene parameter pridá varovanie o počte nerozpoznaných riadkov', () => {
+		const riadky = [{ nazov: 'PROFIL', ks: 1, rezMm: 1000 }];
+		const v = spocitajPlanRezov({ dlzkaTyce: 6000, reznaMedzera: 4, riadky }, ['neplatny riadok']);
+		expect(v.preskocenych).toBe(1);
+		expect(v.preskoceneUkazka).toEqual(['neplatny riadok']);
+		expect(v.varovania).toContain('1 riadok(ov) nebolo rozpoznaných a boli preskočené.');
+	});
+});
