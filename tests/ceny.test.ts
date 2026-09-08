@@ -240,6 +240,7 @@ describe('enrichPolozky', () => {
 				nakupCennik: null,
 				nakupPoslednaFaktura: null,
 				predajVo: null,
+				predajPcmo: null,
 				marza: null,
 				sklad: null,
 				mena: 'EUR',
@@ -247,6 +248,7 @@ describe('enrichPolozky', () => {
 			}
 		]);
 		expect(r.sucty.nakupCennik).toEqual({ suma: 0, kompletne: false });
+		expect(r.sucty.predajPcmo).toEqual({ suma: 0, kompletne: false });
 		expect(r.sucty.marza).toEqual({ suma: 0, kompletne: false });
 	});
 
@@ -406,5 +408,48 @@ describe('#369 — rozvin + lakovanie v snapshote a enrichPolozky', () => {
 		expect(r.lakovanie.radky).toHaveLength(0);
 		expect(r.lakovanie.spotrebaSpolu).toBe(0);
 		expect(r.lakovanie.kompletne).toBe(true);
+	});
+});
+
+describe('#364 — predajPcmo (PCMO predajná cena) v snapshote a enrichPolozky', () => {
+	it('BPK kód s predajPcmo cenou sa naimportuje a objaví v enrichPolozky', async () => {
+		await tick();
+		writeSnapshot('2026-09-08T00:00:00Z', [
+			{
+				kod: 'BPK-PCMO-1',
+				nakupCennik: 0,
+				predajVo: 0,
+				predajPcmo: 12.5,
+				mena: 'EUR',
+				sklad: 30
+			}
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'BPK-PCMO-1', nazov: 'Komponent', qty: 3, mj: 'ks' }]);
+		expect(r.radky[0]!.predajPcmo).toBe(12.5);
+		// nakupCennik 0 → null (honest-null); predajPcmo 12.5 → reálna hodnota
+		expect(r.radky[0]!.nakupCennik).toBeNull();
+		expect(r.sucty.predajPcmo).toEqual({ suma: 37.5, kompletne: true });
+	});
+
+	it('predajPcmo chýba/null → honest-null, sucty.predajPcmo.kompletne=false', async () => {
+		await tick();
+		writeSnapshot('2026-09-08T01:00:00Z', [
+			{ kod: 'BPK-PCMO-2', nakupCennik: 0, mena: 'EUR', sklad: 10 }
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'BPK-PCMO-2', nazov: 'Bez PCMO ceny', qty: 5, mj: 'ks' }]);
+		expect(r.radky[0]!.predajPcmo).toBeNull();
+		expect(r.sucty.predajPcmo).toEqual({ suma: 0, kompletne: false });
+	});
+
+	it('predajPcmo=0 → null (honest-null, rovnaká sémantika ako nakupCennik)', async () => {
+		await tick();
+		writeSnapshot('2026-09-08T02:00:00Z', [
+			{ kod: 'BPK-PCMO-3', predajPcmo: 0, mena: 'EUR', sklad: 5 }
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'BPK-PCMO-3', nazov: 'Nulová PCMO', qty: 2, mj: 'ks' }]);
+		expect(r.radky[0]!.predajPcmo).toBeNull();
 	});
 });
