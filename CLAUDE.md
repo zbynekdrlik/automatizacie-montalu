@@ -132,3 +132,4 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - SkladVarovania cross-module wiring (bindable prop, vylucene_kody, dva mechanizmy odobratia) → `.claude/rules/sklad-varovania.md`
 - e2e zero-console assert + guard (`e2e/**`, `tests/e2e-console-guard.test.ts`) → `.claude/rules/e2e-console.md`
 - celoplošný vizuálny redizajn (`--m-*` tokeny, h1/app.css leak pasca, stage rollout) → `.claude/rules/redizajn.md`
+- objednávka skla podklad (file upload XSS, BODY_SIZE_LIMIT, handoff kontrakt, modul integrácia) → `.claude/rules/objednavka-skla.md`

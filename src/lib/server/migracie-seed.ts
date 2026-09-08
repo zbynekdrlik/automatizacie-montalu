@@ -518,6 +518,68 @@ export function migrateDrevostavby(db: Database.Database, bump: (v: number) => v
  *  vedel precitat pri re-derivacii / retry (#349). FK CASCADE na odpis_log — uvolnenie odpisu
  *  zmaze aj odpad. Len zasklenia a sietka maju ffdPack waste data; moduly bez offcut (pergola,
  *  bazen, clip) tabulku nepouzivaju. Money-NEUTRALNE. */
+/** v25 → v26: sledovanie zrkadlenia dopytu do Odoo CRM leadu (#278). MONEY-NEUTRÁLNE.
+ *  Extrahované sem z migracie.ts (large-file-split) — pure move. */
+export function migrateOdooLeadColumns(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 26) return;
+	const maDopyt =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dopyt'").get() !==
+		undefined;
+	if (!maDopyt) {
+		bump(26);
+		return;
+	}
+	db.transaction(() => {
+		db.exec(`
+			ALTER TABLE dopyt ADD COLUMN odoo_lead_id INTEGER;
+			ALTER TABLE dopyt ADD COLUMN odoo_attempts INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE dopyt ADD COLUMN odoo_last_error TEXT NOT NULL DEFAULT '';
+		`);
+		bump(26);
+	})();
+}
+
+/** #496: objednávka skla podklad — per-zákazka glass order items + file attachments.
+ *  Money-NEUTRÁLNE (objednávka u dodávateľa, nie odpis). Handoff kontrakt pre Odoo subdev. */
+export function migrateObjednavkaSkla(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 41) return;
+	db.transaction(() => {
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS objednavka_skla (
+				id INTEGER PRIMARY KEY,
+				zak TEXT NOT NULL,
+				zak_norm TEXT NOT NULL,
+				op TEXT NOT NULL DEFAULT '',
+				modul TEXT NOT NULL,
+				popis TEXT NOT NULL DEFAULT '',
+				sirka_mm REAL NOT NULL,
+				vyska_mm REAL,
+				v_lavo_mm REAL,
+				v_pravo_mm REAL,
+				pocet INTEGER NOT NULL DEFAULT 1,
+				typ_skla TEXT NOT NULL DEFAULT '',
+				sikmy INTEGER NOT NULL DEFAULT 0,
+				m2 REAL,
+				rezim TEXT NOT NULL DEFAULT 'rozmery' CHECK(rezim IN ('rozmery','atyp')),
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				created_by TEXT NOT NULL DEFAULT ''
+			);
+			CREATE INDEX IF NOT EXISTS idx_objednavka_skla_zak ON objednavka_skla(zak_norm);
+			CREATE TABLE IF NOT EXISTS objednavka_skla_subory (
+				id INTEGER PRIMARY KEY,
+				polozka_id INTEGER NOT NULL REFERENCES objednavka_skla(id) ON DELETE CASCADE,
+				nazov TEXT NOT NULL,
+				typ TEXT NOT NULL DEFAULT '',
+				velkost INTEGER NOT NULL DEFAULT 0,
+				data BLOB NOT NULL,
+				created_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX IF NOT EXISTS idx_objednavka_skla_subory_pol ON objednavka_skla_subory(polozka_id);
+		`);
+		bump(41);
+	})();
+}
+
 export function migrateOdpisOdpad(db: Database.Database, bump: (v: number) => void): void {
 	if ((db.pragma('user_version', { simple: true }) as number) >= 39) return;
 	const maOdpisLog =

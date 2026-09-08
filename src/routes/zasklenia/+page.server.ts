@@ -2,6 +2,7 @@
 // (2) „odoslat" prepočíta ZNOVA zo surových vstupov (nikdy never klientom
 // poslaným číslam) a zapíše odpis s dedup ochranou.
 
+import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
 import {
@@ -63,6 +64,7 @@ import {
 	type MultiVstup
 } from '$lib/server/vstup';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
+import { pridajSklaHromadne, type NoveSklo } from '$lib/server/objednavka-skla';
 
 /** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
  *  ako comma-separated string v hidden inpute `vylucene_kody`. */
@@ -814,5 +816,64 @@ export const actions = {
 				multiVstup: vstup
 			};
 		}
+	},
+
+	// ---- #496: Pridať sklá do objednávky skla (single posuv) ----
+	pridatSkla: async ({ request, locals }) => {
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
+		}
+		const { vstup, error } = parseVstup(await request.formData());
+		if (error) return { step: 'form' as const, error, vstup };
+		const { r, err } = compute(vstup);
+		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		if (!vstup.zak.trim())
+			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', vstup };
+
+		const polozky: NoveSklo[] = [
+			{
+				zak: vstup.zak,
+				op: vstup.op,
+				modul: 'zasklenia',
+				popis: `${r.system} ${r.styl}`,
+				sirkaMm: r.sklo.sirka,
+				vyskaMm: r.sklo.vyska,
+				pocet: r.sklo.pocet,
+				typSkla: vstup.skloPresne || vstup.sklo,
+				createdBy: locals.user?.username ?? ''
+			}
+		];
+		const count = pridajSklaHromadne(polozky);
+		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, count });
+		redirect(303, '/objednavka-skla/' + encodeURIComponent(vstup.zak));
+	},
+
+	// ---- #496: Pridať sklá do objednávky skla (multi posuv / zimná záhrada) ----
+	pridatSklaMulti: async ({ request, locals }) => {
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
+		}
+		const { vstup, error } = parseMultiVstup(await request.formData());
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		const { r, err } = computeMultiFrom(vstup);
+		if (err || !r)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
+		if (!vstup.zak.trim())
+			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', multiVstup: vstup };
+
+		const polozky: NoveSklo[] = r.posuvy.map((p, i) => ({
+			zak: vstup.zak,
+			op: vstup.op,
+			modul: 'zasklenia',
+			popis: `Zasklenie ${i + 1}: ${p.system} ${p.styl}`,
+			sirkaMm: p.sklo.sirka,
+			vyskaMm: p.sklo.vyska,
+			pocet: p.sklo.pocet,
+			typSkla: vstup.posuvy[i]?.sklo ?? '',
+			createdBy: locals.user?.username ?? ''
+		}));
+		const count = pridajSklaHromadne(polozky);
+		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, count });
+		redirect(303, '/objednavka-skla/' + encodeURIComponent(vstup.zak));
 	}
 } satisfies Actions;

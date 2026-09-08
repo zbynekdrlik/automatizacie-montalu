@@ -28,7 +28,10 @@ const B2B_FORBIDDEN_PREFIXES = [
 	'/dopyty-konfigurator',
 	// plán rezov (#482) — univerzálny optimalizátor rezov z CAD tabuľky,
 	// interný nástroj (Dominik — brány), bez Money odpisu; drift guard
-	'/plan-rezov'
+	'/plan-rezov',
+	// objednávka skla (#496) — interný podklad objednávky skla per zákazka,
+	// Money-neutrálne (objednávka u dodávateľa); drift guard
+	'/objednavka-skla'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —
