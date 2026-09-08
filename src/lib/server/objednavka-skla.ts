@@ -110,7 +110,7 @@ const stmtListPre = db.prepare(`
 	       created_at, created_by
 	FROM objednavka_skla
 	WHERE zak_norm = ? OR upper(replace(zak_norm,' ','')) = ?
-	ORDER BY modul, created_at
+	ORDER BY modul, created_at, id
 `);
 
 interface SkloRow {

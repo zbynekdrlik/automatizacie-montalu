@@ -10,12 +10,21 @@ import {
 	pridajSubor,
 	listSubory,
 	zmazSubor,
-	getSuborData,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
 
+// Server-side file extension allowlist (#496 review RED-1: stored XSS prevention).
+// Client-side `accept` attribute is UX only — a forged POST bypasses it.
+const ALLOWED_EXTENSIONS = ['.pdf', '.dxf', '.dwg', '.step', '.stp', '.igs', '.iges'];
+
+function allowedExtension(filename: string): boolean {
+	const ext = '.' + (filename.split('.').pop() ?? '').toLowerCase();
+	return ALLOWED_EXTENSIONS.includes(ext);
+}
+
 export const load: PageServerLoad = async ({ params }) => {
-	const zak = decodeURIComponent(params.zak).trim();
+	// SvelteKit already decodes params — no decodeURIComponent (review BLUE-7: double-decode)
+	const zak = params.zak.trim();
 	if (!zak) error(404, 'Zákazka nie je zadaná.');
 
 	const polozky = listSklaPreZakazku(zak);
@@ -71,8 +80,15 @@ export const actions = {
 				error: `Súbor je príliš veľký (max ${MAX_SUBOR_VELKOST / 1024 / 1024} MB).`
 			});
 
+		// Server-side extension allowlist — client `accept` is UX only
+		if (!allowedExtension(subor.name))
+			return fail(400, {
+				error: `Nepovolený typ súboru. Povolené: ${ALLOWED_EXTENSIONS.join(', ')}.`
+			});
+
 		const buf = Buffer.from(await subor.arrayBuffer());
-		pridajSubor(polozkaId, subor.name, subor.type || 'application/octet-stream', buf);
+		// Force safe MIME type regardless of browser-reported type
+		pridajSubor(polozkaId, subor.name, 'application/octet-stream', buf);
 
 		// Auto-switch to atyp when a file is uploaded
 		nastavRezim(polozkaId, 'atyp');
@@ -85,15 +101,6 @@ export const actions = {
 		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID súboru.' });
 		zmazSubor(id);
 		return { ok: true };
-	},
-
-	stiahnutSubor: async ({ request }) => {
-		const form = await request.formData();
-		const id = Number(form.get('id'));
-		if (!Number.isInteger(id) || id <= 0) error(404, 'Neplatné ID súboru.');
-		const data = getSuborData(id);
-		if (!data) error(404, 'Súbor sa nenašiel.');
-		// Return file info — actual download is a GET endpoint
-		return { ok: true };
 	}
+	// stiahnutSubor removed (review YELLOW-1: dead code — download uses GET endpoint)
 } satisfies Actions;
