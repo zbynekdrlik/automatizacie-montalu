@@ -72,6 +72,8 @@ CENIK_IZOS = "F4A1DFEE-9298-45D2-9891-1548741B2063"  # IZOS (izolačné sklá TS
 # Predajný cenník polykarbonát MO — overený live read-only 2026-09-08.
 # Predajná cena, ZÁMERNE NIE nakupCennik (iný význam). 61/173 BPK kódov má cenu > 0;
 # pokrýva aj PCD (93), PRK (33), ZAS (44). Zobrazuje sa ako orientačná predajná cena.
+# 1:1 overené 2026-09-08 (GROUP BY Artikl_ID HAVING COUNT(*)>1 na snapshot-scope kódoch
+# = 0 duplikátov) — rovnaký vzor ako #369 m2 jednotka. Mena = EUR.
 CENIK_PCMO = "F298CAD0-321A-408B-8FDE-D71C9C638130"  # Predajný cenník polykarbonát MO
 
 # Merná jednotka `m2` (Ciselniky_Jednotka.ID) — overené live read-only 2026-09-03.
@@ -113,7 +115,8 @@ LEFT JOIN Ceniky_Cenik voc ON voc.ID = vo.Cenik_ID
 LEFT JOIN Ceniky_PolozkaCeniku iz ON iz.Artikl_ID = a.ID AND iz.Cenik_ID = %(iz)s AND iz.Deleted = 0
 LEFT JOIN Ceniky_Cenik izc ON izc.ID = iz.Cenik_ID
 LEFT JOIN Ceniky_PolozkaCeniku pcmo ON pcmo.Artikl_ID = a.ID AND pcmo.Cenik_ID = %(pcmo)s AND pcmo.Deleted = 0
-LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID)
+LEFT JOIN Ceniky_Cenik pcmoc ON pcmoc.ID = pcmo.Cenik_ID
+LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID, pcmoc.Mena_ID)
 LEFT JOIN S5_Artikl_CelkoveMnozstviNaSkladech s ON s.Artikl_ID = a.ID
 LEFT JOIN Artikly_ArtiklJednotka r ON r.Parent_ID = a.ID AND r.Deleted = 0
                                   AND r.Jednotka_ID = %(m2)s

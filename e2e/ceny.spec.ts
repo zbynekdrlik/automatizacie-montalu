@@ -41,6 +41,7 @@ test('bez Money snapshotu appka ukáže "cena neznáma" v náhľade, súčty pri
 	await expect(page.getByTestId('ceny-snapshot-vek')).toContainText('nebol naimportovaný');
 	await expect(page.getByTestId('cena-nakup-cennik-ZASP00014')).toHaveText('cena neznáma');
 	await expect(page.getByTestId('cena-predaj-vo-ZASP00014')).toHaveText('cena neznáma');
+	await expect(page.getByTestId('cena-predaj-pcmo-ZASP00014')).toHaveText('cena neznáma');
 	await expect(page.getByTestId('ceny-sucet-nakup-cennik')).toContainText('neúplné');
 	expect(consoleMsgs).toEqual([]);
 });
@@ -65,6 +66,7 @@ test('so seednutým Money snapshotom appka ukáže reálne (vymyslené) ceny + k
 					nakupCennik: 5.5,
 					nakupPoslednaFaktura: 6.5,
 					predajVo: 8,
+					predajPcmo: 12,
 					mena: 'EUR',
 					sklad: 100
 				},
@@ -102,6 +104,10 @@ test('so seednutým Money snapshotom appka ukáže reálne (vymyslené) ceny + k
 	await expect(page.getByTestId('cena-nakup-cennik-ZASP00002')).toContainText('€');
 	await expect(page.getByTestId('cena-nakup-cennik-ZASP00010')).toContainText('€');
 	await expect(page.getByTestId('ceny-sucet-nakup-cennik')).toContainText('176,25 €');
+	// #364: predajPcmo — ZASP00014 má 12 €, ostatné nie (honest-null); súčet neúplný
+	await expect(page.getByTestId('cena-predaj-pcmo-ZASP00014')).toContainText('12,00');
+	await expect(page.getByTestId('cena-predaj-pcmo-ZASP00002')).toHaveText('cena neznáma');
+	await expect(page.getByTestId('ceny-sucet-predaj-pcmo')).toContainText('neúplné');
 	expect(consoleMsgs).toEqual([]);
 });
 
