@@ -51,7 +51,9 @@ grep -rn "toBe(<oldhead>)" tests/   # over: 0 zvyškov; a že žiadny setter `us
 
 Tie dva testy overujú EXAKTNÝ zoznam stĺpcov tabuľky (`dopyt` pre v25/v26). Pri ALTER tej tabuľky
 pridaj nový stĺpec do oboch `toEqual([...])` polí (na správne miesto — na koniec pridaného poradia).
-Iné migračné fixtures (`v28`/`v29`) tú tabuľku nemajú, netreba ich meniť.
+Iné migračné fixtures (`v28`/`v29`) tú tabuľku nemajú, netreba ich meniť. **`material_prices` má
+EXAKTNÉ zoznamy stĺpcov v `migration-v21.test.ts`, `migration-v38.test.ts`, `migration-v42.test.ts`**
+— pri ALTER `material_prices` (pridanie stĺpca) pridaj nový stĺpec do VŠETKÝCH troch.
 
 **NOVÁ tabuľka (nie ALTER `dopyt`) → krok 4 SA NETÝKA** (#349 v34 `odoo_zakazka_push`): `CREATE TABLE`
 nemení `dopyt`, takže exaktné v25/v26 zoznamy stĺpcov ostávajú platné. Rovnako `sqlite_master`

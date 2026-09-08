@@ -603,3 +603,21 @@ export function migrateOdpisOdpad(db: Database.Database, bump: (v: number) => vo
 		bump(39);
 	})();
 }
+
+/** #364: predajná cena z Money cenníka PCMO na `material_prices` — display-only orientačná
+ *  cena, hlavne pre BPK bazénové komponenty (61/173 kódov), ale PCMO pokrýva aj PCD/PRK/ZAS.
+ *  Money-NEUTRÁLNE (appka nikdy do Money nepíše). Aditívny `ALTER … ADD COLUMN` (O(1)). */
+export function migrateMaterialPredajPcmo(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 42) return;
+	// material_prices existuje od v21; minimálne fixtúry ju nemusia mať → feature-detect
+	const maTable =
+		db
+			.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='material_prices'")
+			.get() !== undefined;
+	db.transaction(() => {
+		if (maTable) {
+			db.exec('ALTER TABLE material_prices ADD COLUMN predaj_pcmo REAL');
+		}
+		bump(42);
+	})();
+}

@@ -2,7 +2,7 @@
 """Cenový zoznam materiálu — fáza 1 (#154): READ-ONLY denný snapshot z Money.
 
 Vypíše JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura,
-predajVo, mena, sklad, rozvin}]}` pre všetky ZASP*/ZASK*/TS*/PRP*/BPP*/BPK* Money kódy
+predajVo, predajPcmo, mena, sklad, rozvin}]}` pre všetky ZASP*/ZASK*/TS*/PRP*/BPP*/BPK* Money kódy
 (profily + komponenty/kovanie zasklenia + izolačné sklá #235 + pergolové profily
 #240 + bazénové profily BPP* a kusové komponenty BPK* #359). Appka tento
 súbor sama LAZY naimportuje (`src/lib/server/ceny.ts`) — tento skript do
@@ -69,6 +69,13 @@ CENIK_NC = "BA7DA0F8-8086-4963-AAE1-09D2C1C7266C"  # Nákupný cenník
 CENIK_PRF_VO = "AEEF5C92-5B44-4755-8680-F01CE6E4D5C2"  # Profily a príslušenstvo - VO
 CENIK_IZOS = "F4A1DFEE-9298-45D2-9891-1548741B2063"  # IZOS (izolačné sklá TS*, ceny/m²)
 
+# Predajný cenník polykarbonát MO — overený live read-only 2026-09-08.
+# Predajná cena, ZÁMERNE NIE nakupCennik (iný význam). 61/173 BPK kódov má cenu > 0;
+# pokrýva aj PCD (93), PRK (33), ZAS (44). Zobrazuje sa ako orientačná predajná cena.
+# 1:1 overené 2026-09-08 (GROUP BY Artikl_ID HAVING COUNT(*)>1 na snapshot-scope kódoch
+# = 0 duplikátov) — rovnaký vzor ako #369 m2 jednotka. Mena = EUR.
+CENIK_PCMO = "F298CAD0-321A-408B-8FDE-D71C9C638130"  # Predajný cenník polykarbonát MO
+
 # Merná jednotka `m2` (Ciselniky_Jednotka.ID) — overené live read-only 2026-09-03.
 # Jej koeficient (Artikly_ArtiklJednotka.Mnozstvi) je pri profiloch ROZVIN = m² povrchu
 # na 1 bežný meter (= obvod prierezu v metroch), pre výpočet spotreby farby na lakovanie
@@ -95,6 +102,7 @@ SELECT
     CASE WHEN a.Kod LIKE 'TS%' THEN iz.Cena ELSE nc.Cena END AS nakupCennik,
     ad.PosledniCena AS nakupPoslednaFaktura,
     vo.Cena AS predajVo,
+    pcmo.Cena AS predajPcmo,
     ISNULL(m.Kod, 'EUR') AS mena,
     s.CelkoveDostupneMnozstviNaSkladech AS sklad,
     r.Mnozstvi AS rozvin
@@ -106,7 +114,9 @@ LEFT JOIN Ceniky_PolozkaCeniku vo ON vo.Artikl_ID = a.ID AND vo.Cenik_ID = %(vo)
 LEFT JOIN Ceniky_Cenik voc ON voc.ID = vo.Cenik_ID
 LEFT JOIN Ceniky_PolozkaCeniku iz ON iz.Artikl_ID = a.ID AND iz.Cenik_ID = %(iz)s AND iz.Deleted = 0
 LEFT JOIN Ceniky_Cenik izc ON izc.ID = iz.Cenik_ID
-LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID)
+LEFT JOIN Ceniky_PolozkaCeniku pcmo ON pcmo.Artikl_ID = a.ID AND pcmo.Cenik_ID = %(pcmo)s AND pcmo.Deleted = 0
+LEFT JOIN Ceniky_Cenik pcmoc ON pcmoc.ID = pcmo.Cenik_ID
+LEFT JOIN Meny_Mena m ON m.ID = COALESCE(ncc.Mena_ID, voc.Mena_ID, izc.Mena_ID, pcmoc.Mena_ID)
 LEFT JOIN S5_Artikl_CelkoveMnozstviNaSkladech s ON s.Artikl_ID = a.ID
 LEFT JOIN Artikly_ArtiklJednotka r ON r.Parent_ID = a.ID AND r.Deleted = 0
                                   AND r.Jednotka_ID = %(m2)s
@@ -160,7 +170,7 @@ def _num(v: object) -> float | None:
 
 def fetch_rows(conn) -> list[dict]:
     cur = conn.cursor(as_dict=True)
-    cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO, "iz": CENIK_IZOS, "m2": JEDNOTKA_M2})
+    cur.execute(QUERY, {"nc": CENIK_NC, "vo": CENIK_PRF_VO, "iz": CENIK_IZOS, "pcmo": CENIK_PCMO, "m2": JEDNOTKA_M2})
     rows = []
     seen: set[str] = set()
     for r in cur.fetchall():
@@ -180,6 +190,9 @@ def fetch_rows(conn) -> list[dict]:
                 "nakupCennik": _num(r.get("nakupCennik")),
                 "nakupPoslednaFaktura": _num(r.get("nakupPoslednaFaktura")),
                 "predajVo": _num(r.get("predajVo")),
+                # predajPcmo (#364): predajná cena z cenníka PCMO (hlavne BPK, ale pokrýva aj
+                # PCD/PRK/ZAS). ZÁMERNE NIE nakupCennik — iný sémantický význam.
+                "predajPcmo": _num(r.get("predajPcmo")),
                 "mena": (r.get("mena") or "EUR").strip() or "EUR",
                 # #154 review nález: `None` (LEFT JOIN na S5_Artikl_... bez zhody —
                 # Money pre tento kód vôbec nemá skladovú kartu) MUSÍ ostať `null` v

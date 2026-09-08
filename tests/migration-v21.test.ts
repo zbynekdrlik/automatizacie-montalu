@@ -44,7 +44,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v20 → v21: cenový zoznam materiálu (#154, fáza 1)', () => {
 	it('user_version=21 po migrácii, existujúci odpis_log riadok nedotknutý', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(41);
+		expect(db.pragma('user_version', { simple: true })).toBe(42);
 		const row = db.prepare("SELECT zak, op FROM odpis_log WHERE zak = 'ZAK-V21'").get();
 		expect(row).toEqual({ zak: 'ZAK-V21', op: '01' });
 	});
@@ -61,7 +61,8 @@ describe('migrácia v20 → v21: cenový zoznam materiálu (#154, fáza 1)', () 
 			'mena',
 			'sklad',
 			'updated_at',
-			'rozvin' // #369: pridaný migráciou v38 (ADD COLUMN pripája na koniec)
+			'rozvin', // #369: pridaný migráciou v38 (ADD COLUMN pripája na koniec)
+			'predaj_pcmo' // #364: pridaný migráciou v42 (PCMO predajná cena)
 		]);
 	});
 

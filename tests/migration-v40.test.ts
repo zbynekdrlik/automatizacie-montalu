@@ -37,7 +37,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v39 → v40: Štandard Drevo systém (#445)', () => {
 	it('user_version === 40 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(41);
+		expect(db.pragma('user_version', { simple: true })).toBe(42);
 	});
 
 	it('cfg_sys obsahuje Štandard Drevo|4K', () => {

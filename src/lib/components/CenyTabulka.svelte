@@ -56,6 +56,7 @@
 				<th class="c">Nákup (cenník)</th>
 				<th class="c">Nákup (posledná faktúra)</th>
 				<th class="c">Predaj VO</th>
+				<th class="c">Predaj MO</th>
 				<th class="c">Marža</th>
 				<th class="c">Na sklade</th>
 			</tr>
@@ -73,6 +74,7 @@
 						>{bunka(r.nakupPoslednaFaktura, r.mena)}</td
 					>
 					<td class="c" data-testid={`cena-predaj-vo-${r.kod}`}>{bunka(r.predajVo, r.mena)}</td>
+					<td class="c" data-testid={`cena-predaj-pcmo-${r.kod}`}>{bunka(r.predajPcmo, r.mena)}</td>
 					<td class="c">{bunka(r.marza, r.mena)}</td>
 					<td class="c">{skladBunka(r.sklad)}</td>
 				</tr>
@@ -98,6 +100,13 @@
 				</td>
 				<td class="c" data-testid="ceny-sucet-predaj-vo">
 					<b>{fmtCena(ceny.sucty.predajVo.suma)}</b>{#if !ceny.sucty.predajVo.kompletne}
+						<span class="neuplne" title="Niektoré položky majú neznámu cenu — súčet je neúplný"
+							>⚠ neúplné</span
+						>
+					{/if}
+				</td>
+				<td class="c" data-testid="ceny-sucet-predaj-pcmo">
+					<b>{fmtCena(ceny.sucty.predajPcmo.suma)}</b>{#if !ceny.sucty.predajPcmo.kompletne}
 						<span class="neuplne" title="Niektoré položky majú neznámu cenu — súčet je neúplný"
 							>⚠ neúplné</span
 						>
