@@ -351,16 +351,18 @@ export const actions = {
 			};
 
 		const strechaSklo = spocitajStrechaSklo(vstup);
-		// Honest-null: len keď je šírka A počet tabúľ známy
+		// Honest-null: len keď je šírka, dĺžka A počet tabúľ známy (dĺžka je null pre
+		// neoverenú kotvu — stena / zadný profil != 110 / bez sklonu / sklon nad 9°)
 		if (
 			strechaSklo.sirkaMm == null ||
+			strechaSklo.dlzkaMm == null ||
 			strechaSklo.pocetTabul == null ||
 			strechaSklo.pocetTabul <= 0
 		) {
 			return {
 				step: 'form' as const,
 				error:
-					'Strešné sklo nie je kompletné — zadaj typ skla a počet krovov, aby sa dali pridať sklá.',
+					'Strešné sklo nie je kompletné — zadaj typ skla, počet krovov a sklon strechy (dĺžka tabule sa počíta len pre samostatnú pergolu so zadným profilom 110 a sklonom do 9°).',
 				vstup,
 				ident,
 				rucne: [],

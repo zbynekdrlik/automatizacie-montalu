@@ -4,7 +4,8 @@
 // Karty Cortizo COR-60 CE v Money katalógu neexistujú (overené read-only SQL 2026-07-27).
 // #380: FIX modul má DRUHÝ režim „Fix z cadu" (route /fix/cad), ktorý z CAD nárezu ZAPISUJE
 // Money odpis (reuse pergola CAD2DLV engine + katalóg, modul='fix'). Tá cesta žije ODDELENE
-// v `$lib/server/fix-cad.ts`; tento formulár ostáva Money-clean (guard fix-money-safety.test.ts).
+// v `$lib/server/fix-cad.ts`; engine (`$lib/fix.ts`) ostáva Money-clean (guard fix-money-safety.test.ts).
+// Route importuje `objednavka-skla.ts` (Money-NEUTRÁLNA CRUD, tranzitívne `normZak` z money.ts — pure helper).
 import { redirect } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { pocitajFix, rovnomernePolia, FIX_MAX_POLI } from '$lib/fix';
@@ -47,9 +48,8 @@ export const actions = {
 			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
 		}
 		const { vstup, error } = parseFixVstup(await request.formData());
+		// parseFixVstup already validates ZAK/OP/zákazník
 		if (error) return { step: 'form' as const, error, vstup };
-		if (!vstup.zak.trim())
-			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', vstup };
 		const r = pocitajFix(vstup.s, vstup.v1, vstup.v2, vstup.polia);
 		const sikmy = vstup.tvar === 'sikmy';
 		const polozky: NoveSklo[] = r.polia.map((pole, i) => ({
