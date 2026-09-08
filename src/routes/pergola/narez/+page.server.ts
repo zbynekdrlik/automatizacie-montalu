@@ -32,6 +32,8 @@ import { isB2B, type SessionUser } from '$lib/server/auth';
 import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import { strechaSkloCenaPre, type StrechaSkloCena } from '$lib/server/sklo-strecha-cena';
 import { logger } from '$lib/server/log';
+import { redirect } from '@sveltejs/kit';
+import { pridajSklaHromadne, type NoveSklo } from '$lib/server/objednavka-skla';
 
 const log = logger('pergola:narez');
 
@@ -325,5 +327,62 @@ export const actions = {
 			error: null as string | null,
 			odooResult
 		};
+	},
+
+	// ---- #496: Pridať strešné sklá do objednávky skla ----
+	pridatSkla: async ({ request, locals }) => {
+		// b2b: /pergola je v B2B_FORBIDDEN_PREFIXES, ale defense-in-depth
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
+		}
+		const form = await request.formData();
+		const { vstup, error } = parsePergolaNarezVstup(form);
+		const ident = parseIdent(form);
+		if (error)
+			return { step: 'form' as const, error, vstup, ident, rucne: [], fix: parseFix(form, vstup) };
+		if (!ident.zak.trim())
+			return {
+				step: 'form' as const,
+				error: 'Zadaj číslo zákazky (ZAK).',
+				vstup,
+				ident,
+				rucne: [],
+				fix: parseFix(form, vstup)
+			};
+
+		const strechaSklo = spocitajStrechaSklo(vstup);
+		// Honest-null: len keď je šírka A počet tabúľ známy
+		if (
+			strechaSklo.sirkaMm == null ||
+			strechaSklo.pocetTabul == null ||
+			strechaSklo.pocetTabul <= 0
+		) {
+			return {
+				step: 'form' as const,
+				error:
+					'Strešné sklo nie je kompletné — zadaj typ skla a počet krovov, aby sa dali pridať sklá.',
+				vstup,
+				ident,
+				rucne: [],
+				fix: parseFix(form, vstup)
+			};
+		}
+
+		const polozky: NoveSklo[] = [
+			{
+				zak: ident.zak,
+				op: ident.op,
+				modul: 'pergola',
+				popis: `Strešné sklo${strechaSklo.typ ? ' — ' + strechaSklo.typ : ''}`,
+				sirkaMm: strechaSklo.sirkaMm,
+				vyskaMm: strechaSklo.dlzkaMm,
+				pocet: strechaSklo.pocetTabul,
+				typSkla: strechaSklo.typ ?? '',
+				createdBy: locals.user?.username ?? ''
+			}
+		];
+		const count = pridajSklaHromadne(polozky);
+		log.info('stresne skla pridane do objednavky', { zak: ident.zak, count });
+		redirect(303, '/objednavka-skla/' + encodeURIComponent(ident.zak));
 	}
 } satisfies Actions;
