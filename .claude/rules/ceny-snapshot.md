@@ -21,7 +21,7 @@ paths:
 Producent `scripts/ceny-snapshot.py` beží **mimo repa na dev2**
 (`/home/newlevel/montalu-ceny/run-snapshot.sh`, cron 05:30) → číta Money read-only cez
 tunel → JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura, predajVo,
-mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
+predajPcmo, mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
 **lazy** naimportuje (`ceny.ts` `maybeImportSnapshot`, gejtuje na mtime) do
 `material_prices` (kľúč = Money `kod`). Chýbajúca/nulová cena = **`null`** („neznáma"),
 NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
@@ -51,7 +51,12 @@ potrebuje `git pull` + jeden beh, kým sa rozvin objaví — dovtedy je pri prof
   tiež, ale nákupná cena je pri VŠETKÝCH 0 → honest-null (Money nemá nákupnú cenu bazénových
   komponentov). Jediná nenulová cena BPK žije v predajnom cenníku **PCMO „Predajný cenník
   polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) — PREDAJNÁ cena, do `nakupCennik` sa
-  ZÁMERNE nemapuje; jej zobrazenie je follow-up #364. Obe bazénové rodiny majú sklad (57/57
+  ZÁMERNE nemapuje; zobrazuje sa ako vlastné pole `predajPcmo` (#364, migrácia v42).
+  `predajPcmo` nemá žiadny family gate (na rozdiel od `predajVo`, ktoré appka nuluje pre
+  non-ZASP) — zobrazuje sa pre VŠETKY rodiny, ale nenulová hodnota je hlavne pri BPK
+  (61/173), plus PCD/PRK/ZAS. Producent na dev2 potrebuje `git pull` + jeden beh, kým sa
+  `predajPcmo` objaví — dovtedy je pri všetkých kódoch `null` (stĺpec „Predaj MO" ukáže
+  „cena neznáma"). Obe bazénové rodiny majú sklad (57/57
   BPK, 25/25 BPP). Odkedy sú v snapshote, `validateOdpisKody` (#295) bazén odpisy validuje.
 - **SKLÁ (`TS*` kódy):** cenené LEN v cenníku **IZOS** (`Ceniky_Cenik.Kod='IZOS'`, ID
   `f4a1dfee-9298-45d2-9891-1548741b2063`), **v NC vôbec nie sú** (0 riadkov). Názvy nesú
@@ -152,8 +157,10 @@ odoslanie do Money sa nemení.
   `skladVarovania`). Na route DOSTUPNEJ b2b (`/zasklenia`) MUSÍ byť `cenyPre`-štýl gate
   (`if (isB2B(user)) return undefined`) — druhá vrstva obrany, dáta sa vôbec nedopočítajú.
 - **Bazén honest-null:** BPK* kusové komponenty majú v snapshote nákup=null → súčet
-  `CenySucet.kompletne=false` (priznaný neúplný). To je zámer (Money nemá nákup BPK, PCMO
-  predajná = follow-up #364), nie chyba testu.
+  `CenySucet.kompletne=false` (priznaný neúplný). To je zámer (Money nemá nákup BPK).
+  PCMO predajná cena je od #364 zobrazená ako vlastný stĺpec „Predaj MO" v CenyTabulka
+  — ten ukazuje hodnotu pre kódy, kde PCMO cena existuje (61/173 BPK), a honest-null
+  pre zvyšok.
 
 ## `SkladVarovania.svelte` — výrazný blok + akcia „Odobrať z odpisu" (#451)
 

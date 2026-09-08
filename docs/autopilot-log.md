@@ -2116,3 +2116,9 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   ZASK00007 kefa added to KOMPONENTY_STANDARD (kladkovy×2, same as Deluxe).
   ZASK202541 left honest-null (unknown profile role). 40 new test vectors, golden snapshot updated.
   NEmergnuté (worktree — supervisor integruje).
+- **#364 BPK PCMO predajná cena** (60586f5..c775d7b): PCMO cenník (F298CAD0-...) predajná cena
+  added to full snapshot pipeline: producer SQL LEFT JOIN, migration v42 (predaj_pcmo REAL),
+  ceny.ts PriceRow/enrichPolozky, CenyTabulka "Predaj MO" column. 61/173 BPK codes have PCMO
+  price > 0, also covers PCD/PRK/ZAS. No family gate (unlike predajVo). PCMO 1:1 verified live.
+  Review (fable-5-1): 5 findings all fixed (E2E, COALESCE parity, playbook, decision provenance,
+  1:1 uniqueness). NEmergnuté (worktree — supervisor integruje).

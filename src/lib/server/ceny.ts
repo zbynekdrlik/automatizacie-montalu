@@ -21,6 +21,10 @@ export interface PriceRow {
 	nakupCennik: number | null;
 	nakupPoslednaFaktura: number | null;
 	predajVo: number | null;
+	// predajPcmo (#364): predajná cena z cenníka PCMO (Predajný cenník polykarbonát MO).
+	// Hlavne BPK bazénové komponenty (61/173 kódov), ale pokrýva aj PCD/PRK/ZAS.
+	// ZÁMERNE NIE nakupCennik — iný sémantický význam (predajná, nie nákupná).
+	predajPcmo: number | null;
 	mena: string;
 	/** `null` = Money pre tento kód vôbec nemá skladovú kartu (neznáme); 0/záporné
 	 *  sú REÁLNE hodnoty (vypredané / rezervované nad rámec skladu). */
@@ -104,6 +108,9 @@ function validateRow(raw: unknown, idx: number, log: (m: string) => void): Price
 		nakupCennik: priceOrNull(r.nakupCennik, 'nakupCennik', rowLog),
 		nakupPoslednaFaktura: priceOrNull(r.nakupPoslednaFaktura, 'nakupPoslednaFaktura', rowLog),
 		predajVo,
+		// predajPcmo (#364): predajná cena z PCMO cenníka. `priceOrNull` 1:1 — rovnaká
+		// sémantika (0 = nikdy zadané → null). PCMO je predajný cenník, ZÁMERNE NIE nakupCennik.
+		predajPcmo: priceOrNull(r.predajPcmo, 'predajPcmo', rowLog),
 		mena,
 		sklad,
 		// rozvin (#369): kladné m²/bm, alebo `null`. `priceOrNull` sa hodí 1:1 —
@@ -175,12 +182,13 @@ export function maybeImportSnapshot(): ImportResult {
 	});
 
 	const upsert = db.prepare(`
-		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, mena, sklad, rozvin, updated_at)
-		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @mena, @sklad, @rozvin, datetime('now'))
+		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, predaj_pcmo, mena, sklad, rozvin, updated_at)
+		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @predajPcmo, @mena, @sklad, @rozvin, datetime('now'))
 		ON CONFLICT(kod) DO UPDATE SET
 			nakup_cennik = excluded.nakup_cennik,
 			nakup_posledna_faktura = excluded.nakup_posledna_faktura,
 			predaj_vo = excluded.predaj_vo,
+			predaj_pcmo = excluded.predaj_pcmo,
 			mena = excluded.mena,
 			sklad = excluded.sklad,
 			rozvin = excluded.rozvin,
@@ -256,7 +264,10 @@ export function importOdooPricesData(data: OdooPricesResponse): OdooImportResult
 			continue;
 		}
 		// rozvin nie je v Odoo response — vždy null (#5808 GAP)
-		const row = validateRow({ ...r, rozvin: null }, i, (m) => log.warn(`odoo-prices: ${m}`));
+		// predajPcmo nie je v Odoo response — vždy null (#364)
+		const row = validateRow({ ...r, rozvin: null, predajPcmo: null }, i, (m) =>
+			log.warn(`odoo-prices: ${m}`)
+		);
 		if (!row) {
 			rejected++;
 			continue;
@@ -265,12 +276,13 @@ export function importOdooPricesData(data: OdooPricesResponse): OdooImportResult
 	}
 
 	const upsert = db.prepare(`
-		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, mena, sklad, rozvin, updated_at)
-		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @mena, @sklad, @rozvin, datetime('now'))
+		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, predaj_vo, predaj_pcmo, mena, sklad, rozvin, updated_at)
+		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @predajVo, @predajPcmo, @mena, @sklad, @rozvin, datetime('now'))
 		ON CONFLICT(kod) DO UPDATE SET
 			nakup_cennik = excluded.nakup_cennik,
 			nakup_posledna_faktura = excluded.nakup_posledna_faktura,
 			predaj_vo = excluded.predaj_vo,
+			predaj_pcmo = excluded.predaj_pcmo,
 			mena = excluded.mena,
 			sklad = excluded.sklad,
 			rozvin = excluded.rozvin,
@@ -377,7 +389,7 @@ function getPriceRow(kod: string): PriceRow | undefined {
 	const row = db
 		.prepare(
 			`SELECT kod, nakup_cennik AS nakupCennik, nakup_posledna_faktura AS nakupPoslednaFaktura,
-			        predaj_vo AS predajVo, mena, sklad, rozvin
+			        predaj_vo AS predajVo, predaj_pcmo AS predajPcmo, mena, sklad, rozvin
 			 FROM material_prices WHERE kod = ?`
 		)
 		.get(kod) as
@@ -386,6 +398,7 @@ function getPriceRow(kod: string): PriceRow | undefined {
 				nakupCennik: number | null;
 				nakupPoslednaFaktura: number | null;
 				predajVo: number | null;
+				predajPcmo: number | null;
 				mena: string;
 				sklad: number | null;
 				rozvin: number | null;
@@ -515,6 +528,8 @@ export interface CenaRiadok {
 	nakupCennik: number | null;
 	nakupPoslednaFaktura: number | null;
 	predajVo: number | null;
+	// predajPcmo (#364): predajná cena z PCMO cenníka. Display-only orientačná cena.
+	predajPcmo: number | null;
 	/** JEDNOTKOVÁ marža (predajVo − nakupCennik, na jednotku) — marža sa počíta
 	 *  z CENNÍKOVEJ nákupnej ceny, nie z poslednej faktúry (šéf 2026-08-12). */
 	marza: number | null;
@@ -542,6 +557,7 @@ export interface CenyResult {
 		nakupCennik: CenySucet;
 		nakupPoslednaFaktura: CenySucet;
 		predajVo: CenySucet;
+		predajPcmo: CenySucet;
 		marza: CenySucet;
 	};
 	/** spotreba farby na lakovanie profilov (#369) — display-only, €-náklad honest-null. */
@@ -576,6 +592,7 @@ export function enrichPolozky(
 		nakupCennik: novySucet(),
 		nakupPoslednaFaktura: novySucet(),
 		predajVo: novySucet(),
+		predajPcmo: novySucet(),
 		marza: novySucet()
 	};
 	const radky: CenaRiadok[] = polozky.map((p) => {
@@ -583,10 +600,12 @@ export function enrichPolozky(
 		const nakupCennik = price?.nakupCennik ?? null;
 		const nakupPoslednaFaktura = price?.nakupPoslednaFaktura ?? null;
 		const predajVo = price?.predajVo ?? null;
+		const predajPcmo = price?.predajPcmo ?? null;
 		const marza = nakupCennik !== null && predajVo !== null ? predajVo - nakupCennik : null;
 		pripocitaj(sucty.nakupCennik, nakupCennik, p.qty);
 		pripocitaj(sucty.nakupPoslednaFaktura, nakupPoslednaFaktura, p.qty);
 		pripocitaj(sucty.predajVo, predajVo, p.qty);
+		pripocitaj(sucty.predajPcmo, predajPcmo, p.qty);
 		pripocitaj(sucty.marza, marza, p.qty);
 		return {
 			kod: p.kod,
@@ -596,6 +615,7 @@ export function enrichPolozky(
 			nakupCennik,
 			nakupPoslednaFaktura,
 			predajVo,
+			predajPcmo,
 			marza,
 			sklad: price?.sklad ?? null,
 			mena: price?.mena ?? 'EUR',
