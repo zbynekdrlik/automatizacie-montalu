@@ -66,7 +66,8 @@ test('Štandard: zámok RAL + hláška o neúplnom kovaní (tesnenia/kefy ručne
 	await expect(riadok(page, 'ZASK202531')).toContainText('ks'); // Automaticky zamok R9005
 	await expect(riadok(page, 'ZASK202532')).toHaveCount(0); // R7016 zámok NEJDE
 	await expect(riadok(page, 'ZASK00002')).toContainText('ks'); // kladka dvojitá
-	// neúplnosť: tesnenia 4/6mm + kefy zatiaľ nie sú v odpise
-	await expect(page.getByTestId('plan-warn')).toContainText('tesnenia');
+	// neúplnosť (#342 round 2 — tesnenia 4/6mm UŽ SÚ v odpise, ostáva len kefa):
+	// tesniaca kefa ZASK202541 zatiaľ nie je v odpise kovania (neznáma rola profilu)
+	await expect(page.getByTestId('plan-warn')).toContainText('ZASK202541');
 	expect(errs).toEqual([]);
 });

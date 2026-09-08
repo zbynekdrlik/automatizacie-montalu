@@ -85,17 +85,27 @@ test('zaškrtnutá FAB prežije „Späť a upraviť"', async ({ page }) => {
 	expect(errs).toEqual([]);
 });
 
-test('systémy bez kovania: pole FAB ani karta kovania nie sú', async ({ page }) => {
+test('Štandard +: bez kovania kusov (žiadne FAB pole), ale karta má tesnenie (#342)', async ({
+	page
+}) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await zaklad(page, '04');
 	await page.getByLabel('Systém').selectOption('Štandard +');
+	// Štandard + nemá kovanie kusy (komponentyPre vráti null pre tento systém) →
+	// FAB pole sa vôbec neponúka, presne ako predtým.
 	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
+	await page.getByLabel('Štýl').selectOption('2K');
+	// reaktívny sklo-select sa doplní po zmene systému — samostatný krok (race)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float sklo 6 mm');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	await expect(page.getByTestId('kovanie-karta')).toHaveCount(0);
+	// #342 round 2: Štandard + je v TESNENIE_SYSTEMY, takže karta „Kovanie a
+	// tesnenia" sa zobrazí s tesnením — nie je prázdna ako pred #342.
+	await expect(page.getByTestId('kovanie-karta')).toBeVisible();
+	await expect(riadok(page, 'ZASK00006')).toContainText(' m');
 	// profily sa odpisujú ako doteraz
 	await expect(page.getByText('Odpis (do Money)')).toBeVisible();
 
