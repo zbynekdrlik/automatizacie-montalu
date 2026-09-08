@@ -687,6 +687,12 @@
 						: '🧪 Odoslať odpis (TEST priečinok)'}
 				</button>
 			</form>
+			<form method="POST" action="?/pridatSkla" style="display:inline">
+				{@render hiddenVstup()}
+				<button class="btn secondary" type="submit" data-testid="pridat-skla"
+					>📋 Pridať sklá do objednávky</button
+				>
+			</form>
 		{/if}
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravit" style="display:inline">
@@ -769,6 +775,12 @@
 							: '✅ Odoslať odpis do Money'
 						: '🧪 Odoslať odpis (TEST priečinok)'}
 				</button>
+			</form>
+			<form method="POST" action="?/pridatSklaMulti" style="display:inline">
+				{@render hiddenMulti()}
+				<button class="btn secondary" type="submit" data-testid="pridat-skla-multi"
+					>📋 Pridať sklá do objednávky</button
+				>
 			</form>
 		{/if}
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>

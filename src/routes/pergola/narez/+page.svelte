@@ -436,6 +436,13 @@
 
 	<div class="card noprint">
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<form method="POST" action="?/pridatSkla" style="display:inline">
+			{@render hidden()}
+			{@render hiddenIdent()}
+			<button class="btn secondary" type="submit" data-testid="pridat-skla"
+				>📋 Pridať sklá do objednávky</button
+			>
+		</form>
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
 			{@render hiddenIdent()}

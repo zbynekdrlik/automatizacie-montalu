@@ -56,7 +56,8 @@ services:
       ODOO_JSON2_URL: ${ODOO_JSON2_URL:-}
       ODOO_JSON2_API_KEY: ${ODOO_JSON2_API_KEY:-}
       ODOO_NAREZ_UPLOAD_ENABLED: ${ODOO_NAREZ_UPLOAD_ENABLED:-0}
-      BODY_SIZE_LIMIT: 1M
+      # #496: raised from 1M to 12M to cover MAX_SUBOR_VELKOST (10MB) + multipart overhead
+      BODY_SIZE_LIMIT: 12M
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
       # #251 SEC-1: bez ADDRESS_HEADER vracia getClientAddress() IP kontajnera

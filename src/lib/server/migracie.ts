@@ -26,7 +26,9 @@ import {
 	migrateHrubkaTrieda,
 	migrateMaterialRozvin,
 	migrateOdpisOdpad,
-	migrateDrevostavby
+	migrateDrevostavby,
+	migrateObjednavkaSkla,
+	migrateOdooLeadColumns
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -861,24 +863,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 		})();
 	}
 
-	if ((db.pragma('user_version', { simple: true }) as number) < 26) {
-		// v25 → v26: sledovanie zrkadlenia dopytu do Odoo CRM leadu (#278). Odoo je externá
-		// služba a môže byť dočasne nedostupná — aby sa dopyt NIKDY nestratil, pridávame per-
-		// riadok stav: `odoo_lead_id` (NULL = ešte nevytvorený, >0 = vytvorený lead),
-		// `odoo_attempts` (počet pokusov, ohraničený sweep-om) a `odoo_last_error` (posledná
-		// chyba, diagnostika). MONEY-NEUTRÁLNE: iba marketingovo-lead metadáta, žiadny odpis /
-		// Money / `/data` (guard `tests/odoo-lead.test.ts`). Celé v `db.transaction` (vzor
-		// v24/v25): ALTER TABLE ADD COLUMN je v SQLite transakčné → pád uprostred sa čisto
-		// prehrá, nikdy crash-loop. Konštantné DEFAULT-y (0 / '') — nie nekonštantné výrazy.
-		db.transaction(() => {
-			db.exec(`
-				ALTER TABLE dopyt ADD COLUMN odoo_lead_id INTEGER;
-				ALTER TABLE dopyt ADD COLUMN odoo_attempts INTEGER NOT NULL DEFAULT 0;
-				ALTER TABLE dopyt ADD COLUMN odoo_last_error TEXT NOT NULL DEFAULT '';
-			`);
-			bump(26);
-		})();
-	}
+	migrateOdooLeadColumns(db, bump); // v25→v26 (#278); extrahované do migracie-seed (large-file-split)
 
 	if ((db.pragma('user_version', { simple: true }) as number) < 27) {
 		// v26 → v27: ochrany proti dvojitému importu do Money (#294).
@@ -982,7 +967,6 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 			bump(29);
 		})();
 	}
-
 	migrateDopytCenaStamp(db, bump); // v29 → v30 (#309); extrahované do migracie-seed (viď docstring)
 	migrateManualMoveColumn(db, bump); // v30 → v31 (#299); extrahované do migracie-seed (viď docstring)
 	migrateDopytCenaHladina(db, bump); // v31 → v32 (#318); extrahované do migracie-seed (viď docstring)
@@ -990,10 +974,11 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateOdooZakazkaPush(db, bump); // v33 → v34 (#349); extrahované do migracie-seed (viď docstring)
 	migrateDopytProdukt(db, bump); // v34 → v35 (#384); extrahované do migracie-seed (viď docstring)
 	migrateGlassKorekcia(db, bump); // v35 → v36 (#440); extrahované do migracie-seed (viď docstring)
-	migrateHrubkaTrieda(db, bump); // v36 → v37 (#443); extrahované do migracie-seed (viď docstring)
-	migrateMaterialRozvin(db, bump); // v37 → v38 (#369); extrahované do migracie-seed (viď docstring)
-	migrateOdpisOdpad(db, bump); // v38 → v39 (#417 faza 2); extrahované do migracie-seed (viď docstring)
-	migrateDrevostavby(db, bump); // v39 → v40 (#445); extrahované do migracie-seed (viď docstring)
+	migrateHrubkaTrieda(db, bump); // v36→v37 (#443)
+	migrateMaterialRozvin(db, bump); // v37→v38 (#369)
+	migrateOdpisOdpad(db, bump); // v38→v39 (#417)
+	migrateDrevostavby(db, bump); // v39→v40 (#445)
+	migrateObjednavkaSkla(db, bump); // v40→v41 (#496)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

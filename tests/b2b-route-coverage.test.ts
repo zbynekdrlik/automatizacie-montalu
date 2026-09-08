@@ -250,6 +250,14 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	it('#482: /plan-rezov (plán rezov z CAD, interné-only) JE presmerovaný preč', () => {
 		expect(b2bRedirectTarget('/plan-rezov')).toBe('/zasklenia');
 	});
+
+	// #496: objednávka skla — interný podklad objednávky skla per zákazka,
+	// Money-neutrálne (objednávka u dodávateľa). V B2B_FORBIDDEN_PREFIXES → generický
+	// it.each vyššie to už pokrýva; toto je čitateľné explicitné potvrdenie.
+	it('#496: /objednavka-skla (objednávka skla, interné-only) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/objednavka-skla')).toBe('/zasklenia');
+		expect(b2bRedirectTarget('/objednavka-skla/ZAK260123')).toBe('/zasklenia');
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k

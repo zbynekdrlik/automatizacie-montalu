@@ -97,7 +97,9 @@
 					{ href: '/odpisy', label: 'História' },
 					// #282: interný prehľad zákazníckych dopytov z verejného konfigurátora
 					{ href: '/dopyty-konfigurator', label: 'Dopyty' },
-					{ href: '/problem', label: 'Problém' }
+					{ href: '/problem', label: 'Problém' },
+					// #496: objednávka skla podklad per zákazka (interný, Money-neutrálny)
+					{ href: '/objednavka-skla', label: 'Objednávka skla' }
 				] satisfies { href: RouteId; label: string }[])
 			: []
 	);

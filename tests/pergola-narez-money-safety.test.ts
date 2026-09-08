@@ -89,6 +89,8 @@ describe('/pergola/narez — rezervačný odpis (#221) IDE cez potvrdzovací tok
 		expect(Object.keys(actions).sort()).toEqual([
 			'odoslat',
 			'odoslatExpediciuDoOdoo',
+			// #496 round 2: pridatSkla = glass order producer (Money-NEUTRAL, objednavka_skla tabuľka)
+			'pridatSkla',
 			'rezervovat',
 			'spocitat',
 			'upravit'
