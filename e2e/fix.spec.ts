@@ -75,11 +75,12 @@ test('modul nikam nezapisuje — žiadny Money odpis ani odoslanie', async ({ pa
 	// žiadna karta odpisu, žiadne tlačidlo do Money
 	await expect(page.locator('.card', { hasText: 'Odpis (do Money)' })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: /Odoslať/ })).toHaveCount(0);
-	// a ani formulár na zápis (jediné POST akcie sú vykres/upravit/rozdelit)
+	// a ani formulár na zápis do Money (jediné POST akcie sú vykres/upravit/rozdelit
+	// + pridatSkla — #496: zapisuje LEN do objednavka_skla, app DB, nie Money)
 	const akcie = await page
 		.locator('form[action*="?/"]')
 		.evaluateAll((fs) => fs.map((f) => f.getAttribute('action') ?? ''));
-	expect(akcie.every((a) => /\?\/(vykres|upravit|rozdelit)$/.test(a))).toBe(true);
+	expect(akcie.every((a) => /\?\/(vykres|upravit|rozdelit|pridatSkla)$/.test(a))).toBe(true);
 
 	expect(errs).toEqual([]);
 });
