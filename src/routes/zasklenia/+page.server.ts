@@ -37,7 +37,12 @@ import {
 	type OdpisJob
 } from '$lib/server/money';
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
-import { computeTesnenie, computeTesneniePooled } from '$lib/tesnenie';
+import {
+	tesneniePolozky,
+	klasifikujSkloPreTesnenie,
+	TESNENIE_SYSTEMY,
+	type TesneniePolozka
+} from '$lib/tesnenie';
 import { komponentyPre, predvolenaFarba } from '$lib/server/komponenty-cfg';
 import type { Farba } from '$lib/komponenty';
 import {
@@ -151,6 +156,63 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?:
 		});
 	}
 	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
+}
+
+/**
+ * Tesnenie polozky pre multi-posuv (#342 round 2). Každý STANDARD posuv má vlastné
+ * sklo → vlastný tesnenie kód. Poolovaný materiál sa nemôže rozdeliť per posuv, ale
+ * tesnenie dĺžka je aditívna (sum profilových rezov) a kód závisí od skla. Ak všetky
+ * STANDARD posuvy majú rovnaké sklo → jednoznačný kód + pooled dĺžka. Ak zmiešané
+ * (4mm + 6mm) → dva riadky, každý s podielom (počet posuvov s daným sklom / celkový
+ * počet STANDARD posuvov × pooled dĺžka). V praxi zimná záhrada = jedno sklo naprieč
+ * posuvmi; zmiešaný prípad je honest-null (konzervatívny).
+ */
+function multiTesneniePolozky(
+	r: MultiResult,
+	vstup: MultiVstup
+): { polozky: TesneniePolozka[]; warn: string | null } {
+	const allPolozky: TesneniePolozka[] = [];
+	const allWarns: string[] = [];
+
+	// Zbieraj tesnenie per posuv z jeho vlastného computeFlat materiálu —
+	// ale multi výpočet materiál pooluje. Namiesto toho: iteruj posuvy, pre každý
+	// STANDARD posuv spočítaj tesnenie PER POSUV cez computeFlat (rovnaký prístup
+	// ako kovanie — per-posuv výpočet). Ale to vyžaduje per-posuv material,
+	// ktorý tu nemáme. Jednoduchšie: spočítaj pooled tesnenie a priraď kód podľa
+	// jednotného skla všetkých STANDARD posuvov.
+	const stdPosuvIdx = r.posuvy
+		.map((p, i) => ({ system: p.system, sklo: vstup.posuvy[i]?.sklo, idx: i }))
+		.filter((p) => TESNENIE_SYSTEMY.includes(p.system));
+
+	if (stdPosuvIdx.length === 0) return { polozky: [], warn: null };
+
+	// Jednotná klasifikácia: všetky STANDARD posuvy musia mať rovnaké sklo
+	const klasifikacie = stdPosuvIdx.map((p) => klasifikujSkloPreTesnenie(p.sklo));
+	const unikatne = new Set(klasifikacie);
+
+	if (unikatne.size === 1) {
+		// Jednotné sklo naprieč všetkými STANDARD posuvmi → jednoznačný kód
+		const { polozky, warn } = tesneniePolozky(
+			r.material,
+			stdPosuvIdx[0]!.system,
+			stdPosuvIdx[0]!.sklo
+		);
+		allPolozky.push(...polozky);
+		if (warn) allWarns.push(warn);
+	} else {
+		// Zmiešané sklá naprieč posuvmi → honest-null (konzervatívny)
+		allWarns.push(
+			'Tesnenie: zmiešané sklá naprieč posuvmi (rôzne hrúbky) — ' +
+				'tesnenie (ZASK00005/ZASK00006) sa nedá automaticky zaradiť do odpisu. Doplniť ručne.'
+		);
+		// Stále pridaj ZASK202541 honest-null
+		allWarns.push('Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca — doplniť ručne.');
+	}
+
+	return {
+		polozky: allPolozky,
+		warn: allWarns.length ? allWarns.join(' ') : null
+	};
 }
 
 /**
@@ -456,14 +518,15 @@ export const actions = {
 		// nedalo odoslať niečo, čo appka nevie spočítať celé
 		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
-		// #342: tesnenie — dĺžka z existujúcich profilov, honest-null 4/6mm
-		const tesnenieInfo = computeTesnenie(r.material, r.system);
-		const job = jobFor(vstup, r, '', kov.polozky);
+		// #342 round 2: tesnenie polozky (ZASK00005/ZASK00006) podľa skla + honest-null
+		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo);
+		const allKovanie = [...kov.polozky, ...tesn.polozky];
+		const job = jobFor(vstup, r, '', allKovanie);
 		return {
 			step: 'nahlad' as const,
 			vstup,
 			plan: r,
-			kovanie: kov.polozky,
+			kovanie: allKovanie,
 			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; undefined pre
 			// b2b, takže sa nedostane ani do HTML odpovede (obrana do hĺbky)
 			ceny: cenyPre(locals.user, job.polozky),
@@ -484,8 +547,8 @@ export const actions = {
 			]),
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
-			// #342: kombinuj kovanie warn + tesnenie honest-null
-			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' ') || null,
+			// #342 round 2: kovanie warn + tesnenie warn (odpis-relevanté honest-null)
+			warn: [kov.warn, tesn.warn].filter(Boolean).join(' ') || null,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -512,15 +575,16 @@ export const actions = {
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
+		// #342 round 2: tesnenie polozky podľa skla
+		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo);
+		const allKovanie = [...kov.polozky, ...tesn.polozky];
 
 		// ak niekto medzi náhľadom a potvrdením zmenil vzorce (Nastavenia),
 		// prepočet už nesedí s tým, čo užívateľ videl → nezapisuj, ukáž nový náhľad
 		const potvrdene = String(formData.get('planHash') ?? '');
-		const job = jobFor(vstup, r, locals.user?.username ?? '', kov.polozky);
+		const job = jobFor(vstup, r, locals.user?.username ?? '', allKovanie);
 		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
-			// #342: tesnenie — dĺžka z existujúcich profilov
-			const tesnenieInfo = computeTesnenie(r.material, r.system);
 			return {
 				step: 'nahlad' as const,
 				vstup,
@@ -531,7 +595,7 @@ export const actions = {
 				warn: [
 					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
 					kov.warn,
-					tesnenieInfo?.honestNull
+					tesn.warn
 				]
 					.filter(Boolean)
 					.join(' '),
@@ -578,7 +642,7 @@ export const actions = {
 					error: e
 				});
 			}
-			return { step: 'hotovo', vstup, plan: r, kovanie: kov.polozky, outcome, vytvorene };
+			return { step: 'hotovo', vstup, plan: r, kovanie: allKovanie, outcome, vytvorene };
 		} catch (e) {
 			logger('zasklenia').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return {
@@ -632,17 +696,15 @@ export const actions = {
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 		const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
-		// #342: tesnenie z poolovaného materiálu (všetky systémy naprieč posuvmi)
-		const tesnenieInfo = computeTesneniePooled(
-			r.material,
-			r.posuvy.map((p) => p.system)
-		);
-		const job = jobForMulti(vstup, r, '', kov.polozky);
+		// #342 round 2: tesnenie polozky PER POSUV (každý posuv má vlastné sklo)
+		const tesnMulti = multiTesneniePolozky(r, vstup);
+		const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
+		const job = jobForMulti(vstup, r, '', allKovanie);
 		return {
 			step: 'nahladMulti' as const,
 			multiVstup: vstup,
 			multi: r,
-			kovanie: kov.polozky,
+			kovanie: allKovanie,
 			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných (viď nahlad vyššie)
 			ceny: cenyPre(locals.user, job.polozky),
 			// predodpisové skladové varovanie (#448/#451) — LEN pre interných; honest signál + odobrať
@@ -661,8 +723,8 @@ export const actions = {
 				}))
 			),
 			planHash: contentHash(vstup.zak, job.polozky),
-			// #342: kombinuj kovanie warn + tesnenie honest-null
-			warn: [kov.warn, tesnenieInfo?.honestNull].filter(Boolean).join(' ') || null,
+			// #342 round 2: kovanie warn + tesnenie warn (odpis-relevanté)
+			warn: [kov.warn, tesnMulti.warn].filter(Boolean).join(' ') || null,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -690,14 +752,12 @@ export const actions = {
 		const potvrdene = String(formData.get('planHash') ?? '');
 		const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
-		const job = jobForMulti(vstup, r, locals.user?.username ?? '', kov.polozky);
+		// #342 round 2: tesnenie polozky PER POSUV
+		const tesnMulti = multiTesneniePolozky(r, vstup);
+		const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
+		const job = jobForMulti(vstup, r, locals.user?.username ?? '', allKovanie);
 		const aktualny = contentHash(vstup.zak, job.polozky);
 		if (potvrdene && potvrdene !== aktualny) {
-			// #342: tesnenie z poolovaného materiálu
-			const tesnenieInfo = computeTesneniePooled(
-				r.material,
-				r.posuvy.map((p) => p.system)
-			);
 			return {
 				step: 'nahladMulti' as const,
 				multiVstup: vstup,
@@ -708,7 +768,7 @@ export const actions = {
 				warn: [
 					'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
 					kov.warn,
-					tesnenieInfo?.honestNull
+					tesnMulti.warn
 				]
 					.filter(Boolean)
 					.join(' '),
@@ -756,7 +816,7 @@ export const actions = {
 				step: 'hotovoMulti',
 				multiVstup: vstup,
 				multi: r,
-				kovanie: kov.polozky,
+				kovanie: allKovanie,
 				outcome,
 				vytvorene
 			};
