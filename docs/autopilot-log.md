@@ -2110,3 +2110,9 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   not attached + `bind:value` wiped inputs. 3/4 tests failed on prod, all passed in CI.
   Fix: import+use `goto` helper. Playbook: added mandatory `goto` helper rule to
   `.claude/rules/testing.md`. NEmergnuté (worktree — supervisor integruje).
+- **#342 round 2** (0.25.1-dev.1, d900ab8→039265f): STANDARD tesnenie odpis + kefa ZASK00007.
+  Wire Dominik's mapping (8.9., msg 1807247): 4mm→ZASK00005, 6mm→ZASK00006, IZO→none.
+  Added `tesneniePolozky()` to tesnenie.ts, glass classification via `klasifikujSkloPreTesnenie`.
+  ZASK00007 kefa added to KOMPONENTY_STANDARD (kladkovy×2, same as Deluxe).
+  ZASK202541 left honest-null (unknown profile role). 40 new test vectors, golden snapshot updated.
+  NEmergnuté (worktree — supervisor integruje).

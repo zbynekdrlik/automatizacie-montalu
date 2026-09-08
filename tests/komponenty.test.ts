@@ -574,9 +574,20 @@ describe('KOMPONENTY_STANDARD — ostrá tabuľka', () => {
 		expect(r7.pravidlo).toEqual(r9.pravidlo);
 	});
 
-	it('tesnenia 4/6mm a kefy zatiaľ NIE sú v tabuľke (čaká sa na vzorec)', () => {
+	it('ZASK00007 kefa (kladkový×2) je v tabuľke (#342 round 2)', () => {
+		const kefa = KOMPONENTY_STANDARD.find((k) => k.kod === 'ZASK00007');
+		expect(kefa).toBeDefined();
+		expect(kefa!.mj).toBe('m');
+		expect(kefa!.pravidlo).toEqual({ typ: 'dlzkaProfilu', role: 'kladkovy', koef: 2 });
+	});
+
+	it('tesnenia 4/6mm idú cez tesnenie.ts (nie v komponentovej tabuľke)', () => {
 		const kody = KOMPONENTY_STANDARD.map((k) => k.kod);
-		for (const kod of ['ZASK00005', 'ZASK00006', 'ZASK00007', 'ZASK202541'])
-			expect(kody).not.toContain(kod);
+		for (const kod of ['ZASK00005', 'ZASK00006']) expect(kody).not.toContain(kod);
+	});
+
+	it('ZASK202541 (kefa 4,8×5) zatiaľ NIE JE v tabuľke (honest-null — neznáma rola)', () => {
+		const kody = KOMPONENTY_STANDARD.map((k) => k.kod);
+		expect(kody).not.toContain('ZASK202541');
 	});
 });

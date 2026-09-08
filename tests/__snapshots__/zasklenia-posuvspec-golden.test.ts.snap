@@ -2870,6 +2870,32 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "rozvin": null,
         "sklad": null,
       },
+      {
+        "kod": "ZASK00007",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "m",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Tesniaca kefa 4,8×4 mm",
+        "predajVo": null,
+        "qty": 9.576,
+        "rozvin": null,
+        "sklad": null,
+      },
+      {
+        "kod": "ZASK00006",
+        "marza": null,
+        "mena": "EUR",
+        "mj": "m",
+        "nakupCennik": null,
+        "nakupPoslednaFaktura": null,
+        "nazov": "Zasklievacie tesnenie 6 mm",
+        "predajVo": null,
+        "qty": 12.376,
+        "rozvin": null,
+        "sklad": null,
+      },
     ],
     "snapshot": {
       "daysOld": null,
@@ -2898,7 +2924,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
   },
   "cielInfo": {
-    "filename": "ZAK-G6 - Zákazník G6 [f9748496].xlsx",
+    "filename": "ZAK-G6 - Zákazník G6 [5b3a5ff9].xlsx",
     "live": false,
   },
   "heightWarn": undefined,
@@ -2920,6 +2946,18 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       "mj": "ks",
       "nazov": "Automaticky zamok R9005",
       "qty": 2,
+    },
+    {
+      "kod": "ZASK00007",
+      "mj": "m",
+      "nazov": "Tesniaca kefa 4,8×4 mm",
+      "qty": 9.576,
+    },
+    {
+      "kod": "ZASK00006",
+      "mj": "m",
+      "nazov": "Zasklievacie tesnenie 6 mm",
+      "qty": 12.376,
     },
   ],
   "plan": {
@@ -3154,7 +3192,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "styl": "2K",
     "system": "Štandard",
   },
-  "planHash": "6fb2d95a",
+  "planHash": "ec875d3d",
   "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,
@@ -3206,7 +3244,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G6",
     "zakaznik": "Zákazník G6",
   },
-  "warn": "STANDARD: dĺžka tesnenia je spočítaná, ale výber 4/6 mm kódu ešte nie je určený. Tesniace kefy (ZASK00007/ZASK202541) zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika). Tesnenie: 12.4 m — čaká na spresnenie (4 mm ZASK00005 alebo 6 mm ZASK00006 podľa skla). Tesniace kefy (ZASK00007/ZASK202541) zatiaľ bez vzorca.",
+  "warn": "STANDARD: tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ NIE JE v odpise kovania — neznáma rola profilu, doplniť ručne.",
 }
 `;
 
@@ -4003,7 +4041,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G5",
     "zakaznik": "Zákazník G5",
   },
-  "warn": "Tesnenie: 30.1 m — čaká na spresnenie (4 mm ZASK00005 alebo 6 mm ZASK00006 podľa skla). Tesniace kefy (ZASK00007/ZASK202541) zatiaľ bez vzorca.",
+  "warn": null,
 }
 `;
 
@@ -7355,6 +7393,6 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
   },
   "snapshotDatum": null,
   "step": "nahladMulti",
-  "warn": "Tesnenie: 32.2 m — čaká na spresnenie (4 mm ZASK00005 alebo 6 mm ZASK00006 podľa skla). Tesniace kefy (ZASK00007/ZASK202541) zatiaľ bez vzorca.",
+  "warn": null,
 }
 `;
