@@ -49,7 +49,7 @@ the action redirects to `/objednavka-skla/[zak]`. B2B guard rejects non-internal
 | `/zasklenia` | `pridatSkla` | `ComputeResult.sklo: { sirka, vyska, pocet }` | 1 item per posuv |
 | `/zasklenia` | `pridatSklaMulti` | `MultiResult.posuvy[i].sklo` | N items (per posuv) |
 | `/fix` | `pridatSkla` | `FixVykres.polia[]: { sirka, vLavo, vPravo }` | N items (per pole); sikmy→vLavo/vPravo, rovny→vyska |
-| `/pergola/narez` | `pridatSkla` | `StrechaSkloVypocet: { sirkaMm, dlzkaMm, pocetTabul, typ }` | 1 item; honest-null gate (no insert when sirkaMm or pocetTabul is null) |
+| `/pergola/narez` | `pridatSkla` | `StrechaSkloVypocet: { sirkaMm, dlzkaMm, pocetTabul, typ }` | 1 item; honest-null gate (no insert when sirkaMm, dlzkaMm, or pocetTabul is null) |
 
 **ZAK/OP source per module:** zasklenia uses `parseVstup().zak/.op`, FIX uses
 `parseFixVstup().zak/.op`, pergola uses `parseIdent(form).zak/.op` (separate from
@@ -63,3 +63,12 @@ client-sent computed values) — the same discipline as `odoslat`/`nahlad` actio
 `+page.server.ts`, import `pridajSklaHromadne` + `NoveSklo`, map the module's glass
 output to `NoveSklo[]`, redirect to `/objednavka-skla/[zak]`. Add the route path to
 this rule's `paths:` frontmatter. Add a vitest in `tests/objednavka-skla-producenti.test.ts`.
+
+## Testing gotcha: glass type names must be EXACT catalog matches
+
+`spocitajStrechaSklo` (pergola) checks glass type against `SKLO_STRECHA_TYPY` in
+`src/lib/sklo-strecha.ts` — e.g. `'4.4.2 číre'`, `'5.5.2 mliečne'`, `'polykarbonát 16 mm číry'`.
+A generic description like `'Lepené bezp. sklo (VSG)'` is NOT in the catalog and will
+return `null` for all dimensions. Always use an EXACT `nazov` from `SKLO_STRECHA_TYPY`
+in tests. Similarly, zasklenia glass types must match `listGlassTypes()` (`glass_types`
+seed table). FIX glass type (`vstup.sklo`) is free text (no catalog validation).
