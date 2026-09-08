@@ -1,4 +1,4 @@
-// Tesnenie — výpočet celkovej dĺžky zasklievacieho tesnenia pre STANDARD (#342).
+// Tesnenie — výpočet a Money odpis zasklievacieho tesnenia pre STANDARD (#342).
 //
 // Vzorec (Dominik, 7.9.2026, úloha 582, msg 1806754):
 //   dĺžka tesnenia = Σ(ZASP202415 rezy) + Σ(ZASP00024 rezy) + Σ(ZASP20244 rezy)
@@ -15,7 +15,7 @@
 //   10 mm / iné → honest-null (Dominik neurčil)
 //
 // Kefy ZASK00007 (4,8×4) sa počítajú cez komponentový systém (komponenty-cfg.ts).
-// ZASK202541 (4,8×5) zostáva otvorený — neznáma rola profilu.
+// ZASK202541 (4,8×5) zostáva otvorený — KOVANIE_NEUPLNE ho vlastní (nie tento modul).
 
 import type { MaterialRow } from '$lib/server/compute';
 import { jeIzoSklo } from '$lib/styl';
@@ -70,12 +70,15 @@ export const TESNENIE_KODY: Record<'tesnenie4' | 'tesnenie6', { kod: string; naz
  *
  * Detekcia: izolačné cez existujúci `jeIzoSklo` (regex), hrúbka z názvu skla
  * (STANDARD_GLASS mená: "Float sklo 4 mm", "Float sklo 6 mm", "Float sklo 10 mm").
+ * Lookbehind `(?<![\d.,])` zamedzí falošnému matchu na desatinné názvy ("6,4 mm" → 🟡5).
+ * glass_types je admin-editable, takže budúci laminovaný názov nesmie misroutovať.
  */
 export function klasifikujSkloPreTesnenie(skloNazov: string | undefined): SkloKlasifikacia {
 	if (!skloNazov) return 'nezname';
 	if (jeIzoSklo(skloNazov)) return 'izolacne';
 	// Hrúbka z názvu: "… 4 mm" / "… 6 mm" (STANDARD glass nazvy)
-	const m = /(\d+)\s*mm/i.exec(skloNazov);
+	// Lookbehind: "6,4 mm" nesmie matchnúť ako 4 mm (desatinné číslo)
+	const m = /(?<![\d.,])(\d+)\s*mm\b/i.exec(skloNazov);
 	if (!m) return 'nezname';
 	const hrubka = Number(m[1]!); // regex has 1 mandatory capture group
 	if (hrubka === 4) return 'tesnenie4';
@@ -83,21 +86,7 @@ export function klasifikujSkloPreTesnenie(skloNazov: string | undefined): SkloKl
 	return 'nezname'; // 10 mm a iné — Dominik neurčil
 }
 
-// ---- Výsledok výpočtu tesnenia ----
-
-/** Výsledok výpočtu tesnenia pre STANDARD zasklenie. */
-export interface TesnenieResult {
-	/** Celková dĺžka tesnenia v mm. */
-	dlzkaMm: number;
-	/** Celková dĺžka tesnenia v metroch (zaokrúhlené na 1 desatinné miesto). */
-	dlzkaM: number;
-	/** Systém, pre ktorý bola dĺžka spočítaná. */
-	system: string;
-	/** Klasifikácia skla pre tesnenie. */
-	skloKlasifikacia: SkloKlasifikacia;
-	/** Honest-null správa alebo null keď je tesnenie plne určené. */
-	honestNull: string | null;
-}
+// ---- Polozky do Money odpisu ----
 
 /** Polozka do Money odpisu. */
 export interface TesneniePolozka {
@@ -107,78 +96,43 @@ export interface TesneniePolozka {
 	mj: 'm';
 }
 
-const round1 = (x: number) => Math.round(x * 10) / 10;
 const R3 = (x: number) => Math.round(x * 1000) / 1000;
+const round1 = (x: number) => Math.round(x * 10) / 10;
 
 /**
- * Vypočíta celkovú dĺžku zasklievacieho tesnenia pre STANDARD zasklenie
- * z už spočítaných materiálových riadkov (computeFlat/computeMulti).
- *
- * Vráti `null` pre systémy, ktoré nemajú tesnenie (Robust, Slide, Deluxe).
+ * Celková dĺžka tesnenia (mm) z materiálu pre JEDEN systém.
+ * Sčíta rezy kladkového + nosového + krajovej (podľa systému).
  */
-export function computeTesnenie(
-	material: MaterialRow[],
-	system: string,
-	skloNazov?: string
-): TesnenieResult | null {
-	if (!TESNENIE_SYSTEMY.includes(system)) return null;
-
+function dlzkaTesneniaMm(material: MaterialRow[], system: string): number {
 	const kodKrajovej = kodKrajovejPre(system);
-	const kladkovaSum = sumaRezovMm(material, KOD_KLADKOVY);
-	const nosSum = sumaRezovMm(material, KOD_NOS);
-	const krajovaSum = sumaRezovMm(material, kodKrajovej);
-
-	const dlzkaMm = kladkovaSum + nosSum + krajovaSum;
-	const klasifikacia = klasifikujSkloPreTesnenie(skloNazov);
-
-	return {
-		dlzkaMm,
-		dlzkaM: round1(dlzkaMm / 1000),
-		system,
-		skloKlasifikacia: klasifikacia,
-		honestNull: formatHonestNull(dlzkaMm, klasifikacia)
-	};
+	return (
+		sumaRezovMm(material, KOD_KLADKOVY) +
+		sumaRezovMm(material, KOD_NOS) +
+		sumaRezovMm(material, kodKrajovej)
+	);
 }
 
 /**
- * Spočíta tesnenie z POOLOVANÉHO materiálu (computeMulti). Bezpečné aj pre
- * zmiešanú zákazku (Štandard + Štandard +): ZASP202415/ZASP00024 sú zdieľané
- * a len JEDEN z ZASP20244/ZASP00018 existuje per systém, takže súčet oboch
- * krajových kódov dá správny výsledok bez toho, aby sme potrebovali per-posuv
- * material (na rozdiel od kovanie, kde sú per-posuv počty krídel).
+ * Celková dĺžka tesnenia (mm) z POOLOVANÉHO materiálu naprieč VIACERÝMI STANDARD
+ * systémami. Bezpečné pre zmiešanú zákazku (Štandard + Štandard +): sčíta OBE
+ * krajové kódy, lebo ZASP202415/ZASP00024 sú zdieľané a len JEDEN z ZASP20244/
+ * ZASP00018 existuje per systém v materiáli.
  */
-export function computeTesneniePooled(
-	material: MaterialRow[],
-	systems: string[]
-): TesnenieResult | null {
-	const stdSystem = systems.find((s) => TESNENIE_SYSTEMY.includes(s));
-	if (!stdSystem) return null;
-
-	const kladkovaSum = sumaRezovMm(material, KOD_KLADKOVY);
-	const nosSum = sumaRezovMm(material, KOD_NOS);
-	// Obe krajové kódy — len jeden bude mať nenulový súčet per systém,
-	// ale ak zákazka mieša Štandard + Štandard+ (oba STANDARD), sčítame oba.
-	const krajovaSum =
-		sumaRezovMm(material, KOD_KRAJOVA_PLUS) + sumaRezovMm(material, KOD_KRAJOVA_KLASIK);
-
-	const dlzkaMm = kladkovaSum + nosSum + krajovaSum;
-
-	return {
-		dlzkaMm,
-		dlzkaM: round1(dlzkaMm / 1000),
-		system: stdSystem,
-		// pooled nemá jednoznačné sklo — každý posuv môže mať iné
-		skloKlasifikacia: 'nezname',
-		honestNull: formatHonestNull(dlzkaMm, 'nezname')
-	};
+function dlzkaTesneniePooledMm(material: MaterialRow[]): number {
+	return (
+		sumaRezovMm(material, KOD_KLADKOVY) +
+		sumaRezovMm(material, KOD_NOS) +
+		sumaRezovMm(material, KOD_KRAJOVA_PLUS) +
+		sumaRezovMm(material, KOD_KRAJOVA_KLASIK)
+	);
 }
 
 /**
- * Vráti Money položky tesnenia pre jeden posuv (tesnenie 4/6mm + budúce ZASK202541).
- * Volať PER POSUV — každý posuv má vlastné sklo, teda vlastný tesnenie kód.
+ * Money položky tesnenia pre JEDEN posuv.
  *
- * @returns polozky — ZASK00005 alebo ZASK00006 s dĺžkou v metroch; prázdne pre izolačné
- *   alebo neznáme sklo. warn — honest-null správa pre neznáme/ZASK202541.
+ * @returns polozky — ZASK00005 alebo ZASK00006 s dĺžkou v metroch; prázdne pre
+ *   izolačné alebo neznáme sklo. warn — honest-null správa pre neznáme sklo.
+ *   Kefa ZASK202541 sa tu NEHLÁSI — vlastní ho `KOVANIE_NEUPLNE` (jedno miesto).
  */
 export function tesneniePolozky(
 	material: MaterialRow[],
@@ -187,57 +141,53 @@ export function tesneniePolozky(
 ): { polozky: TesneniePolozka[]; warn: string | null } {
 	if (!TESNENIE_SYSTEMY.includes(system)) return { polozky: [], warn: null };
 
-	const kodKrajovej = kodKrajovejPre(system);
-	const kladkovaSum = sumaRezovMm(material, KOD_KLADKOVY);
-	const nosSum = sumaRezovMm(material, KOD_NOS);
-	const krajovaSum = sumaRezovMm(material, kodKrajovej);
-	const dlzkaMm = kladkovaSum + nosSum + krajovaSum;
+	const dlzkaMm = dlzkaTesneniaMm(material, system);
+	return buildPolozky(dlzkaMm, skloNazov);
+}
 
+/**
+ * Money položky tesnenia pre POOLOVANÝ materiál naprieč viacerými STANDARD systémami.
+ * Bezpečné pre zmiešanú zákazku (Štandard + Štandard +): sčíta OBE krajové kódy.
+ */
+export function tesneniePolozkyPooled(
+	material: MaterialRow[],
+	systems: string[],
+	skloNazov: string | undefined
+): { polozky: TesneniePolozka[]; warn: string | null } {
+	const hasStd = systems.some((s) => TESNENIE_SYSTEMY.includes(s));
+	if (!hasStd) return { polozky: [], warn: null };
+
+	const dlzkaMm = dlzkaTesneniePooledMm(material);
+	return buildPolozky(dlzkaMm, skloNazov);
+}
+
+/** Spoločné jadro — z dĺžky + skla vyrobí polozky a warn. */
+function buildPolozky(
+	dlzkaMm: number,
+	skloNazov: string | undefined
+): { polozky: TesneniePolozka[]; warn: string | null } {
 	const klasifikacia = klasifikujSkloPreTesnenie(skloNazov);
 	const polozky: TesneniePolozka[] = [];
-	const warny: string[] = [];
+	let warn: string | null = null;
 
-	// Tesnenie riadok — len pre 4mm/6mm, izolačné žiadne (Dominik: "bez gumy")
 	if (klasifikacia === 'tesnenie4' || klasifikacia === 'tesnenie6') {
 		const { kod, nazov } = TESNENIE_KODY[klasifikacia];
 		const metrov = R3(dlzkaMm / 1000);
 		if (metrov > 0) {
 			polozky.push({ kod, nazov, qty: metrov, mj: 'm' });
+		} else {
+			// Nulová dĺžka pri STANDARD posuve = konfiguračná anomália
+			warn =
+				`Tesnenie: dĺžka je 0 m pri ${klasifikacia === 'tesnenie4' ? '4' : '6'} mm skle — ` +
+				'konfiguračná anomália (profily ZASP202415/ZASP00024/krajová nemajú rezy).';
 		}
 	} else if (klasifikacia === 'nezname') {
-		warny.push(
+		warn =
 			`Tesnenie: ${round1(dlzkaMm / 1000)} m — ` +
-				`sklo „${skloNazov ?? '?'}" nie je 4 mm ani 6 mm; ` +
-				'tesnenie (ZASK00005/ZASK00006) sa nedá zaradiť do odpisu.'
-		);
+			`sklo „${skloNazov ?? '?'}“ nie je 4 mm ani 6 mm; ` +
+			'tesnenie (ZASK00005/ZASK00006) sa nedá zaradiť do odpisu.';
 	}
 	// izolačné = žiadne tesnenie, žiadny warn (Dominik potvrdil "bez gumy" = OK)
 
-	// ZASK202541 (kefa 4,8×5) — honest-null, neznáma rola profilu (#342)
-	warny.push('Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca — doplniť ručne.');
-
-	return {
-		polozky,
-		warn: warny.length ? warny.join(' ') : null
-	};
-}
-
-function formatHonestNull(dlzkaMm: number, klasifikacia: SkloKlasifikacia): string | null {
-	const parts: string[] = [];
-
-	if (klasifikacia === 'izolacne') {
-		// Izolačné = bez tesnenia, len info o dĺžke pre budúce rozšírenie
-		parts.push(`Tesnenie: izolačné sklo — bez tesnenia (Dominik: „bez gumy").`);
-	} else if (klasifikacia === 'nezname') {
-		parts.push(
-			`Tesnenie: ${round1(dlzkaMm / 1000)} m — ` +
-				'výber 4/6 mm kódu sa nedá určiť pre zvolené sklo.'
-		);
-	}
-	// tesnenie4/tesnenie6 = plne určené, žiadny honest-null pre tesnenie samotné
-
-	// ZASK202541 ostáva otvorený vždy
-	parts.push('Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca.');
-
-	return parts.length ? parts.join(' ') : null;
+	return { polozky, warn };
 }

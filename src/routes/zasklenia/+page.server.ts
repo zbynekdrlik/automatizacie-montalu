@@ -39,6 +39,7 @@ import {
 import { kovanieDoOdpisu } from '$lib/server/kovanie';
 import {
 	tesneniePolozky,
+	tesneniePolozkyPooled,
 	klasifikujSkloPreTesnenie,
 	TESNENIE_SYSTEMY,
 	type TesneniePolozka
@@ -159,59 +160,39 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?:
 }
 
 /**
- * Tesnenie polozky pre multi-posuv (#342 round 2). Každý STANDARD posuv má vlastné
- * sklo → vlastný tesnenie kód. Poolovaný materiál sa nemôže rozdeliť per posuv, ale
- * tesnenie dĺžka je aditívna (sum profilových rezov) a kód závisí od skla. Ak všetky
- * STANDARD posuvy majú rovnaké sklo → jednoznačný kód + pooled dĺžka. Ak zmiešané
- * (4mm + 6mm) → dva riadky, každý s podielom (počet posuvov s daným sklom / celkový
- * počet STANDARD posuvov × pooled dĺžka). V praxi zimná záhrada = jedno sklo naprieč
- * posuvmi; zmiešaný prípad je honest-null (konzervatívny).
+ * Tesnenie polozky pre multi-posuv (#342 round 2). Používa `tesneniePolozkyPooled`
+ * ktorý sčíta OBE krajové kódy (ZASP20244 + ZASP00018) — bezpečné pre zmiešanú
+ * zákazku Štandard + Štandard + (review 🔴1). Kód tesnenia závisí od skla:
+ * ak VŠETKY STANDARD posuvy majú rovnaké sklo → jednoznačný kód; zmiešané → honest-null.
  */
 function multiTesneniePolozky(
 	r: MultiResult,
 	vstup: MultiVstup
 ): { polozky: TesneniePolozka[]; warn: string | null } {
-	const allPolozky: TesneniePolozka[] = [];
-	const allWarns: string[] = [];
-
-	// Zbieraj tesnenie per posuv z jeho vlastného computeFlat materiálu —
-	// ale multi výpočet materiál pooluje. Namiesto toho: iteruj posuvy, pre každý
-	// STANDARD posuv spočítaj tesnenie PER POSUV cez computeFlat (rovnaký prístup
-	// ako kovanie — per-posuv výpočet). Ale to vyžaduje per-posuv material,
-	// ktorý tu nemáme. Jednoduchšie: spočítaj pooled tesnenie a priraď kód podľa
-	// jednotného skla všetkých STANDARD posuvov.
-	const stdPosuvIdx = r.posuvy
-		.map((p, i) => ({ system: p.system, sklo: vstup.posuvy[i]?.sklo, idx: i }))
+	const stdPosuvy = r.posuvy
+		.map((p, i) => ({ system: p.system, sklo: vstup.posuvy[i]?.sklo }))
 		.filter((p) => TESNENIE_SYSTEMY.includes(p.system));
 
-	if (stdPosuvIdx.length === 0) return { polozky: [], warn: null };
+	if (stdPosuvy.length === 0) return { polozky: [], warn: null };
 
 	// Jednotná klasifikácia: všetky STANDARD posuvy musia mať rovnaké sklo
-	const klasifikacie = stdPosuvIdx.map((p) => klasifikujSkloPreTesnenie(p.sklo));
+	const klasifikacie = stdPosuvy.map((p) => klasifikujSkloPreTesnenie(p.sklo));
 	const unikatne = new Set(klasifikacie);
 
 	if (unikatne.size === 1) {
-		// Jednotné sklo naprieč všetkými STANDARD posuvmi → jednoznačný kód
-		const { polozky, warn } = tesneniePolozky(
+		// Jednotné sklo → pooled dĺžka (OBE krajové kódy) + jeden tesnenie kód
+		return tesneniePolozkyPooled(
 			r.material,
-			stdPosuvIdx[0]!.system,
-			stdPosuvIdx[0]!.sklo
+			stdPosuvy.map((p) => p.system),
+			stdPosuvy[0]!.sklo
 		);
-		allPolozky.push(...polozky);
-		if (warn) allWarns.push(warn);
-	} else {
-		// Zmiešané sklá naprieč posuvmi → honest-null (konzervatívny)
-		allWarns.push(
-			'Tesnenie: zmiešané sklá naprieč posuvmi (rôzne hrúbky) — ' +
-				'tesnenie (ZASK00005/ZASK00006) sa nedá automaticky zaradiť do odpisu. Doplniť ručne.'
-		);
-		// Stále pridaj ZASK202541 honest-null
-		allWarns.push('Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca — doplniť ručne.');
 	}
-
+	// Zmiešané sklá naprieč posuvmi → honest-null (konzervatívny)
 	return {
-		polozky: allPolozky,
-		warn: allWarns.length ? allWarns.join(' ') : null
+		polozky: [],
+		warn:
+			'Tesnenie: zmiešané sklá naprieč posuvmi (rôzne hrúbky) — ' +
+			'tesnenie (ZASK00005/ZASK00006) sa nedá automaticky zaradiť do odpisu. Doplniť ručne.'
 	};
 }
 

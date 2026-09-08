@@ -3244,7 +3244,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G6",
     "zakaznik": "Zákazník G6",
   },
-  "warn": "STANDARD: tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ NIE JE v odpise kovania — neznáma rola profilu, doplniť ručne. Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca — doplniť ručne.",
+  "warn": "STANDARD: tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ NIE JE v odpise kovania — neznáma rola profilu, doplniť ručne.",
 }
 `;
 
@@ -4041,7 +4041,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "zak": "ZAK-G5",
     "zakaznik": "Zákazník G5",
   },
-  "warn": "Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca — doplniť ručne.",
+  "warn": null,
 }
 `;
 
@@ -7393,6 +7393,6 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
   },
   "snapshotDatum": null,
   "step": "nahladMulti",
-  "warn": "Tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ bez vzorca — doplniť ručne.",
+  "warn": null,
 }
 `;
