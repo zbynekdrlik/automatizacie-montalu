@@ -241,12 +241,11 @@ for (const [styl, ks] of Object.entries({
  * zapnutý (na rozdiel od Slide). Automatický zámok má RAL varianty R9005/R7016 —
  * do odpisu ide len variant zvolenej farby kovania.
  *
- * NEÚPLNÉ: zasklievacie tesnenia 4/6mm (ZASK00005/00006) a tesniace kefy
- * (ZASK00007/ZASK202541) tu ZATIAĽ NIE SÚ — chýba jednoznačný vzorec (tesnenia:
- * „šírka+výška prírezov kladkového/koncového/stredového profilu podľa hrúbky skla",
- * potrebuje rezné rozmery + hrúbku/IZO, ktoré `ZakladPoctov` nemá; kefy: „viď
- * obrázok" bez vzorca). Náhľad preto pri Štandarde zobrazí hlášku o neúplnosti a je
- * na to samostatný follow-up ticket. NEPRIDÁVAŤ bez vzorca od Dominika.
+ * ČIASTOČNE NEÚPLNÉ: zasklievacie tesnenia (ZASK00005/ZASK00006) počíta tesnenie.ts
+ * a pridáva do odpisu podľa skla (4mm→00005, 6mm→00006, IZO→žiadne; #342 round 2).
+ * Kefa ZASK00007 (4,8×4) je tu — rovnaká formula ako Deluxe (kladkový×2, Dominik
+ * 8.9.: „kefy ostávajú všade rovnako podľa výpočtu"). ZASK202541 (4,8×5) ZATIAĽ
+ * NIE JE — neznáma rola profilu v STANDARD kontexte (STANDARD nemá klzný profil).
  */
 export const KOMPONENTY_STANDARD: Komponent[] = [
 	{ kod: 'ZASK00002', nazov: 'Kladka dvojitá', mj: 'ks', pravidlo: { typ: 'naKridlo', koef: 2 } },
@@ -264,7 +263,19 @@ export const KOMPONENTY_STANDARD: Komponent[] = [
 		mj: 'ks',
 		farba: 'R7016',
 		pravidlo: { typ: 'konstPreStyl', ks: ZAMKY_STANDARD }
+	},
+	// Tesniaca kefa 4,8×4 — Dominik 8.9.2026 (msg 1807247): „kefy ostávajú všade
+	// rovnako podľa výpočtu". Rovnaká formula ako Deluxe (kladkový profil × 2).
+	// STANDARD má kladkový profil ZASP202415, takže dlzkaKladkovehoMm je nenulové.
+	{
+		kod: 'ZASK00007',
+		nazov: 'Tesniaca kefa 4,8×4 mm',
+		mj: 'm',
+		pravidlo: { typ: 'dlzkaProfilu', role: 'kladkovy', koef: 2 }
 	}
+	// ZASK202541 (Tesniaca kefa 4,8×5 mm) — HONEST-NULL. Kód je INÝ než Deluxe
+	// ZASK202542 a STANDARD nemá klzný profil. Bez potvrdenia od Dominika, KTORÁ rola
+	// profilu mapuje na 202541, sa nedá pridať do odpisu (netipovať Money).
 ];
 
 /**
@@ -369,7 +380,7 @@ export const KOVANIE_NEUPLNE: Record<
 	string | ((skloHrubka?: number, farbaKovania?: Farba) => string | null)
 > = {
 	Štandard:
-		'STANDARD: dĺžka tesnenia je spočítaná, ale výber 4/6 mm kódu ešte nie je určený. Tesniace kefy (ZASK00007/ZASK202541) zatiaľ NIE sú v odpise kovania — doplniť ručne (čaká sa na vzorec od Dominika).',
+		'STANDARD: tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ NIE JE v odpise kovania — neznáma rola profilu, doplniť ručne.',
 	Deluxe: (skloHrubka) =>
 		skloHrubka === 6
 			? 'DELUXE 6mm: krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'

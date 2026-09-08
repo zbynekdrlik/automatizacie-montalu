@@ -91,14 +91,18 @@ describe('kovanieDoOdpisu — RAL farebné varianty (#338)', () => {
 });
 
 describe('kovanieDoOdpisu — STANDARD (#338)', () => {
-	it('Štandard 2K: kladka, protikus, zámok R9005; tesnenia/kefy chýbajú (warn)', () => {
+	it('Štandard 2K: kladka, protikus, zámok R9005, kefa ZASK00007; ZASK202541 warn', () => {
 		const r = kov([spec('Štandard|2K')], false, 'R9005');
 		expect(r.err).toBeNull();
 		expect(qty(r, 'ZASK00002')).toBe(4); // kladka dvojitá 2 ks × 2 okná
 		expect(qty(r, 'ZASK202531')).toBe(2); // automaticky zamok R9005: 2 koncové okná
 		expect(qty(r, 'ZASK20252')).toBe(2); // protikus zámku 1 ks × 2 zámky
 		expect(r.polozky.find((p) => p.kod === 'ZASK202532')).toBeUndefined(); // R7016
-		expect(r.warn).toMatch(/tesnenia/i); // upozornenie na neúplnosť
+		// #342 round 2: kefa ZASK00007 (kladkový×2) je v odpise
+		expect(r.polozky.find((p) => p.kod === 'ZASK00007')).toBeDefined();
+		expect(qty(r, 'ZASK00007')).toBeGreaterThan(0);
+		// ZASK202541 zostáva otvorený → warn
+		expect(r.warn).toMatch(/ZASK202541/);
 	});
 
 	it('Štandard opona (2x2K): zámok 3, protikus 3', () => {
