@@ -138,6 +138,24 @@ tabuľky (`SELECT 1 FROM sqlite_master WHERE name='…'`) — tak to predpisuje 
 `migrateGlassKorekcia` (`glass_types`), aby minimálne fixtúry bez tej tabuľky ALTER
 preskočili namiesto crashu. Reálna prod DB `glass_types` ju má od v1/v22, takže ALTER prebehne.
 
+## UNIQUE(nazov, system) index mení poradie `WHERE nazov = ?` výsledkov (#235, v43)
+
+Od v22 je na `glass_types` index `UNIQUE(nazov, system)`. Dopytovanie `WHERE nazov = ?`
+BEZ system filtra vracia riadky v **indexovom** poradí (podľa `system` abecedne), NIE
+podľa `rowid` — takže `db.prepare('SELECT ... WHERE nazov = ?').get(nazov)` vráti
+riadok s abecedne PRVÝM systémom (napr. 'Robust' < 'Slide' < 'Štandard +'). V testoch,
+ktoré robia globálny lookup podľa mena (napr. `glass(nazov)`), po pridaní toho istého
+skla do viacerých systémov padne assertion na neočakávaný systém. **Fix: v teste vždy
+scope cez `glassTypesForSystem(system).find(g => g.nazov === ...)`, nie globálny
+`WHERE nazov = ?`** — rovnaká zásada ako v produkčnom kóde (glass-catalog rule §3).
+
+## Nová glass_types migrácia s neskoršími stĺpcami → feature-detect (#235, v43)
+
+`hrubka_trieda` (v37), `sklo_korekcia` (v36), `money_kod` (v23) neexistujú v minimálnych
+test fixtúrach z pred tých migrácií. INSERT do neexistujúceho stĺpca crashne pri importe
+`db.ts`. **Fix: `PRAGMA table_info(glass_types)` → `cols.includes('hrubka_trieda')` →
+podmienený INSERT s/bez stĺpca** (vzor `migrateGlassCatalogExpansion` v43).
+
 ## Recreate tabuľky v migrácii (zmena constraintu)
 
 SQLite nevie ALTER-nuť UNIQUE → recreate: `CREATE glass_types_new (... UNIQUE(...))` →
