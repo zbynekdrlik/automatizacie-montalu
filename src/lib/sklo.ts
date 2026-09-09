@@ -1,5 +1,6 @@
 // Zdieľané pomôcky pre SKLO v zaskleniach — používa ich formulár, plán aj náhľad.
 // Display-only: nič odtiaľto nevstupuje do Money odpisu.
+import { SYSTEMY_SKLO_VYBERA_IZO, jeIzoSklo } from './styl';
 
 /**
  * Predvolené sklo pre nový posuv:
@@ -24,6 +25,18 @@ export function defaultSklo(skla: string[], system?: string): string {
 	if (system === 'Deluxe') {
 		const desat = skla.find((g) => g.toLowerCase().includes('10 mm'));
 		if (desat) return desat;
+	}
+	// Štandard +/Štandard/Štandard Drevo (#235, v43): katalóg teraz obsahuje IZO sklá
+	// s „číre" v názve (napr. „Izolačné sklo 4/8/4 číre"). Bez tejto vetvy by sa IZO
+	// sklo stalo defaultom (prvé „číre" v katalógu) a zmenilo Money povrch — sysStylPre
+	// by vybral IZO nárezák + pridavnaKolajnicaDefault by zaškrtol koľajnicu.
+	// Fix: pre systémy kde skloVyberaIzo, hľadaj „číre" LEN v non-IZO sklách.
+	if (system && SYSTEMY_SKLO_VYBERA_IZO.includes(system)) {
+		const nonIzo = skla.filter((g) => !jeIzoSklo(g));
+		const cire = nonIzo.find((g) => g.toLowerCase().includes('číre'));
+		if (cire) return cire;
+		if (nonIzo.length > 0) return nonIzo[0]!;
+		// fallback: ak by neostalo žiadne non-IZO sklo, použi prvé akékoľvek
 	}
 	return skla.find((g) => g.toLowerCase().includes('číre')) ?? skla[0] ?? '';
 }
