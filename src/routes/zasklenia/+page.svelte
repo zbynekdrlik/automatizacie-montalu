@@ -404,13 +404,15 @@
 		])
 	);
 	// po zmene systému/štýlu ďalšieho posuvu daj do poriadku jeho štýl/sklo/otváranie
-	function fixPosuv(i: number) {
+	// #235: systemZmeneny = true keď extra posuv zmenil systém (nie štýl) — rovnaká
+	// logika ako prevSystemForSklo pre primárny posuv: zmena systému VŽDY resetne sklo.
+	function fixPosuv(i: number, systemZmeneny = false) {
 		const p = posuvyExtra[i];
 		if (!p) return; // i je vždy platný index do posuvyExtra — guard len pre typ
 		const st = stylyForSystem(p.system);
 		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
-		if (!sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
+		if (systemZmeneny || !sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {
