@@ -20,7 +20,7 @@ const stdRez = seed.rez.filter((r) => r.sysStyl.startsWith('Štandard +'));
 
 describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_seed', () => {
 	it('user_version=9 po plnej migrácii od nuly', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(42);
+		expect(db.pragma('user_version', { simple: true })).toBe(43);
 	});
 
 	it('v21 tabuľky (material_prices, material_prices_meta, odpis_polozky) existujú aj na fresh DB', () => {
@@ -87,11 +87,11 @@ describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_see
 		expect(systems.has('Deluxe')).toBe(true);
 	});
 
-	it('5 Štandard + glass_types (Float 4/6/10 + Izolačné 4.8.4 + „3.3.1" z v22; sklo_hrubka=0)', () => {
+	it('17 Štandard + glass_types (5 pôvodných + 12 z v43 #235; sklo_hrubka=0)', () => {
 		const rows = db
 			.prepare("SELECT nazov, hrubka FROM glass_types WHERE system = 'Štandard +'")
 			.all() as { nazov: string; hrubka: number }[];
-		expect(rows.length).toBe(5); // + „3.3.1" (#214, v22)
+		expect(rows.length).toBe(17); // 5 pôvodných + 12 z v43 (#235)
 		expect(rows.every((r) => r.hrubka === 0)).toBe(true);
 	});
 });

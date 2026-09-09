@@ -30,13 +30,27 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 	const styly = await page.getByLabel('Štýl').locator('option').allTextContents();
 	expect(styly.sort()).toEqual(['2K', '2x2K', '2x3K', '2x4K', '3K', '4K']);
 	// sklá zdieľa so Štandard + (Float 4/6/10 + izolačné)
+	// v43 (#235): plná škála skiel — Štandard zdieľa katalóg so Štandard+ (GLASS_SYSTEM_ALIAS).
+	// 2K štýl má IZO nárezák → ponuka obsahuje AJ izolačné sklá (sklaDoPonuky vracia všetko).
 	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
 	expect(skla).toEqual([
 		'Float sklo 4 mm',
 		'Float sklo 6 mm',
 		'3.3.1',
 		'Float sklo 10 mm',
-		'Izolačné sklo 4.8.4'
+		'Izolačné sklo 4.8.4',
+		'3.3.1 mliečne',
+		'3.3.2',
+		'3.3.2 mliečne',
+		'Izolačné sklo 4/8/4 číre',
+		'Izolačné sklo 4/8/4 mliečne',
+		'Izolačné sklo 4/8/4 stopsol',
+		'Izolačné sklo 4/16/4 číre',
+		'Izolačné sklo 4/16/4 mliečne',
+		'Izolačné sklo 4/16/4 stopsol',
+		'ESG kalené 4 mm',
+		'ESG kalené 6 mm',
+		'ESG kalené 10 mm'
 	]);
 
 	expect(errs).toEqual([]);

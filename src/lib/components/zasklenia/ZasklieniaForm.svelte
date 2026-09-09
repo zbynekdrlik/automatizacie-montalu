@@ -146,7 +146,7 @@
 		kolajnicaPre: (sys: string) => boolean;
 		addPosuv: () => void;
 		removePosuv: (i: number) => void;
-		fixPosuv: (i: number) => void;
+		fixPosuv: (i: number, systemZmeneny?: boolean) => void;
 	} = $props();
 </script>
 
@@ -448,7 +448,7 @@
 				<div class="grid2">
 					<div class="field">
 						<label for={`ps${i}-sys`}>Systém</label>
-						<select id={`ps${i}-sys`} bind:value={p.system} onchange={() => fixPosuv(i)}>
+						<select id={`ps${i}-sys`} bind:value={p.system} onchange={() => fixPosuv(i, true)}>
 							{#each systemy as sys (sys)}<option value={sys}>{nazovSystemu(sys)}</option>{/each}
 						</select>
 					</div>
