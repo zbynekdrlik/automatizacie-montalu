@@ -16,19 +16,27 @@ import seed from '../src/lib/server/cfg_seed.json';
 
 // katalóg skiel v poradí, v akom ho appka ponúka (poradie ASC), podľa systému —
 // zrkadlí prod stav glass_types (overené čítaním ostrej DB 2026-07-27)
+// v43 (#235): katalóg rozšírený o plnú škálu skiel (Robust, Slide, Štandard+)
 const KATALOG: Record<string, { nazov: string; redukciaZero: boolean; hrubka: number }[]> = {
 	Robust: [
 		{ nazov: 'Izolačné sklo 4/16/4 mliečne', redukciaZero: false, hrubka: 0 },
-		{ nazov: 'Izolačné sklo 4/16/4 číre', redukciaZero: true, hrubka: 0 },
-		{ nazov: 'Kalené 8mm', redukciaZero: false, hrubka: 0 },
-		{ nazov: 'Kalené 10mm', redukciaZero: false, hrubka: 0 }
+		{ nazov: 'Izolačné sklo 4/16/4 číre', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/16/4 stopsol', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/8/4 číre', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/8/4 mliečne', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Float sklo 4 mm', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Float sklo 6 mm', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'ESG kalené 6 mm', redukciaZero: false, hrubka: 0 }
 	],
 	Slide: [
 		{ nazov: 'Izolačné sklo 4/8/4 mliečne', redukciaZero: true, hrubka: 0 },
 		{ nazov: 'Izolačné sklo 4/8/4 číre', redukciaZero: true, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/16/4 číre', redukciaZero: true, hrubka: 0 },
 		{ nazov: '6mm číre', redukciaZero: false, hrubka: 0 },
 		{ nazov: '6mm mliečne', redukciaZero: false, hrubka: 0 },
-		{ nazov: '3.3.1', redukciaZero: false, hrubka: 0 }
+		{ nazov: '3.3.1', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Float sklo 4 mm', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'ESG kalené 6 mm', redukciaZero: false, hrubka: 0 }
 	],
 	Deluxe: [
 		{ nazov: 'Float kalené 6 mm', redukciaZero: false, hrubka: 6 },
@@ -37,8 +45,14 @@ const KATALOG: Record<string, { nazov: string; redukciaZero: boolean; hrubka: nu
 	'Štandard +': [
 		{ nazov: 'Float sklo 4 mm', redukciaZero: false, hrubka: 0 },
 		{ nazov: 'Float sklo 6 mm', redukciaZero: false, hrubka: 0 },
+		{ nazov: '3.3.1', redukciaZero: false, hrubka: 0 },
 		{ nazov: 'Float sklo 10 mm', redukciaZero: false, hrubka: 0 },
-		{ nazov: 'Izolačné sklo 4.8.4', redukciaZero: true, hrubka: 0 }
+		{ nazov: 'Izolačné sklo 4.8.4', redukciaZero: true, hrubka: 0 },
+		{ nazov: '3.3.2', redukciaZero: false, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/8/4 číre', redukciaZero: true, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/8/4 mliečne', redukciaZero: true, hrubka: 0 },
+		{ nazov: 'Izolačné sklo 4/16/4 číre', redukciaZero: true, hrubka: 0 },
+		{ nazov: 'ESG kalené 6 mm', redukciaZero: false, hrubka: 0 }
 	]
 };
 
@@ -59,7 +73,10 @@ describe('defaultSklo — predvoľba je vždy číre', () => {
 		expect(defaultSklo(zoznam, 'Deluxe')).toBe('Float kalené 10 mm');
 	});
 
-	it('systém bez „číre" a bez Deluxe-pravidla → prvé sklo v katalógu (Štandard +)', () => {
+	it('Štandard +: predvoľba ostáva non-IZO (Float sklo 4 mm) aj keď katalóg má IZO „číre" (#235)', () => {
+		// v43 pridalo IZO sklá s „číre" do Štandard+ — bez #235 fixu by defaultSklo
+		// vybralo „Izolačné sklo 4/8/4 číre" a zmenilo Money povrch (IZO nárezák + koľajnica).
+		// Fix v defaultSklo: pre skloVyberaIzo systémy hľadá „číre" LEN v non-IZO sklách.
 		expect(
 			defaultSklo(
 				KATALOG['Štandard +']!.map((g) => g.nazov),
