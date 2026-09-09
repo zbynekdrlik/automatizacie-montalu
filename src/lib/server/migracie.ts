@@ -29,7 +29,8 @@ import {
 	migrateDrevostavby,
 	migrateObjednavkaSkla,
 	migrateOdooLeadColumns,
-	migrateMaterialPredajPcmo
+	migrateMaterialPredajPcmo,
+	migrateGlassCatalogExpansion
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -981,6 +982,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateDrevostavby(db, bump); // v39→v40 (#445)
 	migrateObjednavkaSkla(db, bump); // v40→v41 (#496)
 	migrateMaterialPredajPcmo(db, bump); // v41→v42 (#364)
+	migrateGlassCatalogExpansion(db, bump); // v42→v43 (#235)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

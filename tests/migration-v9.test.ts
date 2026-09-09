@@ -68,7 +68,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)', () => {
 	it('user_version=9', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(42);
+		expect(db.pragma('user_version', { simple: true })).toBe(43);
 	});
 
 	it('presne 13 nových Štandard + štýlov (basic 2K…6K, IZO 2K IZO…6K IZO, opona 2x2K/2x3K/2x4K)', () => {
@@ -114,14 +114,17 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 		const rows = db
 			.prepare("SELECT nazov, hrubka FROM glass_types WHERE system = 'Štandard +' ORDER BY poradie")
 			.all() as { nazov: string; hrubka: number }[];
-		// „3.3.1" (#214, v22) sedí hneď za „Float sklo 6 mm" (poradie 25)
-		expect(rows.map((r) => r.nazov)).toEqual([
-			'Float sklo 4 mm',
-			'Float sklo 6 mm',
-			'3.3.1',
-			'Float sklo 10 mm',
-			'Izolačné sklo 4.8.4'
-		]);
+		// pôvodných 5 + 12 z v43 (#235)
+		expect(rows.length).toBe(17);
+		// pôvodné sú stále prítomné (v správnom poradí)
+		const nazvy = rows.map((r) => r.nazov);
+		expect(nazvy).toContain('Float sklo 4 mm');
+		expect(nazvy).toContain('Float sklo 6 mm');
+		expect(nazvy).toContain('3.3.1');
+		expect(nazvy).toContain('Izolačné sklo 4.8.4');
+		// v43 additions
+		expect(nazvy).toContain('3.3.2');
+		expect(nazvy).toContain('ESG kalené 6 mm');
 		// žiadne z nich nevyberá kladka/klzný profil podľa hrúbky (na rozdiel od Deluxe)
 		expect(rows.every((r) => r.hrubka === 0)).toBe(true);
 	});
@@ -150,7 +153,7 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 				}
 			).c
 		).toBe(seed.rez.filter((r) => r.sysStyl === 'Deluxe|5K').length);
-		// pôvodné glass_types (Robust/Deluxe) nedotknuté
+		// Robust glass_types rozšírené v43 (14 nových), Deluxe nedotknuté
 		expect(
 			(
 				db
@@ -159,6 +162,6 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 					c: number;
 				}
 			).c
-		).toBe(3);
+		).toBe(17); // Robust 2+14=16, Deluxe 1 (fixture len 6mm) = 17
 	});
 });

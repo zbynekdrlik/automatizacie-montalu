@@ -184,15 +184,17 @@ describe('editor vzorcov', () => {
 		expect(g10.hrubka).toBe(10);
 	});
 
-	it('sklá podľa systému: Robust = len 4/16/4 (IZO-only), Slide = 4/8/4 + 6 mm sklá', () => {
+	it('sklá podľa systému: Robust + Slide majú plný katalóg (v43 #235)', () => {
 		const robust = glassTypesForSystem('Robust').map((g) => g.nazov);
 		const slide = glassTypesForSystem('Slide').map((g) => g.nazov);
 		expect(robust).toContain('Izolačné sklo 4/16/4 mliečne');
 		expect(robust).toContain('Izolačné sklo 4/16/4 číre');
-		expect(robust.some((n) => n.includes('4/8/4'))).toBe(false);
+		// v43 (#235): Robust teraz má aj 4/8/4 a single glass
+		expect(robust).toContain('Izolačné sklo 4/8/4 číre');
 		expect(slide).toContain('Izolačné sklo 4/8/4 mliečne');
 		expect(slide).toContain('Izolačné sklo 4/8/4 číre');
-		expect(slide.some((n) => n.includes('4/16/4'))).toBe(false);
+		// v43 (#235): Slide teraz má aj 4/16/4
+		expect(slide).toContain('Izolačné sklo 4/16/4 číre');
 		// kalené 8/10 patria Robustu — do žiadnej Slide skladby sa nezmestia (Patrik, v17)
 		// Robust je IZO-only (Patrik 2026-07-31, migrácia v19) — kalené 8/10 mm
 		// sa už neponúkajú nikde

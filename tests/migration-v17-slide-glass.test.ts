@@ -75,28 +75,49 @@ const glass = (nazov: string) =>
 
 describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm)', () => {
 	it('user_version = 17', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(42);
+		expect(db.pragma('user_version', { simple: true })).toBe(43);
 	});
 
 	it('Slide zoznam je presne to, čo si dielňa vypýtala (v poradí)', () => {
+		// v43 (#235) rozšíril katalóg — Slide má teraz plnú škálu (IZO + single + laminated + ESG)
 		expect(nazvy('Slide')).toEqual([
 			'Izolačné sklo 4/8/4 mliečne',
 			'Izolačné sklo 4/8/4 číre',
+			'Izolačné sklo 4/8/4 stopsol',
+			'Izolačné sklo 4/16/4 číre',
+			'Izolačné sklo 4/16/4 mliečne',
+			'Izolačné sklo 4/16/4 stopsol',
 			'6mm číre',
 			'6mm mliečne',
-			'3.3.1'
+			'3.3.1',
+			'3.3.1 mliečne',
+			'3.3.2',
+			'3.3.2 mliečne',
+			'Float sklo 4 mm',
+			'Float sklo 10 mm',
+			'ESG kalené 4 mm',
+			'ESG kalené 6 mm',
+			'ESG kalené 10 mm'
 		]);
 	});
 
 	it('4/8/4 (obe) redukciu NULUJÚ — skladba 16 mm', () => {
-		expect(glass('Izolačné sklo 4/8/4 mliečne')?.redukcia_zero).toBe(1);
-		expect(glass('Izolačné sklo 4/8/4 číre')?.redukcia_zero).toBe(1);
+		// v43 (#235) pridáva 4/8/4 aj do Robustu → globálny glass() je nejednoznačný → scope cez system
+		const slideGlass = glassTypesForSystem('Slide');
+		const m = slideGlass.find((g) => g.nazov === 'Izolačné sklo 4/8/4 mliečne');
+		const c = slideGlass.find((g) => g.nazov === 'Izolačné sklo 4/8/4 číre');
+		expect(m?.redukciaZero).toBe(true);
+		expect(c?.redukciaZero).toBe(true);
 	});
 
 	it('6 mm sklá redukciu POČÍTAJÚ a patria Slide', () => {
-		for (const n of ['6mm číre', '6mm mliečne', '3.3.1']) {
-			expect(glass(n), n).toMatchObject({ redukcia_zero: 0, system: 'Slide' });
-		}
+		// 6mm číre a 6mm mliečne existujú len v Slide (globálne unikátne) → glass() je OK
+		expect(glass('6mm číre')).toMatchObject({ redukcia_zero: 0, system: 'Slide' });
+		expect(glass('6mm mliečne')).toMatchObject({ redukcia_zero: 0, system: 'Slide' });
+		// 3.3.1 existuje v 3 systémoch (v43 #235) → over cez glassTypesForSystem
+		const slide331 = glassTypesForSystem('Slide').find((g) => g.nazov === '3.3.1');
+		expect(slide331).toBeDefined();
+		expect(slide331!.redukciaZero).toBe(false);
 	});
 
 	it('kalené 8/10 zmizli zo Slide a vo v19 aj z Robustu', () => {
@@ -121,8 +142,9 @@ describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm
 
 	it('Deluxe a Štandard + ostávajú na svojich vlastných sklách (žiadne Slide/Robust sklo)', () => {
 		expect(nazvy('Deluxe')).toEqual(['Float kalené 6 mm']);
-		// „3.3.1" je Štandard + VLASTNÉ sklo (#214, v22), nie preliate zo Slide
-		expect(nazvy('Štandard +')).toEqual(['Float sklo 6 mm', '3.3.1']);
+		// v43 (#235) rozšíril Štandard+ katalóg — plná škála
+		expect(nazvy('Štandard +')).toContain('Float sklo 6 mm');
+		expect(nazvy('Štandard +')).toContain('3.3.1');
 	});
 
 	it('opakovaný beh migrácie nič nezduplikuje (idempotencia)', () => {
@@ -131,6 +153,6 @@ describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm
 				c: number;
 			}
 		).c;
-		expect(pocet).toBe(5);
+		expect(pocet).toBe(17); // 5 pôvodných + 12 z v43 (#235)
 	});
 });

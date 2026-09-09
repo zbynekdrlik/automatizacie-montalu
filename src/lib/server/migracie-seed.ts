@@ -621,3 +621,112 @@ export function migrateMaterialPredajPcmo(db: Database.Database, bump: (v: numbe
 		bump(42);
 	})();
 }
+
+/**
+ * v42 → v43: rozšírenie katalógu skiel — plná škála výberu pre nárezový plán (#235).
+ * Patrik (msg 1815122, 8.9.): „Budem potrebovať v nárezovom pláne možnosť výberu všetkého" —
+ * rezané (Float 4/6/10), lepené (3.3.1/3.3.2), IZO (4-8-4/4-16-4), ESG kalené; vyhotovenia
+ * číre/mliečne/stopsol. Pridáva nové riadky do Robust (14), Slide (12), Štandard+ (12).
+ * Deluxe bez zmeny (špecifický Float kalené 6/10 pre kladka/klzný výber).
+ *
+ * Money-neutralita:
+ * - Robust: žiadny sklozávislý profil → KAŽDÉ sklo je Money-identické (len popis na plán)
+ * - Slide: redukcia_zero + hrubka_trieda nastavené: IZO→(1,16), single/laminated/ESG→(0,6)
+ * - Štandard+: jeIzoSklo klasifikácia + hrubka_trieda: IZO→16, non-IZO→6
+ * - money_kod=NULL pre všetky nové typy (honest-null, „cena nedostupná")
+ *
+ * Idempotentné: INSERT OR IGNORE vďaka UNIQUE(nazov, system).
+ */
+export function migrateGlassCatalogExpansion(
+	db: Database.Database,
+	bump: (v: number) => void
+): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 43) return;
+	// Feature-detect: minimálne migračné fixtúry nemusia mať glass_types
+	const maTable =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='glass_types'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maTable) {
+			// INSERT OR IGNORE — UNIQUE(nazov, system) zabezpečí idempotentnosť.
+			// hrubka_trieda nemusí existovať v minimálnych fixtúrach (pridáva ju v37) →
+			// feature-detect; ak chýba, INSERT bez nej (v37 ju pridá + backfillne neskôr
+			// na reálnej DB; na minimálnych fixtúrach je inertná).
+			const cols = (db.prepare('PRAGMA table_info(glass_types)').all() as { name: string }[]).map(
+				(c) => c.name
+			);
+			const hasTrieda = cols.includes('hrubka_trieda');
+			const ins = hasTrieda
+				? db.prepare(
+						`INSERT OR IGNORE INTO glass_types
+						 (nazov, redukcia_zero, poradie, system, hrubka, hrubka_trieda)
+						 VALUES (?, ?, ?, ?, 0, ?)`
+					)
+				: db.prepare(
+						`INSERT OR IGNORE INTO glass_types
+						 (nazov, redukcia_zero, poradie, system, hrubka)
+						 VALUES (?, ?, ?, ?, 0)`
+					);
+			// Wrapper: ak hrubka_trieda existuje, posielaj 5 args; ak nie, 4 args (trieda sa ignoruje).
+			const add = (
+				nazov: string,
+				redukciaZero: number,
+				poradie: number,
+				system: string,
+				trieda: number | null
+			) => {
+				if (hasTrieda) ins.run(nazov, redukciaZero, poradie, system, trieda);
+				else ins.run(nazov, redukciaZero, poradie, system);
+			};
+
+			// ── Robust ── Money-neutrálne (žiadny sklozávislý profil)
+			// hrubka_trieda=NULL (Robust nie je klasifikovaný)
+			add('Izolačné sklo 4/16/4 stopsol', 0, 22, 'Robust', null);
+			add('Izolačné sklo 4/8/4 číre', 0, 30, 'Robust', null);
+			add('Izolačné sklo 4/8/4 mliečne', 0, 32, 'Robust', null);
+			add('Izolačné sklo 4/8/4 stopsol', 0, 34, 'Robust', null);
+			add('Float sklo 4 mm', 0, 40, 'Robust', null);
+			add('Float sklo 6 mm', 0, 42, 'Robust', null);
+			add('Float sklo 10 mm', 0, 44, 'Robust', null);
+			add('3.3.1', 0, 50, 'Robust', null);
+			add('3.3.1 mliečne', 0, 52, 'Robust', null);
+			add('3.3.2', 0, 55, 'Robust', null);
+			add('3.3.2 mliečne', 0, 57, 'Robust', null);
+			add('ESG kalené 4 mm', 0, 70, 'Robust', null);
+			add('ESG kalené 6 mm', 0, 72, 'Robust', null);
+			add('ESG kalené 10 mm', 0, 74, 'Robust', null);
+
+			// ── Slide ── redukcia_zero + hrubka_trieda musia sedieť:
+			//   IZO (4/8/4, 4/16/4) → redukcia_zero=1, hrubka_trieda=16
+			//   single/laminated/ESG → redukcia_zero=0, hrubka_trieda=6
+			add('Izolačné sklo 4/8/4 stopsol', 1, 22, 'Slide', 16);
+			add('Izolačné sklo 4/16/4 číre', 1, 24, 'Slide', 16);
+			add('Izolačné sklo 4/16/4 mliečne', 1, 26, 'Slide', 16);
+			add('Izolačné sklo 4/16/4 stopsol', 1, 28, 'Slide', 16);
+			add('3.3.1 mliečne', 0, 52, 'Slide', 6);
+			add('3.3.2', 0, 55, 'Slide', 6);
+			add('3.3.2 mliečne', 0, 57, 'Slide', 6);
+			add('Float sklo 4 mm', 0, 60, 'Slide', 6);
+			add('Float sklo 10 mm', 0, 62, 'Slide', 6);
+			add('ESG kalené 4 mm', 0, 70, 'Slide', 6);
+			add('ESG kalené 6 mm', 0, 72, 'Slide', 6);
+			add('ESG kalené 10 mm', 0, 74, 'Slide', 6);
+
+			// ── Štandard + ── (zdieľaný so „Štandard" a „Štandard Drevo" cez GLASS_SYSTEM_ALIAS)
+			// hrubka_trieda: IZO → 16, non-IZO → 6 (vzor v37 backfill z jeIzoSklo)
+			add('3.3.1 mliečne', 0, 45, 'Štandard +', 6);
+			add('3.3.2', 0, 47, 'Štandard +', 6);
+			add('3.3.2 mliečne', 0, 49, 'Štandard +', 6);
+			add('Izolačné sklo 4/8/4 číre', 0, 50, 'Štandard +', 16);
+			add('Izolačné sklo 4/8/4 mliečne', 0, 52, 'Štandard +', 16);
+			add('Izolačné sklo 4/8/4 stopsol', 0, 54, 'Štandard +', 16);
+			add('Izolačné sklo 4/16/4 číre', 0, 56, 'Štandard +', 16);
+			add('Izolačné sklo 4/16/4 mliečne', 0, 58, 'Štandard +', 16);
+			add('Izolačné sklo 4/16/4 stopsol', 0, 60, 'Štandard +', 16);
+			add('ESG kalené 4 mm', 0, 70, 'Štandard +', 6);
+			add('ESG kalené 6 mm', 0, 72, 'Štandard +', 6);
+			add('ESG kalené 10 mm', 0, 74, 'Štandard +', 6);
+		}
+		bump(43);
+	})();
+}
