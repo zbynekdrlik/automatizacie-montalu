@@ -85,6 +85,24 @@ describe('defaultSklo — predvoľba je vždy číre', () => {
 		).toBe('Float sklo 4 mm');
 	});
 
+	it('#235 kolízia: „4/16/4 číre" je v Robust aj Slide — defaultSklo dáva pre každý systém INÝ default', () => {
+		// Toto je precondícia bugu #235: po v43 rovnaké sklo existuje vo viacerých systémoch.
+		// Keby reactive $effect v +page.svelte pri prepnutí systému sklo nereinicializoval,
+		// „Izolačné sklo 4/16/4 číre" z Robustu by prežilo prepnutie na Slide (name-match).
+		// Tento test overuje, že defaultSklo SPRÁVNE vyberie per-systém default — ak je
+		// rovnaký, $effect nemá jak rozlíšiť „chcené" od „preživšieho".
+		const koliznyNazov = 'Izolačné sklo 4/16/4 číre';
+		const robustList = KATALOG.Robust!.map((g) => g.nazov);
+		const slideList = KATALOG.Slide!.map((g) => g.nazov);
+		expect(robustList).toContain(koliznyNazov);
+		expect(slideList).toContain(koliznyNazov);
+		// Robust default = „4/16/4 číre" (sám je default, lebo je prvé číre v katalógu)
+		expect(defaultSklo(robustList, 'Robust')).toBe(koliznyNazov);
+		// Slide default = „4/8/4 číre" (menšia skladba, prvé číre v Slide)
+		expect(defaultSklo(slideList, 'Slide')).toBe('Izolačné sklo 4/8/4 číre');
+		expect(defaultSklo(slideList, 'Slide')).not.toBe(koliznyNazov);
+	});
+
 	it('prázdny zoznam nespadne (vráti prázdny string)', () => {
 		expect(defaultSklo([])).toBe('');
 	});
