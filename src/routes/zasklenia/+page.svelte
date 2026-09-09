@@ -117,6 +117,12 @@
 	// #132: hranový tracker pre DEFAULT „Prídavná koľajnica" — pozri
 	// pridavnaKolajnicaOdporucana nižšie prečo je hranový, nie „vždy keď true"
 	let pridavnaKolajnicaOdporucanaPrev = $state(false);
+	// #235: hranový tracker pre system → sklo reset: zmena systému VŽDY resetne sklo
+	// na defaultSklo, aj keď nový systém má sklo rovnakého mena (v43 rozšírenie katalógu
+	// umožnilo zdieľané názvy naprieč systémami — „Izolačné sklo 4/16/4 číre" je teraz
+	// v Robust AJ Slide). Štýlová zmena v rámci rovnakého systému zachová výber obsluhy.
+	// Seeduje sa v reštart-efekte rovnako ako pridavnaKolajnicaOdporucanaPrev.
+	let prevSystemForSklo = $state('Robust');
 	// jednostranná FAB — výnimka, MENÍ Money odpis (kľučka/krytka vložky 1 ks)
 	let jednostrannaFabS = $state(false);
 	// RAL farba kovania (#338) — MENÍ Money kód (kľučka/krytka/zámok R9005 vs R7016).
@@ -178,6 +184,10 @@
 			p?.styl ?? '2K',
 			p?.sklo ?? ''
 		);
+		// #235: zasej prevSystemForSklo z OBNOVENÝCH dát, inak by sklo-efekt videl
+		// „zmenu systému" a prepísal obnovené sklo na defaultSklo (rovnaký vzor ako
+		// pridavnaKolajnicaOdporucanaPrev — „Použiť znova" sa NESMIE prepísať).
+		prevSystemForSklo = p?.system ?? 'Robust';
 		system = p?.system ?? 'Robust';
 		styl = p?.styl ?? '2K';
 		otvaranie = p?.otvaranie ?? 'P - L';
@@ -308,10 +318,23 @@
 	let sklaPre = $derived(sklaForSystem(system, styl));
 	$effect(() => {
 		const zoznam = sklaPre;
-		// už zvolené sklo si drž, kým je v ponuke (zmena počtu krídel nesmie
-		// prepísať voľbu obsluhy); inak predvoľba = vždy ČÍRE, ak ho systém má
-		const chcene = untrack(() => sklo) || prim()?.sklo;
-		sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam, system);
+		const currentSystem = system;
+		const systemZmeneny = currentSystem !== untrack(() => prevSystemForSklo);
+		if (systemZmeneny) {
+			// #235: zmena systému → VŽDY reset na defaultSklo. Po v43 (rozšírenie
+			// katalógu) systémy zdieľajú názvy skiel (napr. „Izolačné sklo 4/16/4
+			// číre" je v Robust AJ Slide) — bez tohto resetu by sa Robustové sklo
+			// „prenieslo" do Slide namiesto resetu na Slide default (audit2 kontrakt:
+			// „Robustové sklo neprežije prepnutie"). Zápis do prevSystemForSklo
+			// je untracked → nespúšťa znovu tento efekt.
+			sklo = defaultSklo(zoznam, currentSystem);
+			prevSystemForSklo = currentSystem;
+		} else {
+			// štýlová zmena / iný trigger → name-persistence (zmena počtu krídel
+			// nesmie prepísať voľbu obsluhy)
+			const chcene = untrack(() => sklo) || prim()?.sklo;
+			sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam, currentSystem);
+		}
 	});
 
 	// #132 (Patrik, Odoo 207 #1646652: „vždy dávame pri štandardoch IZO spodnú
