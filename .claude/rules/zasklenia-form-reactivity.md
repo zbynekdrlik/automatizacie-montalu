@@ -144,3 +144,20 @@ v `<select>`). Volá sa z `+page.svelte` na dvoch miestach (primárny sklo-effec
 — zmena Deluxe defaultu 6→10 mm zmení KTORÉ sklo je prednastavené a 10 mm dáva iný (úplnejší)
 odpis; sklo→odpis kanály sú tri: Slide (`redukcia_zero`), Deluxe (`hrubka`), Štandard IZO
 (`sysStylPre`) — viď `.claude/rules/glass-catalog.md`.
+
+### Zmena systému = VŽDY reset skla (#235, v43)
+
+Od v43 (`migrateGlassCatalogExpansion`) systémy zdieľajú NÁZVY skiel (napr. „Izolačné sklo
+4/16/4 číre" je v Robust AJ Slide AJ Štandard+). Name-based persistence v sklo-`$effect`
+preto NESTAČÍ na detekciu zmeny systému — sklo rovnakého mena prejde `zoznam.includes(chcene)`
+aj v novom systéme. Invariant:
+
+- **Zmena SYSTÉMU → VŽDY `defaultSklo(zoznam, system)`** (primárny posuv: `prevSystemForSklo`
+  edge-tracker v `$effect`; extra posuv: `fixPosuv(i, true)` — system `<select>` onchange
+  v `ZasklieniaForm.svelte` posúva `true`).
+- **Zmena ŠTÝLU (rovnaký systém) → name-persistence** (zachová výber obsluhy, ak sklo ostáva
+  v ponuke nového štýlu).
+
+`prevSystemForSklo` sa seeduje v reštart-efekte (rovnaký vzor ako `pridavnaKolajnicaOdporucanaPrev`)
+— „Použiť znova" sa NESMIE prepísať. `addPosuv()` volá `fixPosuv(idx)` BEZ flagu (klon je
+same-system). Audit2 kontrakt: „Robustové sklo neprežije prepnutie".
