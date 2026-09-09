@@ -120,24 +120,25 @@ describe('reálny v16 → v17: Slide sklá (bez redukcie 4/8/4, s redukciou 6 mm
 		expect(slide331!.redukciaZero).toBe(false);
 	});
 
-	it('kalené 8/10 zmizli zo Slide a vo v19 aj z Robustu', () => {
+	it('pôvodné kalené 8/10 mm boli zmazané (v19) — neexistujú pod starými názvami', () => {
+		// v43 (#235, Patrik 8.9.) pridáva „ESG kalené" pod NOVÝMI názvami — to nie sú
+		// tie isté staré „Kalené 8mm/10mm" (iné názvy, iná fyzická špecifikácia)
 		expect(nazvy('Slide')).not.toContain('Kalené 8mm');
 		expect(nazvy('Slide')).not.toContain('Kalené 10mm');
-		// v19 ich potom zmazala úplne — Robust je IZO-only (Patrik 2026-07-31),
-		// takže po plnej migrácii nie sú ani v Robuste
 		expect(nazvy('Robust')).not.toContain('Kalené 8mm');
 		expect(nazvy('Robust')).not.toContain('Kalené 10mm');
 	});
 
-	it('Robust sklá sa nezmenili (4/16/4 zostávajú vrátane ich príznakov)', () => {
-		expect(glass('Izolačné sklo 4/16/4 mliečne')).toMatchObject({
-			redukcia_zero: 0,
-			system: 'Robust'
-		});
-		expect(glass('Izolačné sklo 4/16/4 číre')).toMatchObject({
-			redukcia_zero: 1,
-			system: 'Robust'
-		});
+	it('Robust pôvodné 4/16/4 sklá stále existujú', () => {
+		// v43 pridala ďalšie sklá do Robustu — over pôvodné cez glassTypesForSystem
+		const robust416c = glassTypesForSystem('Robust').find(
+			(g) => g.nazov === 'Izolačné sklo 4/16/4 číre'
+		);
+		const robust416m = glassTypesForSystem('Robust').find(
+			(g) => g.nazov === 'Izolačné sklo 4/16/4 mliečne'
+		);
+		expect(robust416m).toBeDefined();
+		expect(robust416c).toBeDefined();
 	});
 
 	it('Deluxe a Štandard + ostávajú na svojich vlastných sklách (žiadne Slide/Robust sklo)', () => {

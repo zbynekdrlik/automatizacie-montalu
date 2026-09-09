@@ -195,13 +195,14 @@ describe('editor vzorcov', () => {
 		expect(slide).toContain('Izolačné sklo 4/8/4 číre');
 		// v43 (#235): Slide teraz má aj 4/16/4
 		expect(slide).toContain('Izolačné sklo 4/16/4 číre');
-		// kalené 8/10 patria Robustu — do žiadnej Slide skladby sa nezmestia (Patrik, v17)
-		// Robust je IZO-only (Patrik 2026-07-31, migrácia v19) — kalené 8/10 mm
-		// sa už neponúkajú nikde
+		// Pôvodné „Kalené 8mm/10mm" boli zmazané v19 — v43 (#235, Patrik 8.9.) pridáva
+		// „ESG kalené" pod NOVÝMI názvami (iná špecifikácia)
 		expect(robust).not.toContain('Kalené 8mm');
 		expect(robust).not.toContain('Kalené 10mm');
+		expect(robust).toContain('ESG kalené 6 mm');
 		expect(slide).not.toContain('Kalené 8mm');
 		expect(slide).not.toContain('Kalené 10mm');
+		expect(slide).toContain('ESG kalené 6 mm');
 		// Slide 6 mm skladba = S redukciou (v17)
 		expect(slide).toContain('6mm číre');
 		expect(slide).toContain('6mm mliečne');

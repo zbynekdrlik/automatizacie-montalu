@@ -114,17 +114,26 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 		const rows = db
 			.prepare("SELECT nazov, hrubka FROM glass_types WHERE system = 'Štandard +' ORDER BY poradie")
 			.all() as { nazov: string; hrubka: number }[];
-		// pôvodných 5 + 12 z v43 (#235)
-		expect(rows.length).toBe(17);
-		// pôvodné sú stále prítomné (v správnom poradí)
-		const nazvy = rows.map((r) => r.nazov);
-		expect(nazvy).toContain('Float sklo 4 mm');
-		expect(nazvy).toContain('Float sklo 6 mm');
-		expect(nazvy).toContain('3.3.1');
-		expect(nazvy).toContain('Izolačné sklo 4.8.4');
-		// v43 additions
-		expect(nazvy).toContain('3.3.2');
-		expect(nazvy).toContain('ESG kalené 6 mm');
+		// pôvodných 5 + 12 z v43 (#235) — presné poradie
+		expect(rows.map((r) => r.nazov)).toEqual([
+			'Float sklo 4 mm',
+			'Float sklo 6 mm',
+			'3.3.1',
+			'Float sklo 10 mm',
+			'Izolačné sklo 4.8.4',
+			'3.3.1 mliečne',
+			'3.3.2',
+			'3.3.2 mliečne',
+			'Izolačné sklo 4/8/4 číre',
+			'Izolačné sklo 4/8/4 mliečne',
+			'Izolačné sklo 4/8/4 stopsol',
+			'Izolačné sklo 4/16/4 číre',
+			'Izolačné sklo 4/16/4 mliečne',
+			'Izolačné sklo 4/16/4 stopsol',
+			'ESG kalené 4 mm',
+			'ESG kalené 6 mm',
+			'ESG kalené 10 mm'
+		]);
 		// žiadne z nich nevyberá kladka/klzný profil podľa hrúbky (na rozdiel od Deluxe)
 		expect(rows.every((r) => r.hrubka === 0)).toBe(true);
 	});

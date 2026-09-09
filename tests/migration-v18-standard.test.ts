@@ -128,17 +128,26 @@ describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', 
 		const pocet = (db.prepare('SELECT COUNT(*) c FROM glass_types').get() as { c: number }).c;
 		// 8 pôvodných + 38 z v43 (#235 — Robust 14, Slide 12, Štandard+ 12)
 		expect(pocet).toBe(46);
-		// starý Štandard zdieľa katalóg so Štandard + vrátane rozšírenia z v43
-		const stdGlass = glassTypesForSystem('Štandard').map((g) => g.nazov);
-		expect(stdGlass).toContain('Float sklo 4 mm');
-		expect(stdGlass).toContain('Float sklo 6 mm');
-		expect(stdGlass).toContain('3.3.1');
-		expect(stdGlass).toContain('Float sklo 10 mm');
-		expect(stdGlass).toContain('Izolačné sklo 4.8.4');
-		// v43 additions
-		expect(stdGlass).toContain('3.3.2');
-		expect(stdGlass).toContain('ESG kalené 6 mm');
-		expect(stdGlass).toContain('Izolačné sklo 4/16/4 číre');
+		// starý Štandard zdieľa katalóg so Štandard + vrátane rozšírenia z v43 (#235)
+		expect(glassTypesForSystem('Štandard').map((g) => g.nazov)).toEqual([
+			'Float sklo 4 mm',
+			'Float sklo 6 mm',
+			'3.3.1',
+			'Float sklo 10 mm',
+			'Izolačné sklo 4.8.4',
+			'3.3.1 mliečne',
+			'3.3.2',
+			'3.3.2 mliečne',
+			'Izolačné sklo 4/8/4 číre',
+			'Izolačné sklo 4/8/4 mliečne',
+			'Izolačné sklo 4/8/4 stopsol',
+			'Izolačné sklo 4/16/4 číre',
+			'Izolačné sklo 4/16/4 mliečne',
+			'Izolačné sklo 4/16/4 stopsol',
+			'ESG kalené 4 mm',
+			'ESG kalené 6 mm',
+			'ESG kalené 10 mm'
+		]);
 	});
 
 	it('migrácia je idempotentná — druhý beh nič nepridá', () => {

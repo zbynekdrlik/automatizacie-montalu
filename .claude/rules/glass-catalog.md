@@ -149,12 +149,15 @@ skla do viacerých systémov padne assertion na neočakávaný systém. **Fix: v
 scope cez `glassTypesForSystem(system).find(g => g.nazov === ...)`, nie globálny
 `WHERE nazov = ?`** — rovnaká zásada ako v produkčnom kóde (glass-catalog rule §3).
 
-## Nová glass_types migrácia s neskoršími stĺpcami → feature-detect (#235, v43)
+## Nová glass_types migrácia s neskoršími stĺpcami — oprav FIXTÚRU, nie migráciu (#235, v43)
 
 `hrubka_trieda` (v37), `sklo_korekcia` (v36), `money_kod` (v23) neexistujú v minimálnych
 test fixtúrach z pred tých migrácií. INSERT do neexistujúceho stĺpca crashne pri importe
-`db.ts`. **Fix: `PRAGMA table_info(glass_types)` → `cols.includes('hrubka_trieda')` →
-podmienený INSERT s/bez stĺpca** (vzor `migrateGlassCatalogExpansion` v43).
+`db.ts`. **Fix: pridaj chýbajúci stĺpec do CREATE v dotknutej fixtúre** (rovnaký princíp
+ako „pridaj PRÁZDNU chýbajúcu tabuľku" vyššie). Na reálnej DB stĺpec VŽDY existuje (v37
+beží pred v43), takže migráciu NEguarduj — guard v migrácii skryje dieru vo fixtúre.
+(v43 `migrateGlassCatalogExpansion` obsahuje historický feature-detect `hasTrieda` ako
+obrannú vrstvu; nová migrácia by mala radšej opraviť fixtúru.)
 
 ## Recreate tabuľky v migrácii (zmena constraintu)
 
