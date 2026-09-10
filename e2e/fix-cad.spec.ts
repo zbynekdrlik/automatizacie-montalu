@@ -51,8 +51,8 @@ test('Fix z cadu — CAD nárez dá Money rozpis (16xxx), odoslať je blokované
 
 	// Money rozpis sa zobrazil s resolvnutými FIX kódmi (priamy 16xxx match, bez CODE_MAP)
 	await expect(page.getByTestId('odoslat')).toBeVisible();
-	await expect(page.locator('.mono', { hasText: '16101' })).toBeVisible();
-	await expect(page.locator('.mono', { hasText: '16104' })).toBeVisible();
+	await expect(page.getByLabel('Množstvo 16101')).toBeVisible();
+	await expect(page.getByLabel('Množstvo 16104')).toBeVisible();
 
 	// odoslanie zostáva na náhľade s honest-null blok hláškou — do Money sa NIČ nezapíše
 	await page.getByTestId('odoslat').click();
