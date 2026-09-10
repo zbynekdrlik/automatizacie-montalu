@@ -21,7 +21,7 @@ const pergolaRoute = await import('../src/routes/pergola/+page.server');
 const { listOdpisy } = await import('../src/lib/server/money');
 
 // FIX CAD text s kódmi 16xxx — reálny tvar z Patrikovho CAD (ZAK2026408 / OPDL260153).
-// Kódy sú PRIAMO Money kódy (nie mapovanie cez CODE_MAP ako pergola 18xxx → PRP).
+// Round 2 (#500): CAD kódy 16xxx sa mapujú na ZASP Money kódy cez Dominikov kód field.
 const FIX_CAD = [
 	'16101 RAMOVY PROFIL 1 109.80',
 	'16101 RAMOVY PROFIL 1 301.00',
@@ -46,8 +46,8 @@ function ev(body: Record<string, string>) {
 	} as never;
 }
 
-describe('fix-catalog — transformFix', () => {
-	it('FIX kódy (16xxx) sa rozpoznajú ako platné Money kódy', () => {
+describe('fix-catalog — transformFix (round 2: CAD→ZASP cez Dominikov kód)', () => {
+	it('FIX CAD kódy (16xxx) sa mapujú na ZASP Money kódy', () => {
 		const rows = [
 			{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 2000 },
 			{ code: '16104', name: 'ZASKLIEVACI PROFIL 36mm', qty: 2, cut_mm: 500 }
@@ -55,11 +55,15 @@ describe('fix-catalog — transformFix', () => {
 		const r = fixCatalog.transformFix(rows);
 		expect(r.unresolved).toEqual([]);
 		expect(r.items).toHaveLength(2);
-		expect(r.items[0]!.kod).toBe('16101');
-		expect(r.items[0]!.qty).toBe(2); // 2000mm = 2m
+		// Round 2: CAD 16101 → Money ZASP00116 (Dominik msg 1818224)
+		expect(r.items[0]!.kod).toBe('ZASP00116');
+		expect(r.items[0]!.qty).toBe(7.5); // 2000mm < 7500mm bar → 1 bar = 7.5m
 		expect(r.items[0]!.mj).toBe('m');
-		expect(r.items[1]!.kod).toBe('16104');
-		expect(r.items[1]!.qty).toBe(1); // 2x500mm = 1000mm = 1m
+		// Round 2: CAD 16104 → Money ZASP202413
+		expect(r.items[1]!.kod).toBe('ZASP202413');
+		expect(r.items[1]!.qty).toBe(7.5); // 2x500mm = 1000mm < 7500mm → 1 bar = 7.5m
+		// Round 2: bar_mm známe → barMmConfirmed = true
+		expect(r.barMmConfirmed).toBe(true);
 	});
 
 	it('neznámy kód → unresolved (honest chyba)', () => {
@@ -70,7 +74,33 @@ describe('fix-catalog — transformFix', () => {
 		expect(r.items).toHaveLength(0);
 	});
 
-	it('viacero rezov rovnakého kódu sa sčítajú', () => {
+	it('V1 kód bez Dominik mapovania (16001) → unresolved', () => {
+		const rows = [{ code: '16001', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 1000 }];
+		const r = fixCatalog.transformFix(rows);
+		expect(r.unresolved).toHaveLength(1);
+		expect(r.unresolved[0]!.cad).toBe('16001');
+	});
+
+	it('V1 kód 16006 (zasklievací 28mm) SA mapuje — ZASP00119', () => {
+		const rows = [{ code: '16006', name: 'ZASKLIEVACI PROFIL 28mm', qty: 1, cut_mm: 3000 }];
+		const r = fixCatalog.transformFix(rows);
+		expect(r.unresolved).toEqual([]);
+		expect(r.items).toHaveLength(1);
+		expect(r.items[0]!.kod).toBe('ZASP00119');
+	});
+
+	it('viacero rezov rovnakého kódu: FFD bin-packing do 7500mm tyčí', () => {
+		const rows = [
+			{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 4000 },
+			{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 4000 }
+		];
+		const r = fixCatalog.transformFix(rows);
+		expect(r.items).toHaveLength(1);
+		// 4000+4000=8000mm > 7500mm → 2 tyče (FFD: first 4000 → bar1, second 4000 → bar2)
+		expect(r.items[0]!.qty).toBe(15); // 2 bars × 7.5m
+	});
+
+	it('rezy vmestiteľné do jednej tyče → 1 × 7.5m', () => {
 		const rows = [
 			{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 1000 },
 			{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 2000 },
@@ -78,13 +108,28 @@ describe('fix-catalog — transformFix', () => {
 		];
 		const r = fixCatalog.transformFix(rows);
 		expect(r.items).toHaveLength(1);
-		// 1000 + 2000 + 2x500 = 4000mm = 4m
-		expect(r.items[0]!.qty).toBe(4);
+		// 1000+2000+2×500=4000mm < 7500mm → 1 tyč = 7.5m
+		expect(r.items[0]!.qty).toBe(7.5);
+	});
+
+	it('celých 5 Dominik mapovaní je v katalógu', () => {
+		const mapping = [
+			{ cad: '16101', zasp: 'ZASP00116' },
+			{ cad: '16006', zasp: 'ZASP00119' },
+			{ cad: '16102', zasp: 'ZASP00125' },
+			{ cad: '16103', zasp: 'ZASP00128' },
+			{ cad: '16104', zasp: 'ZASP202413' }
+		];
+		for (const { cad, zasp } of mapping) {
+			const r = fixCatalog.transformFix([{ code: cad, name: 'test', qty: 1, cut_mm: 100 }]);
+			expect(r.unresolved).toEqual([]);
+			expect(r.items[0]!.kod).toBe(zasp);
+		}
 	});
 });
 
 describe('fix-cad modul — cadOdpisView s FIX opts (bez DB)', () => {
-	it('cadOdpisView s FIX opts rozparsuje FIX kódy (16xxx)', () => {
+	it('cadOdpisView s FIX opts mapuje CAD 16xxx → ZASP Money kódy', () => {
 		const { error, view } = cadOdpis.cadOdpisView(
 			{ zak: 'F1', op: 'OP1', zakaznik: 'Z', cad: FIX_CAD, caka: false },
 			undefined,
@@ -93,10 +138,10 @@ describe('fix-cad modul — cadOdpisView s FIX opts (bez DB)', () => {
 		expect(error).toBeNull();
 		expect(view).not.toBeNull();
 		expect(view!.nonzero.length).toBeGreaterThan(0);
-		// FIX kódy sú PRIAMO Money kódy (nie PRP mapovanie)
+		// Round 2: CAD 16xxx → ZASP Money kódy (cez Dominikov kód field)
 		const codes = view!.nonzero.map((p) => p.kod);
-		expect(codes).toContain('16101');
-		expect(codes).toContain('16104');
+		expect(codes).toContain('ZASP00116'); // CAD 16101 → ZASP00116
+		expect(codes).toContain('ZASP202413'); // CAD 16104 → ZASP202413
 	});
 
 	it('nenamapovaný CAD kód → TVRDÁ chyba (nikdy tichý výpadok materiálu)', () => {
@@ -157,18 +202,26 @@ describe('fix-cad modul — buildFixCadJob', () => {
 	});
 });
 
-describe('fix-cad route — odoslat BLOKOVANÉ (bar_mm neznáme — honest-null)', () => {
-	// #500 review HIGH-1: bar_mm neznáme → odoslat do Money BLOKOVANÉ. Náhľad funguje
-	// (operátor vidí kódy + metrá), ale zápis je pozastavený kým sa MJ nepotvrdí.
-	it('odoslat s neznámym bar_mm → step=nahlad s blok hláškou (NIE hotovo)', async () => {
+describe('fix-cad route — odoslat ODBLOKOVANÉ (round 2: bar_mm = 7500)', () => {
+	// Round 2: Dominik potvrdil bar_mm = 7500 → odoslat FUNGUJE, ZASP kódy v xlsx
+	it('odoslat s potvrdenými bar_mm → step=hotovo, ZASP kódy v Money', async () => {
 		const r = (await route.actions.odoslat(
-			ev({ zak: 'FIX-1', op: 'OP1', zakaznik: 'Zákazník A', cad: FIX_CAD })
-		)) as { step: string; error: string | null };
-		expect(r.step).toBe('nahlad');
-		expect(r.error).toMatch(/Odpis pozastavený/);
-		expect(r.error).toMatch(/bar_mm/);
-		// do Money sa nič NEzapísalo
-		expect(listOdpisy(200).some((o) => o.zak === 'FIX-1' && o.op === 'OP1')).toBe(false);
+			ev({ zak: 'FIX-R2', op: 'OP1', zakaznik: 'Zákazník A', cad: FIX_CAD })
+		)) as { step: string; outcome?: { target: string } };
+		expect(r.step).toBe('hotovo');
+		// xlsx existuje a obsahuje ZASP kódy
+		expect(r.outcome).toBeDefined();
+		const wb = new ExcelJS.Workbook();
+		await wb.xlsx.readFile(r.outcome!.target);
+		const ws = wb.getWorksheet('Hárok2')!;
+		const kody: string[] = [];
+		ws.eachRow((row, i) => {
+			if (i >= 2) kody.push(String(row.getCell(2).value));
+		});
+		expect(kody).toContain('ZASP00116'); // CAD 16101
+		expect(kody).toContain('ZASP202413'); // CAD 16104
+		// zápis v odpis_log existuje
+		expect(listOdpisy(200).some((o) => o.zak === 'FIX-R2' && o.op === 'OP1')).toBe(true);
 	});
 
 	it('chybný vstup (nenamapovaný kód) → step=form, do Money sa nič nezapíše', async () => {
@@ -180,14 +233,15 @@ describe('fix-cad route — odoslat BLOKOVANÉ (bar_mm neznáme — honest-null)
 	});
 });
 
-describe('fix-cad route — spocitat FUNGUJE (náhľad aj pri neznámom bar_mm)', () => {
-	it('spocitat s FIX kódmi → step=nahlad + fixBarMmWarning', async () => {
+describe('fix-cad route — spocitat (round 2: bar_mm potvrdené)', () => {
+	it('spocitat s FIX kódmi → step=nahlad, žiadne fixBarMmWarning, ZASP kódy', async () => {
 		const r = (await route.actions.spocitat(
 			ev({ zak: 'FIX-S1', op: 'OP1', zakaznik: 'Z', cad: FIX_CAD })
 		)) as { step: string; fixBarMmWarning: string | null; v: { nonzero: { kod: string }[] } };
 		expect(r.step).toBe('nahlad');
-		expect(r.fixBarMmWarning).toMatch(/nie je zatiaľ možný/);
-		expect(r.v.nonzero.map((p) => p.kod)).toContain('16101');
+		// Round 2: bar_mm = 7500 → žiadne varovanie
+		expect(r.fixBarMmWarning).toBeNull();
+		expect(r.v.nonzero.map((p) => p.kod)).toContain('ZASP00116');
 	});
 });
 
@@ -208,7 +262,7 @@ describe('cad-odpis — pergola route identita (PERGOLA_OPTS)', () => {
 });
 
 describe('fix-cad — Patrikove testovacie vektory (ZAK2026408 / OPDL260153)', () => {
-	it('reálny FIX CAD nárez z výroby dá správne metráže per kód', () => {
+	it('reálny FIX CAD nárez z výroby → ZASP00116, 2 tyče (15m)', () => {
 		// Rekonštrukcia z ticketu issue 500 — Patrikova vzorka (zákazka SHOP MARKET).
 		// Všetky rezy sú kód 16101 RAMOVY PROFIL, rôzne dĺžky v mm.
 		const patrikCad = [
@@ -232,9 +286,19 @@ describe('fix-cad — Patrikove testovacie vektory (ZAK2026408 / OPDL260153)', (
 		expect(error).toBeNull();
 		expect(view).not.toBeNull();
 		expect(view!.nonzero).toHaveLength(1);
-		expect(view!.nonzero[0]!.kod).toBe('16101');
-		// Celková dĺžka rezov: 109.80+301.00+2072.48+2060.00+53.81+2x212.00+1664.68+1653.39+303.00+109.83+2074.69
-		// = 10826.68 mm = 10.827 m (zaokrúhlené na 3 desatinné miesta)
-		expect(view!.nonzero[0]!.qty).toBeCloseTo(10.827, 2);
+		// Round 2: CAD 16101 → ZASP00116 (Money Dominikov kód field)
+		expect(view!.nonzero[0]!.kod).toBe('ZASP00116');
+		// FFD bin-packing rezov do 7500mm tyčí:
+		// Rezy sorted desc: 2074.69, 2072.48, 2060.00, 1664.68, 1653.39, 303, 301, 212, 212, 109.83, 109.80, 53.81
+		// Bar1: 2074.69+2072.48+2060.00+303+301+212+212+109.83+109.80 = 9454.80 > 7500 → nop
+		// FFD: bar1 gets 2074.69+2072.48+2060.00+303+301+212+212+109.83+109.80 all fit? No:
+		//   2074.69 (rem 5425.31) + 2072.48 (rem 3352.83) + 2060.00 (rem 1292.83)
+		//   1664.68 > 1292.83 → bar2; 1653.39 fits bar2 (rem 4181.93)
+		//   303 fits bar1 (rem 989.83), 301 fits bar1 (rem 688.83)
+		//   212 fits bar1 (rem 476.83), 212 fits bar1 (rem 264.83)
+		//   109.83 fits bar1 (rem ~155), 109.80 fits bar1 (rem ~45.2)
+		//   53.81 > 45.2 → fits bar2
+		// = 2 tyče × 7.5m = 15.0m
+		expect(view!.nonzero[0]!.qty).toBe(15);
 	});
 });
