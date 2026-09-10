@@ -545,3 +545,24 @@ bez combo voľby. Combo test preto píš na /pergola (`parita.spec.ts`), nie na 
   `getContext('webgl2')`, ovplyvní to aj stránky PRED cieľovou (napr. navrh page
   s 3D náhľadom). Preto sa zakaznícky „Skúsiť znova" retry path nedá spoľahlivo
   testovať cez session-wide WebGL stub (navrh page sa nepostaví).
+
+## E2E: `page.request` cez SSH tunel → stale keepAlive socket → "socket hang up" (#506)
+
+Playwright globálny `httpHappyEyeballsAgent` (`keepAlive: true`, proces-wide singleton
+v `coreBundle.js`) pooluje TCP spojenia naprieč VŠETKÝMI `page.request` volaniami vo
+workeri. Keď medzi dvoma `page.request` volaniami prebehne niekoľko browser-only testov
+(~15-30 s), SvelteKit server `keepAliveTimeout` (5 s) uzavrie idle TCP spojenie, ale
+Node.js `http.Agent` drží stale socket a dispatchne naň ďalší request → `ECONNRESET` /
+"socket hang up". Lokálne to nikdy nevidno (loopback je rýchlejší než timeout);
+cez SSH tunel (post-deploy E2E) je latencia dostatočná na deterministickú reprodukciu.
+
+**Fix:** `skipAkLive()` v `e2e/helpers.ts` používa Node.js `fetch()` (undici Pool,
+`keepAliveTimeout: 4000` ms — proaktívne disposal PRED server timeout) namiesto
+`page.request.get()`. `/health` je verejný JSON GET bez browser cookies a bez
+`x-forwarded-*` hlavičiek (CSRF je len POST). Caller interface je nezmenený —
+`await skipAkLive(page)` funguje rovnako, `page` parameter ostáva pre kompatibilitu.
+
+**NEKOPÍRUJ vzor `page.request.get` na NOVÉ helpers** — keď treba HTTP request bez
+browser kontextu (health check, metadata GET), použi `fetch()`. `page.request` je
+správny len keď request POTREBUJE browser cookies (autentizovaný GET z kontextu
+prihláseného testu).
