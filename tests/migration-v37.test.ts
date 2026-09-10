@@ -63,7 +63,7 @@ const trieda = (system: string, t: number) =>
 
 describe('migrácia v36 → v37: trieda skladby posuvu podľa hrúbky skla (#443)', () => {
 	it('user_version === 37 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(44);
+		expect(db.pragma('user_version', { simple: true })).toBe(45);
 	});
 
 	it('tabuľka glass_types má nový stĺpec hrubka_trieda', () => {
@@ -89,7 +89,8 @@ describe('migrácia v36 → v37: trieda skladby posuvu podľa hrúbky skla (#443
 
 	it('Štandard + backfill: jeIzoSklo(nazov) rozhoduje triedu', () => {
 		expect(glass('Float sklo 4 mm', 'Štandard +')?.hrubka_trieda).toBe(6);
-		expect(glass('Izolačné sklo 4.8.4', 'Štandard +')?.hrubka_trieda).toBe(16);
+		// v44 (#504): "Izolačné sklo 4.8.4" removed — test its replacement instead
+		expect(glass('Izolačné sklo 4/8/4 číre', 'Štandard +')?.hrubka_trieda).toBe(16);
 	});
 
 	it('Robust: honest-null (trieda sa neuplatňuje, nedotknuté)', () => {
@@ -123,6 +124,6 @@ describe('migrácia v36 → v37: trieda skladby posuvu podľa hrúbky skla (#443
 			before
 		);
 		expect(db.prepare('SELECT * FROM glass_types ORDER BY id').all()).toEqual(beforeGlass);
-		expect(db.pragma('user_version', { simple: true })).toBe(44);
+		expect(db.pragma('user_version', { simple: true })).toBe(45);
 	});
 });

@@ -34,7 +34,8 @@ riadok (`database-migrations.md`). NIKDY needituj/nedropuj migráciu, čo už be
 
 ## 3. Bumpni HLAVU vo VŠETKÝCH migračných testoch (najčastejší zabudnutý krok)
 
-**35 migračných test súborov** (aktualizované #505, 2026-09-10 — reálny počet cez
+**37 migračných test súborov** (aktualizované #505, 2026-09-10 — po prečíslovaní
+v44→v45 kvôli kolízii s #504 v44 — reálny počet cez
 `grep -rln "user_version" tests/ | while read f; do grep -q "toBe(<oldhead>)" "$f" && echo "$f"; done | wc -l`
 — tento počet rastie s KAŽDOU migráciou, ktorá dotýka existujúcu `user_version` asserciu +
 pridá si vlastný nový `migration-vNN.test.ts`; neber ho ako fixné číslo, vždy prepočítaj)
