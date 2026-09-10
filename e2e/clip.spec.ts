@@ -168,8 +168,8 @@ test('#502 clip hotovo: výrobný podklad s nárezom a sklami', async ({ page })
 	// RAL badge
 	await expect(podklad.locator('.badge', { hasText: 'RAL: RAL 7016' })).toBeVisible();
 
-	// glass dimensions (izo B1 3000×1000: šírka výplne = (3000-(19+29*2))/2-8 = 1454, výška = 944)
-	await expect(podklad).toContainText('1454');
+	// glass dimensions (izo B1 3000×1000: šírka výplne = (3000-(19+29*2))/2-8 = 1453,5, výška = 944)
+	await expect(podklad).toContainText('1453,5');
 	await expect(podklad).toContainText('944');
 
 	// narez table with profile rows
