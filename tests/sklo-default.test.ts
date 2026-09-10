@@ -43,11 +43,10 @@ const KATALOG: Record<string, { nazov: string; redukciaZero: boolean; hrubka: nu
 		{ nazov: 'Float kalené 10 mm', redukciaZero: false, hrubka: 10 }
 	],
 	'Štandard +': [
+		// v44 (#504): "Float sklo 10 mm" a "Izolačné sklo 4.8.4" odstránené (orphaned v9 seed)
 		{ nazov: 'Float sklo 4 mm', redukciaZero: false, hrubka: 0 },
 		{ nazov: 'Float sklo 6 mm', redukciaZero: false, hrubka: 0 },
 		{ nazov: '3.3.1', redukciaZero: false, hrubka: 0 },
-		{ nazov: 'Float sklo 10 mm', redukciaZero: false, hrubka: 0 },
-		{ nazov: 'Izolačné sklo 4.8.4', redukciaZero: true, hrubka: 0 },
 		{ nazov: '3.3.2', redukciaZero: false, hrubka: 0 },
 		{ nazov: 'Izolačné sklo 4/8/4 číre', redukciaZero: true, hrubka: 0 },
 		{ nazov: 'Izolačné sklo 4/8/4 mliečne', redukciaZero: true, hrubka: 0 },

@@ -216,7 +216,9 @@ test('Štandard + 2K + IZO sklo + sieťka: nárezák-hint aj hláška sedia, odp
 
 	await zaklad(page, 'E2E-SIETKA-STD-2K-IZO', 'E2E Sietka standard 2K IZO');
 	await page.selectOption('#styl', '2K');
-	await page.selectOption('#sklo', 'Izolačné sklo 4.8.4');
+	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
+	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
+	await page.selectOption('#sklo', 'Izolačné sklo 4/8/4 číre');
 	// nárezák-hint potvrdzuje, že appka interne počíta s '2K IZO', nie holým '2K'
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 2K IZO');
 

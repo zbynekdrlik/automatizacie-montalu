@@ -77,7 +77,7 @@ const nazvy = (sys: string) => glassTypesForSystem(sys).map((g) => g.nazov);
 
 describe('migrácia v21 → v22: sklo „3.3.1" pre Štandard plus a starý Štandard (#214)', () => {
 	it('user_version = 22 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(43);
+		expect(db.pragma('user_version', { simple: true })).toBe(45);
 	});
 
 	it('„3.3.1" je ponúknuté pre Štandard plus (system=„Štandard +")', () => {
@@ -103,8 +103,8 @@ describe('migrácia v21 → v22: sklo „3.3.1" pre Štandard plus a starý Šta
 		expect(rows.map((r) => r.system).sort()).toEqual(['Robust', 'Slide', 'Štandard +']);
 	});
 
-	it('presne jeden nový riadok skla (13 → 14) + v43 rozšírenie (+38)', () => {
-		expect(listGlassTypes().length).toBe(52); // 14 + 38 z v43 (#235)
+	it('presne jeden nový riadok skla (13 → 14) + v43 rozšírenie (+38) - v44 cleanup (-2)', () => {
+		expect(listGlassTypes().length).toBe(50); // 14 + 38 z v43 (#235) - 2 orphaned v44 (#504)
 	});
 
 	it('nová UNIQUE(nazov, system): to isté sklo v dvoch systémoch je OK, ten istý pár nie', () => {

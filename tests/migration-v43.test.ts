@@ -59,8 +59,8 @@ const allGlass = () =>
 		.all() as GlassRow[];
 
 describe('migrácia v42 → v43: rozšírenie katalógu skiel (#235)', () => {
-	it('user_version === 43', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(43);
+	it('user_version === 45 (v43 + v44 cleanup + v45 plan_rezov)', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(45);
 	});
 
 	it('Robust: 16 skiel (2 pôvodné + 14 nových)', () => {
@@ -71,8 +71,8 @@ describe('migrácia v42 → v43: rozšírenie katalógu skiel (#235)', () => {
 		expect(glassTypesForSystem('Slide').length).toBe(17);
 	});
 
-	it('Štandard +: 17 skiel (5 pôvodných + 12 nových)', () => {
-		expect(glassTypesForSystem('Štandard +').length).toBe(17);
+	it('Štandard +: 15 skiel (5 pôvodných + 12 nových - 2 orphaned v44)', () => {
+		expect(glassTypesForSystem('Štandard +').length).toBe(15);
 	});
 
 	it('Slide IZO sklá: redukcia_zero=1, hrubka_trieda=16', () => {

@@ -29,16 +29,16 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 
 	const styly = await page.getByLabel('Štýl').locator('option').allTextContents();
 	expect(styly.sort()).toEqual(['2K', '2x2K', '2x3K', '2x4K', '3K', '4K']);
-	// sklá zdieľa so Štandard + (Float 4/6/10 + izolačné)
+	// sklá zdieľa so Štandard + (Float 4/6 + izolačné)
 	// v43 (#235): plná škála skiel — Štandard zdieľa katalóg so Štandard+ (GLASS_SYSTEM_ALIAS).
 	// 2K štýl má IZO nárezák → ponuka obsahuje AJ izolačné sklá (sklaDoPonuky vracia všetko).
+	// v44 (#504): orphaned v9 duplikáty 'Float sklo 10 mm' a 'Izolačné sklo 4.8.4' zmazané
+	// (nahradené v43 variantmi 'ESG kalené 10 mm' / 'Izolačné sklo 4/8/4 číre'/mliečne/stopsol).
 	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
 	expect(skla).toEqual([
 		'Float sklo 4 mm',
 		'Float sklo 6 mm',
 		'3.3.1',
-		'Float sklo 10 mm',
-		'Izolačné sklo 4.8.4',
 		'3.3.1 mliečne',
 		'3.3.2',
 		'3.3.2 mliečne',
@@ -85,7 +85,9 @@ test('2K + izolačné: IZO nárezák — U profil 21,6 m a spodná koľajnica o 
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
-	await zadanie(page, '02', '2K', 'Izolačné sklo 4.8.4');
+	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
+	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
+	await zadanie(page, '02', '2K', 'Izolačné sklo 4/8/4 číre');
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard 2K IZO');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
@@ -108,7 +110,9 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ (na rozdiel od Št
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
-	await zadanie(page, '03', '2x3K', 'Izolačné sklo 4.8.4');
+	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
+	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
+	await zadanie(page, '03', '2x3K', 'Izolačné sklo 4/8/4 číre');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
