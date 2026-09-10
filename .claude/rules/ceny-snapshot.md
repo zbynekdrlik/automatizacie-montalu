@@ -56,12 +56,18 @@ ukáže „cena neznáma", rovnako ako pred #506).
 - **Profily/kovanie (ZASP*/ZASK*):** `nakupCennik` z cenníka **NC** (Nákupný cenník,
   GUID `BA7DA0F8-…`), `predajVo` z **PRF_VO** (appka `predajVo` nuluje pre VŠETKY non-ZASP
   kódy — veľkoobchodnému cenníku pri komponentoch šéf neverí).
-- **Bazén (BPP*/BPK*, #359, live overené 2026-08-31):** **BPP** (profily) sú v NC ako
-  PRP/ZASP → reálny `nakupCennik` (22/25 app kódov > 0). **BPK** (kusové komponenty) sú v NC
-  tiež, ale nákupná cena je pri VŠETKÝCH 0 → honest-null (Money nemá nákupnú cenu bazénových
-  komponentov). Jediná nenulová cena BPK žije v predajnom cenníku **PCMO „Predajný cenník
-  polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) — PREDAJNÁ cena, do `nakupCennik` sa
-  ZÁMERNE nemapuje; zobrazuje sa ako vlastné pole `predajPcmo` (#364, migrácia v42).
+- **Bazén (BPP*/BPK*, #359, live overené 2026-08-31; #506 nákup doplnený 2026-09-10):**
+  **BPP** (profily) sú v NC ako PRP/ZASP → reálny `nakupCennik` (22/25 app kódov > 0).
+  **BPK** (kusové komponenty) sú v NC tiež, ale nákupná cena je pri VŠETKÝCH 0 (NC cenník
+  ju nemá). NÁKUPNÁ cena BPK žije na **skladovej karte** (`Artikly_Artikl.PosledniCena`
+  — 63/173 s cenou > 0, Dominik ich ručne nahodil; Money túto cenu používa na ocenenie
+  výdajky). Appka ju číta ako `nakupSkladovaKarta` a používa ako FALLBACK keď `nakupCennik`
+  (NC) je null (#506, migrácia v45). POZOR: `Artikly_Artikl.PosledniCena` (skladová karta)
+  NIE JE to isté ako `Artikly_ArtiklDodavatel.PosledniCena` (posledná faktúra dodávateľa
+  → `nakupPoslednaFaktura`) — dva rôzne polia, dve rôzne tabuľky. Predajná cena BPK žije
+  v cenníku **PCMO „Predajný cenník polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) —
+  PREDAJNÁ cena, do `nakupCennik` sa ZÁMERNE nemapuje; zobrazuje sa ako vlastné pole
+  `predajPcmo` (#364, migrácia v42).
   `predajPcmo` nemá žiadny family gate (na rozdiel od `predajVo`, ktoré appka nuluje pre
   non-ZASP) — zobrazuje sa pre VŠETKY rodiny, ale nenulová hodnota je hlavne pri BPK
   (61/173), plus PCD/PRK/ZAS. Producent na dev2 potrebuje `git pull` + jeden beh, kým sa
