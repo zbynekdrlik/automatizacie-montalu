@@ -538,7 +538,7 @@ describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
 		expect(r.sucty.nakupCennik.kompletne).toBe(true);
 	});
 
-	it('regression vector OP260407: BPP+BPK total matches Money (#506)', async () => {
+	it('simplified OP260407-shaped vector: BPP (NC primary) + BPK (skladovaKarta fallback) (#506)', async () => {
 		await tick();
 		// Simplified OP260407 vector: 2 BPP profiles (with NC) + 2 BPK components (NC=0, SK>0)
 		writeSnapshot('2026-09-10T05:00:00Z', [
