@@ -5,11 +5,14 @@
 	import { resolve } from '$app/paths';
 	import {
 		popisTyp,
+		computeClip,
 		CLIP_MIN_SIRKA,
 		CLIP_MAX_SIRKA,
 		CLIP_MIN_VYSKA,
 		CLIP_MAX_VYSKA,
-		type ClipVstup
+		CLIP_DLZKA_TYCE,
+		type ClipVstup,
+		type ClipVypocet
 	} from '$lib/clip';
 
 	let { data, form } = $props();
@@ -141,6 +144,56 @@
 	<input type="hidden" name="zakaznik" value={multiVstup?.zakaznik ?? multiZakaznik} />
 	<input type="hidden" name="clipKusy" value={kusyJSON} />
 	{#if multiVstup?.caka ?? multiCaka}<input type="hidden" name="caka" value="1" />{/if}
+{/snippet}
+
+{#snippet clipVyrobnySec(v: ClipVypocet, cv: ClipVstup)}
+	<div class="card" data-testid="vyrobny-podklad">
+		<div class="sec">Výrobný podklad</div>
+		<p class="sub">
+			<span class="badge"
+				>CLIP · {popisTyp(cv.typ)} · B{cv.variant - 1} ({cv.variant}
+				{cv.variant === 1 ? 'výplň' : cv.variant < 5 ? 'výplne' : 'výplní'}) · {cv.sirka}×{cv.vyska}
+				mm</span
+			>
+			{#if cv.ral}<span class="badge">RAL: {cv.ral}</span>{/if}
+		</p>
+		<p class="sub">
+			Výplň: {fmt(v.sirkaVyplne)} × {fmt(v.vyskaVyplne)} mm · {v.pocetVyplni}
+			{v.pocetVyplni === 1 ? 'ks' : 'ks'} · {fmt(v.m2)} m²
+			{#if v.poziciePriecok.length}
+				· priečky od kraja: {v.poziciePriecok.map((p) => fmt(p)).join(', ')} mm
+			{/if}
+		</p>
+
+		<div class="sec" style="margin-top:14px">
+			Nárez — rozloženie na tyče ({CLIP_DLZKA_TYCE} mm)
+		</div>
+		<table data-testid="hotovo-narez-tabulka">
+			<thead
+				><tr
+					><th>Označenie</th><th>Kód</th><th class="c">Rozmer</th><th class="c">Ks</th><th class="c"
+						>Z tyče</th
+					><th class="c">Tyče</th><th class="c">Množstvo</th></tr
+				></thead
+			>
+			<tbody>
+				{#each v.riadky as r, i (i)}
+					<tr class:drobna={r.kod === null}>
+						<td>{r.oznacenie}</td>
+						<td class="c mono">{r.kod ?? '—'}</td>
+						<td class="c mono">{r.rozmer === null ? '—' : `${fmt(r.rozmer)} mm`}</td>
+						<td class="c mono">{r.rozmer === null ? '—' : r.pocetKs}</td>
+						<td class="c mono">{r.zaokruhlene ?? '—'}</td>
+						<td class="c mono">{r.pocetTyci ?? '—'}</td>
+						<td class="c">
+							<span class="mono">{fmt(r.mnozstvo)} {r.mj}</span>
+							{#if r.poznamka}<span class="hint" title={r.poznamka}>· neodpisuje sa</span>{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 {/snippet}
 
 {#if step === 'form'}
@@ -581,6 +634,7 @@
 		</form>
 	</div>
 {:else if step === 'hotovo' && form && 'finalOut' in form && form.finalOut && form.outcome}
+	{@const hv = computeClip(vstup)}
 	<div class="card">
 		<h1>Hotovo — {vstup.zak} · {vstup.zakaznik}</h1>
 		<p class="sub">
@@ -598,6 +652,8 @@
 			✅ Odoslané do Money na import: <b>{form.outcome.filename}</b>
 		{/if}
 	</div>
+
+	{@render clipVyrobnySec(hv, vstup)}
 
 	<div class="card">
 		<div class="sec">Money rozpis — {form.finalOut.filter((o) => o.qty > 0).length} položiek</div>
@@ -619,7 +675,12 @@
 		<a class="btn secondary" href={resolve('/clip')}>➕ Nový rozpis</a>
 	</div>
 {:else if step === 'hotovoMulti' && form && 'multi' in form && form.multi && 'finalOut' in form && form.finalOut && form.outcome}
-	{@const mv = form.multiVstup as { zak: string; zakaznik: string; caka: boolean }}
+	{@const mv = form.multiVstup as {
+		zak: string;
+		zakaznik: string;
+		caka: boolean;
+		kusy: ClipVstup[];
+	}}
 	<div class="card">
 		<h1>Hotovo — {mv.zak} · {mv.zakaznik}</h1>
 		<p class="sub">
@@ -637,6 +698,13 @@
 			✅ Odoslané do Money na import: <b>{form.outcome.filename}</b>
 		{/if}
 	</div>
+
+	{#each form.multi.kusy as kus, ki (ki)}
+		{@const mkv = mv.kusy[ki]}
+		{#if mkv}
+			{@render clipVyrobnySec(kus, mkv)}
+		{/if}
+	{/each}
 
 	<div class="card">
 		<div class="sec">
