@@ -2122,3 +2122,7 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   price > 0, also covers PCD/PRK/ZAS. No family gate (unlike predajVo). PCMO 1:1 verified live.
   Review (fable-5-1): 5 findings all fixed (E2E, COALESCE parity, playbook, decision provenance,
   1:1 uniqueness). NEmergnuté (worktree — supervisor integruje).
+- #500 round 2 (0.25.9-dev.2): FIX CAD→Money mapping corrected: CAD 16xxx codes now map
+  to ZASP cards via Dominikov kód field (16101→ZASP00116, 16006→ZASP00119, 16102→ZASP00125,
+  16103→ZASP00128, 16104→ZASP202413). bar_mm=7500 confirmed, FFD bin-packing, odoslat
+  unblocked. RED e74b7db → GREEN 29112e4. V1 codes without mapping stay "Nenamapované".

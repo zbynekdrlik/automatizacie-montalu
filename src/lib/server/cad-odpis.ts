@@ -108,9 +108,9 @@ function editsFrom(form: FormData): Map<string, string> {
 }
 
 /**
- * FIX-špecifický náhľad (#500): CAD kódy sú PRIAMO Money kódy (16xxx/26xxx),
- * bez CODE_MAP/CATALOG mapovania. Qty = celková dĺžka rezov v metroch (honest-null
- * bez bar_mm). Žiadne kombinácie tyčí (FIX nemá multi-variant profily).
+ * FIX-špecifický náhľad (#500 round 2): CAD kódy (16xxx) sa mapujú na Money ZASP karty
+ * cez Dominikov kód field. Qty = FFD bin-packing rezov do 7500mm tyčí, výstup v metroch.
+ * Žiadne kombinácie tyčí (FIX má len jednu veľkosť tyče per kód).
  */
 function fixCadOdpisView(vstup: CadVstup, form?: FormData) {
 	const { rows, skipped } = parseCad(vstup.cad);
@@ -133,9 +133,8 @@ function fixCadOdpisView(vstup: CadVstup, form?: FormData) {
 		error: null as string | null,
 		editError,
 		r: null,
-		// honest-null: bar_mm neznáme → náhľad funguje (operátor vidí kódy + metrá),
-		// ale odoslat do Money je BLOKOVANÉ (MJ nepotvrdená, odpis by mohol naviezť
-		// zlé množstvo). Odblokuje sa doplnením bar_mm do FIX_CATALOG.
+		// Round 2: bar_mm = 7500 potvrdené → barMmConfirmed = true, odoslat funguje.
+		// Flag ostáva ako defense-in-depth pre prípad budúceho kódu bez bar_mm.
 		fixBarMmBlocked: !fixResult.barMmConfirmed,
 		fixMissingBarMm: fixResult.missingBarMm,
 		view: {
@@ -286,7 +285,7 @@ export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: Cad
 	const viewResult = cadOdpisView(vstup, form, opts);
 	const { error, view: v } = viewResult;
 	if (error) return { step: 'form' as const, error, vstup };
-	// #500: FIX bar_mm neznáme → náhľad funguje, ale odoslat bude blokované
+	// #500 round 2: bar_mm potvrdené → fixBarMmBlocked = false. Defense-in-depth ostáva.
 	const fixBarMmBlocked = 'fixBarMmBlocked' in viewResult && viewResult.fixBarMmBlocked;
 	// „Spočítať" beží z formulára, kde polia qty_ ešte nie sú — editError tu nevzniká
 	return {
@@ -297,7 +296,7 @@ export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: Cad
 		// #448/#451 predodpisové skladové varovanie + odobrať (LEN interní; b2b → [])
 		skladVarovania: v ? cadSklad(user, v.nonzero) : [],
 		snapshotDatum: getSnapshotMeta().generatedAt,
-		// #500: varovanie pre operátora, že odpis bude blokovaný (bar_mm neznáme)
+		// #500 round 2: bar_mm potvrdené → warning je null. Defense-in-depth ostáva.
 		fixBarMmWarning: fixBarMmBlocked
 			? 'Odpis do Money nie je zatiaľ možný — dĺžka tyče pre FIX profily nebola potvrdená.'
 			: null,
@@ -316,8 +315,8 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 	const viewResult = cadOdpisView(vstup, form, opts);
 	const { error, editError, view: v } = viewResult;
 	if (error) return { step: 'form' as const, error, vstup };
-	// #500 honest-null: FIX bar_mm neznáme → odoslat do Money je BLOKOVANÉ (MJ nepotvrdená,
-	// import by mohol naviezť zlé množstvo). Náhľad funguje (operátor vidí kódy + metrá).
+	// #500 round 2: bar_mm potvrdené → táto vetva sa NESPUSTÍ (barMmConfirmed=true).
+	// Ostáva ako defense-in-depth pre budúci kód bez bar_mm.
 	if ('fixBarMmBlocked' in viewResult && viewResult.fixBarMmBlocked) {
 		const missing =
 			'fixMissingBarMm' in viewResult ? (viewResult.fixMissingBarMm as string[]).join(', ') : '';

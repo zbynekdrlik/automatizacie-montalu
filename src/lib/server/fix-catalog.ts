@@ -1,56 +1,67 @@
-// FIX (pevné zasklenie) katalóg (#500) — data-driven z Money `Artikly_Artikl`.
-// FIX CAD kódy (Dominikov kód) sú PRIAMO Money kódy (16xxx/26xxx), na rozdiel
-// od pergoly (18xxx → PRP-meno cez CODE_MAP). Potvrdené live read-only SQL
-// 2026-09-10: všetkých 16 článkov existuje v Money (Deleted=0), DominokKod = Kod 1:1.
+// FIX (pevné zasklenie) katalóg (#500 round 2) — CAD kódy mapované na Money ZASP karty
+// cez Money pole „Dominikov kód" (`DominokKod_UserData`). Rovnaký princíp ako pergola
+// (CAD → Money skladová karta), len pergola ide cez CODE_MAP→meno profilu→PRP, zatiaľ
+// čo FIX má priamy CAD kód → ZASP kód (1:1 cez Dominikov kód field).
 //
-// `bar_mm: null` = dĺžka tyče NEZNÁMA (honest-null) — Money nemá bar_mm ekvivalent
-// pre FIX profily (`Delka_ID` je nerozriešiteľný GUID, Odoo má len hmotnosť/MJ).
-// Bez bar_mm engine počíta LEN celkovú dĺžku rezov (nie počet tyčí). Doplnenie
-// bar_mm = follow-up so zdrojom od dodávateľa (FINAL SPOLKA AKCYJNA, katalóg ZC-*V2).
+// Potvrdené Dominikovým screenshotom Money artiklov (msg 1818224, 10.9.2026):
+//   ZASP00116  → CAD 16101 (Rámový profil, 7500 mm)
+//   ZASP00119  → CAD 16006 (Zasklievací 28 mm, 7500 mm)
+//   ZASP00125  → CAD 16102 (Priečkový profil, 7500 mm)
+//   ZASP00128  → CAD 16103 (Rohový stĺp, 7500 mm)
+//   ZASP202413 → CAD 16104 (Zasklievací 36 mm, 7500 mm)
 //
-// Qty do Money ide v METROCH (`mj: 'm'`): celková dĺžka rezov per kód. To je
-// konzervativné minimum (nezahŕňa odpad); Money karta má MJ=Units, ale meter
-// je honest-null fallback — presnejší odpis v ks (tyče) vyžaduje bar_mm.
+// Všetky ZASP karty majú MJ = m (metre), tyč 7500 mm. Qty do Money = počet tyčí ×
+// dĺžka tyče (FFD bin-packing rezov do 7500 mm tyčí, výstup v metroch — rovnaký
+// princíp ako pergola engine). Round 1 chybne liečil 16xxx ako priame Money kódy
+// (s MJ=Units z Odoo, bar_mm neznáme); round 2 opravuje na ZASP karty.
 
-import type { CadRow } from '$lib/server/pergola';
+import { ffd, type CadRow } from '$lib/server/pergola';
 
 export interface FixCatalogItem {
+	/** CAD kód zo Solid Edge (16xxx) — lookup kľúč v transformFix. */
+	cadKod: string;
+	/** Money ZASP kód (skladová karta) — cieľ odpisu. */
 	kod: string;
+	/** Ľudský názov profilu. */
 	name: string;
-	/** Dĺžka tyče v mm. `null` = neznáma (honest-null); bez nej sa nedá
-	 *  spočítať bin-packing na tyče, qty = celková dĺžka rezov. */
-	bar_mm: number | null;
-	/** Katalóg dodávateľa (Money `Artikly_Artikl.Katalog`). */
-	katalog: string;
+	/** Dĺžka tyče v mm (všetky FIX profily = 7500). */
+	bar_mm: number;
 }
 
-// V2 = aktuálny FIX systém (Cortizo COR-60 CE V2), V1 = starší (bez V2 suffixu).
-// 26xxx = príslušenstvo (kovanie, krytky). Všetky overené v Money 2026-09-10.
+// Dominikovo mapovanie CAD→ZASP (msg 1818224, 10.9.2026, screenshot Money artiklov).
+// Len kódy s potvrdeným „Dominikov kód" field. V1 kódy bez mapovania (16001-16005)
+// a 26xxx príslušenstvo sú VYNECHANÉ — ak sa objavia v reálnom CAD → „Nenamapované"
+// (honest unknown, rovnaký princíp ako round 1).
 export const FIX_CATALOG: FixCatalogItem[] = [
-	// V1 (starší systém — kódy sa stále používajú v niektorých zákazkách)
-	{ kod: '16001', name: 'RAMOVY PROFIL', bar_mm: null, katalog: 'ZC-0001' },
-	{ kod: '16002', name: 'PRIECKOVY PROFIL', bar_mm: null, katalog: 'ZC-0002' },
-	{ kod: '16003', name: 'ROZNY STLP', bar_mm: null, katalog: 'ZC-0003' },
-	{ kod: '16004', name: 'ZASKLIEVACI PROFIL 38mm', bar_mm: null, katalog: 'ZC-0004' },
-	{ kod: '16005', name: 'SPOJOVACI PROFIL PRIECKY', bar_mm: null, katalog: 'ZC-0005' },
-	{ kod: '16006', name: 'ZASKLIEVACI PROFIL 28mm', bar_mm: null, katalog: 'ZC-0006' },
-	// V2 (aktuálny systém — tieto kódy Patrik použil v reálnom CAD)
-	{ kod: '16101', name: 'RAMOVY PROFIL', bar_mm: null, katalog: 'ZC-0001V2' },
-	{ kod: '16102', name: 'PRIECKOVY PROFIL', bar_mm: null, katalog: 'ZC-0002V2' },
-	{ kod: '16103', name: 'ROZNY STLP', bar_mm: null, katalog: 'ZC-0003V2' },
-	{ kod: '16104', name: 'ZASKLIEVACI PROFIL 36mm', bar_mm: null, katalog: 'ZC-0004V2' }
-	// 26xxx príslušenstvo (rohovníky, krytky, nožičky) VYNECHANÉ — sú to kusové
-	// komponenty (mj='ks'), nie rezané profily. CAD nárez ich buď neobsahuje, alebo
-	// ich výroba odpíše inak. Ak sa 26xxx objaví v reálnom CAD → doplniť sem s mj='ks'
-	// a rozšíriť transformFix o kusovú vetvu. Overené v Money (26001-26004, 26101-26102
-	// existujú), ale bez vzorky od výroby sa nedá potvrdiť, ako sa odpisujú.
+	// V2 aktuálny systém (Cortizo COR-60 CE V2) — Patrikove kódy z reálneho CAD
+	{ cadKod: '16101', kod: 'ZASP00116', name: 'Rámový profil Surový 7500 mm', bar_mm: 7500 },
+	{ cadKod: '16102', kod: 'ZASP00125', name: 'Priečkový profil Surový 7500 mm', bar_mm: 7500 },
+	{
+		cadKod: '16103',
+		kod: 'ZASP00128',
+		name: 'Rohový stĺp Surový 7500 mm',
+		bar_mm: 7500
+	},
+	{
+		cadKod: '16104',
+		kod: 'ZASP202413',
+		name: 'Zasklievací profil 36 mm Surový 7500 mm',
+		bar_mm: 7500
+	},
+	// V1 kód 16006 má Dominikov kód mapping (jediný V1 s potvrdeným mapovaním)
+	{
+		cadKod: '16006',
+		kod: 'ZASP00119',
+		name: 'Zasklievací profil 28 mm Surový 7500 mm',
+		bar_mm: 7500
+	}
 ];
 
-const fixByKod = new Map(FIX_CATALOG.map((c) => [c.kod, c]));
+const fixByCadKod = new Map(FIX_CATALOG.map((c) => [c.cadKod, c]));
 
-/** Lookup — vráti FIX katalógový riadok alebo `undefined` (neznámy kód). */
-export function fixLookup(kod: string): FixCatalogItem | undefined {
-	return fixByKod.get(kod);
+/** Lookup CAD kód → FIX katalógový riadok, alebo `undefined` (neznámy kód). */
+export function fixLookup(cadKod: string): FixCatalogItem | undefined {
+	return fixByCadKod.get(cadKod);
 }
 
 export interface FixTransformResult {
@@ -59,21 +70,27 @@ export interface FixTransformResult {
 	/** Nerozpoznané kódy (nie sú v FIX katalógu). */
 	unresolved: { cad: string; name: string }[];
 	/** Trace pre zobrazenie (kód → zoznam rezov). */
-	trace: { code: string; name: string; cuts: number[]; totalMm: number; totalM: number }[];
-	/** `true` keď VŠETKY použité kódy majú bar_mm — len vtedy je bin-packing a MJ
-	 *  potvrdená a odpis môže ísť do Money. `false` = honest-null, odpis BLOKOVANÝ. */
+	trace: {
+		code: string;
+		name: string;
+		cuts: number[];
+		totalMm: number;
+		totalM: number;
+		bars: number;
+	}[];
+	/** `true` keď VŠETKY použité kódy majú bar_mm — odpis môže ísť do Money. */
 	barMmConfirmed: boolean;
-	/** Kódy, pre ktoré bar_mm chýba (pre chybovú hlášku). */
+	/** CAD kódy, pre ktoré bar_mm chýba (pre chybovú hlášku). */
 	missingBarMm: string[];
 }
 
 /**
- * FIX transform: CAD kódy sú PRIAMO Money kódy (bez CODE_MAP). Qty = celková dĺžka
- * rezov v metroch (honest-null fallback bez bar_mm). Ak bar_mm je známe, qty = počet
- * tyčí (budúce rozšírenie).
+ * FIX transform: CAD kódy (16xxx) → Money ZASP kódy cez Dominikov kód field.
+ * Qty = FFD bin-packing rezov do 7500 mm tyčí, výstup v metroch (bars × bar_mm / 1000).
+ * Rovnaký princíp ako pergola engine (pergola.ts:transform → qtyByPrp).
  */
 export function transformFix(rows: CadRow[]): FixTransformResult {
-	// Akumuluj rezy per kód
+	// Akumuluj rezy per CAD kód
 	const byCode = new Map<string, { name: string; cuts: number[] }>();
 	for (const r of rows) {
 		let entry = byCode.get(r.code);
@@ -88,34 +105,39 @@ export function transformFix(rows: CadRow[]): FixTransformResult {
 	const unresolved: FixTransformResult['unresolved'] = [];
 	const trace: FixTransformResult['trace'] = [];
 
-	for (const [code, info] of byCode) {
-		const cat = fixLookup(code);
+	for (const [cadCode, info] of byCode) {
+		const cat = fixLookup(cadCode);
 		if (!cat) {
-			unresolved.push({ cad: code, name: info.name });
+			unresolved.push({ cad: cadCode, name: info.name });
 			continue;
 		}
 
 		const totalMm = info.cuts.reduce((s, c) => s + c, 0);
 		const totalM = Math.round((totalMm / 1000) * 1000) / 1000;
 
-		// Qty = celková dĺžka rezov v metroch (honest-null: bar_mm neznáme →
-		// nemožno spočítať tyče). Keď sa bar_mm doplní, tu pribudne bin-packing
-		// (rovnaký FFD ako v pergole) a qty bude v ks (tyče).
-		items.push({ kod: cat.kod, nazov: cat.name, qty: totalM, mj: 'm' });
+		// FFD bin-packing: zabaliť rezy do tyčí, spočítať koľko tyčí treba.
+		// Rezy > bar_mm: ceil(rez / bar_mm) tyčí (kus dlhší ako tyč = viac tyčí, spojených).
+		const fitsInBar = info.cuts.filter((c) => c <= cat.bar_mm);
+		const oversize = info.cuts.filter((c) => c > cat.bar_mm);
+		const oversizeBars = oversize.reduce((s, c) => s + Math.ceil(c / cat.bar_mm), 0);
+		const bars = ffd(fitsInBar, cat.bar_mm) + oversizeBars;
+
+		// Qty = počet tyčí × dĺžka tyče v metroch (celkový materiál vrátane odpadu)
+		const qty = Math.round((bars * cat.bar_mm) / 10) / 100; // mm → m, rounded to 2dp
+
+		items.push({ kod: cat.kod, nazov: cat.name, qty, mj: 'm' });
 
 		trace.push({
-			code,
+			code: cadCode,
 			name: cat.name,
 			cuts: info.cuts,
 			totalMm,
-			totalM
+			totalM,
+			bars
 		});
 	}
 
-	const missingBarMm = [...byCode.keys()].filter((code) => {
-		const cat = fixLookup(code);
-		return cat && cat.bar_mm === null;
-	});
+	const missingBarMm: string[] = []; // round 2: all mapped codes have bar_mm
 	const barMmConfirmed = missingBarMm.length === 0 && items.length > 0;
 
 	return { items, unresolved, trace, barMmConfirmed, missingBarMm };
