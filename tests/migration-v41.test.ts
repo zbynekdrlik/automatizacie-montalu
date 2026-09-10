@@ -30,7 +30,7 @@ describe('migration v40 → v41 (objednavka skla)', () => {
 	it('bumps to v41 and creates tables', async () => {
 		await import('../src/lib/server/db');
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(44);
+		expect(d.pragma('user_version', { simple: true })).toBe(45);
 
 		// objednavka_skla table exists with correct columns
 		const cols = d.prepare('PRAGMA table_info(objednavka_skla)').all() as { name: string }[];
