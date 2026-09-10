@@ -12,7 +12,8 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions = {
-	spocitat: async ({ request, locals }) => cadSpocitat(await request.formData(), locals.user),
+	spocitat: async ({ request, locals }) =>
+		cadSpocitat(await request.formData(), locals.user, FIX_CAD_OPTS),
 	upravit: async ({ request }) => cadUpravit(await request.formData()),
 	odoslat: async ({ request, locals }) =>
 		cadOdoslat(await request.formData(), locals.user, FIX_CAD_OPTS)
