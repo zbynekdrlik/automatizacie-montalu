@@ -2,14 +2,11 @@ import { test, expect } from '@playwright/test';
 import { collectConsole, loginAs, goto, skipAkLive } from './helpers';
 
 // FIX z CADu (#380) — prepínač režimov „Fix z appky" / „Fix z cadu" + CAD → Money tok.
-// #500 (2026-09-10): FIX CAD kódy sú PRIAMO Money kódy (16xxx/26xxx, `fix-catalog.ts`),
-// BEZ mapovania cez pergola CODE_MAP (18xxx). Fixtúra nižšie preto používa REÁLNE FIX
-// kódy (rovnaký tvar ako `tests/fix-cad.test.ts`), nie pergola 18xxx.
-// Odoslanie do Money je zatiaľ TRVALO BLOKOVANÉ pre všetky FIX kódy (bar_mm — dĺžka tyče —
-// nie je od dodávateľa potvrdená, honest-null) — „hotovo" krok (a teda aj ✏️ marker/
-// kopiruj-tyce, ktoré sa renderujú LEN na ňom) je preto na /fix/cad momentálne
-// nedosiahnuteľný; ten istý zdieľaný cad-odpis.ts tok JE plne overený na /pergola
-// (`e2e/parita.spec.ts`, vrátane ✏️ markeru aj kopiruj-tyce tlačidla).
+// #500 round 2 (2026-09-10): FIX CAD kódy (16xxx) sa mapujú na Money ZASP skladové
+// karty cez pole „Dominikov kód" (`fix-catalog.ts`) — NIE priamo ako Money kódy
+// (round 1 defekt). Všetky potvrdené karty majú `bar_mm: 7500` (Dominik msg 1818224),
+// takže „Odpis pozastavený" honest-null blok je preč a odoslat prechádza rovnako ako
+// na /pergola — ten istý zdieľaný `cad-odpis.ts` tok (`e2e/parita.spec.ts`).
 const FIX_CAD = [
 	'16101 RAMOVY PROFIL 1 109.80',
 	'16101 RAMOVY PROFIL 1 301.00',
@@ -36,7 +33,7 @@ test('FIX prepínač režimov appka ↔ cad naviguje medzi /fix a /fix/cad', asy
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('Fix z cadu — CAD nárez dá Money rozpis (16xxx), odoslať je blokované (bar_mm honest-null, #500)', async ({
+test('Fix z cadu — CAD nárez dá Money rozpis (16xxx→ZASP) a odoslanie do Money prejde (#500 round 2)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -49,16 +46,15 @@ test('Fix z cadu — CAD nárez dá Money rozpis (16xxx), odoslať je blokované
 	await page.getByLabel('Materiál (CAD nárez) *').fill(FIX_CAD);
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 
-	// Money rozpis sa zobrazil s resolvnutými FIX kódmi (priamy 16xxx match, bez CODE_MAP)
+	// Money rozpis sa zobrazil s resolvnutými ZASP kódmi (CAD 16xxx → Money cez Dominikov kód)
 	await expect(page.getByTestId('odoslat')).toBeVisible();
-	await expect(page.getByLabel('Množstvo 16101')).toBeVisible();
-	await expect(page.getByLabel('Množstvo 16104')).toBeVisible();
+	await expect(page.getByLabel('Množstvo ZASP00116')).toBeVisible();
+	await expect(page.getByLabel('Množstvo ZASP202413')).toBeVisible();
 
-	// odoslanie zostáva na náhľade s honest-null blok hláškou — do Money sa NIČ nezapíše
+	// odoslanie PREJDE (bar_mm=7500 potvrdené) → hotovo krok, rovnaký tok ako /pergola
 	await page.getByTestId('odoslat').click();
-	await expect(page.getByTestId('nahlad-error')).toContainText('Odpis pozastavený');
-	await expect(page.getByTestId('nahlad-error')).toContainText('bar_mm');
-	await expect(page.getByTestId('vysledok')).toHaveCount(0);
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	await expect(page.getByTestId('kopiruj-tyce')).toBeVisible();
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -83,12 +79,12 @@ test('Fix z cadu — nenamapovaný CAD kód → „Nenamapované CAD kódy" chyb
 	expect(consoleMsgs).toEqual([]);
 });
 
-// ── #462 fix/cad: qty_ ručná editácia prežije aj cez blokovaný odoslat ──────
-// Plný „upraviť → odoslať → ✏️ marker v hotovo" tok (ako predtým testovaný tu) sa dá
-// overiť LEN na module, kde odoslat naozaj prejde — to je od #500 /pergola
-// (`e2e/parita.spec.ts`). Tu overujeme, čo je na /fix/cad reálne dosiahnuteľné: ručne
-// upravená hodnota sa echo-uje späť do poľa aj po (blokovanom) odoslaní.
-test('#462 fix/cad: qty_ ručná úprava sa echo-uje späť aj pri blokovanom odoslaní', async ({
+// ── #462 fix/cad: qty_ ručná editácia prežije cez ÚSPEŠNÉ odoslanie (#500 round 2) ──
+// Round 1 malo odoslat trvalo blokované (bar_mm honest-null), takže sa dala overiť len
+// echo-hodnota na náhľade. Round 2 (bar_mm=7500 potvrdené) odoslat prechádza — tok teraz
+// mirroruje /clip (`e2e/clip.spec.ts`) a /pergola (`e2e/parita.spec.ts`): ručne upravené
+// qty_ pred odoslaním sa premietne do odpisu a je označené ✏️ v „hotovo" kroku.
+test('#462 fix/cad: qty_ ručná úprava pred odoslaním sa premietne do odpisu (✏️)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -101,14 +97,15 @@ test('#462 fix/cad: qty_ ručná úprava sa echo-uje späť aj pri blokovanom od
 	await page.getByLabel('Materiál (CAD nárez) *').fill(FIX_CAD);
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 
-	const qty = page.locator('input[name^="qty_"]').first();
-	const povodna = await qty.inputValue();
+	const qtyInput = page.locator('input[name="qty_ZASP00116"]');
+	const povodna = await qtyInput.inputValue();
 	const nova = String(Number(povodna) + 3);
-	await qty.fill(nova);
+	await qtyInput.fill(nova);
+	await expect(qtyInput).toHaveValue(nova);
 
 	await page.getByTestId('odoslat').click();
-	await expect(page.getByTestId('nahlad-error')).toContainText('Odpis pozastavený');
-	await expect(page.locator('input[name^="qty_"]').first()).toHaveValue(nova);
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
+	await expect(page.locator('.row', { hasText: 'ZASP00116' })).toContainText('✏️');
 
 	expect(consoleMsgs).toEqual([]);
 });

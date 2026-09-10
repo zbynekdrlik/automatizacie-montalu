@@ -32,15 +32,11 @@ test('pergola CAD: „⏳ Čaká" prežije kontrolu → odoslanie a zapíše sa 
 	expect(consoleMsgs).toEqual([]);
 });
 
-// #500 (2026-09-10): FIX CAD kódy sú priamo 16xxx Money kódy (nie pergola 18xxx cez
-// CODE_MAP), A odoslanie do Money je pre FIX TRVALO blokované (bar_mm honest-null —
-// dĺžka tyče nepotvrdená dodávateľom). Checkbox „⏳ Čaká" je na /fix/cad prítomný a
-// prežije do náhľadu (hidden caka=1 vo formulári), ale plný „prežije → odoslanie →
-// história" tok sa tu NEDÁ overiť — odoslat sa nikdy nedostane za blok, teda ani do
-// NA ODPIS/Fix, ani do histórie. Ten istý zdieľaný cad-odpis.ts tok je plne overený
-// vyššie na /pergola (kde bar_mm/CODE_MAP funguje) — táto limitácia je zámerná, nie
-// medzera v teste.
-test('fix/cad: „⏳ Čaká" checkbox prežije do náhľadu, odoslanie je blokované bar_mm honest-null (#500)', async ({
+// #500 round 2 (2026-09-10): FIX CAD kódy (16xxx) sa mapujú na Money ZASP karty cez
+// „Dominikov kód" (bar_mm=7500 potvrdené), takže odoslanie do Money už PREJDE — plný
+// „prežije kontrolu → odoslanie → história" tok je teraz dosiahnuteľný na /fix/cad
+// rovnako ako na /pergola (rovnaký zdieľaný cad-odpis.ts tok).
+test('fix/cad: „⏳ Čaká" prežije kontrolu → odoslanie a zapíše sa do histórie (#500 round 2)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -55,10 +51,13 @@ test('fix/cad: „⏳ Čaká" checkbox prežije do náhľadu, odoslanie je bloko
 	await page.getByLabel(/Čaká na materiál/).check();
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 	await page.getByTestId('odoslat').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	await expect(page.getByTestId('nahlad-error')).toContainText('Odpis pozastavený');
-	await expect(page.getByTestId('nahlad-error')).toContainText('bar_mm');
-	await expect(page.getByTestId('vysledok')).toHaveCount(0);
+	// história — riadok s ⏳
+	await goto(page, '/odpisy');
+	const row = page.locator('tr', { hasText: `${RUN}-FIX` });
+	await expect(row).toContainText('Fix');
+	await expect(row).toContainText('⏳');
 
 	expect(consoleMsgs).toEqual([]);
 });
