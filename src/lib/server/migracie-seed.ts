@@ -757,8 +757,36 @@ export function migrateCleanupStandardPlusOrphans(
 	})();
 }
 
+// v44 → v45: Plán rezov — uloženie vygenerovaného plánu (#505, prečíslovaná z pôvodnej
+// v43→v44 kvôli kolízii s #504 v44). Dominik chce uložiť výsledok optimalizátora
+// (vstupná tabuľka + nastavenia) pod názvom, znovu otvoriť a vytlačiť. Ukladáme VSTUPY
+// (cad_text + dlzka_tyce + rezna_medzera) — pri otvorení rekomputujeme cez
+// spocitajPlanRezov(). ZAK je len textový label (voliteľné, brány sú externý nákup),
+// nie FK. Money-NEUTRÁLNE.
+export function migratePlanRezovUlozene(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 45) return;
+	db.transaction(() => {
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS plan_rezov_ulozene (
+				id INTEGER PRIMARY KEY,
+				nazov TEXT NOT NULL,
+				zak TEXT NOT NULL DEFAULT '',
+				cad_text TEXT NOT NULL,
+				dlzka_tyce INTEGER NOT NULL DEFAULT 6000,
+				rezna_medzera REAL NOT NULL DEFAULT 4,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				created_by TEXT NOT NULL DEFAULT ''
+			);
+			CREATE INDEX IF NOT EXISTS idx_plan_rezov_ulozene_nazov
+				ON plan_rezov_ulozene(nazov);
+		`);
+		bump(45);
+	})();
+}
+
 /**
- * v44 → v45: pridanie stĺpca `nakup_skladova_karta` do `material_prices` (#506).
+ * v45 → v46: pridanie stĺpca `nakup_skladova_karta` do `material_prices` (#506,
+ * prečíslovaná z pôvodnej v44→v45 kvôli kolízii s #505 v45).
  * Artikly_Artikl.PosledniCena — posledná nákupná cena na skladovej karte Money.
  * Pre BPK kusové komponenty JEDINÝ nákupný zdroj (NC cenník = 0/173).
  * Appka ho používa ako FALLBACK keď nakupCennik (NC) je null.
@@ -768,7 +796,7 @@ export function migrateMaterialNakupSkladovaKarta(
 	db: Database.Database,
 	bump: (v: number) => void
 ): void {
-	if ((db.pragma('user_version', { simple: true }) as number) >= 45) return;
+	if ((db.pragma('user_version', { simple: true }) as number) >= 46) return;
 	const maTable =
 		db
 			.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='material_prices'")
@@ -777,6 +805,6 @@ export function migrateMaterialNakupSkladovaKarta(
 		if (maTable) {
 			db.exec('ALTER TABLE material_prices ADD COLUMN nakup_skladova_karta REAL');
 		}
-		bump(45);
+		bump(46);
 	})();
 }

@@ -294,7 +294,9 @@ test('Štandard + 2K IZO: default „prídavná koľajnica" zaškrtnutý, mechan
 	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4.8.4');
+	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
+	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4/8/4 číre');
 
 	// #132: IZO sklo na Štandard + → checkbox sa predvyplní zaškrtnutý; pre tento
 	// test ho explicitne odškrtneme, aby sme overili mechanizmus (nie default)

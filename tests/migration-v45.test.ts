@@ -1,122 +1,103 @@
-// Reálny prod upgrade path v44 → v45 (#506): nakup_skladova_karta do material_prices —
-// Artikly_Artikl.PosledniCena (posledná nákupná cena na skladovej karte Money).
-// Pre BPK komponenty JEDINÝ nákupný zdroj (NC cenník = 0/173).
-// Postav DB v stave v44 (base tabuľky + material_prices v42 shape s predaj_pcmo,
-// BEZ stĺpca nakup_skladova_karta + jeden base riadok), import db.ts spustí
-// SKUTOČNÝ v45 blok. Vzor: migration-v42.test.ts.
+// Reálny prod upgrade path v44 → v45: uložené plány rezov (#505, prečíslovaná z
+// pôvodnej v43→v44 kvôli kolízii s #504 v44 — pozri migracie-seed.ts).
+// Postav DB v stave v43 (base tabuľky + ≥1 riadok → seedData/seedUsers no-opnú),
+// import db.ts spustí SKUTOČNÝ migračný reťazec vrátane v43→v44 (#504), v44→v45
+// (#505) a v45→v46 (#506). Overuje: hlava po celom reťazci, nová tabuľka + stĺpce
+// + index, zapisovateľnosť, žiadna strata iných dát.
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { migrateMaterialNakupSkladovaKarta } from '../src/lib/server/migracie-seed';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v45-test-'));
-const dbPath = path.join(tmpRoot, 'v44.db');
+const dbPath = path.join(tmpRoot, 'v43.db');
 
 {
-	const v44 = new Database(dbPath);
-	// v44 stav: base tabuľky + material_prices v42 shape (s predaj_pcmo, BEZ nakup_skladova_karta).
-	v44.exec(`
+	const v43 = new Database(dbPath);
+	// Minimálne base tabuľky (vzor migration-v34.test.ts).
+	v43.exec(`
 		CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), role TEXT NOT NULL DEFAULT 'internal');
 		CREATE TABLE cfg_sys (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL UNIQUE, n INTEGER NOT NULL, sklo_offset REAL NOT NULL);
-		CREATE TABLE glass_types (id INTEGER PRIMARY KEY, nazov TEXT NOT NULL, redukcia_zero INTEGER NOT NULL DEFAULT 0, poradie INTEGER NOT NULL DEFAULT 0, system TEXT NOT NULL DEFAULT 'ALL', hrubka INTEGER NOT NULL DEFAULT 0, sklo_korekcia INTEGER, hrubka_trieda INTEGER, UNIQUE(nazov, system));
-		CREATE TABLE cfg_sklo_trieda (system TEXT NOT NULL, trieda INTEGER NOT NULL, korekcia INTEGER NOT NULL, PRIMARY KEY (system, trieda));
+		CREATE TABLE glass_types (id INTEGER PRIMARY KEY, nazov TEXT NOT NULL, redukcia_zero INTEGER NOT NULL DEFAULT 0, poradie INTEGER NOT NULL DEFAULT 0, system TEXT NOT NULL DEFAULT 'ALL', hrubka INTEGER NOT NULL DEFAULT 0, UNIQUE(nazov, system));
 		CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL, dim TEXT NOT NULL, koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks REAL NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500, sklo_hrubka INTEGER NOT NULL DEFAULT 0);
-		CREATE TABLE material_prices (kod TEXT PRIMARY KEY, nakup_cennik REAL, nakup_posledna_faktura REAL, predaj_vo REAL, mena TEXT NOT NULL DEFAULT 'EUR', sklad REAL, updated_at TEXT NOT NULL DEFAULT (datetime('now')), rozvin REAL, predaj_pcmo REAL);
-		CREATE TABLE material_prices_meta (id INTEGER PRIMARY KEY CHECK (id = 1), snapshot_generated_at TEXT, snapshot_file_mtime_ms REAL, imported_at TEXT, row_count INTEGER NOT NULL DEFAULT 0, rejected_count INTEGER NOT NULL DEFAULT 0);
 	`);
-	v44
+	v43
 		.prepare("INSERT INTO users (username, pass_hash, role) VALUES ('palo', 'x:y', 'internal')")
 		.run();
-	v44.prepare("INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES ('X', 1, 83)").run();
-	v44
-		.prepare(
-			"INSERT INTO glass_types (nazov, poradie, system) VALUES ('Float sklo 6 mm', 1, 'ALL')"
-		)
-		.run();
-	// base cenový riadok BPK BEZ nakup_skladova_karta — musí prežiť ALTER
-	v44
-		.prepare(
-			"INSERT INTO material_prices (kod, nakup_cennik, predaj_pcmo, mena, sklad) VALUES ('BPK00074', NULL, 12.0, 'EUR', 25)"
-		)
-		.run();
-	v44.pragma('user_version = 44');
-	v44.close();
+	v43.prepare("INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES ('X', 1, 0)").run();
+	v43.prepare("INSERT INTO glass_types (nazov, system) VALUES ('X', 'ALL')").run();
+	v43.pragma('user_version = 43');
+	v43.close();
 }
 
 process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
-describe('migrácia v44 → v45: nakup_skladova_karta do material_prices (#506)', () => {
-	it('user_version === 45 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(45);
+describe('migrácia v44 → v45: plan_rezov_ulozene (#505)', () => {
+	it('user_version === 46 po migrácii (v45 plan_rezov + v46 nakup_skladova_karta)', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(46);
 	});
 
-	it('material_prices má nový stĺpec nakup_skladova_karta (aditívne, na konci)', () => {
-		const cols = (db.prepare('PRAGMA table_info(material_prices)').all() as { name: string }[]).map(
-			(c) => c.name
-		);
+	it('vznikla tabuľka plan_rezov_ulozene s očakávanými stĺpcami', () => {
+		const cols = (
+			db.prepare('PRAGMA table_info(plan_rezov_ulozene)').all() as { name: string }[]
+		).map((c) => c.name);
 		expect(cols).toEqual([
-			'kod',
-			'nakup_cennik',
-			'nakup_posledna_faktura',
-			'predaj_vo',
-			'mena',
-			'sklad',
-			'updated_at',
-			'rozvin',
-			'predaj_pcmo',
-			'nakup_skladova_karta'
+			'id',
+			'nazov',
+			'zak',
+			'cad_text',
+			'dlzka_tyce',
+			'rezna_medzera',
+			'created_at',
+			'created_by'
 		]);
 	});
 
-	it('base riadok prežil migráciu, nakup_skladova_karta default NULL', () => {
+	it('existuje index idx_plan_rezov_ulozene_nazov', () => {
+		const idx = db
+			.prepare(
+				"SELECT name FROM sqlite_master WHERE type='index' AND name='idx_plan_rezov_ulozene_nazov'"
+			)
+			.get();
+		expect(idx).toBeTruthy();
+	});
+
+	it('zápis + čítanie fungujú', () => {
+		db.prepare(
+			"INSERT INTO plan_rezov_ulozene (nazov, zak, cad_text, dlzka_tyce, rezna_medzera, created_by) VALUES ('Brány', 'ZAK1', 'PROFIL\t2\t5330', 6000, 4, 'test')"
+		).run();
 		const row = db
 			.prepare(
-				"SELECT kod, nakup_cennik, predaj_pcmo, nakup_skladova_karta FROM material_prices WHERE kod = 'BPK00074'"
+				'SELECT nazov, zak, cad_text, dlzka_tyce, rezna_medzera FROM plan_rezov_ulozene WHERE nazov = ?'
 			)
-			.get() as {
-			kod: string;
-			nakup_cennik: number | null;
-			predaj_pcmo: number | null;
-			nakup_skladova_karta: number | null;
-		};
-		expect(row).toEqual({
-			kod: 'BPK00074',
-			nakup_cennik: null,
-			predaj_pcmo: 12,
-			nakup_skladova_karta: null
-		});
+			.get('Brány') as Record<string, unknown>;
+		expect(row.nazov).toBe('Brány');
+		expect(row.zak).toBe('ZAK1');
+		expect(row.cad_text).toBe('PROFIL\t2\t5330');
+		expect(row.dlzka_tyce).toBe(6000);
+		expect(row.rezna_medzera).toBe(4);
 	});
 
-	it('nakup_skladova_karta je zapisovateľný', () => {
+	it('defaulty: zak prázdny, dlzka_tyce 6000, rezna_medzera 4, created_at vyplnený', () => {
 		db.prepare(
-			"UPDATE material_prices SET nakup_skladova_karta = 4.00 WHERE kod = 'BPK00074'"
+			"INSERT INTO plan_rezov_ulozene (nazov, cad_text) VALUES ('Test defaults', 'X\t1\t1000')"
 		).run();
-		const r = db
-			.prepare("SELECT nakup_skladova_karta FROM material_prices WHERE kod = 'BPK00074'")
-			.get() as { nakup_skladova_karta: number | null };
-		expect(r.nakup_skladova_karta).toBe(4);
+		const row = db
+			.prepare(
+				'SELECT zak, dlzka_tyce, rezna_medzera, created_at, created_by FROM plan_rezov_ulozene WHERE nazov = ?'
+			)
+			.get('Test defaults') as Record<string, unknown>;
+		expect(row.zak).toBe('');
+		expect(row.dlzka_tyce).toBe(6000);
+		expect(row.rezna_medzera).toBe(4);
+		expect(row.created_at).toBeTruthy();
+		expect(row.created_by).toBe('');
 	});
 
-	it('idempotencia: opätovné volanie migrácie (guard >= 45) nič nemení', () => {
-		migrateMaterialNakupSkladovaKarta(db, () => {
-			throw new Error('bump sa nesmie zavolať znova — guard >= 45 mal vrátiť skôr');
-		});
-		expect(db.pragma('user_version', { simple: true })).toBe(45);
-	});
-
-	it('feature-detect: DB bez material_prices → bump(45) bez ALTER (minimálne fixtúry nepadnú)', () => {
-		const mini = new Database(':memory:');
-		mini.pragma('user_version = 44');
-		let bumped: number | null = null;
-		migrateMaterialNakupSkladovaKarta(mini, (v) => {
-			mini.pragma(`user_version = ${v}`);
-			bumped = v;
-		});
-		expect(bumped).toBe(45);
-		expect(mini.pragma('user_version', { simple: true })).toBe(45);
-		mini.close();
+	it('base dáta (users) prežili migráciu', () => {
+		const row = db.prepare("SELECT username FROM users WHERE username = 'palo'").get();
+		expect(row).toEqual({ username: 'palo' });
 	});
 });

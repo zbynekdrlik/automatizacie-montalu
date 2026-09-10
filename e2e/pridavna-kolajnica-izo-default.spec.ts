@@ -8,7 +8,10 @@
 import { test, expect } from '@playwright/test';
 import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
 
-const IZO = 'Izolačné sklo 4.8.4';
+// v44 (#504) zmazala orphaned 'Izolačné sklo 4.8.4' (Štandard+) — nahradené
+// surviving v43 IZO variantom rovnakej triedy (16mm skladba, jeIzoTrieda ⇒ true),
+// takže IZO-detekcia a odvodené odpis kódy (ZASP00030/ZASP00033...) sú nezmenené.
+const IZO = 'Izolačné sklo 4/8/4 číre';
 const NIE_IZO = 'Float sklo 4 mm';
 
 test('Štandard + | 2K | IZO sklo: checkbox sa predvyplní zaškrtnutý a odpis ukáže 3K spodnú', async ({

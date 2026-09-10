@@ -36,7 +36,9 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await page.getByLabel('Štýl').selectOption('4K');
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
-	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4.8.4');
+	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
+	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
+	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4/8/4 číre');
 	// formulár rovno povie, ktorý nárezák sa podľa skla ťahá
 	await expect(page.getByTestId('narezak-hint')).toContainText('4K IZO');
 	await vyberFarbuKovania(page);
@@ -74,10 +76,12 @@ test('zmena počtu krídel nezmaže zvolené sklo; opona izolačné sklo neponú
 	await loginAs(page);
 	await hlavicka(page, '03');
 	await page.getByLabel('Štýl').selectOption('3K');
-	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4.8.4');
+	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
+	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
+	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4/8/4 číre');
 	// 3K → 5K: voľba skla ostáva, nárezák sa prepne na 5K IZO
 	await page.getByLabel('Štýl').selectOption('5K');
-	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4.8.4');
+	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/8/4 číre');
 	await expect(page.getByTestId('narezak-hint')).toContainText('5K IZO');
 
 	// opona nemá izolačnú skladbu → sklo sa prepne na float a IZO nie je v ponuke

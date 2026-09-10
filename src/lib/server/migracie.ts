@@ -32,6 +32,7 @@ import {
 	migrateMaterialPredajPcmo,
 	migrateGlassCatalogExpansion,
 	migrateCleanupStandardPlusOrphans,
+	migratePlanRezovUlozene,
 	migrateMaterialNakupSkladovaKarta
 } from './migracie-seed';
 
@@ -986,7 +987,8 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateMaterialPredajPcmo(db, bump); // v41→v42 (#364)
 	migrateGlassCatalogExpansion(db, bump); // v42→v43 (#235)
 	migrateCleanupStandardPlusOrphans(db, bump); // v43→v44 (#504)
-	migrateMaterialNakupSkladovaKarta(db, bump); // v44→v45 (#506)
+	migratePlanRezovUlozene(db, bump); // v44→v45 (#505)
+	migrateMaterialNakupSkladovaKarta(db, bump); // v45→v46 (#506, prečíslovaná z v44→v45 kvôli kolízii s #505 v45)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

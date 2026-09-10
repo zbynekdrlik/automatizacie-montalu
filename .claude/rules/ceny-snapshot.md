@@ -36,7 +36,7 @@ takže je to spoľahlivý signál lakovaného profilu. Konzument = `computeLakov
 potrebuje `git pull` + jeden beh, kým sa rozvin objaví — dovtedy je pri profiloch `null`
 (sekcia ukáže „neúplné").
 
-**`nakupSkladovaKarta` (#506, migrácia v45, `material_prices.nakup_skladova_karta REAL`):**
+**`nakupSkladovaKarta` (#506, migrácia v46, `material_prices.nakup_skladova_karta REAL`):**
 `Artikly_Artikl.PosledniCena` — posledná nákupná cena priamo na skladovej karte Money.
 Pre BPK kusové komponenty JEDINÝ nákupný zdroj (NC cenník = 0/173 — Dominik ceny ručne
 nahodil na kartu, 63/173 s cenou > 0). Money túto cenu používa na ocenenie výdajky
@@ -62,7 +62,7 @@ ukáže „cena neznáma", rovnako ako pred #506).
   ju nemá). NÁKUPNÁ cena BPK žije na **skladovej karte** (`Artikly_Artikl.PosledniCena`
   — 63/173 s cenou > 0, Dominik ich ručne nahodil; Money túto cenu používa na ocenenie
   výdajky). Appka ju číta ako `nakupSkladovaKarta` a používa ako FALLBACK keď `nakupCennik`
-  (NC) je null (#506, migrácia v45). POZOR: `Artikly_Artikl.PosledniCena` (skladová karta)
+  (NC) je null (#506, migrácia v46). POZOR: `Artikly_Artikl.PosledniCena` (skladová karta)
   NIE JE to isté ako `Artikly_ArtiklDodavatel.PosledniCena` (posledná faktúra dodávateľa
   → `nakupPoslednaFaktura`) — dva rôzne polia, dve rôzne tabuľky. Predajná cena BPK žije
   v cenníku **PCMO „Predajný cenník polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) —
