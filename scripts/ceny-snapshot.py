@@ -101,6 +101,7 @@ SELECT
     a.Kod AS kod,
     CASE WHEN a.Kod LIKE 'TS%' THEN iz.Cena ELSE nc.Cena END AS nakupCennik,
     ad.PosledniCena AS nakupPoslednaFaktura,
+    a.PosledniCena AS nakupSkladovaKarta,
     vo.Cena AS predajVo,
     pcmo.Cena AS predajPcmo,
     ISNULL(m.Kod, 'EUR') AS mena,
@@ -189,6 +190,13 @@ def fetch_rows(conn) -> list[dict]:
                 "kod": kod,
                 "nakupCennik": _num(r.get("nakupCennik")),
                 "nakupPoslednaFaktura": _num(r.get("nakupPoslednaFaktura")),
+                # nakupSkladovaKarta (#506): Artikly_Artikl.PosledniCena — posledná
+                # nákupná cena priamo na skladovej karte. Pre BPK komponenty je to
+                # JEDINÝ zdroj nákupnej ceny (NC cenník má 0/173, ale Dominik ceny
+                # ručne nahodil na kartu — 63/173 s cenou > 0). Money ju používa na
+                # ocenenie výdajky (odpisu). Appka ju používa ako FALLBACK keď
+                # nakupCennik (NC) je null.
+                "nakupSkladovaKarta": _num(r.get("nakupSkladovaKarta")),
                 "predajVo": _num(r.get("predajVo")),
                 # predajPcmo (#364): predajná cena z cenníka PCMO (hlavne BPK, ale pokrýva aj
                 # PCD/PRK/ZAS). ZÁMERNE NIE nakupCennik — iný sémantický význam.

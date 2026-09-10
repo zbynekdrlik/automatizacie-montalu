@@ -783,3 +783,28 @@ export function migratePlanRezovUlozene(db: Database.Database, bump: (v: number)
 		bump(45);
 	})();
 }
+
+/**
+ * v45 → v46: pridanie stĺpca `nakup_skladova_karta` do `material_prices` (#506,
+ * prečíslovaná z pôvodnej v44→v45 kvôli kolízii s #505 v45).
+ * Artikly_Artikl.PosledniCena — posledná nákupná cena na skladovej karte Money.
+ * Pre BPK kusové komponenty JEDINÝ nákupný zdroj (NC cenník = 0/173).
+ * Appka ho používa ako FALLBACK keď nakupCennik (NC) je null.
+ * Vzor #364 (predaj_pcmo) — ALTER TABLE ADD COLUMN, O(1), žiadny rewrite.
+ */
+export function migrateMaterialNakupSkladovaKarta(
+	db: Database.Database,
+	bump: (v: number) => void
+): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 46) return;
+	const maTable =
+		db
+			.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='material_prices'")
+			.get() !== undefined;
+	db.transaction(() => {
+		if (maTable) {
+			db.exec('ALTER TABLE material_prices ADD COLUMN nakup_skladova_karta REAL');
+		}
+		bump(46);
+	})();
+}

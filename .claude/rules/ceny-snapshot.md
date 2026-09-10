@@ -20,8 +20,8 @@ paths:
 
 Producent `scripts/ceny-snapshot.py` beží **mimo repa na dev2**
 (`/home/newlevel/montalu-ceny/run-snapshot.sh`, cron 05:30) → číta Money read-only cez
-tunel → JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura, predajVo,
-predajPcmo, mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
+tunel → JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura,
+nakupSkladovaKarta, predajVo, predajPcmo, mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
 **lazy** naimportuje (`ceny.ts` `maybeImportSnapshot`, gejtuje na mtime) do
 `material_prices` (kľúč = Money `kod`). Chýbajúca/nulová cena = **`null`** („neznáma"),
 NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
@@ -36,6 +36,16 @@ takže je to spoľahlivý signál lakovaného profilu. Konzument = `computeLakov
 potrebuje `git pull` + jeden beh, kým sa rozvin objaví — dovtedy je pri profiloch `null`
 (sekcia ukáže „neúplné").
 
+**`nakupSkladovaKarta` (#506, migrácia v46, `material_prices.nakup_skladova_karta REAL`):**
+`Artikly_Artikl.PosledniCena` — posledná nákupná cena priamo na skladovej karte Money.
+Pre BPK kusové komponenty JEDINÝ nákupný zdroj (NC cenník = 0/173 — Dominik ceny ručne
+nahodil na kartu, 63/173 s cenou > 0). Money túto cenu používa na ocenenie výdajky
+(odpisu). Appka ju používa ako **FALLBACK**: `enrichPolozky` → `nakupCennik =
+price.nakupCennik ?? price.nakupSkladovaKarta ?? null`. NC ostáva primárny pre profily
+(ZASP/ZASK/PRP). Producent na dev2 potrebuje `git pull` + jeden beh, kým sa
+`nakupSkladovaKarta` objaví — dovtedy je pri BPK kódoch `null` (stĺpec „Nákup cenník"
+ukáže „cena neznáma", rovnako ako pred #506).
+
 ## Money cenníky — kde je ktorá cena (overené read-only 2026-08-19)
 
 - **Producent dnes ťahá 6 rodín:** `WHERE Kod LIKE 'ZASP%'/'ZASK%'/'TS%'/'PRP%'/'BPP%'/'BPK%'`
@@ -46,12 +56,18 @@ potrebuje `git pull` + jeden beh, kým sa rozvin objaví — dovtedy je pri prof
 - **Profily/kovanie (ZASP*/ZASK*):** `nakupCennik` z cenníka **NC** (Nákupný cenník,
   GUID `BA7DA0F8-…`), `predajVo` z **PRF_VO** (appka `predajVo` nuluje pre VŠETKY non-ZASP
   kódy — veľkoobchodnému cenníku pri komponentoch šéf neverí).
-- **Bazén (BPP*/BPK*, #359, live overené 2026-08-31):** **BPP** (profily) sú v NC ako
-  PRP/ZASP → reálny `nakupCennik` (22/25 app kódov > 0). **BPK** (kusové komponenty) sú v NC
-  tiež, ale nákupná cena je pri VŠETKÝCH 0 → honest-null (Money nemá nákupnú cenu bazénových
-  komponentov). Jediná nenulová cena BPK žije v predajnom cenníku **PCMO „Predajný cenník
-  polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) — PREDAJNÁ cena, do `nakupCennik` sa
-  ZÁMERNE nemapuje; zobrazuje sa ako vlastné pole `predajPcmo` (#364, migrácia v42).
+- **Bazén (BPP*/BPK*, #359, live overené 2026-08-31; #506 nákup doplnený 2026-09-10):**
+  **BPP** (profily) sú v NC ako PRP/ZASP → reálny `nakupCennik` (22/25 app kódov > 0).
+  **BPK** (kusové komponenty) sú v NC tiež, ale nákupná cena je pri VŠETKÝCH 0 (NC cenník
+  ju nemá). NÁKUPNÁ cena BPK žije na **skladovej karte** (`Artikly_Artikl.PosledniCena`
+  — 63/173 s cenou > 0, Dominik ich ručne nahodil; Money túto cenu používa na ocenenie
+  výdajky). Appka ju číta ako `nakupSkladovaKarta` a používa ako FALLBACK keď `nakupCennik`
+  (NC) je null (#506, migrácia v46). POZOR: `Artikly_Artikl.PosledniCena` (skladová karta)
+  NIE JE to isté ako `Artikly_ArtiklDodavatel.PosledniCena` (posledná faktúra dodávateľa
+  → `nakupPoslednaFaktura`) — dva rôzne polia, dve rôzne tabuľky. Predajná cena BPK žije
+  v cenníku **PCMO „Predajný cenník polykarbonát MO"** (`F298CAD0-…`, TypCeniku=0) —
+  PREDAJNÁ cena, do `nakupCennik` sa ZÁMERNE nemapuje; zobrazuje sa ako vlastné pole
+  `predajPcmo` (#364, migrácia v42).
   `predajPcmo` nemá žiadny family gate (na rozdiel od `predajVo`, ktoré appka nuluje pre
   non-ZASP) — zobrazuje sa pre VŠETKY rodiny, ale nenulová hodnota je hlavne pri BPK
   (61/173), plus PCD/PRK/ZAS. Producent na dev2 potrebuje `git pull` + jeden beh, kým sa

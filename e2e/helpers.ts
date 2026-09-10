@@ -64,9 +64,22 @@ export async function goto(page: Page, path: string) {
 }
 
 /** TVRDÁ POISTKA: zápisové testy sa NIKDY nespúšťajú proti LIVE nasadeniu —
- * testovací odpis nesmie skončiť v ostrom Money importe. */
-export async function skipAkLive(page: Page) {
-	const res = await page.request.get('/health');
+ * testovací odpis nesmie skončiť v ostrom Money importe.
+ *
+ * Používa Node.js `fetch()` namiesto `page.request.get()` kvôli stale-connection
+ * bugu v post-deploy E2E cez SSH tunel: Playwright globálny `httpHappyEyeballsAgent`
+ * (`keepAlive: true`, proces-wide singleton) pooluje TCP spojenia naprieč testami.
+ * Na konkrétnom mieste (konfigurator-zasklenie test 2 → 3 browser-only testy →
+ * konfigurator-zimna-zahrada test 3) znovupoužitie pooled socketu koinciduje so
+ * serverovým keepAliveTimeout (5 s) close — cez SSH tunel sa FIN propaguje s oneskorením,
+ * takže agent dispatchne na stale socket → "socket hang up" (CI runy 34454348804,
+ * 34468718466; deterministic na TEJTO pozícii, nie každá medzera). Node.js `fetch()`
+ * (undici Pool, `keepAliveTimeout: 4000` ms) proaktívne disposal idle spojení pred
+ * server timeoutom a rešpektuje server hint, takže close-race nevznikne. `/health` je
+ * verejný JSON GET bez session cookies a bez x-forwarded-* hlavičiek (CSRF je len POST). */
+export async function skipAkLive(_page: Page) {
+	const baseUrl = process.env.BASE_URL || 'http://localhost:4173';
+	const res = await fetch(`${baseUrl}/health`);
 	const { live } = (await res.json()) as { live: boolean };
 	test.skip(live === true, 'LIVE nasadenie (MONEY_LIVE=1) — zápisové E2E preskočené');
 }
