@@ -104,7 +104,10 @@ describe('#443 efektivnaRedukciaZero — derivácia z triedy, Slide-only gate', 
 	});
 
 	it('iný systém než Slide (Štandard +) → uložený stĺpec, aj keď má triedu', () => {
-		const g = glassTypesForSystem('Štandard +').find((x) => x.nazov === 'Izolačné sklo 4.8.4')!;
+		// v44 (#504): "Izolačné sklo 4.8.4" removed — test its replacement
+		const g = glassTypesForSystem('Štandard +').find(
+			(x) => x.nazov === 'Izolačné sklo 4/8/4 číre'
+		)!;
 		expect(g.hrubkaTrieda).toBe(16); // klasifikované, ale gate je Slide-only
 		expect(efektivnaRedukciaZero(g)).toBe(g.redukciaZero);
 	});

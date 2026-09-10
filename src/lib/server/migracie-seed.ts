@@ -730,3 +730,29 @@ export function migrateGlassCatalogExpansion(
 		bump(43);
 	})();
 }
+
+/**
+ * v43 → v44: vyčistenie orphaned glass_types pre Štandard+ (#504, Patrik 10.9.).
+ * v43 (migrateGlassCatalogExpansion) pridala plnú škálu skiel cez INSERT OR IGNORE ale
+ * nevyčistila staré v9 seed záznamy (STANDARD_GLASS):
+ *  - "Float sklo 10 mm" — v43 namiesto neho pridáva "ESG kalené 10 mm"
+ *  - "Izolačné sklo 4.8.4" — nahradená v43 variantmi "Izolačné sklo 4/8/4 číre/mliečne/stopsol"
+ * Money-neutrálne: obe sú nahradené Money-identickými variantmi (glass-catalog rule).
+ */
+export function migrateCleanupStandardPlusOrphans(
+	db: Database.Database,
+	bump: (v: number) => void
+): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 44) return;
+	const maTable =
+		db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='glass_types'").get() !==
+		undefined;
+	db.transaction(() => {
+		if (maTable) {
+			db.prepare(
+				"DELETE FROM glass_types WHERE system = 'Štandard +' AND nazov IN ('Float sklo 10 mm', 'Izolačné sklo 4.8.4')"
+			).run();
+		}
+		bump(44);
+	})();
+}
