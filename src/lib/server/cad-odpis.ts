@@ -7,6 +7,7 @@
 import { logger } from '$lib/server/log';
 import {
 	transform,
+	parseCad,
 	applyCombos,
 	buildCopyBack,
 	parseChoice,
@@ -14,6 +15,7 @@ import {
 	validatePergola,
 	CATALOG
 } from '$lib/server/pergola';
+import { transformFix, validateFix } from '$lib/server/fix-catalog';
 import {
 	writeOdpis,
 	applyEdits,
@@ -106,12 +108,59 @@ function editsFrom(form: FormData): Map<string, string> {
 }
 
 /**
- * Náhľad Money rozpisu z CAD nárezu — reuse pergola enginu (`transform`/`validatePergola`/
- * `applyCombos`/`buildCopyBack`). `validatePergola` je generická (žiadny „pergola" v
- * user-facing hláškach) a surfacuje nerozpoznané riadky / nenamapované CAD kódy ako TVRDÚ
- * chybu → do Money sa nikdy nedostane tichý výpadok materiálu.
+ * FIX-špecifický náhľad (#500): CAD kódy sú PRIAMO Money kódy (16xxx/26xxx),
+ * bez CODE_MAP/CATALOG mapovania. Qty = celková dĺžka rezov v metroch (honest-null
+ * bez bar_mm). Žiadne kombinácie tyčí (FIX nemá multi-variant profily).
  */
-export function cadOdpisView(vstup: CadVstup, form?: FormData) {
+function fixCadOdpisView(vstup: CadVstup, form?: FormData) {
+	const { rows, skipped } = parseCad(vstup.cad);
+	const fixResult = transformFix(rows);
+	const error = validateFix(vstup.zak, vstup.op, vstup.zakaznik, skipped, fixResult);
+	if (error) return { error, editError: null as string | null, r: null, view: null };
+	const spocitane = fixResult.items.map((i) => ({
+		kod: i.kod,
+		nazov: i.nazov,
+		qty: i.qty,
+		mj: i.mj
+	}));
+	// ručné úpravy — rovnaký mechanizmus ako pergola
+	const edits = form ? editsFrom(form) : new Map<string, string>();
+	const { finalOut, zmenene, error: editError } = applyEdits(spocitane, edits);
+	const polozky = editError ? spocitane : finalOut;
+	const editVals = Object.fromEntries(edits);
+	return {
+		error: null as string | null,
+		editError,
+		r: null,
+		view: {
+			polozky,
+			zmenene,
+			editVals,
+			nonzero: polozky.filter((o) => o.qty > 0),
+			nulove: polozky.filter((o) => o.qty <= 0),
+			// FIX nemá bin-packing tyčí (bar_mm neznáme) → žiadne copyBack/kombinácie
+			copyLines: [] as { code: string; name: string; barsStr: string }[],
+			totalBars: 0,
+			cadLastCol: '',
+			longNotes: [] as string[],
+			kombinacie: [] as {
+				idx: number;
+				fieldLabel: string;
+				options: string[];
+				selected: string | undefined;
+			}[]
+		}
+	};
+}
+
+/**
+ * Náhľad Money rozpisu z CAD nárezu. Pre pergolu (default) reusuje pergola engine
+ * (`transform`/`validatePergola`/`applyCombos`/`buildCopyBack`); pre FIX (#500)
+ * používa priame mapovanie CAD kód = Money kód (`fixCadOdpisView`).
+ * `opts.modul` rozhoduje cestu — pergola je default (spätná kompatibilita).
+ */
+export function cadOdpisView(vstup: CadVstup, form?: FormData, opts?: CadJobOpts) {
+	if (opts?.modul === 'fix') return fixCadOdpisView(vstup, form);
 	const r = transform(vstup.cad);
 	const error = validatePergola(vstup.zak, vstup.op, vstup.zakaznik, vstup.cad, r);
 	if (error) return { error, editError: null as string | null, r: null, view: null };
@@ -226,9 +275,9 @@ export function buildCadJob(
 
 // --- zdieľané akčné telá (spocitat / upravit / odoslat) — route glue žije RAZ (#393) ---
 
-export function cadSpocitat(form: FormData, user: SessionUser | null) {
+export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: CadJobOpts) {
 	const vstup = parseCadVstup(form);
-	const { error, view: v } = cadOdpisView(vstup, form);
+	const { error, view: v } = cadOdpisView(vstup, form, opts);
 	if (error) return { step: 'form' as const, error, vstup };
 	// „Spočítať" beží z formulára, kde polia qty_ ešte nie sú — editError tu nevzniká
 	return {
@@ -251,7 +300,7 @@ export function cadUpravit(form: FormData) {
 
 export async function cadOdoslat(form: FormData, user: SessionUser | null, opts: CadActionOpts) {
 	const vstup = parseCadVstup(form);
-	const { error, editError, view: v } = cadOdpisView(vstup, form);
+	const { error, editError, view: v } = cadOdpisView(vstup, form, opts);
 	if (error) return { step: 'form' as const, error, vstup };
 	// cenový blok (interní) — lazy (thunk): úspešné odoslanie končí v „hotovo" bez cenového
 	// bloku, tak ho nepočítame zbytočne — len keď sa vraciame do „nahlad" s chybou. Zavolá sa
