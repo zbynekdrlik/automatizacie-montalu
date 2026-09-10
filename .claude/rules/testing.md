@@ -550,11 +550,12 @@ bez combo voľby. Combo test preto píš na /pergola (`parita.spec.ts`), nie na 
 
 Playwright globálny `httpHappyEyeballsAgent` (`keepAlive: true`, proces-wide singleton
 v `coreBundle.js`) pooluje TCP spojenia naprieč VŠETKÝMI `page.request` volaniami vo
-workeri. Keď medzi dvoma `page.request` volaniami prebehne niekoľko browser-only testov
-(~15-30 s), SvelteKit server `keepAliveTimeout` (5 s) uzavrie idle TCP spojenie, ale
-Node.js `http.Agent` drží stale socket a dispatchne naň ďalší request → `ECONNRESET` /
-"socket hang up". Lokálne to nikdy nevidno (loopback je rýchlejší než timeout);
-cez SSH tunel (post-deploy E2E) je latencia dostatočná na deterministickú reprodukciu.
+workeri. Na konkrétnom mieste (`konfigurator-zasklenie` test 2 → 3 browser-only testy →
+`konfigurator-zimna-zahrada` test 3) znovupoužitie pooled socketu koinciduje so serverovým
+`keepAliveTimeout` (5 s) close — cez SSH tunel sa FIN propaguje s oneskorením, takže agent
+dispatchne na stale socket → `ECONNRESET` / "socket hang up". Deterministic na TEJTO
+pozícii, nie každá medzera (iné `skipAkLive` volania s kratšími/dlhšími medzerami race
+netrafili). Lokálne to nikdy nevidno (loopback je rýchlejší než tunnel FIN propagation).
 
 **Fix:** `skipAkLive()` v `e2e/helpers.ts` používa Node.js `fetch()` (undici Pool,
 `keepAliveTimeout: 4000` ms — proaktívne disposal PRED server timeout) namiesto

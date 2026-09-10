@@ -69,12 +69,14 @@ export async function goto(page: Page, path: string) {
  * Používa Node.js `fetch()` namiesto `page.request.get()` kvôli stale-connection
  * bugu v post-deploy E2E cez SSH tunel: Playwright globálny `httpHappyEyeballsAgent`
  * (`keepAlive: true`, proces-wide singleton) pooluje TCP spojenia naprieč testami.
- * Keď medzi dvoma `page.request` volaniami prebehne niekoľko browser-only testov
- * (~15-30 s), server keepAliveTimeout (5 s) uzavrie idle spojenie, ale agent drží
- * stale socket → "socket hang up" (CI runy 34454348804, 34468718466). Node.js `fetch()`
+ * Na konkrétnom mieste (konfigurator-zasklenie test 2 → 3 browser-only testy →
+ * konfigurator-zimna-zahrada test 3) znovupoužitie pooled socketu koinciduje so
+ * serverovým keepAliveTimeout (5 s) close — cez SSH tunel sa FIN propaguje s oneskorením,
+ * takže agent dispatchne na stale socket → "socket hang up" (CI runy 34454348804,
+ * 34468718466; deterministic na TEJTO pozícii, nie každá medzera). Node.js `fetch()`
  * (undici Pool, `keepAliveTimeout: 4000` ms) proaktívne disposal idle spojení pred
- * server timeoutom, takže stale socket nikdy nevznikne. `/health` je verejný JSON GET
- * bez session cookies a bez x-forwarded-* hlavičiek (CSRF je len POST). */
+ * server timeoutom a rešpektuje server hint, takže close-race nevznikne. `/health` je
+ * verejný JSON GET bez session cookies a bez x-forwarded-* hlavičiek (CSRF je len POST). */
 export async function skipAkLive(_page: Page) {
 	const baseUrl = process.env.BASE_URL || 'http://localhost:4173';
 	const res = await fetch(`${baseUrl}/health`);
