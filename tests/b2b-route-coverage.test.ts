@@ -251,6 +251,12 @@ describe('b2b route coverage (denylist drift guard)', () => {
 		expect(b2bRedirectTarget('/plan-rezov')).toBe('/zasklenia');
 	});
 
+	// #505: uložený plán rezov — sub-route /plan-rezov/[id] je pokrytá prefixom
+	// /plan-rezov v B2B_FORBIDDEN_PREFIXES (b2b-access.ts startsWith).
+	it('#505: /plan-rezov/7 (uložený plán, sub-route) JE presmerovaný preč', () => {
+		expect(b2bRedirectTarget('/plan-rezov/7')).toBe('/zasklenia');
+	});
+
 	// #496: objednávka skla — interný podklad objednávky skla per zákazka,
 	// Money-neutrálne (objednávka u dodávateľa). V B2B_FORBIDDEN_PREFIXES → generický
 	// it.each vyššie to už pokrýva; toto je čitateľné explicitné potvrdenie.

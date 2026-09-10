@@ -167,7 +167,7 @@
 			}}
 		>
 			<h3>Uložiť plán</h3>
-			<input type="hidden" name="cadText" value={cadText} />
+			<input type="hidden" name="cad" value={cadText} />
 			<input type="hidden" name="dlzkaTyce" value={dlzkaTyce} />
 			<input type="hidden" name="reznaMedzera" value={reznaMedzera} />
 			<div class="save-fields">

@@ -38,20 +38,22 @@ export const actions = {
 			return fail(400, { saveError: 'Názov je príliš dlhý (max 200 znakov).' });
 
 		const zak = String(fd.get('zak') ?? '').trim();
-		const cadText = String(fd.get('cadText') ?? '').trim();
-		if (!cadText) return fail(400, { saveError: 'Chýba CAD text na uloženie.' });
 
-		const dlzkaTyce = Number(fd.get('dlzkaTyce') ?? 6000);
-		const reznaMedzera = Number(fd.get('reznaMedzera') ?? 4);
+		// #505 review finding (HIGH): validate cadText through parsePlanRezovFormData
+		// — the same bounds (500k chars, MAX_RIADKOV, MAX_KUSOV_SPOLU 20k, dlzkaTyce>0,
+		// reznaMedzera>=0) that spocitat enforces. Without this, a saved plan with
+		// enormous ks would cause OOM on every detail GET (persistent DoS).
+		const parsed = parsePlanRezovFormData(fd);
+		if ('error' in parsed) return fail(400, { saveError: parsed.error });
 
 		const user = (locals as { user?: { username: string } }).user?.username ?? '';
 
 		const id = ulozPlan({
 			nazov,
 			zak: zak || undefined,
-			cadText,
-			dlzkaTyce: Number.isFinite(dlzkaTyce) ? dlzkaTyce : 6000,
-			reznaMedzera: Number.isFinite(reznaMedzera) ? reznaMedzera : 4,
+			cadText: String(fd.get('cad') ?? '').trim(),
+			dlzkaTyce: parsed.vstup.dlzkaTyce,
+			reznaMedzera: parsed.vstup.reznaMedzera,
 			createdBy: user
 		});
 
