@@ -32,7 +32,15 @@ test('pergola CAD: „⏳ Čaká" prežije kontrolu → odoslanie a zapíše sa 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('fix/cad: „⏳ Čaká" prežije kontrolu → odoslanie a zapíše sa do histórie', async ({
+// #500 (2026-09-10): FIX CAD kódy sú priamo 16xxx Money kódy (nie pergola 18xxx cez
+// CODE_MAP), A odoslanie do Money je pre FIX TRVALO blokované (bar_mm honest-null —
+// dĺžka tyče nepotvrdená dodávateľom). Checkbox „⏳ Čaká" je na /fix/cad prítomný a
+// prežije do náhľadu (hidden caka=1 vo formulári), ale plný „prežije → odoslanie →
+// história" tok sa tu NEDÁ overiť — odoslat sa nikdy nedostane za blok, teda ani do
+// NA ODPIS/Fix, ani do histórie. Ten istý zdieľaný cad-odpis.ts tok je plne overený
+// vyššie na /pergola (kde bar_mm/CODE_MAP funguje) — táto limitácia je zámerná, nie
+// medzera v teste.
+test('fix/cad: „⏳ Čaká" checkbox prežije do náhľadu, odoslanie je blokované bar_mm honest-null (#500)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -43,16 +51,14 @@ test('fix/cad: „⏳ Čaká" prežije kontrolu → odoslanie a zapíše sa do h
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-FIX`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
 	await page.getByLabel('Zákazník *').fill('E2E Fix Caka');
-	await page.getByLabel('Materiál (CAD nárez) *').fill('18016 PROFIL 110x43 V2\t2\t3000');
+	await page.getByLabel('Materiál (CAD nárez) *').fill('16101 RAMOVY PROFIL\t2\t2000');
 	await page.getByLabel(/Čaká na materiál/).check();
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 	await page.getByTestId('odoslat').click();
-	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	await goto(page, '/odpisy');
-	const row = page.locator('tr', { hasText: `${RUN}-FIX` });
-	await expect(row).toContainText('Fix');
-	await expect(row).toContainText('⏳');
+	await expect(page.getByTestId('nahlad-error')).toContainText('Odpis pozastavený');
+	await expect(page.getByTestId('nahlad-error')).toContainText('bar_mm');
+	await expect(page.getByTestId('vysledok')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });
