@@ -3,6 +3,7 @@ paths:
   - "src/lib/fix.ts"
   - "src/lib/server/fix-vstup.ts"
   - "src/lib/server/fix-cad.ts"
+  - "src/lib/server/fix-catalog.ts"
   - "src/routes/fix/**"
 ---
 
@@ -88,11 +89,18 @@ Od #380 má FIX modul prepínač `FixModeNav.svelte` (vzor `PergolaModeNav`, ale
   `cadSpocitat`/`cadUpravit`/`cadOdoslat`. Detaily zdieľaného toku → `.claude/rules/odpis-detail.md`.
   Nenamapovaný CAD kód = TVRDÁ chyba (nikdy tichý odpis).
 
-**OTVORENÁ OTÁZKA (gated na vzorku):** FIX formulár používa Cortizo COR-60 CE profily BEZ Money
-kariet (overené 2026-07-27). Či reálny FIX CAD zo Solid Edge používa tie isté kódy alebo zdieľa
-pergola artikle, sa BEZ reálnej FIX CAD vzorky od Dominika nedá potvrdiť. Mechanizmus je honest
-(nenamapovaný kód → chyba). Doplnenie FIX-špecifického katalógu/CODE_MAP = follow-up so vzorkou;
-NEHÁDAŤ kódy (Money-safety).
+**VYRIEŠENÉ (#500, 2026-09-10):** FIX CAD zo Solid Edge používa kódy 16xxx (V2: 16101-16104,
+V1: 16001-16006) — priamo Money kódy, BEZ mapovania cez CODE_MAP (na rozdiel od pergoly
+18xxx→PRP). `src/lib/server/fix-catalog.ts` drží katalóg 10 FIX profilov (overených v Money
+SQL). `cad-odpis.ts` je module-aware: `opts.modul='fix'` → FIX transform path (priamy kód
+match). 26xxx príslušenstvo (krytky, rohovníky) VYNECHANÉ — kusové komponenty, nie rezané
+profily (doplniť keď sa objavia v reálnom CAD).
+
+**OTVORENÁ OTÁZKA — bar_mm (dĺžka tyče):** Money nemá bar_mm pre FIX profily (`Delka_ID`
+nerozriešiteľný). Bez bar_mm engine počíta LEN celkovú dĺžku rezov (nie počet tyčí) a odpis
+do Money je BLOKOVANÝ (`fixBarMmBlocked`). Odblokuje sa doplnením bar_mm do `FIX_CATALOG`
+(zdroj: dodávateľ FINAL SPOLKA AKCYJNA, katalóg ZC-*V2). MJ v Money nepotvrdená (Odoo ukazuje
+"Units", ale reálna Money MJ pre 16xxx nezistená).
 
 ## Výrobné odpočty zo zamerania (#469) — `prepocitajFixNaVyrobu`
 

@@ -7,6 +7,7 @@
 import { logger } from '$lib/server/log';
 import {
 	transform,
+	parseCad,
 	applyCombos,
 	buildCopyBack,
 	parseChoice,
@@ -14,6 +15,7 @@ import {
 	validatePergola,
 	CATALOG
 } from '$lib/server/pergola';
+import { transformFix, validateFix } from '$lib/server/fix-catalog';
 import {
 	writeOdpis,
 	applyEdits,
@@ -106,12 +108,65 @@ function editsFrom(form: FormData): Map<string, string> {
 }
 
 /**
- * Náhľad Money rozpisu z CAD nárezu — reuse pergola enginu (`transform`/`validatePergola`/
- * `applyCombos`/`buildCopyBack`). `validatePergola` je generická (žiadny „pergola" v
- * user-facing hláškach) a surfacuje nerozpoznané riadky / nenamapované CAD kódy ako TVRDÚ
- * chybu → do Money sa nikdy nedostane tichý výpadok materiálu.
+ * FIX-špecifický náhľad (#500): CAD kódy sú PRIAMO Money kódy (16xxx/26xxx),
+ * bez CODE_MAP/CATALOG mapovania. Qty = celková dĺžka rezov v metroch (honest-null
+ * bez bar_mm). Žiadne kombinácie tyčí (FIX nemá multi-variant profily).
  */
-export function cadOdpisView(vstup: CadVstup, form?: FormData) {
+function fixCadOdpisView(vstup: CadVstup, form?: FormData) {
+	const { rows, skipped } = parseCad(vstup.cad);
+	const fixResult = transformFix(rows);
+	const error = validateFix(vstup.zak, vstup.op, vstup.zakaznik, skipped, fixResult);
+	if (error)
+		return { error, editError: null as string | null, r: null, view: null, fixBarMmBlocked: false };
+	const spocitane = fixResult.items.map((i) => ({
+		kod: i.kod,
+		nazov: i.nazov,
+		qty: i.qty,
+		mj: i.mj
+	}));
+	// ručné úpravy — rovnaký mechanizmus ako pergola
+	const edits = form ? editsFrom(form) : new Map<string, string>();
+	const { finalOut, zmenene, error: editError } = applyEdits(spocitane, edits);
+	const polozky = editError ? spocitane : finalOut;
+	const editVals = Object.fromEntries(edits);
+	return {
+		error: null as string | null,
+		editError,
+		r: null,
+		// honest-null: bar_mm neznáme → náhľad funguje (operátor vidí kódy + metrá),
+		// ale odoslat do Money je BLOKOVANÉ (MJ nepotvrdená, odpis by mohol naviezť
+		// zlé množstvo). Odblokuje sa doplnením bar_mm do FIX_CATALOG.
+		fixBarMmBlocked: !fixResult.barMmConfirmed,
+		fixMissingBarMm: fixResult.missingBarMm,
+		view: {
+			polozky,
+			zmenene,
+			editVals,
+			nonzero: polozky.filter((o) => o.qty > 0),
+			nulove: polozky.filter((o) => o.qty <= 0),
+			// FIX nemá bin-packing tyčí (bar_mm neznáme) → žiadne copyBack/kombinácie
+			copyLines: [] as { code: string; name: string; barsStr: string }[],
+			totalBars: 0,
+			cadLastCol: '',
+			longNotes: [] as string[],
+			kombinacie: [] as {
+				idx: number;
+				fieldLabel: string;
+				options: string[];
+				selected: string | undefined;
+			}[]
+		}
+	};
+}
+
+/**
+ * Náhľad Money rozpisu z CAD nárezu. Pre pergolu (default) reusuje pergola engine
+ * (`transform`/`validatePergola`/`applyCombos`/`buildCopyBack`); pre FIX (#500)
+ * používa priame mapovanie CAD kód = Money kód (`fixCadOdpisView`).
+ * `opts.modul` rozhoduje cestu — pergola je default (spätná kompatibilita).
+ */
+export function cadOdpisView(vstup: CadVstup, form?: FormData, opts?: CadJobOpts) {
+	if (opts?.modul === 'fix') return fixCadOdpisView(vstup, form);
 	const r = transform(vstup.cad);
 	const error = validatePergola(vstup.zak, vstup.op, vstup.zakaznik, vstup.cad, r);
 	if (error) return { error, editError: null as string | null, r: null, view: null };
@@ -226,10 +281,13 @@ export function buildCadJob(
 
 // --- zdieľané akčné telá (spocitat / upravit / odoslat) — route glue žije RAZ (#393) ---
 
-export function cadSpocitat(form: FormData, user: SessionUser | null) {
+export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: CadJobOpts) {
 	const vstup = parseCadVstup(form);
-	const { error, view: v } = cadOdpisView(vstup, form);
+	const viewResult = cadOdpisView(vstup, form, opts);
+	const { error, view: v } = viewResult;
 	if (error) return { step: 'form' as const, error, vstup };
+	// #500: FIX bar_mm neznáme → náhľad funguje, ale odoslat bude blokované
+	const fixBarMmBlocked = 'fixBarMmBlocked' in viewResult && viewResult.fixBarMmBlocked;
 	// „Spočítať" beží z formulára, kde polia qty_ ešte nie sú — editError tu nevzniká
 	return {
 		step: 'nahlad' as const,
@@ -239,6 +297,10 @@ export function cadSpocitat(form: FormData, user: SessionUser | null) {
 		// #448/#451 predodpisové skladové varovanie + odobrať (LEN interní; b2b → [])
 		skladVarovania: v ? cadSklad(user, v.nonzero) : [],
 		snapshotDatum: getSnapshotMeta().generatedAt,
+		// #500: varovanie pre operátora, že odpis bude blokovaný (bar_mm neznáme)
+		fixBarMmWarning: fixBarMmBlocked
+			? 'Odpis do Money nie je zatiaľ možný — dĺžka tyče pre FIX profily nebola potvrdená.'
+			: null,
 		error: null as string | null
 	};
 }
@@ -251,8 +313,27 @@ export function cadUpravit(form: FormData) {
 
 export async function cadOdoslat(form: FormData, user: SessionUser | null, opts: CadActionOpts) {
 	const vstup = parseCadVstup(form);
-	const { error, editError, view: v } = cadOdpisView(vstup, form);
+	const viewResult = cadOdpisView(vstup, form, opts);
+	const { error, editError, view: v } = viewResult;
 	if (error) return { step: 'form' as const, error, vstup };
+	// #500 honest-null: FIX bar_mm neznáme → odoslat do Money je BLOKOVANÉ (MJ nepotvrdená,
+	// import by mohol naviezť zlé množstvo). Náhľad funguje (operátor vidí kódy + metrá).
+	if ('fixBarMmBlocked' in viewResult && viewResult.fixBarMmBlocked) {
+		const missing =
+			'fixMissingBarMm' in viewResult ? (viewResult.fixMissingBarMm as string[]).join(', ') : '';
+		return {
+			step: 'nahlad' as const,
+			vstup,
+			v,
+			ceny: v ? cadCeny(user, v.nonzero) : undefined,
+			skladVarovania: v ? cadSklad(user, v.nonzero) : [],
+			snapshotDatum: getSnapshotMeta().generatedAt,
+			error:
+				`Odpis pozastavený — dĺžka tyče (bar_mm) pre FIX kódy ${missing} nie je ` +
+				'potvrdená, merná jednotka v Money neznáma. Odpis bude možný po doplnení ' +
+				'dĺžok tyčí od dodávateľa (FINAL SPOLKA AKCYJNA).'
+		};
+	}
 	// cenový blok (interní) — lazy (thunk): úspešné odoslanie končí v „hotovo" bez cenového
 	// bloku, tak ho nepočítame zbytočne — len keď sa vraciame do „nahlad" s chybou. Zavolá sa
 	// nanajvýš raz (vetvy sú return).
