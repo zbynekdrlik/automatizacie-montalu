@@ -41,7 +41,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v38 → v39: per-profil odpad z nárezov (#417 fáza 2)', () => {
 	it('user_version === 39 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(43);
+		expect(db.pragma('user_version', { simple: true })).toBe(44);
 	});
 
 	it('vznikla tabuľka odpis_odpad s očakávanými stĺpcami', () => {

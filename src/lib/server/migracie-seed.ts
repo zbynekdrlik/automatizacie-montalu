@@ -730,3 +730,29 @@ export function migrateGlassCatalogExpansion(
 		bump(43);
 	})();
 }
+
+// v43 → v44: Plán rezov — uloženie vygenerovaného plánu (#505). Dominik chce
+// uložiť výsledok optimalizátora (vstupná tabuľka + nastavenia) pod názvom,
+// znovu otvoriť a vytlačiť. Ukladáme VSTUPY (cad_text + dlzka_tyce +
+// rezna_medzera) — pri otvorení rekomputujeme cez spocitajPlanRezov(). ZAK je
+// len textový label (voliteľné, brány sú externý nákup), nie FK. Money-NEUTRÁLNE.
+export function migratePlanRezovUlozene(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 44) return;
+	db.transaction(() => {
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS plan_rezov_ulozene (
+				id INTEGER PRIMARY KEY,
+				nazov TEXT NOT NULL,
+				zak TEXT NOT NULL DEFAULT '',
+				cad_text TEXT NOT NULL,
+				dlzka_tyce INTEGER NOT NULL DEFAULT 6000,
+				rezna_medzera REAL NOT NULL DEFAULT 4,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				created_by TEXT NOT NULL DEFAULT ''
+			);
+			CREATE INDEX IF NOT EXISTS idx_plan_rezov_ulozene_nazov
+				ON plan_rezov_ulozene(nazov);
+		`);
+		bump(44);
+	})();
+}

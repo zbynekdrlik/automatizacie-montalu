@@ -60,7 +60,7 @@ const allGlass = () =>
 
 describe('migrácia v42 → v43: rozšírenie katalógu skiel (#235)', () => {
 	it('user_version === 43', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(43);
+		expect(db.pragma('user_version', { simple: true })).toBe(44);
 	});
 
 	it('Robust: 16 skiel (2 pôvodné + 14 nových)', () => {
