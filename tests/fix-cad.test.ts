@@ -157,48 +157,18 @@ describe('fix-cad modul — buildFixCadJob', () => {
 	});
 });
 
-describe('fix-cad route — odoslat (TEST režim, do ostrého Money NIČ)', () => {
-	it('zapíše FIX odpis do TEST priečinka; row.modul=fix', async () => {
+describe('fix-cad route — odoslat BLOKOVANÉ (bar_mm neznáme — honest-null)', () => {
+	// #500 review HIGH-1: bar_mm neznáme → odoslat do Money BLOKOVANÉ. Náhľad funguje
+	// (operátor vidí kódy + metrá), ale zápis je pozastavený kým sa MJ nepotvrdí.
+	it('odoslat s neznámym bar_mm → step=nahlad s blok hláškou (NIE hotovo)', async () => {
 		const r = (await route.actions.odoslat(
 			ev({ zak: 'FIX-1', op: 'OP1', zakaznik: 'Zákazník A', cad: FIX_CAD })
-		)) as { step: string; outcome: { live: boolean; filename: string } };
-		expect(r.step).toBe('hotovo');
-		expect(r.outcome.live).toBe(false);
-		expect(r.outcome.filename).toMatch(/\.xlsx$/);
-		const files = fs.readdirSync(process.env.MONEY_TEST_DIR!);
-		expect(files).toContain(r.outcome.filename);
-		const row = listOdpisy(200).find((o) => o.zak === 'FIX-1' && o.op === 'OP1')!;
-		expect(row.modul).toBe('fix');
-	});
-
-	it('druhé odoslanie tej istej FIX ZAK+OP = duplikát (dedup modul=fix)', async () => {
-		await route.actions.odoslat(ev({ zak: 'FIX-DUP', op: 'OP2', zakaznik: 'Z', cad: FIX_CAD }));
-		const r2 = (await route.actions.odoslat(
-			ev({ zak: 'FIX-DUP', op: 'OP2', zakaznik: 'Z', cad: FIX_CAD })
-		)) as { step: string };
-		expect(r2.step).toBe('duplikat');
-	});
-
-	// Od issue 500: FIX má VLASTNÝ katalóg (16xxx) a pergola má SVOJ (18xxx → PRP). Identický
-	// obsah cez OBE routy (rovnaký CAD text) nie je možný — FIX nerozpozná pergola kódy a naopak.
-	// Cross-modul guard je stále aktívny vo writeOdpis, ale v praxi sa pri FIX/pergola (rôzne
-	// kódové rodiny) neuplatní. Testujeme KOEXISTENCIU: FIX odpis + pergola odpis na tej istej
-	// ZAK+OP s RÔZNYMI nárezmi (rôzne kódy → rôzny content_hash) koexistujú.
-	it('FIX + pergola odpis na tej istej ZAK+OP KOEXISTUJE (rôzne kódové rodiny)', async () => {
-		const pr = (await pergolaRoute.actions.odoslat(
-			ev({ zak: 'COEX-2', op: 'OP4', zakaznik: 'Z', cad: PERGOLA_CAD })
-		)) as { step: string };
-		expect(pr.step).toBe('hotovo');
-		const fr = (await route.actions.odoslat(
-			ev({ zak: 'COEX-2', op: 'OP4', zakaznik: 'Z', cad: FIX_CAD })
-		)) as { step: string };
-		expect(fr.step).toBe('hotovo');
-		const rows = listOdpisy(500).filter((o) => o.zak === 'COEX-2' && o.op === 'OP4');
-		expect(rows.map((o) => o.modul).sort()).toEqual(['fix', 'pergola']);
-		// dva RÔZNE súbory (rôzne kódy → rôzny hash → žiadny prepis)
-		expect(
-			fs.readdirSync(process.env.MONEY_TEST_DIR!).filter((f) => f.startsWith('COEX-2')).length
-		).toBe(2);
+		)) as { step: string; error: string | null };
+		expect(r.step).toBe('nahlad');
+		expect(r.error).toMatch(/Odpis pozastavený/);
+		expect(r.error).toMatch(/bar_mm/);
+		// do Money sa nič NEzapísalo
+		expect(listOdpisy(200).some((o) => o.zak === 'FIX-1' && o.op === 'OP1')).toBe(false);
 	});
 
 	it('chybný vstup (nenamapovaný kód) → step=form, do Money sa nič nezapíše', async () => {
@@ -207,6 +177,17 @@ describe('fix-cad route — odoslat (TEST režim, do ostrého Money NIČ)', () =
 		)) as { step: string };
 		expect(r.step).toBe('form');
 		expect(listOdpisy(500).some((o) => o.zak === 'FIX-BAD')).toBe(false);
+	});
+});
+
+describe('fix-cad route — spocitat FUNGUJE (náhľad aj pri neznámom bar_mm)', () => {
+	it('spocitat s FIX kódmi → step=nahlad + fixBarMmWarning', async () => {
+		const r = (await route.actions.spocitat(
+			ev({ zak: 'FIX-S1', op: 'OP1', zakaznik: 'Z', cad: FIX_CAD })
+		)) as { step: string; fixBarMmWarning: string | null; v: { nonzero: { kod: string }[] } };
+		expect(r.step).toBe('nahlad');
+		expect(r.fixBarMmWarning).toMatch(/nie je zatiaľ možný/);
+		expect(r.v.nonzero.map((p) => p.kod)).toContain('16101');
 	});
 });
 

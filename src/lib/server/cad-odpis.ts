@@ -116,7 +116,8 @@ function fixCadOdpisView(vstup: CadVstup, form?: FormData) {
 	const { rows, skipped } = parseCad(vstup.cad);
 	const fixResult = transformFix(rows);
 	const error = validateFix(vstup.zak, vstup.op, vstup.zakaznik, skipped, fixResult);
-	if (error) return { error, editError: null as string | null, r: null, view: null };
+	if (error)
+		return { error, editError: null as string | null, r: null, view: null, fixBarMmBlocked: false };
 	const spocitane = fixResult.items.map((i) => ({
 		kod: i.kod,
 		nazov: i.nazov,
@@ -132,6 +133,11 @@ function fixCadOdpisView(vstup: CadVstup, form?: FormData) {
 		error: null as string | null,
 		editError,
 		r: null,
+		// honest-null: bar_mm neznáme → náhľad funguje (operátor vidí kódy + metrá),
+		// ale odoslat do Money je BLOKOVANÉ (MJ nepotvrdená, odpis by mohol naviezť
+		// zlé množstvo). Odblokuje sa doplnením bar_mm do FIX_CATALOG.
+		fixBarMmBlocked: !fixResult.barMmConfirmed,
+		fixMissingBarMm: fixResult.missingBarMm,
 		view: {
 			polozky,
 			zmenene,
@@ -277,8 +283,11 @@ export function buildCadJob(
 
 export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: CadJobOpts) {
 	const vstup = parseCadVstup(form);
-	const { error, view: v } = cadOdpisView(vstup, form, opts);
+	const viewResult = cadOdpisView(vstup, form, opts);
+	const { error, view: v } = viewResult;
 	if (error) return { step: 'form' as const, error, vstup };
+	// #500: FIX bar_mm neznáme → náhľad funguje, ale odoslat bude blokované
+	const fixBarMmBlocked = 'fixBarMmBlocked' in viewResult && viewResult.fixBarMmBlocked;
 	// „Spočítať" beží z formulára, kde polia qty_ ešte nie sú — editError tu nevzniká
 	return {
 		step: 'nahlad' as const,
@@ -288,6 +297,10 @@ export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: Cad
 		// #448/#451 predodpisové skladové varovanie + odobrať (LEN interní; b2b → [])
 		skladVarovania: v ? cadSklad(user, v.nonzero) : [],
 		snapshotDatum: getSnapshotMeta().generatedAt,
+		// #500: varovanie pre operátora, že odpis bude blokovaný (bar_mm neznáme)
+		fixBarMmWarning: fixBarMmBlocked
+			? 'Odpis do Money nie je zatiaľ možný — dĺžka tyče pre FIX profily nebola potvrdená.'
+			: null,
 		error: null as string | null
 	};
 }
@@ -300,8 +313,27 @@ export function cadUpravit(form: FormData) {
 
 export async function cadOdoslat(form: FormData, user: SessionUser | null, opts: CadActionOpts) {
 	const vstup = parseCadVstup(form);
-	const { error, editError, view: v } = cadOdpisView(vstup, form, opts);
+	const viewResult = cadOdpisView(vstup, form, opts);
+	const { error, editError, view: v } = viewResult;
 	if (error) return { step: 'form' as const, error, vstup };
+	// #500 honest-null: FIX bar_mm neznáme → odoslat do Money je BLOKOVANÉ (MJ nepotvrdená,
+	// import by mohol naviezť zlé množstvo). Náhľad funguje (operátor vidí kódy + metrá).
+	if ('fixBarMmBlocked' in viewResult && viewResult.fixBarMmBlocked) {
+		const missing =
+			'fixMissingBarMm' in viewResult ? (viewResult.fixMissingBarMm as string[]).join(', ') : '';
+		return {
+			step: 'nahlad' as const,
+			vstup,
+			v,
+			ceny: v ? cadCeny(user, v.nonzero) : undefined,
+			skladVarovania: v ? cadSklad(user, v.nonzero) : [],
+			snapshotDatum: getSnapshotMeta().generatedAt,
+			error:
+				`Odpis pozastavený — dĺžka tyče (bar_mm) pre FIX kódy ${missing} nie je ` +
+				'potvrdená, merná jednotka v Money neznáma. Odpis bude možný po doplnení ' +
+				'dĺžok tyčí od dodávateľa (FINAL SPOLKA AKCYJNA).'
+		};
+	}
 	// cenový blok (interní) — lazy (thunk): úspešné odoslanie končí v „hotovo" bez cenového
 	// bloku, tak ho nepočítame zbytočne — len keď sa vraciame do „nahlad" s chybou. Zavolá sa
 	// nanajvýš raz (vetvy sú return).

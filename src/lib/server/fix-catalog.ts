@@ -38,14 +38,12 @@ export const FIX_CATALOG: FixCatalogItem[] = [
 	{ kod: '16101', name: 'RAMOVY PROFIL', bar_mm: null, katalog: 'ZC-0001V2' },
 	{ kod: '16102', name: 'PRIECKOVY PROFIL', bar_mm: null, katalog: 'ZC-0002V2' },
 	{ kod: '16103', name: 'ROZNY STLP', bar_mm: null, katalog: 'ZC-0003V2' },
-	{ kod: '16104', name: 'ZASKLIEVACI PROFIL 36mm', bar_mm: null, katalog: 'ZC-0004V2' },
-	// Príslušenstvo (26xxx)
-	{ kod: '26001', name: 'SPOJKA PRIECKY CLIP', bar_mm: null, katalog: '' },
-	{ kod: '26002', name: 'REKTIFIKACNA NOZICKA M8x53', bar_mm: null, katalog: '' },
-	{ kod: '26003', name: 'ROHOVNIK ZABRADLIA', bar_mm: null, katalog: '' },
-	{ kod: '26004', name: 'ROHOVNIK STABILIZACNEHO PROFILU', bar_mm: null, katalog: '' },
-	{ kod: '26101', name: 'ROHOVNIK ZABRADLIA 2020', bar_mm: null, katalog: '' },
-	{ kod: '26102', name: 'KRYTKA RAMOVEHO PROFILU 2020', bar_mm: null, katalog: '' }
+	{ kod: '16104', name: 'ZASKLIEVACI PROFIL 36mm', bar_mm: null, katalog: 'ZC-0004V2' }
+	// 26xxx príslušenstvo (rohovníky, krytky, nožičky) VYNECHANÉ — sú to kusové
+	// komponenty (mj='ks'), nie rezané profily. CAD nárez ich buď neobsahuje, alebo
+	// ich výroba odpíše inak. Ak sa 26xxx objaví v reálnom CAD → doplniť sem s mj='ks'
+	// a rozšíriť transformFix o kusovú vetvu. Overené v Money (26001-26004, 26101-26102
+	// existujú), ale bez vzorky od výroby sa nedá potvrdiť, ako sa odpisujú.
 ];
 
 const fixByKod = new Map(FIX_CATALOG.map((c) => [c.kod, c]));
@@ -62,6 +60,11 @@ export interface FixTransformResult {
 	unresolved: { cad: string; name: string }[];
 	/** Trace pre zobrazenie (kód → zoznam rezov). */
 	trace: { code: string; name: string; cuts: number[]; totalMm: number; totalM: number }[];
+	/** `true` keď VŠETKY použité kódy majú bar_mm — len vtedy je bin-packing a MJ
+	 *  potvrdená a odpis môže ísť do Money. `false` = honest-null, odpis BLOKOVANÝ. */
+	barMmConfirmed: boolean;
+	/** Kódy, pre ktoré bar_mm chýba (pre chybovú hlášku). */
+	missingBarMm: string[];
 }
 
 /**
@@ -109,7 +112,13 @@ export function transformFix(rows: CadRow[]): FixTransformResult {
 		});
 	}
 
-	return { items, unresolved, trace };
+	const missingBarMm = [...byCode.keys()].filter((code) => {
+		const cat = fixLookup(code);
+		return cat && cat.bar_mm === null;
+	});
+	const barMmConfirmed = missingBarMm.length === 0 && items.length > 0;
+
+	return { items, unresolved, trace, barMmConfirmed, missingBarMm };
 }
 
 /**
