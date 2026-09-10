@@ -348,7 +348,7 @@ export function coverCombos(cut: number, availIn: number[]): ComboOption[] {
 	return out;
 }
 
-function ffd(pieces: number[], bar: number): number {
+export function ffd(pieces: number[], bar: number): number {
 	return ffdBins(pieces, bar).length;
 }
 

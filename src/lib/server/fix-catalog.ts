@@ -15,7 +15,7 @@
 // princíp ako pergola engine). Round 1 chybne liečil 16xxx ako priame Money kódy
 // (s MJ=Units z Odoo, bar_mm neznáme); round 2 opravuje na ZASP karty.
 
-import type { CadRow } from '$lib/server/pergola';
+import { ffd, type CadRow } from '$lib/server/pergola';
 
 export interface FixCatalogItem {
 	/** CAD kód zo Solid Edge (16xxx) — lookup kľúč v transformFix. */
@@ -62,27 +62,6 @@ const fixByCadKod = new Map(FIX_CATALOG.map((c) => [c.cadKod, c]));
 /** Lookup CAD kód → FIX katalógový riadok, alebo `undefined` (neznámy kód). */
 export function fixLookup(cadKod: string): FixCatalogItem | undefined {
 	return fixByCadKod.get(cadKod);
-}
-
-/**
- * First Fit Decreasing bin-packing: zabaliť kusy do tyčí dĺžky `bar`.
- * Vracia počet tyčí. Rovnaký algoritmus ako pergola `ffd` (pergola.ts:351),
- * len nie je exportovaný → lokálna kópia pre FIX.
- */
-function ffd(pieces: number[], bar: number): number {
-	const used: number[] = [];
-	for (const p of [...pieces].sort((a, b) => b - a)) {
-		let placed = false;
-		for (let i = 0; i < used.length; i++) {
-			if (bar - used[i]! >= p) {
-				used[i] = used[i]! + p;
-				placed = true;
-				break;
-			}
-		}
-		if (!placed) used.push(p);
-	}
-	return used.length;
 }
 
 export interface FixTransformResult {
@@ -144,7 +123,7 @@ export function transformFix(rows: CadRow[]): FixTransformResult {
 		const bars = ffd(fitsInBar, cat.bar_mm) + oversizeBars;
 
 		// Qty = počet tyčí × dĺžka tyče v metroch (celkový materiál vrátane odpadu)
-		const qty = Math.round((bars * cat.bar_mm) / 10) / 100; // mm → m, rounded to 3dp
+		const qty = Math.round((bars * cat.bar_mm) / 10) / 100; // mm → m, rounded to 2dp
 
 		items.push({ kod: cat.kod, nazov: cat.name, qty, mj: 'm' });
 

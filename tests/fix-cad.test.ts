@@ -100,6 +100,14 @@ describe('fix-catalog — transformFix (round 2: CAD→ZASP cez Dominikov kód)'
 		expect(r.items[0]!.qty).toBe(15); // 2 bars × 7.5m
 	});
 
+	it('rez dlhší ako tyč (oversize) → ceil(9000/7500) = 2 tyče', () => {
+		const rows = [{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 9000 }];
+		const r = fixCatalog.transformFix(rows);
+		expect(r.items).toHaveLength(1);
+		// 9000mm > 7500mm → ceil(9000/7500) = 2 bars (spojenie tyčí)
+		expect(r.items[0]!.qty).toBe(15); // 2 × 7.5m
+	});
+
 	it('rezy vmestiteľné do jednej tyče → 1 × 7.5m', () => {
 		const rows = [
 			{ code: '16101', name: 'RAMOVY PROFIL', qty: 1, cut_mm: 1000 },
