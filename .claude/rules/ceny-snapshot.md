@@ -20,8 +20,8 @@ paths:
 
 Producent `scripts/ceny-snapshot.py` beží **mimo repa na dev2**
 (`/home/newlevel/montalu-ceny/run-snapshot.sh`, cron 05:30) → číta Money read-only cez
-tunel → JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura, predajVo,
-predajPcmo, mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
+tunel → JSON `{generatedAt, rows:[{kod, nakupCennik, nakupPoslednaFaktura,
+nakupSkladovaKarta, predajVo, predajPcmo, mena, sklad, rozvin}]}` → rsync na VPS `/opt/automatizacie-montalu/ceny/ceny.json`. Appka ho
 **lazy** naimportuje (`ceny.ts` `maybeImportSnapshot`, gejtuje na mtime) do
 `material_prices` (kľúč = Money `kod`). Chýbajúca/nulová cena = **`null`** („neznáma"),
 NIKDY 0 — Money má reálne kódy kde `Cena=0` = „nikdy zadané".
@@ -35,6 +35,16 @@ takže je to spoľahlivý signál lakovaného profilu. Konzument = `computeLakov
 `rozvin × dĺžka × 0,150 kg/m²`; €-náklad honest-null, čaká na RAL sadzby). Producent na dev2
 potrebuje `git pull` + jeden beh, kým sa rozvin objaví — dovtedy je pri profiloch `null`
 (sekcia ukáže „neúplné").
+
+**`nakupSkladovaKarta` (#506, migrácia v45, `material_prices.nakup_skladova_karta REAL`):**
+`Artikly_Artikl.PosledniCena` — posledná nákupná cena priamo na skladovej karte Money.
+Pre BPK kusové komponenty JEDINÝ nákupný zdroj (NC cenník = 0/173 — Dominik ceny ručne
+nahodil na kartu, 63/173 s cenou > 0). Money túto cenu používa na ocenenie výdajky
+(odpisu). Appka ju používa ako **FALLBACK**: `enrichPolozky` → `nakupCennik =
+price.nakupCennik ?? price.nakupSkladovaKarta ?? null`. NC ostáva primárny pre profily
+(ZASP/ZASK/PRP). Producent na dev2 potrebuje `git pull` + jeden beh, kým sa
+`nakupSkladovaKarta` objaví — dovtedy je pri BPK kódoch `null` (stĺpec „Nákup cenník"
+ukáže „cena neznáma", rovnako ako pred #506).
 
 ## Money cenníky — kde je ktorá cena (overené read-only 2026-08-19)
 
