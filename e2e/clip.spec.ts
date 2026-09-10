@@ -141,6 +141,55 @@ test('#462 clip: „Späť a upraviť zadanie" zachová celé zadanie', async ({
 	expect(errs).toEqual([]);
 });
 
+// #502: hotovo step shows production output (nárez table + glass dimensions)
+test('#502 clip hotovo: výrobný podklad s nárezom a sklami', async ({ page }) => {
+	const errs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-CLIP-VP');
+	await page.getByTestId('typ').selectOption('izo');
+	await page.getByTestId('variant').selectOption('2');
+	await page.locator('#sirka').fill('3000');
+	await page.locator('#vyska').fill('1000');
+	await page.locator('#ral').fill('RAL 7016');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await expect(page.getByTestId('odoslat')).toBeVisible();
+	await page.getByTestId('odoslat').click();
+
+	// hotovo step → výrobný podklad section is visible
+	await expect(page.getByTestId('vysledok')).toBeVisible();
+	await expect(page.getByTestId('vyrobny-podklad')).toBeVisible();
+
+	// spec badge: CLIP · IZO · B1 · dimensions
+	const podklad = page.getByTestId('vyrobny-podklad');
+	await expect(podklad.locator('.badge').first()).toContainText('CLIP');
+	await expect(podklad.locator('.badge').first()).toContainText('B1');
+	await expect(podklad.locator('.badge').first()).toContainText('3000×1000');
+	// RAL badge
+	await expect(podklad.locator('.badge', { hasText: 'RAL: RAL 7016' })).toBeVisible();
+
+	// glass dimensions (izo B1 3000×1000: šírka výplne = (3000-(19+29*2))/2-8 = 1454, výška = 944)
+	await expect(podklad).toContainText('1454');
+	await expect(podklad).toContainText('944');
+
+	// narez table with profile rows
+	const narezTable = page.getByTestId('hotovo-narez-tabulka');
+	await expect(narezTable).toBeVisible();
+	// 5 profile rows + 4 drobné = 9 rows
+	await expect(narezTable.locator('tbody tr')).toHaveCount(9);
+	// contains profile names
+	await expect(narezTable).toContainText('hlavný profil');
+	await expect(narezTable).toContainText('zasklievací profil');
+	// contains drobné with "neodpisuje sa" hint
+	await expect(narezTable).toContainText('vnútorné tesnenie');
+	await expect(narezTable).toContainText('neodpisuje sa');
+
+	// Money rozpis section still present
+	await expect(page.locator('.sec', { hasText: 'Money rozpis' })).toBeVisible();
+
+	expect(errs).toEqual([]);
+});
+
 // #464: clip RAL metadata field — fill → assert rendered in badge
 test('#464: clip RAL metadata zobrazí sa v badge', async ({ page }) => {
 	const errs = collectConsole(page);
