@@ -58,7 +58,7 @@ const { db, glassTypesForSystem } = await import('../src/lib/server/db');
 
 describe('migrácia v43 → v44: vyčistenie orphaned Štandard+ skiel (#504)', () => {
 	it('user_version === 44', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(44);
+		expect(db.pragma('user_version', { simple: true })).toBe(45);
 	});
 
 	it('Štandard+: NEMÁ "Float sklo 10 mm" (orphaned v9 seed)', () => {

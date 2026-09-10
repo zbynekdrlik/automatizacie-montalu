@@ -31,7 +31,8 @@ import {
 	migrateOdooLeadColumns,
 	migrateMaterialPredajPcmo,
 	migrateGlassCatalogExpansion,
-	migrateCleanupStandardPlusOrphans
+	migrateCleanupStandardPlusOrphans,
+	migrateMaterialNakupSkladovaKarta
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -985,6 +986,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateMaterialPredajPcmo(db, bump); // v41→v42 (#364)
 	migrateGlassCatalogExpansion(db, bump); // v42→v43 (#235)
 	migrateCleanupStandardPlusOrphans(db, bump); // v43→v44 (#504)
+	migrateMaterialNakupSkladovaKarta(db, bump); // v44→v45 (#506)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

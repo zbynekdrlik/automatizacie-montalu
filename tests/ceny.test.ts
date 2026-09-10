@@ -453,3 +453,130 @@ describe('#364 — predajPcmo (PCMO predajná cena) v snapshote a enrichPolozky'
 		expect(r.radky[0]!.predajPcmo).toBeNull();
 	});
 });
+
+// --- nakupSkladovaKarta fallback (#506) ---
+
+describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
+	it('nakupCennik null + nakupSkladovaKarta present → nakupCennik uses fallback', async () => {
+		await tick();
+		// BPK code: NC cennik null, skladová karta cena 4.00 (Dominikove ručné ceny)
+		writeSnapshot('2026-09-10T01:00:00Z', [
+			{
+				kod: 'BPK-SK-1',
+				nakupCennik: null,
+				nakupSkladovaKarta: 4.0,
+				predajPcmo: 12.0,
+				mena: 'EUR',
+				sklad: 50
+			}
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([
+			{ kod: 'BPK-SK-1', nazov: 'Testovací BPK komponent', qty: 8, mj: 'ks' }
+		]);
+		// nakupCennik v riadku = fallback zo skladovej karty (4.0)
+		expect(r.radky[0]!.nakupCennik).toBe(4);
+		// súčet nakupCennik: 4 * 8 = 32
+		expect(r.sucty.nakupCennik.suma).toBe(32);
+		expect(r.sucty.nakupCennik.kompletne).toBe(true);
+	});
+
+	it('nakupCennik present → ignore nakupSkladovaKarta (NC is primary)', async () => {
+		await tick();
+		// ZASP profile: has NC price AND skladová karta — NC wins
+		writeSnapshot('2026-09-10T02:00:00Z', [
+			{
+				kod: 'ZASP-SK-1',
+				nakupCennik: 5.5,
+				nakupSkladovaKarta: 7.9,
+				predajVo: 8.1,
+				mena: 'EUR',
+				sklad: 100
+			}
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'ZASP-SK-1', nazov: 'Testovací profil', qty: 10 }]);
+		// nakupCennik = NC value (5.5), NOT skladová karta (7.9)
+		expect(r.radky[0]!.nakupCennik).toBe(5.5);
+		expect(r.sucty.nakupCennik.suma).toBe(55);
+	});
+
+	it('nakupCennik null + nakupSkladovaKarta null → honest-null (kompletne=false)', async () => {
+		await tick();
+		writeSnapshot('2026-09-10T03:00:00Z', [
+			{
+				kod: 'BPK-SK-2',
+				nakupCennik: null,
+				nakupSkladovaKarta: null,
+				mena: 'EUR',
+				sklad: 10
+			}
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'BPK-SK-2', nazov: 'BPK bez ceny', qty: 3, mj: 'ks' }]);
+		expect(r.radky[0]!.nakupCennik).toBeNull();
+		expect(r.sucty.nakupCennik.kompletne).toBe(false);
+	});
+
+	it('nakupCennik 0 → null (honest-null), fallback to nakupSkladovaKarta', async () => {
+		await tick();
+		// NC = 0 (Money "nikdy zadané") → priceOrNull converts to null → fallback kicks in
+		writeSnapshot('2026-09-10T04:00:00Z', [
+			{
+				kod: 'BPK-SK-3',
+				nakupCennik: 0,
+				nakupSkladovaKarta: 2.5,
+				mena: 'EUR',
+				sklad: 100
+			}
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([{ kod: 'BPK-SK-3', nazov: 'BPK s NC=0', qty: 4, mj: 'ks' }]);
+		// NC=0 → null (priceOrNull), fallback to skladová karta 2.5
+		expect(r.radky[0]!.nakupCennik).toBe(2.5);
+		expect(r.sucty.nakupCennik.suma).toBe(10);
+		expect(r.sucty.nakupCennik.kompletne).toBe(true);
+	});
+
+	it('regression vector OP260407: BPP+BPK total matches Money (#506)', async () => {
+		await tick();
+		// Simplified OP260407 vector: 2 BPP profiles (with NC) + 2 BPK components (NC=0, SK>0)
+		writeSnapshot('2026-09-10T05:00:00Z', [
+			// BPP with NC cennik price
+			{ kod: 'BPP-506-1', nakupCennik: 6.64, nakupSkladovaKarta: 7.92, mena: 'EUR', sklad: 500 },
+			// BPK: NC=null, skladová karta=4.0 (Dominik entered manually)
+			{
+				kod: 'BPK-506-1',
+				nakupCennik: null,
+				nakupSkladovaKarta: 4.0,
+				predajPcmo: 12.0,
+				mena: 'EUR',
+				sklad: 50
+			},
+			// BPK: NC=0 → null, skladová karta=9.0
+			{
+				kod: 'BPK-506-2',
+				nakupCennik: 0,
+				nakupSkladovaKarta: 9.0,
+				predajPcmo: 32.0,
+				mena: 'EUR',
+				sklad: 20
+			}
+		]);
+		maybeImportSnapshot();
+		const r = enrichPolozky([
+			{ kod: 'BPP-506-1', nazov: 'Bazén profil', qty: 8.8 },
+			{ kod: 'BPK-506-1', nazov: 'Nožička', qty: 8, mj: 'ks' },
+			{ kod: 'BPK-506-2', nazov: 'Koliesko', qty: 8, mj: 'ks' }
+		]);
+		// BPP: NC=6.64 (primary, NOT skladová karta 7.92) * 8.8 = 58.43
+		expect(r.radky[0]!.nakupCennik).toBe(6.64);
+		// BPK-1: fallback 4.0 * 8 = 32
+		expect(r.radky[1]!.nakupCennik).toBe(4);
+		// BPK-2: NC=0→null, fallback 9.0 * 8 = 72
+		expect(r.radky[2]!.nakupCennik).toBe(9);
+		// Total: 58.43 + 32 + 72 = 162.43 (rounded to 2 decimals)
+		expect(r.sucty.nakupCennik.suma).toBeCloseTo(162.43, 2);
+		expect(r.sucty.nakupCennik.kompletne).toBe(true);
+	});
+});
