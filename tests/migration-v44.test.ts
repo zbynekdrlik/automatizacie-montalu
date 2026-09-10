@@ -57,8 +57,8 @@ process.env.DATABASE_PATH = dbPath;
 const { db, glassTypesForSystem } = await import('../src/lib/server/db');
 
 describe('migrácia v43 → v44: vyčistenie orphaned Štandard+ skiel (#504)', () => {
-	it('user_version === 45 (v44 + v45 plan_rezov)', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(45);
+	it('user_version === 46 (v44 + v45 plan_rezov + v46 nakup_skladova_karta)', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(46);
 	});
 
 	it('Štandard+: NEMÁ "Float sklo 10 mm" (orphaned v9 seed)', () => {

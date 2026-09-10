@@ -1,9 +1,9 @@
 // Reálny prod upgrade path v44 → v45: uložené plány rezov (#505, prečíslovaná z
 // pôvodnej v43→v44 kvôli kolízii s #504 v44 — pozri migracie-seed.ts).
 // Postav DB v stave v43 (base tabuľky + ≥1 riadok → seedData/seedUsers no-opnú),
-// import db.ts spustí SKUTOČNÝ migračný reťazec vrátane v43→v44 (#504) a v44→v45
-// (#505). Overuje: user_version=45, nová tabuľka + stĺpce + index, zapisovateľnosť,
-// žiadna strata iných dát.
+// import db.ts spustí SKUTOČNÝ migračný reťazec vrátane v43→v44 (#504), v44→v45
+// (#505) a v45→v46 (#506). Overuje: hlava po celom reťazci, nová tabuľka + stĺpce
+// + index, zapisovateľnosť, žiadna strata iných dát.
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
@@ -35,8 +35,8 @@ process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v44 → v45: plan_rezov_ulozene (#505)', () => {
-	it('user_version === 45 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(45);
+	it('user_version === 46 po migrácii (v45 plan_rezov + v46 nakup_skladova_karta)', () => {
+		expect(db.pragma('user_version', { simple: true })).toBe(46);
 	});
 
 	it('vznikla tabuľka plan_rezov_ulozene s očakávanými stĺpcami', () => {
