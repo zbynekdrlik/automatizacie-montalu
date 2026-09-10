@@ -89,18 +89,17 @@ Od #380 má FIX modul prepínač `FixModeNav.svelte` (vzor `PergolaModeNav`, ale
   `cadSpocitat`/`cadUpravit`/`cadOdoslat`. Detaily zdieľaného toku → `.claude/rules/odpis-detail.md`.
   Nenamapovaný CAD kód = TVRDÁ chyba (nikdy tichý odpis).
 
-**VYRIEŠENÉ (#500, 2026-09-10):** FIX CAD zo Solid Edge používa kódy 16xxx (V2: 16101-16104,
-V1: 16001-16006) — priamo Money kódy, BEZ mapovania cez CODE_MAP (na rozdiel od pergoly
-18xxx→PRP). `src/lib/server/fix-catalog.ts` drží katalóg 10 FIX profilov (overených v Money
-SQL). `cad-odpis.ts` je module-aware: `opts.modul='fix'` → FIX transform path (priamy kód
-match). 26xxx príslušenstvo (krytky, rohovníky) VYNECHANÉ — kusové komponenty, nie rezané
-profily (doplniť keď sa objavia v reálnom CAD).
+**VYRIEŠENÉ (#500 round 2, 2026-09-10):** FIX CAD kódy (16xxx) sa mapujú na Money ZASP karty
+cez pole „Dominikov kód" (`DominokKod_UserData`) — NIE priamo ako Money kódy (round 1 defekt).
+`src/lib/server/fix-catalog.ts` drží 5 potvrdených mapovaní (Dominik msg 1818224):
+  16101→ZASP00116, 16006→ZASP00119, 16102→ZASP00125, 16103→ZASP00128, 16104→ZASP202413.
+Všetky ZASP karty: MJ = m (metre), tyč 7500 mm. `cad-odpis.ts` je module-aware:
+`opts.modul='fix'` → FIX transform path (CAD→ZASP lookup + FFD bin-packing do 7500mm tyčí,
+qty = bars × 7.5m — rovnaký princíp ako pergola). V1 kódy bez mapovania (16001-16005)
++ 26xxx príslušenstvo → „Nenamapované" (honest unknown). Odoslat ODBLOKOVANÉ.
 
-**OTVORENÁ OTÁZKA — bar_mm (dĺžka tyče):** Money nemá bar_mm pre FIX profily (`Delka_ID`
-nerozriešiteľný). Bez bar_mm engine počíta LEN celkovú dĺžku rezov (nie počet tyčí) a odpis
-do Money je BLOKOVANÝ (`fixBarMmBlocked`). Odblokuje sa doplnením bar_mm do `FIX_CATALOG`
-(zdroj: dodávateľ FINAL SPOLKA AKCYJNA, katalóg ZC-*V2). MJ v Money nepotvrdená (Odoo ukazuje
-"Units", ale reálna Money MJ pre 16xxx nezistená).
+**VYRIEŠENÉ — bar_mm:** Dominik potvrdil „všetko 7500mm" (msg 1818224). Všetkých 5 ZASP
+kariet má `bar_mm: 7500`. FFD bin-packing rovnaký ako pergola. Odpis do Money funguje.
 
 ## Výrobné odpočty zo zamerania (#469) — `prepocitajFixNaVyrobu`
 
