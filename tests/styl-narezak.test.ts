@@ -14,7 +14,8 @@ import {
 	jeOponaStyl,
 	sysStylPre,
 	stylyDoPonuky,
-	sklaDoPonuky
+	sklaDoPonuky,
+	odvodenyOdpisWarn
 } from '../src/lib/styl';
 import { buildCFG, computeFlat, type SysRow, type RezRow } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
@@ -51,10 +52,16 @@ describe('sysStylPre — sklo vyberá nárezák', () => {
 		expect(cfg[sysStylPre(STANDARD, '4K IZO', IZO, existuje)]).toBeDefined();
 	});
 
-	it('Štandard + opona IZO variant NEMÁ — ostáva basic aj s izolačným sklom', () => {
+	// #504 round 3 (Patrik, úloha 854, msg 1823604): opona IZO nárezák DODANÝ (2×4K
+	// 1:1 z reálneho Money Excelu, 2×2K/2×3K odvodené) → `existuje('… 2x*K IZO')` sa
+	// preklopilo na true, takže izolačné sklo teraz vyberie IZO variant. Predtým
+	// (round 2) opona IZO NEEXISTOVALA a ostávala basic — teraz je opak PRAVDA.
+	it('Štandard + opona IZO variant EXISTUJE — izolačné sklo ho vyberie', () => {
 		for (const n of ['2x2K', '2x3K', '2x4K']) {
-			expect(sysStylPre(STANDARD, n, IZO, existuje)).toBe(`Štandard +|${n}`);
-			expect(cfg[`Štandard +|${n} IZO`]).toBeUndefined();
+			expect(sysStylPre(STANDARD, n, IZO, existuje)).toBe(`Štandard +|${n} IZO`);
+			expect(cfg[`Štandard +|${n} IZO`]).toBeDefined();
+			// float sklo naďalej vyberie basic oponu (IZO vyberá SKLO, nie štýl)
+			expect(sysStylPre(STANDARD, n, FLOAT, existuje)).toBe(`Štandard +|${n}`);
 		}
 	});
 
@@ -92,6 +99,17 @@ describe('sysStylPre — sklo vyberá nárezák', () => {
 		expect(jeOponaStyl('2x3K')).toBe(true);
 		expect(jeOponaStyl('3K')).toBe(false);
 	});
+
+	// #504 round 3: čestné označenie ODVODENÝCH (neoverených) opona IZO štýlov
+	it('odvodenyOdpisWarn: 2×2K/2×3K opona IZO majú upozornenie, overené (2×4K)/iné null', () => {
+		expect(odvodenyOdpisWarn('Štandard +|2x2K IZO')).toMatch(/odvoden/i);
+		expect(odvodenyOdpisWarn('Štandard +|2x3K IZO')).toMatch(/odvoden/i);
+		// 2×4K je overený 1:1 z Excelu → žiadne upozornenie
+		expect(odvodenyOdpisWarn('Štandard +|2x4K IZO')).toBeNull();
+		// ne-opona IZO a iné systémy → null (honest-null miss vetva)
+		expect(odvodenyOdpisWarn('Štandard +|4K IZO')).toBeNull();
+		expect(odvodenyOdpisWarn('Robust|2K')).toBeNull();
+	});
 });
 
 describe('ponuky vo formulári', () => {
@@ -113,15 +131,32 @@ describe('ponuky vo formulári', () => {
 		expect(stylyDoPonuky('Robust', robust)).toEqual(robust);
 	});
 
-	it('opona neponúka izolačné sklo, basic áno', () => {
+	it('opona PONÚKA izolačné sklo (#504 round 3 — nárezák dodaný), basic tiež', () => {
 		const skla = ['Float sklo 4 mm', FLOAT, 'Float sklo 10 mm', IZO];
-		expect(sklaDoPonuky(STANDARD, '2x3K', skla, existuje)).not.toContain(IZO);
+		// #504 round 3: opona 2×3K IZO nárezák existuje → filter už IZO NESKRÝVA
+		expect(sklaDoPonuky(STANDARD, '2x3K', skla, existuje)).toContain(IZO);
 		expect(sklaDoPonuky(STANDARD, '4K', skla, existuje)).toContain(IZO);
 		// starší Štandard IZO oponu MÁ → izolačné sklo v ponuke ostáva
 		expect(sklaDoPonuky(STANDARD_STARY, '2x3K', skla, existuje)).toContain(IZO);
 		expect(sklaDoPonuky('Slide', '2x3K', ['Izolačné sklo 4/8/4 číre'], existuje)).toContain(
 			'Izolačné sklo 4/8/4 číre'
 		);
+	});
+
+	// Defenzíva filtra `sklaDoPonuky`: keby IZO nárezák pre daný štýl NEEXISTOVAL, IZO
+	// sa stále skryje. Po #504 už žiadny reálny Štandard+ štýl bez IZO nie je (2×2K/2×3K/
+	// 2×4K IZO pribudli), takže filter-vetvu drží tento test cez syntetické existuje=false
+	// — cez meno (jeIzoSklo) AJ cez triedu (#443, jeIzoTrieda trieda-first).
+	it('sklaDoPonuky filter skryje IZO pre štýl bez nárezáku — cez meno aj cez triedu', () => {
+		const skla = ['Float sklo 4 mm', FLOAT, IZO, 'Izolačné sklo 4/16/4 číre'];
+		// (a) bez triedaZa → IZO-nosť z názvu (jeIzoSklo regex)
+		expect(sklaDoPonuky(STANDARD, '2x3K', skla, () => false)).toEqual(['Float sklo 4 mm', FLOAT]);
+		// (b) s triedaZa (#443) → IZO-nosť z triedy 16 (4/16/4 aj 4.8.4 = trieda 16)
+		const triedaZa = (n: string): 6 | 16 => (/izola|4\.8\.4|4\/1?6?\/4/i.test(n) ? 16 : 6);
+		expect(sklaDoPonuky(STANDARD, '2x3K', skla, () => false, triedaZa)).toEqual([
+			'Float sklo 4 mm',
+			FLOAT
+		]);
 	});
 });
 
@@ -146,8 +181,16 @@ describe('Money: výber sklom dá PRESNE ten istý odpis ako pôvodný IZO štý
 		}
 	});
 
-	it('opona s izolačným sklom NEZmení odpis (žiadny IZO nárezák neexistuje)', () => {
-		for (const n of ['2x2K', '2x3K', '2x4K'])
-			expect(odpis(sysStylPre(STANDARD, n, IZO, existuje))).toEqual(odpis(`Štandard +|${n}`));
+	// #504 round 3: opona IZO nárezák dodaný → izolačné sklo ZMENÍ odpis (pridá
+	// U-profil ZASP202439 + iné offsety), presne ako pri ne-opona IZO. Predtým
+	// opona IZO === basic (žiadny nárezák neexistoval).
+	it('opona s izolačným sklom ZMENÍ odpis (IZO nárezák pridá U-profil ZASP202439)', () => {
+		for (const n of ['2x2K', '2x3K', '2x4K']) {
+			const izoOdpis = odpis(sysStylPre(STANDARD, n, IZO, existuje));
+			expect(izoOdpis).toEqual(odpis(`Štandard +|${n} IZO`));
+			expect(izoOdpis.map((o) => o.kod)).toContain(U_PROFIL);
+			// a naozaj sa líši od basic opony (inak by test nič nestrážil)
+			expect(izoOdpis).not.toEqual(odpis(`Štandard +|${n}`));
+		}
 	});
 });

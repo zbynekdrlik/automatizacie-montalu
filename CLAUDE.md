@@ -92,6 +92,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - deploy / post-deploy E2E / LIVE flip → skill `.claude/skills/deploy`
 - Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
 - pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
+- odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner) → `.claude/rules/opona-izo-narezak.md`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`

@@ -32,6 +32,7 @@ import {
 	sklaDoPonuky,
 	skloVyberaIzo,
 	zakladnyStyl,
+	odvodenyOdpisWarn,
 	type ExistujeSysStyl,
 	type TriedaZaNazov
 } from '$lib/styl';
@@ -603,7 +604,9 @@ export const actions = {
 			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
 			planHash: contentHash(vstup.zak, job.polozky),
 			// #342 round 2: kovanie warn + tesnenie warn (odpis-relevanté honest-null)
-			warn: [kov.warn, tesn.warn].filter(Boolean).join(' ') || null,
+			// #504 round 3: odvodený (neoverený) nárezák (2×2K/2×3K opona IZO) — čestné označenie
+			warn:
+				[odvodenyOdpisWarn(spec.sysStyl), kov.warn, tesn.warn].filter(Boolean).join(' ') || null,
 			heightWarn,
 			vytvorene,
 			cielInfo: {
@@ -779,7 +782,15 @@ export const actions = {
 			),
 			planHash: contentHash(vstup.zak, job.polozky),
 			// #342 round 2: kovanie warn + tesnenie warn (odpis-relevanté)
-			warn: [kov.warn, tesnMulti.warn].filter(Boolean).join(' ') || null,
+			// #504 round 3: odvodený nárezák niektorého posuvu (2×2K/2×3K opona IZO) — distinct, čestné označenie
+			warn:
+				[
+					...new Set(specs.map((s) => odvodenyOdpisWarn(s.sysStyl)).filter(Boolean)),
+					kov.warn,
+					tesnMulti.warn
+				]
+					.filter(Boolean)
+					.join(' ') || null,
 			heightWarn,
 			vytvorene,
 			cielInfo: {

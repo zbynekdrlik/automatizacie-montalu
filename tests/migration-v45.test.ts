@@ -36,7 +36,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v44 → v45: plan_rezov_ulozene (#505)', () => {
 	it('user_version === 46 po migrácii (v45 plan_rezov + v46 nakup_skladova_karta)', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('vznikla tabuľka plan_rezov_ulozene s očakávanými stĺpcami', () => {

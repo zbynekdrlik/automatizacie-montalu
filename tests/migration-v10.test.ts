@@ -75,14 +75,14 @@ const off = (sysStyl: string, nazov: string) =>
 
 describe('reálny v9 → v10 upgrade: oprava šírky skla Štandard + (+2 mm)', () => {
 	it('user_version = 10', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('offset šírky skla je opravený na cfg_seed hodnotu (o 2N vyššie) pre KAŽDÝ Štandard štýl', () => {
 		const stdSkloWidth = seed.rez.filter(
 			(r) => r.sysStyl.startsWith('Štandard +') && r.nazov === 'Sklo šírka'
 		);
-		expect(stdSkloWidth.length).toBe(13);
+		expect(stdSkloWidth.length).toBe(16); // #504 round 3: +3 opona IZO štýly
 		for (const r of stdSkloWidth) expect(off(r.sysStyl, 'Sklo šírka'), r.sysStyl).toBe(r.offset);
 	});
 

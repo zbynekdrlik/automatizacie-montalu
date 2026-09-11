@@ -77,6 +77,35 @@ the workshop needs it on the app cut plan + its real code.
   jokel 40×10 steel (no ZASP) `V−33` ×1.
 - Sklo: šírka `G+14`, výška `V−115`, počet `2N`; type Float 4.
 
+## OPONA IZO variant (2x2K/2x3K/2x4K IZO) — opona + učko U-frame (#504 round 3)
+
+Doplnené 2026-09-11 (Patrik, úloha 854, msg 1823604 „Nárezový plán 2016 IZO + 2mm.xlsx",
+hárok „4K s U PLUS opona"). Opona + IZO SA vyrába; pôvodne (#504 round 2) filtrovaná,
+lebo nárezák neexistoval. `sysStyl`: `Štandard +|2x*K IZO`, `N = 2·k` (2x2K→4/2x3K→6/2x4K→8).
+
+- **2×4K opona IZO — rezové rozmery + počty kusov 1:1 z reálneho Money Excelu** (overené
+  proti PRIAMEMU vyhodnoteniu formúl na S=5000/V=2100 aj S=6300/V=2400). POČET TYČÍ (a teda
+  metre) používa FFD balenie appky (rovnaká politika ako všetky systémy — Excel má naivný
+  súčet-po-dĺžkach vyšší, napr. ZASP202439: appka 16 tyčí = 57,6 m, Excel-H stĺpec 19).
+  Opona geometria (`W=S/2`) + IZO učko:
+  prírez ZASP202415 `off −335 ×16`; U ZASP202439 (šírka `off −367 ×16` + výška `V−161 ×16`);
+  krajová ZASP20244 `V−33 ×4`; nos ZASP00024 `V−33 ×12`; **dorazová ZASP202419 `V−d ×3`**
+  (opona IZO má 3, basic/ne-opona 2!); sklo šírka `off −407`, výška `V−135`, počet `2N`.
+- **Odpočet prírezu je REDUKOVANÝ** oproti opona-basic: `ded_izo(k)=27k+67.5` (= opona-basic
+  `10.5+X(k)` − 19 = `18.5+X(k−1)`). NIE je to copy-paste chyba — starý systém „Štandard"
+  má opona-IZO tiež s redukovaným X (`standard-stary` X 103/130/151 opona IZO vs 103/130/157
+  basic), takže redukcia je reálna vlastnosť opona-IZO geometrie.
+- **Spodná koľajnica:** v seede BASIC (2x2K ZASP00104 / 2x3K ZASP00030 / 2x4K ZASP00033),
+  upsize o 1 (→ ZASP00030/00033/**ZASP202432**) rieši existujúci `railUpsize` + checkbox
+  „prídavná koľajnica" (default zaškrtnutý pri Štandard+ IZO, #132) — presne ako pri ne-opona
+  IZO. Excel má spod=ZASP202432 = 2×4K basic (ZASP00033) + 1. Horná koľajnica sa NEmení.
+- **2×2K / 2×3K sú ODVODENÉ** z 2×4K vzoru (rovnaký odpočet-posun, dorazová ×3) — čakajú na
+  overenie výrobou. V pláne označené „odvodené" bannerom (`odvodenyOdpisWarn` v `styl.ts`,
+  `SYSSTYL_ODVODENE`). Keď Patrik dodá reálne Excely pre 2×2K/2×3K, doladia sa 1:1 a označenie
+  sa zruší. **11016** (U spodok) NIE je v odpise (v Exceli prázdny riadok — ako ne-opona IZO).
+- Nové profilové kódy: ŽIADNE (všetkých 12 už používajú existujúce Štandard+ štýly). Migrácia
+  v47 (`migrateOponaIzo`, vzor v9 seed). IZO 4/8/4 aj 4/16/4 sklá už v katalógu (v43).
+
 ## Money codes — all 20 verified live (read-only), all exist
 
 ZASP00107/104/027/030/036/033, ZASP202433/202432/202438/**202437**, ZASP202415, ZASP00018,
