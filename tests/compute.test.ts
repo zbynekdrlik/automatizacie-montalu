@@ -1476,9 +1476,9 @@ describe('Štandard + opona IZO (#504 round 3)', () => {
 		const r = P('Štandard +|2x4K IZO', 5000, 2100);
 		expect(r.odpis.map((o) => o.kod)).toContain('ZASP202439');
 		// basic opona 2×4K U-profil NEMÁ
-		expect(computeFlat(cfg, 'Štandard +|2x4K', 5000, 2100, false)!.odpis.map((o) => o.kod)).not.toContain(
-			'ZASP202439'
-		);
+		expect(
+			computeFlat(cfg, 'Štandard +|2x4K', 5000, 2100, false)!.odpis.map((o) => o.kod)
+		).not.toContain('ZASP202439');
 		// dorazová ZASP202419 = 3 ks → 1 tyč 7500 (basic opona má 2 ks, tiež 1 tyč,
 		// ale rozpis počtu sa líši) — over cez počet rezov v pláne
 		const dor = r.material.find((m) => m.kod === 'ZASP202419')!;

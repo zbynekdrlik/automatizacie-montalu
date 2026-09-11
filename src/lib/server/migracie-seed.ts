@@ -808,3 +808,61 @@ export function migrateMaterialNakupSkladovaKarta(
 		bump(46);
 	})();
 }
+
+/**
+ * v46 → v47: Štandard + opona IZO nárezák — 3 nové sysStyl (#504 round 3, Patrik
+ * úloha 854, msg 1823604 „Nárezový plán 2016 IZO + 2mm.xlsx"). 2×4K opona IZO je
+ * 1:1 z reálneho Money nárezáku, 2×2K/2×3K sú ODVODENÉ z rovnakého vzoru (v pláne
+ * čestne označené „odvodené" cez `odvodenyOdpisWarn`). Predtým (round 2) opona IZO
+ * neexistovala a `sklaDoPonuky` IZO pri opone správne filtroval — teraz nárezák
+ * existuje, takže `existuje('Štandard +|2x*K IZO')` sa preklopí a IZO sa v ponuke
+ * objaví BEZ zmeny kódu v styl.ts. Money-korektnosť: pridávajú sa LEN dáta, žiaden
+ * nový profilový kód (všetkých 12 už používajú existujúce Štandard+ štýly).
+ *
+ * Vzor v9 (Štandard + seed): idempotentný `hasSys` guard, insert z `seed` do
+ * cfg_sys/cfg_rez. Fresh DB dostane riadky už cez v9 (číta AKTUÁLNY cfg_seed),
+ * takže na fresh je táto migrácia no-op; existujúca prod DB (>= v9) ich dostane tu.
+ * Feature-detect tabuliek (minimálne migračné fixtúry cfg_sys/cfg_rez nemusia mať).
+ */
+export function migrateOponaIzo(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 47) return;
+	const maTables = db
+		.prepare(
+			"SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name IN ('cfg_sys','cfg_rez')"
+		)
+		.get() as { c: number };
+	const NOVE = ['Štandard +|2x2K IZO', 'Štandard +|2x3K IZO', 'Štandard +|2x4K IZO'];
+	db.transaction(() => {
+		if (maTables.c === 2) {
+			const hasSys = db.prepare('SELECT 1 FROM cfg_sys WHERE sys_styl = ?');
+			const insSys = db.prepare('INSERT INTO cfg_sys (sys_styl, n, sklo_offset) VALUES (?, ?, ?)');
+			const insRez = db.prepare(
+				`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			);
+			// vzor v9: iteruj priamo FILTROVANÝ seed (s je vždy definované) + hasSys guard
+			for (const s of seed.sys.filter((x) => NOVE.includes(x.sysStyl))) {
+				if (hasSys.get(s.sysStyl)) continue; // idempotencia — už zoseedované (fresh cez v9)
+				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
+					insRez.run(
+						r.sysStyl,
+						r.poradie,
+						r.typ,
+						r.kod,
+						r.nazov,
+						r.dim,
+						r.koef,
+						r.offset,
+						r.delitN,
+						r.kerf,
+						r.pocetKs,
+						r.sklozavisle,
+						(r as { dlzkaTyce?: number }).dlzkaTyce ?? 7500,
+						0 // opona IZO nemá hrúbko-závislé profily (sklo_hrubka=0, ako ne-opona IZO)
+					);
+			}
+		}
+		bump(47);
+	})();
+}

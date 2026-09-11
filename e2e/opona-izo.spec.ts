@@ -8,13 +8,11 @@
 //  3. 2×2K/2×3K majú v pláne čestné „odvodené" upozornenie (banner plan-warn).
 // Každý test vyžaduje NULA console errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, vyberFarbuKovania } from './helpers';
 
 const RUN = `E2E-OPIZO-${Date.now().toString(36).toUpperCase()}`;
 
-test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excelu', async ({
-	page
-}) => {
+test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excelu', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
@@ -64,6 +62,6 @@ test('Štandard+ 2×2K opona IZO: plán má čestné „odvodené" upozornenie',
 
 	// 2×2K opona IZO je ODVODENÉ → plán ukáže čestný banner (Money-safety honesty)
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	await expect(page.getByTestId('plan-warn')).toContainText(/[Oo]dvoden/);
+	await expect(page.getByTestId('plan-warn')).toContainText(/odvoden/i);
 	expect(consoleMsgs).toEqual([]);
 });

@@ -14,7 +14,8 @@ import {
 	jeOponaStyl,
 	sysStylPre,
 	stylyDoPonuky,
-	sklaDoPonuky
+	sklaDoPonuky,
+	odvodenyOdpisWarn
 } from '../src/lib/styl';
 import { buildCFG, computeFlat, type SysRow, type RezRow } from '../src/lib/server/compute';
 import seed from '../src/lib/server/cfg_seed.json';
@@ -98,6 +99,17 @@ describe('sysStylPre — sklo vyberá nárezák', () => {
 		expect(jeOponaStyl('2x3K')).toBe(true);
 		expect(jeOponaStyl('3K')).toBe(false);
 	});
+
+	// #504 round 3: čestné označenie ODVODENÝCH (neoverených) opona IZO štýlov
+	it('odvodenyOdpisWarn: 2×2K/2×3K opona IZO majú upozornenie, overené (2×4K)/iné null', () => {
+		expect(odvodenyOdpisWarn('Štandard +|2x2K IZO')).toMatch(/odvoden/i);
+		expect(odvodenyOdpisWarn('Štandard +|2x3K IZO')).toMatch(/odvoden/i);
+		// 2×4K je overený 1:1 z Excelu → žiadne upozornenie
+		expect(odvodenyOdpisWarn('Štandard +|2x4K IZO')).toBeNull();
+		// ne-opona IZO a iné systémy → null (honest-null miss vetva)
+		expect(odvodenyOdpisWarn('Štandard +|4K IZO')).toBeNull();
+		expect(odvodenyOdpisWarn('Robust|2K')).toBeNull();
+	});
 });
 
 describe('ponuky vo formulári', () => {
@@ -129,6 +141,22 @@ describe('ponuky vo formulári', () => {
 		expect(sklaDoPonuky('Slide', '2x3K', ['Izolačné sklo 4/8/4 číre'], existuje)).toContain(
 			'Izolačné sklo 4/8/4 číre'
 		);
+	});
+
+	// Defenzíva filtra `sklaDoPonuky`: keby IZO nárezák pre daný štýl NEEXISTOVAL, IZO
+	// sa stále skryje. Po #504 už žiadny reálny Štandard+ štýl bez IZO nie je (2×2K/2×3K/
+	// 2×4K IZO pribudli), takže filter-vetvu drží tento test cez syntetické existuje=false
+	// — cez meno (jeIzoSklo) AJ cez triedu (#443, jeIzoTrieda trieda-first).
+	it('sklaDoPonuky filter skryje IZO pre štýl bez nárezáku — cez meno aj cez triedu', () => {
+		const skla = ['Float sklo 4 mm', FLOAT, IZO, 'Izolačné sklo 4/16/4 číre'];
+		// (a) bez triedaZa → IZO-nosť z názvu (jeIzoSklo regex)
+		expect(sklaDoPonuky(STANDARD, '2x3K', skla, () => false)).toEqual(['Float sklo 4 mm', FLOAT]);
+		// (b) s triedaZa (#443) → IZO-nosť z triedy 16 (4/16/4 aj 4.8.4 = trieda 16)
+		const triedaZa = (n: string): 6 | 16 => (/izola|4\.8\.4|4\/1?6?\/4/i.test(n) ? 16 : 6);
+		expect(sklaDoPonuky(STANDARD, '2x3K', skla, () => false, triedaZa)).toEqual([
+			'Float sklo 4 mm',
+			FLOAT
+		]);
 	});
 });
 

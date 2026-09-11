@@ -20,7 +20,7 @@ const stdRez = seed.rez.filter((r) => r.sysStyl.startsWith('Štandard +'));
 
 describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_seed', () => {
 	it('user_version=9 po plnej migrácii od nuly', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('v21 tabuľky (material_prices, material_prices_meta, odpis_polozky) existujú aj na fresh DB', () => {
@@ -36,13 +36,15 @@ describe('fresh-install (user_version 0 → 9): Štandard + konverguje s cfg_see
 		);
 	});
 
-	it('všetkých 13 Štandard + štýlov je zoseedovaných (bez duplicít z v9)', () => {
+	// #504 round 3: +3 opona IZO štýly (2x2K/2x3K/2x4K IZO). Fresh DB ich dostane cez
+	// v9 (číta AKTUÁLNY cfg_seed) → 16; v47 je potom no-op (hasSys guard).
+	it('všetkých 16 Štandard + štýlov je zoseedovaných (bez duplicít z v9)', () => {
 		const rows = db
 			.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Štandard +|%'")
 			.all() as { sys_styl: string }[];
-		expect(rows.length).toBe(13);
+		expect(rows.length).toBe(16);
 		// každý štýl práve raz (v9 hasSys guard nesmie zduplikovať v<5 seed)
-		expect(new Set(rows.map((r) => r.sys_styl)).size).toBe(13);
+		expect(new Set(rows.map((r) => r.sys_styl)).size).toBe(16);
 	});
 
 	it('KĽÚČOVÉ: dlzka_tyce KAŽDÉHO Štandard + riadku sedí s cfg_seed (v6 updBar prebehol)', () => {

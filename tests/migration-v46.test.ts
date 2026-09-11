@@ -51,7 +51,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v45 → v46: nakup_skladova_karta do material_prices (#506)', () => {
 	it('user_version === 46 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('material_prices má nový stĺpec nakup_skladova_karta (aditívne, na konci)', () => {
@@ -105,7 +105,7 @@ describe('migrácia v45 → v46: nakup_skladova_karta do material_prices (#506)'
 		migrateMaterialNakupSkladovaKarta(db, () => {
 			throw new Error('bump sa nesmie zavolať znova — guard >= 46 mal vrátiť skôr');
 		});
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('feature-detect: DB bez material_prices → bump(46) bez ALTER (minimálne fixtúry nepadnú)', () => {
