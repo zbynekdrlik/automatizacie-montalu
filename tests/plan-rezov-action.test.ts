@@ -1,8 +1,15 @@
 // #505: Action validation tests for plan-rezov save (ulozit) — validates that
 // the save path enforces the same input bounds as spocitat (parsePlanRezovFormData).
 // Pattern: objednavka-action.test.ts.
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '../src/lib/server/db';
+
+// #511: kioskový upload je fire-and-forget — mockuj ho, aby sme overili ZAPOJENIE (že `ulozit`
+// ho volá so správnymi argumentmi po uložení) a že jeho zlyhanie NIKDY nezhodí uloženie plánu.
+vi.mock('../src/lib/server/odoo-plan-rezov-upload', () => ({
+	queuePlanRezovUpload: vi.fn()
+}));
+import { queuePlanRezovUpload } from '../src/lib/server/odoo-plan-rezov-upload';
 
 // Direct action import — actions are plain async functions
 const { actions } = await import('../src/routes/plan-rezov/+page.server');
@@ -22,6 +29,7 @@ const locals = { user: { username: 'test' } };
 
 beforeEach(() => {
 	db.prepare('DELETE FROM plan_rezov_ulozene').run();
+	vi.mocked(queuePlanRezovUpload).mockReset();
 });
 
 describe('plan-rezov ulozit action validation (#505)', () => {
@@ -127,6 +135,51 @@ describe('plan-rezov ulozit action validation (#505)', () => {
 		};
 		expect(row.dlzka_tyce).toBe(7500);
 		expect(row.rezna_medzera).toBe(3);
+	});
+
+	it('#511: po uložení spustí kioskový upload plánu rezov so správnymi argumentmi', async () => {
+		const r = await actions.ulozit({
+			request: makeRequest({
+				nazov: 'Brány vstup',
+				zak: 'ZAK-511',
+				cad: 'PROFIL\t2\t5330\nPROFIL\t1\t1550',
+				dlzkaTyce: '6000',
+				reznaMedzera: '4'
+			}),
+			locals
+		} as never);
+		expect(r).toMatchObject({ saved: true });
+		expect(queuePlanRezovUpload).toHaveBeenCalledTimes(1);
+		const arg = vi.mocked(queuePlanRezovUpload).mock.calls[0]![0];
+		expect(arg).toMatchObject({
+			zak: 'ZAK-511',
+			nazov: 'Brány vstup',
+			dlzkaTyce: 6000,
+			reznaMedzera: 4
+		});
+		// cadText normalizuj (\r\n z multipart FormData v teste) — porovnaj obsah, nie CRLF artefakt
+		expect(arg.cadText.replace(/\r/g, '')).toBe('PROFIL\t2\t5330\nPROFIL\t1\t1550');
+	});
+
+	it('#511: zlyhanie kioskového uploadu NIKDY nezhodí uloženie plánu (best-effort)', async () => {
+		vi.mocked(queuePlanRezovUpload).mockImplementationOnce(() => {
+			throw new Error('boom');
+		});
+		const r = await actions.ulozit({
+			request: makeRequest({
+				nazov: 'Test',
+				zak: 'ZAK-511',
+				cad: 'PROFIL\t2\t5330',
+				dlzkaTyce: '6000',
+				reznaMedzera: '4'
+			}),
+			locals
+		} as never);
+		expect(r).toMatchObject({ saved: true });
+		// plán je uložený napriek hodenému uploadu
+		expect(
+			(db.prepare('SELECT COUNT(*) AS n FROM plan_rezov_ulozene').get() as { n: number }).n
+		).toBe(1);
 	});
 });
 

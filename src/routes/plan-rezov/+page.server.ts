@@ -10,6 +10,8 @@ import { fail } from '@sveltejs/kit';
 import { parsePlanRezovFormData } from '$lib/server/plan-rezov-vstup';
 import { spocitajPlanRezov } from '$lib/server/plan-rezov';
 import { ulozPlan, listPlany, zmazPlan } from '$lib/server/plan-rezov-ulozene';
+import { queuePlanRezovUpload } from '$lib/server/odoo-plan-rezov-upload';
+import { logger } from '$lib/server/log';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	return {
@@ -48,14 +50,35 @@ export const actions = {
 
 		const user = (locals as { user?: { username: string } }).user?.username ?? '';
 
+		const cadText = String(fd.get('cad') ?? '').trim();
 		const id = ulozPlan({
 			nazov,
 			zak: zak || undefined,
-			cadText: String(fd.get('cad') ?? '').trim(),
+			cadText,
 			dlzkaTyce: parsed.vstup.dlzkaTyce,
 			reznaMedzera: parsed.vstup.reznaMedzera,
 			createdBy: user
 		});
+
+		// #511: po uložení pripni SKUTOČNÝ plán rezov (PDF bez cien) na kiosk „Rezanie" (sale.order)
+		// cez montalu_narezak_upload. Fire-and-forget — NIKDY nezhodí uloženie plánu; no-op keď zákazka
+		// prázdna / bez odpisu / upload vypnutý (env). Nahrádza starý odpis→rozpis narezak upload.
+		// Defenzívny try/catch: plán je už uložený (durable), kioskový upload je best-effort —
+		// ani hypotetický synchrónny throw z queue funkcie nesmie zhodiť odpoveď na uloženie.
+		try {
+			queuePlanRezovUpload({
+				zak,
+				nazov,
+				cadText,
+				dlzkaTyce: parsed.vstup.dlzkaTyce,
+				reznaMedzera: parsed.vstup.reznaMedzera
+			});
+		} catch (e) {
+			logger('plan-rezov').error('queuePlanRezovUpload synchrónne hodil (plán je uložený)', {
+				zak,
+				err: e instanceof Error ? e.message : String(e)
+			});
+		}
 
 		return { saved: true, savedId: id, saveError: null };
 	},
