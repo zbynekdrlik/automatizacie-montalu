@@ -1381,3 +1381,107 @@ describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korek
 		expect(err).toMatch(/opon/i);
 	});
 });
+
+// #504 round 3 — Štandard + opona IZO (2×2K/2×3K/2×4K).
+// 2×4K = 1:1 z REÁLNEHO Money nárezáku (Patrik, úloha 854, msg 1823604,
+// „Nárezový plán 2016 IZO + 2mm.xlsx", hárok „4K s U PLUS opona"): každý ZASP
+// riadok + sklo overený proti PRIAMEMU vyhodnoteniu Excel formúl (scratchpad
+// vectors.py „1:1 MATCH" na S=5000/V=2100 aj S=6300/V=2400). Spodná koľajnica je
+// v seede BASIC (ZASP00033/00030/00104); checkbox „prídavná koľajnica" ju zväčší
+// o 1 (railUpsize → ZASP202432/00033/00030) a je DEFAULT pri Štandard+ IZO (#132),
+// čo zodpovedá Excel-ovej spodnej ZASP202432. 2×2K/2×3K sú ODVODENÉ z toho istého
+// vzoru (opona-basic X(k) + IZO posun) — čakajú na overenie Patrikom (v appke
+// označené „odvodené" bannerom `plan-warn`).
+describe('Štandard + opona IZO (#504 round 3)', () => {
+	// pridavna=true → DEFAULT pri Štandard+ IZO; zodpovedá Excel-ovej ZASP202432
+	const P = (ss: string, S: number, V: number) => computeFlat(cfg, ss, S, V, false, 0, true)!;
+	const F = (ss: string, S: number, V: number) => computeFlat(cfg, ss, S, V, false, 0, false)!;
+	const spodna = (r: NonNullable<ReturnType<typeof computeFlat>>) =>
+		r.odpis.find((o) => /Koľajnica spodná/i.test(o.nazov))!.kod;
+
+	it('2×4K opona IZO — 1:1 z Money Excelu (úloha 854), 2 vstupné sady', () => {
+		let r = P('Štandard +|2x4K IZO', 5000, 2100);
+		expect(odpisByKod(r)).toMatchObject({
+			ZASP00036: 7.5,
+			ZASP202432: 7.5,
+			ZASP202415: 10.8,
+			ZASP20244: 15,
+			ZASP00024: 30,
+			ZASP202419: 7.5,
+			ZASP202439: 57.6
+		});
+		expect(r.odpis.length).toBe(7);
+		expect(r.sklo).toMatchObject({ sirka: 574, vyska: 1965, pocet: 8 });
+
+		r = P('Štandard +|2x4K IZO', 6300, 2400);
+		expect(odpisByKod(r)).toMatchObject({
+			ZASP00036: 7.5,
+			ZASP202432: 7.5,
+			ZASP202415: 14.4,
+			ZASP20244: 15,
+			ZASP00024: 30,
+			ZASP202419: 7.5,
+			ZASP202439: 57.6
+		});
+		expect(r.sklo).toMatchObject({ sirka: 737, vyska: 2265, pocet: 8 });
+	});
+
+	it('2×3K opona IZO — ODVODENÉ (na overenie), 2 vstupné sady', () => {
+		let r = P('Štandard +|2x3K IZO', 5000, 2100);
+		expect(odpisByKod(r)).toMatchObject({
+			ZASP00027: 7.5,
+			ZASP00033: 7.5,
+			ZASP202415: 10.8,
+			ZASP20244: 15,
+			ZASP00024: 22.5,
+			ZASP202419: 7.5,
+			ZASP202439: 43.2
+		});
+		expect(r.sklo).toMatchObject({ sirka: 777, vyska: 1965, pocet: 6 });
+
+		r = P('Štandard +|2x3K IZO', 6300, 2400);
+		expect(odpisByKod(r)).toMatchObject({ ZASP202415: 14.4, ZASP00024: 22.5, ZASP202439: 43.2 });
+		expect(r.sklo).toMatchObject({ sirka: 994, vyska: 2265, pocet: 6 });
+	});
+
+	it('2×2K opona IZO — ODVODENÉ (na overenie), 2 vstupné sady', () => {
+		let r = P('Štandard +|2x2K IZO', 5000, 2100);
+		expect(odpisByKod(r)).toMatchObject({
+			ZASP00107: 7.5,
+			ZASP00030: 7.5,
+			ZASP202415: 10.8,
+			ZASP20244: 15,
+			ZASP00024: 15,
+			ZASP202419: 7.5,
+			ZASP202439: 28.8
+		});
+		expect(r.sklo).toMatchObject({ sirka: 1182, vyska: 1965, pocet: 4 });
+
+		r = P('Štandard +|2x2K IZO', 6300, 2400);
+		expect(odpisByKod(r)).toMatchObject({ ZASP202415: 14.4, ZASP00024: 15, ZASP202439: 43.2 });
+		expect(r.sklo).toMatchObject({ sirka: 1507, vyska: 2265, pocet: 4 });
+	});
+
+	it('spodná koľajnica: v seede BASIC, „prídavná" (default IZO) ju zväčší o 1 (= Excel ZASP202432)', () => {
+		// bez prídavnej → basic kód
+		expect(spodna(F('Štandard +|2x4K IZO', 5000, 2100))).toBe('ZASP00033');
+		expect(spodna(F('Štandard +|2x2K IZO', 5000, 2100))).toBe('ZASP00104');
+		// s prídavnou (default pri IZO) → o 1 väčšia; 2×4K = ZASP202432 (presne Excel)
+		expect(spodna(P('Štandard +|2x4K IZO', 5000, 2100))).toBe('ZASP202432');
+		expect(spodna(P('Štandard +|2x3K IZO', 5000, 2100))).toBe('ZASP00033');
+		expect(spodna(P('Štandard +|2x2K IZO', 5000, 2100))).toBe('ZASP00030');
+	});
+
+	it('opona IZO má U-profil ZASP202439 (odlišuje IZO od basic opony) a 3 dorazové (Excel)', () => {
+		const r = P('Štandard +|2x4K IZO', 5000, 2100);
+		expect(r.odpis.map((o) => o.kod)).toContain('ZASP202439');
+		// basic opona 2×4K U-profil NEMÁ
+		expect(computeFlat(cfg, 'Štandard +|2x4K', 5000, 2100, false)!.odpis.map((o) => o.kod)).not.toContain(
+			'ZASP202439'
+		);
+		// dorazová ZASP202419 = 3 ks → 1 tyč 7500 (basic opona má 2 ks, tiež 1 tyč,
+		// ale rozpis počtu sa líši) — over cez počet rezov v pláne
+		const dor = r.material.find((m) => m.kod === 'ZASP202419')!;
+		expect(dor.rezy.reduce((a, x) => a + x.ks, 0)).toBe(3);
+	});
+});
