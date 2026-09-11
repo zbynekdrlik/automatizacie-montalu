@@ -925,12 +925,13 @@ export const actions = {
 				createdBy: locals.user?.username ?? ''
 			}
 		];
-		// #514: idempotentne (dvojklik neduplikuje) a BEZ presmerovania — vráť späť náhľad
-		// s potvrdením, aby „uložiť nárezák" (odpis) ostalo dostupné nad tým istým výsledkom.
-		const pridane = pridajSklaHromadneIdempotentne(polozky);
-		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
+		// #514: náhľad zostav PRED zápisom — ak kovanie zlyhá (form), NEvkladaj sklá
+		// (validácia pred vedľajším efektom). Potom idempotentne (dvojklik neduplikuje)
+		// a BEZ presmerovania, aby „uložiť nárezák" (odpis) ostalo dostupné.
 		const v = stavNahlad(vstup, r, spec, locals.user);
 		if (v.step === 'form') return v;
+		const pridane = pridajSklaHromadneIdempotentne(polozky);
+		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
 		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
 	},
 
@@ -958,11 +959,11 @@ export const actions = {
 			typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
 			createdBy: locals.user?.username ?? ''
 		}));
-		// #514: idempotentne + bez presmerovania — viď `pridatSkla`
-		const pridane = pridajSklaHromadneIdempotentne(polozky);
-		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
+		// #514: validácia pred vedľajším efektom + idempotentne + bez presmerovania — viď `pridatSkla`
 		const v = stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
+		const pridane = pridajSklaHromadneIdempotentne(polozky);
+		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
 		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
 	}
 } satisfies Actions;

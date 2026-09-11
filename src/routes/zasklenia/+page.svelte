@@ -633,6 +633,24 @@
 		/>{/if}
 {/snippet}
 
+<!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) — nahlad aj nahladMulti -->
+{#snippet sklaPridaneBanner()}
+	{#if form?.sklaPridane}
+		<div class="okmsg noprint" data-testid="skla-pridane">
+			{#if form.sklaPridane.pridane > 0}
+				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane} ks).
+			{:else}
+				ℹ️ Sklá pre tento plán už sú v objednávke.
+			{/if}
+			<a
+				data-testid="skla-pridane-odkaz"
+				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
+				>Otvoriť objednávku skla →</a
+			>
+		</div>
+	{/if}
+{/snippet}
+
 {#if step === 'form'}
 	<div class="card">
 		<OdpisNavrhNav modul="zasklenia" active="odpis" b2b={isB2B} />
@@ -748,21 +766,7 @@
 		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
 	{/if}
 
-	<!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) -->
-	{#if form?.sklaPridane}
-		<div class="okmsg noprint" data-testid="skla-pridane">
-			{#if form.sklaPridane.pridane > 0}
-				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane} ks).
-			{:else}
-				ℹ️ Sklá pre tento plán už sú v objednávke.
-			{/if}
-			<a
-				data-testid="skla-pridane-odkaz"
-				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
-				>Otvoriť objednávku skla →</a
-			>
-		</div>
-	{/if}
+	{@render sklaPridaneBanner()}
 
 	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
@@ -856,21 +860,7 @@
 		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
 	{/if}
 
-	<!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) -->
-	{#if form?.sklaPridane}
-		<div class="okmsg noprint" data-testid="skla-pridane">
-			{#if form.sklaPridane.pridane > 0}
-				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane} ks).
-			{:else}
-				ℹ️ Sklá pre tento plán už sú v objednávke.
-			{/if}
-			<a
-				data-testid="skla-pridane-odkaz"
-				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
-				>Otvoriť objednávku skla →</a
-			>
-		</div>
-	{/if}
+	{@render sklaPridaneBanner()}
 
 	<PlanKartyMulti
 		{multi}
