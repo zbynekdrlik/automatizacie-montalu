@@ -50,3 +50,41 @@ export function defaultSklo(skla: string[], system?: string): string {
 export function fmtSkloRozmer(sirka: number, vyska: number): string {
 	return `${Math.round(sirka)}mm × ${Math.round(vyska)}mm`;
 }
+
+// ---- Vlastná (nekatalógová) skladba skla v nárezáku (#235 slice 2) ----
+//
+// Patrik (11.9., úloha 625): v nárezáku objednáva aj skladby, ktoré nie sú v katalógu
+// (napr. „5esg/14/5esg"), a doteraz ich ručne prepisoval. `SKLO_INE` je SENTINEL voľby
+// v glass selecte — NIE je to riadok v `glass_types`. Keď je zvolený, sklo je zadané
+// voľným textom (`skloPresne`) + hrúbkovou triedou skladby (`skloTrieda`):
+//   • VÝPOČET beží zo SYNTETICKÉHO skla odvodeného z triedy (server `skloPre`) —
+//     bit-identicky ako katalógové sklo tej istej triedy;
+//   • CENA je honest-null (`glassMoneyKod(sentinel)` → null → „cena nedostupná");
+//   • ZOBRAZENIE na pláne/tlači/objednávke je `skloPresne` (text).
+export const SKLO_INE = 'Iné (vlastná skladba)';
+
+/** Hrúbkové triedy skladby ponúkané pri vlastnom skle (mm). Odvodené znaky:
+ *  - hrúbková trieda (`hrubkaTrieda` 6/16): >=16 ⇒ izolačné dvojsklo, inak jednoduché
+ *    (Slide `redukcia_zero`, Štandard IZO nárezák, triedová korekcia);
+ *  - Deluxe fyzická hrúbka (kladka/klzný profil): 10 ⇒ 10 mm, inak 6 mm;
+ *  - tesnenie (Štandard): 4⇒ZASK00005, 6⇒ZASK00006, 10⇒nezname, 16/24⇒izolačné/bez gumy. */
+export const SKLO_TRIEDY = [4, 6, 10, 16, 24] as const;
+export type SkloTrieda = (typeof SKLO_TRIEDY)[number];
+
+/** Je `x` jedna z povolených hrúbkových tried vlastného skla? */
+export function jeSkloTrieda(x: unknown): x is SkloTrieda {
+	return typeof x === 'number' && (SKLO_TRIEDY as readonly number[]).includes(x);
+}
+
+/** Hrúbková trieda skladby (6|16) syntetického vlastného skla z Patrikovej triedy
+ *  — jednoduché sklo (4/6/10 mm) ⇒ 6, izolačné dvojsklo (16/24 mm) ⇒ 16. */
+export function ineHrubkaTrieda(trieda: SkloTrieda): 6 | 16 {
+	return trieda >= 16 ? 16 : 6;
+}
+
+/** Fyzická hrúbka skla (mm) syntetického vlastného skla — vyberá Deluxe kladka/klzný
+ *  profil; mimo Deluxe je 0 (bit-identické s katalógom — hrubka je Deluxe-only). */
+export function ineHrubka(system: string, trieda: SkloTrieda): number {
+	if (system !== 'Deluxe') return 0;
+	return trieda === 10 ? 10 : 6;
+}

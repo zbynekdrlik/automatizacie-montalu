@@ -20,6 +20,10 @@ export type PosuvRow = {
 	s: number | string;
 	v: number | string;
 	sklo: string;
+	// vlastná (nekatalógová) skladba TOHOTO posuvu (#235 slice 2) — text + hrúbková
+	// trieda; platné len pri `sklo===SKLO_INE`, inak `''`/prázdne
+	skloPresne: string;
+	skloTrieda: number | '';
 	otvaranie: string;
 	kovanieL: string;
 	kovanieP: string;
@@ -50,6 +54,8 @@ export type PlanVstup = {
 	v: number;
 	sklo: string;
 	skloPresne: string;
+	/** vlastná skladba (#235 slice 2) — hrúbková trieda pri `sklo===SKLO_INE`, inak null */
+	skloTrieda: number | null;
 	otvaranie: string;
 	kovanieL: string;
 	kovanieP: string;
