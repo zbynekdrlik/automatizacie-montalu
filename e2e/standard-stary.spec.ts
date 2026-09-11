@@ -108,7 +108,7 @@ test('2K + izolačné: IZO nárezák — U profil 21,6 m a spodná koľajnica o 
 	expect(errs).toEqual([]);
 });
 
-test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ (na rozdiel od Štandard +)', async ({
+test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ; Štandard + opona IZO teraz tiež MÁ (#504)', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
@@ -124,13 +124,24 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ (na rozdiel od Št
 	await expect(riadok(page, 'ZASP202439')).toContainText(/(^|\D)43,2 m/);
 	await expect(riadok(page, 'ZASP00024')).toContainText(/(^|\D)22,5 m/);
 
-	// pre porovnanie: Štandard + IZO oponu nemá → izolačné sklo tam nie je v ponuke
+	// #504 round 3: Štandard + opona teraz TIEŽ má IZO nárezák (2×2K/2×3K/2×4K) →
+	// izolačné sklo je v ponuke aj tam (predtým filtrované — pozri opona-izo.spec.ts
+	// pre plný pozitívny tok 2×2K/2×4K).
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2x3K');
 	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
-	expect(skla.filter((s) => /Izola/i.test(s))).toEqual([]);
+	expect(skla.filter((s) => /Izola/i.test(s)).sort()).toEqual(
+		[
+			'Izolačné sklo 4/8/4 číre',
+			'Izolačné sklo 4/8/4 mliečne',
+			'Izolačné sklo 4/8/4 stopsol',
+			'Izolačné sklo 4/16/4 číre',
+			'Izolačné sklo 4/16/4 mliečne',
+			'Izolačné sklo 4/16/4 stopsol'
+		].sort()
+	);
 
 	expect(errs).toEqual([]);
 });

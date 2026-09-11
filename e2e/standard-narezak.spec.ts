@@ -71,7 +71,9 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	expect(errs).toEqual([]);
 });
 
-test('zmena počtu krídel nezmaže zvolené sklo; opona izolačné sklo neponúka', async ({ page }) => {
+test('zmena počtu krídel nezmaže zvolené sklo; opona ponúka izolačné sklo (#504)', async ({
+	page
+}) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await hlavicka(page, '03');
@@ -84,11 +86,23 @@ test('zmena počtu krídel nezmaže zvolené sklo; opona izolačné sklo neponú
 	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/8/4 číre');
 	await expect(page.getByTestId('narezak-hint')).toContainText('5K IZO');
 
-	// opona nemá izolačnú skladbu → sklo sa prepne na float a IZO nie je v ponuke
+	// #504 round 3: Štandard + opona teraz TIEŽ má IZO nárezák (2×2K/2×3K/2×4K) →
+	// izolačné sklá sú v ponuke aj pri opone; keďže ide o zmenu ŠTÝLU (nie systému),
+	// predchádzajúci výber skla PRETRVÁ (name-persistence, zasklenia-form-reactivity.md).
 	await page.getByLabel('Štýl').selectOption('2x3K');
+	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/8/4 číre');
 	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
-	expect(skla.filter((s) => /Izola/i.test(s))).toEqual([]);
-	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 2x3K.');
+	expect(skla.filter((s) => /Izola/i.test(s)).sort()).toEqual(
+		[
+			'Izolačné sklo 4/8/4 číre',
+			'Izolačné sklo 4/8/4 mliečne',
+			'Izolačné sklo 4/8/4 stopsol',
+			'Izolačné sklo 4/16/4 číre',
+			'Izolačné sklo 4/16/4 mliečne',
+			'Izolačné sklo 4/16/4 stopsol'
+		].sort()
+	);
+	await expect(page.getByTestId('narezak-hint')).toContainText('2x3K IZO');
 
 	expect(errs).toEqual([]);
 });
