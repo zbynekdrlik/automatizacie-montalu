@@ -112,6 +112,48 @@ test('Štandard +: bez kovania kusov (žiadne FAB pole), ale karta má tesnenie 
 	expect(errs).toEqual([]);
 });
 
+test('Štandard + 4 mm: odpis má tesnenie ZASK00005 (dĺžka kladkový-only, #342 kolo 2)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '4a');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2K');
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float sklo 4 mm');
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+
+	// 4 mm → ZASK00005 (metrážové; dĺžka = súčet šírok kladkových profilov), NIE 6 mm kód
+	await expect(page.getByTestId('kovanie-karta')).toBeVisible();
+	await expect(riadok(page, 'ZASK00005')).toContainText(' m');
+	await expect(riadok(page, 'ZASK00006')).toHaveCount(0);
+	await expect(page.getByText('Odpis (do Money)')).toBeVisible();
+
+	expect(errs).toEqual([]);
+});
+
+test('Štandard + IZO: žiadne zasklievacie tesnenie (bez gumy, #342 kolo 2)', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '4b');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2K');
+	// reaktívny sklo-select sa doplní po zmene systému — samostatný krok (race)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4/8/4 číre');
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+
+	// IZO → žiadny tesnenie riadok (Dominik: „pre izolačne … ide bez gumy"). Štandard +
+	// nemá ani kovanie kusy, takže karta „Kovanie a tesnenia (do Money)" sa vôbec nezobrazí.
+	await expect(page.getByText('Odpis (do Money)')).toBeVisible();
+	await expect(page.getByTestId('kovanie-karta')).toHaveCount(0);
+
+	expect(errs).toEqual([]);
+});
+
 test('zimná záhrada: kusy sa sčítajú za oba posuvy', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
