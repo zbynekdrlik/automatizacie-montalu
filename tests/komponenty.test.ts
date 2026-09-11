@@ -14,8 +14,10 @@ import {
 	KOMPONENTY_ROBUST,
 	KOMPONENTY_SLIDE,
 	KOMPONENTY_STANDARD,
+	KOMPONENTY_DELUXE,
 	SLIDE_PRIPRAVENY,
 	KOVANIE_NEUPLNE,
+	PREDVOLENA_FARBA,
 	komponentyPre
 } from '../src/lib/server/komponenty-cfg';
 import seed from '../src/lib/server/cfg_seed.json';
@@ -302,6 +304,38 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 					farby: ocakavane
 				});
 			}
+		}
+	});
+
+	it('DELUXE krytky: každá skupina (názov vrátane „N mm") má PRÁVE obe farby per hrúbka (#431 kolo 2)', () => {
+		// Deluxe krytky sú DVOJfarebné per HRÚBKA: 6mm {R9006, R9005}, 10mm {R9006, R7016}.
+		// Chráni pred „pridal som len jednu farbu" — jednofarebná skupina by pri druhej
+		// farbe ticho vynechala krytku (mismatch-skip je zámerne tichý). Zoskup podľa
+		// NÁZVU BEZ RAL prípony (názov nesie „N mm", tá ostáva súčasťou kľúča).
+		const baza = (nazov: string) => nazov.replace(/\s*R(9005|9006|7016)\s*$/, '').trim();
+		const skupiny = new Map<string, Set<string>>();
+		for (const k of KOMPONENTY_DELUXE.filter((x) => x.farba)) {
+			const key = `${baza(k.nazov)}|h${k.hrubkaSkla}`;
+			if (!skupiny.has(key)) skupiny.set(key, new Set());
+			skupiny.get(key)!.add(k.farba!);
+		}
+		// 3 pozície (stredová L, stredová P, krajná) × 2 hrúbky = 6 skupín, každá 2 farby
+		expect(skupiny.size).toBe(6);
+		for (const [key, farby] of skupiny) {
+			const ocakavane = key.endsWith('|h6') ? ['R9005', 'R9006'] : ['R7016', 'R9006'];
+			expect({ key, farby: [...farby].sort() }).toEqual({ key, farby: ocakavane.sort() });
+		}
+	});
+
+	it('PREDVOLENA_FARBA.Deluxe (R9006) je platná na OBOCH hrúbkach krytiek (#431 kolo 2)', () => {
+		// Server fallback (kovanieFor) aj klientsky default-fill závisia od toho, že
+		// predvolená farba sedí na KAŽDÚ hrúbku — inak by sa fallback zmenil na fail-loud.
+		const pred = PREDVOLENA_FARBA.Deluxe!;
+		for (const h of [6, 10] as const) {
+			const farbyH = new Set(
+				KOMPONENTY_DELUXE.filter((k) => k.hrubkaSkla === h).map((k) => k.farba)
+			);
+			expect(farbyH.has(pred)).toBe(true);
 		}
 	});
 

@@ -1,11 +1,11 @@
 // BS DELUXE komponenty do Money odpisu (#354, Dominik — att 14668/14670) v
 // prehliadači. Money-korektnosť množstiev je pokrytá unit testom
 // (tests/kovanie-deluxe.test.ts); toto overuje LEN prehliadačovú vrstvu — Deluxe
-// má RAL select (krytky = 2 farebné Money kódy R9006/R7016, #431 bod 1, Patrik
-// msg 1801337), s PREDVOLENOU farbou R9006 a hintom „nerezová mušľa" (kovanie
-// je nerez, krytky podľa zvolenej farby). Prepnutie z farebného systému (Robust)
-// na Deluxe zahodí neplatnú farbu z predošlého systému (#354 spirit) a predvyplní
-// R9006, a náhľad naozaj zobrazí krajnú/stredovú krytku + madlo + kefy.
+// má RAL select „Farba krytiek" (kovanie = pevne nerezová mušľa; #431 kolo 2, Dominik
+// úloha 574). Možnosti krytiek sú HRÚBKO-ZÁVISLÉ: 6 mm → R9006/R9005, 10 mm →
+// R9006/R7016; predvolená R9006 (platná na oboch hrúbkach). Prepnutie z farebného
+// systému (Robust) na Deluxe zahodí neplatnú farbu z predošlého systému a predvyplní
+// R9006; 6 mm aj 10 mm objednávka zobrazí krajnú/stredovú krytku + madlo + kefy.
 //
 // Všetko READ-ONLY („Spočítať" / „Späť"), nič sa nezapisuje do Money.
 import { test, expect, type Page } from '@playwright/test';
@@ -32,19 +32,23 @@ const riadok = (page: Page, kod: string) =>
 // text, nie číslica). Exaktný text na IZOLOVANOM `<b>` elementu je jednoznačný.
 const mnozstvo = (page: Page, kod: string) => riadok(page, kod).locator('b');
 
-test('Deluxe: RAL select viditeľný s R9006/R7016, predvolená R9006, hint nerezová mušľa (#431)', async ({
+test('Deluxe 10mm: RAL select „Farba krytiek" s R9006/R7016, predvolená R9006, hint nerezová mušľa (#431 kolo 2)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
 	await page.getByLabel('Systém').selectOption('Deluxe');
-	// #431 bod 1: RAL select je VIDITEĽNÝ pre Deluxe (krytky majú 2 farebné varianty)
+	// Deluxe default sklo = 10 mm → možnosti R9006/R7016
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	// #431 kolo 2: RAL select je VIDITEĽNÝ pre Deluxe (krytky majú farebné varianty)
 	const sel = page.getByTestId('farba-kovania');
 	await expect(sel).toBeVisible();
-	// predvolená farba R9006 (nerezová mušľa — Patrik msg 1801337)
+	// #431 kolo 2: label je „Farba krytiek" (kovanie = pevne nerezová mušľa)
+	await expect(page.getByLabel(/Farba krytiek/)).toBeVisible();
+	// predvolená farba R9006 (Patrik msg 1801337)
 	await expect(sel).toHaveValue('R9006');
-	// ponúka len R9006/R7016 (nie R9005)
+	// 10 mm ponúka len R9006/R7016 (nie R9005 — tá je 6 mm)
 	const hodnoty = await sel
 		.locator('option')
 		.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter((v) => v));
@@ -54,6 +58,36 @@ test('Deluxe: RAL select viditeľný s R9006/R7016, predvolená R9006, hint nere
 	await expect(page.getByTestId('kovanie-musla-hint')).toContainText('nerezová mušľa');
 	// fixný div z 0f3dd88 NEEXISTUJE
 	await expect(page.getByTestId('farba-kovania-fixed')).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('Deluxe: prepnutie 10mm R7016 → 6mm zahodí neplatnú farbu, možnosti 6mm sú R9006/R9005, default R9006 (#431 kolo 2)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Systém').selectOption('Deluxe');
+	await expect(page.getByLabel(/Farba krytiek/)).toBeVisible();
+	// 10 mm default → zvoľ R7016 (platná len pre 10 mm)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	const sel = page.getByTestId('farba-kovania');
+	await sel.selectOption('R7016');
+	await expect(sel).toHaveValue('R7016');
+
+	// prepni na 6 mm → R7016 už nie je platná (6 mm ponúka R9006/R9005) → hranový
+	// $effect ju zahodí a predvyplní R9006 (platnú na oboch hrúbkach)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	// deterministicky prejdi Svelte render-flush (reaktívny select) pred asertom
+	await page.evaluate(
+		() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+	);
+	const hodnoty = await sel
+		.locator('option')
+		.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter((v) => v));
+	expect(hodnoty.sort()).toEqual(['R9005', 'R9006'].sort());
+	await expect(sel).toHaveValue('R9006', { timeout: 2000 });
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -85,7 +119,7 @@ test('prepnutie Robust (R9005) → Deluxe predvyplní R9006; návrat na Robust v
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('Deluxe 3K 10mm: krajná×2, stredová L×2 + P×2, madlo×2, kefy + upozornenie na 6mm', async ({
+test('Deluxe 3K 10mm R9006: krajná×2, stredová L×2 + P×2, madlo×2, kefy, žiadne upozornenie', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -118,7 +152,7 @@ test('Deluxe 3K 10mm: krajná×2, stredová L×2 + P×2, madlo×2, kefy + upozor
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('Deluxe 3K 6mm: madlo + kefy sú v odpise, ŽIADNA krytka (0 ks skladu), farba nie je potrebná, upozornenie viditeľné', async ({
+test('Deluxe 3K 6mm R9006: krytky (stredová L/P + krajná) + madlo + kefy, žiadne upozornenie (#431 kolo 2)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -126,27 +160,28 @@ test('Deluxe 3K 6mm: madlo + kefy sú v odpise, ŽIADNA krytka (0 ks skladu), fa
 
 	await zaklad(page, '02');
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
-	// RAL select je pri Deluxe VŽDY vidno (systémová voľba), ale 6mm krytky ju
-	// nepotrebujú — vyberFarbuKovania zvolí platnú hodnotu, engine ju len ignoruje.
-	await vyberFarbuKovania(page);
+	// 6mm krytky sa teraz evidujú v RAL (#431 kolo 2) — vyber R9006
+	await vyberFarbuKovania(page, 'R9006');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
+	// 3K = 3 krídla → 2 stykov (N-1) → stredová L aj P 2×; krajná vždy 2×
+	await expect(mnozstvo(page, 'ZASK202519')).toHaveText('2 ks'); // stredová L 6mm R9006
+	await expect(mnozstvo(page, 'ZASK202521')).toHaveText('2 ks'); // stredová P 6mm R9006
+	await expect(mnozstvo(page, 'ZASK202523')).toHaveText('2 ks'); // krajná 6mm R9006
+	// R9005 6mm varianty absent (zvolili sme R9006)
+	for (const k of ['ZASK202520', 'ZASK202522', 'ZASK202524']) {
+		await expect(riadok(page, k)).toHaveCount(0);
+	}
+	// 10mm varianty vôbec (iná hrúbka)
+	for (const k of ['ZASK202525', 'ZASK202527', 'ZASK202529']) {
+		await expect(riadok(page, k)).toHaveCount(0);
+	}
 	await expect(mnozstvo(page, 'ZASK00049')).toHaveText('2 ks'); // madlo
 	await expect(mnozstvo(page, 'ZASK00007')).toContainText(/\d+(,\d+)? m/); // kefa kladkový
 	await expect(mnozstvo(page, 'ZASK202542')).toContainText(/\d+(,\d+)? m/); // kefa klzný
-	for (const k of [
-		'ZASK202525',
-		'ZASK202526',
-		'ZASK202527',
-		'ZASK202528',
-		'ZASK202529',
-		'ZASK202530'
-	])
-		await expect(riadok(page, k)).toHaveCount(0);
-	// 6mm objednávke naozaj CHÝBAJÚ krytky — tu sa upozornenie MÁ zobraziť
-	await expect(page.getByTestId('plan-warn')).toContainText('6');
-	await expect(page.getByTestId('plan-warn')).toContainText('krytk');
+	// 6mm objednávka je teraz KOMPLETNÁ — žiadne upozornenie na chýbajúce krytky
+	await expect(page.getByTestId('plan-warn')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });

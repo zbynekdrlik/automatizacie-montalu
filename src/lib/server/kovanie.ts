@@ -54,9 +54,11 @@ export function kovanieDoOdpisu(
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
 		// KOVANIE_NEUPLNE hodnota je buď pevný text (Štandard), alebo funkcia hrúbky
-		// skla + farby kovania (Deluxe: neúplné len pri 6mm, #354 review nález; Slide:
-		// madlo vždy, zámok len pri R9005, #357) — obe tvary tu vyhodnotíme rovnako,
-		// nikdy natvrdo neporovnávaj `system === 'Deluxe'`/`'Slide'`.
+		// skla + farby kovania (Slide: madlo vždy, zámok len pri R9005, #357) — obe
+		// tvary tu vyhodnotíme rovnako, nikdy natvrdo neporovnávaj `system ===
+		// 'Deluxe'`/`'Slide'`. Deluxe kľúč tu NIE JE (#431 kolo 2: 6mm aj 10mm krytky
+		// sú v odpise → Deluxe kovanie je kompletné), `KOVANIE_NEUPLNE[system]` je vtedy
+		// undefined = žiadne varovanie.
 		const neuplneRaw = KOVANIE_NEUPLNE[system];
 		const neuplne =
 			typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka, farbaKovania) : neuplneRaw;

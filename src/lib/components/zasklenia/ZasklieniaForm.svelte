@@ -74,6 +74,7 @@
 		maFab,
 		maFarbu,
 		ralOptions,
+		farbaPopis,
 		kovanieMuslaHint,
 		maKolajnicu,
 		maSietka,
@@ -135,6 +136,7 @@
 		maFab: boolean;
 		maFarbu: boolean;
 		ralOptions: Farba[];
+		farbaPopis: string;
 		kovanieMuslaHint: string | null;
 		maKolajnicu: boolean;
 		maSietka: boolean;
@@ -394,13 +396,17 @@
 				</label>
 			</div>
 		{/if}
-		<!-- RAL farba kovania (#338) — vyberá Money kód farebného variantu (kľučka/
-		     krytka vložky / Štandard zámok R9005 vs R7016). Bez voľby engine vyhlási
-		     chybu, aby sa do Money nedostal zlý/žiadny farebný variant.
-		     #431 bod 1: Deluxe má RAL select (krytky = 2 farby) + hint „nerezová mušľa". -->
+		<!-- RAL farba (#338) — vyberá Money kód farebného variantu (kľučka/krytka vložky /
+		     Štandard zámok R9005 vs R7016). Bez voľby engine vyhlási chybu, aby sa do Money
+		     nedostal zlý/žiadny farebný variant.
+		     #431 kolo 2: label je per-systém (`farbaPopis`) — Deluxe „Farba krytiek" (kovanie
+		     = pevne nerezová mušľa), ostatné „Farba kovania". Možnosti (`ralOptions`) sú
+		     hrúbko-závislé pre Deluxe krytky (6mm R9006/R9005, 10mm R9006/R7016). Pole ostáva
+		     `farbaKovania` (jedna objednávková farebná voľba; žiadny systém nemá naraz kovanie
+		     aj krytky). data-testid ostáva `farba-kovania` (stabilný selektor pre E2E). -->
 		{#if maFarbu}
 			<div class="field">
-				<label for="farbaKovania">Farba kovania (RAL) — MENÍ Money kód</label>
+				<label for="farbaKovania">{farbaPopis} (RAL) — MENÍ Money kód</label>
 				{#if kovanieMuslaHint}
 					<span class="hint" data-testid="kovanie-musla-hint"
 						>kovanie = {kovanieMuslaHint} · krytky podľa zvolenej farby</span
@@ -413,7 +419,7 @@
 					data-testid="farba-kovania"
 					required
 				>
-					<option value="">— vyber farbu kovania —</option>
+					<option value="">— vyber farbu —</option>
 					{#each ralOptions as f (f)}
 						<option value={f}>{f} ({RAL_NAZOV[f]})</option>
 					{/each}

@@ -7,9 +7,51 @@
 import type { Klin, KlinVstup } from '$lib/klin';
 import type { Sietka, SietkaUchyt } from '$lib/sietka';
 import type { Farba } from '$lib/komponenty';
+import { SKLO_INE, ineHrubka, jeSkloTrieda } from '$lib/sklo';
 
 // mm → čitateľné (max 3 desatinné, čiarka). Presunuté z +page (#250); display-only.
 export const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
+
+// RAL možnosť selectu, ako ju posiela server (config-derived z `komponentyPre`).
+// `hrubkaSkla` je NEPRÍTOMNÁ pre hrúbko-neutrálne farby (kľučka/zámok kovania) a
+// PRÍTOMNÁ pre krytky, ktoré majú Money kód per hrúbka×farba (Deluxe, #431 kolo 2).
+export type RalPar = { farba: Farba; hrubkaSkla?: 6 | 10 };
+
+// Fyzická hrúbka (mm) zvoleného skla — vyberá, ktoré krytky (a teda ktoré RAL
+// varianty) sú platné (#431 kolo 2). Katalógové sklo ju nesie v `data.skla.hrubka`;
+// vlastná skladba (SKLO_INE) ju odvodí z triedy cez `ineHrubka` (jeden zdroj pravdy,
+// nie parsovanie mena). `null` = sklo nezvolené / nenájdené → volajúci neaplikuje
+// hrúbkový filter (ponúkne všetky farby; server ostáva autoritatívny cez fail-loud).
+export function hrubkaPreSklo(
+	system: string,
+	sklo: string,
+	skloTrieda: number | '' | null,
+	skla: { nazov: string; system: string; hrubka: number }[]
+): number | null {
+	if (!sklo) return null;
+	if (sklo === SKLO_INE) return jeSkloTrieda(skloTrieda) ? ineHrubka(system, skloTrieda) : null;
+	return skla.find((g) => g.system === system && g.nazov === sklo)?.hrubka ?? null;
+}
+
+// Farby do RAL selectu — únia naprieč posuvmi v hre. Farba sa ponúkne, keď je
+// hrúbko-neutrálna (`hrubkaSkla===undefined`) ALEBO jej hrúbka sedí s hrúbkou skla
+// TOHO posuvu; pri neznámej hrúbke posuvu (sklo ešte nezvolené) sa jeho hrúbko-
+// špecifické farby ponúknu všetky (UX fallback — server je aj tak autoritatívny).
+// Poradie = poradie prvého výskytu; bez duplicít.
+export function ralOptionsPre(
+	posuvy: { system: string; hrubka: number | null }[],
+	ralPreSystem: Record<string, RalPar[]>
+): Farba[] {
+	const out: Farba[] = [];
+	for (const p of posuvy)
+		for (const par of ralPreSystem[p.system] ?? [])
+			if (
+				(par.hrubkaSkla === undefined || p.hrubka === null || par.hrubkaSkla === p.hrubka) &&
+				!out.includes(par.farba)
+			)
+				out.push(par.farba);
+	return out;
+}
 
 // Riadok ĎALŠIEHO posuvu (zimná záhrada) — ploché polia rovnakého tvaru ako primárny
 // posuv; do JSON-u idú tak, ako ich parsuje server. `kliny` (#472) je JEDINÉ pole,
