@@ -332,7 +332,9 @@ describe('KOMPONENTY_ROBUST — ostrá tabuľka', () => {
 		// predvolená farba sedí na KAŽDÚ hrúbku — inak by sa fallback zmenil na fail-loud.
 		const pred = PREDVOLENA_FARBA.Deluxe!;
 		for (const h of [6, 10] as const) {
-			const farbyH = new Set(KOMPONENTY_DELUXE.filter((k) => k.hrubkaSkla === h).map((k) => k.farba));
+			const farbyH = new Set(
+				KOMPONENTY_DELUXE.filter((k) => k.hrubkaSkla === h).map((k) => k.farba)
+			);
 			expect(farbyH.has(pred)).toBe(true);
 		}
 	});

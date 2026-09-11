@@ -55,8 +55,9 @@ import {
 	TESNENIE_SYSTEMY,
 	type TesneniePolozka
 } from '$lib/tesnenie';
-import { komponentyPre, predvolenaFarba } from '$lib/server/komponenty-cfg';
+import { komponentyPre, predvolenaFarba, popisFarby } from '$lib/server/komponenty-cfg';
 import type { Farba } from '$lib/komponenty';
+import type { RalPar } from '$lib/zasklenia-form';
 import {
 	enrichPolozky,
 	skladoveVarovania,
@@ -493,7 +494,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		skla: listGlassTypes().map((g) => ({
 			nazov: g.nazov,
 			system: g.system,
-			trieda: g.hrubkaTrieda
+			trieda: g.hrubkaTrieda,
+			// fyzická hrúbka (mm) — klient ňou filtruje hrúbko-závislé RAL možnosti
+			// krytiek (#431 kolo 2); ostatné farby sú hrúbko-neutrálne
+			hrubka: g.hrubka
 		})),
 		otvarania: OTVARANIA,
 		// kovanie krídla — zoznam pre selecty (len Robust), display-only
@@ -522,16 +526,36 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		predvolenaFarbaPreSystem: Object.fromEntries(
 			systemy.filter((sys) => predvolenaFarba(sys)).map((sys) => [sys, predvolenaFarba(sys)!])
 		),
-		// platné RAL možnosti PER SYSTÉM (#354) — Deluxe (R9006/R7016, len 10mm je live)
-		// a Robust/Štandard (R9005/R7016) majú ROZDIELNU farebnú množinu; zdieľaný pevný
-		// zoznam by nesprávnu voľbu pre daný systém TICHO preskočil (farba-mismatch nie je
-		// chyba, len absent) namiesto ponuky len platných kombinácií. Derivované z configu,
-		// nie hardcoded — nová farba/systém sa premietne bez úpravy tejto stránky.
+		// popis (label) RAL selectu per systém (#431 kolo 2) — Deluxe: „Farba krytiek"
+		// (kovanie je pevne nerezová mušľa); ostatné majú default „Farba kovania". Config-
+		// derived z `POPIS_FARBY`, žiadny `system==='Deluxe'` v stránke.
+		farbaPopisPreSystem: Object.fromEntries(
+			systemy.filter((sys) => popisFarby(sys)).map((sys) => [sys, popisFarby(sys)!])
+		),
+		// platné RAL možnosti PER SYSTÉM (#354, #431 kolo 2) ako páry {farba, hrubkaSkla?}
+		// — Deluxe krytky sú hrúbko-špecifické (6mm R9006/R9005, 10mm R9006/R7016), Robust/
+		// Štandard kovanie hrúbko-neutrálne (hrubkaSkla nezadané). Klient filtruje podľa
+		// hrúbky zvoleného skla. Zdieľaný plochý zoznam by nesprávnu voľbu TICHO preskočil
+		// (farba-mismatch nie je chyba, len absent). Derivované z configu, nie hardcoded —
+		// nová farba/hrúbka/systém sa premietne bez úpravy tejto stránky. Dedup po dvojici
+		// (farba, hrubkaSkla): tá istá farba môže legitímne existovať na oboch hrúbkach.
 		ralPreSystem: Object.fromEntries(
-			systemy.map((sys) => [
-				sys,
-				[...new Set((komponentyPre(sys) ?? []).map((k) => k.farba).filter((f) => f !== undefined))]
-			])
+			systemy.map((sys) => {
+				const videne = new Set<string>();
+				const pary: RalPar[] = [];
+				for (const k of komponentyPre(sys) ?? []) {
+					if (k.farba === undefined) continue;
+					const kluc = `${k.farba}|${k.hrubkaSkla ?? ''}`;
+					if (videne.has(kluc)) continue;
+					videne.add(kluc);
+					pary.push(
+						k.hrubkaSkla === undefined
+							? { farba: k.farba }
+							: { farba: k.farba, hrubkaSkla: k.hrubkaSkla }
+					);
+				}
+				return [sys, pary];
+			})
 		),
 		znova,
 		live: isLive()

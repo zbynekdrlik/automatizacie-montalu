@@ -249,7 +249,12 @@ describe('znovaZOdpisu — farbaKovania vrátane R9006 (#431 kolo 2)', () => {
 
 	it('neplatná/chýbajúca farba → null (fail-loud v engine, nie tichý default)', () => {
 		const idBad = vlozOdpis('ZAK-ZNOVA-BAD', '01', { ...DETAIL_DELUXE, farbaKovania: 'R9999' }, 0);
-		const idNone = vlozOdpis('ZAK-ZNOVA-NONE', '01', { ...DETAIL_DELUXE, farbaKovania: undefined }, 0);
+		const idNone = vlozOdpis(
+			'ZAK-ZNOVA-NONE',
+			'01',
+			{ ...DETAIL_DELUXE, farbaKovania: undefined },
+			0
+		);
 		expect(znovaZOdpisu(idBad)!.vstup!.farbaKovania).toBeNull();
 		expect(znovaZOdpisu(idNone)!.vstup!.farbaKovania).toBeNull();
 	});

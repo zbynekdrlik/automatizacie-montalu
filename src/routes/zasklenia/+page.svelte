@@ -18,7 +18,7 @@
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
 	// #250 — vyčlenené krokové subkomponenty (vzor #239); +page ostáva state+compute hub
-	import { type PosuvRow } from '$lib/zasklenia-form';
+	import { hrubkaPreSklo, ralOptionsPre, type PosuvRow } from '$lib/zasklenia-form';
 	import ZasklieniaForm from '$lib/components/zasklenia/ZasklieniaForm.svelte';
 	import PlanKarty from '$lib/components/zasklenia/PlanKarty.svelte';
 	import PlanKartyMulti from '$lib/components/zasklenia/PlanKartyMulti.svelte';
@@ -297,16 +297,32 @@
 	let kovanieMuslaHint = $derived(
 		data.predvolenaFarbaPreSystem?.[system] ? 'nerezová mušľa' : null
 	);
-	// platné RAL možnosti pre RAL <select> (#354) — zjednotenie farieb naprieč systémami
-	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), zo servera odvodených
-	// per-systém množín (Deluxe R9006/R7016 ≠ Robust/Štandard R9005/R7016).
-	let ralOptions = $derived.by(() => {
-		const systemyVHre = [system, ...posuvyExtra.map((p) => p.system)];
-		const zjednotene: Farba[] = [];
-		for (const s of systemyVHre)
-			for (const f of data.ralPreSystem?.[s] ?? []) if (!zjednotene.includes(f)) zjednotene.push(f);
-		return zjednotene;
+	// #431 kolo 2: label RAL selectu z popisov systémov v hre — všetky krytkové →
+	// „Farba krytiek", žiadny → „Farba kovania", zmiešané → „Farba kovania / krytiek".
+	// Config-derived (server `farbaPopisPreSystem`), žiadny `system==='Deluxe'`.
+	let farbaPopis = $derived.by(() => {
+		const vHre = [system, ...posuvyExtra.map((p) => p.system)].filter((s) =>
+			(data.systemyFarba ?? []).includes(s)
+		);
+		const popisy = new Set(vHre.map((s) => data.farbaPopisPreSystem?.[s] ?? 'Farba kovania'));
+		return popisy.size === 1 ? [...popisy][0]! : 'Farba kovania / krytiek';
 	});
+	// platné RAL možnosti pre RAL <select> (#354, #431 kolo 2) — únia naprieč posuvmi
+	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), HRÚBKO-ZÁVISLE pre
+	// krytky (Deluxe 6mm R9006/R9005 ≠ 10mm R9006/R7016; Robust/Štandard hrúbko-neutrálne).
+	// Hrúbku posuvu odvodí `hrubkaPreSklo` z `data.skla` (katalóg) / triedy (SKLO_INE).
+	let ralOptions = $derived.by(() =>
+		ralOptionsPre(
+			[
+				{ system, hrubka: hrubkaPreSklo(system, sklo, skloTriedaS, data.skla) },
+				...posuvyExtra.map((p) => ({
+					system: p.system,
+					hrubka: hrubkaPreSklo(p.system, p.sklo, p.skloTrieda, data.skla)
+				}))
+			],
+			data.ralPreSystem ?? {}
+		)
+	);
 	// zvolená farba, ktorá je pre AKTUÁLNU množinu neplatná (napr. R9005 z Robustu
 	// po prepnutí na Deluxe, ktorý ponúka len R9006/R7016) sa zahodí — inak by
 	// bola vidno v selecte prázdna, ale mohla by v `farbaKovaniaS` ostať trčať
@@ -708,6 +724,7 @@
 		{maFab}
 		{maFarbu}
 		{ralOptions}
+		{farbaPopis}
 		{kovanieMuslaHint}
 		{maKolajnicu}
 		{maSietka}

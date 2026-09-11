@@ -60,8 +60,22 @@ describe('komponentyPre(Deluxe) — 10mm + 6mm live (#431 kolo 2: krytky evidova
 		const komp = komponentyPre('Deluxe')!;
 		const krytky6 = komp.filter((k) => k.hrubkaSkla === 6);
 		const krytky10 = komp.filter((k) => k.hrubkaSkla === 10);
-		expect(krytky6.map((k) => k.farba).sort()).toEqual(['R9005', 'R9005', 'R9005', 'R9006', 'R9006', 'R9006']);
-		expect(krytky10.map((k) => k.farba).sort()).toEqual(['R7016', 'R7016', 'R7016', 'R9006', 'R9006', 'R9006']);
+		expect(krytky6.map((k) => k.farba).sort()).toEqual([
+			'R9005',
+			'R9005',
+			'R9005',
+			'R9006',
+			'R9006',
+			'R9006'
+		]);
+		expect(krytky10.map((k) => k.farba).sort()).toEqual([
+			'R7016',
+			'R7016',
+			'R7016',
+			'R9006',
+			'R9006',
+			'R9006'
+		]);
 	});
 
 	it('KOVANIE_NEUPLNE.Deluxe už NEEXISTUJE — 6mm krytky teraz idú do odpisu (#431 kolo 2)', () => {

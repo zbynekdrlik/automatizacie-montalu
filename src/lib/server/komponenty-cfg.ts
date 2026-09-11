@@ -284,20 +284,72 @@ export const KOMPONENTY_STANDARD: Komponent[] = [
  * ŽIVO proti ostrému Money (read-only SQL, 31.8.2026): všetkých 15 kódov existuje,
  * `Deleted=0`, názvy sedia s Dominikovou tabuľkou.
  *
- * MONEY-KRITICKÉ nález: 6mm krytky (ZASK202519/202520/202521/202522/202523/202524)
- * majú v Money 0 ks na sklade (všetky sklady spolu) — presne tá istá situácia, aká
- * viedla k vynechaniu ZASK202537/ZASK20258 z `KOMPONENTY_SLIDE` vyššie (#357;
- * „artikel bez zásoby… appka neposlala pohyb, ktorý nemá kam sadnúť"). Preto sú tu
- * zámerne VYNECHANÉ, kým sklad nepríde —
- * design komentár na #354 nesie ich úplnú tabuľku aj Money kódy pre budúce doplnenie
- * (mechanizmus `hrubkaSkla` už existuje, doplnenie = 6 riadkov analogických nižšie).
+ * #431 KOLO 2 (Dominik, Odoo úloha 574, 11.9.2026 „krytky evidovať v RAL" + príloha
+ * 15952 = celý 12-kódový katalóg krytiek Delux): 6mm krytky
+ * (ZASK202519–202524) sú TERAZ v odpise — evidujú sa podľa RAL (6mm: R9006/R9005,
+ * 10mm: R9006/R7016). 0-ks caution z #354 (6mm mali 0 ks skladu 31.8, preto boli
+ * dovtedy VYNECHANÉ, rovnaký vzor ako Slide #357) je PREKONANÁ majiteľským
+ * rozhodnutím výroby — krytky sa evidujú, obsluha vyberie farbu, odpis pošle
+ * zodpovedajúci Money kód. Farba je pole na úrovni objednávky (`farbaKovania`);
+ * kovanie (mušľa) ostáva pevne nerezová (RAL voľba je „Farba krytiek", nie kovania).
+ * Slide vynechania (#357) sa TENTO tiket NEDOTÝKA.
  *
  * Krajná/stredová L-P počítacia formula (`konst`/`naStyk`) je odvodená z existujúcej
  * `cfg_seed` geometrie (Dorazový profil `pocetKs=2` na KAŽDOM Deluxe štýle vrátane
  * opony; Kladkový aj Klzný profil `pocetKs=N`) — plné odvodenie v design komentári.
+ * 6mm používa ROVNAKÉ pravidlá ako 10mm (líši sa len hrúbka + farebná dvojica).
  */
 export const KOMPONENTY_DELUXE: Komponent[] = [
-	// 10mm krytky — RAL R9006 / R7016 (6mm vynechané, viď komentár vyššie).
+	// 6mm krytky — RAL R9006 / R9005 (#431 kolo 2). Rovnaké pravidlá ako 10mm nižšie.
+	{
+		kod: 'ZASK202519',
+		nazov: 'Krytka stredová L 6 mm R9006',
+		mj: 'ks',
+		hrubkaSkla: 6,
+		farba: 'R9006',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202520',
+		nazov: 'Krytka stredová L 6 mm R9005',
+		mj: 'ks',
+		hrubkaSkla: 6,
+		farba: 'R9005',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202521',
+		nazov: 'Krytka stredová P 6 mm R9006',
+		mj: 'ks',
+		hrubkaSkla: 6,
+		farba: 'R9006',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202522',
+		nazov: 'Krytka stredová P 6 mm R9005',
+		mj: 'ks',
+		hrubkaSkla: 6,
+		farba: 'R9005',
+		pravidlo: { typ: 'naStyk', koef: 1 }
+	},
+	{
+		kod: 'ZASK202523',
+		nazov: 'Krytka krajná 6 mm R9006',
+		mj: 'ks',
+		hrubkaSkla: 6,
+		farba: 'R9006',
+		pravidlo: { typ: 'konst', ks: 2 }
+	},
+	{
+		kod: 'ZASK202524',
+		nazov: 'Krytka krajná 6 mm R9005',
+		mj: 'ks',
+		hrubkaSkla: 6,
+		farba: 'R9005',
+		pravidlo: { typ: 'konst', ks: 2 }
+	},
+	// 10mm krytky — RAL R9006 / R7016.
 	{
 		kod: 'ZASK202525',
 		nazov: 'Krytka stredová L 10 mm R9006',
@@ -368,12 +420,10 @@ export const KOMPONENTY_DELUXE: Komponent[] = [
  * na to musí upozorniť (#338). Prázdne = kompletné.
  *
  * Hodnota je buď PEVNÝ text (Štandard: neúplné VŽDY, nezávisle od vstupu), alebo
- * FUNKCIA `(skloHrubka, farbaKovania) => text | null` (Deluxe: neúplné LEN pri 6mm —
- * #354 review nález 🟡, pôvodná pevná hláška sa zobrazovala aj na 10mm objednávkach,
- * kde je odpis kovania v skutočnosti kompletný a hláška by zmiatla/viedla na zbytočné
- * ručné doplnenie 6mm položiek, ktoré sa 10mm objednávky vôbec netýkajú; Slide, #357:
- * neúplné VŽDY kvôli madlu, PLUS zámok pri R9005 — druhý parameter `farbaKovania`
- * pridaný #357, Deluxe funkciu ignoruje, TS bezproblémovo prijme kratší podpis).
+ * FUNKCIA `(skloHrubka, farbaKovania) => text | null` (Slide, #357: neúplné VŽDY kvôli
+ * madlu, PLUS zámok pri R9005 — druhý parameter `farbaKovania`). Deluxe už tu NIE JE:
+ * #431 kolo 2 doplnilo 6mm krytky, takže Deluxe 6mm aj 10mm sú kompletné (predtým
+ * #354 mal Deluxe funkciu hlásiacu chýbajúce 6mm krytky pri 0 ks sklade — prekonané).
  */
 export const KOVANIE_NEUPLNE: Record<
 	string,
@@ -381,10 +431,10 @@ export const KOVANIE_NEUPLNE: Record<
 > = {
 	Štandard:
 		'STANDARD: tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ NIE JE v odpise kovania — neznáma rola profilu, doplniť ručne.',
-	Deluxe: (skloHrubka) =>
-		skloHrubka === 6
-			? 'DELUXE 6mm: krytky (stredová L/P, krajná) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026); madlo D56 a tesniace kefy odpis dostávajú. Doplniť, keď 6mm dostane sklad (#354).'
-			: null,
+	// #431 kolo 2: Deluxe už NEMÁ neúplné kovanie — 6mm krytky (ZASK202519–524) sú
+	// teraz v odpise (predtým 0 ks caution #354). Deluxe 6mm aj 10mm sú kompletné
+	// (krytky + madlo + kefy), preto tu Deluxe kľúč ZÁMERNE NIE JE (kovanie.ts znesie
+	// chýbajúci kľúč — `KOVANIE_NEUPLNE[system]` je undefined = žiadne varovanie).
 	// #357: madlo 200 chýba VŽDY (mandatórna položka, 0 ks); automatický zámok chýba
 	// LEN pri R9005 (R7016 má sklad a odpis dostáva). Bez zvolenej farby (chyba inde
 	// vo výpočte, nie tu) sa zobrazí len madlová veta.
@@ -394,18 +444,34 @@ export const KOVANIE_NEUPLNE: Record<
 			: 'SLIDE: madlo 200 (ZASK20258) zatiaľ NIE JE v odpise kovania — Money má na ňom 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). Doplniť ručne, kým nedostane sklad (#357).'
 };
 
-/** Systémy s PREDVOLENOU farbou kovania (#431 bod 1, Patrik msg 1801337) — Deluxe:
- *  kovanie je nerezová mušľa (žiadny farebný variant KOVANIA), ale KRYTKY existujú
- *  v dvoch RAL variantoch (R9006 bielohliníková / R7016 antracit), takže RAL select
- *  OSTÁVA viditeľný. `predvolenaFarba` je len PREDVOLBA — operátor ju môže zmeniť
- *  na R7016. Defence: ak formulár farbu nepošle, engine použije túto hodnotu. */
+/** Systémy s PREDVOLENOU farbou (#431 bod 1/kolo 2, Patrik msg 1801337) — Deluxe:
+ *  kovanie je pevne nerezová mušľa (žiadny farebný variant KOVANIA), ale KRYTKY
+ *  existujú v RAL variantoch per hrúbka (6mm R9006/R9005, 10mm R9006/R7016), takže
+ *  RAL select OSTÁVA viditeľný. `predvolenaFarba` je len PREDVOLBA — operátor ju môže
+ *  zmeniť. MUSÍ byť platná na OBOCH hrúbkach krytiek (invariant v komponenty.test.ts),
+ *  inak by sa serverový fallback (kovanieFor) zmenil na fail-loud; R9006 to spĺňa.
+ *  Defence: ak formulár farbu nepošle, engine použije túto hodnotu. */
 export const PREDVOLENA_FARBA: Partial<Record<string, Farba>> = {
 	Deluxe: 'R9006'
 };
 
-/** Predvolená farba kovania pre systém, alebo `undefined` keď systém nemá predvoľbu. */
+/** Predvolená farba pre systém, alebo `undefined` keď systém nemá predvoľbu. */
 export function predvolenaFarba(system: string): Farba | undefined {
 	return PREDVOLENA_FARBA[system];
+}
+
+/** Popis (label) RAL selectu per systém (#431 kolo 2). Deluxe: RAL voľba sa týka
+ *  KRYTIEK (kovanie = pevne nerezová mušľa), preto „Farba krytiek", nie „Farba
+ *  kovania" (Patrik/Dominik: „farba kovania je len nerezová mušľa"). Systémy tu
+ *  neuvedené = default label „Farba kovania" (kľučka/zámok RAL). Config-derived —
+ *  žiadny `system==='Deluxe'` v stránke (zasklenia-form-reactivity.md). */
+export const POPIS_FARBY: Partial<Record<string, string>> = {
+	Deluxe: 'Farba krytiek'
+};
+
+/** Popis RAL selectu pre systém, alebo `undefined` keď systém používa default label. */
+export function popisFarby(system: string): string | undefined {
+	return POPIS_FARBY[system];
 }
 
 /** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
