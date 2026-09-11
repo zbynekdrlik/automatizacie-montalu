@@ -10,12 +10,15 @@ import { describe, it, expect } from 'vitest';
 import {
 	krovUlozenie,
 	krovDlzkaNominal,
+	krovRezneUhly,
 	KROV_C,
 	KROV_CC,
 	KROV_KONST,
 	KROV_PRAH_STUPNE,
 	KROV_FREZ_ZMENA_STUPNE,
-	KROV_ODPOCET
+	KROV_ODPOCET,
+	KROV_PRIEREZ_SIRKA,
+	KROV_PRIEREZ_VYSKA
 } from '../src/lib/pergola-krov';
 
 describe('konštanty uloženia — potvrdené hodnoty z callu (nie magické čísla)', () => {
@@ -159,6 +162,80 @@ describe('krovUlozenie — čistá funkcia, monotónny rast offsetov s uhlom', (
 			const r = krovUlozenie(u);
 			expect(r.lv!).toBeGreaterThan(r.ps!);
 		}
+	});
+});
+
+// ── KROV REZNÉ UHLY (#161) — odvodené z 3D STEP dát (OP260357 Khúrová, 11.9.2026) ──────
+// Dva reálne modely (sklon DO 7° a NAD 7°) → koncové rezné uhly krokvy (18102 priečkový
+// profil 105, prierez 50×120): jeden koniec rezaný pod uhlom = SKLON strechy, druhý koniec
+// pod |SKLON − 7| (= |uhol3|, strana seating drážky). VŠETKY hodnoty MERANÉ zo STEP
+// geometrie (rotácia zostavy + normály plôch; STEP NEOBSAHUJE PMI kóty). Krížová
+// validácia: |sklon − 7| = presne CAD `uhol3`, ktorý appka už používa na uloženie.
+describe('konštanty rezných uhlov — prierez krokvy 50×120 (STEP OP260357 + výkres OP260282)', () => {
+	it('prierez profilu krokvy = 50 × 120 mm (2 nezávislé zdroje)', () => {
+		expect(KROV_PRIEREZ_SIRKA).toBe(50);
+		expect(KROV_PRIEREZ_VYSKA).toBe(120);
+	});
+});
+
+describe('krovRezneUhly — VERIFIKAČNÝ VEKTOR z STEP dát (do 7° / nad 7°)', () => {
+	it('DO 7 (sklon 5,157°): koncový rez = sklon 5,16°; rez drážky = |5,157−7| = 1,84° (STEP meral 1,85°)', () => {
+		const r = krovRezneUhly(5.157);
+		expect(r.podporovane).toBe(true);
+		expect(r.uholRezSklon).toBe(5.16); // = sklon (meraný STEP koncový rez 5,16°)
+		expect(r.uholRezDrazka).toBe(1.84); // = |5,157−7| (STEP drážka 1,85°, Δ0,01 zaokrúhlenie)
+		expect(r.uholRezDrazka!).toBeCloseTo(1.85, 1); // krížová kontrola na meranú STEP hodnotu
+		expect(r.prierez).toEqual({ sirka: 50, vyska: 120 });
+	});
+
+	it('NAD 7 (sklon 9,501°): koncový rez = sklon 9,50°; rez drážky = |9,501−7| = 2,50° (STEP meral 2,50°)', () => {
+		const r = krovRezneUhly(9.501);
+		expect(r.podporovane).toBe(true);
+		expect(r.uholRezSklon).toBe(9.5);
+		expect(r.uholRezDrazka).toBe(2.5);
+		expect(r.uholRezDrazka!).toBeCloseTo(2.5, 1);
+	});
+
+	it('= 7° → rez drážky = 0° („krov leží rovnobežne s hranou" — Dominik verbatim)', () => {
+		const r = krovRezneUhly(7);
+		expect(r.uholRezSklon).toBe(7);
+		expect(r.uholRezDrazka).toBe(0);
+	});
+
+	it('POD 7° → rez drážky sa „prehodí" (kladná |sklon−7|), koncový rez ostáva = sklon', () => {
+		const r = krovRezneUhly(6);
+		expect(r.uholRezSklon).toBe(6);
+		expect(r.uholRezDrazka).toBe(1); // |6 − 7| = 1 (trojuholník otočený)
+		expect(r.podporovane).toBe(true); // uhly sú definované aj pod prahom (na rozdiel od uloženia)
+	});
+
+	it('krížová validácia: rez drážky = |uhol3| z krovUlozenie tam, kde je uloženie podporované', () => {
+		for (const s of [7, 7.2, 8, 9]) {
+			const drazka = krovRezneUhly(s).uholRezDrazka!;
+			const uhol3 = krovUlozenie(s).uhol3!;
+			expect(drazka).toBeCloseTo(Math.abs(uhol3), 2);
+		}
+	});
+
+	it('nezadané / neplatné (null / undefined / NaN / 0 / záporné) → null, nepodporované, nič sa nehádže', () => {
+		for (const v of [null, undefined, NaN, 0, -3]) {
+			const r = krovRezneUhly(v as number);
+			expect(r.podporovane).toBe(false);
+			expect(r.uholRezSklon).toBeNull();
+			expect(r.uholRezDrazka).toBeNull();
+		}
+	});
+
+	it('R2 (0,01°) — dve desatinné miesta, žiadny plávajúci chvost', () => {
+		const r = krovRezneUhly(6.1);
+		expect(Math.round(r.uholRezDrazka! * 100) / 100).toBe(r.uholRezDrazka);
+		expect(Math.round(r.uholRezSklon! * 100) / 100).toBe(r.uholRezSklon);
+	});
+
+	it('čistá funkcia — poznámky sú plain slovenčina (#233), bez #N / O-čiek / „call"', () => {
+		const p = krovRezneUhly(8).poznamky.join(' | ');
+		expect(p.length).toBeGreaterThan(0);
+		expect(p).not.toMatch(/#\d|(?:\bO\d)|call/i);
 	});
 });
 
