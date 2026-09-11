@@ -11,8 +11,10 @@ import {
 	listGlassTypes,
 	glassTypesForSystem,
 	efektivnaKorekcia,
-	efektivnaRedukciaZero
+	efektivnaRedukciaZero,
+	type GlassType
 } from '$lib/server/db';
+import { SKLO_INE, ineHrubka, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
 import {
 	safeCompute,
 	safeComputeMulti,
@@ -106,6 +108,8 @@ function jobFor(
 			// zaznamenaj presné zloženie ak zadané, inak základné sklo
 			sklo: vstup.skloPresne || vstup.sklo,
 			skloZaklad: vstup.sklo,
+			// vlastná skladba (#235 slice 2): trieda pre „Použiť znova" restore (inak null)
+			skloTrieda: vstup.skloTrieda,
 			otvaranie: vstup.otvaranie,
 			// kovanie (kľučky) — len záznam do histórie/plánu, do Money položiek nejde
 			kovanieL: vstup.kovanieL,
@@ -172,13 +176,18 @@ function multiTesneniePolozky(
 	vstup: MultiVstup
 ): { polozky: TesneniePolozka[]; warn: string | null } {
 	const stdPosuvy = r.posuvy
-		.map((p, i) => ({ system: p.system, sklo: vstup.posuvy[i]?.sklo }))
+		.map((p, i) => ({
+			system: p.system,
+			sklo: vstup.posuvy[i]?.sklo,
+			// #235 slice 2: vlastná skladba → klasifikácia z triedy (názov je sentinel)
+			trieda: vstup.posuvy[i]?.skloTrieda ?? null
+		}))
 		.filter((p) => TESNENIE_SYSTEMY.includes(p.system));
 
 	if (stdPosuvy.length === 0) return { polozky: [], warn: null };
 
 	// Jednotná klasifikácia: všetky STANDARD posuvy musia mať rovnaké sklo
-	const klasifikacie = stdPosuvy.map((p) => klasifikujSkloPreTesnenie(p.sklo));
+	const klasifikacie = stdPosuvy.map((p) => klasifikujSkloPreTesnenie(p.sklo, p.trieda));
 	const unikatne = new Set(klasifikacie);
 
 	if (unikatne.size === 1) {
@@ -186,7 +195,8 @@ function multiTesneniePolozky(
 		return tesneniePolozkyPooled(
 			r.material,
 			stdPosuvy.map((p) => p.system),
-			stdPosuvy[0]!.sklo
+			stdPosuvy[0]!.sklo,
+			stdPosuvy[0]!.trieda
 		);
 	}
 	// Zmiešané sklá naprieč posuvmi → honest-null (konzervatívny)
@@ -241,7 +251,32 @@ const existujeVCfg =
  *  #443: `sklaDoPonuky` dostáva trieda-lookup (`platne` je práve TENTO systém, takže
  *  `find` podľa mena je jednoznačný) — basic/IZO filter sa rozhoduje primárne triedou,
  *  regex `jeIzoSklo` ostáva fallback len pre neklasifikované sklo. */
-function skloPre(cfg: ReturnType<typeof loadCfg>, system: string, styl: string, sklo: string) {
+function skloPre(
+	cfg: ReturnType<typeof loadCfg>,
+	system: string,
+	styl: string,
+	sklo: string,
+	skloTrieda?: number | null
+) {
+	// Vlastná (nekatalógová) skladba (#235 slice 2): SYNTETICKÉ sklo z hrúbkovej triedy —
+	// počíta sa BIT-IDENTICKY ako katalógové sklo tej istej triedy. `skloKorekcia=null` →
+	// efektivnaKorekcia = triedová korekcia (systém × trieda); `redukciaZero` sa pre Slide
+	// DERIVUJE z hrubkaTrieda (efektivnaRedukciaZero). `hrubka` (Deluxe kladka/klzný) = 0 mimo
+	// Deluxe (bit-identické s katalógom). Cena je honest-null (glassMoneyKod(SKLO_INE)→null,
+	// lebo variant je sentinel). Trieda POVINNÁ — bez platnej triedy null (validácia odmietne).
+	if (sklo === SKLO_INE) {
+		if (!jeSkloTrieda(skloTrieda)) return null;
+		const g: GlassType = {
+			id: -1,
+			nazov: SKLO_INE,
+			system,
+			redukciaZero: false,
+			hrubka: ineHrubka(system, skloTrieda),
+			skloKorekcia: null,
+			hrubkaTrieda: ineHrubkaTrieda(skloTrieda)
+		};
+		return g;
+	}
 	const platne = glassTypesForSystem(system);
 	const triedaZa: TriedaZaNazov = (nazov) =>
 		platne.find((g) => g.nazov === nazov)?.hrubkaTrieda ?? null;
@@ -263,7 +298,7 @@ function compute(vstup: Vstup): {
 	const cfg = loadCfg();
 	// sklo musí patriť k zvolenému systému (Robust = 4/16/4, Slide = 4/8/4) —
 	// nedá sa cez skriptovaný POST poslať cudzie sklo
-	const g = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo);
+	const g = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo, vstup.skloTrieda);
 	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém a štýl.', spec: null };
 	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
 	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
@@ -320,7 +355,7 @@ function computeMultiFrom(vstup: MultiVstup) {
 	const cfg = loadCfg();
 	const specs: PosuvSpec[] = [];
 	for (const [i, p] of vstup.posuvy.entries()) {
-		const g = skloPre(cfg, p.system, p.styl, p.sklo);
+		const g = skloPre(cfg, p.system, p.styl, p.sklo, p.skloTrieda);
 		if (!g)
 			return {
 				r: null,
@@ -341,7 +376,9 @@ function computeMultiFrom(vstup: MultiVstup) {
 				// #443: reťaz precedencie per-sklo (#440) → trieda (systém × 6/16) → systémová
 				skloKorekcia: efektivnaKorekcia(g, p.system),
 				otvaranie: p.otvaranie,
-				sklo: p.sklo,
+				// display echo do PosuvInfo.skloNazov (plán/tlač) — pri vlastnej skladbe TEXT
+				// (skloPresne); compute glass rieši skloPre() z RAW p.sklo (sentinel) vyššie (#235)
+				sklo: p.skloPresne || p.sklo,
 				kovanieL: p.kovanieL,
 				kovanieP: p.kovanieP,
 				kovanieStred: p.kovanieStred,
@@ -393,7 +430,11 @@ function jobForMulti(
 				styl: p.styl,
 				s: p.S,
 				v: p.V,
-				sklo: vstup.posuvy[i]?.sklo,
+				// #235 slice 2: rovnaká schéma ako single (jobFor) — display text v `sklo`,
+				// základ (sentinel pri vlastnej skladbe) v `skloZaklad`, trieda pre restore
+				sklo: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo,
+				skloZaklad: vstup.posuvy[i]?.sklo,
+				skloTrieda: vstup.posuvy[i]?.skloTrieda ?? null,
 				otvaranie: p.otvaranie,
 				kovanieL: vstup.posuvy[i]?.kovanieL,
 				kovanieP: vstup.posuvy[i]?.kovanieP,
@@ -487,7 +528,13 @@ export const actions = {
 			// #443 review: trieda-aware, rovnako ako compute() — inak by tento pred-check
 			// mohol pri novom neklasifikovanom Odoo skle vybrať iný sysStyl (a teda iné B2B
 			// medze) než skutočný výpočet nižšie.
-			const trieda = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo)?.hrubkaTrieda;
+			const trieda = skloPre(
+				cfg,
+				vstup.system,
+				vstup.styl,
+				vstup.sklo,
+				vstup.skloTrieda
+			)?.hrubkaTrieda;
 			const sysStyl = sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg), trieda);
 			const wErr = checkB2BWidth(cfg, sysStyl, vstup.s);
 			if (wErr) return { step: 'form' as const, error: wErr, vstup };
@@ -502,7 +549,7 @@ export const actions = {
 		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 		// #342 round 2: tesnenie polozky (ZASK00005/ZASK00006) podľa skla + honest-null
-		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo);
+		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo, vstup.skloTrieda);
 		const allKovanie = [...kov.polozky, ...tesn.polozky];
 		const job = jobFor(vstup, r, '', allKovanie);
 		return {
@@ -559,7 +606,7 @@ export const actions = {
 		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 		// #342 round 2: tesnenie polozky podľa skla
-		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo);
+		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo, vstup.skloTrieda);
 		const allKovanie = [...kov.polozky, ...tesn.polozky];
 
 		// ak niekto medzi náhľadom a potvrdením zmenil vzorce (Nastavenia),
@@ -664,7 +711,7 @@ export const actions = {
 			const warns: string[] = [];
 			for (const p of vstup.posuvy) {
 				// #443 review: trieda-aware, rovnako ako computeMultiFrom() nižšie.
-				const trieda = skloPre(cfg, p.system, p.styl, p.sklo)?.hrubkaTrieda;
+				const trieda = skloPre(cfg, p.system, p.styl, p.sklo, p.skloTrieda)?.hrubkaTrieda;
 				const sysStyl = sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg), trieda);
 				const wErr = checkB2BWidth(cfg, sysStyl, p.s);
 				if (wErr) return { step: 'form' as const, error: wErr, multiVstup: vstup };
@@ -869,7 +916,7 @@ export const actions = {
 			sirkaMm: p.sklo.sirka,
 			vyskaMm: p.sklo.vyska,
 			pocet: p.sklo.pocet,
-			typSkla: vstup.posuvy[i]?.sklo ?? '',
+			typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
 			createdBy: locals.user?.username ?? ''
 		}));
 		const count = pridajSklaHromadne(polozky);

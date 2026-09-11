@@ -14,6 +14,7 @@
 //     obsluha vidí, než potichu prenesená hodnota, ktorú server odmietne.
 import { getOdpis } from './money';
 import { glassTypesForSystem, listSysStyly } from './db';
+import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
 import type { Klin } from '$lib/klin';
 import type { KolajnicaRucne } from '$lib/kolajnica';
@@ -35,6 +36,8 @@ const s = (x: unknown): string => (typeof x === 'string' ? x : '');
 // null → obsluha musí farbu znova zvoliť (nikdy tichý default na jednu z farieb).
 const farba = (x: unknown): 'R9005' | 'R7016' | null => (x === 'R9005' || x === 'R7016' ? x : null);
 const n = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
+// #235 slice 2: hrúbková trieda vlastnej skladby (4/6/10/16/24) alebo null (katalógové sklo)
+const trieda = (x: unknown): number | null => (jeSkloTrieda(x) ? x : null);
 const b = (x: unknown): boolean => x === true;
 const obj = <T>(x: unknown): T | null => (x && typeof x === 'object' ? (x as T) : null);
 // #472: historické záznamy majú `klin: {...}|null` (jeden klín); nové majú `kliny: [...]`.
@@ -48,6 +51,8 @@ const objArr = <T>(x: unknown): T[] => {
 /** sklo, ktoré daný systém stále ponúka; inak '' + záznam do `chybajuce` */
 function platneSklo(system: string, sklo: string, chybajuce: string[], kde: string): string {
 	if (!sklo) return '';
+	// vlastná skladba (#235 slice 2): sentinel, NIE katalógový riadok — vždy platný
+	if (sklo === SKLO_INE) return sklo;
 	if (glassTypesForSystem(system).some((g) => g.nazov === sklo)) return sklo;
 	chybajuce.push(`${kde}: sklo „${sklo}" sa už pre systém ${system} neponúka — vyber nové`);
 	return '';
@@ -73,6 +78,10 @@ function posuvZDetailu(
 		s: n(d.s),
 		v: n(d.v),
 		sklo: platneSklo(system, zaklad, chybajuce, kde),
+		// vlastná skladba (#235 slice 2): pri `sklo===SKLO_INE` je text v `d.sklo`
+		// (základ je sentinel v `d.skloZaklad`) a trieda v `d.skloTrieda`
+		skloPresne: s(d.skloZaklad) ? s(d.sklo) : '',
+		skloTrieda: trieda(d.skloTrieda),
 		otvaranie: s(d.otvaranie),
 		kovanieL: s(d.kovanieL),
 		kovanieP: s(d.kovanieP),
@@ -128,10 +137,10 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 	}
 
 	const p = posuvZDetailu(d, styly, chybajuce, 'Zasklenie');
+	// `...p` už nesie skloPresne + skloTrieda (posuvZDetailu, #235 slice 2)
 	const vstup: Vstup = {
 		...spolocne,
 		...p,
-		skloPresne: s(d.skloZaklad) ? s(d.sklo) : '',
 		vrtanieZamku: n(d.vrtanieZamku) || 1050
 	};
 	return { zdroj, chybajuce, vstup };

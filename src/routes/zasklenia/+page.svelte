@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
-	import { defaultSklo } from '$lib/sklo';
+	import { defaultSklo, SKLO_INE, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
@@ -49,6 +49,7 @@
 			v: (fv?.v ?? '') as unknown as number,
 			sklo: fv?.sklo ?? '',
 			skloPresne: fv?.skloPresne ?? '',
+			skloTrieda: fv?.skloTrieda ?? null,
 			otvaranie: fv?.otvaranie ?? 'P - L',
 			kovanieL: fv?.kovanieL ?? '',
 			kovanieP: fv?.kovanieP ?? '',
@@ -89,8 +90,10 @@
 	// (a Štandard + opona nemá izolačnú skladbu → sklaDoPonuky ju odfiltruje)
 	// existencia nárezáka podľa data.styly (server má ten istý test nad cfg)
 	const existuje = (sysStyl: string) => data.styly.some((x) => x.sysStyl === sysStyl);
-	const sklaForSystem = (sys: string, styl: string) =>
-		sklaDoPonuky(
+	// SKLO_INE (#235 slice 2) je doplnené ZA katalóg pre KAŽDÝ systém — vlastná skladba
+	// nie je katalógový riadok; `defaultSklo` ho nikdy nevráti (nie „číre" ani prvý v poradí).
+	const sklaForSystem = (sys: string, styl: string) => [
+		...sklaDoPonuky(
 			sys,
 			styl,
 			data.skla
@@ -101,7 +104,9 @@
 				)
 				.map((g) => g.nazov),
 			existuje
-		);
+		),
+		SKLO_INE
+	];
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
@@ -110,6 +115,8 @@
 	let opS = $state('');
 	let zakaznikS = $state('');
 	let skloPresneS = $state('');
+	// vlastná skladba (#235 slice 2) — hrúbková trieda pri „Iné"; '' = nezvolená
+	let skloTriedaS = $state<number | ''>('');
 	let poznamkaS = $state('');
 	let ralS = $state('');
 	let cakaS = $state(false);
@@ -157,6 +164,7 @@
 		opS = zd?.op ?? '';
 		zakaznikS = zd?.zakaznik ?? '';
 		skloPresneS = fv?.skloPresne ?? '';
+		skloTriedaS = fv?.skloTrieda ?? '';
 		vrtanieZamkuS = fv?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
 		ralS = zd?.ral ?? '';
@@ -199,6 +207,9 @@
 		vyska = (p?.v as number | string) ?? '';
 		posuvyExtra = (fmv?.posuvy ?? []).slice(1).map((x) => ({
 			...x,
+			// vlastná skladba (#235 slice 2): number|null (PosuvVstup) → number|'' (PosuvRow)
+			skloPresne: x.skloPresne ?? '',
+			skloTrieda: x.skloTrieda ?? '',
 			kovanieStred: x.kovanieStred ?? '',
 			kovanieStredOkno: (x.kovanieStredOkno ?? 'L') as 'L' | 'P',
 			kliny: (x.kliny ?? []).map((k) => ({ ...k })),
@@ -304,10 +315,15 @@
 			kolSS = '';
 		}
 	});
-	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO)
+	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO).
+	// #235 slice 2: pri vlastnej skladbe („Iné") IZO-nosť určuje ZVOLENÁ trieda (nie názov
+	// sentinelu) — inak by hint tvrdil „basic" aj pre vlastnú IZO 24. Cosmetic hint (server
+	// compute je autoritatívny cez triedu), ale nech nezavádza.
 	let narezakHint = $derived.by(() => {
 		if (!skloVyberaIzo(system) || !sklo) return '';
-		const styl2 = sysStylPre(system, styl, sklo, existuje).split('|')[1];
+		const trieda =
+			sklo === SKLO_INE && jeSkloTrieda(skloTriedaS) ? ineHrubkaTrieda(skloTriedaS) : undefined;
+		const styl2 = sysStylPre(system, styl, sklo, existuje, trieda).split('|')[1];
 		return `Podľa skla sa ťahá nárezák ${system} ${styl2}.`;
 	});
 	let stylyPre = $derived(stylyForSystem(system));
@@ -371,6 +387,9 @@
 				s: sirka,
 				v: vyska,
 				sklo,
+				// vlastná skladba primárneho posuvu (#235 slice 2)
+				skloPresne: skloPresneS,
+				skloTrieda: skloTriedaS,
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
@@ -389,6 +408,9 @@
 				s: p.s,
 				v: p.v,
 				sklo: p.sklo,
+				// vlastná skladba tohto posuvu (#235 slice 2)
+				skloPresne: p.skloPresne,
+				skloTrieda: p.skloTrieda,
 				otvaranie: p.otvaranie,
 				kovanieL: p.kovanieL,
 				kovanieP: p.kovanieP,
@@ -413,6 +435,11 @@
 		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
 		if (systemZmeneny || !sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
+		// #235 slice 2: zmena systému zresetuje aj vlastnú skladbu (patrí starému systému)
+		if (systemZmeneny) {
+			p.skloPresne = '';
+			p.skloTrieda = '';
+		}
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {
@@ -438,6 +465,9 @@
 				s: '',
 				v: '',
 				sklo,
+				// klonuj aj vlastnú skladbu primárneho posuvu (#235 slice 2)
+				skloPresne: skloPresneS,
+				skloTrieda: skloTriedaS,
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
@@ -525,6 +555,11 @@
 	<input type="hidden" name="v" value={vstup.v} />
 	<input type="hidden" name="sklo" value={vstup.sklo} />
 	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
+	{#if vstup.skloTrieda != null}<input
+			type="hidden"
+			name="skloTrieda"
+			value={vstup.skloTrieda}
+		/>{/if}
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
 	<input type="hidden" name="kovanieL" value={vstup.kovanieL} />
 	<input type="hidden" name="kovanieP" value={vstup.kovanieP} />
@@ -626,6 +661,7 @@
 		bind:kovanieStredOknoS
 		bind:vrtanieZamkuS
 		bind:skloPresneS
+		bind:skloTriedaS
 		bind:poznamkaS
 		bind:ralS
 		bind:cakaS

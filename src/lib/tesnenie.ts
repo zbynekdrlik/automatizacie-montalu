@@ -68,12 +68,29 @@ export const TESNENIE_KODY: Record<'tesnenie4' | 'tesnenie6', { kod: string; naz
  * Klasifikuj sklo pre výber tesnenia.
  * Dominik (8.9., msg 1807247): 4 mm → ZASK00005, 6 mm → ZASK00006, izolačné → žiadne.
  *
- * Detekcia: izolačné cez existujúci `jeIzoSklo` (regex), hrúbka z názvu skla
+ * `skloTrieda` (#235 slice 2) — pri VLASTNEJ skladbe (`sklo===SKLO_INE`) je katalógový
+ * názov len sentinel bez hrúbky, takže klasifikácia sa robí z Patrikovej triedy skladby
+ * (AUTORITATÍVNA): 4→ZASK00005, 6→ZASK00006, 10→nezname (Dominik neurčil), 16/24→izolačné
+ * (bez gumy). Presne to isté mapovanie ako z názvu katalógového skla, len explicitne.
+ * Pre KATALÓGOVÉ sklo (`skloTrieda == null`) ostáva pôvodná name-based detekcia — testy
+ * a Money vektory bit-identické.
+ *
+ * Detekcia (katalóg): izolačné cez existujúci `jeIzoSklo` (regex), hrúbka z názvu skla
  * (STANDARD_GLASS mená: "Float sklo 4 mm", "Float sklo 6 mm", "Float sklo 10 mm").
  * Lookbehind `(?<![\d.,])` zamedzí falošnému matchu na desatinné názvy ("6,4 mm" → 🟡5).
  * glass_types je admin-editable, takže budúci laminovaný názov nesmie misroutovať.
  */
-export function klasifikujSkloPreTesnenie(skloNazov: string | undefined): SkloKlasifikacia {
+export function klasifikujSkloPreTesnenie(
+	skloNazov: string | undefined,
+	skloTrieda?: number | null
+): SkloKlasifikacia {
+	// Vlastná skladba: trieda je autoritatívna (názov je len sentinel bez hrúbky)
+	if (skloTrieda != null) {
+		if (skloTrieda === 4) return 'tesnenie4';
+		if (skloTrieda === 6) return 'tesnenie6';
+		if (skloTrieda >= 16) return 'izolacne'; // izolačné dvojsklo → bez gumy
+		return 'nezname'; // 10 mm — Dominik neurčil
+	}
 	if (!skloNazov) return 'nezname';
 	if (jeIzoSklo(skloNazov)) return 'izolacne';
 	// Hrúbka z názvu: "… 4 mm" / "… 6 mm" (STANDARD glass nazvy)
@@ -137,12 +154,13 @@ function dlzkaTesneniePooledMm(material: MaterialRow[]): number {
 export function tesneniePolozky(
 	material: MaterialRow[],
 	system: string,
-	skloNazov: string | undefined
+	skloNazov: string | undefined,
+	skloTrieda?: number | null
 ): { polozky: TesneniePolozka[]; warn: string | null } {
 	if (!TESNENIE_SYSTEMY.includes(system)) return { polozky: [], warn: null };
 
 	const dlzkaMm = dlzkaTesneniaMm(material, system);
-	return buildPolozky(dlzkaMm, skloNazov);
+	return buildPolozky(dlzkaMm, skloNazov, skloTrieda);
 }
 
 /**
@@ -152,21 +170,23 @@ export function tesneniePolozky(
 export function tesneniePolozkyPooled(
 	material: MaterialRow[],
 	systems: string[],
-	skloNazov: string | undefined
+	skloNazov: string | undefined,
+	skloTrieda?: number | null
 ): { polozky: TesneniePolozka[]; warn: string | null } {
 	const hasStd = systems.some((s) => TESNENIE_SYSTEMY.includes(s));
 	if (!hasStd) return { polozky: [], warn: null };
 
 	const dlzkaMm = dlzkaTesneniePooledMm(material);
-	return buildPolozky(dlzkaMm, skloNazov);
+	return buildPolozky(dlzkaMm, skloNazov, skloTrieda);
 }
 
-/** Spoločné jadro — z dĺžky + skla vyrobí polozky a warn. */
+/** Spoločné jadro — z dĺžky + skla (alebo vlastnej triedy) vyrobí polozky a warn. */
 function buildPolozky(
 	dlzkaMm: number,
-	skloNazov: string | undefined
+	skloNazov: string | undefined,
+	skloTrieda?: number | null
 ): { polozky: TesneniePolozka[]; warn: string | null } {
-	const klasifikacia = klasifikujSkloPreTesnenie(skloNazov);
+	const klasifikacia = klasifikujSkloPreTesnenie(skloNazov, skloTrieda);
 	const polozky: TesneniePolozka[] = [];
 	let warn: string | null = null;
 
