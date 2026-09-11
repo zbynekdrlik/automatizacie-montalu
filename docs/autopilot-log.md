@@ -2126,3 +2126,14 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   to ZASP cards via Dominikov kód field (16101→ZASP00116, 16006→ZASP00119, 16102→ZASP00125,
   16103→ZASP00128, 16104→ZASP202413). bar_mm=7500 confirmed, FFD bin-packing, odoslat
   unblocked. RED e74b7db → GREEN 29112e4. V1 codes without mapping stay "Nenamapované".
+- **#342 kolo 2 (0.25.14-dev.5): tesnenie dĺžka KOREKCIA na Dominikov verbatim** (2024065 bump,
+  2c44adc [red], 41f6ab1 [green], 3f854e2 e2e). Stará lane da2af81 bola UŽ zaintegrovaná
+  (merge d199ebf, vydaná 0.25.1) — žiadny salvage. Zaintegrovaný `dlzkaTesneniaMm` sčítaval
+  3 profily (kladkový ZASP202415 + nos ZASP00024 + krajová ZASP20244/ZASP00018) ≈ obvod →
+  NADHODNOTENÁ dĺžka (Money-kritické). Dominik verbatim (úloha 582, 8.9. 05:36, owner UNPARK):
+  „je to súčet sírok (kladkových profilov)" → dĺžka = LEN `Σ(ZASP202415)`. Fix: obe dlzka fns →
+  kladkový-only (nos/krajová dead code odstránený), single==pooled. Mapovanie skla (4/6/IZO) a
+  kefy ZASK00007 (=kladkový×2) NEZMENENÉ. Golden standard-2K-basic ZASK00006 12.376→4.788 m
+  (=kefa 9.576/2). §1c rozpor (7.9. msg 1806754 vs 8.9.) zapísaný v kóde+tickete. Vektory
+  tesnenie.test.ts 18.06→5.658 / 27.456→10.664 / 11.572→3.704 + nová formula regresia. compute.test.ts
+  NEDOTKNUTÉ. Full vitest green (exit 0, coverage OK). NEmergnuté (worktree — supervisor integruje).

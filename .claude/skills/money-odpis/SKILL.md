@@ -842,6 +842,24 @@ nemá): odpis by vyzeral kompletne → tichá pod-fakturácia pri KAŽDEJ objedn
 Follow-up ticket na vzorec. Pozor na `warn` KOLÍZIU: stale-formula hláška („Vzorce sa medzitým
 zmenili") a `kov.warn` sa musia SPOJIŤ (`.filter(Boolean).join(' ')`), nie prepísať.
 
+### Dorobený vzorec tesnenia = súčet ŠÍROK KLADKOVÝCH profilov (#342 kolo 2, Dominik 8.9.2026)
+
+Vzorec z §2l („šírka+výška prírezov kladkového/koncového/stredového") bol len PODKLADOVÝ
+text. Dominik ho na priamu otázku (Odoo úloha 582, 8.9. 05:36, verbatim) ZJEDNODUŠIL:
+**„je to súčet sírok (kladkových profilov)"** — teda dĺžka zasklievacieho tesnenia =
+`Σ(ZASP202415 rezy)` (kladkový profil), NIE obvod skla a NIE nos/krajová. Kladkový rez JE
+šírka prírezu krídla (`compute-sietka.ts`: „Šírka prírezov sa číta z POSUVU, kód ZASP202415"),
+takže Σ jeho rezov = súčet šírok. Mapovanie: 4 mm→ZASK00005, 6 mm→ZASK00006, izolačné→ŽIADNE
+(„bez gumy"), 10 mm/iné→honest-null. Kefa ZASK00007 = kladkový × 2 („kefy ostávajú všade
+rovnako podľa výpočtu") — kríž-kontrola: tesnenie:kefa = 1:2 pomer na tom istom kladkovom
+základe. Implementácia: `src/lib/tesnenie.ts` `dlzkaTesneniaMm = sumaRezovMm(material, 'ZASP202415')`.
+
+**§1c pasca naživo:** kolo 1 zaintegrovalo (a VYDALO 0.25.1) 3-profilový súčet kladkový+nos+
+krajová, lebo citovalo STARŠIU Dominikovu 7.9. odpoveď (msg 1806754) — dĺžka bola nadhodnotená.
+Keď máš dve dátumované Dominikove odpovede a novšia je PRIAMA a JEDNODUCHŠIA (+ owner ju
+rozsúdi), vyhráva novšia; rozpor zapíš do kódového komentára aj na ticket, nevyber ticho.
+ZASK202541 (4,8×5 kefa) ostáva honest-null pod `KOVANIE_NEUPLNE` — Dominik neurčil rolu profilu.
+
 ## 2m. E2E: každý zasklenia compute-trigger vyžaduje zvolenú farbu (#338, aktualizované #354)
 
 Po #338 KAŽDÝ Robust/Štandard náhľad potrebuje zvolenú RAL farbu, inak engine chyba a náhľad sa
