@@ -515,9 +515,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			(komponentyPre(sys) ?? []).some((k) => k.pravidlo.typ === 'naUzaverPodlaFab')
 		),
 		// systémy, ktorých kovanie má RAL farebné varianty (kľučka/krytka/zámok R9005 vs
-		// R7016) → formulár ponúkne voľbu farby kovania (#338). Derivované z configu.
-		// #431 bod 1: Deluxe JE zahrnutý — krytky majú 2 farebné Money kódy (R9006/R7016),
-		// aj keď kovanie (mušľa) je nerez. Predvolená farba je len PREDVOĽBA v selecte.
+		// R7016) → formulár ponúkne voľbu farby (#338). Derivované z configu.
+		// #431 kolo 2: Deluxe JE zahrnutý — krytky majú farebné Money kódy per hrúbka
+		// (6mm R9006/R9005, 10mm R9006/R7016), aj keď kovanie (mušľa) je nerez. Label je
+		// „Farba krytiek" (farbaPopisPreSystem); predvolená farba je len PREDVOĽBA.
 		systemyFarba: systemy.filter((sys) =>
 			(komponentyPre(sys) ?? []).some((k) => k.farba !== undefined)
 		),

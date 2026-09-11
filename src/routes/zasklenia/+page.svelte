@@ -289,7 +289,7 @@
 	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
 	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv
 	// (aj ďalší posuv zimnej záhrady s iným systémom než primárny).
-	// #431 bod 1: Deluxe JE zahrnutý (krytky majú 2 farebné Money kódy R9006/R7016).
+	// #431 kolo 2: Deluxe JE zahrnutý (krytky majú farebné kódy per hrúbka: 6mm R9006/R9005, 10mm R9006/R7016).
 	let maFarbu = $derived(
 		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFarba ?? []).includes(s))
 	);
@@ -324,10 +324,11 @@
 		)
 	);
 	// zvolená farba, ktorá je pre AKTUÁLNU množinu neplatná (napr. R9005 z Robustu
-	// po prepnutí na Deluxe, ktorý ponúka len R9006/R7016) sa zahodí — inak by
-	// bola vidno v selecte prázdna, ale mohla by v `farbaKovaniaS` ostať trčať
-	// neplatná hodnota (#354). Po vyčistení sa predvyplní predvolená farba systému
-	// (#431 bod 1: R9006 pre Deluxe — krytky majú 2 farby, kovanie = nerez mušľa).
+	// po prepnutí na Deluxe 10mm, ktoré ponúka R9006/R7016; alebo R7016 po prepnutí
+	// skla 10→6 mm, kde 6mm ponúka R9006/R9005) sa zahodí — inak by bola v selecte
+	// prázdna, ale mohla by v `farbaKovaniaS` ostať trčať neplatná hodnota (#354).
+	// Po vyčistení sa predvyplní predvolená farba systému (#431 kolo 2: R9006 pre
+	// Deluxe — platná na oboch hrúbkach; kovanie = nerez mušľa, voľba je farba krytiek).
 	$effect(() => {
 		if (farbaKovaniaS && !ralOptions.includes(farbaKovaniaS)) farbaKovaniaS = '';
 		// predvyplň predvolenú farbu keď je prázdna (prepnutie systému / čerstvý štart)

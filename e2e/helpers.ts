@@ -148,16 +148,15 @@ export async function stubWindowPrint(page: Page) {
 /**
  * #338: kovanie RS Robust/Štandard vyžaduje zvolenú RAL farbu — bez nej engine
  * odmietne odpis a náhľad sa nezobrazí. Tento pomocník zvolí farbu, keď je select
- * na obrazovke (Robust/Štandard, aj Deluxe od #354 — jeho 10mm krytky majú tiež
- * RAL variant), a je NO-OP pri systémoch bez farebného kovania (Slide/Štandard +).
- * Volaj ho PRED „Spočítať".
+ * na obrazovke (Robust/Štandard, aj Deluxe — jeho krytky majú RAL variant), a je
+ * NO-OP pri systémoch bez farebného kovania (Slide/Štandard +). Volaj ho PRED „Spočítať".
  *
  * BEZ explicitného `farba` argumentu (VŠETKY existujúce volania v e2e/*.spec.ts)
  * si zvolí PLATNÚ hodnotu z reálnych `<option>` na obrazovke namiesto natvrdo
- * `R9005` (#354) — Deluxe ponúka LEN R9006/R7016 (10mm live tabuľka), takže
- * natvrdo `R9005` by na Deluxe zlyhalo (option neexistuje). Robust/Štandard
- * naďalej dostanú R9005 (zachovaná spätná kompatibilita — je to prvá platná
- * možnosť v ich zozname), Deluxe dostane prvú svoju (R9006).
+ * `R9005` (#354). Deluxe ponúka krytky per HRÚBKA skla (#431 kolo 2: 6mm R9006/R9005,
+ * 10mm R9006/R7016), takže natvrdo `R9005` by na 10mm Deluxe zlyhalo. Robust/Štandard
+ * naďalej dostanú R9005 (prvá platná možnosť). Deluxe 10mm dostane R9006, Deluxe 6mm
+ * (ak je R9005 v ponuke) R9005 — na deterministický výsledok posielaj `farba` explicitne.
  */
 export async function vyberFarbuKovania(page: Page, farba?: 'R9005' | 'R9006' | 'R7016') {
 	const sel = page.getByTestId('farba-kovania');

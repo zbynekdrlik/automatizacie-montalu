@@ -62,23 +62,32 @@ test('Deluxe 10mm: RAL select „Farba krytiek" s R9006/R7016, predvolená R9006
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('Deluxe 6mm: RAL možnosti sú R9006/R9005 (nie R7016), default ostáva platná R9006 (#431 kolo 2)', async ({
+test('Deluxe: prepnutie 10mm R7016 → 6mm zahodí neplatnú farbu, možnosti 6mm sú R9006/R9005, default R9006 (#431 kolo 2)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
 	await page.getByLabel('Systém').selectOption('Deluxe');
-	// prepni na 6 mm sklo → možnosti krytiek sa zmenia na R9006/R9005
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
-	const sel = page.getByTestId('farba-kovania');
 	await expect(page.getByLabel(/Farba krytiek/)).toBeVisible();
+	// 10 mm default → zvoľ R7016 (platná len pre 10 mm)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	const sel = page.getByTestId('farba-kovania');
+	await sel.selectOption('R7016');
+	await expect(sel).toHaveValue('R7016');
+
+	// prepni na 6 mm → R7016 už nie je platná (6 mm ponúka R9006/R9005) → hranový
+	// $effect ju zahodí a predvyplní R9006 (platnú na oboch hrúbkach)
+	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	// deterministicky prejdi Svelte render-flush (reaktívny select) pred asertom
+	await page.evaluate(
+		() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+	);
 	const hodnoty = await sel
 		.locator('option')
 		.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value).filter((v) => v));
 	expect(hodnoty.sort()).toEqual(['R9005', 'R9006'].sort());
-	// R9006 je platná na oboch hrúbkach → default prežije prepnutie 10→6 mm
-	await expect(sel).toHaveValue('R9006');
+	await expect(sel).toHaveValue('R9006', { timeout: 2000 });
 
 	expect(consoleMsgs).toEqual([]);
 });
