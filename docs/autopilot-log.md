@@ -2126,3 +2126,13 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   to ZASP cards via Dominikov kód field (16101→ZASP00116, 16006→ZASP00119, 16102→ZASP00125,
   16103→ZASP00128, 16104→ZASP202413). bar_mm=7500 confirmed, FFD bin-packing, odoslat
   unblocked. RED e74b7db → GREEN 29112e4. V1 codes without mapping stay "Nenamapované".
+- **#514 zasklenia sklo+nárezák poradie** (ed98822 bump → 3bbfcdf [red] → 851617e [green]
+  → b6d925e review-nity): Odoo úloha 885 (Marek) — na výsledkovej obrazovke sa „Odoslať
+  sklo" (pridatSkla) a „uložiť nárezák" (odoslat/odpis) vzájomne vylučovali (pridatSkla
+  redirect(303) preč; hotovo bez sklo-tlačidla). Fix Money-NEUTRÁLNY: pridatSkla*
+  neprsmerúva (vráti nahlad + sklaPridane banner cez zdieľané stavNahlad/stavNahladMulti),
+  hotovo/hotovoMulti dostali pridatSkla formulár → poradie nezáleží; idempotentný insert
+  pridajSklaHromadneIdempotentne (dvojklik neduplikuje). writeOdpis/money.ts/dedup/xlsx
+  NEDOTKNUTÉ. RED (unit + E2E) → GREEN. Review claude-fable-5-1 0R/0Y/3B, 2 nity opravené
+  (validácia pred insertom, banner→snippet). Playbook: objednavka-skla.md #514 sekcia.
+  NEmergnuté (worktree — supervisor integruje).
