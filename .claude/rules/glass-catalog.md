@@ -3,6 +3,7 @@ paths:
   - "src/lib/server/migracie.ts"
   - "src/lib/server/db.ts"
   - "src/lib/styl.ts"
+  - "src/lib/sklo.ts"
   - "tests/migration-*.test.ts"
   - "tests/sklo-*.test.ts"
 ---
@@ -167,3 +168,36 @@ lebo na `glass_types` NIE je žiadny FK. Celé v `db.transaction(() => { DDL; pr
 (vzor v18/v19) — atomické, crash → rollback, blok sa prehrá. Fresh aj existujúca DB konvergujú
 až v tej migrácii (nový seed do starého bloku by narazil na iný systém s tým istým názvom, kým
 je constraint ešte globálny).
+
+## Vlastná (nekatalógová) skladba `SKLO_INE` — syntetické sklo, a pasca s obídeným gate-om (#235 slice 2)
+
+`sklo.ts` `SKLO_INE = 'Iné (vlastná skladba)'` je SENTINEL voľby v glass selecte (NIE riadok
+`glass_types`). Keď je zvolený, obsluha zadá voľný text skladby (reuse `skloPresne`) + hrúbkovú
+triedu `skloTrieda` (4/6/10/16/24). Server (`zasklenia/+page.server.ts` `skloPre`) z nej postaví
+SYNTETICKÝ `GlassType`, aby sa vlastné sklo počítalo BIT-IDENTICKY ako katalógové sklo tej istej
+triedy. Odvodenie (`sklo.ts` `ineHrubkaTrieda`/`ineHrubka`): `hrubkaTrieda = trieda>=16?16:6`,
+`hrubka = Deluxe?(10→10 else 6):0`, `skloKorekcia=null`, `redukciaZero=false` (Slide derivuje
+z triedy cez `efektivnaRedukciaZero`). Cena honest-null (variant=sentinel → `glassMoneyKod`=null).
+Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klasifikuje z TRIEDY
+(4→ZASK00005, 6→ZASK00006, 10→nezname, 16/24→izolačné/bez gumy), katalóg ostáva name-based.
+
+**Dve pasce, ktoré stáli RED nález pri review — dodrž pri KAŽDOM budúcom rozšírení:**
+
+1. **Syntetické sklo MUSÍ prejsť TÝM ISTÝM system×štýl gate-om ako katalóg (`sklaDoPonuky`),
+   inak spočíta stav, aký žiadne katalógové sklo v tej kombinácii nevie.** `sklaDoPonuky`
+   FILTRUJE izolačné sklá tam, kde pre daný štýl IZO nárezák neexistuje (Štandard + opona 2x*).
+   Sentinel branch v `skloPre` preto MUSÍ odmietnuť (`return null`) izolačnú vlastnú skladbu na
+   takom štýle: `skloVyberaIzo(system) && ineHrubkaTrieda(trieda)===16 && !existuje(\`sys|zakladnyStyl IZO\`)`.
+   Bez toho `sysStylPre` ticho padne na BASIC nárezák a pritom sadne trieda-16 korekciu — Money
+   stav, aký katalógová IZO tam nevie. Klient zrkadli cez `triedyPre(system, styl)`.
+2. **`hrubkaTrieda` syntetického skla nastav non-null LEN pre systémy, ktoré klasifikujú
+   skladbu (Slide + Štandardy).** Robust/Deluxe majú v katalógu `hrubka_trieda=NULL` — ak by
+   syntetické sklo malo non-null, `efektivnaKorekcia` by sadla triedovú korekciu (`cfg_sklo_trieda`)
+   tam, kde katalóg NIKDY. Deluxe hrúbku rieši `hrubka` (6/10), nie trieda.
+
+**Zobrazenie vs compute = DVA oddelené kanály:** base `sklo` (sentinel) ide do `skloPre`/ceny;
+displej (plán/tlač/objednávka) je `skloPresne||sklo`. V multi-posuve `PosuvSpec.sklo` (echo do
+`PosuvInfo.skloNazov`) nes text, ale `skloPre` číta RAW `p.sklo`. Perzistencia: detail `sklo`=text,
+`skloZaklad`=sentinel, `skloTrieda`; `znova` obnoví `skloPresne` LEN keď `d.sklo !== d.skloZaklad`
+(inak by holé katalógové sklo dostalo svoj názov ako „presné zloženie"), a `platneSklo` akceptuje
+sentinel.

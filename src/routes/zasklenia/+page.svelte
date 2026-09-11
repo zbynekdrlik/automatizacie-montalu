@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
-	import { defaultSklo } from '$lib/sklo';
+	import { defaultSklo, SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
 		sysStylPre,
 		skloVyberaIzo,
+		zakladnyStyl,
 		pridavnaKolajnicaDefault
 	} from '$lib/styl';
 	import { popisMulti } from '$lib/popis';
@@ -49,6 +50,7 @@
 			v: (fv?.v ?? '') as unknown as number,
 			sklo: fv?.sklo ?? '',
 			skloPresne: fv?.skloPresne ?? '',
+			skloTrieda: fv?.skloTrieda ?? null,
 			otvaranie: fv?.otvaranie ?? 'P - L',
 			kovanieL: fv?.kovanieL ?? '',
 			kovanieP: fv?.kovanieP ?? '',
@@ -89,8 +91,10 @@
 	// (a Štandard + opona nemá izolačnú skladbu → sklaDoPonuky ju odfiltruje)
 	// existencia nárezáka podľa data.styly (server má ten istý test nad cfg)
 	const existuje = (sysStyl: string) => data.styly.some((x) => x.sysStyl === sysStyl);
-	const sklaForSystem = (sys: string, styl: string) =>
-		sklaDoPonuky(
+	// SKLO_INE (#235 slice 2) je doplnené ZA katalóg pre KAŽDÝ systém — vlastná skladba
+	// nie je katalógový riadok; `defaultSklo` ho nikdy nevráti (nie „číre" ani prvý v poradí).
+	const sklaForSystem = (sys: string, styl: string) => [
+		...sklaDoPonuky(
 			sys,
 			styl,
 			data.skla
@@ -101,8 +105,17 @@
 				)
 				.map((g) => g.nazov),
 			existuje
-		);
+		),
+		SKLO_INE
+	];
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
+	// Hrúbkové triedy vlastnej skladby ponúkané pre systém+štýl (#235 slice 2, RED-1 mirror):
+	// izolačné triedy (16/24) sa v UI NEPONÚKAJÚ tam, kde IZO nárezák pre daný štýl
+	// neexistuje (Štandard + opona) — rovnaký gate ako `sklaForSystem`/server `skloPre`.
+	const triedyPre = (sys: string, styl: string): readonly number[] =>
+		skloVyberaIzo(sys) && !existuje(`${sys}|${zakladnyStyl(styl)} IZO`)
+			? SKLO_TRIEDY.filter((t) => t < 16)
+			: SKLO_TRIEDY;
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
 	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.
@@ -110,6 +123,8 @@
 	let opS = $state('');
 	let zakaznikS = $state('');
 	let skloPresneS = $state('');
+	// vlastná skladba (#235 slice 2) — hrúbková trieda pri „Iné"; '' = nezvolená
+	let skloTriedaS = $state<number | ''>('');
 	let poznamkaS = $state('');
 	let ralS = $state('');
 	let cakaS = $state(false);
@@ -157,6 +172,7 @@
 		opS = zd?.op ?? '';
 		zakaznikS = zd?.zakaznik ?? '';
 		skloPresneS = fv?.skloPresne ?? '';
+		skloTriedaS = fv?.skloTrieda ?? '';
 		vrtanieZamkuS = fv?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
 		ralS = zd?.ral ?? '';
@@ -182,7 +198,11 @@
 		pridavnaKolajnicaOdporucanaPrev = pridavnaKolajnicaDefault(
 			p?.system ?? 'Robust',
 			p?.styl ?? '2K',
-			p?.sklo ?? ''
+			p?.sklo ?? '',
+			// #235 slice 2 (YELLOW-1): pri vlastnej skladbe IZO-nosť určuje trieda, nie názov
+			p?.sklo === SKLO_INE && jeSkloTrieda(p?.skloTrieda)
+				? ineHrubkaTrieda(p.skloTrieda)
+				: undefined
 		);
 		// #235: zasej prevSystemForSklo z OBNOVENÝCH dát, inak by sklo-efekt videl
 		// „zmenu systému" a prepísal obnovené sklo na defaultSklo (rovnaký vzor ako
@@ -199,6 +219,9 @@
 		vyska = (p?.v as number | string) ?? '';
 		posuvyExtra = (fmv?.posuvy ?? []).slice(1).map((x) => ({
 			...x,
+			// vlastná skladba (#235 slice 2): number|null (PosuvVstup) → number|'' (PosuvRow)
+			skloPresne: x.skloPresne ?? '',
+			skloTrieda: x.skloTrieda ?? '',
 			kovanieStred: x.kovanieStred ?? '',
 			kovanieStredOkno: (x.kovanieStredOkno ?? 'L') as 'L' | 'P',
 			kliny: (x.kliny ?? []).map((k) => ({ ...k })),
@@ -304,10 +327,19 @@
 			kolSS = '';
 		}
 	});
-	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO)
+	// Štandard +: povedz obsluhe, ktorý nárezák sklo práve vyberá (basic vs IZO).
+	// #235 slice 2: pri vlastnej skladbe („Iné") IZO-nosť určuje ZVOLENÁ trieda (nie názov
+	// sentinelu) — inak by hint tvrdil „basic" aj pre vlastnú IZO 24. Cosmetic hint (server
+	// compute je autoritatívny cez triedu), ale nech nezavádza.
+	// #235 slice 2: hrúbková trieda PRIMÁRNEHO posuvu pri vlastnej skladbe (inak undefined)
+	// — jeden zdroj pravdy pre narezakHint AJ pridavnaKolajnicaDefault (YELLOW-1), aby sa
+	// IZO-nosť vlastnej skladby určovala triedou, nie názvom sentinelu.
+	let triedaPrimara = $derived(
+		sklo === SKLO_INE && jeSkloTrieda(skloTriedaS) ? ineHrubkaTrieda(skloTriedaS) : undefined
+	);
 	let narezakHint = $derived.by(() => {
 		if (!skloVyberaIzo(system) || !sklo) return '';
-		const styl2 = sysStylPre(system, styl, sklo, existuje).split('|')[1];
+		const styl2 = sysStylPre(system, styl, sklo, existuje, triedaPrimara).split('|')[1];
 		return `Podľa skla sa ťahá nárezák ${system} ${styl2}.`;
 	});
 	let stylyPre = $derived(stylyForSystem(system));
@@ -328,6 +360,10 @@
 			// „Robustové sklo neprežije prepnutie"). Zápis do prevSystemForSklo
 			// je untracked → nespúšťa znovu tento efekt.
 			sklo = defaultSklo(zoznam, currentSystem);
+			// #235 slice 2 (BLUE-3): reset vlastnej skladby pri zmene systému — trieda
+			// patrí starému systému. sklo sa resetuje na katalógový default, takže
+			// skloTriedaS je aj tak ignorovaná serverom, ale nech nezostane stará voľba.
+			skloTriedaS = '';
 			prevSystemForSklo = currentSystem;
 		} else {
 			// štýlová zmena / iný trigger → name-persistence (zmena počtu krídel
@@ -351,7 +387,9 @@
 	// ten „stays ticked after the reason disappears" bug, ktorému sa chceme
 	// vyhnúť). `pridavnaKolajnicaOdporucanaPrev` sa zasieva aj v reštart-efekte
 	// vyššie, aby „Použiť znova" nikdy neprepísalo obnovenú hodnotu.
-	let pridavnaKolajnicaOdporucana = $derived(pridavnaKolajnicaDefault(system, styl, sklo));
+	let pridavnaKolajnicaOdporucana = $derived(
+		pridavnaKolajnicaDefault(system, styl, sklo, triedaPrimara)
+	);
 	$effect(() => {
 		const chce = pridavnaKolajnicaOdporucana;
 		if (chce !== untrack(() => pridavnaKolajnicaOdporucanaPrev)) {
@@ -371,6 +409,9 @@
 				s: sirka,
 				v: vyska,
 				sklo,
+				// vlastná skladba primárneho posuvu (#235 slice 2)
+				skloPresne: skloPresneS,
+				skloTrieda: skloTriedaS,
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
@@ -389,6 +430,9 @@
 				s: p.s,
 				v: p.v,
 				sklo: p.sklo,
+				// vlastná skladba tohto posuvu (#235 slice 2)
+				skloPresne: p.skloPresne,
+				skloTrieda: p.skloTrieda,
 				otvaranie: p.otvaranie,
 				kovanieL: p.kovanieL,
 				kovanieP: p.kovanieP,
@@ -413,6 +457,11 @@
 		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
 		if (systemZmeneny || !sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
+		// #235 slice 2: zmena systému zresetuje aj vlastnú skladbu (patrí starému systému)
+		if (systemZmeneny) {
+			p.skloPresne = '';
+			p.skloTrieda = '';
+		}
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {
@@ -438,6 +487,9 @@
 				s: '',
 				v: '',
 				sklo,
+				// klonuj aj vlastnú skladbu primárneho posuvu (#235 slice 2)
+				skloPresne: skloPresneS,
+				skloTrieda: skloTriedaS,
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
@@ -525,6 +577,11 @@
 	<input type="hidden" name="v" value={vstup.v} />
 	<input type="hidden" name="sklo" value={vstup.sklo} />
 	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
+	{#if vstup.skloTrieda != null}<input
+			type="hidden"
+			name="skloTrieda"
+			value={vstup.skloTrieda}
+		/>{/if}
 	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
 	<input type="hidden" name="kovanieL" value={vstup.kovanieL} />
 	<input type="hidden" name="kovanieP" value={vstup.kovanieP} />
@@ -626,6 +683,7 @@
 		bind:kovanieStredOknoS
 		bind:vrtanieZamkuS
 		bind:skloPresneS
+		bind:skloTriedaS
 		bind:poznamkaS
 		bind:ralS
 		bind:cakaS
@@ -661,6 +719,7 @@
 		{b2bBlok}
 		{stylyForSystem}
 		{sklaForSystem}
+		{triedyPre}
 		{otvaraniaForStyl}
 		{kolajnicaPre}
 		{addPosuv}

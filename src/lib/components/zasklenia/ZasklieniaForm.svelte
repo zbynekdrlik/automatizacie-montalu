@@ -10,6 +10,7 @@
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { zaskleniaSlovom } from '$lib/popis';
 	import { plusRailEligible, SYSTEMY_OBVODOVA } from '$lib/styl';
+	import { SKLO_INE } from '$lib/sklo';
 	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
 	import type { Farba } from '$lib/komponenty';
 	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -47,6 +48,7 @@
 		kovanieStredOknoS = $bindable('L'),
 		vrtanieZamkuS = $bindable(1050),
 		skloPresneS = $bindable(''),
+		skloTriedaS = $bindable<number | ''>(''),
 		poznamkaS = $bindable(''),
 		ralS = $bindable(''),
 		cakaS = $bindable(false),
@@ -84,6 +86,7 @@
 		// pure helpery (uzávery nad `data`/`existuje` v rodičovi) + mutátory stavu rodiča
 		stylyForSystem,
 		sklaForSystem,
+		triedyPre,
 		otvaraniaForStyl,
 		kolajnicaPre,
 		addPosuv,
@@ -107,6 +110,7 @@
 		kovanieStredOknoS?: 'L' | 'P';
 		vrtanieZamkuS?: number | string;
 		skloPresneS?: string;
+		skloTriedaS?: number | '';
 		poznamkaS?: string;
 		ralS?: string;
 		cakaS?: boolean;
@@ -142,6 +146,7 @@
 		b2bBlok: boolean;
 		stylyForSystem: (sys: string) => string[];
 		sklaForSystem: (sys: string, styl: string) => string[];
+		triedyPre: (sys: string, styl: string) => readonly number[];
 		otvaraniaForStyl: (st: string) => string[];
 		kolajnicaPre: (sys: string) => boolean;
 		addPosuv: () => void;
@@ -219,6 +224,29 @@
 					{#each sklaPre as g (g)}<option>{g}</option>{/each}
 				</select>
 				{#if narezakHint}<span class="hint" data-testid="narezak-hint">{narezakHint}</span>{/if}
+				<!-- Vlastná (nekatalógová) skladba (#235 slice 2): trieda určuje výpočet + tesnenie;
+				     samotnú skladbu (text) obsluha napíše do poľa „Presné zloženie skla" nižšie. -->
+				{#if sklo === SKLO_INE}
+					<label for="skloTrieda" style="margin-top:8px"
+						>Trieda skladby (mm) — určuje výpočet *</label
+					>
+					<select
+						id="skloTrieda"
+						name="skloTrieda"
+						bind:value={skloTriedaS}
+						required
+						data-testid="ine-trieda"
+					>
+						<option value="">— vyber triedu —</option>
+						{#each triedyPre(system, styl) as t (t)}<option value={t}
+								>{t} mm{t >= 16 ? ' (izolačné)' : ''}</option
+							>{/each}
+					</select>
+					<span class="hint" data-testid="ine-hint"
+						>Vlastnú skladbu (napr. „5esg/14/5esg") napíš dole do „Presné zloženie skla" — zobrazí
+						sa na pláne aj objednávke. Cena je pri vlastnej skladbe nedostupná.</span
+					>
+				{/if}
 			</div>
 			<div class="field">
 				<label for="otvaranie">Otváranie</label>
@@ -287,13 +315,20 @@
 			</div>
 		{/if}
 		<div class="field">
-			<label for="skloPresne">Presné zloženie skla (nepovinné — nemení vzorec)</label>
+			<label for="skloPresne"
+				>{sklo === SKLO_INE
+					? 'Zloženie skla (text na plán/objednávku) *'
+					: 'Presné zloženie skla (nepovinné — nemení vzorec)'}</label
+			>
 			<input
 				id="skloPresne"
 				name="skloPresne"
 				bind:value={skloPresneS}
 				maxlength="120"
-				placeholder="napr. Stopsol Classic Grey, dubová kôra…"
+				required={sklo === SKLO_INE}
+				placeholder={sklo === SKLO_INE
+					? 'napr. 5esg/14/5esg'
+					: 'napr. Stopsol Classic Grey, dubová kôra…'}
 			/>
 		</div>
 		<div class="field">
@@ -492,9 +527,46 @@
 				<div class="grid2">
 					<div class="field">
 						<label for={`ps${i}-sklo`}>Sklo</label>
-						<select id={`ps${i}-sklo`} bind:value={p.sklo}>
+						<!-- YELLOW-2 (#235 slice 2): pri prepnutí PREČ z „Iné" vyčisti skrytú vlastnú
+						     skladbu — inak by stará (neviditeľná) hodnota tichonko sadla na katalógové
+						     sklo (plán, objednávka, detail). -->
+						<select
+							id={`ps${i}-sklo`}
+							bind:value={p.sklo}
+							onchange={() => {
+								if (p.sklo !== SKLO_INE) {
+									p.skloPresne = '';
+									p.skloTrieda = '';
+								}
+							}}
+						>
 							{#each sklaForSystem(p.system, p.styl) as g (g)}<option>{g}</option>{/each}
 						</select>
+						<!-- vlastná skladba tohto posuvu (#235 slice 2) — bind (žiadne name=,
+						     serializuje sa cez posuvyJSON z p.skloTrieda / p.skloPresne) -->
+						{#if p.sklo === SKLO_INE}
+							<label for={`ps${i}-trieda`} style="margin-top:8px">Trieda skladby (mm) *</label>
+							<select
+								id={`ps${i}-trieda`}
+								bind:value={p.skloTrieda}
+								required
+								data-testid={`ps${i}-ine-trieda`}
+							>
+								<option value="">— vyber triedu —</option>
+								{#each triedyPre(p.system, p.styl) as t (t)}<option value={t}
+										>{t} mm{t >= 16 ? ' (izolačné)' : ''}</option
+									>{/each}
+							</select>
+							<input
+								type="text"
+								bind:value={p.skloPresne}
+								maxlength="120"
+								required
+								placeholder="zloženie, napr. 5esg/14/5esg"
+								data-testid={`ps${i}-ine-text`}
+								style="margin-top:6px"
+							/>
+						{/if}
 					</div>
 					<div class="field">
 						<label for={`ps${i}-otv`}>Otváranie</label>

@@ -2,6 +2,7 @@
 // serverový strážca rozsahov (HTML5 min/max vie skriptovaný POST obísť).
 import { KLIN_MAX_KS, KLIN_MAX_POCET, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
+import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 // Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
 import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -16,6 +17,20 @@ export const OTVARANIA = ['P - L', 'L - P', 'Opona'];
 export function parseFarba(raw: FormDataEntryValue | null): Farba | null {
 	const v = String(raw ?? '').trim();
 	return v === 'R9005' || v === 'R9006' || v === 'R7016' ? v : null;
+}
+
+/** Hrúbková trieda skladby vlastného skla (#235 slice 2) — parsuje sa LEN keď je
+ *  zvolené „Iné (vlastná skladba)" (`skloRaw===SKLO_INE`); pre katalógové sklo `null`
+ *  (katalógové sklo nesie triedu vo svojom `glass_types` riadku). Neplatná/chýbajúca
+ *  hodnota → `null` → serverová validácia (`parseVstup`/`parseMultiVstup`) ju odmietne. */
+export function parseSkloTrieda(
+	skloRaw: FormDataEntryValue | null,
+	triedaRaw: FormDataEntryValue | null
+): number | null {
+	if (String(skloRaw ?? '').trim() !== SKLO_INE) return null;
+	// Number() (nie parseInt) — striktné: „4abc"/„4.9" → NaN → null (nie tiché 4).
+	const t = Number(String(triedaRaw ?? '').trim());
+	return jeSkloTrieda(t) ? t : null;
 }
 
 /** Štandard +: štýl je LEN počet krídel; „ IZO" (starý formulár / bookmark) sa
@@ -297,8 +312,13 @@ export interface Vstup {
 	v: number;
 	sklo: string;
 	/** voľné upresnenie zloženia skla (Stopsol, grey, dubová kôra…) — ide len
-	 *  na plán, vzorec ostáva podľa základného skla `sklo` */
+	 *  na plán, vzorec ostáva podľa základného skla `sklo`. Pri vlastnej skladbe
+	 *  (`sklo===SKLO_INE`, #235 slice 2) je to POVINNÝ text celej skladby. */
 	skloPresne: string;
+	/** vlastná (nekatalógová) skladba: hrúbková trieda skladby (4/6/10/16/24 mm) —
+	 *  NENULOVÉ len keď `sklo===SKLO_INE`; určuje syntetické sklo pre výpočet
+	 *  (server `skloPre`) + tesnenie, inak `null`. (#235 slice 2) */
+	skloTrieda: number | null;
 	otvaranie: string;
 	/** kovanie ĽAVEJ strany posuvu (kľučka) — len Robust, len na plán/náhľad */
 	kovanieL: string;
@@ -358,6 +378,8 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		skloPresne: String(form.get('skloPresne') ?? '')
 			.trim()
 			.slice(0, 120),
+		// vlastná skladba (#235 slice 2): trieda platí LEN keď je zvolené „Iné" — inak null
+		skloTrieda: parseSkloTrieda(form.get('sklo'), form.get('skloTrieda')),
 		otvaranie: String(form.get('otvaranie') ?? '').trim(),
 		kovanieL: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieL')),
 		kovanieP: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieP')),
@@ -414,6 +436,10 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	else if (!(vstup.s >= S_MIN && vstup.s <= S_MAX)) error = `Šírka musí byť ${S_MIN}–${S_MAX} mm.`;
 	else if (!(vstup.v >= V_MIN && vstup.v <= V_MAX)) error = `Výška musí byť ${V_MIN}–${V_MAX} mm.`;
 	else if (!OTVARANIA.includes(vstup.otvaranie)) error = 'Vyber otváranie.';
+	else if (vstup.sklo === SKLO_INE && !vstup.skloPresne)
+		error = 'Pri vlastnej skladbe zadaj zloženie skla (text).';
+	else if (vstup.sklo === SKLO_INE && vstup.skloTrieda === null)
+		error = 'Pri vlastnej skladbe vyber hrúbkovú triedu skla.';
 	else if (kol.error) error = kol.error;
 	else if (k.error) error = k.error;
 	else if (maSietkaSystem(vstup.system) && sk.error) error = sk.error;
@@ -428,6 +454,11 @@ export interface PosuvVstup {
 	s: number;
 	v: number;
 	sklo: string;
+	/** voľné upresnenie zloženia skla TOHOTO posuvu — na plán/objednávku, vzorec podľa
+	 *  `sklo`. Pri vlastnej skladbe (`sklo===SKLO_INE`, #235 slice 2) POVINNÝ text. */
+	skloPresne: string;
+	/** vlastná skladba: hrúbková trieda (4/6/10/16/24 mm), nenulové len pri `SKLO_INE` (#235 slice 2) */
+	skloTrieda: number | null;
 	otvaranie: string;
 	/** kovanie ľavej/pravej strany TOHOTO posuvu (Patrik: „pri každom posuve sólo") */
 	kovanieL: string;
@@ -511,6 +542,14 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				s: Number.isFinite(s) ? s : 0,
 				v: Number.isFinite(v) ? v : 0,
 				sklo: String(p.sklo ?? '').trim(),
+				// vlastná skladba (#235 slice 2) — text + trieda per posuv
+				skloPresne: String(p.skloPresne ?? '')
+					.trim()
+					.slice(0, 120),
+				skloTrieda: parseSkloTrieda(
+					String(p.sklo ?? ''),
+					p.skloTrieda == null ? '' : String(p.skloTrieda)
+				),
 				otvaranie: String(p.otvaranie ?? '').trim(),
 				kovanieL: sanitizeKovanie(posuvSystem, p.kovanieL),
 				kovanieP: sanitizeKovanie(posuvSystem, p.kovanieP),
@@ -537,6 +576,14 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			}
 			if (!posuv.sklo) {
 				error = `Zasklenie ${i + 1}: vyber sklo.`;
+				break;
+			}
+			if (posuv.sklo === SKLO_INE && !posuv.skloPresne) {
+				error = `Zasklenie ${i + 1}: pri vlastnej skladbe zadaj zloženie skla (text).`;
+				break;
+			}
+			if (posuv.sklo === SKLO_INE && posuv.skloTrieda === null) {
+				error = `Zasklenie ${i + 1}: pri vlastnej skladbe vyber hrúbkovú triedu skla.`;
 				break;
 			}
 			if (!OTVARANIA.includes(posuv.otvaranie)) {
