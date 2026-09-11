@@ -17,7 +17,16 @@
 // „POZOR:". HTML note (`odoo-zakazka.ts`) si emoji ponecháva (prehliadač ich vykreslí).
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { ZakazkaNote } from './odoo-zakazka';
-import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, ellipsize, embedDejavu } from './pdf-common';
+import {
+	A4_W,
+	A4_H,
+	MARGIN,
+	CONTENT_W,
+	wrapText,
+	ellipsize,
+	embedDejavu,
+	stampSk
+} from './pdf-common';
 
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
@@ -46,21 +55,6 @@ const NAZOV_W = COL_QTY_R - COL_NAZOV - 44; // šírka názvu (necháva medzeru 
 const fmtEur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
 /** množstvo zaokrúhlené na 3 des. (mm/kusy stačia) — bez toho by float šum (0.1+0.2) pretiekol stĺpec. */
 const fmtQty = (n: number) => String(Math.round(n * 1000) / 1000);
-
-/** YYYYMMDD-HHMM v Europe/Bratislava — sortovateľná pečiatka do názvu prílohy (odlíši viac verzií). */
-function stampSk(now: Date): string {
-	const parts = new Intl.DateTimeFormat('sv-SE', {
-		timeZone: 'Europe/Bratislava',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-		hour: '2-digit',
-		minute: '2-digit',
-		hour12: false
-	}).formatToParts(now);
-	const g = (t: string) => parts.find((x) => x.type === t)?.value ?? '';
-	return `${g('year')}${g('month')}${g('day')}-${g('hour')}${g('minute')}`;
-}
 
 interface Ctx {
 	doc: PDFDocument;
