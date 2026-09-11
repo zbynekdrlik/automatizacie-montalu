@@ -174,10 +174,10 @@ function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?:
 }
 
 /**
- * Tesnenie polozky pre multi-posuv (#342 round 2). Používa `tesneniePolozkyPooled`
- * ktorý sčíta OBE krajové kódy (ZASP20244 + ZASP00018) — bezpečné pre zmiešanú
- * zákazku Štandard + Štandard + (review 🔴1). Kód tesnenia závisí od skla:
- * ak VŠETKY STANDARD posuvy majú rovnaké sklo → jednoznačný kód; zmiešané → honest-null.
+ * Tesnenie polozky pre multi-posuv (#342). Používa `tesneniePolozkyPooled`, ktorý sčíta
+ * dĺžku kladkového profilu (ZASP202415, zdieľaný) naprieč posuvmi — bezpečné pre zmiešanú
+ * zákazku Štandard + Štandard +. Kód tesnenia závisí od skla: ak VŠETKY STANDARD posuvy
+ * majú rovnaké sklo → jednoznačný kód; zmiešané → honest-null.
  */
 function multiTesneniePolozky(
 	r: MultiResult,
@@ -199,7 +199,7 @@ function multiTesneniePolozky(
 	const unikatne = new Set(klasifikacie);
 
 	if (unikatne.size === 1) {
-		// Jednotné sklo → pooled dĺžka (OBE krajové kódy) + jeden tesnenie kód
+		// Jednotné sklo → pooled dĺžka (Σ kladkový ZASP202415) + jeden tesnenie kód
 		return tesneniePolozkyPooled(
 			r.material,
 			stdPosuvy.map((p) => p.system),

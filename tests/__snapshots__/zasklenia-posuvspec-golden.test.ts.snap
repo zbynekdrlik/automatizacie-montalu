@@ -2985,7 +2985,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Zasklievacie tesnenie 6 mm",
         "predajPcmo": null,
         "predajVo": null,
-        "qty": 12.376,
+        "qty": 4.788,
         "rozvin": null,
         "sklad": null,
       },
@@ -3021,7 +3021,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     },
   },
   "cielInfo": {
-    "filename": "ZAK-G6 - Zákazník G6 [5b3a5ff9].xlsx",
+    "filename": "ZAK-G6 - Zákazník G6 [352ec811].xlsx",
     "live": false,
   },
   "heightWarn": undefined,
@@ -3054,7 +3054,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
       "kod": "ZASK00006",
       "mj": "m",
       "nazov": "Zasklievacie tesnenie 6 mm",
-      "qty": 12.376,
+      "qty": 4.788,
     },
   ],
   "plan": {
@@ -3289,7 +3289,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
     "styl": "2K",
     "system": "Štandard",
   },
-  "planHash": "ec875d3d",
+  "planHash": "9e6f2cd5",
   "skladVarovania": [],
   "skloCeny": {
     "kompletne": false,

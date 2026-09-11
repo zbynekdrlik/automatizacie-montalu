@@ -1,12 +1,17 @@
 // Tesnenie — výpočet a Money odpis zasklievacieho tesnenia pre STANDARD (#342).
 //
-// Vzorec (Dominik, 7.9.2026, úloha 582, msg 1806754):
-//   dĺžka tesnenia = Σ(ZASP202415 rezy) + Σ(ZASP00024 rezy) + Σ(ZASP20244 rezy)
-//   (pri RS STANDARD PLUS; pri klasickom Štandarde namiesto ZASP20244 → ZASP00018)
+// Vzorec (Dominik, úloha 582, 8.9.2026 05:36, verbatim v UNPARK komentári #342):
+//   dĺžka tesnenia = „súčet šírok kladkových profilov" = Σ(ZASP202415 rezy).
+//   Kladkový rez JE šírka prírezu krídla (compute-sietka.ts: „Šírka prírezov sa číta
+//   z POSUVU, kód ZASP202415"), takže Σ jeho rezov = súčet šírok kladkových profilov.
+//   NIE obvod skla, NIE nos/krajová.
 //
-// Výsledok = celkový počet mm rezov troch profilov: kladkový + nos/stredový + krajová.
-// Tieto profily sú UŽ spočítané v compute engine (computeFlat/computeMulti) —
-// tesnenie je len SUM ich rezných dĺžok, žiadna nová geometria.
+// §1c KONFLIKT (money-odpis skill), zaznamenaný explicitne: kód kola 1 citoval STARŠIU
+// Dominikovu odpoveď (7.9., msg 1806754) ako 3-profilový súčet kladkový+nos+krajová a
+// tak to aj VYDAL (0.25.1) — dĺžka bola NADHODNOTENÁ (Money-kritické). Novšia PRIAMA
+// odpoveď (8.9. „je to súčet sírok (kladkových profilov)") + owner UNPARK rozsúdenie
+// vyhrávajú → kolo 2 opravuje dĺžku na kladkový-only. Kladkový je zdieľaný všetkými
+// STANDARD systémami, takže single aj pooled (multi-posuv) vetva sú identické.
 //
 // Mapovanie (Dominik, 8.9.2026, úloha 582, msg 1807247):
 //   4 mm sklo → ZASK00005 (Zasklievacie tesnenie 4 mm)
@@ -14,31 +19,22 @@
 //   izolačné sklo → ŽIADNE tesnenie („bez gumy")
 //   10 mm / iné → honest-null (Dominik neurčil)
 //
-// Kefy ZASK00007 (4,8×4) sa počítajú cez komponentový systém (komponenty-cfg.ts).
+// Kefy ZASK00007 (4,8×4) sa počítajú cez komponentový systém (komponenty-cfg.ts) ako
+// kladkový × 2 — NEZMENENÉ (Dominik: „kefy ostávajú všade rovnako podľa výpočtu").
 // ZASK202541 (4,8×5) zostáva otvorený — KOVANIE_NEUPLNE ho vlastní (nie tento modul).
 
 import type { MaterialRow } from '$lib/server/compute';
 import { jeIzoSklo } from '$lib/styl';
 
-// Profilové kódy, ktorých rezné dĺžky tvoria dĺžku tesnenia.
-// Kladkový profil — zdieľaný medzi Štandard a Štandard +.
+// Kladkový profil — dĺžka jeho rezov = „súčet šírok kladkových profilov" (Dominik verbatim).
+// Zdieľaný VŠETKÝMI STANDARD systémami (Štandard / Štandard + / Štandard Drevo), takže
+// dĺžka tesnenia je systémovo-agnostická. (Nos ZASP00024 a krajová ZASP20244/ZASP00018 sa
+// do dĺžky tesnenia UŽ nerátajú — kolo 2 korekcia; kladkový je jediný vstup.)
 const KOD_KLADKOVY = 'ZASP202415';
-// Nos / rámový stredový — zdieľaný medzi Štandard a Štandard +.
-const KOD_NOS = 'ZASP00024';
-// Krajová (koncový) — líši sa podľa systému:
-//   Štandard + (PLUS): ZASP20244
-//   Štandard (klasik): ZASP00018
-const KOD_KRAJOVA_PLUS = 'ZASP20244';
-const KOD_KRAJOVA_KLASIK = 'ZASP00018';
 
-/** Systémy, pre ktoré sa tesnenie počíta. Štandard Drevo (#445) zdieľa rovnaký
- *  profilový trojuholník (ZASP202415/ZASP00024/ZASP00018) ako klasický Štandard. */
+/** Systémy, pre ktoré sa tesnenie počíta. Kladkový profil ZASP202415 je zdieľaný
+ *  všetkými troma (Štandard Drevo #445 tiež). */
 export const TESNENIE_SYSTEMY: readonly string[] = ['Štandard', 'Štandard +', 'Štandard Drevo'];
-
-/** Vráti kód krajovej podľa systému (PLUS vs klasik). */
-function kodKrajovejPre(system: string): string {
-	return system === 'Štandard +' ? KOD_KRAJOVA_PLUS : KOD_KRAJOVA_KLASIK;
-}
 
 /**
  * Suma rezných dĺžok (mm) pre daný kód z material výstupu.
@@ -117,31 +113,13 @@ const R3 = (x: number) => Math.round(x * 1000) / 1000;
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
 /**
- * Celková dĺžka tesnenia (mm) z materiálu pre JEDEN systém.
- * Sčíta rezy kladkového + nosového + krajovej (podľa systému).
+ * Dĺžka tesnenia (mm) = „súčet šírok kladkových profilov" (Dominik verbatim, úloha 582,
+ * 8.9.2026) = Σ rezných dĺžok kladkového profilu ZASP202415. NIE obvod skla, NIE nos/
+ * krajová. Kladkový je zdieľaný všetkými STANDARD systémami, takže single aj pooled
+ * (multi-posuv) vetva používajú TEN ISTÝ výpočet — nič systémovo-špecifické.
  */
-function dlzkaTesneniaMm(material: MaterialRow[], system: string): number {
-	const kodKrajovej = kodKrajovejPre(system);
-	return (
-		sumaRezovMm(material, KOD_KLADKOVY) +
-		sumaRezovMm(material, KOD_NOS) +
-		sumaRezovMm(material, kodKrajovej)
-	);
-}
-
-/**
- * Celková dĺžka tesnenia (mm) z POOLOVANÉHO materiálu naprieč VIACERÝMI STANDARD
- * systémami. Bezpečné pre zmiešanú zákazku (Štandard + Štandard +): sčíta OBE
- * krajové kódy, lebo ZASP202415/ZASP00024 sú zdieľané a len JEDEN z ZASP20244/
- * ZASP00018 existuje per systém v materiáli.
- */
-function dlzkaTesneniePooledMm(material: MaterialRow[]): number {
-	return (
-		sumaRezovMm(material, KOD_KLADKOVY) +
-		sumaRezovMm(material, KOD_NOS) +
-		sumaRezovMm(material, KOD_KRAJOVA_PLUS) +
-		sumaRezovMm(material, KOD_KRAJOVA_KLASIK)
-	);
+function dlzkaTesneniaMm(material: MaterialRow[]): number {
+	return sumaRezovMm(material, KOD_KLADKOVY);
 }
 
 /**
@@ -159,13 +137,15 @@ export function tesneniePolozky(
 ): { polozky: TesneniePolozka[]; warn: string | null } {
 	if (!TESNENIE_SYSTEMY.includes(system)) return { polozky: [], warn: null };
 
-	const dlzkaMm = dlzkaTesneniaMm(material, system);
+	const dlzkaMm = dlzkaTesneniaMm(material);
 	return buildPolozky(dlzkaMm, skloNazov, skloTrieda);
 }
 
 /**
  * Money položky tesnenia pre POOLOVANÝ materiál naprieč viacerými STANDARD systémami.
- * Bezpečné pre zmiešanú zákazku (Štandard + Štandard +): sčíta OBE krajové kódy.
+ * Dĺžka = Σ kladkového (ZASP202415), ktorý je zdieľaný naprieč posuvmi — pooluje sa
+ * prirodzene, žiadny systémovo-špecifický kód netreba (zmiešaná Štandard + Štandard +
+ * zákazka je bezpečná: kladkový je v materiáli spoločný).
  */
 export function tesneniePolozkyPooled(
 	material: MaterialRow[],
@@ -176,7 +156,7 @@ export function tesneniePolozkyPooled(
 	const hasStd = systems.some((s) => TESNENIE_SYSTEMY.includes(s));
 	if (!hasStd) return { polozky: [], warn: null };
 
-	const dlzkaMm = dlzkaTesneniePooledMm(material);
+	const dlzkaMm = dlzkaTesneniaMm(material);
 	return buildPolozky(dlzkaMm, skloNazov, skloTrieda);
 }
 
@@ -199,7 +179,7 @@ function buildPolozky(
 			// Nulová dĺžka pri STANDARD posuve = konfiguračná anomália
 			warn =
 				`Tesnenie: dĺžka je 0 m pri ${klasifikacia === 'tesnenie4' ? '4' : '6'} mm skle — ` +
-				'konfiguračná anomália (profily ZASP202415/ZASP00024/krajová nemajú rezy).';
+				'konfiguračná anomália (kladkový profil ZASP202415 nemá rezy).';
 		}
 	} else if (klasifikacia === 'nezname') {
 		warn =
