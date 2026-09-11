@@ -217,3 +217,40 @@ describe('MIGRÁCIA v19: Robust je IZO-only', () => {
 		expect(skla.length).toBeGreaterThan(0);
 	});
 });
+
+// #431 kolo 2: „Použiť znova" MUSÍ zachovať farbu krytiek/kovania vrátane R9006
+// (Deluxe). Predtým `farba()` helper akceptoval len R9005/R7016 a R9006 ticho
+// zahodil → obsluha musela farbu znova voliť, a bez default-fillu by 10mm Deluxe
+// odpis stratil krytky. Delegujeme na `parseFarba` (jeden zdroj pravdy).
+describe('znovaZOdpisu — farbaKovania vrátane R9006 (#431 kolo 2)', () => {
+	const DETAIL_DELUXE = {
+		system: 'Deluxe',
+		styl: '3K',
+		s: 4200,
+		v: 2250,
+		sklo: 'Float kalené 10 mm',
+		skloZaklad: 'Float kalené 10 mm',
+		otvaranie: 'P - L',
+		farbaKovania: 'R9006'
+	};
+
+	it('R9006 sa prenesie (nie null) — inak by 10mm Deluxe reuse stratil krytky', () => {
+		const id = vlozOdpis('ZAK-ZNOVA-DLX', '01', DETAIL_DELUXE, 0);
+		const v = znovaZOdpisu(id)!.vstup!;
+		expect(v.farbaKovania).toBe('R9006');
+	});
+
+	it('R9005 a R7016 sa stále prenesú', () => {
+		const id5 = vlozOdpis('ZAK-ZNOVA-R5', '01', { ...DETAIL_DELUXE, farbaKovania: 'R9005' }, 0);
+		const id7 = vlozOdpis('ZAK-ZNOVA-R7', '01', { ...DETAIL_DELUXE, farbaKovania: 'R7016' }, 0);
+		expect(znovaZOdpisu(id5)!.vstup!.farbaKovania).toBe('R9005');
+		expect(znovaZOdpisu(id7)!.vstup!.farbaKovania).toBe('R7016');
+	});
+
+	it('neplatná/chýbajúca farba → null (fail-loud v engine, nie tichý default)', () => {
+		const idBad = vlozOdpis('ZAK-ZNOVA-BAD', '01', { ...DETAIL_DELUXE, farbaKovania: 'R9999' }, 0);
+		const idNone = vlozOdpis('ZAK-ZNOVA-NONE', '01', { ...DETAIL_DELUXE, farbaKovania: undefined }, 0);
+		expect(znovaZOdpisu(idBad)!.vstup!.farbaKovania).toBeNull();
+		expect(znovaZOdpisu(idNone)!.vstup!.farbaKovania).toBeNull();
+	});
+});
