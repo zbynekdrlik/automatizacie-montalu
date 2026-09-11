@@ -41,8 +41,11 @@ The FK has `ON DELETE CASCADE` — deleting a glass item auto-deletes its files.
 ## Module integration (producers) — WIRED (round 2)
 
 Each module page has a `pridatSkla` (or `pridatSklaMulti`) named form action that
-re-computes glass from form data and inserts via `pridajSklaHromadne()`. After insert
-the action redirects to `/objednavka-skla/[zak]`. B2B guard rejects non-internal users.
+re-computes glass from form data and inserts. B2B guard rejects non-internal users.
+`/fix` + `/pergola/narez` insert via `pridajSklaHromadne()` and **redirect** to
+`/objednavka-skla/[zak]`. **`/zasklenia` is the EXCEPTION since #514** (see the #514
+section below): it inserts idempotently and STAYS on the result screen instead of
+redirecting.
 
 | Module | Action | Glass source | Mapping |
 |---|---|---|---|
@@ -63,6 +66,33 @@ client-sent computed values) — the same discipline as `odoslat`/`nahlad` actio
 `+page.server.ts`, import `pridajSklaHromadne` + `NoveSklo`, map the module's glass
 output to `NoveSklo[]`, redirect to `/objednavka-skla/[zak]`. Add the route path to
 this rule's `paths:` frontmatter. Add a vitest in `tests/objednavka-skla-producenti.test.ts`.
+
+## `/zasklenia`: obe akcie („Odoslať sklo" + „uložiť nárezák") v ľubovoľnom poradí (#514)
+
+Odoo úloha 885 (Marek): na výsledkovej obrazovke zasklení sa „Odoslať sklo" (`pridatSkla`)
+a „uložiť nárezák" (= `odoslat`, Money odpis) vzájomne vylučovali — `pridatSkla`
+`redirect(303)` odnavigoval preč (odpis zmizol), a po odpise (`step:'hotovo'`) chýbalo
+sklo-tlačidlo. Oprava (Money-NEUTRÁLNA — `writeOdpis`/`money.ts`/dedup/xlsx SA NEDOTÝKA):
+
+- `pridatSkla`/`pridatSklaMulti` **už NEpresmerúva** — vráti späť `nahlad`/`nahladMulti`
+  s plným payloadom (cez zdieľané server-helpery `stavNahlad`/`stavNahladMulti`, ktoré
+  ťahá aj `nahlad`/`nahladMulti`) + `sklaPridane:{pridane,zak}`; odpisové tlačidlo zostáva.
+- **Poradie NEZÁLEŽÍ:** vetvy `hotovo`/`hotovoMulti` (`+page.svelte`) majú `?/pridatSkla`
+  (resp. Multi) formulár (gated `{#if !isB2B}`), takže sklo ide aj PO odpise.
+- **Potvrdenie:** `{#snippet sklaPridaneBanner()}` (`data-testid="skla-pridane"` + odkaz
+  `resolve(\`/objednavka-skla/${encodeURIComponent(zak)}\`)`) na nahlad AJ nahladMulti.
+- **Idempotencia (dvojklik neduplikuje):** zasklenia používa
+  `pridajSklaHromadneIdempotentne()` (NIE `pridajSklaHromadne`) — preskočí už existujúci
+  riadok podľa null-safe `IS` zhody na identite (`zak_norm,op,modul,popis,sirka_mm,
+  vyska_mm,v_lavo_mm,v_pravo_mm,pocet,typ_skla`), vráti počet NOVO vložených. `modul`
+  v identite izoluje /fix + /pergola riadky; multi popis `Zasklenie ${i+1}` nespojí dva
+  identické posuvy. `pridajSklaHromadne` (bez dedupu) ostáva pre /fix + /pergola.
+- **Poradie v akcii:** náhľad (`stavNahlad`) zostav PRED `pridajSklaHromadneIdempotentne`
+  (validácia pred vedľajším efektom — kovanie-fail nevloží sklá).
+- **Existujúci `objednavka-skla.spec.ts`** overuje handoff cez klik na `skla-pridane-odkaz`
+  (NIE cez auto-redirect); nový regres je `e2e/zasklenia-akcie-poradie.spec.ts` (oba smery
+  + idempotencia, zero-console) + `tests/zasklenia-akcie-poradie.test.ts` (akcia nevracia
+  redirect, vracia `sklaPridane`).
 
 ## Testing gotcha: glass type names must be EXACT catalog matches
 

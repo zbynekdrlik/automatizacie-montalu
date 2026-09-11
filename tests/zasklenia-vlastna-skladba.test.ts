@@ -285,11 +285,9 @@ describe('vlastná skladba — multi-posuv cesta (#235 slice 2)', () => {
 	});
 
 	it('objednávka skla (multi) preberie TEXT skladby ako typSkla', async () => {
-		// pridatSklaMulti spraví INSERT, potom redirect(303) — SvelteKit redirect je throw;
-		// insert prebehne PRED ním, takže redirect zachytíme a overíme DB.
-		await callAction('pridatSklaMulti', { ...multiBase, zak: 'ZAK-M2', posuvy: posuvyJSON }).catch(
-			() => undefined
-		);
+		// #514: pridatSklaMulti spraví idempotentný INSERT a vráti späť náhľad (už NEpresmerúva);
+		// insert prebehne, DB overíme.
+		await callAction('pridatSklaMulti', { ...multiBase, zak: 'ZAK-M2', posuvy: posuvyJSON });
 		const rows = db
 			.prepare('SELECT typ_skla FROM objednavka_skla WHERE zak = ? ORDER BY id')
 			.all('ZAK-M2') as { typ_skla: string }[];

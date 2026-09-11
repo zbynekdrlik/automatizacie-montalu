@@ -104,6 +104,48 @@ export function pridajSklaHromadne(polozky: NoveSklo[]): number {
 	return count;
 }
 
+// #514: idempotentné pridanie — pre „Pridať sklá" na výsledkovej obrazovke zasklení, ktoré
+// (po zrušení redirectu) ostáva na stránke, takže dvojklik nesmie duplikovať. Zhoda na
+// GEOMETRICKEJ + popisnej identite riadka; `IS` je null-safe (v_lavo/v_pravo sú pri
+// pravouhlom skle NULL). Rezim/created_* sa do identity neráta (rovnaké fyzické sklo).
+const stmtRovnaka = db.prepare(`
+	SELECT id FROM objednavka_skla
+	WHERE zak_norm = ? AND op = ? AND modul = ? AND popis = ?
+	  AND sirka_mm IS ? AND vyska_mm IS ? AND v_lavo_mm IS ? AND v_pravo_mm IS ?
+	  AND pocet = ? AND typ_skla = ?
+	LIMIT 1
+`);
+
+function existujeRovnaka(s: NoveSklo): boolean {
+	return !!stmtRovnaka.get(
+		normZak(s.zak),
+		s.op ?? '',
+		s.modul,
+		s.popis,
+		s.sirkaMm,
+		s.vyskaMm ?? null,
+		s.vLavoMm ?? null,
+		s.vPravoMm ?? null,
+		s.pocet,
+		s.typSkla
+	);
+}
+
+/** Ako `pridajSklaHromadne`, ale IDEMPOTENTNE — riadok, ktorý už (identicky) existuje,
+ *  preskočí. Vracia počet NOVO vložených. Umožňuje opakované „Pridať sklá" nad tým istým
+ *  spočítaným plánom bez duplikácie (#514). Money-NEUTRÁLNE (objednavka_skla). */
+export function pridajSklaHromadneIdempotentne(polozky: NoveSklo[]): number {
+	let pridane = 0;
+	db.transaction(() => {
+		for (const s of polozky) {
+			if (existujeRovnaka(s)) continue;
+			pridajSklo(s);
+			pridane++;
+		}
+	})();
+	return pridane;
+}
+
 const stmtListPre = db.prepare(`
 	SELECT id, zak, zak_norm, op, modul, popis, sirka_mm, vyska_mm,
 	       v_lavo_mm, v_pravo_mm, pocet, typ_skla, sikmy, m2, rezim,

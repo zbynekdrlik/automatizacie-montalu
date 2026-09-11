@@ -50,11 +50,16 @@ test('zasklenia: spočítať → Pridať sklá do objednávky → podklad s reá
 	expect(pocet).toBeGreaterThan(0);
 	expect(typTxt.length).toBeGreaterThan(0);
 
+	// #514: „Pridať sklá" už NEpresmeruje preč — ostane výsledok s potvrdením + odkazom;
+	// z odkazu prejdeme na podklad objednávky.
 	await page.getByTestId('pridat-skla').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('skla-pridane')).toBeVisible();
+	await page.getByTestId('skla-pridane-odkaz').click();
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
 
-	// presmerovanie na podklad objednávky KONKRÉTNEJ zákazky
+	// podklad objednávky KONKRÉTNEJ zákazky
 	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
 
 	const riadok = page.locator('tbody tr').first();
