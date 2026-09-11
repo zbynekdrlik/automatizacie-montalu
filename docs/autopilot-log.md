@@ -2126,3 +2126,13 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   to ZASP cards via Dominikov kód field (16101→ZASP00116, 16006→ZASP00119, 16102→ZASP00125,
   16103→ZASP00128, 16104→ZASP202413). bar_mm=7500 confirmed, FFD bin-packing, odoslat
   unblocked. RED e74b7db → GREEN 29112e4. V1 codes without mapping stay "Nenamapované".
+- #161 (0.25.14-dev.3): Krov REZNÉ UHLY z 3D STEP dát (OP260357 Khúrová, príloha 15961).
+  Odvodené z B-rep geometrie (STEP NEMAL PMI kóty — 0× DIMENSIONAL_SIZE napriek export flagu).
+  Pravidlo (2 body cez prah 7°): koncový rez krokvy = sklon; rez na strane drážky = |sklon−7|
+  (= |uhol3|, geometricky potvrdzuje shipped CAD prah 7°). Prierez krokvy 50×120 (2. zdroj
+  OP260282). Nová pure fn krovRezneUhly(sklon) v pergola-krov.ts (display-only, CISTY_ENGINE),
+  podblok „Rezné uhly krokvy" v karte Krov (RezVysledok). RED d724a7c → GREEN d06c57c → review
+  eda5167. Fable-5-1 review 0R/3Y/4B, všetko fixnuté (caveaty na obrazovke, >9° note, toHaveText,
+  DRY). Full unit suite 3943/3943. Parser skripty → ~/.claude/work-products/montalu-podklady-11-9/
+  step-analyza/. OTVORENÉ (otázky pre Dominika): predný/zadný koniec, rozmery drážky, nad 9–10°,
+  SVG výkres render (follow-up). NEmergnuté (worktree — supervisor integruje).

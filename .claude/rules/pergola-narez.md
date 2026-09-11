@@ -482,6 +482,43 @@ krovDlzkaDoMoney  = krovNominal != null && pocetKrovov != null ? krovNominal : n
   (majiteľ posúdi), NIKDY dohad. Kódy 18004–18008 SÚ v Money CODE_MAP (`server/pergola.ts`), takže
   po pustení idú cez `transformRows` do rezervácie — preto config-gate.
 
+## Krov REZNÉ UHLY (#161) — z 3D STEP dát (OP260357), `krovRezneUhly` — display-only
+
+11.9.2026 klient dodal Solid Edge STEP export dvoch reálnych krovov (sklon do 7° a nad 7°,
+príloha 15961, zákazka OP260357 Khúrová). Odvodené POTVRDENÉ pravidlo koncových rezov krokvy
+(18102 priečkový profil 105), implementované v `krovRezneUhly(sklon)` (`pergola-krov.ts`):
+
+- **Jeden koniec krokvy je rezaný pod uhlom = SKLON strechy** (strana spádu); **druhý koniec pod
+  `|sklon − 7|`** (strana seating drážky). To druhé = presne CAD `uhol3 = sklon − 7`, ktoré appka
+  už používa na uloženie offsety — geometria 3D modelu ho NEZÁVISLE potvrdzuje. Je to úplné
+  geometrické vysvetlenie prahu 7°: pri 7° je drážkový rez 0° („krov leží rovnobežne s hranou"),
+  pod 7° sa „prehodí" (`|7−sklon|`, trojuholník otočený).
+- Overené na 2 bodoch cez prah: sklon 5,157° → rezy 5,16°/1,84° (drážka STEP meral 1,85°); sklon
+  9,501° → 9,50°/2,50°. **Prierez krokvy 50×120 mm** (`KROV_PRIEREZ_SIRKA/VYSKA`, 2. zdroj = výkres
+  OP260282).
+- **Platí pre KAŽDÝ sklon > 0** (aj < 7° / > 9°, na rozdiel od `krovUlozenie` gated 7–9°) — preto je
+  `krovRezneUhly` ODDELENÁ funkcia (ako `krovDlzkaNominal`). Display-only, Money-NEUTRÁLNE — žiadny
+  Money kód/qty/dĺžka, `pergola-krov.ts` ostáva v `CISTY_ENGINE`. Renderuje sa podblok „Rezné uhly
+  krokvy" v karte Krov (`RezVysledok`, `data-testid` `krov-rezy`/`krov-rez-sklon`/`krov-rez-drazka`/
+  `krov-prierez`/`krov-rezy-pozn`); `{#if krovRezy?.podporovane}`.
+
+**HONEST — STEP export NEMAL PMI kóty** (export flag „Export PMI dat: Zapnuto", ale 0×
+`DIMENSIONAL_SIZE`/`ANGULAR_LOCATION`/`DRAUGHTING` vo všetkých 4 súboroch). Všetky uhly sú ODVODENÉ
+z B-rep geometrie, nie odčítané z anotácie. Ako re-derivovať z BUDÚCEHO STEP-u (skripty archivované
+v `~/.claude/work-products/montalu-podklady-11-9/step-analyza/`):
+
+- STEP = textový ISO 10303-21; pomenované solidy cez `SHAPE_REPRESENTATION_RELATIONSHIP(namedRep,
+  brepRep)` (názov diela nesie `SHAPE_REPRESENTATION`, solid `ADVANCED_BREP_SHAPE_REPRESENTATION →
+  MANIFOLD_SOLID_BREP`). Normála planárnej plochy = `PLANE → AXIS2_PLACEMENT_3D` os. Sklon modelu =
+  tilt osi krokvy z rotácie zostavy `ITEM_DEFINED_TRANSFORMATION` (z krokvy `(0, sin, cos)` →
+  `atan(sin/cos)`). Bez OCC — planárne plochy stačia, `pip` venv v scratchi (netreba).
+
+**STÁLE OTVORENÉ (honest-null / otázky pre Dominika):** priradenie predného/zadného konca (žľab vs
+kotviaci), presné rozmery drážky ako funkcia sklonu (len 1 model na režim), správanie nad 9–10°
+(model pri 9,5° drážku STÁLE má → engine pridá varovnú poznámku, ale nič nehádže). SVG technický
+výkres (`PergolaNarezVykres`) rezné uhly zatiaľ NErenderuje (odložené, near-cap súbor + vykres.md
+gotchy) — karta na výsledkovej stránke ich zobrazuje.
+
 ## Strešné sklo (#223) — SAMOSTATNÁ pure funkcia, Money-NEUTRÁLNA (nikdy do `vypocitane`)
 
 Výpočet strešného skla žije v `src/lib/pergola-sklo.ts` (`spocitajStrechaSklo(v)`) ako
