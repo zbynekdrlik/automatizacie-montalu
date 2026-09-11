@@ -7,7 +7,14 @@
 // Zápisový tok (píše do objednavka_skla + testový Money priečinok, NIE do ostrého
 // Money) — `skipAkLive` na ostrom nasadení preskočí. Zero-console-errors ako všade.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	skipAkLive,
+	vyberFarbuKovania
+} from './helpers';
 
 const RUN = `E2E-PORADIE-${Date.now().toString(36).slice(-5)}`;
 

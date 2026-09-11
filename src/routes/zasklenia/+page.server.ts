@@ -2,7 +2,6 @@
 // (2) „odoslat" prepočíta ZNOVA zo surových vstupov (nikdy never klientom
 // poslaným číslam) a zapíše odpis s dedup ochranou.
 
-import { redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
 import {
@@ -74,7 +73,7 @@ import {
 	type MultiVstup
 } from '$lib/server/vstup';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
-import { pridajSklaHromadne, type NoveSklo } from '$lib/server/objednavka-skla';
+import { pridajSklaHromadneIdempotentne, type NoveSklo } from '$lib/server/objednavka-skla';
 
 /** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
  *  ako comma-separated string v hidden inpute `vylucene_kody`. */
@@ -538,11 +537,96 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	};
 };
 
+// #514: náhľadový payload vyčlenený, aby ho vedeli vrátiť AJ `nahlad` AJ `pridatSkla`
+// (ktoré po pridaní skiel už NEpresmerúva preč, ale vráti späť náhľad s potvrdením) —
+// odpisové tlačidlo + ceny + `planHash` sa tak po pridaní skla vyrenderujú IDENTICKY.
+// Predpokladá, že compute prebehol (r + spec sú platné). Chybu kovania vráti ako 'form'.
+function stavNahlad(vstup: Vstup, r: ComputeResult, spec: PosuvSpec, user: SessionUser | null) {
+	const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
+	if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
+	const tesn = tesneniePolozky(r.material, r.system, vstup.sklo, vstup.skloTrieda);
+	const allKovanie = [...kov.polozky, ...tesn.polozky];
+	const job = jobFor(vstup, r, '', allKovanie);
+	return {
+		step: 'nahlad' as const,
+		vstup,
+		plan: r,
+		kovanie: allKovanie,
+		ceny: cenyPre(user, job.polozky),
+		skladVarovania: skladVarovaniaPre(user, job.polozky),
+		snapshotDatum: getSnapshotMeta().generatedAt,
+		skloCeny: skloCenyPre(user, [
+			{
+				label: '',
+				system: vstup.system,
+				variant: vstup.sklo,
+				sirka: r.sklo.sirka,
+				vyska: r.sklo.vyska,
+				pocet: r.sklo.pocet
+			}
+		]),
+		planHash: contentHash(vstup.zak, job.polozky),
+		warn: [odvodenyOdpisWarn(spec.sysStyl), kov.warn, tesn.warn].filter(Boolean).join(' ') || null,
+		vytvorene: new Date().toISOString(),
+		cielInfo: {
+			live: isLive(),
+			filename: filenameFor(job),
+			dir: targetDirFor(r.system, vstup.caka)
+		}
+	};
+}
+
+// #514: multi-posuv obdoba `stavNahlad` — pre `nahladMulti` AJ `pridatSklaMulti`.
+function stavNahladMulti(
+	vstup: MultiVstup,
+	r: MultiResult,
+	specs: PosuvSpec[],
+	user: SessionUser | null
+) {
+	const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
+	if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
+	const tesnMulti = multiTesneniePolozky(r, vstup);
+	const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
+	const job = jobForMulti(vstup, r, '', allKovanie);
+	return {
+		step: 'nahladMulti' as const,
+		multiVstup: vstup,
+		multi: r,
+		kovanie: allKovanie,
+		ceny: cenyPre(user, job.polozky),
+		skladVarovania: skladVarovaniaPre(user, job.polozky),
+		snapshotDatum: getSnapshotMeta().generatedAt,
+		skloCeny: skloCenyPre(
+			user,
+			r.posuvy.map((p, i) => ({
+				label: 'Zasklenie ' + (i + 1),
+				system: p.system,
+				variant: vstup.posuvy[i]?.sklo ?? '',
+				sirka: p.sklo.sirka,
+				vyska: p.sklo.vyska,
+				pocet: p.sklo.pocet
+			}))
+		),
+		planHash: contentHash(vstup.zak, job.polozky),
+		warn:
+			[
+				...new Set(specs.map((s) => odvodenyOdpisWarn(s.sysStyl)).filter(Boolean)),
+				kov.warn,
+				tesnMulti.warn
+			]
+				.filter(Boolean)
+				.join(' ') || null,
+		vytvorene: new Date().toISOString(),
+		cielInfo: {
+			live: isLive(),
+			filename: filenameFor(job),
+			dir: targetDirFor(r.posuvy[0]?.system ?? 'Robust', vstup.caka)
+		}
+	};
+}
+
 export const actions = {
 	nahlad: async ({ request, locals }) => {
-		// dátum vzniku plánu pre tlačenú hlavičku (#114) — server clock PRI spracovaní
-		// akcie, nie new Date() na klientovi, aby sa nemenilo, ak stránka ostane otvorená
-		const vytvorene = new Date().toISOString();
 		const { vstup, error } = parseVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
 
@@ -570,51 +654,10 @@ export const actions = {
 		const { r, err, spec } = compute(vstup);
 		if (err || !r || !spec)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
-		// kovanie (kusy + tesnenia) — chyba v počtoch zastaví už náhľad, aby sa
-		// nedalo odoslať niečo, čo appka nevie spočítať celé
-		const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
-		if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
-		// #342 round 2: tesnenie polozky (ZASK00005/ZASK00006) podľa skla + honest-null
-		const tesn = tesneniePolozky(r.material, r.system, vstup.sklo, vstup.skloTrieda);
-		const allKovanie = [...kov.polozky, ...tesn.polozky];
-		const job = jobFor(vstup, r, '', allKovanie);
-		return {
-			step: 'nahlad' as const,
-			vstup,
-			plan: r,
-			kovanie: allKovanie,
-			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných; undefined pre
-			// b2b, takže sa nedostane ani do HTML odpovede (obrana do hĺbky)
-			ceny: cenyPre(locals.user, job.polozky),
-			// predodpisové skladové varovanie (#448/#451) — LEN pre interných; honest signál + odobrať
-			skladVarovania: skladVarovaniaPre(locals.user, job.polozky),
-			snapshotDatum: getSnapshotMeta().generatedAt,
-			// náklad na sklo (display-only, #225) — LEN pre interných, undefined pre b2b;
-			// plocha reálnych tabúľ × cena/m² zo snapshotu, honest-null keď cena chýba
-			skloCeny: skloCenyPre(locals.user, [
-				{
-					label: '',
-					system: vstup.system,
-					variant: vstup.sklo,
-					sirka: r.sklo.sirka,
-					vyska: r.sklo.vyska,
-					pocet: r.sklo.pocet
-				}
-			]),
-			// hash plánu — potvrdenie zapíše len PRESNE to, čo užívateľ videl
-			planHash: contentHash(vstup.zak, job.polozky),
-			// #342 round 2: kovanie warn + tesnenie warn (odpis-relevanté honest-null)
-			// #504 round 3: odvodený (neoverený) nárezák (2×2K/2×3K opona IZO) — čestné označenie
-			warn:
-				[odvodenyOdpisWarn(spec.sysStyl), kov.warn, tesn.warn].filter(Boolean).join(' ') || null,
-			heightWarn,
-			vytvorene,
-			cielInfo: {
-				live: isLive(),
-				filename: filenameFor(job),
-				dir: targetDirFor(r.system, vstup.caka)
-			}
-		};
+		// náhľadový payload (kovanie/tesnenie/ceny/planHash/warn) je zdieľaný so `pridatSkla`
+		const v = stavNahlad(vstup, r, spec, locals.user);
+		if (v.step === 'form') return v;
+		return { ...v, heightWarn };
 	},
 
 	odoslat: async ({ request, locals }) => {
@@ -726,8 +769,6 @@ export const actions = {
 
 	// ---- Viac posuvov (zimná záhrada): spoločné balenie tyčí naprieč posuvmi ----
 	nahladMulti: async ({ request, locals }) => {
-		// dátum vzniku plánu pre tlačenú hlavičku (#114) — pozri poznámku pri `nahlad`
-		const vytvorene = new Date().toISOString();
 		const { vstup, error } = parseMultiVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 
@@ -752,53 +793,10 @@ export const actions = {
 		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
-		const kov = kovanieFor(specs, vstup.jednostrannaFab, vstup.farbaKovania);
-		if (kov.err) return { step: 'form' as const, error: kov.err, multiVstup: vstup };
-		// #342 round 2: tesnenie polozky PER POSUV (každý posuv má vlastné sklo)
-		const tesnMulti = multiTesneniePolozky(r, vstup);
-		const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
-		const job = jobForMulti(vstup, r, '', allKovanie);
-		return {
-			step: 'nahladMulti' as const,
-			multiVstup: vstup,
-			multi: r,
-			kovanie: allKovanie,
-			// cenový zoznam materiálu (#154, fáza 1) — LEN pre interných (viď nahlad vyššie)
-			ceny: cenyPre(locals.user, job.polozky),
-			// predodpisové skladové varovanie (#448/#451) — LEN pre interných; honest signál + odobrať
-			skladVarovania: skladVarovaniaPre(locals.user, job.polozky),
-			snapshotDatum: getSnapshotMeta().generatedAt,
-			// náklad na sklo per posuv + súhrn (display-only, #225) — LEN pre interných
-			skloCeny: skloCenyPre(
-				locals.user,
-				r.posuvy.map((p, i) => ({
-					label: 'Zasklenie ' + (i + 1),
-					system: p.system,
-					variant: vstup.posuvy[i]?.sklo ?? '',
-					sirka: p.sklo.sirka,
-					vyska: p.sklo.vyska,
-					pocet: p.sklo.pocet
-				}))
-			),
-			planHash: contentHash(vstup.zak, job.polozky),
-			// #342 round 2: kovanie warn + tesnenie warn (odpis-relevanté)
-			// #504 round 3: odvodený nárezák niektorého posuvu (2×2K/2×3K opona IZO) — distinct, čestné označenie
-			warn:
-				[
-					...new Set(specs.map((s) => odvodenyOdpisWarn(s.sysStyl)).filter(Boolean)),
-					kov.warn,
-					tesnMulti.warn
-				]
-					.filter(Boolean)
-					.join(' ') || null,
-			heightWarn,
-			vytvorene,
-			cielInfo: {
-				live: isLive(),
-				filename: filenameFor(job),
-				dir: targetDirFor(r.posuvy[0]?.system ?? 'Robust', vstup.caka)
-			}
-		};
+		// náhľadový payload zdieľaný so `pridatSklaMulti`
+		const v = stavNahladMulti(vstup, r, specs, locals.user);
+		if (v.step === 'form') return v;
+		return { ...v, heightWarn };
 	},
 
 	odoslatMulti: async ({ request, locals }) => {
@@ -908,8 +906,9 @@ export const actions = {
 		}
 		const { vstup, error } = parseVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
-		const { r, err } = compute(vstup);
-		if (err || !r) return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
+		const { r, err, spec } = compute(vstup);
+		if (err || !r || !spec)
+			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		if (!vstup.zak.trim())
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', vstup };
 
@@ -926,9 +925,13 @@ export const actions = {
 				createdBy: locals.user?.username ?? ''
 			}
 		];
-		const count = pridajSklaHromadne(polozky);
-		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, count });
-		redirect(303, '/objednavka-skla/' + encodeURIComponent(vstup.zak));
+		// #514: idempotentne (dvojklik neduplikuje) a BEZ presmerovania — vráť späť náhľad
+		// s potvrdením, aby „uložiť nárezák" (odpis) ostalo dostupné nad tým istým výsledkom.
+		const pridane = pridajSklaHromadneIdempotentne(polozky);
+		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
+		const v = stavNahlad(vstup, r, spec, locals.user);
+		if (v.step === 'form') return v;
+		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
 	},
 
 	// ---- #496: Pridať sklá do objednávky skla (multi posuv / zimná záhrada) ----
@@ -938,7 +941,7 @@ export const actions = {
 		}
 		const { vstup, error } = parseMultiVstup(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
-		const { r, err } = computeMultiFrom(vstup);
+		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 		if (!vstup.zak.trim())
@@ -955,8 +958,11 @@ export const actions = {
 			typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
 			createdBy: locals.user?.username ?? ''
 		}));
-		const count = pridajSklaHromadne(polozky);
-		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, count });
-		redirect(303, '/objednavka-skla/' + encodeURIComponent(vstup.zak));
+		// #514: idempotentne + bez presmerovania — viď `pridatSkla`
+		const pridane = pridajSklaHromadneIdempotentne(polozky);
+		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
+		const v = stavNahladMulti(vstup, r, specs, locals.user);
+		if (v.step === 'form') return v;
+		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
 	}
 } satisfies Actions;

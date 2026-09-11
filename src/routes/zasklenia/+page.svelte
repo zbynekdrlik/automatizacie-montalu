@@ -748,6 +748,22 @@
 		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
 	{/if}
 
+	<!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) -->
+	{#if form?.sklaPridane}
+		<div class="okmsg noprint" data-testid="skla-pridane">
+			{#if form.sklaPridane.pridane > 0}
+				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane} ks).
+			{:else}
+				ℹ️ Sklá pre tento plán už sú v objednávke.
+			{/if}
+			<a
+				data-testid="skla-pridane-odkaz"
+				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
+				>Otvoriť objednávku skla →</a
+			>
+		</div>
+	{/if}
+
 	<PlanKarty {plan} {vstup} kovanie={form?.kovanie} ceny={form?.ceny} skloCeny={form?.skloCeny} />
 
 	<!-- #448/#451: predodpisové skladové varovanie + odobrať (LEN interní; b2b server []) -->
@@ -812,6 +828,15 @@
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<!-- #514: „Odoslať sklo" dostupné aj po uložení nárezáku (odpise) nad tým istým výsledkom -->
+		{#if !isB2B}
+			<form method="POST" action="?/pridatSkla" style="display:inline">
+				{@render hiddenVstup()}
+				<button class="btn secondary" type="submit" data-testid="pridat-skla"
+					>📋 Pridať sklá do objednávky</button
+				>
+			</form>
+		{/if}
 		<a class="btn secondary" href={resolve('/zasklenia')}>➕ Nový nárezový plán</a>
 	</div>
 {:else if step === 'nahladMulti' && multi}
@@ -829,6 +854,22 @@
 	{#if form?.warn}<div class="warn" data-testid="plan-warn">⚠️ {form.warn}</div>{/if}
 	{#if form?.heightWarn}
 		<div class="warn-zaruka" data-testid="height-warn">{form.heightWarn}</div>
+	{/if}
+
+	<!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) -->
+	{#if form?.sklaPridane}
+		<div class="okmsg noprint" data-testid="skla-pridane">
+			{#if form.sklaPridane.pridane > 0}
+				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane} ks).
+			{:else}
+				ℹ️ Sklá pre tento plán už sú v objednávke.
+			{/if}
+			<a
+				data-testid="skla-pridane-odkaz"
+				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
+				>Otvoriť objednávku skla →</a
+			>
+		</div>
 	{/if}
 
 	<PlanKartyMulti
@@ -904,6 +945,15 @@
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<!-- #514: „Odoslať sklo" dostupné aj po uložení nárezáku (odpise) nad tým istým výsledkom -->
+		{#if !isB2B}
+			<form method="POST" action="?/pridatSklaMulti" style="display:inline">
+				{@render hiddenMulti()}
+				<button class="btn secondary" type="submit" data-testid="pridat-skla-multi"
+					>📋 Pridať sklá do objednávky</button
+				>
+			</form>
+		{/if}
 		<a class="btn secondary" href={resolve('/zasklenia')}>➕ Nový nárezový plán</a>
 	</div>
 {:else if step === 'blocked' && form && 'rawEntries' in form && form.rawEntries}
