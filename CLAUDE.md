@@ -128,6 +128,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - verejný dopyt / PDF ponuka s orientačnou cenou / slovenský text v pdf-lib / DopytForm → `.claude/rules/dopyt-ponuka.md`
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
 - interný zoznam materiálu zákazky → Odoo sale.order log-note (odoo-rpc, mt_note, observer hook, ZAK/OP match) → `.claude/rules/odoo-zakazka.md`
+- plán rezov → Odoo kiosk „Rezanie" PDF bez cien (montalu_narezak_upload, OP z odpisu, doc_id plan-rezov-<zak>-<op>, setImmediate defer, PDF metadáta test kanál, source-guard vs próza pasca) → `.claude/rules/plan-rezov-kiosk.md`
 - 1000-r. strop pre celé `src/**` (split vzory) → `.claude/rules/large-file-split.md`
 - SkladVarovania cross-module wiring (bindable prop, vylucene_kody, dva mechanizmy odobratia) → `.claude/rules/sklad-varovania.md`
 - e2e zero-console assert + guard (`e2e/**`, `tests/e2e-console-guard.test.ts`) → `.claude/rules/e2e-console.md`
