@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
-	import { defaultSklo, SKLO_INE, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
+	import { defaultSklo, SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
 		sysStylPre,
 		skloVyberaIzo,
+		zakladnyStyl,
 		pridavnaKolajnicaDefault
 	} from '$lib/styl';
 	import { popisMulti } from '$lib/popis';
@@ -108,6 +109,13 @@
 		SKLO_INE
 	];
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
+	// Hrúbkové triedy vlastnej skladby ponúkané pre systém+štýl (#235 slice 2, RED-1 mirror):
+	// izolačné triedy (16/24) sa v UI NEPONÚKAJÚ tam, kde IZO nárezák pre daný štýl
+	// neexistuje (Štandard + opona) — rovnaký gate ako `sklaForSystem`/server `skloPre`.
+	const triedyPre = (sys: string, styl: string): readonly number[] =>
+		skloVyberaIzo(sys) && !existuje(`${sys}|${zakladnyStyl(styl)} IZO`)
+			? SKLO_TRIEDY.filter((t) => t < 16)
+			: SKLO_TRIEDY;
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
 	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.
@@ -190,7 +198,11 @@
 		pridavnaKolajnicaOdporucanaPrev = pridavnaKolajnicaDefault(
 			p?.system ?? 'Robust',
 			p?.styl ?? '2K',
-			p?.sklo ?? ''
+			p?.sklo ?? '',
+			// #235 slice 2 (YELLOW-1): pri vlastnej skladbe IZO-nosť určuje trieda, nie názov
+			p?.sklo === SKLO_INE && jeSkloTrieda(p?.skloTrieda)
+				? ineHrubkaTrieda(p.skloTrieda)
+				: undefined
 		);
 		// #235: zasej prevSystemForSklo z OBNOVENÝCH dát, inak by sklo-efekt videl
 		// „zmenu systému" a prepísal obnovené sklo na defaultSklo (rovnaký vzor ako
@@ -319,11 +331,15 @@
 	// #235 slice 2: pri vlastnej skladbe („Iné") IZO-nosť určuje ZVOLENÁ trieda (nie názov
 	// sentinelu) — inak by hint tvrdil „basic" aj pre vlastnú IZO 24. Cosmetic hint (server
 	// compute je autoritatívny cez triedu), ale nech nezavádza.
+	// #235 slice 2: hrúbková trieda PRIMÁRNEHO posuvu pri vlastnej skladbe (inak undefined)
+	// — jeden zdroj pravdy pre narezakHint AJ pridavnaKolajnicaDefault (YELLOW-1), aby sa
+	// IZO-nosť vlastnej skladby určovala triedou, nie názvom sentinelu.
+	let triedaPrimara = $derived(
+		sklo === SKLO_INE && jeSkloTrieda(skloTriedaS) ? ineHrubkaTrieda(skloTriedaS) : undefined
+	);
 	let narezakHint = $derived.by(() => {
 		if (!skloVyberaIzo(system) || !sklo) return '';
-		const trieda =
-			sklo === SKLO_INE && jeSkloTrieda(skloTriedaS) ? ineHrubkaTrieda(skloTriedaS) : undefined;
-		const styl2 = sysStylPre(system, styl, sklo, existuje, trieda).split('|')[1];
+		const styl2 = sysStylPre(system, styl, sklo, existuje, triedaPrimara).split('|')[1];
 		return `Podľa skla sa ťahá nárezák ${system} ${styl2}.`;
 	});
 	let stylyPre = $derived(stylyForSystem(system));
@@ -344,6 +360,10 @@
 			// „Robustové sklo neprežije prepnutie"). Zápis do prevSystemForSklo
 			// je untracked → nespúšťa znovu tento efekt.
 			sklo = defaultSklo(zoznam, currentSystem);
+			// #235 slice 2 (BLUE-3): reset vlastnej skladby pri zmene systému — trieda
+			// patrí starému systému. sklo sa resetuje na katalógový default, takže
+			// skloTriedaS je aj tak ignorovaná serverom, ale nech nezostane stará voľba.
+			skloTriedaS = '';
 			prevSystemForSklo = currentSystem;
 		} else {
 			// štýlová zmena / iný trigger → name-persistence (zmena počtu krídel
@@ -367,7 +387,9 @@
 	// ten „stays ticked after the reason disappears" bug, ktorému sa chceme
 	// vyhnúť). `pridavnaKolajnicaOdporucanaPrev` sa zasieva aj v reštart-efekte
 	// vyššie, aby „Použiť znova" nikdy neprepísalo obnovenú hodnotu.
-	let pridavnaKolajnicaOdporucana = $derived(pridavnaKolajnicaDefault(system, styl, sklo));
+	let pridavnaKolajnicaOdporucana = $derived(
+		pridavnaKolajnicaDefault(system, styl, sklo, triedaPrimara)
+	);
 	$effect(() => {
 		const chce = pridavnaKolajnicaOdporucana;
 		if (chce !== untrack(() => pridavnaKolajnicaOdporucanaPrev)) {
@@ -697,6 +719,7 @@
 		{b2bBlok}
 		{stylyForSystem}
 		{sklaForSystem}
+		{triedyPre}
 		{otvaraniaForStyl}
 		{kolajnicaPre}
 		{addPosuv}

@@ -28,7 +28,8 @@ export function parseSkloTrieda(
 	triedaRaw: FormDataEntryValue | null
 ): number | null {
 	if (String(skloRaw ?? '').trim() !== SKLO_INE) return null;
-	const t = parseInt(String(triedaRaw ?? ''), 10);
+	// Number() (nie parseInt) — striktné: „4abc"/„4.9" → NaN → null (nie tiché 4).
+	const t = Number(String(triedaRaw ?? '').trim());
 	return jeSkloTrieda(t) ? t : null;
 }
 

@@ -27,7 +27,14 @@ import {
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { znovaZOdpisu } from '$lib/server/znova';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
-import { sysStylPre, sklaDoPonuky, type ExistujeSysStyl, type TriedaZaNazov } from '$lib/styl';
+import {
+	sysStylPre,
+	sklaDoPonuky,
+	skloVyberaIzo,
+	zakladnyStyl,
+	type ExistujeSysStyl,
+	type TriedaZaNazov
+} from '$lib/styl';
 import {
 	writeOdpis,
 	isLive,
@@ -266,6 +273,24 @@ function skloPre(
 	// lebo variant je sentinel). Trieda POVINNÁ — bez platnej triedy null (validácia odmietne).
 	if (sklo === SKLO_INE) {
 		if (!jeSkloTrieda(skloTrieda)) return null;
+		const trieda = ineHrubkaTrieda(skloTrieda);
+		// RED-1 (#235 slice 2): rovnaký system×štýl gate ako katalóg. `sklaDoPonuky`
+		// FILTRUJE izolačné sklá tam, kde pre daný štýl IZO nárezák neexistuje (napr.
+		// Štandard + opona 2x2K — cfg nemá „…|2x2K IZO"). Bez tohto by vlastná IZO na
+		// takej kombinácii spočítala BASIC nárezák (sysStylPre padne späť) + trieda-16
+		// korekciu — stav, aký žiadne katalógové IZO sklo v tej kombinácii nevie. Mirror
+		// klienta: SKLO_TRIEDY 16/24 sú v UI odfiltrované keď IZO nárezák chýba.
+		if (
+			skloVyberaIzo(system) &&
+			trieda === 16 &&
+			!existujeVCfg(cfg)(`${system}|${zakladnyStyl(styl)} IZO`)
+		)
+			return null;
+		// YELLOW-3 (#235 slice 2): `hrubkaTrieda` je non-null LEN pre systémy, ktoré
+		// klasifikujú skladbu (Slide + Štandardy). Robust/Deluxe majú v katalógu NULL
+		// (db.ts) → syntetické sklo tiež NULL, inak by `efektivnaKorekcia` sadla triedovú
+		// korekciu tam, kde katalóg nikdy. Deluxe rieši hrúbku cez `hrubka` (nie triedu).
+		const klasifikuje = system === 'Slide' || skloVyberaIzo(system);
 		const g: GlassType = {
 			id: -1,
 			nazov: SKLO_INE,
@@ -273,7 +298,7 @@ function skloPre(
 			redukciaZero: false,
 			hrubka: ineHrubka(system, skloTrieda),
 			skloKorekcia: null,
-			hrubkaTrieda: ineHrubkaTrieda(skloTrieda)
+			hrubkaTrieda: klasifikuje ? trieda : null
 		};
 		return g;
 	}

@@ -10,7 +10,7 @@
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { zaskleniaSlovom } from '$lib/popis';
 	import { plusRailEligible, SYSTEMY_OBVODOVA } from '$lib/styl';
-	import { SKLO_INE, SKLO_TRIEDY } from '$lib/sklo';
+	import { SKLO_INE } from '$lib/sklo';
 	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
 	import type { Farba } from '$lib/komponenty';
 	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -86,6 +86,7 @@
 		// pure helpery (uzávery nad `data`/`existuje` v rodičovi) + mutátory stavu rodiča
 		stylyForSystem,
 		sklaForSystem,
+		triedyPre,
 		otvaraniaForStyl,
 		kolajnicaPre,
 		addPosuv,
@@ -145,6 +146,7 @@
 		b2bBlok: boolean;
 		stylyForSystem: (sys: string) => string[];
 		sklaForSystem: (sys: string, styl: string) => string[];
+		triedyPre: (sys: string, styl: string) => readonly number[];
 		otvaraniaForStyl: (st: string) => string[];
 		kolajnicaPre: (sys: string) => boolean;
 		addPosuv: () => void;
@@ -236,7 +238,7 @@
 						data-testid="ine-trieda"
 					>
 						<option value="">— vyber triedu —</option>
-						{#each SKLO_TRIEDY as t (t)}<option value={t}
+						{#each triedyPre(system, styl) as t (t)}<option value={t}
 								>{t} mm{t >= 16 ? ' (izolačné)' : ''}</option
 							>{/each}
 					</select>
@@ -525,7 +527,19 @@
 				<div class="grid2">
 					<div class="field">
 						<label for={`ps${i}-sklo`}>Sklo</label>
-						<select id={`ps${i}-sklo`} bind:value={p.sklo}>
+						<!-- YELLOW-2 (#235 slice 2): pri prepnutí PREČ z „Iné" vyčisti skrytú vlastnú
+						     skladbu — inak by stará (neviditeľná) hodnota tichonko sadla na katalógové
+						     sklo (plán, objednávka, detail). -->
+						<select
+							id={`ps${i}-sklo`}
+							bind:value={p.sklo}
+							onchange={() => {
+								if (p.sklo !== SKLO_INE) {
+									p.skloPresne = '';
+									p.skloTrieda = '';
+								}
+							}}
+						>
 							{#each sklaForSystem(p.system, p.styl) as g (g)}<option>{g}</option>{/each}
 						</select>
 						<!-- vlastná skladba tohto posuvu (#235 slice 2) — bind (žiadne name=,
@@ -539,7 +553,7 @@
 								data-testid={`ps${i}-ine-trieda`}
 							>
 								<option value="">— vyber triedu —</option>
-								{#each SKLO_TRIEDY as t (t)}<option value={t}
+								{#each triedyPre(p.system, p.styl) as t (t)}<option value={t}
 										>{t} mm{t >= 16 ? ' (izolačné)' : ''}</option
 									>{/each}
 							</select>

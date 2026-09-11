@@ -370,3 +370,118 @@ describe('vlastná skladba — Deluxe hrubka (kladka/klzný) podľa triedy (#235
 		expect(odpisJSON(vl10)).not.toBe(odpisJSON(vl6));
 	});
 });
+
+// ---- (10) RED-1: system×štýl IZO gate — vlastná IZO nesmie obísť katalógový filter ----
+
+describe('vlastná skladba — IZO gate (RED-1, #235 slice 2)', () => {
+	const odpisJSON = (r: Record<string, unknown>) =>
+		JSON.stringify((r.plan as { odpis: unknown }).odpis);
+
+	it('Štandard + opona (2x2K, bez IZO nárezáku) + Iné + trieda 24 → ODMIETNUTÉ (ako katalógová IZO)', async () => {
+		const r = (await nahlad({
+			op: '01',
+			zakaznik: 'X',
+			system: 'Štandard +',
+			styl: '2x2K',
+			s: '3000',
+			v: '2000',
+			otvaranie: 'Opona',
+			sklo: SKLO_INE,
+			skloPresne: '5esg/14/5esg',
+			skloTrieda: '24',
+			zak: 'ZAK-G1'
+		})) as Record<string, unknown>;
+		// server gate (skloPre) odmietne — rovnaká chyba ako katalógová IZO na opone
+		expect(r.step).toBe('form');
+		expect(String(r.error)).toMatch(/typ skla platný/);
+	});
+
+	it('Štandard + 4K (IZO nárezák existuje) + Iné + 24 = katalógová IZO 4/8/4 (IZO nárezák)', async () => {
+		const kat = (await nahlad({
+			...STDPLUS,
+			sklo: 'Izolačné sklo 4/8/4 číre',
+			zak: 'ZAK-G2'
+		})) as Record<string, unknown>;
+		const vl = (await nahlad({
+			...STDPLUS,
+			sklo: SKLO_INE,
+			skloPresne: '5esg/14/5esg',
+			skloTrieda: '24',
+			zak: 'ZAK-G3'
+		})) as Record<string, unknown>;
+		expect(kat.step).toBe('nahlad'); // IZO nárezák pre 4K existuje (inak by bol filtrovaný)
+		expect(vl.step).toBe('nahlad');
+		expect(odpisJSON(vl)).toBe(odpisJSON(kat)); // vlastná IZO == katalógová IZO (IZO nárezák)
+	});
+
+	it('Robust (Money-neutrálne sklo) + Iné + 24 = katalógová Robust IZO 4/16/4', async () => {
+		const base = {
+			op: '01',
+			zakaznik: 'X',
+			system: 'Robust',
+			styl: '2K',
+			s: '3000',
+			v: '2000',
+			otvaranie: 'P - L',
+			farbaKovania: 'R9005' // Robust kovanie má farebný variant (#338) — inak nahlad padne
+		};
+		const kat = (await nahlad({
+			...base,
+			sklo: 'Izolačné sklo 4/16/4 číre',
+			zak: 'ZAK-G4'
+		})) as Record<string, unknown>;
+		const vl = (await nahlad({
+			...base,
+			sklo: SKLO_INE,
+			skloPresne: 'čokoľvek',
+			skloTrieda: '24',
+			zak: 'ZAK-G5'
+		})) as Record<string, unknown>;
+		expect(kat.step).toBe('nahlad');
+		expect(vl.step).toBe('nahlad');
+		expect(odpisJSON(vl)).toBe(odpisJSON(kat)); // Robust: sklo Money-neutrálne → identické
+	});
+});
+
+// ---- (11) multi-posuv serverová validácia vlastnej skladby ----
+
+describe('vlastná skladba — multi validácia (#235 slice 2)', () => {
+	const posuvIne = (extra: Record<string, unknown>) =>
+		JSON.stringify([
+			{
+				system: 'Slide',
+				styl: '3K',
+				s: '3000',
+				v: '2000',
+				sklo: 'Izolačné sklo 4/8/4 číre',
+				otvaranie: 'P - L'
+			},
+			{
+				system: 'Slide',
+				styl: '3K',
+				s: '3000',
+				v: '2000',
+				sklo: SKLO_INE,
+				otvaranie: 'P - L',
+				...extra
+			}
+		]);
+	const base = { zak: 'ZAK-MV', op: '01', zakaznik: 'X', farbaKovania: 'R7016' };
+
+	it('posuv „Iné" bez textu → chyba (zloženie skla)', async () => {
+		const r = (await nahladMulti({ ...base, posuvy: posuvIne({ skloTrieda: 24 }) })) as Record<
+			string,
+			unknown
+		>;
+		expect(r.step).toBe('form');
+		expect(String(r.error)).toContain('zloženie skla');
+	});
+	it('posuv „Iné" bez triedy → chyba (trieda)', async () => {
+		const r = (await nahladMulti({
+			...base,
+			posuvy: posuvIne({ skloPresne: '5esg/14/5esg' })
+		})) as Record<string, unknown>;
+		expect(r.step).toBe('form');
+		expect(String(r.error)).toContain('triedu');
+	});
+});

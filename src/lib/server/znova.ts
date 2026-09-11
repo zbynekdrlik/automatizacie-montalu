@@ -78,9 +78,11 @@ function posuvZDetailu(
 		s: n(d.s),
 		v: n(d.v),
 		sklo: platneSklo(system, zaklad, chybajuce, kde),
-		// vlastná skladba (#235 slice 2): pri `sklo===SKLO_INE` je text v `d.sklo`
-		// (základ je sentinel v `d.skloZaklad`) a trieda v `d.skloTrieda`
-		skloPresne: s(d.skloZaklad) ? s(d.sklo) : '',
+		// vlastná skladba / presné zloženie (#235 slice 2, YELLOW-2): skloPresne obnov LEN
+		// keď sa `d.sklo` (uložený text/presné zloženie) LÍŠI od `d.skloZaklad` (základ).
+		// Pri holom katalógovom skle sú rovnaké → skloPresne prázdne (inak by sa katalógový
+		// názov obnovil ako „presné zloženie" a po zmene skla ticho vytlačil na plán).
+		skloPresne: s(d.sklo) !== s(d.skloZaklad) ? s(d.sklo) : '',
 		skloTrieda: trieda(d.skloTrieda),
 		otvaranie: s(d.otvaranie),
 		kovanieL: s(d.kovanieL),
