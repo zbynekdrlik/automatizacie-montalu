@@ -3,8 +3,9 @@
 // E2E env VYPNUTÝ (žiadny ODOO_JSON2_URL) — tento test overuje USER FLOW: plán sa uloží, wiring
 // uploadu nezhodí uloženie, a detail plánu renderuje TEN ISTÝ plán rezov (rezy/tyče/odpad), ktorý
 // nesie kiosk PDF. Transport-kontrakt uploadu (kind/doc_id/filename/PDF bez cien) je pokrytý
-// integračne v `tests/odoo-plan-rezov-upload.test.ts` (server-side fetch sa cez prehliadač
-// nezachytáva — vzor existujúceho `standard-narezak.spec.ts`, ktorý je tiež UI-only).
+// integračne v `tests/odoo-plan-rezov-upload.test.ts` cez `setJson2Transport` — server-side fetch
+// sa cez prehliadač Playwrightom nezachytáva, a pôvodný odpis→narezak upload (zmazaný) nemal
+// v E2E ŽIADNE pokrytie uploadu vôbec (jeho spustenie záviselo na PROD Odoo env).
 import { test, expect } from '@playwright/test';
 import { collectConsole, goto, loginAs } from './helpers';
 

@@ -33,6 +33,9 @@ export interface PlanRezovUploadInput {
 	cadText: string;
 	dlzkaTyce: number;
 	reznaMedzera: number;
+	/** názov uloženého plánu (#505) — do hlavičky PDF, aby rezač rozlíšil viac plánov tej istej
+	 *  zákazky (re-save prepíše ten istý doc_id, takže názov je jediný odlišovač v prílohe). */
+	nazov?: string;
 	/** injektovateľný čas (testy / zhoda pečiatky s uložením). */
 	now?: Date;
 }
@@ -96,7 +99,9 @@ export async function uploadPlanRezovToOdoo(
 			log.info('plan-rezov upload: zákazka nemá žiadny odpis — nič neposielam', { zak });
 			return { result: 'missing' };
 		}
-		const op = prehlad.odpisy[0]?.op ?? '';
+		// OP z NAJNOVŠIEHO ODPISU — preferuj LIVE (rovnaká live-first logika ako `zakazkaPrehlad.scope`),
+		// aby posledný TEST odpis (`live=0`) nesmeroval kioskovú prílohu na testovacie OP.
+		const op = (prehlad.odpisy.find((o) => o.live === 1) ?? prehlad.odpisy[0])?.op ?? '';
 		if (!op) {
 			log.info('plan-rezov upload: zákazka nemá OP na najnovšom odpise — nič neposielam', { zak });
 			return { result: 'missing' };
@@ -114,7 +119,8 @@ export async function uploadPlanRezovToOdoo(
 		const header: PlanRezovPdfHeader = {
 			zak: prehlad.zak || zak,
 			op,
-			zakaznik: prehlad.zakaznik
+			zakaznik: prehlad.zakaznik,
+			nazov: input.nazov
 		};
 
 		let pdfBase64: string;
@@ -153,16 +159,16 @@ export async function uploadPlanRezovToOdoo(
 }
 
 /**
- * FIRE-AND-FORGET vstupný bod — volá `/plan-rezov` `ulozit` akcia po `ulozPlan`. Synchrónny `void`
- * wrapper: NIKDY neblokuje ani nezhodí volajúceho (plán je už uložený). Vonkajší try/catch chytí aj
- * prípadný synchrónny throw pred prvým `await`.
+ * FIRE-AND-FORGET vstupný bod — volá `/plan-rezov` `ulozit` akcia po `ulozPlan`. Celá práca
+ * (SQLite read `zakazkaPrehlad`, `parsePlanRezov`, FFD `spocitajPlanRezov`, generovanie PDF, upload)
+ * sa odloží cez `setImmediate` MIMO request tick — takže odpoveď na uloženie plánu sa NIKDY nezdrží
+ * ani synchrónnou časťou pred prvým `await`. NIKDY nezhodí volajúceho (async chyby chytá `.catch`,
+ * scheduling nehádže).
  */
 export function queuePlanRezovUpload(input: PlanRezovUploadInput): void {
-	try {
+	setImmediate(() => {
 		void uploadPlanRezovToOdoo(input).catch((e) =>
 			log.error('plan-rezov upload queue: neočakávane hodil', { zak: input.zak, err: errMsg(e) })
 		);
-	} catch (e) {
-		log.error('plan-rezov upload queue: synchrónne hodil', { zak: input.zak, err: errMsg(e) });
-	}
+	});
 }

@@ -143,4 +143,17 @@ describe('Money-neutralita (plan-rezov-pdf zdroj)', () => {
 	it('nepoužíva cenové identifikátory ani € v kóde (leak cien nemožný)', () => {
 		expect(src).not.toMatch(/fmtEur|predajVo|cenaSpolu|cenaNakup|nakupCennik|€/);
 	});
+	it('vstupný typ PDF (PlanRezovVysledok + MaterialRow) nemá žiadne cenové pole — data-flow guard', () => {
+		// generátor môže vykresliť LEN to, čo je v dátach; ak dáta nemajú cenové pole, PDF nemôže
+		// niesť cenu ani po budúcej zmene generátora (silnejšie než source-text guard vyššie).
+		const topKeys = Object.keys(vysledok);
+		const row0 = vysledok.material[0];
+		const rowKeys = row0 ? Object.keys(row0) : [];
+		const bar0 = row0?.bary[0];
+		const barKeys = bar0 ? Object.keys(bar0) : [];
+		for (const k of [...topKeys, ...rowKeys, ...barKeys]) {
+			// „cena/nákup/predaj/eur/price" — celé slovo, nie iba „cen" (to matchne aj `preskocenych`)
+			expect(k).not.toMatch(/cena|nakup|predaj|eur|price/i);
+		}
+	});
 });

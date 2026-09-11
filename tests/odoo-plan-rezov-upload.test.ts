@@ -6,6 +6,9 @@
 // compute + plan-rezov-pdf + odoo-json2 sú čisté, bežia naostro (vzor odoo-narezak-upload.test.ts).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
+// normZak mock == real (`money.ts` normZak = trim+upper+strip-ws); normOp mock líši sa od reálneho
+// LEN kanonizáciou `OP` prefixu (real: `260286`→`OP260286`), čo doc_id regex-bezpečnosť nemení —
+// slug v `buildPlanRezovDocId` aj tak nechá len `[a-z0-9]`. Preto je mock verný pre tieto testy.
 vi.mock('../src/lib/server/money', () => ({
 	normOp: (s: string) => s.toUpperCase().replace(/\s+/g, ''),
 	normZak: (s: string) => s.toUpperCase().replace(/\s+/g, '')
@@ -128,6 +131,30 @@ describe('uploadPlanRezovToOdoo', () => {
 		expect(pdf.slice(0, 5).toString('latin1')).toBe('%PDF-');
 		// žiadna cena neprešla ani ako `lines` — tento upload žiadne lines neposiela
 		expect('lines' in cap.body).toBe(false);
+	});
+
+	it('OP z NAJNOVŠIEHO LIVE odpisu (nie z novšieho TEST odpisu) — kiosk nemieri na test OP', async () => {
+		enableEnv();
+		// najnovší (odpisy[0]) je TEST (live=0); LIVE odpis je starší — upload MUSÍ vziať LIVE OP
+		vi.mocked(zakazkaPrehlad).mockReturnValue({
+			zak: 'ZAK123',
+			zakaznik: 'Firma',
+			odpisy: [
+				{ op: 'OPTEST', live: 0 },
+				{ op: 'OP260439', live: 1 }
+			]
+		} as never);
+
+		let captured: { body: Record<string, unknown> } | null = null;
+		setJson2Transport(async (_url, opts) => {
+			captured = { body: JSON.parse(String((opts as RequestInit).body)) };
+			return new Response(JSON.stringify({}), { status: 200 });
+		});
+
+		const r = await uploadPlanRezovToOdoo(baseInput());
+		expect(r.result).toBe('uploaded');
+		expect(captured!.body.order_number).toBe('OP260439');
+		expect(captured!.body.doc_id).toBe('plan-rezov-zak123-op260439');
 	});
 
 	it('failed (nie throw) keď transport zlyhá — best-effort kontrakt', async () => {
