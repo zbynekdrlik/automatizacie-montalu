@@ -69,7 +69,7 @@ const styly = () => listSysStyly().filter((s) => s.system === 'Štandard');
 
 describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', () => {
 	it('user_version = 19', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('pribudlo presne 12 štýlov s N podľa počtu krídel (opona 2×n)', () => {
@@ -119,8 +119,8 @@ describe('reálny v17 → v18: doseedovanie systému „Štandard" (bez plus)', 
 		expect(cfg['Štandard|2x4K IZO']).toBeDefined();
 	});
 
-	it('existujúce systémy sa NEDOTKLI (Štandard + má stále svojich 13 štýlov)', () => {
-		expect(listSysStyly().filter((s) => s.system === 'Štandard +').length).toBe(13);
+	it('existujúce systémy sa NEDOTKLI (Štandard + má 16 štýlov — 13 + 3 opona IZO #504 r3)', () => {
+		expect(listSysStyly().filter((s) => s.system === 'Štandard +').length).toBe(16);
 		expect(listSysStyly().filter((s) => s.system === 'Robust').length).toBeGreaterThan(0);
 	});
 

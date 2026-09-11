@@ -66,16 +66,19 @@ const dbPath = path.join(tmpRoot, 'v8.db');
 process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 
-describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)', () => {
+describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 v9 + 3 opona IZO v47 = 16 štýlov)', () => {
 	it('user_version=9', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
-	it('presne 13 nových Štandard + štýlov (basic 2K…6K, IZO 2K IZO…6K IZO, opona 2x2K/2x3K/2x4K)', () => {
+	// #504 round 3: pribudli 3 opona IZO štýly (2x2K/2x3K/2x4K IZO). v9 seeduje z
+	// AKTUÁLNEHO cfg_seed → na fresh/v8 DB dostane všetkých 16 už tu (v47 je potom
+	// no-op cez hasSys guard); existujúca prod DB (>= v9) ich dostane cez migráciu v47.
+	it('presne 16 Štandard + štýlov (basic 2K…6K, IZO 2K IZO…6K IZO, opona 2x2K/2x3K/2x4K + opona IZO)', () => {
 		const rows = db
 			.prepare("SELECT sys_styl FROM cfg_sys WHERE sys_styl LIKE 'Štandard +|%'")
 			.all() as { sys_styl: string }[];
-		expect(rows.length).toBe(13);
+		expect(rows.length).toBe(16);
 		const styly = new Set(rows.map((r) => r.sys_styl.split('|')[1]));
 		expect(styly).toEqual(
 			new Set([
@@ -91,7 +94,10 @@ describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 nových štýlov)
 				'6K IZO',
 				'2x2K',
 				'2x3K',
-				'2x4K'
+				'2x4K',
+				'2x2K IZO',
+				'2x3K IZO',
+				'2x4K IZO'
 			])
 		);
 	});

@@ -33,7 +33,8 @@ import {
 	migrateGlassCatalogExpansion,
 	migrateCleanupStandardPlusOrphans,
 	migratePlanRezovUlozene,
-	migrateMaterialNakupSkladovaKarta
+	migrateMaterialNakupSkladovaKarta,
+	migrateOponaIzo
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -989,6 +990,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateCleanupStandardPlusOrphans(db, bump); // v43→v44 (#504)
 	migratePlanRezovUlozene(db, bump); // v44→v45 (#505)
 	migrateMaterialNakupSkladovaKarta(db, bump); // v45→v46 (#506, prečíslovaná z v44→v45 kvôli kolízii s #505 v45)
+	migrateOponaIzo(db, bump); // v46→v47 (#504 round 3, Štandard+ opona IZO nárezák)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

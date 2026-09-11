@@ -168,3 +168,22 @@ export function sklaDoPonuky(
 	if (existuje(`${system}|${zakladnyStyl(styl)} IZO`)) return skla;
 	return skla.filter((g) => !jeIzoTrieda(triedaZa?.(g), g));
 }
+
+/**
+ * sysStyly, ktorých Money odpis je ODVODENÝ (nie 1:1 overený proti reálnemu Money
+ * nárezáku) — appka ich MUSÍ v pláne čestne označiť (#504 round 3, Patrik úloha 854).
+ * 2×4K opona IZO je overená 1:1 z Excelu (msg 1823604); 2×2K/2×3K sú z nej ODVODENÉ
+ * (rovnaký vzor: opona-basic X(k) + IZO posun) a čakajú na overenie výrobou. Keď Patrik
+ * dodá reálny Money nárezák pre 2×2K/2×3K, doladí sa `cfg_seed` a záznam sa odtiaľto zmaže.
+ */
+export const SYSSTYL_ODVODENE: Record<string, string> = {
+	'Štandard +|2x2K IZO':
+		'Nárezák „2×2K opona IZO" je ODVODENÝ (nie 1:1 overený proti Money nárezáku) — čaká na overenie výrobou (Patrik). Money odpis pred odoslaním prekontroluj.',
+	'Štandard +|2x3K IZO':
+		'Nárezák „2×3K opona IZO" je ODVODENÝ (nie 1:1 overený proti Money nárezáku) — čaká na overenie výrobou (Patrik). Money odpis pred odoslaním prekontroluj.'
+};
+
+/** Honest-null upozornenie pre odvodený (neoverený) nárezák; null keď je overený 1:1. */
+export function odvodenyOdpisWarn(sysStyl: string): string | null {
+	return SYSSTYL_ODVODENE[sysStyl] ?? null;
+}

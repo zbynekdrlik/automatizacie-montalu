@@ -181,6 +181,15 @@ z triedy cez `efektivnaRedukciaZero`). Cena honest-null (variant=sentinel → `g
 Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klasifikuje z TRIEDY
 (4→ZASK00005, 6→ZASK00006, 10→nezname, 16/24→izolačné/bez gumy), katalóg ostáva name-based.
 
+## Zmena PONUKY skiel = oprav asserty ponuky v TEJ ISTEJ lane (#504×#235, 11.9.2026)
+
+Lane nevie Playwright (Tier 0) → zastarané asserty ponuky vybuchnú až v dev CI (11.9. 3×:
+`standard-stary`, `standard-narezak`, unit IZO-gate). Pri zmene toho, čo `sklaDoPonuky`/
+`sklaForSystem`/`triedyPre` ponúkajú (nový `… IZO` sysStyl, nové sklo, sentinel):
+`grep -rn "Izola\|toEqual(\[\|skla.filter\|SKLO_INE" e2e/*.spec.ts tests/zasklenia-*.test.ts`
+a prepíš na novú realitu (vlastný `test(e2e)` commit). Po #504 má každý basic štýl
+Štandard/Štandard + svoj `… IZO` → IZO-gate negatívny prípad je so seedom nedosiahnuteľný.
+
 **Dve pasce, ktoré stáli RED nález pri review — dodrž pri KAŽDOM budúcom rozšírení:**
 
 1. **Syntetické sklo MUSÍ prejsť TÝM ISTÝM system×štýl gate-om ako katalóg (`sklaDoPonuky`),

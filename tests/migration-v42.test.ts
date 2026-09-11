@@ -51,7 +51,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v41 → v42: predaj_pcmo do material_prices (#364)', () => {
 	it('user_version === 42 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('material_prices má nový stĺpec predaj_pcmo (aditívne, na konci)', () => {
@@ -100,7 +100,7 @@ describe('migrácia v41 → v42: predaj_pcmo do material_prices (#364)', () => {
 		migrateMaterialPredajPcmo(db, () => {
 			throw new Error('bump sa nesmie zavolať znova — guard >= 42 mal vrátiť skôr');
 		});
-		expect(db.pragma('user_version', { simple: true })).toBe(46);
+		expect(db.pragma('user_version', { simple: true })).toBe(47);
 	});
 
 	it('feature-detect: DB bez material_prices → bump(42) bez ALTER (minimálne fixtúry nepadnú)', () => {
