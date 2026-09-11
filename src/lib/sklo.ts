@@ -12,9 +12,9 @@ import { SYSTEMY_SKLO_VYBERA_IZO, jeIzoSklo } from './styl';
  *
  * Predvoľba je len prednastavenie — obsluha sklo stále VOLÍ a odpis sa počíta
  * zo ZVOLENÉHO skla, takže odpis pre KONKRÉTNE sklo je nezmenený. POZOR: pri
- * Deluxe posun predvoľby 6→10 mm mení, KTORÉ sklo je prednastavené (10 mm dáva
- * úplnejší odpis — 10 mm krytky sú v Money, 6 mm sú vynechané pre 0 ks sklad,
- * #354). Sklo vplýva na odpis troma kanálmi: Slide (`redukcia_zero`), Deluxe
+ * Deluxe posun predvoľby 6→10 mm mení, KTORÉ sklo je prednastavené — 10 mm aj
+ * 6 mm krytky sú od #431 kolo 2 v Money podľa RAL (6 mm R9006/R9005, 10 mm
+ * R9006/R7016), 10 mm ostáva len predvolené sklo. Sklo vplýva na odpis troma kanálmi: Slide (`redukcia_zero`), Deluxe
  * (`hrubka` vyberá kladka/klzný profil) a Štandard +/Štandard (IZO sklo prepína
  * nárezák cez `sysStylPre`). Overené testom (`tests/sklo-default.test.ts`).
  */

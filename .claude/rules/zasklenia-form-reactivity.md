@@ -112,17 +112,43 @@ Viditeľnosť polí formulára, ktoré závisia od SYSTÉMU, sa NEgate-uje hardc
 | Pole | server množina | odvodené z | klient gate |
 |---|---|---|---|
 | „Jednostranná FAB" | `systemyFab` | kovanie má položku `pravidlo.typ==='naUzaverPodlaFab'` (kľučka/krytka vložky — **dnes iba Robust**) | `maFab` (únia posuvov) |
-| „Farba kovania (RAL)" | `systemyFarba` | kovanie má položku s `.farba` | `maFarbu` (únia posuvov) |
+| RAL farba (label per systém: „Farba kovania"/„Farba krytiek") | `systemyFarba` (+ `ralPreSystem` páry, `farbaPopisPreSystem`) | kovanie má položku s `.farba`; možnosti hrúbko-závislé pre krytky (#431 kolo 2) | `maFarbu` + `ralOptions` (`ralOptionsPre`) + `farbaPopis` |
 | ručná koľajnica | `systemyKolajnica` | `systemyRucnaKolajnica(cfg)` | `maKolajnicu` (primárny) |
 
 **Predvolená farba (#431 bod 1):** `predvolenaFarbaPreSystem` (server, z `PREDVOLENA_FARBA` v
 `komponenty-cfg.ts`) nesie NAVODNÚ predvoľbu pre RAL select — dnes len `{ Deluxe: 'R9006' }`.
-RAL select ostáva VIDITEĽNÝ (krytky majú 2 farebné Money kódy); predvoľba sa predvyplní
-v `$effect` na `+page.svelte` keď je `farbaKovaniaS` prázdna (prepnutie systému / čerstvý
-štart). Operátor ju môže kedykoľvek zmeniť na R7016. `kovanieMuslaHint` (hint „nerezová
-mušľa" vedľa RAL selectu) je derivovaný z existencie `predvolenaFarbaPreSystem[system]`.
+RAL select ostáva VIDITEĽNÝ; predvoľba sa predvyplní v `$effect` na `+page.svelte` keď je
+`farbaKovaniaS` prázdna (prepnutie systému / čerstvý štart). `kovanieMuslaHint` (hint
+„nerezová mušľa" vedľa RAL selectu) je derivovaný z existencie `predvolenaFarbaPreSystem[system]`.
 `kovanieFor()` v `+page.server.ts` má defense fallback na `predvolenaFarba()` — loguje
 warn keď sa použije (stale tab / forged POST).
+
+**HRÚBKO-ZÁVISLÉ RAL možnosti + config LABEL (#431 kolo 2):** Deluxe kovanie je pevne
+nerezová mušľa; RAL voľba sa týka KRYTIEK, ktoré majú Money kód per HRÚBKA×farba (6 mm
+R9006/R9005, 10 mm R9006/R7016). Preto:
+- `ralPreSystem` (server, `+page.server.ts` load) vracia per-systém páry `{farba, hrubkaSkla?}`
+  (dedup po dvojici, nie len po farbe — tá istá farba žije na oboch hrúbkach), derivované z
+  `komponentyPre`. Hrúbko-neutrálne farby (Robust/Štandard kľučka/zámok) majú `hrubkaSkla`
+  nezadané → ponúknu sa vždy.
+- klient `ralOptions` = `ralOptionsPre(posuvy, data.ralPreSystem)` (čistá fn v
+  `zasklenia-form.ts`) — filtruje páry podľa fyzickej hrúbky zvoleného skla posuvu
+  (`hrubkaPreSklo` z `data.skla.hrubka`, alebo `ineHrubka` pre `SKLO_INE`). Neznáma hrúbka
+  (sklo nezvolené) → ponúkne všetky (UX fallback; server je autoritatívny cez fail-loud).
+- LABEL selectu je config-derived: `POPIS_FARBY` (`komponenty-cfg.ts`) → server
+  `farbaPopisPreSystem` → klient `farbaPopis` (všetky krytkové systémy v hre → „Farba
+  krytiek", žiadny → „Farba kovania", zmiešané → „Farba kovania / krytiek"). NIKDY
+  `system==='Deluxe'` v stránke. `data.skla` nesie `hrubka` (fyzická) popri `trieda`.
+- prepnutie skla 10→6 mm zahodí neplatnú R7016 (hranový `$effect`) a predvyplní R9006
+  (platná na oboch hrúbkach — invariant v `komponenty.test.ts`). Testuj e2e cez reálne
+  prepnutie skla + `requestAnimationFrame` flush (`e2e/kovanie-deluxe.spec.ts`).
+- POZOR mixed-thickness zimná záhrada (Deluxe 6 mm + 10 mm posuv): `ralOptionsPre` robí
+  ÚNIU → ponúkne R9006/R9005/R7016, ale len R9006 prejde oboma posuvmi (fail-loud na
+  druhom). Money-safe (nikdy tiché vynechanie); intersekcia je follow-up.
+
+**Money-neutralita nového farebného/hrúbko variantu:** default farba MUSÍ ostať platná na
+KAŽDEJ hrúbke krytiek (inak sa serverový `kovanieFor` fallback zmení na fail-loud) — invariant
+`komponenty.test.ts`. Reuse (`znova.ts`) preberá farbu cez `parseFarba` (jeden zdroj pravdy,
+akceptuje R9005/R9006/R7016) — NIKDY lokálnu kópiu allowlistu (predtým zahadzovala R9006).
 
 **Dôsledok (#431):** FAB checkbox sa NEriadi „má systém kovanie?" — Deluxe/Slide/Štandard
 kovanie DO Money majú, ale FAB položky (`naUzaverPodlaFab`) NIE, takže tam checkbox nič

@@ -18,7 +18,7 @@
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
 	// #250 — vyčlenené krokové subkomponenty (vzor #239); +page ostáva state+compute hub
-	import { type PosuvRow } from '$lib/zasklenia-form';
+	import { hrubkaPreSklo, ralOptionsPre, type PosuvRow } from '$lib/zasklenia-form';
 	import ZasklieniaForm from '$lib/components/zasklenia/ZasklieniaForm.svelte';
 	import PlanKarty from '$lib/components/zasklenia/PlanKarty.svelte';
 	import PlanKartyMulti from '$lib/components/zasklenia/PlanKartyMulti.svelte';
@@ -289,7 +289,7 @@
 	// systém má RAL farebné varianty kovania → treba zvoliť farbu (#338). Farba je
 	// spoločná pre celú objednávku, takže stačí, aby JU potreboval hociktorý posuv
 	// (aj ďalší posuv zimnej záhrady s iným systémom než primárny).
-	// #431 bod 1: Deluxe JE zahrnutý (krytky majú 2 farebné Money kódy R9006/R7016).
+	// #431 kolo 2: Deluxe JE zahrnutý (krytky majú farebné kódy per hrúbka: 6mm R9006/R9005, 10mm R9006/R7016).
 	let maFarbu = $derived(
 		[system, ...posuvyExtra.map((p) => p.system)].some((s) => (data.systemyFarba ?? []).includes(s))
 	);
@@ -297,21 +297,38 @@
 	let kovanieMuslaHint = $derived(
 		data.predvolenaFarbaPreSystem?.[system] ? 'nerezová mušľa' : null
 	);
-	// platné RAL možnosti pre RAL <select> (#354) — zjednotenie farieb naprieč systémami
-	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), zo servera odvodených
-	// per-systém množín (Deluxe R9006/R7016 ≠ Robust/Štandard R9005/R7016).
-	let ralOptions = $derived.by(() => {
-		const systemyVHre = [system, ...posuvyExtra.map((p) => p.system)];
-		const zjednotene: Farba[] = [];
-		for (const s of systemyVHre)
-			for (const f of data.ralPreSystem?.[s] ?? []) if (!zjednotene.includes(f)) zjednotene.push(f);
-		return zjednotene;
+	// #431 kolo 2: label RAL selectu z popisov systémov v hre — všetky krytkové →
+	// „Farba krytiek", žiadny → „Farba kovania", zmiešané → „Farba kovania / krytiek".
+	// Config-derived (server `farbaPopisPreSystem`), žiadny `system==='Deluxe'`.
+	let farbaPopis = $derived.by(() => {
+		const vHre = [system, ...posuvyExtra.map((p) => p.system)].filter((s) =>
+			(data.systemyFarba ?? []).includes(s)
+		);
+		const popisy = new Set(vHre.map((s) => data.farbaPopisPreSystem?.[s] ?? 'Farba kovania'));
+		return popisy.size === 1 ? [...popisy][0]! : 'Farba kovania / krytiek';
 	});
+	// platné RAL možnosti pre RAL <select> (#354, #431 kolo 2) — únia naprieč posuvmi
+	// v hre (rovnaká „hociktorý posuv" únia ako `maFarbu` vyššie), HRÚBKO-ZÁVISLE pre
+	// krytky (Deluxe 6mm R9006/R9005 ≠ 10mm R9006/R7016; Robust/Štandard hrúbko-neutrálne).
+	// Hrúbku posuvu odvodí `hrubkaPreSklo` z `data.skla` (katalóg) / triedy (SKLO_INE).
+	let ralOptions = $derived.by(() =>
+		ralOptionsPre(
+			[
+				{ system, hrubka: hrubkaPreSklo(system, sklo, skloTriedaS, data.skla) },
+				...posuvyExtra.map((p) => ({
+					system: p.system,
+					hrubka: hrubkaPreSklo(p.system, p.sklo, p.skloTrieda, data.skla)
+				}))
+			],
+			data.ralPreSystem ?? {}
+		)
+	);
 	// zvolená farba, ktorá je pre AKTUÁLNU množinu neplatná (napr. R9005 z Robustu
-	// po prepnutí na Deluxe, ktorý ponúka len R9006/R7016) sa zahodí — inak by
-	// bola vidno v selecte prázdna, ale mohla by v `farbaKovaniaS` ostať trčať
-	// neplatná hodnota (#354). Po vyčistení sa predvyplní predvolená farba systému
-	// (#431 bod 1: R9006 pre Deluxe — krytky majú 2 farby, kovanie = nerez mušľa).
+	// po prepnutí na Deluxe 10mm, ktoré ponúka R9006/R7016; alebo R7016 po prepnutí
+	// skla 10→6 mm, kde 6mm ponúka R9006/R9005) sa zahodí — inak by bola v selecte
+	// prázdna, ale mohla by v `farbaKovaniaS` ostať trčať neplatná hodnota (#354).
+	// Po vyčistení sa predvyplní predvolená farba systému (#431 kolo 2: R9006 pre
+	// Deluxe — platná na oboch hrúbkach; kovanie = nerez mušľa, voľba je farba krytiek).
 	$effect(() => {
 		if (farbaKovaniaS && !ralOptions.includes(farbaKovaniaS)) farbaKovaniaS = '';
 		// predvyplň predvolenú farbu keď je prázdna (prepnutie systému / čerstvý štart)
@@ -726,6 +743,7 @@
 		{maFab}
 		{maFarbu}
 		{ralOptions}
+		{farbaPopis}
 		{kovanieMuslaHint}
 		{maKolajnicu}
 		{maSietka}

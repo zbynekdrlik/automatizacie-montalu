@@ -28,8 +28,8 @@ const qty = (r: { polozky: { kod: string; qty: number }[] }, kod: string) =>
 	r.polozky.find((p) => p.kod === kod)?.qty;
 const R3 = (x: number) => Math.round(x * 1000) / 1000;
 
-describe('komponentyPre(Deluxe) — 10mm live, 6mm vynechané (0 ks skladu, #354)', () => {
-	it('vracia madlo + obe kefy + 6× 10mm krytku, žiadny 6mm kód', () => {
+describe('komponentyPre(Deluxe) — 10mm + 6mm live (#431 kolo 2: krytky evidované v RAL)', () => {
+	it('vracia madlo + obe kefy + 6× 10mm + 6× 6mm krytku', () => {
 		const komp = komponentyPre('Deluxe')!;
 		expect(komp).toBe(KOMPONENTY_DELUXE);
 		const kody = komp.map((k) => k.kod).sort();
@@ -37,6 +37,14 @@ describe('komponentyPre(Deluxe) — 10mm live, 6mm vynechané (0 ks skladu, #354
 			[
 				'ZASK00007',
 				'ZASK00049',
+				// 6mm krytky (#431 kolo 2, Dominik úloha 574 — 0-ks caution #354 prekonaná)
+				'ZASK202519',
+				'ZASK202520',
+				'ZASK202521',
+				'ZASK202522',
+				'ZASK202523',
+				'ZASK202524',
+				// 10mm krytky
 				'ZASK202525',
 				'ZASK202526',
 				'ZASK202527',
@@ -46,27 +54,34 @@ describe('komponentyPre(Deluxe) — 10mm live, 6mm vynechané (0 ks skladu, #354
 				'ZASK202542'
 			].sort()
 		);
-		const zakazane6mm = [
-			'ZASK202519',
-			'ZASK202520',
-			'ZASK202521',
-			'ZASK202522',
-			'ZASK202523',
-			'ZASK202524'
-		];
-		for (const k of zakazane6mm) expect(kody).not.toContain(k);
 	});
 
-	it('KOVANIE_NEUPLNE.Deluxe upozorňuje na chýbajúce 6mm krytky LEN pri 6mm (#354 review nález 🟡)', () => {
-		// 10mm objednávka NEMÁ čo doplniť (krytky/madlo/kefy odpis dostáva) — pevná
-		// hláška by ju zbytočne mýlila. Hodnota je funkcia hrúbky, nie natvrdo text.
-		const neuplne = KOVANIE_NEUPLNE.Deluxe;
-		expect(typeof neuplne).toBe('function');
-		const fn = neuplne as (skloHrubka?: number) => string | null;
-		expect(fn(6)).toMatch(/6\s?mm/);
-		expect(fn(6)).toMatch(/krytk/i);
-		expect(fn(10)).toBeNull();
-		expect(fn(undefined)).toBeNull();
+	it('6mm krytky nesú hrubkaSkla=6 + farbu R9006/R9005; 10mm hrubkaSkla=10 + R9006/R7016', () => {
+		const komp = komponentyPre('Deluxe')!;
+		const krytky6 = komp.filter((k) => k.hrubkaSkla === 6);
+		const krytky10 = komp.filter((k) => k.hrubkaSkla === 10);
+		expect(krytky6.map((k) => k.farba).sort()).toEqual([
+			'R9005',
+			'R9005',
+			'R9005',
+			'R9006',
+			'R9006',
+			'R9006'
+		]);
+		expect(krytky10.map((k) => k.farba).sort()).toEqual([
+			'R7016',
+			'R7016',
+			'R7016',
+			'R9006',
+			'R9006',
+			'R9006'
+		]);
+	});
+
+	it('KOVANIE_NEUPLNE.Deluxe už NEEXISTUJE — 6mm krytky teraz idú do odpisu (#431 kolo 2)', () => {
+		// 6mm aj 10mm objednávka je teraz KOMPLETNÁ (krytky+madlo+kefy) — bývalá
+		// funkcia hlásiaca „6mm krytky nie sú v odpise" je nepravdivá a je odstránená.
+		expect(KOVANIE_NEUPLNE.Deluxe).toBeUndefined();
 	});
 });
 
@@ -138,7 +153,18 @@ describe('krajná/stredová krytka — konšt./naStyk formula (#354, design kome
 	it('madlo D56 = konštanta 2 na KAŽDOM štýle, nezávisle od RAL/hrúbky', () => {
 		for (const [ss] of pripady) {
 			expect(qty(kovD([specD(ss, 10)], 'R9006'), 'ZASK00049')).toBe(2);
-			expect(qty(kovD([specD(ss, 6)]), 'ZASK00049')).toBe(2); // 6mm: žiadna farba potrebná
+			// #431 kolo 2: 6mm už MÁ farebné krytky → farba je teraz potrebná aj na 6mm
+			expect(qty(kovD([specD(ss, 6)], 'R9006'), 'ZASK00049')).toBe(2);
+		}
+	});
+
+	it('6mm krajná krytka = 2, stredová L/P = počet krídel − 1 (rovnaké pravidlá ako 10mm, #431 kolo 2)', () => {
+		for (const [ss, n] of pripady) {
+			const r = kovD([specD(ss, 6)], 'R9006');
+			expect(r.err).toBeNull();
+			expect(qty(r, 'ZASK202523')).toBe(2); // krajná 6mm R9006
+			expect(qty(r, 'ZASK202519')).toBe(n - 1); // stredová L 6mm R9006
+			expect(qty(r, 'ZASK202521')).toBe(n - 1); // stredová P 6mm R9006
 		}
 	});
 });
@@ -152,21 +178,15 @@ describe('tesniace kefy — súčet dĺžky kladkového/klzného × 2 (#354)', (
 		expect(qty(r, 'ZASK202542')).toBe(R3((2 * z.dlzkaKlznehoMm) / 1000));
 	});
 
-	it('kefy počítajú aj bez zvolenej RAL farby (hrúbko/farbo-neutrálne, 6mm)', () => {
-		const r = kovD([specD('Deluxe|3K', 6)]); // žiadna farba — krytky 6mm nie sú v tabuľke
-		expect(r.err).toBeNull();
-		expect(qty(r, 'ZASK00007')).toBeGreaterThan(0);
-		expect(qty(r, 'ZASK202542')).toBeGreaterThan(0);
-		// 6mm objednávka nedostane ŽIADNU krytku (len 10mm je v live tabuľke, #354)
-		for (const k of [
-			'ZASK202525',
-			'ZASK202526',
-			'ZASK202527',
-			'ZASK202528',
-			'ZASK202529',
-			'ZASK202530'
-		])
-			expect(qty(r, k)).toBeUndefined();
+	it('kefy sú farbo/hrúbko-neutrálne — rovnaké m na 6mm aj 10mm pri tej istej geometrii', () => {
+		const spec6 = specD('Deluxe|3K', 6);
+		const spec10 = specD('Deluxe|3K', 10);
+		const k6 = kovD([spec6], 'R9006');
+		const k10 = kovD([spec10], 'R9006');
+		expect(qty(k6, 'ZASK00007')).toBeGreaterThan(0);
+		expect(qty(k6, 'ZASK202542')).toBeGreaterThan(0);
+		expect(qty(k10, 'ZASK00007')).toBeGreaterThan(0);
+		expect(qty(k10, 'ZASK202542')).toBeGreaterThan(0);
 	});
 });
 
@@ -193,13 +213,30 @@ describe('RAL × hrúbka skla — fail-loud disciplína (#354)', () => {
 		expect(r.err).toMatch(/R9005/);
 	});
 
-	it('R9005 pre 6mm Deluxe → v poriadku (žiadny farebný kandidát po hrúbkovom filtri)', () => {
-		// 6mm krytky nie sú v live tabuľke vôbec — hrúbkový filter ich vyradí PRED
-		// farebnou kontrolou, takže "R9005 nesedí na Deluxe" sa tu netýka ničoho a
-		// nemá vzniknúť žiadna chyba (madlo/kefy sú farbo-neutrálne).
+	it('R9005 pre 6mm Deluxe → pošle R9005 6mm krytky (#431 kolo 2: 6mm ponúka R9006/R9005)', () => {
 		const r = kovD([specD('Deluxe|3K', 6)], 'R9005');
 		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK202520')).toBe(2); // stredová L 6mm R9005
+		expect(qty(r, 'ZASK202522')).toBe(2); // stredová P 6mm R9005
+		expect(qty(r, 'ZASK202524')).toBe(2); // krajná 6mm R9005
+		// R9006 6mm varianty absent (zvolili sme R9005)
+		for (const k of ['ZASK202519', 'ZASK202521', 'ZASK202523']) expect(qty(r, k)).toBeUndefined();
 		expect(qty(r, 'ZASK00049')).toBe(2);
+	});
+
+	it('R7016 pre 6mm Deluxe → HLASNÁ chyba (6mm ponúka len R9006/R9005, nie R7016; #431 kolo 2)', () => {
+		// R7016 existuje len pre 10mm krytky. Na 6mm objednávke nesedí na ŽIADEN
+		// farebný 6mm kandidát → fail-loud (nikdy tichý odpis bez krytiek).
+		const r = kovD([specD('Deluxe|3K', 6)], 'R7016');
+		expect(r.polozky).toEqual([]);
+		expect(r.err).toMatch(/farb/i);
+		expect(r.err).toMatch(/R7016/);
+	});
+
+	it('6mm bez zvolenej farby → HLASNÁ chyba (krytky ju teraz potrebujú aj na 6mm; #431 kolo 2)', () => {
+		const r = kovD([specD('Deluxe|3K', 6)]);
+		expect(r.polozky).toEqual([]);
+		expect(r.err).toMatch(/farb/i);
 	});
 
 	it('R9006 pošle len R9006 variant, R7016 vôbec (absent, nie 0)', () => {

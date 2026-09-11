@@ -15,7 +15,9 @@
 import { getOdpis } from './money';
 import { glassTypesForSystem, listSysStyly } from './db';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
+import { parseFarba } from './vstup';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
+import type { Farba } from '$lib/komponenty';
 import type { Klin } from '$lib/klin';
 import type { KolajnicaRucne } from '$lib/kolajnica';
 import type { Sietka } from '$lib/sietka';
@@ -32,9 +34,12 @@ export interface ZnovaVysledok {
 }
 
 const s = (x: unknown): string => (typeof x === 'string' ? x : '');
-// #338: farbu kovania preberáme LEN keď je platná; stará objednávka spred farby →
+// #338/#431 kolo 2: farbu preberáme LEN keď je platná; stará objednávka spred farby →
 // null → obsluha musí farbu znova zvoliť (nikdy tichý default na jednu z farieb).
-const farba = (x: unknown): 'R9005' | 'R7016' | null => (x === 'R9005' || x === 'R7016' ? x : null);
+// Delegujeme na `parseFarba` (JEDEN zdroj pravdy) — akceptuje R9005/R9006/R7016. Predtým
+// tu bola lokálna kópia BEZ R9006, ktorá pri „Použiť znova" Deluxe (R9006) farbu ticho
+// zahodila na null → 10mm reuse by stratil krytky (nájdené #431 kolo 2 dizajn konzultom).
+const farba = (x: unknown): Farba | null => parseFarba(typeof x === 'string' ? x : null);
 const n = (x: unknown): number => (typeof x === 'number' && Number.isFinite(x) ? x : 0);
 // #235 slice 2: hrúbková trieda vlastnej skladby (4/6/10/16/24) alebo null (katalógové sklo)
 const trieda = (x: unknown): number | null => (jeSkloTrieda(x) ? x : null);
