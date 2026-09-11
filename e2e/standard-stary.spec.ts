@@ -34,6 +34,8 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 	// 2K štýl má IZO nárezák → ponuka obsahuje AJ izolačné sklá (sklaDoPonuky vracia všetko).
 	// v44 (#504): orphaned v9 duplikáty 'Float sklo 10 mm' a 'Izolačné sklo 4.8.4' zmazané
 	// (nahradené v43 variantmi 'ESG kalené 10 mm' / 'Izolačné sklo 4/8/4 číre'/mliečne/stopsol).
+	// #235 slice 2: SKLO_INE ('Iné (vlastná skladba)') je doplnené ZA katalóg pre KAŽDÝ
+	// systém (sklaForSystem v +page.svelte) — vlastná skladba je vždy posledná voľba.
 	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
 	expect(skla).toEqual([
 		'Float sklo 4 mm',
@@ -50,7 +52,8 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 		'Izolačné sklo 4/16/4 stopsol',
 		'ESG kalené 4 mm',
 		'ESG kalené 6 mm',
-		'ESG kalené 10 mm'
+		'ESG kalené 10 mm',
+		'Iné (vlastná skladba)'
 	]);
 
 	expect(errs).toEqual([]);

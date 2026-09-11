@@ -11,6 +11,12 @@ import { collectConsole, loginAs, vyberFarbuKovania, skipAkLive } from './helper
 const SKLO_INE = 'Iné (vlastná skladba)';
 
 async function zadajVlastnuSkladbu(page: import('@playwright/test').Page) {
+	// povinné polia (ZAK/OP/Zákazník) — bez nich formulár nikdy neodošle (HTML5 required),
+	// takže sklo-typ na pláne nikdy nevykreslí. Vyplň LEN keď volajúci test ich ešte
+	// nenastavil (test 3 si ich pred volaním helpera plní vlastnými hodnotami).
+	if (!(await page.inputValue('#zak'))) await page.fill('#zak', 'E2E-VLASTNA-SKLADBA');
+	if (!(await page.inputValue('#op'))) await page.fill('#op', 'OP-VLASTNA');
+	if (!(await page.inputValue('#zakaznik'))) await page.fill('#zakaznik', 'E2E zákazník vlastná');
 	await page.selectOption('#system', 'Štandard +');
 	// pred voľbou „Iné" trieda-select NEEXISTUJE
 	await expect(page.getByTestId('ine-trieda')).toHaveCount(0);
