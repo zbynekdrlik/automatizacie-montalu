@@ -31,7 +31,7 @@
 		type HornyProfil,
 		type VystuhaProfil
 	} from '$lib/pergola-narez';
-	import { krovUlozenie } from '$lib/pergola-krov';
+	import { krovUlozenie, krovRezneUhly } from '$lib/pergola-krov';
 	// #223 — strešné sklo: geometria (pure, klientsky $derived); cena príde zo servera (form)
 	import { spocitajStrechaSklo } from '$lib/pergola-sklo';
 	import type { RucnaPolozka } from '$lib/pergola-rucne';
@@ -211,6 +211,10 @@
 	let krov = $derived(
 		step === 'vysledok' && vstup.sklonStrechy != null ? krovUlozenie(vstup.sklonStrechy) : null
 	);
+	// #161 — rezné uhly koncov krokvy (z 3D STEP dát); platia pre KAŽDÝ sklon (aj < 7° / > 9°)
+	let krovRezy = $derived(
+		step === 'vysledok' && vstup.sklonStrechy != null ? krovRezneUhly(vstup.sklonStrechy) : null
+	);
 	// #223 — strešné sklo: geometria (šírka/počet tabúľ, honest-null dĺžka) sa počíta klientsky
 	// (pure, ako vysledok/komponenty); cena €/m² príde zo servera (`spocitat` → form), interní.
 	let strechaSklo = $derived(step === 'vysledok' ? spocitajStrechaSklo(vstup) : null);
@@ -368,6 +372,7 @@
 		{vysledok}
 		{komponenty}
 		{krov}
+		{krovRezy}
 		{strechaSklo}
 		{strechaSkloCena}
 		{spocitaneCount}

@@ -16,7 +16,7 @@
 	// #419 — expedičný zoznam: čistý transform vypočítaných dát (profily + komponenty + extras)
 	import { expedicnyZoznam } from '$lib/pergola-expedicia';
 	import { spocitajTesnenia } from '$lib/pergola-tesnenia';
-	import type { KrovUlozenie } from '$lib/pergola-krov';
+	import type { KrovUlozenie, KrovRezneUhly } from '$lib/pergola-krov';
 	import type { StrechaSkloVypocet } from '$lib/pergola-sklo';
 	// #378 — FIX (bočné pevné zasklenie): výkres re-use + typy (Money-neutrálne)
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
@@ -38,6 +38,7 @@
 		vysledok,
 		komponenty,
 		krov,
+		krovRezy,
 		strechaSklo,
 		strechaSkloCena,
 		spocitaneCount,
@@ -54,6 +55,7 @@
 		vysledok: NarezVysledok;
 		komponenty: PergolaKomponent[];
 		krov: KrovUlozenie | null;
+		krovRezy: KrovRezneUhly | null;
 		strechaSklo: StrechaSkloVypocet | null;
 		strechaSkloCena: StrechaSkloCenaProp;
 		spocitaneCount: number;
@@ -259,6 +261,28 @@
 				Zadaný sklon <b>{krov.sklonStupne}°</b> je pod prahom 7° — bod dotyku sa „prehodí" (trojuholník
 				sa otočí), táto vetva nie je potvrdeným vzorcom pokrytá. Uloženie sa nepočíta — nič sa nehádže.
 			</p>
+		{/if}
+		{#if krovRezy}
+			<p class="sub" style="margin:12px 0 4px">
+				<b>Rezné uhly krokvy</b> <span class="badge ok">✅ z 3D modelu</span> — koncové rezy do plánu
+				rezov (platia pre každý sklon)
+			</p>
+			<div data-testid="krov-rezy">
+				<div class="row">
+					<span>Koncový rez — strana spádu</span>
+					<b class="mono" data-testid="krov-rez-sklon">{krovRezy.uholRezSklon}°</b>
+				</div>
+				<div class="row">
+					<span>Koncový rez — strana drážky (|sklon − 7°|)</span>
+					<b class="mono" data-testid="krov-rez-drazka">{krovRezy.uholRezDrazka}°</b>
+				</div>
+				<div class="row">
+					<span>Prierez krokvy</span>
+					<b class="mono" data-testid="krov-prierez"
+						>{krovRezy.prierez.sirka} × {krovRezy.prierez.vyska} mm</b
+					>
+				</div>
+			</div>
 		{/if}
 		<ul style="margin:6px 0 0;padding-left:18px">
 			{#each krov.poznamky as p (p)}

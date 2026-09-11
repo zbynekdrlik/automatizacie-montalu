@@ -283,6 +283,14 @@ test('krov uloženie 8°: karta aj výkres ukážu potvrdené hodnoty (ps=0.52, 
 	await expect(page.getByTestId('krov-ps')).toContainText('0.52'); // ps=ls
 	await expect(page.getByTestId('krov-lv')).toContainText('0.66'); // lv=pv
 
+	// #161 — rezné uhly krokvy z 3D modelu: koncový rez = sklon (8°), rez drážky = |8−7| = 1°,
+	// prierez krokvy 50×120
+	await expect(page.getByTestId('krov-rezy')).toBeVisible();
+	await expect(page.getByTestId('krov-rez-sklon')).toContainText('8');
+	await expect(page.getByTestId('krov-rez-drazka')).toContainText('1');
+	await expect(page.getByTestId('krov-prierez')).toContainText('50');
+	await expect(page.getByTestId('krov-prierez')).toContainText('120');
+
 	// výkres — uloženie detail nahradil generickú poznámku
 	await expect(page.getByTestId('pnr-krov-ulozenie')).toContainText('ULOŽENIE');
 	await expect(page.getByTestId('pnr-krov-ulozenie-hodnoty')).toContainText('0,52');
@@ -313,6 +321,11 @@ test('krov uloženie pod 7° (5°): čestne „nepodporované" (O5), nič sa neh
 	// karta hlási nepodporované, žiadne vymyslené hodnoty
 	await expect(page.getByTestId('krov-nepodporovane')).toContainText('pod prahom 7°');
 	await expect(page.getByTestId('krov-ulozenie')).toHaveCount(0);
+	// #161 — rezné uhly krokvy sa zobrazia AJ pod 7° (na rozdiel od uloženia): rez=sklon (5°),
+	// rez drážky = |5−7| = 2° (trojuholník otočený)
+	await expect(page.getByTestId('krov-rezy')).toBeVisible();
+	await expect(page.getByTestId('krov-rez-sklon')).toContainText('5');
+	await expect(page.getByTestId('krov-rez-drazka')).toContainText('2');
 	// výkres ostáva čestný placeholder (#233 — plain text, nie uloženie detail)
 	await expect(page.getByTestId('pnr-krov-ulozenie')).toHaveCount(0);
 	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('konštruktér');

@@ -76,6 +76,14 @@ export const KROV_ODPOCET_ROBUST = 220;
  *  „otvára") a nesie varovnú poznámku o pásme. */
 export const KROV_FREZ_ZMENA_STUPNE = 9;
 
+// --- Prierez profilu krokvy (18102 PRIECKOVY PROFIL 105) [mm] --------------------------
+// Odvodené z 3D STEP exportu OP260357 (bbox krokvy 50 × 120 v oboch modeloch, do 7° aj
+// nad 7°) — nezávisle potvrdzuje „prierez krovu 50×120" z výkresu OP260282 (2. zdroj).
+/** šírka prierezu krokvy [mm]. */
+export const KROV_PRIEREZ_SIRKA = 50;
+/** výška prierezu krokvy [mm]. */
+export const KROV_PRIEREZ_VYSKA = 120;
+
 export type KrovRezim = 'nezadane' | 'nepodporovane' | 'rovnobezne' | 'otvara';
 
 export interface KrovUlozenie {
@@ -215,6 +223,84 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 		lv,
 		pv: lv,
 		konstanty,
+		poznamky
+	};
+}
+
+export interface KrovRezneUhly {
+	/** vstupný sklon strechy [°] (echo; null keď nezadané/neplatné). */
+	sklonStupne: number | null;
+	/** či sa dajú počítať rezné uhly (true pre každý sklon > 0 — na rozdiel od `krovUlozenie`
+	 *  uhly platia AJ pod 7° a nad 9°, mení sa len znamienko/otvorenie, nie definovanosť). */
+	podporovane: boolean;
+	/** koncový rez krokvy na strane spádu = SKLON strechy [°]. null keď nezadané/neplatné. */
+	uholRezSklon: number | null;
+	/** koncový rez na strane seating drážky = `|sklon − 7|` [°] (= `|uhol3|`, prah 7°).
+	 *  0° pri sklone 7° („krov leží rovnobežne s hranou"); pod 7° sa „prehodí". null keď nezadané. */
+	uholRezDrazka: number | null;
+	/** prierez profilu krokvy (18102) [mm] — na zobrazenie v pláne rezov. */
+	prierez: { sirka: number; vyska: number };
+	/** čestné poznámky (čo je odvodené, čo ešte čaká na potvrdenie). */
+	poznamky: string[];
+}
+
+/** REZNÉ UHLY koncov krokvy zo sklonu strechy — ODVODENÉ z 3D STEP dát (OP260357, dva
+ *  reálne modely do 7° / nad 7°). Krokva má DVA koncové rezy: jeden pod uhlom = SKLON
+ *  strechy (strana spádu), druhý pod `|sklon − 7|` (strana seating drážky). Druhý PRESNE
+ *  zodpovedá CAD premennej `uhol3 = UHOL − 7`, ktorú appka už používa na uloženie —
+ *  geometria 3D modelu ju nezávisle potvrdzuje, a je to úplné vysvetlenie prahu 7°:
+ *  pri sklone 7° je rez drážky 0° (krov leží rovnobežne s hranou), pod 7° sa „prehodí".
+ *
+ *  Overené na 2 bodoch cez prah: sklon 5,157° → rez 5,16° / drážka 1,84° (STEP meral 1,85°);
+ *  sklon 9,501° → rez 9,50° / drážka 2,50°. Prierez krokvy 50×120 (2. zdroj OP260282).
+ *
+ *  ODDELENÉ od `krovUlozenie` (offsety prahu 7°, gated 7°–9°): rezné uhly platia pre KAŽDÝ
+ *  sklon > 0. R2 (0,01°) = presnosť STEP merania. Čistá funkcia, bez vedľajších efektov,
+ *  bez Money zápisu (display-only; do rezervačného odpisu nejde žiadny uhol ani rozmer).
+ *
+ *  ČESTNE nepokryté (poznámky, otázky pre konštruktéra): priradenie predného/zadného konca
+ *  (žľab vs kotviaci) a presné rozmery drážky ako funkcia sklonu (máme len 1 model na režim).
+ *  STEP export NEOBSAHOVAL PMI kóty — všetky uhly sú odvodené z B-rep geometrie. */
+export function krovRezneUhly(sklonStupne: number | null | undefined): KrovRezneUhly {
+	const prierez = { sirka: KROV_PRIEREZ_SIRKA, vyska: KROV_PRIEREZ_VYSKA };
+	const s = typeof sklonStupne === 'number' && Number.isFinite(sklonStupne) ? sklonStupne : null;
+
+	if (s === null || s <= 0) {
+		return {
+			sklonStupne: s,
+			podporovane: false,
+			uholRezSklon: null,
+			uholRezDrazka: null,
+			prierez,
+			poznamky: ['Sklon strechy nezadaný — rezné uhly krokvy sa nepočítajú.']
+		};
+	}
+
+	const uholRezSklon = R2(s);
+	const uholRezDrazka = R2(Math.abs(s - KROV_PRAH_STUPNE));
+
+	const poznamky: string[] = [
+		'Krokva má dva koncové rezy: jeden pod uhlom sklonu strechy (strana spádu), ' +
+			`druhý pod uhlom ${uholRezDrazka}° (strana drážky uloženia).`
+	];
+	if (s === KROV_PRAH_STUPNE) {
+		poznamky.push('Pri sklone 7° je rez drážky nulový — krov leží rovnobežne s hranou.');
+	} else if (s < KROV_PRAH_STUPNE) {
+		poznamky.push(
+			'Sklon je pod 7° — rez drážky sa prehodí (trojuholník sa otočí na druhú stranu).'
+		);
+	}
+	poznamky.push(
+		'Priradenie predného a zadného konca (žľab / kotviaci) a presné rozmery drážky ešte ' +
+			'čakajú na potvrdenie od konštruktéra.'
+	);
+
+	return {
+		sklonStupne: s,
+		podporovane: true,
+		uholRezSklon,
+		uholRezDrazka,
+		prierez,
 		poznamky
 	};
 }
