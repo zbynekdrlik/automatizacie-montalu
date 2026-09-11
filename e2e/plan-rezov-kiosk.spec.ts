@@ -7,12 +7,15 @@
 // sa cez prehliadač Playwrightom nezachytáva, a pôvodný odpis→narezak upload (zmazaný) nemal
 // v E2E ŽIADNE pokrytie uploadu vôbec (jeho spustenie záviselo na PROD Odoo env).
 import { test, expect } from '@playwright/test';
-import { collectConsole, goto, loginAs } from './helpers';
+import { collectConsole, goto, loginAs, skipAkLive } from './helpers';
 
 test('uloženie plánu rezov so zákazkou → uloží sa a detail renderuje plán rezov (bez pádu)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
+	// ZÁPISOVÝ test (uloží plán do DB) — na LIVE prode sa preskočí (0.25.13 post-deploy beh
+	// zapísal testový plán „E2E Kiosk plán" ZAKE2E511 do prod DB; upload sa vtedy short-circuitol).
+	await skipAkLive(page);
 	await loginAs(page);
 	await goto(page, '/plan-rezov');
 
