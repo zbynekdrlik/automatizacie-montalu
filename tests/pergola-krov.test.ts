@@ -237,6 +237,18 @@ describe('krovRezneUhly — VERIFIKAČNÝ VEKTOR z STEP dát (do 7° / nad 7°)'
 		expect(p.length).toBeGreaterThan(0);
 		expect(p).not.toMatch(/#\d|(?:\bO\d)|call/i);
 	});
+
+	it('nad 9°: uhly SÚ definované (3D model pri 9,5° drážku má), ale poznámka čestne hlási pásmo', () => {
+		// #161 A7-tension: krovUlozenie nad 9° = nepodporované (drážka sa zatvára), ale REZNÉ UHLY
+		// sú z geometrie definované aj tam (nad-7 STEP model = 9,501°). Uhly ostávajú, poznámka varuje.
+		const r = krovRezneUhly(9.5);
+		expect(r.podporovane).toBe(true);
+		expect(r.uholRezSklon).toBe(9.5);
+		expect(r.uholRezDrazka).toBe(2.5); // |9,5 − 7|
+		expect(r.poznamky.join(' | ')).toMatch(/nad 9°|zatvár/i);
+		// pod hranicou (8°) poznámku o pásme NEMÁ
+		expect(krovRezneUhly(8).poznamky.join(' | ')).not.toMatch(/nad 9°|zatvár/i);
+	});
 });
 
 describe('krovDlzkaNominal — NOMINÁLNA dĺžka krovu (#161, derivácia 21.8. overená proti golden)', () => {

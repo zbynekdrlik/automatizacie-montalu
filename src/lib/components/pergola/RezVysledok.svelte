@@ -262,10 +262,10 @@
 				sa otočí), táto vetva nie je potvrdeným vzorcom pokrytá. Uloženie sa nepočíta — nič sa nehádže.
 			</p>
 		{/if}
-		{#if krovRezy}
+		{#if krovRezy?.podporovane}
 			<p class="sub" style="margin:12px 0 4px">
-				<b>Rezné uhly krokvy</b> <span class="badge ok">✅ z 3D modelu</span> — koncové rezy do plánu
-				rezov (platia pre každý sklon)
+				<b>Rezné uhly krokvy</b> <span class="badge ok">✅ z 3D modelu</span> — koncové rezy krokvy (platia
+				pre každý sklon)
 			</p>
 			<div data-testid="krov-rezy">
 				<div class="row">
@@ -282,6 +282,11 @@
 						>{krovRezy.prierez.sirka} × {krovRezy.prierez.vyska} mm</b
 					>
 				</div>
+				<ul style="margin:6px 0 0;padding-left:18px" data-testid="krov-rezy-pozn">
+					{#each krovRezy.poznamky as p (`rez·${p}`)}
+						<li style="margin:4px 0" class="sub">{p}</li>
+					{/each}
+				</ul>
 			</div>
 		{/if}
 		<ul style="margin:6px 0 0;padding-left:18px">

@@ -286,10 +286,11 @@ test('krov uloženie 8°: karta aj výkres ukážu potvrdené hodnoty (ps=0.52, 
 	// #161 — rezné uhly krokvy z 3D modelu: koncový rez = sklon (8°), rez drážky = |8−7| = 1°,
 	// prierez krokvy 50×120
 	await expect(page.getByTestId('krov-rezy')).toBeVisible();
-	await expect(page.getByTestId('krov-rez-sklon')).toContainText('8');
-	await expect(page.getByTestId('krov-rez-drazka')).toContainText('1');
-	await expect(page.getByTestId('krov-prierez')).toContainText('50');
-	await expect(page.getByTestId('krov-prierez')).toContainText('120');
+	await expect(page.getByTestId('krov-rez-sklon')).toHaveText('8°');
+	await expect(page.getByTestId('krov-rez-drazka')).toHaveText('1°');
+	await expect(page.getByTestId('krov-prierez')).toHaveText('50 × 120 mm');
+	// čestný caveat (priradenie koncov + rozmery drážky čakajú na konštruktéra) je VIDITEĽNÝ
+	await expect(page.getByTestId('krov-rezy-pozn')).toContainText('konštruktér');
 
 	// výkres — uloženie detail nahradil generickú poznámku
 	await expect(page.getByTestId('pnr-krov-ulozenie')).toContainText('ULOŽENIE');
@@ -324,8 +325,8 @@ test('krov uloženie pod 7° (5°): čestne „nepodporované" (O5), nič sa neh
 	// #161 — rezné uhly krokvy sa zobrazia AJ pod 7° (na rozdiel od uloženia): rez=sklon (5°),
 	// rez drážky = |5−7| = 2° (trojuholník otočený)
 	await expect(page.getByTestId('krov-rezy')).toBeVisible();
-	await expect(page.getByTestId('krov-rez-sklon')).toContainText('5');
-	await expect(page.getByTestId('krov-rez-drazka')).toContainText('2');
+	await expect(page.getByTestId('krov-rez-sklon')).toHaveText('5°');
+	await expect(page.getByTestId('krov-rez-drazka')).toHaveText('2°');
 	// výkres ostáva čestný placeholder (#233 — plain text, nie uloženie detail)
 	await expect(page.getByTestId('pnr-krov-ulozenie')).toHaveCount(0);
 	await expect(page.getByTestId('pnr-krov-pozn')).toContainText('konštruktér');
