@@ -3,8 +3,9 @@
 // (úloha 854, msg 1821818) hlásil, že pri Štandard+ opone chýba IZO 16 mm sklo — round 3
 // doplnil nárezák (2×4K 1:1 z Money Excelu msg 1823604, 2×2K/2×3K odvodené). Test overuje:
 //  1. IZO 4/16/4 sklo je pri opone PONÚKANÉ (predtým filtrované) a plán sa vykreslí,
-//  2. 2×4K odpis = 1:1 čísla z Excelu (sklo 574×1965, U-profil ZASP202439 57,6 m,
-//     spodná koľajnica ZASP202432 z default „prídavnej"),
+//  2. 2×4K rezy/počty 1:1 z Excelu (sklo 574×1965; U-profil ZASP202439 16 tyčí =
+//     57,6 m cez FFD balenie appky — Excel má naivný stĺpec tyčí vyšší; spodná
+//     koľajnica ZASP202432 z default „prídavnej"),
 //  3. 2×2K/2×3K majú v pláne čestné „odvodené" upozornenie (banner plan-warn).
 // Každý test vyžaduje NULA console errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
@@ -42,6 +43,8 @@ test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excel
 	await expect(page.locator('.row', { hasText: 'ZASP202439' })).toContainText(/(^|\D)57,6 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP202432' })).toContainText(/(^|\D)7,5 m/);
 	await expect(page.locator('.row', { hasText: 'ZASP00033' })).toHaveCount(0);
+	// 2×4K je 1:1 overený → ŽIADNE „odvodené" upozornenie (banner len pri 2×2K/2×3K)
+	await expect(page.getByTestId('plan-warn').filter({ hasText: /odvoden/i })).toHaveCount(0);
 	expect(consoleMsgs).toEqual([]);
 });
 

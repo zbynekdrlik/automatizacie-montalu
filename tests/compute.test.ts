@@ -1383,10 +1383,13 @@ describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korek
 });
 
 // #504 round 3 — Štandard + opona IZO (2×2K/2×3K/2×4K).
-// 2×4K = 1:1 z REÁLNEHO Money nárezáku (Patrik, úloha 854, msg 1823604,
-// „Nárezový plán 2016 IZO + 2mm.xlsx", hárok „4K s U PLUS opona"): každý ZASP
-// riadok + sklo overený proti PRIAMEMU vyhodnoteniu Excel formúl (scratchpad
-// vectors.py „1:1 MATCH" na S=5000/V=2100 aj S=6300/V=2400). Spodná koľajnica je
+// 2×4K rezové ROZMERY + POČTY kusov sú 1:1 z REÁLNEHO Money nárezáku (Patrik,
+// úloha 854, msg 1823604, „Nárezový plán 2016 IZO + 2mm.xlsx", hárok „4K s U PLUS
+// opona"): každý ZASP rez + sklo overený proti PRIAMEMU vyhodnoteniu Excel formúl
+// (scratchpad vectors.py na S=5000/V=2100 aj S=6300/V=2400). POČET TYČÍ (a teda
+// metre) používa FFD balenie appky — rovnaká politika ako všetky systémy (Excel má
+// naivný súčet-po-dĺžkach vyšší, napr. ZASP202439: appka 16 tyčí, Excel-H stĺpec 19).
+// Spodná koľajnica je
 // v seede BASIC (ZASP00033/00030/00104); checkbox „prídavná koľajnica" ju zväčší
 // o 1 (railUpsize → ZASP202432/00033/00030) a je DEFAULT pri Štandard+ IZO (#132),
 // čo zodpovedá Excel-ovej spodnej ZASP202432. 2×2K/2×3K sú ODVODENÉ z toho istého
@@ -1399,7 +1402,7 @@ describe('Štandard + opona IZO (#504 round 3)', () => {
 	const spodna = (r: NonNullable<ReturnType<typeof computeFlat>>) =>
 		r.odpis.find((o) => /Koľajnica spodná/i.test(o.nazov))!.kod;
 
-	it('2×4K opona IZO — 1:1 z Money Excelu (úloha 854), 2 vstupné sady', () => {
+	it('2×4K opona IZO — rezy/počty 1:1 z Money Excelu (úloha 854), tyče = FFD, 2 vstupné sady', () => {
 		let r = P('Štandard +|2x4K IZO', 5000, 2100);
 		expect(odpisByKod(r)).toMatchObject({
 			ZASP00036: 7.5,

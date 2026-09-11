@@ -145,11 +145,18 @@ describe('migrácia v46 → v47: Štandard + opona IZO (#504 round 3)', () => {
 		mini.pragma('user_version = 46');
 		migrateOponaIzo(mini, (v) => mini.pragma(`user_version = ${v}`));
 		expect(mini.pragma('user_version', { simple: true })).toBe(47);
-		// 2x4K IZO sa NEzduplikoval (bol už tam) — presne 1 riadok; 2x2K/2x3K pribudli
+		// 2x4K IZO sa NEzduplikoval (bol už tam) — presne 1 riadok
 		const c = mini
 			.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl = 'Štandard +|2x4K IZO'")
 			.get() as { c: number };
 		expect(c.c).toBe(1);
+		// … zatiaľ čo 2x2K/2x3K IZO (ktoré tam neboli) PRIBUDLI
+		const pribudli = mini
+			.prepare(
+				"SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl IN ('Štandard +|2x2K IZO', 'Štandard +|2x3K IZO')"
+			)
+			.get() as { c: number };
+		expect(pribudli.c).toBe(2);
 		mini.close();
 	});
 

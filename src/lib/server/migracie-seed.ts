@@ -842,8 +842,14 @@ export function migrateOponaIzo(db: Database.Database, bump: (v: number) => void
 			);
 			// vzor v9: iteruj priamo FILTROVANÝ seed (s je vždy definované) + hasSys guard
 			for (const s of seed.sys.filter((x) => NOVE.includes(x.sysStyl))) {
-				if (hasSys.get(s.sysStyl)) continue; // idempotencia — už zoseedované (fresh cez v9)
+				if (hasSys.get(s.sysStyl)) {
+					// už existuje (fresh DB cez v9, alebo ručne cez /nastavenia) → NEprepisuj;
+					// loguj, aby bolo v prod audite vidno, že Excel-overený riadok nedostal prednosť
+					log.info('migrateOponaIzo: sysStyl už existuje — preskočené', { sysStyl: s.sysStyl });
+					continue;
+				}
 				insSys.run(s.sysStyl, s.N, s.skloOffset);
+				log.info('migrateOponaIzo: opona IZO zoseedované', { sysStyl: s.sysStyl });
 				for (const r of seed.rez.filter((x) => x.sysStyl === s.sysStyl))
 					insRez.run(
 						r.sysStyl,

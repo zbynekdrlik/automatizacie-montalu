@@ -83,8 +83,11 @@ Doplnené 2026-09-11 (Patrik, úloha 854, msg 1823604 „Nárezový plán 2016 I
 hárok „4K s U PLUS opona"). Opona + IZO SA vyrába; pôvodne (#504 round 2) filtrovaná,
 lebo nárezák neexistoval. `sysStyl`: `Štandard +|2x*K IZO`, `N = 2·k` (2x2K→4/2x3K→6/2x4K→8).
 
-- **2×4K opona IZO = 1:1 z reálneho Money Excelu** (overené proti PRIAMEMU vyhodnoteniu
-  formúl na S=5000/V=2100 aj S=6300/V=2400). Opona geometria (`W=S/2`) + IZO učko:
+- **2×4K opona IZO — rezové rozmery + počty kusov 1:1 z reálneho Money Excelu** (overené
+  proti PRIAMEMU vyhodnoteniu formúl na S=5000/V=2100 aj S=6300/V=2400). POČET TYČÍ (a teda
+  metre) používa FFD balenie appky (rovnaká politika ako všetky systémy — Excel má naivný
+  súčet-po-dĺžkach vyšší, napr. ZASP202439: appka 16 tyčí = 57,6 m, Excel-H stĺpec 19).
+  Opona geometria (`W=S/2`) + IZO učko:
   prírez ZASP202415 `off −335 ×16`; U ZASP202439 (šírka `off −367 ×16` + výška `V−161 ×16`);
   krajová ZASP20244 `V−33 ×4`; nos ZASP00024 `V−33 ×12`; **dorazová ZASP202419 `V−d ×3`**
   (opona IZO má 3, basic/ne-opona 2!); sklo šírka `off −407`, výška `V−135`, počet `2N`.
