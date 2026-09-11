@@ -37,6 +37,9 @@
  *  (0,52 / 0,66). NIE R1 z pergola-narez.ts (0,1 mm) — tá by 0,52 aj 0,66 zlepila na 0,5. */
 const R2 = (x: number) => Math.round(x * 100) / 100;
 const rad = (deg: number) => (deg * Math.PI) / 180;
+/** sklon (°) len keď je to konečné číslo, inak null (prázdny formulár, NaN, undefined). */
+const sklonAleboNull = (x: number | null | undefined): number | null =>
+	typeof x === 'number' && Number.isFinite(x) ? x : null;
 
 // --- Potvrdené konštanty uloženia (dôkaz = kóty na skici scr_009/010/030) -----------
 /** vodorovná odvesna 1 [mm], kóta „29" (odvesna trojuholníka 0,52–29–0,01). */
@@ -76,6 +79,14 @@ export const KROV_ODPOCET_ROBUST = 220;
  *  „otvára") a nesie varovnú poznámku o pásme. */
 export const KROV_FREZ_ZMENA_STUPNE = 9;
 
+// --- Prierez profilu krokvy (18102 PRIECKOVY PROFIL 105) [mm] --------------------------
+// Odvodené z 3D STEP exportu OP260357 (bbox krokvy 50 × 120 v oboch modeloch, do 7° aj
+// nad 7°) — nezávisle potvrdzuje „prierez krovu 50×120" z výkresu OP260282 (2. zdroj).
+/** šírka prierezu krokvy [mm]. */
+export const KROV_PRIEREZ_SIRKA = 50;
+/** výška prierezu krokvy [mm]. */
+export const KROV_PRIEREZ_VYSKA = 120;
+
 export type KrovRezim = 'nezadane' | 'nepodporovane' | 'rovnobezne' | 'otvara';
 
 export interface KrovUlozenie {
@@ -112,7 +123,7 @@ const ODVESNA_POZN = 'Priradenie odvesny c/cc prednej/zadnej hrane je odvodené,
  *  (vzťah nie je potvrdený) — sklon je priamy vstup, presne ako `uhol` v SE modeli. */
 export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozenie {
 	const konstanty = { c: KROV_C, cc: KROV_CC, konst: KROV_KONST };
-	const s = typeof sklonStupne === 'number' && Number.isFinite(sklonStupne) ? sklonStupne : null;
+	const s = sklonAleboNull(sklonStupne);
 
 	// nezadané / neplatné (prázdny formulár, NaN, ≤ 0) — nič sa nepočíta
 	if (s === null || s <= 0) {
@@ -219,6 +230,93 @@ export function krovUlozenie(sklonStupne: number | null | undefined): KrovUlozen
 	};
 }
 
+export interface KrovRezneUhly {
+	/** vstupný sklon strechy [°] (echo; null keď nezadané/neplatné). */
+	sklonStupne: number | null;
+	/** či sa dajú počítať rezné uhly (true pre každý sklon > 0 — na rozdiel od `krovUlozenie`
+	 *  uhly platia AJ pod 7° a nad 9°, mení sa len znamienko/otvorenie, nie definovanosť). */
+	podporovane: boolean;
+	/** koncový rez krokvy na strane spádu = SKLON strechy [°]. null keď nezadané/neplatné. */
+	uholRezSklon: number | null;
+	/** koncový rez na strane seating drážky = `|sklon − 7|` [°] (= `|uhol3|`, prah 7°).
+	 *  0° pri sklone 7° („krov leží rovnobežne s hranou"); pod 7° sa „prehodí". null keď nezadané. */
+	uholRezDrazka: number | null;
+	/** prierez profilu krokvy (18102) [mm] — na zobrazenie v pláne rezov. */
+	prierez: { sirka: number; vyska: number };
+	/** čestné poznámky (čo je odvodené, čo ešte čaká na potvrdenie). */
+	poznamky: string[];
+}
+
+/** REZNÉ UHLY koncov krokvy zo sklonu strechy — ODVODENÉ z 3D STEP dát (OP260357, dva
+ *  reálne modely do 7° / nad 7°). Krokva má DVA koncové rezy: jeden pod uhlom = SKLON
+ *  strechy (strana spádu), druhý pod `|sklon − 7|` (strana seating drážky). Druhý PRESNE
+ *  zodpovedá CAD premennej `uhol3 = UHOL − 7`, ktorú appka už používa na uloženie —
+ *  geometria 3D modelu ju nezávisle potvrdzuje, a je to úplné vysvetlenie prahu 7°:
+ *  pri sklone 7° je rez drážky 0° (krov leží rovnobežne s hranou), pod 7° sa „prehodí".
+ *
+ *  Overené na 2 bodoch cez prah: sklon 5,157° → rez 5,16° / drážka 1,84° (STEP meral 1,85°);
+ *  sklon 9,501° → rez 9,50° / drážka 2,50°. Prierez krokvy 50×120 (2. zdroj OP260282).
+ *
+ *  ODDELENÉ od `krovUlozenie` (offsety prahu 7°, gated 7°–9°): rezné uhly platia pre KAŽDÝ
+ *  sklon > 0. R2 (0,01°) = presnosť STEP merania. Čistá funkcia, bez vedľajších efektov,
+ *  bez Money zápisu (display-only; do rezervačného odpisu nejde žiadny uhol ani rozmer).
+ *
+ *  ČESTNE nepokryté (poznámky, otázky pre konštruktéra): priradenie predného/zadného konca
+ *  (žľab vs kotviaci) a presné rozmery drážky ako funkcia sklonu (máme len 1 model na režim).
+ *  STEP export NEOBSAHOVAL PMI kóty — všetky uhly sú odvodené z B-rep geometrie. */
+export function krovRezneUhly(sklonStupne: number | null | undefined): KrovRezneUhly {
+	const prierez = { sirka: KROV_PRIEREZ_SIRKA, vyska: KROV_PRIEREZ_VYSKA };
+	const s = sklonAleboNull(sklonStupne);
+
+	if (s === null || s <= 0) {
+		return {
+			sklonStupne: s,
+			podporovane: false,
+			uholRezSklon: null,
+			uholRezDrazka: null,
+			prierez,
+			poznamky: ['Sklon strechy nezadaný — rezné uhly krokvy sa nepočítajú.']
+		};
+	}
+
+	const uholRezSklon = R2(s);
+	const uholRezDrazka = R2(Math.abs(s - KROV_PRAH_STUPNE));
+
+	const poznamky: string[] = [
+		'Krokva má dva koncové rezy: jeden pod uhlom sklonu strechy (strana spádu), ' +
+			`druhý pod uhlom ${uholRezDrazka}° (strana drážky uloženia).`
+	];
+	if (s === KROV_PRAH_STUPNE) {
+		poznamky.push('Pri sklone 7° je rez drážky nulový — krov leží rovnobežne s hranou.');
+	} else if (s < KROV_PRAH_STUPNE) {
+		poznamky.push(
+			'Sklon je pod 7° — rez drážky sa prehodí (trojuholník sa otočí na druhú stranu).'
+		);
+	}
+	if (s > KROV_FREZ_ZMENA_STUPNE) {
+		// nad 9° call popisuje „drážka sa zatvára, výška krovu sa dvíha" (uloženie sa preto
+		// nad 9° nepočíta); 3D model pri 9,5° drážku STÁLE má, takže rezné uhly sú definované,
+		// ale správanie pásma ešte nie je potvrdené — čestne to hlásime pri uhloch.
+		poznamky.push(
+			'Nad 9° sa podľa konštruktéra drážka zatvára a výška krovu sa dvíha — rezné uhly ' +
+				'z 3D modelu tam ešte čakajú na potvrdenie.'
+		);
+	}
+	poznamky.push(
+		'Priradenie predného a zadného konca (žľab / kotviaci) a presné rozmery drážky ešte ' +
+			'čakajú na potvrdenie od konštruktéra.'
+	);
+
+	return {
+		sklonStupne: s,
+		podporovane: true,
+		uholRezSklon,
+		uholRezDrazka,
+		prierez,
+		poznamky
+	};
+}
+
 /** NOMINÁLNA dĺžka krovu (spodná hrana / uloženie) zo sklonu strechy [mm] — meria sa po
  *  spáde: `hĺbka / cos(sklon) − 250`. Vráti `null` keď sklon/hĺbka nezadané alebo neplatné
  *  (honest-null — bez sklonu sa dĺžka NEDÁ počítať, nič sa nehádže).
@@ -244,7 +342,7 @@ export function krovDlzkaNominal(
 	sklonStupne: number | null | undefined,
 	system: 'Robust' | 'Massive' = 'Massive'
 ): number | null {
-	const s = typeof sklonStupne === 'number' && Number.isFinite(sklonStupne) ? sklonStupne : null;
+	const s = sklonAleboNull(sklonStupne);
 	if (s === null || s <= 0) return null;
 	if (s > KROV_FREZ_ZMENA_STUPNE) return null; // A7 — pásmo nad 9° bez vzorca (honest-null)
 	if (!(typeof hlbkaMm === 'number' && Number.isFinite(hlbkaMm) && hlbkaMm > 0)) return null;
