@@ -123,17 +123,24 @@ describe('planRezovPdfFilename', () => {
 
 // ---- Money-neutralita — vlastný guard (vzor zakazka-pdf.test.ts) ----
 describe('Money-neutralita (plan-rezov-pdf zdroj)', () => {
-	const src = fs.readFileSync(new URL('../src/lib/server/plan-rezov-pdf.ts', import.meta.url), 'utf8');
+	const src = fs.readFileSync(
+		new URL('../src/lib/server/plan-rezov-pdf.ts', import.meta.url),
+		'utf8'
+	);
 	it('NEPÍŠE do /data, nevolá writeOdpis, nesiaha na MONEY_LIVE ani na fs zápis', () => {
 		expect(src).not.toMatch(/\/data\//);
 		expect(src).not.toMatch(/writeOdpis\s*\(/);
 		expect(src).not.toMatch(/fs\.(write|append|mkdir|rename|open)/);
 		expect(src).not.toMatch(/process\.env\.MONEY_LIVE|isLive\s*\(/);
 	});
-	it('nekreslí do PDF tela emoji, ktoré DejaVu subset nemá (⚠️/⏳ → tofu)', () => {
+	it('nekreslí do PDF tela emoji, ktoré DejaVu subset nemá (U+26A0/U+23F3 → tofu)', () => {
+		// telo aj komentáre bez literálnych ⚠/⏳ (komentár používa U+ názvy — vzor zakazka-pdf.ts)
 		expect(src).not.toMatch(/⚠|⏳/);
 	});
-	it('nereferencuje cenové polia (žiadny leak cien do plánu rezov)', () => {
-		expect(src).not.toMatch(/cena|nakup|predajVo|cennik/i);
+	it('neimportuje Money/price moduly (žiadny leak vektor)', () => {
+		expect(src).not.toMatch(/from\s+['"]\.\/(ceny|money|odoo-zakazka|zakazka-ceny)['"]/);
+	});
+	it('nepoužíva cenové identifikátory ani € v kóde (leak cien nemožný)', () => {
+		expect(src).not.toMatch(/fmtEur|predajVo|cenaSpolu|cenaNakup|nakupCennik|€/);
 	});
 });

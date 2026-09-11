@@ -42,6 +42,23 @@ export function ellipsize(font: PDFFont, s: string, size: number, maxWidth: numb
 	return out.length > 0 ? out + ell : ell;
 }
 
+/** YYYYMMDD-HHMM v Europe/Bratislava — sortovateľná pečiatka do názvu prílohy (odlíši viac verzií).
+ *  Zdieľané `zakazka-pdf.ts` (Rozpis-…) aj `plan-rezov-pdf.ts` (Plan-rezov-…) — jeden zdroj pravdy
+ *  pre časovú pečiatku názvu súboru (UTC pasca: Intl s explicitným `timeZone`, nie `toISOString`). */
+export function stampSk(now: Date): string {
+	const parts = new Intl.DateTimeFormat('sv-SE', {
+		timeZone: 'Europe/Bratislava',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		hour12: false
+	}).formatToParts(now);
+	const g = (t: string) => parts.find((x) => x.type === t)?.value ?? '';
+	return `${g('year')}${g('month')}${g('day')}-${g('hour')}${g('minute')}`;
+}
+
 /** Zaregistruj fontkit a embedni vendorovaný DejaVu Sans subset (regular + bold) do dokumentu. */
 export async function embedDejavu(doc: PDFDocument): Promise<{ reg: PDFFont; bold: PDFFont }> {
 	doc.registerFontkit(fontkit);

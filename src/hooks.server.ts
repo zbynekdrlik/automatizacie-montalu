@@ -11,7 +11,6 @@ import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
 import { queueZakazkaPush, runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
-import { queueNarezakUpload } from '$lib/server/odoo-narezak-upload';
 
 const log = logger('http');
 
@@ -47,10 +46,11 @@ let pruneCounter = 0;
 	runStartupLeadSweep();
 	// #340: po každom úspešnom odpise pushni interný zoznam materiálu zákazky do Odoo
 	// (interná log-note na sale.order, zákazník ju nikdy nevidí). Money-neutrálny observer.
-	// #6385: + upload nárezového PDF na zákazku cez montalu_narezak_upload (/json/2).
+	// #511: nárezák PDF sa už NEnahráva z odpisu — kiosk „Rezanie" dostáva SKUTOČNÝ plán rezov
+	// po ULOŽENÍ plánu (`/plan-rezov` → queuePlanRezovUpload), nie rozpis materiálu s cenami.
+	// Rozpis (s cenami) ostáva LEN v tejto internej mt_note.
 	setOdpisWrittenHook((zak: string, op: string) => {
 		queueZakazkaPush(zak, op);
-		queueNarezakUpload(zak, op);
 	});
 	// #349: pri štarte (po migráciách — db.ts modul-load prebehol vyššie cez importy) dopostni
 	// zaostalé zákazka-pushe z minulých výpadkov Odoo. Fire-and-forget, no-op keď chýba ODOO_LEAD_*.
