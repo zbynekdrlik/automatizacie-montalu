@@ -216,6 +216,33 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		}
 	}
 
+	// #504: sklo riadky sa historicky zrkadlili z rámového profilu ROVNAKEJ dimenzie
+	// BEZPODMIENEČNE pri každom uložení — to prepisovalo NEZÁVISLÉ sklo offsety (opona IZO
+	// sklo výška = V−135, rámový stredový = V−33; 29 z 39 štýlov má sklo ≠ rámový; prod
+	// korupcia 14.9., cfg_rez 419/409/399/377). Nový kontrakt: zrkadli rámový→sklo LEN keď
+	// sa rámový offset SKUTOČNE zmenil A sklo ho práve sledovalo (sklo.offset === starý
+	// rámový.offset) — inak je sklo samostatný rozmer a ostáva. Zrkadlenie sa auditni (zmeny).
+	const skloAktual = db
+		.prepare(`SELECT dim, offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo'`)
+		.all(input.sysStyl) as { dim: 'S' | 'V'; offset: number }[];
+	const skloByDim = new Map<'S' | 'V', number>(skloAktual.map((r) => [r.dim, r.offset]));
+	const skloMirror = new Map<'S' | 'V', number>();
+	for (const r of cur.rows) {
+		const nova = input.offsets.get(r.id);
+		if (nova === undefined || nova === r.offset) continue; // rámový sa nezmenil
+		if (!/rámový/i.test(r.nazov)) continue;
+		const skloStara = skloByDim.get(r.dim);
+		// sklo ho práve sledovalo (rovný štýl) → drž v synchróne; inak nezávislé → nechaj tak
+		if (skloStara === undefined || skloStara !== r.offset) continue;
+		if (skloMirror.get(r.dim) === nova) continue; // už zaznamenané pre túto dim
+		skloMirror.set(r.dim, nova);
+		zmeny.push({
+			pole: `Sklo ${r.dim === 'S' ? 'šírka' : 'výška'} (zrkadlené z „${r.nazov}")`,
+			stara: skloStara,
+			nova
+		});
+	}
+
 	if (!zmeny.length) return { zmeny: [], error: null };
 
 	// všetky profil riadky (vrátane skrytého 10mm dvojčaťa) — na zrkadlenie 6→10 offsetu
@@ -242,10 +269,6 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		db.transaction(() => {
 			for (const [id, off] of input.offsets) {
 				updRez.run(off, id);
-				// sklo riadky zdieľajú offsety s rámovým profilom rovnakej dimenzie
-				// (rovnaká väzba ako v pôvodnom odpisovom Exceli) — drží ich v synchróne
-				const row = cur.rows.find((r) => r.id === id)!;
-				if (/rámový/i.test(row.nazov)) updSkloRez.run(off, input.sysStyl, row.dim);
 				// Deluxe: editovaný kanonický (6mm) profil → zrkadli offset na 10mm dvojča
 				// (rovnaká rola), aby 6/10 mali IDENTICKÉ množstvo do Money
 				const edited = allProfil.find((r) => r.id === id);
@@ -256,6 +279,8 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 							updRez.run(off, sib.id);
 				}
 			}
+			// #504: podmienené + auditované zrkadlenie rámový→sklo (rozhodnuté v skloMirror vyššie)
+			for (const [dim, off] of skloMirror) updSkloRez.run(off, input.sysStyl, dim);
 			updSys.run(input.skloOffset, input.sysStyl);
 			for (const g of glassZmeny) updGlass.run(g.nova, g.id);
 			// #440: NULL sa zapíše ako SQL NULL (better-sqlite3 viaže JS null → NULL) → zruší override
