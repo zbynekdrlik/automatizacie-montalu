@@ -62,7 +62,9 @@ describe('#518 zoznam systémov — jediný zdroj pravdy + parita labelov', () =
 });
 
 describe('#518 editor load() — systemy z jediného zdroja + system pre nadpis', () => {
-	it('load vracia systemy zhodné so systemyZoStylov (nie druhá kópia)', async () => {
+	it('load vracia systemy s hodnotami zhodnými so systemyZoStylov (value-parita, drift guard)', async () => {
+		// Value-parita: editor NEsmie mať vlastný poriadok/labely. Že je to ten ISTÝ zdroj
+		// (nie identická inline kópia) je zaručené diffom — editor volá systemyZoStylov(styly).
 		const data = (await load(loadEvent('Robust|2K'))) as { systemy: string[] };
 		expect(data.systemy).toEqual(dbMod.systemyZoStylov(dbMod.listSysStyly()));
 	});
