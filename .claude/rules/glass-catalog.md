@@ -4,6 +4,7 @@ paths:
   - "src/lib/server/db.ts"
   - "src/lib/styl.ts"
   - "src/lib/sklo.ts"
+  - "src/routes/zasklenia/nastavenia/**"
   - "tests/migration-*.test.ts"
   - "tests/sklo-*.test.ts"
 ---
@@ -92,6 +93,34 @@ Nasledovník #440: pri desiatkach/stovkách skiel z Odoo je per-sklo korekcia ne
   `system='Štandard +'`, starý „Štandard" k nim smeruje cez `GLASS_SYSTEM_ALIAS`
   (server `glassTypesForSystem`) a cez `sklaForSystem` (klient `zasklenia/+page.svelte`).
   Sklo pridané pod `Štandard +` sa teda objaví v OBOCH a nepretečie do Slide/Robust/Deluxe.
+
+## Editor vzorcov — dvojkrokový výber Systém → Štýl (#518)
+
+`/zasklenia/nastavenia` používa DVA selecty (`#system` → `#styl`) ako nárezák, NIE jeden
+plochý „Systém · štýl" (ten miešal „Štandard plus" a „Starý štandard" — Patrik upravil zlý;
+Odoo úloha 922). Nadpis `data-testid="editor-nadpis"` („Upravuješ: <Systém> · <Štýl>")
+jednoznačne ukáže, ktorý z dvoch Štandardov (zdieľajú katalóg cez `GLASS_SYSTEM_ALIAS`
+vyššie) sa práve edituje.
+
+- **Zoznam systémov = JEDINÝ zdroj `systemyZoStylov(styly)` v `db.ts`** (poradie = prvý
+  výskyt v `listSysStyly()` = `ORDER BY sys_styl`), zdieľaný nárezákom
+  (`zasklenia/+page.server.ts`) aj editorom (`nastavenia/+page.server.ts`). Labely pre
+  človeka dáva `nazovSystemu` (`$lib/system-nazvy`). Poradie kľúčov je dnes
+  `Deluxe, Robust, Slide, Štandard +, Štandard Drevo, Štandard` → labely
+  `Deluxe, Robust, Slide, Štandard plus, Drevostavby, Starý štandard`.
+- **Pridanie/odobratie systému** → zdvihni DRIFT GUARD `tests/nastavenia-editor-systemy.test.ts`
+  (`OCAKAVANE_KLUCE` + `OCAKAVANE_LABELY`) — inak padne (to je jeho účel).
+- **Štýl krok editora = SUROVÉ cfg `styl` kľúče systému** (`data.styly.filter(system===sys)`,
+  vrátane IZO variantov ako `2x4K IZO`) — NIE „ponuka" nárezáka (`stylyForSystem`/`stylyDoPonuky`,
+  ktorá IZO kolabuje a odvodzuje zo skla). Editor edituje SUROVÉ vzorce, preto musí ísť na
+  každý reálny `sysStyl` kľúč.
+- **Stav žije v URL `?sysStyl=`** → reload/„Upraviť ďalší štýl" ho zachovajú; navigácia je
+  plný reload cez `window.location.href` (žiadny klientsky `$state` — editor sa aj tak
+  načítava per `sysStyl` na serveri). Selection-only, Money-neutrálne.
+- **Zvyšný drift (mimo #518):** `zasklenia/navrh/+page.server.ts` a `sietka/+page.svelte`
+  ešte inline-ujú `[...new Set(styly.map(s=>s.system))]`. `navrh` (server) môže importovať
+  `systemyZoStylov`; `sietka` je KLIENT (nemôže importovať server-only `db.ts`) — potreboval
+  by klientsky helper. Neurobené (mimo scope #518).
 
 ## Money-neutralita skla v Štandardoch — jediný kanál je `jeIzoSklo`
 
