@@ -5,6 +5,7 @@ import type { Actions, PageServerLoad } from './$types';
 import {
 	loadCfg,
 	listSysStyly,
+	systemyZoStylov,
 	glassTypesForSystem,
 	systemFromSysStyl,
 	triedaKorekcia
@@ -32,6 +33,9 @@ export const load: PageServerLoad = async ({ url }) => {
 	// vôbec nemá — napr. trieda 16 pri Deluxe, kde je hrubkaTrieda vždy NULL).
 	return {
 		styly,
+		// #518: zoznam systémov pre dvojkrokový výber Systém → Štýl (ako nárezák);
+		// systemyZoStylov = JEDINÝ zdroj pravdy poradia, zdieľaný s `zasklenia/+page.server.ts`.
+		systemy: systemyZoStylov(styly),
 		sysStyl,
 		system,
 		editable,

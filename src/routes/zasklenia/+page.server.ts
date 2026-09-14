@@ -7,6 +7,7 @@ import { logger } from '$lib/server/log';
 import {
 	loadCfg,
 	listSysStyly,
+	systemyZoStylov,
 	listGlassTypes,
 	glassTypesForSystem,
 	efektivnaKorekcia,
@@ -482,7 +483,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	// Vracia iba PREDVYPLNENIE formulára; nič sa tým nezapisuje ani neodpisuje.
 	const znovaId = Number(url.searchParams.get('znova') ?? '');
 	const znova = znovaId && !isB2B(locals.user) ? znovaZOdpisu(znovaId) : null;
-	const systemy = [...new Set(styly.map((s) => s.system))];
+	const systemy = systemyZoStylov(styly); // #518: jediný zdroj pravdy, zdieľaný s editorom vzorcov
 	return {
 		systemy,
 		styly, // len existujúce kombinácie — neplatná voľba sa nedá odoslať
