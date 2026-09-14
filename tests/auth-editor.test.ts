@@ -85,7 +85,13 @@ describe('editor vzorcov', () => {
 			skloOffset: 140
 		});
 		expect(error).toBeNull();
-		expect(zmeny.length).toBe(2);
+		// #504: zrkadlenie rámový→sklo je teraz AUDITOVANÉ → 3 záznamy: rámový S,
+		// skloOffset 135→140, a zrkadlený sklo S (predtým 2 — mirror bol tichý/neaudito­vaný).
+		expect(zmeny.length).toBe(3);
+		expect(
+			zmeny.some((z) => /sklo/i.test(z.pole) && z.nova === ram.offset + 3),
+			'zrkadlený sklo S záznam musí byť v zmeny (auditovaný)'
+		).toBe(true);
 
 		// audit
 		const audit = getAuditLog(5);
