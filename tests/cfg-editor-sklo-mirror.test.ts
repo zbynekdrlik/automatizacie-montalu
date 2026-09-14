@@ -78,7 +78,7 @@ describe('#504 editor vzorcov: mirror rámový→sklo je podmienený a auditovan
 		// zrkadlený sklo záznam MUSÍ byť v `zmeny` a v cfg_audit (staré správanie ho neaudito­valo)
 		const mirrorZmena = zmeny.find((z) => /sklo/i.test(z.pole) && z.nova === -72);
 		expect(mirrorZmena, 'zrkadlený sklo záznam musí byť v zmeny').toBeTruthy();
-		const audit = getAuditLog(1)[0];
+		const audit = getAuditLog(1)[0]!;
 		const auditZmeny = JSON.parse(audit.zmeny) as { pole: string; stara: number; nova: number }[];
 		expect(
 			auditZmeny.some((z) => /sklo/i.test(z.pole) && z.nova === -72),
