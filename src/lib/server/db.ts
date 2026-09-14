@@ -99,6 +99,15 @@ export function listSysStyly(): { sysStyl: string; system: string; styl: string;
 	}));
 }
 
+/** Poradie + množina KĽÚČOV systémov pre `<select id="system">` — JEDINÝ zdroj pravdy
+ *  pre nárezák (`zasklenia/+page.server.ts`) aj editor vzorcov (`nastavenia/…`, #518).
+ *  Poradie = poradie prvého výskytu v odovzdanom zozname (`listSysStyly()` = ORDER BY
+ *  sys_styl). Labely pre človeka dáva `nazovSystemu` (`$lib/system-nazvy`) — toto je len
+ *  poradie kľúčov, aby sa derivácia nekopírovala do dvoch rout (drift = padne #518 test). */
+export function systemyZoStylov(styly: { system: string }[]): string[] {
+	return [...new Set(styly.map((s) => s.system))];
+}
+
 export interface GlassType {
 	/** riadok `glass_types.id` — stabilná identita skla (nazov je unikátny len v rámci
 	 *  systému, #214/#438); editor ho používa ako identitu checkboxu. */

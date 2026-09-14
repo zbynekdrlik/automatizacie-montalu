@@ -1,11 +1,29 @@
 <script lang="ts">
-	import { nazovSysStyl } from '$lib/system-nazvy';
+	import { nazovSysStyl, nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
 	import { POZNAMKY } from '$lib/nastavenia-poznamky';
 
 	let { data, form } = $props();
 
 	const fmtM = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
+
+	// #518: dvojkrokový výber Systém → Štýl (ako nárezák `/zasklenia`). Stav žije v URL
+	// (?sysStyl=), takže reload aj „Upraviť ďalší štýl" ho zachovajú; navigácia je plný
+	// reload (žiadny klientsky $state — editor sa aj tak načítava per sysStyl na serveri).
+	const styl = $derived(data.sysStyl.split('|')[1] ?? '');
+	// SUROVÉ cfg štýly vybraného systému (vrátane IZO variantov — editor edituje surové vzorce,
+	// nie „ponuku" nárezáka, kde sa IZO odvodzuje zo skla).
+	const stylyPreSystem = $derived(data.styly.filter((x) => x.system === data.system));
+	// nadpis skladám v jednom výraze, aby Svelte neprehltla medzery okolo „·" (testing.md)
+	const nadpis = $derived(`Upravuješ: ${nazovSystemu(data.system)} · ${styl}`);
+
+	function vyberSystem(e: Event) {
+		const sys = (e.target as HTMLSelectElement).value;
+		// naviguj na PRVÝ štýl zvoleného systému (poradie = listSysStyly ORDER BY sys_styl)
+		const prvy = data.styly.find((x) => x.system === sys);
+		if (prvy)
+			window.location.href = `/zasklenia/nastavenia?sysStyl=${encodeURIComponent(prvy.sysStyl)}`;
+	}
 
 	function vyberStyl(e: Event) {
 		const v = (e.target as HTMLSelectElement).value;
@@ -72,13 +90,35 @@
 	</div>
 {:else if data.editable}
 	<div class="card">
-		<div class="field">
-			<label for="vyber">Systém · štýl</label>
-			<select id="vyber" onchange={vyberStyl} value={data.sysStyl}>
-				{#each data.styly as st (st.sysStyl)}
-					<option value={st.sysStyl}>{nazovSysStyl(st.sysStyl)}</option>
-				{/each}
-			</select>
+		<!-- #518: prominentný názov práve editovaného systému·štýlu — aby sa už nepomýlil
+		     starý „Štandard" so „Štandard +" (Odoo úloha 922). -->
+		<div
+			class="editor-nadpis"
+			data-testid="editor-nadpis"
+			style="font-size:1.15rem;font-weight:700;padding:12px 14px;margin-bottom:14px;border-radius:10px;background:#eef2ff;border:1px solid #c7d2fe;color:#1e293b"
+		>
+			✏️ {nadpis}
+		</div>
+
+		<!-- Dvojkrokový výber ako v nárezáku: Systém → Štýl. Labely + poradie systémov idú
+		     z toho istého zdroja (`data.systemy` = systemyZoStylov, `nazovSystemu`). -->
+		<div class="grid2">
+			<div class="field">
+				<label for="system">Systém</label>
+				<select id="system" onchange={vyberSystem} value={data.system}>
+					{#each data.systemy as sys (sys)}
+						<option value={sys}>{nazovSystemu(sys)}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="field">
+				<label for="styl">Štýl</label>
+				<select id="styl" onchange={vyberStyl} value={data.sysStyl}>
+					{#each stylyPreSystem as st (st.sysStyl)}
+						<option value={st.sysStyl}>{st.styl}</option>
+					{/each}
+				</select>
+			</div>
 		</div>
 
 		<form method="POST" action="?/ulozit">
