@@ -510,7 +510,7 @@ test('zimná záhrada: odobratie posuvu zachová správne indexy a prepne späť
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('editor: dropdown „Systém · štýl" naviguje a načíta offsety správneho štýlu', async ({
+test('editor: výber systému (Systém → Štýl) naviguje a načíta offsety správneho systému', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -519,8 +519,8 @@ test('editor: dropdown „Systém · štýl" naviguje a načíta offsety správn
 	const sklo = page.getByLabel('Sklo — konečné zmenšenie (mm)');
 	const robustOff = await sklo.inputValue();
 
-	// prepnutie cez dropdown naviguje na iný štýl a načíta jeho offsety
-	await page.getByLabel('Systém · štýl').selectOption('Slide|2K');
+	// #518: dvojkrok — výber SYSTÉMU naviguje na prvý štýl toho systému a načíta jeho offsety
+	await page.getByLabel('Systém').selectOption('Slide');
 	await page.waitForURL(/sysStyl=Slide/);
 	await waitHydrated(page);
 	const slideOff = await sklo.inputValue();
