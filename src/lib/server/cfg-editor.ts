@@ -234,7 +234,10 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		const skloStara = skloByDim.get(r.dim);
 		// sklo ho práve sledovalo (rovný štýl) → drž v synchróne; inak nezávislé → nechaj tak
 		if (skloStara === undefined || skloStara !== r.offset) continue;
-		if (skloMirror.get(r.dim) === nova) continue; // už zaznamenané pre túto dim
+		// prvý zmenený rámový danej dim vyhráva → JEDEN auditovaný záznam, ktorý presne
+		// zodpovedá tomu, čo sa zapíše (deterministické; predtým last-wins zápis vs. viac
+		// audit záznamov, ak by štýl mal 2 rámový riadky tej istej dim s rôznymi novými hodnotami)
+		if (skloMirror.has(r.dim)) continue;
 		skloMirror.set(r.dim, nova);
 		zmeny.push({
 			pole: `Sklo ${r.dim === 'S' ? 'šírka' : 'výška'} (zrkadlené z „${r.nazov}")`,
