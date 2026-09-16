@@ -670,14 +670,16 @@ describe('runBackfill — orchestrácia', () => {
 		expect(s.ops[0]!.akcia).toBe('uploaded');
 	});
 
-	it('orderExists 403 + --live + upload zamietne neznámu OP → no-order (nie chyba), existenciaNeoverena 1', async () => {
+	it('orderExists 403 + --live + upload zamietne neznámu OP → no-order (nie chyba), errMsg surfacovaný (review 🟡)', async () => {
+		const log = vi.fn();
 		const d = deps({
 			orderExists: async () => {
 				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
 			},
 			uploadLines: vi.fn(async () => {
 				throw new Error('Odoo JSON-2 HTTP 404: objednávka neexistuje');
-			})
+			}),
+			log
 		});
 		const s = await runBackfill(
 			[row({ id: 1, op: 'OP17', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
@@ -690,6 +692,13 @@ describe('runBackfill — orchestrácia', () => {
 		expect(s.existenciaNeoverena).toBe(1);
 		expect(s.nahranych).toBe(0);
 		expect(s.ops[0]!.akcia).toBe('skip-no-order');
+		// review 🟡: masked upload chyba NESMIE ostať skrytá pod „Chýb: 0" — errMsg na opSum (CLI ⚠)
+		// + WARN log (nie info), aby genuine transport 5xx na existujúcej OP bola viditeľná.
+		expect(s.ops[0]!.error).toContain('404');
+		const warnUpload = log.mock.calls.filter(
+			(c) => c[0] === 'warn' && /zamietnut.*upload|upload.*→ no-order/i.test(String(c[1]))
+		);
+		expect(warnUpload).toHaveLength(1);
 	});
 
 	it('čítanie prejde (existencia + has-lines OK) → presná cesta ostáva, existenciaNeoverena 0', async () => {

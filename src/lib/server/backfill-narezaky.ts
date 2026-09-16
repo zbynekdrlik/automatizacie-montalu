@@ -504,11 +504,14 @@ export async function runBackfill(
 			const errMsg = e instanceof Error ? e.message : String(e);
 			if (precheckUnverified) {
 				// #524 R2: existencia nebola overená → upload zamietol → objednávka pravdepodobne
-				// neexistuje. Mapuj na no-order (nie chyba); chybová správa ostáva v logu.
+				// neexistuje. Mapuj na no-order (nie chyba). Review 🟡: log na WARN + errMsg na opSum,
+				// aby genuine transport chyba (5xx/timeout) na REÁLNE existujúcej OP NEostala skrytá
+				// pod „Chýb: 0" — operátor ju vidí v CLI (⚠ pri riadku OP) aj v server WARN logu.
 				opSum.akcia = 'skip-no-order';
+				opSum.error = errMsg;
 				summary.skipNoOrder++;
 				summary.existenciaNeoverena++;
-				log('info', 'backfill: neoverená OP zamietnutá uploadom → no-order', {
+				log('warn', 'backfill: neoverená OP zamietnutá uploadom → no-order', {
 					op,
 					docId,
 					err: errMsg
