@@ -3,7 +3,7 @@ paths:
   - 'src/lib/qr-zakazka.ts'
   - 'src/lib/components/QrZakazka.svelte'
   - 'src/lib/server/pdf-common.ts'
-  - 'src/lib/server/plan-rezov-pdf.ts'
+  - 'src/lib/server/narezak-pdf.ts'
   - 'src/lib/server/expedicia-pdf.ts'
   - 'tests/qr-zakazka.test.ts'
   - 'tests/pdf-qr.test.ts'
@@ -38,7 +38,8 @@ ho nevie odvodiť — vtedy STOP + otázka, nie dohad.
   print hlavičkách — near-cap route súbory (`zasklenia/+page.svelte`) tak nerastú o QR logiku.
 - `src/lib/server/pdf-common.ts::drawQrZakazkaPdf(page, payload, x, y, size)` — pre pdf-lib PDF
   (vektorové obdĺžniky z `buildQrMatrix`, biele pozadie + 4-modulová quiet zóna, riadok 0 HORE →
-  pdf-lib má počiatok vľavo-dole). Volajú `plan-rezov-pdf.ts` + `expedicia-pdf.ts`.
+  pdf-lib má počiatok vľavo-dole). Volajú `narezak-pdf.ts` (kiosk nárezák, #529 nahradil
+  `plan-rezov-pdf.ts`) + `expedicia-pdf.ts`.
 - `src/lib/server/zakazka-ceny.ts::zakazkaOp(zak)` — OP najnovšieho odpisu, live-first (extrahované
   z `odoo-glass-order-upload.ts`). Reuse pri objednávke skla (`[zak]/+page.server.ts` load), aby QR
   na podklade viedol na TÚ ISTÚ `sale.order` ako nahraná `glass_order`.

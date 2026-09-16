@@ -51,6 +51,23 @@ znovu-dopočítanú Money metráž `{kod→qty}` proti uloženej `odpis_polozky`
 `contentHash` na profilových kódoch; kovanie navyše ignorované). Nezhoda → `poznamka`. CAD moduly
 nikdy nedriftnú (rezy = surový CAD).
 
+## GRAFICKÝ nárezák PDF pripnutý k backfill uploadu (#529)
+
+Backfill teraz pripne k tomu istému `montalu_narezak_upload` aj **grafický nárezák PDF** (tyče
+kreslené s rezmi/uhlami/odpadom/obrázkami — `narezak-pdf.ts`), aby odpisové zákazky videli na kiosku
+to isté čo výtlačok appky (nie len textové `lines`).
+
+- `mapOdpisToLines` vracia navyše `material: MaterialRow[]` s tyčami. **Zasklenia** (recompute)
+  posiela svoj plný `MaterialRow[]` (tyče/uhly/kódy/obrázky priamo). **Sietka/clip/CAD** nemajú
+  vlastné tyče → synthesizujú sa cez `materialRowsFromRozpis` (FFD `ffdPack`, `barLen=BAR` 7500,
+  `sikmyRez=false` — rezy presné, dĺžka tyče orientačná; `kod` sa zachová pre sietku → obrázok).
+- `runBackfill` skombinuje `material` VŠETKÝCH modulov OP → JEDEN PDF, pošle `pdf_base64` + `filename`
+  (`Narezak-<zak>-<stamp>.pdf`). **Best-effort:** keď generovanie PDF zlyhá, pošlú sa len `lines`
+  (endpoint PDF nevyžaduje, #6517). PDF sa generuje LEN v `--live` behu (nie dry-run).
+- Idempotencia PDF: doc_id `backfill-narezak-<op>` verziuje tú istú prílohu (nová verzia, neduplikuje).
+- v2 payload (`narezak_v2`) sa pri backfille pridá za flagom `ODOO_NAREZ_LINES_V2=1` (default OFF) —
+  viď `plan-rezov-kiosk.md` „v2 payload groundwork".
+
 ## Idempotencia + bezpečnosť
 
 - **Grupuje sa PER OP**, nie per modul: Odoo `lines` upload NAHRADÍ VŠETKY `montalu.rozpis.line` na

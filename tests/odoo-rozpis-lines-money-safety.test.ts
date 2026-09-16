@@ -1,5 +1,5 @@
 // #522: `buildRozpisLines` je Money-NEUTRÁLNY — `lines` posielané na kiosk nesmú niesť žiadnu
-// cenu (leak cutterovi). Source-guard + DATA-FLOW guard (vzor `plan-rezov-pdf.test.ts` #511):
+// cenu (leak cutterovi). Source-guard + DATA-FLOW guard (vzor `narezak-pdf.test.ts` #511):
 // zdrojový guard chytí IMPORT/identifikátor leak vektory, data-flow guard chytí cenu v dátach aj
 // po budúcej zmene mapovača (silnejší — mapper môže do `lines` dať len to, čo je v type).
 //

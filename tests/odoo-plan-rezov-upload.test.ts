@@ -1,9 +1,12 @@
 // #511: upload skutočného plánu rezov na kiosk (sale.order) cez montalu_narezak_upload.
 // Mock Odoo transport (setJson2Transport) ZACHYTÍ upload — overuje kontrakt: kind='narezak',
-// doc_id 'plan-rezov-<zak>-<op>', filename 'Plan-rezov-…', PDF prítomné. Money-neutrálne.
+// doc_id 'plan-rezov-<zak>-<op>', filename 'Narezak-…', PDF prítomné. Money-neutrálne.
+//
+// #529: PDF je odteraz GRAFICKÝ nárezák (`narezak-pdf.ts`) — tyče kreslené s rezmi/uhlami/odpadom/
+// obrázkami profilov, nie starý textový plan-rezov-pdf.
 //
 // Mocky obchádzajú native better-sqlite3 (money.ts → db.ts, zakazka-ceny.ts → db.ts) — plan-rezov
-// compute + plan-rezov-pdf + odoo-json2 sú čisté, bežia naostro (vzor odoo-narezak-upload.test.ts).
+// compute + narezak-pdf + odoo-json2 sú čisté, bežia naostro (vzor odoo-narezak-upload.test.ts).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
 // normZak mock == real (`money.ts` normZak = trim+upper+strip-ws); normOp mock líši sa od reálneho
@@ -103,7 +106,7 @@ describe('uploadPlanRezovToOdoo', () => {
 		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('missing');
 	});
 
-	it('uploaded — mock transport zachytí narezak upload s plan-rezov doc_id + Plan-rezov filename + PDF', async () => {
+	it('uploaded — mock transport zachytí narezak upload s plan-rezov doc_id + Narezak filename + PDF', async () => {
 		enableEnv();
 		vi.mocked(zakazkaPrehlad).mockReturnValue({
 			zak: 'ZAK123',
@@ -125,7 +128,7 @@ describe('uploadPlanRezovToOdoo', () => {
 		expect(cap.body.order_number).toBe('OP260439');
 		expect(cap.body.kind).toBe('narezak');
 		expect(cap.body.doc_id).toBe('plan-rezov-zak123-op260439');
-		expect(String(cap.body.filename)).toMatch(/^Plan-rezov-ZAK123-\d{8}-\d{4}\.pdf$/);
+		expect(String(cap.body.filename)).toMatch(/^Narezak-ZAK123-\d{8}-\d{4}\.pdf$/);
 		// PDF prítomné a je to naozaj PDF (base64 → %PDF)
 		const pdf = Buffer.from(String(cap.body.pdf_base64), 'base64');
 		expect(pdf.slice(0, 5).toString('latin1')).toBe('%PDF-');
@@ -143,6 +146,33 @@ describe('uploadPlanRezovToOdoo', () => {
 			},
 			{ kod: '', nazov: 'LAT 80x19', mnozstvo: 4, mj: 'ks', dlzka: 1.865, poznamka: '' }
 		]);
+		// #529: v2 payload je za flagom (default OFF) → nesmie sa poslať
+		expect(cap.body).not.toHaveProperty('narezak_v2');
+	});
+
+	it('#529: flag ON → payload nesie narezak_v2 (tyče/uhly/odpad + sumár); OFF → nie', async () => {
+		enableEnv();
+		vi.stubEnv('ODOO_NAREZ_LINES_V2', '1');
+		vi.mocked(zakazkaPrehlad).mockReturnValue({
+			zak: 'ZAK123',
+			zakaznik: 'Firma s.r.o.',
+			odpisy: [{ op: 'OP260439' }]
+		} as never);
+
+		let captured: Record<string, unknown> | null = null;
+		setJson2Transport(async (_url, opts) => {
+			captured = JSON.parse(String((opts as RequestInit).body));
+			return new Response(JSON.stringify({}), { status: 200 });
+		});
+
+		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('uploaded');
+		expect(captured).not.toBeNull();
+		const body = captured!;
+		const v2 = body.narezak_v2 as { lines: unknown[]; sumar: unknown[] };
+		expect(v2).toBeDefined();
+		expect(Array.isArray(v2.lines)).toBe(true);
+		expect(v2.lines.length).toBeGreaterThan(0);
+		expect(Array.isArray(v2.sumar)).toBe(true);
 	});
 
 	it('#522: lines idú spolu s PDF v tom istom volaní a re-export používa TEN ISTÝ doc_id (idempotencia)', async () => {
