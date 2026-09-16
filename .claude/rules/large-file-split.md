@@ -140,3 +140,19 @@ behavior change. The mechanics:
   A `.sec .badge` override copied into only ONE child silently dropped the badge on
   the others — put shared component CSS in `app.css`, not per-child (review 🟡, fixed
   in #239's own review, commit 2e6c285).
+
+## Extrahovanie route kódu do `src/lib` EXPONUJE predtým-nemerané vetvy coverage gate-u (#524)
+
+Coverage `include` je `src/lib/**/*.ts` (`vite.config.ts`) — `src/routes/**` (aj `+page.server.ts`)
+sa vitestom NEMERIA (route logika je krytá LEN E2E, ktoré do vitest coverage nerátajú). Keď PURE-MOVE
+presunie route-private funkciu (napr. `skloPre`, `compute`) z route do `src/lib/server/*.ts`, tá istá
+logika sa zrazu OCITNE v coverage menovateli — a jej vetvy, ktoré kryl len E2E (SKLO_INE vlastná
+skladba, sietka/kolajnica non-null, error návraty), padnú do „uncovered" a **znížia GLOBÁLNY branch
+prah** (`#524`: extrakcia `zasklenia-sklo.ts` zhodila branches z ~90,5 % na 87,8 % → `ERROR: does not
+meet global threshold (88%)`).
+
+**Pri každej route→`src/lib` extrakcii pridaj VITEST unit testy pre presunuté vetvy** (nie len E2E) —
+najmä sklo-rozlíšenie (katalóg/SKLO_INE/neplatné), default-param vetvy (`cfg = loadCfg()`), a
+error/null návraty. Extrahovaný modul testuj PRIAMO (`tests/<modul>.test.ts`), nie len cez route.
+Over subset coverage (`npx vitest run --coverage tests/<modul>.test.ts …` → per-file `% Branch` +
+`Uncovered Line #s`) PRED plným behom (plný `--coverage --no-file-parallelism` je ~10–14 min serial).

@@ -70,7 +70,7 @@ export interface CadActionOpts extends CadJobOpts {
 // #156 review nález: surový vložený CAD text v `detail` histórie je bound-ovaný proti
 // patologicky veľkému vstupu; `vstup.cad` použitý na prepočet ostáva celý. Predtým žil
 // DVAKRÁT (pergola route + fix-cad.ts) — teraz RAZ tu (#393).
-const CAD_DETAIL_MAX = 20000;
+export const CAD_DETAIL_MAX = 20000;
 
 function parseCadVstup(form: FormData): CadVstup {
 	return {

@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { spocitajPlanRezov, type PlanRezovVysledok } from '../src/lib/server/plan-rezov';
 import { parsePlanRezov as parse } from '../src/lib/server/plan-rezov-vstup';
-import { buildRozpisLines } from '../src/lib/server/odoo-rozpis-lines';
+import { buildRozpisLines, rozpisLinesFromMaterial } from '../src/lib/server/odoo-rozpis-lines';
 
 function vysledokZCad(cad: string, dlzkaTyce = 6000, reznaMedzera = 4): PlanRezovVysledok {
 	const { riadky, preskocene } = parse(cad);
@@ -67,5 +67,30 @@ describe('buildRozpisLines — mapovanie PlanRezovVysledok → montalu.rozpis.li
 		expect(lines).toEqual([
 			{ kod: '', nazov: 'PROFIL W', mnozstvo: 2, mj: 'ks', dlzka: 3, poznamka: '' }
 		]);
+	});
+});
+
+describe('rozpisLinesFromMaterial (jadro) — poznamka + rez.ks guard', () => {
+	it('poznamka sa pripíše KAŽDÉMU riadku (#524 „spätne dopočítané")', () => {
+		const lines = rozpisLinesFromMaterial(
+			[{ nazov: 'P', rezy: [{ rozmer: 2000, ks: 2 }] }],
+			'note-X'
+		);
+		expect(lines).toEqual([
+			{ kod: '', nazov: 'P', mnozstvo: 2, mj: 'ks', dlzka: 2, poznamka: 'note-X' }
+		]);
+	});
+
+	it('rez s ks <= 0 sa preskočí (guard)', () => {
+		const lines = rozpisLinesFromMaterial([
+			{
+				nazov: 'P',
+				rezy: [
+					{ rozmer: 2000, ks: 0 },
+					{ rozmer: 3000, ks: 2 }
+				]
+			}
+		]);
+		expect(lines).toEqual([{ kod: '', nazov: 'P', mnozstvo: 2, mj: 'ks', dlzka: 3, poznamka: '' }]);
 	});
 });

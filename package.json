@@ -1,7 +1,7 @@
 {
 	"name": "automatizacie-montalu",
 	"private": true,
-	"version": "0.25.19",
+	"version": "0.25.20",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -13,7 +13,8 @@
 		"lint": "eslint . && prettier --check .",
 		"format": "prettier --write .",
 		"test": "vitest run --coverage",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"backfill:narezaky": "node scripts/backfill-narezaky-cli.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
