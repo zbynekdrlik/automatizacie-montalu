@@ -275,7 +275,13 @@ export interface BackfillOptions {
 }
 
 export type OpAkcia =
-	'uploaded' | 'dry-run' | 'skip-no-order' | 'skip-has-lines' | 'skip-no-lines' | 'error';
+	| 'uploaded'
+	| 'dry-run'
+	| 'dry-run-neoverena' // #524 R2: dry-run „poslal by", ale existenciu sa nepodarilo overiť (Odoo read 403)
+	| 'skip-no-order'
+	| 'skip-has-lines'
+	| 'skip-no-lines'
+	| 'error';
 
 export interface BackfillOpSummary {
 	op: string;
@@ -297,6 +303,9 @@ export interface BackfillSummary {
 	skipNoLines: number;
 	skipPergolaRezervacia: number;
 	skipUnreconstructable: number;
+	/** #524 R2: OP, ktorých existenciu sa nepodarilo overiť (Odoo read 403/AccessError), a napriek
+	 *  tomu boli spracované (dry-run: „poslal by"; live: upload/no-order podľa odpovede endpointu). */
+	existenciaNeoverena: number;
 	driftOp: number;
 	chyb: number;
 	ops: BackfillOpSummary[];
@@ -355,6 +364,7 @@ export async function runBackfill(
 		skipNoLines: 0,
 		skipPergolaRezervacia: 0,
 		skipUnreconstructable: 0,
+		existenciaNeoverena: 0,
 		driftOp: 0,
 		chyb: 0,
 		ops: []

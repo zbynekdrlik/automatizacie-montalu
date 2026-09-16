@@ -608,26 +608,38 @@ describe('runBackfill — orchestrácia', () => {
 		expect(s.ops[0]!.akcia).toBe('error');
 	});
 
-	it('orderExists hodí → error, žiadny upload', async () => {
+	// #524 R2: tolerantná pre-check — Odoo READ (orderExists/orderHasLines) môže byť zamietnutý
+	// 403/AccessError (uid 524 nemá read na sale.order). Read zlyhá → existencia NEZNÁMA,
+	// NEZAPOČÍTA sa ako chyba; dry-run vypíše „existencia neoverená" a spracuje ako would-send,
+	// live nechá rozhodnúť endpoint (unknown order → no-order, nie chyba). Presná cesta ostáva
+	// keď read prejde. Nahrádza pôvodné „orderExists/orderHasLines hodí → error" (contract R2).
+	it('orderExists 403 (read blokovaný) → dry-run: existencia neoverená, „poslal by", 0 chýb, has-lines sa NEčíta', async () => {
+		const orderHasLines = vi.fn(async () => false);
 		const d = deps({
 			orderExists: async () => {
-				throw new Error('Odoo read 500');
-			}
+				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
+			},
+			orderHasLines
 		});
 		const s = await runBackfill(
 			[row({ id: 1, op: 'OP10', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
 			d,
 			{ dryRun: true }
 		);
-		expect(d.uploadLines).not.toHaveBeenCalled();
-		expect(s.chyb).toBe(1);
-		expect(s.ops[0]!.akcia).toBe('error');
+		expect(d.uploadLines).not.toHaveBeenCalled(); // dry-run nič neposiela
+		// pri neznámej existencii sa has-lines read NEskúša (opäť by 403-lo)
+		expect(orderHasLines).not.toHaveBeenCalled();
+		expect(s.chyb).toBe(0); // 403 read NIE je chyba
+		expect(s.existenciaNeoverena).toBe(1);
+		expect(s.nahranych).toBe(1); // „poslal by"
+		expect(s.riadkovSpolu).toBe(1);
+		expect(s.ops[0]!.akcia).toBe('dry-run-neoverena');
 	});
 
-	it('orderHasLines hodí → error', async () => {
+	it('orderHasLines 403 (existencia OK, has-lines read blokovaný) → dry-run-neoverena, 0 chýb', async () => {
 		const d = deps({
 			orderHasLines: async () => {
-				throw new Error('Odoo read 500');
+				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError montalu.rozpis.line');
 			}
 		});
 		const s = await runBackfill(
@@ -635,7 +647,84 @@ describe('runBackfill — orchestrácia', () => {
 			d,
 			{ dryRun: true }
 		);
-		expect(s.chyb).toBe(1);
+		expect(s.chyb).toBe(0);
+		expect(s.existenciaNeoverena).toBe(1);
+		expect(s.ops[0]!.akcia).toBe('dry-run-neoverena');
+	});
+
+	it('orderExists 403 + --live + upload prejde → uploaded (existenciu potvrdil upload), existenciaNeoverena 1, 0 chýb', async () => {
+		const d = deps({
+			orderExists: async () => {
+				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
+			}
+		});
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP16', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(d.uploadLines).toHaveBeenCalledTimes(1);
+		expect(s.nahranych).toBe(1);
+		expect(s.existenciaNeoverena).toBe(1);
+		expect(s.chyb).toBe(0);
+		expect(s.ops[0]!.akcia).toBe('uploaded');
+	});
+
+	it('orderExists 403 + --live + upload zamietne neznámu OP → no-order (nie chyba), existenciaNeoverena 1', async () => {
+		const d = deps({
+			orderExists: async () => {
+				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
+			},
+			uploadLines: vi.fn(async () => {
+				throw new Error('Odoo JSON-2 HTTP 404: objednávka neexistuje');
+			})
+		});
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP17', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(d.uploadLines).toHaveBeenCalledTimes(1);
+		expect(s.chyb).toBe(0); // neznáma OP zamietnutá endpointom → no-order, NIE chyba
+		expect(s.skipNoOrder).toBe(1);
+		expect(s.existenciaNeoverena).toBe(1);
+		expect(s.nahranych).toBe(0);
+		expect(s.ops[0]!.akcia).toBe('skip-no-order');
+	});
+
+	it('čítanie prejde (existencia + has-lines OK) → presná cesta ostáva, existenciaNeoverena 0', async () => {
+		const d = deps();
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP18', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: true }
+		);
+		expect(s.existenciaNeoverena).toBe(0);
+		expect(s.ops[0]!.akcia).toBe('dry-run');
+	});
+
+	it('read 403 sa loguje RAZ za beh (nie per OP), obe OP spracované', async () => {
+		const log = vi.fn();
+		const d = deps({
+			orderExists: async () => {
+				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
+			},
+			log
+		});
+		const s = await runBackfill(
+			[
+				row({ id: 1, op: 'OP19', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) }),
+				row({ id: 2, op: 'OP20', modul: 'pergola', detail: JSON.stringify({ cad: CAD_B }) })
+			],
+			d,
+			{ dryRun: true }
+		);
+		expect(s.existenciaNeoverena).toBe(2); // obe OP spracované, žiadna nespadla na chybu
+		expect(s.chyb).toBe(0);
+		const warnReadBlocked = log.mock.calls.filter(
+			(c) => c[0] === 'warn' && /neoveren|zamietnut|403/i.test(String(c[1]))
+		);
+		expect(warnReadBlocked).toHaveLength(1); // raz za beh, nie 2×
 	});
 
 	it('modul mimo záberu (bazen) sa odfiltruje — žiadna objednávka', async () => {
