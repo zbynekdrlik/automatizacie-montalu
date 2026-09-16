@@ -80,6 +80,9 @@ console.log(`Skip — už má riadky:   ${s.skipHasLines}`);
 console.log(`Skip — bez riadkov:    ${s.skipNoLines}`);
 console.log(`Skip — pergola rezerv: ${s.skipPergolaRezervacia}`);
 console.log(`Skip — nerekonštr.:    ${s.skipUnreconstructable}`);
+// #524 R2: OP, ktorých existenciu nešlo overiť (Odoo read 403) — dry-run ich ukázal ako „poslal by",
+// live ich buď nahral (endpoint OP potvrdil) alebo mapoval na „bez objednávky".
+console.log(`Existencia neover.(403):${s.existenciaNeoverena ?? 0}`);
 console.log(`Spätne dopočítané OP:  ${s.driftOp}`);
 console.log(`Chýb:                  ${s.chyb}`);
 console.log('');

@@ -275,7 +275,13 @@ export interface BackfillOptions {
 }
 
 export type OpAkcia =
-	'uploaded' | 'dry-run' | 'skip-no-order' | 'skip-has-lines' | 'skip-no-lines' | 'error';
+	| 'uploaded'
+	| 'dry-run'
+	| 'dry-run-neoverena' // #524 R2: dry-run „poslal by", ale existenciu sa nepodarilo overiť (Odoo read 403)
+	| 'skip-no-order'
+	| 'skip-has-lines'
+	| 'skip-no-lines'
+	| 'error';
 
 export interface BackfillOpSummary {
 	op: string;
@@ -297,6 +303,9 @@ export interface BackfillSummary {
 	skipNoLines: number;
 	skipPergolaRezervacia: number;
 	skipUnreconstructable: number;
+	/** #524 R2: OP, ktorých existenciu sa nepodarilo overiť (Odoo read 403/AccessError), a napriek
+	 *  tomu boli spracované (dry-run: „poslal by"; live: upload/no-order podľa odpovede endpointu). */
+	existenciaNeoverena: number;
 	driftOp: number;
 	chyb: number;
 	ops: BackfillOpSummary[];
@@ -355,6 +364,7 @@ export async function runBackfill(
 		skipNoLines: 0,
 		skipPergolaRezervacia: 0,
 		skipUnreconstructable: 0,
+		existenciaNeoverena: 0,
 		driftOp: 0,
 		chyb: 0,
 		ops: []
@@ -362,6 +372,20 @@ export async function runBackfill(
 
 	// stabilné poradie (podľa OP) pre reprodukovateľný dry-run výpis
 	const orderNumbers = [...perOp.keys()].sort();
+
+	// #524 R2: Odoo READ (existencia/has-lines) môže byť zamietnutý 403/AccessError (uid 524 nemá
+	// read na sale.order). DÔVOD zaloguj RAZ za beh (nie 48× rovnaký warn), potom pokračuj tolerantne
+	// — read zlyhanie NIE je chyba, existencia sa berie ako NEZNÁMA a endpoint rozhodne pri uploade.
+	let readBlockLogged = false;
+	const noteReadBlocked = (phase: string, op: string, err: string): void => {
+		if (readBlockLogged) return;
+		readBlockLogged = true;
+		log(
+			'warn',
+			'backfill: Odoo čítanie zamietnuté — existencia neoverená, pokračujem (endpoint rozhodne)',
+			{ phase, op, reason: err }
+		);
+	};
 
 	for (const op of orderNumbers) {
 		const g = perOp.get(op)!;
@@ -373,19 +397,19 @@ export async function runBackfill(
 			akcia: 'dry-run'
 		};
 
-		// read-only existenčné kontroly (bežia aj v dry-rune)
-		let exists: boolean;
+		// read-only existenčné kontroly (bežia aj v dry-rune). #524 R2: keď READ zlyhá (403/
+		// AccessError, alebo akékoľvek zlyhanie čítania) → existencia NEZNÁMA, NIE chyba —
+		// pokračuj a nechaj rozhodnúť endpoint pri uploade (dry-run: „poslal by"; live: no-order).
+		let precheckUnverified = false;
+
+		let exists = true; // default keď neznáme: pokračuj (nedávaj skip-no-order)
 		try {
 			exists = await deps.orderExists(op);
 		} catch (e) {
-			opSum.akcia = 'error';
-			opSum.error = e instanceof Error ? e.message : String(e);
-			summary.chyb++;
-			log('error', 'backfill: orderExists zlyhal', { op, err: opSum.error });
-			summary.ops.push(opSum);
-			continue;
+			precheckUnverified = true;
+			noteReadBlocked('orderExists', op, e instanceof Error ? e.message : String(e));
 		}
-		if (!exists) {
+		if (!precheckUnverified && !exists) {
 			opSum.akcia = 'skip-no-order';
 			summary.skipNoOrder++;
 			log('info', 'backfill skip: objednávka v Odoo neexistuje', { op });
@@ -393,18 +417,18 @@ export async function runBackfill(
 			continue;
 		}
 
-		let hasLines: boolean;
-		try {
-			hasLines = await deps.orderHasLines(op);
-		} catch (e) {
-			opSum.akcia = 'error';
-			opSum.error = e instanceof Error ? e.message : String(e);
-			summary.chyb++;
-			log('error', 'backfill: orderHasLines zlyhal', { op, err: opSum.error });
-			summary.ops.push(opSum);
-			continue;
+		// has-lines číta LEN keď existencia bola overená — pri neznámej existencii by to isté
+		// read-právo (order_id.name → sale.order) 403-lo znova; ber has-lines tiež ako neznáme.
+		let hasLines = false;
+		if (!precheckUnverified) {
+			try {
+				hasLines = await deps.orderHasLines(op);
+			} catch (e) {
+				precheckUnverified = true;
+				noteReadBlocked('orderHasLines', op, e instanceof Error ? e.message : String(e));
+			}
 		}
-		if (hasLines) {
+		if (!precheckUnverified && hasLines) {
 			opSum.akcia = 'skip-has-lines';
 			summary.skipHasLines++;
 			log('info', 'backfill skip: objednávka už má riadky (additive)', { op });
@@ -447,13 +471,17 @@ export async function runBackfill(
 		opSum.docId = docId;
 
 		if (opts.dryRun) {
-			opSum.akcia = 'dry-run';
+			// #524 R2: keď existenciu nemožno overiť (read 403), OP je stále would-send, ale pod
+			// vlastnou akciou/počítadlom „existencia neoverená".
+			opSum.akcia = precheckUnverified ? 'dry-run-neoverena' : 'dry-run';
+			if (precheckUnverified) summary.existenciaNeoverena++;
 			summary.nahranych++;
 			summary.riadkovSpolu += combined.length;
 			log('info', 'backfill DRY-RUN: poslal by riadky', {
 				op,
 				docId,
 				riadkov: combined.length,
+				neoverena: precheckUnverified,
 				moduly: opSum.moduly
 			});
 			summary.ops.push(opSum);
@@ -465,12 +493,35 @@ export async function runBackfill(
 			opSum.akcia = 'uploaded';
 			summary.nahranych++;
 			summary.riadkovSpolu += combined.length;
-			log('info', 'backfill: nahrané riadky', { op, docId, riadkov: combined.length });
+			if (precheckUnverified) summary.existenciaNeoverena++; // upload existenciu potvrdil
+			log('info', 'backfill: nahrané riadky', {
+				op,
+				docId,
+				riadkov: combined.length,
+				neoverena: precheckUnverified
+			});
 		} catch (e) {
-			opSum.akcia = 'error';
-			opSum.error = e instanceof Error ? e.message : String(e);
-			summary.chyb++;
-			log('error', 'backfill: upload zlyhal', { op, docId, err: opSum.error });
+			const errMsg = e instanceof Error ? e.message : String(e);
+			if (precheckUnverified) {
+				// #524 R2: existencia nebola overená → upload zamietol → objednávka pravdepodobne
+				// neexistuje. Mapuj na no-order (nie chyba). Review 🟡: log na WARN + errMsg na opSum,
+				// aby genuine transport chyba (5xx/timeout) na REÁLNE existujúcej OP NEostala skrytá
+				// pod „Chýb: 0" — operátor ju vidí v CLI (⚠ pri riadku OP) aj v server WARN logu.
+				opSum.akcia = 'skip-no-order';
+				opSum.error = errMsg;
+				summary.skipNoOrder++;
+				summary.existenciaNeoverena++;
+				log('warn', 'backfill: neoverená OP zamietnutá uploadom → no-order', {
+					op,
+					docId,
+					err: errMsg
+				});
+			} else {
+				opSum.akcia = 'error';
+				opSum.error = errMsg;
+				summary.chyb++;
+				log('error', 'backfill: upload zlyhal', { op, docId, err: errMsg });
+			}
 		}
 		summary.ops.push(opSum);
 		if (delayMs > 0) await sleep(delayMs);
@@ -486,6 +537,7 @@ export async function runBackfill(
 		skipNoLines: summary.skipNoLines,
 		skipPergolaRezervacia: summary.skipPergolaRezervacia,
 		skipUnreconstructable: summary.skipUnreconstructable,
+		existenciaNeoverena: summary.existenciaNeoverena,
 		driftOp: summary.driftOp,
 		chyb: summary.chyb
 	});
