@@ -2,6 +2,10 @@
 // Nahrádza starý odpis→rozpis narezak upload (`odoo-narezak-upload.ts`, zmazaný): rezač na kiosku
 // má vidieť plán rezov, NIE interné ceny. Interná mt_note s rozpisom+cenami (#340/#418) beží ďalej.
 //
+// #522: k tomu istému volaniu posielame aj `lines` (rozpis rezov → `montalu.rozpis.line`), aby
+// tablet „Čo rezať" vedel riadky odškrtávať. Riadky sa odvodzujú z TOHO ISTÉHO plánu ako PDF
+// (`buildRozpisLines`, `odoo-rozpis-lines.ts`) — jeden zdroj pravdy, Money-neutrálne.
+//
 // Fire-and-forget — zlyhanie NIKDY neblokuje uloženie plánu. Transport: /json/2 + bearer (odoo-json2.ts),
 // `sale.order.montalu_narezak_upload`, kind='narezak', xmlid-idempotentný doc_id (opätovné uloženie
 // prepíše prílohu, nezduplikuje). BEZ durable-retry — rovnako ako pôvodná narezak cesta bola čistý
@@ -17,6 +21,7 @@ import { normOp, normZak } from './money';
 import { zakazkaPrehlad } from './zakazka-ceny';
 import { parsePlanRezov } from './plan-rezov-vstup';
 import { spocitajPlanRezov } from './plan-rezov';
+import { buildRozpisLines } from './odoo-rozpis-lines';
 import {
 	generatePlanRezovPdfBase64,
 	planRezovPdfFilename,
@@ -135,12 +140,26 @@ export async function uploadPlanRezovToOdoo(
 		const docId = buildPlanRezovDocId(zak, op);
 		const filename = planRezovPdfFilename(zak, now);
 
+		// #522: `lines` = rozpis rezov (jednotlivé profily/tyče na narezanie) z TOHO ISTÉHO
+		// plánu ako PDF (jeden zdroj pravdy). Vznikajú z nich `montalu.rozpis.line` na tablete
+		// „Čo rezať". Money-neutrálne (bez cien, bez článkových kódov). Idempotentne cez doc_id:
+		// rovnaký doc_id → Odoo nahradí VŠETKY predchádzajúce riadky objednávky (verzia++).
+		const lines = buildRozpisLines(vysledok);
+		log.debug('plan-rezov upload: postavené lines rozpisu rezov', {
+			zak,
+			op,
+			orderNumber,
+			docId,
+			linesCount: lines.length
+		});
+
 		const uploadResult = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', {
 			order_number: orderNumber,
 			doc_id: docId,
 			kind: 'narezak',
 			filename,
-			pdf_base64: pdfBase64
+			pdf_base64: pdfBase64,
+			lines
 		});
 
 		log.info('plan-rezov upload: úspešne nahraný', {
@@ -148,6 +167,7 @@ export async function uploadPlanRezovToOdoo(
 			op,
 			orderNumber,
 			docId,
+			linesCount: lines.length,
 			result: uploadResult
 		});
 		return { result: 'uploaded' };
