@@ -172,4 +172,13 @@ describe('generatePlanRezovPdf — QR zákazky (#528)', () => {
 		expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-');
 		expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
 	});
+	it('veľmi dlhé meno zákazníka + OP → PDF sa vykreslí (hlavička sa zalomí vedľa QR, nie pod ním)', async () => {
+		const dlheMeno = {
+			...HEADER,
+			zakaznik: 'Veľmi Dlhý Názov Zákazníckej Firmy s Ručením Obmedzeným a Pobočkami s.r.o.'
+		};
+		const bytes = await generatePlanRezovPdf(dlheMeno, vysledok, NOW);
+		expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-');
+		expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+	});
 });

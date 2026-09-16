@@ -23,7 +23,10 @@ import {
 	wrapText,
 	ellipsize,
 	embedDejavu,
-	drawQrZakazkaPdf
+	drawQrZakazkaPdf,
+	qrZakazkaHeaderXY,
+	qrHeaderTextWidth,
+	qrHeaderBandBottom
 } from './pdf-common';
 import { qrZakazkaPayload } from '$lib/qr-zakazka';
 
@@ -36,7 +39,6 @@ const HEAD_BG = rgb(0.95, 0.96, 0.98);
 const FS_TITLE = 15;
 const FS_META = 9;
 const FS_SEC = 11;
-const QR_SIZE = 68; // ~24 mm @ 72dpi — QR zákazky v hlavičke (#528)
 const FS_ROW = 9;
 const LINE = 12;
 const ROW_PAD = 4;
@@ -267,8 +269,15 @@ function drawRow(ctx: Ctx, p: ExpedicnaPolozka): void {
 	});
 }
 
-function drawParagraph(ctx: Ctx, text: string, size: number, font: PDFFont, color = INK): void {
-	const lines = wrapText(font, text, size, CONTENT_W);
+function drawParagraph(
+	ctx: Ctx,
+	text: string,
+	size: number,
+	font: PDFFont,
+	color = INK,
+	maxWidth = CONTENT_W
+): void {
+	const lines = wrapText(font, text, size, maxWidth);
 	for (const ln of lines.length > 0 ? lines : ['']) {
 		ensureSpace(ctx, LINE);
 		ctx.page.drawText(ln, {
@@ -314,15 +323,19 @@ export async function generateExpediciaPdf(
 	// na Odoo kiosku. Kreslí sa LEN keď je OP zadané.
 	const qrPayload = qrZakazkaPayload(ident.op);
 	if (qrPayload) {
-		drawQrZakazkaPdf(ctx.page, qrPayload, A4_W - MARGIN - QR_SIZE, A4_H - MARGIN - QR_SIZE, QR_SIZE);
+		const qr = qrZakazkaHeaderXY();
+		drawQrZakazkaPdf(ctx.page, qrPayload, qr.x, qr.y, qr.size);
 	}
 	ctx.cursor -= FS_TITLE + 8;
+	// riadky hlavičky v QR pásme sa zalomia užšie, aby text nepretlačil QR (viď qrHeaderTextWidth)
+	const hw = () => qrHeaderTextWidth(!!qrPayload && ctx.cursor > qrHeaderBandBottom());
 	drawParagraph(
 		ctx,
 		`Zákazka: ${ident.zak}  ·  Objednávka: ${ident.op}  ·  Zákazník: ${ident.zakaznik}`,
 		FS_META,
 		reg,
-		INK
+		INK,
+		hw()
 	);
 	const stav = now.toLocaleString('sk-SK', { timeZone: 'Europe/Bratislava' });
 	drawParagraph(
@@ -330,7 +343,8 @@ export async function generateExpediciaPdf(
 		`Stav k ${stav}  ·  interné (zákazník toto nevidí)  ·  zdroj: automatizácie Montalu.`,
 		FS_META,
 		reg,
-		MUTED
+		MUTED,
+		hw()
 	);
 	ctx.cursor -= 4;
 
@@ -344,7 +358,9 @@ export async function generateExpediciaPdf(
 			`${zoznam.pocetFixov} FIX  ·  ` +
 			`${zoznam.pocetTesneni} tesnení`,
 		FS_SEC,
-		bold
+		bold,
+		INK,
+		hw()
 	);
 	ctx.cursor -= 4;
 

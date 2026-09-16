@@ -3,7 +3,14 @@
 // plan-rezov-kiosk.md). Prázdny payload → nič sa nekreslí (výstup byte-identický).
 import { describe, it, expect, vi } from 'vitest';
 import type { PDFPage } from 'pdf-lib';
-import { drawQrZakazkaPdf } from '../src/lib/server/pdf-common';
+import {
+	drawQrZakazkaPdf,
+	qrZakazkaHeaderXY,
+	qrHeaderTextWidth,
+	A4_W,
+	MARGIN,
+	CONTENT_W
+} from '../src/lib/server/pdf-common';
 import { buildQrMatrix } from '../src/lib/qr-zakazka';
 
 function fakePage() {
@@ -61,5 +68,25 @@ describe('drawQrZakazkaPdf', () => {
 			expect(cx + w).toBeLessThanOrEqual(x + size + 1e-6);
 			expect(cy + h).toBeLessThanOrEqual(y + size + 1e-6);
 		}
+	});
+});
+
+// #528 review (correctness): text hlavičky (kreslený PO QR bielom pozadí) nikdy nesmie zasiahnuť pod
+// QR — inak by dlhé meno zákazníka pretlačilo QR moduly a sken by zlyhal. Toto je geometrický invariant
+// nezávislý od obsahu (silnejší než render-konkrétneho-mena): pravý okraj zalomeného textu hlavičky je
+// VŽDY vľavo od ľavého okraja QR.
+describe('QR header geometry — text nikdy nepretlačí QR', () => {
+	it('bez QR: plná šírka hlavičky (výstup nezmenený)', () => {
+		expect(qrHeaderTextWidth(false)).toBe(CONTENT_W);
+	});
+	it('s QR: pravý okraj textu hlavičky je vľavo od ľavého okraja QR (s medzerou)', () => {
+		const qr = qrZakazkaHeaderXY();
+		const textRight = MARGIN + qrHeaderTextWidth(true);
+		expect(textRight).toBeLessThan(qr.x);
+	});
+	it('QR sa celý zmestí do pravého horného rohu stránky', () => {
+		const qr = qrZakazkaHeaderXY();
+		expect(qr.x).toBeGreaterThanOrEqual(MARGIN);
+		expect(qr.x + qr.size).toBeLessThanOrEqual(A4_W - MARGIN + 1e-6);
 	});
 });
