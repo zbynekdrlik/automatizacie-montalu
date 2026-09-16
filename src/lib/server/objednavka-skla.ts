@@ -4,8 +4,17 @@
 import { db } from './db';
 import { normZak } from './money';
 import { logger } from './log';
+import {
+	GLASS_SPEC_OFF,
+	type GlassSpec,
+	type HoleSize,
+	type EdgeFinish
+} from './odoo-rozpis-lines';
 
 const log = logger('objednavka-skla');
+
+const HOLE_SIZES: readonly (HoleSize | '')[] = ['', 'd30', 'd50'];
+const EDGE_FINISHES: readonly EdgeFinish[] = ['none', 'ksr', 'trapez_brusena', 'trapez_lestena'];
 
 // ---- Typy (handoff kontrakt) ----------------------------------------------------------
 
@@ -27,6 +36,8 @@ export interface SkloPolozka {
 	sikmy: boolean;
 	m2: number | null;
 	rezim: 'rozmery' | 'atyp';
+	/** #521: voliteľná špecifikácia tabule pre Odoo IZOS oceňovanie (default vypnutá). */
+	spec: GlassSpec;
 	createdAt: string;
 	createdBy: string;
 }
@@ -146,9 +157,15 @@ export function pridajSklaHromadneIdempotentne(polozky: NoveSklo[]): number {
 	return pridane;
 }
 
+// #521: spec_* stĺpce v SELECT-e (rovnaké poradie ako v `mapRow`).
+const SPEC_SELECT =
+	'spec_warm_edge, spec_colored_frame, spec_muntin_cross_qty, spec_holes_qty, spec_hole_size, ' +
+	'spec_cutout_small_qty, spec_cutout_large_qty, spec_edge_finish, spec_hst, spec_tempering_own_glass';
+
 const stmtListPre = db.prepare(`
 	SELECT id, zak, zak_norm, op, modul, popis, sirka_mm, vyska_mm,
 	       v_lavo_mm, v_pravo_mm, pocet, typ_skla, sikmy, m2, rezim,
+	       ${SPEC_SELECT},
 	       created_at, created_by
 	FROM objednavka_skla
 	WHERE zak_norm = ? OR upper(replace(zak_norm,' ','')) = ?
@@ -171,6 +188,16 @@ interface SkloRow {
 	sikmy: number;
 	m2: number | null;
 	rezim: string;
+	spec_warm_edge: number;
+	spec_colored_frame: number;
+	spec_muntin_cross_qty: number;
+	spec_holes_qty: number;
+	spec_hole_size: string;
+	spec_cutout_small_qty: number;
+	spec_cutout_large_qty: number;
+	spec_edge_finish: string;
+	spec_hst: number;
+	spec_tempering_own_glass: number;
 	created_at: string;
 	created_by: string;
 }
@@ -198,8 +225,29 @@ function mapRow(r: SkloRow): SkloPolozka {
 		sikmy: r.sikmy === 1,
 		m2: r.m2,
 		rezim: r.rezim === 'atyp' ? 'atyp' : 'rozmery',
+		spec: mapSpec(r),
 		createdAt: r.created_at,
 		createdBy: r.created_by
+	};
+}
+
+/** SkloRow spec_* stĺpce → `GlassSpec` (INTEGER 0/1 → bool; neplatné texty → predvolené). */
+function mapSpec(r: SkloRow): GlassSpec {
+	const hole = HOLE_SIZES.includes(r.spec_hole_size as HoleSize) ? (r.spec_hole_size as HoleSize | '') : '';
+	const edge = EDGE_FINISHES.includes(r.spec_edge_finish as EdgeFinish)
+		? (r.spec_edge_finish as EdgeFinish)
+		: 'none';
+	return {
+		warmEdge: r.spec_warm_edge === 1,
+		coloredFrame: r.spec_colored_frame === 1,
+		muntinCrossQty: r.spec_muntin_cross_qty ?? 0,
+		holesQty: r.spec_holes_qty ?? 0,
+		holeSize: hole,
+		cutoutSmallQty: r.spec_cutout_small_qty ?? 0,
+		cutoutLargeQty: r.spec_cutout_large_qty ?? 0,
+		edgeFinish: edge,
+		hst: r.spec_hst === 1,
+		temperingOwnGlass: r.spec_tempering_own_glass === 1
 	};
 }
 
@@ -216,6 +264,54 @@ export function nastavRezim(id: number, rezim: 'rozmery' | 'atyp'): void {
 	stmtNastavRezim.run(rezim, id);
 	log.info('sklo rezim zmeneny', { id, rezim });
 }
+
+// #521: špecifikácia tabule (spec_* stĺpce). Neplatná hodnota = throw PRED zápisom (kontrakt
+// montalu-narezak-upload.md: neplatný počet/hrana = UserError) — server akcia to chytí → fail 400.
+const stmtNastavSpec = db.prepare(`
+	UPDATE objednavka_skla SET
+		spec_warm_edge = ?, spec_colored_frame = ?, spec_muntin_cross_qty = ?,
+		spec_holes_qty = ?, spec_hole_size = ?, spec_cutout_small_qty = ?,
+		spec_cutout_large_qty = ?, spec_edge_finish = ?, spec_hst = ?, spec_tempering_own_glass = ?
+	WHERE id = ?
+`);
+
+function nezapornyCely(x: number, pole: string): number {
+	if (!Number.isInteger(x) || x < 0) throw new Error(`Neplatný počet (${pole}): musí byť celé číslo >= 0.`);
+	return x;
+}
+
+/** Validuje `GlassSpec` (hodí Error na neplatnú hodnotu) — jediné miesto validácie spec vstupu. */
+export function validateSpec(spec: GlassSpec): void {
+	nezapornyCely(spec.muntinCrossQty, 'priečky');
+	nezapornyCely(spec.holesQty, 'otvory');
+	nezapornyCely(spec.cutoutSmallQty, 'výrezy 35×60');
+	nezapornyCely(spec.cutoutLargeQty, 'výrezy 60×120');
+	if (!HOLE_SIZES.includes(spec.holeSize)) throw new Error('Neplatný priemer otvoru.');
+	if (!EDGE_FINISHES.includes(spec.edgeFinish)) throw new Error('Neplatné opracovanie hrany.');
+}
+
+export function nastavSpec(id: number, spec: GlassSpec): void {
+	validateSpec(spec);
+	// otvory > 0 bez zvolenej triedy → default d30 (4–30 mm), aby Odoo nedefaultlo na d50
+	const holeSize = spec.holesQty > 0 ? (spec.holeSize === 'd50' ? 'd50' : 'd30') : '';
+	stmtNastavSpec.run(
+		spec.warmEdge ? 1 : 0,
+		spec.coloredFrame ? 1 : 0,
+		spec.muntinCrossQty,
+		spec.holesQty,
+		holeSize,
+		spec.cutoutSmallQty,
+		spec.cutoutLargeQty,
+		spec.edgeFinish,
+		spec.hst ? 1 : 0,
+		spec.temperingOwnGlass ? 1 : 0,
+		id
+	);
+	log.info('sklo spec zmenený', { id });
+}
+
+/** Predvolený (vypnutý) spec — re-export pre UI/akcie. */
+export { GLASS_SPEC_OFF };
 
 const stmtZmaz = db.prepare('DELETE FROM objednavka_skla WHERE id = ?');
 
