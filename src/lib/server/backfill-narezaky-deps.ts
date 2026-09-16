@@ -78,11 +78,20 @@ export function makeOdooBackfillDeps(
 			});
 			return arrLen(res) > 0;
 		},
-		uploadLines: async (op: string, docId: string, lines: RozpisLine[]) =>
+		uploadLines: async (
+			op: string,
+			docId: string,
+			lines: RozpisLine[],
+			pdfBase64?: string,
+			filename?: string
+		) =>
 			callJson2(odooCfg, 'sale.order', 'montalu_narezak_upload', {
 				order_number: normOp(op),
 				doc_id: docId,
 				kind: 'narezak',
+				// #529: pripni GRAFICKÝ nárezák PDF keď sa vygeneroval (endpoint PDF nevyžaduje —
+				// `has_pdf` je voliteľné pri `lines`, #6517). Idempotentne verziuje cez doc_id.
+				...(pdfBase64 ? { pdf_base64: pdfBase64, filename } : {}),
 				lines
 			}),
 		log

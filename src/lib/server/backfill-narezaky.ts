@@ -20,8 +20,11 @@
 // unit testy dodajú fake transport + fake rows bez native DB / bez PROD Odoo (vzor #522
 // `setJson2Transport`). CLI (`src/scripts/backfill-narezaky.ts`) zapojí reálne `callJson2` + SELECT.
 import { rozpisLinesFromMaterial, type RozpisLine, type RozpisMaterial } from './odoo-rozpis-lines';
-import type { Cfg } from './compute';
+import type { Cfg, Kus, MaterialRow } from './compute';
 import {
+	ffdPack,
+	BAR,
+	KOTUC,
 	sietkaSamostatnaVypocet,
 	sietkaSamostatnaMultiVypocet,
 	type SietkaSamostatnaKus
@@ -32,6 +35,7 @@ import { parseCad } from './pergola';
 import { CAD_DETAIL_MAX } from './cad-odpis';
 import { normOp, normZak, type Polozka } from './money';
 import type { Vstup, MultiVstup } from './vstup';
+import { generateNarezakPdfBase64, narezakPdfFilename, type NarezakPdfHeader } from './narezak-pdf';
 
 /** Surový riadok `odpis_log` potrebný pre backfill (vlastný SELECT — `listOdpisy` nevracia
  *  `content_hash`; `detail` je surový JSON string, parsuje sa tu). */
@@ -47,9 +51,9 @@ export interface OdpisBackfillRow {
 	created_at: string;
 }
 
-/** Výsledok namapovania JEDNÉHO odpisu na `lines`. */
+/** Výsledok namapovania JEDNÉHO odpisu na `lines` (+ `material` na GRAFICKÝ nárezák PDF, #529). */
 export type OdpisMapResult =
-	| { status: 'lines'; lines: RozpisLine[]; drift: boolean }
+	| { status: 'lines'; lines: RozpisLine[]; material: MaterialRow[]; drift: boolean }
 	| { status: 'skip'; reason: BackfillSkipReason };
 
 export type BackfillSkipReason =
@@ -87,11 +91,57 @@ export function driftVsStored(
 
 const spatneNote = (createdAt: string): string => `spätne dopočítané ${createdAt.slice(0, 10)}`;
 
-/** Postaví `lines` z materiálu + (voliteľného) drift-tagu; prázdny materiál → skip 'no-cut-list'. */
-function linesFrom(material: RozpisMaterial[], drift: boolean, createdAt: string): OdpisMapResult {
+/**
+ * #529: RozpisMaterial (nazov + agregované rezy) → `MaterialRow[]` s tyčami (FFD `ffdPack`) pre
+ * GRAFICKÝ nárezák PDF. Zrkadlí per-profil packing v `spocitajPlanRezov` (ffdPack + odpad +
+ * agregované rezy). Použité pre moduly BEZ vlastného MaterialRow s tyčami (sietka/clip/CAD);
+ * zasklenia posiela svoj plný `MaterialRow[]` priamo. `kod` sa zachová keď je (sietka), inak ''
+ * (bez obrázka). `barLen = BAR` (7500) — CAD/clip/sietka nemajú per-profil dĺžku tyče; rezy sú
+ * presné, dĺžka tyče orientačná. `sikmyRez=false` (uhly nesie len zasklenia MaterialRow).
+ */
+export function materialRowsFromRozpis(
+	material: { nazov: string; kod?: string; rezy: { rozmer: number; ks: number }[] }[],
+	barLen: number = BAR,
+	kerf: number = KOTUC
+): MaterialRow[] {
+	return material.map((m) => {
+		const kusy: Kus[] = [];
+		for (const r of m.rezy) {
+			if (!(r.ks > 0) || r.rozmer + kerf > barLen) continue;
+			for (let i = 0; i < r.ks; i++) kusy.push({ rozmer: r.rozmer, dlzka: r.rozmer });
+		}
+		const bary = ffdPack(kusy, barLen, kerf);
+		const tyce = bary.length;
+		const odpadMm = Math.round(bary.reduce((s, b) => s + b.zvysok, 0));
+		const odpadPct = tyce > 0 ? Math.round((odpadMm / (tyce * barLen)) * 1000) / 10 : 0;
+		return {
+			kod: m.kod ?? '',
+			nazov: m.nazov,
+			rezy: m.rezy.filter((r) => r.ks > 0),
+			tyce,
+			bary,
+			odpadMm,
+			odpadPct,
+			barLen,
+			sikmyRez: false
+		};
+	});
+}
+
+/**
+ * Postaví `lines` z materiálu + (voliteľného) drift-tagu; prázdny materiál → skip 'no-cut-list'.
+ * `barMaterial` = `MaterialRow[]` s tyčami pre grafický PDF (zasklenia posiela svoj plný, ostatné
+ * synthesizované cez `materialRowsFromRozpis` volajúcim).
+ */
+function linesFrom(
+	material: RozpisMaterial[],
+	barMaterial: MaterialRow[],
+	drift: boolean,
+	createdAt: string
+): OdpisMapResult {
 	const lines = rozpisLinesFromMaterial(material, drift ? spatneNote(createdAt) : '');
 	if (lines.length === 0) return { status: 'skip', reason: 'no-cut-list' };
-	return { status: 'lines', lines, drift };
+	return { status: 'lines', lines, material: barMaterial, drift };
 }
 
 /** clip `ClipRiadok[]` → materiál (len narezateľné riadky: rozmer + počet kusov). */
@@ -138,7 +188,8 @@ export function mapOdpisToLines(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
 						polozky
 					);
-					return linesFrom(r.material, drift, createdAt);
+					// sietka MaterialRow nemá tyče → synthesizuj (kod sa zachová pre obrázok)
+					return linesFrom(r.material, materialRowsFromRozpis(r.material), drift, createdAt);
 				}
 				if (detail.sietkaSamostatnaMulti === true) {
 					const kusy = (detail.kusy as SietkaSamostatnaKus[] | undefined) ?? [];
@@ -148,13 +199,10 @@ export function mapOdpisToLines(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
 						polozky
 					);
-					return linesFrom(
-						r.kusy.flatMap((k) => k.material),
-						drift,
-						createdAt
-					);
+					const mat = r.kusy.flatMap((k) => k.material);
+					return linesFrom(mat, materialRowsFromRozpis(mat), drift, createdAt);
 				}
-				// zimná záhrada (viac posuvov)
+				// zimná záhrada (viac posuvov) — plný MaterialRow[] s tyčami/uhlami/kódmi priamo
 				if (detail.multiZasklenie === true || detail.zimnaZahrada === true) {
 					const vstup = detail.vstupRaw as MultiVstup | undefined;
 					if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
@@ -164,9 +212,9 @@ export function mapOdpisToLines(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
 						polozky
 					);
-					return linesFrom(r.material, drift, createdAt);
+					return linesFrom(r.material, r.material, drift, createdAt);
 				}
-				// bežné jednoposuvové zasklenie
+				// bežné jednoposuvové zasklenie — plný MaterialRow[] s tyčami/uhlami/kódmi priamo
 				const vstup = detail.vstupRaw as Vstup | undefined;
 				if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
 				const { r } = recomputeVstup(vstup, cfg);
@@ -175,7 +223,7 @@ export function mapOdpisToLines(
 					r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
 					polozky
 				);
-				return linesFrom(r.material, drift, createdAt);
+				return linesFrom(r.material, r.material, drift, createdAt);
 			}
 
 			case 'clip': {
@@ -187,7 +235,8 @@ export function mapOdpisToLines(
 						v.polozky.map((p) => ({ kod: p.kod, qty: p.qty })),
 						polozky
 					);
-					return linesFrom(clipRiadkyToMaterial(v.kusy.flatMap((k) => k.riadky)), drift, createdAt);
+					const mat = clipRiadkyToMaterial(v.kusy.flatMap((k) => k.riadky));
+					return linesFrom(mat, materialRowsFromRozpis(mat), drift, createdAt);
 				}
 				const raw = detail.vstupRaw as Partial<ClipVstup> | undefined;
 				if (!raw) return { status: 'skip', reason: 'unreconstructable' };
@@ -196,7 +245,8 @@ export function mapOdpisToLines(
 					v.polozky.map((p) => ({ kod: p.kod, qty: p.qty })),
 					polozky
 				);
-				return linesFrom(clipRiadkyToMaterial(v.riadky), drift, createdAt);
+				const mat = clipRiadkyToMaterial(v.riadky);
+				return linesFrom(mat, materialRowsFromRozpis(mat), drift, createdAt);
 			}
 
 			case 'pergola':
@@ -219,7 +269,7 @@ export function mapOdpisToLines(
 					nazov: r.name,
 					rezy: [{ rozmer: r.cut_mm, ks: r.qty }]
 				}));
-				return linesFrom(material, false, createdAt);
+				return linesFrom(material, materialRowsFromRozpis(material), false, createdAt);
 			}
 
 			default:
@@ -261,7 +311,15 @@ export interface BackfillDeps {
 	loadPolozky: (odpisLogId: number) => Polozka[];
 	orderExists: (orderNumber: string) => Promise<boolean>;
 	orderHasLines: (orderNumber: string) => Promise<boolean>;
-	uploadLines: (orderNumber: string, docId: string, lines: RozpisLine[]) => Promise<unknown>;
+	/** #529: `pdfBase64`/`filename` = GRAFICKÝ nárezák PDF (voliteľné — keď generovanie zlyhalo,
+	 *  pošlú sa len `lines`, upload endpoint PDF nevyžaduje). */
+	uploadLines: (
+		orderNumber: string,
+		docId: string,
+		lines: RozpisLine[],
+		pdfBase64?: string,
+		filename?: string
+	) => Promise<unknown>;
 	log?: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 	sleep?: (ms: number) => Promise<void>;
 }
@@ -341,13 +399,16 @@ export async function runBackfill(
 	);
 
 	// grupuj per OP → per modul: posledný odpis vyhráva
-	const perOp = new Map<string, { zak: string; byModul: Map<string, OdpisBackfillRow> }>();
+	const perOp = new Map<
+		string,
+		{ zak: string; zakaznik: string; byModul: Map<string, OdpisBackfillRow> }
+	>();
 	for (const r of scoped) {
 		const op = normOp(r.op);
 		if (!op) continue;
 		let g = perOp.get(op);
 		if (!g) {
-			g = { zak: r.zak, byModul: new Map() };
+			g = { zak: r.zak, zakaznik: r.zakaznik, byModul: new Map() };
 			perOp.set(op, g);
 		}
 		const prev = g.byModul.get(r.modul);
@@ -438,6 +499,7 @@ export async function runBackfill(
 
 		// znovu-dopočítaj lines všetkých modulov OP a skombinuj
 		const combined: RozpisLine[] = [];
+		const combinedMaterial: MaterialRow[] = []; // #529: pre grafický nárezák PDF
 		let opDrift = false;
 		for (const [modul, r] of g.byModul) {
 			const res = mapOdpisToLines(r, deps.loadPolozky(r.id), deps.cfg);
@@ -453,6 +515,7 @@ export async function runBackfill(
 				continue;
 			}
 			combined.push(...res.lines);
+			combinedMaterial.push(...res.material);
 			opSum.moduly.push({ modul, riadkov: res.lines.length, drift: res.drift });
 			if (res.drift) opDrift = true;
 		}
@@ -488,8 +551,26 @@ export async function runBackfill(
 			continue;
 		}
 
+		// #529: GRAFICKÝ nárezák PDF z rekomputovaného materiálu (best-effort — keď zlyhá, pošlú sa
+		// len `lines`, endpoint PDF nevyžaduje). Generujeme LEN v live behu (nie dry-run — zbytočné).
+		let pdfBase64: string | undefined;
+		let filename: string | undefined;
 		try {
-			await deps.uploadLines(op, docId, combined);
+			const header: NarezakPdfHeader = { zak: g.zak || op, op, zakaznik: g.zakaznik };
+			const viacPosuvov = combinedMaterial.some((m) =>
+				m.bary.some((b) => b.kusy.some((k) => k.posuv != null))
+			);
+			pdfBase64 = await generateNarezakPdfBase64(header, combinedMaterial, { viacPosuvov });
+			filename = narezakPdfFilename(g.zak || op, new Date());
+		} catch (e) {
+			log('warn', 'backfill: generovanie nárezák PDF zlyhalo — pošlem len lines', {
+				op,
+				err: e instanceof Error ? e.message : String(e)
+			});
+		}
+
+		try {
+			await deps.uploadLines(op, docId, combined, pdfBase64, filename);
 			opSum.akcia = 'uploaded';
 			summary.nahranych++;
 			summary.riadkovSpolu += combined.length;
@@ -498,6 +579,7 @@ export async function runBackfill(
 				op,
 				docId,
 				riadkov: combined.length,
+				pdf: pdfBase64 != null,
 				neoverena: precheckUnverified
 			});
 		} catch (e) {

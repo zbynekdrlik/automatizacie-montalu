@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
 	mapOdpisToLines,
+	materialRowsFromRozpis,
 	backfillDocId,
 	driftVsStored,
 	runBackfill,
@@ -36,6 +37,46 @@ function row(over: Partial<OdpisBackfillRow>): OdpisBackfillRow {
 		...over
 	};
 }
+
+describe('materialRowsFromRozpis (#529 — FFD tyče pre grafický PDF)', () => {
+	it('agregované rezy → MaterialRow[] s tyčami zabalenými cez ffdPack', () => {
+		// 5× 2000 mm na 6000 mm tyč (kerf 4) = 2 kusy/tyč (2000+2000+kerf ≤ 6000, 3. sa nezmestí)
+		const mat = materialRowsFromRozpis(
+			[{ nazov: 'Profil X', rezy: [{ rozmer: 2000, ks: 5 }] }],
+			6000,
+			4
+		);
+		expect(mat).toHaveLength(1);
+		expect(mat[0]!.nazov).toBe('Profil X');
+		expect(mat[0]!.barLen).toBe(6000);
+		expect(mat[0]!.sikmyRez).toBe(false);
+		// 5 kusov po 2000: 3 tyče (2+2+1), spolu 5 kusov naprieč tyčami
+		const kusovSpolu = mat[0]!.bary.reduce((s, b) => s + b.kusy.length, 0);
+		expect(kusovSpolu).toBe(5);
+		expect(mat[0]!.tyce).toBe(mat[0]!.bary.length);
+		expect(mat[0]!.odpadMm).toBeGreaterThan(0);
+	});
+	it('zachová kod keď je (sietka) → obrázok v PDF; rez dlhší ako tyč vypadne', () => {
+		const mat = materialRowsFromRozpis(
+			[
+				{
+					nazov: 'Sietka',
+					kod: 'ZASP00002',
+					rezy: [
+						{ rozmer: 8000, ks: 1 },
+						{ rozmer: 2000, ks: 2 }
+					]
+				}
+			],
+			7500,
+			4
+		);
+		expect(mat[0]!.kod).toBe('ZASP00002');
+		// 8000 > 7500 → nezaradí sa; ostanú 2× 2000
+		const kusovSpolu = mat[0]!.bary.reduce((s, b) => s + b.kusy.length, 0);
+		expect(kusovSpolu).toBe(2);
+	});
+});
 
 describe('backfillDocId', () => {
 	it('stabilný per-OP doc_id s vlastným prefixom, matchuje Odoo regex', () => {
@@ -98,6 +139,11 @@ describe('mapOdpisToLines — pergola/fix CAD (surový rozpis, žiadny drift-tag
 			{ kod: '', nazov: 'Žlabový profil 110', mnozstvo: 4, mj: 'ks', dlzka: 4.5, poznamka: '' },
 			{ kod: '', nazov: 'Kotviaci profil', mnozstvo: 2, mj: 'ks', dlzka: 2.8345, poznamka: '' }
 		]);
+		// #529: vráti aj MaterialRow[] s tyčami (FFD) pre grafický PDF — 2 profily, každý má bary
+		expect(res.material).toHaveLength(2);
+		expect(res.material[0]!.nazov).toBe('Žlabový profil 110');
+		expect(res.material[0]!.bary.length).toBeGreaterThan(0);
+		expect(res.material.every((m) => m.tyce === m.bary.length)).toBe(true);
 	});
 
 	it('fix CAD → rovnaké mapovanie (zdieľaný CAD parser)', () => {
@@ -498,6 +544,29 @@ describe('runBackfill — orchestrácia', () => {
 		expect(orderNumber).toBe('OP2');
 		expect(docId).toBe('backfill-narezak-op2');
 		expect(lines).toHaveLength(1);
+	});
+
+	it('ostrý beh pripne GRAFICKÝ nárezák PDF (%PDF + Narezak- filename) k lines (#529)', async () => {
+		const d = deps();
+		await runBackfill(
+			[row({ id: 1, op: 'OP2B', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		const [, , , pdfBase64, filename] = d.uploadLines.mock.calls[0]!;
+		expect(typeof pdfBase64).toBe('string');
+		expect(Buffer.from(String(pdfBase64), 'base64').slice(0, 5).toString('latin1')).toBe('%PDF-');
+		expect(String(filename)).toMatch(/^Narezak-.*\.pdf$/);
+	});
+
+	it('dry-run NEGENERUJE PDF (upload sa nevolá vôbec)', async () => {
+		const d = deps();
+		await runBackfill(
+			[row({ id: 1, op: 'OP2C', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: true }
+		);
+		expect(d.uploadLines).not.toHaveBeenCalled();
 	});
 
 	it('per-OP kombinácia: dva moduly tej istej OP → JEDEN upload so spojenými lines', async () => {
