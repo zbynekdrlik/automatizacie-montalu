@@ -47,6 +47,11 @@ export function listOdpisyForBackfill(daysBack: number): OdpisBackfillRow[] {
  * / `orderHasLines` sú READ-ONLY (`search_read`), `uploadLines` posiela `lines` cez to isté
  * `montalu_narezak_upload` volanie ako #522. `op` prichádza už normalizovaný (`runBackfill` grupuje
  * cez `normOp`); `normOp` znova je idempotentné.
+ *
+ * #524 R2: `orderExists`/`orderHasLines` HODIA `OdooJson2Error` pri 403/AccessError (uid 524 je len
+ * v narezak-upload skupine, nemá read na `sale.order`). Tu sa to úmyselne NECHYTÁ — `runBackfill`
+ * throw toleruje (existencia NEZNÁMA, nie chyba; endpoint rozhodne pri uploade). Read grant na
+ * `sale.order` (+ `montalu.rozpis.line`) je vyžiadaný paralelne v odoo-erp #6949.
  */
 export function makeOdooBackfillDeps(
 	cfg: Cfg,
