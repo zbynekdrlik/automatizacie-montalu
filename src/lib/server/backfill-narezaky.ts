@@ -36,8 +36,7 @@ import { CAD_DETAIL_MAX } from './cad-odpis';
 import { normOp, normZak, type Polozka } from './money';
 import type { Vstup, MultiVstup } from './vstup';
 import { generateNarezakPdfBase64, narezakPdfFilename, type NarezakPdfHeader } from './narezak-pdf';
-import { buildNarezakV2, type NarezakV2 } from './narezak-lines-v2';
-import { isNarezLinesV2Enabled } from './odoo-json2';
+import { buildCutPlan, pocetVynechanychBezKodu, type CutPlan } from './narezak-cut-plan';
 
 /** Surový riadok `odpis_log` potrebný pre backfill (vlastný SELECT — `listOdpisy` nevracia
  *  `content_hash`; `detail` je surový JSON string, parsuje sa tu). */
@@ -316,15 +315,15 @@ export interface BackfillDeps {
 	orderExists: (orderNumber: string) => Promise<boolean>;
 	orderHasLines: (orderNumber: string) => Promise<boolean>;
 	/** #529: `pdfBase64`/`filename` = GRAFICKÝ nárezák PDF (voliteľné — keď generovanie zlyhalo,
-	 *  pošlú sa len `lines`, upload endpoint PDF nevyžaduje). `narezakV2` = v2 payload (za flagom,
-	 *  default undefined). */
+	 *  pošlú sa len `lines`, upload endpoint PDF nevyžaduje). #532: `cutPlan` = `cut_plan` payload
+	 *  (voliteľné — undefined keď žiadna tyč nemá Money kód; CAD moduly pergola/fix/clip). */
 	uploadLines: (
 		orderNumber: string,
 		docId: string,
 		lines: RozpisLine[],
 		pdfBase64?: string,
 		filename?: string,
-		narezakV2?: NarezakV2
+		cutPlan?: CutPlan
 	) => Promise<unknown>;
 	log?: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 	sleep?: (ms: number) => Promise<void>;
@@ -575,11 +574,17 @@ export async function runBackfill(
 			});
 		}
 
-		// #529: v2 groundwork za flagom (default OFF) — z toho istého skombinovaného materiálu.
-		const narezakV2 = isNarezLinesV2Enabled() ? buildNarezakV2(combinedMaterial) : undefined;
+		// #532: `cut_plan` z toho istého skombinovaného materiálu (bez flagu — ide vždy keď má tyče
+		// s Money kódom). CAD moduly (pergola/fix/clip) idú cez `materialRowsFromRozpis` s `kod:''`,
+		// takže sa vynechajú — zasklenia (recompute) nesú Money kódy, tie plán naplnia.
+		const cutPlan = buildCutPlan(combinedMaterial);
+		const bezKodu = pocetVynechanychBezKodu(combinedMaterial);
+		if (!cutPlan && bezKodu > 0) {
+			log('info', 'backfill: cut_plan vynechaný — tyče bez Money kódu', { op, bezKodu });
+		}
 
 		try {
-			await deps.uploadLines(op, docId, combined, pdfBase64, filename, narezakV2);
+			await deps.uploadLines(op, docId, combined, pdfBase64, filename, cutPlan);
 			opSum.akcia = 'uploaded';
 			summary.nahranych++;
 			summary.riadkovSpolu += combined.length;

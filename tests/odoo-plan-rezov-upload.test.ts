@@ -146,13 +146,15 @@ describe('uploadPlanRezovToOdoo', () => {
 			},
 			{ kod: '', nazov: 'LAT 80x19', mnozstvo: 4, mj: 'ks', dlzka: 1.865, poznamka: '' }
 		]);
-		// #529: v2 payload je za flagom (default OFF) → nesmie sa poslať
+		// #532: `cut_plan` sa VYNECHÁ na tejto ceste — CAD planner /plan-rezov píše `kod:''`
+		// (`spocitajPlanRezov`, display-only), takže žiadna tyč nemá Money kód → kľúč sa nepošle.
+		// (v2 kľúč `narezak_v2` je odstránený úplne.)
+		expect(cap.body).not.toHaveProperty('cut_plan');
 		expect(cap.body).not.toHaveProperty('narezak_v2');
 	});
 
-	it('#529: flag ON → payload nesie narezak_v2 (tyče/uhly/odpad + sumár); OFF → nie', async () => {
+	it('#532: CAD planner materiál bez Money kódu → cut_plan sa vôbec nepošle (žiadne prázdne polia)', async () => {
 		enableEnv();
-		vi.stubEnv('ODOO_NAREZ_LINES_V2', '1');
 		vi.mocked(zakazkaPrehlad).mockReturnValue({
 			zak: 'ZAK123',
 			zakaznik: 'Firma s.r.o.',
@@ -168,11 +170,9 @@ describe('uploadPlanRezovToOdoo', () => {
 		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('uploaded');
 		expect(captured).not.toBeNull();
 		const body = captured!;
-		const v2 = body.narezak_v2 as { lines: unknown[]; sumar: unknown[] };
-		expect(v2).toBeDefined();
-		expect(Array.isArray(v2.lines)).toBe(true);
-		expect(v2.lines.length).toBeGreaterThan(0);
-		expect(Array.isArray(v2.sumar)).toBe(true);
+		// lines idú (nepotrebujú kód), ale cut_plan nie (kontrakt: profile_kod nikdy prázdny)
+		expect(Array.isArray(body.lines)).toBe(true);
+		expect(body).not.toHaveProperty('cut_plan');
 	});
 
 	it('#522: lines idú spolu s PDF v tom istom volaní a re-export používa TEN ISTÝ doc_id (idempotencia)', async () => {

@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
 	buildCutPlan,
+	pocetVynechanychBezKodu,
 	type CutPlan,
 	type CutPlanBar
 } from '../src/lib/server/narezak-cut-plan';
@@ -110,8 +111,22 @@ describe('buildCutPlan', () => {
 			profile_name: 'RÁMOVÝ',
 			stock_length_mm: 7500,
 			pieces: [
-				{ seq: 1, length_mm: 2500, angle_left_deg: 45, angle_right_deg: 45, label: 'Z1 2500', qty: 1 },
-				{ seq: 2, length_mm: 2500, angle_left_deg: 45, angle_right_deg: 45, label: 'Z1 2500', qty: 1 }
+				{
+					seq: 1,
+					length_mm: 2500,
+					angle_left_deg: 45,
+					angle_right_deg: 45,
+					label: 'Z1 2500',
+					qty: 1
+				},
+				{
+					seq: 2,
+					length_mm: 2500,
+					angle_left_deg: 45,
+					angle_right_deg: 45,
+					label: 'Z1 2500',
+					qty: 1
+				}
 			],
 			waste_mm: 2492,
 			note: ''
@@ -125,8 +140,22 @@ describe('buildCutPlan', () => {
 			profile_name: 'RÁMOVÝ',
 			stock_length_mm: 7500,
 			pieces: [
-				{ seq: 1, length_mm: 1800, angle_left_deg: 45, angle_right_deg: 45, label: 'Z1 1800', qty: 1 },
-				{ seq: 2, length_mm: 2500, angle_left_deg: 45, angle_right_deg: 45, label: 'Z2 2500', qty: 1 }
+				{
+					seq: 1,
+					length_mm: 1800,
+					angle_left_deg: 45,
+					angle_right_deg: 45,
+					label: 'Z1 1800',
+					qty: 1
+				},
+				{
+					seq: 2,
+					length_mm: 2500,
+					angle_left_deg: 45,
+					angle_right_deg: 45,
+					label: 'Z2 2500',
+					qty: 1
+				}
 			],
 			waste_mm: 3192,
 			note: ''
@@ -186,6 +215,63 @@ describe('buildCutPlan', () => {
 		const p = buildCutPlan([stary]) as CutPlan;
 		expect(p.bars[0]!.pieces[0]!.angle_left_deg).toBe(45);
 		expect(p.bars[0]!.pieces[0]!.angle_right_deg).toBe(45);
+	});
+});
+
+describe('pocetVynechanychBezKodu', () => {
+	it('spočíta profily s tyčami ale BEZ Money kódu (log na vynechané tyče)', () => {
+		// material: ZASP00002 (kód), BPP00054 (kód), BEZ KÓDU (kod=''), PRÁZDNY (tyce=0)
+		expect(pocetVynechanychBezKodu(material)).toBe(1); // len „BEZ KÓDU" (tyce>0, kod='')
+		expect(pocetVynechanychBezKodu([])).toBe(0);
+		expect(pocetVynechanychBezKodu([material[0]!])).toBe(0); // má kód
+		expect(pocetVynechanychBezKodu([material[3]!])).toBe(0); // tyce=0 → nepočíta sa
+	});
+});
+
+describe('renderBarSvg — hranné prípady (branch coverage)', () => {
+	const branchMat: MaterialRow[] = [
+		{
+			kod: 'ZASP55555',
+			nazov: 'BRANCH',
+			rezy: [
+				{ rozmer: 7000, ks: 1 },
+				{ rozmer: 100, ks: 1 },
+				{ rozmer: 7496, ks: 1 }
+			],
+			tyce: 2,
+			bary: [
+				// tyč 1: úzky kus (<5 % → popisok skrytý) + veľký kus; malý odpad (>1, <12 % → bez „odpad" textu)
+				{
+					kusy: [
+						{ rozmer: 100, dlzka: 100 },
+						{ rozmer: 7000, dlzka: 7000 }
+					],
+					zvysok: 400
+				},
+				// tyč 2: bez odpadu (zvyšok ≤ 1 → žiadny odpad segment)
+				{ kusy: [{ rozmer: 7496, dlzka: 7496 }], zvysok: 0 }
+			],
+			odpadMm: 400,
+			odpadPct: 2.7,
+			barLen: 7500,
+			sikmyRez: false
+		}
+	];
+	const plan = buildCutPlan(branchMat) as CutPlan;
+
+	it('úzky kus (<5 %) skryje mm popisok; malý odpad (<12 %) kreslí segment bez „odpad" textu', () => {
+		const svg = decodeSvg(plan.bars[0]!.render_svg);
+		expect((svg.match(/class="rez"/g) ?? []).length).toBe(2); // 2 kusy nakreslené
+		expect(svg).toContain('class="odpad"'); // odpad 400 > 1 → segment je
+		expect(svg).not.toContain('odpad 400'); // ale <12 % → bez textu
+		// jediný mm popisok = veľký kus (7000); úzky 100 mm kus popisok nemá
+		expect((svg.match(/<text /g) ?? []).length).toBe(1);
+	});
+
+	it('tyč bez odpadu (zvyšok ≤ 1) → žiadny odpad segment', () => {
+		const svg = decodeSvg(plan.bars[1]!.render_svg);
+		expect((svg.match(/class="rez"/g) ?? []).length).toBe(1);
+		expect(svg).not.toContain('class="odpad"');
 	});
 });
 
