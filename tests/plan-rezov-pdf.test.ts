@@ -157,3 +157,19 @@ describe('Money-neutralita (plan-rezov-pdf zdroj)', () => {
 		}
 	});
 });
+
+// #528: QR zákazky v hlavičke. QR = holé sale.order.name (= normOp(op)); kreslí sa LEN keď je OP
+// zadané. QR sa v PDF tele nedá prečítať (vektorové obdĺžniky, žiaden font) — testujeme cez rozdiel
+// veľkosti PDF (s OP > bez OP o stovky obdĺžnikov QR) + kreslenie kryje tests/pdf-qr.test.ts.
+describe('generatePlanRezovPdf — QR zákazky (#528)', () => {
+	it('PDF s OP je väčší než bez OP (QR sa nakreslil)', async () => {
+		const withOp = await generatePlanRezovPdf(HEADER, vysledok, NOW);
+		const withoutOp = await generatePlanRezovPdf({ ...HEADER, op: '' }, vysledok, NOW);
+		expect(withOp.length).toBeGreaterThan(withoutOp.length + 500);
+	});
+	it('bez OP → žiaden QR (PDF ostáva platný, 1 strana)', async () => {
+		const bytes = await generatePlanRezovPdf({ ...HEADER, op: '' }, vysledok, NOW);
+		expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-');
+		expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+	});
+});

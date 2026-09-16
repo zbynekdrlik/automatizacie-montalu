@@ -15,7 +15,17 @@
 // `zakazka-pdf.ts` / `dopyt-ponuka.md`).
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { ExpedicnyZoznam, ExpedicnaPolozka } from '$lib/pergola-expedicia';
-import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, ellipsize, embedDejavu } from './pdf-common';
+import {
+	A4_W,
+	A4_H,
+	MARGIN,
+	CONTENT_W,
+	wrapText,
+	ellipsize,
+	embedDejavu,
+	drawQrZakazkaPdf
+} from './pdf-common';
+import { qrZakazkaPayload } from '$lib/qr-zakazka';
 
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
@@ -26,6 +36,7 @@ const HEAD_BG = rgb(0.95, 0.96, 0.98);
 const FS_TITLE = 15;
 const FS_META = 9;
 const FS_SEC = 11;
+const QR_SIZE = 68; // ~24 mm @ 72dpi — QR zákazky v hlavičke (#528)
 const FS_ROW = 9;
 const LINE = 12;
 const ROW_PAD = 4;
@@ -299,6 +310,12 @@ export async function generateExpediciaPdf(
 		font: bold,
 		color: ACCENT
 	});
+	// #528: QR zákazky (holé sale.order.name) v pravom hornom rohu — sken tabletom otvorí objednávku
+	// na Odoo kiosku. Kreslí sa LEN keď je OP zadané.
+	const qrPayload = qrZakazkaPayload(ident.op);
+	if (qrPayload) {
+		drawQrZakazkaPdf(ctx.page, qrPayload, A4_W - MARGIN - QR_SIZE, A4_H - MARGIN - QR_SIZE, QR_SIZE);
+	}
 	ctx.cursor -= FS_TITLE + 8;
 	drawParagraph(
 		ctx,

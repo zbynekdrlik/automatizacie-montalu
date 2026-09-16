@@ -16,7 +16,17 @@
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { PlanRezovVysledok } from './plan-rezov';
 import type { Tyc } from './compute';
-import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, embedDejavu, stampSk } from './pdf-common';
+import {
+	A4_W,
+	A4_H,
+	MARGIN,
+	CONTENT_W,
+	wrapText,
+	embedDejavu,
+	stampSk,
+	drawQrZakazkaPdf
+} from './pdf-common';
+import { qrZakazkaPayload } from '$lib/qr-zakazka';
 
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
@@ -24,6 +34,7 @@ const ACCENT = rgb(0.11, 0.31, 0.85); // #1d4ed8
 
 const FS_TITLE = 15;
 const FS_META = 9;
+const QR_SIZE = 68; // ~24 mm @ 72dpi — QR zákazky v hlavičke (#528)
 const FS_SEC = 11;
 const FS_ROW = 9;
 const LINE = 12; // riadkovanie
@@ -105,6 +116,12 @@ export async function generatePlanRezovPdf(
 		font: bold,
 		color: ACCENT
 	});
+	// #528: QR zákazky (holé sale.order.name) v pravom hornom rohu — pracovník ho naskenuje tabletom
+	// na Odoo kiosku a otvorí sa daná objednávka. Kreslí sa LEN keď je OP zadané.
+	const qrPayload = qrZakazkaPayload(header.op);
+	if (qrPayload) {
+		drawQrZakazkaPdf(ctx.page, qrPayload, A4_W - MARGIN - QR_SIZE, A4_H - MARGIN - QR_SIZE, QR_SIZE);
+	}
 	ctx.cursor -= FS_TITLE + 8;
 	drawParagraph(
 		ctx,

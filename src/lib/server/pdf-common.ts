@@ -2,9 +2,10 @@
 // (#418 review), aby druhý konzument neduplikoval A4 rozmery, `wrapText` a embed DejaVu fontov —
 // rovnaká disciplína ako `odoo-rpc.ts` vyextrahovaný z `odoo-lead.ts` (#340). Hodnoty sú byte-identické
 // s pôvodnými v `ponuka-pdf.ts` → jeho PDF výstup ostáva nezmenený.
-import { PDFDocument, type PDFFont } from 'pdf-lib';
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { DEJAVU_SANS_REGULAR_B64, DEJAVU_SANS_BOLD_B64 } from './fonts/dejavu';
+import { buildQrMatrix } from '$lib/qr-zakazka';
 
 // A4 na body (pt) + jednotný okraj.
 export const A4_W = 595.28;
@@ -57,6 +58,42 @@ export function stampSk(now: Date): string {
 	}).formatToParts(now);
 	const g = (t: string) => parts.find((x) => x.type === t)?.value ?? '';
 	return `${g('year')}${g('month')}${g('day')}-${g('hour')}${g('minute')}`;
+}
+
+/**
+ * #528: Nakreslí QR zákazky (payload = holé `sale.order.name`) do PDF stránky obdĺžnikmi (vektorovo,
+ * ostré pri každom DPI). QR obsadí štvorec `size×size` bodov s ľavým-dolným rohom v `(x, y)`, vrátane
+ * 4-modulovej quiet zóny a bieleho pozadia (čitateľné aj keď pod ním prebehne text hlavičky).
+ * Prázdny payload → nekreslí nič a vráti `false` (výstup PDF ostáva byte-identický s dneškom).
+ */
+export function drawQrZakazkaPdf(
+	page: PDFPage,
+	payload: string,
+	x: number,
+	y: number,
+	size: number
+): boolean {
+	const m = buildQrMatrix(payload);
+	if (!m) return false;
+	const QUIET = 4; // moduly quiet zóny na každej strane (QR štandard)
+	const cell = size / (m.count + 2 * QUIET);
+	// biele pozadie celého štvorca (quiet zóna + istota čitateľnosti nad prípadným textom)
+	page.drawRectangle({ x, y, width: size, height: size, color: rgb(1, 1, 1) });
+	const black = rgb(0, 0, 0);
+	for (let r = 0; r < m.count; r++) {
+		for (let c = 0; c < m.count; c++) {
+			if (!m.isDark(r, c)) continue;
+			// riadok 0 je HORE; pdf-lib má počiatok vľavo-dole, y rastie nahor
+			page.drawRectangle({
+				x: x + (c + QUIET) * cell,
+				y: y + size - (r + QUIET + 1) * cell,
+				width: cell,
+				height: cell,
+				color: black
+			});
+		}
+	}
+	return true;
 }
 
 /** Zaregistruj fontkit a embedni vendorovaný DejaVu Sans subset (regular + bold) do dokumentu. */

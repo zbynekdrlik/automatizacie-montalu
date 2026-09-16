@@ -170,3 +170,18 @@ describe('expediciaPdfFilename', () => {
 		expect(name).toMatch(/\.pdf$/);
 	});
 });
+
+// #528: QR zákazky v hlavičke expedičného zoznamu. Kreslí sa LEN keď je OP zadané; QR sa v PDF tele
+// nedá prečítať (vektor) → testujeme cez rozdiel veľkosti PDF (s OP > bez OP). Kreslenie kryje
+// tests/pdf-qr.test.ts.
+describe('generateExpediciaPdf — QR zákazky (#528)', () => {
+	it('PDF s OP je väčší než bez OP (QR sa nakreslil)', async () => {
+		const withOp = await generateExpediciaPdf(baseZoznam, IDENT, NOW);
+		const withoutOp = await generateExpediciaPdf(baseZoznam, { ...IDENT, op: '' }, NOW);
+		expect(withOp.length).toBeGreaterThan(withoutOp.length + 500);
+	});
+	it('bez OP → žiaden QR (PDF ostáva platný)', async () => {
+		const bytes = await generateExpediciaPdf(baseZoznam, { ...IDENT, op: '' }, NOW);
+		expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-');
+	});
+});
