@@ -9,7 +9,7 @@ import { db } from './db';
 import { listOdpisPolozky, normOp } from './money';
 import { callJson2, type OdooJson2Config } from './odoo-json2';
 import type { RozpisLine } from './odoo-rozpis-lines';
-import type { NarezakV2 } from './narezak-lines-v2';
+import type { CutPlan } from './narezak-cut-plan';
 import type { Cfg } from './compute';
 import type { OdpisBackfillRow, BackfillDeps } from './backfill-narezaky';
 
@@ -85,7 +85,7 @@ export function makeOdooBackfillDeps(
 			lines: RozpisLine[],
 			pdfBase64?: string,
 			filename?: string,
-			narezakV2?: NarezakV2
+			cutPlan?: CutPlan
 		) =>
 			callJson2(odooCfg, 'sale.order', 'montalu_narezak_upload', {
 				order_number: normOp(op),
@@ -94,8 +94,9 @@ export function makeOdooBackfillDeps(
 				// #529: pripni GRAFICKÝ nárezák PDF keď sa vygeneroval (endpoint PDF nevyžaduje —
 				// `has_pdf` je voliteľné pri `lines`, #6517). Idempotentne verziuje cez doc_id.
 				...(pdfBase64 ? { pdf_base64: pdfBase64, filename } : {}),
-				// #529: v2 groundwork za flagom (intake IGNORUJE cez **extra) — Odoo #6949 vykreslí neskôr.
-				...(narezakV2 ? { narezak_v2: narezakV2 } : {}),
+				// #532: `cut_plan` (kontrakt #7431) — plán tyčí (bars/pieces/uhly/render_svg). Ide keď
+				// nárezák má tyče s Money kódom; intake je LENIENT (**extra), Odoo vykreslí montalu.rozpis.bar.
+				...(cutPlan ? { cut_plan: cutPlan } : {}),
 				lines
 			}),
 		log
