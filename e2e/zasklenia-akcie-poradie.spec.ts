@@ -92,10 +92,11 @@ test('opakované Odoslať sklo nad tým istým výsledkom neduplikuje', async ({
 	await expect(page.getByTestId('skla-pridane')).toBeVisible();
 
 	// otvoriť objednávku a overiť, že je práve JEDNA položka (nie dve)
+	// (#521: každá položka má aj druhý riadok `tr.spec-row` so špecifikáciou tabule — počítaj len dátové riadky)
 	await page.getByTestId('skla-pridane-odkaz').click();
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
-	await expect(page.locator('tbody tr')).toHaveCount(1);
+	await expect(page.locator('tbody tr:not(.spec-row)')).toHaveCount(1);
 
 	expect(consoleMsgs).toEqual([]);
 });
