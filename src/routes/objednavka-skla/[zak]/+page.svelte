@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { modulNazov } from '$lib/modul-nazov';
+	import QrZakazka from '$lib/components/QrZakazka.svelte';
 
 	let { data, form } = $props();
 
@@ -47,6 +48,7 @@
 
 <svelte:head><title>Objednávka skla {zak} — Montalu</title></svelte:head>
 
+<QrZakazka op={data.op} />
 <h1>Objednávka skla — {zak}</h1>
 
 {#if polozky.length === 0}

@@ -1,7 +1,7 @@
 {
 	"name": "automatizacie-montalu",
 	"private": true,
-	"version": "0.25.22",
+	"version": "0.25.23",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
@@ -47,6 +47,7 @@
 		"better-sqlite3": "^12.11.1",
 		"exceljs": "^4.4.0",
 		"pdf-lib": "^1.17.1",
+		"qrcode-generator": "^2.0.4",
 		"three": "0.185.1"
 	},
 	"overrides": {

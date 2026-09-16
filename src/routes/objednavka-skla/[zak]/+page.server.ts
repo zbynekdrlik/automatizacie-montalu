@@ -21,6 +21,7 @@ import {
 	type HoleSize
 } from '$lib/server/odoo-rozpis-lines';
 import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
+import { zakazkaOp } from '$lib/server/zakazka-ceny';
 
 /** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
 function parseSpec(form: FormData): GlassSpec {
@@ -62,6 +63,9 @@ export const load: PageServerLoad = async ({ params }) => {
 	if (!zak) error(404, 'Zákazka nie je zadaná.');
 
 	const polozky = listSklaPreZakazku(zak);
+	// #528: OP zákazky (z najnovšieho odpisu, live-first) pre QR zákazky v hlavičke výtlačku — QR
+	// vedie na TÚ ISTÚ `sale.order` ako nahraná `glass_order`. Prázdny keď zákazka nemá odpis/OP.
+	const op = zakazkaOp(zak);
 
 	// Pre každú položku načítaj zoznam príloh (bez dát — len metadata)
 	const suboryMap: Record<number, { id: number; nazov: string; typ: string; velkost: number }[]> =
@@ -78,7 +82,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		}
 	}
 
-	return { zak, polozky, suboryMap };
+	return { zak, op, polozky, suboryMap };
 };
 
 export const actions = {

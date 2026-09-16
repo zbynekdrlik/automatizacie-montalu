@@ -15,7 +15,20 @@
 // `zakazka-pdf.ts` / `dopyt-ponuka.md`).
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { ExpedicnyZoznam, ExpedicnaPolozka } from '$lib/pergola-expedicia';
-import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, ellipsize, embedDejavu } from './pdf-common';
+import {
+	A4_W,
+	A4_H,
+	MARGIN,
+	CONTENT_W,
+	wrapText,
+	ellipsize,
+	embedDejavu,
+	drawQrZakazkaPdf,
+	qrZakazkaHeaderXY,
+	qrHeaderTextWidth,
+	qrHeaderBandBottom
+} from './pdf-common';
+import { qrZakazkaPayload } from '$lib/qr-zakazka';
 
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
@@ -256,8 +269,15 @@ function drawRow(ctx: Ctx, p: ExpedicnaPolozka): void {
 	});
 }
 
-function drawParagraph(ctx: Ctx, text: string, size: number, font: PDFFont, color = INK): void {
-	const lines = wrapText(font, text, size, CONTENT_W);
+function drawParagraph(
+	ctx: Ctx,
+	text: string,
+	size: number,
+	font: PDFFont,
+	color = INK,
+	maxWidth = CONTENT_W
+): void {
+	const lines = wrapText(font, text, size, maxWidth);
 	for (const ln of lines.length > 0 ? lines : ['']) {
 		ensureSpace(ctx, LINE);
 		ctx.page.drawText(ln, {
@@ -299,13 +319,23 @@ export async function generateExpediciaPdf(
 		font: bold,
 		color: ACCENT
 	});
+	// #528: QR zákazky (holé sale.order.name) v pravom hornom rohu — sken tabletom otvorí objednávku
+	// na Odoo kiosku. Kreslí sa LEN keď je OP zadané.
+	const qrPayload = qrZakazkaPayload(ident.op);
+	if (qrPayload) {
+		const qr = qrZakazkaHeaderXY();
+		drawQrZakazkaPdf(ctx.page, qrPayload, qr.x, qr.y, qr.size);
+	}
 	ctx.cursor -= FS_TITLE + 8;
+	// riadky hlavičky v QR pásme sa zalomia užšie, aby text nepretlačil QR (viď qrHeaderTextWidth)
+	const hw = () => qrHeaderTextWidth(!!qrPayload && ctx.cursor > qrHeaderBandBottom());
 	drawParagraph(
 		ctx,
 		`Zákazka: ${ident.zak}  ·  Objednávka: ${ident.op}  ·  Zákazník: ${ident.zakaznik}`,
 		FS_META,
 		reg,
-		INK
+		INK,
+		hw()
 	);
 	const stav = now.toLocaleString('sk-SK', { timeZone: 'Europe/Bratislava' });
 	drawParagraph(
@@ -313,7 +343,8 @@ export async function generateExpediciaPdf(
 		`Stav k ${stav}  ·  interné (zákazník toto nevidí)  ·  zdroj: automatizácie Montalu.`,
 		FS_META,
 		reg,
-		MUTED
+		MUTED,
+		hw()
 	);
 	ctx.cursor -= 4;
 
@@ -327,7 +358,9 @@ export async function generateExpediciaPdf(
 			`${zoznam.pocetFixov} FIX  ·  ` +
 			`${zoznam.pocetTesneni} tesnení`,
 		FS_SEC,
-		bold
+		bold,
+		INK,
+		hw()
 	);
 	ctx.cursor -= 4;
 

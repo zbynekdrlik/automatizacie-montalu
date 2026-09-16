@@ -5,6 +5,7 @@
 	// prezentácia — všetok stav aj výpočty (`vysledok`, `komponenty`, `krov`, počítadlá)
 	// prídu ako propy z rodiča (state + compute hub); tu sa nič nemutuje ani nepočíta.
 	import PergolaNarezVykres from '$lib/components/PergolaNarezVykres.svelte';
+	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import { formatDatumCasSk } from '$lib/datum';
 	import {
 		MAX_ROZOSTUP_PRIECOK,
@@ -49,7 +50,8 @@
 		fixVykres,
 		fixError,
 		datumIso,
-		live
+		live,
+		op = '' // #528: OP zákazky pre QR v hlavičke (prázdne → žiaden QR)
 	}: {
 		vstup: PergolaNarezVstup;
 		vysledok: NarezVysledok;
@@ -68,6 +70,7 @@
 		fixError: string | null;
 		datumIso: string;
 		live: boolean;
+		op?: string;
 	} = $props();
 
 	// Slovenský formát: desatinná ČIARKA (celé čísla ostávajú bez zmeny) — rovnaká konvencia
@@ -92,6 +95,7 @@
 </script>
 
 <div class="card">
+	<QrZakazka {op} />
 	<h1 data-testid="narez-nadpis">
 		Pergola z appky — {vstup.system}
 		{vstup.sirka}×{vstup.hlbka} mm

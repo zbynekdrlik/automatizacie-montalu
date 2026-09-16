@@ -5,6 +5,7 @@
 	// renderované cez `{@render}` v <form> = DOM potomkovia formulára → submit ich zahrnie.
 	import type { Snippet } from 'svelte';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
+	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import type { RezervaciaIdent, RezervaciaRozpis } from '$lib/server/pergola-rezervacia';
 	import type { CenyResult } from '$lib/server/ceny';
 	// #378 — FIX (bočné pevné zasklenie): zhrnutie do náhľadu (honest-null Money)
@@ -40,6 +41,7 @@
 </script>
 
 <div class="card">
+	<QrZakazka op={ident.op} />
 	<h1 data-testid="rez-nadpis">Pergola z appky — {ident.zak} · {ident.zakaznik}</h1>
 	<p class="sub">
 		<span class="badge">Pergola · {rozpis.pocetPolozok} položiek</span>
