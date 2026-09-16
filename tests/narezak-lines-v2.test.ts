@@ -138,6 +138,16 @@ describe('buildNarezakV2', () => {
 	it('prázdny materiál → prázdny payload', () => {
 		expect(buildNarezakV2([])).toEqual({ lines: [], sumar: [] });
 	});
+
+	it('staré dáta bez sikmyRez → obranný default 45° (rovnako ako RozpisRezov `?? true`)', () => {
+		const staryProfil = { ...material[1]!, kod: 'ZASP00002' } as MaterialRow & {
+			sikmyRez?: boolean;
+		};
+		delete staryProfil.sikmyRez;
+		const v2 = buildNarezakV2([staryProfil], BASE);
+		expect(v2.lines[0]!.uhol_l).toBe(45);
+		expect(v2.lines[0]!.uhol_r).toBe(45);
+	});
 });
 
 describe('isNarezLinesV2Enabled (flag gating)', () => {
