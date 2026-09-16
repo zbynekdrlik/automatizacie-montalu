@@ -87,6 +87,15 @@ export type HoleSize = 'd30' | 'd50';
 /** Opracovanie hrany tabule (kontrakt: 4 hodnoty). */
 export type EdgeFinish = 'none' | 'ksr' | 'trapez_brusena' | 'trapez_lestena';
 
+/** Povolené hodnoty spec vstupu — JEDINÝ zdroj (validácia v `objednavka-skla.ts` + parse v podklade). */
+export const HOLE_SIZES: readonly (HoleSize | '')[] = ['', 'd30', 'd50'];
+export const EDGE_FINISHES: readonly EdgeFinish[] = [
+	'none',
+	'ksr',
+	'trapez_brusena',
+	'trapez_lestena'
+];
+
 /**
  * Spec kľúče, ktoré appka NEVIE z katalógu — zadáva ich obsluha na podklade objednávky skla
  * (default všetko vypnuté, takže existujúce toky sú byte-identické). Persistované so sklovou

@@ -6,15 +6,14 @@ import { normZak } from './money';
 import { logger } from './log';
 import {
 	GLASS_SPEC_OFF,
+	HOLE_SIZES,
+	EDGE_FINISHES,
 	type GlassSpec,
 	type HoleSize,
 	type EdgeFinish
 } from './odoo-rozpis-lines';
 
 const log = logger('objednavka-skla');
-
-const HOLE_SIZES: readonly (HoleSize | '')[] = ['', 'd30', 'd50'];
-const EDGE_FINISHES: readonly EdgeFinish[] = ['none', 'ksr', 'trapez_brusena', 'trapez_lestena'];
 
 // ---- Typy (handoff kontrakt) ----------------------------------------------------------
 

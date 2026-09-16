@@ -13,11 +13,14 @@ import {
 	zmazSubor,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
-import type { GlassSpec, EdgeFinish, HoleSize } from '$lib/server/odoo-rozpis-lines';
+import {
+	HOLE_SIZES,
+	EDGE_FINISHES,
+	type GlassSpec,
+	type EdgeFinish,
+	type HoleSize
+} from '$lib/server/odoo-rozpis-lines';
 import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
-
-const EDGE_FINISHES: readonly EdgeFinish[] = ['none', 'ksr', 'trapez_brusena', 'trapez_lestena'];
-const HOLE_SIZES: readonly (HoleSize | '')[] = ['', 'd30', 'd50'];
 
 /** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
 function parseSpec(form: FormData): GlassSpec {
