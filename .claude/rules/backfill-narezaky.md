@@ -62,6 +62,36 @@ nikdy nedriftnú (rezy = surový CAD).
   žiadny `odpis_log` zápis (guard `backfill-narezaky-money-safety.test.ts`).
 - **BEZPEČNÝ default = DRY-RUN.** Ostrý zápis IBA s `--live` (endpoint `dryRun:false`).
 
+## ROUND 2 — tolerantná pre-check pri Odoo read 403 (#524 R2)
+
+PROD dry-run (16.9.) skončil **48/48 chýb: Odoo HTTP 403 `AccessError` na `sale.order`** — kľúč uid 524
+(`appka-vyroba@montalu.local`) je len v narezak-**upload** skupine, nemá **read** na `sale.order` (ani
+`montalu.rozpis.line`). Upload endpoint funguje, len existenčná pre-check padala a rátala sa ako chyba.
+
+`runBackfill` preto číta existenciu/has-lines **tolerantne** (`backfill-narezaky.ts`):
+
+- **Read zlyhá (403/AccessError, alebo akékoľvek zlyhanie čítania)** → existencia je NEZNÁMA, **NEráta sa
+  ako chyba**. Dôvod sa zaloguje **RAZ za beh** (`warn` „Odoo čítanie zamietnuté — existencia neoverená").
+  Keď existencia nie je overená, `has-lines` read sa **NEskúša** (to isté právo by 403-lo znova).
+- **`--dry-run`:** takú OP započíta pod novým počítadlom **`Existencia neover.(403): N`** a ukáže ako
+  would-send (per-OP akcia `dry-run-neoverena`, rátaná do „Poslal by").
+- **`--live`:** pokračuje na upload a nechá rozhodnúť endpoint — upload prejde → `uploaded` (existenciu
+  potvrdil); upload zamietne neznámu OP → **`Skip — bez objednávky`** (nie chyba), pričom chybová správa
+  ide na `warn` log AJ do CLI riadku OP (`⚠`), takže genuine transport 5xx na reálne existujúcej OP
+  NEostane skrytá pod „Chýb: 0" (review 🟡 #1).
+- **Presná cesta ostáva**, keď read prejde: `!exists` → `skip-no-order`, `hasLines` → `skip-has-lines`.
+
+**AKCEPTOVANÉ RIZIKO (review 🟡 #2 — owner decision):** keď existencia nie je overená, additive-ochrana
+`has-lines` je nedostupná, takže `--live` beh môže **PREPÍSAŤ existujúce #522 `montalu.rozpis.line`** na
+objednávke (upload nahrádza VŠETKY riadky). Prijateľné, lebo backfill reprodukuje riadky tým istým enginom
+z toho istého `detail` (drift je tagovaný „spätne dopočítané"), ALE drift-nezhodné rekomputy nie sú
+garantovane byte-identické. Kým read grant nepridelia, spúšťaj `--live` uvážene (radšej `--zak` na
+konkrétne zákazky). Presnú additive-ochranu obnoví read grant.
+
+**Read grant** na `sale.order` (+ `montalu.rozpis.line`) pre uid 524 je vyžiadaný paralelne v
+**odoo-erp #6949** (skupina „MCP konektor/MCP — read-only (predaj + výroba)"). Po pridelení sa tolerantná
+vetva prestane spúšťať sama (reads prejdú → presná cesta) — netreba nič meniť v kóde.
+
 ## Spustenie na VPS (supervisor, po nasadení)
 
 Predpoklad na VPS `.env` (`/opt/automatizacie-montalu/.env`) + reštart:
@@ -82,10 +112,11 @@ docker exec automatizacie-montalu npm run backfill:narezaky -- --days 30 --live
 docker exec automatizacie-montalu npm run backfill:narezaky -- --days 30 --live --zak ZAK1 ZAK2
 ```
 
-Dry-run výstup čítaj takto: `Poslal by: N (riadkov spolu: M)` = koľko OP by dostalo riadky;
-`Skip — pergola rezerv:` = koľko pergola-rezervačných odpisov sa nedá rekonštruovať (ak vysoké →
-follow-up: ukladať plný `PergolaNarezVstup` do `detail`); `Spätne dopočítané OP:` = koľko OP má aspoň
-jeden drift-tag riadok.
+Dry-run výstup čítaj takto: `Poslal by: N (riadkov spolu: M)` = koľko OP by dostalo riadky (vrátane
+neoverených 403 OP); `Existencia neover.(403): N` = koľko z nich má NEOVERENÚ existenciu kvôli read 403
+(pozri „ROUND 2" vyššie — v live sa buď nahrajú, alebo mapujú na „bez objednávky"); `Skip — pergola
+rezerv:` = koľko pergola-rezervačných odpisov sa nedá rekonštruovať (ak vysoké → follow-up: ukladať plný
+`PergolaNarezVstup` do `detail`); `Spätne dopočítané OP:` = koľko OP má aspoň jeden drift-tag riadok.
 
 ## Overenie na PROD (po ostrom behu)
 
@@ -94,7 +125,9 @@ vráti vytvorené riadky (kod prázdny, nazov/mnozstvo/mj/dlzka/rozpis_version).
 karta zákazky prepne z „materiál z objednávky" na riadky z appky. Dôkaz (počet OP, počet riadkov,
 jeden `search_read` sample) sa odovzdá do odoo-erp #6949.
 
-**Pozn. (UNVERIFIED bez PROD):** `orderExists`/`orderHasLines` používajú `callJson2` POST
-`search_read`; presný /json/2 read-shape sa dá overiť až dry-runom na VPS (dokumentovaný `GET`
-príklad je len ilustračný curl). Ak dry-run hlási chyby na existenčných čítaniach, uprav read metódu
-v `makeOdooBackfillDeps`.
+**Pozn. (R1 UNVERIFIED → R2 VYRIEŠENÉ):** R1 nechal otvorené, či `orderExists`/`orderHasLines`
+(`callJson2` POST `search_read`) na PROD fungujú. Dry-run na PROD (16.9.) ukázal, že **nefungujú — uid
+524 nemá read na `sale.order`** (403 AccessError). R2 to rieši tolerantne (pozri „ROUND 2" vyššie): read
+403 už NEzhodí beh, existencia sa berie ako neoverená a endpoint rozhodne pri uploade. Read metódu v
+`makeOdooBackfillDeps` NETREBA meniť — po pridelení read grantu (odoo-erp #6949) sa presná cesta obnoví
+sama.
