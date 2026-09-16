@@ -18,6 +18,7 @@ import { recomputeVstup } from '../src/lib/server/zasklenia-sklo';
 import { loadCfg } from '../src/lib/server/db';
 import type { Vstup } from '../src/lib/server/vstup';
 import type { Polozka } from '../src/lib/server/money';
+import { SKLO_INE } from '../src/lib/sklo';
 
 const cfg = loadCfg();
 
@@ -322,6 +323,117 @@ describe('mapOdpisToLines — zasklenia zimná záhrada (multiZasklenie, seeded 
 	});
 });
 
+describe('mapOdpisToLines — okrajové vetvy rekomputy (seeded DB)', () => {
+	function robustVstup(over: Partial<Vstup>): Vstup {
+		return {
+			zak: 'ZAK',
+			op: 'OP1',
+			zakaznik: 'T',
+			system: 'Robust',
+			styl: '2K',
+			s: 2000,
+			v: 1000,
+			sklo: 'Izolačné sklo 4/16/4 číre',
+			skloPresne: '',
+			skloTrieda: null,
+			otvaranie: '',
+			kovanieL: '',
+			kovanieP: '',
+			kovanieStred: '',
+			kovanieStredOkno: 'L',
+			vrtanieZamku: 1050,
+			poznamka: '',
+			ral: '',
+			caka: false,
+			pridavnaKolajnica: false,
+			jednostrannaFab: false,
+			farbaKovania: null,
+			kliny: [],
+			kolajnica: null,
+			sietka: null,
+			...over
+		};
+	}
+
+	it('vlastná skladba (sklo=SKLO_INE + trieda) → syntetické sklo, lines vzniknú', () => {
+		const vstup = robustVstup({ sklo: SKLO_INE, skloPresne: 'moja skladba 6mm', skloTrieda: 6 });
+		const res = mapOdpisToLines(
+			row({ modul: 'zasklenia', detail: JSON.stringify({ vstupRaw: vstup }) }),
+			[],
+			cfg
+		);
+		expect(res.status).toBe('lines');
+		if (res.status !== 'lines') return;
+		expect(res.lines.length).toBeGreaterThan(0);
+	});
+
+	it('neplatné sklo v jednoposuve → skip recompute-failed', () => {
+		const vstup = robustVstup({ sklo: 'NEEXISTUJE-SKLO' });
+		expect(
+			mapOdpisToLines(
+				row({ modul: 'zasklenia', detail: JSON.stringify({ vstupRaw: vstup }) }),
+				[],
+				cfg
+			)
+		).toEqual({ status: 'skip', reason: 'recompute-failed' });
+	});
+
+	it('multiZasklenie s neplatným sklom v posuve → skip recompute-failed', () => {
+		const badMulti = {
+			zak: 'ZAK',
+			op: 'OP1',
+			zakaznik: 'T',
+			poznamka: '',
+			ral: '',
+			caka: false,
+			pridavnaKolajnica: false,
+			jednostrannaFab: false,
+			farbaKovania: null,
+			posuvy: [
+				{
+					system: 'Robust',
+					styl: '2K',
+					s: 2000,
+					v: 1000,
+					sklo: 'NEEXISTUJE',
+					skloPresne: '',
+					skloTrieda: null,
+					otvaranie: '',
+					kovanieL: '',
+					kovanieP: '',
+					kovanieStred: '',
+					kovanieStredOkno: 'L',
+					kliny: [],
+					kolajnica: null,
+					sietka: null
+				}
+			]
+		};
+		expect(
+			mapOdpisToLines(
+				row({
+					modul: 'zasklenia',
+					detail: JSON.stringify({ multiZasklenie: true, vstupRaw: badMulti })
+				}),
+				[],
+				cfg
+			)
+		).toEqual({ status: 'skip', reason: 'recompute-failed' });
+	});
+
+	it('CAD bez validných riadkov → skip no-cut-list', () => {
+		const res = mapOdpisToLines(
+			row({
+				modul: 'pergola',
+				detail: JSON.stringify({ cad: 'úplne nezmyselný riadok bez formátu' })
+			}),
+			[],
+			cfg
+		);
+		expect(res).toEqual({ status: 'skip', reason: 'no-cut-list' });
+	});
+});
+
 describe('mapOdpisToLines — mimo záberu', () => {
 	it('bazén → skip out-of-scope (žiadny rozpis rezov)', () => {
 		expect(mapOdpisToLines(row({ modul: 'bazen' }), [], cfg)).toEqual({
@@ -495,5 +607,44 @@ describe('runBackfill — orchestrácia', () => {
 		);
 		expect(s.chyb).toBe(1);
 		expect(s.ops[0]!.akcia).toBe('error');
+	});
+
+	it('orderExists hodí → error, žiadny upload', async () => {
+		const d = deps({
+			orderExists: async () => {
+				throw new Error('Odoo read 500');
+			}
+		});
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP10', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: true }
+		);
+		expect(d.uploadLines).not.toHaveBeenCalled();
+		expect(s.chyb).toBe(1);
+		expect(s.ops[0]!.akcia).toBe('error');
+	});
+
+	it('orderHasLines hodí → error', async () => {
+		const d = deps({
+			orderHasLines: async () => {
+				throw new Error('Odoo read 500');
+			}
+		});
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP11', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: true }
+		);
+		expect(s.chyb).toBe(1);
+	});
+
+	it('modul mimo záberu (bazen) sa odfiltruje — žiadna objednávka', async () => {
+		const d = deps();
+		const s = await runBackfill([row({ id: 1, op: 'OP12', modul: 'bazen', detail: '{}' })], d, {
+			dryRun: true
+		});
+		expect(s.objednavok).toBe(0);
+		expect(d.uploadLines).not.toHaveBeenCalled();
 	});
 });
