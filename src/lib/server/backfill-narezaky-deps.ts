@@ -7,7 +7,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { db } from './db';
 import { listOdpisPolozky, normOp } from './money';
-import { callJson2, type OdooJson2Config } from './odoo-json2';
+import { callJson2, uploadNarezak, type OdooJson2Config } from './odoo-json2';
 import type { RozpisLine } from './odoo-rozpis-lines';
 import type { CutPlan } from './narezak-cut-plan';
 import type { Cfg } from './compute';
@@ -86,8 +86,11 @@ export function makeOdooBackfillDeps(
 			pdfBase64?: string,
 			filename?: string,
 			cutPlan?: CutPlan
-		) =>
-			callJson2(odooCfg, 'sale.order', 'montalu_narezak_upload', {
+		) => {
+			// #532 R2: cez `uploadNarezak` — reaktívny cut_plan 422 fallback (PROD Odoo bez #7431
+			// odmieta neznámy kľúč `cut_plan`) + kill switch `ODOO_NAREZ_CUT_PLAN`. Vráť `cutPlanRejected`,
+			// aby `runBackfill` vedel odlíšiť „cut_plan odmietnutý (422)" od chyby / no-order.
+			const res = await uploadNarezak(odooCfg, {
 				order_number: normOp(op),
 				doc_id: docId,
 				kind: 'narezak',
@@ -95,10 +98,12 @@ export function makeOdooBackfillDeps(
 				// `has_pdf` je voliteľné pri `lines`, #6517). Idempotentne verziuje cez doc_id.
 				...(pdfBase64 ? { pdf_base64: pdfBase64, filename } : {}),
 				// #532: `cut_plan` (kontrakt #7431) — plán tyčí (bars/pieces/uhly/render_svg). Ide keď
-				// nárezák má tyče s Money kódom; intake je LENIENT (**extra), Odoo vykreslí montalu.rozpis.bar.
+				// nárezák má tyče s Money kódom; `uploadNarezak` ho na PROD 422 sám odstráni (lines+PDF ostanú).
 				...(cutPlan ? { cut_plan: cutPlan } : {}),
 				lines
-			}),
+			});
+			return { cutPlanRejected: res.cutPlanRejected };
+		},
 		log
 	};
 }
