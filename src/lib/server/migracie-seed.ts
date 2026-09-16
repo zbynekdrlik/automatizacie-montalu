@@ -872,3 +872,51 @@ export function migrateOponaIzo(db: Database.Database, bump: (v: number) => void
 		bump(47);
 	})();
 }
+
+/**
+ * v47 → v48: objednávka skla — voliteľná ŠPECIFIKÁCIA tabule pre Odoo IZOS oceňovanie (#521).
+ * Pridáva 10 `spec_*` stĺpcov na `objednavka_skla` (kľúče, ktoré appka NEVIE z katalógu — obsluha
+ * ich zadá na podklade). Aditívne + idempotentné: `ALTER TABLE … ADD COLUMN` s neutrálnym defaultom
+ * (bool→INTEGER 0, počty→INTEGER 0, texty→''), O(1), neprepíše žiaden existujúci riadok → existujúce
+ * flowy sú byte-identické (spec default vypnutý). Money-NEUTRÁLNE (objednávka u dodávateľa skla).
+ * Feature-detect tabuľky (minimálne migračné fixtúry `objednavka_skla` nemusia mať) + idempotentné
+ * pridanie stĺpca (kolóna už existuje na re-behu → preskoč).
+ */
+export function migrateObjednavkaSklaSpec(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 48) return;
+	const maTable =
+		(
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='objednavka_skla'"
+				)
+				.get() as { c: number }
+		).c === 1;
+	db.transaction(() => {
+		if (maTable) {
+			const existujuce = new Set(
+				(db.prepare('PRAGMA table_info(objednavka_skla)').all() as { name: string }[]).map(
+					(c) => c.name
+				)
+			);
+			const stlpce: [string, string][] = [
+				['spec_warm_edge', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_colored_frame', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_muntin_cross_qty', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_holes_qty', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_hole_size', "TEXT NOT NULL DEFAULT ''"],
+				['spec_cutout_small_qty', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_cutout_large_qty', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_edge_finish', "TEXT NOT NULL DEFAULT ''"],
+				['spec_hst', 'INTEGER NOT NULL DEFAULT 0'],
+				['spec_tempering_own_glass', 'INTEGER NOT NULL DEFAULT 0']
+			];
+			for (const [name, def] of stlpce) {
+				if (existujuce.has(name)) continue;
+				db.exec(`ALTER TABLE objednavka_skla ADD COLUMN ${name} ${def};`);
+			}
+			log.info('migrateObjednavkaSklaSpec: spec stĺpce pridané (#521)');
+		}
+		bump(48);
+	})();
+}

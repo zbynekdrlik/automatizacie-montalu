@@ -6,12 +6,46 @@ import type { Actions, PageServerLoad } from './$types';
 import {
 	listSklaPreZakazku,
 	nastavRezim,
+	nastavSpec,
 	zmazPolozku,
 	pridajSubor,
 	listSubory,
 	zmazSubor,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
+import {
+	HOLE_SIZES,
+	EDGE_FINISHES,
+	type GlassSpec,
+	type EdgeFinish,
+	type HoleSize
+} from '$lib/server/odoo-rozpis-lines';
+import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
+
+/** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
+function parseSpec(form: FormData): GlassSpec {
+	const bool = (n: string) => form.get(n) != null;
+	const int = (n: string) => {
+		const v = Math.trunc(Number(form.get(n) ?? 0));
+		return Number.isFinite(v) && v > 0 ? v : 0;
+	};
+	const edgeRaw = String(form.get('spec_edge_finish') ?? 'none');
+	const holeRaw = String(form.get('spec_hole_size') ?? '');
+	return {
+		warmEdge: bool('spec_warm_edge'),
+		coloredFrame: bool('spec_colored_frame'),
+		muntinCrossQty: int('spec_muntin_cross_qty'),
+		holesQty: int('spec_holes_qty'),
+		holeSize: (HOLE_SIZES as readonly string[]).includes(holeRaw) ? (holeRaw as HoleSize | '') : '',
+		cutoutSmallQty: int('spec_cutout_small_qty'),
+		cutoutLargeQty: int('spec_cutout_large_qty'),
+		edgeFinish: (EDGE_FINISHES as readonly string[]).includes(edgeRaw)
+			? (edgeRaw as EdgeFinish)
+			: 'none',
+		hst: bool('spec_hst'),
+		temperingOwnGlass: bool('spec_tempering_own_glass')
+	};
+}
 
 // Server-side file extension allowlist (#496 review RED-1: stored XSS prevention).
 // Client-side `accept` attribute is UX only — a forged POST bypasses it.
@@ -101,6 +135,27 @@ export const actions = {
 		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID súboru.' });
 		zmazSubor(id);
 		return { ok: true };
+	},
+
+	// #521: uloženie špecifikácie tabule (spec_* kľúče, ktoré appka nevie z katalógu).
+	ulozitSpec: async ({ request }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID.' });
+		try {
+			nastavSpec(id, parseSpec(form));
+		} catch (e) {
+			return fail(400, { error: e instanceof Error ? e.message : 'Neplatná špecifikácia.' });
+		}
+		return { ok: true, specUlozene: true };
+	},
+
+	// #521: odoslanie objednávky skla do Odoo (glass_order). Vracia postavený payload (náhľad) +
+	// výsledok — keď je upload vypnutý (dev/test), payload sa len zobrazí, PROD Odoo sa nevolá.
+	odoslatDoOdoo: async ({ params }) => {
+		const zak = params.zak.trim();
+		if (!zak) return fail(400, { error: 'Zákazka nie je zadaná.' });
+		const out = await uploadGlassOrderToOdoo(zak);
+		return { ok: true, odoslane: { result: out.result, payload: out.payload, error: out.error } };
 	}
-	// stiahnutSubor removed (review YELLOW-1: dead code — download uses GET endpoint)
 } satisfies Actions;

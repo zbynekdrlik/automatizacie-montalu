@@ -3,9 +3,19 @@
 	import { resolve } from '$app/paths';
 	import { modulNazov } from '$lib/modul-nazov';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
 	const zak = $derived(data.zak);
+
+	// #521: stavový text výsledku odoslania objednávky skla do Odoo
+	const odoslaneStav: Record<string, string> = {
+		uploaded: 'Odoslané do Odoo ✓',
+		disabled: 'Náhľad payloadu (odoslanie do Odoo je vypnuté v tomto prostredí)',
+		'no-items': 'Žiadne sklá na odoslanie',
+		'no-zak': 'Zákazka nie je zadaná',
+		missing: 'Zákazka nemá odpis / OP — nedá sa priradiť objednávka',
+		failed: 'Odoslanie zlyhalo'
+	};
 	const polozky = $derived(data.polozky);
 	const suboryMap = $derived(data.suboryMap);
 
@@ -128,6 +138,104 @@
 								</form>
 							</td>
 						</tr>
+						<!-- #521: voliteľná špecifikácia tabule (spec kľúče, ktoré appka nevie z katalógu) -->
+						<tr class="noprint spec-row">
+							<td colspan="8">
+								<details>
+									<summary>Ďalšie možnosti (zriedkavé) — pre presný výpočet ceny IZOS</summary>
+									<form method="POST" action="?/ulozitSpec" use:enhance class="spec-form">
+										<input type="hidden" name="id" value={p.id} />
+										<label class="chk">
+											<input type="checkbox" name="spec_warm_edge" checked={p.spec.warmEdge} /> Teplá
+											hrana
+										</label>
+										<label class="chk">
+											<input
+												type="checkbox"
+												name="spec_colored_frame"
+												checked={p.spec.coloredFrame}
+											/>
+											Farebný rámik
+										</label>
+										<label
+											>Priečky kríž (ks)
+											<input
+												type="number"
+												name="spec_muntin_cross_qty"
+												min="0"
+												value={p.spec.muntinCrossQty}
+											/></label
+										>
+										<label
+											>Otvory (ks)
+											<input
+												type="number"
+												name="spec_holes_qty"
+												min="0"
+												value={p.spec.holesQty}
+											/></label
+										>
+										<label
+											>Priemer otvoru
+											<select name="spec_hole_size">
+												<option value="d30" selected={p.spec.holeSize !== 'd50'}>4–30 mm</option>
+												<option value="d50" selected={p.spec.holeSize === 'd50'}>31–50 mm</option>
+											</select></label
+										>
+										<label
+											>Výrezy 35×60 (ks)
+											<input
+												type="number"
+												name="spec_cutout_small_qty"
+												min="0"
+												value={p.spec.cutoutSmallQty}
+											/></label
+										>
+										<label
+											>Výrezy 60×120 (ks)
+											<input
+												type="number"
+												name="spec_cutout_large_qty"
+												min="0"
+												value={p.spec.cutoutLargeQty}
+											/></label
+										>
+										<label
+											>Hrana
+											<select name="spec_edge_finish">
+												<option value="none" selected={p.spec.edgeFinish === 'none'}>žiadna</option>
+												<option value="ksr" selected={p.spec.edgeFinish === 'ksr'}
+													>KSR zrazená</option
+												>
+												<option
+													value="trapez_brusena"
+													selected={p.spec.edgeFinish === 'trapez_brusena'}>trapéz brúsená</option
+												>
+												<option
+													value="trapez_lestena"
+													selected={p.spec.edgeFinish === 'trapez_lestena'}>trapéz leštená</option
+												>
+											</select></label
+										>
+										<label class="chk">
+											<input type="checkbox" name="spec_hst" checked={p.spec.hst} /> HST
+										</label>
+										<label class="chk">
+											<input
+												type="checkbox"
+												name="spec_tempering_own_glass"
+												checked={p.spec.temperingOwnGlass}
+											/> Kalenie vlastného skla
+										</label>
+										<button
+											type="submit"
+											class="btn sm secondary"
+											data-testid={`ulozit-spec-${p.id}`}>Uložiť špecifikáciu</button
+										>
+									</form>
+								</details>
+							</td>
+						</tr>
 					{/each}
 				</tbody>
 			</table>
@@ -136,7 +244,32 @@
 
 	<div class="noprint tbl-akcie">
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<!-- #521: odoslať objednávku skla do Odoo (glass_order → IZOS oceňovanie) -->
+		<form method="POST" action="?/odoslatDoOdoo" use:enhance style="display:inline">
+			<button type="submit" class="btn" data-testid="odoslat-odoo"
+				>Odoslať objednávku skla do Odoo</button
+			>
+		</form>
 	</div>
+
+	{#if form?.odoslane}
+		<section class="noprint odoslane">
+			<p class="stav" data-testid="odoslane-stav">
+				{odoslaneStav[form.odoslane.result] ?? form.odoslane.result}{#if form.odoslane.error}
+					— {form.odoslane.error}{/if}
+			</p>
+			{#if form.odoslane.payload}
+				<details open>
+					<summary>Náhľad payloadu (to, čo ide do Odoo)</summary>
+					<pre data-testid="glass-order-payload">{JSON.stringify(
+							form.odoslane.payload,
+							null,
+							2
+						)}</pre>
+				</details>
+			{/if}
+		</section>
+	{/if}
 {/if}
 
 <style>
@@ -214,6 +347,54 @@
 	}
 	.tbl-akcie {
 		margin-top: 16px;
+		display: flex;
+		gap: 10px;
+		align-items: center;
+	}
+	.spec-row td {
+		border-bottom: 1px solid var(--m-line);
+		background: var(--m-surface-2);
+	}
+	.spec-row summary {
+		cursor: pointer;
+		font-size: 0.85rem;
+		color: var(--m-muted-ink);
+	}
+	.spec-form {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 16px;
+		align-items: center;
+		margin-top: 8px;
+		font-size: 0.85rem;
+	}
+	.spec-form label {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.spec-form input[type='number'] {
+		width: 60px;
+		padding: 2px 4px;
+	}
+	.spec-form label.chk {
+		gap: 6px;
+	}
+	.odoslane {
+		margin-top: 16px;
+	}
+	.odoslane .stav {
+		font-weight: 600;
+		color: var(--m-ink-2);
+	}
+	.odoslane pre {
+		background: var(--m-surface-2);
+		border: 1px solid var(--m-line);
+		border-radius: var(--m-radius-sm);
+		padding: 10px;
+		overflow-x: auto;
+		font-size: 0.8rem;
+		max-height: 400px;
 	}
 
 	@media print {
