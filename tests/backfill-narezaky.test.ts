@@ -517,6 +517,37 @@ function deps(over: Partial<BackfillDeps> = {}): BackfillDeps & {
 	} as BackfillDeps & { uploadLines: ReturnType<typeof vi.fn> };
 }
 
+/** #532: Robust 2K zasklenie — recompute nesie Money kódy (ZASP…) + per-profil uhly. */
+function robustZaskVstup(op: string): Vstup {
+	return {
+		zak: 'ZAKC',
+		op,
+		zakaznik: 'Test',
+		system: 'Robust',
+		styl: '2K',
+		s: 2000,
+		v: 1000,
+		sklo: 'Izolačné sklo 4/16/4 číre',
+		skloPresne: '',
+		skloTrieda: null,
+		otvaranie: '',
+		kovanieL: '',
+		kovanieP: '',
+		kovanieStred: '',
+		kovanieStredOkno: 'L',
+		vrtanieZamku: 1050,
+		poznamka: '',
+		ral: '',
+		caka: false,
+		pridavnaKolajnica: false,
+		jednostrannaFab: false,
+		farbaKovania: null,
+		kliny: [],
+		kolajnica: null,
+		sietka: null
+	} as unknown as Vstup;
+}
+
 describe('runBackfill — orchestrácia', () => {
 	it('dry-run NEPOŠLE nič (upload spy 0×), vráti dry-run akcie + počty', async () => {
 		const d = deps();
@@ -569,33 +600,75 @@ describe('runBackfill — orchestrácia', () => {
 		expect(d.uploadLines).not.toHaveBeenCalled();
 	});
 
-	it('#529: flag OFF → uploadLines bez v2 (6. arg undefined); flag ON → v2 prítomné', async () => {
-		const prev = process.env.ODOO_NAREZ_LINES_V2;
-		try {
-			delete process.env.ODOO_NAREZ_LINES_V2;
-			const off = deps();
-			await runBackfill(
-				[row({ id: 1, op: 'OP2D', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
-				off,
-				{ dryRun: false, delayMs: 0 }
-			);
-			expect(off.uploadLines.mock.calls[0]![5]).toBeUndefined();
+	it('#532: pergola CAD (bez Money kódov) → cut_plan VYNECHANÝ (6. arg undefined)', async () => {
+		// pergola/fix/clip idú cez `materialRowsFromRozpis` s `kod:''` → žiadna tyč nemá Money kód
+		// → `buildCutPlan` vráti undefined → kľúč sa nepošle (kontrakt: profile_kod nikdy prázdny).
+		const d = deps();
+		await runBackfill(
+			[row({ id: 1, op: 'OP2D', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(d.uploadLines.mock.calls[0]![5]).toBeUndefined();
+	});
 
-			process.env.ODOO_NAREZ_LINES_V2 = '1';
-			const on = deps();
-			await runBackfill(
-				[row({ id: 1, op: 'OP2E', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
-				on,
-				{ dryRun: false, delayMs: 0 }
-			);
-			const v2 = on.uploadLines.mock.calls[0]![5] as { lines: unknown[]; sumar: unknown[] };
-			expect(v2).toBeDefined();
-			expect(v2.lines.length).toBeGreaterThan(0);
-			expect(v2.sumar.length).toBeGreaterThan(0);
-		} finally {
-			if (prev === undefined) delete process.env.ODOO_NAREZ_LINES_V2;
-			else process.env.ODOO_NAREZ_LINES_V2 = prev;
+	it('#532: zasklenia (Money kódy) → cut_plan PRÍTOMNÝ s tyčami (bars[].profile_kod neprázdny)', async () => {
+		// zasklenia recompute nesie Money kódy profilov (ZASP…) + per-profil uhly → bars sa naplnia.
+		const d = deps();
+		await runBackfill(
+			[
+				row({
+					id: 1,
+					op: 'OP2F',
+					modul: 'zasklenia',
+					detail: JSON.stringify({ vstupRaw: robustZaskVstup('OP2F') })
+				})
+			],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		const cutPlan = d.uploadLines.mock.calls[0]![5] as {
+			version: number;
+			bars: { profile_kod: string; pieces: unknown[]; render_svg: string }[];
+		};
+		expect(cutPlan).toBeDefined();
+		expect(cutPlan.version).toBe(1);
+		expect(cutPlan.bars.length).toBeGreaterThan(0);
+		// každý vydaný bar nesie neprázdny Money kód + aspoň jeden kus + SVG
+		for (const b of cutPlan.bars) {
+			expect(b.profile_kod).not.toBe('');
+			expect(b.pieces.length).toBeGreaterThan(0);
+			expect(Buffer.from(b.render_svg, 'base64').toString('utf8').startsWith('<svg')).toBe(true);
 		}
+	});
+
+	it('#532: mixovaná OP (zasklenia + pergola) → cut_plan má zasklenia tyče A LOG na vynechané pergola tyče', async () => {
+		// review nález: v mixovanej OP je `cutPlan` pravdivý (zasklenia s kódmi), ale pergola tyče
+		// (bez Money kódu) sa tichým dropom nedostanú do plánu — musí sa to ZALOGOVAŤ (kontrakt).
+		const log = vi.fn();
+		const d = deps({ log });
+		await runBackfill(
+			[
+				row({
+					id: 1,
+					op: 'OP2G',
+					modul: 'zasklenia',
+					detail: JSON.stringify({ vstupRaw: robustZaskVstup('OP2G') })
+				}),
+				row({ id: 2, op: 'OP2G', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })
+			],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		const cutPlan = d.uploadLines.mock.calls[0]![5] as { bars: unknown[] } | undefined;
+		expect(cutPlan).toBeDefined();
+		expect(cutPlan!.bars.length).toBeGreaterThan(0); // zasklenia tyče (coded)
+		// pergola tyče (bez kódu) vynechané → log fire-ol s planSent:true a bezKodu>0
+		const bezKoduLog = log.mock.calls.find((c) => String(c[1]).includes('bez Money kódu'));
+		expect(bezKoduLog).toBeDefined();
+		const ctx = bezKoduLog![2] as { planSent: boolean; bezKodu: number };
+		expect(ctx.planSent).toBe(true);
+		expect(ctx.bezKodu).toBeGreaterThan(0);
 	});
 
 	it('per-OP kombinácia: dva moduly tej istej OP → JEDEN upload so spojenými lines', async () => {

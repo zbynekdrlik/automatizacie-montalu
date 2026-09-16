@@ -41,15 +41,8 @@ export function isNarezUploadEnabled(): boolean {
 	return process.env.ODOO_NAREZ_UPLOAD_ENABLED === '1';
 }
 
-/**
- * #529: Feature flag pre v2 nárezák payload (`narezak_v2` — tyče/uhly/odpad/obrázky per tyč +
- * sumár per profil). Default OFF: Odoo strana v2 zatiaľ nevykresľuje (odoo-erp #6949). Intake je
- * LENIENT (top-level `**extra` + per-riadok `.get()` — overené), takže posielanie v2 je bezpečné
- * a spätne kompatibilné, ale kým Odoo v2 nevykreslí, je zbytočné ho posielať → default OFF.
- */
-export function isNarezLinesV2Enabled(): boolean {
-	return process.env.ODOO_NAREZ_LINES_V2 === '1';
-}
+// #532: `narezak_v2` groundwork (za flagom `ODOO_NAREZ_LINES_V2`) je ODSTRÁNENÝ — nahradený
+// `cut_plan` (`narezak-cut-plan.ts`), ktorý ide VŽDY (bez flagu), keď nárezák má tyče s Money kódom.
 
 export class OdooJson2Error extends Error {
 	status: number;

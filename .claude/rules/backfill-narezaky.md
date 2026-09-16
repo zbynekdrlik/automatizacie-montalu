@@ -65,8 +65,16 @@ to isté čo výtlačok appky (nie len textové `lines`).
   (`Narezak-<zak>-<stamp>.pdf`). **Best-effort:** keď generovanie PDF zlyhá, pošlú sa len `lines`
   (endpoint PDF nevyžaduje, #6517). PDF sa generuje LEN v `--live` behu (nie dry-run).
 - Idempotencia PDF: doc_id `backfill-narezak-<op>` verziuje tú istú prílohu (nová verzia, neduplikuje).
-- v2 payload (`narezak_v2`) sa pri backfille pridá za flagom `ODOO_NAREZ_LINES_V2=1` (default OFF) —
-  viď `plan-rezov-kiosk.md` „v2 payload groundwork".
+- **#532: `cut_plan` payload** sa pri backfille pridá VŽDY (bez flagu), keď má skombinovaný materiál
+  tyče s Money kódom (`buildCutPlan(combinedMaterial)`, `narezak-cut-plan.ts`). Nahradil #529 v2
+  (`narezak_v2` za flagom, odstránený). **Dôsledok pre backfill:** pergola/fix/clip idú cez
+  `materialRowsFromRozpis` s `kod:''` → ich tyče sa VYNECHAJÚ (kontrakt: `profile_kod` nikdy
+  prázdny), takže `cut_plan` naplnia LEN **zasklenia** odpisy (recompute nesie ZASP…/BPP… kódy). V
+  mixovanej OP (zasklenia + pergola) je `cut_plan` prítomný so zaskliavacími tyčami a vynechanie
+  pergola tyčí sa **zaloguje** (`log('info', …, {op, bezKodu, planSent})`, `pocetVynechanychBezKodu`).
+  Detail kontraktu (`bars/pieces/angle/label/render_svg`) → `plan-rezov-kiosk.md` „`cut_plan` payload".
+- **Overenie backfillu (#532):** po `--days 30 --live` → PROD read-back `montalu.rozpis.bar` > 0 per
+  (zaskliavacia) OP; montalu1 sleduje watcherom, tablet „Rezanie" ukáže tyč graficky (odoo-erp 7431).
 
 ## Idempotencia + bezpečnosť
 
