@@ -38,6 +38,56 @@ The Odoo side reads from two SQLite tables:
 The FK has `ON DELETE CASCADE` — deleting a glass item auto-deletes its files.
 `foreign_keys = ON` is set in `db.ts` at connection time.
 
+## `glass_order` API export do Odoo + špecifikácia tabule pre IZOS oceňovanie (#521)
+
+Objednávka skla sa DNES posiela do Odoo cez `POST /json/2/sale.order/montalu_narezak_upload`
+s `glass_order.items[]` (NIE už len „Odoo číta SQLite" — to bol pôvodný #496 zámer; skutočný
+kontrakt je API). Kód:
+
+- **Payload builder** `buildGlassOrder(items)` + `derivGlassComposition(typSkla)` sú v
+  `src/lib/server/odoo-rozpis-lines.ts` (deklarovaný „domov payload shapingu"). Čisté, žiadny IO.
+- **Upload** `uploadGlassOrderToOdoo(zak)` v `src/lib/server/odoo-glass-order-upload.ts` —
+  reuse `odoo-json2` (`callJson2`/`odooJson2Config`/`isNarezUploadEnabled`), OP z
+  `zakazkaPrehlad` (live-first, ako plan-rezov upload), `kind='sklo'`, `doc_id='glass-order-<zak>-<op>'`,
+  fire-and-forget, **Money-NEUTRÁLNE** (objednávka u dodávateľa skla). VŽDY vráti postavený
+  `payload` (pre náhľad na podklade), aj keď upload vypnutý/zlyhal; NIKDY nehádže.
+- **Podklad** `/objednavka-skla/[zak]`: per-riadok `<details>` „Ďalšie možnosti (zriedkavé)"
+  (default off) → akcia `ulozitSpec`; akcia `odoslatDoOdoo` (náhľad `<pre data-testid="glass-order-payload">`
+  + gated upload). Keď `ODOO_NAREZ_UPLOAD_ENABLED !== 1` → len náhľad, PROD Odoo sa NEVOLÁ.
+
+### Spec kľúče (PLOCHÉ na item, NIE vnorené pod `spec`)
+
+Kontrakt: `zbynekdrlik/odoo-erp` `.claude/rules/montalu-narezak-upload.md` (@ develop po #7378).
+5 základných kľúčov (`width_mm/height_mm/glass_type/qty/note`) je BIT-IDENTICKÝCH keď žiadny spec.
+Voliteľné (pridané LEN keď non-default): `composition`, `spacer_mm`, `warm_edge`, `colored_frame`,
+`muntin_cross_qty`, `holes_qty`, `hole_size` (`d30` 4–30mm | `d50` 31–50mm — **posiela sa VŽDY keď
+holes_qty>0, default d30**, lebo Odoo defaultne na d50/vyššiu sadzbu), `cutout_small_qty`,
+`cutout_large_qty`, `edge_finish` (`none|ksr|trapez_brusena|trapez_lestena`, `none` sa vynecháva),
+`hst`, `tempering_own_glass`. `catalog_code` appka NEPOZNÁ (IZOS kódy) → neposiela.
+
+### Derivácia `composition` z `typ_skla` (KONZERVATÍVNA — radšej vynechať než mis-price)
+
+`typ_skla` je voľnotextový názov (žiadna katalóg→zloženie mapa v `sklo.ts`). `derivGlassComposition`:
+
+| vzor `typ_skla` | composition | spacer_mm |
+|---|---|---|
+| IZO `A/B/C`\|`A.B.C` (aj `5esg/14/5esg`), stred `B>=6` | `A-B-C` (+` ESG` ak „esg"/„kalen") | `B` |
+| jednosklo `N mm` + kalené/esg | `N ESG` | — |
+| jednosklo `N mm` bez kalenia | `N` | — |
+| VSG kód `dd.d` (44.2) / `d.d.d` (3.3.1, 4.4.2) | ten kód | — |
+| „polykarbonát…" / nerozpoznané | — (omit) | — |
+
+Guard `B>=6` odlíši IZO od VSG kódu (`3.3.1`→B=3<6 → NIE IZO). Odoo mapuje `glass_type`
+tolerantne aj bez `composition`, takže vynechanie je bezpečné; NESPRÁVNE zloženie by mis-priclo.
+
+### Perzistencia + migrácia
+
+Spec kľúče, ktoré appka nevie z katalógu, sa ukladajú do `objednavka_skla` `spec_*` stĺpcov
+(migrácia **v48**, aditívne ADD COLUMN, defaulty vypnuté → existujúce toky byte-identické).
+`nastavSpec(id, spec)` validuje (neplatný počet/hrana = throw pred zápisom → akcia `fail(400)`);
+`mapSpec` normalizuje neplatné uložené texty na predvolené. Deriváty (composition/spacer) sa
+NEUKLADAJÚ — počítajú sa pri builde z `typ_skla`.
+
 ## Module integration (producers) — WIRED (round 2)
 
 Each module page has a `pridatSkla` (or `pridatSklaMulti`) named form action that
