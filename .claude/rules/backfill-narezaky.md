@@ -16,6 +16,34 @@ istým enginom modulu z uloženého `detail` a pošle do Odoo `montalu.rozpis.li
 `montalu_narezak_upload` cestu (#522), aby tablet „Čo rezať" (odoo-erp #6949) mal riadky aj pre už
 rozpracované zákazky. Nadväzuje na #522 (živý plán-rezov upload).
 
+## cut_plan 422 fallback + kill switch (R2 hotfix #532)
+
+**Príznak:** `--live` beh (alebo živý plán-rezov save) → HTTP **422 `ValidationError: Neznámy
+parameter: cut_plan`** z `POST /json/2/sale.order/montalu_narezak_upload`. PROD Odoo ešte NEmá
+odoo-erp#7431 (param `cut_plan` + model `montalu.rozpis.bar`), a intake (`sale_order_narezak.py`)
+odmieta neznáme top-level kľúče — raise **PRED** vyhľadaním objednávky (~r. 274 vs ~r. 340), takže
+422 dostane KAŽDÁ zákazka s `cut_plan` bez ohľadu na existenciu (16.9.: 26× 422).
+
+**Riešenie (transport helper `uploadNarezak`, `odoo-json2.ts`):** OBA call-sites
+(`odoo-plan-rezov-upload.ts`, `backfill-narezaky-deps.ts`) idú cezeň. Na 422 so správou match
+`/nezn\S*my parameter:.*cut_plan/i` zopakuje TEN ISTÝ upload **BEZ `cut_plan`** (lines+PDF vždy
+doručené), warn RAZ za proces, a vráti `{ cutPlanRejected: true }`. `runBackfill` to počíta v
+`summary.cutPlanOdmietnutych` (CLI riadok `cut_plan odmietnutý(422)`), NIE ako chybu.
+
+**Kill switch:** env **`ODOO_NAREZ_CUT_PLAN=0`** (alebo `false`, case-insensitive) úplne vypne
+posielanie `cut_plan` (žiadny 422, žiadny retry — hneď lines+PDF). Default ON (env neset). Použi keď
+chceš eliminovať aj reaktívny retry, kým #7431 nepristane.
+
+**Klasifikácia upload chýb (opravené #532 R2):** LEN stabilný token `montalu_order_not_found` →
+`skip-no-order`; každá iná 4xx/5xx (vrátane 422 mimo cut_plan) → `error` so správou. Predtým sa pod
+`precheckUnverified` (read 403 — na PROD VŽDY) mapovala AKÁKOĽVEK upload chyba na no-order, čím sa
+26× 422 skrylo ako „Skip — bez objednávky".
+
+**Re-run po nasadení odoo-erp#7431 (montalu1 ohlási):** intake potom `cut_plan` prijme, fallback
+prestane fire-ovať sám (auto-heal). Spusti backfill znova (`--live`) — `cut_plan odmietnutý(422)`
+klesne na 0, a over PROD read-back `montalu.rozpis.bar > 0` per zaskliavaciu OP (tablet Rezanie
+ukáže tyč graficky). Netreba žiadny kód-zásah ani vypnutie kill switchu.
+
 ## Architektúra (prečo endpoint + wrapper, nie samostatný CLI)
 
 Deployed kontajner je **bundle-only** (Dockerfile kopíruje LEN `build/` + prod `node_modules`, žiadny
@@ -122,6 +150,9 @@ vetva prestane spúšťať sama (reads prejdú → presná cesta) — netreba ni
 Predpoklad na VPS `.env` (`/opt/automatizacie-montalu/.env`) + reštart:
 `ODOO_NAREZ_UPLOAD_ENABLED=1`, `ODOO_JSON2_URL`, `ODOO_JSON2_API_KEY`, a **`BACKFILL_TOKEN=<náhodný>`**
 (server aj wrapper ho čítajú z env kontajnera; po behu ODSTRÁŇ token z `.env` + reštart).
+Voliteľne **`ODOO_NAREZ_CUT_PLAN=0`** (kill switch #532 R2 — vypne posielanie `cut_plan`; default ON,
+viď sekcia „cut_plan 422 fallback" vyššie). Kým PROD nemá odoo-erp#7431, `cut_plan` sa aj tak reaktívne
+odstráni na 422 (lines+PDF doručené) — kill switch je len na elimináciu retry.
 
 ```bash
 # 1) DRY-RUN (nič neposiela; vypíše zoznam OP × modul × počet riadkov + skip počty)

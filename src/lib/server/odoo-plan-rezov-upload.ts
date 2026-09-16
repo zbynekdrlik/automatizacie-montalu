@@ -16,7 +16,7 @@
 // `sale.order.name === normOp(op)`. Ak zákazka nemá odpis (alebo `zak` prázdny) → skip (plán nie je
 // viazaný na objednávku).
 import { logger } from './log';
-import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
+import { uploadNarezak, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
 import { normOp, normZak } from './money';
 import { zakazkaPrehlad } from './zakazka-ceny';
 import { parsePlanRezov } from './plan-rezov-vstup';
@@ -176,7 +176,11 @@ export async function uploadPlanRezovToOdoo(
 			});
 		}
 
-		const uploadResult = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', {
+		// #532 R2: cez `uploadNarezak` — reaktívny cut_plan 422 fallback (PROD Odoo bez odoo-erp#7431
+		// odmieta neznámy kľúč `cut_plan` 422 → upload sa zopakuje BEZ neho, lines+PDF vždy doručené) +
+		// kill switch `ODOO_NAREZ_CUT_PLAN`. CAD planner /plan-rezov píše `kod:''`, takže tu je `cutPlan`
+		// typicky undefined; fallback drží kontrakt aj keby raz materiál niesol kódy.
+		const up = await uploadNarezak(cfg, {
 			order_number: orderNumber,
 			doc_id: docId,
 			kind: 'narezak',
@@ -192,7 +196,8 @@ export async function uploadPlanRezovToOdoo(
 			orderNumber,
 			docId,
 			linesCount: lines.length,
-			result: uploadResult
+			cutPlanRejected: up.cutPlanRejected,
+			result: up.result
 		});
 		return { result: 'uploaded' };
 	} catch (e) {

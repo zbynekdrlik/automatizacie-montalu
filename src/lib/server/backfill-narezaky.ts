@@ -324,7 +324,7 @@ export interface BackfillDeps {
 		pdfBase64?: string,
 		filename?: string,
 		cutPlan?: CutPlan
-	) => Promise<unknown>;
+	) => Promise<{ cutPlanRejected?: boolean } | void>;
 	log?: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 	sleep?: (ms: number) => Promise<void>;
 }
@@ -371,8 +371,18 @@ export interface BackfillSummary {
 	existenciaNeoverena: number;
 	driftOp: number;
 	chyb: number;
+	/** #532 R2: OP, kde PROD Odoo odmietol `cut_plan` 422 „Neznámy parameter" a upload prebehol BEZ
+	 *  neho (lines+PDF doručené). Nie chyba — kým odoo-erp#7431 nepristane na PROD. */
+	cutPlanOdmietnutych: number;
 	ops: BackfillOpSummary[];
 }
+
+/**
+ * #532 R2: stabilný token skutočnej neexistencie objednávky z intake (odoo-erp
+ * `sale_order_narezak.py`: `UserError("montalu_order_not_found: objednávka „%s" nie je v Odoo …")`).
+ * LEN táto správa → `no-order`; každá iná upload chyba (4xx/5xx) → `error` (nikdy tichý no-order).
+ */
+const ORDER_NOT_FOUND_RE = /montalu_order_not_found/i;
 
 /** najnovší odpis vyhráva: vyššie `created_at` (string YYYY-MM-DD HH:MM:SS je lexikograficky
  *  monotónny), tie-break vyššie `id`. */
@@ -433,6 +443,7 @@ export async function runBackfill(
 		existenciaNeoverena: 0,
 		driftOp: 0,
 		chyb: 0,
+		cutPlanOdmietnutych: 0,
 		ops: []
 	};
 
@@ -591,30 +602,33 @@ export async function runBackfill(
 		}
 
 		try {
-			await deps.uploadLines(op, docId, combined, pdfBase64, filename, cutPlan);
+			const up = await deps.uploadLines(op, docId, combined, pdfBase64, filename, cutPlan);
 			opSum.akcia = 'uploaded';
 			summary.nahranych++;
 			summary.riadkovSpolu += combined.length;
 			if (precheckUnverified) summary.existenciaNeoverena++; // upload existenciu potvrdil
+			// #532 R2: transport helper musel odstrániť cut_plan (PROD Odoo 422 „Neznámy parameter") —
+			// upload prebehol bez neho (lines+PDF doručené). Počítaj oddelene, NIE ako chybu.
+			if (up && up.cutPlanRejected) summary.cutPlanOdmietnutych++;
 			log('info', 'backfill: nahrané riadky', {
 				op,
 				docId,
 				riadkov: combined.length,
 				pdf: pdfBase64 != null,
-				neoverena: precheckUnverified
+				neoverena: precheckUnverified,
+				cutPlanRejected: !!(up && up.cutPlanRejected)
 			});
 		} catch (e) {
 			const errMsg = e instanceof Error ? e.message : String(e);
-			if (precheckUnverified) {
-				// #524 R2: existencia nebola overená → upload zamietol → objednávka pravdepodobne
-				// neexistuje. Mapuj na no-order (nie chyba). Review 🟡: log na WARN + errMsg na opSum,
-				// aby genuine transport chyba (5xx/timeout) na REÁLNE existujúcej OP NEostala skrytá
-				// pod „Chýb: 0" — operátor ju vidí v CLI (⚠ pri riadku OP) aj v server WARN logu.
+			// #532 R2 KLASIFIKÁCIA (opravuje #524 R2): NEmapuj každú upload chybu pod precheckUnverified
+			// na no-order — to maskovalo 26× 422 „Neznámy parameter: cut_plan" ako „Skip — bez objednávky".
+			// LEN skutočný token neexistencie objednávky (`montalu_order_not_found`) → no-order; každá iná
+			// 4xx/5xx (vrátane 422 mimo cut_plan, ktorý má transport helper vlastný fallback) → error.
+			if (ORDER_NOT_FOUND_RE.test(errMsg)) {
 				opSum.akcia = 'skip-no-order';
-				opSum.error = errMsg;
 				summary.skipNoOrder++;
-				summary.existenciaNeoverena++;
-				log('warn', 'backfill: neoverená OP zamietnutá uploadom → no-order', {
+				if (precheckUnverified) summary.existenciaNeoverena++;
+				log('warn', 'backfill: upload → objednávka neexistuje (montalu_order_not_found)', {
 					op,
 					docId,
 					err: errMsg
@@ -642,7 +656,8 @@ export async function runBackfill(
 		skipUnreconstructable: summary.skipUnreconstructable,
 		existenciaNeoverena: summary.existenciaNeoverena,
 		driftOp: summary.driftOp,
-		chyb: summary.chyb
+		chyb: summary.chyb,
+		cutPlanOdmietnutych: summary.cutPlanOdmietnutych
 	});
 	return summary;
 }
