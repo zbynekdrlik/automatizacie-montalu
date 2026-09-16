@@ -222,6 +222,106 @@ describe('mapOdpisToLines — zasklenia (seeded DB, rekomputa z detail.vstupRaw)
 	});
 });
 
+describe('mapOdpisToLines — samostatná sieťka (pod modul=zasklenia, seeded DB)', () => {
+	const sietkaDetail = {
+		sietkaSamostatna: true,
+		system: 'Robust',
+		styl: '2K',
+		otvorS: 2509,
+		otvorV: 1930
+	};
+
+	it('sietkaSamostatna → lines z materiálu sieťky (mj ks, kod prázdny)', () => {
+		const res = mapOdpisToLines(
+			row({ modul: 'zasklenia', detail: JSON.stringify(sietkaDetail) }),
+			[],
+			cfg
+		);
+		expect(res.status).toBe('lines');
+		if (res.status !== 'lines') return;
+		expect(res.lines.length).toBeGreaterThan(0);
+		expect(res.lines.every((l) => l.mj === 'ks' && l.kod === '')).toBe(true);
+	});
+
+	it('sietkaSamostatnaMulti → riadky všetkých kusov (2× kus = 2× toľko)', () => {
+		const single = mapOdpisToLines(
+			row({ modul: 'zasklenia', detail: JSON.stringify(sietkaDetail) }),
+			[],
+			cfg
+		);
+		const kus = { system: 'Robust', styl: '2K', otvorS: 2509, otvorV: 1930 };
+		const multi = mapOdpisToLines(
+			row({
+				modul: 'zasklenia',
+				detail: JSON.stringify({ sietkaSamostatnaMulti: true, kusy: [kus, kus] })
+			}),
+			[],
+			cfg
+		);
+		expect(single.status).toBe('lines');
+		expect(multi.status).toBe('lines');
+		if (single.status !== 'lines' || multi.status !== 'lines') return;
+		expect(multi.lines.length).toBe(single.lines.length * 2);
+	});
+});
+
+describe('mapOdpisToLines — zasklenia zimná záhrada (multiZasklenie, seeded DB)', () => {
+	const posuv = {
+		system: 'Robust',
+		styl: '2K',
+		s: 2000,
+		v: 1000,
+		sklo: 'Izolačné sklo 4/16/4 číre',
+		skloPresne: '',
+		skloTrieda: null,
+		otvaranie: '',
+		kovanieL: '',
+		kovanieP: '',
+		kovanieStred: '',
+		kovanieStredOkno: 'L',
+		kliny: [],
+		kolajnica: null,
+		sietka: null
+	};
+	const multiVstup = {
+		zak: 'ZAK9',
+		op: 'OP260901',
+		zakaznik: 'Test',
+		poznamka: '',
+		ral: '',
+		caka: false,
+		pridavnaKolajnica: false,
+		jednostrannaFab: false,
+		farbaKovania: null,
+		posuvy: [posuv]
+	};
+
+	it('multiZasklenie → lines zo všetkých posuvov', () => {
+		const res = mapOdpisToLines(
+			row({
+				modul: 'zasklenia',
+				detail: JSON.stringify({ multiZasklenie: true, vstupRaw: multiVstup })
+			}),
+			[],
+			cfg
+		);
+		expect(res.status).toBe('lines');
+		if (res.status !== 'lines') return;
+		expect(res.lines.length).toBeGreaterThan(0);
+		expect(res.lines.every((l) => l.mj === 'ks' && l.kod === '')).toBe(true);
+	});
+
+	it('multiZasklenie bez vstupRaw → skip unreconstructable', () => {
+		expect(
+			mapOdpisToLines(
+				row({ modul: 'zasklenia', detail: JSON.stringify({ multiZasklenie: true }) }),
+				[],
+				cfg
+			)
+		).toEqual({ status: 'skip', reason: 'unreconstructable' });
+	});
+});
+
 describe('mapOdpisToLines — mimo záberu', () => {
 	it('bazén → skip out-of-scope (žiadny rozpis rezov)', () => {
 		expect(mapOdpisToLines(row({ modul: 'bazen' }), [], cfg)).toEqual({
