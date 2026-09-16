@@ -3,13 +3,13 @@ paths:
   - "src/lib/server/odoo-plan-rezov-upload.ts"
   - "src/lib/server/odoo-rozpis-lines.ts"
   - "src/lib/server/narezak-pdf.ts"
-  - "src/lib/server/narezak-lines-v2.ts"
+  - "src/lib/server/narezak-cut-plan.ts"
   - "src/lib/server/profil-png.ts"
   - "src/lib/server/pdf-common.ts"
   - "scripts/gen-profil-png.mjs"
   - "src/routes/plan-rezov/**"
   - "tests/narezak-pdf.test.ts"
-  - "tests/narezak-lines-v2.test.ts"
+  - "tests/narezak-cut-plan.test.ts"
   - "tests/odoo-plan-rezov-upload.test.ts"
   - "tests/odoo-rozpis-lines.test.ts"
   - "tests/odoo-rozpis-lines-money-safety.test.ts"
@@ -31,7 +31,8 @@ cutterovi) — rozpis+ceny odteraz žijú LEN v internej `mt_note` (viď `odoo-z
 - `src/lib/server/narezak-pdf.ts` (#529) — **GRAFICKÝ** generátor PDF z `MaterialRow[]`
   (pdf-lib cez `pdf-common.ts`, BEZ cien). Nahradil textový `plan-rezov-pdf.ts` (zmazaný).
   Kreslí tyče proporčne s rezmi/uhlami/odpadom/obrázkami — zrkadlí `RozpisRezov.svelte`.
-- `src/lib/server/narezak-lines-v2.ts` (#529) — v2 payload builder (`buildNarezakV2`, za flagom).
+- `src/lib/server/narezak-cut-plan.ts` (#532) — `cut_plan` payload builder (`buildCutPlan` +
+  `renderBarSvg`); nahradil #529 v2 (`narezak-lines-v2.ts`, zmazaný). Ide VŽDY (bez flagu).
 - `src/lib/server/profil-png.ts` (#529) — server-only base64 PNG obrázky profilov (generované
   `scripts/gen-profil-png.mjs` cez `dwebp`; pdf-lib nevie webp).
 - `src/lib/server/odoo-plan-rezov-upload.ts` — `queuePlanRezovUpload` (fire-and-forget
@@ -62,18 +63,38 @@ now)`) to kreslí; obe upload cesty (plán-rezov save + backfill) ho kŕmia `Mat
 - **Vizuálne overenie PDF:** `pdftoppm -png -r 90 x.pdf out` (na dev boxe) → screenshot, potom
   posúď nákres tyčí očami. `MaterialRow` už NESIE všetko (`bary`/`sikmyRez`/`kod`/`barLen`/odpad).
 
-## v2 payload groundwork (#529) — kontrakt appka↔odoo-erp #6949
+## `cut_plan` payload (#532) — kontrakt appka↔odoo-erp 7431 (tablet pri píle)
 
-Intake `montalu_narezak_upload` je **LENIENT** (overené v odoo-erp `sale_order_narezak.py`):
-signatúra má `**extra` (top-level neznáme kľúče IGNORUJE) a `_montalu_rozpis_lines_intake` číta
-per-riadok LEN `kod/nazov/mnozstvo/mj/dlzka/poznamka` cez `.get()` (per-riadok neznáme IGNORUJE).
-Takže v2 polia sa dajú posielať bezpečne. `narezak_v2` ide ako SAMOSTATNÝ top-level kľúč (NIE ako
-ďalšie riadky v `lines[]` — tie by dnes kiosk zobrazil ako nepochopené); v1 `lines` (profil×dĺžka)
-OSTÁVAJÚ nezmenené. Za flagom `ODOO_NAREZ_LINES_V2=1` (default OFF, kým Odoo v2 nevykreslí).
-`buildNarezakV2(MaterialRow[])`: 1 riadok = 1 tyč (`kod/tyc_index/tyc_pocet/tyc_dlzka_mm/rezy_mm[]/
-uhol_l/uhol_r/odpad_mm/posuv?/profil_obrazok?`) + `sumar` per profil. `profil_obrazok` = absolútna
-`https://app.montalu.cloud/profil/<kod>.webp` (`APP_PUBLIC_URL` override). `posuv` len keď je tyč
-z JEDNÉHO posuvu (zmiešaná ho vynechá). Money-neutrálne (`kod` = profilový kód, NIE cena).
+Intake `montalu_narezak_upload` je **LENIENT** (`**extra` top-level IGNORUJE neznáme kľúče), takže
+`cut_plan` sa posiela bezpečne popri `lines` + PDF (tie OSTÁVAJÚ nezmenené). `cut_plan` NAHRADIL
+#529 v2 (`narezak_v2` za flagom) — ide **VŽDY** (bez flagu), keď nárezák má tyče s Money kódom.
+
+`buildCutPlan(MaterialRow[])` → `{ version:1, bars:[…] }` alebo **`undefined`** keď žiadna tyč nemá
+kód (kľúč sa vynechá úplne — žiadne prázdne polia). JEDEN `bars[]` = JEDNA fyzická tyč
+(`Tyc = MaterialRow.bary[i]`), v poradí profilov ako grafický PDF (JEDEN zdroj pravdy s
+`narezak-pdf.ts drawBar`):
+
+- `bar_id` = `B1`/`B2`… 1-based **len cez vydané tyče** (bez-kódu tyče `bar_id` nedostanú).
+- `profile_kod` = `MaterialRow.kod` (Money kód) — **NIKDY prázdny**; tyč bez kódu sa VYNECHÁ +
+  zaloguje (`pocetVynechanychBezKodu`, log fire-uje vždy keď `bezKodu>0`, aj v mixovanej OP kde je
+  `cutPlan` pravdivý — `planSent` flag).
+- `pieces[]` = `Tyc.kusy[]` v poradí rezu: `seq` 1-based, `length_mm = Kus.rozmer` (finálna dĺžka
+  s prerezom, ako popisok na kresbe), `angle_left/right_deg` = per-profil `(sikmyRez ?? true)?45:90`
+  (oba konce rovnaké — per-kus uhly štruktúra `Kus` nemá, NEVYMÝŠĽAJ; pergola krov #161 sem
+  nepríde), `label` = `(posuv?"Z{posuv} ":"") + fmt(rozmer)`, `qty` vždy 1 (1 záznam = 1 rez).
+- `waste_mm = round(Tyc.zvysok)`, `stock_length_mm = round(MaterialRow.barLen)`, `note = ""`.
+- `render_svg` = base64 kompaktného samostatného SVG per tyč (`renderBarSvg`), ROVNAKÁ geometria
+  ako `drawBar` (proporčné segmenty ∝ `Kus.dlzka`, 45° lichobežník `s=250·scale` klampovaný
+  `segW/2-0.5`, koncový odpad; SVG y DOLE vs PDF y HORE). Money-neutrálne (žiadne ceny).
+
+**KRITICKÁ PASCA (stálo ma to čas — runtime sonda):** `cut_plan` sa naplní **LEN pri zaskleniach**
+(recompute nesie Money kódy ZASP…/BPP…). `spocitajPlanRezov` (CAD planner `/plan-rezov`) píše
+`kod:''` (`plan-rezov.ts` „display-only") a backfill CAD moduly (pergola/fix/clip cez
+`materialRowsFromRozpis`) tiež `kod:''` → tam sa `cut_plan` VŽDY vynechá (len `lines`+PDF idú). Preto
+je overovacia cesta read-backom `montalu.rozpis.bar` **backfill zasklení**, nie /plan-rezov save.
+
+**Overenie (montalu1 watcher):** po deploy backfill (`--days 30 --live`) → Odoo PROD read-back
+`montalu.rozpis.bar` > 0 pre nahratú (zaskliavaciu) zákazku; tablet „Rezanie" ukáže tyč graficky.
 
 ## OP + zákazník sa ODVODZUJÚ z odpisu (uložený plán ich nedrží)
 
