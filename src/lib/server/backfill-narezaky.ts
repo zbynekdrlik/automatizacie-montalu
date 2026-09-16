@@ -1,0 +1,482 @@
+// #524: BACKFILL nárezákov (ostrých odpisov) za posledný mesiac → Odoo `lines` (rozpis rezov).
+//
+// Historické odpisy (`odpis_log`) nikdy nevyprodukovali `montalu.rozpis.line` — tie vznikajú len z
+// uloženia plánu rezov (#522). Tento nástroj pre posledných ~N dní `odpis_log` (`live=1`) znovu
+// dopočíta rozpis rezov TÝM ISTÝM enginom modulu z uloženého `detail`, namapuje na `lines` cez
+// zdieľaný #522 builder (`rozpisLinesFromMaterial` — JEDEN zdroj pravdy) a pošle cez existujúcu
+// `montalu_narezak_upload` cestu.
+//
+// KĽÚČOVÉ (Odoo kontrakt `montalu-narezak-upload.md`): `lines` upload NAHRADÍ VŠETKY
+// `montalu.rozpis.line` na objednávke (doc_id verziuje len PDF). Preto sa grupuje PER OP a lines
+// všetkých modulov OP sa skombinujú do JEDNÉHO uploadu (nie per-modul — to by sa moduly navzájom
+// prepísali). Idempotencia = ADDITIVE: OP, ktorý už riadky má, sa preskočí (chráni živé #522 riadky,
+// opätovný beh je no-op).
+//
+// Money-NEUTRÁLNE: žiadny zápis do Money ani `odpis_log`; iba READ (`detail`/`odpis_polozky`) a
+// upload `lines` na Odoo. Rekomputa je čistá (pure engine z `detail.vstupRaw`/CAD). `content_hash`
+// / uložené `odpis_polozky` slúžia len na detekciu driftu vzorcov („spätne dopočítané").
+//
+// DI (dependency injection): orchestrácia dostáva READ/UPLOAD funkcie zvonka (`BackfillDeps`), takže
+// unit testy dodajú fake transport + fake rows bez native DB / bez PROD Odoo (vzor #522
+// `setJson2Transport`). CLI (`src/scripts/backfill-narezaky.ts`) zapojí reálne `callJson2` + SELECT.
+import { rozpisLinesFromMaterial, type RozpisLine, type RozpisMaterial } from './odoo-rozpis-lines';
+import type { Cfg } from './compute';
+import {
+	sietkaSamostatnaVypocet,
+	sietkaSamostatnaMultiVypocet,
+	type SietkaSamostatnaKus
+} from './compute';
+import { recomputeVstup, recomputeMultiVstup } from './zasklenia-sklo';
+import { computeClip, computeClipMulti, type ClipVstup, type ClipRiadok } from '$lib/clip';
+import { parseCad } from './pergola';
+import { normOp, normZak, type Polozka } from './money';
+import type { Vstup, MultiVstup } from './vstup';
+
+/** Surový riadok `odpis_log` potrebný pre backfill (vlastný SELECT — `listOdpisy` nevracia
+ *  `content_hash`; `detail` je surový JSON string, parsuje sa tu). */
+export interface OdpisBackfillRow {
+	id: number;
+	modul: string;
+	zak: string;
+	op: string;
+	zakaznik: string;
+	live: number;
+	content_hash: string;
+	detail: string;
+	created_at: string;
+}
+
+/** Výsledok namapovania JEDNÉHO odpisu na `lines`. */
+export type OdpisMapResult =
+	| { status: 'lines'; lines: RozpisLine[]; drift: boolean }
+	| { status: 'skip'; reason: BackfillSkipReason };
+
+export type BackfillSkipReason =
+	| 'pergola-rezervacia' // rezervačná cesta — `detail` je lossy, nedá sa znovu spočítať
+	| 'unreconstructable' // neznámy tvar `detail` / chýbajúce vstupy
+	| 'recompute-failed' // engine vrátil chybu/null
+	| 'no-cut-list' // rekomputa prebehla, ale žiadne narezateľné rezy (napr. bazén)
+	| 'out-of-scope'; // modul mimo záberu backfillu
+
+/** Moduly so skutočným rozpisom rezov. `bazen` je mimo (Money počty, žiadne dĺžky rezov). */
+export const BACKFILL_MODULY = new Set(['zasklenia', 'pergola', 'clip', 'fix']);
+
+/** mm zaokrúhlenie na 3 des. miesta pre porovnanie metráže (rovnaká presnosť ako Money `R`). */
+const q3 = (x: number): number => Math.round(x * 1000);
+
+/**
+ * Detekcia driftu vzorcov: znovu-dopočítaná Money metráž `{kod→qty}` vs uložená `odpis_polozky`.
+ * Ak sa KTORÝKOĽVEK znovu-dopočítaný (profilový) kód nezhoduje s uloženým množstvom (alebo v
+ * uloženom chýba) → vzorce/katalóg sa od odpisu zmenili (alebo bola ručná úprava). Kovanie a iné
+ * uložené kódy, ktoré rekomputa neprodukuje, sa IGNORUJÚ (porovnávame len znovu-dopočítané kódy).
+ */
+export function driftVsStored(
+	recomputed: { kod: string; qty: number }[],
+	stored: Polozka[]
+): boolean {
+	const storedByKod = new Map<string, number>();
+	for (const p of stored) storedByKod.set(p.kod, p.qty);
+	for (const o of recomputed) {
+		const s = storedByKod.get(o.kod);
+		if (s === undefined || q3(s) !== q3(o.qty)) return true;
+	}
+	return false;
+}
+
+const spatneNote = (createdAt: string): string => `spätne dopočítané ${createdAt.slice(0, 10)}`;
+
+/** Postaví `lines` z materiálu + (voliteľného) drift-tagu; prázdny materiál → skip 'no-cut-list'. */
+function linesFrom(material: RozpisMaterial[], drift: boolean, createdAt: string): OdpisMapResult {
+	const lines = rozpisLinesFromMaterial(material, drift ? spatneNote(createdAt) : '');
+	if (lines.length === 0) return { status: 'skip', reason: 'no-cut-list' };
+	return { status: 'lines', lines, drift };
+}
+
+/** clip `ClipRiadok[]` → materiál (len narezateľné riadky: rozmer + počet kusov). */
+function clipRiadkyToMaterial(riadky: ClipRiadok[]): RozpisMaterial[] {
+	const out: RozpisMaterial[] = [];
+	for (const r of riadky) {
+		if (r.rozmer == null || r.pocetKs == null || r.pocetKs <= 0) continue;
+		out.push({ nazov: r.oznacenie, rezy: [{ rozmer: r.rozmer, ks: r.pocetKs }] });
+	}
+	return out;
+}
+
+/**
+ * Namapuje JEDEN uložený odpis na `lines` (rozpis rezov). Dispatch per modul + marker v `detail`.
+ * `cfg` je predané (raz načítané volajúcim). Čisté — žiadny DB/Money zápis.
+ */
+export function mapOdpisToLines(
+	row: OdpisBackfillRow,
+	polozky: Polozka[],
+	cfg: Cfg
+): OdpisMapResult {
+	let detail: Record<string, unknown>;
+	try {
+		detail = JSON.parse(row.detail || '{}') as Record<string, unknown>;
+	} catch {
+		return { status: 'skip', reason: 'unreconstructable' };
+	}
+	const createdAt = row.created_at;
+
+	try {
+		switch (row.modul) {
+			case 'zasklenia': {
+				// samostatná sieťka (schová sa pod modul='zasklenia')
+				if (detail.sietkaSamostatna === true) {
+					const { r } = sietkaSamostatnaVypocet(
+						cfg,
+						String(detail.system ?? ''),
+						String(detail.styl ?? ''),
+						Number(detail.otvorS),
+						Number(detail.otvorV)
+					);
+					if (!r) return { status: 'skip', reason: 'recompute-failed' };
+					const drift = driftVsStored(
+						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
+						polozky
+					);
+					return linesFrom(r.material, drift, createdAt);
+				}
+				if (detail.sietkaSamostatnaMulti === true) {
+					const kusy = (detail.kusy as SietkaSamostatnaKus[] | undefined) ?? [];
+					const { r } = sietkaSamostatnaMultiVypocet(cfg, kusy);
+					if (!r) return { status: 'skip', reason: 'recompute-failed' };
+					const drift = driftVsStored(
+						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
+						polozky
+					);
+					return linesFrom(
+						r.kusy.flatMap((k) => k.material),
+						drift,
+						createdAt
+					);
+				}
+				// zimná záhrada (viac posuvov)
+				if (detail.multiZasklenie === true || detail.zimnaZahrada === true) {
+					const vstup = detail.vstupRaw as MultiVstup | undefined;
+					if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
+					const { r } = recomputeMultiVstup(vstup, cfg);
+					if (!r) return { status: 'skip', reason: 'recompute-failed' };
+					const drift = driftVsStored(
+						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
+						polozky
+					);
+					return linesFrom(r.material, drift, createdAt);
+				}
+				// bežné jednoposuvové zasklenie
+				const vstup = detail.vstupRaw as Vstup | undefined;
+				if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
+				const { r } = recomputeVstup(vstup, cfg);
+				if (!r) return { status: 'skip', reason: 'recompute-failed' };
+				const drift = driftVsStored(
+					r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
+					polozky
+				);
+				return linesFrom(r.material, drift, createdAt);
+			}
+
+			case 'clip': {
+				if (detail.multiClip === true) {
+					const kusy = (detail.kusy as Partial<ClipVstup>[] | undefined) ?? [];
+					const vstupy = kusy.map(clipVstupFrom);
+					const v = computeClipMulti(vstupy);
+					const drift = driftVsStored(
+						v.polozky.map((p) => ({ kod: p.kod, qty: p.qty })),
+						polozky
+					);
+					return linesFrom(clipRiadkyToMaterial(v.kusy.flatMap((k) => k.riadky)), drift, createdAt);
+				}
+				const raw = detail.vstupRaw as Partial<ClipVstup> | undefined;
+				if (!raw) return { status: 'skip', reason: 'unreconstructable' };
+				const v = computeClip(clipVstupFrom(raw));
+				const drift = driftVsStored(
+					v.polozky.map((p) => ({ kod: p.kod, qty: p.qty })),
+					polozky
+				);
+				return linesFrom(clipRiadkyToMaterial(v.riadky), drift, createdAt);
+			}
+
+			case 'pergola':
+			case 'fix': {
+				// pergola rezervačná cesta: `detail` je lossy (chýba plný PergolaNarezVstup) → nedá sa
+				// znovu spočítať. FIX píše odpis len z CAD, pergola z CAD ALEBO z rezervácie.
+				if (detail.rezervacia === true) return { status: 'skip', reason: 'pergola-rezervacia' };
+				const cad = detail.cad;
+				if (typeof cad !== 'string' || !cad.trim())
+					return { status: 'skip', reason: 'unreconstructable' };
+				// rozpis rezov = SUROVÝ CAD text (operátorom zadané dĺžky) → žiadny vzorec sa nemení,
+				// takže žiadny drift-tag (poznamka ostáva prázdna).
+				const material: RozpisMaterial[] = parseCad(cad).rows.map((r) => ({
+					nazov: r.name,
+					rezy: [{ rozmer: r.cut_mm, ks: r.qty }]
+				}));
+				return linesFrom(material, false, createdAt);
+			}
+
+			default:
+				return { status: 'skip', reason: 'out-of-scope' };
+		}
+	} catch {
+		return { status: 'skip', reason: 'recompute-failed' };
+	}
+}
+
+/** Doplní `ClipVstup` povinné (ale pre engine irelevantné) hlavičkové polia — `computeClip` číta
+ *  len typ/variant/sirka/vyska (ral je informačné). */
+function clipVstupFrom(raw: Partial<ClipVstup>): ClipVstup {
+	return {
+		zak: '',
+		op: '',
+		zakaznik: '',
+		caka: false,
+		typ: (raw.typ as ClipVstup['typ']) ?? 'klasika',
+		variant: Number(raw.variant ?? 1),
+		sirka: Number(raw.sirka ?? 0),
+		vyska: Number(raw.vyska ?? 0),
+		ral: String(raw.ral ?? '')
+	};
+}
+
+/** Stabilný per-OP doc_id `backfill-narezak-<opSlug≤12>` (≤40, charset [a-z0-9-] — Odoo regex). */
+export function backfillDocId(op: string): string {
+	const slug =
+		normOp(op)
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, '')
+			.slice(0, 12) || 'x';
+	return `backfill-narezak-${slug}`.slice(0, 40);
+}
+
+export interface BackfillDeps {
+	cfg: Cfg;
+	loadPolozky: (odpisLogId: number) => Polozka[];
+	orderExists: (orderNumber: string) => Promise<boolean>;
+	orderHasLines: (orderNumber: string) => Promise<boolean>;
+	uploadLines: (orderNumber: string, docId: string, lines: RozpisLine[]) => Promise<unknown>;
+	now: Date;
+	log?: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
+	sleep?: (ms: number) => Promise<void>;
+}
+
+export interface BackfillOptions {
+	dryRun: boolean;
+	/** rozostup medzi ostrými uploadmi (ms). Default 300. */
+	delayMs?: number;
+	/** obmedz na tieto zákazky (normZak); prázdne/undefined = všetky. */
+	zakFilter?: string[];
+}
+
+export type OpAkcia =
+	'uploaded' | 'dry-run' | 'skip-no-order' | 'skip-has-lines' | 'skip-no-lines' | 'error';
+
+export interface BackfillOpSummary {
+	op: string;
+	zak: string;
+	moduly: { modul: string; riadkov: number; drift: boolean }[];
+	riadkovSpolu: number;
+	akcia: OpAkcia;
+	docId?: string;
+	error?: string;
+}
+
+export interface BackfillSummary {
+	odpisov: number;
+	objednavok: number;
+	nahranych: number;
+	riadkovSpolu: number;
+	skipNoOrder: number;
+	skipHasLines: number;
+	skipNoLines: number;
+	skipPergolaRezervacia: number;
+	skipUnreconstructable: number;
+	driftOp: number;
+	chyb: number;
+	ops: BackfillOpSummary[];
+}
+
+/** najnovší odpis vyhráva: vyššie `created_at` (string YYYY-MM-DD HH:MM:SS je lexikograficky
+ *  monotónny), tie-break vyššie `id`. */
+function novsi(a: OdpisBackfillRow, b: OdpisBackfillRow): OdpisBackfillRow {
+	if (a.created_at !== b.created_at) return a.created_at > b.created_at ? a : b;
+	return a.id > b.id ? a : b;
+}
+
+/**
+ * Spustí backfill nad danými `odpis_log` riadkami (už filtrované na `live=1` + časové okno volajúcim).
+ * Grupuje per `normOp(op)`, v rámci OP berie POSLEDNÝ odpis per `modul`, znovu dopočíta rozpis rezov,
+ * skombinuje lines všetkých modulov OP a pošle JEDNÝM uploadom (additive: OP, ktorý už riadky má, sa
+ * preskočí). `dryRun` NEODOSIELA nič (read-only existenčné kontroly bežia aj tak — dávajú presné počty).
+ */
+export async function runBackfill(
+	rows: OdpisBackfillRow[],
+	deps: BackfillDeps,
+	opts: BackfillOptions
+): Promise<BackfillSummary> {
+	const log = deps.log ?? (() => {});
+	const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+	const delayMs = opts.delayMs ?? 300;
+	const zakFilter =
+		opts.zakFilter && opts.zakFilter.length ? new Set(opts.zakFilter.map(normZak)) : null;
+
+	// filtruj na moduly v zábere + (voliteľne) zákazky
+	const scoped = rows.filter(
+		(r) => BACKFILL_MODULY.has(r.modul) && (!zakFilter || zakFilter.has(normZak(r.zak)))
+	);
+
+	// grupuj per OP → per modul: posledný odpis vyhráva
+	const perOp = new Map<string, { zak: string; byModul: Map<string, OdpisBackfillRow> }>();
+	for (const r of scoped) {
+		const op = normOp(r.op);
+		if (!op) continue;
+		let g = perOp.get(op);
+		if (!g) {
+			g = { zak: r.zak, byModul: new Map() };
+			perOp.set(op, g);
+		}
+		const prev = g.byModul.get(r.modul);
+		g.byModul.set(r.modul, prev ? novsi(prev, r) : r);
+	}
+
+	const summary: BackfillSummary = {
+		odpisov: scoped.length,
+		objednavok: perOp.size,
+		nahranych: 0,
+		riadkovSpolu: 0,
+		skipNoOrder: 0,
+		skipHasLines: 0,
+		skipNoLines: 0,
+		skipPergolaRezervacia: 0,
+		skipUnreconstructable: 0,
+		driftOp: 0,
+		chyb: 0,
+		ops: []
+	};
+
+	// stabilné poradie (podľa OP) pre reprodukovateľný dry-run výpis
+	const orderNumbers = [...perOp.keys()].sort();
+
+	for (const op of orderNumbers) {
+		const g = perOp.get(op)!;
+		const opSum: BackfillOpSummary = {
+			op,
+			zak: g.zak,
+			moduly: [],
+			riadkovSpolu: 0,
+			akcia: 'dry-run'
+		};
+
+		// read-only existenčné kontroly (bežia aj v dry-rune)
+		let exists: boolean;
+		try {
+			exists = await deps.orderExists(op);
+		} catch (e) {
+			opSum.akcia = 'error';
+			opSum.error = e instanceof Error ? e.message : String(e);
+			summary.chyb++;
+			log('error', 'backfill: orderExists zlyhal', { op, err: opSum.error });
+			summary.ops.push(opSum);
+			continue;
+		}
+		if (!exists) {
+			opSum.akcia = 'skip-no-order';
+			summary.skipNoOrder++;
+			log('info', 'backfill skip: objednávka v Odoo neexistuje', { op });
+			summary.ops.push(opSum);
+			continue;
+		}
+
+		let hasLines: boolean;
+		try {
+			hasLines = await deps.orderHasLines(op);
+		} catch (e) {
+			opSum.akcia = 'error';
+			opSum.error = e instanceof Error ? e.message : String(e);
+			summary.chyb++;
+			log('error', 'backfill: orderHasLines zlyhal', { op, err: opSum.error });
+			summary.ops.push(opSum);
+			continue;
+		}
+		if (hasLines) {
+			opSum.akcia = 'skip-has-lines';
+			summary.skipHasLines++;
+			log('info', 'backfill skip: objednávka už má riadky (additive)', { op });
+			summary.ops.push(opSum);
+			continue;
+		}
+
+		// znovu-dopočítaj lines všetkých modulov OP a skombinuj
+		const combined: RozpisLine[] = [];
+		let opDrift = false;
+		for (const [modul, r] of g.byModul) {
+			const res = mapOdpisToLines(r, deps.loadPolozky(r.id), deps.cfg);
+			if (res.status === 'skip') {
+				if (res.reason === 'pergola-rezervacia') summary.skipPergolaRezervacia++;
+				else if (res.reason === 'unreconstructable' || res.reason === 'recompute-failed')
+					summary.skipUnreconstructable++;
+				log('info', 'backfill: modul preskočený', { op, modul, reason: res.reason });
+				continue;
+			}
+			combined.push(...res.lines);
+			opSum.moduly.push({ modul, riadkov: res.lines.length, drift: res.drift });
+			if (res.drift) opDrift = true;
+		}
+
+		opSum.riadkovSpolu = combined.length;
+		if (combined.length === 0) {
+			opSum.akcia = 'skip-no-lines';
+			summary.skipNoLines++;
+			log('info', 'backfill skip: žiadne narezateľné riadky', { op });
+			summary.ops.push(opSum);
+			continue;
+		}
+		if (opDrift) summary.driftOp++;
+
+		const docId = backfillDocId(op);
+		opSum.docId = docId;
+
+		if (opts.dryRun) {
+			opSum.akcia = 'dry-run';
+			summary.nahranych++;
+			summary.riadkovSpolu += combined.length;
+			log('info', 'backfill DRY-RUN: poslal by riadky', {
+				op,
+				docId,
+				riadkov: combined.length,
+				moduly: opSum.moduly
+			});
+			summary.ops.push(opSum);
+			continue;
+		}
+
+		try {
+			await deps.uploadLines(op, docId, combined);
+			opSum.akcia = 'uploaded';
+			summary.nahranych++;
+			summary.riadkovSpolu += combined.length;
+			log('info', 'backfill: nahrané riadky', { op, docId, riadkov: combined.length });
+		} catch (e) {
+			opSum.akcia = 'error';
+			opSum.error = e instanceof Error ? e.message : String(e);
+			summary.chyb++;
+			log('error', 'backfill: upload zlyhal', { op, docId, err: opSum.error });
+		}
+		summary.ops.push(opSum);
+		if (delayMs > 0) await sleep(delayMs);
+	}
+
+	log('info', 'backfill dokončený', {
+		dryRun: opts.dryRun,
+		objednavok: summary.objednavok,
+		nahranych: summary.nahranych,
+		riadkovSpolu: summary.riadkovSpolu,
+		skipNoOrder: summary.skipNoOrder,
+		skipHasLines: summary.skipHasLines,
+		skipNoLines: summary.skipNoLines,
+		skipPergolaRezervacia: summary.skipPergolaRezervacia,
+		skipUnreconstructable: summary.skipUnreconstructable,
+		driftOp: summary.driftOp,
+		chyb: summary.chyb
+	});
+	return summary;
+}

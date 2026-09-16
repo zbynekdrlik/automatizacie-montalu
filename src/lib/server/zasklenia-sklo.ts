@@ -101,12 +101,14 @@ export function skloPre(
 
 /** Rekomputuj JEDEN posuv z `Vstup` (surové vstupy — nikdy klientské čísla). Pôvodne route-private
  *  `compute()`; extrahované (#524), aby ten istý autoritatívny nárezák vedel spočítať aj backfill. */
-export function recomputeVstup(vstup: Vstup): {
+export function recomputeVstup(
+	vstup: Vstup,
+	cfg: Cfg = loadCfg()
+): {
 	r: ComputeResult | null;
 	err: string | null;
 	spec: PosuvSpec | null;
 } {
-	const cfg = loadCfg();
 	// sklo musí patriť k zvolenému systému (Robust = 4/16/4, Slide = 4/8/4) —
 	// nedá sa cez skriptovaný POST poslať cudzie sklo
 	const g = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo, vstup.skloTrieda);
@@ -163,12 +165,14 @@ export function recomputeVstup(vstup: Vstup): {
 // ---- Viac posuvov (zimná záhrada) ----
 
 /** Rekomputuj VIAC posuvov z `MultiVstup`. Pôvodne route-private `computeMultiFrom()` (#524 move). */
-export function recomputeMultiVstup(vstup: MultiVstup): {
+export function recomputeMultiVstup(
+	vstup: MultiVstup,
+	cfg: Cfg = loadCfg()
+): {
 	r: MultiResult | null;
 	err: string | null;
 	specs: PosuvSpec[];
 } {
-	const cfg = loadCfg();
 	const specs: PosuvSpec[] = [];
 	for (const [i, p] of vstup.posuvy.entries()) {
 		const g = skloPre(cfg, p.system, p.styl, p.sklo, p.skloTrieda);
