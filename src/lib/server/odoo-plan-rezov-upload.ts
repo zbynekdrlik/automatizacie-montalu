@@ -16,17 +16,19 @@
 // `sale.order.name === normOp(op)`. Ak zákazka nemá odpis (alebo `zak` prázdny) → skip (plán nie je
 // viazaný na objednávku).
 import { logger } from './log';
-import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
+import {
+	callJson2,
+	odooJson2Config,
+	isNarezUploadEnabled,
+	isNarezLinesV2Enabled
+} from './odoo-json2';
 import { normOp, normZak } from './money';
 import { zakazkaPrehlad } from './zakazka-ceny';
 import { parsePlanRezov } from './plan-rezov-vstup';
 import { spocitajPlanRezov } from './plan-rezov';
 import { buildRozpisLines } from './odoo-rozpis-lines';
-import {
-	generatePlanRezovPdfBase64,
-	planRezovPdfFilename,
-	type PlanRezovPdfHeader
-} from './plan-rezov-pdf';
+import { buildNarezakV2 } from './narezak-lines-v2';
+import { generateNarezakPdfBase64, narezakPdfFilename, type NarezakPdfHeader } from './narezak-pdf';
 
 const log = logger('plan-rezov-upload');
 
@@ -121,7 +123,7 @@ export async function uploadPlanRezovToOdoo(
 			preskocene
 		);
 
-		const header: PlanRezovPdfHeader = {
+		const header: NarezakPdfHeader = {
 			zak: prehlad.zak || zak,
 			op,
 			zakaznik: prehlad.zakaznik,
@@ -130,7 +132,14 @@ export async function uploadPlanRezovToOdoo(
 
 		let pdfBase64: string;
 		try {
-			pdfBase64 = await generatePlanRezovPdfBase64(header, vysledok, now);
+			// #529: GRAFICKÝ nárezák (tyče kreslené s rezmi/uhlami/odpadom/obrázkami profilov) namiesto
+			// pôvodného textového PDF — rezač na kiosku vidí to isté čo výtlačok appky (`RozpisRezov`).
+			pdfBase64 = await generateNarezakPdfBase64(
+				header,
+				vysledok.material,
+				{ dlzkaTyce: input.dlzkaTyce, reznaMedzera: input.reznaMedzera },
+				now
+			);
 		} catch (e) {
 			log.warn('plan-rezov upload: generovanie PDF zlyhalo', { zak, op, err: errMsg(e) });
 			return { result: 'no-pdf', error: errMsg(e) };
@@ -138,7 +147,7 @@ export async function uploadPlanRezovToOdoo(
 
 		const orderNumber = normOp(op);
 		const docId = buildPlanRezovDocId(zak, op);
-		const filename = planRezovPdfFilename(zak, now);
+		const filename = narezakPdfFilename(zak, now);
 
 		// #522: `lines` = rozpis rezov (jednotlivé profily/tyče na narezanie) z TOHO ISTÉHO
 		// plánu ako PDF (jeden zdroj pravdy). Vznikajú z nich `montalu.rozpis.line` na tablete
@@ -153,13 +162,18 @@ export async function uploadPlanRezovToOdoo(
 			linesCount: lines.length
 		});
 
+		// #529: v2 groundwork (za flagom, default OFF) — `narezak_v2` (tyče/uhly/odpad/obrázky per tyč
+		// + sumár per profil). Intake ho IGNORUJE (LENIENT `**extra`); Odoo #6949 ho vykreslí neskôr.
+		const narezakV2 = isNarezLinesV2Enabled() ? buildNarezakV2(vysledok.material) : undefined;
+
 		const uploadResult = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', {
 			order_number: orderNumber,
 			doc_id: docId,
 			kind: 'narezak',
 			filename,
 			pdf_base64: pdfBase64,
-			lines
+			lines,
+			...(narezakV2 ? { narezak_v2: narezakV2 } : {})
 		});
 
 		log.info('plan-rezov upload: úspešne nahraný', {
