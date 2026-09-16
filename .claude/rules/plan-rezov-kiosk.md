@@ -1,12 +1,16 @@
 ---
 paths:
   - "src/lib/server/odoo-plan-rezov-upload.ts"
+  - "src/lib/server/odoo-rozpis-lines.ts"
   - "src/lib/server/plan-rezov-pdf.ts"
   - "src/lib/server/pdf-common.ts"
   - "src/routes/plan-rezov/**"
   - "tests/plan-rezov-pdf.test.ts"
   - "tests/odoo-plan-rezov-upload.test.ts"
+  - "tests/odoo-rozpis-lines.test.ts"
+  - "tests/odoo-rozpis-lines-money-safety.test.ts"
   - "tests/narezak-rozpis-removed.test.ts"
+  - "e2e/plan-rezov-lines-kiosk.spec.ts"
 ---
 
 # Plán rezov → Odoo kiosk „Rezanie" (#511)
@@ -52,11 +56,42 @@ xmlid-idempotentný: re-save prepíše tú istú prílohu.
 do try/catch (plán je durable, upload best-effort). BEZ durable-retry (rovnako ako pôvodná
 narezak cesta) — BEZ migrácie.
 
-## App NEPOSIELA žiadny `lines` payload
+## App POSIELA `lines` (rozpis rezov) spolu s PDF (#522, bolo #511 „neposiela")
 
-`montalu_narezak_upload` volanie nesie LEN `order_number, doc_id, kind, filename,
-pdf_base64`. odoo-erp #6517 (`lines` ako riadky) konzumuje `lines` z INÉHO zdroja — appka
-ho neposiela, takže zmena PDF prílohy `lines` kontrakt nedotýka (a cez `lines` neuniká cena).
+Od #522 nesie to isté `montalu_narezak_upload` volanie AJ `lines` — z nich Odoo vytvorí
+`montalu.rozpis.line` a tablet „Čo rezať" ich odškrtáva. Riadky sa odvodzujú z TOHO
+ISTÉHO `PlanRezovVysledok` ako PDF (`buildRozpisLines`, `odoo-rozpis-lines.ts`) → jeden
+zdroj pravdy, PDF a riadky sa nemôžu rozísť. Volanie teraz nesie
+`order_number, doc_id, kind, filename, pdf_base64, lines`.
+
+**Element `lines[]` (kontrakt odoo-erp #6517, model `montalu.rozpis.line`):**
+`{ kod, nazov, mnozstvo, mj, dlzka, poznamka }`. Mapovanie z plánu rezov (jeden riadok =
+jedna kombinácia profil × dĺžka rezu):
+- `kod = ''` — plán rezov je Money-neutrálny (žiadne článkové kódy); identitu profilu nesie `nazov`.
+- `nazov = profil.material.nazov` (presný názov profilu z CAD).
+- `mnozstvo = rez.ks` (celý počet kusov danej dĺžky), `mj = 'ks'`.
+- `dlzka = rez.rozmer / 1000` — **mm → m** (4500 mm → 4.5), 0.1 mm presnosť (`Math.round(mm*10)/10000`).
+- `poznamka = ''` — plán rezov nedrží posuv/sekciu (plochá CAD tabuľka).
+- Rezy dlhšie ako tyč (`tooLong`) sa do `lines` nedostanú — `spocitajPlanRezov` ich nezaradí
+  do `material.rezy`, takže sa nemieša nerealizovateľný rez do „čo rezať".
+
+**Money-neutralita (LEAK invariant preserved by CONTENT, nie omission):** `lines` nesú
+LEN kód/názov/počet/dĺžku — ŽIADNU cenu. `buildRozpisLines` neimportuje `money`/`ceny`/
+`zakazka-ceny` a nemá žiadny `€`/`fmtEur`/`cena` identifikátor — stráži to source-guard
+`tests/odoo-rozpis-lines-money-safety.test.ts` (vzor `plan-rezov-pdf` guardu nižšie).
+Rozpis+ceny žijú ďalej LEN v internej `mt_note` (`odoo-zakazka.md`).
+
+**Idempotencia:** `lines` sa posielajú pod tým istým `buildPlanRezovDocId(zak, op)` ako
+PDF. Odoo pri každom uploade NAHRADÍ VŠETKY predchádzajúce `montalu.rozpis.line` na
+objednávke (`rozpis_version` sa auto-inkrementuje) — re-export teda riadky prepíše,
+nezduplikuje.
+
+**Overenie na PROD (po deployi + prvom zápise):**
+`GET /json/2/montalu.rozpis.line/search_read` s filtrom `[["order_id.name","=","<OP>"]]`
+(bearer uid 524) → vráti vytvorené riadky (kod/nazov/mnozstvo/mj/dlzka/rozpis_version).
+Na tablete Rezanie sa karta zákazky prepne z „materiál z objednávky" na riadky z appky.
+Jeden úspešný zápis = uzavretie odoo-erp #6949. `lines` idú len keď je upload zapnutý
+(`ODOO_NAREZ_UPLOAD_ENABLED=1` + `ODOO_JSON2_URL`/`_API_KEY`) a zákazka má LIVE OP z odpisu.
 
 ## PDF obsah sa testuje cez METADÁTA, nie telo (custom-font glyfy sa nečítajú)
 

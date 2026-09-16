@@ -129,8 +129,52 @@ describe('uploadPlanRezovToOdoo', () => {
 		// PDF prítomné a je to naozaj PDF (base64 → %PDF)
 		const pdf = Buffer.from(String(cap.body.pdf_base64), 'base64');
 		expect(pdf.slice(0, 5).toString('latin1')).toBe('%PDF-');
-		// žiadna cena neprešla ani ako `lines` — tento upload žiadne lines neposiela
-		expect('lines' in cap.body).toBe(false);
+		// #522: upload teraz NESIE aj `lines` (rozpis rezov) k tomu istému volaniu — z toho
+		// istého plánu ako PDF (jeden zdroj pravdy). Riadky bez cien, Money-neutrálne.
+		expect(Array.isArray(cap.body.lines)).toBe(true);
+		expect(cap.body.lines).toEqual([
+			{
+				kod: '',
+				nazov: 'STABILIZAČNÝ PROFIL 100X50',
+				mnozstvo: 3,
+				mj: 'ks',
+				dlzka: 2,
+				poznamka: ''
+			},
+			{ kod: '', nazov: 'LAT 80x19', mnozstvo: 4, mj: 'ks', dlzka: 1.865, poznamka: '' }
+		]);
+	});
+
+	it('#522: lines idú spolu s PDF v tom istom volaní a re-export používa TEN ISTÝ doc_id (idempotencia)', async () => {
+		enableEnv();
+		vi.mocked(zakazkaPrehlad).mockReturnValue({
+			zak: 'ZAK123',
+			zakaznik: 'Firma s.r.o.',
+			odpisy: [{ op: 'OP260439' }]
+		} as never);
+
+		const bodies: Record<string, unknown>[] = [];
+		setJson2Transport(async (_url, opts) => {
+			bodies.push(JSON.parse(String((opts as RequestInit).body)));
+			return new Response(JSON.stringify({ lines_created: 2, lines_version: bodies.length }), {
+				status: 200
+			});
+		});
+
+		// dva exporty tej istej zákazky (napr. nárezák zmenený a znovu uložený)
+		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('uploaded');
+		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('uploaded');
+
+		expect(bodies).toHaveLength(2);
+		// oba nesú PDF aj lines
+		for (const b of bodies) {
+			expect(typeof b.pdf_base64).toBe('string');
+			expect(Array.isArray(b.lines)).toBe(true);
+			expect((b.lines as unknown[]).length).toBe(2);
+		}
+		// idempotencia: rovnaký doc_id → Odoo nahradí staré riadky (nová verzia), nezduplikuje
+		expect(bodies[0]!.doc_id).toBe('plan-rezov-zak123-op260439');
+		expect(bodies[1]!.doc_id).toBe(bodies[0]!.doc_id);
 	});
 
 	it('OP z NAJNOVŠIEHO LIVE odpisu (nie z novšieho TEST odpisu) — kiosk nemieri na test OP', async () => {
