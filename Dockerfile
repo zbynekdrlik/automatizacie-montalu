@@ -26,6 +26,10 @@ ENV NODE_ENV=production
 COPY --from=build /app/build build
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/package.json .
+# #524: tenký CLI klient pre `npm run backfill:narezaky` (docker exec) — POSTne na lokálny
+# admin endpoint bežiaceho servera. Čistý node ESM (žiadny src import), preto stačí skopírovať
+# jeden súbor; ťažkú prácu robí server (má DB/compute/callJson2 v `build/`).
+COPY --from=build /app/scripts/backfill-narezaky-cli.mjs scripts/backfill-narezaky-cli.mjs
 # Non-root runtime (#256): bež ako `node` (uid 1000, existuje v base image) — least
 # privilege. Priprav /data/app node-vlastnené, aby ČERSTVÝ prázdny named volume
 # `appdata` zdedil owner node:node (Docker kopíruje vlastníctvo image adresára do

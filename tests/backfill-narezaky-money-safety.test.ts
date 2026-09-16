@@ -11,6 +11,10 @@ const src = fs.readFileSync(
 	new URL('../src/lib/server/backfill-narezaky.ts', import.meta.url),
 	'utf8'
 );
+const depsSrc = fs.readFileSync(
+	new URL('../src/lib/server/backfill-narezaky-deps.ts', import.meta.url),
+	'utf8'
+);
 
 describe('#524 backfill Money-neutralita', () => {
 	it('nevolá writeOdpis ani žiadny odpis zápis', () => {
@@ -27,6 +31,13 @@ describe('#524 backfill Money-neutralita', () => {
 	it('nezapisuje na disk (žiadny fs write, žiadna import cesta /data)', () => {
 		expect(src).not.toMatch(/fs\.(write|append|mkdir|rename|open|createWrite)/);
 		expect(src).not.toMatch(/\/data\/dlv-import/);
+	});
+
+	it('deps (SELECT + Odoo) je READ-ONLY nad odpis_log — žiadny INSERT/UPDATE/DELETE, žiadny writeOdpis', () => {
+		// jediný odpis_log dotyk je SELECT; jediný zápis je Odoo montalu_narezak_upload (lines)
+		expect(depsSrc).not.toMatch(/writeOdpis\s*\(/);
+		expect(depsSrc).not.toMatch(/(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+odpis_log/i);
+		expect(depsSrc).toMatch(/SELECT[\s\S]*FROM\s+odpis_log/i); // musí ostať čítanie
 	});
 
 	it('DATA-FLOW guard: žiadny kľúč vygenerovaného `lines` riadku nenesie cenu', () => {

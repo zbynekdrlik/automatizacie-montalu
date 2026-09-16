@@ -2146,3 +2146,18 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   NEDOTKNUTÉ. RED (unit + E2E) → GREEN. Review claude-fable-5-1 0R/0Y/3B, 2 nity opravené
   (validácia pred insertom, banner→snippet). Playbook: objednavka-skla.md #514 sekcia.
   NEmergnuté (worktree — supervisor integruje).
+
+## #524 — Backfill nárezákov (ostrých odpisov) za posledný mesiac → Odoo lines (0.25.20)
+- Recompute rozpisu rezov z `odpis_log.detail` per modul (zasklenia/sietka via `zasklenia-sklo.ts`
+  pure-move recompute + sietka engine; clip `computeClip`; pergola/fix `parseCad`), mapované cez
+  zdieľaný `rozpisLinesFromMaterial` (#522, jeden zdroj pravdy). pergola-rezervacia je lossy → skip.
+- Odoo `lines` upload NAHRADÍ VŠETKY riadky objednávky → grupovanie PER OP (kombinovaný upload),
+  additive idempotencia (skip OP ktoré už majú riadky / bez objednávky). Drift vs `odpis_polozky` →
+  „spätne dopočítané <dátum>". Money-neutrálne.
+- Kontajner je bundle-only → spúšťanie cez admin endpoint `POST /admin/backfill-narezaky` (rides
+  CI build) + tenký `scripts/backfill-narezaky-cli.mjs` wrapper (`npm run backfill:narezaky`).
+  Gate: interná session ALEBO BACKFILL_TOKEN + ODOO_NAREZ_UPLOAD_ENABLED. Default DRY-RUN, `--live`
+  na zápis. Runbook: `.claude/rules/backfill-narezaky.md`.
+- Súbory: `backfill-narezaky.ts` (core), `backfill-narezaky-deps.ts` (SELECT+Odoo), `zasklenia-sklo.ts`
+  (pure-move), endpoint + wrapper + Dockerfile COPY + compose BACKFILL_TOKEN + hooks/b2b denylist.
+  Testy: mapper per modul + orchestrácia + endpoint gate/beh + money-safety (39 nových).

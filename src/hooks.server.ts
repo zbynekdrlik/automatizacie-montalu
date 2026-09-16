@@ -20,7 +20,10 @@ const log = logger('http');
 // (guard: tests/konfigurator-money-safety.test.ts). b2b drift guard: je to top-level
 // route (nie pod Money-denylist prefixom) → dostupná pre všetkých vrátane prihláseného
 // b2b (tests/b2b-route-coverage.test.ts).
-const PUBLIC_PATHS = ['/login', '/health', '/konfigurator'];
+// #524: /admin/backfill-narezaky je „verejná" LEN v zmysle auth-brány (aby ju dosiahol CLI
+// wrapper bez session); endpoint SÁM gate-uje interná-session-ALEBO-BACKFILL_TOKEN (+
+// ODOO_NAREZ_UPLOAD_ENABLED). b2b sem nemá prístup (/admin je v B2B_FORBIDDEN_PREFIXES).
+const PUBLIC_PATHS = ['/login', '/health', '/konfigurator', '/admin/backfill-narezaky'];
 
 let pruneCounter = 0;
 

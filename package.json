@@ -13,7 +13,8 @@
 		"lint": "eslint . && prettier --check .",
 		"format": "prettier --write .",
 		"test": "vitest run --coverage",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"backfill:narezaky": "node scripts/backfill-narezaky-cli.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

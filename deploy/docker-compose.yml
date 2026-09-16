@@ -56,6 +56,10 @@ services:
       ODOO_JSON2_URL: ${ODOO_JSON2_URL:-}
       ODOO_JSON2_API_KEY: ${ODOO_JSON2_API_KEY:-}
       ODOO_NAREZ_UPLOAD_ENABLED: ${ODOO_NAREZ_UPLOAD_ENABLED:-0}
+      # #524: token pre jednorazový backfill nárezákov (admin endpoint + CLI wrapper). PRÁZDNY
+      # default = endpoint bez internej session VYPNUTÝ (403). Nastav v .env len na čas behu
+      # backfillu, po behu odstráň. Server aj `docker exec` wrapper ho čítajú z tej istej env.
+      BACKFILL_TOKEN: ${BACKFILL_TOKEN:-}
       # #496: raised from 1M to 12M to cover MAX_SUBOR_VELKOST (10MB) + multipart overhead
       BODY_SIZE_LIMIT: 12M
       PROTOCOL_HEADER: x-forwarded-proto
