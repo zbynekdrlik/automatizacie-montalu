@@ -34,7 +34,8 @@ import {
 	migrateCleanupStandardPlusOrphans,
 	migratePlanRezovUlozene,
 	migrateMaterialNakupSkladovaKarta,
-	migrateOponaIzo
+	migrateOponaIzo,
+	migrateObjednavkaSklaSpec
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -991,6 +992,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migratePlanRezovUlozene(db, bump); // v44→v45 (#505)
 	migrateMaterialNakupSkladovaKarta(db, bump); // v45→v46 (#506, prečíslovaná z v44→v45 kvôli kolízii s #505 v45)
 	migrateOponaIzo(db, bump); // v46→v47 (#504 round 3, Štandard+ opona IZO nárezák)
+	migrateObjednavkaSklaSpec(db, bump); // v47→v48 (#521 objednávka skla spec pre IZOS oceňovanie)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

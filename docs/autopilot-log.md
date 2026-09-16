@@ -2161,3 +2161,26 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
 - Súbory: `backfill-narezaky.ts` (core), `backfill-narezaky-deps.ts` (SELECT+Odoo), `zasklenia-sklo.ts`
   (pure-move), endpoint + wrapper + Dockerfile COPY + compose BACKFILL_TOKEN + hooks/b2b denylist.
   Testy: mapper per modul + orchestrácia + endpoint gate/beh + money-safety (39 nových).
+
+## #521 — Objednávka skla: export špecifikácie tabule pre IZOS oceňovanie (2026-09-16)
+
+- Rozšírenie: appka posiela `glass_order.items[]` do Odoo (`montalu_narezak_upload`) so spec kľúčmi,
+  z ktorých Odoo (#7371/#7378) AUTOMATICKY počíta nákupnú cenu skla podľa cenníka IZOS.
+- STEP-0 zistenie: appka `glass_order` doteraz NEPOSIELALA vôbec (len „future home" komentár);
+  premisa tiketu čiastočne zastaraná (odkaz na zmazaný `odoo-narezak-upload.ts`). #521 preto export
+  NAJPRV zadrôtoval (nie len upravil).
+- Verzia: 0.25.20 → 0.25.21-dev.1. Migrácia **v47→v48** `migrateObjednavkaSklaSpec` (10 `spec_*`
+  stĺpcov na `objednavka_skla`, aditívne). Head-bump 39 migračných testov + `migration-v48.test.ts`.
+  POZOR: slepý head-bump zle prepol `migration-v47` izolovaný `migrateOponaIzo` bump (47, nie head 48)
+  — vrátené manuálne.
+- Súbory: `odoo-rozpis-lines.ts` (`derivGlassComposition` + `buildGlassOrder`), `odoo-glass-order-upload.ts`
+  (gated fire-and-forget upload, reuse `odoo-json2`, kind='sklo'), `objednavka-skla.ts` (`nastavSpec`/
+  `validateSpec`/`mapSpec` + `SkloPolozka.spec`), `/objednavka-skla/[zak]` route (spec inputy + Odoslať
+  + JSON náhľad payloadu). Money-NEUTRÁLNE.
+- Derivácia composition je KONZERVATÍVNA (radšej vynechať než mis-price): IZO A/B/C stred≥6, VSG kód,
+  jednosklo N mm (+ESG), polykarbonát/nerozpoznané = omit. `hole_size` sa posiela vždy pri holes>0
+  (default d30, aby Odoo nedefaultlo na d50). Playbook: `.claude/rules/objednavka-skla.md` (#521 sekcia).
+- Testy: `odoo-glass-order.test.ts` (builder+derivácia, 21), `odoo-glass-order-upload.test.ts` (upload
+  branch coverage, 10), `objednavka-skla-spec.test.ts` (CRUD perzistencia+validácia, 7), `migration-v48`,
+  E2E `e2e/objednavka-skla-spec.spec.ts` (spec na podklade → náhľad payloadu, zero-console). Plný beh
+  4106 testov zelený, coverage 94.72/88.05/96.97/95.74 (prahy 94/88/95/95 — branch tesne na hrane).
