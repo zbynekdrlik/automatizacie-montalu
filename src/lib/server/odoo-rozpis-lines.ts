@@ -8,6 +8,14 @@
 // budúci domov pre `buildGlassOrder` (#521 glass_order), payload shaping na jednom mieste.
 import type { PlanRezovVysledok } from './plan-rezov';
 
+/** Minimálny tvar profilu, ktorý builder potrebuje: názov + agregované rezy (dĺžka → počet).
+ *  `MaterialRow` (zasklenia/sietka compute), `PlanRezovProfil.material` (#522) aj ad-hoc adaptéry
+ *  backfillu (CAD/clip → tento tvar) ho spĺňajú → JEDEN zdroj pravdy pre `lines`, žiadna duplicita. */
+export interface RozpisMaterial {
+	nazov: string;
+	rezy: { rozmer: number; ks: number }[];
+}
+
 /** Jeden riadok rozpisu rezov = jedna kombinácia (profil × dĺžka rezu) → počet kusov.
  *  Zodpovedá elementu `lines[]` v `montalu_narezak_upload` (model `montalu.rozpis.line`). */
 export interface RozpisLine {
@@ -31,17 +39,19 @@ function mmNaMetre(mm: number): number {
 }
 
 /**
- * Postaví `lines` pre `montalu_narezak_upload` z výsledku plánu rezov.
+ * JADRO mapovania profilov (názov + agregované rezy) → `montalu.rozpis.line[]`. Pre každý profil
+ * vezme jeho AGREGOVANÉ rezy (`rezy` = dĺžka → počet kusov, tie isté, ktoré renderuje `RozpisRezov`
+ * na detaile a PDF) a spraví z každej dvojice jeden riadok. Rezy dlhšie ako tyč sa v agregovaných
+ * rezoch nenachádzajú (compute ich nezaradil do kusov), takže sa do `lines` prirodzene nedostanú —
+ * nemieša sa nerealizovateľný rez do „čo rezať".
  *
- * Pre každý profil vezme jeho AGREGOVANÉ rezy (`material.rezy` = dĺžka → počet kusov, tie isté,
- * ktoré renderuje `RozpisRezov` na detaile a PDF) a spraví z každej dvojice jeden riadok.
- * Rezy dlhšie ako tyč (`tooLong`) v `material.rezy` nie sú (compute ich nezaradil do kusov),
- * takže sa do `lines` prirodzene nedostanú — nemieša sa nerealizovateľný rez do „čo rezať".
+ * `poznamka` (default '') sa pripíše KAŽDÉMU riadku — plán rezov (#522) posiela '', backfill (#524)
+ * posiela „spätne dopočítané <dátum>" keď sa modul nedá bit-identicky znovu spočítať. `kod` ostáva
+ * prázdny (Money-neutrálne, identitu nesie `nazov`) — kiosk je pre rezača bez interných kódov/cien.
  */
-export function buildRozpisLines(vysledok: PlanRezovVysledok): RozpisLine[] {
+export function rozpisLinesFromMaterial(material: RozpisMaterial[], poznamka = ''): RozpisLine[] {
 	const lines: RozpisLine[] = [];
-	for (const profil of vysledok.profily) {
-		const mat = profil.material;
+	for (const mat of material) {
 		for (const rez of mat.rezy) {
 			if (!(rez.ks > 0)) continue;
 			lines.push({
@@ -50,9 +60,18 @@ export function buildRozpisLines(vysledok: PlanRezovVysledok): RozpisLine[] {
 				mnozstvo: rez.ks,
 				mj: 'ks',
 				dlzka: mmNaMetre(rez.rozmer),
-				poznamka: ''
+				poznamka
 			});
 		}
 	}
 	return lines;
+}
+
+/**
+ * Postaví `lines` pre `montalu_narezak_upload` z výsledku plánu rezov (#522). Deleguje na
+ * `rozpisLinesFromMaterial` — `vysledok.material` je `vysledok.profily.map(p => p.material)`
+ * (plan-rezov.ts), takže výstup je BIT-IDENTICKÝ s pôvodnou per-profil iteráciou (žiadna regresia).
+ */
+export function buildRozpisLines(vysledok: PlanRezovVysledok): RozpisLine[] {
+	return rozpisLinesFromMaterial(vysledok.material);
 }

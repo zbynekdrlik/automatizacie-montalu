@@ -4,22 +4,9 @@
 
 import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
+import { loadCfg, listSysStyly, systemyZoStylov, listGlassTypes } from '$lib/server/db';
 import {
-	loadCfg,
-	listSysStyly,
-	systemyZoStylov,
-	listGlassTypes,
-	glassTypesForSystem,
-	efektivnaKorekcia,
-	efektivnaRedukciaZero,
-	type GlassType
-} from '$lib/server/db';
-import { SKLO_INE, ineHrubka, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
-import {
-	safeCompute,
-	safeComputeMulti,
 	systemyRucnaKolajnica,
-	buildPosuvSpec,
 	type ComputeResult,
 	type MultiResult,
 	type PosuvSpec
@@ -27,15 +14,7 @@ import {
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { znovaZOdpisu } from '$lib/server/znova';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
-import {
-	sysStylPre,
-	sklaDoPonuky,
-	skloVyberaIzo,
-	zakladnyStyl,
-	odvodenyOdpisWarn,
-	type ExistujeSysStyl,
-	type TriedaZaNazov
-} from '$lib/styl';
+import { sysStylPre, odvodenyOdpisWarn } from '$lib/styl';
 import {
 	writeOdpis,
 	isLive,
@@ -74,6 +53,14 @@ import {
 	type Vstup,
 	type MultiVstup
 } from '$lib/server/vstup';
+// #524: sklo-rozlíšenie + rekomputa extrahované do zdieľaného modulu (PURE-MOVE) — ten istý
+// autoritatívny nárezák používa aj backfill (#524). Aliasy zachovávajú pôvodné volania v tejto route.
+import {
+	existujeVCfg,
+	skloPre,
+	recomputeVstup as compute,
+	recomputeMultiVstup as computeMultiFrom
+} from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
 import { pridajSklaHromadneIdempotentne, type NoveSklo } from '$lib/server/objednavka-skla';
 
@@ -248,180 +235,6 @@ function skladVarovaniaPre(
 function skloCenyPre(user: SessionUser | null, plany: SkloPlanVstup[]): SkloCenaResult | undefined {
 	if (isB2B(user)) return undefined;
 	return skloCenaPre(plany);
-}
-
-/** Existuje taký nárezák? Zdroj pravdy pre server je konfigurácia (cfg z DB). */
-const existujeVCfg =
-	(cfg: ReturnType<typeof loadCfg>): ExistujeSysStyl =>
-	(s) =>
-		!!cfg[s];
-
-/** Sklo musí patriť k systému AJ k štýlu (napr. Štandard + opona nemá IZO skladbu).
- *  #443: `sklaDoPonuky` dostáva trieda-lookup (`platne` je práve TENTO systém, takže
- *  `find` podľa mena je jednoznačný) — basic/IZO filter sa rozhoduje primárne triedou,
- *  regex `jeIzoSklo` ostáva fallback len pre neklasifikované sklo. */
-function skloPre(
-	cfg: ReturnType<typeof loadCfg>,
-	system: string,
-	styl: string,
-	sklo: string,
-	skloTrieda?: number | null
-) {
-	// Vlastná (nekatalógová) skladba (#235 slice 2): SYNTETICKÉ sklo z hrúbkovej triedy —
-	// počíta sa BIT-IDENTICKY ako katalógové sklo tej istej triedy. `skloKorekcia=null` →
-	// efektivnaKorekcia = triedová korekcia (systém × trieda); `redukciaZero` sa pre Slide
-	// DERIVUJE z hrubkaTrieda (efektivnaRedukciaZero). `hrubka` (Deluxe kladka/klzný) = 0 mimo
-	// Deluxe (bit-identické s katalógom). Cena je honest-null (glassMoneyKod(SKLO_INE)→null,
-	// lebo variant je sentinel). Trieda POVINNÁ — bez platnej triedy null (validácia odmietne).
-	if (sklo === SKLO_INE) {
-		if (!jeSkloTrieda(skloTrieda)) return null;
-		const trieda = ineHrubkaTrieda(skloTrieda);
-		// RED-1 (#235 slice 2): rovnaký system×štýl gate ako katalóg. `sklaDoPonuky`
-		// FILTRUJE izolačné sklá tam, kde pre daný štýl IZO nárezák neexistuje (napr.
-		// Štandard + opona 2x2K — cfg nemá „…|2x2K IZO"). Bez tohto by vlastná IZO na
-		// takej kombinácii spočítala BASIC nárezák (sysStylPre padne späť) + trieda-16
-		// korekciu — stav, aký žiadne katalógové IZO sklo v tej kombinácii nevie. Mirror
-		// klienta: SKLO_TRIEDY 16/24 sú v UI odfiltrované keď IZO nárezák chýba.
-		if (
-			skloVyberaIzo(system) &&
-			trieda === 16 &&
-			!existujeVCfg(cfg)(`${system}|${zakladnyStyl(styl)} IZO`)
-		)
-			return null;
-		// YELLOW-3 (#235 slice 2): `hrubkaTrieda` je non-null LEN pre systémy, ktoré
-		// klasifikujú skladbu (Slide + Štandardy). Robust/Deluxe majú v katalógu NULL
-		// (db.ts) → syntetické sklo tiež NULL, inak by `efektivnaKorekcia` sadla triedovú
-		// korekciu tam, kde katalóg nikdy. Deluxe rieši hrúbku cez `hrubka` (nie triedu).
-		const klasifikuje = system === 'Slide' || skloVyberaIzo(system);
-		const g: GlassType = {
-			id: -1,
-			nazov: SKLO_INE,
-			system,
-			redukciaZero: false,
-			hrubka: ineHrubka(system, skloTrieda),
-			skloKorekcia: null,
-			hrubkaTrieda: klasifikuje ? trieda : null
-		};
-		return g;
-	}
-	const platne = glassTypesForSystem(system);
-	const triedaZa: TriedaZaNazov = (nazov) =>
-		platne.find((g) => g.nazov === nazov)?.hrubkaTrieda ?? null;
-	const povolene = sklaDoPonuky(
-		system,
-		styl,
-		platne.map((g) => g.nazov),
-		existujeVCfg(cfg),
-		triedaZa
-	);
-	return povolene.includes(sklo) ? (platne.find((g) => g.nazov === sklo) ?? null) : null;
-}
-
-function compute(vstup: Vstup): {
-	r: ComputeResult | null;
-	err: string | null;
-	spec: PosuvSpec | null;
-} {
-	const cfg = loadCfg();
-	// sklo musí patriť k zvolenému systému (Robust = 4/16/4, Slide = 4/8/4) —
-	// nedá sa cez skriptovaný POST poslať cudzie sklo
-	const g = skloPre(cfg, vstup.system, vstup.styl, vstup.sklo, vstup.skloTrieda);
-	if (!g) return { r: null, err: 'Vyber typ skla platný pre zvolený systém a štýl.', spec: null };
-	// hrúbka skla (Deluxe 6/10) vyberá kladka/klzný profil; Robust/Slide = 0
-	// prídavná koľajnica: spodná koľajnica o 1 väčšia (compute gejtuje na Štandard +)
-	// sysStylPre: v Štandard + vyberá basic/IZO nárezák ZVOLENÁ TRIEDA skla (#443,
-	// regex jeIzoSklo len fallback pre neklasifikované sklo)
-	// #109: zdieľaný builder pre OBE cesty (compute() aj computeMultiFrom()) — nové
-	// pole PosuvSpec, ktoré tu chýba, je teraz kompilačná chyba, nie tichá diera.
-	const spec: PosuvSpec = buildPosuvSpec({
-		sysStyl: sysStylPre(vstup.system, vstup.styl, vstup.sklo, existujeVCfg(cfg), g.hrubkaTrieda),
-		S: vstup.s,
-		V: vstup.v,
-		// #443: pre klasifikované Slide sklo DERIVOVANÉ z triedy (efektivnaRedukciaZero);
-		// inak uložený stĺpec (honest-null fallback)
-		redukciaZero: efektivnaRedukciaZero(g),
-		skloHrubka: g.hrubka,
-		// #443: reťaz precedencie per-sklo (#440) → trieda (systém × 6/16) → systémová
-		skloKorekcia: efektivnaKorekcia(g, vstup.system),
-		pridavnaKolajnica: vstup.pridavnaKolajnica,
-		// ručná dĺžka koľajnice (Patrik): mení rez → mení metre v odpise
-		kolajnica: vstup.kolajnica ?? undefined,
-		// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ odpis
-		// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeFlat
-		sietka: vstup.sietka,
-		// jednoposuvová cesta tieto polia zo `spec` NIKDY nečíta — jobFor() číta
-		// otvaranie/sklo/kovanie*/klin PRIAMO z `vstup` (jedna sada hodnôt, jeden
-		// formulár). Explicitný `undefined` namiesto tichého vynechania poľa —
-		// presne dôvod #109 (viď design komentár na tickete).
-		otvaranie: undefined,
-		sklo: undefined,
-		kovanieL: undefined,
-		kovanieP: undefined,
-		kovanieStred: undefined,
-		kovanieStredOkno: undefined,
-		kliny: undefined
-	});
-	const out = safeCompute(
-		cfg,
-		spec.sysStyl,
-		spec.S,
-		spec.V,
-		spec.redukciaZero,
-		spec.skloHrubka,
-		spec.pridavnaKolajnica,
-		spec.kolajnica,
-		spec.sietka,
-		spec.skloKorekcia
-	);
-	return { ...out, spec };
-}
-
-// ---- Viac posuvov (zimná záhrada) ----
-
-function computeMultiFrom(vstup: MultiVstup) {
-	const cfg = loadCfg();
-	const specs: PosuvSpec[] = [];
-	for (const [i, p] of vstup.posuvy.entries()) {
-		const g = skloPre(cfg, p.system, p.styl, p.sklo, p.skloTrieda);
-		if (!g)
-			return {
-				r: null,
-				err: `Zasklenie ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.`,
-				specs: []
-			};
-		// #109: rovnaký zdieľaný builder ako compute() vyššie — na tejto ceste sú
-		// naopak VŠETKY polia potrebné (echo pre plán/tlač cez PosuvInfo, viď design
-		// komentár na tickete).
-		specs.push(
-			buildPosuvSpec({
-				sysStyl: sysStylPre(p.system, p.styl, p.sklo, existujeVCfg(cfg), g.hrubkaTrieda),
-				S: p.s,
-				V: p.v,
-				// #443: pre klasifikované Slide sklo DERIVOVANÉ z triedy; inak uložený stĺpec
-				redukciaZero: efektivnaRedukciaZero(g),
-				skloHrubka: g.hrubka,
-				// #443: reťaz precedencie per-sklo (#440) → trieda (systém × 6/16) → systémová
-				skloKorekcia: efektivnaKorekcia(g, p.system),
-				otvaranie: p.otvaranie,
-				// display echo do PosuvInfo.skloNazov (plán/tlač) — pri vlastnej skladbe TEXT
-				// (skloPresne); compute glass rieši skloPre() z RAW p.sklo (sentinel) vyššie (#235)
-				sklo: p.skloPresne || p.sklo,
-				kovanieL: p.kovanieL,
-				kovanieP: p.kovanieP,
-				kovanieStred: p.kovanieStred,
-				kovanieStredOkno: p.kovanieStredOkno,
-				kliny: p.kliny,
-				// prídavná koľajnica je vstup na úrovni objednávky → platí pre všetky posuvy
-				pridavnaKolajnica: vstup.pridavnaKolajnica,
-				// ručná dĺžka koľajnice je PER POSUV (každý posuv má vlastnú šírku)
-				kolajnica: p.kolajnica ?? undefined,
-				// sieťka (#86–#90, KOREKCIA 2026-08-02) — na Robust/Slide MENÍ Money odpis
-				// (rám+nos+[2K→3K koľajnica]), gate je vo vnútri computeMulti/computeFlat
-				sietka: p.sietka ?? undefined
-			})
-		);
-	}
-	return { ...safeComputeMulti(cfg, specs), specs };
 }
 
 function jobForMulti(
