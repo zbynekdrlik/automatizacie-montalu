@@ -140,10 +140,10 @@ describe('buildNarezakV2', () => {
 	});
 
 	it('staré dáta bez sikmyRez → obranný default 45° (rovnako ako RozpisRezov `?? true`)', () => {
-		const staryProfil = { ...material[1]!, kod: 'ZASP00002' } as MaterialRow & {
-			sikmyRez?: boolean;
-		};
-		delete staryProfil.sikmyRez;
+		// material[1] má sikmyRez=false (→ 90°); po odstránení poľa musí padnúť na default 45°
+		const staryProfil: MaterialRow = { ...material[1]! };
+		// simuluj staré dáta bez `sikmyRez` (cast operandu na optional — inak TS2790 pod strict)
+		delete (staryProfil as { sikmyRez?: boolean }).sikmyRez;
 		const v2 = buildNarezakV2([staryProfil], BASE);
 		expect(v2.lines[0]!.uhol_l).toBe(45);
 		expect(v2.lines[0]!.uhol_r).toBe(45);

@@ -119,7 +119,9 @@ export function materialRowsFromRozpis(
 		return {
 			kod: m.kod ?? '',
 			nazov: m.nazov,
-			rezy: m.rezy.filter((r) => r.ks > 0),
+			// rezy tabuľka konzistentná s nakreslenými tyčami — rez dlhší ako tyč (degenerát) sa
+			// nezmestí do žiadnej tyče, takže ho ani do tabuľky neuvádzame (na reálnych dátach nikdy).
+			rezy: m.rezy.filter((r) => r.ks > 0 && r.rozmer + kerf <= barLen),
 			tyce,
 			bary,
 			odpadMm,
