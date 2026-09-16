@@ -1,6 +1,6 @@
 // #511: rozpis materiálu (s cenami) prestal ísť na kiosk ako `narezak`; kiosk dostáva
 // skutočný plán rezov po ULOŽENÍ plánu. Behaviorálny/source guard — kontroluje ZAPOJENIE
-// (ktorá cesta strieľa upload), nie glyfy v PDF (tie pokrýva plan-rezov-pdf.test.ts).
+// (ktorá cesta strieľa upload), nie glyfy v PDF (tie pokrýva narezak-pdf.test.ts).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 

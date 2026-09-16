@@ -1,9 +1,12 @@
 // #511: upload skutočného plánu rezov na kiosk (sale.order) cez montalu_narezak_upload.
 // Mock Odoo transport (setJson2Transport) ZACHYTÍ upload — overuje kontrakt: kind='narezak',
-// doc_id 'plan-rezov-<zak>-<op>', filename 'Plan-rezov-…', PDF prítomné. Money-neutrálne.
+// doc_id 'plan-rezov-<zak>-<op>', filename 'Narezak-…', PDF prítomné. Money-neutrálne.
+//
+// #529: PDF je odteraz GRAFICKÝ nárezák (`narezak-pdf.ts`) — tyče kreslené s rezmi/uhlami/odpadom/
+// obrázkami profilov, nie starý textový plan-rezov-pdf.
 //
 // Mocky obchádzajú native better-sqlite3 (money.ts → db.ts, zakazka-ceny.ts → db.ts) — plan-rezov
-// compute + plan-rezov-pdf + odoo-json2 sú čisté, bežia naostro (vzor odoo-narezak-upload.test.ts).
+// compute + narezak-pdf + odoo-json2 sú čisté, bežia naostro (vzor odoo-narezak-upload.test.ts).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
 // normZak mock == real (`money.ts` normZak = trim+upper+strip-ws); normOp mock líši sa od reálneho
@@ -103,7 +106,7 @@ describe('uploadPlanRezovToOdoo', () => {
 		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('missing');
 	});
 
-	it('uploaded — mock transport zachytí narezak upload s plan-rezov doc_id + Plan-rezov filename + PDF', async () => {
+	it('uploaded — mock transport zachytí narezak upload s plan-rezov doc_id + Narezak filename + PDF', async () => {
 		enableEnv();
 		vi.mocked(zakazkaPrehlad).mockReturnValue({
 			zak: 'ZAK123',
@@ -125,7 +128,7 @@ describe('uploadPlanRezovToOdoo', () => {
 		expect(cap.body.order_number).toBe('OP260439');
 		expect(cap.body.kind).toBe('narezak');
 		expect(cap.body.doc_id).toBe('plan-rezov-zak123-op260439');
-		expect(String(cap.body.filename)).toMatch(/^Plan-rezov-ZAK123-\d{8}-\d{4}\.pdf$/);
+		expect(String(cap.body.filename)).toMatch(/^Narezak-ZAK123-\d{8}-\d{4}\.pdf$/);
 		// PDF prítomné a je to naozaj PDF (base64 → %PDF)
 		const pdf = Buffer.from(String(cap.body.pdf_base64), 'base64');
 		expect(pdf.slice(0, 5).toString('latin1')).toBe('%PDF-');

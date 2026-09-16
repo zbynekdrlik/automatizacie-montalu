@@ -43,7 +43,7 @@ export function ellipsize(font: PDFFont, s: string, size: number, maxWidth: numb
 }
 
 /** YYYYMMDD-HHMM v Europe/Bratislava — sortovateľná pečiatka do názvu prílohy (odlíši viac verzií).
- *  Zdieľané `zakazka-pdf.ts` (Rozpis-…) aj `plan-rezov-pdf.ts` (Plan-rezov-…) — jeden zdroj pravdy
+ *  Zdieľané `zakazka-pdf.ts` (Rozpis-…) aj `narezak-pdf.ts` (Narezak-…) — jeden zdroj pravdy
  *  pre časovú pečiatku názvu súboru (UTC pasca: Intl s explicitným `timeZone`, nie `toISOString`). */
 export function stampSk(now: Date): string {
 	const parts = new Intl.DateTimeFormat('sv-SE', {
