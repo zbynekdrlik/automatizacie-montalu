@@ -20,12 +20,7 @@ const log = logger('glass-order-upload');
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 export type GlassOrderUploadResult =
-	| 'uploaded'
-	| 'disabled'
-	| 'no-items'
-	| 'no-zak'
-	| 'missing'
-	| 'failed';
+	'uploaded' | 'disabled' | 'no-items' | 'no-zak' | 'missing' | 'failed';
 
 export interface GlassOrderUploadOutcome {
 	result: GlassOrderUploadResult;

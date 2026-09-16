@@ -887,7 +887,9 @@ export function migrateObjednavkaSklaSpec(db: Database.Database, bump: (v: numbe
 	const maTable =
 		(
 			db
-				.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='objednavka_skla'")
+				.prepare(
+					"SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='objednavka_skla'"
+				)
 				.get() as { c: number }
 		).c === 1;
 	db.transaction(() => {

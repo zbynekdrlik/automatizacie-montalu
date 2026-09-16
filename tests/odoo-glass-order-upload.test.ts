@@ -42,7 +42,9 @@ afterEach(() => {
 
 describe('uploadGlassOrderToOdoo (#521)', () => {
 	it('doc_id je stabilný glass-order-<zak>-<op> slug', () => {
-		expect(buildGlassOrderDocId('ZAK 26/0501', 'OP260501')).toMatch(/^glass-order-[a-z0-9]+-[a-z0-9]+$/);
+		expect(buildGlassOrderDocId('ZAK 26/0501', 'OP260501')).toMatch(
+			/^glass-order-[a-z0-9]+-[a-z0-9]+$/
+		);
 	});
 
 	it('žiadne sklá → no-items, payload null', async () => {

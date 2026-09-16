@@ -21,9 +21,8 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('nastavSpec perzistuje a číta späť (round-trip)', async () => {
-		const { pridajSklo, nastavSpec, getSkloPolozka } = await import(
-			'../src/lib/server/objednavka-skla'
-		);
+		const { pridajSklo, nastavSpec, getSkloPolozka } =
+			await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-2',
 			modul: 'fix',
@@ -54,9 +53,8 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('otvory > 0 bez zvolenej triedy → default d30 (nie prázdne, nie d50)', async () => {
-		const { pridajSklo, nastavSpec, getSkloPolozka } = await import(
-			'../src/lib/server/objednavka-skla'
-		);
+		const { pridajSklo, nastavSpec, getSkloPolozka } =
+			await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-3',
 			modul: 'zasklenia',
@@ -82,9 +80,8 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('spec z DB položky tečie do buildGlassOrder payloadu', async () => {
-		const { pridajSklo, nastavSpec, listSklaPreZakazku } = await import(
-			'../src/lib/server/objednavka-skla'
-		);
+		const { pridajSklo, nastavSpec, listSklaPreZakazku } =
+			await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-4',
 			modul: 'zasklenia',

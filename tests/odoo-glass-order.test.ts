@@ -108,9 +108,7 @@ describe('buildGlassOrderItem — základ + deriváty + spec', () => {
 
 	it('bez popisu → note vynechaný (len 4 základné kľúče)', () => {
 		const it0 = buildGlassOrderItem(pane({ popis: '' }));
-		expect(Object.keys(it0).sort()).toEqual(
-			['glass_type', 'height_mm', 'qty', 'width_mm'].sort()
-		);
+		expect(Object.keys(it0).sort()).toEqual(['glass_type', 'height_mm', 'qty', 'width_mm'].sort());
 	});
 
 	it('katalógová tabuľa → composition/spacer derivované automaticky', () => {

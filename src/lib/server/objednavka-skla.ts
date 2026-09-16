@@ -233,7 +233,9 @@ function mapRow(r: SkloRow): SkloPolozka {
 
 /** SkloRow spec_* stĺpce → `GlassSpec` (INTEGER 0/1 → bool; neplatné texty → predvolené). */
 function mapSpec(r: SkloRow): GlassSpec {
-	const hole = HOLE_SIZES.includes(r.spec_hole_size as HoleSize) ? (r.spec_hole_size as HoleSize | '') : '';
+	const hole = HOLE_SIZES.includes(r.spec_hole_size as HoleSize)
+		? (r.spec_hole_size as HoleSize | '')
+		: '';
 	const edge = EDGE_FINISHES.includes(r.spec_edge_finish as EdgeFinish)
 		? (r.spec_edge_finish as EdgeFinish)
 		: 'none';
@@ -276,7 +278,8 @@ const stmtNastavSpec = db.prepare(`
 `);
 
 function nezapornyCely(x: number, pole: string): number {
-	if (!Number.isInteger(x) || x < 0) throw new Error(`Neplatný počet (${pole}): musí byť celé číslo >= 0.`);
+	if (!Number.isInteger(x) || x < 0)
+		throw new Error(`Neplatný počet (${pole}): musí byť celé číslo >= 0.`);
 	return x;
 }
 

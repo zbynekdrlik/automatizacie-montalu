@@ -69,9 +69,9 @@ describe('migration v47 → v48 (objednavka_skla spec)', () => {
 		const d = new Database(dbPath);
 		expect(d.pragma('user_version', { simple: true })).toBe(48);
 
-		const cols = (
-			d.prepare('PRAGMA table_info(objednavka_skla)').all() as { name: string }[]
-		).map((c) => c.name);
+		const cols = (d.prepare('PRAGMA table_info(objednavka_skla)').all() as { name: string }[]).map(
+			(c) => c.name
+		);
 		for (const c of SPEC_COLS) expect(cols).toContain(c);
 		// pôvodné stĺpce ostávajú
 		expect(cols).toContain('typ_skla');
@@ -101,10 +101,9 @@ describe('migration v47 → v48 (objednavka_skla spec)', () => {
 		d.prepare(
 			`UPDATE objednavka_skla SET spec_warm_edge = 1, spec_holes_qty = 2, spec_hole_size = 'd30', spec_edge_finish = 'ksr' WHERE zak_norm = ?`
 		).run('ZAKV48');
-		const row = d.prepare('SELECT * FROM objednavka_skla WHERE zak_norm = ?').get('ZAKV48') as Record<
-			string,
-			unknown
-		>;
+		const row = d
+			.prepare('SELECT * FROM objednavka_skla WHERE zak_norm = ?')
+			.get('ZAKV48') as Record<string, unknown>;
 		expect(row.spec_warm_edge).toBe(1);
 		expect(row.spec_holes_qty).toBe(2);
 		expect(row.spec_hole_size).toBe('d30');
