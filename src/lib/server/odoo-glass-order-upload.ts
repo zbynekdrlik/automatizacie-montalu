@@ -11,7 +11,7 @@
 import { logger } from './log';
 import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
 import { normOp, normZak } from './money';
-import { zakazkaPrehlad } from './zakazka-ceny';
+import { zakazkaOp } from './zakazka-ceny';
 import { listSklaPreZakazku } from './objednavka-skla';
 import { buildGlassOrder, type GlassOrder } from './odoo-rozpis-lines';
 
@@ -69,18 +69,12 @@ export async function uploadGlassOrderToOdoo(zak: string): Promise<GlassOrderUpl
 	if (!cfg) return { result: 'disabled', payload };
 
 	try {
-		const prehlad = zakazkaPrehlad(trimmed);
-		if (!prehlad) {
-			log.info('glass-order upload: zákazka nemá žiadny odpis — nič neposielam', { zak: trimmed });
-			return { result: 'missing', payload };
-		}
-		// OP z NAJNOVŠIEHO odpisu, live-first (rovnaká logika ako plan-rezov upload) — aby posledný
-		// TEST odpis (live=0) nesmeroval objednávku skla na testovacie OP.
-		const op = (prehlad.odpisy.find((o) => o.live === 1) ?? prehlad.odpisy[0])?.op ?? '';
+		// OP z NAJNOVŠIEHO odpisu, live-first (zdieľaný `zakazkaOp` — rovnaká voľba ako plán-rezov
+		// upload aj QR na podklade objednávky skla) — aby posledný TEST odpis (live=0) nesmeroval
+		// objednávku skla na testovacie OP.
+		const op = zakazkaOp(trimmed);
 		if (!op) {
-			log.info('glass-order upload: zákazka nemá OP na najnovšom odpise — nič neposielam', {
-				zak: trimmed
-			});
+			log.info('glass-order upload: zákazka nemá odpis/OP — nič neposielam', { zak: trimmed });
 			return { result: 'missing', payload };
 		}
 
