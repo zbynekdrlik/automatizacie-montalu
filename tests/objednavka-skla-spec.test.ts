@@ -67,6 +67,9 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 		});
 		nastavSpec(id, { ...GLASS_SPEC_OFF, holesQty: 1, holeSize: '' });
 		expect(getSkloPolozka(id)!.spec.holeSize).toBe('d30');
+		// otvory = 0 → hole_size sa vynuluje aj keď je zvolené d50 (nemá zmysel bez otvorov)
+		nastavSpec(id, { ...GLASS_SPEC_OFF, holesQty: 0, holeSize: 'd50' });
+		expect(getSkloPolozka(id)!.spec.holeSize).toBe('');
 	});
 
 	it('validateSpec hodí na neplatné hodnoty', async () => {
@@ -100,5 +103,27 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 		expect(item.spacer_mm).toBe(16);
 		expect(item.warm_edge).toBe(true);
 		expect(item.edge_finish).toBe('trapez_lestena');
+	});
+
+	it('mapSpec: neplatné uložené texty (hole_size/edge_finish) → predvolené', async () => {
+		const { db } = await import('../src/lib/server/db');
+		const { pridajSklo, getSkloPolozka } = await import('../src/lib/server/objednavka-skla');
+		const id = pridajSklo({
+			zak: 'ZAK-SPEC-5',
+			modul: 'zasklenia',
+			popis: 'P',
+			sirkaMm: 500,
+			vyskaMm: 500,
+			pocet: 1,
+			typSkla: 'Float sklo 6 mm',
+			createdBy: 'test'
+		});
+		// zapíš NEPLATNÉ hodnoty priamo (obídeme validáciu nastavSpec) — mapSpec ich má normalizovať
+		db.prepare(
+			`UPDATE objednavka_skla SET spec_hole_size = 'garbage', spec_edge_finish = 'garbage' WHERE id = ?`
+		).run(id);
+		const p = getSkloPolozka(id);
+		expect(p!.spec.holeSize).toBe('');
+		expect(p!.spec.edgeFinish).toBe('none');
 	});
 });

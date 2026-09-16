@@ -198,6 +198,16 @@ describe('buildGlassOrderItem — základ + deriváty + spec', () => {
 		expect(it0.width_mm).toBe(1200);
 		expect(it0.height_mm).toBe(800);
 	});
+
+	it('nulové/chýbajúce rozmery → height_mm=0 (bez pádu na null)', () => {
+		const rovny = buildGlassOrderItem(pane({ vyskaMm: null }));
+		expect(rovny.height_mm).toBe(0);
+		const sikmy = buildGlassOrderItem(
+			pane({ sikmy: true, vyskaMm: null, vLavoMm: null, vPravoMm: 1000, popis: '' })
+		);
+		expect(sikmy.height_mm).toBe(1000);
+		expect(sikmy.note).toContain('šikmé');
+	});
 });
 
 describe('buildGlassOrder — celá objednávka', () => {

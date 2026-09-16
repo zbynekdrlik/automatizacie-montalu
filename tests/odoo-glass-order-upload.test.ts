@@ -109,4 +109,56 @@ describe('uploadGlassOrderToOdoo (#521)', () => {
 	it('buildGlassOrderForZak → null keď niet položiek', () => {
 		expect(buildGlassOrderForZak('ZAK-PRAZDNA-GLASS')).toBeNull();
 	});
+
+	it('prázdny zak → no-zak, payload null', async () => {
+		const out = await uploadGlassOrderToOdoo('   ');
+		expect(out.result).toBe('no-zak');
+		expect(out.payload).toBeNull();
+	});
+
+	it('enabled flag ale bez config (URL/KEY) → disabled (payload postavený)', async () => {
+		const zak = 'ZAK-GU-NOCFG';
+		seedGlass(zak);
+		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
+		// ODOO_JSON2_URL/API_KEY zámerne NEnastavené
+		const out = await uploadGlassOrderToOdoo(zak);
+		expect(out.result).toBe('disabled');
+		expect(out.payload!.items).toHaveLength(1);
+	});
+
+	it('enabled + config, ale zákazka bez odpisu/OP → missing (payload postavený)', async () => {
+		const zak = 'ZAK-GU-NOODPIS';
+		seedGlass(zak); // sklo áno, odpis NIE
+		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
+		process.env.ODOO_JSON2_URL = 'https://erp.example.test';
+		process.env.ODOO_JSON2_API_KEY = 'k';
+		let called = false;
+		setJson2Transport(async () => {
+			called = true;
+			return new Response('{}', { status: 200 });
+		});
+		const out = await uploadGlassOrderToOdoo(zak);
+		expect(out.result).toBe('missing');
+		expect(called).toBe(false); // bez OP sa Odoo NEVOLÁ
+		expect(out.payload!.items).toHaveLength(1);
+	});
+
+	it('enabled + config, Odoo hodí → failed (nikdy nehádže, payload postavený)', async () => {
+		const zak = 'ZAK-GU-FAIL';
+		const op = 'OP260999';
+		seedOdpis(zak, op);
+		seedGlass(zak);
+		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
+		process.env.ODOO_JSON2_URL = 'https://erp.example.test';
+		process.env.ODOO_JSON2_API_KEY = 'k';
+		setJson2Transport(async () => new Response('boom', { status: 500 }));
+		const out = await uploadGlassOrderToOdoo(zak);
+		expect(out.result).toBe('failed');
+		expect(out.error).toBeTruthy();
+		expect(out.payload!.items).toHaveLength(1);
+	});
+
+	it('doc_id fallback na "x" pri nealfanumerických vstupoch', () => {
+		expect(buildGlassOrderDocId('///', '...')).toBe('glass-order-x-x');
+	});
 });
