@@ -65,9 +65,22 @@ now)`) to kreslí; obe upload cesty (plán-rezov save + backfill) ho kŕmia `Mat
 
 ## `cut_plan` payload (#532) — kontrakt appka↔odoo-erp 7431 (tablet pri píle)
 
-Intake `montalu_narezak_upload` je **LENIENT** (`**extra` top-level IGNORUJE neznáme kľúče), takže
-`cut_plan` sa posiela bezpečne popri `lines` + PDF (tie OSTÁVAJÚ nezmenené). `cut_plan` NAHRADIL
-#529 v2 (`narezak_v2` za flagom) — ide **VŽDY** (bez flagu), keď nárezák má tyče s Money kódom.
+**POZOR — intake NIE JE lenient (opravené #532 R2):** `montalu_narezak_upload` (odoo-erp
+`sale_order_narezak.py`) **ODMIETA neznáme top-level kľúče** — `ValidationError("Neznámy parameter:
+%s")` raise **PRED** vyhľadaním objednávky. R1 predpokladal „intake `**extra` ignoruje" — NEplatí (to
+platí len pre extra polia vnútri `lines[]`, #529). PROD bez odoo-erp#7431 → `cut_plan` = **HTTP 422**
+a padne celý upload. **PRAVIDLO pri pridaní NOVÉHO top-level kľúča do tohto uploadu: Odoo strana MUSÍ
+byť nasadená PRV, a appka potrebuje klient-side fallback** (viď nižšie).
+
+**Doručenie cez `uploadNarezak` (`odoo-json2.ts`, #532 R2):** oba call-sites (`odoo-plan-rezov-upload.ts`,
+`backfill-narezaky-deps.ts`) posielajú `montalu_narezak_upload` cez `uploadNarezak`, ktorý na 422
+„Neznámy parameter: cut_plan" zopakuje upload **BEZ `cut_plan`** (lines+PDF vždy doručené, warn raz za
+proces, `cutPlanRejected` signál). Kill switch `ODOO_NAREZ_CUT_PLAN=0/false` vypne `cut_plan` úplne
+(default ON). Po nasadení #7431 sa fallback prestane spúšťať sám (auto-heal) — detaily + re-run:
+`.claude/rules/backfill-narezaky.md` sekcia „cut_plan 422 fallback".
+
+`cut_plan` NAHRADIL #529 v2 (`narezak_v2` za flagom) — ide **VŽDY** (bez flagu), keď nárezák má tyče
+s Money kódom.
 
 `buildCutPlan(MaterialRow[])` → `{ version:1, bars:[…] }` alebo **`undefined`** keď žiadna tyč nemá
 kód (kľúč sa vynechá úplne — žiadne prázdne polia). JEDEN `bars[]` = JEDNA fyzická tyč

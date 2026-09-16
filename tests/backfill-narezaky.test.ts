@@ -841,14 +841,21 @@ describe('runBackfill — orchestrácia', () => {
 		expect(s.ops[0]!.akcia).toBe('uploaded');
 	});
 
-	it('orderExists 403 + --live + upload zamietne neznámu OP → no-order (nie chyba), errMsg surfacovaný (review 🟡)', async () => {
+	// #532 R2 — KONTRAKT ZMENA (opravuje pôvodné buggy „akákoľvek upload chyba pod precheckUnverified =
+	// no-order"). Klasifikácia je teraz podľa SPRÁVY, nie podľa precheckUnverified: LEN skutočný stabilný
+	// token `montalu_order_not_found` (odoo-erp `sale_order_narezak.py` ~r.340) → no-order; každá iná
+	// 4xx/5xx → error. Pôvodný test posielal vymyslenú správu „HTTP 404: objednávka neexistuje" a čakal
+	// no-order — to bol práve defekt (26× 422 cut_plan sa maskovalo ako „bez objednávky").
+	it('orderExists 403 + --live + upload hodí montalu_order_not_found → no-order (nie chyba)', async () => {
 		const log = vi.fn();
 		const d = deps({
 			orderExists: async () => {
 				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
 			},
 			uploadLines: vi.fn(async () => {
-				throw new Error('Odoo JSON-2 HTTP 404: objednávka neexistuje');
+				throw new Error(
+					'Odoo JSON-2 error: montalu_order_not_found: objednávka „OP17" nie je v Odoo (synchronizuje sa z Money).'
+				);
 			}),
 			log
 		});
@@ -858,18 +865,84 @@ describe('runBackfill — orchestrácia', () => {
 			{ dryRun: false, delayMs: 0 }
 		);
 		expect(d.uploadLines).toHaveBeenCalledTimes(1);
-		expect(s.chyb).toBe(0); // neznáma OP zamietnutá endpointom → no-order, NIE chyba
+		expect(s.chyb).toBe(0); // skutočná neexistencia objednávky → no-order, NIE chyba
 		expect(s.skipNoOrder).toBe(1);
 		expect(s.existenciaNeoverena).toBe(1);
 		expect(s.nahranych).toBe(0);
 		expect(s.ops[0]!.akcia).toBe('skip-no-order');
-		// review 🟡: masked upload chyba NESMIE ostať skrytá pod „Chýb: 0" — errMsg na opSum (CLI ⚠)
-		// + WARN log (nie info), aby genuine transport 5xx na existujúcej OP bola viditeľná.
-		expect(s.ops[0]!.error).toContain('404');
-		const warnUpload = log.mock.calls.filter(
-			(c) => c[0] === 'warn' && /zamietnut.*upload|upload.*→ no-order/i.test(String(c[1]))
+		const warnNoOrder = log.mock.calls.filter(
+			(c) => c[0] === 'warn' && /montalu_order_not_found|neexistuje/i.test(String(c[1]))
 		);
-		expect(warnUpload).toHaveLength(1);
+		expect(warnNoOrder).toHaveLength(1);
+	});
+
+	// #532 R2 DEFEKT-FIX (RED): pod precheckUnverified (Odoo read 403, VŽDY na PROD) GENUINE transport
+	// chyba (5xx / iná 4xx bez montalu_order_not_found) sa NESMIE maskovať ako no-order — musí byť error
+	// so správou. Toto je presne to, čo spôsobilo, že 26× 422 „Neznámy parameter: cut_plan" spadlo do
+	// „Skip — bez objednávky" namiesto chýb.
+	it('orderExists 403 + --live + upload hodí GENUINE 5xx (nie no-order token) → error, NIE no-order', async () => {
+		const log = vi.fn();
+		const d = deps({
+			orderExists: async () => {
+				throw new Error('Odoo JSON-2 HTTP 403 Forbidden: AccessError sale.order');
+			},
+			uploadLines: vi.fn(async () => {
+				throw new Error('Odoo JSON-2 HTTP 500 Internal Server Error: boom');
+			}),
+			log
+		});
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP30', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(s.chyb).toBe(1);
+		expect(s.skipNoOrder).toBe(0); // NIE tichý no-order
+		expect(s.ops[0]!.akcia).toBe('error');
+		expect(s.ops[0]!.error).toContain('500');
+	});
+
+	// #532 R2: aj s OVERENOU existenciou (read prešiel) iná chyba než no-order → error.
+	it('existencia OK + upload hodí 422 (nie cut_plan, nie no-order) → error', async () => {
+		const d = deps({
+			uploadLines: vi.fn(async () => {
+				throw new Error('Odoo JSON-2 HTTP 422 Unprocessable Entity: Neplatný doc_id');
+			})
+		});
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP31', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(s.chyb).toBe(1);
+		expect(s.skipNoOrder).toBe(0);
+		expect(s.ops[0]!.akcia).toBe('error');
+	});
+
+	// #532 R2: keď transport helper musel odstrániť cut_plan (422 fallback) a upload prebehol, backfill
+	// to počíta v summary.cutPlanOdmietnutych (CLI „cut_plan odmietnutý (422)"), NIE ako chybu.
+	it('uploadLines vráti cutPlanRejected → summary.cutPlanOdmietnutych++, uploaded (nie chyba)', async () => {
+		const d = deps({ uploadLines: vi.fn(async () => ({ cutPlanRejected: true })) });
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP32', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(s.nahranych).toBe(1);
+		expect(s.chyb).toBe(0);
+		expect(s.cutPlanOdmietnutych).toBe(1);
+		expect(s.ops[0]!.akcia).toBe('uploaded');
+	});
+
+	it('uploadLines bez cutPlanRejected → cutPlanOdmietnutych ostáva 0', async () => {
+		const d = deps(); // default vracia { lines_created: 1 }
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP33', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(s.nahranych).toBe(1);
+		expect(s.cutPlanOdmietnutych).toBe(0);
 	});
 
 	it('čítanie prejde (existencia + has-lines OK) → presná cesta ostáva, existenciaNeoverena 0', async () => {

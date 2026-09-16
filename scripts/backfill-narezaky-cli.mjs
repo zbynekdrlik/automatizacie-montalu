@@ -84,6 +84,9 @@ console.log(`Skip — nerekonštr.:    ${s.skipUnreconstructable}`);
 // live ich buď nahral (endpoint OP potvrdil) alebo mapoval na „bez objednávky".
 console.log(`Existencia neover.(403):${s.existenciaNeoverena ?? 0}`);
 console.log(`Spätne dopočítané OP:  ${s.driftOp}`);
+// #532 R2: PROD Odoo bez odoo-erp#7431 odmieta `cut_plan` (422) — upload prebehol BEZ neho
+// (lines+PDF doručené). NIE chyba; po nasadení #7431 spusti backfill znova (cut_plan sa prijme).
+console.log(`cut_plan odmietnutý(422):${s.cutPlanOdmietnutych ?? 0}`);
 console.log(`Chýb:                  ${s.chyb}`);
 console.log('');
 for (const op of s.ops) {

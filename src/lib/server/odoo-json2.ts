@@ -44,6 +44,17 @@ export function isNarezUploadEnabled(): boolean {
 // #532: `narezak_v2` groundwork (za flagom `ODOO_NAREZ_LINES_V2`) je ODSTRÁNENÝ — nahradený
 // `cut_plan` (`narezak-cut-plan.ts`), ktorý ide VŽDY (bez flagu), keď nárezák má tyče s Money kódom.
 
+/**
+ * #532 R2 KILL SWITCH: `ODOO_NAREZ_CUT_PLAN` — `0`/`false` (case-insensitive, orezané medzery) úplne
+ * VYPNE posielanie `cut_plan` v `montalu_narezak_upload` (fallback na `lines`+PDF). Default ON (env
+ * neset alebo čokoľvek iné). Použi keď PROD Odoo `cut_plan` odmieta a chceš vypnúť aj reaktívny
+ * 422-retry (napr. znížiť latenciu), kým odoo-erp#7431 nepristane. Bezpečný default: ZAPNUTÉ.
+ */
+export function isCutPlanEnabled(): boolean {
+	const v = (process.env.ODOO_NAREZ_CUT_PLAN ?? '').trim().toLowerCase();
+	return v !== '0' && v !== 'false';
+}
+
 export class OdooJson2Error extends Error {
 	status: number;
 	constructor(message: string, status: number = 0) {
@@ -139,5 +150,78 @@ export async function callJson2(
 		return parsed;
 	} finally {
 		clearTimeout(timer);
+	}
+}
+
+// --- #532 R2: montalu_narezak_upload s cut_plan 422 fallbackom ----------------------------------- //
+
+/** Výsledok `uploadNarezak`. `cutPlanAccepted` = cut_plan bol poslaný a Odoo ho prijal (upload bez
+ *  422). `cutPlanRejected` = cut_plan bol poslaný, Odoo ho odmietol 422 „Neznámy parameter" a upload
+ *  sa zopakoval BEZ neho (lines+PDF doručené). Oba false = cut_plan sa neposlal (žiadny / kill switch). */
+export interface NarezakUploadResult {
+	result: unknown;
+	cutPlanAccepted: boolean;
+	cutPlanRejected: boolean;
+}
+
+/**
+ * Tolerantný match na PROD 422 „Neznámy parameter: cut_plan" (odoo-erp `sale_order_narezak.py`
+ * `ValidationError(_("Neznámy parameter: %s"))`, raise PRED lookupom objednávky). `nezn\S*my` znesie
+ * literálnu aj `á`-escapovanú diakritiku; `[\s\S]*` znesie ďalšie neznáme kľúče pred `cut_plan`.
+ */
+const CUT_PLAN_UNKNOWN_RE = /nezn\S*my\s+parameter:[\s\S]*cut_plan/i;
+
+/** „warn raz za proces" state — cut_plan odmietnutie 422 sa loguje LEN pri prvom výskyte za beh. */
+let _cutPlanRejectWarned = false;
+
+/** TEST hook: vynuluj „warn raz za proces" state (aby ďalší test videl warn znova). */
+export function _resetCutPlanRejectWarn(): void {
+	_cutPlanRejectWarned = false;
+}
+
+/**
+ * Nahrá `montalu_narezak_upload` s reaktívnym `cut_plan` 422 fallbackom (#532 R2). PROD Odoo bez
+ * odoo-erp#7431 odmieta neznámy top-level kľúč `cut_plan` HTTP 422 → zopakuj TEN ISTÝ upload BEZ
+ * `cut_plan` (lines+PDF vždy doručené), warn RAZ za proces. Kill switch `ODOO_NAREZ_CUT_PLAN=0/false`
+ * odstráni `cut_plan` ešte pred prvým pokusom (žiadny 422, žiadny retry).
+ *
+ * Iné chyby (iná 422, 4xx/5xx, timeout) sa NEretry-ujú — hodia sa volajúcemu nezmenené.
+ */
+export async function uploadNarezak(
+	cfg: OdooJson2Config,
+	kwargs: Record<string, unknown>
+): Promise<NarezakUploadResult> {
+	const wantsCutPlan = kwargs.cut_plan != null;
+
+	// Kill switch: cut_plan sa vôbec nepošle (fallback na lines+PDF). Nič sa neposlalo → ani accepted
+	// ani rejected.
+	if (wantsCutPlan && !isCutPlanEnabled()) {
+		const { cut_plan: _off, ...rest } = kwargs;
+		const result = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', rest);
+		return { result, cutPlanAccepted: false, cutPlanRejected: false };
+	}
+
+	try {
+		const result = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', kwargs);
+		return { result, cutPlanAccepted: wantsCutPlan, cutPlanRejected: false };
+	} catch (e) {
+		if (
+			wantsCutPlan &&
+			e instanceof OdooJson2Error &&
+			e.status === 422 &&
+			CUT_PLAN_UNKNOWN_RE.test(e.message)
+		) {
+			if (!_cutPlanRejectWarned) {
+				log.warn(
+					'montalu_narezak_upload: cut_plan zatiaľ nie je akceptovaný týmto Odoo (422 Neznámy ' +
+						'parameter) — posielam bez cut_plan (lines+PDF); re-run po nasadení odoo-erp#7431'
+				);
+				_cutPlanRejectWarned = true;
+			}
+			const { cut_plan: _drop, ...rest } = kwargs;
+			const result = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', rest);
+			return { result, cutPlanAccepted: false, cutPlanRejected: true };
+		}
+		throw e;
 	}
 }
