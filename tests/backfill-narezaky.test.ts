@@ -465,7 +465,6 @@ function deps(over: Partial<BackfillDeps> = {}): BackfillDeps & {
 		loadPolozky: () => [],
 		orderExists: async () => true,
 		orderHasLines: async () => false,
-		now: new Date('2026-09-16T10:00:00Z'),
 		sleep: async () => {},
 		...over,
 		uploadLines
@@ -646,5 +645,40 @@ describe('runBackfill — orchestrácia', () => {
 		});
 		expect(s.objednavok).toBe(0);
 		expect(d.uploadLines).not.toHaveBeenCalled();
+	});
+
+	it('OP len s pergola-rezervacia → skipPergolaRezervacia + skip-no-lines, žiadny upload', async () => {
+		const d = deps();
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP13', modul: 'pergola', detail: JSON.stringify({ rezervacia: true }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(d.uploadLines).not.toHaveBeenCalled();
+		expect(s.skipPergolaRezervacia).toBe(1);
+		expect(s.skipNoLines).toBe(1);
+		expect(s.ops[0]!.akcia).toBe('skip-no-lines');
+	});
+
+	it('OP s nerekonštruovateľným modulom → skipUnreconstructable + skip-no-lines', async () => {
+		const d = deps();
+		const s = await runBackfill([row({ id: 1, op: 'OP14', modul: 'pergola', detail: '{}' })], d, {
+			dryRun: false,
+			delayMs: 0
+		});
+		expect(s.skipUnreconstructable).toBe(1);
+		expect(s.skipNoLines).toBe(1);
+	});
+
+	it('CAD odrezaný na CAD_DETAIL_MAX → skip (neposiela kusý rozpis)', async () => {
+		const d = deps();
+		const longCad = '18013 Profil A\t3\t3000\n'.repeat(2000); // > 20000 znakov
+		const s = await runBackfill(
+			[row({ id: 1, op: 'OP15', modul: 'pergola', detail: JSON.stringify({ cad: longCad }) })],
+			d,
+			{ dryRun: false, delayMs: 0 }
+		);
+		expect(d.uploadLines).not.toHaveBeenCalled();
+		expect(s.skipUnreconstructable).toBe(1);
 	});
 });

@@ -51,7 +51,6 @@ export function listOdpisyForBackfill(daysBack: number): OdpisBackfillRow[] {
 export function makeOdooBackfillDeps(
 	cfg: Cfg,
 	odooCfg: OdooJson2Config,
-	now: Date,
 	log: BackfillDeps['log']
 ): BackfillDeps {
 	const arrLen = (res: unknown): number => (Array.isArray(res) ? res.length : 0);
@@ -81,7 +80,6 @@ export function makeOdooBackfillDeps(
 				kind: 'narezak',
 				lines
 			}),
-		now,
 		log
 	};
 }

@@ -29,6 +29,7 @@ import {
 import { recomputeVstup, recomputeMultiVstup } from './zasklenia-sklo';
 import { computeClip, computeClipMulti, type ClipVstup, type ClipRiadok } from '$lib/clip';
 import { parseCad } from './pergola';
+import { CAD_DETAIL_MAX } from './cad-odpis';
 import { normOp, normZak, type Polozka } from './money';
 import type { Vstup, MultiVstup } from './vstup';
 
@@ -54,6 +55,7 @@ export type OdpisMapResult =
 export type BackfillSkipReason =
 	| 'pergola-rezervacia' // rezervačná cesta — `detail` je lossy, nedá sa znovu spočítať
 	| 'unreconstructable' // neznámy tvar `detail` / chýbajúce vstupy
+	| 'cad-truncated' // `detail.cad` dosiahol CAD_DETAIL_MAX → neúplný zdroj, neposielaj kusý rozpis
 	| 'recompute-failed' // engine vrátil chybu/null
 	| 'no-cut-list' // rekomputa prebehla, ale žiadne narezateľné rezy (napr. bazén)
 	| 'out-of-scope'; // modul mimo záberu backfillu
@@ -205,8 +207,14 @@ export function mapOdpisToLines(
 				const cad = detail.cad;
 				if (typeof cad !== 'string' || !cad.trim())
 					return { status: 'skip', reason: 'unreconstructable' };
+				// #524 review 🟡: `detail.cad` je uložený ORezaný na CAD_DETAIL_MAX (`cad-odpis.ts`),
+				// zatiaľ čo pôvodný Money odpis vznikol z PLNÉHO `vstup.cad`. Pri (zriedkavom) dosiahnutí
+				// stropu by rekomputa vrátila NEÚPLNÝ zoznam rezov bez varovania → radšej PRESKOČ, než
+				// poslať kusý „čo rezať" na tablet. Reálne zoznamy sú ~1–2 KB, takže to takmer nenastane.
+				if (cad.length >= CAD_DETAIL_MAX) return { status: 'skip', reason: 'cad-truncated' };
 				// rozpis rezov = SUROVÝ CAD text (operátorom zadané dĺžky) → žiadny vzorec sa nemení,
-				// takže žiadny drift-tag (poznamka ostáva prázdna).
+				// takže žiadny drift-tag (poznamka ostáva prázdna). Rezné dĺžky sú z CAD priamo,
+				// nezávisia od CODE_MAP (ten mapuje len Money kódy), takže parse-divergencia rez nemení.
 				const material: RozpisMaterial[] = parseCad(cad).rows.map((r) => ({
 					nazov: r.name,
 					rezy: [{ rozmer: r.cut_mm, ks: r.qty }]
@@ -254,7 +262,6 @@ export interface BackfillDeps {
 	orderExists: (orderNumber: string) => Promise<boolean>;
 	orderHasLines: (orderNumber: string) => Promise<boolean>;
 	uploadLines: (orderNumber: string, docId: string, lines: RozpisLine[]) => Promise<unknown>;
-	now: Date;
 	log?: (level: 'info' | 'warn' | 'error', msg: string, ctx?: Record<string, unknown>) => void;
 	sleep?: (ms: number) => Promise<void>;
 }
@@ -412,7 +419,11 @@ export async function runBackfill(
 			const res = mapOdpisToLines(r, deps.loadPolozky(r.id), deps.cfg);
 			if (res.status === 'skip') {
 				if (res.reason === 'pergola-rezervacia') summary.skipPergolaRezervacia++;
-				else if (res.reason === 'unreconstructable' || res.reason === 'recompute-failed')
+				else if (
+					res.reason === 'unreconstructable' ||
+					res.reason === 'recompute-failed' ||
+					res.reason === 'cad-truncated'
+				)
 					summary.skipUnreconstructable++;
 				log('info', 'backfill: modul preskočený', { op, modul, reason: res.reason });
 				continue;

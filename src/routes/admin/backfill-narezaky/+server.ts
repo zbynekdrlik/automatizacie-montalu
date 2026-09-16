@@ -54,9 +54,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const cfg = loadCfg();
 	const rows = listOdpisyForBackfill(days);
-	const deps = makeOdooBackfillDeps(cfg, odooCfg, new Date(), (lvl, msg, ctx) =>
-		log[lvl](msg, ctx)
-	);
+	const deps = makeOdooBackfillDeps(cfg, odooCfg, (lvl, msg, ctx) => log[lvl](msg, ctx));
 	const summary = await runBackfill(rows, deps, { dryRun, zakFilter: zak });
 
 	return json({ dryRun, days, ...summary });
