@@ -31,7 +31,10 @@ const B2B_FORBIDDEN_PREFIXES = [
 	'/plan-rezov',
 	// objednávka skla (#496) — interný podklad objednávky skla per zákazka,
 	// Money-neutrálne (objednávka u dodávateľa); drift guard
-	'/objednavka-skla'
+	'/objednavka-skla',
+	// #524: admin backfill nárezákov → Odoo lines (interný jednorazový nástroj, token/session
+	// gate). b2b sem nikdy — endpoint je „public" len pre CLI wrapper; drift guard to vynúti.
+	'/admin'
 ];
 
 // Podcesty POD inak zakázaným prefixom, ktoré sú pre b2b predsa len povolené (#144) —
