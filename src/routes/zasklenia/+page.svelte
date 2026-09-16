@@ -23,6 +23,7 @@
 	import PlanKarty from '$lib/components/zasklenia/PlanKarty.svelte';
 	import PlanKartyMulti from '$lib/components/zasklenia/PlanKartyMulti.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
+	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 
@@ -764,6 +765,7 @@
 	/>
 {:else if step === 'nahlad' && plan}
 	<div class="card">
+		<QrZakazka op={vstup.op} />
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge"
@@ -824,6 +826,7 @@
 	</div>
 {:else if step === 'hotovo' && plan && form?.outcome}
 	<div class="card">
+		<QrZakazka op={vstup.op} />
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge"
@@ -863,6 +866,7 @@
 	</div>
 {:else if step === 'nahladMulti' && multi}
 	<div class="card">
+		<QrZakazka op={vstup.op} />
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>
@@ -924,6 +928,7 @@
 	</div>
 {:else if step === 'hotovoMulti' && multi && form?.outcome}
 	<div class="card">
+		<QrZakazka op={vstup.op} />
 		<h1>{vstup.op} · {vstup.zakaznik}</h1>
 		<p class="sub">
 			<span class="badge" data-testid="plan-badge">{popisMulti(multi.posuvy)}</span>

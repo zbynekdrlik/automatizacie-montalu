@@ -13,7 +13,7 @@ process.env.DATABASE_PATH = path.join(tmpRoot, 'test.db');
 // poistka, nech prípadný lazy import v module chain je no-op
 process.env.CENY_SNAPSHOT_PATH = path.join(tmpRoot, 'neexistuje.json');
 
-const { zakazkaPrehlad } = await import('../src/lib/server/zakazka-ceny');
+const { zakazkaPrehlad, zakazkaOp } = await import('../src/lib/server/zakazka-ceny');
 const { db } = await import('../src/lib/server/db');
 
 let nextId = 50001;
@@ -228,5 +228,31 @@ describe('zakazkaPrehlad', () => {
 		expect(p!.parkovanych).toBe(1);
 		// materiál parkovaného AJ presunutého je v súčte (reálny live materiál)
 		expect(p!.polozky).toEqual([{ kod: 'UT-KP', nazov: 'Parkovaný', qty: 7, mj: 'm' }]);
+	});
+});
+
+// #528: zakazkaOp — OP najnovšieho odpisu, live-first (na naviazanie výstupu appky na sale.order).
+describe('zakazkaOp', () => {
+	it('zákazka bez odpisu → prázdny reťazec', () => {
+		expect(zakazkaOp('ZAKQRNONE')).toBe('');
+		expect(zakazkaOp('')).toBe('');
+	});
+	it('jeden LIVE odpis → jeho OP', () => {
+		seedOdpis({ zak: 'ZAKQR1', op: 'OP260901', live: 1 });
+		expect(zakazkaOp('ZAKQR1')).toBe('OP260901');
+	});
+	it('live-first: LIVE odpis vyhráva nad novším TEST odpisom', () => {
+		seedOdpis({ zak: 'ZAKQR2', op: 'OP260902', live: 1 }); // starší (nižšie id)
+		seedOdpis({ zak: 'ZAKQR2', op: 'OPTEST902', live: 0 }); // novší TEST — nesmie vyhrať
+		expect(zakazkaOp('ZAKQR2')).toBe('OP260902');
+	});
+	it('bez LIVE odpisu → OP najnovšieho TEST odpisu', () => {
+		seedOdpis({ zak: 'ZAKQR3', op: 'OPTEST903A', live: 0 }); // starší
+		seedOdpis({ zak: 'ZAKQR3', op: 'OPTEST903B', live: 0 }); // novší → vyhrá
+		expect(zakazkaOp('ZAKQR3')).toBe('OPTEST903B');
+	});
+	it('odpis bez OP → prázdny reťazec', () => {
+		seedOdpis({ zak: 'ZAKQR4', op: '', live: 1 });
+		expect(zakazkaOp('ZAKQR4')).toBe('');
 	});
 });

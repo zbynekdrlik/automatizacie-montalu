@@ -384,6 +384,7 @@
 		fixError={fixVykresRes.error}
 		datumIso={data.datumIso}
 		live={data.live}
+		op={ident.op}
 	/>
 
 	<RucnePolozky bind:rucneRiadky catalog={data.catalog ?? []} />

@@ -16,7 +16,20 @@
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { PlanRezovVysledok } from './plan-rezov';
 import type { Tyc } from './compute';
-import { A4_W, A4_H, MARGIN, CONTENT_W, wrapText, embedDejavu, stampSk } from './pdf-common';
+import {
+	A4_W,
+	A4_H,
+	MARGIN,
+	CONTENT_W,
+	wrapText,
+	embedDejavu,
+	stampSk,
+	drawQrZakazkaPdf,
+	qrZakazkaHeaderXY,
+	qrHeaderTextWidth,
+	qrHeaderBandBottom
+} from './pdf-common';
+import { qrZakazkaPayload } from '$lib/qr-zakazka';
 
 const INK = rgb(0.06, 0.09, 0.16); // #0f172a
 const MUTED = rgb(0.39, 0.45, 0.55); // #64748b
@@ -58,8 +71,15 @@ function ensureSpace(ctx: Ctx, need: number): void {
 	if (ctx.cursor - need < MARGIN) newPage(ctx);
 }
 
-function drawParagraph(ctx: Ctx, text: string, size: number, font: PDFFont, color = INK): void {
-	const lines = wrapText(font, text, size, CONTENT_W);
+function drawParagraph(
+	ctx: Ctx,
+	text: string,
+	size: number,
+	font: PDFFont,
+	color = INK,
+	maxWidth = CONTENT_W
+): void {
+	const lines = wrapText(font, text, size, maxWidth);
 	for (const ln of lines.length > 0 ? lines : ['']) {
 		ensureSpace(ctx, LINE);
 		ctx.page.drawText(ln, { x: MARGIN, y: ctx.cursor - size, size, font, color });
@@ -105,22 +125,33 @@ export async function generatePlanRezovPdf(
 		font: bold,
 		color: ACCENT
 	});
+	// #528: QR zákazky (holé sale.order.name) v pravom hornom rohu — pracovník ho naskenuje tabletom
+	// na Odoo kiosku a otvorí sa daná objednávka. Kreslí sa LEN keď je OP zadané.
+	const qrPayload = qrZakazkaPayload(header.op);
+	if (qrPayload) {
+		const qr = qrZakazkaHeaderXY();
+		drawQrZakazkaPdf(ctx.page, qrPayload, qr.x, qr.y, qr.size);
+	}
 	ctx.cursor -= FS_TITLE + 8;
+	// riadky hlavičky v QR pásme sa zalomia užšie, aby text nepretlačil QR (viď qrHeaderTextWidth)
+	const hw = () => qrHeaderTextWidth(!!qrPayload && ctx.cursor > qrHeaderBandBottom());
 	drawParagraph(
 		ctx,
 		`Zákazka: ${header.zak}  ·  Objednávka: ${header.op}  ·  Zákazník: ${header.zakaznik}`,
 		FS_META,
 		reg,
-		INK
+		INK,
+		hw()
 	);
-	if (header.nazov) drawParagraph(ctx, `Plán: ${header.nazov}`, FS_META, reg, INK);
+	if (header.nazov) drawParagraph(ctx, `Plán: ${header.nazov}`, FS_META, reg, INK, hw());
 	const stav = now.toLocaleString('sk-SK', { timeZone: 'Europe/Bratislava' });
 	drawParagraph(
 		ctx,
 		`Dátum: ${stav}  ·  nahrádza predchádzajúce  ·  zdroj: automatizácie Montalu (plán rezov).`,
 		FS_META,
 		reg,
-		MUTED
+		MUTED,
+		hw()
 	);
 
 	// sumár
@@ -130,7 +161,8 @@ export async function generatePlanRezovPdf(
 		`Profilov: ${profilov}  ·  Tyčí spolu: ${vysledok.tyceSpolu}  ·  Odpad spolu: ${fmt(vysledok.odpadMm)} mm (${fmt(vysledok.odpadPct)} %)  ·  Dĺžka tyče: ${fmt(vysledok.dlzkaTyce)} mm  ·  Rezná medzera: ${fmt(vysledok.reznaMedzera)} mm`,
 		FS_META,
 		bold,
-		INK
+		INK,
+		hw()
 	);
 	ctx.cursor -= 4;
 

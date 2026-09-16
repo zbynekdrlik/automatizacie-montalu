@@ -141,3 +141,15 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 		odpad
 	};
 }
+
+/**
+ * #528: OP zákazky z NAJNOVŠIEHO odpisu, live-first (posledný TEST odpis `live=0` nesmie nasmerovať
+ * výstup na testovacie OP — rovnaká voľba ako glass-order / plán-rezov upload). Prázdny reťazec keď
+ * zákazka nemá odpis / OP. Slúži na naviazanie výstupu appky na `sale.order` (napr. QR na podklade
+ * objednávky skla ukazuje na TÚ ISTÚ objednávku ako nahraná `glass_order`).
+ */
+export function zakazkaOp(zakRaw: string): string {
+	const p = zakazkaPrehlad(zakRaw);
+	if (!p) return '';
+	return (p.odpisy.find((o) => o.live === 1) ?? p.odpisy[0])?.op ?? '';
+}
