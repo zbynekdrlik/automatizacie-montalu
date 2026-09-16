@@ -164,11 +164,15 @@ export async function uploadPlanRezovToOdoo(
 		// materiál nesie Money kódy; inak sa vynechá (a zalogujeme koľko tyčí bez kódu).
 		const cutPlan = buildCutPlan(vysledok.material);
 		const bezKodu = pocetVynechanychBezKodu(vysledok.material);
-		if (!cutPlan && bezKodu > 0) {
-			log.debug('plan-rezov upload: cut_plan vynechaný — tyče bez Money kódu', {
+		// zaloguj VŽDY keď sa tyče vynechali pre chýbajúci Money kód (kontrakt: „a zaloguj"). CAD
+		// planner /plan-rezov píše `kod:''`, takže tu je `cutPlan` typicky undefined — ale log fire-uje
+		// nezávisle od `cutPlan`, aby bol konzistentný s backfillom a odolný voči budúcemu kódovaniu.
+		if (bezKodu > 0) {
+			log.debug('plan-rezov upload: tyče bez Money kódu vynechané z cut_plan', {
 				zak,
 				op,
-				bezKodu
+				bezKodu,
+				planSent: !!cutPlan
 			});
 		}
 

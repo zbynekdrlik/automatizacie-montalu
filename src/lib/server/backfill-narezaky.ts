@@ -579,8 +579,15 @@ export async function runBackfill(
 		// takže sa vynechajú — zasklenia (recompute) nesú Money kódy, tie plán naplnia.
 		const cutPlan = buildCutPlan(combinedMaterial);
 		const bezKodu = pocetVynechanychBezKodu(combinedMaterial);
-		if (!cutPlan && bezKodu > 0) {
-			log('info', 'backfill: cut_plan vynechaný — tyče bez Money kódu', { op, bezKodu });
+		// zaloguj VŽDY keď sa nejaké tyče vynechali pre chýbajúci Money kód — aj v mixovanej OP
+		// (zasklenia s kódmi + pergola/fix/clip bez kódov v jednom `combinedMaterial`), kde `cutPlan`
+		// je pravdivý, ale bez-kódu tyče sa tichým dropom nedostanú do plánu (kontrakt: „a zaloguj").
+		if (bezKodu > 0) {
+			log('info', 'backfill: tyče bez Money kódu vynechané z cut_plan', {
+				op,
+				bezKodu,
+				planSent: !!cutPlan
+			});
 		}
 
 		try {
