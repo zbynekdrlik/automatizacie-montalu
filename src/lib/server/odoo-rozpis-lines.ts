@@ -184,7 +184,7 @@ export function derivGlassComposition(typSkla: string): {
 
 	// IZO dvojsklo: tri číselné tokeny oddelené /.- (medzi číslom a oddeľovačom môžu byť písmená,
 	// napr. „5esg/14/5esg"). Stred = medzera rámika.
-	const izo = t.match(/(\d{1,2})[a-z]*[/.\-](\d{1,2})[a-z]*[/.\-](\d{1,2})/);
+	const izo = t.match(/(\d{1,2})[a-z]*[/.-](\d{1,2})[a-z]*[/.-](\d{1,2})/);
 	if (izo) {
 		const a = Number(izo[1]);
 		const b = Number(izo[2]);
