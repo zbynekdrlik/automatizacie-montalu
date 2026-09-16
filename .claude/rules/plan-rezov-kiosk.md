@@ -2,15 +2,20 @@
 paths:
   - "src/lib/server/odoo-plan-rezov-upload.ts"
   - "src/lib/server/odoo-rozpis-lines.ts"
-  - "src/lib/server/plan-rezov-pdf.ts"
+  - "src/lib/server/narezak-pdf.ts"
+  - "src/lib/server/narezak-lines-v2.ts"
+  - "src/lib/server/profil-png.ts"
   - "src/lib/server/pdf-common.ts"
+  - "scripts/gen-profil-png.mjs"
   - "src/routes/plan-rezov/**"
-  - "tests/plan-rezov-pdf.test.ts"
+  - "tests/narezak-pdf.test.ts"
+  - "tests/narezak-lines-v2.test.ts"
   - "tests/odoo-plan-rezov-upload.test.ts"
   - "tests/odoo-rozpis-lines.test.ts"
   - "tests/odoo-rozpis-lines-money-safety.test.ts"
   - "tests/narezak-rozpis-removed.test.ts"
   - "e2e/plan-rezov-lines-kiosk.spec.ts"
+  - "e2e/narezak-print-view.spec.ts"
 ---
 
 # Plán rezov → Odoo kiosk „Rezanie" (#511)
@@ -23,12 +28,52 @@ cutterovi) — rozpis+ceny odteraz žijú LEN v internej `mt_note` (viď `odoo-z
 
 ## Kde je čo
 
-- `src/lib/server/plan-rezov-pdf.ts` — generátor PDF z `PlanRezovVysledok` (pdf-lib cez
-  `pdf-common.ts`, BEZ cien). Vzor `zakazka-pdf.ts`.
+- `src/lib/server/narezak-pdf.ts` (#529) — **GRAFICKÝ** generátor PDF z `MaterialRow[]`
+  (pdf-lib cez `pdf-common.ts`, BEZ cien). Nahradil textový `plan-rezov-pdf.ts` (zmazaný).
+  Kreslí tyče proporčne s rezmi/uhlami/odpadom/obrázkami — zrkadlí `RozpisRezov.svelte`.
+- `src/lib/server/narezak-lines-v2.ts` (#529) — v2 payload builder (`buildNarezakV2`, za flagom).
+- `src/lib/server/profil-png.ts` (#529) — server-only base64 PNG obrázky profilov (generované
+  `scripts/gen-profil-png.mjs` cez `dwebp`; pdf-lib nevie webp).
 - `src/lib/server/odoo-plan-rezov-upload.ts` — `queuePlanRezovUpload` (fire-and-forget
   vstup z `ulozit`), `uploadPlanRezovToOdoo`, `buildPlanRezovDocId`.
 - `src/hooks.server.ts` — odpis hook volá UŽ LEN `queueZakazkaPush` (interná note), NIE
   narezak upload.
+
+## GRAFICKÝ nárezák PDF (#529) — zrkadlí `RozpisRezov`, kontrakt + pdf-lib pasce
+
+Owner ROZHODNUTÉ (16.9.): rezač na kiosku má vidieť TO ISTÉ čo výtlačok appky —
+tyče kreslené s rezmi (obrázok), obrázky/rezy profilov, uhly rezov, odpad per tyč, súčty
+za profil, kód profilu. `narezak-pdf.ts` (`generateNarezakPdf(header, MaterialRow[], opts,
+now)`) to kreslí; obe upload cesty (plán-rezov save + backfill) ho kŕmia `MaterialRow[]`.
+
+- **pdf-lib 1.17 NEMÁ `drawPolygon`** — lichobežníkové segmenty rezov (45° zošikmenie ako v
+  `RozpisRezov.segmenty`) kresli cez `drawSvgPath`. Origin `{x:0, y:A4_H}` a SVG y ide DOLE, takže
+  PDF bod (px,py) → svg token `px, ${A4_H − py}` (helper `fillPoly`). `drawRectangle`/`drawLine`
+  existujú.
+- **pdf-lib NEVIE embednúť webp** — `static/profil/*.webp` (VP8) sa prekonvertujú `dwebp`om na
+  zmenšené base64 PNG do `profil-png.ts` (server-only, vzor `fonts/dejavu.ts`), embed `embedPng`.
+  Generátor `scripts/gen-profil-png.mjs` PRESKOČÍ nedekódovateľný zdroj (napr. `ZASP00113.webp` je
+  31 B poškodený placeholder) → ten profil nemá PDF náhľad (graceful, ako UI `maObrazok`).
+- **Base64 PNG blob v `.ts` spustí `block-sensitive-staging.sh`** — commituj s
+  `# airuleset:secret-ok <dôvod>` NA `git add` AJ NA `git commit` príkaze (skenuje sa oboje).
+- **Hodnoty (tyče/rezy/uhol/odpad) sa testujú cez METADÁTA** (Title/Subject/Keywords: `Tyčí: N`,
+  `Rezov: N`, `Uhol: 45°/rovný/45°+rovný`, `Odpad: NN mm`, per-profil digest) — custom-font glyfy
+  sa z PDF tela nečítajú. Guard „žiadne ceny" skenuje metadáta (`narezak-pdf.test.ts`).
+- **Vizuálne overenie PDF:** `pdftoppm -png -r 90 x.pdf out` (na dev boxe) → screenshot, potom
+  posúď nákres tyčí očami. `MaterialRow` už NESIE všetko (`bary`/`sikmyRez`/`kod`/`barLen`/odpad).
+
+## v2 payload groundwork (#529) — kontrakt appka↔odoo-erp #6949
+
+Intake `montalu_narezak_upload` je **LENIENT** (overené v odoo-erp `sale_order_narezak.py`):
+signatúra má `**extra` (top-level neznáme kľúče IGNORUJE) a `_montalu_rozpis_lines_intake` číta
+per-riadok LEN `kod/nazov/mnozstvo/mj/dlzka/poznamka` cez `.get()` (per-riadok neznáme IGNORUJE).
+Takže v2 polia sa dajú posielať bezpečne. `narezak_v2` ide ako SAMOSTATNÝ top-level kľúč (NIE ako
+ďalšie riadky v `lines[]` — tie by dnes kiosk zobrazil ako nepochopené); v1 `lines` (profil×dĺžka)
+OSTÁVAJÚ nezmenené. Za flagom `ODOO_NAREZ_LINES_V2=1` (default OFF, kým Odoo v2 nevykreslí).
+`buildNarezakV2(MaterialRow[])`: 1 riadok = 1 tyč (`kod/tyc_index/tyc_pocet/tyc_dlzka_mm/rezy_mm[]/
+uhol_l/uhol_r/odpad_mm/posuv?/profil_obrazok?`) + `sumar` per profil. `profil_obrazok` = absolútna
+`https://app.montalu.cloud/profil/<kod>.webp` (`APP_PUBLIC_URL` override). `posuv` len keď je tyč
+z JEDNÉHO posuvu (zmiešaná ho vynechá). Money-neutrálne (`kod` = profilový kód, NIE cena).
 
 ## OP + zákazník sa ODVODZUJÚ z odpisu (uložený plán ich nedrží)
 
@@ -78,7 +123,7 @@ jedna kombinácia profil × dĺžka rezu):
 **Money-neutralita (LEAK invariant preserved by CONTENT, nie omission):** `lines` nesú
 LEN kód/názov/počet/dĺžku — ŽIADNU cenu. `buildRozpisLines` neimportuje `money`/`ceny`/
 `zakazka-ceny` a nemá žiadny `€`/`fmtEur`/`cena` identifikátor — stráži to source-guard
-`tests/odoo-rozpis-lines-money-safety.test.ts` (vzor `plan-rezov-pdf` guardu nižšie).
+`tests/odoo-rozpis-lines-money-safety.test.ts` (vzor `narezak-pdf` guardu nižšie).
 Rozpis+ceny žijú ďalej LEN v internej `mt_note` (`odoo-zakazka.md`).
 
 **Idempotencia:** `lines` sa posielajú pod tým istým `buildPlanRezovDocId(zak, op)` ako

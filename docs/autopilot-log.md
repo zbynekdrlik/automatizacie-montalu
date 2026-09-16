@@ -2184,3 +2184,28 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   branch coverage, 10), `objednavka-skla-spec.test.ts` (CRUD perzistencia+validácia, 7), `migration-v48`,
   E2E `e2e/objednavka-skla-spec.spec.ts` (spec na podklade → náhľad payloadu, zero-console). Plný beh
   4106 testov zelený, coverage 94.72/88.05/96.97/95.74 (prahy 94/88/95/95 — branch tesne na hrane).
+
+## #529 — Kiosk „Čo rezať": grafický nárezák PDF (tyče/rezy/uhly/odpad/obrázky) + v2 groundwork (0.25.24)
+
+- **Owner ROZHODNUTÉ (16.9.):** rezač na tablete vidí TO ISTÉ čo výtlačok appky — rozloženie na tyče
+  s rezmi (obrázok), obrázky/rezy profilov, uhly, odpad per tyč, súčty za profil, kód profilu.
+- **PHASE A:** `narezak-pdf.ts` (NEW) — grafický PDF z `MaterialRow[]` (proporčné tyče + lichobežníkové
+  45° segmenty ako `RozpisRezov`, odpad, obrázky profilov, súčty; hodnoty do metadát = test kanál).
+  Nahradil textový `plan-rezov-pdf.ts` (zmazaný). Obe upload cesty ho kŕmia: `odoo-plan-rezov-upload`
+  (plán-rezov save) + backfill (`mapOdpisToLines` vracia aj `MaterialRow[]`; sietka/clip/CAD sa balí cez
+  `materialRowsFromRozpis`/ffdPack, zasklenia posiela plný). `runBackfill` kombinuje material per OP → 1
+  PDF → `pdf_base64`+`filename` v `uploadLines` (best-effort, len live). Obrázky = server-only base64 PNG
+  `profil-png.ts` (generované `scripts/gen-profil-png.mjs` cez `dwebp`; pdf-lib nevie webp; 88/89,
+  ZASP00113 poškodený 31 B placeholder → skip).
+- **V2 groundwork:** `narezak-lines-v2.ts` `buildNarezakV2` (1 riadok/tyč + sumár per profil, kod/uhly/
+  odpad/posuv/profil_obrazok URL), `isNarezLinesV2Enabled()` flag (default OFF). Intake overený LENIENT
+  (`**extra` + per-riadok `.get()` v odoo-erp `sale_order_narezak.py`) → v2 bezpečné; ide ako samostatný
+  top-level `narezak_v2`, v1 lines nezmenené.
+- **pdf-lib pasce:** 1.17 nemá `drawPolygon` → `drawSvgPath` origin (0,A4_H), PDF (px,py)→svg (px,A4_H−py)
+  (helper `fillPoly`, overené `pdftoppm` renderom). Base64 blob → `# airuleset:secret-ok` na add+commit.
+- **Testy:** `narezak-pdf.test.ts` (10, metadáta kanál + obrázok + „žiadne ceny"), `narezak-lines-v2.test.ts`
+  (12, exact JSON + flag + Money-safety), rozšírené `backfill-narezaky.test.ts` (materialRowsFromRozpis +
+  PDF attach + v2 flag) a `odoo-plan-rezov-upload.test.ts` (v2 flag ON/OFF), E2E `narezak-print-view.spec.ts`.
+  Plný beh 4128 testov zelený, coverage 94.8/88.11/97.03/95.79 (prahy 94/88/95/95).
+- **Post-deploy (supervízor):** backfill `--days 30 --live` re-attach PDF idempotentne (doc_id → nová verzia).
+- Commity: c08978c (grafický PDF) → 4760c9c (backfill attach) → d665ac6 (v2) → 9c2ae3b (E2E). Version 0.25.24.
