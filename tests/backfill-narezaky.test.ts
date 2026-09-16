@@ -569,6 +569,35 @@ describe('runBackfill — orchestrácia', () => {
 		expect(d.uploadLines).not.toHaveBeenCalled();
 	});
 
+	it('#529: flag OFF → uploadLines bez v2 (6. arg undefined); flag ON → v2 prítomné', async () => {
+		const prev = process.env.ODOO_NAREZ_LINES_V2;
+		try {
+			delete process.env.ODOO_NAREZ_LINES_V2;
+			const off = deps();
+			await runBackfill(
+				[row({ id: 1, op: 'OP2D', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+				off,
+				{ dryRun: false, delayMs: 0 }
+			);
+			expect(off.uploadLines.mock.calls[0]![5]).toBeUndefined();
+
+			process.env.ODOO_NAREZ_LINES_V2 = '1';
+			const on = deps();
+			await runBackfill(
+				[row({ id: 1, op: 'OP2E', modul: 'pergola', detail: JSON.stringify({ cad: CAD_A }) })],
+				on,
+				{ dryRun: false, delayMs: 0 }
+			);
+			const v2 = on.uploadLines.mock.calls[0]![5] as { lines: unknown[]; sumar: unknown[] };
+			expect(v2).toBeDefined();
+			expect(v2.lines.length).toBeGreaterThan(0);
+			expect(v2.sumar.length).toBeGreaterThan(0);
+		} finally {
+			if (prev === undefined) delete process.env.ODOO_NAREZ_LINES_V2;
+			else process.env.ODOO_NAREZ_LINES_V2 = prev;
+		}
+	});
+
 	it('per-OP kombinácia: dva moduly tej istej OP → JEDEN upload so spojenými lines', async () => {
 		const d = deps();
 		await runBackfill(

@@ -146,6 +146,33 @@ describe('uploadPlanRezovToOdoo', () => {
 			},
 			{ kod: '', nazov: 'LAT 80x19', mnozstvo: 4, mj: 'ks', dlzka: 1.865, poznamka: '' }
 		]);
+		// #529: v2 payload je za flagom (default OFF) → nesmie sa poslať
+		expect(cap.body).not.toHaveProperty('narezak_v2');
+	});
+
+	it('#529: flag ON → payload nesie narezak_v2 (tyče/uhly/odpad + sumár); OFF → nie', async () => {
+		enableEnv();
+		vi.stubEnv('ODOO_NAREZ_LINES_V2', '1');
+		vi.mocked(zakazkaPrehlad).mockReturnValue({
+			zak: 'ZAK123',
+			zakaznik: 'Firma s.r.o.',
+			odpisy: [{ op: 'OP260439' }]
+		} as never);
+
+		let captured: Record<string, unknown> | null = null;
+		setJson2Transport(async (_url, opts) => {
+			captured = JSON.parse(String((opts as RequestInit).body));
+			return new Response(JSON.stringify({}), { status: 200 });
+		});
+
+		expect((await uploadPlanRezovToOdoo(baseInput())).result).toBe('uploaded');
+		expect(captured).not.toBeNull();
+		const body = captured!;
+		const v2 = body.narezak_v2 as { lines: unknown[]; sumar: unknown[] };
+		expect(v2).toBeDefined();
+		expect(Array.isArray(v2.lines)).toBe(true);
+		expect(v2.lines.length).toBeGreaterThan(0);
+		expect(Array.isArray(v2.sumar)).toBe(true);
 	});
 
 	it('#522: lines idú spolu s PDF v tom istom volaní a re-export používa TEN ISTÝ doc_id (idempotencia)', async () => {

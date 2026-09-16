@@ -16,12 +16,18 @@
 // `sale.order.name === normOp(op)`. Ak zákazka nemá odpis (alebo `zak` prázdny) → skip (plán nie je
 // viazaný na objednávku).
 import { logger } from './log';
-import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
+import {
+	callJson2,
+	odooJson2Config,
+	isNarezUploadEnabled,
+	isNarezLinesV2Enabled
+} from './odoo-json2';
 import { normOp, normZak } from './money';
 import { zakazkaPrehlad } from './zakazka-ceny';
 import { parsePlanRezov } from './plan-rezov-vstup';
 import { spocitajPlanRezov } from './plan-rezov';
 import { buildRozpisLines } from './odoo-rozpis-lines';
+import { buildNarezakV2 } from './narezak-lines-v2';
 import { generateNarezakPdfBase64, narezakPdfFilename, type NarezakPdfHeader } from './narezak-pdf';
 
 const log = logger('plan-rezov-upload');
@@ -156,13 +162,18 @@ export async function uploadPlanRezovToOdoo(
 			linesCount: lines.length
 		});
 
+		// #529: v2 groundwork (za flagom, default OFF) — `narezak_v2` (tyče/uhly/odpad/obrázky per tyč
+		// + sumár per profil). Intake ho IGNORUJE (LENIENT `**extra`); Odoo #6949 ho vykreslí neskôr.
+		const narezakV2 = isNarezLinesV2Enabled() ? buildNarezakV2(vysledok.material) : undefined;
+
 		const uploadResult = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', {
 			order_number: orderNumber,
 			doc_id: docId,
 			kind: 'narezak',
 			filename,
 			pdf_base64: pdfBase64,
-			lines
+			lines,
+			...(narezakV2 ? { narezak_v2: narezakV2 } : {})
 		});
 
 		log.info('plan-rezov upload: úspešne nahraný', {
