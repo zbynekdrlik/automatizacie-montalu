@@ -19,7 +19,7 @@
 import { PDFDocument, rgb, type PDFFont, type PDFPage, type PDFImage } from 'pdf-lib';
 import type { MaterialRow, Tyc } from './compute';
 import { KOTUC } from './compute';
-import { sumaOdpad } from '$lib/odpad';
+import { sumaOdpad, narezakSummary } from '$lib/odpad';
 import { profilPngB64 } from './profil-png';
 import {
 	A4_W,
@@ -290,8 +290,11 @@ export async function generateNarezakPdf(
 	const ctx: Ctx = { doc, page: doc.addPage([A4_W, A4_H]), reg, bold, cursor: A4_H - MARGIN };
 
 	const pouzite = material.filter((m) => m.tyce > 0);
-	const profilov = pouzite.length;
-	const tyceSpolu = pouzite.reduce((s, m) => s + m.tyce, 0);
+	// #535: sumárne čísla hlavičky idú cez ZDIEĽANÝ helper `narezakSummary` — ten istý, ktorý plní
+	// `cut_plan.summary` (tablet pri píle), takže papier a dáta sú 1:1 bez duplicity výpočtu.
+	const sum = narezakSummary(material);
+	const profilov = sum.profiles_count;
+	const tyceSpolu = sum.bars_total;
 	const spolu = sumaOdpad(material);
 	const reznaMedzera = opts.reznaMedzera ?? KOTUC;
 	const dlzkaTyce = opts.dlzkaTyce ?? pouzite[0]?.barLen ?? 0;
