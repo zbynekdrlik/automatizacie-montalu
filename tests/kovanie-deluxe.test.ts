@@ -252,22 +252,27 @@ describe('RAL × hrúbka skla — fail-loud disciplína (#354)', () => {
 	});
 });
 
-describe('zmiešaná zákazka Robust + Deluxe — JEDNA farbaKovania (#354 review nález 🔴)', () => {
+describe('zmiešaná zákazka Robust + Deluxe — JEDNA farbaKovania (#354 → #537 per-spec)', () => {
 	// Robust používa R9005/R7016, 10mm Deluxe R9006/R7016 — DVE rôzne farebné
-	// dvojice zdieľajú jedno objednávkové pole `farbaKovania` (Robust+Standard mali
-	// do #354 tú istú dvojicu, takže tento konflikt nemohol nastať). Zvolená farba,
-	// ktorá sedí LEN jednému systému, musí zastaviť CELÝ odpis chybou — nikdy ho
-	// nesmie poslať s tichy vynechanou farebnou rodinou druhého systému.
-	it('R9005 (sedí Robustu, nesedí 10mm Deluxe) → chyba, žiadny riadok', () => {
+	// dvojice zdieľajú jedno objednávkové pole `farbaKovania`. #537 (r2) mení #354
+	// „zvolená farba sediaca len jednému systému ZASTAVÍ celý odpis" na PER-SPEC
+	// riešenie: farba platná pre INÝ posuv objednávky, ktorá tomuto posuvu nesedí,
+	// spadne na `predvolenaFarba(system)` (Deluxe R9006) — odpis NIE JE tichý ani
+	// polovičný (Deluxe dostane kompletnú rodinu R9006 krytiek), len fallback farbu.
+	// Systém bez predvolenej (Robust) pri nesediacej farbe stále HLASNÁ chyba.
+	it('R9005 (sedí Robustu, nesedí 10mm Deluxe) → Robust R9005, Deluxe fallback R9006, žiadna chyba (#537)', () => {
 		const r = kovD([specD('Robust|2K', undefined), specD('Deluxe|3K', 10)], 'R9005');
-		expect(r.polozky).toEqual([]);
-		expect(r.err).toMatch(/farb/i);
+		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK202533')).toBeGreaterThan(0); // Robust kľučka R9005
+		expect(qty(r, 'ZASK202525')).toBeGreaterThan(0); // Deluxe stredová L R9006 (fallback)
+		expect(qty(r, 'ZASK202526')).toBeUndefined(); // Deluxe R7016 absent (žiadny bleed)
 	});
 
-	it('R9006 (sedí Deluxe, nesedí Robustu) → chyba, žiadny riadok', () => {
+	it('R9006 (sedí Deluxe, nesedí Robustu — bez predvolenej) → chyba menuje Robust, žiadny riadok (#537)', () => {
 		const r = kovD([specD('Robust|2K', undefined), specD('Deluxe|3K', 10)], 'R9006');
 		expect(r.polozky).toEqual([]);
 		expect(r.err).toMatch(/farb/i);
+		expect(r.err).toContain('Robust');
 	});
 
 	it('R7016 (sedí OBOM) → kompletný odpis, žiadna chyba', () => {

@@ -11,8 +11,59 @@
 import { pocitajKomponenty, pocetUzaverov, zlucKomponenty } from '$lib/komponenty';
 import type { PolozkaKomponentu, Farba } from '$lib/komponenty';
 import { computeFlat, zakladPoctov, type Cfg, type PosuvSpec } from './compute';
-import { komponentyPre, KOVANIE_NEUPLNE } from './komponenty-cfg';
+import { komponentyPre, KOVANIE_NEUPLNE, platneFarbyPre, predvolenaFarba } from './komponenty-cfg';
 import type { Polozka } from './money';
+
+/**
+ * Rozlíšenie farby krytiek/komponentov pre JEDEN posuv (#537 / gk #6413, design r2).
+ * `farbaKovania` je jedno objednávkové pole zdieľané všetkými posuvmi; systémy majú
+ * RÔZNE farebné dvojice (Robust R9005/R7016, Deluxe 10mm R9006/R7016, 6mm R9006/R9005,
+ * Slide len R7016), preto sa farba musí vyriešiť PER SPEC:
+ *
+ *  - systém bez farebných variantov pri tejto hrúbke → farbo-neutrálny, `farbaKovania`
+ *    prejde nedotknutá (napr. chýbajúca hrúbka → chyba padne až v `pocitajKomponenty`);
+ *  - `farbaKovania` platná pre tento systém+hrúbku → použije sa;
+ *  - `farbaKovania` nezvolená (`undefined`) → nechá sa `undefined` (obrana in-depth:
+ *    `pocitajKomponenty` vyhlási „nezvolená farba" — NIKDY tichý default na jednu z farieb);
+ *  - `farbaKovania` zvolená, tomuto posuvu nesedí, ale sedí INÉMU posuvu objednávky
+ *    (`platneVObjednavke`) → legitímna objednávková farba, len na tento systém neplatí →
+ *    `predvolenaFarba(system)`, ak je platná; inak HLASNÁ chyba menujúca systém + platné farby;
+ *  - `farbaKovania` nesedí ŽIADNEMU posuvu objednávky → operátorská voľba je zlá →
+ *    HLASNÁ chyba (zachováva #354: nikdy tichý odpis bez farebnej rodiny).
+ *
+ * Nikdy sa netvorí druhý zoznam validity — číta sa z `platneFarbyPre` (komponenty-cfg).
+ */
+export function farbaPreSpec(
+	system: string,
+	skloHrubka: number | undefined,
+	farbaKovania: Farba | undefined,
+	platneVObjednavke: ReadonlySet<Farba>
+): { farba?: Farba; chyba?: string; varovanie?: string } {
+	const platne = platneFarbyPre(system, skloHrubka);
+	if (platne.length === 0) return { farba: farbaKovania }; // farbo-neutrálny systém
+	if (farbaKovania !== undefined && platne.includes(farbaKovania)) return { farba: farbaKovania };
+	if (farbaKovania === undefined) return { farba: undefined }; // obrana in-depth v pocitajKomponenty
+	// farbaKovania je zvolená, ale tomuto posuvu nesedí:
+	if (platneVObjednavke.has(farbaKovania)) {
+		// sedí INÉMU posuvu objednávky → tento posuv dostane svoju predvolenú farbu.
+		// MONEY-KRITICKÉ: substitúcia sa VŽDY hlási cez `varovanie` — do odpisu ide farba,
+		// ktorú operátor NEZVOLIL (jeho voľba systému nesedí), náhľad to musí ukázať
+		// (predtým `kovanieFor` logoval warn pri fallbacku; per-spec ho tu nahrádza viditeľným varovaním).
+		const pred = predvolenaFarba(system);
+		if (pred !== undefined && platne.includes(pred))
+			return {
+				farba: pred,
+				varovanie: `zvolená farba ${farbaKovania} nie je platná pre systém ${system} (hrúbka ${skloHrubka ?? '?'} mm) — do odpisu ide predvolená ${pred} (platné: ${platne.join(', ')}).`
+			};
+		return {
+			chyba: `systém ${system} — zvolená farba ${farbaKovania} preň nie je platná (platné: ${platne.join(', ')}) a systém nemá predvolenú farbu krytiek; vyber platnú RAL farbu.`
+		};
+	}
+	// farbaKovania nesedí ŽIADNEMU posuvu objednávky → zlá operátorská voľba
+	return {
+		chyba: `zvolená farba ${farbaKovania} nesedí na žiadnu farebnú položku (systém ${system}, platné: ${platne.join(', ')}) — skontroluj RAL voľbu, inak by odpis nedostal žiadnu z týchto položiek.`
+	};
+}
 
 /**
  * Kód uzáveru/zámku daného systému — kotva, na ktorej visí počet ďalších položiek
@@ -48,20 +99,45 @@ export function kovanieDoOdpisu(
 ): { polozky: Polozka[]; err: string | null; warn: string | null } {
 	const davky: PolozkaKomponentu[][] = [];
 	const varovania = new Set<string>();
+	const systemOf = (s: PosuvSpec) => s.sysStyl.split('|')[0] ?? '';
+
+	// #537 (r2): objednávková množina platných farieb — únia platných farieb VŠETKÝCH
+	// posuvov. Rozhoduje, či je zvolená `farbaKovania` legitímna objednávková voľba
+	// (sedí aspoň jednému posuvu → nesediaci posuv spadne na predvolenú), alebo úplne
+	// zlá voľba (nesedí žiadnemu → hlasná chyba). Pozri `farbaPreSpec`.
+	const platneVObjednavke = new Set<Farba>();
+	for (const spec of specs)
+		for (const f of platneFarbyPre(systemOf(spec), spec.skloHrubka)) platneVObjednavke.add(f);
 
 	for (const [i, spec] of specs.entries()) {
-		const system = spec.sysStyl.split('|')[0] ?? '';
+		const system = systemOf(spec);
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
+
+		// #537 (r2): farba sa rieši PER SPEC (jedno objednávkové pole, rôzne farebné
+		// dvojice per systém) — JEDEN zdroj pravdy rezolúcie. Deluxe posuv, ktorému
+		// zvolená farba nesedí (napr. R9005 na 10mm), dostane predvolenú R9006; systém
+		// bez predvolenej (Robust/Štandard/Slide) s nesediacou farbou → hlasná chyba.
+		const {
+			farba: efektivnaFarba,
+			chyba: farbaChyba,
+			varovanie: farbaVarovanie
+		} = farbaPreSpec(system, spec.skloHrubka, farbaKovania, platneVObjednavke);
+		if (farbaChyba)
+			return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${farbaChyba}`, warn: null };
+		// MONEY-KRITICKÉ: fallback na predvolenú farbu sa VŽDY zviditeľní v náhľade —
+		// operátor musí vidieť, že do odpisu ide iná farba, než zvolil (#537 review 🟡).
+		if (farbaVarovanie) varovania.add(`Kovanie, posuv ${i + 1}: ${farbaVarovanie}`);
+
 		// KOVANIE_NEUPLNE hodnota je buď pevný text (Štandard), alebo funkcia hrúbky
 		// skla + farby kovania (Slide: madlo vždy, zámok len pri R9005, #357) — obe
 		// tvary tu vyhodnotíme rovnako, nikdy natvrdo neporovnávaj `system ===
 		// 'Deluxe'`/`'Slide'`. Deluxe kľúč tu NIE JE (#431 kolo 2: 6mm aj 10mm krytky
 		// sú v odpise → Deluxe kovanie je kompletné), `KOVANIE_NEUPLNE[system]` je vtedy
-		// undefined = žiadne varovanie.
+		// undefined = žiadne varovanie. Používa už ROZLÍŠENÚ `efektivnaFarba` (#537).
 		const neuplneRaw = KOVANIE_NEUPLNE[system];
 		const neuplne =
-			typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka, farbaKovania) : neuplneRaw;
+			typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka, efektivnaFarba) : neuplneRaw;
 		if (neuplne) varovania.add(neuplne);
 
 		// VEDOME sa sem neposiela `spec.sietka` — sieťka mení len profily (rám/nos/
@@ -93,7 +169,7 @@ export function kovanieDoOdpisu(
 			zakladPoctov(r),
 			uzaver ? pocetUzaverov(uzaver, spec.sysStyl) : null,
 			!jednostrannaFab,
-			farbaKovania,
+			efektivnaFarba,
 			// Deluxe krytky majú Money kód aj per hrúbka skla (#354) — rovnaký vstup,
 			// ktorý si už berie `computeFlat` vyššie na výber kladkového/klzného profilu.
 			spec.skloHrubka

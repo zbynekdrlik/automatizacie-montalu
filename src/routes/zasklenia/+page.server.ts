@@ -145,20 +145,13 @@ function jobFor(
  * Chyba tu MUSÍ zastaviť odoslanie: radšej žiadny odpis než polovičný.
  */
 function kovanieFor(specs: PosuvSpec[], jednostrannaFab: boolean, farbaKovania?: Farba | null) {
-	// #431: defense fallback — ak farbaKovania nie je zadaná, použi predvolenú farbu
-	// systému (R9006 pre Deluxe). Normálne formulár farbu pošle (RAL select je
-	// viditeľný), toto je len ochrana proti chybe (stale tab / forged POST).
-	const efektivnaFarba =
-		farbaKovania ??
-		(specs.length ? predvolenaFarba(specs[0]!.sysStyl.split('|')[0] ?? '') : undefined);
-	if (!farbaKovania && efektivnaFarba) {
-		const sys = specs[0]!.sysStyl.split('|')[0] ?? '';
-		logger('zasklenia').warn('kovanie fallback: farbaKovania chýba, použitá predvolená', {
-			system: sys,
-			predvolena: efektivnaFarba
-		});
-	}
-	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, efektivnaFarba ?? undefined);
+	// #537 (r2): farba sa rieši PER SPEC vnútri `kovanieDoOdpisu` (JEDEN zdroj pravdy)
+	// — sem sa posúva len surová formulárová farba. Predchádzajúci specs[0] fallback
+	// (predvolená PRIMÁRNEHO systému aplikovaná na VŠETKY posuvy) bol nesprávny pri
+	// zmiešaných objednávkach (Deluxe primárny → R9006 pretieklo na Robust posuv);
+	// per-spec predvolená v `kovanieDoOdpisu` ho nahrádza. Nezvolená farba na
+	// farbo-závislom systéme je HLASNÁ chyba (nikdy tichý default na jednu z farieb).
+	return kovanieDoOdpisu(loadCfg(), specs, jednostrannaFab, farbaKovania ?? undefined);
 }
 
 /**
