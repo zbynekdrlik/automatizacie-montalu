@@ -8,17 +8,20 @@ import fs from 'node:fs';
 import {
 	buildCutPlan,
 	pocetVynechanychBezKodu,
+	cutTypeFor,
 	type CutPlan,
 	type CutPlanBar
 } from '../src/lib/server/narezak-cut-plan';
-import type { MaterialRow } from '../src/lib/server/compute';
+import { narezakSummary } from '../src/lib/odpad';
+import { KOTUC, type MaterialRow } from '../src/lib/server/compute';
 
 /** dekóduj base64 SVG na text. */
 const decodeSvg = (b64: string): string => Buffer.from(b64, 'base64').toString('utf8');
-/** bar bez render_svg (na presné porovnanie dátových polí). */
-const stripSvg = (b: CutPlanBar): Omit<CutPlanBar, 'render_svg'> => {
-	const { render_svg, ...rest } = b;
+/** bar bez render_svg + profile_icon_svg (na presné porovnanie dátových polí; oba sú base64 binárky). */
+const stripSvg = (b: CutPlanBar): Omit<CutPlanBar, 'render_svg' | 'profile_icon_svg'> => {
+	const { render_svg, profile_icon_svg, ...rest } = b;
 	void render_svg;
+	void profile_icon_svg;
 	return rest;
 };
 
@@ -104,18 +107,20 @@ describe('buildCutPlan', () => {
 		expect(plan.bars.every((b) => b.profile_kod !== '')).toBe(true);
 	});
 
-	it('B1 (ZASP00002 tyč 1): presný tvar — seq/length/angles/label/qty/waste/stock', () => {
+	it('B1 (ZASP00002 tyč 1): presný tvar — seq/length/angles/cut_type/label/qty/waste/stock/kerf', () => {
 		expect(stripSvg(plan.bars[0]!)).toEqual({
 			bar_id: 'B1',
 			profile_kod: 'ZASP00002',
 			profile_name: 'RÁMOVÝ',
 			stock_length_mm: 7500,
+			kerf_mm: 4,
 			pieces: [
 				{
 					seq: 1,
 					length_mm: 2500,
 					angle_left_deg: 45,
 					angle_right_deg: 45,
+					cut_type: 'uhol',
 					label: 'Z1 2500',
 					qty: 1
 				},
@@ -124,6 +129,7 @@ describe('buildCutPlan', () => {
 					length_mm: 2500,
 					angle_left_deg: 45,
 					angle_right_deg: 45,
+					cut_type: 'uhol',
 					label: 'Z1 2500',
 					qty: 1
 				}
@@ -139,12 +145,14 @@ describe('buildCutPlan', () => {
 			profile_kod: 'ZASP00002',
 			profile_name: 'RÁMOVÝ',
 			stock_length_mm: 7500,
+			kerf_mm: 4,
 			pieces: [
 				{
 					seq: 1,
 					length_mm: 1800,
 					angle_left_deg: 45,
 					angle_right_deg: 45,
+					cut_type: 'uhol',
 					label: 'Z1 1800',
 					qty: 1
 				},
@@ -153,6 +161,7 @@ describe('buildCutPlan', () => {
 					length_mm: 2500,
 					angle_left_deg: 45,
 					angle_right_deg: 45,
+					cut_type: 'uhol',
 					label: 'Z2 2500',
 					qty: 1
 				}
@@ -162,14 +171,23 @@ describe('buildCutPlan', () => {
 		});
 	});
 
-	it('B3 (rovný profil, bez posuvu): uhly 90/90, label = len dĺžka, vlastná dĺžka tyče', () => {
+	it('B3 (rovný profil, bez posuvu): uhly 90/90, cut_type rovny, label = len dĺžka, vlastná dĺžka tyče', () => {
 		expect(stripSvg(plan.bars[2]!)).toEqual({
 			bar_id: 'B3',
 			profile_kod: 'BPP00054',
 			profile_name: 'ROVNÝ',
 			stock_length_mm: 6000,
+			kerf_mm: 4,
 			pieces: [
-				{ seq: 1, length_mm: 2000, angle_left_deg: 90, angle_right_deg: 90, label: '2000', qty: 1 }
+				{
+					seq: 1,
+					length_mm: 2000,
+					angle_left_deg: 90,
+					angle_right_deg: 90,
+					cut_type: 'rovny',
+					label: '2000',
+					qty: 1
+				}
 			],
 			waste_mm: 3996,
 			note: ''
@@ -215,6 +233,142 @@ describe('buildCutPlan', () => {
 		const p = buildCutPlan([stary]) as CutPlan;
 		expect(p.bars[0]!.pieces[0]!.angle_left_deg).toBe(45);
 		expect(p.bars[0]!.pieces[0]!.angle_right_deg).toBe(45);
+	});
+});
+
+describe('cut_plan v2: kerf_mm (#535)', () => {
+	const plan = buildCutPlan(material) as CutPlan;
+	it('každá vydaná tyč nesie kerf_mm = engine kotúč (KOTUC)', () => {
+		expect(KOTUC).toBe(4);
+		expect(plan.bars.length).toBeGreaterThan(0);
+		for (const b of plan.bars) expect(b.kerf_mm).toBe(KOTUC);
+	});
+});
+
+describe('cut_plan v2: cut_type (#535)', () => {
+	it('cutTypeFor: rovny len keď OBA konce 90°, inak uhol (vrátane zmiešaných uhlov)', () => {
+		expect(cutTypeFor(90, 90)).toBe('rovny');
+		expect(cutTypeFor(45, 45)).toBe('uhol');
+		expect(cutTypeFor(90, 45)).toBe('uhol'); // zmiešaný — pravý koniec šikmý
+		expect(cutTypeFor(45, 90)).toBe('uhol'); // zmiešaný — ľavý koniec šikmý
+		expect(cutTypeFor(30, 30)).toBe('uhol'); // iný nie-90 uhol
+	});
+	it('per-kus cut_type odvodený z uhlov: šikmý profil → uhol, rovný → rovny', () => {
+		const plan = buildCutPlan(material) as CutPlan;
+		// ZASP00002 (sikmyRez) → všetky kusy „uhol"
+		for (const p of plan.bars[0]!.pieces) expect(p.cut_type).toBe('uhol');
+		for (const p of plan.bars[1]!.pieces) expect(p.cut_type).toBe('uhol');
+		// BPP00054 (rovný) → „rovny"
+		for (const p of plan.bars[2]!.pieces) expect(p.cut_type).toBe('rovny');
+	});
+});
+
+describe('cut_plan v2: profile_icon_svg (#535) — RAZ per profile_kod, PNG base64, bez obrázka vynechaný', () => {
+	const iconMat: MaterialRow[] = [
+		{
+			kod: 'BPP00054', // MÁ obrázok v profil-png; 2 tyče
+			nazov: 'S OBRÁZKOM',
+			rezy: [{ rozmer: 2000, ks: 2 }],
+			tyce: 2,
+			bary: [
+				{ kusy: [{ rozmer: 2000, dlzka: 2004 }], zvysok: 3996 },
+				{ kusy: [{ rozmer: 2000, dlzka: 2004 }], zvysok: 3996 }
+			],
+			odpadMm: 7992,
+			odpadPct: 66.6,
+			barLen: 6000,
+			sikmyRez: false
+		},
+		{
+			kod: 'ZASP99999', // NEMÁ obrázok v profil-png
+			nazov: 'BEZ OBRÁZKA',
+			rezy: [{ rozmer: 1000, ks: 1 }],
+			tyce: 1,
+			bary: [{ kusy: [{ rozmer: 1000, dlzka: 1004 }], zvysok: 6496 }],
+			odpadMm: 6496,
+			odpadPct: 86.6,
+			barLen: 7500,
+			sikmyRez: false
+		}
+	];
+	const plan = buildCutPlan(iconMat) as CutPlan;
+
+	it('ikona LEN na PRVEJ tyči daného kódu (Odoo cachuje podľa kódu)', () => {
+		expect('profile_icon_svg' in plan.bars[0]!).toBe(true); // BPP00054 tyč 1
+		expect('profile_icon_svg' in plan.bars[1]!).toBe(false); // BPP00054 tyč 2 — vynechané
+	});
+
+	it('obsah je PNG base64 (nie prázdny reťazec), kľúč meno ostáva profile_icon_svg', () => {
+		const icon = plan.bars[0]!.profile_icon_svg!;
+		expect(icon.length).toBeGreaterThan(0);
+		// PNG magic bytes 89 50 4E 47
+		const sig = Buffer.from(icon, 'base64').subarray(0, 4);
+		expect([...sig]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+	});
+
+	it('kód BEZ obrázka → kľúč sa VYNECHÁ (nikdy prázdny reťazec)', () => {
+		expect('profile_icon_svg' in plan.bars[2]!).toBe(false); // ZASP99999 — žiadny obrázok
+	});
+});
+
+describe('cut_plan v2: summary (#535) — čísla 1:1 s PDF sumárom', () => {
+	it('narezakSummary(material): profiles_count/bars_total/waste — vrátane profilov BEZ kódu (papier)', () => {
+		// material: ZASP00002 (2 tyče), BPP00054 (1), BEZ KÓDU (1, kod=''), PRÁZDNY (tyce=0).
+		// Sumár = papierový nárezák → počíta VŠETKY profily s tyčami (aj bez Money kódu), ako PDF.
+		expect(narezakSummary(material)).toEqual({
+			profiles_count: 3, // ZASP00002 + BPP00054 + BEZ KÓDU (PRÁZDNY tyce=0 vypadol)
+			bars_total: 4, // 2 + 1 + 1
+			waste_total_mm: 16176, // 5684 + 3996 + 6496
+			waste_total_pct: 56.8 // 16176 / (2*7500 + 6000 + 7500) * 100 = 56.75 → 56.8
+		});
+	});
+
+	it('plan.summary = narezakSummary(material)', () => {
+		const plan = buildCutPlan(material) as CutPlan;
+		expect(plan.summary).toEqual(narezakSummary(material));
+	});
+
+	it('ZÁMER: summary je nárezák-široký (papier) → bars_total > bars[].length v mixovanej OP bez kódu', () => {
+		const plan = buildCutPlan(material) as CutPlan;
+		// bars[] nesie len kódované tyče (3), sumár drží papierové čísla (4 tyče, 3 profily).
+		expect(plan.bars).toHaveLength(3);
+		expect(plan.summary.bars_total).toBe(4);
+		expect(plan.summary.profiles_count).toBe(3);
+	});
+
+	it('pct zaokrúhlené na 1 desatinné miesto', () => {
+		const mat: MaterialRow[] = [
+			{
+				kod: 'BPP00046',
+				nazov: 'R',
+				rezy: [{ rozmer: 5000, ks: 1 }],
+				tyce: 1,
+				bary: [{ kusy: [{ rozmer: 5000, dlzka: 5000 }], zvysok: 1000 }],
+				odpadMm: 1000,
+				odpadPct: 16.7,
+				barLen: 6000,
+				sikmyRez: false
+			}
+		];
+		// 1000 / 6000 * 100 = 16.666… → 16.7
+		expect(narezakSummary(mat).waste_total_pct).toBe(16.7);
+	});
+
+	it('prázdny vstup → samé nuly (0 keď žiadne tyče)', () => {
+		expect(narezakSummary([])).toEqual({
+			profiles_count: 0,
+			bars_total: 0,
+			waste_total_mm: 0,
+			waste_total_pct: 0
+		});
+	});
+
+	it('žiadna duplicita: narezak-pdf.ts používa TEN ISTÝ helper narezakSummary (papier = dáta)', () => {
+		const pdfSrc = fs.readFileSync(
+			new URL('../src/lib/server/narezak-pdf.ts', import.meta.url),
+			'utf8'
+		);
+		expect(pdfSrc).toMatch(/narezakSummary/);
 	});
 });
 
