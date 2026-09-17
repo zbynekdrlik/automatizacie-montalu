@@ -162,7 +162,9 @@ export async function uploadPlanRezovToOdoo(
 		// (jeden zdroj pravdy). Vynechá sa úplne, keď nárezák nemá tyče s Money kódom — CAD planner
 		// /plan-rezov píše `kod:''` (display-only), takže tejto cesty sa cut_plan naplní len keď
 		// materiál nesie Money kódy; inak sa vynechá (a zalogujeme koľko tyčí bez kódu).
-		const cutPlan = buildCutPlan(vysledok.material);
+		// #535: kerf = tá istá `reznaMedzera`, ktorou sa material zbalil (l.117) aj generoval PDF
+		// (l.135), aby `bars[].kerf_mm` sedelo s papierom aj keby táto cesta raz niesla Money kódy.
+		const cutPlan = buildCutPlan(vysledok.material, input.reznaMedzera);
 		const bezKodu = pocetVynechanychBezKodu(vysledok.material);
 		// zaloguj VŽDY keď sa tyče vynechali pre chýbajúci Money kód (kontrakt: „a zaloguj"). CAD
 		// planner /plan-rezov píše `kod:''`, takže tu je `cutPlan` typicky undefined — ale log fire-uje

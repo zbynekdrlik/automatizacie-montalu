@@ -36,3 +36,39 @@ export function sumaOdpad(material: MaterialRow[]): OdpadSpolu {
 	const odpadPct = materialMm > 0 ? Math.round((odpadMm / materialMm) * 1000) / 10 : 0;
 	return { profily: pouzite.length, odpadMm, materialMm, odpadPct };
 }
+
+/**
+ * Sumár nárezového plánu (#535) — presne tie čísla, ktoré ukazuje hlavička grafického
+ * PDF (`narezak-pdf.ts`): počet profilov s tyčami, počet tyčí spolu, celkový koncový
+ * odpad (mm) a jeho % z použitého materiálu. JEDEN zdroj pravdy pre PDF hlavičku aj pre
+ * `cut_plan.summary` (tablet pri píle) — papier a dáta sú tak 1:1 bez duplicity.
+ *
+ * Ráta nad CELÝM nárezákom (všetky profily s `tyce > 0`, aj bez Money kódu) — rovnaká
+ * množina, akú kreslí PDF. Preto `bars_total`/`profiles_count` môžu byť VYŠŠIE než
+ * `cut_plan.bars[].length`, keď OP nesie aj profily bez kódu (pergola/fix/clip), ktoré
+ * `buildCutPlan` z `bars[]` vynecháva — sumár drží papierové čísla zámerne.
+ * Money-neutrálne (žiadna cena; len súčty už-spočítaných dĺžok).
+ */
+export interface NarezakSummary {
+	/** počet profilov s aspoň jednou tyčou (= PDF „Profilov"). */
+	profiles_count: number;
+	/** počet fyzických tyčí spolu (= PDF „Tyčí spolu"). */
+	bars_total: number;
+	/** celkový koncový odpad (mm, = PDF „Odpad spolu"). */
+	waste_total_mm: number;
+	/** odpad ako % z použitého materiálu, 1 desatinné miesto (0 keď žiadne tyče). */
+	waste_total_pct: number;
+}
+
+export function narezakSummary(material: MaterialRow[]): NarezakSummary {
+	const spolu = sumaOdpad(material); // odpadMm + odpadPct + počet finite profilov (jediný výpočet odpadu)
+	const bars_total = material
+		.filter((m) => m.tyce > 0 && Number.isFinite(m.barLen) && Number.isFinite(m.odpadMm))
+		.reduce((s, m) => s + m.tyce, 0);
+	return {
+		profiles_count: spolu.profily,
+		bars_total,
+		waste_total_mm: spolu.odpadMm,
+		waste_total_pct: spolu.odpadPct
+	};
+}
