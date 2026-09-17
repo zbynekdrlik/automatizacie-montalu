@@ -78,6 +78,34 @@ describe('kovanieDoOdpisu — farba PER SPEC pri zmiešaných systémoch (#537)'
 		expect(kody(r)).toContain('ZASK202525'); // Deluxe stredová L R9006 (fallback)
 		expect(kody(r)).not.toContain('ZASK202526'); // Deluxe R7016 absent
 	});
+
+	it('(a) fallback MUSÍ hlásiť varovanie — do odpisu ide iná farba než operátor zvolil (#537 review 🟡)', () => {
+		// Deluxe 10mm posuv spadol z R9005 na predvolenú R9006 → náhľad to musí ukázať
+		// (Money-kritické: do skladového pohybu ide farba, ktorú operátor NEZVOLIL).
+		const r = kov([spec('Deluxe|2K', 10), spec('Robust|2K', 6)], 'R9005');
+		expect(r.err).toBeNull();
+		expect(r.warn).not.toBeNull();
+		expect(r.warn).toContain('R9005');
+		expect(r.warn).toContain('R9006');
+		expect(r.warn).toContain('Deluxe');
+	});
+
+	it('single-systém Deluxe 6mm + 10mm pod jednou R9005 → 6mm R9005, 10mm predvolená R9006 + varovanie', () => {
+		// Zámerné per-hrúbku správanie (r2): R9005 je platná pre Deluxe 6mm, nie 10mm →
+		// jedna objednávka vyprodukuje krytky v DVOCH farbách; 10mm fallback sa hlási.
+		const r = kov([spec('Deluxe|3K', 6), spec('Deluxe|3K', 10)], 'R9005');
+		expect(r.err).toBeNull();
+		expect(kody(r)).toContain('ZASK202520'); // 6mm stredová L R9005 (zvolená)
+		expect(kody(r)).toContain('ZASK202525'); // 10mm stredová L R9006 (fallback)
+		expect(kody(r)).not.toContain('ZASK202526'); // 10mm R7016 absent
+		expect(r.warn).toContain('R9006'); // fallback zviditeľnený
+	});
+
+	it('platná farba pre všetky posuvy → žiadne fallback varovanie', () => {
+		const r = kov([spec('Robust|2K', 6), spec('Deluxe|2K', 10)], 'R7016');
+		expect(r.err).toBeNull();
+		expect(r.warn).toBeNull();
+	});
 });
 
 describe('platneFarbyPre — JEDEN zdroj pravdy validity farby (#537)', () => {
@@ -114,10 +142,11 @@ describe('farbaPreSpec — čisté vetvy rezolúcie (#537)', () => {
 	it('nezvolená (undefined) → undefined (obrana in-depth, nie tichý default)', () => {
 		expect(farbaPreSpec('Deluxe', 10, undefined, vObj(['R9006']))).toEqual({ farba: undefined });
 	});
-	it('neplatná pre spec ale platná v objednávke + má predvolenú → predvolená', () => {
-		expect(farbaPreSpec('Deluxe', 10, 'R9005', vObj(['R9005', 'R9006']))).toEqual({
-			farba: 'R9006'
-		});
+	it('neplatná pre spec ale platná v objednávke + má predvolenú → predvolená + varovanie', () => {
+		const r = farbaPreSpec('Deluxe', 10, 'R9005', vObj(['R9005', 'R9006']));
+		expect(r.farba).toBe('R9006');
+		expect(r.chyba).toBeUndefined();
+		expect(r.varovanie).toContain('R9006'); // fallback sa hlási
 	});
 	it('neplatná pre spec, platná v objednávke, bez predvolenej → chyba menuje systém', () => {
 		const r = farbaPreSpec('Robust', 6, 'R9006', vObj(['R9006', 'R9005']));

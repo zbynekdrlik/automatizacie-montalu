@@ -38,16 +38,23 @@ export function farbaPreSpec(
 	skloHrubka: number | undefined,
 	farbaKovania: Farba | undefined,
 	platneVObjednavke: ReadonlySet<Farba>
-): { farba?: Farba; chyba?: string } {
+): { farba?: Farba; chyba?: string; varovanie?: string } {
 	const platne = platneFarbyPre(system, skloHrubka);
 	if (platne.length === 0) return { farba: farbaKovania }; // farbo-neutrálny systém
 	if (farbaKovania !== undefined && platne.includes(farbaKovania)) return { farba: farbaKovania };
 	if (farbaKovania === undefined) return { farba: undefined }; // obrana in-depth v pocitajKomponenty
 	// farbaKovania je zvolená, ale tomuto posuvu nesedí:
 	if (platneVObjednavke.has(farbaKovania)) {
-		// sedí INÉMU posuvu objednávky → tento posuv dostane svoju predvolenú farbu
+		// sedí INÉMU posuvu objednávky → tento posuv dostane svoju predvolenú farbu.
+		// MONEY-KRITICKÉ: substitúcia sa VŽDY hlási cez `varovanie` — do odpisu ide farba,
+		// ktorú operátor NEZVOLIL (jeho voľba systému nesedí), náhľad to musí ukázať
+		// (predtým `kovanieFor` logoval warn pri fallbacku; per-spec ho tu nahrádza viditeľným varovaním).
 		const pred = predvolenaFarba(system);
-		if (pred !== undefined && platne.includes(pred)) return { farba: pred };
+		if (pred !== undefined && platne.includes(pred))
+			return {
+				farba: pred,
+				varovanie: `zvolená farba ${farbaKovania} nie je platná pre systém ${system} (hrúbka ${skloHrubka ?? '?'} mm) — do odpisu ide predvolená ${pred} (platné: ${platne.join(', ')}).`
+			};
 		return {
 			chyba: `systém ${system} — zvolená farba ${farbaKovania} preň nie je platná (platné: ${platne.join(', ')}) a systém nemá predvolenú farbu krytiek; vyber platnú RAL farbu.`
 		};
@@ -92,6 +99,7 @@ export function kovanieDoOdpisu(
 ): { polozky: Polozka[]; err: string | null; warn: string | null } {
 	const davky: PolozkaKomponentu[][] = [];
 	const varovania = new Set<string>();
+	const systemOf = (s: PosuvSpec) => s.sysStyl.split('|')[0] ?? '';
 
 	// #537 (r2): objednávková množina platných farieb — únia platných farieb VŠETKÝCH
 	// posuvov. Rozhoduje, či je zvolená `farbaKovania` legitímna objednávková voľba
@@ -99,11 +107,10 @@ export function kovanieDoOdpisu(
 	// zlá voľba (nesedí žiadnemu → hlasná chyba). Pozri `farbaPreSpec`.
 	const platneVObjednavke = new Set<Farba>();
 	for (const spec of specs)
-		for (const f of platneFarbyPre(spec.sysStyl.split('|')[0] ?? '', spec.skloHrubka))
-			platneVObjednavke.add(f);
+		for (const f of platneFarbyPre(systemOf(spec), spec.skloHrubka)) platneVObjednavke.add(f);
 
 	for (const [i, spec] of specs.entries()) {
-		const system = spec.sysStyl.split('|')[0] ?? '';
+		const system = systemOf(spec);
 		const komponenty = komponentyPre(system);
 		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
 
@@ -111,14 +118,16 @@ export function kovanieDoOdpisu(
 		// dvojice per systém) — JEDEN zdroj pravdy rezolúcie. Deluxe posuv, ktorému
 		// zvolená farba nesedí (napr. R9005 na 10mm), dostane predvolenú R9006; systém
 		// bez predvolenej (Robust/Štandard/Slide) s nesediacou farbou → hlasná chyba.
-		const { farba: efektivnaFarba, chyba: farbaChyba } = farbaPreSpec(
-			system,
-			spec.skloHrubka,
-			farbaKovania,
-			platneVObjednavke
-		);
+		const {
+			farba: efektivnaFarba,
+			chyba: farbaChyba,
+			varovanie: farbaVarovanie
+		} = farbaPreSpec(system, spec.skloHrubka, farbaKovania, platneVObjednavke);
 		if (farbaChyba)
 			return { polozky: [], err: `Kovanie, posuv ${i + 1}: ${farbaChyba}`, warn: null };
+		// MONEY-KRITICKÉ: fallback na predvolenú farbu sa VŽDY zviditeľní v náhľade —
+		// operátor musí vidieť, že do odpisu ide iná farba, než zvolil (#537 review 🟡).
+		if (farbaVarovanie) varovania.add(`Kovanie, posuv ${i + 1}: ${farbaVarovanie}`);
 
 		// KOVANIE_NEUPLNE hodnota je buď pevný text (Štandard), alebo funkcia hrúbky
 		// skla + farby kovania (Slide: madlo vždy, zámok len pri R9005, #357) — obe
