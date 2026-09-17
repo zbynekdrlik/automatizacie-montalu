@@ -460,6 +460,31 @@ export function predvolenaFarba(system: string): Farba | undefined {
 	return PREDVOLENA_FARBA[system];
 }
 
+/**
+ * PLATNÉ RAL farby pre daný systém (a hrúbku skla, keď od nej variant závisí) —
+ * JEDEN zdroj pravdy pre validitu farby (#537 / gk #6413). Číta sa priamo z
+ * `komponentyPre(system)`: farba je platná, ak existuje aspoň jeden farebný
+ * komponent s tou `farba` a — ak nesie `hrubkaSkla` — platí pre danú hrúbku
+ * (Deluxe krytky: 6mm R9006/R9005, 10mm R9006/R7016). Systém bez farebných
+ * komponentov (alebo bez kovania) → prázdne pole = farbo-neutrálny.
+ *
+ * Žiadna NOVÁ tabuľka — validita je odvodená z tých istých `Komponent` záznamov,
+ * z ktorých sa počíta odpis (netvorí sa druhý, rozchádzajúci sa zoznam).
+ */
+export function platneFarbyPre(system: string, skloHrubka?: number): Farba[] {
+	const komponenty = komponentyPre(system);
+	if (!komponenty) return [];
+	const out = new Set<Farba>();
+	for (const k of komponenty) {
+		if (k.farba === undefined) continue;
+		// hrúbko-viazaný variant (Deluxe krytky) platí len pre svoju hrúbku;
+		// hrúbko-neutrálny farebný variant (Robust kľučka, Štandard/Slide zámok) vždy.
+		if (k.hrubkaSkla !== undefined && k.hrubkaSkla !== skloHrubka) continue;
+		out.add(k.farba);
+	}
+	return [...out];
+}
+
 /** Popis (label) RAL selectu per systém (#431 kolo 2). Deluxe: RAL voľba sa týka
  *  KRYTIEK (kovanie = pevne nerezová mušľa), preto „Farba krytiek", nie „Farba
  *  kovania" (Patrik/Dominik: „farba kovania je len nerezová mušľa"). Systémy tu

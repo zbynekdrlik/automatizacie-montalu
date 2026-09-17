@@ -10,8 +10,10 @@
 //     voľba, #354 správanie — nikdy tichý odpis bez farebnej rodiny).
 // Mušľa Deluxe (kovanie) ostáva pevne nerezová — netýka sa krytiek (farba = KRYTKY).
 import { describe, it, expect } from 'vitest';
-import { kovanieDoOdpisu } from '../src/lib/server/kovanie';
+import { kovanieDoOdpisu, farbaPreSpec } from '../src/lib/server/kovanie';
+import { platneFarbyPre } from '../src/lib/server/komponenty-cfg';
 import { buildCFG, type PosuvSpec } from '../src/lib/server/compute';
+import type { Farba } from '../src/lib/komponenty';
 import seed from '../src/lib/server/cfg_seed.json';
 
 const cfg = buildCFG(seed.sys as never, seed.rez as never);
@@ -75,5 +77,55 @@ describe('kovanieDoOdpisu — farba PER SPEC pri zmiešaných systémoch (#537)'
 		expect(kody(r)).not.toContain('ZASK202532'); // Štandard zámok R7016
 		expect(kody(r)).toContain('ZASK202525'); // Deluxe stredová L R9006 (fallback)
 		expect(kody(r)).not.toContain('ZASK202526'); // Deluxe R7016 absent
+	});
+});
+
+describe('platneFarbyPre — JEDEN zdroj pravdy validity farby (#537)', () => {
+	it('Robust je hrúbko-neutrálny: R9005/R7016 na každej hrúbke', () => {
+		expect(platneFarbyPre('Robust', 6).sort()).toEqual(['R7016', 'R9005']);
+		expect(platneFarbyPre('Robust', undefined).sort()).toEqual(['R7016', 'R9005']);
+	});
+	it('Štandard: R9005/R7016 (zámok)', () => {
+		expect(platneFarbyPre('Štandard', 10).sort()).toEqual(['R7016', 'R9005']);
+	});
+	it('Slide: len R7016 (R9005 zámok má 0 ks, vynechaný #357)', () => {
+		expect(platneFarbyPre('Slide', 10)).toEqual(['R7016']);
+	});
+	it('Deluxe závisí od hrúbky: 6mm R9006/R9005, 10mm R9006/R7016', () => {
+		expect(platneFarbyPre('Deluxe', 6).sort()).toEqual(['R9005', 'R9006']);
+		expect(platneFarbyPre('Deluxe', 10).sort()).toEqual(['R7016', 'R9006']);
+	});
+	it('Deluxe bez hrúbky → prázdne (krytky sú hrúbko-viazané) = farbo-neutrálny fallback', () => {
+		expect(platneFarbyPre('Deluxe', undefined)).toEqual([]);
+	});
+	it('neznámy systém → prázdne pole', () => {
+		expect(platneFarbyPre('Neznamy', 10)).toEqual([]);
+	});
+});
+
+describe('farbaPreSpec — čisté vetvy rezolúcie (#537)', () => {
+	const vObj = (fs: Farba[]) => new Set<Farba>(fs);
+	it('farbo-neutrálny (prázdne platné) → prejde surová farba', () => {
+		expect(farbaPreSpec('Deluxe', undefined, 'R9005', vObj(['R9005']))).toEqual({ farba: 'R9005' });
+	});
+	it('zvolená platná pre spec → použije sa', () => {
+		expect(farbaPreSpec('Robust', 6, 'R9005', vObj(['R9005']))).toEqual({ farba: 'R9005' });
+	});
+	it('nezvolená (undefined) → undefined (obrana in-depth, nie tichý default)', () => {
+		expect(farbaPreSpec('Deluxe', 10, undefined, vObj(['R9006']))).toEqual({ farba: undefined });
+	});
+	it('neplatná pre spec ale platná v objednávke + má predvolenú → predvolená', () => {
+		expect(farbaPreSpec('Deluxe', 10, 'R9005', vObj(['R9005', 'R9006']))).toEqual({
+			farba: 'R9006'
+		});
+	});
+	it('neplatná pre spec, platná v objednávke, bez predvolenej → chyba menuje systém', () => {
+		const r = farbaPreSpec('Robust', 6, 'R9006', vObj(['R9006', 'R9005']));
+		expect(r.farba).toBeUndefined();
+		expect(r.chyba).toContain('Robust');
+	});
+	it('neplatná ŽIADNEMU posuvu objednávky → chyba (zlá operátorská voľba)', () => {
+		const r = farbaPreSpec('Deluxe', 10, 'R9005', vObj(['R9006', 'R7016']));
+		expect(r.chyba).toMatch(/R9005/);
 	});
 });
