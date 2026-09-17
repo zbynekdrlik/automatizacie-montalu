@@ -44,7 +44,10 @@ export interface CutPlanBar {
 	profile_name: string;
 	/** dĺžka tyče profilu (mm). */
 	stock_length_mm: number;
-	/** rezná medzera / kotúč (mm, #535) — engine `KOTUC`, rovnaká hodnota ako papier „kotúč N mm". */
+	/**
+	 * rezná medzera / kotúč (mm, #535) — TÁ ISTÁ, ktorou boli tyče zbalené (`ffdPack` kerf) a ktorú
+	 * tlačí PDF hlavička (`reznaMedzera ?? KOTUC`), takže papier a dáta sedia. Default `KOTUC` (4).
+	 */
 	kerf_mm: number;
 	pieces: CutPlanPiece[];
 	/** koncový odpad tyče (mm). */
@@ -156,8 +159,13 @@ function renderBarSvgBase64(tyc: Tyc, barLen: number, sikmy: boolean): string {
  * poradí profilov ako grafický PDF. VYNECHÁVA profily bez Money kódu (`profile_kod` nesmie byť
  * prázdny — kontrakt #7431) aj profily bez tyčí; volajúci zaloguje, koľko sa vynechalo. Vracia
  * `undefined` keď žiadna tyč nemá kód → kľúč `cut_plan` sa vynechá úplne (žiadne prázdne objekty).
+ *
+ * `kerfMm` (#535) = rezná medzera, ktorou volajúci ZBALIL tyče a ktorou generuje PDF (`reznaMedzera`),
+ * aby `bars[].kerf_mm` sedelo s papierom. Default `KOTUC` (backfill + dnešné cesty ju nemenia);
+ * `/plan-rezov` upload posiela `input.reznaMedzera` (user-editovateľná), takže kerf ostáva 1:1 s PDF
+ * aj keby tá cesta raz niesla Money kódy (dnes píše `kod:''` → `cut_plan` sa aj tak vynechá).
  */
-export function buildCutPlan(material: MaterialRow[]): CutPlan | undefined {
+export function buildCutPlan(material: MaterialRow[], kerfMm: number = KOTUC): CutPlan | undefined {
 	const bars: CutPlanBar[] = [];
 	// ikonu profilu posielame RAZ per Money kód (na prvej tyči s tým kódom) — Odoo cachuje podľa kódu
 	const seenKody = new Set<string>();
@@ -173,7 +181,7 @@ export function buildCutPlan(material: MaterialRow[]): CutPlan | undefined {
 				profile_kod: m.kod,
 				profile_name: m.nazov,
 				stock_length_mm: stockLen,
-				kerf_mm: KOTUC, // engine kotúč — ten istý zdroj ako PDF „kotúč N mm"
+				kerf_mm: kerfMm, // kotúč, ktorým volajúci zbalil tyče = ten istý zdroj ako PDF „kotúč N mm"
 				pieces: tyc.kusy.map((k, i) => ({
 					seq: i + 1,
 					length_mm: k.rozmer,

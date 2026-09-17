@@ -108,8 +108,12 @@ kotúč, typ rezu, ikonu prierezu a sumár; v1 dáta ich nemali. v2 ich pridáva
 DQ-and-continue #7436) — všetko VNÚTRI `cut_plan` (nový top-level kľúč = 422 na PROD pred Odoo
 deployom, viď #532 R2):
 
-- `bars[].kerf_mm` = engine kotúč `KOTUC` (`compute-model.ts`, dnes 4) — **ten istý zdroj** ako PDF
-  hlavička „kotúč N mm" (`opts.reznaMedzera ?? KOTUC`), takže papier a dáta sedia. Number.
+- `bars[].kerf_mm` = **rezná medzera, ktorou volajúci ZBALIL tyče** (`buildCutPlan(material, kerfMm)`,
+  default `KOTUC`=4) — TÁ ISTÁ, ktorou generuje PDF (`reznaMedzera ?? KOTUC`), takže papier a dáta
+  sedia. Backfill + dnešné cesty ju nemenia (KOTUC); `/plan-rezov` upload posiela
+  `input.reznaMedzera` (user-editovateľná) → kerf ostáva 1:1 s PDF aj keby tá cesta raz niesla Money
+  kódy (dnes píše `kod:''` → cut_plan sa aj tak vynechá). **NEhardcoduj `KOTUC` v builderi** — inak
+  by user-zmenený kotúč šiel na pílu zle. Number.
 - `pieces[].cut_type` = `cutTypeFor(angle_left, angle_right)` → `"uhol"` keď ktorýkoľvek koniec ≠ 90°,
   inak `"rovny"` (1:1 s papierom „rez rovný"). Per-kus; uhly sú per-profil (oba konce rovnaké), ale
   helper je pure a testovaný aj pre zmiešané uhly (pripravené na per-kus uhly, keby raz prišli).

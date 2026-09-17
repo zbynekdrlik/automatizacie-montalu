@@ -238,10 +238,16 @@ describe('buildCutPlan', () => {
 
 describe('cut_plan v2: kerf_mm (#535)', () => {
 	const plan = buildCutPlan(material) as CutPlan;
-	it('každá vydaná tyč nesie kerf_mm = engine kotúč (KOTUC)', () => {
+	it('každá vydaná tyč nesie kerf_mm = default engine kotúč (KOTUC) keď volajúci kerf nedá', () => {
 		expect(KOTUC).toBe(4);
 		expect(plan.bars.length).toBeGreaterThan(0);
 		for (const b of plan.bars) expect(b.kerf_mm).toBe(KOTUC);
+	});
+
+	it('kerf_mm = kerf zadaný volajúcim (reznaMedzera, ktorou sa tyče zbalili) — 1:1 s PDF', () => {
+		const p = buildCutPlan(material, 3) as CutPlan;
+		expect(p.bars.length).toBeGreaterThan(0);
+		for (const b of p.bars) expect(b.kerf_mm).toBe(3);
 	});
 });
 
