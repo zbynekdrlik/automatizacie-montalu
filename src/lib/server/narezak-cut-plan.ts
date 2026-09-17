@@ -12,7 +12,9 @@
 // PROFILU (`sikmyRez` → 45/45, inak 90/90); per-kus uhly (pergola krov #161) štruktúra `Kus`/
 // `MaterialRow` nemá, takže sa nevymýšľajú. `render_svg` = base64 SVG per tyč, ROVNAKÁ geometria ako
 // `narezak-pdf.ts drawBar` (proporčné segmenty, dĺžky, odpad; žiadne ceny).
-import type { MaterialRow, Tyc } from './compute';
+import { KOTUC, type MaterialRow, type Tyc } from './compute';
+import { profilPngB64 } from './profil-png';
+import { narezakSummary, type NarezakSummary } from '$lib/odpad';
 
 /** Jeden kus (rez) na tyči — v poradí rezu (`seq` 1-based). */
 export interface CutPlanPiece {
@@ -22,6 +24,11 @@ export interface CutPlanPiece {
 	/** uhol ľavého/pravého rezu (° — 90 = kolmý, 45 = šikmý). Per-profil, oba konce rovnaké. */
 	angle_left_deg: number;
 	angle_right_deg: number;
+	/**
+	 * typ rezu (#535, 1:1 s papierom „rez rovný/uhol"): `"uhol"` keď ktorýkoľvek koniec ≠ 90°,
+	 * inak `"rovny"`. Odvodené z uhlov (kiosk si to vie dopočítať, papier to píše explicitne).
+	 */
+	cut_type: 'rovny' | 'uhol';
 	/** posuv/sekcia + dĺžka (napr. „Z1 3810"); bez posuvu len dĺžka. */
 	label: string;
 	/** vždy 1 (jeden záznam = jeden fyzický rez, 1:1 s kresbou). */
@@ -37,6 +44,11 @@ export interface CutPlanBar {
 	profile_name: string;
 	/** dĺžka tyče profilu (mm). */
 	stock_length_mm: number;
+	/**
+	 * rezná medzera / kotúč (mm, #535) — TÁ ISTÁ, ktorou boli tyče zbalené (`ffdPack` kerf) a ktorú
+	 * tlačí PDF hlavička (`reznaMedzera ?? KOTUC`), takže papier a dáta sedia. Default `KOTUC` (4).
+	 */
+	kerf_mm: number;
 	pieces: CutPlanPiece[];
 	/** koncový odpad tyče (mm). */
 	waste_mm: number;
@@ -44,11 +56,20 @@ export interface CutPlanBar {
 	note: string;
 	/** base64 SVG per tyč (vizuálny fallback; Odoo kreslí primárne z dát). */
 	render_svg: string;
+	/**
+	 * base64 PNG prierezu profilu (#535, `static/profil/<kod>.webp` → `profil-png.ts`). Meno kľúča
+	 * je kontraktové (`profile_icon_svg`), obsah je PNG base64. Posiela sa RAZ per `profile_kod`
+	 * (na PRVEJ tyči s tým kódom; Odoo cachuje podľa kódu). Keď obrázok pre kód nemáme, kľúč sa
+	 * VYNECHÁ (nikdy prázdny reťazec) — preto voliteľný.
+	 */
+	profile_icon_svg?: string;
 }
 
 export interface CutPlan {
 	version: 1;
 	bars: CutPlanBar[];
+	/** sumár nárezáku (#535) — tie isté čísla ako PDF hlavička (papier = dáta). */
+	summary: NarezakSummary;
 }
 
 /** číslo na 1 desatinné miesto so slovenskou čiarkou (rovnako ako `narezak-pdf.ts` / RozpisRezov). */
@@ -57,6 +78,14 @@ const fmt = (n: number): string => String(Math.round(n * 10) / 10).replace('.', 
 /** popisok kusu: posuv/sekcia + dĺžka. „Z1 3810" pri posuve, inak len dĺžka. */
 function pieceLabel(k: { rozmer: number; posuv?: number }): string {
 	return (k.posuv != null ? `Z${k.posuv} ` : '') + fmt(k.rozmer);
+}
+
+/**
+ * Typ rezu z uhlov konieckov (#535): `"uhol"` keď ktorýkoľvek koniec ≠ 90°, inak `"rovny"`.
+ * 1:1 s papierovým nárezákom („rez rovný"); pure, testovateľné aj pre zmiešané uhly.
+ */
+export function cutTypeFor(angleLeftDeg: number, angleRightDeg: number): 'rovny' | 'uhol' {
+	return angleLeftDeg !== 90 || angleRightDeg !== 90 ? 'uhol' : 'rovny';
 }
 
 // --- SVG geometria (zrkadlí `narezak-pdf.ts drawBar`; SVG y ide DOLE, PDF y HORE) --------------- //
@@ -130,9 +159,16 @@ function renderBarSvgBase64(tyc: Tyc, barLen: number, sikmy: boolean): string {
  * poradí profilov ako grafický PDF. VYNECHÁVA profily bez Money kódu (`profile_kod` nesmie byť
  * prázdny — kontrakt #7431) aj profily bez tyčí; volajúci zaloguje, koľko sa vynechalo. Vracia
  * `undefined` keď žiadna tyč nemá kód → kľúč `cut_plan` sa vynechá úplne (žiadne prázdne objekty).
+ *
+ * `kerfMm` (#535) = rezná medzera, ktorou volajúci ZBALIL tyče a ktorou generuje PDF (`reznaMedzera`),
+ * aby `bars[].kerf_mm` sedelo s papierom. Default `KOTUC` (backfill + dnešné cesty ju nemenia);
+ * `/plan-rezov` upload posiela `input.reznaMedzera` (user-editovateľná), takže kerf ostáva 1:1 s PDF
+ * aj keby tá cesta raz niesla Money kódy (dnes píše `kod:''` → `cut_plan` sa aj tak vynechá).
  */
-export function buildCutPlan(material: MaterialRow[]): CutPlan | undefined {
+export function buildCutPlan(material: MaterialRow[], kerfMm: number = KOTUC): CutPlan | undefined {
 	const bars: CutPlanBar[] = [];
+	// ikonu profilu posielame RAZ per Money kód (na prvej tyči s tým kódom) — Odoo cachuje podľa kódu
+	const seenKody = new Set<string>();
 	for (const m of material) {
 		if (!(m.tyce > 0)) continue; // len profily s aspoň jednou tyčou
 		if (!m.kod) continue; // Money kód povinný — tyče bez kódu vynechaj
@@ -140,27 +176,38 @@ export function buildCutPlan(material: MaterialRow[]): CutPlan | undefined {
 		const angle = sikmy ? 45 : 90;
 		const stockLen = Math.round(m.barLen);
 		for (const tyc of m.bary) {
-			bars.push({
+			const bar: CutPlanBar = {
 				bar_id: `B${bars.length + 1}`,
 				profile_kod: m.kod,
 				profile_name: m.nazov,
 				stock_length_mm: stockLen,
+				kerf_mm: kerfMm, // kotúč, ktorým volajúci zbalil tyče = ten istý zdroj ako PDF „kotúč N mm"
 				pieces: tyc.kusy.map((k, i) => ({
 					seq: i + 1,
 					length_mm: k.rozmer,
 					angle_left_deg: angle,
 					angle_right_deg: angle,
+					cut_type: cutTypeFor(angle, angle),
 					label: pieceLabel(k),
 					qty: 1
 				})),
 				waste_mm: Math.round(tyc.zvysok),
 				note: '',
 				render_svg: renderBarSvgBase64(tyc, m.barLen, sikmy)
-			});
+			};
+			// ikona LEN na prvej tyči kódu; keď obrázok nemáme, kľúč vynecháme (nikdy prázdny reťazec)
+			if (!seenKody.has(m.kod)) {
+				seenKody.add(m.kod);
+				const icon = profilPngB64(m.kod);
+				if (icon) bar.profile_icon_svg = icon;
+			}
+			bars.push(bar);
 		}
 	}
 	if (bars.length === 0) return undefined;
-	return { version: 1, bars };
+	// sumár = tie isté čísla ako PDF hlavička (papier = dáta); nad CELÝM nárezákom (aj profily bez
+	// kódu), preto summary.bars_total môže byť > bars.length v OP s nekódovanými profilmi (#535).
+	return { version: 1, bars, summary: narezakSummary(material) };
 }
 
 /** Počet profilov s tyčami, ktoré sa VYNECHAJÚ z cut_plan pre chýbajúci Money kód (na log). */

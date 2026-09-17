@@ -629,17 +629,33 @@ describe('runBackfill — orchestrácia', () => {
 		);
 		const cutPlan = d.uploadLines.mock.calls[0]![5] as {
 			version: number;
-			bars: { profile_kod: string; pieces: unknown[]; render_svg: string }[];
+			bars: {
+				profile_kod: string;
+				pieces: { cut_type: string }[];
+				render_svg: string;
+				kerf_mm: number;
+			}[];
+			summary: {
+				profiles_count: number;
+				bars_total: number;
+				waste_total_mm: number;
+				waste_total_pct: number;
+			};
 		};
 		expect(cutPlan).toBeDefined();
 		expect(cutPlan.version).toBe(1);
 		expect(cutPlan.bars.length).toBeGreaterThan(0);
-		// každý vydaný bar nesie neprázdny Money kód + aspoň jeden kus + SVG
+		// #535: cut_plan v2 — každý vydaný bar nesie neprázdny Money kód + aspoň jeden kus + SVG +
+		// kerf_mm (engine kotúč) + cut_type na kusoch; payload má top-level summary.
 		for (const b of cutPlan.bars) {
 			expect(b.profile_kod).not.toBe('');
 			expect(b.pieces.length).toBeGreaterThan(0);
+			expect(b.kerf_mm).toBe(4);
+			for (const p of b.pieces) expect(['rovny', 'uhol']).toContain(p.cut_type);
 			expect(Buffer.from(b.render_svg, 'base64').toString('utf8').startsWith('<svg')).toBe(true);
 		}
+		expect(cutPlan.summary).toBeDefined();
+		expect(cutPlan.summary.bars_total).toBeGreaterThan(0);
 	});
 
 	it('#532: mixovaná OP (zasklenia + pergola) → cut_plan má zasklenia tyče A LOG na vynechané pergola tyče', async () => {

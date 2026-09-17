@@ -82,7 +82,8 @@ proces, `cutPlanRejected` signál). Kill switch `ODOO_NAREZ_CUT_PLAN=0/false` vy
 `cut_plan` NAHRADIL #529 v2 (`narezak_v2` za flagom) — ide **VŽDY** (bez flagu), keď nárezák má tyče
 s Money kódom.
 
-`buildCutPlan(MaterialRow[])` → `{ version:1, bars:[…] }` alebo **`undefined`** keď žiadna tyč nemá
+`buildCutPlan(MaterialRow[])` → `{ version:1, bars:[…], summary }` (v2 kľúče #535 nižšie) alebo
+**`undefined`** keď žiadna tyč nemá
 kód (kľúč sa vynechá úplne — žiadne prázdne polia). JEDEN `bars[]` = JEDNA fyzická tyč
 (`Tyc = MaterialRow.bary[i]`), v poradí profilov ako grafický PDF (JEDEN zdroj pravdy s
 `narezak-pdf.ts drawBar`):
@@ -99,6 +100,42 @@ kód (kľúč sa vynechá úplne — žiadne prázdne polia). JEDEN `bars[]` = J
 - `render_svg` = base64 kompaktného samostatného SVG per tyč (`renderBarSvg`), ROVNAKÁ geometria
   ako `drawBar` (proporčné segmenty ∝ `Kus.dlzka`, 45° lichobežník `s=250·scale` klampovaný
   `segW/2-0.5`, koncový odpad; SVG y DOLE vs PDF y HORE). Money-neutrálne (žiadne ceny).
+
+### v2 aditívne kľúče (#535) — VNÚTRI `cut_plan`, verzia ostáva `1`, žiadny nový top-level kľúč
+
+„nech neklesá úroveň, aj uhly, aj všetky detaily na tablete" (owner 17.9.). Papierový nárezák nesie
+kotúč, typ rezu, ikonu prierezu a sumár; v1 dáta ich nemali. v2 ich pridáva ADITÍVNE (tolerované,
+DQ-and-continue #7436) — všetko VNÚTRI `cut_plan` (nový top-level kľúč = 422 na PROD pred Odoo
+deployom, viď #532 R2):
+
+- `bars[].kerf_mm` = **rezná medzera, ktorou volajúci ZBALIL tyče** (`buildCutPlan(material, kerfMm)`,
+  default `KOTUC`=4) — TÁ ISTÁ, ktorou generuje PDF (`reznaMedzera ?? KOTUC`), takže papier a dáta
+  sedia. Backfill + dnešné cesty ju nemenia (KOTUC); `/plan-rezov` upload posiela
+  `input.reznaMedzera` (user-editovateľná) → kerf ostáva 1:1 s PDF aj keby tá cesta raz niesla Money
+  kódy (dnes píše `kod:''` → cut_plan sa aj tak vynechá). **NEhardcoduj `KOTUC` v builderi** — inak
+  by user-zmenený kotúč šiel na pílu zle. Number.
+- `pieces[].cut_type` = `cutTypeFor(angle_left, angle_right)` → `"uhol"` keď ktorýkoľvek koniec ≠ 90°,
+  inak `"rovny"` (1:1 s papierom „rez rovný"). Per-kus; uhly sú per-profil (oba konce rovnaké), ale
+  helper je pure a testovaný aj pre zmiešané uhly (pripravené na per-kus uhly, keby raz prišli).
+- `bars[].profile_icon_svg` = **base64 PNG** prierezu profilu (`profilPngB64(kod)`,
+  `static/profil/<kod>.webp` → PNG cez `profil-png.ts`). **POZOR: meno kľúča je kontraktové
+  (`profile_icon_svg`), OBSAH je PNG base64** (Odoo #7489 sanitizer to vie). Posiela sa **RAZ per
+  `profile_kod`** — na PRVEJ tyči s tým kódom (`seenKody` Set), ďalšie tyče kľúč vynechajú (Odoo
+  cachuje podľa kódu, payload ostáva malý). **Bez obrázka pre kód → kľúč sa VYNECHÁ** (nikdy prázdny
+  reťazec — preto voliteľný v type).
+- `cut_plan.summary` = `{profiles_count, bars_total, waste_total_mm, waste_total_pct}` cez zdieľaný
+  pure helper `narezakSummary(material)` (`$lib/odpad`) — **ten istý helper plní aj PDF hlavičku**
+  (`narezak-pdf.ts`: `profilov`/`tyceSpolu` idú z neho), takže papier = dáta bez duplicity.
+  `waste_total_pct = waste_total_mm / Σ(tyce×barLen) × 100`, 1 desatinné miesto, 0 keď žiadne tyče.
+  **ZÁMER:** sumár je **nárezák-široký** (počíta VŠETKY profily s tyčami, aj bez Money kódu, ako
+  papier) — preto `summary.bars_total`/`profiles_count` môžu byť **VYŠŠIE** než `bars[].length`
+  v OP s nekódovanými profilmi (pergola/fix/clip), ktoré `buildCutPlan` z `bars[]` vynecháva.
+
+**Odoo consumption status (17.9.):** `kerf_mm` + `cut_type` číta odoo-erp **PR 7478**
+(`sale_order_narezak_cutplan.py`, `montalu.rozpis.bar.kerf_mm` / `montalu.rozpis.piece.cut_type`,
+kiosk odvodí cut_type z uhlov keď prázdne). `profile_icon_svg` sa renderuje až po **#7489** (SVG/PNG
+sanitizer) — kľúč posielame HNEĎ (tolerovaný), aby fáza C mala z čoho čítať. `summary` intake zatiaľ
+**NEČÍTA** (počíta si vlastný) — posiela sa pre 1:1 zhodu s papierom.
 
 **KRITICKÁ PASCA (stálo ma to čas — runtime sonda):** `cut_plan` sa naplní **LEN pri zaskleniach**
 (recompute nesie Money kódy ZASP…/BPP…). `spocitajPlanRezov` (CAD planner `/plan-rezov`) píše
