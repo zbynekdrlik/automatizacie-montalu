@@ -120,8 +120,9 @@ Viditeľnosť polí formulára, ktoré závisia od SYSTÉMU, sa NEgate-uje hardc
 RAL select ostáva VIDITEĽNÝ; predvoľba sa predvyplní v `$effect` na `+page.svelte` keď je
 `farbaKovaniaS` prázdna (prepnutie systému / čerstvý štart). `kovanieMuslaHint` (hint
 „nerezová mušľa" vedľa RAL selectu) je derivovaný z existencie `predvolenaFarbaPreSystem[system]`.
-`kovanieFor()` v `+page.server.ts` má defense fallback na `predvolenaFarba()` — loguje
-warn keď sa použije (stale tab / forged POST).
+`kovanieFor()` v `+page.server.ts` už NEMÁ specs[0] fallback (#537) — posúva len surovú
+formulárovú farbu do `kovanieDoOdpisu`, ktorý ju rieši PER SPEC (viď „Server: farba per
+spec" nižšie). Nezvolená farba na farbo-závislom systéme = hlasná chyba (nikdy tichý default).
 
 **HRÚBKO-ZÁVISLÉ RAL možnosti + config LABEL (#431 kolo 2):** Deluxe kovanie je pevne
 nerezová mušľa; RAL voľba sa týka KRYTIEK, ktoré majú Money kód per HRÚBKA×farba (6 mm
@@ -142,13 +143,42 @@ R9006/R9005, 10 mm R9006/R7016). Preto:
   (platná na oboch hrúbkach — invariant v `komponenty.test.ts`). Testuj e2e cez reálne
   prepnutie skla + `requestAnimationFrame` flush (`e2e/kovanie-deluxe.spec.ts`).
 - POZOR mixed-thickness zimná záhrada (Deluxe 6 mm + 10 mm posuv): `ralOptionsPre` robí
-  ÚNIU → ponúkne R9006/R9005/R7016, ale len R9006 prejde oboma posuvmi (fail-loud na
-  druhom). Money-safe (nikdy tiché vynechanie); intersekcia je follow-up.
+  ÚNIU → ponúkne R9006/R9005/R7016. #537: posuv, ktorému zvolená farba nesedí, už NEpadá
+  fail-loud — spadne na `predvolenaFarba(system)` a fallback sa ZVIDITEĽNÍ vo `warn`
+  (viď „Server: farba per spec" nižšie). Money-safe (nikdy tiché vynechanie ANI tichá
+  substitúcia).
 
 **Money-neutralita nového farebného/hrúbko variantu:** default farba MUSÍ ostať platná na
-KAŽDEJ hrúbke krytiek (inak sa serverový `kovanieFor` fallback zmení na fail-loud) — invariant
-`komponenty.test.ts`. Reuse (`znova.ts`) preberá farbu cez `parseFarba` (jeden zdroj pravdy,
-akceptuje R9005/R9006/R7016) — NIKDY lokálnu kópiu allowlistu (predtým zahadzovala R9006).
+KAŽDEJ hrúbke krytiek — invariant `komponenty.test.ts`. Reuse (`znova.ts`) preberá farbu cez
+`parseFarba` (jeden zdroj pravdy, akceptuje R9005/R9006/R7016) — NIKDY lokálnu kópiu
+allowlistu (predtým zahadzovala R9006).
+
+## Server: farba KRYTIEK per spec pri zmiešaných systémoch (#537 / gk odoo-erp #6413)
+
+Jedno objednávkové pole `farbaKovania` zdieľajú všetky posuvy, ale systémy majú RÔZNE farebné
+dvojice (Robust/Štandard R9005/R7016, Slide len R7016, Deluxe 10 mm R9006/R7016, 6 mm
+R9006/R9005). Farba sa preto rieši **PER SPEC** v `kovanieDoOdpisu` (`src/lib/server/kovanie.ts`,
+JEDEN zdroj pravdy) — NIE globálne v `kovanieFor` (starý specs[0] fallback zrušený, pretekal
+predvolenú PRIMÁRNEHO systému na iné posuvy).
+
+Pravidlo (`farbaPreSpec(system, hrubka, farba, platneVObjednavke)`):
+- **farba platná pre systém+hrúbku** (validita čítaná z `platneFarbyPre` = existujúce
+  `Komponent` varianty v `komponenty-cfg.ts`, ŽIADNA nová tabuľka) → použije sa;
+- **nezvolená (`undefined`)** → nechá sa `undefined` (obrana in-depth: `pocitajKomponenty`
+  vyhlási „nezvolená farba"; NIKDY tichý default);
+- **neplatná pre spec, ale platná pre INÝ posuv objednávky** (`platneVObjednavke` = únia
+  platných farieb všetkých posuvov) → `predvolenaFarba(system)` ak platná, inak HLASNÁ chyba
+  MENUJÚCA systém + platné farby. Substitúcia sa VŽDY zviditeľní vo `warn` (Money-kritické:
+  do odpisu ide farba, ktorú operátor nezvolil — náhľad to musí ukázať);
+- **neplatná ŽIADNEMU posuvu** → HLASNÁ chyba (zachováva #354 fail-loud, nikdy tichý odpis
+  bez farebnej rodiny).
+
+Mušľa Deluxe (kovanie) ostáva pevne nerezová — farba = KRYTKY, nie kovanie. Golden snapshot +
+`deluxe-default-farba` testy ostávajú byte-identické (validné farby → žiadny fallback, žiadny
+nový warn). **NIKDY neoznač diff dotýkajúci sa RAL/farba-kovania logiky ako `Harness-e2e-exempt`**
+— `e2e/kovanie-deluxe.spec.ts` assertuje selektor farby krytiek naživo; e2e-exempt by prepustil
+regresiu vo farbe Money kódu. Testy per-spec rezolúcie: `tests/kovanie-mixed-system.test.ts`
+(+ `farbaPreSpec`/`platneFarbyPre` unit vetvy).
 
 **Dôsledok (#431):** FAB checkbox sa NEriadi „má systém kovanie?" — Deluxe/Slide/Štandard
 kovanie DO Money majú, ale FAB položky (`naUzaverPodlaFab`) NIE, takže tam checkbox nič
