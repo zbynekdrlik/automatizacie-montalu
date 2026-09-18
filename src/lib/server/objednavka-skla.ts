@@ -111,6 +111,10 @@ export interface ManualSklo {
 	/** Pôvod riadku — default `'manual'` (sekcia „Pridané položky"); `'pergola'` pre honest-null
 	 *  strešné sklo zadané operátorom (#546). */
 	modul?: string;
+	/** OP objednávky riadka (#546) — pergola honest-null vetva pozná OP z formulára (ako automatický
+	 *  producent `pridatSkla` → `op: ident.op`), nech sa operátorom zadané OP nestratí. Default `''`
+	 *  (ručný podklad `pridatRiadok` nastavuje jedno OP na CELÝ podklad cez `nastavOp`). */
+	op?: string;
 	popis: string;
 	typSkla: string;
 	sirkaMm: number;
@@ -146,6 +150,7 @@ export function pridajSkloManual(s: ManualSklo): number {
 	return db.transaction(() => {
 		const id = pridajSklo({
 			zak: s.zak,
+			op: s.op,
 			modul: (s.modul ?? 'manual').trim() || 'manual',
 			popis: (s.popis ?? '').trim(),
 			sirkaMm: s.sirkaMm,

@@ -113,6 +113,7 @@ describe('#545 pridajSkloManual — ručný riadok objednávky skla', () => {
 		pridajSkloManual({
 			zak: zakPerg,
 			modul: 'pergola',
+			op: 'OP260546',
 			popis: 'Strešné sklo — 4.4.2 číre',
 			typSkla: '4.4.2 číre',
 			sirkaMm: 1200,
@@ -125,6 +126,23 @@ describe('#545 pridajSkloManual — ručný riadok objednávky skla', () => {
 		expect(r.modul).toBe('pergola');
 		expect(r.popis).toBe('Strešné sklo — 4.4.2 číre');
 		expect(modulNazov(r.modul)).toBe('Pergola');
+		// #546 review 🟡: OP z formulára sa prenesie na riadok (ako automatický producent)
+		expect(r.op).toBe('OP260546');
+	});
+
+	it('op sa vynechá (default) keď sa nezadá — ručný podklad nastavuje OP cez nastavOp', () => {
+		const zak = 'ZAK-546-MOD-NOOP';
+		pridajSkloManual({
+			zak,
+			popis: 'x',
+			typSkla: 'Float 4',
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
+		});
+		expect(listSklaPreZakazku(zak)[0]!.op).toBe('');
 	});
 });
 

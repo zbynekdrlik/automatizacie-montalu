@@ -437,6 +437,9 @@ export const actions = {
 		try {
 			pridajSkloManual({
 				zak,
+				// OP z formulára (ako automatický producent `pridatSkla` → `op: ident.op`) — nech sa
+				// operátorom zadané OP nestratí (review 🟡 #546)
+				op: ident.op,
 				modul: 'pergola',
 				// rovnaké znenie ako automatický producent strešného skla vyššie
 				popis: `Strešné sklo${typSkla ? ' — ' + typSkla : ''}`,

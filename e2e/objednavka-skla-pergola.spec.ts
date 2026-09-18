@@ -26,9 +26,11 @@ test('pergola honest-null strešné sklo → ručný riadok objednávky (modul P
 	await expect(card).toBeVisible();
 	await expect(page.getByTestId('pridat-skla')).toHaveCount(0);
 
-	// ZAK objednávky (rezervačná ZAK karta = zdroj identu pre riadok skla)
+	// ZAK + OP objednávky (rezervačná karta = zdroj identu pre riadok skla; #546 review 🟡: OP
+	// zadané tu sa prenesie na riadok, netreba ho zadávať znova na podklade)
 	const zak = `${RUN}-01`;
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
+	await page.getByLabel('OP/OPDL číslo *').fill('OP260546');
 
 	// typ skla z pickera (prvá reálna možnosť), rozmer, počet
 	const typSelect = card.getByTestId('sklo-rucne-typ');
@@ -54,6 +56,9 @@ test('pergola honest-null strešné sklo → ručný riadok objednávky (modul P
 	await expect(riadok.locator('td').nth(1)).toContainText('1200');
 	await expect(riadok.locator('td').nth(1)).toContainText('900');
 	await expect(riadok.locator('td').nth(3)).toContainText('2');
+
+	// OP z pergola formulára sa prenieslo na riadok (netreba ho zadávať znova)
+	await expect(page.getByTestId('op-hodnota')).toContainText('OP260546');
 
 	expect(consoleMsgs).toEqual([]);
 });
