@@ -259,3 +259,54 @@ lokálny `glass_types` katalóg (sklo → `skloHrubka` → profily → Money kó
 a MENÍ SA LEN MIGRÁCIOU — Odoo zoznam ho nikdy neprepisuje (Prístup 2 ZAMIETNUTÝ: Odoo
 `composition_spec` nenesie hrúbkové triedy/profily/Money mapovanie appky). Detaily objednávkovej
 strany: `objednavka-skla.md` sekcia „Odoo typy skla = OBJEDNÁVKOVÝ picker".
+
+## PASCA: Odoo JSON-2 `false` pre prázdne char polia + dedupe pickerov pri zdroji (#551)
+
+**Odoo JSON-2 `search_read` vracia pre NEVYPLNENÉ char pole boolean `false` — NIE `null` ani `''`.**
+Preto `String(x ?? '').trim()` je pasca: `false ?? ''` je `false` → `String(false)` = `"false"` →
+po `.trim()` truthy → hodnota `"false"` prenikne do `value`/`label`/`category`. Na `odoo-glass-types.ts`
+to zhodilo PROD picker typov skla (0.25.32–0.25.33): každý typ bez `cennik_code` dostal
+`value === "false"`, ≥ 2 také riadky = duplicitný `{#each … as t (t.value)}` kľúč → Svelte
+client-side `each_key_duplicate` → hydratácia padla, `each` blok sa odstránil, ostal len placeholder
++ „iné sklo". SSR kľúče nevaliduje → bez JS to „fungovalo", takže CI/E2E to nechytili (preview beží
+na `localFallback()` z SQLite = reálne reťazce; unit fixtures používali `cennik_code: ''`, hodnotu
+ktorú Odoo NIKDY nepošle).
+
+Dve pravidlá pre KAŽDÉ budúce Odoo `search_read` char-pole mapovanie:
+
+1. **NIKDY `String(x ?? '')` na surovej Odoo char hodnote — vždy normalizuj cez helper**
+   `s(v) = (v == null || v === false) ? '' : String(v).trim()` (`odoo-glass-types.ts`). Číselné
+   polia majú svoj vlastný ekvivalent `numOrNull` (`odoo-prices.ts:99` — `v === false → null`); toto
+   je jeho char verzia. `false` = prázdne pole.
+2. **Každý `{#each … as t (t.value)}` picker MUSÍ byť dedupnutý PRI ZDROJI** (v mapovacom module,
+   `Set` idiom ako `localFallback`), nie až v šablóne. Odoo dáta (duplicitné kódy, prázdne polia)
+   nesmú nikdy zhodiť picker duplicitným kľúčom; duplicita → warn RAZ za fetch + vynechať riadok.
+
+Kandidát na neskôr (ZAMIETNUTÝ pre hotfix, príliš široký dosah): typovaný `charField()` helper priamo
+v transporte `searchReadJson2` — normalizoval by `false` globálne pre všetkých volajúcich, ale zmenil
+by sémantiku boolean polí. Pre teraz normalizuj v KAŽDOM mapovacom module zvlášť.
+
+## PASCA: NIKDY neblokuj page load na Odoo — krátky timeout + cachovaný fallback (#551 noha 2)
+
+**`+page.server.ts` load, ktorý `await`-uje Odoo read, je latenčná bomba.** `searchReadJson2`/`callJson2`
+mali `DEFAULT_TIMEOUT_MS = 15_000` a `fetchGlassTypes` napĺňal cache až PO návrate volania — takže
+pomalé-ale-nepadajúce PROD Odoo zdržalo KAŽDÝ load `/pergola/narez` aj `/objednavka-skla/[zak]` až
+15 s. PROD post-deploy E2E (2 loady/test) prestrelil 30 s Playwright limit a celý deploy run 0.25.33
+spadol (main CI 35380772116), hoci appka „fungovala" (SSR fallback).
+
+Pravidlá pre KAŽDÝ Odoo read v horúcej ceste page loadu:
+
+1. **Krátky PER-VOLANIE timeout, nie 15 s default.** `callJson2`/`searchReadJson2` majú voliteľný
+   `timeoutMs`; page-load fetch ho nastaví nízko (`fetchGlassTypes` default **3000 ms**). Uploady
+   (`montalu_narezak_upload`, `get_prices`) si držia 15 s default — timeout ZUŽUJ len tam, kde blokuje
+   používateľa. Timeout = AbortController, pri abort okamžitý lokálny fallback (nikdy nehádž do loadu).
+2. **Fallback cachuj len KRÁTKO (60 s), úspech DLHO (5 min).** Inak buď (a) hanging Odoo fanuje 15 s
+   čakanie na každý request (žiadny short-circuit), alebo (b) dlho-cachovaný fallback nezachytí, že sa
+   Odoo vrátil. Krátky fallback TTL = rýchly auto-heal + žiadny fan-out.
+3. **Single-flight.** Súbežní volajúci (N paralelných loadov) MUSIA zdieľať JEDEN in-flight fetch
+   (`_inflight` promise), nie každý spustiť vlastné Odoo volanie — inak pomalé Odoo × N requestov =
+   thundering herd. Cache-miss + prebiehajúci fetch → vráť ten istý promise.
+
+Vzor je v `odoo-glass-types.ts` (`fetchGlassTypes` + `_doFetch` + `_inflight`); zopakuj ho pri každom
+ďalšom Odoo reade viazanom na page load. NIKDY nenechaj `+page.server.ts` čakať na Odoo bez timeoutu
+a fallbacku.

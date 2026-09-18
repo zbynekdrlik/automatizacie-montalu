@@ -87,7 +87,8 @@ export async function callJson2(
 	cfg: OdooJson2Config,
 	model: string,
 	method: string,
-	kwargs: Record<string, unknown> = {}
+	kwargs: Record<string, unknown> = {},
+	opts: { timeoutMs?: number } = {}
 ): Promise<unknown> {
 	const url = `${cfg.url.replace(/\/+$/, '')}/json/2/${model}/${method}`;
 	// /json/2 (Odoo 19 External JSON-2 API): the request body IS the kwargs object —
@@ -97,7 +98,7 @@ export async function callJson2(
 	const body = JSON.stringify(kwargs);
 
 	const ctrl = new AbortController();
-	const timer = setTimeout(() => ctrl.abort(), DEFAULT_TIMEOUT_MS);
+	const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 	try {
 		const res = await _transport(url, {
 			method: 'POST',
@@ -159,6 +160,8 @@ export interface SearchReadOpts {
 	limit?: number;
 	offset?: number;
 	context?: Record<string, unknown>;
+	/** Per-volanie timeout (ms) pre callJson2; nezaraďuje sa do kwargs. Default 15 s (DEFAULT_TIMEOUT_MS). */
+	timeoutMs?: number;
 }
 
 /**
@@ -179,7 +182,7 @@ export async function searchReadJson2(
 	if (opts.limit != null) kwargs.limit = opts.limit;
 	if (opts.offset != null) kwargs.offset = opts.offset;
 	if (opts.context != null) kwargs.context = opts.context;
-	const res = await callJson2(cfg, model, 'search_read', kwargs);
+	const res = await callJson2(cfg, model, 'search_read', kwargs, { timeoutMs: opts.timeoutMs });
 	return Array.isArray(res) ? (res as Record<string, unknown>[]) : [];
 }
 

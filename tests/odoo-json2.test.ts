@@ -15,6 +15,7 @@ const CFG: OdooJson2Config = { url: 'https://erp.test', apiKey: 'test-key-123' }
 afterEach(() => {
 	setJson2Transport(null);
 	vi.unstubAllEnvs();
+	vi.useRealTimers();
 });
 
 describe('odooJson2Config', () => {
@@ -194,5 +195,52 @@ describe('backward-compat types (#5808)', () => {
 		const cfg: Json2Config = { url: 'https://erp.test', apiKey: 'k' };
 		const _check: OdooJson2Config = cfg;
 		expect(_check.url).toBe('https://erp.test');
+	});
+});
+
+// #551 noha 2: per-volanie `timeoutMs` pre callJson2 (a searchReadJson2). Uploady si držia 15 s
+// default; page-load ready fetchGlassTypes si žiada krátky 3 s. Bez per-volania timeoutu pomalé Odoo
+// zdržalo page load 15 s a PROD post-deploy E2E timeoutol.
+describe('callJson2 timeout (#551 noha 2)', () => {
+	it('per-volanie timeoutMs abortne request v danom čase', async () => {
+		vi.useFakeTimers();
+		let aborted = false;
+		setJson2Transport(
+			(_url, init) =>
+				new Promise((_res, rej) => {
+					init?.signal?.addEventListener('abort', () => {
+						aborted = true;
+						rej(new Error('aborted'));
+					});
+				})
+		);
+		const p = callJson2(CFG, 'm', 'meth', {}, { timeoutMs: 1000 }).catch(() => 'err');
+		await vi.advanceTimersByTimeAsync(999);
+		expect(aborted).toBe(false);
+		await vi.advanceTimersByTimeAsync(2);
+		expect(aborted).toBe(true);
+		await p;
+		vi.useRealTimers();
+	});
+
+	it('bez timeoutMs platí 15 s default (žiadny abort na 3 s — uploady sa nemenia)', async () => {
+		vi.useFakeTimers();
+		let aborted = false;
+		setJson2Transport(
+			(_url, init) =>
+				new Promise((_res, rej) => {
+					init?.signal?.addEventListener('abort', () => {
+						aborted = true;
+						rej(new Error('aborted'));
+					});
+				})
+		);
+		const p = callJson2(CFG, 'm', 'meth', {}).catch(() => 'err');
+		await vi.advanceTimersByTimeAsync(3000);
+		expect(aborted).toBe(false); // stále čaká (15 s default)
+		await vi.advanceTimersByTimeAsync(12_001);
+		expect(aborted).toBe(true);
+		await p;
+		vi.useRealTimers();
 	});
 });
