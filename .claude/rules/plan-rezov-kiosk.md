@@ -137,6 +137,39 @@ kiosk odvodí cut_type z uhlov keď prázdne). `profile_icon_svg` sa renderuje a
 sanitizer) — kľúč posielame HNEĎ (tolerovaný), aby fáza C mala z čoho čítať. `summary` intake zatiaľ
 **NEČÍTA** (počíta si vlastný) — posiela sa pre 1:1 zhodu s papierom.
 
+### v3 aditívny kľúč (#542, owner 18.9., odoo-erp 7431 fáza C) — `cut_plan.render_html`
+
+Owner 18.9. (po fáze B v Odoo): „prerobil si to nanovo, vyzerá to hnusne — mal si to skopírovať
+z appky". ROZHODNUTIE (voľba A): **appka je zdroj CELÉHO vzhľadu nárezáku, Odoo nič nekreslí.** Appka
+NEMÁ HTML šablónu za PDF — `narezak-pdf.ts` kreslí vektorovo cez pdf-lib. Preto NOVÝ serverový HTML
+renderer `src/lib/server/narezak-html.ts`, ktorý **PDF ostáva REFERENCIA, HTML ho ZRKADLÍ** cez
+zdieľané helpery (`renderBarSvg`, `profilPngB64`, `narezakSummary`, `renderQrSvg`) — dva renderery,
+jeden zdroj geometrie. `narezak-pdf.ts` sa NEMENÍ.
+
+- `cut_plan.render_html` = self-contained fragment `<div class="narezak">…</div>` s JEDNÝM inline
+  `<style>` (systémové fonty, **bez `url()`/`@import`/`expression()`**). Sekcie v poradí PDF: hlavička
+  (zákazka/OP/zákazník/dátum + inline QR `<svg>`), blok per profil, pásy tyčí, tabuľka rezov, súhrn.
+  **ADITÍVNE, `version` ostáva `1`, VNÚTRI `cut_plan`** (žiadny nový top-level kľúč → 422 fallback
+  #532 platí). Voliteľný (nad stropom sa vynechá).
+- **Odškrtávacie značky (Odoo Shadow DOM):** `data-profile-kod="<kod>"` na bloku profilu, `data-bar-id="<bar_id>"`
+  na páse tyče, `data-piece-id="<bar_id>:<seq>"` na segmente kusu — **id sú 1:1 s `cut_plan.bars[]`/
+  `pieces[]`** (guard test `narezak-html.test.ts`: presne `bars.length` × `data-bar-id`, Σ pieces ×
+  `data-piece-id`, hodnoty zhodné). `renderBarSvg` dostal voliteľný `opts.barId` → per-piece
+  `data-piece-id`; **BEZ neho je výstup byte-identický** (kontrakt `render_svg` per bar do
+  `montalu.rozpis.bar` ostáva 1:1).
+- **Ikona:** `<img src="data:image/png;base64,…">` z `profilPngB64(kod)` **RAZ per kód** (prvý blok
+  kódu s obrázkom); bez obrázka sa vynechá.
+- **Allow-list sanitizer-safe** (odoo-erp `kiosk_html_sanitize.py`): **žiadny `<script>`/`on*`/
+  `javascript:`/externé URL v `src`/`href`, žiadny `url(`/`@import`**; obrázky VÝHRADNE `data:image/png`
+  a inline `<svg>`. Jediné `http(s)` je SVG `xmlns` namespace (nie `src`/`href`). Dynamický text ide cez
+  `escapeHtml`. QR je inline `<svg>` (nie `data:`), prítomné len keď je OP.
+- **Size-guard** (`renderNarezakHtmlCapped`, strop `NAREZAK_HTML_MAX_BYTES = 1 400 000` B, rezerva pod
+  1,5 MB): > strop → render BEZ ikon (len kódy) + warn; stále nad → `render_html` sa **vynechá** (Odoo
+  fallback na fázu B) + warn. `capBytes` param je testovací override.
+- **Obaja volajúci** (`odoo-plan-rezov-upload.ts` + `backfill-narezaky.ts`) posielajú `meta`
+  (zak/op/zákazník/dátum) do `buildCutPlan(material, kerf, meta)` → `render_html` sa naplní automaticky
+  (typický fragment pre pár profilov ~12–20 KB; ikony sú raz per kód, takže reálny nárezák ostáva malý).
+
 **KRITICKÁ PASCA (stálo ma to čas — runtime sonda):** `cut_plan` sa naplní **LEN pri zaskleniach**
 (recompute nesie Money kódy ZASP…/BPP…). `spocitajPlanRezov` (CAD planner `/plan-rezov`) píše
 `kod:''` (`plan-rezov.ts` „display-only") a backfill CAD moduly (pergola/fix/clip cez
