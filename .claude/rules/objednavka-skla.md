@@ -278,3 +278,40 @@ owner ho odložil → ops-wait na #546).
   ako automatický `pridatSkla` producent (`op: ident.op`); inak by operátorom zadané OP z pergola
   formulára zmizlo a muselo sa zadať znova cez `nastavOp`. Ručný podklad `pridatRiadok` OP naďalej
   NEzadáva (jedno OP na CELÝ podklad cez `nastavOp`), takže `pridajSkloManual.op` je default `''`.
+
+
+## Kontrakt `glass_order` v2 — description, mode, „iné sklo", prílohy per riadok, outcome (#548)
+
+v2 je ADITÍVNE rozšírenie v1 (Odoo intake toleruje neznáme kľúče — appka posiela v2 hneď, kým Odoo
+strana #7586 nie je na PROD `glass_type_manual` = DQ „nie je v katalógu"/cena 0, `require_order` sa
+nectí, OSK odpoveď chýba — vyrieši sa samo po nasadení). Money-NEUTRÁLNE (cena dodávateľa skla).
+
+- **Builder** (`odoo-rozpis-lines.ts` `buildGlassOrder` teraz vracia `{ order, droppedAttachments }`,
+  NIE holý `GlassOrder`): `order.version=2`, `items[].description=popis` (keď je), `items[].mode=rezim`
+  ('rozmery'|'atyp', vždy), všetky v1 kľúče nezmenené. Volajúci destrukturuje `{ order }`.
+- **mimetype prílohy** = pure `mimetypeZNazvu(nazov)` (jediný zdroj mapy): pdf→application/pdf,
+  dxf→application/dxf, dwg→application/acad, step/stp→model/step, igs/iges→model/iges,
+  xlsx→…spreadsheetml.sheet, neznáme→application/octet-stream. **POZOR — v komentároch odoo-rozpis-lines.ts
+  NEPÍŠ literál `€`** (money-safety source-guard `odoo-rozpis-lines-money-safety.test.ts` skenuje celý
+  súbor na `€`); píš „EUR za m2".
+- **Strop príloh** `GLASS_ORDER_ATTACH_MAX_BYTES=25 MB` base64 na CELÚ objednávku (`enforceAttachmentCap`):
+  nad limitom zahodí NAJVÄČŠIU jednotlivú prílohu (deterministicky), pripíše poznámku „príloha <name>
+  vynechaná — limit" na riadok a vráti `droppedAttachments[]`. Prílohy sa načítavajú (`buildGlassOrderForZak`
+  `nacitajPrilohy`) LEN pre riadky, ktoré majú súbory (bez BLOB fetchu inak).
+- **„Iné sklo" (vlastný typ + cena/m²)** — migrácia **v49** (`typ_skla_manual TEXT NULL`,
+  `cena_m2_manual REAL NULL`). `rozriesTypSkla` = XOR: katalógový `typSkla` ALEBO
+  (`typSklaManual` + `cenaM2Manual>0`), NIKDY oboje/nič (throw). `pridajSkloManual` ho volá; per-riadok
+  akcia `nastavTypManual` (registrovaná v `b2b-route-coverage.test.ts`) prepne existujúci riadok na iné
+  sklo a vynuluje `typ_skla`. **SYMETRIA (GK review, KRITICKÉ):** `nastavTypSkla` (prepnutie SPÄŤ na
+  katalóg) MUSÍ vynulovať `typ_skla_manual`+`cena_m2_manual` — inak riadok ostane v XOR-zakázanom stave
+  a `buildGlassOrderItem` (manuál = `typSklaManual.length>0 && cenaM2Manual>0`) ticho pošle staré iné sklo.
+  Builder pri manuáli posiela `glass_type_manual`+`price_m2_manual` a `glass_type` VYNECHÁ (aj composition).
+  UI: sentinel `__ine__` v pickeri odkryje vlastný typ + cenu (`novyIne` $derived; per-riadok `ineRiadok`
+  record + `onTypSelect`).
+- **`require_order:false`** VŽDY v `uploadGlassOrderToOdoo` — Odoo vytvorí objednávku skla aj bez
+  sale.order (servis bez zákazky), `order_number`=zak + OP precedencia nezmenené.
+- **Outcome** `parseOdooOutcome(res)` tolerantne číta `{glass_order_id, name, lines, dq}` (v1 intake
+  nevracia nič → `undefined`); `GlassOrderUploadOutcome.odoo` + `droppedAttachments`. Podklad po odoslaní
+  ukáže „Odoslané do Odoo: <OSK name>" + DQ zoznam + vynechané prílohy.
+- **v49 wiring pretlačil `migracie.ts` cez 1000-r. strop** → PURE MOVE inline v29 (`money_dlv` bloku) do
+  `migracie-seed.ts` (`migrateMoneyDlv`), byte-identické (viď `migrations.md` + `large-file-split.md`).

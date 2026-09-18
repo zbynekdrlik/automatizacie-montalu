@@ -92,23 +92,27 @@ describe('derivGlassComposition — zloženie z názvu skla (konzervatívne)', (
 });
 
 describe('buildGlassOrderItem — základ + deriváty + spec', () => {
-	it('5 základných kľúčov byte-identických keď žiadny spec a nič sa nederivuje', () => {
+	it('#548 v2: základ + description/mode; deriváty vynechané keď nič', () => {
 		const it0 = buildGlassOrderItem(pane({ popis: 'Posuv 1' }));
 		expect(it0).toEqual({
 			width_mm: 1200,
 			height_mm: 800,
 			glass_type: 'Nezaradené sklo',
 			qty: 2,
+			description: 'Posuv 1',
+			mode: 'rozmery',
 			note: 'Posuv 1'
 		});
 		expect(Object.keys(it0).sort()).toEqual(
-			['glass_type', 'height_mm', 'note', 'qty', 'width_mm'].sort()
+			['description', 'glass_type', 'height_mm', 'mode', 'note', 'qty', 'width_mm'].sort()
 		);
 	});
 
-	it('bez popisu → note vynechaný (len 4 základné kľúče)', () => {
+	it('#548 v2: bez popisu → description/note vynechané, mode ostáva', () => {
 		const it0 = buildGlassOrderItem(pane({ popis: '' }));
-		expect(Object.keys(it0).sort()).toEqual(['glass_type', 'height_mm', 'qty', 'width_mm'].sort());
+		expect(Object.keys(it0).sort()).toEqual(
+			['glass_type', 'height_mm', 'mode', 'qty', 'width_mm'].sort()
+		);
 	});
 
 	it('katalógová tabuľa → composition/spacer derivované automaticky', () => {
@@ -212,10 +216,11 @@ describe('buildGlassOrderItem — základ + deriváty + spec', () => {
 
 describe('buildGlassOrder — celá objednávka', () => {
 	it('mapuje N položiek 1:1 do items[]', () => {
-		const order = buildGlassOrder([
+		const { order } = buildGlassOrder([
 			pane({ typSkla: 'Izolačné sklo 4/16/4 číre' }),
 			pane({ typSkla: 'Float kalené 6 mm', pocet: 1 })
 		]);
+		expect(order.version).toBe(2);
 		expect(order.items).toHaveLength(2);
 		expect(order.items[0]!.composition).toBe('4-16-4');
 		expect(order.items[1]!.composition).toBe('6 ESG');
@@ -223,6 +228,6 @@ describe('buildGlassOrder — celá objednávka', () => {
 	});
 
 	it('prázdny vstup → prázdne items', () => {
-		expect(buildGlassOrder([])).toEqual({ items: [] });
+		expect(buildGlassOrder([]).order).toEqual({ version: 2, items: [] });
 	});
 });

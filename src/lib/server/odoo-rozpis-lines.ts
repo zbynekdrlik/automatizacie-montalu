@@ -139,17 +139,45 @@ export interface GlassOrderItemInput {
 	pocet: number;
 	typSkla: string;
 	popis: string;
+	/** #548: režim riadka (v2 kontrakt) — 'rozmery' | 'atyp'. Keď chýba, berie sa 'rozmery'. */
+	mode?: 'rozmery' | 'atyp';
+	/** #548: „iné sklo" — vlastný typ. Keď je zadaný (+ `cenaM2Manual`>0), pošle sa `glass_type_manual`
+	 *  a `glass_type` sa VYNECHÁ (Odoo nepáruje katalóg, použije manuálnu cenu). */
+	typSklaManual?: string | null;
+	/** #548: „iné sklo" — cena EUR za m2 bez DPH (> 0), posiela sa ako `price_m2_manual`. */
+	cenaM2Manual?: number | null;
+	/** #548: už NAČÍTANÉ prílohy riadka (base64) — builder aplikuje strop veľkosti. Prázdne/nezadané =
+	 *  žiadne prílohy (Money-neutrálne, číta ich `buildGlassOrderForZak`, nie tento čistý builder). */
+	attachments?: GlassAttachment[];
 	/** voliteľný — keď chýba, berie sa `GLASS_SPEC_OFF`. */
 	spec?: GlassSpec;
 }
 
-/** Element `glass_order.items[]` per kontrakt — 5 základných + voliteľné spec kľúče. */
+/** #548: príloha riadka objednávky skla (base64) — kontrakt v2 `items[].attachments[]`. */
+export interface GlassAttachment {
+	name: string;
+	mimetype: string;
+	data_base64: string;
+}
+
+/** Element `glass_order.items[]` per kontrakt v2 — základné + voliteľné v2/spec kľúče. */
 export interface GlassOrderItem {
 	width_mm: number;
 	height_mm: number;
-	glass_type: string;
+	/** katalógový typ (`cennik_code`/`name`); VYNECHANÝ pri manuálnom skle (#548). */
+	glass_type?: string;
+	/** #548: „iné sklo" — vlastný typ (namiesto `glass_type`). */
+	glass_type_manual?: string;
+	/** #548: „iné sklo" — cena EUR za m2 bez DPH. */
+	price_m2_manual?: number;
 	qty: number;
+	/** #548: voľný popis riadka („ATYP podľa výkresu", „FIX", …). */
+	description?: string;
+	/** #548: režim riadka — 'rozmery' | 'atyp'. */
+	mode?: 'rozmery' | 'atyp';
 	note?: string;
+	/** #548: prílohy per riadok (base64). */
+	attachments?: GlassAttachment[];
 	// ---- voliteľná špecifikácia (len keď set / derivované) ----
 	composition?: string;
 	spacer_mm?: number;
@@ -166,7 +194,51 @@ export interface GlassOrderItem {
 }
 
 export interface GlassOrder {
+	/** #548: kontrakt verzia — v2. */
+	version: number;
 	items: GlassOrderItem[];
+}
+
+/** #548: jedna zahodená príloha (strop veľkosti prekročený) — surfacuje do outcome + poznámky riadka. */
+export interface DroppedAttachment {
+	itemIndex: number;
+	name: string;
+	bytes: number;
+}
+
+/** #548: výsledok builderu — payload + zoznam príloh zahodených stropom veľkosti. */
+export interface GlassOrderBuildResult {
+	order: GlassOrder;
+	droppedAttachments: DroppedAttachment[];
+}
+
+/** #548: strop base64 príloh na CELÚ objednávku (25 MB). Nad limitom sa zahadzujú najväčšie prílohy. */
+export const GLASS_ORDER_ATTACH_MAX_BYTES = 25 * 1024 * 1024;
+
+/**
+ * #548: mimetype prílohy podľa PRÍPONY názvu (čistý helper, jediný zdroj mapy). Neznáme →
+ * `application/octet-stream`. Zhoda s kontraktom v2: pdf/dxf/dwg/step/stp/igs/iges/xlsx.
+ */
+export function mimetypeZNazvu(nazov: string): string {
+	const ext = ((nazov ?? '').split('.').pop() ?? '').toLowerCase();
+	switch (ext) {
+		case 'pdf':
+			return 'application/pdf';
+		case 'dxf':
+			return 'application/dxf';
+		case 'dwg':
+			return 'application/acad';
+		case 'step':
+		case 'stp':
+			return 'model/step';
+		case 'igs':
+		case 'iges':
+			return 'model/iges';
+		case 'xlsx':
+			return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+		default:
+			return 'application/octet-stream';
+	}
 }
 
 /**
@@ -241,18 +313,39 @@ export function buildGlassOrderItem(inp: GlassOrderItemInput): GlassOrderItem {
 	const height = inp.sikmy
 		? Math.round(Math.max(inp.vLavoMm ?? 0, inp.vPravoMm ?? 0))
 		: Math.round(inp.vyskaMm ?? 0);
+	// #548: „iné sklo" = vlastný typ + cena (> 0). Vtedy sa `glass_type` VYNECHÁ a katalóg sa nederivuje.
+	const manualTyp = (inp.typSklaManual ?? '').trim();
+	const jeManual = manualTyp.length > 0 && (inp.cenaM2Manual ?? 0) > 0;
 	const item: GlassOrderItem = {
 		width_mm: Math.round(inp.sirkaMm),
 		height_mm: height,
-		glass_type: inp.typSkla,
 		qty: inp.pocet
 	};
+	if (jeManual) {
+		item.glass_type_manual = manualTyp;
+		item.price_m2_manual = inp.cenaM2Manual!;
+	} else {
+		item.glass_type = inp.typSkla;
+	}
+	// #548: v2 kľúče — voľný popis (keď je) + režim (vždy).
+	const description = (inp.popis ?? '').trim();
+	if (description) item.description = description;
+	item.mode = inp.mode === 'atyp' ? 'atyp' : 'rozmery';
+
 	const note = buildGlassNote(inp);
 	if (note) item.note = note;
 
-	const { composition, spacer_mm } = derivGlassComposition(inp.typSkla);
-	if (composition) item.composition = composition;
-	if (spacer_mm != null) item.spacer_mm = spacer_mm;
+	// #548: prílohy per riadok (už načítané base64) — strop veľkosti rieši `buildGlassOrder`.
+	if (inp.attachments && inp.attachments.length > 0) {
+		item.attachments = inp.attachments.map((a) => ({ ...a }));
+	}
+
+	// composition/spacer sa derivujú LEN pre katalógové sklo (manuál = cena dodávateľa, žiadny katalóg).
+	if (!jeManual) {
+		const { composition, spacer_mm } = derivGlassComposition(inp.typSkla);
+		if (composition) item.composition = composition;
+		if (spacer_mm != null) item.spacer_mm = spacer_mm;
+	}
 
 	const s = inp.spec;
 	if (s) {
@@ -273,7 +366,55 @@ export function buildGlassOrderItem(inp: GlassOrderItemInput): GlassOrderItem {
 	return item;
 }
 
-/** Postaví celý `glass_order` payload zo zoznamu sklových položiek (čistý, žiadny IO). */
-export function buildGlassOrder(items: GlassOrderItemInput[]): GlassOrder {
-	return { items: items.map(buildGlassOrderItem) };
+/** Súčet base64 dĺžok príloh jedného itemu (proxy „veľkosti" — kontrakt strop je na base64). */
+function attachBytes(item: GlassOrderItem): number {
+	return (item.attachments ?? []).reduce((sum, a) => sum + a.data_base64.length, 0);
+}
+
+/**
+ * #548: strážca stropu príloh na CELÚ objednávku. Kým súčet base64 > `maxBytes`, zahodí NAJVÄČŠIU
+ * jednotlivú prílohu (naprieč riadkami), pripíše poznámku na dotknutý riadok a zaznamená ju do
+ * `DroppedAttachment[]`. Deterministické (najväčšia najprv → najmenej zahodených). Mutuje `items`.
+ */
+function enforceAttachmentCap(items: GlassOrderItem[], maxBytes: number): DroppedAttachment[] {
+	const dropped: DroppedAttachment[] = [];
+	const total = () => items.reduce((sum, it) => sum + attachBytes(it), 0);
+	while (total() > maxBytes) {
+		let bestI = -1;
+		let bestJ = -1;
+		let bestLen = -1;
+		for (let i = 0; i < items.length; i++) {
+			const atts = items[i]!.attachments;
+			if (!atts) continue;
+			for (let j = 0; j < atts.length; j++) {
+				if (atts[j]!.data_base64.length > bestLen) {
+					bestLen = atts[j]!.data_base64.length;
+					bestI = i;
+					bestJ = j;
+				}
+			}
+		}
+		if (bestI < 0) break; // žiadne prílohy, ale stále nad limitom (nemalo by nastať)
+		const it = items[bestI]!;
+		const [removed] = it.attachments!.splice(bestJ, 1);
+		if (it.attachments!.length === 0) delete it.attachments;
+		dropped.push({ itemIndex: bestI, name: removed!.name, bytes: removed!.data_base64.length });
+		const poznamka = `príloha ${removed!.name} vynechaná — limit`;
+		it.note = it.note ? `${it.note} — ${poznamka}` : poznamka;
+	}
+	return dropped;
+}
+
+/**
+ * Postaví celý `glass_order` payload (v2) zo zoznamu sklových položiek (čistý, žiadny IO). Aplikuje
+ * strop veľkosti príloh na celú objednávku a vráti aj zoznam zahodených príloh (#548).
+ */
+export function buildGlassOrder(
+	items: GlassOrderItemInput[],
+	opts: { attachMaxBytes?: number } = {}
+): GlassOrderBuildResult {
+	const built = items.map(buildGlassOrderItem);
+	const maxBytes = opts.attachMaxBytes ?? GLASS_ORDER_ATTACH_MAX_BYTES;
+	const droppedAttachments = enforceAttachmentCap(built, maxBytes);
+	return { order: { version: 2, items: built }, droppedAttachments };
 }

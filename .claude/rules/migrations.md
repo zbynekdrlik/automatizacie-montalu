@@ -66,3 +66,15 @@ stĺpce + index + zapisovateľnosť + prežitie base dát; vzor `migration-v34.t
 
 **Overenie:** `npx vitest run --no-file-parallelism tests/migration*.test.ts tests/server-file-size-cap.test.ts`
 (a `--coverage` na celé `npm test`, prahy v `vite.config.ts`).
+
+
+## v49 (#548) — objednavka_skla „iné sklo": typ_skla_manual + cena_m2_manual
+
+Aditívne nullable `ADD COLUMN` (`migrateObjednavkaSklaManual` v `migracie-seed.ts`, feature-detect
+tabuľky + existencie stĺpca). **Wiring pretlačil `migracie.ts` cez strop → v TOM ISTOM tickete PURE MOVE
+inline v29 `money_dlv` bloku do `migrateMoneyDlv` v seede** (vzor #318, byte-identické). Head-bump: teraz
+**40 test súborov** asertuje `user_version` (48→49). Krok 4 (v25/v26/material_prices exaktné zoznamy) SA
+NETÝKA — ALTER je na `objednavka_skla`, nie `dopyt`/`material_prices` (a existujúce testy používajú
+`toContain`, nie exaktný `toEqual` na objednavka_skla). Nový `migration-v49.test.ts` (fixtúra v48 musí
+niesť base tabuľky pre seedData/seedUsers: users, cfg_sys, **cfg_rez**, glass_types, cfg_sklo_trieda,
+odpis_log, **user_audit**, objednavka_skla — inak `SqliteError: no such table` pri importe db.ts).

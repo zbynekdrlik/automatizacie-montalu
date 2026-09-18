@@ -8,6 +8,7 @@ import {
 	nastavRezim,
 	nastavSpec,
 	nastavTypSkla,
+	nastavTypManual,
 	zmazPolozku,
 	pridajSubor,
 	listSubory,
@@ -57,6 +58,10 @@ function parseSpec(form: FormData): GlassSpec {
 // Client-side `accept` attribute is UX only — a forged POST bypasses it.
 // #545: `.xlsx` pridané (Money OVSKL-štýl objednávka skla ako v prílohe úlohy 951).
 const ALLOWED_EXTENSIONS = ['.pdf', '.dxf', '.dwg', '.step', '.stp', '.igs', '.iges', '.xlsx'];
+
+// #548: sentinel voľby „iné sklo" v pickeri typu (odkryje vlastný typ + cenu €/m²). Nesmie kolidovať
+// s katalógovým `value` (Odoo `cennik_code`/`name`) — podčiarknikový sentinel nikdy nie je katalóg.
+const MANUAL_TYP_SENTINEL = '__ine__';
 
 function allowedExtension(filename: string): boolean {
 	const ext = '.' + (filename.split('.').pop() ?? '').toLowerCase();
@@ -133,16 +138,23 @@ export const actions = {
 		if (!zak) return fail(400, { pridatChyba: 'Zákazka nie je zadaná.' });
 		const form = await request.formData();
 		const popis = String(form.get('popis') ?? '').trim();
-		const typSkla = String(form.get('typ_skla') ?? '').trim();
+		const typVyber = String(form.get('typ_skla') ?? '').trim();
 		const sirkaMm = Math.trunc(Number(form.get('sirka_mm')));
 		const vyskaMm = Math.trunc(Number(form.get('vyska_mm')));
 		const pocet = Math.trunc(Number(form.get('pocet')));
 		const rezim = form.get('rezim') === 'atyp' ? 'atyp' : 'rozmery';
+		// #548: „iné sklo" — sentinel `__ine__` v selecte odkryje vlastný typ + cenu €/m²; inak katalóg.
+		const jeIne = typVyber === MANUAL_TYP_SENTINEL;
+		const typSkla = jeIne ? undefined : typVyber;
+		const typSklaManual = jeIne ? String(form.get('typ_skla_manual') ?? '').trim() : undefined;
+		const cenaM2Manual = jeIne ? Number(form.get('cena_m2_manual')) : undefined;
 		try {
 			pridajSkloManual({
 				zak,
 				popis,
 				typSkla,
+				typSklaManual,
+				cenaM2Manual,
 				sirkaMm,
 				vyskaMm,
 				pocet,
@@ -230,6 +242,21 @@ export const actions = {
 		return { ok: true };
 	},
 
+	// #548: „iné sklo" na EXISTUJÚCOM riadku — vlastný typ + cena €/m² (> 0). Vynuluje katalógový typ.
+	nastavTypManual: async ({ request }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		const typManual = String(form.get('typ_skla_manual') ?? '').trim();
+		const cenaM2Manual = Number(form.get('cena_m2_manual'));
+		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID.' });
+		try {
+			nastavTypManual(id, typManual, cenaM2Manual);
+		} catch (e) {
+			return fail(400, { error: e instanceof Error ? e.message : 'Neplatné iné sklo.' });
+		}
+		return { ok: true };
+	},
+
 	// #521: uloženie špecifikácie tabule (spec_* kľúče, ktoré appka nevie z katalógu).
 	ulozitSpec: async ({ request }) => {
 		const form = await request.formData();
@@ -249,6 +276,17 @@ export const actions = {
 		const zak = params.zak.trim();
 		if (!zak) return fail(400, { error: 'Zákazka nie je zadaná.' });
 		const out = await uploadGlassOrderToOdoo(zak);
-		return { ok: true, odoslane: { result: out.result, payload: out.payload, error: out.error } };
+		const dropped = out.droppedAttachments ?? [];
+		return {
+			ok: true,
+			odoslane: {
+				result: out.result,
+				payload: out.payload,
+				error: out.error,
+				odoo: out.odoo ?? null,
+				droppedAttachments: dropped,
+				droppedNames: dropped.map((d) => d.name).join(', ')
+			}
+		};
 	}
 } satisfies Actions;

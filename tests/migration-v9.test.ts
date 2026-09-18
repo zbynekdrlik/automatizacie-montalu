@@ -68,7 +68,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('reálny v8 → v9 upgrade: Štandard + zasklenie (13 v9 + 3 opona IZO v47 = 16 štýlov)', () => {
 	it('user_version=9', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(48);
+		expect(db.pragma('user_version', { simple: true })).toBe(49);
 	});
 
 	// #504 round 3: pribudli 3 opona IZO štýly (2x2K/2x3K/2x4K IZO). v9 seeduje z
