@@ -149,10 +149,14 @@ export function renderNarezakHtml(input: NarezakHtmlInput, withIcons = true): st
 
 		parts.push(`<section class="profil" data-profile-kod="${escapeHtml(m.kod)}">`);
 		parts.push('<div class="profil-head">');
-		// ikona RAZ per kód (na prvom bloku kódu s obrázkom); vynechaná bez obrázka / v degradovanom móde
+		// ikona RAZ per kód (na prvom bloku kódu s obrázkom); vynechaná bez obrázka / v degradovanom móde.
+		// `typeof === 'string'` guard: `PROFIL_PNG_B64[kod]` je plain-object lookup — kód rovný
+		// prototype kľúču (`constructor`, `toString`…) by vrátil zdedenú FUNKCIU; guard ju odmietne
+		// (nikdy neemitujeme non-base64 do src). Money kódy také reťazce nie sú, ale je to lacná obrana.
 		if (withIcons && !seenIcon.has(m.kod)) {
 			const icon = profilPngB64(m.kod);
-			if (icon) parts.push(`<img class="ikona" alt="" src="data:image/png;base64,${icon}">`);
+			if (typeof icon === 'string' && icon)
+				parts.push(`<img class="ikona" alt="" src="data:image/png;base64,${icon}">`);
 		}
 		seenIcon.add(m.kod);
 		const titul = `${escapeHtml(m.kod)}${m.nazov ? ' · ' + escapeHtml(m.nazov) : ''}`;
