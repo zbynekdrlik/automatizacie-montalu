@@ -5,7 +5,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { db } from '../src/lib/server/db';
 import { setJson2Transport } from '../src/lib/server/odoo-json2';
-import { pridajSklo, nastavSpec, GLASS_SPEC_OFF } from '../src/lib/server/objednavka-skla';
+import {
+	pridajSklo,
+	nastavSpec,
+	nastavOpZakazky,
+	GLASS_SPEC_OFF
+} from '../src/lib/server/objednavka-skla';
 import {
 	uploadGlassOrderToOdoo,
 	buildGlassOrderDocId,
@@ -19,7 +24,7 @@ function seedOdpis(zak: string, op: string) {
 	).run(zak, op, zak.toUpperCase().replace(/\s/g, ''), op);
 }
 
-function seedGlass(zak: string) {
+function seedGlass(zak: string): number {
 	const id = pridajSklo({
 		zak,
 		modul: 'zasklenia',
@@ -31,6 +36,7 @@ function seedGlass(zak: string) {
 		createdBy: 'test'
 	});
 	nastavSpec(id, { ...GLASS_SPEC_OFF, warmEdge: true, holesQty: 2, holeSize: 'd50' });
+	return id;
 }
 
 afterEach(() => {
@@ -160,5 +166,68 @@ describe('uploadGlassOrderToOdoo (#521)', () => {
 
 	it('doc_id fallback na "x" pri nealfanumerických vstupoch', () => {
 		expect(buildGlassOrderDocId('///', '...')).toBe('glass-order-x-x');
+	});
+
+	// #545: OP precedencia opOverride ?? zakazkaOp ?? OP z podkladu (servisná objednávka bez odpisu).
+	it('bez odpisu, ale OP na riadkoch podkladu → odošle s OP z podkladu', async () => {
+		const zak = 'ZAK-GU-PODOP';
+		const op = 'OP260545';
+		seedGlass(zak); // sklo áno, odpis NIE
+		nastavOpZakazky(zak, op); // OP uložené na riadky podkladu
+		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
+		process.env.ODOO_JSON2_URL = 'https://erp.example.test';
+		process.env.ODOO_JSON2_API_KEY = 'k';
+
+		let captured: Record<string, unknown> | null = null;
+		setJson2Transport(async (_input, init) => {
+			captured = init?.body ? JSON.parse(String(init.body)) : null;
+			return new Response(JSON.stringify({ glass_order_id: 1, glass_version: 1 }), { status: 200 });
+		});
+
+		const out = await uploadGlassOrderToOdoo(zak);
+		expect(out.result).toBe('uploaded');
+		const body = captured as unknown as { order_number: string; doc_id: string };
+		expect(body.order_number).toBe(op);
+		expect(body.doc_id).toContain('glass-order-');
+	});
+
+	it('odpis OP má prednosť pred OP z podkladu', async () => {
+		const zak = 'ZAK-GU-PREC';
+		const opOdpis = 'OP260701';
+		seedOdpis(zak, opOdpis);
+		seedGlass(zak);
+		nastavOpZakazky(zak, 'OP260999'); // podklad OP je INÉ — odpis musí vyhrať
+		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
+		process.env.ODOO_JSON2_URL = 'https://erp.example.test';
+		process.env.ODOO_JSON2_API_KEY = 'k';
+
+		let captured: Record<string, unknown> | null = null;
+		setJson2Transport(async (_input, init) => {
+			captured = init?.body ? JSON.parse(String(init.body)) : null;
+			return new Response(JSON.stringify({ glass_order_id: 1, glass_version: 1 }), { status: 200 });
+		});
+		const out = await uploadGlassOrderToOdoo(zak);
+		expect(out.result).toBe('uploaded');
+		expect((captured as unknown as { order_number: string }).order_number).toBe(opOdpis);
+	});
+
+	it('bez odpisu a riadky majú ROZDIELNE OP → missing (chybová hláška)', async () => {
+		const zak = 'ZAK-GU-MIX';
+		const a = seedGlass(zak);
+		const b = seedGlass(zak);
+		db.prepare('UPDATE objednavka_skla SET op = ? WHERE id = ?').run('OP111111', a);
+		db.prepare('UPDATE objednavka_skla SET op = ? WHERE id = ?').run('OP222222', b);
+		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
+		process.env.ODOO_JSON2_URL = 'https://erp.example.test';
+		process.env.ODOO_JSON2_API_KEY = 'k';
+		let called = false;
+		setJson2Transport(async () => {
+			called = true;
+			return new Response('{}', { status: 200 });
+		});
+		const out = await uploadGlassOrderToOdoo(zak);
+		expect(out.result).toBe('missing');
+		expect(called).toBe(false);
+		expect(out.error).toBeTruthy();
 	});
 });
