@@ -19,6 +19,9 @@
 	};
 	const polozky = $derived(data.polozky);
 	const suboryMap = $derived(data.suboryMap);
+	// #540: zoznam typov skla pre picker (Odoo `montalu.glass.type` alebo lokálny fallback)
+	const glassTypes = $derived(data.glassTypes);
+	const glassTypesSource = $derived(data.glassTypesSource);
 
 	// Zoskupenie položiek podľa modulu (plain array, bez Map — svelte/prefer-svelte-reactivity)
 	const skupiny = $derived.by(() => {
@@ -63,6 +66,15 @@
 		{/if}
 	</p>
 
+	<!-- #540: pôvod zoznamu typov skla v pickeri (Odoo samoobslužný katalóg vs lokálny fallback) -->
+	<p class="sub noprint typ-zdroj" data-testid="glass-types-source">
+		{#if glassTypesSource === 'odoo'}
+			Zoznam typov skla: <b>Odoo</b> ({glassTypes.length})
+		{:else}
+			Zoznam typov skla: <b>lokálny zoznam</b> — Odoo nedostupné
+		{/if}
+	</p>
+
 	{#each skupiny as { modul, items } (modul)}
 		<section class="card">
 			<h2 class="sec">{modulNazov(modul)}</h2>
@@ -84,7 +96,26 @@
 						<tr class:atyp={p.rezim === 'atyp'}>
 							<td>{p.popis}</td>
 							<td class="mono">{fmtRozmer(p)}</td>
-							<td>{p.typSkla}</td>
+							<td>
+								<!-- #540: výber typu skla z Odoo katalógu (`code` → glass_order type); vytlačí sa hodnota -->
+								<span class="print-only">{p.typSkla}</span>
+								<form method="POST" action="?/nastavTyp" use:enhance class="noprint typ-form">
+									<input type="hidden" name="id" value={p.id} />
+									<select
+										name="typ_skla"
+										class="typ-select"
+										data-testid={`typ-skla-${p.id}`}
+										onchange={(e) => (e.target as HTMLSelectElement).form?.requestSubmit()}
+									>
+										{#if !glassTypes.some((t) => t.code === p.typSkla)}
+											<option value={p.typSkla} selected>{p.typSkla || '— vyberte typ —'}</option>
+										{/if}
+										{#each glassTypes as t (t.code)}
+											<option value={t.code} selected={t.code === p.typSkla}>{t.name}</option>
+										{/each}
+									</select>
+								</form>
+							</td>
 							<td class="r mono"><b>{p.pocet}</b></td>
 							<td class="r mono">{fmtM2(p.m2)}</td>
 							<td>
@@ -399,7 +430,23 @@
 		max-height: 400px;
 	}
 
+	.typ-form {
+		margin: 0;
+	}
+	.typ-select {
+		max-width: 220px;
+	}
+	.typ-zdroj {
+		font-size: 0.85rem;
+	}
+	.print-only {
+		display: none;
+	}
+
 	@media print {
+		.print-only {
+			display: inline;
+		}
 		.noprint {
 			display: none !important;
 		}
