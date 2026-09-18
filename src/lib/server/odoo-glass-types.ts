@@ -12,7 +12,7 @@
 // Fallback: pri akomkoľvek zlyhaní Odoo readu (403/sieť/timeout) alebo keď integrácia nie je
 // nakonfigurovaná (dev/test) vráti LOKÁLNY zoznam odvodený z `glass_types` — nikdy tichý prázdny
 // select. Warn LEN RAZ za proces (skutočná chyba; config-absent v deve nie je chyba, nevaruje).
-// In-process cache ~5 min (aj fallback) → auto-heal: po nasadení/oprave Odoo sa zoznam obnoví sám.
+// In-process cache: 5 min pri Odoo úspechu, 60 s pri fallbacku (rýchly auto-heal, žiadny fan-out).
 import { logger } from './log';
 import { odooJson2Config, searchReadJson2, OdooJson2Error } from './odoo-json2';
 import { listGlassTypes } from './db';
@@ -20,6 +20,8 @@ import { listGlassTypes } from './db';
 const log = logger('odoo-glass-types');
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const FALLBACK_TTL_MS = 60 * 1000;
+const DEFAULT_FETCH_TIMEOUT_MS = 3000;
 const GLASS_TYPE_MODEL = 'montalu.glass.type';
 
 /**
@@ -41,12 +43,26 @@ export interface GlassTypesResult {
 	source: 'odoo' | 'local';
 }
 
-let _cache: { result: GlassTypesResult; ts: number } | null = null;
+/**
+ * Normalizuj surovú Odoo JSON-2 hodnotu char poľa na string (#551). Odoo `search_read` vracia pre
+ * NEVYPLNENÉ char polia boolean `false` (nie `null`/`''`); `String(false ?? '')` = `"false"` (po
+ * `.trim()` truthy) → typy bez `cennik_code` dostávali `value === "false"` → duplicitné `{#each …
+ * (t.value)}` kľúče → PROD `each_key_duplicate` hydration crash. `false` (a `null`/`undefined`) =
+ * prázdne pole. Rovnaký gotcha rieši `odoo-prices.ts:numOrNull` pre číselné polia.
+ */
+function s(v: unknown): string {
+	if (v == null || v === false) return '';
+	return String(v).trim();
+}
+
+let _cache: { result: GlassTypesResult; ts: number; ttl: number } | null = null;
+let _inflight: Promise<GlassTypesResult> | null = null;
 let _warned = false;
 
 /** TEST hook: vyprázdni cache (aby ďalší test videl fetch/fallback znova). */
 export function _resetGlassTypesCache(): void {
 	_cache = null;
+	_inflight = null;
 }
 
 /** TEST hook: vynuluj „warn raz za proces" state. */
@@ -74,46 +90,85 @@ function localFallback(): GlassTypesResult {
 
 /**
  * Zoznam typov skla pre objednávkový picker. Živý `montalu.glass.type` z Odoo (aktívne, zoradené
- * podľa názvu), pri chybe/nedostupnosti lokálny fallback. In-process cache ~5 min. NIKDY nehádže.
+ * podľa názvu), pri chybe/nedostupnosti/timeoute lokálny fallback. NIKDY nehádže a NIKDY neblokuje
+ * page load na dlho: `timeoutMs` (default 3000) obmedzí Odoo read, aby pomalé-ale-nepadajúce Odoo
+ * nezdržalo `+page.server.ts` load nad E2E limit (#551 noha 2). In-process cache: 5 min pre Odoo
+ * úspech, len 60 s pre fallback (rýchly auto-heal + žiadny fan-out na každý request). Single-flight:
+ * súbežní volajúci zdieľajú JEDEN in-flight fetch (žiadne thundering-herd na Odoo).
  */
-export async function fetchGlassTypes(): Promise<GlassTypesResult> {
+export async function fetchGlassTypes(
+	opts: { timeoutMs?: number } = {}
+): Promise<GlassTypesResult> {
 	const now = Date.now();
-	if (_cache && now - _cache.ts < CACHE_TTL_MS) return _cache.result;
+	if (_cache && now - _cache.ts < _cache.ttl) return _cache.result;
+	// single-flight: ak už fetch beží, počkaj na ten istý promise (žiadny thundering herd na Odoo)
+	if (_inflight) return _inflight;
+	_inflight = _doFetch(opts.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS);
+	try {
+		return await _inflight;
+	} finally {
+		_inflight = null;
+	}
+}
 
+/**
+ * Jeden fetch typov skla (bez cache/single-flight vrstvy — tú rieši `fetchGlassTypes`). Nastaví
+ * `_cache` s TTL podľa výsledku: Odoo úspech → 5 min, fallback (chyba/timeout/config chýba) → 60 s.
+ */
+async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 	const cfg = odooJson2Config();
 	if (!cfg) {
 		// integrácia nie je nakonfigurovaná (dev/test) — očakávané, NIE chyba → žiadny warn
 		const local = localFallback();
-		_cache = { result: local, ts: now };
+		_cache = { result: local, ts: Date.now(), ttl: FALLBACK_TTL_MS };
 		return local;
 	}
 
 	try {
 		// #546: SKUTOČNÉ polia `montalu.glass.type` (relay #540): name/category/cennik_code/composition/
 		// active — nie code/composition_spec (tie na PROD → Odoo 500 → fallback). `value = cennik_code
-		// || name` (Odoo `resolve_glass_type` páruje kód → presný názov → zloženie).
+		// || name` (Odoo `resolve_glass_type` páruje kód → presný názov → zloženie). #551 noha 2: krátky
+		// `timeoutMs`, aby pomalé Odoo nezdržalo page load nad E2E limit.
 		const rows = await searchReadJson2(
 			cfg,
 			GLASS_TYPE_MODEL,
 			[['active', '=', true]],
 			['name', 'category', 'cennik_code', 'composition', 'active'],
-			{ order: 'name' }
+			{ order: 'name', timeoutMs }
 		);
-		const items: GlassTypeOption[] = rows
+		const mapped: GlassTypeOption[] = rows
 			.map((r) => {
-				const name = String(r.name ?? '').trim();
-				const cennik = String(r.cennik_code ?? '').trim();
-				const composition = String(r.composition ?? '').trim();
+				const name = s(r.name);
+				const cennik = s(r.cennik_code);
+				const composition = s(r.composition);
 				return {
 					value: cennik || name,
 					label: composition ? `${name} · ${composition}` : name,
-					category: String(r.category ?? '').trim()
+					category: s(r.category)
 				};
 			})
 			// riadok bez cennik_code AJ bez name je pre `glass_order.items[].glass_type` nepoužiteľný
 			.filter((r) => r.value !== '');
+		// #551: dedupe podľa `value` (kľúč pickera) — Odoo dáta nesmú picker zhodiť duplicitným
+		// `{#each … (t.value)}` kľúčom (rovnaký `Set` idiom ako `localFallback`). Warn RAZ za fetch.
+		const seen = new Set<string>();
+		const items: GlassTypeOption[] = [];
+		const dupes = new Set<string>();
+		for (const it of mapped) {
+			if (seen.has(it.value)) {
+				dupes.add(it.value);
+				continue;
+			}
+			seen.add(it.value);
+			items.push(it);
+		}
+		if (dupes.size > 0) {
+			log.warn('fetchGlassTypes: duplicitné hodnoty typov skla z Odoo — deduplikované', {
+				dupes: [...dupes]
+			});
+		}
 		const result: GlassTypesResult = { items, source: 'odoo' };
-		_cache = { result, ts: now };
+		_cache = { result, ts: Date.now(), ttl: CACHE_TTL_MS };
 		return result;
 	} catch (e) {
 		if (!_warned) {
@@ -125,7 +180,7 @@ export async function fetchGlassTypes(): Promise<GlassTypesResult> {
 			_warned = true;
 		}
 		const local = localFallback();
-		_cache = { result: local, ts: now };
+		_cache = { result: local, ts: Date.now(), ttl: FALLBACK_TTL_MS };
 		return local;
 	}
 }
