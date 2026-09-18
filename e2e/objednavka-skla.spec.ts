@@ -176,3 +176,38 @@ test('index: Nová objednávka len skla (zákazka + OP) → podklad s predvyplne
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #548: „iné sklo" — v pickeri „Pridať riadok" sa zvolí sentinel → odkryjú sa vlastný typ + cena
+// €/m² → riadok sa uloží s manuálnym typom + cenou (zobrazený badge „iné sklo: <typ> · <cena>").
+// NIKDY neposiela do Odoo (proti live sa test skipne). Zero-console.
+test('objednávka skla: „iné sklo" — vlastný typ + cena/m² sa uloží a zobrazí', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await skipAkLive(page);
+
+	const zak = `${RUN}-INE`;
+	await goto(page, `/objednavka-skla/${zak}`);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+
+	const pridatForm = page.getByTestId('pridat-riadok');
+	await pridatForm.getByTestId('manual-popis').fill('ATYP bronz');
+	// zvoľ „iné sklo" → odkryje vlastný typ + cenu
+	await pridatForm.getByTestId('manual-typ').selectOption('__ine__');
+	await waitHydrated(page);
+	await pridatForm.getByTestId('manual-ine-typ').fill('lepené 33.1 bronz');
+	await pridatForm.getByTestId('manual-ine-cena').fill('55.50');
+	await pridatForm.getByTestId('manual-sirka').fill('1000');
+	await pridatForm.getByTestId('manual-vyska').fill('500');
+	await pridatForm.getByTestId('manual-pocet').fill('2');
+	await pridatForm.getByTestId('manual-pridat').click();
+	await waitHydrated(page);
+
+	// riadok pod „Pridané položky" nesie manuálny typ + cenu (badge)
+	await expect(page.getByRole('heading', { name: 'Pridané položky' })).toBeVisible();
+	const riadok = page.locator('tbody tr').first();
+	await expect(riadok.locator('td').nth(0)).toContainText('ATYP bronz');
+	await expect(riadok).toContainText('lepené 33.1 bronz');
+	await expect(riadok).toContainText('55.50');
+
+	expect(consoleMsgs).toEqual([]);
+});

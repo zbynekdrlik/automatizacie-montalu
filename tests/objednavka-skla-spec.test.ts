@@ -97,7 +97,7 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 		});
 		nastavSpec(id, { ...GLASS_SPEC_OFF, warmEdge: true, edgeFinish: 'trapez_lestena' });
 		const polozky = listSklaPreZakazku('ZAK-SPEC-4');
-		const order = buildGlassOrder(polozky);
+		const { order } = buildGlassOrder(polozky);
 		const item = order.items[0]!;
 		expect(item.composition).toBe('4-16-4');
 		expect(item.spacer_mm).toBe(16);

@@ -35,7 +35,9 @@ import {
 	migratePlanRezovUlozene,
 	migrateMaterialNakupSkladovaKarta,
 	migrateOponaIzo,
-	migrateObjednavkaSklaSpec
+	migrateObjednavkaSklaSpec,
+	migrateMoneyDlv,
+	migrateObjednavkaSklaManual
 } from './migracie-seed';
 
 const log = logger('migrate');
@@ -938,42 +940,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 
 	migrateDeluxe5KRail(db, bump); // v27 → v28 (#296); extrahované do migracie-seed (#318 large-file-split)
 
-	if ((db.pragma('user_version', { simple: true }) as number) < 29) {
-		// v28 → v29: POST-import readback z Money DB (#298, kontrola B verdiktu §3). Denný externý
-		// read-only producer (`scripts/dlv-readback-snapshot.py`, dev2, `montalu_ro`) prinesie snapshot
-		// nedávnych Money DLV dokladov → appka ho LAZY naimportuje sem a on-the-fly overí, že pre každý
-		// LIVE odpis existuje DLV s `PocetPolozek == počet odoslaných riadkov`. 1:1 vzor
-		// `material_prices`/`material_prices_meta` (v21). Money-NEUTRÁLNE (žiadny odpis sa nemení,
-		// appka do Money nič nepíše ani nečíta cez sieť — len súborový snapshot). Celé v transakcii
-		// (vzor v21/v24/v25): CREATE je v SQLite transakčné → pád uprostred sa čisto prehrá.
-		// (PREČÍSLOVANÉ z v28 na v29 — #296 dostal v28 medzitým na deve.)
-		db.transaction(() => {
-			db.exec(`
-				CREATE TABLE money_dlv (
-					dlv TEXT PRIMARY KEY,
-					zak_norm TEXT NOT NULL,
-					op_norm TEXT NOT NULL DEFAULT '',
-					datum TEXT,
-					pocet_polozek INTEGER NOT NULL,
-					popis TEXT NOT NULL DEFAULT '',
-					updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-				);
-				CREATE INDEX idx_money_dlv_key ON money_dlv(zak_norm, op_norm);
-				CREATE TABLE money_dlv_meta (
-					id INTEGER PRIMARY KEY CHECK (id = 1),
-					snapshot_generated_at TEXT,
-					snapshot_file_mtime_ms REAL,
-					imported_at TEXT,
-					row_count INTEGER NOT NULL DEFAULT 0,
-					rejected_count INTEGER NOT NULL DEFAULT 0,
-					-- #298 review: producerovo DLV okno (dni). App si svoje readback okno zaklampuje na
-					-- min(app, producer), aby producer s kratším oknom nespôsobil falošné „chýba doklad".
-					window_days INTEGER NOT NULL DEFAULT 0
-				);
-			`);
-			bump(29);
-		})();
-	}
+	migrateMoneyDlv(db, bump); // v28 → v29 (#298); extrahované do migracie-seed (#548 large-file-split)
 	migrateDopytCenaStamp(db, bump); // v29 → v30 (#309); extrahované do migracie-seed (viď docstring)
 	migrateManualMoveColumn(db, bump); // v30 → v31 (#299); extrahované do migracie-seed (viď docstring)
 	migrateDopytCenaHladina(db, bump); // v31 → v32 (#318); extrahované do migracie-seed (viď docstring)
@@ -993,6 +960,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateMaterialNakupSkladovaKarta(db, bump); // v45→v46 (#506, prečíslovaná z v44→v45 kvôli kolízii s #505 v45)
 	migrateOponaIzo(db, bump); // v46→v47 (#504 round 3, Štandard+ opona IZO nárezák)
 	migrateObjednavkaSklaSpec(db, bump); // v47→v48 (#521 objednávka skla spec pre IZOS oceňovanie)
+	migrateObjednavkaSklaManual(db, bump); // v48→v49 (#548 objednávka skla „iné sklo" — vlastný typ + cena/m²)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

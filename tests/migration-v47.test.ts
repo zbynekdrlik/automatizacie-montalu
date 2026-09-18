@@ -39,7 +39,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migrácia v46 → v47: Štandard + opona IZO (#504 round 3)', () => {
 	it('user_version === 47 po migrácii', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(48);
+		expect(db.pragma('user_version', { simple: true })).toBe(49);
 	});
 
 	it('pribudli PRESNE 3 opona IZO sysStyl s N=4/6/8', () => {
@@ -110,7 +110,7 @@ describe('migrácia v46 → v47: Štandard + opona IZO (#504 round 3)', () => {
 		migrateOponaIzo(db, () => {
 			throw new Error('bump sa nesmie zavolať znova — guard >= 47 mal vrátiť skôr');
 		});
-		expect(db.pragma('user_version', { simple: true })).toBe(48);
+		expect(db.pragma('user_version', { simple: true })).toBe(49);
 		// stále presne 3 opona IZO štýly (žiadny duplicitný insert)
 		const c = db
 			.prepare("SELECT COUNT(*) c FROM cfg_sys WHERE sys_styl LIKE 'Štandard +|2x%K IZO'")
