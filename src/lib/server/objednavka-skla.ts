@@ -411,7 +411,12 @@ export function getSkloPolozka(id: number): SkloPolozka | null {
 
 // #540: typ skla riadka — pri výbere z Odoo `montalu.glass.type` pickera sa uloží Odoo `code` do
 // existujúceho `typ_skla` stĺpca (= `glass_order.items[].glass_type`). Money-NEUTRÁLNE (objednávka).
-const stmtNastavTyp = db.prepare('UPDATE objednavka_skla SET typ_skla = ? WHERE id = ?');
+// #548: pri prepnutí SPÄŤ na katalógový typ VYNULUJ manuálne stĺpce — inak by riadok ostal v XOR-
+// -zakázanom stave (typ_skla AJ typ_skla_manual) a `buildGlassOrderItem` by ticho poslal staré
+// „iné sklo" (glass_type by vynechal). Symetria k `nastavTypManual` (ktorý vynuluje typ_skla).
+const stmtNastavTyp = db.prepare(
+	'UPDATE objednavka_skla SET typ_skla = ?, typ_skla_manual = NULL, cena_m2_manual = NULL WHERE id = ?'
+);
 
 export function nastavTypSkla(id: number, typ: string): void {
 	const t = (typ ?? '').trim();

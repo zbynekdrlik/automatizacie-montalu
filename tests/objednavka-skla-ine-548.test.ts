@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	pridajSkloManual,
 	nastavTypManual,
+	nastavTypSkla,
 	rozriesTypSkla,
 	listSklaPreZakazku,
 	getSkloPolozka
@@ -131,5 +132,31 @@ describe('#548 nastavTypManual — „iné sklo" na existujúcom riadku', () => 
 		});
 		expect(() => nastavTypManual(id, 'x', 0)).toThrow();
 		expect(() => nastavTypManual(id, '', 10)).toThrow();
+	});
+
+	// GK review (#548): prepnutie „iné sklo" → SPÄŤ na katalóg MUSÍ vynulovať manuálne stĺpce,
+	// inak riadok ostane v XOR-zakázanom stave (typ_skla AJ typ_skla_manual) a builder pošle staré
+	// „iné sklo". `nastavTypSkla` je symetrické k `nastavTypManual`.
+	it('manuál → katalóg cez nastavTypSkla vynuluje typ_skla_manual + cena_m2_manual', () => {
+		const zak = 'ZAK-548-INE-BACK';
+		const id = pridajSkloManual({
+			zak,
+			popis: 'x',
+			typSklaManual: 'lepené 33.1 bronz',
+			cenaM2Manual: 55.5,
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
+		});
+		// medzistav: manuálny riadok
+		expect(getSkloPolozka(id)!.typSklaManual).toBe('lepené 33.1 bronz');
+		// prepni na katalóg
+		nastavTypSkla(id, '4.4.2 číre');
+		const r = getSkloPolozka(id)!;
+		expect(r.typSkla).toBe('4.4.2 číre');
+		expect(r.typSklaManual).toBeNull();
+		expect(r.cenaM2Manual).toBeNull();
 	});
 });
