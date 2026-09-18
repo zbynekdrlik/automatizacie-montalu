@@ -108,7 +108,9 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 	const typSelect = pridatForm.getByTestId('manual-typ');
 	await expect(typSelect.locator('option')).not.toHaveCount(0);
 	// vyber prvú NEprázdnu možnosť typu skla
-	const typValue = await typSelect.locator('option[value!=""]').first().getAttribute('value');
+	const prvaMoznost = typSelect.locator('option:not([value=""])').first();
+	await expect(prvaMoznost).toBeAttached();
+	const typValue = await prvaMoznost.getAttribute('value');
 	await typSelect.selectOption(typValue!);
 	await pridatForm.getByTestId('manual-sirka').fill('1000');
 	await pridatForm.getByTestId('manual-vyska').fill('1000');
