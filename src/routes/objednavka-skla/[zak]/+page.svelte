@@ -52,6 +52,25 @@
 	function fmtM2(m2: number | null): string {
 		return m2 != null ? `${(Math.round(m2 * 1000) / 1000).toFixed(3)} m²` : '';
 	}
+
+	// #548: „iné sklo" — sentinel voľby v pickeri typu (odkryje vlastný typ + cenu €/m²).
+	const MANUAL_SENTINEL = '__ine__';
+	function fmtCena(c: number | null): string {
+		return c != null ? `${c.toFixed(2)} €/m²` : '';
+	}
+	// „Pridať riadok" — sledovanie voľby typu (odkrytie vlastných polí)
+	let novyTyp = $state('');
+	const novyIne = $derived(novyTyp === MANUAL_SENTINEL);
+	// per-riadok odkrytie „iné sklo" editora (kľúč = id položky)
+	let ineRiadok = $state<Record<number, boolean>>({});
+	function onTypSelect(e: Event, id: number) {
+		const sel = e.currentTarget as HTMLSelectElement;
+		if (sel.value === MANUAL_SENTINEL) {
+			ineRiadok = { ...ineRiadok, [id]: true };
+		} else {
+			sel.form?.requestSubmit();
+		}
+	}
 </script>
 
 <svelte:head><title>Objednávka skla {zak} — Montalu</title></svelte:head>
@@ -75,13 +94,35 @@
 		>
 		<label
 			>Typ skla *
-			<select name="typ_skla" required data-testid="manual-typ">
+			<select name="typ_skla" required bind:value={novyTyp} data-testid="manual-typ">
 				<option value="">— vyberte typ —</option>
 				{#each glassTypes as t (t.value)}
 					<option value={t.value}>{t.label}</option>
 				{/each}
+				<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 			</select></label
 		>
+		{#if novyIne}
+			<label
+				>Vlastný typ skla *
+				<input
+					type="text"
+					name="typ_skla_manual"
+					placeholder="napr. lepené 33.1 bronz"
+					data-testid="manual-ine-typ"
+				/></label
+			>
+			<label
+				>Cena €/m² (bez DPH) *
+				<input
+					type="number"
+					name="cena_m2_manual"
+					min="0.01"
+					step="0.01"
+					data-testid="manual-ine-cena"
+				/></label
+			>
+		{/if}
 		<label
 			>Šírka (mm) *
 			<input
@@ -175,14 +216,18 @@
 							<td class="mono">{fmtRozmer(p)}</td>
 							<td>
 								<!-- #540: výber typu skla z Odoo katalógu (`code` → glass_order type); vytlačí sa hodnota -->
-								<span class="print-only">{p.typSkla}</span>
+								<span class="print-only"
+									>{p.typSklaManual
+										? `${p.typSklaManual} · ${fmtCena(p.cenaM2Manual)}`
+										: p.typSkla}</span
+								>
 								<form method="POST" action="?/nastavTyp" use:enhance class="noprint typ-form">
 									<input type="hidden" name="id" value={p.id} />
 									<select
 										name="typ_skla"
 										class="typ-select"
 										data-testid={`typ-skla-${p.id}`}
-										onchange={(e) => (e.target as HTMLSelectElement).form?.requestSubmit()}
+										onchange={(e) => onTypSelect(e, p.id)}
 									>
 										{#if !glassTypes.some((t) => t.value === p.typSkla)}
 											<option value={p.typSkla} selected>{p.typSkla || '— vyberte typ —'}</option>
@@ -190,8 +235,45 @@
 										{#each glassTypes as t (t.value)}
 											<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option>
 										{/each}
+										<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 									</select>
 								</form>
+								{#if p.typSklaManual}
+									<span class="ine-badge noprint" data-testid={`ine-typ-${p.id}`}
+										>iné sklo: {p.typSklaManual} · {fmtCena(p.cenaM2Manual)}</span
+									>
+								{/if}
+								{#if ineRiadok[p.id] || p.typSklaManual}
+									<form
+										method="POST"
+										action="?/nastavTypManual"
+										use:enhance
+										class="noprint ine-form"
+									>
+										<input type="hidden" name="id" value={p.id} />
+										<input
+											type="text"
+											name="typ_skla_manual"
+											value={p.typSklaManual ?? ''}
+											placeholder="vlastný typ"
+											data-testid={`ine-typ-input-${p.id}`}
+										/>
+										<input
+											type="number"
+											name="cena_m2_manual"
+											min="0.01"
+											step="0.01"
+											value={p.cenaM2Manual ?? ''}
+											placeholder="€/m²"
+											data-testid={`ine-cena-input-${p.id}`}
+										/>
+										<button
+											type="submit"
+											class="btn sm secondary"
+											data-testid={`ine-ulozit-${p.id}`}>Uložiť iné sklo</button
+										>
+									</form>
+								{/if}
 							</td>
 							<td class="r mono"><b>{p.pocet}</b></td>
 							<td class="r mono">{fmtM2(p.m2)}</td>
@@ -390,6 +472,23 @@
 				{odoslaneStav[form.odoslane.result] ?? form.odoslane.result}{#if form.odoslane.error}
 					— {form.odoslane.error}{/if}
 			</p>
+			{#if form.odoslane.odoo?.name}
+				<p class="odoo-osk" data-testid="odoslane-osk">
+					Odoslané do Odoo: <b>{form.odoslane.odoo.name}</b>
+				</p>
+			{/if}
+			{#if form.odoslane.odoo?.dq && form.odoslane.odoo.dq.length > 0}
+				<ul class="dq" data-testid="odoslane-dq">
+					{#each form.odoslane.odoo.dq as d, i (i)}
+						<li>{typeof d === 'string' ? d : JSON.stringify(d)}</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if form.odoslane.droppedAttachments && form.odoslane.droppedAttachments.length > 0}
+				<p class="dropped" data-testid="odoslane-dropped">
+					Vynechané prílohy (limit veľkosti): {form.odoslane.droppedNames}
+				</p>
+			{/if}
 			{#if form.odoslane.payload}
 				<details open>
 					<summary>Náhľad payloadu (to, čo ide do Odoo)</summary>
@@ -533,6 +632,39 @@
 	}
 	.print-only {
 		display: none;
+	}
+	.ine-badge {
+		display: inline-block;
+		margin-top: 4px;
+		font-size: 0.8rem;
+		color: var(--m-ink-2);
+	}
+	.ine-form {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 8px;
+		align-items: center;
+		margin-top: 4px;
+	}
+	.ine-form input[type='number'] {
+		width: 90px;
+	}
+	.ine-form input[type='text'] {
+		max-width: 180px;
+	}
+	.odoo-osk {
+		margin-top: 6px;
+		color: var(--m-ink-2);
+	}
+	.dq {
+		margin: 4px 0 0 18px;
+		font-size: 0.85rem;
+		color: var(--m-muted-ink);
+	}
+	.dropped {
+		margin-top: 6px;
+		font-size: 0.85rem;
+		color: var(--m-danger);
 	}
 
 	/* #545: „Pridať riadok" formulár + OP pole */

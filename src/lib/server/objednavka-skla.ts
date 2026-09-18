@@ -35,6 +35,10 @@ export interface SkloPolozka {
 	sikmy: boolean;
 	m2: number | null;
 	rezim: 'rozmery' | 'atyp';
+	/** #548: „iné sklo" — vlastný typ (keď nie je z katalógu). `null` pre katalógový riadok. */
+	typSklaManual: string | null;
+	/** #548: „iné sklo" — cena €/m² bez DPH. `null` pre katalógový riadok. */
+	cenaM2Manual: number | null;
 	/** #521: voliteľná špecifikácia tabule pre Odoo IZOS oceňovanie (default vypnutá). */
 	spec: GlassSpec;
 	createdAt: string;
@@ -116,7 +120,12 @@ export interface ManualSklo {
 	 *  (ručný podklad `pridatRiadok` nastavuje jedno OP na CELÝ podklad cez `nastavOp`). */
 	op?: string;
 	popis: string;
-	typSkla: string;
+	/** Katalógový typ skla (XOR s `typSklaManual`+`cenaM2Manual`). */
+	typSkla?: string;
+	/** #548: „iné sklo" — vlastný typ (XOR s `typSkla`). */
+	typSklaManual?: string;
+	/** #548: „iné sklo" — cena €/m² bez DPH (> 0, s `typSklaManual`). */
+	cenaM2Manual?: number;
 	sirkaMm: number;
 	vyskaMm: number;
 	pocet: number;
@@ -133,9 +142,43 @@ export interface ManualSklo {
  * `rezim='atyp'` sa nastaví po vložení
  * (`pridajSklo` vkladá vždy s `rezim='rozmery'`), aby atyp riadok rovno ponúkol prílohu.
  */
+/** #548: cena €/m² validná = konečné číslo > 0; zaokrúhlená na 2 desatinné (kontrakt bez DPH). */
+function validnaManualCena(x: unknown): number {
+	const n = typeof x === 'number' ? x : Number(x);
+	if (!Number.isFinite(n) || n <= 0) throw new Error('Cena za m² musí byť číslo väčšie ako 0.');
+	return Math.round(n * 100) / 100;
+}
+
+/**
+ * #548: rozriešenie typu skla ručného riadka — EXKLUZÍVNE (XOR): buď katalógový `typSkla`, ALEBO
+ * „iné sklo" (`typSklaManual` + `cenaM2Manual` > 0). Nikdy oboje, nikdy nič (throw). Vracia, čo sa
+ * uloží do stĺpcov (`typ_skla`, `typ_skla_manual`, `cena_m2_manual`).
+ */
+export function rozriesTypSkla(s: {
+	typSkla?: string;
+	typSklaManual?: string;
+	cenaM2Manual?: number;
+}): { typSkla: string; typSklaManual: string | null; cenaM2Manual: number | null } {
+	const catalog = (s.typSkla ?? '').trim();
+	const manualTyp = (s.typSklaManual ?? '').trim();
+	const maManual = manualTyp.length > 0 || s.cenaM2Manual != null;
+	if (catalog && maManual)
+		throw new Error('Zadajte buď typ skla z katalógu, ALEBO vlastný typ + cenu — nie oboje.');
+	if (!catalog && !maManual)
+		throw new Error('Vyberte typ skla z katalógu, alebo zadajte vlastný typ skla + cenu za m².');
+	if (maManual) {
+		if (!manualTyp) throw new Error('Vlastný typ skla je povinný.');
+		return {
+			typSkla: '',
+			typSklaManual: manualTyp,
+			cenaM2Manual: validnaManualCena(s.cenaM2Manual)
+		};
+	}
+	return { typSkla: catalog, typSklaManual: null, cenaM2Manual: null };
+}
+
 export function pridajSkloManual(s: ManualSklo): number {
-	const typ = (s.typSkla ?? '').trim();
-	if (!typ) throw new Error('Typ skla je povinný — vyberte typ skla.');
+	const { typSkla, typSklaManual, cenaM2Manual } = rozriesTypSkla(s);
 	if (!Number.isInteger(s.sirkaMm) || s.sirkaMm <= 0)
 		throw new Error('Šírka musí byť celé číslo > 0.');
 	if (!Number.isInteger(s.vyskaMm) || s.vyskaMm <= 0)
@@ -144,9 +187,8 @@ export function pridajSkloManual(s: ManualSklo): number {
 		throw new Error('Počet kusov musí byť celé číslo >= 1.');
 
 	const m2 = (s.sirkaMm * s.vyskaMm * s.pocet) / 1e6;
-	// Insert + prípadný atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
-	// `rezim='rozmery'`, atyp doplní `nastavRezim`; transakcia zaručí, že riadok neostane
-	// v polovičnom stave keď by druhý zápis zlyhal (#545 review 🔵).
+	// Insert + manuál/atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
+	// `rezim='rozmery'` a manuálne stĺpce NULL; doplnia sa v tej istej transakcii (#545 review 🔵).
 	return db.transaction(() => {
 		const id = pridajSklo({
 			zak: s.zak,
@@ -156,10 +198,11 @@ export function pridajSkloManual(s: ManualSklo): number {
 			sirkaMm: s.sirkaMm,
 			vyskaMm: s.vyskaMm,
 			pocet: s.pocet,
-			typSkla: typ,
+			typSkla,
 			m2,
 			createdBy: s.createdBy
 		});
+		if (typSklaManual) stmtSetManual.run('', typSklaManual, cenaM2Manual, id);
 		if (s.rezim === 'atyp') nastavRezim(id, 'atyp');
 		return id;
 	})();
@@ -227,6 +270,7 @@ const SPEC_SELECT =
 const stmtListPre = db.prepare(`
 	SELECT id, zak, zak_norm, op, modul, popis, sirka_mm, vyska_mm,
 	       v_lavo_mm, v_pravo_mm, pocet, typ_skla, sikmy, m2, rezim,
+	       typ_skla_manual, cena_m2_manual,
 	       ${SPEC_SELECT},
 	       created_at, created_by
 	FROM objednavka_skla
@@ -250,6 +294,8 @@ interface SkloRow {
 	sikmy: number;
 	m2: number | null;
 	rezim: string;
+	typ_skla_manual: string | null;
+	cena_m2_manual: number | null;
 	spec_warm_edge: number;
 	spec_colored_frame: number;
 	spec_muntin_cross_qty: number;
@@ -326,6 +372,8 @@ function mapRow(r: SkloRow): SkloPolozka {
 		sikmy: r.sikmy === 1,
 		m2: r.m2,
 		rezim: r.rezim === 'atyp' ? 'atyp' : 'rozmery',
+		typSklaManual: r.typ_skla_manual ?? null,
+		cenaM2Manual: r.cena_m2_manual ?? null,
 		spec: mapSpec(r),
 		createdAt: r.created_at,
 		createdBy: r.created_by
@@ -370,6 +418,25 @@ export function nastavTypSkla(id: number, typ: string): void {
 	if (!t) throw new Error('Typ skla je prázdny.');
 	stmtNastavTyp.run(t, id);
 	log.info('sklo typ zmenený', { id, typ: t });
+}
+
+// #548: „iné sklo" — vlastný typ + cena/m². Katalógový `typ_skla` sa vynuluje (builder vtedy pošle
+// `glass_type_manual` + `price_m2_manual` a `glass_type` vynechá). Money-NEUTRÁLNE (cena dodávateľa).
+const stmtSetManual = db.prepare(
+	'UPDATE objednavka_skla SET typ_skla = ?, typ_skla_manual = ?, cena_m2_manual = ? WHERE id = ?'
+);
+
+/**
+ * #548: nastaví na EXISTUJÚCOM riadku „iné sklo" (vlastný typ + cena €/m² bez DPH > 0). Vynuluje
+ * katalógový `typ_skla`. Neplatná cena / prázdny typ → throw pred zápisom (akcia → fail 400).
+ */
+export function nastavTypManual(id: number, typManual: string, cenaM2Manual: number): void {
+	const { typSklaManual, cenaM2Manual: cena } = rozriesTypSkla({
+		typSklaManual: typManual,
+		cenaM2Manual
+	});
+	stmtSetManual.run('', typSklaManual, cena, id);
+	log.info('sklo iné-sklo nastavené', { id, typManual: typSklaManual });
 }
 
 const stmtNastavRezim = db.prepare('UPDATE objednavka_skla SET rezim = ? WHERE id = ?');

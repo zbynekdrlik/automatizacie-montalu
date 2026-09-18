@@ -275,6 +275,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 			'nastavOp',
 			'nastavRezim',
 			'nastavTyp',
+			'nastavTypManual',
 			'odoslatDoOdoo',
 			'pridatRiadok',
 			'ulozitSpec',

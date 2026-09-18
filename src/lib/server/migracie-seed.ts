@@ -920,3 +920,77 @@ export function migrateObjednavkaSklaSpec(db: Database.Database, bump: (v: numbe
 		bump(48);
 	})();
 }
+
+/**
+ * v28 → v29: POST-import readback z Money DB (#298) — tabuľky `money_dlv` + `money_dlv_meta`.
+ * PURE MOVE z `migracie.ts` (#548 — migracie.ts na 1000-r. strope, viď `large-file-split.md`);
+ * správanie BYTE-IDENTICKÉ (rovnaké SQL/transakcia/bump). Money-NEUTRÁLNE (súborový snapshot, appka
+ * do Money nič nepíše). Bez feature-detectu — v28 base tabuľky nie sú podmienkou (CREATE je nové).
+ */
+export function migrateMoneyDlv(db: Database.Database, bump: (v: number) => void): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 29) return;
+	db.transaction(() => {
+		db.exec(`
+			CREATE TABLE money_dlv (
+				dlv TEXT PRIMARY KEY,
+				zak_norm TEXT NOT NULL,
+				op_norm TEXT NOT NULL DEFAULT '',
+				datum TEXT,
+				pocet_polozek INTEGER NOT NULL,
+				popis TEXT NOT NULL DEFAULT '',
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			);
+			CREATE INDEX idx_money_dlv_key ON money_dlv(zak_norm, op_norm);
+			CREATE TABLE money_dlv_meta (
+				id INTEGER PRIMARY KEY CHECK (id = 1),
+				snapshot_generated_at TEXT,
+				snapshot_file_mtime_ms REAL,
+				imported_at TEXT,
+				row_count INTEGER NOT NULL DEFAULT 0,
+				rejected_count INTEGER NOT NULL DEFAULT 0,
+				window_days INTEGER NOT NULL DEFAULT 0
+			);
+		`);
+		bump(29);
+	})();
+}
+
+/**
+ * v48 → v49: objednávka skla „iné sklo" (#548) — vlastný typ + cena €/m² mimo katalógu. Pridáva
+ * `typ_skla_manual TEXT NULL` + `cena_m2_manual REAL NULL` na `objednavka_skla`. Aditívne, nullable,
+ * O(1), neprepíše existujúci riadok (byte-identické existujúce flowy). Feature-detect tabuľky +
+ * idempotentné pridanie stĺpca. Money-NEUTRÁLNE (cena dodávateľa skla, žiadny odpis).
+ */
+export function migrateObjednavkaSklaManual(
+	db: Database.Database,
+	bump: (v: number) => void
+): void {
+	if ((db.pragma('user_version', { simple: true }) as number) >= 49) return;
+	const maTable =
+		(
+			db
+				.prepare(
+					"SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name='objednavka_skla'"
+				)
+				.get() as { c: number }
+		).c === 1;
+	db.transaction(() => {
+		if (maTable) {
+			const existujuce = new Set(
+				(db.prepare('PRAGMA table_info(objednavka_skla)').all() as { name: string }[]).map(
+					(c) => c.name
+				)
+			);
+			const stlpce: [string, string][] = [
+				['typ_skla_manual', 'TEXT'],
+				['cena_m2_manual', 'REAL']
+			];
+			for (const [name, def] of stlpce) {
+				if (existujuce.has(name)) continue;
+				db.exec(`ALTER TABLE objednavka_skla ADD COLUMN ${name} ${def};`);
+			}
+			log.info('migrateObjednavkaSklaManual: typ_skla_manual + cena_m2_manual pridané (#548)');
+		}
+		bump(49);
+	})();
+}
