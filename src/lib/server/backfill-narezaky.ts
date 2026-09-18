@@ -588,7 +588,14 @@ export async function runBackfill(
 		// #532: `cut_plan` z toho istého skombinovaného materiálu (bez flagu — ide vždy keď má tyče
 		// s Money kódom). CAD moduly (pergola/fix/clip) idú cez `materialRowsFromRozpis` s `kod:''`,
 		// takže sa vynechajú — zasklenia (recompute) nesú Money kódy, tie plán naplnia.
-		const cutPlan = buildCutPlan(combinedMaterial);
+		// #542: meta pre `cut_plan.render_html` — tá istá hlavička ako backfill PDF (zak/op/zákazník),
+		// aby tablet zobrazil nárezák 1:1 s papierom. Default kerf (backfill ju nemení).
+		const cutPlan = buildCutPlan(combinedMaterial, undefined, {
+			zak: g.zak || op,
+			op,
+			zakaznik: g.zakaznik,
+			now: new Date()
+		});
 		const bezKodu = pocetVynechanychBezKodu(combinedMaterial);
 		// zaloguj VŽDY keď sa nejaké tyče vynechali pre chýbajúci Money kód — aj v mixovanej OP
 		// (zasklenia s kódmi + pergola/fix/clip bez kódov v jednom `combinedMaterial`), kde `cutPlan`
