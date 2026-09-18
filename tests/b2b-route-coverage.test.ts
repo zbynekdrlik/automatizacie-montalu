@@ -420,3 +420,23 @@ describe('/konfigurator/pristresok — žiadna cesta k Money odpisu (#390)', () 
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });
+
+// #546: /pergola/narez pribudla akcia `pridatSkloRucne` — keď producent strešného skla nepozná
+// rozmery (honest-null #223), operátor zadá typ+rozmer+počet ručne → riadok objednávky skla cez
+// `pridajSkloManual({ modul: 'pergola' })`. Money-NEUTRÁLNE (objednávka u dodávateľa, žiadny odpis;
+// existujúce Money-safety guardy `tests/pergola-narez-money-safety.test.ts` držia engine čistý).
+// Presná množina akcií = fail-closed drift guard; pridanie ďalšej akcie tento test ROZBIJE.
+describe('/pergola/narez — akcie objednávky skla vrátane pridatSkloRucne (#546)', () => {
+	it('akcie routy sú presne definovaná množina (vrátane pridatSkla + pridatSkloRucne)', async () => {
+		const { actions } = await import('../src/routes/pergola/narez/+page.server');
+		expect(Object.keys(actions).sort()).toEqual([
+			'odoslat',
+			'odoslatExpediciuDoOdoo',
+			'pridatSkla',
+			'pridatSkloRucne',
+			'rezervovat',
+			'spocitat',
+			'upravit'
+		]);
+	});
+});

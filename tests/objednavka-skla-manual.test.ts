@@ -92,6 +92,40 @@ describe('#545 pridajSkloManual — ručný riadok objednávky skla', () => {
 	it('MODUL_NAZVY.manual = „Pridané položky"', () => {
 		expect(modulNazov('manual')).toBe('Pridané položky');
 	});
+
+	// #546: pergola honest-null vetva používa `pridajSkloManual` s `modul='pergola'` override,
+	// aby operátorom zadané strešné sklo pristálo v sekcii „Pergola" (nie „Pridané položky").
+	it('modul override → riadok pristane pod zadaným modulom (default ostáva manual)', () => {
+		const zakDef = 'ZAK-546-MOD-DEF';
+		pridajSkloManual({
+			zak: zakDef,
+			popis: 'x',
+			typSkla: 'Float 4',
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
+		});
+		expect(listSklaPreZakazku(zakDef)[0]!.modul).toBe('manual');
+
+		const zakPerg = 'ZAK-546-MOD-PERG';
+		pridajSkloManual({
+			zak: zakPerg,
+			modul: 'pergola',
+			popis: 'Strešné sklo — 4.4.2 číre',
+			typSkla: '4.4.2 číre',
+			sirkaMm: 1200,
+			vyskaMm: 900,
+			pocet: 2,
+			rezim: 'rozmery',
+			createdBy: 'test'
+		});
+		const r = listSklaPreZakazku(zakPerg)[0]!;
+		expect(r.modul).toBe('pergola');
+		expect(r.popis).toBe('Strešné sklo — 4.4.2 číre');
+		expect(modulNazov(r.modul)).toBe('Pergola');
+	});
 });
 
 describe('#545 nastavOpZakazky — jedno OP pre celý podklad', () => {
