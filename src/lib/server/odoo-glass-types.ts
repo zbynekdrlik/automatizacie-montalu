@@ -41,6 +41,18 @@ export interface GlassTypesResult {
 	source: 'odoo' | 'local';
 }
 
+/**
+ * Normalizuj surovú Odoo JSON-2 hodnotu char poľa na string (#551). Odoo `search_read` vracia pre
+ * NEVYPLNENÉ char polia boolean `false` (nie `null`/`''`); `String(false ?? '')` = `"false"` (po
+ * `.trim()` truthy) → typy bez `cennik_code` dostávali `value === "false"` → duplicitné `{#each …
+ * (t.value)}` kľúče → PROD `each_key_duplicate` hydration crash. `false` (a `null`/`undefined`) =
+ * prázdne pole. Rovnaký gotcha rieši `odoo-prices.ts:numOrNull` pre číselné polia.
+ */
+function s(v: unknown): string {
+	if (v == null || v === false) return '';
+	return String(v).trim();
+}
+
 let _cache: { result: GlassTypesResult; ts: number } | null = null;
 let _warned = false;
 
@@ -99,19 +111,37 @@ export async function fetchGlassTypes(): Promise<GlassTypesResult> {
 			['name', 'category', 'cennik_code', 'composition', 'active'],
 			{ order: 'name' }
 		);
-		const items: GlassTypeOption[] = rows
+		const mapped: GlassTypeOption[] = rows
 			.map((r) => {
-				const name = String(r.name ?? '').trim();
-				const cennik = String(r.cennik_code ?? '').trim();
-				const composition = String(r.composition ?? '').trim();
+				const name = s(r.name);
+				const cennik = s(r.cennik_code);
+				const composition = s(r.composition);
 				return {
 					value: cennik || name,
 					label: composition ? `${name} · ${composition}` : name,
-					category: String(r.category ?? '').trim()
+					category: s(r.category)
 				};
 			})
 			// riadok bez cennik_code AJ bez name je pre `glass_order.items[].glass_type` nepoužiteľný
 			.filter((r) => r.value !== '');
+		// #551: dedupe podľa `value` (kľúč pickera) — Odoo dáta nesmú picker zhodiť duplicitným
+		// `{#each … (t.value)}` kľúčom (rovnaký `Set` idiom ako `localFallback`). Warn RAZ za fetch.
+		const seen = new Set<string>();
+		const items: GlassTypeOption[] = [];
+		const dupes = new Set<string>();
+		for (const it of mapped) {
+			if (seen.has(it.value)) {
+				dupes.add(it.value);
+				continue;
+			}
+			seen.add(it.value);
+			items.push(it);
+		}
+		if (dupes.size > 0) {
+			log.warn('fetchGlassTypes: duplicitné hodnoty typov skla z Odoo — deduplikované', {
+				dupes: [...dupes]
+			});
+		}
 		const result: GlassTypesResult = { items, source: 'odoo' };
 		_cache = { result, ts: now };
 		return result;
