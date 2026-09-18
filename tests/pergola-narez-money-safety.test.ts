@@ -91,6 +91,8 @@ describe('/pergola/narez — rezervačný odpis (#221) IDE cez potvrdzovací tok
 			'odoslatExpediciuDoOdoo',
 			// #496 round 2: pridatSkla = glass order producer (Money-NEUTRAL, objednavka_skla tabuľka)
 			'pridatSkla',
+			// #546: pridatSkloRucne = honest-null strešné sklo ručne (Money-NEUTRAL, pridajSkloManual)
+			'pridatSkloRucne',
 			'rezervovat',
 			'spocitat',
 			'upravit'

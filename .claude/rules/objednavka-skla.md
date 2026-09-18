@@ -162,18 +162,29 @@ zoznam, NIKDY nenahrádza výpočtový katalóg** (viď `glass-catalog.md`).
 
 - Zoznam typov v riadku `/objednavka-skla/[zak]` je `<select name="typ_skla">` plnený z
   **`fetchGlassTypes()`** (`src/lib/server/odoo-glass-types.ts`): `montalu.glass.type` `search_read`
-  domain `[["active","=",true]]`, fields `code,name,composition_spec`, order `name`, cez generický
-  **`searchReadJson2`** (`odoo-json2.ts`, ČISTÝ transport bez `db` väzby — fallback žije v samostatnom
-  module, aby `odoo-json2` testy nebootovali native sqlite).
+  domain `[["active","=",true]]`, order `name`, cez generický **`searchReadJson2`** (`odoo-json2.ts`,
+  ČISTÝ transport bez `db` väzby — fallback žije v samostatnom module, aby `odoo-json2` testy
+  nebootovali native sqlite).
+- **SPRÁVNE polia `montalu.glass.type` = `name,category,cennik_code,composition,active` (#546, relay
+  #540 11:18).** POZOR: pôvodná #540 verzia čítala `code`/`composition_spec` — tie na tomto modeli
+  NEEXISTUJÚ → Odoo vrátil 500 → appka na PROD trvalo bežala na lokálnom fallbacku (Marekov
+  screenshot „Odoo nedostupné"). Picker položka je `GlassTypeOption { value, label, category }`:
+  `value = cennik_code || name` (keď `cennik_code` chýba, posiela sa PRESNÝ `name` — Odoo
+  `resolve_glass_type` páruje kód → presný názov → zloženie), `label = name (+ ' · ' + composition)`,
+  `category` = skupina (IZO/VSG/jednosklo…). `value` je to, čo sa uloží ako `typ_skla` =
+  `glass_order.items[].glass_type`. Riadok bez `cennik_code` AJ bez `name` sa vynechá.
 - **In-process cache ~5 min** (aj fallback → auto-heal po oprave Odoo). **Fallback pri AKEJKOĽVEK
-  chybe** (403/sieť/timeout) alebo keď integrácia nie je nakonfigurovaná: LOKÁLNY zoznam z
-  `listGlassTypes()` (`code=name=nazov`, dedup podľa názvu), **warn LEN RAZ za proces** (config-absent
-  v deve NIE je chyba → nevaruje). `source: 'odoo'|'local'` sa zobrazí v UI (`data-testid=
-  "glass-types-source"`) — nikdy tichý prázdny select.
+  chybe** (403/500/sieť/timeout) alebo keď integrácia nie je nakonfigurovaná: LOKÁLNY zoznam z
+  `listGlassTypes()` (`value=label=nazov`, `category=''`, dedup podľa názvu), **warn LEN RAZ za
+  proces** (config-absent v deve NIE je chyba → nevaruje). `source: 'odoo'|'local'` sa zobrazí v UI
+  (`data-testid="glass-types-source"`) — nikdy tichý prázdny select.
 - **Úložisko zvoleného typu = existujúci `typ_skla` stĺpec (BEZ migrácie).** Akcia `nastavTyp` →
-  `nastavTypSkla(id, code)` uloží Odoo `code` do `typ_skla` = `glass_order.items[].glass_type` (cez
+  `nastavTypSkla(id, value)` uloží `value` do `typ_skla` = `glass_order.items[].glass_type` (cez
   doterajší `buildGlassOrderItem`). Staré podklady (voľnotext `typ_skla`) ostávajú spätne kompatibilné
   — mapovanie sa nemení. NIKDY sa nedotýka `glass_types` katalógu / `migracie.ts` / compute cesty.
+- **Konzumenti pickera** používajú `t.value`/`t.label` (NIE staré `t.code`/`t.name`): podklad
+  `/objednavka-skla/[zak]` (ručný riadok + per-riadok select) A honest-null pergola formulár
+  (`/pergola/narez`, #546 nižšie). Picker sa plní z `data.glassTypes` (load `fetchGlassTypes`).
 - Tlač: `typ_skla` sa vytlačí cez `.print-only` span (select je `.noprint`).
 
 ### (1b) Auto glass_order pri uložení plánu rezov so sklom
@@ -222,3 +233,48 @@ nárezáku/odpisu. Prístup 1 — pridal producent `manual` + ručné pole OP, �
 - **`.xlsx` v upload allowliste** (`ALLOWED_EXTENSIONS` + `accept`) — Money OVSKL-štýl objednávky
   ako v prílohe úlohy 951. Príloh do Odoo `glass_order.items[].attachments` = ČASŤ 3, follow-up
   po potvrdení kontraktu (odoo-erp #7371) — TÁTO zmena ich NErobí.
+
+## Meeting výroba 18.9. — Hrana-only spec, glass.type polia, pergola honest-null, index (#546)
+
+Relay z meetingu (Patrik + Dominik Volek, odoo-erp #7371/#7578). Prístup 1 = štyri malé aditívne
+zmeny, žiadna migrácia, Money-neutrálne, b2b naďalej zakázané. Bod 2 (pridať riadok) bol už hotový
+(#545); bod 3 („iné sklo" + cena za m²) je OUT (čaká na Odoo kontrakt + cenový stĺpec = migrácia,
+owner ho odložil → ops-wait na #546).
+
+- **(a) Skutočné polia `montalu.glass.type`** — viď oprava v #540 sekcii vyššie (`name,category,
+  cennik_code,composition,active`; `value = cennik_code || name`). Toto opravilo trvalý PROD 500 →
+  lokálny fallback.
+- **(b) Spec blok = LEN „Hrana".** Podklad `/objednavka-skla/[zak]/+page.svelte` zobrazuje v
+  `<details>` už IBA `spec_edge_finish` (Hrana); ostatných 8 IZOS príplatkov (teplá hrana, farebný
+  rámik, priečky kríž, otvory, priemer, výrezy 35×60/60×120, HST, kalenie) je z UI ODSTRÁNENÝCH
+  (výroba ich nechce). **NEDOTKNUTÉ:** `validateSpec`, `GLASS_SPEC_OFF`, `spec_*` DB stĺpce,
+  `buildGlassOrderItem`. Default riadok → payload BYTE-IDENTICKÝ (skryté polia sa neposielajú).
+  **STARÝ riadok s nastavenou hodnotou** skrytého poľa ju ĎALEJ pošle: skryté polia sa echujú cez
+  CONDITIONAL `<input type="hidden">` (renderované LEN keď hodnota != default), takže re-save Hrany
+  ich NEZMAŽE (`parseSpec` ich prečíta z hidden inputov). `mapSpec`/`nastavSpec` bez zmeny.
+- **(c) Pergola honest-null → ručný formulár „Sklo do objednávky".** `/pergola/narez`: keď producent
+  strešného skla nepozná rozmery (honest-null #223 — neoverená kotva), na výsledku sa MIESTO tlačidla
+  „Pridať sklá do objednávky" zobrazí formulár (typ z pickera `data.glassTypes`, šírka × výška, počet)
+  → akcia `pridatSkloRucne` → `pridajSkloManual({ modul: 'pergola' })` (popis „Strešné sklo — <typ>"
+  ako automatický producent). Keď producent VIE počítať → dnešné správanie (tlačidlo, žiadny formulár
+  navyše). Podmienka honest-null v svelte = presne serverový gate (`sirkaMm/dlzkaMm/pocetTabul`).
+  Load pridal `glassTypes`/`glassTypesSource` (`fetchGlassTypes`). `pridajSkloManual` dostal voliteľný
+  `modul` override (default `'manual'`).
+- **(d) Index `/objednavka-skla` = „Nová objednávka len skla".** `default` akcia (route má LEN
+  `default`, žiadne pomenované — sveltekit-actions.md) validuje `normZak`/`normOp` (bez Odoo lookup),
+  NIČ neukladá, presmeruje na `/objednavka-skla/<zak>?op=<OP>`. Podklad load číta `?op=` do
+  `prefillOp`; OP pole sa predvyplní `podkladOp || prefillOp` (uloží ho `nastavOp` až keď podklad má
+  riadky). Servis (popraskané sklá) tak dostane podklad + OP bez odpisu/nárezáku.
+- **Testy:** `odoo-glass-types.test.ts` (nové polia + value/label), `objednavka-skla-manual.test.ts`
+  (modul override + `op` prenos), `objednavka-skla-index.test.ts` (index redirect + validácia). E2E:
+  `objednavka-skla-spec.spec.ts` (rescope na Hrana + skryté polia nie sú v UI), `objednavka-skla.spec.ts`
+  (index formulár), `objednavka-skla-pergola.spec.ts` (honest-null → ručné strešné sklo).
+- **PASCA — množina akcií `/pergola/narez` je strážená DVOMA drift testami**, nie jedným: pridanie
+  akcie (napr. `pridatSkloRucne`) treba pridať do EXPECTED zoznamu v OBOCH: `b2b-route-coverage.test.ts`
+  AJ `pergola-narez-money-safety.test.ts` (`akcie routy = form + rezervácia + expedícia, nič viac`).
+  Zabudnutý druhý = plná suita padne až po ~5 min serial coverage behu. Pred pridaním akcie na
+  `/pergola/narez` grepni `Object.keys(actions).sort()` cez `tests/`.
+- **Pergola honest-null riadok NESIE OP** (`pridajSkloManual({ op: ident.op })`, review 🟡) — rovnako
+  ako automatický `pridatSkla` producent (`op: ident.op`); inak by operátorom zadané OP z pergola
+  formulára zmizlo a muselo sa zadať znova cez `nastavOp`. Ručný podklad `pridatRiadok` OP naďalej
+  NEzadáva (jedno OP na CELÝ podklad cez `nastavOp`), takže `pridajSkloManual.op` je default `''`.
