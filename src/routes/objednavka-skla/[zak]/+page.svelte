@@ -22,9 +22,11 @@
 	// #540: zoznam typov skla pre picker (Odoo `montalu.glass.type` alebo lokálny fallback)
 	const glassTypes = $derived(data.glassTypes);
 	const glassTypesSource = $derived(data.glassTypesSource);
-	// #545: OP objednávky — odpisové OP má prednosť (read-only); inak ručné pole. Odoslať sa zapne,
-	// keď je (≥ 1 riadok a) neprázdne efektívne OP.
+	// #545: OP objednávky — odpisové OP má prednosť (read-only); inak ručné pole.
 	const maOp = $derived(!!data.effektivneOp);
+	// Odoslať sa zapne LEN keď má podklad ≥ 1 riadok A neprázdne efektívne OP — celý invariant na
+	// jednom mieste (#545 review 🔵), nespoliehaj sa len na to, že tlačidlo je vnútri guardu položiek.
+	const mozeOdoslat = $derived(maOp && polozky.length > 0);
 
 	// Zoskupenie položiek podľa modulu (plain array, bez Map — svelte/prefer-svelte-reactivity)
 	const skupiny = $derived.by(() => {
@@ -383,7 +385,7 @@
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<!-- #521: odoslať objednávku skla do Odoo (glass_order → IZOS oceňovanie).
 			#545: zapnuté len keď má podklad ≥ 1 riadok a OP (inak nemá kam priradiť objednávku). -->
-		{#if maOp}
+		{#if mozeOdoslat}
 			<form method="POST" action="?/odoslatDoOdoo" use:enhance style="display:inline">
 				<button type="submit" class="btn" data-testid="odoslat-odoo"
 					>Odoslať objednávku skla do Odoo</button

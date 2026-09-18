@@ -134,19 +134,24 @@ export function pridajSkloManual(s: ManualSklo): number {
 		throw new Error('Počet kusov musí byť celé číslo >= 1.');
 
 	const m2 = (s.sirkaMm * s.vyskaMm * s.pocet) / 1e6;
-	const id = pridajSklo({
-		zak: s.zak,
-		modul: 'manual',
-		popis: (s.popis ?? '').trim(),
-		sirkaMm: s.sirkaMm,
-		vyskaMm: s.vyskaMm,
-		pocet: s.pocet,
-		typSkla: typ,
-		m2,
-		createdBy: s.createdBy
-	});
-	if (s.rezim === 'atyp') nastavRezim(id, 'atyp');
-	return id;
+	// Insert + prípadný atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
+	// `rezim='rozmery'`, atyp doplní `nastavRezim`; transakcia zaručí, že riadok neostane
+	// v polovičnom stave keď by druhý zápis zlyhal (#545 review 🔵).
+	return db.transaction(() => {
+		const id = pridajSklo({
+			zak: s.zak,
+			modul: 'manual',
+			popis: (s.popis ?? '').trim(),
+			sirkaMm: s.sirkaMm,
+			vyskaMm: s.vyskaMm,
+			pocet: s.pocet,
+			typSkla: typ,
+			m2,
+			createdBy: s.createdBy
+		});
+		if (s.rezim === 'atyp') nastavRezim(id, 'atyp');
+		return id;
+	})();
 }
 
 /** Hromadné pridanie skiel (po výpočte modulu). Vracia počet vložených. */
