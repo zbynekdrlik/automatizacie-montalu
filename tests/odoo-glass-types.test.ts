@@ -148,3 +148,110 @@ describe('fetchGlassTypes (#540/#546)', () => {
 		expect(r.items.length).toBeGreaterThan(0);
 	});
 });
+
+// #551 HOTFIX: Odoo JSON-2 `search_read` vracia pre NEVYPLNENÉ char polia `false` (nie `null`/`''`).
+// `String(false ?? '')` = `"false"` (truthy po `.trim()`) → každý typ bez `cennik_code` dostal
+// `value === "false"` → ≥ 2 také riadky = duplicitný `{#each … as t (t.value)}` kľúč → Svelte
+// client-side `each_key_duplicate` → hydratácia PROD picker-a padla (0.25.32–0.25.33). Tieto testy
+// reprodukujú presný Odoo drôtový tvar (booleany), ktorý CI/E2E fallback nikdy nevideli.
+describe('fetchGlassTypes — Odoo `false` pre prázdne polia (#551)', () => {
+	it('false cennik_code/composition/category → value = presný name, žiadny label „false", unikátne kľúče', async () => {
+		enableEnv();
+		setJson2Transport(
+			async () =>
+				new Response(
+					JSON.stringify([
+						// Odoo pre NEVYPLNENÉ char polia posiela boolean `false`, nie '' ani null
+						{ name: 'Kalené 6 mm', category: false, cennik_code: false, composition: false },
+						{ name: 'Kalené 8 mm', category: false, cennik_code: false, composition: false },
+						{ name: 'Lepené 33.1', category: false, cennik_code: false, composition: false },
+						{
+							name: 'Izolačné 4/16/4',
+							category: 'IZO',
+							cennik_code: '4/16/4',
+							composition: '4-16-4'
+						},
+						{ name: 'VSG 3.3.1', category: 'VSG', cennik_code: '3.3.1', composition: false }
+					]),
+					{ status: 200 }
+				)
+		);
+		const res = await fetchGlassTypes();
+		const values = res.items.map((i) => i.value);
+		// riadky bez cennik_code → value = presný name (nie „false")
+		expect(values).toContain('Kalené 6 mm');
+		expect(values).toContain('Kalené 8 mm');
+		expect(values).toContain('Lepené 33.1');
+		const codeless = res.items.filter((i) =>
+			['Kalené 6 mm', 'Kalené 8 mm', 'Lepené 33.1'].includes(i.value)
+		);
+		for (const it of codeless) {
+			expect(it.value).toBe(it.label); // label = name, žiadne ' · false'
+			expect(it.category).toBe(''); // false → prázdna kategória
+		}
+		// žiadny label nesmie obsahovať reťazec „false" (composition/name nikdy)
+		for (const it of res.items) expect(it.label).not.toContain('false');
+		// žiadna category nesmie byť reťazec „false"
+		for (const it of res.items) expect(it.category).not.toBe('false');
+		// KĽÚČOVÁ invarianta pickera: value je unikátny kľúč pre {#each … (t.value)}
+		expect(new Set(values).size).toBe(res.items.length);
+	});
+
+	it('28-riadková Odoo-tvarová sada (mix false/kódy) → 28 unikátnych kľúčov, žiadne „false"', async () => {
+		enableEnv();
+		const rows = Array.from({ length: 28 }, (_, i) => {
+			const hasCode = i % 3 === 0; // ~tretina má reálny kód, zvyšok Odoo `false`
+			return {
+				name: `Sklo typ ${String(i).padStart(2, '0')}`,
+				category: i % 2 === 0 ? 'IZO' : false,
+				cennik_code: hasCode ? `C-${i}` : false,
+				composition: i % 4 === 0 ? `${i}-16-${i}` : false
+			};
+		});
+		setJson2Transport(async () => new Response(JSON.stringify(rows), { status: 200 }));
+		const res = await fetchGlassTypes();
+		expect(res.source).toBe('odoo');
+		expect(res.items).toHaveLength(28);
+		const values = res.items.map((i) => i.value);
+		expect(new Set(values).size).toBe(28); // žiadny duplicitný kľúč → žiadny each_key_duplicate
+		for (const it of res.items) {
+			expect(it.value).not.toBe('false');
+			expect(it.label).not.toContain('false');
+			expect(it.category).not.toBe('false');
+		}
+	});
+
+	it('dva riadky rovnaký cennik_code → jedna položka + warn RAZ za fetch', async () => {
+		vi.stubEnv('LOG_LEVEL', 'warn');
+		enableEnv();
+		const lines: string[] = [];
+		const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+			lines.push(String(chunk));
+			return true;
+		});
+		setJson2Transport(
+			async () =>
+				new Response(
+					JSON.stringify([
+						{ name: 'Sklo A', category: 'IZO', cennik_code: 'DUP', composition: '' },
+						{ name: 'Sklo B', category: 'IZO', cennik_code: 'DUP', composition: '' },
+						{ name: 'Sklo C', category: 'VSG', cennik_code: 'UNI', composition: '' }
+					]),
+					{ status: 200 }
+				)
+		);
+		const res = await fetchGlassTypes();
+		writeSpy.mockRestore();
+		// duplicitný value 'DUP' sa deduplikuje → 2 položky (DUP raz + UNI)
+		expect(res.items).toHaveLength(2);
+		const values = res.items.map((i) => i.value);
+		expect(new Set(values).size).toBe(res.items.length);
+		expect(values).toContain('DUP');
+		expect(values).toContain('UNI');
+		// warn o duplicite RAZ za fetch, s uvedením duplikovanej hodnoty
+		const warnLines = lines.filter(
+			(l) => l.includes('odoo-glass-types') && l.includes('"level":"warn"') && l.includes('DUP')
+		);
+		expect(warnLines).toHaveLength(1);
+	});
+});
