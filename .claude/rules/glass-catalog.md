@@ -259,3 +259,29 @@ lokálny `glass_types` katalóg (sklo → `skloHrubka` → profily → Money kó
 a MENÍ SA LEN MIGRÁCIOU — Odoo zoznam ho nikdy neprepisuje (Prístup 2 ZAMIETNUTÝ: Odoo
 `composition_spec` nenesie hrúbkové triedy/profily/Money mapovanie appky). Detaily objednávkovej
 strany: `objednavka-skla.md` sekcia „Odoo typy skla = OBJEDNÁVKOVÝ picker".
+
+## PASCA: Odoo JSON-2 `false` pre prázdne char polia + dedupe pickerov pri zdroji (#551)
+
+**Odoo JSON-2 `search_read` vracia pre NEVYPLNENÉ char pole boolean `false` — NIE `null` ani `''`.**
+Preto `String(x ?? '').trim()` je pasca: `false ?? ''` je `false` → `String(false)` = `"false"` →
+po `.trim()` truthy → hodnota `"false"` prenikne do `value`/`label`/`category`. Na `odoo-glass-types.ts`
+to zhodilo PROD picker typov skla (0.25.32–0.25.33): každý typ bez `cennik_code` dostal
+`value === "false"`, ≥ 2 také riadky = duplicitný `{#each … as t (t.value)}` kľúč → Svelte
+client-side `each_key_duplicate` → hydratácia padla, `each` blok sa odstránil, ostal len placeholder
++ „iné sklo". SSR kľúče nevaliduje → bez JS to „fungovalo", takže CI/E2E to nechytili (preview beží
+na `localFallback()` z SQLite = reálne reťazce; unit fixtures používali `cennik_code: ''`, hodnotu
+ktorú Odoo NIKDY nepošle).
+
+Dve pravidlá pre KAŽDÉ budúce Odoo `search_read` char-pole mapovanie:
+
+1. **NIKDY `String(x ?? '')` na surovej Odoo char hodnote — vždy normalizuj cez helper**
+   `s(v) = (v == null || v === false) ? '' : String(v).trim()` (`odoo-glass-types.ts`). Číselné
+   polia majú svoj vlastný ekvivalent `numOrNull` (`odoo-prices.ts:99` — `v === false → null`); toto
+   je jeho char verzia. `false` = prázdne pole.
+2. **Každý `{#each … as t (t.value)}` picker MUSÍ byť dedupnutý PRI ZDROJI** (v mapovacom module,
+   `Set` idiom ako `localFallback`), nie až v šablóne. Odoo dáta (duplicitné kódy, prázdne polia)
+   nesmú nikdy zhodiť picker duplicitným kľúčom; duplicita → warn RAZ za fetch + vynechať riadok.
+
+Kandidát na neskôr (ZAMIETNUTÝ pre hotfix, príliš široký dosah): typovaný `charField()` helper priamo
+v transporte `searchReadJson2` — normalizoval by `false` globálne pre všetkých volajúcich, ale zmenil
+by sémantiku boolean polí. Pre teraz normalizuj v KAŽDOM mapovacom module zvlášť.
