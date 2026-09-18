@@ -33,7 +33,8 @@ import { enrichPolozky, type CenyResult } from '$lib/server/ceny';
 import { strechaSkloCenaPre, type StrechaSkloCena } from '$lib/server/sklo-strecha-cena';
 import { logger } from '$lib/server/log';
 import { redirect } from '@sveltejs/kit';
-import { pridajSklaHromadne, type NoveSklo } from '$lib/server/objednavka-skla';
+import { pridajSklaHromadne, pridajSkloManual, type NoveSklo } from '$lib/server/objednavka-skla';
+import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
 
 const log = logger('pergola:narez');
 
@@ -100,7 +101,16 @@ export const load: PageServerLoad = async () => {
 	// ako /pergola/navrh #138). `live` = TEST vs LIVE Money režim (badge + poistka).
 	// #234 — katalóg pergoly na klienta: okamžité varovanie pri neznámom Money kóde
 	// ručného riadku (server ostáva autorita, toto je len UX).
-	return { datumIso: new Date().toISOString(), live: isLive(), catalog: catalogForClient() };
+	// #546 — zoznam typov skla pre honest-null formulár „Sklo do objednávky" (rovnaký picker ako
+	// /objednavka-skla). Živý Odoo `montalu.glass.type`, s lokálnym fallbackom. Money-neutrálne.
+	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
+	return {
+		datumIso: new Date().toISOString(),
+		live: isLive(),
+		catalog: catalogForClient(),
+		glassTypes,
+		glassTypesSource
+	};
 };
 
 export const actions = {
@@ -386,5 +396,64 @@ export const actions = {
 		const count = pridajSklaHromadne(polozky);
 		log.info('stresne skla pridane do objednavky', { zak: ident.zak, count });
 		redirect(303, '/objednavka-skla/' + encodeURIComponent(ident.zak));
+	},
+
+	// ---- #546: RUČNÉ strešné sklo do objednávky (honest-null vetva producenta) ----
+	// Keď `spocitajStrechaSklo` nepozná rozmery (neoverená kotva — stena / zadný profil != 110 /
+	// bez sklonu / sklon > 9°), producent `pridatSkla` nemá čo vložiť. Operátor tu zadá typ skla +
+	// rozmer + počet ručne → riadok cez `pridajSkloManual({ modul: 'pergola' })` (sekcia „Pergola",
+	// popis „Strešné sklo — <typ>" ako automatický producent). Money-NEUTRÁLNE (objednávka u
+	// dodávateľa, žiadny odpis) — server RE-validuje vstup (nikdy nedôveruje klientovi).
+	pridatSkloRucne: async ({ request, locals }) => {
+		// b2b: /pergola je v B2B_FORBIDDEN_PREFIXES, ale defense-in-depth (vzor `pridatSkla`)
+		if (isB2B(locals.user)) {
+			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
+		}
+		const form = await request.formData();
+		const { vstup } = parsePergolaNarezVstup(form);
+		const ident = parseIdent(form);
+		const fix = parseFix(form, vstup);
+		const { rucne } = parseRucne(form);
+		const strechaSkloCena = strechaCenaPre(locals.user, vstup);
+		// späť na výsledok s chybou (echo vstup/ident/fix/rucne, aby honest-null formulár + round-trip
+		// stav neprepadol; `pridatSkloChyba` sa zobrazí v karte „Sklo do objednávky")
+		const chyba = (pridatSkloChyba: string) => ({
+			step: 'vysledok' as const,
+			vstup,
+			ident,
+			rucne,
+			fix,
+			strechaSkloCena,
+			error: null as string | null,
+			pridatSkloChyba
+		});
+
+		const zak = ident.zak.trim();
+		if (!zak) return chyba('Zadaj číslo zákazky (ZAK).');
+		const typSkla = String(form.get('typ_skla') ?? '').trim();
+		const sirkaMm = Math.trunc(Number(form.get('sirka_mm')));
+		const vyskaMm = Math.trunc(Number(form.get('vyska_mm')));
+		const pocet = Math.trunc(Number(form.get('pocet')));
+		try {
+			pridajSkloManual({
+				zak,
+				// OP z formulára (ako automatický producent `pridatSkla` → `op: ident.op`) — nech sa
+				// operátorom zadané OP nestratí (review 🟡 #546)
+				op: ident.op,
+				modul: 'pergola',
+				// rovnaké znenie ako automatický producent strešného skla vyššie
+				popis: `Strešné sklo${typSkla ? ' — ' + typSkla : ''}`,
+				typSkla,
+				sirkaMm,
+				vyskaMm,
+				pocet,
+				rezim: 'rozmery',
+				createdBy: locals.user?.username ?? ''
+			});
+		} catch (e) {
+			return chyba(e instanceof Error ? e.message : 'Neplatný riadok strešného skla.');
+		}
+		log.info('rucne stresne sklo pridane do objednavky', { zak, typSkla });
+		redirect(303, '/objednavka-skla/' + encodeURIComponent(zak));
 	}
 } satisfies Actions;

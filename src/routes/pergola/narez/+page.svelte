@@ -221,6 +221,18 @@
 	let strechaSkloCena = $derived(
 		form && 'strechaSkloCena' in form ? (form.strechaSkloCena ?? null) : null
 	);
+	// #546 — producent strešného skla je honest-null (neoverená kotva) → automatický riadok sa
+	// nedá vytvoriť, operátor zadá typ+rozmer+počet ručne (`?/pridatSkloRucne`). Presne tá istá
+	// podmienka ako honest-null gate v serveri (`pridatSkla`). Typy skla pre picker z load-u.
+	let strechaSkloHonestNull = $derived(
+		step === 'vysledok' &&
+			(strechaSklo == null ||
+				strechaSklo.sirkaMm == null ||
+				strechaSklo.dlzkaMm == null ||
+				strechaSklo.pocetTabul == null ||
+				strechaSklo.pocetTabul <= 0)
+	);
+	const glassTypes = $derived(data.glassTypes ?? []);
 
 	// #378 — FIX: polia (rovnomerne z počtu), efektívny FIX (auto vs override) a geometria.
 	// Money-neutrálne — spocitajFixZPergoly vracia LEN výkres/chybu, nič do Money.
@@ -440,15 +452,85 @@
 		{/if}
 	</div>
 
+	{#if strechaSkloHonestNull}
+		<!-- #546: producent strešného skla nepozná rozmery (neoverená kotva) → ručné zadanie riadku
+			objednávky skla (typ z pickera, šírka × výška, počet). Money-neutrálne (objednávka). -->
+		<div class="card noprint" data-testid="sklo-rucne-card">
+			<div class="sec">Sklo do objednávky</div>
+			<p class="sub">
+				Rozmery strešného skla sa pre túto konfiguráciu nedopočítali. Zadaj typ skla, rozmer a počet
+				ručne — pridá sa do objednávky skla k zákazke (sekcia Pergola).
+			</p>
+			<form method="POST" action="?/pridatSkloRucne" class="sklo-rucne-form">
+				{@render hidden()}
+				{@render hiddenIdent()}
+				<div class="field">
+					<label for="sklo-typ">Typ skla *</label>
+					<select id="sklo-typ" name="typ_skla" required data-testid="sklo-rucne-typ">
+						<option value="">— vyberte typ —</option>
+						{#each glassTypes as t (t.value)}
+							<option value={t.value}>{t.label}</option>
+						{/each}
+					</select>
+				</div>
+				<div class="field">
+					<label for="sklo-sirka">Šírka (mm) *</label>
+					<input
+						id="sklo-sirka"
+						name="sirka_mm"
+						type="number"
+						min="1"
+						step="1"
+						required
+						data-testid="sklo-rucne-sirka"
+					/>
+				</div>
+				<div class="field">
+					<label for="sklo-vyska">Výška (mm) *</label>
+					<input
+						id="sklo-vyska"
+						name="vyska_mm"
+						type="number"
+						min="1"
+						step="1"
+						required
+						data-testid="sklo-rucne-vyska"
+					/>
+				</div>
+				<div class="field">
+					<label for="sklo-pocet">Počet ks *</label>
+					<input
+						id="sklo-pocet"
+						name="pocet"
+						type="number"
+						min="1"
+						step="1"
+						value="1"
+						required
+						data-testid="sklo-rucne-pocet"
+					/>
+				</div>
+				<button class="btn" type="submit" data-testid="sklo-rucne-pridat"
+					>📋 Pridať sklo do objednávky</button
+				>
+			</form>
+			{#if form && 'pridatSkloChyba' in form && form.pridatSkloChyba}
+				<p class="err" data-testid="sklo-rucne-chyba">⚠️ {form.pridatSkloChyba}</p>
+			{/if}
+		</div>
+	{/if}
+
 	<div class="card noprint">
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<form method="POST" action="?/pridatSkla" style="display:inline">
-			{@render hidden()}
-			{@render hiddenIdent()}
-			<button class="btn secondary" type="submit" data-testid="pridat-skla"
-				>📋 Pridať sklá do objednávky</button
-			>
-		</form>
+		{#if !strechaSkloHonestNull}
+			<form method="POST" action="?/pridatSkla" style="display:inline">
+				{@render hidden()}
+				{@render hiddenIdent()}
+				<button class="btn secondary" type="submit" data-testid="pridat-skla"
+					>📋 Pridať sklá do objednávky</button
+				>
+			</form>
+		{/if}
 		<form method="POST" action="?/upravit" style="display:inline">
 			{@render hidden()}
 			{@render hiddenIdent()}

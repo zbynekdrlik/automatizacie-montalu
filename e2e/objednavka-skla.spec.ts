@@ -138,3 +138,41 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #546: index /objednavka-skla „Nová objednávka len skla" (zákazka + OP) → presmeruje na podklad
+// s predvyplneným OP (`?op=`). Server validuje normZak/normOp, nič neukladá. Zero-console.
+test('index: Nová objednávka len skla (zákazka + OP) → podklad s predvyplneným OP', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await skipAkLive(page);
+	await goto(page, '/objednavka-skla');
+
+	const zak = `${RUN}-IDX`;
+	await page.getByTestId('nova-zak').fill(zak);
+	await page.getByTestId('nova-op').fill('260546');
+	await page.getByTestId('nova-otvorit').click();
+
+	// presmerovanie na podklad s ?op= v URL
+	await page.waitForURL(/\/objednavka-skla\/.*[?&]op=OP260546/);
+	await waitHydrated(page);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+
+	// prázdny podklad → pridaj riadok, potom OP pole je predvyplnené z ?op=
+	const pridatForm = page.getByTestId('pridat-riadok');
+	await pridatForm.getByTestId('manual-popis').fill('Popraskané sklo — servis');
+	const typSelect = pridatForm.getByTestId('manual-typ');
+	const prva = typSelect.locator('option:not([value=""])').first();
+	await typSelect.selectOption((await prva.getAttribute('value'))!);
+	await pridatForm.getByTestId('manual-sirka').fill('800');
+	await pridatForm.getByTestId('manual-vyska').fill('600');
+	await pridatForm.getByTestId('manual-pocet').fill('1');
+	await pridatForm.getByTestId('manual-pridat').click();
+	await waitHydrated(page);
+
+	// OP pole predvyplnené hodnotou z indexu (`?op=OP260546`)
+	await expect(page.getByTestId('op-input')).toHaveValue('OP260546');
+
+	expect(consoleMsgs).toEqual([]);
+});

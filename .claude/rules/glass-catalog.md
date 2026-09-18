@@ -18,6 +18,17 @@ seedované sekvenčnými `PRAGMA user_version` migráciami v `src/lib/server/mig
 **Pridať / zmeniť sklo = MIGRÁCIA, nikdy vetva v kóde.** Katalóg pre systém dáva
 `glassTypesForSystem(system)` v `db.ts`.
 
+## VÝPOČTOVÝ katalóg vs OBJEDNÁVKOVÝ zoznam typov z Odoo — deliaca čiara (#540/#546)
+
+Tento `glass_types` katalóg (sklo → skloHrubka → profily → Money kód, compute cesta) je JEDNA vec.
+Odoo `montalu.glass.type` je INÁ, ÚPLNE ODDELENÁ vec — LEN ordering zoznam pre objednávkový picker
+(`/objednavka-skla`, `src/lib/server/odoo-glass-types.ts` `fetchGlassTypes`), NIKDY nenahrádza tento
+výpočtový katalóg (Money-neutrálne). **Skutočné polia `montalu.glass.type` = `name, category,
+cennik_code, composition, active`** (#546, relay #540) — NIE `code`/`composition_spec` (tie na
+modeli neexistujú → Odoo 500 → lokálny fallback). Uložený `typ_skla` (= `glass_order.items[].glass_type`)
+= `cennik_code || name` (ak `cennik_code` chýba, posiela sa presný `name`; Odoo `resolve_glass_type`
+páruje kód → presný názov → zloženie). Detail objednávkovej vrstvy je v `objednavka-skla.md`.
+
 ## Per-sklo korekcia rozmeru skla (`sklo_korekcia`, #440)
 
 `sklo_korekcia INTEGER` (nullable, migrácia v36) je **ABSOLÚTNY per-sklo override** systémovej
