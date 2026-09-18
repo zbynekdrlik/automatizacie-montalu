@@ -57,7 +57,10 @@ export function buildGlassOrderForZak(zak: string): GlassOrder | null {
  * `montalu_narezak_upload`. VŽDY vráti postavený `payload` (pre náhľad na podklade), aj keď je
  * upload vypnutý alebo zlyhal. NIKDY nehádže.
  */
-export async function uploadGlassOrderToOdoo(zak: string): Promise<GlassOrderUploadOutcome> {
+export async function uploadGlassOrderToOdoo(
+	zak: string,
+	opOverride?: string
+): Promise<GlassOrderUploadOutcome> {
 	const trimmed = (zak ?? '').trim();
 	if (!trimmed) return { result: 'no-zak', payload: null };
 
@@ -69,10 +72,11 @@ export async function uploadGlassOrderToOdoo(zak: string): Promise<GlassOrderUpl
 	if (!cfg) return { result: 'disabled', payload };
 
 	try {
-		// OP z NAJNOVŠIEHO odpisu, live-first (zdieľaný `zakazkaOp` — rovnaká voľba ako plán-rezov
-		// upload aj QR na podklade objednávky skla) — aby posledný TEST odpis (live=0) nesmeroval
-		// objednávku skla na testovacie OP.
-		const op = zakazkaOp(trimmed);
+		// OP: keď volajúci (auto-send z plán-rezov uloženia, #540) explicitne poslal op TEJ ISTEJ
+		// zákazky, použi ho priamo (glass_order ide na tú istú OP ako nárezák). Inak (explicitná
+		// akcia na podklade) OP z NAJNOVŠIEHO odpisu, live-first (zdieľaný `zakazkaOp`) — aby posledný
+		// TEST odpis (live=0) nesmeroval objednávku skla na testovacie OP.
+		const op = (opOverride ?? '').trim() || zakazkaOp(trimmed);
 		if (!op) {
 			log.info('glass-order upload: zákazka nemá odpis/OP — nič neposielam', { zak: trimmed });
 			return { result: 'missing', payload };

@@ -152,3 +152,42 @@ A generic description like `'Lepené bezp. sklo (VSG)'` is NOT in the catalog an
 return `null` for all dimensions. Always use an EXACT `nazov` from `SKLO_STRECHA_TYPY`
 in tests. Similarly, zasklenia glass types must match `listGlassTypes()` (`glass_types`
 seed table). FIX glass type (`vstup.sklo`) is free text (no catalog validation).
+
+## Odoo typy skla = OBJEDNÁVKOVÝ picker + auto glass_order pri pláne so sklom (#540)
+
+Dve nezávislé, aditívne, Money-NEUTRÁLNE zmeny (Prístup 1). **Odoo `montalu.glass.type` je ORDERING
+zoznam, NIKDY nenahrádza výpočtový katalóg** (viď `glass-catalog.md`).
+
+### (1a) Picker typu skla z Odoo — deliaca čiara „objednávka vs výpočet"
+
+- Zoznam typov v riadku `/objednavka-skla/[zak]` je `<select name="typ_skla">` plnený z
+  **`fetchGlassTypes()`** (`src/lib/server/odoo-glass-types.ts`): `montalu.glass.type` `search_read`
+  domain `[["active","=",true]]`, fields `code,name,composition_spec`, order `name`, cez generický
+  **`searchReadJson2`** (`odoo-json2.ts`, ČISTÝ transport bez `db` väzby — fallback žije v samostatnom
+  module, aby `odoo-json2` testy nebootovali native sqlite).
+- **In-process cache ~5 min** (aj fallback → auto-heal po oprave Odoo). **Fallback pri AKEJKOĽVEK
+  chybe** (403/sieť/timeout) alebo keď integrácia nie je nakonfigurovaná: LOKÁLNY zoznam z
+  `listGlassTypes()` (`code=name=nazov`, dedup podľa názvu), **warn LEN RAZ za proces** (config-absent
+  v deve NIE je chyba → nevaruje). `source: 'odoo'|'local'` sa zobrazí v UI (`data-testid=
+  "glass-types-source"`) — nikdy tichý prázdny select.
+- **Úložisko zvoleného typu = existujúci `typ_skla` stĺpec (BEZ migrácie).** Akcia `nastavTyp` →
+  `nastavTypSkla(id, code)` uloží Odoo `code` do `typ_skla` = `glass_order.items[].glass_type` (cez
+  doterajší `buildGlassOrderItem`). Staré podklady (voľnotext `typ_skla`) ostávajú spätne kompatibilné
+  — mapovanie sa nemení. NIKDY sa nedotýka `glass_types` katalógu / `migracie.ts` / compute cesty.
+- Tlač: `typ_skla` sa vytlačí cez `.print-only` span (select je `.noprint`).
+
+### (1b) Auto glass_order pri uložení plánu rezov so sklom
+
+- Po ÚSPEŠNOM `uploadNarezak` v `uploadPlanRezovToOdoo` (`odoo-plan-rezov-upload.ts`) sa **best-effort**
+  pošle `uploadGlassOrderToOdoo(zak, op)` na TÚ ISTÚ OP. `uploadGlassOrderToOdoo` dostal voliteľný
+  **explicitný `op` override** — auto-send posiela op nárezáku priamo (nie `zakazkaOp` re-derive);
+  explicitná akcia `odoslatDoOdoo` (bez op) ostáva a re-derivuje.
+- **Best-effort ako PDF príloha:** zlyhanie glass_order NIKDY nezhodí nárezák upload (log warn).
+  `uploadGlassOrderToOdoo` sám vráti `no-items` keď zákazka nemá sklo (žiadny Odoo call).
+- **Idempotentný `doc_id` `glass-order-<zak>-<op>`** → neskoršia ručná akcia na /objednavka-skla tú
+  istú objednávku len prepíše (nová verzia), nevytvorí druhú.
+- Wiring používa **DYNAMICKÝ import** `odoo-glass-order-upload` — drží STATICKÝ graf
+  `odoo-plan-rezov-upload` bez `db` väzby (jeho test je zámerne db-free; mockne `uploadGlassOrderToOdoo`).
+- **VEDOME MIMO scope:** backfill (`backfill-narezaky-deps.ts`) auto-send NEmá — bulk retroaktívne
+  objednávky skla za mesiac by mohli duplikovať už ručne zadané objednávky u dodávateľa (design
+  Architektúra scope-uje (ii) na ŽIVÉ plán-rezov uloženie). Prípadné doplnenie = samostatné rozhodnutie.

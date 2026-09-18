@@ -19,6 +19,13 @@ vi.mock('../src/lib/server/money', () => ({
 vi.mock('../src/lib/server/zakazka-ceny', () => ({
 	zakazkaPrehlad: vi.fn()
 }));
+// #540: auto-send glass_order po náreze je best-effort a beží cez DYNAMICKÝ import
+// (`odoo-glass-order-upload` → `objednavka-skla` → `db`). Mockneme ho na no-op, aby tento
+// (zámerne db-free) test nebootoval native better-sqlite3 — wiring má vlastný test
+// (`glass-order-auto-send.test.ts`, reálna DB).
+vi.mock('../src/lib/server/odoo-glass-order-upload', () => ({
+	uploadGlassOrderToOdoo: vi.fn(async () => ({ result: 'no-items', payload: null }))
+}));
 
 import { zakazkaPrehlad } from '../src/lib/server/zakazka-ceny';
 import { setJson2Transport } from '../src/lib/server/odoo-json2';

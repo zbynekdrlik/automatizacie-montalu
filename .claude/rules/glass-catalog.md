@@ -239,3 +239,12 @@ displej (plán/tlač/objednávka) je `skloPresne||sklo`. V multi-posuve `PosuvSp
 `skloZaklad`=sentinel, `skloTrieda`; `znova` obnoví `skloPresne` LEN keď `d.sklo !== d.skloZaklad`
 (inak by holé katalógové sklo dostalo svoj názov ako „presné zloženie"), a `platneSklo` akceptuje
 sentinel.
+
+## Odoo `montalu.glass.type` NIKDY nenahrádza výpočtový katalóg (#540)
+
+`fetchGlassTypes()` (`odoo-glass-types.ts`) ťahá Odoo `montalu.glass.type` LEN ako ORDERING zoznam
+typov skla pre picker v `/objednavka-skla` (Odoo `code` → `glass_order.items[].glass_type`). Tento
+lokálny `glass_types` katalóg (sklo → `skloHrubka` → profily → Money kódy) je zdroj pravdy pre VÝPOČET
+a MENÍ SA LEN MIGRÁCIOU — Odoo zoznam ho nikdy neprepisuje (Prístup 2 ZAMIETNUTÝ: Odoo
+`composition_spec` nenesie hrúbkové triedy/profily/Money mapovanie appky). Detaily objednávkovej
+strany: `objednavka-skla.md` sekcia „Odoo typy skla = OBJEDNÁVKOVÝ picker".
