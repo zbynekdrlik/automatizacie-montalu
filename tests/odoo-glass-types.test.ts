@@ -28,6 +28,7 @@ beforeEach(() => {
 afterEach(() => {
 	setJson2Transport(null);
 	vi.unstubAllEnvs();
+	vi.useRealTimers();
 });
 
 describe('fetchGlassTypes (#540/#546)', () => {
@@ -253,5 +254,117 @@ describe('fetchGlassTypes — Odoo `false` pre prázdne polia (#551)', () => {
 			(l) => l.includes('odoo-glass-types') && l.includes('"level":"warn"') && l.includes('DUP')
 		);
 		expect(warnLines).toHaveLength(1);
+	});
+});
+
+// #551 noha 2: PROD post-deploy E2E na /pergola/narez timeoutol — každý load čaká na
+// `await fetchGlassTypes()`, `searchReadJson2` má 15 s default a cache sa plní až PO návrate, takže
+// pomalé-ale-nepadajúce Odoo zdrží každý page load až 15 s (2 loady/test > 30 s Playwright).
+// Fix: krátky per-volanie timeout (3 s default) → okamžitý fallback; fallback cache len 60 s (rýchly
+// auto-heal, žiadny fan-out); single-flight (žiadny thundering herd na Odoo).
+describe('fetchGlassTypes — timeout + krátky fallback TTL + single-flight (#551 noha 2)', () => {
+	it('pomalé Odoo → fallback do ~3 s (timeout), NIE 15 s', async () => {
+		vi.useFakeTimers();
+		enableEnv();
+		let aborted = false;
+		setJson2Transport(
+			(_url, init) =>
+				new Promise((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => {
+						aborted = true;
+						reject(new Error('aborted'));
+					});
+				})
+		);
+		const p = fetchGlassTypes(); // default 3000 ms
+		await vi.advanceTimersByTimeAsync(2999);
+		expect(aborted).toBe(false); // pred 3 s ešte čaká
+		await vi.advanceTimersByTimeAsync(2);
+		expect(aborted).toBe(true); // po 3 s abort (NIE až 15 s)
+		const res = await p;
+		expect(res.source).toBe('local'); // okamžitý fallback, nehádže
+		vi.useRealTimers();
+	});
+
+	it('fallback sa cachuje len na 60 s; Odoo úspech na 5 min', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(0);
+		enableEnv();
+		let calls = 0;
+		let mode: 'fail' | 'ok' = 'fail';
+		setJson2Transport(async () => {
+			calls++;
+			if (mode === 'fail') return new Response('boom', { status: 500 });
+			return new Response(
+				JSON.stringify([{ name: 'X', category: 'c', cennik_code: 'x', composition: '' }]),
+				{ status: 200 }
+			);
+		});
+		// 1) prvý fetch zlyhá → fallback
+		const r1 = await fetchGlassTypes();
+		expect(r1.source).toBe('local');
+		expect(calls).toBe(1);
+		// 2) do 60 s: cache hit, žiadny nový fetch
+		vi.setSystemTime(59_000);
+		const r2 = await fetchGlassTypes();
+		expect(calls).toBe(1);
+		expect(r2.source).toBe('local');
+		// 3) po 60 s: fallback cache expiruje → nový fetch (teraz Odoo OK)
+		mode = 'ok';
+		vi.setSystemTime(61_000);
+		const r3 = await fetchGlassTypes();
+		expect(calls).toBe(2);
+		expect(r3.source).toBe('odoo');
+		// 4) Odoo úspech drží 5 min: +4 min žiadny nový fetch
+		vi.setSystemTime(61_000 + 4 * 60_000);
+		const r4 = await fetchGlassTypes();
+		expect(calls).toBe(2);
+		expect(r4.source).toBe('odoo');
+		vi.useRealTimers();
+	});
+
+	it('single-flight: súbežné volania zdieľajú JEDEN fetch (žiadny thundering herd)', async () => {
+		enableEnv();
+		let calls = 0;
+		setJson2Transport(async () => {
+			calls++;
+			await Promise.resolve();
+			return new Response(
+				JSON.stringify([{ name: 'X', category: 'c', cennik_code: 'x', composition: '' }]),
+				{ status: 200 }
+			);
+		});
+		const [r1, r2, r3] = await Promise.all([
+			fetchGlassTypes(),
+			fetchGlassTypes(),
+			fetchGlassTypes()
+		]);
+		expect(calls).toBe(1); // len jeden Odoo call pre tri súbežné loady
+		expect(r1).toBe(r2); // ten istý zdieľaný výsledok
+		expect(r2).toBe(r3);
+		expect(r1.source).toBe('odoo');
+	});
+
+	it('explicitný timeoutMs sa rešpektuje (napr. 5000)', async () => {
+		vi.useFakeTimers();
+		enableEnv();
+		let aborted = false;
+		setJson2Transport(
+			(_url, init) =>
+				new Promise((_resolve, reject) => {
+					init?.signal?.addEventListener('abort', () => {
+						aborted = true;
+						reject(new Error('aborted'));
+					});
+				})
+		);
+		const p = fetchGlassTypes({ timeoutMs: 5000 });
+		await vi.advanceTimersByTimeAsync(3001);
+		expect(aborted).toBe(false); // default 3 s sa NEuplatnil, platí 5 s
+		await vi.advanceTimersByTimeAsync(2000);
+		expect(aborted).toBe(true);
+		const res = await p;
+		expect(res.source).toBe('local');
+		vi.useRealTimers();
 	});
 });
