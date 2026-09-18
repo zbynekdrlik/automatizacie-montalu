@@ -98,12 +98,24 @@ describe('#545 nastavOpZakazky — jedno OP pre celý podklad', () => {
 	it('zapíše (normalizované) OP do VŠETKÝCH riadkov zákazky', () => {
 		const zak = 'ZAK-545-OP-ALL';
 		pridajSkloManual({
-			zak, popis: 'A', typSkla: 'Float 4', sirkaMm: 1000, vyskaMm: 1000, pocet: 1,
-			rezim: 'rozmery', createdBy: 'test'
+			zak,
+			popis: 'A',
+			typSkla: 'Float 4',
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
 		});
 		pridajSkloManual({
-			zak, popis: 'B', typSkla: 'Float 4', sirkaMm: 500, vyskaMm: 500, pocet: 2,
-			rezim: 'atyp', createdBy: 'test'
+			zak,
+			popis: 'B',
+			typSkla: 'Float 4',
+			sirkaMm: 500,
+			vyskaMm: 500,
+			pocet: 2,
+			rezim: 'atyp',
+			createdBy: 'test'
 		});
 
 		const op = nastavOpZakazky(zak, '260545'); // normOp → OP260545
@@ -123,8 +135,14 @@ describe('#545 opPodkladu — spoločné OP riadkov podkladu', () => {
 	it('žiadne OP → prázdny reťazec', () => {
 		const zak = 'ZAK-545-POD-NONE';
 		pridajSkloManual({
-			zak, popis: 'A', typSkla: 'Float 4', sirkaMm: 1000, vyskaMm: 1000, pocet: 1,
-			rezim: 'rozmery', createdBy: 'test'
+			zak,
+			popis: 'A',
+			typSkla: 'Float 4',
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
 		});
 		expect(opPodkladu(zak)).toBe('');
 	});
@@ -132,8 +150,14 @@ describe('#545 opPodkladu — spoločné OP riadkov podkladu', () => {
 	it('jednotné OP → to OP', () => {
 		const zak = 'ZAK-545-POD-ONE';
 		pridajSkloManual({
-			zak, popis: 'A', typSkla: 'Float 4', sirkaMm: 1000, vyskaMm: 1000, pocet: 1,
-			rezim: 'rozmery', createdBy: 'test'
+			zak,
+			popis: 'A',
+			typSkla: 'Float 4',
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
 		});
 		nastavOpZakazky(zak, 'OP260600');
 		expect(opPodkladu(zak)).toBe('OP260600');
@@ -142,12 +166,24 @@ describe('#545 opPodkladu — spoločné OP riadkov podkladu', () => {
 	it('rozdielne OP na riadkoch → null (mixed)', () => {
 		const zak = 'ZAK-545-POD-MIX';
 		const a = pridajSkloManual({
-			zak, popis: 'A', typSkla: 'Float 4', sirkaMm: 1000, vyskaMm: 1000, pocet: 1,
-			rezim: 'rozmery', createdBy: 'test'
+			zak,
+			popis: 'A',
+			typSkla: 'Float 4',
+			sirkaMm: 1000,
+			vyskaMm: 1000,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
 		});
 		const b = pridajSkloManual({
-			zak, popis: 'B', typSkla: 'Float 4', sirkaMm: 500, vyskaMm: 500, pocet: 1,
-			rezim: 'rozmery', createdBy: 'test'
+			zak,
+			popis: 'B',
+			typSkla: 'Float 4',
+			sirkaMm: 500,
+			vyskaMm: 500,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
 		});
 		// rozdielnosť OP na riadkoch simulujeme priamym UPDATE (nastavOpZakazky je hromadné,
 		// takže cez public API by rozdielne OP nevznikli — to je práve invariant, ktorý stráži).
