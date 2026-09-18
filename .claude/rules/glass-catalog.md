@@ -285,3 +285,28 @@ Dve pravidlá pre KAŽDÉ budúce Odoo `search_read` char-pole mapovanie:
 Kandidát na neskôr (ZAMIETNUTÝ pre hotfix, príliš široký dosah): typovaný `charField()` helper priamo
 v transporte `searchReadJson2` — normalizoval by `false` globálne pre všetkých volajúcich, ale zmenil
 by sémantiku boolean polí. Pre teraz normalizuj v KAŽDOM mapovacom module zvlášť.
+
+## PASCA: NIKDY neblokuj page load na Odoo — krátky timeout + cachovaný fallback (#551 noha 2)
+
+**`+page.server.ts` load, ktorý `await`-uje Odoo read, je latenčná bomba.** `searchReadJson2`/`callJson2`
+mali `DEFAULT_TIMEOUT_MS = 15_000` a `fetchGlassTypes` napĺňal cache až PO návrate volania — takže
+pomalé-ale-nepadajúce PROD Odoo zdržalo KAŽDÝ load `/pergola/narez` aj `/objednavka-skla/[zak]` až
+15 s. PROD post-deploy E2E (2 loady/test) prestrelil 30 s Playwright limit a celý deploy run 0.25.33
+spadol (main CI 35380772116), hoci appka „fungovala" (SSR fallback).
+
+Pravidlá pre KAŽDÝ Odoo read v horúcej ceste page loadu:
+
+1. **Krátky PER-VOLANIE timeout, nie 15 s default.** `callJson2`/`searchReadJson2` majú voliteľný
+   `timeoutMs`; page-load fetch ho nastaví nízko (`fetchGlassTypes` default **3000 ms**). Uploady
+   (`montalu_narezak_upload`, `get_prices`) si držia 15 s default — timeout ZUŽUJ len tam, kde blokuje
+   používateľa. Timeout = AbortController, pri abort okamžitý lokálny fallback (nikdy nehádž do loadu).
+2. **Fallback cachuj len KRÁTKO (60 s), úspech DLHO (5 min).** Inak buď (a) hanging Odoo fanuje 15 s
+   čakanie na každý request (žiadny short-circuit), alebo (b) dlho-cachovaný fallback nezachytí, že sa
+   Odoo vrátil. Krátky fallback TTL = rýchly auto-heal + žiadny fan-out.
+3. **Single-flight.** Súbežní volajúci (N paralelných loadov) MUSIA zdieľať JEDEN in-flight fetch
+   (`_inflight` promise), nie každý spustiť vlastné Odoo volanie — inak pomalé Odoo × N requestov =
+   thundering herd. Cache-miss + prebiehajúci fetch → vráť ten istý promise.
+
+Vzor je v `odoo-glass-types.ts` (`fetchGlassTypes` + `_doFetch` + `_inflight`); zopakuj ho pri každom
+ďalšom Odoo reade viazanom na page load. NIKDY nenechaj `+page.server.ts` čakať na Odoo bez timeoutu
+a fallbacku.
