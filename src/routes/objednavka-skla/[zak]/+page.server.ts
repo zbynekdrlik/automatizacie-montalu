@@ -63,10 +63,15 @@ function allowedExtension(filename: string): boolean {
 	return ALLOWED_EXTENSIONS.includes(ext);
 }
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, url }) => {
 	// SvelteKit already decodes params — no decodeURIComponent (review BLUE-7: double-decode)
 	const zak = params.zak.trim();
 	if (!zak) error(404, 'Zákazka nie je zadaná.');
+
+	// #546: `?op=` predvyplnenie OP poľa z indexu „Nová objednávka len skla" (servis bez odpisu).
+	// Len UI hint — perzistuje ho až akcia `nastavOp` (keď má podklad riadky). Nenormalizuje sa tu
+	// (index už poslal `normOp`); je to display-only prefill, nikdy sa priamo nezapisuje.
+	const prefillOp = (url.searchParams.get('op') ?? '').trim();
 
 	const polozky = listSklaPreZakazku(zak);
 	// #528: OP zákazky (z najnovšieho odpisu, live-first) pre QR zákazky v hlavičke výtlačku — QR
@@ -97,7 +102,17 @@ export const load: PageServerLoad = async ({ params }) => {
 	// fallbackom keď Odoo nedostupné (source sa zobrazí v UI). Money-neutrálne (len ordering).
 	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
 
-	return { zak, op, podkladOp, effektivneOp, polozky, suboryMap, glassTypes, glassTypesSource };
+	return {
+		zak,
+		op,
+		podkladOp,
+		effektivneOp,
+		prefillOp,
+		polozky,
+		suboryMap,
+		glassTypes,
+		glassTypesSource
+	};
 };
 
 export const actions = {

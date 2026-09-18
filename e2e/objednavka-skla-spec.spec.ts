@@ -1,7 +1,8 @@
-// #521: objednávka skla — obsluha nastaví voliteľnú špecifikáciu tabule (teplá hrana, otvory,
-// hrana) na podklade a „Odoslať objednávku skla do Odoo" jej ukáže PAYLOAD (to, čo pôjde do Odoo)
-// so spec kľúčmi. Zápisový tok (píše spec do objednavka_skla) → skipAkLive na ostrom nasadení
-// preskočí. Zero-console.
+// #521/#546: objednávka skla — obsluha nastaví „Hrana" (jediné spec pole, ktoré výroba používa)
+// na podklade a „Odoslať objednávku skla do Odoo" jej ukáže PAYLOAD (to, čo pôjde do Odoo) s
+// edge_finish. #546 skryl ostatných 8 IZOS príplatkov z UI (výroba ich nechce) — test overuje, že
+// „Hrana" ostáva funkčná A že skryté polia (napr. teplá hrana) v UI UŽ NIE SÚ. Zápisový tok (píše
+// spec do objednavka_skla) → skipAkLive na ostrom nasadení preskočí. Zero-console.
 import { test, expect } from '@playwright/test';
 import {
 	collectConsole,
@@ -14,7 +15,7 @@ import {
 
 const RUN = `E2E-SKLASPEC-${Date.now().toString(36).slice(-5)}`;
 
-test('podklad: nastav špecifikáciu tabule → Odoslať → payload obsahuje spec kľúče', async ({
+test('podklad: nastav Hrana → Odoslať → payload obsahuje edge_finish; skryté polia nie sú v UI', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -43,11 +44,14 @@ test('podklad: nastav špecifikáciu tabule → Odoslať → payload obsahuje sp
 
 	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
 
-	// otvor „Ďalšie možnosti (zriedkavé)" na prvom riadku a nastav spec
+	// otvor „Hrana skla (opracovanie)" na prvom riadku a nastav Hrana (jediné pole, ktoré ostalo)
 	const specForm = page.locator('form[action="?/ulozitSpec"]').first();
 	await page.locator('details').filter({ has: specForm }).locator('summary').first().click();
-	await specForm.locator('input[name="spec_warm_edge"]').check();
-	await specForm.locator('input[name="spec_holes_qty"]').fill('2');
+	// #546: skryté IZOS príplatky UŽ NIE SÚ v UI (výroba ich nechce)
+	await expect(specForm.locator('input[name="spec_warm_edge"]')).toHaveCount(0);
+	await expect(specForm.locator('input[name="spec_holes_qty"]')).toHaveCount(0);
+	await expect(specForm.locator('input[name="spec_hst"]')).toHaveCount(0);
+	// „Hrana" ostáva a funguje
 	await specForm.locator('select[name="spec_edge_finish"]').selectOption('ksr');
 	await specForm.getByRole('button', { name: 'Uložiť špecifikáciu' }).click();
 	await waitHydrated(page);
@@ -58,11 +62,11 @@ test('podklad: nastav špecifikáciu tabule → Odoslať → payload obsahuje sp
 
 	const payload = page.getByTestId('glass-order-payload');
 	await expect(payload).toBeVisible();
-	// spec kľúče, ktoré obsluha zadala, sú v payloade
-	await expect(payload).toContainText('"warm_edge": true');
-	await expect(payload).toContainText('"holes_qty": 2');
-	await expect(payload).toContainText('"hole_size": "d30"');
+	// spec kľúč, ktorý obsluha zadala, je v payloade
 	await expect(payload).toContainText('"edge_finish": "ksr"');
+	// skryté (default) spec kľúče sa NEPOSIELAJÚ (payload byte-identický pre default riadok)
+	await expect(payload).not.toContainText('"warm_edge"');
+	await expect(payload).not.toContainText('"holes_qty"');
 	// základné kľúče ostávajú
 	await expect(payload).toContainText('"glass_type"');
 	await expect(payload).toContainText('"width_mm"');

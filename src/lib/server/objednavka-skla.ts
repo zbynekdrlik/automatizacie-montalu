@@ -104,9 +104,13 @@ export function pridajSklo(s: NoveSklo): number {
 
 // ---- Ručný riadok (#545) --------------------------------------------------------------
 
-/** Vstup pre ručne pridaný riadok objednávky skla (`modul='manual'`). Typ skla je POVINNÝ. */
+/** Vstup pre ručne pridaný riadok objednávky skla. Typ skla je POVINNÝ. `modul` je voliteľný
+ *  override (#546: pergola honest-null vetva zadáva `modul='pergola'`); default `'manual'`. */
 export interface ManualSklo {
 	zak: string;
+	/** Pôvod riadku — default `'manual'` (sekcia „Pridané položky"); `'pergola'` pre honest-null
+	 *  strešné sklo zadané operátorom (#546). */
+	modul?: string;
 	popis: string;
 	typSkla: string;
 	sirkaMm: number;
@@ -118,9 +122,11 @@ export interface ManualSklo {
 
 /**
  * #545: pridá RUČNÝ riadok objednávky skla (`modul='manual'`, sekcia „Pridané položky") — pre ATYP
- * podľa výkresu, V.O., priobjednané sklo a servisné objednávky bez nárezáku. Reuse `pridajSklo`
- * (Money-NEUTRÁLNE). Typ skla POVINNÝ (prázdny → throw, nič sa neuloží); rozmery celé > 0, počet
- * celý >= 1; `m2 = š×v×ks/1e6` (ako FIX producent). `rezim='atyp'` sa nastaví po vložení
+ * podľa výkresu, V.O., priobjednané sklo a servisné objednávky bez nárezáku. #546: voliteľný `modul`
+ * override (default `'manual'`) — pergola honest-null vetva zadáva `modul='pergola'`, aby riadok
+ * pristál v sekcii „Pergola". Reuse `pridajSklo` (Money-NEUTRÁLNE). Typ skla POVINNÝ (prázdny →
+ * throw, nič sa neuloží); rozmery celé > 0, počet celý >= 1; `m2 = š×v×ks/1e6` (ako FIX producent).
+ * `rezim='atyp'` sa nastaví po vložení
  * (`pridajSklo` vkladá vždy s `rezim='rozmery'`), aby atyp riadok rovno ponúkol prílohu.
  */
 export function pridajSkloManual(s: ManualSklo): number {
@@ -140,7 +146,7 @@ export function pridajSkloManual(s: ManualSklo): number {
 	return db.transaction(() => {
 		const id = pridajSklo({
 			zak: s.zak,
-			modul: 'manual',
+			modul: (s.modul ?? 'manual').trim() || 'manual',
 			popis: (s.popis ?? '').trim(),
 			sirkaMm: s.sirkaMm,
 			vyskaMm: s.vyskaMm,

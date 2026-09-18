@@ -77,8 +77,8 @@
 			>Typ skla *
 			<select name="typ_skla" required data-testid="manual-typ">
 				<option value="">— vyberte typ —</option>
-				{#each glassTypes as t (t.code)}
-					<option value={t.code}>{t.name}</option>
+				{#each glassTypes as t (t.value)}
+					<option value={t.value}>{t.label}</option>
 				{/each}
 			</select></label
 		>
@@ -184,11 +184,11 @@
 										data-testid={`typ-skla-${p.id}`}
 										onchange={(e) => (e.target as HTMLSelectElement).form?.requestSubmit()}
 									>
-										{#if !glassTypes.some((t) => t.code === p.typSkla)}
+										{#if !glassTypes.some((t) => t.value === p.typSkla)}
 											<option value={p.typSkla} selected>{p.typSkla || '— vyberte typ —'}</option>
 										{/if}
-										{#each glassTypes as t (t.code)}
-											<option value={t.code} selected={t.code === p.typSkla}>{t.name}</option>
+										{#each glassTypes as t (t.value)}
+											<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option>
 										{/each}
 									</select>
 								</form>
@@ -252,67 +252,59 @@
 						<tr class="noprint spec-row">
 							<td colspan="8">
 								<details>
-									<summary>Ďalšie možnosti (zriedkavé) — pre presný výpočet ceny IZOS</summary>
+									<summary>Hrana skla (opracovanie) — pre IZOS oceňovanie</summary>
 									<form method="POST" action="?/ulozitSpec" use:enhance class="spec-form">
 										<input type="hidden" name="id" value={p.id} />
-										<label class="chk">
-											<input type="checkbox" name="spec_warm_edge" checked={p.spec.warmEdge} /> Teplá
-											hrana
-										</label>
-										<label class="chk">
-											<input
-												type="checkbox"
+										<!-- #546: výroba chce z IZOS špecifikácie LEN „Hrana"; ostatných 8 príplatkov (teplá
+											hrana, farebný rámik, priečky, otvory, priemer, výrezy 35×60/60×120, HST, kalenie) je
+											z UI skryté. Stĺpce/DB/payload builder sa NEmenia — pre STARÉ riadky s nastavenou
+											hodnotou ju echujeme hidden inputom, aby ju re-save (Hrana) nezmazal a
+											`buildGlassOrderItem` ju ďalej poslal. Default (vypnuté) → hidden sa nerenderuje →
+											payload byte-identický. -->
+										{#if p.spec.warmEdge}<input
+												type="hidden"
+												name="spec_warm_edge"
+												value="1"
+											/>{/if}
+										{#if p.spec.coloredFrame}<input
+												type="hidden"
 												name="spec_colored_frame"
-												checked={p.spec.coloredFrame}
-											/>
-											Farebný rámik
-										</label>
-										<label
-											>Priečky kríž (ks)
-											<input
-												type="number"
+												value="1"
+											/>{/if}
+										{#if p.spec.muntinCrossQty > 0}<input
+												type="hidden"
 												name="spec_muntin_cross_qty"
-												min="0"
 												value={p.spec.muntinCrossQty}
-											/></label
-										>
-										<label
-											>Otvory (ks)
-											<input
-												type="number"
+											/>{/if}
+										{#if p.spec.holesQty > 0}<input
+												type="hidden"
 												name="spec_holes_qty"
-												min="0"
 												value={p.spec.holesQty}
-											/></label
-										>
-										<label
-											>Priemer otvoru
-											<select name="spec_hole_size">
-												<option value="d30" selected={p.spec.holeSize !== 'd50'}>4–30 mm</option>
-												<option value="d50" selected={p.spec.holeSize === 'd50'}>31–50 mm</option>
-											</select></label
-										>
-										<label
-											>Výrezy 35×60 (ks)
-											<input
-												type="number"
+											/>{/if}
+										{#if p.spec.holeSize}<input
+												type="hidden"
+												name="spec_hole_size"
+												value={p.spec.holeSize}
+											/>{/if}
+										{#if p.spec.cutoutSmallQty > 0}<input
+												type="hidden"
 												name="spec_cutout_small_qty"
-												min="0"
 												value={p.spec.cutoutSmallQty}
-											/></label
-										>
-										<label
-											>Výrezy 60×120 (ks)
-											<input
-												type="number"
+											/>{/if}
+										{#if p.spec.cutoutLargeQty > 0}<input
+												type="hidden"
 												name="spec_cutout_large_qty"
-												min="0"
 												value={p.spec.cutoutLargeQty}
-											/></label
-										>
+											/>{/if}
+										{#if p.spec.hst}<input type="hidden" name="spec_hst" value="1" />{/if}
+										{#if p.spec.temperingOwnGlass}<input
+												type="hidden"
+												name="spec_tempering_own_glass"
+												value="1"
+											/>{/if}
 										<label
 											>Hrana
-											<select name="spec_edge_finish">
+											<select name="spec_edge_finish" data-testid={`spec-edge-${p.id}`}>
 												<option value="none" selected={p.spec.edgeFinish === 'none'}>žiadna</option>
 												<option value="ksr" selected={p.spec.edgeFinish === 'ksr'}
 													>KSR zrazená</option
@@ -327,16 +319,6 @@
 												>
 											</select></label
 										>
-										<label class="chk">
-											<input type="checkbox" name="spec_hst" checked={p.spec.hst} /> HST
-										</label>
-										<label class="chk">
-											<input
-												type="checkbox"
-												name="spec_tempering_own_glass"
-												checked={p.spec.temperingOwnGlass}
-											/> Kalenie vlastného skla
-										</label>
 										<button
 											type="submit"
 											class="btn sm secondary"
@@ -367,7 +349,7 @@
 					<input
 						type="text"
 						name="op"
-						value={data.podkladOp}
+						value={data.podkladOp || data.prefillOp}
 						placeholder="napr. OP260545"
 						data-testid="op-input"
 					/></label
@@ -522,13 +504,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-	}
-	.spec-form input[type='number'] {
-		width: 60px;
-		padding: 2px 4px;
-	}
-	.spec-form label.chk {
-		gap: 6px;
 	}
 	.odoslane {
 		margin-top: 16px;

@@ -22,11 +22,17 @@ const log = logger('odoo-glass-types');
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const GLASS_TYPE_MODEL = 'montalu.glass.type';
 
-/** Jedna položka objednávkového pickera typov skla (Odoo `code` ide do `glass_order.items[].type`). */
+/**
+ * Jedna položka objednávkového pickera typov skla. `value` sa uloží do `typ_skla` =
+ * `glass_order.items[].glass_type` (Odoo `resolve_glass_type` páruje `cennik_code` → presný `name`
+ * → `composition`). `value = cennik_code || name` (keď `cennik_code` chýba, posiela sa presný
+ * `name`). `label` = `name` (+ ' · ' + composition, ak je) pre operátora. `category` = Odoo
+ * `montalu.glass.type.category` (skupina — IZO / VSG / jednosklo …).
+ */
 export interface GlassTypeOption {
-	code: string;
-	name: string;
-	composition_spec: string;
+	value: string;
+	label: string;
+	category: string;
 }
 
 export interface GlassTypesResult {
@@ -50,8 +56,8 @@ export function _resetGlassTypesWarn(): void {
 
 /**
  * Lokálny fallback zoznam z appkovho `glass_types` katalógu. Dedup podľa názvu (to isté sklo môže
- * legitímne existovať vo viacerých systémoch — #214), `code = name = nazov` (lokálne appka nemá Odoo
- * kódy). LEN pre objednávkový picker — výpočtový katalóg sa nemení.
+ * legitímne existovať vo viacerých systémoch — #214), `value = label = nazov` (lokálne appka nemá
+ * Odoo kódy ani kategórie). LEN pre objednávkový picker — výpočtový katalóg sa nemení.
  */
 function localFallback(): GlassTypesResult {
 	const seen = new Set<string>();
@@ -60,9 +66,9 @@ function localFallback(): GlassTypesResult {
 		const name = (g.nazov ?? '').trim();
 		if (!name || seen.has(name)) continue;
 		seen.add(name);
-		items.push({ code: name, name, composition_spec: '' });
+		items.push({ value: name, label: name, category: '' });
 	}
-	items.sort((a, b) => a.name.localeCompare(b.name, 'sk'));
+	items.sort((a, b) => a.label.localeCompare(b.label, 'sk'));
 	return { items, source: 'local' };
 }
 
@@ -83,21 +89,29 @@ export async function fetchGlassTypes(): Promise<GlassTypesResult> {
 	}
 
 	try {
+		// #546: SKUTOČNÉ polia `montalu.glass.type` (relay #540): name/category/cennik_code/composition/
+		// active — nie code/composition_spec (tie na PROD → Odoo 500 → fallback). `value = cennik_code
+		// || name` (Odoo `resolve_glass_type` páruje kód → presný názov → zloženie).
 		const rows = await searchReadJson2(
 			cfg,
 			GLASS_TYPE_MODEL,
 			[['active', '=', true]],
-			['code', 'name', 'composition_spec'],
+			['name', 'category', 'cennik_code', 'composition', 'active'],
 			{ order: 'name' }
 		);
 		const items: GlassTypeOption[] = rows
-			.map((r) => ({
-				code: String(r.code ?? '').trim(),
-				name: String(r.name ?? '').trim(),
-				composition_spec: String(r.composition_spec ?? '').trim()
-			}))
-			// riadok bez `code` je pre `glass_order.items[].type` nepoužiteľný → vynechaj
-			.filter((r) => r.code !== '');
+			.map((r) => {
+				const name = String(r.name ?? '').trim();
+				const cennik = String(r.cennik_code ?? '').trim();
+				const composition = String(r.composition ?? '').trim();
+				return {
+					value: cennik || name,
+					label: composition ? `${name} · ${composition}` : name,
+					category: String(r.category ?? '').trim()
+				};
+			})
+			// riadok bez cennik_code AJ bez name je pre `glass_order.items[].glass_type` nepoužiteľný
+			.filter((r) => r.value !== '');
 		const result: GlassTypesResult = { items, source: 'odoo' };
 		_cache = { result, ts: now };
 		return result;
