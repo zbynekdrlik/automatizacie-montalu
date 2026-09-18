@@ -70,6 +70,12 @@ test('zasklenia: spočítať → Pridať sklá do objednávky → podklad s reá
 	await expect(riadok.locator('td').nth(2)).toContainText(typTxt);
 	await expect(riadok.locator('td').nth(3)).toContainText(String(pocet));
 
+	// #540: picker typu skla — select v riadku + zdroj zoznamu. Proti preview cieľu (bez Odoo
+	// pripojenia) je zdroj lokálny fallback, nikdy tichý prázdny select.
+	await expect(riadok.locator('select[name="typ_skla"]')).toBeVisible();
+	await expect(riadok.locator('select[name="typ_skla"] option')).not.toHaveCount(0);
+	await expect(page.getByTestId('glass-types-source')).toContainText('lokálny zoznam');
+
 	// rozmery/atyp prepínač: pred prepnutím žiadny upload vstup, po prepnutí sa objaví
 	await expect(riadok.locator('input[type="file"]')).toHaveCount(0);
 	await riadok.locator('select[name="rezim"]').selectOption('atyp');

@@ -201,6 +201,33 @@ export async function uploadPlanRezovToOdoo(
 			cutPlanRejected: up.cutPlanRejected,
 			result: up.result
 		});
+
+		// #540: po úspešnom nárezák uploade pošli AUTOMATICKY aj objednávku skla (glass_order) na TÚ
+		// ISTÚ OP, keď má zákazka aspoň jednu tabuľu skla. BEST-EFFORT ako PDF príloha: zlyhanie
+		// glass_order NIKDY nezhodí nárezák upload (log + počítadlo). Idempotentný doc_id
+		// `glass-order-<zak>-<op>` → neskoršia ručná akcia na /objednavka-skla tú istú objednávku len
+		// prepíše, nevytvorí druhú. Money-NEUTRÁLNE (objednávka u dodávateľa skla). Dynamický import
+		// drží STATICKÝ graf tohto modulu bez `db` väzby (`odoo-glass-order-upload` → `objednavka-skla`
+		// → `db`); `uploadGlassOrderToOdoo` sám vráti 'no-items' keď zákazka nemá sklo (žiadny Odoo call).
+		try {
+			const { uploadGlassOrderToOdoo } = await import('./odoo-glass-order-upload');
+			const g = await uploadGlassOrderToOdoo(zak, op);
+			if (g.result === 'failed') {
+				log.warn('plan-rezov upload: glass_order auto-send zlyhal (nárezák OK, best-effort)', {
+					zak,
+					op,
+					err: g.error
+				});
+			} else {
+				log.info('plan-rezov upload: glass_order auto-send', { zak, op, glassResult: g.result });
+			}
+		} catch (e) {
+			log.warn('plan-rezov upload: glass_order auto-send hodil (ignorované, nárezák OK)', {
+				zak,
+				err: errMsg(e)
+			});
+		}
+
 		return { result: 'uploaded' };
 	} catch (e) {
 		const msg = errMsg(e);

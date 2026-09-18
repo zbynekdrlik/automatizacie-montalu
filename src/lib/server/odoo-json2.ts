@@ -153,6 +153,36 @@ export async function callJson2(
 	}
 }
 
+/** Voliteľné parametre `search_read` (#540). */
+export interface SearchReadOpts {
+	order?: string;
+	limit?: number;
+	offset?: number;
+	context?: Record<string, unknown>;
+}
+
+/**
+ * Generický READ cez Odoo External JSON-2 `search_read` (#540). Tenká vrstva nad `callJson2` s
+ * rovnakou auth/env ako uploady (bearer kľúč sám identifikuje volajúceho). Vracia pole záznamov
+ * (prázdne, keď odpoveď nie je pole). Hodí `OdooJson2Error` pri HTTP/JSON-RPC chybe — volajúci
+ * rieši fallback (napr. `fetchGlassTypes`). Money-neutrálne: read-only.
+ */
+export async function searchReadJson2(
+	cfg: OdooJson2Config,
+	model: string,
+	domain: unknown[],
+	fields: string[],
+	opts: SearchReadOpts = {}
+): Promise<Record<string, unknown>[]> {
+	const kwargs: Record<string, unknown> = { domain, fields };
+	if (opts.order != null) kwargs.order = opts.order;
+	if (opts.limit != null) kwargs.limit = opts.limit;
+	if (opts.offset != null) kwargs.offset = opts.offset;
+	if (opts.context != null) kwargs.context = opts.context;
+	const res = await callJson2(cfg, model, 'search_read', kwargs);
+	return Array.isArray(res) ? (res as Record<string, unknown>[]) : [];
+}
+
 // --- #532 R2: montalu_narezak_upload s cut_plan 422 fallbackom ----------------------------------- //
 
 /** Výsledok `uploadNarezak`. `cutPlanAccepted` = cut_plan bol poslaný a Odoo ho prijal (upload bez

@@ -7,12 +7,14 @@ import {
 	listSklaPreZakazku,
 	nastavRezim,
 	nastavSpec,
+	nastavTypSkla,
 	zmazPolozku,
 	pridajSubor,
 	listSubory,
 	zmazSubor,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
+import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
 import {
 	HOLE_SIZES,
 	EDGE_FINISHES,
@@ -82,7 +84,11 @@ export const load: PageServerLoad = async ({ params }) => {
 		}
 	}
 
-	return { zak, op, polozky, suboryMap };
+	// #540: zoznam typov skla pre picker riadka — živý Odoo `montalu.glass.type`, s lokálnym
+	// fallbackom keď Odoo nedostupné (source sa zobrazí v UI). Money-neutrálne (len ordering).
+	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
+
+	return { zak, op, polozky, suboryMap, glassTypes, glassTypesSource };
 };
 
 export const actions = {
@@ -138,6 +144,22 @@ export const actions = {
 		const id = Number(form.get('id'));
 		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID súboru.' });
 		zmazSubor(id);
+		return { ok: true };
+	},
+
+	// #540: výber typu skla z Odoo pickera — uloží Odoo `code` (alebo lokálny názov) do `typ_skla`
+	// (= `glass_order.items[].glass_type`). Money-neutrálne (objednávka, nie výpočtový katalóg).
+	nastavTyp: async ({ request }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		const typ = String(form.get('typ_skla') ?? '').trim();
+		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID.' });
+		if (!typ) return fail(400, { error: 'Vyberte typ skla.' });
+		try {
+			nastavTypSkla(id, typ);
+		} catch (e) {
+			return fail(400, { error: e instanceof Error ? e.message : 'Neplatný typ skla.' });
+		}
 		return { ok: true };
 	},
 

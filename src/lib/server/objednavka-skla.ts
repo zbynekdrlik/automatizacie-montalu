@@ -259,6 +259,17 @@ export function getSkloPolozka(id: number): SkloPolozka | null {
 	return r ? mapRow(r) : null;
 }
 
+// #540: typ skla riadka — pri výbere z Odoo `montalu.glass.type` pickera sa uloží Odoo `code` do
+// existujúceho `typ_skla` stĺpca (= `glass_order.items[].glass_type`). Money-NEUTRÁLNE (objednávka).
+const stmtNastavTyp = db.prepare('UPDATE objednavka_skla SET typ_skla = ? WHERE id = ?');
+
+export function nastavTypSkla(id: number, typ: string): void {
+	const t = (typ ?? '').trim();
+	if (!t) throw new Error('Typ skla je prázdny.');
+	stmtNastavTyp.run(t, id);
+	log.info('sklo typ zmenený', { id, typ: t });
+}
+
 const stmtNastavRezim = db.prepare('UPDATE objednavka_skla SET rezim = ? WHERE id = ?');
 
 export function nastavRezim(id: number, rezim: 'rozmery' | 'atyp'): void {
