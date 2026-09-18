@@ -12,7 +12,7 @@ import { logger } from './log';
 import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
 import { normOp, normZak } from './money';
 import { zakazkaOp } from './zakazka-ceny';
-import { listSklaPreZakazku } from './objednavka-skla';
+import { listSklaPreZakazku, opPodkladu } from './objednavka-skla';
 import { buildGlassOrder, type GlassOrder } from './odoo-rozpis-lines';
 
 const log = logger('glass-order-upload');
@@ -72,11 +72,26 @@ export async function uploadGlassOrderToOdoo(
 	if (!cfg) return { result: 'disabled', payload };
 
 	try {
-		// OP: keď volajúci (auto-send z plán-rezov uloženia, #540) explicitne poslal op TEJ ISTEJ
-		// zákazky, použi ho priamo (glass_order ide na tú istú OP ako nárezák). Inak (explicitná
-		// akcia na podklade) OP z NAJNOVŠIEHO odpisu, live-first (zdieľaný `zakazkaOp`) — aby posledný
-		// TEST odpis (live=0) nesmeroval objednávku skla na testovacie OP.
-		const op = (opOverride ?? '').trim() || zakazkaOp(trimmed);
+		// OP precedencia (#540 + #545): opOverride ?? OP z odpisu ?? OP z podkladu.
+		//  1) opOverride — auto-send z plán-rezov uloženia (#540) posiela op TEJ ISTEJ zákazky priamo
+		//     (glass_order ide na tú istú OP ako nárezák).
+		//  2) OP z NAJNOVŠIEHO odpisu, live-first (`zakazkaOp`) — aby posledný TEST odpis (live=0)
+		//     nesmeroval objednávku skla na testovacie OP.
+		//  3) OP z podkladu (#545) — servisná objednávka bez odpisu, OP zadané ručne (`nastavOp`).
+		//     Rozdielne OP na riadkoch (mixed) → missing s hláškou (operátor nastaví jedno OP).
+		let op = (opOverride ?? '').trim() || zakazkaOp(trimmed);
+		if (!op) {
+			const pod = opPodkladu(trimmed);
+			if (pod === null) {
+				log.info('glass-order upload: riadky podkladu majú rôzne OP', { zak: trimmed });
+				return {
+					result: 'missing',
+					payload,
+					error: 'Riadky podkladu majú rôzne OP — nastavte jedno OP objednávky.'
+				};
+			}
+			op = pod;
+		}
 		if (!op) {
 			log.info('glass-order upload: zákazka nemá odpis/OP — nič neposielam', { zak: trimmed });
 			return { result: 'missing', payload };

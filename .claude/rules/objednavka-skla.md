@@ -191,3 +191,34 @@ zoznam, NIKDY nenahrádza výpočtový katalóg** (viď `glass-catalog.md`).
 - **VEDOME MIMO scope:** backfill (`backfill-narezaky-deps.ts`) auto-send NEmá — bulk retroaktívne
   objednávky skla za mesiac by mohli duplikovať už ručne zadané objednávky u dodávateľa (design
   Architektúra scope-uje (ii) na ŽIVÉ plán-rezov uloženie). Prípadné doplnenie = samostatné rozhodnutie.
+
+## Ručné riadky (`modul='manual'`) + samostatná objednávka len skla bez odpisu (#545)
+
+Marek (Odoo úloha 951): jeden doklad na zákazku so VŠETKÝMI tabuľami (posuvy z výpočtu +
+ATYP + V.O. + priobjednané), a servisná objednávka len skla (rozbité balkónové sklo) BEZ
+nárezáku/odpisu. Prístup 1 — pridal producent `manual` + ručné pole OP, žiadna nová route,
+žiadna migrácia (stĺpce existujú). Money-NEUTRÁLNE, b2b naďalej zakázané.
+
+- **Producent `manual`** = ďalší zdroj riadkov popri zasklenia/fix/pergola. `pridajSkloManual(s)`
+  (`objednavka-skla.ts`) reuse `pridajSklo` s `modul='manual'`: typ skla POVINNÝ (prázdny → throw,
+  nič sa neuloží — z pickera `fetchGlassTypes`, Odoo `code` alebo lokálny názov), popis voľný
+  („ATYP podľa výkresu", „V.O."), rozmery celé > 0, počet celý >= 1, `m2 = š×v×ks/1e6` (ako FIX),
+  `rezim` rozmery|atyp (atyp sa nastaví PO vložení cez `nastavRezim`, lebo `pridajSklo` vkladá
+  vždy `rezim='rozmery'`). `MODUL_NAZVY.manual = 'Pridané položky'` (`modul-nazov.ts`) → vlastná
+  sekcia „Pridané položky". Akcia `pridatRiadok` re-validuje vstup na serveri (nikdy nedôveruje
+  klientovi). Prílohy/spec/mazanie/atyp-upload rovnaké ako iné riadky (`buildGlassOrderItem`
+  nezmenený). `manual` riadky sa NEdedupujú (vlastná sekcia, operátor maže).
+- **Formulár „Pridať riadok" je MIMO `{#if polozky.length === 0}` guardu** (`+page.svelte`) →
+  existuje aj na PRÁZDNOM podklade (servisná zákazka bez výpočtu). Guard obaľuje LEN
+  tabuľky/sekcie + OP pole + odoslanie.
+- **OP objednávky = jedno OP na celý podklad.** `nastavOpZakazky(zak, op)` (validácia `normOp`,
+  throw na prázdne) zapíše do `op` VŠETKÝCH riadkov zákazky (akcia `nastavOp`). Zobrazí sa OP
+  z odpisu READ-ONLY keď existuje (`zakazkaOp`, prednosť), inak ručné pole.
+- **Upload OP precedencia** (`uploadGlassOrderToOdoo`): `opOverride ?? zakazkaOp(zak) ??
+  opPodkladu(zak)`. `opPodkladu` vráti `''` (žiadne OP → `missing`), samotné OP keď sú riadky
+  jednotné, `null` keď sa OP riadkov ROZCHÁDZAJÚ (mixed → `missing` s hláškou „nastavte jedno OP").
+  Tak servisná zákazka BEZ odpisu odošle s ručným OP z podkladu; `doc_id` `glass-order-<zak>-<op>`
+  + Money-neutralita nezmenené. Tlačidlo Odoslať je zapnuté len keď má podklad ≥ 1 riadok A OP.
+- **`.xlsx` v upload allowliste** (`ALLOWED_EXTENSIONS` + `accept`) — Money OVSKL-štýl objednávky
+  ako v prílohe úlohy 951. Príloh do Odoo `glass_order.items[].attachments` = ČASŤ 3, follow-up
+  po potvrdení kontraktu (odoo-erp #7371) — TÁTO zmena ich NErobí.

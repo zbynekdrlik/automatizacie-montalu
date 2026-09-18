@@ -264,6 +264,24 @@ describe('b2b route coverage (denylist drift guard)', () => {
 		expect(b2bRedirectTarget('/objednavka-skla')).toBe('/zasklenia');
 		expect(b2bRedirectTarget('/objednavka-skla/ZAK260123')).toBe('/zasklenia');
 	});
+
+	// #545: presná množina akcií /objednavka-skla/[zak] — pridané `nastavOp` (jedno OP na podklad)
+	// a `pridatRiadok` (ručný riadok modul='manual'). Všetky pomenované (SvelteKit nedovolí default
+	// + pomenované naraz), Money-neutrálne (objednávka u dodávateľa, žiadny odpis). Fail-closed drift.
+	it('#545: /objednavka-skla/[zak] akcie sú presne definovaná množina (vrátane pridatRiadok/nastavOp)', async () => {
+		const { actions } = await import('../src/routes/objednavka-skla/[zak]/+page.server');
+		expect(Object.keys(actions).sort()).toEqual([
+			'nahratSubor',
+			'nastavOp',
+			'nastavRezim',
+			'nastavTyp',
+			'odoslatDoOdoo',
+			'pridatRiadok',
+			'ulozitSpec',
+			'zmazat',
+			'zmazatSubor'
+		]);
+	});
 });
 
 // #144, zadanie bod 3: „overiť testom, že b2b na /pergola/navrh nemá žiadnu cestu k

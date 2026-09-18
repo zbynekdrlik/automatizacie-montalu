@@ -86,3 +86,55 @@ test('zasklenia: spočítať → Pridať sklá do objednávky → podklad s reá
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #545: prázdny podklad (servisná zákazka bez nárezáku) → formulár „Pridať riadok" je viditeľný
+// aj bez položiek → pridá sa ručný riadok (typ z pickera, atyp) → riadok pod „Pridané položky" →
+// nastaví sa OP → tlačidlo Odoslať je zapnuté. NIKDY nesend-uje (proti live sa test skipne).
+test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať zapnuté', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await skipAkLive(page);
+
+	const zak = `${RUN}-SERVIS`;
+	await goto(page, `/objednavka-skla/${zak}`);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+
+	// prázdny podklad: formulár „Pridať riadok" je viditeľný aj bez položiek
+	const pridatForm = page.getByTestId('pridat-riadok');
+	await expect(pridatForm).toBeVisible();
+
+	// pridaj ručný riadok: popis, typ skla z pickera (prvá reálna možnosť), 1000×1000, 2 ks, atyp
+	await pridatForm.getByTestId('manual-popis').fill('ATYP podľa výkresu');
+	const typSelect = pridatForm.getByTestId('manual-typ');
+	await expect(typSelect.locator('option')).not.toHaveCount(0);
+	// vyber prvú NEprázdnu možnosť typu skla
+	const prvaMoznost = typSelect.locator('option:not([value=""])').first();
+	await expect(prvaMoznost).toBeAttached();
+	const typValue = await prvaMoznost.getAttribute('value');
+	await typSelect.selectOption(typValue!);
+	await pridatForm.getByTestId('manual-sirka').fill('1000');
+	await pridatForm.getByTestId('manual-vyska').fill('1000');
+	await pridatForm.getByTestId('manual-pocet').fill('2');
+	await pridatForm.getByTestId('manual-rezim').selectOption('atyp');
+	await pridatForm.getByTestId('manual-pridat').click();
+	await waitHydrated(page);
+
+	// riadok sa objaví v sekcii „Pridané položky"
+	await expect(page.getByRole('heading', { name: 'Pridané položky' })).toBeVisible();
+	const riadok = page.locator('tbody tr').first();
+	await expect(riadok.locator('td').nth(0)).toContainText('ATYP podľa výkresu');
+	await expect(riadok.locator('td').nth(1)).toContainText('1000');
+
+	// Odoslať je bez OP zatiaľ zakázané
+	await expect(page.getByTestId('odoslat-odoo')).toBeDisabled();
+
+	// nastav OP objednávky (zákazka nemá odpis) → jedno OP pre celý podklad
+	await page.getByTestId('op-input').fill('260545');
+	await page.getByTestId('nastav-op').click();
+	await waitHydrated(page);
+
+	// Odoslať je teraz zapnuté (≥ 1 riadok + OP); v teste NIKDY neklikáme send
+	await expect(page.getByTestId('odoslat-odoo')).toBeEnabled();
+
+	expect(consoleMsgs).toEqual([]);
+});
