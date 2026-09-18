@@ -266,7 +266,15 @@ owner ho odložil → ops-wait na #546).
   `prefillOp`; OP pole sa predvyplní `podkladOp || prefillOp` (uloží ho `nastavOp` až keď podklad má
   riadky). Servis (popraskané sklá) tak dostane podklad + OP bez odpisu/nárezáku.
 - **Testy:** `odoo-glass-types.test.ts` (nové polia + value/label), `objednavka-skla-manual.test.ts`
-  (modul override), `objednavka-skla-index.test.ts` (index redirect + validácia), drift guard
-  `b2b-route-coverage.test.ts` (množina akcií `/pergola/narez` vrátane `pridatSkloRucne`). E2E:
+  (modul override + `op` prenos), `objednavka-skla-index.test.ts` (index redirect + validácia). E2E:
   `objednavka-skla-spec.spec.ts` (rescope na Hrana + skryté polia nie sú v UI), `objednavka-skla.spec.ts`
   (index formulár), `objednavka-skla-pergola.spec.ts` (honest-null → ručné strešné sklo).
+- **PASCA — množina akcií `/pergola/narez` je strážená DVOMA drift testami**, nie jedným: pridanie
+  akcie (napr. `pridatSkloRucne`) treba pridať do EXPECTED zoznamu v OBOCH: `b2b-route-coverage.test.ts`
+  AJ `pergola-narez-money-safety.test.ts` (`akcie routy = form + rezervácia + expedícia, nič viac`).
+  Zabudnutý druhý = plná suita padne až po ~5 min serial coverage behu. Pred pridaním akcie na
+  `/pergola/narez` grepni `Object.keys(actions).sort()` cez `tests/`.
+- **Pergola honest-null riadok NESIE OP** (`pridajSkloManual({ op: ident.op })`, review 🟡) — rovnako
+  ako automatický `pridatSkla` producent (`op: ident.op`); inak by operátorom zadané OP z pergola
+  formulára zmizlo a muselo sa zadať znova cez `nastavOp`. Ručný podklad `pridatRiadok` OP naďalej
+  NEzadáva (jedno OP na CELÝ podklad cez `nastavOp`), takže `pridajSkloManual.op` je default `''`.
