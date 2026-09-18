@@ -12,6 +12,9 @@ import {
 	pridajSubor,
 	listSubory,
 	zmazSubor,
+	pridajSkloManual,
+	nastavOpZakazky,
+	opPodkladu,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
 import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
@@ -52,7 +55,8 @@ function parseSpec(form: FormData): GlassSpec {
 
 // Server-side file extension allowlist (#496 review RED-1: stored XSS prevention).
 // Client-side `accept` attribute is UX only — a forged POST bypasses it.
-const ALLOWED_EXTENSIONS = ['.pdf', '.dxf', '.dwg', '.step', '.stp', '.igs', '.iges'];
+// #545: `.xlsx` pridané (Money OVSKL-štýl objednávka skla ako v prílohe úlohy 951).
+const ALLOWED_EXTENSIONS = ['.pdf', '.dxf', '.dwg', '.step', '.stp', '.igs', '.iges', '.xlsx'];
 
 function allowedExtension(filename: string): boolean {
 	const ext = '.' + (filename.split('.').pop() ?? '').toLowerCase();
@@ -68,6 +72,11 @@ export const load: PageServerLoad = async ({ params }) => {
 	// #528: OP zákazky (z najnovšieho odpisu, live-first) pre QR zákazky v hlavičke výtlačku — QR
 	// vedie na TÚ ISTÚ `sale.order` ako nahraná `glass_order`. Prázdny keď zákazka nemá odpis/OP.
 	const op = zakazkaOp(zak);
+	// #545: OP uložené priamo na riadkoch podkladu (servisná objednávka bez odpisu). `null` (mixed) →
+	// zobraz prázdne (operátor nastaví jedno OP). `effektivneOp` = precedencia odpis > podklad —
+	// tlačidlo Odoslať sa zapne, keď je (≥ 1 riadok a) neprázdne.
+	const podkladOp = opPodkladu(zak) ?? '';
+	const effektivneOp = op || podkladOp;
 
 	// Pre každú položku načítaj zoznam príloh (bez dát — len metadata)
 	const suboryMap: Record<number, { id: number; nazov: string; typ: string; velkost: number }[]> =
@@ -88,7 +97,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	// fallbackom keď Odoo nedostupné (source sa zobrazí v UI). Money-neutrálne (len ordering).
 	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
 
-	return { zak, op, polozky, suboryMap, glassTypes, glassTypesSource };
+	return { zak, op, podkladOp, effektivneOp, polozky, suboryMap, glassTypes, glassTypesSource };
 };
 
 export const actions = {
@@ -99,6 +108,49 @@ export const actions = {
 		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID.' });
 		if (rezim !== 'rozmery' && rezim !== 'atyp') return fail(400, { error: 'Neplatný režim.' });
 		nastavRezim(id, rezim);
+		return { ok: true };
+	},
+
+	// #545: ručný riadok objednávky skla (modul='manual'). Typ skla POVINNÝ; server RE-validuje
+	// vstup (nikdy nedôveruje klientovi) — rovnaká disciplína ako producent-akcie.
+	pridatRiadok: async ({ params, request, locals }) => {
+		const zak = params.zak.trim();
+		if (!zak) return fail(400, { pridatChyba: 'Zákazka nie je zadaná.' });
+		const form = await request.formData();
+		const popis = String(form.get('popis') ?? '').trim();
+		const typSkla = String(form.get('typ_skla') ?? '').trim();
+		const sirkaMm = Math.trunc(Number(form.get('sirka_mm')));
+		const vyskaMm = Math.trunc(Number(form.get('vyska_mm')));
+		const pocet = Math.trunc(Number(form.get('pocet')));
+		const rezim = form.get('rezim') === 'atyp' ? 'atyp' : 'rozmery';
+		try {
+			pridajSkloManual({
+				zak,
+				popis,
+				typSkla,
+				sirkaMm,
+				vyskaMm,
+				pocet,
+				rezim,
+				createdBy: locals.user?.username ?? ''
+			});
+		} catch (e) {
+			return fail(400, { pridatChyba: e instanceof Error ? e.message : 'Neplatný riadok.' });
+		}
+		return { ok: true };
+	},
+
+	// #545: jedno OP objednávky pre celý podklad (servisná zákazka bez odpisu) → `op` všetkých riadkov.
+	nastavOp: async ({ params, request }) => {
+		const zak = params.zak.trim();
+		if (!zak) return fail(400, { opChyba: 'Zákazka nie je zadaná.' });
+		const form = await request.formData();
+		const op = String(form.get('op') ?? '');
+		try {
+			nastavOpZakazky(zak, op);
+		} catch (e) {
+			return fail(400, { opChyba: e instanceof Error ? e.message : 'Neplatné OP.' });
+		}
 		return { ok: true };
 	},
 

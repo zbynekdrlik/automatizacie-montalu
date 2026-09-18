@@ -22,6 +22,9 @@
 	// #540: zoznam typov skla pre picker (Odoo `montalu.glass.type` alebo lokálny fallback)
 	const glassTypes = $derived(data.glassTypes);
 	const glassTypesSource = $derived(data.glassTypesSource);
+	// #545: OP objednávky — odpisové OP má prednosť (read-only); inak ručné pole. Odoslať sa zapne,
+	// keď je (≥ 1 riadok a) neprázdne efektívne OP.
+	const maOp = $derived(!!data.effektivneOp);
 
 	// Zoskupenie položiek podľa modulu (plain array, bez Map — svelte/prefer-svelte-reactivity)
 	const skupiny = $derived.by(() => {
@@ -54,9 +57,81 @@
 <QrZakazka op={data.op} />
 <h1>Objednávka skla — {zak}</h1>
 
+<!-- #545: „Pridať riadok" — ručný riadok (ATYP / V.O. / priobjednané / servis). Viditeľný VŽDY,
+	aj na prázdnom podklade (formulár mimo guardu položiek). Typ skla je povinný. -->
+<section class="card noprint pridat-card" data-testid="pridat-riadok">
+	<h2 class="sec">Pridať riadok</h2>
+	<form method="POST" action="?/pridatRiadok" use:enhance class="pridat-form">
+		<label class="wide"
+			>Popis
+			<input
+				type="text"
+				name="popis"
+				placeholder="napr. ATYP podľa výkresu, V.O., priobjednané sklo"
+				data-testid="manual-popis"
+			/></label
+		>
+		<label
+			>Typ skla *
+			<select name="typ_skla" required data-testid="manual-typ">
+				<option value="">— vyberte typ —</option>
+				{#each glassTypes as t (t.code)}
+					<option value={t.code}>{t.name}</option>
+				{/each}
+			</select></label
+		>
+		<label
+			>Šírka (mm) *
+			<input
+				type="number"
+				name="sirka_mm"
+				min="1"
+				step="1"
+				required
+				data-testid="manual-sirka"
+			/></label
+		>
+		<label
+			>Výška (mm) *
+			<input
+				type="number"
+				name="vyska_mm"
+				min="1"
+				step="1"
+				required
+				data-testid="manual-vyska"
+			/></label
+		>
+		<label
+			>Počet ks *
+			<input
+				type="number"
+				name="pocet"
+				min="1"
+				step="1"
+				value="1"
+				required
+				data-testid="manual-pocet"
+			/></label
+		>
+		<label
+			>Režim
+			<select name="rezim" data-testid="manual-rezim">
+				<option value="rozmery">rozmery</option>
+				<option value="atyp">atyp</option>
+			</select></label
+		>
+		<button type="submit" class="btn" data-testid="manual-pridat">Pridať riadok</button>
+	</form>
+	{#if form?.pridatChyba}
+		<p class="err" data-testid="manual-chyba">{form.pridatChyba}</p>
+	{/if}
+</section>
+
 {#if polozky.length === 0}
 	<p class="hint">
-		Žiadne sklá pre túto zákazku. Pridajte ich z výpočtu v module (Zasklenia, Fixy, Pergola).
+		Žiadne sklá pre túto zákazku. Pridajte riadok vyššie, alebo ich pridajte z výpočtu v module
+		(Zasklenia, Fixy, Pergola).
 	</p>
 {:else}
 	<p class="sub noprint">
@@ -155,7 +230,7 @@
 										<input
 											type="file"
 											name="subor"
-											accept=".pdf,.dxf,.dwg,.step,.stp,.igs,.iges"
+											accept=".pdf,.dxf,.dwg,.step,.stp,.igs,.iges,.xlsx"
 											required
 										/>
 										<button type="submit" class="btn sm secondary">Nahrať</button>
@@ -275,14 +350,54 @@
 		</section>
 	{/each}
 
+	<!-- #545: OP objednávky — jedno OP na celý podklad. Z odpisu (read-only, prednosť) alebo ručné
+		pole pre servisnú zákazku bez nárezáku. Odoslať sa zapne až keď je OP nastavené. -->
+	<section class="card noprint op-card" data-testid="op-card">
+		{#if data.op}
+			<p class="op-info">
+				OP objednávky: <b class="mono" data-testid="op-hodnota">{data.op}</b>
+				<span class="sub">(z odpisu zákazky)</span>
+			</p>
+		{:else}
+			<form method="POST" action="?/nastavOp" use:enhance class="op-form">
+				<label
+					>OP objednávky
+					<input
+						type="text"
+						name="op"
+						value={data.podkladOp}
+						placeholder="napr. OP260545"
+						data-testid="op-input"
+					/></label
+				>
+				<button type="submit" class="btn secondary" data-testid="nastav-op">Uložiť OP</button>
+				{#if data.podkladOp}<span class="mono op-set" data-testid="op-hodnota"
+						>{data.podkladOp}</span
+					>{/if}
+			</form>
+			{#if form?.opChyba}<p class="err" data-testid="op-chyba">{form.opChyba}</p>{/if}
+		{/if}
+	</section>
+
 	<div class="noprint tbl-akcie">
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
-		<!-- #521: odoslať objednávku skla do Odoo (glass_order → IZOS oceňovanie) -->
-		<form method="POST" action="?/odoslatDoOdoo" use:enhance style="display:inline">
-			<button type="submit" class="btn" data-testid="odoslat-odoo"
-				>Odoslať objednávku skla do Odoo</button
+		<!-- #521: odoslať objednávku skla do Odoo (glass_order → IZOS oceňovanie).
+			#545: zapnuté len keď má podklad ≥ 1 riadok a OP (inak nemá kam priradiť objednávku). -->
+		{#if maOp}
+			<form method="POST" action="?/odoslatDoOdoo" use:enhance style="display:inline">
+				<button type="submit" class="btn" data-testid="odoslat-odoo"
+					>Odoslať objednávku skla do Odoo</button
+				>
+			</form>
+		{:else}
+			<button
+				type="button"
+				class="btn"
+				data-testid="odoslat-odoo"
+				disabled
+				title="Najprv nastavte OP objednávky">Odoslať objednávku skla do Odoo</button
 			>
-		</form>
+		{/if}
 	</div>
 
 	{#if form?.odoslane}
@@ -441,6 +556,48 @@
 	}
 	.print-only {
 		display: none;
+	}
+
+	/* #545: „Pridať riadok" formulár + OP pole */
+	.pridat-form,
+	.op-form {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 16px;
+		align-items: flex-end;
+		font-size: 0.85rem;
+	}
+	.pridat-form label,
+	.op-form label {
+		display: inline-flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.pridat-form label.wide {
+		flex: 1 1 220px;
+	}
+	.pridat-form input[type='number'] {
+		width: 90px;
+	}
+	.op-card {
+		margin-top: 16px;
+	}
+	.op-info {
+		font-size: 0.9rem;
+		color: var(--m-ink-2);
+	}
+	.op-set {
+		align-self: center;
+		color: var(--m-ink-2);
+	}
+	.err {
+		color: var(--m-danger);
+		font-size: 0.85rem;
+		margin-top: 6px;
+	}
+	.btn[disabled] {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	@media print {

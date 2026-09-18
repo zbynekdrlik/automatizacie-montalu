@@ -2,7 +2,7 @@
 // Money-NEUTRÁLNE (objednávka u dodávateľa skla, nie Money odpis).
 // Handoff kontrakt pre Odoo subdev: číta z objednavka_skla + objednavka_skla_subory.
 import { db } from './db';
-import { normZak } from './money';
+import { normOp, normZak } from './money';
 import { logger } from './log';
 import {
 	GLASS_SPEC_OFF,
@@ -100,6 +100,53 @@ export function pridajSklo(s: NoveSklo): number {
 	);
 	log.info('sklo polozka pridana', { id: r.lastInsertRowid, zak: s.zak, modul: s.modul });
 	return Number(r.lastInsertRowid);
+}
+
+// ---- Ručný riadok (#545) --------------------------------------------------------------
+
+/** Vstup pre ručne pridaný riadok objednávky skla (`modul='manual'`). Typ skla je POVINNÝ. */
+export interface ManualSklo {
+	zak: string;
+	popis: string;
+	typSkla: string;
+	sirkaMm: number;
+	vyskaMm: number;
+	pocet: number;
+	rezim: 'rozmery' | 'atyp';
+	createdBy: string;
+}
+
+/**
+ * #545: pridá RUČNÝ riadok objednávky skla (`modul='manual'`, sekcia „Pridané položky") — pre ATYP
+ * podľa výkresu, V.O., priobjednané sklo a servisné objednávky bez nárezáku. Reuse `pridajSklo`
+ * (Money-NEUTRÁLNE). Typ skla POVINNÝ (prázdny → throw, nič sa neuloží); rozmery celé > 0, počet
+ * celý >= 1; `m2 = š×v×ks/1e6` (ako FIX producent). `rezim='atyp'` sa nastaví po vložení
+ * (`pridajSklo` vkladá vždy s `rezim='rozmery'`), aby atyp riadok rovno ponúkol prílohu.
+ */
+export function pridajSkloManual(s: ManualSklo): number {
+	const typ = (s.typSkla ?? '').trim();
+	if (!typ) throw new Error('Typ skla je povinný — vyberte typ skla.');
+	if (!Number.isInteger(s.sirkaMm) || s.sirkaMm <= 0)
+		throw new Error('Šírka musí byť celé číslo > 0.');
+	if (!Number.isInteger(s.vyskaMm) || s.vyskaMm <= 0)
+		throw new Error('Výška musí byť celé číslo > 0.');
+	if (!Number.isInteger(s.pocet) || s.pocet < 1)
+		throw new Error('Počet kusov musí byť celé číslo >= 1.');
+
+	const m2 = (s.sirkaMm * s.vyskaMm * s.pocet) / 1e6;
+	const id = pridajSklo({
+		zak: s.zak,
+		modul: 'manual',
+		popis: (s.popis ?? '').trim(),
+		sirkaMm: s.sirkaMm,
+		vyskaMm: s.vyskaMm,
+		pocet: s.pocet,
+		typSkla: typ,
+		m2,
+		createdBy: s.createdBy
+	});
+	if (s.rezim === 'atyp') nastavRezim(id, 'atyp');
+	return id;
 }
 
 /** Hromadné pridanie skiel (po výpočte modulu). Vracia počet vložených. */
@@ -205,6 +252,45 @@ export function listSklaPreZakazku(zakRaw: string): SkloPolozka[] {
 	const norm = normZak(zakRaw);
 	const rows = stmtListPre.all(norm, norm) as SkloRow[];
 	return rows.map(mapRow);
+}
+
+// ---- OP objednávky (#545) -------------------------------------------------------------
+
+// Jedno OP pre celý podklad (servisná objednávka bez odpisu): zapíše sa do `op` VŠETKÝCH riadkov
+// zákazky (rovnaký WHERE ako `stmtListPre` — pokrýva aj legacy `zak_norm` s medzerami).
+const stmtSetOpAll = db.prepare(`
+	UPDATE objednavka_skla SET op = ?
+	WHERE zak_norm = ? OR upper(replace(zak_norm,' ','')) = ?
+`);
+
+/**
+ * #545: nastaví (normalizované cez `normOp`) OP objednávky pre CELÝ podklad zákazky — jedno OP na
+ * podklad, uložené do `op` stĺpca všetkých riadkov. Prázdne/neplatné OP → throw (akcia → fail 400).
+ * Vracia normalizované OP. Money-NEUTRÁLNE (objednávka u dodávateľa, nie odpis).
+ */
+export function nastavOpZakazky(zakRaw: string, opRaw: string): string {
+	const op = normOp(opRaw ?? '');
+	if (!op) throw new Error('OP objednávky je prázdne alebo neplatné.');
+	const norm = normZak(zakRaw);
+	stmtSetOpAll.run(op, norm, norm);
+	log.info('objednavka OP nastavené', { zak: zakRaw, op });
+	return op;
+}
+
+/**
+ * #545: spoločné OP riadkov podkladu (pre upload OP precedenciu). Vráti `''` keď žiadny riadok nemá
+ * OP, samotné OP keď sú všetky (neprázdne) rovnaké, `null` keď sa OP riadkov ROZCHÁDZAJÚ (mixed →
+ * volajúci to hlási ako chybu „nastavte jedno OP").
+ */
+export function opPodkladu(zakRaw: string): string | null {
+	const ops = new Set(
+		listSklaPreZakazku(zakRaw)
+			.map((r) => (r.op ?? '').trim())
+			.filter((o) => o.length > 0)
+	);
+	if (ops.size === 0) return '';
+	if (ops.size > 1) return null;
+	return [...ops][0]!;
 }
 
 function mapRow(r: SkloRow): SkloPolozka {

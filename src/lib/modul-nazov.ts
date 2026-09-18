@@ -8,7 +8,9 @@ const MODUL_NAZVY: Record<string, string> = {
 	bazen: 'Bazén',
 	pergola: 'Pergola',
 	clip: 'Clip',
-	fix: 'Fix'
+	fix: 'Fix',
+	// #545: ručne pridané riadky objednávky skla (ATYP / V.O. / priobjednané) — vlastná sekcia.
+	manual: 'Pridané položky'
 };
 
 export function modulNazov(m: string): string {
