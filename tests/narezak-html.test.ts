@@ -122,7 +122,9 @@ describe('renderNarezakHtml — data-bar-id / data-piece-id zhodné s cut_plan.b
 	it('render_html je fragment `<div class="narezak">` (bez <html>/<head>)', () => {
 		expect(typeof html).toBe('string');
 		expect(html.startsWith('<div class="narezak">')).toBe(true);
-		expect(html).not.toMatch(/<html|<head|<!DOCTYPE/i);
+		// žiadny dokumentový wrapper (Odoo vkladá fragment do Shadow DOM). `<head[\s>]` zámerne
+		// NEmatchne `<header>` (vlastnú hlavičku fragmentu).
+		expect(html).not.toMatch(/<html[\s>]|<head[\s>]|<!DOCTYPE/i);
 	});
 
 	it('presne bars.length × data-bar-id, ids == cut_plan.bars[].bar_id v poradí', () => {
@@ -184,7 +186,8 @@ describe('renderNarezakHtml — allow-list sanitizer-safety (Odoo Shadow DOM)', 
 	});
 
 	it('obrázky výhradne data:image/png; jediné http(s) je SVG xmlns namespace (nie src/href)', () => {
-		const imgs = [...html.matchAll(/<img[^>]*\bsrc="([^"]*)"/g)].map((m) => m[1]);
+		const imgs = [...html.matchAll(/<img[^>]*\bsrc="([^"]*)"/g)].map((m) => m[1] ?? '');
+		expect(imgs.length).toBeGreaterThan(0);
 		for (const s of imgs) expect(s.startsWith('data:image/png;base64,')).toBe(true);
 	});
 
@@ -221,8 +224,7 @@ describe('renderBarSvg — opts.barId pridá data-piece-id; opts off je byte-ide
 		zvysok: 3188
 	};
 	// zachytené z PÔVODNEJ renderBarSvg (pred #542) — musí ostať 1:1 (render_svg kontrakt Odoo)
-	const EXPECTED_OFF =
-		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 30" width="600" height="30"><rect x="0" y="1" width="600" height="28" fill="#f8fafc" stroke="#475569" stroke-width="0.7"/><polygon class="rez" points="20,1 180.32,1 200.32,29 0,29" fill="#f5ede2" stroke="#475569" stroke-width="0.7"/><text x="100.16" y="18" text-anchor="middle" font-size="8" font-family="'DejaVu Sans',sans-serif" fill="#0f172a">Z1 2500</text><polygon class="rez" points="220.32,1 324.64,1 344.64,29 200.32,29" fill="#f5ede2" stroke="#475569" stroke-width="0.7"/><text x="272.48" y="18" text-anchor="middle" font-size="8" font-family="'DejaVu Sans',sans-serif" fill="#0f172a">1800</text><polygon class="odpad" points="324.64,1 600,1 600,29 344.64,29" fill="#f1f5f9" stroke="#475569" stroke-width="0.7"/><text x="472.32" y="18" text-anchor="middle" font-size="8" font-family="'DejaVu Sans',sans-serif" fill="#64748b">odpad 3188</text></svg>`;
+	const EXPECTED_OFF = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 30" width="600" height="30"><rect x="0" y="1" width="600" height="28" fill="#f8fafc" stroke="#475569" stroke-width="0.7"/><polygon class="rez" points="20,1 180.32,1 200.32,29 0,29" fill="#f5ede2" stroke="#475569" stroke-width="0.7"/><text x="100.16" y="18" text-anchor="middle" font-size="8" font-family="'DejaVu Sans',sans-serif" fill="#0f172a">Z1 2500</text><polygon class="rez" points="220.32,1 324.64,1 344.64,29 200.32,29" fill="#f5ede2" stroke="#475569" stroke-width="0.7"/><text x="272.48" y="18" text-anchor="middle" font-size="8" font-family="'DejaVu Sans',sans-serif" fill="#0f172a">1800</text><polygon class="odpad" points="324.64,1 600,1 600,29 344.64,29" fill="#f1f5f9" stroke="#475569" stroke-width="0.7"/><text x="472.32" y="18" text-anchor="middle" font-size="8" font-family="'DejaVu Sans',sans-serif" fill="#64748b">odpad 3188</text></svg>`;
 
 	it('bez opts (a s prázdnym opts) je výstup byte-identický s pôvodným', () => {
 		expect(renderBarSvg(fixtureTyc, 7500, true)).toBe(EXPECTED_OFF);
@@ -261,8 +263,14 @@ describe('renderNarezakHtmlCapped — size guard (1,4 MB → ikony preč → kľ
 	});
 
 	it('strop medzi (bezIkon, sIkonami) → degraduje: ikony preč, html ostáva', () => {
-		const sIkonami = Buffer.byteLength(renderNarezakHtml({ material, kerfMm: KOTUC, meta }, true), 'utf8');
-		const bezIkon = Buffer.byteLength(renderNarezakHtml({ material, kerfMm: KOTUC, meta }, false), 'utf8');
+		const sIkonami = Buffer.byteLength(
+			renderNarezakHtml({ material, kerfMm: KOTUC, meta }, true),
+			'utf8'
+		);
+		const bezIkon = Buffer.byteLength(
+			renderNarezakHtml({ material, kerfMm: KOTUC, meta }, false),
+			'utf8'
+		);
 		expect(sIkonami).toBeGreaterThan(bezIkon); // ikony pridávajú bajty
 		const cap = Math.floor((sIkonami + bezIkon) / 2);
 		const res = renderNarezakHtmlCapped({ material, kerfMm: KOTUC, meta }, cap);
@@ -273,7 +281,10 @@ describe('renderNarezakHtmlCapped — size guard (1,4 MB → ikony preč → kľ
 	});
 
 	it('strop pod bez-ikon veľkosťou → render_html sa vynechá (Odoo fallback na fázu B)', () => {
-		const bezIkon = Buffer.byteLength(renderNarezakHtml({ material, kerfMm: KOTUC, meta }, false), 'utf8');
+		const bezIkon = Buffer.byteLength(
+			renderNarezakHtml({ material, kerfMm: KOTUC, meta }, false),
+			'utf8'
+		);
 		const res = renderNarezakHtmlCapped({ material, kerfMm: KOTUC, meta }, bezIkon - 1);
 		expect(res.omitted).toBe(true);
 		expect(res.html).toBeUndefined();

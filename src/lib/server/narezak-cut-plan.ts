@@ -15,6 +15,10 @@
 import { KOTUC, type MaterialRow, type Tyc } from './compute';
 import { profilPngB64 } from './profil-png';
 import { narezakSummary, type NarezakSummary } from '$lib/odpad';
+// #542: render_html (celý nárezák ako HTML) sa skladá VNÚTRI cut_plan cez zdieľané helpery. Kruhový
+// import (narezak-html volá `renderBarSvg` odtiaľto) je bezpečný — obe strany sú hoisted `function`
+// deklarácie, viažu sa až za behu, nie pri načítaní modulu.
+import { renderNarezakHtmlCapped, type NarezakHtmlMeta } from './narezak-html';
 
 /** Jeden kus (rez) na tyči — v poradí rezu (`seq` 1-based). */
 export interface CutPlanPiece {
@@ -70,6 +74,14 @@ export interface CutPlan {
 	bars: CutPlanBar[];
 	/** sumár nárezáku (#535) — tie isté čísla ako PDF hlavička (papier = dáta). */
 	summary: NarezakSummary;
+	/**
+	 * #542 (v3): celý hotový nárezák ako self-contained HTML fragment (`<div class="narezak">…</div>`),
+	 * ktorý ZRKADLÍ grafické PDF a zdieľa jeho helpery (`narezak-html.ts`). Tablet pri píle ho zobrazí
+	 * 1:1, Odoo (fáza C, #7431) ho vloží do Shadow DOM a odškrtáva cez `data-bar-id`/`data-piece-id`.
+	 * ADITÍVNE, `version` ostáva `1`, VNÚTRI `cut_plan` (žiadny nový top-level kľúč — 422 fallback #532
+	 * platí). Vynechá sa, keď HTML prekročí strop aj bez ikon (Odoo fallback na fázu B). Voliteľný.
+	 */
+	render_html?: string;
 }
 
 /** číslo na 1 desatinné miesto so slovenskou čiarkou (rovnako ako `narezak-pdf.ts` / RozpisRezov). */
@@ -98,12 +110,29 @@ const SKEW_MM = 250; // 45° zošikmenie hornej hrany (mm), ako v PDF
 /** zaokrúhli na 2 des. miesta (kompaktné SVG súradnice). */
 const n2 = (v: number): string => String(Math.round(v * 100) / 100);
 
+/** #542: voliteľné parametre `renderBarSvg`. */
+export interface RenderBarSvgOpts {
+	/**
+	 * keď zadané, každý segment kusu (`class="rez"`) dostane `data-piece-id="<barId>:<seq>"` (seq
+	 * 1-based, ROVNAKÉ id ako `cut_plan.bars[].pieces[].seq`) — pre HTML odškrtávanie na tablete
+	 * (`narezak-html.ts`). BEZ neho je výstup BYTE-IDENTICKÝ s pôvodným (kontrakt `render_svg` per
+	 * bar, ktorý ide do Odoo `montalu.rozpis.bar` ako base64 — nesmie sa zmeniť).
+	 */
+	barId?: string;
+}
+
 /**
  * Nakreslí jednu tyč do samostatného SVG: podklad + segmenty rezov (lichobežník pri 45°, obdĺžnik
  * pri rovnom) + koncový odpad + mm popisky. Vracia SVG reťazec (začína `<svg`, každý rez
- * `class="rez"`, odpad `class="odpad"`). Money-neutrálne (žiadne ceny).
+ * `class="rez"`, odpad `class="odpad"`). Money-neutrálne (žiadne ceny). `opts.barId` (#542) pridá
+ * `data-piece-id` na segmenty rezov (odpad NIE); bez neho je výstup byte-identický.
  */
-export function renderBarSvg(tyc: Tyc, barLen: number, sikmy: boolean): string {
+export function renderBarSvg(
+	tyc: Tyc,
+	barLen: number,
+	sikmy: boolean,
+	opts: RenderBarSvgOpts = {}
+): string {
 	const scale = SVG_W / Math.max(1, barLen); // jednotka na mm
 	const sBase = sikmy ? SKEW_MM * scale : 0;
 	const parts: string[] = [
@@ -111,13 +140,18 @@ export function renderBarSvg(tyc: Tyc, barLen: number, sikmy: boolean): string {
 	];
 
 	let xMm = 0;
+	let seq = 0;
 	for (const k of tyc.kusy) {
+		seq++;
 		const x0 = xMm * scale;
 		const x1 = (xMm + k.dlzka) * scale;
 		const segW = x1 - x0;
 		const s = Math.min(sBase, Math.max(0, segW / 2 - 0.5));
+		// #542: data-piece-id LEN keď volajúci zadá barId (HTML odškrtávanie); prázdny reťazec inak →
+		// render_svg per bar (base64 do Odoo) ostáva byte-identický.
+		const pid = opts.barId ? ` data-piece-id="${opts.barId}:${seq}"` : '';
 		parts.push(
-			`<polygon class="rez" points="${n2(x0 + s)},${TOP} ${n2(x1 - s)},${TOP} ${n2(x1)},${BOT} ${n2(x0)},${BOT}" fill="#f5ede2" stroke="#475569" stroke-width="0.7"/>`
+			`<polygon class="rez"${pid} points="${n2(x0 + s)},${TOP} ${n2(x1 - s)},${TOP} ${n2(x1)},${BOT} ${n2(x0)},${BOT}" fill="#f5ede2" stroke="#475569" stroke-width="0.7"/>`
 		);
 		// mm popisok — skry pri úzkom segmente (<5 % tyče), zrkadlí PDF skryLabel
 		if ((k.dlzka / barLen) * 100 >= 5) {
@@ -165,7 +199,11 @@ function renderBarSvgBase64(tyc: Tyc, barLen: number, sikmy: boolean): string {
  * `/plan-rezov` upload posiela `input.reznaMedzera` (user-editovateľná), takže kerf ostáva 1:1 s PDF
  * aj keby tá cesta raz niesla Money kódy (dnes píše `kod:''` → `cut_plan` sa aj tak vynechá).
  */
-export function buildCutPlan(material: MaterialRow[], kerfMm: number = KOTUC): CutPlan | undefined {
+export function buildCutPlan(
+	material: MaterialRow[],
+	kerfMm: number = KOTUC,
+	meta: NarezakHtmlMeta = {}
+): CutPlan | undefined {
 	const bars: CutPlanBar[] = [];
 	// ikonu profilu posielame RAZ per Money kód (na prvej tyči s tým kódom) — Odoo cachuje podľa kódu
 	const seenKody = new Set<string>();
@@ -207,7 +245,16 @@ export function buildCutPlan(material: MaterialRow[], kerfMm: number = KOTUC): C
 	if (bars.length === 0) return undefined;
 	// sumár = tie isté čísla ako PDF hlavička (papier = dáta); nad CELÝM nárezákom (aj profily bez
 	// kódu), preto summary.bars_total môže byť > bars.length v OP s nekódovanými profilmi (#535).
-	return { version: 1, bars, summary: narezakSummary(material) };
+	const summary = narezakSummary(material);
+	// #542 (v3): celý nárezák ako HTML VNÚTRI cut_plan — zdieľa helpery s PDF (`narezak-html.ts`),
+	// so size-guardom (nad stropom bez ikon → render_html sa vynechá, Odoo fallback na fázu B).
+	const htmlRes = renderNarezakHtmlCapped({ material, kerfMm, meta });
+	return {
+		version: 1,
+		bars,
+		summary,
+		...(htmlRes.html ? { render_html: htmlRes.html } : {})
+	};
 }
 
 /** Počet profilov s tyčami, ktoré sa VYNECHAJÚ z cut_plan pre chýbajúci Money kód (na log). */
