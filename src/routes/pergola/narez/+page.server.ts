@@ -34,6 +34,7 @@ import { strechaSkloCenaPre, type StrechaSkloCena } from '$lib/server/sklo-strec
 import { logger } from '$lib/server/log';
 import { redirect } from '@sveltejs/kit';
 import { pridajSklaHromadne, pridajSkloManual, type NoveSklo } from '$lib/server/objednavka-skla';
+import { priradOdooTypy } from '$lib/server/odoo-glass-types';
 import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
 
 const log = logger('pergola:narez');
@@ -393,7 +394,8 @@ export const actions = {
 				createdBy: locals.user?.username ?? ''
 			}
 		];
-		const count = pridajSklaHromadne(polozky);
+		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
+		const count = pridajSklaHromadne(await priradOdooTypy(polozky));
 		log.info('stresne skla pridane do objednavky', { zak: ident.zak, count });
 		redirect(303, '/objednavka-skla/' + encodeURIComponent(ident.zak));
 	},

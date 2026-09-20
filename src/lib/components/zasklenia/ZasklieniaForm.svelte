@@ -87,6 +87,9 @@
 		// pure helpery (uzávery nad `data`/`existuje` v rodičovi) + mutátory stavu rodiča
 		stylyForSystem,
 		sklaForSystem,
+		// #556: lokálny názov skla → cenníkový popis z Odoo (len neprázdne); nárezák select
+		// zobrazí „· cenník: <Odoo name>". Prázdna mapa (Odoo nedostupné) = bez popisu.
+		cennikPopisSkla = {},
 		triedyPre,
 		otvaraniaForStyl,
 		kolajnicaPre,
@@ -148,6 +151,8 @@
 		b2bBlok: boolean;
 		stylyForSystem: (sys: string) => string[];
 		sklaForSystem: (sys: string, styl: string) => string[];
+		/** #556: lokálny názov skla → cenníkový popis z Odoo (voliteľné, prázdne = bez popisu). */
+		cennikPopisSkla?: Record<string, string>;
 		triedyPre: (sys: string, styl: string) => readonly number[];
 		otvaraniaForStyl: (st: string) => string[];
 		kolajnicaPre: (sys: string) => boolean;
@@ -223,7 +228,9 @@
 			<div class="field">
 				<label for="sklo">Sklo (základ — určuje vzorec)</label>
 				<select id="sklo" name="sklo" bind:value={sklo}>
-					{#each sklaPre as g (g)}<option>{g}</option>{/each}
+					{#each sklaPre as g (g)}<option value={g}
+							>{g}{cennikPopisSkla[g] ? ` · cenník: ${cennikPopisSkla[g]}` : ''}</option
+						>{/each}
 				</select>
 				{#if narezakHint}<span class="hint" data-testid="narezak-hint">{narezakHint}</span>{/if}
 				<!-- Vlastná (nekatalógová) skladba (#235 slice 2): trieda určuje výpočet + tesnenie;
@@ -546,7 +553,9 @@
 								}
 							}}
 						>
-							{#each sklaForSystem(p.system, p.styl) as g (g)}<option>{g}</option>{/each}
+							{#each sklaForSystem(p.system, p.styl) as g (g)}<option value={g}
+									>{g}{cennikPopisSkla[g] ? ` · cenník: ${cennikPopisSkla[g]}` : ''}</option
+								>{/each}
 						</select>
 						<!-- vlastná skladba tohto posuvu (#235 slice 2) — bind (žiadne name=,
 						     serializuje sa cez posuvyJSON z p.skloTrieda / p.skloPresne) -->

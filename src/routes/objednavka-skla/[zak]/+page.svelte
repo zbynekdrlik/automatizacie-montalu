@@ -211,6 +211,7 @@
 				</thead>
 				<tbody>
 					{#each items as p (p.id)}
+						{@const nav = data.naviazanie[p.id]}
 						<tr class:atyp={p.rezim === 'atyp'}>
 							<td>{p.popis}</td>
 							<td class="mono">{fmtRozmer(p)}</td>
@@ -232,12 +233,30 @@
 										{#if !glassTypes.some((t) => t.value === p.typSkla)}
 											<option value={p.typSkla} selected>{p.typSkla || '— vyberte typ —'}</option>
 										{/if}
+										<!-- #556: kandidáti podľa zloženia (pri „viac") navrchu pickera -->
+										{#if nav?.kandidati.length}
+											<optgroup label="Kandidáti (podľa zloženia)">
+												{#each nav.kandidati as k (k.value)}
+													<option value={k.value}>{k.label}</option>
+												{/each}
+											</optgroup>
+										{/if}
 										{#each glassTypes as t (t.value)}
 											<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option>
 										{/each}
 										<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 									</select>
 								</form>
+								{#if nav?.nepriradene}
+									<span class="nepriradene-badge noprint" data-testid={`nepriradene-${p.id}`}
+										>nepriradené — vyber typ</span
+									>
+									{#if nav.kandidati.length}
+										<span class="kandidati-hint noprint" data-testid={`kandidati-${p.id}`}
+											>Kandidáti: {nav.kandidati.map((k) => k.label).join(' · ')}</span
+										>
+									{/if}
+								{/if}
 								{#if p.typSklaManual}
 									<span class="ine-badge noprint" data-testid={`ine-typ-${p.id}`}
 										>iné sklo: {p.typSklaManual} · {fmtCena(p.cenaM2Manual)}</span
@@ -637,6 +656,23 @@
 		display: inline-block;
 		margin-top: 4px;
 		font-size: 0.8rem;
+		color: var(--m-ink-2);
+	}
+	/* #556: riadok z výpočtu bez jednoznačného Odoo typu — operátor musí vybrať */
+	.nepriradene-badge {
+		display: inline-block;
+		margin-top: 4px;
+		padding: 1px 6px;
+		border-radius: 4px;
+		background: var(--m-warn-bg, #fff3cd);
+		color: var(--m-warn-ink, #8a6d3b);
+		font-size: 0.78rem;
+		font-weight: 600;
+	}
+	.kandidati-hint {
+		display: block;
+		margin-top: 2px;
+		font-size: 0.78rem;
 		color: var(--m-ink-2);
 	}
 	.ine-form {

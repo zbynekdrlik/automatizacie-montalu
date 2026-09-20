@@ -25,7 +25,12 @@ const ODOO: OdooTypLike[] = [
 		category: 'izolacne'
 	},
 	// nejednoznačná skupina 4-16-4 (AL vs teplý rámik TH)
-	{ value: '001', name: 'Izolačné sklo 4/16/4 číre AL', composition: '4/16/4', category: 'izolacne' },
+	{
+		value: '001',
+		name: 'Izolačné sklo 4/16/4 číre AL',
+		composition: '4/16/4',
+		category: 'izolacne'
+	},
 	{
 		value: '003',
 		name: 'Izolačné sklo 4/16/4 číre TH (teplý rámik)',
@@ -35,10 +40,30 @@ const ODOO: OdooTypLike[] = [
 	// jednoznačné izolačné 4-12-4
 	{ value: '020', name: 'Izolačné sklo 4/12/4 číre', composition: '4/12/4', category: 'izolacne' },
 	// trojsklo 4-16-4-16-4 — 4 varianty (nejednoznačné)
-	{ value: '030', name: 'Trojsklo 4/16/4/16/4 číre', composition: '4/16/4/16/4', category: 'izolacne' },
-	{ value: '031', name: 'Trojsklo 4/16/4/16/4 TH', composition: '4/16/4/16/4', category: 'izolacne' },
-	{ value: '032', name: 'Trojsklo 4/16/4/16/4 Ug=0,6', composition: '4/16/4/16/4', category: 'izolacne' },
-	{ value: '033', name: 'Trojsklo 4/16/4/16/4 warm', composition: '4/16/4/16/4', category: 'izolacne' },
+	{
+		value: '030',
+		name: 'Trojsklo 4/16/4/16/4 číre',
+		composition: '4/16/4/16/4',
+		category: 'izolacne'
+	},
+	{
+		value: '031',
+		name: 'Trojsklo 4/16/4/16/4 TH',
+		composition: '4/16/4/16/4',
+		category: 'izolacne'
+	},
+	{
+		value: '032',
+		name: 'Trojsklo 4/16/4/16/4 Ug=0,6',
+		composition: '4/16/4/16/4',
+		category: 'izolacne'
+	},
+	{
+		value: '033',
+		name: 'Trojsklo 4/16/4/16/4 warm',
+		composition: '4/16/4/16/4',
+		category: 'izolacne'
+	},
 	// ESG jednosklo 6 mm (jednoznačné)
 	{ value: 'E6', name: 'ESG 6 mm číre', composition: '6', category: 'esg' },
 	// VSG (lepené) 3.3.1

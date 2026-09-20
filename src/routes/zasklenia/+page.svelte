@@ -756,6 +756,7 @@
 		{b2bBlok}
 		{stylyForSystem}
 		{sklaForSystem}
+		cennikPopisSkla={data.cennikPopisSkla}
 		{triedyPre}
 		{otvaraniaForStyl}
 		{kolajnicaPre}

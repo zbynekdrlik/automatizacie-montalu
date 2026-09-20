@@ -19,6 +19,7 @@ import {
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
 import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
+import { naviazanieRiadku } from '$lib/server/glass-match';
 import {
 	HOLE_SIZES,
 	EDGE_FINISHES,
@@ -107,6 +108,25 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	// fallbackom keď Odoo nedostupné (source sa zobrazí v UI). Money-neutrálne (len ordering).
 	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
 
+	// #556: riadky z výpočtu, ktorých `typ_skla` nie je platná Odoo hodnota (nejednoznačné „viac"
+	// alebo „ziadne" pri vkladaní) → badge „nepriradené — vyber typ" + kandidáti (pri „viac") navrchu
+	// pickera. Manuál „iné sklo" riadky (typSklaManual) sú zámerne mimo katalógu → nenaväzujú sa.
+	// Prázdne pri lokálnom fallbacku (Odoo nedostupné) — bez Odoo dát nič nenaväzujeme.
+	const naviazanie: Record<
+		number,
+		{ nepriradene: boolean; kandidati: { value: string; label: string }[] }
+	> = {};
+	for (const p of polozky) {
+		if (p.typSklaManual) continue;
+		const n = naviazanieRiadku(p.typSkla, glassTypes, glassTypesSource);
+		if (n.nepriradene) {
+			naviazanie[p.id] = {
+				nepriradene: true,
+				kandidati: n.kandidati.map((k) => ({ value: k.value, label: k.label }))
+			};
+		}
+	}
+
 	return {
 		zak,
 		op,
@@ -116,7 +136,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		polozky,
 		suboryMap,
 		glassTypes,
-		glassTypesSource
+		glassTypesSource,
+		naviazanie
 	};
 };
 
