@@ -10,6 +10,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { logger } from '$lib/server/log';
 import { computeClip, computeClipMulti, chybaClipVstupu, type ClipPolozka } from '$lib/clip';
 import type { ClipVstup } from '$lib/clip';
+import { clipMaterialRows } from '$lib/server/clip-narez';
 import { parseClipVstup, parseClipMultiVstup } from '$lib/server/vstup';
 import type { ClipMultiVstup } from '$lib/server/vstup';
 import {
@@ -109,6 +110,8 @@ export const actions = {
 			step: 'kontrola' as const,
 			vstup,
 			vypocet,
+			// #554 pílový plán (display-only) — RozpisRezov na tyče
+			narez: clipMaterialRows([vypocet]),
 			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
 			skladVarovania: skladoveVarovania(
 				vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -141,6 +144,7 @@ export const actions = {
 			step: 'kontrola' as const,
 			vstup,
 			vypocet,
+			narez: clipMaterialRows([vypocet]),
 			editVals,
 			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
 			skladVarovania: skladoveVarovania(
@@ -181,7 +185,14 @@ export const actions = {
 					vstup
 				};
 			}
-			return { step: 'hotovo' as const, vstup, finalOut, zmenene, outcome };
+			return {
+				step: 'hotovo' as const,
+				vstup,
+				finalOut,
+				zmenene,
+				outcome,
+				narez: clipMaterialRows([vypocet])
+			};
 		} catch (e) {
 			logger('clip').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return kontrola(
@@ -208,11 +219,13 @@ export const actions = {
 				return { step: 'form' as const, error: `Zasklenie ${i + 1}: ${cErr}`, multiVstup: vstup };
 		}
 		const multi = computeClipMulti(vstup.kusy);
+		const narez = clipMaterialRows(multi.kusy); // #554 spoločný pílový plán (display-only)
 		const job = jobForMulti(vstup, multi.polozky, '');
 		return {
 			step: 'kontrolaMulti' as const,
 			multiVstup: vstup,
 			multi,
+			narez,
 			skladVarovania: skladoveVarovania(
 				multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 			),
@@ -233,6 +246,7 @@ export const actions = {
 				return { step: 'form' as const, error: `Zasklenie ${i + 1}: ${cErr}`, multiVstup: vstup };
 		}
 		const multi = computeClipMulti(vstup.kusy);
+		const narez = clipMaterialRows(multi.kusy); // #554 spoločný pílový plán (display-only)
 		const job = jobForMulti(vstup, multi.polozky, locals.user?.username ?? '');
 		const potvrdene = String(formData.get('planHash') ?? '');
 		const aktualny = contentHash(vstup.zak, job.polozky);
@@ -241,6 +255,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
+				narez,
 				skladVarovania: skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
@@ -258,6 +273,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
+				narez,
 				editVals: Object.fromEntries(edits),
 				skladVarovania: skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -272,6 +288,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
+				narez,
 				editVals: Object.fromEntries(edits),
 				skladVarovania: skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -286,6 +303,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
+				narez,
 				editVals: Object.fromEntries(edits),
 				skladVarovania: skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -319,6 +337,7 @@ export const actions = {
 				step: 'hotovoMulti' as const,
 				multiVstup: vstup,
 				multi,
+				narez,
 				finalOut,
 				outcome,
 				zmenene
@@ -333,6 +352,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
+				narez,
 				skladVarovania: skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),

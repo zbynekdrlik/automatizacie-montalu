@@ -14,6 +14,14 @@ export interface ClipPriecka {
 	xPct: number;
 }
 
+/** Jedno pole (výplň) medzi susednými priečkami / okrajmi — na kreslenie obdĺžnika. */
+export interface ClipPole {
+	/** ľavý okraj poľa [mm] */
+	x: number;
+	/** šírka poľa [mm] (>= 0) */
+	width: number;
+}
+
 export interface ClipNahladGeom {
 	/** šírka zábradlia [mm] — viewBox nesie skutočné rozmery (mierka) */
 	sirka: number;
@@ -23,6 +31,8 @@ export interface ClipNahladGeom {
 	poleCount: number;
 	/** deliace priečky (prázdne pri 1 výplni) */
 	priecky: ClipPriecka[];
+	/** polia (výplne) medzi okrajmi/priečkami — vždy `poleCount` kusov */
+	poles: ClipPole[];
 }
 
 /**
@@ -41,10 +51,17 @@ export function clipNahladGeom(
 		mm,
 		xPct: sirka > 0 ? (mm / sirka) * 100 : 0
 	}));
+	// hranice polí: 0 → priečky → šírka; poľa je vždy o 1 viac než priečok
+	const hranice = [0, ...poziciePriecok, sirka];
+	const poles: ClipPole[] = [];
+	for (let i = 0; i < hranice.length - 1; i++) {
+		poles.push({ x: hranice[i]!, width: Math.max(hranice[i + 1]! - hranice[i]!, 0) });
+	}
 	return {
 		sirka,
 		vyska,
 		poleCount: poziciePriecok.length + 1,
-		priecky
+		priecky,
+		poles
 	};
 }

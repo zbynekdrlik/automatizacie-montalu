@@ -16,6 +16,13 @@ describe('clipNahladGeom — počet polí a priečok', () => {
 		const g = clipNahladGeom(3000, 1200, [1003, 1997]);
 		expect(g.poleCount).toBe(3);
 		expect(g.priecky).toHaveLength(2);
+		// polia pokrývajú celú šírku bez prekryvu: [0..1003][1003..1997][1997..3000]
+		expect(g.poles).toHaveLength(3);
+		expect(g.poles.map((p) => [p.x, p.width])).toEqual([
+			[0, 1003],
+			[1003, 994],
+			[1997, 1003]
+		]);
 		expect(g.priecky.map((p) => p.mm)).toEqual([1003, 1997]);
 		// číslovanie od 1
 		expect(g.priecky.map((p) => p.cislo)).toEqual([1, 2]);
