@@ -310,3 +310,35 @@ Pravidlá pre KAŽDÝ Odoo read v horúcej ceste page loadu:
 Vzor je v `odoo-glass-types.ts` (`fetchGlassTypes` + `_doFetch` + `_inflight`); zopakuj ho pri každom
 ďalšom Odoo reade viazanom na page load. NIKDY nenechaj `+page.server.ts` čakať na Odoo bez timeoutu
 a fallbacku.
+
+## Mapovanie LOKÁLNE sklo → Odoo `montalu.glass.type` — matcher + podklad badge (#556)
+
+Producenti riadkov objednávky (`zasklenia`/`fix`/`pergola` `pridatSkla`) nesú `typ_skla` = LOKÁLNY
+voľnotextový názov z výpočtového katalógu. Odoo `resolve_glass_type` páruje kód → presný názov →
+zloženie, a FORMÁT zloženia sa líši (Odoo „4/8/4" lomítka vs appka „4-8-4" pomlčky). Preto
+**`src/lib/server/glass-match.ts`** (ČISTÁ funkcia, žiadny IO):
+
+- `normalizeComposition(raw)` kanonizuje zloženie na „A-B-C" (zvláda lomítka/pomlčky/bodky/medzery,
+  písmená pri tabuli „5esg/14/5esg", IZO dvoj/trojsklo „4/16/4/16/4", VSG „3.3.1"/„44.2", jednosklo
+  „6 mm"). `localGlassCategory(nazov)` = izol→izolacne, kalen/esg→esg, vsg/kód d.d.d→vsg, inak float.
+- `matchOdooGlassType(lokalneSklo, odooTypy)` → `{ typ, istota, kandidati }`; zhoda = zloženie ∧
+  kategória; **viac kandidátov (napr. AL/TH pri „4-16-4") → istota `'viac'`, `typ=null` (NIKDY tichý
+  výber)**; žiadna → `'ziadne'`.
+- `naviazanieRiadku(typSkla, odooTypy, source)` a `cennikPopis(typSkla, odooTypy, source)` — GATOVANÉ
+  na `source==='odoo'`: pri lokálnom fallbacku (Odoo nedostupné) sa NIČ nenaväzuje (bez Odoo dát niet
+  na čo) a nárezák nemá popis.
+
+Kotva na `fetchGlassTypes`: **`GlassTypeOption` nesie aj surové `name` + `composition`** (nielen
+`value`/`label`/`category`) — matcher aj nárezák popis čítajú z tej ISTEJ cache, žiadny druhý zdroj
+pravdy. **`priradOdooTypy(polozky)`** (v `odoo-glass-types.ts`, fetch RAZ pre pole) volajú producenti
+PRED vložením: jednoznačná zhoda uloží Odoo `value` (`cennik_code || name`) → objednávka ide do Odoo
+presne; „viac"/„ziadne" ostáva lokálny názov.
+
+Podklad `/objednavka-skla/[zak]`: riadok, ktorého `typSkla` nie je platná Odoo `value` (a nie je
+manuál „iné sklo"), dostane badge **„nepriradené — vyber typ"** + kandidátov navrchu pickera
+(`load` počíta `naviazanie: Record<id, {nepriradene, kandidati}>`). Nárezák `zasklenia` select ukáže
+pri lokálnom skle **„· cenník: <Odoo name>"** (pri „viac" prvý kandidát + „(+N)") — `cennikPopisSkla`
+mapa z `load` cez `ZasklieniaForm` prop. FIX nemá select typu skla (jedno `name="sklo"` hidden),
+pergola honest-null formulár už používa priamo Odoo picker → popis v selecte dáva zmysel len v
+zaskleniach. **Money-NEUTRÁLNE, bez migrácie** — výpočtový `glass_types`, hrúbky, profily, Money kódy
+NEDOTKNUTÉ. Pri rozšírení na ďalší producent: `await priradOdooTypy(...)` pred insertom + vitest.

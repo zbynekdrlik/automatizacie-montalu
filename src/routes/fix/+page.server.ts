@@ -12,6 +12,7 @@ import { pocitajFix, rovnomernePolia, FIX_MAX_POLI } from '$lib/fix';
 import { parseFixVstup } from '$lib/server/fix-vstup';
 import { isB2B } from '$lib/server/auth';
 import { pridajSklaHromadne, type NoveSklo } from '$lib/server/objednavka-skla';
+import { priradOdooTypy } from '$lib/server/odoo-glass-types';
 import { logger } from '$lib/server/log';
 
 export const actions = {
@@ -68,7 +69,9 @@ export const actions = {
 			m2: pole.m2,
 			createdBy: locals.user?.username ?? ''
 		}));
-		const count = pridajSklaHromadne(polozky);
+		// #556: jednoznačná zhoda lokálneho typu skla na Odoo `montalu.glass.type` → uloží Odoo
+		// hodnotu, aby objednávka išla do Odoo presne (nejednoznačné/žiadne ostáva lokálne).
+		const count = pridajSklaHromadne(await priradOdooTypy(polozky));
 		logger('fix').info('skla pridane do objednavky', { zak: vstup.zak, count });
 		redirect(303, '/objednavka-skla/' + encodeURIComponent(vstup.zak));
 	}
