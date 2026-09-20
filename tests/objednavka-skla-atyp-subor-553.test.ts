@@ -8,11 +8,11 @@ import { listSklaPreZakazku, listSubory } from '../src/lib/server/objednavka-skl
 function mkEvent(
 	zak: string,
 	fields: Record<string, string>,
-	file?: { name: string; bytes: Uint8Array }
+	file?: { name: string; content: string }
 ) {
 	const f = new FormData();
 	for (const [k, v] of Object.entries(fields)) f.set(k, v);
-	if (file) f.set('subor', new File([file.bytes], file.name, { type: 'application/pdf' }));
+	if (file) f.set('subor', new File([file.content], file.name, { type: 'application/pdf' }));
 	return {
 		params: { zak },
 		request: { formData: async () => f },
@@ -34,7 +34,7 @@ describe('#553 pridatRiadok — výkres priamo vo formulári „Pridať riadok"'
 	it('multipart s pdf súborom → riadok A príloha uložené jedným odoslaním', async () => {
 		const zak = 'ZAK-553-PDF';
 		const res = await actions.pridatRiadok(
-			mkEvent(zak, BASE, { name: 'vykres.pdf', bytes: new Uint8Array([1, 2, 3, 4]) })
+			mkEvent(zak, BASE, { name: 'vykres.pdf', content: '%PDF-1.4 test' })
 		);
 		expect((res as { ok?: boolean }).ok).toBe(true);
 
@@ -51,7 +51,7 @@ describe('#553 pridatRiadok — výkres priamo vo formulári „Pridať riadok"'
 	it('neplatná prípona → fail(400), NIČ sa nevloží (ani riadok, ani príloha)', async () => {
 		const zak = 'ZAK-553-BAD';
 		const res = await actions.pridatRiadok(
-			mkEvent(zak, BASE, { name: 'vykres.exe', bytes: new Uint8Array([1, 2, 3]) })
+			mkEvent(zak, BASE, { name: 'vykres.exe', content: 'MZ fake' })
 		);
 		expect((res as { status?: number }).status).toBe(400);
 		expect((res as { data?: { pridatChyba?: string } }).data?.pridatChyba).toBeTruthy();

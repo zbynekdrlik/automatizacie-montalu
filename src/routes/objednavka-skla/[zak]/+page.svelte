@@ -61,6 +61,9 @@
 	// „Pridať riadok" — sledovanie voľby typu (odkrytie vlastných polí)
 	let novyTyp = $state('');
 	const novyIne = $derived(novyTyp === MANUAL_SENTINEL);
+	// #553: sledovanie režimu vo formulári — pri atyp zvýrazniť pole na výkres (required-hint)
+	let novyRezim = $state('rozmery');
+	const novyAtyp = $derived(novyRezim === 'atyp');
 	// per-riadok odkrytie „iné sklo" editora (kľúč = id položky)
 	let ineRiadok = $state<Record<number, boolean>>({});
 	function onTypSelect(e: Event, id: number) {
@@ -82,7 +85,13 @@
 	aj na prázdnom podklade (formulár mimo guardu položiek). Typ skla je povinný. -->
 <section class="card noprint pridat-card" data-testid="pridat-riadok">
 	<h2 class="sec">Pridať riadok</h2>
-	<form method="POST" action="?/pridatRiadok" use:enhance class="pridat-form">
+	<form
+		method="POST"
+		action="?/pridatRiadok"
+		enctype="multipart/form-data"
+		use:enhance
+		class="pridat-form"
+	>
 		<label class="wide"
 			>Popis
 			<input
@@ -159,15 +168,29 @@
 		>
 		<label
 			>Režim
-			<select name="rezim" data-testid="manual-rezim">
+			<select name="rezim" bind:value={novyRezim} data-testid="manual-rezim">
 				<option value="rozmery">rozmery</option>
 				<option value="atyp">atyp</option>
 			</select></label
+		>
+		<!-- #553: výkres priamo vo formulári — vždy renderovaný (progressive enhancement, funguje aj
+			bez JS); pri atyp vizuálne zvýraznený + hint (rozmery ostávajú povinné, m² pre cenu). -->
+		<label class="subor-vykres wide" class:atyp-zvyraznene={novyAtyp}
+			>Výkres {novyAtyp ? '(pri atyp priložte)' : '(pri atyp)'}
+			<input
+				type="file"
+				name="subor"
+				accept=".pdf,.dxf,.dwg,.step,.stp,.igs,.iges,.xlsx"
+				data-testid="manual-subor"
+			/></label
 		>
 		<button type="submit" class="btn" data-testid="manual-pridat">Pridať riadok</button>
 	</form>
 	{#if form?.pridatChyba}
 		<p class="err" data-testid="manual-chyba">{form.pridatChyba}</p>
+	{/if}
+	{#if form?.pridatUpozornenie}
+		<p class="warn" data-testid="manual-upozornenie">{form.pridatUpozornenie}</p>
 	{/if}
 </section>
 
@@ -703,6 +726,18 @@
 		color: var(--m-danger);
 		font-size: 0.85rem;
 		margin-top: 6px;
+	}
+	.warn {
+		color: var(--m-warn, #8a5a00);
+		font-size: 0.85rem;
+		margin-top: 6px;
+	}
+	/* #553: pole na výkres v „Pridať riadok" — pri atyp zvýraznené (required-hint) */
+	.subor-vykres.atyp-zvyraznene {
+		padding: 2px 6px;
+		border-radius: 6px;
+		background: var(--m-warn-bg, #fff6e6);
+		outline: 1px solid var(--m-warn, #e0a54a);
 	}
 	.btn[disabled] {
 		opacity: 0.5;
