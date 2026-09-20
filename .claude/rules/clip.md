@@ -84,10 +84,58 @@ v `+page.server.ts`; parser `parseClipMultiVstup` v `vstup.ts` (JSON pole kusov 
 hidden inputu `clipKusy`, max 12 kusov). `jobForMulti` produkuje jeden OdpisJob so
 spoločnou zak/op hlavičkou; dedup `UNIQUE(zak,op,live)` NEDOTKNUTÝ.
 
-UI vzor: toggle checkbox „Viac kusov naraz" na formulári; spoločné zak/op/zakaznik/caka
-+ per-kus typ/variant/sirka/vyska/ral. Kontrolná obrazovka: per-kus nárezová tabuľka +
-spoločná odpisová tabuľka s editovateľnými množstvami. Úspešná obrazovka: `finalOut`
-(po užívateľových úpravách), NIE originálne polozky (review nález #468).
+UI vzor (od #554 zjednotený so zaskleniami — pozri nižšie): žiadny prepínač; prvé
+zábradlie = základ, tlačidlo „➕ Pridať zábradlie" pridá ďalšie. Spoločné
+zak/op/zakaznik/caka + per-kus typ/variant/sirka/vyska/ral. Kontrolná obrazovka: per-kus
+nárezová tabuľka + SVG náhľad + spoločná odpisová tabuľka s editovateľnými množstvami +
+spoločný rozpis rezov. Úspešná obrazovka: `finalOut` (po užívateľových úpravách), NIE
+originálne polozky (review nález #468).
+
+## #554 — CLIP ako zasklenia (UX + SVG náhľad + rozpis rezov na tyče), Patrik úloha 1009
+
+Tri veci, VŠETKO okolo `computeClip*` (Money odpis) sa NEDOTKLO — odpis ostáva
+per-riadkový ROUNDUP (1:1 Excel, kontrakt vyššie). Guard: `tests/clip-narez.test.ts`
+(odpis polozky byte-identické pred/po adaptéri + žiadny Money/odpis modul neimportuje
+`clip-narez`).
+
+1. **Zjednotený formulár = `src/lib/components/clip/ClipForm.svelte`** (vzor
+   `ZasklieniaForm`): prepínač „Viac kusov naraz" ZRUŠENÝ, „➕ Pridať zábradlie" je vždy
+   viditeľné. Prvé zábradlie (index 0) nesie `name="typ/variant/sirka/vyska/ral"` +
+   testidy `typ`/`variant`/`#sirka`/`#vyska`/`#ral` (single tok `?/spocitat` +
+   pôvodné E2E ostávajú platné). Ďalšie zábradlia idú LEN cez hidden `clipKusy` JSON
+   (`z{i}-*` id/testid, bez `name`). Submit prepína `formaction={jeMulti ? '?/spocitatMulti'
+   : '?/spocitat'}` (`jeMulti = kusy.length > 1`). `clipKusy` = VŠETKY kusy (základ +
+   ďalšie), takže `parseClipMultiVstup` (číta `clipKusy`) aj `parseClipVstup` (číta
+   top-level `name=`) ostali NEDOTKNUTÉ — 6 akcií nezmenených (guard `clip-odpis.test.ts`).
+   Stav sa inicializuje zo servera cez `seed()` funkciu (nie `$state(prop)` priamo — inak
+   `state_referenced_locally` warning) a re-synchronizuje `$effect`-om pri POST round-tripe
+   (echo `vstup`/`multiVstup`).
+
+2. **SVG náhľad = `src/lib/components/ClipNahlad.svelte`** + čistá geometria
+   `src/lib/clip-nahlad.ts` (`clipNahladGeom`, client-safe, unit `clip-nahlad.test.ts`).
+   1 výplň = 1 obdĺžnik (0 priečok); N výplní = N polí + N−1 priečok na
+   `computeClip(...).poziciePriecok` (mm od kraja, popisky ako Excel 37649 „priečka č.1
+   1003,0"). Testidy `clip-nahlad`/`clip-pole`/`clip-priecka`/`clip-priecka-pozicie`.
+   CLIP kreslí ROVNO (obdĺžnik), preto rez v pláne je `sikmyRez: false`.
+
+3. **Rozpis rezov na tyče = adaptér `src/lib/server/clip-narez.ts`** `clipMaterialRows(kusy:
+   ClipVypocet[]) → MaterialRow[]` cez `ffdPack` (rovnaká 7500 mm tyč `CLIP_DLZKA_TYCE` +
+   kotúč `KOTUC` ako compute), vykreslený existujúcim `RozpisRezov.svelte` (pásy tyčí,
+   odpad). Server (`+page.server.ts`) ho počíta a vracia ako `narez` na
+   kontrola/kontrolaMulti/hotovo/hotovoMulti; stránka kreslí sekciu „Rozpis rezov na tyče —
+   pre pílu". MULTI = ZDIEĽANÉ tyče naprieč zábradliami (`clipMaterialRows(multi.kusy)`,
+   jeden spoločný plán — ako zasklenia multi). **Adaptér je server-only** (leží v
+   `$lib/server/`, lebo `ffdPack` je server modul) — do `src/lib/clip-narez.ts` (mimo
+   `server/`) NEPATRÍ (importuje `$lib/server/compute` → poison klient bundle).
+
+   **DISPLAY-ONLY (pozor):** počet tyčí v pláne (bin-packing `ffdPack`) sa môže LÍŠIŤ od
+   počtu v odpise (per-riadkový ROUNDUP) — to je zámer. Poznámka pod plánom to hovorí
+   („počet tyčí v odpise = ROUNDUP podľa Excelu; pílový plán = optimalizované rozloženie").
+   Excel 37649 má stĺpec „reálny počet" PRÁZDNY = OTVORENÉ: či má optimalizovaný počet
+   NAHRADIŤ odpis do Money, treba spýtať Patrika (verifikačná otázka, NIE v tomto lane —
+   zmena by menila Money kontrakt, #372 čaká na plné šablóny). Fixtúra pre adaptér vektory:
+   izo 3000×1200 (3 výplne) → ZASP00116 2 tyče, ZASP00125 1, ZASP00119 2 (zhodné s odpisom
+   pri TEJTO fixtúre; pri iných rozmeroch sa môžu líšiť).
 
 ## Money-bezpečnosť + validácia
 

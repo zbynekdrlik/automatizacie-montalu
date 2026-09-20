@@ -158,10 +158,10 @@
 				</div>
 				<div class="grid3">
 					<div class="field">
-						<label for={i === 0 ? 'typ-label' : `z${i}-typ`}>Výplň</label>
+						<label for={i === 0 ? 'typ' : `z${i}-typ`}>Výplň</label>
 						<!-- základ (i=0) nesie name+testid single toku; ďalšie idú len cez clipKusy JSON -->
 						{#if i === 0}
-							<select id="typ-label" name="typ" bind:value={kus.typ} data-testid="typ">
+							<select id="typ" name="typ" bind:value={kus.typ} data-testid="typ">
 								<option value="izo">IZO (4-8-4)</option>
 								<option value="klasika">klasika (3.3.1 číre)</option>
 							</select>
@@ -175,6 +175,9 @@
 					<div class="field">
 						<label for={i === 0 ? 'variant' : `z${i}-variant`}>Počet výplní</label>
 						{#if i === 0}
+							<!-- native (non-enhance) `?/spocitat` POST — Svelte serializuje `value={1}`
+							     na atribút "1", `parseClipVstup` ho číta cez Math.round(num); rovnaký
+							     vzor ako pôvodný multi formulár (bind:value + číselné option) -->
 							<select id="variant" name="variant" bind:value={kus.variant} data-testid="variant">
 								<option value={1}>B0 — 1 výplň</option>
 								<option value={2}>B1 — 2 výplne</option>
