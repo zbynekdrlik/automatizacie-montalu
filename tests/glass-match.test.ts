@@ -210,7 +210,9 @@ describe('matchOdooGlassType (#556)', () => {
 	});
 	it('Odoo typ s viacerými odtieňmi („bronz/šedý") sa zhoduje s ktorýmkoľvek z nich, nie s číre', () => {
 		expect(matchOdooGlassType('ESG kalené 4 mm šedé', ODOO).typ?.value).toBe('EB4');
-		expect(matchOdooGlassType('ESG kalené 4 mm číre', ODOO).kandidati.map((k) => k.value)).not.toContain('EB4');
+		expect(
+			matchOdooGlassType('ESG kalené 4 mm číre', ODOO).kandidati.map((k) => k.value)
+		).not.toContain('EB4');
 	});
 	it('lokálne číre 4/16/4 ostáva „viac" (AL/TH, oba číre) aj s osou odtieňa', () => {
 		const m = matchOdooGlassType('Izolačné sklo 4/16/4 číre', ODOO);
