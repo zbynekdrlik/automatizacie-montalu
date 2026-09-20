@@ -50,6 +50,17 @@ export const E2E_USER = process.env.E2E_USER || 'e2e';
 export const E2E_PASS = process.env.E2E_PASS || 'e2e-heslo-123';
 
 /**
+ * #556 hotfix: HOLÝ názov skla z `<option>` textu. Nárezák `<option>` má `value` = holý lokálny
+ * názov, ale TEXT nesie Odoo enrichment sufix „ · cenník: <Odoo name>" — a to LEN keď je Odoo
+ * dostupné (PROD/post-deploy), nie v CI `test` jobe. Testy overujú MNOŽINU skiel (nie sufix), tak
+ * porovnávajú `option.textContent` cez tento helper. Jediné miesto, kde sa sufix strippuje — platí
+ * pre každý budúci Odoo enrichment popiskov v selecte. Bez sufixu vráti text nezmenený (len trim).
+ */
+export function bareSkloLabel(text: string): string {
+	return text.split(' · cenník:')[0]!.trim();
+}
+
+/**
  * goto + počkanie na hydratáciu. fill() pred dokončenou hydratáciou prehráva
  * s Svelte, ktorá value-bound inputy vráti na serverový stav (cez pomalý SSH
  * tunel sa JS načítava neskoro — v CI to nikdy nevidno).

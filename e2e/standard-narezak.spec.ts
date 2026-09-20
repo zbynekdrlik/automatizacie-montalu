@@ -3,7 +3,7 @@
 //
 // Všetko READ-ONLY — len „Spočítať nárezový plán", žiadne odoslanie do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, bareSkloLabel } from './helpers';
 
 const RUN = `E2E-NRZ-${Date.now().toString(36).slice(-5)}`;
 const SKLO = 'Sklo (základ — určuje vzorec)';
@@ -91,7 +91,8 @@ test('zmena počtu krídel nezmaže zvolené sklo; opona ponúka izolačné sklo
 	// predchádzajúci výber skla PRETRVÁ (name-persistence, zasklenia-form-reactivity.md).
 	await page.getByLabel('Štýl').selectOption('2x3K');
 	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/8/4 číre');
-	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
+	// #556 hotfix: strip Odoo enrichment sufix „ · cenník:" — overujeme MNOŽINU skiel, nie sufix.
+	const skla = (await page.getByLabel(SKLO).locator('option').allTextContents()).map(bareSkloLabel);
 	expect(skla.filter((s) => /Izola/i.test(s)).sort()).toEqual(
 		[
 			'Izolačné sklo 4/8/4 číre',

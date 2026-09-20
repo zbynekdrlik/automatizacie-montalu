@@ -10,6 +10,7 @@ import {
 	matchOdooGlassType,
 	normalizeComposition,
 	localGlassCategory,
+	glassTint,
 	naviazanieRiadku,
 	cennikPopis,
 	type OdooTypLike
@@ -66,6 +67,9 @@ const ODOO: OdooTypLike[] = [
 	},
 	// ESG jednosklo 6 mm (jednoznačné)
 	{ value: 'E6', name: 'ESG 6 mm číre', composition: '6', category: 'esg' },
+	// ESG jednosklo 4 mm — LEN odtieňový variant (bronz/šedý), žiadne číre 4 mm. #556 hotfix:
+	// lokálne „ESG kalené 4 mm" (číre) sa NESMIE spárovať na tento odtieňový typ (predtým áno).
+	{ value: 'EB4', name: 'ESG Float bronz/šedý 4mm', composition: '4', category: 'esg' },
 	// VSG (lepené) 3.3.1
 	{ value: 'V331', name: 'VSG 3.3.1 číre', composition: '3.3.1', category: 'vsg' }
 ];
@@ -120,6 +124,30 @@ describe('localGlassCategory (#556)', () => {
 	});
 });
 
+describe('glassTint (#556 hotfix — os odtieňa)', () => {
+	it('bez odtieňového tokenu / „číre" / „clear" → cire (default)', () => {
+		expect(glassTint('Izolačné sklo 4/8/4 číre')).toBe('cire');
+		expect(glassTint('Izolačné sklo 4/16/4')).toBe('cire');
+		expect(glassTint('ESG clear 6 mm')).toBe('cire');
+	});
+	it('„mlieč"/„satin"/„matn" → mliecne', () => {
+		expect(glassTint('Izolačné sklo 4/8/4 mliečne')).toBe('mliecne');
+		expect(glassTint('Sklo satinato')).toBe('mliecne');
+		expect(glassTint('Sklo matné')).toBe('mliecne');
+	});
+	it('„bronz" → bronz', () => {
+		expect(glassTint('ESG bronz 4mm')).toBe('bronz');
+	});
+	it('„šed"/„grey"/„gray" → seda', () => {
+		expect(glassTint('ESG šedé 4mm')).toBe('seda');
+		expect(glassTint('ESG grey 4mm')).toBe('seda');
+		expect(glassTint('ESG gray 4mm')).toBe('seda');
+	});
+	it('„grafit" → grafit', () => {
+		expect(glassTint('Sklo grafit')).toBe('grafit');
+	});
+});
+
 describe('matchOdooGlassType (#556)', () => {
 	it('jednoznačná zhoda (acceptačné 4/8/4) → istota=jednoznacne, typ = name (cennik_code chýba)', () => {
 		const m = matchOdooGlassType('Izolačné sklo 4/8/4 číre', ODOO);
@@ -162,6 +190,35 @@ describe('matchOdooGlassType (#556)', () => {
 		const m = matchOdooGlassType('Izolačné sklo 4/16/4 číre', ODOO);
 		expect(m.typ).toBeNull();
 	});
+
+	// #556 hotfix — os ODTIEŇA
+	it('mliečne 4/8/4 → ziadne (Odoo má len číre 4/8/4, nie mliečne)', () => {
+		const m = matchOdooGlassType('Izolačné sklo 4/8/4 mliečne', ODOO);
+		expect(m.istota).toBe('ziadne');
+		expect(m.typ).toBeNull();
+		expect(m.kandidati).toHaveLength(0);
+	});
+	it('ESG kalené 4 mm (číre) sa NESPÁRUJE na odtieňový „ESG Float bronz/šedý 4mm"', () => {
+		const m = matchOdooGlassType('ESG kalené 4 mm', ODOO);
+		expect(m.istota).toBe('ziadne');
+		expect(m.kandidati.map((k) => k.value)).not.toContain('EB4');
+	});
+	it('ESG kalené 4 mm bronz → jednoznačne EB4 (odtieň sa zhoduje)', () => {
+		const m = matchOdooGlassType('ESG kalené 4 mm bronz', ODOO);
+		expect(m.istota).toBe('jednoznacne');
+		expect(m.typ?.value).toBe('EB4');
+	});
+	it('Odoo typ s viacerými odtieňmi („bronz/šedý") sa zhoduje s ktorýmkoľvek z nich, nie s číre', () => {
+		expect(matchOdooGlassType('ESG kalené 4 mm šedé', ODOO).typ?.value).toBe('EB4');
+		expect(
+			matchOdooGlassType('ESG kalené 4 mm číre', ODOO).kandidati.map((k) => k.value)
+		).not.toContain('EB4');
+	});
+	it('lokálne číre 4/16/4 ostáva „viac" (AL/TH, oba číre) aj s osou odtieňa', () => {
+		const m = matchOdooGlassType('Izolačné sklo 4/16/4 číre', ODOO);
+		expect(m.istota).toBe('viac');
+		expect(m.kandidati.map((k) => k.value).sort()).toEqual(['001', '003']);
+	});
 });
 
 describe('naviazanieRiadku (podklad badge + kandidáti, #556)', () => {
@@ -190,10 +247,8 @@ describe('cennikPopis (nárezák popis, #556)', () => {
 			'Izolačné sklo 4/8/4- číre (Ug=1,1)'
 		);
 	});
-	it('viac → prvý kandidát + "(+N)"', () => {
-		expect(cennikPopis('Izolačné sklo 4/16/4 číre', ODOO, 'odoo')).toBe(
-			'Izolačné sklo 4/16/4 číre AL (+1)'
-		);
+	it('viac → „viac typov (N)" (#556 hotfix — nikdy zavádzajúce meno prvého kandidáta)', () => {
+		expect(cennikPopis('Izolačné sklo 4/16/4 číre', ODOO, 'odoo')).toBe('viac typov (2)');
 	});
 	it('ziadne → ""', () => {
 		expect(cennikPopis('Float číre 6 mm', ODOO, 'odoo')).toBe('');
