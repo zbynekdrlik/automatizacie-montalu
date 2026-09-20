@@ -63,6 +63,8 @@ import {
 } from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
 import { pridajSklaHromadneIdempotentne, type NoveSklo } from '$lib/server/objednavka-skla';
+import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
+import { cennikPopis } from '$lib/server/glass-match';
 
 /** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
  *  ako comma-separated string v hidden inpute `vylucene_kody`. */
@@ -290,6 +292,14 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const znovaId = Number(url.searchParams.get('znova') ?? '');
 	const znova = znovaId && !isB2B(locals.user) ? znovaZOdpisu(znovaId) : null;
 	const systemy = systemyZoStylov(styly); // #518: jediný zdroj pravdy, zdieľaný s editorom vzorcov
+	// #556: cenníkový popis z Odoo per lokálny názov skla (len neprázdne). Živý `montalu.glass.type`
+	// cez `fetchGlassTypes` cache, pri lokálnom fallbacku (Odoo nedostupné) prázdne (bez popisu).
+	const { items: odooTypy, source: odooSource } = await fetchGlassTypes();
+	const cennikPopisSkla: Record<string, string> = {};
+	for (const nazov of new Set(listGlassTypes().map((g) => g.nazov))) {
+		const popis = cennikPopis(nazov, odooTypy, odooSource);
+		if (popis) cennikPopisSkla[nazov] = popis;
+	}
 	return {
 		systemy,
 		styly, // len existujúce kombinácie — neplatná voľba sa nedá odoslať
@@ -365,6 +375,11 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			})
 		),
 		znova,
+		// #556: cenníkový popis z Odoo `montalu.glass.type` per lokálny názov skla — nárezák select
+		// zobrazí „· cenník: <Odoo name>" (pri „viac" prvý kandidát + „(+N)"). Enrichment cez
+		// EXISTUJÚCU `fetchGlassTypes` cache (3 s timeout, fallback = bez popisu). Výpočtový katalóg,
+		// hrúbky, profily a Money kódy NEDOTKNUTÉ (`glass-catalog.md`).
+		cennikPopisSkla,
 		live: isLive()
 	};
 };
@@ -762,7 +777,8 @@ export const actions = {
 		// a BEZ presmerovania, aby „uložiť nárezák" (odpis) ostalo dostupné.
 		const v = stavNahlad(vstup, r, spec, locals.user);
 		if (v.step === 'form') return v;
-		const pridane = pridajSklaHromadneIdempotentne(polozky);
+		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
+		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
 		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
 		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
 	},
@@ -794,7 +810,8 @@ export const actions = {
 		// #514: validácia pred vedľajším efektom + idempotentne + bez presmerovania — viď `pridatSkla`
 		const v = stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
-		const pridane = pridajSklaHromadneIdempotentne(polozky);
+		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
+		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
 		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
 		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
 	}

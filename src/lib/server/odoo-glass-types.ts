@@ -16,6 +16,7 @@
 import { logger } from './log';
 import { odooJson2Config, searchReadJson2, OdooJson2Error } from './odoo-json2';
 import { listGlassTypes } from './db';
+import { matchOdooGlassType } from './glass-match';
 
 const log = logger('odoo-glass-types');
 
@@ -35,6 +36,10 @@ export interface GlassTypeOption {
 	value: string;
 	label: string;
 	category: string;
+	/** #556: surový Odoo `name` (cenníkový názov pre nárezák popis + matcher). */
+	name: string;
+	/** #556: surový Odoo `composition` (napr. „4/8/4") — matcher normalizuje na „4-8-4". */
+	composition: string;
 }
 
 export interface GlassTypesResult {
@@ -82,7 +87,9 @@ function localFallback(): GlassTypesResult {
 		const name = (g.nazov ?? '').trim();
 		if (!name || seen.has(name)) continue;
 		seen.add(name);
-		items.push({ value: name, label: name, category: '' });
+		// #556: lokálny fallback nemá Odoo composition/category → prázdne (matcher gatuje na
+		// source==='odoo', takže sa lokálne názvy neparujú samé na seba).
+		items.push({ value: name, label: name, category: '', name, composition: '' });
 	}
 	items.sort((a, b) => a.label.localeCompare(b.label, 'sk'));
 	return { items, source: 'local' };
@@ -144,7 +151,10 @@ async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 				return {
 					value: cennik || name,
 					label: composition ? `${name} · ${composition}` : name,
-					category: s(r.category)
+					category: s(r.category),
+					// #556: surové polia pre matcher (`glass-match.ts`) + nárezák popis
+					name,
+					composition
 				};
 			})
 			// riadok bez cennik_code AJ bez name je pre `glass_order.items[].glass_type` nepoužiteľný
@@ -183,4 +193,31 @@ async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 		_cache = { result: local, ts: Date.now(), ttl: FALLBACK_TTL_MS };
 		return local;
 	}
+}
+
+/**
+ * #556: pre riadky objednávky skla vytvorené Z VÝPOČTU (producenti zasklenia/fix/pergola) —
+ * jednoznačnú zhodu lokálneho `typSkla` na Odoo `montalu.glass.type` uloží ako Odoo `value`
+ * (`cennik_code || name`), takže riadok ide do Odoo presne (Patrik: „takto vie presné aké sklo
+ * požadujem"). Pri „viac"/„ziadne" ostáva lokálny názov (operátor rozhodne na podklade cez badge
+ * „nepriradené"). GATOVANÉ na `source==='odoo'` — pri lokálnom fallbacku (Odoo nedostupné) sa NIČ
+ * nepriradzuje (bez Odoo dát niet na čo). Fetch RAZ pre celé pole (zdieľaná cache). Money-NEUTRÁLNE.
+ */
+export async function priradOdooTypy<T extends { typSkla: string }>(polozky: T[]): Promise<T[]> {
+	if (polozky.length === 0) return polozky;
+	const { items, source } = await fetchGlassTypes();
+	if (source !== 'odoo') return polozky;
+	return polozky.map((p) => {
+		const m = matchOdooGlassType(p.typSkla, items);
+		if (m.istota === 'jednoznacne' && m.typ) {
+			// #556 review: zhoda je len zloženie ∧ kategória (pokov/plyn/Ug sa nerozlišuje) — logni
+			// KAŽDÉ jednoznačné priradenie, aby bolo auditovateľné (kolízia pri jedno-variantovom katalógu).
+			log.info('priradOdooTypy: lokálne sklo priradené na Odoo typ (jednoznačné)', {
+				lokalne: p.typSkla,
+				odoo: m.typ.value
+			});
+			return { ...p, typSkla: m.typ.value };
+		}
+		return p;
+	});
 }

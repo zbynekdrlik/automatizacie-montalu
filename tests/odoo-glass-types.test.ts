@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setJson2Transport } from '../src/lib/server/odoo-json2';
 import {
 	fetchGlassTypes,
+	priradOdooTypy,
 	_resetGlassTypesCache,
 	_resetGlassTypesWarn
 } from '../src/lib/server/odoo-glass-types';
@@ -67,10 +68,19 @@ describe('fetchGlassTypes (#540/#546)', () => {
 		expect(res.items[0]).toEqual({
 			value: '4/16/4',
 			label: 'Izolačné 4/16/4 · 4-16-4',
-			category: 'IZO'
+			category: 'IZO',
+			// #556: surové polia pre matcher / nárezák popis
+			name: 'Izolačné 4/16/4',
+			composition: '4-16-4'
 		});
 		// composition prázdne → label = name (bez ' · ')
-		expect(res.items[1]).toEqual({ value: '3.3.1', label: 'VSG 3.3.1', category: 'VSG' });
+		expect(res.items[1]).toEqual({
+			value: '3.3.1',
+			label: 'VSG 3.3.1',
+			category: 'VSG',
+			name: 'VSG 3.3.1',
+			composition: ''
+		});
 	});
 
 	it('chýbajúci cennik_code → value = presný name (Odoo páruje názov)', async () => {
@@ -91,7 +101,9 @@ describe('fetchGlassTypes (#540/#546)', () => {
 		expect(res.items[0]).toEqual({
 			value: 'Číre 6 mm',
 			label: 'Číre 6 mm · 6',
-			category: 'jednosklo'
+			category: 'jednosklo',
+			name: 'Číre 6 mm',
+			composition: '6'
 		});
 	});
 
@@ -366,5 +378,61 @@ describe('fetchGlassTypes — timeout + krátky fallback TTL + single-flight (#5
 		const res = await p;
 		expect(res.source).toBe('local');
 		vi.useRealTimers();
+	});
+});
+
+// #556: producent objednávky skla uloží Odoo hodnotu (`cennik_code || name`) LEN pri jednoznačnej
+// zhode lokálneho typu skla na Odoo `montalu.glass.type` (zloženie ∧ kategória); nejednoznačné
+// („viac") a bez zhody („ziadne") ostávajú s lokálnym názvom → operátor rozhodne na podklade.
+// Gatované na `source==='odoo'` — pri lokálnom fallbacku sa NIČ nenaväzuje.
+describe('priradOdooTypy (#556 — producent uloží Odoo hodnotu pri jednoznačnej zhode)', () => {
+	it('jednoznačná zhoda → typSkla = Odoo value; „viac"/„ziadne" → lokálny názov', async () => {
+		enableEnv();
+		setJson2Transport(
+			async () =>
+				new Response(
+					JSON.stringify([
+						// acceptačné 4/8/4 bez cennik_code (Odoo `false`) → value = presný name
+						{
+							name: 'Izolačné sklo 4/8/4- číre (Ug=1,1)',
+							category: 'izolacne',
+							cennik_code: false,
+							composition: '4/8/4'
+						},
+						// nejednoznačná skupina 4-16-4 (AL/TH)
+						{
+							name: 'Izolačné sklo 4/16/4 AL',
+							category: 'izolacne',
+							cennik_code: '001',
+							composition: '4/16/4'
+						},
+						{
+							name: 'Izolačné sklo 4/16/4 TH',
+							category: 'izolacne',
+							cennik_code: '003',
+							composition: '4/16/4'
+						}
+					]),
+					{ status: 200 }
+				)
+		);
+		const out = await priradOdooTypy([
+			{ typSkla: 'Izolačné sklo 4/8/4 číre' }, // jednoznacne → uloží Odoo name
+			{ typSkla: 'Izolačné sklo 4/16/4 číre' }, // viac → ostáva lokálne
+			{ typSkla: 'Float číre 6 mm' } // ziadne → ostáva lokálne
+		]);
+		expect(out[0]!.typSkla).toBe('Izolačné sklo 4/8/4- číre (Ug=1,1)');
+		expect(out[1]!.typSkla).toBe('Izolačné sklo 4/16/4 číre');
+		expect(out[2]!.typSkla).toBe('Float číre 6 mm');
+	});
+
+	it('lokálny fallback (Odoo config chýba) → typSkla nezmenené (bez Odoo dát nič nenaväzujeme)', async () => {
+		// bez enableEnv → odooJson2Config() null → source 'local'
+		const out = await priradOdooTypy([{ typSkla: 'Izolačné sklo 4/16/4 číre' }]);
+		expect(out[0]!.typSkla).toBe('Izolačné sklo 4/16/4 číre');
+	});
+
+	it('prázdne pole → prázdne (žiadny fetch)', async () => {
+		expect(await priradOdooTypy([])).toEqual([]);
 	});
 });
