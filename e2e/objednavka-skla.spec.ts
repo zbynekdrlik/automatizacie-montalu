@@ -211,3 +211,49 @@ test('objednávka skla: „iné sklo" — vlastný typ + cena/m² sa uloží a z
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #553: prázdny podklad → vo formulári „Pridať riadok" pri atyp priložíme výkres priamo
+// (setInputFiles na `manual-subor`) → riadok sa vloží AJ s prílohou jedným odoslaním a v riadku
+// je vidno názov pripnutého súboru. Money-NEUTRÁLNE (objednávka u dodávateľa). Zero-console.
+test('objednávka skla: atyp riadok + výkres jedným krokom vo formulári „Pridať riadok"', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await skipAkLive(page);
+
+	const zak = `${RUN}-VYKRES`;
+	await goto(page, `/objednavka-skla/${zak}`);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+
+	const pridatForm = page.getByTestId('pridat-riadok');
+	await expect(pridatForm).toBeVisible();
+
+	await pridatForm.getByTestId('manual-popis').fill('ATYP podľa výkresu');
+	const typSelect = pridatForm.getByTestId('manual-typ');
+	const prva = typSelect.locator('option:not([value=""])').first();
+	await typSelect.selectOption((await prva.getAttribute('value'))!);
+	await pridatForm.getByTestId('manual-sirka').fill('1000');
+	await pridatForm.getByTestId('manual-vyska').fill('700');
+	await pridatForm.getByTestId('manual-pocet').fill('1');
+	await pridatForm.getByTestId('manual-rezim').selectOption('atyp');
+
+	// výkres priložíme priamo vo formulári (minimálny PDF ako fixture bez súboru na disku)
+	const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'latin1');
+	await pridatForm.getByTestId('manual-subor').setInputFiles({
+		name: 'vykres-553.pdf',
+		mimeType: 'application/pdf',
+		buffer: pdfBytes
+	});
+
+	await pridatForm.getByTestId('manual-pridat').click();
+	await waitHydrated(page);
+
+	// riadok pod „Pridané položky" rovno ukazuje pripnutý súbor (stĺpec Prílohy)
+	await expect(page.getByRole('heading', { name: 'Pridané položky' })).toBeVisible();
+	const riadok = page.locator('tbody tr').first();
+	await expect(riadok.locator('td').nth(0)).toContainText('ATYP podľa výkresu');
+	await expect(riadok).toContainText('vykres-553.pdf');
+
+	expect(consoleMsgs).toEqual([]);
+});
