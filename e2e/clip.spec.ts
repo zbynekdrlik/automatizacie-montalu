@@ -217,3 +217,97 @@ test('#464: clip RAL metadata zobrazí sa v badge', async ({ page }) => {
 	await expect(page.locator('.badge', { hasText: 'RAL: RAL 9005' })).toBeVisible();
 	expect(errs).toEqual([]);
 });
+
+// ── #554: CLIP ako zasklenia — „Pridať zábradlie", SVG náhľad, rozpis rezov ──
+
+test('#554 clip: „➕ Pridať zábradlie" viditeľné bez prepínača', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/clip');
+	await waitHydrated(page);
+	// nové tlačidlo je vždy viditeľné
+	await expect(page.getByRole('button', { name: '➕ Pridať zábradlie' })).toBeVisible();
+	// starý prepínač „Viac kusov naraz" je preč
+	await expect(page.getByTestId('clip-multi-toggle')).toHaveCount(0);
+	// nesprávny label „Pridať zasklenie" (bod ticketu 1009) na CLIP už nie je
+	await expect(page.getByRole('button', { name: 'Pridať zasklenie' })).toHaveCount(0);
+	expect(errs).toEqual([]);
+});
+
+test('#554 clip: 1 výplň → náhľad 1 pole/0 priečok + rozpis rezov', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-CLIP-N1');
+	await page.getByTestId('typ').selectOption('izo');
+	await page.getByTestId('variant').selectOption('1');
+	await page.locator('#sirka').fill('1500');
+	await page.locator('#vyska').fill('1000');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+
+	// SVG náhľad: 1 pole, žiadna priečka
+	await expect(page.getByTestId('clip-nahlad')).toBeVisible();
+	await expect(page.getByTestId('clip-pole')).toHaveCount(1);
+	await expect(page.getByTestId('clip-priecka')).toHaveCount(0);
+
+	// rozpis rezov na tyče (pílový plán) viditeľný
+	await expect(page.getByTestId('clip-rozpis-rezov')).toBeVisible();
+	await expect(page.getByTestId('clip-rozpis-rezov')).toContainText('Rozpis rezov na tyče');
+	expect(errs).toEqual([]);
+});
+
+test('#554 clip: 3 výplne → náhľad 2 priečky (1003/1997) + rozpis rezov', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-CLIP-N3');
+	await page.getByTestId('typ').selectOption('izo');
+	await page.getByTestId('variant').selectOption('3');
+	await page.locator('#sirka').fill('3000');
+	await page.locator('#vyska').fill('1200');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+
+	// 3 polia, 2 priečky, pozície ako v Exceli 37649
+	await expect(page.getByTestId('clip-pole')).toHaveCount(3);
+	await expect(page.getByTestId('clip-priecka')).toHaveCount(2);
+	await expect(page.getByTestId('clip-priecka-pozicie')).toContainText('1003');
+	await expect(page.getByTestId('clip-priecka-pozicie')).toContainText('1997');
+
+	await expect(page.getByTestId('clip-rozpis-rezov')).toBeVisible();
+	expect(errs).toEqual([]);
+});
+
+test('#554 clip multi: pridaj 2. zábradlie → spoločný rozpis + odoslať (TEST)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	await hlavicka(page, `E2E-CLIP-MULTI-${Date.now().toString(36)}`);
+
+	// zábradlie 1 (základ)
+	await page.getByTestId('typ').selectOption('izo');
+	await page.getByTestId('variant').selectOption('1');
+	await page.locator('#sirka').fill('1500');
+	await page.locator('#vyska').fill('1000');
+
+	// pridaj zábradlie 2
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	await page.getByTestId('z1-variant').selectOption('3');
+	await page.locator('#z1-sirka').fill('3000');
+	await page.locator('#z1-vyska').fill('1200');
+
+	// spoločný rozpis (multi)
+	await page.getByRole('button', { name: /Spočítať spoločný rozpis/ }).click();
+	await waitHydrated(page);
+
+	// per-kus náhľady + spoločný rozpis rezov
+	await expect(page.getByTestId('kus-detail-0')).toBeVisible();
+	await expect(page.getByTestId('kus-detail-1')).toBeVisible();
+	await expect(page.getByTestId('clip-rozpis-rezov')).toBeVisible();
+
+	// odoslať spoločný odpis (TEST režim)
+	await page.getByTestId('odoslat-multi').click();
+	await expect(page.getByTestId('vysledok-multi')).toContainText('TEST');
+	expect(errs).toEqual([]);
+});
