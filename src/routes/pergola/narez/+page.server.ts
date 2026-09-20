@@ -34,8 +34,7 @@ import { strechaSkloCenaPre, type StrechaSkloCena } from '$lib/server/sklo-strec
 import { logger } from '$lib/server/log';
 import { redirect } from '@sveltejs/kit';
 import { pridajSklaHromadne, pridajSkloManual, type NoveSklo } from '$lib/server/objednavka-skla';
-import { priradOdooTypy } from '$lib/server/odoo-glass-types';
-import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
+import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
 
 const log = logger('pergola:narez');
 

@@ -49,8 +49,9 @@ export interface GlassMatch<T extends OdooTypLike = OdooTypLike> {
  */
 export function normalizeComposition(raw: string): string {
 	const t = (raw ?? '').toLowerCase();
-	// viac-číselné zloženie: A[sep]B[sep]C… kde sep ∈ / . - a môžu byť písmená pred oddeľovačom
-	const multi = t.match(/\d{1,2}(?:\s*[a-z]*\s*[./-]\s*\d{1,2})+/);
+	// viac-číselné zloženie: A[sep]B[sep]C… kde sep ∈ / . - a písmená sú PRIPOJENÉ k číslu (napr.
+	// tabuľa „5esg/14/5esg") — žiadna medzera pred písmenami, aby „4 dvere / 8" NEparsovalo ako „4-8".
+	const multi = t.match(/\d{1,2}(?:[a-z]*\s*[./-]\s*\d{1,2})+/);
 	if (multi) {
 		const nums = multi[0].match(/\d{1,2}/g);
 		if (nums && nums.length >= 2) return nums.join('-');
@@ -65,15 +66,17 @@ export function normalizeComposition(raw: string): string {
 }
 
 /**
- * Kategória LOKÁLNEHO skla z jeho voľnotextového názvu (poradie podľa návrhu #556): „izol" →
- * izolacne; „kalen"/„esg" → esg; „vsg" alebo kód d.d.d / dd.d → vsg; inak float (obyčajný float
- * nemá v Odoo náprotivok). Poradie izol-first chráni izolačné sklá zapísané bodkami („4.8.4").
+ * Kategória LOKÁLNEHO skla z jeho voľnotextového názvu: „izol" → izolacne; „vsg" alebo kód d.d.d /
+ * dd.d → vsg; „kalen"/„esg" → esg; inak float (obyčajný float nemá v Odoo náprotivok). Poradie:
+ * izol-first chráni izolačné sklá zapísané bodkami („4.8.4"); vsg PRED esg, aby lepené-kalené („VSG
+ * … kalené") ostalo vsg, nie esg (review #556). Float kalené (bez „vsg"/kódu) → esg (Odoo má pri
+ * jednoskle len ESG).
  */
 export function localGlassCategory(nazov: string): GlassKategoria {
 	const t = (nazov ?? '').toLowerCase();
 	if (t.includes('izol')) return 'izolacne';
-	if (t.includes('kalen') || t.includes('esg')) return 'esg';
 	if (/\bvsg\b/.test(t) || /\d\.\d\.\d/.test(t) || /\d{2}\.\d/.test(t)) return 'vsg';
+	if (t.includes('kalen') || t.includes('esg')) return 'esg';
 	return 'float';
 }
 

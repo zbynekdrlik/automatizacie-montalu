@@ -94,6 +94,10 @@ describe('normalizeComposition (#556)', () => {
 		expect(normalizeComposition('')).toBe('');
 		expect(normalizeComposition('sklo bez čísla')).toBe('');
 	});
+	it('slovo medzi číslom a oddeľovačom NEparsuje ako zloženie (review #556)', () => {
+		// „4 dvere / 8" nie je zloženie — písmená musia byť PRIPOJENÉ k číslu (ako „5esg/14")
+		expect(normalizeComposition('4 dvere / 8')).toBe('');
+	});
 });
 
 describe('localGlassCategory (#556)', () => {
@@ -110,6 +114,9 @@ describe('localGlassCategory (#556)', () => {
 	});
 	it('obyčajný float bez kalenia → float (bez Odoo náprotivku)', () => {
 		expect(localGlassCategory('Float číre 6 mm')).toBe('float');
+	});
+	it('lepené-kalené „VSG … kalené" → vsg (vsg PRED esg, review #556)', () => {
+		expect(localGlassCategory('VSG 33.1 kalené')).toBe('vsg');
 	});
 });
 

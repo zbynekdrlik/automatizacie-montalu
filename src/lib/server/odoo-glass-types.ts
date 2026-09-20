@@ -209,6 +209,15 @@ export async function priradOdooTypy<T extends { typSkla: string }>(polozky: T[]
 	if (source !== 'odoo') return polozky;
 	return polozky.map((p) => {
 		const m = matchOdooGlassType(p.typSkla, items);
-		return m.istota === 'jednoznacne' && m.typ ? { ...p, typSkla: m.typ.value } : p;
+		if (m.istota === 'jednoznacne' && m.typ) {
+			// #556 review: zhoda je len zloženie ∧ kategória (pokov/plyn/Ug sa nerozlišuje) — logni
+			// KAŽDÉ jednoznačné priradenie, aby bolo auditovateľné (kolízia pri jedno-variantovom katalógu).
+			log.info('priradOdooTypy: lokálne sklo priradené na Odoo typ (jednoznačné)', {
+				lokalne: p.typSkla,
+				odoo: m.typ.value
+			});
+			return { ...p, typSkla: m.typ.value };
+		}
+		return p;
 	});
 }
