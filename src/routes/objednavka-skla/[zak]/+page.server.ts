@@ -68,6 +68,27 @@ function allowedExtension(filename: string): boolean {
 	return ALLOWED_EXTENSIONS.includes(ext);
 }
 
+// #553: jeden zdroj pravdy pre validáciu prílohy — používajú ho OBE akcie (`nahratSubor` na
+// existujúcom riadku, `pridatRiadok` s výkresom priamo vo formulári). Synchrónna kontrola (File,
+// veľkosť, prípona z allowlistu); byte-obsah číta až volajúci. Server RE-validuje — client `accept`
+// je len UX a forged POST ho obíde.
+function validujSubor(
+	subor: FormDataEntryValue | null
+): { ok: true; subor: File } | { ok: false; error: string } {
+	if (!(subor instanceof File) || subor.size === 0) return { ok: false, error: 'Vyberte súbor.' };
+	if (subor.size > MAX_SUBOR_VELKOST)
+		return {
+			ok: false,
+			error: `Súbor je príliš veľký (max ${MAX_SUBOR_VELKOST / 1024 / 1024} MB).`
+		};
+	if (!allowedExtension(subor.name))
+		return {
+			ok: false,
+			error: `Nepovolený typ súboru. Povolené: ${ALLOWED_EXTENSIONS.join(', ')}.`
+		};
+	return { ok: true, subor };
+}
+
 export const load: PageServerLoad = async ({ params, url }) => {
 	// SvelteKit already decodes params — no decodeURIComponent (review BLUE-7: double-decode)
 	const zak = params.zak.trim();
@@ -148,8 +169,21 @@ export const actions = {
 		const typSkla = jeIne ? undefined : typVyber;
 		const typSklaManual = jeIne ? String(form.get('typ_skla_manual') ?? '').trim() : undefined;
 		const cenaM2Manual = jeIne ? Number(form.get('cena_m2_manual')) : undefined;
+
+		// #553: voliteľný výkres priamo vo formulári. Ak je súbor priložený → validuj PRED vložením
+		// (neplatný → fail(400), NIČ sa nevloží), zdieľaný helper s `nahratSubor`.
+		const suborEntry = form.get('subor');
+		const maSubor = suborEntry instanceof File && suborEntry.size > 0;
+		let subor: File | null = null;
+		if (maSubor) {
+			const v = validujSubor(suborEntry);
+			if (!v.ok) return fail(400, { pridatChyba: v.error });
+			subor = v.subor;
+		}
+
+		let id: number;
 		try {
-			pridajSkloManual({
+			id = pridajSkloManual({
 				zak,
 				popis,
 				typSkla,
@@ -163,6 +197,15 @@ export const actions = {
 			});
 		} catch (e) {
 			return fail(400, { pridatChyba: e instanceof Error ? e.message : 'Neplatný riadok.' });
+		}
+
+		if (subor) {
+			const buf = Buffer.from(await subor.arrayBuffer());
+			// Force safe MIME type regardless of browser-reported type (rovnako ako `nahratSubor`)
+			pridajSubor(id, subor.name, 'application/octet-stream', buf);
+		} else if (rezim === 'atyp') {
+			// atyp bez výkresu — nie chyba (Odoo vráti DQ, operátor doplní na riadku)
+			return { ok: true, pridatUpozornenie: 'atyp bez výkresu — pripni súbor pri riadku' };
 		}
 		return { ok: true };
 	},
@@ -195,23 +238,13 @@ export const actions = {
 		if (!Number.isInteger(polozkaId) || polozkaId <= 0)
 			return fail(400, { error: 'Neplatné ID položky.' });
 
-		const subor = form.get('subor');
-		if (!(subor instanceof File) || subor.size === 0) return fail(400, { error: 'Vyberte súbor.' });
+		// #553: zdieľaná validácia (File, veľkosť, allowlist prípon) — rovnaká ako `pridatRiadok`.
+		const v = validujSubor(form.get('subor'));
+		if (!v.ok) return fail(400, { error: v.error });
 
-		if (subor.size > MAX_SUBOR_VELKOST)
-			return fail(400, {
-				error: `Súbor je príliš veľký (max ${MAX_SUBOR_VELKOST / 1024 / 1024} MB).`
-			});
-
-		// Server-side extension allowlist — client `accept` is UX only
-		if (!allowedExtension(subor.name))
-			return fail(400, {
-				error: `Nepovolený typ súboru. Povolené: ${ALLOWED_EXTENSIONS.join(', ')}.`
-			});
-
-		const buf = Buffer.from(await subor.arrayBuffer());
+		const buf = Buffer.from(await v.subor.arrayBuffer());
 		// Force safe MIME type regardless of browser-reported type
-		pridajSubor(polozkaId, subor.name, 'application/octet-stream', buf);
+		pridajSubor(polozkaId, v.subor.name, 'application/octet-stream', buf);
 
 		// Auto-switch to atyp when a file is uploaded
 		nastavRezim(polozkaId, 'atyp');

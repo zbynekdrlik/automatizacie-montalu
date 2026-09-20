@@ -315,3 +315,28 @@ nectí, OSK odpoveď chýba — vyrieši sa samo po nasadení). Money-NEUTRÁLNE
   ukáže „Odoslané do Odoo: <OSK name>" + DQ zoznam + vynechané prílohy.
 - **v49 wiring pretlačil `migracie.ts` cez 1000-r. strop** → PURE MOVE inline v29 (`money_dlv` bloku) do
   `migracie-seed.ts` (`migrateMoneyDlv`), byte-identické (viď `migrations.md` + `large-file-split.md`).
+
+## Výkres priamo vo formulári „Pridať riadok" — multipart + zdieľaný `validujSubor` (#553)
+
+Formulár „Pridať riadok" (`+page.svelte`, `?/pridatRiadok`) je `enctype="multipart/form-data"`
++ `use:enhance` (multipart funguje natívne v SvelteKit enhance) a má vždy renderované pole na
+súbor `data-testid="manual-subor"` (`accept` z allowlistu; pri režime `atyp` vizuálne zvýraznené
+cez `class:atyp-zvyraznene` — progressive enhancement, funguje aj bez JS). Operátor pri atype
+priloží výkres jedným odoslaním; predtým sa dal pripnúť len na UŽ pridaný riadok.
+
+- **JEDEN zdroj pravdy pre validáciu prílohy = `validujSubor(FormDataEntryValue | null)`**
+  (`+page.server.ts`) → `{ ok: true; subor: File } | { ok: false; error }`. Synchrónna kontrola
+  (File instance, `size>0`, `size<=MAX_SUBOR_VELKOST`, `allowedExtension`); byte-obsah
+  (`arrayBuffer`) číta až volajúci. Používajú ho OBE akcie — `nahratSubor` (existujúci riadok) aj
+  `pridatRiadok` (nový riadok s výkresom). Pri pridaní ĎALŠEJ akcie s uploadom reuse tento helper,
+  needuplikuj vetvy „File/size/extension".
+- **Poradie v `pridatRiadok`:** validuj súbor PRED `pridajSkloManual` (neplatná prípona/veľkosť →
+  `fail(400, { pridatChyba })`, NIČ sa nevloží). Po úspešnom vložení (`id`) → `pridajSubor(id,
+  name, 'application/octet-stream', buf)` (vynútený bezpečný MIME, rovnako ako `nahratSubor`).
+- **atyp bez výkresu = upozornenie, NIE chyba:** `return { ok: true, pridatUpozornenie: 'atyp bez
+  výkresu — pripni súbor pri riadku' }` (Odoo vráti DQ, operátor doplní na riadku). UI ho ukáže
+  `data-testid="manual-upozornenie"` (`.warn`, nie `.err`). Rozmery ostávajú povinné (m² pre cenu).
+- **Test akcie s multipart:** mock event `{ params:{zak}, request:{ formData: async()=>fd },
+  locals:{user} }`; súbor cez `fd.set('subor', new File([content], name, {type}))` — obsah **string**
+  (BlobPart), NIE `Uint8Array` (TS lib `SharedArrayBuffer` nie je `BlobPart` → `svelte-check` padne).
+  E2E: `setInputFiles({ name, mimeType, buffer })` s inline PDF bufferom (žiadny fixture súbor na disku).
