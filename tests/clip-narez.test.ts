@@ -150,11 +150,14 @@ describe('clipMaterialRows — Money-neutralita (žiadny Money/odpis modul ho ne
 		return out;
 	}
 
-	it('adaptér neimportuje Money (money.ts / writeOdpis / server/ceny)', () => {
+	it('adaptér neimportuje Money (money.ts / writeOdpis-call / server/ceny)', () => {
 		const src = fs.readFileSync(path.join(SRC, 'lib/server/clip-narez.ts'), 'utf8');
-		expect(src).not.toMatch(/server\/money/);
-		expect(src).not.toMatch(/writeOdpis/);
-		expect(src).not.toMatch(/server\/ceny/);
+		// import-špecifické (nie substring v komentári — vysvetlivka smie slovo spomenúť)
+		expect(src).not.toMatch(/from\s+['"]\$lib\/server\/money['"]/);
+		expect(src).not.toMatch(/from\s+['"]\$lib\/server\/ceny['"]/);
+		// žiadne volanie writeOdpis( / saveOdpis( (Money zápis)
+		expect(src).not.toMatch(/writeOdpis\s*\(/);
+		expect(src).not.toMatch(/saveOdpis\w*\s*\(/);
 	});
 
 	it('žiadny Money/odpisový modul neimportuje clip-narez', () => {
