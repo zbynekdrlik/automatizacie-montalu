@@ -67,4 +67,13 @@ describe('#553 pridatRiadok — výkres priamo vo formulári „Pridať riadok"'
 		expect(rows).toHaveLength(1);
 		expect(listSubory(rows[0]!.id)).toHaveLength(0);
 	});
+
+	it('nadrozmerný súbor (> 10 MB) → fail(400), NIČ sa nevloží (size vetva zdieľaného helpera)', async () => {
+		const zak = 'ZAK-553-BIG';
+		const big = 'x'.repeat(10 * 1024 * 1024 + 1); // > MAX_SUBOR_VELKOST
+		const res = await actions.pridatRiadok(mkEvent(zak, BASE, { name: 'big.pdf', content: big }));
+		expect((res as { status?: number }).status).toBe(400);
+		expect((res as { data?: { pridatChyba?: string } }).data?.pridatChyba).toMatch(/veľký|max/i);
+		expect(listSklaPreZakazku(zak)).toHaveLength(0);
+	});
 });
