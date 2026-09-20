@@ -1,7 +1,11 @@
 {
 	"name": "automatizacie-montalu",
 	"private": true,
-	"version": "0.25.35",
+<<<<<<< HEAD
+	"version": "0.25.36",
+=======
+	"version": "0.25.36-dev.1",
+>>>>>>> worktree-agent-a9988b6d9fff8bd52
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",

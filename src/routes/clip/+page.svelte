@@ -2,26 +2,24 @@
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
+	import ClipForm from '$lib/components/clip/ClipForm.svelte';
+	import ClipNahlad from '$lib/components/ClipNahlad.svelte';
+	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		popisTyp,
 		computeClip,
-		CLIP_MIN_SIRKA,
-		CLIP_MAX_SIRKA,
-		CLIP_MIN_VYSKA,
-		CLIP_MAX_VYSKA,
 		CLIP_DLZKA_TYCE,
 		type ClipVstup,
 		type ClipVypocet
 	} from '$lib/clip';
+	import type { MaterialRow } from '$lib/server/compute';
 
 	let { data, form } = $props();
 
 	const fmt = (n: number) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 
-	// Plný POST + echo vzor (nova-stranka #4/#7 — wizard s krokmi): žiadny $state
-	// pre polia formulára, žiadny reštart-effect. Server vždy vráti `vstup`, ktorý
-	// value={} echuje späť; typed hodnoty tečú cez FormData, nie cez Svelte state.
+	// Echo vstupu (single) — hlavička kontroly/hotova + počiatočný stav ClipForm.
 	let vstup = $derived(
 		(form?.vstup as ClipVstup) ?? {
 			zak: '',
@@ -44,16 +42,7 @@
 	// #461: vylúčené kódy z SkladVarovania — bindable, ide do hidden inputu vo formulári
 	let vyluceneKody = $state('');
 
-	// --- Multi režim (#468 fáza 2) ---
-	type KusRow = {
-		typ: 'izo' | 'klasika';
-		variant: number;
-		sirka: number | '';
-		vyska: number | '';
-		ral: string;
-	};
-
-	// multi vstup z echovaného servera (po POST), alebo default
+	// multi vstup z echovaného servera (kontrolaMulti/hotovoMulti + init ClipForm pri chybe)
 	let multiVstup = $derived(
 		form && 'multiVstup' in form && form.multiVstup
 			? (form.multiVstup as {
@@ -66,61 +55,9 @@
 			: null
 	);
 
-	// mode toggle — single vs multi
-	let multiMode = $state(false);
-
-	// reactive: keď server vráti multiVstup, prepni do multi režimu a inicializuj stav
-	let kusy = $state<KusRow[]>([
-		{ typ: 'izo', variant: 1, sirka: '' as number | '', vyska: '' as number | '', ral: '' }
-	]);
-	let multiZak = $state('');
-	let multiOp = $state('');
-	let multiZakaznik = $state('');
-	let multiCaka = $state(false);
-
-	$effect(() => {
-		const mv = multiVstup;
-		if (mv) {
-			multiMode = true;
-			multiZak = mv.zak;
-			multiOp = mv.op;
-			multiZakaznik = mv.zakaznik;
-			multiCaka = mv.caka;
-			kusy = mv.kusy.map((k) => ({
-				typ: k.typ,
-				variant: k.variant,
-				sirka: k.sirka,
-				vyska: k.vyska,
-				ral: k.ral
-			}));
-		}
-	});
-
-	function addKus() {
-		kusy.push({
-			typ: 'izo',
-			variant: 1,
-			sirka: '' as number | '',
-			vyska: '' as number | '',
-			ral: ''
-		});
-	}
-
-	function removeKus(i: number) {
-		if (kusy.length > 1) kusy.splice(i, 1);
-	}
-
-	// JSON serializácia kusov pre hidden input
-	let kusyJSON = $derived(
-		JSON.stringify(
-			kusy.map((k) => ({
-				typ: k.typ,
-				variant: k.variant,
-				sirka: k.sirka,
-				vyska: k.vyska,
-				ral: k.ral
-			}))
-		)
+	// #554 pílový plán (MaterialRow[]) zo servera — display-only (odpis nezmenený)
+	let narez = $derived(
+		form && 'narez' in form && form.narez ? (form.narez as MaterialRow[]) : null
 	);
 </script>
 
@@ -139,11 +76,24 @@
 {/snippet}
 
 {#snippet hiddenMulti()}
-	<input type="hidden" name="zak" value={multiVstup?.zak ?? multiZak} />
-	<input type="hidden" name="op" value={multiVstup?.op ?? multiOp} />
-	<input type="hidden" name="zakaznik" value={multiVstup?.zakaznik ?? multiZakaznik} />
-	<input type="hidden" name="clipKusy" value={kusyJSON} />
-	{#if multiVstup?.caka ?? multiCaka}<input type="hidden" name="caka" value="1" />{/if}
+	<!-- multi zadanie sa nesie DOPREDU zo servera (echo multiVstup) — clipKusy = všetky kusy -->
+	<input type="hidden" name="zak" value={multiVstup?.zak ?? ''} />
+	<input type="hidden" name="op" value={multiVstup?.op ?? ''} />
+	<input type="hidden" name="zakaznik" value={multiVstup?.zakaznik ?? ''} />
+	<input type="hidden" name="clipKusy" value={JSON.stringify(multiVstup?.kusy ?? [])} />
+	{#if multiVstup?.caka}<input type="hidden" name="caka" value="1" />{/if}
+{/snippet}
+
+{#snippet rozpisRezovSekcia(material: MaterialRow[])}
+	<div class="card" data-testid="clip-rozpis-rezov">
+		<div class="sec">Rozpis rezov na tyče — pre pílu</div>
+		<p class="sub" style="margin-bottom:14px">
+			Každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci (dĺžka tyče {fmt(
+				CLIP_DLZKA_TYCE
+			)} mm, kotúč 4 mm). Počet tyčí v odpise = ROUNDUP podľa Excelu; pílový plán = optimalizované rozloženie.
+		</p>
+		<RozpisRezov {material} />
+	</div>
 {/snippet}
 
 {#snippet clipVyrobnySec(v: ClipVypocet, cv: ClipVstup)}
@@ -164,6 +114,13 @@
 				· priečky od kraja: {v.poziciePriecok.map((p) => fmt(p)).join(', ')} mm
 			{/if}
 		</p>
+
+		<!-- #554 SVG náhľad výplní s priečkami -->
+		<ClipNahlad
+			sirka={Number(cv.sirka)}
+			vyska={Number(cv.vyska)}
+			poziciePriecok={v.poziciePriecok}
+		/>
 
 		<div class="sec" style="margin-top:14px">
 			Nárez — rozloženie na tyče ({CLIP_DLZKA_TYCE} mm)
@@ -200,211 +157,19 @@
 	<div class="card">
 		<h1>CLIP zábradlie — odpis materiálu do Money</h1>
 		<p class="sub">
-			Zadaj rozmer zábradlia a počet výplní, rozpis si skontroluješ a upravíš pred odoslaním.
+			Zadaj rozmer zábradlia a počet výplní, rozpis si skontroluješ a upravíš pred odoslaním. Viac
+			zábradlí naraz pridáš tlačidlom „➕ Pridať zábradlie" — spočíta sa jeden spoločný odpis.
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
-		<!-- #468: prepínač single / multi -->
-		<div style="margin-top:8px">
-			<label class="opt opt-grid">
-				<input type="checkbox" bind:checked={multiMode} data-testid="clip-multi-toggle" />
-				Viac kusov naraz (spoločný odpis)
-			</label>
-		</div>
 	</div>
 
 	{#if form?.error}
 		<div class="err" data-testid="form-error">⚠️ {form.error}</div>
 	{/if}
 
-	{#if !multiMode}
-		<!-- === SINGLE režim (pôvodný formulár) === -->
-		<div class="card">
-			<form method="POST" action="?/spocitat">
-				<div class="grid3">
-					<div class="field">
-						<label for="zak">Číslo objednávky (ZAK) *</label>
-						<input id="zak" name="zak" value={vstup.zak} required />
-					</div>
-					<div class="field">
-						<label for="op">OP/OPDL číslo *</label>
-						<input id="op" name="op" value={vstup.op} required />
-					</div>
-					<div class="field">
-						<label for="zakaznik">Zákazník *</label>
-						<input id="zakaznik" name="zakaznik" value={vstup.zakaznik} required />
-					</div>
-				</div>
-				<div class="grid3">
-					<div class="field">
-						<label for="typ">Výplň</label>
-						<select id="typ" name="typ" value={vstup.typ} data-testid="typ">
-							<option value="izo">IZO (4-8-4)</option>
-							<option value="klasika">klasika (3.3.1 číre)</option>
-						</select>
-					</div>
-					<div class="field">
-						<label for="variant">Počet výplní</label>
-						<select id="variant" name="variant" value={String(vstup.variant)} data-testid="variant">
-							<option value="1">B0 — 1 výplň</option>
-							<option value="2">B1 — 2 výplne</option>
-							<option value="3">B2 — 3 výplne</option>
-							<option value="4">B3 — 4 výplne</option>
-						</select>
-					</div>
-					<div class="field">
-						<label for="ral">RAL farba (informačná)</label>
-						<input
-							id="ral"
-							name="ral"
-							value={vstup.ral}
-							maxlength="40"
-							placeholder="napr. RAL 7016"
-						/>
-					</div>
-				</div>
-				<div class="grid3">
-					<div class="field">
-						<label for="sirka">Šírka zábradlia (mm) *</label>
-						<input
-							id="sirka"
-							name="sirka"
-							type="number"
-							min={CLIP_MIN_SIRKA}
-							max={CLIP_MAX_SIRKA}
-							step="any"
-							value={vstup.sirka}
-							required
-						/>
-					</div>
-					<div class="field">
-						<label for="vyska">Výška zábradlia (mm) *</label>
-						<input
-							id="vyska"
-							name="vyska"
-							type="number"
-							min={CLIP_MIN_VYSKA}
-							max={CLIP_MAX_VYSKA}
-							step="any"
-							value={vstup.vyska}
-							required
-						/>
-					</div>
-					<div class="field">
-						<label class="opt opt-grid">
-							<input type="checkbox" name="caka" value="1" checked={vstup.caka} />
-							Čaká na materiál (odloží do NA ODPIS/Clip)
-						</label>
-					</div>
-				</div>
-				<button class="btn" type="submit">Spočítať rozpis</button>
-			</form>
-		</div>
-	{:else}
-		<!-- === MULTI režim (#468) === -->
-		<div class="card">
-			<form method="POST" action="?/spocitatMulti">
-				<div class="grid3">
-					<div class="field">
-						<label for="m-zak">Číslo objednávky (ZAK) *</label>
-						<input id="m-zak" name="zak" bind:value={multiZak} required />
-					</div>
-					<div class="field">
-						<label for="m-op">OP/OPDL číslo *</label>
-						<input id="m-op" name="op" bind:value={multiOp} required />
-					</div>
-					<div class="field">
-						<label for="m-zakaznik">Zákazník *</label>
-						<input id="m-zakaznik" name="zakaznik" bind:value={multiZakaznik} required />
-					</div>
-				</div>
-				<div class="field" style="margin-bottom:8px">
-					<label class="opt opt-grid">
-						<input type="checkbox" bind:checked={multiCaka} />
-						Čaká na materiál (odloží do NA ODPIS/Clip)
-					</label>
-				</div>
-				{#if multiCaka}<input type="hidden" name="caka" value="1" />{/if}
-				<input type="hidden" name="clipKusy" value={kusyJSON} />
-
-				{#each kusy as kus, i (i)}
-					<div
-						class="card"
-						style="margin:8px 0;padding:12px;border-left:3px solid var(--m-primary)"
-					>
-						<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-							<b>Zasklenie {i + 1}</b>
-							{#if kusy.length > 1}
-								<button
-									type="button"
-									class="btn secondary"
-									style="padding:2px 8px;font-size:12px"
-									onclick={() => removeKus(i)}>✕ Odstrániť</button
-								>
-							{/if}
-						</div>
-						<div class="grid3">
-							<div class="field">
-								<label for="k{i}-typ">Výplň</label>
-								<select id="k{i}-typ" bind:value={kus.typ} data-testid="k{i}-typ">
-									<option value="izo">IZO (4-8-4)</option>
-									<option value="klasika">klasika (3.3.1 číre)</option>
-								</select>
-							</div>
-							<div class="field">
-								<label for="k{i}-variant">Počet výplní</label>
-								<select id="k{i}-variant" bind:value={kus.variant} data-testid="k{i}-variant">
-									<option value={1}>B0 — 1 výplň</option>
-									<option value={2}>B1 — 2 výplne</option>
-									<option value={3}>B2 — 3 výplne</option>
-									<option value={4}>B3 — 4 výplne</option>
-								</select>
-							</div>
-							<div class="field">
-								<label for="k{i}-ral">RAL farba</label>
-								<input
-									id="k{i}-ral"
-									bind:value={kus.ral}
-									maxlength="40"
-									placeholder="napr. RAL 7016"
-								/>
-							</div>
-						</div>
-						<div class="grid3">
-							<div class="field">
-								<label for="k{i}-sirka">Šírka (mm) *</label>
-								<input
-									id="k{i}-sirka"
-									type="number"
-									min={CLIP_MIN_SIRKA}
-									max={CLIP_MAX_SIRKA}
-									step="any"
-									bind:value={kus.sirka}
-									required
-								/>
-							</div>
-							<div class="field">
-								<label for="k{i}-vyska">Výška (mm) *</label>
-								<input
-									id="k{i}-vyska"
-									type="number"
-									min={CLIP_MIN_VYSKA}
-									max={CLIP_MAX_VYSKA}
-									step="any"
-									bind:value={kus.vyska}
-									required
-								/>
-							</div>
-						</div>
-					</div>
-				{/each}
-
-				<button type="button" class="btn secondary" onclick={addKus} data-testid="clip-add-kus"
-					>➕ Pridať zasklenie</button
-				>
-				<button class="btn" type="submit" style="margin-left:8px">Spočítať rozpis</button>
-			</form>
-		</div>
-	{/if}
+	<!-- #554: zjednotený formulár ako zasklenia — prvé zábradlie = základ, „➕ Pridať
+	     zábradlie" VŽDY viditeľné (single ↔ multi cez formaction, žiadny prepínač) -->
+	<ClipForm {vstup} {multiVstup} />
 {:else if step === 'kontrola' && form && 'vypocet' in form && form.vypocet}
 	{@const v = form.vypocet}
 	<div class="card">
@@ -423,6 +188,12 @@
 				· priečky od kraja: {v.poziciePriecok.map((p) => fmt(p)).join(', ')} mm
 			{/if}
 		</p>
+		<!-- #554 SVG náhľad výplní s priečkami -->
+		<ClipNahlad
+			sirka={Number(vstup.sirka)}
+			vyska={Number(vstup.vyska)}
+			poziciePriecok={v.poziciePriecok}
+		/>
 		<p class="sub">
 			Množstvá (počet tyčí) môžeš upraviť — prázdne pole = automatická hodnota. Záporné a nečíselné
 			sa odmietnu.
@@ -514,6 +285,11 @@
 			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
 		</form>
 	</div>
+
+	<!-- #554 pílový plán (rozpis rezov na tyče) — display-only -->
+	{#if narez}
+		{@render rozpisRezovSekcia(narez)}
+	{/if}
 {:else if step === 'kontrolaMulti' && form && 'multi' in form && form.multi}
 	{@const multi = form.multi}
 	<div class="card">
@@ -542,7 +318,7 @@
 		{@const mv = (form.multiVstup as { kusy: ClipVstup[] }).kusy[ki]}
 		<div class="card" data-testid="kus-detail-{ki}">
 			<div class="sec">
-				Zasklenie {ki + 1}: {popisTyp(mv?.typ ?? 'izo')} · B{(mv?.variant ?? 1) - 1} · {mv?.sirka ??
+				Zábradlie {ki + 1}: {popisTyp(mv?.typ ?? 'izo')} · B{(mv?.variant ?? 1) - 1} · {mv?.sirka ??
 					0}×{mv?.vyska ?? 0} mm
 				{#if mv?.ral}
 					· RAL: {mv.ral}{/if}
@@ -550,6 +326,12 @@
 			<p class="sub">
 				Šírka výplne {fmt(kus.sirkaVyplne)} mm · výška {fmt(kus.vyskaVyplne)} mm · {fmt(kus.m2)} m²
 			</p>
+			<!-- #554 SVG náhľad zábradlia (per kus) -->
+			<ClipNahlad
+				sirka={Number(mv?.sirka ?? 0)}
+				vyska={Number(mv?.vyska ?? 0)}
+				poziciePriecok={kus.poziciePriecok}
+			/>
 			<table>
 				<thead
 					><tr
@@ -633,6 +415,11 @@
 			<button class="btn secondary noprint" type="submit">← Späť a upraviť zadanie</button>
 		</form>
 	</div>
+
+	<!-- #554 spoločný pílový plán (zdieľané tyče naprieč zábradliami) — display-only -->
+	{#if narez}
+		{@render rozpisRezovSekcia(narez)}
+	{/if}
 {:else if step === 'hotovo' && form && 'finalOut' in form && form.finalOut && form.outcome}
 	{@const hv = computeClip(vstup)}
 	<div class="card">
@@ -669,6 +456,11 @@
 			</div>
 		{/each}
 	</div>
+
+	<!-- #554 pílový plán -->
+	{#if narez}
+		{@render rozpisRezovSekcia(narez)}
+	{/if}
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
@@ -722,6 +514,11 @@
 			</div>
 		{/each}
 	</div>
+
+	<!-- #554 spoločný pílový plán (zdieľané tyče naprieč zábradliami) -->
+	{#if narez}
+		{@render rozpisRezovSekcia(narez)}
+	{/if}
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
