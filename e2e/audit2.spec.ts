@@ -5,7 +5,7 @@
 // Audit #12 (primárne selecty), #13 (extra posuv), #33 (login redirect), #34 (badge).
 // Pozn.: zlé heslo, prefill mena a ?next= deep-link už kryje app.spec.ts (1. dávka).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs } from './helpers';
+import { collectConsole, loginAs, bareSkloLabel } from './helpers';
 
 test('#12 primárne selecty: zmena systému snapne Štýl aj Sklo na platné hodnoty', async ({
 	page
@@ -25,13 +25,14 @@ test('#12 primárne selecty: zmena systému snapne Štýl aj Sklo na platné hod
 	const slideSkla = await page.locator('#sklo option').allTextContents();
 	expect(slideStyly).not.toContain('2x4K');
 	expect(slideStyly).toContain(styl); // vybraná hodnota je z NOVÉHO zoznamu
-	expect(slideSkla).toContain(sklo);
+	// #556 hotfix: `<option>` skla nesie na PROD sufix „ · cenník: <Odoo>" — porovnávame HOLÝ názov.
+	expect(slideSkla.map(bareSkloLabel)).toContain(sklo);
 	expect(sklo).not.toContain('4/16/4'); // Robustové sklo neprežije prepnutie
-	expect(slideSkla).toContain('3.3.1'); // 6 mm skladba je v ponuke (v17)
+	expect(slideSkla.map(bareSkloLabel)).toContain('3.3.1'); // 6 mm skladba je v ponuke (v17)
 
 	// a naopak: Slide → Deluxe (Deluxe má vlastné sklá, žiadne Slide/Robust)
 	await page.selectOption('#system', 'Deluxe');
-	const deluxeSkla = await page.locator('#sklo option').allTextContents();
+	const deluxeSkla = (await page.locator('#sklo option').allTextContents()).map(bareSkloLabel);
 	expect(deluxeSkla).toContain(await page.locator('#sklo').inputValue());
 	expect(deluxeSkla.some((s) => s.includes('4/8/4'))).toBe(false);
 
@@ -55,7 +56,7 @@ test('#13 extra posuv: zmena jeho systému snapne jeho štýl/sklo/otváranie (p
 	// prepni LEN posuv na Slide → jeho štýl aj sklo musia byť platné pre Slide
 	await page.selectOption('#ps0-sys', 'Slide');
 	const psStyly = await page.locator('#ps0-styl option').allTextContents();
-	const psSkla = await page.locator('#ps0-sklo option').allTextContents();
+	const psSkla = (await page.locator('#ps0-sklo option').allTextContents()).map(bareSkloLabel);
 	expect(psStyly).toContain(await page.locator('#ps0-styl').inputValue());
 	expect(psSkla).toContain(await page.locator('#ps0-sklo').inputValue());
 	expect(psStyly).not.toContain('2x4K');
