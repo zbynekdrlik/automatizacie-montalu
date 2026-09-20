@@ -322,8 +322,19 @@ zloženie, a FORMÁT zloženia sa líši (Odoo „4/8/4" lomítka vs appka „4-
   písmená pri tabuli „5esg/14/5esg", IZO dvoj/trojsklo „4/16/4/16/4", VSG „3.3.1"/„44.2", jednosklo
   „6 mm"). `localGlassCategory(nazov)` = izol→izolacne, kalen/esg→esg, vsg/kód d.d.d→vsg, inak float.
 - `matchOdooGlassType(lokalneSklo, odooTypy)` → `{ typ, istota, kandidati }`; zhoda = zloženie ∧
-  kategória; **viac kandidátov (napr. AL/TH pri „4-16-4") → istota `'viac'`, `typ=null` (NIKDY tichý
-  výber)**; žiadna → `'ziadne'`.
+  kategória ∧ **odtieň** (#556 hotfix); **viac kandidátov (napr. AL/TH pri „4-16-4") → istota
+  `'viac'`, `typ=null` (NIKDY tichý výber)**; žiadna → `'ziadne'`.
+- **Os ODTIEŇA (`glassTint`, #556 hotfix).** Bez odtieňa by sa „Izolačné sklo 4/8/4 mliečne"
+  spárovalo na „Izolačné sklo 4/8/4- číre" → do objednávky u dodávateľa by šlo NESPRÁVNE SKLO (PROD
+  incident, main run 35514443000). `glassTint(name)` → `cire` (default, aj „číre"/„clear"/bez
+  tokenu) | `mliecne` („mlieč"/„satin"/„matn") | `bronz` | `seda` („šed"/„grey"/„gray") | `grafit`.
+  Párovanie je ASYMETRICKÉ: lokálne sklo má JEDEN odtieň, Odoo typ môže niesť VIAC v názve
+  („bronz/šedý"). Lokálne **číre** sa zhoduje LEN s Odoo typmi bez ne-číreho tokenu; lokálny
+  **ne-číry** odtieň sa zhoduje s Odoo typom, ktorého názov ten odtieň spomína (aj keď ich je viac);
+  Odoo typ s ne-čírymi tokenmi sa NIKDY nespáruje s lokálnym číre. Odtieň NIE je Money os — mení sa
+  len text `glass_type` v objednávke. `stopsol` NIE je v tejto osi (nezoznamovaný token → `cire`).
+- `cennikPopis` pri „viac" → **„viac typov (N)"** (#556 hotfix), NIKDY meno prvého kandidáta — pri
+  odtieňoch by ukázalo zavádzajúci názov iného odtieňa; operátor rozhodne na podklade.
 - `naviazanieRiadku(typSkla, odooTypy, source)` a `cennikPopis(typSkla, odooTypy, source)` — GATOVANÉ
   na `source==='odoo'`: pri lokálnom fallbacku (Odoo nedostupné) sa NIČ nenaväzuje (bez Odoo dát niet
   na čo) a nárezák nemá popis.
@@ -342,3 +353,11 @@ mapa z `load` cez `ZasklieniaForm` prop. FIX nemá select typu skla (jedno `name
 pergola honest-null formulár už používa priamo Odoo picker → popis v selecte dáva zmysel len v
 zaskleniach. **Money-NEUTRÁLNE, bez migrácie** — výpočtový `glass_types`, hrúbky, profily, Money kódy
 NEDOTKNUTÉ. Pri rozšírení na ďalší producent: `await priradOdooTypy(...)` pred insertom + vitest.
+
+**E2E a Odoo-obohatený sufix (`bareSkloLabel`, #556 hotfix).** Nárezák `<option>` skla nesie
+`value` = HOLÝ lokálny názov, ale TEXT = „<názov> · cenník: <Odoo name>" — a to LEN keď je Odoo
+dostupné (PROD/post-deploy), nie v CI `test` jobe (bez Odoo). E2E, ktoré čítajú `option.textContent`
+a porovnávajú MNOŽINU skiel (nie sufix), preto MUSIA strippnúť sufix cez `e2e/helpers.ts`
+`bareSkloLabel(text)` = text pred „ · cenník:" (trim). Je to JEDINÉ miesto, kde sa sufix strippuje;
+platí pre každý budúci Odoo enrichment popiskov v selecte (inak test zelený lokálne / CI, ale padne
+v post-deploy proti PROD). Sufix samotný je ZÁMERNÉ #556 správanie — testy overujú množinu skiel.
