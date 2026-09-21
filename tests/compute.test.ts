@@ -1311,7 +1311,9 @@ describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korek
 		expect(r!.potrebuje3K).toBe(false);
 		expect(r!.sklo).toEqual({ sirka: 1445, vyska: 2115 });
 		expect(r!.rozmerSietoviny).toEqual({ sirka: 1447, vyska: 2116 });
-		expect(r!.material).toEqual([
+		// #555: Money profily (kod !== null) ostávajú byte-identické — jokle sa pridali
+		// SAMOSTATNE ako honest-null riadky (nižšie), do odpisu nevstupujú.
+		expect(r!.material.filter((m) => m.kod !== null)).toEqual([
 			{
 				kod: 'ZASP00002',
 				nazov: 'Rámový profil Surový 7500 mm',
@@ -1327,6 +1329,13 @@ describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korek
 				rezy: [{ rozmer: 2250, ks: 1 }],
 				tyce: 1
 			}
+		]);
+		// #555: jokle Robust — sieťovina 1447×2116 → šírka 4 ks 1457, výška 4 ks 2094
+		expect(r!.jokle).toEqual({ profil: 'Jokel 12x8', sirka: 1457, vyska: 2094, ks: 4 });
+		const jokleRiadky = r!.material.filter((m) => m.kod === null);
+		expect(jokleRiadky.map((m) => m.rezy)).toEqual([
+			[{ rozmer: 1457, ks: 4 }],
+			[{ rozmer: 2094, ks: 4 }]
 		]);
 		expect(r!.odpis).toEqual([
 			{ kod: 'ZASP00002', nazov: 'Rámový profil Surový 7500 mm', metre: 15 },

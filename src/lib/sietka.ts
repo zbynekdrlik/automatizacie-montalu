@@ -90,6 +90,53 @@ export function rozmerSietovinyPre(
 		: rozmerSietoviny(skloS, skloV);
 }
 
+/** Jokle sieťky (#555, Patrik Odoo úloha 1010, príloha ir.attachment 37652) — oceľová
+ *  výstuha rámu sieťky 12×8 mm, ktorú VÝROBA reže z NÁŠHO nárezáku. Platí LEN pre Robust
+ *  (Patrik verbatim: „pre robust") — Slide/Štandard jokle NEMAJÚ. Na JEDNU sieťku ide
+ *  `JOKLE_KS` (4) rezov šírky + 4 rezov výšky. Rozmer sa odvodzuje zo SIEŤOVINY (nie zo
+ *  skla), takže je JEDEN zdroj vzorca: šírka = sieťovina.šírka + 10, výška =
+ *  sieťovina.výška − 22. Excel 1:1 (Robust 3K zasklenie 5000×2150, sklo 1563×1945 →
+ *  sieťovina 1565×1946 → jokel šírka 4 ks 1575, výška 4 ks 1924).
+ *
+ *  MONEY: kód dnes NEEXISTUJE — Odoo katalóg (sync z Money) má 24× „Jokel AxB" bez
+ *  `default_code` a „Jokel 12x8" tam nie je → honest-null: jokle sa ZOBRAZIA s rozmermi,
+ *  do Money odpisu NEVSTUPUJÚ. Dnes sú DISPLAY-only (nie sú v odpisovej `byKod` ceste ako
+ *  CLIP drobné, ktoré cez odpisovú slučku prechádzajú). Zapnutie do Money, keď výroba dodá
+ *  kartu „Jokel 12x8" s kódom, NIE je len premenovanie `JOKLE_PROFIL` — treba jokle zaradiť
+ *  do odpisovej cesty (najčistejšie ako cfg RezRow) + overiť množstvo (viď `compute-sietka.ts`
+ *  a `sietka.md`). */
+export const JOKLE_PROFIL = 'Jokel 12x8';
+export const JOKLE_DELTA = { sirka: 10, vyska: -22 };
+export const JOKLE_KS = 4;
+
+export interface Jokle {
+	/** názov profilu (dnes bez Money kódu — honest-null) */
+	profil: string;
+	/** dĺžka rezu šírky [mm] = sieťovina.šírka + 10 */
+	sirka: number;
+	/** dĺžka rezu výšky [mm] = sieťovina.výška − 22 */
+	vyska: number;
+	/** počet rezov KAŽDÉHO rozmeru (šírka aj výška) na jednu sieťku */
+	ks: number;
+}
+
+/** Systémy, kde sieťka nesie jokle (Patrik: „pre robust"). Slide/Štandard/Deluxe = false. */
+export function jeJokleSystem(system: string): boolean {
+	return system === 'Robust';
+}
+
+/** Rozmery joklov z rozmeru SIEŤOVINY (`rozmerSietoviny*` výstupu) — JEDEN zdroj vzorca
+ *  aj konštánt, používaný samostatnou sieťkou (`compute-sietka.ts`) aj zasklením
+ *  (`PlanKarty`/`PlanKartyMulti`). Volaj len keď `jeJokleSystem(system)` (Robust). */
+export function rozmerJokle(sietovina: { sirka: number; vyska: number }): Jokle {
+	return {
+		profil: JOKLE_PROFIL,
+		sirka: sietovina.sirka + JOKLE_DELTA.sirka,
+		vyska: sietovina.vyska + JOKLE_DELTA.vyska,
+		ks: JOKLE_KS
+	};
+}
+
 /** Systémy, kde appka sieťku ponúka NA POSUVE (Patrik 2026-07-31 pri #90: „malo
  *  by to byť všetko totožné" ako Robust; #110 pridal Štandard/Štandard +).
  *  Deluxe/Bazén/Pergola sieťku nemajú. */

@@ -91,6 +91,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - version bump mechanics (tabs/#161) + `-dev`-on-`main` recovery (#98/#174) → `.claude/rules/version-bump.md`
 - deploy / post-deploy E2E / LIVE flip → skill `.claude/skills/deploy`
 - Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
+- sieťka (moskytiéra) jokle Robust / honest-null kód-null / rozmerJokle zo sieťoviny / samostatná /sietka + zasklenie karty → `.claude/rules/sietka.md`
 - pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
 - odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner) → `.claude/rules/opona-izo-narezak.md`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`

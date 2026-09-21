@@ -18,7 +18,9 @@
 		potrebuje3KKolajnicu,
 		popis3KKolajnicaVymena,
 		pridavnaKolajnicaHint,
-		uchytLabel
+		uchytLabel,
+		jeJokleSystem,
+		rozmerJokle
 	} from '$lib/sietka';
 	import { fmtM, type PlanVstup } from '$lib/zasklenia-form';
 	import type { ComputeResult } from '$lib/server/compute';
@@ -147,7 +149,17 @@
 							: '+2 rámové rezy (S aj V) + 1 nosový rez'}</b
 				>
 			</div>
-			<div><span>Joklík</span><b>bez skladovej karty — nájde dielňa, neodpisuje sa</b></div>
+			{#if jeJokleSystem(p.system)}
+				{@const jokle = rozmerJokle(rozmer)}
+				<div>
+					<span>Jokel 12x8</span><b class="mono" data-testid="sietka-jokle"
+						>šírka {jokle.ks} ks {jokle.sirka}, výška {jokle.ks} ks {jokle.vyska} — bez Money karty, neodpisuje
+						sa</b
+					>
+				</div>
+			{:else}
+				<div><span>Joklík</span><b>bez skladovej karty — nájde dielňa, neodpisuje sa</b></div>
+			{/if}
 		</div>
 		{#if potrebuje3KKolajnicu(vstup.styl)}
 			<p class="sub" data-testid="sietka-2k-warn-karta">
