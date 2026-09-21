@@ -61,6 +61,26 @@ export function bareSkloLabel(text: string): string {
 }
 
 /**
+ * #555 HOTFIX: očakávané rozmery joklov ODVODENÉ z rozmeru SIEŤOVINY zobrazeného na tej istej
+ * stránke/karte (testid `sietka-rozmer` na karte zasklenia, `sietka-samostatna-rozmer` na
+ * `/sietka`). Post-deploy E2E beží proti ŽIVEJ PROD cfg, kde sú Robust vzorce upravené editorom
+ * (sklo/sieťovina o pár mm inak než seed) — takže PEVNÝ mm literál zo seed cfg je env-viazaný a
+ * padne (main run 35588964456, deploy fail). Odvodenie z DOM je odolné voči zmene cfg editorom.
+ *
+ * Delty +10 / −22 a `ks` 4 sú JEDINÉ miesto v E2E, kde žijú — držia paritu s `JOKLE_DELTA` a
+ * `JOKLE_KS` v `src/lib/sietka.ts` (import konštánt do E2E nie je možný bez buildu — Tier 0).
+ * Paritu overuje unit test `tests/sietka-jokle.test.ts` („JOKLE_DELTA / JOKLE_KS — parita").
+ *
+ * Vstup je text rozmeru sieťoviny „1447 × 2116 mm" (fmtM, sieťovina má celé mm). Vzorec zhodný
+ * s `rozmerJokle`: jokel.šírka = sieťovina.šírka + 10, jokel.výška = sieťovina.výška − 22.
+ */
+export function jokleZoSietoviny(rozmerText: string): { sirka: number; vyska: number; ks: number } {
+	const m = rozmerText.match(/(\d+)\s*×\s*(\d+)/);
+	if (!m) throw new Error(`jokleZoSietoviny: nečakaný text rozmeru sieťoviny „${rozmerText}"`);
+	return { sirka: Number(m[1]) + 10, vyska: Number(m[2]) - 22, ks: 4 };
+}
+
+/**
  * goto + počkanie na hydratáciu. fill() pred dokončenou hydratáciou prehráva
  * s Svelte, ktorá value-bound inputy vráti na serverový stav (cez pomalý SSH
  * tunel sa JS načítava neskoro — v CI to nikdy nevidno).

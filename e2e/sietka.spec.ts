@@ -14,7 +14,8 @@ import {
 	goto,
 	skipAkLive,
 	vyberFarbuKovania,
-	logout
+	logout,
+	jokleZoSietoviny
 } from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string, styl = '3K') {
@@ -87,9 +88,16 @@ test('jeden posuv: sieťka pridá presnú deltu do Money odpisu (rám+nos, #86 k
 	await expect(karta).toContainText('pravá'); // P - L → sieťka vpravo
 	await expect(karta).toContainText('vystúpené madlo veľké');
 
-	// #555: Robust nesie jokle — karta ukáže skutočné čísla namiesto starého literálu
-	// (Robust 3K S=4645/V=2320 → sieťovina 1447×2116 → jokel šírka 4 ks 1457, výška 4 ks 2094)
-	await expect(page.getByTestId('sietka-jokle')).toContainText('šírka 4 ks 1457, výška 4 ks 2094');
+	// #555 HOTFIX: Robust nesie jokle — očakávané ODVOĎ z rozmeru sieťoviny zobrazeného na
+	// tej istej karte (testid `sietka-rozmer`), NIKDY pevný mm literál zo seed cfg. Post-deploy
+	// E2E beží proti ŽIVEJ PROD cfg (Robust vzorce upravené editorom → sklo/sieťovina o pár mm
+	// inak než seed), takže seed literál je env-viazaný a padne (main run 35588964456, deploy fail).
+	const jokleKarta = jokleZoSietoviny(
+		(await page.getByTestId('sietka-rozmer').textContent()) ?? ''
+	);
+	await expect(page.getByTestId('sietka-jokle')).toContainText(
+		`šírka ${jokleKarta.ks} ks ${jokleKarta.sirka}, výška ${jokleKarta.ks} ks ${jokleKarta.vyska}`
+	);
 	await expect(page.getByTestId('sietka-jokle')).toContainText('neodpisuje sa');
 
 	// MONEY-KOREKCIA: sieťka MUSÍ zmeniť odpis (rámový profil pribudne)
@@ -366,12 +374,18 @@ test('#555 /sietka Robust: jokle riadky (Jokel 12x8) s rozmermi, bez Money kódu
 	await page.getByTestId('spocitat-sietku').click();
 	await waitHydrated(page);
 
+	// #555 HOTFIX: očakávané jokle ODVOĎ z rozmeru sieťoviny na tej istej stránke
+	// (testid `sietka-samostatna-rozmer`), NIKDY pevný mm literál zo seed cfg — post-deploy
+	// E2E beží proti ŽIVEJ PROD cfg (main run 35588964456, deploy fail na env-viazanom literáli).
+	const jokle = jokleZoSietoviny(
+		(await page.getByTestId('sietka-samostatna-rozmer').textContent()) ?? ''
+	);
 	// práve 2 jokle riadky (šírka + výška), oba bez Money kódu (honest-null)
 	const jokleRiadky = page.getByTestId('sietka-jokle-riadok');
 	await expect(jokleRiadky).toHaveCount(2);
 	await expect(jokleRiadky.first()).toContainText('Jokel 12x8');
-	await expect(jokleRiadky.first()).toContainText('4×1575 mm');
-	await expect(jokleRiadky.nth(1)).toContainText('4×1924 mm');
+	await expect(jokleRiadky.first()).toContainText(`${jokle.ks}×${jokle.sirka} mm`);
+	await expect(jokleRiadky.nth(1)).toContainText(`${jokle.ks}×${jokle.vyska} mm`);
 	await expect(jokleRiadky.first()).toContainText('neodpisuje sa');
 
 	expect(errs).toEqual([]);
