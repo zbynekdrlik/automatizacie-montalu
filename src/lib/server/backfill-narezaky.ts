@@ -27,7 +27,8 @@ import {
 	KOTUC,
 	sietkaSamostatnaVypocet,
 	sietkaSamostatnaMultiVypocet,
-	type SietkaSamostatnaKus
+	type SietkaSamostatnaKus,
+	type SietkaSamostatnaMaterialRow
 } from './compute';
 import { recomputeVstup, recomputeMultiVstup } from './zasklenia-sklo';
 import { computeClip, computeClipMulti, type ClipVstup, type ClipRiadok } from '$lib/clip';
@@ -147,6 +148,19 @@ function linesFrom(
 	return { status: 'lines', lines, material: barMaterial, drift };
 }
 
+/** #555: jokle sieťky sú honest-null (`kod:null`) — do Odoo nárezák lines NEVSTUPUJÚ
+ *  (nemajú Money kód; výroba ich reže z karty sieťky, rovnako ako sa CLIP drobné položky
+ *  s `kod:null` do rozpisu nedostanú). Odfiltruj ich pred mapovaním, aby Odoo line-sync
+ *  ostal byte-identický ako pred #555. Keď výroba založí Money kartu, odfilter odpadne
+ *  automaticky (kod prestane byť null). */
+function bezJoklov(
+	material: SietkaSamostatnaMaterialRow[]
+): { nazov: string; kod?: string; rezy: { rozmer: number; ks: number }[] }[] {
+	return material
+		.filter((m) => m.kod !== null)
+		.map((m) => ({ nazov: m.nazov, kod: m.kod ?? undefined, rezy: m.rezy }));
+}
+
 /** clip `ClipRiadok[]` → materiál (len narezateľné riadky: rozmer + počet kusov). */
 function clipRiadkyToMaterial(riadky: ClipRiadok[]): RozpisMaterial[] {
 	const out: RozpisMaterial[] = [];
@@ -191,8 +205,10 @@ export function mapOdpisToLines(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
 						polozky
 					);
-					// sietka MaterialRow nemá tyče → synthesizuj (kod sa zachová pre obrázok)
-					return linesFrom(r.material, materialRowsFromRozpis(r.material), drift, createdAt);
+					// sietka MaterialRow nemá tyče → synthesizuj (kod sa zachová pre obrázok);
+					// jokle (kod:null) sa do Odoo lines nedostanú (#555, `bezJoklov`)
+					const mat = bezJoklov(r.material);
+					return linesFrom(mat, materialRowsFromRozpis(mat), drift, createdAt);
 				}
 				if (detail.sietkaSamostatnaMulti === true) {
 					const kusy = (detail.kusy as SietkaSamostatnaKus[] | undefined) ?? [];
@@ -202,7 +218,7 @@ export function mapOdpisToLines(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
 						polozky
 					);
-					const mat = r.kusy.flatMap((k) => k.material);
+					const mat = bezJoklov(r.kusy.flatMap((k) => k.material));
 					return linesFrom(mat, materialRowsFromRozpis(mat), drift, createdAt);
 				}
 				// zimná záhrada (viac posuvov) — plný MaterialRow[] s tyčami/uhlami/kódmi priamo

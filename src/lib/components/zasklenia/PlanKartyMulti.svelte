@@ -19,7 +19,9 @@
 		sietkaStrana,
 		potrebuje3KKolajnicu,
 		popis3KKolajnicaVymena,
-		pridavnaKolajnicaHint
+		pridavnaKolajnicaHint,
+		jeJokleSystem,
+		rozmerJokle
 	} from '$lib/sietka';
 	import { fmtM, type PlanVstup } from '$lib/zasklenia-form';
 	import type { MultiResult } from '$lib/server/compute';
@@ -148,6 +150,13 @@
 							· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
 					><b>{sietkaPopis(pv.sietka, rozmer)}</b>
 				</div>
+				{#if jeJokleSystem(pv.system)}
+					{@const jokle = rozmerJokle(rozmer)}
+					<p class="sub" data-testid={`sietka-jokle-multi-${i}`}>
+						Jokel 12x8: šírka {jokle.ks} ks {jokle.sirka}, výška {jokle.ks} ks {jokle.vyska} — bez Money
+						karty, neodpisuje sa
+					</p>
+				{/if}
 				{#if potrebuje3KKolajnicu(pv.styl)}
 					<p class="sub" data-testid={`sietka-2k-warn-multi-${i}`}>
 						⚠ Zasklenie {i + 1}: 2K systém — appka automaticky odpíše {popis3KKolajnicaVymena(
