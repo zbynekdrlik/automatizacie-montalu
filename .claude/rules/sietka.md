@@ -29,16 +29,19 @@ Doména sieťky je rozliata cez `sietka.ts` (čisté helpery + konštanty) → `
 ## Honest-null (kód doplní výroba = ZMENA KONŠTANTY, nie prerábka)
 
 Jokle dnes NEMAJÚ Money kód (Odoo katalóg má 24× „Jokel AxB" bez `default_code`, „Jokel 12x8"
-tam nie je). Preto rovnaký **honest-null** kontrakt ako CLIP drobné (`clip.ts`, `clip.md`):
+tam nie je). Preto **honest-null** (`kod: null`) — zobrazí sa, do odpisu nevstupuje:
 
 - `SietkaSamostatnaMaterialRow.kod: string | null` — jokle sú 2 riadky s `kod: null`
   (šírka 4 ks, výška 4 ks), ZOBRAZIA sa, ale do `odpis` NEVSTUPUJÚ. Money-neutralita je
   **štrukturálna**: `odpis` sa plní len z reálnych `byKod` profilov, jokle sa tam nikdy
   nedostanú (`OdpisRow.kod: string` je typová bariéra). Guard: Robust vektory `odpis`
   ostávajú byte-identické (`tests/compute.test.ts`, `tests/sietka-jokle.test.ts`).
-- **Keď výroba založí Money kartu „Jokel 12x8" s kódom** → jokle sa zapnú do odpisu ZMENOU
-  `JOKLE_PROFIL` → skutočný kód (dáta), bez zásahu do compute/route (rovnaký kontrakt ako
-  CLIP drobné, `clip.md`).
+- **POZOR — zapnutie do Money NIE je len zmena konštanty.** Na rozdiel od CLIP drobných
+  (ktoré cez odpisovú slučku PRECHÁDZAJÚ a `continue`-ujú na `kod===null`, takže tam
+  doplnenie kódu naozaj stačí), jokle sú DISPLAY-only push MIMO `byKod`. Keď výroba dodá
+  Money kartu „Jokel 12x8" s kódom, treba jokle ZARADIŤ do odpisovej cesty (najčistejšie
+  ako cfg RezRow, nech idú cez `byKod`/`ffdPack` ako ostatné profily, a zrušiť honest-null
+  push) + overiť množstvo proti reálnemu Money odpisu. Nestačí premenovať `JOKLE_PROFIL`.
 
 ## Pasce
 

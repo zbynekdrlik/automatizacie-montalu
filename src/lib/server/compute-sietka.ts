@@ -8,6 +8,7 @@ import {
 	maSietkaSystemVyber,
 	potrebuje3KKolajnicu,
 	rozmerJokle,
+	rozmerSietovinyPre,
 	type Jokle,
 	type Sietka
 } from '$lib/sietka';
@@ -540,10 +541,17 @@ export function sietkaSamostatnaVypocet(
 		sirka: Math.round(val(ss, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
 		vyska: Math.round(val(sv, S, V, N, true) - (skloKorekcia ?? g.skloOffset))
 	};
-	const rozmerSietoviny = { sirka: sklo.sirka + 2, vyska: sklo.vyska + 1 };
+	// jeden zdroj vzorca sieťoviny (rovnaká funkcia ako zasklenie/UI) — pre Robust/Slide
+	// (jediné samostatné systémy) = sklo +2/+1; jokle sa z tohto rozmeru odvodzujú
+	const rozmerSietoviny = rozmerSietovinyPre(system, sklo.sirka, sklo.vyska);
 	// jokle (#555) — LEN Robust (samostatná sieťka je aj tak len Robust/Slide). Honest-null:
 	// 2 material riadky s `kod:null` (šírka 4 ks, výška 4 ks), do `odpis` NEVSTUPUJÚ (odpis
 	// sa vyššie naplnil len z reálnych `byKod` profilov — jokle sa tam nikdy nedostanú).
+	// POZOR (ako to ZAPNÚŤ do Money, keď výroba dodá kartu „Jokel 12x8"): NIE je to len
+	// premenovanie `JOKLE_PROFIL` — jokle sú DISPLAY-only, mimo `byKod`, takže samotný kód
+	// ich do `odpis` nezaradí. Skutočný krok je zaradiť jokle do odpisovej cesty (najčistejšie:
+	// pridať ich ako cfg RezRow, nech idú cez `byKod`/`ffdPack` ako ostatné profily, a zrušiť
+	// tento honest-null push) + overiť množstvo proti reálnemu Money odpisu.
 	const jokle: Jokle | null = jeJokleSystem(system) ? rozmerJokle(rozmerSietoviny) : null;
 	if (jokle) {
 		const packJokle = (dlzka: number, ks: number): number =>

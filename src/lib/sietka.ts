@@ -99,10 +99,12 @@ export function rozmerSietovinyPre(
  *  sieťovina 1565×1946 → jokel šírka 4 ks 1575, výška 4 ks 1924).
  *
  *  MONEY: kód dnes NEEXISTUJE — Odoo katalóg (sync z Money) má 24× „Jokel AxB" bez
- *  `default_code` a „Jokel 12x8" tam nie je → honest-null (rovnaký kontrakt ako CLIP
- *  drobné položky, `clip.ts`/`clip.md`): jokle sa ZOBRAZIA s rozmermi, do Money odpisu
- *  NEVSTUPUJÚ. Keď výroba založí Money kartu „Jokel 12x8" s kódom, odpis sa zapne
- *  ZMENOU KONŠTANTY (`JOKLE_PROFIL` → kód), bez zásahu do compute/route. */
+ *  `default_code` a „Jokel 12x8" tam nie je → honest-null: jokle sa ZOBRAZIA s rozmermi,
+ *  do Money odpisu NEVSTUPUJÚ. Dnes sú DISPLAY-only (nie sú v odpisovej `byKod` ceste ako
+ *  CLIP drobné, ktoré cez odpisovú slučku prechádzajú). Zapnutie do Money, keď výroba dodá
+ *  kartu „Jokel 12x8" s kódom, NIE je len premenovanie `JOKLE_PROFIL` — treba jokle zaradiť
+ *  do odpisovej cesty (najčistejšie ako cfg RezRow) + overiť množstvo (viď `compute-sietka.ts`
+ *  a `sietka.md`). */
 export const JOKLE_PROFIL = 'Jokel 12x8';
 export const JOKLE_DELTA = { sirka: 10, vyska: -22 };
 export const JOKLE_KS = 4;
