@@ -460,14 +460,18 @@
 					><tr><th>Kód</th><th>Názov</th><th class="c">Rezy</th><th class="c">Metre</th></tr></thead
 				>
 				<tbody>
-					{#each r.material as m (m.kod)}
-						<tr>
-							<td class="c mono">{m.kod}</td>
+					{#each r.material as m, mi (m.kod ?? `jokle-${mi}`)}
+						<tr data-testid={m.kod === null ? 'sietka-jokle-riadok' : undefined}>
+							<td class="c mono">{m.kod ?? '—'}</td>
 							<td>{m.nazov}</td>
 							<td class="mono">{m.rezy.map((x) => `${x.ks}×${x.rozmer} mm`).join(' + ')}</td>
-							<td class="c mono"
-								><b>{fmtM(r.odpis.find((o) => o.kod === m.kod)?.metre ?? 0)} m</b></td
-							>
+							{#if m.kod === null}
+								<td class="c sub" title={m.poznamka}>neodpisuje sa</td>
+							{:else}
+								<td class="c mono"
+									><b>{fmtM(r.odpis.find((o) => o.kod === m.kod)?.metre ?? 0)} m</b></td
+								>
+							{/if}
 						</tr>
 					{/each}
 				</tbody>
@@ -573,6 +577,14 @@
 						>{fmtM(kus.rozmerSietoviny.sirka)} × {fmtM(kus.rozmerSietoviny.vyska)} mm</b
 					>
 				</div>
+				{#if kus.jokle}
+					<div>
+						<span>Jokel 12x8</span><b class="mono" data-testid="sietka-jokle-multi-{ki}"
+							>šírka {kus.jokle.ks} ks {kus.jokle.sirka}, výška {kus.jokle.ks} ks {kus.jokle.vyska} —
+							bez Money karty, neodpisuje sa</b
+						>
+					</div>
+				{/if}
 				<div><span>Úchyt</span><b>{uchytLabel(mv?.sietka.uchyt ?? 'ziadny')}</b></div>
 			</div>
 			{#if kus.potrebuje3K}

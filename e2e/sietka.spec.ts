@@ -87,6 +87,11 @@ test('jeden posuv: sieťka pridá presnú deltu do Money odpisu (rám+nos, #86 k
 	await expect(karta).toContainText('pravá'); // P - L → sieťka vpravo
 	await expect(karta).toContainText('vystúpené madlo veľké');
 
+	// #555: Robust nesie jokle — karta ukáže skutočné čísla namiesto starého literálu
+	// (Robust 3K S=4645/V=2320 → sieťovina 1447×2116 → jokel šírka 4 ks 1457, výška 4 ks 2094)
+	await expect(page.getByTestId('sietka-jokle')).toContainText('šírka 4 ks 1457, výška 4 ks 2094');
+	await expect(page.getByTestId('sietka-jokle')).toContainText('neodpisuje sa');
+
 	// MONEY-KOREKCIA: sieťka MUSÍ zmeniť odpis (rámový profil pribudne)
 	const soSietkou = await odpisRiadky(page);
 	expect(soSietkou).not.toEqual(bezSietky);
@@ -336,6 +341,60 @@ test('#462 sietka poznamka: vyplnenie + round-trip zachováva hodnotu', async ({
 	// overí, že hidden poznamka prežila POST (je v DOM v odoslat forme)
 	const hiddenPozn = page.locator('input[name="poznamka"][type="hidden"]').first();
 	await expect(hiddenPozn).toHaveValue('E2E poznamka riadok');
+
+	expect(errs).toEqual([]);
+});
+
+// ── #555 jokle sieťky Robust (Patrik Odoo úloha 1010) ──────────────────────
+// Samostatná /sietka pre Robust ukáže v tabuľke aj jokle (Jokel 12x8) ako
+// riadky bez Money kódu („neodpisuje sa"). Excel príloha 37652: Robust 3K
+// zasklenie 5000×2150 → sieťka 1565×1946 → jokel šírka 4 ks 1575, výška 4 ks 1924.
+test('#555 /sietka Robust: jokle riadky (Jokel 12x8) s rozmermi, bez Money kódu', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await goto(page, '/sietka');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-SIETKA-JOKLE');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka jokle');
+	await page.selectOption('#system', 'Robust');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('5000');
+	await page.locator('#otvorV').fill('2150');
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+
+	// práve 2 jokle riadky (šírka + výška), oba bez Money kódu (honest-null)
+	const jokleRiadky = page.getByTestId('sietka-jokle-riadok');
+	await expect(jokleRiadky).toHaveCount(2);
+	await expect(jokleRiadky.first()).toContainText('Jokel 12x8');
+	await expect(jokleRiadky.first()).toContainText('4×1575 mm');
+	await expect(jokleRiadky.nth(1)).toContainText('4×1924 mm');
+	await expect(jokleRiadky.first()).toContainText('neodpisuje sa');
+
+	expect(errs).toEqual([]);
+});
+
+// Slide NEMÁ jokle — samostatná /sietka pre Slide neukáže žiadny jokle riadok.
+test('#555 /sietka Slide: žiadne jokle riadky', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await goto(page, '/sietka');
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-SIETKA-SLIDE-NOJOKLE');
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Sietka slide');
+	await page.selectOption('#system', 'Slide');
+	await page.selectOption('#styl', '3K');
+	await page.locator('#otvorS').fill('3500');
+	await page.locator('#otvorV').fill('2001');
+	await page.getByTestId('spocitat-sietku').click();
+	await waitHydrated(page);
+
+	await expect(page.getByTestId('sietka-samostatna-rozmer')).toBeVisible();
+	await expect(page.getByTestId('sietka-jokle-riadok')).toHaveCount(0);
 
 	expect(errs).toEqual([]);
 });
