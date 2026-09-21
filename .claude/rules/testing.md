@@ -567,3 +567,29 @@ netrafili). Lokálne to nikdy nevidno (loopback je rýchlejší než tunnel FIN 
 browser kontextu (health check, metadata GET), použi `fetch()`. `page.request` je
 správny len keď request POTREBUJE browser cookies (autentizovaný GET z kontextu
 prihláseného testu).
+
+## Post-deploy E2E beží proti ŽIVEJ PROD cfg — NIKDY pevný mm literál z výpočtu; odvoď z DOM / assertuj reláciu (#555 HOTFIX)
+
+**Pravidlo:** akákoľvek E2E asercia na VYPOČÍTANÚ mm hodnotu (rozmer skla, sieťoviny, prírezu,
+jokla…) NESMIE niesť pevný literál odvodený zo **seed** cfg. Post-deploy sada beží proti
+`BASE_URL` = **ŽIVÁ PROD appka**, ktorej `cfg` tabuľka je upravovaná editorom vzorcov —
+Robust/iné vzorce sa na PROD líšia od seedu → tá istá vstupná objednávka dá o pár mm INÝ
+výsledok. Pevný seed literál je preto ENV-VIAZANÝ a padne LEN v deploy jobe (CI `test` job so
+seed `e2e.db` prejde, deploy zlyhá — nekonzistentne vyzerajúca „flaky" regresia, ktorá je v
+skutočnosti deterministická).
+
+**Ako správne:** buď (a) **odvoď očakávanú hodnotu z DOM** — prečítaj príbuznú hodnotu, ktorú
+tá istá stránka zobrazuje, a dopočítaj vzťah v helperi (jediné miesto delty v E2E, paritu drží
+unit test), alebo (b) **assertuj RELÁCIU** (`> bez`, `!= referenčný`, „obsahuje 3K"), nikdy
+konkrétne mm. Vzor: `jokleZoSietoviny(text)` v `e2e/helpers.ts` číta rozmer sieťoviny z testidu
+(`sietka-rozmer` / `sietka-samostatna-rozmer`) a dopočíta jokel (`+10 / −22`, `ks 4`) — parita s
+`JOKLE_DELTA`/`JOKLE_KS` v `src/lib/sietka.ts` cez `tests/sietka-jokle.test.ts`.
+
+**Prečo NIE „zosúladiť seed s PROD":** seed je zdroj pre nové inštalácie a deterministické unit
+vektory (`tests/compute.test.ts` — CONTRACTUAL 1:1 s Money odpisom); PROD cfg sa mení editorom
+kedykoľvek, takže naviazať test na dnešnú PROD hodnotu by ho rozbilo pri ďalšej úprave. **Unit
+vektory teda ostávajú pevné (seed = deterministický), E2E na vypočítané mm sú relačné/odvodené.**
+
+Incident: PR #561 pridal na `sietka.spec.ts` pevné jokle literály zo seedu → main run 35588964456
+deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-riadok` 4×1575 vs
+4×1578). Fix (#555 HOTFIX): odvodenie zo sieťoviny cez `jokleZoSietoviny`. Pozri aj `sietka.md`.

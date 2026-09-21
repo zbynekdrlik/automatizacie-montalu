@@ -55,3 +55,11 @@ tam nie je). Preto **honest-null** (`kod: null`) — zobrazí sa, do odpisu nevs
   preklep (S=4994 dáva sklo 1561, nie 1563). Správny Robust 3K vektor pre sklo 1563×1945 je
   **S=5000/V=2150** (= príloha 37652). Sklo dimenzie NEHÁDŽ — over `sietkaSamostatnaVypocet`
   probom pred zápisom do testu.
+- **E2E jokle asercie NIKDY pevný mm literál zo seedu — post-deploy beží proti PROD cfg (#555 HOTFIX).**
+  Robust vzorce sú na PROD upravené editorom (sklo/sieťovina +3 mm vs seed), takže pevný jokel
+  literál (napr. „4×1575 mm") padne LEN v deploy jobe (CI `test` so seedom prejde). E2E preto
+  **odvodzuje** očakávaný jokel z rozmeru sieťoviny na tej istej stránke cez `jokleZoSietoviny`
+  (`e2e/helpers.ts`, testid `sietka-rozmer` / `sietka-samostatna-rozmer`); delta drží paritu s
+  `JOKLE_DELTA`/`JOKLE_KS` cez `tests/sietka-jokle.test.ts`. **Unit vektory ostávajú pevné**
+  (seed = deterministický). Plné pravidlo: `.claude/rules/testing.md` — „Post-deploy E2E beží
+  proti ŽIVEJ PROD cfg".
