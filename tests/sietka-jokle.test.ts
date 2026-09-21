@@ -5,7 +5,7 @@
 // zasklenie 5000×2150, sklo 1563×1945, sieťka 1565×1946 → jokel šírka 4 ks 1575, výška
 // 4 ks 1924). Money kód dnes NEEXISTUJE → honest-null: zobrazí sa, do odpisu NEVSTUPUJE.
 import { describe, it, expect } from 'vitest';
-import { rozmerJokle, jeJokleSystem, JOKLE_PROFIL } from '../src/lib/sietka';
+import { rozmerJokle, jeJokleSystem, JOKLE_PROFIL, JOKLE_DELTA, JOKLE_KS } from '../src/lib/sietka';
 import {
 	buildCFG,
 	sietkaSamostatnaVypocet,
@@ -32,6 +32,18 @@ describe('rozmerJokle — vzorec zo sieťoviny (Excel 1:1, príloha 37652)', () 
 		expect(j.vyska).toBe(1978);
 		expect(j.ks).toBe(4);
 		expect(j.profil).toBe('Jokel 12x8');
+	});
+});
+
+// #555 HOTFIX: post-deploy E2E beží proti ŽIVEJ PROD cfg (Robust vzorce upravené
+// editorom → sklo/sieťovina o pár mm inak než seed) — preto E2E jokle asercie ODVODZUJÚ
+// očakávané hodnoty z rozmeru sieťoviny zobrazeného na stránke a duplikujú deltu v helperi
+// `jokleZoSietoviny` (e2e/helpers.ts). Tento test drží PARITU tej E2E delty s jediným
+// zdrojom pravdy `JOKLE_DELTA`/`JOKLE_KS` — keď sa konštanty zmenia, aktualizuj aj helper.
+describe('JOKLE_DELTA / JOKLE_KS — parita s E2E helperom jokleZoSietoviny', () => {
+	it('delta je šírka +10 / výška −22, ks 4 (jediný zdroj vzorca)', () => {
+		expect(JOKLE_DELTA).toEqual({ sirka: 10, vyska: -22 });
+		expect(JOKLE_KS).toBe(4);
 	});
 });
 
