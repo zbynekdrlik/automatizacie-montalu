@@ -328,9 +328,14 @@ export function buildGlassOrderItem(inp: GlassOrderItemInput): GlassOrderItem {
 		item.glass_type = inp.typSkla;
 	}
 	// #548: v2 kľúče — voľný popis (keď je) + režim (vždy).
-	const description = (inp.popis ?? '').trim();
-	if (description) item.description = description;
 	item.mode = inp.mode === 'atyp' ? 'atyp' : 'rozmery';
+	// #565: atyp BEZ rozmerov (0 × 0 — rozmery sú vo výkrese). Odoo v2 príjem
+	// (odoo-erp `sale_order_narezak_glass.py`, #7586) kontroluje width/height > 0 LEN pri
+	// mode=rozmery; pri atype vyžaduje prílohu. Posielame 0 × 0 + výkres; bez popisu operátora
+	// dostane riadok zrozumiteľný popis pre dodávateľa (plochu určí z výkresu).
+	const atypBezRozmerov = item.mode === 'atyp' && item.width_mm <= 0 && item.height_mm <= 0;
+	const description = (inp.popis ?? '').trim() || (atypBezRozmerov ? 'ATYP podľa výkresu' : '');
+	if (description) item.description = description;
 
 	const note = buildGlassNote(inp);
 	if (note) item.note = note;

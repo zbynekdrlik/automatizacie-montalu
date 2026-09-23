@@ -92,6 +92,13 @@ function validujSubor(
 	return { ok: true, subor };
 }
 
+// #565: voliteľný rozmer z formulára — prázdne/chýbajúce pole = `null` (nezadané); inak číslo
+// orezané na celé mm (neplatný text → NaN, odmietne ho validácia v `pridajSkloManual`).
+function volitelnyRozmer(v: FormDataEntryValue | null): number | null {
+	const s = typeof v === 'string' ? v.trim() : '';
+	return s === '' ? null : Math.trunc(Number(s));
+}
+
 export const load: PageServerLoad = async ({ params, url }) => {
 	// SvelteKit already decodes params — no decodeURIComponent (review BLUE-7: double-decode)
 	const zak = params.zak.trim();
@@ -184,7 +191,12 @@ export const actions = {
 		const rezim = String(form.get('rezim') ?? '');
 		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID.' });
 		if (rezim !== 'rozmery' && rezim !== 'atyp') return fail(400, { error: 'Neplatný režim.' });
-		nastavRezim(id, rezim);
+		try {
+			nastavRezim(id, rezim);
+		} catch (e) {
+			// #565: riadok bez rozmerov (atyp podľa výkresu) sa nedá prepnúť na režim rozmery
+			return fail(400, { error: e instanceof Error ? e.message : 'Neplatný režim.' });
+		}
 		return { ok: true };
 	},
 
@@ -196,8 +208,10 @@ export const actions = {
 		const form = await request.formData();
 		const popis = String(form.get('popis') ?? '').trim();
 		const typVyber = String(form.get('typ_skla') ?? '').trim();
-		const sirkaMm = Math.trunc(Number(form.get('sirka_mm')));
-		const vyskaMm = Math.trunc(Number(form.get('vyska_mm')));
+		// #565: prázdne pole = rozmer NEZADANÝ (`null`) — pri atype s výkresom povolené; validuje
+		// `pridajSkloManual` (rozmery režim / atyp bez výkresu → throw → fail 400).
+		const sirkaMm = volitelnyRozmer(form.get('sirka_mm'));
+		const vyskaMm = volitelnyRozmer(form.get('vyska_mm'));
 		const pocet = Math.trunc(Number(form.get('pocet')));
 		const rezim = form.get('rezim') === 'atyp' ? 'atyp' : 'rozmery';
 		// #548: „iné sklo" — sentinel `__ine__` v selecte odkryje vlastný typ + cenu €/m²; inak katalóg.
@@ -210,16 +224,16 @@ export const actions = {
 		// (neplatný → fail(400), NIČ sa nevloží), zdieľaný helper s `nahratSubor`.
 		const suborEntry = form.get('subor');
 		const maSubor = suborEntry instanceof File && suborEntry.size > 0;
-		let subor: File | null = null;
+		// #565: obsah výkresu načítaný PRED vložením — riadok + výkres sa uložia v jednej transakcii.
+		let vykres: { nazov: string; data: Buffer } | undefined;
 		if (maSubor) {
 			const v = validujSubor(suborEntry);
 			if (!v.ok) return fail(400, { pridatChyba: v.error });
-			subor = v.subor;
+			vykres = { nazov: v.subor.name, data: Buffer.from(await v.subor.arrayBuffer()) };
 		}
 
-		let id: number;
 		try {
-			id = pridajSkloManual({
+			pridajSkloManual({
 				zak,
 				popis,
 				typSkla,
@@ -229,17 +243,15 @@ export const actions = {
 				vyskaMm,
 				pocet,
 				rezim,
+				// #565: výkres sa uloží v TEJ ISTEJ transakcii ako riadok (vynútený bezpečný MIME)
+				vykres,
 				createdBy: locals.user?.username ?? ''
 			});
 		} catch (e) {
 			return fail(400, { pridatChyba: e instanceof Error ? e.message : 'Neplatný riadok.' });
 		}
 
-		if (subor) {
-			const buf = Buffer.from(await subor.arrayBuffer());
-			// Force safe MIME type regardless of browser-reported type (rovnako ako `nahratSubor`)
-			pridajSubor(id, subor.name, 'application/octet-stream', buf);
-		} else if (rezim === 'atyp') {
+		if (!vykres && rezim === 'atyp') {
 			// atyp bez výkresu — nie chyba (Odoo vráti DQ, operátor doplní na riadku)
 			return { ok: true, pridatUpozornenie: 'atyp bez výkresu — pripni súbor pri riadku' };
 		}
@@ -291,7 +303,12 @@ export const actions = {
 		const form = await request.formData();
 		const id = Number(form.get('id'));
 		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'Neplatné ID súboru.' });
-		zmazSubor(id);
+		try {
+			zmazSubor(id);
+		} catch (e) {
+			// #565: posledný výkres riadka bez rozmerov sa nemaže
+			return fail(400, { error: e instanceof Error ? e.message : 'Súbor sa nedá zmazať.' });
+		}
 		return { ok: true };
 	},
 

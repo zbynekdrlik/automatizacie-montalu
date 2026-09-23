@@ -337,7 +337,7 @@ priloží výkres jedným odoslaním; predtým sa dal pripnúť len na UŽ prida
   name, 'application/octet-stream', buf)` (vynútený bezpečný MIME, rovnako ako `nahratSubor`).
 - **atyp bez výkresu = upozornenie, NIE chyba:** `return { ok: true, pridatUpozornenie: 'atyp bez
   výkresu — pripni súbor pri riadku' }` (Odoo vráti DQ, operátor doplní na riadku). UI ho ukáže
-  `data-testid="manual-upozornenie"` (`.warn`, nie `.err`). Rozmery ostávajú povinné (m² pre cenu).
+  `data-testid="manual-upozornenie"` (`.warn`, nie `.err`). Rozmery: pozri #565 nižšie (atyp s výkresom = nepovinné). POZOR (#565 čítanie kódu): Odoo v2 príjem atyp riadok BEZ prílohy ODMIETNE (UserError → pri odoslaní zlyhá CELÁ objednávka, nie DQ) — výkres musí byť pripnutý PRED „Odoslať do Odoo".
 - **Test akcie s multipart:** mock event `{ params:{zak}, request:{ formData: async()=>fd },
   locals:{user} }`; súbor cez `fd.set('subor', new File([content], name, {type}))` — obsah **string**
   (BlobPart), NIE `Uint8Array` (TS lib `SharedArrayBuffer` nie je `BlobPart` → `svelte-check` padne).
@@ -376,3 +376,44 @@ nezmenené okrem `description` nových riadkov = „Zasklenie N").
   (TS00016/17/21/22) — ostatné zobrazujú lokálny názov; doplnenie = dátové rozhodnutie výroby (migrácia
   `money_kod` MENÍ Money odpis skla → nie bez potvrdenia). Zobrazuje sa v `.print-only` spane
   (`typ-nazov-<id>`) a v záložnej `<option>` pickera. Testy mockujú LEN `setJson2Transport`.
+
+## Atyp s výkresom BEZ šírky/výšky (#565)
+
+Patrik (Odoo úloha 1051, výkres FIX Květoň — 9 lichobežníkových tabúľ): jeden rozmer neexistuje,
+formulár ho blokoval („Vyplňte toto pole"). Owner 23.9. „1": atyp s výkresom = rozmery nepovinné.
+Money-NEUTRÁLNE, BEZ migrácie.
+
+- **Pravidlo (server = zdroj pravdy):** `pridajSkloManual` → `rozmeryManual`: OBE rozmery nezadané
+  (`null`) sú povolené LEN pri `rezim='atyp'` A `maVykres` (súbor priložený v TOM ISTOM odoslaní —
+  `pridatRiadok` ho validuje zdieľaným `validujSubor` PRED vložením). Atyp bez výkresu bez rozmerov →
+  throw „Atyp bez výkresu potrebuje šírku a výšku — alebo priložte výkres…" (fail 400, nič sa
+  nevloží). Jeden zadaný rozmer / režim rozmery → doterajšia validácia (obe celé > 0). Akcia číta
+  prázdne pole ako `null` (`volitelnyRozmer`), NIE `Math.trunc(Number(''))=0`.
+- **Úložisko bez migrácie:** schéma v41 má `sirka_mm REAL NOT NULL`, `vyska_mm REAL` a `m2 REAL`
+  nullable → riadok bez rozmerov = `sirka_mm=0`, `vyska_mm=NULL`, `m2=NULL`. `mapRow` m² fallback
+  (`vyska_mm != null ? m2Tabule : null`) ostane `null` → žiadne 0 m² do súčtov/tlače.
+- **Detekcia = JEDEN čistý helper** `bezRozmerov(p)` (`objednavka-skla-pozicia.ts`, client-safe):
+  `!sikmy && sirkaMm <= 0` (šikmý FIX s výškou null NIE JE „bez rozmerov"). `fmtRozmerTabule(p)` je
+  jediné zobrazenie rozmeru riadka (svelte `data-testid="rozmer-<id>"`): „podľa výkresu" / „š × v mm" /
+  „š × Ľ/P mm (šikmé)".
+- **UI:** `required={!novyAtyp}` na `manual-sirka`/`manual-vyska` (hviezdička len pri rozmery) + hint
+  `manual-rozmery-hint` pri atype. Per-riadok select režimu má `rozmery` `disabled` pre riadok bez
+  rozmerov; server `nastavRezim(id,'rozmery')` to STRÁŽI tiež (throw → akcia fail 400) — Odoo príjem
+  by riadok 0 × 0 v režime rozmery odmietol a zlyhala by CELÁ objednávka.
+- **Odoo kontrakt (prečítané v odoo-erp @ main):** `addons/company_montalu_install_config/models/
+  sale_order_narezak_glass.py` — `width = int(item.get("width_mm") or 0)`; kontrola `width <= 0` /
+  `height <= 0` beží LEN `if mode == "rozmery"` („atyp berie plochu z výkresu (rozmery voliteľné)");
+  `if mode == "atyp" and not line_atts: raise UserError(... vyžaduje aspoň jednu prílohu (výkres))`.
+  Plocha ATYP = voliteľný kľúč `area_m2` → `area_m2_manual`; odoslanie dodávateľovi IZOS
+  (`montalu_glass_order.py` `action_send`) vyžaduje pri ATYP `area_m2_manual > 0` — plochu teda
+  doplní Odoo strana (appka ju nepozná, NEPOSIELA `area_m2`). Payload: `buildGlassOrderItem` pošle
+  `width_mm=0, height_mm=0, mode='atyp'` + `attachments[]`; bez popisu operátora `description =
+  'ATYP podľa výkresu'` (len pre atyp 0 × 0; ostatné riadky byte-identické).
+- **Riadok bez rozmerov NIKDY bez výkresu (review):** (1) `pridajSkloManual({ vykres: { nazov, data } })`
+  uloží výkres v TEJ ISTEJ transakcii ako riadok (akcia načíta `arrayBuffer` PRED vložením) —
+  zlyhanie `pridajSubor` zruší aj riadok; `maVykres` bool NEEXISTUJE, pravidlo sa odvodzuje z `vykres`.
+  (2) `zmazSubor` odmietne zmazať POSLEDNÝ výkres riadka `bezRozmerov` (throw → akcia `zmazatSubor`
+  fail 400, UI `podklad-chyba` zobrazí `form.error`). Riadok s rozmermi maže výkres ako doteraz.
+- **Testy:** `tests/objednavka-skla-atyp-bez-rozmerov-565.test.ts` (akcia OK/400/400/polovičné,
+  prepnutie režimu blokované, `buildGlassOrderForZak` payload, `buildGlassOrderItem`, helpery). E2E
+  `objednavka-skla.spec.ts` „atyp s výkresom bez šírky/výšky" (required zmizne, riadok „podľa výkresu").

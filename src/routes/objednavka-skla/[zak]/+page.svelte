@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { modulNazov } from '$lib/modul-nazov';
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
-	import { popisPozicie } from '$lib/objednavka-skla-pozicia';
+	import { bezRozmerov, fmtRozmerTabule, popisPozicie } from '$lib/objednavka-skla-pozicia';
 
 	let { data, form } = $props();
 
@@ -45,13 +45,6 @@
 		}
 		return groups;
 	});
-
-	function fmtRozmer(p: (typeof polozky)[number]): string {
-		if (p.sikmy) {
-			return `${Math.round(p.sirkaMm)} × ${Math.round(p.vLavoMm ?? 0)}/${Math.round(p.vPravoMm ?? 0)} mm (šikmé)`;
-		}
-		return `${Math.round(p.sirkaMm)} × ${Math.round(p.vyskaMm ?? 0)} mm`;
-	}
 
 	function fmtM2(m2: number | null): string {
 		return m2 != null ? `${(Math.round(m2 * 1000) / 1000).toFixed(3)} m²` : '';
@@ -136,28 +129,35 @@
 				/></label
 			>
 		{/if}
+		<!-- #565: pri atype s výkresom sú rozmery NEPOVINNÉ (výkres má viac tvarov — Patrik, úloha
+			1051); pri režime rozmery povinné ako doteraz. Server to re-validuje (atyp bez výkresu → 400). -->
 		<label
-			>Šírka (mm) *
+			>Šírka (mm){novyAtyp ? '' : ' *'}
 			<input
 				type="number"
 				name="sirka_mm"
 				min="1"
 				step="1"
-				required
+				required={!novyAtyp}
 				data-testid="manual-sirka"
 			/></label
 		>
 		<label
-			>Výška (mm) *
+			>Výška (mm){novyAtyp ? '' : ' *'}
 			<input
 				type="number"
 				name="vyska_mm"
 				min="1"
 				step="1"
-				required
+				required={!novyAtyp}
 				data-testid="manual-vyska"
 			/></label
 		>
+		{#if novyAtyp}
+			<p class="hint wide" data-testid="manual-rozmery-hint">
+				Pri atype nepovinné — rozmery sú vo výkrese (výkres priložte nižšie).
+			</p>
+		{/if}
 		<label
 			>Počet ks *
 			<input
@@ -178,7 +178,7 @@
 			</select></label
 		>
 		<!-- #553: výkres priamo vo formulári — vždy renderovaný (progressive enhancement, funguje aj
-			bez JS); pri atyp vizuálne zvýraznený + hint (rozmery ostávajú povinné, m² pre cenu). -->
+			bez JS); pri atyp vizuálne zvýraznený + hint (#565: s výkresom rozmery nepovinné). -->
 		<label class="subor-vykres wide" class:atyp-zvyraznene={novyAtyp}
 			>Výkres {novyAtyp ? '(pri atyp priložte)' : '(pri atyp)'}
 			<input
@@ -210,6 +210,10 @@
 			· <span class="mono"><b>{polozky.filter((p) => p.rezim === 'atyp').length}</b></span> atyp
 		{/if}
 	</p>
+	<!-- #565: odmietnutá akcia riadka (napr. zmazanie posledného výkresu riadka bez rozmerov) -->
+	{#if form?.error}
+		<p class="err noprint" data-testid="podklad-chyba">{form.error}</p>
+	{/if}
 
 	<!-- #540: pôvod zoznamu typov skla v pickeri (Odoo samoobslužný katalóg vs lokálny fallback) -->
 	<p class="sub noprint typ-zdroj" data-testid="glass-types-source">
@@ -241,7 +245,7 @@
 						{@const nav = data.naviazanie[p.id]}
 						<tr class:atyp={p.rezim === 'atyp'}>
 							<td data-testid={`popis-${p.id}`}>{popisPozicie(p.popis, p.modul)}</td>
-							<td class="mono">{fmtRozmer(p)}</td>
+							<td class="mono" data-testid={`rozmer-${p.id}`}>{fmtRozmerTabule(p)}</td>
 							<td>
 								<!-- #540: výber typu skla z Odoo katalógu (`code` → glass_order type); vytlačí sa hodnota -->
 								<span class="print-only" data-testid={`typ-nazov-${p.id}`}
@@ -332,7 +336,12 @@
 										name="rezim"
 										onchange={(e) => (e.target as HTMLSelectElement).form?.requestSubmit()}
 									>
-										<option value="rozmery" selected={p.rezim === 'rozmery'}>rozmery</option>
+										<!-- #565: riadok bez rozmerov (podľa výkresu) ostáva atyp — server to stráži tiež -->
+										<option
+											value="rozmery"
+											selected={p.rezim === 'rozmery'}
+											disabled={bezRozmerov(p)}>rozmery</option
+										>
 										<option value="atyp" selected={p.rezim === 'atyp'}>atyp</option>
 									</select>
 								</form>
