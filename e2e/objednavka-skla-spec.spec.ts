@@ -42,7 +42,9 @@ test('podklad: nastav Hrana → Odoslať → payload obsahuje edge_finish; skryt
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
 
-	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+	// #563: nadpis = OP podkladu (zákazka bez odpisu → bez zákazníka), podklad danej zákazky z URL
+	await expect(page).toHaveURL(new RegExp(`/objednavka-skla/${zak}`));
+	await expect(page.getByTestId('objednavka-nadpis')).toHaveText('Objednávka skla — 01');
 
 	// otvor „Hrana skla (opracovanie)" na prvom riadku a nastav Hrana (jediné pole, ktoré ostalo)
 	const specForm = page.locator('form[action="?/ulozitSpec"]').first();

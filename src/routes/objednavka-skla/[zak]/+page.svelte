@@ -3,10 +3,14 @@
 	import { resolve } from '$app/paths';
 	import { modulNazov } from '$lib/modul-nazov';
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
+	import { popisPozicie } from '$lib/objednavka-skla-pozicia';
 
 	let { data, form } = $props();
 
-	const zak = $derived(data.zak);
+	// #563: nadpis = OP + zákazník (bez OP → ZAK) — počíta server (`nadpisObjednavky`)
+	const nadpis = $derived(data.nadpis);
+	// #563: zobrazovací typ skla = reálny Money názov (fallback uložený typ) — len display
+	const nazovTypu = (typSkla: string): string => data.nazvySkiel[typSkla] ?? typSkla;
 
 	// #521: stavový text výsledku odoslania objednávky skla do Odoo
 	const odoslaneStav: Record<string, string> = {
@@ -76,10 +80,10 @@
 	}
 </script>
 
-<svelte:head><title>Objednávka skla {zak} — Montalu</title></svelte:head>
+<svelte:head><title>Objednávka skla {nadpis} — Montalu</title></svelte:head>
 
 <QrZakazka op={data.op} />
-<h1>Objednávka skla — {zak}</h1>
+<h1 data-testid="objednavka-nadpis">Objednávka skla — {nadpis}</h1>
 
 <!-- #545: „Pridať riadok" — ručný riadok (ATYP / V.O. / priobjednané / servis). Viditeľný VŽDY,
 	aj na prázdnom podklade (formulár mimo guardu položiek). Typ skla je povinný. -->
@@ -236,14 +240,14 @@
 					{#each items as p (p.id)}
 						{@const nav = data.naviazanie[p.id]}
 						<tr class:atyp={p.rezim === 'atyp'}>
-							<td>{p.popis}</td>
+							<td data-testid={`popis-${p.id}`}>{popisPozicie(p.popis, p.modul)}</td>
 							<td class="mono">{fmtRozmer(p)}</td>
 							<td>
 								<!-- #540: výber typu skla z Odoo katalógu (`code` → glass_order type); vytlačí sa hodnota -->
-								<span class="print-only"
+								<span class="print-only" data-testid={`typ-nazov-${p.id}`}
 									>{p.typSklaManual
 										? `${p.typSklaManual} · ${fmtCena(p.cenaM2Manual)}`
-										: p.typSkla}</span
+										: nazovTypu(p.typSkla)}</span
 								>
 								<form method="POST" action="?/nastavTyp" use:enhance class="noprint typ-form">
 									<input type="hidden" name="id" value={p.id} />
@@ -254,7 +258,9 @@
 										onchange={(e) => onTypSelect(e, p.id)}
 									>
 										{#if !glassTypes.some((t) => t.value === p.typSkla)}
-											<option value={p.typSkla} selected>{p.typSkla || '— vyberte typ —'}</option>
+											<option value={p.typSkla} selected
+												>{p.typSkla ? nazovTypu(p.typSkla) : '— vyberte typ —'}</option
+											>
 										{/if}
 										<!-- #556: kandidáti podľa zloženia (pri „viac") navrchu pickera -->
 										{#if nav?.kandidati.length}
@@ -318,7 +324,7 @@
 								{/if}
 							</td>
 							<td class="r mono"><b>{p.pocet}</b></td>
-							<td class="r mono">{fmtM2(p.m2)}</td>
+							<td class="r mono" data-testid={`m2-${p.id}`}>{fmtM2(p.m2)}</td>
 							<td>
 								<form method="POST" action="?/nastavRezim" use:enhance>
 									<input type="hidden" name="id" value={p.id} />

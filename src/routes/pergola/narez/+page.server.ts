@@ -34,6 +34,7 @@ import { strechaSkloCenaPre, type StrechaSkloCena } from '$lib/server/sklo-strec
 import { logger } from '$lib/server/log';
 import { redirect } from '@sveltejs/kit';
 import { pridajSklaHromadne, pridajSkloManual, type NoveSklo } from '$lib/server/objednavka-skla';
+import { m2Tabule } from '$lib/objednavka-skla-pozicia';
 import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
 
 const log = logger('pergola:narez');
@@ -389,6 +390,8 @@ export const actions = {
 				sirkaMm: strechaSklo.sirkaMm,
 				vyskaMm: strechaSklo.dlzkaMm,
 				pocet: strechaSklo.pocetTabul,
+				// #563: m² vopred (rovnaký vzorec ako ručné riadky)
+				m2: m2Tabule(strechaSklo.sirkaMm, strechaSklo.dlzkaMm, strechaSklo.pocetTabul),
 				typSkla: strechaSklo.typ ?? '',
 				createdBy: locals.user?.username ?? ''
 			}

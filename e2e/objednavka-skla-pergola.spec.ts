@@ -47,7 +47,10 @@ test('pergola honest-null strešné sklo → ručný riadok objednávky (modul P
 	// presmerovanie na podklad objednávky KONKRÉTNEJ zákazky
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
-	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+	// #563: nadpis = OP (z pergola formulára, prenesené na riadok); zákazka bez odpisu → bez
+	// zákazníka. Podklad TEJ zákazky overí URL.
+	await expect(page).toHaveURL(new RegExp(`/objednavka-skla/${zak}`));
+	await expect(page.getByTestId('objednavka-nadpis')).toHaveText('Objednávka skla — OP260546');
 
 	// riadok pod sekciou „Pergola" s popisom „Strešné sklo — <typ>"
 	await expect(page.getByRole('heading', { name: 'Pergola' })).toBeVisible();
