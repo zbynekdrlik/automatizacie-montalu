@@ -273,3 +273,52 @@ test('objednávka skla: atyp riadok + výkres jedným krokom vo formulári „Pr
 
 	expect(consoleMsgs).toEqual([]);
 });
+
+// #565: Patrik (Odoo úloha 1051) — atyp s priloženým výkresom BEZ šírky/výšky (výkres má 9
+// lichobežníkových tabúľ, jeden rozmer neexistuje). Prehliadač nesmie blokovať odoslanie
+// („Vyplňte toto pole"); riadok sa vloží s prílohou a v stĺpci rozmer ukáže „podľa výkresu",
+// m² prázdne. Money-NEUTRÁLNE (objednávka u dodávateľa). Zero-console.
+test('objednávka skla: atyp s výkresom bez šírky/výšky → riadok „podľa výkresu"', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await skipAkLive(page);
+
+	const zak = `${RUN}-ATYPBEZ`;
+	await goto(page, `/objednavka-skla/${zak}`);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+
+	const pridatForm = page.getByTestId('pridat-riadok');
+	const typSelect = pridatForm.getByTestId('manual-typ');
+	const prva = typSelect.locator('option:not([value=""])').first();
+	await typSelect.selectOption((await prva.getAttribute('value'))!);
+	await pridatForm.getByTestId('manual-rezim').selectOption('atyp');
+	// pri atype sú rozmery nepovinné (hint) — polia necháme PRÁZDNE
+	await expect(pridatForm.getByTestId('manual-sirka')).not.toHaveAttribute('required', '');
+	await expect(pridatForm.getByTestId('manual-vyska')).not.toHaveAttribute('required', '');
+	await expect(pridatForm.getByTestId('manual-rozmery-hint')).toBeVisible();
+
+	const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'latin1');
+	await pridatForm.getByTestId('manual-subor').setInputFiles({
+		name: 'vykres-565.pdf',
+		mimeType: 'application/pdf',
+		buffer: pdfBytes
+	});
+
+	await pridatForm.getByTestId('manual-pridat').click();
+	await waitHydrated(page);
+
+	await expect(page.getByRole('heading', { name: 'Pridané položky' })).toBeVisible();
+	const riadok = page.locator('tbody tr').first();
+	await expect(riadok).toContainText('vykres-565.pdf');
+	await expect(riadok).toContainText('podľa výkresu');
+	await expect(riadok).not.toContainText('0 × 0');
+	await expect(page.getByTestId('manual-chyba')).toHaveCount(0);
+
+	// späť na režim rozmery → polia sú opäť povinné
+	await pridatForm.getByTestId('manual-rezim').selectOption('rozmery');
+	await expect(pridatForm.getByTestId('manual-sirka')).toHaveAttribute('required', '');
+
+	expect(consoleMsgs).toEqual([]);
+});
