@@ -210,6 +210,10 @@
 			· <span class="mono"><b>{polozky.filter((p) => p.rezim === 'atyp').length}</b></span> atyp
 		{/if}
 	</p>
+	<!-- #565: odmietnutá akcia riadka (napr. zmazanie posledného výkresu riadka bez rozmerov) -->
+	{#if form?.error}
+		<p class="err noprint" data-testid="podklad-chyba">{form.error}</p>
+	{/if}
 
 	<!-- #540: pôvod zoznamu typov skla v pickeri (Odoo samoobslužný katalóg vs lokálny fallback) -->
 	<p class="sub noprint typ-zdroj" data-testid="glass-types-source">

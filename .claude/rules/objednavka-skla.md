@@ -409,6 +409,11 @@ Money-NEUTRÁLNE, BEZ migrácie.
   doplní Odoo strana (appka ju nepozná, NEPOSIELA `area_m2`). Payload: `buildGlassOrderItem` pošle
   `width_mm=0, height_mm=0, mode='atyp'` + `attachments[]`; bez popisu operátora `description =
   'ATYP podľa výkresu'` (len pre atyp 0 × 0; ostatné riadky byte-identické).
+- **Riadok bez rozmerov NIKDY bez výkresu (review):** (1) `pridajSkloManual({ vykres: { nazov, data } })`
+  uloží výkres v TEJ ISTEJ transakcii ako riadok (akcia načíta `arrayBuffer` PRED vložením) —
+  zlyhanie `pridajSubor` zruší aj riadok; `maVykres` bool NEEXISTUJE, pravidlo sa odvodzuje z `vykres`.
+  (2) `zmazSubor` odmietne zmazať POSLEDNÝ výkres riadka `bezRozmerov` (throw → akcia `zmazatSubor`
+  fail 400, UI `podklad-chyba` zobrazí `form.error`). Riadok s rozmermi maže výkres ako doteraz.
 - **Testy:** `tests/objednavka-skla-atyp-bez-rozmerov-565.test.ts` (akcia OK/400/400/polovičné,
   prepnutie režimu blokované, `buildGlassOrderForZak` payload, `buildGlassOrderItem`, helpery). E2E
   `objednavka-skla.spec.ts` „atyp s výkresom bez šírky/výšky" (required zmizne, riadok „podľa výkresu").

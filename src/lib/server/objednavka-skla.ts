@@ -127,14 +127,15 @@ export interface ManualSklo {
 	typSklaManual?: string;
 	/** #548: „iné sklo" — cena €/m² bez DPH (> 0, s `typSklaManual`). */
 	cenaM2Manual?: number;
-	/** Šírka mm. #565: `null` = nezadaná — povolené LEN pri `rezim='atyp'` + `maVykres`. */
+	/** Šírka mm. #565: `null` = nezadaná — povolené LEN pri `rezim='atyp'` + `vykres`. */
 	sirkaMm: number | null;
-	/** Výška mm. #565: `null` = nezadaná — povolené LEN pri `rezim='atyp'` + `maVykres`. */
+	/** Výška mm. #565: `null` = nezadaná — povolené LEN pri `rezim='atyp'` + `vykres`. */
 	vyskaMm: number | null;
 	pocet: number;
 	rezim: 'rozmery' | 'atyp';
-	/** #565: výkres je priložený v TOM ISTOM odoslaní (akcia ho uloží hneď po vložení riadka). */
-	maVykres?: boolean;
+	/** #565: výkres priložený v TOM ISTOM odoslaní (už validovaný `validujSubor`). Uloží sa v tej
+	 *  istej transakcii ako riadok — riadok bez rozmerov nikdy neostane bez výkresu. */
+	vykres?: { nazov: string; data: Buffer };
 	createdBy: string;
 }
 
@@ -191,7 +192,7 @@ export function rozriesTypSkla(s: {
  */
 function rozmeryManual(s: ManualSklo): { sirkaMm: number; vyskaMm: number } | null {
 	if (s.sirkaMm == null && s.vyskaMm == null && s.rezim === 'atyp') {
-		if (s.maVykres) return null;
+		if (s.vykres) return null;
 		throw new Error(
 			'Atyp bez výkresu potrebuje šírku a výšku — alebo priložte výkres (rozmery sú potom nepovinné).'
 		);
@@ -229,6 +230,9 @@ export function pridajSkloManual(s: ManualSklo): number {
 		});
 		if (typSklaManual) stmtSetManual.run('', typSklaManual, cenaM2Manual, id);
 		if (s.rezim === 'atyp') nastavRezim(id, 'atyp');
+		// #565 review: výkres v TEJ ISTEJ transakcii — keď jeho uloženie zlyhá, nevznikne ani riadok
+		// (riadok 0 × 0 bez výkresu by Odoo príjem odmietol). Vynútený bezpečný MIME (ako `nahratSubor`).
+		if (s.vykres) pridajSubor(id, s.vykres.nazov, 'application/octet-stream', s.vykres.data);
 		return id;
 	})();
 }
@@ -476,6 +480,25 @@ export function nastavTypManual(id: number, typManual: string, cenaM2Manual: num
 }
 
 const stmtNastavRezim = db.prepare('UPDATE objednavka_skla SET rezim = ? WHERE id = ?');
+/** #565: rozmerové stĺpce riadka (pre `bezRozmerov` guardy v `nastavRezim` / `zmazSubor`). */
+interface RozmerRow {
+	sirka_mm: number;
+	vyska_mm: number | null;
+	v_lavo_mm: number | null;
+	v_pravo_mm: number | null;
+	sikmy: number;
+}
+
+function rozmerZRiadku(r: RozmerRow) {
+	return {
+		sirkaMm: r.sirka_mm,
+		vyskaMm: r.vyska_mm,
+		vLavoMm: r.v_lavo_mm,
+		vPravoMm: r.v_pravo_mm,
+		sikmy: r.sikmy === 1
+	};
+}
+
 const stmtRozmerRiadku = db.prepare(
 	'SELECT sirka_mm, vyska_mm, v_lavo_mm, v_pravo_mm, sikmy FROM objednavka_skla WHERE id = ?'
 );
@@ -484,25 +507,8 @@ export function nastavRezim(id: number, rezim: 'rozmery' | 'atyp'): void {
 	if (rezim === 'rozmery') {
 		// #565: riadok BEZ rozmerov (atyp podľa výkresu) do režimu rozmery NIE — Odoo príjem by
 		// riadok 0 × 0 v režime rozmery odmietol (UserError → zlyhá CELÁ objednávka skla).
-		const r = stmtRozmerRiadku.get(id) as
-			| {
-					sirka_mm: number;
-					vyska_mm: number | null;
-					v_lavo_mm: number | null;
-					v_pravo_mm: number | null;
-					sikmy: number;
-			  }
-			| undefined;
-		if (
-			r &&
-			bezRozmerov({
-				sirkaMm: r.sirka_mm,
-				vyskaMm: r.vyska_mm,
-				vLavoMm: r.v_lavo_mm,
-				vPravoMm: r.v_pravo_mm,
-				sikmy: r.sikmy === 1
-			})
-		)
+		const r = stmtRozmerRiadku.get(id) as RozmerRow | undefined;
+		if (r && bezRozmerov(rozmerZRiadku(r)))
 			throw new Error(
 				'Riadok nemá rozmery (podľa výkresu) — do režimu rozmery ho nemožno prepnúť. Zmažte ho a pridajte s rozmermi.'
 			);
@@ -631,7 +637,22 @@ export function getSuborMeta(id: number): { nazov: string; typ: string; velkost:
 
 const stmtZmazSubor = db.prepare('DELETE FROM objednavka_skla_subory WHERE id = ?');
 
+// #565 review: riadok súboru + počet výkresov jeho riadka (guard „posledný výkres riadka bez rozmerov")
+const stmtSuborRiadok = db.prepare(`
+	SELECT s.sirka_mm, s.vyska_mm, s.v_lavo_mm, s.v_pravo_mm, s.sikmy,
+	       (SELECT COUNT(*) FROM objednavka_skla_subory x WHERE x.polozka_id = s.id) AS pocet_suborov
+	FROM objednavka_skla_subory f JOIN objednavka_skla s ON s.id = f.polozka_id
+	WHERE f.id = ?
+`);
+
 export function zmazSubor(id: number): void {
+	const r = stmtSuborRiadok.get(id) as (RozmerRow & { pocet_suborov: number }) | undefined;
+	// #565 review: riadok BEZ rozmerov (atyp podľa výkresu) nesmie ostať bez výkresu — Odoo príjem by
+	// atyp bez prílohy odmietol a zlyhala by CELÁ objednávka skla.
+	if (r && r.pocet_suborov <= 1 && bezRozmerov(rozmerZRiadku(r)))
+		throw new Error(
+			'Riadok bez rozmerov musí mať výkres — najprv nahrajte iný výkres, alebo zmažte celý riadok.'
+		);
 	stmtZmazSubor.run(id);
 	log.info('subor zmazany', { id });
 }
