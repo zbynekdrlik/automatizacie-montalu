@@ -12,7 +12,7 @@ import {
 	type HoleSize,
 	type EdgeFinish
 } from './odoo-rozpis-lines';
-import { m2Tabule, popisPozicie } from '../objednavka-skla-pozicia';
+import { bezRozmerov, m2Tabule, popisPozicie } from '../objednavka-skla-pozicia';
 
 const log = logger('objednavka-skla');
 
@@ -127,10 +127,14 @@ export interface ManualSklo {
 	typSklaManual?: string;
 	/** #548: „iné sklo" — cena €/m² bez DPH (> 0, s `typSklaManual`). */
 	cenaM2Manual?: number;
-	sirkaMm: number;
-	vyskaMm: number;
+	/** Šírka mm. #565: `null` = nezadaná — povolené LEN pri `rezim='atyp'` + `maVykres`. */
+	sirkaMm: number | null;
+	/** Výška mm. #565: `null` = nezadaná — povolené LEN pri `rezim='atyp'` + `maVykres`. */
+	vyskaMm: number | null;
 	pocet: number;
 	rezim: 'rozmery' | 'atyp';
+	/** #565: výkres je priložený v TOM ISTOM odoslaní (akcia ho uloží hneď po vložení riadka). */
+	maVykres?: boolean;
 	createdBy: string;
 }
 
@@ -178,16 +182,36 @@ export function rozriesTypSkla(s: {
 	return { typSkla: catalog, typSklaManual: null, cenaM2Manual: null };
 }
 
+/**
+ * #565: rozmery ručného riadka. Bez rozmerov (OBE nezadané) LEN pri atype s výkresom v tom istom
+ * odoslaní (Patrik, Odoo úloha 1051 — výkres s viacerými tvarmi, jeden rozmer neexistuje) →
+ * `null` (uloží sa `sirka_mm=0` — stĺpec NOT NULL, bez migrácie — `vyska_mm=NULL`, `m2=NULL`).
+ * Atyp bez výkresu aj bez rozmerov → throw (Odoo príjem atyp bez prílohy odmietne). Inak (aj jeden
+ * zadaný rozmer) platí doterajšia validácia: obe celé > 0.
+ */
+function rozmeryManual(s: ManualSklo): { sirkaMm: number; vyskaMm: number } | null {
+	if (s.sirkaMm == null && s.vyskaMm == null && s.rezim === 'atyp') {
+		if (s.maVykres) return null;
+		throw new Error(
+			'Atyp bez výkresu potrebuje šírku a výšku — alebo priložte výkres (rozmery sú potom nepovinné).'
+		);
+	}
+	const { sirkaMm, vyskaMm } = s;
+	if (typeof sirkaMm !== 'number' || !Number.isInteger(sirkaMm) || sirkaMm <= 0)
+		throw new Error('Šírka musí byť celé číslo > 0.');
+	if (typeof vyskaMm !== 'number' || !Number.isInteger(vyskaMm) || vyskaMm <= 0)
+		throw new Error('Výška musí byť celé číslo > 0.');
+	return { sirkaMm, vyskaMm };
+}
+
 export function pridajSkloManual(s: ManualSklo): number {
 	const { typSkla, typSklaManual, cenaM2Manual } = rozriesTypSkla(s);
-	if (!Number.isInteger(s.sirkaMm) || s.sirkaMm <= 0)
-		throw new Error('Šírka musí byť celé číslo > 0.');
-	if (!Number.isInteger(s.vyskaMm) || s.vyskaMm <= 0)
-		throw new Error('Výška musí byť celé číslo > 0.');
+	const rozmery = rozmeryManual(s);
 	if (!Number.isInteger(s.pocet) || s.pocet < 1)
 		throw new Error('Počet kusov musí byť celé číslo >= 1.');
 
-	const m2 = m2Tabule(s.sirkaMm, s.vyskaMm, s.pocet);
+	// #565: bez rozmerov → m² NEZNÁME (null, nikdy 0 do súčtov); plochu určí dodávateľ z výkresu.
+	const m2 = rozmery ? m2Tabule(rozmery.sirkaMm, rozmery.vyskaMm, s.pocet) : null;
 	// Insert + manuál/atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
 	// `rezim='rozmery'` a manuálne stĺpce NULL; doplnia sa v tej istej transakcii (#545 review 🔵).
 	return db.transaction(() => {
@@ -196,8 +220,8 @@ export function pridajSkloManual(s: ManualSklo): number {
 			op: s.op,
 			modul: (s.modul ?? 'manual').trim() || 'manual',
 			popis: (s.popis ?? '').trim(),
-			sirkaMm: s.sirkaMm,
-			vyskaMm: s.vyskaMm,
+			sirkaMm: rozmery?.sirkaMm ?? 0,
+			vyskaMm: rozmery?.vyskaMm ?? null,
 			pocet: s.pocet,
 			typSkla,
 			m2,
@@ -452,8 +476,37 @@ export function nastavTypManual(id: number, typManual: string, cenaM2Manual: num
 }
 
 const stmtNastavRezim = db.prepare('UPDATE objednavka_skla SET rezim = ? WHERE id = ?');
+const stmtRozmerRiadku = db.prepare(
+	'SELECT sirka_mm, vyska_mm, v_lavo_mm, v_pravo_mm, sikmy FROM objednavka_skla WHERE id = ?'
+);
 
 export function nastavRezim(id: number, rezim: 'rozmery' | 'atyp'): void {
+	if (rezim === 'rozmery') {
+		// #565: riadok BEZ rozmerov (atyp podľa výkresu) do režimu rozmery NIE — Odoo príjem by
+		// riadok 0 × 0 v režime rozmery odmietol (UserError → zlyhá CELÁ objednávka skla).
+		const r = stmtRozmerRiadku.get(id) as
+			| {
+					sirka_mm: number;
+					vyska_mm: number | null;
+					v_lavo_mm: number | null;
+					v_pravo_mm: number | null;
+					sikmy: number;
+			  }
+			| undefined;
+		if (
+			r &&
+			bezRozmerov({
+				sirkaMm: r.sirka_mm,
+				vyskaMm: r.vyska_mm,
+				vLavoMm: r.v_lavo_mm,
+				vPravoMm: r.v_pravo_mm,
+				sikmy: r.sikmy === 1
+			})
+		)
+			throw new Error(
+				'Riadok nemá rozmery (podľa výkresu) — do režimu rozmery ho nemožno prepnúť. Zmažte ho a pridajte s rozmermi.'
+			);
+	}
 	stmtNastavRezim.run(rezim, id);
 	log.info('sklo rezim zmeneny', { id, rezim });
 }

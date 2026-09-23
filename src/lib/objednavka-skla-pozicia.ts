@@ -22,6 +22,33 @@ export function m2Tabule(sirkaMm: number, vyskaMm: number, pocet: number): numbe
 	return (sirkaMm * vyskaMm * pocet) / 1e6;
 }
 
+/** Rozmerové polia riadka potrebné na zobrazenie rozmeru (podmnožina `SkloPolozka`). */
+export interface RozmerTabule {
+	sirkaMm: number;
+	vyskaMm: number | null;
+	vLavoMm: number | null;
+	vPravoMm: number | null;
+	sikmy: boolean;
+}
+
+/**
+ * #565: riadok BEZ rozmerov = atyp zadaný výkresom (Patrik, Odoo úloha 1051 — viac tvarov, jeden
+ * rozmer neexistuje). Uložený ako `sirka_mm = 0` (stĺpec NOT NULL, bez migrácie), `vyska_mm = NULL`.
+ * Šikmý FIX (výška null, ale v_lavo/v_pravo) sem NEPATRÍ.
+ */
+export function bezRozmerov(p: RozmerTabule): boolean {
+	return !p.sikmy && p.sirkaMm <= 0;
+}
+
+/** Zobrazenie rozmeru riadka podkladu: „š × v mm", „š × Ľ/P mm (šikmé)", bez rozmerov „podľa výkresu". */
+export function fmtRozmerTabule(p: RozmerTabule): string {
+	if (bezRozmerov(p)) return 'podľa výkresu';
+	if (p.sikmy) {
+		return `${Math.round(p.sirkaMm)} × ${Math.round(p.vLavoMm ?? 0)}/${Math.round(p.vPravoMm ?? 0)} mm (šikmé)`;
+	}
+	return `${Math.round(p.sirkaMm)} × ${Math.round(p.vyskaMm ?? 0)} mm`;
+}
+
 /**
  * Nadpis podkladu (za „Objednávka skla — "): OP + zákazník (vzor 37880 „OPDL260238 Bondiro").
  * Bez zákazníka len OP; bez OP číslo zákazky (servisný podklad bez odpisu aj bez OP).
