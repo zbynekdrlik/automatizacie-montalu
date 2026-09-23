@@ -19,6 +19,7 @@ const { actions } = await import('../src/routes/zasklenia/+page.server');
 const { load } = await import('../src/routes/objednavka-skla/[zak]/+page.server');
 const { listSklaPreZakazku, pridajSklo, pridajSkloManual } =
 	await import('../src/lib/server/objednavka-skla');
+const { buildGlassOrderForZak } = await import('../src/lib/server/odoo-glass-order-upload');
 const { db } = await import('../src/lib/server/db');
 
 const USER = { id: 1, username: 'tester', role: 'internal' as const };
@@ -64,13 +65,24 @@ function callLoad(zak: string) {
 }
 
 describe('#563 čisté helpery podkladu', () => {
-	it('popisPozicie: „Zasklenie N: <systém> <štýl>" → „Zasklenie N"; iné popisy nezmenené', () => {
-		expect(popisPozicie('Zasklenie 1: Robust 3K')).toBe('Zasklenie 1');
-		expect(popisPozicie('Zasklenie 12: Slide 4K')).toBe('Zasklenie 12');
-		expect(popisPozicie('Zasklenie 2')).toBe('Zasklenie 2');
-		expect(popisPozicie('FIX pole 1 — okno')).toBe('FIX pole 1 — okno');
-		expect(popisPozicie('ATYP podľa výkresu: pozor')).toBe('ATYP podľa výkresu: pozor');
-		expect(popisPozicie('')).toBe('');
+	it('popisPozicie (zasklenia): „Zasklenie N: <systém> <štýl>" → „Zasklenie N"', () => {
+		expect(popisPozicie('Zasklenie 1: Robust 3K', 'zasklenia')).toBe('Zasklenie 1');
+		expect(popisPozicie('Zasklenie 12: Slide 4K', 'zasklenia')).toBe('Zasklenie 12');
+		expect(popisPozicie('Zasklenie 2', 'zasklenia')).toBe('Zasklenie 2');
+	});
+
+	it('popisPozicie (zasklenia): starý single riadok „Robust 2K" (bez pozície) → „Zasklenie 1"', () => {
+		// review 🟡: single producent spred #563 písal len „<systém> <štýl>" = jediný posuv
+		expect(popisPozicie('Robust 2K', 'zasklenia')).toBe('Zasklenie 1');
+		expect(popisPozicie('Slide 3K', 'zasklenia')).toBe('Zasklenie 1');
+	});
+
+	it('popisPozicie: iné moduly (FIX, pergola, ručné) NEMENÍ — ani text „Zasklenie N: …"', () => {
+		// review 🔵: operátorova poznámka v ručnom riadku sa nesmie odrezať
+		expect(popisPozicie('Zasklenie 2: prasklina', 'manual')).toBe('Zasklenie 2: prasklina');
+		expect(popisPozicie('FIX pole 1 — okno', 'fix')).toBe('FIX pole 1 — okno');
+		expect(popisPozicie('Strešné sklo — 4.4.2 číre', 'pergola')).toBe('Strešné sklo — 4.4.2 číre');
+		expect(popisPozicie('', 'manual')).toBe('');
 	});
 
 	it('m2Tabule = šírka × výška × kusy / 1e6', () => {
@@ -261,5 +273,56 @@ describe('#563 load podkladu — nadpis OP + zákazník', () => {
 		const d = await callLoad('ZAK-563-H4');
 		// bez Odoo konfigurácie (test) → zobrazí sa uložený typ, nikdy prázdne
 		expect((d.nazvySkiel as Record<string, string>)['Float 4mm']).toBe('Float 4mm');
+	});
+});
+
+describe('#563 review — staré riadky spred zmeny popisu (idempotencia + Odoo popis)', () => {
+	it('opakované „Pridať sklá" po nasadení neduplikuje riadok spred #563 (starý popis „Slide 3K")', async () => {
+		// riadok, ako ho uložil single producent PRED #563 (popis = systém + štýl, bez m²)
+		await callAction('pridatSkla', { ...SLIDE, zak: 'ZAK-563-DEDUP' });
+		db.prepare("UPDATE objednavka_skla SET popis = 'Slide 3K', m2 = NULL WHERE zak = ?").run(
+			'ZAK-563-DEDUP'
+		);
+		const r = await callAction('pridatSkla', { ...SLIDE, zak: 'ZAK-563-DEDUP' });
+		expect((r.sklaPridane as { pridane: number }).pridane).toBe(0);
+		expect(listSklaPreZakazku('ZAK-563-DEDUP')).toHaveLength(1);
+	});
+
+	it('Odoo glass_order description/note starého riadka = pozícia „Zasklenie N" (zhoda s tlačou)', () => {
+		pridajSklo({
+			zak: 'ZAK-563-ODOO',
+			modul: 'zasklenia',
+			popis: 'Zasklenie 2: Robust 4K',
+			sirkaMm: 998,
+			vyskaMm: 1958,
+			pocet: 4,
+			typSkla: 'Izolačné sklo 4/16/4 číre',
+			createdBy: 'test'
+		});
+		const built = buildGlassOrderForZak('ZAK-563-ODOO');
+		const item = built!.order.items[0]!;
+		expect(item.description).toBe('Zasklenie 2');
+		expect(item.note).toBe('Zasklenie 2');
+	});
+
+	it('nový riadok zo zasklení posiela do Odoo description „Zasklenie 1"', async () => {
+		await callAction('pridatSkla', { ...SLIDE, zak: 'ZAK-563-ODOO-NEW' });
+		const item = buildGlassOrderForZak('ZAK-563-ODOO-NEW')!.order.items[0]!;
+		expect(item.description).toBe('Zasklenie 1');
+	});
+
+	it('ručný riadok s textom „Zasklenie 2: prasklina" ide do Odoo nezmenený', () => {
+		pridajSkloManual({
+			zak: 'ZAK-563-ODOO-MAN',
+			popis: 'Zasklenie 2: prasklina',
+			typSkla: 'Float 4mm',
+			sirkaMm: 500,
+			vyskaMm: 400,
+			pocet: 1,
+			rezim: 'rozmery',
+			createdBy: 'test'
+		});
+		const item = buildGlassOrderForZak('ZAK-563-ODOO-MAN')!.order.items[0]!;
+		expect(item.description).toBe('Zasklenie 2: prasklina');
 	});
 });
