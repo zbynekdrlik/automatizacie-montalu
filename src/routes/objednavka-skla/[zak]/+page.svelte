@@ -240,7 +240,7 @@
 					{#each items as p (p.id)}
 						{@const nav = data.naviazanie[p.id]}
 						<tr class:atyp={p.rezim === 'atyp'}>
-							<td data-testid={`popis-${p.id}`}>{popisPozicie(p.popis)}</td>
+							<td data-testid={`popis-${p.id}`}>{popisPozicie(p.popis, p.modul)}</td>
 							<td class="mono">{fmtRozmer(p)}</td>
 							<td>
 								<!-- #540: výber typu skla z Odoo katalógu (`code` → glass_order type); vytlačí sa hodnota -->

@@ -94,11 +94,13 @@ async function nazvyPreKody(kody: string[], timeoutMs: number): Promise<Map<stri
 		if (_inflight) await _inflight;
 		const chybajuce = kody.filter((k) => !platne(k, Date.now()));
 		if (chybajuce.length > 0) {
-			_inflight = nacitajKody(chybajuce, timeoutMs);
+			const p = nacitajKody(chybajuce, timeoutMs);
+			_inflight = p;
 			try {
-				await _inflight;
+				await p;
 			} finally {
-				_inflight = null;
+				// vynuluj LEN svoj fetch — súbežný volajúci mohol medzitým spustiť ďalší
+				if (_inflight === p) _inflight = null;
 			}
 		}
 	}
@@ -112,7 +114,10 @@ async function nazvyPreKody(kody: string[], timeoutMs: number): Promise<Map<stri
 
 /**
  * Zobrazovacie názvy typov skla pre riadky podkladu: `{ [typSkla]: názov }` pre KAŽDÝ vstupný typ
- * (fallback = samotný `typSkla`). NIKDY nehádže a neblokuje page load dlhšie než `timeoutMs`.
+ * (fallback = samotný `typSkla`). NIKDY nehádže. Každé Odoo volanie je ohraničené `timeoutMs`
+ * (default 3 s); v najhoršom prípade (čakanie na súbežný fetch + vlastný fetch + necachovaný
+ * `fetchGlassTypes`) sa to môže sčítať na niekoľko timeoutov — v bežnom loade je `fetchGlassTypes`
+ * už v cache (load ho volá skôr) a kódy sú cachované 5 min.
  */
 export async function moneyNazvySkiel(
 	typy: string[],

@@ -350,7 +350,10 @@ zobrazenie + producenti, žiadna migrácia, Money-NEUTRÁLNE (`typ_skla`/`money_
 nezmenené okrem `description` nových riadkov = „Zasklenie N").
 
 - **Čisté helpery `src/lib/objednavka-skla-pozicia.ts`** (client-safe, svelte ich importuje):
-  `popisPozicie` („Zasklenie N: Robust 3K" → „Zasklenie N", staré riadky), `m2Tabule(š,v,ks)`
+  `popisPozicie(popis, modul)` — LEN `modul='zasklenia'`: „Zasklenie N[: Robust 3K]" → „Zasklenie N",
+  starý single riadok („Robust 2K", bez pozície) → „Zasklenie 1"; iné moduly (ručný text operátora,
+  FIX, pergola) NEMENÍ. Používa ho podklad (zobrazenie), `buildGlassOrderForZak` (Odoo
+  `description`/`note` — aj staré riadky = zhoda s tlačou) A idempotentná identita. `m2Tabule(š,v,ks)`
   (JEDINÝ vzorec m² — ručné riadky, zasklenia single/multi, pergola producent), `nadpisObjednavky`.
 - **Nadpis** = `effektivneOp` + `zakazkaPrehlad(zak).zakaznik` (JEDEN prehľad → `opZPrehladu`,
   live-first ako `zakazkaOp`); bez OP → ZAK, bez zákazníka (servis bez odpisu) → len OP. Testid
@@ -359,9 +362,11 @@ nezmenené okrem `description` nových riadkov = „Zasklenie N").
 - **m²**: `mapRow` fallback `r.m2 ?? (vyska ? m2Tabule : null)` — uložené m² má prednosť (FIX
   lichobežník `pole.m2`), šikmý bez výšky ostáva null. E2E m² ODVOĎ z rozmerov/počtu v DOM.
 - **Popis**: zasklenia posiela len „Zasklenie N" (single = „Zasklenie 1"). FIX („FIX pole N — názov")
-  a pergola („Strešné sklo — typ") NEMENENÉ — nenesú systém/štýl. POZOR: popis je v idempotentnej
-  identite (`pridajSklaHromadneIdempotentne`) — zmena textu popisu = riadky spred zmeny sa s novými
-  nededupnú (jednorazovo akceptované).
+  a pergola („Strešné sklo — typ") NEMENENÉ — nenesú systém/štýl. **Idempotencia
+  (`existujeRovnaka`) porovnáva POZÍCIU (`popisPozicie`), nie surový popis** — SQL vyberie geometrických
+  kandidátov, pozícia sa porovná v JS. Inak by opakované „Pridať sklá" po zmene textu producenta
+  zduplikovalo riadky spred zmeny (= duplicitná objednávka u dodávateľa). Dôsledok: rovnaké sklo
+  (rozmer+ks+typ) na tej istej pozícii zákazky sa nepridá druhýkrát ani pri inom systéme.
 - **Money názov skla** `src/lib/server/money-nazov-skla.ts` `moneyNazvySkiel(typy)`: lokálny názov →
   `glassMoneyKodPodlaNazvu` (db.ts — kód LEN keď je naprieč systémami JEDNOZNAČNÝ; riadok objednávky
   systém neukladá, `glassMoneyKod(system,…)` sa nedá) → Odoo `product.product` `default_code in [...]`

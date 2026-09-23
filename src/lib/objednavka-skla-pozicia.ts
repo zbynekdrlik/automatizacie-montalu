@@ -2,17 +2,19 @@
 // tabule, nadpis. Patrik (Odoo úloha 625, 23.9.): výrobu „nezaujíma kam to dávame" → popis riadka
 // je len „Zasklenie N"; m² vyplnené vopred; nadpis = OP + zákazník. Money-NEUTRÁLNE.
 
-// Popis riadkov spred #563 (multi producent): „Zasklenie 1: Robust 3K" — časť za dvojbodkou je
-// systém/štýl, ktorý výrobu nezaujíma.
-const POZICIA_SO_SYSTEMOM = /^(Zasklenie \d+):/;
+// Pozícia zasklenia na začiatku popisu: nové riadky „Zasklenie N", staré multi „Zasklenie N: Robust 3K".
+const POZICIA = /^(Zasklenie \d+)(?::|$)/;
 
 /**
- * Zobrazovaný popis pozície: „Zasklenie N: <systém> <štýl>" → „Zasklenie N" (staré riadky spred
- * #563 sa tak zobrazia rovnako ako nové). Iné popisy (FIX pole, pergola, ručné riadky) nezmenené.
+ * Popis POZÍCIE riadka (zobrazenie + Odoo `description`/`note`). LEN pre `modul='zasklenia'`:
+ * „Zasklenie N[: <systém> <štýl>]" → „Zasklenie N"; starý single riadok spred #563 (popis len
+ * „<systém> <štýl>" = jediný posuv) → „Zasklenie 1". Iné moduly (FIX pole, pergola, ručné riadky —
+ * voľný text operátora) NEMENÍ, ani keď text začína „Zasklenie N:".
  */
-export function popisPozicie(popis: string): string {
-	const m = POZICIA_SO_SYSTEMOM.exec(popis);
-	return m ? m[1]! : popis;
+export function popisPozicie(popis: string, modul: string): string {
+	if (modul !== 'zasklenia') return popis;
+	const m = POZICIA.exec(popis.trim());
+	return m ? m[1]! : 'Zasklenie 1';
 }
 
 /** Plocha tabúľ riadka v m² = šírka × výška × kusy / 1e6 (jeden vzorec pre všetkých producentov). */
