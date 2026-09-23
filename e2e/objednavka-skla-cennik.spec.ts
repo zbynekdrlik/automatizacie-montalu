@@ -58,7 +58,9 @@ test('zasklenia nárezák select sa renderuje + „Pridať sklá" → podklad s 
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
 
-	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+	// #563: nadpis = OP podkladu (zákazka bez odpisu → bez zákazníka), podklad danej zákazky z URL
+	await expect(page).toHaveURL(new RegExp(`/objednavka-skla/${zak}`));
+	await expect(page.getByTestId('objednavka-nadpis')).toHaveText('Objednávka skla — 01');
 
 	// riadok podkladu nesie LOKÁLNY typ skla (fallback: producent nepriradil Odoo hodnotu) a je
 	// platnou voľbou v pickeri (select má hodnotu, ktorá je medzi možnosťami → žiadny nepriradené

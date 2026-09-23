@@ -153,6 +153,38 @@ describe('moneyNazvySkiel (#563)', () => {
 		expect(Date.now() - t0).toBeLessThan(2000);
 	});
 
+	it('single-flight: súbežné loady zdieľajú JEDEN product.product read', async () => {
+		enableEnv();
+		const calls = mockOdoo();
+		const [a, b] = await Promise.all([
+			moneyNazovSkla('Izolačné sklo 4/16/4 číre'),
+			moneyNazovSkla('Izolačné sklo 4/16/4 číre')
+		]);
+		expect(a).toBe('Izolačné sklo 4/16/4- číre (Ug=1,1)');
+		expect(b).toBe('Izolačné sklo 4/16/4- číre (Ug=1,1)');
+		expect(calls.filter((c) => c.model === 'product.product')).toHaveLength(1);
+	});
+
+	it('Odoo `false` v name (prázdne char pole) → lokálny názov, nikdy reťazec „false"', async () => {
+		enableEnv();
+		setJson2Transport(async (url) => {
+			if (String(url).includes('/product.product/'))
+				return new Response(JSON.stringify([{ default_code: 'TS00016', name: false }]), {
+					status: 200
+				});
+			return new Response('[]', { status: 200 });
+		});
+		expect(await moneyNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
+	});
+
+	it('prázdne / medzerové typy sa vrátia bezo zmeny a nevolajú Odoo', async () => {
+		enableEnv();
+		const calls = mockOdoo();
+		const m = await moneyNazvySkiel(['', '  ']);
+		expect(m).toEqual({ '': '', '  ': '  ' });
+		expect(calls).toHaveLength(0);
+	});
+
 	it('integrácia nenakonfigurovaná (dev/test) → lokálny názov bez volania Odoo', async () => {
 		const calls = mockOdoo();
 		expect(await moneyNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');

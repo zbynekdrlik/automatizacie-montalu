@@ -12,6 +12,7 @@ import {
 	type HoleSize,
 	type EdgeFinish
 } from './odoo-rozpis-lines';
+import { m2Tabule } from '../objednavka-skla-pozicia';
 
 const log = logger('objednavka-skla');
 
@@ -186,7 +187,7 @@ export function pridajSkloManual(s: ManualSklo): number {
 	if (!Number.isInteger(s.pocet) || s.pocet < 1)
 		throw new Error('Počet kusov musí byť celé číslo >= 1.');
 
-	const m2 = (s.sirkaMm * s.vyskaMm * s.pocet) / 1e6;
+	const m2 = m2Tabule(s.sirkaMm, s.vyskaMm, s.pocet);
 	// Insert + manuál/atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
 	// `rezim='rozmery'` a manuálne stĺpce NULL; doplnia sa v tej istej transakcii (#545 review 🔵).
 	return db.transaction(() => {
@@ -370,7 +371,10 @@ function mapRow(r: SkloRow): SkloPolozka {
 		pocet: r.pocet,
 		typSkla: r.typ_skla,
 		sikmy: r.sikmy === 1,
-		m2: r.m2,
+		// #563: riadky spred #563 (zasklenia/pergola producent m² neukladal) → dopočítaj z rozmerov,
+		// keď je výška (pravouhlé sklo). Uložené m² má prednosť (FIX lichobežník nesie vlastnú plochu);
+		// šikmý bez výšky a bez m² ostáva null (žiadny odhad).
+		m2: r.m2 ?? (r.vyska_mm != null ? m2Tabule(r.sirka_mm, r.vyska_mm, r.pocet) : null),
 		rezim: r.rezim === 'atyp' ? 'atyp' : 'rozmery',
 		typSklaManual: r.typ_skla_manual ?? null,
 		cenaM2Manual: r.cena_m2_manual ?? null,

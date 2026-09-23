@@ -28,7 +28,9 @@ import {
 	type HoleSize
 } from '$lib/server/odoo-rozpis-lines';
 import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
-import { zakazkaOp } from '$lib/server/zakazka-ceny';
+import { zakazkaPrehlad, opZPrehladu } from '$lib/server/zakazka-ceny';
+import { moneyNazvySkiel } from '$lib/server/money-nazov-skla';
+import { nadpisObjednavky } from '$lib/objednavka-skla-pozicia';
 
 /** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
 function parseSpec(form: FormData): GlassSpec {
@@ -103,12 +105,16 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	const polozky = listSklaPreZakazku(zak);
 	// #528: OP zákazky (z najnovšieho odpisu, live-first) pre QR zákazky v hlavičke výtlačku — QR
 	// vedie na TÚ ISTÚ `sale.order` ako nahraná `glass_order`. Prázdny keď zákazka nemá odpis/OP.
-	const op = zakazkaOp(zak);
+	// #563: JEDEN prehľad zákazky → OP (live-first, rovnako ako `zakazkaOp`) aj meno zákazníka pre nadpis.
+	const prehlad = zakazkaPrehlad(zak);
+	const op = opZPrehladu(prehlad);
 	// #545: OP uložené priamo na riadkoch podkladu (servisná objednávka bez odpisu). `null` (mixed) →
 	// zobraz prázdne (operátor nastaví jedno OP). `effektivneOp` = precedencia odpis > podklad —
 	// tlačidlo Odoslať sa zapne, keď je (≥ 1 riadok a) neprázdne.
 	const podkladOp = opPodkladu(zak) ?? '';
 	const effektivneOp = op || podkladOp;
+	// #563: nadpis „Objednávka skla — {OP} {zákazník}" (vzor 37880); bez OP → ZAK, bez zákazníka → OP.
+	const nadpis = nadpisObjednavky({ zak, op: effektivneOp, zakaznik: prehlad?.zakaznik ?? '' });
 
 	// Pre každú položku načítaj zoznam príloh (bez dát — len metadata)
 	const suboryMap: Record<number, { id: number; nazov: string; typ: string; velkost: number }[]> =
@@ -148,8 +154,17 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		}
 	}
 
+	// #563: zobrazovací (reálny Money) názov typu skla pre riadky — LEN display, `typ_skla` sa nemení.
+	// Jeden Odoo read pre všetky kódy (cache + 3 s timeout, fallback = uložený typ). Manuál „iné
+	// sklo" riadky majú vlastný typ (mimo katalógu) → neprekladá sa.
+	const nazvySkiel = await moneyNazvySkiel(
+		polozky.filter((p) => !p.typSklaManual).map((p) => p.typSkla)
+	);
+
 	return {
 		zak,
+		nadpis,
+		nazvySkiel,
 		op,
 		podkladOp,
 		effektivneOp,
