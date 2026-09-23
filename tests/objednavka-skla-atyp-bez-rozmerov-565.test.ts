@@ -6,7 +6,12 @@
 // Money-NEUTRÁLNE. DB je zdieľaná → unikátne zákazky.
 import { describe, it, expect } from 'vitest';
 import { actions } from '../src/routes/objednavka-skla/[zak]/+page.server';
-import { listSklaPreZakazku, listSubory } from '../src/lib/server/objednavka-skla';
+import {
+	listSklaPreZakazku,
+	listSubory,
+	pridajSkloManual,
+	MAX_SUBOR_VELKOST
+} from '../src/lib/server/objednavka-skla';
 import { buildGlassOrderItem } from '../src/lib/server/odoo-rozpis-lines';
 import { buildGlassOrderForZak } from '../src/lib/server/odoo-glass-order-upload';
 import { bezRozmerov, fmtRozmerTabule } from '../src/lib/objednavka-skla-pozicia';
@@ -157,6 +162,66 @@ describe('#565 buildGlassOrderItem — atyp bez rozmerov (kontrakt v2 príjmu)',
 	it('režim rozmery s rozmermi → bez fallback popisu (byte-identické s doterajškom)', () => {
 		const it0 = buildGlassOrderItem({ ...base, sirkaMm: 1000, vyskaMm: 500, mode: 'rozmery' });
 		expect(it0.description).toBeUndefined();
+	});
+
+	it('atyp S rozmermi a bez popisu → bez fallback popisu (existujúce atyp riadky nezmenené)', () => {
+		const it0 = buildGlassOrderItem({ ...base, sirkaMm: 1000, vyskaMm: 500, mode: 'atyp' });
+		expect(it0.description).toBeUndefined();
+		expect(it0.width_mm).toBe(1000);
+		expect(it0.height_mm).toBe(500);
+	});
+});
+
+describe('#565 review — výkres riadka bez rozmerov sa nestratí', () => {
+	it('riadok + výkres ATOMICKY: zlyhanie uloženia výkresu nevloží ani riadok', () => {
+		const zak = 'ZAK-565-ATOM';
+		const priVelky = Buffer.alloc(MAX_SUBOR_VELKOST + 1); // pridajSubor hodí (strop veľkosti)
+		expect(() =>
+			pridajSkloManual({
+				zak,
+				popis: '',
+				typSkla: 'Float 4',
+				sirkaMm: null,
+				vyskaMm: null,
+				pocet: 1,
+				rezim: 'atyp',
+				vykres: { nazov: 'velky.pdf', data: priVelky },
+				createdBy: 'test'
+			})
+		).toThrow(/veľký/);
+		expect(listSklaPreZakazku(zak)).toHaveLength(0); // žiadny riadok 0 × 0 bez výkresu
+	});
+
+	it('posledný výkres riadka bez rozmerov sa nedá zmazať (Odoo by atyp bez prílohy odmietol)', async () => {
+		const zak = 'ZAK-565-ZMAZ';
+		await actions.pridatRiadok(mkEvent(zak, ATYP_BEZ, VYKRES));
+		const id = listSklaPreZakazku(zak)[0]!.id;
+		const suborId = listSubory(id)[0]!.id;
+		const f = new FormData();
+		f.set('id', String(suborId));
+		const res = (await actions.zmazatSubor({
+			request: { formData: async () => f }
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} as any)) as Res;
+		expect(res.status).toBe(400);
+		expect(res.data?.error).toMatch(/výkres/i);
+		expect(listSubory(id)).toHaveLength(1);
+	});
+
+	it('riadok S rozmermi — výkres sa dá zmazať ako doteraz', async () => {
+		const zak = 'ZAK-565-ZMAZ-OK';
+		await actions.pridatRiadok(
+			mkEvent(zak, { ...ATYP_BEZ, sirka_mm: '1000', vyska_mm: '500' }, VYKRES)
+		);
+		const id = listSklaPreZakazku(zak)[0]!.id;
+		const f = new FormData();
+		f.set('id', String(listSubory(id)[0]!.id));
+		const res = (await actions.zmazatSubor({
+			request: { formData: async () => f }
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		} as any)) as Res;
+		expect(res.ok).toBe(true);
+		expect(listSubory(id)).toHaveLength(0);
 	});
 });
 
