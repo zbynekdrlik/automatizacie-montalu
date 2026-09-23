@@ -12,6 +12,7 @@ import {
 	type HoleSize,
 	type EdgeFinish
 } from './odoo-rozpis-lines';
+import { m2Tabule, popisPozicie } from '../objednavka-skla-pozicia';
 
 const log = logger('objednavka-skla');
 
@@ -186,7 +187,7 @@ export function pridajSkloManual(s: ManualSklo): number {
 	if (!Number.isInteger(s.pocet) || s.pocet < 1)
 		throw new Error('Počet kusov musí byť celé číslo >= 1.');
 
-	const m2 = (s.sirkaMm * s.vyskaMm * s.pocet) / 1e6;
+	const m2 = m2Tabule(s.sirkaMm, s.vyskaMm, s.pocet);
 	// Insert + manuál/atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
 	// `rezim='rozmery'` a manuálne stĺpce NULL; doplnia sa v tej istej transakcii (#545 review 🔵).
 	return db.transaction(() => {
@@ -222,29 +223,32 @@ export function pridajSklaHromadne(polozky: NoveSklo[]): number {
 
 // #514: idempotentné pridanie — pre „Pridať sklá" na výsledkovej obrazovke zasklení, ktoré
 // (po zrušení redirectu) ostáva na stránke, takže dvojklik nesmie duplikovať. Zhoda na
-// GEOMETRICKEJ + popisnej identite riadka; `IS` je null-safe (v_lavo/v_pravo sú pri
-// pravouhlom skle NULL). Rezim/created_* sa do identity neráta (rovnaké fyzické sklo).
-const stmtRovnaka = db.prepare(`
-	SELECT id FROM objednavka_skla
-	WHERE zak_norm = ? AND op = ? AND modul = ? AND popis = ?
+// GEOMETRICKEJ identite riadka (SQL; `IS` je null-safe — v_lavo/v_pravo sú pri pravouhlom skle
+// NULL) + na POZÍCII (`popisPozicie`). Rezim/created_* sa do identity neráta (rovnaké fyzické sklo).
+// #563: pozícia namiesto surového popisu — riadok spred zmeny producenta („Slide 3K",
+// „Zasklenie 1: Robust 3K") je TÁ ISTÁ pozícia ako nový „Zasklenie 1" → opakované „Pridať sklá"
+// po nasadení ho NEzduplikuje (duplicitná objednávka u dodávateľa skla).
+const stmtRovnake = db.prepare(`
+	SELECT popis FROM objednavka_skla
+	WHERE zak_norm = ? AND op = ? AND modul = ?
 	  AND sirka_mm IS ? AND vyska_mm IS ? AND v_lavo_mm IS ? AND v_pravo_mm IS ?
 	  AND pocet = ? AND typ_skla = ?
-	LIMIT 1
 `);
 
 function existujeRovnaka(s: NoveSklo): boolean {
-	return !!stmtRovnaka.get(
+	const kandidati = stmtRovnake.all(
 		normZak(s.zak),
 		s.op ?? '',
 		s.modul,
-		s.popis,
 		s.sirkaMm,
 		s.vyskaMm ?? null,
 		s.vLavoMm ?? null,
 		s.vPravoMm ?? null,
 		s.pocet,
 		s.typSkla
-	);
+	) as { popis: string }[];
+	const pozicia = popisPozicie(s.popis, s.modul);
+	return kandidati.some((k) => popisPozicie(k.popis, s.modul) === pozicia);
 }
 
 /** Ako `pridajSklaHromadne`, ale IDEMPOTENTNE — riadok, ktorý už (identicky) existuje,
@@ -370,7 +374,10 @@ function mapRow(r: SkloRow): SkloPolozka {
 		pocet: r.pocet,
 		typSkla: r.typ_skla,
 		sikmy: r.sikmy === 1,
-		m2: r.m2,
+		// #563: riadky spred #563 (zasklenia/pergola producent m² neukladal) → dopočítaj z rozmerov,
+		// keď je výška (pravouhlé sklo). Uložené m² má prednosť (FIX lichobežník nesie vlastnú plochu);
+		// šikmý bez výšky a bez m² ostáva null (žiadny odhad).
+		m2: r.m2 ?? (r.vyska_mm != null ? m2Tabule(r.sirka_mm, r.vyska_mm, r.pocet) : null),
 		rezim: r.rezim === 'atyp' ? 'atyp' : 'rozmery',
 		typSklaManual: r.typ_skla_manual ?? null,
 		cenaM2Manual: r.cena_m2_manual ?? null,

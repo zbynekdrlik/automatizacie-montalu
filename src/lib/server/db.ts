@@ -207,6 +207,18 @@ export function glassMoneyKod(system: string, nazov: string): string | null {
 	return row?.money_kod ?? null;
 }
 
+/** #563: Money kód skla podľa SAMOTNÉHO názvu — LEN pre display-only Money názov na podklade
+ *  objednávky skla (riadok objednávky systém neukladá, takže `glassMoneyKod` sa nedá zavolať).
+ *  Vráti kód LEN keď je JEDNOZNAČNÝ: presne jeden odlišný non-null `money_kod` pre daný `nazov`
+ *  naprieč riadkami katalógu; viac rôznych kódov (alebo žiadny) → `null` (volajúci ukáže lokálny
+ *  názov — nič sa nehádže). NIKDY sa nepoužíva pre odpis/výpočet (glass-catalog rule). */
+export function glassMoneyKodPodlaNazvu(nazov: string): string | null {
+	const rows = db
+		.prepare('SELECT DISTINCT money_kod FROM glass_types WHERE nazov = ? AND money_kod IS NOT NULL')
+		.all(nazov) as { money_kod: string }[];
+	return rows.length === 1 ? rows[0]!.money_kod : null;
+}
+
 /** Korekcia rozmeru skla nastavená RAZ na (systém × trieda 6/16) — #443, `cfg_sklo_trieda`.
  *  `null` = žiadny override pre túto triedu (padne ďalej na systémovú `cfg_sys.sklo_offset`
  *  — ten fallback ostáva VO compute vrstve, `?? g.skloOffset`, nedotknutý). Rieši alias

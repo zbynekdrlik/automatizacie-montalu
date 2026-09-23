@@ -1,8 +1,9 @@
 // #496: objednávka skla — reálny tok obsluhy: spočítať nárezový plán na /zasklenia,
 // „Pridať sklá do objednávky" (?/pridatSkla), presmerovanie na /objednavka-skla/[zak],
 // pridaná položka viditeľná s reálne dopočítanými rozmermi/počtom/typom skla, a
-// rozmery/atyp prepínač (režim) sprístupní upload vstup. Zápisový tok (píše do
-// objednavka_skla, nie do Money) — skipAkLive na ostrom nasadení preskočí.
+// rozmery/atyp prepínač (režim) sprístupní upload vstup. #563: nadpis podkladu = OP + zákazník
+// (z odpisu), popis riadka len „Zasklenie 1", m² vyplnené. Zápisový tok (objednavka_skla + TESTOVÝ
+// Money priečinok, nikdy ostrý Money) — skipAkLive na ostrom nasadení preskočí.
 import { test, expect } from '@playwright/test';
 import {
 	collectConsole,
@@ -50,6 +51,12 @@ test('zasklenia: spočítať → Pridať sklá do objednávky → podklad s reá
 	expect(pocet).toBeGreaterThan(0);
 	expect(typTxt.length).toBeGreaterThan(0);
 
+	// #563: najprv „uložiť nárezák" (odpis, MONEY_LIVE=0 → testový priečinok) — odpis nesie OP +
+	// zákazníka pre nadpis podkladu; #514: „Pridať sklá" je dostupné aj po odpise.
+	await page.getByTestId('odoslat').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('vysledok')).toBeVisible();
+
 	// #514: „Pridať sklá" už NEpresmeruje preč — ostane výsledok s potvrdením + odkazom;
 	// z odkazu prejdeme na podklad objednávky.
 	await page.getByTestId('pridat-skla').click();
@@ -59,16 +66,25 @@ test('zasklenia: spočítať → Pridať sklá do objednávky → podklad s reá
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
 
-	// podklad objednávky KONKRÉTNEJ zákazky
-	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+	// podklad objednávky KONKRÉTNEJ zákazky; #563: nadpis = OP + zákazník z odpisu (nie ZAK)
+	await expect(page).toHaveURL(new RegExp(`/objednavka-skla/${zak}`));
+	const nadpis = page.getByTestId('objednavka-nadpis');
+	await expect(nadpis).toContainText('Objednávka skla — ');
+	await expect(nadpis).toContainText('01');
+	await expect(nadpis).toContainText('E2E Objednávka skla');
+	await expect(nadpis).not.toContainText(zak);
 
 	const riadok = page.locator('tbody tr').first();
 	await expect(riadok).toBeVisible();
-	await expect(riadok.locator('td').nth(0)).toContainText('Robust 2K'); // popis: system + styl
+	// #563: popis len pozícia (výrobu systém/štýl nezaujíma)
+	await expect(riadok.locator('td').nth(0)).toHaveText('Zasklenie 1');
 	await expect(riadok.locator('td').nth(1)).toContainText(String(sirka));
 	await expect(riadok.locator('td').nth(1)).toContainText(String(vyska));
 	await expect(riadok.locator('td').nth(2)).toContainText(typTxt);
 	await expect(riadok.locator('td').nth(3)).toContainText(String(pocet));
+	// #563: m² vyplnené vopred — odvodené z rozmerov/počtu čítaných z DOM (nie pevný literál)
+	const m2 = (Math.round(((sirka * vyska * pocet) / 1e6) * 1000) / 1000).toFixed(3);
+	await expect(riadok.locator('td').nth(4)).toHaveText(`${m2} m²`);
 
 	// #540: picker typu skla — select v riadku + zdroj zoznamu. Proti preview cieľu (bez Odoo
 	// pripojenia) je zdroj lokálny fallback, nikdy tichý prázdny select.

@@ -13,6 +13,7 @@ import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
 import { normOp, normZak } from './money';
 import { zakazkaOp } from './zakazka-ceny';
 import { listSklaPreZakazku, opPodkladu, listSubory, getSuborData } from './objednavka-skla';
+import { popisPozicie } from '../objednavka-skla-pozicia';
 import {
 	buildGlassOrder,
 	mimetypeZNazvu,
@@ -102,7 +103,8 @@ export function buildGlassOrderForZak(
 		sikmy: p.sikmy,
 		pocet: p.pocet,
 		typSkla: p.typSkla,
-		popis: p.popis,
+		// #563: pozícia „Zasklenie N" aj pre riadky spred zmeny producenta (zhoda s tlačou podkladu)
+		popis: popisPozicie(p.popis, p.modul),
 		mode: p.rezim,
 		typSklaManual: p.typSklaManual,
 		cenaM2Manual: p.cenaM2Manual,

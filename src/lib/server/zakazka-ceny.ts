@@ -149,7 +149,12 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
  * objednávky skla ukazuje na TÚ ISTÚ objednávku ako nahraná `glass_order`).
  */
 export function zakazkaOp(zakRaw: string): string {
-	const p = zakazkaPrehlad(zakRaw);
+	return opZPrehladu(zakazkaPrehlad(zakRaw));
+}
+
+/** #563: OP (live-first) z UŽ načítaného prehľadu — volajúci, ktorý potrebuje aj iné polia prehľadu
+ *  (napr. `zakaznik` pre nadpis podkladu objednávky skla), tak nečíta odpisy dvakrát. */
+export function opZPrehladu(p: ZakazkaPrehlad | null): string {
 	if (!p) return '';
 	return (p.odpisy.find((o) => o.live === 1) ?? p.odpisy[0])?.op ?? '';
 }

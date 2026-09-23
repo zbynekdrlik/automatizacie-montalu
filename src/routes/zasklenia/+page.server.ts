@@ -63,6 +63,7 @@ import {
 } from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
 import { pridajSklaHromadneIdempotentne, type NoveSklo } from '$lib/server/objednavka-skla';
+import { m2Tabule } from '$lib/objednavka-skla-pozicia';
 import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
 import { cennikPopis } from '$lib/server/glass-match';
 
@@ -764,10 +765,12 @@ export const actions = {
 				zak: vstup.zak,
 				op: vstup.op,
 				modul: 'zasklenia',
-				popis: `${r.system} ${r.styl}`,
+				// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
+				popis: 'Zasklenie 1',
 				sirkaMm: r.sklo.sirka,
 				vyskaMm: r.sklo.vyska,
 				pocet: r.sklo.pocet,
+				m2: m2Tabule(r.sklo.sirka, r.sklo.vyska, r.sklo.pocet),
 				typSkla: vstup.skloPresne || vstup.sklo,
 				createdBy: locals.user?.username ?? ''
 			}
@@ -800,10 +803,12 @@ export const actions = {
 			zak: vstup.zak,
 			op: vstup.op,
 			modul: 'zasklenia',
-			popis: `Zasklenie ${i + 1}: ${p.system} ${p.styl}`,
+			// #563: len pozícia „Zasklenie N" (bez systému/štýlu) + m² vopred
+			popis: `Zasklenie ${i + 1}`,
 			sirkaMm: p.sklo.sirka,
 			vyskaMm: p.sklo.vyska,
 			pocet: p.sklo.pocet,
+			m2: m2Tabule(p.sklo.sirka, p.sklo.vyska, p.sklo.pocet),
 			typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
 			createdBy: locals.user?.username ?? ''
 		}));
