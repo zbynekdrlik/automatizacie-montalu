@@ -9,5 +9,6 @@ export function wireStringMember(body: string, name: string): string | null {
 	const m = new RegExp(`<name>${name}</name><value><string>([\\s\\S]*?)</string></value>`).exec(
 		body
 	);
-	return m ? xmlUnescape(m[1]) : null;
+	const raw = m?.[1];
+	return raw === undefined ? null : xmlUnescape(raw);
 }
