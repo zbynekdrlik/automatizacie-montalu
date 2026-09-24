@@ -2,7 +2,9 @@
 // v Montalu Odoo. Šéf ho vidí PRI zákazke v Odoo; ZÁKAZNÍK ho NIKDY nevidí.
 //
 // TVRDÁ PODMIENKA (zákazník to nevidí) — poznámka sa postuje ako Odoo LOG-NOTE:
-//   message_post(subtype_xmlid='mail.mt_note', message_type='comment', partner_ids=[])
+//   message_post(subtype_xmlid='mail.mt_note', message_type='comment', partner_ids=[],
+//                body_is_html=True)   ← #349: bez body_is_html Odoo HTML telo escapuje
+// (volanie ide cez zdieľaný `postInternalHtmlNote` v odoo-rpc.ts).
 // `mail.mt_note` má `internal=true` (overené na prode) → viditeľné LEN interným Odoo
 // používateľom, nikdy portál/e-mail/tlačová zostava/zákazník. `partner_ids=[]` = žiaden
 // follower/notifikácia. „Interné" = všetci interní Odoo používatelia (Sales), nie len šéf
@@ -28,9 +30,9 @@ import {
 	createRecord,
 	executeKw,
 	odooConfig,
+	postInternalHtmlNote,
 	xmlEscape,
-	type OdooConfig,
-	type XmlRpcValue
+	type OdooConfig
 } from './odoo-rpc';
 import { generateZakazkaPdfBase64, zakazkaPdfFilename } from './zakazka-pdf';
 import { normOp, normZak } from './money';
@@ -254,14 +256,8 @@ async function postInternalNote(
 	html: string,
 	attachmentIds: number[] = []
 ): Promise<void> {
-	const kwargs: Record<string, XmlRpcValue> = {
-		body: html,
-		subtype_xmlid: 'mail.mt_note', // internal=true → interné, nikdy k zákazníkovi
-		message_type: 'comment',
-		partner_ids: [] // explicitne prázdne — žiadny follower/notifikácia
-	};
-	if (attachmentIds.length > 0) kwargs.attachment_ids = attachmentIds;
-	await executeKw(cfg, uid, 'sale.order', 'message_post', [[saleOrderId]], kwargs);
+	// #349: zdieľaný helper (body_is_html=true + leak-kontrakt mt_note/partner_ids=[])
+	await postInternalHtmlNote(cfg, uid, 'sale.order', saleOrderId, html, attachmentIds);
 }
 
 /**

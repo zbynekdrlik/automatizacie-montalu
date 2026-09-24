@@ -32,6 +32,23 @@ BEZ `email_from`/notif kwargov. `partner_ids=[]` = žiadny follower/notifikácia
 ceny (predaj/nákup) smú ísť LEN do tejto log-note. Test to stráži POZITÍVNE (kwargy sú)
 aj NEGATÍVNE (žiadny `email_from`/`subtype_id`/neprázdny `partner_ids`).
 
+## `message_post` cez RPC VŽDY `body_is_html: true`, telo SUROVÉ HTML (#349 gk nález)
+
+- **Incident 23.9. 17:40–18:03:** 38 interných poznámok zákaziek na PROD (napr. `mail.message`
+  1856685, OPDL260219) prišlo s ENTITAMI namiesto značiek — výroba v chatteri videla surové
+  `<div><p><strong>…`. Príčina: XML-RPC `message_post` BEZ `body_is_html` → Odoo berie `body`
+  ako plain str a escapuje ho (markupsafe). Rovnaký bug mala aj expedičná poznámka (#419).
+- **JEDINÁ cesta = `postInternalHtmlNote(cfg, uid, model, resId, html, attachmentIds?)`** v
+  `odoo-rpc.ts` — nastaví `body_is_html: true` + leak-kontrakt (`mt_note`, `partner_ids=[]`,
+  `attachment_ids` len keď sú). Používa ju `odoo-zakazka.ts` AJ `expedicia-odoo.ts`. Nový
+  `message_post` NIKDY ručne cez `executeKw` — vždy cez helper.
+- **Telo je SUROVÉ HTML, nikdy pred-escapované** (dvojvrstvové escapovanie nižšie platí: hodnoty
+  `xmlEscape`, tagy literálne; XML-RPC encoder escapuje raz na drôte, Odoo raz dekóduje).
+  Test to číta DEKÓDOVANÉ z drôtu cez `tests/helpers/xmlrpc-wire.ts` (`wireStringMember`).
+- **Staré escapované poznámky sa NEprepisujú** (`mail.message.write` = post-then-rewrite, zakázané,
+  bez bus notifikácie) — nahradí ich ďalšia poznámka pri najbližšom odpise zákazky („nahrádza
+  predchádzajúce"). Hromadné prepostnutie = rozhodnutie ownera.
+
 ## PDF príloha rozpisu materiálu (#418 — rozšírenie #340)
 
 - **Príloha MUSÍ visieť na INTERNEJ `mt_note` správe, nie samostatne na zázname.** PDF rozpisu
