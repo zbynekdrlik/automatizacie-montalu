@@ -4,6 +4,9 @@ paths:
   - 'src/lib/server/odoo-zakazka.ts'
   - 'tests/odoo-rpc.test.ts'
   - 'tests/odoo-zakazka.test.ts'
+  - 'src/lib/server/expedicia-odoo.ts'
+  - 'tests/expedicia-odoo.test.ts'
+  - 'tests/helpers/xmlrpc-wire.ts'
   - 'tests/odpis-written-hook.test.ts'
 ---
 
