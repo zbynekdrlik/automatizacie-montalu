@@ -11,9 +11,9 @@ import {
 	executeKw,
 	createRecord,
 	odooConfig,
+	postInternalHtmlNote,
 	xmlEscape,
-	type OdooConfig,
-	type XmlRpcValue
+	type OdooConfig
 } from './odoo-rpc';
 import { generateExpediciaPdfBase64, expediciaPdfFilename } from './expedicia-pdf';
 import { normOp } from './money';
@@ -94,14 +94,8 @@ export async function pushExpediciaToOdoo(
 			}
 			// Postni internú log-note (s prílohou ak sa podarila, inak bez)
 			try {
-				const kwargs: Record<string, XmlRpcValue> = {
-					body: htmlBody,
-					subtype_xmlid: 'mail.mt_note',
-					message_type: 'comment',
-					partner_ids: []
-				};
-				if (attIds.length > 0) kwargs.attachment_ids = attIds;
-				await executeKw(cfg, uid, 'sale.order', 'message_post', [[orderId]], kwargs);
+				// #349: zdieľaný helper (body_is_html=true + leak-kontrakt mt_note/partner_ids=[])
+				await postInternalHtmlNote(cfg, uid, 'sale.order', orderId, htmlBody, attIds);
 			} catch (e) {
 				// message_post zlyhal PO vytvorení prílohy → best-effort odviazanie osirelej
 				// prílohy (vzor #418 review, odoo-zakazka.ts unlinkAttachments)
