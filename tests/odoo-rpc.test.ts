@@ -10,9 +10,11 @@ import {
 	authenticate,
 	executeKw,
 	createRecord,
+	postInternalHtmlNote,
 	odooConfig,
 	type OdooConfig
 } from '../src/lib/server/odoo-rpc';
+import { wireStringMember } from './helpers/xmlrpc-wire';
 
 const CFG: OdooConfig = { url: 'https://odoo.test', db: 'odoo', login: 'web', apiKey: 'k' };
 
@@ -140,6 +142,57 @@ describe('authenticate + executeKw (mock transport)', () => {
 				'<methodResponse><params><param><value><boolean>0</boolean></value></param></params></methodResponse>'
 		);
 		await expect(createRecord(CFG, 1, 'crm.lead', {})).rejects.toThrow(OdooRpcError);
+	});
+});
+
+// #349: jediné miesto, kde appka postuje internú HTML poznámku — body_is_html VŽDY true,
+// telo surové (nie pred-escapované), leak-kontrakt mt_note + prázdne partner_ids.
+describe('postInternalHtmlNote (#349)', () => {
+	const okInt = (n: number) =>
+		`<methodResponse><params><param><value><int>${n}</int></value></param></params></methodResponse>`;
+
+	it('posiela message_post s body_is_html=true a surovým HTML telom', async () => {
+		let seen = '';
+		setOdooTransport(async (_u, body) => {
+			seen = body;
+			return okInt(77);
+		});
+		await postInternalHtmlNote(CFG, 64, 'sale.order', 53051, '<p><strong>A&amp;B</strong></p>');
+		expect(seen).toContain('<string>sale.order</string>');
+		expect(seen).toContain('<string>message_post</string>');
+		expect(seen).toContain('<value><int>53051</int></value>');
+		expect(seen).toContain(
+			'<member><name>body_is_html</name><value><boolean>1</boolean></value></member>'
+		);
+		expect(wireStringMember(seen, 'body')).toBe('<p><strong>A&amp;B</strong></p>');
+		expect(seen).toContain('<name>subtype_xmlid</name><value><string>mail.mt_note</string>');
+		expect(seen).toContain('<name>message_type</name><value><string>comment</string>');
+		expect(seen).toContain('<name>partner_ids</name><value><array><data></data></array></value>');
+		expect(seen).not.toContain('attachment_ids');
+		expect(seen).not.toContain('email_from');
+		expect(seen).not.toContain('subtype_id');
+	});
+
+	it('attachment_ids pribudnú len keď sú', async () => {
+		let seen = '';
+		setOdooTransport(async (_u, body) => {
+			seen = body;
+			return okInt(78);
+		});
+		await postInternalHtmlNote(CFG, 64, 'sale.order', 1, '<p>x</p>', [8801, 8802]);
+		expect(seen).toContain(
+			'<name>attachment_ids</name><value><array><data><value><int>8801</int></value><value><int>8802</int></value></data></array></value>'
+		);
+	});
+
+	it('Odoo fault prepadne von (volajúci rieši retry/unlink)', async () => {
+		setOdooTransport(
+			async () =>
+				'<methodResponse><fault><value><struct><member><name>faultCode</name><value><int>1</int></value></member><member><name>faultString</name><value><string>denied</string></value></member></struct></value></fault></methodResponse>'
+		);
+		await expect(postInternalHtmlNote(CFG, 64, 'sale.order', 1, '<p>x</p>')).rejects.toThrow(
+			OdooRpcError
+		);
 	});
 });
 

@@ -20,6 +20,7 @@ const { buildZakazkaNote, buildZakazkaNoteHtml, pushZakazkaToOdoo, queueZakazkaP
 	await import('../src/lib/server/odoo-zakazka');
 const { zakazkaPrehlad } = await import('../src/lib/server/zakazka-ceny');
 const zakazkaPdf = await import('../src/lib/server/zakazka-pdf');
+const { wireStringMember } = await import('./helpers/xmlrpc-wire');
 
 let nextId = 70001;
 function seedOdpis(opts: {
@@ -403,5 +404,32 @@ describe('Money-neutralita', () => {
 		expect(src).not.toMatch(/writeOdpis\s*\(/); // žiadne VOLANIE writeOdpis
 		expect(src).not.toMatch(/fs\.(write|append|mkdir|rename|open)/);
 		expect(src).not.toMatch(/process\.env\.MONEY_LIVE|isLive\s*\(/); // žiadny prístup k MONEY_LIVE
+	});
+});
+
+// ---- #349: HTML telo poznámky sa v Odoo NESMIE escapovať ------------------------------
+// Incident 23.9.: 38 poznámok na PROD prišlo s entitami namiesto značiek — XML-RPC
+// poznámka bez body_is_html=True → Odoo plain str escapuje (markupsafe).
+describe('pushZakazkaToOdoo — body_is_html (#349)', () => {
+	it('kwargs nesú body_is_html=true a telo je SUROVÉ HTML (nie pred-escapované)', async () => {
+		enableOdoo();
+		seedOdpis({
+			zak: 'ZAKHTML349',
+			op: 'OP349349',
+			polozky: [{ kod: 'K349', nazov: 'Profil 349', qty: 3 }]
+		});
+		let postedBody = '';
+		setOdooTransport(mockOdoo({ searchIds: [34901], onPost: (b) => (postedBody = b) }));
+		expect(await pushZakazkaToOdoo('ZAKHTML349', 'OP349349')).toBe('posted');
+		expect(postedBody).toContain(
+			'<member><name>body_is_html</name><value><boolean>1</boolean></value></member>'
+		);
+		const html = wireStringMember(postedBody, 'body');
+		expect(html).not.toBeNull();
+		expect(html).toMatch(/^<div><p><strong>Interný zoznam materiálu k zákazke<\/strong><\/p>/);
+		expect(html).toContain('<table');
+		expect(html).toContain('Profil 349');
+		// nikdy pred-escapované značky (to by Odoo zobrazilo ako text)
+		expect(html).not.toMatch(/&lt;(div|p|table|strong)/);
 	});
 });
