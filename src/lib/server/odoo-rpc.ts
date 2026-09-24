@@ -245,3 +245,30 @@ export async function createRecord(
 		throw new OdooRpcError(`Odoo create ${model} nevrátil id (dostal: ${JSON.stringify(res)})`);
 	return res;
 }
+
+/**
+ * #349: JEDINÁ cesta, ktorou appka postuje INTERNÚ HTML log-note (`mail.mt_note`) na záznam.
+ * `body_is_html: true` je POVINNÉ — bez neho Odoo `message_post` berie plain str a escapuje ho
+ * (markupsafe) → v chatteri sa zobrazia surové značky (PROD incident 23.9.: 38 poznámok zákaziek).
+ * `html` je SUROVÉ HTML (štruktúrne tagy literálne, dynamické hodnoty už `xmlEscape`-nuté volajúcim);
+ * NIKDY ho pred-escapovať. Leak-kontrakt #340: `mt_note` (internal=true) + prázdne `partner_ids`,
+ * žiadny `email_from`. `attachment_ids` pribudne len keď je čo naviazať (#418).
+ */
+export async function postInternalHtmlNote(
+	cfg: OdooConfig,
+	uid: number,
+	model: string,
+	resId: number,
+	html: string,
+	attachmentIds: number[] = []
+): Promise<void> {
+	const kwargs: Record<string, XmlRpcValue> = {
+		body: html,
+		body_is_html: true,
+		subtype_xmlid: 'mail.mt_note', // internal=true → interné, nikdy k zákazníkovi
+		message_type: 'comment',
+		partner_ids: [] // explicitne prázdne — žiadny follower/notifikácia
+	};
+	if (attachmentIds.length > 0) kwargs.attachment_ids = attachmentIds;
+	await executeKw(cfg, uid, model, 'message_post', [[resId]], kwargs);
+}

@@ -12,6 +12,7 @@ process.env.ODOO_LEAD_API_KEY = 'test-key-fake';
 
 const { setOdooTransport } = await import('../src/lib/server/odoo-rpc');
 const { pushExpediciaToOdoo } = await import('../src/lib/server/expedicia-odoo');
+const { wireStringMember } = await import('./helpers/xmlrpc-wire');
 
 const IDENT = { zak: 'ZAK2026500', op: 'OP260500', zakaznik: 'Test s.r.o.' };
 
@@ -169,5 +170,22 @@ describe('pushExpediciaToOdoo (#419)', () => {
 		const r = await pushExpediciaToOdoo(baseZoznam, IDENT);
 		expect(r.result).toBe('failed');
 		expect(unlinkCalled).toBe(true);
+	});
+});
+
+// #349: HTML telo expedičnej poznámky sa v Odoo NESMIE escapovať (body_is_html=True).
+describe('pushExpediciaToOdoo — body_is_html (#349)', () => {
+	it('kwargs nesú body_is_html=true a telo je SUROVÉ HTML (nie pred-escapované)', async () => {
+		let postBody = '';
+		setOdooTransport(mockOdoo({ searchIds: [42], onPost: (b) => (postBody = b) }));
+		const r = await pushExpediciaToOdoo(baseZoznam, IDENT);
+		expect(r.result).toBe('posted');
+		expect(postBody).toContain(
+			'<member><name>body_is_html</name><value><boolean>1</boolean></value></member>'
+		);
+		const html = wireStringMember(postBody, 'body');
+		expect(html).not.toBeNull();
+		expect(html).toMatch(/^<div><p><strong>Expedičný zoznam<\/strong><\/p>/);
+		expect(html).not.toMatch(/&lt;(div|p|table|strong)/);
 	});
 });
