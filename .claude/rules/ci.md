@@ -1,6 +1,9 @@
 ---
 paths:
   - ".github/workflows/*.yml"
+  - "scripts/mutation-*.sh"
+  - "tests/mutation-*.test.ts"
+  - "stryker.config.json"
 ---
 
 # CI workflow gotchas
