@@ -112,6 +112,30 @@ describe('scripts/mutation-lines.sh (mutation.yml diff-scope na riadky)', () => 
 		expect(lines('')).toEqual([]);
 	});
 
+	it('riadok tela hunku `++ x` / `-- x` (vyzerá ako ---/+++) nezmätie hlavičku súboru', () => {
+		const diff = `diff --git a/src/lib/c.ts b/src/lib/c.ts
+index 1111111..2222222 100644
+--- a/src/lib/c.ts
++++ b/src/lib/c.ts
+@@ -3 +3 @@
+--- /dev/null
++++ /dev/null
+@@ -9,0 +10,2 @@
++++ b/iny.ts
++x
+`;
+		expect(lines(diff)).toEqual(['src/lib/c.ts:3-3', 'src/lib/c.ts:10-11']);
+	});
+
+	it('nečitateľná hlavička hunku = chyba (nie tichý prázdny scope)', () => {
+		const diff = `diff --git a/src/lib/c.ts b/src/lib/c.ts
+--- a/src/lib/c.ts
++++ b/src/lib/c.ts
+@@ pokazene @@
+`;
+		expect(() => lines(diff)).toThrow();
+	});
+
 	// Integračný test na skutočnom `git diff -U0` (nie ručne písaný fixture) —
 	// chráni pred rozchodom medzi fixture a reálnym formátom gitu.
 	const dirs: string[] = [];
