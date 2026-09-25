@@ -5,6 +5,9 @@ paths:
   - 'src/routes/sietka/**'
   - 'src/lib/components/zasklenia/PlanKarty.svelte'
   - 'src/lib/components/zasklenia/PlanKartyMulti.svelte'
+  - 'src/lib/sietka-standard.ts'
+  - 'src/lib/server/migracie-sietka.ts'
+  - 'tests/sietka-standard*.test.ts'
 ---
 
 # Sieťka (moskytiéra) — jokle, honest-null, jeden zdroj vzorca
@@ -13,6 +16,36 @@ Doména sieťky je rozliata cez `sietka.ts` (čisté helpery + konštanty) → `
 (samostatná /sietka výpočet + multi) → `compute-odpis.ts` (sieťka NA posuve, Money delta)
 → UI karty `PlanKarty`/`PlanKartyMulti` + route `/sietka`. Historické korekcie sú v hlavičke
 `sietka.ts` (#86–#110) a v `tests/compute.test.ts` (kontraktové Money vektory).
+
+## Sieťka Štandard / Štandard + — geometrický model z RÁMU posuvu (#569, Patrik Odoo úloha 1070)
+
+- **JEDEN zdroj vzorca: `src/lib/sietka-standard.ts`** (čistý, client-safe). Server volá
+  `sietovinaPre` (`compute-sietka.ts`) → `ComputeResult.sietovina` / `PosuvInfo.sietovina`;
+  `PlanKarty`/`PlanKartyMulti` len ZOBRAZIA `p.sietovina` (klient nič nepočíta). Robust/Slide
+  ostávajú `rozmerSietoviny` = sklo +2/+1 cez tú istú `sietovinaPre`.
+- **Vzorec:** kladkový sieťky = kladkový posuvu + Δkríž; šírka sieťoviny = kladkový posuvu
+  (NEzaokrúhlený, `val(...,true)`) + Δkríž + R; výška = ZÁKLADNÉ (ne-IZO) sklo V toho istého
+  systému/štýlu (`cfg[system|zakladnyStyl(styl)]`, bez per-sklo korekcie) + H. Zaokrúhli RAZ na
+  konci. Δkríž (`krizDelta`) = **+K** Š+ posuv + stará sieťka, **−K** starý posuv + sieťka plus,
+  0 rovnaká rodina — TEN ISTÝ Δ ide do Money rezu kladkového (`sietkaStandardExtra`).
+- **Prečo NIE zo skla:** IZO sklo má rozširovací profil (ZASP202439), ktorý do sieťky nejde → IZO
+  sklo je o 23 × 20 mm menšie a sieťka „sklo +3/+3" (#110, zrušená `rozmerSietovinyStandard`/
+  `rozmerSietovinyPre`) vyšla malá. Nikdy neodvádzaj sieťku Štandard znovu zo `sklo`.
+- **Konštanty K/R/H** (seed 16,5 / 17 / 3) sú v tabuľke `cfg_sietka_standard` (migrácia v50,
+  `migracie-sietka.ts`), `loadCfg` ich nesie v `Cfg` pod symbolom `SIETKA_STANDARD_CFG` (čítaj
+  `sietkaStandardParams(cfg)`; ručne postavené cfg v testoch = seed). Editor `/zasklenia/nastavenia`
+  sekcia „Sieťka Štandard" (len pri Štandard-rodine) → `saveCfgChanges({ sietkaStandard })` s
+  auditom. **R = 17 je konštantné pre VŠETKY štýly** (seed: základné sklo S − kladkový S = 14 mm
+  pre každé N 2K–6K aj opona, sieťovina = sklo + 3) — keď by nový štýl mal iný vzťah sklo/kladkový,
+  sieťka Štandard by preň nesedela: over pred pridaním štýlu (`tests/sietka-standard-569.test.ts`
+  A/E parita cez všetky štýly to chytí).
+- **Money:** mení LEN K (kladkový ZASP202415 pri krížovej sieťke). Issue 416 malo +16,5 oboma
+  smermi (zlé čítanie) — #569 opravil starý posuv + sieťka plus na −K (seed 3K 3000: 969 → 936).
+  Guard `tests/sietka-standard-569.test.ts`: tabuľka 8 buniek + odpis fixtúra
+  `tests/fixtures/sietka-standard-odpis-569.json` (zachytená PRED zmenou). Tabuľka 3K 3000 × 1850:
+  A/B 960×1738, C/D 976×1738, E/F 969×1738, G/H 953×1738 (C/D = 942,5+16,5 = 959 + 17 = 976).
+- **E2E relačne** (PROD cfg upravuje editor): kladkový sieťky > / < rez posuvu podľa smeru,
+  sieťovina pri IZO skle == pri základnom (`e2e/sietka-standard.spec.ts`), nikdy seed mm.
 
 ## Jokle Robust (#555, Patrik Odoo úloha 1010)
 
