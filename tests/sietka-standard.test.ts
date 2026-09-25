@@ -12,7 +12,7 @@
 //                nedotknuté.
 import { describe, it, expect } from 'vitest';
 import { parseSietka, sanitizeSietka } from '../src/lib/server/vstup';
-import { maSietkaSystemVyber, SIETKA_SYSTEM_ALT, rozmerSietovinyPre } from '../src/lib/sietka';
+import { maSietkaSystemVyber, SIETKA_SYSTEM_ALT } from '../src/lib/sietka';
 import {
 	buildCFG,
 	computeFlat,
@@ -121,18 +121,21 @@ describe('#110 — sieťka INÉHO systému (Štandard ↔ Štandard +), Patrikov
 		]);
 	});
 
-	it('opačný smer (plus sieťka na starom posuve) je tiež +16,5mm VÄČŠIA — POTVRDENÉ Patrikom (#416, kanál 207 msg 1777560: „štandard + a starý štandard … sieťka musí byť +16mm väčšia"), NIE symetrický −16,5', () => {
+	it('opačný smer (plus sieťka na starom posuve) je o K = 16,5mm MENŠIA voči posuvu (#569, Patrik úloha 1070 — čítanie z #416 bolo chybné)', () => {
 		const so = computeFlat(cfg, 'Štandard|3K', 3000, 1850, false, 0, false, undefined, {
 			uchyt: 'ziadny',
 			system: 'Štandard +'
 		})!;
 		const rezy = (kod: string) => so.material.find((m) => m.kod === kod)?.rezy;
-		// starého posuvu vlastná šírka (952 = round((3000-143)/3)) + 2 ks +16,5mm →
-		// round(952,33+16,5) = 969. Patrikova výroba: kríž systémov = sieťka VŽDY
-		// väčšia, v OBOCH smeroch (nie menšia ako pôvodný nepotvrdený symetrický −16,5).
+		// #569: Patrik (1070) „starý štandard sieťka plus ZASP202415 … má byť o 16mm menšia voči
+		// posuvu" — plus rám je o 16,5 mm širší (koncový 54,5 vs 38), takže kladkový sieťky musí
+		// byť o K KRATŠÍ, aby vyšlo to isté okno. Issue 416 (msg 1777560) čítal „+16mm väčšia" ako
+		// kladkový +16,5 aj v tomto smere — Patrik tam myslel šírku SIEŤOVINY v opačnej bunke.
+		// starého posuvu vlastná šírka (952 = round((3000-143)/3)) + 2 ks −16,5mm →
+		// round(952,33−16,5) = 936.
 		expect(rezy('ZASP202415')).toEqual([
 			{ rozmer: 952, ks: 6 },
-			{ rozmer: 969, ks: 2 }
+			{ rozmer: 936, ks: 2 }
 		]);
 		expect(rezy('ZASP20244')).toEqual([{ rozmer: 1817, ks: 1 }]); // plus koncový, nový riadok
 		expect(rezy('ZASP202419')).toEqual([{ rozmer: 1841, ks: 1 }]); // plus doraz, nový riadok
@@ -201,11 +204,19 @@ describe('#110 — IZO sklo: sieťka ide BEZ rozširujúceho profilu (msg #16162
 	});
 });
 
-describe('#110 — sklo tabuľky: riadok „sieťka" (+3mm šírka, +3mm výška) LEN pre Štandard-rodinu', () => {
-	it('rozmerSietovinyPre: Štandard-rodina používa +3/+3, Robust/Slide +2/+1', () => {
-		expect(rozmerSietovinyPre('Štandard +', 957, 1735)).toEqual({ sirka: 960, vyska: 1738 });
-		expect(rozmerSietovinyPre('Štandard', 957, 1735)).toEqual({ sirka: 960, vyska: 1738 });
-		expect(rozmerSietovinyPre('Robust', 957, 1735)).toEqual({ sirka: 959, vyska: 1736 });
+describe('#569 — rozmer sieťoviny: Štandard-rodina z modelu rámu, Robust/Slide sklo +2/+1', () => {
+	it('computeFlat nesie `sietovina` — Štandard + rovnaký systém 960×1738, Robust sklo +2/+1', () => {
+		// #569 nahradil sklo +3/+3 (`rozmerSietovinyPre`) modelom z kladkového posuvu:
+		// 942,5 + R 17 = 959,5 → 960; výška = základné sklo 1735 + H 3 = 1738.
+		// Celá tabuľka 8 kombinácií: tests/sietka-standard-569.test.ts.
+		const std = computeFlat(cfg, 'Štandard +|3K', 3000, 1850, false, 0, false, undefined, {
+			uchyt: 'ziadny'
+		})!;
+		expect(std.sietovina).toEqual({ sirka: 960, vyska: 1738 });
+		const rob = computeFlat(cfg, 'Robust|3K', 3000, 1850, false, 0, false, undefined, {
+			uchyt: 'ziadny'
+		})!;
+		expect(rob.sietovina).toEqual({ sirka: rob.sklo.sirka + 2, vyska: rob.sklo.vyska + 1 });
 	});
 });
 
