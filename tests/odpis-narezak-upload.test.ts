@@ -27,6 +27,7 @@ const { writeOdpis } = await import('../src/lib/server/money');
 const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
 const { loadCfg } = await import('../src/lib/server/db');
 const { recomputeVstup } = await import('../src/lib/server/zasklenia-sklo');
+const { uploadNarezakZOdpisu } = await import('../src/lib/server/odoo-narezak-odpis');
 import type { OdpisJob, Modul } from '../src/lib/server/money';
 import type { Vstup } from '../src/lib/server/vstup';
 
@@ -207,5 +208,78 @@ describe('#570 ostrý odpis → nárezák (lines) na kiosk „Čo rezať"', () =
 		expect(out.status).toBe('written');
 		await settle();
 		expect(narezakCalls(calls)).toHaveLength(0);
+	});
+});
+
+// Priame výsledky `uploadNarezakZOdpisu` (vetvy skip/no-order/failed). Odpisy sa zapíšu s VYPNUTÝM
+// uploadom (hook nič nepošle), potom sa upload zapne a funkcia sa zavolá priamo.
+describe('#570 uploadNarezakZOdpisu — výsledky vetiev', () => {
+	async function zapisBezUploadu(job: OdpisJob) {
+		vi.stubEnv('MONEY_LIVE', '1');
+		vi.stubEnv('ODOO_NAREZ_UPLOAD_ENABLED', '0');
+		const out = await writeOdpis(job, {});
+		expect(out.status).toBe('written');
+		await settle();
+		enableOdoo('1');
+	}
+
+	it('uploaded → vráti počet riadkov a doc_id per OP', async () => {
+		await zapisBezUploadu(pergolaJob('ZAK570G', 'OP570007'));
+		const calls = captureTransport();
+		const r = await uploadNarezakZOdpisu('ZAK570G', '570007');
+		expect(r).toMatchObject({ result: 'uploaded', docId: 'backfill-narezak-op570007' });
+		expect(r.riadkov).toBeGreaterThan(0);
+		expect(narezakCalls(calls)).toHaveLength(1);
+	});
+
+	it('chýba JSON-2 konfigurácia → disabled, žiadne volanie', async () => {
+		enableOdoo('1');
+		vi.stubEnv('ODOO_JSON2_API_KEY', '');
+		const calls = captureTransport();
+		expect(await uploadNarezakZOdpisu('ZAK570G', 'OP570007')).toEqual({ result: 'disabled' });
+		expect(calls).toHaveLength(0);
+	});
+
+	it('OP len s bazénom (mimo záberu rozpisu rezov) → no-odpis', async () => {
+		await zapisBezUploadu({
+			...pergolaJob('ZAK570H', 'OP570008'),
+			modul: 'bazen',
+			cakaSubdir: 'Bazen',
+			detail: {}
+		});
+		const calls = captureTransport();
+		expect(await uploadNarezakZOdpisu('ZAK570H', 'OP570008')).toEqual({ result: 'no-odpis' });
+		expect(calls).toHaveLength(0);
+	});
+
+	it('pergola rezervačný odpis (lossy detail) → no-lines, nič sa neposiela', async () => {
+		await zapisBezUploadu({
+			...pergolaJob('ZAK570I', 'OP570009'),
+			detail: { rezervacia: true }
+		});
+		const calls = captureTransport();
+		expect(await uploadNarezakZOdpisu('ZAK570I', 'OP570009')).toEqual({ result: 'no-lines' });
+		expect(calls).toHaveLength(0);
+	});
+
+	it('Odoo montalu_order_not_found → no-order (nie chyba)', async () => {
+		await zapisBezUploadu(pergolaJob('ZAK570J', 'OP570010'));
+		setJson2Transport(
+			(async () =>
+				new Response('UserError: montalu_order_not_found: objednávka nie je v Odoo', {
+					status: 422
+				})) as typeof fetch
+		);
+		const r = await uploadNarezakZOdpisu('ZAK570J', 'OP570010');
+		expect(r.result).toBe('no-order');
+		expect(r.error).toMatch(/montalu_order_not_found/);
+	});
+
+	it('Odoo 500 → failed so správou', async () => {
+		await zapisBezUploadu(pergolaJob('ZAK570K', 'OP570011'));
+		captureTransport(500);
+		const r = await uploadNarezakZOdpisu('ZAK570K', 'OP570011');
+		expect(r.result).toBe('failed');
+		expect(r.error).toMatch(/HTTP 500/);
 	});
 });
