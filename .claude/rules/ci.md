@@ -233,6 +233,11 @@ vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `threshol
     parser predpokladá `a/`/`b/` prefixy — `diff.noprefix`/`diff.mnemonicPrefix`/`diff.external`
     v configu by ho inak rozbili. Parser je POSIX awk (runner Ubuntu = **mawk**): žiadne
     gawk-izmy (`length(pole)`), allowlist cez `ENVIRON`, nie `-v`.
+  - **PASCA — `run:` bez `shell:` beží `bash -e {0}` BEZ `pipefail`.** Zlyhaný/useknutý
+    `git diff` v `$(git diff … | bash scripts/mutation-lines.sh …)` by dal prázdny/čiastočný
+    scope a ZELENÝ shard (fail-open). `scope` krok má preto `shell: bash` (= `bash -eo
+    pipefail {0}`), strážené testom zapojenia. Prázdny allowlist (len prázdne argumenty)
+    = nič na mutovanie, NIE „bez filtra = všetko".
   - **Zámerná cena:** Stryker zaradí mutant len ak CELÝ leží v jednom rozsahu — mutant
     presahujúci nezmenené riadky (napr. blok okolo jednoriadkovej zmeny) a čisté zmazania PR
     gate netestuje; dobieha ich on-demand `mutation-sweep`. Sharding váži stále celé súbory

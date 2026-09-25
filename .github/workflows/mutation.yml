@@ -53,6 +53,9 @@ jobs:
           fetch-depth: 0
       - name: Zisti zmenené src/lib/**/*.ts oproti main a vyber shard
         id: scope
+        # `shell: bash` = `bash -eo pipefail {0}` (default `run:` je `bash -e {0}`
+        # BEZ pipefail) — zlyhaný `git diff | mutation-lines.sh` nesmie dať zelený shard.
+        shell: bash
         run: |
           git fetch origin +refs/heads/main:refs/remotes/origin/main
           # Vylúč DÁTOVÉ/DDL súbory z mutácie (exclude_globs, airuleset mutation-testing):

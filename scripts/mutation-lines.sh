@@ -35,6 +35,13 @@ set -euo pipefail
 MUTATION_LINES_ALLOW=""
 if [ "$#" -gt 0 ]; then
 	MUTATION_LINES_ALLOW=$(printf '%s\n' "$@")
+	# Allowlist ZADANÝ, ale bez jedinej neprázdnej cesty → nič na mutovanie
+	# (nie „bez filtra = všetko"). Stdin aj tak dočítaj, nech producent diffu
+	# nedostane SIGPIPE (pod pipefail by to shodilo step).
+	if [ -z "${MUTATION_LINES_ALLOW//[[:space:]]/}" ]; then
+		cat >/dev/null
+		exit 0
+	fi
 fi
 export MUTATION_LINES_ALLOW
 
