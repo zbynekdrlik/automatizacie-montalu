@@ -15,7 +15,6 @@
 	import { klinPopis } from '$lib/klin';
 	import {
 		sietkaPopis,
-		rozmerSietovinyPre,
 		sietkaStrana,
 		potrebuje3KKolajnicu,
 		popis3KKolajnicaVymena,
@@ -137,7 +136,7 @@
 		<div class="sec">Sieťky — v Money odpise</div>
 		{#each m.posuvy as pv, i (i)}
 			{#if pv.sietka}
-				{@const rozmer = rozmerSietovinyPre(pv.system, pv.sklo.sirka, pv.sklo.vyska)}
+				{@const rozmer = pv.sietovina}
 				{@const pridavnaHint = pridavnaKolajnicaHint(
 					pv.system,
 					pv.styl,
@@ -150,7 +149,7 @@
 							· strana {sietkaStrana(pv.otvaranie ?? '')}{/if}</span
 					><b>{sietkaPopis(pv.sietka, rozmer)}</b>
 				</div>
-				{#if jeJokleSystem(pv.system)}
+				{#if jeJokleSystem(pv.system) && rozmer}
 					{@const jokle = rozmerJokle(rozmer)}
 					<p class="sub" data-testid={`sietka-jokle-multi-${i}`}>
 						Jokel 12x8: šírka {jokle.ks} ks {jokle.sirka}, výška {jokle.ks} ks {jokle.vyska} — bez Money

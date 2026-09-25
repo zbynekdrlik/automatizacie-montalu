@@ -449,11 +449,13 @@ nabudúce, keď treba pridať „ešte jedno z toho istého":
   = {sirka: skloS+2, vyska: skloV+1}` (Patrik, potvrdené jeho fotom vlastného
   nárezáka — sklo 1063×1795 → sieťka 1065×1796). Do Money odpisu NEJDE (appka len
   vypíše na tlač) — nepliesť s krídla dĺžkou rezu vyššie (tá je z RÁMOVÉHO profilu,
-  nie zo skla). Tento offset je SYSTÉM-ŠPECIFICKÝ, nie univerzálny — Štandard/
-  Štandard + majú vlastnú formulu `rozmerSietovinyStandard = {sirka: skloS+3,
-  vyska: skloV+3}` (#110, jeho Štandard+ nárezák: sklo 957×1735 → sieťka
-  960×1738) — INÁ delta ako Robust/Slide vyššie. Nový systém nikdy nededí túto
-  formulu automaticky.
+  nie zo skla). Tento offset je SYSTÉM-ŠPECIFICKÝ, nie univerzálny. **Štandard/
+  Štandard + od #569 sieťovinu ZO SKLA NEPOČÍTAJÚ** (pôvodná `rozmerSietovinyStandard`
+  = sklo +3/+3 z #110 je zrušená): IZO sklo má rozširovací profil, ktorý do sieťky
+  nejde, takže sieťka zo skla vyšla pri IZO o 23 × 20 mm malá. Model z RÁMU posuvu
+  (`$lib/sietka-standard`, na serveri `sietovinaPre` → `ComputeResult.sietovina`):
+  šírka = kladkový posuvu ± K + R, výška = základné (ne-IZO) sklo V + H — pozri §5c
+  posledný bod. Nový systém nikdy nededí žiadnu formulu automaticky.
 
 ## 5c. Sieťka na ĎALŠOM systéme (#110/#90, 2026-08-03) — keď „počítadlo kusov" prestane stačiť
 
@@ -503,6 +505,18 @@ zopakovať pri ĎALŠOM systéme so sieťkou (alebo inou "delta rolí"):
   IDENTICKÉ ostatné role (over v `cfg_seed.json`: krajová/nos/dorazová majú v
   „…IZO" skupine ROVNAKÉ hodnoty ako v základnej), takže presné regexy exkluzívne
   na role automaticky vylúčia len ten JEDEN riadok, ktorý sieťka nemá dostať.
+- **Krížová delta kladkového má ZNAMIENKO podľa smeru (#569, Patrik Odoo úloha 1070)
+  — Money-relevantné.** Plus rám je o 16,5 mm širší (koncový 54,5 vs starý 38, nos 33
+  oba), takže pri tom istom kladkovom by okná nesedeli: Š+ posuv + stará sieťka →
+  kladkový sieťky **+K**, starý posuv + sieťka plus → **−K**, rovnaká rodina 0
+  (`krizDelta`). Issue 416 (PR 433) zapísal +16,5 v OBOCH smeroch podľa správy 1777560
+  („sieťka musí byť +16mm väčšia") — Patrik tam myslel šírku SIEŤOVINY v opačnej bunke,
+  nie kladkový. Poučenie: keď klient hovorí „väčšia/menšia", over, ČO presne (profil
+  do Money vs látka mimo Money) a v KTOREJ kombinácii — jedna veta ≠ symetrické pravidlo.
+  K/R/H žijú v `cfg_sietka_standard` (v50) a mení ich editor vzorcov s auditom; Money
+  mení LEN K (kladkový ZASP202415 pri krížovej sieťke). Guard: `tests/sietka-standard-569.test.ts`
+  (tabuľka 8 buniek + odpis fixtúra pred zmenou — mení sa len kladkový v starý posuv +
+  sieťka plus).
 
 ## 5d. `buildPosuvSpec()` — pridávaj NOVÉ pole PosuvSpec TU, nie do `compute()`/`computeMultiFrom()` priamo (#109)
 

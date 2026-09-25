@@ -14,7 +14,6 @@ import {
 	maSietkaSystem,
 	uchytLabel,
 	rozmerSietoviny,
-	rozmerSietovinyStandard,
 	type SietkaUchyt
 } from '../src/lib/sietka';
 import {
@@ -390,11 +389,10 @@ describe('rozmerSietoviny — Patrik 2026-08-02, potvrdené foto z nárezáka', 
 	});
 });
 
-describe('rozmerSietovinyStandard — #110, Patrikov Štandard+ nárezák (msg #1616284)', () => {
-	it('sklo +3mm šírka, +3mm výška (sklo 957×1735 → sieťka 960×1738)', () => {
-		expect(rozmerSietovinyStandard(957, 1735)).toEqual({ sirka: 960, vyska: 1738 });
-	});
-});
+// #569: `rozmerSietovinyStandard` (sklo +3/+3) ZRUŠENÝ — sieťka Štandard sa neodvíja od skla
+// (IZO sklo je o 23 × 20 mm menšie, rozširovací profil do sieťky nejde), ale od rámu posuvu:
+// model `$lib/sietka-standard` (tests/sietka-standard-model.test.ts, -569.test.ts). Pôvodný
+// vektor 957×1735 → 960×1738 ostáva pravdivý pre bunku A a je pinovaný v -569 tabuľke.
 
 describe('sietkaPopis — jeden riadok do plánu a histórie', () => {
 	it('vypíše rozmer sieťoviny (odvodený zo skla) a úchyt', () => {

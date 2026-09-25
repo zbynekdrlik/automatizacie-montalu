@@ -39,6 +39,7 @@ import {
 	migrateMoneyDlv,
 	migrateObjednavkaSklaManual
 } from './migracie-seed';
+import { migrateSietkaStandard } from './migracie-sietka';
 
 const log = logger('migrate');
 
@@ -961,6 +962,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateOponaIzo(db, bump); // v46→v47 (#504 round 3, Štandard+ opona IZO nárezák)
 	migrateObjednavkaSklaSpec(db, bump); // v47→v48 (#521 objednávka skla spec pre IZOS oceňovanie)
 	migrateObjednavkaSklaManual(db, bump); // v48→v49 (#548 objednávka skla „iné sklo" — vlastný typ + cena/m²)
+	migrateSietkaStandard(db, bump); // v49→v50 (#569 sieťka Štandard K/R/H; vlastný súbor — seed na strope)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }
