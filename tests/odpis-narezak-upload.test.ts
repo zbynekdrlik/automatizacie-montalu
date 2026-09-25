@@ -211,6 +211,63 @@ describe('#570 ostrý odpis → nárezák (lines) na kiosk „Čo rezať"', () =
 	});
 });
 
+// Review 🟡 (#570): dva odpisy tej istej OP rýchlo po sebe → dva súbežné uploady; starší (len modul A)
+// mohol doraziť do Odoo PO novšom (A+B) a keďže lines nahrádzajú všetky riadky objednávky, tablet by
+// ukázal len A. Uploady jednej OP musia ísť SÉRIOVO a posledný musí niesť aktuálny stav (A+B).
+describe('#570 súbeh dvoch odpisov tej istej OP', () => {
+	it('uploady jednej OP idú sériovo a posledný nesie riadky OBOCH modulov', async () => {
+		enableOdoo('1');
+		const bodies: Record<string, unknown>[] = [];
+		let naraz = 0;
+		let maxNaraz = 0;
+		setJson2Transport((async (url: string, init?: RequestInit) => {
+			if (String(url).endsWith('/sale.order/montalu_narezak_upload')) {
+				naraz++;
+				maxNaraz = Math.max(maxNaraz, naraz);
+				bodies.push(JSON.parse(String(init?.body ?? '{}')));
+				await new Promise((r) => setTimeout(r, 150));
+				naraz--;
+			}
+			return new Response(JSON.stringify({ lines_created: 1 }), { status: 200 });
+		}) as typeof fetch);
+
+		await writeOdpis(pergolaJob('ZAK570R', 'OP570020'), {});
+		// nech prvý upload reálne beží (je vo „výrobe" v Odoo), kým príde druhý odpis
+		await vi.waitFor(() => expect(bodies).toHaveLength(1), { timeout: 3000 });
+		await writeOdpis(zaskleniaJob('ZAK570R', 'OP570020'), {});
+		await writeOdpis({ ...pergolaJob('ZAK570R', 'OP570020'), modul: 'fix', cakaSubdir: 'Fix' }, {});
+
+		await vi.waitFor(
+			() => {
+				expect(naraz).toBe(0);
+				const posledny = bodies[bodies.length - 1]!;
+				const lines = posledny.lines as { nazov: string }[];
+				expect(lines.some((l) => l.nazov === 'Profil A')).toBe(true);
+				expect(lines.length).toBeGreaterThan((bodies[0]!.lines as unknown[]).length);
+			},
+			{ timeout: 4000 }
+		);
+		await settle();
+		expect(maxNaraz).toBe(1);
+		// koalescencia: 3 odpisy → najviac 2 uploady (bežiaci + jeden zlúčený dobeh), nie 3 paralelné
+		expect(bodies.length).toBeLessThanOrEqual(2);
+	});
+
+	it('payload na kiosk nenesie ceny — riadky majú len polia RozpisLine, žiadne €', async () => {
+		enableOdoo('1');
+		const calls = captureTransport();
+		await writeOdpis(zaskleniaJob('ZAK570S', 'OP570021'), {});
+		await vi.waitFor(() => expect(narezakCalls(calls)).toHaveLength(1), { timeout: 3000 });
+		const body = narezakCalls(calls)[0]!.body;
+		const povolene = new Set(['kod', 'nazov', 'mnozstvo', 'mj', 'dlzka', 'poznamka']);
+		for (const l of body.lines as Record<string, unknown>[]) {
+			for (const k of Object.keys(l)) expect(povolene.has(k)).toBe(true);
+		}
+		const json = JSON.stringify({ ...body, pdf_base64: '' });
+		expect(json).not.toMatch(/€|cena|predaj|nakup/i);
+	});
+});
+
 // Priame výsledky `uploadNarezakZOdpisu` (vetvy skip/no-order/failed). Odpisy sa zapíšu s VYPNUTÝM
 // uploadom (hook nič nepošle), potom sa upload zapne a funkcia sa zavolá priamo.
 describe('#570 uploadNarezakZOdpisu — výsledky vetiev', () => {
