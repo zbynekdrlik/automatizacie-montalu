@@ -1,8 +1,9 @@
 name: Mutation
 
 # Dvojvrstvový mutačný gate (airuleset `mutation-testing`, StrykerJS):
-#  1) mutation-diff — na KAŽDÝ push do `dev`, diff-scoped (len zmenené
-#     `src/lib/**/*.ts` oproti main), tvrdý strop `timeout-minutes: 20`.
+#  1) mutation-diff — na KAŽDÝ push do `dev`, diff-scoped na ZMENENÉ RIADKY
+#     zmenených `src/lib/**/*.ts` oproti main (`scripts/mutation-lines.sh`,
+#     #569; nový súbor = celý), tvrdý strop `timeout-minutes: 20`.
 #     Prázdny diff → explicitný exit 0 (žiadne mutovateľné súbory nie je chyba).
 #     SHARDOVANÉ do matrixu 6 shardov (overrun 2026-08-20, kolo 8, run
 #     32387255712: hash-podľa-cesty partícia je uniformná len v OČAKÁVANÍ, pri
@@ -69,17 +70,30 @@ jobs:
           #    polia skiel), Stryker ich nevie scoped testovať → 183 mutantov / >19 min,
           #    run 33567427786 cancel na 98 % s 0 preživšími. Rovnaký fix ako migracie.ts:
           #    vylúčenie, nie väčší timeout.
-          CHANGED=$(git diff --name-only origin/main...HEAD \
+          #  - server/migracie-*.ts = ďalšie DDL/seed moduly vyčlenené z migracie.ts
+          #    (napr. migracie-sietka.ts, #569) — rovnaká kategória, rovnaké vylúčenie.
+          CHANGED=$(git -c core.quotePath=false diff --name-only origin/main...HEAD \
             | grep -E '^src/lib/.*\.ts$' \
             | grep -vE '\.svelte\.ts$' \
-            | grep -vE '^src/lib/server/migracie\.ts$|^src/lib/server/migracie-seed\.ts$|^src/lib/server/fonts/' || true)
+            | grep -vE '^src/lib/server/migracie(-[^/]*)?\.ts$|^src/lib/server/fonts/' || true)
           SHARDED=$(printf '%s\n' "$CHANGED" | bash scripts/mutation-shard.sh)
-          if [ -z "$SHARDED" ]; then
-            echo "Shard $SHARD/$SHARDS: žiadne zmenené súbory mu nepatria — mutačný gate nemá čo mutovať, končím zelený."
+          # Diff-scope na ZMENENÉ RIADKY (#569, run 36109311931: celý LEAF modul
+          # compute-model.ts kvôli pár riadkom = stovky mutantov → 20-min strop).
+          # Sharding ostáva po súboroch (LPT); každý súbor mutuje len svoje hunky
+          # (`súbor:start-end`), nový súbor celý — scripts/mutation-lines.sh.
+          RANGES=""
+          if [ -n "$SHARDED" ]; then
+            IFS=, read -r -a FILES <<<"$SHARDED"
+            RANGES=$(git -c core.quotePath=false diff -U0 origin/main...HEAD -- "${FILES[@]}" \
+              | bash scripts/mutation-lines.sh)
+          fi
+          if [ -z "$RANGES" ]; then
+            echo "Shard $SHARD/$SHARDS: žiadne zmenené riadky mu nepatria — mutačný gate nemá čo mutovať, končím zelený."
             echo "changed=" >>"$GITHUB_OUTPUT"
           else
-            echo "Shard $SHARD/$SHARDS mutuje: $SHARDED"
-            echo "changed=$SHARDED" >>"$GITHUB_OUTPUT"
+            echo "Shard $SHARD/$SHARDS súbory: $SHARDED"
+            echo "Shard $SHARD/$SHARDS mutuje riadky: $RANGES"
+            echo "changed=$RANGES" >>"$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-node@v4
         if: steps.scope.outputs.changed != ''
