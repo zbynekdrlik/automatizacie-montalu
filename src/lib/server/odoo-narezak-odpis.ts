@@ -111,10 +111,39 @@ export async function uploadNarezakZOdpisu(zak: string, op: string): Promise<Nar
 }
 
 /**
+ * SÉRIOVANIE per OP (review 🟡 #570): `lines` upload NAHRÁDZA všetky riadky objednávky, takže dva
+ * súbežné uploady tej istej OP (dva odpisy rýchlo po sebe) by mohli doraziť v opačnom poradí a starší
+ * snapshot (len modul A) by prepísal novší (A+B). Preto per OP beží NAJVIAC JEDEN upload; odpis, ktorý
+ * príde počas behu, len označí `dobeh` — po skončení prebehne JEDEN ďalší upload, ktorý si stav načíta
+ * z DB NANOVO (obsahuje všetky moduly vrátane neskorších). N odpisov počas behu = 1 zlúčený dobeh.
+ * Stav je len in-memory (jeden proces servera); reštart ho zahodí — nič durable sa nestratí, lebo
+ * každý upload rekonštruuje celú OP z `odpis_log`.
+ */
+const bezi = new Map<string, { dobeh: boolean; zak: string; op: string }>();
+
+function spustiSerioveho(opNorm: string, zak: string, op: string): void {
+	const stav = { dobeh: false, zak, op };
+	bezi.set(opNorm, stav);
+	void uploadNarezakZOdpisu(zak, op)
+		.catch((e) =>
+			log.error('nárezák z odpisu queue: neočakávane hodil', { zak, op, err: errMsg(e) })
+		)
+		.finally(() => {
+			if (stav.dobeh) {
+				log.info('nárezák z odpisu: dobeh zlúčených odpisov OP', { op: opNorm });
+				spustiSerioveho(opNorm, stav.zak, stav.op);
+			} else {
+				bezi.delete(opNorm);
+			}
+		});
+}
+
+/**
  * FIRE-AND-FORGET vstupný bod — registruje sa v `hooks.server.ts` `setOdpisWrittenHook` vedľa
  * `queueZakazkaPush`. `live` sa číta SYNCHRÓNNE v mieste volania (ten istý proces-flag, ktorým
  * `writeOdpis` práve zapísal `odpis_log.live`) — test odpis (`live=0`) neposiela NIČ. Celá práca
- * (SQLite read, rekomputa, PDF, upload) sa odloží cez `setImmediate` mimo request tick. NIKDY nehádže.
+ * (SQLite read, rekomputa, PDF, upload) sa odloží cez `setImmediate` mimo request tick a je SÉRIOVÁ
+ * per OP (viď `bezi` vyššie). NIKDY nehádže.
  */
 export function queueNarezakUploadZOdpisu(zak: string, op: string): void {
 	try {
@@ -122,10 +151,18 @@ export function queueNarezakUploadZOdpisu(zak: string, op: string): void {
 			log.debug('nárezák z odpisu: test odpis (live=0) — nič neposielam', { zak, op });
 			return;
 		}
+		const opNorm = normOp(op);
 		setImmediate(() => {
-			void uploadNarezakZOdpisu(zak, op).catch((e) =>
-				log.error('nárezák z odpisu queue: neočakávane hodil', { zak, op, err: errMsg(e) })
-			);
+			const stav = bezi.get(opNorm);
+			if (stav) {
+				// upload tejto OP práve beží → po ňom prebehne JEDEN dobeh s čerstvým stavom z DB
+				stav.dobeh = true;
+				stav.zak = zak;
+				stav.op = op;
+				log.debug('nárezák z odpisu: upload OP beží — zaradený dobeh', { zak, op: opNorm });
+				return;
+			}
+			spustiSerioveho(opNorm, zak, op);
 		});
 	} catch (e) {
 		log.error('nárezák z odpisu queue: synchrónne hodil', { zak, op, err: errMsg(e) });
