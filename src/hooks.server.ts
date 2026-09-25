@@ -11,6 +11,7 @@ import { dlvReadbackPath } from '$lib/server/money-readback';
 import { DB_PATH } from '$lib/server/db';
 import { runStartupLeadSweep } from '$lib/server/odoo-lead';
 import { queueZakazkaPush, runStartupZakazkaSweep } from '$lib/server/odoo-zakazka';
+import { queueNarezakUploadZOdpisu } from '$lib/server/odoo-narezak-odpis';
 
 const log = logger('http');
 
@@ -49,11 +50,13 @@ let pruneCounter = 0;
 	runStartupLeadSweep();
 	// #340: po každom úspešnom odpise pushni interný zoznam materiálu zákazky do Odoo
 	// (interná log-note na sale.order, zákazník ju nikdy nevidí). Money-neutrálny observer.
-	// #511: nárezák PDF sa už NEnahráva z odpisu — kiosk „Rezanie" dostáva SKUTOČNÝ plán rezov
-	// po ULOŽENÍ plánu (`/plan-rezov` → queuePlanRezovUpload), nie rozpis materiálu s cenami.
-	// Rozpis (s cenami) ostáva LEN v tejto internej mt_note.
+	// Rozpis materiálu S CENAMI ostáva LEN v tejto internej mt_note (#511 — nikdy na kiosk).
+	// #570: pri OSTROM odpise ide na kiosk „Čo rezať" aj nárezák BEZ cien (rozpis rezov `lines`
+	// + grafický PDF + cut_plan) zo zdieľaného jadra backfillu — #511 odstránil jediný automatický
+	// trigger a /plan-rezov save výroba nepoužíva (tablety boli prázdne). Test odpis nič neposiela.
 	setOdpisWrittenHook((zak: string, op: string) => {
 		queueZakazkaPush(zak, op);
+		queueNarezakUploadZOdpisu(zak, op);
 	});
 	// #349: pri štarte (po migráciách — db.ts modul-load prebehol vyššie cez importy) dopostni
 	// zaostalé zákazka-pushe z minulých výpadkov Odoo. Fire-and-forget, no-op keď chýba ODOO_LEAD_*.

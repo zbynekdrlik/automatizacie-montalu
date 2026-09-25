@@ -407,6 +407,185 @@ function novsi(a: OdpisBackfillRow, b: OdpisBackfillRow): OdpisBackfillRow {
 	return a.id > b.id ? a : b;
 }
 
+// ---------------------------------------------------------------------------------------------
+// #570: ZDIEĽANÉ JADRO per OP — volá ho backfill (`runBackfill`) AJ živý upload pri ostrom odpise
+// (`odoo-narezak-odpis.ts`, `setOdpisWrittenHook`). Jeden zdroj pravdy: grupovanie per OP (posledný
+// odpis per modul) → rekomputa + kombinácia lines všetkých modulov OP → grafický PDF + `cut_plan` →
+// `uploadLines` s klasifikáciou výsledku. `lines` upload NAHRÁDZA všetky riadky objednávky, preto sa
+// VŽDY posiela kombinácia všetkých modulov OP (nikdy len modul práve zapísaného odpisu).
+// ---------------------------------------------------------------------------------------------
+
+/** Odpisy jednej OP: posledný odpis per modul (v zábere `BACKFILL_MODULY`). */
+export interface OpOdpisy {
+	zak: string;
+	zakaznik: string;
+	byModul: Map<string, OdpisBackfillRow>;
+}
+
+export type NarezakLog = NonNullable<BackfillDeps['log']>;
+
+/**
+ * Zgrupuje `odpis_log` riadky per `normOp(op)` — len moduly v zábere (`BACKFILL_MODULY`), v rámci OP
+ * posledný odpis per `modul` (novší `created_at`, tie-break `id`). Riadky bez OP sa preskočia.
+ */
+export function groupOdpisyPerOp(rows: OdpisBackfillRow[]): Map<string, OpOdpisy> {
+	const perOp = new Map<string, OpOdpisy>();
+	for (const r of rows) {
+		if (!BACKFILL_MODULY.has(r.modul)) continue;
+		const op = normOp(r.op);
+		if (!op) continue;
+		let g = perOp.get(op);
+		if (!g) {
+			g = { zak: r.zak, zakaznik: r.zakaznik, byModul: new Map() };
+			perOp.set(op, g);
+		}
+		const prev = g.byModul.get(r.modul);
+		g.byModul.set(r.modul, prev ? novsi(prev, r) : r);
+	}
+	return perOp;
+}
+
+export interface OpLinesResult {
+	/** skombinované `lines` všetkých modulov OP (prázdne = nič narezateľné). */
+	lines: RozpisLine[];
+	/** skombinovaný `MaterialRow[]` (tyče) pre grafický PDF + `cut_plan`. */
+	material: MaterialRow[];
+	moduly: { modul: string; riadkov: number; drift: boolean }[];
+	drift: boolean;
+	skipy: { modul: string; reason: BackfillSkipReason }[];
+}
+
+/**
+ * Znovu-dopočíta rozpis rezov všetkých modulov JEDNEJ OP a skombinuje ich `lines` + materiál.
+ * Preskočený modul (napr. pergola rezervačná cesta — lossy `detail`) sa zaloguje a vráti v `skipy`.
+ * Čisté voči Money (len READ `odpis_polozky` cez `loadPolozky`).
+ */
+export function linesPreOp(
+	op: string,
+	g: OpOdpisy,
+	cfg: Cfg,
+	loadPolozky: (odpisLogId: number) => Polozka[],
+	log: NarezakLog
+): OpLinesResult {
+	const out: OpLinesResult = { lines: [], material: [], moduly: [], drift: false, skipy: [] };
+	for (const [modul, r] of g.byModul) {
+		const res = mapOdpisToLines(r, loadPolozky(r.id), cfg);
+		if (res.status === 'skip') {
+			out.skipy.push({ modul, reason: res.reason });
+			log('info', 'nárezák: modul preskočený', { op, modul, reason: res.reason });
+			continue;
+		}
+		out.lines.push(...res.lines);
+		out.material.push(...res.material);
+		out.moduly.push({ modul, riadkov: res.lines.length, drift: res.drift });
+		if (res.drift) out.drift = true;
+	}
+	return out;
+}
+
+export interface NarezakUploadOutcome {
+	akcia: 'uploaded' | 'skip-no-order' | 'error';
+	docId: string;
+	pdf: boolean;
+	cutPlanRejected: boolean;
+	error?: string;
+}
+
+/**
+ * Pošle skombinované `lines` OP na Odoo (`montalu_narezak_upload` cez `uploadLines`) spolu s GRAFICKÝM
+ * nárezák PDF (#529, best-effort) a `cut_plan` (#532/#535/#542 — v1/v2/v3 vrátane `render_html`;
+ * 422 fallback + kill switch rieši `uploadNarezak` v transporte). doc_id per OP (`backfillDocId`).
+ * NIKDY nehádže — výsledok klasifikuje: `montalu_order_not_found` → `skip-no-order`, iná chyba → `error`.
+ * `logCtx` sa pridá do log riadkov (napr. backfill `neoverena`).
+ */
+export async function odoslatNarezakPreOp(
+	op: string,
+	g: OpOdpisy,
+	lines: RozpisLine[],
+	material: MaterialRow[],
+	uploadLines: BackfillDeps['uploadLines'],
+	log: NarezakLog,
+	logCtx: Record<string, unknown> = {},
+	now: Date = new Date()
+): Promise<NarezakUploadOutcome> {
+	const docId = backfillDocId(op);
+
+	// #529: GRAFICKÝ nárezák PDF z rekomputovaného materiálu (best-effort — keď zlyhá, pošlú sa
+	// len `lines`, endpoint PDF nevyžaduje).
+	let pdfBase64: string | undefined;
+	let filename: string | undefined;
+	try {
+		const header: NarezakPdfHeader = { zak: g.zak || op, op, zakaznik: g.zakaznik };
+		const viacPosuvov = material.some((m) =>
+			m.bary.some((b) => b.kusy.some((k) => k.posuv != null))
+		);
+		pdfBase64 = await generateNarezakPdfBase64(header, material, { viacPosuvov });
+		filename = narezakPdfFilename(g.zak || op, now);
+	} catch (e) {
+		log('warn', 'nárezák: generovanie PDF zlyhalo — pošlem len lines', {
+			op,
+			err: e instanceof Error ? e.message : String(e)
+		});
+	}
+
+	// #532: `cut_plan` z toho istého skombinovaného materiálu (bez flagu — ide vždy keď má tyče
+	// s Money kódom). CAD moduly (pergola/fix/clip) idú cez `materialRowsFromRozpis` s `kod:''`,
+	// takže sa vynechajú — zasklenia (recompute) nesú Money kódy, tie plán naplnia.
+	// #542: meta pre `cut_plan.render_html` — tá istá hlavička ako PDF (zak/op/zákazník),
+	// aby tablet zobrazil nárezák 1:1 s papierom. Default kerf.
+	const cutPlan = buildCutPlan(material, undefined, {
+		zak: g.zak || op,
+		op,
+		zakaznik: g.zakaznik,
+		now
+	});
+	const bezKodu = pocetVynechanychBezKodu(material);
+	// zaloguj VŽDY keď sa nejaké tyče vynechali pre chýbajúci Money kód — aj v mixovanej OP
+	// (zasklenia s kódmi + pergola/fix/clip bez kódov), kde `cutPlan` je pravdivý, ale bez-kódu
+	// tyče sa tichým dropom nedostanú do plánu (kontrakt: „a zaloguj").
+	if (bezKodu > 0) {
+		log('info', 'nárezák: tyče bez Money kódu vynechané z cut_plan', {
+			op,
+			bezKodu,
+			planSent: !!cutPlan
+		});
+	}
+
+	try {
+		const up = await uploadLines(op, docId, lines, pdfBase64, filename, cutPlan);
+		const cutPlanRejected = !!(up && up.cutPlanRejected);
+		log('info', 'nárezák: nahrané riadky', {
+			op,
+			docId,
+			riadkov: lines.length,
+			pdf: pdfBase64 != null,
+			cutPlanRejected,
+			...logCtx
+		});
+		return { akcia: 'uploaded', docId, pdf: pdfBase64 != null, cutPlanRejected };
+	} catch (e) {
+		const errMsg = e instanceof Error ? e.message : String(e);
+		// #532 R2 KLASIFIKÁCIA: LEN skutočný token neexistencie objednávky (`montalu_order_not_found`)
+		// → no-order; každá iná 4xx/5xx → error (nikdy tichý no-order).
+		if (ORDER_NOT_FOUND_RE.test(errMsg)) {
+			log('warn', 'nárezák: upload → objednávka neexistuje (montalu_order_not_found)', {
+				op,
+				docId,
+				err: errMsg
+			});
+			return {
+				akcia: 'skip-no-order',
+				docId,
+				pdf: pdfBase64 != null,
+				cutPlanRejected: false,
+				error: errMsg
+			};
+		}
+		log('error', 'nárezák: upload zlyhal', { op, docId, err: errMsg });
+		return { akcia: 'error', docId, pdf: pdfBase64 != null, cutPlanRejected: false, error: errMsg };
+	}
+}
+
 /**
  * Spustí backfill nad danými `odpis_log` riadkami (už filtrované na `live=1` + časové okno volajúcim).
  * Grupuje per `normOp(op)`, v rámci OP berie POSLEDNÝ odpis per `modul`, znovu dopočíta rozpis rezov,
@@ -429,22 +608,8 @@ export async function runBackfill(
 		(r) => BACKFILL_MODULY.has(r.modul) && (!zakFilter || zakFilter.has(normZak(r.zak)))
 	);
 
-	// grupuj per OP → per modul: posledný odpis vyhráva
-	const perOp = new Map<
-		string,
-		{ zak: string; zakaznik: string; byModul: Map<string, OdpisBackfillRow> }
-	>();
-	for (const r of scoped) {
-		const op = normOp(r.op);
-		if (!op) continue;
-		let g = perOp.get(op);
-		if (!g) {
-			g = { zak: r.zak, zakaznik: r.zakaznik, byModul: new Map() };
-			perOp.set(op, g);
-		}
-		const prev = g.byModul.get(r.modul);
-		g.byModul.set(r.modul, prev ? novsi(prev, r) : r);
-	}
+	// grupuj per OP → per modul: posledný odpis vyhráva (#570: zdieľané jadro)
+	const perOp = groupOdpisyPerOp(scoped);
 
 	const summary: BackfillSummary = {
 		odpisov: scoped.length,
@@ -529,53 +694,43 @@ export async function runBackfill(
 			continue;
 		}
 
-		// znovu-dopočítaj lines všetkých modulov OP a skombinuj
-		const combined: RozpisLine[] = [];
-		const combinedMaterial: MaterialRow[] = []; // #529: pre grafický nárezák PDF
-		let opDrift = false;
-		for (const [modul, r] of g.byModul) {
-			const res = mapOdpisToLines(r, deps.loadPolozky(r.id), deps.cfg);
-			if (res.status === 'skip') {
-				if (res.reason === 'pergola-rezervacia') summary.skipPergolaRezervacia++;
-				else if (
-					res.reason === 'unreconstructable' ||
-					res.reason === 'recompute-failed' ||
-					res.reason === 'cad-truncated'
-				)
-					summary.skipUnreconstructable++;
-				log('info', 'backfill: modul preskočený', { op, modul, reason: res.reason });
-				continue;
-			}
-			combined.push(...res.lines);
-			combinedMaterial.push(...res.material);
-			opSum.moduly.push({ modul, riadkov: res.lines.length, drift: res.drift });
-			if (res.drift) opDrift = true;
+		// znovu-dopočítaj lines všetkých modulov OP a skombinuj (#570: zdieľané jadro)
+		const res = linesPreOp(op, g, deps.cfg, deps.loadPolozky, log);
+		for (const sk of res.skipy) {
+			if (sk.reason === 'pergola-rezervacia') summary.skipPergolaRezervacia++;
+			else if (
+				sk.reason === 'unreconstructable' ||
+				sk.reason === 'recompute-failed' ||
+				sk.reason === 'cad-truncated'
+			)
+				summary.skipUnreconstructable++;
 		}
+		opSum.moduly = res.moduly;
 
-		opSum.riadkovSpolu = combined.length;
-		if (combined.length === 0) {
+		opSum.riadkovSpolu = res.lines.length;
+		if (res.lines.length === 0) {
 			opSum.akcia = 'skip-no-lines';
 			summary.skipNoLines++;
 			log('info', 'backfill skip: žiadne narezateľné riadky', { op });
 			summary.ops.push(opSum);
 			continue;
 		}
-		if (opDrift) summary.driftOp++;
+		if (res.drift) summary.driftOp++;
 
 		const docId = backfillDocId(op);
 		opSum.docId = docId;
 
 		if (opts.dryRun) {
 			// #524 R2: keď existenciu nemožno overiť (read 403), OP je stále would-send, ale pod
-			// vlastnou akciou/počítadlom „existencia neoverená".
+			// vlastnou akciou/počítadlom „existencia neoverená". Dry-run NEGENERUJE PDF a nič neposiela.
 			opSum.akcia = precheckUnverified ? 'dry-run-neoverena' : 'dry-run';
 			if (precheckUnverified) summary.existenciaNeoverena++;
 			summary.nahranych++;
-			summary.riadkovSpolu += combined.length;
+			summary.riadkovSpolu += res.lines.length;
 			log('info', 'backfill DRY-RUN: poslal by riadky', {
 				op,
 				docId,
-				riadkov: combined.length,
+				riadkov: res.lines.length,
 				neoverena: precheckUnverified,
 				moduly: opSum.moduly
 			});
@@ -583,85 +738,26 @@ export async function runBackfill(
 			continue;
 		}
 
-		// #529: GRAFICKÝ nárezák PDF z rekomputovaného materiálu (best-effort — keď zlyhá, pošlú sa
-		// len `lines`, endpoint PDF nevyžaduje). Generujeme LEN v live behu (nie dry-run — zbytočné).
-		let pdfBase64: string | undefined;
-		let filename: string | undefined;
-		try {
-			const header: NarezakPdfHeader = { zak: g.zak || op, op, zakaznik: g.zakaznik };
-			const viacPosuvov = combinedMaterial.some((m) =>
-				m.bary.some((b) => b.kusy.some((k) => k.posuv != null))
-			);
-			pdfBase64 = await generateNarezakPdfBase64(header, combinedMaterial, { viacPosuvov });
-			filename = narezakPdfFilename(g.zak || op, new Date());
-		} catch (e) {
-			log('warn', 'backfill: generovanie nárezák PDF zlyhalo — pošlem len lines', {
-				op,
-				err: e instanceof Error ? e.message : String(e)
-			});
-		}
-
-		// #532: `cut_plan` z toho istého skombinovaného materiálu (bez flagu — ide vždy keď má tyče
-		// s Money kódom). CAD moduly (pergola/fix/clip) idú cez `materialRowsFromRozpis` s `kod:''`,
-		// takže sa vynechajú — zasklenia (recompute) nesú Money kódy, tie plán naplnia.
-		// #542: meta pre `cut_plan.render_html` — tá istá hlavička ako backfill PDF (zak/op/zákazník),
-		// aby tablet zobrazil nárezák 1:1 s papierom. Default kerf (backfill ju nemení).
-		const cutPlan = buildCutPlan(combinedMaterial, undefined, {
-			zak: g.zak || op,
-			op,
-			zakaznik: g.zakaznik,
-			now: new Date()
+		// PDF + cut_plan + upload + klasifikácia výsledku (#570: zdieľané s živým uploadom pri odpise)
+		const up = await odoslatNarezakPreOp(op, g, res.lines, res.material, deps.uploadLines, log, {
+			neoverena: precheckUnverified
 		});
-		const bezKodu = pocetVynechanychBezKodu(combinedMaterial);
-		// zaloguj VŽDY keď sa nejaké tyče vynechali pre chýbajúci Money kód — aj v mixovanej OP
-		// (zasklenia s kódmi + pergola/fix/clip bez kódov v jednom `combinedMaterial`), kde `cutPlan`
-		// je pravdivý, ale bez-kódu tyče sa tichým dropom nedostanú do plánu (kontrakt: „a zaloguj").
-		if (bezKodu > 0) {
-			log('info', 'backfill: tyče bez Money kódu vynechané z cut_plan', {
-				op,
-				bezKodu,
-				planSent: !!cutPlan
-			});
-		}
-
-		try {
-			const up = await deps.uploadLines(op, docId, combined, pdfBase64, filename, cutPlan);
+		if (up.akcia === 'uploaded') {
 			opSum.akcia = 'uploaded';
 			summary.nahranych++;
-			summary.riadkovSpolu += combined.length;
+			summary.riadkovSpolu += res.lines.length;
 			if (precheckUnverified) summary.existenciaNeoverena++; // upload existenciu potvrdil
 			// #532 R2: transport helper musel odstrániť cut_plan (PROD Odoo 422 „Neznámy parameter") —
 			// upload prebehol bez neho (lines+PDF doručené). Počítaj oddelene, NIE ako chybu.
-			if (up && up.cutPlanRejected) summary.cutPlanOdmietnutych++;
-			log('info', 'backfill: nahrané riadky', {
-				op,
-				docId,
-				riadkov: combined.length,
-				pdf: pdfBase64 != null,
-				neoverena: precheckUnverified,
-				cutPlanRejected: !!(up && up.cutPlanRejected)
-			});
-		} catch (e) {
-			const errMsg = e instanceof Error ? e.message : String(e);
-			// #532 R2 KLASIFIKÁCIA (opravuje #524 R2): NEmapuj každú upload chybu pod precheckUnverified
-			// na no-order — to maskovalo 26× 422 „Neznámy parameter: cut_plan" ako „Skip — bez objednávky".
-			// LEN skutočný token neexistencie objednávky (`montalu_order_not_found`) → no-order; každá iná
-			// 4xx/5xx (vrátane 422 mimo cut_plan, ktorý má transport helper vlastný fallback) → error.
-			if (ORDER_NOT_FOUND_RE.test(errMsg)) {
-				opSum.akcia = 'skip-no-order';
-				summary.skipNoOrder++;
-				if (precheckUnverified) summary.existenciaNeoverena++;
-				log('warn', 'backfill: upload → objednávka neexistuje (montalu_order_not_found)', {
-					op,
-					docId,
-					err: errMsg
-				});
-			} else {
-				opSum.akcia = 'error';
-				opSum.error = errMsg;
-				summary.chyb++;
-				log('error', 'backfill: upload zlyhal', { op, docId, err: errMsg });
-			}
+			if (up.cutPlanRejected) summary.cutPlanOdmietnutych++;
+		} else if (up.akcia === 'skip-no-order') {
+			opSum.akcia = 'skip-no-order';
+			summary.skipNoOrder++;
+			if (precheckUnverified) summary.existenciaNeoverena++;
+		} else {
+			opSum.akcia = 'error';
+			opSum.error = up.error;
+			summary.chyb++;
 		}
 		summary.ops.push(opSum);
 		if (delayMs > 0) await sleep(delayMs);
