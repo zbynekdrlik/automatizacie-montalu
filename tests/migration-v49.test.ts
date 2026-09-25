@@ -62,7 +62,7 @@ await import('../src/lib/server/db');
 describe('migration v48 → v49 (objednavka_skla „iné sklo")', () => {
 	it('bumpne na v49 a pridá typ_skla_manual + cena_m2_manual (nullable)', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(49);
+		expect(d.pragma('user_version', { simple: true })).toBe(50);
 		const cols = (
 			d.prepare('PRAGMA table_info(objednavka_skla)').all() as {
 				name: string;

@@ -78,3 +78,17 @@ NETÝKA — ALTER je na `objednavka_skla`, nie `dopyt`/`material_prices` (a exis
 `toContain`, nie exaktný `toEqual` na objednavka_skla). Nový `migration-v49.test.ts` (fixtúra v48 musí
 niesť base tabuľky pre seedData/seedUsers: users, cfg_sys, **cfg_rez**, glass_types, cfg_sklo_trieda,
 odpis_log, **user_audit**, objednavka_skla — inak `SqliteError: no such table` pri importe db.ts).
+
+## v50 (#569) — `cfg_sietka_standard` (K/R/H sieťky Štandard) vo VLASTNOM súbore
+
+`migracie-seed.ts` bol na 996 r. → nová migrácia `migrateSietkaStandard` žije v novom
+`src/lib/server/migracie-sietka.ts` (rovnaký `(db, bump)` vzor, guard `>= 50`, transakcia,
+`CREATE TABLE IF NOT EXISTS` + `INSERT OR IGNORE` zo `SIETKA_STANDARD_SEED` — jeden zdroj s kódom).
+**Ďalšia migrácia: tiež nový/malý súbor, NIE do `migracie-seed.ts`** (je na strope). `migracie.ts`
+968 r. (import + call). Head-bump: **41 test súborov** (49 → 50). NOVÁ tabuľka → krok 4 sa netýka.
+
+**Pomenovanie `migracie-*.ts` = LEN DDL/seed.** Mutačný gate (`mutation.yml` `grep -vE
+'^src/lib/server/migracie(-[^/]*)?\.ts$'`) aj sweep (`stryker.config.json`
+`!src/lib/server/migracie-*.ts`) každý súbor s týmto prefixom z mutácie VYLÚČIA (DDL overujú
+`migration-vN.test.ts`). Skutočnú LOGIKU (výpočty, validácie) preto NIKDY nedávaj do
+`migracie-*.ts` súboru — patrí do modulu s iným menom, inak by ticho stratila mutačnú ochranu.

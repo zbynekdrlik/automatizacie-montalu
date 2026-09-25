@@ -44,6 +44,30 @@ export function listOdpisyForBackfill(daysBack: number): OdpisBackfillRow[] {
 }
 
 /**
+ * #570: READ-ONLY SELECT VŠETKÝCH ostrých (`live=1`) odpisov jednej OP — pre živý nárezák upload pri
+ * odpise (`odoo-narezak-odpis.ts`), aby upload niesol riadky VŠETKÝCH modulov OP (lines upload
+ * nahrádza všetky riadky objednávky). Match je `normOp(r.op) === normOp(op)` (OP260286 ≡ 260286) —
+ * NIE priama rovnosť `op_norm`: v27 migrácia skopírovala `op_norm = op` RAW pre staré riadky (tá istá
+ * legacy pasca ako `zak_norm`, viď zakazka-ceny.md). SQL len predfiltruje podľa číselného jadra OP,
+ * presnú zhodu robí `normOp` (jeden zdroj normalizácie).
+ */
+export function listLiveOdpisyForOp(op: string): OdpisBackfillRow[] {
+	const opNorm = normOp(op);
+	if (!opNorm) return [];
+	const jadro = opNorm.replace(/^OP/, '');
+	if (!jadro) return []; // „OP" bez čísla — nič nepárovať (inak by instr(x,'') matchol všetko)
+	const rows = db
+		.prepare(
+			`SELECT id, modul, zak, op, zakaznik, live, content_hash, detail, created_at
+			 FROM odpis_log
+			 WHERE live = 1 AND (op_norm = ? OR instr(replace(upper(op), ' ', ''), ?) > 0)
+			 ORDER BY id`
+		)
+		.all(opNorm, jadro) as OdpisBackfillRow[];
+	return rows.filter((r) => normOp(r.op) === opNorm);
+}
+
+/**
  * Postaví reálne `BackfillDeps` s Odoo READ/UPLOAD cez `callJson2` (/json/2, bearer). `orderExists`
  * / `orderHasLines` sú READ-ONLY (`search_read`), `uploadLines` posiela `lines` cez to isté
  * `montalu_narezak_upload` volanie ako #522. `op` prichádza už normalizovaný (`runBackfill` grupuje

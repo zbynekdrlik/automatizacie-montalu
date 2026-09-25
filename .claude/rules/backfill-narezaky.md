@@ -7,6 +7,8 @@ paths:
   - 'tests/backfill-narezaky.test.ts'
   - 'tests/backfill-narezaky-endpoint.test.ts'
   - 'tests/backfill-narezaky-money-safety.test.ts'
+  - 'tests/sklo-legacy-alias.test.ts'
+  - 'src/lib/server/odoo-narezak-odpis.ts'
 ---
 
 # Backfill nárezákov (ostrých odpisov) → Odoo `lines` (#524)
@@ -15,6 +17,28 @@ Jednorazový nástroj: pre posledných ~30 dní `odpis_log` (`live=1`) znovu dop
 istým enginom modulu z uloženého `detail` a pošle do Odoo `montalu.rozpis.line` cez existujúcu
 `montalu_narezak_upload` cestu (#522), aby tablet „Čo rezať" (odoo-erp #6949) mal riadky aj pre už
 rozpracované zákazky. Nadväzuje na #522 (živý plán-rezov upload).
+
+## Zdieľané jadro s ŽIVÝM uploadom pri odpise (#570)
+
+Per-OP práca `runBackfill` je extrahovaná do exportovaných funkcií, ktoré volá AJ živý nárezák pri
+ostrom odpise (`odoo-narezak-odpis.ts`, viď `plan-rezov-kiosk.md` „REGRESIA #570"):
+`groupOdpisyPerOp(rows)` (záber `BACKFILL_MODULY`, posledný odpis per modul) → `linesPreOp(op, g, cfg,
+loadPolozky, log)` (rekomputa + kombinácia, `skipy` pre počítadlá) → `odoslatNarezakPreOp(op, g, lines,
+material, uploadLines, log, logCtx)` (PDF + cut_plan + upload + klasifikácia → `uploaded` /
+`skip-no-order` / `error`, NIKDY nehádže). Backfill si nad tým drží LEN svoje: prechecky
+(exists/has-lines, 403 tolerancia), dry-run a sumár. **Zmena správania nárezáku = zmena v jadre
+(platí pre obe cesty); nič nekopíruj do `odoo-narezak-odpis.ts`.** Log správy jadra majú prefix
+`nárezák:` (nie `backfill:`) — testy filtrujú regexom na obsah (`bez Money kódu`, `neexistuje`).
+
+## Legacy názvy skiel zmazané migráciou (#570, OPDL260208)
+
+Odpisy spred v44 (issue 504, 10.9.) nesú v `detail.vstupRaw` sklá, ktoré v44 z katalógu Štandard +
+ZMAZALA („Izolačné sklo 4.8.4", „Float sklo 10 mm") → `skloPre` null → `recompute-failed` → OP bez
+riadkov (PROD: OPDL260208 zimná záhrada, posuvy 2+3). `mapOdpisToLines` preto rekomputuje z KÓPIE
+vstupu cez `vstupSAktualnymSklom` / `multiVstupSAktualnymSklom` (`zasklenia-sklo.ts`, mapa
+`LEGACY_SKLO` kľúčovaná `resolveGlassSystem`). **Nová migrácia, ktorá zmaže/premenuje sklo s
+Money-identickou náhradou → pridaj riadok do `LEGACY_SKLO`**, inak staré odpisy prestanú ísť na
+kiosk. Sklo zmazané BEZ náhrady (v19 Kalené 8/10 mm) tam NEPATRÍ — honest-fail ostáva.
 
 ## cut_plan 422 fallback + kill switch (R2 hotfix #532)
 

@@ -12,7 +12,8 @@ import {
 	sietkaChyba,
 	sietkaKolajnicaSwap,
 	sietkaSlideExtra,
-	sietkaStandardExtra
+	sietkaStandardExtra,
+	sietovinaPre
 } from './compute-sietka';
 import {
 	missingHrubkaProfile,
@@ -102,6 +103,14 @@ export function computeFlat(
 	const ss = g.sklo.s,
 		sv = g.sklo.v;
 	if (!ss || !sv) return null;
+	const sklo = {
+		// sklo sa objednáva na CELÉ milimetre (Dominik: 904,578 → 905) — zaokrúhli
+		// na najbližší mm. Sklo NIE je v Money odpise, takže je to len rozmer na plán/objednávku.
+		// #440: per-sklo override korekcie (NULL → systémový skloOffset).
+		sirka: Math.round(val(ss, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
+		vyska: Math.round(val(sv, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
+		pocet: N
+	};
 	return {
 		system,
 		styl,
@@ -111,14 +120,9 @@ export function computeFlat(
 		m2: R((S * V) / 1e6),
 		material,
 		odpis,
-		sklo: {
-			// sklo sa objednáva na CELÉ milimetre (Dominik: 904,578 → 905) — zaokrúhli
-			// na najbližší mm. Sklo NIE je v Money odpise, takže je to len rozmer na plán/objednávku.
-			// #440: per-sklo override korekcie (NULL → systémový skloOffset).
-			sirka: Math.round(val(ss, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
-			vyska: Math.round(val(sv, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
-			pocet: N
-		}
+		sklo,
+		// #569: sieťovina zo servera (Štandard-rodina z rámu posuvu, nie zo skla)
+		sietovina: sietovinaPre(cfg, system, styl, sietka, S, V, sklo)
 	};
 }
 
@@ -319,6 +323,8 @@ export interface PosuvInfo {
 	kolajnica?: KolajnicaRucne | null;
 	/** sieťka tohto posuvu (#86–#90) — na plán/tlač, do Money odpisu NEJDE */
 	sietka?: Sietka | null;
+	/** rozmer sieťoviny tohto posuvu (#569, `sietovinaPre`) — null bez sieťky */
+	sietovina: { sirka: number; vyska: number } | null;
 }
 
 export interface MultiResult {
@@ -419,6 +425,12 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 		}
 		const ss = g.sklo.s,
 			sv = g.sklo.v;
+		const sklo = {
+			// #440: per-sklo override korekcie (NULL/undefined → systémový skloOffset).
+			sirka: Math.round(val(ss, p.S, p.V, N, true) - (p.skloKorekcia ?? g.skloOffset)),
+			vyska: Math.round(val(sv, p.S, p.V, N, true) - (p.skloKorekcia ?? g.skloOffset)),
+			pocet: N
+		};
 		infos.push({
 			system,
 			styl,
@@ -426,12 +438,8 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			V: p.V,
 			N,
 			m2: R((p.S * p.V) / 1e6),
-			sklo: {
-				// #440: per-sklo override korekcie (NULL/undefined → systémový skloOffset).
-				sirka: Math.round(val(ss, p.S, p.V, N, true) - (p.skloKorekcia ?? g.skloOffset)),
-				vyska: Math.round(val(sv, p.S, p.V, N, true) - (p.skloKorekcia ?? g.skloOffset)),
-				pocet: N
-			},
+			sklo,
+			sietovina: sietovinaPre(cfg, system, styl, p.sietka, p.S, p.V, sklo),
 			otvaranie: p.otvaranie,
 			skloNazov: p.sklo,
 			kovanieL: p.kovanieL,

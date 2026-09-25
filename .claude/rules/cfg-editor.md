@@ -55,7 +55,7 @@ stráži invariant (rovnaký offset per `baseRole`) — nemeň ho.
 ## Audit invariant
 
 Každý DB zápis v `saveCfgChanges` (offset, sklo mirror, skloOffset, glass redukcia/korekcia,
-trieda) MUSÍ mať zodpovedajúci `zmeny` záznam — `cfg_audit` je jediná stopa „kto/kedy/čo" a
+trieda, sieťka Štandard K/R/H #569) MUSÍ mať zodpovedajúci `zmeny` záznam — `cfg_audit` je jediná stopa „kto/kedy/čo" a
 Money-kritické zmeny nesmú byť tiché. Nový typ zápisu = nový `zmeny.push` v diff fáze.
 
 ## Testovanie
@@ -66,3 +66,10 @@ Money-kritické zmeny nesmú byť tiché. Nový typ zápisu = nový `zmeny.push`
 - Zmena správania mirroru → aktualizuj `tests/auth-editor.test.ts` očakávanie počtu `zmeny`
   (audit záznam mirroru sa počíta) a nezabudni, že RRED test mení NErámové pole (zmena
   rámového by mirror spustila legitímne).
+
+## Sieťka Štandard K/R/H (#569) — GLOBÁLNE parametre z editora štýlu
+
+`input.sietkaStandard` (Partial K/R/H) zapisuje do `cfg_sietka_standard` (jedna tabuľka pre
+Štandard AJ Štandard +), hoci sa edituje z konkrétneho štýlu — audit ide pod ten `sysStyl`.
+Odmietne sa mimo Štandard-rodiny a mimo `SIETKA_STANDARD_BOUNDS` (NaN z prázdneho poľa tiež).
+Form pole `sietka_<k>` je `required` a action ho číta len pri `form.has` (ako trieda_6/16).

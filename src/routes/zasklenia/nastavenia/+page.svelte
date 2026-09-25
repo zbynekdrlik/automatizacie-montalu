@@ -2,6 +2,11 @@
 	import { nazovSysStyl, nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
 	import { POZNAMKY } from '$lib/nastavenia-poznamky';
+	import {
+		SIETKA_STANDARD_BOUNDS,
+		SIETKA_STANDARD_KLUCE,
+		SIETKA_STANDARD_POPIS
+	} from '$lib/sietka-standard';
 
 	let { data, form } = $props();
 
@@ -195,6 +200,35 @@
 							/>
 						</div>
 					{/if}
+				</div>
+			{/if}
+
+			{#if data.sietkaStandard}
+				<div class="sec" style="margin-top:16px" data-testid="sietka-standard-sekcia">
+					Sieťka Štandard
+				</div>
+				<p class="sub" style="margin-bottom:10px">
+					Rozmer sieťky sa počíta z rámu posuvu, nie zo skla (izolačné sklo sieťku nemení). Platí
+					pre Štandard aj Štandard + naraz. <b>K mení odpis kladkového profilu</b> pri sieťke iného systému
+					než posuv.
+				</p>
+				<div class="grid2">
+					{#each SIETKA_STANDARD_KLUCE as k (k)}
+						<div class="field">
+							<label for="sietka_{k}">{SIETKA_STANDARD_POPIS[k].label} (mm)</label>
+							<input
+								id="sietka_{k}"
+								name="sietka_{k}"
+								type="number"
+								step="any"
+								min={SIETKA_STANDARD_BOUNDS[k].min}
+								max={SIETKA_STANDARD_BOUNDS[k].max}
+								value={data.sietkaStandard[k]}
+								required
+							/>
+							<p class="pozn">{SIETKA_STANDARD_POPIS[k].help}</p>
+						</div>
+					{/each}
 				</div>
 			{/if}
 

@@ -479,6 +479,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazový profil Surový 7500 mm",
       },
     ],
+    "sietovina": null,
     "sklo": {
       "pocet": 3,
       "sirka": 1402,
@@ -1160,6 +1161,10 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Nosový profil Surový 7500 mm",
       },
     ],
+    "sietovina": {
+      "sirka": 2199,
+      "vyska": 2116,
+    },
     "sklo": {
       "pocet": 2,
       "sirka": 2197,
@@ -1933,6 +1938,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Nosový profil Surový 7500 mm",
       },
     ],
+    "sietovina": null,
     "sklo": {
       "pocet": 4,
       "sirka": 1185,
@@ -2702,6 +2708,10 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Redukcia pre sieťku Surový 7500 mm",
       },
     ],
+    "sietovina": {
+      "sirka": 1132,
+      "vyska": 1953,
+    },
     "sklo": {
       "pocet": 3,
       "sirka": 1130,
@@ -3281,6 +3291,7 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazový profil Surový 7500 mm",
       },
     ],
+    "sietovina": null,
     "sklo": {
       "pocet": 2,
       "sirka": 1211,
@@ -4086,6 +4097,10 @@ exports[`golden #109 — jeden posuv (nahlad) — snapshot pred refaktorom Posuv
         "nazov": "Dorazový profil Surový 7500 mm",
       },
     ],
+    "sietovina": {
+      "sirka": 1184,
+      "vyska": 1988,
+    },
     "sklo": {
       "pocet": 4,
       "sirka": 1142,
@@ -5436,6 +5451,10 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "sietka": {
           "uchyt": "madloVelke",
         },
+        "sietovina": {
+          "sirka": 2199,
+          "vyska": 2116,
+        },
         "sklo": {
           "pocet": 2,
           "sirka": 2197,
@@ -5459,6 +5478,10 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "otvaranie": "L - P",
         "sietka": {
           "uchyt": "zamok",
+        },
+        "sietovina": {
+          "sirka": 1132,
+          "vyska": 1953,
         },
         "sklo": {
           "pocet": 3,
@@ -7412,6 +7435,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "m2": 9.45,
         "otvaranie": "P - L",
         "sietka": null,
+        "sietovina": null,
         "sklo": {
           "pocet": 3,
           "sirka": 1402,
@@ -7440,6 +7464,10 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
           "system": "Štandard",
           "uchyt": "madloVelke",
         },
+        "sietovina": {
+          "sirka": 1184,
+          "vyska": 1988,
+        },
         "sklo": {
           "pocet": 4,
           "sirka": 1142,
@@ -7462,6 +7490,7 @@ exports[`golden #109 — viac posuvov (nahladMulti) — snapshot pred refaktorom
         "m2": 11.44,
         "otvaranie": "Opona",
         "sietka": null,
+        "sietovina": null,
         "sklo": {
           "pocet": 4,
           "sirka": 1185,
