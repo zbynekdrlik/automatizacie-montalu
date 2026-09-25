@@ -1,6 +1,9 @@
 ---
 paths:
   - ".github/workflows/*.yml"
+  - "scripts/mutation-*.sh"
+  - "tests/mutation-*.test.ts"
+  - "stryker.config.json"
 ---
 
 # CI workflow gotchas
@@ -173,8 +176,8 @@ vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `threshol
 `incremental`).
 
 - **`mutation-diff`** — na KAŽDÝ `push` do `dev`. Diff-scoped: `git diff --name-only
-  origin/main...HEAD` filtrovaný na `src/lib/**/*.ts` → `npx stryker run --incremental
-  --mutate "<súbory>"`. **Tvrdý strop `timeout-minutes: 20`** — prekročenie je chyba SETUPU
+  origin/main...HEAD` filtrovaný na `src/lib/**/*.ts` → shard → zmenené riadky →
+  `npx stryker run --incremental --mutate "<súbor:start-end,…>"` (od #569, nižšie). **Tvrdý strop `timeout-minutes: 20`** — prekročenie je chyba SETUPU
   (zúž scope / sharduj), NIKDY nezvyšuj timeout (`no-timeout-band-aids`). **Prázdny diff =
   explicitný `exit 0`** (žiadne mutovateľné súbory nie je zlyhanie; kroky setup+stryker sú
   gated cez `steps.scope.outputs.changed != ''`, takže config-only push je rýchly no-op).
@@ -210,6 +213,53 @@ vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `threshol
     na stabilite lineage nezávisí. Výstupný formát skriptu (čiarkový zoznam bez
     koncového newline, povinné `SHARD`/`SHARDS`, prázdny vstup → prázdny výstup) sa
     NEMENIL — len algoritmus výberu shardu.
+- **Diff-scope na ZMENENÉ RIADKY (#569, 25.9.)** — run 36109311931: shard 6
+  (`compute-model.ts` + `sietka-standard.ts`) zrušený na 20-min strope, hoci #569 v
+  `compute-model.ts` zmenil ~25 riadkov. Príčina: gate mutoval CELÉ súbory a
+  `compute-model.ts` je LEAF modul importovaný takmer každým výpočtom → 323 mutantov, každý
+  spúšťa veľkú časť sady. Sharding súbor NErozdelí. Fix: `scope` krok po LPT shardingu
+  (po súboroch, bez zmeny) prepustí shard cez **`scripts/mutation-lines.sh <súbory shardu>`**:
+  z `git -c core.quotePath=false diff -U0 -M --no-ext-diff --no-color --src-prefix=a/
+  --dst-prefix=b/ origin/main...HEAD -- src/lib` (RAZ nad celým `src/lib`, súbory shardu
+  vyberá ALLOWLIST = argumenty skriptu) vyrobí `súbor:start-end` (jeden záznam na hunk,
+  čísla riadkov strany HEAD; `+c` bez počtu = 1 riadok; čisté zmazanie `+c,0` → nič; NOVÝ
+  súbor `--- /dev/null` → holá cesta = celý súbor; zmazaný súbor → nič) → `stryker --mutate`.
+  Výsledok shardu 6: **323 → 51 mutantov**. Prázdny zoznam rozsahov (napr. súbor len so
+  zmazaniami) = shard končí zelený ako prázdny diff. Testy: `tests/mutation-lines.test.ts`
+  (fixture + reálny `git diff` v temp repe s izolovaným git configom + text-guard zapojenia
+  v `mutation.yml`: volanie skriptu s allowlistom, príznaky diffu, DDL regex).
+  - **PASCA — pathspec `-- <súbory shardu>` sa aplikuje PRED detekciou premenovaní.**
+    Premenovaný/presunutý súbor (napr. split veľkého modulu) by s pathspecom na novú cestu
+    vyzeral ako NOVÝ (`--- /dev/null`) → mutoval by sa CELÝ → späť na 20-min strop. Preto
+    diff nad celým `src/lib` + `-M` a filter cez allowlist, nie pathspec.
+  - **Pevné príznaky diffu** (`--no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/`):
+    parser predpokladá `a/`/`b/` prefixy — `diff.noprefix`/`diff.mnemonicPrefix`/`diff.external`
+    v configu by ho inak rozbili. Parser je POSIX awk (runner Ubuntu = **mawk**): žiadne
+    gawk-izmy (`length(pole)`), allowlist cez `ENVIRON`, nie `-v`.
+  - **PASCA — `run:` bez `shell:` beží `bash -e {0}` BEZ `pipefail`.** Zlyhaný/useknutý
+    `git diff` v `$(git diff … | bash scripts/mutation-lines.sh …)` by dal prázdny/čiastočný
+    scope a ZELENÝ shard (fail-open). `scope` krok má preto `shell: bash` (= `bash -eo
+    pipefail {0}`), strážené testom zapojenia. Prázdny allowlist (len prázdne argumenty)
+    = nič na mutovanie, NIE „bez filtra = všetko".
+  - **Zámerná cena:** Stryker zaradí mutant len ak CELÝ leží v jednom rozsahu — mutant
+    presahujúci nezmenené riadky (napr. blok okolo jednoriadkovej zmeny) a čisté zmazania PR
+    gate netestuje; dobieha ich on-demand `mutation-sweep`. Sharding váži stále celé súbory
+    (`wc -c`), hoci práca teraz škáluje so zmenenými riadkami — nevyváženie je možné, ale
+    nikdy horšie než pred #569.
+  - Stryker 10 syntax overená v zdroji (`@stryker-mutator/core` `dist/src/fs/project-reader.js`
+    `MUTATION_RANGE_REGEX`): `súbor:startLine[:col]-endLine[:col]`, `start == end` OK (validator
+    odmieta len `start > end` a `start < 1`), glob + rozsah NEkombinovať, viac záznamov toho
+    istého súboru sa ÚNIUJE (`unionFileDescriptions`) → jeden záznam na hunk je korektný.
+  - CLI `--mutate` NAHRÁDZA `mutate` z `stryker.config.json` → vylúčenia z configu (`!…`) v
+    diff gate NEPLATIA; DDL/dáta sa vylučujú v `grep -vE` scope kroku. Regex je teraz
+    `^src/lib/server/migracie(-[^/]*)?\.ts$` (pokrýva `migracie.ts`, `migracie-seed.ts`,
+    `migracie-sietka.ts` a každý budúci `migracie-*.ts` split — `.claude/rules/migrations.md`).
+    `stryker.config.json` (sweep) má zrkadlovo `!src/lib/server/migracie-*.ts`.
+  - Parser berie `---`/`+++` ako hlavičku LEN pred prvým `@@` súboru (pridaný riadok `++ x`
+    je v -U0 diffe `+++ x`); nečitateľný `@@` = exit 2 (step padne, nie tichý prázdny scope).
+  - Lokálny Stryker beh na zaťaženom dev1 môže padnúť na „Initial test run timed out"
+    (default `dryRunTimeoutMinutes` 5) — to je lokálna záťaž, NIE chyba configu; počet
+    mutantov sa overí už z riadku `Instrumenter … Instrumented N source file(s) with M mutant(s)`.
 - **`mutation-sweep`** — LEN `workflow_dispatch` (NIKDY cron — user vyvíja nonstop, cron by
   súperil o runnery). Full `npx stryker run --force || true`; job padne **len keď chýba
   `reports/mutation/mutation.json`** (zlyhal NÁSTROJ), NIE na nízkom skóre. Survivori

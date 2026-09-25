@@ -7,7 +7,7 @@
 	"mutate": [
 		"src/lib/**/*.ts",
 		"!src/lib/server/migracie.ts",
-		"!src/lib/server/migracie-seed.ts",
+		"!src/lib/server/migracie-*.ts",
 		"!src/lib/server/fonts/**"
 	],
 	"incremental": true,
