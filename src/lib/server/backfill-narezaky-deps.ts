@@ -55,11 +55,12 @@ export function listLiveOdpisyForOp(op: string): OdpisBackfillRow[] {
 	const opNorm = normOp(op);
 	if (!opNorm) return [];
 	const jadro = opNorm.replace(/^OP/, '');
+	if (!jadro) return []; // „OP" bez čísla — nič nepárovať (inak by instr(x,'') matchol všetko)
 	const rows = db
 		.prepare(
 			`SELECT id, modul, zak, op, zakaznik, live, content_hash, detail, created_at
 			 FROM odpis_log
-			 WHERE live = 1 AND (op_norm = ? OR instr(upper(op), ?) > 0)
+			 WHERE live = 1 AND (op_norm = ? OR instr(replace(upper(op), ' ', ''), ?) > 0)
 			 ORDER BY id`
 		)
 		.all(opNorm, jadro) as OdpisBackfillRow[];

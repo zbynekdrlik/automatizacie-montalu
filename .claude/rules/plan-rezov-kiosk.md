@@ -66,6 +66,11 @@ triggera vždy over, ČO ho v produkcii nahrádza (reálne dáta, nie existencia
 - doc_id `backfill-narezak-<op>` (rovnaký ako backfill → neskorší prepíše PDF). `/plan-rezov` save
   ostáva (doc_id `plan-rezov-<zak>-<op>` — INÁ príloha, ale `lines` sa nahrádzajú bez ohľadu na
   doc_id, takže riadky sa NEduplikujú; neskorší zápis vyhrá).
+- **SÉRIOVO per OP so zlúčeným dobehom** (`bezi` Map v `odoo-narezak-odpis.ts`, review #570): lines
+  nahrádzajú všetky riadky objednávky, takže dva súbežné uploady tej istej OP by mohli doraziť v
+  opačnom poradí a starší snapshot (len modul A) by prepísal novší (A+B). Per OP beží najviac 1
+  upload; odpisy počas behu len nastavia `dobeh` → po skončení JEDEN ďalší upload s čerstvým stavom z
+  DB. Test: `súbeh dvoch odpisov tej istej OP` (max súbežnosť 1, posledný payload = všetky moduly).
 - Fire-and-forget (`setImmediate`, sync+async catch), log modul `narezak-upload`
   (`nárezák z odpisu: štart` / `ok` s `linesCount` / chyba). Pergola rezervačný odpis → `no-lines` skip s logom.
 - **Test** `tests/odpis-narezak-upload.test.ts` ide cez REÁLNY `hooks.server` composition root +

@@ -28,6 +28,7 @@ const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
 const { loadCfg } = await import('../src/lib/server/db');
 const { recomputeVstup } = await import('../src/lib/server/zasklenia-sklo');
 const { uploadNarezakZOdpisu } = await import('../src/lib/server/odoo-narezak-odpis');
+const { listLiveOdpisyForOp } = await import('../src/lib/server/backfill-narezaky-deps');
 import type { OdpisJob, Modul } from '../src/lib/server/money';
 import type { Vstup } from '../src/lib/server/vstup';
 
@@ -287,6 +288,24 @@ describe('#570 uploadNarezakZOdpisu — výsledky vetiev', () => {
 		expect(r).toMatchObject({ result: 'uploaded', docId: 'backfill-narezak-op570007' });
 		expect(r.riadkov).toBeGreaterThan(0);
 		expect(narezakCalls(calls)).toHaveLength(1);
+	});
+
+	it('OP zapísaná rôznymi zápismi (OP570030 / 570030) → jeden upload s riadkami oboch modulov', async () => {
+		await zapisBezUploadu(pergolaJob('ZAK570T', 'OP570030'));
+		await zapisBezUploadu(zaskleniaJob('ZAK570T', '570030'));
+		expect(
+			listLiveOdpisyForOp('op 570030')
+				.map((r) => r.modul)
+				.sort()
+		).toEqual(['pergola', 'zasklenia']);
+		expect(listLiveOdpisyForOp('OP')).toEqual([]);
+		expect(listLiveOdpisyForOp('')).toEqual([]);
+		const calls = captureTransport();
+		const r = await uploadNarezakZOdpisu('ZAK570T', '570030');
+		expect(r.result).toBe('uploaded');
+		const lines = narezakCalls(calls)[0]!.body.lines as { nazov: string }[];
+		expect(lines.some((l) => l.nazov === 'Profil A')).toBe(true);
+		expect(lines.length).toBeGreaterThan(2);
 	});
 
 	it('chýba JSON-2 konfigurácia → disabled, žiadne volanie', async () => {
