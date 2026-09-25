@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 // scripts/mutation-lines.sh — z `git diff -U0` (stdin) vyrobí Stryker `--mutate`
@@ -14,14 +14,25 @@ import { tmpdir } from 'node:os';
 // (3) NOVÝ súbor (`--- /dev/null`) → celý súbor (holá cesta, bez rozsahu);
 // (4) ZMAZANÝ súbor (`+++ /dev/null`) → nič;
 // (5) viac hunkov → viac záznamov, v poradí diffu; viac súborov → zreťazené;
-// (6) prázdny vstup → prázdny výstup (gate na tom stavia „nič na mutovanie").
+// (6) prázdny vstup → prázdny výstup (gate na tom stavia „nič na mutovanie");
+// (7) argumenty = allowlist súborov shardu: záznamy LEN pre tie cesty (diff sa robí
+//     raz nad celým `src/lib` s `-M`, aby premenovaný súbor nebol „nový = celý").
 const SCRIPT = resolve(__dirname, '../scripts/mutation-lines.sh');
+const WORKFLOW = resolve(__dirname, '../.github/workflows/mutation.yml');
+// Rovnaké príznaky ako mutation.yml scope krok — diff nezávislý od lokálneho git configu.
+const DIFF_FLAGS = [
+	'-U0',
+	'-M',
+	'--no-ext-diff',
+	'--no-color',
+	'--src-prefix=a/',
+	'--dst-prefix=b/'
+];
 
-function lines(diff: string, cwd?: string): string[] {
-	const out = execFileSync('bash', [SCRIPT], {
+function lines(diff: string, files: string[] = []): string[] {
+	const out = execFileSync('bash', [SCRIPT, ...files], {
 		input: diff,
-		encoding: 'utf8',
-		...(cwd ? { cwd } : {})
+		encoding: 'utf8'
 	});
 	return out === '' ? [] : out.split(',');
 }
@@ -136,12 +147,24 @@ index 1111111..2222222 100644
 		expect(() => lines(diff)).toThrow();
 	});
 
-	// Integračný test na skutočnom `git diff -U0` (nie ručne písaný fixture) —
-	// chráni pred rozchodom medzi fixture a reálnym formátom gitu.
+	it('allowlist (argumenty): záznamy len pre súbory shardu, poradie diffu', () => {
+		const vsetko = NEW_FILE + MODIFIED;
+		expect(lines(vsetko, ['src/lib/server/compute-model.ts'])).toEqual([
+			'src/lib/server/compute-model.ts:2-2',
+			'src/lib/server/compute-model.ts:5-5',
+			'src/lib/server/compute-model.ts:43-54'
+		]);
+		expect(lines(vsetko, ['src/lib/sietka-standard.ts'])).toEqual(['src/lib/sietka-standard.ts']);
+		expect(lines(vsetko, ['src/lib/iny.ts'])).toEqual([]);
+	});
+
+	// Integračné testy na skutočnom `git diff` (nie ručne písaný fixture) — chránia pred
+	// rozchodom medzi fixture a reálnym formátom gitu. Izolovaný od globálneho/systémového
+	// git configu (gpgsign, diff.noprefix, … by inak zmenili správanie na inom stroji).
 	const dirs: string[] = [];
 	afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-	it('reálny `git diff -U0 base...HEAD`: rozsahy sedia na HEAD čísla riadkov', () => {
+	function repo() {
 		const dir = mkdtempSync(join(tmpdir(), 'mutation-lines-'));
 		dirs.push(dir);
 		const git = (...args: string[]) =>
@@ -150,6 +173,8 @@ index 1111111..2222222 100644
 				encoding: 'utf8',
 				env: {
 					...process.env,
+					GIT_CONFIG_GLOBAL: '/dev/null',
+					GIT_CONFIG_NOSYSTEM: '1',
 					GIT_AUTHOR_NAME: 't',
 					GIT_AUTHOR_EMAIL: 't@t',
 					GIT_COMMITTER_NAME: 't',
@@ -158,22 +183,78 @@ index 1111111..2222222 100644
 			});
 		git('init', '-q', '-b', 'main');
 		mkdirSync(join(dir, 'src/lib'), { recursive: true });
-		const base = Array.from({ length: 30 }, (_, i) => `const r${i + 1} = ${i + 1};`);
-		writeFileSync(join(dir, 'src/lib/a.ts'), base.join('\n') + '\n');
-		writeFileSync(join(dir, 'src/lib/zmaz.ts'), 'export const z = 1;\n');
-		git('add', '.');
-		git('commit', '-q', '-m', 'base');
-		git('checkout', '-q', '-b', 'dev');
-		const next = [...base];
+		const zapis = (f: string, obsah: string) => writeFileSync(join(dir, f), obsah);
+		const commit = (msg: string) => {
+			git('add', '-A');
+			git('commit', '-q', '-m', msg);
+		};
+		const diff = () =>
+			git('-c', 'core.quotePath=false', 'diff', ...DIFF_FLAGS, 'main...HEAD', '--', 'src/lib');
+		return { dir, git, zapis, commit, diff };
+	}
+
+	const BASE = Array.from({ length: 30 }, (_, i) => `const r${i + 1} = ${i + 1};`);
+
+	it('reálny `git diff -U0 base...HEAD`: rozsahy sedia na HEAD čísla riadkov', () => {
+		const r = repo();
+		r.zapis('src/lib/a.ts', BASE.join('\n') + '\n');
+		r.zapis('src/lib/zmaz.ts', 'export const z = 1;\n');
+		r.commit('base');
+		r.git('checkout', '-q', '-b', 'dev');
+		const next = [...BASE];
 		next[4] = 'const r5 = 500;'; // riadok 5 zmenený
 		next.splice(10, 3); // pôvodné riadky 11-13 zmazané (čisté zmazanie)
 		next.splice(20, 0, 'const n1 = 1;', 'const n2 = 2;'); // 2 nové riadky na HEAD 21-22
-		writeFileSync(join(dir, 'src/lib/a.ts'), next.join('\n') + '\n');
-		writeFileSync(join(dir, 'src/lib/novy.ts'), 'export const n = 1;\nexport const m = 2;\n');
-		rmSync(join(dir, 'src/lib/zmaz.ts'));
-		git('add', '-A');
-		git('commit', '-q', '-m', 'zmena');
-		const diff = git('-c', 'core.quotePath=false', 'diff', '-U0', 'main...HEAD', '--', 'src/lib');
-		expect(lines(diff)).toEqual(['src/lib/a.ts:5-5', 'src/lib/a.ts:21-22', 'src/lib/novy.ts']);
+		r.zapis('src/lib/a.ts', next.join('\n') + '\n');
+		r.zapis('src/lib/novy.ts', 'export const n = 1;\nexport const m = 2;\n');
+		rmSync(join(r.dir, 'src/lib/zmaz.ts'));
+		r.commit('zmena');
+		expect(lines(r.diff())).toEqual(['src/lib/a.ts:5-5', 'src/lib/a.ts:21-22', 'src/lib/novy.ts']);
+	});
+
+	it('premenovaný súbor s malou zmenou = len zmenené riadky, NIE celý súbor', () => {
+		const r = repo();
+		r.zapis('src/lib/stary.ts', BASE.join('\n') + '\n');
+		r.commit('base');
+		r.git('checkout', '-q', '-b', 'dev');
+		r.git('mv', 'src/lib/stary.ts', 'src/lib/novy-nazov.ts');
+		const next = [...BASE];
+		next[7] = 'const r8 = 800;'; // riadok 8 zmenený
+		r.zapis('src/lib/novy-nazov.ts', next.join('\n') + '\n');
+		r.commit('premenovanie');
+		// shard dostane NOVÚ cestu (tak ju vráti `--name-only`)
+		expect(lines(r.diff(), ['src/lib/novy-nazov.ts'])).toEqual(['src/lib/novy-nazov.ts:8-8']);
+	});
+});
+
+// Zapojenie v mutation.yml — tichý návrat k mutácii celých súborov (alebo zmena
+// príznakov diffu, ktoré testy vyššie predpokladajú) má padnúť tu, nie až na 20-min strope.
+describe('mutation.yml scope krok (zapojenie #569)', () => {
+	const yml = readFileSync(WORKFLOW, 'utf8');
+
+	it('rozsahy riadkov idú cez mutation-lines.sh s allowlistom shardu, diff s rovnakými príznakmi', () => {
+		expect(yml).toContain('| bash scripts/mutation-lines.sh "${FILES[@]}"');
+		expect(yml).toContain(`diff ${DIFF_FLAGS.join(' ')} origin/main...HEAD -- src/lib`);
+		expect(yml).toContain('--mutate "$CHANGED"');
+		expect(yml).toContain('changed=$RANGES');
+	});
+
+	it('DDL vylúčenie pokrýva migracie.ts aj každý migracie-*.ts, nie iné súbory', () => {
+		const m = yml.match(/grep -vE '(\^src\/lib\/server\/migracie[^']*)'/);
+		expect(m).not.toBeNull();
+		const re = new RegExp(m![1]!);
+		for (const f of [
+			'src/lib/server/migracie.ts',
+			'src/lib/server/migracie-seed.ts',
+			'src/lib/server/migracie-sietka.ts',
+			'src/lib/server/fonts/roboto.ts'
+		])
+			expect(re.test(f), f).toBe(true);
+		for (const f of [
+			'src/lib/server/compute-model.ts',
+			'src/lib/server/migracie/iny.ts',
+			'src/lib/migracie-x.ts'
+		])
+			expect(re.test(f), f).toBe(false);
 	});
 });
