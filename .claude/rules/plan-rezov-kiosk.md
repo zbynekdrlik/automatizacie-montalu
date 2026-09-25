@@ -1,6 +1,9 @@
 ---
 paths:
   - "src/lib/server/odoo-plan-rezov-upload.ts"
+  - "src/lib/server/odoo-narezak-odpis.ts"
+  - "src/hooks.server.ts"
+  - "tests/odpis-narezak-upload.test.ts"
   - "src/lib/server/odoo-rozpis-lines.ts"
   - "src/lib/server/narezak-pdf.ts"
   - "src/lib/server/narezak-cut-plan.ts"
@@ -37,8 +40,37 @@ cutterovi) — rozpis+ceny odteraz žijú LEN v internej `mt_note` (viď `odoo-z
   `scripts/gen-profil-png.mjs` cez `dwebp`; pdf-lib nevie webp).
 - `src/lib/server/odoo-plan-rezov-upload.ts` — `queuePlanRezovUpload` (fire-and-forget
   vstup z `ulozit`), `uploadPlanRezovToOdoo`, `buildPlanRezovDocId`.
-- `src/hooks.server.ts` — odpis hook volá UŽ LEN `queueZakazkaPush` (interná note), NIE
-  narezak upload.
+- `src/hooks.server.ts` — odpis hook volá `queueZakazkaPush` (interná note S CENAMI) **a od #570
+  aj `queueNarezakUploadZOdpisu`** (`odoo-narezak-odpis.ts`) — nárezák BEZ cien zo zdieľaného jadra
+  backfillu. Viď sekcia „REGRESIA #570" nižšie.
+
+## REGRESIA #570 — kiosk „Čo rezať" MUSÍ dostať riadky z ODPISU, nie len z /plan-rezov
+
+**Lekcia:** #511 odstránil `queueNarezakUpload` z odpis hooku (dôvod: posielal rozpis S CENAMI) a
+jediným automatickým triggerom nárezáku ostalo **uloženie plánu na `/plan-rezov`** — lenže výroba
+plán NIKDY neukladá (PROD `plan_rezov_ulozene` = 1 E2E riadok). Tablety „Čo rezať" boli od 20.9.
+prázdne; regresiu 5 dní maskovali ručné backfill behy (16.–19.9.). Guard
+`narezak-rozpis-removed.test.ts` (`not.toMatch(/queueNarezakUpload/)`) ju dokonca betónoval —
+zakazoval AKÝKOĽVEK nárezák z odpisu, hoci zámer bol len „žiadne ceny na kiosk". **Pri odstraňovaní
+triggera vždy over, ČO ho v produkcii nahrádza (reálne dáta, nie existencia cesty v kóde).**
+
+**Oprava (#570):** `setOdpisWrittenHook` → `queueNarezakUploadZOdpisu(zak, op)`:
+- **LEN `live=1`** — `isLive()` sa číta SYNCHRÓNNE v hooku (ten istý proces-flag, ktorým `writeOdpis`
+  zapísal `odpis_log.live`); test odpis nič neposiela. Brána `ODOO_NAREZ_UPLOAD_ENABLED=1` + JSON-2 env.
+- **Telo = ZDIEĽANÉ JADRO backfillu** (`backfill-narezaky.ts`): `groupOdpisyPerOp` →
+  `linesPreOp` → `odoslatNarezakPreOp` (PDF + `cut_plan` v1–v3 + `uploadNarezak` 422 fallback +
+  klasifikácia `montalu_order_not_found`). Žiadna kópia — `runBackfill` volá to isté.
+- **Riadky VŠETKÝCH modulov OP** (`listLiveOdpisyForOp` — match `normOp(r.op)`, lebo v27 `op_norm`
+  je pre staré riadky RAW kópia) — lines upload nahrádza VŠETKY riadky objednávky, takže upload len
+  práve zapísaného modulu by zmazal riadky ostatných modulov tej istej OP.
+- doc_id `backfill-narezak-<op>` (rovnaký ako backfill → neskorší prepíše PDF). `/plan-rezov` save
+  ostáva (doc_id `plan-rezov-<zak>-<op>` — INÁ príloha, ale `lines` sa nahrádzajú bez ohľadu na
+  doc_id, takže riadky sa NEduplikujú; neskorší zápis vyhrá).
+- Fire-and-forget (`setImmediate`, sync+async catch), log modul `narezak-upload`
+  (`nárezák z odpisu: štart` / `ok` s `linesCount` / chyba). Pergola rezervačný odpis → `no-lines` skip s logom.
+- **Test** `tests/odpis-narezak-upload.test.ts` ide cez REÁLNY `hooks.server` composition root +
+  `writeOdpis` nad temp DB, mockuje LEN `setJson2Transport`; `vi.waitFor` na odložený upload
+  (timeout < test timeout, inak dostaneš `Test timed out` namiesto assertion diffu).
 
 ## GRAFICKÝ nárezák PDF (#529) — zrkadlí `RozpisRezov`, kontrakt + pdf-lib pasce
 
