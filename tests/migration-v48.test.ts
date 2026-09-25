@@ -67,7 +67,7 @@ describe('migration v47 → v48 (objednavka_skla spec)', () => {
 	it('bumps to v48 and adds all 10 spec_* columns', async () => {
 		await import('../src/lib/server/db');
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(49);
+		expect(d.pragma('user_version', { simple: true })).toBe(50);
 
 		const cols = (d.prepare('PRAGMA table_info(objednavka_skla)').all() as { name: string }[]).map(
 			(c) => c.name

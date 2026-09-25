@@ -1,0 +1,634 @@
+{
+	"Štandard +|2K|3000x2200|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard +|2K IZO|3000x2200|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 14.4
+		}
+	],
+	"Štandard +|2K|3000x2200|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard +|2K IZO|3000x2200|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 14.4
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|2K|3000x2200|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|2K IZO|3000x2200|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00033",
+			"nazov": "Koľajnica spodná 4K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 14.4
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|2K|3000x2200|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|2K IZO|3000x2200|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00033",
+			"nazov": "Koľajnica spodná 4K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 14.4
+		}
+	],
+	"Štandard +|3K|3000x1850|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard +|3K IZO|3000x1850|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 18
+		}
+	],
+	"Štandard +|3K|3000x1850|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard +|3K IZO|3000x1850|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 18
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|3K|3000x1850|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|3K IZO|3000x1850|sietka=Štandard +": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00033",
+			"nazov": "Koľajnica spodná 4K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 18
+		},
+		{
+			"kod": "ZASP20244",
+			"nazov": "Koncový profil (PLUS) surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202419",
+			"nazov": "Dorazová lišta zámok (PLUS) Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|3K|3000x1850|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00030",
+			"nazov": "Koľajnica spodná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		}
+	],
+	"Štandard|3K IZO|3000x1850|sietka=Štandard": [
+		{
+			"kod": "ZASP00027",
+			"nazov": "Koľajnica horná 3K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00033",
+			"nazov": "Koľajnica spodná 4K Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202415",
+			"nazov": "Kladkový profil Surový 3600mm",
+			"metre": 10.8
+		},
+		{
+			"kod": "ZASP00018",
+			"nazov": "Rámový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP00024",
+			"nazov": "Rámový profil stredový Surový 7500 mm",
+			"metre": 15
+		},
+		{
+			"kod": "ZASP00021",
+			"nazov": "Dorazový profil Surový 7500 mm",
+			"metre": 7.5
+		},
+		{
+			"kod": "ZASP202439",
+			"nazov": "Rozširujúci profil Surový 3600 mm",
+			"metre": 18
+		}
+	]
+}

@@ -8,7 +8,8 @@ import {
 	systemyZoStylov,
 	glassTypesForSystem,
 	systemFromSysStyl,
-	triedaKorekcia
+	triedaKorekcia,
+	getSietkaStandardParams
 } from '$lib/server/db';
 import {
 	getEditableRows,
@@ -17,6 +18,8 @@ import {
 	type CfgZmena
 } from '$lib/server/cfg-editor';
 import { safeCompute } from '$lib/server/compute';
+import { maSietkaSystemVyber } from '$lib/sietka';
+import { SIETKA_STANDARD_KLUCE, type SietkaStandardParams } from '$lib/sietka-standard';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const styly = listSysStyly();
@@ -44,6 +47,9 @@ export const load: PageServerLoad = async ({ url }) => {
 		maTrieda16: glass.some((g) => g.hrubkaTrieda === 16),
 		trieda6Korekcia: triedaKorekcia(system, 6),
 		trieda16Korekcia: triedaKorekcia(system, 16),
+		// #569: K/R/H modelu sieťky Štandard — globálne pre Štandard aj Štandard +, zobrazia sa
+		// LEN pri Štandard-rodine (inde sieťka Štandard nie je).
+		sietkaStandard: maSietkaSystemVyber(system) ? getSietkaStandardParams() : null,
 		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) as CfgZmena[] }))
 	};
 };
@@ -99,6 +105,14 @@ export const actions = {
 			triedaKorekciaVstup.set(16, raw === '' ? null : num(raw));
 		}
 
+		// #569: K/R/H sieťky Štandard — rovnaký form.has() guard (chýbajúce pole = bez zmeny;
+		// pole sa renderuje len pri Štandard-rodine). Prázdne/nečíselné → NaN → saveCfgChanges odmietne.
+		let sietkaStandard: Partial<SietkaStandardParams> | undefined;
+		for (const k of SIETKA_STANDARD_KLUCE) {
+			if (!form.has(`sietka_${k}`)) continue;
+			(sietkaStandard ??= {})[k] = num(form.get(`sietka_${k}`));
+		}
+
 		// náhľad PRED zmenou na kontrolných rozmeroch. Deluxe: kladka/klzný je
 		// hrúbko-závislý (6/10) — bez zvolenej hrúbky by z náhľadu vypadol, tak zvoľ
 		// reprezentatívnu 6mm (odpis metre je pre 6 aj 10 rovnaký, líši sa len kód).
@@ -114,7 +128,8 @@ export const actions = {
 			skloOffset,
 			glassRedukcia,
 			glassKorekcia,
-			triedaKorekcia: triedaKorekciaVstup
+			triedaKorekcia: triedaKorekciaVstup,
+			sietkaStandard
 		});
 		if (error) return { error, sysStyl };
 

@@ -1,7 +1,8 @@
 // Zdieľané dátové typy + jadro pure/validačných helperov výpočtu zasklení
-// (LEAF vrstva — žiadne interné importy). Rozdelené z compute.ts (#249, pure-move
+// (LEAF vrstva — žiadne interné server importy; len čistý `$lib/sietka-standard`, #569). Rozdelené z compute.ts (#249, pure-move
 // split pod 1000-r. strop). Verejné API sa re-exportuje cez fasádu compute.ts,
 // preto importuj z `$lib/server/compute`, nie priamo odtiaľto.
+import { SIETKA_STANDARD_SEED, type SietkaStandardParams } from '$lib/sietka-standard';
 
 export interface SysRow {
 	sysStyl: string;
@@ -39,7 +40,18 @@ export interface CfgGroup {
 	sklo: { s?: RezRow; v?: RezRow };
 }
 
-export type Cfg = Record<string, CfgGroup>;
+/** Kľúč, pod ktorým `Cfg` nesie konštanty modelu sieťky Štandard (K/R/H, #569) — globálne
+ *  parametre vzorcov, nie skupina štýlu. Symbol: `for…in`/`Object.keys` ho nevidia, takže
+ *  žiadna iterácia cez skupiny štýlov sa nezmení. Číta sa cez `sietkaStandardParams(cfg)`. */
+export const SIETKA_STANDARD_CFG: unique symbol = Symbol('sietkaStandardParams');
+
+export type Cfg = Record<string, CfgGroup> & { [SIETKA_STANDARD_CFG]?: SietkaStandardParams };
+
+/** Konštanty modelu sieťky Štandard pre toto cfg (`loadCfg` ich naplní z DB); ručne
+ *  postavené cfg bez nich (unit testy) dostanú seed hodnoty. */
+export function sietkaStandardParams(cfg: Cfg): SietkaStandardParams {
+	return cfg[SIETKA_STANDARD_CFG] ?? { ...SIETKA_STANDARD_SEED };
+}
 
 export interface Kus {
 	/** finálna dĺžka rezu (zobrazená robotníkovi, s prerezom) */
@@ -90,6 +102,9 @@ export interface ComputeResult {
 	material: MaterialRow[];
 	odpis: OdpisRow[];
 	sklo: { sirka: number; vyska: number; pocet: number };
+	/** rozmer SIEŤOVINY (objednávka u dodávateľa), keď je sieťka zapnutá — Štandard-rodina
+	 *  z modelu rámu (#569, `$lib/sietka-standard`), Robust/Slide sklo +2/+1; inak null */
+	sietovina: { sirka: number; vyska: number } | null;
 }
 
 export const BAR = 7500;
@@ -100,8 +115,12 @@ export const KOTUC = 4;
 
 export const R = (x: number) => Math.round(x * 1000) / 1000;
 
-export function buildCFG(sysRows: SysRow[], rezRows: RezRow[]): Cfg {
-	const cfg: Cfg = {};
+export function buildCFG(
+	sysRows: SysRow[],
+	rezRows: RezRow[],
+	sietkaStandard: SietkaStandardParams = SIETKA_STANDARD_SEED
+): Cfg {
+	const cfg: Cfg = { [SIETKA_STANDARD_CFG]: { ...sietkaStandard } };
 	for (const s of sysRows) {
 		if (!s || !s.sysStyl) continue;
 		cfg[s.sysStyl] = { N: Number(s.N), skloOffset: Number(s.skloOffset), rez: [], sklo: {} };
