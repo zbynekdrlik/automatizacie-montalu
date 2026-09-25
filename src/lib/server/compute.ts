@@ -39,7 +39,8 @@ export {
 	sietkaKolajnicaSwap,
 	sietkaKolajnicaVzorecChyba,
 	sietkaSamostatnaVypocet,
-	sietkaSamostatnaMultiVypocet
+	sietkaSamostatnaMultiVypocet,
+	sietovinaPre
 } from './compute-sietka';
 export type {
 	ExtraRez,

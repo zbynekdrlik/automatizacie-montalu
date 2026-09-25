@@ -12,6 +12,14 @@ import path from 'node:path';
 import type { SysRow, RezRow, Cfg } from './compute';
 import { buildCFG } from './compute';
 import { migrate } from './migracie';
+import { logger } from './log';
+import {
+	SIETKA_STANDARD_KLUCE,
+	SIETKA_STANDARD_SEED,
+	type SietkaStandardParams
+} from '../sietka-standard';
+
+const log = logger('db');
 
 // exportované pre štartovací config log v hooks.server.ts (#245); jediný zdroj cesty k DB
 export const DB_PATH = process.env.DATABASE_PATH || './data/app.db';
@@ -76,7 +84,28 @@ export function loadCfg(): Cfg {
 		dlzkaTyce: r.dlzka_tyce as number,
 		skloHrubka: r.sklo_hrubka as number
 	}));
-	return buildCFG(sys, rez);
+	return buildCFG(sys, rez, getSietkaStandardParams());
+}
+
+/** Konštanty modelu sieťky Štandard (K/R/H, #569) z `cfg_sietka_standard` (migrácia v50,
+ *  editor vzorcov). Chýbajúci/nečíselný riadok nemá nastať (migrácia seeduje, CHECK + editor
+ *  validuje) — ak predsa, použije sa seed hodnota a zaloguje warn (nikdy tichý fallback). */
+export function getSietkaStandardParams(): SietkaStandardParams {
+	const rows = db.prepare('SELECT kluc, hodnota FROM cfg_sietka_standard').all() as {
+		kluc: string;
+		hodnota: number;
+	}[];
+	const podla = new Map(rows.map((r) => [r.kluc, Number(r.hodnota)]));
+	const out: SietkaStandardParams = { ...SIETKA_STANDARD_SEED };
+	for (const k of SIETKA_STANDARD_KLUCE) {
+		const v = podla.get(k);
+		if (v === undefined || !Number.isFinite(v)) {
+			log.warn('cfg_sietka_standard: chýba hodnota, použitý seed', { kluc: k, seed: out[k] });
+			continue;
+		}
+		out[k] = v;
+	}
+	return out;
 }
 
 /** Systémová časť `sysStyl` (pred prvým „|"), napr. „Slide|2K" → „Slide". Jediné miesto,

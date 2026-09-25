@@ -6,9 +6,18 @@ import {
 	glassTypesForSystem,
 	systemFromSysStyl,
 	resolveGlassSystem,
-	triedaKorekcia
+	triedaKorekcia,
+	getSietkaStandardParams
 } from './db';
 import { BOUNDS, validSys, inBounds } from './compute';
+import { maSietkaSystemVyber } from '../sietka';
+import {
+	SIETKA_STANDARD_BOUNDS,
+	SIETKA_STANDARD_KLUCE,
+	SIETKA_STANDARD_POPIS,
+	type SietkaStandardKluc,
+	type SietkaStandardParams
+} from '../sietka-standard';
 
 export interface EditRow {
 	id: number;
@@ -77,6 +86,10 @@ export interface SaveInput {
 	// zruš override → systémová). Kľúčovaná RESOLVED systémom (Štandard zdieľa riadok so
 	// Štandard + — `resolveGlassSystem`), nastavuje sa RAZ pre celý systém, nie per sklo.
 	triedaKorekcia?: Map<6 | 16, number | null>;
+	// #569: konštanty modelu sieťky Štandard (K/R/H) — GLOBÁLNE pre Štandard aj Štandard +
+	// (jedna tabuľka `cfg_sietka_standard`), editujú sa z editora ktoréhokoľvek Štandard
+	// štýlu; audit záznam ide pod editovaný sysStyl. Chýbajúci kľúč = bez zmeny.
+	sietkaStandard?: Partial<SietkaStandardParams>;
 }
 
 export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: string | null } {
@@ -134,6 +147,26 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 				return {
 					zmeny: [],
 					error: `Korekcia rozmeru skla — trieda musí byť celé číslo ${BOUNDS.skloOffset.min}–${BOUNDS.skloOffset.max} mm (alebo prázdne pole = systémová).`
+				};
+		}
+	}
+
+	// #569: K/R/H sieťky Štandard — len pri Štandard-rodine (inde ich formulár nemá), v medziach.
+	// Preklep sa odmietne skôr, než sa čohokoľvek dotkne (ako offsety vyššie).
+	if (input.sietkaStandard) {
+		if (!maSietkaSystemVyber(systemFromSysStyl(input.sysStyl)))
+			return {
+				zmeny: [],
+				error: 'Sieťka Štandard sa nastavuje len pri systéme Štandard / Štandard +.'
+			};
+		for (const k of SIETKA_STANDARD_KLUCE) {
+			const v = input.sietkaStandard[k];
+			if (v === undefined) continue;
+			const b = SIETKA_STANDARD_BOUNDS[k];
+			if (!Number.isFinite(v) || v < b.min || v > b.max)
+				return {
+					zmeny: [],
+					error: `Sieťka Štandard — ${SIETKA_STANDARD_POPIS[k].label}: hodnota musí byť ${b.min}–${b.max} mm.`
 				};
 		}
 	}
@@ -216,6 +249,23 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		}
 	}
 
+	// #569: K/R/H sieťky Štandard — diff proti aktuálnej DB hodnote, každá zmena auditovaná
+	// (K mení Money kladkový ZASP202415 pri krížovej sieťke → nesmie byť tichá).
+	const sietkaZmeny: { kluc: SietkaStandardKluc; nova: number }[] = [];
+	if (input.sietkaStandard) {
+		const aktual = getSietkaStandardParams();
+		for (const k of SIETKA_STANDARD_KLUCE) {
+			const nova = input.sietkaStandard[k];
+			if (nova === undefined || nova === aktual[k]) continue;
+			sietkaZmeny.push({ kluc: k, nova });
+			zmeny.push({
+				pole: `Sieťka Štandard — ${SIETKA_STANDARD_POPIS[k].label}`,
+				stara: aktual[k],
+				nova
+			});
+		}
+	}
+
 	// #504: sklo riadky sa historicky zrkadlili z rámového profilu ROVNAKEJ dimenzie
 	// BEZPODMIENEČNE pri každom uložení — to prepisovalo NEZÁVISLÉ sklo offsety (opona IZO
 	// sklo výška = V−135, rámový stredový = V−33; 29 z 39 štýlov má sklo ≠ rámový; prod
@@ -266,6 +316,9 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 	const delTriedaKorekcia = db.prepare(
 		'DELETE FROM cfg_sklo_trieda WHERE system = ? AND trieda = ?'
 	);
+	const updSietka = db.prepare(
+		'INSERT OR REPLACE INTO cfg_sietka_standard (kluc, hodnota) VALUES (?, ?)'
+	);
 	const insAudit = db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)');
 
 	try {
@@ -293,6 +346,7 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 				if (t.nova === null) delTriedaKorekcia.run(sysProTriedu, t.trieda);
 				else insTriedaKorekcia.run(sysProTriedu, t.trieda, t.nova);
 			}
+			for (const z of sietkaZmeny) updSietka.run(z.kluc, z.nova);
 			insAudit.run(input.username, input.sysStyl, JSON.stringify(zmeny));
 
 			// invariant: hrúbko-závislé dvojča (6/10) MUSÍ mať rovnaký offset — inak by

@@ -67,28 +67,12 @@ export function rozmerSietoviny(skloS: number, skloV: number): { sirka: number; 
 	return { sirka: skloS + 2, vyska: skloV + 1 };
 }
 
-/** Rozmer SIEŤOVINY pre Štandard/Štandard + (#110, jeho vlastný nárezák
- *  „ŠTANDARD PLUS V2 3K+1K sieťka", msg #1616284): sklo 957×1735 → riadok
- *  „sieťka" 960×1738 → +3mm šírka, +3mm výška. INÁ delta ako Robust/Slide
- *  (`rozmerSietoviny`, +2/+1) — preto samostatná funkcia, nie parameter. */
-export function rozmerSietovinyStandard(
-	skloS: number,
-	skloV: number
-): { sirka: number; vyska: number } {
-	return { sirka: skloS + 3, vyska: skloV + 3 };
-}
-
-/** Rozmer sieťoviny podľa RODINY systému posuvu — jeden vstupný bod pre UI,
- *  aby si komponenty nemuseli pamätať, ktorá formula patrí ktorému systému. */
-export function rozmerSietovinyPre(
-	system: string,
-	skloS: number,
-	skloV: number
-): { sirka: number; vyska: number } {
-	return maSietkaSystemVyber(system)
-		? rozmerSietovinyStandard(skloS, skloV)
-		: rozmerSietoviny(skloS, skloV);
-}
+/* Rozmer SIEŤOVINY pre Štandard/Štandard + (#569): NIE zo skla. Pôvodné `rozmerSietovinyStandard`
+ * (sklo +3/+3, #110) a `rozmerSietovinyPre` sú ZRUŠENÉ — sieťka Štandard sa odvíja od RÁMU posuvu
+ * (kladkový + R, základné sklo V + H, krížová delta ±K), model `$lib/sietka-standard`, na serveri
+ * `sietovinaPre` (`compute-sietka.ts`) → `ComputeResult.sietovina`. Dôvod: IZO sklo má rozširovací
+ * profil, ktorý do sieťky nejde, takže sieťka zo skla vyšla pri IZO o 23 × 20 mm malá (Patrik
+ * Odoo úloha 1070). `rozmerSietoviny` vyššie ostáva pre Robust/Slide. */
 
 /** Jokle sieťky (#555, Patrik Odoo úloha 1010, príloha ir.attachment 37652) — oceľová
  *  výstuha rámu sieťky 12×8 mm, ktorú VÝROBA reže z NÁŠHO nárezáku. Platí LEN pre Robust
@@ -245,8 +229,9 @@ export function pridavnaKolajnicaHint(
 const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
 
 /** jednoriadkový popis sieťky do plánu / detailu histórie (rovnaký vzor ako klinPopis).
- *  `rozmer` = `rozmerSietoviny(skloS, skloV)` toho posuvu — appka ho vždy vie (je
- *  odvodený zo skla), preto tu nie je nepovinný ako predtým. */
-export function sietkaPopis(s: Sietka, rozmer: { sirka: number; vyska: number }): string {
-	return `sieťka — ${fmt(rozmer.sirka)} × ${fmt(rozmer.vyska)} mm, úchyt: ${uchytLabel(s.uchyt)}`;
+ *  `rozmer` = rozmer sieťoviny toho posuvu zo servera (`ComputeResult.sietovina` /
+ *  `PosuvInfo.sietovina`, #569); `null` len keď cfg nemá z čoho počítať → „—". */
+export function sietkaPopis(s: Sietka, rozmer: { sirka: number; vyska: number } | null): string {
+	const r = rozmer ? `${fmt(rozmer.sirka)} × ${fmt(rozmer.vyska)} mm` : '—';
+	return `sieťka — ${r}, úchyt: ${uchytLabel(s.uchyt)}`;
 }

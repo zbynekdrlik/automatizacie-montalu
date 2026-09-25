@@ -12,7 +12,6 @@
 	import KovanieStrany from './KovanieStrany.svelte';
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import {
-		rozmerSietovinyPre,
 		maSietkaSystemVyber,
 		sietkaStrana,
 		potrebuje3KKolajnicu,
@@ -119,7 +118,7 @@
 {/if}
 
 {#if vstup.sietka}
-	{@const rozmer = rozmerSietovinyPre(p.system, p.sklo.sirka, p.sklo.vyska)}
+	{@const rozmer = p.sietovina}
 	{@const sietkaSystemVal = vstup.sietka.system ?? p.system}
 	{@const pridavnaHint = pridavnaKolajnicaHint(p.system, vstup.styl, true, vstup.pridavnaKolajnica)}
 	<div class="card" data-testid="sietka-karta">
@@ -136,7 +135,8 @@
 			<div>
 				<span>Rozmer sieťoviny (objednávka u dodávateľa)</span><b
 					class="mono"
-					data-testid="sietka-rozmer">{fmtM(rozmer.sirka)} × {fmtM(rozmer.vyska)} mm</b
+					data-testid="sietka-rozmer"
+					>{rozmer ? `${fmtM(rozmer.sirka)} × ${fmtM(rozmer.vyska)} mm` : '—'}</b
 				>
 			</div>
 			<div><span>Úchyt</span><b>{uchytLabel(vstup.sietka.uchyt)}</b></div>
@@ -149,7 +149,7 @@
 							: '+2 rámové rezy (S aj V) + 1 nosový rez'}</b
 				>
 			</div>
-			{#if jeJokleSystem(p.system)}
+			{#if jeJokleSystem(p.system) && rozmer}
 				{@const jokle = rozmerJokle(rozmer)}
 				<div>
 					<span>Jokel 12x8</span><b class="mono" data-testid="sietka-jokle"

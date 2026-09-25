@@ -8,10 +8,11 @@ import {
 	maSietkaSystemVyber,
 	potrebuje3KKolajnicu,
 	rozmerJokle,
-	rozmerSietovinyPre,
+	rozmerSietoviny,
 	type Jokle,
 	type Sietka
 } from '$lib/sietka';
+import { krizDelta, sietkaStandardRozmer } from '$lib/sietka-standard';
 import { zakladnyStyl } from '$lib/styl';
 import { oversizeCut, type ProfilCuts } from './compute-profily';
 import {
@@ -22,6 +23,7 @@ import {
 	JE_RAMOVY_PROFIL,
 	KOTUC,
 	R,
+	sietkaStandardParams,
 	val,
 	validSys,
 	type Cfg,
@@ -97,6 +99,47 @@ function najdiRolu(g: CfgGroup, re: RegExp): RezRow | undefined {
 	return g.rez.find((r) => r.typ === 'profil' && re.test(r.nazov));
 }
 
+/** Systém sieťky: zvolený cudzí systém, inak ten istý ako posuv (#110). */
+function systemSietky(posuvSystem: string, sietka: Sietka): string {
+	return sietka.system && sietka.system !== posuvSystem ? sietka.system : posuvSystem;
+}
+
+/**
+ * Rozmer SIEŤOVINY (objednávka u dodávateľa, do Money NEJDE) pre posuv so sieťkou — JEDINÝ
+ * serverový zdroj pre plán (`ComputeResult.sietovina`/`PosuvInfo.sietovina` → `PlanKarty`).
+ *
+ * Štandard/Štandard + (#569): geometrický model z RÁMU posuvu (`$lib/sietka-standard`) —
+ * kladkový profil posuvu (ten istý riadok, z ktorého `sietkaStandardExtra` reže šírku
+ * prírezov) ± K + R, výška zo ZÁKLADNÉHO (ne-IZO) skla toho istého systému/štýlu + H. IZO sklo
+ * sa NEPOUŽIJE: jeho rozširovací profil do sieťky nejde (Patrik 1070), preto sieťka zo skla
+ * vychádzala pri IZO o 23 × 20 mm malá. Robust/Slide: sklo +2/+1 (`rozmerSietoviny`, nezmenené).
+ * `null` = bez sieťky, alebo cfg nemá kladkový/základné sklo (sietkaChyba to hlási skôr).
+ */
+export function sietovinaPre(
+	cfg: Cfg,
+	system: string,
+	styl: string,
+	sietka: Sietka | null | undefined,
+	S: number,
+	V: number,
+	N: number,
+	sklo: { sirka: number; vyska: number }
+): { sirka: number; vyska: number } | null {
+	if (!sietka) return null;
+	if (!maSietkaSystemVyber(system)) return rozmerSietoviny(sklo.sirka, sklo.vyska);
+	const posuvGroup = cfg[`${system}|${styl}`];
+	const zaklad = cfg[`${system}|${zakladnyStyl(styl)}`];
+	const kladkovy = posuvGroup && najdiRolu(posuvGroup, STANDARD_ROLY[system]!.sirka);
+	if (!kladkovy || !zaklad?.sklo.v) return null;
+	return sietkaStandardRozmer({
+		kladkovyPosuv: val(kladkovy, S, V, N, true),
+		skloVZaklad: val(zaklad.sklo.v, S, V, zaklad.N, true) - zaklad.skloOffset,
+		posuvSystem: system,
+		sietkaSystem: systemSietky(system, sietka),
+		params: sietkaStandardParams(cfg)
+	}).sietovina;
+}
+
 /**
  * Sieťka na Štandarde/Štandard+ (#110) — 4 riadky navyše (šírka prírezov ×2,
  * krajová ×1, nos ×1, dorazová ×1), ALEBO chyba, keď zvolená kombinácia systém
@@ -107,18 +150,15 @@ function najdiRolu(g: CfgGroup, re: RegExp): RezRow | undefined {
  * Krajová/dorazová/nos sa čerpajú zo SYSTÉMU SIEŤKY (jeho VLASTNÝ kód — to je
  * celý zmysel výberu #110, napr. starý „Rámový profil"/„Dorazový profil" na
  * plus posuve). Šírka prírezov sa číta z POSUVU (kód ZASP202415 je zdieľaný
- * oboma systémami) a keď je sieťka INÉHO systému než posuv, pripočíta sa
- * Patrikova PEVNÁ konštanta +16,5 mm (#1616282/#1616285) — jeho DOSLOVNÉ číslo,
- * nie prepočet vzorcom cudzieho systému (ten by dal iné číslo — overené ručne:
- * (3000−143)/3 = 952,33 mm, nie 942,5+16,5 = 959 mm, ktoré uviedol on).
- * Delta je +16,5 mm v OBOCH krížových smeroch (sieťka je vždy VÄČŠIA), nie
- * symetrická ±16,5. Smer „starý sieťka na plus posuve" (+16,5) bol doslovne
- * potvrdený už v #110; opačný smer „plus sieťka na starom posuve" bol pôvodne
- * nepotvrdený PREDPOKLAD zapísaný symetricky (−16,5), no Patrikova výroba ho
- * v #416 (kanál 207, msg 1777560: „štandard + a starý štandard … sieťka musí byť
- * +16mm väčšia") potvrdila ako TIEŽ +16,5 väčší — teda konštantné +16,5, nie ±.
- * (Presná magnitúda 16 vs 16,5 čaká na Patrikovo potvrdenie — #416 needs-answer;
- * ponechaná potvrdená hodnota 16,5 z #110, nie casual „16" z novej správy.)
+ * oboma systémami) a keď je sieťka INÉHO systému než posuv, posunie sa o krížovú
+ * deltu `krizDelta` z modelu `$lib/sietka-standard` (#569): +K pri Š+ posuve so
+ * starou sieťkou, −K pri starom posuve so sieťkou plus (K editovateľné, seed 16,5 =
+ * koncový profil plus 54,5 − starý 38; Patrik Odoo úloha 1070). Nie prepočet vzorcom
+ * cudzieho systému (ten by dal iné číslo — (3000−143)/3 = 952,33 mm, nie 942,5+16,5 = 959).
+ * #569: issue 416 (PR 433) zapísal +16,5 v OBOCH smeroch podľa Patrikovej správy
+ * 1777560 („sieťka musí byť +16mm väčšia") — to bolo zlé čítanie: myslel šírku
+ * SIEŤOVINY v bunke Š+ posuv/stará sieťka, nie kladkový v opačnom smere. Patrik to
+ * v 1070 spresnil: starý posuv + sieťka plus = kladkový o 16 mm MENŠÍ voči posuvu.
  */
 export function sietkaStandardExtra(
 	cfg: Cfg,
@@ -130,7 +170,7 @@ export function sietkaStandardExtra(
 	N: number
 ): { rezy: ExtraRez[]; err: string | null } {
 	if (!maSietkaSystemVyber(posuvSystem) || !sietka) return { rezy: [], err: null };
-	const sietkaSystem = sietka.system && sietka.system !== posuvSystem ? sietka.system : posuvSystem;
+	const sietkaSystem = systemSietky(posuvSystem, sietka);
 	const roly = STANDARD_ROLY[sietkaSystem];
 	if (!roly) return { rezy: [], err: `Neznámy systém sieťky „${sietkaSystem}".` };
 	const posuvGroup = cfg[`${posuvSystem}|${styl}`];
@@ -152,7 +192,9 @@ export function sietkaStandardExtra(
 			rezy: [],
 			err: 'Konfigurácia sieťky nemá všetky potrebné profily (šírka/krajová/nos/dorazová).'
 		};
-	const sirkaDelta = sietkaSystem === posuvSystem ? 0 : 16.5;
+	// #569: znamienko podľa smeru kombinácie (±K, 0 pri rovnakej rodine) — jeden zdroj s
+	// rozmerom sieťoviny (`sietovinaPre`), K z editora vzorcov (`cfg_sietka_standard`).
+	const sirkaDelta = krizDelta(posuvSystem, sietkaSystem, sietkaStandardParams(cfg).k);
 	// delta sa pripočíta PRED zaokrúhlením (nie na už zaokrúhlené číslo) — inak by
 	// 942,5 + 16,5 dalo 943 + 16,5 = 959,5 namiesto Patrikovho doslovného 959
 	// (#1616282/#1616285: 942,5 + 16,5 = 959).
@@ -217,9 +259,10 @@ export function sietkaSlideExtra(
 /** Kus z riadku navyše dlhší než jeho tyč — ten istý guard ako `oversizeCut`, ale
  *  pre `ExtraRez[]` (sieťková delta). Väčšina extra kusov má IDENTICKÚ dĺžku ako
  *  existujúci riadok toho istého systému, ktorý `oversizeCut` už overil — GAP je
- *  cross-systémová šírka prírezov (#110), kde sa k základnej dĺžke pripočíta
- *  Patrikova +16,5 mm konštanta a mohla by (tesne pri hranici tyče) preklopiť
- *  kus, ktorý bez delty ešte sedel, na kus, ktorý sa už nezmestí. */
+ *  cross-systémová šírka prírezov (#110), kde sa k základnej dĺžke pripočíta krížová
+ *  delta +K (Š+ posuv + stará sieťka; #569: opačný smer je −K, kratší — ten tyč
+ *  nepreklopí) a mohla by (tesne pri hranici tyče) preklopiť kus, ktorý bez delty
+ *  ešte sedel, na kus, ktorý sa už nezmestí. */
 function extraOversizeErr(extra: ExtraRez[]): string | null {
 	for (const e of extra) {
 		if (e.dlzka + KOTUC > e.barLen)
@@ -265,7 +308,7 @@ export function sietkaChyba(
  *  oba dali identický odpis. Rovnaký kód → pripočíta sa do existujúceho riadku
  *  (rovnaký `rozmer` → zlúči sa do JEDNÉHO `rezy` riadku — presne ako Patrikov
  *  nárezák ukazuje „8 ks", nie „6 ks" + „2 ks" osobitne; iný `rozmer`, napr.
- *  cross-systémová šírka prírezov s +16,5 mm, ostáva vlastný riadok). Cudzí kód
+ *  cross-systémová šírka prírezov s ±K (#569), ostáva vlastný riadok). Cudzí kód
  *  (cross-systémová sieťka #110) → pridá sa nový riadok. Vracia NOVÝ zoznam,
  *  pôvodný nemutuje. */
 export function mergeExtraCuts(
@@ -541,9 +584,10 @@ export function sietkaSamostatnaVypocet(
 		sirka: Math.round(val(ss, S, V, N, true) - (skloKorekcia ?? g.skloOffset)),
 		vyska: Math.round(val(sv, S, V, N, true) - (skloKorekcia ?? g.skloOffset))
 	};
-	// jeden zdroj vzorca sieťoviny (rovnaká funkcia ako zasklenie/UI) — pre Robust/Slide
-	// (jediné samostatné systémy) = sklo +2/+1; jokle sa z tohto rozmeru odvodzujú
-	const rozmerSietoviny = rozmerSietovinyPre(system, sklo.sirka, sklo.vyska);
+	// jeden zdroj vzorca sieťoviny (rovnaká funkcia ako zasklenie Robust/Slide) — samostatná
+	// sieťka je LEN Robust/Slide (`SIETKA_SAMOSTATNA_SYSTEMY`, gate v sietka-samostatna.ts) =
+	// sklo +2/+1; Štandard model z rámu (#569) sa tu nepoužíva. Jokle sa odvodzujú z tohto rozmeru.
+	const sietovina = rozmerSietoviny(sklo.sirka, sklo.vyska);
 	// jokle (#555) — LEN Robust (samostatná sieťka je aj tak len Robust/Slide). Honest-null:
 	// 2 material riadky s `kod:null` (šírka 4 ks, výška 4 ks), do `odpis` NEVSTUPUJÚ (odpis
 	// sa vyššie naplnil len z reálnych `byKod` profilov — jokle sa tam nikdy nedostanú).
@@ -552,7 +596,7 @@ export function sietkaSamostatnaVypocet(
 	// ich do `odpis` nezaradí. Skutočný krok je zaradiť jokle do odpisovej cesty (najčistejšie:
 	// pridať ich ako cfg RezRow, nech idú cez `byKod`/`ffdPack` ako ostatné profily, a zrušiť
 	// tento honest-null push) + overiť množstvo proti reálnemu Money odpisu.
-	const jokle: Jokle | null = jeJokleSystem(system) ? rozmerJokle(rozmerSietoviny) : null;
+	const jokle: Jokle | null = jeJokleSystem(system) ? rozmerJokle(sietovina) : null;
 	if (jokle) {
 		const packJokle = (dlzka: number, ks: number): number =>
 			ffdPack(
@@ -583,7 +627,7 @@ export function sietkaSamostatnaVypocet(
 			styl,
 			N,
 			sklo,
-			rozmerSietoviny,
+			rozmerSietoviny: sietovina,
 			jokle,
 			material,
 			odpis,
