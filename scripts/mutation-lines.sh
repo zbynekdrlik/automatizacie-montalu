@@ -17,16 +17,40 @@ set -euo pipefail
 # (`scripts/mutation-shard.sh`) súbor nerozdelí; náprava je užší scope, NIKDY
 # väčší timeout. Mutanty mimo zmenených riadkov pokrýva on-demand full sweep.
 #
-# Použitie:
-#   git -c core.quotePath=false diff -U0 origin/main...HEAD -- a.ts b.ts \
-#     | bash scripts/mutation-lines.sh
+# Mutant, ktorý presahuje nezmenené riadky (napr. blok okolo jednoriadkovej
+# zmeny), Stryker do rozsahu nezaradí; čisté zmazanie sa tiež netestuje — to
+# je zámerná cena rýchleho PR gate-u, dohnať ich má on-demand mutation-sweep.
+#
+# Použitie (argumenty = ALLOWLIST ciest shardu; bez argumentov = všetky súbory):
+#   git -c core.quotePath=false diff -U0 -M --no-ext-diff --no-color \
+#       --src-prefix=a/ --dst-prefix=b/ origin/main...HEAD -- src/lib \
+#     | bash scripts/mutation-lines.sh a.ts b.ts
+# Diff sa robí RAZ nad celým `src/lib` (nie `-- <súbory shardu>`): pathspec sa
+# aplikuje PRED detekciou premenovaní, takže premenovaný súbor by s pathspecom
+# na novú cestu vyzeral ako NOVÝ (`--- /dev/null`) → mutoval by sa celý.
 #
 # Výstup: čiarkami oddelený zoznam, BEZ koncového newline; prázdny výstup ak
 # nie je čo mutovať (mutation.yml na tom stavia „shard končí zelený").
 
+MUTATION_LINES_ALLOW=""
+if [ "$#" -gt 0 ]; then
+	MUTATION_LINES_ALLOW=$(printf '%s\n' "$@")
+fi
+export MUTATION_LINES_ALLOW
+
+# POSIX awk (runner Ubuntu = mawk): allowlist cez ENVIRON (nie -v — to by
+# interpretovalo escape sekvencie), filter príznak cez počítadlo, nie length(pole).
 awk '
+BEGIN {
+	nallow = split(ENVIRON["MUTATION_LINES_ALLOW"], a, "\n")
+	filtered = 0
+	for (i = 1; i <= nallow; i++) if (a[i] != "") { ok[a[i]] = 1; filtered = 1 }
+}
+function wanted(p) {
+	return !filtered || (p in ok)
+}
 function flush_new() {
-	if (is_new && path != "") emit(path)
+	if (is_new && path != "" && wanted(path)) emit(path)
 }
 function emit(s) {
 	out = (out == "" ? s : out "," s)
@@ -52,7 +76,7 @@ in_hdr && /^\+\+\+ / {
 }
 /^@@ / {
 	in_hdr = 0
-	if (is_new || is_del || path == "") next
+	if (is_new || is_del || path == "" || !wanted(path)) next
 	# @@ -a[,b] +c[,d] @@ ...
 	if (match($0, /\+[0-9]+(,[0-9]+)?/) == 0) {
 		print "mutation-lines: nečitateľná hlavička hunku: " $0 > "/dev/stderr"

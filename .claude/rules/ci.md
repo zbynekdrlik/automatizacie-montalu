@@ -215,13 +215,29 @@ vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `threshol
   `compute-model.ts` zmenil ~25 riadkov. Príčina: gate mutoval CELÉ súbory a
   `compute-model.ts` je LEAF modul importovaný takmer každým výpočtom → 323 mutantov, každý
   spúšťa veľkú časť sady. Sharding súbor NErozdelí. Fix: `scope` krok po LPT shardingu
-  (po súboroch, bez zmeny) prepustí shard cez **`scripts/mutation-lines.sh`**: z
-  `git -c core.quotePath=false diff -U0 origin/main...HEAD -- <súbory shardu>` vyrobí
-  `súbor:start-end` (jeden záznam na hunk, čísla riadkov strany HEAD; `+c` bez počtu =
-  1 riadok; čisté zmazanie `+c,0` → nič; NOVÝ súbor `--- /dev/null` → holá cesta = celý
-  súbor; zmazaný súbor → nič) → `stryker --mutate`. Výsledok shardu 6: **323 → 51 mutantov**.
-  Prázdny zoznam rozsahov (napr. súbor len so zmazaniami) = shard končí zelený ako prázdny
-  diff. Testy: `tests/mutation-lines.test.ts` (fixture + reálny `git diff -U0` v temp repe).
+  (po súboroch, bez zmeny) prepustí shard cez **`scripts/mutation-lines.sh <súbory shardu>`**:
+  z `git -c core.quotePath=false diff -U0 -M --no-ext-diff --no-color --src-prefix=a/
+  --dst-prefix=b/ origin/main...HEAD -- src/lib` (RAZ nad celým `src/lib`, súbory shardu
+  vyberá ALLOWLIST = argumenty skriptu) vyrobí `súbor:start-end` (jeden záznam na hunk,
+  čísla riadkov strany HEAD; `+c` bez počtu = 1 riadok; čisté zmazanie `+c,0` → nič; NOVÝ
+  súbor `--- /dev/null` → holá cesta = celý súbor; zmazaný súbor → nič) → `stryker --mutate`.
+  Výsledok shardu 6: **323 → 51 mutantov**. Prázdny zoznam rozsahov (napr. súbor len so
+  zmazaniami) = shard končí zelený ako prázdny diff. Testy: `tests/mutation-lines.test.ts`
+  (fixture + reálny `git diff` v temp repe s izolovaným git configom + text-guard zapojenia
+  v `mutation.yml`: volanie skriptu s allowlistom, príznaky diffu, DDL regex).
+  - **PASCA — pathspec `-- <súbory shardu>` sa aplikuje PRED detekciou premenovaní.**
+    Premenovaný/presunutý súbor (napr. split veľkého modulu) by s pathspecom na novú cestu
+    vyzeral ako NOVÝ (`--- /dev/null`) → mutoval by sa CELÝ → späť na 20-min strop. Preto
+    diff nad celým `src/lib` + `-M` a filter cez allowlist, nie pathspec.
+  - **Pevné príznaky diffu** (`--no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/`):
+    parser predpokladá `a/`/`b/` prefixy — `diff.noprefix`/`diff.mnemonicPrefix`/`diff.external`
+    v configu by ho inak rozbili. Parser je POSIX awk (runner Ubuntu = **mawk**): žiadne
+    gawk-izmy (`length(pole)`), allowlist cez `ENVIRON`, nie `-v`.
+  - **Zámerná cena:** Stryker zaradí mutant len ak CELÝ leží v jednom rozsahu — mutant
+    presahujúci nezmenené riadky (napr. blok okolo jednoriadkovej zmeny) a čisté zmazania PR
+    gate netestuje; dobieha ich on-demand `mutation-sweep`. Sharding váži stále celé súbory
+    (`wc -c`), hoci práca teraz škáluje so zmenenými riadkami — nevyváženie je možné, ale
+    nikdy horšie než pred #569.
   - Stryker 10 syntax overená v zdroji (`@stryker-mutator/core` `dist/src/fs/project-reader.js`
     `MUTATION_RANGE_REGEX`): `súbor:startLine[:col]-endLine[:col]`, `start == end` OK (validator
     odmieta len `start > end` a `start < 1`), glob + rozsah NEkombinovať, viac záznamov toho

@@ -81,11 +81,15 @@ jobs:
           # compute-model.ts kvôli pár riadkom = stovky mutantov → 20-min strop).
           # Sharding ostáva po súboroch (LPT); každý súbor mutuje len svoje hunky
           # (`súbor:start-end`), nový súbor celý — scripts/mutation-lines.sh.
+          # Diff RAZ nad celým src/lib s -M (pathspec súborov shardu by sa aplikoval
+          # pred detekciou premenovaní → premenovaný súbor = „nový" = celý súbor);
+          # súbory shardu vyberá allowlist (argumenty skriptu). Pevné príznaky =
+          # výstup nezávislý od git configu (prefixy, externý diff, farby).
           RANGES=""
           if [ -n "$SHARDED" ]; then
             IFS=, read -r -a FILES <<<"$SHARDED"
-            RANGES=$(git -c core.quotePath=false diff -U0 origin/main...HEAD -- "${FILES[@]}" \
-              | bash scripts/mutation-lines.sh)
+            RANGES=$(git -c core.quotePath=false diff -U0 -M --no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/ origin/main...HEAD -- src/lib \
+              | bash scripts/mutation-lines.sh "${FILES[@]}")
           fi
           if [ -z "$RANGES" ]; then
             echo "Shard $SHARD/$SHARDS: žiadne zmenené riadky mu nepatria — mutačný gate nemá čo mutovať, končím zelený."
