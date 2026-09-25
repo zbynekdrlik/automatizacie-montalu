@@ -85,4 +85,34 @@ describe('#569 editor: sieťka Štandard K/R/H', () => {
 		expect(error).toBeNull();
 		expect(zmeny).toEqual([]);
 	});
+
+	it('NaN (prázdne pole z formulára) sa odmietne', () => {
+		const { error } = saveCfgChanges({ ...zaklad(), sietkaStandard: { h: Number.NaN } });
+		expect(error).toMatch(/Sieťka Štandard — H/);
+	});
+
+	it('mimo Štandard-rodiny (Robust) sa K/R/H nedajú zapísať', () => {
+		const cur = getEditableRows('Robust|3K')!;
+		const { error } = saveCfgChanges({
+			sysStyl: 'Robust|3K',
+			username: 'vyroba',
+			offsets: new Map(cur.rows.map((r) => [r.id, r.offset])),
+			skloOffset: cur.skloOffset,
+			sietkaStandard: { k: 20 }
+		});
+		expect(error).toMatch(/len pri systéme Štandard/);
+		expect(getSietkaStandardParams().k).not.toBe(20);
+	});
+
+	it('chýbajúci riadok v DB → seed hodnota (nie pád výpočtu), ostatné z DB', () => {
+		saveCfgChanges({ ...zaklad(), sietkaStandard: { r: 18 } });
+		db.prepare("DELETE FROM cfg_sietka_standard WHERE kluc = 'h'").run();
+		try {
+			expect(getSietkaStandardParams()).toEqual({ ...SIETKA_STANDARD_SEED, r: 18 });
+		} finally {
+			db.prepare("INSERT INTO cfg_sietka_standard (kluc, hodnota) VALUES ('h', ?)").run(
+				SIETKA_STANDARD_SEED.h
+			);
+		}
+	});
 });

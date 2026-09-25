@@ -14,6 +14,7 @@ import {
 	buildCFG,
 	safeCompute,
 	computeMulti,
+	sietovinaPre,
 	type SysRow,
 	type RezRow,
 	type OdpisRow
@@ -101,6 +102,34 @@ describe('#569 — 8 kombinácií posuv × sieťka × sklo (3K 3000 × 1850, see
 		])!;
 		expect(multi.posuvy[0]!.sietovina).toEqual(flat.r!.sietovina);
 		expect(multi.odpis).toEqual(flat.r!.odpis);
+	});
+
+	it('sietovinaPre: cfg bez kladkového profilu posuvu → null (nie vymyslený rozmer)', () => {
+		const bezKladk = buildCFG(
+			seed.sys as SysRow[],
+			(seed.rez as RezRow[]).filter(
+				(r) => !(r.sysStyl === 'Štandard|3K' && /^Kladkový profil/i.test(r.nazov))
+			)
+		);
+		const sklo = { sirka: 966, vyska: 1735 };
+		expect(
+			sietovinaPre(bezKladk, 'Štandard', '3K', { uchyt: 'ziadny' }, 3000, 1850, 3, sklo)
+		).toBeNull();
+		expect(sietovinaPre(cfg, 'Štandard', '3K', null, 3000, 1850, 3, sklo)).toBeNull();
+	});
+
+	it('K/R/H z cfg (editor) sa premietnu — buildCFG s inými parametrami', () => {
+		const iny = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[], { k: 20, r: 18, h: 5 });
+		const { r } = safeCompute(iny, 'Štandard|3K', 3000, 1850, false, 0, false, undefined, {
+			uchyt: 'ziadny',
+			system: 'Štandard +'
+		});
+		// 952,33 − 20 = 932,33 → rez 932; sieťovina 932,33 + 18 = 950,33 → 950; výška 1735 + 5
+		expect(r!.sietovina).toEqual({ sirka: 950, vyska: 1740 });
+		expect(r!.material.find((m) => m.kod === 'ZASP202415')!.rezy).toEqual([
+			{ rozmer: 952, ks: 6 },
+			{ rozmer: 932, ks: 2 }
+		]);
 	});
 
 	it('Robust/Slide: sieťovina ostáva sklo +2/+1 (#569 ich nemení)', () => {
