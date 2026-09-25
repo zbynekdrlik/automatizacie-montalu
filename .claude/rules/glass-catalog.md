@@ -179,6 +179,11 @@ tabuľky (`SELECT 1 FROM sqlite_master WHERE name='…'`) — tak to predpisuje 
 `migrateGlassKorekcia` (`glass_types`), aby minimálne fixtúry bez tej tabuľky ALTER
 preskočili namiesto crashu. Reálna prod DB `glass_types` ju má od v1/v22, takže ALTER prebehne.
 
+**Zmazanie/premenovanie skla migráciou rozbije REKOMPUTU starých odpisov (#570).** Uložený
+`detail.vstupRaw` drží starý názov → `skloPre` null → nárezák na kiosk 0 riadkov (OPDL260208 po v44).
+Ak má zmazané sklo Money-identickú náhradu, pridaj ju do `LEGACY_SKLO` v `zasklenia-sklo.ts`
+(detail v `backfill-narezaky.md` „Legacy názvy skiel"). Formulár ani Money sa tým nemenia.
+
 ## UNIQUE(nazov, system) index mení poradie `WHERE nazov = ?` výsledkov (#235, v43)
 
 Od v22 je na `glass_types` index `UNIQUE(nazov, system)`. Dopytovanie `WHERE nazov = ?`

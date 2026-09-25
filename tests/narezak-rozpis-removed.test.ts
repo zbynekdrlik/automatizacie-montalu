@@ -7,9 +7,22 @@ import fs from 'node:fs';
 const read = (rel: string) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 
 describe('#511 rozpis→kiosk odpojený, plán-rezov→kiosk zapojený', () => {
-	it('odpis hook UŽ NENAHRÁVA rozpis ako narezak (queueNarezakUpload odstránené)', () => {
+	it('odpis hook NENAHRÁVA cenový rozpis ako narezak (starý queueNarezakUpload( odstránený)', () => {
 		const hooks = read('../src/hooks.server.ts');
-		expect(hooks).not.toMatch(/queueNarezakUpload/);
+		expect(hooks).not.toMatch(/queueNarezakUpload\(/);
+	});
+
+	// #570: #511 odstránil JEDINÝ automatický trigger nárezáku a /plan-rezov save výroba nepoužíva →
+	// tablety „Čo rezať" prázdne. Odpis hook znova posiela nárezák, ale BEZ CIEN — zo zdieľaného jadra
+	// backfillu (rozpis rezov lines + grafický PDF + cut_plan), nie cenový rozpis materiálu.
+	it('#570: odpis hook posiela cenovo-neutrálny nárezák z jadra backfillu', () => {
+		const hooks = read('../src/hooks.server.ts');
+		expect(hooks).toMatch(/queueNarezakUploadZOdpisu\(/);
+		const mod = read('../src/lib/server/odoo-narezak-odpis.ts');
+		expect(mod).toMatch(/from '\.\/backfill-narezaky'/);
+		expect(mod).not.toMatch(/from ['"]\.\/(ceny|odoo-zakazka|zakazka-ceny|zakazka-pdf)['"]/);
+		expect(mod).not.toMatch(/fmtEur|predajVo|cenaSpolu|enrichPolozky|€/);
+		expect(mod).not.toMatch(/writeOdpis\s*\(/);
 	});
 
 	it('interná mt_note s rozpisom (queueZakazkaPush) na odpis OSTÁVA (leak-kontrakt nedotknutý)', () => {
