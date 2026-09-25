@@ -56,7 +56,7 @@ export const SIETKA_STANDARD_POPIS: Readonly<
 > = Object.freeze({
 	k: {
 		label: 'K — rozdiel kladkového (starý / plus Štandard)',
-		help: 'O koľko je kladkový sieťky dlhší (Štandard + posuv so starou sieťkou) alebo kratší (starý posuv so sieťkou plus) než kladkový posuvu. Pri rovnakom systéme sa nepoužije.'
+		help: 'O koľko je kladkový sieťky dlhší (Štandard + posuv so starou sieťkou) alebo kratší (starý posuv so sieťkou plus) než kladkový posuvu. Pri rovnakom systéme sa nepoužije. Kontrolný odpis po uložení (bez sieťky) túto zmenu neukáže — over ju na nárezáku so sieťkou.'
 	},
 	r: {
 		label: 'R — šírka rámu sieťky nad kladkovým',
@@ -78,7 +78,7 @@ export function krizDelta(posuvSystem: string, sietkaSystem: string, k: number):
 }
 
 export interface SietkaStandardVstup {
-	/** kladkový profil POSUVU na jedno krídlo, NEZAOKRÚHLENÝ (mm) */
+	/** kladkový profil posuvu (ZÁKLADNEJ ne-IZO skupiny) na jedno krídlo, NEZAOKRÚHLENÝ (mm) */
 	kladkovyPosuv: number;
 	/** výška ZÁKLADNÉHO (ne-IZO) skla posuvu, NEZAOKRÚHLENÁ (mm) */
 	skloVZaklad: number;

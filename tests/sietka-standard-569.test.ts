@@ -81,6 +81,23 @@ describe('#569 — 8 kombinácií posuv × sieťka × sklo (3K 3000 × 1850, see
 		}
 	});
 
+	it('opona (2x*): IZO skupina má INÝ kladkový, sieťka sa aj tak berie zo základnej → IZO = základ', () => {
+		// review nález: Š+ 2x3K kladkový −323 vs 2x3K IZO −285 — keby sa kladkový čítal z posuvovej
+		// (IZO) skupiny, sieťovina by sa pri IZO skle zmenila, čo model vylučuje
+		for (const posuv of ['Štandard +', 'Štandard'] as const) {
+			const basic = safeCompute(cfg, `${posuv}|2x3K`, 6000, 1850, false, 0, false, undefined, {
+				uchyt: 'ziadny'
+			});
+			const izo = safeCompute(cfg, `${posuv}|2x3K IZO`, 6000, 1850, false, 0, false, undefined, {
+				uchyt: 'ziadny'
+			});
+			expect(basic.err).toBeNull();
+			expect(izo.err).toBeNull();
+			expect(izo.r!.sietovina).not.toBeNull();
+			expect(izo.r!.sietovina).toEqual(basic.r!.sietovina);
+		}
+	});
+
 	it('bez sieťky výsledok nenesie rozmer sieťoviny (null)', () => {
 		const { r } = safeCompute(cfg, 'Štandard +|3K', 3000, 1850, false, 0, false, undefined, null);
 		expect(r!.sietovina).toBeNull();
@@ -113,9 +130,9 @@ describe('#569 — 8 kombinácií posuv × sieťka × sklo (3K 3000 × 1850, see
 		);
 		const sklo = { sirka: 966, vyska: 1735 };
 		expect(
-			sietovinaPre(bezKladk, 'Štandard', '3K', { uchyt: 'ziadny' }, 3000, 1850, 3, sklo)
+			sietovinaPre(bezKladk, 'Štandard', '3K', { uchyt: 'ziadny' }, 3000, 1850, sklo)
 		).toBeNull();
-		expect(sietovinaPre(cfg, 'Štandard', '3K', null, 3000, 1850, 3, sklo)).toBeNull();
+		expect(sietovinaPre(cfg, 'Štandard', '3K', null, 3000, 1850, sklo)).toBeNull();
 	});
 
 	it('K/R/H z cfg (editor) sa premietnu — buildCFG s inými parametrami', () => {

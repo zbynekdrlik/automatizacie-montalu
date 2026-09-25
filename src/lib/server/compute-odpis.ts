@@ -122,7 +122,7 @@ export function computeFlat(
 		odpis,
 		sklo,
 		// #569: sieťovina zo servera (Štandard-rodina z rámu posuvu, nie zo skla)
-		sietovina: sietovinaPre(cfg, system, styl, sietka, S, V, N, sklo)
+		sietovina: sietovinaPre(cfg, system, styl, sietka, S, V, sklo)
 	};
 }
 
@@ -439,7 +439,7 @@ export function computeMulti(cfg: Cfg, posuvy: PosuvSpec[]): MultiResult | null 
 			N,
 			m2: R((p.S * p.V) / 1e6),
 			sklo,
-			sietovina: sietovinaPre(cfg, system, styl, p.sietka, p.S, p.V, N, sklo),
+			sietovina: sietovinaPre(cfg, system, styl, p.sietka, p.S, p.V, sklo),
 			otvaranie: p.otvaranie,
 			skloNazov: p.sklo,
 			kovanieL: p.kovanieL,

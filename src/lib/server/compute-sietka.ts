@@ -109,10 +109,15 @@ function systemSietky(posuvSystem: string, sietka: Sietka): string {
  * serverový zdroj pre plán (`ComputeResult.sietovina`/`PosuvInfo.sietovina` → `PlanKarty`).
  *
  * Štandard/Štandard + (#569): geometrický model z RÁMU posuvu (`$lib/sietka-standard`) —
- * kladkový profil posuvu (ten istý riadok, z ktorého `sietkaStandardExtra` reže šírku
- * prírezov) ± K + R, výška zo ZÁKLADNÉHO (ne-IZO) skla toho istého systému/štýlu + H. IZO sklo
- * sa NEPOUŽIJE: jeho rozširovací profil do sieťky nejde (Patrik 1070), preto sieťka zo skla
- * vychádzala pri IZO o 23 × 20 mm malá. Robust/Slide: sklo +2/+1 (`rozmerSietoviny`, nezmenené).
+ * kladkový profil ± K + R, výška zo skla + H, OBOJE zo ZÁKLADNEJ (ne-IZO) skupiny toho istého
+ * systému/štýlu (`zakladnyStyl`). IZO variant sa NEPOUŽIJE: jeho rozširovací profil do sieťky
+ * nejde (Patrik 1070), preto sieťka zo IZO skla vychádzala o 23 × 20 mm malá; a pri opone
+ * (2x*) má IZO skupina aj INÝ kladkový (Š+ 2x3K −323 vs IZO −285) — zo základnej skupiny je
+ * sieťka pri IZO aj základnom skle rovnaká (pri 1-behových štýloch sú kladkové rovnaké).
+ * Money rez kladkového (`sietkaStandardExtra`) ostáva z POSUVOVEJ skupiny (skutočný nárez).
+ * Výška zámerne BEZ per-sklo / triedovej korekcie skla (#440/#443) — tie zmenšujú SKLO voči
+ * rámu, sieťka ide z rámu; systémový `skloOffset` základnej skupiny sa odráta (je súčasť
+ * definície základného skla). Robust/Slide: sklo +2/+1 (`rozmerSietoviny`, nezmenené).
  * `null` = bez sieťky, alebo cfg nemá kladkový/základné sklo (sietkaChyba to hlási skôr).
  */
 export function sietovinaPre(
@@ -122,17 +127,15 @@ export function sietovinaPre(
 	sietka: Sietka | null | undefined,
 	S: number,
 	V: number,
-	N: number,
 	sklo: { sirka: number; vyska: number }
 ): { sirka: number; vyska: number } | null {
 	if (!sietka) return null;
 	if (!maSietkaSystemVyber(system)) return rozmerSietoviny(sklo.sirka, sklo.vyska);
-	const posuvGroup = cfg[`${system}|${styl}`];
 	const zaklad = cfg[`${system}|${zakladnyStyl(styl)}`];
-	const kladkovy = posuvGroup && najdiRolu(posuvGroup, STANDARD_ROLY[system]!.sirka);
-	if (!kladkovy || !zaklad?.sklo.v) return null;
+	const kladkovy = zaklad && najdiRolu(zaklad, STANDARD_ROLY[system]!.sirka);
+	if (!zaklad || !kladkovy || !zaklad.sklo.v) return null;
 	return sietkaStandardRozmer({
-		kladkovyPosuv: val(kladkovy, S, V, N, true),
+		kladkovyPosuv: val(kladkovy, S, V, zaklad.N, true),
 		skloVZaklad: val(zaklad.sklo.v, S, V, zaklad.N, true) - zaklad.skloOffset,
 		posuvSystem: system,
 		sietkaSystem: systemSietky(system, sietka),

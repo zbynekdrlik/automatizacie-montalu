@@ -36,7 +36,8 @@ Doména sieťky je rozliata cez `sietka.ts` (čisté helpery + konštanty) → `
   `sietkaStandardParams(cfg)`; ručne postavené cfg v testoch = seed). Editor `/zasklenia/nastavenia`
   sekcia „Sieťka Štandard" (len pri Štandard-rodine) → `saveCfgChanges({ sietkaStandard })` s
   auditom. **R = 17 je konštantné pre VŠETKY štýly** (seed: základné sklo S − kladkový S = 14 mm
-  pre každé N 2K–6K aj opona, sieťovina = sklo + 3) — keď by nový štýl mal iný vzťah sklo/kladkový,
+  pre každé N 2K–6K aj opona, sieťovina = sklo + 3; sieťka číta kladkový aj sklo zo ZÁKLADNEJ
+  skupiny — pri opone má IZO skupina iný kladkový, preto nie z posuvovej) — keď by nový štýl mal iný vzťah sklo/kladkový,
   sieťka Štandard by preň nesedela: over pred pridaním štýlu (`tests/sietka-standard-569.test.ts`
   A/E parita cez všetky štýly to chytí).
 - **Money:** mení LEN K (kladkový ZASP202415 pri krížovej sieťke). Issue 416 malo +16,5 oboma

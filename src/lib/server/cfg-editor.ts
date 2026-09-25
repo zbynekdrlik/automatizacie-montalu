@@ -365,7 +365,11 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 						`Profil „${role}" má rozdielne odsadenie pre 6/10 mm — musí byť rovnaké.`
 					);
 
-			// poistka: nová konfigurácia MUSÍ byť platná, inak sa celá transakcia vráti
+			// poistka: nová konfigurácia MUSÍ byť platná, inak sa celá transakcia vráti.
+			// #569: K/R/H sú GLOBÁLNE (všetky Štandard štýly), poistka tu overí len editovaný
+			// štýl — dosť, lebo K/R/H sú ohraničené SIETKA_STANDARD_BOUNDS vyššie a prípadný
+			// kus dlhší než tyč pri krížovej sieťke odmietne `sietkaChyba`/`extraOversizeErr`
+			// pri výpočte (presná chyba, nie tichý odpis).
 			const cfg = loadCfg();
 			if (!validSys(cfg, input.sysStyl)) throw new Error('Nová konfigurácia je neplatná.');
 			const boundErr = inBounds(cfg, input.sysStyl);
