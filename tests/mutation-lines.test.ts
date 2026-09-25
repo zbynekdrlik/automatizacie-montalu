@@ -158,6 +158,11 @@ index 1111111..2222222 100644
 		expect(lines(vsetko, ['src/lib/iny.ts'])).toEqual([]);
 	});
 
+	it('allowlist zadaný, ale prázdny (len prázdne argumenty) = nič, NIE všetko', () => {
+		expect(lines(NEW_FILE + MODIFIED, [''])).toEqual([]);
+		expect(lines(NEW_FILE + MODIFIED, ['', ''])).toEqual([]);
+	});
+
 	// Integračné testy na skutočnom `git diff` (nie ručne písaný fixture) — chránia pred
 	// rozchodom medzi fixture a reálnym formátom gitu. Izolovaný od globálneho/systémového
 	// git configu (gpgsign, diff.noprefix, … by inak zmenili správanie na inom stroji).
@@ -237,6 +242,13 @@ describe('mutation.yml scope krok (zapojenie #569)', () => {
 		expect(yml).toContain(`diff ${DIFF_FLAGS.join(' ')} origin/main...HEAD -- src/lib`);
 		expect(yml).toContain('--mutate "$CHANGED"');
 		expect(yml).toContain('changed=$RANGES');
+	});
+
+	it('scope krok beží s pipefail (`shell: bash`) — zlyhaný git diff nesmie dať zelený shard', () => {
+		// default `run:` shell je `bash -e {0}` BEZ pipefail; `shell: bash` = `bash -eo pipefail {0}`
+		const scope = yml.match(/\n( +)id: scope\n([\s\S]*?)\1run: \|/);
+		expect(scope).not.toBeNull();
+		expect(scope![2]).toMatch(/^\s+shell: bash$/m);
 	});
 
 	it('DDL vylúčenie pokrýva migracie.ts aj každý migracie-*.ts, nie iné súbory', () => {
