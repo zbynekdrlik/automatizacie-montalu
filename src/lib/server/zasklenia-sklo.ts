@@ -11,6 +11,7 @@ import {
 	glassTypesForSystem,
 	efektivnaKorekcia,
 	efektivnaRedukciaZero,
+	resolveGlassSystem,
 	type GlassType
 } from '$lib/server/db';
 import { SKLO_INE, ineHrubka, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
@@ -32,6 +33,44 @@ import {
 	type TriedaZaNazov
 } from '$lib/styl';
 import type { Vstup, MultiVstup } from '$lib/server/vstup';
+
+/**
+ * #570: názvy skiel, ktoré MIGRÁCIA z katalógu zmazala, → ich Money-identická náhrada. Kľúč je
+ * KANONICKÝ systém katalógu (`resolveGlassSystem` — starý „Štandard"/„Štandard Drevo" zdieľajú
+ * Štandard +). Zdroj: v44 `migrateCleanupStandardPlusOrphans` (issue 504, 10.9.) — obe náhrady sú
+ * podľa migrácie klasifikované zhodne (non-IZO / IZO trieda 16), takže nárezák je bit-identický.
+ * v19 „Kalené 8mm/10mm" (Robust) sem ZÁMERNE nepatrí: zmazané BEZ náhrady a pred oknom rekomputy.
+ * Použitie: LEN rekomputa uložených odpisov (backfill + živý nárezák na kiosk) — nikdy nový vstup
+ * z formulára, nikdy prepis uloženého `detail`, nikdy Money.
+ */
+const LEGACY_SKLO: Record<string, Record<string, string>> = {
+	'Štandard +': {
+		'Izolačné sklo 4.8.4': 'Izolačné sklo 4/8/4 číre',
+		'Float sklo 10 mm': 'ESG kalené 10 mm'
+	}
+};
+
+/** Legacy (migráciou zmazaný) názov skla → aktuálna náhrada pre daný systém; inak nezmenený. */
+export function legacySkloNazov(system: string, sklo: string): string {
+	return LEGACY_SKLO[resolveGlassSystem(system)]?.[sklo] ?? sklo;
+}
+
+/** Kópia jednoposuvového `Vstup` s legacy sklom rozlíšeným na náhradu (vstup sa nemutuje). */
+export function vstupSAktualnymSklom(v: Vstup): Vstup {
+	const sklo = legacySkloNazov(v.system, v.sklo);
+	return sklo === v.sklo ? v : { ...v, sklo };
+}
+
+/** Kópia `MultiVstup` s legacy sklom rozlíšeným per posuv (vstup sa nemutuje). */
+export function multiVstupSAktualnymSklom(v: MultiVstup): MultiVstup {
+	return {
+		...v,
+		posuvy: v.posuvy.map((p) => {
+			const sklo = legacySkloNazov(p.system, p.sklo);
+			return sklo === p.sklo ? p : { ...p, sklo };
+		})
+	};
+}
 
 export const existujeVCfg =
 	(cfg: Cfg): ExistujeSysStyl =>

@@ -30,7 +30,12 @@ import {
 	type SietkaSamostatnaKus,
 	type SietkaSamostatnaMaterialRow
 } from './compute';
-import { recomputeVstup, recomputeMultiVstup } from './zasklenia-sklo';
+import {
+	recomputeVstup,
+	recomputeMultiVstup,
+	vstupSAktualnymSklom,
+	multiVstupSAktualnymSklom
+} from './zasklenia-sklo';
 import { computeClip, computeClipMulti, type ClipVstup, type ClipRiadok } from '$lib/clip';
 import { parseCad } from './pergola';
 import { CAD_DETAIL_MAX } from './cad-odpis';
@@ -225,7 +230,8 @@ export function mapOdpisToLines(
 				if (detail.multiZasklenie === true || detail.zimnaZahrada === true) {
 					const vstup = detail.vstupRaw as MultiVstup | undefined;
 					if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
-					const { r } = recomputeMultiVstup(vstup, cfg);
+					// #570: legacy názov skla zmazaný migráciou (v44) → Money-identická náhrada (len rekomputa)
+					const { r } = recomputeMultiVstup(multiVstupSAktualnymSklom(vstup), cfg);
 					if (!r) return { status: 'skip', reason: 'recompute-failed' };
 					const drift = driftVsStored(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
@@ -236,7 +242,7 @@ export function mapOdpisToLines(
 				// bežné jednoposuvové zasklenie — plný MaterialRow[] s tyčami/uhlami/kódmi priamo
 				const vstup = detail.vstupRaw as Vstup | undefined;
 				if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
-				const { r } = recomputeVstup(vstup, cfg);
+				const { r } = recomputeVstup(vstupSAktualnymSklom(vstup), cfg);
 				if (!r) return { status: 'skip', reason: 'recompute-failed' };
 				const drift = driftVsStored(
 					r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
