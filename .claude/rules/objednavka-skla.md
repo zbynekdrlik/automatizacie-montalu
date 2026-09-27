@@ -462,18 +462,25 @@ To isté zasiahne `+layout.svelte` user menu (`{data.user.username}`) pre KAŽD�
 e-mailovým menom — na každej stránke.
 
 - **Oprava (globálna, jedno miesto):** `hooks.server.ts` `handle` → `pridajNoTransform` pridá
-  `Cache-Control: no-transform` ku každej odpovedi (existujúce direktívy zachová, nezdvojí). Cloudflare
-  potom HTML nemení (developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation).
+  `Cache-Control: no-transform` LEN k `text/html` odpovediam (existujúce direktívy zachová, nezdvojí).
+  Cloudflare potom HTML nemení (developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation).
   NEOBCHÁDZAJ to per-miesto (`<!--email_off-->` Svelte zo šablóny odstráni; rozbíjanie e-mailu na
   uzly = hack v každom texte).
+- **TRADE-OFF (review):** no-transform vypne pre to HTML aj Cloudflare brotli/gzip
+  (developers.cloudflare.com/speed/optimization/content/compression) — preto LEN `text/html`; JSON
+  (`__data.json` pri klientskej navigácii, endpointy) ostáva komprimovaný. **Čistejšie riešenie** je
+  vypnúť Email Obfuscation v Cloudflare zóne `montalu.cloud` (Configuration Rule pre
+  `app.montalu.cloud`) — infra mimo repa; potom `pridajNoTransform` odstráň a HTML je znova komprimované.
 - **Diagnóza „PROD mismatch, CI čisté":** najprv porovnaj, čo medzi serverom a prehliadačom STOJÍ
   (proxy/CDN transformácie: e-mail obfuscation, Rocket Loader, minify) — nie len dáta/TZ. Repro:
   Playwright `page.route` dokumentu, ktorý aplikuje transformáciu proxy → presne 1× mismatch.
 - **Testy:** `tests/cache-no-transform-571.test.ts` (hlavička), E2E
   `objednavka-skla-proxy-hydratacia.spec.ts` — seed riadku s e-mailovým autorom priamo do e2e DB
-  (`skipAkLive`, NIE nový doslovný BASE_URL skip riadok — `e2e-console.md`), `page.route` emuluje
-  Cloudflare LEN keď odpoveď nemá `no-transform`, `test.use({ timezoneId: 'America/New_York' })` =
-  prehliadač v inej TZ než server (CI UTC) → pokryje aj triedu „dátum server ≠ prehliadač". Zero-console.
+  (`skipAkLive`, NIE nový doslovný BASE_URL skip riadok — `e2e-console.md`). `page.route` emuluje
+  Cloudflare (prepis e-mailu na `<a class="__cf_email__">` + dekódovací skript pred `</body>`):
+  KONTROLNÝ test prepíše vždy a čaká presne 1× `hydration_mismatch` (dôkaz vernosti emulácie),
+  REGRESNÝ prepíše len bez `no-transform` a čaká zero-console. `timezoneId: 'America/New_York'` len
+  potvrdzuje, že banner (formátovaný na serveri) nezávisí od TZ prehliadača — príčinou TZ nebola.
 - **Lokálne spustenie jedného E2E bez buildu (Tier 0):** `vite dev` na vlastnom porte (DATABASE_PATH do
   scratchpadu) + dočasný playwright config bez `webServer` s `baseURL` na ten port; v dev móde Vite
   HMR websocket loguje `ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` — to je šum dev servera, v CI

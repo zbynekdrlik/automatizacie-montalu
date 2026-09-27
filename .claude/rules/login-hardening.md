@@ -96,4 +96,4 @@ three.js/inline štýly Svelte = riziko rozbitia; CSP samostatne ak sa ukáže b
 `Permissions-Policy` je minimálny (`camera=(), microphone=(), geolocation=()`) — WebGL
 Permissions-Policy neriadi. E2E číta hlavičky cez `res.headers()` (malé písmená).
 
-- **`Cache-Control: no-transform` (#571 follow-up):** `handle` ho pridá ku každej odpovedi (`pridajNoTransform` — zachová existujúce direktívy, nezdvojí), aby Cloudflare (Email Obfuscation, Rocket Loader…) nemenil HTML → inak `hydration_mismatch` pri texte s e-mailom. Detail `objednavka-skla.md`.
+- **`Cache-Control: no-transform` (#571 follow-up):** `handle` ho pridá LEN k `text/html` odpovediam (`pridajNoTransform` — zachová existujúce direktívy, nezdvojí), aby Cloudflare (Email Obfuscation) nemenil HTML → inak `hydration_mismatch` pri texte s e-mailom. **TRADE-OFF:** no-transform vypne aj Cloudflare brotli/gzip pre to HTML (JSON/`__data.json` ostáva komprimovaný). Čistejšie riešenie = vypnúť Email Obfuscation v Cloudflare zóne → potom hlavičku odstráň. Detail `objednavka-skla.md`.
