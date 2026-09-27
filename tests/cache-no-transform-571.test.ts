@@ -59,8 +59,8 @@ describe('Cache-Control: no-transform — proxy nesmie meniť HTML (#571 hydrati
 	// review: no-transform vypne aj Cloudflare brotli/gzip (developers.cloudflare.com/speed/
 	// optimization/content/compression) — Email Obfuscation mení LEN HTML, takže JSON/__data.json
 	// odpovede hlavičku NEdostanú a ostanú komprimované.
-	it('JSON odpoveď (napr. __data.json) → no-transform sa NEpridá (kompresia ostane)', async () => {
-		const res = await callHandle('/objednavka-skla/test/__data.json', {
+	it('JSON odpoveď (napr. /health, __data.json) → no-transform sa NEpridá (kompresia ostane)', async () => {
+		const res = await callHandle('/health', {
 			'content-type': 'application/json'
 		});
 		expect(res.headers.get('cache-control')).toBeNull();
