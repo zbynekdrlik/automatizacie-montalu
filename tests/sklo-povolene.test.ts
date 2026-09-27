@@ -7,21 +7,26 @@
 // Katalóg `glass_types` sa NEMENÍ (Money-neutrálne, staré odpisy sa dajú prepočítať — #570);
 // allow-list filtruje len PONUKU a NOVÝ vstup z formulára (parseVstup/parseMultiVstup/znova).
 import { describe, it, expect } from 'vitest';
-import { glassTypesForSystem, loadCfg } from '../src/lib/server/db';
+import { glassTypesForSystem, listGlassTypes, loadCfg } from '../src/lib/server/db';
 import { parseVstup, parseMultiVstup } from '../src/lib/server/vstup';
 import { skloPre } from '../src/lib/server/zasklenia-sklo';
 import { sklaDoPonuky } from '../src/lib/styl';
 import { defaultSklo, SKLO_INE, SKLO_TRIEDY } from '../src/lib/sklo';
-import { filtrujPovoleneSkla, skloPovolene, povoleneTriedyIne } from '../src/lib/sklo-povolene';
+import {
+	POVOLENE_SKLA,
+	filtrujPovoleneSkla,
+	ponukaSkielSystemu,
+	skloPovolene,
+	povoleneTriedyIne
+} from '../src/lib/sklo-povolene';
 
 const cfg = loadCfg();
 const existuje = (s: string) => !!cfg[s];
 
-/** ponuka „Sklo (základ)" pre systém+štýl — rovnaký reťazec ako klient `sklaForSystem`
- *  (katalóg systému → allow-list #573 → IZO gate štýlu), bez sentinelu SKLO_INE. */
+/** ponuka „Sklo (základ)" pre systém+štýl — TEN ISTÝ reťazec ako klient `sklaForSystem`
+ *  (`ponukaSkielSystemu` nad `data.skla` riadkami → IZO gate štýlu), bez sentinelu SKLO_INE. */
 function ponuka(system: string, styl: string): string[] {
-	const katalog = glassTypesForSystem(system).map((g) => g.nazov);
-	return sklaDoPonuky(system, styl, filtrujPovoleneSkla(system, katalog), existuje);
+	return sklaDoPonuky(system, styl, ponukaSkielSystemu(system, listGlassTypes()), existuje);
 }
 
 describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
@@ -53,9 +58,22 @@ describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
 		expect(defaultSklo(p, 'Štandard +')).toBe('Float sklo 6 mm');
 	});
 
-	it('Štandard plus: každá povolená voľba je z katalógu (allow-list nevymýšľa sklá)', () => {
-		const katalog = glassTypesForSystem('Štandard +').map((g) => g.nazov);
-		for (const g of filtrujPovoleneSkla('Štandard +', katalog)) expect(katalog).toContain(g);
+	it('každý názov v POVOLENE_SKLA je riadok katalógu systému (preklep = padne)', () => {
+		for (const [sys, p] of Object.entries(POVOLENE_SKLA)) {
+			const katalog = glassTypesForSystem(sys).map((g) => g.nazov);
+			expect(katalog).toEqual(expect.arrayContaining([...p.nazvy]));
+		}
+	});
+
+	it('klientsky katalóg systému (ponukaSkielSystemu) = serverový glassTypesForSystem + allow-list', () => {
+		const riadky = listGlassTypes();
+		for (const sys of ['Deluxe', 'Robust', 'Slide', 'Štandard +', 'Štandard', 'Štandard Drevo']) {
+			const server = filtrujPovoleneSkla(
+				sys,
+				glassTypesForSystem(sys).map((g) => g.nazov)
+			);
+			expect(ponukaSkielSystemu(sys, riadky)).toEqual(server);
+		}
 	});
 
 	it('starý Štandard: 6 mm a 3.3.1 v ponuke, inak BEZ ZMENY (celý zdieľaný katalóg)', () => {

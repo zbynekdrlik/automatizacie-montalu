@@ -134,6 +134,34 @@ describe('znovaZOdpisu — hodnoty, ktoré už neplatia', () => {
 		expect(z.chybajuce.join(' ')).toMatch(/neponúka/);
 	});
 
+	it('#573 review: vlastná skladba s triedou mimo allow-listu (Robust 6 mm) — trieda sa zahodí a nahlási', () => {
+		const id = vlozOdpis('ZAK-ZNOVA-573B', '01', {
+			...DETAIL_JEDEN,
+			sklo: '5esg/6',
+			skloZaklad: 'Iné (vlastná skladba)',
+			skloTrieda: 6
+		});
+		const z = znovaZOdpisu(id)!;
+		// vlastná skladba (text) ostáva — obsluha len vyberie povolenú triedu
+		expect(z.vstup!.sklo).toBe('Iné (vlastná skladba)');
+		expect(z.vstup!.skloPresne).toBe('5esg/6');
+		expect(z.vstup!.skloTrieda).toBeNull();
+		expect(z.chybajuce.join(' ')).toMatch(/6 mm/);
+		expect(z.chybajuce.join(' ')).toMatch(/neponúka/);
+	});
+
+	it('#573 review: vlastná skladba s povolenou triedou (Robust 24 mm) sa prenesie bez hlásenia', () => {
+		const id = vlozOdpis('ZAK-ZNOVA-573C', '01', {
+			...DETAIL_JEDEN,
+			sklo: '5esg/14/5esg',
+			skloZaklad: 'Iné (vlastná skladba)',
+			skloTrieda: 24
+		});
+		const z = znovaZOdpisu(id)!;
+		expect(z.vstup!.skloTrieda).toBe(24);
+		expect(z.chybajuce).toEqual([]);
+	});
+
 	it('štýl, ktorý v konfigurácii nie je, sa nahlási (ale zadanie sa nezahodí)', () => {
 		const id = vlozOdpis('ZAK-ZNOVA-3', '01', { ...DETAIL_JEDEN, styl: '9K' });
 		const z = znovaZOdpisu(id)!;
