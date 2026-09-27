@@ -66,6 +66,12 @@ describe('Cache-Control: no-transform — proxy nesmie meniť HTML (#571 hydrati
 		expect(res.headers.get('cache-control')).toBeNull();
 	});
 
+	it('text/plain (aj default string Response) → no-transform sa NEpridá', async () => {
+		expect((await callHandle('/health', {})).headers.get('cache-control')).toBeNull();
+		const txt = await callHandle('/health', { 'content-type': 'text/plain' });
+		expect(txt.headers.get('cache-control')).toBeNull();
+	});
+
 	it('no-transform sa nezdvojí, keď ho odpoveď už má', async () => {
 		const res = await callHandle('/login', {
 			'content-type': 'text/html; charset=utf-8',
