@@ -62,7 +62,11 @@ import {
 	recomputeMultiVstup as computeMultiFrom
 } from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
-import { pridajSklaHromadneIdempotentne, type NoveSklo } from '$lib/server/objednavka-skla';
+import {
+	pridajSklaHromadneIdempotentne,
+	upozornenieCudzie,
+	type NoveSklo
+} from '$lib/server/objednavka-skla';
 import { m2Tabule } from '$lib/objednavka-skla-pozicia';
 import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
 import { cennikPopis } from '$lib/server/glass-match';
@@ -377,7 +381,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		),
 		znova,
 		// #556: cenníkový popis z Odoo `montalu.glass.type` per lokálny názov skla — nárezák select
-		// zobrazí „· cenník: <Odoo name>" (pri „viac" → „viac typov (N)", hotfix). Enrichment cez
+		// zobrazí „· cenník: <Odoo name>" (pri „viac" bez popisu — #573). Enrichment cez
 		// EXISTUJÚCU `fetchGlassTypes` cache (3 s timeout, fallback = bez popisu). Výpočtový katalóg,
 		// hrúbky, profily a Money kódy NEDOTKNUTÉ (`glass-catalog.md`).
 		cennikPopisSkla,
@@ -783,7 +787,9 @@ export const actions = {
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
 		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
-		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
+		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
+		const cudzie = upozornenieCudzie(vstup.zak, locals.user?.username ?? '');
+		return { ...v, sklaPridane: { pridane, zak: vstup.zak, upozornenieCudzie: cudzie } };
 	},
 
 	// ---- #496: Pridať sklá do objednávky skla (multi posuv / zimná záhrada) ----
@@ -818,6 +824,8 @@ export const actions = {
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
 		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
-		return { ...v, sklaPridane: { pridane, zak: vstup.zak } };
+		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
+		const cudzie = upozornenieCudzie(vstup.zak, locals.user?.username ?? '');
+		return { ...v, sklaPridane: { pridane, zak: vstup.zak, upozornenieCudzie: cudzie } };
 	}
 } satisfies Actions;

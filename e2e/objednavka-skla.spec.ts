@@ -4,14 +4,16 @@
 // rozmery/atyp prepínač (režim) sprístupní upload vstup. #563: nadpis podkladu = OP + zákazník
 // (z odpisu), popis riadka len „Zasklenie 1", m² vyplnené. Zápisový tok (objednavka_skla + TESTOVÝ
 // Money priečinok, nikdy ostrý Money) — skipAkLive na ostrom nasadení preskočí.
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { formatDatumSk } from '../src/lib/datum';
 import {
 	collectConsole,
 	loginAs,
 	goto,
 	waitHydrated,
 	skipAkLive,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	logout
 } from './helpers';
 
 const RUN = `E2E-SKLA-${Date.now().toString(36).slice(-5)}`;
@@ -319,6 +321,107 @@ test('objednávka skla: atyp s výkresom bez šírky/výšky → riadok „podľ
 	// späť na režim rozmery → polia sú opäť povinné
 	await pridatForm.getByTestId('manual-rezim').selectOption('rozmery');
 	await expect(pridatForm.getByTestId('manual-sirka')).toHaveAttribute('required', '');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+/** Ručný riadok cez formulár „Pridať riadok" na podklade (typ = prvá reálna možnosť pickera). */
+async function pridajRucnyRiadok(page: Page, popis: string) {
+	const f = page.getByTestId('pridat-riadok');
+	await f.getByTestId('manual-popis').fill(popis);
+	const typ = f.getByTestId('manual-typ');
+	const prva = typ.locator('option:not([value=""])').first();
+	await expect(prva).toBeAttached();
+	await typ.selectOption((await prva.getAttribute('value'))!);
+	await f.getByTestId('manual-sirka').fill('600');
+	await f.getByTestId('manual-vyska').fill('700');
+	await f.getByTestId('manual-pocet').fill('1');
+	await f.getByTestId('manual-pridat').click();
+	await waitHydrated(page);
+	await expect(page.locator('tbody tr', { hasText: popis })).toBeVisible();
+}
+
+// #571 (PROD 25.9.): podklad je kľúčovaný číslom zákazky → skúšobný názov („test") zdieľa podklad
+// viacerých používateľov. Reálny tok DVOCH účtov: kolega (nový interný účet) pridá riadok na
+// zákazku → `e2e` na tom istom podklade vidí banner s autorom + dnešným dátumom (Europe/Bratislava),
+// aj pri formulári „Pridať riadok"; jeho pridanie (ručné aj zo zasklení) NEblokuje a zasklenia
+// potvrdenie nesie to isté upozornenie. Kolega na svojom podklade banner nemá. Upratanie účtu
+// kolegu je vo `finally` (interný účet sa z UI zmazať nedá — najprv B2B). Zero-console.
+test('objednávka skla: riadky iného používateľa → upozornenie, pridanie neblokuje (#571)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	page.on('dialog', (d) => d.accept()); // confirm() pri zmene roly aj pri Zmazať
+	await loginAs(page);
+	await skipAkLive(page);
+
+	const zak = `${RUN}-CUDZIE`;
+	const kolega = `e2e-kolega-${Date.now().toString(36)}`;
+	const kolegaPass = 'e2eheslo1';
+
+	// 1. e2e založí interný účet kolegu
+	await goto(page, '/pouzivatelia');
+	await page.getByLabel('Prihlasovacie meno').fill(kolega);
+	await page.getByLabel('Heslo (min. 6 znakov)').fill(kolegaPass);
+	await page.getByLabel('Rola').selectOption('internal');
+	try {
+		await page.getByRole('button', { name: 'Pridať účet' }).click();
+		await expect(page.getByTestId('pouzivatelia-ok')).toContainText('Interný');
+
+		// 2. kolega pridá riadok na zákazku — vlastný podklad, žiadne upozornenie
+		await logout(page);
+		await loginAs(page, kolega, kolegaPass);
+		await goto(page, `/objednavka-skla/${zak}`);
+		await pridajRucnyRiadok(page, 'E2E 571 kolega');
+		await expect(page.getByTestId('cudzie-riadky')).toHaveCount(0);
+		await expect(page.getByTestId('cudzie-riadky-pridat')).toHaveCount(0);
+		// dátum vzniku riadka = dnes v Europe/Bratislava (NIE UTC) — ten istý formátovač ako appka
+		const text = `Táto zákazka už obsahuje 1 riadok od ${kolega} (${formatDatumSk(new Date().toISOString())}) — pridávaš do existujúceho podkladu`;
+
+		// 3. e2e na TOM ISTOM podklade → banner hore aj pri formulári „Pridať riadok"
+		await logout(page);
+		await loginAs(page);
+		await goto(page, `/objednavka-skla/${zak}`);
+		await expect(page.getByTestId('cudzie-riadky')).toHaveText(text);
+		await expect(page.getByTestId('pridat-riadok').getByTestId('cudzie-riadky-pridat')).toHaveText(
+			text
+		);
+
+		// 4. ručné pridanie NEblokuje — riadok e2e pribudne, kolegov ostane, upozornenie ostáva
+		await pridajRucnyRiadok(page, 'E2E 571 e2e');
+		await expect(page.locator('tbody tr', { hasText: 'E2E 571 kolega' })).toBeVisible();
+		await expect(page.getByTestId('cudzie-riadky')).toHaveText(text);
+
+		// 5. zasklenia „Pridať sklá" na tú istú zákazku → sklá pridané + to isté upozornenie
+		await goto(page, '/zasklenia');
+		await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
+		await page.getByLabel('OP/OPDL číslo *').fill('01');
+		await page.getByLabel('Zákazník *').fill('E2E 571');
+		await page.getByLabel('Šírka (mm) *').fill('3000');
+		await page.getByLabel('Výška (mm) *').fill('2200');
+		await page.getByLabel('Systém').selectOption('Robust');
+		await page.getByLabel('Štýl').selectOption('2K');
+		await vyberFarbuKovania(page);
+		await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+		await waitHydrated(page);
+		await page.getByTestId('pridat-skla').click();
+		await waitHydrated(page);
+		await expect(page.getByTestId('skla-pridane')).toContainText('Sklá pridané do objednávky');
+		await expect(page.getByTestId('skla-pridane-cudzie')).toContainText(text);
+	} finally {
+		// 6. upratanie účtu kolegu aj pri páde (interný je nezmazateľný → najprv B2B, potom Zmazať)
+		await page.context().clearCookies();
+		await loginAs(page);
+		await goto(page, '/pouzivatelia');
+		const row = page.locator('tr', { hasText: kolega });
+		if ((await row.count()) > 0) {
+			await row.locator('select[name="role"]').selectOption('b2b');
+			await row.getByRole('button', { name: 'Zmeniť' }).click();
+			await expect(page.getByTestId('pouzivatelia-ok')).toContainText('B2B');
+			await row.getByRole('button', { name: 'Zmazať' }).click();
+			await expect(page.getByTestId('pouzivatelia-ok')).toContainText('zmazaný');
+		}
+	}
 
 	expect(consoleMsgs).toEqual([]);
 });

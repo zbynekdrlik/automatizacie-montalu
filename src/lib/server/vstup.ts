@@ -3,6 +3,7 @@
 import { KLIN_MAX_KS, KLIN_MAX_POCET, KLIN_MAX_ROZMER, type Klin } from '$lib/klin';
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
+import { skloPovolene } from '$lib/sklo-povolene';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 // Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
 import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -440,6 +441,11 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		error = 'Pri vlastnej skladbe zadaj zloženie skla (text).';
 	else if (vstup.sklo === SKLO_INE && vstup.skloTrieda === null)
 		error = 'Pri vlastnej skladbe vyber hrúbkovú triedu skla.';
+	// #573: sklo mimo allow-listu systému (meeting 25.9.) — tá istá hláška ako neplatné sklo
+	// (`recomputeVstup`); katalóg ho môže mať kvôli rekompute starých odpisov (#570)
+	// (prázdne sklo tu nie — to hlási výpočet, ako doteraz)
+	else if (vstup.sklo && !skloPovolene(vstup.system, vstup.sklo, vstup.skloTrieda))
+		error = 'Vyber typ skla platný pre zvolený systém a štýl.';
 	else if (kol.error) error = kol.error;
 	else if (k.error) error = k.error;
 	else if (maSietkaSystem(vstup.system) && sk.error) error = sk.error;
@@ -584,6 +590,11 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			}
 			if (posuv.sklo === SKLO_INE && posuv.skloTrieda === null) {
 				error = `Zasklenie ${i + 1}: pri vlastnej skladbe vyber hrúbkovú triedu skla.`;
+				break;
+			}
+			// #573: allow-list systému (viď parseVstup)
+			if (!skloPovolene(posuv.system, posuv.sklo, posuv.skloTrieda)) {
+				error = `Zasklenie ${i + 1}: vyber typ skla platný pre zvolený systém a štýl.`;
 				break;
 			}
 			if (!OTVARANIA.includes(posuv.otvaranie)) {
