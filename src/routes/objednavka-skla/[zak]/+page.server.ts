@@ -16,7 +16,8 @@ import {
 	pridajSkloManual,
 	nastavOpZakazky,
 	opPodkladu,
-	upozornenieCudzie,
+	cudzieRiadky,
+	textCudzichRiadkov,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
 import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
@@ -126,7 +127,8 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 	// #571: podklad je kľúčovaný číslom zákazky → riadky od INÉHO používateľa ako prihlásený
 	// (opakovaný skúšobný názov) = banner. Pokrýva aj FIX/pergola producentov (presmerujú sem) a
 	// ručný „Pridať riadok". Len upozornenie — nič neblokuje, nič nemaže.
-	const cudzie = upozornenieCudzie(zak, locals?.user?.username ?? '');
+	// Bez logu (load beží pri každom reloade podkladu) — loguje producent (`upozornenieCudzie`).
+	const cudzie = textCudzichRiadkov(cudzieRiadky(zak, locals?.user?.username ?? ''));
 
 	// Pre každú položku načítaj zoznam príloh (bez dát — len metadata)
 	const suboryMap: Record<number, { id: number; nazov: string; typ: string; velkost: number }[]> =
