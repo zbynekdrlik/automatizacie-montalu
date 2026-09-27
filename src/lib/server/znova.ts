@@ -81,18 +81,28 @@ function posuvZDetailu(
 	// v histórii je pod `sklo` uložené PRESNÉ zloženie, ak ho obsluha zadala;
 	// základné sklo (to, ktoré určuje vzorec) je `skloZaklad`
 	const zaklad = s(d.skloZaklad) || s(d.sklo);
+	const sklo = platneSklo(system, zaklad, chybajuce, kde);
+	// #573: vlastná skladba ostáva, ale trieda, ktorú systém už neponúka (Robust len 24 mm),
+	// sa zahodí + nahlási — obsluha vyberie povolenú (formulár ju inak nemá v ponuke)
+	let skloTrieda = trieda(d.skloTrieda);
+	if (sklo === SKLO_INE && !skloPovolene(system, sklo, skloTrieda)) {
+		chybajuce.push(
+			`${kde}: trieda vlastnej skladby ${skloTrieda} mm sa pre systém ${system} už neponúka — vyber novú`
+		);
+		skloTrieda = null;
+	}
 	return {
 		system,
 		styl,
 		s: n(d.s),
 		v: n(d.v),
-		sklo: platneSklo(system, zaklad, chybajuce, kde),
+		sklo,
 		// vlastná skladba / presné zloženie (#235 slice 2, YELLOW-2): skloPresne obnov LEN
 		// keď sa `d.sklo` (uložený text/presné zloženie) LÍŠI od `d.skloZaklad` (základ).
 		// Pri holom katalógovom skle sú rovnaké → skloPresne prázdne (inak by sa katalógový
 		// názov obnovil ako „presné zloženie" a po zmene skla ticho vytlačil na plán).
 		skloPresne: s(d.sklo) !== s(d.skloZaklad) ? s(d.sklo) : '',
-		skloTrieda: trieda(d.skloTrieda),
+		skloTrieda,
 		otvaranie: s(d.otvaranie),
 		kovanieL: s(d.kovanieL),
 		kovanieP: s(d.kovanieP),

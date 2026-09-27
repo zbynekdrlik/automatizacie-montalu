@@ -13,7 +13,9 @@ async function ponuka(page: Page, system: string, styl: string): Promise<string[
 	await page.getByLabel('Systém').selectOption(system);
 	await page.getByLabel('Štýl').selectOption(styl);
 	const texty = await page.getByLabel(SKLO).locator('option').allTextContents();
-	// žiadna voľba nenesie príponu „viac typov" (Palo 25.9. [04:19])
+	// žiadna voľba nenesie príponu „viac typov" (Palo 25.9. [04:19]) — zahryzne len proti
+	// nasadeniu s Odoo obohatením (post-deploy); v CI preview bez Odoo je popis vždy prázdny
+	// a správanie kryje unit `tests/glass-match.test.ts`
 	for (const t of texty) expect(t).not.toContain('viac typov');
 	return texty.map(bareSkloLabel).filter((t) => t !== INE);
 }

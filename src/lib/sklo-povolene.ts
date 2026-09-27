@@ -73,3 +73,20 @@ export function skloPovolene(system: string, sklo: string, skloTrieda?: number |
 export function filtrujPovoleneSkla(system: string, skla: string[]): string[] {
 	return skla.filter((g) => skloPovolene(system, g));
 }
+
+/** Ponuka katalógových skiel pre systém z riadkov katalógu (`data.skla` na klientovi) — klientsky
+ *  ZRKADLOVÝ výber serverového `glassTypesForSystem` (Deluxe + Štandardy LEN vlastné sklá, starý
+ *  Štandard a Drevostavby čítajú riadky `'Štandard +'`; Robust/Slide vlastné + spoločné `'ALL'`)
+ *  zúžený allow-listom. Paritu so serverom stráži `tests/sklo-povolene.test.ts`. */
+export function ponukaSkielSystemu(
+	system: string,
+	skla: readonly { nazov: string; system: string }[]
+): string[] {
+	const zdielany = system === 'Štandard' || system === 'Štandard Drevo';
+	const kat = zdielany ? 'Štandard +' : system;
+	const lenVlastne = kat === 'Deluxe' || kat === 'Štandard +';
+	return filtrujPovoleneSkla(
+		system,
+		skla.filter((g) => g.system === kat || (!lenVlastne && g.system === 'ALL')).map((g) => g.nazov)
+	);
+}
