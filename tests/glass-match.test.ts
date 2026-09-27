@@ -247,8 +247,8 @@ describe('cennikPopis (nárezák popis, #556)', () => {
 			'Izolačné sklo 4/8/4- číre (Ug=1,1)'
 		);
 	});
-	it('viac → „viac typov (N)" (#556 hotfix — nikdy zavádzajúce meno prvého kandidáta)', () => {
-		expect(cennikPopis('Izolačné sklo 4/16/4 číre', ODOO, 'odoo')).toBe('viac typov (2)');
+	it('viac → "" (#573: Palo 25.9. [04:19] — bez prípony „viac typov (N)"; nikdy ani meno prvého kandidáta, #556)', () => {
+		expect(cennikPopis('Izolačné sklo 4/16/4 číre', ODOO, 'odoo')).toBe('');
 	});
 	it('ziadne → ""', () => {
 		expect(cennikPopis('Float číre 6 mm', ODOO, 'odoo')).toBe('');
