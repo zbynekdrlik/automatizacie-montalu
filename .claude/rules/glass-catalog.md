@@ -4,6 +4,10 @@ paths:
   - "src/lib/server/db.ts"
   - "src/lib/styl.ts"
   - "src/lib/sklo.ts"
+  - "src/lib/sklo-povolene.ts"
+  - "src/lib/server/vstup.ts"
+  - "src/lib/server/znova.ts"
+  - "src/routes/zasklenia/+page.svelte"
   - "src/routes/zasklenia/nastavenia/**"
   - "tests/migration-*.test.ts"
   - "tests/sklo-*.test.ts"
@@ -225,6 +229,31 @@ triedy. Odvodenie (`sklo.ts` `ineHrubkaTrieda`/`ineHrubka`): `hrubkaTrieda = tri
 z triedy cez `efektivnaRedukciaZero`). Cena honest-null (variant=sentinel → `glassMoneyKod`=null).
 Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klasifikuje z TRIEDY
 (4→ZASK00005, 6→ZASK00006, 10→nezname, 16/24→izolačné/bez gumy), katalóg ostáva name-based.
+
+## Povolené sklá PER SYSTÉM = allow-list NAD katalógom, nie zmena katalógu (#573, 27.9.2026)
+
+„Ktoré sklo smie systém ponúknuť" (meeting výroby 25.9.: Robust len 4/16/4 číre/mliečne,
+Štandard plus bez Float 4 mm a 10 mm, Deluxe 6/10) žije v JEDNOM mieste:
+`POVOLENE_SKLA` v `src/lib/sklo-povolene.ts` (client-safe — importuje ho klient aj server).
+**Zmena zoznamu (napr. Patrik pošle presný) = úprava LEN tam** + `tests/sklo-povolene.test.ts`
++ E2E `e2e/sklo-povolene-573.spec.ts` (a grep e2e na zakázané sklá — pozri sekciu nižšie).
+
+- **Kde sa aplikuje:** klient `sklaForSystem` (ponuka single aj multi posuv → `defaultSklo`
+  a reset pri zmene systému vždy padnú na povolené sklo) + `triedyPre` (triedy vlastnej
+  skladby `triedyIne`, inak by „Iné" allow-list obišlo); server `parseVstup`/`parseMultiVstup`
+  (tá istá hláška ako neplatné sklo) a `znova.ts` `platneSklo` (zakázané sklo sa pri
+  „Použiť znova" zahodí + nahlási).
+- **Kde sa ZÁMERNE NEaplikuje: `skloPre` / `recomputeVstup` / `recomputeMultiVstup`** — tie
+  prepočítavajú aj ULOŽENÉ staré odpisy (backfill, kiosk). Allow-list tam = staré Robust 3.3.1
+  odpisy by dali 0 riadkov nárezáku (presne pasca #570). Preto NIKDY nemaž „zakázané" sklo z
+  katalógu migráciou — allow-list je filter NOVÉHO vstupu, katalóg + `money_kod` ostávajú.
+- **Systém bez záznamu = celý katalóg** (starý Štandard „bez zmeny", Drevostavby, Slide).
+  Pozor: starý Štandard zdieľa katalóg so Štandard + cez `GLASS_SYSTEM_ALIAS`, ale allow-list je
+  kľúčovaný POŽADOVANÝM systémom (`'Štandard +'` vs `'Štandard'`) — ich ponuky sa teda líšia.
+- Názvy v zozname musia byť riadky katalógu systému (test to stráži); prázdne sklo parseVstup
+  allow-listom neodmieta (hlási ho výpočet).
+- Fixtúry testov/E2E so sklom mimo zoznamu (placeholder `'X'`, Robust „Izolačné 4/16/4 číre" bez
+  „sklo", Štandard + Float 4 mm, trieda 4) sa pri rozšírení zoznamu musia prepísať na povolené.
 
 ## Zmena PONUKY skiel = oprav asserty ponuky v TEJ ISTEJ lane (#504×#235, 11.9.2026)
 

@@ -79,6 +79,16 @@ describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
 		expect(povoleneTriedyIne('Štandard')).toEqual([...SKLO_TRIEDY]);
 		expect(skloPovolene('Robust', SKLO_INE, 6)).toBe(false);
 		expect(skloPovolene('Robust', SKLO_INE, 24)).toBe(true);
+		// chýbajúcu triedu hlási vlastná validácia („vyber hrúbkovú triedu"), nie allow-list
+		expect(skloPovolene('Robust', SKLO_INE, null)).toBe(true);
+		expect(skloPovolene('Robust', SKLO_INE)).toBe(true);
+	});
+
+	it('systém mimo tabuľky prijme čokoľvek; systém v tabuľke odmietne neznáme sklo', () => {
+		expect(skloPovolene('Slide', 'Float sklo 4 mm')).toBe(true);
+		expect(skloPovolene('Štandard', 'ESG kalené 10 mm')).toBe(true);
+		expect(skloPovolene('Robust', 'X')).toBe(false);
+		expect(skloPovolene('Deluxe', 'Float kalené 8 mm')).toBe(false);
 	});
 });
 
@@ -103,6 +113,10 @@ const CHYBA_SKLA = 'Vyber typ skla platný pre zvolený systém a štýl.';
 describe('#573 serverová validácia — sklo mimo allow-listu systému sa odmietne', () => {
 	it('Robust 4/16/4 číre prejde', () => {
 		expect(parseVstup(fd(zaklad)).error).toBeNull();
+	});
+
+	it('prázdne sklo parseVstup allow-listom neodmieta (hlási ho výpočet, ako doteraz)', () => {
+		expect(parseVstup(fd({ ...zaklad, sklo: '' })).error).toBeNull();
 	});
 
 	it('Robust 3.3.1 / Float 6 mm / 4/8/4 → rovnaká chyba ako neplatné sklo', () => {
