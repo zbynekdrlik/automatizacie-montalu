@@ -105,8 +105,26 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+	pridajNoTransform(response.headers);
 	return response;
 };
+
+/**
+ * #571 follow-up: PROD beží za Cloudflare, ktorého „Email Address Obfuscation" prepíše e-mail v
+ * TEXTE HTML (banner cudzích riadkov „…od palo@montalu.sk…", user menu s e-mailovým menom) na
+ * `<a class="__cf_email__">` → server HTML ≠ to, čo klient hydratuje → `hydration_mismatch`.
+ * `Cache-Control: no-transform` Cloudflare (a každej inej proxy) zakáže HTML meniť. Existujúce
+ * direktívy (napr. z `setHeaders`) ostanú; `no-transform` sa pridá len raz.
+ */
+function pridajNoTransform(headers: Headers): void {
+	const cc = headers.get('cache-control') ?? '';
+	const direktivy = cc
+		.split(',')
+		.map((d) => d.trim())
+		.filter(Boolean);
+	if (direktivy.some((d) => d.toLowerCase() === 'no-transform')) return;
+	headers.set('Cache-Control', [...direktivy, 'no-transform'].join(', '));
+}
 
 // #245: neočakávané serverové chyby (500) — zaloguj plný kontext + stack pod
 // dohľadateľným `errorId`, používateľovi vráť bezpečnú SK správu + to isté ID.
