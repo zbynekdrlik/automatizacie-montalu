@@ -448,3 +448,33 @@ bez migrácie.
   očakávanom texte sa počíta v teste tou istou Intl `Europe/Bratislava` logikou (nie pevný literál).
 - **Testy:** `tests/objednavka-skla-cudzie-571.test.ts` (helper, text/TZ/skloňovanie, zasklenia akcia,
   load), E2E `objednavka-skla.spec.ts` „riadky iného používateľa → upozornenie".
+
+## `hydration_mismatch` na PROD = Cloudflare prepísal e-mail v texte → `Cache-Control: no-transform` (#571 follow-up)
+
+PROD 27.9. (0.25.45): `/objednavka-skla/test` hlásil 1× `[svelte] hydration_mismatch`, CI E2E #571
+čisté. NEBOLA to časová zóna (banner sa formátuje na serveri — `upozornenieCudzie`), ani Odoo kód
+typu skla / `<optgroup>` kandidátov / QR (všetko overené lokálne, 0 varovaní). **Príčina:** PROD
+`app.montalu.cloud` je za **Cloudflare**, ktorého „Email Address Obfuscation" prepíše každý e-mail v
+TEXTE HTML (mimo `<script>`) na `<a class="__cf_email__">[email protected]</a>` + dekódovací skript.
+Autor riadku `palo@montalu.sk` v banneri → `<span data-testid="cudzie-riadky">` má iné uzly než SSR,
+serializované `data` (v `<script>`) ostali → Svelte `reset()` nájde navyše súrodenca → mismatch.
+To isté zasiahne `+layout.svelte` user menu (`{data.user.username}`) pre KAŽDÉHO používateľa s
+e-mailovým menom — na každej stránke.
+
+- **Oprava (globálna, jedno miesto):** `hooks.server.ts` `handle` → `pridajNoTransform` pridá
+  `Cache-Control: no-transform` ku každej odpovedi (existujúce direktívy zachová, nezdvojí). Cloudflare
+  potom HTML nemení (developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation).
+  NEOBCHÁDZAJ to per-miesto (`<!--email_off-->` Svelte zo šablóny odstráni; rozbíjanie e-mailu na
+  uzly = hack v každom texte).
+- **Diagnóza „PROD mismatch, CI čisté":** najprv porovnaj, čo medzi serverom a prehliadačom STOJÍ
+  (proxy/CDN transformácie: e-mail obfuscation, Rocket Loader, minify) — nie len dáta/TZ. Repro:
+  Playwright `page.route` dokumentu, ktorý aplikuje transformáciu proxy → presne 1× mismatch.
+- **Testy:** `tests/cache-no-transform-571.test.ts` (hlavička), E2E
+  `objednavka-skla-proxy-hydratacia.spec.ts` — seed riadku s e-mailovým autorom priamo do e2e DB
+  (`skipAkLive`, NIE nový doslovný BASE_URL skip riadok — `e2e-console.md`), `page.route` emuluje
+  Cloudflare LEN keď odpoveď nemá `no-transform`, `test.use({ timezoneId: 'America/New_York' })` =
+  prehliadač v inej TZ než server (CI UTC) → pokryje aj triedu „dátum server ≠ prehliadač". Zero-console.
+- **Lokálne spustenie jedného E2E bez buildu (Tier 0):** `vite dev` na vlastnom porte (DATABASE_PATH do
+  scratchpadu) + dočasný playwright config bez `webServer` s `baseURL` na ten port; v dev móde Vite
+  HMR websocket loguje `ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` — to je šum dev servera, v CI
+  (preview build) neexistuje; hodnoť len ostatné správy.

@@ -8,10 +8,10 @@
 // Test EMULUJE tento zdokumentovaný kontrakt proxy cez `page.route`: dokument podkladu prepíše
 // rovnako ako Cloudflare, LEN ak odpoveď nemá `no-transform`. Zároveň beží v inej časovej zóne
 // prehliadača (America/New_York) než server (CI = UTC) — kategória „server ≠ prehliadač" pre
-// dátum v banneri. Seeduje lokálnu e2e DB → proti nasadeniu (BASE_URL) skip.
+// dátum v banneri. Seeduje lokálnu e2e DB → na ostrom nasadení `skipAkLive`.
 import { test, expect } from '@playwright/test';
 import Database from 'better-sqlite3';
-import { collectConsole, loginAs, goto } from './helpers';
+import { collectConsole, loginAs, goto, skipAkLive } from './helpers';
 
 const DB_PATH = process.env.DATABASE_PATH || './data/e2e.db';
 const ZAK = `E2E-PROXY-${Date.now().toString(36).slice(-5)}`;
@@ -37,7 +37,9 @@ test('objednávka skla: cudzí autor s e-mailom + proxy + iná TZ → banner bez
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
-	test.skip(!!process.env.BASE_URL, 'seeduje lokálnu e2e DB — nedá sa proti nasadenému cieľu');
+	// seeduje lokálnu e2e DB → na ostrom nasadení (post-deploy BASE_URL) preskočí; skipAkLive je
+	// sankcionovaný helper (nový doslovný BASE_URL skip riadok by zablokoval integračný push).
+	await skipAkLive(page);
 
 	// riadok podkladu od INÉHO používateľa (meno = e-mail), Odoo cenníkový kód typu skla, 25.9. UTC
 	const db = new Database(DB_PATH);

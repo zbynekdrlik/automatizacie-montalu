@@ -95,3 +95,5 @@ odpovede (200 rendery incl. `/login`, `/zasklenia`, aj 404/500). 3xx redirecty z
 three.js/inline štýly Svelte = riziko rozbitia; CSP samostatne ak sa ukáže bezpečné.
 `Permissions-Policy` je minimálny (`camera=(), microphone=(), geolocation=()`) — WebGL
 Permissions-Policy neriadi. E2E číta hlavičky cez `res.headers()` (malé písmená).
+
+- **`Cache-Control: no-transform` (#571 follow-up):** `handle` ho pridá ku každej odpovedi (`pridajNoTransform` — zachová existujúce direktívy, nezdvojí), aby Cloudflare (Email Obfuscation, Rocket Loader…) nemenil HTML → inak `hydration_mismatch` pri texte s e-mailom. Detail `objednavka-skla.md`.
