@@ -430,7 +430,10 @@ bez migrácie.
   — ROVNAKÝ WHERE ako `listSklaPreZakazku` (aj legacy `zak_norm` s medzerou), `created_by <> ''` AND
   `<> username`, `od` = najstarší `created_at` autora. Prázdne meno → nič. `textCudzichRiadkov(c)` =
   hláška („1 riadok / 2–4 riadky / 5+ riadkov", dátum cez `sqliteUtcToIso` + `formatDatumSk`, nie UTC
-  default). `upozornenieCudzie(zak, user)` = oboje + log (volajú ho producenti aj load).
+  default). `upozornenieCudzie(zak, user)` = oboje, BEZ logu (volá ho zasklenia producent aj load —
+  load beží pri každom reloade). LOG je v zápisovej vrstve: `logCudzieRiadky` po `pridajSklaHromadne` /
+  `pridajSklaHromadneIdempotentne` / `pridajSkloManual` (raz na zákazku+autora) → pokryje VŠETKÝCH
+  producentov vrátane FIX/pergoly/ručného riadku; nový producent cez tieto funkcie loguje sám.
 - **Kde sa zobrazí:** zasklenia `pridatSkla`/`pridatSklaMulti` → `sklaPridane.upozornenieCudzie` (testid
   `skla-pridane-cudzie` v `sklaPridaneBanner`); podklad `/objednavka-skla/[zak]` load → `data.cudzie` →
   banner `cudzie-riadky` pod nadpisom + `cudzie-riadky-pridat` vo formulári „Pridať riadok". FIX a
