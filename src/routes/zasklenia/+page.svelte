@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
+	import { filtrujPovoleneSkla, povoleneTriedyIne } from '$lib/sklo-povolene';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
@@ -94,17 +95,26 @@
 	const existuje = (sysStyl: string) => data.styly.some((x) => x.sysStyl === sysStyl);
 	// SKLO_INE (#235 slice 2) je doplnené ZA katalóg pre KAŽDÝ systém — vlastná skladba
 	// nie je katalógový riadok; `defaultSklo` ho nikdy nevráti (nie „číre" ani prvý v poradí).
+	// #573: katalóg systému sa ešte zúži allow-listom `POVOLENE_SKLA` (meeting 25.9. — Robust
+	// len 4/16/4, Štandard plus bez 4 mm/10 mm); server odmietne to isté (`parseVstup`), takže
+	// `defaultSklo` aj „Znova z odpisu" vždy padnú na povolené sklo z TOHTO zoznamu.
 	const sklaForSystem = (sys: string, styl: string) => [
 		...sklaDoPonuky(
 			sys,
 			styl,
-			data.skla
-				.filter((g) =>
-					sys === 'Deluxe' || sys === 'Štandard +' || sys === 'Štandard' || sys === 'Štandard Drevo'
-						? g.system === (sys === 'Štandard' || sys === 'Štandard Drevo' ? 'Štandard +' : sys)
-						: g.system === sys || g.system === 'ALL'
-				)
-				.map((g) => g.nazov),
+			filtrujPovoleneSkla(
+				sys,
+				data.skla
+					.filter((g) =>
+						sys === 'Deluxe' ||
+						sys === 'Štandard +' ||
+						sys === 'Štandard' ||
+						sys === 'Štandard Drevo'
+							? g.system === (sys === 'Štandard' || sys === 'Štandard Drevo' ? 'Štandard +' : sys)
+							: g.system === sys || g.system === 'ALL'
+					)
+					.map((g) => g.nazov)
+			),
 			existuje
 		),
 		SKLO_INE
@@ -113,10 +123,12 @@
 	// Hrúbkové triedy vlastnej skladby ponúkané pre systém+štýl (#235 slice 2, RED-1 mirror):
 	// izolačné triedy (16/24) sa v UI NEPONÚKAJÚ tam, kde IZO nárezák pre daný štýl
 	// neexistuje (Štandard + opona) — rovnaký gate ako `sklaForSystem`/server `skloPre`.
+	// #573: a len triedy povolené pre systém (Robust 24, Deluxe 6/10, Štandard plus bez 4/10).
 	const triedyPre = (sys: string, styl: string): readonly number[] =>
-		skloVyberaIzo(sys) && !existuje(`${sys}|${zakladnyStyl(styl)} IZO`)
+		(skloVyberaIzo(sys) && !existuje(`${sys}|${zakladnyStyl(styl)} IZO`)
 			? SKLO_TRIEDY.filter((t) => t < 16)
-			: SKLO_TRIEDY;
+			: SKLO_TRIEDY
+		).filter((t) => povoleneTriedyIne(sys).includes(t));
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
 	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.

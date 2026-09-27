@@ -14,6 +14,7 @@
 //     obsluha vidí, než potichu prenesená hodnota, ktorú server odmietne.
 import { getOdpis } from './money';
 import { glassTypesForSystem, listSysStyly } from './db';
+import { skloPovolene } from '$lib/sklo-povolene';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { parseFarba } from './vstup';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
@@ -58,7 +59,10 @@ function platneSklo(system: string, sklo: string, chybajuce: string[], kde: stri
 	if (!sklo) return '';
 	// vlastná skladba (#235 slice 2): sentinel, NIE katalógový riadok — vždy platný
 	if (sklo === SKLO_INE) return sklo;
-	if (glassTypesForSystem(system).some((g) => g.nazov === sklo)) return sklo;
+	// #573: katalóg môže sklo ešte mať (rekomputa starých odpisov), ale ponuka systému
+	// (allow-list) ho už nemusí — predvyplniť sa smie len to, čo formulár ponúkne
+	if (skloPovolene(system, sklo) && glassTypesForSystem(system).some((g) => g.nazov === sklo))
+		return sklo;
 	chybajuce.push(`${kde}: sklo „${sklo}" sa už pre systém ${system} neponúka — vyber nové`);
 	return '';
 }

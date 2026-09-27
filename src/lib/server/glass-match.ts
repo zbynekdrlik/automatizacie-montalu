@@ -172,9 +172,9 @@ export function naviazanieRiadku<T extends OdooTypLike>(
 
 /**
  * Nárezák — cenníkový popis pre lokálne sklo („· cenník: <Odoo name>"). Jednoznačné → Odoo name;
- * viac → „viac typov (N)" (#556 hotfix — NIKDY meno prvého kandidáta, lebo pri odtieňoch by to
- * ukázalo zavádzajúci názov iného odtieňa; operátor rozhodne na podklade); žiadna zhoda alebo
- * lokálny fallback → „" (bez popisu).
+ * viac → „" (#573 — klient nechce príponu „viac typov (N)"; a NIKDY meno prvého kandidáta, #556,
+ * lebo pri odtieňoch by ukázalo zavádzajúci názov iného odtieňa); žiadna zhoda alebo lokálny
+ * fallback → „" (bez popisu).
  */
 export function cennikPopis(
 	typSkla: string,
@@ -184,6 +184,7 @@ export function cennikPopis(
 	if (source !== 'odoo' || !typSkla) return '';
 	const m = matchOdooGlassType(typSkla, odooTypy);
 	if (m.istota === 'jednoznacne' && m.typ) return m.typ.name;
-	if (m.istota === 'viac') return `viac typov (${m.kandidati.length})`;
+	// viac kandidátov → bez popisu (#573, Palo 25.9.: žiadna prípona „viac typov (N)"; meno
+	// prvého kandidáta nikdy — pri odtieňoch zavádzajúce, #556); operátor rozhodne na podklade
 	return '';
 }
