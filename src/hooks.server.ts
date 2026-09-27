@@ -115,8 +115,12 @@ export const handle: Handle = async ({ event, resolve }) => {
  * `<a class="__cf_email__">` → server HTML ≠ to, čo klient hydratuje → `hydration_mismatch`.
  * `Cache-Control: no-transform` Cloudflare (a každej inej proxy) zakáže HTML meniť. Existujúce
  * direktívy (napr. z `setHeaders`) ostanú; `no-transform` sa pridá len raz.
+ * TRADE-OFF: no-transform vypne aj Cloudflare brotli/gzip → LEN pre `text/html` (Email
+ * Obfuscation mení iba HTML); JSON (`__data.json`, endpointy) ostáva komprimovaný. Čistejšie je
+ * vypnúť Email Obfuscation v Cloudflare zóne — potom táto hlavička môže ísť preč.
  */
 function pridajNoTransform(headers: Headers): void {
+	if (!(headers.get('content-type') ?? '').toLowerCase().startsWith('text/html')) return;
 	const cc = headers.get('cache-control') ?? '';
 	const direktivy = cc
 		.split(',')
