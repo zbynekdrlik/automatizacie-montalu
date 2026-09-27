@@ -1,6 +1,7 @@
 ---
 paths:
   - "src/routes/objednavka-skla/**"
+  - "e2e/objednavka-skla*.spec.ts"
   - "src/lib/server/objednavka-skla.ts"
   - "src/lib/server/money-nazov-skla.ts"
   - "src/lib/objednavka-skla-pozicia.ts"

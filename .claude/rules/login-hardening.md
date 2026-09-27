@@ -9,6 +9,7 @@ paths:
   - "tests/login-*.test.ts"
   - "tests/client-ip.test.ts"
   - "tests/security-headers.test.ts"
+  - "tests/cache-no-transform-571.test.ts"
   - "e2e/login-headers.spec.ts"
 ---
 
