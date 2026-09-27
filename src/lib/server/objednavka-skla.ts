@@ -13,6 +13,7 @@ import {
 	type EdgeFinish
 } from './odoo-rozpis-lines';
 import { bezRozmerov, m2Tabule, popisPozicie } from '../objednavka-skla-pozicia';
+import { formatDatumSk, sqliteUtcToIso } from '../datum';
 
 const log = logger('objednavka-skla');
 
@@ -346,6 +347,77 @@ export function listSklaPreZakazku(zakRaw: string): SkloPolozka[] {
 	const norm = normZak(zakRaw);
 	const rows = stmtListPre.all(norm, norm) as SkloRow[];
 	return rows.map(mapRow);
+}
+
+// ---- Cudzie riadky podkladu (#571) ----------------------------------------------------
+
+/** Riadky podkladu zákazky od INÉHO používateľa: celkový počet + autori (najstarší riadok autora). */
+export interface CudzieRiadky {
+	pocet: number;
+	/** `od` = najstarší `created_at` autora (SQLite UTC tvar), zoradené od najstaršieho. */
+	autori: { user: string; od: string }[];
+}
+
+// Rovnaký WHERE ako `stmtListPre` (aj legacy `zak_norm` s medzerami) — banner počíta presne riadky,
+// ktoré podklad zobrazuje. Prázdny `created_by` (bez autora) sa neráta.
+const stmtCudzie = db.prepare(`
+	SELECT created_by AS user, COUNT(*) AS pocet, MIN(created_at) AS od
+	FROM objednavka_skla
+	WHERE (zak_norm = ? OR upper(replace(zak_norm,' ','')) = ?)
+	  AND created_by <> '' AND created_by <> ?
+	GROUP BY created_by
+	ORDER BY od, created_by
+`);
+
+/**
+ * #571: podklad je kľúčovaný číslom zákazky (`zak_norm`), nie používateľom → opakovane použitý
+ * (skúšobný) názov zákazky zdieľa podklad viacerých ľudí. Vráti riadky toho istého podkladu od
+ * INÉHO používateľa ako `username` (prázdny `created_by` ignoruje). Bez prihláseného mena
+ * (`''`) nevieme porovnať → nič. Len čítanie — nikdy neblokuje ani nemaže.
+ */
+export function cudzieRiadky(zakRaw: string, username: string): CudzieRiadky {
+	if (!username) return { pocet: 0, autori: [] };
+	const norm = normZak(zakRaw);
+	const rows = stmtCudzie.all(norm, norm, username) as {
+		user: string;
+		pocet: number;
+		od: string;
+	}[];
+	return {
+		pocet: rows.reduce((s, r) => s + r.pocet, 0),
+		autori: rows.map((r) => ({ user: r.user, od: r.od }))
+	};
+}
+
+function riadkovSk(n: number): string {
+	if (n === 1) return 'riadok';
+	return n >= 2 && n <= 4 ? 'riadky' : 'riadkov';
+}
+
+/**
+ * #571: hláška pre operátora „Táto zákazka už obsahuje N riadkov od <user> (<dátum>) — pridávaš
+ * do existujúceho podkladu", alebo `null` keď cudzie riadky nie sú. Dátum cez `sqliteUtcToIso` +
+ * `formatDatumSk` (Europe/Bratislava — nie UTC default kontajnera, `timestamps.md`).
+ */
+export function textCudzichRiadkov(c: CudzieRiadky): string | null {
+	if (c.pocet <= 0 || c.autori.length === 0) return null;
+	const autori = c.autori
+		.map((a) => `${a.user} (${formatDatumSk(sqliteUtcToIso(a.od))})`)
+		.join(', ');
+	return `Táto zákazka už obsahuje ${c.pocet} ${riadkovSk(c.pocet)} od ${autori} — pridávaš do existujúceho podkladu`;
+}
+
+/** #571: `cudzieRiadky` + `textCudzichRiadkov` naraz (producenti + load podkladu), s logom. */
+export function upozornenieCudzie(zakRaw: string, username: string): string | null {
+	const c = cudzieRiadky(zakRaw, username);
+	if (c.pocet > 0)
+		log.info('podklad obsahuje cudzie riadky', {
+			zak: zakRaw,
+			user: username,
+			pocet: c.pocet,
+			autori: c.autori.map((a) => a.user)
+		});
+	return textCudzichRiadkov(c);
 }
 
 // ---- OP objednávky (#545) -------------------------------------------------------------

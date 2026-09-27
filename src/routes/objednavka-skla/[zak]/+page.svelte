@@ -78,10 +78,24 @@
 <QrZakazka op={data.op} />
 <h1 data-testid="objednavka-nadpis">Objednávka skla — {nadpis}</h1>
 
+<!-- #571: podklad je kľúčovaný číslom zákazky — riadky od INÉHO používateľa (napr. opakovane
+	použitý skúšobný názov „test") len UPOZORNIA, nič sa neblokuje ani nemaže. -->
+{#if data.cudzie}
+	<p class="warn cudzie-banner noprint">
+		<span aria-hidden="true">⚠️</span> <span data-testid="cudzie-riadky">{data.cudzie}</span>
+	</p>
+{/if}
+
 <!-- #545: „Pridať riadok" — ručný riadok (ATYP / V.O. / priobjednané / servis). Viditeľný VŽDY,
 	aj na prázdnom podklade (formulár mimo guardu položiek). Typ skla je povinný. -->
 <section class="card noprint pridat-card" data-testid="pridat-riadok">
 	<h2 class="sec">Pridať riadok</h2>
+	{#if data.cudzie}
+		<p class="warn">
+			<span aria-hidden="true">⚠️</span>
+			<span data-testid="cudzie-riadky-pridat">{data.cudzie}</span>
+		</p>
+	{/if}
 	<form
 		method="POST"
 		action="?/pridatRiadok"
@@ -782,6 +796,14 @@
 		color: var(--m-warn, #8a5a00);
 		font-size: 0.85rem;
 		margin-top: 6px;
+	}
+	/* #571: banner cudzích riadkov podkladu — výraznejší než inline upozornenie */
+	.cudzie-banner {
+		font-size: 0.95rem;
+		padding: 8px 12px;
+		border-radius: 6px;
+		background: var(--m-warn-bg, #fff6e6);
+		outline: 1px solid var(--m-warn, #e0a54a);
 	}
 	/* #553: pole na výkres v „Pridať riadok" — pri atyp zvýraznené (required-hint) */
 	.subor-vykres.atyp-zvyraznene {

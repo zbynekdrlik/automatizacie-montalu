@@ -16,6 +16,7 @@ import {
 	pridajSkloManual,
 	nastavOpZakazky,
 	opPodkladu,
+	upozornenieCudzie,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
 import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
@@ -99,7 +100,7 @@ function volitelnyRozmer(v: FormDataEntryValue | null): number | null {
 	return s === '' ? null : Math.trunc(Number(s));
 }
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, locals }) => {
 	// SvelteKit already decodes params — no decodeURIComponent (review BLUE-7: double-decode)
 	const zak = params.zak.trim();
 	if (!zak) error(404, 'Zákazka nie je zadaná.');
@@ -122,6 +123,10 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	const effektivneOp = op || podkladOp;
 	// #563: nadpis „Objednávka skla — {OP} {zákazník}" (vzor 37880); bez OP → ZAK, bez zákazníka → OP.
 	const nadpis = nadpisObjednavky({ zak, op: effektivneOp, zakaznik: prehlad?.zakaznik ?? '' });
+	// #571: podklad je kľúčovaný číslom zákazky → riadky od INÉHO používateľa ako prihlásený
+	// (opakovaný skúšobný názov) = banner. Pokrýva aj FIX/pergola producentov (presmerujú sem) a
+	// ručný „Pridať riadok". Len upozornenie — nič neblokuje, nič nemaže.
+	const cudzie = upozornenieCudzie(zak, locals?.user?.username ?? '');
 
 	// Pre každú položku načítaj zoznam príloh (bez dát — len metadata)
 	const suboryMap: Record<number, { id: number; nazov: string; typ: string; velkost: number }[]> =
@@ -171,6 +176,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
 	return {
 		zak,
 		nadpis,
+		cudzie,
 		nazvySkiel,
 		op,
 		podkladOp,

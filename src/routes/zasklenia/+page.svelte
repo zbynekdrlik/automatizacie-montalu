@@ -666,6 +666,12 @@
 				>Otvoriť objednávku skla →</a
 			>
 		</div>
+		<!-- #571: podklad zákazky už má riadky od iného používateľa — len upozornenie, nič neblokuje -->
+		{#if form.sklaPridane.upozornenieCudzie}
+			<div class="warn noprint" data-testid="skla-pridane-cudzie">
+				⚠️ {form.sklaPridane.upozornenieCudzie}
+			</div>
+		{/if}
 	{/if}
 {/snippet}
 
