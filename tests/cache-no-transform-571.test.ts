@@ -1,7 +1,7 @@
 // #571 follow-up (PROD 27.9., 0.25.45): podklad objednávky skla hlásil `hydration_mismatch`.
 // Príčina: PROD beží za Cloudflare, ktorého „Email Address Obfuscation" prepíše e-mail v TEXTE
 // HTML (banner „…od palo@montalu.sk…", user menu s e-mailovým menom) na `<a class="__cf_email__">`
-// → server HTML ≠ to, čo klient hydratuje. Appka preto na každú odpoveď posiela
+// → server HTML ≠ to, čo klient hydratuje. Appka preto na HTML odpovede posiela
 // `Cache-Control: no-transform` (Cloudflare potom HTML nemení — developers.cloudflare.com
 // /waf/tools/scrape-shield/email-address-obfuscation). Existujúce direktívy sa zachovajú.
 import { describe, it, expect } from 'vitest';
@@ -56,9 +56,19 @@ describe('Cache-Control: no-transform — proxy nesmie meniť HTML (#571 hydrati
 		]);
 	});
 
+	// review: no-transform vypne aj Cloudflare brotli/gzip (developers.cloudflare.com/speed/
+	// optimization/content/compression) — Email Obfuscation mení LEN HTML, takže JSON/__data.json
+	// odpovede hlavičku NEdostanú a ostanú komprimované.
+	it('JSON odpoveď (napr. __data.json) → no-transform sa NEpridá (kompresia ostane)', async () => {
+		const res = await callHandle('/objednavka-skla/test/__data.json', {
+			'content-type': 'application/json'
+		});
+		expect(res.headers.get('cache-control')).toBeNull();
+	});
+
 	it('no-transform sa nezdvojí, keď ho odpoveď už má', async () => {
-		const res = await callHandle('/health', {
-			'content-type': 'application/json',
+		const res = await callHandle('/login', {
+			'content-type': 'text/html; charset=utf-8',
 			'cache-control': 'no-store, No-Transform'
 		});
 		expect(direktivy(res.headers.get('cache-control'))).toEqual(['no-store', 'no-transform']);
