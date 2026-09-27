@@ -14,7 +14,7 @@ const base: Record<string, string> = {
 	styl: '2K',
 	s: '2000',
 	v: '2200',
-	sklo: 'Izolačné 4/16/4 číre',
+	sklo: 'Izolačné sklo 4/16/4 číre',
 	otvaranie: 'P - L'
 };
 const POSUV = {

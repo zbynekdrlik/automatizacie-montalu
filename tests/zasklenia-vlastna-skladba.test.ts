@@ -161,22 +161,28 @@ describe('vlastná skladba má honest-null cenu (#235 slice 2)', () => {
 // ---- (4) tesnenie v Money odpise podľa triedy (Štandard +) ----
 
 describe('vlastná skladba — tesnenie (Money) podľa triedy v Štandard + (#235 slice 2)', () => {
-	const kodySkla = async (skloTrieda: string) => {
+	const kodySkla = async (skloTrieda: string, system = STDPLUS.system) => {
 		const r = (await nahlad({
 			...STDPLUS,
+			system,
+			// starý Štandard má farebný automatický zámok (#338) → farba kovania povinná
+			...(system === 'Štandard' ? { farbaKovania: 'R7016' } : {}),
 			sklo: SKLO_INE,
 			skloPresne: 'vlastné ' + skloTrieda,
 			skloTrieda,
 			zak: 'ZAK-T' + skloTrieda
 		})) as Record<string, unknown>;
+		expect(r.error ?? null).toBeNull();
 		expect(r.step).toBe('nahlad');
 		return (r.kovanie as { kod: string }[]).map((p) => p.kod);
 	};
 	it('trieda 6 → ZASK00006 v odpise', async () => {
 		expect(await kodySkla('6')).toContain('ZASK00006');
 	});
-	it('trieda 4 → ZASK00005 v odpise', async () => {
-		expect(await kodySkla('4')).toContain('ZASK00005');
+	// #573: Štandard plus trieda 4 už nepovoľuje (meeting 25.9. — žiadne 4 mm) → mapovanie
+	// trieda 4 → ZASK00005 sa overuje na STAROM Štandarde (bez zmeny, zdieľa tesnenie)
+	it('trieda 4 → ZASK00005 v odpise (starý Štandard)', async () => {
+		expect(await kodySkla('4', 'Štandard')).toContain('ZASK00005');
 	});
 	it('trieda 24 (izolačné) → žiadne zasklievacie tesnenie (bez gumy)', async () => {
 		const kody = await kodySkla('24');

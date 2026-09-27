@@ -381,7 +381,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		),
 		znova,
 		// #556: cenníkový popis z Odoo `montalu.glass.type` per lokálny názov skla — nárezák select
-		// zobrazí „· cenník: <Odoo name>" (pri „viac" → „viac typov (N)", hotfix). Enrichment cez
+		// zobrazí „· cenník: <Odoo name>" (pri „viac" bez popisu — #573). Enrichment cez
 		// EXISTUJÚCU `fetchGlassTypes` cache (3 s timeout, fallback = bez popisu). Výpočtový katalóg,
 		// hrúbky, profily a Money kódy NEDOTKNUTÉ (`glass-catalog.md`).
 		cennikPopisSkla,

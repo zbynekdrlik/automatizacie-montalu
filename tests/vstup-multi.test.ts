@@ -8,7 +8,14 @@ function fd(fields: Record<string, string>): FormData {
 	return f;
 }
 
-const POSUV = { system: 'Robust', styl: '2K', s: 5000, v: 2000, sklo: 'X', otvaranie: 'P - L' };
+const POSUV = {
+	system: 'Robust',
+	styl: '2K',
+	s: 5000,
+	v: 2000,
+	sklo: 'Izolačné sklo 4/16/4 číre',
+	otvaranie: 'P - L'
+};
 const base = { zak: 'Z1', op: 'O1', zakaznik: 'Test' };
 
 describe('parseMultiVstup — strážne kontroly viac-zaskleniového vstupu', () => {
@@ -90,7 +97,7 @@ describe('parseVstup — 2x štýl vynúti Opona serverovo (jedno zasklenie)', (
 			styl: '2x3K',
 			s: '5000',
 			v: '2200',
-			sklo: 'X',
+			sklo: 'Izolačné sklo 4/16/4 číre',
 			otvaranie: 'L - P'
 		}))
 			f.set(k, v);

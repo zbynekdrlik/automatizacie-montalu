@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
+	import { ponukaSkielSystemu, povoleneTriedyIne } from '$lib/sklo-povolene';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
@@ -85,38 +86,27 @@
 			sys,
 			data.styly.filter((x) => x.system === sys).map((x) => x.styl)
 		);
-	// Deluxe aj Štandard +: LEN vlastné sklá (Deluxe: Float kalené 6/10 — hrúbka
-	// vyberá kladka/klzný profil; Štandard +: Float 4/6/10 + „3.3.1" + Izolačné 4.8.4);
-	// spoločné 'ALL' sklá nemajú ich profil (musí sedieť so serverovým
-	// glassTypesForSystem, inak by formulár ponúkol sklo, ktoré server odmietne).
-	// (a Štandard + opona nemá izolačnú skladbu → sklaDoPonuky ju odfiltruje)
 	// existencia nárezáka podľa data.styly (server má ten istý test nad cfg)
 	const existuje = (sysStyl: string) => data.styly.some((x) => x.sysStyl === sysStyl);
 	// SKLO_INE (#235 slice 2) je doplnené ZA katalóg pre KAŽDÝ systém — vlastná skladba
 	// nie je katalógový riadok; `defaultSklo` ho nikdy nevráti (nie „číre" ani prvý v poradí).
+	// #573: `ponukaSkielSystemu` = katalóg systému (zrkadlo serverového glassTypesForSystem) zúžený
+	// allow-listom `POVOLENE_SKLA`; server odmietne to isté (`parseVstup`), takže `defaultSklo`
+	// aj „Znova z odpisu" vždy padnú na povolené sklo z TOHTO zoznamu.
 	const sklaForSystem = (sys: string, styl: string) => [
-		...sklaDoPonuky(
-			sys,
-			styl,
-			data.skla
-				.filter((g) =>
-					sys === 'Deluxe' || sys === 'Štandard +' || sys === 'Štandard' || sys === 'Štandard Drevo'
-						? g.system === (sys === 'Štandard' || sys === 'Štandard Drevo' ? 'Štandard +' : sys)
-						: g.system === sys || g.system === 'ALL'
-				)
-				.map((g) => g.nazov),
-			existuje
-		),
+		...sklaDoPonuky(sys, styl, ponukaSkielSystemu(sys, data.skla), existuje),
 		SKLO_INE
 	];
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
 	// Hrúbkové triedy vlastnej skladby ponúkané pre systém+štýl (#235 slice 2, RED-1 mirror):
 	// izolačné triedy (16/24) sa v UI NEPONÚKAJÚ tam, kde IZO nárezák pre daný štýl
 	// neexistuje (Štandard + opona) — rovnaký gate ako `sklaForSystem`/server `skloPre`.
+	// #573: a len triedy povolené pre systém (Robust 24, Deluxe 6/10, Štandard plus bez 4/10).
 	const triedyPre = (sys: string, styl: string): readonly number[] =>
-		skloVyberaIzo(sys) && !existuje(`${sys}|${zakladnyStyl(styl)} IZO`)
+		(skloVyberaIzo(sys) && !existuje(`${sys}|${zakladnyStyl(styl)} IZO`)
 			? SKLO_TRIEDY.filter((t) => t < 16)
-			: SKLO_TRIEDY;
+			: SKLO_TRIEDY
+		).filter((t) => povoleneTriedyIne(sys).includes(t));
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
 	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.
@@ -388,6 +378,17 @@
 			// nesmie prepísať voľbu obsluhy)
 			const chcene = untrack(() => sklo) || prim()?.sklo;
 			sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam, currentSystem);
+			// #573: trieda vlastnej skladby, ktorú štýl už neponúka, sa zruší (inak select ukáže
+			// neexistujúcu voľbu a server submit odmietne)
+			const t = untrack(() => skloTriedaS);
+			if (
+				t !== '' &&
+				!triedyPre(
+					currentSystem,
+					untrack(() => styl)
+				).includes(t)
+			)
+				skloTriedaS = '';
 		}
 	});
 
@@ -480,6 +481,9 @@
 			p.skloPresne = '';
 			p.skloTrieda = '';
 		}
+		// #573: trieda, ktorú systém/štýl posuvu už neponúka, sa zruší
+		if (p.skloTrieda !== '' && !triedyPre(p.system, p.styl).includes(p.skloTrieda))
+			p.skloTrieda = '';
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
 		if (p.system !== 'Robust') {

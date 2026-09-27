@@ -14,6 +14,7 @@
 //     obsluha vidí, než potichu prenesená hodnota, ktorú server odmietne.
 import { getOdpis } from './money';
 import { glassTypesForSystem, listSysStyly } from './db';
+import { skloPovolene } from '$lib/sklo-povolene';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { parseFarba } from './vstup';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
@@ -58,7 +59,10 @@ function platneSklo(system: string, sklo: string, chybajuce: string[], kde: stri
 	if (!sklo) return '';
 	// vlastná skladba (#235 slice 2): sentinel, NIE katalógový riadok — vždy platný
 	if (sklo === SKLO_INE) return sklo;
-	if (glassTypesForSystem(system).some((g) => g.nazov === sklo)) return sklo;
+	// #573: katalóg môže sklo ešte mať (rekomputa starých odpisov), ale ponuka systému
+	// (allow-list) ho už nemusí — predvyplniť sa smie len to, čo formulár ponúkne
+	if (skloPovolene(system, sklo) && glassTypesForSystem(system).some((g) => g.nazov === sklo))
+		return sklo;
 	chybajuce.push(`${kde}: sklo „${sklo}" sa už pre systém ${system} neponúka — vyber nové`);
 	return '';
 }
@@ -77,18 +81,28 @@ function posuvZDetailu(
 	// v histórii je pod `sklo` uložené PRESNÉ zloženie, ak ho obsluha zadala;
 	// základné sklo (to, ktoré určuje vzorec) je `skloZaklad`
 	const zaklad = s(d.skloZaklad) || s(d.sklo);
+	const sklo = platneSklo(system, zaklad, chybajuce, kde);
+	// #573: vlastná skladba ostáva, ale trieda, ktorú systém už neponúka (Robust len 24 mm),
+	// sa zahodí + nahlási — obsluha vyberie povolenú (formulár ju inak nemá v ponuke)
+	let skloTrieda = trieda(d.skloTrieda);
+	if (sklo === SKLO_INE && !skloPovolene(system, sklo, skloTrieda)) {
+		chybajuce.push(
+			`${kde}: trieda vlastnej skladby ${skloTrieda} mm sa pre systém ${system} už neponúka — vyber novú`
+		);
+		skloTrieda = null;
+	}
 	return {
 		system,
 		styl,
 		s: n(d.s),
 		v: n(d.v),
-		sklo: platneSklo(system, zaklad, chybajuce, kde),
+		sklo,
 		// vlastná skladba / presné zloženie (#235 slice 2, YELLOW-2): skloPresne obnov LEN
 		// keď sa `d.sklo` (uložený text/presné zloženie) LÍŠI od `d.skloZaklad` (základ).
 		// Pri holom katalógovom skle sú rovnaké → skloPresne prázdne (inak by sa katalógový
 		// názov obnovil ako „presné zloženie" a po zmene skla ticho vytlačil na plán).
 		skloPresne: s(d.sklo) !== s(d.skloZaklad) ? s(d.sklo) : '',
-		skloTrieda: trieda(d.skloTrieda),
+		skloTrieda,
 		otvaranie: s(d.otvaranie),
 		kovanieL: s(d.kovanieL),
 		kovanieP: s(d.kovanieP),
