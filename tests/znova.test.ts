@@ -120,6 +120,20 @@ describe('znovaZOdpisu — hodnoty, ktoré už neplatia', () => {
 		expect(z.chybajuce.join(' ')).toMatch(/neponúka/);
 	});
 
+	it('#573: sklo mimo allow-listu systému (Robust 3.3.1) sa ZAHODÍ a nahlási', () => {
+		// katalóg ho pre Robust stále má (rekomputa starých odpisov, #570), ale nárezák ho
+		// po meetingu 25.9. už neponúka — „Použiť znova" nesmie predvyplniť zakázané sklo
+		const id = vlozOdpis('ZAK-ZNOVA-573', '01', {
+			...DETAIL_JEDEN,
+			sklo: '3.3.1',
+			skloZaklad: '3.3.1'
+		});
+		const z = znovaZOdpisu(id)!;
+		expect(z.vstup!.sklo).toBe('');
+		expect(z.chybajuce.join(' ')).toMatch(/3\.3\.1/);
+		expect(z.chybajuce.join(' ')).toMatch(/neponúka/);
+	});
+
 	it('štýl, ktorý v konfigurácii nie je, sa nahlási (ale zadanie sa nezahodí)', () => {
 		const id = vlozOdpis('ZAK-ZNOVA-3', '01', { ...DETAIL_JEDEN, styl: '9K' });
 		const z = znovaZOdpisu(id)!;
