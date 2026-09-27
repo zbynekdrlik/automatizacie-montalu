@@ -482,7 +482,7 @@
 			p.skloTrieda = '';
 		}
 		// #573: trieda, ktorú systém/štýl posuvu už neponúka, sa zruší
-		if (p.skloTrieda !== '' && !triedyPre(p.system, p.styl).includes(Number(p.skloTrieda)))
+		if (p.skloTrieda !== '' && !triedyPre(p.system, p.styl).includes(p.skloTrieda))
 			p.skloTrieda = '';
 		const ot = otvaraniaForStyl(p.styl);
 		if (!ot.includes(p.otvaranie)) p.otvaranie = ot[0]!; // ot vždy neprázdne
