@@ -12,7 +12,8 @@ import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } 
 // surviving v43 IZO variantom rovnakej triedy (16mm skladba, jeIzoTrieda ⇒ true),
 // takže IZO-detekcia a odvodené odpis kódy (ZASP00030/ZASP00033...) sú nezmenené.
 const IZO = 'Izolačné sklo 4/8/4 číre';
-const NIE_IZO = 'Float sklo 4 mm';
+// #573: Štandard plus už Float 4 mm neponúka (meeting 25.9.) → neizolačné povolené = 6 mm
+const NIE_IZO = 'Float sklo 6 mm';
 
 test('Štandard + | 2K | IZO sklo: checkbox sa predvyplní zaškrtnutý a odpis ukáže 3K spodnú', async ({
 	page
