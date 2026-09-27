@@ -417,3 +417,34 @@ Money-NEUTRÁLNE, BEZ migrácie.
 - **Testy:** `tests/objednavka-skla-atyp-bez-rozmerov-565.test.ts` (akcia OK/400/400/polovičné,
   prepnutie režimu blokované, `buildGlassOrderForZak` payload, `buildGlassOrderItem`, helpery). E2E
   `objednavka-skla.spec.ts` „atyp s výkresom bez šírky/výšky" (required zmizne, riadok „podľa výkresu").
+
+## Cudzie riadky na podklade — upozornenie, NIKDY blok (#571)
+
+PROD 25.9.: podklad je kľúčovaný číslom zákazky (`zak_norm`), NIE používateľom → opakovane použitý
+skúšobný názov („test", „te") zdieľa jeden podklad a `palo@montalu.sk` nevedomky pridal sklo do
+podkladu s riadkami iného používateľa. ROZHODNUTÉ (gk z poverenia ownera 27.9.): **upozorniť, nič
+neblokovať, skúšobné podklady „test"/„te" NEMAZAŤ** (ani migráciou, ani skriptom). Money-NEUTRÁLNE,
+bez migrácie.
+
+- **JEDEN helper** `cudzieRiadky(zak, username)` (`objednavka-skla.ts`) → `{ pocet, autori:[{user, od}] }`
+  — ROVNAKÝ WHERE ako `listSklaPreZakazku` (aj legacy `zak_norm` s medzerou), `created_by <> ''` AND
+  `<> username`, `od` = najstarší `created_at` autora. Prázdne meno → nič. `textCudzichRiadkov(c)` =
+  hláška („1 riadok / 2–4 riadky / 5+ riadkov", dátum cez `sqliteUtcToIso` + `formatDatumSk`, nie UTC
+  default). `upozornenieCudzie(zak, user)` = oboje, BEZ logu (volá ho zasklenia producent aj load —
+  load beží pri každom reloade). LOG je v zápisovej vrstve: `logCudzieRiadky` po `pridajSklaHromadne` /
+  `pridajSklaHromadneIdempotentne` / `pridajSkloManual` (raz na zákazku+autora) → pokryje VŠETKÝCH
+  producentov vrátane FIX/pergoly/ručného riadku; nový producent cez tieto funkcie loguje sám.
+- **Kde sa zobrazí:** zasklenia `pridatSkla`/`pridatSklaMulti` → `sklaPridane.upozornenieCudzie` (testid
+  `skla-pridane-cudzie` v `sklaPridaneBanner`); podklad `/objednavka-skla/[zak]` load → `data.cudzie` →
+  banner `cudzie-riadky` pod nadpisom + `cudzie-riadky-pridat` vo formulári „Pridať riadok". FIX a
+  pergola producenti presmerujú na podklad → pokryje ich banner (žiadna zmena ich akcií). **Nový
+  producent podkladu:** ak NEpresmeruje na podklad, vráť `upozornenieCudzie(...)` vo výsledku akcie.
+- **Známe obmedzenie:** porovnáva sa `created_by` = prihlasovacie meno. Spoločný účet (`vyroba`, ktorý
+  vytvára väčšinu podkladov) sa SÁM neupozorní — dvaja ľudia pod jedným účtom sú pre appku jeden
+  používateľ. Riešenie je organizačné (osobné účty), nie v kóde.
+- **E2E bez nového skip guardu:** druhý používateľ sa v E2E NEseeduje priamo do DB (to by vyžadovalo
+  nový BASE_URL skip riadok = blok integračného pushu, viď `e2e-console.md`), ale vytvorí sa cez UI
+  `/pouzivatelia` (interný účet → pridá riadok → späť `e2e` → banner → kolega B2B → Zmazať). Dátum v
+  očakávanom texte sa počíta v teste tou istou Intl `Europe/Bratislava` logikou (nie pevný literál).
+- **Testy:** `tests/objednavka-skla-cudzie-571.test.ts` (helper, text/TZ/skloňovanie, zasklenia akcia,
+  load), E2E `objednavka-skla.spec.ts` „riadky iného používateľa → upozornenie".
