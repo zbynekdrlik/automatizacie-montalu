@@ -364,10 +364,10 @@ test('objednávka skla: riadky iného používateľa → upozornenie, pridanie n
 	await page.getByLabel('Prihlasovacie meno').fill(kolega);
 	await page.getByLabel('Heslo (min. 6 znakov)').fill(kolegaPass);
 	await page.getByLabel('Rola').selectOption('internal');
-	await page.getByRole('button', { name: 'Pridať účet' }).click();
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('Interný');
-
 	try {
+		await page.getByRole('button', { name: 'Pridať účet' }).click();
+		await expect(page.getByTestId('pouzivatelia-ok')).toContainText('Interný');
+
 		// 2. kolega pridá riadok na zákazku — vlastný podklad, žiadne upozornenie
 		await logout(page);
 		await loginAs(page, kolega, kolegaPass);

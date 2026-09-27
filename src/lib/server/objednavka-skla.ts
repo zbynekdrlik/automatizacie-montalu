@@ -216,7 +216,7 @@ export function pridajSkloManual(s: ManualSklo): number {
 	const m2 = rozmery ? m2Tabule(rozmery.sirkaMm, rozmery.vyskaMm, s.pocet) : null;
 	// Insert + manuál/atyp UPDATE ATOMICKY (jeden logický riadok) — `pridajSklo` vkladá vždy
 	// `rezim='rozmery'` a manuálne stĺpce NULL; doplnia sa v tej istej transakcii (#545 review 🔵).
-	return db.transaction(() => {
+	const id = db.transaction(() => {
 		const id = pridajSklo({
 			zak: s.zak,
 			op: s.op,
@@ -236,6 +236,8 @@ export function pridajSkloManual(s: ManualSklo): number {
 		if (s.vykres) pridajSubor(id, s.vykres.nazov, 'application/octet-stream', s.vykres.data);
 		return id;
 	})();
+	logCudzieRiadky([s]);
+	return id;
 }
 
 /** Hromadné pridanie skiel (po výpočte modulu). Vracia počet vložených. */
@@ -247,6 +249,7 @@ export function pridajSklaHromadne(polozky: NoveSklo[]): number {
 			count++;
 		}
 	})();
+	logCudzieRiadky(polozky);
 	return count;
 }
 
@@ -292,6 +295,7 @@ export function pridajSklaHromadneIdempotentne(polozky: NoveSklo[]): number {
 			pridane++;
 		}
 	})();
+	logCudzieRiadky(polozky);
 	return pridane;
 }
 
@@ -407,17 +411,29 @@ export function textCudzichRiadkov(c: CudzieRiadky): string | null {
 	return `Táto zákazka už obsahuje ${c.pocet} ${riadkovSk(c.pocet)} od ${autori} — pridávaš do existujúceho podkladu`;
 }
 
-/** #571: `cudzieRiadky` + `textCudzichRiadkov` naraz (producenti + load podkladu), s logom. */
+/** #571: `cudzieRiadky` + `textCudzichRiadkov` naraz — hláška pre výsledok producenta aj load
+ *  podkladu. BEZ logu (load beží pri každom reloade); loguje zápisová vrstva (`logCudzieRiadky`). */
 export function upozornenieCudzie(zakRaw: string, username: string): string | null {
-	const c = cudzieRiadky(zakRaw, username);
-	if (c.pocet > 0)
-		log.info('podklad obsahuje cudzie riadky', {
-			zak: zakRaw,
-			user: username,
-			pocet: c.pocet,
-			autori: c.autori.map((a) => a.user)
-		});
-	return textCudzichRiadkov(c);
+	return textCudzichRiadkov(cudzieRiadky(zakRaw, username));
+}
+
+/** #571: po ZÁPISE do podkladu (všetci producenti: zasklenia, FIX, pergola, ručný riadok) zaloguj,
+ *  keď používateľ pridal do podkladu s riadkami iného používateľa — raz na (zákazka, autor). */
+function logCudzieRiadky(polozky: { zak: string; createdBy: string }[]): void {
+	const videne = new Set<string>();
+	for (const s of polozky) {
+		const kluc = `${normZak(s.zak)}\u0000${s.createdBy}`;
+		if (videne.has(kluc)) continue;
+		videne.add(kluc);
+		const c = cudzieRiadky(s.zak, s.createdBy);
+		if (c.pocet > 0)
+			log.info('pridane do podkladu s cudzimi riadkami', {
+				zak: s.zak,
+				user: s.createdBy,
+				pocet: c.pocet,
+				autori: c.autori.map((a) => a.user)
+			});
+	}
 }
 
 // ---- OP objednávky (#545) -------------------------------------------------------------
