@@ -9,6 +9,7 @@ paths:
   - "tests/login-*.test.ts"
   - "tests/client-ip.test.ts"
   - "tests/security-headers.test.ts"
+  - "tests/cache-no-transform-571.test.ts"
   - "e2e/login-headers.spec.ts"
 ---
 
@@ -95,3 +96,5 @@ odpovede (200 rendery incl. `/login`, `/zasklenia`, aj 404/500). 3xx redirecty z
 three.js/inline štýly Svelte = riziko rozbitia; CSP samostatne ak sa ukáže bezpečné.
 `Permissions-Policy` je minimálny (`camera=(), microphone=(), geolocation=()`) — WebGL
 Permissions-Policy neriadi. E2E číta hlavičky cez `res.headers()` (malé písmená).
+
+- **`Cache-Control: no-transform` (#571 follow-up):** `handle` ho pridá LEN k `text/html` odpovediam (`pridajNoTransform` — zachová existujúce direktívy, nezdvojí), aby Cloudflare (Email Obfuscation) nemenil HTML → inak `hydration_mismatch` pri texte s e-mailom. **TRADE-OFF:** no-transform vypne aj Cloudflare brotli/gzip pre to HTML (JSON/`__data.json` ostáva komprimovaný). Čistejšie riešenie = vypnúť Email Obfuscation v Cloudflare zóne → potom hlavičku odstráň. Detail `objednavka-skla.md`.

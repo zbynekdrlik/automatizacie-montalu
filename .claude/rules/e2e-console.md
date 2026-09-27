@@ -68,6 +68,11 @@ E2E — pokry logiku SERVER-SIDE unit testom (vzor `sklo-strecha-cena.test.ts` c
 je triviálny. Bypass hooku (`# airuleset:test-skip-ok`) je logovaný a je na pushera, nie na
 worktree workera — nespoliehaj sa naň.
 
+**Nový DB-seedovaný E2E (lokálny preview) → `await skipAkLive(page)` ako PRVÉ, nie nový doslovný
+BASE_URL skip riadok** (#571 follow-up, `objednavka-skla-proxy-hydratacia.spec.ts`): PROD je jediné
+nasadenie a hlási `live: true`, takže helper preskočí presne tam, kde by seed do DB nešiel — a
+hook nič nematchne.
+
 ## PASCA: `block-test-skips.sh` false-block na META/guard testoch
 
 Pre-push hook `block-test-skips.sh` matchne `\btest\.skip\(` v PRIDANÝCH riadkoch
