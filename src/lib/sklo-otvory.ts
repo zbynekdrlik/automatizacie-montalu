@@ -13,6 +13,9 @@ export const D_ZAMOK_MM = 46;
 /** Prípona popisu riadku objednávky skla s tabuľami s otvorom („Zasklenie N — s otvorom ⌀46"). */
 export const PRIPONA_S_OTVOROM = ` — s otvorom ⌀${D_ZAMOK_MM}`;
 
+/** Prípona otvoru ĽUBOVOĽNÉHO priemeru na konci popisu (ďalší typ otvoru = iný ⌀, rovnaký tvar). */
+export const PRIPONA_OTVOR_RE = / — s otvorom ⌀\d+$/;
+
 /** Trieda priemeru otvoru podľa kontraktu odoo-erp (`d50` = 31–50 mm; ⌀46 ∈ d50). */
 export type TriedaOtvoru = 'd50';
 

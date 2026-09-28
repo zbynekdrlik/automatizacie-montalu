@@ -45,6 +45,8 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	const sirka = (await page.getByTestId('sklo-sirka').innerText()).replace(/\D/g, '');
 	const vyska = (await page.getByTestId('sklo-vyska').innerText()).replace(/\D/g, '');
 	const otvory = await page.getByTestId('nahlad-2d').locator('circle[stroke-dasharray]').count();
+	expect(Number(sirka)).toBeGreaterThan(0);
+	expect(Number(vyska)).toBeGreaterThan(0);
 	expect(otvory).toBeGreaterThan(0);
 	expect(kusy).toBeGreaterThan(otvory);
 

@@ -2,7 +2,7 @@
 // tabule, nadpis. Patrik (Odoo úloha 625, 23.9.): výrobu „nezaujíma kam to dávame" → popis riadka
 // je len „Zasklenie N"; m² vyplnené vopred; nadpis = OP + zákazník. Money-NEUTRÁLNE.
 
-import { PRIPONA_S_OTVOROM } from './sklo-otvory';
+import { PRIPONA_OTVOR_RE } from './sklo-otvory';
 
 // Pozícia zasklenia na začiatku popisu: nové riadky „Zasklenie N", staré multi „Zasklenie N: Robust 3K",
 // #578 riadok tabúľ s otvorom „Zasklenie N — s otvorom ⌀46".
@@ -21,7 +21,13 @@ export function popisPozicie(popis: string, modul: string): string {
 	const t = popis.trim();
 	const m = POZICIA.exec(t);
 	if (!m) return 'Zasklenie 1';
-	return t.endsWith(PRIPONA_S_OTVOROM) ? `${m[1]!}${PRIPONA_S_OTVOROM}` : m[1]!;
+	const otvor = PRIPONA_OTVOR_RE.exec(t);
+	return otvor ? `${m[1]!}${otvor[0]}` : m[1]!;
+}
+
+/** #578: pozícia BEZ prípony otvoru („Zasklenie N — s otvorom ⌀46" → „Zasklenie N") — celý posuv. */
+export function zakladPozicie(popis: string, modul: string): string {
+	return popisPozicie(popis, modul).replace(PRIPONA_OTVOR_RE, '');
 }
 
 /** Plocha tabúľ riadka v m² = šírka × výška × kusy / 1e6 (jeden vzorec pre všetkých producentov). */
