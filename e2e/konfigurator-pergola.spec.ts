@@ -5,7 +5,7 @@
 // #277 DOPYT tok (kontaktný formulár → PDF ponuka s orientačnou cenou): zapisuje audit riadok
 // do SQLite `dopyt` (Money-NEUTRÁLNE, žiadny Money import) — je za `skipAkLive`, nech proti
 // LIVE prode nepribúdajú testovacie dopyty. Každý test = NULA console chýb.
-import { test, expect } from './ucty';
+import { test, expect, zalozB2bUcet } from './ucty';
 import { readFile } from 'node:fs/promises';
 import { PDFDocument } from 'pdf-lib';
 import { goto, collectConsole, skipAkLive, loginAs, logout } from './helpers';
@@ -254,7 +254,6 @@ test('konfigurátor: objednávka (VO/b2b) — prihlásený veľkoobchod vidí VO
 	page.on('dialog', (d) => d.accept()); // confirm() pri Zmazať
 
 	const voUser = `e2e-obj-vo-${Date.now().toString(36)}`;
-	const voPass = 'e2eheslo1';
 
 	const odhlas = async () => {
 		await goto(page, '/zasklenia'); // nav s user menu je na authed stránke, nie na verejnom /konfigurator
@@ -263,12 +262,7 @@ test('konfigurátor: objednávka (VO/b2b) — prihlásený veľkoobchod vidí VO
 
 	// 1. interný vytvorí VO/b2b účet (rola defaultne B2B)
 	await loginAs(page);
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(voUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(voPass);
-	e2eUcty.zaregistruj(voUser); // #583: zaručené zmazanie aj pri páde testu
-	await page.getByRole('button', { name: 'Pridať účet' }).click();
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const voPass = await zalozB2bUcet(page, e2eUcty, voUser); // #583: zaručené zmazanie + náhodné heslo
 
 	// 2. prihlásenie ako VO/b2b + konfigurácia → VO cena + odznak
 	await odhlas();
@@ -679,7 +673,6 @@ test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); inte
 	page.on('dialog', (d) => d.accept()); // confirm() pri Zmazať
 
 	const voUser = `e2e-vo-${Date.now().toString(36)}`;
-	const voPass = 'e2eheslo1';
 
 	// vyplň konfigurátor FIXNÝM rozmerom (LIGHT default, v katalógu) a spočítaj → cena s DPH (€ ako number)
 	const spocitajCenu = async (): Promise<number> => {
@@ -701,12 +694,7 @@ test('konfigurátor: prihlásený VO/b2b vidí VEĽKOOBCHODNÚ cenu (< MO); inte
 
 	// 1. interný vytvorí VO/b2b účet (rola defaultne B2B)
 	await loginAs(page);
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(voUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(voPass);
-	e2eUcty.zaregistruj(voUser); // #583: zaručené zmazanie aj pri páde testu
-	await page.getByRole('button', { name: 'Pridať účet' }).click();
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const voPass = await zalozB2bUcet(page, e2eUcty, voUser); // #583: zaručené zmazanie + náhodné heslo
 
 	// 2. INTERNÝ vidí MO — žiadny VO odznak (interný v zákazníckom konfigurátore = maloobchod)
 	const moCena = await spocitajCenu();

@@ -5,7 +5,7 @@
 // VŠETKY ceny TU sú VYMYSLENÉ (repo je verejné — nikdy reálnu Money cenu). PRP20242 =
 // „Profil 110x110 V2" (predná noha), PRP202410 = „Profil 110x43" (bočný), PRP202526 =
 // „Žlab 110" (známy katalógový kód pre ručný riadok). Nula console errors všade.
-import { test, expect } from './ucty';
+import { test, expect, zalozB2bUcet } from './ucty';
 import fs from 'node:fs';
 import { collectConsole, loginAs, goto, waitHydrated, logout } from './helpers';
 
@@ -156,13 +156,7 @@ test('b2b: /pergola/narez je presmerovaná preč — cenový blok b2b nikdy neuv
 
 	page.on('dialog', (d) => d.accept());
 	const b2bUser = `e2e-pergola-ceny-b2b-${Date.now().toString(36)}`;
-	const b2bPass = 'e2eheslo1';
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
-	e2eUcty.zaregistruj(b2bUser); // #583: zaručené zmazanie aj pri páde testu
-	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const b2bPass = await zalozB2bUcet(page, e2eUcty, b2bUser); // #583: zaručené zmazanie + náhodné heslo
 
 	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);

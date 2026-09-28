@@ -17,7 +17,7 @@ test('pád testu PO založení účtu — zaručené upratanie ho aj tak zmaže 
 	const consoleMsgs = collectConsole(page);
 	const username = `e2e-upratanie-${Date.now().toString(36)}`;
 	await loginAs(page);
-	await zalozB2bUcet(page, e2eUcty, username, 'e2eheslo1');
+	await zalozB2bUcet(page, e2eUcty, username);
 	await expect(page.getByRole('cell', { name: username, exact: true })).toHaveCount(1);
 	zalozenyUcet = username;
 	expect(consoleMsgs).toEqual([]);

@@ -139,6 +139,8 @@ export async function loginAs(page: Page, user = E2E_USER, pass = E2E_PASS) {
  */
 export async function openUserMenu(page: Page) {
 	// #583: klik na summary PREPÍNA — už otvorené menu by druhý klik zavrel; otvor len zatvorené
+	// stav `open` čítame jednorazovo → najprv hydratácia, nech ho už nič neprepíše
+	await waitHydrated(page);
 	const menu = page.locator('details.nav-user');
 	if ((await menu.getAttribute('open')) === null)
 		await page.getByTestId('user-menu-toggle').click();

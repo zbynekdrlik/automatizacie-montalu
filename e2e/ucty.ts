@@ -8,7 +8,7 @@
 //   kontexte (stav testovej stránky — prihlásený B2B, otvorený náhľad, zaseknutý dialóg — nehrá rolu).
 // - `zmazE2eUcty` — spoločné jadro, volá ho aj globalSetup sweep (zvyšky `e2e-` z minulých behov).
 // Maže sa LEN cez sankcionovaný UI tok (tlačidlo „Zmazať" na /pouzivatelia), LEN B2B účty (interný
-// UI nezmaže) a LEN mená s prefixom `e2e-` — nikdy E2E admin samotný.
+// UI nezmaže) a LEN mená tvaru `E2E_UCET_VZOR` (`e2e-<popis>-<ts>`) — nikdy E2E admin samotný.
 import {
 	test as base,
 	expect,
@@ -16,9 +16,11 @@ import {
 	type BrowserContextOptions,
 	type Page
 } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
 import { E2E_USER, goto, loginAs } from './helpers';
 
-export const E2E_UCET_PREFIX = 'e2e-';
+/** Tvar mena throwaway účtu `e2e-<popis>-<Date.now base36>` — fixture iný odmietne, sweep maže LEN tento. */
+export const E2E_UCET_VZOR = /^e2e-[a-z0-9-]+-[a-z0-9]{6,}$/;
 
 type Ciel = Pick<BrowserContextOptions, 'baseURL' | 'extraHTTPHeaders' | 'ignoreHTTPSErrors'>;
 
@@ -39,8 +41,8 @@ async function nacitajUcty(page: Page): Promise<{ username: string; b2b: boolean
 }
 
 /**
- * Prihlási E2E admina v NOVOM kontexte a zmaže B2B účty, ktoré vyberie `vyber` (vždy len prefix
- * `e2e-`, nikdy E2E admin). Vracia zoznam zmazaných mien. Chyba pri mazaní padne HLASNO — upratanie,
+ * Prihlási E2E admina v NOVOM kontexte a zmaže B2B účty, ktoré vyberie `vyber` (vždy len tvar
+ * `E2E_UCET_VZOR`, nikdy E2E admin). Vracia zoznam zmazaných mien. Chyba pri mazaní padne HLASNO — upratanie,
  * ktoré ticho zlyhá, je presne to, čo nechalo účet na PROD.
  */
 export async function zmazE2eUcty(
@@ -60,11 +62,7 @@ export async function zmazE2eUcty(
 		await loginAs(page);
 		await page.goto('/pouzivatelia');
 		const ciele = (await nacitajUcty(page)).filter(
-			(u) =>
-				u.b2b &&
-				u.username.startsWith(E2E_UCET_PREFIX) &&
-				u.username !== E2E_USER &&
-				vyber(u.username)
+			(u) => u.b2b && E2E_UCET_VZOR.test(u.username) && u.username !== E2E_USER && vyber(u.username)
 		);
 		for (const { username } of ciele) {
 			const row = page
@@ -95,12 +93,13 @@ export const test = base.extend<{ e2eUcty: E2eUcty }>({
 		const ucty = new Set<string>();
 		await use({
 			zaregistruj(username) {
-				if (!username.startsWith(E2E_UCET_PREFIX) || username === E2E_USER)
-					throw new Error(`E2E účet musí mať prefix „${E2E_UCET_PREFIX}": ${username}`);
+				if (!E2E_UCET_VZOR.test(username) || username === E2E_USER)
+					throw new Error(`E2E účet musí mať tvar ${E2E_UCET_VZOR}: ${username}`);
 				ucty.add(username);
 			}
 		});
-		// teardown — beží aj po páde/timeoute testu
+		// teardown — beží aj po páde/timeoute testu. Keď test účet zmazal sám, stojí to jedno admin
+		// prihlásenie navyše (nič nenájde) — vedome: overiť existenciu by tiež chcelo admin session.
 		if (ucty.size) await zmazE2eUcty(browser, testInfo.project.use, (u) => ucty.has(u));
 	}
 });
@@ -108,19 +107,21 @@ export const test = base.extend<{ e2eUcty: E2eUcty }>({
 export { expect };
 
 /**
- * Založí throwaway B2B účet cez /pouzivatelia (stránka už musí byť prihlásená ako interný) a
- * PREDTÝM ho zaregistruje na zaručené zmazanie.
+ * Založí throwaway B2B účet cez /pouzivatelia (stránka už musí byť prihlásená ako interný), PREDTÝM ho
+ * zaregistruje na zaručené zmazanie a vráti NÁHODNÉ heslo na prihlásenie (#583: žiadne verejné heslo
+ * natvrdo v repe pre účet, ktorý na PROD žije počas behu).
  */
 export async function zalozB2bUcet(
 	page: Page,
 	e2eUcty: E2eUcty,
-	username: string,
-	password: string
-) {
+	username: string
+): Promise<string> {
+	const heslo = `e2e-${randomBytes(12).toString('base64url')}`;
 	e2eUcty.zaregistruj(username);
 	await goto(page, '/pouzivatelia');
 	await page.getByLabel('Prihlasovacie meno').fill(username);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(password);
+	await page.getByLabel('Heslo (min. 6 znakov)').fill(heslo);
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	return heslo;
 }
