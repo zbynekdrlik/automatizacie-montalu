@@ -147,7 +147,7 @@ test('sieťka skryje kľučku LEN na strane sieťky — druhá strana ostane aj 
 	await page.selectOption('#kovanieP', 'Jednostranná kľučka z vnútra bez FAB');
 
 	await page.locator('#sietka-on').check();
-	await expect(page.getByTestId('sietka-strana')).toContainText('ľavá');
+	await expect(page.getByTestId('sietka-strana')).toContainText('na ľavú stranu');
 	await expect(page.locator('#kovanieL')).toHaveCount(0);
 	await expect(page.locator('#kovanieP')).toBeVisible();
 	await expect(page.locator('#kovanieP')).toHaveValue('Jednostranná kľučka z vnútra bez FAB');
