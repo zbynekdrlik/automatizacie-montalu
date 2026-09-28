@@ -48,6 +48,22 @@ Doména sieťky je rozliata cez `sietka.ts` (čisté helpery + konštanty) → `
 - **E2E relačne** (PROD cfg upravuje editor): kladkový sieťky > / < rez posuvu podľa smeru,
   sieťovina pri IZO skle == pri základnom (`e2e/sietka-standard.spec.ts`), nikdy seed mm.
 
+## Kovanie (kľučka) vs STRANA sieťky — len strana sieťky sa skryje (#583, Patrik Odoo úloha 1191)
+
+- **JEDNO pravidlo: `kovanieSkryte(sietka, strana)` v `src/lib/sietka.ts`** → `{ l, p }`. Pri
+  sieťke vylúči LEN kovanie na strane `sietkaStrana(otvaranie)` (L - P → ľavá, P - L → pravá);
+  druhá strana aj stredové kovanie opony (`kovanieStred`) ostávajú. Strana `null` (opona) → nič.
+  #88 pôvodne skrylo kovanie na OBOCH stranách aj v strede — Patrik: „zruší mi kľučky na posuve".
+- **Štyri miesta ho MUSIA používať (nikdy vlastná podmienka):** primárny formulár šablóna
+  (`ZasklieniaForm` `kovSkryte`) + nulovací `$effect` v `routes/zasklenia/+page.svelte`; ďalšie
+  posuvy — šablóna (`{@const ks}`) + `zhodKovaniePodSietkou` (onZmena sieťky AJ onchange
+  otvárania, inak ostane skrytá hodnota v `posuvy` JSON-e); server `bezKovaniaNaStraneSietky`
+  v `parseVstup`/`parseMultiVstup` — volať AŽ po `sanitizeSietka` + vynútení `Opona`.
+- **Money-neutrálne:** mení sa len echo `vstup.kovanieL/P` (golden `zasklenia-posuvspec-golden`
+  robust-2K-plny P - L: `kovanieP` → `''`), `plan`/`kovanie`/`planHash` byte-identické.
+- `znova.ts` nemá vlastné pravidlo — obnoví uložené (už sanitizované) hodnoty, submit ich prejde
+  serverom znova. E2E: `e2e/sietka.spec.ts` (#88 spresnené + #583 single aj multi + náhľad).
+
 ## Jokle Robust (#555, Patrik Odoo úloha 1010)
 
 - **Vzorec žije LEN v `sietka.ts` — `rozmerJokle(sietovina)`** (jeden zdroj pravdy pre
