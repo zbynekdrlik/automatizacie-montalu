@@ -7,6 +7,8 @@ paths:
   - "src/lib/objednavka-skla-pozicia.ts"
   - "src/lib/objednavka-skla-typy.ts"
   - "src/lib/server/objednavka-skla-odoslanie.ts"
+  - "src/lib/sklo-otvory.ts"
+  - "src/lib/components/Nahlad2D.svelte"
   - "src/routes/zasklenia/+page.server.ts"
   - "src/routes/fix/+page.server.ts"
   - "src/routes/pergola/narez/+page.server.ts"
@@ -104,8 +106,8 @@ redirecting.
 
 | Module | Action | Glass source | Mapping |
 |---|---|---|---|
-| `/zasklenia` | `pridatSkla` | `ComputeResult.sklo: { sirka, vyska, pocet }` | 1 item per posuv |
-| `/zasklenia` | `pridatSklaMulti` | `MultiResult.posuvy[i].sklo` | N items (per posuv) |
+| `/zasklenia` | `pridatSkla` | `ComputeResult.sklo: { sirka, vyska, pocet }` | 1 item per posuv (Deluxe: s otvorom + bez, #578 `sklaPosuvu`) |
+| `/zasklenia` | `pridatSklaMulti` | `MultiResult.posuvy[i].sklo` | 1–2 items per posuv (`sklaPosuvu`, #578) |
 | `/fix` | `pridatSkla` | `FixVykres.polia[]: { sirka, vLavo, vPravo }` | N items (per pole); sikmy→vLavo/vPravo, rovny→vyska |
 | `/pergola/narez` | `pridatSkla` | `StrechaSkloVypocet: { sirkaMm, dlzkaMm, pocetTabul, typ }` | 1 item; honest-null gate (no insert when sirkaMm, dlzkaMm, or pocetTabul is null) |
 
@@ -530,3 +532,44 @@ Marek D. (Odoo úlohy 1180/1181, 28.9.): 99 Odoo typov v plochom `<select>` bolo
   voľba v skupine, bez duplicít — len čítanie, beží aj proti PROD) + `objednavka-skla-odoo-odkaz-577.spec.ts`
   (seed `objednavka_skla_odoslanie` do e2e DB so syntetickým id, `skipAkLive`; v CI je upload vypnutý,
   preto reálny odkaz z akcie kryje unit test).
+
+## Tabule s otvorom vs bez — JEDNO pravidlo pre výkres aj objednávku (#578)
+
+Marek (Odoo úloha 1185): IZOS cení tabuľu s otvorom inak než bez → objednávka musí povedať, KTORÉ
+tabule vŕtať. Money-NEUTRÁLNE, bez migrácie (spec stĺpce v48).
+
+- **Pravidlo `otvoryVSkle(system, N)`** (`src/lib/sklo-otvory.ts`, client-safe) — Deluxe: krajné
+  sklá (`N===1 → [0]`, inak `[0, N-1]`), 1 otvor na tabuľu, trieda `d50` (⌀46 ∈ 31–50 mm); ostatné
+  systémy `[]`. Štýl (opona/2x) pravidlo NEmení — `Nahlad2D` ho nedostáva a kreslí rovnako polia
+  0 a N−1. `Nahlad2D` berie indexy z pravidla (`zamky`), takže výkres a objednávka nemôžu nesedieť
+  (test `tests/sklo-otvory-578.test.ts` SSR-renderuje `Nahlad2D` cez `svelte/server` `render` a
+  porovná počet `circle[stroke-dasharray]` s pravidlom). Ďalší otvor (madlo D56, iný systém) = zmena
+  LEN v `otvoryVSkle`.
+- **Producent** `sklaPosuvu(pozicia, posuv, ident)` (`objednavka-skla.ts`, zdieľa single aj multi
+  akcia `/zasklenia`) → `riadkySklaPosuvu`: riadok „Zasklenie N — s otvorom ⌀46" (`pocet = sOtvorom`,
+  `holesQty = 1`, `holeSize = 'd50'`) + riadok „Zasklenie N" (zvyšok; pri 0 ks NEvznikne — Deluxe 2K
+  = len jeden riadok s otvorom). m² z kusov KAŽDÉHO riadku.
+- **`NoveSklo.holesQty/holeSize`** → `pridajSklo` zapíše `spec_holes_qty/spec_hole_size` (validácia +
+  default d30 ako `nastavSpec`). **Dedup** `stmtRovnake` má `AND spec_holes_qty = ?` — Deluxe 4K =
+  2 + 2 ks rovnakej geometrie, rozlišuje ich otvor + prípona pozície.
+- **`popisPozicie` ponechá príponu `PRIPONA_S_OTVOROM`** (regex `(?::|$| — )`). PASCA: starý regex
+  `(?::|$)` by „Zasklenie 3 — s otvorom ⌀46" zmenil na „Zasklenie 1" (fallback) → zlý popis na
+  podklade, v Odoo `description` aj v dedup-identite. Podklad zobrazuje otvor práve cez tento popis
+  (read-only; editácia otvorov ostáva skrytá podľa #546, hidden echo ich pri uložení Hrany zachová).
+- **Kontrakt Odoo: `holes_qty` je NA TABUĽU**, nie na riadok — odoo-erp `montalu_glass_price.py`
+  `price_unit = (base × plocha + Σ príplatky) × nadrozmer`, `price_purchase = price_unit × qty`;
+  `montalu_glass_line_spec.py` vŕtanie `items.append((code, holes_qty, 1))` „raz na jednotku".
+  Riadok s otvorom teda posiela `qty = 2, holes_qty = 1, hole_size = d50` (nie `holes_qty = 2`).
+- **Prechod (review 🟡):** riadok celého posuvu spred #578 („Zasklenie 1", N ks, 0 otvorov) sa s
+  novými riadkami nespáruje (iné `pocet`) → bez ošetrenia by opakované „Pridať sklá" pridalo tabule
+  NAVYŠE (Deluxe 4K = 8 ks). `prevedStaryCelok` (v `pridajSklaHromadneIdempotentne`) ho PREVEDIE na
+  riadok „s otvorom" (UPDATE popis/pocet/m2/spec — id aj prílohy ostanú) a „bez" sa vloží bežne.
+  Celok = súčet `pocet` riadkov tej istej `zakladPozicie` + skla v tom istom pridaní; starý riadok
+  s iným počtom (iný posuv) sa NEprevádza. Otvory starého riadku sa NEfiltrujú (ručne nastavené cez
+  #521 spec by inak znova zdvojili) — prepíše ich pravidlo. Test `tests/objednavka-skla-otvory-prechod-578.test.ts`.
+- **Prípona otvoru je všeobecná** (`PRIPONA_OTVOR_RE = / — s otvorom ⌀\d+$/`), `zakladPozicie`
+  ju odreže — ďalší priemer (madlo ⌀56) = nový riadok s inou príponou bez zmeny `popisPozicie`.
+- **Styl vs otvory:** pravidlo štýl ignoruje (výkres ho nedostáva); ak výroba potvrdí iné polia pre
+  oponu/2x, zmena je v `otvoryVSkle` (ROZHODNUTÉ na #578 to explicitne predpokladá).
+- **E2E** `e2e/objednavka-skla-otvory.spec.ts` — relačne: ks s otvorom = kruhy vo výkrese, súčet = ks
+  skla z karty „Sklo (mm)" (Počet nemá testid → `div:has(> span:text-is("Počet")) > b`).

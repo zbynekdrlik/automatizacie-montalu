@@ -64,10 +64,9 @@ import {
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
 import {
 	pridajSklaHromadneIdempotentne,
-	upozornenieCudzie,
-	type NoveSklo
+	sklaPosuvu,
+	upozornenieCudzie
 } from '$lib/server/objednavka-skla';
-import { m2Tabule } from '$lib/objednavka-skla-pozicia';
 import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
 import { cennikPopis } from '$lib/server/glass-match';
 
@@ -764,21 +763,13 @@ export const actions = {
 		if (!vstup.zak.trim())
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', vstup };
 
-		const polozky: NoveSklo[] = [
-			{
-				zak: vstup.zak,
-				op: vstup.op,
-				modul: 'zasklenia',
-				// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
-				popis: 'Zasklenie 1',
-				sirkaMm: r.sklo.sirka,
-				vyskaMm: r.sklo.vyska,
-				pocet: r.sklo.pocet,
-				m2: m2Tabule(r.sklo.sirka, r.sklo.vyska, r.sklo.pocet),
-				typSkla: vstup.skloPresne || vstup.sklo,
-				createdBy: locals.user?.username ?? ''
-			}
-		];
+		// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
+		const polozky = sklaPosuvu('Zasklenie 1', r, {
+			zak: vstup.zak,
+			op: vstup.op,
+			typSkla: vstup.skloPresne || vstup.sklo,
+			createdBy: locals.user?.username ?? ''
+		});
 		// #514: náhľad zostav PRED zápisom — ak kovanie zlyhá (form), NEvkladaj sklá
 		// (validácia pred vedľajším efektom). Potom idempotentne (dvojklik neduplikuje)
 		// a BEZ presmerovania, aby „uložiť nárezák" (odpis) ostalo dostupné.
@@ -805,19 +796,15 @@ export const actions = {
 		if (!vstup.zak.trim())
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', multiVstup: vstup };
 
-		const polozky: NoveSklo[] = r.posuvy.map((p, i) => ({
-			zak: vstup.zak,
-			op: vstup.op,
-			modul: 'zasklenia',
-			// #563: len pozícia „Zasklenie N" (bez systému/štýlu) + m² vopred
-			popis: `Zasklenie ${i + 1}`,
-			sirkaMm: p.sklo.sirka,
-			vyskaMm: p.sklo.vyska,
-			pocet: p.sklo.pocet,
-			m2: m2Tabule(p.sklo.sirka, p.sklo.vyska, p.sklo.pocet),
-			typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
-			createdBy: locals.user?.username ?? ''
-		}));
+		// #563: len pozícia „Zasklenie N" (bez systému/štýlu) + m² vopred
+		const polozky = r.posuvy.flatMap((p, i) =>
+			sklaPosuvu(`Zasklenie ${i + 1}`, p, {
+				zak: vstup.zak,
+				op: vstup.op,
+				typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
+				createdBy: locals.user?.username ?? ''
+			})
+		);
 		// #514: validácia pred vedľajším efektom + idempotentne + bez presmerovania — viď `pridatSkla`
 		const v = stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
