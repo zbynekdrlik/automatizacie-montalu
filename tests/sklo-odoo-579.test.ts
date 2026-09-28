@@ -21,8 +21,10 @@ const { fetchGlassTypes, _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
 const { listGlassTypes } = await import('../src/lib/server/db');
 const { ponukaSkielSystemu, odooTriedyPre, ODOO_HRUBKY } = await import('../src/lib/sklo-povolene');
-const { ponukaSkielPre } = await import('../src/lib/server/sklo-odoo');
-const { ponukaPreStyl, volbaSkla, rozlozVolbu, ODOO_PREFIX } = await import('../src/lib/sklo-odoo');
+const { ponukaSkielPre, ponukySkiel, overSkloOdoo } = await import('../src/lib/server/sklo-odoo');
+const { ponukaPreStyl, volbaSkla, rozlozVolbu, skloOdooPre, ODOO_PREFIX } =
+	await import('../src/lib/sklo-odoo');
+const { SKLO_INE } = await import('../src/lib/sklo');
 const { actions } = await import('../src/routes/zasklenia/+page.server');
 const { listSklaPreZakazku } = await import('../src/lib/server/objednavka-skla');
 const { znovaZOdpisu } = await import('../src/lib/server/znova');
@@ -237,6 +239,49 @@ describe('#579 klient — výber voľby (select) ↔ výpočtové sklo + Odoo ty
 	it('bez serverovej ponuky (napr. neznámy systém) = lokálne názvy 1:1', () => {
 		const sk = ponukaPreStyl(undefined, ['A', 'B']);
 		expect(sk.flatMap((g) => g.items).map((o) => o.value)).toEqual(['A', 'B']);
+	});
+
+	it('skloOdooPre: posielaný Odoo typ = to, čo select ukazuje (aj zástupca / neplatný typ → „")', async () => {
+		odooOn();
+		const p = await ponuka('Robust');
+		const pov = lokalne('Robust');
+		const al = p.zastupca['Izolačné sklo 4/16/4 číre']!.slice(ODOO_PREFIX.length);
+		// predvolené lokálne sklo bez voľby → posiela sa jeho zástupca (AL), ktorý select ukazuje
+		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 číre', '')).toBe(al);
+		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 číre', '003')).toBe('003');
+		// Odoo typ nesediaci s výpočtovým sklom (napr. po zmene skla) sa neposiela
+		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 mliečne', '003')).toBe('');
+		// „Iné (vlastná skladba)" nikdy nenesie Odoo typ
+		expect(skloOdooPre(p, pov, SKLO_INE, '003')).toBe('');
+		// bez ponuky zo servera = lokálne sklo, žiadny Odoo typ
+		expect(skloOdooPre(undefined, pov, 'Izolačné sklo 4/16/4 číre', '003')).toBe('');
+	});
+});
+
+describe('#579 server — ponuky pre všetky systémy + Odoo nedostupné pri odoslaní', () => {
+	it('ponukySkiel: jedna ponuka pre každý systém nárezáka', async () => {
+		odooOn();
+		const all = await ponukySkiel(['Robust', 'Deluxe']);
+		expect(Object.keys(all)).toEqual(['Robust', 'Deluxe']);
+		expect(odooMena(all.Robust!)).toEqual([...ROBUST_24_MM].sort());
+	});
+
+	it('overSkloOdoo: Odoo nedostupné → typ prijatý bez overenia (len text objednávky), názov = hodnota', async () => {
+		const p = { system: 'Robust', sklo: 'Izolačné sklo 4/16/4 číre', skloOdoo: '003' } as {
+			system: string;
+			sklo: string;
+			skloOdoo: string;
+			skloOdooNazov?: string;
+		};
+		expect(await overSkloOdoo(p)).toBeNull();
+		expect(p.skloOdooNazov).toBe('003');
+		// bez Odoo typu sa nič nedopĺňa
+		const q: { system: string; sklo: string; skloOdooNazov?: string } = {
+			system: 'Robust',
+			sklo: 'Izolačné sklo 4/16/4 číre'
+		};
+		expect(await overSkloOdoo(q)).toBeNull();
+		expect(q.skloOdooNazov).toBeUndefined();
 	});
 });
 
