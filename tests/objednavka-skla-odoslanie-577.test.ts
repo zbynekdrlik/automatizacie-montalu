@@ -94,6 +94,14 @@ describe('#577 trvalé uloženie posledného odoslania k podkladu', () => {
 	});
 });
 
+describe('#577 ulozOdoslanieOdoo — neplatné id', () => {
+	it('id <= 0 / necelé → throw, nič sa neuloží', () => {
+		expect(() => ulozOdoslanieOdoo('ZAK-577-BAD', { glassOrderId: 0 }, 'x')).toThrow(/Neplatné id/);
+		expect(() => ulozOdoslanieOdoo('ZAK-577-BAD', { glassOrderId: 2.5 }, 'x')).toThrow();
+		expect(posledneOdoslanieOdoo('ZAK-577-BAD')).toBeNull();
+	});
+});
+
 describe('#577 akcia odoslatDoOdoo → odkaz + trvalosť po obnovení (load)', () => {
 	it('úspešný upload s glass_order_id → akcia vráti odkaz, load ho vráti aj po obnovení', async () => {
 		const zak = 'ZAK-577-A1';
