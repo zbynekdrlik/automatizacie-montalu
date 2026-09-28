@@ -604,8 +604,9 @@ toho istého pravidla).
   by odporoval objednávke). **Dedup prevezme polohu:** `najdiRovnaku` + `doplnPolohu` — riadok spred
   #587 (0.25.48–0.25.51) dostane polohu opakovaným „Pridať sklá"; zmenená výška prepíše uloženú; nová
   výška MIMO skla (`otvor: null` od producenta) starú ZMAŽE (honest-null); producent bez polohy
-  (`otvor` chýba) nič nemení. Zmena polohy sa počíta do `pridane` (ako prevod #578 `prevedStaryCelok`,
-  ktorý polohu tiež zapisuje).
+  (`otvor` chýba) nič nemení — `sklaPosuvu` preto posiela `rd.otvor` BEZ `?? null`. Zmena polohy sa
+  NEpočíta do `pridane` (nič sa nepridalo): voliteľný `stats.polohaZmenena` → zasklenia banner
+  `skla-poloha-zmenena` „odošli objednávku znova do Odoo". `prevedStaryCelok` polohu tiež zapisuje.
 - **PDF** `src/lib/server/sklo-otvor-pdf.ts` (`pdf-common` + DejaVu): A4, ĽAVÉ krídlo (otvor pri ľavej
   hrane) a pri 2 ks aj PRAVÉ krídlo (otvor ZRKADLOVO pri pravej hrane) vedľa seba, každé s kótami
   skla + otvoru (od hrany, od spodku). ŽIADNE „otoč tabuľu" (review: vrstvené/pokovované/matné sklo má
@@ -624,10 +625,13 @@ toho istého pravidla).
   zaloguje, objednávka ide bez výkresu. Strop príloh (`enforceAttachmentCap`) platí aj pre výkres.
 - **Podklad:** stĺpec Prílohy — `vykres-otvoru-<id>` odkaz na GET `/objednavka-skla/vykres-otvoru/[id]`
   (inline `application/pdf` — generované z NAŠICH dát, preto nie octet-stream ako nahraté súbory;
-  b2b kryje prefix) + `otvor-poloha-<id>` (`popisPolohyOtvoru`); upozornenie `otvor-neznamy-<id>`
-  LEN pri riadku „— s otvorom" z nárezáka (`PRIPONA_OTVOR_RE`), nie atyp, bez platnej polohy (návod:
-  znova „Pridať sklá", alebo atyp + nahrať výkres) — ručné riadky s #521 otvormi ho nedostanú. Ručné
-  nahratie na rozmery-riadok NEPONÚKAME — `nahratSubor` prepína riadok na atyp.
+  b2b kryje prefix) + `otvor-poloha-<id>` (`popisPolohyOtvoru`). Odkaz sa zobrazí podľa
+  `data.vykresOtvoru[id]` = load volá TÚ ISTÚ bránu `vykresOtvoruZPolozky` (nie vlastná svelte
+  podmienka). Upozornenie `otvor-neznamy-<id>` LEN pri riadku „— s otvorom" z nárezáka
+  (`PRIPONA_OTVOR_RE`), nie atyp, bez výkresu; dva texty: `otvoryRucneZmenene` (spec ručne zmenená →
+  „prepni na atyp + vlastný výkres" — znova „Pridať sklá" by riadok NESPÁROVAL, dedup kľúč = otvory
+  → duplicitné sklo!) inak „poloha neznáma" (znova „Pridať sklá" so správnou výškou, alebo atyp).
+  Ručné nahratie na rozmery-riadok NEPONÚKAME — `nahratSubor` prepína riadok na atyp.
 - **Nárezák karta „Sklo (mm)":** `SkloOtvoryRozpis` (`rozpisOtvorovSkla`) „z toho s otvorom ⌀46: 2 ks
   · bez otvoru: 2 ks" — single (`sklo-otvory`, pod Počet, hodnota Počet nezmenená) aj multi
   (`posuv-sklo-otvory-<i>` v bunke skla). Systém bez otvorov → nič. Tlačí sa s kartou.

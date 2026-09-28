@@ -621,6 +621,14 @@
 				>Otvoriť objednávku skla →</a
 			>
 		</div>
+		<!-- #587: existujúcim riadkom sa zmenila poloha otvoru (výška vŕtania) — nič nové sa nepridalo -->
+		{#if form.sklaPridane.polohaZmenena > 0}
+			<div class="warn noprint" data-testid="skla-poloha-zmenena">
+				Poloha otvoru aktualizovaná ({form.sklaPridane.polohaZmenena}
+				{form.sklaPridane.polohaZmenena === 1 ? 'riadok' : 'riadky'}) — ak už bola objednávka skla
+				odoslaná do Odoo, odošli ju znova.
+			</div>
+		{/if}
 		<!-- #571: podklad zákazky už má riadky od iného používateľa — len upozornenie, nič neblokuje -->
 		{#if form.sklaPridane.upozornenieCudzie}
 			<div class="warn noprint" data-testid="skla-pridane-cudzie">

@@ -16,7 +16,8 @@ import {
 	triedaOtvoru,
 	stranyOtvorov,
 	fmtMmOtvoru,
-	otvoryVSkle
+	otvoryVSkle,
+	otvoryRucneZmenene
 } from '../src/lib/sklo-otvory';
 import Nahlad2D from '../src/lib/components/Nahlad2D.svelte';
 import SkloOtvoryRozpis from '../src/lib/components/zasklenia/SkloOtvoryRozpis.svelte';
@@ -134,6 +135,14 @@ describe('#587 pomocné pravidlá polohy', () => {
 		expect(triedaOtvoru(51)).toBeNull();
 		expect(triedaOtvoru(3)).toBeNull();
 		expect(triedaOtvoru(Number.NaN)).toBeNull();
+	});
+
+	it('otvoryRucneZmenene — len riadok „— s otvorom ⌀N", ktorého spec nesedí s ⌀', () => {
+		const popis = 'Zasklenie 1 — s otvorom ⌀46';
+		expect(otvoryRucneZmenene({ popis, holesQty: 1, holeSize: 'd50' })).toBe(false);
+		expect(otvoryRucneZmenene({ popis, holesQty: 2, holeSize: 'd50' })).toBe(true);
+		expect(otvoryRucneZmenene({ popis, holesQty: 1, holeSize: 'd30' })).toBe(true);
+		expect(otvoryRucneZmenene({ popis: 'ATYP', holesQty: 2, holeSize: 'd30' })).toBe(false);
 	});
 
 	it('stranyOtvorov — prvá tabuľa ľavé krídlo, ďalšia pravé (pravidlo otvoryVSkle)', () => {

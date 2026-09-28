@@ -125,7 +125,7 @@ export function sklaPosuvu(
 		typSkla: ident.typSkla,
 		holesQty: rd.holesQty,
 		holeSize: rd.holeSize || undefined,
-		otvor: rd.otvor ?? null,
+		otvor: rd.otvor,
 		createdBy: ident.createdBy
 	}));
 }
@@ -486,14 +486,18 @@ function prevedStaryCelok(s: NoveSklo, polozky: NoveSklo[]): boolean {
  *  preskočí. Vracia počet NOVO vložených (#578: aj prevedených starých riadkov). Umožňuje
  *  opakované „Pridať sklá" nad tým istým spočítaným plánom bez duplikácie (#514).
  *  Money-NEUTRÁLNE (objednavka_skla). */
-export function pridajSklaHromadneIdempotentne(polozky: NoveSklo[]): number {
+export function pridajSklaHromadneIdempotentne(
+	polozky: NoveSklo[],
+	/** #587: voliteľne — počet existujúcich riadkov, ktorým sa zmenila poloha otvoru (NIE sú v
+	 *  návratovej hodnote: nič sa nepridalo, len treba objednávku znova odoslať do Odoo). */
+	stats?: { polohaZmenena: number }
+): number {
 	let pridane = 0;
 	db.transaction(() => {
 		for (const s of polozky) {
 			const rovnaka = najdiRovnaku(s);
 			if (rovnaka) {
-				// #587: zmenená poloha otvoru sa ráta ako zmenený riadok (ako prevod #578)
-				if (doplnPolohu(rovnaka, s)) pridane++;
+				if (doplnPolohu(rovnaka, s) && stats) stats.polohaZmenena++;
 				continue;
 			}
 			if (!prevedStaryCelok(s, polozky)) pridajSklo(s);

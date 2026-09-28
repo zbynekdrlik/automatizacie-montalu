@@ -5,7 +5,7 @@
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import { bezRozmerov, fmtRozmerTabule, popisPozicie } from '$lib/objednavka-skla-pozicia';
 	import { SENTINEL_INE_SKLO, zoskupTypySkla } from '$lib/objednavka-skla-typy';
-	import { PRIPONA_OTVOR_RE, popisPolohyOtvoru } from '$lib/sklo-otvory';
+	import { PRIPONA_OTVOR_RE, otvoryRucneZmenene, popisPolohyOtvoru } from '$lib/sklo-otvory';
 
 	let { data, form } = $props();
 
@@ -379,7 +379,7 @@
 							<td class="noprint">
 								<!-- #587: vygenerovaný výkres tabule s otvorom (ide aj do Odoo/IZOS ako príloha) -->
 								<!-- atyp = obsluha dodáva vlastný výkres → generovaný sa nepridáva (dva by si odporovali) -->
-								{#if p.otvor && p.rezim !== 'atyp'}
+								{#if p.otvor && data.vykresOtvoru[p.id]}
 									<span class="subor-tag vykres-otvoru" data-testid={`vykres-otvoru-${p.id}`}>
 										<a
 											href={resolve(`/objednavka-skla/vykres-otvoru/${p.id}`)}
@@ -391,10 +391,16 @@
 										{popisPolohyOtvoru(p.otvor)}
 									</div>
 								{:else if p.spec.holesQty > 0 && p.rezim !== 'atyp' && PRIPONA_OTVOR_RE.test(p.popis)}
-									<!-- riadok „— s otvorom" z nárezáka bez platnej polohy (spred #587 / nezmestí sa / spec zmenená) -->
+									<!-- riadok „— s otvorom" z nárezáka bez platného výkresu -->
 									<div class="warn" data-testid={`otvor-neznamy-${p.id}`}>
-										Poloha otvoru neznáma — výkres sa negeneruje. Doplň ho: znova „Pridať sklá" z
-										nárezáka, alebo prepni riadok na atyp a nahraj výkres.
+										{#if otvoryRucneZmenene( { popis: p.popis, holesQty: p.spec.holesQty, holeSize: p.spec.holeSize } )}
+											Otvory na riadku sú zmenené ručne — výkres sa negeneruje. Prepni riadok na
+											atyp a nahraj vlastný výkres.
+										{:else}
+											Poloha otvoru neznáma — výkres sa negeneruje (riadok spred výkresov, alebo sa
+											otvor do skla nezmestí). Doplň: znova „Pridať sklá" z nárezáka so správnou
+											výškou vŕtania, alebo prepni riadok na atyp a nahraj výkres.
+										{/if}
 									</div>
 								{/if}
 								{#if suboryMap[p.id]}

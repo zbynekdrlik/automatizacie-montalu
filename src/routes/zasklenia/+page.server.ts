@@ -783,11 +783,21 @@ export const actions = {
 		const v = stavNahlad(vstup, r, spec, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
-		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
+		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
+		const stats = { polohaZmenena: 0 };
+		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
 		const cudzie = upozornenieCudzie(vstup.zak, locals.user?.username ?? '');
-		return { ...v, sklaPridane: { pridane, zak: vstup.zak, upozornenieCudzie: cudzie } };
+		return {
+			...v,
+			sklaPridane: {
+				pridane,
+				polohaZmenena: stats.polohaZmenena,
+				zak: vstup.zak,
+				upozornenieCudzie: cudzie
+			}
+		};
 	},
 
 	// ---- #496: Pridať sklá do objednávky skla (multi posuv / zimná záhrada) ----
@@ -817,10 +827,20 @@ export const actions = {
 		const v = stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
-		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
+		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
+		const stats = { polohaZmenena: 0 };
+		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
 		const cudzie = upozornenieCudzie(vstup.zak, locals.user?.username ?? '');
-		return { ...v, sklaPridane: { pridane, zak: vstup.zak, upozornenieCudzie: cudzie } };
+		return {
+			...v,
+			sklaPridane: {
+				pridane,
+				polohaZmenena: stats.polohaZmenena,
+				zak: vstup.zak,
+				upozornenieCudzie: cudzie
+			}
+		};
 	}
 } satisfies Actions;

@@ -90,6 +90,21 @@ export const PRIPONA_S_OTVOROM = ` — s otvorom ⌀${D_ZAMOK_MM}`;
 /** Prípona otvoru ĽUBOVOĽNÉHO priemeru na konci popisu (ďalší typ otvoru = iný ⌀, rovnaký tvar). */
 export const PRIPONA_OTVOR_RE = / — s otvorom ⌀\d+$/;
 
+/**
+ * #587: riadok „— s otvorom ⌀N" z nárezáka, ktorého spec otvorov obsluha RUČNE zmenila (#521 — iný
+ * počet na tabuľu alebo iná trieda než ⌀ z popisu). Poloha k nemu neplatí a opakované „Pridať sklá"
+ * ho nespáruje (dedup kľúč = otvory) → podklad radí atyp + vlastný výkres, nie znova pridať.
+ */
+export function otvoryRucneZmenene(p: {
+	popis: string;
+	holesQty: number;
+	holeSize: string;
+}): boolean {
+	const m = / — s otvorom ⌀(\d+)$/.exec(p.popis);
+	if (!m) return false;
+	return p.holesQty !== 1 || p.holeSize !== triedaOtvoru(Number(m[1]));
+}
+
 /** Trieda priemeru otvoru podľa kontraktu odoo-erp (`d50` = 31–50 mm; ⌀46 ∈ d50). */
 export type TriedaOtvoru = 'd50';
 

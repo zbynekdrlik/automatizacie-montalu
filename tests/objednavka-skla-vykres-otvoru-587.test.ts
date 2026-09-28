@@ -126,8 +126,8 @@ describe('#587 riadok s otvorom z Deluxe posuvu nesie polohu otvoru', () => {
 			listSklaPreZakazku('ZAK-587-LEGACY').find((p) => p.popis === S_OTVOROM)!.otvor
 		).toBeNull();
 		const r = await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-LEGACY' });
-		// nič nové sa nevložilo; 1 = riadok s otvorom dostal polohu (zmenený riadok, ako prevod #578)
-		expect((r.sklaPridane as { pridane: number }).pridane).toBe(1);
+		// nič nové sa nevložilo; riadok s otvorom dostal polohu → banner „odošli znova do Odoo"
+		expect(r.sklaPridane).toMatchObject({ pridane: 0, polohaZmenena: 1 });
 		const po = listSklaPreZakazku('ZAK-587-LEGACY');
 		expect(po).toHaveLength(2);
 		expect(po.find((p) => p.popis === S_OTVOROM)!.otvor?.odSpodkuMm).toBe(1100);
@@ -269,7 +269,7 @@ describe('#587 review — poloha platí len k zadaniu, ktoré objednávka nesie'
 			zak: 'ZAK-587-MIMO',
 			vrtanieZamku: '19000'
 		});
-		expect((r.sklaPridane as { pridane: number }).pridane).toBe(1);
+		expect(r.sklaPridane).toMatchObject({ pridane: 0, polohaZmenena: 1 });
 		const s = sOtvorom('ZAK-587-MIMO');
 		expect(s.otvor).toBeNull();
 		expect(s.spec.holesQty).toBe(1); // cena IZOS (otvor) ostáva
