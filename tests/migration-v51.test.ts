@@ -35,7 +35,7 @@ await import('../src/lib/server/db');
 describe('migration v50 → v51 (objednavka_skla_odoslanie, #577)', () => {
 	it('bumpne na v51 a vytvorí tabuľku s kľúčom zak_norm', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(51);
+		expect(d.pragma('user_version', { simple: true })).toBe(52);
 		const cols = (
 			d.prepare('PRAGMA table_info(objednavka_skla_odoslanie)').all() as {
 				name: string;

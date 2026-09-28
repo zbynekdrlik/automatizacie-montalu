@@ -19,7 +19,7 @@ const { actions } = await import('../src/routes/zasklenia/+page.server');
 const { listSklaPreZakazku, pridajSklo, pridajSubor, pridajSklaHromadneIdempotentne } =
 	await import('../src/lib/server/objednavka-skla');
 const { buildGlassOrderForZak } = await import('../src/lib/server/odoo-glass-order-upload');
-const { generateVykresOtvoruPdf, vykresOtvoruZPolozky } =
+const { generateVykresOtvoruPdf, vykresOtvoruZPolozky, vykresOtvoruFilename } =
 	await import('../src/lib/server/sklo-otvor-pdf');
 const { GET } = await import('../src/routes/objednavka-skla/vykres-otvoru/[id]/+server');
 const { OKRAJ_ZAMOK_MM, D_ZAMOK_MM, VRTANIE_ZAMKU_DEFAULT_MM } =
@@ -227,5 +227,47 @@ describe('#587 podklad: stiahnutie výkresu otvoru', () => {
 		expect(body.subarray(0, 5).toString()).toBe('%PDF-');
 		await expect(get(bez.id)).rejects.toMatchObject({ status: 404 });
 		await expect(get('abc')).rejects.toMatchObject({ status: 404 });
+	});
+});
+
+describe('#587 výkres — okrajové vstupy', () => {
+	const V = {
+		zak: 'ZAK2',
+		op: '',
+		popis: S_OTVOROM,
+		typSkla: '',
+		sirkaMm: 1004.5,
+		vyskaMm: 1914.25,
+		pocet: 1,
+		otvor: { odHranyMm: 50, odSpodkuMm: 1050.5, priemerMm: 46 }
+	};
+
+	it('desatinné mm s čiarkou, prázdne OP aj typ skla nezhodia PDF', async () => {
+		const doc = await PDFDocument.load(await generateVykresOtvoruPdf(V));
+		const subject = doc.getSubject() ?? '';
+		expect(subject).toContain('1004,5 × 1914,3 mm');
+		expect(subject).toContain('1050,5 mm od spodku');
+		expect(doc.getKeywords() ?? '').toContain('op=');
+	});
+
+	it('názov prílohy je ASCII slug (diakritika preč, prázdna časť → x)', () => {
+		expect(vykresOtvoruFilename({ zak: 'Žák 1/2', popis: S_OTVOROM })).toBe(
+			'Vykres-otvoru-Zak-1-2-Zasklenie-1-s-otvorom-46.pdf'
+		);
+		expect(vykresOtvoruFilename({ zak: '—', popis: '' })).toBe('Vykres-otvoru-x-x.pdf');
+	});
+
+	it('riadok bez otvoru / šikmý / bez výšky / bez šírky → žiadny výkres', async () => {
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-EDGE' });
+		const s = listSklaPreZakazku('ZAK-587-EDGE').find((p) => p.popis === S_OTVOROM)!;
+		expect(vykresOtvoruZPolozky(s)).not.toBeNull();
+		expect(vykresOtvoruZPolozky({ ...s, spec: { ...s.spec, holesQty: 0 } })).toBeNull();
+		expect(vykresOtvoruZPolozky({ ...s, sikmy: true })).toBeNull();
+		expect(vykresOtvoruZPolozky({ ...s, vyskaMm: null })).toBeNull();
+		expect(vykresOtvoruZPolozky({ ...s, sirkaMm: 0 })).toBeNull();
+		// „iné sklo" (vlastný typ) ide do výkresu namiesto katalógového typu
+		expect(vykresOtvoruZPolozky({ ...s, typSklaManual: 'Vlastné 8 mm' })!.typSkla).toBe(
+			'Vlastné 8 mm'
+		);
 	});
 });

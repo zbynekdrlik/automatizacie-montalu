@@ -34,6 +34,8 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await page.getByLabel('Šírka (mm) *').fill('4000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
 	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	// #587: výška vŕtania zámku → poloha otvoru na riadku objednávky + PDF výkres pre IZOS
+	await page.locator('#vrtanieZamku').fill('1100');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
@@ -49,6 +51,10 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	expect(Number(vyska)).toBeGreaterThan(0);
 	expect(otvory).toBeGreaterThan(0);
 	expect(kusy).toBeGreaterThan(otvory);
+	// #587: karta „Sklo (mm)" rozpíše tabule s otvorom / bez — TO ISTÉ pravidlo ako výkres
+	await expect(skloKarta.getByTestId('sklo-otvory')).toHaveText(
+		`z toho s otvorom ⌀46: ${otvory} ks · bez otvoru: ${kusy - otvory} ks`
+	);
 
 	await page.getByTestId('pridat-skla').click();
 	await waitHydrated(page);
@@ -76,6 +82,21 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 		await expect(r.locator('td').nth(1)).toContainText(sirka);
 		await expect(r.locator('td').nth(1)).toContainText(vyska);
 	}
+
+	// #587: výkres otvoru len pri riadku s otvorom — poloha z nárezáku (1100 od spodku, 50 od hrany)
+	await expect(page.locator('[data-testid^="vykres-otvoru-"]')).toHaveCount(1);
+	await expect(bez.locator('[data-testid^="vykres-otvoru-"]')).toHaveCount(0);
+	await expect(sOtvorom.locator('[data-testid^="otvor-poloha-"]')).toHaveText(
+		/⌀46 · 50 mm od hrany · 1100 mm\s+od spodku/
+	);
+	const odkaz = sOtvorom.locator('[data-testid^="vykres-otvoru-"] a');
+	await expect(odkaz).toHaveText('Výkres otvoru (PDF)');
+	const href = await odkaz.getAttribute('href');
+	expect(href).toMatch(/\/objednavka-skla\/vykres-otvoru\/\d+$/);
+	const pdf = await page.request.get(href!);
+	expect(pdf.status()).toBe(200);
+	expect(pdf.headers()['content-type']).toBe('application/pdf');
+	expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
 
 	expect(consoleMsgs).toEqual([]);
 });

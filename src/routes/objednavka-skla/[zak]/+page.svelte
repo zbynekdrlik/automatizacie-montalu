@@ -376,6 +376,27 @@
 								</form>
 							</td>
 							<td class="noprint">
+								<!-- #587: vygenerovaný výkres tabule s otvorom (ide aj do Odoo/IZOS ako príloha) -->
+								{#if p.spec.holesQty > 0}
+									{#if p.otvor}
+										<span class="subor-tag vykres-otvoru" data-testid={`vykres-otvoru-${p.id}`}>
+											<a
+												href={resolve(`/objednavka-skla/vykres-otvoru/${p.id}`)}
+												target="_blank"
+												rel="noopener noreferrer">Výkres otvoru (PDF)</a
+											>
+										</span>
+										<div class="otvor-poloha" data-testid={`otvor-poloha-${p.id}`}>
+											⌀{p.otvor.priemerMm} · {p.otvor.odHranyMm} mm od hrany · {p.otvor.odSpodkuMm} mm
+											od spodku
+										</div>
+									{:else}
+										<div class="warn" data-testid={`otvor-neznamy-${p.id}`}>
+											Poloha otvoru neznáma — výkres sa negeneruje. Doplň ho: znova „Pridať sklá" z
+											nárezáka, alebo prepni riadok na atyp a nahraj výkres.
+										</div>
+									{/if}
+								{/if}
 								{#if suboryMap[p.id]}
 									{#each suboryMap[p.id]! as f (f.id)}
 										<span class="subor-tag">
@@ -669,6 +690,11 @@
 	}
 	.subor-tag a {
 		color: var(--m-ink);
+	}
+	.otvor-poloha {
+		font-size: 0.8rem;
+		color: var(--m-muted-ink);
+		margin: 2px 0 4px;
 	}
 	.btn-remove {
 		background: none;

@@ -5,7 +5,12 @@
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import type { Klin } from '$lib/klin';
 	import { sietkaStrana, type Sietka } from '$lib/sietka';
-	import { otvoryVSkle, D_ZAMOK_MM } from '$lib/sklo-otvory';
+	import {
+		otvoryVSkle,
+		D_ZAMOK_MM,
+		OKRAJ_ZAMOK_MM,
+		VRTANIE_ZAMKU_DEFAULT_MM
+	} from '$lib/sklo-otvory';
 	// unikátne id pre <pattern> (viac Nahlad2D inštancií na jednej stránke pri
 	// zimnej záhrade s viac posuvmi — duplicitné SVG id by boli neplatné DOM)
 	const uid = $props.id();
@@ -17,7 +22,7 @@
 		skloV,
 		otvaranie = '',
 		system = '',
-		vrtanieZamku = 1050,
+		vrtanieZamku = VRTANIE_ZAMKU_DEFAULT_MM,
 		kovanieL = '',
 		kovanieP = '',
 		kovanieStred = '',
@@ -200,8 +205,10 @@
 	// posúvať, hlavné je zobraziť + okótovať hodnotu (Dominik 2026-07-14).
 	// #578: KTORÉ sklá majú otvor určuje `otvoryVSkle` — to isté pravidlo ide do objednávky
 	// skla (riadok „s otvorom"), takže výkres a objednávka vždy sedia.
+	// #587: aj POLOHA (odsadenie od hrany, default výška) je z `sklo-otvory.ts` — z tých istých
+	// konštánt kreslí PDF výkres tabule pre IZOS (`sklo-otvor-pdf.ts`).
 	const D_ZAMOK = D_ZAMOK_MM; // priemer otvoru [mm]
-	const OKRAJ_ZAMOK = 50; // vzdialenosť stredu diery od kraja skla [mm]
+	const OKRAJ_ZAMOK = OKRAJ_ZAMOK_MM; // vzdialenosť stredu diery od kraja skla [mm]
 	let zamky = $derived.by(() => {
 		const idxs = otvoryVSkle(system, N).indexy;
 		if (idxs.length === 0) return [];

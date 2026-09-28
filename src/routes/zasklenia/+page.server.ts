@@ -765,13 +765,18 @@ export const actions = {
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', vstup };
 
 		// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
-		const polozky = sklaPosuvu('Zasklenie 1', r, {
-			zak: vstup.zak,
-			op: vstup.op,
-			// #579: zvolený Odoo typ ide do objednávky PRESNE (bez matchera #556)
-			typSkla: vstup.skloOdoo || vstup.skloPresne || vstup.sklo,
-			createdBy: locals.user?.username ?? ''
-		});
+		// #587: výška vŕtania zámku z formulára → poloha otvoru na riadku „s otvorom" (PDF výkres)
+		const polozky = sklaPosuvu(
+			'Zasklenie 1',
+			{ ...r, vrtanieZamku: vstup.vrtanieZamku },
+			{
+				zak: vstup.zak,
+				op: vstup.op,
+				// #579: zvolený Odoo typ ide do objednávky PRESNE (bez matchera #556)
+				typSkla: vstup.skloOdoo || vstup.skloPresne || vstup.sklo,
+				createdBy: locals.user?.username ?? ''
+			}
+		);
 		// #514: náhľad zostav PRED zápisom — ak kovanie zlyhá (form), NEvkladaj sklá
 		// (validácia pred vedľajším efektom). Potom idempotentne (dvojklik neduplikuje)
 		// a BEZ presmerovania, aby „uložiť nárezák" (odpis) ostalo dostupné.

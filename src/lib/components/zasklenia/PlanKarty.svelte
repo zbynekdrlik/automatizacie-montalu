@@ -10,6 +10,7 @@
 	import SkloCena from '$lib/components/SkloCena.svelte';
 	import PoznamkaRal from './PoznamkaRal.svelte';
 	import KovanieStrany from './KovanieStrany.svelte';
+	import SkloOtvoryRozpis from './SkloOtvoryRozpis.svelte';
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import {
 		maSietkaSystemVyber,
@@ -179,7 +180,10 @@
 	<div class="g">
 		<div><span>Šírka</span><b class="mono" data-testid="sklo-sirka">{fmtM(p.sklo.sirka)}</b></div>
 		<div><span>Výška</span><b class="mono" data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
-		<div><span>Počet</span><b class="mono">{p.sklo.pocet} ks</b></div>
+		<div>
+			<span>Počet</span><b class="mono">{p.sklo.pocet} ks</b>
+			<SkloOtvoryRozpis system={p.system} pocet={p.sklo.pocet} testid="sklo-otvory" />
+		</div>
 		<div>
 			<span>Typ</span><b data-testid="sklo-typ" style="font-size:13px"
 				>{vstup.skloPresne || vstup.skloOdooNazov || vstup.sklo}</b

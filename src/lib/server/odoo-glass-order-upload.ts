@@ -12,8 +12,19 @@ import { logger } from './log';
 import { callJson2, odooJson2Config, isNarezUploadEnabled } from './odoo-json2';
 import { normOp, normZak } from './money';
 import { zakazkaOp } from './zakazka-ceny';
-import { listSklaPreZakazku, opPodkladu, listSubory, getSuborData } from './objednavka-skla';
+import {
+	listSklaPreZakazku,
+	opPodkladu,
+	listSubory,
+	getSuborData,
+	type SkloPolozka
+} from './objednavka-skla';
 import { popisPozicie } from '../objednavka-skla-pozicia';
+import {
+	generateVykresOtvoruPdf,
+	vykresOtvoruFilename,
+	vykresOtvoruZPolozky
+} from './sklo-otvor-pdf';
 import {
 	buildGlassOrder,
 	mimetypeZNazvu,
@@ -86,16 +97,46 @@ function nacitajPrilohy(polozkaId: number): GlassAttachment[] {
 }
 
 /**
+ * #587: vygenerovaný PDF výkres tabule s otvorom (poloha uložená k riadku „— s otvorom ⌀46") ako
+ * príloha riadku — IZOS tak vie, KDE vŕtať. Riadok bez otvoru / bez uloženej polohy → `[]`
+ * (honest-null; podklad upozorní). Zlyhanie generovania sa zaloguje a objednávka ide ďalej bez
+ * výkresu (ako pri PDF prílohe plánu rezov) — nikdy nezhodí odoslanie.
+ */
+async function vykresOtvoruPrilohy(p: SkloPolozka): Promise<GlassAttachment[]> {
+	const vstup = vykresOtvoruZPolozky(p);
+	if (!vstup) return [];
+	try {
+		const pdf = await generateVykresOtvoruPdf(vstup);
+		return [
+			{
+				name: vykresOtvoruFilename(vstup),
+				mimetype: 'application/pdf',
+				data_base64: Buffer.from(pdf).toString('base64')
+			}
+		];
+	} catch (e) {
+		log.error('výkres otvoru: generovanie PDF zlyhalo — riadok ide bez výkresu', {
+			id: p.id,
+			zak: p.zak,
+			err: errMsg(e)
+		});
+		return [];
+	}
+}
+
+/**
  * Postaví `glass_order` v2 payload zákazky z uložených sklových položiek + ich príloh
  * (Money-neutrálne, IO len SQLite read + base64). Vracia payload + zoznam zahodených príloh
- * (strop veľkosti). `null` keď niet položiek.
+ * (strop veľkosti). `null` keď niet položiek. #587: riadok s otvorom dostane aj vygenerovaný PDF
+ * výkres tabule (popri ručných prílohách) — preto async (pdf-lib `save()`).
  */
 export async function buildGlassOrderForZak(
 	zak: string
 ): Promise<{ order: GlassOrder; droppedAttachments: DroppedAttachment[] } | null> {
 	const polozky = listSklaPreZakazku(zak);
 	if (polozky.length === 0) return null;
-	const inputs: GlassOrderItemInput[] = polozky.map((p) => ({
+	const vykresy = await Promise.all(polozky.map(vykresOtvoruPrilohy));
+	const inputs: GlassOrderItemInput[] = polozky.map((p, i) => ({
 		sirkaMm: p.sirkaMm,
 		vyskaMm: p.vyskaMm,
 		vLavoMm: p.vLavoMm,
@@ -108,7 +149,7 @@ export async function buildGlassOrderForZak(
 		mode: p.rezim,
 		typSklaManual: p.typSklaManual,
 		cenaM2Manual: p.cenaM2Manual,
-		attachments: nacitajPrilohy(p.id),
+		attachments: [...nacitajPrilohy(p.id), ...vykresy[i]!],
 		spec: p.spec
 	}));
 	return buildGlassOrder(inputs);
