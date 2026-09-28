@@ -66,6 +66,8 @@ export type PosuvRow = {
 	// trieda; platné len pri `sklo===SKLO_INE`, inak `''`/prázdne
 	skloPresne: string;
 	skloTrieda: number | '';
+	// #579: zvolený Odoo typ skla TOHTO posuvu ('' = lokálne sklo); `sklo` ostáva výpočtové
+	skloOdoo: string;
 	otvaranie: string;
 	kovanieL: string;
 	kovanieP: string;
@@ -98,6 +100,9 @@ export type PlanVstup = {
 	skloPresne: string;
 	/** vlastná skladba (#235 slice 2) — hrúbková trieda pri `sklo===SKLO_INE`, inak null */
 	skloTrieda: number | null;
+	/** #579: zvolený Odoo typ skla (`cennik_code || name`) + jeho Odoo názov (plán) */
+	skloOdoo?: string;
+	skloOdooNazov?: string;
 	otvaranie: string;
 	kovanieL: string;
 	kovanieP: string;

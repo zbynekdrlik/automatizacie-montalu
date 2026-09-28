@@ -34,6 +34,15 @@ export function parseSkloTrieda(
 	return jeSkloTrieda(t) ? t : null;
 }
 
+/** #579: Odoo typ skla z formulára (orezaný na 120 znakov ako `skloPresne`); pri vlastnej skladbe
+ *  (`SKLO_INE`) vždy '' — tá má vlastný text. Platnosť voči Odoo overí `overSkloOdoo`. */
+export function parseSkloOdoo(skloRaw: unknown, raw: unknown): string {
+	if (String(skloRaw ?? '').trim() === SKLO_INE) return '';
+	return String(raw ?? '')
+		.trim()
+		.slice(0, 120);
+}
+
 /** Štandard +: štýl je LEN počet krídel; „ IZO" (starý formulár / bookmark) sa
  *  zahodí — basic/IZO nárezák vyberá zvolené sklo (`sysStylPre`). */
 function normalizujStyl(system: string, styl: string): string {
@@ -320,6 +329,11 @@ export interface Vstup {
 	 *  NENULOVÉ len keď `sklo===SKLO_INE`; určuje syntetické sklo pre výpočet
 	 *  (server `skloPre`) + tesnenie, inak `null`. (#235 slice 2) */
 	skloTrieda: number | null;
+	/** #579: presne zvolený Odoo typ skla (`cennik_code || name`) — ide do objednávky skla a na
+	 *  plán; výpočet ide VŽDY z lokálneho `sklo`. '' = lokálne sklo. Overuje `overSkloOdoo`. */
+	skloOdoo?: string;
+	/** #579: Odoo `name` zvoleného typu (doplní server pri overení) — text na pláne/v histórii */
+	skloOdooNazov?: string;
 	otvaranie: string;
 	/** kovanie ĽAVEJ strany posuvu (kľučka) — len Robust, len na plán/náhľad */
 	kovanieL: string;
@@ -406,6 +420,13 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		kolajnica: null,
 		sietka: null
 	};
+	// #579: Odoo typ skla LEN keď je zvolený — bez neho tvar vstupu (detail, golden) nezmenený
+	const skloOdoo = parseSkloOdoo(form.get('sklo'), form.get('skloOdoo'));
+	// Odoo typ JE presné zloženie → voľný text sa zahodí (plán aj objednávka nesú ten istý typ)
+	if (skloOdoo) {
+		vstup.skloOdoo = skloOdoo;
+		vstup.skloPresne = '';
+	}
 	const kol = parseKolajnica(form.get('kolajnicaHorna'), form.get('kolajnicaSpodna'));
 	vstup.kolajnica = kol.kolajnica;
 	const kRaw = rozbalKliny(form.get('kliny'), {
@@ -465,6 +486,10 @@ export interface PosuvVstup {
 	skloPresne: string;
 	/** vlastná skladba: hrúbková trieda (4/6/10/16/24 mm), nenulové len pri `SKLO_INE` (#235 slice 2) */
 	skloTrieda: number | null;
+	/** #579: zvolený Odoo typ skla TOHTO posuvu (viď `Vstup.skloOdoo`) */
+	skloOdoo?: string;
+	/** #579: Odoo `name` zvoleného typu (doplní server) */
+	skloOdooNazov?: string;
 	otvaranie: string;
 	/** kovanie ľavej/pravej strany TOHOTO posuvu (Patrik: „pri každom posuve sólo") */
 	kovanieL: string;
@@ -565,6 +590,12 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 				kolajnica: kol.kolajnica,
 				sietka: sanitizeSietka(posuvSystem, sk.sietka)
 			};
+			// #579: zvolený Odoo typ skla (len keď je — tvar posuvu bez neho nezmenený)
+			const skloOdoo = parseSkloOdoo(p.sklo, p.skloOdoo);
+			if (skloOdoo) {
+				posuv.skloOdoo = skloOdoo;
+				posuv.skloPresne = ''; // Odoo typ JE presné zloženie (viď parseVstup)
+			}
 			if (!posuv.system || !posuv.styl) {
 				error = `Zasklenie ${i + 1}: vyber systém a štýl.`;
 				break;

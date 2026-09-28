@@ -3,6 +3,8 @@
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { defaultSklo, SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
 	import { ponukaSkielSystemu, povoleneTriedyIne } from '$lib/sklo-povolene';
+	import { skloOdooPre } from '$lib/sklo-odoo';
+	import HiddenVstup from '$lib/components/zasklenia/HiddenVstup.svelte';
 	import {
 		stylyDoPonuky,
 		sklaDoPonuky,
@@ -53,6 +55,8 @@
 			sklo: fv?.sklo ?? '',
 			skloPresne: fv?.skloPresne ?? '',
 			skloTrieda: fv?.skloTrieda ?? null,
+			skloOdoo: fv?.skloOdoo ?? '',
+			skloOdooNazov: fv?.skloOdooNazov ?? '',
 			otvaranie: fv?.otvaranie ?? 'P - L',
 			kovanieL: fv?.kovanieL ?? '',
 			kovanieP: fv?.kovanieP ?? '',
@@ -107,6 +111,9 @@
 			? SKLO_TRIEDY.filter((t) => t < 16)
 			: SKLO_TRIEDY
 		).filter((t) => povoleneTriedyIne(sys).includes(t));
+	// #579: Odoo typ skla, ktorý select posuvu ukazuje (posiela sa v `posuvy` JSON-e)
+	const odooPre = (sys: string, st: string, sk: string, so: string) =>
+		skloOdooPre(data.ponukaSkiel[sys], sklaForSystem(sys, st), sk, so);
 
 	// VŠETKY editovateľné polia sú $state (bind) — nie jednosmerné value={vstup.x}.
 	// Jednosmerné by sa pri každom re-renderi (napr. po zmene rozmeru) vymazali.
@@ -116,6 +123,8 @@
 	let skloPresneS = $state('');
 	// vlastná skladba (#235 slice 2) — hrúbková trieda pri „Iné"; '' = nezvolená
 	let skloTriedaS = $state<number | ''>('');
+	// #579: zvolený Odoo typ skla primárneho posuvu ('' = lokálne sklo; `sklo` = výpočtové)
+	let skloOdooS = $state('');
 	let poznamkaS = $state('');
 	let ralS = $state('');
 	let cakaS = $state(false);
@@ -164,6 +173,7 @@
 		zakaznikS = zd?.zakaznik ?? '';
 		skloPresneS = fv?.skloPresne ?? '';
 		skloTriedaS = fv?.skloTrieda ?? '';
+		skloOdooS = prim()?.skloOdoo ?? '';
 		vrtanieZamkuS = fv?.vrtanieZamku ?? 1050;
 		poznamkaS = zd?.poznamka ?? '';
 		ralS = zd?.ral ?? '';
@@ -213,6 +223,7 @@
 			// vlastná skladba (#235 slice 2): number|null (PosuvVstup) → number|'' (PosuvRow)
 			skloPresne: x.skloPresne ?? '',
 			skloTrieda: x.skloTrieda ?? '',
+			skloOdoo: x.skloOdoo ?? '',
 			kovanieStred: x.kovanieStred ?? '',
 			kovanieStredOkno: (x.kovanieStredOkno ?? 'L') as 'L' | 'P',
 			kliny: (x.kliny ?? []).map((k) => ({ ...k })),
@@ -372,6 +383,7 @@
 			// patrí starému systému. sklo sa resetuje na katalógový default, takže
 			// skloTriedaS je aj tak ignorovaná serverom, ale nech nezostane stará voľba.
 			skloTriedaS = '';
+			skloOdooS = ''; // #579: Odoo typ patrí starému systému
 			prevSystemForSklo = currentSystem;
 		} else {
 			// štýlová zmena / iný trigger → name-persistence (zmena počtu krídel
@@ -431,6 +443,7 @@
 				// vlastná skladba primárneho posuvu (#235 slice 2)
 				skloPresne: skloPresneS,
 				skloTrieda: skloTriedaS,
+				skloOdoo: odooPre(system, styl, sklo, skloOdooS),
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
@@ -452,6 +465,7 @@
 				// vlastná skladba tohto posuvu (#235 slice 2)
 				skloPresne: p.skloPresne,
 				skloTrieda: p.skloTrieda,
+				skloOdoo: odooPre(p.system, p.styl, p.sklo, p.skloOdoo),
 				otvaranie: p.otvaranie,
 				kovanieL: p.kovanieL,
 				kovanieP: p.kovanieP,
@@ -480,6 +494,7 @@
 		if (systemZmeneny) {
 			p.skloPresne = '';
 			p.skloTrieda = '';
+			p.skloOdoo = '';
 		}
 		// #573: trieda, ktorú systém/štýl posuvu už neponúka, sa zruší
 		if (p.skloTrieda !== '' && !triedyPre(p.system, p.styl).includes(p.skloTrieda))
@@ -512,6 +527,7 @@
 				// klonuj aj vlastnú skladbu primárneho posuvu (#235 slice 2)
 				skloPresne: skloPresneS,
 				skloTrieda: skloTriedaS,
+				skloOdoo: skloOdooS,
 				otvaranie,
 				kovanieL: kovanieLS,
 				kovanieP: kovaniePS,
@@ -589,72 +605,6 @@
 
 <svelte:head><title>Zasklenia — nárezový plán</title></svelte:head>
 
-{#snippet hiddenVstup()}
-	<input type="hidden" name="zak" value={vstup.zak} />
-	<input type="hidden" name="op" value={vstup.op} />
-	<input type="hidden" name="zakaznik" value={vstup.zakaznik} />
-	<input type="hidden" name="system" value={vstup.system} />
-	<input type="hidden" name="styl" value={vstup.styl} />
-	<input type="hidden" name="s" value={vstup.s} />
-	<input type="hidden" name="v" value={vstup.v} />
-	<input type="hidden" name="sklo" value={vstup.sklo} />
-	<input type="hidden" name="skloPresne" value={vstup.skloPresne} />
-	{#if vstup.skloTrieda != null}<input
-			type="hidden"
-			name="skloTrieda"
-			value={vstup.skloTrieda}
-		/>{/if}
-	<input type="hidden" name="otvaranie" value={vstup.otvaranie} />
-	<input type="hidden" name="kovanieL" value={vstup.kovanieL} />
-	<input type="hidden" name="kovanieP" value={vstup.kovanieP} />
-	<input type="hidden" name="kovanieStred" value={vstup.kovanieStred} />
-	<input type="hidden" name="kovanieStredOkno" value={vstup.kovanieStredOkno} />
-	<input type="hidden" name="vrtanieZamku" value={vstup.vrtanieZamku} />
-	<input type="hidden" name="poznamka" value={vstup.poznamka} />
-	<input type="hidden" name="ral" value={vstup.ral} />
-	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
-	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
-	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
-	{#if vstup.farbaKovania}<input
-			type="hidden"
-			name="farbaKovania"
-			value={vstup.farbaKovania}
-		/>{/if}
-	{#if vstup.kolajnica?.horna}
-		<input type="hidden" name="kolajnicaHorna" value={vstup.kolajnica.horna} />
-	{/if}
-	{#if vstup.kolajnica?.spodna}
-		<input type="hidden" name="kolajnicaSpodna" value={vstup.kolajnica.spodna} />
-	{/if}
-	{#if vstup.kliny.length}
-		<input type="hidden" name="kliny" value={JSON.stringify(vstup.kliny)} />
-	{/if}
-	{#if vstup.sietka}
-		<input type="hidden" name="sietka" value="1" />
-		<input type="hidden" name="sietkaUchyt" value={vstup.sietka.uchyt} />
-		{#if vstup.sietka.system}
-			<input type="hidden" name="sietkaSystem" value={vstup.sietka.system} />
-		{/if}
-	{/if}
-{/snippet}
-
-{#snippet hiddenMulti()}
-	<input type="hidden" name="zak" value={vstup.zak} />
-	<input type="hidden" name="op" value={vstup.op} />
-	<input type="hidden" name="zakaznik" value={vstup.zakaznik} />
-	<input type="hidden" name="poznamka" value={vstup.poznamka} />
-	<input type="hidden" name="ral" value={vstup.ral} />
-	<input type="hidden" name="posuvy" value={JSON.stringify(multiVstup?.posuvy ?? [])} />
-	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
-	{#if vstup.pridavnaKolajnica}<input type="hidden" name="pridavnaKolajnica" value="1" />{/if}
-	{#if vstup.jednostrannaFab}<input type="hidden" name="jednostrannaFab" value="1" />{/if}
-	{#if vstup.farbaKovania}<input
-			type="hidden"
-			name="farbaKovania"
-			value={vstup.farbaKovania}
-		/>{/if}
-{/snippet}
-
 <!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) — nahlad aj nahladMulti -->
 {#snippet sklaPridaneBanner()}
 	{#if form?.sklaPridane}
@@ -730,6 +680,7 @@
 		bind:vrtanieZamkuS
 		bind:skloPresneS
 		bind:skloTriedaS
+		bind:skloOdooS
 		bind:poznamkaS
 		bind:ralS
 		bind:cakaS
@@ -766,7 +717,7 @@
 		{b2bBlok}
 		{stylyForSystem}
 		{sklaForSystem}
-		cennikPopisSkla={data.cennikPopisSkla}
+		ponukaSkiel={data.ponukaSkiel}
 		{triedyPre}
 		{otvaraniaForStyl}
 		{kolajnicaPre}
@@ -811,7 +762,7 @@
 	<div class="card noprint">
 		{#if !isB2B}
 			<form method="POST" action="?/odoslat">
-				{@render hiddenVstup()}
+				<HiddenVstup {vstup} />
 				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
 				<input type="hidden" name="vylucene_kody" value={vyluceneKodySingle} />
 				<button class="btn" type="submit" data-testid="odoslat">
@@ -823,7 +774,7 @@
 				</button>
 			</form>
 			<form method="POST" action="?/pridatSkla" style="display:inline">
-				{@render hiddenVstup()}
+				<HiddenVstup {vstup} />
 				<button class="btn secondary" type="submit" data-testid="pridat-skla"
 					>📋 Pridať sklá do objednávky</button
 				>
@@ -831,7 +782,7 @@
 		{/if}
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravit" style="display:inline">
-			{@render hiddenVstup()}
+			<HiddenVstup {vstup} />
 			<button class="btn secondary" type="submit">← Späť a upraviť</button>
 		</form>
 	</div>
@@ -867,7 +818,7 @@
 		<!-- #514: „Odoslať sklo" dostupné aj po uložení nárezáku (odpise) nad tým istým výsledkom -->
 		{#if !isB2B}
 			<form method="POST" action="?/pridatSkla" style="display:inline">
-				{@render hiddenVstup()}
+				<HiddenVstup {vstup} />
 				<button class="btn secondary" type="submit" data-testid="pridat-skla"
 					>📋 Pridať sklá do objednávky</button
 				>
@@ -913,7 +864,7 @@
 	<div class="card noprint">
 		{#if !isB2B}
 			<form method="POST" action="?/odoslatMulti">
-				{@render hiddenMulti()}
+				<HiddenVstup {vstup} posuvy={multiVstup?.posuvy ?? []} />
 				<input type="hidden" name="planHash" value={form?.planHash ?? ''} />
 				<input type="hidden" name="vylucene_kody" value={vyluceneKodyMulti} />
 				<button class="btn" type="submit" data-testid="odoslat-multi">
@@ -925,7 +876,7 @@
 				</button>
 			</form>
 			<form method="POST" action="?/pridatSklaMulti" style="display:inline">
-				{@render hiddenMulti()}
+				<HiddenVstup {vstup} posuvy={multiVstup?.posuvy ?? []} />
 				<button class="btn secondary" type="submit" data-testid="pridat-skla-multi"
 					>📋 Pridať sklá do objednávky</button
 				>
@@ -933,7 +884,7 @@
 		{/if}
 		<button class="btn secondary" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
 		<form method="POST" action="?/upravitMulti" style="display:inline">
-			{@render hiddenMulti()}
+			<HiddenVstup {vstup} posuvy={multiVstup?.posuvy ?? []} />
 			<button class="btn secondary" type="submit">← Späť a upraviť</button>
 		</form>
 	</div>
@@ -972,7 +923,7 @@
 		<!-- #514: „Odoslať sklo" dostupné aj po uložení nárezáku (odpise) nad tým istým výsledkom -->
 		{#if !isB2B}
 			<form method="POST" action="?/pridatSklaMulti" style="display:inline">
-				{@render hiddenMulti()}
+				<HiddenVstup {vstup} posuvy={multiVstup?.posuvy ?? []} />
 				<button class="btn secondary" type="submit" data-testid="pridat-skla-multi"
 					>📋 Pridať sklá do objednávky</button
 				>

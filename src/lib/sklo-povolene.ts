@@ -53,6 +53,65 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 	}
 };
 
+// ---- #579: Odoo typy skla (`montalu.glass.type`) v ponuke nárezáku podľa HRÚBKY ----
+//
+// Owner 28.9.: „ak robust používa 24 mm, má mu ponúknuť všetky sklá s tou hrúbkou". Hrúbka je
+// SPOJKA medzi Odoo a výpočtom: Odoo typ s `total_thickness_mm` = `mm` (a druhom `druh`) sa ponúkne
+// a počíta sa ako reprezentatívne LOKÁLNE sklo `sklo` (vzorce/profily/Money nezmenené — výpočet
+// pozná len triedy 6/16 + Deluxe hrúbku 6/10). Nové sklo pridané v Odoo sa objaví bez releasu.
+// Ak výroba použije pri systéme inú hrúbku, upraví sa LEN táto tabuľka (design #579, doplnenie
+// 28.9.). `sklo` musí byť v lokálnej ponuke systému (stráži `tests/sklo-odoo-579.test.ts`).
+
+/** Druh Odoo skla v triede: izolačné (Odoo `category=izolacne`), jednoduché (jednosklo — kalené,
+ *  lepené aj rezané) alebo LEN kalené (`category=esg`, Deluxe). */
+export type OdooDruh = 'izolacne' | 'jednoduche' | 'esg';
+
+export interface OdooTrieda {
+	/** Odoo `total_thickness_mm` */
+	readonly mm: number;
+	readonly druh: OdooDruh;
+	/** reprezentatívne lokálne výpočtové sklo triedy (`glass_types.nazov` v ponuke systému) */
+	readonly sklo: string;
+}
+
+// Štandard plus, starý Štandard, Drevostavby: vzorec rovnaký (IZO nárezák podľa triedy 16)
+const STANDARDNE: readonly OdooTrieda[] = [
+	{ mm: 6, druh: 'jednoduche', sklo: 'Float sklo 6 mm' },
+	{ mm: 16, druh: 'izolacne', sklo: 'Izolačné sklo 4/8/4 číre' },
+	{ mm: 24, druh: 'izolacne', sklo: 'Izolačné sklo 4/16/4 číre' }
+];
+
+export const ODOO_HRUBKY: Readonly<Record<string, readonly OdooTrieda[]>> = {
+	// izolačné 4/16/4 (24 mm); vzorec od skla nezávisí
+	Robust: [{ mm: 24, druh: 'izolacne', sklo: 'Izolačné sklo 4/16/4 číre' }],
+	// trieda 16 (izolačné) aj 6 („Redukcia 6mm" pri triede 6)
+	Slide: [
+		{ mm: 16, druh: 'izolacne', sklo: 'Izolačné sklo 4/8/4 číre' },
+		{ mm: 6, druh: 'jednoduche', sklo: '6mm číre' }
+	],
+	// len kalené 6 / 10 mm (`skloHrubka` vyberá kladkový/klzný profil)
+	Deluxe: [
+		{ mm: 6, druh: 'esg', sklo: 'Float kalené 6 mm' },
+		{ mm: 10, druh: 'esg', sklo: 'Float kalené 10 mm' }
+	],
+	'Štandard +': STANDARDNE,
+	Štandard: STANDARDNE,
+	'Štandard Drevo': STANDARDNE
+};
+
+/** Hrúbkové triedy Odoo skiel, ktoré nárezák pre systém ponúka (bez záznamu = žiadne). */
+export function odooTriedyPre(system: string): readonly OdooTrieda[] {
+	return ODOO_HRUBKY[system] ?? [];
+}
+
+/** Patrí Odoo typ (`category`) do druhu triedy? */
+export function odooDruhSedi(druh: OdooDruh, category: string): boolean {
+	const c = category.trim().toLowerCase();
+	if (druh === 'izolacne') return c === 'izolacne';
+	if (druh === 'esg') return c === 'esg';
+	return c !== '' && c !== 'izolacne';
+}
+
 /** Povolené hrúbkové triedy vlastnej skladby pre systém (bez záznamu = všetky). */
 export function povoleneTriedyIne(system: string): readonly number[] {
 	return POVOLENE_SKLA[system]?.triedyIne ?? SKLO_TRIEDY;

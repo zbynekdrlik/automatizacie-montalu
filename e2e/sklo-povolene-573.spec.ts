@@ -4,7 +4,7 @@
 // Relačné: ponuku čítame z `<option>` (holý názov cez `bareSkloLabel`, PROD nesie Odoo sufix
 // „· cenník: <name>" pri jednoznačnej zhode), porovnávame s tabuľkou, nie s mm literálmi.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, bareSkloLabel } from './helpers';
+import { collectConsole, loginAs, bareSkloLabel, LOKALNE_SKLA } from './helpers';
 
 const SKLO = 'Sklo (základ — určuje vzorec)';
 const INE = 'Iné (vlastná skladba)';
@@ -12,7 +12,7 @@ const INE = 'Iné (vlastná skladba)';
 async function ponuka(page: Page, system: string, styl: string): Promise<string[]> {
 	await page.getByLabel('Systém').selectOption(system);
 	await page.getByLabel('Štýl').selectOption(styl);
-	const texty = await page.getByLabel(SKLO).locator('option').allTextContents();
+	const texty = await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents();
 	// žiadna voľba nenesie príponu „viac typov" (Palo 25.9. [04:19]) — zahryzne len proti
 	// nasadeniu s Odoo obohatením (post-deploy); v CI preview bez Odoo je popis vždy prázdny
 	// a správanie kryje unit `tests/glass-match.test.ts`

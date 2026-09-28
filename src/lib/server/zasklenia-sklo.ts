@@ -236,8 +236,9 @@ export function recomputeMultiVstup(
 				skloKorekcia: efektivnaKorekcia(g, p.system),
 				otvaranie: p.otvaranie,
 				// display echo do PosuvInfo.skloNazov (plán/tlač) — pri vlastnej skladbe TEXT
-				// (skloPresne); compute glass rieši skloPre() z RAW p.sklo (sentinel) vyššie (#235)
-				sklo: p.skloPresne || p.sklo,
+				// (skloPresne); compute glass rieši skloPre() z RAW p.sklo (sentinel) vyššie (#235).
+				// #579: zvolený Odoo typ skla sa zobrazí jeho Odoo názvom (výpočet stále z p.sklo)
+				sklo: p.skloPresne || p.skloOdooNazov || p.sklo,
 				kovanieL: p.kovanieL,
 				kovanieP: p.kovanieP,
 				kovanieStred: p.kovanieStred,
