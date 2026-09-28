@@ -13,7 +13,12 @@ import {
 	type EdgeFinish
 } from './odoo-rozpis-lines';
 import { bezRozmerov, m2Tabule, popisPozicie, zakladPozicie } from '../objednavka-skla-pozicia';
-import { riadkySklaPosuvu, VRTANIE_ZAMKU_DEFAULT_MM, type PolohaOtvoru } from '../sklo-otvory';
+import {
+	riadkySklaPosuvu,
+	triedaOtvoru,
+	VRTANIE_ZAMKU_DEFAULT_MM,
+	type PolohaOtvoru
+} from '../sklo-otvory';
 import { formatDatumSk, sqliteUtcToIso } from '../datum';
 
 const log = logger('objednavka-skla');
@@ -369,27 +374,30 @@ const stmtNastavPolohu = db.prepare(`
 `);
 
 /**
- * #587: už existujúci identický riadok (dedup) dostane polohu otvoru z producenta, keď ju NEMÁ
- * alebo je iná — riadok spred #587 (0.25.48–0.25.51) tak opakovaným „Pridať sklá" získa výkres, a
- * zmenená výška vŕtania v nárezáku sa prenesie (to isté fyzické sklo, nový bod vŕtania). Nič sa
- * nevkladá (kusy/cena nezmenené); neznáma poloha (null) existujúcu nikdy neprepíše.
+ * #587: už existujúci identický riadok (dedup) prevezme polohu otvoru z producenta, keď sa líši —
+ * riadok spred #587 (0.25.48–0.25.51) tak opakovaným „Pridať sklá" získa výkres a zmenená výška
+ * vŕtania v nárezáku sa prenesie (to isté fyzické sklo, nový bod vŕtania). Keď producent polohu
+ * spočítal, ale otvor sa do skla nezmestí (`otvor: null`), stará poloha sa ZMAŽE (honest-null —
+ * starý výkres by dodávateľ vŕtal podľa neplatného zadania). Producent, ktorý polohu vôbec nepočíta
+ * (`otvor` chýba), nič nemení. Nič sa nevkladá (kusy/cena nezmenené). Vráti, či riadok zmenil.
  */
-function doplnPolohu(riadok: RovnakyRiadok, s: NoveSklo): void {
+function doplnPolohu(riadok: RovnakyRiadok, s: NoveSklo): boolean {
+	if (s.otvor === undefined || !((s.holesQty ?? 0) > 0)) return false;
 	const [hrana, spodok, priemer] = otvoryRiadku(s).poloha;
-	if (hrana == null) return;
 	if (
 		riadok.otvor_od_hrany_mm === hrana &&
 		riadok.otvor_od_spodku_mm === spodok &&
 		riadok.otvor_priemer_mm === priemer
 	)
-		return;
+		return false;
 	stmtNastavPolohu.run(hrana, spodok, priemer, riadok.id);
-	log.info('poloha otvoru doplnena na existujuci riadok', {
-		id: riadok.id,
-		zak: s.zak,
-		predtym: riadok.otvor_od_spodku_mm,
-		odSpodkuMm: spodok
-	});
+	log.info(
+		hrana == null
+			? 'poloha otvoru zmazana — nova sa do skla nezmesti'
+			: 'poloha otvoru doplnena na existujuci riadok',
+		{ id: riadok.id, zak: s.zak, predtym: riadok.otvor_od_spodku_mm, odSpodkuMm: spodok }
+	);
+	return true;
 }
 
 function najdiRovnaku(s: NoveSklo): RovnakyRiadok | undefined {
@@ -484,7 +492,8 @@ export function pridajSklaHromadneIdempotentne(polozky: NoveSklo[]): number {
 		for (const s of polozky) {
 			const rovnaka = najdiRovnaku(s);
 			if (rovnaka) {
-				doplnPolohu(rovnaka, s);
+				// #587: zmenená poloha otvoru sa ráta ako zmenený riadok (ako prevod #578)
+				if (doplnPolohu(rovnaka, s)) pridane++;
 				continue;
 			}
 			if (!prevedStaryCelok(s, polozky)) pridajSklo(s);
@@ -707,7 +716,10 @@ function mapRow(r: SkloRow): SkloPolozka {
 /** #587: poloha otvoru LEN pri riadku s otvormi a úplnej uloženej polohe; inak `null` (honest-null). */
 function mapOtvor(r: SkloRow): PolohaOtvoru | null {
 	const { otvor_od_hrany_mm: hrana, otvor_od_spodku_mm: spodok, otvor_priemer_mm: priemer } = r;
-	if (!(r.spec_holes_qty > 0) || hrana == null || spodok == null || priemer == null) return null;
+	if (hrana == null || spodok == null || priemer == null) return null;
+	// poloha opisuje JEDEN otvor danej triedy — keď obsluha spec otvorov (#521) zmenila, výkres by
+	// odporoval riadku → žiadny (honest-null), nie výkres s iným počtom/priemerom než objednávka
+	if (r.spec_holes_qty !== 1 || r.spec_hole_size !== triedaOtvoru(priemer)) return null;
 	return { odHranyMm: hrana, odSpodkuMm: spodok, priemerMm: priemer };
 }
 

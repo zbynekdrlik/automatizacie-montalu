@@ -201,7 +201,7 @@
 
 	// Deluxe zámkové otvory D46: ⌀46 mm, 50 mm od kraja skla, na KRAJNÝCH sklách
 	// (ľavé pole pri ľavej hrane, pravé pole pri pravej). Výška vŕtania od spodku
-	// skla je konfigurovateľná (default 1050); diera sa v kresbe nemusí presne
+	// skla je konfigurovateľná (default `VRTANIE_ZAMKU_DEFAULT_MM`); diera sa v kresbe nemusí presne
 	// posúvať, hlavné je zobraziť + okótovať hodnotu (Dominik 2026-07-14).
 	// #578: KTORÉ sklá majú otvor určuje `otvoryVSkle` — to isté pravidlo ide do objednávky
 	// skla (riadok „s otvorom"), takže výkres a objednávka vždy sedia.

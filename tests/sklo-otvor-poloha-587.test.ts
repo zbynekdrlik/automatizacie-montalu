@@ -11,7 +11,12 @@ import {
 	VRTANIE_ZAMKU_DEFAULT_MM,
 	polohaOtvoru,
 	riadkySklaPosuvu,
-	rozpisOtvorovSkla
+	rozpisOtvorovSkla,
+	popisPolohyOtvoru,
+	triedaOtvoru,
+	stranyOtvorov,
+	fmtMmOtvoru,
+	otvoryVSkle
 } from '../src/lib/sklo-otvory';
 import Nahlad2D from '../src/lib/components/Nahlad2D.svelte';
 import SkloOtvoryRozpis from '../src/lib/components/zasklenia/SkloOtvoryRozpis.svelte';
@@ -102,5 +107,39 @@ describe('#587 náhľad a PDF čítajú TIE ISTÉ konštanty', () => {
 		const pdf = fs.readFileSync('src/lib/server/sklo-otvor-pdf.ts', 'utf8');
 		expect(pdf).toContain("from '../sklo-otvory'");
 		expect(pdf).not.toMatch(/\b(50|46|1050)\b/);
+	});
+
+	it('formulár nárezáka (single) nemá vlastný literál default výšky vŕtania', () => {
+		for (const f of [
+			'src/routes/zasklenia/+page.svelte',
+			'src/lib/components/zasklenia/ZasklieniaForm.svelte',
+			'src/lib/components/Nahlad2D.svelte'
+		])
+			expect(fs.readFileSync(f, 'utf8'), f).not.toMatch(/\b1050\b/);
+	});
+});
+
+describe('#587 pomocné pravidlá polohy', () => {
+	it('popisPolohyOtvoru — text do poznámky Odoo aj na podklad', () => {
+		expect(popisPolohyOtvoru({ odHranyMm: 50, odSpodkuMm: 1100, priemerMm: 46 })).toBe(
+			'otvor ⌀46: stred 50 mm od zvislej hrany, 1100 mm od spodku skla'
+		);
+		expect(fmtMmOtvoru(1050.25)).toBe('1050,3');
+	});
+
+	it('triedaOtvoru — d30 do 30 mm, d50 31–50 mm, inak null', () => {
+		expect(triedaOtvoru(D_ZAMOK_MM)).toBe('d50');
+		expect(triedaOtvoru(30)).toBe('d30');
+		expect(triedaOtvoru(31)).toBe('d50');
+		expect(triedaOtvoru(51)).toBeNull();
+		expect(triedaOtvoru(3)).toBeNull();
+		expect(triedaOtvoru(Number.NaN)).toBeNull();
+	});
+
+	it('stranyOtvorov — prvá tabuľa ľavé krídlo, ďalšia pravé (pravidlo otvoryVSkle)', () => {
+		expect(stranyOtvorov(otvoryVSkle('Deluxe', 4).sOtvorom)).toEqual({ vlavo: 1, vpravo: 1 });
+		expect(stranyOtvorov(otvoryVSkle('Deluxe', 1).sOtvorom)).toEqual({ vlavo: 1, vpravo: 0 });
+		expect(stranyOtvorov(0)).toEqual({ vlavo: 0, vpravo: 0 });
+		expect(stranyOtvorov(-1)).toEqual({ vlavo: 0, vpravo: 0 });
 	});
 });

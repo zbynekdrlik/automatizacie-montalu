@@ -46,6 +46,44 @@ export function polohaOtvoru(
 	return { odHranyMm: OKRAJ_ZAMOK_MM, odSpodkuMm: vrtanieZamku, priemerMm: D_ZAMOK_MM };
 }
 
+/** #587: mm do textu polohy (celé bez desatín, inak 1 desatinné miesto s čiarkou) — PDF aj poznámka. */
+export function fmtMmOtvoru(x: number): string {
+	return Number.isInteger(x) ? String(x) : String(Math.round(x * 10) / 10).replace('.', ',');
+}
+
+/**
+ * #587: poloha otvoru slovom — ide do POZNÁMKY riadku objednávky v Odoo (IZOS ju vidí aj bez PDF a
+ * zmena polohy = zmena riadku, takže Odoo pri opätovnom odoslaní založí novú verziu; prílohy riadku
+ * Odoo pri porovnaní verzií nesleduje) a na podklad.
+ */
+export function popisPolohyOtvoru(o: PolohaOtvoru): string {
+	return (
+		`otvor ⌀${fmtMmOtvoru(o.priemerMm)}: stred ${fmtMmOtvoru(o.odHranyMm)} mm od zvislej hrany, ` +
+		`${fmtMmOtvoru(o.odSpodkuMm)} mm od spodku skla`
+	);
+}
+
+/**
+ * #587: trieda priemeru podľa kontraktu odoo-erp (`d30` = 4–30 mm, `d50` = 31–50 mm), inak `null`.
+ * Uložená poloha platí len vtedy, keď sedí so spec riadku (1 otvor na tabuľu, tá istá trieda) — ak
+ * obsluha spec otvorov neskôr zmení, výkres by jej odporoval → radšej žiadny (honest-null).
+ */
+export function triedaOtvoru(priemerMm: number): 'd30' | 'd50' | null {
+	if (!(priemerMm >= 4)) return null;
+	if (priemerMm <= 30) return 'd30';
+	return priemerMm <= 50 ? 'd50' : null;
+}
+
+/**
+ * #587: tabule riadku s otvorom podľa krídla. `otvoryVSkle` dáva otvor ľavému poľu (index 0) a pri
+ * N > 1 aj pravému (N − 1) → prvá tabuľa je ľavá, ďalšia pravá. Pravá má otvor ZRKADLOVO (pri pravej
+ * hrane) — výkres ju kreslí zvlášť, žiadne „otoč tabuľu" (vrstvené/pokovované sklo má stranu).
+ */
+export function stranyOtvorov(sOtvorom: number): { vlavo: number; vpravo: number } {
+	const n = Number.isInteger(sOtvorom) && sOtvorom > 0 ? sOtvorom : 0;
+	return { vlavo: Math.ceil(n / 2), vpravo: Math.floor(n / 2) };
+}
+
 /** Prípona popisu riadku objednávky skla s tabuľami s otvorom („Zasklenie N — s otvorom ⌀46"). */
 export const PRIPONA_S_OTVOROM = ` — s otvorom ⌀${D_ZAMOK_MM}`;
 
@@ -126,8 +164,13 @@ export function riadkySklaPosuvu(
  */
 export function rozpisOtvorovSkla(system: string, N: number): string | null {
 	const riadky = riadkySklaPosuvu('', system, N);
-	const kusy = (s: boolean) =>
-		riadky.filter((r) => r.holesQty > 0 === s).reduce((a, r) => a + r.pocet, 0);
+	const kusy = (sOtvormi: boolean) =>
+		riadky
+			.filter((r) => {
+				const maOtvor = r.holesQty > 0;
+				return maOtvor === sOtvormi;
+			})
+			.reduce((a, r) => a + r.pocet, 0);
 	const sOtvorom = kusy(true);
 	if (sOtvorom === 0) return null;
 	return `z toho s otvorom ⌀${D_ZAMOK_MM}: ${sOtvorom} ks · bez otvoru: ${kusy(false)} ks`;

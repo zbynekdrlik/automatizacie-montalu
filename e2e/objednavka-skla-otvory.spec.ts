@@ -87,7 +87,7 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await expect(page.locator('[data-testid^="vykres-otvoru-"]')).toHaveCount(1);
 	await expect(bez.locator('[data-testid^="vykres-otvoru-"]')).toHaveCount(0);
 	await expect(sOtvorom.locator('[data-testid^="otvor-poloha-"]')).toHaveText(
-		/⌀46 · 50 mm od hrany · 1100 mm\s+od spodku/
+		'otvor ⌀46: stred 50 mm od zvislej hrany, 1100 mm od spodku skla'
 	);
 	const odkaz = sOtvorom.locator('[data-testid^="vykres-otvoru-"] a');
 	await expect(odkaz).toHaveText('Výkres otvoru (PDF)');

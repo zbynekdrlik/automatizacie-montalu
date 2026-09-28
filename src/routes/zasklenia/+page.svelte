@@ -29,6 +29,7 @@
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
+	import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
 
 	let { data, form } = $props();
 
@@ -62,7 +63,7 @@
 			kovanieP: fv?.kovanieP ?? '',
 			kovanieStred: fv?.kovanieStred ?? '',
 			kovanieStredOkno: (fv?.kovanieStredOkno ?? 'L') as 'L' | 'P',
-			vrtanieZamku: fv?.vrtanieZamku ?? 1050,
+			vrtanieZamku: fv?.vrtanieZamku ?? VRTANIE_ZAMKU_DEFAULT_MM,
 			poznamka: zd?.poznamka ?? '',
 			ral: zd?.ral ?? '',
 			caka: zd?.caka ?? false,
@@ -154,7 +155,7 @@
 	let kovanieStredOknoS = $state<'L' | 'P'>('L');
 	let sirka = $state<number | string>('');
 	let vyska = $state<number | string>('');
-	let vrtanieZamkuS = $state<number | string>(1050);
+	let vrtanieZamkuS = $state<number | string>(VRTANIE_ZAMKU_DEFAULT_MM);
 	// klíny primárneho posuvu (Patrik 2026-07-27, MULTI #472) — display-only, do Money nejde
 	let klinyS = $state<KlinVstup[]>([]);
 	// sieťka primárneho posuvu (#86–#90, KOREKCIA 2026-08-02) — rozmer sa už nezadáva
@@ -174,7 +175,7 @@
 		skloPresneS = fv?.skloPresne ?? '';
 		skloTriedaS = fv?.skloTrieda ?? '';
 		skloOdooS = prim()?.skloOdoo ?? '';
-		vrtanieZamkuS = fv?.vrtanieZamku ?? 1050;
+		vrtanieZamkuS = fv?.vrtanieZamku ?? VRTANIE_ZAMKU_DEFAULT_MM;
 		poznamkaS = zd?.poznamka ?? '';
 		ralS = zd?.ral ?? '';
 		cakaS = zd?.caka ?? false;

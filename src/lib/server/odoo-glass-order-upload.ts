@@ -20,6 +20,7 @@ import {
 	type SkloPolozka
 } from './objednavka-skla';
 import { popisPozicie } from '../objednavka-skla-pozicia';
+import { popisPolohyOtvoru } from '../sklo-otvory';
 import {
 	generateVykresOtvoruPdf,
 	vykresOtvoruFilename,
@@ -124,6 +125,12 @@ async function vykresOtvoruPrilohy(p: SkloPolozka): Promise<GlassAttachment[]> {
 	}
 }
 
+/** #587: poloha otvoru slovom — LEN pri riadku, ku ktorému ide aj výkres (tá istá brána). */
+function poznamkaOtvoru(p: SkloPolozka): string | undefined {
+	const vstup = vykresOtvoruZPolozky(p);
+	return vstup ? popisPolohyOtvoru(vstup.otvor) : undefined;
+}
+
 /**
  * Postaví `glass_order` v2 payload zákazky z uložených sklových položiek + ich príloh
  * (Money-neutrálne, IO len SQLite read + base64). Vracia payload + zoznam zahodených príloh
@@ -150,6 +157,8 @@ export async function buildGlassOrderForZak(
 		typSklaManual: p.typSklaManual,
 		cenaM2Manual: p.cenaM2Manual,
 		attachments: [...nacitajPrilohy(p.id), ...vykresy[i]!],
+		// #587: poloha otvoru aj do poznámky — Odoo porovnáva pri re-odoslaní polia riadku, nie prílohy
+		poznamkaOtvoru: poznamkaOtvoru(p),
 		spec: p.spec
 	}));
 	return buildGlassOrder(inputs);

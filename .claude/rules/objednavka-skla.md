@@ -585,9 +585,12 @@ toho istého pravidla).
 
 - **Poloha = JEDEN zdroj `src/lib/sklo-otvory.ts`:** `OKRAJ_ZAMOK_MM` (50, stred od zvislej hrany),
   `VRTANIE_ZAMKU_DEFAULT_MM` (1050, stred od spodku), `D_ZAMOK_MM` (46) + `polohaOtvoru(vrtanie, š, v)`.
-  `Nahlad2D` (náhľad), `vstup.ts`/`znova.ts` (default výšky) aj PDF generátor z nich čítajú — žiadna
-  lokálna číselná konštanta (guard `tests/sklo-otvor-poloha-587.test.ts` skenuje Nahlad2D AJ
-  `sklo-otvor-pdf.ts` na `\b(50|46|1050)\b` — **aj v komentároch**, píš „⌀…"). `polohaOtvoru` vráti
+  `Nahlad2D` (náhľad), `vstup.ts`/`znova.ts`, formulár (`zasklenia/+page.svelte`, `ZasklieniaForm`)
+  aj PDF generátor z nich čítajú. Guard `tests/sklo-otvor-poloha-587.test.ts`: `sklo-otvor-pdf.ts`
+  nesmie obsahovať `\b(50|46|1050)\b` — **ani v komentároch**, píš „⌀…"; Nahlad2D nesmie mať
+  `OKRAJ_ZAMOK = <číslo>` ani `vrtanieZamku = <číslo>`; formulár + Nahlad2D nesmú mať literál `1050`.
+  Pomocníci: `popisPolohyOtvoru` (text), `triedaOtvoru` (d30/d50), `stranyOtvorov` (ľavé/pravé
+  krídlo), `fmtMmOtvoru`. `polohaOtvoru` vráti
   `null`, keď by otvor nebol CELÝ v skle (náhľad výšku len oreže do kresby, dodávateľovi sa
   nedomýšľa) → riadok ostane „s otvorom" (cena IZOS), ale výkres sa negeneruje.
 - **Producent:** `riadkySklaPosuvu(pozícia, systém, N, rozmer?)` dá riadku s otvorom `otvor`;
@@ -596,28 +599,42 @@ toho istého pravidla).
   Bez `rozmer` kľúč `otvor` chýba → existujúce `toEqual` vektory #578 ostali platné.
 - **Úložisko:** `objednavka_skla.otvor_od_hrany_mm/otvor_od_spodku_mm/otvor_priemer_mm` (REAL NULL,
   `migracie-objednavka-otvor.ts`). `pridajSklo` ich zapíše LEN pri `holesQty > 0`; `mapRow` →
-  `SkloPolozka.otvor` (`null` pri 0 otvoroch alebo neúplnej polohe). **Dedup doplní polohu:**
-  `najdiRovnaku` + `doplnPolohu` — riadok spred #587 (0.25.48–0.25.51) dostane polohu opakovaným
-  „Pridať sklá" (nič sa nevloží, `pridane = 0`); zmenená výška vŕtania prepíše uloženú; neznáma
-  (`null`) nikdy neprepíše. `prevedStaryCelok` zapisuje polohu tiež.
-- **PDF** `src/lib/server/sklo-otvor-pdf.ts` (`pdf-common` + DejaVu): A4, obdĺžnik š × v s kótami,
-  otvor s kótou od hrany a od spodku, poznámka „kreslené pre ľavé krídlo, pravé = tá istá tabuľa
-  otočená". **DejaVu subset NEMÁ „⌀" (U+2300)** → v tele „Ø" (`pdfText`), v metadátach „⌀". Hodnoty
-  sú v Subject/Keywords (`od_hrany_mm=`, `od_spodku_mm=`, `priemer_mm=` …) = testovací kanál; BEZ
-  cien. `vykresOtvoruZPolozky(p)` = honest-null brána (bez otvoru/polohy, šikmý, bez výšky/šírky).
+  `SkloPolozka.otvor` — `null` pri neúplnej polohe ALEBO keď spec riadku nesedí (`spec_holes_qty !== 1`
+  alebo `spec_hole_size !== triedaOtvoru(priemer)` — obsluha zmenila otvory cez #521 spec → výkres
+  by odporoval objednávke). **Dedup prevezme polohu:** `najdiRovnaku` + `doplnPolohu` — riadok spred
+  #587 (0.25.48–0.25.51) dostane polohu opakovaným „Pridať sklá"; zmenená výška prepíše uloženú; nová
+  výška MIMO skla (`otvor: null` od producenta) starú ZMAŽE (honest-null); producent bez polohy
+  (`otvor` chýba) nič nemení. Zmena polohy sa počíta do `pridane` (ako prevod #578 `prevedStaryCelok`,
+  ktorý polohu tiež zapisuje).
+- **PDF** `src/lib/server/sklo-otvor-pdf.ts` (`pdf-common` + DejaVu): A4, ĽAVÉ krídlo (otvor pri ľavej
+  hrane) a pri 2 ks aj PRAVÉ krídlo (otvor ZRKADLOVO pri pravej hrane) vedľa seba, každé s kótami
+  skla + otvoru (od hrany, od spodku). ŽIADNE „otoč tabuľu" (review: vrstvené/pokovované/matné sklo má
+  stranu). **DejaVu subset NEMÁ „⌀" (U+2300)** → v tele „Ø" (`pdfText`), v metadátach „⌀". Hodnoty sú
+  v Subject/Keywords (`od_hrany_mm=`, `od_spodku_mm=`, `priemer_mm=`, `ks_lave=`, `ks_prave=` …) =
+  testovací kanál; BEZ cien. `vykresOtvoruZPolozky(p)` = honest-null brána (bez otvoru/platnej polohy,
+  **atyp** — obsluha dodáva vlastný výkres, šikmý, bez výšky/šírky). Vizuálna kontrola: vitest
+  jednorazovka zapíše PDF → `pdftoppm -png -r 70`.
 - **Odoo:** `buildGlassOrderForZak` je od #587 **async** (pdf-lib `save()`) — riadok s otvorom dostane
-  `attachments: [...ručné, Vykres-otvoru-<zak>-<pozícia>.pdf]` (`application/pdf`). Zlyhanie
-  generovania sa zaloguje, objednávka ide bez výkresu (nikdy nezhodí odoslanie). Strop príloh
-  (`enforceAttachmentCap`) platí aj pre výkres.
+  `attachments: [...ručné, Vykres-otvoru-<zak>-<pozícia>.pdf]` (`application/pdf`) A poznámku
+  `note = "<pozícia> — otvor ⌀46: stred 50 mm od zvislej hrany, 1100 mm od spodku skla"`
+  (`GlassOrderItemInput.poznamkaOtvoru` → `buildGlassNote`). **PASCA (review 🔴, odoo-erp
+  `sale_order_narezak_glass.py`):** Odoo pri opätovnom odoslaní porovnáva polia riadkov + prílohy
+  CELEJ objednávky, NIE prílohy riadku → bez poznámky by nový/zmenený výkres pri re-odoslaní zapadol
+  („identická" objednávka). Poznámka je tiež textová záloha pre IZOS. Zlyhanie generovania sa
+  zaloguje, objednávka ide bez výkresu. Strop príloh (`enforceAttachmentCap`) platí aj pre výkres.
 - **Podklad:** stĺpec Prílohy — `vykres-otvoru-<id>` odkaz na GET `/objednavka-skla/vykres-otvoru/[id]`
   (inline `application/pdf` — generované z NAŠICH dát, preto nie octet-stream ako nahraté súbory;
-  b2b kryje prefix) + `otvor-poloha-<id>`; riadok s otvorom BEZ polohy → `otvor-neznamy-<id>` (návod:
-  znova „Pridať sklá", alebo atyp + nahrať výkres). Ručné nahratie na rozmery-riadok NEPONÚKAME —
-  `nahratSubor` prepína riadok na atyp.
+  b2b kryje prefix) + `otvor-poloha-<id>` (`popisPolohyOtvoru`); upozornenie `otvor-neznamy-<id>`
+  LEN pri riadku „— s otvorom" z nárezáka (`PRIPONA_OTVOR_RE`), nie atyp, bez platnej polohy (návod:
+  znova „Pridať sklá", alebo atyp + nahrať výkres) — ručné riadky s #521 otvormi ho nedostanú. Ručné
+  nahratie na rozmery-riadok NEPONÚKAME — `nahratSubor` prepína riadok na atyp.
 - **Nárezák karta „Sklo (mm)":** `SkloOtvoryRozpis` (`rozpisOtvorovSkla`) „z toho s otvorom ⌀46: 2 ks
   · bez otvoru: 2 ks" — single (`sklo-otvory`, pod Počet, hodnota Počet nezmenená) aj multi
   (`posuv-sklo-otvory-<i>` v bunke skla). Systém bez otvorov → nič. Tlačí sa s kartou.
 - **Testy:** `tests/sklo-otvor-poloha-587.test.ts` (pravidlo, SSR komponent, zdroj konštánt),
-  `tests/objednavka-skla-vykres-otvoru-587.test.ts` (producent, dedup doplnenie, payload, PDF
-  metadáta, GET), `tests/migration-v52.test.ts`; E2E `objednavka-skla-otvory.spec.ts` rozšírený
-  (rozpis na karte, odkaz len pri riadku s otvorom, poloha 1100/50, PDF 200 `%PDF-`).
+  `tests/objednavka-skla-vykres-otvoru-587.test.ts` (producent, dedup doplnenie/zmazanie, poznámka
+  pre Odoo re-send, spec nesúlad, atyp, payload, PDF metadáta, GET), `tests/migration-v52.test.ts`;
+  E2E `objednavka-skla-otvory.spec.ts` rozšírený (rozpis na karte, odkaz len pri riadku s otvorom,
+  poloha 1100/50, PDF 200 `%PDF-`).
+- **`objednavka-skla.ts` má ~966 r.** — ďalšia funkcia v ňom = najprv split (napr. otvory/dedup do
+  vlastného modulu), `large-file-split.md`.

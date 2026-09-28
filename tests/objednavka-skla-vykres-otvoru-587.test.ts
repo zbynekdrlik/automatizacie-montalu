@@ -16,8 +16,14 @@ process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'export');
 fs.mkdirSync(process.env.MONEY_TEST_DIR, { recursive: true });
 
 const { actions } = await import('../src/routes/zasklenia/+page.server');
-const { listSklaPreZakazku, pridajSklo, pridajSubor, pridajSklaHromadneIdempotentne } =
-	await import('../src/lib/server/objednavka-skla');
+const {
+	listSklaPreZakazku,
+	pridajSklo,
+	pridajSubor,
+	pridajSklaHromadneIdempotentne,
+	nastavSpec,
+	nastavRezim
+} = await import('../src/lib/server/objednavka-skla');
 const { buildGlassOrderForZak } = await import('../src/lib/server/odoo-glass-order-upload');
 const { generateVykresOtvoruPdf, vykresOtvoruZPolozky, vykresOtvoruFilename } =
 	await import('../src/lib/server/sklo-otvor-pdf');
@@ -120,7 +126,8 @@ describe('#587 riadok s otvorom z Deluxe posuvu nesie polohu otvoru', () => {
 			listSklaPreZakazku('ZAK-587-LEGACY').find((p) => p.popis === S_OTVOROM)!.otvor
 		).toBeNull();
 		const r = await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-LEGACY' });
-		expect((r.sklaPridane as { pridane: number }).pridane).toBe(0); // nič nové sa nevložilo
+		// nič nové sa nevložilo; 1 = riadok s otvorom dostal polohu (zmenený riadok, ako prevod #578)
+		expect((r.sklaPridane as { pridane: number }).pridane).toBe(1);
 		const po = listSklaPreZakazku('ZAK-587-LEGACY');
 		expect(po).toHaveLength(2);
 		expect(po.find((p) => p.popis === S_OTVOROM)!.otvor?.odSpodkuMm).toBe(1100);
@@ -227,6 +234,92 @@ describe('#587 podklad: stiahnutie výkresu otvoru', () => {
 		expect(body.subarray(0, 5).toString()).toBe('%PDF-');
 		await expect(get(bez.id)).rejects.toMatchObject({ status: 404 });
 		await expect(get('abc')).rejects.toMatchObject({ status: 404 });
+	});
+});
+
+describe('#587 review — poloha platí len k zadaniu, ktoré objednávka nesie', () => {
+	const sOtvorom = (zak: string) => listSklaPreZakazku(zak).find((p) => p.popis === S_OTVOROM)!;
+	const noteS = async (zak: string) =>
+		(await buildGlassOrderForZak(zak))!.order.items.find((i) => i.description === S_OTVOROM)!
+			.note ?? '';
+
+	it('poloha ide aj do poznámky riadku (Odoo porovnáva pri re-odoslaní polia, nie prílohy)', async () => {
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-NOTE' });
+		const pred = await noteS('ZAK-587-NOTE');
+		expect(pred).toBe(
+			`${S_OTVOROM} — otvor ⌀46: stred 50 mm od zvislej hrany, 1100 mm od spodku skla`
+		);
+		// zmena výšky vŕtania → iná poznámka → Odoo založí novú verziu (nový výkres dorazí)
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-NOTE', vrtanieZamku: '1200' });
+		const po = await noteS('ZAK-587-NOTE');
+		expect(po).toContain('1200 mm od spodku');
+		expect(po).not.toBe(pred);
+		// riadok bez otvoru poznámku nemení
+		const bez = (await buildGlassOrderForZak('ZAK-587-NOTE'))!.order.items.find(
+			(i) => i.description === 'Zasklenie 1'
+		)!;
+		expect(bez.note).toBe('Zasklenie 1');
+	});
+
+	it('nová výška mimo skla ZMAŽE starú polohu (žiadny starý výkres)', async () => {
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-MIMO' });
+		expect(sOtvorom('ZAK-587-MIMO').otvor?.odSpodkuMm).toBe(1100);
+		const r = await callAction('pridatSkla', {
+			...DELUXE_4K,
+			zak: 'ZAK-587-MIMO',
+			vrtanieZamku: '19000'
+		});
+		expect((r.sklaPridane as { pridane: number }).pridane).toBe(1);
+		const s = sOtvorom('ZAK-587-MIMO');
+		expect(s.otvor).toBeNull();
+		expect(s.spec.holesQty).toBe(1); // cena IZOS (otvor) ostáva
+		const item = (await buildGlassOrderForZak('ZAK-587-MIMO'))!.order.items.find(
+			(i) => i.description === S_OTVOROM
+		)!;
+		expect(item).not.toHaveProperty('attachments');
+	});
+
+	it('obsluha zmení spec otvorov (2 otvory / iný priemer) → výkres sa negeneruje', async () => {
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-SPEC' });
+		const s = sOtvorom('ZAK-587-SPEC');
+		nastavSpec(s.id, { ...s.spec, holesQty: 2 });
+		expect(sOtvorom('ZAK-587-SPEC').otvor).toBeNull();
+		nastavSpec(s.id, { ...s.spec, holesQty: 1, holeSize: 'd30' });
+		expect(sOtvorom('ZAK-587-SPEC').otvor).toBeNull();
+		nastavSpec(s.id, { ...s.spec, holesQty: 1, holeSize: 'd50' });
+		expect(sOtvorom('ZAK-587-SPEC').otvor?.odSpodkuMm).toBe(1100);
+	});
+
+	it('atyp riadok (vlastný výkres obsluhy) → generovaný výkres sa nepridá', async () => {
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-ATYP' });
+		const s = sOtvorom('ZAK-587-ATYP');
+		pridajSubor(s.id, 'vlastny.pdf', 'application/octet-stream', Buffer.from('PDF'));
+		nastavRezim(s.id, 'atyp');
+		const p = sOtvorom('ZAK-587-ATYP');
+		expect(vykresOtvoruZPolozky(p)).toBeNull();
+		const item = (await buildGlassOrderForZak('ZAK-587-ATYP'))!.order.items.find(
+			(i) => i.description === S_OTVOROM
+		)!;
+		expect(item.attachments!.map((a) => a.name)).toEqual(['vlastny.pdf']);
+	});
+
+	it('PDF kreslí ľavé aj pravé krídlo a polohu berie zo vstupu (nie z konštánt)', async () => {
+		const doc = await PDFDocument.load(
+			await generateVykresOtvoruPdf({
+				zak: 'Z',
+				op: 'O',
+				popis: S_OTVOROM,
+				typSkla: 'T',
+				sirkaMm: 900,
+				vyskaMm: 1800,
+				pocet: 2,
+				otvor: { odHranyMm: 73, odSpodkuMm: 987, priemerMm: 28 }
+			})
+		);
+		expect(doc.getSubject() ?? '').toContain('2 ks (ľavé 1, pravé 1)');
+		const kw = doc.getKeywords() ?? '';
+		for (const k of ['od_hrany_mm=73', 'od_spodku_mm=987', 'priemer_mm=28', 'ks_prave=1'])
+			expect(kw).toContain(k);
 	});
 });
 
