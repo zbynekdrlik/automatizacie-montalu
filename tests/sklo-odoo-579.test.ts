@@ -202,6 +202,47 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 			expect(o.value.startsWith(ODOO_PREFIX)).toBe(true);
 	});
 
+	// #579 finding 1 review: os povlaku matchera nesmie zmeniť VÝPOČTOVÉ sklo Odoo voľby — povlak
+	// (stopsol) mení len text objednávky, nie nárez/profily/Money. Stopsol ESG 6 mm sa počíta ako
+	// kalené 6 mm (ako v 0.25.49), nie ako predvolené nekalené sklo triedy.
+	it('ESG Stopsol Classic Clear 6mm sa počíta ako kalené 6 mm vo všetkých systémoch s triedou 6', async () => {
+		odooOn();
+		const cakane: Record<string, string> = {
+			'Štandard +': 'ESG kalené 6 mm',
+			Štandard: 'ESG kalené 6 mm',
+			'Štandard Drevo': 'ESG kalené 6 mm',
+			Slide: 'ESG kalené 6 mm',
+			Deluxe: 'Float kalené 6 mm'
+		};
+		for (const [s, sklo] of Object.entries(cakane)) {
+			const o = (await ponuka(s)).skupiny
+				.flatMap((g) => g.items)
+				.find((x) => x.nazov === 'ESG Stopsol Classic Clear 6mm');
+			expect(o?.vypocet, s).toBe(sklo);
+		}
+	});
+
+	it('Odoo stopsol izolačné (nový typ) má výpočtový zdroj lokálne stopsol; číre AL/TH bez zmeny', async () => {
+		odooOn([
+			...ODOO_KATALOG_579,
+			{
+				name: 'IZOS DOUBLE 4-16-4 Stopsol',
+				category: 'izolacne',
+				cennik_code: 'X88',
+				composition: '4 - 16 - 4',
+				total_thickness_mm: 24,
+				pane_count: 'dvojsklo'
+			}
+		]);
+		const p = await ponuka('Štandard +');
+		const by = (n: string) => p.skupiny.flatMap((g) => g.items).find((o) => o.nazov === n)!;
+		expect(by('IZOS DOUBLE 4-16-4 Stopsol').vypocet).toBe('Izolačné sklo 4/16/4 stopsol');
+		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		const lok = p.skupiny[0]!.items.find((o) => o.value === 'Izolačné sklo 4/16/4 stopsol')!;
+		expect(lok.label).toBe('Izolačné sklo 4/16/4 stopsol · cenník: IZOS DOUBLE 4-16-4 Stopsol');
+	});
+
 	it('Odoo nedostupné → lokálna ponuka ako doteraz (fallback, bez skupín)', async () => {
 		// integrácia nenakonfigurovaná = lokálny fallback
 		const p = ponukaSkielPre('Robust', lokalne('Robust'), await fetchGlassTypes());
