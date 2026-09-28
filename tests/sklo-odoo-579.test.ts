@@ -20,7 +20,12 @@ const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
 const { fetchGlassTypes, _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
 const { listGlassTypes } = await import('../src/lib/server/db');
-const { ponukaSkielSystemu, odooTriedyPre, ODOO_HRUBKY } = await import('../src/lib/sklo-povolene');
+const {
+	ponukaSkielSystemu,
+	vypocetneSkloPre,
+	ODOO_HRUBKY_SEED: ODOO_HRUBKY
+} = await import('../src/lib/sklo-povolene');
+const { skloHrubkyPre: odooTriedyPre } = await import('../src/lib/server/sklo-hrubky');
 const { ponukaSkielPre, ponukySkiel, overSkloOdoo, SKUPINA_APPKA, PREFIX_ODOO_SKUPINY } =
 	await import('../src/lib/server/sklo-odoo');
 const { ponukaPreStyl, volbaSkla, rozlozVolbu, skloOdooPre, ODOO_PREFIX } =
@@ -108,7 +113,8 @@ describe('#579 jeden zdroj hrúbok per systém (sklo-povolene.ts)', () => {
 
 	it('reprezentatívne výpočtové sklo každej triedy je v lokálnej ponuke systému', () => {
 		for (const [system, triedy] of Object.entries(ODOO_HRUBKY))
-			for (const t of triedy) expect(lokalne(system), `${system} ${t.mm}`).toContain(t.sklo);
+			for (const t of triedy)
+				expect(vypocetneSkloPre(t.mm, t.druh, lokalne(system)), `${system} ${t.mm}`).not.toBeNull();
 	});
 });
 
