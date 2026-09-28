@@ -262,7 +262,10 @@ function robustForm(extra: Record<string, string> = {}) {
 type Akcia = keyof typeof actions;
 async function akcia(name: Akcia, fd: FormData) {
 	const a = actions[name] as (e: unknown) => Promise<Record<string, unknown>>;
-	return a({ request: new Request('http://x/zasklenia', { method: 'POST', body: fd }), locals: LOCALS });
+	return a({
+		request: new Request('http://x/zasklenia', { method: 'POST', body: fd }),
+		locals: LOCALS
+	});
 }
 
 describe('#579 akcie — výpočet nezmenený, objednávka nesie Odoo typ', () => {
@@ -283,7 +286,10 @@ describe('#579 akcie — výpočet nezmenený, objednávka nesie Odoo typ', () =
 
 	it('pridatSkla: objednávka skla nesie PRESNE zvolený Odoo typ (bez matchera)', async () => {
 		odooOn();
-		await akcia('pridatSkla', robustForm({ zak: 'ZAK-579-A', skloOdoo: 'IZOS DOUBLE 5ESG-14-5ESG' }));
+		await akcia(
+			'pridatSkla',
+			robustForm({ zak: 'ZAK-579-A', skloOdoo: 'IZOS DOUBLE 5ESG-14-5ESG' })
+		);
 		expect(listSklaPreZakazku('ZAK-579-A').map((r) => r.typSkla)).toEqual([
 			'IZOS DOUBLE 5ESG-14-5ESG'
 		]);
