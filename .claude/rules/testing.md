@@ -624,10 +624,13 @@ v kroku upratania → `e2e-b2b-mul90ik9` ostal na PROD).
 
 - Každý E2E, ktorý zakladá účet: `import { test, expect } from './ucty'` (rozšírený `test`, názov
   `test` ostáva kvôli zero-console guardu), fixture `e2eUcty` do signatúry a
-  `e2eUcty.zaregistruj(user)` **PRED** klikom „Pridať účet" (alebo helper `zalozB2bUcet`). Teardown
+  helper `const heslo = await zalozB2bUcet(page, e2eUcty, user)` — zaregistruje PRED „Pridať účet" a
+  vráti NÁHODNÉ heslo (nikdy heslo natvrdo v repe — PROD účet žije počas behu). Teardown
   fixture beží aj po páde/timeoute a maže v SAMOSTATNOM admin kontexte (stav testovej stránky nehrá
   rolu). Vlastné mazanie na konci testu môže ostať (teardown je potom no-op).
-- Meno MUSÍ začínať `e2e-` (fixture iné odmietne). `e2e/global-setup.ts` pred sadou zmaže zvyšky
+- Meno MUSÍ mať tvar `E2E_UCET_VZOR` = `e2e-<popis>-<Date.now base36>` (fixture iné odmietne).
+  Ručný `BASE_URL=… npx playwright test` proti PROD nepúšťaj súbežne s CI post-deploy (sweep by
+  zmazal jeho rozbehnuté účty). `e2e/global-setup.ts` pred sadou zmaže zvyšky
   B2B `e2e-*` účtov (nikdy E2E admin, nikdy interný — interný UI nezmaže). Sweep log:
   `[e2e #583] sweep zvyškových e2e- účtov: …`.
 - Interný účet (nezmazateľný z UI) zakladaj len za `skipAkLive` + vlastné `finally` (vzor
