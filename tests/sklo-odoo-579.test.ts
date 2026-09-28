@@ -184,14 +184,99 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 		expect(by('Drôtené sklo 6mm').vypocet).toBe('Float sklo 6 mm');
 		expect(by('IZOS DOUBLE 6-6-4').vypocet).toBe('Izolačné sklo 4/8/4 číre');
 		expect(by('IZOS DOUBLE 5ESG-14-5ESG').vypocet).toBe('Izolačné sklo 4/16/4 číre');
-		// stopsol (povlak, ktorý matcher nerozlišuje) nie je výpočtový zdroj IZOS AL/TH
+		// stopsol (os povlaku matchera, #579 finding 1) nie je výpočtový zdroj čírych IZOS AL/TH ani 4/8/4
 		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(by('Izolačné sklo 4/8/4- číre (Ug=1,1)').vypocet).toBe('Izolačné sklo 4/8/4 číre');
+		// lokálne stopsol nedostane cenníkový popis čírého skla (Odoo stopsol 4/8/4 neexistuje)
+		const lok = (n: string) => p.skupiny[0]!.items.find((o) => o.value === n)!;
+		expect(lok('Izolačné sklo 4/8/4 stopsol').label).toBe('Izolačné sklo 4/8/4 stopsol');
+		expect(lok('Izolačné sklo 4/8/4 číre').label).toBe(
+			'Izolačné sklo 4/8/4 číre · cenník: Izolačné sklo 4/8/4- číre (Ug=1,1)'
+		);
 		expect(lokalneVPonuke(p)).toEqual(lokalne('Štandard +'));
 		// hodnoty volieb sú unikátne (kľúč {#each}) a Odoo voľby sa nebijú s lokálnymi názvami
 		const vals = p.skupiny.flatMap((g) => g.items).map((o) => o.value);
 		expect(new Set(vals).size).toBe(vals.length);
 		for (const o of p.skupiny.flatMap((g) => g.items).filter((o) => o.odoo))
 			expect(o.value.startsWith(ODOO_PREFIX)).toBe(true);
+	});
+
+	// #579 finding 1 review: os povlaku matchera nesmie zmeniť VÝPOČTOVÉ sklo Odoo voľby — povlak
+	// (stopsol) mení len text objednávky, nie nárez/profily/Money. Stopsol ESG 6 mm sa počíta ako
+	// kalené 6 mm (ako v 0.25.49), nie ako predvolené nekalené sklo triedy.
+	it('ESG Stopsol Classic Clear 6mm sa počíta ako kalené 6 mm vo všetkých systémoch s triedou 6', async () => {
+		odooOn();
+		const cakane: Record<string, string> = {
+			'Štandard +': 'ESG kalené 6 mm',
+			Štandard: 'ESG kalené 6 mm',
+			'Štandard Drevo': 'ESG kalené 6 mm',
+			Slide: 'ESG kalené 6 mm',
+			Deluxe: 'Float kalené 6 mm'
+		};
+		for (const [s, sklo] of Object.entries(cakane)) {
+			const o = (await ponuka(s)).skupiny
+				.flatMap((g) => g.items)
+				.find((x) => x.nazov === 'ESG Stopsol Classic Clear 6mm');
+			expect(o?.vypocet, s).toBe(sklo);
+		}
+	});
+
+	it('Odoo stopsol izolačné (nový typ) má výpočtový zdroj lokálne stopsol; číre AL/TH bez zmeny', async () => {
+		odooOn([
+			...ODOO_KATALOG_579,
+			{
+				name: 'IZOS DOUBLE 4-16-4 Stopsol',
+				category: 'izolacne',
+				cennik_code: 'X88',
+				composition: '4 - 16 - 4',
+				total_thickness_mm: 24,
+				pane_count: 'dvojsklo'
+			}
+		]);
+		const p = await ponuka('Štandard +');
+		const by = (n: string) => p.skupiny.flatMap((g) => g.items).find((o) => o.nazov === n)!;
+		expect(by('IZOS DOUBLE 4-16-4 Stopsol').vypocet).toBe('Izolačné sklo 4/16/4 stopsol');
+		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		const lok = p.skupiny[0]!.items.find((o) => o.value === 'Izolačné sklo 4/16/4 stopsol')!;
+		expect(lok.label).toBe('Izolačné sklo 4/16/4 stopsol · cenník: IZOS DOUBLE 4-16-4 Stopsol');
+	});
+
+	it('dve lokálne stopsol sklá presne na jeden Odoo stopsol typ → predvolené sklo triedy (žiadny tichý výber)', async () => {
+		odooOn([
+			...ODOO_KATALOG_579,
+			{
+				name: 'IZOS DOUBLE 4-16-4 Stopsol',
+				category: 'izolacne',
+				cennik_code: 'X88',
+				composition: '4 - 16 - 4',
+				total_thickness_mm: 24,
+				pane_count: 'dvojsklo'
+			}
+		]);
+		const lok = [
+			...lokalne('Štandard +'),
+			'Izolačné sklo 4/16/4 stopsol TH' // hypotetický druhý stopsol variant
+		];
+		const p = ponukaSkielPre('Štandard +', lok, await fetchGlassTypes());
+		const o = p.skupiny
+			.flatMap((g) => g.items)
+			.find((x) => x.nazov === 'IZOS DOUBLE 4-16-4 Stopsol');
+		expect(o?.vypocet).toBe('Izolačné sklo 4/16/4 číre');
+	});
+
+	// Money-neutralita (#579 finding 1 review): VÝPOČTOVÉ sklo každej Odoo voľby v každom systéme
+	// na PROD výreze. Snapshot = stav overený parity behom proti 0.25.49 (122 volieb, 0 rozdielov).
+	// Zmena snapshotu = zmena výpočtu/Money odpisu Odoo voľby → vedome, nikdy len `-u`.
+	it('výpočtové sklo všetkých Odoo volieb vo všetkých systémoch (Money-neutrálny snapshot)', async () => {
+		odooOn();
+		const out: Record<string, Record<string, string>> = {};
+		for (const s of Object.keys(ODOO_HRUBKY)) {
+			const items = (await ponuka(s)).skupiny.flatMap((g) => g.items).filter((o) => o.odoo);
+			out[s] = Object.fromEntries(items.map((o) => [o.nazov, o.vypocet]));
+		}
+		expect(out).toMatchSnapshot();
 	});
 
 	it('Odoo nedostupné → lokálna ponuka ako doteraz (fallback, bez skupín)', async () => {
