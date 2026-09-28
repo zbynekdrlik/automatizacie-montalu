@@ -31,6 +31,32 @@ const KATEGORIE: readonly { category: string; label: string }[] = [
 	{ category: 'rezane', label: 'Rezané / float' }
 ];
 const OSTATNE = 'Ostatné';
+const ODPORUCANE = 'Odporúčané';
+const INE_SKLO = 'Iné sklo';
+
+/** Všetky názvy skupín v poradí zobrazenia (pre E2E kontrolu poradia — jeden zdroj). */
+export const PORADIE_SKUPIN: readonly string[] = [
+	ODPORUCANE,
+	...KATEGORIE.map((k) => k.label),
+	OSTATNE,
+	INE_SKLO
+];
+
+const normKategoria = (c: string): string => c.trim().toLowerCase();
+const ZNAME_KATEGORIE = new Set(KATEGORIE.map((k) => k.category));
+
+/**
+ * NEPRÁZDNE Odoo kategórie, ktoré picker nepozná (spadli by do „Ostatné") — pre warn log pri
+ * načítaní (drift Odoo `category` hodnôt by sa inak prejavil len tichým presunom do „Ostatné").
+ */
+export function neznameKategorie(items: readonly { category: string }[]): string[] {
+	const nezname = new Set<string>();
+	for (const t of items) {
+		const c = normKategoria(t.category);
+		if (c && !ZNAME_KATEGORIE.has(c)) nezname.add(c);
+	}
+	return [...nezname].sort();
+}
 
 const INE_SKLO_LABEL = 'iné sklo (vlastný typ + cena/m²)';
 
@@ -49,21 +75,20 @@ export function zoskupTypySkla(
 ): SkupinaTypovSkla[] {
 	const out: SkupinaTypovSkla[] = [];
 	const odporucane = kandidati.map((k) => ({ value: k.value, label: k.label }));
-	if (odporucane.length > 0) out.push({ label: 'Odporúčané', items: odporucane });
+	if (odporucane.length > 0) out.push({ label: ODPORUCANE, items: odporucane });
 	const uzVybrate = new Set(odporucane.map((k) => k.value));
 
-	const znameKategorie = new Set(KATEGORIE.map((k) => k.category));
 	const zvysne = items.filter((t) => !uzVybrate.has(t.value));
 	const skupina = (label: string, pred: (c: string) => boolean) => {
 		const vyber = zvysne
-			.filter((t) => pred(t.category.trim().toLowerCase()))
+			.filter((t) => pred(normKategoria(t.category)))
 			.map((t) => ({ value: t.value, label: t.label }))
 			.sort(podlaNazvu);
 		if (vyber.length > 0) out.push({ label, items: vyber });
 	};
 	for (const k of KATEGORIE) skupina(k.label, (c) => c === k.category);
-	skupina(OSTATNE, (c) => !znameKategorie.has(c));
+	skupina(OSTATNE, (c) => !ZNAME_KATEGORIE.has(c));
 
-	out.push({ label: 'Iné sklo', items: [{ value: SENTINEL_INE_SKLO, label: INE_SKLO_LABEL }] });
+	out.push({ label: INE_SKLO, items: [{ value: SENTINEL_INE_SKLO, label: INE_SKLO_LABEL }] });
 	return out;
 }

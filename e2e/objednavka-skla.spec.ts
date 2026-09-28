@@ -6,6 +6,7 @@
 // Money priečinok, nikdy ostrý Money) — skipAkLive na ostrom nasadení preskočí.
 import { test, expect, type Page } from '@playwright/test';
 import { formatDatumSk } from '../src/lib/datum';
+import { PORADIE_SKUPIN } from '../src/lib/objednavka-skla-typy';
 import {
 	collectConsole,
 	loginAs,
@@ -246,6 +247,11 @@ test('objednávka skla: výber typu skla je zoskupený podľa druhu (#576)', asy
 	const skupiny = typ.locator('optgroup');
 	expect(await skupiny.count()).toBeGreaterThanOrEqual(2);
 	await expect(skupiny.last()).toHaveAttribute('label', 'Iné sklo');
+	// každá skupina je známa a v PEVNOM poradí (IZOS → ESG → VSG → rezané → ostatné → iné sklo)
+	const nazvy = await skupiny.evaluateAll((g) => g.map((x) => (x as HTMLOptGroupElement).label));
+	const poradie = nazvy.map((n) => PORADIE_SKUPIN.indexOf(n));
+	expect(poradie).not.toContain(-1);
+	expect(poradie).toEqual([...poradie].sort((a, b) => a - b));
 	await expect(skupiny.last().locator('option')).toHaveAttribute('value', '__ine__');
 	// každá voľba okrem placeholdera je v skupine, a žiadna hodnota nie je dvakrát
 	const vsetky = await typ

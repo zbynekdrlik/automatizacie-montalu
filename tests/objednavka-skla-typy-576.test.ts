@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import {
 	zoskupTypySkla,
+	neznameKategorie,
+	PORADIE_SKUPIN,
 	SENTINEL_INE_SKLO,
 	type TypSklaVolba
 } from '../src/lib/objednavka-skla-typy';
@@ -102,5 +104,42 @@ describe('zoskupTypySkla (#576)', () => {
 	it('kandidát, ktorý nie je v katalógu, sa aj tak ponúkne v „Odporúčané"', () => {
 		const g = zoskupTypySkla([], [{ value: 'Z9', label: 'Kandidát mimo' }]);
 		expect(g[0]).toEqual({ label: 'Odporúčané', items: [{ value: 'Z9', label: 'Kandidát mimo' }] });
+	});
+});
+
+describe('neznameKategorie + PORADIE_SKUPIN (#576 review)', () => {
+	it('vráti len NEPRÁZDNE neznáme kategórie (normalizované, bez duplicít, zoradené)', () => {
+		expect(
+			neznameKategorie([
+				{ category: 'vsg' },
+				{ category: ' IZOLACNE ' },
+				{ category: '' },
+				{ category: 'zrkadla' },
+				{ category: 'Zrkadla' },
+				{ category: 'ornament' }
+			])
+		).toEqual(['ornament', 'zrkadla']);
+		expect(neznameKategorie(TYPY)).toEqual(['zrkadla']);
+	});
+
+	it('kategória s veľkými písmenami/medzerami sa zaradí do správnej skupiny', () => {
+		const g = zoskupTypySkla([t('Q1', 'Kalené Q', ' ESG ')], []);
+		expect(g.map((x) => x.label)).toEqual(['Kalené ESG', 'Iné sklo']);
+	});
+
+	it('PORADIE_SKUPIN = poradie, v akom ich zoskupTypySkla vracia', () => {
+		expect(PORADIE_SKUPIN).toEqual([
+			'Odporúčané',
+			'Izolačné (IZOS)',
+			'Kalené ESG',
+			'Lepené VSG',
+			'Rezané / float',
+			'Ostatné',
+			'Iné sklo'
+		]);
+		const g = zoskupTypySkla(TYPY, [{ value: 'V1', label: 'VSG Alfa' }]);
+		const idx = g.map((x) => PORADIE_SKUPIN.indexOf(x.label));
+		expect(idx).toEqual([...idx].sort((a, b) => a - b));
+		expect(idx).not.toContain(-1);
 	});
 });

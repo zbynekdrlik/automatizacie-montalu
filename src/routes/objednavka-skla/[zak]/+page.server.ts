@@ -37,10 +37,12 @@ import {
 import { zakazkaPrehlad, opZPrehladu } from '$lib/server/zakazka-ceny';
 import { moneyNazvySkiel } from '$lib/server/money-nazov-skla';
 import { nadpisObjednavky } from '$lib/objednavka-skla-pozicia';
-import { SENTINEL_INE_SKLO } from '$lib/objednavka-skla-typy';
+import { SENTINEL_INE_SKLO, neznameKategorie } from '$lib/objednavka-skla-typy';
 import { logger } from '$lib/server/log';
 
 const log = logger('objednavka-skla-podklad');
+// #576: už nahlásené neznáme Odoo kategórie (warn raz za proces — load beží pri každom reloade)
+const hlaseneKategorie = new Set<string>();
 
 /** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
 function parseSpec(form: FormData): GlassSpec {
@@ -157,6 +159,12 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 	// #540: zoznam typov skla pre picker riadka — živý Odoo `montalu.glass.type`, s lokálnym
 	// fallbackom keď Odoo nedostupné (source sa zobrazí v UI). Money-neutrálne (len ordering).
 	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
+	// #576: Odoo kategória, ktorú picker nepozná, by ticho spadla do „Ostatné" → warn RAZ za proces.
+	const nezname = neznameKategorie(glassTypes).filter((c) => !hlaseneKategorie.has(c));
+	if (nezname.length > 0) {
+		for (const c of nezname) hlaseneKategorie.add(c);
+		log.warn('neznáma Odoo kategória typu skla — v pickeri pod „Ostatné"', { kategorie: nezname });
+	}
 
 	// #556: riadky z výpočtu, ktorých `typ_skla` nie je platná Odoo hodnota (nejednoznačné „viac"
 	// alebo „ziadne" pri vkladaní) → badge „nepriradené — vyber typ" + kandidáti (pri „viac") navrchu

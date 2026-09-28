@@ -62,8 +62,9 @@
 
 	// #548: „iné sklo" — sentinel voľby v pickeri typu (odkryje vlastný typ + cenu €/m²).
 	const MANUAL_SENTINEL = SENTINEL_INE_SKLO;
-	// #576: „Pridať riadok" picker — skupiny podľa druhu skla (bez kandidátov, riadok ešte neexistuje)
-	const skupinyNovy = $derived(zoskupTypySkla(glassTypes, []));
+	// #576: skupiny podľa druhu skla BEZ kandidátov — „Pridať riadok" aj každý riadok bez kandidátov
+	// (zoskupí sa RAZ, nie per riadok); riadok s kandidátmi #556 si ich zoskupí s „Odporúčané".
+	const skupinyTypov = $derived(zoskupTypySkla(glassTypes, []));
 	function fmtCena(c: number | null): string {
 		return c != null ? `${c.toFixed(2)} €/m²` : '';
 	}
@@ -129,7 +130,7 @@
 			<select name="typ_skla" required bind:value={novyTyp} data-testid="manual-typ">
 				<option value="">— vyberte typ —</option>
 				<!-- #576: skupiny podľa druhu skla (IZOS / ESG / VSG / rezané / ostatné) + iné sklo -->
-				{#each skupinyNovy as g (g.label)}
+				{#each skupinyTypov as g (g.label)}
 					<optgroup label={g.label}>
 						{#each g.items as t (t.value)}
 							<option value={t.value}>{t.label}</option>
@@ -298,7 +299,7 @@
 										{/if}
 										<!-- #576: skupiny podľa druhu skla; #556 kandidáti (pri „viac") navrchu
 											ako „Odporúčané"; „iné sklo" posledné -->
-										{#each zoskupTypySkla(glassTypes, nav?.kandidati ?? []) as g (g.label)}
+										{#each nav?.kandidati.length ? zoskupTypySkla(glassTypes, nav.kandidati) : skupinyTypov as g (g.label)}
 											<optgroup label={g.label}>
 												{#each g.items as t (t.value)}
 													<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option
