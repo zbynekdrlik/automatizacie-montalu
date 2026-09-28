@@ -18,7 +18,7 @@
 		type PonukaSkiel,
 		type SkupinaVolieb
 	} from '$lib/sklo-odoo';
-	import { sietkaStrana, maSietkaSystem, kovanieSkryte, type SietkaUchyt } from '$lib/sietka';
+	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
 	import type { Farba } from '$lib/komponenty';
 	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
 	import { KOLAJNICA_MAX, KOLAJNICA_MIN } from '$lib/kolajnica';
@@ -201,14 +201,6 @@
 			p.skloTrieda = '';
 		}
 	}
-	// #583: sieťka vylučuje kovanie LEN na svojej strane (`kovanieSkryte`) — primárny posuv
-	// nuluje rodičovský `$effect`, ďalšie posuvy tu (zapnutie sieťky aj zmena otvárania)
-	let kovSkryte = $derived(kovanieSkryte(sietkaS, sietkaStranaVal));
-	function zhodKovaniePodSietkou(p: PosuvRow, sietkaOn = p.sietka) {
-		const ks = kovanieSkryte(sietkaOn, sietkaStrana(p.otvaranie));
-		if (ks.l) p.kovanieL = '';
-		if (ks.p) p.kovanieP = '';
-	}
 </script>
 
 {#snippet volbySkla(sk: SkupinaVolieb[])}
@@ -330,28 +322,24 @@
 		</div>
 		<!-- Kovanie (kľučka) — LEN Robust; ľavá aj pravá strana zvlášť, pri každom
 		     posuve sólo. Display-only: plán/náhľad + detail v histórii, Money NIE.
-		     #88/#583: pri sieťke sa kľučka NEPONÚKA len na STRANE sieťky (tam úchyt v
-		     SietkaPolia); druhá strana aj stredové kovanie opony ostávajú. -->
+		     #583 ROZHODNUTÉ: sieťka kľučku NESKRÝVA — obe strany aj stredové kovanie
+		     opony ostávajú na výber; úchyt sieťky (SietkaPolia) je navyše. -->
 		{#if jeRobust}
 			<div class="grid2">
-				{#if !kovSkryte.l}
-					<div class="field">
-						<label for="kovanieL">Kovanie — ľavá strana</label>
-						<select id="kovanieL" name="kovanieL" bind:value={kovanieLS}>
-							<option value="">—</option>
-							{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
-						</select>
-					</div>
-				{/if}
-				{#if !kovSkryte.p}
-					<div class="field">
-						<label for="kovanieP">Kovanie — pravá strana</label>
-						<select id="kovanieP" name="kovanieP" bind:value={kovaniePS}>
-							<option value="">—</option>
-							{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
-						</select>
-					</div>
-				{/if}
+				<div class="field">
+					<label for="kovanieL">Kovanie — ľavá strana</label>
+					<select id="kovanieL" name="kovanieL" bind:value={kovanieLS}>
+						<option value="">—</option>
+						{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
+					</select>
+				</div>
+				<div class="field">
+					<label for="kovanieP">Kovanie — pravá strana</label>
+					<select id="kovanieP" name="kovanieP" bind:value={kovaniePS}>
+						<option value="">—</option>
+						{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
+					</select>
+				</div>
 			</div>
 			<!-- Opona má kľučku NAVYŠE na jednom z dvoch krídel v strede (Patrik
 			     2026-07-31: „ak máme 2x3, kľučka bude okno 1, okno 6 a potom buď
@@ -647,36 +635,27 @@
 					</div>
 					<div class="field">
 						<label for={`ps${i}-otv`}>Otváranie</label>
-						<select
-							id={`ps${i}-otv`}
-							bind:value={p.otvaranie}
-							onchange={() => zhodKovaniePodSietkou(p)}
-						>
+						<select id={`ps${i}-otv`} bind:value={p.otvaranie}>
 							{#each otvaraniaForStyl(p.styl) as o (o)}<option>{o}</option>{/each}
 						</select>
 					</div>
 				</div>
 				{#if p.system === 'Robust'}
-					{@const ks = kovanieSkryte(p.sietka, sietkaStrana(p.otvaranie))}
 					<div class="grid2">
-						{#if !ks.l}
-							<div class="field">
-								<label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
-								<select id={`ps${i}-kovl`} bind:value={p.kovanieL}>
-									<option value="">—</option>
-									{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
-								</select>
-							</div>
-						{/if}
-						{#if !ks.p}
-							<div class="field">
-								<label for={`ps${i}-kovp`}>Kovanie — pravá strana</label>
-								<select id={`ps${i}-kovp`} bind:value={p.kovanieP}>
-									<option value="">—</option>
-									{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
-								</select>
-							</div>
-						{/if}
+						<div class="field">
+							<label for={`ps${i}-kovl`}>Kovanie — ľavá strana</label>
+							<select id={`ps${i}-kovl`} bind:value={p.kovanieL}>
+								<option value="">—</option>
+								{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
+							</select>
+						</div>
+						<div class="field">
+							<label for={`ps${i}-kovp`}>Kovanie — pravá strana</label>
+							<select id={`ps${i}-kovp`} bind:value={p.kovanieP}>
+								<option value="">—</option>
+								{#each kovania as k (k)}<option value={k}>{k}</option>{/each}
+							</select>
+						</div>
 					</div>
 					{#if p.styl.startsWith('2x')}
 						<div class="grid2" data-testid={`kovanie-stred-polia-${i}`}>
@@ -736,7 +715,6 @@
 						bind:on={p.sietka}
 						bind:uchyt={p.sietkaUchyt}
 						bind:sietkaSystem={p.sietkaSystem}
-						onZmena={(on) => zhodKovaniePodSietkou(p, on)}
 					/>
 				{/if}
 			</div>
