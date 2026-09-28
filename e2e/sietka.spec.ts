@@ -110,23 +110,25 @@ test('jeden posuv: sieťka pridá presnú deltu do Money odpisu (rám+nos, #86 k
 	expect(errs).toEqual([]);
 });
 
-test('sieťka: kľučka sa neponúka, keď je sieťka zapnutá (#88)', async ({ page }) => {
+test('sieťka: kľučka sa neponúka na STRANE sieťky (#88, spresnené #583)', async ({ page }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-KOV', 'E2E Sietka kovanie');
-	await expect(page.locator('#kovanieL')).toBeVisible();
-	await page.locator('#kovanieL').selectOption('Obojstranná kľučka bez FAB');
+	// P - L → sieťka beží na PRAVEJ strane
+	await page.selectOption('#otvaranie', 'P - L');
+	await expect(page.locator('#kovanieP')).toBeVisible();
+	await page.locator('#kovanieP').selectOption('Obojstranná kľučka bez FAB');
 
 	await page.locator('#sietka-on').check();
-	await expect(page.locator('#kovanieL')).toHaveCount(0);
 	await expect(page.locator('#kovanieP')).toHaveCount(0);
+	await expect(page.locator('#kovanieL')).toBeVisible();
 
 	// odškrtnutie sieťky kľučku znova ponúkne (ale hodnota sa nevracia — bola
 	// vynulovaná spolu so zapnutím sieťky)
 	await page.locator('#sietka-on').uncheck();
-	await expect(page.locator('#kovanieL')).toBeVisible();
-	await expect(page.locator('#kovanieL')).toHaveValue('');
+	await expect(page.locator('#kovanieP')).toBeVisible();
+	await expect(page.locator('#kovanieP')).toHaveValue('');
 
 	expect(errs).toEqual([]);
 });
