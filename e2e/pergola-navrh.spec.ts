@@ -1,6 +1,7 @@
 // Pergola — zákaznícky návrhový výkres (#138, vzor OP260032). Všetko ČÍTACIE — modul
 // do Money nič nezapisuje, takže sa dá pustiť aj proti nasadenej appke (BASE_URL).
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect, zalozB2bUcet } from './ucty';
 import { goto, loginAs, collectConsole, waitHydrated, logout } from './helpers';
 
 /** Rovnaká rekurzívna @page-detekcia ako v navrh-vykres.spec.ts (#137) — @page je
@@ -240,7 +241,8 @@ test('zníženie počtu polí po zaškrtnutí zvodu na zaniknutom stĺpe: odosla
 // zablokované, a keď b2b (bez Montalu OP čísla) OP nechá prázdne, pečiatka to ukáže
 // ako „—" (nie prázdny text ani natvrdo predstierané "0"/meno).
 test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva blokované, prázdne OP = "—" v pečiatke (#144)', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
@@ -248,12 +250,7 @@ test('b2b: nav odkaz "Pergola návrh", otvorenie funguje, /pergola ostáva bloko
 	// b2b throwaway účet (rovnaký vzor ako app.spec.ts/sietka.spec.ts B2B testy)
 	page.on('dialog', (d) => d.accept());
 	const b2bUser = `e2e-pergola-navrh-b2b-${Date.now().toString(36)}`;
-	const b2bPass = 'e2eheslo1';
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
-	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const b2bPass = await zalozB2bUcet(page, e2eUcty, b2bUser); // #583: zaručené zmazanie + náhodné heslo
 
 	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);

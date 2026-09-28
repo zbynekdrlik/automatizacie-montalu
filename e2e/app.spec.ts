@@ -1,7 +1,7 @@
 // E2E cez reálny prehliadač: login, celý zasklenia tok (náhľad → odoslanie →
 // duplikát), editor vzorcov (zmena + návrat), verzia v pätičke. Každý test
 // vyžaduje NULA console errors/warnings (browser-console-zero-errors).
-import { test, expect } from '@playwright/test';
+import { test, expect, zalozB2bUcet } from './ucty';
 import {
 	collectConsole,
 	loginAs,
@@ -604,23 +604,19 @@ test('editor vzorcov: uloženie bez zmeny → zmena → overenie vo výpočte �
 });
 
 test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blok/výškový warning), admin ho zmaže', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const consoleMsgs = collectConsole(page);
 	page.on('dialog', (d) => d.accept()); // confirm() pri Zmazať
 
 	const b2bUser = `e2e-b2b-${Date.now().toString(36)}`;
-	const b2bPass = 'e2eheslo1';
 
 	// 1. interný vidí odkaz Používatelia (#392: v user menu) a vytvorí B2B účet cez /pouzivatelia
 	await loginAs(page);
 	await openUserMenu(page);
 	await expect(page.getByRole('link', { name: 'Používatelia' })).toBeVisible();
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
-	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const b2bPass = await zalozB2bUcet(page, e2eUcty, b2bUser); // #583: zaručené zmazanie + náhodné heslo
 	await expect(page.locator('tr', { hasText: b2bUser })).toContainText('B2B');
 
 	// 2. odhlásenie + prihlásenie ako čerstvo vytvorený B2B účet

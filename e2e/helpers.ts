@@ -138,7 +138,13 @@ export async function loginAs(page: Page, user = E2E_USER, pass = E2E_PASS) {
  * čokoľvek vnútri (nezávislé od dynamického username v summary textu).
  */
 export async function openUserMenu(page: Page) {
-	await page.getByTestId('user-menu-toggle').click();
+	// #583: klik na summary PREPÍNA — už otvorené menu by druhý klik zavrel; otvor len zatvorené
+	// stav `open` čítame jednorazovo → najprv hydratácia, nech ho už nič neprepíše
+	await waitHydrated(page);
+	const menu = page.locator('details.nav-user');
+	if ((await menu.getAttribute('open')) === null)
+		await page.getByTestId('user-menu-toggle').click();
+	await expect(menu).toHaveAttribute('open', '');
 }
 
 /**
@@ -156,8 +162,13 @@ export async function openTools(page: Page) {
  * Nahrádza predošlé priame `page.getByRole('button', { name: 'Odhlásiť' }).click()`.
  */
 export async function logout(page: Page) {
+	// #583: po dlhom náhľade (plný POST → nový dokument) počkaj na hydratáciu a na VIDITEĽNÚ položku
+	// menu pred klikom — pád 0.25.50 bol klik na položku zavretého menu (`.card intercepts…`).
+	await waitHydrated(page);
 	await openUserMenu(page);
-	await page.getByRole('button', { name: 'Odhlásiť' }).click();
+	const odhlasit = page.getByRole('button', { name: 'Odhlásiť' });
+	await expect(odhlasit).toBeVisible();
+	await odhlasit.click();
 	await expect(page).toHaveURL(/\/login/);
 }
 
