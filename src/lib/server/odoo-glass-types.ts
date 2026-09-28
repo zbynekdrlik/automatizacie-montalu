@@ -41,7 +41,7 @@ export interface GlassTypeOption {
 	/** #556: surový Odoo `composition` (napr. „4/8/4") — matcher normalizuje na „4-8-4". */
 	composition: string;
 	/** #579: Odoo `total_thickness_mm` (celková hrúbka) — nárezák ňou páruje typ na hrúbkové
-	 *  triedy systému (`sklo-povolene.ts` `ODOO_HRUBKY`). 0 = chýba (dátová chyba / lokálny
+	 *  triedy systému (`cfg_sklo_hrubka`, `sklo-hrubky.ts`). 0 = chýba (dátová chyba / lokálny
 	 *  fallback) → nárezák taký typ neponúkne. */
 	hrubkaMm: number;
 }

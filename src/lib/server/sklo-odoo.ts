@@ -1,11 +1,13 @@
 // #579: Odoo typy skla (`montalu.glass.type`) v ponuke nárezáku zasklení podľa HRÚBKY systému.
 //
 // Design (Prístup 1, main 28.9.): hrúbka je spojka medzi Odoo a výpočtom. Systém povoľuje hrúbkové
-// triedy (`sklo-povolene.ts` `ODOO_HRUBKY` — JEDEN zdroj); Odoo typ s `total_thickness_mm` v triede
-// (a správneho druhu) sa ponúkne a počíta sa ako reprezentatívne LOKÁLNE výpočtové sklo:
+// triedy (tabuľka `cfg_sklo_hrubka`, `sklo-hrubky.ts` — JEDEN zdroj, nastavuje výroba v editore,
+// #579 časť 2); Odoo typ s `total_thickness_mm` v triede (a správneho druhu) sa ponúkne a počíta sa
+// ako reprezentatívne LOKÁLNE výpočtové sklo:
 //   • lokálne povolené sklo, ktoré naň matcher #556 mapuje (napr. ESG Float čirý 6mm → „ESG kalené
 //     6 mm"), keď je také JEDINÉ;
-//   • inak predvolené sklo triedy (Robust 24 → „Izolačné sklo 4/16/4 číre").
+//   • inak výpočtové sklo triedy odvodené pravidlom `vypocetneSkloPre` (Robust 24 → „Izolačné sklo
+//     4/16/4 číre").
 // Výpočtový katalóg `glass_types`, vzorce, profily a Money sú NEDOTKNUTÉ — do výpočtu ide vždy len
 // lokálne sklo; zvolený Odoo typ (`skloOdoo`) ide do objednávky skla a na plán.
 //
@@ -18,7 +20,13 @@ import { listGlassTypes } from './db';
 import { fetchGlassTypes, type GlassTypeOption, type GlassTypesResult } from './odoo-glass-types';
 import { matchOdooGlassType, cennikPopis, glassPovlak } from './glass-match';
 import { parseVstup, parseMultiVstup, type Vstup, type MultiVstup } from './vstup';
-import { odooTriedyPre, odooDruhSedi, ponukaSkielSystemu } from '$lib/sklo-povolene';
+import {
+	odooDruhSedi,
+	ponukaSkielSystemu,
+	vypocetneSkloPre,
+	type OdooHrubka
+} from '$lib/sklo-povolene';
+import { skloHrubkyPre } from './sklo-hrubky';
 import { zoskupTypySkla } from '$lib/objednavka-skla-typy';
 import { ODOO_PREFIX, type PonukaSkiel, type VolbaSkla } from '$lib/sklo-odoo';
 
@@ -35,18 +43,24 @@ function lokalnaVolba(n: string, popis: string): VolbaSkla {
 
 /**
  * Ponuka „Sklo (základ)" pre systém. `lokalne` = lokálna povolená ponuka systému
- * (`ponukaSkielSystemu`), `odoo` = výsledok `fetchGlassTypes`. ČISTÁ (žiadne IO).
+ * (`ponukaSkielSystemu`), `odoo` = výsledok `fetchGlassTypes`, `hrubky` = povolené hrúbky systému
+ * (default z tabuľky `cfg_sklo_hrubka`, cache). Pri explicitných `hrubky` ČISTÁ (žiadne IO).
  */
 export function ponukaSkielPre(
 	system: string,
 	lokalne: readonly string[],
-	odoo: GlassTypesResult
+	odoo: GlassTypesResult,
+	hrubky: readonly OdooHrubka[] = skloHrubkyPre(system)
 ): PonukaSkiel {
 	if (odoo.source !== 'odoo')
 		return { skupiny: [{ label: '', items: lokalne.map((n) => lokalnaVolba(n, '')) }] };
 
-	// len triedy, ktorých výpočtové sklo systém naozaj ponúka (obrana pri zmene allow-listu)
-	const triedy = odooTriedyPre(system).filter((t) => lokalne.includes(t.sklo));
+	// výpočtové sklo triedy sa ODVODÍ z lokálnej ponuky (nikdy sa nezadáva); trieda bez neho
+	// (napr. katalóg/allow-list sa medzitým zmenil) sa vynechá
+	const triedy = hrubky.flatMap((h) => {
+		const sklo = vypocetneSkloPre(h.mm, h.druh, lokalne);
+		return sklo ? [{ ...h, sklo }] : [];
+	});
 	const triedaPre = (o: GlassTypeOption) =>
 		triedy.find((t) => t.mm === o.hrubkaMm && odooDruhSedi(t.druh, o.category));
 	// hrúbka 0 (dátová chyba v Odoo) nikdy nesedí na triedu → neponúkne sa (warn v fetchGlassTypes)

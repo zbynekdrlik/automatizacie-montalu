@@ -57,51 +57,99 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 //
 // Owner 28.9.: „ak robust používa 24 mm, má mu ponúknuť všetky sklá s tou hrúbkou". Hrúbka je
 // SPOJKA medzi Odoo a výpočtom: Odoo typ s `total_thickness_mm` = `mm` (a druhom `druh`) sa ponúkne
-// a počíta sa ako reprezentatívne LOKÁLNE sklo `sklo` (vzorce/profily/Money nezmenené — výpočet
+// a počíta sa ako reprezentatívne LOKÁLNE výpočtové sklo (vzorce/profily/Money nezmenené — výpočet
 // pozná len triedy 6/16 + Deluxe hrúbku 6/10). Nové sklo pridané v Odoo sa objaví bez releasu.
-// Ak výroba použije pri systéme inú hrúbku, upraví sa LEN táto tabuľka (design #579, doplnenie
-// 28.9.). `sklo` musí byť v lokálnej ponuke systému (stráži `tests/sklo-odoo-579.test.ts`).
+//
+// #579 časť 2 (Odoo úloha 1180 po stretnutí 28.9.: „Povolené hrúbky pri systéme si nastaví
+// výroba"): povolené hrúbky ŽIJÚ v SQLite `cfg_sklo_hrubka` (server `sklo-hrubky.ts`, editor
+// `/zasklenia/nastavenia` s auditom). `ODOO_HRUBKY_SEED` je LEN seed migrácie v52 (= tabuľka pred
+// časťou 2). Výroba zadáva systém × hrúbku × druh; výpočtové sklo sa NIKDY nezadáva — odvodí ho
+// `vypocetneSkloPre` z lokálnej ponuky systému (kombinácia bez výpočtového skla = neplatná).
 
 /** Druh Odoo skla v triede: izolačné (Odoo `category=izolacne`), jednoduché (jednosklo — kalené,
  *  lepené aj rezané) alebo LEN kalené (`category=esg`, Deluxe). */
 export type OdooDruh = 'izolacne' | 'jednoduche' | 'esg';
 
-export interface OdooTrieda {
+/** Všetky druhy v poradí pre editor (CHECK v `cfg_sklo_hrubka` = presne tieto). */
+export const ODOO_DRUHY: readonly OdooDruh[] = ['izolacne', 'jednoduche', 'esg'];
+
+/** Popis druhu pre človeka (editor, audit). */
+export const ODOO_DRUH_POPIS: Readonly<Record<OdooDruh, string>> = {
+	izolacne: 'izolačné',
+	jednoduche: 'jednoduché',
+	esg: 'len kalené'
+};
+
+export function jeOdooDruh(v: string): v is OdooDruh {
+	return (ODOO_DRUHY as readonly string[]).includes(v);
+}
+
+/** Povolená hrúbka Odoo skla v systéme (riadok `cfg_sklo_hrubka` bez id/systému). */
+export interface OdooHrubka {
 	/** Odoo `total_thickness_mm` */
 	readonly mm: number;
 	readonly druh: OdooDruh;
-	/** reprezentatívne lokálne výpočtové sklo triedy (`glass_types.nazov` v ponuke systému) */
-	readonly sklo: string;
 }
 
 // Štandard plus, starý Štandard, Drevostavby: vzorec rovnaký (IZO nárezák podľa triedy 16)
-const STANDARDNE: readonly OdooTrieda[] = [
-	{ mm: 6, druh: 'jednoduche', sklo: 'Float sklo 6 mm' },
-	{ mm: 16, druh: 'izolacne', sklo: 'Izolačné sklo 4/8/4 číre' },
-	{ mm: 24, druh: 'izolacne', sklo: 'Izolačné sklo 4/16/4 číre' }
+const STANDARDNE: readonly OdooHrubka[] = [
+	{ mm: 6, druh: 'jednoduche' },
+	{ mm: 16, druh: 'izolacne' },
+	{ mm: 24, druh: 'izolacne' }
 ];
 
-export const ODOO_HRUBKY: Readonly<Record<string, readonly OdooTrieda[]>> = {
+/** Seed migrácie v52 (`cfg_sklo_hrubka`) — tabuľka z designu #579 (doplnenie 28.9.). Živé hodnoty
+ *  číta server z DB (`skloHrubkyPre`), NIKDY z tejto konštanty. */
+export const ODOO_HRUBKY_SEED: Readonly<Record<string, readonly OdooHrubka[]>> = {
 	// izolačné 4/16/4 (24 mm); vzorec od skla nezávisí
-	Robust: [{ mm: 24, druh: 'izolacne', sklo: 'Izolačné sklo 4/16/4 číre' }],
+	Robust: [{ mm: 24, druh: 'izolacne' }],
 	// trieda 16 (izolačné) aj 6 („Redukcia 6mm" pri triede 6)
 	Slide: [
-		{ mm: 16, druh: 'izolacne', sklo: 'Izolačné sklo 4/8/4 číre' },
-		{ mm: 6, druh: 'jednoduche', sklo: '6mm číre' }
+		{ mm: 16, druh: 'izolacne' },
+		{ mm: 6, druh: 'jednoduche' }
 	],
 	// len kalené 6 / 10 mm (`skloHrubka` vyberá kladkový/klzný profil)
 	Deluxe: [
-		{ mm: 6, druh: 'esg', sklo: 'Float kalené 6 mm' },
-		{ mm: 10, druh: 'esg', sklo: 'Float kalené 10 mm' }
+		{ mm: 6, druh: 'esg' },
+		{ mm: 10, druh: 'esg' }
 	],
 	'Štandard +': STANDARDNE,
 	Štandard: STANDARDNE,
 	'Štandard Drevo': STANDARDNE
 };
 
-/** Hrúbkové triedy Odoo skiel, ktoré nárezák pre systém ponúka (bez záznamu = žiadne). */
-export function odooTriedyPre(system: string): readonly OdooTrieda[] {
-	return ODOO_HRUBKY[system] ?? [];
+// Izolačné lokálne výpočtové sklo: „Izolačné sklo A/B/C číre" (len ČÍRE — mliečne/stopsol nikdy
+// nie je reprezentatívne); fyzická hrúbka = A + B + C.
+const IZO_CIRE = /^Izolačné sklo (\d+)\/(\d+)\/(\d+) číre$/;
+
+/**
+ * Reprezentatívne LOKÁLNE výpočtové sklo pre Odoo sklo hrúbky `mm` a druhu `druh` v systéme s
+ * lokálnou povolenou ponukou `lokalne` (`ponukaSkielSystemu`). Pravidlo = číre sklo rovnakej
+ * fyzickej hrúbky, ktoré si obsluha vie zvoliť aj lokálne (výpočet/Money teda identické s lokálnym
+ * výberom):
+ *   • izolačné → „Izolačné sklo A/B/C číre" s A+B+C = mm (16 → 4/8/4, 24 → 4/16/4);
+ *   • jednoduché → „Float sklo N mm", inak „Nmm číre" (Slide);
+ *   • len kalené → „Float kalené N mm" (Deluxe), inak „ESG kalené N mm".
+ * Žiadny kandidát v ponuke systému → `null` = kombinácia NEPLATÍ (editor ju odmietne, ponuka ju
+ * vynechá). ČISTÁ.
+ */
+export function vypocetneSkloPre(
+	mm: number,
+	druh: OdooDruh,
+	lokalne: readonly string[]
+): string | null {
+	if (druh === 'izolacne') {
+		for (const n of lokalne) {
+			const m = IZO_CIRE.exec(n);
+			if (m && Number(m[1]) + Number(m[2]) + Number(m[3]) === mm) return n;
+		}
+		return null;
+	}
+	const kandidati =
+		druh === 'esg'
+			? [`Float kalené ${mm} mm`, `ESG kalené ${mm} mm`]
+			: [`Float sklo ${mm} mm`, `${mm}mm číre`];
+	return kandidati.find((k) => lokalne.includes(k)) ?? null;
 }
 
 /** Patrí Odoo typ (`category`) do druhu triedy? */
