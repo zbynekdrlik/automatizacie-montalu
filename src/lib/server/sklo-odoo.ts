@@ -29,10 +29,6 @@ export const SKUPINA_APPKA = 'Sklá appky';
 /** Prefix skupín Odoo typov (za ním druh zo `zoskupTypySkla`). */
 export const PREFIX_ODOO_SKUPINY = 'Odoo — ';
 
-/** Povlaky, ktoré matcher #556 nerozlišuje (páruje ich ako číre) — také lokálne sklo nie je
- *  spoľahlivý výpočtový zdroj Odoo typu (inak by „4/16/4 stopsol" rozbilo jednoznačnosť). */
-const POVLAK_BEZ_OSI = /stopsol/i;
-
 function lokalnaVolba(n: string, popis: string): VolbaSkla {
 	return { value: n, label: popis ? `${n} · cenník: ${popis}` : n, nazov: n, vypocet: n, odoo: '' };
 }
@@ -56,10 +52,11 @@ export function ponukaSkielPre(
 	// hrúbka 0 (dátová chyba v Odoo) nikdy nesedí na triedu → neponúkne sa (warn v fetchGlassTypes)
 	const typy = odoo.items.filter((o) => o.hrubkaMm > 0 && triedaPre(o));
 
-	// lokálne sklo → jeho Odoo náprotivky v ponuke (matcher #556: zloženie ∧ kategória ∧ odtieň)
+	// lokálne sklo → jeho Odoo náprotivky v ponuke (matcher #556: zloženie ∧ kategória ∧ odtieň ∧
+	// povlak — stopsol sa páruje len na stopsol, preto netreba stopsol sklá z výpočtových zdrojov
+	// vynechávať; „4/16/4 stopsol" nemá v Odoo náprotivok a IZOS AL/TH ostávajú na „4/16/4 číre")
 	const kandidati = new Map<string, GlassTypeOption[]>();
 	for (const n of lokalne) {
-		if (POVLAK_BEZ_OSI.test(n)) continue;
 		const k = matchOdooGlassType(n, typy).kandidati;
 		if (k.length > 0) kandidati.set(n, k);
 	}

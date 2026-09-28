@@ -8,7 +8,8 @@
 // voľnotextový názov (napr. „Izolačné sklo 4/8/4 číre"); Odoo `resolve_glass_type` páruje kód →
 // presný názov → zloženie. Formát zloženia sa líši (Odoo „4/8/4" lomítka, appka „4-8-4" pomlčky),
 // preto normalizujeme OBE strany na kanonický tvar a párujeme podľa (zloženie ∧ kategória ∧ odtieň
-// — #556 hotfix: odtieň bráni tomu, aby sa „…mliečne" spárovalo na „…číre" = nesprávne sklo).
+// ∧ povlak — #556 hotfix: odtieň bráni tomu, aby sa „…mliečne" spárovalo na „…číre"; #579: povlak
+// bráni tomu, aby sa „…stopsol" spárovalo na „…číre" = nesprávne sklo).
 // Jednoznačná zhoda → uloží sa Odoo `value` (`cennik_code || name`); viac kandidátov → NIKDY tichý
 // výber (operátor rozhodne na podklade); žiadna zhoda → ostáva lokálny názov + badge „nepriradené".
 
@@ -20,6 +21,18 @@ export type GlassKategoria = 'izolacne' | 'esg' | 'vsg' | 'float';
 
 /** Odtieň skla (tretia deliaca os párovania — #556 hotfix). `cire` = číre / bez tokenu (default). */
 export type GlassTint = 'cire' | 'mliecne' | 'bronz' | 'seda' | 'grafit';
+
+/**
+ * Povlak skla (štvrtá deliaca os — #579 finding 1). `stopsol` = reflexný povlak, `ziadny` =
+ * default. Nezávislá od odtieňa: „ESG Stopsol Classic Clear" je ČÍRE so stopsol povlakom, teda iné
+ * sklo než číre ESG — bez tejto osi sa „4/8/4 stopsol" párovalo na „4/8/4- číre".
+ */
+export type GlassPovlak = 'ziadny' | 'stopsol';
+
+/** Povlak z (lokálneho aj Odoo) názvu skla — `stopsol`, ak ho názov spomína, inak `ziadny`. */
+export function glassPovlak(nazov: string): GlassPovlak {
+	return /stopsol/i.test(nazov ?? '') ? 'stopsol' : 'ziadny';
+}
 
 /**
  * Minimálny tvar Odoo typu skla, ktorý matcher potrebuje. Štrukturálne ho spĺňa `GlassTypeOption`
@@ -133,7 +146,9 @@ function tintMatch(lokTint: GlassTint, odooName: string): boolean {
 
 /**
  * Priraď lokálne sklo (voľnotextový názov) na Odoo typ podľa (kanonické zloženie ∧ kategória ∧
- * odtieň). Nikdy tichý výber pri viacerých kandidátoch. `odooTypy` = živý katalóg z `fetchGlassTypes`.
+ * odtieň ∧ povlak). Povlak musí sedieť OBOJSTRANNE: stopsol len na stopsol, sklo bez povlaku nikdy
+ * na stopsol (#579). Nikdy tichý výber pri viacerých kandidátoch. `odooTypy` = živý katalóg z
+ * `fetchGlassTypes`.
  */
 export function matchOdooGlassType<T extends OdooTypLike>(
 	lokalneSklo: string,
@@ -142,12 +157,14 @@ export function matchOdooGlassType<T extends OdooTypLike>(
 	const lokComp = normalizeComposition(lokalneSklo);
 	const lokKat = localGlassCategory(lokalneSklo);
 	const lokTint = glassTint(lokalneSklo);
+	const lokPovlak = glassPovlak(lokalneSklo);
 	if (!lokComp) return { typ: null, istota: 'ziadne', kandidati: [] };
 	const kandidati = odooTypy.filter(
 		(t) =>
 			normalizeComposition(t.composition || t.name) === lokComp &&
 			odooKategoria(t) === lokKat &&
-			tintMatch(lokTint, t.name)
+			tintMatch(lokTint, t.name) &&
+			glassPovlak(t.name) === lokPovlak
 	);
 	if (kandidati.length === 0) return { typ: null, istota: 'ziadne', kandidati: [] };
 	if (kandidati.length === 1) return { typ: kandidati[0]!, istota: 'jednoznacne', kandidati };

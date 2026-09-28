@@ -11,6 +11,7 @@ import {
 	normalizeComposition,
 	localGlassCategory,
 	glassTint,
+	glassPovlak,
 	naviazanieRiadku,
 	cennikPopis,
 	type OdooTypLike
@@ -148,6 +149,19 @@ describe('glassTint (#556 hotfix — os odtieňa)', () => {
 	});
 	it('„grafit" → grafit', () => {
 		expect(glassTint('Sklo grafit')).toBe('grafit');
+	});
+});
+
+describe('glassPovlak (#579 finding 1 — os povlaku)', () => {
+	it('„stopsol" (bez ohľadu na veľkosť písmen) → stopsol, nezávisle od odtieňa', () => {
+		expect(glassPovlak('Izolačné sklo 4/8/4 stopsol')).toBe('stopsol');
+		expect(glassPovlak('ESG Stopsol Classic Clear 6mm')).toBe('stopsol');
+		expect(glassPovlak('Stopsol Classic Grey')).toBe('stopsol');
+	});
+	it('bez povlaku → ziadny (aj číre / odtieň / prázdny názov)', () => {
+		expect(glassPovlak('Izolačné sklo 4/8/4 číre')).toBe('ziadny');
+		expect(glassPovlak('ESG Float bronz/šedý 6mm')).toBe('ziadny');
+		expect(glassPovlak('')).toBe('ziadny');
 	});
 });
 

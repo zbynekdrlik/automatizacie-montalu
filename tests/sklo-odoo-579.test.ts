@@ -184,8 +184,16 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 		expect(by('Drôtené sklo 6mm').vypocet).toBe('Float sklo 6 mm');
 		expect(by('IZOS DOUBLE 6-6-4').vypocet).toBe('Izolačné sklo 4/8/4 číre');
 		expect(by('IZOS DOUBLE 5ESG-14-5ESG').vypocet).toBe('Izolačné sklo 4/16/4 číre');
-		// stopsol (povlak, ktorý matcher nerozlišuje) nie je výpočtový zdroj IZOS AL/TH
+		// stopsol (os povlaku matchera, #579 finding 1) nie je výpočtový zdroj čírych IZOS AL/TH ani 4/8/4
 		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(by('Izolačné sklo 4/8/4- číre (Ug=1,1)').vypocet).toBe('Izolačné sklo 4/8/4 číre');
+		// lokálne stopsol nedostane cenníkový popis čírého skla (Odoo stopsol 4/8/4 neexistuje)
+		const lok = (n: string) => p.skupiny[0]!.items.find((o) => o.value === n)!;
+		expect(lok('Izolačné sklo 4/8/4 stopsol').label).toBe('Izolačné sklo 4/8/4 stopsol');
+		expect(lok('Izolačné sklo 4/8/4 číre').label).toBe(
+			'Izolačné sklo 4/8/4 číre · cenník: Izolačné sklo 4/8/4- číre (Ug=1,1)'
+		);
 		expect(lokalneVPonuke(p)).toEqual(lokalne('Štandard +'));
 		// hodnoty volieb sú unikátne (kľúč {#each}) a Odoo voľby sa nebijú s lokálnymi názvami
 		const vals = p.skupiny.flatMap((g) => g.items).map((o) => o.value);
