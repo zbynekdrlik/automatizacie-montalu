@@ -21,7 +21,8 @@ const { fetchGlassTypes, _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
 const { listGlassTypes } = await import('../src/lib/server/db');
 const { ponukaSkielSystemu, odooTriedyPre, ODOO_HRUBKY } = await import('../src/lib/sklo-povolene');
-const { ponukaSkielPre, ponukySkiel, overSkloOdoo } = await import('../src/lib/server/sklo-odoo');
+const { ponukaSkielPre, ponukySkiel, overSkloOdoo, SKUPINA_APPKA, PREFIX_ODOO_SKUPINY } =
+	await import('../src/lib/server/sklo-odoo');
 const { ponukaPreStyl, volbaSkla, rozlozVolbu, skloOdooPre, ODOO_PREFIX } =
 	await import('../src/lib/sklo-odoo');
 const { SKLO_INE } = await import('../src/lib/sklo');
@@ -112,15 +113,15 @@ describe('#579 jeden zdroj hrúbok per systém (sklo-povolene.ts)', () => {
 });
 
 describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
-	it('Robust: VŠETKY Odoo typy 24 mm + lokálne sklá bez Odoo náprotivku', async () => {
+	it('Robust: VŠETKY Odoo typy 24 mm + lokálne povolené sklá (prvá skupina)', async () => {
 		odooOn();
 		const p = await ponuka('Robust');
 		expect(odooMena(p)).toEqual([...ROBUST_24_MM].sort());
-		// „4/16/4 mliečne" v Odoo náprotivok nemá → ostáva (skupina „Z appky");
-		// „4/16/4 číre" nahradili IZOS DOUBLE AL/TH → zo zoznamu zmizne, jeho zástupca = AL
-		expect(lokalneVPonuke(p)).toEqual(['Izolačné sklo 4/16/4 mliečne']);
-		const al = p.skupiny.flatMap((g) => g.items).find((o) => o.nazov === 'IZOS DOUBLE 4-16-4 AL');
-		expect(p.zastupca['Izolačné sklo 4/16/4 číre']).toBe(al!.value);
+		// ROZHODNUTÉ #579: lokálne povolené sklá ostávajú všetky (prvá skupina, predvolené sklo ako
+		// doteraz) — skrytie „4/16/4 číre" by vyžadovalo tichý výber AL vs TH (#556)
+		expect(p.skupiny[0]!.label).toBe(SKUPINA_APPKA);
+		expect(lokalneVPonuke(p)).toEqual(lokalne('Robust'));
+		expect(p.skupiny.slice(1).every((g) => g.label.startsWith(PREFIX_ODOO_SKUPINY))).toBe(true);
 		// každý Odoo typ Robustu sa počíta ako 4/16/4 číre (jediná trieda, vzorec od skla nezávisí)
 		for (const o of p.skupiny.flatMap((g) => g.items).filter((o) => o.odoo))
 			expect(o.vypocet).toBe('Izolačné sklo 4/16/4 číre');
@@ -183,8 +184,9 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 		expect(by('Drôtené sklo 6mm').vypocet).toBe('Float sklo 6 mm');
 		expect(by('IZOS DOUBLE 6-6-4').vypocet).toBe('Izolačné sklo 4/8/4 číre');
 		expect(by('IZOS DOUBLE 5ESG-14-5ESG').vypocet).toBe('Izolačné sklo 4/16/4 číre');
-		// stopsol (povlak, ktorý matcher nerozlišuje) sa NESKRYJE za IZOS AL/TH
-		expect(lokalneVPonuke(p)).toContain('Izolačné sklo 4/16/4 stopsol');
+		// stopsol (povlak, ktorý matcher nerozlišuje) nie je výpočtový zdroj IZOS AL/TH
+		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(lokalneVPonuke(p)).toEqual(lokalne('Štandard +'));
 		// hodnoty volieb sú unikátne (kľúč {#each}) a Odoo voľby sa nebijú s lokálnymi názvami
 		const vals = p.skupiny.flatMap((g) => g.items).map((o) => o.value);
 		expect(new Set(vals).size).toBe(vals.length);
@@ -192,17 +194,17 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 			expect(o.value.startsWith(ODOO_PREFIX)).toBe(true);
 	});
 
-	it('Odoo nedostupné → lokálna ponuka ako doteraz (fallback, žiadny zástupca)', async () => {
+	it('Odoo nedostupné → lokálna ponuka ako doteraz (fallback, bez skupín)', async () => {
 		// integrácia nenakonfigurovaná = lokálny fallback
 		const p = ponukaSkielPre('Robust', lokalne('Robust'), await fetchGlassTypes());
 		expect(lokalneVPonuke(p)).toEqual(lokalne('Robust'));
 		expect(odooMena(p)).toEqual([]);
-		expect(p.zastupca).toEqual({});
+		expect(p.skupiny.map((g) => g.label)).toEqual(['']);
 	});
 });
 
 describe('#579 klient — výber voľby (select) ↔ výpočtové sklo + Odoo typ', () => {
-	it('volbaSkla / rozlozVolbu: Odoo voľba nesie výpočtové sklo, skryté lokálne sklo → zástupca', async () => {
+	it('volbaSkla / rozlozVolbu: Odoo voľba nesie výpočtové sklo, lokálne sklo samo seba', async () => {
 		odooOn();
 		const p = await ponuka('Robust');
 		const sk = ponukaPreStyl(p, lokalne('Robust'));
@@ -211,12 +213,12 @@ describe('#579 klient — výber voľby (select) ↔ výpočtové sklo + Odoo ty
 			sklo: 'Izolačné sklo 4/16/4 číre',
 			skloOdoo: 'IZOS DOUBLE 5ESG-14-5ESG'
 		});
-		expect(volbaSkla('Izolačné sklo 4/16/4 číre', 'IZOS DOUBLE 5ESG-14-5ESG', sk, p.zastupca)).toBe(
-			tesc.value
-		);
-		// predvolené lokálne „4/16/4 číre" (skryté) sa zobrazí ako prvý Odoo náprotivok (AL)
-		expect(volbaSkla('Izolačné sklo 4/16/4 číre', '', sk, p.zastupca)).toBe(
-			p.zastupca['Izolačné sklo 4/16/4 číre']
+		expect(volbaSkla('Izolačné sklo 4/16/4 číre', 'IZOS DOUBLE 5ESG-14-5ESG', sk)).toBe(tesc.value);
+		// bez Odoo voľby → lokálne sklo (predvolené ako doteraz)
+		expect(volbaSkla('Izolačné sklo 4/16/4 číre', '', sk)).toBe('Izolačné sklo 4/16/4 číre');
+		// Odoo typ, ktorý sa už nepočíta zvoleným sklom (zmena skla) → lokálne sklo
+		expect(volbaSkla('Izolačné sklo 4/16/4 mliečne', 'IZOS DOUBLE 5ESG-14-5ESG', sk)).toBe(
+			'Izolačné sklo 4/16/4 mliečne'
 		);
 		// lokálne sklo v ponuke → samo seba, Odoo typ prázdny
 		expect(rozlozVolbu('Izolačné sklo 4/16/4 mliečne', sk)).toEqual({
@@ -241,13 +243,12 @@ describe('#579 klient — výber voľby (select) ↔ výpočtové sklo + Odoo ty
 		expect(sk.flatMap((g) => g.items).map((o) => o.value)).toEqual(['A', 'B']);
 	});
 
-	it('skloOdooPre: posielaný Odoo typ = to, čo select ukazuje (aj zástupca / neplatný typ → „")', async () => {
+	it('skloOdooPre: posielaný Odoo typ = to, čo select ukazuje (neplatný typ → „")', async () => {
 		odooOn();
 		const p = await ponuka('Robust');
 		const pov = lokalne('Robust');
-		const al = p.zastupca['Izolačné sklo 4/16/4 číre']!.slice(ODOO_PREFIX.length);
-		// predvolené lokálne sklo bez voľby → posiela sa jeho zástupca (AL), ktorý select ukazuje
-		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 číre', '')).toBe(al);
+		// lokálne sklo bez voľby → žiadny Odoo typ (objednávka ako doteraz cez matcher #556)
+		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 číre', '')).toBe('');
 		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 číre', '003')).toBe('003');
 		// Odoo typ nesediaci s výpočtovým sklom (napr. po zmene skla) sa neposiela
 		expect(skloOdooPre(p, pov, 'Izolačné sklo 4/16/4 mliečne', '003')).toBe('');

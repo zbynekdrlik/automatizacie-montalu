@@ -1,5 +1,5 @@
-// #579: ponuka „Sklo (základ)" v nárezáku zasklení = Odoo typy skla podľa hrúbky systému + lokálne
-// sklá bez Odoo náprotivku. CLIENT-SAFE (žiadny `$lib/server` import) — ponuku per systém počíta
+// #579: ponuka „Sklo (základ)" v nárezáku zasklení = lokálne (výpočtové) sklá appky + Odoo typy
+// skla podľa hrúbky systému. CLIENT-SAFE (žiadny `$lib/server` import) — ponuku per systém počíta
 // server (`$lib/server/sklo-odoo` `ponukaSkielPre`), klient ju len zúži podľa štýlu a prekladá
 // voľbu selectu na DVE polia formulára:
 //   • `sklo`     = LOKÁLNE výpočtové sklo (vzorce, IZO nárezák, hrúbka, tesnenie, Money — nič z toho
@@ -33,8 +33,6 @@ export interface SkupinaVolieb {
 /** Ponuka skiel jedného systému (zo servera). */
 export interface PonukaSkiel {
 	skupiny: SkupinaVolieb[];
-	/** lokálne sklo, ktoré ponuka skryla (nahradil ho Odoo typ) → `value` jeho prvého náprotivku */
-	zastupca: Record<string, string>;
 }
 
 const lokalnaVolba = (n: string): VolbaSkla => ({
@@ -65,39 +63,19 @@ export function ponukaPreStyl(
 const vsetky = (skupiny: readonly SkupinaVolieb[]): VolbaSkla[] => skupiny.flatMap((g) => g.items);
 
 /**
- * Hodnota selectu pre stav (`sklo`, `skloOdoo`): zvolený Odoo typ, ak stále patrí k výpočtovému
- * sklu; inak lokálne sklo, ak je v ponuke; inak zástupca skrytého lokálneho skla (napr. predvolené
- * „4/16/4 číre" → IZOS DOUBLE 4-16-4 AL); inak `sklo` samo (sentinel „Iné").
+ * Hodnota selectu pre stav (`sklo`, `skloOdoo`): zvolený Odoo typ, ak je v ponuke a stále sa počíta
+ * zvoleným výpočtovým sklom; inak lokálne sklo samo (aj sentinel „Iné").
  */
 export function volbaSkla(
 	sklo: string,
 	skloOdoo: string,
-	skupiny: readonly SkupinaVolieb[],
-	zastupca: Record<string, string>
+	skupiny: readonly SkupinaVolieb[]
 ): string {
-	const v = vsetky(skupiny);
 	if (skloOdoo) {
-		const o = v.find((x) => x.odoo === skloOdoo && x.vypocet === sklo);
+		const o = vsetky(skupiny).find((x) => x.odoo === skloOdoo && x.vypocet === sklo);
 		if (o) return o.value;
 	}
-	if (v.some((x) => x.value === sklo)) return sklo;
-	const z = zastupca[sklo];
-	if (z && v.some((x) => x.value === z)) return z;
 	return sklo;
-}
-
-/**
- * Odoo typ, ktorý select pre stav (`sklo`, `skloOdoo`) naozaj ukazuje — aj zástupca predvoleného
- * lokálneho skla; '' pri lokálnom skle. Toto (nie surový stav) sa posiela na server (`posuvy` JSON).
- */
-export function skloOdooPre(
-	p: PonukaSkiel | undefined,
-	povolene: readonly string[],
-	sklo: string,
-	skloOdoo: string
-): string {
-	const sk = ponukaPreStyl(p, povolene);
-	return rozlozVolbu(volbaSkla(sklo, skloOdoo, sk, p?.zastupca ?? {}), sk).skloOdoo;
 }
 
 /** Voľba selectu → polia formulára (`sklo` výpočtové, `skloOdoo` Odoo typ alebo ''). */
@@ -107,4 +85,18 @@ export function rozlozVolbu(
 ): { sklo: string; skloOdoo: string } {
 	const o = vsetky(skupiny).find((x) => x.value === value);
 	return o ? { sklo: o.vypocet, skloOdoo: o.odoo } : { sklo: value, skloOdoo: '' };
+}
+
+/**
+ * Odoo typ, ktorý select pre stav (`sklo`, `skloOdoo`) naozaj ukazuje ('' pri lokálnom skle alebo
+ * keď typ po zmene skla/štýlu už neplatí). Toto (nie surový stav) sa posiela na server.
+ */
+export function skloOdooPre(
+	p: PonukaSkiel | undefined,
+	povolene: readonly string[],
+	sklo: string,
+	skloOdoo: string
+): string {
+	const sk = ponukaPreStyl(p, povolene);
+	return rozlozVolbu(volbaSkla(sklo, skloOdoo, sk), sk).skloOdoo;
 }

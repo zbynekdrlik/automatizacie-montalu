@@ -180,12 +180,10 @@
 			skla.filter((g) => g !== SKLO_INE)
 		);
 	const skupinyPre = (sys: string, st: string) => skupinyZ(sys, sklaForSystem(sys, st));
-	const volbaPre = (sys: string, sk: string, so: string, skup: SkupinaVolieb[]) =>
-		volbaSkla(sk, so, skup, ponukaSkiel[sys]?.zastupca ?? {});
 	// primárny posuv: `sklaPre` = sklaForSystem(system, styl) z rodiča
 	let skupiny = $derived(skupinyZ(system, sklaPre));
-	let volba = $derived(volbaPre(system, sklo, skloOdooS, skupiny));
-	// Odoo typ, ktorý select naozaj ukazuje (aj zástupca predvoleného lokálneho skla)
+	let volba = $derived(volbaSkla(sklo, skloOdooS, skupiny));
+	// Odoo typ, ktorý select naozaj ukazuje ('' keď po zmene skla/štýlu už neplatí)
 	let skloOdooEf = $derived(rozlozVolbu(volba, skupiny).skloOdoo);
 	function zvolSklo(v: string) {
 		const r = rozlozVolbu(v, skupiny);
@@ -601,7 +599,7 @@
 						<select
 							id={`ps${i}-sklo`}
 							bind:value={
-								() => volbaPre(p.system, p.sklo, p.skloOdoo, skupinyPre(p.system, p.styl)),
+								() => volbaSkla(p.sklo, p.skloOdoo, skupinyPre(p.system, p.styl)),
 								(v) => zvolSkloPosuvu(p, v)
 							}
 						>
