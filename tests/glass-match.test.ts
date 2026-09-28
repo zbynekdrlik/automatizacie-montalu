@@ -71,7 +71,10 @@ const ODOO: OdooTypLike[] = [
 	// lokálne „ESG kalené 4 mm" (číre) sa NESMIE spárovať na tento odtieňový typ (predtým áno).
 	{ value: 'EB4', name: 'ESG Float bronz/šedý 4mm', composition: '4', category: 'esg' },
 	// VSG (lepené) 3.3.1
-	{ value: 'V331', name: 'VSG 3.3.1 číre', composition: '3.3.1', category: 'vsg' }
+	{ value: 'V331', name: 'VSG 3.3.1 číre', composition: '3.3.1', category: 'vsg' },
+	// #579 finding 1 — povlak STOPSOL (živý PROD katalóg 28.9.: „ESG Stopsol Classic Clear 6mm"
+	// OP018E). „Clear" = číry odtieň, ale povlak ho robí iným sklom než číre ESG 6 mm.
+	{ value: 'OP018E', name: 'ESG Stopsol Classic Clear 6mm', composition: '', category: 'esg' }
 ];
 
 describe('normalizeComposition (#556)', () => {
@@ -214,6 +217,24 @@ describe('matchOdooGlassType (#556)', () => {
 			matchOdooGlassType('ESG kalené 4 mm číre', ODOO).kandidati.map((k) => k.value)
 		).not.toContain('EB4');
 	});
+	// #579 finding 1 — os POVLAKU (stopsol)
+	it('stopsol 4/8/4 → ziadne (Odoo má 4/8/4 len číre bez povlaku — nikdy nie číre)', () => {
+		const m = matchOdooGlassType('Izolačné sklo 4/8/4 stopsol', ODOO);
+		expect(m.istota).toBe('ziadne');
+		expect(m.typ).toBeNull();
+		expect(m.kandidati).toHaveLength(0);
+	});
+	it('stopsol ESG 6 mm → jednoznačne Odoo typ so stopsol', () => {
+		const m = matchOdooGlassType('ESG kalené 6 mm stopsol', ODOO);
+		expect(m.istota).toBe('jednoznacne');
+		expect(m.typ?.value).toBe('OP018E');
+	});
+	it('číre ESG 6 mm sa NESPÁRUJE na stopsol typ (ostáva jednoznačne číre E6)', () => {
+		const m = matchOdooGlassType('Float kalené 6 mm', ODOO);
+		expect(m.istota).toBe('jednoznacne');
+		expect(m.typ?.value).toBe('E6');
+		expect(m.kandidati.map((k) => k.value)).not.toContain('OP018E');
+	});
 	it('lokálne číre 4/16/4 ostáva „viac" (AL/TH, oba číre) aj s osou odtieňa', () => {
 		const m = matchOdooGlassType('Izolačné sklo 4/16/4 číre', ODOO);
 		expect(m.istota).toBe('viac');
@@ -252,6 +273,9 @@ describe('cennikPopis (nárezák popis, #556)', () => {
 	});
 	it('ziadne → ""', () => {
 		expect(cennikPopis('Float číre 6 mm', ODOO, 'odoo')).toBe('');
+	});
+	it('stopsol 4/8/4 → "" (nikdy „· cenník: …číre", #579 finding 1)', () => {
+		expect(cennikPopis('Izolačné sklo 4/8/4 stopsol', ODOO, 'odoo')).toBe('');
 	});
 	it('source=local → "" (fallback = bez popisu)', () => {
 		expect(cennikPopis('Izolačné sklo 4/8/4 číre', ODOO, 'local')).toBe('');
