@@ -502,6 +502,12 @@ Marek D. (Odoo úlohy 1180/1181, 28.9.): 99 Odoo typov v plochom `<select>` bolo
   `localeCompare(…, 'sk')`; prázdne skupiny sa vynechajú; kandidát sa v kategórii NEopakuje (žiadne
   duplicitné `value` v jednom selecte). **`value` sa NEMENÍ** → uložený `typ_skla` aj payload
   bit-identické. Nový picker typu skla inde (napr. pergola honest-null) → reuse tejto funkcie.
+  Kategórie `izolacne/esg/vsg/rezane` = Odoo read 28.9. (99 typov: 11/28/31/29); porovnanie je
+  trim+lowercase. **Drift guard:** load volá `neznameKategorie(glassTypes)` a NEPRÁZDNU neznámu
+  kategóriu zaloguje `warn` RAZ za proces (inak by ticho spadla do „Ostatné" — CI to nevidí, beží na
+  lokálnom fallbacku s `category=''`). Nová Odoo kategória = pridať riadok do `KATEGORIE`.
+  `PORADIE_SKUPIN` (export) = jeden zdroj poradia pre E2E. Riadok BEZ kandidátov používa zdieľané
+  `skupinyTypov` ($derived raz), per-riadok sa zoskupuje len pri kandidátoch.
 - **Sentinel „iné sklo" = `SENTINEL_INE_SKLO`** z toho istého modulu — svelte aj server
   (`MANUAL_TYP_SENTINEL`) ho importujú (jeden zdroj). E2E vyberá `'__ine__'` hodnotou — optgroup to
   nemení. Prvá NEprázdna voľba pickera je v CI prvý typ skupiny „Ostatné" (lokálny fallback).
