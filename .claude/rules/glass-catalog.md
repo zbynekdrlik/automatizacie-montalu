@@ -434,9 +434,11 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   povlak: 'ignoruj' })`, lokálne stopsol vynechané) — „ESG Stopsol Classic Clear 6mm" = „ESG kalené
   6 mm", nie predvolené NEkalené „Float sklo 6 mm"; (3) inak predvolené sklo triedy. **Pasca:**
   prísny matcher (os povlaku) rovno na výber výpočtového skla zmenil výpočet stopsol ESG 6 mm (= iný
-  Money odpis) — review to chytil; parity test proti starému kódu (122 volieb, všetky `vypocet`
-  zhodné) je dôkaz Money-neutrality pri každej zmene matchera. `'ignoruj'` NIKDY pre objednávku /
-  cenníkový popis / podklad.
+  Money odpis) — review to chytil. **Stála stráž Money-neutrality:** snapshot `vypocet` každej Odoo
+  voľby v každom systéme na PROD výreze (`tests/sklo-odoo-579.test.ts` „Money-neutrálny snapshot",
+  `tests/__snapshots__/sklo-odoo-579.test.ts.snap`; overený jednorazovým parity behom proti 0.25.49,
+  122 volieb, 0 rozdielov). Zmena snapshotu = zmena výpočtu Odoo voľby → vedome, NIKDY slepé `-u`.
+  `'ignoruj'` NIKDY pre objednávku / cenníkový popis / podklad.
 - **Formulár nesie DVE polia:** `sklo` = lokálne výpočtové (všetka klientska aj serverová logika —
   default, IZO nárezák, RAL hrúbka, tesnenie, B2B, compute, Money — beží bez zmeny) + `skloOdoo`
   (Odoo `cennik_code || name`). Select hodnota je ODVODENÁ (`$lib/sklo-odoo` `volbaSkla` /
