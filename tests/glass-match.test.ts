@@ -249,6 +249,14 @@ describe('matchOdooGlassType (#556)', () => {
 		expect(m.typ?.value).toBe('E6');
 		expect(m.kandidati.map((k) => k.value)).not.toContain('OP018E');
 	});
+	it('povlak: "ignoruj" (len výpočtové sklo) vypne os povlaku, odtieň/zloženie ostávajú', () => {
+		const m = matchOdooGlassType('Float kalené 6 mm', ODOO, { povlak: 'ignoruj' });
+		expect(m.istota).toBe('viac');
+		expect(m.kandidati.map((k) => k.value).sort()).toEqual(['E6', 'OP018E']);
+		expect(
+			matchOdooGlassType('Izolačné sklo 4/8/4 mliečne', ODOO, { povlak: 'ignoruj' }).istota
+		).toBe('ziadne');
+	});
 	it('lokálne číre 4/16/4 ostáva „viac" (AL/TH, oba číre) aj s osou odtieňa', () => {
 		const m = matchOdooGlassType('Izolačné sklo 4/16/4 číre', ODOO);
 		expect(m.istota).toBe('viac');

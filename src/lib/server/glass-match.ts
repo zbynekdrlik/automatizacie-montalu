@@ -149,11 +149,17 @@ function tintMatch(lokTint: GlassTint, odooName: string): boolean {
  * odtieň ∧ povlak). Povlak musí sedieť OBOJSTRANNE: stopsol len na stopsol, sklo bez povlaku nikdy
  * na stopsol (#579). Nikdy tichý výber pri viacerých kandidátoch. `odooTypy` = živý katalóg z
  * `fetchGlassTypes`.
+ *
+ * `povlak: 'ignoruj'` vypne os povlaku — LEN pre voľbu VÝPOČTOVÉHO skla (`sklo-odoo.ts`): povlak
+ * mení text objednávky, nie nárez/profily/Money, takže „ESG Stopsol … 6mm" sa počíta ako kalené
+ * 6 mm. Objednávka / cenníkový popis / podklad používajú vždy predvolený `'presne'`.
  */
 export function matchOdooGlassType<T extends OdooTypLike>(
 	lokalneSklo: string,
-	odooTypy: T[]
+	odooTypy: T[],
+	opts: { povlak?: 'presne' | 'ignoruj' } = {}
 ): GlassMatch<T> {
+	const povlakPresne = (opts.povlak ?? 'presne') === 'presne';
 	const lokComp = normalizeComposition(lokalneSklo);
 	const lokKat = localGlassCategory(lokalneSklo);
 	const lokTint = glassTint(lokalneSklo);
@@ -164,7 +170,7 @@ export function matchOdooGlassType<T extends OdooTypLike>(
 			normalizeComposition(t.composition || t.name) === lokComp &&
 			odooKategoria(t) === lokKat &&
 			tintMatch(lokTint, t.name) &&
-			glassPovlak(t.name) === lokPovlak
+			(!povlakPresne || glassPovlak(t.name) === lokPovlak)
 	);
 	if (kandidati.length === 0) return { typ: null, istota: 'ziadne', kandidati: [] };
 	if (kandidati.length === 1) return { typ: kandidati[0]!, istota: 'jednoznacne', kandidati };

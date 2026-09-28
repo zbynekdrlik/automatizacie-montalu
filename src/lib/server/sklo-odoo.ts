@@ -16,7 +16,7 @@
 import { logger } from './log';
 import { listGlassTypes } from './db';
 import { fetchGlassTypes, type GlassTypeOption, type GlassTypesResult } from './odoo-glass-types';
-import { matchOdooGlassType, cennikPopis } from './glass-match';
+import { matchOdooGlassType, cennikPopis, glassPovlak } from './glass-match';
 import { parseVstup, parseMultiVstup, type Vstup, type MultiVstup } from './vstup';
 import { odooTriedyPre, odooDruhSedi, ponukaSkielSystemu } from '$lib/sklo-povolene';
 import { zoskupTypySkla } from '$lib/objednavka-skla-typy';
@@ -53,16 +53,30 @@ export function ponukaSkielPre(
 	const typy = odoo.items.filter((o) => o.hrubkaMm > 0 && triedaPre(o));
 
 	// lokálne sklo → jeho Odoo náprotivky v ponuke (matcher #556: zloženie ∧ kategória ∧ odtieň ∧
-	// povlak — stopsol sa páruje len na stopsol, preto netreba stopsol sklá z výpočtových zdrojov
-	// vynechávať; „4/16/4 stopsol" nemá v Odoo náprotivok a IZOS AL/TH ostávajú na „4/16/4 číre")
-	const kandidati = new Map<string, GlassTypeOption[]>();
-	for (const n of lokalne) {
-		const k = matchOdooGlassType(n, typy).kandidati;
-		if (k.length > 0) kandidati.set(n, k);
-	}
+	// povlak). Výpočtový zdroj Odoo typu:
+	//   1. PRESNÁ zhoda vrátane povlaku (stopsol ↔ stopsol) — keď je JEDINÁ;
+	//   2. typ s povlakom, pre ktorý lokálne sklo s povlakom neexistuje (napr. „ESG Stopsol … 6mm"),
+	//      sa počíta ako jeho sklo BEZ povlaku — povlak mení len text objednávky, nie nárez/Money;
+	//   3. inak predvolené sklo triedy.
+	const zdrojePre = (povlak: 'presne' | 'ignoruj') => {
+		const m = new Map<string, GlassTypeOption[]>();
+		for (const n of lokalne) {
+			if (povlak === 'ignoruj' && glassPovlak(n) !== 'ziadny') continue;
+			const k = matchOdooGlassType(n, typy, { povlak }).kandidati;
+			if (k.length > 0) m.set(n, k);
+		}
+		return (o: GlassTypeOption) => [...m].filter(([, k]) => k.includes(o)).map(([n]) => n);
+	};
+	const presne = zdrojePre('presne');
+	const bezPovlaku = zdrojePre('ignoruj');
 	const vypocetPre = (o: GlassTypeOption): string => {
-		const zdroje = [...kandidati].filter(([, k]) => k.includes(o)).map(([n]) => n);
-		return zdroje.length === 1 ? zdroje[0]! : triedaPre(o)!.sklo;
+		const p = presne(o);
+		if (p.length === 1) return p[0]!;
+		if (p.length === 0) {
+			const b = bezPovlaku(o);
+			if (b.length === 1) return b[0]!;
+		}
+		return triedaPre(o)!.sklo;
 	};
 	const volby = new Map<string, VolbaSkla>(
 		typy.map((o) => [

@@ -428,9 +428,15 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
 - **Lokálne sklá sa NESKRÝVAJÚ** (ROZHODNUTÉ na #579): 4/16/4 číre má AL aj TH → skrytie = tichý
   výber (zakázaný #556) a rozbilo by výber podľa názvu (post-deploy E2E, „Použiť znova").
 - **Výpočtové sklo Odoo voľby** = lokálne sklo, ktoré naň matcher #556 mapuje, keď je JEDINÉ (napr.
-  ESG Float čirý 6mm → „ESG kalené 6 mm"), inak `ODOO_HRUBKY[..].sklo`. Stopsol lokálne sklá sú
-  bežné zdroje — os povlaku matchera ich páruje len na Odoo stopsol typy (workaround
-  `POVLAK_BEZ_OSI` odstránený, #579 finding 1).
+  ESG Float čirý 6mm → „ESG kalené 6 mm"), inak `ODOO_HRUBKY[..].sklo`. **Tri kroky (#579 finding
+  1):** (1) jediná PRESNÁ zhoda vrátane povlaku (stopsol ↔ stopsol); (2) pri 0 presných typ s
+  povlakom bez lokálneho náprotivku sa počíta ako jeho sklo BEZ povlaku (`matchOdooGlassType(…, {
+  povlak: 'ignoruj' })`, lokálne stopsol vynechané) — „ESG Stopsol Classic Clear 6mm" = „ESG kalené
+  6 mm", nie predvolené NEkalené „Float sklo 6 mm"; (3) inak predvolené sklo triedy. **Pasca:**
+  prísny matcher (os povlaku) rovno na výber výpočtového skla zmenil výpočet stopsol ESG 6 mm (= iný
+  Money odpis) — review to chytil; parity test proti starému kódu (122 volieb, všetky `vypocet`
+  zhodné) je dôkaz Money-neutrality pri každej zmene matchera. `'ignoruj'` NIKDY pre objednávku /
+  cenníkový popis / podklad.
 - **Formulár nesie DVE polia:** `sklo` = lokálne výpočtové (všetka klientska aj serverová logika —
   default, IZO nárezák, RAL hrúbka, tesnenie, B2B, compute, Money — beží bez zmeny) + `skloOdoo`
   (Odoo `cennik_code || name`). Select hodnota je ODVODENÁ (`$lib/sklo-odoo` `volbaSkla` /
