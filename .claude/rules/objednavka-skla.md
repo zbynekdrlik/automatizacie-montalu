@@ -8,6 +8,9 @@ paths:
   - "src/lib/objednavka-skla-typy.ts"
   - "src/lib/server/objednavka-skla-odoslanie.ts"
   - "src/lib/sklo-otvory.ts"
+  - "src/lib/server/sklo-otvor-pdf.ts"
+  - "src/lib/server/odoo-glass-order-upload.ts"
+  - "src/lib/components/zasklenia/SkloOtvoryRozpis.svelte"
   - "src/lib/components/Nahlad2D.svelte"
   - "src/routes/zasklenia/+page.server.ts"
   - "src/routes/fix/+page.server.ts"
@@ -573,3 +576,48 @@ tabule vŕtať. Money-NEUTRÁLNE, bez migrácie (spec stĺpce v48).
   oponu/2x, zmena je v `otvoryVSkle` (ROZHODNUTÉ na #578 to explicitne predpokladá).
 - **E2E** `e2e/objednavka-skla-otvory.spec.ts` — relačne: ks s otvorom = kruhy vo výkrese, súčet = ks
   skla z karty „Sklo (mm)" (Počet nemá testid → `div:has(> span:text-is("Počet")) > b`).
+
+## Výkres tabule s otvorom (PDF) ide s objednávkou do Odoo/IZOS (#587)
+
+Odoo úloha 1185 „Výkres alebo DXF k sklu pôjde s objednávkou z appky". Nadväzuje na #578 (riadky s
+otvorom / bez). Money-NEUTRÁLNE, migrácia **v52**, DXF ZAMIETNUTÉ (PDF stačí; DXF sa dá doplniť z
+toho istého pravidla).
+
+- **Poloha = JEDEN zdroj `src/lib/sklo-otvory.ts`:** `OKRAJ_ZAMOK_MM` (50, stred od zvislej hrany),
+  `VRTANIE_ZAMKU_DEFAULT_MM` (1050, stred od spodku), `D_ZAMOK_MM` (46) + `polohaOtvoru(vrtanie, š, v)`.
+  `Nahlad2D` (náhľad), `vstup.ts`/`znova.ts` (default výšky) aj PDF generátor z nich čítajú — žiadna
+  lokálna číselná konštanta (guard `tests/sklo-otvor-poloha-587.test.ts` skenuje Nahlad2D AJ
+  `sklo-otvor-pdf.ts` na `\b(50|46|1050)\b` — **aj v komentároch**, píš „⌀…"). `polohaOtvoru` vráti
+  `null`, keď by otvor nebol CELÝ v skle (náhľad výšku len oreže do kresby, dodávateľovi sa
+  nedomýšľa) → riadok ostane „s otvorom" (cena IZOS), ale výkres sa negeneruje.
+- **Producent:** `riadkySklaPosuvu(pozícia, systém, N, rozmer?)` dá riadku s otvorom `otvor`;
+  `sklaPosuvu` posiela `vrtanieZamku` (single `/zasklenia` z formulára cez `{ ...r, vrtanieZamku }`;
+  **multi posuv výšku nezadáva → default**, rovnako ako ho kreslí `PlanKartyMulti` → `Nahlad2D`).
+  Bez `rozmer` kľúč `otvor` chýba → existujúce `toEqual` vektory #578 ostali platné.
+- **Úložisko:** `objednavka_skla.otvor_od_hrany_mm/otvor_od_spodku_mm/otvor_priemer_mm` (REAL NULL,
+  `migracie-objednavka-otvor.ts`). `pridajSklo` ich zapíše LEN pri `holesQty > 0`; `mapRow` →
+  `SkloPolozka.otvor` (`null` pri 0 otvoroch alebo neúplnej polohe). **Dedup doplní polohu:**
+  `najdiRovnaku` + `doplnPolohu` — riadok spred #587 (0.25.48–0.25.51) dostane polohu opakovaným
+  „Pridať sklá" (nič sa nevloží, `pridane = 0`); zmenená výška vŕtania prepíše uloženú; neznáma
+  (`null`) nikdy neprepíše. `prevedStaryCelok` zapisuje polohu tiež.
+- **PDF** `src/lib/server/sklo-otvor-pdf.ts` (`pdf-common` + DejaVu): A4, obdĺžnik š × v s kótami,
+  otvor s kótou od hrany a od spodku, poznámka „kreslené pre ľavé krídlo, pravé = tá istá tabuľa
+  otočená". **DejaVu subset NEMÁ „⌀" (U+2300)** → v tele „Ø" (`pdfText`), v metadátach „⌀". Hodnoty
+  sú v Subject/Keywords (`od_hrany_mm=`, `od_spodku_mm=`, `priemer_mm=` …) = testovací kanál; BEZ
+  cien. `vykresOtvoruZPolozky(p)` = honest-null brána (bez otvoru/polohy, šikmý, bez výšky/šírky).
+- **Odoo:** `buildGlassOrderForZak` je od #587 **async** (pdf-lib `save()`) — riadok s otvorom dostane
+  `attachments: [...ručné, Vykres-otvoru-<zak>-<pozícia>.pdf]` (`application/pdf`). Zlyhanie
+  generovania sa zaloguje, objednávka ide bez výkresu (nikdy nezhodí odoslanie). Strop príloh
+  (`enforceAttachmentCap`) platí aj pre výkres.
+- **Podklad:** stĺpec Prílohy — `vykres-otvoru-<id>` odkaz na GET `/objednavka-skla/vykres-otvoru/[id]`
+  (inline `application/pdf` — generované z NAŠICH dát, preto nie octet-stream ako nahraté súbory;
+  b2b kryje prefix) + `otvor-poloha-<id>`; riadok s otvorom BEZ polohy → `otvor-neznamy-<id>` (návod:
+  znova „Pridať sklá", alebo atyp + nahrať výkres). Ručné nahratie na rozmery-riadok NEPONÚKAME —
+  `nahratSubor` prepína riadok na atyp.
+- **Nárezák karta „Sklo (mm)":** `SkloOtvoryRozpis` (`rozpisOtvorovSkla`) „z toho s otvorom ⌀46: 2 ks
+  · bez otvoru: 2 ks" — single (`sklo-otvory`, pod Počet, hodnota Počet nezmenená) aj multi
+  (`posuv-sklo-otvory-<i>` v bunke skla). Systém bez otvorov → nič. Tlačí sa s kartou.
+- **Testy:** `tests/sklo-otvor-poloha-587.test.ts` (pravidlo, SSR komponent, zdroj konštánt),
+  `tests/objednavka-skla-vykres-otvoru-587.test.ts` (producent, dedup doplnenie, payload, PDF
+  metadáta, GET), `tests/migration-v52.test.ts`; E2E `objednavka-skla-otvory.spec.ts` rozšírený
+  (rozpis na karte, odkaz len pri riadku s otvorom, poloha 1100/50, PDF 200 `%PDF-`).
