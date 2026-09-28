@@ -48,21 +48,23 @@ Doména sieťky je rozliata cez `sietka.ts` (čisté helpery + konštanty) → `
 - **E2E relačne** (PROD cfg upravuje editor): kladkový sieťky > / < rez posuvu podľa smeru,
   sieťovina pri IZO skle == pri základnom (`e2e/sietka-standard.spec.ts`), nikdy seed mm.
 
-## Kovanie (kľučka) vs STRANA sieťky — len strana sieťky sa skryje (#583, Patrik Odoo úloha 1191)
+## Kovanie (kľučka) pri sieťke — OBE strany ostávajú na výber (#583 ROZHODNUTÉ 28.9.)
 
-- **JEDNO pravidlo: `kovanieSkryte(sietka, strana)` v `src/lib/sietka.ts`** → `{ l, p }`. Pri
-  sieťke vylúči LEN kovanie na strane `sietkaStrana(otvaranie)` (L - P → ľavá, P - L → pravá);
-  druhá strana aj stredové kovanie opony (`kovanieStred`) ostávajú. Strana `null` (opona) → nič.
-  #88 pôvodne skrylo kovanie na OBOCH stranách aj v strede — Patrik: „zruší mi kľučky na posuve".
-- **Štyri miesta ho MUSIA používať (nikdy vlastná podmienka):** primárny formulár šablóna
-  (`ZasklieniaForm` `kovSkryte`) + nulovací `$effect` v `routes/zasklenia/+page.svelte`; ďalšie
-  posuvy — šablóna (`{@const ks}`) + `zhodKovaniePodSietkou` (onZmena sieťky AJ onchange
-  otvárania, inak ostane skrytá hodnota v `posuvy` JSON-e); server `bezKovaniaNaStraneSietky`
-  v `parseVstup`/`parseMultiVstup` — volať AŽ po `sanitizeSietka` + vynútení `Opona`.
-- **Money-neutrálne:** mení sa len echo `vstup.kovanieL/P` (golden `zasklenia-posuvspec-golden`
-  robust-2K-plny P - L: `kovanieP` → `''`), `plan`/`kovanie`/`planHash` byte-identické.
-- `znova.ts` nemá vlastné pravidlo — obnoví uložené (už sanitizované) hodnoty, submit ich prejde
-  serverom znova. E2E: `e2e/sietka.spec.ts` (#88 spresnené + #583 single aj multi + náhľad).
+- **Sieťka kovanie NESKRÝVA ani NEZAHADZUJE na žiadnej strane.** Patrik (Odoo úloha 1191,
+  msg 1865361): „nechal by som tam obe klučky na výber zo stietkou". Ľavá aj pravá kľučka
+  (aj stredová pri opone) ostávajú vo formulári (single aj multi) aj po zapnutí sieťky, hodnoty
+  sa nemažú a idú do plánu/náhľadu; server (`parseVstup`/`parseMultiVstup`) ich zachová.
+- **História — neobnovovať:** #88 skrylo kovanie na OBOCH stranách („sieťka nahrádza kľučku
+  úchytom"); 0.25.50 to zúžilo na stranu sieťky (`kovanieSkryte` + `bezKovaniaNaStraneSietky`
+  + `onZmena` nulovanie v `SietkaPolia`) — Patrik oboje zamietol, kód je celý preč (0.25.52).
+  Nepridávaj nové pravidlo „sieťka ↔ kľučka" bez nového rozhodnutia od výroby.
+- **Ostáva:** hint strany sieťky (`<prefix>-strana` „Sieťka pôjde na ľavú/pravú stranu", podľa
+  `sietkaStrana(otvaranie)`) a výber úchytu sieťky (`<prefix>-uchyt`) — úchyt je NAVYŠE ku kľučkám.
+  Jediné nulovanie kovania vo formulári: mimo Robust (`$effect` v `routes/zasklenia/+page.svelte`).
+- **Money-neutrálne:** kovanie je display-only; golden `zasklenia-posuvspec-golden` robust-2K-plny
+  (P - L + sieťka) echo `kovanieP` = zvolená kľučka, `plan`/`kovanie`/`planHash` byte-identické.
+- Testy: `tests/sietka-obe-klucky.test.ts` (server), `e2e/sietka.spec.ts` („OBE kľučky" single +
+  multi + náhľad; #88 test = zapnutie/vypnutie sieťky hodnotu nemení).
 
 ## Jokle Robust (#555, Patrik Odoo úloha 1010)
 
