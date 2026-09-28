@@ -131,6 +131,52 @@ test('sieťka: kľučka sa neponúka, keď je sieťka zapnutá (#88)', async ({ 
 	expect(errs).toEqual([]);
 });
 
+test('sieťka skryje kľučku LEN na strane sieťky — druhá strana ostane aj v náhľade (#583)', async ({
+	page
+}) => {
+	// Patrik (Odoo úloha 1191, att 39256): Robust, otváranie L - P, sieťka vľavo →
+	// „Kovanie — pravá strana" musí ostať ponúknuté a jeho hodnota prejsť do plánu.
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await zaklad(page, 'E2E-SIETKA-KOV-STRANA', 'E2E Sietka kovanie strana');
+	await page.selectOption('#otvaranie', 'L - P');
+	await page.selectOption('#kovanieL', 'Obojstranná kľučka s FAB');
+	await page.selectOption('#kovanieP', 'Jednostranná kľučka z vnútra bez FAB');
+
+	await page.locator('#sietka-on').check();
+	await expect(page.getByTestId('sietka-strana')).toContainText('ľavá');
+	await expect(page.locator('#kovanieL')).toHaveCount(0);
+	await expect(page.locator('#kovanieP')).toBeVisible();
+	await expect(page.locator('#kovanieP')).toHaveValue('Jednostranná kľučka z vnútra bez FAB');
+
+	// ďalší posuv (multi): rovnaké pravidlo per posuv
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
+	await page.locator('#ps0-s').fill('4365');
+	await page.locator('#ps0-v').fill('2320');
+	await page.selectOption('#ps0-otv', 'L - P');
+	await page.selectOption('#ps0-kovl', 'Obojstranná kľučka bez FAB');
+	await page.selectOption('#ps0-kovp', 'Jednostranná kľučka z vnútra s FAB');
+	await page.locator('#ps0-sietka-on').check();
+	await expect(page.locator('#ps0-kovl')).toHaveCount(0);
+	await expect(page.locator('#ps0-kovp')).toHaveValue('Jednostranná kľučka z vnútra s FAB');
+
+	await vyberFarbuKovania(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// v náhľade oboch posuvov je pravá kľučka, ľavá (strana sieťky) nie
+	const kovP = page.getByTestId('kovanie-p');
+	await expect(kovP).toHaveCount(2);
+	await expect(kovP.nth(0)).toContainText('Jednostranná');
+	await expect(kovP.nth(0)).toContainText('bez');
+	await expect(kovP.nth(1)).toContainText('Jednostranná');
+	await expect(kovP.nth(1)).not.toContainText('bez');
+	await expect(page.getByTestId('kovanie-l')).toHaveCount(0);
+
+	expect(errs).toEqual([]);
+});
+
 test('sieťka na 2K posuve ukáže upozornenie a Money odpis PRIDÁ 3K koľajnicu (#87)', async ({
 	page
 }) => {
