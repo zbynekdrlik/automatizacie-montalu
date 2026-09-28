@@ -173,18 +173,21 @@ async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 			.filter((r) => r.value !== '');
 		// #551: dedupe podľa `value` (kľúč pickera) — Odoo dáta nesmú picker zhodiť duplicitným
 		// `{#each … (t.value)}` kľúčom (rovnaký `Set` idiom ako `localFallback`). Warn RAZ za fetch.
+		// #579: kód zdieľaný VIACERÝMI typmi (PROD: „001" má „Izolačné 4/8/4" AJ „IZOS DOUBLE 4-16-4
+		// AL") je pre Odoo `resolve_glass_type` (páruje kód PRVÝ) nejednoznačný → VŠETCI jeho nositelia
+		// dostanú `value = name` (páruje presný názov) a žiadny typ sa nezahodí; zahodí sa len riadok,
+		// ktorého aj názov koliduje.
+		const pocetKodu = new Map<string, number>();
+		for (const it of mapped) pocetKodu.set(it.value, (pocetKodu.get(it.value) ?? 0) + 1);
 		const seen = new Set<string>();
 		const items: GlassTypeOption[] = [];
 		const dupes = new Set<string>();
 		for (const it of mapped) {
-			if (seen.has(it.value)) {
+			if ((pocetKodu.get(it.value) ?? 0) > 1) {
 				dupes.add(it.value);
-				// #579: pri kolízii `cennik_code` (PROD: „001" má „Izolačné 4/8/4" AJ „IZOS DOUBLE
-				// 4-16-4 AL") sa ďalší typ NEZAHODÍ — dostane `value = name` (Odoo
-				// `resolve_glass_type` páruje aj presný názov); zahodí sa, len keď koliduje aj názov.
-				if (!it.name || seen.has(it.name)) continue;
-				it.value = it.name;
+				if (it.name) it.value = it.name;
 			}
+			if (seen.has(it.value)) continue;
 			seen.add(it.value);
 			items.push(it);
 		}

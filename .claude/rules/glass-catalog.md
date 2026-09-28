@@ -436,7 +436,12 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   `skloOdoo`/`skloOdooNazov`; „Použiť znova" obnoví `skloOdoo` (Odoo názov NIE je `skloPresne`).
   Rekompute/backfill/kiosk (#570) čítajú `skloZaklad`/`vstupRaw.sklo` = lokálne sklo — nezmenené.
 - **Duplicitný `cennik_code` v Odoo** (PROD: „001" = Izolačné 4/8/4 AJ IZOS DOUBLE 4-16-4 AL):
-  `fetchGlassTypes` ďalší typ NEZAHODÍ, dostane `value = name` (warn o duplicite).
+  kód je pre Odoo `resolve_glass_type` (páruje kód PRVÝ) nejednoznačný → VŠETCI nositelia dostanú
+  `value = name` (páruje presný názov), žiadny typ sa nezahodí (warn o duplicite). Staré riadky
+  podkladu s `typ_skla='001'` sú odteraz „nepriradené" — zámerne (kód nevie, ktoré sklo).
+- **Odoo typ JE presné zloženie:** pri `skloOdoo` parse zahodí `skloPresne` a formulár pole skryje
+  → plán aj objednávka nesú TEN ISTÝ typ (review #579). Pri nedostupnom Odoo sa `skloOdooNazov`
+  NEvyplní (plán ukáže lokálne sklo, nie holý kód).
 - **E2E:** CI nemá Odoo → fallback vetva; post-deploy PROD → Odoo vetva (`e2e/sklo-odoo-579.spec.ts`
   pokrýva obe, relačne). Specy nad MNOŽINOU lokálnej ponuky čítajú `LOKALNE_SKLA`
   (`e2e/helpers.ts`, `option:not([value^="odoo:"])`). Lokálne Odoo vetvu over cez `vite dev` +

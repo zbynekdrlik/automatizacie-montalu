@@ -266,11 +266,11 @@ describe('fetchGlassTypes — Odoo `false` pre prázdne polia (#551)', () => {
 		);
 		const res = await fetchGlassTypes();
 		writeSpy.mockRestore();
-		// duplicitný kód 'DUP': prvý si ho ponechá, druhý dostane presný názov → 3 položky
+		// duplicitný kód 'DUP' je pre Odoo nejednoznačný → OBA typy dostanú presný názov → 3 položky
 		expect(res.items).toHaveLength(3);
 		const values = res.items.map((i) => i.value);
 		expect(new Set(values).size).toBe(res.items.length);
-		expect(values).toEqual(['DUP', 'Sklo B', 'UNI']);
+		expect(values).toEqual(['Sklo A', 'Sklo B', 'UNI']);
 		// warn o duplicite RAZ za fetch, s uvedením duplikovanej hodnoty
 		const warnLines = lines.filter(
 			(l) => l.includes('odoo-glass-types') && l.includes('"level":"warn"') && l.includes('DUP')

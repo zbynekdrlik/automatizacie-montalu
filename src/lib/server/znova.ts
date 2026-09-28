@@ -108,7 +108,6 @@ function posuvZDetailu(
 		// #579: Odoo názov zvoleného typu (uložený v `d.sklo`) NIE JE presné zloženie
 		skloPresne: s(d.sklo) !== s(d.skloZaklad) && s(d.sklo) !== s(d.skloOdooNazov) ? s(d.sklo) : '',
 		skloTrieda,
-		// #579: zvolený Odoo typ skla — formulár ho predvolí, ak ho ponuka ešte má (inak lokálne sklo)
 		otvaranie: s(d.otvaranie),
 		kovanieL: s(d.kovanieL),
 		kovanieP: s(d.kovanieP),

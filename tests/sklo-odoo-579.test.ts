@@ -67,9 +67,9 @@ describe('#579 fetchGlassTypes — hrúbka + duplicitný cenníkový kód', () =
 		const izo16 = res.items.find((t) => t.name.startsWith('Izolačné sklo 4/8/4'));
 		expect(al).toBeTruthy();
 		expect(izo16).toBeTruthy();
-		// prvý nositeľ kódu „001" si ho ponechá, ďalší dostane presný názov (Odoo resolve_glass_type
-		// páruje aj presný názov) — žiadny typ z katalógu nesmie potichu zmiznúť
-		expect(izo16!.value).toBe('001');
+		// kód „001" majú DVA typy → pre Odoo resolve_glass_type (páruje kód prvý) nejednoznačný, preto
+		// OBA nesú presný názov (Odoo páruje aj názov) — a žiadny typ nesmie potichu zmiznúť
+		expect(izo16!.value).toBe('Izolačné sklo 4/8/4- číre (Ug=1,1)');
 		expect(al!.value).toBe('IZOS DOUBLE 4-16-4 AL');
 		expect(al!.hrubkaMm).toBe(24);
 		expect(izo16!.hrubkaMm).toBe(16);
@@ -267,7 +267,7 @@ describe('#579 server — ponuky pre všetky systémy + Odoo nedostupné pri odo
 		expect(odooMena(all.Robust!)).toEqual([...ROBUST_24_MM].sort());
 	});
 
-	it('overSkloOdoo: Odoo nedostupné → typ prijatý bez overenia (len text objednávky), názov = hodnota', async () => {
+	it('overSkloOdoo: Odoo nedostupné → typ prijatý bez overenia (len text objednávky), názov neznámy', async () => {
 		const p = { system: 'Robust', sklo: 'Izolačné sklo 4/16/4 číre', skloOdoo: '003' } as {
 			system: string;
 			sklo: string;
@@ -275,7 +275,9 @@ describe('#579 server — ponuky pre všetky systémy + Odoo nedostupné pri odo
 			skloOdooNazov?: string;
 		};
 		expect(await overSkloOdoo(p)).toBeNull();
-		expect(p.skloOdooNazov).toBe('003');
+		// review #579: holý kód („003") by na pláne nič nepovedal → názov ostane nevyplnený a plán
+		// ukáže lokálne výpočtové sklo
+		expect(p.skloOdooNazov).toBeUndefined();
 		// bez Odoo typu sa nič nedopĺňa
 		const q: { system: string; sklo: string; skloOdooNazov?: string } = {
 			system: 'Robust',
@@ -387,6 +389,23 @@ describe('#579 akcie — výpočet nezmenený, objednávka nesie Odoo typ', () =
 			robustForm({ sklo: 'Izolačné sklo 4/16/4 mliečne', skloOdoo: 'IZOS DOUBLE 4-16-4 AL' })
 		);
 		expect(r.step).toBe('form');
+	});
+
+	it('Odoo typ + voľný text „presné zloženie": plán aj objednávka nesú TEN ISTÝ Odoo typ', async () => {
+		odooOn();
+		const fd = robustForm({
+			zak: 'ZAK-579-P',
+			skloOdoo: 'IZOS DOUBLE 5ESG-14-5ESG',
+			skloPresne: 'Stopsol Classic Grey'
+		});
+		const r = await akcia('pridatSkla', fd);
+		const v = r.vstup as { skloPresne: string; skloOdooNazov: string };
+		// Odoo typ JE presné zloženie → voľný text sa zahodí (inak by plán a objednávka nesúhlasili)
+		expect(v.skloPresne).toBe('');
+		expect(v.skloOdooNazov).toBe('IZOS DOUBLE 5ESG-14-5ESG');
+		expect(listSklaPreZakazku('ZAK-579-P').map((x) => x.typSkla)).toEqual([
+			'IZOS DOUBLE 5ESG-14-5ESG'
+		]);
 	});
 
 	it('odoslat: detail nesie Odoo typ (plán/história) a „Použiť znova" ho obnoví', async () => {

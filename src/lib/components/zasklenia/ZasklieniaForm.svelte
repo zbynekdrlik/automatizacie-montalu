@@ -96,8 +96,8 @@
 		// pure helpery (uzávery nad `data`/`existuje` v rodičovi) + mutátory stavu rodiča
 		stylyForSystem,
 		sklaForSystem,
-		// #579: ponuka „Sklo (základ)" per systém zo servera — Odoo typy podľa hrúbky systému +
-		// lokálne sklá bez Odoo náprotivku (s popisom „· cenník:" #556). Prázdne = lokálne názvy.
+		// #579: ponuka „Sklo (základ)" per systém zo servera — lokálne sklá appky (s popisom
+		// „· cenník:" #556) + Odoo typy podľa hrúbky systému. Prázdne = lokálne názvy.
 		ponukaSkiel = {},
 		triedyPre,
 		otvaraniaForStyl,
@@ -281,7 +281,7 @@
 		<div class="grid2">
 			<div class="field">
 				<label for="sklo">Sklo (základ — určuje vzorec)</label>
-				<select id="sklo" bind:value={() => volba, zvolSklo} data-testid="sklo-select">
+				<select id="sklo" bind:value={() => volba, zvolSklo}>
 					{@render volbySkla(skupiny)}
 				</select>
 				<input type="hidden" name="sklo" value={sklo} />
@@ -377,7 +377,8 @@
 				/>
 			</div>
 		{/if}
-		<div class="field">
+		<!-- #579: zvolený Odoo typ JE presné zloženie (server voľný text pri ňom zahodí) → pole sa skryje -->
+		<div class="field" hidden={!!skloOdooEf}>
 			<label for="skloPresne"
 				>{sklo === SKLO_INE
 					? 'Zloženie skla (text na plán/objednávku) *'

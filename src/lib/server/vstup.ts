@@ -422,7 +422,11 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	};
 	// #579: Odoo typ skla LEN keď je zvolený — bez neho tvar vstupu (detail, golden) nezmenený
 	const skloOdoo = parseSkloOdoo(form.get('sklo'), form.get('skloOdoo'));
-	if (skloOdoo) vstup.skloOdoo = skloOdoo;
+	// Odoo typ JE presné zloženie → voľný text sa zahodí (plán aj objednávka nesú ten istý typ)
+	if (skloOdoo) {
+		vstup.skloOdoo = skloOdoo;
+		vstup.skloPresne = '';
+	}
 	const kol = parseKolajnica(form.get('kolajnicaHorna'), form.get('kolajnicaSpodna'));
 	vstup.kolajnica = kol.kolajnica;
 	const kRaw = rozbalKliny(form.get('kliny'), {
@@ -588,7 +592,10 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			};
 			// #579: zvolený Odoo typ skla (len keď je — tvar posuvu bez neho nezmenený)
 			const skloOdoo = parseSkloOdoo(p.sklo, p.skloOdoo);
-			if (skloOdoo) posuv.skloOdoo = skloOdoo;
+			if (skloOdoo) {
+				posuv.skloOdoo = skloOdoo;
+				posuv.skloPresne = ''; // Odoo typ JE presné zloženie (viď parseVstup)
+			}
 			if (!posuv.system || !posuv.styl) {
 				error = `Zasklenie ${i + 1}: vyber systém a štýl.`;
 				break;

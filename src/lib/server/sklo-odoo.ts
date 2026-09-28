@@ -117,7 +117,7 @@ export async function overSkloOdoo(p: SOdoo): Promise<string | null> {
 			system: p.system,
 			skloOdoo: p.skloOdoo
 		});
-		p.skloOdooNazov = p.skloOdoo;
+		// názov bez Odoo nepoznáme → plán ukáže lokálne sklo (nie holý kód typu)
 		return null;
 	}
 	const ponuka = ponukaSkielPre(p.system, ponukaSkielSystemu(p.system, listGlassTypes()), odoo);
