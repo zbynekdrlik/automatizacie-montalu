@@ -180,6 +180,61 @@ test('sieťka skryje kľučku LEN na strane sieťky — druhá strana ostane aj 
 	expect(errs).toEqual([]);
 });
 
+test('so sieťkou ostávajú OBE kľučky na výber aj v náhľade (#583 ROZHODNUTÉ)', async ({ page }) => {
+	// Patrik (Odoo úloha 1191, msg 1865361): „nechal by som tam obe klučky na výber zo
+	// stietkou". Robust, L - P, obe kľučky zvolené → po zaškrtnutí sieťky ostanú obe
+	// ponúknuté s hodnotami, hint strany aj úchyt sieťky ostávajú, a obe idú do náhľadu.
+	const errs = collectConsole(page);
+	await loginAs(page);
+
+	await zaklad(page, 'E2E-SIETKA-OBE-KLUCKY', 'E2E Sietka obe klucky');
+	await page.selectOption('#otvaranie', 'L - P');
+	await page.selectOption('#kovanieL', 'Obojstranná kľučka s FAB');
+	await page.selectOption('#kovanieP', 'Jednostranná kľučka z vnútra bez FAB');
+
+	await page.locator('#sietka-on').check();
+	await expect(page.getByTestId('sietka-strana')).toContainText('na ľavú stranu');
+	await expect(page.locator('#sietka-uchyt')).toBeVisible();
+	await expect(page.locator('#kovanieL')).toHaveValue('Obojstranná kľučka s FAB');
+	await expect(page.locator('#kovanieP')).toHaveValue('Jednostranná kľučka z vnútra bez FAB');
+
+	// ďalší posuv (multi), P - L: rovnako — obe kľučky ostávajú aj po zapnutí sieťky
+	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
+	await page.locator('#ps0-s').fill('4365');
+	await page.locator('#ps0-v').fill('2320');
+	await page.selectOption('#ps0-otv', 'P - L');
+	await page.selectOption('#ps0-kovl', 'Obojstranná kľučka bez FAB');
+	await page.selectOption('#ps0-kovp', 'Jednostranná kľučka z vnútra s FAB');
+	await page.locator('#ps0-sietka-on').check();
+	await expect(page.getByTestId('ps0-sietka-strana')).toContainText('na pravú stranu');
+	await expect(page.locator('#ps0-kovl')).toHaveValue('Obojstranná kľučka bez FAB');
+	await expect(page.locator('#ps0-kovp')).toHaveValue('Jednostranná kľučka z vnútra s FAB');
+	// zmena otvárania kľučky nemaže
+	await page.selectOption('#ps0-otv', 'L - P');
+	await expect(page.locator('#ps0-kovl')).toHaveValue('Obojstranná kľučka bez FAB');
+	await expect(page.locator('#ps0-kovp')).toHaveValue('Jednostranná kľučka z vnútra s FAB');
+
+	await vyberFarbuKovania(page);
+	await page.getByTestId('spocitat').click();
+	await waitHydrated(page);
+
+	// v náhľade OBOCH posuvov je ľavá aj pravá kľučka
+	const kovL = page.getByTestId('kovanie-l');
+	const kovP = page.getByTestId('kovanie-p');
+	await expect(kovL).toHaveCount(2);
+	await expect(kovP).toHaveCount(2);
+	await expect(kovL.nth(0)).toContainText('Obojstranná');
+	await expect(kovL.nth(0)).not.toContainText('bez');
+	await expect(kovP.nth(0)).toContainText('Jednostranná');
+	await expect(kovP.nth(0)).toContainText('bez');
+	await expect(kovL.nth(1)).toContainText('Obojstranná');
+	await expect(kovL.nth(1)).toContainText('bez');
+	await expect(kovP.nth(1)).toContainText('Jednostranná');
+	await expect(kovP.nth(1)).not.toContainText('bez');
+
+	expect(errs).toEqual([]);
+});
+
 test('sieťka na 2K posuve ukáže upozornenie a Money odpis PRIDÁ 3K koľajnicu (#87)', async ({
 	page
 }) => {
