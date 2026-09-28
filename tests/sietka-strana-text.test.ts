@@ -1,6 +1,6 @@
 // #583 (dodatok): hint sieťky vo formulári zasklení skloňoval stranu zle —
 // „Sieťka pôjde na ľavá stranu" (nominatív). Správne je akuzatív „na ľavú / pravú stranu".
-// Hodnoty `sietkaStrana` ('ľavá'/'pravá') sú IDENTIFIKÁTORY (kovanieSkryte, server) —
+// Hodnoty `sietkaStrana` ('ľavá'/'pravá') sú IDENTIFIKÁTORY (náhľad, karta plánu) —
 // menia sa len v zobrazenom texte.
 import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
