@@ -29,9 +29,20 @@ import {
 	type HoleSize
 } from '$lib/server/odoo-rozpis-lines';
 import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
+import {
+	odooObjednavkaSklaUrl,
+	posledneOdoslanieOdoo,
+	ulozOdoslanieOdoo
+} from '$lib/server/objednavka-skla-odoslanie';
 import { zakazkaPrehlad, opZPrehladu } from '$lib/server/zakazka-ceny';
 import { moneyNazvySkiel } from '$lib/server/money-nazov-skla';
 import { nadpisObjednavky } from '$lib/objednavka-skla-pozicia';
+import { SENTINEL_INE_SKLO, neznameKategorie } from '$lib/objednavka-skla-typy';
+import { logger } from '$lib/server/log';
+
+const log = logger('objednavka-skla-podklad');
+// #576: už nahlásené neznáme Odoo kategórie (warn raz za proces — load beží pri každom reloade)
+const hlaseneKategorie = new Set<string>();
 
 /** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
 function parseSpec(form: FormData): GlassSpec {
@@ -65,7 +76,8 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.dxf', '.dwg', '.step', '.stp', '.igs', '.i
 
 // #548: sentinel voľby „iné sklo" v pickeri typu (odkryje vlastný typ + cenu €/m²). Nesmie kolidovať
 // s katalógovým `value` (Odoo `cennik_code`/`name`) — podčiarknikový sentinel nikdy nie je katalóg.
-const MANUAL_TYP_SENTINEL = '__ine__';
+// #576: jeden zdroj so svelte pickerom (`zoskupTypySkla` ho dáva do poslednej skupiny).
+const MANUAL_TYP_SENTINEL = SENTINEL_INE_SKLO;
 
 function allowedExtension(filename: string): boolean {
 	const ext = '.' + (filename.split('.').pop() ?? '').toLowerCase();
@@ -147,6 +159,12 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 	// #540: zoznam typov skla pre picker riadka — živý Odoo `montalu.glass.type`, s lokálnym
 	// fallbackom keď Odoo nedostupné (source sa zobrazí v UI). Money-neutrálne (len ordering).
 	const { items: glassTypes, source: glassTypesSource } = await fetchGlassTypes();
+	// #576: Odoo kategória, ktorú picker nepozná, by ticho spadla do „Ostatné" → warn RAZ za proces.
+	const nezname = neznameKategorie(glassTypes).filter((c) => !hlaseneKategorie.has(c));
+	if (nezname.length > 0) {
+		for (const c of nezname) hlaseneKategorie.add(c);
+		log.warn('neznáma Odoo kategória typu skla — v pickeri pod „Ostatné"', { kategorie: nezname });
+	}
 
 	// #556: riadky z výpočtu, ktorých `typ_skla` nie je platná Odoo hodnota (nejednoznačné „viac"
 	// alebo „ziadne" pri vkladaní) → badge „nepriradené — vyber typ" + kandidáti (pri „viac") navrchu
@@ -174,6 +192,9 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 		polozky.filter((p) => !p.typSklaManual).map((p) => p.typSkla)
 	);
 
+	// #577: posledné odoslanie podkladu do Odoo → trvalý odkaz na objednávku skla (aj po obnovení).
+	const odoslanieOdoo = posledneOdoslanieOdoo(zak);
+
 	return {
 		zak,
 		nadpis,
@@ -187,7 +208,8 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 		suboryMap,
 		glassTypes,
 		glassTypesSource,
-		naviazanie
+		naviazanie,
+		odoslanieOdoo
 	};
 };
 
@@ -365,11 +387,31 @@ export const actions = {
 
 	// #521: odoslanie objednávky skla do Odoo (glass_order). Vracia postavený payload (náhľad) +
 	// výsledok — keď je upload vypnutý (dev/test), payload sa len zobrazí, PROD Odoo sa nevolá.
-	odoslatDoOdoo: async ({ params }) => {
+	odoslatDoOdoo: async ({ params, locals }) => {
 		const zak = params.zak.trim();
 		if (!zak) return fail(400, { error: 'Zákazka nie je zadaná.' });
 		const out = await uploadGlassOrderToOdoo(zak);
 		const dropped = out.droppedAttachments ?? [];
+		// #577: úspešný upload s `glass_order_id` → priamy odkaz na objednávku skla v Odoo + uloženie
+		// k podkladu (odkaz ostane aj po obnovení). Bez id (v1 intake / vypnuté / chyba) → žiadny odkaz.
+		const glassOrderId = out.result === 'uploaded' ? out.odoo?.glassOrderId : undefined;
+		const odkaz = glassOrderId != null ? odooObjednavkaSklaUrl(glassOrderId) : null;
+		if (odkaz && glassOrderId != null) {
+			// Zlyhanie uloženia nesmie zhodiť odpoveď — objednávka v Odoo UŽ existuje, odkaz sa vráti.
+			try {
+				ulozOdoslanieOdoo(
+					zak,
+					{ glassOrderId, name: out.odoo?.name },
+					locals?.user?.username ?? ''
+				);
+			} catch (e) {
+				log.error('uloženie odoslania objednávky skla zlyhalo', {
+					zak,
+					glassOrderId,
+					err: e instanceof Error ? e.message : String(e)
+				});
+			}
+		}
 		return {
 			ok: true,
 			odoslane: {
@@ -377,6 +419,7 @@ export const actions = {
 				payload: out.payload,
 				error: out.error,
 				odoo: out.odoo ?? null,
+				odkaz,
 				droppedAttachments: dropped,
 				droppedNames: dropped.map((d) => d.name).join(', ')
 			}

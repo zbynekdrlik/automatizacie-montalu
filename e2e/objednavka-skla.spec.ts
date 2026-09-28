@@ -6,6 +6,7 @@
 // Money priečinok, nikdy ostrý Money) — skipAkLive na ostrom nasadení preskočí.
 import { test, expect, type Page } from '@playwright/test';
 import { formatDatumSk } from '../src/lib/datum';
+import { PORADIE_SKUPIN } from '../src/lib/objednavka-skla-typy';
 import {
 	collectConsole,
 	loginAs,
@@ -226,6 +227,41 @@ test('objednávka skla: „iné sklo" — vlastný typ + cena/m² sa uloží a z
 	await expect(riadok.locator('td').nth(0)).toContainText('ATYP bronz');
 	await expect(riadok).toContainText('lepené 33.1 bronz');
 	await expect(riadok).toContainText('55.50');
+	// #576: aj picker riadka je zoskupený — „iné sklo" je posledná skupina
+	const riadokOptgroupy = riadok.locator('select.typ-select optgroup');
+	await expect(riadokOptgroupy.last()).toHaveAttribute('label', 'Iné sklo');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #576 (Marek D., Odoo úloha 1180): výber „Typ skla" nie je plochý zoznam ~99 typov — typy sú v
+// `<optgroup>` podľa druhu skla, „iné sklo" je posledná skupina, žiadna hodnota sa neopakuje a
+// každý typ je v niektorej skupine. RELAČNÉ (počet typov aj skupiny závisia od Odoo / lokálneho
+// fallbacku — žiadny PROD literál). Len čítanie (podklad sa neukladá) → beží aj proti nasadeniu.
+test('objednávka skla: výber typu skla je zoskupený podľa druhu (#576)', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await goto(page, `/objednavka-skla/${RUN}-TYPY`);
+	const typ = page.getByTestId('pridat-riadok').getByTestId('manual-typ');
+	const skupiny = typ.locator('optgroup');
+	expect(await skupiny.count()).toBeGreaterThanOrEqual(2);
+	await expect(skupiny.last()).toHaveAttribute('label', 'Iné sklo');
+	// každá skupina je známa a v PEVNOM poradí (IZOS → ESG → VSG → rezané → ostatné → iné sklo)
+	const nazvy = await skupiny.evaluateAll((g) => g.map((x) => (x as HTMLOptGroupElement).label));
+	const poradie = nazvy.map((n) => PORADIE_SKUPIN.indexOf(n));
+	expect(poradie).not.toContain(-1);
+	expect(poradie).toEqual([...poradie].sort((a, b) => a - b));
+	await expect(skupiny.last().locator('option')).toHaveAttribute('value', '__ine__');
+	// každá voľba okrem placeholdera je v skupine, a žiadna hodnota nie je dvakrát
+	const vsetky = await typ
+		.locator('option:not([value=""])')
+		.evaluateAll((o) => o.map((x) => (x as HTMLOptionElement).value));
+	const vSkupinach = await typ
+		.locator('optgroup option')
+		.evaluateAll((o) => o.map((x) => (x as HTMLOptionElement).value));
+	expect(vSkupinach).toEqual(vsetky);
+	expect(new Set(vsetky).size).toBe(vsetky.length);
 
 	expect(consoleMsgs).toEqual([]);
 });

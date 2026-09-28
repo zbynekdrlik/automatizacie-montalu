@@ -4,6 +4,7 @@
 	import { modulNazov } from '$lib/modul-nazov';
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import { bezRozmerov, fmtRozmerTabule, popisPozicie } from '$lib/objednavka-skla-pozicia';
+	import { SENTINEL_INE_SKLO, zoskupTypySkla } from '$lib/objednavka-skla-typy';
 
 	let { data, form } = $props();
 
@@ -31,6 +32,15 @@
 	// Odoslať sa zapne LEN keď má podklad ≥ 1 riadok A neprázdne efektívne OP — celý invariant na
 	// jednom mieste (#545 review 🔵), nespoliehaj sa len na to, že tlačidlo je vnútri guardu položiek.
 	const mozeOdoslat = $derived(maOp && polozky.length > 0);
+	// #577: odkaz na objednávku skla v Odoo — uložené posledné odoslanie podkladu (trvalé, po
+	// `use:enhance` sa load znova načíta); čerstvý odkaz z akcie len keď sa uloženie nepodarilo.
+	const odkazOdoo = $derived.by(() => {
+		const u = data.odoslanieOdoo;
+		if (u?.url) return { url: u.url, name: u.name, kedy: u.odoslaneKedy, kto: u.odoslal };
+		const f = form?.odoslane;
+		if (f?.odkaz) return { url: f.odkaz, name: f.odoo?.name ?? '', kedy: '', kto: '' };
+		return null;
+	});
 
 	// Zoskupenie položiek podľa modulu (plain array, bez Map — svelte/prefer-svelte-reactivity)
 	const skupiny = $derived.by(() => {
@@ -51,7 +61,10 @@
 	}
 
 	// #548: „iné sklo" — sentinel voľby v pickeri typu (odkryje vlastný typ + cenu €/m²).
-	const MANUAL_SENTINEL = '__ine__';
+	const MANUAL_SENTINEL = SENTINEL_INE_SKLO;
+	// #576: skupiny podľa druhu skla BEZ kandidátov — „Pridať riadok" aj každý riadok bez kandidátov
+	// (zoskupí sa RAZ, nie per riadok); riadok s kandidátmi #556 si ich zoskupí s „Odporúčané".
+	const skupinyTypov = $derived(zoskupTypySkla(glassTypes, []));
 	function fmtCena(c: number | null): string {
 		return c != null ? `${c.toFixed(2)} €/m²` : '';
 	}
@@ -116,10 +129,14 @@
 			>Typ skla *
 			<select name="typ_skla" required bind:value={novyTyp} data-testid="manual-typ">
 				<option value="">— vyberte typ —</option>
-				{#each glassTypes as t (t.value)}
-					<option value={t.value}>{t.label}</option>
+				<!-- #576: skupiny podľa druhu skla (IZOS / ESG / VSG / rezané / ostatné) + iné sklo -->
+				{#each skupinyTypov as g (g.label)}
+					<optgroup label={g.label}>
+						{#each g.items as t (t.value)}
+							<option value={t.value}>{t.label}</option>
+						{/each}
+					</optgroup>
 				{/each}
-				<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 			</select></label
 		>
 		{#if novyIne}
@@ -280,18 +297,16 @@
 												>{p.typSkla ? nazovTypu(p.typSkla) : '— vyberte typ —'}</option
 											>
 										{/if}
-										<!-- #556: kandidáti podľa zloženia (pri „viac") navrchu pickera -->
-										{#if nav?.kandidati.length}
-											<optgroup label="Kandidáti (podľa zloženia)">
-												{#each nav.kandidati as k (k.value)}
-													<option value={k.value}>{k.label}</option>
+										<!-- #576: skupiny podľa druhu skla; #556 kandidáti (pri „viac") navrchu
+											ako „Odporúčané"; „iné sklo" posledné -->
+										{#each nav?.kandidati.length ? zoskupTypySkla(glassTypes, nav.kandidati) : skupinyTypov as g (g.label)}
+											<optgroup label={g.label}>
+												{#each g.items as t (t.value)}
+													<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option
+													>
 												{/each}
 											</optgroup>
-										{/if}
-										{#each glassTypes as t (t.value)}
-											<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option>
 										{/each}
-										<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 									</select>
 								</form>
 								{#if nav?.nepriradene}
@@ -574,6 +589,28 @@
 	{/if}
 {/if}
 
+<!-- #577 (Marek D., úloha 1181): po odoslaní priamy odkaz na objednávku skla v Odoo — TRVALO (uložené
+	k podkladu, aj po obnovení stránky). Mimo guardu položiek: objednávka v Odoo existuje ďalej. -->
+{#if odkazOdoo}
+	<p class="noprint odoo-odkaz" data-testid="odoo-objednavka">
+		<!-- eslint-disable svelte/no-navigation-without-resolve -- externá absolútna URL Odoo
+		     (erp.montalu.cloud), nie interná route appky → `resolve()` sa na ňu nevzťahuje. -->
+		<a
+			href={odkazOdoo.url}
+			target="_blank"
+			rel="noopener noreferrer"
+			data-testid="odoo-objednavka-link"
+			>{'Otvoriť objednávku skla v Odoo' + (odkazOdoo.name ? ` (${odkazOdoo.name})` : '')}</a
+		>
+		<!-- eslint-enable svelte/no-navigation-without-resolve -->
+		{#if odkazOdoo.kedy}
+			<span class="odoo-odkaz-kedy" data-testid="odoo-objednavka-kedy"
+				>{'· odoslané ' + odkazOdoo.kedy + (odkazOdoo.kto ? ` (${odkazOdoo.kto})` : '')}</span
+			>
+		{/if}
+	</p>
+{/if}
+
 <style>
 	h1 {
 		margin-bottom: 8px;
@@ -739,6 +776,14 @@
 	}
 	.ine-form input[type='text'] {
 		max-width: 180px;
+	}
+	.odoo-odkaz {
+		margin-top: 12px;
+		font-weight: 600;
+	}
+	.odoo-odkaz-kedy {
+		font-weight: normal;
+		color: var(--m-muted-ink);
 	}
 	.odoo-osk {
 		margin-top: 6px;
