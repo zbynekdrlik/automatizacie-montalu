@@ -67,11 +67,13 @@ const podlaNazvu = (a: TypSklaVolba, b: TypSklaVolba): number =>
  * Zoskupí typy skla do skupín pickera: „Odporúčané" (kandidáti, keď sú) → Izolačné → ESG → VSG →
  * Rezané → „Ostatné" (neznáma/prázdna kategória, napr. lokálny fallback) → „Iné sklo" (VŽDY
  * posledné). V kategórii zoradené podľa názvu (sk). Kandidát sa v kategóriách NEopakuje (žiadne
- * duplicitné `value` v jednom selecte); prázdne skupiny sa vynechajú.
+ * duplicitné `value` v jednom selecte); prázdne skupiny sa vynechajú. `sIneSklo=false` vynechá
+ * skupinu „Iné sklo" (#579 nárezák má vlastnú „Iné (vlastná skladba)" voľbu).
  */
 export function zoskupTypySkla(
 	items: readonly (TypSklaVolba & { category: string })[],
-	kandidati: readonly TypSklaVolba[]
+	kandidati: readonly TypSklaVolba[],
+	sIneSklo = true
 ): SkupinaTypovSkla[] {
 	const out: SkupinaTypovSkla[] = [];
 	const odporucane = kandidati.map((k) => ({ value: k.value, label: k.label }));
@@ -89,6 +91,7 @@ export function zoskupTypySkla(
 	for (const k of KATEGORIE) skupina(k.label, (c) => c === k.category);
 	skupina(OSTATNE, (c) => !ZNAME_KATEGORIE.has(c));
 
-	out.push({ label: INE_SKLO, items: [{ value: SENTINEL_INE_SKLO, label: INE_SKLO_LABEL }] });
+	if (sIneSklo)
+		out.push({ label: INE_SKLO, items: [{ value: SENTINEL_INE_SKLO, label: INE_SKLO_LABEL }] });
 	return out;
 }

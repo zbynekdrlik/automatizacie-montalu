@@ -11,6 +11,13 @@
 	import { zaskleniaSlovom } from '$lib/popis';
 	import { plusRailEligible, SYSTEMY_OBVODOVA } from '$lib/styl';
 	import { SKLO_INE } from '$lib/sklo';
+	import {
+		ponukaPreStyl,
+		volbaSkla,
+		rozlozVolbu,
+		type PonukaSkiel,
+		type SkupinaVolieb
+	} from '$lib/sklo-odoo';
 	import { sietkaStrana, maSietkaSystem, type SietkaUchyt } from '$lib/sietka';
 	import type { Farba } from '$lib/komponenty';
 	import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -49,6 +56,8 @@
 		vrtanieZamkuS = $bindable(1050),
 		skloPresneS = $bindable(''),
 		skloTriedaS = $bindable<number | ''>(''),
+		// #579: zvolený Odoo typ skla primárneho posuvu ('' = lokálne sklo); `sklo` = výpočtové
+		skloOdooS = $bindable(''),
 		poznamkaS = $bindable(''),
 		ralS = $bindable(''),
 		cakaS = $bindable(false),
@@ -87,9 +96,9 @@
 		// pure helpery (uzávery nad `data`/`existuje` v rodičovi) + mutátory stavu rodiča
 		stylyForSystem,
 		sklaForSystem,
-		// #556: lokálny názov skla → cenníkový popis z Odoo (len neprázdne); nárezák select
-		// zobrazí „· cenník: <Odoo name>". Prázdna mapa (Odoo nedostupné) = bez popisu.
-		cennikPopisSkla = {},
+		// #579: ponuka „Sklo (základ)" per systém zo servera — Odoo typy podľa hrúbky systému +
+		// lokálne sklá bez Odoo náprotivku (s popisom „· cenník:" #556). Prázdne = lokálne názvy.
+		ponukaSkiel = {},
 		triedyPre,
 		otvaraniaForStyl,
 		kolajnicaPre,
@@ -115,6 +124,7 @@
 		vrtanieZamkuS?: number | string;
 		skloPresneS?: string;
 		skloTriedaS?: number | '';
+		skloOdooS?: string;
 		poznamkaS?: string;
 		ralS?: string;
 		cakaS?: boolean;
@@ -151,8 +161,8 @@
 		b2bBlok: boolean;
 		stylyForSystem: (sys: string) => string[];
 		sklaForSystem: (sys: string, styl: string) => string[];
-		/** #556: lokálny názov skla → cenníkový popis z Odoo (voliteľné, prázdne = bez popisu). */
-		cennikPopisSkla?: Record<string, string>;
+		/** #579: ponuka skiel per systém (voliteľné, prázdne = lokálne názvy). */
+		ponukaSkiel?: Record<string, PonukaSkiel>;
 		triedyPre: (sys: string, styl: string) => readonly number[];
 		otvaraniaForStyl: (st: string) => string[];
 		kolajnicaPre: (sys: string) => boolean;
@@ -160,7 +170,53 @@
 		removePosuv: (i: number) => void;
 		fixPosuv: (i: number, systemZmeneny?: boolean) => void;
 	} = $props();
+
+	// #579: select „Sklo (základ)" zobrazuje VOĽBU (Odoo typ alebo lokálne sklo), formulár nesie
+	// dve polia — `sklo` (lokálne výpočtové, všetka existujúca logika) a `skloOdoo` (zvolený Odoo
+	// typ). Voľba je odvodená, výber ju rozloží späť (`$lib/sklo-odoo`).
+	const skupinyZ = (sys: string, skla: string[]): SkupinaVolieb[] =>
+		ponukaPreStyl(
+			ponukaSkiel[sys],
+			skla.filter((g) => g !== SKLO_INE)
+		);
+	const skupinyPre = (sys: string, st: string) => skupinyZ(sys, sklaForSystem(sys, st));
+	const volbaPre = (sys: string, sk: string, so: string, skup: SkupinaVolieb[]) =>
+		volbaSkla(sk, so, skup, ponukaSkiel[sys]?.zastupca ?? {});
+	// primárny posuv: `sklaPre` = sklaForSystem(system, styl) z rodiča
+	let skupiny = $derived(skupinyZ(system, sklaPre));
+	let volba = $derived(volbaPre(system, sklo, skloOdooS, skupiny));
+	// Odoo typ, ktorý select naozaj ukazuje (aj zástupca predvoleného lokálneho skla)
+	let skloOdooEf = $derived(rozlozVolbu(volba, skupiny).skloOdoo);
+	function zvolSklo(v: string) {
+		const r = rozlozVolbu(v, skupiny);
+		sklo = r.sklo;
+		skloOdooS = r.skloOdoo;
+	}
+	// YELLOW-2 (#235 slice 2): pri prepnutí PREČ z „Iné" vyčisti skrytú vlastnú skladbu posuvu —
+	// inak by stará (neviditeľná) hodnota tichonko sadla na katalógové sklo (plán, objednávka).
+	function zvolSkloPosuvu(p: PosuvRow, v: string) {
+		const r = rozlozVolbu(v, skupinyPre(p.system, p.styl));
+		p.sklo = r.sklo;
+		p.skloOdoo = r.skloOdoo;
+		if (p.sklo !== SKLO_INE) {
+			p.skloPresne = '';
+			p.skloTrieda = '';
+		}
+	}
 </script>
+
+{#snippet volbySkla(sk: SkupinaVolieb[])}
+	{#each sk as g (g.label)}
+		{#if g.label}
+			<optgroup label={g.label}>
+				{#each g.items as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+			</optgroup>
+		{:else}
+			{#each g.items as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+		{/if}
+	{/each}
+	<option value={SKLO_INE}>{SKLO_INE}</option>
+{/snippet}
 
 <div class="card">
 	<form method="POST" action="?/nahlad">
@@ -227,11 +283,11 @@
 		<div class="grid2">
 			<div class="field">
 				<label for="sklo">Sklo (základ — určuje vzorec)</label>
-				<select id="sklo" name="sklo" bind:value={sklo}>
-					{#each sklaPre as g (g)}<option value={g}
-							>{g}{cennikPopisSkla[g] ? ` · cenník: ${cennikPopisSkla[g]}` : ''}</option
-						>{/each}
+				<select id="sklo" bind:value={() => volba, zvolSklo} data-testid="sklo-select">
+					{@render volbySkla(skupiny)}
 				</select>
+				<input type="hidden" name="sklo" value={sklo} />
+				{#if skloOdooEf}<input type="hidden" name="skloOdoo" value={skloOdooEf} />{/if}
 				{#if narezakHint}<span class="hint" data-testid="narezak-hint">{narezakHint}</span>{/if}
 				<!-- Vlastná (nekatalógová) skladba (#235 slice 2): trieda určuje výpočet + tesnenie;
 				     samotnú skladbu (text) obsluha napíše do poľa „Presné zloženie skla" nižšie. -->
@@ -540,22 +596,16 @@
 				<div class="grid2">
 					<div class="field">
 						<label for={`ps${i}-sklo`}>Sklo</label>
-						<!-- YELLOW-2 (#235 slice 2): pri prepnutí PREČ z „Iné" vyčisti skrytú vlastnú
-						     skladbu — inak by stará (neviditeľná) hodnota tichonko sadla na katalógové
-						     sklo (plán, objednávka, detail). -->
+						<!-- #579: voľba (Odoo typ / lokálne sklo) → p.sklo (výpočtové) + p.skloOdoo;
+						     YELLOW-2 čistenie vlastnej skladby je v `zvolSkloPosuvu`. -->
 						<select
 							id={`ps${i}-sklo`}
-							bind:value={p.sklo}
-							onchange={() => {
-								if (p.sklo !== SKLO_INE) {
-									p.skloPresne = '';
-									p.skloTrieda = '';
-								}
-							}}
+							bind:value={
+								() => volbaPre(p.system, p.sklo, p.skloOdoo, skupinyPre(p.system, p.styl)),
+								(v) => zvolSkloPosuvu(p, v)
+							}
 						>
-							{#each sklaForSystem(p.system, p.styl) as g (g)}<option value={g}
-									>{g}{cennikPopisSkla[g] ? ` · cenník: ${cennikPopisSkla[g]}` : ''}</option
-								>{/each}
+							{@render volbySkla(skupinyPre(p.system, p.styl))}
 						</select>
 						<!-- vlastná skladba tohto posuvu (#235 slice 2) — bind (žiadne name=,
 						     serializuje sa cez posuvyJSON z p.skloTrieda / p.skloPresne) -->

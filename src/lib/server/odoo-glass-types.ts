@@ -40,6 +40,10 @@ export interface GlassTypeOption {
 	name: string;
 	/** #556: surový Odoo `composition` (napr. „4/8/4") — matcher normalizuje na „4-8-4". */
 	composition: string;
+	/** #579: Odoo `total_thickness_mm` (celková hrúbka) — nárezák ňou páruje typ na hrúbkové
+	 *  triedy systému (`sklo-povolene.ts` `ODOO_HRUBKY`). 0 = chýba (dátová chyba / lokálny
+	 *  fallback) → nárezák taký typ neponúkne. */
+	hrubkaMm: number;
 }
 
 export interface GlassTypesResult {
@@ -58,6 +62,12 @@ export interface GlassTypesResult {
 function s(v: unknown): string {
 	if (v == null || v === false) return '';
 	return String(v).trim();
+}
+
+/** #579: Odoo číselné pole (`false` = nevyplnené, #551) → kladné číslo, inak 0. */
+function mm(v: unknown): number {
+	const x = typeof v === 'number' ? v : Number(v);
+	return Number.isFinite(x) && x > 0 ? x : 0;
 }
 
 let _cache: { result: GlassTypesResult; ts: number; ttl: number } | null = null;
@@ -89,7 +99,7 @@ function localFallback(): GlassTypesResult {
 		seen.add(name);
 		// #556: lokálny fallback nemá Odoo composition/category → prázdne (matcher gatuje na
 		// source==='odoo', takže sa lokálne názvy neparujú samé na seba).
-		items.push({ value: name, label: name, category: '', name, composition: '' });
+		items.push({ value: name, label: name, category: '', name, composition: '', hrubkaMm: 0 });
 	}
 	items.sort((a, b) => a.label.localeCompare(b.label, 'sk'));
 	return { items, source: 'local' };
@@ -140,7 +150,7 @@ async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 			cfg,
 			GLASS_TYPE_MODEL,
 			[['active', '=', true]],
-			['name', 'category', 'cennik_code', 'composition', 'active'],
+			['name', 'category', 'cennik_code', 'composition', 'total_thickness_mm', 'active'],
 			{ order: 'name', timeoutMs }
 		);
 		const mapped: GlassTypeOption[] = rows
@@ -154,7 +164,9 @@ async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 					category: s(r.category),
 					// #556: surové polia pre matcher (`glass-match.ts`) + nárezák popis
 					name,
-					composition
+					composition,
+					// #579: celková hrúbka — nárezák ponúka typy podľa hrúbky systému
+					hrubkaMm: mm(r.total_thickness_mm)
 				};
 			})
 			// riadok bez cennik_code AJ bez name je pre `glass_order.items[].glass_type` nepoužiteľný
@@ -167,14 +179,26 @@ async function _doFetch(timeoutMs: number): Promise<GlassTypesResult> {
 		for (const it of mapped) {
 			if (seen.has(it.value)) {
 				dupes.add(it.value);
-				continue;
+				// #579: pri kolízii `cennik_code` (PROD: „001" má „Izolačné 4/8/4" AJ „IZOS DOUBLE
+				// 4-16-4 AL") sa ďalší typ NEZAHODÍ — dostane `value = name` (Odoo
+				// `resolve_glass_type` páruje aj presný názov); zahodí sa, len keď koliduje aj názov.
+				if (!it.name || seen.has(it.name)) continue;
+				it.value = it.name;
 			}
 			seen.add(it.value);
 			items.push(it);
 		}
 		if (dupes.size > 0) {
-			log.warn('fetchGlassTypes: duplicitné hodnoty typov skla z Odoo — deduplikované', {
+			log.warn('fetchGlassTypes: duplicitné cenníkové kódy typov skla v Odoo', {
 				dupes: [...dupes]
+			});
+		}
+		// #579 (f): typ bez celkovej hrúbky je dátová chyba v Odoo — nárezák ho neponúkne; zaloguj
+		// RAZ za fetch (cache 5 min), aby ho výroba v Odoo doplnila.
+		const bezHrubky = items.filter((t) => t.hrubkaMm === 0).map((t) => t.name);
+		if (bezHrubky.length > 0) {
+			log.warn('fetchGlassTypes: typy skla bez total_thickness_mm — nárezák ich neponúkne', {
+				typy: bezHrubky
 			});
 		}
 		const result: GlassTypesResult = { items, source: 'odoo' };
@@ -208,6 +232,8 @@ export async function priradOdooTypy<T extends { typSkla: string }>(polozky: T[]
 	const { items, source } = await fetchGlassTypes();
 	if (source !== 'odoo') return polozky;
 	return polozky.map((p) => {
+		// #579: už platná Odoo hodnota (nárezák zvolil Odoo typ priamo) sa NEpreklápa matcherom
+		if (items.some((t) => t.value === p.typSkla)) return p;
 		const m = matchOdooGlassType(p.typSkla, items);
 		if (m.istota === 'jednoznacne' && m.typ) {
 			// #556 review: zhoda je len zloženie ∧ kategória (pokov/plyn/Ug sa nerozlišuje) — logni

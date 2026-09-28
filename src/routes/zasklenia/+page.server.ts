@@ -67,8 +67,8 @@ import {
 	sklaPosuvu,
 	upozornenieCudzie
 } from '$lib/server/objednavka-skla';
-import { priradOdooTypy, fetchGlassTypes } from '$lib/server/odoo-glass-types';
-import { cennikPopis } from '$lib/server/glass-match';
+import { priradOdooTypy } from '$lib/server/odoo-glass-types';
+import { ponukySkiel, parseVstupSOdoo, parseMultiVstupSOdoo } from '$lib/server/sklo-odoo';
 
 /** #461: parsuj vylúčené kódy z FormData — komponent SkladVarovania ich posiela
  *  ako comma-separated string v hidden inpute `vylucene_kody`. */
@@ -82,6 +82,11 @@ function parseVyluceneKody(form: FormData): Set<string> {
 function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
 	if (vylucene.size === 0) return job;
 	return { ...job, polozky: job.polozky.filter((p) => !vylucene.has(p.kod)) };
+}
+
+/** #579: polia zvoleného Odoo typu skla do `detail` — len keď bol zvolený (tvar bez Odoo nezmenený). */
+function odooSkloDetail(p?: { skloOdoo?: string; skloOdooNazov?: string }) {
+	return p?.skloOdoo ? { skloOdoo: p.skloOdoo, skloOdooNazov: p.skloOdooNazov ?? '' } : {};
 }
 
 function jobFor(
@@ -107,9 +112,11 @@ function jobFor(
 			styl: r.styl,
 			s: r.S,
 			v: r.V,
-			// zaznamenaj presné zloženie ak zadané, inak základné sklo
-			sklo: vstup.skloPresne || vstup.sklo,
+			// zaznamenaj presné zloženie ak zadané, inak zvolený Odoo typ (#579), inak základné sklo
+			sklo: vstup.skloPresne || vstup.skloOdooNazov || vstup.sklo,
 			skloZaklad: vstup.sklo,
+			// #579: zvolený Odoo typ skla (objednávka + „Použiť znova"); výpočet ide zo `skloZaklad`
+			...odooSkloDetail(vstup),
 			// vlastná skladba (#235 slice 2): trieda pre „Použiť znova" restore (inak null)
 			skloTrieda: vstup.skloTrieda,
 			otvaranie: vstup.otvaranie,
@@ -271,8 +278,10 @@ function jobForMulti(
 				v: p.V,
 				// #235 slice 2: rovnaká schéma ako single (jobFor) — display text v `sklo`,
 				// základ (sentinel pri vlastnej skladbe) v `skloZaklad`, trieda pre restore
-				sklo: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo,
+				sklo:
+					vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.skloOdooNazov || vstup.posuvy[i]?.sklo,
 				skloZaklad: vstup.posuvy[i]?.sklo,
+				...odooSkloDetail(vstup.posuvy[i]),
 				skloTrieda: vstup.posuvy[i]?.skloTrieda ?? null,
 				otvaranie: p.otvaranie,
 				kovanieL: vstup.posuvy[i]?.kovanieL,
@@ -296,14 +305,6 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	const znovaId = Number(url.searchParams.get('znova') ?? '');
 	const znova = znovaId && !isB2B(locals.user) ? znovaZOdpisu(znovaId) : null;
 	const systemy = systemyZoStylov(styly); // #518: jediný zdroj pravdy, zdieľaný s editorom vzorcov
-	// #556: cenníkový popis z Odoo per lokálny názov skla (len neprázdne). Živý `montalu.glass.type`
-	// cez `fetchGlassTypes` cache, pri lokálnom fallbacku (Odoo nedostupné) prázdne (bez popisu).
-	const { items: odooTypy, source: odooSource } = await fetchGlassTypes();
-	const cennikPopisSkla: Record<string, string> = {};
-	for (const nazov of new Set(listGlassTypes().map((g) => g.nazov))) {
-		const popis = cennikPopis(nazov, odooTypy, odooSource);
-		if (popis) cennikPopisSkla[nazov] = popis;
-	}
 	return {
 		systemy,
 		styly, // len existujúce kombinácie — neplatná voľba sa nedá odoslať
@@ -379,11 +380,11 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			})
 		),
 		znova,
-		// #556: cenníkový popis z Odoo `montalu.glass.type` per lokálny názov skla — nárezák select
-		// zobrazí „· cenník: <Odoo name>" (pri „viac" bez popisu — #573). Enrichment cez
-		// EXISTUJÚCU `fetchGlassTypes` cache (3 s timeout, fallback = bez popisu). Výpočtový katalóg,
-		// hrúbky, profily a Money kódy NEDOTKNUTÉ (`glass-catalog.md`).
-		cennikPopisSkla,
+		// #579: ponuka „Sklo (základ)" per systém = Odoo typy skla podľa hrúbky systému (zoskupené
+		// podľa druhu) + lokálne sklá bez Odoo náprotivku (s popisom „· cenník:" #556). Každá voľba
+		// nesie LOKÁLNE výpočtové sklo — vzorce/Money nezmenené. `fetchGlassTypes` cache (3 s
+		// timeout); Odoo nedostupné → dnešná lokálna ponuka (`glass-catalog.md`).
+		ponukaSkiel: await ponukySkiel(systemy),
 		live: isLive()
 	};
 };
@@ -478,7 +479,7 @@ function stavNahladMulti(
 
 export const actions = {
 	nahlad: async ({ request, locals }) => {
-		const { vstup, error } = parseVstup(await request.formData());
+		const { vstup, error } = await parseVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
 
 		// b2b: šírka na sklo blokuje (nedá sa vyrobiť), výška NEblokuje — len
@@ -520,7 +521,7 @@ export const actions = {
 			return { step: 'form' as const, error: 'Veľkoobchodný účet nemôže odpisovať do Money.' };
 		}
 		const formData = await request.formData();
-		const { vstup, error } = parseVstup(formData);
+		const { vstup, error } = await parseVstupSOdoo(formData);
 		if (error) return { step: 'form' as const, error, vstup };
 		const { r, err, spec } = compute(vstup);
 		if (err || !r || !spec)
@@ -620,7 +621,7 @@ export const actions = {
 
 	// ---- Viac posuvov (zimná záhrada): spoločné balenie tyčí naprieč posuvmi ----
 	nahladMulti: async ({ request, locals }) => {
-		const { vstup, error } = parseMultiVstup(await request.formData());
+		const { vstup, error } = await parseMultiVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 
 		// b2b: per-posuv šírka blokuje celý náhľad na prvej chybe; výšky, ktoré
@@ -658,7 +659,7 @@ export const actions = {
 			return { step: 'form' as const, error: 'Veľkoobchodný účet nemôže odpisovať do Money.' };
 		}
 		const formData = await request.formData();
-		const { vstup, error } = parseMultiVstup(formData);
+		const { vstup, error } = await parseMultiVstupSOdoo(formData);
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r)
@@ -755,7 +756,7 @@ export const actions = {
 		if (isB2B(locals.user)) {
 			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
 		}
-		const { vstup, error } = parseVstup(await request.formData());
+		const { vstup, error } = await parseVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
 		const { r, err, spec } = compute(vstup);
 		if (err || !r || !spec)
@@ -767,7 +768,8 @@ export const actions = {
 		const polozky = sklaPosuvu('Zasklenie 1', r, {
 			zak: vstup.zak,
 			op: vstup.op,
-			typSkla: vstup.skloPresne || vstup.sklo,
+			// #579: zvolený Odoo typ ide do objednávky PRESNE (bez matchera #556)
+			typSkla: vstup.skloOdoo || vstup.skloPresne || vstup.sklo,
 			createdBy: locals.user?.username ?? ''
 		});
 		// #514: náhľad zostav PRED zápisom — ak kovanie zlyhá (form), NEvkladaj sklá
@@ -788,7 +790,7 @@ export const actions = {
 		if (isB2B(locals.user)) {
 			return { step: 'form' as const, error: 'Veľkoobchodný účet nemá prístup k objednávke skla.' };
 		}
-		const { vstup, error } = parseMultiVstup(await request.formData());
+		const { vstup, error } = await parseMultiVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const { r, err, specs } = computeMultiFrom(vstup);
 		if (err || !r)
@@ -801,7 +803,8 @@ export const actions = {
 			sklaPosuvu(`Zasklenie ${i + 1}`, p, {
 				zak: vstup.zak,
 				op: vstup.op,
-				typSkla: vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
+				typSkla:
+					vstup.posuvy[i]?.skloOdoo || vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
 				createdBy: locals.user?.username ?? ''
 			})
 		);
