@@ -55,10 +55,15 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await page.waitForURL(/\/objednavka-skla\//);
 	await waitHydrated(page);
 
-	const riadky = page.locator('tbody tr');
-	await expect(riadky).toHaveCount(2);
-	const sOtvorom = riadky.filter({ hasText: 'Zasklenie 1 — s otvorom ⌀46' });
-	const bez = riadky.filter({ has: page.locator('td', { hasText: /^Zasklenie 1$/ }) });
+	// každá položka má pod sebou aj riadok s voľbami (spec/prílohy) → počítaj bunky popisu
+	const popisy = page.locator('td[data-testid^="popis-"]');
+	await expect(popisy).toHaveCount(2);
+	const riadok = (popis: string | RegExp) =>
+		page.locator('tbody tr').filter({
+			has: page.locator('td[data-testid^="popis-"]', { hasText: popis })
+		});
+	const sOtvorom = riadok('Zasklenie 1 — s otvorom ⌀46');
+	const bez = riadok(/^Zasklenie 1$/);
 	await expect(sOtvorom).toHaveCount(1);
 	await expect(bez).toHaveCount(1);
 	// počet tabúľ s otvorom = počet otvorov vo výkrese; zvyšok bez otvoru
