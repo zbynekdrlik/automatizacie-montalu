@@ -412,6 +412,16 @@ run FAIL, celý mutation-diff job červený. **Fix: rozdeľ na samostatné match
 mutation-diff padá hneď v dry rune s failnutým guard testom, pričom
 `npx vitest run <guard>` lokálne prechádza.
 
+## Mutácia: negatívny guard na ČÍSELNÝ literál (`not.toMatch(/\b50\b/)`) padne — Stryker vkladá číselné id mutantov (#587)
+
+Výnimka z pravidla „negatívny `.not.toMatch()` na neprítomný vzor je Stryker-safe" vyššie: Stryker
+do inštrumentovaného `.ts` súboru VKLADÁ nový text — `stryMutAct_9fa48("50")` / `stryCov_9fa48("46",
+"47")` — a ID mutantov sú ČÍSLA. Guard „súbor nemá vlastnú konštantu 50/46/1050" preto padne v
+mutation-diff dry rune (`ConfigError: There were failed tests in the initial test run`, 0.25.53 PR
+#589 shard 5), hoci `npx vitest run` lokálne prejde. **Fix:** pred kontrolou odstráň Stryker volania
+`.replace(/stry(?:MutAct|Cov)_\w+\((?:"\d+"(?:,\s*)?)+\)/g, '')` — pôvodné literály kódu ostávajú,
+guard ďalej chytí skutočnú konštantu. Platí pre každý guard nad číslami v súbore z `mutate` scope.
+
 ## In-memory per-IP throttle nazbiera naprieč CELOU E2E suite (jeden proces, jedna IP) → posledný spec padne (#390)
 
 `dopyt-throttle` (`allowDopyt`) je in-memory `Map` v SERVEROVOM procese a inkrementuje

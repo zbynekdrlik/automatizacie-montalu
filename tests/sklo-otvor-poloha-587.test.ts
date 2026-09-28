@@ -105,7 +105,12 @@ describe('#587 náhľad a PDF čítajú TIE ISTÉ konštanty', () => {
 		const nahlad = fs.readFileSync('src/lib/components/Nahlad2D.svelte', 'utf8');
 		expect(nahlad).not.toMatch(/OKRAJ_ZAMOK\s*=\s*\d/);
 		expect(nahlad).not.toMatch(/vrtanieZamku\s*=\s*\d/);
-		const pdf = fs.readFileSync('src/lib/server/sklo-otvor-pdf.ts', 'utf8');
+		// Stryker (mutation-diff) súbor inštrumentuje a vkladá ČÍSELNÉ id mutantov
+		// (`stryMutAct_xxx("50")`, `stryCov_xxx("46", …)`) — tie nie sú konštanty kódu, preto ich
+		// pred kontrolou literálov odstráň (pôvodné literály kódu v súbore ostávajú).
+		const pdf = fs
+			.readFileSync('src/lib/server/sklo-otvor-pdf.ts', 'utf8')
+			.replace(/stry(?:MutAct|Cov)_\w+\((?:"\d+"(?:,\s*)?)+\)/g, '');
 		expect(pdf).toContain("from '../sklo-otvory'");
 		expect(pdf).not.toMatch(/\b(50|46|1050)\b/);
 	});
