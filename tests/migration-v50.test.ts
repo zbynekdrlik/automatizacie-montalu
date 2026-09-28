@@ -33,7 +33,7 @@ await import('../src/lib/server/db');
 describe('migration v49 → v50 (cfg_sietka_standard, #569)', () => {
 	it('bumpne na v50 a vytvorí tabuľku so seed hodnotami K 16,5 / R 17 / H 3', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(50);
+		expect(d.pragma('user_version', { simple: true })).toBe(51);
 		const rows = d.prepare('SELECT kluc, hodnota FROM cfg_sietka_standard ORDER BY kluc').all() as {
 			kluc: string;
 			hodnota: number;
