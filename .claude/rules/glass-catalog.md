@@ -361,7 +361,7 @@ zloženie, a FORMÁT zloženia sa líši (Odoo „4/8/4" lomítka vs appka „4-
   písmená pri tabuli „5esg/14/5esg", IZO dvoj/trojsklo „4/16/4/16/4", VSG „3.3.1"/„44.2", jednosklo
   „6 mm"). `localGlassCategory(nazov)` = izol→izolacne, kalen/esg→esg, vsg/kód d.d.d→vsg, inak float.
 - `matchOdooGlassType(lokalneSklo, odooTypy)` → `{ typ, istota, kandidati }`; zhoda = zloženie ∧
-  kategória ∧ **odtieň** (#556 hotfix); **viac kandidátov (napr. AL/TH pri „4-16-4") → istota
+  kategória ∧ **odtieň** (#556 hotfix) ∧ **povlak** (#579); **viac kandidátov (napr. AL/TH pri „4-16-4") → istota
   `'viac'`, `typ=null` (NIKDY tichý výber)**; žiadna → `'ziadne'`.
 - **Os ODTIEŇA (`glassTint`, #556 hotfix).** Bez odtieňa by sa „Izolačné sklo 4/8/4 mliečne"
   spárovalo na „Izolačné sklo 4/8/4- číre" → do objednávky u dodávateľa by šlo NESPRÁVNE SKLO (PROD
@@ -371,7 +371,15 @@ zloženie, a FORMÁT zloženia sa líši (Odoo „4/8/4" lomítka vs appka „4-
   („bronz/šedý"). Lokálne **číre** sa zhoduje LEN s Odoo typmi bez ne-číreho tokenu; lokálny
   **ne-číry** odtieň sa zhoduje s Odoo typom, ktorého názov ten odtieň spomína (aj keď ich je viac);
   Odoo typ s ne-čírymi tokenmi sa NIKDY nespáruje s lokálnym číre. Odtieň NIE je Money os — mení sa
-  len text `glass_type` v objednávke. `stopsol` NIE je v tejto osi (nezoznamovaný token → `cire`).
+  len text `glass_type` v objednávke. `stopsol` NIE je odtieň — má vlastnú os povlaku (nižšie).
+- **Os POVLAKU (`glassPovlak`, #579 finding 1).** Povlak je NEZÁVISLÝ od odtieňa: „ESG Stopsol
+  Classic Clear" je odtieňom ČÍRE („Clear"), ale so stopsol povlakom — bez tejto osi sa „Izolačné sklo
+  4/8/4 stopsol" párovalo na „4/8/4- číre" (nárezák „· cenník: …číre", objednávka ČÍRE sklo) a číre
+  „Float kalené 6 mm" dostalo navyše stopsol kandidáta („viac" namiesto E6). `glassPovlak(name)` →
+  `stopsol` | `ziadny`; zhoda je SYMETRICKÁ (stopsol len na stopsol, bez povlaku nikdy na stopsol),
+  bez kandidáta honest null. **Pasca pri novom povlaku / reflexnom skle v Odoo** (napr. low-E,
+  „Planibel", „Sunergy"): pridaj ho do `glassPovlak` + vektor do `tests/glass-match.test.ts` — token,
+  ktorý matcher nepozná, sa páruje ako BEZ povlaku = na číre sklo.
 - `cennikPopis` pri „viac" → **`''` (bez popisu)** (#573, Palo 25.9. — predtým #556 „viac typov
   (N)"), NIKDY meno prvého kandidáta — pri odtieňoch by ukázalo zavádzajúci názov iného odtieňa;
   operátor rozhodne na podklade.
@@ -420,8 +428,9 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
 - **Lokálne sklá sa NESKRÝVAJÚ** (ROZHODNUTÉ na #579): 4/16/4 číre má AL aj TH → skrytie = tichý
   výber (zakázaný #556) a rozbilo by výber podľa názvu (post-deploy E2E, „Použiť znova").
 - **Výpočtové sklo Odoo voľby** = lokálne sklo, ktoré naň matcher #556 mapuje, keď je JEDINÉ (napr.
-  ESG Float čirý 6mm → „ESG kalené 6 mm"), inak `ODOO_HRUBKY[..].sklo`. Stopsol lokálne sklá sa ako
-  zdroj nepočítajú (matcher stopsol nerozlišuje).
+  ESG Float čirý 6mm → „ESG kalené 6 mm"), inak `ODOO_HRUBKY[..].sklo`. Stopsol lokálne sklá sú
+  bežné zdroje — os povlaku matchera ich páruje len na Odoo stopsol typy (workaround
+  `POVLAK_BEZ_OSI` odstránený, #579 finding 1).
 - **Formulár nesie DVE polia:** `sklo` = lokálne výpočtové (všetka klientska aj serverová logika —
   default, IZO nárezák, RAL hrúbka, tesnenie, B2B, compute, Money — beží bez zmeny) + `skloOdoo`
   (Odoo `cennik_code || name`). Select hodnota je ODVODENÁ (`$lib/sklo-odoo` `volbaSkla` /
