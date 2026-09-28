@@ -32,6 +32,7 @@ import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
 import { zakazkaPrehlad, opZPrehladu } from '$lib/server/zakazka-ceny';
 import { moneyNazvySkiel } from '$lib/server/money-nazov-skla';
 import { nadpisObjednavky } from '$lib/objednavka-skla-pozicia';
+import { SENTINEL_INE_SKLO } from '$lib/objednavka-skla-typy';
 
 /** Parsuje `GlassSpec` z formData podkladu (checkbox → bool, number vstupy, selecty). */
 function parseSpec(form: FormData): GlassSpec {
@@ -65,7 +66,8 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.dxf', '.dwg', '.step', '.stp', '.igs', '.i
 
 // #548: sentinel voľby „iné sklo" v pickeri typu (odkryje vlastný typ + cenu €/m²). Nesmie kolidovať
 // s katalógovým `value` (Odoo `cennik_code`/`name`) — podčiarknikový sentinel nikdy nie je katalóg.
-const MANUAL_TYP_SENTINEL = '__ine__';
+// #576: jeden zdroj so svelte pickerom (`zoskupTypySkla` ho dáva do poslednej skupiny).
+const MANUAL_TYP_SENTINEL = SENTINEL_INE_SKLO;
 
 function allowedExtension(filename: string): boolean {
 	const ext = '.' + (filename.split('.').pop() ?? '').toLowerCase();

@@ -4,6 +4,7 @@
 	import { modulNazov } from '$lib/modul-nazov';
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import { bezRozmerov, fmtRozmerTabule, popisPozicie } from '$lib/objednavka-skla-pozicia';
+	import { SENTINEL_INE_SKLO, zoskupTypySkla } from '$lib/objednavka-skla-typy';
 
 	let { data, form } = $props();
 
@@ -51,7 +52,9 @@
 	}
 
 	// #548: „iné sklo" — sentinel voľby v pickeri typu (odkryje vlastný typ + cenu €/m²).
-	const MANUAL_SENTINEL = '__ine__';
+	const MANUAL_SENTINEL = SENTINEL_INE_SKLO;
+	// #576: „Pridať riadok" picker — skupiny podľa druhu skla (bez kandidátov, riadok ešte neexistuje)
+	const skupinyNovy = $derived(zoskupTypySkla(glassTypes, []));
 	function fmtCena(c: number | null): string {
 		return c != null ? `${c.toFixed(2)} €/m²` : '';
 	}
@@ -116,10 +119,14 @@
 			>Typ skla *
 			<select name="typ_skla" required bind:value={novyTyp} data-testid="manual-typ">
 				<option value="">— vyberte typ —</option>
-				{#each glassTypes as t (t.value)}
-					<option value={t.value}>{t.label}</option>
+				<!-- #576: skupiny podľa druhu skla (IZOS / ESG / VSG / rezané / ostatné) + iné sklo -->
+				{#each skupinyNovy as g (g.label)}
+					<optgroup label={g.label}>
+						{#each g.items as t (t.value)}
+							<option value={t.value}>{t.label}</option>
+						{/each}
+					</optgroup>
 				{/each}
-				<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 			</select></label
 		>
 		{#if novyIne}
@@ -280,18 +287,16 @@
 												>{p.typSkla ? nazovTypu(p.typSkla) : '— vyberte typ —'}</option
 											>
 										{/if}
-										<!-- #556: kandidáti podľa zloženia (pri „viac") navrchu pickera -->
-										{#if nav?.kandidati.length}
-											<optgroup label="Kandidáti (podľa zloženia)">
-												{#each nav.kandidati as k (k.value)}
-													<option value={k.value}>{k.label}</option>
+										<!-- #576: skupiny podľa druhu skla; #556 kandidáti (pri „viac") navrchu
+											ako „Odporúčané"; „iné sklo" posledné -->
+										{#each zoskupTypySkla(glassTypes, nav?.kandidati ?? []) as g (g.label)}
+											<optgroup label={g.label}>
+												{#each g.items as t (t.value)}
+													<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option
+													>
 												{/each}
 											</optgroup>
-										{/if}
-										{#each glassTypes as t (t.value)}
-											<option value={t.value} selected={t.value === p.typSkla}>{t.label}</option>
 										{/each}
-										<option value={MANUAL_SENTINEL}>iné sklo (vlastný typ + cena/m²)</option>
 									</select>
 								</form>
 								{#if nav?.nepriradene}

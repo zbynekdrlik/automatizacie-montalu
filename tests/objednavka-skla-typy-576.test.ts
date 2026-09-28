@@ -10,7 +10,11 @@ import {
 	type TypSklaVolba
 } from '../src/lib/objednavka-skla-typy';
 
-const t = (value: string, label: string, category: string): TypSklaVolba & { category: string } => ({
+const t = (
+	value: string,
+	label: string,
+	category: string
+): TypSklaVolba & { category: string } => ({
 	value,
 	label,
 	category
@@ -89,7 +93,9 @@ describe('zoskupTypySkla (#576)', () => {
 
 	it('každý katalógový typ je v pickeri práve raz (nič sa nestratí)', () => {
 		const g = zoskupTypySkla(TYPY, [{ value: 'I1', label: 'IZO Dvojsklo' }]);
-		const hodnoty = g.flatMap((x) => x.items.map((i) => i.value)).filter((v) => v !== SENTINEL_INE_SKLO);
+		const hodnoty = g
+			.flatMap((x) => x.items.map((i) => i.value))
+			.filter((v) => v !== SENTINEL_INE_SKLO);
 		expect([...hodnoty].sort()).toEqual(TYPY.map((x) => x.value).sort());
 	});
 
