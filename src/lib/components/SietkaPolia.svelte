@@ -31,8 +31,7 @@
 		pridavna = false,
 		on = $bindable(false),
 		uchyt = $bindable('ziadny' as SietkaUchyt),
-		sietkaSystem = $bindable(''),
-		onZmena
+		sietkaSystem = $bindable('')
 	}: {
 		/** predpona id-čiek (unikátna per posuv) */
 		idPrefix?: string;
@@ -53,29 +52,19 @@
 		uchyt?: SietkaUchyt;
 		/** zvolený systém sieťky (#110) — prázdny reťazec = rovnaký ako posuv */
 		sietkaSystem?: string;
-		/** #88/#583: pri zapnutí sieťky zmizne kľučka na STRANE sieťky — rodič si tak vie
-		 *  vynulovať kovanie tej strany (`kovanieSkryte`; úchyt sieťky ho tam nahrádza) */
-		onZmena?: (on: boolean) => void;
 	} = $props();
 
 	const nm = (k: string) => (names ? k : undefined);
 	let maVyber = $derived(maSietkaSystemVyber(system));
 	let altSystem = $derived(SIETKA_SYSTEM_ALT[system] ?? '');
-	// `strana` je identifikátor ('ľavá'/'pravá' — kovanieSkryte, server); v texte hintu
+	// `strana` je identifikátor ('ľavá'/'pravá' zo `sietkaStrana`); v texte hintu
 	// treba akuzatív („na ľavú stranu"), nie nominatív.
 	const STRANA_AKUZATIV: Record<'ľavá' | 'pravá', string> = { ľavá: 'ľavú', pravá: 'pravú' };
 </script>
 
 <div class="field">
 	<label class="opt">
-		<input
-			type="checkbox"
-			id={`${idPrefix}-on`}
-			name={nm('sietka')}
-			value="1"
-			bind:checked={on}
-			onchange={() => onZmena?.(on)}
-		/>
+		<input type="checkbox" id={`${idPrefix}-on`} name={nm('sietka')} value="1" bind:checked={on} />
 		So sieťkou (na poslednej koľaji) — pridá rám a nos podľa potvrdeného rozpisu, ide do Money odpisu
 	</label>
 </div>

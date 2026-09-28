@@ -7,14 +7,7 @@ import { skloPovolene } from '$lib/sklo-povolene';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 // Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
 import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
-import {
-	jeSietkaUchyt,
-	kovanieSkryte,
-	maSietkaSystem,
-	maSietkaSystemVyber,
-	sietkaStrana,
-	type Sietka
-} from '$lib/sietka';
+import { jeSietkaUchyt, maSietkaSystem, maSietkaSystemVyber, type Sietka } from '$lib/sietka';
 import type { Farba } from '$lib/komponenty';
 import { jeClipTyp, type ClipVstup } from '$lib/clip';
 
@@ -239,21 +232,6 @@ export function sanitizeSietka(system: string, sietka: Sietka | null): Sietka | 
 	return { uchyt };
 }
 
-/** #583: kovanie krajného krídla na STRANE sieťky sa zahodí (úchyt sieťky tam nahrádza
- *  kľučku, #88) — druhá strana aj stredové kovanie ostávajú. Rovnaké pravidlo ako formulár
- *  (`kovanieSkryte`); obrana proti starému/podvrhnutému POSTu. Volať AŽ keď je `sietka`
- *  sanitizovaná a `otvaranie` normalizované (opona → strana `null` → nič sa nezahodí). */
-export function bezKovaniaNaStraneSietky(x: {
-	kovanieL: string;
-	kovanieP: string;
-	otvaranie: string;
-	sietka: Sietka | null;
-}): void {
-	const skryte = kovanieSkryte(!!x.sietka, sietkaStrana(x.otvaranie));
-	if (skryte.l) x.kovanieL = '';
-	if (skryte.p) x.kovanieP = '';
-}
-
 /**
  * Ručne zadaná dĺžka koľajníc (Patrik 2026-07-28). Prázdne pole = počítaj zo šírky
  * (pôvodné chovanie). MONEY-KRITICKÉ: zadaná dĺžka mení balenie na tyče → mení metre
@@ -473,7 +451,6 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 	// zahadzuje a sieťka sa ponúka len na systémoch, ktoré ju majú (Robust/Slide)
 	vstup.kovanieStred = sanitizeKovanieStred(vstup.system, vstup.styl, form.get('kovanieStred'));
 	vstup.sietka = sanitizeSietka(vstup.system, sk.sietka);
-	bezKovaniaNaStraneSietky(vstup);
 	let error: string | null = null;
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
@@ -626,7 +603,6 @@ export function parseMultiVstup(form: FormData): { vstup: MultiVstup; error: str
 			// 2x štýly sú vždy opona (serverové vynútenie, viď parseVstup)
 			if (posuv.styl.startsWith('2x')) posuv.otvaranie = 'Opona';
 			posuv.kovanieStred = sanitizeKovanieStred(posuv.system, posuv.styl, p.kovanieStred);
-			bezKovaniaNaStraneSietky(posuv);
 			if (!(posuv.s >= S_MIN && posuv.s <= S_MAX)) {
 				error = `Zasklenie ${i + 1}: šírka musí byť ${S_MIN}–${S_MAX} mm.`;
 				break;
