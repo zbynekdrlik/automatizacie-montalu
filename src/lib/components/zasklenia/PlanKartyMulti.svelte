@@ -9,6 +9,7 @@
 	import SkloCena from '$lib/components/SkloCena.svelte';
 	import PoznamkaRal from './PoznamkaRal.svelte';
 	import KovanieStrany from './KovanieStrany.svelte';
+	import SkloOtvoryRozpis from './SkloOtvoryRozpis.svelte';
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice } from '$lib/kolajnica';
@@ -65,7 +66,11 @@
 					     bodkou prišlo pri kompilácii (zachytil e2e: „2115mm· Izolačné") -->
 					<td data-testid={`posuv-sklo-${i}`}
 						>{fmtSkloRozmer(pv.sklo.sirka, pv.sklo.vyska) +
-							(pv.skloNazov ? ` · ${pv.skloNazov}` : '')}</td
+							(pv.skloNazov ? ` · ${pv.skloNazov}` : '')}<SkloOtvoryRozpis
+							system={pv.system}
+							pocet={pv.sklo.pocet}
+							testid={`posuv-sklo-otvory-${i}`}
+						/></td
 					>
 					<td>{pv.otvaranie ?? ''}</td>
 				</tr>

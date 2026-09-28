@@ -151,6 +151,10 @@ export interface GlassOrderItemInput {
 	attachments?: GlassAttachment[];
 	/** voliteľný — keď chýba, berie sa `GLASS_SPEC_OFF`. */
 	spec?: GlassSpec;
+	/** #587: poloha vŕtaného otvoru slovom (`popisPolohyOtvoru`) — pripojí sa k `note`. Odoo pri
+	 *  opätovnom odoslaní porovnáva polia riadku (aj `note`), NIE prílohy riadku → bez tejto poznámky
+	 *  by nový/zmenený PDF výkres pri re-odoslaní zapadol. Nezadané = `note` bit-identický. */
+	poznamkaOtvoru?: string;
 }
 
 /** #548: príloha riadka objednávky skla (base64) — kontrakt v2 `items[].attachments[]`. */
@@ -293,13 +297,16 @@ export function derivGlassComposition(typSkla: string): {
 /** Poznámka k tabuli: popis + (pri šikmom FIXe) info o šikmine (výška vľavo/vpravo). */
 function buildGlassNote(inp: GlassOrderItemInput): string {
 	const popis = (inp.popis ?? '').trim();
+	const casti = [popis];
 	if (inp.sikmy) {
 		const l = Math.round(inp.vLavoMm ?? 0);
 		const p = Math.round(inp.vPravoMm ?? 0);
-		const s = `šikmé Ľ${l}/P${p} mm`;
-		return popis ? `${popis} — ${s}` : s;
+		casti.push(`šikmé Ľ${l}/P${p} mm`);
 	}
-	return popis;
+	// #587: poloha otvoru (IZOS ju vidí aj bez PDF; zmena polohy = zmena riadku pre Odoo)
+	const otvor = (inp.poznamkaOtvoru ?? '').trim();
+	if (otvor) casti.push(otvor);
+	return casti.filter(Boolean).join(' — ');
 }
 
 /**

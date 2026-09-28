@@ -113,3 +113,11 @@ Logika (cache, validácia, zápis + audit) je v `sklo-hrubky.ts` (NIE v `migraci
 `migration-v52.test.ts` = v51 fixtúra + `objednavka_skla_odoslanie`. **Paralelná lane (#587) tiež
 pridáva migráciu** — pri kolízii čísla pri integrácii prečísluj jednu (guard `>= N`, `bump(N)`, vlastný
 test, head-bump všade), obe sú vo vlastných súboroch, takže sa nebijú v `migracie-seed.ts`.
+
+## v53 (#587) — poloha otvoru na `objednavka_skla` vo VLASTNOM súbore
+
+`migracie-objednavka-otvor.ts` (`migrateObjednavkaSklaOtvor`, guard `>= 52`, transakcia, feature-detect
+tabuľky + existujúcich stĺpcov) pridá `otvor_od_hrany_mm`, `otvor_od_spodku_mm`, `otvor_priemer_mm`
+(REAL NULL). `migracie.ts` 972 r. Head-bump: **43 test súborov** (51 → 52, python recept vyššie).
+Fixtúra `migration-v53.test.ts` = v51 base + `objednavka_skla` s v49 stĺpcami + `objednavka_skla_odoslanie`.
+Krok 4 sa netýka (ALTER `objednavka_skla`, žiadny exaktný zoznam stĺpcov v starších testoch).

@@ -29,6 +29,7 @@ import {
 	type HoleSize
 } from '$lib/server/odoo-rozpis-lines';
 import { uploadGlassOrderToOdoo } from '$lib/server/odoo-glass-order-upload';
+import { vykresOtvoruZPolozky } from '$lib/server/sklo-otvor-pdf';
 import {
 	odooObjednavkaSklaUrl,
 	posledneOdoslanieOdoo,
@@ -194,6 +195,10 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 
 	// #577: posledné odoslanie podkladu do Odoo → trvalý odkaz na objednávku skla (aj po obnovení).
 	const odoslanieOdoo = posledneOdoslanieOdoo(zak);
+	// #587: ktoré riadky majú generovaný výkres otvoru — TÁ ISTÁ brána ako Odoo príloha aj GET endpoint
+	const vykresOtvoru: Record<number, boolean> = Object.fromEntries(
+		polozky.map((p) => [p.id, vykresOtvoruZPolozky(p) !== null])
+	);
 
 	return {
 		zak,
@@ -209,7 +214,8 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 		glassTypes,
 		glassTypesSource,
 		naviazanie,
-		odoslanieOdoo
+		odoslanieOdoo,
+		vykresOtvoru
 	};
 };
 

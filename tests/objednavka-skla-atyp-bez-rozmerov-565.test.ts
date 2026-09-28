@@ -120,7 +120,7 @@ describe('#565 pridatRiadok — atyp s výkresom bez šírky/výšky', () => {
 	it('Odoo payload zákazky: atyp bez rozmerov → width/height 0, mode atyp, príloha, popis', async () => {
 		const zak = 'ZAK-565-ODOO';
 		await actions.pridatRiadok(mkEvent(zak, ATYP_BEZ, VYKRES));
-		const built = buildGlassOrderForZak(zak)!;
+		const built = (await buildGlassOrderForZak(zak))!;
 		const item = built.order.items[0]!;
 		expect(item.mode).toBe('atyp');
 		expect(item.width_mm).toBe(0);

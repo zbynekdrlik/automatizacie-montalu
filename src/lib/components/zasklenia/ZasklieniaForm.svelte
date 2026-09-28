@@ -26,6 +26,7 @@
 	import SietkaPolia from '$lib/components/SietkaPolia.svelte';
 	import type { PosuvRow } from '$lib/zasklenia-form';
 	import type { KlinVstup } from '$lib/klin';
+	import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
 
 	// Display názvy RAL kódov pre <select> (#354) — bežné RAL pomenovania, rovnaký
 	// vzor ako pôvodné hardcoded „(čierna)"/„(antracit)" labely.
@@ -53,7 +54,7 @@
 		kovaniePS = $bindable(''),
 		kovanieStredS = $bindable(''),
 		kovanieStredOknoS = $bindable('L'),
-		vrtanieZamkuS = $bindable(1050),
+		vrtanieZamkuS = $bindable(VRTANIE_ZAMKU_DEFAULT_MM),
 		skloPresneS = $bindable(''),
 		skloTriedaS = $bindable<number | ''>(''),
 		// #579: zvolený Odoo typ skla primárneho posuvu ('' = lokálne sklo); `sklo` = výpočtové

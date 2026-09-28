@@ -16,6 +16,7 @@ import { getOdpis } from './money';
 import { glassTypesForSystem, listSysStyly } from './db';
 import { skloPovolene } from '$lib/sklo-povolene';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
+import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
 import { parseFarba } from './vstup';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
 import type { Farba } from '$lib/komponenty';
@@ -167,7 +168,7 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 	const vstup: Vstup = {
 		...spolocne,
 		...p,
-		vrtanieZamku: n(d.vrtanieZamku) || 1050
+		vrtanieZamku: n(d.vrtanieZamku) || VRTANIE_ZAMKU_DEFAULT_MM
 	};
 	return { zdroj, chybajuce, vstup };
 }
