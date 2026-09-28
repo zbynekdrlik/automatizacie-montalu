@@ -419,12 +419,25 @@ v post-deploy proti PROD). Sufix samotný je ZÁMERNÉ #556 správanie — testy
 Owner: „ak Robust používa 24 mm, má mu ponúknuť všetky sklá s tou hrúbkou" (nové sklo v Odoo sa má
 objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtový katalóg sa NEMENÍ.
 
-- **Jeden zdroj hrúbok per systém:** `ODOO_HRUBKY` v `src/lib/sklo-povolene.ts` = `{ mm, druh,
-  sklo }` (Robust 24 izolačné; Slide 16 izolačné + 6 jednoduché; Deluxe 6/10 LEN `esg`; Štandard +
-  / starý Štandard / Drevostavby 6 jednoduché + 16 a 24 izolačné). `druh` páruje Odoo `category`
-  (`izolacne` / `esg` / jednoduché = všetko okrem izolačných). **Izolačné triedy LEN
-  `category=izolacne`** — pri 16 mm sú aj jednosklá VSG 88.x. `sklo` (reprezentatívne výpočtové)
-  musí byť v lokálnej ponuke systému (test). Zmena hrúbky systému = úprava LEN tejto tabuľky.
+- **Jeden zdroj hrúbok per systém = SQLite `cfg_sklo_hrubka(id, system, mm, druh)`** (#579 časť 2,
+  Odoo úloha 1180: „Povolené hrúbky pri systéme si nastaví výroba"; migrácia v52, `UNIQUE(system,
+  mm)`, CHECK druh/mm>0). Seed = `ODOO_HRUBKY_SEED` v `src/lib/sklo-povolene.ts` (Robust 24
+  izolačné; Slide 16 izolačné + 6 jednoduché; Deluxe 6/10 LEN `esg`; Štandard + / starý Štandard /
+  Drevostavby 6 jednoduché + 16 a 24 izolačné) — konštanta je LEN seed, živé hodnoty číta
+  `src/lib/server/sklo-hrubky.ts` (`skloHrubkyPre`, cache invalidovaná pri zápise). Výroba ich mení
+  v `/zasklenia/nastavenia` (karta „Povolené hrúbky skla z Odoo", akcie `pridatHrubku` /
+  `odobratHrubku`, `use:enhance`), každý zápis + `cfg_audit` v JEDNEJ transakcii (sys_styl =
+  systém). `druh` páruje Odoo `category` (`izolacne` / `esg` / jednoduché = všetko okrem
+  izolačných). **Izolačné triedy LEN `category=izolacne`** — pri 16 mm sú aj jednosklá VSG 88.x.
+- **Výpočtové sklo sa NIKDY nezadáva — odvodí ho `vypocetneSkloPre(mm, druh, lokalne)`** (čistá, v
+  `sklo-povolene.ts`) z lokálnej povolenej ponuky systému: izolačné → „Izolačné sklo A/B/C číre" s
+  A+B+C = mm; jednoduché → „Float sklo N mm", inak „Nmm číre"; len kalené → „Float kalené N mm",
+  inak „ESG kalené N mm". Žiadny kandidát → `null` = kombinácia NEPLATÍ (editor ju odmietne s
+  hláškou, ponuka ju vynechá). Pre seed dáva presne pôvodné `sklo` konštanty (test
+  `tests/sklo-hrubky-579.test.ts` + nezmenený snapshot `sklo-odoo-579`). **Pasca:** nový lokálny
+  názov skla mimo týchto vzorov (napr. „Izolačné sklo 4/12/4 číre" je OK, „4-16-4 číre" nie) sa
+  pravidlom nenájde — pridaj vzor + vektor do testu, nie výnimku v editore. `ponukaSkielPre(system,
+  lokalne, odoo, hrubky = skloHrubkyPre(system))` — v testoch sa dá `hrubky` podať explicitne.
 - **Ponuka** (`src/lib/server/sklo-odoo.ts` `ponukaSkielPre`, load `ponukaSkiel`): skupina „Sklá
   appky" (lokálne povolené, predvolené ako doteraz) + skupiny „Odoo — <druh>" (reuse
   `zoskupTypySkla(…, [], false)`). Odoo nedostupné → lokálna ponuka bez skupín. Typ s
@@ -432,7 +445,7 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
 - **Lokálne sklá sa NESKRÝVAJÚ** (ROZHODNUTÉ na #579): 4/16/4 číre má AL aj TH → skrytie = tichý
   výber (zakázaný #556) a rozbilo by výber podľa názvu (post-deploy E2E, „Použiť znova").
 - **Výpočtové sklo Odoo voľby** = lokálne sklo, ktoré naň matcher #556 mapuje, keď je JEDINÉ (napr.
-  ESG Float čirý 6mm → „ESG kalené 6 mm"), inak `ODOO_HRUBKY[..].sklo`. **Tri kroky (#579 finding
+  ESG Float čirý 6mm → „ESG kalené 6 mm"), inak výpočtové sklo triedy (`vypocetneSkloPre`). **Tri kroky (#579 finding
   1):** (1) jediná PRESNÁ zhoda vrátane povlaku (stopsol ↔ stopsol); (2) pri 0 presných typ s
   povlakom bez lokálneho náprotivku sa počíta ako jeho sklo BEZ povlaku (`matchOdooGlassType(…, {
   povlak: 'ignoruj' })`, lokálne stopsol vynechané) — „ESG Stopsol Classic Clear 6mm" = „ESG kalené
