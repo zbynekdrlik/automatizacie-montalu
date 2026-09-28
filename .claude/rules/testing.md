@@ -615,3 +615,31 @@ deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-r
   failed` (artefakt harnessu, nie regresia). Iný port len keď je 4173 obsadený súrodencom.
 - **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
   položky cez `td[data-testid^="popis-"]`, nie `tbody tr`.
+
+## E2E účet založený na cieli (aj PROD) = ZARUČENÉ upratanie cez fixture `e2eUcty`, nikdy „zmažem na konci testu" (#583)
+
+Post-deploy E2E beží proti PROD — throwaway B2B účet s heslom natvrdo vo verejnom repe, ktorý test
+zmaže až na SVOJOM konci, ostane na PROD pri AKOMKOĽVEK páde po vytvorení (0.25.50: `logout()` padol
+v kroku upratania → `e2e-b2b-mul90ik9` ostal na PROD).
+
+- Každý E2E, ktorý zakladá účet: `import { test, expect } from './ucty'` (rozšírený `test`, názov
+  `test` ostáva kvôli zero-console guardu), fixture `e2eUcty` do signatúry a
+  `e2eUcty.zaregistruj(user)` **PRED** klikom „Pridať účet" (alebo helper `zalozB2bUcet`). Teardown
+  fixture beží aj po páde/timeoute a maže v SAMOSTATNOM admin kontexte (stav testovej stránky nehrá
+  rolu). Vlastné mazanie na konci testu môže ostať (teardown je potom no-op).
+- Meno MUSÍ začínať `e2e-` (fixture iné odmietne). `e2e/global-setup.ts` pred sadou zmaže zvyšky
+  B2B `e2e-*` účtov (nikdy E2E admin, nikdy interný — interný UI nezmaže). Sweep log:
+  `[e2e #583] sweep zvyškových e2e- účtov: …`.
+- Interný účet (nezmazateľný z UI) zakladaj len za `skipAkLive` + vlastné `finally` (vzor
+  `objednavka-skla.spec.ts` #571: najprv rola B2B, potom Zmazať).
+- Dôkaz, že upratanie beží aj pri zlyhaní: `e2e/ucty-upratanie.spec.ts` (serial; prvý test
+  `test.fail` padne po založení, druhý overí, že účet neostal).
+
+## User menu / nav `<details>` — žiadny `bind:open` (#583)
+
+Nav dropdowny v `+layout.svelte` vlastnia `open` natívne; zatváranie ide cez `bind:this` refs a
+`afterNavigate` preskočí `type === 'enter'`. `bind:open` (aj zatváranie pri 'enter') pri hydratácii
+prepíše klik spravený PRED ňou (plný POST „Spočítať" → nový dokument) a menu sa zavrie — presne
+nestabilný `logout()` v post-deploy E2E. Regresný test `e2e/user-menu-hydratacia.spec.ts` zadrží JS
+cez `page.route` (deterministicky pred hydratáciou). `logout()` čaká na hydratáciu + viditeľné
+„Odhlásiť"; `openUserMenu()` otvára len zatvorené menu (summary klik PREPÍNA).
