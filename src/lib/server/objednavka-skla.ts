@@ -338,16 +338,18 @@ function existujeRovnaka(s: NoveSklo): boolean {
 	return kandidati.some((k) => popisPozicie(k.popis, s.modul) === pozicia);
 }
 
-// #578 prechod: riadok spred rozlíšenia otvorov = CELÝ posuv jedným riadkom (N ks, 0 otvorov) na
-// tej istej pozícii. Nový producent ho rozdelí na „s otvorom" + „bez" — ani jeden sa s ním nespáruje
-// (iné kusy), takže bez prevodu by opakované „Pridať sklá" pridalo tabule NAVYŠE (dvojitá
+// #578 prechod: riadok spred rozlíšenia otvorov = CELÝ posuv jedným riadkom (N ks) na tej istej
+// pozícii BEZ prípony otvoru. Nový producent ho rozdelí na „s otvorom" + „bez" — ani jeden sa s ním
+// nespáruje (iné kusy), takže bez prevodu by opakované „Pridať sklá" pridalo tabule NAVYŠE (dvojitá
 // objednávka). Starý riadok sa preto PREVEDIE na riadok „s otvorom" (id + prílohy ostanú); zvyšok
-// „bez" sa potom vloží bežne → výsledok = ako čerstvé pridanie.
+// „bez" sa potom vloží bežne → výsledok = ako čerstvé pridanie. Otvory starého riadku sa NEfiltrujú
+// (obsluha ich mohla pred #578 nastaviť ručne cez #521 spec) — prepíše ich pravidlo. Nový riadok sa
+// nikdy nechytí: „s otvorom" má príponu (≠ základná pozícia), „bez" má menej kusov než celok.
 const stmtStaryCelok = db.prepare(`
 	SELECT id, popis FROM objednavka_skla
 	WHERE zak_norm = ? AND op = ? AND modul = ?
 	  AND sirka_mm IS ? AND vyska_mm IS ? AND v_lavo_mm IS ? AND v_pravo_mm IS ?
-	  AND pocet = ? AND typ_skla = ? AND spec_holes_qty = 0
+	  AND pocet = ? AND typ_skla = ?
 `);
 const stmtPrevedNaOtvor = db.prepare(`
 	UPDATE objednavka_skla SET popis = ?, pocet = ?, m2 = ?, spec_holes_qty = ?, spec_hole_size = ?

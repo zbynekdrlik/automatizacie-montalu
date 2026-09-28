@@ -521,7 +521,8 @@ tabule vŕtať. Money-NEUTRÁLNE, bez migrácie (spec stĺpce v48).
   NAVYŠE (Deluxe 4K = 8 ks). `prevedStaryCelok` (v `pridajSklaHromadneIdempotentne`) ho PREVEDIE na
   riadok „s otvorom" (UPDATE popis/pocet/m2/spec — id aj prílohy ostanú) a „bez" sa vloží bežne.
   Celok = súčet `pocet` riadkov tej istej `zakladPozicie` + skla v tom istom pridaní; starý riadok
-  s iným počtom (iný posuv) sa NEprevádza. Test `tests/objednavka-skla-otvory-prechod-578.test.ts`.
+  s iným počtom (iný posuv) sa NEprevádza. Otvory starého riadku sa NEfiltrujú (ručne nastavené cez
+  #521 spec by inak znova zdvojili) — prepíše ich pravidlo. Test `tests/objednavka-skla-otvory-prechod-578.test.ts`.
 - **Prípona otvoru je všeobecná** (`PRIPONA_OTVOR_RE = / — s otvorom ⌀\d+$/`), `zakladPozicie`
   ju odreže — ďalší priemer (madlo ⌀56) = nový riadok s inou príponou bez zmeny `popisPozicie`.
 - **Styl vs otvory:** pravidlo štýl ignoruje (výkres ho nedostáva); ak výroba potvrdí iné polia pre
