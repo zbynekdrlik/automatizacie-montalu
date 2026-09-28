@@ -16,7 +16,7 @@
 import { logger } from './log';
 import { listGlassTypes } from './db';
 import { fetchGlassTypes, type GlassTypeOption, type GlassTypesResult } from './odoo-glass-types';
-import { matchOdooGlassType, cennikPopis } from './glass-match';
+import { matchOdooGlassType, cennikPopis, glassPovlak } from './glass-match';
 import { parseVstup, parseMultiVstup, type Vstup, type MultiVstup } from './vstup';
 import { odooTriedyPre, odooDruhSedi, ponukaSkielSystemu } from '$lib/sklo-povolene';
 import { zoskupTypySkla } from '$lib/objednavka-skla-typy';
@@ -28,10 +28,6 @@ const log = logger('sklo-odoo');
 export const SKUPINA_APPKA = 'Sklá appky';
 /** Prefix skupín Odoo typov (za ním druh zo `zoskupTypySkla`). */
 export const PREFIX_ODOO_SKUPINY = 'Odoo — ';
-
-/** Povlaky, ktoré matcher #556 nerozlišuje (páruje ich ako číre) — také lokálne sklo nie je
- *  spoľahlivý výpočtový zdroj Odoo typu (inak by „4/16/4 stopsol" rozbilo jednoznačnosť). */
-const POVLAK_BEZ_OSI = /stopsol/i;
 
 function lokalnaVolba(n: string, popis: string): VolbaSkla {
 	return { value: n, label: popis ? `${n} · cenník: ${popis}` : n, nazov: n, vypocet: n, odoo: '' };
@@ -56,16 +52,31 @@ export function ponukaSkielPre(
 	// hrúbka 0 (dátová chyba v Odoo) nikdy nesedí na triedu → neponúkne sa (warn v fetchGlassTypes)
 	const typy = odoo.items.filter((o) => o.hrubkaMm > 0 && triedaPre(o));
 
-	// lokálne sklo → jeho Odoo náprotivky v ponuke (matcher #556: zloženie ∧ kategória ∧ odtieň)
-	const kandidati = new Map<string, GlassTypeOption[]>();
-	for (const n of lokalne) {
-		if (POVLAK_BEZ_OSI.test(n)) continue;
-		const k = matchOdooGlassType(n, typy).kandidati;
-		if (k.length > 0) kandidati.set(n, k);
-	}
+	// lokálne sklo → jeho Odoo náprotivky v ponuke (matcher #556: zloženie ∧ kategória ∧ odtieň ∧
+	// povlak). Výpočtový zdroj Odoo typu:
+	//   1. PRESNÁ zhoda vrátane povlaku (stopsol ↔ stopsol) — keď je JEDINÁ;
+	//   2. typ s povlakom, pre ktorý lokálne sklo s povlakom neexistuje (napr. „ESG Stopsol … 6mm"),
+	//      sa počíta ako jeho sklo BEZ povlaku — povlak mení len text objednávky, nie nárez/Money;
+	//   3. inak predvolené sklo triedy.
+	const zdrojePre = (povlak: 'presne' | 'ignoruj') => {
+		const m = new Map<string, GlassTypeOption[]>();
+		for (const n of lokalne) {
+			if (povlak === 'ignoruj' && glassPovlak(n) !== 'ziadny') continue;
+			const k = matchOdooGlassType(n, typy, { povlak }).kandidati;
+			if (k.length > 0) m.set(n, k);
+		}
+		return (o: GlassTypeOption) => [...m].filter(([, k]) => k.includes(o)).map(([n]) => n);
+	};
+	const presne = zdrojePre('presne');
+	const bezPovlaku = zdrojePre('ignoruj');
 	const vypocetPre = (o: GlassTypeOption): string => {
-		const zdroje = [...kandidati].filter(([, k]) => k.includes(o)).map(([n]) => n);
-		return zdroje.length === 1 ? zdroje[0]! : triedaPre(o)!.sklo;
+		const p = presne(o);
+		if (p.length === 1) return p[0]!;
+		if (p.length === 0) {
+			const b = bezPovlaku(o);
+			if (b.length === 1) return b[0]!;
+		}
+		return triedaPre(o)!.sklo;
 	};
 	const volby = new Map<string, VolbaSkla>(
 		typy.map((o) => [
