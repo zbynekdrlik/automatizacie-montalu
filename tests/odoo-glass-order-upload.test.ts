@@ -112,8 +112,8 @@ describe('uploadGlassOrderToOdoo (#521)', () => {
 		expect(item.hole_size).toBe('d50');
 	});
 
-	it('buildGlassOrderForZak → null keď niet položiek', () => {
-		expect(buildGlassOrderForZak('ZAK-PRAZDNA-GLASS')).toBeNull();
+	it('buildGlassOrderForZak → null keď niet položiek', async () => {
+		expect(await buildGlassOrderForZak('ZAK-PRAZDNA-GLASS')).toBeNull();
 	});
 
 	it('prázdny zak → no-zak, payload null', async () => {

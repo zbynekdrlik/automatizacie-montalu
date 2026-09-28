@@ -288,7 +288,7 @@ describe('#563 review — staré riadky spred zmeny popisu (idempotencia + Odoo 
 		expect(listSklaPreZakazku('ZAK-563-DEDUP')).toHaveLength(1);
 	});
 
-	it('Odoo glass_order description/note starého riadka = pozícia „Zasklenie N" (zhoda s tlačou)', () => {
+	it('Odoo glass_order description/note starého riadka = pozícia „Zasklenie N" (zhoda s tlačou)', async () => {
 		pridajSklo({
 			zak: 'ZAK-563-ODOO',
 			modul: 'zasklenia',
@@ -299,7 +299,7 @@ describe('#563 review — staré riadky spred zmeny popisu (idempotencia + Odoo 
 			typSkla: 'Izolačné sklo 4/16/4 číre',
 			createdBy: 'test'
 		});
-		const built = buildGlassOrderForZak('ZAK-563-ODOO');
+		const built = await buildGlassOrderForZak('ZAK-563-ODOO');
 		const item = built!.order.items[0]!;
 		expect(item.description).toBe('Zasklenie 2');
 		expect(item.note).toBe('Zasklenie 2');
@@ -307,11 +307,11 @@ describe('#563 review — staré riadky spred zmeny popisu (idempotencia + Odoo 
 
 	it('nový riadok zo zasklení posiela do Odoo description „Zasklenie 1"', async () => {
 		await callAction('pridatSkla', { ...SLIDE, zak: 'ZAK-563-ODOO-NEW' });
-		const item = buildGlassOrderForZak('ZAK-563-ODOO-NEW')!.order.items[0]!;
+		const item = (await buildGlassOrderForZak('ZAK-563-ODOO-NEW'))!.order.items[0]!;
 		expect(item.description).toBe('Zasklenie 1');
 	});
 
-	it('ručný riadok s textom „Zasklenie 2: prasklina" ide do Odoo nezmenený', () => {
+	it('ručný riadok s textom „Zasklenie 2: prasklina" ide do Odoo nezmenený', async () => {
 		pridajSkloManual({
 			zak: 'ZAK-563-ODOO-MAN',
 			popis: 'Zasklenie 2: prasklina',
@@ -322,7 +322,7 @@ describe('#563 review — staré riadky spred zmeny popisu (idempotencia + Odoo 
 			rezim: 'rozmery',
 			createdBy: 'test'
 		});
-		const item = buildGlassOrderForZak('ZAK-563-ODOO-MAN')!.order.items[0]!;
+		const item = (await buildGlassOrderForZak('ZAK-563-ODOO-MAN'))!.order.items[0]!;
 		expect(item.description).toBe('Zasklenie 2: prasklina');
 	});
 });

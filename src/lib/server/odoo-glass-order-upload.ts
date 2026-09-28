@@ -90,9 +90,9 @@ function nacitajPrilohy(polozkaId: number): GlassAttachment[] {
  * (Money-neutrálne, IO len SQLite read + base64). Vracia payload + zoznam zahodených príloh
  * (strop veľkosti). `null` keď niet položiek.
  */
-export function buildGlassOrderForZak(
+export async function buildGlassOrderForZak(
 	zak: string
-): { order: GlassOrder; droppedAttachments: DroppedAttachment[] } | null {
+): Promise<{ order: GlassOrder; droppedAttachments: DroppedAttachment[] } | null> {
 	const polozky = listSklaPreZakazku(zak);
 	if (polozky.length === 0) return null;
 	const inputs: GlassOrderItemInput[] = polozky.map((p) => ({
@@ -142,7 +142,7 @@ export async function uploadGlassOrderToOdoo(
 	const trimmed = (zak ?? '').trim();
 	if (!trimmed) return { result: 'no-zak', payload: null };
 
-	const built = buildGlassOrderForZak(trimmed);
+	const built = await buildGlassOrderForZak(trimmed);
 	if (!built) return { result: 'no-items', payload: null };
 	const payload = built.order;
 	const droppedAttachments = built.droppedAttachments;

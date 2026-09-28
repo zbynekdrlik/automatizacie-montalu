@@ -178,7 +178,7 @@ describe('#578 popisPozicie ponechá príponu otvoru', () => {
 describe('#578 Odoo glass_order — holes_qty na tabuľu', () => {
 	it('riadok s otvorom: qty = tabule s otvorom, holes_qty = 1 na tabuľu, hole_size d50', async () => {
 		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-578-ODOO' });
-		const items = buildGlassOrderForZak('ZAK-578-ODOO')!.order.items;
+		const items = (await buildGlassOrderForZak('ZAK-578-ODOO'))!.order.items;
 		expect(items).toHaveLength(2);
 		const s = items.find((i) => i.description === S_OTVOROM)!;
 		const bez = items.find((i) => i.description === 'Zasklenie 1')!;
