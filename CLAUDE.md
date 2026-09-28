@@ -110,7 +110,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - SQLite/Money durability (synchronous pin, fsync zápis, v24 audit) → `.claude/rules/db-durability.md`
 - pridanie novej SQLite migrácie (seed-extrakcia, 1000-r. strop, head-bump ~26 testov, v25/v26 stĺpce) → `.claude/rules/migrations.md`
 - pridanie nového `writeOdpis` block-reason (audited-override 6-touch checklist) → `.claude/rules/money-block-reason.md`
-- katalóg skiel, pridanie/zmena skla, povolené sklá per systém (`POVOLENE_SKLA`, #573), Odoo sklá v nárezáku podľa hrúbky (`ODOO_HRUBKY`, `skloOdoo`, #579), Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
+- katalóg skiel, pridanie/zmena skla, povolené sklá per systém (`POVOLENE_SKLA`, #573), Odoo sklá v nárezáku podľa hrúbky (`cfg_sklo_hrubka` nastaviteľné výrobou, `vypocetneSkloPre`, `skloOdoo`, #579), Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - editor vzorcov `saveCfgChanges` (skryté zrkadlenia rámový→sklo #504 + Deluxe 6/10, audit invariant) → `.claude/rules/cfg-editor.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
 - POST-import readback z Money DB (money_dlv snapshot, /odpisy overenie, exkluzívne párovanie) → `.claude/rules/money-readback.md`
