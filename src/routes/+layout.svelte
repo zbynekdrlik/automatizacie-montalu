@@ -110,18 +110,20 @@
 	// route zmene NEremountuje, takže natívny `open` atribút by inak ostal nastavený aj
 	// po kliku na odkaz vnútri dropdownu; (2) light-dismiss (klik mimo / Escape) — review
 	// nález #392 🟡, natívny <details> sám osebe nezatvára ani jedno z toho.
-	let modulesOpen = $state(false);
-	let toolsOpen = $state(false);
-	let userOpen = $state(false);
+	// #583: open stav vlastní NATÍVNY <details> (žiadny `bind:open`) — `bind:open` efekt pri
+	// hydratácii prepísal `open` na `false`, takže menu otvorené klikom PRED hydratáciou (plný
+	// POST → nový dokument, pomalé pripojenie) sa hneď zavrelo. Zatváranie ide cez element refs.
+	let modulesEl = $state<HTMLDetailsElement>();
+	let toolsEl = $state<HTMLDetailsElement>();
+	let userEl = $state<HTMLDetailsElement>();
 
 	function zavriMenu() {
-		modulesOpen = false;
-		toolsOpen = false;
-		userOpen = false;
+		for (const el of [modulesEl, toolsEl, userEl]) if (el) el.open = false;
 	}
 
-	afterNavigate(() => {
-		zavriMenu();
+	afterNavigate(({ type }) => {
+		// 'enter' = prvá hydratácia, nie navigácia — menu otvorené pred ňou nechaj otvorené (#583)
+		if (type !== 'enter') zavriMenu();
 	});
 </script>
 
@@ -161,7 +163,7 @@
 			<details
 				class="nav-dropdown nav-modules-drop"
 				class:active={moduleLinks.some((l) => page.url.pathname === resolve(l.href))}
-				bind:open={modulesOpen}
+				bind:this={modulesEl}
 			>
 				<summary data-testid="modules-menu-toggle">Moduly <span aria-hidden="true">▾</span></summary
 				>
@@ -174,7 +176,7 @@
 				<details
 					class="nav-dropdown nav-tools"
 					class:active={toolLinks.some((l) => page.url.pathname === resolve(l.href))}
-					bind:open={toolsOpen}
+					bind:this={toolsEl}
 				>
 					<summary data-testid="tools-menu-toggle"
 						>Nástroje <span aria-hidden="true">▾</span></summary
@@ -197,7 +199,7 @@
 			<details
 				class="nav-dropdown nav-user"
 				class:active={isInterny && page.url.pathname === resolve('/pouzivatelia')}
-				bind:open={userOpen}
+				bind:this={userEl}
 			>
 				<summary data-testid="user-menu-toggle"
 					>{data.user.username} <span aria-hidden="true">▾</span></summary

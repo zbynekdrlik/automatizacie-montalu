@@ -61,6 +61,9 @@
 	const nm = (k: string) => (names ? k : undefined);
 	let maVyber = $derived(maSietkaSystemVyber(system));
 	let altSystem = $derived(SIETKA_SYSTEM_ALT[system] ?? '');
+	// `strana` je identifikátor ('ľavá'/'pravá' — kovanieSkryte, server); v texte hintu
+	// treba akuzatív („na ľavú stranu"), nie nominatív.
+	const STRANA_AKUZATIV: Record<'ľavá' | 'pravá', string> = { ľavá: 'ľavú', pravá: 'pravú' };
 </script>
 
 <div class="field">
@@ -81,7 +84,7 @@
 	<div class="sietka-box" data-testid={`${idPrefix}-box`}>
 		{#if strana}
 			<p class="sietka-hint" data-testid={`${idPrefix}-strana`}>
-				Sieťka pôjde na <b>{strana}</b> stranu (podľa smeru posuvu).
+				Sieťka pôjde na <b>{STRANA_AKUZATIV[strana]}</b> stranu (podľa smeru posuvu).
 			</p>
 		{/if}
 		{#if potrebuje3KKolajnicu(styl)}

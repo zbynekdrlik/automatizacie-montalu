@@ -1,7 +1,8 @@
 // Zasklenia — zákaznícky návrhový výkres (#162, architektúra 1:1 podľa pergoly
 // #138/#144/#150/#153). Všetko ČÍTACIE — modul do Money nič nezapisuje, takže sa
 // dá pustiť aj proti nasadenej appke (BASE_URL).
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect, zalozB2bUcet } from './ucty';
 import { goto, loginAs, collectConsole, waitHydrated, logout } from './helpers';
 
 /** Rovnaká rekurzívna @page-detekcia ako v navrh-vykres.spec.ts/pergola-navrh.spec.ts
@@ -310,7 +311,8 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 // v B2B_ALLOWED_EXCEPTIONS, lebo /zasklenia/* nie je v B2B_FORBIDDEN_PREFIXES) —
 // kachlička na stránke /zasklenia (obe role ju vidia), otvorenie a vykreslenie funguje.
 test('b2b: kachlička „Návrhový výkres" (#423) na /zasklenia, otvorenie a vykreslenie funguje (#162)', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
@@ -318,12 +320,7 @@ test('b2b: kachlička „Návrhový výkres" (#423) na /zasklenia, otvorenie a v
 	// b2b throwaway účet (rovnaký vzor ako pergola-navrh.spec.ts/sietka.spec.ts B2B testy)
 	page.on('dialog', (d) => d.accept());
 	const b2bUser = `e2e-zaskl-navrh-b2b-${Date.now().toString(36)}`;
-	const b2bPass = 'e2eheslo1';
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
-	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const b2bPass = await zalozB2bUcet(page, e2eUcty, b2bUser); // #583: zaručené zmazanie + náhodné heslo
 
 	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);

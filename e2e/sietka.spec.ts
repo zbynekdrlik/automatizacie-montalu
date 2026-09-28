@@ -6,7 +6,8 @@
 // Väčšina testov je ČÍTACIA: formulár + „Spočítať" (?/nahlad, ?/nahladMulti) len
 // počítajú, nezapisujú odpis → dá sa pustiť aj proti nasadenej appke (BASE_URL).
 // Testy, ktoré idú AŽ ZA odoslanie do Money, sú označené a používajú `skipAkLive`.
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect, zalozB2bUcet } from './ucty';
 import {
 	collectConsole,
 	loginAs,
@@ -147,7 +148,7 @@ test('sieťka skryje kľučku LEN na strane sieťky — druhá strana ostane aj 
 	await page.selectOption('#kovanieP', 'Jednostranná kľučka z vnútra bez FAB');
 
 	await page.locator('#sietka-on').check();
-	await expect(page.getByTestId('sietka-strana')).toContainText('ľavá');
+	await expect(page.getByTestId('sietka-strana')).toContainText('na ľavú stranu');
 	await expect(page.locator('#kovanieL')).toHaveCount(0);
 	await expect(page.locator('#kovanieP')).toBeVisible();
 	await expect(page.locator('#kovanieP')).toHaveValue('Jednostranná kľučka z vnútra bez FAB');
@@ -326,7 +327,8 @@ test('samostatná stránka /sietka: Odoslať do Money zapíše odpis (TEST reži
 });
 
 test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí tlačidlo Odoslať', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
@@ -336,12 +338,7 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 	// nepresmeruje preč (Patrik #89: „hlavne pre externých") a nevidí Money zápis
 	page.on('dialog', (d) => d.accept());
 	const b2bUser = `e2e-sietka-b2b-${Date.now().toString(36)}`;
-	const b2bPass = 'e2eheslo1';
-	await goto(page, '/pouzivatelia');
-	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
-	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
-	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
-	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
+	const b2bPass = await zalozB2bUcet(page, e2eUcty, b2bUser); // #583: zaručené zmazanie + náhodné heslo
 
 	await logout(page);
 	await loginAs(page, b2bUser, b2bPass);

@@ -11,6 +11,8 @@ export default defineConfig({
 	// je to 404 by design, takže error-stranka spec je preview-only — proti
 	// deploymentu ho vynecháme na úrovni configu (nie runtime skip v spec súbore).
 	testIgnore: process.env.BASE_URL ? ['**/error-stranka.spec.ts'] : [],
+	// #583: pred sadou zmaž zvyšky throwaway `e2e-` B2B účtov z minulých behov (aj na PROD)
+	globalSetup: './e2e/global-setup.ts',
 	timeout: 30000,
 	// cez SSH tunel na nasadenú appku sú odozvy pomalšie — default 5 s expect
 	// timeout intermitentne padal na login redirecte
