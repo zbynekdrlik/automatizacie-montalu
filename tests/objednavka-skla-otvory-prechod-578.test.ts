@@ -104,6 +104,28 @@ describe('#578 prechod — starý riadok celého posuvu sa nezdvojí', () => {
 		expect(rows[0]!.spec.holesQty).toBe(1);
 	});
 
+	it('starý riadok s RUČNE nastavenými otvormi (#521 spec) sa tiež prevedie, nezdvojí', async () => {
+		const g = await geometria(deluxe('4K', '4000'), 'ZAK-578-GH');
+		const stareId = pridajSklo({
+			zak: 'ZAK-578-PH',
+			op: '01',
+			modul: 'zasklenia',
+			popis: 'Zasklenie 1',
+			...g,
+			pocet: 4,
+			holesQty: 2,
+			holeSize: 'd30',
+			createdBy: 'test'
+		});
+		await callAction({ ...deluxe('4K', '4000'), zak: 'ZAK-578-PH' });
+		const rows = listSklaPreZakazku('ZAK-578-PH');
+		expect(rows.reduce((a, p) => a + p.pocet, 0)).toBe(4);
+		const s = rows.find((p) => p.id === stareId)!;
+		expect(s.pocet).toBe(2);
+		expect(s.spec.holesQty).toBe(1);
+		expect(s.spec.holeSize).toBe('d50');
+	});
+
 	it('starý riadok s INÝM počtom (iný posuv) sa neprevádza — pridajú sa nové riadky', async () => {
 		const g = await geometria(deluxe('4K', '4000'), 'ZAK-578-G3');
 		const stareId = staryRiadok('ZAK-578-P3', g, 3);
