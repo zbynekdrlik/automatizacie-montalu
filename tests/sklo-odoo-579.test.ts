@@ -20,7 +20,9 @@ const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
 const { fetchGlassTypes, _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
 const { listGlassTypes } = await import('../src/lib/server/db');
-const { ponukaSkielSystemu, odooTriedyPre, ODOO_HRUBKY } = await import('../src/lib/sklo-povolene');
+const { ponukaSkielSystemu, vypocetneSkloPre, ODOO_HRUBKY_SEED } =
+	await import('../src/lib/sklo-povolene');
+const { skloHrubkyPre } = await import('../src/lib/server/sklo-hrubky');
 const { ponukaSkielPre, ponukySkiel, overSkloOdoo, SKUPINA_APPKA, PREFIX_ODOO_SKUPINY } =
 	await import('../src/lib/server/sklo-odoo');
 const { ponukaPreStyl, volbaSkla, rozlozVolbu, skloOdooPre, ODOO_PREFIX } =
@@ -97,18 +99,19 @@ describe('#579 fetchGlassTypes — hrúbka + duplicitný cenníkový kód', () =
 
 describe('#579 jeden zdroj hrúbok per systém (sklo-povolene.ts)', () => {
 	it('tabuľka z designu: Robust 24, Slide 16+6, Deluxe 6/10 kalené, Štandardy 6+16+24', () => {
-		const mm = (s: string) => odooTriedyPre(s).map((t) => `${t.mm}:${t.druh}`);
+		const mm = (s: string) => skloHrubkyPre(s).map((t) => `${t.mm}:${t.druh}`);
 		expect(mm('Robust')).toEqual(['24:izolacne']);
 		expect(mm('Slide')).toEqual(['16:izolacne', '6:jednoduche']);
 		expect(mm('Deluxe')).toEqual(['6:esg', '10:esg']);
 		for (const s of ['Štandard +', 'Štandard', 'Štandard Drevo'])
 			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
-		expect(odooTriedyPre('Neznámy')).toEqual([]);
+		expect(skloHrubkyPre('Neznámy')).toEqual([]);
 	});
 
 	it('reprezentatívne výpočtové sklo každej triedy je v lokálnej ponuke systému', () => {
-		for (const [system, triedy] of Object.entries(ODOO_HRUBKY))
-			for (const t of triedy) expect(lokalne(system), `${system} ${t.mm}`).toContain(t.sklo);
+		for (const [system, triedy] of Object.entries(ODOO_HRUBKY_SEED))
+			for (const t of triedy)
+				expect(vypocetneSkloPre(t.mm, t.druh, lokalne(system)), `${system} ${t.mm}`).not.toBeNull();
 	});
 });
 
@@ -144,7 +147,7 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 
 	it('typ s hrúbkou 0 sa neponúkne v žiadnom systéme', async () => {
 		odooOn();
-		for (const s of Object.keys(ODOO_HRUBKY))
+		for (const s of Object.keys(ODOO_HRUBKY_SEED))
 			expect(odooMena(await ponuka(s))).not.toContain('ESG Stopsol Classic Clear');
 	});
 
@@ -272,7 +275,7 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 	it('výpočtové sklo všetkých Odoo volieb vo všetkých systémoch (Money-neutrálny snapshot)', async () => {
 		odooOn();
 		const out: Record<string, Record<string, string>> = {};
-		for (const s of Object.keys(ODOO_HRUBKY)) {
+		for (const s of Object.keys(ODOO_HRUBKY_SEED)) {
 			const items = (await ponuka(s)).skupiny.flatMap((g) => g.items).filter((o) => o.odoo);
 			out[s] = Object.fromEntries(items.map((o) => [o.nazov, o.vypocet]));
 		}

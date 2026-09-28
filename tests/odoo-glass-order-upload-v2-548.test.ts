@@ -42,7 +42,7 @@ describe('#548 parseOdooOutcome', () => {
 });
 
 describe('#548 buildGlassOrderForZak — prílohy per riadok', () => {
-	it('načíta prílohu riadka do items[].attachments (base64 + mimetype)', () => {
+	it('načíta prílohu riadka do items[].attachments (base64 + mimetype)', async () => {
 		const zak = 'ZAK-548-UP-ATT';
 		const id = pridajSklo({
 			zak,
@@ -55,7 +55,7 @@ describe('#548 buildGlassOrderForZak — prílohy per riadok', () => {
 			createdBy: 'test'
 		});
 		pridajSubor(id, 'vykres.pdf', 'application/octet-stream', Buffer.from('PDFDATA'));
-		const built = buildGlassOrderForZak(zak)!;
+		const built = (await buildGlassOrderForZak(zak))!;
 		expect(built.order.version).toBe(2);
 		const item = built.order.items[0]!;
 		expect(item.attachments).toHaveLength(1);
@@ -64,7 +64,7 @@ describe('#548 buildGlassOrderForZak — prílohy per riadok', () => {
 		expect(item.attachments![0]!.data_base64).toBe(Buffer.from('PDFDATA').toString('base64'));
 	});
 
-	it('riadok bez prílohy → žiadny attachments kľúč', () => {
+	it('riadok bez prílohy → žiadny attachments kľúč', async () => {
 		const zak = 'ZAK-548-UP-NOATT';
 		pridajSklo({
 			zak,
@@ -76,12 +76,12 @@ describe('#548 buildGlassOrderForZak — prílohy per riadok', () => {
 			typSkla: '4.4.2 číre',
 			createdBy: 'test'
 		});
-		const item = buildGlassOrderForZak(zak)!.order.items[0]!;
+		const item = (await buildGlassOrderForZak(zak))!.order.items[0]!;
 		expect(item).not.toHaveProperty('attachments');
 	});
 
-	it('prázdna zákazka → null', () => {
-		expect(buildGlassOrderForZak('ZAK-548-UP-PRAZDNA')).toBeNull();
+	it('prázdna zákazka → null', async () => {
+		expect(await buildGlassOrderForZak('ZAK-548-UP-PRAZDNA')).toBeNull();
 	});
 });
 

@@ -103,3 +103,21 @@ NOVÁ tabuľka → krok 4 sa netýka. Fixtúra `migration-v51.test.ts` = v50 fix
 **Bump recept bez `xargs sed`:** worktree-izolovaný worker má `xargs sed` zablokované guardom
 (hodnota počítaná za behu) → použi krátky python loop nad `glob('tests/**/*.ts')`, ktorý mení LEN
 riadky s `user_version` A `toBe(<old>)`.
+
+## v52 (#579 časť 2) — `cfg_sklo_hrubka` (povolené hrúbky Odoo skiel per systém) vo VLASTNOM súbore
+
+`migracie-sklo-hrubky.ts` `migrateSkloHrubky` (guard `>= 52`, transakcia, `CREATE TABLE IF NOT EXISTS`
++ `INSERT OR IGNORE` zo `ODOO_HRUBKY_SEED` — jeden zdroj s kódom, CHECK zoznam druhov z `ODOO_DRUHY`).
+Logika (cache, validácia, zápis + audit) je v `sklo-hrubky.ts` (NIE v `migracie-*`). `migracie.ts`
+972 r. Head-bump: **43 test súborov** (51 → 52). NOVÁ tabuľka → krok 4 sa netýka. Fixtúra
+`migration-v52.test.ts` = v51 fixtúra + `objednavka_skla_odoslanie`. **Paralelná lane (#587) tiež
+pridáva migráciu** — pri kolízii čísla pri integrácii prečísluj jednu (guard `>= N`, `bump(N)`, vlastný
+test, head-bump všade), obe sú vo vlastných súboroch, takže sa nebijú v `migracie-seed.ts`.
+
+## v53 (#587) — poloha otvoru na `objednavka_skla` vo VLASTNOM súbore
+
+`migracie-objednavka-otvor.ts` (`migrateObjednavkaSklaOtvor`, guard `>= 52`, transakcia, feature-detect
+tabuľky + existujúcich stĺpcov) pridá `otvor_od_hrany_mm`, `otvor_od_spodku_mm`, `otvor_priemer_mm`
+(REAL NULL). `migracie.ts` 972 r. Head-bump: **43 test súborov** (51 → 52, python recept vyššie).
+Fixtúra `migration-v53.test.ts` = v51 base + `objednavka_skla` s v49 stĺpcami + `objednavka_skla_odoslanie`.
+Krok 4 sa netýka (ALTER `objednavka_skla`, žiadny exaktný zoznam stĺpcov v starších testoch).

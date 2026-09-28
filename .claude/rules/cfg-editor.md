@@ -58,6 +58,12 @@ Každý DB zápis v `saveCfgChanges` (offset, sklo mirror, skloOffset, glass red
 trieda, sieťka Štandard K/R/H #569) MUSÍ mať zodpovedajúci `zmeny` záznam — `cfg_audit` je jediná stopa „kto/kedy/čo" a
 Money-kritické zmeny nesmú byť tiché. Nový typ zápisu = nový `zmeny.push` v diff fáze.
 
+**Povolené hrúbky Odoo skiel (#579 časť 2)** NIE sú súčasť `saveCfgChanges` — majú vlastné akcie
+`pridatHrubku` / `odobratHrubku` (`sklo-hrubky.ts`), ale ten istý invariant: zápis do
+`cfg_sklo_hrubka` + `cfg_audit` riadok (sys_styl = SYSTÉM, nie sysStyl) v JEDNEJ transakcii. Akcie
+nesú `?sysStyl=…&/<akcia>` v URL (inak by load po POST-e skočil na prvý štýl) a formuláre majú
+`use:enhance` — `fail(400)` bez enhance vráti 400 DOKUMENT = console error v E2E.
+
 ## Testovanie
 
 - `saveCfgChanges` testy importujú `db` z `../src/lib/server/db` a čítajú `cfg_rez` priamo

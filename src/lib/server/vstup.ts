@@ -4,6 +4,7 @@ import { KLIN_MAX_KS, KLIN_MAX_POCET, KLIN_MAX_ROZMER, type Klin } from '$lib/kl
 import { STANDARD, zakladnyStyl } from '$lib/styl';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { skloPovolene } from '$lib/sklo-povolene';
+import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
 import { KOLAJNICA_MAX, KOLAJNICA_MIN, type KolajnicaRucne } from '$lib/kolajnica';
 // Rozmerové medze — jediný zdroj pravdy (#216); floor 100 mm pre malé vetracie okienka.
 import { S_MIN, S_MAX, V_MIN, V_MAX } from '$lib/zasklenia-navrh';
@@ -344,7 +345,7 @@ export interface Vstup {
 	/** ktoré stredové krídlo ju nesie: 'L' ľavé, 'P' pravé */
 	kovanieStredOkno: 'L' | 'P';
 	/** výška vŕtania zámku [mm od spodku skla] — len Deluxe (otvory D46 v náhľade),
-	 *  default 1050; do budúcna aj do objednávky skla */
+	 *  default `VRTANIE_ZAMKU_DEFAULT_MM`; #587 aj poloha otvoru v objednávke skla */
 	vrtanieZamku: number;
 	/** voľná VIACRIADKOVÁ poznámka — zobrazí sa vľavo v rámčeku na nárezovom pláne
 	 *  (aj v tlači), riadky pod sebou (pre-wrap) */
@@ -400,10 +401,10 @@ export function parseVstup(form: FormData): { vstup: Vstup; error: string | null
 		kovanieP: sanitizeKovanie(String(form.get('system') ?? '').trim(), form.get('kovanieP')),
 		kovanieStred: '',
 		kovanieStredOkno: sanitizeStredOkno(form.get('kovanieStredOkno')),
-		// Deluxe zámok: kladná výška vŕtania, inak default 1050 (len na náhľad/tlač)
+		// Deluxe zámok: kladná výška vŕtania, inak default (náhľad/tlač + #587 poloha otvoru v objednávke skla)
 		vrtanieZamku: (() => {
 			const x = num('vrtanieZamku');
-			return x > 0 && x <= 20000 ? x : 1050;
+			return x > 0 && x <= 20000 ? x : VRTANIE_ZAMKU_DEFAULT_MM;
 		})(),
 		poznamka: String(form.get('poznamka') ?? '')
 			.replace(/\r\n/g, '\n')

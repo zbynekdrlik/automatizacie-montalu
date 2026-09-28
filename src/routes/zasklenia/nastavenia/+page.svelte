@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { nazovSysStyl, nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
+	import { enhance } from '$app/forms';
 	import { POZNAMKY } from '$lib/nastavenia-poznamky';
+	import { ODOO_DRUHY, ODOO_DRUH_POPIS } from '$lib/sklo-povolene';
 	import {
 		SIETKA_STANDARD_BOUNDS,
 		SIETKA_STANDARD_KLUCE,
@@ -291,6 +293,71 @@
 			</div>
 
 			<button class="btn" type="submit" data-testid="ulozit-vzorce">💾 Uložiť vzorce</button>
+		</form>
+	</div>
+
+	<!-- #579 časť 2 (Odoo úloha 1180): povolené hrúbky Odoo skiel pri systéme nastavuje výroba.
+	     Zadáva sa LEN hrúbka + druh; výpočtové sklo appka odvodí sama (nedá sa zadať). Vlastné
+	     formuláre/akcie (nie súčasť „Uložiť vzorce"); ?sysStyl v akcii drží zvolený štýl. use:enhance:
+	     odmietnutie (fail 400) príde v JSON tele, nie ako 400 dokument (konzola ostane čistá). -->
+	<div class="card" data-testid="hrubky-skla">
+		<div class="sec">Povolené hrúbky skla z Odoo — {nazovSystemu(data.system)}</div>
+		<p class="sub" style="margin-bottom:10px">
+			Nárezák pri tomto systéme ponúkne v „Sklo (základ)" všetky typy skla z Odoo s touto celkovou
+			hrúbkou a druhom. Výpočet (nárez aj odpis do Money) ide podľa výpočtového skla, ktoré appka
+			odvodí sama — ak pre hrúbku žiadne nemá, hrúbku nepovolí.
+		</p>
+		{#if form?.hrubkaChyba}
+			<div class="err" data-testid="hrubka-chyba">⚠️ {form.hrubkaChyba}</div>
+		{/if}
+		{#if form?.hrubkaOk}
+			<div class="okmsg" data-testid="hrubka-ok">✅ {form.hrubkaOk}</div>
+		{/if}
+		{#each data.hrubky as h (h.id)}
+			<form
+				method="POST"
+				action="?sysStyl={encodeURIComponent(data.sysStyl)}&/odobratHrubku"
+				use:enhance
+				class="row"
+				data-testid="hrubka-{h.mm}"
+			>
+				<input type="hidden" name="system" value={data.system} />
+				<input type="hidden" name="id" value={h.id} />
+				<span>
+					<b>{h.mm} mm</b> · {ODOO_DRUH_POPIS[h.druh]} · počíta sa ako {h.vypocet ??
+						'— chýba výpočtové sklo, neponúka sa'}
+				</span>
+				<button class="btn secondary" type="submit" data-testid="odobrat-hrubku-{h.mm}"
+					>Odobrať</button
+				>
+			</form>
+		{:else}
+			<p class="sub" data-testid="hrubky-prazdne">
+				Systém nemá povolenú žiadnu hrúbku — nárezák ponúka len sklá appky.
+			</p>
+		{/each}
+		<form
+			method="POST"
+			action="?sysStyl={encodeURIComponent(data.sysStyl)}&/pridatHrubku"
+			use:enhance
+			style="margin-top:12px"
+		>
+			<input type="hidden" name="system" value={data.system} />
+			<div class="grid2">
+				<div class="field">
+					<label for="hrubka-mm">Hrúbka skla (mm)</label>
+					<input id="hrubka-mm" name="mm" type="number" step="any" min="1" max="100" required />
+				</div>
+				<div class="field">
+					<label for="hrubka-druh">Druh skla</label>
+					<select id="hrubka-druh" name="druh">
+						{#each ODOO_DRUHY as d (d)}
+							<option value={d}>{ODOO_DRUH_POPIS[d]}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+			<button class="btn" type="submit" data-testid="pridat-hrubku">➕ Povoliť hrúbku</button>
 		</form>
 	</div>
 

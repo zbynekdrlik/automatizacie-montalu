@@ -5,6 +5,7 @@
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import { bezRozmerov, fmtRozmerTabule, popisPozicie } from '$lib/objednavka-skla-pozicia';
 	import { SENTINEL_INE_SKLO, zoskupTypySkla } from '$lib/objednavka-skla-typy';
+	import { PRIPONA_OTVOR_RE, otvoryRucneZmenene, popisPolohyOtvoru } from '$lib/sklo-otvory';
 
 	let { data, form } = $props();
 
@@ -376,6 +377,32 @@
 								</form>
 							</td>
 							<td class="noprint">
+								<!-- #587: vygenerovaný výkres tabule s otvorom (ide aj do Odoo/IZOS ako príloha) -->
+								<!-- atyp = obsluha dodáva vlastný výkres → generovaný sa nepridáva (dva by si odporovali) -->
+								{#if p.otvor && data.vykresOtvoru[p.id]}
+									<span class="subor-tag vykres-otvoru" data-testid={`vykres-otvoru-${p.id}`}>
+										<a
+											href={resolve(`/objednavka-skla/vykres-otvoru/${p.id}`)}
+											target="_blank"
+											rel="noopener noreferrer">Výkres otvoru (PDF)</a
+										>
+									</span>
+									<div class="otvor-poloha" data-testid={`otvor-poloha-${p.id}`}>
+										{popisPolohyOtvoru(p.otvor)}
+									</div>
+								{:else if p.spec.holesQty > 0 && p.rezim !== 'atyp' && PRIPONA_OTVOR_RE.test(p.popis)}
+									<!-- riadok „— s otvorom" z nárezáka bez platného výkresu -->
+									<div class="warn" data-testid={`otvor-neznamy-${p.id}`}>
+										{#if otvoryRucneZmenene( { popis: p.popis, holesQty: p.spec.holesQty, holeSize: p.spec.holeSize } )}
+											Otvory na riadku sú zmenené ručne — výkres sa negeneruje. Prepni riadok na
+											atyp a nahraj vlastný výkres.
+										{:else}
+											Poloha otvoru neznáma — výkres sa negeneruje (riadok spred výkresov, alebo sa
+											otvor do skla nezmestí). Doplň: znova „Pridať sklá" z nárezáka so správnou
+											výškou vŕtania, alebo prepni riadok na atyp a nahraj výkres.
+										{/if}
+									</div>
+								{/if}
 								{#if suboryMap[p.id]}
 									{#each suboryMap[p.id]! as f (f.id)}
 										<span class="subor-tag">
@@ -669,6 +696,11 @@
 	}
 	.subor-tag a {
 		color: var(--m-ink);
+	}
+	.otvor-poloha {
+		font-size: 0.8rem;
+		color: var(--m-muted-ink);
+		margin: 2px 0 4px;
 	}
 	.btn-remove {
 		background: none;

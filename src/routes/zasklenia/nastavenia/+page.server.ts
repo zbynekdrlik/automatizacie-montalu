@@ -1,6 +1,7 @@
 // Editor vzorcov: bounds validácia, transakčný zápis, audit trail a
 // old→new náhľad odpisu na kontrolných rozmeroch.
 
+import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import {
 	loadCfg,
@@ -20,6 +21,7 @@ import {
 import { safeCompute } from '$lib/server/compute';
 import { maSietkaSystemVyber } from '$lib/sietka';
 import { SIETKA_STANDARD_KLUCE, type SietkaStandardParams } from '$lib/sietka-standard';
+import { pridajSkloHrubku, odoberSkloHrubku, skloHrubkyEditor } from '$lib/server/sklo-hrubky';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const styly = listSysStyly();
@@ -50,11 +52,46 @@ export const load: PageServerLoad = async ({ url }) => {
 		// #569: K/R/H modelu sieťky Štandard — globálne pre Štandard aj Štandard +, zobrazia sa
 		// LEN pri Štandard-rodine (inde sieťka Štandard nie je).
 		sietkaStandard: maSietkaSystemVyber(system) ? getSietkaStandardParams() : null,
+		// #579 časť 2: povolené hrúbky Odoo skiel systému (nastavuje výroba) + odvodené výpočtové sklo
+		hrubky: skloHrubkyEditor(system),
 		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) as CfgZmena[] }))
 	};
 };
 
+// #579 časť 2: povolené hrúbky Odoo skiel per systém — samostatné akcie (nie súčasť `ulozit`),
+// validácia + zápis + `cfg_audit` v `sklo-hrubky.ts`. Výpočtové sklo sa nezadáva (odvodí sa).
+// `Number` (nie parseFloat): „24abc" → NaN → odmietnuté; prázdne pole → NaN (nie 0)
+const hrubkaCislo = (v: FormDataEntryValue | null) => {
+	const t = String(v ?? '')
+		.replace(',', '.')
+		.trim();
+	return t === '' ? NaN : Number(t);
+};
+
 export const actions = {
+	pridatHrubku: async ({ request, locals }) => {
+		const form = await request.formData();
+		const system = String(form.get('system') ?? '');
+		const mm = hrubkaCislo(form.get('mm'));
+		const r = pridajSkloHrubku({
+			system,
+			mm,
+			druh: String(form.get('druh') ?? ''),
+			username: locals.user?.username ?? ''
+		});
+		if (r.error) return fail(400, { hrubkaChyba: r.error });
+		return { hrubkaOk: `${r.zmena!.pole} — ${r.zmena!.nova}.` };
+	},
+	odobratHrubku: async ({ request, locals }) => {
+		const form = await request.formData();
+		const r = odoberSkloHrubku({
+			id: Number(form.get('id')),
+			system: String(form.get('system') ?? ''),
+			username: locals.user?.username ?? ''
+		});
+		if (r.error) return fail(400, { hrubkaChyba: r.error });
+		return { hrubkaOk: `${r.zmena!.pole} — odobratá.` };
+	},
 	ulozit: async ({ request, locals }) => {
 		const form = await request.formData();
 		const sysStyl = String(form.get('sysStyl') ?? '');

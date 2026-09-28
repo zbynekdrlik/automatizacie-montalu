@@ -765,24 +765,39 @@ export const actions = {
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', vstup };
 
 		// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
-		const polozky = sklaPosuvu('Zasklenie 1', r, {
-			zak: vstup.zak,
-			op: vstup.op,
-			// #579: zvolený Odoo typ ide do objednávky PRESNE (bez matchera #556)
-			typSkla: vstup.skloOdoo || vstup.skloPresne || vstup.sklo,
-			createdBy: locals.user?.username ?? ''
-		});
+		// #587: výška vŕtania zámku z formulára → poloha otvoru na riadku „s otvorom" (PDF výkres)
+		const polozky = sklaPosuvu(
+			'Zasklenie 1',
+			{ ...r, vrtanieZamku: vstup.vrtanieZamku },
+			{
+				zak: vstup.zak,
+				op: vstup.op,
+				// #579: zvolený Odoo typ ide do objednávky PRESNE (bez matchera #556)
+				typSkla: vstup.skloOdoo || vstup.skloPresne || vstup.sklo,
+				createdBy: locals.user?.username ?? ''
+			}
+		);
 		// #514: náhľad zostav PRED zápisom — ak kovanie zlyhá (form), NEvkladaj sklá
 		// (validácia pred vedľajším efektom). Potom idempotentne (dvojklik neduplikuje)
 		// a BEZ presmerovania, aby „uložiť nárezák" (odpis) ostalo dostupné.
 		const v = stavNahlad(vstup, r, spec, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
-		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
+		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
+		const stats = { polohaZmenena: 0 };
+		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
 		const cudzie = upozornenieCudzie(vstup.zak, locals.user?.username ?? '');
-		return { ...v, sklaPridane: { pridane, zak: vstup.zak, upozornenieCudzie: cudzie } };
+		return {
+			...v,
+			sklaPridane: {
+				pridane,
+				polohaZmenena: stats.polohaZmenena,
+				zak: vstup.zak,
+				upozornenieCudzie: cudzie
+			}
+		};
 	},
 
 	// ---- #496: Pridať sklá do objednávky skla (multi posuv / zimná záhrada) ----
@@ -812,10 +827,20 @@ export const actions = {
 		const v = stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
-		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
+		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
+		const stats = { polohaZmenena: 0 };
+		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
 		const cudzie = upozornenieCudzie(vstup.zak, locals.user?.username ?? '');
-		return { ...v, sklaPridane: { pridane, zak: vstup.zak, upozornenieCudzie: cudzie } };
+		return {
+			...v,
+			sklaPridane: {
+				pridane,
+				polohaZmenena: stats.polohaZmenena,
+				zak: vstup.zak,
+				upozornenieCudzie: cudzie
+			}
+		};
 	}
 } satisfies Actions;
