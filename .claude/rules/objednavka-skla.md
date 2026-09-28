@@ -5,6 +5,8 @@ paths:
   - "src/lib/server/objednavka-skla.ts"
   - "src/lib/server/money-nazov-skla.ts"
   - "src/lib/objednavka-skla-pozicia.ts"
+  - "src/lib/objednavka-skla-typy.ts"
+  - "src/lib/server/objednavka-skla-odoslanie.ts"
   - "src/routes/zasklenia/+page.server.ts"
   - "src/routes/fix/+page.server.ts"
   - "src/routes/pergola/narez/+page.server.ts"
@@ -486,3 +488,39 @@ e-mailovým menom — na každej stránke.
   scratchpadu) + dočasný playwright config bez `webServer` s `baseURL` na ten port; v dev móde Vite
   HMR websocket loguje `ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` — to je šum dev servera, v CI
   (preview build) neexistuje; hodnoť len ostatné správy.
+
+## Picker typu skla zoskupený podľa druhu (#576) + trvalý odkaz do Odoo po odoslaní (#577)
+
+Marek D. (Odoo úlohy 1180/1181, 28.9.): 99 Odoo typov v plochom `<select>` bolo neprehľadné, a po
+„Odoslať do Odoo" musela výroba objednávku v Odoo hľadať. Money-NEUTRÁLNE.
+
+- **JEDNA funkcia `zoskupTypySkla(items, kandidati)`** (`src/lib/objednavka-skla-typy.ts`, ČISTÁ,
+  client-safe — svelte ju volá per riadok s `nav?.kandidati`, aj pre „Pridať riadok" s `[]`) →
+  `{label, items}[]` v PEVNOM poradí: „Odporúčané" (kandidáti matchera #556, keď sú) → „Izolačné
+  (IZOS)" `izolacne` → „Kalené ESG" `esg` → „Lepené VSG" `vsg` → „Rezané / float" `rezane` → „Ostatné"
+  (neznáma/prázdna kategória = aj lokálny fallback) → „Iné sklo" (sentinel, VŽDY posledné). V skupine
+  `localeCompare(…, 'sk')`; prázdne skupiny sa vynechajú; kandidát sa v kategórii NEopakuje (žiadne
+  duplicitné `value` v jednom selecte). **`value` sa NEMENÍ** → uložený `typ_skla` aj payload
+  bit-identické. Nový picker typu skla inde (napr. pergola honest-null) → reuse tejto funkcie.
+- **Sentinel „iné sklo" = `SENTINEL_INE_SKLO`** z toho istého modulu — svelte aj server
+  (`MANUAL_TYP_SENTINEL`) ho importujú (jeden zdroj). E2E vyberá `'__ine__'` hodnotou — optgroup to
+  nemení. Prvá NEprázdna voľba pickera je v CI prvý typ skupiny „Ostatné" (lokálny fallback).
+- **Odkaz** `odooObjednavkaSklaUrl(id)` (`src/lib/server/objednavka-skla-odoslanie.ts`) =
+  `<base>/odoo/action-1008/<id>`, base = `odooJson2Config().url` (ODOO_JSON2_URL, trailing `/`
+  orezaný), inak `https://erp.montalu.cloud`; neplatné id → `null` (žiadny mŕtvy odkaz).
+- **Trvalosť = tabuľka `objednavka_skla_odoslanie(zak_norm PK, glass_order_id CHECK>0, name,
+  odoslane_at, odoslal)`** (migrácia **v51**, vlastný súbor `migracie-objednavka-odoslanie.ts`).
+  Podklad nemá hlavičkovú tabuľku → jeden riadok per `normZak(zak)`, upsert (Odoo `doc_id` je
+  idempotentný = tá istá objednávka). Akcia `odoslatDoOdoo` uloží LEN pri `result==='uploaded'` A
+  `odoo.glassOrderId` (v1 intake/vypnuté/chyba → nič, `odkaz:null`); zlyhanie uloženia sa zaloguje a
+  odkaz sa aj tak vráti. Load vráti `odoslanieOdoo` (čas cez `sqliteUtcToIso`+`formatDatumCasSk`).
+- **UI:** blok `odoo-objednavka` / `odoo-objednavka-link` (target `_blank`, `rel=noopener noreferrer`)
+  je MIMO guardu položiek (objednávka v Odoo existuje ďalej); zdroj = `data.odoslanieOdoo`, fallback
+  `form.odoslane.odkaz`. Externý `href` potrebuje scoped `eslint-disable
+  svelte/no-navigation-without-resolve` (vzor `KonfVyber.svelte`).
+- **Testy:** `tests/objednavka-skla-typy-576.test.ts`, `tests/objednavka-skla-odoslanie-577.test.ts`
+  (akcia s mocknutým `setJson2Transport` + load „po obnovení"), `tests/migration-v51.test.ts`. E2E:
+  `objednavka-skla.spec.ts` „zoskupený podľa druhu" (RELAČNE: ≥2 optgroup, posledná „Iné sklo", každá
+  voľba v skupine, bez duplicít — len čítanie, beží aj proti PROD) + `objednavka-skla-odoo-odkaz-577.spec.ts`
+  (seed `objednavka_skla_odoslanie` do e2e DB so syntetickým id, `skipAkLive`; v CI je upload vypnutý,
+  preto reálny odkaz z akcie kryje unit test).

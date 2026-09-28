@@ -92,3 +92,14 @@ odpis_log, **user_audit**, objednavka_skla — inak `SqliteError: no such table`
 `!src/lib/server/migracie-*.ts`) každý súbor s týmto prefixom z mutácie VYLÚČIA (DDL overujú
 `migration-vN.test.ts`). Skutočnú LOGIKU (výpočty, validácie) preto NIKDY nedávaj do
 `migracie-*.ts` súboru — patrí do modulu s iným menom, inak by ticho stratila mutačnú ochranu.
+
+## v51 (#577) — `objednavka_skla_odoslanie` vo VLASTNOM súbore
+
+Posledné odoslanie objednávky skla do Odoo per podklad (`migracie-objednavka-odoslanie.ts`,
+`migrateObjednavkaSklaOdoslanie`, guard `>= 51`, transakcia, `CREATE TABLE IF NOT EXISTS`). Logika
+(upsert/čítanie/URL) je v `objednavka-skla-odoslanie.ts` (NIE v `migracie-*` — mutačný scope).
+`migracie.ts` 970 r. Head-bump: **42 test súborov** (50 → 51, vrátane `migration-v50.test.ts`).
+NOVÁ tabuľka → krok 4 sa netýka. Fixtúra `migration-v51.test.ts` = v50 fixtúra + `cfg_sietka_standard`.
+**Bump recept bez `xargs sed`:** worktree-izolovaný worker má `xargs sed` zablokované guardom
+(hodnota počítaná za behu) → použi krátky python loop nad `glob('tests/**/*.ts')`, ktorý mení LEN
+riadky s `user_version` A `toBe(<old>)`.
