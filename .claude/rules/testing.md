@@ -606,5 +606,12 @@ deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-r
   chrome-headless-shell` (cez `os.homedir()`), nič nesťahovať. Config aj `test-results/` po behu
   zmaž — necommitovať. Prvý test na ešte neskompilovanú route môže v dev móde timeoutnúť (on-demand
   kompilácia) → rerun, nie bug.
+- **Cesta k binárke sa líši podľa verzie Chromia a cache sa mení pod rukami** (#583: 1244 zmizlo
+  počas behu, ostalo 1193): 12xx = `chromium_headless_shell-<v>/chrome-headless-shell-linux64/
+  chrome-headless-shell`, 1193 = `chromium_headless_shell-1193/chrome-linux/headless_shell`. Pred
+  behom `ls ~/.cache/ms-playwright/chromium_headless_shell-*/`.
+- **Temp E2E config drž na porte 4173, ak je voľný** — `skipAkLive` (`e2e/helpers.ts`) číta
+  `BASE_URL || http://localhost:4173`, takže na inom porte všetky zápisové testy padnú na `fetch
+  failed` (artefakt harnessu, nie regresia). Iný port len keď je 4173 obsadený súrodencom.
 - **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
   položky cez `td[data-testid^="popis-"]`, nie `tbody tr`.
