@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { nazovSysStyl, nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
+	import { enhance } from '$app/forms';
 	import { POZNAMKY } from '$lib/nastavenia-poznamky';
 	import { ODOO_DRUHY, ODOO_DRUH_POPIS } from '$lib/sklo-povolene';
 	import {
@@ -297,7 +298,8 @@
 
 	<!-- #579 časť 2 (Odoo úloha 1180): povolené hrúbky Odoo skiel pri systéme nastavuje výroba.
 	     Zadáva sa LEN hrúbka + druh; výpočtové sklo appka odvodí sama (nedá sa zadať). Vlastné
-	     formuláre/akcie (nie súčasť „Uložiť vzorce"); ?sysStyl v akcii drží zvolený štýl. -->
+	     formuláre/akcie (nie súčasť „Uložiť vzorce"); ?sysStyl v akcii drží zvolený štýl. use:enhance:
+	     odmietnutie (fail 400) príde v JSON tele, nie ako 400 dokument (konzola ostane čistá). -->
 	<div class="card" data-testid="hrubky-skla">
 		<div class="sec">Povolené hrúbky skla z Odoo — {nazovSystemu(data.system)}</div>
 		<p class="sub" style="margin-bottom:10px">
@@ -315,6 +317,7 @@
 			<form
 				method="POST"
 				action="?sysStyl={encodeURIComponent(data.sysStyl)}&/odobratHrubku"
+				use:enhance
 				class="row"
 				data-testid="hrubka-{h.mm}"
 			>
@@ -336,6 +339,7 @@
 		<form
 			method="POST"
 			action="?sysStyl={encodeURIComponent(data.sysStyl)}&/pridatHrubku"
+			use:enhance
 			style="margin-top:12px"
 		>
 			<input type="hidden" name="system" value={data.system} />
