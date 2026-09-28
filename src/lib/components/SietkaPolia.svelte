@@ -53,8 +53,8 @@
 		uchyt?: SietkaUchyt;
 		/** zvolený systém sieťky (#110) — prázdny reťazec = rovnaký ako posuv */
 		sietkaSystem?: string;
-		/** #88: pri zapnutí sieťky kľučka/FAB tohto posuvu zmizne — rodič si tak vie
-		 *  vynulovať svoje kovanieL/kovanieP polia (sieťka ich nahrádza úchytom) */
+		/** #88/#583: pri zapnutí sieťky zmizne kľučka na STRANE sieťky — rodič si tak vie
+		 *  vynulovať kovanie tej strany (`kovanieSkryte`; úchyt sieťky ho tam nahrádza) */
 		onZmena?: (on: boolean) => void;
 	} = $props();
 
