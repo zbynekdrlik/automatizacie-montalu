@@ -4,7 +4,7 @@
 // (súbory `migracie-*.ts` sú mimo mutačného scope — logika žije v `sklo-hrubky.ts`).
 import type Database from 'better-sqlite3';
 import { logger } from './log';
-import { ODOO_DRUHY, ODOO_HRUBKY_SEED } from '../sklo-povolene';
+import { ODOO_HRUBKY_SEED } from '../sklo-povolene';
 
 const log = logger('migrate');
 
@@ -18,14 +18,15 @@ const log = logger('migrate');
  */
 export function migrateSkloHrubky(db: Database.Database, bump: (v: number) => void): void {
 	if ((db.pragma('user_version', { simple: true }) as number) >= 52) return;
-	const druhy = ODOO_DRUHY.map((d) => `'${d}'`).join(', ');
 	db.transaction(() => {
+		// CHECK zoznam druhov je ZMRAZENÝ literál (= `ODOO_DRUHY` v čase v52) — nový druh = nová
+		// migrácia (recreate tabuľky), nikdy úprava tohto DDL (existujúca DB by ju nevidela)
 		db.exec(`
 			CREATE TABLE IF NOT EXISTS cfg_sklo_hrubka (
 				id INTEGER PRIMARY KEY,
 				system TEXT NOT NULL,
 				mm REAL NOT NULL CHECK (mm > 0),
-				druh TEXT NOT NULL CHECK (druh IN (${druhy})),
+				druh TEXT NOT NULL CHECK (druh IN ('izolacne', 'jednoduche', 'esg')),
 				UNIQUE (system, mm)
 			);
 		`);

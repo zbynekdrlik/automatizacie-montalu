@@ -125,8 +125,13 @@ describe('#579/2 zmena tabuľky sa prejaví v ponuke bez releasu + audit', () =>
 		const a = posledneAudit();
 		expect(a.username).toBe('vyroba');
 		expect(a.sys_styl).toBe('Slide');
-		expect(a.zmeny).toContain('24 mm');
-		expect(a.zmeny).toContain('Izolačné sklo 4/16/4 číre');
+		expect(JSON.parse(a.zmeny)).toEqual([
+			{
+				pole: 'Povolená hrúbka skla 24 mm (izolačné)',
+				stara: 'nie',
+				nova: 'áno — počíta sa ako Izolačné sklo 4/16/4 číre'
+			}
+		]);
 
 		const po = await odooVolby('Slide');
 		for (const n of ROBUST_24_MM) {
@@ -141,7 +146,9 @@ describe('#579/2 zmena tabuľky sa prejaví v ponuke bez releasu + audit', () =>
 		const id = skloHrubkyPre('Slide').find((h) => h.mm === 24)!.id;
 		expect(odoberSkloHrubku({ id, system: 'Slide', username: 'vyroba' }).error).toBeNull();
 		expect(auditCount()).toBe(a0 + 2);
-		expect(posledneAudit().zmeny).toContain('24 mm');
+		expect(JSON.parse(posledneAudit().zmeny)).toEqual([
+			{ pole: 'Povolená hrúbka skla 24 mm (izolačné)', stara: 'áno', nova: 'nie' }
+		]);
 		const spat = (await odooVolby('Slide')).map((o) => o.nazov);
 		for (const n of ROBUST_24_MM) expect(spat).not.toContain(n);
 		expect(
@@ -158,29 +165,70 @@ describe('#579/2 zmena tabuľky sa prejaví v ponuke bez releasu + audit', () =>
 		expect(auditCount()).toBe(a0);
 	});
 
-	it('duplicitná hrúbka, neznámy systém, zlé mm a zlý druh sa odmietnu', () => {
+	it('duplicitná hrúbka, neznámy systém, zlé mm a zlý druh sa odmietnu — každé vlastnou hláškou', () => {
 		const n0 = listSkloHrubky().length;
-		const zle = [
-			{ system: 'Robust', mm: 24, druh: 'izolacne' },
-			{ system: 'Neznámy', mm: 24, druh: 'izolacne' },
-			{ system: 'Slide', mm: Number.NaN, druh: 'izolacne' },
-			{ system: 'Slide', mm: 0, druh: 'izolacne' },
-			{ system: 'Slide', mm: 500, druh: 'izolacne' },
-			{ system: 'Slide', mm: 24, druh: 'xyz' }
+		const a0 = auditCount();
+		const zle: [{ system: string; mm: number; druh: string }, RegExp][] = [
+			[{ system: 'Robust', mm: 24, druh: 'izolacne' }, /24 mm je pri systéme Robust už povolená/],
+			[{ system: 'Robust', mm: 24, druh: 'jednoduche' }, /už povolená \(izolačné\)/],
+			[{ system: 'Neznámy', mm: 24, druh: 'izolacne' }, /Neznámy systém „Neznámy"/],
+			[{ system: 'Slide', mm: Number.NaN, druh: 'izolacne' }, /1–100 mm/],
+			[{ system: 'Slide', mm: 0, druh: 'izolacne' }, /1–100 mm/],
+			[{ system: 'Slide', mm: 0.99, druh: 'izolacne' }, /1–100 mm/],
+			[{ system: 'Slide', mm: 100.01, druh: 'izolacne' }, /1–100 mm/],
+			[{ system: 'Slide', mm: 500, druh: 'izolacne' }, /1–100 mm/],
+			// hranice 1 a 100 prejdú rozsahom — odmietne ich až pravidlo výpočtového skla
+			[{ system: 'Slide', mm: 1, druh: 'izolacne' }, /nemá výpočtové sklo pre 1 mm/],
+			[{ system: 'Slide', mm: 100, druh: 'izolacne' }, /nemá výpočtové sklo pre 100 mm/],
+			[{ system: 'Slide', mm: 24, druh: 'xyz' }, /Neznámy druh skla/]
 		];
-		for (const z of zle)
-			expect(
-				pridajSkloHrubku({ ...z, username: 'vyroba' } as Parameters<typeof pridajSkloHrubku>[0])
-					.error,
-				JSON.stringify(z)
-			).toBeTruthy();
+		for (const [z, hlaska] of zle)
+			expect(pridajSkloHrubku({ ...z, username: 'vyroba' }).error, JSON.stringify(z)).toMatch(
+				hlaska
+			);
 		expect(listSkloHrubky()).toHaveLength(n0);
+		expect(auditCount()).toBe(a0);
 	});
 
 	it('odobratie cudzieho riadku (id iného systému) sa odmietne', () => {
+		const a0 = auditCount();
 		const id = skloHrubkyPre('Robust')[0]!.id;
-		expect(odoberSkloHrubku({ id, system: 'Slide', username: 'x' }).error).toBeTruthy();
+		expect(odoberSkloHrubku({ id, system: 'Slide', username: 'x' }).error).toMatch(/neexistuje/);
 		expect(skloHrubkyPre('Robust')).toHaveLength(1);
+		expect(auditCount()).toBe(a0);
+	});
+
+	it('každé odmietnutie sa zaloguje (warn) s kontextom — podvrhnutý POST nie je tichý', () => {
+		vi.stubEnv('LOG_LEVEL', 'warn');
+		const lines: string[] = [];
+		const spy = vi.spyOn(process.stdout, 'write').mockImplementation((c: unknown) => {
+			lines.push(String(c));
+			return true;
+		});
+		pridajSkloHrubku({ system: 'Neznámy', mm: 24, druh: 'izolacne', username: 'utocnik' });
+		odoberSkloHrubku({ id: 999999, system: 'Slide', username: 'utocnik' });
+		spy.mockRestore();
+		const warn = lines.filter(
+			(l) => l.includes('"level":"warn"') && l.includes('zmena odmietnutá') && l.includes('utocnik')
+		);
+		expect(warn).toHaveLength(2);
+		expect(warn[1]).toContain('999999');
+	});
+
+	it('súbežný zápis z iného procesu (cache ho nevidí) → UNIQUE kolízia = hláška, nie výnimka', () => {
+		listSkloHrubky(); // naplň cache
+		db.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)').run(
+			'Slide',
+			10,
+			'jednoduche'
+		);
+		const a0 = auditCount();
+		const r = pridajSkloHrubku({ system: 'Slide', mm: 10, druh: 'jednoduche', username: 'x' });
+		expect(r.error).toMatch(/10 mm je pri systéme Slide už povolená/);
+		expect(auditCount()).toBe(a0);
+		// cache sa po kolízii obnovila → riadok je viditeľný a dá sa odobrať
+		const id = skloHrubkyPre('Slide').find((h) => h.mm === 10)!.id;
+		expect(odoberSkloHrubku({ id, system: 'Slide', username: 'x' }).error).toBeNull();
 	});
 });
 
@@ -222,6 +270,25 @@ describe('#579/2 editor nastavení — hrúbky skla', () => {
 		)) as { status?: number; data?: { hrubkaChyba?: string } };
 		expect(zle.status).toBe(400);
 		expect(zle.data?.hrubkaChyba).toMatch(/výpočtové sklo/);
+
+		// číslo s „smetím" alebo prázdne pole = neplatná hrúbka (nie 24 / 0)
+		for (const mm of ['24abc', '', '  '])
+			expect(
+				(
+					(await actions.pridatHrubku(event({ system: 'Slide', mm, druh: 'izolacne' }))) as {
+						data?: { hrubkaChyba?: string };
+					}
+				).data?.hrubkaChyba,
+				mm
+			).toMatch(/1–100 mm/);
+		// desatinná čiarka sa prijme (6,0 = 6) — Slide 6 už povolená → duplicita, nie „1–100"
+		expect(
+			(
+				(await actions.pridatHrubku(event({ system: 'Slide', mm: '6,0', druh: 'jednoduche' }))) as {
+					data?: { hrubkaChyba?: string };
+				}
+			).data?.hrubkaChyba
+		).toMatch(/6 mm je pri systéme Slide už povolená/);
 
 		const id = skloHrubkyPre('Slide').find((h) => h.mm === 24)!.id;
 		const del = (await actions.odobratHrubku(event({ system: 'Slide', id: String(id) }))) as {

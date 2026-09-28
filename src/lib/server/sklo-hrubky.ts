@@ -67,6 +67,15 @@ function audit(username: string, system: string, zmena: CfgZmena): void {
 
 type Vysledok = { error: string | null; zmena?: CfgZmena };
 
+/** Odmietnutie editora — vždy zalogované (podvrhnutý POST / zastaraná stránka je signál). */
+function odmietni(sprava: string, ctx: Record<string, unknown>): Vysledok {
+	log.warn('sklo-hrubky: zmena odmietnutá', { dovod: sprava, ...ctx });
+	return { error: sprava };
+}
+
+const jeUniqueKolizia = (e: unknown) =>
+	(e as { code?: string } | null)?.code === 'SQLITE_CONSTRAINT_UNIQUE';
+
 /** Pridaj povolenú hrúbku (validácia + zápis + audit v jednej transakcii). */
 export function pridajSkloHrubku(input: {
 	system: string;
@@ -75,44 +84,43 @@ export function pridajSkloHrubku(input: {
 	username: string;
 }): Vysledok {
 	const { system, mm, druh, username } = input;
+	const ctx = { system, mm, druh, username };
 	if (!systemyZoStylov(listSysStyly()).includes(system))
-		return { error: `Neznámy systém „${system}".` };
+		return odmietni(`Neznámy systém „${system}".`, ctx);
 	if (!Number.isFinite(mm) || mm < HRUBKA_BOUNDS.min || mm > HRUBKA_BOUNDS.max)
-		return {
-			error: `Hrúbka musí byť číslo ${HRUBKA_BOUNDS.min}–${HRUBKA_BOUNDS.max} mm.`
-		};
-	if (!jeOdooDruh(druh)) return { error: 'Neznámy druh skla.' };
+		return odmietni(`Hrúbka musí byť číslo ${HRUBKA_BOUNDS.min}–${HRUBKA_BOUNDS.max} mm.`, ctx);
+	if (!jeOdooDruh(druh)) return odmietni('Neznámy druh skla.', ctx);
+	const duplicita = (d: OdooDruh) =>
+		`Hrúbka ${mm} mm je pri systéme ${system} už povolená (${ODOO_DRUH_POPIS[d]}).`;
 	const existujuca = skloHrubkyPre(system).find((h) => h.mm === mm);
-	if (existujuca)
-		return {
-			error: `Hrúbka ${mm} mm je pri systéme ${system} už povolená (${ODOO_DRUH_POPIS[existujuca.druh]}).`
-		};
+	if (existujuca) return odmietni(duplicita(existujuca.druh), ctx);
 	const vypocet = vypocetneSkloPre(mm, druh, lokalnaPonuka(system));
-	if (!vypocet) {
-		log.warn('pridajSkloHrubku: kombinácia bez výpočtového skla — odmietnuté', {
-			system,
-			mm,
-			druh
-		});
-		return {
-			error:
-				`Systém ${system} nemá výpočtové sklo pre ${mm} mm (${ODOO_DRUH_POPIS[druh]}) — ` +
-				'nárezák by takéto sklo nevedel spočítať. Túto kombináciu nemožno povoliť.'
-		};
-	}
+	if (!vypocet)
+		return odmietni(
+			`Systém ${system} nemá výpočtové sklo pre ${mm} mm (${ODOO_DRUH_POPIS[druh]}) — ` +
+				'nárezák by takéto sklo nevedel spočítať. Túto kombináciu nemožno povoliť.',
+			ctx
+		);
 	const zmena: CfgZmena = {
 		pole: popis({ mm, druh }),
 		stara: 'nie',
 		nova: `áno — počíta sa ako ${vypocet}`
 	};
-	db.transaction(() => {
-		db.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)').run(
-			system,
-			mm,
-			druh
-		);
-		audit(username, system, zmena);
-	})();
+	try {
+		db.transaction(() => {
+			db.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)').run(
+				system,
+				mm,
+				druh
+			);
+			audit(username, system, zmena);
+		})();
+	} catch (e) {
+		// UNIQUE(system, mm) — súbežný zápis z iného procesu (cache nevidí) → hláška, nie 500
+		if (!jeUniqueKolizia(e)) throw e;
+		cache = null;
+		return odmietni(duplicita(druh), ctx);
+	}
 	cache = null;
 	log.info('pridajSkloHrubku: povolená hrúbka pridaná', { system, mm, druh, vypocet, username });
 	return { error: null, zmena };
@@ -126,7 +134,12 @@ export function odoberSkloHrubku(input: {
 }): Vysledok {
 	const { id, system, username } = input;
 	const h = skloHrubkyPre(system).find((x) => x.id === id);
-	if (!h) return { error: 'Táto hrúbka pri zvolenom systéme neexistuje (stránka je zastaraná?).' };
+	if (!h)
+		return odmietni('Táto hrúbka pri zvolenom systéme neexistuje (stránka je zastaraná?).', {
+			id,
+			system,
+			username
+		});
 	const zmena: CfgZmena = { pole: popis(h), stara: 'áno', nova: 'nie' };
 	db.transaction(() => {
 		db.prepare('DELETE FROM cfg_sklo_hrubka WHERE id = ?').run(id);

@@ -60,12 +60,13 @@ export const load: PageServerLoad = async ({ url }) => {
 
 // #579 časť 2: povolené hrúbky Odoo skiel per systém — samostatné akcie (nie súčasť `ulozit`),
 // validácia + zápis + `cfg_audit` v `sklo-hrubky.ts`. Výpočtové sklo sa nezadáva (odvodí sa).
-const hrubkaCislo = (v: FormDataEntryValue | null) =>
-	parseFloat(
-		String(v ?? '')
-			.replace(',', '.')
-			.trim()
-	);
+// `Number` (nie parseFloat): „24abc" → NaN → odmietnuté; prázdne pole → NaN (nie 0)
+const hrubkaCislo = (v: FormDataEntryValue | null) => {
+	const t = String(v ?? '')
+		.replace(',', '.')
+		.trim();
+	return t === '' ? NaN : Number(t);
+};
 
 export const actions = {
 	pridatHrubku: async ({ request, locals }) => {

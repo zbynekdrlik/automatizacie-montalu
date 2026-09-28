@@ -58,6 +58,8 @@ test('editor: Slide + 24 mm izolačné → ponuka nárezáka bez releasu, audit,
 	const pred = await ponuka(page, 'Slide');
 	await editorSystemu(page, 'Slide');
 	await expect(page.getByTestId('hrubka-24')).toHaveCount(0);
+	const auditZapis = page.getByText(/Povolená hrúbka skla 24 mm \(izolačné\): nie → áno/);
+	const auditPred = await auditZapis.count();
 
 	try {
 		await page.locator('#hrubka-mm').fill('24');
@@ -67,10 +69,8 @@ test('editor: Slide + 24 mm izolačné → ponuka nárezáka bez releasu, audit,
 		await expect(page.getByTestId('hrubka-24')).toContainText(
 			'počíta sa ako Izolačné sklo 4/16/4 číre'
 		);
-		// audit — história zmien nesie zápis
-		await expect(
-			page.getByText(/Povolená hrúbka skla 24 mm \(izolačné\): nie → áno/).first()
-		).toBeVisible();
+		// audit — história zmien nesie PRÁVE jeden nový zápis (nie zvyšok z predošlého behu)
+		await expect(auditZapis).toHaveCount(auditPred + 1);
 
 		const po = await ponuka(page, 'Slide');
 		// lokálne sklá appky sa nemenia (výpočtový katalóg je nedotknutý)

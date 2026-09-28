@@ -436,7 +436,11 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   hláškou, ponuka ju vynechá). Pre seed dáva presne pôvodné `sklo` konštanty (test
   `tests/sklo-hrubky-579.test.ts` + nezmenený snapshot `sklo-odoo-579`). **Pasca:** nový lokálny
   názov skla mimo týchto vzorov (napr. „Izolačné sklo 4/12/4 číre" je OK, „4-16-4 číre" nie) sa
-  pravidlom nenájde — pridaj vzor + vektor do testu, nie výnimku v editore. `ponukaSkielPre(system,
+  pravidlom nenájde — pridaj vzor + vektor do testu, nie výnimku v editore. **Pasca 2:** odvodenie
+  číta LOKÁLNU povolenú ponuku, takže zmena `POVOLENE_SKLA` / katalógu môže ZMENIŤ výpočtové sklo
+  Odoo volieb (napr. „Float sklo 6 mm" pridané do Slide → Slide 6 mm jednoduché sa začne počítať
+  ním namiesto „6mm číre" = iný Money odpis). Chytí to seed test + snapshot `sklo-odoo-579` — ich
+  zmena je vedomé rozhodnutie, nikdy slepé `-u`. `ponukaSkielPre(system,
   lokalne, odoo, hrubky = skloHrubkyPre(system))` — v testoch sa dá `hrubky` podať explicitne.
 - **Ponuka** (`src/lib/server/sklo-odoo.ts` `ponukaSkielPre`, load `ponukaSkiel`): skupina „Sklá
   appky" (lokálne povolené, predvolené ako doteraz) + skupiny „Odoo — <druh>" (reuse
