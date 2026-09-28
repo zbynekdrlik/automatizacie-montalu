@@ -17,7 +17,13 @@
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { type Klin, type KlinVstup } from '$lib/klin';
 	import { type Farba } from '$lib/komponenty';
-	import { maSietkaSystem, sietkaStrana, type Sietka, type SietkaUchyt } from '$lib/sietka';
+	import {
+		kovanieSkryte,
+		maSietkaSystem,
+		sietkaStrana,
+		type Sietka,
+		type SietkaUchyt
+	} from '$lib/sietka';
 	import { resolve } from '$app/paths';
 	import { formatDatumCasSk } from '$lib/datum';
 	// #250 — vyčlenené krokové subkomponenty (vzor #239); +page ostáva state+compute hub
@@ -245,14 +251,18 @@
 	// kovanie je zatiaľ len robustové — pri inom systéme voľbu zahoď (aj v JSON-e
 	// posuvov), nech sa na plán nedostane kovanie k systému, ktorý ho neponúka
 	let jeRobust = $derived(system === 'Robust');
-	// #88: sieťka nemá kľučku/FAB — kým je zapnutá, kovanie sa v ponuke skryje aj
-	// vynuluje (namiesto neho sa ponúka úchyt v SietkaPolia)
+	// #88/#583: sieťka nahrádza kľučku úchytom LEN na svojej strane — kovanie tej strany sa
+	// v ponuke skryje aj vynuluje; druhá strana aj stredové kovanie opony ostávajú
 	$effect(() => {
-		if (!jeRobust || sietkaS) {
+		if (!jeRobust) {
 			kovanieLS = '';
 			kovaniePS = '';
 			kovanieStredS = '';
+			return;
 		}
+		const ks = kovanieSkryte(sietkaS, sietkaStranaVal);
+		if (ks.l) kovanieLS = '';
+		if (ks.p) kovaniePS = '';
 	});
 	// sieťka (#86–#90) sa ponúka na Robust/Slide/Štandard/Štandard + — pri inom
 	// systéme zapínač zhoď. `sietkaSystemS` sa netrie automaticky pri každej zmene

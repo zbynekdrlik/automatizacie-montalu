@@ -162,6 +162,18 @@ export function sietkaStrana(otvaranie: string): 'ľavá' | 'pravá' | null {
 	return null;
 }
 
+/** Ktoré kovanie (kľučka) krajného krídla sieťka VYLUČUJE — #583 (Patrik, Odoo úloha 1191):
+ *  sieťka beží len na JEDNEJ strane (`sietkaStrana`) a jej úchyt nahrádza kľučku LEN tam (#88);
+ *  druhá strana aj stredové kovanie opony kľučku ďalej majú. Strana neurčená (`null`, opona) →
+ *  nič sa nevylučuje. JEDNO pravidlo pre formulár (skrytie + vynulovanie, single aj multi) aj
+ *  server (`vstup.ts` zahodí kovanie na strane sieťky). Display-only, Money-neutrálne. */
+export function kovanieSkryte(
+	sietka: boolean,
+	strana: 'ľavá' | 'pravá' | null
+): { l: boolean; p: boolean } {
+	return { l: sietka && strana === 'ľavá', p: sietka && strana === 'pravá' };
+}
+
 /** 2K nemá voľnú koľaj pre sieťku — treba 3K koľajnicu (Patrik 2026-07-31, #87).
  *  Od korekcie 2026-08-02 appka koľajnicu v odpise SKUTOČNE mení (`sietkaKolajnicaSwap`
  *  v `compute.ts`, keď je sieťka Money-relevantná) — táto funkcia určuje KEDY, gate aj
