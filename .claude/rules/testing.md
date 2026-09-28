@@ -593,3 +593,18 @@ vektory teda ostávajú pevné (seed = deterministický), E2E na vypočítané m
 Incident: PR #561 pridal na `sietka.spec.ts` pevné jokle literály zo seedu → main run 35588964456
 deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-riadok` 4×1575 vs
 4×1578). Fix (#555 HOTFIX): odvodenie zo sieťoviny cez `jokleZoSietoviny`. Pozri aj `sietka.md`.
+
+## Svelte komponent vo vitest cez SSR `render` + lokálny E2E s inou verziou Chromia (#578)
+
+- **Komponent sa dá testovať bez prehliadača:** `import { render } from 'svelte/server'` +
+  `render(Komponent, { props }).body` → regex nad HTML (vzor `tests/sklo-otvory-578.test.ts`: počet
+  `circle[stroke-dasharray]` z `Nahlad2D` = pravidlo `otvoryVSkle`). `$props.id()` aj `$lib` aliasy
+  fungujú (sveltekit plugin vo `vite.config.ts`). Lacnejšie a presnejšie než E2E na „kreslí toľko X".
+- **Lokálny E2E cez `vite dev` (Tier 0) keď chýba pinned Chromium** (`Executable doesn't exist …
+  chromium_headless_shell-12xx`): v dočasnom configu `use.launchOptions.executablePath` na už
+  nainštalovaný `~/.cache/ms-playwright/chromium_headless_shell-<iná>/chrome-headless-shell-linux64/
+  chrome-headless-shell` (cez `os.homedir()`), nič nesťahovať. Config aj `test-results/` po behu
+  zmaž — necommitovať. Prvý test na ešte neskompilovanú route môže v dev móde timeoutnúť (on-demand
+  kompilácia) → rerun, nie bug.
+- **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
+  položky cez `td[data-testid^="popis-"]`, nie `tbody tr`.
