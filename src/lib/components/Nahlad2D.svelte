@@ -5,6 +5,7 @@
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import type { Klin } from '$lib/klin';
 	import { sietkaStrana, type Sietka } from '$lib/sietka';
+	import { otvoryVSkle, D_ZAMOK_MM } from '$lib/sklo-otvory';
 	// unikátne id pre <pattern> (viac Nahlad2D inštancií na jednej stránke pri
 	// zimnej záhrade s viac posuvmi — duplicitné SVG id by boli neplatné DOM)
 	const uid = $props.id();
@@ -197,17 +198,19 @@
 	// (ľavé pole pri ľavej hrane, pravé pole pri pravej). Výška vŕtania od spodku
 	// skla je konfigurovateľná (default 1050); diera sa v kresbe nemusí presne
 	// posúvať, hlavné je zobraziť + okótovať hodnotu (Dominik 2026-07-14).
-	const D_ZAMOK = 46; // priemer otvoru [mm]
+	// #578: KTORÉ sklá majú otvor určuje `otvoryVSkle` — to isté pravidlo ide do objednávky
+	// skla (riadok „s otvorom"), takže výkres a objednávka vždy sedia.
+	const D_ZAMOK = D_ZAMOK_MM; // priemer otvoru [mm]
 	const OKRAJ_ZAMOK = 50; // vzdialenosť stredu diery od kraja skla [mm]
 	let zamky = $derived.by(() => {
-		if (system !== 'Deluxe' || !(N >= 1)) return [];
+		const idxs = otvoryVSkle(system, N).indexy;
+		if (idxs.length === 0) return [];
 		const r = (D_ZAMOK / 2) * scale;
 		const glassTop = M.top + frame;
 		const glassBot = M.top + h - frame;
 		// stred vo výške vrtanieZamku od spodku, orezané aby kruh ostal v skle
 		const cyRaw = glassBot - vrtanieZamku * scale;
 		const cy = Math.max(glassTop + r + 4, Math.min(glassBot - r - 4, cyRaw));
-		const idxs = N === 1 ? [0] : [0, N - 1];
 		return idxs.map((i) => {
 			const left = i === 0;
 			const gx0 = M.left + i * panelW + frame;

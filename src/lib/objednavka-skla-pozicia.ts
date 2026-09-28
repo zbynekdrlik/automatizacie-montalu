@@ -2,19 +2,32 @@
 // tabule, nadpis. Patrik (Odoo úloha 625, 23.9.): výrobu „nezaujíma kam to dávame" → popis riadka
 // je len „Zasklenie N"; m² vyplnené vopred; nadpis = OP + zákazník. Money-NEUTRÁLNE.
 
-// Pozícia zasklenia na začiatku popisu: nové riadky „Zasklenie N", staré multi „Zasklenie N: Robust 3K".
-const POZICIA = /^(Zasklenie \d+)(?::|$)/;
+import { PRIPONA_OTVOR_RE } from './sklo-otvory';
+
+// Pozícia zasklenia na začiatku popisu: nové riadky „Zasklenie N", staré multi „Zasklenie N: Robust 3K",
+// #578 riadok tabúľ s otvorom „Zasklenie N — s otvorom ⌀46".
+const POZICIA = /^(Zasklenie \d+)(?::|$| — )/;
 
 /**
  * Popis POZÍCIE riadka (zobrazenie + Odoo `description`/`note`). LEN pre `modul='zasklenia'`:
  * „Zasklenie N[: <systém> <štýl>]" → „Zasklenie N"; starý single riadok spred #563 (popis len
- * „<systém> <štýl>" = jediný posuv) → „Zasklenie 1". Iné moduly (FIX pole, pergola, ručné riadky —
- * voľný text operátora) NEMENÍ, ani keď text začína „Zasklenie N:".
+ * „<systém> <štýl>" = jediný posuv) → „Zasklenie 1". #578: prípona „— s otvorom ⌀46" OSTÁVA
+ * (odlišuje riadok tabúľ s otvorom od riadku bez na tej istej pozícii — podklad, Odoo, dedup).
+ * Iné moduly (FIX pole, pergola, ručné riadky — voľný text operátora) NEMENÍ, ani keď text
+ * začína „Zasklenie N:".
  */
 export function popisPozicie(popis: string, modul: string): string {
 	if (modul !== 'zasklenia') return popis;
-	const m = POZICIA.exec(popis.trim());
-	return m ? m[1]! : 'Zasklenie 1';
+	const t = popis.trim();
+	const m = POZICIA.exec(t);
+	if (!m) return 'Zasklenie 1';
+	const otvor = PRIPONA_OTVOR_RE.exec(t);
+	return otvor ? `${m[1]!}${otvor[0]}` : m[1]!;
+}
+
+/** #578: pozícia BEZ prípony otvoru („Zasklenie N — s otvorom ⌀46" → „Zasklenie N") — celý posuv. */
+export function zakladPozicie(popis: string, modul: string): string {
+	return popisPozicie(popis, modul).replace(PRIPONA_OTVOR_RE, '');
 }
 
 /** Plocha tabúľ riadka v m² = šírka × výška × kusy / 1e6 (jeden vzorec pre všetkých producentov). */
