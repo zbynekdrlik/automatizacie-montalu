@@ -5,7 +5,7 @@
 // VŠETKY ceny TU sú VYMYSLENÉ (repo je verejné — nikdy reálnu Money cenu). PRP20242 =
 // „Profil 110x110 V2" (predná noha), PRP202410 = „Profil 110x43" (bočný), PRP202526 =
 // „Žlab 110" (známy katalógový kód pre ručný riadok). Nula console errors všade.
-import { test, expect } from '@playwright/test';
+import { test, expect } from './ucty';
 import fs from 'node:fs';
 import { collectConsole, loginAs, goto, waitHydrated, logout } from './helpers';
 
@@ -148,7 +148,8 @@ test('cenový blok je NOPRINT — v tlačovom náhľade skrytý (dielňa cenu ne
 });
 
 test('b2b: /pergola/narez je presmerovaná preč — cenový blok b2b nikdy neuvidí', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
@@ -159,6 +160,7 @@ test('b2b: /pergola/narez je presmerovaná preč — cenový blok b2b nikdy neuv
 	await goto(page, '/pouzivatelia');
 	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
 	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
+	e2eUcty.zaregistruj(b2bUser); // #583: zaručené zmazanie aj pri páde testu
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 

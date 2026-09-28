@@ -100,9 +100,8 @@ export const test = base.extend<{ e2eUcty: E2eUcty }>({
 				ucty.add(username);
 			}
 		});
-		// TODO(#583 GREEN): teardown upratanie zaregistrovaných účtov
-		void browser;
-		void testInfo;
+		// teardown — beží aj po páde/timeoute testu
+		if (ucty.size) await zmazE2eUcty(browser, testInfo.project.use, (u) => ucty.has(u));
 	}
 });
 

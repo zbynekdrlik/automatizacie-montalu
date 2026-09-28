@@ -1,7 +1,8 @@
 // Bazén — zákaznícky návrhový výkres, FÁZA 1 (#139, architektúra 1:1 podľa
 // pergoly #138/#144/#150/#153 a zaskleniam #162). Všetko ČÍTACIE — modul do
 // Money nič nezapisuje, takže sa dá pustiť aj proti nasadenej appke (BASE_URL).
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from './ucty';
 import { goto, loginAs, collectConsole, waitHydrated, logout } from './helpers';
 
 /** Rovnaká rekurzívna @page-detekcia ako v pergola-navrh.spec.ts/zasklenia-navrh.spec.ts
@@ -278,7 +279,8 @@ test('← Späť a upraviť: vstup prežije (echo akcia, nie <a href> ktorý by 
 // /pergola/navrh a /zasklenia/navrh (obe b2b PRÍSTUPNÉ) je /bazen/navrh
 // pre b2b ÚPLNE zablokovaná, presne ako existujúca /bazen (Money odpis).
 test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/zasklenia)', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
@@ -289,6 +291,7 @@ test('b2b: /bazen/navrh je presmerovaná preč (#139 — na rozdiel od pergoly/z
 	await goto(page, '/pouzivatelia');
 	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
 	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
+	e2eUcty.zaregistruj(b2bUser); // #583: zaručené zmazanie aj pri páde testu
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 

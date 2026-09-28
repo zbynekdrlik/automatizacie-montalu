@@ -6,7 +6,8 @@
 // Väčšina testov je ČÍTACIA: formulár + „Spočítať" (?/nahlad, ?/nahladMulti) len
 // počítajú, nezapisujú odpis → dá sa pustiť aj proti nasadenej appke (BASE_URL).
 // Testy, ktoré idú AŽ ZA odoslanie do Money, sú označené a používajú `skipAkLive`.
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from './ucty';
 import {
 	collectConsole,
 	loginAs,
@@ -326,7 +327,8 @@ test('samostatná stránka /sietka: Odoslať do Money zapíše odpis (TEST reži
 });
 
 test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí tlačidlo Odoslať', async ({
-	page
+	page,
+	e2eUcty
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
@@ -340,6 +342,7 @@ test('/sietka je v nav odkazoch, b2b naň nie je presmerovaný preč a nevidí t
 	await goto(page, '/pouzivatelia');
 	await page.getByLabel('Prihlasovacie meno').fill(b2bUser);
 	await page.getByLabel('Heslo (min. 6 znakov)').fill(b2bPass);
+	e2eUcty.zaregistruj(b2bUser); // #583: zaručené zmazanie aj pri páde testu
 	await page.getByRole('button', { name: 'Pridať účet' }).click(); // rola defaultne B2B
 	await expect(page.getByTestId('pouzivatelia-ok')).toContainText('vytvorený');
 
