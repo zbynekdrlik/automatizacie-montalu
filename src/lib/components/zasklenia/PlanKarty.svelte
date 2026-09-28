@@ -182,7 +182,7 @@
 		<div><span>Počet</span><b class="mono">{p.sklo.pocet} ks</b></div>
 		<div>
 			<span>Typ</span><b data-testid="sklo-typ" style="font-size:13px"
-				>{vstup.skloPresne || vstup.sklo}</b
+				>{vstup.skloPresne || vstup.skloOdooNazov || vstup.sklo}</b
 			>
 		</div>
 		<div>

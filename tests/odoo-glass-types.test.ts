@@ -44,7 +44,8 @@ describe('fetchGlassTypes (#540/#546)', () => {
 						name: 'Izolačné 4/16/4',
 						category: 'IZO',
 						cennik_code: '4/16/4',
-						composition: '4-16-4'
+						composition: '4-16-4',
+						total_thickness_mm: 24
 					},
 					{ name: 'VSG 3.3.1', category: 'VSG', cennik_code: '3.3.1', composition: '' }
 				]),
@@ -59,6 +60,7 @@ describe('fetchGlassTypes (#540/#546)', () => {
 			'category',
 			'cennik_code',
 			'composition',
+			'total_thickness_mm',
 			'active'
 		]);
 		expect(captured!.body.order).toBe('name');
@@ -71,7 +73,9 @@ describe('fetchGlassTypes (#540/#546)', () => {
 			category: 'IZO',
 			// #556: surové polia pre matcher / nárezák popis
 			name: 'Izolačné 4/16/4',
-			composition: '4-16-4'
+			composition: '4-16-4',
+			// #579: celková hrúbka (mm) — nárezák ňou páruje typy na systém
+			hrubkaMm: 24
 		});
 		// composition prázdne → label = name (bez ' · ')
 		expect(res.items[1]).toEqual({
@@ -79,7 +83,9 @@ describe('fetchGlassTypes (#540/#546)', () => {
 			label: 'VSG 3.3.1',
 			category: 'VSG',
 			name: 'VSG 3.3.1',
-			composition: ''
+			composition: '',
+			// #579: chýbajúca hrúbka → 0 (nárezák taký typ neponúkne)
+			hrubkaMm: 0
 		});
 	});
 
@@ -103,7 +109,8 @@ describe('fetchGlassTypes (#540/#546)', () => {
 			label: 'Číre 6 mm · 6',
 			category: 'jednosklo',
 			name: 'Číre 6 mm',
-			composition: '6'
+			composition: '6',
+			hrubkaMm: 0
 		});
 	});
 
@@ -234,7 +241,11 @@ describe('fetchGlassTypes — Odoo `false` pre prázdne polia (#551)', () => {
 		}
 	});
 
-	it('dva riadky rovnaký cennik_code → jedna položka + warn RAZ za fetch', async () => {
+	// #579: pôvodne (#551) sa druhý typ s rovnakým `cennik_code` ZAHODIL — reálny PROD katalóg má
+	// kód „001" na „Izolačné 4/8/4" (16 mm) AJ „IZOS DOUBLE 4-16-4 AL" (24 mm), takže AL v appke
+	// chýbal úplne. Teraz ďalší nositeľ kódu dostane `value = name` (Odoo `resolve_glass_type` páruje
+	// aj presný názov); kľúč pickera ostáva unikátny, kolízia sa zaloguje RAZ za fetch.
+	it('dva riadky rovnaký cennik_code → druhý dostane value = name + warn RAZ za fetch', async () => {
 		vi.stubEnv('LOG_LEVEL', 'warn');
 		enableEnv();
 		const lines: string[] = [];
@@ -255,12 +266,11 @@ describe('fetchGlassTypes — Odoo `false` pre prázdne polia (#551)', () => {
 		);
 		const res = await fetchGlassTypes();
 		writeSpy.mockRestore();
-		// duplicitný value 'DUP' sa deduplikuje → 2 položky (DUP raz + UNI)
-		expect(res.items).toHaveLength(2);
+		// duplicitný kód 'DUP' je pre Odoo nejednoznačný → OBA typy dostanú presný názov → 3 položky
+		expect(res.items).toHaveLength(3);
 		const values = res.items.map((i) => i.value);
 		expect(new Set(values).size).toBe(res.items.length);
-		expect(values).toContain('DUP');
-		expect(values).toContain('UNI');
+		expect(values).toEqual(['Sklo A', 'Sklo B', 'UNI']);
 		// warn o duplicite RAZ za fetch, s uvedením duplikovanej hodnoty
 		const warnLines = lines.filter(
 			(l) => l.includes('odoo-glass-types') && l.includes('"level":"warn"') && l.includes('DUP')

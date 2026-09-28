@@ -91,7 +91,11 @@ function posuvZDetailu(
 		);
 		skloTrieda = null;
 	}
+	// #579: zvolený Odoo typ skla — formulár ho predvolí, ak ho ponuka ešte má (inak lokálne
+	// sklo); pole len keď je (tvar predvyplnenia bez Odoo nezmenený)
+	const skloOdoo = sklo && sklo !== SKLO_INE ? s(d.skloOdoo) : '';
 	return {
+		...(skloOdoo ? { skloOdoo } : {}),
 		system,
 		styl,
 		s: n(d.s),
@@ -101,7 +105,8 @@ function posuvZDetailu(
 		// keď sa `d.sklo` (uložený text/presné zloženie) LÍŠI od `d.skloZaklad` (základ).
 		// Pri holom katalógovom skle sú rovnaké → skloPresne prázdne (inak by sa katalógový
 		// názov obnovil ako „presné zloženie" a po zmene skla ticho vytlačil na plán).
-		skloPresne: s(d.sklo) !== s(d.skloZaklad) ? s(d.sklo) : '',
+		// #579: Odoo názov zvoleného typu (uložený v `d.sklo`) NIE JE presné zloženie
+		skloPresne: s(d.sklo) !== s(d.skloZaklad) && s(d.sklo) !== s(d.skloOdooNazov) ? s(d.sklo) : '',
 		skloTrieda,
 		otvaranie: s(d.otvaranie),
 		kovanieL: s(d.kovanieL),

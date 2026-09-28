@@ -61,6 +61,14 @@ export function bareSkloLabel(text: string): string {
 }
 
 /**
+ * #579: selektor LOKÁLNYCH (výpočtových) volieb selectu „Sklo (základ)". Na PROD (Odoo dostupné)
+ * select navyše ponúka Odoo typy skla podľa hrúbky systému (`value` s prefixom `odoo:`, skupiny
+ * „Odoo — …"); v CI preview bez Odoo ich niet. Testy MNOŽINY lokálnej ponuky (allow-list #573,
+ * IZO gate štýlu) preto čítajú `select.locator(LOKALNE_SKLA)`, nie všetky `option`.
+ */
+export const LOKALNE_SKLA = 'option:not([value^="odoo:"])';
+
+/**
  * #555 HOTFIX: očakávané rozmery joklov ODVODENÉ z rozmeru SIEŤOVINY zobrazeného na tej istej
  * stránke/karte (testid `sietka-rozmer` na karte zasklenia, `sietka-samostatna-rozmer` na
  * `/sietka`). Post-deploy E2E beží proti ŽIVEJ PROD cfg, kde sú Robust vzorce upravené editorom

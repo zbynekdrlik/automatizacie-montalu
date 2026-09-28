@@ -2,7 +2,7 @@
 // správa sa ako obyčajná 6 mm (basic nárezák, žiadny IZO „U" profil). Read-only tok —
 // len „Spočítať nárezový plán", nič sa neodosiela do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, LOKALNE_SKLA } from './helpers';
 
 const SKLO = 'Sklo (základ — určuje vzorec)';
 const RUN = `E2E-331-${Date.now().toString(36).slice(-5)}`;
@@ -25,7 +25,7 @@ test('Štandard plus: „3.3.1" je v ponuke skla a ťahá basic nárezák (ako 6
 	await page.getByLabel('Štýl').selectOption('4K');
 
 	// „3.3.1" je v zozname skiel
-	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
+	const skla = await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents();
 	expect(skla).toContain('3.3.1');
 
 	await page.getByLabel('Šírka (mm) *').fill('3000');
@@ -50,7 +50,7 @@ test('starý Štandard: „3.3.1" je v ponuke skla a ťahá basic nárezák', as
 	await hlavicka(page, 'Štandard', '02');
 	await page.getByLabel('Štýl').selectOption('2K');
 
-	const skla = await page.getByLabel(SKLO).locator('option').allTextContents();
+	const skla = await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents();
 	expect(skla).toContain('3.3.1');
 
 	await page.getByLabel('Šírka (mm) *').fill('3000');

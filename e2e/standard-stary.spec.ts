@@ -4,7 +4,14 @@
 //
 // Všetko READ-ONLY — len „Spočítať nárezový plán", nič sa neodosiela do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, bareSkloLabel } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	vyberFarbuKovania,
+	bareSkloLabel,
+	LOKALNE_SKLA
+} from './helpers';
 
 const RUN = `E2E-STD-${Date.now().toString(36).slice(-5)}`;
 const SKLO = 'Sklo (základ — určuje vzorec)';
@@ -37,7 +44,9 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 	// #235 slice 2: SKLO_INE ('Iné (vlastná skladba)') je doplnené ZA katalóg pre KAŽDÝ
 	// systém (sklaForSystem v +page.svelte) — vlastná skladba je vždy posledná voľba.
 	// #556 hotfix: strip Odoo enrichment sufix „ · cenník:" — overujeme MNOŽINU skiel, nie sufix.
-	const skla = (await page.getByLabel(SKLO).locator('option').allTextContents()).map(bareSkloLabel);
+	const skla = (await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents()).map(
+		bareSkloLabel
+	);
 	expect(skla).toEqual([
 		'Float sklo 4 mm',
 		'Float sklo 6 mm',
@@ -133,7 +142,9 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ; Štandard + opona
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2x3K');
 	// #556 hotfix: strip Odoo enrichment sufix „ · cenník:" — overujeme MNOŽINU skiel, nie sufix.
-	const skla = (await page.getByLabel(SKLO).locator('option').allTextContents()).map(bareSkloLabel);
+	const skla = (await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents()).map(
+		bareSkloLabel
+	);
 	expect(skla.filter((s) => /Izola/i.test(s)).sort()).toEqual(
 		[
 			'Izolačné sklo 4/8/4 číre',
