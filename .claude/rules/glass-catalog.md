@@ -493,8 +493,12 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
 Patrik (Odoo úloha 1193, msg 1865357, 28.9.): „pri štandardoch tam môže byť aj 4mm sklo" — novšie
 vyjadrenie výroby má prednosť pred vylúčením scr_017 z meetingu 25.9. (#573). Drevostavby bez zmeny.
 
-- **Lokálne:** `POVOLENE_SKLA['Štandard +']` má znova „Float sklo 4 mm" (ESG kalené 4 mm a 10 mm
-  ďalej NIE — rozhodnutie menovalo len Float). Starý Štandard allow-list nemá → 4 mm ponúkal vždy.
+- **Lokálne:** `POVOLENE_SKLA['Štandard +']` má znova „Float sklo 4 mm" AJ „ESG kalené 4 mm" a
+  trieda 4 vlastnej skladby (`triedyIne`); 10 mm ďalej NIE. Kalené 4 mm je nutné kvôli Money: bez
+  neho by sa Odoo tvrdené 4 mm („ESG Float čirý 4mm") v Štandard + odvodilo ako Float sklo 4 mm (iný
+  Money kód než tvrdené sklo) — pravidlo `vypocetneSkloPre` hľadá kalený kandidát LEN v lokálnej
+  ponuke. Pri povolení hrúbky vždy povoľ aj kalený variant tej hrúbky, ak ho katalóg systému má.
+  Starý Štandard allow-list nemá → 4 mm (Float aj kalené) ponúkal vždy.
 - **PASCA predvoľby:** katalóg Štandard + má Float 4 mm (poradie 10) PRED Float 6 mm (20), takže
   `defaultSklo` (prvé neizolačné) by po rozšírení allow-listu ticho prepol predvolené sklo na 4 mm
   (= iný nárezák/Money pre každý nový odpis). Preto `PovoleneSkla.predvolene` + `predvoleneSklo(skla,
@@ -505,6 +509,6 @@ vyjadrenie výroby má prednosť pred vylúčením scr_017 z meetingu 25.9. (#57
   jednoduché) a (Štandard, 4, jednoduché); riadok (systém, 4 mm), ktorý výroba nastavila editorom
   (napr. „len kalené"), sa nemení (`UNIQUE(system, mm)`). `ODOO_HRUBKY_SEED` má tie isté riadky NA
   KONCI (čerstvá DB = rovnaké poradie ako PROD po v54). `vypocetneSkloPre(4, 'jednoduche', …)` =
-  „Float sklo 4 mm" pre oba systémy; Odoo 4 mm kalené typy sa v Štandard + počítajú ako Float sklo
-  4 mm, v starom Štandarde ako ESG kalené 4 mm (lokálne povolené). Snapshot `sklo-odoo-579` sa zmenil
-  LEN pridaním 4 riadkov (4 mm voľby), žiadna existujúca voľba nezmenila výpočtové sklo.
+  „Float sklo 4 mm" pre oba systémy; Odoo 4 mm kalené typy sa v oboch počítajú ako ESG kalené 4 mm.
+  Snapshot `sklo-odoo-579` sa zmenil LEN pridaním 4 riadkov (4 mm voľby: rezané → Float sklo 4 mm,
+  kalené → ESG kalené 4 mm), žiadna existujúca voľba nezmenila výpočtové sklo.

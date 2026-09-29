@@ -37,13 +37,15 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 		nazvy: ['Izolačné sklo 4/16/4 číre', 'Izolačné sklo 4/16/4 mliečne'],
 		triedyIne: [24]
 	},
-	// Štandard plus: izolačné (trieda 16 — 4/8/4 aj 4/16/4), 6 mm, 3.3.1 (ako 6 mm, #214) a
-	// Float 4 mm (#579: Patrik, Odoo úloha 1193, 28.9. „pri štandardoch tam môže byť aj 4mm sklo" —
-	// novšie vyjadrenie výroby nahrádza vylúčenie scr_017 z meetingu 25.9.); NIE ESG 4 mm a NIE
-	// 10 mm (#504). 4 mm je VÝNIMKA na výber — predvolené ostáva 6 mm (katalóg má Float 4 mm pred 6).
+	// Štandard plus: izolačné (trieda 16 — 4/8/4 aj 4/16/4), 6 mm, 3.3.1 (ako 6 mm, #214) a 4 mm
+	// Float aj kalené (#579: Patrik, Odoo úloha 1193, 28.9. „pri štandardoch tam môže byť aj 4mm
+	// sklo" — novšie vyjadrenie výroby ruší celé vylúčenie 4 mm scr_017 z meetingu 25.9.; kalené 4 mm
+	// aj preto, aby sa Odoo tvrdené 4 mm počítalo ako tvrdené, nie ako Float); NIE 10 mm (#504).
+	// 4 mm je VÝNIMKA na výber — predvolené ostáva 6 mm (katalóg má Float 4 mm pred 6).
 	'Štandard +': {
 		nazvy: [
 			'Float sklo 4 mm',
+			'ESG kalené 4 mm',
 			'Float sklo 6 mm',
 			'ESG kalené 6 mm',
 			'3.3.1',
@@ -55,7 +57,7 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 			'Izolačné sklo 4/16/4 mliečne',
 			'Izolačné sklo 4/16/4 stopsol'
 		],
-		triedyIne: [6, 16, 24],
+		triedyIne: [4, 6, 16, 24],
 		predvolene: 'Float sklo 6 mm'
 	}
 };
