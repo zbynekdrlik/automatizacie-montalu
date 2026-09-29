@@ -10,7 +10,6 @@ import { describe, it, expect } from 'vitest';
 import {
 	matchOdooGlassType,
 	glassTint,
-	cennikPopis,
 	naviazanieRiadku,
 	type OdooTypLike
 } from '../src/lib/server/glass-match';
@@ -44,6 +43,9 @@ describe('#594 glassTint — extračiré a Matelux', () => {
 		expect(glassTint('Float extračiré 6 mm')).toBe('extracire');
 		expect(glassTint('Float extra čiré 6 mm')).toBe('extracire');
 		expect(glassTint('Float Extra Clear 6mm')).toBe('extracire');
+		// review #594: slovenský tvar s „í" a spojovník
+		expect(glassTint('Float extra číre 6 mm')).toBe('extracire');
+		expect(glassTint('Float Extra-Clear 6mm')).toBe('extracire');
 	});
 	it('„Matelux" (satinované) → mliecne (matné), aj keď názov nesie „čirý"', () => {
 		expect(glassTint('ESG Matelux čirý 10mm')).toBe('mliecne');
@@ -59,7 +61,7 @@ describe('#594 matchOdooGlassType — číre ≠ extračiré, Matelux = matné',
 		const m = matchOdooGlassType('Float kalené 10 mm', ODOO_10);
 		expect(m.istota).toBe('jednoznacne');
 		expect(m.typ?.value).toBe('OP005E');
-		expect(cennikPopis('Float kalené 10 mm', ODOO_10, 'odoo')).toBe('ESG Float čirý 10mm');
+		expect(m.typ?.name).toBe('ESG Float čirý 10mm');
 		// podklad: riadok „Float kalené 10 mm" už nemá 3 kandidátov, ale jediného
 		expect(naviazanieRiadku('Float kalené 10 mm', ODOO_10, 'odoo').kandidati).toEqual([ODOO_10[1]]);
 	});

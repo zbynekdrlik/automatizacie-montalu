@@ -25,7 +25,7 @@ const { ponukaSkielSystemu, vypocetneSkloPre, ODOO_HRUBKY_SEED } =
 const { skloHrubkyPre } = await import('../src/lib/server/sklo-hrubky');
 const { ponukaSkielPre, ponukySkiel, overSkloOdoo, PREFIX_ODOO_SKUPINY } =
 	await import('../src/lib/server/sklo-odoo');
-const { cennikPopis } = await import('../src/lib/server/glass-match');
+const { matchOdooGlassType } = await import('../src/lib/server/glass-match');
 const { ponukaPreStyl, volbaSkla, rozlozVolbu, skloOdooPre, ODOO_PREFIX } =
 	await import('../src/lib/sklo-odoo');
 const { SKLO_INE } = await import('../src/lib/sklo');
@@ -193,10 +193,10 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
 		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
 		expect(by('Izolačné sklo 4/8/4- číre (Ug=1,1)').vypocet).toBe('Izolačné sklo 4/8/4 číre');
-		// lokálne stopsol nedostane cenníkový popis čírého skla (Odoo stopsol 4/8/4 neexistuje)
+		// lokálne stopsol sa nespáruje na číre sklo (Odoo stopsol 4/8/4 neexistuje)
 		const items = (await fetchGlassTypes()).items;
-		expect(cennikPopis('Izolačné sklo 4/8/4 stopsol', items, 'odoo')).toBe('');
-		expect(cennikPopis('Izolačné sklo 4/8/4 číre', items, 'odoo')).toBe(
+		expect(matchOdooGlassType('Izolačné sklo 4/8/4 stopsol', items).istota).toBe('ziadne');
+		expect(matchOdooGlassType('Izolačné sklo 4/8/4 číre', items).typ?.name).toBe(
 			'Izolačné sklo 4/8/4- číre (Ug=1,1)'
 		);
 		// #594: pri dostupnom Odoo žiadne lokálne voľby
@@ -246,7 +246,7 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
 		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
 		expect(
-			cennikPopis('Izolačné sklo 4/16/4 stopsol', (await fetchGlassTypes()).items, 'odoo')
+			matchOdooGlassType('Izolačné sklo 4/16/4 stopsol', (await fetchGlassTypes()).items).typ?.name
 		).toBe('IZOS DOUBLE 4-16-4 Stopsol');
 	});
 

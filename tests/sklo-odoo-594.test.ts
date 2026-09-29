@@ -99,7 +99,8 @@ describe('#594 ponuka pri dostupnom Odoo = LEN Odoo typy', () => {
 });
 
 describe('#594 predvolené sklo = Odoo voľba s dnešným predvoleným výpočtovým sklom', () => {
-	for (const system of ['Robust', 'Štandard +', 'Deluxe', 'Slide']) {
+	// review #594: VŠETKY systémy s Odoo hrúbkami (nový formulár nesmie štartovať na doplnkovej voľbe)
+	for (const system of Object.keys(ODOO_HRUBKY_SEED)) {
 		it(`${system}: predvolené lokálne sklo → prvý presný Odoo náprotivok (posiela sa jeho typ)`, async () => {
 			odooOn();
 			const p = await ponuka(system);
