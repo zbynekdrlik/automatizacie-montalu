@@ -3,7 +3,8 @@
 // skla, ⌀46) a pri odoslaní do Odoo appka k nemu VYGENERUJE PDF výkres tabule (príloha riadku popri
 // ručných prílohách) — IZOS tak vie, KDE vŕtať. Riadok bez uloženej polohy (spred zmeny) → žiadny
 // výkres (honest-null, podklad upozorní). Money-NEUTRÁLNE (objednávka u dodávateľa skla).
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -59,6 +60,8 @@ const DELUXE_4K = {
 };
 
 const S_OTVOROM = 'Zasklenie 1 — s otvorom ⌀46';
+/** `created_at` riadku (SQLite UTC tvar) — jediný dátum, z ktorého výkres smie vychádzať. */
+const VYTVORENE = '2026-09-28 10:00:00';
 
 async function metadata(b64: string) {
 	const doc = await PDFDocument.load(Buffer.from(b64, 'base64'));
@@ -194,7 +197,8 @@ describe('#587 generateVykresOtvoruPdf', () => {
 		sirkaMm: 1004,
 		vyskaMm: 1914,
 		pocet: 2,
-		otvor: { odHranyMm: 50, odSpodkuMm: 1050, priemerMm: 46 }
+		otvor: { odHranyMm: 50, odSpodkuMm: 1050, priemerMm: 46 },
+		vytvoreneAt: VYTVORENE
 	};
 
 	it('platné 1-stranové PDF s rozmermi, ⌀46, 50 mm a výškou v metadátach', async () => {
@@ -313,7 +317,8 @@ describe('#587 review — poloha platí len k zadaniu, ktoré objednávka nesie'
 				sirkaMm: 900,
 				vyskaMm: 1800,
 				pocet: 2,
-				otvor: { odHranyMm: 73, odSpodkuMm: 987, priemerMm: 28 }
+				otvor: { odHranyMm: 73, odSpodkuMm: 987, priemerMm: 28 },
+				vytvoreneAt: VYTVORENE
 			})
 		);
 		expect(doc.getSubject() ?? '').toContain('2 ks (ľavé 1, pravé 1)');
@@ -332,7 +337,8 @@ describe('#587 výkres — okrajové vstupy', () => {
 		sirkaMm: 1004.5,
 		vyskaMm: 1914.25,
 		pocet: 1,
-		otvor: { odHranyMm: 50, odSpodkuMm: 1050.5, priemerMm: 46 }
+		otvor: { odHranyMm: 50, odSpodkuMm: 1050.5, priemerMm: 46 },
+		vytvoreneAt: VYTVORENE
 	};
 
 	it('desatinné mm s čiarkou, prázdne OP aj typ skla nezhodia PDF', async () => {
@@ -362,5 +368,68 @@ describe('#587 výkres — okrajové vstupy', () => {
 		expect(vykresOtvoruZPolozky({ ...s, typSklaManual: 'Vlastné 8 mm' })!.typSkla).toBe(
 			'Vlastné 8 mm'
 		);
+	});
+});
+
+// Odoo 2.370.0 (odoo-erp 8536, `_montalu_glass_line_atts_changed`) porovnáva pri re-odoslaní prílohy
+// riadku podľa názvu + SHA-1; pri zmene zmaže riadky a vráti objednávku do Konceptu. Objednávka sa
+// znova posiela pri KAŽDOM uložení plánu rezov → výkres toho istého riadku MUSÍ byť bajtovo rovnaký
+// (žiadny wall-clock v tele ani metadátach), inak by každá odoslaná objednávka skočila do Konceptu.
+describe('#587 výkres je deterministický (Odoo re-send porovnáva SHA-1 príloh)', () => {
+	afterEach(() => vi.useRealTimers());
+
+	const V = {
+		zak: 'ZAK-DET',
+		op: 'OP260002',
+		popis: S_OTVOROM,
+		typSkla: 'Float kalené 10 mm',
+		sirkaMm: 1004,
+		vyskaMm: 1914,
+		pocet: 2,
+		otvor: { odHranyMm: 50, odSpodkuMm: 1050, priemerMm: 46 },
+		vytvoreneAt: VYTVORENE
+	};
+	const sha1 = (b: Uint8Array | string) => createHash('sha1').update(b).digest('hex');
+
+	/** Len `Date` — pdf-lib `save()` čaká cez setTimeout, ten musí ostať reálny. */
+	const hodinyNa = (iso: string) => {
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.setSystemTime(new Date(iso));
+	};
+
+	it('rovnaký riadok v inom čase → identické bajty (rovnaký SHA-1)', async () => {
+		hodinyNa('2026-09-29T08:00:00Z');
+		const a = await generateVykresOtvoruPdf(V);
+		hodinyNa('2027-03-15T21:37:00Z');
+		const b = await generateVykresOtvoruPdf(V);
+		expect(sha1(b)).toBe(sha1(a));
+	});
+
+	it('dátum v metadátach = vytvorenie riadku, nie aktuálny čas', async () => {
+		hodinyNa('2027-01-01T00:00:00Z');
+		const doc = await PDFDocument.load(await generateVykresOtvoruPdf(V));
+		const riadok = new Date('2026-09-28T10:00:00Z').getTime();
+		expect(doc.getCreationDate()?.getTime()).toBe(riadok);
+		expect(doc.getModificationDate()?.getTime()).toBe(riadok);
+	});
+
+	it('ZMENENÁ poloha otvoru → iné bajty (skutočná zmena sa znova odošle)', async () => {
+		const a = await generateVykresOtvoruPdf(V);
+		const b = await generateVykresOtvoruPdf({ ...V, otvor: { ...V.otvor, odSpodkuMm: 1100 } });
+		expect(sha1(b)).not.toBe(sha1(a));
+	});
+
+	it('Odoo príloha riadku je pri dvoch odoslaniach v inom čase bajtovo rovnaká', async () => {
+		await callAction('pridatSkla', { ...DELUXE_4K, zak: 'ZAK-587-DET' });
+		const vykres = async () =>
+			(await buildGlassOrderForZak('ZAK-587-DET'))!.order.items
+				.find((i) => i.description === S_OTVOROM)!
+				.attachments!.find((x) => x.mimetype === 'application/pdf')!;
+		hodinyNa('2026-09-29T08:00:00Z');
+		const prve = await vykres();
+		hodinyNa('2026-12-24T18:00:00Z');
+		const druhe = await vykres();
+		expect(druhe.name).toBe(prve.name);
+		expect(sha1(druhe.data_base64)).toBe(sha1(prve.data_base64));
 	});
 });
