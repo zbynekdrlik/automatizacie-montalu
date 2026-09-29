@@ -715,6 +715,11 @@ export function parseBazenVstup(form: FormData): { vstup: BazenVstup; error: str
 	return { vstup, error };
 }
 
+/** #593: Odoo typ skla výplne CLIP z formulára/JSON — orezaný text (capnutý, ide do `detail`). */
+function clipSkloOdoo(v: unknown): string {
+	return typeof v === 'string' ? v.trim().slice(0, 200) : '';
+}
+
 /**
  * CLIP zábradlie (#372) — parse hlavičky + parametrov. Rozsahovú/whitelist
  * validáciu (typ×variant, šírka výplne) rieši `chybaClipVstupu` v `$lib/clip`
@@ -742,6 +747,10 @@ export function parseClipVstup(form: FormData): { vstup: ClipVstup; error: strin
 			.trim()
 			.slice(0, 40)
 	};
+	// #593: zvolený Odoo typ skla výplne — kľúč LEN keď je zvolený (detail starých odpisov
+	// byte-identický); overenie voči živému katalógu robí `parseClipVstupSOdoo` (clip-sklo.ts)
+	const skloOdoo = clipSkloOdoo(form.get('skloOdoo'));
+	if (skloOdoo) vstup.skloOdoo = skloOdoo;
 	let error: string | null = null;
 	if (!vstup.zak) error = 'Chýba číslo objednávky (ZAK).';
 	else if (!vstup.op) error = 'Chýba OP/OPDL číslo.';
@@ -809,7 +818,8 @@ export function parseClipMultiVstup(form: FormData): {
 				vyska: num(k.vyska),
 				ral: String(k.ral ?? '')
 					.trim()
-					.slice(0, 40)
+					.slice(0, 40),
+				...(clipSkloOdoo(k.skloOdoo) ? { skloOdoo: clipSkloOdoo(k.skloOdoo) } : {})
 			});
 			if (!jeClipTyp(rawTyp)) {
 				error = `Zasklenie ${i + 1}: neplatný typ výplne (očakáva sa „izo" alebo „klasika").`;

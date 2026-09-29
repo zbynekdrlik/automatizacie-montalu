@@ -58,7 +58,19 @@ export interface ClipVstup {
 	vyska: number;
 	/** RAL farba — voľný text z hlavičky šablóny, čisto informačný (do odpisu NEJDE) */
 	ral: string;
+	/** #593: zvolený Odoo typ skla výplne (`cennik_code || name`) — LEN keď je zvolený (kľúč inak
+	 *  chýba → detail starých odpisov byte-identický). Ide do objednávky skla, NIE do Money odpisu
+	 *  (ten určuje `typ` = šablóna). */
+	skloOdoo?: string;
+	/** #593: názov Odoo typu (doplní server po overení; pri nedostupnom Odoo chýba) */
+	skloOdooNazov?: string;
 }
+
+/** #593: popis voľby výplne (šablóna) — záloha ponuky pri nedostupnom Odoo + dnešné texty selectu. */
+export const CLIP_VYPLN_POPIS: Readonly<Record<ClipTyp, string>> = {
+	izo: 'IZO (4-8-4)',
+	klasika: 'klasika (3.3.1 číre)'
+};
 
 /** Jeden riadok Money odpisu (súčet tyčí per kód). Profily = kusové (7500 mm tyče). */
 export interface ClipPolozka {
@@ -173,7 +185,7 @@ export function chybaClipVstupu(vstup: ClipVstup): string | null {
 		return `Šírka zábradlia musí byť ${CLIP_MIN_SIRKA}–${CLIP_MAX_SIRKA} mm.`;
 	if (!(vyska >= CLIP_MIN_VYSKA && vyska <= CLIP_MAX_VYSKA))
 		return `Výška zábradlia musí byť ${CLIP_MIN_VYSKA}–${CLIP_MAX_VYSKA} mm.`;
-	const sirkaVyplne = (sirka - (19 + 29 * N)) / N - 8;
+	const sirkaVyplne = vyplnSurova(vstup).sirka;
 	if (!(sirkaVyplne >= CLIP_MIN_VYPLNE))
 		return `Pri ${N} výplniach je šírka zábradlia príliš malá — šírka jednej výplne by vyšla ${Math.round(sirkaVyplne)} mm (min ${CLIP_MIN_VYPLNE} mm).`;
 	return null;
@@ -197,6 +209,45 @@ function poziciePriecok(N: number, B6: number): number[] {
 	return [];
 }
 
+/** Surový (nezaokrúhlený) rozmer výplne zo šablóny: B10 = (B6 − (19 + 29·N)) / N − 8,
+ *  C10 = C6 − 56. JEDINÉ miesto vzorca — `computeClip` aj rozmer skla ho zdieľajú. */
+function vyplnSurova(v: Pick<ClipVstup, 'variant' | 'sirka' | 'vyska'>): {
+	sirka: number;
+	vyska: number;
+} {
+	const N = v.variant;
+	return { sirka: (v.sirka - (19 + 29 * N)) / N - 8, vyska: v.vyska - 56 };
+}
+
+/**
+ * #593: rozmer SKLA výplne pre objednávku skla — výplň JE sklo (šablóny Patrika „FIX - klasika /
+ * FIX - IZO", ROZHODNUTÉ na tickete). Zaokrúhlené na celé mm zo SUROVÉHO rozmeru (nie z R1
+ * zobrazenia — 1000,45 → 1000, nie 1001).
+ */
+export function rozmerSklaClip(v: Pick<ClipVstup, 'variant' | 'sirka' | 'vyska'>): {
+	sirka: number;
+	vyska: number;
+} {
+	const r = vyplnSurova(v);
+	return { sirka: Math.round(r.sirka), vyska: Math.round(r.vyska) };
+}
+
+/**
+ * #593 (Odoo úloha 1217 — „jedna zákazka jedna farba… nech už je farba vyplnená, ale môže
+ * zmeniť"): efektívna RAL farba zábradlia `i`. Ďalšie zábradlie, ktorého farbu obsluha RUČNE
+ * nezmenila (`ralVlastna` nie je true), preberá farbu PRVÉHO — aj keď sa prvá zmení neskôr;
+ * ručne zmenená (aj vymazaná) ostáva. ČISTÁ (formulár `ClipForm` ju volá pre zobrazenie aj JSON).
+ */
+export function ralZabradlia(
+	kusy: readonly { ral: string; ralVlastna?: boolean }[],
+	i: number
+): string {
+	const k = kusy[i];
+	if (!k) return '';
+	// k existuje → pole je neprázdne, prvé zábradlie tiež
+	return i === 0 || k.ralVlastna ? k.ral : kusy[0]!.ral;
+}
+
 /**
  * Spočíta CLIP zábradlie (materiálová tabuľka + Money odpis). Predpokladá PLATNÝ
  * vstup — volajúci najprv volá `chybaClipVstupu`. Odpis = súčet počtu tyčí per
@@ -208,8 +259,7 @@ export function computeClip(vstup: ClipVstup): ClipVypocet {
 	const N = vstup.variant;
 	const B6 = vstup.sirka;
 	const C6 = vstup.vyska;
-	const B10 = (B6 - (19 + 29 * N)) / N - 8; // šírka výplne
-	const C10 = C6 - 56; // výška výplne
+	const { sirka: B10, vyska: C10 } = vyplnSurova(vstup); // šírka / výška výplne
 	const zask = KOD_ZASKLIEVACI[vstup.typ];
 
 	const profil = (oznacenie: string, kod: string, rozmer: number, pocetKs: number): ClipRiadok => {
