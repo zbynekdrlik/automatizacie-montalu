@@ -100,13 +100,13 @@ describe('#594 ponuka pri dostupnom Odoo = LEN Odoo typy', () => {
 
 describe('#594 predvolené sklo = Odoo voľba s dnešným predvoleným výpočtovým sklom', () => {
 	for (const system of ['Robust', 'Štandard +', 'Deluxe', 'Slide']) {
-		it(`${system}: predvolené lokálne sklo → prvá Odoo voľba počítaná ním (posiela sa jej typ)`, async () => {
+		it(`${system}: predvolené lokálne sklo → prvý presný Odoo náprotivok (posiela sa jeho typ)`, async () => {
 			odooOn();
 			const p = await ponuka(system);
 			const pov = lokalne(system);
 			const def = predvoleneSklo(pov, system);
 			const sk = ponukaPreStyl(p, pov, def);
-			const prva = vsetky(sk).find((o) => o.vypocet === def);
+			const prva = vsetky(sk).find((o) => o.vypocet === def && o.naprotivok);
 			expect(prva, `${system}: Odoo voľba pre ${def}`).toBeTruthy();
 			expect(prva!.odoo).not.toBe('');
 			// žiadna doplnková lokálna voľba — predvolené sklo má Odoo náprotivok
@@ -116,6 +116,39 @@ describe('#594 predvolené sklo = Odoo voľba s dnešným predvoleným výpočto
 			expect(skloOdooPre(p, pov, def, '')).toBe(prva!.odoo);
 		});
 	}
+
+	// E2E proti živému katalógu (lokálny mock PROD 29.9.) ukázal, že „prvá voľba s tým výpočtovým
+	// sklom" vyberie stopsol / bronz / VSG typ (skupiny a abeceda) — predvolené sklo musí byť PRESNÝ
+	// náprotivok lokálneho skla (matcher #556: zloženie ∧ kategória ∧ odtieň ∧ povlak), pri viacerých
+	// (AL/TH) prvý v poradí; iný typ počítaný tým istým sklom len keď presný nie je.
+	it('predvolené = presný náprotivok lokálneho skla, nie stopsol/bronz/VSG typ s tým istým výpočtom', async () => {
+		odooOn([
+			...ODOO_KATALOG_579,
+			r(
+				24,
+				'izolacne',
+				'Izolačné sklo 4/16/4 stopsol super silver  clear',
+				'011',
+				'4/16/4 stopsol super silver  clear'
+			)
+		]);
+		const predvolena = async (system: string) => {
+			const p = await ponuka(system);
+			const pov = lokalne(system);
+			const def = predvoleneSklo(pov, system);
+			const sk = ponukaPreStyl(p, pov, def);
+			return vsetky(sk).find((o) => o.value === volbaSkla(def, '', sk))!;
+		};
+		const robust = await predvolena('Robust');
+		expect(robust.vypocet).toBe(CIRE_24);
+		expect(['IZOS DOUBLE 4-16-4 AL', 'IZOS DOUBLE 4-16-4 TH']).toContain(robust.nazov);
+		const std = await predvolena('Štandard +');
+		expect(std.vypocet).toBe('Float sklo 6 mm');
+		expect(std.nazov).toBe('Float čirý 6mm');
+		const dlx = await predvolena('Deluxe');
+		expect(dlx.vypocet).toBe('Float kalené 10 mm');
+		expect(dlx.nazov).toBe('ESG Float čirý 10mm');
+	});
 
 	it('explicitne zvolený Odoo typ s tým istým výpočtovým sklom ostáva zvolený', async () => {
 		odooOn();
