@@ -5,7 +5,7 @@
 // je Money kód pre „Izolačné sklo 4/16/4 číre" (v23 seed). Nula console errors všade.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { collectConsole, loginAs, goto, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, goto, vyberFarbuKovania, vyberSklo } from './helpers';
 
 const SKLO = 'Izolačné sklo 4/16/4 číre';
 
@@ -18,7 +18,7 @@ async function vyplnRobust2K(page: import('@playwright/test').Page, zak: string,
 	await page.getByLabel('Štýl').selectOption('2K');
 	await page.getByLabel('Šírka (mm) *').fill('2509');
 	await page.getByLabel('Výška (mm) *').fill('1930');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(sklo);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), sklo);
 }
 
 test('bez ceny skla v snapshote appka ukáže „cena nedostupná" (honest-null)', async ({ page }) => {

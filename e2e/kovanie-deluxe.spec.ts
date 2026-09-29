@@ -9,7 +9,7 @@
 //
 // Všetko READ-ONLY („Spočítať" / „Späť"), nič sa nezapisuje do Money.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, vyberSklo } from './helpers';
 
 const RUN = `E2E-DLX-${Date.now().toString(36).slice(-5)}`;
 
@@ -40,7 +40,7 @@ test('Deluxe 10mm: RAL select „Farba krytiek" s R9006/R7016, predvolená R9006
 
 	await page.getByLabel('Systém').selectOption('Deluxe');
 	// Deluxe default sklo = 10 mm → možnosti R9006/R7016
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 	// #431 kolo 2: RAL select je VIDITEĽNÝ pre Deluxe (krytky majú farebné varianty)
 	const sel = page.getByTestId('farba-kovania');
 	await expect(sel).toBeVisible();
@@ -71,14 +71,14 @@ test('Deluxe: prepnutie 10mm R7016 → 6mm zahodí neplatnú farbu, možnosti 6m
 	await page.getByLabel('Systém').selectOption('Deluxe');
 	await expect(page.getByLabel(/Farba krytiek/)).toBeVisible();
 	// 10 mm default → zvoľ R7016 (platná len pre 10 mm)
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 	const sel = page.getByTestId('farba-kovania');
 	await sel.selectOption('R7016');
 	await expect(sel).toHaveValue('R7016');
 
 	// prepni na 6 mm → R7016 už nie je platná (6 mm ponúka R9006/R9005) → hranový
 	// $effect ju zahodí a predvyplní R9006 (platnú na oboch hrúbkach)
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 6 mm');
 	// deterministicky prejdi Svelte render-flush (reaktívny select) pred asertom
 	await page.evaluate(
 		() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
@@ -126,7 +126,7 @@ test('Deluxe 3K 10mm R9006: krajná×2, stredová L×2 + P×2, madlo×2, kefy, �
 	await loginAs(page);
 
 	await zaklad(page, '01');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 	await vyberFarbuKovania(page, 'R9006');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
@@ -159,7 +159,7 @@ test('Deluxe 3K 6mm R9006: krytky (stredová L/P + krajná) + madlo + kefy, žia
 	await loginAs(page);
 
 	await zaklad(page, '02');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 6 mm');
 	// 6mm krytky sa teraz evidujú v RAL (#431 kolo 2) — vyber R9006
 	await vyberFarbuKovania(page, 'R9006');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();

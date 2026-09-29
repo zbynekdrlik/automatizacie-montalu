@@ -12,7 +12,8 @@ import {
 	goto,
 	waitHydrated,
 	skipAkLive,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	vyberSklo
 } from './helpers';
 
 const RUN = `E2E-OTV-${Date.now().toString(36).slice(-5)}`;
@@ -33,7 +34,7 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await page.getByLabel('Štýl').selectOption('4K');
 	await page.getByLabel('Šírka (mm) *').fill('4000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 	// #587: výška vŕtania zámku → poloha otvoru na riadku objednávky + PDF výkres pre IZOS
 	await page.locator('#vrtanieZamku').fill('1100');
 	await vyberFarbuKovania(page);
@@ -64,11 +65,11 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await waitHydrated(page);
 
 	// každá položka má pod sebou aj riadok s voľbami (spec/prílohy) → počítaj bunky popisu
-	const popisy = page.locator('td[data-testid^="popis-"]');
+	const popisy = page.locator('span[data-testid^="popis-"]');
 	await expect(popisy).toHaveCount(2);
 	const riadok = (popis: string | RegExp) =>
 		page.locator('tbody tr').filter({
-			has: page.locator('td[data-testid^="popis-"]', { hasText: popis })
+			has: page.locator('span[data-testid^="popis-"]', { hasText: popis })
 		});
 	const sOtvorom = riadok('Zasklenie 1 — s otvorom ⌀46');
 	const bez = riadok(/^Zasklenie 1$/);

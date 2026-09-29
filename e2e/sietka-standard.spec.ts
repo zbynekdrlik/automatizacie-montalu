@@ -2,7 +2,7 @@
 // Rovnaký vzor ako e2e/sietka.spec.ts (Robust/Slide), plus #110-špecifický výber
 // SYSTÉMU sieťky, ktorý na Robust/Slide vôbec neexistuje.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, vyberSklo } from './helpers';
 
 async function zaklad(page: Page, zak: string, zakaznik: string, system = 'Štandard +') {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
@@ -168,7 +168,7 @@ test('#569: IZO sklo sieťku NEzmenší — sieťovina z rámu posuvu je rovnak�
 	await loginAs(page);
 
 	await zaklad(page, 'E2E-SIETKA-IZO', 'E2E Sietka IZO', 'Štandard');
-	await page.selectOption('#sklo', 'Float sklo 4 mm');
+	await vyberSklo(page.locator('#sklo'), 'Float sklo 4 mm');
 	await page.locator('#sietka-on').check();
 	await page.locator('#sietka-system').selectOption('Štandard +');
 	await vyberFarbuKovania(page);
@@ -180,7 +180,7 @@ test('#569: IZO sklo sieťku NEzmenší — sieťovina z rámu posuvu je rovnak�
 
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
-	await page.selectOption('#sklo', 'Izolačné sklo 4/8/4 číre');
+	await vyberSklo(page.locator('#sklo'), 'Izolačné sklo 4/8/4 číre');
 	await expect(page.getByTestId('narezak-hint')).toContainText('IZO');
 	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
@@ -286,7 +286,7 @@ test('Štandard + 2K + IZO sklo + sieťka: nárezák-hint aj hláška sedia, odp
 	await page.selectOption('#styl', '2K');
 	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
 	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
-	await page.selectOption('#sklo', 'Izolačné sklo 4/8/4 číre');
+	await vyberSklo(page.locator('#sklo'), 'Izolačné sklo 4/8/4 číre');
 	// nárezák-hint potvrdzuje, že appka interne počíta s '2K IZO', nie holým '2K'
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 2K IZO');
 

@@ -380,10 +380,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 			})
 		),
 		znova,
-		// #579: ponuka „Sklo (základ)" per systém = lokálne sklá appky (s popisom „· cenník:" #556) +
-		// Odoo typy skla podľa hrúbky systému (zoskupené podľa druhu). Každá voľba
-		// nesie LOKÁLNE výpočtové sklo — vzorce/Money nezmenené. `fetchGlassTypes` cache (3 s
-		// timeout); Odoo nedostupné → dnešná lokálna ponuka (`glass-catalog.md`).
+		// #579/#594: ponuka „Sklo (základ)" per systém = LEN Odoo typy skla podľa hrúbky systému
+		// (zoskupené podľa druhu, #594 bez lokálnych skiel appky). Každá voľba nesie LOKÁLNE
+		// výpočtové sklo — vzorce/Money nezmenené. `fetchGlassTypes` cache (3 s timeout); Odoo
+		// nedostupné → dnešná lokálna ponuka (`glass-catalog.md`).
 		ponukaSkiel: await ponukySkiel(systemy),
 		live: isLive()
 	};

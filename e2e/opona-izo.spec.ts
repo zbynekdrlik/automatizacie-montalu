@@ -9,7 +9,7 @@
 //  3. 2×2K/2×3K majú v pláne čestné „odvodené" upozornenie (banner plan-warn).
 // Každý test vyžaduje NULA console errors/warnings (browser-console-zero-errors).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, vyberFarbuKovania, vyberSklo } from './helpers';
 
 const RUN = `E2E-OPIZO-${Date.now().toString(36).toUpperCase()}`;
 
@@ -27,7 +27,7 @@ test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excel
 	await page.getByLabel('Výška (mm) *').fill('2100');
 	// #504 round 3: IZO 16 mm (4/16/4) je teraz PONÚKANÉ aj pri opone (predtým filtrované).
 	// selectOption zlyhá, ak by option neexistoval → to je RED pred opravou.
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4/16/4 číre');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Izolačné sklo 4/16/4 číre');
 
 	// IZO pri Štandard+ → „prídavná koľajnica" default zaškrtnutá (#132) → spodná o 1 väčšia
 	await expect(page.getByLabel(/Prídavná koľajnica/)).toBeChecked();
@@ -59,7 +59,7 @@ test('Štandard+ 2×2K opona IZO: plán má čestné „odvodené" upozornenie',
 	await page.getByLabel('Štýl').selectOption('2x2K');
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2100');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4/16/4 číre');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Izolačné sklo 4/16/4 číre');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 

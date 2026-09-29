@@ -673,3 +673,19 @@ akákoľvek nedeterministická príloha = každá odoslaná objednávka skočí 
   sám prepíše ModDate/Producer na „teraz" — metadáta dátumu čítaj s `{ updateMetadata: false }`.
 - **Nová generovaná príloha (DXF, iný PDF):** rovnaké pravidlo — žiadny čas/UUID/náhoda; dátum len z
   uložených dát riadku.
+
+## Autor riadku podkladu — „pridal <autor> · <čas>" (#594, úloha 1219)
+
+Podklad je kľúčovaný zákazkou (#571), takže riadok od iného používateľa (skúšobná zákazka „test")
+výroba nespoznala („prečo tam je Zasklenie 1"). Pri KAŽDOM riadku je malý text `pridal-<id>`
+(`.pridal-hint`, noprint) „pridal <created_by> · d.m.rrrr hh:mm", bez autora (legacy) „pridané <čas>".
+
+- **JEDEN helper `pridalRiadku(p)`** v client-safe `src/lib/objednavka-skla-pozicia.ts` (re-export z
+  `objednavka-skla.ts`, ktorý je pri 1000-r. strope); load podkladu vráti `pridal: Record<id, text>`.
+  Čas: SQLite UTC `created_at` → `sqliteUtcToIso` → `formatDatumCasSk` (Europe/Bratislava, NIE UTC
+  default kontajnera — `timestamps.md`). Formátuje server, nie prehliadač (žiadny hydration rozdiel).
+- Popis riadka je odteraz `<span data-testid="popis-<id>">` (nie `<td>`) — E2E počíta položky cez
+  `span[data-testid^="popis-"]`. Pri e-mailovom autorovi platí Cloudflare pasca vyššie
+  (`no-transform`, #571 follow-up) — text sa formátuje na serveri a CF ho nesmie prepísať.
+- **Testy:** `tests/objednavka-skla-pridal-594.test.ts` (leto/zima/polnoc, bez autora, load), E2E
+  `objednavka-skla.spec.ts` #571 test (dvaja používatelia → každý riadok nesie svojho autora + dnes).

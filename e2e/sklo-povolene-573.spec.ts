@@ -1,33 +1,32 @@
 // #573 — meeting výroba 25.9.: nárezák ponúka per systém LEN povolené sklá (allow-list
 // `POVOLENE_SKLA`, ROZHODNUTÉ 27.9. na tickete) a „Sklo (základ)" nemá príponu
 // „· cenník: viac typov (N)". Read-only tok — len čítanie ponuky z DOM, nič sa neodosiela.
-// Relačné: ponuku čítame z `<option>` (holý názov cez `bareSkloLabel`, PROD nesie Odoo sufix
-// „· cenník: <name>" pri jednoznačnej zhode), porovnávame s tabuľkou, nie s mm literálmi.
+// Relačné (#594): ponuku čítame ako VÝPOČTOVÉ sklá volieb (`data-vypocet`) — v CI bez Odoo sú to
+// lokálne sklá (presne allow-list), na PROD s Odoo LEN Odoo typy, ktorých výpočtové sklo musí byť
+// v allow-liste (podmnožina — lokálne sklo bez Odoo typu sa pri Odoo neponúka, #594).
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, bareSkloLabel, LOKALNE_SKLA } from './helpers';
+import { collectConsole, loginAs, ponukaSkla, overPonukuSkla, expectSklo } from './helpers';
 
 const SKLO = 'Sklo (základ — určuje vzorec)';
 const INE = 'Iné (vlastná skladba)';
 
-async function ponuka(page: Page, system: string, styl: string): Promise<string[]> {
+async function ponuka(page: Page, system: string, styl: string) {
 	await page.getByLabel('Systém').selectOption(system);
 	await page.getByLabel('Štýl').selectOption(styl);
-	const texty = await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents();
-	// žiadna voľba nenesie príponu „viac typov" (Palo 25.9. [04:19]) — zahryzne len proti
-	// nasadeniu s Odoo obohatením (post-deploy); v CI preview bez Odoo je popis vždy prázdny
-	// a správanie kryje unit `tests/glass-match.test.ts`
-	for (const t of texty) expect(t).not.toContain('viac typov');
-	return texty.map(bareSkloLabel).filter((t) => t !== INE);
+	const sel = page.getByLabel(SKLO);
+	// žiadna voľba nenesie príponu „viac typov" (Palo 25.9. [04:19])
+	for (const t of await sel.locator('option').allTextContents())
+		expect(t).not.toContain('viac typov');
+	return ponukaSkla(sel);
 }
 
 test('Robust ponúka LEN skladby 4/16/4 číre a mliečne (#573)', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	const skla = await ponuka(page, 'Robust', '3K');
-	expect([...skla].sort()).toEqual(
-		['Izolačné sklo 4/16/4 číre', 'Izolačné sklo 4/16/4 mliečne'].sort()
-	);
-	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/16/4 číre');
+	const p = await ponuka(page, 'Robust', '3K');
+	overPonukuSkla(p, ['Izolačné sklo 4/16/4 číre', 'Izolačné sklo 4/16/4 mliečne']);
+	// predvolené sklo = 4/16/4 číre (#594: na PROD Odoo voľba počítaná týmto sklom)
+	await expectSklo(page.getByLabel(SKLO), 'Izolačné sklo 4/16/4 číre');
 	expect(consoleMsgs).toEqual([]);
 });
 
@@ -36,14 +35,30 @@ test('Štandard plus 3K ponúka 4 mm Float aj kalené (#579), nie 10 mm; predvol
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
-	const skla = await ponuka(page, 'Štandard +', '3K');
+	const p = await ponuka(page, 'Štandard +', '3K');
+	const povolene = [
+		'Float sklo 4 mm',
+		'ESG kalené 4 mm',
+		'Float sklo 6 mm',
+		'ESG kalené 6 mm',
+		'3.3.1',
+		'3.3.1 mliečne',
+		'Izolačné sklo 4/8/4 číre',
+		'Izolačné sklo 4/8/4 mliečne',
+		'Izolačné sklo 4/8/4 stopsol',
+		'Izolačné sklo 4/16/4 číre',
+		'Izolačné sklo 4/16/4 mliečne',
+		'Izolačné sklo 4/16/4 stopsol'
+	];
+	overPonukuSkla(p, povolene);
 	// #579 (Patrik 28.9.): 4 mm sklo pri Štandardoch áno — výnimka, predvolené ostáva 6 mm
-	expect(skla.filter((s) => /\b4 mm\b/.test(s))).toEqual(['Float sklo 4 mm', 'ESG kalené 4 mm']);
-	expect(skla.filter((s) => /10 mm/.test(s))).toEqual([]);
-	expect(skla).toContain('Float sklo 6 mm');
-	expect(skla).toContain('3.3.1');
-	expect(skla.some((s) => /^Izolačné sklo 4\/16\/4/.test(s))).toBe(true);
-	await expect(page.getByLabel(SKLO)).toHaveValue('Float sklo 6 mm');
+	expect(p.vypocty.filter((s) => /\b4 mm\b/.test(s)).sort()).toEqual([
+		'ESG kalené 4 mm',
+		'Float sklo 4 mm'
+	]);
+	expect(p.vypocty.filter((s) => /10 mm/.test(s))).toEqual([]);
+	expect(p.vypocty.some((s) => /^Izolačné sklo 4\/16\/4/.test(s))).toBe(true);
+	await expectSklo(page.getByLabel(SKLO), 'Float sklo 6 mm');
 	expect(consoleMsgs).toEqual([]);
 });
 
@@ -53,14 +68,15 @@ test('Deluxe 6 mm a 10 mm (predvolené 10 mm); starý Štandard bez zmeny (#573)
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	const deluxe = await ponuka(page, 'Deluxe', '3K');
-	expect(deluxe).toEqual(['Float kalené 6 mm', 'Float kalené 10 mm']);
-	await expect(page.getByLabel(SKLO)).toHaveValue('Float kalené 10 mm');
+	expect([...deluxe.vypocty].sort()).toEqual(['Float kalené 10 mm', 'Float kalené 6 mm']);
+	await expectSklo(page.getByLabel(SKLO), 'Float kalené 10 mm');
 
 	const stary = await ponuka(page, 'Štandard', '3K');
-	expect(stary).toContain('Float sklo 6 mm');
-	expect(stary).toContain('3.3.1');
-	// starý Štandard je „bez zmeny" — ponúka ďalej aj to, čo Štandard plus už nie
-	expect(stary).toContain('Float sklo 4 mm');
+	expect(stary.vypocty).toContain('Float sklo 6 mm');
+	// starý Štandard je „bez zmeny" — ponúka ďalej aj to, čo Štandard plus už nie (4 mm Float)
+	expect(stary.vypocty).toContain('Float sklo 4 mm');
+	// 3.3.1 je lokálne sklo — pri Odoo ponuke je len keď ho počíta niektorý Odoo typ (#594)
+	if (!stary.odoo) expect(stary.vypocty).toContain('3.3.1');
 	expect(consoleMsgs).toEqual([]);
 });
 

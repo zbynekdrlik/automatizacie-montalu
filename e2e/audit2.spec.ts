@@ -5,7 +5,7 @@
 // Audit #12 (primárne selecty), #13 (extra posuv), #33 (login redirect), #34 (badge).
 // Pozn.: zlé heslo, prefill mena a ?next= deep-link už kryje app.spec.ts (1. dávka).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, bareSkloLabel, LOKALNE_SKLA } from './helpers';
+import { collectConsole, loginAs, vyberSklo, ponukaSkla, vypocetSkla } from './helpers';
 
 test('#12 primárne selecty: zmena systému snapne Štýl aj Sklo na platné hodnoty', async ({
 	page
@@ -16,27 +16,26 @@ test('#12 primárne selecty: zmena systému snapne Štýl aj Sklo na platné hod
 	// Robust má 4/16/4 sklá a štýl 2x4K; Slide má 4/8/4 + 6 mm sklá a 2x4K NEMÁ
 	await page.selectOption('#system', 'Robust');
 	await page.selectOption('#styl', '2x4K');
-	await page.selectOption('#sklo', 'Izolačné sklo 4/16/4 číre');
+	await vyberSklo(page.locator('#sklo'), 'Izolačné sklo 4/16/4 číre');
 
 	await page.selectOption('#system', 'Slide');
 	const styl = await page.locator('#styl').inputValue();
-	const sklo = await page.locator('#sklo').inputValue();
+	// #594: sklo porovnávame ako VÝPOČTOVÉ sklo voľby (na PROD sú v ponuke len Odoo typy)
+	const sklo = await vypocetSkla(page.locator('#sklo'));
 	const slideStyly = await page.locator('#styl option').allTextContents();
-	const slideSkla = await page.locator('#sklo').locator(LOKALNE_SKLA).allTextContents();
+	const slide = await ponukaSkla(page.locator('#sklo'));
 	expect(slideStyly).not.toContain('2x4K');
 	expect(slideStyly).toContain(styl); // vybraná hodnota je z NOVÉHO zoznamu
-	// #556 hotfix: `<option>` skla nesie na PROD sufix „ · cenník: <Odoo>" — porovnávame HOLÝ názov.
-	expect(slideSkla.map(bareSkloLabel)).toContain(sklo);
+	expect(slide.vypocty).toContain(sklo);
 	expect(sklo).not.toContain('4/16/4'); // Robustové sklo neprežije prepnutie
-	expect(slideSkla.map(bareSkloLabel)).toContain('3.3.1'); // 6 mm skladba je v ponuke (v17)
+	// 6 mm skladba 3.3.1 je v lokálnej ponuke (v17); pri Odoo ponuke len ak ju počíta Odoo typ
+	if (!slide.odoo) expect(slide.vypocty).toContain('3.3.1');
 
 	// a naopak: Slide → Deluxe (Deluxe má vlastné sklá, žiadne Slide/Robust)
 	await page.selectOption('#system', 'Deluxe');
-	const deluxeSkla = (await page.locator('#sklo').locator(LOKALNE_SKLA).allTextContents()).map(
-		bareSkloLabel
-	);
-	expect(deluxeSkla).toContain(await page.locator('#sklo').inputValue());
-	expect(deluxeSkla.some((s) => s.includes('4/8/4'))).toBe(false);
+	const deluxe = await ponukaSkla(page.locator('#sklo'));
+	expect(deluxe.vypocty).toContain(await vypocetSkla(page.locator('#sklo')));
+	expect(deluxe.vypocty.some((s) => s.includes('4/8/4'))).toBe(false);
 
 	expect(errs).toEqual([]);
 });
@@ -58,13 +57,12 @@ test('#13 extra posuv: zmena jeho systému snapne jeho štýl/sklo/otváranie (p
 	// prepni LEN posuv na Slide → jeho štýl aj sklo musia byť platné pre Slide
 	await page.selectOption('#ps0-sys', 'Slide');
 	const psStyly = await page.locator('#ps0-styl option').allTextContents();
-	const psSkla = (await page.locator('#ps0-sklo').locator(LOKALNE_SKLA).allTextContents()).map(
-		bareSkloLabel
-	);
+	const psSkla = await ponukaSkla(page.locator('#ps0-sklo'));
+	const psSklo = await vypocetSkla(page.locator('#ps0-sklo'));
 	expect(psStyly).toContain(await page.locator('#ps0-styl').inputValue());
-	expect(psSkla).toContain(await page.locator('#ps0-sklo').inputValue());
+	expect(psSkla.vypocty).toContain(psSklo);
 	expect(psStyly).not.toContain('2x4K');
-	expect(await page.locator('#ps0-sklo').inputValue()).not.toContain('4/16/4');
+	expect(psSklo).not.toContain('4/16/4');
 	// primárny posuv zmena extra posuvu NESMIE ovplyvniť
 	await expect(page.locator('#system')).toHaveValue('Robust');
 	await expect(page.locator('#styl')).toHaveValue('2x4K');
@@ -107,12 +105,15 @@ test('#12b presné zloženie skla a poznámka prežijú prepnutie systému (nevy
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
-	await page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)').fill('Stopsol Grey');
+	const presne = page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)');
+	// #594: pri Odoo ponuke je zvolený Odoo typ = presné zloženie → pole je skryté (#579)
+	const odoo = (await ponukaSkla(page.locator('#sklo'))).odoo;
+	if (odoo) await expect(presne).toBeHidden();
+	else await presne.fill('Stopsol Grey');
 	await page.getByLabel(/^Poznámka/).fill('prvý riadok\ndruhý riadok');
 	await page.selectOption('#system', 'Slide');
-	await expect(page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')).toHaveValue(
-		'Stopsol Grey'
-	);
+	if (odoo) await expect(presne).toBeHidden();
+	else await expect(presne).toHaveValue('Stopsol Grey');
 	await expect(page.getByLabel(/^Poznámka/)).toHaveValue('prvý riadok\ndruhý riadok');
 	expect(errs).toEqual([]);
 });

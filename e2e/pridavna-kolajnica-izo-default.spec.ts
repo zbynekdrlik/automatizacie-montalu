@@ -6,7 +6,15 @@
 // ON → ZASP00030 (spodná 3K). Cez REÁLNY formulár, presne ako
 // e2e/pridavna-v-sietke.spec.ts.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	skipAkLive,
+	vyberFarbuKovania,
+	expectSklo,
+	vyberSklo
+} from './helpers';
 
 // v44 (#504) zmazala orphaned 'Izolačné sklo 4.8.4' (Štandard+) — nahradené
 // surviving v43 IZO variantom rovnakej triedy (16mm skladba, jeIzoTrieda ⇒ true),
@@ -29,7 +37,7 @@ test('Štandard + | 2K | IZO sklo: checkbox sa predvyplní zaškrtnutý a odpis 
 	const checkbox = page.getByLabel(/Prídavná koľajnica/);
 	await expect(checkbox).not.toBeChecked(); // predvolené sklo je číre (nie IZO)
 
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await expect(checkbox).toBeChecked(); // sklo prepnuté na IZO → predvyplní sa
 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`E2E-132-A-${Date.now()}`);
@@ -52,7 +60,7 @@ test('predvyplnenie sa dá ručne odškrtnúť — odpis sa vráti na 2K spodnú
 
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('1850');
 
@@ -80,7 +88,7 @@ test('deliberatívne odškrtnutie prežije zmenu iného poľa (rozmery)', async 
 
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 
 	const checkbox = page.getByLabel(/Prídavná koľajnica/);
 	await expect(checkbox).toBeChecked();
@@ -104,16 +112,16 @@ test('prepnutie skla PREČ z IZO odškrtne default (žiadny IZO dôvod neostáva
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
 	const skloSelect = page.getByLabel('Sklo (základ — určuje vzorec)');
-	await skloSelect.selectOption(IZO);
+	await vyberSklo(skloSelect, IZO);
 
 	const checkbox = page.getByLabel(/Prídavná koľajnica/);
 	await expect(checkbox).toBeChecked();
 
-	await skloSelect.selectOption(NIE_IZO);
+	await vyberSklo(skloSelect, NIE_IZO);
 	await expect(checkbox).not.toBeChecked();
 
 	// a späť na IZO → znova zaškrtne (nová voľba skla = nová príležitosť na default)
-	await skloSelect.selectOption(IZO);
+	await vyberSklo(skloSelect, IZO);
 	await expect(checkbox).toBeChecked();
 
 	expect(errs).toEqual([]);
@@ -141,7 +149,7 @@ test('prepnutie SYSTÉMU preč z Štandard + a späť: ručný override nezostan
 
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 
 	const checkbox = page.getByLabel(/Prídavná koľajnica/);
 	await expect(checkbox).toBeChecked();
@@ -166,7 +174,7 @@ test('prepnutie SYSTÉMU preč z Štandard + a späť: ručný override nezostan
 
 	// nová voľba IZO skla PO návrate → nová hrana → znova zaškrtne (override
 	// spred odchodu zo systému neplatí naveky)
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await expect(checkbox).toBeChecked();
 
 	expect(errs).toEqual([]);
@@ -178,7 +186,7 @@ test('Štandard + | 3K | IZO sklo: predvyplní tiež, odpis ukáže 4K spodnú',
 
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('3K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
 
@@ -206,7 +214,7 @@ test('Štandard + | 6K: checkbox v UI vôbec nie je (7K koľajnica neexistuje) �
 
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('6K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 
 	await expect(page.getByLabel(/Prídavná koľajnica/)).toHaveCount(0);
 
@@ -233,7 +241,7 @@ test('zimná záhrada: order-level default z primárneho posuvu upsizne AJ extra
 	// primárny posuv = Štandard + | 2K | IZO sklo → default zaškrtne order-level box
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('1850');
 	await expect(page.getByLabel(/Prídavná koľajnica/)).toBeChecked();
@@ -243,7 +251,7 @@ test('zimná záhrada: order-level default z primárneho posuvu upsizne AJ extra
 	await page.getByRole('button', { name: /Pridať zasklenie/ }).click();
 	await page.locator('#ps0-sys').selectOption('Štandard +');
 	await page.locator('#ps0-styl').selectOption('2K');
-	await page.locator('#ps0-sklo').selectOption(NIE_IZO);
+	await vyberSklo(page.locator('#ps0-sklo'), NIE_IZO);
 	await page.locator('#ps0-s').fill('3200');
 	await page.locator('#ps0-v').fill('1900');
 
@@ -277,7 +285,7 @@ test('„Použiť znova": ručne odškrtnutá IZO objednávka sa po obnovení NE
 	await page.getByLabel('Zákazník *').fill('Prvý zákazník IZO');
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2K');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption(IZO);
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('1850');
 
@@ -301,7 +309,7 @@ test('„Použiť znova": ručne odškrtnutá IZO objednávka sa po obnovení NE
 	// 3. systém/štýl/sklo sa obnovili na Štandard + | 2K | IZO (default BY zaškrtol),
 	//    ale uložená hodnota bola FALSE — tá musí vyhrať, appka ju nesmie prepísať
 	await expect(page.getByLabel('Systém')).toHaveValue('Štandard +');
-	await expect(page.getByLabel('Sklo (základ — určuje vzorec)')).toHaveValue(IZO);
+	await expectSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO);
 	await expect(checkbox).not.toBeChecked();
 
 	expect(errs).toEqual([]);

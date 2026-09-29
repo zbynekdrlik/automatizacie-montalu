@@ -4,7 +4,15 @@
 // Väčšina testov je READ-ONLY („Spočítať" / „Späť"); zápisový test „po odoslaní"
 // je za `skipAkLive`, takže proti ostrej appke (MONEY_LIVE=1) sa preskočí.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, skipAkLive } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	vyberFarbuKovania,
+	skipAkLive,
+	expectSklo,
+	vyberSklo
+} from './helpers';
 
 const RUN = `E2E-KOV-${Date.now().toString(36).slice(-5)}`;
 const FAB = 'Jednostranná FAB (menej kľučiek a krytiek vložky v odpise)';
@@ -97,7 +105,7 @@ test('Štandard +: bez kovania kusov (žiadne FAB pole), ale karta má tesnenie 
 	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
 	await page.getByLabel('Štýl').selectOption('2K');
 	// reaktívny sklo-select sa doplní po zmene systému — samostatný krok (race)
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float sklo 6 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float sklo 6 mm');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
@@ -170,7 +178,7 @@ test('Deluxe: FAB skryté (nemá FAB položky), kovanie ide, predvolené sklo 10
 	await page.getByLabel('Systém').selectOption('Deluxe');
 	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
 	// predvolené sklo pre Deluxe = 10 mm (predtým prvé v poradí = 6 mm) — Patrik #431
-	await expect(page.getByLabel('Sklo (základ — určuje vzorec)')).toHaveValue('Float kalené 10 mm');
+	await expectSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 
 	// ...ale Deluxe kovanie DO Money IDE — karta kovania sa po výpočte zobrazí (skrytie
 	// FAB checkboxu nesmie skryť samotné kovanie, to gate-uje `kovanie?.length`, nie FAB).

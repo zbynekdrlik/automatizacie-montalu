@@ -6,7 +6,7 @@
 // Prvý test je ČÍTACÍ (Spočítať iba počíta, nezapisuje — beží aj proti nasadeniu). Druhý test
 // ZAPISUJE (Odoslať odpis) → `skipAkLive` ho preskočí proti LIVE nasadeniu (Money-safety).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, vyberFarbuKovania, skipAkLive } from './helpers';
+import { collectConsole, loginAs, vyberFarbuKovania, skipAkLive, vyberSklo } from './helpers';
 
 const SKLO_INE = 'Iné (vlastná skladba)';
 
@@ -54,7 +54,7 @@ test('prepnutie späť na katalógové sklo skryje výber triedy (reaktivita)', 
 	await page.selectOption('#sklo', SKLO_INE);
 	await expect(page.getByTestId('ine-trieda')).toBeVisible();
 	// späť na katalógové sklo → trieda-select zmizne
-	await page.selectOption('#sklo', 'Float sklo 6 mm');
+	await vyberSklo(page.locator('#sklo'), 'Float sklo 6 mm');
 	await expect(page.getByTestId('ine-trieda')).toHaveCount(0);
 	expect(errs).toEqual([]);
 });

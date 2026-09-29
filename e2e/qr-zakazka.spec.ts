@@ -2,7 +2,7 @@
 // kiosku sa otvorí daná objednávka — QR nesie HOLÉ sale.order.name (= normOp(op) = Odoo A6 štítok).
 // READ-ONLY (len „Spočítať nárezový plán", žiadne odoslanie do Money). Zero-console (helpers).
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, vyberSklo } from './helpers';
 
 const RUN = `E2E-QR-${Date.now().toString(36).slice(-5)}`;
 const SKLO = 'Sklo (základ — určuje vzorec)';
@@ -17,7 +17,7 @@ async function spocitajPlan(page: Page, op: string) {
 	await page.getByLabel('Štýl').selectOption('4K');
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
-	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4/8/4 číre');
+	await vyberSklo(page.getByLabel(SKLO), 'Izolačné sklo 4/8/4 číre');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);

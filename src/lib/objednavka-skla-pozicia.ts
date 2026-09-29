@@ -3,6 +3,7 @@
 // je len „Zasklenie N"; m² vyplnené vopred; nadpis = OP + zákazník. Money-NEUTRÁLNE.
 
 import { PRIPONA_OTVOR_RE } from './sklo-otvory';
+import { formatDatumCasSk, sqliteUtcToIso } from './datum';
 
 // Pozícia zasklenia na začiatku popisu: nové riadky „Zasklenie N", staré multi „Zasklenie N: Robust 3K",
 // #578 riadok tabúľ s otvorom „Zasklenie N — s otvorom ⌀46".
@@ -71,4 +72,15 @@ export function nadpisObjednavky(p: { zak: string; op: string; zakaznik: string 
 	if (!op) return p.zak;
 	const zakaznik = p.zakaznik.trim();
 	return zakaznik ? `${op} ${zakaznik}` : op;
+}
+
+/**
+ * #594 (úloha 1219): kto a kedy pridal riadok podkladu — „pridal <autor> · <d.m.rrrr hh:mm>". Podklad
+ * je kľúčovaný zákazkou (#571), takže cudzí riadok treba vidieť pri riadku samom. Čas je SQLite UTC
+ * `created_at` → `sqliteUtcToIso` → `formatDatumCasSk` (Europe/Bratislava, `timestamps.md`); volá ho
+ * server (load podkladu). Riadok bez autora (legacy) → „pridané <čas>".
+ */
+export function pridalRiadku(p: { createdBy: string; createdAt: string }): string {
+	const kedy = formatDatumCasSk(sqliteUtcToIso(p.createdAt));
+	return p.createdBy ? `pridal ${p.createdBy} · ${kedy}` : `pridané ${kedy}`;
 }
