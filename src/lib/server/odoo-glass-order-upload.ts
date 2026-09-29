@@ -231,13 +231,15 @@ export async function uploadGlassOrderToOdoo(
 		const orderNumber = normOp(op);
 		const docId = buildGlassOrderDocId(trimmed, op);
 		// #548: `require_order: false` — Odoo vytvorí objednávku skla aj bez sale.order (servis bez
-		// zákazky); `order_number` = zak ostáva (Odoo ho spáruje, keď existuje).
+		// zákazky); `order_number` = zak ostáva (Odoo ho spáruje, keď existuje). #540: kľúč patrí
+		// VNORENE do `glass_order` — Odoo číta len `glass_order.require_order`, hornú úroveň zámerne
+		// ignoruje (odoo-erp `sale_order_narezak_glass.py`; „neznámy kľúč" v chate zákazky). Pridáva
+		// sa len do odosielaného volania — náhľad (`payload`) ostáva čistý v2 payload.
 		const uploadResult = await callJson2(cfg, 'sale.order', 'montalu_narezak_upload', {
 			order_number: orderNumber,
 			doc_id: docId,
 			kind: 'sklo',
-			require_order: false,
-			glass_order: payload
+			glass_order: { ...payload, require_order: false }
 		});
 		const odoo = parseOdooOutcome(uploadResult);
 		log.info('glass-order upload: úspešne nahraný', {
