@@ -51,6 +51,7 @@ describe('#592: položka „Pevné zasklenie" v hornej lište', () => {
 	});
 
 	it('nav <details> v layoute nepoužívajú bind:open (#583 — hydratácia prepíše stav)', () => {
-		expect(LAYOUT).not.toMatch(/bind:open/);
+		// atribút `bind:open={…}`, nie zmienka v komentári (#583 komentár ho cituje)
+		expect(LAYOUT).not.toMatch(/bind:open\s*=/);
 	});
 });
