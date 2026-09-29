@@ -1,5 +1,5 @@
 // #577 (Marek D., Odoo úloha 1181): po „Odoslať do Odoo" má podklad objednávky skla ukázať PRIAMY
-// odkaz na vytvorenú objednávku skla v Odoo (`/odoo/action-1008/<id>`) — a TRVALO, aj po obnovení.
+// odkaz na vytvorenú objednávku skla v Odoo (`/odoo/action-1015/<id>`) — a TRVALO, aj po obnovení.
 // V CI je Odoo upload vypnutý (žiadny ODOO_JSON2_URL) → reálne odoslanie tu odkaz nevytvorí (akcia +
 // uloženie sú pokryté unit testom `tests/objednavka-skla-odoslanie-577.test.ts` s mocknutým Odoo).
 // E2E preto overí POUŽÍVATEĽSKÝ tok okolo toho: (1) náhľad bez uploadu → žiadny mŕtvy odkaz;
@@ -46,7 +46,7 @@ test('objednávka skla: uložené odoslanie → odkaz do Odoo aj po obnovení (#
 	await expect(odkaz).toBeVisible();
 	await expect(odkaz).toContainText('Otvoriť objednávku skla v Odoo');
 	await expect(odkaz).toContainText('OSK-E2E');
-	await expect(odkaz).toHaveAttribute('href', new RegExp(`/odoo/action-1008/${GLASS_ORDER_ID}$`));
+	await expect(odkaz).toHaveAttribute('href', new RegExp(`/odoo/action-1015/${GLASS_ORDER_ID}$`));
 	await expect(odkaz).toHaveAttribute('target', '_blank');
 
 	// obnovenie stránky → odkaz ostáva (trvalé uloženie k podkladu)
@@ -54,7 +54,7 @@ test('objednávka skla: uložené odoslanie → odkaz do Odoo aj po obnovení (#
 	await waitHydrated(page);
 	await expect(page.getByTestId('odoo-objednavka-link')).toHaveAttribute(
 		'href',
-		new RegExp(`/odoo/action-1008/${GLASS_ORDER_ID}$`)
+		new RegExp(`/odoo/action-1015/${GLASS_ORDER_ID}$`)
 	);
 
 	expect(consoleMsgs).toEqual([]);

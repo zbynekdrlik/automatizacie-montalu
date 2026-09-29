@@ -1,5 +1,5 @@
 // #577 (Marek D., Odoo úloha 1181): po „Odoslať do Odoo" na podklade objednávky skla ukázať PRIAMY
-// odkaz na vytvorenú objednávku skla v Odoo (`montalu.glass.order`, `/odoo/action-1008/<id>`), aby ju
+// odkaz na vytvorenú objednávku skla v Odoo (`montalu.glass.order`, `/odoo/action-1015/<id>`), aby ju
 // výroba nemusela hľadať — a TRVALO (aj po obnovení stránky). DB per-file izolátor; Odoo transport
 // mocknutý (nikdy reálne Odoo). Money-NEUTRÁLNE (objednávka u dodávateľa skla).
 import { describe, it, expect, afterEach } from 'vitest';
@@ -11,6 +11,7 @@ import {
 	posledneOdoslanieOdoo
 } from '../src/lib/server/objednavka-skla-odoslanie';
 import { actions, load } from '../src/routes/objednavka-skla/[zak]/+page.server';
+import { db } from '../src/lib/server/db';
 
 afterEach(() => {
 	setJson2Transport(null);
@@ -60,13 +61,22 @@ function callLoad(zak: string) {
 
 describe('#577 odooObjednavkaSklaUrl — odkaz na montalu.glass.order', () => {
 	it('bez Odoo konfigurácie → Montalu Odoo inštancia', () => {
-		expect(odooObjednavkaSklaUrl(42)).toBe('https://erp.montalu.cloud/odoo/action-1008/42');
+		expect(odooObjednavkaSklaUrl(42)).toBe('https://erp.montalu.cloud/odoo/action-1015/42');
 	});
 
 	it('base URL z existujúcej Odoo konfigurácie appky (ODOO_JSON2_URL), bez dvojitej lomky', () => {
 		process.env.ODOO_JSON2_URL = 'https://erp.example.test/';
 		process.env.ODOO_JSON2_API_KEY = 'k';
-		expect(odooObjednavkaSklaUrl(7)).toBe('https://erp.example.test/odoo/action-1008/7');
+		expect(odooObjednavkaSklaUrl(7)).toBe('https://erp.example.test/odoo/action-1015/7');
+	});
+
+	it('akcia 1015 (jednoduché objednávky), NIE 1008 (cenníkové od odoo-erp 7894)', () => {
+		// Appka zakladá `pricing_mode='simple'` objednávky → menu „Sales/Orders/Objednávky skla" =
+		// akcia 1015. Akcia 1008 je cenníková (domain `pricing_mode='cennik'`) — otvorila by
+		// jednoduchú objednávku v cenníkovom formulári a breadcrumb na zoznam bez nej.
+		const url = odooObjednavkaSklaUrl(3) ?? '';
+		expect(url).toMatch(/\/odoo\/action-1015\/3$/);
+		expect(url).not.toContain('action-1008');
 	});
 
 	it('neplatné id → null (žiadny mŕtvy odkaz)', () => {
@@ -82,8 +92,15 @@ describe('#577 trvalé uloženie posledného odoslania k podkladu', () => {
 		ulozOdoslanieOdoo('zak-577-p1', { glassOrderId: 5, name: 'OSK00005' }, 'marek');
 		const a = posledneOdoslanieOdoo('ZAK-577-P1');
 		expect(a).toMatchObject({ glassOrderId: 5, name: 'OSK00005', odoslal: 'marek' });
-		expect(a?.url).toBe('https://erp.montalu.cloud/odoo/action-1008/5');
+		expect(a?.url).toBe('https://erp.montalu.cloud/odoo/action-1015/5');
 		expect(a?.odoslaneKedy).toMatch(/^\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}$/);
+
+		// odkaz sa NEUKLADÁ (len id) → riadky uložené, keď appka ešte skladala action-1008, dostanú
+		// pri renderi opravený odkaz bez migrácie
+		const stlpce = (
+			db.prepare(`PRAGMA table_info(objednavka_skla_odoslanie)`).all() as { name: string }[]
+		).map((c) => c.name);
+		expect(stlpce.some((c) => /url|odkaz/i.test(c))).toBe(false);
 
 		ulozOdoslanieOdoo('ZAK-577-P1', { glassOrderId: 9 }, 'patrik');
 		expect(posledneOdoslanieOdoo('zak-577-p1')).toMatchObject({
@@ -109,7 +126,7 @@ describe('#577 akcia odoslatDoOdoo → odkaz + trvalosť po obnovení (load)', (
 		zapniUpload({ glass_order_id: 11, name: 'OSK00011' });
 		const r = await odoslat(zak);
 		expect(r.odoslane.result).toBe('uploaded');
-		expect(r.odoslane.odkaz).toBe('https://erp.example.test/odoo/action-1008/11');
+		expect(r.odoslane.odkaz).toBe('https://erp.example.test/odoo/action-1015/11');
 
 		// „obnovenie stránky": nový load (Odoo transport vypnutý — typy skla idú z lokálneho zoznamu)
 		setJson2Transport(null);
@@ -120,7 +137,7 @@ describe('#577 akcia odoslatDoOdoo → odkaz + trvalosť po obnovení (load)', (
 		expect(d.odoslanieOdoo).toMatchObject({
 			glassOrderId: 11,
 			name: 'OSK00011',
-			url: 'https://erp.montalu.cloud/odoo/action-1008/11'
+			url: 'https://erp.montalu.cloud/odoo/action-1015/11'
 		});
 	});
 
