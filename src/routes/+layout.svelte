@@ -20,6 +20,12 @@
 	// pripojené CELOPLOŠNE tu (jediné miesto pre všetky routy vrátane
 	// /konfigurator), detail + zdôvodnenie v src/lib/wheel-guard.ts.
 	import { odfokusujCisloInputPriWheeli } from '$lib/wheel-guard';
+	// #592 (Odoo úloha 1220): „Fixy" + „Clip" zjednotené pod jednu položku „Pevné zasklenie"
+	import {
+		PEVNE_ZASKLENIE_LABEL,
+		PEVNE_ZASKLENIE_LINKS,
+		jePevneZasklenie
+	} from '$lib/nav-pevne-zasklenie';
 
 	let { data, children } = $props();
 
@@ -54,6 +60,12 @@
 	// nižšie), lebo interní ju už dosiahnu jedným klikom z vnútra /zasklenia (in-page
 	// odkaz „→ Návrhový výkres" pridaný v #162). B2B naopak MÁ tento odkaz priamo v
 	// (krátkom) menu — presne to isté zdôvodnenie, aké #144 dalo pergole.
+	//
+	// #592: interný zoznam nesie namiesto dvoch odkazov „Fixy"/„Clip" jeden ZNAČKOVÝ člen
+	// `PEVNE` — na jeho mieste sa renderuje skupina „Pevné zasklenie" (desktop: vnorený
+	// <details> dropdown; v „Moduly" dropdowne pod 900px: podsekcia s nadpisom). B2B vetva
+	// ho nemá — /fix aj /clip sú v B2B_FORBIDDEN_PREFIXES (drift guard v unit teste #592).
+	const PEVNE = { skupina: 'pevne' } as const;
 	const moduleLinks = $derived(
 		data.user?.role === 'b2b'
 			? ([
@@ -71,14 +83,12 @@
 				] satisfies { href: RouteId; label: string }[])
 			: ([
 					{ href: '/pergola', label: 'Pergola' },
-					{ href: '/fix', label: 'Fixy' },
+					// #592: Fix z appky / Fix z CADu / Zábradlia (CLIP) — `$lib/nav-pevne-zasklenie`
+					PEVNE,
 					{ href: '/bazen', label: 'Bazén' },
-					// CLIP zábradlie nárez + Money odpis (#372) — interný modul (b2b má /clip
-					// v B2B_FORBIDDEN_PREFIXES)
-					{ href: '/clip', label: 'Clip' },
 					{ href: '/zasklenia', label: 'Zasklenia' },
 					{ href: '/sietka', label: 'Sieťka' }
-				] satisfies { href: RouteId; label: string }[])
+				] satisfies ({ href: RouteId; label: string } | typeof PEVNE)[])
 	);
 
 	// #392: SEKUNDÁRNA skupina „Nástroje" — vždy dropdown, menej výrazný font. Len pre
@@ -116,9 +126,18 @@
 	let modulesEl = $state<HTMLDetailsElement>();
 	let toolsEl = $state<HTMLDetailsElement>();
 	let userEl = $state<HTMLDetailsElement>();
+	// #592: vnorený dropdown „Pevné zasklenie" v plochej lište (rovnaký vzor, žiadny bind:open)
+	let pevneEl = $state<HTMLDetailsElement>();
 
 	function zavriMenu() {
-		for (const el of [modulesEl, toolsEl, userEl]) if (el) el.open = false;
+		for (const el of [modulesEl, toolsEl, userEl, pevneEl]) if (el) el.open = false;
+	}
+
+	// aktívny člen lišty — odkaz presnou zhodou, skupina „Pevné zasklenie" celou vetvou /fix*, /clip*
+	function jeAktivny(l: (typeof moduleLinks)[number] | (typeof toolLinks)[number]): boolean {
+		return 'href' in l
+			? page.url.pathname === resolve(l.href)
+			: jePevneZasklenie(page.url.pathname);
 	}
 
 	afterNavigate(({ type }) => {
@@ -127,9 +146,35 @@
 	});
 </script>
 
-{#snippet navLinks(list: typeof moduleLinks | typeof toolLinks)}
-	{#each list as l (l.href)}
-		<a href={resolve(l.href)} class:active={page.url.pathname === resolve(l.href)}>{l.label}</a>
+<!-- vMenu = vykresľuje sa VNÚTRI dropdown menu (Moduly pod 900px / Nástroje): skupina
+     „Pevné zasklenie" je tam podsekcia s nadpisom, nie ďalší vnorený <details> (#592) -->
+{#snippet navLinks(list: typeof moduleLinks | typeof toolLinks, vMenu: boolean)}
+	{#each list as l ('href' in l ? l.href : l.skupina)}
+		{#if 'href' in l}
+			<a href={resolve(l.href)} class:active={jeAktivny(l)}>{l.label}</a>
+		{:else if vMenu}
+			<div class="nav-subgroup" role="group" aria-label={PEVNE_ZASKLENIE_LABEL}>
+				<span class="nav-subgroup-title" data-testid="modules-pevne-nadpis"
+					>{PEVNE_ZASKLENIE_LABEL}</span
+				>
+				{@render pevneLinks()}
+			</div>
+		{:else}
+			<details class="nav-dropdown nav-pevne" class:active={jeAktivny(l)} bind:this={pevneEl}>
+				<summary data-testid="pevne-menu-toggle"
+					>{PEVNE_ZASKLENIE_LABEL} <span aria-hidden="true">▾</span></summary
+				>
+				<div class="nav-dropdown-menu">
+					{@render pevneLinks()}
+				</div>
+			</details>
+		{/if}
+	{/each}
+{/snippet}
+
+{#snippet pevneLinks()}
+	{#each PEVNE_ZASKLENIE_LINKS as p (p.href)}
+		<a href={resolve(p.href)} class:active={page.url.pathname === resolve(p.href)}>{p.label}</a>
 	{/each}
 {/snippet}
 
@@ -158,31 +203,31 @@
 			<!-- primárna skupina „Moduly" — plochá na desktope; pod 900px ju nahradí
 			     dropdown nižšie (rovnaké moduleLinks pole, CSS display toggle — #392) -->
 			<div class="nav-group nav-modules-flat">
-				{@render navLinks(moduleLinks)}
+				{@render navLinks(moduleLinks, false)}
 			</div>
 			<details
 				class="nav-dropdown nav-modules-drop"
-				class:active={moduleLinks.some((l) => page.url.pathname === resolve(l.href))}
+				class:active={moduleLinks.some(jeAktivny)}
 				bind:this={modulesEl}
 			>
 				<summary data-testid="modules-menu-toggle">Moduly <span aria-hidden="true">▾</span></summary
 				>
 				<div class="nav-dropdown-menu">
-					{@render navLinks(moduleLinks)}
+					{@render navLinks(moduleLinks, true)}
 				</div>
 			</details>
 
 			{#if toolLinks.length}
 				<details
 					class="nav-dropdown nav-tools"
-					class:active={toolLinks.some((l) => page.url.pathname === resolve(l.href))}
+					class:active={toolLinks.some(jeAktivny)}
 					bind:this={toolsEl}
 				>
 					<summary data-testid="tools-menu-toggle"
 						>Nástroje <span aria-hidden="true">▾</span></summary
 					>
 					<div class="nav-dropdown-menu">
-						{@render navLinks(toolLinks)}
+						{@render navLinks(toolLinks, true)}
 					</div>
 				</details>
 			{/if}
