@@ -295,9 +295,11 @@ ak pribudne ďalší dropdown/menu:
   `{ href: RouteId; label: string }[]` — `resolve()`'s overloaded signatúra zlyhá proti
   celej `RouteId` únii (detaily + fix v `.claude/rules/lint-formatting.md`).
 - **Light-dismiss (klik mimo / Escape) natívny `<details>` NEDÁVA zadarmo** — treba
-  `<svelte:window onclick/onkeydown>` (~6 riadkov, žiadna knižnica); klik VNÚTRI
-  `.nav-dropdown` sa musí vynechať (`e.target.closest('details.nav-dropdown')`), inak
-  sa natívny toggle na `<summary>` a tvoj listener pobijú.
+  `<svelte:window onclick/onkeydown>` (~6 riadkov, žiadna knižnica); dropdown, ktorý klik
+  OBSAHUJE, sa musí vynechať (`el.contains(e.target)`), inak sa natívny toggle na
+  `<summary>` a tvoj listener pobijú. Od #592 sa zatvárajú všetky OSTATNÉ refs (nie „klik
+  do akéhokoľvek `.nav-dropdown` = nič") — otvorenie jedného menu zavrie súrodenca, dve
+  menu sa neprekrývajú. Nový dropdown = pridaj jeho ref do jediného zoznamu v `zavriMenu(okrem)`.
 - **Zatváranie po SPA navigácii**: `afterNavigate` z `$app/navigation` (nie ručný
   `$effect` na `page.url.pathname`) — root layout sa pri route zmene neremountuje,
   takže `<details open>` by inak ostalo nastavené aj po kliku na odkaz vnútri.

@@ -129,8 +129,10 @@
 	// #592: vnorený dropdown „Pevné zasklenie" v plochej lište (rovnaký vzor, žiadny bind:open)
 	let pevneEl = $state<HTMLDetailsElement>();
 
-	function zavriMenu() {
-		for (const el of [modulesEl, toolsEl, userEl, pevneEl]) if (el) el.open = false;
+	// zavrie všetky dropdowny OKREM toho, ktorý obsahuje `okrem` (cieľ kliku) — #592
+	function zavriMenu(okrem: Node | null = null) {
+		for (const el of [modulesEl, toolsEl, userEl, pevneEl])
+			if (el && !(okrem && el.contains(okrem))) el.open = false;
 	}
 
 	// aktívny člen lišty — odkaz presnou zhodou, skupina „Pevné zasklenie" celou vetvou /fix*, /clip*
@@ -183,12 +185,11 @@
 </svelte:head>
 
 <!-- #392 review nález 🟡: light-dismiss pre nav dropdowny — natívny <details> sám
-     osebe nezatvára pri kliku mimo ani na Escape. Klik VNÚTRI ktoréhokoľvek
-     .nav-dropdown necháme prejsť (natívny toggle na summary sa postará sám). -->
+     osebe nezatvára pri kliku mimo ani na Escape. Zatvor každý dropdown, ktorý klik
+     NEOBSAHUJE: klik mimo zavrie všetky, klik do jedného (napr. na jeho summary — natívny
+     toggle sa postará sám) zavrie jeho súrodencov, aby sa dve menu neprekrývali (#592). -->
 <svelte:window
-	onclick={(e) => {
-		if (!(e.target instanceof Element) || !e.target.closest('details.nav-dropdown')) zavriMenu();
-	}}
+	onclick={(e) => zavriMenu(e.target instanceof Node ? e.target : null)}
 	onkeydown={(e) => {
 		if (e.key === 'Escape') zavriMenu();
 	}}

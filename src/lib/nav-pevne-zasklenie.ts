@@ -17,10 +17,13 @@ export const PEVNE_ZASKLENIE_LINKS = [
 	{ href: '/clip', label: 'Zábradlia (CLIP)' }
 ] as const satisfies readonly { href: RouteId; label: string }[];
 
-// Prefixy vetiev, na ktorých je skupina aktívna (celé /fix* vrátane /fix/cad, a /clip*).
-const PREFIXY = ['/fix', '/clip'] as const;
-
-/** Je `pathname` stránka skupiny „Pevné zasklenie"? Presná zhoda alebo pod-cesta (nie `/fixy`). */
+/**
+ * Je `pathname` stránka skupiny „Pevné zasklenie"? Presná zhoda s niektorou voľbou alebo jej
+ * pod-cesta (`/fix` pokrýva aj `/fix/cad`; nie `/fixy`). Odvodené priamo zo zoznamu volieb,
+ * takže nový riadok v `PEVNE_ZASKLENIE_LINKS` netreba nikde inde dopĺňať.
+ */
 export function jePevneZasklenie(pathname: string): boolean {
-	return PREFIXY.some((p) => pathname === p || pathname.startsWith(p + '/'));
+	return PEVNE_ZASKLENIE_LINKS.some(
+		({ href }) => pathname === href || pathname.startsWith(href + '/')
+	);
 }
