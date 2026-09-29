@@ -13,7 +13,7 @@
 // („bez zmeny" v tabuľke), Drevostavby, Slide. Kľúč = cfg systém (`Štandard +` = Štandard plus).
 // Zmena zoznamu (napr. keď Patrik pošle presný zoznam) = úprava LEN tu; názvy musia byť riadky
 // katalógu systému (stráži `tests/sklo-povolene.test.ts`).
-import { SKLO_INE, SKLO_TRIEDY, type SkloTrieda } from './sklo';
+import { SKLO_INE, SKLO_TRIEDY, defaultSklo, type SkloTrieda } from './sklo';
 
 interface PovoleneSkla {
 	/** povolené katalógové sklá (`glass_types.nazov` v katalógu systému) */
@@ -21,6 +21,9 @@ interface PovoleneSkla {
 	/** povolené hrúbkové triedy vlastnej skladby („Iné (vlastná skladba)", `SKLO_INE`) —
 	 *  inak by „Iné" allow-list obišlo */
 	readonly triedyIne: readonly SkloTrieda[];
+	/** predvolené sklo ponuky, keď ho všeobecné pravidlo `defaultSklo` (prvé v poradí katalógu)
+	 *  nedá — napr. povolená výnimka stojí v katalógu PRED bežným sklom */
+	readonly predvolene?: string;
 }
 
 export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
@@ -34,10 +37,13 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 		nazvy: ['Izolačné sklo 4/16/4 číre', 'Izolačné sklo 4/16/4 mliečne'],
 		triedyIne: [24]
 	},
-	// Štandard plus: izolačné (trieda 16 — 4/8/4 aj 4/16/4), 6 mm, 3.3.1 (ako 6 mm, #214);
-	// NIE Float/ESG 4 mm (scr_017, ani pri 3K) a NIE 10 mm (#504)
+	// Štandard plus: izolačné (trieda 16 — 4/8/4 aj 4/16/4), 6 mm, 3.3.1 (ako 6 mm, #214) a
+	// Float 4 mm (#579: Patrik, Odoo úloha 1193, 28.9. „pri štandardoch tam môže byť aj 4mm sklo" —
+	// novšie vyjadrenie výroby nahrádza vylúčenie scr_017 z meetingu 25.9.); NIE ESG 4 mm a NIE
+	// 10 mm (#504). 4 mm je VÝNIMKA na výber — predvolené ostáva 6 mm (katalóg má Float 4 mm pred 6).
 	'Štandard +': {
 		nazvy: [
+			'Float sklo 4 mm',
 			'Float sklo 6 mm',
 			'ESG kalené 6 mm',
 			'3.3.1',
@@ -49,9 +55,17 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 			'Izolačné sklo 4/16/4 mliečne',
 			'Izolačné sklo 4/16/4 stopsol'
 		],
-		triedyIne: [6, 16, 24]
+		triedyIne: [6, 16, 24],
+		predvolene: 'Float sklo 6 mm'
 	}
 };
+
+/** Predvolené sklo ponuky systému: explicitná predvoľba z `POVOLENE_SKLA` (keď ju ponuka má),
+ *  inak všeobecné `defaultSklo`. Klient ho volá pri každom resete výberu skla. */
+export function predvoleneSklo(skla: string[], system: string): string {
+	const p = POVOLENE_SKLA[system]?.predvolene;
+	return p && skla.includes(p) ? p : defaultSklo(skla, system);
+}
 
 // ---- #579: Odoo typy skla (`montalu.glass.type`) v ponuke nárezáku podľa HRÚBKY ----
 //
@@ -97,8 +111,12 @@ const STANDARDNE: readonly OdooHrubka[] = [
 	{ mm: 16, druh: 'izolacne' },
 	{ mm: 24, druh: 'izolacne' }
 ];
+// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché (počíta sa ako Float sklo
+// 4 mm); Drevostavby bez zmeny. Na KONCI — rovnaké poradie ako na PROD po migrácii v54.
+const STANDARDNE_4MM: readonly OdooHrubka[] = [...STANDARDNE, { mm: 4, druh: 'jednoduche' }];
 
-/** Seed migrácie v52 (`cfg_sklo_hrubka`) — tabuľka z designu #579 (doplnenie 28.9.). Živé hodnoty
+/** Seed migrácie v52 (`cfg_sklo_hrubka`) — tabuľka z designu #579 (doplnenie 28.9.) + 4 mm pre
+ *  Štandardy (29.9.; existujúcej DB ich doplní v54 `migracie-sklo-hrubky-4mm.ts`). Živé hodnoty
  *  číta server z DB (`skloHrubkyPre`), NIKDY z tejto konštanty. */
 export const ODOO_HRUBKY_SEED: Readonly<Record<string, readonly OdooHrubka[]>> = {
 	// izolačné 4/16/4 (24 mm); vzorec od skla nezávisí
@@ -113,8 +131,8 @@ export const ODOO_HRUBKY_SEED: Readonly<Record<string, readonly OdooHrubka[]>> =
 		{ mm: 6, druh: 'esg' },
 		{ mm: 10, druh: 'esg' }
 	],
-	'Štandard +': STANDARDNE,
-	Štandard: STANDARDNE,
+	'Štandard +': STANDARDNE_4MM,
+	Štandard: STANDARDNE_4MM,
 	'Štandard Drevo': STANDARDNE
 };
 

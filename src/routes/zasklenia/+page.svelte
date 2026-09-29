@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
-	import { defaultSklo, SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
-	import { ponukaSkielSystemu, povoleneTriedyIne } from '$lib/sklo-povolene';
+	import { SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
+	import { ponukaSkielSystemu, povoleneTriedyIne, predvoleneSklo } from '$lib/sklo-povolene';
 	import { skloOdooPre } from '$lib/sklo-odoo';
 	import HiddenVstup from '$lib/components/zasklenia/HiddenVstup.svelte';
 	import {
@@ -379,7 +379,7 @@
 			// „prenieslo" do Slide namiesto resetu na Slide default (audit2 kontrakt:
 			// „Robustové sklo neprežije prepnutie"). Zápis do prevSystemForSklo
 			// je untracked → nespúšťa znovu tento efekt.
-			sklo = defaultSklo(zoznam, currentSystem);
+			sklo = predvoleneSklo(zoznam, currentSystem);
 			// #235 slice 2 (BLUE-3): reset vlastnej skladby pri zmene systému — trieda
 			// patrí starému systému. sklo sa resetuje na katalógový default, takže
 			// skloTriedaS je aj tak ignorovaná serverom, ale nech nezostane stará voľba.
@@ -390,7 +390,7 @@
 			// štýlová zmena / iný trigger → name-persistence (zmena počtu krídel
 			// nesmie prepísať voľbu obsluhy)
 			const chcene = untrack(() => sklo) || prim()?.sklo;
-			sklo = chcene && zoznam.includes(chcene) ? chcene : defaultSklo(zoznam, currentSystem);
+			sklo = chcene && zoznam.includes(chcene) ? chcene : predvoleneSklo(zoznam, currentSystem);
 			// #573: trieda vlastnej skladby, ktorú štýl už neponúka, sa zruší (inak select ukáže
 			// neexistujúcu voľbu a server submit odmietne)
 			const t = untrack(() => skloTriedaS);
@@ -490,7 +490,7 @@
 		const st = stylyForSystem(p.system);
 		if (!st.includes(p.styl)) p.styl = st[0]!; // st neprázdne pre platný systém
 		const sk = sklaForSystem(p.system, p.styl);
-		if (systemZmeneny || !sk.includes(p.sklo)) p.sklo = defaultSklo(sk, p.system);
+		if (systemZmeneny || !sk.includes(p.sklo)) p.sklo = predvoleneSklo(sk, p.system);
 		// #235 slice 2: zmena systému zresetuje aj vlastnú skladbu (patrí starému systému)
 		if (systemZmeneny) {
 			p.skloPresne = '';
