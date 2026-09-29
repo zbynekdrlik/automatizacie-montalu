@@ -43,6 +43,7 @@ import { migrateSietkaStandard } from './migracie-sietka';
 import { migrateObjednavkaSklaOdoslanie } from './migracie-objednavka-odoslanie';
 import { migrateSkloHrubky } from './migracie-sklo-hrubky';
 import { migrateObjednavkaSklaOtvor } from './migracie-objednavka-otvor';
+import { migrateSkloHrubky4mm } from './migracie-sklo-hrubky-4mm';
 
 const log = logger('migrate');
 
@@ -969,6 +970,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateObjednavkaSklaOdoslanie(db, bump); // v50→v51 (#577 odkaz na objednávku skla v Odoo; vlastný súbor)
 	migrateSkloHrubky(db, bump); // v51→v52 (#579 povolené hrúbky skla per systém; vlastný súbor)
 	migrateObjednavkaSklaOtvor(db, bump); // v52→v53 (#587 poloha otvoru → PDF výkres skla pre IZOS; vlastný súbor)
+	migrateSkloHrubky4mm(db, bump); // v53→v54 (#579 4 mm jednoduché pre Štandardy; vlastný súbor)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

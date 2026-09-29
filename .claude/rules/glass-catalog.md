@@ -237,7 +237,7 @@ Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klas
 ## Povolené sklá PER SYSTÉM = allow-list NAD katalógom, nie zmena katalógu (#573, 27.9.2026)
 
 „Ktoré sklo smie systém ponúknuť" (meeting výroby 25.9.: Robust len 4/16/4 číre/mliečne,
-Štandard plus bez Float 4 mm a 10 mm, Deluxe 6/10) žije v JEDNOM mieste:
+Štandard plus bez 10 mm — Float 4 mm od #579 29.9. ZNOVA áno, Deluxe 6/10) žije v JEDNOM mieste:
 `POVOLENE_SKLA` v `src/lib/sklo-povolene.ts` (client-safe — importuje ho klient aj server).
 **Zmena zoznamu (napr. Patrik pošle presný) = úprava LEN tam** + `tests/sklo-povolene.test.ts`
 + E2E `e2e/sklo-povolene-573.spec.ts` (a grep e2e na zakázané sklá — pozri sekciu nižšie).
@@ -423,7 +423,8 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   Odoo úloha 1180: „Povolené hrúbky pri systéme si nastaví výroba"; migrácia v52, `UNIQUE(system,
   mm)`, CHECK druh/mm>0). Seed = `ODOO_HRUBKY_SEED` v `src/lib/sklo-povolene.ts` (Robust 24
   izolačné; Slide 16 izolačné + 6 jednoduché; Deluxe 6/10 LEN `esg`; Štandard + / starý Štandard /
-  Drevostavby 6 jednoduché + 16 a 24 izolačné) — konštanta je LEN seed, živé hodnoty číta
+  Drevostavby 6 jednoduché + 16 a 24 izolačné; Štandard + a starý Štandard od v54 aj 4 jednoduché)
+  — konštanta je LEN seed, živé hodnoty číta
   `src/lib/server/sklo-hrubky.ts` (`skloHrubkyPre`, cache invalidovaná pri zápise). Výroba ich mení
   v `/zasklenia/nastavenia` (karta „Povolené hrúbky skla z Odoo", akcie `pridatHrubku` /
   `odobratHrubku`, `use:enhance`), každý zápis + `cfg_audit` v JEDNEJ transakcii (sys_styl =
@@ -486,3 +487,28 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   mock JSON-2 servera (`ODOO_JSON2_URL=http://127.0.0.1:<port>`, odpovedá len
   `/json/2/montalu.glass.type/search_read`); vo worktree so symlinknutým `node_modules` treba
   dočasný vite config so `server.fs.allow` na hlavný `node_modules` (inak 403 na fonty v konzole).
+
+## 4 mm sklo pri Štandardoch — výnimka, NIE predvoľba (#579, 29.9.2026)
+
+Patrik (Odoo úloha 1193, msg 1865357, 28.9.): „pri štandardoch tam môže byť aj 4mm sklo" — novšie
+vyjadrenie výroby má prednosť pred vylúčením scr_017 z meetingu 25.9. (#573). Drevostavby bez zmeny.
+
+- **Lokálne:** `POVOLENE_SKLA['Štandard +']` má znova „Float sklo 4 mm" AJ „ESG kalené 4 mm" a
+  trieda 4 vlastnej skladby (`triedyIne`); 10 mm ďalej NIE. Kalené 4 mm je nutné kvôli Money: bez
+  neho by sa Odoo tvrdené 4 mm („ESG Float čirý 4mm") v Štandard + odvodilo ako Float sklo 4 mm (iný
+  Money kód než tvrdené sklo) — pravidlo `vypocetneSkloPre` hľadá kalený kandidát LEN v lokálnej
+  ponuke. Pri povolení hrúbky vždy povoľ aj kalený variant tej hrúbky, ak ho katalóg systému má.
+  Starý Štandard allow-list nemá → 4 mm (Float aj kalené) ponúkal vždy.
+- **PASCA predvoľby:** katalóg Štandard + má Float 4 mm (poradie 10) PRED Float 6 mm (20), takže
+  `defaultSklo` (prvé neizolačné) by po rozšírení allow-listu ticho prepol predvolené sklo na 4 mm
+  (= iný nárezák/Money pre každý nový odpis). Preto `PovoleneSkla.predvolene` + `predvoleneSklo(skla,
+  system)` (explicitná predvoľba, keď ju ponuka má, inak `defaultSklo`); formulár zasklení
+  (`+page.svelte` sklo efekt + `fixPosuv`) volá `predvoleneSklo`. Rozšírenie allow-listu o sklo,
+  ktoré v katalógu stojí PRED dnešným defaultom → vždy doplň `predvolene`.
+- **Odoo hrúbky:** migrácia **v54** `migracie-sklo-hrubky-4mm.ts` — `INSERT OR IGNORE` (Štandard +, 4,
+  jednoduché) a (Štandard, 4, jednoduché); riadok (systém, 4 mm), ktorý výroba nastavila editorom
+  (napr. „len kalené"), sa nemení (`UNIQUE(system, mm)`). `ODOO_HRUBKY_SEED` má tie isté riadky NA
+  KONCI (čerstvá DB = rovnaké poradie ako PROD po v54). `vypocetneSkloPre(4, 'jednoduche', …)` =
+  „Float sklo 4 mm" pre oba systémy; Odoo 4 mm kalené typy sa v oboch počítajú ako ESG kalené 4 mm.
+  Snapshot `sklo-odoo-579` sa zmenil LEN pridaním 4 riadkov (4 mm voľby: rezané → Float sklo 4 mm,
+  kalené → ESG kalené 4 mm), žiadna existujúca voľba nezmenila výpočtové sklo.

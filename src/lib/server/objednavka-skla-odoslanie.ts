@@ -12,8 +12,14 @@ const log = logger('objednavka-skla-odoslanie');
 
 /** Montalu Odoo inštancia — fallback, keď appka nemá Odoo konfiguráciu (`ODOO_JSON2_URL`). */
 const ODOO_BASE_URL = 'https://erp.montalu.cloud';
-/** Odoo akcia „Objednávky skla" (`montalu.glass.order` formulár) — tvar odkazu používaný od 18.9. */
-const ODOO_AKCIA_OBJEDNAVKY_SKLA = 1008;
+/**
+ * Odoo akcia „Objednávky skla" pre JEDNODUCHÉ objednávky (`montalu.glass.order`,
+ * `pricing_mode='simple'` — menu „Sales/Orders/Objednávky skla"), ktoré appka zakladá. odoo-erp 7894
+ * rozdelil akcie: 1008 je odvtedy CENNÍKOVÁ objednávka (`pricing_mode='cennik'`) — otvorila by našu
+ * objednávku v cenníkovom formulári a breadcrumb by viedol na zoznam bez nej. Odkaz sa NEUKLADÁ
+ * (v DB je len `glass_order_id`), takže zmena akcie opraví aj odkazy skôr odoslaných podkladov.
+ */
+const ODOO_AKCIA_OBJEDNAVKY_SKLA = 1015;
 
 export interface OdoslanieOdoo {
 	glassOrderId: number;
@@ -27,7 +33,7 @@ export interface OdoslanieOdoo {
 }
 
 /**
- * Odkaz na objednávku skla v Odoo: `<base>/odoo/action-1008/<id>`. Base = existujúca Odoo
+ * Odkaz na objednávku skla v Odoo: `<base>/odoo/action-<ODOO_AKCIA_OBJEDNAVKY_SKLA>/<id>`. Base = existujúca Odoo
  * konfigurácia appky (`ODOO_JSON2_URL`, base URL inštancie), inak Montalu Odoo. Neplatné id
  * (nie kladné celé číslo) → `null` (radšej žiadny odkaz než mŕtvy).
  */

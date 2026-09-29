@@ -37,7 +37,7 @@ await import('../src/lib/server/db');
 describe('migration v51 → v52 (cfg_sklo_hrubka, #579)', () => {
 	it('bumpne na v52 a vytvorí tabuľku (id, system, mm, druh)', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(53);
+		expect(d.pragma('user_version', { simple: true })).toBe(54);
 		const cols = (d.prepare('PRAGMA table_info(cfg_sklo_hrubka)').all() as { name: string }[]).map(
 			(c) => c.name
 		);

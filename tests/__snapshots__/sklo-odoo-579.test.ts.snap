@@ -30,9 +30,11 @@ exports[`#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky > výpočtové skl
   "Štandard": {
     "Drôtené sklo 6mm": "Float sklo 6 mm",
     "ESG Float bronz/šedý 6mm": "Float sklo 6 mm",
+    "ESG Float čirý 4mm": "ESG kalené 4 mm",
     "ESG Float čirý 6mm": "ESG kalené 6 mm",
     "ESG Stopsol Classic Clear 6mm": "ESG kalené 6 mm",
     "Float bronz/šedý 6mm": "Float sklo 6 mm",
+    "Float čirý 4mm": "Float sklo 4 mm",
     "Float čirý 6mm": "Float sklo 6 mm",
     "IZOS DOUBLE 3.3.1-6-4 (VSG)": "Izolačné sklo 4/8/4 číre",
     "IZOS DOUBLE 4-16-4 AL": "Izolačné sklo 4/16/4 číre",
@@ -46,9 +48,11 @@ exports[`#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky > výpočtové skl
   "Štandard +": {
     "Drôtené sklo 6mm": "Float sklo 6 mm",
     "ESG Float bronz/šedý 6mm": "Float sklo 6 mm",
+    "ESG Float čirý 4mm": "ESG kalené 4 mm",
     "ESG Float čirý 6mm": "ESG kalené 6 mm",
     "ESG Stopsol Classic Clear 6mm": "ESG kalené 6 mm",
     "Float bronz/šedý 6mm": "Float sklo 6 mm",
+    "Float čirý 4mm": "Float sklo 4 mm",
     "Float čirý 6mm": "Float sklo 6 mm",
     "IZOS DOUBLE 3.3.1-6-4 (VSG)": "Izolačné sklo 4/8/4 číre",
     "IZOS DOUBLE 4-16-4 AL": "Izolačné sklo 4/16/4 číre",
