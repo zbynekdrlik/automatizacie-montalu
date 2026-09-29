@@ -1,19 +1,19 @@
-// #587: migration v52 → v53 (hlavička; fixture z v51 prejde aj v52 #579) — poloha zámkového otvoru na riadku objednávky skla
-// (`otvor_od_hrany_mm`, `otvor_od_spodku_mm`, `otvor_priemer_mm`, všetky nullable REAL) → PDF výkres
-// pre IZOS. Postav DB v stave v51 (base tabuľky + objednavka_skla s v49 stĺpcami + v51 tabuľka) →
-// import db.ts spustí v52. Aditívne ADD COLUMN — existujúce riadky dostanú NULL (honest-null).
+// #593 (Odoo úloha 1214, Marek 29.9.: „tu maju byt skla v clip 6mm a 16mm"): migrácia v54 → v55
+// doplní povolené hrúbky Odoo skiel pre CLIP zábradlie do `cfg_sklo_hrubka` — 6 mm jednoduché
+// (šablóna klasika) a 16 mm izolačné (šablóna IZO). LEN chýbajúce riadky (INSERT OR IGNORE);
+// ostatné systémy bez zmeny. Money-NEUTRÁLNE (mení sa len ponuka výplne na /clip).
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v53-test-'));
-const dbPath = path.join(tmpRoot, 'v51.db');
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v55-test-'));
+const dbPath = path.join(tmpRoot, 'v54.db');
 
 {
-	const v51 = new Database(dbPath);
-	v51.exec(`
+	const v54 = new Database(dbPath);
+	v54.exec(`
 		CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), role TEXT NOT NULL DEFAULT 'internal');
 		CREATE TABLE cfg_sys (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL UNIQUE, n INTEGER NOT NULL, sklo_offset REAL NOT NULL);
 		CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL DEFAULT '', dim TEXT NOT NULL DEFAULT 'S', koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks INTEGER NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500, sklo_hrubka INTEGER NOT NULL DEFAULT 0);
@@ -52,61 +52,98 @@ const dbPath = path.join(tmpRoot, 'v51.db');
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
 			created_by TEXT NOT NULL DEFAULT '',
 			typ_skla_manual TEXT,
-			cena_m2_manual REAL
+			cena_m2_manual REAL,
+			otvor_od_hrany_mm REAL,
+			otvor_od_spodku_mm REAL,
+			otvor_priemer_mm REAL
 		);
 		INSERT INTO objednavka_skla (zak, zak_norm, modul, popis, sirka_mm, vyska_mm, pocet, typ_skla, spec_holes_qty, spec_hole_size, created_by)
 			VALUES ('ZAK-V52', 'ZAKV52', 'zasklenia', 'Zasklenie 1 — s otvorom ⌀46', 1004, 1914, 2, 'Float kalené 10 mm', 1, 'd50', 'test');
 		CREATE TABLE objednavka_skla_odoslanie (zak_norm TEXT PRIMARY KEY, glass_order_id INTEGER NOT NULL CHECK (glass_order_id > 0), name TEXT NOT NULL DEFAULT '', odoslane_at TEXT NOT NULL DEFAULT (datetime('now')), odoslal TEXT NOT NULL DEFAULT '');
-		PRAGMA user_version = 51;
+		CREATE TABLE cfg_sklo_hrubka (
+			id INTEGER PRIMARY KEY,
+			system TEXT NOT NULL,
+			mm REAL NOT NULL CHECK (mm > 0),
+			druh TEXT NOT NULL CHECK (druh IN ('izolacne', 'jednoduche', 'esg')),
+			UNIQUE (system, mm)
+		);
+		-- stav PROD po v54 + (fiktívny) CLIP riadok, ktorý už existuje s iným druhom → v55 ho NESMIE
+		-- prepísať ani zdvojiť (INSERT OR IGNORE na UNIQUE(system, mm))
+		INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES
+			('Robust', 24, 'izolacne'),
+			('Štandard +', 6, 'jednoduche'), ('Štandard +', 16, 'izolacne'), ('Štandard +', 24, 'izolacne'),
+			('Štandard', 6, 'jednoduche'), ('Štandard', 16, 'izolacne'), ('Štandard', 24, 'izolacne'),
+			('Štandard +', 4, 'jednoduche'), ('Štandard', 4, 'jednoduche'),
+			('Štandard Drevo', 6, 'jednoduche'), ('Štandard Drevo', 16, 'izolacne'), ('Štandard Drevo', 24, 'izolacne');
+		PRAGMA user_version = 54;
 	`);
-	v51.close();
+	v54.close();
 }
 
 process.env.DATABASE_PATH = dbPath;
 await import('../src/lib/server/db');
 
-describe('migration → v53 (poloha otvoru na objednavka_skla, #587)', () => {
-	it('bumpne na v53 a pridá tri nullable stĺpce polohy otvoru', () => {
+const hrubky = (d: Database.Database, system: string) =>
+	(
+		d.prepare('SELECT mm, druh FROM cfg_sklo_hrubka WHERE system = ? ORDER BY id').all(system) as {
+			mm: number;
+			druh: string;
+		}[]
+	).map((r) => `${r.mm}:${r.druh}`);
+
+describe('migration → v55 (CLIP 6 mm jednoduché + 16 mm izolačné, #593)', () => {
+	it('bumpne na v55', () => {
 		const d = new Database(dbPath);
 		expect(d.pragma('user_version', { simple: true })).toBe(55);
-		const cols = d.prepare('PRAGMA table_info(objednavka_skla)').all() as {
-			name: string;
-			type: string;
-			notnull: number;
-		}[];
-		for (const n of ['otvor_od_hrany_mm', 'otvor_od_spodku_mm', 'otvor_priemer_mm']) {
-			const c = cols.find((x) => x.name === n);
-			expect(c, n).toBeDefined();
-			expect(c!.type).toBe('REAL');
-			expect(c!.notnull).toBe(0);
-		}
 		d.close();
 	});
 
-	it('existujúci riadok prežije a má polohu NULL (honest-null — výkres sa negeneruje)', () => {
+	it('CLIP dostane 6 mm jednoduché + 16 mm izolačné na koniec tabuľky', () => {
 		const d = new Database(dbPath);
-		const r = d
-			.prepare(
-				'SELECT popis, spec_holes_qty, otvor_od_hrany_mm, otvor_od_spodku_mm, otvor_priemer_mm FROM objednavka_skla WHERE zak_norm = ?'
-			)
-			.get('ZAKV52') as Record<string, unknown>;
-		expect(r.popis).toBe('Zasklenie 1 — s otvorom ⌀46');
-		expect(r.spec_holes_qty).toBe(1);
-		expect(r.otvor_od_hrany_mm).toBeNull();
-		expect(r.otvor_od_spodku_mm).toBeNull();
-		expect(r.otvor_priemer_mm).toBeNull();
+		expect(hrubky(d, 'CLIP')).toEqual(['6:jednoduche', '16:izolacne']);
+		const posledne = d
+			.prepare('SELECT system FROM cfg_sklo_hrubka ORDER BY id DESC LIMIT 2')
+			.all() as { system: string }[];
+		expect(posledne.map((r) => r.system)).toEqual(['CLIP', 'CLIP']);
 		d.close();
 	});
 
-	it('stĺpce sú zapisovateľné', () => {
+	it('ostatné systémy bez zmeny', () => {
 		const d = new Database(dbPath);
-		d.prepare(
-			'UPDATE objednavka_skla SET otvor_od_hrany_mm = 50, otvor_od_spodku_mm = 1050, otvor_priemer_mm = 46 WHERE zak_norm = ?'
-		).run('ZAKV52');
-		const r = d
-			.prepare('SELECT otvor_od_spodku_mm FROM objednavka_skla WHERE zak_norm = ?')
-			.get('ZAKV52') as { otvor_od_spodku_mm: number };
-		expect(r.otvor_od_spodku_mm).toBe(1050);
+		expect(hrubky(d, 'Štandard')).toEqual([
+			'6:jednoduche',
+			'16:izolacne',
+			'24:izolacne',
+			'4:jednoduche'
+		]);
+		expect(hrubky(d, 'Robust')).toEqual(['24:izolacne']);
+		expect(hrubky(d, 'Štandard Drevo')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
 		d.close();
+	});
+
+	it('existujúci CLIP riadok (systém, mm) sa NEprepíše ani nezdvojí', () => {
+		const d = new Database(dbPath);
+		d.prepare('DELETE FROM cfg_sklo_hrubka WHERE system = ?').run('CLIP');
+		d.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)').run(
+			'CLIP',
+			6,
+			'esg'
+		);
+		d.pragma('user_version = 54');
+		d.close();
+		return import('../src/lib/server/migracie-clip-sklo-hrubky').then(
+			({ migrateClipSkloHrubky }) => {
+				const d2 = new Database(dbPath);
+				migrateClipSkloHrubky(d2, (v) => d2.pragma(`user_version = ${v}`));
+				expect(hrubky(d2, 'CLIP')).toEqual(['6:esg', '16:izolacne']);
+				expect(d2.pragma('user_version', { simple: true })).toBe(55);
+				// druhý beh je no-op (guard >= 55)
+				migrateClipSkloHrubky(d2, () => {
+					throw new Error('nemal bumpnúť');
+				});
+				expect(hrubky(d2, 'CLIP')).toEqual(['6:esg', '16:izolacne']);
+				d2.close();
+			}
+		);
 	});
 });

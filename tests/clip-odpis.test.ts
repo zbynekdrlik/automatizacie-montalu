@@ -189,10 +189,12 @@ describe('clip — Money-bezpečnosť (statické záruky)', () => {
 		expect(src).not.toMatch(/writeOdpis|MONEY_LIVE/);
 	});
 
-	it('route má presne akcie spocitat/upravit/odoslat + multi (#468)', () => {
+	it('route má presne akcie spocitat/upravit/odoslat + multi (#468) + pridatSkla (#593)', () => {
 		expect(Object.keys(clip.actions).sort()).toEqual([
 			'odoslat',
 			'odoslatMulti',
+			'pridatSkla',
+			'pridatSklaMulti',
 			'spocitat',
 			'spocitatMulti',
 			'upravit',
