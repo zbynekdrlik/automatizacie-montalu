@@ -14,7 +14,7 @@ test('rovný fix: jedna výška, výkres bez sklonu a bez uhlov', async ({ page 
 	await page.goto('/fix');
 	await waitHydrated(page);
 
-	await expect(page.getByRole('heading', { name: 'Fixy — pevné zasklenie' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Pevné zasklenie — Fix z appky' })).toBeVisible();
 
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill('E2E-ROVNY');
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
