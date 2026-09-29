@@ -407,7 +407,10 @@ describe('#587 výkres je deterministický (Odoo re-send porovnáva SHA-1 prílo
 
 	it('dátum v metadátach = vytvorenie riadku, nie aktuálny čas', async () => {
 		hodinyNa('2027-01-01T00:00:00Z');
-		const doc = await PDFDocument.load(await generateVykresOtvoruPdf(V));
+		// `updateMetadata: false` — inak by sám `load()` prepísal ModDate/Producer na „teraz"
+		const doc = await PDFDocument.load(await generateVykresOtvoruPdf(V), {
+			updateMetadata: false
+		});
 		const riadok = new Date('2026-09-28T10:00:00Z').getTime();
 		expect(doc.getCreationDate()?.getTime()).toBe(riadok);
 		expect(doc.getModificationDate()?.getTime()).toBe(riadok);
