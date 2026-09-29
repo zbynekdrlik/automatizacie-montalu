@@ -158,6 +158,19 @@ export async function openTools(page: Page) {
 }
 
 /**
+ * #592: „Pevné zasklenie" (Fix z appky / Fix z CADu / Zábradlia (CLIP)) je vnorený dropdown v
+ * primárnej lište (desktop). Rovnako ako `openUserMenu`: summary klik PREPÍNA (#583), takže otvor
+ * len zatvorené menu a najprv počkaj na hydratáciu.
+ */
+export async function openPevneZasklenie(page: Page) {
+	await waitHydrated(page);
+	const menu = page.locator('details.nav-pevne');
+	if ((await menu.getAttribute('open')) === null)
+		await page.getByTestId('pevne-menu-toggle').click();
+	await expect(menu).toHaveAttribute('open', '');
+}
+
+/**
  * #392: „Odhlásiť" presunuté do user menu — otvor ho, klikni, počkaj na /login.
  * Nahrádza predošlé priame `page.getByRole('button', { name: 'Odhlásiť' }).click()`.
  */

@@ -615,7 +615,9 @@ deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-r
   nainštalovaný `~/.cache/ms-playwright/chromium_headless_shell-<iná>/chrome-headless-shell-linux64/
   chrome-headless-shell` (cez `os.homedir()`), nič nesťahovať. Config aj `test-results/` po behu
   zmaž — necommitovať. Prvý test na ešte neskompilovanú route môže v dev móde timeoutnúť (on-demand
-  kompilácia) → rerun, nie bug.
+  kompilácia) → rerun, nie bug. Pri #592 (zmena len nav/nadpisov) padli pod `vite dev`
+  aj `app.spec.ts` „editor vzorcov…" (v celom súbore; samostatne prejde) a `fix-cad.spec.ts`
+  „#462 … ✏️" — formulárové toky citlivé na dev-mode hydratáciu; rozhoduje CI preview beh.
 - **Cesta k binárke sa líši podľa verzie Chromia a cache sa mení pod rukami** (#583: 1244 zmizlo
   počas behu, ostalo 1193): 12xx = `chromium_headless_shell-<v>/chrome-headless-shell-linux64/
   chrome-headless-shell`, 1193 = `chromium_headless_shell-1193/chrome-linux/headless_shell`. Pred

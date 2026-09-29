@@ -770,6 +770,24 @@ nav.top .nav-dropdown-menu a.active {
 	background: var(--m-accent-soft);
 	color: var(--m-ink);
 }
+/* #592: „Pevné zasklenie" ako podsekcia v dropdowne „Moduly" (pod 900px) — nadpis skupiny
+   + jej tri voľby mierne odsadené (na desktope je to vnorený .nav-dropdown .nav-pevne) */
+nav.top .nav-subgroup {
+	display: flex;
+	flex-direction: column;
+}
+nav.top .nav-subgroup-title {
+	padding: 8px 10px 2px;
+	color: var(--m-muted);
+	font-family: var(--m-font-display);
+	font-size: 12.5px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+nav.top .nav-dropdown-menu .nav-subgroup a {
+	padding-left: 20px;
+}
 /* user menu trigger — nahradil pôvodný statický .user span (#392) */
 nav.top .nav-user summary {
 	font-size: 14.5px;

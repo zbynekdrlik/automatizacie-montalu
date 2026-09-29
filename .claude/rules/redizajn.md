@@ -295,11 +295,22 @@ ak pribudne ďalší dropdown/menu:
   `{ href: RouteId; label: string }[]` — `resolve()`'s overloaded signatúra zlyhá proti
   celej `RouteId` únii (detaily + fix v `.claude/rules/lint-formatting.md`).
 - **Light-dismiss (klik mimo / Escape) natívny `<details>` NEDÁVA zadarmo** — treba
-  `<svelte:window onclick/onkeydown>` (~6 riadkov, žiadna knižnica); klik VNÚTRI
-  `.nav-dropdown` sa musí vynechať (`e.target.closest('details.nav-dropdown')`), inak
-  sa natívny toggle na `<summary>` a tvoj listener pobijú.
+  `<svelte:window onclick/onkeydown>` (~6 riadkov, žiadna knižnica); dropdown, ktorý klik
+  OBSAHUJE, sa musí vynechať (`el.contains(e.target)`), inak sa natívny toggle na
+  `<summary>` a tvoj listener pobijú. Od #592 sa zatvárajú všetky OSTATNÉ refs (nie „klik
+  do akéhokoľvek `.nav-dropdown` = nič") — otvorenie jedného menu zavrie súrodenca, dve
+  menu sa neprekrývajú. Nový dropdown = pridaj jeho ref do jediného zoznamu v `zavriMenu(okrem)`.
 - **Zatváranie po SPA navigácii**: `afterNavigate` z `$app/navigation` (nie ručný
   `$effect` na `page.url.pathname`) — root layout sa pri route zmene neremountuje,
   takže `<details open>` by inak ostalo nastavené aj po kliku na odkaz vnútri.
 - **`▾` glyf patrí do `<span aria-hidden="true">`**, nie priamo do textu triggera —
   inak si accessible name („Moduly ▾") nesie aj názov glyfu pre screen reader.
+- **Vnorená skupina v primárnej lište (#592 „Pevné zasklenie")** — `moduleLinks` nesie
+  namiesto odkazu ZNAČKOVÝ člen (`{ skupina: 'pevne' }`); `navLinks(list, vMenu)` ho na
+  desktope renderuje ako vnorený `<details class="nav-dropdown nav-pevne">` (testid
+  `pevne-menu-toggle`, ref `pevneEl` v `zavriMenu`), vo vnútri dropdown menu (Moduly pod
+  900px) ako podsekciu s nadpisom (`.nav-subgroup`, testid `modules-pevne-nadpis`) — NIKDY
+  `<details>` v `<details>` v mobilnom menu. Voľby + aktívny stav celej vetvy (`/fix*`,
+  `/clip*`) žijú v `$lib/nav-pevne-zasklenie.ts` (unit test). Ďalší typ pevného zasklenia =
+  riadok v `PEVNE_ZASKLENIE_LINKS`. E2E: `openPevneZasklenie(page)` (otvára len zatvorené) a
+  voľby hľadaj v `nav.top` s `exact: true` — karty `FixModeNav` nesú podobný text.
