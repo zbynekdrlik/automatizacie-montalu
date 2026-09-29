@@ -50,17 +50,6 @@ export const E2E_USER = process.env.E2E_USER || 'e2e';
 export const E2E_PASS = process.env.E2E_PASS || 'e2e-heslo-123';
 
 /**
- * #556 hotfix: HOLÝ názov skla z `<option>` textu. Nárezák `<option>` má `value` = holý lokálny
- * názov, ale TEXT nesie Odoo enrichment sufix „ · cenník: <Odoo name>" — a to LEN keď je Odoo
- * dostupné (PROD/post-deploy), nie v CI `test` jobe. Testy overujú MNOŽINU skiel (nie sufix), tak
- * porovnávajú `option.textContent` cez tento helper. Jediné miesto, kde sa sufix strippuje — platí
- * pre každý budúci Odoo enrichment popiskov v selecte. Bez sufixu vráti text nezmenený (len trim).
- */
-export function bareSkloLabel(text: string): string {
-	return text.split(' · cenník:')[0]!.trim();
-}
-
-/**
  * #579: selektor LOKÁLNYCH (výpočtových) volieb selectu „Sklo (základ)". Na PROD (Odoo dostupné)
  * select navyše ponúka Odoo typy skla podľa hrúbky systému (`value` s prefixom `odoo:`, skupiny
  * „Odoo — …"); v CI preview bez Odoo ich niet. Testy MNOŽINY lokálnej ponuky (allow-list #573,
@@ -78,11 +67,16 @@ export const LOKALNE_SKLA = 'option:not([value^="odoo:"])';
 
 const INE_SKLO = 'Iné (vlastná skladba)';
 
-/** Hodnota voľby, ktorá sa počíta sklom `sklo` (lokálna voľba toho mena, inak PRVÁ Odoo voľba). */
+/** Hodnota voľby, ktorá sa počíta sklom `sklo`: lokálna voľba toho mena, inak PRVÝ presný Odoo
+ *  náprotivok (`data-naprotivok`, ako predvolené sklo appky), inak prvá Odoo voľba s tým výpočtom. */
 async function hodnotaSkla(select: Locator, sklo: string): Promise<string | null> {
 	return select.evaluate((el, sk) => {
 		const opts = [...(el as HTMLSelectElement).options];
-		const o = opts.find((x) => x.value === sk) ?? opts.find((x) => x.dataset.vypocet === sk);
+		const pocita = opts.filter((x) => x.dataset.vypocet === sk);
+		const o =
+			opts.find((x) => x.value === sk) ??
+			pocita.find((x) => x.dataset.naprotivok === 'true') ??
+			pocita[0];
 		return o?.value ?? null;
 	}, sklo);
 }

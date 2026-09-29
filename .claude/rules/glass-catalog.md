@@ -259,8 +259,8 @@ Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klas
   kľúčovaný POŽADOVANÝM systémom (`'Štandard +'` vs `'Štandard'`) — ich ponuky sa teda líšia.
 - Názvy v zozname musia byť riadky katalógu systému (`arrayContaining` test — preklep padne);
   prázdne sklo parseVstup allow-listom neodmieta (hlási ho výpočet).
-- E2E „žiadna voľba nemá `viac typov`" je v CI (preview bez Odoo) vákuová — `cennikPopis` je tam
-  vždy `''`; skutočne ju kryje unit `tests/glass-match.test.ts` (a post-deploy beh proti PROD).
+- E2E „žiadna voľba nemá `viac typov`" je pri #594 len poistka (nárezák popis „· cenník:" už nemá —
+  `cennikPopis` bol zmazaný, lokálne voľby pri Odoo nie sú).
 - Fixtúry testov/E2E so sklom mimo zoznamu (placeholder `'X'`, Robust „Izolačné 4/16/4 číre" bez
   „sklo", Štandard + Float 4 mm, trieda 4) sa pri rozšírení zoznamu musia prepísať na povolené.
 
@@ -370,7 +370,7 @@ zloženie, a FORMÁT zloženia sa líši (Odoo „4/8/4" lomítka vs appka „4-
 - **Os ODTIEŇA (`glassTint`, #556 hotfix).** Bez odtieňa by sa „Izolačné sklo 4/8/4 mliečne"
   spárovalo na „Izolačné sklo 4/8/4- číre" → do objednávky u dodávateľa by šlo NESPRÁVNE SKLO (PROD
   incident, main run 35514443000). `glassTint(name)` → `cire` (default, aj „číre"/„clear"/bez
-  tokenu) | `extracire` (#594: „extračir"/„extra čir"/„extra clear" — low-iron, NIKDY nie číre) |
+  tokenu) | `extracire` (#594: „extračir"/„extra čír"/„extra-clear" … — low-iron, NIKDY nie číre) |
   `mliecne` („mlieč"/„satin"/„matn"/„matelux" #594) | `bronz` | `seda` („šed"/„grey"/„gray") | `grafit`.
   **Pasca:** Odoo názvy nesú „čirý" aj pri ne-čírych sklách („ESG Matelux čirý 10mm", „ESG Float
   extračirý 10mm") — bez #594 tokenov malo „Float kalené 10 mm" troch kandidátov (úloha 1219).
@@ -387,12 +387,10 @@ zloženie, a FORMÁT zloženia sa líši (Odoo „4/8/4" lomítka vs appka „4-
   bez kandidáta honest null. **Pasca pri novom povlaku / reflexnom skle v Odoo** (napr. low-E,
   „Planibel", „Sunergy"): pridaj ho do `glassPovlak` + vektor do `tests/glass-match.test.ts` — token,
   ktorý matcher nepozná, sa páruje ako BEZ povlaku = na číre sklo.
-- `cennikPopis` pri „viac" → **`''` (bez popisu)** (#573, Palo 25.9. — predtým #556 „viac typov
-  (N)"), NIKDY meno prvého kandidáta — pri odtieňoch by ukázalo zavádzajúci názov iného odtieňa;
-  operátor rozhodne na podklade.
-- `naviazanieRiadku(typSkla, odooTypy, source)` a `cennikPopis(typSkla, odooTypy, source)` — GATOVANÉ
-  na `source==='odoo'`: pri lokálnom fallbacku (Odoo nedostupné) sa NIČ nenaväzuje (bez Odoo dát niet
-  na čo) a nárezák nemá popis.
+- (`cennikPopis` — nárezák popis „· cenník: <Odoo name>" pri jednoznačnej zhode, „" pri „viac" —
+  ZMAZANÝ v #594: nárezák pri Odoo ponúka priamo Odoo typy, popis lokálneho skla nemá kto zobraziť.)
+- `naviazanieRiadku(typSkla, odooTypy, source)` — GATOVANÉ na `source==='odoo'`: pri lokálnom
+  fallbacku (Odoo nedostupné) sa NIČ nenaväzuje (bez Odoo dát niet na čo).
 
 Kotva na `fetchGlassTypes`: **`GlassTypeOption` nesie aj surové `name` + `composition`** (nielen
 `value`/`label`/`category`) — matcher aj nárezák popis čítajú z tej ISTEJ cache, žiadny druhý zdroj
@@ -404,20 +402,16 @@ Podklad `/objednavka-skla/[zak]`: riadok, ktorého `typSkla` nie je platná Odoo
 manuál „iné sklo"), dostane badge **„nepriradené — vyber typ"** + kandidátov navrchu pickera
 (`load` počíta `naviazanie: Record<id, {nepriradene, kandidati}>`). Nárezák `zasklenia` select
 ukazoval pri lokálnom skle „· cenník: <Odoo name>" — **od #594 NIE** (pri Odoo ponuke lokálne sklá
-nie sú, pri zálohe bez Odoo niet čo popísať); `cennikPopis` ostáva pre ďalších volajúcich. FIX nemá select typu skla (jedno `name="sklo"` hidden),
+nie sú, pri zálohe bez Odoo niet čo popísať; `cennikPopis` zmazaný). FIX nemá select typu skla (jedno `name="sklo"` hidden),
 pergola honest-null formulár už používa priamo Odoo picker → popis v selecte dáva zmysel len v
 zaskleniach. **Money-NEUTRÁLNE, bez migrácie** — výpočtový `glass_types`, hrúbky, profily, Money kódy
 NEDOTKNUTÉ. Pri rozšírení na ďalší producent: `await priradOdooTypy(...)` pred insertom + vitest.
 
-**E2E a Odoo-obohatený sufix (`bareSkloLabel`, #556 hotfix).** Nárezák `<option>` skla nesie
-`value` = HOLÝ lokálny názov, ale TEXT = „<názov> · cenník: <Odoo name>" — a to LEN keď je Odoo
-dostupné (PROD/post-deploy), nie v CI `test` jobe (bez Odoo). E2E, ktoré čítajú `option.textContent`
-a porovnávajú MNOŽINU skiel (nie sufix), preto MUSIA strippnúť sufix cez `e2e/helpers.ts`
-`bareSkloLabel(text)` = text pred „ · cenník:" (trim). Je to JEDINÉ miesto, kde sa sufix strippuje;
-platí pre každý budúci Odoo enrichment popiskov v selecte (inak test zelený lokálne / CI, ale padne
-v post-deploy proti PROD). Sufix samotný je ZÁMERNÉ #556 správanie — testy overujú množinu skiel.
-**#594:** nárezák sufix „· cenník:" už nemá (lokálne voľby pri Odoo nie sú) — `bareSkloLabel` ostáva
-len pre prípadné iné selecty; nárezák specy používajú `ponukaSkla`/`vyberSklo` (sekcia #579 nižšie).
+**E2E a Odoo-obohatený sufix (#556 hotfix → #594).** Nárezák `<option>` mal na PROD text
+„<názov> · cenník: <Odoo name>" a E2E ho strippovali helperom `bareSkloLabel`. #594 sufix aj helper
+ZMAZAL — nárezák specy čítajú ponuku ako výpočtové sklá (`ponukaSkla`/`vyberSklo`, sekcia #579 nižšie).
+Pasca ostáva všeobecná: akýkoľvek Odoo enrichment textu voľby je v CI (bez Odoo) neviditeľný —
+testuj `value`/`data-*`, nie text.
 
 ## Odoo sklá v ponuke nárezáka podľa HRÚBKY systému (#579, 28.9.2026)
 
@@ -513,8 +507,9 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   NEvyplní (plán ukáže lokálne sklo, nie holý kód).
 - **E2E:** CI nemá Odoo → fallback vetva; post-deploy PROD → Odoo vetva (`e2e/sklo-odoo-579.spec.ts`
   pokrýva obe, relačne). **Od #594 každý spec vyberá/overuje sklo nárezáku cez helpery
-  `e2e/helpers.ts`:** `vyberSklo(select, sklo)` (voľba s `value===sklo`, inak PRVÁ s
-  `data-vypocet===sklo`; bez takej PADNE), `expectSklo(select, sklo)` (výpočtové sklo zvolenej
+  `e2e/helpers.ts`:** `vyberSklo(select, sklo)` (voľba s `value===sklo`, inak prvý presný náprotivok
+  `data-naprotivok="true"` s `data-vypocet===sklo` — ako predvolené sklo appky —, inak prvá s tým
+  výpočtom; bez takej PADNE), `expectSklo(select, sklo)` (výpočtové sklo zvolenej
   voľby), `vypocetSkla(select)`, `ponukaSkla(select)` → `{ odoo, vypocty }` a
   `overPonukuSkla(p, ocakavane)` (bez Odoo PRESNE allow-list, s Odoo neprázdna PODMNOŽINA). NIKDY
   `selectOption('<lokálny názov>')` / `toHaveValue('<lokálny názov>')` na `#sklo`/`#psN-sklo` —

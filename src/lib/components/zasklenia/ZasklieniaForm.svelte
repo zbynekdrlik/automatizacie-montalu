@@ -211,13 +211,17 @@
 	{#each sk as g (g.label)}
 		{#if g.label}
 			<optgroup label={g.label}>
-				{#each g.items as o (o.value)}<option value={o.value} data-vypocet={o.vypocet}
-						>{o.label}</option
+				{#each g.items as o (o.value)}<option
+						value={o.value}
+						data-vypocet={o.vypocet}
+						data-naprotivok={o.naprotivok}>{o.label}</option
 					>{/each}
 			</optgroup>
 		{:else}
-			{#each g.items as o (o.value)}<option value={o.value} data-vypocet={o.vypocet}
-					>{o.label}</option
+			{#each g.items as o (o.value)}<option
+					value={o.value}
+					data-vypocet={o.vypocet}
+					data-naprotivok={o.naprotivok}>{o.label}</option
 				>{/each}
 		{/if}
 	{/each}

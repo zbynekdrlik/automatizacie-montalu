@@ -25,8 +25,8 @@ export type GlassTint = 'cire' | 'extracire' | 'mliecne' | 'bronz' | 'seda' | 'g
 
 /**
  * Režim osi odtieňa. `'presne'` (default) = plná os vrátane #594 tokenov (extračiré, Matelux) —
- * objednávka, cenníkový popis, podklad. `'vypoctovy'` = os spred #594 (extračiré aj Matelux ako
- * číre) LEN pre voľbu VÝPOČTOVÉHO skla Odoo voľby (`sklo-odoo.ts`): výpočet tieto odtiene
+ * objednávka, podklad, predvolená voľba (`naprotivok`). `'vypoctovy'` = os spred #594 (extračiré
+ * aj Matelux ako číre) LEN pre voľbu VÝPOČTOVÉHO skla Odoo voľby (`sklo-odoo.ts`): výpočet odtiene
  * nerozlišuje, a bez toho by sa napr. „ESG Matelux čirý 6mm" počítalo ako NEkalené Float 6 mm
  * (iný Money odpis) namiesto doterajšieho „ESG kalené 6 mm". Money-neutralita by konštrukcie.
  */
@@ -134,7 +134,7 @@ function tintTokens(nazov: string, rezim: OdtienRezim = 'presne'): GlassTint[] {
 	const t = (nazov ?? '').toLowerCase();
 	const out: GlassTint[] = [];
 	const rozsirene = rezim === 'presne';
-	if (rozsirene && /extra\s*(?:čir|clear)/.test(t)) out.push('extracire');
+	if (rozsirene && /extra[\s-]*(?:čir|čír|clear)/.test(t)) out.push('extracire');
 	if (
 		t.includes('mlieč') ||
 		t.includes('satin') ||
@@ -216,23 +216,4 @@ export function naviazanieRiadku<T extends OdooTypLike>(
 	if (odooTypy.some((t) => t.value === typSkla)) return { nepriradene: false, kandidati: [] };
 	const m = matchOdooGlassType(typSkla, odooTypy);
 	return { nepriradene: true, kandidati: m.kandidati };
-}
-
-/**
- * Nárezák — cenníkový popis pre lokálne sklo („· cenník: <Odoo name>"). Jednoznačné → Odoo name;
- * viac → „" (#573 — klient nechce príponu „viac typov (N)"; a NIKDY meno prvého kandidáta, #556,
- * lebo pri odtieňoch by ukázalo zavádzajúci názov iného odtieňa); žiadna zhoda alebo lokálny
- * fallback → „" (bez popisu).
- */
-export function cennikPopis(
-	typSkla: string,
-	odooTypy: OdooTypLike[],
-	source: 'odoo' | 'local'
-): string {
-	if (source !== 'odoo' || !typSkla) return '';
-	const m = matchOdooGlassType(typSkla, odooTypy);
-	if (m.istota === 'jednoznacne' && m.typ) return m.typ.name;
-	// viac kandidátov → bez popisu (#573, Palo 25.9.: žiadna prípona „viac typov (N)"; meno
-	// prvého kandidáta nikdy — pri odtieňoch zavádzajúce, #556); operátor rozhodne na podklade
-	return '';
 }
