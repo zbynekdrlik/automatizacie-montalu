@@ -2,7 +2,8 @@
 // ktoré systém reálne používa — JEDEN zdroj pravdy `POVOLENE_SKLA` (`$lib/sklo-povolene`):
 //   Deluxe        6 mm a 10 mm, predvolené 10 mm
 //   Robust        LEN skladby 24 mm (4/16/4 číre, mliečne) — žiadne 3.3.1/3.3.2/4/6 mm
-//   Štandard plus IZO 16 (izolačné), 6 mm, 3.3.1 — NIE Float 4 mm (ani pri 3K), NIE 10 mm
+//   Štandard plus IZO 16 (izolačné), 6 mm, 3.3.1, Float 4 mm (#579: výnimka Patrik 28.9. —
+//                 „pri štandardoch môže byť aj 4mm sklo"; predvolené ostáva 6 mm), NIE 10 mm
 //   starý Štandard 6 mm, 3.3.1 — BEZ ZMENY (celý zdieľaný katalóg ako doteraz)
 // Katalóg `glass_types` sa NEMENÍ (Money-neutrálne, staré odpisy sa dajú prepočítať — #570);
 // allow-list filtruje len PONUKU a NOVÝ vstup z formulára (parseVstup/parseMultiVstup/znova).
@@ -15,6 +16,7 @@ import { defaultSklo, SKLO_INE, SKLO_TRIEDY } from '../src/lib/sklo';
 import {
 	POVOLENE_SKLA,
 	filtrujPovoleneSkla,
+	predvoleneSklo,
 	ponukaSkielSystemu,
 	skloPovolene,
 	povoleneTriedyIne
@@ -45,17 +47,34 @@ describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
 		expect(defaultSklo(p, 'Robust')).toBe('Izolačné sklo 4/16/4 číre');
 	});
 
-	it('Štandard plus 3K: bez Float 4 mm a bez 10 mm; IZO 16, 6 mm a 3.3.1 áno', () => {
+	it('Štandard plus 3K: Float 4 mm áno (#579), bez 10 mm; IZO 16, 6 mm a 3.3.1 áno', () => {
 		const p = ponuka('Štandard +', '3K');
-		expect(p).not.toContain('Float sklo 4 mm');
-		expect(p.filter((g) => /\b4 mm\b/.test(g))).toEqual([]);
+		// #579 (Patrik, Odoo úloha 1193, 28.9.): novšie vyjadrenie výroby — 4 mm sklo pri Štandardoch
+		// áno; nahrádza vylúčenie Float 4 mm z meetingu 25.9. (#573, scr_017)
+		expect(p.filter((g) => /\b4 mm\b/.test(g))).toEqual(['Float sklo 4 mm']);
 		expect(p.filter((g) => /10 mm/.test(g))).toEqual([]);
 		expect(p).toContain('Float sklo 6 mm');
 		expect(p).toContain('3.3.1');
 		expect(p).toContain('Izolačné sklo 4/16/4 číre');
 		expect(p.filter((g) => /3\.3\.2/.test(g))).toEqual([]);
-		// predvolené už NIE je Float 4 mm (scr_017) — prvé neizolačné povolené = 6 mm
-		expect(defaultSklo(p, 'Štandard +')).toBe('Float sklo 6 mm');
+		// predvolené ostáva 6 mm — 4 mm je výnimka na výber, nie predvoľba (katalóg má Float 4 mm
+		// PRED 6 mm, takže bez explicitnej predvoľby by default skočil na 4 mm)
+		expect(predvoleneSklo(p, 'Štandard +')).toBe('Float sklo 6 mm');
+	});
+
+	it('predvoleneSklo: bez predvoľby v POVOLENE_SKLA = defaultSklo (ostatné systémy bez zmeny)', () => {
+		for (const [sys, styl] of [
+			['Deluxe', '3K'],
+			['Robust', '3K'],
+			['Štandard', '3K'],
+			['Slide', '3K']
+		] as const) {
+			if (!existuje(`${sys} ${styl}`)) continue;
+			const p = ponuka(sys, styl);
+			expect(predvoleneSklo(p, sys), sys).toBe(defaultSklo(p, sys));
+		}
+		// predvoľba mimo ponuky (napr. štýl ju nemá) → graceful fallback na defaultSklo
+		expect(predvoleneSklo(['Float sklo 4 mm'], 'Štandard +')).toBe('Float sklo 4 mm');
 	});
 
 	it('každý názov v POVOLENE_SKLA je riadok katalógu systému (preklep = padne)', () => {
@@ -142,9 +161,9 @@ describe('#573 serverová validácia — sklo mimo allow-listu systému sa odmie
 			expect(parseVstup(fd({ ...zaklad, sklo })).error).toBe(CHYBA_SKLA);
 	});
 
-	it('Štandard plus Float 4 mm / ESG 10 mm → chyba; Float 6 mm prejde', () => {
+	it('Štandard plus ESG 10 mm → chyba; Float 6 mm aj Float 4 mm (#579) prejde', () => {
 		const sp = { ...zaklad, system: 'Štandard +', styl: '3K' };
-		expect(parseVstup(fd({ ...sp, sklo: 'Float sklo 4 mm' })).error).toBe(CHYBA_SKLA);
+		expect(parseVstup(fd({ ...sp, sklo: 'Float sklo 4 mm' })).error).toBeNull();
 		expect(parseVstup(fd({ ...sp, sklo: 'ESG kalené 10 mm' })).error).toBe(CHYBA_SKLA);
 		expect(parseVstup(fd({ ...sp, sklo: 'Float sklo 6 mm' })).error).toBeNull();
 	});

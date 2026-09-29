@@ -31,14 +31,15 @@ test('Robust ponúka LEN skladby 4/16/4 číre a mliečne (#573)', async ({ page
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('Štandard plus 3K neponúka Float 4 mm ani 10 mm; predvolené je 6 mm (#573)', async ({
+test('Štandard plus 3K ponúka Float 4 mm (#579), nie 10 mm; predvolené je 6 mm (#573)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	const skla = await ponuka(page, 'Štandard +', '3K');
-	expect(skla).not.toContain('Float sklo 4 mm');
-	expect(skla.filter((s) => /\b4 mm\b/.test(s) || /10 mm/.test(s))).toEqual([]);
+	// #579 (Patrik 28.9.): 4 mm sklo pri Štandardoch áno — výnimka, predvolené ostáva 6 mm
+	expect(skla.filter((s) => /\b4 mm\b/.test(s))).toEqual(['Float sklo 4 mm']);
+	expect(skla.filter((s) => /10 mm/.test(s))).toEqual([]);
 	expect(skla).toContain('Float sklo 6 mm');
 	expect(skla).toContain('3.3.1');
 	expect(skla.some((s) => /^Izolačné sklo 4\/16\/4/.test(s))).toBe(true);

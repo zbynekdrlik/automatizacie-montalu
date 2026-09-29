@@ -56,8 +56,10 @@ describe('#579/2 seed = dnešná tabuľka (migrácia)', () => {
 		expect(mm('Robust')).toEqual(['24:izolacne']);
 		expect(mm('Slide')).toEqual(['16:izolacne', '6:jednoduche']);
 		expect(mm('Deluxe')).toEqual(['6:esg', '10:esg']);
-		for (const s of ['Štandard +', 'Štandard', 'Štandard Drevo'])
-			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
+		// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché; Drevostavby bez zmeny
+		for (const s of ['Štandard +', 'Štandard'])
+			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne', '4:jednoduche']);
+		expect(mm('Štandard Drevo')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
 		expect(skloHrubkyPre('Neznámy')).toEqual([]);
 	});
 
@@ -81,7 +83,9 @@ describe('#579/2 odvodenie výpočtového skla (nikdy sa nezadáva)', () => {
 			cakane[s] = {
 				'6:jednoduche': 'Float sklo 6 mm',
 				'16:izolacne': 'Izolačné sklo 4/8/4 číre',
-				'24:izolacne': 'Izolačné sklo 4/16/4 číre'
+				'24:izolacne': 'Izolačné sklo 4/16/4 číre',
+				// #579: 4 mm jednoduché sa počíta ako katalógové Float sklo 4 mm (vlastné Money kódy)
+				'4:jednoduche': 'Float sklo 4 mm'
 			};
 		for (const [s, rows] of Object.entries(ODOO_HRUBKY_SEED))
 			for (const r of rows)
@@ -94,13 +98,17 @@ describe('#579/2 odvodenie výpočtového skla (nikdy sa nezadáva)', () => {
 		// Robust nemá 4/8/4 (16 mm) ani jednosklá
 		expect(vypocetneSkloPre(16, 'izolacne', lokalne('Robust'))).toBeNull();
 		expect(vypocetneSkloPre(6, 'jednoduche', lokalne('Robust'))).toBeNull();
-		// Štandard + nemá 4 mm (scr_017) ani 10 mm (#504)
-		expect(vypocetneSkloPre(4, 'jednoduche', lokalne('Štandard +'))).toBeNull();
+		// Štandard + nemá 10 mm (#504); 4 mm od #579 áno (test nižšie)
 		expect(vypocetneSkloPre(10, 'jednoduche', lokalne('Štandard +'))).toBeNull();
 		// Deluxe len kalené
 		expect(vypocetneSkloPre(6, 'jednoduche', lokalne('Deluxe'))).toBeNull();
 		// trojsklo 44 mm nemá lokálne výpočtové sklo nikde
 		expect(vypocetneSkloPre(44, 'izolacne', lokalne('Štandard +'))).toBeNull();
+	});
+
+	it('#579: 4 mm jednoduché → Float sklo 4 mm v Štandard + aj starom Štandarde', () => {
+		for (const s of ['Štandard +', 'Štandard'])
+			expect(vypocetneSkloPre(4, 'jednoduche', lokalne(s)), s).toBe('Float sklo 4 mm');
 	});
 
 	it('nové kombinácie odvodené pravidlom: Slide 24 izolačné, Štandard + 6 kalené, Slide 10 jednoduché', () => {
