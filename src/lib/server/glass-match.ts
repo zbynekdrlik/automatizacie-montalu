@@ -19,8 +19,18 @@ export type GlassIstota = 'jednoznacne' | 'viac' | 'ziadne';
 /** Kategória skladby (deliaca os párovania popri zložení). */
 export type GlassKategoria = 'izolacne' | 'esg' | 'vsg' | 'float';
 
-/** Odtieň skla (tretia deliaca os párovania — #556 hotfix). `cire` = číre / bez tokenu (default). */
-export type GlassTint = 'cire' | 'mliecne' | 'bronz' | 'seda' | 'grafit';
+/** Odtieň skla (tretia deliaca os párovania — #556 hotfix). `cire` = číre / bez tokenu (default).
+ *  `extracire` (#594) = extra číre / low-iron sklo — iné sklo než číre, NIKDY sa s ním nepáruje. */
+export type GlassTint = 'cire' | 'extracire' | 'mliecne' | 'bronz' | 'seda' | 'grafit';
+
+/**
+ * Režim osi odtieňa. `'presne'` (default) = plná os vrátane #594 tokenov (extračiré, Matelux) —
+ * objednávka, podklad, predvolená voľba (`naprotivok`). `'vypoctovy'` = os spred #594 (extračiré
+ * aj Matelux ako číre) LEN pre voľbu VÝPOČTOVÉHO skla Odoo voľby (`sklo-odoo.ts`): výpočet odtiene
+ * nerozlišuje, a bez toho by sa napr. „ESG Matelux čirý 6mm" počítalo ako NEkalené Float 6 mm
+ * (iný Money odpis) namiesto doterajšieho „ESG kalené 6 mm". Money-neutralita by konštrukcie.
+ */
+export type OdtienRezim = 'presne' | 'vypoctovy';
 
 /**
  * Povlak skla (štvrtá deliaca os — #579 finding 1). `stopsol` = reflexný povlak, `ziadny` =
@@ -114,11 +124,24 @@ function odooKategoria(t: OdooTypLike): GlassKategoria {
  * niesť VIAC odtieňov v názve („bronz/šedý" → [bronz, seda]) — vtedy sa páruje s ktorýmkoľvek z
  * nich a NIKDY s číre. `mlieč`/`satin`/`matn` → mliecne; `bronz`; `šed`/`grey`/`gray` → seda;
  * `grafit`. Číre („číre"/„clear") nie je token — je to prázdny výsledok (default).
+ *
+ * #594 (úloha 1219, PROD katalóg): „extračirý"/„extra čiré"/„extra clear" → `extracire`
+ * (low-iron, NIE číre) a „Matelux" (satinované) → `mliecne` — hoci ich Odoo názvy nesú aj „čirý"
+ * („ESG Matelux čirý 10mm"). Bez nich malo lokálne „Float kalené 10 mm" troch kandidátov.
+ * `rezim: 'vypoctovy'` tieto dva tokeny vypne (pozri `OdtienRezim`).
  */
-function tintTokens(nazov: string): GlassTint[] {
+function tintTokens(nazov: string, rezim: OdtienRezim = 'presne'): GlassTint[] {
 	const t = (nazov ?? '').toLowerCase();
 	const out: GlassTint[] = [];
-	if (t.includes('mlieč') || t.includes('satin') || t.includes('matn')) out.push('mliecne');
+	const rozsirene = rezim === 'presne';
+	if (rozsirene && /extra[\s-]*(?:čir|čír|clear)/.test(t)) out.push('extracire');
+	if (
+		t.includes('mlieč') ||
+		t.includes('satin') ||
+		t.includes('matn') ||
+		(rozsirene && t.includes('matelux'))
+	)
+		out.push('mliecne');
 	if (t.includes('bronz')) out.push('bronz');
 	if (t.includes('šed') || t.includes('grey') || t.includes('gray')) out.push('seda');
 	if (t.includes('grafit')) out.push('grafit');
@@ -129,8 +152,8 @@ function tintTokens(nazov: string): GlassTint[] {
  * Odtieň LOKÁLNEHO skla z jeho voľnotextového názvu — JEDEN odtieň (lokálne názvy nesú práve
  * jeden); bez ne-číreho tokenu → 'cire' (default, aj „číre"/„clear").
  */
-export function glassTint(nazov: string): GlassTint {
-	return tintTokens(nazov)[0] ?? 'cire';
+export function glassTint(nazov: string, rezim: OdtienRezim = 'presne'): GlassTint {
+	return tintTokens(nazov, rezim)[0] ?? 'cire';
 }
 
 /**
@@ -138,8 +161,8 @@ export function glassTint(nazov: string): GlassTint {
  * Lokálne číre sa zhoduje LEN s Odoo typmi bez ne-číreho tokenu; lokálny ne-číry odtieň sa zhoduje
  * s Odoo typom, ktorého názov ten odtieň spomína (aj keď ich je viac).
  */
-function tintMatch(lokTint: GlassTint, odooName: string): boolean {
-	const s = tintTokens(odooName);
+function tintMatch(lokTint: GlassTint, odooName: string, rezim: OdtienRezim): boolean {
+	const s = tintTokens(odooName, rezim);
 	if (lokTint === 'cire') return s.length === 0;
 	return s.includes(lokTint);
 }
@@ -153,23 +176,25 @@ function tintMatch(lokTint: GlassTint, odooName: string): boolean {
  * `povlak: 'ignoruj'` vypne os povlaku — LEN pre voľbu VÝPOČTOVÉHO skla (`sklo-odoo.ts`): povlak
  * mení text objednávky, nie nárez/profily/Money, takže „ESG Stopsol … 6mm" sa počíta ako kalené
  * 6 mm. Objednávka / cenníkový popis / podklad používajú vždy predvolený `'presne'`.
+ * `odtien: 'vypoctovy'` (#594) — os odtieňa spred #594, tiež LEN pre výpočtové sklo (`OdtienRezim`).
  */
 export function matchOdooGlassType<T extends OdooTypLike>(
 	lokalneSklo: string,
 	odooTypy: T[],
-	opts: { povlak?: 'presne' | 'ignoruj' } = {}
+	opts: { povlak?: 'presne' | 'ignoruj'; odtien?: OdtienRezim } = {}
 ): GlassMatch<T> {
 	const povlakPresne = (opts.povlak ?? 'presne') === 'presne';
+	const odtien = opts.odtien ?? 'presne';
 	const lokComp = normalizeComposition(lokalneSklo);
 	const lokKat = localGlassCategory(lokalneSklo);
-	const lokTint = glassTint(lokalneSklo);
+	const lokTint = glassTint(lokalneSklo, odtien);
 	const lokPovlak = glassPovlak(lokalneSklo);
 	if (!lokComp) return { typ: null, istota: 'ziadne', kandidati: [] };
 	const kandidati = odooTypy.filter(
 		(t) =>
 			normalizeComposition(t.composition || t.name) === lokComp &&
 			odooKategoria(t) === lokKat &&
-			tintMatch(lokTint, t.name) &&
+			tintMatch(lokTint, t.name, odtien) &&
 			(!povlakPresne || glassPovlak(t.name) === lokPovlak)
 	);
 	if (kandidati.length === 0) return { typ: null, istota: 'ziadne', kandidati: [] };
@@ -191,23 +216,4 @@ export function naviazanieRiadku<T extends OdooTypLike>(
 	if (odooTypy.some((t) => t.value === typSkla)) return { nepriradene: false, kandidati: [] };
 	const m = matchOdooGlassType(typSkla, odooTypy);
 	return { nepriradene: true, kandidati: m.kandidati };
-}
-
-/**
- * Nárezák — cenníkový popis pre lokálne sklo („· cenník: <Odoo name>"). Jednoznačné → Odoo name;
- * viac → „" (#573 — klient nechce príponu „viac typov (N)"; a NIKDY meno prvého kandidáta, #556,
- * lebo pri odtieňoch by ukázalo zavádzajúci názov iného odtieňa); žiadna zhoda alebo lokálny
- * fallback → „" (bez popisu).
- */
-export function cennikPopis(
-	typSkla: string,
-	odooTypy: OdooTypLike[],
-	source: 'odoo' | 'local'
-): string {
-	if (source !== 'odoo' || !typSkla) return '';
-	const m = matchOdooGlassType(typSkla, odooTypy);
-	if (m.istota === 'jednoznacne' && m.typ) return m.typ.name;
-	// viac kandidátov → bez popisu (#573, Palo 25.9.: žiadna prípona „viac typov (N)"; meno
-	// prvého kandidáta nikdy — pri odtieňoch zavádzajúce, #556); operátor rozhodne na podklade
-	return '';
 }

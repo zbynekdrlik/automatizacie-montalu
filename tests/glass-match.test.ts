@@ -13,7 +13,6 @@ import {
 	glassTint,
 	glassPovlak,
 	naviazanieRiadku,
-	cennikPopis,
 	type OdooTypLike
 } from '../src/lib/server/glass-match';
 
@@ -281,25 +280,5 @@ describe('naviazanieRiadku (podklad badge + kandidáti, #556)', () => {
 	});
 	it('prázdny typSkla → nie nepriradene', () => {
 		expect(naviazanieRiadku('', ODOO, 'odoo').nepriradene).toBe(false);
-	});
-});
-
-describe('cennikPopis (nárezák popis, #556)', () => {
-	it('jednoznačné → cenníkový name', () => {
-		expect(cennikPopis('Izolačné sklo 4/8/4 číre', ODOO, 'odoo')).toBe(
-			'Izolačné sklo 4/8/4- číre (Ug=1,1)'
-		);
-	});
-	it('viac → "" (#573: Palo 25.9. [04:19] — bez prípony „viac typov (N)"; nikdy ani meno prvého kandidáta, #556)', () => {
-		expect(cennikPopis('Izolačné sklo 4/16/4 číre', ODOO, 'odoo')).toBe('');
-	});
-	it('ziadne → ""', () => {
-		expect(cennikPopis('Float číre 6 mm', ODOO, 'odoo')).toBe('');
-	});
-	it('stopsol 4/8/4 → "" (nikdy „· cenník: …číre", #579 finding 1)', () => {
-		expect(cennikPopis('Izolačné sklo 4/8/4 stopsol', ODOO, 'odoo')).toBe('');
-	});
-	it('source=local → "" (fallback = bez popisu)', () => {
-		expect(cennikPopis('Izolačné sklo 4/8/4 číre', ODOO, 'local')).toBe('');
 	});
 });

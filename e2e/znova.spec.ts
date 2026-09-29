@@ -5,7 +5,15 @@
 // z histórie klikni „Použiť znova" a over, že sa zadanie predvyplnilo a že ZAK/OP/
 // zákazník ostali PRÁZDNE. Test sa preskočí, ak beží proti LIVE inštancii.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, skipAkLive, vyberFarbuKovania } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	skipAkLive,
+	vyberFarbuKovania,
+	ponukaSkla,
+	expectSklo
+} from './helpers';
 
 test('odpis z histórie predvyplní formulár, ale ZAK/OP/zákazník ostanú prázdne', async ({
 	page
@@ -48,6 +56,8 @@ test('odpis z histórie predvyplní formulár, ale ZAK/OP/zákazník ostanú pr�
 	await expect(page.locator('#s')).toHaveValue('3000');
 	await expect(page.locator('#v')).toHaveValue('2400');
 	await expect(page.locator('#poznamka')).toHaveValue('poznámka z prvej zákazky');
+	// #594: sklo sa obnoví — v CI lokálne 4/16/4 číre, pri Odoo ponuke Odoo voľba počítaná ním
+	await expectSklo(page.locator('#sklo'), 'Izolačné sklo 4/16/4 číre');
 
 	// 4. nič sa tým neodpísalo — v histórii je stále len jeden záznam s týmto ZAK
 	await page.goto('/odpisy');
@@ -82,7 +92,10 @@ test('Robust už neponúka kalené sklá 8/10 mm (je IZO-only)', async ({ page }
 		.allTextContents();
 
 	expect(skla.join(' ')).not.toMatch(/Kalené 8mm|Kalené 10mm/);
-	expect(skla.some((g) => /Izolačné sklo 4\/16\/4/.test(g))).toBe(true);
+	// #594: VÝPOČTOVÉ sklá ponuky (na PROD Odoo typy) — len izolačné 4/16/4, žiadne kalené
+	const p = await ponukaSkla(page.getByLabel('Sklo (základ — určuje vzorec)'));
+	expect(p.vypocty.some((g) => /Izolačné sklo 4\/16\/4/.test(g))).toBe(true);
+	expect(p.vypocty.some((g) => /kalen/i.test(g))).toBe(false);
 
 	expect(errs).toEqual([]);
 });

@@ -8,8 +8,10 @@ import {
 	loginAs,
 	waitHydrated,
 	vyberFarbuKovania,
-	bareSkloLabel,
-	LOKALNE_SKLA
+	expectSklo,
+	vyberSklo,
+	ponukaSkla,
+	overPonukuSkla
 } from './helpers';
 
 const RUN = `E2E-NRZ-${Date.now().toString(36).slice(-5)}`;
@@ -45,7 +47,7 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await page.getByLabel('Výška (mm) *').fill('2400');
 	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
 	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
-	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4/8/4 číre');
+	await vyberSklo(page.getByLabel(SKLO), 'Izolačné sklo 4/8/4 číre');
 	// formulár rovno povie, ktorý nárezák sa podľa skla ťahá
 	await expect(page.getByTestId('narezak-hint')).toContainText('4K IZO');
 	await vyberFarbuKovania(page);
@@ -66,7 +68,7 @@ test('4K + izolačné sklo ťahá nárezák „4K IZO"; 4K + float ťahá basic'
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
 	await waitHydrated(page);
 	await expect(page.getByLabel('Štýl')).toHaveValue('4K'); // štýl ostal počtom krídel
-	await page.getByLabel(SKLO).selectOption('Float sklo 6 mm');
+	await vyberSklo(page.getByLabel(SKLO), 'Float sklo 6 mm');
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 4K.');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
@@ -87,31 +89,27 @@ test('zmena počtu krídel nezmaže zvolené sklo; opona ponúka izolačné sklo
 	await page.getByLabel('Štýl').selectOption('3K');
 	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
 	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
-	await page.getByLabel(SKLO).selectOption('Izolačné sklo 4/8/4 číre');
+	await vyberSklo(page.getByLabel(SKLO), 'Izolačné sklo 4/8/4 číre');
 	// 3K → 5K: voľba skla ostáva, nárezák sa prepne na 5K IZO
 	await page.getByLabel('Štýl').selectOption('5K');
-	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/8/4 číre');
+	await expectSklo(page.getByLabel(SKLO), 'Izolačné sklo 4/8/4 číre');
 	await expect(page.getByTestId('narezak-hint')).toContainText('5K IZO');
 
 	// #504 round 3: Štandard + opona teraz TIEŽ má IZO nárezák (2×2K/2×3K/2×4K) →
 	// izolačné sklá sú v ponuke aj pri opone; keďže ide o zmenu ŠTÝLU (nie systému),
 	// predchádzajúci výber skla PRETRVÁ (name-persistence, zasklenia-form-reactivity.md).
 	await page.getByLabel('Štýl').selectOption('2x3K');
-	await expect(page.getByLabel(SKLO)).toHaveValue('Izolačné sklo 4/8/4 číre');
-	// #556 hotfix: strip Odoo enrichment sufix „ · cenník:" — overujeme MNOŽINU skiel, nie sufix.
-	const skla = (await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents()).map(
-		bareSkloLabel
-	);
-	expect(skla.filter((s) => /Izola/i.test(s)).sort()).toEqual(
-		[
-			'Izolačné sklo 4/8/4 číre',
-			'Izolačné sklo 4/8/4 mliečne',
-			'Izolačné sklo 4/8/4 stopsol',
-			'Izolačné sklo 4/16/4 číre',
-			'Izolačné sklo 4/16/4 mliečne',
-			'Izolačné sklo 4/16/4 stopsol'
-		].sort()
-	);
+	await expectSklo(page.getByLabel(SKLO), 'Izolačné sklo 4/8/4 číre');
+	// #594: MNOŽINA výpočtových skiel ponuky (CI = lokálne sklá, PROD = Odoo typy, podmnožina)
+	const p = await ponukaSkla(page.getByLabel(SKLO));
+	overPonukuSkla({ ...p, vypocty: p.vypocty.filter((s) => /Izola/i.test(s)) }, [
+		'Izolačné sklo 4/8/4 číre',
+		'Izolačné sklo 4/8/4 mliečne',
+		'Izolačné sklo 4/8/4 stopsol',
+		'Izolačné sklo 4/16/4 číre',
+		'Izolačné sklo 4/16/4 mliečne',
+		'Izolačné sklo 4/16/4 stopsol'
+	]);
 	await expect(page.getByTestId('narezak-hint')).toContainText('2x3K IZO');
 
 	expect(errs).toEqual([]);

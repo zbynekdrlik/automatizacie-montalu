@@ -17,6 +17,7 @@ import {
 	nastavOpZakazky,
 	opPodkladu,
 	upozornenieCudzie,
+	pridalRiadku,
 	MAX_SUBOR_VELKOST
 } from '$lib/server/objednavka-skla';
 import { fetchGlassTypes } from '$lib/server/odoo-glass-types';
@@ -141,6 +142,10 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 	// ručný „Pridať riadok". Len upozornenie — nič neblokuje, nič nemaže.
 	// Bez logu (load beží pri každom reloade) — pridanie do cudzieho podkladu loguje zápisová vrstva.
 	const cudzie = upozornenieCudzie(zak, locals?.user?.username ?? '');
+	// #594 (úloha 1219): pri KAŽDOM riadku kto a kedy ho pridal — server-side čas (Europe/Bratislava)
+	const pridal: Record<number, string> = Object.fromEntries(
+		polozky.map((p) => [p.id, pridalRiadku(p)])
+	);
 
 	// Pre každú položku načítaj zoznam príloh (bez dát — len metadata)
 	const suboryMap: Record<number, { id: number; nazov: string; typ: string; velkost: number }[]> =
@@ -204,6 +209,7 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 		zak,
 		nadpis,
 		cudzie,
+		pridal,
 		nazvySkiel,
 		op,
 		podkladOp,

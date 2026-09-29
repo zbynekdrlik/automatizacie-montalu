@@ -2,7 +2,7 @@
 // vložky (Robust) a automatického zámku (Štandard). Do Money ide LEN variant zvolenej
 // farby; druhý sa vôbec neobjaví. Všetko READ-ONLY („Spočítať"), nič sa neodosiela.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberSklo } from './helpers';
 
 const RUN = `E2E-FARBA-${Date.now().toString(36).slice(-5)}`;
 
@@ -57,7 +57,7 @@ test('Štandard: zámok RAL + hláška o neúplnom kovaní (tesnenia/kefy ručne
 	await page.getByLabel('Systém').selectOption('Štandard');
 	await page.getByLabel('Štýl').selectOption('2K');
 	// reaktívny sklo-select sa doplní po zmene systému — samostatný krok (race)
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float sklo 6 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float sklo 6 mm');
 	await page.getByTestId('farba-kovania').selectOption('R9005');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);

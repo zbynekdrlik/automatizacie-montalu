@@ -5,7 +5,14 @@
 // NEZAPISUJÚ odpis ani nemenia konfiguráciu → tieto testy sa dajú pustiť aj proti
 // nasadenej appke (BASE_URL). Tlačidlo „Odoslať odpis" tu nikdy nepadne.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	vyberFarbuKovania,
+	expectSklo,
+	vypocetSkla
+} from './helpers';
 
 const KOVANIA = [
 	'Jednostranná kľučka z vnútra bez FAB',
@@ -21,18 +28,18 @@ test('predvolené sklo je vždy číre (Robust aj Slide), po prepnutí systému 
 	await loginAs(page);
 
 	await page.selectOption('#system', 'Robust');
-	await expect(page.locator('#sklo')).toHaveValue('Izolačné sklo 4/16/4 číre');
+	await expectSklo(page.locator('#sklo'), 'Izolačné sklo 4/16/4 číre');
 
 	await page.selectOption('#system', 'Slide');
-	await expect(page.locator('#sklo')).toHaveValue('Izolačné sklo 4/8/4 číre');
+	await expectSklo(page.locator('#sklo'), 'Izolačné sklo 4/8/4 číre');
 
 	// nový posuv sa klonuje z primárneho → tiež číre
 	await page.selectOption('#system', 'Robust');
 	await page.getByRole('button', { name: '➕ Pridať zasklenie' }).click();
-	await expect(page.locator('#ps0-sklo')).toHaveValue('Izolačné sklo 4/16/4 číre');
+	await expectSklo(page.locator('#ps0-sklo'), 'Izolačné sklo 4/16/4 číre');
 	// a po prepnutí systému posuvu ostane číre pre nový systém
 	await page.selectOption('#ps0-sys', 'Slide');
-	await expect(page.locator('#ps0-sklo')).toHaveValue('Izolačné sklo 4/8/4 číre');
+	await expectSklo(page.locator('#ps0-sklo'), 'Izolačné sklo 4/8/4 číre');
 
 	expect(errs).toEqual([]);
 });
@@ -137,6 +144,21 @@ test('viac posuvov: každý náhľad má svoje kovanie, tabuľka sklo v mm', asy
 	await page.locator('#ps0-v').fill('2320');
 	await page.selectOption('#ps0-kovl', KOVANIA[1]);
 	await page.selectOption('#ps0-kovp', KOVANIA[2]);
+	// #594: názov skla na pláne = zvolená voľba (na PROD Odoo typ počítaný 4/16/4 číre, v CI
+	// lokálne „…číre") — očakávaný text sa odvodí zo selectov, výpočtové sklo musí byť číre
+	const nazvy: string[] = [];
+	for (const id of ['#sklo', '#ps0-sklo']) {
+		expect(await vypocetSkla(page.locator(id))).toContain('číre');
+		nazvy.push(
+			(
+				await page
+					.locator(id)
+					.evaluate((el) => (el as HTMLSelectElement).selectedOptions[0]!.textContent ?? '')
+			)
+				.split(' · ')[0]!
+				.trim()
+		);
+	}
 	await vyberFarbuKovania(page);
 	await page.getByTestId('spocitat').click();
 	await waitHydrated(page);
@@ -145,7 +167,7 @@ test('viac posuvov: každý náhľad má svoje kovanie, tabuľka sklo v mm', asy
 	for (const i of [0, 1]) {
 		const txt = (await page.getByTestId(`posuv-sklo-${i}`).textContent())?.trim() ?? '';
 		expect(txt).toMatch(/^\d+mm × \d+mm · /);
-		expect(txt).toContain('číre');
+		expect(txt).toContain(nazvy[i]!);
 	}
 
 	// dva náhľady, každý s vlastným kovaním

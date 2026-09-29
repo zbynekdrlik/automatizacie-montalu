@@ -276,7 +276,13 @@
 					{#each items as p (p.id)}
 						{@const nav = data.naviazanie[p.id]}
 						<tr class:atyp={p.rezim === 'atyp'}>
-							<td data-testid={`popis-${p.id}`}>{popisPozicie(p.popis, p.modul)}</td>
+							<td>
+								<span data-testid={`popis-${p.id}`}>{popisPozicie(p.popis, p.modul)}</span>
+								<!-- #594 (úloha 1219): kto a kedy riadok pridal — cudzí riadok vidno hneď -->
+								<span class="pridal-hint noprint" data-testid={`pridal-${p.id}`}
+									>{data.pridal[p.id]}</span
+								>
+							</td>
 							<td class="mono" data-testid={`rozmer-${p.id}`}>{fmtRozmerTabule(p)}</td>
 							<td>
 								<!-- #540: výber typu skla z Odoo katalógu (`code` → glass_order type); vytlačí sa hodnota -->
@@ -789,6 +795,12 @@
 		color: var(--m-warn-ink, #8a6d3b);
 		font-size: 0.78rem;
 		font-weight: 600;
+	}
+	.pridal-hint {
+		display: block;
+		margin-top: 2px;
+		font-size: 0.75rem;
+		color: var(--m-ink-2);
 	}
 	.kandidati-hint {
 		display: block;
