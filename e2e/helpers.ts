@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // Chromium/ANGLE niekedy vypíše VLASTNÚ nízkoúrovňovú GPU driver diagnostiku
 // (nie `console.error`/`console.warn` z APLIKAČNÉHO JS, ale priamo z GL
@@ -65,8 +65,81 @@ export function bareSkloLabel(text: string): string {
  * select navyše ponúka Odoo typy skla podľa hrúbky systému (`value` s prefixom `odoo:`, skupiny
  * „Odoo — …"); v CI preview bez Odoo ich niet. Testy MNOŽINY lokálnej ponuky (allow-list #573,
  * IZO gate štýlu) preto čítajú `select.locator(LOKALNE_SKLA)`, nie všetky `option`.
+ * #594: pri Odoo ponuke lokálne sklá NIE SÚ (len „Iné" / doplnková „pôvodné sklo z appky") —
+ * množinu ponuky čítaj cez `ponukaSkla` (výpočtové sklá), nie cez tento selektor.
  */
 export const LOKALNE_SKLA = 'option:not([value^="odoo:"])';
+
+// ---- #594: „Sklo (základ)" pri dostupnom Odoo ponúka LEN Odoo typy (žiadne lokálne sklá) ----
+//
+// Každá `<option>` nesie `data-vypocet` = LOKÁLNE výpočtové sklo, ktorým sa voľba počíta (v CI
+// bez Odoo = jej vlastný názov). Specy preto vyberajú a overujú sklo RELAČNE podľa výpočtového
+// skla — rovnaký kód funguje v CI (lokálna záloha) aj v post-deploy proti PROD (Odoo typy).
+
+const INE_SKLO = 'Iné (vlastná skladba)';
+
+/** Hodnota voľby, ktorá sa počíta sklom `sklo` (lokálna voľba toho mena, inak PRVÁ Odoo voľba). */
+async function hodnotaSkla(select: Locator, sklo: string): Promise<string | null> {
+	return select.evaluate((el, sk) => {
+		const opts = [...(el as HTMLSelectElement).options];
+		const o = opts.find((x) => x.value === sk) ?? opts.find((x) => x.dataset.vypocet === sk);
+		return o?.value ?? null;
+	}, sklo);
+}
+
+/**
+ * Vyber v selecte skla voľbu počítanú výpočtovým sklom `sklo` (alebo sentinel „Iné"). Počká, kým
+ * ju (reaktívne prekreslená) ponuka má — ponuka závisí od systému/štýlu. Bez takej voľby test
+ * PADNE (nikdy tichý výber iného skla).
+ */
+export async function vyberSklo(select: Locator, sklo: string): Promise<void> {
+	await expect
+		.poll(() => hodnotaSkla(select, sklo), { message: `ponuka nemá voľbu počítanú „${sklo}"` })
+		.not.toBeNull();
+	await select.selectOption((await hodnotaSkla(select, sklo))!);
+}
+
+/** Výpočtové sklo zvolenej voľby (v CI = jej názov; na PROD = sklo, ktorým sa Odoo typ počíta). */
+export async function vypocetSkla(select: Locator): Promise<string> {
+	return select.evaluate((el) => {
+		const o = (el as HTMLSelectElement).selectedOptions[0];
+		return o ? (o.dataset.vypocet ?? o.value) : '';
+	});
+}
+
+/** Over, že select ukazuje voľbu počítanú sklom `sklo` (reaktívne — poll). */
+export async function expectSklo(select: Locator, sklo: string): Promise<void> {
+	await expect.poll(() => vypocetSkla(select)).toBe(sklo);
+}
+
+/**
+ * Ponuka selectu skla: `odoo` = ponúka Odoo typy (post-deploy PROD), `vypocty` = RÔZNE výpočtové
+ * sklá volieb v poradí (bez „Iné"). V CI (bez Odoo) sú `vypocty` presne lokálne sklá ponuky.
+ */
+export async function ponukaSkla(select: Locator): Promise<{ odoo: boolean; vypocty: string[] }> {
+	const opts = await select.locator('option').evaluateAll((els) =>
+		els.map((e) => ({
+			value: (e as HTMLOptionElement).value,
+			vypocet: (e as HTMLOptionElement).dataset.vypocet ?? (e as HTMLOptionElement).value
+		}))
+	);
+	const vypocty = [...new Set(opts.filter((o) => o.value !== INE_SKLO).map((o) => o.vypocet))];
+	return { odoo: opts.some((o) => o.value.startsWith('odoo:')), vypocty };
+}
+
+/**
+ * Over ponuku voči očakávanej množine výpočtových skiel: bez Odoo PRESNE `ocakavane` (allow-list);
+ * s Odoo (PROD) podmnožina `ocakavane` a neprázdna — Odoo ponúka len sklá, ktoré má (#594), takže
+ * lokálne sklo bez Odoo typu v ponuke chýba zámerne.
+ */
+export function overPonukuSkla(p: { odoo: boolean; vypocty: string[] }, ocakavane: string[]): void {
+	if (!p.odoo) {
+		expect([...p.vypocty].sort()).toEqual([...ocakavane].sort());
+		return;
+	}
+	expect(p.vypocty.length).toBeGreaterThan(0);
+	for (const v of p.vypocty) expect(ocakavane, `Odoo voľba počítaná „${v}"`).toContain(v);
+}
 
 /**
  * #555 HOTFIX: očakávané rozmery joklov ODVODENÉ z rozmeru SIEŤOVINY zobrazeného na tej istej

@@ -624,7 +624,8 @@ deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-r
   `BASE_URL || http://localhost:4173`, takže na inom porte všetky zápisové testy padnú na `fetch
   failed` (artefakt harnessu, nie regresia). Iný port len keď je 4173 obsadený súrodencom.
 - **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
-  položky cez `td[data-testid^="popis-"]`, nie `tbody tr`.
+  položky cez `span[data-testid^="popis-"]` (od #594 je popis `<span>` v bunke popisu vedľa
+  `pridal-<id>` „pridal <autor> · <čas>"), nie `tbody tr`.
 
 ## E2E účet založený na cieli (aj PROD) = ZARUČENÉ upratanie cez fixture `e2eUcty`, nikdy „zmažem na konci testu" (#583)
 

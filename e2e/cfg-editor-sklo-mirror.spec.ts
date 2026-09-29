@@ -13,7 +13,8 @@ import {
 	goto,
 	waitHydrated,
 	skipAkLive,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	vyberSklo
 } from './helpers';
 
 const RUN = `E2E-SKLOMIR-${Date.now().toString(36).toUpperCase()}`;
@@ -51,7 +52,7 @@ test('editor: uloženie opona IZO (zmena Kladkového) NEprepíše nezávislú sk
 	await page.getByLabel('Štýl').selectOption('2x4K');
 	await page.getByLabel('Šírka (mm) *').fill('5000');
 	await page.getByLabel('Výška (mm) *').fill('2100');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4/16/4 číre');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Izolačné sklo 4/16/4 číre');
 	await vyberFarbuKovania(page); // Štandard+ nemá farbu kovania → no-op
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();

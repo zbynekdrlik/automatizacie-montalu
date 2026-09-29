@@ -12,7 +12,9 @@ import {
 	openUserMenu,
 	openTools,
 	logout,
-	stubWindowPrint
+	stubWindowPrint,
+	vyberSklo,
+	ponukaSkla
 } from './helpers';
 
 // unikátna ZAK pre každý beh — dedup je perzistentný
@@ -245,7 +247,7 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 	await page.getByLabel('Výška (mm) *').fill('2400');
 
 	// --- 10mm sklo → kladka/klzný 10mm (ZASP202417/425) ---
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	// sklo (len plán, nie Money) — 908 × 2318, rovnaké pre 6 aj 10
@@ -261,7 +263,7 @@ test('Deluxe 5K: hrúbka skla (6/10) vyberá kladka/klzný profil (Dominik) + pe
 
 	// --- prepni na 6mm sklo → kladka/klzný 6mm (ZASP202416/424), množstvo ROVNAKÉ ---
 	await page.getByRole('button', { name: '← Späť a upraviť' }).click();
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 6 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 6 mm');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	// teraz 6mm kladka ZASP202416 = 7,2 m (rovnaké množstvo ako 10mm — len iný kód)
@@ -296,7 +298,7 @@ test('Štandard + 2K IZO: default „prídavná koľajnica" zaškrtnutý, mechan
 	await page.getByLabel('Výška (mm) *').fill('2400');
 	// v44 (#504): 'Izolačné sklo 4.8.4' zmazané (orphan) → surviving v43 IZO
 	// variant rovnakej 16mm triedy (jeIzoTrieda ⇒ true, rovnaké odvodené hodnoty).
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Izolačné sklo 4/8/4 číre');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Izolačné sklo 4/8/4 číre');
 
 	// #132: IZO sklo na Štandard + → checkbox sa predvyplní zaškrtnutý; pre tento
 	// test ho explicitne odškrtneme, aby sme overili mechanizmus (nie default)
@@ -418,7 +420,13 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await page.getByLabel('Zákazník *').fill('NeDefault');
 	await page.getByLabel('Systém').selectOption('Slide');
 	await page.getByLabel('Štýl').selectOption('3K');
-	await page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)').fill('Stopsol Grey');
+	const presne = page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)');
+	// #594: pri Odoo ponuke je zvolený Odoo typ = presné zloženie → pole je skryté (#579) a
+	// „Späť a upraviť" musí zachovať zvolený Odoo typ
+	const odoo = (await ponukaSkla(page.locator('#sklo'))).odoo;
+	const volba = await page.locator('#sklo').inputValue();
+	if (odoo) await expect(presne).toBeHidden();
+	else await presne.fill('Stopsol Grey');
 	await page.getByLabel(/Poznámka/).fill('Pozn X');
 	await page.getByLabel(/RAL \(farba\)/).fill('7016');
 	await page.getByLabel(/Čaká na materiál/).check();
@@ -432,9 +440,9 @@ test('späť a upraviť: zachová aj NE-defaultné polia (systém/štýl/skloPre
 	await waitHydrated(page);
 	await expect(page.getByLabel('Systém')).toHaveValue('Slide');
 	await expect(page.getByLabel('Štýl')).toHaveValue('3K');
-	await expect(page.getByLabel('Presné zloženie skla (nepovinné — nemení vzorec)')).toHaveValue(
-		'Stopsol Grey'
-	);
+	await expect(page.locator('#sklo')).toHaveValue(volba);
+	if (odoo) await expect(presne).toBeHidden();
+	else await expect(presne).toHaveValue('Stopsol Grey');
 	await expect(page.getByLabel(/Poznámka/)).toHaveValue('Pozn X');
 	await expect(page.getByLabel(/RAL \(farba\)/)).toHaveValue('7016');
 	await expect(page.getByLabel(/Čaká na materiál/)).toBeChecked();

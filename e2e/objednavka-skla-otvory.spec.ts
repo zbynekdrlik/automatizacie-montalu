@@ -12,7 +12,8 @@ import {
 	goto,
 	waitHydrated,
 	skipAkLive,
-	vyberFarbuKovania
+	vyberFarbuKovania,
+	vyberSklo
 } from './helpers';
 
 const RUN = `E2E-OTV-${Date.now().toString(36).slice(-5)}`;
@@ -33,7 +34,7 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await page.getByLabel('Štýl').selectOption('4K');
 	await page.getByLabel('Šírka (mm) *').fill('4000');
 	await page.getByLabel('Výška (mm) *').fill('2000');
-	await page.getByLabel('Sklo (základ — určuje vzorec)').selectOption('Float kalené 10 mm');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float kalené 10 mm');
 	// #587: výška vŕtania zámku → poloha otvoru na riadku objednávky + PDF výkres pre IZOS
 	await page.locator('#vrtanieZamku').fill('1100');
 	await vyberFarbuKovania(page);

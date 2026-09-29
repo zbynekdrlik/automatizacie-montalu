@@ -9,8 +9,9 @@ import {
 	loginAs,
 	waitHydrated,
 	vyberFarbuKovania,
-	bareSkloLabel,
-	LOKALNE_SKLA
+	vyberSklo,
+	ponukaSkla,
+	overPonukuSkla
 } from './helpers';
 
 const RUN = `E2E-STD-${Date.now().toString(36).slice(-5)}`;
@@ -24,7 +25,7 @@ async function zadanie(page: Page, op: string, styl: string, sklo: string) {
 	await page.getByLabel('Štýl').selectOption(styl);
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
-	await page.getByLabel(SKLO).selectOption(sklo);
+	await vyberSklo(page.getByLabel(SKLO), sklo);
 }
 
 const riadok = (page: Page, kod: string) => page.locator('.row', { hasText: kod });
@@ -43,11 +44,9 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 	// (nahradené v43 variantmi 'ESG kalené 10 mm' / 'Izolačné sklo 4/8/4 číre'/mliečne/stopsol).
 	// #235 slice 2: SKLO_INE ('Iné (vlastná skladba)') je doplnené ZA katalóg pre KAŽDÝ
 	// systém (sklaForSystem v +page.svelte) — vlastná skladba je vždy posledná voľba.
-	// #556 hotfix: strip Odoo enrichment sufix „ · cenník:" — overujeme MNOŽINU skiel, nie sufix.
-	const skla = (await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents()).map(
-		bareSkloLabel
-	);
-	expect(skla).toEqual([
+	// #594: ponuku čítame ako VÝPOČTOVÉ sklá volieb — CI (bez Odoo) = celý katalóg v poradí,
+	// PROD (Odoo) = len Odoo typy, ich výpočtové sklo musí byť z katalógu (podmnožina).
+	const katalog = [
 		'Float sklo 4 mm',
 		'Float sklo 6 mm',
 		'3.3.1',
@@ -62,9 +61,13 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 		'Izolačné sklo 4/16/4 stopsol',
 		'ESG kalené 4 mm',
 		'ESG kalené 6 mm',
-		'ESG kalené 10 mm',
-		'Iné (vlastná skladba)'
-	]);
+		'ESG kalené 10 mm'
+	];
+	const p = await ponukaSkla(page.getByLabel(SKLO));
+	overPonukuSkla(p, katalog);
+	if (!p.odoo) expect(p.vypocty).toEqual(katalog); // poradie katalógu
+	// vlastná skladba je vždy posledná voľba
+	await expect(page.getByLabel(SKLO).locator('option').last()).toHaveText('Iné (vlastná skladba)');
 
 	expect(errs).toEqual([]);
 });
@@ -141,20 +144,16 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ; Štandard + opona
 	await waitHydrated(page);
 	await page.getByLabel('Systém').selectOption('Štandard +');
 	await page.getByLabel('Štýl').selectOption('2x3K');
-	// #556 hotfix: strip Odoo enrichment sufix „ · cenník:" — overujeme MNOŽINU skiel, nie sufix.
-	const skla = (await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents()).map(
-		bareSkloLabel
-	);
-	expect(skla.filter((s) => /Izola/i.test(s)).sort()).toEqual(
-		[
-			'Izolačné sklo 4/8/4 číre',
-			'Izolačné sklo 4/8/4 mliečne',
-			'Izolačné sklo 4/8/4 stopsol',
-			'Izolačné sklo 4/16/4 číre',
-			'Izolačné sklo 4/16/4 mliečne',
-			'Izolačné sklo 4/16/4 stopsol'
-		].sort()
-	);
+	// #594: MNOŽINA výpočtových skiel ponuky (CI = lokálne sklá, PROD = Odoo typy, podmnožina)
+	const p = await ponukaSkla(page.getByLabel(SKLO));
+	overPonukuSkla({ ...p, vypocty: p.vypocty.filter((s) => /Izola/i.test(s)) }, [
+		'Izolačné sklo 4/8/4 číre',
+		'Izolačné sklo 4/8/4 mliečne',
+		'Izolačné sklo 4/8/4 stopsol',
+		'Izolačné sklo 4/16/4 číre',
+		'Izolačné sklo 4/16/4 mliečne',
+		'Izolačné sklo 4/16/4 stopsol'
+	]);
 
 	expect(errs).toEqual([]);
 });

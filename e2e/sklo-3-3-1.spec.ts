@@ -1,13 +1,38 @@
 // #214 — sklo „3.3.1" (lepené) je vo výbere skla pre Štandard plus a starý Štandard a
 // správa sa ako obyčajná 6 mm (basic nárezák, žiadny IZO „U" profil). Read-only tok —
 // len „Spočítať nárezový plán", nič sa neodosiela do Money.
+// #594: pri Odoo ponuke (PROD) lokálne „3.3.1" nie je — lepené sklo je Odoo typ zo skupiny
+// „Odoo — Lepené VSG" (počíta sa ako 6 mm jednoduché) a musí ťahať ten istý basic nárezák.
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, LOKALNE_SKLA } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	waitHydrated,
+	vyberFarbuKovania,
+	vyberSklo,
+	ponukaSkla,
+	vypocetSkla
+} from './helpers';
 
 const SKLO = 'Sklo (základ — určuje vzorec)';
 const RUN = `E2E-331-${Date.now().toString(36).slice(-5)}`;
 /** rozširujúci „U" profil — existuje LEN v IZO nárezáku */
 const U_PROFIL = 'ZASP202439';
+
+/** Vyber lepené sklo: v CI lokálne „3.3.1", pri Odoo ponuke prvý Odoo typ skupiny „Lepené VSG". */
+async function vyberLepene(page: Page) {
+	const sel = page.getByLabel(SKLO);
+	const p = await ponukaSkla(sel);
+	if (!p.odoo) {
+		expect(p.vypocty).toContain('3.3.1');
+		await vyberSklo(sel, '3.3.1');
+		return;
+	}
+	const vsg = sel.locator('optgroup[label="Odoo — Lepené VSG"] option').first();
+	await expect(vsg).toBeAttached();
+	await sel.selectOption((await vsg.getAttribute('value'))!);
+	expect(await vypocetSkla(sel)).not.toMatch(/Izolačné/);
+}
 
 async function hlavicka(page: Page, system: string, op: string) {
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-${op}`);
@@ -24,13 +49,9 @@ test('Štandard plus: „3.3.1" je v ponuke skla a ťahá basic nárezák (ako 6
 	await hlavicka(page, 'Štandard +', '01');
 	await page.getByLabel('Štýl').selectOption('4K');
 
-	// „3.3.1" je v zozname skiel
-	const skla = await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents();
-	expect(skla).toContain('3.3.1');
-
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2400');
-	await page.getByLabel(SKLO).selectOption('3.3.1');
+	await vyberLepene(page);
 	// nie je izolačné → ťahá BASIC nárezák, presne ako „Float sklo 6 mm"
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard + 4K.');
 	await vyberFarbuKovania(page);
@@ -50,12 +71,9 @@ test('starý Štandard: „3.3.1" je v ponuke skla a ťahá basic nárezák', as
 	await hlavicka(page, 'Štandard', '02');
 	await page.getByLabel('Štýl').selectOption('2K');
 
-	const skla = await page.getByLabel(SKLO).locator(LOKALNE_SKLA).allTextContents();
-	expect(skla).toContain('3.3.1');
-
 	await page.getByLabel('Šírka (mm) *').fill('3000');
 	await page.getByLabel('Výška (mm) *').fill('2200');
-	await page.getByLabel(SKLO).selectOption('3.3.1');
+	await vyberLepene(page);
 	await expect(page.getByTestId('narezak-hint')).toContainText('Štandard 2K.');
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();

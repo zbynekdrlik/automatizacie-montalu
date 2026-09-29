@@ -14,7 +14,8 @@ import {
 	waitHydrated,
 	skipAkLive,
 	vyberFarbuKovania,
-	logout
+	logout,
+	E2E_USER
 } from './helpers';
 
 const RUN = `E2E-SKLA-${Date.now().toString(36).slice(-5)}`;
@@ -80,7 +81,7 @@ test('zasklenia: spočítať → Pridať sklá do objednávky → podklad s reá
 	const riadok = page.locator('tbody tr').first();
 	await expect(riadok).toBeVisible();
 	// #563: popis len pozícia (výrobu systém/štýl nezaujíma)
-	await expect(riadok.locator('td').nth(0)).toHaveText('Zasklenie 1');
+	await expect(riadok.getByTestId(/^popis-\d+$/)).toHaveText('Zasklenie 1');
 	await expect(riadok.locator('td').nth(1)).toContainText(String(sirka));
 	await expect(riadok.locator('td').nth(1)).toContainText(String(vyska));
 	await expect(riadok.locator('td').nth(2)).toContainText(typTxt);
@@ -427,6 +428,16 @@ test('objednávka skla: riadky iného používateľa → upozornenie, pridanie n
 		await pridajRucnyRiadok(page, 'E2E 571 e2e');
 		await expect(page.locator('tbody tr', { hasText: 'E2E 571 kolega' })).toBeVisible();
 		await expect(page.getByTestId('cudzie-riadky')).toHaveText(text);
+		// #594 (úloha 1219): pri KAŽDOM riadku kto a kedy ho pridal (dnes, Europe/Bratislava)
+		const dnes = formatDatumSk(new Date().toISOString()).replace(/\./g, '\\.');
+		const pridal = (popis: string) =>
+			page.locator('tbody tr', { hasText: popis }).getByTestId(/^pridal-\d+$/);
+		await expect(pridal('E2E 571 kolega')).toHaveText(
+			new RegExp(`^pridal ${kolega} · ${dnes} \\d{2}:\\d{2}$`)
+		);
+		await expect(pridal('E2E 571 e2e')).toHaveText(
+			new RegExp(`^pridal ${E2E_USER} · ${dnes} \\d{2}:\\d{2}$`)
+		);
 
 		// 5. zasklenia „Pridať sklá" na tú istú zákazku → sklá pridané + to isté upozornenie
 		await goto(page, '/zasklenia');
