@@ -281,6 +281,10 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 			const items = (await ponuka(s)).skupiny.flatMap((g) => g.items).filter((o) => o.odoo);
 			out[s] = Object.fromEntries(items.map((o) => [o.nazov, o.vypocet]));
 		}
+		// #579 review: tvrdené 4 mm z Odoo sa v Štandard + počíta ako tvrdené (nie Float 4 mm) — rovnako
+		// ako v starom Štandarde a ako 6 mm kalené v Štandard +
+		for (const s of ['Štandard +', 'Štandard'])
+			expect(out[s]!['ESG Float čirý 4mm'], s).toBe('ESG kalené 4 mm');
 		expect(out).toMatchSnapshot();
 	});
 

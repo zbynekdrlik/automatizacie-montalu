@@ -51,7 +51,9 @@ describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
 		const p = ponuka('Štandard +', '3K');
 		// #579 (Patrik, Odoo úloha 1193, 28.9.): novšie vyjadrenie výroby — 4 mm sklo pri Štandardoch
 		// áno; nahrádza vylúčenie Float 4 mm z meetingu 25.9. (#573, scr_017)
-		expect(p.filter((g) => /\b4 mm\b/.test(g))).toEqual(['Float sklo 4 mm']);
+		// review: aj kalené 4 mm — inak by sa Odoo „ESG Float čirý 4mm" v Štandard + počítal ako Float
+		// 4 mm (iný Money kód než tvrdené sklo); starý Štandard ho počíta ako ESG kalené 4 mm
+		expect(p.filter((g) => /\b4 mm\b/.test(g))).toEqual(['Float sklo 4 mm', 'ESG kalené 4 mm']);
 		expect(p.filter((g) => /10 mm/.test(g))).toEqual([]);
 		expect(p).toContain('Float sklo 6 mm');
 		expect(p).toContain('3.3.1');
@@ -81,6 +83,8 @@ describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
 		for (const [sys, p] of Object.entries(POVOLENE_SKLA)) {
 			const katalog = glassTypesForSystem(sys).map((g) => g.nazov);
 			expect(katalog).toEqual(expect.arrayContaining([...p.nazvy]));
+			// predvoľba s preklepom by ticho spadla na defaultSklo (pri Štandard + = 4 mm)
+			if (p.predvolene !== undefined) expect(p.nazvy, sys).toContain(p.predvolene);
 		}
 	});
 
@@ -108,10 +112,11 @@ describe('#573 ponuka skla per systém = tabuľka ROZHODNUTÉ', () => {
 		expect(filtrujPovoleneSkla('Slide', katalog)).toEqual(katalog);
 	});
 
-	it('vlastná skladba: hrúbkové triedy per systém (Robust 24, Deluxe 6/10, Štandard plus bez 4/10)', () => {
+	it('vlastná skladba: hrúbkové triedy per systém (Robust 24, Deluxe 6/10, Štandard plus bez 10)', () => {
 		expect(povoleneTriedyIne('Robust')).toEqual([24]);
 		expect(povoleneTriedyIne('Deluxe')).toEqual([6, 10]);
-		expect(povoleneTriedyIne('Štandard +')).toEqual([6, 16, 24]);
+		// #579: 4 mm pri Štandardoch áno aj pre vlastnú skladbu (zrkadlo Float 4 mm v ponuke)
+		expect(povoleneTriedyIne('Štandard +')).toEqual([4, 6, 16, 24]);
 		expect(povoleneTriedyIne('Slide')).toEqual([...SKLO_TRIEDY]);
 		expect(povoleneTriedyIne('Štandard')).toEqual([...SKLO_TRIEDY]);
 		expect(skloPovolene('Robust', SKLO_INE, 6)).toBe(false);
@@ -164,6 +169,7 @@ describe('#573 serverová validácia — sklo mimo allow-listu systému sa odmie
 	it('Štandard plus ESG 10 mm → chyba; Float 6 mm aj Float 4 mm (#579) prejde', () => {
 		const sp = { ...zaklad, system: 'Štandard +', styl: '3K' };
 		expect(parseVstup(fd({ ...sp, sklo: 'Float sklo 4 mm' })).error).toBeNull();
+		expect(parseVstup(fd({ ...sp, sklo: 'ESG kalené 4 mm' })).error).toBeNull();
 		expect(parseVstup(fd({ ...sp, sklo: 'ESG kalené 10 mm' })).error).toBe(CHYBA_SKLA);
 		expect(parseVstup(fd({ ...sp, sklo: 'Float sklo 6 mm' })).error).toBeNull();
 	});
