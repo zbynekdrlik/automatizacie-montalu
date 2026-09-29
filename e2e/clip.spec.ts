@@ -2,7 +2,16 @@
 // tyčí + nárez per profil) → odoslať (TEST režim, auto-skip na LIVE). Nová stránka
 // + nula console errors/warnings (e2e-console guard).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, skipAkLive, waitHydrated } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	skipAkLive,
+	waitHydrated,
+	vyberSklo,
+	expectSklo,
+	ponukaSkla
+} from './helpers';
 
 async function hlavicka(page: import('@playwright/test').Page, zak: string) {
 	await goto(page, '/clip');
@@ -15,7 +24,7 @@ test('izo B1 3000×1000 — kontrola: odpis (počet tyčí) + nárez per profil'
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-1');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -42,7 +51,7 @@ test('izo B1 — odoslať zapíše odpis (TEST režim; na LIVE sa preskočí)', 
 	await skipAkLive(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-SEND');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -64,7 +73,7 @@ test('klasika B3 (N=4) — kontrola: ZASP kódy (nie KM12), Patrik #372 potvrdil
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-KL');
-	await page.getByTestId('typ').selectOption('klasika');
+	await vyberSklo(page.getByTestId('typ'), 'klasika');
 	await page.getByTestId('variant').selectOption('4');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -91,7 +100,7 @@ test('#462 clip: qty_ ručná editácia pred submitom zmení odpis', async ({ pa
 	await loginAs(page);
 	const zak = `E2E-CLIP-QTY-${Date.now().toString(36)}`;
 	await hlavicka(page, zak);
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -120,7 +129,7 @@ test('#462 clip: „Späť a upraviť zadanie" zachová celé zadanie', async ({
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-RT');
-	await page.getByTestId('typ').selectOption('klasika');
+	await vyberSklo(page.getByTestId('typ'), 'klasika');
 	await page.getByTestId('variant').selectOption('4');
 	await page.locator('#sirka').fill('2500');
 	await page.locator('#vyska').fill('1200');
@@ -135,7 +144,7 @@ test('#462 clip: „Späť a upraviť zadanie" zachová celé zadanie', async ({
 	// celé zadanie prežilo
 	await expect(page.locator('#sirka')).toHaveValue('2500');
 	await expect(page.locator('#vyska')).toHaveValue('1200');
-	await expect(page.getByTestId('typ')).toHaveValue('klasika');
+	await expectSklo(page.getByTestId('typ'), 'klasika');
 	await expect(page.getByTestId('variant')).toHaveValue('4');
 
 	expect(errs).toEqual([]);
@@ -147,7 +156,7 @@ test('#502 clip hotovo: výrobný podklad s nárezom a sklami', async ({ page })
 	await skipAkLive(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-VP');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -206,7 +215,7 @@ test('#464: clip RAL metadata zobrazí sa v badge', async ({ page }) => {
 	await page.locator('#ral').fill('RAL 9005');
 
 	// fill sizes + compute
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('1');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -238,7 +247,7 @@ test('#554 clip: 1 výplň → náhľad 1 pole/0 priečok + rozpis rezov', async
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-N1');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('1');
 	await page.locator('#sirka').fill('1500');
 	await page.locator('#vyska').fill('1000');
@@ -260,7 +269,7 @@ test('#554 clip: 3 výplne → náhľad 2 priečky (1003/1997) + rozpis rezov', 
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await hlavicka(page, 'E2E-CLIP-N3');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('3');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1200');
@@ -286,7 +295,7 @@ test('#554 clip multi: pridaj 2. zábradlie → spoločný rozpis + odoslať (TE
 	await hlavicka(page, `E2E-CLIP-MULTI-${Date.now().toString(36)}`);
 
 	// zábradlie 1 (základ)
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('1');
 	await page.locator('#sirka').fill('1500');
 	await page.locator('#vyska').fill('1000');
@@ -309,5 +318,139 @@ test('#554 clip multi: pridaj 2. zábradlie → spoločný rozpis + odoslať (TE
 	// odoslať spoločný odpis (TEST režim)
 	await page.getByTestId('odoslat-multi').click();
 	await expect(page.getByTestId('vysledok-multi')).toContainText('TEST');
+	expect(errs).toEqual([]);
+});
+
+// ── #593: sklá z Odoo 6/16 mm, „Pridať sklá do objednávky", RAL nového zábradlia ──
+
+/** Rozmer skla výplne z kontroly („Šírka výplne X mm · výška výplne Y mm"), zaokrúhlený na mm. */
+async function rozmerVyplne(page: import('@playwright/test').Page, scope = page.locator('body')) {
+	const txt =
+		(await scope
+			.getByText(/Šírka výplne [\d,]+ mm · výška/)
+			.first()
+			.textContent()) ?? '';
+	const m = /Šírka výplne ([\d,]+) mm · výška(?: výplne)? ([\d,]+) mm/.exec(txt);
+	expect(m, `rozmer výplne v „${txt}"`).not.toBeNull();
+	const mm = (s: string) => Math.round(Number(s.replace(',', '.')));
+	return { sirka: mm(m![1]!), vyska: mm(m![2]!) };
+}
+
+test('#593 clip: výplň ponúka len šablóny izo/klasika (CI) alebo Odoo sklá 6/16 mm (PROD)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/clip');
+	const p = await ponukaSkla(page.getByTestId('typ'));
+	// každá voľba sa počíta jednou zo šablón; bez Odoo presne dnešné dve voľby
+	expect(p.vypocty.length).toBeGreaterThan(0);
+	for (const v of p.vypocty) expect(['izo', 'klasika']).toContain(v);
+	if (!p.odoo) expect(p.vypocty).toEqual(['izo', 'klasika']);
+	// predvolená voľba = šablóna IZO (ako doteraz)
+	await expectSklo(page.getByTestId('typ'), 'izo');
+	expect(errs).toEqual([]);
+});
+
+test('#593 clip: „Pridať sklá do objednávky" — Zábradlie 1 × N ks rozmeru výplne, idempotentne', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	const zak = `E2E-CLIP-SKLO-${Date.now().toString(36)}`;
+	await hlavicka(page, zak);
+	await vyberSklo(page.getByTestId('typ'), 'izo');
+	await page.getByTestId('variant').selectOption('2');
+	await page.locator('#sirka').fill('3000');
+	await page.locator('#vyska').fill('1000');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+	const rozmer = await rozmerVyplne(page);
+
+	await page.getByTestId('pridat-skla').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('skla-pridane')).toContainText('Sklá pridané do objednávky');
+	// odpis ostal dostupný (bez presmerovania preč)
+	await expect(page.getByTestId('odoslat')).toBeVisible();
+	// druhé pridanie nič neduplikuje
+	await page.getByTestId('pridat-skla').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('skla-pridane')).toContainText('už sú v objednávke');
+
+	await page.getByTestId('skla-pridane-odkaz').click();
+	await page.waitForURL(/\/objednavka-skla\//);
+	await waitHydrated(page);
+	await expect(page.locator('span[data-testid^="popis-"]')).toHaveCount(1);
+	const riadok = page.locator('tbody tr').first();
+	await expect(riadok.getByTestId(/^popis-\d+$/)).toHaveText('Zábradlie 1');
+	await expect(riadok.locator('td').nth(1)).toContainText(String(rozmer.sirka));
+	await expect(riadok.locator('td').nth(1)).toContainText(String(rozmer.vyska));
+	await expect(riadok.locator('td').nth(3)).toContainText('2');
+	expect(errs).toEqual([]);
+});
+
+test('#593 clip multi: 2 zábradlia → 2 riadky objednávky skla', async ({ page }) => {
+	const errs = collectConsole(page);
+	await skipAkLive(page);
+	await loginAs(page);
+	const zak = `E2E-CLIP-SKLOM-${Date.now().toString(36)}`;
+	await hlavicka(page, zak);
+	await vyberSklo(page.getByTestId('typ'), 'izo');
+	await page.getByTestId('variant').selectOption('1');
+	await page.locator('#sirka').fill('1500');
+	await page.locator('#vyska').fill('1000');
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	await vyberSklo(page.getByTestId('z1-typ'), 'klasika');
+	await page.getByTestId('z1-variant').selectOption('3');
+	await page.locator('#z1-sirka').fill('3000');
+	await page.locator('#z1-vyska').fill('1200');
+	await page.getByRole('button', { name: /Spočítať spoločný rozpis/ }).click();
+	await waitHydrated(page);
+	const r2 = await rozmerVyplne(page, page.getByTestId('kus-detail-1'));
+
+	await page.getByTestId('pridat-skla').click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('skla-pridane')).toContainText('2 riadky');
+	await page.getByTestId('skla-pridane-odkaz').click();
+	await page.waitForURL(/\/objednavka-skla\//);
+	await waitHydrated(page);
+	const popisy = page.locator('span[data-testid^="popis-"]');
+	await expect(popisy).toHaveText(['Zábradlie 1', 'Zábradlie 2']);
+	const riadok2 = page.locator('tbody tr', { has: page.getByText('Zábradlie 2', { exact: true }) });
+	await expect(riadok2.locator('td').nth(1)).toContainText(String(r2.sirka));
+	await expect(riadok2.locator('td').nth(3)).toContainText('3');
+	expect(errs).toEqual([]);
+});
+
+test('#593 clip: nové zábradlie preberá RAL prvého, ručná zmena sa neprepíše', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-CLIP-RAL593');
+	await page.locator('#ral').fill('RAL 7016');
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	await expect(page.locator('#z1-ral')).toHaveValue('RAL 7016');
+	// zmena prvého sa prenesie do neupraveného ďalšieho
+	await page.locator('#ral').fill('RAL 9005');
+	await expect(page.locator('#z1-ral')).toHaveValue('RAL 9005');
+	// ručne zmenené druhé zábradlie ostane
+	await page.locator('#z1-ral').fill('RAL 3000');
+	await page.locator('#ral').fill('RAL 1015');
+	await expect(page.locator('#z1-ral')).toHaveValue('RAL 3000');
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	await expect(page.locator('#z2-ral')).toHaveValue('RAL 1015');
+
+	// farby idú do výpočtu (kontrola per zábradlie)
+	await vyberSklo(page.getByTestId('typ'), 'izo');
+	await page.locator('#sirka').fill('1500');
+	await page.locator('#vyska').fill('1000');
+	for (const i of [1, 2]) {
+		await page.locator(`#z${i}-sirka`).fill('1500');
+		await page.locator(`#z${i}-vyska`).fill('1000');
+	}
+	await page.getByRole('button', { name: /Spočítať spoločný rozpis/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('kus-detail-1')).toContainText('RAL: RAL 3000');
+	await expect(page.getByTestId('kus-detail-2')).toContainText('RAL: RAL 1015');
 	expect(errs).toEqual([]);
 });

@@ -449,4 +449,27 @@ describe('#593 (3) RAL farba nového zábradlia', () => {
 		// aj ručne vymazaná farba ostane prázdna (obsluha to tak chcela)
 		expect(ralZabradlia([{ ral: 'RAL 9005' }, { ral: '', ralVlastna: true }], 1)).toBe('');
 	});
+
+	it('index mimo poľa → prázdna farba', () => {
+		expect(ralZabradlia([], 0)).toBe('');
+		expect(ralZabradlia([{ ral: 'RAL 9005' }], 3)).toBe('');
+	});
+});
+
+describe('#593 page load /clip', () => {
+	it('load vracia ponuku výplne (Odoo → Odoo voľby; nedostupné → izo/klasika)', async () => {
+		odooOn();
+		const on = (await clip.load({} as never)) as {
+			live: boolean;
+			ponukaSkiel: { skupiny: { items: { odoo: string }[] }[] };
+		};
+		expect(on.live).toBe(false);
+		expect(vsetky(on.ponukaSkiel.skupiny).every((o) => o.odoo !== '')).toBe(true);
+		_resetGlassTypesCache();
+		odooOff();
+		const off = (await clip.load({} as never)) as {
+			ponukaSkiel: { skupiny: { items: { value: string }[] }[] };
+		};
+		expect(vsetky(off.ponukaSkiel.skupiny).map((o) => o.value)).toEqual(['izo', 'klasika']);
+	});
 });
