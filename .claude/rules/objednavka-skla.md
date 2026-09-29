@@ -15,6 +15,8 @@ paths:
   - "src/routes/zasklenia/+page.server.ts"
   - "src/routes/fix/+page.server.ts"
   - "src/routes/pergola/narez/+page.server.ts"
+  - "src/routes/clip/+page.server.ts"
+  - "src/lib/server/clip-sklo.ts"
 ---
 
 # Objednávka skla — gotchas (#496)
@@ -113,6 +115,17 @@ redirecting.
 | `/zasklenia` | `pridatSklaMulti` | `MultiResult.posuvy[i].sklo` | 1–2 items per posuv (`sklaPosuvu`, #578) |
 | `/fix` | `pridatSkla` | `FixVykres.polia[]: { sirka, vLavo, vPravo }` | N items (per pole); sikmy→vLavo/vPravo, rovny→vyska |
 | `/pergola/narez` | `pridatSkla` | `StrechaSkloVypocet: { sirkaMm, dlzkaMm, pocetTabul, typ }` | 1 item; honest-null gate (no insert when sirkaMm, dlzkaMm, or pocetTabul is null) |
+| `/clip` | `pridatSkla` / `pridatSklaMulti` (#593) | `rozmerSklaClip(kus)` (výplň = sklo, `sklaClip` v `clip-sklo.ts`) | 1 item per zábradlie „Zábradlie i", `pocet` = N výplní; idempotentne + bez presmerovania + `upozornenieCudzie` (ako zasklenia) |
+
+**Banner „Pridať sklá" pre producentov BEZ presmerovania = `src/lib/components/SklaPridaneBanner.svelte`**
+(zasklenia + CLIP; testidy `skla-pridane`/`-odkaz`/`-cudzie`/`skla-poloha-zmenena` sú kontrakt E2E;
+text počtu dáva volajúci — zasklenia „(N ks)", CLIP „(N riadky)"). Nový taký producent ho reuse-uje.
+
+**Pasca idempotencie Odoo hore/dole (CLIP klasika, rovnako zasklenia):** identita riadku obsahuje
+`typ_skla`. Pri nedostupnom Odoo ide lokálny názov (`3.3.1`), ktorý matcher `priradOdooTypy`
+nespáruje; pri dostupnom Odoo zvolený Odoo typ (`OP033` …). „Pridať sklá" v oboch stavoch = DVA
+riadky „Zábradlie 1" (duplicitná objednávka). IZO sa páruje jednoznačne (4/8/4 číre), takže ho to
+netýka. Obsluha to uvidí na podklade (druhý riadok, badge „nepriradené") a zmaže — neriešené kódom.
 
 **ZAK/OP source per module:** zasklenia uses `parseVstup().zak/.op`, FIX uses
 `parseFixVstup().zak/.op`, pergola uses `parseIdent(form).zak/.op` (separate from

@@ -4,14 +4,24 @@
 	// Jedno zábradlie → single tok (`?/spocitat`, zachované testidy typ/variant/#sirka…);
 	// 2+ → multi tok (`?/spocitatMulti`) so zdieľaným odpisom (vzor ZasklieniaForm
 	// `formaction={jeMulti ? … : …}`). computeClipMulti semantika nedotknutá.
+	//
+	// #593: select „Výplň" ponúka Odoo sklá 6/16 mm (`ponukaSkiel` zo servera; pri nedostupnom
+	// Odoo dnešné izo/klasika). Voľba je ODVODENÁ z dvoch polí kusu — `typ` (šablóna, Money) a
+	// `skloOdoo` (Odoo typ → objednávka skla) — cez `$lib/sklo-odoo` (`volbaSkla`/`rozlozVolbu`),
+	// žiadny ďalší stav ani `$effect`. RAL: ďalšie zábradlie preberá farbu prvého, kým ju obsluha
+	// ručne nezmení (`ralZabradlia`, `ralVlastna`).
 	import {
 		CLIP_MIN_SIRKA,
 		CLIP_MAX_SIRKA,
 		CLIP_MIN_VYSKA,
 		CLIP_MAX_VYSKA,
+		jeClipTyp,
+		ralZabradlia,
+		bezZabradlia,
 		type ClipVstup,
 		type ClipTyp
 	} from '$lib/clip';
+	import { volbaSkla, rozlozVolbu, type PonukaSkiel } from '$lib/sklo-odoo';
 
 	type MultiEcho = {
 		zak: string;
@@ -21,29 +31,43 @@
 		kusy: ClipVstup[];
 	} | null;
 
-	let { vstup, multiVstup }: { vstup: ClipVstup; multiVstup: MultiEcho } = $props();
+	let {
+		vstup,
+		multiVstup,
+		ponukaSkiel
+	}: { vstup: ClipVstup; multiVstup: MultiEcho; ponukaSkiel: PonukaSkiel } = $props();
 
 	type KusRow = {
 		typ: ClipTyp;
+		skloOdoo: string;
 		variant: number;
 		sirka: number | '';
 		vyska: number | '';
 		ral: string;
+		/** #593: farbu obsluha ručne zmenila → nepreberá farbu prvého zábradlia */
+		ralVlastna: boolean;
 	};
 
-	function kusFrom(v: {
-		typ: ClipTyp;
-		variant: number;
-		sirka: number;
-		vyska: number;
-		ral: string;
-	}): KusRow {
+	function kusFrom(
+		v: {
+			typ: ClipTyp;
+			skloOdoo?: string;
+			variant: number;
+			sirka: number;
+			vyska: number;
+			ral: string;
+		},
+		ralPrveho: string | null
+	): KusRow {
 		return {
 			typ: v.typ,
+			skloOdoo: v.skloOdoo ?? '',
 			variant: v.variant,
 			sirka: (v.sirka || '') as number | '',
 			vyska: (v.vyska || '') as number | '',
-			ral: v.ral
+			ral: v.ral,
+			// echo zo servera: iná farba než prvé zábradlie = ručne zmenená
+			ralVlastna: ralPrveho !== null && v.ral !== ralPrveho
 		};
 	}
 
@@ -53,13 +77,19 @@
 	function seed() {
 		const mv = multiVstup;
 		return mv
-			? { zak: mv.zak, op: mv.op, zakaznik: mv.zakaznik, caka: mv.caka, kusy: mv.kusy.map(kusFrom) }
+			? {
+					zak: mv.zak,
+					op: mv.op,
+					zakaznik: mv.zakaznik,
+					caka: mv.caka,
+					kusy: mv.kusy.map((k, i) => kusFrom(k, i === 0 ? null : (mv.kusy[0]?.ral ?? '')))
+				}
 			: {
 					zak: vstup.zak ?? '',
 					op: vstup.op ?? '',
 					zakaznik: vstup.zakaznik ?? '',
 					caka: vstup.caka ?? false,
-					kusy: [kusFrom(vstup)]
+					kusy: [kusFrom(vstup, null)]
 				};
 	}
 	function echoKey(): unknown {
@@ -88,29 +118,77 @@
 	});
 
 	let jeMulti = $derived(kusy.length > 1);
+	let skupiny = $derived(ponukaSkiel.skupiny);
+
+	// #593: voľba selectu výplne je odvodená z (typ, skloOdoo); výber ju rozloží späť
+	const volbaKusu = (k: KusRow) => volbaSkla(k.typ, k.skloOdoo, skupiny);
+	/** Odoo typ, ktorý select naozaj ukazuje ('' pri zálohe izo/klasika) — ten sa posiela. */
+	const skloOdooKusu = (k: KusRow) => rozlozVolbu(volbaKusu(k), skupiny).skloOdoo;
+	function zvolVypln(k: KusRow, v: string) {
+		const r = rozlozVolbu(v, skupiny);
+		if (jeClipTyp(r.sklo)) k.typ = r.sklo;
+		k.skloOdoo = r.skloOdoo;
+	}
+	function zmenRal(i: number, v: string) {
+		const k = kusy[i];
+		if (!k) return;
+		k.ral = v;
+		if (i > 0) k.ralVlastna = true;
+	}
 
 	// hidden `clipKusy` = VŠETKY zábradlia (základ + ďalšie) pre multi parser
 	let kusyJSON = $derived(
 		JSON.stringify(
-			kusy.map((k) => ({
+			kusy.map((k, i) => ({
 				typ: k.typ,
 				variant: k.variant,
 				sirka: k.sirka,
 				vyska: k.vyska,
-				ral: k.ral
+				ral: ralZabradlia(kusy, i),
+				skloOdoo: skloOdooKusu(k)
 			}))
 		)
 	);
 
 	function addZabradlie() {
-		kusy.push({ typ: 'izo', variant: 1, sirka: '', vyska: '', ral: '' });
+		// #593: farba sa preberá z prvého zábradlia (ralZabradlia), kým ju obsluha nezmení
+		kusy.push({
+			typ: 'izo',
+			skloOdoo: '',
+			variant: 1,
+			sirka: '',
+			vyska: '',
+			ral: '',
+			ralVlastna: false
+		});
 	}
 	function removeZabradlie(i: number) {
-		if (kusy.length > 1) kusy.splice(i, 1);
+		// #593: odstránenie PRVÉHO zábradlia nesmie zhodiť farbu preberajúcim (bezZabradlia)
+		kusy = bezZabradlia(kusy, i);
 	}
 
 	const cislOznac = (n: number) => (n === 1 ? 'zábradlie' : n < 5 ? 'zábradlia' : 'zábradlí');
 </script>
+
+{#snippet volbyVyplne()}
+	{#each skupiny as g (g.label)}
+		{#if g.label}
+			<optgroup label={g.label}>
+				{#each g.items as o (o.value)}<option
+						value={o.value}
+						data-vypocet={o.vypocet}
+						data-naprotivok={o.naprotivok}>{o.label}</option
+					>{/each}
+			</optgroup>
+		{:else}
+			{#each g.items as o (o.value)}<option
+					value={o.value}
+					data-vypocet={o.vypocet}
+					data-naprotivok={o.naprotivok}>{o.label}</option
+				>{/each}
+		{/if}
+	{/each}
+{/snippet}
 
 <div class="card">
 	<form method="POST" action="?/spocitat">
@@ -137,6 +215,9 @@
 
 		<!-- clipKusy = základ + ďalšie zábradlia (multi parser); pri single sa ignoruje -->
 		<input type="hidden" name="clipKusy" value={kusyJSON} />
+		<!-- #593: single tok — šablóna + Odoo typ prvého zábradlia (select výplne nesie voľbu) -->
+		<input type="hidden" name="typ" value={kusy[0]?.typ ?? 'izo'} />
+		<input type="hidden" name="skloOdoo" value={kusy[0] ? skloOdooKusu(kusy[0]) : ''} />
 
 		{#each kusy as kus, i (i)}
 			<div
@@ -159,18 +240,15 @@
 				<div class="grid3">
 					<div class="field">
 						<label for={i === 0 ? 'typ' : `z${i}-typ`}>Výplň</label>
-						<!-- základ (i=0) nesie name+testid single toku; ďalšie idú len cez clipKusy JSON -->
-						{#if i === 0}
-							<select id="typ" name="typ" bind:value={kus.typ} data-testid="typ">
-								<option value="izo">IZO (4-8-4)</option>
-								<option value="klasika">klasika (3.3.1 číre)</option>
-							</select>
-						{:else}
-							<select id="z{i}-typ" bind:value={kus.typ} data-testid={`z${i}-typ`}>
-								<option value="izo">IZO (4-8-4)</option>
-								<option value="klasika">klasika (3.3.1 číre)</option>
-							</select>
-						{/if}
+						<!-- #593: voľba = Odoo typ (`odoo:` prefix) alebo šablóna (záloha); bez `name` —
+						     formulár nesie `typ` + `skloOdoo` (hidden vyššie / clipKusy JSON) -->
+						<select
+							id={i === 0 ? 'typ' : `z${i}-typ`}
+							data-testid={i === 0 ? 'typ' : `z${i}-typ`}
+							bind:value={() => volbaKusu(kus), (v) => zvolVypln(kus, v)}
+						>
+							{@render volbyVyplne()}
+						</select>
 					</div>
 					<div class="field">
 						<label for={i === 0 ? 'variant' : `z${i}-variant`}>Počet výplní</label>
@@ -204,9 +282,10 @@
 								placeholder="napr. RAL 7016"
 							/>
 						{:else}
+							<!-- #593: predvyplnené farbou prvého zábradlia, ručná zmena sa neprepíše -->
 							<input
 								id="z{i}-ral"
-								bind:value={kus.ral}
+								bind:value={() => ralZabradlia(kusy, i), (v) => zmenRal(i, v)}
 								maxlength="40"
 								placeholder="napr. RAL 7016"
 							/>

@@ -553,3 +553,13 @@ vyjadrenie výroby má prednosť pred vylúčením scr_017 z meetingu 25.9. (#57
   „Float sklo 4 mm" pre oba systémy; Odoo 4 mm kalené typy sa v oboch počítajú ako ESG kalené 4 mm.
   Snapshot `sklo-odoo-579` sa zmenil LEN pridaním 4 riadkov (4 mm voľby: rezané → Float sklo 4 mm,
   kalené → ESG kalené 4 mm), žiadna existujúca voľba nezmenila výpočtové sklo.
+
+## CLIP zábradlie = ďalší spotrebiteľ `cfg_sklo_hrubka` (#593, v55)
+
+Systém `CLIP` (6 jednoduché, 16 izolačné) NIE JE v `ODOO_HRUBKY_SEED` — tie kľúče testy iterujú ako
+systémy nárezáka s lokálnym katalógom (`ponukaSkielSystemu`), CLIP ho nemá. Riadky zakladá LEN
+migrácia v55 (`migracie-clip-sklo-hrubky.ts`, INSERT OR IGNORE, aj na čerstvej DB). Editor hrúbok CLIP
+neponúka (`systemyZoStylov`). `ponukaSkielClip` (`clip-sklo.ts`) reuse-uje `ponukaSkielPre` s
+reprezentatívnou lokálnou ponukou (`Izolačné sklo 4/8/4 číre`, `Float sklo 6 mm`) a výpočtové sklo
+premapuje na šablónu CLIP — detail v `clip.md` (#593). Zmena vzorov `vypocetneSkloPre` / správania
+`ponukaSkielPre` sa CLIP-u dotkne → stráži `tests/clip-sklo-593.test.ts`.

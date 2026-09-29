@@ -94,7 +94,7 @@ const hrubky = (d: Database.Database, system: string) =>
 describe('migration → v54 (4 mm jednoduché pre Štandardy, #579)', () => {
 	it('bumpne na v54', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(54);
+		expect(d.pragma('user_version', { simple: true })).toBe(55);
 		d.close();
 	});
 
