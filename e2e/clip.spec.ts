@@ -345,8 +345,15 @@ test('#593 clip: výplň ponúka len šablóny izo/klasika (CI) alebo Odoo sklá
 	const p = await ponukaSkla(page.getByTestId('typ'));
 	// každá voľba sa počíta jednou zo šablón; bez Odoo presne dnešné dve voľby
 	expect(p.vypocty.length).toBeGreaterThan(0);
-	for (const v of p.vypocty) expect(['izo', 'klasika']).toContain(v);
-	if (!p.odoo) expect(p.vypocty).toEqual(['izo', 'klasika']);
+	// obe šablóny sú vždy voliteľné (bez Odoo presne dnešné dve voľby, s Odoo Odoo typy)
+	expect([...p.vypocty].sort()).toEqual(['izo', 'klasika']);
+	if (p.odoo) {
+		const hodnoty = await page
+			.getByTestId('typ')
+			.locator('option')
+			.evaluateAll((els) => els.map((e) => (e as HTMLOptionElement).value));
+		expect(hodnoty.filter((h) => h.startsWith('odoo:')).length).toBeGreaterThan(1);
+	}
 	// predvolená voľba = šablóna IZO (ako doteraz)
 	await expectSklo(page.getByTestId('typ'), 'izo');
 	expect(errs).toEqual([]);
@@ -386,7 +393,7 @@ test('#593 clip: „Pridať sklá do objednávky" — Zábradlie 1 × N ks rozme
 	await expect(riadok.getByTestId(/^popis-\d+$/)).toHaveText('Zábradlie 1');
 	await expect(riadok.locator('td').nth(1)).toContainText(String(rozmer.sirka));
 	await expect(riadok.locator('td').nth(1)).toContainText(String(rozmer.vyska));
-	await expect(riadok.locator('td').nth(3)).toContainText('2');
+	await expect(riadok.locator('td').nth(3)).toHaveText(/^\s*2\s*$/);
 	expect(errs).toEqual([]);
 });
 
@@ -419,7 +426,7 @@ test('#593 clip multi: 2 zábradlia → 2 riadky objednávky skla', async ({ pag
 	await expect(popisy).toHaveText(['Zábradlie 1', 'Zábradlie 2']);
 	const riadok2 = page.locator('tbody tr', { has: page.getByText('Zábradlie 2', { exact: true }) });
 	await expect(riadok2.locator('td').nth(1)).toContainText(String(r2.sirka));
-	await expect(riadok2.locator('td').nth(3)).toContainText('3');
+	await expect(riadok2.locator('td').nth(3)).toHaveText(/^\s*3\s*$/);
 	expect(errs).toEqual([]);
 });
 
@@ -452,5 +459,80 @@ test('#593 clip: nové zábradlie preberá RAL prvého, ručná zmena sa neprep�
 	await waitHydrated(page);
 	await expect(page.getByTestId('kus-detail-1')).toContainText('RAL: RAL 3000');
 	await expect(page.getByTestId('kus-detail-2')).toContainText('RAL: RAL 1015');
+	expect(errs).toEqual([]);
+});
+
+test('#593 clip: odstránenie 1. zábradlia nezhodí preberanú farbu ostatným', async ({ page }) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-CLIP-RALDEL');
+	await page.locator('#ral').fill('RAL 7016');
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	await expect(page.locator('#z2-ral')).toHaveValue('RAL 7016');
+	await page.getByTestId('zabradlie-remove-0').click();
+	// nové prvé aj preberajúce ďalšie si farbu ponechajú
+	await expect(page.locator('#ral')).toHaveValue('RAL 7016');
+	await expect(page.locator('#z1-ral')).toHaveValue('RAL 7016');
+	expect(errs).toEqual([]);
+});
+
+/** Ne-predvolená voľba výplne počítaná šablónou `sablona` (na PROD Odoo typ), jej hodnota + názov. */
+async function inaVolba(select: import('@playwright/test').Locator, sablona: string) {
+	return select.evaluate((el, sab) => {
+		const s = el as HTMLSelectElement;
+		const o =
+			[...s.options].find((x) => x.dataset.vypocet === sab && x.value !== s.value) ??
+			[...s.options].find((x) => x.dataset.vypocet === sab)!;
+		return { value: o.value, nazov: (o.textContent ?? '').split(' · ')[0]!.trim() };
+	}, sablona);
+}
+
+test('#593 clip: zvolené sklo výplne ide do výpočtu šablóny a na kontrolu (bez zápisu)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await hlavicka(page, 'E2E-CLIP-VOLBA');
+	const typ = page.getByTestId('typ');
+	const p = await ponukaSkla(typ);
+	const volba = await inaVolba(typ, 'klasika');
+	await typ.selectOption(volba.value);
+	await expectSklo(typ, 'klasika');
+	await page.getByTestId('variant').selectOption('4');
+	await page.locator('#sirka').fill('3000');
+	await page.locator('#vyska').fill('1000');
+	// 2. zábradlie s iným (izolačným) sklom
+	await page.getByRole('button', { name: '➕ Pridať zábradlie' }).click();
+	const z1 = page.getByTestId('z1-typ');
+	const volba1 = await inaVolba(z1, 'izo');
+	await z1.selectOption(volba1.value);
+	await expectSklo(z1, 'izo');
+	await page.locator('#z1-sirka').fill('1500');
+	await page.locator('#z1-vyska').fill('1000');
+	await page.getByRole('button', { name: /Spočítať spoločný rozpis/ }).click();
+	await waitHydrated(page);
+	// šablóna podľa druhu skla: klasika → ZASP202413, izo → ZASP00119 (Money kódy šablón)
+	await expect(page.locator('input[name="qty_ZASP202413"]')).toBeVisible();
+	await expect(page.locator('input[name="qty_ZASP00119"]')).toBeVisible();
+	await expect(page.getByTestId('kus-detail-0')).toContainText('3.3.1 číre');
+	await expect(page.getByTestId('kus-detail-1')).toContainText('4-8-4 IZO');
+	if (p.odoo) {
+		await expect(page.getByTestId('kus-detail-0')).toContainText(`sklo: ${volba.nazov}`);
+		await expect(page.getByTestId('kus-detail-1')).toContainText(`sklo: ${volba1.nazov}`);
+	}
+	// späť na zadanie: voľby ostanú
+	await page.getByRole('button', { name: /Späť a upraviť/ }).click();
+	await waitHydrated(page);
+	await expect(page.getByTestId('typ')).toHaveValue(volba.value);
+	await expect(page.getByTestId('z1-typ')).toHaveValue(volba1.value);
+
+	// single tok: zvolené sklo na kontrole (badge „Sklo:" len pri Odoo type)
+	await page.getByTestId('zabradlie-remove-1').click();
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+	await expect(page.locator('input[name="qty_ZASP202413"]')).toBeVisible();
+	if (p.odoo) await expect(page.getByTestId('clip-sklo')).toHaveText(`Sklo: ${volba.nazov}`);
+	else await expect(page.getByTestId('clip-sklo')).toHaveCount(0);
 	expect(errs).toEqual([]);
 });

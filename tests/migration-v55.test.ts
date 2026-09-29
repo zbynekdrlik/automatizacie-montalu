@@ -67,8 +67,8 @@ const dbPath = path.join(tmpRoot, 'v54.db');
 			druh TEXT NOT NULL CHECK (druh IN ('izolacne', 'jednoduche', 'esg')),
 			UNIQUE (system, mm)
 		);
-		-- stav PROD po v54 + (fiktívny) CLIP riadok, ktorý už existuje s iným druhom → v55 ho NESMIE
-		-- prepísať ani zdvojiť (INSERT OR IGNORE na UNIQUE(system, mm))
+		-- stav PROD po v54 (bez CLIP); prípad „CLIP riadok už existuje" (INSERT OR IGNORE na
+		-- UNIQUE(system, mm) ho NESMIE prepísať) stavia až posledný test nižšie
 		INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES
 			('Robust', 24, 'izolacne'),
 			('Štandard +', 6, 'jednoduche'), ('Štandard +', 16, 'izolacne'), ('Štandard +', 24, 'izolacne'),

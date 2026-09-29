@@ -30,7 +30,7 @@ const {
 	sklaClip
 } = await import('../src/lib/server/clip-sklo');
 const { volbaSkla, rozlozVolbu } = await import('../src/lib/sklo-odoo');
-const { computeClip, rozmerSklaClip, ralZabradlia, CLIP_VYPLN_POPIS } =
+const { computeClip, rozmerSklaClip, ralZabradlia, bezZabradlia, CLIP_VYPLN_POPIS } =
 	await import('../src/lib/clip');
 const { parseClipVstup } = await import('../src/lib/server/vstup');
 const clip = await import('../src/routes/clip/+page.server');
@@ -155,6 +155,34 @@ describe('#593 (1) ponuka výplne CLIP z Odoo', () => {
 		odooOn();
 		const p = ponukaSkielClip(await fetchGlassTypes(), []);
 		expect(vsetky(p.skupiny).map((o) => o.value)).toEqual(['izo', 'klasika']);
+	});
+
+	it('Odoo bez skla jednej šablóny → tá šablóna dostane lokálnu voľbu (vždy voliteľná)', async () => {
+		odooOn(ODOO_KATALOG_579.filter((r) => r.total_thickness_mm !== 6));
+		const sk = ponukaSkielClip(await fetchGlassTypes()).skupiny;
+		const v = vsetky(sk);
+		expect(v.filter((o) => o.vypocet === 'izo').every((o) => o.odoo !== '')).toBe(true);
+		expect(v.filter((o) => o.vypocet === 'klasika')).toEqual([
+			{
+				value: 'klasika',
+				label: 'klasika (3.3.1 číre)',
+				nazov: 'klasika (3.3.1 číre)',
+				vypocet: 'klasika',
+				odoo: '',
+				naprotivok: true
+			}
+		]);
+		expect(volbaSkla('klasika', '', sk)).toBe('klasika');
+		// a naopak bez 16 mm izolačných
+		_resetGlassTypesCache();
+		odooOn(ODOO_KATALOG_579.filter((r) => r.total_thickness_mm !== 16));
+		const sk2 = ponukaSkielClip(await fetchGlassTypes()).skupiny;
+		expect(
+			vsetky(sk2)
+				.filter((o) => o.vypocet === 'izo')
+				.map((o) => o.value)
+		).toEqual(['izo']);
+		expect(vsetky(sk2).filter((o) => o.vypocet === 'klasika').length).toBeGreaterThan(1);
 	});
 
 	it('lokálny typ skla pre objednávku bez Odoo voľby = katalógový názov (matcher #556)', () => {
@@ -448,6 +476,36 @@ describe('#593 (3) RAL farba nového zábradlia', () => {
 		expect(ralZabradlia(kusy, 2)).toBe('RAL 9005');
 		// aj ručne vymazaná farba ostane prázdna (obsluha to tak chcela)
 		expect(ralZabradlia([{ ral: 'RAL 9005' }, { ral: '', ralVlastna: true }], 1)).toBe('');
+	});
+
+	it('odstránenie PRVÉHO zábradlia: preberajúce si farbu ponechajú, ručná ostane ručná', () => {
+		const kusy = [
+			{ id: 'a', ral: 'RAL 7016' },
+			{ id: 'b', ral: '' },
+			{ id: 'c', ral: 'RAL 3000', ralVlastna: true },
+			{ id: 'd', ral: '' }
+		];
+		const r = bezZabradlia(kusy, 0);
+		expect(r.map((k) => k.id)).toEqual(['b', 'c', 'd']);
+		expect(r.map((_, i) => ralZabradlia(r, i))).toEqual(['RAL 7016', 'RAL 3000', 'RAL 7016']);
+		// zmena nového prvého sa prenesie len do preberajúceho (d), nie do ručného (c)
+		const zmena = r.map((k, i) => (i === 0 ? { ...k, ral: 'RAL 9005' } : k));
+		expect(zmena.map((_, i) => ralZabradlia(zmena, i))).toEqual([
+			'RAL 9005',
+			'RAL 3000',
+			'RAL 9005'
+		]);
+		expect(kusy[1]!.ral).toBe(''); // vstup sa nemení (čistá funkcia)
+	});
+
+	it('odstránenie iného než prvého / neplatný index / posledné zábradlie', () => {
+		const kusy = [{ ral: 'RAL 7016' }, { ral: '' }, { ral: '' }];
+		const r = bezZabradlia(kusy, 1);
+		expect(r).toEqual([{ ral: 'RAL 7016' }, { ral: '' }]);
+		expect(ralZabradlia(r, 1)).toBe('RAL 7016');
+		expect(bezZabradlia(kusy, 7)).toEqual(kusy);
+		expect(bezZabradlia(kusy, -1)).toEqual(kusy);
+		expect(bezZabradlia([{ ral: 'X' }], 0)).toEqual([{ ral: 'X' }]);
 	});
 
 	it('index mimo poľa → prázdna farba', () => {
