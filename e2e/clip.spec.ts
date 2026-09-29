@@ -477,13 +477,15 @@ test('#593 clip: odstránenie 1. zábradlia nezhodí preberanú farbu ostatným'
 	expect(errs).toEqual([]);
 });
 
-/** Ne-predvolená voľba výplne počítaná šablónou `sablona` (na PROD Odoo typ), jej hodnota + názov. */
+/** Ne-predvolená voľba výplne počítaná šablónou `sablona` (na PROD Odoo typ, ktorý NIE JE
+ *  predvolený náprotivok šablóny ani aktuálna voľba), jej hodnota + názov. Bez Odoo (CI) je
+ *  jediná voľba šablóny = tá lokálna. */
 async function inaVolba(select: import('@playwright/test').Locator, sablona: string) {
 	return select.evaluate((el, sab) => {
 		const s = el as HTMLSelectElement;
+		const sablony = [...s.options].filter((x) => x.dataset.vypocet === sab);
 		const o =
-			[...s.options].find((x) => x.dataset.vypocet === sab && x.value !== s.value) ??
-			[...s.options].find((x) => x.dataset.vypocet === sab)!;
+			sablony.find((x) => x.dataset.naprotivok !== 'true' && x.value !== s.value) ?? sablony[0]!;
 		return { value: o.value, nazov: (o.textContent ?? '').split(' · ')[0]!.trim() };
 	}, sablona);
 }
