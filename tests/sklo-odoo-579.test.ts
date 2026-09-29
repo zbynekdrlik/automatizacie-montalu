@@ -103,8 +103,10 @@ describe('#579 jeden zdroj hrúbok per systém (sklo-povolene.ts)', () => {
 		expect(mm('Robust')).toEqual(['24:izolacne']);
 		expect(mm('Slide')).toEqual(['16:izolacne', '6:jednoduche']);
 		expect(mm('Deluxe')).toEqual(['6:esg', '10:esg']);
-		for (const s of ['Štandard +', 'Štandard', 'Štandard Drevo'])
-			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
+		// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché; Drevostavby bez zmeny
+		for (const s of ['Štandard +', 'Štandard'])
+			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne', '4:jednoduche']);
+		expect(mm('Štandard Drevo')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
 		expect(skloHrubkyPre('Neznámy')).toEqual([]);
 	});
 
