@@ -13,8 +13,8 @@
 //
 // #594 (Odoo úloha 1218, Marek 29.9.: „tam majú byť iba odoo") OBRACIA ROZHODNUTÉ #579 („lokálne
 // sklá ostávajú"): pri dostupnom Odoo ponuka NEMÁ lokálne sklá — len skupiny „Odoo — <druh>".
-// Predvolené sklo systému = Odoo voľba počítaná dnešným predvoleným lokálnym sklom (klient
-// `volbaSkla`, prvá v poradí `zoskupTypySkla` — VIDITEĽNÁ v selecte, nie tichý výber); „Použiť
+// Predvolené sklo systému = PRESNÝ Odoo náprotivok dnešného predvoleného lokálneho skla (klient
+// `volbaSkla` + `naprotivok`, pri AL/TH prvý v poradí `zoskupTypySkla` — VIDITEĽNÝ v selecte); „Použiť
 // znova" lokálneho skla bez Odoo náprotivku dostane doplnkovú voľbu (`ponukaPreStyl`). Odoo
 // nedostupné → dnešná lokálna ponuka (záloha).
 import { logger } from './log';
@@ -42,7 +42,7 @@ export const PREFIX_ODOO_SKUPINY = 'Odoo — ';
 
 /** Lokálna voľba (záloha pri nedostupnom Odoo) — bez cenníkového popisu (Odoo dáta nie sú). */
 function lokalnaVolba(n: string): VolbaSkla {
-	return { value: n, label: n, nazov: n, vypocet: n, odoo: '' };
+	return { value: n, label: n, nazov: n, vypocet: n, odoo: '', naprotivok: true };
 }
 
 /**
@@ -97,17 +97,25 @@ export function ponukaSkielPre(
 		}
 		return triedaPre(o)!.sklo;
 	};
+	// #594: presný náprotivok výpočtového skla (matcher so VŠETKÝMI osami — odtieň aj povlak) —
+	// len taký môže byť predvolený (inak by Robust predvolil stopsol, Štandard + VSG, Deluxe bronz)
+	const naprotivokPre = (o: GlassTypeOption, vypocet: string) =>
+		matchOdooGlassType(vypocet, typy).kandidati.includes(o);
 	const volby = new Map<string, VolbaSkla>(
-		typy.map((o) => [
-			o.value,
-			{
-				value: ODOO_PREFIX + o.value,
-				label: o.label,
-				nazov: o.name || o.value,
-				vypocet: vypocetPre(o),
-				odoo: o.value
-			}
-		])
+		typy.map((o) => {
+			const vypocet = vypocetPre(o);
+			return [
+				o.value,
+				{
+					value: ODOO_PREFIX + o.value,
+					label: o.label,
+					nazov: o.name || o.value,
+					vypocet,
+					odoo: o.value,
+					naprotivok: naprotivokPre(o, vypocet)
+				}
+			];
+		})
 	);
 	const odooSkupiny = zoskupTypySkla(typy, [], false).map((g) => ({
 		label: PREFIX_ODOO_SKUPINY + g.label,

@@ -1,13 +1,13 @@
 // #579: ponuka „Sklo (základ)" v nárezáku zasklení = Odoo typy skla podľa hrúbky systému (#594: pri
-// dostupnom Odoo LEN tie — žiadne lokálne sklá appky; Odoo nedostupné → lokálne sklá). CLIENT-SAFE (žiadny `$lib/server` import) — ponuku per systém počíta
-// server (`$lib/server/sklo-odoo` `ponukaSkielPre`), klient ju len zúži podľa štýlu a prekladá
+// dostupnom Odoo LEN tie — žiadne lokálne sklá appky; Odoo nedostupné → lokálne sklá). CLIENT-SAFE
+// (žiadny `$lib/server` import) — ponuku per systém počíta server (`$lib/server/sklo-odoo` `ponukaSkielPre`), klient ju len zúži podľa štýlu a prekladá
 // voľbu selectu na DVE polia formulára:
 //   • `sklo`     = LOKÁLNE výpočtové sklo (vzorce, IZO nárezák, hrúbka, tesnenie, Money — nič z toho
 //                  sa nemení, všetok existujúci kód pracuje ďalej s ním);
 //   • `skloOdoo` = presne zvolený Odoo typ (`cennik_code || name`) → objednávka skla + plán.
 // Voľba selectu je ODVODENÁ (`volbaSkla`) z týchto dvoch polí — žiadny ďalší stav ani `$effect`.
-// #594: keď lokálne `sklo` v ponuke nie je (Odoo ponuka), select ukáže PRVÚ Odoo voľbu počítanú
-// týmto sklom (predvolené sklo systému aj „Použiť znova" starého odpisu); keď taká voľba nie je,
+// #594: keď lokálne `sklo` v ponuke nie je (Odoo ponuka), select ukáže PRVÝ presný Odoo náprotivok
+// tohto skla (predvolené sklo systému aj „Použiť znova" starého odpisu); keď taká voľba nie je,
 // `ponukaPreStyl` pridá lokálne sklo ako jedinú doplnkovú voľbu „pôvodné sklo z appky".
 import { SKLO_INE } from './sklo';
 
@@ -29,6 +29,12 @@ export interface VolbaSkla {
 	vypocet: string;
 	/** Odoo hodnota (`cennik_code || name`); '' pri lokálnom skle */
 	odoo: string;
+	/**
+	 * #594: voľba je PRESNÝ náprotivok svojho výpočtového skla (matcher #556: zloženie ∧ kategória ∧
+	 * odtieň ∧ povlak) — len taká môže byť predvolená. Napr. stopsol / bronz / VSG typ, ktorý sa
+	 * počíta ako „4/16/4 číre" / „Float sklo 6 mm", NIE JE náprotivok. Lokálne sklo = samo sebe.
+	 */
+	naprotivok: boolean;
 }
 
 /** `<optgroup>` ponuky (prázdny `label` = bez skupiny — lokálny fallback). */
@@ -47,7 +53,8 @@ const lokalnaVolba = (n: string): VolbaSkla => ({
 	label: n,
 	nazov: n,
 	vypocet: n,
-	odoo: ''
+	odoo: '',
+	naprotivok: true
 });
 
 /**
@@ -91,8 +98,9 @@ const vsetky = (skupiny: readonly SkupinaVolieb[]): VolbaSkla[] => skupiny.flatM
 /**
  * Hodnota selectu pre stav (`sklo`, `skloOdoo`): zvolený Odoo typ, ak je v ponuke a stále sa počíta
  * zvoleným výpočtovým sklom; inak lokálne sklo, keď je v ponuke (záloha bez Odoo, doplnková voľba);
- * inak (#594) PRVÁ Odoo voľba počítaná týmto sklom (predvolené sklo / „Použiť znova" — viditeľný
- * výber v selecte); inak sklo samo (aj sentinel „Iné").
+ * inak (#594) PRVÝ presný Odoo náprotivok tohto skla (`naprotivok`; pri AL/TH prvý v poradí), a keď
+ * náprotivok nie je, prvá Odoo voľba počítaná týmto sklom (predvolené sklo / „Použiť znova" —
+ * viditeľný výber v selecte, nikdy stopsol/bronz/VSG typ pred presným); inak sklo samo (aj „Iné").
  */
 export function volbaSkla(
 	sklo: string,
@@ -105,7 +113,8 @@ export function volbaSkla(
 		if (o) return o.value;
 	}
 	if (v.some((x) => x.value === sklo)) return sklo;
-	return v.find((x) => x.odoo !== '' && x.vypocet === sklo)?.value ?? sklo;
+	const odooPre = v.filter((x) => x.odoo !== '' && x.vypocet === sklo);
+	return (odooPre.find((x) => x.naprotivok) ?? odooPre[0])?.value ?? sklo;
 }
 
 /** Voľba selectu → polia formulára (`sklo` výpočtové, `skloOdoo` Odoo typ alebo ''). */
