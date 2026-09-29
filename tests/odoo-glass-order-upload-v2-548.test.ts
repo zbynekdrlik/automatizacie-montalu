@@ -116,10 +116,13 @@ describe('#548 uploadGlassOrderToOdoo — require_order + outcome', () => {
 		const out = await uploadGlassOrderToOdoo(zak);
 		expect(out.result).toBe('uploaded');
 		const body = captured as unknown as {
-			require_order: boolean;
-			glass_order: { version: number };
+			glass_order: { version: number; require_order: boolean };
 		};
-		expect(body.require_order).toBe(false);
+		// #540: Odoo číta LEN `glass_order.require_order` (odoo-erp sale_order_narezak_glass.py,
+		// test_glass_top_level_require_order_ignored_8293) — top-level kľúč ignoruje a hlási
+		// „neznámy kľúč: require_order" v chate zákazky. Top-level ho preto neposielame vôbec.
+		expect(body.glass_order.require_order).toBe(false);
+		expect(body).not.toHaveProperty('require_order');
 		expect(body.glass_order.version).toBe(2);
 		expect(out.odoo).toEqual({ glassOrderId: 11, name: 'OSK00011', dq: ['upozornenie'] });
 	});
@@ -144,7 +147,8 @@ describe('#548 uploadGlassOrderToOdoo — require_order + outcome', () => {
 		setJson2Transport(async (_input, init) => {
 			called = true;
 			const b = init?.body ? JSON.parse(String(init.body)) : {};
-			expect(b.require_order).toBe(false);
+			expect(b.glass_order.require_order).toBe(false);
+			expect(b).not.toHaveProperty('require_order');
 			return new Response('{}', { status: 200 });
 		});
 		const out = await uploadGlassOrderToOdoo(zak);
