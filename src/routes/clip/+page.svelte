@@ -61,7 +61,7 @@
 	);
 </script>
 
-<svelte:head><title>CLIP zábradlie — odpis materiálu</title></svelte:head>
+<svelte:head><title>Pevné zasklenie — Zábradlia (CLIP)</title></svelte:head>
 
 {#snippet hiddenVstup()}
 	<input type="hidden" name="zak" value={vstup.zak} />
@@ -155,7 +155,7 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<h1>CLIP zábradlie — odpis materiálu do Money</h1>
+		<h1>Pevné zasklenie — Zábradlia (CLIP)</h1>
 		<p class="sub">
 			Zadaj rozmer zábradlia a počet výplní, rozpis si skontroluješ a upravíš pred odoslaním. Viac
 			zábradlí naraz pridáš tlačidlom „➕ Pridať zábradlie" — spočíta sa jeden spoločný odpis.

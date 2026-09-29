@@ -639,6 +639,10 @@ test('B2B: admin vytvorí účet, ten je obmedzený (nav/redirect/šírkový blo
 	await expect(page.getByRole('link', { name: 'Zasklenia', exact: true })).toBeVisible();
 	await expect(page.getByRole('link', { name: 'Pergola', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('link', { name: 'Používatelia' })).toHaveCount(0);
+	// #592: skupina „Pevné zasklenie" (/fix, /fix/cad, /clip — všetko b2b-zakázané) sa b2b
+	// vôbec nerenderuje, ani žiadna z jej troch volieb
+	await expect(page.getByTestId('pevne-menu-toggle')).toHaveCount(0);
+	await expect(page.locator('nav.top a[href^="/fix"], nav.top a[href^="/clip"]')).toHaveCount(0);
 	await goto(page, '/pergola');
 	await expect(page).toHaveURL(/\/zasklenia/);
 	await goto(page, '/pouzivatelia');

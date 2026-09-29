@@ -129,7 +129,7 @@
 	let poliaJSON = $derived(JSON.stringify(poliaS.length ? poliaS : sirkaNum ? [sirkaNum] : []));
 </script>
 
-<svelte:head><title>Fixy — pevné zasklenie</title></svelte:head>
+<svelte:head><title>Pevné zasklenie — Fix z appky</title></svelte:head>
 
 {#snippet hidden()}
 	<input type="hidden" name="zak" value={vstup.zak} />
@@ -151,7 +151,7 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<h1>Fixy — pevné zasklenie</h1>
+		<h1>Pevné zasklenie — Fix z appky</h1>
 		<p class="sub" style="margin-bottom:16px">
 			Vyber tvar a zadaj rozmery — vykreslím konštrukciu s kótami, dielňa reže podľa výkresu.
 			<b>Šikmý</b> má šikmú hornú hranu (do boku pergoly, dve rôzne výšky),

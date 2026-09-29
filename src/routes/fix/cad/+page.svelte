@@ -37,7 +37,7 @@
 	}
 </script>
 
-<svelte:head><title>Fixy — CAD → Money</title></svelte:head>
+<svelte:head><title>Pevné zasklenie — Fix z CADu</title></svelte:head>
 
 {#snippet hiddenVstup()}
 	<input type="hidden" name="zak" value={vstup.zak} />
@@ -84,7 +84,7 @@
 
 {#if step === 'form'}
 	<div class="card">
-		<h1>Fixy — pevné zasklenie</h1>
+		<h1>Pevné zasklenie — Fix z CADu</h1>
 		<p class="sub" style="margin-bottom:16px">Vyber, čo práve potrebuješ spraviť:</p>
 		<FixModeNav active="cad" />
 	</div>
