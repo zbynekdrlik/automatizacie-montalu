@@ -15,6 +15,8 @@ paths:
   - "src/routes/zasklenia/+page.server.ts"
   - "src/routes/fix/+page.server.ts"
   - "src/routes/pergola/narez/+page.server.ts"
+  - "src/routes/clip/+page.server.ts"
+  - "src/lib/server/clip-sklo.ts"
 ---
 
 # Objednávka skla — gotchas (#496)
@@ -113,6 +115,7 @@ redirecting.
 | `/zasklenia` | `pridatSklaMulti` | `MultiResult.posuvy[i].sklo` | 1–2 items per posuv (`sklaPosuvu`, #578) |
 | `/fix` | `pridatSkla` | `FixVykres.polia[]: { sirka, vLavo, vPravo }` | N items (per pole); sikmy→vLavo/vPravo, rovny→vyska |
 | `/pergola/narez` | `pridatSkla` | `StrechaSkloVypocet: { sirkaMm, dlzkaMm, pocetTabul, typ }` | 1 item; honest-null gate (no insert when sirkaMm, dlzkaMm, or pocetTabul is null) |
+| `/clip` | `pridatSkla` / `pridatSklaMulti` (#593) | `rozmerSklaClip(kus)` (výplň = sklo, `sklaClip` v `clip-sklo.ts`) | 1 item per zábradlie „Zábradlie i", `pocet` = N výplní; idempotentne + bez presmerovania + `upozornenieCudzie` (ako zasklenia) |
 
 **ZAK/OP source per module:** zasklenia uses `parseVstup().zak/.op`, FIX uses
 `parseFixVstup().zak/.op`, pergola uses `parseIdent(form).zak/.op` (separate from

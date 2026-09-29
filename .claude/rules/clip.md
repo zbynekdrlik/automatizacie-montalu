@@ -5,6 +5,9 @@ paths:
   - 'tests/clip.test.ts'
   - 'tests/clip-odpis.test.ts'
   - 'e2e/clip.spec.ts'
+  - 'src/lib/server/clip-sklo.ts'
+  - 'src/lib/components/clip/ClipForm.svelte'
+  - 'tests/clip-sklo-593.test.ts'
 ---
 
 # CLIP zábradlie (nárez + Money odpis) — #372
@@ -106,7 +109,8 @@ per-riadkový ROUNDUP (1:1 Excel, kontrakt vyššie). Guard: `tests/clip-narez.t
    (`z{i}-*` id/testid, bez `name`). Submit prepína `formaction={jeMulti ? '?/spocitatMulti'
    : '?/spocitat'}` (`jeMulti = kusy.length > 1`). `clipKusy` = VŠETKY kusy (základ +
    ďalšie), takže `parseClipMultiVstup` (číta `clipKusy`) aj `parseClipVstup` (číta
-   top-level `name=`) ostali NEDOTKNUTÉ — 6 akcií nezmenených (guard `clip-odpis.test.ts`).
+   top-level `name=`) ostali NEDOTKNUTÉ — od #593 8 akcií (+ `pridatSkla`/`pridatSklaMulti`,
+   guard `clip-odpis.test.ts`). Od #593 select výplne NEMÁ `name` (sekcia #593 nižšie).
    Stav sa inicializuje zo servera cez `seed()` funkciu (nie `$state(prop)` priamo — inak
    `state_referenced_locally` warning) a re-synchronizuje `$effect`-om pri POST round-tripe
    (echo `vstup`/`multiVstup`).
@@ -151,3 +155,35 @@ per-riadkový ROUNDUP (1:1 Excel, kontrakt vyššie). Guard: `tests/clip-narez.t
   `tests/b2b-route-coverage.test.ts`.
 - Dedup `UNIQUE(zak,op,live)` nedotknutý; mimo `MONEY_LIVE=1` nič do živého importu;
   `clip.ts` je client-safe (žiadny import zo `$lib/server/*`).
+
+## #593 — výplň = Odoo sklo 6/16 mm, „Pridať sklá do objednávky", RAL z prvého zábradlia (úlohy 1214/1216/1217)
+
+Money-NEUTRÁLNE: `typ` (šablóna izo/klasika) ostáva JEDINÝ vstup odpisu (zasklievací profil);
+kontraktné vektory `tests/clip*.test.ts` nezmenené.
+
+- **Výplň z Odoo** = mechanizmus nárezáka zasklení (#579/#594, `glass-catalog.md`): systém `CLIP`
+  v `cfg_sklo_hrubka` (migrácia v55: 6 jednoduché, 16 izolačné) → `src/lib/server/clip-sklo.ts`
+  `ponukaSkielClip` volá `ponukaSkielPre('CLIP', <reprezentatívna lokálna ponuka>, …)` a výsledné
+  výpočtové sklo PREMAPUJE na šablónu (`Izolačné sklo 4/8/4 číre` → `izo`, `Float sklo 6 mm` →
+  `klasika`). `VolbaSkla.vypocet` je pri CLIP ŠABLÓNA — klient `volbaSkla`/`rozlozVolbu` s ňou pracuje
+  bez zmeny. Predvolená voľba (`naprotivok`): izo = presný náprotivok 4/8/4 číre (matcher), klasika =
+  číre VSG bez povlaku (`jeKlasikaVsg` — matcher „3.3.1" na Odoo „VSG 33.1" NEsadne, zloženie „3+3 /
+  PVB"). Odoo nedostupné / CLIP bez hrúbok → záloha `izo`/`klasika` (`CLIP_VYPLN_POPIS`). CLIP NIE JE
+  v editore hrúbok (`/zasklenia/nastavenia` ponúka len systémy nárezáka) — zmena hrúbok CLIP = migrácia.
+- **Formulár:** select výplne nemá `name`; single tok nesie hidden `typ` + `skloOdoo` (efektívny Odoo
+  typ = `rozlozVolbu(volbaSkla(...))`), multi `clipKusy[].skloOdoo`. Server `parseClipVstupSOdoo` /
+  `parseClipMultiVstupSOdoo` (spocitat/odoslat/pridatSkla + multi) overí typ voči ponuke A šablóne
+  (izolačný typ + klasika = chyba) a doplní `skloOdooNazov` (badge „Sklo: …"); pri nedostupnom Odoo
+  prijme bez overenia. `skloOdoo` je v `ClipVstup`/detaile LEN keď je zvolený (starý detail
+  byte-identický); `upravit`/`upravitMulti` echo ostáva na holom parse.
+- **Objednávka skla:** `sklaClip` → na zábradlie JEDEN riadok „Zábradlie i", `pocet` = N výplní,
+  rozmer = `rozmerSklaClip` (výplň JE sklo; `Math.round` zo SUROVÉHO B10/C10 cez zdieľaný
+  `vyplnSurova`, nie z R1 zobrazenia), `typSkla = skloOdoo || lokalnySkloClip(typ)` (`Izolačné sklo
+  4/8/4 číre` / `3.3.1`, potom `priradOdooTypy`; „3.3.1" Odoo nespáruje → podklad badge
+  „nepriradené"). Idempotentne, bez presmerovania (vráti `kontrola`/`kontrolaMulti` + banner
+  `skla-pridane`/`skla-pridane-cudzie`); tlačidlo `pridat-skla` na kontrole aj hotovo (single/multi).
+- **RAL:** `ralZabradlia(kusy, i)` (client-safe `clip.ts`) — ďalšie zábradlie ukazuje/posiela farbu
+  PRVÉHO, kým ho obsluha ručne nezmení (`KusRow.ralVlastna`; pri echu zo servera = farba ≠ prvé).
+- **E2E:** výber výplne VŽDY `vyberSklo(page.getByTestId('typ'), 'izo'|'klasika')` / `expectSklo`
+  (na PROD sú voľby `odoo:…`), nikdy `selectOption('izo')` (aj `caka-checkbox`, `odpis-blok-override`).
+  Lokálne overené aj Odoo vetvou (vite dev + mock JSON-2 s `ODOO_KATALOG_579`).
