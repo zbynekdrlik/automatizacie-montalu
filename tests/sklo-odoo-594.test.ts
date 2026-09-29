@@ -121,7 +121,9 @@ describe('#594 predvolené sklo = Odoo voľba s dnešným predvoleným výpočto
 		odooOn();
 		const p = await ponuka('Robust');
 		const sk = ponukaPreStyl(p, lokalne('Robust'), CIRE_24);
-		const posledna = vsetky(sk).filter((o) => o.vypocet === CIRE_24).at(-1)!;
+		const posledna = vsetky(sk)
+			.filter((o) => o.vypocet === CIRE_24)
+			.at(-1)!;
 		expect(volbaSkla(CIRE_24, posledna.odoo, sk)).toBe(posledna.value);
 		expect(skloOdooPre(p, lokalne('Robust'), CIRE_24, posledna.odoo)).toBe(posledna.odoo);
 	});
@@ -172,9 +174,7 @@ describe('#594 „Použiť znova" starého odpisu s lokálnym sklom', () => {
 		const p = await ponuka('Robust');
 		const pov = lokalne('Robust');
 		expect(vsetky(ponukaPreStyl(p, pov, SKLO_INE)).some((o) => o.odoo === '')).toBe(false);
-		expect(vsetky(ponukaPreStyl(p, pov, 'Float sklo 6 mm')).some((o) => o.odoo === '')).toBe(
-			false
-		);
+		expect(vsetky(ponukaPreStyl(p, pov, 'Float sklo 6 mm')).some((o) => o.odoo === '')).toBe(false);
 	});
 });
 

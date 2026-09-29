@@ -61,9 +61,7 @@ describe('#594 matchOdooGlassType — číre ≠ extračiré, Matelux = matné',
 		expect(m.typ?.value).toBe('OP005E');
 		expect(cennikPopis('Float kalené 10 mm', ODOO_10, 'odoo')).toBe('ESG Float čirý 10mm');
 		// podklad: riadok „Float kalené 10 mm" už nemá 3 kandidátov, ale jediného
-		expect(naviazanieRiadku('Float kalené 10 mm', ODOO_10, 'odoo').kandidati).toEqual([
-			ODOO_10[1]
-		]);
+		expect(naviazanieRiadku('Float kalené 10 mm', ODOO_10, 'odoo').kandidati).toEqual([ODOO_10[1]]);
 	});
 	it('lokálne číre sa NIKDY nespáruje na extračiré (ani rezané, ani kalené)', () => {
 		expect(matchOdooGlassType('Float sklo 6 mm', ODOO_6).typ?.value).toBe('OP003');
