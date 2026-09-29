@@ -64,11 +64,11 @@ test('Deluxe: tabule s otvorom ⌀46 idú na podklad ako samostatný riadok (po�
 	await waitHydrated(page);
 
 	// každá položka má pod sebou aj riadok s voľbami (spec/prílohy) → počítaj bunky popisu
-	const popisy = page.locator('td[data-testid^="popis-"]');
+	const popisy = page.locator('span[data-testid^="popis-"]');
 	await expect(popisy).toHaveCount(2);
 	const riadok = (popis: string | RegExp) =>
 		page.locator('tbody tr').filter({
-			has: page.locator('td[data-testid^="popis-"]', { hasText: popis })
+			has: page.locator('span[data-testid^="popis-"]', { hasText: popis })
 		});
 	const sOtvorom = riadok('Zasklenie 1 — s otvorom ⌀46');
 	const bez = riadok(/^Zasklenie 1$/);

@@ -97,8 +97,8 @@
 		// pure helpery (uzávery nad `data`/`existuje` v rodičovi) + mutátory stavu rodiča
 		stylyForSystem,
 		sklaForSystem,
-		// #579: ponuka „Sklo (základ)" per systém zo servera — lokálne sklá appky (s popisom
-		// „· cenník:" #556) + Odoo typy podľa hrúbky systému. Prázdne = lokálne názvy.
+		// #579: ponuka „Sklo (základ)" per systém zo servera — Odoo typy podľa hrúbky systému
+		// (#594: bez lokálnych skiel appky; Odoo nedostupné → lokálne sklá). Prázdne = lokálne názvy.
 		ponukaSkiel = {},
 		triedyPre,
 		otvaraniaForStyl,
@@ -174,15 +174,18 @@
 
 	// #579: select „Sklo (základ)" zobrazuje VOĽBU (Odoo typ alebo lokálne sklo), formulár nesie
 	// dve polia — `sklo` (lokálne výpočtové, všetka existujúca logika) a `skloOdoo` (zvolený Odoo
-	// typ). Voľba je odvodená, výber ju rozloží späť (`$lib/sklo-odoo`).
-	const skupinyZ = (sys: string, skla: string[]): SkupinaVolieb[] =>
+	// typ). Voľba je odvodená, výber ju rozloží späť (`$lib/sklo-odoo`). #594: `sk` = aktuálne
+	// výpočtové sklo — bez Odoo náprotivku ho ponuka doplní ako „pôvodné sklo z appky".
+	const skupinyZ = (sys: string, skla: string[], sk: string): SkupinaVolieb[] =>
 		ponukaPreStyl(
 			ponukaSkiel[sys],
-			skla.filter((g) => g !== SKLO_INE)
+			skla.filter((g) => g !== SKLO_INE),
+			sk
 		);
-	const skupinyPre = (sys: string, st: string) => skupinyZ(sys, sklaForSystem(sys, st));
+	const skupinyPre = (sys: string, st: string, sk: string) =>
+		skupinyZ(sys, sklaForSystem(sys, st), sk);
 	// primárny posuv: `sklaPre` = sklaForSystem(system, styl) z rodiča
-	let skupiny = $derived(skupinyZ(system, sklaPre));
+	let skupiny = $derived(skupinyZ(system, sklaPre, sklo));
 	let volba = $derived(volbaSkla(sklo, skloOdooS, skupiny));
 	// Odoo typ, ktorý select naozaj ukazuje ('' keď po zmene skla/štýlu už neplatí)
 	let skloOdooEf = $derived(rozlozVolbu(volba, skupiny).skloOdoo);
@@ -194,7 +197,7 @@
 	// YELLOW-2 (#235 slice 2): pri prepnutí PREČ z „Iné" vyčisti skrytú vlastnú skladbu posuvu —
 	// inak by stará (neviditeľná) hodnota tichonko sadla na katalógové sklo (plán, objednávka).
 	function zvolSkloPosuvu(p: PosuvRow, v: string) {
-		const r = rozlozVolbu(v, skupinyPre(p.system, p.styl));
+		const r = rozlozVolbu(v, skupinyPre(p.system, p.styl, p.sklo));
 		p.sklo = r.sklo;
 		p.skloOdoo = r.skloOdoo;
 		if (p.sklo !== SKLO_INE) {
@@ -208,10 +211,14 @@
 	{#each sk as g (g.label)}
 		{#if g.label}
 			<optgroup label={g.label}>
-				{#each g.items as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+				{#each g.items as o (o.value)}<option value={o.value} data-vypocet={o.vypocet}
+						>{o.label}</option
+					>{/each}
 			</optgroup>
 		{:else}
-			{#each g.items as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+			{#each g.items as o (o.value)}<option value={o.value} data-vypocet={o.vypocet}
+					>{o.label}</option
+				>{/each}
 		{/if}
 	{/each}
 	<option value={SKLO_INE}>{SKLO_INE}</option>
@@ -602,11 +609,11 @@
 						<select
 							id={`ps${i}-sklo`}
 							bind:value={
-								() => volbaSkla(p.sklo, p.skloOdoo, skupinyPre(p.system, p.styl)),
+								() => volbaSkla(p.sklo, p.skloOdoo, skupinyPre(p.system, p.styl, p.sklo)),
 								(v) => zvolSkloPosuvu(p, v)
 							}
 						>
-							{@render volbySkla(skupinyPre(p.system, p.styl))}
+							{@render volbySkla(skupinyPre(p.system, p.styl, p.sklo))}
 						</select>
 						<!-- vlastná skladba tohto posuvu (#235 slice 2) — bind (žiadne name=,
 						     serializuje sa cez posuvyJSON z p.skloTrieda / p.skloPresne) -->

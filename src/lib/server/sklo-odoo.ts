@@ -11,14 +11,16 @@
 // Výpočtový katalóg `glass_types`, vzorce, profily a Money sú NEDOTKNUTÉ — do výpočtu ide vždy len
 // lokálne sklo; zvolený Odoo typ (`skloOdoo`) ide do objednávky skla a na plán.
 //
-// Lokálne povolené sklá ostávajú v ponuke VŠETKY (prvá skupina, predvolené sklo ako doteraz) —
-// ROZHODNUTÉ na #579: skrytie lokálneho skla s Odoo náprotivkom by pri viacerých kandidátoch (4/16/4
-// číre → IZOS AL aj TH) vyžadovalo TICHÝ výber zástupcu (zakázané #556) a rozbilo by výber podľa
-// názvu (post-deploy E2E, „Použiť znova"). Odoo nedostupné → dnešná lokálna ponuka.
+// #594 (Odoo úloha 1218, Marek 29.9.: „tam majú byť iba odoo") OBRACIA ROZHODNUTÉ #579 („lokálne
+// sklá ostávajú"): pri dostupnom Odoo ponuka NEMÁ lokálne sklá — len skupiny „Odoo — <druh>".
+// Predvolené sklo systému = Odoo voľba počítaná dnešným predvoleným lokálnym sklom (klient
+// `volbaSkla`, prvá v poradí `zoskupTypySkla` — VIDITEĽNÁ v selecte, nie tichý výber); „Použiť
+// znova" lokálneho skla bez Odoo náprotivku dostane doplnkovú voľbu (`ponukaPreStyl`). Odoo
+// nedostupné → dnešná lokálna ponuka (záloha).
 import { logger } from './log';
 import { listGlassTypes } from './db';
 import { fetchGlassTypes, type GlassTypeOption, type GlassTypesResult } from './odoo-glass-types';
-import { matchOdooGlassType, cennikPopis, glassPovlak } from './glass-match';
+import { matchOdooGlassType, glassPovlak } from './glass-match';
 import { parseVstup, parseMultiVstup, type Vstup, type MultiVstup } from './vstup';
 import {
 	odooDruhSedi,
@@ -32,13 +34,15 @@ import { ODOO_PREFIX, type PonukaSkiel, type VolbaSkla } from '$lib/sklo-odoo';
 
 const log = logger('sklo-odoo');
 
-/** Skupina lokálnych (výpočtových) skiel appky — prvá v selecte. */
-export const SKUPINA_APPKA = 'Sklá appky';
+/** Systémy, pre ktoré už padlo varovanie „žiadna Odoo voľba" (warn raz za proces). */
+const hlaseneBezOdoo = new Set<string>();
+
 /** Prefix skupín Odoo typov (za ním druh zo `zoskupTypySkla`). */
 export const PREFIX_ODOO_SKUPINY = 'Odoo — ';
 
-function lokalnaVolba(n: string, popis: string): VolbaSkla {
-	return { value: n, label: popis ? `${n} · cenník: ${popis}` : n, nazov: n, vypocet: n, odoo: '' };
+/** Lokálna voľba (záloha pri nedostupnom Odoo) — bez cenníkového popisu (Odoo dáta nie sú). */
+function lokalnaVolba(n: string): VolbaSkla {
+	return { value: n, label: n, nazov: n, vypocet: n, odoo: '' };
 }
 
 /**
@@ -52,8 +56,7 @@ export function ponukaSkielPre(
 	odoo: GlassTypesResult,
 	hrubky: readonly OdooHrubka[] = skloHrubkyPre(system)
 ): PonukaSkiel {
-	if (odoo.source !== 'odoo')
-		return { skupiny: [{ label: '', items: lokalne.map((n) => lokalnaVolba(n, '')) }] };
+	if (odoo.source !== 'odoo') return { skupiny: [{ label: '', items: lokalne.map(lokalnaVolba) }] };
 
 	// výpočtové sklo triedy sa ODVODÍ z lokálnej ponuky (nikdy sa nezadáva); trieda bez neho
 	// (napr. katalóg/allow-list sa medzitým zmenil) sa vynechá
@@ -72,11 +75,13 @@ export function ponukaSkielPre(
 	//   2. typ s povlakom, pre ktorý lokálne sklo s povlakom neexistuje (napr. „ESG Stopsol … 6mm"),
 	//      sa počíta ako jeho sklo BEZ povlaku — povlak mení len text objednávky, nie nárez/Money;
 	//   3. inak predvolené sklo triedy.
+	// Os odtieňa v režime 'vypoctovy' (#594): extračiré/Matelux sa pre VÝPOČET správajú ako pred
+	// #594 (číre) — nové odtiene menia len objednávku/popis, nikdy výpočtové sklo (Money-neutrálne).
 	const zdrojePre = (povlak: 'presne' | 'ignoruj') => {
 		const m = new Map<string, GlassTypeOption[]>();
 		for (const n of lokalne) {
 			if (povlak === 'ignoruj' && glassPovlak(n) !== 'ziadny') continue;
-			const k = matchOdooGlassType(n, typy, { povlak }).kandidati;
+			const k = matchOdooGlassType(n, typy, { povlak, odtien: 'vypoctovy' }).kandidati;
 			if (k.length > 0) m.set(n, k);
 		}
 		return (o: GlassTypeOption) => [...m].filter(([, k]) => k.includes(o)).map(([n]) => n);
@@ -104,15 +109,21 @@ export function ponukaSkielPre(
 			}
 		])
 	);
-	const appka = {
-		label: SKUPINA_APPKA,
-		items: lokalne.map((n) => lokalnaVolba(n, cennikPopis(n, odoo.items, 'odoo')))
-	};
 	const odooSkupiny = zoskupTypySkla(typy, [], false).map((g) => ({
 		label: PREFIX_ODOO_SKUPINY + g.label,
 		items: g.items.map((i) => volby.get(i.value)!)
 	}));
-	return { skupiny: [appka, ...odooSkupiny] };
+	// systém bez jedinej Odoo voľby (napr. bez povolených hrúbok) by nemal čo ponúknuť → záloha
+	// ako pri nedostupnom Odoo (inak by nárezák nevedel spočítať)
+	if (odooSkupiny.length === 0) {
+		// warn RAZ za proces a systém (ponuka sa počíta pri každom loade nárezáka)
+		if (!hlaseneBezOdoo.has(system)) {
+			hlaseneBezOdoo.add(system);
+			log.warn('ponukaSkielPre: systém nemá žiadnu Odoo voľbu skla — lokálna ponuka', { system });
+		}
+		return { skupiny: [{ label: '', items: lokalne.map(lokalnaVolba) }] };
+	}
+	return { skupiny: odooSkupiny };
 }
 
 /** Ponuky skiel pre všetky systémy nárezáka (page load) — JEDEN Odoo fetch (cache, 3 s timeout). */

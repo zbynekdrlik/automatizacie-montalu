@@ -630,6 +630,10 @@ export function upozornenieCudzie(zakRaw: string, username: string): string | nu
 	return textCudzichRiadkov(cudzieRiadky(zakRaw, username));
 }
 
+// #594: zobrazovací helper autora riadku žije v client-safe `objednavka-skla-pozicia.ts` (súbor je
+// pri 1000-r. strope); re-export drží jeden import pre load podkladu
+export { pridalRiadku } from '../objednavka-skla-pozicia';
+
 /** #571: po ZÁPISE do podkladu (všetci producenti: zasklenia, FIX, pergola, ručný riadok) zaloguj,
  *  keď používateľ pridal do podkladu s riadkami iného používateľa — raz na (zákazka, autor). */
 function logCudzieRiadky(polozky: { zak: string; createdBy: string }[]): void {
