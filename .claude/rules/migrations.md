@@ -121,3 +121,14 @@ tabuľky + existujúcich stĺpcov) pridá `otvor_od_hrany_mm`, `otvor_od_spodku_
 (REAL NULL). `migracie.ts` 972 r. Head-bump: **43 test súborov** (51 → 52, python recept vyššie).
 Fixtúra `migration-v53.test.ts` = v51 base + `objednavka_skla` s v49 stĺpcami + `objednavka_skla_odoslanie`.
 Krok 4 sa netýka (ALTER `objednavka_skla`, žiadny exaktný zoznam stĺpcov v starších testoch).
+
+## v54 (#579) — 4 mm jednoduché pre Štandardy do `cfg_sklo_hrubka` (DÁTOVÁ migrácia, vlastný súbor)
+
+`migracie-sklo-hrubky-4mm.ts` (`migrateSkloHrubky4mm`, guard `>= 54`, transakcia) — `INSERT OR IGNORE`
+ZMRAZENÉHO literálu (Štandard +, 4, jednoduché) a (Štandard, 4, jednoduché). Vzor pre DÁTOVÚ
+migráciu nad tabuľkou, ktorú edituje výroba: vlož LEN chýbajúce riadky (`UNIQUE` kľúč), riadok
+upravený editorom NEPREPISUJ; rovnaké riadky pridaj na KONIEC seedu (`ODOO_HRUBKY_SEED`), aby čerstvá
+DB mala rovnaké poradie ako PROD po migrácii (v52 na čerstvej DB seeduje už aj nové riadky, v54 je
+potom no-op). `migracie.ts` 976 r. Head-bump: **45 test súborov** (53 → 54, python recept vyššie).
+Fixtúra `migration-v54.test.ts` = v53 fixtúra + v53 stĺpce otvoru + `cfg_sklo_hrubka` so stavom PROD
+a riadkom „upraveným výrobou" (starý Štandard 4 mm `esg` → musí ostať). Krok 4 sa netýka.

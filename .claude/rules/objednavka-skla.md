@@ -319,7 +319,11 @@ nectí, OSK odpoveď chýba — vyrieši sa samo po nasadení). Money-NEUTRÁLNE
   UI: sentinel `__ine__` v pickeri odkryje vlastný typ + cenu (`novyIne` $derived; per-riadok `ineRiadok`
   record + `onTypSelect`).
 - **`require_order:false`** VŽDY v `uploadGlassOrderToOdoo` — Odoo vytvorí objednávku skla aj bez
-  sale.order (servis bez zákazky), `order_number`=zak + OP precedencia nezmenené.
+  sale.order (servis bez zákazky), `order_number`=zak + OP precedencia nezmenené. **Kľúč ide
+  VNORENE v `glass_order` (#540, 29.9.)** — Odoo (`sale_order_narezak_glass.py`, test
+  `test_glass_top_level_require_order_ignored_8293`) číta LEN `glass_order.require_order`; top-level
+  kľúč zámerne ignoruje a do chatu zákazky píše „neznámy kľúč: require_order". Pridáva sa len do
+  odosielaného volania (`{ ...payload, require_order: false }`), náhľad `payload` ostáva bez neho.
 - **Outcome** `parseOdooOutcome(res)` tolerantne číta `{glass_order_id, name, lines, dq}` (v1 intake
   nevracia nič → `undefined`); `GlassOrderUploadOutcome.odoo` + `droppedAttachments`. Podklad po odoslaní
   ukáže „Odoslané do Odoo: <OSK name>" + DQ zoznam + vynechané prílohy.
@@ -517,8 +521,14 @@ Marek D. (Odoo úlohy 1180/1181, 28.9.): 99 Odoo typov v plochom `<select>` bolo
   (`MANUAL_TYP_SENTINEL`) ho importujú (jeden zdroj). E2E vyberá `'__ine__'` hodnotou — optgroup to
   nemení. Prvá NEprázdna voľba pickera je v CI prvý typ skupiny „Ostatné" (lokálny fallback).
 - **Odkaz** `odooObjednavkaSklaUrl(id)` (`src/lib/server/objednavka-skla-odoslanie.ts`) =
-  `<base>/odoo/action-1008/<id>`, base = `odooJson2Config().url` (ODOO_JSON2_URL, trailing `/`
+  `<base>/odoo/action-1015/<id>`, base = `odooJson2Config().url` (ODOO_JSON2_URL, trailing `/`
   orezaný), inak `https://erp.montalu.cloud`; neplatné id → `null` (žiadny mŕtvy odkaz).
+  **Akcia 1015, NIE 1008 (29.9.):** odoo-erp 7894 rozdelil akcie — 1008 je CENNÍKOVÁ objednávka
+  (`pricing_mode='cennik'`, menu „Sales/Configuration/Objednávky skla (cenníkové)"), appka zakladá
+  `pricing_mode='simple'` → menu „Sales/Orders/Objednávky skla" = 1015. Jedna konštanta
+  `ODOO_AKCIA_OBJEDNAVKY_SKLA`. URL sa NEUKLADÁ (tabuľka má len `glass_order_id`, test to stráži) →
+  zmena akcie opraví aj odkazy skôr odoslaných podkladov. Keď Odoo znova prečísluje akcie, over
+  číslo z menu živého Odoo (`ir.actions.act_window` podľa `pricing_mode` domény).
 - **Trvalosť = tabuľka `objednavka_skla_odoslanie(zak_norm PK, glass_order_id CHECK>0, name,
   odoslane_at, odoslal)`** (migrácia **v51**, vlastný súbor `migracie-objednavka-odoslanie.ts`).
   Podklad nemá hlavičkovú tabuľku → jeden riadok per `normZak(zak)`, upsert (Odoo `doc_id` je
@@ -642,3 +652,24 @@ toho istého pravidla).
   poloha 1100/50, PDF 200 `%PDF-`).
 - **`objednavka-skla.ts` má ~966 r.** — ďalšia funkcia v ňom = najprv split (napr. otvory/dedup do
   vlastného modulu), `large-file-split.md`.
+
+## Príloha riadku = BAJTOVO deterministická (Odoo re-send porovnáva SHA-1) (#587, 29.9.)
+
+Odoo 2.370.0 (odoo-erp 8536, `_montalu_glass_line_atts_changed`) pri opätovnom odoslaní porovnáva
+prílohy riadku podľa NÁZVU + SHA-1 a pri zmene zmaže riadky a vráti objednávku do Konceptu (draft).
+Objednávka skla sa znova posiela pri KAŽDOM uložení plánu rezov (`odoo-plan-rezov-upload.ts`) →
+akákoľvek nedeterministická príloha = každá odoslaná objednávka skočí späť do Konceptu.
+
+- **Generovaná príloha NESMIE niesť wall-clock** — ani v tele, ani v Info dict. `sklo-otvor-pdf.ts`:
+  dátum = `created_at` riadku (`VykresOtvoruVstup.vytvoreneAt` → `datumVykresu`, nečitateľný → epoch),
+  telo „Z appky Montalu · riadok zadaný <dátum>", `setCreationDate`/`setModificationDate` na ten istý
+  dátum, `setProducer` explicitne. `generateVykresOtvoruPdf` NEMÁ `now` parameter.
+- **pdf-lib je inak deterministický:** `addRandomSuffix` (názov subset fontu, `uniqueKey`) ide cez
+  `PDFContext.rng = SimpleRNG.withSeed(1)`, trailer `/ID` nepridáva. `PDFDocument.create()` síce
+  nastaví Producer/CreationDate/ModDate na „teraz", ale explicitné settery ich pred `save()` prepíšu.
+- **Test:** dve generovania s posunutými hodinami (`vi.useFakeTimers({ toFake: ['Date'] })` — LEN
+  Date, `save()` čaká cez setTimeout) → rovnaký SHA-1; zmenená poloha → iný SHA-1; aj cez
+  `buildGlassOrderForZak`. **PASCA testu:** `PDFDocument.load(bytes)` s defaultom `updateMetadata:true`
+  sám prepíše ModDate/Producer na „teraz" — metadáta dátumu čítaj s `{ updateMetadata: false }`.
+- **Nová generovaná príloha (DXF, iný PDF):** rovnaké pravidlo — žiadny čas/UUID/náhoda; dátum len z
+  uložených dát riadku.
