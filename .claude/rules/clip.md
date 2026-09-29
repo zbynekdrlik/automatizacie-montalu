@@ -184,6 +184,10 @@ kontraktné vektory `tests/clip*.test.ts` nezmenené.
   `skla-pridane`/`skla-pridane-cudzie`); tlačidlo `pridat-skla` na kontrole aj hotovo (single/multi).
 - **RAL:** `ralZabradlia(kusy, i)` (client-safe `clip.ts`) — ďalšie zábradlie ukazuje/posiela farbu
   PRVÉHO, kým ho obsluha ručne nezmení (`KusRow.ralVlastna`; pri echu zo servera = farba ≠ prvé).
+  Farba ďalších žije LEN odvodene (stav má `ral: ''`) → odstránenie PRVÉHO musí ísť cez
+  `bezZabradlia` (zafixuje efektívne farby; review nález #593), nikdy holý `splice(0, 1)`.
+- **Šablóna bez Odoo skla** (katalóg nemá 6 mm / 16 mm): `ponukaSkielClip` jej doplní lokálnu voľbu
+  (`izo`/`klasika`, warn raz) — inak by select pri `typ` tej šablóny ukázal prázdno.
 - **E2E:** výber výplne VŽDY `vyberSklo(page.getByTestId('typ'), 'izo'|'klasika')` / `expectSklo`
   (na PROD sú voľby `odoo:…`), nikdy `selectOption('izo')` (aj `caka-checkbox`, `odpis-blok-override`).
   Lokálne overené aj Odoo vetvou (vite dev + mock JSON-2 s `ODOO_KATALOG_579`).
