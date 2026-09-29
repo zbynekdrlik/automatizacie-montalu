@@ -516,7 +516,15 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
   na PROD také voľby nie sú. Lokálne sklo bez Odoo typu (3.3.1…) vetvi `if (!p.odoo)` alebo vyber
   Odoo typ podľa skupiny (`optgroup[label="Odoo — Lepené VSG"]`, `sklo-3-3-1.spec.ts`). Názov skla
   na pláne (`sklo-typ`, `posuv-sklo-N`) je pri Odoo názov typu — odvoď ho z textu zvolenej voľby
-  (`text.split(' · ')[0]`), nie literál. `LOKALNE_SKLA` pri Odoo ponuke vráti len „Iné". Lokálne Odoo vetvu over cez `vite dev` +
+  (`text.split(' · ')[0]`), nie literál. `LOKALNE_SKLA` pri Odoo ponuke vráti len „Iné".
+  **Lokálne overenie PROD vetvy (#594):** mock JSON-2 naplň ŽIVÝM katalógom — read-only
+  `search_read` spustený V PROD kontajneri (`ssh … 'docker exec -i automatizacie-montalu node
+  --input-type=module' < skript.mjs`, skript číta `ODOO_JSON2_URL/API_KEY` z env kontajnera a
+  vypíše len riadky, kľúč nikdy) → JSON súbor → mock server; ten istý JSON cez dočasný vitest
+  (transport stub) dá paritu výpočtového skla pred/po zmene. PROD katalóg sa líši od výrezu
+  `odoo-glass-types-579` (napr. 29.9. už bez „IZOS DOUBLE 4-16-4 AL", navyše stopsol super silver).
+  **Pasca:** text voľby čítaj cez `textContent`, NIE `HTMLOptionElement.text` — `.text` zlúči
+  dvojité medzery (Odoo názvy ich majú, „stopsol super silver  clear") a porovnanie s plánom padne. Lokálne Odoo vetvu over cez `vite dev` +
   mock JSON-2 servera (`ODOO_JSON2_URL=http://127.0.0.1:<port>`, odpovedá len
   `/json/2/montalu.glass.type/search_read`); vo worktree so symlinknutým `node_modules` treba
   dočasný vite config so `server.fs.allow` na hlavný `node_modules` (inak 403 na fonty v konzole).
