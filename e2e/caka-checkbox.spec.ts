@@ -2,7 +2,7 @@
 // len na /zasklenia + /bazen — audit3.spec.ts). Zápisové testy za `skipAkLive`.
 // Overuje, že checkbox prežije celý flow a v histórii je ⏳.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, skipAkLive, waitHydrated } from './helpers';
+import { collectConsole, loginAs, goto, skipAkLive, waitHydrated, vyberSklo } from './helpers';
 
 const RUN = `CK-${Date.now().toString(36).toUpperCase()}`;
 
@@ -71,7 +71,7 @@ test('clip: „⏳ Čaká" prežije kontrolu → odoslanie a zapíše sa do hist
 	await page.locator('#zak').fill(`${RUN}-CLP`);
 	await page.locator('#op').fill('01');
 	await page.locator('#zakaznik').fill('E2E Clip Caka');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');

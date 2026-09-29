@@ -28,6 +28,7 @@
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
 	import QrZakazka from '$lib/components/QrZakazka.svelte';
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
+	import SklaPridaneBanner from '$lib/components/SklaPridaneBanner.svelte';
 	import OdpisNavrhNav from '$lib/components/OdpisNavrhNav.svelte';
 	import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
 
@@ -608,33 +609,13 @@
 
 <!-- #514: potvrdenie „sklo odoslané" po „Pridať sklá" (bez presmerovania preč) — nahlad aj nahladMulti -->
 {#snippet sklaPridaneBanner()}
+	<!-- #593: zdieľaný komponent (aj CLIP) — testidy skla-pridane/-odkaz/-cudzie, poloha otvoru -->
 	{#if form?.sklaPridane}
-		<div class="okmsg noprint" data-testid="skla-pridane">
-			{#if form.sklaPridane.pridane > 0}
-				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane} ks).
-			{:else}
-				ℹ️ Sklá pre tento plán už sú v objednávke.
-			{/if}
-			<a
-				data-testid="skla-pridane-odkaz"
-				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
-				>Otvoriť objednávku skla →</a
-			>
-		</div>
-		<!-- #587: existujúcim riadkom sa zmenila poloha otvoru (výška vŕtania) — nič nové sa nepridalo -->
-		{#if form.sklaPridane.polohaZmenena > 0}
-			<div class="warn noprint" data-testid="skla-poloha-zmenena">
-				Poloha otvoru aktualizovaná ({form.sklaPridane.polohaZmenena}
-				{form.sklaPridane.polohaZmenena === 1 ? 'riadok' : 'riadky'}) — ak už bola objednávka skla
-				odoslaná do Odoo, odošli ju znova.
-			</div>
-		{/if}
-		<!-- #571: podklad zákazky už má riadky od iného používateľa — len upozornenie, nič neblokuje -->
-		{#if form.sklaPridane.upozornenieCudzie}
-			<div class="warn noprint" data-testid="skla-pridane-cudzie">
-				⚠️ {form.sklaPridane.upozornenieCudzie}
-			</div>
-		{/if}
+		<SklaPridaneBanner
+			sklaPridane={form.sklaPridane}
+			pridaneText={`✅ Sklá pridané do objednávky (${form.sklaPridane.pridane} ks).`}
+			nicText="ℹ️ Sklá pre tento plán už sú v objednávke."
+		/>
 	{/if}
 {/snippet}
 

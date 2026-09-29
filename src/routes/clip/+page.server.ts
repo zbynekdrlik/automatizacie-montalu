@@ -14,6 +14,14 @@ import { clipMaterialRows } from '$lib/server/clip-narez';
 import { parseClipVstup, parseClipMultiVstup } from '$lib/server/vstup';
 import type { ClipMultiVstup } from '$lib/server/vstup';
 import {
+	nacitajPonukuClip,
+	parseClipVstupSOdoo,
+	parseClipMultiVstupSOdoo,
+	sklaClip
+} from '$lib/server/clip-sklo';
+import { pridajSklaHromadneIdempotentne, upozornenieCudzie } from '$lib/server/objednavka-skla';
+import { priradOdooTypy } from '$lib/server/odoo-glass-types';
+import {
 	writeOdpis,
 	isLive,
 	contentHash,
@@ -57,7 +65,10 @@ function jobForMulti(vstup: ClipMultiVstup, finalOut: ClipPolozka[], createdBy: 
 				variant: k.variant,
 				sirka: k.sirka,
 				vyska: k.vyska,
-				ral: k.ral
+				ral: k.ral,
+				// #593: zvolený Odoo typ skla výplne — kľúče LEN keď sú (detail bez Odoo nezmenený)
+				...(k.skloOdoo ? { skloOdoo: k.skloOdoo } : {}),
+				...(k.skloOdooNazov ? { skloOdooNazov: k.skloOdooNazov } : {})
 			}))
 		}
 	};
@@ -95,30 +106,84 @@ function editsFrom(form: FormData): Map<string, string> {
 	return edits;
 }
 
+/** Náhľadový payload kroku „kontrola" — zdieľaný `spocitat` a `pridatSkla` (#593). */
+function stavKontrola(vstup: ClipVstup) {
+	const vypocet = computeClip(vstup);
+	return {
+		step: 'kontrola' as const,
+		vstup,
+		vypocet,
+		// #554 pílový plán (display-only) — RozpisRezov na tyče
+		narez: clipMaterialRows([vypocet]),
+		// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
+		skladVarovania: skladoveVarovania(
+			vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+		),
+		snapshotDatum: getSnapshotMeta().generatedAt,
+		error: null as string | null
+	};
+}
+
+/** Náhľadový payload kroku „kontrolaMulti" — zdieľaný `spocitatMulti` a `pridatSklaMulti` (#593). */
+function stavKontrolaMulti(vstup: ClipMultiVstup) {
+	const multi = computeClipMulti(vstup.kusy);
+	const job = jobForMulti(vstup, multi.polozky, '');
+	return {
+		step: 'kontrolaMulti' as const,
+		multiVstup: vstup,
+		multi,
+		narez: clipMaterialRows(multi.kusy), // #554 spoločný pílový plán (display-only)
+		skladVarovania: skladoveVarovania(
+			multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+		),
+		snapshotDatum: getSnapshotMeta().generatedAt,
+		planHash: contentHash(vstup.zak, job.polozky),
+		error: null as string | null
+	};
+}
+
+/** Chyba prvého neplatného zábradlia multi vstupu (alebo null). */
+function chybaMulti(vstup: ClipMultiVstup): string | null {
+	for (let i = 0; i < vstup.kusy.length; i++) {
+		const cErr = chybaClipVstupu(vstup.kusy[i]!);
+		if (cErr) return `Zasklenie ${i + 1}: ${cErr}`;
+	}
+	return null;
+}
+
+/**
+ * #593 (Odoo úloha 1216): vlož sklá výplní do objednávky skla (modul `clip`) — idempotentne
+ * (opakované „Pridať sklá" neduplikuje), s upozornením na riadky iného používateľa (#571).
+ * Vracia payload banneru `sklaPridane`. Money-NEUTRÁLNE (objednávka u dodávateľa skla).
+ */
+async function pridajSklaClip(
+	kusy: readonly ClipVstup[],
+	hlava: { zak: string; op: string },
+	username: string
+) {
+	const polozky = sklaClip(kusy, { zak: hlava.zak, op: hlava.op, createdBy: username });
+	// #556: lokálny názov šablóny → jednoznačný Odoo typ; zvolený Odoo typ sa NEpreklápa
+	const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky));
+	logger('clip').info('skla pridane do objednavky', {
+		zak: hlava.zak,
+		zabradli: kusy.length,
+		pridane
+	});
+	return { pridane, zak: hlava.zak, upozornenieCudzie: upozornenieCudzie(hlava.zak, username) };
+}
+
 export const load: PageServerLoad = async () => {
-	return { live: isLive() };
+	// #593: ponuka výplne (Odoo sklá 6/16 mm, záloha izo/klasika) — 3 s timeout + cache (#551)
+	return { live: isLive(), ponukaSkiel: await nacitajPonukuClip() };
 };
 
 export const actions = {
 	spocitat: async ({ request }) => {
-		const { vstup, error } = parseClipVstup(await request.formData());
+		const { vstup, error } = await parseClipVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
-		const vypocet = computeClip(vstup);
-		return {
-			step: 'kontrola' as const,
-			vstup,
-			vypocet,
-			// #554 pílový plán (display-only) — RozpisRezov na tyče
-			narez: clipMaterialRows([vypocet]),
-			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
-			skladVarovania: skladoveVarovania(
-				vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-			),
-			snapshotDatum: getSnapshotMeta().generatedAt,
-			error: null as string | null
-		};
+		return stavKontrola(vstup);
 	},
 
 	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
@@ -130,7 +195,7 @@ export const actions = {
 
 	odoslat: async ({ request, locals }) => {
 		const form = await request.formData();
-		const { vstup, error } = parseClipVstup(form);
+		const { vstup, error } = await parseClipVstupSOdoo(form);
 		if (error) return { step: 'form' as const, error, vstup };
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
@@ -209,42 +274,19 @@ export const actions = {
 	},
 
 	spocitatMulti: async ({ request }) => {
-		const { vstup, error } = parseClipMultiVstup(await request.formData());
+		const { vstup, error } = await parseClipMultiVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
-		// validuj každý kus
-		for (let i = 0; i < vstup.kusy.length; i++) {
-			const kus = vstup.kusy[i]!;
-			const cErr = chybaClipVstupu(kus);
-			if (cErr)
-				return { step: 'form' as const, error: `Zasklenie ${i + 1}: ${cErr}`, multiVstup: vstup };
-		}
-		const multi = computeClipMulti(vstup.kusy);
-		const narez = clipMaterialRows(multi.kusy); // #554 spoločný pílový plán (display-only)
-		const job = jobForMulti(vstup, multi.polozky, '');
-		return {
-			step: 'kontrolaMulti' as const,
-			multiVstup: vstup,
-			multi,
-			narez,
-			skladVarovania: skladoveVarovania(
-				multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-			),
-			snapshotDatum: getSnapshotMeta().generatedAt,
-			planHash: contentHash(vstup.zak, job.polozky),
-			error: null as string | null
-		};
+		const cErr = chybaMulti(vstup);
+		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
+		return stavKontrolaMulti(vstup);
 	},
 
 	odoslatMulti: async ({ request, locals }) => {
 		const formData = await request.formData();
-		const { vstup, error } = parseClipMultiVstup(formData);
+		const { vstup, error } = await parseClipMultiVstupSOdoo(formData);
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
-		for (let i = 0; i < vstup.kusy.length; i++) {
-			const kus = vstup.kusy[i]!;
-			const cErr = chybaClipVstupu(kus);
-			if (cErr)
-				return { step: 'form' as const, error: `Zasklenie ${i + 1}: ${cErr}`, multiVstup: vstup };
-		}
+		const cErr = chybaMulti(vstup);
+		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
 		const multi = computeClipMulti(vstup.kusy);
 		const narez = clipMaterialRows(multi.kusy); // #554 spoločný pílový plán (display-only)
 		const job = jobForMulti(vstup, multi.polozky, locals.user?.username ?? '');
@@ -362,5 +404,28 @@ export const actions = {
 					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};
 		}
+	},
+
+	// ---- #593: Pridať sklá do objednávky skla (Odoo úloha 1216) ----
+	// Validácia PRED vedľajším efektom; idempotentne; BEZ presmerovania — ostane na kontrole
+	// (vzor zasklenia #514), aby odpis ostal dostupný. /clip je v B2B_FORBIDDEN_PREFIXES.
+	pridatSkla: async ({ request, locals }) => {
+		const { vstup, error } = await parseClipVstupSOdoo(await request.formData());
+		if (error) return { step: 'form' as const, error, vstup };
+		const cErr = chybaClipVstupu(vstup);
+		if (cErr) return { step: 'form' as const, error: cErr, vstup };
+		const v = stavKontrola(vstup);
+		const sklaPridane = await pridajSklaClip([vstup], vstup, locals.user?.username ?? '');
+		return { ...v, sklaPridane };
+	},
+
+	pridatSklaMulti: async ({ request, locals }) => {
+		const { vstup, error } = await parseClipMultiVstupSOdoo(await request.formData());
+		if (error) return { step: 'form' as const, error, multiVstup: vstup };
+		const cErr = chybaMulti(vstup);
+		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
+		const v = stavKontrolaMulti(vstup);
+		const sklaPridane = await pridajSklaClip(vstup.kusy, vstup, locals.user?.username ?? '');
+		return { ...v, sklaPridane };
 	}
 } satisfies Actions;

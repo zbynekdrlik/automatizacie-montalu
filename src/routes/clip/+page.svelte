@@ -5,6 +5,7 @@
 	import ClipForm from '$lib/components/clip/ClipForm.svelte';
 	import ClipNahlad from '$lib/components/ClipNahlad.svelte';
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
+	import SklaPridaneBanner from '$lib/components/SklaPridaneBanner.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		popisTyp,
@@ -72,7 +73,34 @@
 	<input type="hidden" name="sirka" value={vstup.sirka} />
 	<input type="hidden" name="vyska" value={vstup.vyska} />
 	<input type="hidden" name="ral" value={vstup.ral} />
+	{#if vstup.skloOdoo}<input type="hidden" name="skloOdoo" value={vstup.skloOdoo} />{/if}
 	{#if vstup.caka}<input type="hidden" name="caka" value="1" />{/if}
+{/snippet}
+
+<!-- #593: potvrdenie „Pridať sklá do objednávky" (bez presmerovania — vzor zasklenia #514) -->
+{#snippet sklaPridaneBanner()}
+	{#if form && 'sklaPridane' in form && form.sklaPridane}
+		{@const n = form.sklaPridane.pridane}
+		<SklaPridaneBanner
+			sklaPridane={form.sklaPridane}
+			pridaneText={`✅ Sklá pridané do objednávky (${n} ${n === 1 ? 'riadok' : n < 5 ? 'riadky' : 'riadkov'}).`}
+			nicText="ℹ️ Sklá pre toto zadanie už sú v objednávke."
+		/>
+	{/if}
+{/snippet}
+
+{#snippet pridatSklaForm(multi: boolean)}
+	<!-- #593 (Odoo úloha 1216): sklá výplní do objednávky skla — riadok „Zábradlie i" × N ks -->
+	<form method="POST" action={multi ? '?/pridatSklaMulti' : '?/pridatSkla'} style="display:inline">
+		{#if multi}{@render hiddenMulti()}{:else}{@render hiddenVstup()}{/if}
+		<button class="btn secondary noprint" type="submit" data-testid="pridat-skla"
+			>📋 Pridať sklá do objednávky</button
+		>
+	</form>
+{/snippet}
+
+{#snippet skloBadge(nazov: string | undefined)}
+	{#if nazov}<span class="badge" data-testid="clip-sklo">Sklo: {nazov}</span>{/if}
 {/snippet}
 
 {#snippet hiddenMulti()}
@@ -106,6 +134,7 @@
 				mm</span
 			>
 			{#if cv.ral}<span class="badge">RAL: {cv.ral}</span>{/if}
+			{@render skloBadge(cv.skloOdooNazov)}
 		</p>
 		<p class="sub">
 			Výplň: {fmt(v.sirkaVyplne)} × {fmt(v.vyskaVyplne)} mm · {v.pocetVyplni}
@@ -169,7 +198,7 @@
 
 	<!-- #554: zjednotený formulár ako zasklenia — prvé zábradlie = základ, „➕ Pridať
 	     zábradlie" VŽDY viditeľné (single ↔ multi cez formaction, žiadny prepínač) -->
-	<ClipForm {vstup} {multiVstup} />
+	<ClipForm {vstup} {multiVstup} ponukaSkiel={data.ponukaSkiel} />
 {:else if step === 'kontrola' && form && 'vypocet' in form && form.vypocet}
 	{@const v = form.vypocet}
 	<div class="card">
@@ -180,6 +209,7 @@
 				mm</span
 			>
 			{#if vstup.ral}<span class="badge">RAL: {vstup.ral}</span>{/if}
+			{@render skloBadge(vstup.skloOdooNazov)}
 			{#if !data.live}<span class="badge test">🧪 TEST — do Money NEJDE</span>{/if}
 		</p>
 		<p class="sub">
@@ -203,6 +233,7 @@
 	{#if form?.error}
 		<div class="err" data-testid="kontrola-error">⚠️ {form.error}</div>
 	{/if}
+	{@render sklaPridaneBanner()}
 
 	<!-- #448/#451: predodpisové skladové varovanie + odobrať pri odpise -->
 	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
@@ -277,6 +308,7 @@
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
+		{@render pridatSklaForm(false)}
 		<button class="btn secondary noprint" onclick={() => window.print()}
 			>🖨 Tlačiť / uložiť PDF</button
 		>
@@ -310,6 +342,7 @@
 	{#if form && 'warn' in form && form.warn}
 		<div class="err" data-testid="kontrola-warn">⚠️ {form.warn}</div>
 	{/if}
+	{@render sklaPridaneBanner()}
 
 	<SkladVarovania varovania={skladVarovania ?? undefined} {snapshotDatum} bind:vyluceneKody />
 
@@ -322,6 +355,8 @@
 					0}×{mv?.vyska ?? 0} mm
 				{#if mv?.ral}
 					· RAL: {mv.ral}{/if}
+				{#if mv?.skloOdooNazov}
+					· sklo: {mv.skloOdooNazov}{/if}
 			</div>
 			<p class="sub">
 				Šírka výplne {fmt(kus.sirkaVyplne)} mm · výška {fmt(kus.vyskaVyplne)} mm · {fmt(kus.m2)} m²
@@ -407,6 +442,7 @@
 					: '🧪 Odoslať odpis (TEST priečinok)'}
 			</button>
 		</form>
+		{@render pridatSklaForm(true)}
 		<button class="btn secondary noprint" onclick={() => window.print()}
 			>🖨 Tlačiť / uložiť PDF</button
 		>
@@ -464,6 +500,8 @@
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		<!-- #593: sklá aj PO odpise (poradie akcií nezáleží — vzor zasklenia #514) -->
+		{@render pridatSklaForm(false)}
 		<a class="btn secondary" href={resolve('/clip')}>➕ Nový rozpis</a>
 	</div>
 {:else if step === 'hotovoMulti' && form && 'multi' in form && form.multi && 'finalOut' in form && form.finalOut && form.outcome}
@@ -522,6 +560,7 @@
 
 	<div class="card noprint">
 		<button class="btn" onclick={() => window.print()}>🖨 Tlačiť / uložiť PDF</button>
+		{@render pridatSklaForm(true)}
 		<a class="btn secondary" href={resolve('/clip')}>➕ Nový rozpis</a>
 	</div>
 {:else if step === 'blocked' && form && 'rawEntries' in form && form.rawEntries}

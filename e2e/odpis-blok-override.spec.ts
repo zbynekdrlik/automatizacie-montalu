@@ -3,7 +3,7 @@
 // Zápisové testy za `skipAkLive`. Overuje, že duplikát → blok hlášku →
 // override klik (po automat. confirm) → odpis naozaj prejde (TEST režim).
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, skipAkLive, waitHydrated } from './helpers';
+import { collectConsole, loginAs, goto, skipAkLive, waitHydrated, vyberSklo } from './helpers';
 
 const RUN = `OB-${Date.now().toString(36).toUpperCase()}`;
 
@@ -71,7 +71,7 @@ test('clip: duplikát → OdpisBlok „Odoslať aj tak" override prejde (TEST)',
 	await page.locator('#zak').fill(zak);
 	await page.locator('#op').fill('01');
 	await page.locator('#zakaznik').fill('E2E Clip Override');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');
@@ -85,7 +85,7 @@ test('clip: duplikát → OdpisBlok „Odoslať aj tak" override prejde (TEST)',
 	await page.locator('#zak').fill(zak);
 	await page.locator('#op').fill('01');
 	await page.locator('#zakaznik').fill('E2E Clip Override');
-	await page.getByTestId('typ').selectOption('izo');
+	await vyberSklo(page.getByTestId('typ'), 'izo');
 	await page.getByTestId('variant').selectOption('2');
 	await page.locator('#sirka').fill('3000');
 	await page.locator('#vyska').fill('1000');

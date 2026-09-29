@@ -132,3 +132,13 @@ DB mala rovnaké poradie ako PROD po migrácii (v52 na čerstvej DB seeduje už 
 potom no-op). `migracie.ts` 976 r. Head-bump: **45 test súborov** (53 → 54, python recept vyššie).
 Fixtúra `migration-v54.test.ts` = v53 fixtúra + v53 stĺpce otvoru + `cfg_sklo_hrubka` so stavom PROD
 a riadkom „upraveným výrobou" (starý Štandard 4 mm `esg` → musí ostať). Krok 4 sa netýka.
+
+## v55 (#593) — CLIP 6/16 mm do `cfg_sklo_hrubka` (DÁTOVÁ migrácia, vlastný súbor)
+
+`migracie-clip-sklo-hrubky.ts` (`migrateClipSkloHrubky`, guard `>= 55`, transakcia) — `INSERT OR IGNORE`
+(CLIP, 6, jednoduche) + (CLIP, 16, izolacne), vzor v54. CLIP NIE je v `ODOO_HRUBKY_SEED` (pozri
+`glass-catalog.md`), takže čerstvá DB dostane riadky tiež z v55 (na konci tabuľky); `migration-v52`
+seed test čaká `[...ODOO_HRUBKY_SEED, CLIP 6, CLIP 16]`. `migracie.ts` 978 r. Head-bump: **51 riadkov**
+`user_version … toBe(54)` → 55 (python recept vyššie). Fixtúra `migration-v55.test.ts` = v54 fixtúra +
+stav `cfg_sklo_hrubka` po v54; test aj priamo volá funkciu nad DB s existujúcim (CLIP, 6, esg) → ostane,
+druhý beh no-op. Krok 4 sa netýka.

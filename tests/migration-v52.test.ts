@@ -37,7 +37,7 @@ await import('../src/lib/server/db');
 describe('migration v51 → v52 (cfg_sklo_hrubka, #579)', () => {
 	it('bumpne na v52 a vytvorí tabuľku (id, system, mm, druh)', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(54);
+		expect(d.pragma('user_version', { simple: true })).toBe(55);
 		const cols = (d.prepare('PRAGMA table_info(cfg_sklo_hrubka)').all() as { name: string }[]).map(
 			(c) => c.name
 		);
@@ -55,7 +55,12 @@ describe('migration v51 → v52 (cfg_sklo_hrubka, #579)', () => {
 		const cakane = Object.entries(ODOO_HRUBKY_SEED).flatMap(([system, r]) =>
 			r.map(({ mm, druh }) => ({ system, mm, druh }))
 		);
-		expect(rows).toEqual(cakane);
+		// #593: v55 potom na KONIEC doplní CLIP zábradlie (nie je systém nárezáka → mimo seedu v52)
+		expect(rows).toEqual([
+			...cakane,
+			{ system: 'CLIP', mm: 6, druh: 'jednoduche' },
+			{ system: 'CLIP', mm: 16, druh: 'izolacne' }
+		]);
 		d.close();
 	});
 
