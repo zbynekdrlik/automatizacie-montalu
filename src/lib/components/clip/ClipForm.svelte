@@ -17,6 +17,7 @@
 		CLIP_MAX_VYSKA,
 		jeClipTyp,
 		ralZabradlia,
+		bezZabradlia,
 		type ClipVstup,
 		type ClipTyp
 	} from '$lib/clip';
@@ -162,7 +163,8 @@
 		});
 	}
 	function removeZabradlie(i: number) {
-		if (kusy.length > 1) kusy.splice(i, 1);
+		// #593: odstránenie PRVÉHO zábradlia nesmie zhodiť farbu preberajúcim (bezZabradlia)
+		kusy = bezZabradlia(kusy, i);
 	}
 
 	const cislOznac = (n: number) => (n === 1 ? 'zábradlie' : n < 5 ? 'zábradlia' : 'zábradlí');

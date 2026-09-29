@@ -5,6 +5,7 @@
 	import ClipForm from '$lib/components/clip/ClipForm.svelte';
 	import ClipNahlad from '$lib/components/ClipNahlad.svelte';
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
+	import SklaPridaneBanner from '$lib/components/SklaPridaneBanner.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		popisTyp,
@@ -79,29 +80,12 @@
 <!-- #593: potvrdenie „Pridať sklá do objednávky" (bez presmerovania — vzor zasklenia #514) -->
 {#snippet sklaPridaneBanner()}
 	{#if form && 'sklaPridane' in form && form.sklaPridane}
-		<div class="okmsg noprint" data-testid="skla-pridane">
-			{#if form.sklaPridane.pridane > 0}
-				✅ Sklá pridané do objednávky ({form.sklaPridane.pridane}
-				{form.sklaPridane.pridane === 1
-					? 'riadok'
-					: form.sklaPridane.pridane < 5
-						? 'riadky'
-						: 'riadkov'}).
-			{:else}
-				ℹ️ Sklá pre toto zadanie už sú v objednávke.
-			{/if}
-			<a
-				data-testid="skla-pridane-odkaz"
-				href={resolve(`/objednavka-skla/${encodeURIComponent(form.sklaPridane.zak)}`)}
-				>Otvoriť objednávku skla →</a
-			>
-		</div>
-		<!-- #571: podklad zákazky už má riadky od iného používateľa — len upozornenie, nič neblokuje -->
-		{#if form.sklaPridane.upozornenieCudzie}
-			<div class="warn noprint" data-testid="skla-pridane-cudzie">
-				⚠️ {form.sklaPridane.upozornenieCudzie}
-			</div>
-		{/if}
+		{@const n = form.sklaPridane.pridane}
+		<SklaPridaneBanner
+			sklaPridane={form.sklaPridane}
+			pridaneText={`✅ Sklá pridané do objednávky (${n} ${n === 1 ? 'riadok' : n < 5 ? 'riadky' : 'riadkov'}).`}
+			nicText="ℹ️ Sklá pre toto zadanie už sú v objednávke."
+		/>
 	{/if}
 {/snippet}
 

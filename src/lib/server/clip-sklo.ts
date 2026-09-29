@@ -58,6 +58,11 @@ export function lokalnySkloClip(typ: ClipTyp): string {
 	return LOKALNY_TYP[typ];
 }
 
+const SABLONY: readonly ClipTyp[] = ['izo', 'klasika'];
+
+/** Chýbajúce šablóny, pre ktoré už padlo varovanie (warn raz za proces a kombináciu). */
+const hlaseneChyba = new Set<string>();
+
 /** Záloha ponuky = dnešné dve voľby (hodnota = šablóna). */
 function lokalnaPonuka(): PonukaSkiel {
 	const volba = (typ: ClipTyp): VolbaSkla => ({
@@ -85,17 +90,25 @@ export function ponukaSkielClip(
 	// `ponukaSkielPre` pri systéme bez Odoo voľby vráti lokálne názvy — tie CLIP nepozná
 	if (volby.length === 0 || volby.some((o) => o.odoo === '')) return lokalnaPonuka();
 	const odooTyp = new Map(odoo.items.map((o) => [o.value, o]));
-	return {
-		skupiny: p.skupiny.map((g) => ({
-			label: g.label,
-			items: g.items.map((o) => {
-				const sablona = CLIP_LOKALNE[o.vypocet]!;
-				const t = odooTyp.get(o.odoo);
-				const naprotivok = sablona === 'izo' ? o.naprotivok : !!t && jeKlasikaVsg(t);
-				return { ...o, vypocet: sablona, naprotivok };
-			})
-		}))
-	};
+	const skupiny = p.skupiny.map((g) => ({
+		label: g.label,
+		items: g.items.map((o) => {
+			const sablona = CLIP_LOKALNE[o.vypocet]!;
+			const t = odooTyp.get(o.odoo);
+			const naprotivok = sablona === 'izo' ? o.naprotivok : !!t && jeKlasikaVsg(t);
+			return { ...o, vypocet: sablona, naprotivok };
+		})
+	}));
+	// šablóna bez jedinej Odoo voľby (Odoo nemá sklo tej hrúbky/druhu) by sa nedala zvoliť →
+	// doplň jej lokálnu voľbu (záloha), nech je vždy voliteľná každá šablóna
+	const chyba = SABLONY.filter((t) => !skupiny.some((g) => g.items.some((o) => o.vypocet === t)));
+	if (chyba.length === 0) return { skupiny };
+	if (!hlaseneChyba.has(chyba.join())) {
+		hlaseneChyba.add(chyba.join());
+		log.warn('ponukaSkielClip: šablóna bez Odoo skla — ponúka sa lokálna voľba', { chyba });
+	}
+	const lok = lokalnaPonuka().skupiny[0]!.items.filter((o) => chyba.some((t) => t === o.vypocet));
+	return { skupiny: [...skupiny, { label: '', items: lok }] };
 }
 
 /** Ponuka výplne pre page load `/clip` — JEDEN Odoo fetch (cache, 3 s timeout, fallback). */

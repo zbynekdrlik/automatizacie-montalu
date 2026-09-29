@@ -249,6 +249,22 @@ export function ralZabradlia(
 }
 
 /**
+ * #593: zábradlia bez `i`-teho (posledné jediné sa neodstraňuje). Pri odstránení PRVÉHO sa farby
+ * ostatných najprv ZAFIXUJÚ na efektívnu hodnotu (`ralZabradlia`) — inak by preberajúce zábradlia
+ * farbu stratili — a farba iná než nové prvé sa odteraz drží ako ručná (`ralVlastna`). ČISTÁ.
+ */
+export function bezZabradlia<T extends { ral: string; ralVlastna?: boolean }>(
+	kusy: readonly T[],
+	i: number
+): T[] {
+	if (kusy.length <= 1 || i < 0 || i >= kusy.length) return [...kusy];
+	if (i !== 0) return kusy.filter((_, j) => j !== i);
+	const zvysok = kusy.slice(1).map((k, j) => ({ ...k, ral: ralZabradlia(kusy, j + 1) }));
+	const prva = zvysok[0]!.ral;
+	return zvysok.map((k, j) => (j > 0 && k.ral !== prva ? { ...k, ralVlastna: true } : k));
+}
+
+/**
  * Spočíta CLIP zábradlie (materiálová tabuľka + Money odpis). Predpokladá PLATNÝ
  * vstup — volajúci najprv volá `chybaClipVstupu`. Odpis = súčet počtu tyčí per
  * Money kód (čelo+výška profilu zdieľajú kód). ROUNDDOWN/ROUNDUP na SUROVÝCH
