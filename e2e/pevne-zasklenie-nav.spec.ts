@@ -3,7 +3,14 @@
 // s tromi voľbami: Fix z appky → /fix, Fix z CADu → /fix/cad, Zábradlia (CLIP) → /clip.
 // URL ostávajú (žiadne presmerovanie). Len čítacie navigácie — bezpečné aj proti BASE_URL.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, goto, waitHydrated, openPevneZasklenie } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	waitHydrated,
+	openPevneZasklenie,
+	openTools
+} from './helpers';
 
 test('#592: „Pevné zasklenie" v lište — 3 voľby, navigácia na všetky tri stránky, aktívny stav', async ({
 	page
@@ -66,6 +73,14 @@ test('#592: „Pevné zasklenie" v lište — 3 voľby, navigácia na všetky tr
 	).toBeVisible();
 	await expect(skupina).toHaveClass(/\bactive\b/);
 
+	// otvorenie „Pevné zasklenie" zavrie iný otvorený dropdown (Nástroje) — nikdy dve menu
+	// cez seba (review nález #592)
+	await openTools(page);
+	await expect(page.locator('details.nav-tools')).toHaveAttribute('open', '');
+	await page.getByTestId('pevne-menu-toggle').click();
+	await expect(skupina).toHaveAttribute('open', '');
+	await expect(page.locator('details.nav-tools')).not.toHaveAttribute('open', '');
+
 	// staré URL fungujú aj priamo (záložky) — žiadne presmerovanie
 	await goto(page, '/fix/cad');
 	await expect(page).toHaveURL(/\/fix\/cad$/);
@@ -84,6 +99,15 @@ test('#592: pod 900px je „Pevné zasklenie" podsekcia v dropdowne „Moduly"',
 	await expect(page.getByTestId('pevne-menu-toggle')).toBeHidden();
 	await page.getByTestId('modules-menu-toggle').click();
 	await expect(page.getByTestId('modules-pevne-nadpis')).toHaveText('Pevné zasklenie');
+	// podsekcia nesie všetky tri voľby v poradí zo zadania
+	await expect(nav.locator('.nav-subgroup a')).toHaveText([
+		'Fix z appky',
+		'Fix z CADu',
+		'Zábradlia (CLIP)'
+	]);
+	expect(
+		await nav.locator('.nav-subgroup a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
+	).toEqual(['/fix', '/fix/cad', '/clip']);
 	// otvorené menu s podsekciou nesmie spôsobiť horizontálny scroll (responzívna požiadavka #392)
 	const maScroll = await page.evaluate(
 		() => document.documentElement.scrollWidth > document.documentElement.clientWidth

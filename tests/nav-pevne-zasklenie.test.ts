@@ -33,6 +33,13 @@ describe('#592: položka „Pevné zasklenie" v hornej lište', () => {
 		}
 	);
 
+	it('každá voľba (aj jej pod-cesty) aktivuje skupinu — nový riadok nepotrebuje ďalšiu úpravu', () => {
+		for (const { href } of PEVNE_ZASKLENIE_LINKS) {
+			expect(jePevneZasklenie(href)).toBe(true);
+			expect(jePevneZasklenie(href + '/detail')).toBe(true);
+		}
+	});
+
 	// b2b konzistencia: b2b vetva `moduleLinks` skupinu vôbec nerenderuje, čo je správne LEN
 	// kým sú všetky tri routy pre b2b zakázané. Ak by niekto niektorú b2b sprístupnil, tento
 	// test ho prinúti vedome doplniť filtrovanie dropdownu (fail-closed drift guard).
@@ -51,7 +58,8 @@ describe('#592: položka „Pevné zasklenie" v hornej lište', () => {
 	});
 
 	it('nav <details> v layoute nepoužívajú bind:open (#583 — hydratácia prepíše stav)', () => {
-		// atribút `bind:open={…}`, nie zmienka v komentári (#583 komentár ho cituje)
-		expect(LAYOUT).not.toMatch(/bind:open\s*=/);
+		// atribút `bind:open={…}` aj skratka `<details bind:open>`, nie zmienka v komentári
+		// (#583 komentár ju cituje v backtickoch)
+		expect(LAYOUT).not.toMatch(/bind:open(?!`)(\s*=|[\s/>])/);
 	});
 });
