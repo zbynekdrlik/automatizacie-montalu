@@ -26,7 +26,7 @@ const {
 	nastavRezim
 } = await import('../src/lib/server/objednavka-skla');
 const { buildGlassOrderForZak } = await import('../src/lib/server/odoo-glass-order-upload');
-const { generateVykresOtvoruPdf, vykresOtvoruZPolozky, vykresOtvoruFilename } =
+const { generateVykresOtvoruPdf, vykresOtvoruZPolozky, vykresOtvoruFilename, datumVykresu } =
 	await import('../src/lib/server/sklo-otvor-pdf');
 const { GET } = await import('../src/routes/objednavka-skla/vykres-otvoru/[id]/+server');
 const { OKRAJ_ZAMOK_MM, D_ZAMOK_MM, VRTANIE_ZAMKU_DEFAULT_MM } =
@@ -414,6 +414,14 @@ describe('#587 výkres je deterministický (Odoo re-send porovnáva SHA-1 prílo
 		const riadok = new Date('2026-09-28T10:00:00Z').getTime();
 		expect(doc.getCreationDate()?.getTime()).toBe(riadok);
 		expect(doc.getModificationDate()?.getTime()).toBe(riadok);
+	});
+
+	it('datumVykresu: SQLite UTC → ten istý okamih; nečitateľný vstup → pevný epoch, nie „teraz"', () => {
+		hodinyNa('2027-05-05T05:05:00Z');
+		expect(datumVykresu(VYTVORENE).toISOString()).toBe('2026-09-28T10:00:00.000Z');
+		expect(datumVykresu('2026-09-28T10:00:00Z').toISOString()).toBe('2026-09-28T10:00:00.000Z');
+		expect(datumVykresu('nezmysel').getTime()).toBe(0);
+		expect(datumVykresu('').getTime()).toBe(0);
 	});
 
 	it('ZMENENÁ poloha otvoru → iné bajty (skutočná zmena sa znova odošle)', async () => {

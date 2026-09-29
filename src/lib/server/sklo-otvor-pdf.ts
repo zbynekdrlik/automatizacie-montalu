@@ -12,7 +12,7 @@
 // DejaVu subset NEMÁ glyf „⌀" (U+2300) → v PDF TELE sa kreslí „Ø" (U+00D8); metadáta nesú „⌀".
 import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage } from 'pdf-lib';
 import { A4_W, A4_H, MARGIN, CONTENT_W, embedDejavu, ellipsize, wrapText } from './pdf-common';
-import { formatDatumCasSk } from '../datum';
+import { formatDatumCasSk, sqliteUtcToIso } from '../datum';
 import { popisPozicie } from '../objednavka-skla-pozicia';
 import { fmtMmOtvoru as fmtMm, stranyOtvorov, type PolohaOtvoru } from '../sklo-otvory';
 import type { SkloPolozka } from './objednavka-skla';
@@ -28,6 +28,20 @@ export interface VykresOtvoruVstup {
 	vyskaMm: number;
 	pocet: number;
 	otvor: PolohaOtvoru;
+	/** `created_at` riadku (SQLite UTC) — JEDINÝ dátum výkresu (telo aj metadáta), nikdy „teraz". */
+	vytvoreneAt: string;
+}
+
+/**
+ * Dátum výkresu = vytvorenie riadku objednávky skla. Výkres MUSÍ byť pre ten istý riadok BAJTOVO
+ * rovnaký: Odoo (2.370.0, odoo-erp 8536) pri re-odoslaní porovnáva prílohy riadku podľa názvu +
+ * SHA-1 a pri zmene zmaže riadky a vráti objednávku do Konceptu — a objednávka sa znova posiela pri
+ * každom uložení plánu rezov. Preto žiadny wall-clock. Nečitateľný `created_at` → pevný epoch
+ * (radšej stabilný než „teraz"; pdf-lib RNG je seedovaný, iný zdroj náhody PDF nemá).
+ */
+export function datumVykresu(vytvoreneAt: string): Date {
+	const d = new Date(sqliteUtcToIso(vytvoreneAt));
+	return Number.isNaN(d.getTime()) ? new Date(0) : d;
 }
 
 const INK = rgb(0.12, 0.16, 0.22);
@@ -73,7 +87,8 @@ export function vykresOtvoruZPolozky(p: SkloPolozka): VykresOtvoruVstup | null {
 		sirkaMm: p.sirkaMm,
 		vyskaMm: p.vyskaMm,
 		pocet: p.pocet,
-		otvor: p.otvor
+		otvor: p.otvor,
+		vytvoreneAt: p.createdAt
 	};
 }
 
@@ -191,10 +206,8 @@ function tabula(
  * nesie aj pravé krídlo — pravé (otvor ZRKADLOVO pri pravej hrane), každé s kótami skla a otvoru.
  * Žiadne „otoč tabuľu" (vrstvené / pokovované / matné sklo má stranu). Čelný pohľad ako náhľad.
  */
-export async function generateVykresOtvoruPdf(
-	v: VykresOtvoruVstup,
-	now: Date = new Date()
-): Promise<Uint8Array> {
+export async function generateVykresOtvoruPdf(v: VykresOtvoruVstup): Promise<Uint8Array> {
+	const datum = datumVykresu(v.vytvoreneAt);
 	const doc = await PDFDocument.create();
 	const fonty = await embedDejavu(doc);
 	const { reg, bold } = fonty;
@@ -263,7 +276,7 @@ export async function generateVykresOtvoruPdf(
 		}
 		py -= 4;
 	}
-	page.drawText(`Vygenerované appkou Montalu ${formatDatumCasSk(now.toISOString())}`, {
+	page.drawText(`Z appky Montalu · riadok zadaný ${formatDatumCasSk(datum.toISOString())}`, {
 		x: MARGIN,
 		y: MARGIN - 20,
 		size: 8,
@@ -292,7 +305,8 @@ export async function generateVykresOtvoruPdf(
 		`od_hrany_mm=${fmtMm(odHranyMm)}`,
 		`od_spodku_mm=${fmtMm(odSpodkuMm)}`
 	]);
-	doc.setCreationDate(now);
-	doc.setModificationDate(now);
+	doc.setProducer('Montalu automatizácie');
+	doc.setCreationDate(datum);
+	doc.setModificationDate(datum);
 	return doc.save();
 }
