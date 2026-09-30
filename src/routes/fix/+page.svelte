@@ -2,7 +2,7 @@
 	// FIX (pevné zasklenie) — zadanie rozmerov → výkres konštrukcie na tlač.
 	// Do Money nejde nič. Tvar: šikmý (šikmá horná hrana) alebo rovný (obdĺžnik).
 	import FixVykres2D from '$lib/components/FixVykres2D.svelte';
-	import FixModeNav from '$lib/components/FixModeNav.svelte';
+	import PevneZasklenieKarty from '$lib/components/PevneZasklenieKarty.svelte';
 	import {
 		rovnomernePolia,
 		rozpocitajPodlaPosuvu,
@@ -158,7 +158,7 @@
 			<b>rovný (pravouhlý)</b> je obdĺžnik s jednou výškou.
 			<b>Do Money sa neposiela nič</b> — tento režim len kreslí.
 		</p>
-		<FixModeNav active="appka" />
+		<PevneZasklenieKarty aktivna="/fix" />
 	</div>
 
 	{#if form?.error}

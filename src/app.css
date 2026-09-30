@@ -518,10 +518,10 @@ select:focus {
    tabuľkový mono sa NEaplikuje plošne cez selektor — číselné hodnoty dostanú
    `.mono` per-hodnotu (stage-3 vzor „monuj len samotné číslo, nie celú bunku").
    `.ral-val` (RAL kód) mono má, je to kód. Plná per-hodnotová adopcia = follow-up. */
-/* #394 — zdieľaný prepínač režimov (PergolaModeNav + FixModeNav), zjednotený z
+/* #394 — zdieľaný prepínač režimov (PergolaModeNav + od #592 PevneZasklenieKarty), zjednotený z
    per-komponent scoped CSS do jednej definície (vzor #239 table.narez → app.css).
-   Počet stĺpcov per-komponent cez modifikátor .cols-2 (Fix 2 karty) vs default 3
-   (Pergola). Aktívny ring zjednotený na 2px (predtým Fix 1px — neúmyselná
+   Počet stĺpcov per-komponent cez modifikátor .cols-2 (OdpisNavrhNav 2 karty) vs default 3
+   (Pergola, Pevné zasklenie). Aktívny ring zjednotený na 2px (predtým Fix 1px — neúmyselná
    divergencia). Fix-only .mode-tag.ok + .mode-card.active .mode-foot sú tu tiež
    (Pergola ich nerenderuje → naň neúčinkujú). Tokenizované na --m-* v #376 stage 2. */
 .mode-grid {
@@ -532,6 +532,13 @@ select:focus {
 }
 .mode-grid.cols-2 {
 	grid-template-columns: repeat(2, 1fr);
+}
+/* #592: 3 karty „Pevné zasklenie" (PevneZasklenieKarty) — dlhšie popisy, preto pod sebou
+   už pod 900px (zlom lišty), nie až pod 720px */
+@media (max-width: 900px) {
+	.mode-grid.pevne-karty {
+		grid-template-columns: 1fr;
+	}
 }
 @media (max-width: 720px) {
 	.mode-grid,
@@ -769,24 +776,6 @@ nav.top .nav-dropdown-menu button:hover,
 nav.top .nav-dropdown-menu a.active {
 	background: var(--m-accent-soft);
 	color: var(--m-ink);
-}
-/* #592: „Pevné zasklenie" ako podsekcia v dropdowne „Moduly" (pod 900px) — nadpis skupiny
-   + jej tri voľby mierne odsadené (na desktope je to vnorený .nav-dropdown .nav-pevne) */
-nav.top .nav-subgroup {
-	display: flex;
-	flex-direction: column;
-}
-nav.top .nav-subgroup-title {
-	padding: 8px 10px 2px;
-	color: var(--m-muted);
-	font-family: var(--m-font-display);
-	font-size: 12.5px;
-	font-weight: 600;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-}
-nav.top .nav-dropdown-menu .nav-subgroup a {
-	padding-left: 20px;
 }
 /* user menu trigger — nahradil pôvodný statický .user span (#392) */
 nav.top .nav-user summary {

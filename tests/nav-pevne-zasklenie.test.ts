@@ -96,21 +96,26 @@ describe('#592: PevneZasklenieKarty — tri karty, aktuálna zvýraznená', () =
 	const html = (aktivna: (typeof PEVNE_ZASKLENIE_KARTY)[number]['href']) =>
 		render(PevneZasklenieKarty, { props: { aktivna } }).body;
 
-	it.each(PEVNE_ZASKLENIE_KARTY.map((k) => k.href))('na %s: 3 karty, aktuálna nie je odkaz', (a) => {
-		const h = html(a);
-		const karty = [...h.matchAll(/<(a|div)\b[^>]*class="mode-card[^"]*"[^>]*>/g)].map((m) => m[0]);
-		expect(karty).toHaveLength(3);
-		const aktivne = karty.filter((k) => /class="mode-card active"/.test(k));
-		expect(aktivne).toHaveLength(1);
-		expect(aktivne[0]).toMatch(/^<div/);
-		// ostatné dve sú odkazy na zvyšné stránky
-		const odkazy = karty
-			.filter((k) => k.startsWith('<a'))
-			.map((k) => k.match(/href="([^"]+)"/)?.[1]);
-		expect(odkazy).toEqual(PEVNE_ZASKLENIE_KARTY.map((k) => k.href).filter((x) => x !== a));
-		expect(h.match(/Otvoriť →/g)).toHaveLength(2);
-		expect(h.match(/tu si/g)).toHaveLength(1);
-	});
+	it.each(PEVNE_ZASKLENIE_KARTY.map((k) => k.href))(
+		'na %s: 3 karty, aktuálna nie je odkaz',
+		(a) => {
+			const h = html(a);
+			const karty = [...h.matchAll(/<(a|div)\b[^>]*class="mode-card[^"]*"[^>]*>/g)].map(
+				(m) => m[0]
+			);
+			expect(karty).toHaveLength(3);
+			const aktivne = karty.filter((k) => /class="mode-card active"/.test(k));
+			expect(aktivne).toHaveLength(1);
+			expect(aktivne[0]).toMatch(/^<div/);
+			// ostatné dve sú odkazy na zvyšné stránky
+			const odkazy = karty
+				.filter((k) => k.startsWith('<a'))
+				.map((k) => k.match(/href="([^"]+)"/)?.[1]);
+			expect(odkazy).toEqual(PEVNE_ZASKLENIE_KARTY.map((k) => k.href).filter((x) => x !== a));
+			expect(h.match(/Otvoriť →/g)).toHaveLength(2);
+			expect(h.match(/tu si/g)).toHaveLength(1);
+		}
+	);
 
 	it('grid má 3 stĺpce s vlastným zlomom pod 900px (modifikátor, nie cols-2)', () => {
 		const h = html('/fix');

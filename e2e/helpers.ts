@@ -225,16 +225,20 @@ export async function openTools(page: Page) {
 }
 
 /**
- * #592: „Pevné zasklenie" (Fix z appky / Fix z CADu / Zábradlia (CLIP)) je vnorený dropdown v
- * primárnej lište (desktop). Rovnako ako `openUserMenu`: summary klik PREPÍNA (#583), takže otvor
- * len zatvorené menu a najprv počkaj na hydratáciu.
+ * #592 (ROZHODNUTÉ 30.9.): „Pevné zasklenie" je v hornej lište JEDEN obyčajný odkaz (žiadny
+ * dropdown) → /fix, kde sú tri karty režimov (Fix z appky / Fix z cadu / Zábradlia (CLIP)).
+ * Klikne naň (desktop — plochá lišta), počká na /fix, hydratáciu a viditeľné karty. Odkaz
+ * hľadá LEN v `nav.top` s `exact` — karty na stránke nesú iné texty, ale drž scope.
  */
 export async function openPevneZasklenie(page: Page) {
 	await waitHydrated(page);
-	const menu = page.locator('details.nav-pevne');
-	if ((await menu.getAttribute('open')) === null)
-		await page.getByTestId('pevne-menu-toggle').click();
-	await expect(menu).toHaveAttribute('open', '');
+	await page
+		.locator('nav.top .nav-modules-flat')
+		.getByRole('link', { name: 'Pevné zasklenie', exact: true })
+		.click();
+	await expect(page).toHaveURL(/\/fix$/);
+	await waitHydrated(page);
+	await expect(page.getByTestId('pevne-karty')).toBeVisible();
 }
 
 /**
