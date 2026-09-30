@@ -145,8 +145,9 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 	await expect(riadok.locator('td').nth(0)).toContainText('ATYP podľa výkresu');
 	await expect(riadok.locator('td').nth(1)).toContainText('1000');
 
-	// Odoslať je bez OP zatiaľ zakázané
+	// Odoslať je bez OP zatiaľ zakázané; #577: viditeľná výzva zadať OP objednávky
 	await expect(page.getByTestId('odoslat-odoo')).toBeDisabled();
+	await expect(page.getByTestId('odoslat-bez-op')).toContainText('OP objednávky');
 
 	// nastav OP objednávky (zákazka nemá odpis) → jedno OP pre celý podklad
 	await page.getByTestId('op-input').fill('260545');
@@ -155,6 +156,19 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 
 	// Odoslať je teraz zapnuté (≥ 1 riadok + OP); v teste NIKDY neklikáme send
 	await expect(page.getByTestId('odoslat-odoo')).toBeEnabled();
+	await expect(page.getByTestId('odoslat-bez-op')).toHaveCount(0);
+
+	// #577 (Patrik, úloha 1181): úvodná stránka ako VYHĽADÁVAČ — len ZAK otvorí tento EXISTUJÚCI
+	// podklad (riadok aj uložené OP ostali), bez chyby o OP
+	await goto(page, '/objednavka-skla');
+	await page.getByTestId('nova-zak').fill(zak);
+	await page.getByTestId('nova-otvorit').click();
+	await page.waitForURL((u) => u.pathname === `/objednavka-skla/${zak}`);
+	await waitHydrated(page);
+	await expect(page.locator('tbody tr').first().locator('td').nth(0)).toContainText(
+		'ATYP podľa výkresu'
+	);
+	await expect(page.getByTestId('op-hodnota')).toContainText('OP260545');
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -193,6 +207,35 @@ test('index: Nová objednávka len skla (zákazka + OP) → podklad s predvyplne
 
 	// OP pole predvyplnené hodnotou z indexu (`?op=OP260546`)
 	await expect(page.getByTestId('op-input')).toHaveValue('OP260546');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+// #577 (Patrik, Odoo úloha 1181): úvodná stránka slúži aj ako vyhľadávač podkladu — OP je
+// NEPOVINNÉ. Len ZAK → podklad sa otvorí (bez `?op=`), pole OP na podklade ostane prázdne a pri
+// vypnutom „Odoslať" je viditeľná výzva zadať OP objednávky. Nič nezapisuje (len navigácia).
+test('index: len zákazka (bez OP) → podklad sa otvorí, výzva na OP objednávky', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/objednavka-skla');
+
+	await expect(page.getByTestId('nova-op')).not.toHaveAttribute('required', /.*/);
+	const zak = `${RUN}-BEZOP`;
+	await page.getByTestId('nova-zak').fill(zak);
+	await page.getByTestId('nova-otvorit').click();
+
+	await page.waitForURL(
+		(u) => u.pathname === `/objednavka-skla/${zak}` && !u.searchParams.has('op')
+	);
+	await waitHydrated(page);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+	await expect(page.getByTestId('nova-chyba')).toHaveCount(0);
+	// nová zákazka = prázdny podklad s formulárom „Pridať riadok" (OP pole/Odoslať až pri riadkoch —
+	// výzvu na OP pri vypnutom Odoslať overuje test „prázdny podklad → ručný riadok + OP")
+	await expect(page.getByText('Žiadne sklá pre túto zákazku.')).toBeVisible();
+	await expect(page.getByTestId('pridat-riadok')).toBeVisible();
 
 	expect(consoleMsgs).toEqual([]);
 });
