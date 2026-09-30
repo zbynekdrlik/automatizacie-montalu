@@ -9,7 +9,7 @@
 // PURE dátový modul (žiadne DB/SvelteKit závislosti) — priamo unit-testovateľný a
 // pripravený na konzumáciu #223 (sklo v streche: rozmer + cena + odpis), ktorý raz zmení
 // dnešný voľný text `strechaSklo` na výber zo `SKLO_STRECHA_TYPY` a cez `moneyKod` vytiahne
-// €/m² zo snapshotu (`ceny.ts` → `cenaZaM2`). Dovtedy modul zámerne NEMÁ UI konzumenta
+// €/m² zo zdroja cien (`ceny.ts` → `cenovyZdroj` + `cenaZaM2Zo`, #599 Odoo/snapshot). Dovtedy modul zámerne NEMÁ UI konzumenta
 // (majiteľ ROZHODNUTÉ cesta A, #235: nemeniť UX pergoly, zobrazenie ceny nechať na #223).
 
 export interface SkloStrechaTyp {

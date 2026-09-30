@@ -410,15 +410,12 @@ async function stavNahlad(
 	const tesn = tesneniePolozky(r.material, r.system, vstup.sklo, vstup.skloTrieda);
 	const allKovanie = [...kov.polozky, ...tesn.polozky];
 	const job = jobFor(vstup, r, '', allKovanie);
-	return {
-		step: 'nahlad' as const,
-		vstup,
-		plan: r,
-		kovanie: allKovanie,
-		ceny: await cenyPre(user, job.polozky),
-		skladVarovania: await skladVarovaniaPre(user, job.polozky),
-		snapshotDatum: getSnapshotMeta().generatedAt,
-		skloCeny: await skloCenyPre(user, [
+	// #599: ceny / sklad / cena skla čítajú Odoo — súbežne (každý má vlastný 3 s timeout a cache),
+	// aby pomalé Odoo zdržalo náhľad najviac raz, nie trikrát za sebou
+	const [ceny, skladVarovania, skloCeny] = await Promise.all([
+		cenyPre(user, job.polozky),
+		skladVarovaniaPre(user, job.polozky),
+		skloCenyPre(user, [
 			{
 				label: '',
 				system: vstup.system,
@@ -427,7 +424,17 @@ async function stavNahlad(
 				vyska: r.sklo.vyska,
 				pocet: r.sklo.pocet
 			}
-		]),
+		])
+	]);
+	return {
+		step: 'nahlad' as const,
+		vstup,
+		plan: r,
+		kovanie: allKovanie,
+		ceny,
+		skladVarovania,
+		snapshotDatum: getSnapshotMeta().generatedAt,
+		skloCeny,
 		planHash: contentHash(vstup.zak, job.polozky),
 		warn: [odvodenyOdpisWarn(spec.sysStyl), kov.warn, tesn.warn].filter(Boolean).join(' ') || null,
 		vytvorene: new Date().toISOString(),
@@ -451,15 +458,11 @@ async function stavNahladMulti(
 	const tesnMulti = multiTesneniePolozky(r, vstup);
 	const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
 	const job = jobForMulti(vstup, r, '', allKovanie);
-	return {
-		step: 'nahladMulti' as const,
-		multiVstup: vstup,
-		multi: r,
-		kovanie: allKovanie,
-		ceny: await cenyPre(user, job.polozky),
-		skladVarovania: await skladVarovaniaPre(user, job.polozky),
-		snapshotDatum: getSnapshotMeta().generatedAt,
-		skloCeny: await skloCenyPre(
+	// #599: súbežne ako `stavNahlad`
+	const [ceny, skladVarovania, skloCeny] = await Promise.all([
+		cenyPre(user, job.polozky),
+		skladVarovaniaPre(user, job.polozky),
+		skloCenyPre(
 			user,
 			r.posuvy.map((p, i) => ({
 				label: 'Zasklenie ' + (i + 1),
@@ -469,7 +472,17 @@ async function stavNahladMulti(
 				vyska: p.sklo.vyska,
 				pocet: p.sklo.pocet
 			}))
-		),
+		)
+	]);
+	return {
+		step: 'nahladMulti' as const,
+		multiVstup: vstup,
+		multi: r,
+		kovanie: allKovanie,
+		ceny,
+		skladVarovania,
+		snapshotDatum: getSnapshotMeta().generatedAt,
+		skloCeny,
 		planHash: contentHash(vstup.zak, job.polozky),
 		warn:
 			[

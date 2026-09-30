@@ -23,7 +23,7 @@ const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
 const odooPrices = await import('../src/lib/server/odoo-prices');
 const { _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
-const { enrichPolozky, cenaZaM2 } = await import('../src/lib/server/ceny');
+const { enrichPolozky, cenaZaM2Zo, cenovyZdroj } = await import('../src/lib/server/ceny');
 const { skloCenaPre } = await import('../src/lib/server/sklo-cena');
 const { strechaSkloCenaPre } = await import('../src/lib/server/sklo-strecha-cena');
 const { db } = await import('../src/lib/server/db');
@@ -475,10 +475,10 @@ describe('cena skla — price_m2 / get_prices / snapshot', () => {
 		expect(r!.cenaSpolu).toBeNull();
 	});
 
-	it('cenaZaM2 (TS kód) pri Odoo zdroji berie get_prices', async () => {
+	it('cenaZaM2Zo (TS kód) pri Odoo zdroji berie get_prices', async () => {
 		enableEnv();
 		mockOdoo();
-		expect((await cenaZaM2('TS00016'))?.eurM2).toBe(44.5);
+		expect(cenaZaM2Zo(await cenovyZdroj(['TS00016']), 'TS00016')?.eurM2).toBe(44.5);
 	});
 });
 

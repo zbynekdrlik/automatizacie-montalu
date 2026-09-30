@@ -1,6 +1,6 @@
 // sklo-strecha-cena.ts — €/m² strešného skla pergoly zo snapshotu (#223). VŠETKY ceny TU
 // sú VYMYSLENÉ (repo je verejné — nikdy reálnu Money cenu, viď CLAUDE.md). Mapovanie
-// typ→TS kód je katalógové (`SKLO_STRECHA_TYPY`, #274); cena = `cenaZaM2` zo snapshotu.
+// typ→TS kód je katalógové (`SKLO_STRECHA_TYPY`, #274); cena = `cenaZaM2Zo` zo zdroja cien (bez Odoo = snapshot).
 // Honest-null: typ bez potvrdeného kódu, alebo kód bez ceny v snapshote → €/m² null.
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';

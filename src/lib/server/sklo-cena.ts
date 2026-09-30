@@ -74,10 +74,14 @@ function odooTypPre(variant: string, typy: GlassTypeOption[]): GlassTypeOption |
 export async function skloCenaPre(plany: SkloPlanVstup[]): Promise<SkloCenaResult> {
 	const snapshot = getSnapshotMeta(); // spustí lazy import + vráti vek snapshotu pre UI
 	const kody = plany.map((p) => glassMoneyKod(p.system, p.variant) ?? '').filter(Boolean);
-	const [skloOdoo, material] = await Promise.all([odooSkloCenyM2(), cenovyZdroj(kody)]);
+	// všetky tri Odoo ready SÚBEŽNE (každý má vlastný 3 s timeout a cache) — page load čaká max 1×
+	const [skloOdoo, material, katalog] = await Promise.all([
+		odooSkloCenyM2(),
+		cenovyZdroj(kody),
+		fetchGlassTypes()
+	]);
 	// typy LEN zo živého Odoo katalógu — lokálny fallback pickera (názvy appky) na `price_m2` nepáruj
-	const katalog = skloOdoo.zdroj === 'odoo' ? await fetchGlassTypes() : null;
-	const typy = katalog?.source === 'odoo' ? katalog.items : [];
+	const typy = skloOdoo.zdroj === 'odoo' && katalog.source === 'odoo' ? katalog.items : [];
 	const zdroj: CenyZdroj =
 		skloOdoo.zdroj === 'odoo' || material.zdroj === 'odoo' ? 'odoo' : 'snapshot';
 	zaznamenajZdroj('sklo', zdroj);

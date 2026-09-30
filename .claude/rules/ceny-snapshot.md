@@ -54,7 +54,16 @@ paths:
 >   JEDNOZNAČNÁ `matchOdooGlassType` zhoda, len zo živého Odoo katalógu; `price_m2 = 0` = neznáma);
 >   inak TS kód → IZOS z `get_prices`; snapshot LEN keď neodpovedá ŽIADNY z dvoch kanálov. Strešné
 >   sklo pergoly (`sklo-strecha-cena.ts`) = TS kód → `get_prices`/snapshot.
-> - `enrichPolozky`, `cenaZaM2`, `skloCenaPre`, `strechaSkloCenaPre` sú **async** — volajúci `await`.
+> - `enrichPolozky`, `skloCenaPre`, `strechaSkloCenaPre`, `cenovyZdroj` sú **async** — volajúci
+>   `await`; €/m² TS kódu = `cenaZaM2Zo(zdroj, kod)` nad už zvoleným zdrojom (JEDEN zdroj na výpočet).
+>   Zasklenia náhľad (`stavNahlad*`) volá ceny / sklad / cenu skla cez `Promise.all` a `skloCenaPre`
+>   číta `price_m2`, `get_prices` aj picker typov súbežne — pomalé Odoo zdrží náhľad max 1× (3 s).
+> - **Cena skla podľa `value` pickera** (review #599): `price_m2` read berie aj `cennik_code` a kľúčuje
+>   TÝM ISTÝM odvodením ako `odoo-glass-types.ts` (`cennik_code`, pri zdieľanom/chýbajúcom kóde
+>   `name`) — rovnaký názov s rôznym kódom (rámik AL/TH) má každý svoju cenu. Nikdy podľa `name`.
+> - `/health` čaká na sondy (paralelne, max ~3 s, potom cache 5 min / 60 s) — pod `--max-time 5`
+>   deploy health pollu (ci.yml); E2E „#599 zdroj cien“ porovnáva UI s `/health` (iná sonda kódu →
+>   teoretický rozdiel len na hrane 60 s výpadku, prijaté).
 > - E2E: `ceny.spec.ts` „#599 zdroj cien" porovnáva `ceny-zdroj` s `/health` (beží aj post-deploy);
 >   CI bez Odoo = vždy `snapshot`. Odoo vetva je krytá unit testom `tests/odoo-ceny-599.test.ts`.
 > - Po sprístupnení v Odoo (8706) sa dá vypnúť `scripts/ceny-snapshot.py` cron bez zmeny kódu —

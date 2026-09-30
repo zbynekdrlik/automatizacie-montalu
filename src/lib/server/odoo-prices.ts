@@ -13,11 +13,11 @@
 // `nedostupne` a volajúci ostane pri Money snapshote. Po sprístupnení v Odoo sa appka prepne SAMA
 // (výpadok sa cachuje len 60 s) — bez releasu, bez reštartu.
 //
-// Vzor `odoo-katalog.ts` (`KodCache`): 3 s timeout, cache per kód 5 min (aj „Odoo kód nepozná"),
-// výpadok 60 s bez volania, single-flight, warn raz za výpadok. NIKDY nehádže.
+// Vzor `odoo-katalog.ts` (`KodCache` z `odoo-kod-cache.ts`): 3 s timeout, cache per kód 5 min (aj
+// „Odoo kód nepozná"), výpadok 60 s bez volania, single-flight, warn raz za výpadok. NIKDY nehádže.
 import { logger } from './log';
 import { callJson2, odooJson2Config, searchReadJson2, OdooJson2Error } from './odoo-json2';
-import { KodCache } from './odoo-katalog';
+import { KodCache } from './odoo-kod-cache';
 
 const log = logger('odoo-prices');
 
@@ -127,7 +127,8 @@ const _ceny = new KodCache<OdooPriceRow>(
 			generatedAt: data.generatedAt
 		});
 		return najdene;
-	}
+	},
+	log
 );
 
 const _skloCeny = new KodCache<Map<string, number | null>>(
@@ -163,7 +164,8 @@ const _skloCeny = new KodCache<Map<string, number | null>>(
 		}
 		log.debug('price_m2 OK', { typy: ceny.size });
 		return new Map([[SKLO_KLUC, ceny]]);
-	}
+	},
+	log
 );
 
 /** Posledný zistený zdroj per kanál — log pri ZMENE (nie pri každom volaní). */

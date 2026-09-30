@@ -479,22 +479,14 @@ export interface CenaZaM2 {
 	mena: string;
 }
 
-/** €/m² TS kódu z už zvoleného zdroja (`cenovyZdroj`); `null` = kód zdroj vôbec nepozná. */
+/** €/m² TS kódu (display-only cena skla #225, strešné sklo #223) z už zvoleného zdroja
+ *  (`cenovyZdroj`); `null` = kód zdroj VÔBEC NEPOZNÁ (rovnaká honest-null hláška ako
+ *  `eurM2 === null`). */
 export function cenaZaM2Zo(zdroj: CenovyZdroj, kod: string): CenaZaM2 | null {
 	if (!kod) return null;
 	const price = zdroj.riadok(kod);
 	if (!price) return null;
 	return { eurM2: price.nakupCennik, mena: price.mena };
-}
-
-/**
- * Cena za m² pre daný TS kód — display-only cena skla (#225, strešné sklo #223). Zdroj = Odoo
- * `get_prices` keď kanál odpovedá, inak Money snapshot (`cenovyZdroj`). Vráti `null`, keď kód zdroj
- * VÔBEC NEPOZNÁ — rovnaká honest-null hláška ako `eurM2 === null`.
- */
-export async function cenaZaM2(kod: string): Promise<CenaZaM2 | null> {
-	if (!kod) return null;
-	return cenaZaM2Zo(await cenovyZdroj([kod]), kod);
 }
 
 export interface CenaRiadok {

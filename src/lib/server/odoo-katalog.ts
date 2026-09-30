@@ -22,14 +22,14 @@
 // `mrp.bom`, sonda 30.9.) a jedno zakázané pole zhodí CELÝ read. Sklad preto ide cez `stock.quant`
 // (technický účet ho číta, sonda 30.9.: 168 produktov / 98 ms, jediná interná lokácia PKO/Zásoby).
 import { logger } from './log';
-import { odooJson2Config, searchReadJson2, OdooJson2Error } from './odoo-json2';
+import { odooJson2Config, searchReadJson2 } from './odoo-json2';
+import { KodCache } from './odoo-kod-cache';
 
 const log = logger('odoo-katalog');
 
 const KATALOG_TTL_MS = 5 * 60 * 1000;
 /** Sklad sa hýbe (odpisy, príjemky) — kratšia platnosť než katalóg; varovanie je len signál. */
 const SKLAD_TTL_MS = 60 * 1000;
-const FALLBACK_TTL_MS = 60 * 1000;
 const DEFAULT_FETCH_TIMEOUT_MS = 3000;
 const PRODUCT_MODEL = 'product.product';
 const QUANT_MODEL = 'stock.quant';
@@ -89,86 +89,6 @@ function m2oId(v: unknown): number | null {
 	return Array.isArray(v) && typeof v[0] === 'number' ? v[0] : null;
 }
 
-/**
- * Per-kód cache jedného Odoo readu: platnosť `ttlMs` pri úspechu (aj „Odoo kód nepozná" = `null`),
- * pri chybe globálna nedostupnosť `FALLBACK_TTL_MS` (počas nej sa Odoo NEvolá), single-flight a warn
- * raz za výpadok. `nacitaj` vráti hodnoty LEN pre nájdené kódy a pri chybe HÁDŽE; `zabezpec` a
- * `hodnota` nehádžu.
- */
-export class KodCache<T> {
-	private cache = new Map<string, { v: T | null; exp: number }>();
-	private inflight: Promise<void> | null = null;
-	/** Do kedy (ms) je Odoo považované za nedostupné. */
-	private nedostupneDo = 0;
-	private warned = false;
-
-	constructor(
-		private readonly model: string,
-		private readonly ttlMs: number,
-		private readonly nacitaj: (kody: string[], timeoutMs: number) => Promise<Map<string, T>>
-	) {}
-
-	reset(): void {
-		this.cache.clear();
-		this.inflight = null;
-		this.nedostupneDo = 0;
-		this.warned = false;
-	}
-
-	/** Hodnota z cache (bez ohľadu na platnosť) — `null` = Odoo kód nepozná / nie je v cache. */
-	hodnota(kod: string): T | null {
-		return this.cache.get(kod)?.v ?? null;
-	}
-
-	private async dotiahni(kody: string[], timeoutMs: number): Promise<void> {
-		try {
-			const najdene = await this.nacitaj(kody, timeoutMs);
-			const exp = Date.now() + this.ttlMs;
-			for (const kod of kody) this.cache.set(kod, { v: najdene.get(kod) ?? null, exp });
-			if (this.warned) {
-				// zotavenie po výpadku — ďalší výpadok sa zaloguje znova (warn raz za VÝPADOK)
-				log.info(`Odoo ${this.model} opäť dostupné`);
-				this.warned = false;
-			}
-		} catch (e) {
-			this.nedostupneDo = Date.now() + FALLBACK_TTL_MS;
-			if (!this.warned) {
-				log.warn(`Odoo ${this.model} nedostupné — volajúci použije fallback`, {
-					status: e instanceof OdooJson2Error ? e.status : 0,
-					err: e instanceof Error ? e.message : String(e)
-				});
-				this.warned = true;
-			}
-		}
-	}
-
-	/**
-	 * `true` = všetky `kody` majú v cache platnú hodnotu (dotiahnuté JEDNÝM readom pre chýbajúce);
-	 * `false` = Odoo nedostupné. Výpadok sa týka LEN kódov, ktoré treba dotiahnuť — požiadavku celú
-	 * pokrytú platnou cache obslúži aj počas nedostupnosti (review #599).
-	 */
-	async zabezpec(kody: readonly string[], timeoutMs: number): Promise<boolean> {
-		if (kody.length === 0) return true;
-		// single-flight: počkaj na KAŽDÝ bežiaci read (môže pokryť aj naše kódy), až potom dotiahni zvyšok
-		while (this.inflight) await this.inflight;
-		const now = Date.now();
-		const chybajuce = kody.filter((k) => {
-			const c = this.cache.get(k);
-			return !c || c.exp <= now;
-		});
-		if (chybajuce.length === 0) return true;
-		if (now < this.nedostupneDo) return false;
-		const p = this.dotiahni(chybajuce, timeoutMs);
-		this.inflight = p;
-		try {
-			await p;
-		} finally {
-			if (this.inflight === p) this.inflight = null;
-		}
-		return Date.now() >= this.nedostupneDo;
-	}
-}
-
 /** Riadok katalógu v cache: produkt + Odoo `id` (kľúč pre `stock.quant`). */
 interface ProduktRiadok {
 	produkt: OdooProdukt;
@@ -205,48 +125,55 @@ const _katalog = new KodCache<ProduktRiadok>(
 			nezname: kody.filter((k) => !najdene.has(k))
 		});
 		return najdene;
-	}
+	},
+	log
 );
 
-const _sklad = new KodCache<SkladRiadok>(QUANT_MODEL, SKLAD_TTL_MS, async (kody, timeoutMs) => {
-	const cfg = odooJson2Config()!;
-	// kódy sem idú LEN sledované skladom a nájdené v katalógu (odooSkladPreKody) — id z jeho cache
-	const kodPreId = new Map<number, string>();
-	for (const kod of kody) {
-		const id = _katalog.hodnota(kod)?.id;
-		if (id) kodPreId.set(id, kod);
-	}
-	// žiadne použiteľné id (katalóg bez `id`) → nie je čo čítať, kódy ostanú „neznáme"
-	if (kodPreId.size === 0) return new Map<string, SkladRiadok>();
-	const rows = await searchReadJson2(
-		cfg,
-		QUANT_MODEL,
-		[
-			['product_id', 'in', [...kodPreId.keys()]],
-			['location_id.usage', '=', 'internal']
-		],
-		QUANT_FIELDS,
-		{ timeoutMs }
-	);
-	// sledovaný produkt bez kvantov = 0 (Odoo nemá nič na sklade) + príznak `bezKvantov`
-	const sucet = new Map<string, SkladRiadok>(
-		[...kodPreId.values()].map((k) => [k, { sklad: 0, bezKvantov: true }])
-	);
-	for (const r of rows) {
-		const kod = kodPreId.get(m2oId(r.product_id) ?? -1);
-		const q = typeof r.quantity === 'number' && Number.isFinite(r.quantity) ? r.quantity : 0;
-		const s = kod ? sucet.get(kod) : undefined;
-		if (kod && s) sucet.set(kod, { sklad: s.sklad + q, bezKvantov: false });
-	}
-	// zaokrúhli na 3 desatinné — FP akumulácia (0,1 + 0,2) by inak dala falošné varovanie
-	for (const [kod, v] of sucet) sucet.set(kod, { ...v, sklad: Math.round(v.sklad * 1000) / 1000 });
-	log.debug('stock.quant read OK', {
-		produkty: kodPreId.size,
-		kvanty: rows.length,
-		bezKvantov: [...sucet].filter(([, v]) => v.bezKvantov).map(([k]) => k)
-	});
-	return sucet;
-});
+const _sklad = new KodCache<SkladRiadok>(
+	QUANT_MODEL,
+	SKLAD_TTL_MS,
+	async (kody, timeoutMs) => {
+		const cfg = odooJson2Config()!;
+		// kódy sem idú LEN sledované skladom a nájdené v katalógu (odooSkladPreKody) — id z jeho cache
+		const kodPreId = new Map<number, string>();
+		for (const kod of kody) {
+			const id = _katalog.hodnota(kod)?.id;
+			if (id) kodPreId.set(id, kod);
+		}
+		// žiadne použiteľné id (katalóg bez `id`) → nie je čo čítať, kódy ostanú „neznáme"
+		if (kodPreId.size === 0) return new Map<string, SkladRiadok>();
+		const rows = await searchReadJson2(
+			cfg,
+			QUANT_MODEL,
+			[
+				['product_id', 'in', [...kodPreId.keys()]],
+				['location_id.usage', '=', 'internal']
+			],
+			QUANT_FIELDS,
+			{ timeoutMs }
+		);
+		// sledovaný produkt bez kvantov = 0 (Odoo nemá nič na sklade) + príznak `bezKvantov`
+		const sucet = new Map<string, SkladRiadok>(
+			[...kodPreId.values()].map((k) => [k, { sklad: 0, bezKvantov: true }])
+		);
+		for (const r of rows) {
+			const kod = kodPreId.get(m2oId(r.product_id) ?? -1);
+			const q = typeof r.quantity === 'number' && Number.isFinite(r.quantity) ? r.quantity : 0;
+			const s = kod ? sucet.get(kod) : undefined;
+			if (kod && s) sucet.set(kod, { sklad: s.sklad + q, bezKvantov: false });
+		}
+		// zaokrúhli na 3 desatinné — FP akumulácia (0,1 + 0,2) by inak dala falošné varovanie
+		for (const [kod, v] of sucet)
+			sucet.set(kod, { ...v, sklad: Math.round(v.sklad * 1000) / 1000 });
+		log.debug('stock.quant read OK', {
+			produkty: kodPreId.size,
+			kvanty: rows.length,
+			bezKvantov: [...sucet].filter(([, v]) => v.bezKvantov).map(([k]) => k)
+		});
+		return sucet;
+	},
+	log
+);
 
 /** TEST hook: vyprázdni cache + single-flight + nedostupnosť + „warn raz" stav (katalóg aj sklad). */
 export function _resetOdooKatalogCache(): void {
