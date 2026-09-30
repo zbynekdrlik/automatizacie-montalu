@@ -617,9 +617,22 @@ odobrať (tvrď podmnožinu / triedu).
 - **Default 1 worker** (lokálne aj CI `test` job proti preview — tam bežia ZÁPISOVÉ testy nad jednou
   e2e.db a zdieľanými fixture súbormi `e2e-ceny.json`, paralelne by sa bili). Post-deploy krok nastaví
   `E2E_WORKERS=3`: proti LIVE PROD je sada read-only. Pri > 1 sú dva Playwright projekty: `paralelne` +
-  `seriove` (1 worker, `dependencies` → beží PO paralelnej časti) pre specy meniace zdieľanú konfiguráciu
-  (`e2e/seriove.ts`, guard `tests/e2e-seriove.test.ts` cez `MUTUJE_CFG` = `ulozit-vzorce` /
-  `pridat-hrubku` / `odobrat-hrubku`). Nový spec so zápisom do editora → pridaj ho do `SERIOVE_SPECY`.
+  `seriove` (1 worker, `dependencies` → beží PO paralelnej časti, `testMatch` = `SERIOVE_VSETKY`).
+  V `seriove` sú DVE kategórie, každá z iného dôvodu (`e2e/seriove.ts`, guard `tests/e2e-seriove.test.ts`):
+  1. **`SERIOVE_SPECY` — menia zdieľanú konfiguráciu** (marker `MUTUJE_CFG` = `ulozit-vzorce` /
+     `pridat-hrubku` / `odobrat-hrubku`): súbežný editor by menil čísla ostatným testom.
+  2. **`SERIOVE_3D` — čakajú na three.js/WebGL scénu** (marker `RENDERUJE_3D` = `data-viz-ready` /
+     `vizual3d-canvas` / `zakaznicky-obrazok`): GH runner (4 vCPU, bez GPU) renderuje swiftshaderom a
+     pri 3 súbežných workeroch CPU vyhladovie → timeout, hoci appka je OK (#599: 0.25.60
+     `zasklenia-zakaznicky` `waitForFunction` 60 s, 0.25.59 prešiel = závislé od záťaže). Oprava =
+     izolácia záťaže, NIKDY retry ani vyšší timeout. Stránka, ktorá 3D panel len namountuje a test na
+     scénu nečaká (`zasklenia-navrh` výkres), ostáva paralelne — na scéne timeoutnúť nemôže.
+  Guard padne, keď spec s markerom nie je v zozname aj keď zoznam má súbor bez markera. Nový spec so
+  zápisom do editora → `SERIOVE_SPECY`; nový spec čakajúci na 3D scénu → `SERIOVE_3D`.
+  **Namerané #599** (lokálne LIVE režim, load ~2, `--project=seriove --no-deps`): 87 testov → 63 passed
+  / 24 skipped za 3,5 min (3D 176 s, editor 17 s — editorové zápisy sú za `skipAkLive`). V CI 0.25.60
+  bol `seriove` 1,8 min a 3D specy v paralelnej časti stáli ~9 min worker-času (pod záťažou) → čakaj
+  `seriove` ~+3–5 min, `paralelne` o ~3 min kratšie; celok hlboko pod 30-min capom.
   Pri JEDNOM volaní by padnutý test v `paralelne` preskočil `seriove` (dependency, „did not run") —
   post-deploy krok preto volá `--project=paralelne` a potom `--project=seriove --no-deps` (každý so
   svojím `PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/<projekt>`), rc oboch, krok padne pri ktoromkoľvek.
@@ -637,7 +650,8 @@ odobrať (tvrď podmnožinu / triedu).
 - **Namerané (dev1 pretažený inými projektmi, load 18–30 na 8 jadrách — čísla sú orientačné):**
   4 workery 7,7 min, sériovo 25,5 min. Pri load ~30 padali pri 3–4 workeroch 3D specy
   (`vizual3d`, `vizual-showroom`, `konfigurator-pergola` 3D, `zasklenia-zakaznicky`) na timeoute —
-  swiftshader render je CPU-ťažký. Preto CI 3 workery (runner 4 vCPU, server je vzdialený VPS). Keď
+  swiftshader render je CPU-ťažký. Preto CI 3 workery (runner 4 vCPU, server je vzdialený VPS); od #599
+  bežia tieto 3D specy navyše v `seriove` (vyššie), 3 workery sú pre zvyšok sady. Keď
   post-deploy pomalý: NAJPRV počet testov / čas z logu behu (reporter `list` ich vypíše), nie limit.
 
 ## Svelte komponent vo vitest cez SSR `render` + lokálny E2E s inou verziou Chromia (#578)

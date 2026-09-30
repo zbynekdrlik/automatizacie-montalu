@@ -326,9 +326,12 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
   **Cap 30 min — NEZVYŠOVAŤ.** História: 16 min (#466) → 30 min (run 33966432945, 373 testov ≈
   19 min workers:1). Do 0.25.58 sada narástla na 446 testov a sériový krok trval 29–33 min (8 behov;
   main run 36676300171 timeout). **#577: krok beží paralelne `E2E_WORKERS=3`** (proti LIVE PROD
-  read-only; specy meniace zdieľanú konfiguráciu v projekte `seriove` s 1 workerom po paralelnej
-  časti; dve volania `--project`, aby padnutý `paralelne` nezamlčal `seriove` — `e2e/seriove.ts`,
-  `playwright.config.ts`, detail v `testing.md`). Reporter pri `CI` = `list`
+  read-only; v projekte `seriove` s 1 workerom po paralelnej časti bežia DVE kategórie: specy
+  meniace zdieľanú konfiguráciu (`SERIOVE_SPECY`) a od #599 specy čakajúce na 3D/WebGL scénu
+  (`SERIOVE_3D` — swiftshader pri 3 súbežných workeroch vyhladovel, 0.25.60 `zasklenia-zakaznicky`
+  timeout; oprava = izolácia záťaže, nie retry/timeout); dve volania `--project`, aby padnutý
+  `paralelne` nezamlčal `seriove` — `e2e/seriove.ts`, `playwright.config.ts`, detail v
+  `testing.md`). Reporter pri `CI` = `list`
   (+ `html` artefakt): názov každého testu ide do logu priebežne, aj keď krok zabije timeout (default
   `dot` pri timeoute nevypísal nič). Cieľ ≤ 20 min. Pri ďalšom prekročení: NAJPRV odmeraj tempo z logu
   behu (počet testov / čas, `list` výpis), až potom hýb workermi (3D specy sú CPU-ťažké, runner 4 vCPU)
