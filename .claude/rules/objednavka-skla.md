@@ -287,8 +287,9 @@ owner ho odložil → ops-wait na #546).
   má LEN `default`, žiadne pomenované — sveltekit-actions.md) validuje `normZak`/`normOp` (bez Odoo
   lookup), NIČ neukladá, presmeruje na `/objednavka-skla/<zak>` (+ `?op=<OP>` LEN keď bolo OP zadané).
   **OP je od #577 NEPOVINNÉ** (Patrik, úloha 1181: výroba stránku používa aj ako VYHĽADÁVAČ podkladu
-  podľa zákazky — „ak dám len ZAK tak chce aj OP"); zadané, ale po `normOp` prázdne OP → chyba
-  (obranný guard, `normOp` dnes vracia `''` len pre prázdny vstup). Podklad load číta `?op=` do
+  podľa zákazky — „ak dám len ZAK tak chce aj OP"); `normOp` prijme každé neprázdne OP (OP…/OPDL…/
+  holé číslo), rovnako ako `nastavOp` — prázdne/medzery = bez OP, žiadna ďalšia validácia formátu
+  (review 🔵: vetva „neplatné neprázdne OP" by bola mŕtva). Podklad load číta `?op=` do
   `prefillOp`; OP pole sa predvyplní `podkladOp || prefillOp` (uloží ho `nastavOp` až keď podklad má
   riadky). Servis (popraskané sklá) tak dostane podklad + OP bez odpisu/nárezáku.
 - **Podklad bez akéhokoľvek OP (#577):** OP pole aj „Odoslať" sú LEN pri riadkoch (prázdny podklad

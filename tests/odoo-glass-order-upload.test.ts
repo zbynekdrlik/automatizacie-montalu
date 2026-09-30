@@ -147,17 +147,7 @@ describe('uploadGlassOrderToOdoo (#521)', () => {
 		expect(out.result).toBe('missing');
 		expect(called).toBe(false); // bez OP sa Odoo NEVOLÁ
 		expect(out.payload!.items).toHaveLength(1);
-	});
-
-	it('#577: missing bez akéhokoľvek OP → explicitná hláška „OP objednávky" pre podklad', async () => {
-		const zak = 'ZAK-GU-NOOP-577';
-		seedGlass(zak); // sklo áno, odpis NIE, OP na podklade NIE
-		process.env.ODOO_NAREZ_UPLOAD_ENABLED = '1';
-		process.env.ODOO_JSON2_URL = 'https://erp.example.test';
-		process.env.ODOO_JSON2_API_KEY = 'k';
-		setJson2Transport(async () => new Response('{}', { status: 200 }));
-		const out = await uploadGlassOrderToOdoo(zak);
-		expect(out.result).toBe('missing');
+		// #577: bez akéhokoľvek OP (odpis ani podklad) → explicitná hláška pre podklad
 		expect(out.error).toContain('OP objednávky');
 	});
 

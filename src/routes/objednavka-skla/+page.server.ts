@@ -23,10 +23,9 @@ export const actions = {
 		const opRaw = String(form.get('op') ?? '').trim();
 		// normZak overí, že po normalizácii ostane platné číslo zákazky (odmietne prázdne/„samé medzery")
 		if (!normZak(zakRaw)) return { error: 'Zadajte platné číslo zákazky.' };
-		// OP nepovinné (#577); ZADANÉ OP musí po normalizácii ostať platné (obranný guard — `normOp`
-		// dnes vracia '' len pre prázdny vstup)
-		const op = opRaw ? normOp(opRaw) : '';
-		if (opRaw && !op) return { error: 'Zadajte platné OP objednávky alebo pole nechajte prázdne.' };
+		// OP nepovinné (#577). `normOp` prijme každé neprázdne OP (OP…, OPDL…, holé číslo → OP<číslo>),
+		// rovnako ako `nastavOp` na podklade — prázdne/„samé medzery" = bez OP.
+		const op = normOp(opRaw);
 		// zak v URL ostáva v pôvodnom (trimnutom) tvare — podklad load ho normalizuje pri lookup-e
 		const ciel = `/objednavka-skla/${encodeURIComponent(zakRaw)}`;
 		log.info('otvorenie podkladu z úvodnej stránky', { zak: zakRaw, op: op || null });

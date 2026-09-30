@@ -231,7 +231,7 @@ export async function uploadGlassOrderToOdoo(
 				payload,
 				droppedAttachments,
 				error:
-					'Chýba OP objednávky — zadajte ho v poli „OP objednávky" na podklade a odošlite znova.'
+					'Chýba OP objednávky — zadajte ho v poli „OP objednávky“ na podklade a odošlite znova.'
 			};
 		}
 

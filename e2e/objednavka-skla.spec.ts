@@ -158,6 +158,18 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 	await expect(page.getByTestId('odoslat-odoo')).toBeEnabled();
 	await expect(page.getByTestId('odoslat-bez-op')).toHaveCount(0);
 
+	// #577 (Patrik, úloha 1181): úvodná stránka ako VYHĽADÁVAČ — len ZAK otvorí tento EXISTUJÚCI
+	// podklad (riadok aj uložené OP ostali), bez chyby o OP
+	await goto(page, '/objednavka-skla');
+	await page.getByTestId('nova-zak').fill(zak);
+	await page.getByTestId('nova-otvorit').click();
+	await page.waitForURL((u) => u.pathname === `/objednavka-skla/${zak}`);
+	await waitHydrated(page);
+	await expect(page.locator('tbody tr').first().locator('td').nth(0)).toContainText(
+		'ATYP podľa výkresu'
+	);
+	await expect(page.getByTestId('op-hodnota')).toContainText('OP260545');
+
 	expect(consoleMsgs).toEqual([]);
 });
 

@@ -20,7 +20,8 @@
 		disabled: 'Náhľad payloadu (odoslanie do Odoo je vypnuté v tomto prostredí)',
 		'no-items': 'Žiadne sklá na odoslanie',
 		'no-zak': 'Zákazka nie je zadaná',
-		missing: 'Zákazka nemá odpis ani OP objednávky — nedá sa priradiť objednávka',
+		// #577: dôvod (chýba OP / rôzne OP riadkov) nesie `error` za pomlčkou
+		missing: 'Nedá sa priradiť objednávka',
 		failed: 'Odoslanie zlyhalo'
 	};
 	const polozky = $derived(data.polozky);
@@ -873,6 +874,11 @@
 	}
 	.op-card {
 		margin-top: 16px;
+	}
+	.bez-op {
+		margin-left: 8px;
+		color: var(--m-muted);
+		font-size: 0.85rem;
 	}
 	.op-info {
 		font-size: 0.9rem;
