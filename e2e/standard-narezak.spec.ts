@@ -105,10 +105,7 @@ test('zmena počtu krídel nezmaže zvolené sklo; opona ponúka izolačné sklo
 	overPonukuSkla({ ...p, vypocty: p.vypocty.filter((s) => /Izola/i.test(s)) }, [
 		'Izolačné sklo 4/8/4 číre',
 		'Izolačné sklo 4/8/4 mliečne',
-		'Izolačné sklo 4/8/4 stopsol',
-		'Izolačné sklo 4/16/4 číre',
-		'Izolačné sklo 4/16/4 mliečne',
-		'Izolačné sklo 4/16/4 stopsol'
+		'Izolačné sklo 4/8/4 stopsol'
 	]);
 	await expect(page.getByTestId('narezak-hint')).toContainText('2x3K IZO');
 

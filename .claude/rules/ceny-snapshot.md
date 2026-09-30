@@ -16,6 +16,14 @@ paths:
 
 # Ceny materiálu + cena skla — denný Money snapshot (#154, #225)
 
+> **#599 (prechod Money → Odoo, 30.9.2026):** kontrola kódov odpisu (`validateOdpisKody`, async)
+> už NEčíta snapshot ako primárny zdroj — rozhoduje Odoo `product.product` cez `odoo-katalog.ts`;
+> snapshot je len FALLBACK pri nedostupnom Odoo (+ WARN). Stav skladu pre `SkladVarovania` (krok 3)
+> číta Odoo `stock.quant`; kým je snapshot čerstvý, platí nižšia z Odoo / snapshot, pri nedostupnom
+> Odoo snapshot. Ceny, rozvin, cena skla a stĺpec „sklad" v `enrichPolozky`/CenyTabulka ostávajú na
+> tomto snapshote: ceny čakajú na Odoo stranu (odoo-erp 8706) a cut skladu (odoo-erp 1122).
+> Detaily + pasce: `odoo-katalog.md`.
+
 ## Dátový tok (READ-ONLY, appka do Money NIKDY nepíše)
 
 Producent `scripts/ceny-snapshot.py` beží **mimo repa na dev2**

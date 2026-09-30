@@ -233,10 +233,10 @@ function cadCeny(
  * access-control hranica ako `cadCeny`). Pre b2b `[]`. Vstup = zobrazené nenulové Money položky
  * (`v.nonzero`); honest signál, nie blok.
  */
-function cadSklad(
+async function cadSklad(
 	user: SessionUser | null,
 	polozky: { kod: string; nazov: string; qty: number }[]
-): SkladVarovanie[] {
+): Promise<SkladVarovanie[]> {
 	if (isB2B(user)) return [];
 	return skladoveVarovania(polozky.map((p) => ({ kod: p.kod, nazov: p.nazov, mnozstvo: p.qty })));
 }
@@ -280,7 +280,7 @@ export function buildCadJob(
 
 // --- zdieľané akčné telá (spocitat / upravit / odoslat) — route glue žije RAZ (#393) ---
 
-export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: CadJobOpts) {
+export async function cadSpocitat(form: FormData, user: SessionUser | null, opts?: CadJobOpts) {
 	const vstup = parseCadVstup(form);
 	const viewResult = cadOdpisView(vstup, form, opts);
 	const { error, view: v } = viewResult;
@@ -294,7 +294,7 @@ export function cadSpocitat(form: FormData, user: SessionUser | null, opts?: Cad
 		v,
 		ceny: v ? cadCeny(user, v.nonzero) : undefined,
 		// #448/#451 predodpisové skladové varovanie + odobrať (LEN interní; b2b → [])
-		skladVarovania: v ? cadSklad(user, v.nonzero) : [],
+		skladVarovania: v ? await cadSklad(user, v.nonzero) : [],
 		snapshotDatum: getSnapshotMeta().generatedAt,
 		// #500 round 2: bar_mm potvrdené → warning je null. Defense-in-depth ostáva.
 		fixBarMmWarning: fixBarMmBlocked
@@ -325,7 +325,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			vstup,
 			v,
 			ceny: v ? cadCeny(user, v.nonzero) : undefined,
-			skladVarovania: v ? cadSklad(user, v.nonzero) : [],
+			skladVarovania: v ? await cadSklad(user, v.nonzero) : [],
 			snapshotDatum: getSnapshotMeta().generatedAt,
 			error:
 				`Odpis pozastavený — dĺžka tyče (bar_mm) pre FIX kódy ${missing} nie je ` +
@@ -337,7 +337,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 	// bloku, tak ho nepočítame zbytočne — len keď sa vraciame do „nahlad" s chybou. Zavolá sa
 	// nanajvýš raz (vetvy sú return).
 	const cenyBlok = () => (v ? cadCeny(user, v.nonzero) : undefined);
-	const skladBlok = () => (v ? cadSklad(user, v.nonzero) : []);
+	const skladBlok = async () => (v ? cadSklad(user, v.nonzero) : []);
 	const snapDatum = () => getSnapshotMeta().generatedAt;
 	// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
 	if (editError)
@@ -346,7 +346,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			vstup,
 			v,
 			ceny: cenyBlok(),
-			skladVarovania: skladBlok(),
+			skladVarovania: await skladBlok(),
 			snapshotDatum: snapDatum(),
 			error: editError
 		};
@@ -358,7 +358,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			vstup,
 			v,
 			ceny: cenyBlok(),
-			skladVarovania: skladBlok(),
+			skladVarovania: await skladBlok(),
 			snapshotDatum: snapDatum(),
 			error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
 		};
@@ -395,7 +395,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			vstup,
 			v,
 			ceny: cenyBlok(),
-			skladVarovania: skladBlok(),
+			skladVarovania: await skladBlok(),
 			snapshotDatum: snapDatum(),
 			error:
 				'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'

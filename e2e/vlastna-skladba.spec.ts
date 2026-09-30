@@ -1,7 +1,7 @@
 // #235 slice 2 — E2E: vlastná (nekatalógová) skladba skla „Iné (vlastná skladba)".
 //
 // Reálny používateľský tok cez prehliadač: v glass selecte zvolím „Iné", odhalí sa výber
-// hrúbkovej triedy + textové pole skladby, vyplním „5esg/14/5esg" + triedu 24, spočítam —
+// hrúbkovej triedy + textové pole skladby, vyplním „5esg/14/5esg" + triedu 16, spočítam —
 // na nárezovom pláne sa zobrazí TEXT skladby (nie sentinel) a cena je „nedostupná" (honest-null).
 // Prvý test je ČÍTACÍ (Spočítať iba počíta, nezapisuje — beží aj proti nasadeniu). Druhý test
 // ZAPISUJE (Odoslať odpis) → `skipAkLive` ho preskočí proti LIVE nasadeniu (Money-safety).
@@ -23,7 +23,8 @@ async function zadajVlastnuSkladbu(page: import('@playwright/test').Page) {
 	await page.selectOption('#sklo', SKLO_INE);
 	// po voľbe „Iné" sa odhalí výber triedy + text sa stane povinný
 	await expect(page.getByTestId('ine-trieda')).toBeVisible();
-	await page.selectOption('#skloTrieda', '24');
+	// #599: Štandard + už trieda 24 nemá (Odoo úloha 1218 — „Štandardy — 4, 6, 16 mm")
+	await page.selectOption('#skloTrieda', '16');
 	await page.fill('#skloPresne', '5esg/14/5esg');
 	await page.fill('#s', '3000');
 	await page.fill('#v', '2000');

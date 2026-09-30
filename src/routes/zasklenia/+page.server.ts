@@ -226,10 +226,10 @@ function cenyPre(user: SessionUser | null, polozky: OdpisJob['polozky']): CenyRe
  * access-control hranica ako `cenyPre`). Pre b2b vráti `[]` (b2b vidí náhľad, ale sklad ani odpis
  * nesmie). Vstup = Money položky odpisu (profily + kovanie); `qty` → `mnozstvo`.
  */
-function skladVarovaniaPre(
+async function skladVarovaniaPre(
 	user: SessionUser | null,
 	polozky: OdpisJob['polozky']
-): SkladVarovanie[] {
+): Promise<SkladVarovanie[]> {
 	if (isB2B(user)) return [];
 	return skladoveVarovania(polozky.map((p) => ({ kod: p.kod, nazov: p.nazov, mnozstvo: p.qty })));
 }
@@ -393,7 +393,12 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 // (ktoré po pridaní skiel už NEpresmerúva preč, ale vráti späť náhľad s potvrdením) —
 // odpisové tlačidlo + ceny + `planHash` sa tak po pridaní skla vyrenderujú IDENTICKY.
 // Predpokladá, že compute prebehol (r + spec sú platné). Chybu kovania vráti ako 'form'.
-function stavNahlad(vstup: Vstup, r: ComputeResult, spec: PosuvSpec, user: SessionUser | null) {
+async function stavNahlad(
+	vstup: Vstup,
+	r: ComputeResult,
+	spec: PosuvSpec,
+	user: SessionUser | null
+) {
 	const kov = kovanieFor([spec], vstup.jednostrannaFab, vstup.farbaKovania);
 	if (kov.err) return { step: 'form' as const, error: kov.err, vstup };
 	const tesn = tesneniePolozky(r.material, r.system, vstup.sklo, vstup.skloTrieda);
@@ -405,7 +410,7 @@ function stavNahlad(vstup: Vstup, r: ComputeResult, spec: PosuvSpec, user: Sessi
 		plan: r,
 		kovanie: allKovanie,
 		ceny: cenyPre(user, job.polozky),
-		skladVarovania: skladVarovaniaPre(user, job.polozky),
+		skladVarovania: await skladVarovaniaPre(user, job.polozky),
 		snapshotDatum: getSnapshotMeta().generatedAt,
 		skloCeny: skloCenyPre(user, [
 			{
@@ -429,7 +434,7 @@ function stavNahlad(vstup: Vstup, r: ComputeResult, spec: PosuvSpec, user: Sessi
 }
 
 // #514: multi-posuv obdoba `stavNahlad` — pre `nahladMulti` AJ `pridatSklaMulti`.
-function stavNahladMulti(
+async function stavNahladMulti(
 	vstup: MultiVstup,
 	r: MultiResult,
 	specs: PosuvSpec[],
@@ -446,7 +451,7 @@ function stavNahladMulti(
 		multi: r,
 		kovanie: allKovanie,
 		ceny: cenyPre(user, job.polozky),
-		skladVarovania: skladVarovaniaPre(user, job.polozky),
+		skladVarovania: await skladVarovaniaPre(user, job.polozky),
 		snapshotDatum: getSnapshotMeta().generatedAt,
 		skloCeny: skloCenyPre(
 			user,
@@ -507,7 +512,7 @@ export const actions = {
 		if (err || !r || !spec)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', vstup };
 		// náhľadový payload (kovanie/tesnenie/ceny/planHash/warn) je zdieľaný so `pridatSkla`
-		const v = stavNahlad(vstup, r, spec, locals.user);
+		const v = await stavNahlad(vstup, r, spec, locals.user);
 		if (v.step === 'form') return v;
 		return { ...v, heightWarn };
 	},
@@ -646,7 +651,7 @@ export const actions = {
 		if (err || !r)
 			return { step: 'form' as const, error: err ?? 'Výpočet zlyhal.', multiVstup: vstup };
 		// náhľadový payload zdieľaný so `pridatSklaMulti`
-		const v = stavNahladMulti(vstup, r, specs, locals.user);
+		const v = await stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
 		return { ...v, heightWarn };
 	},
@@ -780,7 +785,7 @@ export const actions = {
 		// #514: náhľad zostav PRED zápisom — ak kovanie zlyhá (form), NEvkladaj sklá
 		// (validácia pred vedľajším efektom). Potom idempotentne (dvojklik neduplikuje)
 		// a BEZ presmerovania, aby „uložiť nárezák" (odpis) ostalo dostupné.
-		const v = stavNahlad(vstup, r, spec, locals.user);
+		const v = await stavNahlad(vstup, r, spec, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
@@ -824,7 +829,7 @@ export const actions = {
 			})
 		);
 		// #514: validácia pred vedľajším efektom + idempotentne + bez presmerovania — viď `pridatSkla`
-		const v = stavNahladMulti(vstup, r, specs, locals.user);
+		const v = await stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať

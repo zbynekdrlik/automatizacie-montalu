@@ -33,6 +33,15 @@
 		return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
 	}
 
+	// #599: sklad je z Odoo (`stock.quant`) alebo z denného Money snapshotu — kým snapshot žije,
+	// platí NIŽŠIA hodnota (server `skladoveVarovania`). Obsluha vidí, odkiaľ číslo je.
+	let zdrojPopis = $derived.by(() => {
+		const z = new Set((varovania ?? []).map((v) => v.zdroj));
+		const money = `Money snapshot k ${fmtDatum(snapshotDatum)}`;
+		if (z.size === 2) return `sklad: Odoo aj ${money} — platí nižší`;
+		return z.has('odoo') ? 'sklad: Odoo, aktuálny stav' : `sklad: ${money}`;
+	});
+
 	/** Kód, ktorý bol v tejto session odobraný (klient-side, len vizuálny stav). */
 	let odobrate = $state<Set<string>>(new Set());
 
@@ -77,14 +86,22 @@
 				{:else}
 					— {varovania.length} položiek má nedostatočný sklad
 				{/if}
-				<span class="sklad-blok-datum">(sklad k {fmtDatum(snapshotDatum)})</span>
+				<span class="sklad-blok-datum" data-testid={`${testid}-zdroj`}>({zdrojPopis})</span>
 			</div>
 		</div>
 		<p class="sklad-blok-popis">
-			Tieto položky majú v Money nižší sklad než požadované množstvo. Ak odpis odošleš s nimi, Money
-			ho <b>celý</b> ticho zahodí — žiadna chybová hláška, doklad nevznikne. Môžeš ich odobrať a odpísať
-			bez nich.
+			Tieto položky majú nižší sklad než požadované množstvo. Ak odpis odošleš s nimi, Money ho <b
+				>celý</b
+			> ticho zahodí — žiadna chybová hláška, doklad nevznikne. Môžeš ich odobrať a odpísať bez nich.
 		</p>
+		{#if varovania.some((v) => v.zdroj === 'odoo')}
+			<!-- review #599: pri zdroji Odoo nedostatok hlási Odoo sklad — do prechodu skladu na Odoo ho
+			     Money nemusí mať rovnaký (Odoo Money zatiaľ nezrkadlí), tvrdenie o zahodení nemusí platiť -->
+			<p class="sklad-blok-popis" data-testid={`${testid}-odoo-pozn`}>
+				Pri položkách označených <b>Odoo</b> hlási nedostatok sklad v Odoo. Kým sa sklad neprepne na Odoo,
+				Money môže mať iný stav — pred odobratím over skutočný stav na sklade.
+			</p>
+		{/if}
 		<ul class="sklad-blok-zoznam">
 			{#each varovania as v (v.kod)}
 				<li data-testid={`${testid}-${v.kod}`} class:odobrata={odobrate.has(v.kod)}>
@@ -95,6 +112,9 @@
 							<span class="sklad-blok-cisla">
 								sklad <b>{v.sklad}</b>, požadované <b>{v.mnozstvo}</b>
 							</span>
+							<span class="sklad-blok-zdroj" data-testid={`${testid}-${v.kod}-zdroj`}
+								>{v.zdroj === 'odoo' ? 'Odoo' : 'Money'}</span
+							>
 						</div>
 						{#if odobrate.has(v.kod)}
 							<span class="sklad-blok-odobrata" data-testid={`${testid}-${v.kod}-odobrata`}
@@ -179,6 +199,13 @@
 	.sklad-blok-cisla {
 		font-size: 13px;
 		color: var(--m-muted-ink);
+	}
+	.sklad-blok-zdroj {
+		font-size: 12px;
+		color: var(--m-muted-ink);
+		border: 1px solid var(--m-err-border);
+		border-radius: var(--m-radius-sm);
+		padding: 0 6px;
 	}
 	.sklad-blok-odobrata {
 		color: var(--m-ok);

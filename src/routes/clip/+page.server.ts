@@ -107,7 +107,7 @@ function editsFrom(form: FormData): Map<string, string> {
 }
 
 /** Náhľadový payload kroku „kontrola" — zdieľaný `spocitat` a `pridatSkla` (#593). */
-function stavKontrola(vstup: ClipVstup) {
+async function stavKontrola(vstup: ClipVstup) {
 	const vypocet = computeClip(vstup);
 	return {
 		step: 'kontrola' as const,
@@ -116,7 +116,7 @@ function stavKontrola(vstup: ClipVstup) {
 		// #554 pílový plán (display-only) — RozpisRezov na tyče
 		narez: clipMaterialRows([vypocet]),
 		// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
-		skladVarovania: skladoveVarovania(
+		skladVarovania: await skladoveVarovania(
 			vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 		),
 		snapshotDatum: getSnapshotMeta().generatedAt,
@@ -125,7 +125,7 @@ function stavKontrola(vstup: ClipVstup) {
 }
 
 /** Náhľadový payload kroku „kontrolaMulti" — zdieľaný `spocitatMulti` a `pridatSklaMulti` (#593). */
-function stavKontrolaMulti(vstup: ClipMultiVstup) {
+async function stavKontrolaMulti(vstup: ClipMultiVstup) {
 	const multi = computeClipMulti(vstup.kusy);
 	const job = jobForMulti(vstup, multi.polozky, '');
 	return {
@@ -133,7 +133,7 @@ function stavKontrolaMulti(vstup: ClipMultiVstup) {
 		multiVstup: vstup,
 		multi,
 		narez: clipMaterialRows(multi.kusy), // #554 spoločný pílový plán (display-only)
-		skladVarovania: skladoveVarovania(
+		skladVarovania: await skladoveVarovania(
 			multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 		),
 		snapshotDatum: getSnapshotMeta().generatedAt,
@@ -183,7 +183,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, vstup };
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
-		return stavKontrola(vstup);
+		return await stavKontrola(vstup);
 	},
 
 	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
@@ -205,14 +205,14 @@ export const actions = {
 		// úpravy sa nesmú ticho stratiť a nahradiť auto-výpočtom (bazén review vzor)
 		const edits = editsFrom(form);
 		const editVals = Object.fromEntries(edits);
-		const kontrola = (err: string) => ({
+		const kontrola = async (err: string) => ({
 			step: 'kontrola' as const,
 			vstup,
 			vypocet,
 			narez: clipMaterialRows([vypocet]),
 			editVals,
 			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
-			skladVarovania: skladoveVarovania(
+			skladVarovania: await skladoveVarovania(
 				vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 			),
 			snapshotDatum: getSnapshotMeta().generatedAt,
@@ -278,7 +278,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const cErr = chybaMulti(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
-		return stavKontrolaMulti(vstup);
+		return await stavKontrolaMulti(vstup);
 	},
 
 	odoslatMulti: async ({ request, locals }) => {
@@ -298,7 +298,7 @@ export const actions = {
 				multiVstup: vstup,
 				multi,
 				narez,
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,
@@ -317,7 +317,7 @@ export const actions = {
 				multi,
 				narez,
 				editVals: Object.fromEntries(edits),
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,
@@ -332,7 +332,7 @@ export const actions = {
 				multi,
 				narez,
 				editVals: Object.fromEntries(edits),
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,
@@ -347,7 +347,7 @@ export const actions = {
 				multi,
 				narez,
 				editVals: Object.fromEntries(edits),
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,
@@ -395,7 +395,7 @@ export const actions = {
 				multiVstup: vstup,
 				multi,
 				narez,
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,
@@ -414,7 +414,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, vstup };
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
-		const v = stavKontrola(vstup);
+		const v = await stavKontrola(vstup);
 		const sklaPridane = await pridajSklaClip([vstup], vstup, locals.user?.username ?? '');
 		return { ...v, sklaPridane };
 	},
@@ -424,7 +424,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const cErr = chybaMulti(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
-		const v = stavKontrolaMulti(vstup);
+		const v = await stavKontrolaMulti(vstup);
 		const sklaPridane = await pridajSklaClip(vstup.kusy, vstup, locals.user?.username ?? '');
 		return { ...v, sklaPridane };
 	}

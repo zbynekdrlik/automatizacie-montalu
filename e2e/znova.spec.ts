@@ -5,8 +5,10 @@
 // z histórie klikni „Použiť znova" a over, že sa zadanie predvyplnilo a že ZAK/OP/
 // zákazník ostali PRÁZDNE. Test sa preskočí, ak beží proti LIVE inštancii.
 import { test, expect } from '@playwright/test';
+import Database from 'better-sqlite3';
 import {
 	collectConsole,
+	goto,
 	loginAs,
 	waitHydrated,
 	skipAkLive,
@@ -96,6 +98,64 @@ test('Robust už neponúka kalené sklá 8/10 mm (je IZO-only)', async ({ page }
 	const p = await ponukaSkla(page.getByLabel('Sklo (základ — určuje vzorec)'));
 	expect(p.vypocty.some((g) => /Izolačné sklo 4\/16\/4/.test(g))).toBe(true);
 	expect(p.vypocty.some((g) => /kalen/i.test(g))).toBe(false);
+
+	expect(errs).toEqual([]);
+});
+
+// #599 (ROZHODNUTÉ main 30.9., Odoo úloha 1218): Štandardy už 24 mm (4/16/4) neponúkajú ani v
+// lokálnej zálohe. Starý odpis so 4/16/4 sa pri „Použiť znova" NESMIE zahodiť — select ho ukáže
+// ako doplnkovú voľbu „<sklo> · pôvodné sklo z appky" (vzor #594) a výpočet ide ďalej ním.
+// Starý odpis sa nedá vytvoriť cez UI (sklo sa už neponúka) → seed riadku histórie priamo do
+// e2e.db (vzor `dopyty-konfigurator.spec.ts`), len preview beh; nič sa neodpisuje.
+test('„Použiť znova" starého Štandard + odpisu so 4/16/4 ukáže sklo ako pôvodné sklo z appky (#599)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	// seed ide do lokálneho e2e.db — PROD (live) preskočí helper, nie nový BASE_URL skip riadok
+	await skipAkLive(page);
+	const zak = `E2E-ZNOVA-24-${Date.now()}`;
+	const db = new Database('./data/e2e.db');
+	let id: number;
+	try {
+		id = Number(
+			db
+				.prepare(
+					`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by)
+					 VALUES ('zasklenia', ?, '01', 'Starý zákazník', 0, 0, '/tmp', 'x.xlsx', 'e2e-599', ?, 'e2e')`
+				)
+				.run(
+					zak,
+					JSON.stringify({
+						system: 'Štandard +',
+						styl: '3K',
+						s: 3000,
+						v: 2400,
+						sklo: 'Izolačné sklo 4/16/4 číre',
+						skloZaklad: 'Izolačné sklo 4/16/4 číre',
+						otvaranie: 'P - L'
+					})
+				).lastInsertRowid
+		);
+	} finally {
+		db.close();
+	}
+
+	await loginAs(page);
+	await goto(page, `/zasklenia?znova=${id}`);
+
+	const info = page.getByTestId('znova-info');
+	await expect(info).toContainText(zak);
+	// sklo sa NEZAHODILO — žiadna hláška „sa už neponúka"
+	await expect(info).not.toContainText('neponúka');
+	await expect(page.getByLabel('Systém')).toHaveValue('Štandard +');
+	const sklo = page.getByLabel('Sklo (základ — určuje vzorec)');
+	await expectSklo(sklo, 'Izolačné sklo 4/16/4 číre');
+	await expect(sklo.locator('option:checked')).toHaveText(
+		'Izolačné sklo 4/16/4 číre · pôvodné sklo z appky'
+	);
+	// 4/16/4 je v ponuke LEN ako táto jediná doplnková voľba
+	const p = await ponukaSkla(sklo);
+	expect(p.vypocty.filter((s) => /4\/16\/4/.test(s))).toEqual(['Izolačné sklo 4/16/4 číre']);
 
 	expect(errs).toEqual([]);
 });

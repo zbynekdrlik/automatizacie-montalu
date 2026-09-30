@@ -40,7 +40,18 @@ interface Captured {
 function captureTransport(status = 200): Captured[] {
 	const calls: Captured[] = [];
 	setJson2Transport((async (url: string, init?: RequestInit) => {
-		calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? '{}')) });
+		const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+		// #599: live odpis najprv overí kódy v Odoo katalógu (`product.product/search_read`) — mock
+		// odpovedá ako Odoo, ktoré všetky pýtané kódy pozná (echo); inak by boli „neznáme" a odpis
+		// by sa zablokoval. Katalógový read sa do `calls` nezapisuje (test sleduje len uploady).
+		if (String(url).endsWith('/product.product/search_read')) {
+			const kody = (body.domain as [string, string, string[]][])[0]![2];
+			return new Response(
+				JSON.stringify(kody.map((k) => ({ default_code: k, name: k, is_storable: true }))),
+				{ status: 200 }
+			);
+		}
+		calls.push({ url: String(url), body });
 		if (status !== 200) return new Response('boom', { status });
 		return new Response(JSON.stringify({ lines_created: 1 }), { status: 200 });
 	}) as typeof fetch);

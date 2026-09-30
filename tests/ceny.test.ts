@@ -326,7 +326,7 @@ describe('#359 — bazén BPP/BPK v snapshote', () => {
 			{ kod: 'BPK-T359', nakupCennik: 0, mena: 'EUR', sklad: 42 } // komponent (nákup 0 → null), ale má sklad
 		]);
 		maybeImportSnapshot();
-		const v = validateOdpisKody([
+		const v = await validateOdpisKody([
 			{ kod: 'BPP-T359', nazov: 'Bazén profil' },
 			{ kod: 'BPK-T359', nazov: 'Bazén kladka' }
 		]);
@@ -335,8 +335,8 @@ describe('#359 — bazén BPP/BPK v snapshote', () => {
 		expect(v.problemy).toEqual([]);
 	});
 
-	it('BPK je v scope → BPK kód, ktorý v snapshote CHÝBA, sa označí neznamy (predtým sa bazén nevalidoval)', () => {
-		const v = validateOdpisKody([{ kod: 'BPK-NIET-999', nazov: 'Neznámy bazén diel' }]);
+	it('BPK je v scope → BPK kód, ktorý v snapshote CHÝBA, sa označí neznamy (predtým sa bazén nevalidoval)', async () => {
+		const v = await validateOdpisKody([{ kod: 'BPK-NIET-999', nazov: 'Neznámy bazén diel' }]);
 		expect(v.ok).toBe(false);
 		expect(v.problemy).toHaveLength(1);
 		expect(v.problemy[0]!.kod).toBe('BPK-NIET-999');
@@ -348,7 +348,7 @@ describe('#359 — bazén BPP/BPK v snapshote', () => {
 		const cerstvy = new Date(Date.now() - 3600000).toISOString();
 		writeSnapshot(cerstvy, [{ kod: 'BPK-T359-NOSKLAD', nakupCennik: 3, mena: 'EUR', sklad: null }]);
 		maybeImportSnapshot();
-		const v = validateOdpisKody([{ kod: 'BPK-T359-NOSKLAD', nazov: 'Bazén diel bez karty' }]);
+		const v = await validateOdpisKody([{ kod: 'BPK-T359-NOSKLAD', nazov: 'Bazén diel bez karty' }]);
 		expect(v.ok).toBe(false);
 		expect(v.problemy[0]!.dovod).toBe('bez-skladovej-karty');
 	});

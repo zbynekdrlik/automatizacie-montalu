@@ -13,7 +13,7 @@ import type { CfgZmena } from './cfg-editor';
 import {
 	ODOO_DRUH_POPIS,
 	jeOdooDruh,
-	ponukaSkielSystemu,
+	prijateSklaSystemu,
 	vypocetneSkloPre,
 	type OdooDruh,
 	type OdooHrubka
@@ -49,9 +49,11 @@ export function skloHrubkyPre(system: string): SkloHrubka[] {
 	return listSkloHrubky().filter((h) => h.system === system);
 }
 
-/** Lokálna povolená ponuka systému — z nej sa odvodzuje výpočtové sklo. */
+/** Prijaté lokálne sklá systému (ponuka ∪ pôvodné, #599) — z nich sa odvodzuje výpočtové sklo,
+ *  rovnako ako v ponuke nárezáka (`sklo-odoo.ts` `ponukaSystemu`). Pôvodné 4/16/4 pri Štandardoch
+ *  tak ostáva výpočtovým sklom 24 mm — výroba si hrúbku vie znova zapnúť bez releasu. */
 function lokalnaPonuka(system: string): string[] {
-	return ponukaSkielSystemu(system, listGlassTypes());
+	return prijateSklaSystemu(system, listGlassTypes());
 }
 
 const popis = (h: { mm: number; druh: OdooDruh }) =>

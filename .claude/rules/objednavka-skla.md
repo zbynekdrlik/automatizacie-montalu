@@ -3,7 +3,7 @@ paths:
   - "src/routes/objednavka-skla/**"
   - "e2e/objednavka-skla*.spec.ts"
   - "src/lib/server/objednavka-skla.ts"
-  - "src/lib/server/money-nazov-skla.ts"
+  - "src/lib/server/odoo-nazov-skla.ts"
   - "src/lib/objednavka-skla-pozicia.ts"
   - "src/lib/objednavka-skla-typy.ts"
   - "src/lib/server/objednavka-skla-odoslanie.ts"
@@ -404,7 +404,9 @@ nezmenené okrem `description` nových riadkov = „Zasklenie N").
   kandidátov, pozícia sa porovná v JS. Inak by opakované „Pridať sklá" po zmene textu producenta
   zduplikovalo riadky spred zmeny (= duplicitná objednávka u dodávateľa). Dôsledok: rovnaké sklo
   (rozmer+ks+typ) na tej istej pozícii zákazky sa nepridá druhýkrát ani pri inom systéme.
-- **Money názov skla** `src/lib/server/money-nazov-skla.ts` `moneyNazvySkiel(typy)`: lokálny názov →
+- **Názov skla z Odoo katalógu** `src/lib/server/odoo-nazov-skla.ts` `odooNazvySkiel(typy)` (do #599
+  `money-nazov-skla.ts`/`moneyNazvySkiel`; `product.product` read + cache ide cez zdieľaný
+  `odoo-katalog.ts`, viď `odoo-katalog.md`): lokálny názov →
   `glassMoneyKodPodlaNazvu` (db.ts — kód LEN keď je naprieč systémami JEDNOZNAČNÝ; riadok objednávky
   systém neukladá, `glassMoneyKod(system,…)` sa nedá) → Odoo `product.product` `default_code in [...]`
   → `name` (JEDEN read pre všetky kódy podkladu); inak cenníková hodnota → `montalu.glass.type.name`

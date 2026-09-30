@@ -37,7 +37,7 @@ import {
 	ulozOdoslanieOdoo
 } from '$lib/server/objednavka-skla-odoslanie';
 import { zakazkaPrehlad, opZPrehladu } from '$lib/server/zakazka-ceny';
-import { moneyNazvySkiel } from '$lib/server/money-nazov-skla';
+import { odooNazvySkiel } from '$lib/server/odoo-nazov-skla';
 import { nadpisObjednavky } from '$lib/objednavka-skla-pozicia';
 import { SENTINEL_INE_SKLO, neznameKategorie } from '$lib/objednavka-skla-typy';
 import { logger } from '$lib/server/log';
@@ -194,7 +194,7 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 	// #563: zobrazovací (reálny Money) názov typu skla pre riadky — LEN display, `typ_skla` sa nemení.
 	// Jeden Odoo read pre všetky kódy (cache + 3 s timeout, fallback = uložený typ). Manuál „iné
 	// sklo" riadky majú vlastný typ (mimo katalógu) → neprekladá sa.
-	const nazvySkiel = await moneyNazvySkiel(
+	const nazvySkiel = await odooNazvySkiel(
 		polozky.filter((p) => !p.typSklaManual).map((p) => p.typSkla)
 	);
 

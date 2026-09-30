@@ -54,6 +54,11 @@ is `^v\d+\.\d+\.\d+(-dev\.\d+)?(\s\([0-9a-f]{7}\))?$`, which a bare-SHA fallback
     `resolve(l.href)` at the usage site — pre-resolving the array entries themselves
     (`href: resolve('/route')`) does NOT reliably satisfy the rule's type-checker at
     the template call site, even though the value is a `ResolvedPathname`.
+  - **`resolve()` je v SSR ABSOLÚTNY len vďaka `paths: { relative: false }`** vo `vite.config.ts`
+    (#592). SvelteKit default `relative: true` robí `resolve('/fix')` počas SSR relatívnym k stránke
+    (`./fix` na /clip, `../fix` na /fix/cad) — PROD 0.25.59 to malo na kartách „Pevné zasklenie".
+    Unit render (`svelte/server`) to NEVIDÍ (nemá request store); dôkaz je E2E nad surovým SSR HTML
+    (`page.request.get(url)` po `loginAs`, `e2e/pevne-zasklenie-nav.spec.ts`). Nevracaj default.
   - Query strings work directly: `resolve(\`/route?param=${value}\`)` — `resolve()`
     accepts `${Pathname}?${string}`, no need to split off the query string.
   - `window.location.href = ...` assignments are NOT covered by this rule (it only
