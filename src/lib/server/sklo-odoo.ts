@@ -25,6 +25,7 @@ import { parseVstup, parseMultiVstup, type Vstup, type MultiVstup } from './vstu
 import {
 	odooDruhSedi,
 	ponukaSkielSystemu,
+	prijateSklaSystemu,
 	vypocetneSkloPre,
 	type OdooHrubka
 } from '$lib/sklo-povolene';
@@ -49,19 +50,24 @@ function lokalnaVolba(n: string): VolbaSkla {
  * Ponuka „Sklo (základ)" pre systém. `lokalne` = lokálna povolená ponuka systému
  * (`ponukaSkielSystemu`), `odoo` = výsledok `fetchGlassTypes`, `hrubky` = povolené hrúbky systému
  * (default z tabuľky `cfg_sklo_hrubka`, cache). Pri explicitných `hrubky` ČISTÁ (žiadne IO).
+ * `vypocetne` (#599) = lokálne sklá, z ktorých sa odvodzuje VÝPOČTOVÉ sklo Odoo typov — prijaté sklá
+ * systému (`prijateSklaSystemu`, ponuka ∪ pôvodné), aby zúženie zálohy (Štandardy bez 4/16/4)
+ * nezmenilo výpočet Odoo volieb a výroba si 24 mm vedela v editore znova zapnúť; default `lokalne`.
+ * `lokalne` samotné je LEN záloha pri nedostupnom Odoo.
  */
 export function ponukaSkielPre(
 	system: string,
 	lokalne: readonly string[],
 	odoo: GlassTypesResult,
-	hrubky: readonly OdooHrubka[] = skloHrubkyPre(system)
+	hrubky: readonly OdooHrubka[] = skloHrubkyPre(system),
+	vypocetne: readonly string[] = lokalne
 ): PonukaSkiel {
 	if (odoo.source !== 'odoo') return { skupiny: [{ label: '', items: lokalne.map(lokalnaVolba) }] };
 
-	// výpočtové sklo triedy sa ODVODÍ z lokálnej ponuky (nikdy sa nezadáva); trieda bez neho
+	// výpočtové sklo triedy sa ODVODÍ z lokálnych skiel (nikdy sa nezadáva); trieda bez neho
 	// (napr. katalóg/allow-list sa medzitým zmenil) sa vynechá
 	const triedy = hrubky.flatMap((h) => {
-		const sklo = vypocetneSkloPre(h.mm, h.druh, lokalne);
+		const sklo = vypocetneSkloPre(h.mm, h.druh, vypocetne);
 		return sklo ? [{ ...h, sklo }] : [];
 	});
 	const triedaPre = (o: GlassTypeOption) =>
@@ -79,7 +85,7 @@ export function ponukaSkielPre(
 	// #594 (číre) — nové odtiene menia len objednávku/popis, nikdy výpočtové sklo (Money-neutrálne).
 	const zdrojePre = (povlak: 'presne' | 'ignoruj') => {
 		const m = new Map<string, GlassTypeOption[]>();
-		for (const n of lokalne) {
+		for (const n of vypocetne) {
 			if (povlak === 'ignoruj' && glassPovlak(n) !== 'ziadny') continue;
 			const k = matchOdooGlassType(n, typy, { povlak, odtien: 'vypoctovy' }).kandidati;
 			if (k.length > 0) m.set(n, k);
@@ -140,8 +146,22 @@ export async function ponukySkiel(
 ): Promise<Record<string, PonukaSkiel>> {
 	const odoo = await fetchGlassTypes();
 	const katalog = listGlassTypes();
-	return Object.fromEntries(
-		systemy.map((s) => [s, ponukaSkielPre(s, ponukaSkielSystemu(s, katalog), odoo)])
+	return Object.fromEntries(systemy.map((s) => [s, ponukaSystemu(s, katalog, odoo)]));
+}
+
+/** Ponuka systému z výpočtového katalógu: záloha = lokálna ponuka, výpočtové sklo Odoo typov z
+ *  prijatých skiel (#599 — pôvodné sklá sa neponúkajú, ale výpočet Odoo volieb nemenia). */
+function ponukaSystemu(
+	system: string,
+	katalog: ReturnType<typeof listGlassTypes>,
+	odoo: GlassTypesResult
+): PonukaSkiel {
+	return ponukaSkielPre(
+		system,
+		ponukaSkielSystemu(system, katalog),
+		odoo,
+		skloHrubkyPre(system),
+		prijateSklaSystemu(system, katalog)
 	);
 }
 
@@ -164,7 +184,7 @@ export async function overSkloOdoo(p: SOdoo): Promise<string | null> {
 		// názov bez Odoo nepoznáme → plán ukáže lokálne sklo (nie holý kód typu)
 		return null;
 	}
-	const ponuka = ponukaSkielPre(p.system, ponukaSkielSystemu(p.system, listGlassTypes()), odoo);
+	const ponuka = ponukaSystemu(p.system, listGlassTypes(), odoo);
 	const o = ponuka.skupiny.flatMap((g) => g.items).find((x) => x.odoo === p.skloOdoo);
 	if (!o || o.vypocet !== p.sklo) {
 		log.warn('overSkloOdoo: Odoo typ skla nepatrí k systému/výpočtovému sklu — odmietnuté', {

@@ -9,10 +9,18 @@
 // (rekomputa backfill/kiosk) tento zoznam neaplikuje (lekcia #570: zmazané sklo = 0 riadkov
 // nárezáku na kiosku).
 //
-// Systém BEZ záznamu = bez obmedzenia (celý katalóg systému, ako doteraz): starý Štandard
-// („bez zmeny" v tabuľke), Drevostavby, Slide. Kľúč = cfg systém (`Štandard +` = Štandard plus).
+// Systém BEZ záznamu = bez obmedzenia (celý katalóg systému, ako doteraz): Drevostavby, Slide.
+// Kľúč = cfg systém (`Štandard +` = Štandard plus, `Štandard` = starý Štandard).
 // Zmena zoznamu (napr. keď Patrik pošle presný zoznam) = úprava LEN tu; názvy musia byť riadky
 // katalógu systému (stráži `tests/sklo-povolene.test.ts`).
+//
+// #599 (ROZHODNUTÉ main 30.9., Odoo úloha 1218 — Patrik „Štandardy — 4, 6, 16 mm"): zoznam je aj
+// ZÁLOHA ponuky pri NEDOSTUPNOM Odoo, preto sa zosúlaďuje so živou konfiguráciou hrúbok. Sklo, ktoré
+// sa už NEPONÚKA, ale staré odpisy ho majú, patrí do `povodne` (NIE preč): server ho PRIJME
+// (`skloPovolene` — „Použiť znova" + odoslanie), klient ho ukáže LEN ako doplnkovú voľbu
+// „<sklo> · pôvodné sklo z appky" (`ponukaPreStyl`, #594), nikdy ho neprednastaví (`predvoleneSklo`)
+// a výpočtové sklo Odoo typov sa odvodzuje aj z neho (`prijateSklaSystemu` — výroba si hrúbku vie
+// v editore znova zapnúť bez releasu).
 import { SKLO_INE, SKLO_TRIEDY, defaultSklo, type SkloTrieda } from './sklo';
 
 interface PovoleneSkla {
@@ -24,7 +32,17 @@ interface PovoleneSkla {
 	/** predvolené sklo ponuky, keď ho všeobecné pravidlo `defaultSklo` (prvé v poradí katalógu)
 	 *  nedá — napr. povolená výnimka stojí v katalógu PRED bežným sklom */
 	readonly predvolene?: string;
+	/** #599: pôvodné sklá — už sa NEPONÚKAJÚ, ale server ich prijme (staré odpisy, „Použiť znova");
+	 *  riadky katalógu systému, nikdy zároveň v `nazvy` */
+	readonly povodne?: readonly string[];
 }
+
+// #599: izolačné 24 mm (4/16/4) — Štandardy ho od Odoo úlohy 1218 neponúkajú, staré odpisy ho majú
+const IZO_24_POVODNE = [
+	'Izolačné sklo 4/16/4 číre',
+	'Izolačné sklo 4/16/4 mliečne',
+	'Izolačné sklo 4/16/4 stopsol'
+] as const;
 
 export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 	// 6 mm a 10 mm; predvolené 10 mm rieši `defaultSklo` (#431)
@@ -37,11 +55,12 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 		nazvy: ['Izolačné sklo 4/16/4 číre', 'Izolačné sklo 4/16/4 mliečne'],
 		triedyIne: [24]
 	},
-	// Štandard plus: izolačné (trieda 16 — 4/8/4 aj 4/16/4), 6 mm, 3.3.1 (ako 6 mm, #214) a 4 mm
-	// Float aj kalené (#579: Patrik, Odoo úloha 1193, 28.9. „pri štandardoch tam môže byť aj 4mm
-	// sklo" — novšie vyjadrenie výroby ruší celé vylúčenie 4 mm scr_017 z meetingu 25.9.; kalené 4 mm
-	// aj preto, aby sa Odoo tvrdené 4 mm počítalo ako tvrdené, nie ako Float); NIE 10 mm (#504).
-	// 4 mm je VÝNIMKA na výber — predvolené ostáva 6 mm (katalóg má Float 4 mm pred 6).
+	// Štandard plus: izolačné 16 mm (4/8/4), 6 mm, 3.3.1 (ako 6 mm, #214) a 4 mm Float aj kalené
+	// (#579: Patrik, Odoo úloha 1193, 28.9. „pri štandardoch tam môže byť aj 4mm sklo" — novšie
+	// vyjadrenie výroby ruší celé vylúčenie 4 mm scr_017 z meetingu 25.9.; kalené 4 mm aj preto, aby
+	// sa Odoo tvrdené 4 mm počítalo ako tvrdené, nie ako Float); NIE 10 mm (#504); od #599 NIE 24 mm
+	// (4/16/4 → `povodne`). 4 mm je VÝNIMKA na výber — predvolené ostáva 6 mm (katalóg má Float 4 mm
+	// pred 6).
 	'Štandard +': {
 		nazvy: [
 			'Float sklo 4 mm',
@@ -52,21 +71,45 @@ export const POVOLENE_SKLA: Readonly<Record<string, PovoleneSkla>> = {
 			'3.3.1 mliečne',
 			'Izolačné sklo 4/8/4 číre',
 			'Izolačné sklo 4/8/4 mliečne',
-			'Izolačné sklo 4/8/4 stopsol',
-			'Izolačné sklo 4/16/4 číre',
-			'Izolačné sklo 4/16/4 mliečne',
-			'Izolačné sklo 4/16/4 stopsol'
+			'Izolačné sklo 4/8/4 stopsol'
 		],
-		triedyIne: [4, 6, 16, 24],
-		predvolene: 'Float sklo 6 mm'
+		triedyIne: [4, 6, 16],
+		predvolene: 'Float sklo 6 mm',
+		povodne: IZO_24_POVODNE
+	},
+	// #599: starý Štandard — doteraz BEZ záznamu (celý zdieľaný katalóg); odoberá sa LEN 24 mm
+	// (rozhodnutie hovorí len o ňom). 10 mm aj 3.3.2 ostávajú ako doteraz — Odoo hrúbky 4/6/16 ich
+	// síce nemajú, ale ich odobratie nikto nerozhodol. Poradie = katalóg (`defaultSklo` bez zmeny).
+	Štandard: {
+		nazvy: [
+			'Float sklo 4 mm',
+			'Float sklo 6 mm',
+			'3.3.1',
+			'3.3.1 mliečne',
+			'3.3.2',
+			'3.3.2 mliečne',
+			'Izolačné sklo 4/8/4 číre',
+			'Izolačné sklo 4/8/4 mliečne',
+			'Izolačné sklo 4/8/4 stopsol',
+			'ESG kalené 4 mm',
+			'ESG kalené 6 mm',
+			'ESG kalené 10 mm'
+		],
+		triedyIne: [4, 6, 10, 16],
+		povodne: IZO_24_POVODNE
 	}
 };
 
 /** Predvolené sklo ponuky systému: explicitná predvoľba z `POVOLENE_SKLA` (keď ju ponuka má),
  *  inak všeobecné `defaultSklo`. Klient ho volá pri každom resete výberu skla. */
 export function predvoleneSklo(skla: string[], system: string): string {
-	const p = POVOLENE_SKLA[system]?.predvolene;
-	return p && skla.includes(p) ? p : defaultSklo(skla, system);
+	const p = POVOLENE_SKLA[system];
+	// #599: pôvodné sklo (len pre staré odpisy) sa nikdy neprednastaví
+	const povodne: readonly string[] = p?.povodne ?? [];
+	const ponuka = skla.filter((g) => !povodne.includes(g));
+	return p?.predvolene && ponuka.includes(p.predvolene)
+		? p.predvolene
+		: defaultSklo(ponuka, system);
 }
 
 // ---- #579: Odoo typy skla (`montalu.glass.type`) v ponuke nárezáku podľa HRÚBKY ----
@@ -199,12 +242,20 @@ export function skloPovolene(system: string, sklo: string, skloTrieda?: number |
 	if (!p) return true;
 	if (sklo === SKLO_INE)
 		return skloTrieda == null || (p.triedyIne as readonly number[]).includes(skloTrieda);
-	return p.nazvy.includes(sklo);
+	// #599: pôvodné sklo (staré odpisy) server prijme, hoci ho ponuka nemá
+	return p.nazvy.includes(sklo) || (p.povodne ?? []).includes(sklo);
 }
 
-/** Katalógové sklá systému zúžené na allow-list (poradie katalógu zachované). */
+/** Ponúka ho systém ako NOVÝ výber? (`skloPovolene` bez pôvodných skiel.) */
+function skloPonukane(system: string, sklo: string): boolean {
+	const p = POVOLENE_SKLA[system];
+	return !p || p.nazvy.includes(sklo);
+}
+
+/** Katalógové sklá systému zúžené na allow-list PONUKY (poradie katalógu zachované) — bez
+ *  pôvodných skiel (#599). */
 export function filtrujPovoleneSkla(system: string, skla: string[]): string[] {
-	return skla.filter((g) => skloPovolene(system, g));
+	return skla.filter((g) => skloPonukane(system, g));
 }
 
 /** Ponuka katalógových skiel pre systém z riadkov katalógu (`data.skla` na klientovi) — klientsky
@@ -215,11 +266,32 @@ export function ponukaSkielSystemu(
 	system: string,
 	skla: readonly { nazov: string; system: string }[]
 ): string[] {
+	return filtrujPovoleneSkla(system, katalogSystemu(system, skla));
+}
+
+/** Katalóg systému z riadkov (klientske zrkadlo serverového `glassTypesForSystem`). */
+function katalogSystemu(
+	system: string,
+	skla: readonly { nazov: string; system: string }[]
+): string[] {
 	const zdielany = system === 'Štandard' || system === 'Štandard Drevo';
 	const kat = zdielany ? 'Štandard +' : system;
 	const lenVlastne = kat === 'Deluxe' || kat === 'Štandard +';
-	return filtrujPovoleneSkla(
-		system,
-		skla.filter((g) => g.system === kat || (!lenVlastne && g.system === 'ALL')).map((g) => g.nazov)
-	);
+	return skla
+		.filter((g) => g.system === kat || (!lenVlastne && g.system === 'ALL'))
+		.map((g) => g.nazov);
+}
+
+/**
+ * #599: PRIJATÉ sklá systému = ponuka ∪ pôvodné (`povodne`), poradie katalógu. Použi tam, kde
+ * rozhoduje „smie sklo formulár/server niesť" — klient `sklaForSystem` (pôvodné sklo starého odpisu
+ * sa pri „Použiť znova" nezresetuje a `ponukaPreStyl` ho doplní ako „pôvodné sklo z appky") — a pri
+ * odvodení výpočtového skla Odoo typov (`vypocetneSkloPre`: server ponuka, editor hrúbok). Ponuka
+ * NOVÉHO výberu (aj záloha bez Odoo) je `ponukaSkielSystemu`.
+ */
+export function prijateSklaSystemu(
+	system: string,
+	skla: readonly { nazov: string; system: string }[]
+): string[] {
+	return katalogSystemu(system, skla).filter((g) => skloPovolene(system, g));
 }

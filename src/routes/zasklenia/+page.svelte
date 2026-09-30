@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import { checkB2BWidth, checkB2BHeight } from '$lib/b2b-limits';
 	import { SKLO_INE, SKLO_TRIEDY, ineHrubkaTrieda, jeSkloTrieda } from '$lib/sklo';
-	import { ponukaSkielSystemu, povoleneTriedyIne, predvoleneSklo } from '$lib/sklo-povolene';
+	import { prijateSklaSystemu, povoleneTriedyIne, predvoleneSklo } from '$lib/sklo-povolene';
 	import { skloOdooPre } from '$lib/sklo-odoo';
 	import HiddenVstup from '$lib/components/zasklenia/HiddenVstup.svelte';
 	import {
@@ -96,11 +96,13 @@
 	const existuje = (sysStyl: string) => data.styly.some((x) => x.sysStyl === sysStyl);
 	// SKLO_INE (#235 slice 2) je doplnené ZA katalóg pre KAŽDÝ systém — vlastná skladba
 	// nie je katalógový riadok; `defaultSklo` ho nikdy nevráti (nie „číre" ani prvý v poradí).
-	// #573: `ponukaSkielSystemu` = katalóg systému (zrkadlo serverového glassTypesForSystem) zúžený
-	// allow-listom `POVOLENE_SKLA`; server odmietne to isté (`parseVstup`), takže `defaultSklo`
-	// aj „Znova z odpisu" vždy padnú na povolené sklo z TOHTO zoznamu.
+	// #573: katalóg systému (zrkadlo serverového glassTypesForSystem) zúžený allow-listom
+	// `POVOLENE_SKLA`; server odmietne to isté (`parseVstup`). #599: PRIJATÉ sklá (ponuka ∪ pôvodné)
+	// — pôvodné sklo starého odpisu („Použiť znova", napr. 4/16/4 pri Štandardoch) sa tak nezresetuje
+	// a `ponukaPreStyl` ho doplní ako „pôvodné sklo z appky"; samotné voľby selectu nesie serverová
+	// ponuka (`data.ponukaSkiel`, bez pôvodných skiel) a `predvoleneSklo` pôvodné sklo nikdy nevyberie.
 	const sklaForSystem = (sys: string, styl: string) => [
-		...sklaDoPonuky(sys, styl, ponukaSkielSystemu(sys, data.skla), existuje),
+		...sklaDoPonuky(sys, styl, prijateSklaSystemu(sys, data.skla), existuje),
 		SKLO_INE
 	];
 	const otvaraniaForStyl = (st: string) => (st?.startsWith('2x') ? ['Opona'] : data.otvarania);
