@@ -70,7 +70,8 @@ describe('#592: „Pevné zasklenie" — dáta kariet a lišty', () => {
 describe('#592: horná lišta — žiadny dropdown „Pevné zasklenie"', () => {
 	it('layout nemá vnorený dropdown ani mobilnú podsekciu a používa jeden odkaz', () => {
 		expect(LAYOUT).not.toMatch(/pevne-menu-toggle/);
-		expect(LAYOUT).not.toMatch(/nav-pevne/);
+		// trieda starého dropdownu, nie import `$lib/nav-pevne-zasklenie`
+		expect(LAYOUT).not.toMatch(/nav-pevne(?!-zasklenie)/);
 		expect(LAYOUT).not.toMatch(/nav-subgroup/);
 		expect(LAYOUT).not.toMatch(/pevneEl/);
 		expect(LAYOUT).toMatch(/PEVNE_ZASKLENIE_NAV/);
