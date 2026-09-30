@@ -1,7 +1,7 @@
 // #563 (Patrik, Odoo úloha 625, 23.9.): podklad objednávky skla musí byť použiteľný pre výrobu —
 // (a) nadpis = OP + zákazník (nie ZAK), (b) popis riadku = len „Zasklenie N" (bez systému/štýlu —
 // „ich nezaujíma kam to dávame"), (c) stĺpec m² vyplnený vopred, (d) typ skla = reálny Money názov
-// (testuje `tests/money-nazov-skla-563.test.ts`). Money-NEUTRÁLNE (objednávka u dodávateľa skla).
+// (testuje `tests/odoo-nazov-skla-563.test.ts`). Money-NEUTRÁLNE (objednávka u dodávateľa skla).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
