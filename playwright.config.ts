@@ -1,5 +1,5 @@
 import { defineConfig } from '@playwright/test';
-import { SERIOVE_SPECY } from './e2e/seriove';
+import { SERIOVE_VSETKY } from './e2e/seriove';
 
 // BASE_URL nastavený → testuje sa NASADENÁ appka (post-deploy verifikácia).
 // Bez BASE_URL (CI) sa zbuilduje a spustí preview server s test env.
@@ -16,7 +16,7 @@ const testIgnore = process.env.BASE_URL ? ['**/error-stranka.spec.ts'] : [];
 // `E2E_WORKERS` > 1: proti LIVE PROD sú zápisy preskočené (skipAkLive / BASE_URL skip), sada je
 // read-only a paralelný beh ju skráti pod limit kroku (1 worker = 29–33 min, nad 30-min limitom).
 const WORKERS = Math.max(1, Math.floor(Number(process.env.E2E_WORKERS)) || 1);
-const SERIOVE = SERIOVE_SPECY.map((f) => `**/${f}`);
+const SERIOVE = SERIOVE_VSETKY.map((f) => `**/${f}`);
 
 export default defineConfig({
 	testDir: 'e2e',
@@ -32,9 +32,11 @@ export default defineConfig({
 	// zlyhaní sú v logu (default `dot` ich pri timeoute nevypísal). `html` = artefakt pri páde.
 	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
 	workers: WORKERS,
-	// Paralelný beh (WORKERS > 1): specy meniace zdieľanú konfiguráciu (editor vzorcov / hrúbok,
-	// `e2e/seriove.ts`) bežia v projekte `seriove` s 1 workerom AŽ PO paralelnej časti — súbežný
-	// editor by menil čísla ostatným testom. Pri WORKERS = 1 jeden default projekt ako doteraz.
+	// Paralelný beh (WORKERS > 1): dve kategórie specov (`e2e/seriove.ts`) bežia v projekte
+	// `seriove` s 1 workerom AŽ PO paralelnej časti — (1) meniace zdieľanú konfiguráciu (editor
+	// vzorcov / hrúbok: súbežný editor by menil čísla ostatným testom), (2) čakajúce na 3D/WebGL
+	// scénu (softvérový render pri súbežných workeroch vyhladovie CPU → timeout, #599). Pri
+	// WORKERS = 1 jeden default projekt ako doteraz.
 	// Pri JEDNOM volaní padnutý test v `paralelne` preskočí `seriove` (dependency) — post-deploy krok
 	// (ci.yml) preto volá projekty ZVLÁŠŤ (`--project paralelne`, potom `--project seriove --no-deps`),
 	// aby obe sady vždy došli do logu.

@@ -206,10 +206,11 @@ jobs:
         # Cap 30 min (NEZVYŠOVAŤ — no-timeout-band-aids). Sériovo (1 worker) sada 446 testov
         # na GH runneri rástla na 29–33 min (8 behov do 0.25.58, run 36676300171 timeout) →
         # E2E_WORKERS=3: proti LIVE PROD je sada read-only (zápisy za skipAkLive/BASE_URL skip),
-        # specy meniace zdieľanú konfiguráciu (editor vzorcov/hrúbok, e2e/seriove.ts) bežia
-        # po paralelnej časti v projekte `seriove` s 1 workerom (playwright.config.ts). 3 (nie 4)
-        # workery: runner má 4 vCPU a 3D specy renderujú softvérovo (swiftshader) — pri
-        # pretažení CPU padajú na timeoute (lokálne meranie, .claude/rules/testing.md). Reporter
+        # specy meniace zdieľanú konfiguráciu (editor vzorcov/hrúbok) A specy čakajúce na 3D/WebGL
+        # scénu (e2e/seriove.ts `SERIOVE_SPECY` + `SERIOVE_3D`) bežia po paralelnej časti v projekte
+        # `seriove` s 1 workerom (playwright.config.ts). 3D sériovo (#599): runner má 4 vCPU,
+        # swiftshader render pri 3 súbežných workeroch vyhladovie CPU → timeout (0.25.60
+        # zasklenia-zakaznicky) — izolácia záťaže, nie retry ani vyšší timeout. Reporter
         # `list` (config pri CI) vypíše názov každého testu priebežne — aj pri timeoute kroku.
         id: postdeploy_e2e
         if: success() && steps.e2e_secrets.outputs.present == 'true'
