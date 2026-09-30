@@ -604,6 +604,40 @@ Incident: PR #561 pridal na `sietka.spec.ts` pevné jokle literály zo seedu →
 deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-riadok` 4×1575 vs
 4×1578). Fix (#555 HOTFIX): odvodenie zo sieťoviny cez `jokleZoSietoviny`. Pozri aj `sietka.md`.
 
+**Rovnaká pasca pre PONUKU (#577, main run 36676300171):** živá PROD cfg nie sú len vzorce, ale aj
+povolené hrúbky Odoo skiel (`cfg_sklo_hrubka`, editor `/zasklenia/nastavenia`). Výroba 29.9. odobrala
+24 mm izolačné pri Štandardoch → 3 specy, ktoré žiadali výpočtové sklo „Izolačné sklo 4/16/4 číre" pri
+Štandard +, padli LEN v deploy jobe (CI bez Odoo ponúka lokálny allow-list, kde 4/16/4 je). Pravidlo:
+vyber sklo podľa toho, od čoho výpočet REÁLNE závisí (IZO nárezák = TRIEDA 16 → „4/8/4 číre" = Odoo
+16 mm), nikdy konkrétnu skladbu, ktorú výroba môže vypnúť; netvrď prítomnosť voľby, ktorú editor vie
+odobrať (tvrď podmnožinu / triedu).
+
+## Paralelný post-deploy E2E (`E2E_WORKERS`) + lokálne meranie v LIVE režime (#577)
+
+- **Default 1 worker** (lokálne aj CI `test` job proti preview — tam bežia ZÁPISOVÉ testy nad jednou
+  e2e.db a zdieľanými fixture súbormi `e2e-ceny.json`, paralelne by sa bili). Post-deploy krok nastaví
+  `E2E_WORKERS=3`: proti LIVE PROD je sada read-only. Pri > 1 sú dva Playwright projekty: `paralelne` +
+  `seriove` (1 worker, `dependencies` → beží PO paralelnej časti) pre specy meniace zdieľanú konfiguráciu
+  (`e2e/seriove.ts`, guard `tests/e2e-seriove.test.ts` cez `MUTUJE_CFG` = `ulozit-vzorce` /
+  `pridat-hrubku` / `odobrat-hrubku`). Nový spec so zápisom do editora → pridaj ho do `SERIOVE_SPECY`.
+  Daň dependency: padne test v `paralelne` → `seriove` sa nespustí (vo výpise „did not run").
+- **Paralelne-bezpečný spec:** nečíta zoznam, do ktorého súbežné testy pridávajú (používatelia, história
+  odpisov) cez PODREŤAZEC. Vzor zlyhania: `locator('tr', { hasText: E2E_USER })` chytil súbežne zakladaný
+  `e2e-vo-…` účet (strict mode) → vlastný riadok hľadaj cez odznak „ja" / presnú bunku
+  (`pouzivatelia-role.spec.ts`). Throwaway účty (`zalozB2bUcet`) majú unikátne mená — tie sú OK.
+- **Lokálne meranie presne post-deploy množiny BEZ PROD:** dočasný config (necommitovať) so
+  `webServer` preview a env `MONEY_LIVE=1` + `MONEY_LIVE_DIR=./data/<scratch>` (zápisy by išli do
+  scratch adresára, nie `/data/dlv-import`) → `/health` hlási `live:true` → `skipAkLive` preskočí
+  zápisové testy ako na PROD; `BASE_URL=http://localhost:4173` spustí BASE_URL skipy. Výsledok 30.9.:
+  341 passed / 105 skipped = presne profil PROD behu. Chromium binárku ber dynamicky (cache
+  `~/.cache/ms-playwright/chromium_headless_shell-*` sa mení pod rukami iných sessions — medzi dvoma
+  behmi zmizla 1247).
+- **Namerané (dev1 pretažený inými projektmi, load 18–30 na 8 jadrách — čísla sú orientačné):**
+  4 workery 7,7 min, sériovo 25,5 min. Pri load ~30 padali pri 3–4 workeroch 3D specy
+  (`vizual3d`, `vizual-showroom`, `konfigurator-pergola` 3D, `zasklenia-zakaznicky`) na timeoute —
+  swiftshader render je CPU-ťažký. Preto CI 3 workery (runner 4 vCPU, server je vzdialený VPS). Keď
+  post-deploy pomalý: NAJPRV počet testov / čas z logu behu (reporter `list` ich vypíše), nie limit.
+
 ## Svelte komponent vo vitest cez SSR `render` + lokálny E2E s inou verziou Chromia (#578)
 
 - **Komponent sa dá testovať bez prehliadača:** `import { render } from 'svelte/server'` +

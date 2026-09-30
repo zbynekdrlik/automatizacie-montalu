@@ -142,3 +142,18 @@ seed test čaká `[...ODOO_HRUBKY_SEED, CLIP 6, CLIP 16]`. `migracie.ts` 978 r. 
 `user_version … toBe(54)` → 55 (python recept vyššie). Fixtúra `migration-v55.test.ts` = v54 fixtúra +
 stav `cfg_sklo_hrubka` po v54; test aj priamo volá funkciu nad DB s existujúcim (CLIP, 6, esg) → ostane,
 druhý beh no-op. Krok 4 sa netýka.
+
+## v56 (#577, Odoo úloha 1218) — Štandardy bez 24 mm izolačného (DÁTOVÁ migrácia MAZANIA, vlastný súbor)
+
+`migracie-sklo-hrubky-24mm.ts` (`migrateStandardyBez24mm`, guard `>= 56`, transakcia) — `DELETE` LEN
+presného riadku (Štandard +, 24, izolacne) a (Štandard, 24, izolacne) zo ZMRAZENÉHO literálu. Vzor pre
+dátovú migráciu, ktorá ZOSÚLADÍ čerstvú DB s tým, čo výroba už nastavila v PROD editore (cfg_audit
+76/77): na PROD je no-op (riadky chýbajú), CI/čerstvá DB/obnovená záloha dostanú stav PROD. Kľúč
+mazania = systém + mm + **druh** — 24 mm iného druhu (vedomá voľba výroby) ostane; guard zaručí, že
+neskoršie opätovné povolenie 24 mm v editore migrácia nikdy neprepíše. Seed `ODOO_HRUBKY_SEED` sa
+zmenil v tom istom tickete (čerstvá DB tie riadky nedostane vôbec, v56 je tam no-op). `migracie.ts` 980 r.
+Head-bump: **53 riadkov** `user_version … toBe(55)` → 56 (python recept vyššie) — POZOR: v55 test priamo
+volá `migrateClipSkloHrubky` a tvrdí jeho vlastný bump `toBe(55)` — ten ostáva 55 (recept ho zmení,
+vráť ho). `migration-v54`/`v55` full-migrate asserty (migrate() beží po hlavu) stratili 24 mm pri
+Štandardoch. Fixtúra `migration-v56.test.ts` = v55 fixtúra so stavom pred 29.9. (vrátane CLIP). Krok 4
+sa netýka.
