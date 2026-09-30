@@ -625,6 +625,14 @@ deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-r
 - **Temp E2E config drž na porte 4173, ak je voľný** — `skipAkLive` (`e2e/helpers.ts`) číta
   `BASE_URL || http://localhost:4173`, takže na inom porte všetky zápisové testy padnú na `fetch
   failed` (artefakt harnessu, nie regresia). Iný port len keď je 4173 obsadený súrodencom.
+- **`vite dev` vo WORKTREE → 403 na fonty = `server.fs.allow` artefakt (#577).** Worktree
+  (`.claude/worktrees/agent-*`) rezolvuje `node_modules` z RODIČOVSKÉHO repa; vite dev servíruje len
+  z allow listu worktree → `@fontsource-variable/*.woff2` padne 403 a KAŽDÝ zero-console assert zlyhá
+  na `Failed to load resource: … 403` (v logu `is outside of Vite serving allow list`). Nie regresia:
+  spusti dev cez dočasný `vite.tmpN.config.ts` = `mergeConfig(base, { server: { fs: { allow:
+  ['<rodičovské repo>/node_modules'] } } })` (`npx vite dev --config vite.tmpN.config.ts --port 4173
+  --strictPort` vo webServer.command dočasného playwright configu, s `executablePath` podľa bodu
+  vyššie), obe dočasné súbory po behu zmaž.
 - **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
   položky cez `span[data-testid^="popis-"]` (od #594 je popis `<span>` v bunke popisu vedľa
   `pridal-<id>` „pridal <autor> · <čas>"), nie `tbody tr`.

@@ -283,11 +283,22 @@ owner ho odložil → ops-wait na #546).
   navyše). Podmienka honest-null v svelte = presne serverový gate (`sirkaMm/dlzkaMm/pocetTabul`).
   Load pridal `glassTypes`/`glassTypesSource` (`fetchGlassTypes`). `pridajSkloManual` dostal voliteľný
   `modul` override (default `'manual'`).
-- **(d) Index `/objednavka-skla` = „Nová objednávka len skla".** `default` akcia (route má LEN
-  `default`, žiadne pomenované — sveltekit-actions.md) validuje `normZak`/`normOp` (bez Odoo lookup),
-  NIČ neukladá, presmeruje na `/objednavka-skla/<zak>?op=<OP>`. Podklad load číta `?op=` do
+- **(d) Index `/objednavka-skla` = otvoriť/založiť objednávku skla zákazky.** `default` akcia (route
+  má LEN `default`, žiadne pomenované — sveltekit-actions.md) validuje `normZak`/`normOp` (bez Odoo
+  lookup), NIČ neukladá, presmeruje na `/objednavka-skla/<zak>` (+ `?op=<OP>` LEN keď bolo OP zadané).
+  **OP je od #577 NEPOVINNÉ** (Patrik, úloha 1181: výroba stránku používa aj ako VYHĽADÁVAČ podkladu
+  podľa zákazky — „ak dám len ZAK tak chce aj OP"); zadané, ale po `normOp` prázdne OP → chyba
+  (obranný guard, `normOp` dnes vracia `''` len pre prázdny vstup). Podklad load číta `?op=` do
   `prefillOp`; OP pole sa predvyplní `podkladOp || prefillOp` (uloží ho `nastavOp` až keď podklad má
   riadky). Servis (popraskané sklá) tak dostane podklad + OP bez odpisu/nárezáku.
+- **Podklad bez akéhokoľvek OP (#577):** OP pole aj „Odoslať" sú LEN pri riadkoch (prázdny podklad
+  ukáže „Žiadne sklá…" + „Pridať riadok"). Pri vypnutom Odoslať (riadky, bez OP) je VIDITEĽNÁ výzva
+  `odoslat-bez-op` (nie len tooltip). Upload `missing` bez OP (žiadne odpisové ani podkladové OP)
+  vracia `error` „Chýba OP objednávky — zadajte ho v poli „OP objednávky" na podklade…" (zobrazí sa
+  za stavom `odoslane-stav`); mixed OP má vlastnú hlášku „nastavte jedno OP". Testy:
+  `objednavka-skla-index.test.ts` (#577 blok, aj `required` len na `nova-zak`),
+  `odoo-glass-order-upload.test.ts` (#577 missing hláška), E2E `objednavka-skla.spec.ts` „len zákazka
+  (bez OP)" + servisný test (výzva zmizne po nastavení OP).
 - **Testy:** `odoo-glass-types.test.ts` (nové polia + value/label), `objednavka-skla-manual.test.ts`
   (modul override + `op` prenos), `objednavka-skla-index.test.ts` (index redirect + validácia). E2E:
   `objednavka-skla-spec.spec.ts` (rescope na Hrana + skryté polia nie sú v UI), `objednavka-skla.spec.ts`
