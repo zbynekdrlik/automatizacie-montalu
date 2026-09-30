@@ -67,6 +67,14 @@ describe('paralelný post-deploy E2E — sériové specy (CPU-ťažká 3D/WebGL 
 		expect(RENDERUJE_3D.test(`document.querySelector('[data-testid="zakaznicky-obrazok"]')`)).toBe(
 			true
 		);
+		// každý scénový atribút `data-viz-*` (rozmer/RAL/postproc) sa nastaví až z hotovej scény
+		expect(RENDERUJE_3D.test(`toHaveAttribute('data-viz-rozmer', '6000×4000')`)).toBe(true);
+		expect(RENDERUJE_3D.test(`locator('[data-viz-postproc]')`)).toBe(true);
+		// súrodenecké testid-y (placeholder bez obrázka) nie sú čakanie na scénu
+		expect(RENDERUJE_3D.test('querySelector(\'[data-testid="zakaznicky-obrazok-chyba"]\')')).toBe(
+			false
+		);
+		expect(RENDERUJE_3D.test("getByTestId('zakaznicky-obrazok-nedostupne')")).toBe(false);
 		// overlay / kontajner / poster / cudzí <canvas> nie sú čakanie na vyrenderovanú scénu
 		expect(RENDERUJE_3D.test("getByTestId('vizual3d-dotyk-overlay')")).toBe(false);
 		expect(RENDERUJE_3D.test("getByTestId('vizual3d-poster')")).toBe(false);
