@@ -1,8 +1,9 @@
 <script lang="ts">
 	// Cenový zoznam materiálu (#154, fáza 1) — LEN pre interných, zdieľané medzi
 	// zasklenia náhľadom (nahlad/nahladMulti) a históriou odpisov (/odpisy/[id]).
-	// Ceny sú z DENNÉHO Money snapshotu (appka do Money nezapisuje NIČ) — vek
-	// snapshotu sa zobrazuje vždy, nikdy sa nepredstiera aktuálnosť.
+	// #599: ceny sú z Odoo (kanál `get_prices` odpovedá) ALEBO z denného Money snapshotu
+	// (kým Odoo ceny nesprístupní) — zdroj sa zobrazuje vždy (`ceny-zdroj`), pri snapshote aj
+	// jeho vek; nikdy sa nepredstiera aktuálnosť. Appka do Money nezapisuje NIČ.
 	import type { CenyResult } from '$lib/server/ceny';
 	import { formatDatumCasSk } from '$lib/datum';
 
@@ -30,18 +31,27 @@
 
 <div class="card" data-testid="ceny-tabulka">
 	<div class="sec">Ceny materiálu</div>
-	{#if ceny.snapshot.generatedAt}
+	<!-- #599: zdroj cien sa volí automaticky — Odoo, keď jeho kanál cien odpovedá, inak Money
+	     snapshot (kým Odoo ceny nesprístupní). Nikdy sa nemiešajú v jednej tabuľke. -->
+	<p class="sub" data-testid="ceny-zdroj" data-zdroj={ceny.zdroj}>
+		{#if ceny.zdroj === 'odoo'}
+			Zdroj cien: <b>Odoo</b> (aktuálne) — cena, ktorú Odoo nemá, je „cena neznáma".
+		{:else}
+			Zdroj cien: <b>Money snapshot</b> — kým Odoo ceny nesprístupní.
+		{/if}
+	</p>
+	{#if ceny.zdroj === 'snapshot' && ceny.snapshot.generatedAt}
 		<p class="sub" data-testid="ceny-snapshot-vek">
 			Ceny zo snapshotu Money k {formatDatumCasSk(ceny.snapshot.generatedAt)}, {ceny.snapshot
 				.daysOld}
 			{dniSlovo(ceny.snapshot.daysOld ?? 0)} staré.
 		</p>
-	{:else}
+	{:else if ceny.zdroj === 'snapshot'}
 		<p class="sub" data-testid="ceny-snapshot-vek">
 			Snapshot cien z Money zatiaľ nebol naimportovaný — všetky ceny sú „neznáme".
 		</p>
 	{/if}
-	{#if ceny.snapshot.rejectedCount > 0}
+	{#if ceny.zdroj === 'snapshot' && ceny.snapshot.rejectedCount > 0}
 		<p class="sub neuplne" data-testid="ceny-snapshot-odmietnute">
 			⚠ Posledný import snapshotu zamietol {ceny.snapshot.rejectedCount}
 			{riadokSlovo(ceny.snapshot.rejectedCount)} (chybné dáta z Money) — tie kódy môžu chýbať.

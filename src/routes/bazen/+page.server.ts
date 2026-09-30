@@ -47,7 +47,7 @@ async function nahladCien(out: BazenPolozka[]) {
 			out.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 		),
 		snapshotDatum: getSnapshotMeta().generatedAt,
-		ceny: enrichPolozky(out.filter((o) => o.qty > 0))
+		ceny: await enrichPolozky(out.filter((o) => o.qty > 0))
 	};
 }
 

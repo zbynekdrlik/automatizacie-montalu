@@ -2,6 +2,11 @@
 paths:
   - 'src/lib/server/ceny.ts'
   - 'src/lib/server/sklo-cena.ts'
+  - 'src/lib/server/sklo-strecha-cena.ts'
+  - 'src/lib/server/odoo-prices.ts'
+  - 'src/routes/health/+server.ts'
+  - 'tests/odoo-ceny*.test.ts'
+  - 'tests/odoo-prices*.test.ts'
   - 'src/lib/sklo-strecha.ts'
   - 'tests/sklo-strecha.test.ts'
   - 'src/lib/components/CenyTabulka.svelte'
@@ -20,9 +25,50 @@ paths:
 > už NEčíta snapshot ako primárny zdroj — rozhoduje Odoo `product.product` cez `odoo-katalog.ts`;
 > snapshot je len FALLBACK pri nedostupnom Odoo (+ WARN). Stav skladu pre `SkladVarovania` (krok 3)
 > číta Odoo `stock.quant`; kým je snapshot čerstvý, platí nižšia z Odoo / snapshot, pri nedostupnom
-> Odoo snapshot. Ceny, rozvin, cena skla a stĺpec „sklad" v `enrichPolozky`/CenyTabulka ostávajú na
-> tomto snapshote: ceny čakajú na Odoo stranu (odoo-erp 8706) a cut skladu (odoo-erp 1122).
-> Detaily + pasce: `odoo-katalog.md`.
+> Odoo snapshot. Detaily + pasce: `odoo-katalog.md`.
+>
+> **#599 krok ceny (ROZHODNUTÉ owner 30.9. „ano prepnut ceny hned") — zdroj cien je AUTOMATICKÝ,
+> žiadny env flag (`ODOO_PRICES_ENABLED` odstránený).** `ceny.ts` `cenovyZdroj(kody)` sa pri každom
+> výpočte opýta `odoo-prices.ts` `odooCenyPreKody` (`montalu.automatizacie.catalog/get_prices` s
+> `codes`, `KodCache` 3 s / 5 min / výpadok 60 s):
+> - **kanál odpovie (200 s poľom `rows`)** → ceny, `sklad` aj `rozvin` v `enrichPolozky`/CenyTabulka
+>   LEN z Odoo; kód, ktorý Odoo nevráti = všetko „cena neznáma" (NIKDY Money per položka), súčty
+>   `kompletne=false`. `predajPcmo` a `nakupSkladovaKarta` Odoo nevracia → `null` (BPK nákup teda
+>   „neznáma", kým Odoo nedoplní cenník). Odoo riadok ide cez TÚ ISTÚ `validateRow` (0 → null,
+>   `predajVo` len ZASP).
+> - **kanál chýba (404 addon neinštalovaný / 403 technický účet bez skupiny — dnešný PROD, odoo-erp
+>   8706), výpadok, timeout, neplatná odpoveď, dev/CI bez `ODOO_JSON2_*`** → tento snapshot ako doteraz.
+> - Prechod oboma smermi bez releasu aj reštartu (výpadok sa cachuje 60 s, úspech 5 min). Zmena
+>   zdroja = INFO log `zdroj cien sa zmenil {kanal, z, na}` (modul `odoo-prices`).
+> - **`material_prices` sa Odoo cenami NIKDY neprepisuje** (pôvodný `importOdooPricesData` upsertoval
+>   do tej istej tabuľky → Odoo+Money mix a prepis snapshot `sklad`, ktorý číta validácia kódov). Odoo
+>   ceny žijú len v in-memory cache `odoo-prices.ts`. Snapshot sa lazy importuje vždy (jeho meta/sklad
+>   čítajú iní konzumenti).
+> - UI: `ceny-zdroj` (`data-zdroj="odoo|snapshot"`) v `CenyTabulka`, `sklo-cena-zdroj` v `SkloCena`,
+>   `strecha-sklo-zdroj` pri strešnom skle; vek snapshotu (`ceny-snapshot-vek`, `sklo-cena-vek`) sa
+>   ukáže LEN pri snapshot zdroji. `/health` → `cenyZdroj: {material, sklo}` (`zistiCenyZdroj`,
+>   sonda `get_prices(['ZASP00014'])` + `price_m2` cez tie isté cache) — verejné, bez cien.
+> - **Cena skla:** `sklo-cena.ts` — `montalu.glass.type.price_m2` (samostatný read `odooSkloCenyM2`;
+>   pole má `groups=COST_VISIBILITY_GROUPS`, NIKDY ho nepridávaj do reada pickera `odoo-glass-types.ts`
+>   — 403 by zhodilo picker na lokálny fallback) pre Odoo typ variantu (priama `value` alebo
+>   JEDNOZNAČNÁ `matchOdooGlassType` zhoda, len zo živého Odoo katalógu; `price_m2 = 0` = neznáma);
+>   inak TS kód → IZOS z `get_prices`; snapshot LEN keď neodpovedá ŽIADNY z dvoch kanálov. Strešné
+>   sklo pergoly (`sklo-strecha-cena.ts`) = TS kód → `get_prices`/snapshot.
+> - `enrichPolozky`, `skloCenaPre`, `strechaSkloCenaPre`, `cenovyZdroj` sú **async** — volajúci
+>   `await`; €/m² TS kódu = `cenaZaM2Zo(zdroj, kod)` nad už zvoleným zdrojom (JEDEN zdroj na výpočet).
+>   Zasklenia náhľad (`stavNahlad*`) volá ceny / sklad / cenu skla cez `Promise.all` a `skloCenaPre`
+>   číta `price_m2`, `get_prices` aj picker typov súbežne — pomalé Odoo zdrží náhľad max 1× (3 s).
+> - **Cena skla podľa `value` pickera** (review #599): `price_m2` read berie aj `cennik_code` a kľúčuje
+>   ZDIEĽANÝM pravidlom `hodnotyOdooTypov` (glass-match.ts) ako picker (`cennik_code`, pri zdieľanom/chýbajúcom kóde
+>   `name`) — rovnaký názov s rôznym kódom (rámik AL/TH) má každý svoju cenu. Nikdy podľa `name`.
+> - `/health` čaká na sondy (paralelne, max ~3 s, potom cache 5 min / 60 s) — pod `--max-time 5`
+>   deploy health pollu (ci.yml); E2E „#599 zdroj cien“ porovnáva UI s `/health` (iná sonda kódu →
+>   teoretický rozdiel len na hrane 60 s výpadku, prijaté).
+> - E2E: `ceny.spec.ts` „#599 zdroj cien" porovnáva `ceny-zdroj` s `/health` (beží aj post-deploy);
+>   CI bez Odoo = vždy `snapshot`. Odoo vetva je krytá unit testom `tests/odoo-ceny-599.test.ts`.
+> - Po sprístupnení v Odoo (8706) sa dá vypnúť `scripts/ceny-snapshot.py` cron bez zmeny kódu —
+>   ALE snapshot ešte čítajú validácia kódov (`bez-skladovej-karty`) a skladové varovanie (nižšia
+>   z Odoo/snapshot), kým je čerstvý; to sa rieši cutom skladu (odoo-erp 1122).
 
 ## Dátový tok (READ-ONLY, appka do Money NIKDY nepíše)
 

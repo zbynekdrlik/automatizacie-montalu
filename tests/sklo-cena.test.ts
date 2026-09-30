@@ -33,27 +33,27 @@ function writeSnapshot(rows: unknown[]) {
 const tick = () => new Promise((r) => setTimeout(r, 15));
 
 describe('glassMoneyKod (mapovanie variantu skla na Money TS kód, v23 seed)', () => {
-	it('jednoznačné izolačné varianty majú namapovaný TS kód', () => {
+	it('jednoznačné izolačné varianty majú namapovaný TS kód', async () => {
 		expect(glassMoneyKod('Robust', 'Izolačné sklo 4/16/4 číre')).toBe('TS00016');
 		expect(glassMoneyKod('Robust', 'Izolačné sklo 4/16/4 mliečne')).toBe('TS00017');
 		expect(glassMoneyKod('Slide', 'Izolačné sklo 4/8/4 číre')).toBe('TS00021');
 		expect(glassMoneyKod('Slide', 'Izolačné sklo 4/8/4 mliečne')).toBe('TS00022');
 	});
-	it('nejednoznačné / jednoduché sklá NIE sú namapované (null → honest-null)', () => {
+	it('nejednoznačné / jednoduché sklá NIE sú namapované (null → honest-null)', async () => {
 		expect(glassMoneyKod('Štandard +', 'Float sklo 6 mm')).toBeNull();
 		expect(glassMoneyKod('Štandard +', 'Izolačné sklo 4.8.4')).toBeNull();
 		expect(glassMoneyKod('Slide', '3.3.1')).toBeNull();
 		expect(glassMoneyKod('Deluxe', 'Float kalené 6 mm')).toBeNull();
 	});
-	it('neexistujúci variant → null (nikdy nehádže)', () => {
+	it('neexistujúci variant → null (nikdy nehádže)', async () => {
 		expect(glassMoneyKod('Robust', 'nič také')).toBeNull();
 	});
 });
 
 describe('skloCenaPre — plocha × cena/m², honest-null', () => {
-	it('bez snapshotu: cena nedostupná, plocha sa aj tak spočíta, súhrn neúplný', () => {
+	it('bez snapshotu: cena nedostupná, plocha sa aj tak spočíta, súhrn neúplný', async () => {
 		fs.rmSync(snapshotPath, { force: true });
-		const r = skloCenaPre([
+		const r = await skloCenaPre([
 			{
 				label: '',
 				system: 'Robust',
@@ -85,7 +85,7 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				sklad: null
 			}
 		]);
-		const r = skloCenaPre([
+		const r = await skloCenaPre([
 			{
 				label: '',
 				system: 'Robust',
@@ -116,7 +116,7 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				sklad: null
 			}
 		]);
-		const r = skloCenaPre([
+		const r = await skloCenaPre([
 			{
 				label: '',
 				system: 'Robust',
@@ -143,7 +143,7 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				sklad: null
 			}
 		]);
-		const r = skloCenaPre([
+		const r = await skloCenaPre([
 			{
 				label: '',
 				system: 'Štandard +',
@@ -171,7 +171,7 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 			}
 			// TS00021 zámerne CHÝBA → druhý posuv bez ceny
 		]);
-		const r = skloCenaPre([
+		const r = await skloCenaPre([
 			{
 				label: 'Posuv 1',
 				system: 'Robust',
@@ -208,7 +208,7 @@ describe('skloCenaPre — plocha × cena/m², honest-null', () => {
 				sklad: null
 			}
 		]);
-		const r = skloCenaPre([
+		const r = await skloCenaPre([
 			{
 				label: '',
 				system: 'Robust',

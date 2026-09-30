@@ -25,6 +25,19 @@ skla na podklade objednávky). Ďalší krok #599 (ceny, rozvin) **rozšír TENT
 `FIELDS` + do `OdooProdukt`, alebo nová `KodCache` inštancia), nepíš ďalší vlastný Odoo read s
 vlastnou cache.
 
+## `KodCache` žije v `odoo-kod-cache.ts` — katalóg, sklad aj kanál cien (#599 krok ceny)
+
+`KodCache<T>` (+ `FALLBACK_TTL_MS`) je vo vlastnom module `odoo-kod-cache.ts` (review #599 —
+generická mechanika nepatrí do doménového katalógu); konštruktor berie aj `Logger` volajúceho, takže
+warn/info výpadku ide pod menom JEHO modulu (`odoo-katalog` / `odoo-prices` — test
+`odoo-katalog-599` filtruje `module === 'odoo-katalog'`). `odoo-prices.ts` má dve inštancie: `get_prices` per kód (`codes`
+kwarg — `callJson2`, nie `search_read`) a `montalu.glass.type.price_m2` pod JEDNÝM kľúčom `'*'`
+(všetky typy naraz). Pasca: `zabezpec([])` vráti `true` BEZ volania — kto potrebuje zistiť STAV
+kanála aj pre prázdnu sadu kódov, musí sondovať konkrétnym kódom (`odooCenyPreKody` použije
+`ZASP00014`), inak by prázdna sada hlásila „Odoo odpovedá". Parser `get_prices` HÁDŽE bez poľa `rows`
+→ cudzia/prázdna 200 odpoveď (napr. mock, ktorý na všetko vráti `true`) = nedostupné, nie „Odoo
+nepozná nič". Detaily zdroja cien: `ceny-snapshot.md` (#599 krok ceny).
+
 ## Vzor (z `glass-catalog.md` „NIKDY neblokuj page load na Odoo")
 
 - 3 s per-volanie timeout, cache per kód 5 min (aj „Odoo kód nepozná" sa cachuje), pri chybe
@@ -47,7 +60,7 @@ read-only sondou v PROD kontajneri (vzor nižšie).
 
 ## Stav skladu zo `stock.quant` (`odooSkladPreKody`, #599 krok 3)
 
-- **Jeden cache mechanizmus pre oba ready:** `KodCache<T>` v `odoo-katalog.ts` (per-kód platnosť,
+- **Jeden cache mechanizmus pre oba ready:** `KodCache<T>` z `odoo-kod-cache.ts` (per-kód platnosť,
   výpadok 60 s bez volania, single-flight, warn raz za výpadok s názvom modelu). Katalóg 5 min, sklad
   **60 s** (hýbe sa). Nový Odoo read podľa kódu = ďalšia inštancia `KodCache`, nie kópia logiky.
 - `odooSkladPreKody(kody)`: najprv katalóg (id + `is_storable`), potom JEDEN `stock.quant/search_read`

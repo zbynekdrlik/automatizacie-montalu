@@ -5,8 +5,8 @@
 // (`odpis_log` + `odpis_polozky`, kľúč `zak_norm`) — ŽIADNY materializovaný
 // „zákazka" objekt (duplicitný stav = drift risk; zdroj pravdy sa číta vždy
 // čerstvý, presne vzor `readbackStav` v money-readback.ts). Ceny na agregát
-// napája volajúci cez existujúci `enrichPolozky` (denný Money snapshot,
-// honest-null „cena neznáma"). Read-only — do Money sa odtiaľto NIČ nepíše.
+// napája volajúci cez existujúci `enrichPolozky` (#599: Odoo `get_prices`, keď
+// odpovedá, inak denný Money snapshot; honest-null „cena neznáma"). Read-only — do Money sa odtiaľto NIČ nepíše.
 import { db } from './db';
 import { normZak } from './money';
 import { getOdpadForOdpisy, type OdpadRow } from './odpad-store';

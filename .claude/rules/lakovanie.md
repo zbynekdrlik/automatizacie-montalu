@@ -21,6 +21,12 @@ sekcia „Lakovanie" v `CenyTabulka.svelte`. Ceny v testoch sú VŽDY vymyslené
   + defenzívny dedupe podľa kódu) → `material_prices.rozvin` (migrácia v38) → `PriceRow.rozvin` →
   `CenaRiadok.rozvin`. Podrobný dátový tok: `ceny-snapshot.md`. Producent na dev2 potrebuje
   `git pull` + jeden beh, kým sa rozvin objaví (dovtedy je pri profiloch `null`).
+- **#599: keď Odoo kanál cien odpovedá, rozvin ide z Odoo** — `get_prices` vracia `rozvin` z
+  `product.template.montalu_rozvin` (odoo-erp `montalu_catalog_prices.py` `_rozvin`, pri duplikátoch
+  max z kladných, inak `None`); `ceny.ts` `cenovyZdroj` ho prevezme cez `validateRow` (0 → `null`)
+  — predtým ho `importOdooPricesData` NATVRDO nulloval. Odoo zdroj = LEN Odoo rozvin (chýba →
+  `null`, sekcia „neúplné"), NIKDY Money rozvin per položka. Kanál chýba (404/403) → rozvin zo
+  snapshotu ako vyššie. `computeLakovanie` sa nemení — zdroj rieši `enrichPolozky`.
 - **`m2` je spoľahlivý signál lakovaného profilu:** kovanie/tesnenie (ZASK) ho má **0/138**
   (overené live read-only). Ad-hoc Money lookupy = ten istý dev2 `money-ro-thirdparty` kanál
   (`ceny-snapshot.md`, „dev2 Money read-only kanál").

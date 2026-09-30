@@ -20,7 +20,8 @@
 // ešte ponuka / nie je v Odoo) → zaloguj a preskoč (bez pádu); >1 → postni na všetky + zaloguj.
 //
 // MONEY-NEUTRÁLNE: NEPÍŠE do `/data`, NEMENÍ dedup, NEDOTÝKA sa `MONEY_LIVE`; z money.ts
-// používa LEN čistý `normOp`. Ceny číta z denného Money snapshotu (`enrichPolozky`, read-only).
+// používa LEN čistý `normOp`. Ceny číta cez `enrichPolozky` (read-only; #599: Odoo `get_prices`,
+// keď odpovedá, inak denný Money snapshot).
 //
 // ROZŠÍRITEĽNÉ: `sekcie[]` — dnes „Profily a komponenty"; sklá z nárezákov pribudnú neskôr
 // ako ĎALŠIA sekcia bez zmeny štruktúry (#340 zadanie bod 3).
@@ -353,7 +354,7 @@ export async function pushZakazkaToOdooDetailed(
 			log.warn('zakazka push: zákazka nemá žiadny odpis — nič neposielam', { zak });
 			return { result: 'missing', error: null };
 		}
-		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
+		const ceny = prehlad.polozky.length > 0 ? await enrichPolozky(prehlad.polozky) : null;
 		// #418 review: JEDNO `now` pre note aj PDF → ich „Stav k …" pečiatky sa nelíšia.
 		const now = new Date();
 		const note = buildZakazkaNote(prehlad, op, ceny);

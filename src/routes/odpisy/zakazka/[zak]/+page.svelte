@@ -22,7 +22,8 @@
 	<h1>Zákazka {p.zak}</h1>
 	<p class="sub">
 		Cenový zoznam odpísaného materiálu — všetky odoslané odpisy tejto zákazky (nárezové plány →
-		Money). Ceny sú z denného cenníkového snapshotu Money, appka do Money nič nezapisuje.
+		Money). Zdroj cien je uvedený pri tabuľke cien (Odoo, alebo denný snapshot Money, kým Odoo ceny
+		nesprístupní); appka do Money nič nezapisuje.
 	</p>
 	<div class="g">
 		<div><span>Zákazník</span><b>{p.zakaznik}</b></div>
