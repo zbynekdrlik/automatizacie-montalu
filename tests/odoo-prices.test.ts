@@ -38,7 +38,9 @@ describe('_parseOdooPricesResponse', () => {
 			nakupPoslednaFaktura: 11.0,
 			predajVo: 18.0,
 			mena: 'EUR',
-			sklad: 150.0
+			sklad: 150.0,
+			// rozvin not sent in this fixture → null (no longer stripped from the row type, #599)
+			rozvin: null
 		});
 		expect(result.rows[1]!.nakupCennik).toBeNull();
 		expect(result.rows[1]!.sklad).toBe(0);
