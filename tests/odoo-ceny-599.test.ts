@@ -220,7 +220,13 @@ function mockOdoo(opts: { ceny?: Stav; sklo?: Stav } = {}): Call[] {
 			if (fields.includes('price_m2'))
 				return odpoved(
 					opts.sklo ?? 200,
-					GLASS_TYPES.map((t) => ({ id: t.id, name: t.name, price_m2: t.price_m2 }))
+					// ako Odoo search_read: id + LEN vyžiadané polia
+					GLASS_TYPES.map((t) =>
+						Object.fromEntries([
+							['id', t.id],
+							...fields.map((f) => [f, (t as Record<string, unknown>)[f]])
+						])
+					)
 				);
 			// picker read (bez price_m2) je vždy dostupný
 			return new Response(JSON.stringify(GLASS_TYPES.map(({ price_m2: _p, ...t }) => t)), {
