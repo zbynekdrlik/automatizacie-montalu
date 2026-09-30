@@ -213,4 +213,74 @@ describe('odooProduktyPreKody (#599)', () => {
 		expect(calls).toHaveLength(0);
 		expect(r.zdroj).toBe('odoo');
 	});
+
+	it('review: výpadok pre INÝ kód nezhodí požiadavku, ktorú celú pokrýva platná cache', async () => {
+		enableEnv();
+		vi.useFakeTimers({ toFake: ['Date'] });
+		mockOdoo();
+		await odooProduktyPreKody(['ZASP00014']); // úspech → cache 5 min
+		const calls = mockOdoo({ status: 403 });
+		expect((await odooProduktyPreKody(['BPK202535'])).zdroj).toBe('nedostupne'); // výpadok 60 s
+		vi.setSystemTime(Date.now() + 10 * 1000);
+		const r = await odooProduktyPreKody(['ZASP00014']);
+		expect(r.zdroj).toBe('odoo');
+		if (r.zdroj === 'odoo') expect(r.produkty.has('ZASP00014')).toBe(true);
+		expect(calls).toHaveLength(1); // len ten jeden neúspešný read
+	});
+
+	it('review: duplicitný default_code v Odoo (varianty) → prvý riadok vyhráva', async () => {
+		enableEnv();
+		mockOdoo({
+			rows: [
+				{ default_code: 'BPK20251', name: 'Prvý', uom_id: [1, 'Units'], is_storable: true },
+				{ default_code: 'BPK20251', name: 'Druhý', uom_id: [1, 'Units'], is_storable: false }
+			]
+		});
+		const r = await odooProduktyPreKody(['BPK20251']);
+		if (r.zdroj !== 'odoo') throw new Error('čakal som zdroj odoo');
+		expect(r.produkty.get('BPK20251')?.nazov).toBe('Prvý');
+		expect(r.produkty.size).toBe(1);
+	});
+
+	it('review: single-flight s RÔZNYMI kódmi — čakateľ dotiahne LEN svoje chýbajúce kódy', async () => {
+		enableEnv();
+		const calls = mockOdoo();
+		const [a, b] = await Promise.all([
+			odooProduktyPreKody(['ZASP00014']),
+			odooProduktyPreKody(['ZASP00014', 'BPK202535'])
+		]);
+		expect(calls).toHaveLength(2);
+		expect((calls[1]!.body.domain as [string, string, string[]][])[0]![2]).toEqual(['BPK202535']);
+		if (a.zdroj !== 'odoo' || b.zdroj !== 'odoo') throw new Error('čakal som zdroj odoo');
+		expect([...b.produkty.keys()].sort()).toEqual(['BPK202535', 'ZASP00014']);
+	});
+
+	it('review: warn o výpadku sa zaloguje znova po zotavení a ďalšom výpadku', async () => {
+		enableEnv();
+		vi.useFakeTimers({ toFake: ['Date'] });
+		vi.stubEnv('LOG_LEVEL', 'warn');
+		const lines: string[] = [];
+		const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+			lines.push(String(chunk));
+			return true;
+		}) as typeof process.stdout.write);
+		try {
+			mockOdoo({ status: 403 });
+			await odooProduktyPreKody(['ZASP00014']);
+			vi.setSystemTime(Date.now() + 61 * 1000);
+			mockOdoo();
+			expect((await odooProduktyPreKody(['ZASP00014'])).zdroj).toBe('odoo');
+			mockOdoo({ status: 403 });
+			await odooProduktyPreKody(['BPK202535']);
+		} finally {
+			spy.mockRestore();
+		}
+		const warns = lines
+			.join('')
+			.split('\n')
+			.filter(Boolean)
+			.map((l) => JSON.parse(l) as { level: string; module: string })
+			.filter((r) => r.level === 'warn' && r.module === 'odoo-katalog');
+		expect(warns).toHaveLength(2);
+	});
 });

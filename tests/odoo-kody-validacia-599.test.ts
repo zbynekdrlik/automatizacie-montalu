@@ -212,4 +212,30 @@ describe('#599 validateOdpisKody z Odoo product.product', () => {
 		expect(v.ok).toBe(true);
 		expect(odooCalls).toBe(0);
 	});
+
+	it('review: Odoo kód pozná, ale Money snapshot ho má BEZ skladovej karty → blok bez-skladovej-karty', async () => {
+		// Money import (do cutu stále cieľ odpisu) kód bez skladovej karty ticho preskočí → #295 poistka
+		// ostáva aj pri Odoo zdroji, kým je snapshot použiteľný (is_storable NIE JE náhrada — PROD
+		// sonda: 4 kódy so skladom v Money majú is_storable=false).
+		db.prepare(
+			"INSERT INTO material_prices (kod, sklad, mena, updated_at) VALUES ('ZASP20244', NULL, 'EUR', datetime('now'))"
+		).run();
+		try {
+			enableOdoo();
+			const v = await validateOdpisKody([{ kod: 'ZASP20244', nazov: 'Kladkový profil' }]);
+			expect(v.zdroj).toBe('odoo');
+			expect(v.snapshotUsable).toBe(true);
+			expect(v.ok).toBe(false);
+			expect(v.problemy).toEqual([
+				{
+					kod: 'ZASP20244',
+					nazov: 'Kladkový profil',
+					dovod: 'bez-skladovej-karty',
+					popis: 'Money nemá skladovú kartu pre ZASP20244 — import by ho preskočil.'
+				}
+			]);
+		} finally {
+			db.prepare("DELETE FROM material_prices WHERE kod = 'ZASP20244'").run();
+		}
+	});
 });
