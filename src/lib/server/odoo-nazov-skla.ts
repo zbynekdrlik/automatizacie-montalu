@@ -16,9 +16,12 @@
 //
 // Timeout (3 s), cache (5 min / 60 s), single-flight a warn-raz rieši `odoo-katalog.ts` (vzor
 // `odoo-glass-types.ts`); nenakonfigurovaná integrácia (dev/test) = bez volania + bez warnu.
+import { logger } from './log';
 import { glassMoneyKodPodlaNazvu } from './db';
 import { fetchGlassTypes } from './odoo-glass-types';
 import { odooProduktyPreKody, _resetOdooKatalogCache } from './odoo-katalog';
+
+const log = logger('odoo-nazov-skla');
 
 const DEFAULT_FETCH_TIMEOUT_MS = 3000;
 
@@ -34,6 +37,9 @@ async function nazvyPreKody(kody: string[], timeoutMs: number): Promise<Map<stri
 	const katalog = await odooProduktyPreKody(kody, { timeoutMs });
 	if (katalog.zdroj !== 'odoo') return out;
 	for (const [kod, p] of katalog.produkty) if (p.nazov) out.set(kod, p.nazov);
+	const chyba = kody.filter((k) => !out.has(k));
+	if (chyba.length > 0)
+		log.info('názov skla: kód bez Odoo názvu — zobrazí sa lokálny názov', { kody: chyba });
 	return out;
 }
 

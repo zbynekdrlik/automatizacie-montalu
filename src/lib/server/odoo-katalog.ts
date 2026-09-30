@@ -8,7 +8,8 @@
 //   - cache per kód 5 min pri úspechu (aj „Odoo kód nepozná"), nedostupnosť 60 s (rýchly auto-heal,
 //     žiadny fan-out na Odoo počas výpadku),
 //   - single-flight (súbežní volajúci zdieľajú JEDEN in-flight read),
-//   - warn LEN RAZ za proces; nenakonfigurovaná integrácia (dev/test/CI) = bez volania, bez warnu.
+//   - warn LEN RAZ za výpadok (po zotavení info + reset); nenakonfigurovaná integrácia (dev/test/CI)
+//     = bez volania, bez warnu.
 //
 // NIKDY nehádže — nedostupné Odoo vráti `{ zdroj: 'nedostupne' }` a volajúci rozhodne o fallbacku
 // (validácia kódov → Money snapshot). Read-only, Money-neutrálne.
@@ -25,6 +26,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const FALLBACK_TTL_MS = 60 * 1000;
 const DEFAULT_FETCH_TIMEOUT_MS = 3000;
 const PRODUCT_MODEL = 'product.product';
+// `active`: `search_read` bez `active_test=false` vracia len aktívne produkty, pole je len pre
+// diagnostiku/budúce kroky. `is_storable` NIE JE náhrada Money skladovej karty (PROD: 4 kódy so
+// skladom v Money majú `is_storable=false`) — len informačné `skladovy`.
 const FIELDS = ['default_code', 'name', 'uom_id', 'is_storable', 'active'];
 
 /** Jeden aktívny Odoo produkt podľa `default_code`. */
@@ -100,9 +104,17 @@ async function nacitajKody(kody: string[], timeoutMs: number): Promise<void> {
 			});
 		}
 		for (const kod of kody) _cache.set(kod, { produkt: najdene.get(kod) ?? null, exp });
-		const chyba = kody.filter((k) => !najdene.has(k));
-		log.debug('product.product read OK', { kody: kody.length, najdene: najdene.size });
-		if (chyba.length > 0) log.info('kódy, ktoré Odoo katalóg nepozná', { kody: chyba });
+		if (_warned) {
+			// zotavenie po výpadku — ďalší výpadok sa zaloguje znova (warn raz za VÝPADOK, nie za proces)
+			log.info('Odoo product.product opäť dostupné');
+			_warned = false;
+		}
+		// neznáme kódy loguje volajúci s kontextom (validácia kódov / názov skla) — tu len debug
+		log.debug('product.product read OK', {
+			kody: kody.length,
+			najdene: najdene.size,
+			nezname: kody.filter((k) => !najdene.has(k))
+		});
 	} catch (e) {
 		_nedostupneDo = Date.now() + FALLBACK_TTL_MS;
 		if (!_warned) {
@@ -131,8 +143,11 @@ export async function odooProduktyPreKody(
 	if (unikatne.length > 0) {
 		// single-flight: počkaj na KAŽDÝ bežiaci read (môže pokryť aj naše kódy), až potom dotiahni zvyšok
 		while (_inflight) await _inflight;
-		if (Date.now() < _nedostupneDo) return { zdroj: 'nedostupne', dovod: 'chyba' };
 		const chybajuce = unikatne.filter((k) => !platne(k, Date.now()));
+		// výpadok sa týka LEN kódov, ktoré treba dotiahnuť — požiadavku celú pokrytú platnou cache
+		// (5 min) obslúž z cache aj počas 60 s nedostupnosti (review #599)
+		if (chybajuce.length > 0 && Date.now() < _nedostupneDo)
+			return { zdroj: 'nedostupne', dovod: 'chyba' };
 		if (chybajuce.length > 0) {
 			const p = nacitajKody(chybajuce, timeoutMs);
 			_inflight = p;

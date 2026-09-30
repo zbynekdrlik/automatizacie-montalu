@@ -49,9 +49,18 @@ is_storable` (200) a `stock.quant` (`quantity`, `location_id`) — alternatíva 
   má celý katalóg), nie len prefixy snapshotu. Presná zhoda (case-sensitive, bez trimu) — pokazený
   kód = neznámy (konzervatívne ako snapshot). Hláška aj `dovod: 'neznamy'` sú ROVNAKÉ ako pri
   snapshote (`neznamyKod()`); výsledok nesie `zdroj: 'odoo' | 'snapshot'`.
-- Odoo nedostupné → `validateOdpisKodySnapshot` (pôvodná #295 logika vrátane `bez-skladovej-karty`)
-  + WARN `validácia kódov: Odoo katalóg nedostupný — fallback na Money snapshot`. Výpadok Odoo
-  odpis NIKDY neblokuje navyše.
+- **Aj pri Odoo zdroji ostáva `bez-skladovej-karty` zo snapshotu** (keď je snapshot použiteľný): kód
+  v Odoo existuje, ale Money snapshot ho má so `sklad === null` → blok. Je to vlastnosť MONEY importu
+  (do cutu odoo-erp 1122 je Money cieľ odpisu). Odoo `is_storable` NIE JE náhrada — PROD sonda 30.9.:
+  4 kódy so skladom v Money (BPP00013/16/18, PRP00050) majú `is_storable=false` (falošný blok).
+  Dnes má snapshot 0 kódov so `sklad=null`, poistka je preventívna. Po cute sa preklápa na Odoo.
+- Odoo nedostupné → `validateOdpisKodySnapshot` (pôvodná #295 logika) + WARN `validácia kódov: Odoo
+  katalóg nedostupný — fallback na Money snapshot`. Výpadok Odoo odpis NIKDY neblokuje navyše.
+- Výpadok (60 s) sa týka len kódov MIMO platnej cache — požiadavka celá pokrytá cache (5 min) ide zo
+  zdroja `odoo` aj počas výpadku. Warn raz za výpadok (po zotavení info + reset).
+- Test, ktorý mockuje CELÉ Odoo (`setJson2Transport`) a zapisuje live odpis, musí na
+  `product.product/search_read` vrátiť pole produktov (echo kódov) — inak sú všetky kódy „neznáme"
+  a odpis sa zablokuje (vzor `tests/odpis-narezak-upload.test.ts` `captureTransport`).
 - `writeOdpis` ju `await`-uje PRED synchrónnym blokom dedup precheck→claim — nikdy nepresúvaj
   volanie medzi precheck a INSERT (cross-spelling double-import okno, `money.ts` komentár #294).
 - PROD dáta (30.9.): 164/164 kódov odpísaných od 1.9. je v Odoo aktívnych; z 904 kódov Money
