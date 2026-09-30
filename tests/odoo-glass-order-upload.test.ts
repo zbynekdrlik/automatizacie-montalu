@@ -147,6 +147,8 @@ describe('uploadGlassOrderToOdoo (#521)', () => {
 		expect(out.result).toBe('missing');
 		expect(called).toBe(false); // bez OP sa Odoo NEVOLÁ
 		expect(out.payload!.items).toHaveLength(1);
+		// #577: bez akéhokoľvek OP (odpis ani podklad) → explicitná hláška pre podklad
+		expect(out.error).toContain('OP objednávky');
 	});
 
 	it('enabled + config, Odoo hodí → failed (nikdy nehádže, payload postavený)', async () => {

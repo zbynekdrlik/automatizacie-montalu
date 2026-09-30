@@ -8,9 +8,11 @@
 
 <h1>Objednávka skla</h1>
 
+<!-- #577: OP nepovinné — stránka otvorí existujúci podklad zákazky alebo založí nový -->
 <p>
-	Nová objednávka len skla (servis — bez nárezáku/odpisu). Zadajte číslo zákazky a OP objednávky;
-	otvorí sa podklad, kde pridáte jednotlivé sklá.
+	Zadajte číslo zákazky — otvorí sa objednávka skla tejto zákazky (alebo sa založí nová), kde
+	pridáte jednotlivé sklá. OP objednávky stačí vyplniť pri servisnej objednávke bez nárezáku;
+	zákazka s nárezákom ho má z odpisu.
 </p>
 
 <form method="POST" use:enhance data-testid="nova-objednavka">
@@ -20,8 +22,8 @@
 	</label>
 
 	<label>
-		OP objednávky
-		<input type="text" name="op" required placeholder="napr. OP260123" data-testid="nova-op" />
+		OP objednávky <span class="nepovinne">(nepovinné)</span>
+		<input type="text" name="op" placeholder="napr. OP260123" data-testid="nova-op" />
 	</label>
 
 	{#if form?.error}
@@ -44,5 +46,9 @@
 	}
 	.btn {
 		margin-top: 12px;
+	}
+	.nepovinne {
+		color: var(--m-muted);
+		font-size: 0.9em;
 	}
 </style>

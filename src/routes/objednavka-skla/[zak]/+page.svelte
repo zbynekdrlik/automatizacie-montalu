@@ -20,7 +20,8 @@
 		disabled: 'Náhľad payloadu (odoslanie do Odoo je vypnuté v tomto prostredí)',
 		'no-items': 'Žiadne sklá na odoslanie',
 		'no-zak': 'Zákazka nie je zadaná',
-		missing: 'Zákazka nemá odpis / OP — nedá sa priradiť objednávka',
+		// #577: dôvod (chýba OP / rôzne OP riadkov) nesie `error` za pomlčkou
+		missing: 'Nedá sa priradiť objednávka',
 		failed: 'Odoslanie zlyhalo'
 	};
 	const polozky = $derived(data.polozky);
@@ -582,6 +583,12 @@
 				disabled
 				title="Najprv nastavte OP objednávky">Odoslať objednávku skla do Odoo</button
 			>
+			<!-- #577: podklad otvorený len so ZAK — viditeľná výzva (nie len tooltip) -->
+			{#if !maOp}
+				<span class="bez-op" data-testid="odoslat-bez-op"
+					>Pred odoslaním do Odoo zadajte OP objednávky (pole vyššie).</span
+				>
+			{/if}
 		{/if}
 	</div>
 
@@ -867,6 +874,11 @@
 	}
 	.op-card {
 		margin-top: 16px;
+	}
+	.bez-op {
+		margin-left: 8px;
+		color: var(--m-muted);
+		font-size: 0.85rem;
 	}
 	.op-info {
 		font-size: 0.9rem;
