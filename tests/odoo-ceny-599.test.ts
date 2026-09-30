@@ -144,6 +144,49 @@ const GLASS_TYPES = [
 		total_thickness_mm: 7,
 		active: true,
 		price_m2: 0
+	},
+	// review #599: ROVNAKÝ názov, rôzny cenníkový kód a cena (napr. rámik AL vs TH) — cena sa musí
+	// priradiť podľa `value` pickera (cennik_code), nie podľa názvu
+	{
+		id: 3,
+		name: 'VSG 4.4.2 číre',
+		category: 'vsg',
+		cennik_code: 'VSG-442-A',
+		composition: '4.4.2',
+		total_thickness_mm: 9,
+		active: true,
+		price_m2: 50
+	},
+	{
+		id: 4,
+		name: 'VSG 4.4.2 číre',
+		category: 'vsg',
+		cennik_code: 'VSG-442-B',
+		composition: '4.4.2',
+		total_thickness_mm: 9,
+		active: true,
+		price_m2: 60
+	},
+	// zdieľaný cennik_code (PROD „001") → picker `value = name` pre oboch nositeľov
+	{
+		id: 5,
+		name: 'ESG 6 číre',
+		category: 'esg',
+		cennik_code: 'DUP',
+		composition: '6',
+		total_thickness_mm: 6,
+		active: true,
+		price_m2: 30
+	},
+	{
+		id: 6,
+		name: 'ESG 8 číre',
+		category: 'esg',
+		cennik_code: 'DUP',
+		composition: '8',
+		total_thickness_mm: 8,
+		active: true,
+		price_m2: 35
 	}
 ];
 
@@ -377,6 +420,20 @@ describe('cena skla — price_m2 / get_prices / snapshot', () => {
 		const r = await skloCenaPre([plan('Izolačné sklo 4/16/4 číre')]);
 		expect(r.zdroj).toBe('odoo');
 		expect(r.radky[0]!.eurM2).toBe(38.9);
+	});
+
+	it('review #599: rovnaký názov, rôzny cenníkový kód → každý typ vlastná cena (kľúč = value pickera)', async () => {
+		enableEnv();
+		mockOdoo({ ceny: 404 });
+		const r = await skloCenaPre([plan('VSG-442-A'), plan('VSG-442-B')]);
+		expect(r.radky.map((x) => x.eurM2)).toEqual([50, 60]);
+	});
+
+	it('review #599: zdieľaný cennik_code → value = name, cena podľa názvu', async () => {
+		enableEnv();
+		mockOdoo({ ceny: 404 });
+		const r = await skloCenaPre([plan('ESG 6 číre'), plan('ESG 8 číre')]);
+		expect(r.radky.map((x) => x.eurM2)).toEqual([30, 35]);
 	});
 
 	it('price_m2 = 0 → cena neznáma (honest-null), súhrn neúplný', async () => {
