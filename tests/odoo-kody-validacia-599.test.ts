@@ -82,7 +82,9 @@ function job(zak: string, polozky: Polozka[]): OdpisJob {
 	};
 }
 
-async function capture<T>(fn: () => Promise<T>): Promise<{ res: T; logs: Record<string, unknown>[] }> {
+async function capture<T>(
+	fn: () => Promise<T>
+): Promise<{ res: T; logs: Record<string, unknown>[] }> {
 	const lines: string[] = [];
 	const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
 		lines.push(String(chunk));

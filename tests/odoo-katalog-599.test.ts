@@ -87,7 +87,13 @@ describe('odooProduktyPreKody (#599)', () => {
 		expect(domain[0]![0]).toBe('default_code');
 		expect(domain[0]![1]).toBe('in');
 		expect([...domain[0]![2]].sort()).toEqual(['BPK202535', 'ZASP00014']);
-		expect(calls[0]!.body.fields).toEqual(['default_code', 'name', 'uom_id', 'is_storable', 'active']);
+		expect(calls[0]!.body.fields).toEqual([
+			'default_code',
+			'name',
+			'uom_id',
+			'is_storable',
+			'active'
+		]);
 		expect(calls[0]!.body.fields).not.toContain('qty_available');
 	});
 
@@ -115,7 +121,12 @@ describe('odooProduktyPreKody (#599)', () => {
 		});
 		const r = await odooProduktyPreKody(['TS00016']);
 		if (r.zdroj !== 'odoo') throw new Error('čakal som zdroj odoo');
-		expect(r.produkty.get('TS00016')).toEqual({ kod: 'TS00016', nazov: '', mj: '', skladovy: false });
+		expect(r.produkty.get('TS00016')).toEqual({
+			kod: 'TS00016',
+			nazov: '',
+			mj: '',
+			skladovy: false
+		});
 	});
 
 	it('cache: druhé volanie v TTL (aj pre kód, ktorý Odoo nepozná) nevolá Odoo znova', async () => {
