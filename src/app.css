@@ -522,7 +522,7 @@ select:focus {
    per-komponent scoped CSS do jednej definície (vzor #239 table.narez → app.css).
    Počet stĺpcov per-komponent cez modifikátor .cols-2 (OdpisNavrhNav 2 karty) vs default 3
    (Pergola, Pevné zasklenie). Aktívny ring zjednotený na 2px (predtým Fix 1px — neúmyselná
-   divergencia). Fix-only .mode-tag.ok + .mode-card.active .mode-foot sú tu tiež
+   divergencia). Pevné-zasklenie-only (PevneZasklenieKarty) .mode-tag.ok + .mode-card.active .mode-foot sú tu tiež
    (Pergola ich nerenderuje → naň neúčinkujú). Tokenizované na --m-* v #376 stage 2. */
 .mode-grid {
 	display: grid;

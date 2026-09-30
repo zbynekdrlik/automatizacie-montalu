@@ -131,7 +131,8 @@
 
 	// aktívny člen lišty — odkaz presnou zhodou, „Pevné zasklenie" celou vetvou /fix*, /clip*
 	function jeAktivny(l: (typeof moduleLinks)[number] | (typeof toolLinks)[number]): boolean {
-		return l === PEVNE_ZASKLENIE_NAV
+		// porovnanie cez href (nie identitu objektu) — prežije aj kópiu/spread člena
+		return l.href === PEVNE_ZASKLENIE_NAV.href
 			? jePevneZasklenie(page.url.pathname)
 			: page.url.pathname === resolve(l.href);
 	}
@@ -144,7 +145,11 @@
 
 {#snippet navLinks(list: typeof moduleLinks | typeof toolLinks)}
 	{#each list as l (l.href)}
-		<a href={resolve(l.href)} class:active={jeAktivny(l)}>{l.label}</a>
+		<a
+			href={resolve(l.href)}
+			class:active={jeAktivny(l)}
+			aria-current={jeAktivny(l) ? 'page' : undefined}>{l.label}</a
+		>
 	{/each}
 {/snippet}
 

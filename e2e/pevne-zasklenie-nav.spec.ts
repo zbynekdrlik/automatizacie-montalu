@@ -47,6 +47,7 @@ test('#592: „Pevné zasklenie" v lište = jeden odkaz; tri karty na /fix, /cli
 	await expect(page.getByRole('link', { name: 'Clip', exact: true })).toHaveCount(0);
 	await expect(odkaz).toHaveAttribute('href', '/fix');
 	await expect(odkaz).not.toHaveClass(/\bactive\b/);
+	await expect(odkaz).not.toHaveAttribute('aria-current');
 
 	// 1. klik v lište → /fix s tromi kartami, aktívna „Fix z appky"
 	await openPevneZasklenie(page);
@@ -56,6 +57,7 @@ test('#592: „Pevné zasklenie" v lište = jeden odkaz; tri karty na /fix, /cli
 	await overKarty(page, '/fix');
 	await expect(page.getByTestId('pevne-karta-fix')).toContainText('z rozmerov tu si');
 	await expect(odkaz).toHaveClass(/\bactive\b/);
+	await expect(odkaz).toHaveAttribute('aria-current', 'page');
 
 	// desktop: tri karty VEDĽA seba (rovnaký riadok)
 	const ys = await page
