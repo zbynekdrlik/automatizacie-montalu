@@ -146,6 +146,10 @@ describe('#599 pôvodné 4/16/4 zo starých odpisov sa nezahadzuje', () => {
 		expect(doplnok).toHaveLength(1);
 		expect(doplnok[0]!.label).toBe(`${CIRE_24} · ${POVODNE_SKLO_APPKY}`);
 		expect(volbaSkla(CIRE_24, '', sk)).toBe(CIRE_24);
+		// `{#each sk as g (g.label)}` v ZasklieniaForm — záloha aj doplnok sú bez skupiny (label ''),
+		// dve skupiny s rovnakým label = Svelte each_key_duplicate (formulár padne pri prepnutí systému)
+		const labely = sk.map((g) => g.label);
+		expect(new Set(labely).size).toBe(labely.length);
 		// bez pôvodného skla vo formulári sa 4/16/4 neponúka
 		const bez = ponukaPreStyl(server, prijate, 'Float sklo 6 mm').flatMap((g) => g.items);
 		expect(bez.filter((i) => SKLA_24.includes(i.vypocet))).toEqual([]);
