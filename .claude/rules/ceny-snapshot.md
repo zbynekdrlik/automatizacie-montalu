@@ -16,6 +16,13 @@ paths:
 
 # Ceny materiálu + cena skla — denný Money snapshot (#154, #225)
 
+> **#599 (prechod Money → Odoo, 30.9.2026):** kontrola kódov odpisu (`validateOdpisKody`, async)
+> už NEčíta snapshot ako primárny zdroj — rozhoduje Odoo `product.product` cez `odoo-katalog.ts`;
+> snapshot je len FALLBACK pri nedostupnom Odoo (+ WARN). Stav skladu (`skladoveVarovania`/
+> `SkladVarovania`), ceny, rozvin a cena skla ostávajú na tomto snapshote: `qty_available` technický
+> účet na PROD NEČÍTA (403 `mrp.bom`), ceny čakajú na Odoo stranu (odoo-erp 8706) a cut skladu
+> (odoo-erp 1122). Detaily + pasce: `odoo-katalog.md`.
+
 ## Dátový tok (READ-ONLY, appka do Money NIKDY nepíše)
 
 Producent `scripts/ceny-snapshot.py` beží **mimo repa na dev2**

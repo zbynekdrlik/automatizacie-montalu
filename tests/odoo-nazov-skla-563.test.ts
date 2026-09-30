@@ -9,12 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-money-nazov-563-'));
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-odoo-nazov-563-'));
 process.env.DATABASE_PATH = path.join(tmpRoot, 'd.db');
 
 const { setJson2Transport } = await import('../src/lib/server/odoo-json2');
-const { moneyNazvySkiel, moneyNazovSkla, _resetMoneyNazvyCache } =
-	await import('../src/lib/server/money-nazov-skla');
+const { odooNazvySkiel, odooNazovSkla, _resetOdooNazvyCache } =
+	await import('../src/lib/server/odoo-nazov-skla');
 const { _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
 
@@ -76,7 +76,7 @@ function mockOdoo(opts: { failProducts?: boolean; hangProducts?: boolean } = {})
 }
 
 beforeEach(() => {
-	_resetMoneyNazvyCache();
+	_resetOdooNazvyCache();
 	_resetGlassTypesCache();
 	_resetGlassTypesWarn();
 });
@@ -86,14 +86,14 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe('moneyNazvySkiel (#563)', () => {
+describe('odooNazvySkiel (#563)', () => {
 	it('lokálny názov s money_kod → Money názov z Odoo product.product (s Ug)', async () => {
 		enableEnv();
 		mockOdoo();
-		expect(await moneyNazovSkla('Izolačné sklo 4/16/4 číre')).toBe(
+		expect(await odooNazovSkla('Izolačné sklo 4/16/4 číre')).toBe(
 			'Izolačné sklo 4/16/4- číre (Ug=1,1)'
 		);
-		expect(await moneyNazovSkla('Izolačné sklo 4/8/4 číre')).toBe(
+		expect(await odooNazovSkla('Izolačné sklo 4/8/4 číre')).toBe(
 			'Izolačné sklo 4/8/4- číre (Ug=1,1)'
 		);
 	});
@@ -101,7 +101,7 @@ describe('moneyNazvySkiel (#563)', () => {
 	it('dávka: JEDEN product.product read pre všetky kódy riadkov (domain default_code in …)', async () => {
 		enableEnv();
 		const calls = mockOdoo();
-		const m = await moneyNazvySkiel([
+		const m = await odooNazvySkiel([
 			'Izolačné sklo 4/16/4 číre',
 			'Izolačné sklo 4/16/4 mliečne',
 			'Izolačné sklo 4/16/4 číre'
@@ -110,7 +110,14 @@ describe('moneyNazvySkiel (#563)', () => {
 		expect(m['Izolačné sklo 4/16/4 mliečne']).toBe('Izolačné sklo 4/16/4 mliečne');
 		const prod = calls.filter((c) => c.model === 'product.product');
 		expect(prod).toHaveLength(1);
-		expect(prod[0]!.body.fields).toEqual(['default_code', 'name']);
+		// #599: read ide cez zdieľaný katalóg `odoo-katalog.ts` (jeho polia; `name` je medzi nimi)
+		expect(prod[0]!.body.fields).toEqual([
+			'default_code',
+			'name',
+			'uom_id',
+			'is_storable',
+			'active'
+		]);
 		const domain = prod[0]!.body.domain as [string, string, string[]][];
 		expect(domain[0]![0]).toBe('default_code');
 		expect(domain[0]![1]).toBe('in');
@@ -120,35 +127,35 @@ describe('moneyNazvySkiel (#563)', () => {
 	it('cache: druhé volanie v TTL nevolá Odoo znova', async () => {
 		enableEnv();
 		const calls = mockOdoo();
-		await moneyNazovSkla('Izolačné sklo 4/16/4 číre');
-		await moneyNazovSkla('Izolačné sklo 4/16/4 číre');
+		await odooNazovSkla('Izolačné sklo 4/16/4 číre');
+		await odooNazovSkla('Izolačné sklo 4/16/4 číre');
 		expect(calls.filter((c) => c.model === 'product.product')).toHaveLength(1);
 	});
 
 	it('Odoo cenníková hodnota (typ z pickera) → montalu.glass.type name', async () => {
 		enableEnv();
 		mockOdoo();
-		expect(await moneyNazovSkla('IZO-4-16-4-AL')).toBe('IZOS DOUBLE 4-16-4 AL');
+		expect(await odooNazovSkla('IZO-4-16-4-AL')).toBe('IZOS DOUBLE 4-16-4 AL');
 	});
 
 	it('sklo bez money_kod a mimo Odoo cenníka → lokálny názov (fallback, nikdy chyba)', async () => {
 		enableEnv();
 		mockOdoo();
-		expect(await moneyNazovSkla('Float sklo 4 mm')).toBe('Float sklo 4 mm');
-		expect(await moneyNazovSkla('')).toBe('');
+		expect(await odooNazovSkla('Float sklo 4 mm')).toBe('Float sklo 4 mm');
+		expect(await odooNazovSkla('')).toBe('');
 	});
 
 	it('Odoo product.product 500 → lokálny názov (fallback)', async () => {
 		enableEnv();
 		mockOdoo({ failProducts: true });
-		expect(await moneyNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
+		expect(await odooNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
 	});
 
 	it('timeout (Odoo visí) → lokálny názov v rámci timeoutu (neblokuje page load)', async () => {
 		enableEnv();
 		mockOdoo({ hangProducts: true });
 		const t0 = Date.now();
-		const m = await moneyNazvySkiel(['Izolačné sklo 4/16/4 číre'], { timeoutMs: 50 });
+		const m = await odooNazvySkiel(['Izolačné sklo 4/16/4 číre'], { timeoutMs: 50 });
 		expect(m['Izolačné sklo 4/16/4 číre']).toBe('Izolačné sklo 4/16/4 číre');
 		expect(Date.now() - t0).toBeLessThan(2000);
 	});
@@ -157,8 +164,8 @@ describe('moneyNazvySkiel (#563)', () => {
 		enableEnv();
 		const calls = mockOdoo();
 		const [a, b] = await Promise.all([
-			moneyNazovSkla('Izolačné sklo 4/16/4 číre'),
-			moneyNazovSkla('Izolačné sklo 4/16/4 číre')
+			odooNazovSkla('Izolačné sklo 4/16/4 číre'),
+			odooNazovSkla('Izolačné sklo 4/16/4 číre')
 		]);
 		expect(a).toBe('Izolačné sklo 4/16/4- číre (Ug=1,1)');
 		expect(b).toBe('Izolačné sklo 4/16/4- číre (Ug=1,1)');
@@ -174,20 +181,20 @@ describe('moneyNazvySkiel (#563)', () => {
 				});
 			return new Response('[]', { status: 200 });
 		});
-		expect(await moneyNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
+		expect(await odooNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
 	});
 
 	it('prázdne / medzerové typy sa vrátia bezo zmeny a nevolajú Odoo', async () => {
 		enableEnv();
 		const calls = mockOdoo();
-		const m = await moneyNazvySkiel(['', '  ']);
+		const m = await odooNazvySkiel(['', '  ']);
 		expect(m).toEqual({ '': '', '  ': '  ' });
 		expect(calls).toHaveLength(0);
 	});
 
 	it('integrácia nenakonfigurovaná (dev/test) → lokálny názov bez volania Odoo', async () => {
 		const calls = mockOdoo();
-		expect(await moneyNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
+		expect(await odooNazovSkla('Izolačné sklo 4/16/4 číre')).toBe('Izolačné sklo 4/16/4 číre');
 		expect(calls).toHaveLength(0);
 	});
 });
