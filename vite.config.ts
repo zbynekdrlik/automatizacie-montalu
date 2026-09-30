@@ -47,7 +47,12 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			adapter: adapter(),
+			// #592: absolútne cesty aj v SSR. Default `relative: true` robí `resolve()` počas SSR
+			// relatívnym k aktuálnej stránke (/clip → `./fix`, /fix/cad → `../fix`) — PROD 0.25.59
+			// mal na /clip relatívne odkazy kariet „Pevné zasklenie". Appka beží v koreni domény
+			// (base ''), relatívna prenositeľnosť (IPFS/archív) sa nepoužíva.
+			paths: { relative: false }
 		})
 	],
 	test: {

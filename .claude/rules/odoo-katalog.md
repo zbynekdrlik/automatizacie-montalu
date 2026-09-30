@@ -6,6 +6,8 @@ paths:
   - 'tests/odoo-katalog*.test.ts'
   - 'tests/odoo-kody-validacia*.test.ts'
   - 'tests/odoo-nazov-skla*.test.ts'
+  - 'tests/odoo-sklad*.test.ts'
+  - 'src/lib/components/SkladVarovania.svelte'
 ---
 
 # Odoo katalóg artiklov (`odoo-katalog.ts`) — prechod Money → Odoo (#599)
@@ -18,9 +20,10 @@ kódy). Vracia `{ zdroj: 'odoo', produkty: Map<kod, {kod, nazov, mj, skladovy}> 
 ktoré Odoo pozná) alebo `{ zdroj: 'nedostupne', dovod: 'config' | 'chyba' }`. NIKDY nehádže.
 
 Konzumenti: `ceny.ts` `validateOdpisKody` (kontrola kódov odpisu pred zápisom do Money, live=1),
-`odoo-nazov-skla.ts` (názov skla na podklade objednávky). Ďalší krok #599 (ceny, rozvin, sklad)
-**rozšír TENTO modul** (pole do `FIELDS` + do `OdooProdukt`), nepíš ďalší vlastný `product.product`
-read s vlastnou cache.
+`ceny.ts` `skladoveVarovania` (sklad cez `odooSkladPreKody`, krok 3), `odoo-nazov-skla.ts` (názov
+skla na podklade objednávky). Ďalší krok #599 (ceny, rozvin) **rozšír TENTO modul** (pole do
+`FIELDS` + do `OdooProdukt`, alebo nová `KodCache` inštancia), nepíš ďalší vlastný Odoo read s
+vlastnou cache.
 
 ## Vzor (z `glass-catalog.md` „NIKDY neblokuj page load na Odoo")
 
@@ -37,11 +40,37 @@ read s vlastnou cache.
 
 `product.product/search_read` s poľom `qty_available` → **HTTP 403 AccessError na `mrp.bom`**
 (výpočet qty pri nainštalovanom MRP siaha na kusovníky kvôli kitom). Jedno zakázané pole = 403 na
-celý request → katalóg by bol stále „nedostupný". Preto `FIELDS` `qty_available` NEMÁ a stav skladu
-(`SkladVarovania`) ostáva na Money snapshote. Čitateľné: `default_code, name, uom_id, active, type,
-is_storable` (200) a `stock.quant` (`quantity`, `location_id`) — alternatíva pre sklad = súčet
-`quantity` na interných lokáciách (rozhodnutie na #599, nie implementované). Pred pridaním
-ĎALŠIEHO poľa ho over read-only sondou v PROD kontajneri (vzor nižšie).
+celý request → katalóg by bol stále „nedostupný". Preto `FIELDS` `qty_available` NEMÁ; sklad ide cez
+`stock.quant` (sekcia nižšie). Čitateľné: `default_code, name, uom_id, active, type, is_storable`
+(200) a `stock.quant` (`product_id`, `quantity`, `location_id`). Pred pridaním ĎALŠIEHO poľa ho over
+read-only sondou v PROD kontajneri (vzor nižšie).
+
+## Stav skladu zo `stock.quant` (`odooSkladPreKody`, #599 krok 3)
+
+- **Jeden cache mechanizmus pre oba ready:** `KodCache<T>` v `odoo-katalog.ts` (per-kód platnosť,
+  výpadok 60 s bez volania, single-flight, warn raz za výpadok s názvom modelu). Katalóg 5 min, sklad
+  **60 s** (hýbe sa). Nový Odoo read podľa kódu = ďalšia inštancia `KodCache`, nie kópia logiky.
+- `odooSkladPreKody(kody)`: najprv katalóg (id + `is_storable`), potom JEDEN `stock.quant/search_read`
+  s doménou `[['product_id','in',ids],['location_id.usage','=','internal']]`, polia `product_id,
+  quantity` → súčet per kód, zaokr. na 3 desatinné. Sledovaný produkt bez kvantov = **0**; produkt
+  nesledovaný skladom (`is_storable=false`, nemá kvanty) alebo neznámy = **v mape nie je** (neznámy
+  stav). Mapovanie cez `product_id` id (doména cez `product_id.default_code` tiež funguje, ale
+  `product_id` vracia len `[id, "[KÓD] názov"]` — kód z display name neparsuj).
+- PROD sonda 30.9.: 168 produktov → 160 kvantov za 98 ms, jediná interná lokácia `PKO/Zásoby`.
+- **PASCA: Odoo sklad NIE JE zrkadlo Money** (sonda 30.9., 168 kódov): zhoda 49/168; väčšina
+  rozdielov je zaokrúhlenie (Odoo drží 2 desatinné), ~35 materiálnych — Odoo takmer vždy VYŠŠIE o
+  nedávnu spotrebu (ZASP00024 Money 440.35 / Odoo 470.35), výnimočne nižšie (ZASP00033 2982.5 /
+  982.5). Preto `ceny.ts` `skladoveVarovania` kým je snapshot čerstvý (≤ 7 dní) berie NIŽŠIU z
+  hodnôt (Money pri nedostatku ticho zahodí celý doklad — čisté Odoo by varovanie stratilo); po cute
+  (snapshot zastará) ostane čisté Odoo. **Sledovaný produkt BEZ interných kvantov** (`bezKvantov`)
+  sa pri známej Money hodnote berie ako NEZNÁMY, nie 0 (review #599: inak falošné varovanie →
+  „Odobrať z odpisu" reálneho materiálu); bez Money hodnoty ostáva Odoo 0. Pri zhode hodnôt vyhráva
+  `zdroj: 'odoo'`. Odoo nedostupné → snapshot ako pred #599. Varovanie nesie
+  `zdroj: 'odoo' | 'snapshot'`, `SkladVarovania` ho ukáže (`sklad-varovania-zdroj`, per položka
+  `sklad-varovania-<kod>-zdroj`).
+- `skladoveVarovania` je **async** — volajúci (zasklenia, cad-odpis = pergola + fix/cad, bazén, clip,
+  sietka) ho `await`-ujú; pomocné náhľadové funkcie (`stavNahlad*`, `stavKontrola*`, `nahladCien`,
+  `kontrola`) sú preto async. Nulové množstvá sa do Odoo ani nepýtajú.
 
 ## Kontrola kódov odpisu z Odoo (`validateOdpisKody`, async od #599)
 

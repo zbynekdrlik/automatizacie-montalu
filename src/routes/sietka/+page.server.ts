@@ -78,7 +78,7 @@ export const actions = {
 			// ale nie sklad ani tlačidlo Odoslať); sklad je interná dáta (rovnaká hranica ako inde)
 			skladVarovania: isB2B(locals.user)
 				? []
-				: skladoveVarovania(
+				: await skladoveVarovania(
 						r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
 					),
 			snapshotDatum: getSnapshotMeta().generatedAt,
@@ -128,7 +128,7 @@ export const actions = {
 				r,
 				potrebuje3K: potrebuje3KKolajnicu(vstup.styl),
 				// #448/#451 predodpisové skladové varovanie + odobrať — interní (b2b odmietnutý vyššie)
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,
@@ -204,7 +204,7 @@ export const actions = {
 			// #448/#451 predodpisové skladové varovanie + odobrať — LEN interní (rovnaký vzor ako single)
 			skladVarovania: isB2B(locals.user)
 				? []
-				: skladoveVarovania(
+				: await skladoveVarovania(
 						r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
 					),
 			snapshotDatum: getSnapshotMeta().generatedAt,
@@ -237,7 +237,7 @@ export const actions = {
 				step: 'vysledokMulti' as const,
 				multiVstup: vstup,
 				multi: r,
-				skladVarovania: skladoveVarovania(
+				skladVarovania: await skladoveVarovania(
 					r.odpis.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.metre }))
 				),
 				snapshotDatum: getSnapshotMeta().generatedAt,

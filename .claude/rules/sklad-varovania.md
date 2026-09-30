@@ -43,6 +43,20 @@ funkčnou cestou. Na moduloch S `qty_` inputmi fungujú OBA (belt-and-suspenders
 4. V serveri pridaj `parseVyluceneKody` + `vylucPolozky` (vzor: zasklenia `+page.server.ts`).
 5. Filtruj `job.polozky` PRED `writeOdpis`, ALE PO `contentHash` (planHash check).
 
+## Zdroj skladu: Odoo `stock.quant` + Money snapshot (#599 krok 3)
+
+- `skladoveVarovania` je **async** (Odoo read) — každý volajúci `await`; náhľadový helper, ktorý ho
+  obaľuje (`stavNahlad*`, `stavKontrola*`, `nahladCien`, `kontrola`, `cadSklad`), je async.
+- Kým je Money snapshot čerstvý (≤ 7 dní), platí **nižšia** z hodnôt Odoo / snapshot (Odoo dnes Money
+  nezrkadlí — detail + čísla v `odoo-katalog.md`); Odoo nedostupné → snapshot. Každé varovanie nesie
+  `zdroj`; komponent ukáže hlavičku `data-testid="<testid>-zdroj"` („sklad: Odoo, aktuálny stav" /
+  „sklad: Money snapshot k D.M.YYYY" / zmiešané „— platí nižší") a per položku `<testid>-<kod>-zdroj`
+  (`Odoo` / `Money`). `snapshotDatum` prop ostáva (dátum pre Money zdroj). Keď je aspoň jedna
+  položka zo zdroja Odoo, pribudne poznámka `<testid>-odoo-pozn` (nedostatok hlási Odoo, Money môže
+  mať iný stav — tvrdenie „Money zahodí" platí naisto len pre zdroj Money).
+- CI nemá Odoo → E2E vždy zdroj `Money`; Odoo vetva je krytá unit testami (`tests/odoo-sklad-599`,
+  SSR render `tests/sklad-varovania-zdroj-599`).
+
 ## E2E test — ZASP00002 je Robust rámový profil
 
 Pre sklad-varovanie E2E na /zasklenia (Robust 2K) seeduj `ZASP00002` do

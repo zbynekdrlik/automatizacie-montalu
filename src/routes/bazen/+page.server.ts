@@ -41,9 +41,9 @@ function vylucPolozky(job: OdpisJob, vylucene: Set<string>): OdpisJob {
  * honest-neúplný (Money nemá nákupnú cenu bazénových komponentov, follow-up #364);
  * `CenyTabulka` to priznáva (`CenySucet.kompletne=false`).
  */
-function nahladCien(out: BazenPolozka[]) {
+async function nahladCien(out: BazenPolozka[]) {
 	return {
-		skladVarovania: skladoveVarovania(
+		skladVarovania: await skladoveVarovania(
 			out.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 		),
 		snapshotDatum: getSnapshotMeta().generatedAt,
@@ -101,7 +101,7 @@ export const actions = {
 			vstup,
 			out,
 			// #448 sklad + #454 ceny materiálu — predodpisový náhľad, len čítanie snapshotu
-			...nahladCien(out),
+			...(await nahladCien(out)),
 			error: null as string | null
 		};
 	},
@@ -124,13 +124,13 @@ export const actions = {
 		// úpravy sa nesmú ticho stratiť a nahradiť auto-výpočtom (nález review)
 		const edits = editsFrom(form);
 		const editVals = Object.fromEntries(edits);
-		const kontrola = (err: string) => ({
+		const kontrola = async (err: string) => ({
 			step: 'kontrola' as const,
 			vstup,
 			out,
 			editVals,
 			// #448 sklad + #454 ceny materiálu — predodpisový náhľad, len čítanie snapshotu
-			...nahladCien(out),
+			...(await nahladCien(out)),
 			error: err
 		});
 

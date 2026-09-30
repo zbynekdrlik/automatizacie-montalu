@@ -45,10 +45,7 @@ test('Štandard plus 3K ponúka 4 mm Float aj kalené (#579), nie 10 mm; predvol
 		'3.3.1 mliečne',
 		'Izolačné sklo 4/8/4 číre',
 		'Izolačné sklo 4/8/4 mliečne',
-		'Izolačné sklo 4/8/4 stopsol',
-		'Izolačné sklo 4/16/4 číre',
-		'Izolačné sklo 4/16/4 mliečne',
-		'Izolačné sklo 4/16/4 stopsol'
+		'Izolačné sklo 4/8/4 stopsol'
 	];
 	overPonukuSkla(p, povolene);
 	// #579 (Patrik 28.9.): 4 mm sklo pri Štandardoch áno — výnimka, predvolené ostáva 6 mm
@@ -58,9 +55,10 @@ test('Štandard plus 3K ponúka 4 mm Float aj kalené (#579), nie 10 mm; predvol
 	]);
 	expect(p.vypocty.filter((s) => /10 mm/.test(s))).toEqual([]);
 	// IZO triedy 16 (4/8/4 = Odoo 16 mm izolačné) je v ponuke vždy — CI aj PROD. 24 mm izolačné
-	// (4/16/4) sa NEtvrdí: na PROD ho výroba pri Štandardoch odobrala (Odoo úloha 1218, 29.9.), CI
-	// lokálny allow-list ho ešte má — ponuka hrúbok je živá cfg, spec ju nesmie zamrznúť.
+	// (4/16/4): lokálna záloha ho od #599 nemá (Odoo úloha 1218) — tvrdí sa LEN bez Odoo; pri Odoo
+	// je ponuka hrúbok živá cfg (výroba si 24 mm vie v editore zapnúť), spec ju nesmie zamrznúť.
 	expect(p.vypocty.some((s) => /^Izolačné sklo 4\/8\/4/.test(s))).toBe(true);
+	if (!p.odoo) expect(p.vypocty.filter((s) => /4\/16\/4/.test(s))).toEqual([]);
 	await expectSklo(page.getByLabel(SKLO), 'Float sklo 6 mm');
 	expect(consoleMsgs).toEqual([]);
 });
@@ -80,6 +78,11 @@ test('Deluxe 6 mm a 10 mm (predvolené 10 mm); starý Štandard bez zmeny (#573)
 	expect(stary.vypocty).toContain('Float sklo 4 mm');
 	// 3.3.1 je lokálne sklo — pri Odoo ponuke je len keď ho počíta niektorý Odoo typ (#594)
 	if (!stary.odoo) expect(stary.vypocty).toContain('3.3.1');
+	// #599: ani starý Štandard už v lokálnej zálohe neponúka 24 mm (4/16/4); 10 mm ostáva
+	if (!stary.odoo) {
+		expect(stary.vypocty.filter((s) => /4\/16\/4/.test(s))).toEqual([]);
+		expect(stary.vypocty).toContain('ESG kalené 10 mm');
+	}
 	expect(consoleMsgs).toEqual([]);
 });
 

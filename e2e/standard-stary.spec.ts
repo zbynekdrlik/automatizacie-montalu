@@ -56,9 +56,6 @@ test('Štandard je v ponuke systémov a má štýly 2K/3K/4K + oponu', async ({ 
 		'Izolačné sklo 4/8/4 číre',
 		'Izolačné sklo 4/8/4 mliečne',
 		'Izolačné sklo 4/8/4 stopsol',
-		'Izolačné sklo 4/16/4 číre',
-		'Izolačné sklo 4/16/4 mliečne',
-		'Izolačné sklo 4/16/4 stopsol',
 		'ESG kalené 4 mm',
 		'ESG kalené 6 mm',
 		'ESG kalené 10 mm'
@@ -149,10 +146,7 @@ test('opona 2x3K + izolačné: starý Štandard IZO oponu MÁ; Štandard + opona
 	overPonukuSkla({ ...p, vypocty: p.vypocty.filter((s) => /Izola/i.test(s)) }, [
 		'Izolačné sklo 4/8/4 číre',
 		'Izolačné sklo 4/8/4 mliečne',
-		'Izolačné sklo 4/8/4 stopsol',
-		'Izolačné sklo 4/16/4 číre',
-		'Izolačné sklo 4/16/4 mliečne',
-		'Izolačné sklo 4/16/4 stopsol'
+		'Izolačné sklo 4/8/4 stopsol'
 	]);
 
 	expect(errs).toEqual([]);

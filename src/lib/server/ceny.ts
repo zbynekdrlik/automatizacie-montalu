@@ -13,7 +13,7 @@ import { db } from './db';
 import { logger } from './log';
 import { computeLakovanie, type LakovanieResult } from '$lib/lakovanie';
 import { isOdooPricesEnabled, fetchOdooPrices, type OdooPricesResponse } from './odoo-prices';
-import { odooProduktyPreKody } from './odoo-katalog';
+import { odooProduktyPreKody, odooSkladPreKody } from './odoo-katalog';
 
 const log = logger('ceny');
 
@@ -702,36 +702,46 @@ export function enrichPolozky(
 	return { radky, sucty, lakovanie, snapshot: readSnapshotMetaFromDb() };
 }
 
-// ---- predodpisové skladové varovanie (#448) ----
+// ---- predodpisové skladové varovanie (#448, zdroj Odoo od #599 krok 3) ----
 
-/** Jedno skladové varovanie pred odpisom (#448): kód, ktorého denný Money snapshot hlási nižší
- *  sklad než požadované množstvo. Honest signál — NIE blok (appka sklad nevlastní, snapshot je stale).
+/** Jedno skladové varovanie pred odpisom (#448): kód, ktorého sklad je nižší než požadované
+ *  množstvo. Honest signál — NIE blok (appka sklad nevlastní).
  *  #451: `nazov` pridaný pre UI — výrazné varovanie s akciou „Odobrať z odpisu" musí ukázať
  *  ČO je za daným kódom, nielen číslo artiklu. */
 export interface SkladVarovanie {
 	kod: string;
 	/** ľudsky čitateľný názov položky (z odpisu). */
 	nazov: string;
-	/** dostupný sklad zo snapshotu (non-null, < požadované). */
+	/** dostupný sklad (< požadované) — NIŽŠIA zo známych hodnôt (viď `zdroj`). */
 	sklad: number;
 	/** požadované množstvo (SÚČET za kód v tomto odpise). */
 	mnozstvo: number;
+	/** #599: odkiaľ je `sklad` — `odoo` = `stock.quant` (interné lokácie), `snapshot` = denný
+	 *  Money snapshot. UI ho ukáže, aby bolo jasné, či ide o živý Odoo stav alebo dátum snapshotu. */
+	zdroj: 'odoo' | 'snapshot';
 }
 
 /**
  * Predodpisové SKLADOVÉ VAROVANIE (#448) — pre položky odpisu vráti varovanie za KAŽDÝ kód, ktorého
- * denný Money snapshot hlási `sklad != null && sklad < požadované`. Presná rovnosť (`sklad ===
- * mnozstvo`), `sklad === null` (Money nemá skladovú kartu), kód mimo snapshotu (Money ho nepozná)
- * aj nulové/záporné množstvo → žiadne varovanie: appka sklad NEVLASTNÍ, záporný sklad je v Money
- * legitímny a snapshot je 1×denne stale, takže tvrdý blok by dával falošné poplachy (settled dizajn
- * #448 — na rozdiel od `validateOdpisKody`, ktoré unknown-kod/bez-skladovej-karty BLOKUJE). Množstvo
- * sa AGREGUJE za kód (Money kontroluje sklad na CELKOVÝ dopyt kódu v doklade). Sám si spustí lazy
- * import snapshotu (idempotentný), rovnako ako `validateOdpisKody`/`enrichPolozky`.
+ * sklad je `< požadované`. Presná rovnosť, neznámy sklad (kód mimo Odoo aj snapshotu, `sklad === null`
+ * = Money nemá skladovú kartu, Odoo produkt nesledovaný skladom) aj nulové/záporné množstvo → žiadne
+ * varovanie: appka sklad NEVLASTNÍ, záporný sklad je legitímny → tvrdý blok by dával falošné poplachy
+ * (settled dizajn #448 — na rozdiel od `validateOdpisKody`, ktoré neznámy kód BLOKUJE). Množstvo sa
+ * AGREGUJE za kód (Money kontroluje sklad na CELKOVÝ dopyt kódu v doklade).
+ *
+ * #599 krok 3 — ZDROJ skladu (ROZHODNUTÉ main 30.9. + nález na tickete):
+ *   - Odoo `stock.quant` (súčet interných kvantov, `odooSkladPreKody`) je primárny zdroj.
+ *   - KÝM je Money snapshot POUŽITEĽNÝ (čerstvý ≤ 7 dní, ako `validateOdpisKody`) — Money je ešte
+ *     cieľ odpisu (do cutu odoo-erp 1122) — rozhoduje NIŽŠIA z hodnôt Odoo / snapshot: sonda 30.9.
+ *     ukázala, že Odoo sklad Money NEzrkadlí (väčšinou vyšší o nedávnu spotrebu) a Money pri
+ *     nedostatku celý doklad TICHO zahodí — čisté Odoo by také varovanie stratilo. Po cute snapshot
+ *     zastará → ostane čisté Odoo, bez ďalšej zmeny kódu.
+ *   - Odoo nedostupné (nenakonfigurované / výpadok / timeout 3 s) → snapshot ako pred #599 (aj
+ *     zastaraný — lepší signál než žiadny); nikdy chyba, nikdy blok.
  */
-export function skladoveVarovania(
+export async function skladoveVarovania(
 	polozky: { kod: string; nazov: string; mnozstvo: number }[]
-): SkladVarovanie[] {
-	maybeImportSnapshot();
+): Promise<SkladVarovanie[]> {
 	// súčet požadovaného množstva za kód (LEN kladné — nulová položka nič nežiada); Map insertion
 	// order určuje poradie výstupu = deterministické podľa prvého výskytu kódu
 	const dopyt = new Map<string, { mnozstvo: number; nazov: string }>();
@@ -744,16 +754,41 @@ export function skladoveVarovania(
 			nazov: existing?.nazov ?? p.nazov
 		});
 	}
+	if (dopyt.size === 0) return [];
+
+	const { snapshotUsable } = snapshotPreValidaciu(); // spustí aj lazy import snapshotu
+	const odoo = await odooSkladPreKody([...dopyt.keys()]);
+	// snapshot sa berie, keď Odoo nie je (vždy, ako pred #599), alebo popri Odoo, kým je čerstvý
+	const ajSnapshot = odoo.zdroj !== 'odoo' || snapshotUsable;
+	if (odoo.zdroj !== 'odoo' && odoo.dovod === 'chyba')
+		log.debug('skladové varovanie: Odoo sklad nedostupný — Money snapshot', { kody: dopyt.size });
+
 	const out: SkladVarovanie[] = [];
 	for (const [kod, { mnozstvo: rawMnozstvo, nazov }] of dopyt) {
 		// zaokrúhli agregát na 3 desatinné (mm presnosť) — FP akumulácia (napr. 0,1+0,2=0,30000…4) by
 		// inak spravila FALOŠNÉ varovanie pri koncepčne ROVNOM sklade (design: presná rovnosť = žiadne
 		// varovanie). Vzor `round2` v `enrichPolozky` — tam sa súčty tiež zaokrúhľujú pred zobrazením.
 		const mnozstvo = Math.round(rawMnozstvo * 1000) / 1000;
-		const price = getPriceRow(kod);
-		if (price && price.sklad !== null && price.sklad < mnozstvo) {
-			out.push({ kod, nazov, sklad: price.sklad, mnozstvo });
-		}
+		const zSnapshotu = ajSnapshot ? (getPriceRow(kod)?.sklad ?? null) : null;
+		// review #599: produkt, ktorý Odoo sleduje, ale nemá v ňom ŽIADNY interný kvant, je pri známom
+		// Money sklade „neznámy", nie 0 — Odoo dnes Money nezrkadlí a falošné varovanie by viedlo k
+		// odobratiu reálneho materiálu z odpisu. Bez Money hodnoty (po cute) ostáva Odoo 0.
+		const bezKvantovAleMoneyVie =
+			odoo.zdroj === 'odoo' && odoo.bezKvantov.has(kod) && zSnapshotu !== null;
+		const zOdoo = odoo.zdroj === 'odoo' && !bezKvantovAleMoneyVie ? odoo.sklad.get(kod) : undefined;
+		const kandidati: { sklad: number; zdroj: SkladVarovanie['zdroj'] }[] = [];
+		if (zOdoo !== undefined) kandidati.push({ sklad: zOdoo, zdroj: 'odoo' });
+		if (zSnapshotu !== null) kandidati.push({ sklad: zSnapshotu, zdroj: 'snapshot' });
+		if (kandidati.length === 0) continue; // sklad neznámy → žiadne varovanie
+		// nižšia hodnota vyhráva; pri zhode Odoo (prvé v poli — živý stav)
+		const najnizsi = kandidati.reduce((a, b) => (b.sklad < a.sklad ? b : a));
+		if (najnizsi.sklad < mnozstvo) out.push({ kod, nazov, mnozstvo, ...najnizsi });
+		if (zOdoo !== undefined && zSnapshotu !== null && zOdoo !== zSnapshotu)
+			log.debug('skladové varovanie: Odoo a Money snapshot sa líšia', {
+				kod,
+				odoo: zOdoo,
+				snapshot: zSnapshotu
+			});
 	}
 	return out;
 }
