@@ -225,7 +225,14 @@ export async function uploadGlassOrderToOdoo(
 		}
 		if (!op) {
 			log.info('glass-order upload: zákazka nemá odpis/OP — nič neposielam', { zak: trimmed });
-			return { result: 'missing', payload, droppedAttachments };
+			// #577: podklad sa dá otvoriť len so ZAK (bez OP) → povedz obsluhe, čo doplniť
+			return {
+				result: 'missing',
+				payload,
+				droppedAttachments,
+				error:
+					'Chýba OP objednávky — zadajte ho v poli „OP objednávky" na podklade a odošlite znova.'
+			};
 		}
 
 		const orderNumber = normOp(op);
