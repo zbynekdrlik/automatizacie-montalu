@@ -620,7 +620,9 @@ odobrať (tvrď podmnožinu / triedu).
   `seriove` (1 worker, `dependencies` → beží PO paralelnej časti) pre specy meniace zdieľanú konfiguráciu
   (`e2e/seriove.ts`, guard `tests/e2e-seriove.test.ts` cez `MUTUJE_CFG` = `ulozit-vzorce` /
   `pridat-hrubku` / `odobrat-hrubku`). Nový spec so zápisom do editora → pridaj ho do `SERIOVE_SPECY`.
-  Daň dependency: padne test v `paralelne` → `seriove` sa nespustí (vo výpise „did not run").
+  Pri JEDNOM volaní by padnutý test v `paralelne` preskočil `seriove` (dependency, „did not run") —
+  post-deploy krok preto volá `--project=paralelne` a potom `--project=seriove --no-deps` (každý so
+  svojím `PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/<projekt>`), rc oboch, krok padne pri ktoromkoľvek.
 - **Paralelne-bezpečný spec:** nečíta zoznam, do ktorého súbežné testy pridávajú (používatelia, história
   odpisov) cez PODREŤAZEC. Vzor zlyhania: `locator('tr', { hasText: E2E_USER })` chytil súbežne zakladaný
   `e2e-vo-…` účet (strict mode) → vlastný riadok hľadaj cez odznak „ja" / presnú bunku

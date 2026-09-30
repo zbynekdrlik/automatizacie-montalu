@@ -327,7 +327,8 @@ aby bola testovateľná — pokrýva ju `tests/deploy-remote.test.ts` (vitest, m
   19 min workers:1). Do 0.25.58 sada narástla na 446 testov a sériový krok trval 29–33 min (8 behov;
   main run 36676300171 timeout). **#577: krok beží paralelne `E2E_WORKERS=3`** (proti LIVE PROD
   read-only; specy meniace zdieľanú konfiguráciu v projekte `seriove` s 1 workerom po paralelnej
-  časti — `e2e/seriove.ts`, `playwright.config.ts`, detail v `testing.md`). Reporter pri `CI` = `list`
+  časti; dve volania `--project`, aby padnutý `paralelne` nezamlčal `seriove` — `e2e/seriove.ts`,
+  `playwright.config.ts`, detail v `testing.md`). Reporter pri `CI` = `list`
   (+ `html` artefakt): názov každého testu ide do logu priebežne, aj keď krok zabije timeout (default
   `dot` pri timeoute nevypísal nič). Cieľ ≤ 20 min. Pri ďalšom prekročení: NAJPRV odmeraj tempo z logu
   behu (počet testov / čas, `list` výpis), až potom hýb workermi (3D specy sú CPU-ťažké, runner 4 vCPU)

@@ -578,6 +578,7 @@ v unit testoch presunuli na Drevostavby (rovnaký lokálny katalóg `Štandard +
   4/16/4 (trieda 16, IZO nárezák ten istý). CI (bez Odoo) teda 4/16/4 pri Štandard + ponúka, PROD (Odoo)
   nie. E2E preto NIKDY netvrdí 4/16/4 pri Štandardoch — IZO nárezák Štandardov vyberá relačne triedu 16
   cez „Izolačné sklo 4/8/4 číre" (`opona-izo.spec.ts`, `sklo-povolene-573.spec.ts`; testing.md).
-  Či má výroba aj lokálnu zálohu zúžiť, je samostatné rozhodnutie (mimo #577).
+  Zúženie lokálnej zálohy (bez 4/16/4 pri Štandardoch) je produktové rozhodnutie mimo rozsahu #577 —
+  kandidát nahlásený supervízorovi komentárom „Follow-up kandidát" na #577.
 - 4/8/4 a 4/16/4 pri Štandard + = `hrubka_trieda` 16, `redukcia_zero` 0, bez per-sklo korekcie (overené
   aj na PROD 30.9.) → nárez/Money identické; zmena výberu skla v E2E opona IZO nemení Excel 1:1 čísla.
