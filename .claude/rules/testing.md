@@ -671,6 +671,11 @@ odobrať (tvrď podmnožinu / triedu).
   vyššie), obe dočasné súbory po behu zmaž. Jednoduchšia alternatíva (#592 karty): `npm ci` priamo
   vo worktree — `node_modules` je potom v allow liste worktree, stačí len dočasný playwright config
   (`npx vite dev --port N --strictPort`), fonty idú 200 a zero-console prejde.
+  **PASCA `npm ci` vo worktree (#599):** npm `allow-scripts` NESPUSTÍ install skript
+  `better-sqlite3` → chýba natívny `build/Release/better_sqlite3.node` a server padne. Skopíruj
+  binárku z rodičovského repa (`mkdir -p node_modules/better-sqlite3/build/Release && cp
+  <rodič>/node_modules/better-sqlite3/build/Release/better_sqlite3.node …`, over zhodu verzie
+  balíka) — nekompiluj.
 - **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
   položky cez `span[data-testid^="popis-"]` (od #594 je popis `<span>` v bunke popisu vedľa
   `pridal-<id>` „pridal <autor> · <čas>"), nie `tbody tr`.
