@@ -222,7 +222,14 @@ jobs:
           # tunel: localhost:18091 → VPS 127.0.0.1:8090 (8091 býva obsadený presenterom)
           ssh -f -N -L 18091:127.0.0.1:8090 -i ~/.ssh/deploy_key -o ExitOnForwardFailure=yes deploy@167.233.125.9
           for _ in $(seq 1 15); do curl -sf --max-time 5 -o /dev/null http://localhost:18091/health && break || sleep 1; done
-          DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 E2E_WORKERS=3 npx playwright test
+          export DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 E2E_WORKERS=3
+          # dve volania (nie jedno s dependency): padnutý test v `paralelne` nesmie zamlčať
+          # výsledky `seriove` — obe sady idú do logu, krok padne, ak padla ktorákoľvek
+          rc_par=0; rc_ser=0
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/paralelne npx playwright test --project=paralelne || rc_par=$?
+          PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/seriove npx playwright test --project=seriove --no-deps || rc_ser=$?
+          echo "post-deploy E2E: paralelne rc=$rc_par, seriove rc=$rc_ser"
+          [ "$rc_par" -eq 0 ] && [ "$rc_ser" -eq 0 ]
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         # always() lebo pri zlyhaní E2E je job vo `failure` stave a implicitné
         # `success() &&` by tento krok preskočilo → padnutý report by sa nenahral.

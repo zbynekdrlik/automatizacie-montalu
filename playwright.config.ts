@@ -35,8 +35,9 @@ export default defineConfig({
 	// Paralelný beh (WORKERS > 1): specy meniace zdieľanú konfiguráciu (editor vzorcov / hrúbok,
 	// `e2e/seriove.ts`) bežia v projekte `seriove` s 1 workerom AŽ PO paralelnej časti — súbežný
 	// editor by menil čísla ostatným testom. Pri WORKERS = 1 jeden default projekt ako doteraz.
-	// Daň: padne test v `paralelne` → Playwright `seriove` nespustí (dependency). Proti PROD sú ich
-	// zápisové testy aj tak preskočené, čítacie dobehnú v ďalšom behu po oprave.
+	// Pri JEDNOM volaní padnutý test v `paralelne` preskočí `seriove` (dependency) — post-deploy krok
+	// (ci.yml) preto volá projekty ZVLÁŠŤ (`--project paralelne`, potom `--project seriove --no-deps`),
+	// aby obe sady vždy došli do logu.
 	projects:
 		WORKERS > 1
 			? [
