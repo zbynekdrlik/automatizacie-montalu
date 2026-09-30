@@ -38,6 +38,13 @@ describe('#599 SkladVarovania — zdroj skladu', () => {
 		expect(hlavicka(h)).toBe('(sklad: Odoo aj Money snapshot k 30.9.2026 — platí nižší)');
 	});
 
+	it('review: Odoo zdroj → poznámka, že nedostatok hlási Odoo (Money ho nemusí zahodiť)', () => {
+		const h = html([v('ZASP00024', 'odoo')]);
+		expect(h).toContain('data-testid="sklad-varovania-odoo-pozn"');
+		// len snapshot → tvrdenie o Money ostáva bez poznámky
+		expect(html([v('ZASP00024', 'snapshot')])).not.toContain('sklad-varovania-odoo-pozn');
+	});
+
 	it('bez varovaní sa nič nerenderuje', () => {
 		expect(html([])).not.toContain('sklad-varovania');
 	});

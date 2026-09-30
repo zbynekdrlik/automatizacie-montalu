@@ -293,6 +293,36 @@ describe('skladoveVarovania zo stock.quant (#599 krok 3)', () => {
 		]);
 	});
 
+	it('review: sledovaný produkt BEZ kvantov + čerstvý snapshot so skladom → Odoo „0" sa neberie', async () => {
+		enableEnv();
+		mockOdoo();
+		// Odoo dnes Money nezrkadlí — produkt bez interných kvantov nemusí znamenať prázdny sklad
+		// v Money; falošné varovanie by viedlo k „Odobrať z odpisu" reálneho materiálu
+		await seed([{ kod: 'PRP20256', sklad: 45 }]);
+		expect(await skladoveVarovania(pol('PRP20256', 10))).toEqual([]);
+		// Money sám nemá dosť → varuje snapshot hodnotou
+		expect(await skladoveVarovania(pol('PRP20256', 50))).toEqual([
+			{ kod: 'PRP20256', nazov: 'Položka PRP20256', sklad: 45, mnozstvo: 50, zdroj: 'snapshot' }
+		]);
+	});
+
+	it('review: rovnaká hodnota Odoo aj snapshot → zdroj odoo (živý stav)', async () => {
+		enableEnv();
+		mockOdoo();
+		await seed([{ kod: 'ZASP00024', sklad: 470.35 }]);
+		expect(await skladoveVarovania(pol('ZASP00024', 500))).toEqual([
+			{ kod: 'ZASP00024', nazov: 'Položka ZASP00024', sklad: 470.35, mnozstvo: 500, zdroj: 'odoo' }
+		]);
+	});
+
+	it('review: zastaraný snapshot + kód, ktorý Odoo nesleduje → žiadne varovanie (zámerne)', async () => {
+		enableEnv();
+		mockOdoo();
+		// po cute sa na zastaraný Money snapshot nespolieha — Odoo nesledovaný = stav neznámy
+		await seed([{ kod: 'BPP00013', sklad: 1 }], '2026-01-01T00:00:00Z');
+		expect(await skladoveVarovania(pol('BPP00013', 5))).toEqual([]);
+	});
+
 	it('Odoo nenakonfigurované (CI/dev) → snapshot, žiadne volanie', async () => {
 		const calls = mockOdoo();
 		await seed([{ kod: 'ZASP00024', sklad: 5 }]);
