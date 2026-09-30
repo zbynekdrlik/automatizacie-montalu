@@ -633,6 +633,8 @@ odobrať (tvrď podmnožinu / triedu).
   / 24 skipped za 3,5 min (3D 176 s, editor 17 s — editorové zápisy sú za `skipAkLive`). V CI 0.25.60
   bol `seriove` 1,8 min a 3D specy v paralelnej časti stáli ~7 min worker-času (pod záťažou) → čakaj
   `seriove` ~+3–5 min, `paralelne` o ~2–3 min kratšie; celok hlboko pod 30-min capom.
+  Obsah projektu over bez servera: `E2E_WORKERS=3 BASE_URL=http://localhost:1 npx playwright test
+  --list --project=seriove --no-deps` — BEZ `--no-deps` `--list` vypíše aj závislý `paralelne` (celú sadu).
   Pri JEDNOM volaní by padnutý test v `paralelne` preskočil `seriove` (dependency, „did not run") —
   post-deploy krok preto volá `--project=paralelne` a potom `--project=seriove --no-deps` (každý so
   svojím `PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/<projekt>`), rc oboch, krok padne pri ktoromkoľvek.
