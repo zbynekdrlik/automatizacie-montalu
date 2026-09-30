@@ -74,11 +74,14 @@ confirmed as-is, the other required a real code fix.
 
 ## FIX má DVA režimy (#380) — „Fix z appky" (výkres, Money-clean) + „Fix z cadu" (Money odpis)
 
-V hornej lište (od #592) FIX aj CLIP nie sú samostatné položky — sú pod skupinou „Pevné
-zasklenie" (Fix z appky `/fix`, Fix z CADu `/fix/cad`, Zábradlia (CLIP) `/clip`,
-`src/lib/nav-pevne-zasklenie.ts`); nadpisy stránok „Pevné zasklenie — …". URL sa nemenili.
+V hornej lište (od #592) FIX aj CLIP nie sú samostatné položky — je tam JEDEN odkaz „Pevné
+zasklenie" (→ /fix, bez dropdownu, aktívny na /fix* a /clip*). Výber režimu sú TRI veľké karty
+`PevneZasklenieKarty.svelte` pod nadpisom na /fix, /fix/cad aj /clip (Fix z appky, Fix z cadu,
+Zábradlia (CLIP); dáta `PEVNE_ZASKLENIE_KARTY` v `src/lib/nav-pevne-zasklenie.ts`, aktuálna
+karta zvýraznená). Nadpisy stránok „Pevné zasklenie — …". URL sa nemenili.
 
-Od #380 má FIX modul prepínač `FixModeNav.svelte` (vzor `PergolaModeNav`, ale 2 karty):
+Od #380 má FIX modul dva režimy (od #592 prepínané zdieľanými kartami, predtým 2-kartový
+`FixModeNav`):
 
 - **„Fix z appky" = `/fix`** (`+page.svelte`/`+page.server.ts` + `fix-vstup.ts` + `$lib/fix.ts`) —
   dnešný formulár rozmery → výkres konštrukcie. **Do Money NEJDE nič** (kresliaci režim). Ostáva

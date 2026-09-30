@@ -1,12 +1,12 @@
 <script lang="ts">
 	// FIX z CADu (#380) — CAD nárez → Money odpis. Vzor `/pergola/+page.svelte`
 	// (reuse rovnaký engine + `OdpisBlok`/`CenyTabulka`/`ProfilObrazok`), FIX-branded,
-	// prepínač režimov `FixModeNav`.
+	// karty režimov `PevneZasklenieKarty` (#592).
 	import ProfilObrazok from '$lib/components/ProfilObrazok.svelte';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import SkladVarovania from '$lib/components/SkladVarovania.svelte';
 	import OdpisBlok from '$lib/components/OdpisBlok.svelte';
-	import FixModeNav from '$lib/components/FixModeNav.svelte';
+	import PevneZasklenieKarty from '$lib/components/PevneZasklenieKarty.svelte';
 	import { resolve } from '$app/paths';
 
 	let { data, form } = $props();
@@ -86,7 +86,7 @@
 	<div class="card">
 		<h1>Pevné zasklenie — Fix z CADu</h1>
 		<p class="sub" style="margin-bottom:16px">Vyber, čo práve potrebuješ spraviť:</p>
-		<FixModeNav active="cad" />
+		<PevneZasklenieKarty aktivna="/fix/cad" />
 	</div>
 
 	{#if form?.error}

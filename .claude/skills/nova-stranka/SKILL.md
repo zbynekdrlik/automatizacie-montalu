@@ -21,8 +21,11 @@ od #392 už nie je jeden plochý `links` zoznam, ale tri polia: `moduleLinks`
 modulov), `toolLinks` (sekundárna „Nástroje", len interní) a samostatný
 natvrdo-zapísaný odkaz „Používatelia" v user menu (len admin). Pridaj novú route do
 toho poľa, ktoré sedí (a do OBOCH vetiev `moduleLinks`, ak má stránku vidieť aj b2b).
-Nový typ PEVNÉHO ZASKLENIA (fix/zábradlie) nepatrí do `moduleLinks`, ale ako riadok do
-`PEVNE_ZASKLENIE_LINKS` v `src/lib/nav-pevne-zasklenie.ts` (skupina „Pevné zasklenie", #592).
+Nový typ PEVNÉHO ZASKLENIA (fix/zábradlie) nepatrí do `moduleLinks` — v lište je len jeden
+odkaz „Pevné zasklenie" (→ /fix, bez dropdownu, owner 30.9.). Pridaj riadok (href/nadpis/
+štítok/popis) do `PEVNE_ZASKLENIE_KARTY` v `src/lib/nav-pevne-zasklenie.ts` a na novú stránku
+pod nadpis `<PevneZasklenieKarty aktivna="/nova" />` — karta sa objaví na VŠETKÝCH stránkach
+skupiny a odkaz v lište je na nej automaticky aktívny (`jePevneZasklenie`, #592).
 
 **Keď b2b MÁ stránku vidieť** (napr. `/sietka`, #89 — Patrik: „hlavne pre externých"),
 route sa jednoducho NEPRIDÁ do `B2B_FORBIDDEN_PREFIXES` — ale drift guard test to
