@@ -506,7 +506,9 @@ export async function writeOdpis(
 	let overridingKody = false;
 	let kodProblemy: KodProblem[] = [];
 	if (live === 1) {
-		const val = validateOdpisKody(job.polozky);
+		// #599: validácia je async (Odoo `product.product`, fallback snapshot) — await je PRED
+		// synchrónnym blokom dedup precheck→claim nižšie, takže jeho atomicita ostáva zachovaná.
+		const val = await validateOdpisKody(job.polozky);
 		if (!val.ok) {
 			if (opts.overrideKody === true) {
 				overridingKody = true;

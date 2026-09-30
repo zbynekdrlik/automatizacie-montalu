@@ -13,6 +13,7 @@ import { db } from './db';
 import { logger } from './log';
 import { computeLakovanie, type LakovanieResult } from '$lib/lakovanie';
 import { isOdooPricesEnabled, fetchOdooPrices, type OdooPricesResponse } from './odoo-prices';
+import { odooProduktyPreKody } from './odoo-katalog';
 
 const log = logger('ceny');
 
@@ -435,6 +436,9 @@ export interface KodProblem {
 export interface OdpisKodyValidacia {
 	/** `true` = žiadny problém, ALEBO snapshot nie je použiteľný (degrade — NEblokuj naslepo). */
 	ok: boolean;
+	/** #599: `odoo` = kódy overené proti Odoo `product.product`; `snapshot` = Odoo nedostupné
+	 *  (nenakonfigurované / výpadok) → fallback na denný Money snapshot (pôvodná #295 validácia). */
+	zdroj: 'odoo' | 'snapshot';
 	/** snapshot je čerstvý (≤ `SNAPSHOT_MAX_DNI`) + neprázdny → validácia má zmysel. */
 	snapshotUsable: boolean;
 	snapshot: SnapshotMeta;
@@ -471,14 +475,63 @@ function snapshotPrefixy(): Set<string> {
 	return s;
 }
 
+/** Hláška pre neznámy kód — ROVNAKÁ pre Odoo aj snapshot zdroj (#599: používateľ nevidí rozdiel). */
+function neznamyKod(p: { kod: string; nazov: string }): KodProblem {
+	return {
+		kod: p.kod,
+		nazov: p.nazov,
+		dovod: 'neznamy',
+		popis: `Money nepozná kód ${p.kod} — import by tento riadok (a možno celý doklad) preskočil.`
+	};
+}
+
 /**
- * PRE-export validácia položiek odpisu proti dennému Money snapshotu (#295). Kód, ktorého PREFIX
- * snapshot pokrýva, ale ktorý v snapshote CHÝBA alebo má `sklad === null` (Money nemá skladovú
- * kartu), by Money import TICHO preskočil (a Dominik potvrdil, že vtedy neodpíše CELÝ doklad).
- * Volajúci (`writeOdpis` pre live=1) na základe `!ok` blokuje. Keď snapshot nie je použiteľný
- * (chýba/zastaraný), vráti `ok=true`, `snapshotUsable=false` — NEblokuje naslepo, len degrade.
+ * PRE-export validácia položiek odpisu (#295) — brána pred zápisom do Money pre live=1: kód, ktorý by
+ * Money import TICHO preskočil (a Dominik potvrdil, že vtedy neodpíše CELÝ doklad), zablokuje zápis.
+ * Volajúci (`writeOdpis` pre live=1) na základe `!ok` blokuje (s auditovaným override).
+ *
+ * #599: zdrojom pravdy je Odoo `product.product` (katalóg syncovaný z Money, rovnaké `default_code`)
+ * — kód je platný, keď v Odoo existuje ako AKTÍVNY produkt. Odoo pokrýva CELÝ katalóg, takže sa
+ * validujú všetky rodiny (nie len prefixy snapshotu). Pri NEDOSTUPNOM Odoo (nenakonfigurované,
+ * chyba, timeout 3 s, 403) FALLBACK na snapshot validáciu nižšie + WARN pri výpadku — odpis sa NIKDY
+ * neblokuje len kvôli výpadku Odoo (snapshot fallback blokuje presne ako pred #599).
  */
-export function validateOdpisKody(polozky: { kod: string; nazov: string }[]): OdpisKodyValidacia {
+export async function validateOdpisKody(
+	polozky: { kod: string; nazov: string }[]
+): Promise<OdpisKodyValidacia> {
+	const katalog = await odooProduktyPreKody(polozky.map((p) => p.kod));
+	if (katalog.zdroj === 'odoo') {
+		const problemy: KodProblem[] = [];
+		for (const p of polozky) {
+			if (!p.kod || !p.kod.trim()) continue; // prázdny kód nemá čo overiť (ako mimo-scope snapshotu)
+			if (!katalog.produkty.has(p.kod)) problemy.push(neznamyKod(p));
+		}
+		if (problemy.length > 0)
+			log.info('validácia kódov (Odoo): kódy, ktoré Odoo katalóg nepozná', {
+				kody: problemy.map((p) => p.kod)
+			});
+		return {
+			ok: problemy.length === 0,
+			zdroj: 'odoo',
+			snapshotUsable: false,
+			snapshot: readSnapshotMetaFromDb(),
+			problemy
+		};
+	}
+	if (katalog.dovod === 'chyba')
+		log.warn('validácia kódov: Odoo katalóg nedostupný — fallback na Money snapshot', {
+			kody: polozky.length
+		});
+	else log.debug('validácia kódov: Odoo nenakonfigurované — Money snapshot');
+	return validateOdpisKodySnapshot(polozky);
+}
+
+/**
+ * Snapshot validácia (#295, fallback od #599): kód, ktorého PREFIX snapshot pokrýva, ale ktorý
+ * v snapshote CHÝBA alebo má `sklad === null` (Money nemá skladovú kartu) → problém. Keď snapshot
+ * nie je použiteľný (chýba/zastaraný), vráti `ok=true`, `snapshotUsable=false` — NEblokuje naslepo.
+ */
+function validateOdpisKodySnapshot(polozky: { kod: string; nazov: string }[]): OdpisKodyValidacia {
 	maybeImportSnapshot();
 	const snapshot = readSnapshotMetaFromDb();
 	const snapshotUsable =
@@ -492,12 +545,7 @@ export function validateOdpisKody(polozky: { kod: string; nazov: string }[]): Od
 			if (!prefixy.has(kodPrefix(p.kod))) continue; // mimo scope snapshotu — nevalidujeme
 			const price = getPriceRow(p.kod);
 			if (!price) {
-				problemy.push({
-					kod: p.kod,
-					nazov: p.nazov,
-					dovod: 'neznamy',
-					popis: `Money nepozná kód ${p.kod} — import by tento riadok (a možno celý doklad) preskočil.`
-				});
+				problemy.push(neznamyKod(p));
 			} else if (price.sklad === null) {
 				problemy.push({
 					kod: p.kod,
@@ -508,7 +556,7 @@ export function validateOdpisKody(polozky: { kod: string; nazov: string }[]): Od
 			}
 		}
 	}
-	return { ok: problemy.length === 0, snapshotUsable, snapshot, problemy };
+	return { ok: problemy.length === 0, zdroj: 'snapshot', snapshotUsable, snapshot, problemy };
 }
 
 export interface CenaZaM2 {
