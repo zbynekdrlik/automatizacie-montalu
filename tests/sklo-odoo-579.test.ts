@@ -99,14 +99,15 @@ describe('#579 fetchGlassTypes — hrúbka + duplicitný cenníkový kód', () =
 });
 
 describe('#579 jeden zdroj hrúbok per systém (sklo-povolene.ts)', () => {
-	it('tabuľka z designu: Robust 24, Slide 16+6, Deluxe 6/10 kalené, Štandardy 6+16+24', () => {
+	it('tabuľka z designu: Robust 24, Slide 16+6, Deluxe 6/10 kalené, Štandardy 4+6+16, Drevostavby 6+16+24', () => {
 		const mm = (s: string) => skloHrubkyPre(s).map((t) => `${t.mm}:${t.druh}`);
 		expect(mm('Robust')).toEqual(['24:izolacne']);
 		expect(mm('Slide')).toEqual(['16:izolacne', '6:jednoduche']);
 		expect(mm('Deluxe')).toEqual(['6:esg', '10:esg']);
-		// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché; Drevostavby bez zmeny
+		// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché; úloha 1218 (Patrik
+		// 29.9.: „Štandardy — 4, 6, 16 mm"): bez 24 mm izolačného; Drevostavby bez zmeny
 		for (const s of ['Štandard +', 'Štandard'])
-			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne', '4:jednoduche']);
+			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '4:jednoduche']);
 		expect(mm('Štandard Drevo')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
 		expect(skloHrubkyPre('Neznámy')).toEqual([]);
 	});
@@ -170,14 +171,15 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 			expect(o.vypocet).toBe(o.nazov.includes('10mm') ? 'Float kalené 10 mm' : 'Float kalené 6 mm');
 	});
 
-	it('Štandard plus: 16 mm LEN izolačné (VSG 88.2 nie), 24 mm izolačné, 6 mm jednosklá', async () => {
+	it('Štandard plus: 16 mm LEN izolačné (VSG 88.2 nie), bez 24 mm (úloha 1218), 6 mm jednosklá', async () => {
 		odooOn();
 		const p = await ponuka('Štandard +');
 		const mena = odooMena(p);
 		expect(mena).not.toContain('VSG 88.2');
 		expect(mena).toContain('Izolačné sklo 4/8/4- číre (Ug=1,1)');
 		expect(mena).toContain('IZOS DOUBLE 6-6-4');
-		expect(mena).toEqual(expect.arrayContaining(ROBUST_24_MM));
+		// Patrik 29.9. (Odoo úloha 1218): Štandardy 4, 6, 16 mm — žiadny 24 mm Odoo typ
+		for (const n of ROBUST_24_MM) expect(mena).not.toContain(n);
 		expect(mena).toContain('Float čirý 6mm');
 		expect(mena).toContain('VSG 33.1');
 		expect(mena).not.toContain('Float čirý 10mm');
@@ -188,11 +190,15 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 		expect(by('Float čirý 6mm').vypocet).toBe('Float sklo 6 mm');
 		expect(by('Drôtené sklo 6mm').vypocet).toBe('Float sklo 6 mm');
 		expect(by('IZOS DOUBLE 6-6-4').vypocet).toBe('Izolačné sklo 4/8/4 číre');
-		expect(by('IZOS DOUBLE 5ESG-14-5ESG').vypocet).toBe('Izolačné sklo 4/16/4 číre');
-		// stopsol (os povlaku matchera, #579 finding 1) nie je výpočtový zdroj čírych IZOS AL/TH ani 4/8/4
-		expect(by('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
-		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
 		expect(by('Izolačné sklo 4/8/4- číre (Ug=1,1)').vypocet).toBe('Izolačné sklo 4/8/4 číre');
+		// 24 mm Odoo typy — Drevostavby (rovnaký lokálny katalóg ako Štandard +, 24 mm povolené):
+		// stopsol (os povlaku matchera, #579 finding 1) nie je výpočtový zdroj čírych IZOS AL/TH
+		const dp = await ponuka('Štandard Drevo');
+		const dby = (n: string) => dp.skupiny.flatMap((g) => g.items).find((o) => o.nazov === n)!;
+		expect(odooMena(dp)).toEqual(expect.arrayContaining(ROBUST_24_MM));
+		expect(dby('IZOS DOUBLE 5ESG-14-5ESG').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(dby('IZOS DOUBLE 4-16-4 TH').vypocet).toBe('Izolačné sklo 4/16/4 číre');
+		expect(dby('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
 		// lokálne stopsol sa nespáruje na číre sklo (Odoo stopsol 4/8/4 neexistuje)
 		const items = (await fetchGlassTypes()).items;
 		expect(matchOdooGlassType('Izolačné sklo 4/8/4 stopsol', items).istota).toBe('ziadne');
@@ -240,7 +246,8 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 				pane_count: 'dvojsklo'
 			}
 		]);
-		const p = await ponuka('Štandard +');
+		// 24 mm izolačné má zo Štandardov len Drevostavby (úloha 1218) — rovnaký lokálny katalóg
+		const p = await ponuka('Štandard Drevo');
 		const by = (n: string) => p.skupiny.flatMap((g) => g.items).find((o) => o.nazov === n)!;
 		expect(by('IZOS DOUBLE 4-16-4 Stopsol').vypocet).toBe('Izolačné sklo 4/16/4 stopsol');
 		expect(by('IZOS DOUBLE 4-16-4 AL').vypocet).toBe('Izolačné sklo 4/16/4 číre');
@@ -262,11 +269,12 @@ describe('#579 ponuka „Sklo (základ)" z Odoo podľa hrúbky', () => {
 				pane_count: 'dvojsklo'
 			}
 		]);
+		// 24 mm izolačné má zo Štandardov len Drevostavby (úloha 1218) — rovnaký lokálny katalóg
 		const lok = [
-			...lokalne('Štandard +'),
+			...lokalne('Štandard Drevo'),
 			'Izolačné sklo 4/16/4 stopsol TH' // hypotetický druhý stopsol variant
 		];
-		const p = ponukaSkielPre('Štandard +', lok, await fetchGlassTypes());
+		const p = ponukaSkielPre('Štandard Drevo', lok, await fetchGlassTypes());
 		const o = p.skupiny
 			.flatMap((g) => g.items)
 			.find((x) => x.nazov === 'IZOS DOUBLE 4-16-4 Stopsol');

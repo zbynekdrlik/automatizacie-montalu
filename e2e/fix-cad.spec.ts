@@ -19,15 +19,15 @@ test('FIX prepínač režimov appka ↔ cad naviguje medzi /fix a /fix/cad', asy
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 	await goto(page, '/fix');
-	// obe karty prepínača sú na stránke, aktívna je „appka"
-	await expect(page.getByTestId('fix-rezim-appka')).toBeVisible();
-	await expect(page.getByTestId('fix-rezim-cad')).toBeVisible();
+	// karty režimov (#592: zdieľané PevneZasklenieKarty) sú na stránke, aktívna je „appka"
+	await expect(page.getByTestId('pevne-karta-fix')).toBeVisible();
+	await expect(page.getByTestId('pevne-karta-fix-cad')).toBeVisible();
 	// klik na „Fix z cadu" → /fix/cad, kde je CAD textarea
-	await page.getByTestId('fix-rezim-cad').click();
+	await page.getByTestId('pevne-karta-fix-cad').click();
 	await expect(page).toHaveURL(/\/fix\/cad$/);
 	await expect(page.getByLabel('Materiál (CAD nárez) *')).toBeVisible();
 	// späť na „Fix z appky" → /fix, kde je formulár rozmerov
-	await page.getByTestId('fix-rezim-appka').click();
+	await page.getByTestId('pevne-karta-fix').click();
 	await expect(page).toHaveURL(/\/fix$/);
 	await expect(page.getByLabel('Šírka (mm) *')).toBeVisible();
 	expect(consoleMsgs).toEqual([]);

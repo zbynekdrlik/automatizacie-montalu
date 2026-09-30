@@ -1,6 +1,6 @@
 <script lang="ts">
 	// Zdieľaný prepínač režimov pre ZASKLENIA a BAZÉN (#423) — vzor
-	// `PergolaModeNav.svelte`/`FixModeNav.svelte`. Owner (2.9.): pri zaskleniach a
+	// `PergolaModeNav.svelte`/`PevneZasklenieKarty.svelte`. Owner (2.9.): pri zaskleniach a
 	// bazéne majú byť tie isté veľké kachličky ako pri pergole — „normálny zápis do
 	// Money so všetkým" vs. „iba návrhový výkres" — namiesto malého redirect odkazu.
 	//

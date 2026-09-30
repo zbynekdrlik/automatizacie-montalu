@@ -6,6 +6,7 @@
 	import ClipNahlad from '$lib/components/ClipNahlad.svelte';
 	import RozpisRezov from '$lib/components/RozpisRezov.svelte';
 	import SklaPridaneBanner from '$lib/components/SklaPridaneBanner.svelte';
+	import PevneZasklenieKarty from '$lib/components/PevneZasklenieKarty.svelte';
 	import { resolve } from '$app/paths';
 	import {
 		popisTyp,
@@ -185,11 +186,13 @@
 {#if step === 'form'}
 	<div class="card">
 		<h1>Pevné zasklenie — Zábradlia (CLIP)</h1>
-		<p class="sub">
+		<p class="sub" style="margin-bottom:16px">
 			Zadaj rozmer zábradlia a počet výplní, rozpis si skontroluješ a upravíš pred odoslaním. Viac
 			zábradlí naraz pridáš tlačidlom „➕ Pridať zábradlie" — spočíta sa jeden spoločný odpis.
 			{#if !data.live}<b>Bežíme v 🧪 TEST režime — do Money nejde nič.</b>{/if}
 		</p>
+		<!-- #592: výber režimu „Pevné zasklenie" (Fix z appky / Fix z cadu / Zábradlia (CLIP)) -->
+		<PevneZasklenieKarty aktivna="/clip" />
 	</div>
 
 	{#if form?.error}

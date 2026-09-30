@@ -57,7 +57,10 @@ test('Štandard plus 3K ponúka 4 mm Float aj kalené (#579), nie 10 mm; predvol
 		'Float sklo 4 mm'
 	]);
 	expect(p.vypocty.filter((s) => /10 mm/.test(s))).toEqual([]);
-	expect(p.vypocty.some((s) => /^Izolačné sklo 4\/16\/4/.test(s))).toBe(true);
+	// IZO triedy 16 (4/8/4 = Odoo 16 mm izolačné) je v ponuke vždy — CI aj PROD. 24 mm izolačné
+	// (4/16/4) sa NEtvrdí: na PROD ho výroba pri Štandardoch odobrala (Odoo úloha 1218, 29.9.), CI
+	// lokálny allow-list ho ešte má — ponuka hrúbok je živá cfg, spec ju nesmie zamrznúť.
+	expect(p.vypocty.some((s) => /^Izolačné sklo 4\/8\/4/.test(s))).toBe(true);
 	await expectSklo(page.getByLabel(SKLO), 'Float sklo 6 mm');
 	expect(consoleMsgs).toEqual([]);
 });

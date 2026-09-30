@@ -51,7 +51,8 @@ Nikdy nepoužiť `--m-accent`/`--m-line` tam, kde patrí `-ink`/`-2` variant.
   Používaj ho pre muted TEXT na tónovanom podklade (mode-karta popis/foot); `--m-muted`
   ostáva pre muted text na bielej/neutrále.
 - **`.mode-*` prepínač tokenizovaný na `--m-*` bronz** (+ `.mode-grid.cols-2` modifikátor
-  pre 2-kartové navy — Fix). Konsolidované z per-komponent scoped CSS (#394).
+  pre 2-kartové navy — OdpisNavrhNav; `.mode-grid.pevne-karty` = 3 karty „Pevné zasklenie"
+  so zlomom pod sebou už pod 900px, #592). Konsolidované z per-komponent scoped CSS (#394).
 - **`.mono` adoptované** na článkové kódy `{o.kod}` v odpisových kartách
   (bazen/clip/pergola/fix-cad/zasklenia PlanKarty) — kód mono, názov body. Množstvá/ceny
   v result `.g`/`.row`/`<b>` ešte mono NEmajú (stage 3/4).
@@ -305,12 +306,13 @@ ak pribudne ďalší dropdown/menu:
   takže `<details open>` by inak ostalo nastavené aj po kliku na odkaz vnútri.
 - **`▾` glyf patrí do `<span aria-hidden="true">`**, nie priamo do textu triggera —
   inak si accessible name („Moduly ▾") nesie aj názov glyfu pre screen reader.
-- **Vnorená skupina v primárnej lište (#592 „Pevné zasklenie")** — `moduleLinks` nesie
-  namiesto odkazu ZNAČKOVÝ člen (`{ skupina: 'pevne' }`); `navLinks(list, vMenu)` ho na
-  desktope renderuje ako vnorený `<details class="nav-dropdown nav-pevne">` (testid
-  `pevne-menu-toggle`, ref `pevneEl` v `zavriMenu`), vo vnútri dropdown menu (Moduly pod
-  900px) ako podsekciu s nadpisom (`.nav-subgroup`, testid `modules-pevne-nadpis`) — NIKDY
-  `<details>` v `<details>` v mobilnom menu. Voľby + aktívny stav celej vetvy (`/fix*`,
-  `/clip*`) žijú v `$lib/nav-pevne-zasklenie.ts` (unit test). Ďalší typ pevného zasklenia =
-  riadok v `PEVNE_ZASKLENIE_LINKS`. E2E: `openPevneZasklenie(page)` (otvára len zatvorené) a
-  voľby hľadaj v `nav.top` s `exact: true` — karty `FixModeNav` nesú podobný text.
+- **Výber režimu NEPATRÍ do lišty — patrí na stránku ako veľké karty (#592, owner 30.9.:
+  „nemalo to byť cez ten dropdown, ale cez tie obdĺžniky veľké nižšie").** 0.25.55 dal
+  „Pevné zasklenie" ako vnorený dropdown v lište — zlé čítanie zadania, zrušené. Dnes: v
+  lište JEDEN obyčajný odkaz `PEVNE_ZASKLENIE_NAV` (→ /fix), aktívny na celej vetve
+  (`jeAktivny` → `jePevneZasklenie`, /fix* aj /clip*); pod 900px je to jedna položka v
+  „Moduly". Tri režimy = zdieľaný `PevneZasklenieKarty.svelte` (dáta `PEVNE_ZASKLENIE_KARTY`)
+  pod nadpisom na /fix, /fix/cad aj /clip. Keď zadanie hovorí „pridať kolónku/voľbu" k
+  existujúcim kartám na stránke, rozširuj KARTY, nie navigáciu. E2E: `openPevneZasklenie(page)`
+  klikne odkaz v `nav.top .nav-modules-flat` a počká na karty; karty cez testid
+  `pevne-karta-fix|fix-cad|clip`.

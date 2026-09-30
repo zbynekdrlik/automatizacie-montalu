@@ -94,24 +94,20 @@ const hrubky = (d: Database.Database, system: string) =>
 describe('migration → v54 (4 mm jednoduché pre Štandardy, #579)', () => {
 	it('bumpne na v54', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(55);
+		expect(d.pragma('user_version', { simple: true })).toBe(56);
 		d.close();
 	});
 
+	// migrate() beží po hlavu: v56 (úloha 1218) potom zo Štandardov odoberie 24 mm izolačné
 	it('Štandard + dostane 4 mm jednoduché (na koniec, existujúce riadky nezmenené)', () => {
 		const d = new Database(dbPath);
-		expect(hrubky(d, 'Štandard +')).toEqual([
-			'6:jednoduche',
-			'16:izolacne',
-			'24:izolacne',
-			'4:jednoduche'
-		]);
+		expect(hrubky(d, 'Štandard +')).toEqual(['6:jednoduche', '16:izolacne', '4:jednoduche']);
 		d.close();
 	});
 
 	it('riadok upravený výrobou (starý Štandard 4 mm len kalené) sa NEprepíše ani nezdvojí', () => {
 		const d = new Database(dbPath);
-		expect(hrubky(d, 'Štandard')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne', '4:esg']);
+		expect(hrubky(d, 'Štandard')).toEqual(['6:jednoduche', '16:izolacne', '4:esg']);
 		d.close();
 	});
 

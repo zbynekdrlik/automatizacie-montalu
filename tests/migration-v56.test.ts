@@ -1,19 +1,20 @@
-// #593 (Odoo úloha 1214, Marek 29.9.: „tu maju byt skla v clip 6mm a 16mm"): migrácia v54 → v55
-// doplní povolené hrúbky Odoo skiel pre CLIP zábradlie do `cfg_sklo_hrubka` — 6 mm jednoduché
-// (šablóna klasika) a 16 mm izolačné (šablóna IZO). LEN chýbajúce riadky (INSERT OR IGNORE);
-// ostatné systémy bez zmeny. Money-NEUTRÁLNE (mení sa len ponuka výplne na /clip).
+// Odoo úloha 1218 (Patrik 29.9., msg 1872179: „Štandardy — 4, 6, 16 mm"): výroba v PROD editore
+// hrúbok odobrala 24 mm izolačné pri Štandard + a starom Štandarde (cfg_audit 76/77). Migrácia
+// v55 → v56 zosúladí KAŽDÚ DB (čerstvú, CI, zálohu) s touto špecifikáciou — zmaže LEN riadky
+// (Štandard +, 24, izolacne) a (Štandard, 24, izolacne), ak existujú (na PROD no-op). Drevostavby
+// a ostatné systémy bez zmeny. Money-NEUTRÁLNE (mení sa len ponuka Odoo skiel nárezáka).
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v55-test-'));
-const dbPath = path.join(tmpRoot, 'v54.db');
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v56-test-'));
+const dbPath = path.join(tmpRoot, 'v55.db');
 
 {
-	const v54 = new Database(dbPath);
-	v54.exec(`
+	const v55 = new Database(dbPath);
+	v55.exec(`
 		CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), role TEXT NOT NULL DEFAULT 'internal');
 		CREATE TABLE cfg_sys (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL UNIQUE, n INTEGER NOT NULL, sklo_offset REAL NOT NULL);
 		CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL DEFAULT '', dim TEXT NOT NULL DEFAULT 'S', koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks INTEGER NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500, sklo_hrubka INTEGER NOT NULL DEFAULT 0);
@@ -67,17 +68,20 @@ const dbPath = path.join(tmpRoot, 'v54.db');
 			druh TEXT NOT NULL CHECK (druh IN ('izolacne', 'jednoduche', 'esg')),
 			UNIQUE (system, mm)
 		);
-		-- stav PROD po v54 (bez CLIP); prípad „CLIP riadok už existuje" (INSERT OR IGNORE na
-		-- UNIQUE(system, mm) ho NESMIE prepísať) stavia až posledný test nižšie
+		-- stav PRED 29.9. (seed v52 + v54 + v55): Štandard + a Štandard ešte s 24 mm izolačným;
+		-- Štandard Drevo 24 mm MUSÍ ostať (Patrik menil len Štandardy)
 		INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES
 			('Robust', 24, 'izolacne'),
+			('Slide', 16, 'izolacne'), ('Slide', 6, 'jednoduche'),
+			('Deluxe', 6, 'esg'), ('Deluxe', 10, 'esg'),
 			('Štandard +', 6, 'jednoduche'), ('Štandard +', 16, 'izolacne'), ('Štandard +', 24, 'izolacne'),
 			('Štandard', 6, 'jednoduche'), ('Štandard', 16, 'izolacne'), ('Štandard', 24, 'izolacne'),
+			('Štandard Drevo', 6, 'jednoduche'), ('Štandard Drevo', 16, 'izolacne'), ('Štandard Drevo', 24, 'izolacne'),
 			('Štandard +', 4, 'jednoduche'), ('Štandard', 4, 'jednoduche'),
-			('Štandard Drevo', 6, 'jednoduche'), ('Štandard Drevo', 16, 'izolacne'), ('Štandard Drevo', 24, 'izolacne');
-		PRAGMA user_version = 54;
+			('CLIP', 6, 'jednoduche'), ('CLIP', 16, 'izolacne');
+		PRAGMA user_version = 55;
 	`);
-	v54.close();
+	v55.close();
 }
 
 process.env.DATABASE_PATH = dbPath;
@@ -91,55 +95,58 @@ const hrubky = (d: Database.Database, system: string) =>
 		}[]
 	).map((r) => `${r.mm}:${r.druh}`);
 
-describe('migration → v55 (CLIP 6 mm jednoduché + 16 mm izolačné, #593)', () => {
-	it('bumpne na v55', () => {
+describe('migration → v56 (Štandardy bez 24 mm izolačného, Odoo úloha 1218)', () => {
+	it('bumpne na v56', () => {
 		const d = new Database(dbPath);
 		expect(d.pragma('user_version', { simple: true })).toBe(56);
 		d.close();
 	});
 
-	it('CLIP dostane 6 mm jednoduché + 16 mm izolačné na koniec tabuľky', () => {
+	it('Štandard + a starý Štandard = 4, 6, 16 mm (bez 24 mm izolačného)', () => {
 		const d = new Database(dbPath);
-		expect(hrubky(d, 'CLIP')).toEqual(['6:jednoduche', '16:izolacne']);
-		const posledne = d
-			.prepare('SELECT system FROM cfg_sklo_hrubka ORDER BY id DESC LIMIT 2')
-			.all() as { system: string }[];
-		expect(posledne.map((r) => r.system)).toEqual(['CLIP', 'CLIP']);
+		for (const s of ['Štandard +', 'Štandard'])
+			expect(hrubky(d, s)).toEqual(['6:jednoduche', '16:izolacne', '4:jednoduche']);
 		d.close();
 	});
 
-	it('ostatné systémy bez zmeny', () => {
+	it('Drevostavby a ostatné systémy bez zmeny', () => {
 		const d = new Database(dbPath);
-		// v56 (úloha 1218) potom zo Štandardov odoberie 24 mm izolačné (migrate() beží po hlavu)
-		expect(hrubky(d, 'Štandard')).toEqual(['6:jednoduche', '16:izolacne', '4:jednoduche']);
-		expect(hrubky(d, 'Robust')).toEqual(['24:izolacne']);
 		expect(hrubky(d, 'Štandard Drevo')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
+		expect(hrubky(d, 'Robust')).toEqual(['24:izolacne']);
+		expect(hrubky(d, 'Slide')).toEqual(['16:izolacne', '6:jednoduche']);
+		expect(hrubky(d, 'Deluxe')).toEqual(['6:esg', '10:esg']);
+		expect(hrubky(d, 'CLIP')).toEqual(['6:jednoduche', '16:izolacne']);
 		d.close();
 	});
 
-	it('existujúci CLIP riadok (systém, mm) sa NEprepíše ani nezdvojí', () => {
+	it('zmaže LEN izolačné 24 mm — 24 mm iného druhu (nastavené výrobou) ostane; druhý beh no-op', async () => {
 		const d = new Database(dbPath);
-		d.prepare('DELETE FROM cfg_sklo_hrubka WHERE system = ?').run('CLIP');
-		d.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)').run(
-			'CLIP',
-			6,
-			'esg'
-		);
-		d.pragma('user_version = 54');
+		const ins = d.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)');
+		ins.run('Štandard', 24, 'jednoduche');
+		ins.run('Štandard +', 24, 'izolacne');
+		d.pragma('user_version = 55');
 		d.close();
-		return import('../src/lib/server/migracie-clip-sklo-hrubky').then(
-			({ migrateClipSkloHrubky }) => {
-				const d2 = new Database(dbPath);
-				migrateClipSkloHrubky(d2, (v) => d2.pragma(`user_version = ${v}`));
-				expect(hrubky(d2, 'CLIP')).toEqual(['6:esg', '16:izolacne']);
-				expect(d2.pragma('user_version', { simple: true })).toBe(55);
-				// druhý beh je no-op (guard >= 55)
-				migrateClipSkloHrubky(d2, () => {
-					throw new Error('nemal bumpnúť');
-				});
-				expect(hrubky(d2, 'CLIP')).toEqual(['6:esg', '16:izolacne']);
-				d2.close();
-			}
+		const { migrateStandardyBez24mm } = await import('../src/lib/server/migracie-sklo-hrubky-24mm');
+		const d2 = new Database(dbPath);
+		migrateStandardyBez24mm(d2, (v) => d2.pragma(`user_version = ${v}`));
+		expect(hrubky(d2, 'Štandard +')).toEqual(['6:jednoduche', '16:izolacne', '4:jednoduche']);
+		expect(hrubky(d2, 'Štandard')).toEqual([
+			'6:jednoduche',
+			'16:izolacne',
+			'4:jednoduche',
+			'24:jednoduche'
+		]);
+		expect(d2.pragma('user_version', { simple: true })).toBe(56);
+		// druhý beh je no-op (guard >= 56) — neskoršie rozhodnutie výroby v editore sa neprepíše
+		d2.prepare('INSERT INTO cfg_sklo_hrubka (system, mm, druh) VALUES (?, ?, ?)').run(
+			'Štandard +',
+			24,
+			'izolacne'
 		);
+		migrateStandardyBez24mm(d2, () => {
+			throw new Error('nemal bumpnúť');
+		});
+		expect(hrubky(d2, 'Štandard +')).toContain('24:izolacne');
+		d2.close();
 	});
 });

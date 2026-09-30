@@ -421,8 +421,9 @@ objaviť bez releasu). Hrúbka je SPOJKA medzi Odoo a výpočtom — výpočtov�
 - **Jeden zdroj hrúbok per systém = SQLite `cfg_sklo_hrubka(id, system, mm, druh)`** (#579 časť 2,
   Odoo úloha 1180: „Povolené hrúbky pri systéme si nastaví výroba"; migrácia v52, `UNIQUE(system,
   mm)`, CHECK druh/mm>0). Seed = `ODOO_HRUBKY_SEED` v `src/lib/sklo-povolene.ts` (Robust 24
-  izolačné; Slide 16 izolačné + 6 jednoduché; Deluxe 6/10 LEN `esg`; Štandard + / starý Štandard /
-  Drevostavby 6 jednoduché + 16 a 24 izolačné; Štandard + a starý Štandard od v54 aj 4 jednoduché)
+  izolačné; Slide 16 izolačné + 6 jednoduché; Deluxe 6/10 LEN `esg`; Drevostavby 6 jednoduché + 16
+  a 24 izolačné; Štandard + a starý Štandard 6 jednoduché + 16 izolačné + od v54 aj 4 jednoduché — BEZ
+  24 mm od v56, Patrik 29.9. v Odoo úlohe 1218: „Štandardy — 4, 6, 16 mm", pozri sekciu nižšie)
   — konštanta je LEN seed, živé hodnoty číta
   `src/lib/server/sklo-hrubky.ts` (`skloHrubkyPre`, cache invalidovaná pri zápise). Výroba ich mení
   v `/zasklenia/nastavenia` (karta „Povolené hrúbky skla z Odoo", akcie `pridatHrubku` /
@@ -563,3 +564,21 @@ neponúka (`systemyZoStylov`). `ponukaSkielClip` (`clip-sklo.ts`) reuse-uje `pon
 reprezentatívnou lokálnou ponukou (`Izolačné sklo 4/8/4 číre`, `Float sklo 6 mm`) a výpočtové sklo
 premapuje na šablónu CLIP — detail v `clip.md` (#593). Zmena vzorov `vypocetneSkloPre` / správania
 `ponukaSkielPre` sa CLIP-u dotkne → stráži `tests/clip-sklo-593.test.ts`.
+
+## Štandardy = 4, 6, 16 mm — bez 24 mm izolačného (#577, Odoo úloha 1218, v56)
+
+Patrik (msg 1872179, 29.9.): Štandard + a starý Štandard ponúkajú Odoo sklá LEN 4, 6, 16 mm; výroba
+24 mm izolačné pri nich odobrala priamo v PROD editore hrúbok (cfg_audit 76/77). Seed
+`ODOO_HRUBKY_SEED` (`STANDARDY` vs `DREVOSTAVBY`) + migrácia v56 to zosúladili pre každú DB. Drevostavby
+24 mm MAJÚ ďalej. Snapshot `sklo-odoo-579` stratil LEN 24 mm voľby Štandard/Štandard + (žiadna
+ostávajúca voľba nezmenila výpočtové sklo); matcher prípady 24 mm Odoo typov (AL/TH/5ESG, stopsol) sa
+v unit testoch presunuli na Drevostavby (rovnaký lokálny katalóg `Štandard +`).
+
+- **Lokálny allow-list `POVOLENE_SKLA['Štandard +']` (záloha bez Odoo) sa NEMENIL** — ponúka ďalej aj
+  4/16/4 (trieda 16, IZO nárezák ten istý). CI (bez Odoo) teda 4/16/4 pri Štandard + ponúka, PROD (Odoo)
+  nie. E2E preto NIKDY netvrdí 4/16/4 pri Štandardoch — IZO nárezák Štandardov vyberá relačne triedu 16
+  cez „Izolačné sklo 4/8/4 číre" (`opona-izo.spec.ts`, `sklo-povolene-573.spec.ts`; testing.md).
+  Zúženie lokálnej zálohy (bez 4/16/4 pri Štandardoch) je produktové rozhodnutie mimo rozsahu #577 —
+  kandidát nahlásený supervízorovi komentárom „Follow-up kandidát" na #577.
+- 4/8/4 a 4/16/4 pri Štandard + = `hrubka_trieda` 16, `redukcia_zero` 0, bez per-sklo korekcie (overené
+  aj na PROD 30.9.) → nárez/Money identické; zmena výberu skla v E2E opona IZO nemení Excel 1:1 čísla.
