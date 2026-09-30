@@ -632,7 +632,9 @@ deploy zlyhal 2/319 (`sietka-jokle` 1457/2094 vs PROD 1460/2097; `sietka-jokle-r
   spusti dev cez dočasný `vite.tmpN.config.ts` = `mergeConfig(base, { server: { fs: { allow:
   ['<rodičovské repo>/node_modules'] } } })` (`npx vite dev --config vite.tmpN.config.ts --port 4173
   --strictPort` vo webServer.command dočasného playwright configu, s `executablePath` podľa bodu
-  vyššie), obe dočasné súbory po behu zmaž.
+  vyššie), obe dočasné súbory po behu zmaž. Jednoduchšia alternatíva (#592 karty): `npm ci` priamo
+  vo worktree — `node_modules` je potom v allow liste worktree, stačí len dočasný playwright config
+  (`npx vite dev --port N --strictPort`), fonty idú 200 a zero-console prejde.
 - **Podklad objednávky skla: každá položka = 2× `tbody tr`** (riadok + riadok volieb) → počítaj
   položky cez `span[data-testid^="popis-"]` (od #594 je popis `<span>` v bunke popisu vedľa
   `pridal-<id>` „pridal <autor> · <čas>"), nie `tbody tr`.

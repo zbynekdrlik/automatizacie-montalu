@@ -2209,3 +2209,4 @@ impl 22e67aa → review-fixy 15fdc23. Čisto prezentačné (nula logiky/rout/dat
   Plný beh 4128 testov zelený, coverage 94.8/88.11/97.03/95.79 (prahy 94/88/95/95).
 - **Post-deploy (supervízor):** backfill `--days 30 --live` re-attach PDF idempotentne (doc_id → nová verzia).
 - Commity: c08978c (grafický PDF) → 4760c9c (backfill attach) → d665ac6 (v2) → 9c2ae3b (E2E). Version 0.25.24.
+- #592 (reopen, ROZHODNUTÉ 30.9. „1") 0.25.59-dev.1 — „Pevné zasklenie" v lište = jeden odkaz → /fix (dropdown z 0.25.55 zrušený), výber režimu = 3 karty `PevneZasklenieKarty.svelte` (Fix z appky / Fix z cadu / Zábradlia (CLIP)) na /fix, /fix/cad, /clip, pod 900px pod sebou; FixModeNav nahradený. RED c021369 (tests/nav-pevne-zasklenie.test.ts) → GREEN d34e4ea, review b2d0a86 (href-compare, aria-current). E2E e2e/pevne-zasklenie-nav.spec.ts 3/3 cez vite dev. Integruje main.
