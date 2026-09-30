@@ -769,8 +769,13 @@ export async function skladoveVarovania(
 		// inak spravila FALOŠNÉ varovanie pri koncepčne ROVNOM sklade (design: presná rovnosť = žiadne
 		// varovanie). Vzor `round2` v `enrichPolozky` — tam sa súčty tiež zaokrúhľujú pred zobrazením.
 		const mnozstvo = Math.round(rawMnozstvo * 1000) / 1000;
-		const zOdoo = odoo.zdroj === 'odoo' ? odoo.sklad.get(kod) : undefined;
 		const zSnapshotu = ajSnapshot ? (getPriceRow(kod)?.sklad ?? null) : null;
+		// review #599: produkt, ktorý Odoo sleduje, ale nemá v ňom ŽIADNY interný kvant, je pri známom
+		// Money sklade „neznámy", nie 0 — Odoo dnes Money nezrkadlí a falošné varovanie by viedlo k
+		// odobratiu reálneho materiálu z odpisu. Bez Money hodnoty (po cute) ostáva Odoo 0.
+		const bezKvantovAleMoneyVie =
+			odoo.zdroj === 'odoo' && odoo.bezKvantov.has(kod) && zSnapshotu !== null;
+		const zOdoo = odoo.zdroj === 'odoo' && !bezKvantovAleMoneyVie ? odoo.sklad.get(kod) : undefined;
 		const kandidati: { sklad: number; zdroj: SkladVarovanie['zdroj'] }[] = [];
 		if (zOdoo !== undefined) kandidati.push({ sklad: zOdoo, zdroj: 'odoo' });
 		if (zSnapshotu !== null) kandidati.push({ sklad: zSnapshotu, zdroj: 'snapshot' });

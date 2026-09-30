@@ -62,9 +62,16 @@ export type OdooKatalogVysledok =
 
 export type OdooSkladVysledok =
 	/** Odoo odpovedalo: `sklad` = súčet interných kvantov (zaokr. na 3 desatinné) LEN pre kódy, ktoré
-	 *  Odoo pozná A sleduje skladom (`is_storable`); sledovaný produkt bez kvantov = 0. Kód, ktorý
-	 *  Odoo nepozná / nesleduje, v mape NIE JE (stav neznámy — rozhodne volajúci). */
-	{ zdroj: 'odoo'; sklad: Map<string, number> } | Nedostupne;
+	 *  Odoo pozná A sleduje skladom (`is_storable`); sledovaný produkt bez kvantov = 0 a je aj v
+	 *  `bezKvantov` (review #599: kým Odoo Money nezrkadlí, volajúci ho môže brať ako neznámy). Kód,
+	 *  ktorý Odoo nepozná / nesleduje, v mape NIE JE (stav neznámy — rozhodne volajúci). */
+	{ zdroj: 'odoo'; sklad: Map<string, number>; bezKvantov: Set<string> } | Nedostupne;
+
+/** Stav skladu jedného kódu v cache: súčet interných kvantov + či Odoo nemá žiadny kvant. */
+interface SkladRiadok {
+	sklad: number;
+	bezKvantov: boolean;
+}
 
 /** Odoo char pole → string (`false`/`null` = prázdne; pasca #551 v `glass-catalog.md`). */
 function s(v: unknown): string {
@@ -85,7 +92,8 @@ function m2oId(v: unknown): number | null {
 /**
  * Per-kód cache jedného Odoo readu: platnosť `ttlMs` pri úspechu (aj „Odoo kód nepozná" = `null`),
  * pri chybe globálna nedostupnosť `FALLBACK_TTL_MS` (počas nej sa Odoo NEvolá), single-flight a warn
- * raz za výpadok. `nacitaj` vráti hodnoty LEN pre nájdené kódy a pri chybe HÁDŽE; `ziskaj` nehádže.
+ * raz za výpadok. `nacitaj` vráti hodnoty LEN pre nájdené kódy a pri chybe HÁDŽE; `zabezpec` a
+ * `hodnota` nehádžu.
  */
 class KodCache<T> {
 	private cache = new Map<string, { v: T | null; exp: number }>();
@@ -200,7 +208,7 @@ const _katalog = new KodCache<ProduktRiadok>(
 	}
 );
 
-const _sklad = new KodCache<number>(QUANT_MODEL, SKLAD_TTL_MS, async (kody, timeoutMs) => {
+const _sklad = new KodCache<SkladRiadok>(QUANT_MODEL, SKLAD_TTL_MS, async (kody, timeoutMs) => {
 	const cfg = odooJson2Config()!;
 	// kódy sem idú LEN sledované skladom a nájdené v katalógu (odooSkladPreKody) — id z jeho cache
 	const kodPreId = new Map<number, string>();
@@ -208,6 +216,8 @@ const _sklad = new KodCache<number>(QUANT_MODEL, SKLAD_TTL_MS, async (kody, time
 		const id = _katalog.hodnota(kod)?.id;
 		if (id) kodPreId.set(id, kod);
 	}
+	// žiadne použiteľné id (katalóg bez `id`) → nie je čo čítať, kódy ostanú „neznáme"
+	if (kodPreId.size === 0) return new Map<string, SkladRiadok>();
 	const rows = await searchReadJson2(
 		cfg,
 		QUANT_MODEL,
@@ -218,16 +228,23 @@ const _sklad = new KodCache<number>(QUANT_MODEL, SKLAD_TTL_MS, async (kody, time
 		QUANT_FIELDS,
 		{ timeoutMs }
 	);
-	// sledovaný produkt bez kvantov = 0 (nič na sklade), nie „neznámy"
-	const sucet = new Map<string, number>([...kodPreId.values()].map((k) => [k, 0]));
+	// sledovaný produkt bez kvantov = 0 (Odoo nemá nič na sklade) + príznak `bezKvantov`
+	const sucet = new Map<string, SkladRiadok>(
+		[...kodPreId.values()].map((k) => [k, { sklad: 0, bezKvantov: true }])
+	);
 	for (const r of rows) {
 		const kod = kodPreId.get(m2oId(r.product_id) ?? -1);
 		const q = typeof r.quantity === 'number' && Number.isFinite(r.quantity) ? r.quantity : 0;
-		if (kod) sucet.set(kod, (sucet.get(kod) ?? 0) + q);
+		const s = kod ? sucet.get(kod) : undefined;
+		if (kod && s) sucet.set(kod, { sklad: s.sklad + q, bezKvantov: false });
 	}
 	// zaokrúhli na 3 desatinné — FP akumulácia (0,1 + 0,2) by inak dala falošné varovanie
-	for (const [kod, v] of sucet) sucet.set(kod, Math.round(v * 1000) / 1000);
-	log.debug('stock.quant read OK', { produkty: kodPreId.size, kvanty: rows.length });
+	for (const [kod, v] of sucet) sucet.set(kod, { ...v, sklad: Math.round(v.sklad * 1000) / 1000 });
+	log.debug('stock.quant read OK', {
+		produkty: kodPreId.size,
+		kvanty: rows.length,
+		bezKvantov: [...sucet].filter(([, v]) => v.bezKvantov).map(([k]) => k)
+	});
 	return sucet;
 });
 
@@ -279,9 +296,12 @@ export async function odooSkladPreKody(
 	if (!(await _sklad.zabezpec(sledovane, opts.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS)))
 		return { zdroj: 'nedostupne', dovod: 'chyba' };
 	const sklad = new Map<string, number>();
+	const bezKvantov = new Set<string>();
 	for (const kod of sledovane) {
 		const v = _sklad.hodnota(kod);
-		if (v !== null) sklad.set(kod, v);
+		if (v === null) continue;
+		sklad.set(kod, v.sklad);
+		if (v.bezKvantov) bezKvantov.add(kod);
 	}
-	return { zdroj: 'odoo', sklad };
+	return { zdroj: 'odoo', sklad, bezKvantov };
 }

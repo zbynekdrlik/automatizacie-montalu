@@ -94,6 +94,14 @@
 				>celý</b
 			> ticho zahodí — žiadna chybová hláška, doklad nevznikne. Môžeš ich odobrať a odpísať bez nich.
 		</p>
+		{#if varovania.some((v) => v.zdroj === 'odoo')}
+			<!-- review #599: pri zdroji Odoo nedostatok hlási Odoo sklad — do prechodu skladu na Odoo ho
+			     Money nemusí mať rovnaký (Odoo Money zatiaľ nezrkadlí), tvrdenie o zahodení nemusí platiť -->
+			<p class="sklad-blok-popis" data-testid={`${testid}-odoo-pozn`}>
+				Pri položkách označených <b>Odoo</b> hlási nedostatok sklad v Odoo. Kým sa sklad neprepne na Odoo,
+				Money môže mať iný stav — pred odobratím over skutočný stav na sklade.
+			</p>
+		{/if}
 		<ul class="sklad-blok-zoznam">
 			{#each varovania as v (v.kod)}
 				<li data-testid={`${testid}-${v.kod}`} class:odobrata={odobrate.has(v.kod)}>

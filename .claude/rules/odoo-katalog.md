@@ -62,7 +62,10 @@ read-only sondou v PROD kontajneri (vzor nižšie).
   nedávnu spotrebu (ZASP00024 Money 440.35 / Odoo 470.35), výnimočne nižšie (ZASP00033 2982.5 /
   982.5). Preto `ceny.ts` `skladoveVarovania` kým je snapshot čerstvý (≤ 7 dní) berie NIŽŠIU z
   hodnôt (Money pri nedostatku ticho zahodí celý doklad — čisté Odoo by varovanie stratilo); po cute
-  (snapshot zastará) ostane čisté Odoo. Odoo nedostupné → snapshot ako pred #599. Varovanie nesie
+  (snapshot zastará) ostane čisté Odoo. **Sledovaný produkt BEZ interných kvantov** (`bezKvantov`)
+  sa pri známej Money hodnote berie ako NEZNÁMY, nie 0 (review #599: inak falošné varovanie →
+  „Odobrať z odpisu" reálneho materiálu); bez Money hodnoty ostáva Odoo 0. Pri zhode hodnôt vyhráva
+  `zdroj: 'odoo'`. Odoo nedostupné → snapshot ako pred #599. Varovanie nesie
   `zdroj: 'odoo' | 'snapshot'`, `SkladVarovania` ho ukáže (`sklad-varovania-zdroj`, per položka
   `sklad-varovania-<kod>-zdroj`).
 - `skladoveVarovania` je **async** — volajúci (zasklenia, cad-odpis = pergola + fix/cad, bazén, clip,

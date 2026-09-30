@@ -51,7 +51,9 @@ funkčnou cestou. Na moduloch S `qty_` inputmi fungujú OBA (belt-and-suspenders
   nezrkadlí — detail + čísla v `odoo-katalog.md`); Odoo nedostupné → snapshot. Každé varovanie nesie
   `zdroj`; komponent ukáže hlavičku `data-testid="<testid>-zdroj"` („sklad: Odoo, aktuálny stav" /
   „sklad: Money snapshot k D.M.YYYY" / zmiešané „— platí nižší") a per položku `<testid>-<kod>-zdroj`
-  (`Odoo` / `Money`). `snapshotDatum` prop ostáva (dátum pre Money zdroj).
+  (`Odoo` / `Money`). `snapshotDatum` prop ostáva (dátum pre Money zdroj). Keď je aspoň jedna
+  položka zo zdroja Odoo, pribudne poznámka `<testid>-odoo-pozn` (nedostatok hlási Odoo, Money môže
+  mať iný stav — tvrdenie „Money zahodí" platí naisto len pre zdroj Money).
 - CI nemá Odoo → E2E vždy zdroj `Money`; Odoo vetva je krytá unit testami (`tests/odoo-sklad-599`,
   SSR render `tests/sklad-varovania-zdroj-599`).
 
