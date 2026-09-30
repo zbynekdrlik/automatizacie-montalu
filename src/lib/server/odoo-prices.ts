@@ -18,6 +18,7 @@
 import { logger } from './log';
 import { callJson2, odooJson2Config, searchReadJson2, OdooJson2Error } from './odoo-json2';
 import { KodCache } from './odoo-kod-cache';
+import { hodnotyOdooTypov } from './glass-match';
 
 const log = logger('odoo-prices');
 
@@ -143,25 +144,19 @@ const _skloCeny = new KodCache<Map<string, number | null>>(
 			['name', 'cennik_code', 'price_m2'],
 			{ timeoutMs }
 		);
-		const typy = rows.map((r) => ({
-			nazov: s(r.name),
-			kod: s(r.cennik_code),
-			// 0 = karta nemá riadok dodávateľa skla / nie je v Sklo IZOS → neznáma (nie 0 €)
-			cena: typeof r.price_m2 === 'number' && r.price_m2 > 0 ? r.price_m2 : null
-		}));
-		// kľúč = TÁ ISTÁ `value`, akú odvodí picker (`odoo-glass-types.ts`): `cennik_code || name`,
-		// a kód zdieľaný viacerými typmi → `name` (#579). Rovnaký názov s rôznym kódom (rámik AL/TH)
-		// tak nesie každý svoju cenu (review #599).
-		const pocetKodu = new Map<string, number>();
-		for (const t of typy) if (t.kod) pocetKodu.set(t.kod, (pocetKodu.get(t.kod) ?? 0) + 1);
-		const ceny = new Map<string, number | null>();
-		for (const t of typy) {
-			const hodnota = t.kod && pocetKodu.get(t.kod) === 1 ? t.kod : t.nazov;
-			if (!hodnota) continue;
-			// ten istý kľúč s INOU cenou = nejednoznačné → neznáma (nikdy tichý výber)
-			if (ceny.has(hodnota) && ceny.get(hodnota) !== t.cena) ceny.set(hodnota, null);
-			else ceny.set(hodnota, t.cena);
-		}
+		const typy = rows
+			.map((r) => ({
+				value: s(r.cennik_code) || s(r.name),
+				name: s(r.name),
+				// 0 = karta nemá riadok dodávateľa skla / nie je v Sklo IZOS → neznáma (nie 0 €)
+				cena: typeof r.price_m2 === 'number' && r.price_m2 > 0 ? r.price_m2 : null
+			}))
+			.filter((t) => t.value !== '');
+		// kľúč = TÁ ISTÁ `value`, akú dostane typ v pickeri — ZDIEĽANÉ pravidlo `hodnotyOdooTypov`
+		// (review #599): rovnaký názov s rôznym kódom (rámik AL/TH) nesie každý svoju cenu
+		const ceny = new Map<string, number | null>(
+			hodnotyOdooTypov(typy).items.map((t) => [t.value, t.cena])
+		);
 		log.debug('price_m2 OK', { typy: ceny.size });
 		return new Map([[SKLO_KLUC, ceny]]);
 	},

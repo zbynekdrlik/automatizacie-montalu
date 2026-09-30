@@ -1,6 +1,6 @@
 // Cenový zoznam odpísaného materiálu k zákazke (#154, časti 1+2). Read-only
-// agregácia uložených odoslaných odpisov zákazky (zakazka-ceny.ts) + denný Money
-// cenový snapshot (enrichPolozky) + Money readback (overenie, že odpisy reálne
+// agregácia uložených odoslaných odpisov zákazky (zakazka-ceny.ts) + ceny cez
+// enrichPolozky (#599: Odoo, inak denný Money snapshot) + Money readback (overenie, že odpisy reálne
 // prešli). b2b sa sem NIKDY nedostane (celý /odpisy prefix je denylistovaný
 // v b2b-access.ts) a appka vyžaduje prihlásenie na každú inú stránku — ďalší
 // guard tu nie je potrebný (rovnaká úvaha ako /odpisy/[id]).
