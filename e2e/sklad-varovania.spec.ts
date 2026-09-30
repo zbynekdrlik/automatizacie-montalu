@@ -66,6 +66,9 @@ test('sklad=0: upozornenie sa zobrazi s kodom + cislami, odobrat nastavi qty na 
 	await expect(polozka).toContainText(KOD_SKLAD_0);
 	await expect(polozka).toContainText('sklad 0');
 	await expect(polozka).toContainText('požadované');
+	// #599: zdroj skladu je viditeľný — CI nemá Odoo → Money snapshot (s dátumom snapshotu)
+	await expect(page.getByTestId('sklad-varovania-zdroj')).toContainText('Money snapshot');
+	await expect(page.getByTestId(`sklad-varovania-${KOD_SKLAD_0}-zdroj`)).toHaveText('Money');
 
 	// klik "Odobrat z odpisu" → qty input na 0 + vizualne oznacenie "Odobrana"
 	await page.getByTestId(`sklad-varovania-${KOD_SKLAD_0}-odobrat`).click();
