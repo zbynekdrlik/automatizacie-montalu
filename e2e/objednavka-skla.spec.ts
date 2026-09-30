@@ -197,6 +197,34 @@ test('index: Nová objednávka len skla (zákazka + OP) → podklad s predvyplne
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #577 (Patrik, Odoo úloha 1181): úvodná stránka slúži aj ako vyhľadávač podkladu — OP je
+// NEPOVINNÉ. Len ZAK → podklad sa otvorí (bez `?op=`), pole OP na podklade ostane prázdne a pri
+// vypnutom „Odoslať" je viditeľná výzva zadať OP objednávky. Nič nezapisuje (len navigácia).
+test('index: len zákazka (bez OP) → podklad sa otvorí, výzva na OP objednávky', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	await goto(page, '/objednavka-skla');
+
+	await expect(page.getByTestId('nova-op')).not.toHaveAttribute('required', /.*/);
+	const zak = `${RUN}-BEZOP`;
+	await page.getByTestId('nova-zak').fill(zak);
+	await page.getByTestId('nova-otvorit').click();
+
+	await page.waitForURL(
+		(u) => u.pathname === `/objednavka-skla/${zak}` && !u.searchParams.has('op')
+	);
+	await waitHydrated(page);
+	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
+	await expect(page.getByTestId('nova-chyba')).toHaveCount(0);
+	await expect(page.getByTestId('op-input')).toHaveValue('');
+	await expect(page.getByTestId('odoslat-odoo')).toBeDisabled();
+	await expect(page.getByTestId('odoslat-bez-op')).toContainText('OP objednávky');
+
+	expect(consoleMsgs).toEqual([]);
+});
+
 // #548: „iné sklo" — v pickeri „Pridať riadok" sa zvolí sentinel → odkryjú sa vlastný typ + cena
 // €/m² → riadok sa uloží s manuálnym typom + cenou (zobrazený badge „iné sklo: <typ> · <cena>").
 // NIKDY neposiela do Odoo (proti live sa test skipne). Zero-console.

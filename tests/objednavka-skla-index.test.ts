@@ -1,7 +1,10 @@
 // #546: index /objednavka-skla — „Nová objednávka len skla" (zákazka + OP). Server validuje
 // normZak/normOp (žiadny Odoo lookup), NIČ neukladá, len presmeruje na podklad
 // /objednavka-skla/<zak>?op=<OP> (podklad si `?op=` predvyplní do poľa OP). Money-NEUTRÁLNE.
+// #577 (Patrik, Odoo úloha 1181): úvodná stránka slúži aj ako vyhľadávač podkladu podľa zákazky —
+// OP je NEPOVINNÉ (samotné ZAK → /objednavka-skla/<zak> bez `?op=`).
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { isRedirect } from '@sveltejs/kit';
 import { actions } from '../src/routes/objednavka-skla/+page.server';
 
@@ -50,10 +53,27 @@ describe('#546 index objednavka-skla — nová objednávka len skla', () => {
 		expect(r.kind).toBe('return');
 		if (r.kind === 'return') expect(r.value.error).toBeTruthy();
 	});
+});
 
-	it('prázdne / neplatné OP → chyba (žiadny redirect)', async () => {
+describe('#577 index objednavka-skla — OP nepovinné (vyhľadávač podkladu podľa ZAK)', () => {
+	it('len zákazka (OP chýba) → redirect na podklad BEZ ?op=', async () => {
+		const r = await run({ zak: 'ZAK260546' });
+		expect(r.kind).toBe('redirect');
+		if (r.kind === 'redirect') expect(r.location).toBe('/objednavka-skla/ZAK260546');
+	});
+
+	it('len zákazka (OP samé medzery) → redirect na podklad BEZ ?op=', async () => {
 		const r = await run({ zak: 'ZAK260546', op: '   ' });
-		expect(r.kind).toBe('return');
-		if (r.kind === 'return') expect(r.value.error).toBeTruthy();
+		expect(r.kind).toBe('redirect');
+		if (r.kind === 'redirect') expect(r.location).toBe('/objednavka-skla/ZAK260546');
+	});
+
+	it('input OP na úvodnej stránke nemá `required` (ZAK áno)', () => {
+		const src = readFileSync('src/routes/objednavka-skla/+page.svelte', 'utf8');
+		const opInput = src.match(/<input[^>]*data-testid="nova-op"[^>]*>/)?.[0] ?? '';
+		const zakInput = src.match(/<input[^>]*data-testid="nova-zak"[^>]*>/)?.[0] ?? '';
+		expect(opInput).not.toBe('');
+		expect(opInput).not.toMatch(/\brequired\b/);
+		expect(zakInput).toMatch(/\brequired\b/);
 	});
 });
