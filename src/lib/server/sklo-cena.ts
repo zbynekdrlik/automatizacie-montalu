@@ -85,7 +85,7 @@ export async function skloCenaPre(plany: SkloPlanVstup[]): Promise<SkloCenaResul
 	const cenaPre = (p: SkloPlanVstup): CenaZaM2 | null => {
 		if (skloOdoo.zdroj === 'odoo') {
 			const typ = odooTypPre(p.variant, typy);
-			if (typ) return { eurM2: skloOdoo.cenaPreNazov.get(typ.name) ?? null, mena: 'EUR' };
+			if (typ) return { eurM2: skloOdoo.cenaPreHodnotu.get(typ.value) ?? null, mena: 'EUR' };
 		}
 		const kod = glassMoneyKod(p.system, p.variant);
 		if (!kod) return null;

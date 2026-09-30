@@ -58,8 +58,9 @@ export type OdooCenyVysledok =
 	{ zdroj: 'odoo'; ceny: Map<string, OdooPriceRow> } | Nedostupne;
 
 export type OdooSkloCenyVysledok =
-	/** `price_m2` čitateľné: Odoo `name` typu skla → €/m² (`null` = 0/nevyplnené/nejednoznačné). */
-	{ zdroj: 'odoo'; cenaPreNazov: Map<string, number | null> } | Nedostupne;
+	/** `price_m2` čitateľné: `value` typu skla (ako picker: `cennik_code`, pri zdieľanom/chýbajúcom
+	 *  kóde `name`) → €/m² (`null` = 0/nevyplnené/nejednoznačné). */
+	{ zdroj: 'odoo'; cenaPreHodnotu: Map<string, number | null> } | Nedostupne;
 
 /** Zdroj cien pre UI a `/health`: `odoo` = kanál odpovedá, `snapshot` = denný Money snapshot. */
 export type CenyZdroj = 'odoo' | 'snapshot';
@@ -105,6 +106,12 @@ function numOrNull(v: unknown): number | null {
 	return null;
 }
 
+/** Odoo char pole → string (`false`/`null` = prázdne; pasca #551 v `glass-catalog.md`). */
+function s(v: unknown): string {
+	if (v == null || v === false) return '';
+	return String(v).trim();
+}
+
 const _ceny = new KodCache<OdooPriceRow>(
 	`${CENY_MODEL}.get_prices`,
 	CENY_TTL_MS,
@@ -132,19 +139,27 @@ const _skloCeny = new KodCache<Map<string, number | null>>(
 			cfg,
 			SKLO_MODEL,
 			[['active', '=', true]],
-			['name', 'price_m2'],
+			['name', 'cennik_code', 'price_m2'],
 			{ timeoutMs }
 		);
-		const ceny = new Map<string, number | null>();
-		for (const r of rows) {
-			const nazov = typeof r.name === 'string' ? r.name.trim() : '';
-			if (!nazov) continue;
+		const typy = rows.map((r) => ({
+			nazov: s(r.name),
+			kod: s(r.cennik_code),
 			// 0 = karta nemá riadok dodávateľa skla / nie je v Sklo IZOS → neznáma (nie 0 €)
-			const p = typeof r.price_m2 === 'number' && Number.isFinite(r.price_m2) ? r.price_m2 : 0;
-			const cena = p > 0 ? p : null;
-			// ten istý názov s INOU cenou = nejednoznačné → neznáma (nikdy tichý výber)
-			if (ceny.has(nazov) && ceny.get(nazov) !== cena) ceny.set(nazov, null);
-			else ceny.set(nazov, cena);
+			cena: typeof r.price_m2 === 'number' && r.price_m2 > 0 ? r.price_m2 : null
+		}));
+		// kľúč = TÁ ISTÁ `value`, akú odvodí picker (`odoo-glass-types.ts`): `cennik_code || name`,
+		// a kód zdieľaný viacerými typmi → `name` (#579). Rovnaký názov s rôznym kódom (rámik AL/TH)
+		// tak nesie každý svoju cenu (review #599).
+		const pocetKodu = new Map<string, number>();
+		for (const t of typy) if (t.kod) pocetKodu.set(t.kod, (pocetKodu.get(t.kod) ?? 0) + 1);
+		const ceny = new Map<string, number | null>();
+		for (const t of typy) {
+			const hodnota = t.kod && pocetKodu.get(t.kod) === 1 ? t.kod : t.nazov;
+			if (!hodnota) continue;
+			// ten istý kľúč s INOU cenou = nejednoznačné → neznáma (nikdy tichý výber)
+			if (ceny.has(hodnota) && ceny.get(hodnota) !== t.cena) ceny.set(hodnota, null);
+			else ceny.set(hodnota, t.cena);
 		}
 		log.debug('price_m2 OK', { typy: ceny.size });
 		return new Map([[SKLO_KLUC, ceny]]);
@@ -214,8 +229,8 @@ export async function odooSkloCenyM2(
 	if (!odooJson2Config()) return { zdroj: 'nedostupne', dovod: 'config' };
 	if (!(await _skloCeny.zabezpec([SKLO_KLUC], opts.timeoutMs ?? DEFAULT_TIMEOUT_MS)))
 		return { zdroj: 'nedostupne', dovod: 'chyba' };
-	const cenaPreNazov = _skloCeny.hodnota(SKLO_KLUC) ?? new Map<string, number | null>();
-	return { zdroj: 'odoo', cenaPreNazov };
+	const cenaPreHodnotu = _skloCeny.hodnota(SKLO_KLUC) ?? new Map<string, number | null>();
+	return { zdroj: 'odoo', cenaPreHodnotu };
 }
 
 /**
