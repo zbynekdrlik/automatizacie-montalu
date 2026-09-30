@@ -68,7 +68,7 @@ await import('../src/lib/server/db');
 describe('migration → v53 (poloha otvoru na objednavka_skla, #587)', () => {
 	it('bumpne na v53 a pridá tri nullable stĺpce polohy otvoru', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(55);
+		expect(d.pragma('user_version', { simple: true })).toBe(56);
 		const cols = d.prepare('PRAGMA table_info(objednavka_skla)').all() as {
 			name: string;
 			type: string;

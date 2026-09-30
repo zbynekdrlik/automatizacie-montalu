@@ -51,14 +51,15 @@ const posledneAudit = () =>
 	};
 
 describe('#579/2 seed = dnešná tabuľka (migrácia)', () => {
-	it('tabuľka z designu: Robust 24, Slide 16+6, Deluxe 6/10 kalené, Štandardy 6+16+24', () => {
+	it('tabuľka z designu: Robust 24, Slide 16+6, Deluxe 6/10 kalené, Štandardy 4+6+16, Drevostavby 6+16+24', () => {
 		const mm = (s: string) => skloHrubkyPre(s).map((t) => `${t.mm}:${t.druh}`);
 		expect(mm('Robust')).toEqual(['24:izolacne']);
 		expect(mm('Slide')).toEqual(['16:izolacne', '6:jednoduche']);
 		expect(mm('Deluxe')).toEqual(['6:esg', '10:esg']);
-		// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché; Drevostavby bez zmeny
+		// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché; úloha 1218 (Patrik
+		// 29.9.: „Štandardy — 4, 6, 16 mm"): bez 24 mm izolačného; Drevostavby bez zmeny
 		for (const s of ['Štandard +', 'Štandard'])
-			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne', '4:jednoduche']);
+			expect(mm(s)).toEqual(['6:jednoduche', '16:izolacne', '4:jednoduche']);
 		expect(mm('Štandard Drevo')).toEqual(['6:jednoduche', '16:izolacne', '24:izolacne']);
 		expect(skloHrubkyPre('Neznámy')).toEqual([]);
 	});
