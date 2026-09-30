@@ -84,13 +84,12 @@ export function ponukaPreStyl(
 		ok.has(sklo) &&
 		!sk.some((g) => g.items.some((o) => o.vypocet === sklo));
 	if (!doplnit) return sk;
-	return [
-		...sk,
-		{
-			label: '',
-			items: [{ ...lokalnaVolba(sklo), label: `${sklo} · ${POVODNE_SKLO_APPKY}` }]
-		}
-	];
+	const doplnok = { ...lokalnaVolba(sklo), label: `${sklo} · ${POVODNE_SKLO_APPKY}` };
+	// #599: záloha bez Odoo je sama skupina bez label — doplnok ide NA JEJ KONIEC, nie do druhej
+	// skupiny '' (select kľúčuje skupiny podľa label → each_key_duplicate)
+	if (sk.some((g) => g.label === ''))
+		return sk.map((g) => (g.label === '' ? { label: '', items: [...g.items, doplnok] } : g));
+	return [...sk, { label: '', items: [doplnok] }];
 }
 
 const vsetky = (skupiny: readonly SkupinaVolieb[]): VolbaSkla[] => skupiny.flatMap((g) => g.items);
