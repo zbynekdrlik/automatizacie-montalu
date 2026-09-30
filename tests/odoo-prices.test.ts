@@ -1,32 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import {
-	isOdooPricesEnabled,
-	fetchOdooPrices,
-	_parseOdooPricesResponse
-} from '../src/lib/server/odoo-prices';
-import { setJson2Transport } from '../src/lib/server/odoo-json2';
-
-afterEach(() => {
-	setJson2Transport(null);
-	vi.unstubAllEnvs();
-});
-
-describe('isOdooPricesEnabled', () => {
-	it('returns false when env is unset', () => {
-		vi.stubEnv('ODOO_PRICES_ENABLED', '');
-		expect(isOdooPricesEnabled()).toBe(false);
-	});
-
-	it('returns false when env is "0"', () => {
-		vi.stubEnv('ODOO_PRICES_ENABLED', '0');
-		expect(isOdooPricesEnabled()).toBe(false);
-	});
-
-	it('returns true when env is "1"', () => {
-		vi.stubEnv('ODOO_PRICES_ENABLED', '1');
-		expect(isOdooPricesEnabled()).toBe(true);
-	});
-});
+// odoo-prices.ts — parsing of `montalu.automatizacie.catalog/get_prices` (#5808 / #599).
+// The automatic price-source switch (no env flag), cache and fallback are covered in
+// tests/odoo-ceny-599.test.ts. Prices are INVENTED (the repo is public).
+import { describe, it, expect } from 'vitest';
+import { _parseOdooPricesResponse } from '../src/lib/server/odoo-prices';
 
 describe('_parseOdooPricesResponse', () => {
 	it('parses valid response with all fields', () => {
@@ -144,71 +120,30 @@ describe('_parseOdooPricesResponse', () => {
 		expect(() => _parseOdooPricesResponse('string')).toThrow('nie je objekt');
 	});
 
-	it('handles missing rows gracefully', () => {
-		const result = _parseOdooPricesResponse({ generatedAt: null });
+	it('response without a `rows` array is NOT a valid answer (channel treated as unavailable)', () => {
+		// #599: an empty/foreign 200 body must not read as "Odoo knows no prices" — that would
+		// switch the price source to Odoo with every price unknown
+		expect(() => _parseOdooPricesResponse({ generatedAt: null })).toThrow('rows');
+		expect(() => _parseOdooPricesResponse([])).toThrow();
+	});
+
+	it('empty `rows` array is a valid answer (Odoo knows none of the codes)', () => {
+		const result = _parseOdooPricesResponse({ generatedAt: null, rows: [], total: 0 });
 		expect(result.rows).toHaveLength(0);
-		expect(result.total).toBe(0);
-	});
-});
-
-describe('fetchOdooPrices', () => {
-	it('returns null when json2 config is missing', async () => {
-		vi.stubEnv('ODOO_JSON2_URL', '');
-		vi.stubEnv('ODOO_JSON2_API_KEY', '');
-		const result = await fetchOdooPrices();
-		expect(result).toBeNull();
 	});
 
-	it('returns parsed prices on success', async () => {
-		const mockResponse = {
-			generatedAt: '2026-09-07T12:00:00Z',
-			rows: [
-				{
-					kod: 'ZASP00014',
-					nakupCennik: 10.0,
-					nakupPoslednaFaktura: 9.5,
-					predajVo: 15.0,
-					mena: 'EUR',
-					sklad: 100
-				}
-			],
+	it('parses rozvin (montalu_rozvin) — #599: no longer forced to null', () => {
+		const result = _parseOdooPricesResponse({
+			generatedAt: null,
+			rows: [{ kod: 'PRP00050', nakupCennik: 3, rozvin: 0.183, mena: 'EUR', sklad: 1 }],
 			total: 1
-		};
-
-		setJson2Transport(
-			async () =>
-				new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: mockResponse }), {
-					status: 200
-				})
-		);
-
-		vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
-		vi.stubEnv('ODOO_JSON2_API_KEY', 'key');
-		const result = await fetchOdooPrices({ url: 'https://erp.test', apiKey: 'key' });
-		expect(result).not.toBeNull();
-		expect(result!.rows).toHaveLength(1);
-		expect(result!.rows[0]!.kod).toBe('ZASP00014');
-	});
-
-	it('returns null on fetch error (graceful fallback)', async () => {
-		setJson2Transport(async () => {
-			throw new Error('ECONNREFUSED');
 		});
-
-		const result = await fetchOdooPrices({ url: 'https://erp.test', apiKey: 'key' });
-		expect(result).toBeNull();
-	});
-
-	it('returns null on Odoo error response (graceful fallback)', async () => {
-		setJson2Transport(
-			async () =>
-				new Response(
-					JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: 403, message: 'AccessDenied' } }),
-					{ status: 200 }
-				)
-		);
-
-		const result = await fetchOdooPrices({ url: 'https://erp.test', apiKey: 'key' });
-		expect(result).toBeNull();
+		expect(result.rows[0]!.rozvin).toBe(0.183);
+		const r2 = _parseOdooPricesResponse({
+			generatedAt: null,
+			rows: [{ kod: 'ZASK00001', rozvin: false, mena: 'EUR', sklad: null }],
+			total: 1
+		});
+		expect(r2.rows[0]!.rozvin).toBeNull();
 	});
 });

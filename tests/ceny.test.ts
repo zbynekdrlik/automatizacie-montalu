@@ -27,7 +27,7 @@ function writeSnapshot(generatedAt: string, rows: unknown[]) {
 const tick = () => new Promise((r) => setTimeout(r, 15));
 
 describe('maybeImportSnapshot + getSnapshotMeta', () => {
-	it('chýbajúci súbor: no-op, žiadna chyba, meta prázdna (nikdy neimportované)', () => {
+	it('chýbajúci súbor: no-op, žiadna chyba, meta prázdna (nikdy neimportované)', async () => {
 		expect(fs.existsSync(snapshotPath)).toBe(false);
 		expect(maybeImportSnapshot()).toEqual({ imported: false, reason: 'no-file' });
 		expect(getSnapshotMeta()).toEqual({
@@ -39,7 +39,7 @@ describe('maybeImportSnapshot + getSnapshotMeta', () => {
 		});
 	});
 
-	it('platný snapshot sa naimportuje, riadky sa upsertnú do material_prices', () => {
+	it('platný snapshot sa naimportuje, riadky sa upsertnú do material_prices', async () => {
 		writeSnapshot('2026-08-10T00:00:00Z', [
 			{
 				kod: 'ZASP-TEST-1',
@@ -68,7 +68,7 @@ describe('maybeImportSnapshot + getSnapshotMeta', () => {
 		});
 	});
 
-	it('opätovné volanie BEZ zmeny mtime súboru je no-op ("not-newer")', () => {
+	it('opätovné volanie BEZ zmeny mtime súboru je no-op ("not-newer")', async () => {
 		expect(maybeImportSnapshot()).toEqual({ imported: false, reason: 'not-newer' });
 	});
 
@@ -190,7 +190,7 @@ describe('maybeImportSnapshot + getSnapshotMeta', () => {
 			db.prepare("SELECT sklad FROM material_prices WHERE kod = 'ZASP-SKLAD-CHYBA'").get()
 		).toEqual({ sklad: null });
 		// a odlišuje sa od SKUTOČNEJ nuly (vypredané) — nezlievajú sa do jednej hodnoty
-		const r2 = enrichPolozky([
+		const r2 = await enrichPolozky([
 			{ kod: 'ZASP-SKLAD-NULL', nazov: 'X', qty: 1, mj: 'm' },
 			{ kod: 'ZASP-NULA', nazov: 'Y', qty: 1, mj: 'm' } // z predošlého testu vyššie, sklad=0 reálne
 		]);
@@ -229,8 +229,8 @@ describe('maybeImportSnapshot + getSnapshotMeta', () => {
 });
 
 describe('enrichPolozky', () => {
-	it('položka BEZ cenových dát v material_prices → "cena neznáma" (null) všade, vylúčená zo súčtu', () => {
-		const r = enrichPolozky([{ kod: 'NEZNAMY-KOD-ENRICH', nazov: 'Test', qty: 10, mj: 'm' }]);
+	it('položka BEZ cenových dát v material_prices → "cena neznáma" (null) všade, vylúčená zo súčtu', async () => {
+		const r = await enrichPolozky([{ kod: 'NEZNAMY-KOD-ENRICH', nazov: 'Test', qty: 10, mj: 'm' }]);
 		expect(r.radky).toEqual([
 			{
 				kod: 'NEZNAMY-KOD-ENRICH',
@@ -259,7 +259,7 @@ describe('enrichPolozky', () => {
 			{ kod: 'ZASK-ENRICH-KS', nakupCennik: 3, mena: 'EUR', sklad: 20 }
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([
+		const r = await enrichPolozky([
 			{ kod: 'ZASP-ENRICH-M', nazov: 'Profil', qty: 7.5, mj: 'm' },
 			{ kod: 'ZASK-ENRICH-KS', nazov: 'Kladka', qty: 4, mj: 'ks' }
 		]);
@@ -280,19 +280,19 @@ describe('enrichPolozky', () => {
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'ZASP-ENRICH-MARZA', nazov: 'X', qty: 2, mj: 'm' }]);
+		const r = await enrichPolozky([{ kod: 'ZASP-ENRICH-MARZA', nazov: 'X', qty: 2, mj: 'm' }]);
 		expect(r.radky[0]!.marza).toBe(3); // 8 − 5, NIE 8 − 9
 		expect(r.sucty.marza).toEqual({ suma: 6, kompletne: true }); // 3 × 2 ks
 	});
 
-	it('sucty.kompletne=false len keď chýbajúca cena patrí položke s NENULOVÝM množstvom (bazén posiela aj nulové riadky)', () => {
-		const r = enrichPolozky([{ kod: 'NEZNAMY-KOD-QTY0', nazov: 'X', qty: 0, mj: 'm' }]);
+	it('sucty.kompletne=false len keď chýbajúca cena patrí položke s NENULOVÝM množstvom (bazén posiela aj nulové riadky)', async () => {
+		const r = await enrichPolozky([{ kod: 'NEZNAMY-KOD-QTY0', nazov: 'X', qty: 0, mj: 'm' }]);
 		expect(r.sucty.nakupCennik.kompletne).toBe(true);
 		expect(r.sucty.nakupCennik.suma).toBe(0);
 	});
 
-	it('vracia aktuálny snapshot meta spolu s výsledkom (appka to zobrazí vedľa tabuľky)', () => {
-		const r = enrichPolozky([{ kod: 'ZASP-ENRICH-M', nazov: 'Profil', qty: 1, mj: 'm' }]);
+	it('vracia aktuálny snapshot meta spolu s výsledkom (appka to zobrazí vedľa tabuľky)', async () => {
+		const r = await enrichPolozky([{ kod: 'ZASP-ENRICH-M', nazov: 'Profil', qty: 1, mj: 'm' }]);
 		expect(r.snapshot.generatedAt).toBe('2026-08-18T00:00:00Z');
 		expect(typeof r.snapshot.daysOld).toBe('number');
 	});
@@ -301,7 +301,7 @@ describe('enrichPolozky', () => {
 		await tick();
 		writeSnapshot('2026-08-19T00:00:00Z', [{ kod: 'ZASP-ENRICH-SKLAD', sklad: 42, mena: 'EUR' }]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([
+		const r = await enrichPolozky([
 			{ kod: 'ZASP-ENRICH-SKLAD', nazov: 'X', qty: 1, mj: 'm' },
 			{ kod: 'NEZNAMY-KOD-SKLAD', nazov: 'Y', qty: 1, mj: 'm' }
 		]);
@@ -311,7 +311,7 @@ describe('enrichPolozky', () => {
 });
 
 describe('#359 — bazén BPP/BPK v snapshote', () => {
-	it('producent ceny-snapshot.py ťahá všetkých 6 rodín vrátane bazénových BPP/BPK', () => {
+	it('producent ceny-snapshot.py ťahá všetkých 6 rodín vrátane bazénových BPP/BPK', async () => {
 		const src = fs.readFileSync(path.resolve('scripts/ceny-snapshot.py'), 'utf8');
 		for (const fam of ['ZASP', 'ZASK', 'TS', 'PRP', 'BPP', 'BPK']) {
 			expect(src).toContain(`a.Kod LIKE '${fam}%'`);
@@ -355,7 +355,7 @@ describe('#359 — bazén BPP/BPK v snapshote', () => {
 });
 
 describe('#369 — rozvin + lakovanie v snapshote a enrichPolozky', () => {
-	it('producent ceny-snapshot.py ťahá rozvin z `m2` mernej jednotky', () => {
+	it('producent ceny-snapshot.py ťahá rozvin z `m2` mernej jednotky', async () => {
 		const src = fs.readFileSync(path.resolve('scripts/ceny-snapshot.py'), 'utf8');
 		expect(src).toContain('AS rozvin');
 		expect(src).toContain('Artikly_ArtiklJednotka');
@@ -379,9 +379,9 @@ describe('#369 — rozvin + lakovanie v snapshote a enrichPolozky', () => {
 		expect(get('ZASP-LAK-C').rozvin).toBeNull();
 	});
 
-	it('enrichPolozky vystaví ceny.lakovanie: spotreba, súčty, honest-null €', () => {
+	it('enrichPolozky vystaví ceny.lakovanie: spotreba, súčty, honest-null €', async () => {
 		// ZASP-LAK-A má rozvin 0,5 → plocha 0,5×10=5 m², spotreba 5×0,15=0,75 kg
-		const r = enrichPolozky([
+		const r = await enrichPolozky([
 			{ kod: 'ZASP-LAK-A', nazov: 'Lakovaný profil', qty: 10, mj: 'm' },
 			{ kod: 'ZASP-LAK-C', nazov: 'Profil bez rozvinu', qty: 4, mj: 'm' }
 		]);
@@ -404,7 +404,7 @@ describe('#369 — rozvin + lakovanie v snapshote a enrichPolozky', () => {
 			{ kod: 'PRP00047', mena: 'EUR', sklad: 5, rozvin: 0.4 } // Dominikova výnimka
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'PRP00047', nazov: 'Výnimka', qty: 5, mj: 'm' }]);
+		const r = await enrichPolozky([{ kod: 'PRP00047', nazov: 'Výnimka', qty: 5, mj: 'm' }]);
 		expect(r.lakovanie.radky).toHaveLength(0);
 		expect(r.lakovanie.spotrebaSpolu).toBe(0);
 		expect(r.lakovanie.kompletne).toBe(true);
@@ -425,7 +425,7 @@ describe('#364 — predajPcmo (PCMO predajná cena) v snapshote a enrichPolozky'
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'BPK-PCMO-1', nazov: 'Komponent', qty: 3, mj: 'ks' }]);
+		const r = await enrichPolozky([{ kod: 'BPK-PCMO-1', nazov: 'Komponent', qty: 3, mj: 'ks' }]);
 		expect(r.radky[0]!.predajPcmo).toBe(12.5);
 		// nakupCennik 0 → null (honest-null); predajPcmo 12.5 → reálna hodnota
 		expect(r.radky[0]!.nakupCennik).toBeNull();
@@ -438,7 +438,9 @@ describe('#364 — predajPcmo (PCMO predajná cena) v snapshote a enrichPolozky'
 			{ kod: 'BPK-PCMO-2', nakupCennik: 0, mena: 'EUR', sklad: 10 }
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'BPK-PCMO-2', nazov: 'Bez PCMO ceny', qty: 5, mj: 'ks' }]);
+		const r = await enrichPolozky([
+			{ kod: 'BPK-PCMO-2', nazov: 'Bez PCMO ceny', qty: 5, mj: 'ks' }
+		]);
 		expect(r.radky[0]!.predajPcmo).toBeNull();
 		expect(r.sucty.predajPcmo).toEqual({ suma: 0, kompletne: false });
 	});
@@ -449,7 +451,7 @@ describe('#364 — predajPcmo (PCMO predajná cena) v snapshote a enrichPolozky'
 			{ kod: 'BPK-PCMO-3', predajPcmo: 0, mena: 'EUR', sklad: 5 }
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'BPK-PCMO-3', nazov: 'Nulová PCMO', qty: 2, mj: 'ks' }]);
+		const r = await enrichPolozky([{ kod: 'BPK-PCMO-3', nazov: 'Nulová PCMO', qty: 2, mj: 'ks' }]);
 		expect(r.radky[0]!.predajPcmo).toBeNull();
 	});
 });
@@ -471,7 +473,7 @@ describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([
+		const r = await enrichPolozky([
 			{ kod: 'BPK-SK-1', nazov: 'Testovací BPK komponent', qty: 8, mj: 'ks' }
 		]);
 		// nakupCennik v riadku = fallback zo skladovej karty (4.0)
@@ -495,7 +497,7 @@ describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'ZASP-SK-1', nazov: 'Testovací profil', qty: 10 }]);
+		const r = await enrichPolozky([{ kod: 'ZASP-SK-1', nazov: 'Testovací profil', qty: 10 }]);
 		// nakupCennik = NC value (5.5), NOT skladová karta (7.9)
 		expect(r.radky[0]!.nakupCennik).toBe(5.5);
 		expect(r.sucty.nakupCennik.suma).toBe(55);
@@ -513,7 +515,7 @@ describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'BPK-SK-2', nazov: 'BPK bez ceny', qty: 3, mj: 'ks' }]);
+		const r = await enrichPolozky([{ kod: 'BPK-SK-2', nazov: 'BPK bez ceny', qty: 3, mj: 'ks' }]);
 		expect(r.radky[0]!.nakupCennik).toBeNull();
 		expect(r.sucty.nakupCennik.kompletne).toBe(false);
 	});
@@ -531,7 +533,7 @@ describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([{ kod: 'BPK-SK-3', nazov: 'BPK s NC=0', qty: 4, mj: 'ks' }]);
+		const r = await enrichPolozky([{ kod: 'BPK-SK-3', nazov: 'BPK s NC=0', qty: 4, mj: 'ks' }]);
 		// NC=0 → null (priceOrNull), fallback to skladová karta 2.5
 		expect(r.radky[0]!.nakupCennik).toBe(2.5);
 		expect(r.sucty.nakupCennik.suma).toBe(10);
@@ -564,7 +566,7 @@ describe('enrichPolozky — nakupSkladovaKarta fallback (#506)', () => {
 			}
 		]);
 		maybeImportSnapshot();
-		const r = enrichPolozky([
+		const r = await enrichPolozky([
 			{ kod: 'BPP-506-1', nazov: 'Bazén profil', qty: 8.8 },
 			{ kod: 'BPK-506-1', nazov: 'Nožička', qty: 8, mj: 'ks' },
 			{ kod: 'BPK-506-2', nazov: 'Koliesko', qty: 8, mj: 'ks' }
