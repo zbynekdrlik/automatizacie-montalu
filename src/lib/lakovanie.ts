@@ -3,7 +3,8 @@
 //   spotreba [kg] = rozvin [m²/bm] × dĺžka [bm] × 0,150 [kg/m²]
 // Rozvin = merná jednotka `m2` na Money artikli (Artikly_ArtiklJednotka.Mnozstvi,
 // m² povrchu na 1 bežný meter = obvod prierezu v metroch) — dodaná do appky cez
-// denný snapshot (ceny-snapshot.py → material_prices.rozvin → enrichPolozky).
+// denný snapshot (ceny-snapshot.py → material_prices.rozvin), od #599 z Odoo
+// `product.template.montalu_rozvin` (`get_prices`), keď Odoo kanál cien odpovedá → enrichPolozky.
 // €-náklad je zámerne honest-null: RAL sadzbu (Money cenník LAKOVNA
 // 20,16/24,12/22,18 €/m²) sa nedá vybrať bez RAL rozdelenia štandard/pigment/
 // štruktúra — to Dominik ešte dopĺňa (ch427, 3.9.2026). Nikdy sa nehádže cena.

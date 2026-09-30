@@ -25,6 +25,16 @@ skla na podklade objednávky). Ďalší krok #599 (ceny, rozvin) **rozšír TENT
 `FIELDS` + do `OdooProdukt`, alebo nová `KodCache` inštancia), nepíš ďalší vlastný Odoo read s
 vlastnou cache.
 
+## `KodCache` je exportovaný — kanál cien (`odoo-prices.ts`, #599 krok ceny) ho používa tiež
+
+`KodCache<T>` je `export`-nutý; `odoo-prices.ts` má dve inštancie: `get_prices` per kód (`codes`
+kwarg — `callJson2`, nie `search_read`) a `montalu.glass.type.price_m2` pod JEDNÝM kľúčom `'*'`
+(všetky typy naraz). Pasca: `zabezpec([])` vráti `true` BEZ volania — kto potrebuje zistiť STAV
+kanála aj pre prázdnu sadu kódov, musí sondovať konkrétnym kódom (`odooCenyPreKody` použije
+`ZASP00014`), inak by prázdna sada hlásila „Odoo odpovedá". Parser `get_prices` HÁDŽE bez poľa `rows`
+→ cudzia/prázdna 200 odpoveď (napr. mock, ktorý na všetko vráti `true`) = nedostupné, nie „Odoo
+nepozná nič". Detaily zdroja cien: `ceny-snapshot.md` (#599 krok ceny).
+
 ## Vzor (z `glass-catalog.md` „NIKDY neblokuj page load na Odoo")
 
 - 3 s per-volanie timeout, cache per kód 5 min (aj „Odoo kód nepozná" sa cachuje), pri chybe

@@ -20,7 +20,8 @@
 // ešte ponuka / nie je v Odoo) → zaloguj a preskoč (bez pádu); >1 → postni na všetky + zaloguj.
 //
 // MONEY-NEUTRÁLNE: NEPÍŠE do `/data`, NEMENÍ dedup, NEDOTÝKA sa `MONEY_LIVE`; z money.ts
-// používa LEN čistý `normOp`. Ceny číta z denného Money snapshotu (`enrichPolozky`, read-only).
+// používa LEN čistý `normOp`. Ceny číta cez `enrichPolozky` (read-only; #599: Odoo `get_prices`,
+// keď odpovedá, inak denný Money snapshot).
 //
 // ROZŠÍRITEĽNÉ: `sekcie[]` — dnes „Profily a komponenty"; sklá z nárezákov pribudnú neskôr
 // ako ĎALŠIA sekcia bez zmeny štruktúry (#340 zadanie bod 3).
