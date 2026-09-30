@@ -32,6 +32,8 @@
 		eurM2: number | null;
 		cenaSpolu: number | null;
 		mena: string;
+		/** #599: `odoo` = €/m² z Odoo (cenník IZOS), `snapshot` = denný Money snapshot */
+		zdroj: 'odoo' | 'snapshot';
 	} | null;
 
 	let {
@@ -585,6 +587,12 @@
 						>{strechaSkloCena.eurM2 != null
 							? `${String(strechaSkloCena.eurM2).replace('.', ',')} ${strechaSkloCena.mena}/m²`
 							: 'cena nedostupná'}</b
+					>
+				</div>
+				<div class="row">
+					<span>Zdroj ceny</span>
+					<b data-testid="strecha-sklo-zdroj" data-zdroj={strechaSkloCena.zdroj}
+						>{strechaSkloCena.zdroj === 'odoo' ? 'Odoo' : 'Money snapshot'}</b
 					>
 				</div>
 				{#if strechaSkloCena.cenaSpolu != null}

@@ -25,7 +25,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	// a stránka to ukáže ako "položky nie sú k dispozícii", nikdy prázdnu tabuľku
 	// tváriacu sa, že sa nič neodpísalo
 	const polozky = listOdpisPolozky(id);
-	const ceny = polozky.length > 0 ? enrichPolozky(polozky) : null;
+	const ceny = polozky.length > 0 ? await enrichPolozky(polozky) : null;
 
 	return { odpis, detail, ceny };
 };

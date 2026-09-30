@@ -220,10 +220,10 @@ export type CadView = NonNullable<ReturnType<typeof cadOdpisView>['view']>;
  * takže sa nikdy nedostane do HTML odpovede. Ceníme presne zobrazené nenulové Money položky
  * (`v.nonzero` — PRP profily); Money odpis sa tým NEMENÍ (goldeny byte-identické).
  */
-function cadCeny(
+async function cadCeny(
 	user: SessionUser | null,
 	polozky: { kod: string; nazov: string; qty: number }[]
-): CenyResult | undefined {
+): Promise<CenyResult | undefined> {
 	if (isB2B(user)) return undefined;
 	return enrichPolozky(polozky);
 }
@@ -292,7 +292,7 @@ export async function cadSpocitat(form: FormData, user: SessionUser | null, opts
 		step: 'nahlad' as const,
 		vstup,
 		v,
-		ceny: v ? cadCeny(user, v.nonzero) : undefined,
+		ceny: v ? await cadCeny(user, v.nonzero) : undefined,
 		// #448/#451 predodpisové skladové varovanie + odobrať (LEN interní; b2b → [])
 		skladVarovania: v ? await cadSklad(user, v.nonzero) : [],
 		snapshotDatum: getSnapshotMeta().generatedAt,
@@ -324,7 +324,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			step: 'nahlad' as const,
 			vstup,
 			v,
-			ceny: v ? cadCeny(user, v.nonzero) : undefined,
+			ceny: v ? await cadCeny(user, v.nonzero) : undefined,
 			skladVarovania: v ? await cadSklad(user, v.nonzero) : [],
 			snapshotDatum: getSnapshotMeta().generatedAt,
 			error:
@@ -336,7 +336,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 	// cenový blok (interní) — lazy (thunk): úspešné odoslanie končí v „hotovo" bez cenového
 	// bloku, tak ho nepočítame zbytočne — len keď sa vraciame do „nahlad" s chybou. Zavolá sa
 	// nanajvýš raz (vetvy sú return).
-	const cenyBlok = () => (v ? cadCeny(user, v.nonzero) : undefined);
+	const cenyBlok = async () => (v ? cadCeny(user, v.nonzero) : undefined);
 	const skladBlok = async () => (v ? cadSklad(user, v.nonzero) : []);
 	const snapDatum = () => getSnapshotMeta().generatedAt;
 	// neplatná ručná úprava → späť do náhľadu s chybou, do Money sa nezapisuje
@@ -345,7 +345,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			step: 'nahlad' as const,
 			vstup,
 			v,
-			ceny: cenyBlok(),
+			ceny: await cenyBlok(),
 			skladVarovania: await skladBlok(),
 			snapshotDatum: snapDatum(),
 			error: editError
@@ -357,7 +357,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			step: 'nahlad' as const,
 			vstup,
 			v,
-			ceny: cenyBlok(),
+			ceny: await cenyBlok(),
 			skladVarovania: await skladBlok(),
 			snapshotDatum: snapDatum(),
 			error: 'Rozpis obsahuje neplatné množstvo — skontroluj vstup a voľby kombinácií.'
@@ -394,7 +394,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 			step: 'nahlad' as const,
 			vstup,
 			v,
-			ceny: cenyBlok(),
+			ceny: await cenyBlok(),
 			skladVarovania: await skladBlok(),
 			snapshotDatum: snapDatum(),
 			error:

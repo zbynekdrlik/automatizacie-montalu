@@ -111,6 +111,36 @@ test('so seednutým Money snapshotom appka ukáže reálne (vymyslené) ceny + k
 	expect(consoleMsgs).toEqual([]);
 });
 
+test('#599: cenová tabuľka ukáže ZDROJ cien a zhoduje sa s /health cenyZdroj', async ({ page }) => {
+	// Zdroj cien sa volí automaticky (Odoo kanál odpovedá → Odoo, inak Money snapshot). CI nemá Odoo
+	// → snapshot vetva; na PROD platí to, čo hlási /health — test preto porovnáva UI s /health a beží
+	// v oboch stavoch (aj post-deploy). Nič nezapisuje.
+	const consoleMsgs = collectConsole(page);
+	const health = (await (await page.request.get('/health')).json()) as {
+		cenyZdroj: { material: 'odoo' | 'snapshot'; sklo: 'odoo' | 'snapshot' };
+	};
+	expect(['odoo', 'snapshot']).toContain(health.cenyZdroj.material);
+	expect(['odoo', 'snapshot']).toContain(health.cenyZdroj.sklo);
+	if (!process.env.BASE_URL)
+		expect(health.cenyZdroj).toEqual({ material: 'snapshot', sklo: 'snapshot' });
+	await loginAs(page);
+	await vyplnZasklenie(page, `E2E-CENY-ZDROJ-${Date.now()}`);
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	const zdroj = page.getByTestId('ceny-zdroj');
+	await expect(zdroj).toBeVisible();
+	await expect(zdroj).toHaveAttribute('data-zdroj', health.cenyZdroj.material);
+	await expect(zdroj).toContainText(
+		health.cenyZdroj.material === 'odoo' ? 'Odoo' : 'Money snapshot'
+	);
+	// cena skla (Robust 4/16/4) nesie vlastný zdroj
+	const skloZdroj = page.getByTestId('sklo-cena-zdroj');
+	await expect(skloZdroj).toBeVisible();
+	await expect(skloZdroj).toHaveAttribute('data-zdroj', health.cenyZdroj.sklo);
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('/odpisy/[id]: detail histórie ukáže položky + ceny KONKRÉTNEHO odpisu', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page); // odoslanie nižšie zapisuje (TEST režim) — na LIVE sa preskočí

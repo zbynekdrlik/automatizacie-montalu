@@ -217,3 +217,32 @@ export function naviazanieRiadku<T extends OdooTypLike>(
 	const m = matchOdooGlassType(typSkla, odooTypy);
 	return { nepriradene: true, kandidati: m.kandidati };
 }
+
+/**
+ * Finálna `value` Odoo typov skla — JEDINÉ pravidlo pre picker (`odoo-glass-types.ts`) aj ceny
+ * `price_m2` (`odoo-prices.ts`, review #599: kópia pravidla by sa rozišla na hranách). Vstup má
+ * `value = cennik_code || name` (prázdne už odfiltrované). #551: dedupe podľa `value` (prvý vyhráva
+ * — Odoo dáta nesmú zhodiť `{#each … (t.value)}` kľúč). #579: kód zdieľaný VIACERÝMI typmi (PROD
+ * „001" = „Izolačné 4/8/4" AJ „IZOS DOUBLE 4-16-4 AL") je pre Odoo `resolve_glass_type` (páruje kód
+ * PRVÝ) nejednoznačný → VŠETCI jeho nositelia dostanú `value = name`; zahodí sa len riadok, ktorého
+ * aj názov koliduje. MUTUJE `value` položiek. `dupes` = kódy, ktoré kolidovali (na warn volajúceho).
+ */
+export function hodnotyOdooTypov<T extends { value: string; name: string }>(
+	mapped: T[]
+): { items: T[]; dupes: Set<string> } {
+	const pocet = new Map<string, number>();
+	for (const it of mapped) pocet.set(it.value, (pocet.get(it.value) ?? 0) + 1);
+	const seen = new Set<string>();
+	const items: T[] = [];
+	const dupes = new Set<string>();
+	for (const it of mapped) {
+		if ((pocet.get(it.value) ?? 0) > 1) {
+			dupes.add(it.value);
+			if (it.name) it.value = it.name;
+		}
+		if (seen.has(it.value)) continue;
+		seen.add(it.value);
+		items.push(it);
+	}
+	return { items, dupes };
+}
