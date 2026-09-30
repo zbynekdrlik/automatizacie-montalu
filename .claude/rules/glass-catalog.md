@@ -595,6 +595,10 @@ ROZHODNUTÉ main 30.9. (Odoo úloha 1218): `POVOLENE_SKLA` (ponuka pri NEDOSTUPN
   Klient `sklaForSystem` = `prijateSklaSystemu` → reset efekt pôvodné sklo nezruší a `ponukaPreStyl`
   ho doplní ako „<sklo> · pôvodné sklo z appky" (vzor #594) — voľby selectu nesie serverová ponuka,
   takže v ponuke je 4/16/4 LEN ako táto doplnková voľba. `predvoleneSklo` pôvodné sklo nikdy nevyberie.
+  **PASCA (chytil až lokálny E2E, nie unit):** `ZasklieniaForm` kľúčuje skupiny `{#each sk as g
+  (g.label)}` — záloha bez Odoo je skupina `''`, doplnok preto ide NA JEJ KONIEC (`ponukaPreStyl`),
+  nikdy do druhej skupiny `''` (each_key_duplicate pri prepnutí systému, keď prechodne platí sklo
+  starého systému). Nová skupina v ponuke = unikátny `label`.
 - **Výpočtové sklo Odoo typov sa odvodzuje z PRIJATÝCH skiel** (`ponukaSkielPre` 5. parameter
   `vypocetne`, server helper `ponukaSystemu`; editor hrúbok `sklo-hrubky.ts` `lokalnaPonuka`) — zúženie
   zálohy tak nemení výpočet Odoo volieb (snapshot `sklo-odoo-579` nezmenený) a výroba si 24 mm pri
