@@ -108,17 +108,23 @@ export interface OdooHrubka {
 }
 
 // Štandard plus, starý Štandard, Drevostavby: vzorec rovnaký (IZO nárezák podľa triedy 16)
-const STANDARDNE: readonly OdooHrubka[] = [
-	{ mm: 6, druh: 'jednoduche' },
-	{ mm: 16, druh: 'izolacne' },
+const JEDNODUCHE_6: OdooHrubka = { mm: 6, druh: 'jednoduche' };
+const IZOLACNE_16: OdooHrubka = { mm: 16, druh: 'izolacne' };
+// Drevostavby bez zmeny: 6 jednoduché, 16 aj 24 izolačné
+const DREVOSTAVBY: readonly OdooHrubka[] = [
+	JEDNODUCHE_6,
+	IZOLACNE_16,
 	{ mm: 24, druh: 'izolacne' }
 ];
-// #579 (Patrik 28.9.): Štandard + a starý Štandard aj 4 mm jednoduché (počíta sa ako Float sklo
-// 4 mm); Drevostavby bez zmeny. Na KONCI — rovnaké poradie ako na PROD po migrácii v54.
-const STANDARDNE_4MM: readonly OdooHrubka[] = [...STANDARDNE, { mm: 4, druh: 'jednoduche' }];
+// Štandard + a starý Štandard = 4, 6, 16 mm (Patrik, Odoo úloha 1218, msg 1872179, 29.9.:
+// „Štandardy — 4, 6, 16 mm"; výroba 24 mm izolačné odobrala v PROD editore — cfg_audit 76/77,
+// existujúcej DB ho zmaže v56 `migracie-sklo-hrubky-24mm.ts`). 4 mm jednoduché (#579, 28.9.) na
+// KONCI — rovnaké poradie ako na PROD po migrácii v54.
+const STANDARDY: readonly OdooHrubka[] = [JEDNODUCHE_6, IZOLACNE_16, { mm: 4, druh: 'jednoduche' }];
 
 /** Seed migrácie v52 (`cfg_sklo_hrubka`) — tabuľka z designu #579 (doplnenie 28.9.) + 4 mm pre
- *  Štandardy (29.9.; existujúcej DB ich doplní v54 `migracie-sklo-hrubky-4mm.ts`). Živé hodnoty
+ *  Štandardy (29.9.; existujúcej DB ich doplní v54 `migracie-sklo-hrubky-4mm.ts`) − 24 mm
+ *  izolačné pri Štandardoch (úloha 1218, 29.9.; existujúcej DB ho zmaže v56). Živé hodnoty
  *  číta server z DB (`skloHrubkyPre`), NIKDY z tejto konštanty. */
 export const ODOO_HRUBKY_SEED: Readonly<Record<string, readonly OdooHrubka[]>> = {
 	// izolačné 4/16/4 (24 mm); vzorec od skla nezávisí
@@ -133,9 +139,9 @@ export const ODOO_HRUBKY_SEED: Readonly<Record<string, readonly OdooHrubka[]>> =
 		{ mm: 6, druh: 'esg' },
 		{ mm: 10, druh: 'esg' }
 	],
-	'Štandard +': STANDARDNE_4MM,
-	Štandard: STANDARDNE_4MM,
-	'Štandard Drevo': STANDARDNE
+	'Štandard +': STANDARDY,
+	Štandard: STANDARDY,
+	'Štandard Drevo': DREVOSTAVBY
 };
 
 // Izolačné lokálne výpočtové sklo: „Izolačné sklo A/B/C číre" (len ČÍRE — mliečne/stopsol nikdy
