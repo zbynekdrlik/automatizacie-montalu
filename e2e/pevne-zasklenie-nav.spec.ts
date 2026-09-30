@@ -132,6 +132,25 @@ test('#592: pod 900px — jedna položka v „Moduly" a karty pod sebou', async 
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #592 (PROD 0.25.59 nález): serverom vyrenderované HTML (pred hydratáciou) malo na /clip karty
+// s RELATÍVNYMI odkazmi (`./fix`, `./fix/cad`) — SvelteKit `paths.relative` (default true) robí
+// `resolve()` počas SSR relatívnym k aktuálnej stránke. Odkazy kariet musia byť VŽDY absolútne.
+// Číta sa surové SSR HTML (prihlásená session, bez JS) — hydratovaný DOM by to zakryl.
+test('#592: SSR HTML kariet má absolútne odkazy na /fix, /fix/cad aj /clip', async ({ page }) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+	for (const stranka of KARTY.map((k) => k.href)) {
+		const res = await page.request.get(stranka);
+		expect(res.ok(), stranka).toBe(true);
+		const html = await res.text();
+		const odkazy = [...html.matchAll(/<a\b[^>]*data-testid="pevne-karta-[^"]*"[^>]*>/g)].map(
+			(m) => m[0].match(/\bhref="([^"]*)"/)?.[1]
+		);
+		expect(odkazy, stranka).toEqual(KARTY.map((k) => k.href).filter((h) => h !== stranka));
+	}
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('#592: pri šírke 800px (nad mobilom, pod 900px) sú tri karty pod sebou', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);

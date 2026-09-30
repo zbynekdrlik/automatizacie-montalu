@@ -67,6 +67,17 @@ describe('#592: „Pevné zasklenie" — dáta kariet a lišty', () => {
 	);
 });
 
+describe('#592: odkazy kariet sú v SSR absolútne (PROD 0.25.59: /clip mal `./fix`)', () => {
+	// SvelteKit `paths.relative` (default true) robí `resolve()` počas SSR RELATÍVNYM k aktuálnej
+	// stránke (`./fix` na /clip, `../fix` na /fix/cad) — `svelte/server` render v unit teste nemá
+	// request store, takže to nevidí (behaviorálny dôkaz = e2e/pevne-zasklenie-nav.spec.ts nad
+	// surovým SSR HTML). Tu stráž konfigurácie: absolútne cesty pre celú appku.
+	it('vite.config.ts: sveltekit paths.relative = false', () => {
+		const cfg = citaj('vite.config.ts');
+		expect(cfg).toMatch(/paths:\s*\{\s*relative:\s*false\s*\}/);
+	});
+});
+
 describe('#592: horná lišta — žiadny dropdown „Pevné zasklenie"', () => {
 	it('layout nemá vnorený dropdown ani mobilnú podsekciu a používa jeden odkaz', () => {
 		expect(LAYOUT).not.toMatch(/pevne-menu-toggle/);
