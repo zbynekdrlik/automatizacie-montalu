@@ -621,7 +621,7 @@ odobrať (tvrď podmnožinu / triedu).
   V `seriove` sú DVE kategórie, každá z iného dôvodu (`e2e/seriove.ts`, guard `tests/e2e-seriove.test.ts`):
   1. **`SERIOVE_SPECY` — menia zdieľanú konfiguráciu** (marker `MUTUJE_CFG` = `ulozit-vzorce` /
      `pridat-hrubku` / `odobrat-hrubku`): súbežný editor by menil čísla ostatným testom.
-  2. **`SERIOVE_3D` — čakajú na three.js/WebGL scénu** (marker `RENDERUJE_3D` = `data-viz-ready` /
+  2. **`SERIOVE_3D` — čakajú na three.js/WebGL scénu** (marker `RENDERUJE_3D` = ľubovoľný `data-viz-*` /
      `vizual3d-canvas` / `zakaznicky-obrazok`): GH runner (4 vCPU, bez GPU) renderuje swiftshaderom a
      pri 3 súbežných workeroch CPU vyhladovie → timeout, hoci appka je OK (#599: 0.25.60
      `zasklenia-zakaznicky` `waitForFunction` 60 s, 0.25.59 prešiel = závislé od záťaže). Oprava =
@@ -631,8 +631,8 @@ odobrať (tvrď podmnožinu / triedu).
   zápisom do editora → `SERIOVE_SPECY`; nový spec čakajúci na 3D scénu → `SERIOVE_3D`.
   **Namerané #599** (lokálne LIVE režim, load ~2, `--project=seriove --no-deps`): 87 testov → 63 passed
   / 24 skipped za 3,5 min (3D 176 s, editor 17 s — editorové zápisy sú za `skipAkLive`). V CI 0.25.60
-  bol `seriove` 1,8 min a 3D specy v paralelnej časti stáli ~9 min worker-času (pod záťažou) → čakaj
-  `seriove` ~+3–5 min, `paralelne` o ~3 min kratšie; celok hlboko pod 30-min capom.
+  bol `seriove` 1,8 min a 3D specy v paralelnej časti stáli ~7 min worker-času (pod záťažou) → čakaj
+  `seriove` ~+3–5 min, `paralelne` o ~2–3 min kratšie; celok hlboko pod 30-min capom.
   Pri JEDNOM volaní by padnutý test v `paralelne` preskočil `seriove` (dependency, „did not run") —
   post-deploy krok preto volá `--project=paralelne` a potom `--project=seriove --no-deps` (každý so
   svojím `PLAYWRIGHT_HTML_OUTPUT_DIR=playwright-report/<projekt>`), rc oboch, krok padne pri ktoromkoľvek.

@@ -15,7 +15,7 @@
 //    vyhladovie a čakanie na scénu padne na timeoute, hoci appka je v poriadku (#599: post-deploy
 //    0.25.60, `zasklenia-zakaznicky` `waitForFunction` 60 s; 0.25.59 prešiel = závislé od záťaže).
 //    Oprava je izolácia záťaže, NIE retry ani vyšší timeout. Marker = test čaká na vyrenderovanú
-//    scénu: `data-viz-ready` (tier scény hotový), `vizual3d-canvas` (screenshot/rozmer canvasu),
+//    scénu: `data-viz-*` (ready/rozmer/ral/postproc zo scény), `vizual3d-canvas` (screenshot canvasu),
 //    `zakaznicky-obrazok` (PNG zachytené z 3D scény). Stránka, ktorá 3D panel len namountuje a test
 //    na scénu nečaká (napr. `zasklenia-navrh` výkres), na nej timeoutnúť nemôže → ostáva paralelne.
 //
@@ -24,8 +24,11 @@
 /** Zápisové ovládače zdieľanej konfigurácie (testid-y v specoch). */
 export const MUTUJE_CFG = /\b(?:ulozit-vzorce|pridat-hrubku|odobrat-hrubku)\b/;
 
-/** Čakanie na vyrenderovanú three.js scénu (atribút / testid-y v specoch). */
-export const RENDERUJE_3D = /\bdata-viz-ready\b|\bvizual3d-canvas\b|\bzakaznicky-obrazok\b/;
+/** Čakanie na vyrenderovanú three.js scénu: ľubovoľný scénový atribút `data-viz-*` (ready/rozmer/
+ *  ral/postproc — nastavuje ich až hotová scéna) alebo testid canvasu / zachyteného PNG. Testid-y sú
+ *  ukotvené aj sprava (`(?![\w-])`), lebo `\b` pri pomlčke by chytil súrodencov
+ *  (`zakaznicky-obrazok-chyba` = placeholder bez obrázka, nie scéna). */
+export const RENDERUJE_3D = /\bdata-viz-[a-z]|\b(?:vizual3d-canvas|zakaznicky-obrazok)(?![\w-])/;
 
 /** Specy (názov súboru v `e2e/`) meniace zdieľanú konfiguráciu. */
 export const SERIOVE_SPECY: readonly string[] = [
