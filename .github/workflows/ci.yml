@@ -203,13 +203,14 @@ jobs:
         # error-stranka). Nové spec-y sa automaticky zahrnú — žiadna údržba zoznamu.
         # Zlyhanie = červený job (ALARM), ale rollback sa TU NEROBÍ — nová verzia
         # je zdravá (health poll prešiel).
-        # Cap 30 min = celá sada workers:1 cez tunel. NAMERANÉ na OSTROM GH runneri
-        # 2026-09-05 (run 33966432945, release 0.24.91): ~20 testov/min cez tunel,
-        # 373 testov ≈ 19 min čistého behu — predchádzajúci cap 16 min (meraný z dev1
-        # na 324 testoch, #466) nestačil: release 0.24.91 sám pridal ~49 E2E testov
-        # (#462–#464) a dev1 meranie podhodnotilo tempo GH runnera. 30 min =
-        # ~19 min + ~55 % rezerva na ďalší rast sady (census #459 pokračuje) —
-        # zdvihnuté na základe merania (no-timeout-band-aids), nie naslepo.
+        # Cap 30 min (NEZVYŠOVAŤ — no-timeout-band-aids). Sériovo (1 worker) sada 446 testov
+        # na GH runneri rástla na 29–33 min (8 behov do 0.25.58, run 36676300171 timeout) →
+        # E2E_WORKERS=3: proti LIVE PROD je sada read-only (zápisy za skipAkLive/BASE_URL skip),
+        # specy meniace zdieľanú konfiguráciu (editor vzorcov/hrúbok, e2e/seriove.ts) bežia
+        # po paralelnej časti v projekte `seriove` s 1 workerom (playwright.config.ts). 3 (nie 4)
+        # workery: runner má 4 vCPU a 3D specy renderujú softvérovo (swiftshader) — pri
+        # pretažení CPU padajú na timeoute (lokálne meranie, .claude/rules/testing.md). Reporter
+        # `list` (config pri CI) vypíše názov každého testu priebežne — aj pri timeoute kroku.
         id: postdeploy_e2e
         if: success() && steps.e2e_secrets.outputs.present == 'true'
         timeout-minutes: 30
@@ -221,7 +222,7 @@ jobs:
           # tunel: localhost:18091 → VPS 127.0.0.1:8090 (8091 býva obsadený presenterom)
           ssh -f -N -L 18091:127.0.0.1:8090 -i ~/.ssh/deploy_key -o ExitOnForwardFailure=yes deploy@167.233.125.9
           for _ in $(seq 1 15); do curl -sf --max-time 5 -o /dev/null http://localhost:18091/health && break || sleep 1; done
-          DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 npx playwright test
+          DEPLOY_SHA7="$SHA7" BASE_URL=http://localhost:18091 E2E_WORKERS=3 npx playwright test
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         # always() lebo pri zlyhaní E2E je job vo `failure` stave a implicitné
         # `success() &&` by tento krok preskočilo → padnutý report by sa nenahral.

@@ -1,16 +1,26 @@
 import { defineConfig } from '@playwright/test';
+import { SERIOVE_SPECY } from './e2e/seriove';
 
 // BASE_URL nastavený → testuje sa NASADENÁ appka (post-deploy verifikácia).
 // Bez BASE_URL (CI) sa zbuilduje a spustí preview server s test env.
 const baseURL = process.env.BASE_URL || 'http://localhost:4173';
 
+// #245: test-only route /__test-error existuje LEN v CI preview (cez
+// ENABLE_TEST_ERROR_ROUTE vo webServer.env nižšie); proti nasadeniu (BASE_URL)
+// je to 404 by design, takže error-stranka spec je preview-only — proti
+// deploymentu ho vynecháme na úrovni configu (nie runtime skip v spec súbore).
+const testIgnore = process.env.BASE_URL ? ['**/error-stranka.spec.ts'] : [];
+
+// Počet workerov: default 1 (lokálne + CI `test` job proti preview — tam bežia aj ZÁPISOVÉ testy nad
+// jednou zdieľanou e2e.db / fixture súbormi, sériovo ako doteraz). Post-deploy krok (ci.yml) nastaví
+// `E2E_WORKERS` > 1: proti LIVE PROD sú zápisy preskočené (skipAkLive / BASE_URL skip), sada je
+// read-only a paralelný beh ju skráti pod limit kroku (1 worker = 29–33 min, nad 30-min limitom).
+const WORKERS = Math.max(1, Math.floor(Number(process.env.E2E_WORKERS)) || 1);
+const SERIOVE = SERIOVE_SPECY.map((f) => `**/${f}`);
+
 export default defineConfig({
 	testDir: 'e2e',
-	// #245: test-only route /__test-error existuje LEN v CI preview (cez
-	// ENABLE_TEST_ERROR_ROUTE vo webServer.env nižšie); proti nasadeniu (BASE_URL)
-	// je to 404 by design, takže error-stranka spec je preview-only — proti
-	// deploymentu ho vynecháme na úrovni configu (nie runtime skip v spec súbore).
-	testIgnore: process.env.BASE_URL ? ['**/error-stranka.spec.ts'] : [],
+	testIgnore,
 	// #583: pred sadou zmaž zvyšky throwaway `e2e-` B2B účtov z minulých behov (aj na PROD)
 	globalSetup: './e2e/global-setup.ts',
 	timeout: 30000,
@@ -18,9 +28,28 @@ export default defineConfig({
 	// timeout intermitentne padal na login redirecte
 	expect: { timeout: process.env.BASE_URL ? 15000 : 5000 },
 	retries: 0,
-	// sériovo: editor test dočasne mení konfiguráciu vzorcov — paralelný beh
-	// by menil čísla ostatným testom (a tunel na nasadenú appku paralelu nezvláda)
-	workers: 1,
+	// CI: `list` vypíše KAŽDÝ test (aj padnutý) priebežne — aj keď krok zabije timeout, názvy
+	// zlyhaní sú v logu (default `dot` ich pri timeoute nevypísal). `html` = artefakt pri páde.
+	reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+	workers: WORKERS,
+	// Paralelný beh (WORKERS > 1): specy meniace zdieľanú konfiguráciu (editor vzorcov / hrúbok,
+	// `e2e/seriove.ts`) bežia v projekte `seriove` s 1 workerom AŽ PO paralelnej časti — súbežný
+	// editor by menil čísla ostatným testom. Pri WORKERS = 1 jeden default projekt ako doteraz.
+	// Daň: padne test v `paralelne` → Playwright `seriove` nespustí (dependency). Proti PROD sú ich
+	// zápisové testy aj tak preskočené, čítacie dobehnú v ďalšom behu po oprave.
+	projects:
+		WORKERS > 1
+			? [
+					{ name: 'paralelne', testIgnore: [...testIgnore, ...SERIOVE] },
+					{
+						name: 'seriove',
+						testMatch: SERIOVE,
+						testIgnore,
+						workers: 1,
+						dependencies: ['paralelne']
+					}
+				]
+			: undefined,
 	use: {
 		baseURL,
 		screenshot: 'only-on-failure',
