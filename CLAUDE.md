@@ -113,7 +113,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - katalóg skiel, pridanie/zmena skla, povolené sklá per systém (`POVOLENE_SKLA`, #573), Odoo sklá v nárezáku podľa hrúbky (`cfg_sklo_hrubka` nastaviteľné výrobou, `vypocetneSkloPre`, `skloOdoo`, #579), 4 mm pri Štandardoch + `predvoleneSklo` (#579 v54), Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - editor vzorcov `saveCfgChanges` (skryté zrkadlenia rámový→sklo #504 + Deluxe 6/10, audit invariant) → `.claude/rules/cfg-editor.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
-- Odoo katalóg artiklov `product.product` (`odoo-katalog.ts`, kontrola kódov odpisu z Odoo + snapshot fallback, `qty_available` 403 pasca, prechod Money→Odoo #599) → `.claude/rules/odoo-katalog.md`
+- Odoo katalóg artiklov `product.product` (`odoo-katalog.ts`, kontrola kódov odpisu z Odoo + snapshot fallback, `qty_available` 403 pasca, sklad zo `stock.quant` + nižšia z Odoo/snapshotu, prechod Money→Odoo #599) → `.claude/rules/odoo-katalog.md`
 - POST-import readback z Money DB (money_dlv snapshot, /odpisy overenie, exkluzívne párovanie) → `.claude/rules/money-readback.md`
 - cenový zoznam k zákazke `/odpisy/zakazka/[zak]` (agregácia, zak_norm legacy pasca, ReadbackBadge) → `.claude/rules/zakazka-ceny.md`
 - FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`

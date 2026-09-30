@@ -254,9 +254,10 @@ Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klas
   prepočítavajú aj ULOŽENÉ staré odpisy (backfill, kiosk). Allow-list tam = staré Robust 3.3.1
   odpisy by dali 0 riadkov nárezáku (presne pasca #570). Preto NIKDY nemaž „zakázané" sklo z
   katalógu migráciou — allow-list je filter NOVÉHO vstupu, katalóg + `money_kod` ostávajú.
-- **Systém bez záznamu = celý katalóg** (starý Štandard „bez zmeny", Drevostavby, Slide).
-  Pozor: starý Štandard zdieľa katalóg so Štandard + cez `GLASS_SYSTEM_ALIAS`, ale allow-list je
-  kľúčovaný POŽADOVANÝM systémom (`'Štandard +'` vs `'Štandard'`) — ich ponuky sa teda líšia.
+- **Systém bez záznamu = celý katalóg** (Drevostavby, Slide; starý Štandard má od #599 vlastný
+  záznam = celý katalóg BEZ 24 mm). Pozor: starý Štandard zdieľa katalóg so Štandard + cez
+  `GLASS_SYSTEM_ALIAS`, ale allow-list je kľúčovaný POŽADOVANÝM systémom (`'Štandard +'` vs
+  `'Štandard'`) — ich ponuky sa teda líšia.
 - Názvy v zozname musia byť riadky katalógu systému (`arrayContaining` test — preklep padne);
   prázdne sklo parseVstup allow-listom neodmieta (hlási ho výpočet).
 - E2E „žiadna voľba nemá `viac typov`" je pri #594 len poistka (nárezák popis „· cenník:" už nemá —
@@ -574,11 +575,35 @@ Patrik (msg 1872179, 29.9.): Štandard + a starý Štandard ponúkajú Odoo skl�
 ostávajúca voľba nezmenila výpočtové sklo); matcher prípady 24 mm Odoo typov (AL/TH/5ESG, stopsol) sa
 v unit testoch presunuli na Drevostavby (rovnaký lokálny katalóg `Štandard +`).
 
-- **Lokálny allow-list `POVOLENE_SKLA['Štandard +']` (záloha bez Odoo) sa NEMENIL** — ponúka ďalej aj
-  4/16/4 (trieda 16, IZO nárezák ten istý). CI (bez Odoo) teda 4/16/4 pri Štandard + ponúka, PROD (Odoo)
-  nie. E2E preto NIKDY netvrdí 4/16/4 pri Štandardoch — IZO nárezák Štandardov vyberá relačne triedu 16
-  cez „Izolačné sklo 4/8/4 číre" (`opona-izo.spec.ts`, `sklo-povolene-573.spec.ts`; testing.md).
-  Zúženie lokálnej zálohy (bez 4/16/4 pri Štandardoch) je produktové rozhodnutie mimo rozsahu #577 —
-  kandidát nahlásený supervízorovi komentárom „Follow-up kandidát" na #577.
+- **Lokálny allow-list (záloha bez Odoo) zúžil až #599** (sekcia nižšie) — od #599 ani CI 4/16/4 pri
+  Štandardoch neponúka. E2E ďalej vyberá IZO nárezák Štandardov relačne triedou 16 cez „Izolačné sklo
+  4/8/4 číre" (`opona-izo.spec.ts`, `sklo-povolene-573.spec.ts`; testing.md).
 - 4/8/4 a 4/16/4 pri Štandard + = `hrubka_trieda` 16, `redukcia_zero` 0, bez per-sklo korekcie (overené
   aj na PROD 30.9.) → nárez/Money identické; zmena výberu skla v E2E opona IZO nemení Excel 1:1 čísla.
+
+## Lokálna záloha skiel = živá Odoo konfigurácia hrúbok; „pôvodné" sklá (#599, 30.9.2026)
+
+ROZHODNUTÉ main 30.9. (Odoo úloha 1218): `POVOLENE_SKLA` (ponuka pri NEDOSTUPNOM Odoo + validácia +
+„Použiť znova") sa zosúlaďuje s hrúbkami v Odoo — Štandard + aj starý Štandard BEZ 24 mm.
+
+- **Tri množiny per systém** (`src/lib/sklo-povolene.ts`): `nazvy` = PONUKA nového výberu;
+  `povodne` = sklá, ktoré sa už neponúkajú, ale staré odpisy ich majú (dnes 3× „Izolačné sklo
+  4/16/4 …" pri oboch Štandardoch); PRIJATÉ = `nazvy ∪ povodne`.
+- **Kto číta čo:** ponuka (server záloha `ponukaSkielPre` `lokalne`, `ponukaSkielSystemu`,
+  `filtrujPovoleneSkla`) = LEN `nazvy`. Server `skloPovolene` (parseVstup / parseMultiVstup / znova
+  `platneSklo`) = PRIJATÉ → starý 4/16/4 odpis sa pri „Použiť znova" NEZAHODÍ a dá sa aj odoslať.
+  Klient `sklaForSystem` = `prijateSklaSystemu` → reset efekt pôvodné sklo nezruší a `ponukaPreStyl`
+  ho doplní ako „<sklo> · pôvodné sklo z appky" (vzor #594) — voľby selectu nesie serverová ponuka,
+  takže v ponuke je 4/16/4 LEN ako táto doplnková voľba. `predvoleneSklo` pôvodné sklo nikdy nevyberie.
+- **Výpočtové sklo Odoo typov sa odvodzuje z PRIJATÝCH skiel** (`ponukaSkielPre` 5. parameter
+  `vypocetne`, server helper `ponukaSystemu`; editor hrúbok `sklo-hrubky.ts` `lokalnaPonuka`) — zúženie
+  zálohy tak nemení výpočet Odoo volieb (snapshot `sklo-odoo-579` nezmenený) a výroba si 24 mm pri
+  Štandardoch vie v editore znova zapnúť (počíta sa ako 4/16/4 číre). **Pasca:** odvodzovať z ponuky
+  (`nazvy`) by pri každom zúžení zálohy ticho zablokovalo editor aj posunulo výpočet Odoo volieb.
+- Starý Štandard: prvý záznam = doterajší celý katalóg MÍNUS 4/16/4 (10 mm, 3.3.2 ostávajú — ich
+  odobratie nikto nerozhodol, hoci Odoo hrúbky 4/6/16 ich nemajú). Trieda `Iné` 24 mm pri oboch
+  Štandardoch preč (`triedyIne`); starý odpis s `Iné` 24 → „Použiť znova" triedu zahodí + nahlási
+  (existujúci #573 vzor, ako Robust).
+- Fixtúry: vlastná skladba 24 mm pri Štandard + v testoch → trieda 16 (tá istá izolačná vetva);
+  zoznamy očakávanej ponuky Štandardov v E2E bez 4/16/4. E2E „pôvodné sklo" seeduje starý odpis
+  priamo do `e2e.db` (`znova.spec.ts`, za `skipAkLive`) — cez UI sa 4/16/4 už zadať nedá.
