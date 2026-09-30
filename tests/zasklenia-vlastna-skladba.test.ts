@@ -184,8 +184,10 @@ describe('vlastná skladba — tesnenie (Money) podľa triedy v Štandard + (#23
 	it('trieda 4 → ZASK00005 v odpise (starý Štandard)', async () => {
 		expect(await kodySkla('4', 'Štandard')).toContain('ZASK00005');
 	});
-	it('trieda 24 (izolačné) → žiadne zasklievacie tesnenie (bez gumy)', async () => {
-		const kody = await kodySkla('24');
+	// #599: Štandard + už nepovoľuje triedu 24 (Odoo úloha 1218, „Štandardy — 4, 6, 16 mm") →
+	// izolačné tesnenie sa overuje triedou 16 (tá istá izolačná vetva klasifikácie)
+	it('trieda 16 (izolačné) → žiadne zasklievacie tesnenie (bez gumy)', async () => {
+		const kody = await kodySkla('16');
 		expect(kody).not.toContain('ZASK00005');
 		expect(kody).not.toContain('ZASK00006');
 	});
@@ -391,7 +393,8 @@ describe('vlastná skladba — IZO gate (RED-1, #235 slice 2)', () => {
 	// dosiahnuteľná. Test je preto prevedený na POZITÍVNY prípad (rovnaký vzor ako
 	// susedný „Štandard + 4K" test nižšie) — dokazuje, že vlastná IZO skladba na opone
 	// teraz prejde a počíta identicky ako katalógová IZO.
-	it('Štandard + opona (2x2K, IZO nárezák pridaný #504) + Iné + trieda 24 → PRIJATÉ (== katalógová IZO)', async () => {
+	// #599: trieda 24 pri Štandard + už nie je povolená → izolačná vlastná skladba triedou 16
+	it('Štandard + opona (2x2K, IZO nárezák pridaný #504) + Iné + trieda 16 → PRIJATÉ (== katalógová IZO)', async () => {
 		const base = {
 			op: '01',
 			zakaznik: 'X',
@@ -410,7 +413,7 @@ describe('vlastná skladba — IZO gate (RED-1, #235 slice 2)', () => {
 			...base,
 			sklo: SKLO_INE,
 			skloPresne: '5esg/14/5esg',
-			skloTrieda: '24',
+			skloTrieda: '16',
 			zak: 'ZAK-G1b'
 		})) as Record<string, unknown>;
 		expect(kat.step).toBe('nahlad'); // #504: opona 2x2K IZO nárezák existuje
@@ -418,7 +421,7 @@ describe('vlastná skladba — IZO gate (RED-1, #235 slice 2)', () => {
 		expect(odpisJSON(vl)).toBe(odpisJSON(kat)); // vlastná IZO == katalógová IZO (IZO nárezák)
 	});
 
-	it('Štandard + 4K (IZO nárezák existuje) + Iné + 24 = katalógová IZO 4/8/4 (IZO nárezák)', async () => {
+	it('Štandard + 4K (IZO nárezák existuje) + Iné + 16 = katalógová IZO 4/8/4 (IZO nárezák)', async () => {
 		const kat = (await nahlad({
 			...STDPLUS,
 			sklo: 'Izolačné sklo 4/8/4 číre',
@@ -428,7 +431,7 @@ describe('vlastná skladba — IZO gate (RED-1, #235 slice 2)', () => {
 			...STDPLUS,
 			sklo: SKLO_INE,
 			skloPresne: '5esg/14/5esg',
-			skloTrieda: '24',
+			skloTrieda: '16',
 			zak: 'ZAK-G3'
 		})) as Record<string, unknown>;
 		expect(kat.step).toBe('nahlad'); // IZO nárezák pre 4K existuje (inak by bol filtrovaný)
