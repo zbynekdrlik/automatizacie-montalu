@@ -145,8 +145,9 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 	await expect(riadok.locator('td').nth(0)).toContainText('ATYP podľa výkresu');
 	await expect(riadok.locator('td').nth(1)).toContainText('1000');
 
-	// Odoslať je bez OP zatiaľ zakázané
+	// Odoslať je bez OP zatiaľ zakázané; #577: viditeľná výzva zadať OP objednávky
 	await expect(page.getByTestId('odoslat-odoo')).toBeDisabled();
+	await expect(page.getByTestId('odoslat-bez-op')).toContainText('OP objednávky');
 
 	// nastav OP objednávky (zákazka nemá odpis) → jedno OP pre celý podklad
 	await page.getByTestId('op-input').fill('260545');
@@ -155,6 +156,7 @@ test('objednávka skla: prázdny podklad → ručný riadok + OP → Odoslať za
 
 	// Odoslať je teraz zapnuté (≥ 1 riadok + OP); v teste NIKDY neklikáme send
 	await expect(page.getByTestId('odoslat-odoo')).toBeEnabled();
+	await expect(page.getByTestId('odoslat-bez-op')).toHaveCount(0);
 
 	expect(consoleMsgs).toEqual([]);
 });
@@ -218,9 +220,10 @@ test('index: len zákazka (bez OP) → podklad sa otvorí, výzva na OP objedná
 	await waitHydrated(page);
 	await expect(page.getByRole('heading', { name: `Objednávka skla — ${zak}` })).toBeVisible();
 	await expect(page.getByTestId('nova-chyba')).toHaveCount(0);
-	await expect(page.getByTestId('op-input')).toHaveValue('');
-	await expect(page.getByTestId('odoslat-odoo')).toBeDisabled();
-	await expect(page.getByTestId('odoslat-bez-op')).toContainText('OP objednávky');
+	// nová zákazka = prázdny podklad s formulárom „Pridať riadok" (OP pole/Odoslať až pri riadkoch —
+	// výzvu na OP pri vypnutom Odoslať overuje test „prázdny podklad → ručný riadok + OP")
+	await expect(page.getByText('Žiadne sklá pre túto zákazku.')).toBeVisible();
+	await expect(page.getByTestId('pridat-riadok')).toBeVisible();
 
 	expect(consoleMsgs).toEqual([]);
 });
