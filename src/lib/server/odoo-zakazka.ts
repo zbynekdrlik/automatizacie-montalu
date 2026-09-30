@@ -353,7 +353,7 @@ export async function pushZakazkaToOdooDetailed(
 			log.warn('zakazka push: zákazka nemá žiadny odpis — nič neposielam', { zak });
 			return { result: 'missing', error: null };
 		}
-		const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
+		const ceny = prehlad.polozky.length > 0 ? await enrichPolozky(prehlad.polozky) : null;
 		// #418 review: JEDNO `now` pre note aj PDF → ich „Stav k …" pečiatky sa nelíšia.
 		const now = new Date();
 		const note = buildZakazkaNote(prehlad, op, ceny);

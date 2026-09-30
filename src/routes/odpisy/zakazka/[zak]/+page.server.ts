@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	// ceny LEN keď scope má uložené položky; inak čestné „nie sú k dispozícii"
 	// (odpisy spred fázy 1 nemajú položky — nikdy prázdna tabuľka tváriaca sa kompletná)
-	const ceny = prehlad.polozky.length > 0 ? enrichPolozky(prehlad.polozky) : null;
+	const ceny = prehlad.polozky.length > 0 ? await enrichPolozky(prehlad.polozky) : null;
 
 	// #298 readback: LIVE odpisy overí proti Money DLV snapshotu. NESMIE zhodiť
 	// stránku — DB/IO chyba degraduje na „neoverené", NIKDY 500 (vzor /odpisy).

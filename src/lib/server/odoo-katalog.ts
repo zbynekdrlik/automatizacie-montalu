@@ -95,7 +95,7 @@ function m2oId(v: unknown): number | null {
  * raz za výpadok. `nacitaj` vráti hodnoty LEN pre nájdené kódy a pri chybe HÁDŽE; `zabezpec` a
  * `hodnota` nehádžu.
  */
-class KodCache<T> {
+export class KodCache<T> {
 	private cache = new Map<string, { v: T | null; exp: number }>();
 	private inflight: Promise<void> | null = null;
 	/** Do kedy (ms) je Odoo považované za nedostupné. */

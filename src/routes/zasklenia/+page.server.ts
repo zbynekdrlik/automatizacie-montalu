@@ -216,7 +216,10 @@ function multiTesneniePolozky(
  * hranica (access-control skill §2): dáta sa pre b2b vôbec NEDOPOČÍTAJÚ, nielen
  * neukážu v UI, takže sa nikdy nedostanú do HTML odpovede ani skriptovaným POST-om.
  */
-function cenyPre(user: SessionUser | null, polozky: OdpisJob['polozky']): CenyResult | undefined {
+async function cenyPre(
+	user: SessionUser | null,
+	polozky: OdpisJob['polozky']
+): Promise<CenyResult | undefined> {
 	if (isB2B(user)) return undefined;
 	return enrichPolozky(polozky);
 }
@@ -238,7 +241,10 @@ async function skladVarovaniaPre(
  * Náklad na sklo (display-only, #225) — rovnaká interná-only hranica ako `cenyPre`:
  * pre b2b sa cena skla vôbec NEDOPOČÍTA, takže sa nikdy nedostane do HTML odpovede.
  */
-function skloCenyPre(user: SessionUser | null, plany: SkloPlanVstup[]): SkloCenaResult | undefined {
+async function skloCenyPre(
+	user: SessionUser | null,
+	plany: SkloPlanVstup[]
+): Promise<SkloCenaResult | undefined> {
 	if (isB2B(user)) return undefined;
 	return skloCenaPre(plany);
 }
@@ -409,10 +415,10 @@ async function stavNahlad(
 		vstup,
 		plan: r,
 		kovanie: allKovanie,
-		ceny: cenyPre(user, job.polozky),
+		ceny: await cenyPre(user, job.polozky),
 		skladVarovania: await skladVarovaniaPre(user, job.polozky),
 		snapshotDatum: getSnapshotMeta().generatedAt,
-		skloCeny: skloCenyPre(user, [
+		skloCeny: await skloCenyPre(user, [
 			{
 				label: '',
 				system: vstup.system,
@@ -450,10 +456,10 @@ async function stavNahladMulti(
 		multiVstup: vstup,
 		multi: r,
 		kovanie: allKovanie,
-		ceny: cenyPre(user, job.polozky),
+		ceny: await cenyPre(user, job.polozky),
 		skladVarovania: await skladVarovaniaPre(user, job.polozky),
 		snapshotDatum: getSnapshotMeta().generatedAt,
-		skloCeny: skloCenyPre(
+		skloCeny: await skloCenyPre(
 			user,
 			r.posuvy.map((p, i) => ({
 				label: 'Zasklenie ' + (i + 1),

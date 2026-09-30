@@ -11,7 +11,8 @@
 // kotve) → `cenaSpolu = null`. Gate na interných je na úrovni route (rovnako ako `cenyPre`/
 // `skloCenaPre`) — tento modul cenu len počíta.
 import { skloStrechaMoneyKod } from '$lib/sklo-strecha';
-import { cenaZaM2, getSnapshotMeta, type SnapshotMeta } from './ceny';
+import { cenaZaM2Zo, cenovyZdroj, getSnapshotMeta, type SnapshotMeta } from './ceny';
+import type { CenyZdroj } from './odoo-prices';
 
 /** zaokrúhlenie na 2 desatinné (€/m² aj celková cena) */
 const R2 = (x: number) => Math.round(x * 100) / 100;
@@ -28,6 +29,8 @@ export interface StrechaSkloCena {
 	/** mena (IZOS je EUR-only, ale nesieme ju z ceny pre konzistenciu) */
 	mena: string;
 	/** vek snapshotu pre UI (rovnako ako `skloCenaPre`) */
+	/** #599: `odoo` = €/m² z Odoo `get_prices` (IZOS), `snapshot` = denný Money snapshot */
+	zdroj: CenyZdroj;
 	snapshot: SnapshotMeta;
 }
 
@@ -38,15 +41,17 @@ export interface StrechaSkloCena {
  * `cenaSpolu = plochaCelkomM2 × €/m²`; keď €/m²/plocha chýba → `cenaSpolu = null` (honest-null).
  * Volá sa LEN pre interných (gate na route). Money ODPIS skla sa NEROBÍ.
  */
-export function strechaSkloCenaPre(
+export async function strechaSkloCenaPre(
 	typ: string | null,
 	plochaCelkomM2: number | null = null
-): StrechaSkloCena | null {
+): Promise<StrechaSkloCena | null> {
 	const t = (typ ?? '').trim();
 	if (!t) return null;
 	const snapshot = getSnapshotMeta(); // spustí lazy import + vráti vek snapshotu pre UI
 	const moneyKod = skloStrechaMoneyKod(t);
-	const cena = moneyKod ? cenaZaM2(moneyKod) : null;
+	// #599: TS kód strešného skla = cenník IZOS z Odoo `get_prices`, keď odpovedá (inak snapshot)
+	const zdroj = await cenovyZdroj(moneyKod ? [moneyKod] : []);
+	const cena = moneyKod ? cenaZaM2Zo(zdroj, moneyKod) : null;
 	const eurM2 = cena?.eurM2 ?? null;
 	const cenaSpolu = eurM2 != null && plochaCelkomM2 != null ? R2(plochaCelkomM2 * eurM2) : null;
 	return {
@@ -55,6 +60,7 @@ export function strechaSkloCenaPre(
 		eurM2,
 		cenaSpolu,
 		mena: cena?.mena ?? 'EUR',
+		zdroj: zdroj.zdroj,
 		snapshot
 	};
 }

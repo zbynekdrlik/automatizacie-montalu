@@ -73,10 +73,10 @@ function parseFix(form: FormData, vstup: PergolaNarezVstup): FixZPergola {
  * sa nikdy nedostane do HTML odpovede. Ceníme zobrazené nenulové položky — spočítané
  * PRP profily + ručné riadky #234 (nesú vlastnú MJ m/ks). Money odpis sa NEMENÍ.
  */
-function cenyPre(
+async function cenyPre(
 	user: SessionUser | null,
 	nonzero: { kod: string; nazov: string; qty: number; mj?: string }[]
-): CenyResult | undefined {
+): Promise<CenyResult | undefined> {
 	if (isB2B(user)) return undefined;
 	return enrichPolozky(nonzero);
 }
@@ -88,10 +88,10 @@ function cenyPre(
  * čistá geometria, akú klient renderuje) — honest-null keď dĺžka/počet/kód/cena chýba. Money odpis
  * skla sa NEROBÍ.
  */
-function strechaCenaPre(
+async function strechaCenaPre(
 	user: SessionUser | null,
 	vstup: PergolaNarezVstup
-): StrechaSkloCena | null {
+): Promise<StrechaSkloCena | null> {
 	if (isB2B(user)) return null;
 	const geo = spocitajStrechaSklo(vstup);
 	return strechaSkloCenaPre(vstup.strechaSkloTyp ?? null, geo.plochaCelkomM2);
@@ -128,7 +128,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, vstup, ident, rucne, fix };
 		// #223 — cena strešného skla €/m² + celková cena (LEN interní; b2b nikdy nedostane cenu).
 		// Geometria sa renderuje klientsky, ale server si celkovú plochu re-počíta pre cenu.
-		const strechaSkloCena = strechaCenaPre(locals.user, vstup);
+		const strechaSkloCena = await strechaCenaPre(locals.user, vstup);
 		return {
 			step: 'vysledok' as const,
 			vstup,
@@ -182,7 +182,7 @@ export const actions = {
 			vylucene: rozpis.vylucene.length
 		});
 		// cenový blok (#232) — LEN interní; b2b nikdy nedostane `ceny`
-		const ceny = cenyPre(locals.user, rozpis.nonzero);
+		const ceny = await cenyPre(locals.user, rozpis.nonzero);
 		return { step: 'rez-nahlad' as const, vstup, ident, rucne, fix, rozpis, ceny, rezError: null };
 	},
 
@@ -220,7 +220,7 @@ export const actions = {
 		// cenový blok (#232) — LEN interní. Lazy (thunk): úspešný zápis končí v „rez-hotovo"
 		// bez cenového bloku, tak ho nepočítame zbytočne — len keď sa vraciame do
 		// „rez-nahlad" (duplikát/chyba). Zavolá sa nanajvýš raz (vetvy sú return).
-		const cenyBlok = () => cenyPre(locals.user, rozpis.nonzero);
+		const cenyBlok = async () => cenyPre(locals.user, rozpis.nonzero);
 		try {
 			const outcome = await writeOdpis(job, overrideOpts(form));
 			if (outcome.status === 'duplicate') {
@@ -231,7 +231,7 @@ export const actions = {
 					rucne,
 					fix,
 					rozpis,
-					ceny: cenyBlok(),
+					ceny: await cenyBlok(),
 					rezError: `Zákazka ${ident.zak} (OP ${ident.op}) už bola odoslaná (rezervácia alebo odpis) ${outcome.duplicateCreatedAt ?? ''} — znova ju neposielam. Ak ide o opravu, najprv uvoľni záznam v histórii odpisov.`
 				};
 			}
@@ -274,7 +274,7 @@ export const actions = {
 				rucne,
 				fix,
 				rozpis,
-				ceny: cenyBlok(),
+				ceny: await cenyBlok(),
 				rezError:
 					'Zápis rezervácie zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
 			};
@@ -296,7 +296,7 @@ export const actions = {
 				ident,
 				rucne,
 				fix,
-				strechaSkloCena: strechaCenaPre(locals.user, vstup),
+				strechaSkloCena: await strechaCenaPre(locals.user, vstup),
 				error: error ?? 'Vyplň ZAK, OP a zákazníka.',
 				odooResult: null
 			};
@@ -334,7 +334,7 @@ export const actions = {
 			ident,
 			rucne,
 			fix,
-			strechaSkloCena: strechaCenaPre(locals.user, vstup),
+			strechaSkloCena: await strechaCenaPre(locals.user, vstup),
 			error: null as string | null,
 			odooResult
 		};
@@ -418,7 +418,7 @@ export const actions = {
 		const ident = parseIdent(form);
 		const fix = parseFix(form, vstup);
 		const { rucne } = parseRucne(form);
-		const strechaSkloCena = strechaCenaPre(locals.user, vstup);
+		const strechaSkloCena = await strechaCenaPre(locals.user, vstup);
 		// späť na výsledok s chybou (echo vstup/ident/fix/rucne, aby honest-null formulár + round-trip
 		// stav neprepadol; `pridatSkloChyba` sa zobrazí v karte „Sklo do objednávky")
 		const chyba = (pridatSkloChyba: string) => ({

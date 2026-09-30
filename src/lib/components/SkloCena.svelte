@@ -25,16 +25,27 @@
 
 <div class="card noprint" data-testid="sklo-cena">
 	<div class="sec">Cena skla (náklad — len interné)</div>
-	{#if skloCeny.snapshot.generatedAt}
-		<p class="sub" data-testid="sklo-cena-vek">
-			Ceny zo snapshotu Money k {formatDatumCasSk(skloCeny.snapshot.generatedAt)}, {skloCeny
-				.snapshot.daysOld}
-			{dniSlovo(skloCeny.snapshot.daysOld ?? 0)} staré.
-		</p>
-	{:else}
-		<p class="sub" data-testid="sklo-cena-vek">
-			Snapshot cien z Money zatiaľ nebol naimportovaný — cena skla je „nedostupná".
-		</p>
+	<!-- #599: Odoo (cena typu skla / cenník IZOS), keď Odoo kanál odpovedá; inak Money snapshot -->
+	<p class="sub" data-testid="sklo-cena-zdroj" data-zdroj={skloCeny.zdroj}>
+		{#if skloCeny.zdroj === 'odoo'}
+			Zdroj cien: <b>Odoo</b> (aktuálne) — sklo bez ceny v Odoo je „cena nedostupná".
+		{:else}
+			Zdroj cien: <b>Money snapshot</b> — kým Odoo ceny nesprístupní.
+		{/if}
+	</p>
+	<!-- vek Money snapshotu len pri snapshot zdroji (pri Odoo zdroji nie je relevantný) -->
+	{#if skloCeny.zdroj === 'snapshot'}
+		{#if skloCeny.snapshot.generatedAt}
+			<p class="sub" data-testid="sklo-cena-vek">
+				Ceny zo snapshotu Money k {formatDatumCasSk(skloCeny.snapshot.generatedAt)}, {skloCeny
+					.snapshot.daysOld}
+				{dniSlovo(skloCeny.snapshot.daysOld ?? 0)} staré.
+			</p>
+		{:else}
+			<p class="sub" data-testid="sklo-cena-vek">
+				Snapshot cien z Money zatiaľ nebol naimportovaný — cena skla je „nedostupná".
+			</p>
+		{/if}
 	{/if}
 	<table>
 		<thead>

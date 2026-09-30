@@ -5,14 +5,17 @@
 // dátový tok). Chýbajúca cena je vždy `null` ("cena neznáma"), nikdy 0 — Money má
 // reálne kódy, kde `Cena=0` znamená "nikdy zadané", nie "zadarmo" (overené live).
 //
-// #5808 noha 3: pri `ODOO_PRICES_ENABLED=1` sa ceny čítajú z Odoo cez json/2
-// (`get_prices`) namiesto snapshot súboru. Odoo nevracia `rozvin` — ostáva `null`
-// (honest-null, `computeLakovanie` to zvládne). Fallback na snapshot pri chybe.
+// #599 krok ceny (ROZHODNUTÉ owner 30.9. „ano prepnut ceny hned"): ZDROJ cien sa volí
+// AUTOMATICKY — keď Odoo kanál `get_prices` odpovie (`odoo-prices.ts`), ceny (aj rozvin a
+// stĺpec sklad) sú LEN z Odoo a chýbajúca cena je „neznáma" (žiadny Money fallback per
+// položka); keď kanál chýba (404/403 — dnešný PROD, odoo-erp 8706) / výpadok / dev-CI bez
+// Odoo → denný Money snapshot ako doteraz. Snapshot tabuľka `material_prices` sa Odoo cenami
+// NIKDY neprepisuje (číta ju ďalej validácia kódov + skladové varovanie).
 import fs from 'node:fs';
 import { db } from './db';
 import { logger } from './log';
 import { computeLakovanie, type LakovanieResult } from '$lib/lakovanie';
-import { isOdooPricesEnabled, fetchOdooPrices, type OdooPricesResponse } from './odoo-prices';
+import { odooCenyPreKody, zaznamenajZdroj, type CenyZdroj } from './odoo-prices';
 import { odooProduktyPreKody, odooSkladPreKody } from './odoo-katalog';
 
 const log = logger('ceny');
@@ -142,10 +145,6 @@ export interface ImportResult {
  * zablokovať aktualizáciu cien pre všetky ostatné položky — viď design komentár).
  */
 export function maybeImportSnapshot(): ImportResult {
-	// #5808: pri Odoo móde triggeruj async refresh na pozadí (fire-and-forget).
-	// Sync flow pokračuje z SQLite cache (vždy obsahuje POSLEDNÉ dáta).
-	triggerOdooRefreshIfNeeded();
-
 	const p = snapshotPath();
 	let stat: fs.Stats;
 	try {
@@ -228,141 +227,6 @@ export function maybeImportSnapshot(): ImportResult {
 	};
 }
 
-// ---- #5808 noha 3: import z Odoo json/2 -----------------------------------------
-
-export interface OdooImportResult {
-	imported: boolean;
-	reason: 'disabled' | 'no-config' | 'fetch-error' | 'ok';
-	rowCount?: number;
-	generatedAt?: string | null;
-}
-
-/**
- * Stiahne aktuálne ceny z Odoo cez json/2 `get_prices` a naimportuje ich do
- * SQLite `material_prices` (rovnaký upsert ako `maybeImportSnapshot`).
- *
- * ASYNC — volá sa zo startup hookov a z `maybeRefreshPrices` (lazy refresh).
- * Odoo nevracia `rozvin` (#369) — ostáva `null` (honest-null).
- *
- * Vráti `null` namiesto hodunia — zlyhanie sa len zaloguje, volajúci
- * fallbackne na existujúci snapshot v SQLite.
- */
-export async function importFromOdoo(): Promise<OdooImportResult> {
-	if (!isOdooPricesEnabled()) {
-		return { imported: false, reason: 'disabled' };
-	}
-	const data = await fetchOdooPrices();
-	if (!data) {
-		return { imported: false, reason: data === null ? 'fetch-error' : 'no-config' };
-	}
-	return importOdooPricesData(data);
-}
-
-/**
- * Naimportuje už-stiahnuté Odoo ceny do SQLite. Čistá DB operácia (žiadny HTTP).
- * Exportovaná pre testy.
- */
-export function importOdooPricesData(data: OdooPricesResponse): OdooImportResult {
-	const valid: PriceRow[] = [];
-	let rejected = 0;
-	for (let i = 0; i < data.rows.length; i++) {
-		const r = data.rows[i];
-		if (!r || !r.kod) {
-			rejected++;
-			continue;
-		}
-		// rozvin nie je v Odoo response — vždy null (#5808 GAP)
-		// predajPcmo nie je v Odoo response — vždy null (#364)
-		// nakupSkladovaKarta nie je v Odoo response — vždy null (#506)
-		const row = validateRow(
-			{ ...r, rozvin: null, predajPcmo: null, nakupSkladovaKarta: null },
-			i,
-			(m) => log.warn(`odoo-prices: ${m}`)
-		);
-		if (!row) {
-			rejected++;
-			continue;
-		}
-		valid.push(row);
-	}
-
-	const upsert = db.prepare(`
-		INSERT INTO material_prices (kod, nakup_cennik, nakup_posledna_faktura, nakup_skladova_karta, predaj_vo, predaj_pcmo, mena, sklad, rozvin, updated_at)
-		VALUES (@kod, @nakupCennik, @nakupPoslednaFaktura, @nakupSkladovaKarta, @predajVo, @predajPcmo, @mena, @sklad, @rozvin, datetime('now'))
-		ON CONFLICT(kod) DO UPDATE SET
-			nakup_cennik = excluded.nakup_cennik,
-			nakup_posledna_faktura = excluded.nakup_posledna_faktura,
-			nakup_skladova_karta = excluded.nakup_skladova_karta,
-			predaj_vo = excluded.predaj_vo,
-			predaj_pcmo = excluded.predaj_pcmo,
-			mena = excluded.mena,
-			sklad = excluded.sklad,
-			rozvin = excluded.rozvin,
-			updated_at = excluded.updated_at
-	`);
-	const upsertMeta = db.prepare(`
-		INSERT INTO material_prices_meta (id, snapshot_generated_at, snapshot_file_mtime_ms, imported_at, row_count, rejected_count)
-		VALUES (1, ?, NULL, datetime('now'), ?, ?)
-		ON CONFLICT(id) DO UPDATE SET
-			snapshot_generated_at = excluded.snapshot_generated_at,
-			snapshot_file_mtime_ms = NULL,
-			imported_at = excluded.imported_at,
-			row_count = excluded.row_count,
-			rejected_count = excluded.rejected_count
-	`);
-	db.transaction(() => {
-		for (const row of valid) upsert.run(row);
-		upsertMeta.run(data.generatedAt, valid.length, rejected);
-	})();
-
-	log.info('odoo-prices: naimportované z Odoo', { rows: valid.length, rejected });
-	return {
-		imported: true,
-		reason: 'ok',
-		rowCount: valid.length,
-		generatedAt: data.generatedAt
-	};
-}
-
-// ---- Odoo refresh cache (throttled, async) -----------------------------------
-
-/** Posledný čas úspešného Odoo importu (ms). `null` = ešte nikdy (snapshot mód). */
-let lastOdooImportMs: number | null = null;
-
-/** Min. interval medzi Odoo pull-mi (ms) — default 5 min. */
-const ODOO_REFRESH_INTERVAL_MS = parseInt(process.env.ODOO_PRICES_REFRESH_MS || '300000', 10);
-
-/**
- * Lazy async refresh: keď je Odoo mód zapnutý a uplynul interval od posledného
- * pull-u, stiahne čerstvé ceny na pozadí. Volá sa z `maybeImportSnapshot` ako
- * fire-and-forget (existujúci sync flow sa NEMENÍ — SQLite cache vždy obsahuje
- * POSLEDNÉ naimportované dáta, či už zo snapshotu alebo z Odoo).
- */
-export function triggerOdooRefreshIfNeeded(): void {
-	if (!isOdooPricesEnabled()) return;
-	const now = Date.now();
-	if (lastOdooImportMs !== null && now - lastOdooImportMs < ODOO_REFRESH_INTERVAL_MS) return;
-	// Nastav HNEĎ aby sa ďalšie volania nespustili duplicitne (fire-and-forget)
-	lastOdooImportMs = now;
-	void importFromOdoo()
-		.then((r) => {
-			if (r.imported) {
-				lastOdooImportMs = Date.now();
-				log.info('odoo-prices: lazy refresh hotový', { rows: r.rowCount });
-			}
-		})
-		.catch((e) => {
-			log.error('odoo-prices: lazy refresh zlyhal', {
-				err: e instanceof Error ? e.message : String(e)
-			});
-		});
-}
-
-/** Test helper: reset internal state. */
-export function _resetOdooRefreshState(): void {
-	lastOdooImportMs = null;
-}
-
 export interface SnapshotMeta {
 	generatedAt: string | null;
 	importedAt: string | null;
@@ -419,6 +283,45 @@ function getPriceRow(kod: string): PriceRow | undefined {
 		  }
 		| undefined;
 	return row;
+}
+
+// ---- zdroj cien: Odoo `get_prices` alebo Money snapshot (#599 krok ceny) ----
+
+/** Cenové riadky pre sadu kódov z JEDNÉHO zdroja (celý výpočet ide z rovnakého zdroja). */
+export interface CenovyZdroj {
+	zdroj: CenyZdroj;
+	/** riadok pre kód, `undefined` = zdroj kód nepozná (cena neznáma). */
+	riadok(kod: string): PriceRow | undefined;
+}
+
+/**
+ * Zvolí zdroj cien pre `kody`: Odoo kanál odpovedá → LEN Odoo riadky (kód mimo Odoo = `undefined`,
+ * NIKDY snapshot); inak Money snapshot (lazy import). Odoo riadok ide cez TÚ ISTÚ `validateRow` ako
+ * snapshot (0 → neznáma, `predajVo` len ZASP), `predajPcmo` a `nakupSkladovaKarta` Odoo nemá → null.
+ * Zdroj sa zaznamená (`zaznamenajZdroj` — INFO log pri zmene).
+ */
+export async function cenovyZdroj(kody: string[]): Promise<CenovyZdroj> {
+	// snapshot sa lazy importuje VŽDY (lacný `statSync`): jeho meta aj riadky čítajú aj iní
+	// konzumenti (vek pre UI, validácia kódov, skladové varovanie) nezávisle od zdroja cien
+	maybeImportSnapshot();
+	const odoo = await odooCenyPreKody(kody);
+	if (odoo.zdroj === 'odoo') {
+		zaznamenajZdroj('material', 'odoo');
+		const riadky = new Map<string, PriceRow>();
+		let i = 0;
+		for (const r of odoo.ceny.values()) {
+			const row = validateRow({ ...r, predajPcmo: null, nakupSkladovaKarta: null }, i++, (m) =>
+				log.warn(`odoo get_prices: ${m}`)
+			);
+			if (row) riadky.set(row.kod, row);
+		}
+		const chybaju = kody.filter((k) => k && !riadky.has(k));
+		if (chybaju.length > 0)
+			log.debug('ceny z Odoo: kódy bez ceny v Odoo (cena neznáma)', { kody: chybaju });
+		return { zdroj: 'odoo', riadok: (kod) => riadky.get(kod) };
+	}
+	zaznamenajZdroj('material', 'snapshot');
+	return { zdroj: 'snapshot', riadok: getPriceRow };
 }
 
 // ---- pre-export validácia Money kódov (#295) ----
@@ -570,25 +473,28 @@ function validateOdpisKodySnapshot(polozky: { kod: string; nazov: string }[]): O
 }
 
 export interface CenaZaM2 {
-	/** €/m² z Money cenníka (pre sklo = IZOS cenník cez `nakupCennik`); `null` =
-	 *  kód je v snapshote, ale cenu preň Money nemá (0/chýba) → „cena nedostupná". */
+	/** €/m² z cenníka IZOS (`nakupCennik` TS kódu — Odoo `get_prices` alebo Money snapshot); `null`
+	 *  = kód zdroj pozná, ale cenu preň nemá (0/chýba) → „cena nedostupná". */
 	eurM2: number | null;
 	mena: string;
 }
 
-/**
- * Cena za m² pre daný Money kód zo snapshotu — pre display-only zobrazenie ceny
- * skla v nárezáku (#225). Zdroj je existujúce pole `nakupCennik` (u skiel doň
- * producent snapshotu mapne IZOS cenník). Vráti `null`, keď kód v snapshote VÔBEC
- * NIE JE (variant je namapovaný, ale cena ešte nie je k dispozícii) — rovnaká
- * honest-null hláška ako `eurM2 === null`. Sám si spustí lazy import (idempotentný).
- */
-export function cenaZaM2(kod: string): CenaZaM2 | null {
+/** €/m² TS kódu z už zvoleného zdroja (`cenovyZdroj`); `null` = kód zdroj vôbec nepozná. */
+export function cenaZaM2Zo(zdroj: CenovyZdroj, kod: string): CenaZaM2 | null {
 	if (!kod) return null;
-	maybeImportSnapshot();
-	const price = getPriceRow(kod);
+	const price = zdroj.riadok(kod);
 	if (!price) return null;
 	return { eurM2: price.nakupCennik, mena: price.mena };
+}
+
+/**
+ * Cena za m² pre daný TS kód — display-only cena skla (#225, strešné sklo #223). Zdroj = Odoo
+ * `get_prices` keď kanál odpovedá, inak Money snapshot (`cenovyZdroj`). Vráti `null`, keď kód zdroj
+ * VÔBEC NEPOZNÁ — rovnaká honest-null hláška ako `eurM2 === null`.
+ */
+export async function cenaZaM2(kod: string): Promise<CenaZaM2 | null> {
+	if (!kod) return null;
+	return cenaZaM2Zo(await cenovyZdroj([kod]), kod);
 }
 
 export interface CenaRiadok {
@@ -633,6 +539,10 @@ export interface CenyResult {
 	};
 	/** spotreba farby na lakovanie profilov (#369) — display-only, €-náklad honest-null. */
 	lakovanie: LakovanieResult;
+	/** #599: odkiaľ sú ceny — `odoo` (kanál `get_prices` odpovedal) alebo `snapshot` (denný Money
+	 *  snapshot, kým Odoo kanál nie je). UI ho ukáže pri cenách (`ceny-zdroj`). */
+	zdroj: CenyZdroj;
+	/** meta Money snapshotu (vek pre UI) — relevantné len pri `zdroj === 'snapshot'`. */
 	snapshot: SnapshotMeta;
 }
 
@@ -654,11 +564,12 @@ function pripocitaj(sucet: CenySucet, hodnota: number | null, qty: number) {
  * Napojí cenové dáta na položky odpisu (JOIN podľa kódu) + spočíta súčty za
  * zákazku. Volá sa LEN pre interných (b2b cenový blok nesmie vidieť vôbec —
  * gatuje sa na úrovni route/akcie, nie tu, presne ako Money-write hranica).
+ * #599: zdroj = Odoo `get_prices` keď odpovedá (inak Money snapshot) — celý výpočet z JEDNÉHO zdroja.
  */
-export function enrichPolozky(
+export async function enrichPolozky(
 	polozky: { kod: string; nazov: string; qty: number; mj?: string }[]
-): CenyResult {
-	maybeImportSnapshot();
+): Promise<CenyResult> {
+	const zdroj = await cenovyZdroj(polozky.map((p) => p.kod));
 	const sucty = {
 		nakupCennik: novySucet(),
 		nakupPoslednaFaktura: novySucet(),
@@ -667,7 +578,7 @@ export function enrichPolozky(
 		marza: novySucet()
 	};
 	const radky: CenaRiadok[] = polozky.map((p) => {
-		const price = getPriceRow(p.kod);
+		const price = zdroj.riadok(p.kod);
 		// nakupCennik (#506): NC cenník je primárny; keď je null, použij skladovú kartu
 		// (Artikly_Artikl.PosledniCena) ako fallback — pre BPK komponenty jediný zdroj.
 		const nakupCennik = price?.nakupCennik ?? price?.nakupSkladovaKarta ?? null;
@@ -699,7 +610,7 @@ export function enrichPolozky(
 	// Lakovanie (#369): spotreba farby na rozvin profilov — display-only, počítané
 	// z tých istých riadkov (rozvin + dĺžka). €-náklad ostáva honest-null.
 	const lakovanie = computeLakovanie(radky);
-	return { radky, sucty, lakovanie, snapshot: readSnapshotMetaFromDb() };
+	return { radky, sucty, lakovanie, zdroj: zdroj.zdroj, snapshot: readSnapshotMetaFromDb() };
 }
 
 // ---- predodpisové skladové varovanie (#448, zdroj Odoo od #599 krok 3) ----
