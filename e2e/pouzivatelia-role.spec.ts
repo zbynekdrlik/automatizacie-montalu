@@ -73,8 +73,15 @@ test('vlastnú rolu si účet nemôže zmeniť — ovládač sa na vlastnom riad
 	await loginAs(page);
 	await goto(page, '/pouzivatelia');
 
-	const vlastnyRiadok = page.locator('tr', { hasText: E2E_USER });
+	// vlastný riadok = riadok s odznakom „ja" (nie `hasText: E2E_USER` — podreťazec by pri
+	// paralelnom behu, post-deploy E2E_WORKERS, chytil aj súbežne zakladané throwaway účty
+	// `e2e-<popis>-…` iných testov → strict mode violation)
+	const vlastnyRiadok = page.locator('tr', {
+		has: page.locator('.badge', { hasText: /^ja$/ })
+	});
 	await expect(vlastnyRiadok).toBeVisible();
+	const menoRe = E2E_USER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	await expect(vlastnyRiadok.getByRole('cell').first()).toHaveText(new RegExp(`^${menoRe}\\s*ja$`));
 	// žiadny select/tlačidlo Zmeniť na vlastnom riadku — len text roly
 	await expect(vlastnyRiadok.locator('select[name="role"]')).toHaveCount(0);
 	await expect(vlastnyRiadok.getByRole('button', { name: 'Zmeniť' })).toHaveCount(0);
