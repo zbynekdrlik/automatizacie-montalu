@@ -59,7 +59,7 @@ paths:
 >   Zasklenia náhľad (`stavNahlad*`) volá ceny / sklad / cenu skla cez `Promise.all` a `skloCenaPre`
 >   číta `price_m2`, `get_prices` aj picker typov súbežne — pomalé Odoo zdrží náhľad max 1× (3 s).
 > - **Cena skla podľa `value` pickera** (review #599): `price_m2` read berie aj `cennik_code` a kľúčuje
->   TÝM ISTÝM odvodením ako `odoo-glass-types.ts` (`cennik_code`, pri zdieľanom/chýbajúcom kóde
+>   ZDIEĽANÝM pravidlom `hodnotyOdooTypov` (glass-match.ts) ako picker (`cennik_code`, pri zdieľanom/chýbajúcom kóde
 >   `name`) — rovnaký názov s rôznym kódom (rámik AL/TH) má každý svoju cenu. Nikdy podľa `name`.
 > - `/health` čaká na sondy (paralelne, max ~3 s, potom cache 5 min / 60 s) — pod `--max-time 5`
 >   deploy health pollu (ci.yml); E2E „#599 zdroj cien“ porovnáva UI s `/health` (iná sonda kódu →
