@@ -2,6 +2,7 @@
 paths:
   - 'src/lib/server/migracie.ts'
   - 'src/lib/server/migracie-seed.ts'
+  - 'src/lib/server/migracie-*.ts'
   - 'tests/migration*.test.ts'
 ---
 
@@ -157,3 +158,28 @@ volá `migrateClipSkloHrubky` a tvrdí jeho vlastný bump `toBe(55)` — ten ost
 vráť ho). `migration-v54`/`v55` full-migrate asserty (migrate() beží po hlavu) stratili 24 mm pri
 Štandardoch. Fixtúra `migration-v56.test.ts` = v55 fixtúra so stavom pred 29.9. (vrátane CLIP). Krok 4
 sa netýka.
+
+## v57 (#608) — PRESTAVBA `odpis_log` (UNIQUE s `poradie`) pod FK deťmi — vlastný súbor
+
+`migracie-odpis-poradie.ts` (`migrateOdpisPoradie`, guard `>= 57`) pridá `poradie INTEGER NOT NULL
+DEFAULT 1 CHECK (poradie >= 1)` a zmení dedup kľúč na `UNIQUE (modul, zak, op, live, poradie)`.
+UNIQUE je inline v CREATE TABLE → SQLite „12 krokov" (nová tabuľka → kópia AJ `id` → DROP → RENAME →
+indexy späť). Vzor pre KAŽDÚ budúcu prestavbu tabuľky, na ktorú visí FK:
+
+- **PASCA CASCADE:** `odpis_polozky` (v19) aj `odpis_odpad` (v39) majú `REFERENCES odpis_log(id) ON
+  DELETE CASCADE` a `db.ts` zapína `foreign_keys = ON` → `DROP TABLE odpis_log` by ich CASCADE-om
+  ZMAZAL. `PRAGMA foreign_keys = OFF` MUSÍ ísť PRED `db.transaction` (vnútri transakcie je no-op),
+  pôvodný stav späť vo `finally`; pred commitom `PRAGMA foreign_key_check` (prázdne, inak throw →
+  rollback). RENAME novej tabuľky na pôvodné meno FK deti nemení (odkazujú na meno, ktoré po RENAME
+  zase existuje; SQLite ≥ 3.26 prepisuje len odkazy na PREMENOVANÚ tabuľku).
+- **Indexy** zmiznú s DROP → zachyť ich SQL zo `sqlite_master` (`type='index' AND tbl_name=… AND sql
+  IS NOT NULL`, autoindexy bez SQL vynechá) a po RENAME ich spusti znova.
+- **Fixtúry rôznych tvarov:** minimálne migračné fixtúry majú `odpis_log` bez v27/v31 stĺpcov
+  (`op_norm`, `presunute_at`) → kopíruj PRIENIK stĺpcov (`PRAGMA table_info`), nie pevný zoznam;
+  chýbajúca tabuľka = len `bump`. Počet riadkov pred/po sa porovná (throw pri nesúlade).
+- Test `migration-v57.test.ts`: PROD-tvar fixtúra s ne-sekvenčnými id + deti + presunuté/parkované →
+  bit-presné riadky, deti nedotknuté, FK späť ON a CASCADE funguje, UNIQUE s poradím, CHECK, index,
+  čerstvá DB cez `migrate(new Database(':memory:'))`.
+- `migracie.ts` 982 r. Head-bump: **54 riadkov** `user_version … toBe(56)` → 57 (python recept) —
+  POZOR: `migration-v56.test.ts` priamo volá `migrateStandardyBez24mm` a tvrdí JEHO bump `toBe(56)` —
+  ten ostáva 56 (recept ho zmení, vráť ho). Krok 4 sa netýka (žiadny exaktný zoznam stĺpcov odpis_log).

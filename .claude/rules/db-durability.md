@@ -44,7 +44,9 @@ try { const d = fs.openSync(dir, 'r'); try { fs.fsyncSync(d); } finally { fs.clo
   dať otvoriť na fsync, čo nie je fatálne (dáta sú už durable cez fsync(fd)).
 - tmp MUSÍ ostať BEZ prípony `.xlsx` (Money watcher importuje `*.xlsx` z live priečinka).
 - Celý zápis ostáva v tom istom `try/catch` ako kompenzácia (DELETE `odpis_log` pri zlyhaní
-  → uvoľní dedup kľúč) — fsync refaktor ju nesmie vytrhnúť z tohto bloku.
+  → uvoľní dedup kľúč) — fsync refaktor ju nesmie vytrhnúť z tohto bloku. Od #608 žije telo
+  vo funkcii `zapisAtomicky(dir, target, buf)` (money.ts, byte-identické), ktorú `writeOdpis`
+  volá VNÚTRI toho try — nová logika zápisu ide tam, volanie nikdy mimo try.
 - Durability sa NEDÁ unit-testom dokázať (výpadok sa nesimuluje) → guard je štrukturálny:
   `tests/money-fsync.test.ts` overí, že target je neprázdny + plne parsovateľný xlsx +
   žiadny `.tmp-*` zvyšok; golden testy v `money.test.ts` ostávajú 1:1 zelené.

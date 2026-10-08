@@ -156,8 +156,9 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
 	await expect(page.getByTestId('odoslat-ako-dorobenie')).toBeVisible();
+	// blok nič neodoslal — žiadny výsledok (súbor) na stránke
+	await expect(page.getByTestId('vysledok')).toHaveCount(0);
 	await goto(page, '/zasklenia');
-	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue('');
 
 	// 4. iná OP tej istej ZAK prejde
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(RUN);
