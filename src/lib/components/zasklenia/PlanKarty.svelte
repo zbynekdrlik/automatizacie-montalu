@@ -182,7 +182,12 @@
 		<div><span>Výška</span><b class="mono" data-testid="sklo-vyska">{fmtM(p.sklo.vyska)}</b></div>
 		<div>
 			<span>Počet</span><b class="mono">{p.sklo.pocet} ks</b>
-			<SkloOtvoryRozpis system={p.system} pocet={p.sklo.pocet} testid="sklo-otvory" />
+			<SkloOtvoryRozpis
+				system={p.system}
+				pocet={p.sklo.pocet}
+				otvaranie={vstup.otvaranie}
+				testid="sklo-otvory"
+			/>
 		</div>
 		<div>
 			<span>Typ</span><b data-testid="sklo-typ" style="font-size:13px"

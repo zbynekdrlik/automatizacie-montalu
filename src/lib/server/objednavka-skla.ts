@@ -92,7 +92,8 @@ export interface NoveSklo {
 
 /**
  * #578: riadky objednávky skla z JEDNÉHO posuvu zasklenia (producent `/zasklenia` single aj multi).
- * Tabule s vŕtaným otvorom (Deluxe krajné sklá, pravidlo `otvoryVSkle` = to isté ako výkres) idú
+ * Tabule s vŕtaným otvorom (Deluxe krajné sklá, pri opone aj stredové — #603; pravidlo
+ * `otvoryVSkle` = to isté ako výkres, preto posuv nesie aj `otvaranie`) idú
  * na samostatný riadok „<pozícia> — s otvorom ⌀46" s otvormi NA TABUĽU; zvyšok ako „<pozícia>".
  * m² sa počíta z kusov KAŽDÉHO riadku. Money-NEUTRÁLNE.
  * #587: riadok s otvorom nesie aj POLOHU otvoru (výška vŕtania posuvu; multi posuv ju nezadáva →
@@ -104,6 +105,8 @@ export function sklaPosuvu(
 		system: string;
 		sklo: { sirka: number; vyska: number; pocet: number };
 		vrtanieZamku?: number;
+		/** #603: otváranie posuvu — pri opone majú otvor aj stredové sklá (povinné) */
+		otvaranie: string;
 	},
 	ident: { zak: string; op: string; typSkla: string; createdBy: string }
 ): NoveSklo[] {
@@ -113,7 +116,7 @@ export function sklaPosuvu(
 		sirkaMm: sirka,
 		vyskaMm: vyska
 	};
-	return riadkySklaPosuvu(pozicia, posuv.system, pocet, rozmer).map((rd) => ({
+	return riadkySklaPosuvu(pozicia, posuv.system, pocet, posuv.otvaranie, rozmer).map((rd) => ({
 		zak: ident.zak,
 		op: ident.op,
 		modul: 'zasklenia',

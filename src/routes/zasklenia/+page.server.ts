@@ -67,6 +67,7 @@ import {
 	sklaPosuvu,
 	upozornenieCudzie
 } from '$lib/server/objednavka-skla';
+import { otvaraniePosuvu } from '$lib/sklo-otvory';
 import { priradOdooTypy } from '$lib/server/odoo-glass-types';
 import { ponukySkiel, parseVstupSOdoo, parseMultiVstupSOdoo } from '$lib/server/sklo-odoo';
 
@@ -790,9 +791,10 @@ export const actions = {
 
 		// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
 		// #587: výška vŕtania zámku z formulára → poloha otvoru na riadku „s otvorom" (PDF výkres)
+		// #603: otváranie z formulára (2× štýl = vždy opona) → pri opone aj stredové sklá s otvorom
 		const polozky = sklaPosuvu(
 			'Zasklenie 1',
-			{ ...r, vrtanieZamku: vstup.vrtanieZamku },
+			{ ...r, vrtanieZamku: vstup.vrtanieZamku, otvaranie: vstup.otvaranie },
 			{
 				zak: vstup.zak,
 				op: vstup.op,
@@ -838,14 +840,19 @@ export const actions = {
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', multiVstup: vstup };
 
 		// #563: len pozícia „Zasklenie N" (bez systému/štýlu) + m² vopred
+		// #603: otváranie posuvu cez TEN ISTÝ fallback ako výkres/karta `PlanKartyMulti`
 		const polozky = r.posuvy.flatMap((p, i) =>
-			sklaPosuvu(`Zasklenie ${i + 1}`, p, {
-				zak: vstup.zak,
-				op: vstup.op,
-				typSkla:
-					vstup.posuvy[i]?.skloOdoo || vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
-				createdBy: locals.user?.username ?? ''
-			})
+			sklaPosuvu(
+				`Zasklenie ${i + 1}`,
+				{ ...p, otvaranie: otvaraniePosuvu(p.otvaranie) },
+				{
+					zak: vstup.zak,
+					op: vstup.op,
+					typSkla:
+						vstup.posuvy[i]?.skloOdoo || vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
+					createdBy: locals.user?.username ?? ''
+				}
+			)
 		);
 		// #514: validácia pred vedľajším efektom + idempotentne + bez presmerovania — viď `pridatSkla`
 		const v = await stavNahladMulti(vstup, r, specs, locals.user);
