@@ -156,6 +156,17 @@ describe('#603 Nahlad2D kreslí otvory opony na správnych sklách a stranách',
 		expect(stredy(nahlad(4, 'Opona'))).toHaveLength(4);
 		expect(stredy(nahlad(4, 'L - P'))).toHaveLength(2);
 	});
+
+	it('popisy otvorov smerujú do skla — popisy dvoch stredových otvorov sa neprekrývajú', () => {
+		// popis „⌀46" každého otvoru v poradí polí: x + ukotvenie textu
+		const popisy = [
+			...nahlad(6, 'Opona').matchAll(/<text x="([\d.]+)"[^>]*text-anchor="(\w+)"[^>]*>⌀46</g)
+		].map((m) => ({ x: Number(m[1]), kotva: m[2] }));
+		// otvor pri ľavej hrane → text doprava (start), pri pravej → doľava (end)
+		expect(popisy.map((p) => p.kotva)).toEqual(['start', 'end', 'start', 'end']);
+		// ľavé stredové (pole 2) končí naľavo od začiatku pravého stredového (pole 3)
+		expect(popisy[1]!.x).toBeLessThan(popisy[2]!.x);
+	});
 });
 
 describe('#603 /zasklenia → objednávka skla + Odoo glass_order pri opone', () => {

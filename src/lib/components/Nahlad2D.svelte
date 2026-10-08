@@ -225,7 +225,11 @@
 			const gx1 = M.left + i * panelW + panelW - frame;
 			const edgeX = left ? gx0 : gx1;
 			const cx = left ? gx0 + OKRAJ_ZAMOK * scale : gx1 - OKRAJ_ZAMOK * scale;
-			return { cx, cy, r, edgeX, left };
+			// #603: popis otvoru (⌀, výška vŕtania) smeruje od hrany s otvorom DO skla — pri opone
+			// stoja dva stredové otvory tesne pri stretávacej hrane a centrované popisy by sa prekryli
+			const textX = left ? cx - r : cx + r;
+			const anchor: 'start' | 'end' = left ? 'start' : 'end';
+			return { cx, cy, r, edgeX, left, textX, anchor };
 		});
 	});
 
@@ -498,14 +502,14 @@
 		>
 		<!-- ⌀46 + výška vŕtania pod otvorom -->
 		<text
-			x={z.cx}
+			x={z.textX}
 			y={z.cy + z.r + 11}
-			text-anchor="middle"
+			text-anchor={z.anchor}
 			font-size="9"
 			fill="#334155"
 			font-weight="600">⌀{D_ZAMOK}</text
 		>
-		<text x={z.cx} y={z.cy + z.r + 21} text-anchor="middle" font-size="9" fill="#334155"
+		<text x={z.textX} y={z.cy + z.r + 21} text-anchor={z.anchor} font-size="9" fill="#334155"
 			>v {fmt(vrtanieZamku)}</text
 		>
 	{/each}
