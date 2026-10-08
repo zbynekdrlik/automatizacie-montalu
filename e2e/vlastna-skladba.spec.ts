@@ -28,7 +28,7 @@ async function zadajVlastnuSkladbu(page: import('@playwright/test').Page) {
 	await page.fill('#skloPresne', '5esg/14/5esg');
 	await page.fill('#s', '3000');
 	await page.fill('#v', '2000');
-	await vyberFarbuKovania(page); // no-op pre Štandard + (nemá farebné kovanie)
+	await vyberFarbuKovania(page); // #604: Štandard + má RAL zámok (kovanie RS STANDARD)
 }
 
 test('„Iné" → text + trieda → Spočítať → vlastná skladba je na pláne, cena nedostupná', async ({

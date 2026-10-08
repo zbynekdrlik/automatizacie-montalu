@@ -863,7 +863,8 @@ nevykreslí → červený celý E2E beh. Od #354 platí to isté aj pre 10mm Del
 TRI selektory (`getByTestId('spocitat')`, `{ name: 'Spočítať nárezový plán' }`,
 `{ name: /Spočítať spoločný plán/ }`) — `spocitat` testid je v ZasklieniaForm AJ v pergola
 RezForm, takže patchuj len ZASKLENIA specy. Helper `vyberFarbuKovania(page)` v `e2e/helpers.ts`
-je no-op keď farba-select nie je na obrazovke (Slide/Štandard +), inak vyberie farbu — od #354
+je no-op keď farba-select nie je na obrazovke (od #604 už len Štandard Drevo — Slide aj Štandard +
+majú RAL zámok), inak vyberie farbu — od #354
 BEZ explicitného argumentu si sám vyberie PLATNÚ hodnotu z reálnych `<option>` (uprednostní
 `R9005`, ak je v ponuke, inak prvú) namiesto natvrdo `R9005` — Deluxe ho totiž nemá (viď #354n
 nižšie). Volaj ho PRED každým trigger klikom. Pri pridaní ďalšieho farebného komponentu over
@@ -938,3 +939,11 @@ zlepí s množstvom BEZ medzery.** `PlanKarty.svelte`/`PlanKartyMulti.svelte` ma
 na to NIKDY nesadne (znak pred "2" je "6", nie nedigit). Rieš locator na IZOLOVANOM `<b>`
 elemente (`riadok(page, kod).locator('b')`) s exaktným `toHaveText('N ks')`, nie regex na
 celý `.row`.
+
+## 2p. Kovanie sa priraďuje podľa RODINY systému, nie presného reťazca (#604)
+
+Štandard + dostal `komponentyPre` = `null` (porovnanie `system === 'Štandard'`) → 65 ostrých
+posuvov bez kladiek/zámkov/kefy. Zdroj pravdy je teraz `RODINA_KOVANIA` + výslovné
+`SYSTEMY_BEZ_KOVANIA`; čo sa pri zapnutí kovania pre ďalší systém rozbije (RAL `required`,
+fixtures, golden snapshot, zmiešaná zákazka × 3 farby) → `.claude/rules/kovanie.md` (auto-loads
+na `komponenty-cfg.ts` / `kovanie.ts` / `komponenty.ts`).

@@ -40,9 +40,8 @@ export interface ZakladPoctov {
 	/**
 	 * súčet dĺžok rezov profilu s „kladkový" v názve (mm), #354. POZOR: NIE je
 	 * exkluzívne Deluxe — Štandard má VLASTNÝ „Kladkový profil" (ZASP202415), takže
-	 * toto pole je nenulové aj pri Štandard posuve; dnes ho žiadny Štandard
-	 * komponent nepoužíva (KOVANIE_NEUPLNE.Štandard čaká na vzorec kefy/tesnenia),
-	 * ale budúci Štandard-kefy vzorec s touto rolou musí počítať.
+	 * toto pole je nenulové aj pri Štandard / Štandard + posuve — číta ho kefa
+	 * ZASK00007 (kladkový × 2) v KOMPONENTY_STANDARD aj KOMPONENTY_DELUXE (#342, #604).
 	 */
 	dlzkaKladkovehoMm: number;
 	/** súčet dĺžok rezov profilu s „klzný" v názve (mm), #354; 0 mimo Deluxe — žiadny

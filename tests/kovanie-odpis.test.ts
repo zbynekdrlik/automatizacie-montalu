@@ -159,16 +159,25 @@ describe('kovanieDoOdpisu — SLIDE (#357, zapnuté — 2 z 11 kódov s 0 ks vyn
 		expect(r.polozky).toEqual([]);
 	});
 
-	it('Štandard + kovanie nemá — odpis profilov beží ďalej bez chyby', () => {
-		expect(kov([spec('Štandard +|2K')])).toEqual({ polozky: [], err: null, warn: null });
+	// #604: pôvodné „Štandard + kovanie nemá" kódovalo BUG (Odoo úloha 1261 — odpis bez
+	// kladiek, zámku a kefy). Štandard + dostáva KOMPONENTY_STANDARD; podrobné počty
+	// pre všetky štýly sú v tests/kovanie-standard-plus.test.ts.
+	it('Štandard + dostane kovanie RS STANDARD (kladka, zámok, protikus, kefa) — #604', () => {
+		const r = kov([spec('Štandard +|2K')]);
+		expect(r.err).toBeNull();
+		expect(qty(r, 'ZASK00002')).toBe(4);
+		expect(qty(r, 'ZASK202531')).toBe(2);
+		expect(qty(r, 'ZASK20252')).toBe(2);
+		expect(qty(r, 'ZASK00007')).toBeGreaterThan(0);
 	});
 	// Deluxe DOSTALO kovanie v #354 (madlo/kefy/10mm krytky) — testy v
 	// tests/kovanie-deluxe.test.ts nahrádzajú pôvodné "Deluxe kovanie nemá".
 
-	it('zmiešaná zákazka: Robust dá kovanie, Štandard + nie', () => {
+	it('zmiešaná zákazka: Robust aj Štandard + dajú každý svoje kovanie (#604)', () => {
 		const r = kov([spec('Robust|2K'), spec('Štandard +|2K')]);
 		expect(r.err).toBeNull();
 		expect(qty(r, 'ZASK00027')).toBe(4);
+		expect(qty(r, 'ZASK00002')).toBe(4);
 	});
 });
 

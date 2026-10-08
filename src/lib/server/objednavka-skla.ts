@@ -12,7 +12,8 @@ import {
 	type HoleSize,
 	type EdgeFinish
 } from './odoo-rozpis-lines';
-import { bezRozmerov, m2Tabule, popisPozicie, zakladPozicie } from '../objednavka-skla-pozicia';
+import { bezRozmerov, m2Tabule, popisPozicie } from '../objednavka-skla-pozicia';
+import { otvoryRiadku, prevedStaryCelok, prevedStareRozdelenie } from './objednavka-skla-otvory';
 import {
 	riadkySklaPosuvu,
 	triedaOtvoru,
@@ -92,7 +93,8 @@ export interface NoveSklo {
 
 /**
  * #578: riadky objednávky skla z JEDNÉHO posuvu zasklenia (producent `/zasklenia` single aj multi).
- * Tabule s vŕtaným otvorom (Deluxe krajné sklá, pravidlo `otvoryVSkle` = to isté ako výkres) idú
+ * Tabule s vŕtaným otvorom (Deluxe krajné sklá, pri opone aj stredové — #603; pravidlo
+ * `otvoryVSkle` = to isté ako výkres, preto posuv nesie aj `otvaranie`) idú
  * na samostatný riadok „<pozícia> — s otvorom ⌀46" s otvormi NA TABUĽU; zvyšok ako „<pozícia>".
  * m² sa počíta z kusov KAŽDÉHO riadku. Money-NEUTRÁLNE.
  * #587: riadok s otvorom nesie aj POLOHU otvoru (výška vŕtania posuvu; multi posuv ju nezadáva →
@@ -104,6 +106,8 @@ export function sklaPosuvu(
 		system: string;
 		sklo: { sirka: number; vyska: number; pocet: number };
 		vrtanieZamku?: number;
+		/** #603: otváranie posuvu — pri opone majú otvor aj stredové sklá (povinné) */
+		otvaranie: string;
 	},
 	ident: { zak: string; op: string; typSkla: string; createdBy: string }
 ): NoveSklo[] {
@@ -113,7 +117,7 @@ export function sklaPosuvu(
 		sirkaMm: sirka,
 		vyskaMm: vyska
 	};
-	return riadkySklaPosuvu(pozicia, posuv.system, pocet, rozmer).map((rd) => ({
+	return riadkySklaPosuvu(pozicia, posuv.system, pocet, posuv.otvaranie, rozmer).map((rd) => ({
 		zak: ident.zak,
 		op: ident.op,
 		modul: 'zasklenia',
@@ -142,32 +146,6 @@ const stmtInsert = db.prepare(`
 		 otvor_od_hrany_mm, otvor_od_spodku_mm, otvor_priemer_mm)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'rozmery', ?, ?, ?, ?, ?, ?)
 `);
-
-/** #587: stĺpce polohy otvoru (poradie `otvor_od_hrany_mm, otvor_od_spodku_mm, otvor_priemer_mm`). */
-type OtvorStlpce = [number | null, number | null, number | null];
-
-/** #578: otvory z producenta → hodnoty `spec_holes_qty`/`spec_hole_size` (validované ako `nastavSpec`).
- *  #587: + poloha otvoru — uloží sa LEN pri otvoroch > 0 a kladných konečných číslach, inak NULL. */
-function otvoryRiadku(s: NoveSklo): {
-	holesQty: number;
-	holeSize: HoleSize | '';
-	poloha: OtvorStlpce;
-} {
-	const holesQty = s.holesQty ?? 0;
-	if (!Number.isInteger(holesQty) || holesQty < 0)
-		throw new Error('Neplatný počet (otvory): musí byť celé číslo >= 0.');
-	if (s.holeSize !== undefined && !HOLE_SIZES.includes(s.holeSize))
-		throw new Error('Neplatný priemer otvoru.');
-	const o = holesQty > 0 ? (s.otvor ?? null) : null;
-	const platna =
-		o != null && [o.odHranyMm, o.odSpodkuMm, o.priemerMm].every((x) => Number.isFinite(x) && x > 0);
-	// otvory > 0 bez triedy → d30 (rovnako ako `nastavSpec`); bez otvorov trieda nemá zmysel
-	return {
-		holesQty,
-		holeSize: holesQty > 0 ? s.holeSize || 'd30' : '',
-		poloha: platna ? [o.odHranyMm, o.odSpodkuMm, o.priemerMm] : [null, null, null]
-	};
-}
 
 export function pridajSklo(s: NoveSklo): number {
 	const otvory = otvoryRiadku(s);
@@ -417,84 +395,39 @@ function najdiRovnaku(s: NoveSklo): RovnakyRiadok | undefined {
 	return kandidati.find((k) => popisPozicie(k.popis, s.modul) === pozicia);
 }
 
-// #578 prechod: riadok spred rozlíšenia otvorov = CELÝ posuv jedným riadkom (N ks) na tej istej
-// pozícii BEZ prípony otvoru. Nový producent ho rozdelí na „s otvorom" + „bez" — ani jeden sa s ním
-// nespáruje (iné kusy), takže bez prevodu by opakované „Pridať sklá" pridalo tabule NAVYŠE (dvojitá
-// objednávka). Starý riadok sa preto PREVEDIE na riadok „s otvorom" (id + prílohy ostanú); zvyšok
-// „bez" sa potom vloží bežne → výsledok = ako čerstvé pridanie. Otvory starého riadku sa NEfiltrujú
-// (obsluha ich mohla pred #578 nastaviť ručne cez #521 spec) — prepíše ich pravidlo. Nový riadok sa
-// nikdy nechytí: „s otvorom" má príponu (≠ základná pozícia), „bez" má menej kusov než celok.
-const stmtStaryCelok = db.prepare(`
-	SELECT id, popis FROM objednavka_skla
-	WHERE zak_norm = ? AND op = ? AND modul = ?
-	  AND sirka_mm IS ? AND vyska_mm IS ? AND v_lavo_mm IS ? AND v_pravo_mm IS ?
-	  AND pocet = ? AND typ_skla = ?
-`);
-const stmtPrevedNaOtvor = db.prepare(`
-	UPDATE objednavka_skla SET popis = ?, pocet = ?, m2 = ?, spec_holes_qty = ?, spec_hole_size = ?,
-		otvor_od_hrany_mm = ?, otvor_od_spodku_mm = ?, otvor_priemer_mm = ?
-	WHERE id = ?
-`);
-
-function prevedStaryCelok(s: NoveSklo, polozky: NoveSklo[]): boolean {
-	if (s.modul !== 'zasklenia' || !((s.holesQty ?? 0) > 0)) return false;
-	const zaklad = zakladPozicie(s.popis, s.modul);
-	// kusy CELÉHO posuvu = súčet riadkov tej istej pozície a toho istého skla v tomto pridaní
-	const celok = polozky
-		.filter(
-			(p) =>
-				p.modul === s.modul &&
-				zakladPozicie(p.popis, p.modul) === zaklad &&
-				p.sirkaMm === s.sirkaMm &&
-				p.vyskaMm === s.vyskaMm &&
-				p.typSkla === s.typSkla
-		)
-		.reduce((sum, p) => sum + p.pocet, 0);
-	const kandidati = stmtStaryCelok.all(
-		normZak(s.zak),
-		s.op ?? '',
-		s.modul,
-		s.sirkaMm,
-		s.vyskaMm ?? null,
-		s.vLavoMm ?? null,
-		s.vPravoMm ?? null,
-		celok,
-		s.typSkla
-	) as { id: number; popis: string }[];
-	const stary = kandidati.find((k) => popisPozicie(k.popis, s.modul) === zaklad);
-	if (!stary) return false;
-	const otvory = otvoryRiadku(s);
-	stmtPrevedNaOtvor.run(
-		s.popis,
-		s.pocet,
-		s.m2 ?? null,
-		otvory.holesQty,
-		otvory.holeSize,
-		...otvory.poloha,
-		stary.id
-	);
-	log.info('stary riadok posuvu prevedeny na riadok s otvorom', {
-		id: stary.id,
-		zak: s.zak,
-		celok,
-		sOtvorom: s.pocet
-	});
-	return true;
-}
-
 /** Ako `pridajSklaHromadne`, ale IDEMPOTENTNE — riadok, ktorý už (identicky) existuje,
- *  preskočí. Vracia počet NOVO vložených (#578: aj prevedených starých riadkov). Umožňuje
+ *  preskočí. Vracia počet NOVO vložených (#578/#603: aj prevedených starých riadkov). Umožňuje
  *  opakované „Pridať sklá" nad tým istým spočítaným plánom bez duplikácie (#514).
  *  Money-NEUTRÁLNE (objednavka_skla). */
 export function pridajSklaHromadneIdempotentne(
 	polozky: NoveSklo[],
 	/** #587: voliteľne — počet existujúcich riadkov, ktorým sa zmenila poloha otvoru (NIE sú v
 	 *  návratovej hodnote: nič sa nepridalo, len treba objednávku znova odoslať do Odoo). */
-	stats?: { polohaZmenena: number }
+	stats?: { polohaZmenena: number; prechodOdmietnuty: string[] }
 ): number {
 	let pridane = 0;
 	db.transaction(() => {
+		// #603: najprv prechod starého rozdelenia otvorov (pred dedupom, aby nerozhodovalo poradie
+		// riadkov) — prevedený riadok „s otvorom" sa počíta ako pridaný, jeho „bez" potom páruje dedup;
+		// ODMIETNUTÝ prechod (ručné zásahy) = riadky toho posuvu sa NEpridajú (žiadne zdvojenie) a
+		// pozícia ide do `stats.prechodOdmietnuty` (upozornenie v banneri)
+		const prevedene = new Set<NoveSklo>();
+		const vynechane = new Set<NoveSklo>();
 		for (const s of polozky) {
+			if (najdiRovnaku(s)) continue;
+			const prechod = prevedStareRozdelenie(s, polozky);
+			if (prechod?.stav === 'prevedene') prevedene.add(s);
+			else if (prechod?.stav === 'odmietnute') {
+				for (const r of prechod.riadky) vynechane.add(r);
+				stats?.prechodOdmietnuty.push(`${prechod.pozicia} (${prechod.dovod})`);
+			}
+		}
+		for (const s of polozky) {
+			if (vynechane.has(s)) continue;
+			if (prevedene.has(s)) {
+				pridane++;
+				continue;
+			}
 			const rovnaka = najdiRovnaku(s);
 			if (rovnaka) {
 				if (doplnPolohu(rovnaka, s) && stats) stats.polohaZmenena++;

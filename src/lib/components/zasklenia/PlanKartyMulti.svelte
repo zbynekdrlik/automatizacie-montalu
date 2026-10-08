@@ -10,6 +10,7 @@
 	import PoznamkaRal from './PoznamkaRal.svelte';
 	import KovanieStrany from './KovanieStrany.svelte';
 	import SkloOtvoryRozpis from './SkloOtvoryRozpis.svelte';
+	import { otvaraniePosuvu } from '$lib/sklo-otvory';
 	import { fmtSkloRozmer } from '$lib/sklo';
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { popisRucnejKolajnice } from '$lib/kolajnica';
@@ -69,6 +70,7 @@
 							(pv.skloNazov ? ` · ${pv.skloNazov}` : '')}<SkloOtvoryRozpis
 							system={pv.system}
 							pocet={pv.sklo.pocet}
+							otvaranie={otvaraniePosuvu(pv.otvaranie)}
 							testid={`posuv-sklo-otvory-${i}`}
 						/></td
 					>
@@ -91,7 +93,7 @@
 					N={pv.N}
 					skloS={pv.sklo.sirka}
 					skloV={pv.sklo.vyska}
-					otvaranie={pv.otvaranie ?? 'Opona'}
+					otvaranie={otvaraniePosuvu(pv.otvaranie)}
 					system={pv.system}
 					kovanieL={pv.kovanieL ?? ''}
 					kovanieP={pv.kovanieP ?? ''}

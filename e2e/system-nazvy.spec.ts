@@ -8,7 +8,7 @@
 //
 // Všetko ČÍTACIE („Spočítať"), do Money nejde nič.
 import { test, expect } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated } from './helpers';
+import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania } from './helpers';
 
 test('ponuka systémov: text je nový, hodnota ostáva pôvodný kľúč', async ({ page }) => {
 	const errs = collectConsole(page);
@@ -50,6 +50,8 @@ test('hlavička nárezového plánu píše „Štandard plus", odpis sa neposiel
 	await page.getByLabel('Štýl').selectOption('3K');
 	await page.locator('#s').fill('3000');
 	await page.locator('#v').fill('2400');
+	// #604: Štandard + má kovanie RS STANDARD s RAL zámkom → farba je povinná (required select)
+	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať' }).click();
 
 	const badge = page.getByTestId('plan-badge').first();

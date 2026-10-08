@@ -8,6 +8,9 @@ paths:
   - "src/lib/objednavka-skla-typy.ts"
   - "src/lib/server/objednavka-skla-odoslanie.ts"
   - "src/lib/sklo-otvory.ts"
+  - "src/lib/server/objednavka-skla-otvory.ts"
+  - "src/lib/components/zasklenia/PlanKarty.svelte"
+  - "src/lib/components/zasklenia/PlanKartyMulti.svelte"
   - "src/lib/server/sklo-otvor-pdf.ts"
   - "src/lib/server/odoo-glass-order-upload.ts"
   - "src/lib/components/zasklenia/SkloOtvoryRozpis.svelte"
@@ -578,10 +581,11 @@ Marek D. (Odoo úlohy 1180/1181, 28.9.): 99 Odoo typov v plochom `<select>` bolo
 Marek (Odoo úloha 1185): IZOS cení tabuľu s otvorom inak než bez → objednávka musí povedať, KTORÉ
 tabule vŕtať. Money-NEUTRÁLNE, bez migrácie (spec stĺpce v48).
 
-- **Pravidlo `otvoryVSkle(system, N)`** (`src/lib/sklo-otvory.ts`, client-safe) — Deluxe: krajné
-  sklá (`N===1 → [0]`, inak `[0, N-1]`), 1 otvor na tabuľu, trieda `d50` (⌀46 ∈ 31–50 mm); ostatné
-  systémy `[]`. Štýl (opona/2x) pravidlo NEmení — `Nahlad2D` ho nedostáva a kreslí rovnako polia
-  0 a N−1. `Nahlad2D` berie indexy z pravidla (`zamky`), takže výkres a objednávka nemôžu nesedieť
+- **Pravidlo `otvoryVSkle(system, N, otvaranie)`** (`src/lib/sklo-otvory.ts`, client-safe) — Deluxe:
+  krajné sklá (`N===1 → [0]`, inak `[0, N-1]`), pri otváraní **Opona aj obe stredové** (#603, sekcia
+  nižšie), 1 otvor na tabuľu, trieda `d50` (⌀46 ∈ 31–50 mm); ostatné systémy žiadne. Vracia
+  `tabule: {pole, vlavo}[]` (strana otvoru PER TABUĽA). `Nahlad2D` berie tabule aj strany z pravidla
+  (`zamky`), takže výkres a objednávka nemôžu nesedieť
   (test `tests/sklo-otvory-578.test.ts` SSR-renderuje `Nahlad2D` cez `svelte/server` `render` a
   porovná počet `circle[stroke-dasharray]` s pravidlom). Ďalší otvor (madlo D56, iný systém) = zmena
   LEN v `otvoryVSkle`.
@@ -609,8 +613,8 @@ tabule vŕtať. Money-NEUTRÁLNE, bez migrácie (spec stĺpce v48).
   #521 spec by inak znova zdvojili) — prepíše ich pravidlo. Test `tests/objednavka-skla-otvory-prechod-578.test.ts`.
 - **Prípona otvoru je všeobecná** (`PRIPONA_OTVOR_RE = / — s otvorom ⌀\d+$/`), `zakladPozicie`
   ju odreže — ďalší priemer (madlo ⌀56) = nový riadok s inou príponou bez zmeny `popisPozicie`.
-- **Styl vs otvory:** pravidlo štýl ignoruje (výkres ho nedostáva); ak výroba potvrdí iné polia pre
-  oponu/2x, zmena je v `otvoryVSkle` (ROZHODNUTÉ na #578 to explicitne predpokladá).
+- **Otváranie vs otvory:** od #603 pravidlo dostáva OTVÁRANIE (opona = aj stredové sklá); štýl
+  priamo nie (2× štýl vynúti otváranie `Opona` už `parseVstup`/formulár). Detail v sekcii #603.
 - **E2E** `e2e/objednavka-skla-otvory.spec.ts` — relačne: ks s otvorom = kruhy vo výkrese, súčet = ks
   skla z karty „Sklo (mm)" (Počet nemá testid → `div:has(> span:text-is("Počet")) > b`).
 
@@ -626,11 +630,11 @@ toho istého pravidla).
   aj PDF generátor z nich čítajú. Guard `tests/sklo-otvor-poloha-587.test.ts`: `sklo-otvor-pdf.ts`
   nesmie obsahovať `\b(50|46|1050)\b` — **ani v komentároch**, píš „⌀…"; Nahlad2D nesmie mať
   `OKRAJ_ZAMOK = <číslo>` ani `vrtanieZamku = <číslo>`; formulár + Nahlad2D nesmú mať literál `1050`.
-  Pomocníci: `popisPolohyOtvoru` (text), `triedaOtvoru` (d30/d50), `stranyOtvorov` (ľavé/pravé
-  krídlo), `fmtMmOtvoru`. `polohaOtvoru` vráti
+  Pomocníci: `popisPolohyOtvoru` (text), `triedaOtvoru` (d30/d50), `stranyOtvorov` (tabule s
+  otvorom pri ľavej / pravej hrane = „ľavé/pravé krídlo" v PDF), `fmtMmOtvoru`. `polohaOtvoru` vráti
   `null`, keď by otvor nebol CELÝ v skle (náhľad výšku len oreže do kresby, dodávateľovi sa
   nedomýšľa) → riadok ostane „s otvorom" (cena IZOS), ale výkres sa negeneruje.
-- **Producent:** `riadkySklaPosuvu(pozícia, systém, N, rozmer?)` dá riadku s otvorom `otvor`;
+- **Producent:** `riadkySklaPosuvu(pozícia, systém, N, otvaranie, rozmer?)` dá riadku s otvorom `otvor`;
   `sklaPosuvu` posiela `vrtanieZamku` (single `/zasklenia` z formulára cez `{ ...r, vrtanieZamku }`;
   **multi posuv výšku nezadáva → default**, rovnako ako ho kreslí `PlanKartyMulti` → `Nahlad2D`).
   Bez `rozmer` kľúč `otvor` chýba → existujúce `toEqual` vektory #578 ostali platné.
@@ -669,16 +673,66 @@ toho istého pravidla).
   „prepni na atyp + vlastný výkres" — znova „Pridať sklá" by riadok NESPÁROVAL, dedup kľúč = otvory
   → duplicitné sklo!) inak „poloha neznáma" (znova „Pridať sklá" so správnou výškou, alebo atyp).
   Ručné nahratie na rozmery-riadok NEPONÚKAME — `nahratSubor` prepína riadok na atyp.
-- **Nárezák karta „Sklo (mm)":** `SkloOtvoryRozpis` (`rozpisOtvorovSkla`) „z toho s otvorom ⌀46: 2 ks
-  · bez otvoru: 2 ks" — single (`sklo-otvory`, pod Počet, hodnota Počet nezmenená) aj multi
-  (`posuv-sklo-otvory-<i>` v bunke skla). Systém bez otvorov → nič. Tlačí sa s kartou.
+- **Nárezák karta „Sklo (mm)":** `SkloOtvoryRozpis` (`rozpisOtvorovSkla`, povinný prop `otvaranie`)
+  „z toho s otvorom ⌀46: 2 ks · bez otvoru: 2 ks" — single (`sklo-otvory`, pod Počet, hodnota Počet
+  nezmenená) aj multi (`posuv-sklo-otvory-<i>` v bunke skla). Systém bez otvorov → nič. Tlačí sa s kartou.
 - **Testy:** `tests/sklo-otvor-poloha-587.test.ts` (pravidlo, SSR komponent, zdroj konštánt),
   `tests/objednavka-skla-vykres-otvoru-587.test.ts` (producent, dedup doplnenie/zmazanie, poznámka
   pre Odoo re-send, spec nesúlad, atyp, payload, PDF metadáta, GET), `tests/migration-v52.test.ts`;
   E2E `objednavka-skla-otvory.spec.ts` rozšírený (rozpis na karte, odkaz len pri riadku s otvorom,
   poloha 1100/50, PDF 200 `%PDF-`).
-- **`objednavka-skla.ts` má ~966 r.** — ďalšia funkcia v ňom = najprv split (napr. otvory/dedup do
-  vlastného modulu), `large-file-split.md`.
+- **`objednavka-skla.ts` má ~896 r.** (#603 vyčlenil `otvoryRiadku` + prechody starých riadkov do
+  `objednavka-skla-otvory.ts`, ktorý z neho importuje LEN typ `NoveSklo` — žiadny cyklus). Ďalšia
+  logika otvorov/prechodov patrí tam, nie späť do `objednavka-skla.ts` (`large-file-split.md`).
+
+## Opona — otvor ⌀46 aj na DVOCH STREDOVÝCH sklách (#603, Odoo úloha 1370)
+
+Klient (úloha 1370 „Delux opona"): „2x2K 4 okna z vyrezom, 2x3K 4 okna výrez 2 bez, 2x4K 4 okna výrez
+4 bez". ROZHODNUTÉ (stream 8.10.): pri otváraní `Opona` majú otvor polia `0, N/2−1, N/2, N−1`;
+stredové pri STRETÁVACEJ hrane (ľavé stredové pri pravej, pravé stredové pri ľavej). Money-NEUTRÁLNE,
+bez migrácie.
+
+- **Jedno pravidlo, povinné otváranie.** `otvoryVSkle(system, N, otvaranie)` /
+  `riadkySklaPosuvu(…, otvaranie, rozmer?)` / `rozpisOtvorovSkla(…, otvaranie)` / propy
+  `SkloOtvoryRozpis.otvaranie` aj `Nahlad2D.otvaranie` / `sklaPosuvu` posuv `.otvaranie` sú POVINNÉ —
+  zabudnutý volajúci = chyba `svelte-check`, nie tichý návrat k 2 otvorom. Single berie `vstup.otvaranie`; multi JEDEN
+  fallback `otvaraniePosuvu(pv.otvaranie)` (`?? 'Opona'`, pôvodný default náhľadu) pre výkres, kartu
+  (`PlanKartyMulti`) AJ objednávku (`pridatSklaMulti`) — nikdy dva rôzne fallbacky.
+- **Prekryv / nepárne N:** krajná tabuľa má prednosť (N=2 opona = 2 krajné, N=1 = 1). Stred =
+  `Math.floor(N/2)` ako stredová kľučka `poleStred` — týka sa ručne zvolenej „Opona" pri ne-2× štýle
+  (3K/5K; formulár ju ponúka).
+- **Strana otvoru je v pravidle (`tabule[].vlavo`)** — `Nahlad2D` ju neodvodzuje z `i === 0`. Popis
+  otvoru (⌀46, výška vŕtania) je ukotvený od hrany s otvorom DO skla (`textX`/`anchor` v `zamky`),
+  inak sa popisy dvoch stredových otvorov (tesne pri stretávacej hrane) prekrývajú.
+- **PDF pre IZOS bez zmeny:** riadok objednávky nesie len počet tabúľ → `stranyOtvorov` delí ceil/floor.
+  Pravidlo je zrkadlové (krajné L+P, stredové P+L), takže delenie = strany z pravidla pre KAŽDÉ N a
+  otváranie — invariant drží test (`tests/sklo-otvory-opona-603.test.ts`). „Ľavé krídlo" v PDF = tabuľa
+  s otvorom pri ľavej hrane (pri opone aj pravé stredové krídlo).
+- **Prechod starých podkladov (`prevedStareRozdelenie`, `objednavka-skla-otvory.ts`):** podklad
+  spred #603 má pri opone 2 + (N−2); nový producent 4 + (N−4) → identita (aj kusy) sa nespáruje a
+  opakované „Pridať sklá" by objednávku ZDVOJILO. Pred dedupom sa staré rozdelenie toho istého posuvu
+  (pozícia vrátane prípony ⌀, rozmer, typ, rovnaký CELOK kusov, presne 1 riadok s otvorom + max 1 bez)
+  prevedie: „s otvorom" UPDATE (kusy, m², spec, poloha — id + prílohy ostanú), „bez" UPDATE kusov alebo
+  DELETE, keď ho nové rozdelenie nemá (2×2K, `log.warn`). Počíta sa do `pridane` (ako prevod #578).
+  Ďalšia zmena pravidla otvorov = ten istý prechod sa uplatní sám (je všeobecný na „iné rozdelenie,
+  rovnaký celok").
+- **Odmietnutý prechod NIKDY nezdvojí (review 🟡):** staré rozdelenie TOHO ISTÉHO posuvu s ručným
+  zásahom (atyp riadok, ručne zmenené otvory — `otvoryRucneZmenene`, príloha na riadku „bez", ktorý by
+  sa mazal) vráti `{ stav: 'odmietnute', pozicia, dovod, riadky }` → riadky toho posuvu sa NEpridajú
+  (podklad ostane presne ako bol) a `stats.prechodOdmietnuty` → banner `skla-prechod-odmietnuty`
+  („uprav riadky na podklade ručne / zmaž a pridaj znova"). Riadky sa delia na „s otvorom" / „bez"
+  podľa PRÍPONY pozície (`PRIPONA_OTVOR_RE`), NIE podľa spec — zrušené otvory na riadku s príponou aj
+  pridané na riadku bez nej sú ručný zásah (odmietnutie), nie „iné rozdelenie" (review round 2).
+  `stats.prechodOdmietnuty` je povinné pole. Nejednoznačné riadky (2× „bez", 2× „s otvorom") = `null`
+  → bežné pridanie bez upozornenia (nie je isté, že ide o ten istý posuv; test to tvrdí).
+- **Hranica identity:** podklad otváranie neukladá — „Zasklenie 1" toho istého OP s rovnakým sklom a
+  celkom je pre appku TEN ISTÝ posuv (rovnako ako dedup #514/#563). Prepnutie otvárania toho istého
+  okna (L - P → Opona) sa preto správne prevedie; dve RÔZNE okná s identickým sklom v jednom OP cez
+  single nárezák appka nerozlíši (patria do multi posuvu „Zasklenie 1..N").
+- **Testy:** `tests/sklo-otvory-opona-603.test.ts` (pravidlo, strany, karta, riadky, `sklaPosuvu`, SSR
+  výkres + popisy, akcie single/multi + `holes_qty` do Odoo), `tests/objednavka-skla-opona-prechod-603.test.ts`
+  (prechod 2×3K/2×2K/multi + guardy + odmietnutie + banner), E2E `e2e/zasklenia-opona-otvory-603.spec.ts` (read-only výpočet
+  2×3K: karta 4/2, 4 kruhy, súmernosť stredových — beží aj proti PROD).
 
 ## Príloha riadku = BAJTOVO deterministická (Odoo re-send porovnáva SHA-1) (#587, 29.9.)
 

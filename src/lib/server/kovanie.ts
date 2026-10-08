@@ -11,8 +11,19 @@
 import { pocitajKomponenty, pocetUzaverov, zlucKomponenty } from '$lib/komponenty';
 import type { PolozkaKomponentu, Farba } from '$lib/komponenty';
 import { computeFlat, zakladPoctov, type Cfg, type PosuvSpec } from './compute';
-import { komponentyPre, KOVANIE_NEUPLNE, platneFarbyPre, predvolenaFarba } from './komponenty-cfg';
+import {
+	komponentyPre,
+	kovanieZaradene,
+	KOVANIE_NEUPLNE,
+	platneFarbyPre,
+	predvolenaFarba,
+	rodinaKovania,
+	type RodinaKovania
+} from './komponenty-cfg';
+import { logger } from './log';
 import type { Polozka } from './money';
+
+const log = logger('kovanie');
 
 /**
  * Rozlíšenie farby krytiek/komponentov pre JEDEN posuv (#537 / gk #6413, design r2).
@@ -72,8 +83,9 @@ export function farbaPreSpec(
  * zámkov je farbo-nezávislý (invariant drží config-test), takže je jedno, ktorý
  * variant sa nájde. Slide: pôvodná ZASK20254 zrušená (#353), nahradená
  * ZASK202538 (R7016) / ZASK202537 (R9005) — kotva ukazuje na R7016.
+ * Kľúč je RODINA kovania (#604) — `Štandard` kotva platí aj pre Štandard +.
  */
-const KOD_UZAVERU: Record<string, string> = {
+const KOD_UZAVERU: Partial<Record<RodinaKovania, string>> = {
 	Robust: 'ZASK00029',
 	Slide: 'ZASK202538',
 	Štandard: 'ZASK202531'
@@ -87,9 +99,10 @@ const KOD_UZAVERU: Record<string, string> = {
  * @param farbaKovania zvolená RAL farba kovania — vyberá, ktorý farebný variant
  *   položky ide do odpisu (kľučka/krytka vložky R9005 vs R7016, Štandard zámok).
  *   Keď systém má farebnú položku a farba nie je zvolená → HLASNÁ chyba.
- * @returns `polozky` do Money xlsx (prázdne, keď systém kovanie zatiaľ nedáva — napr.
- *   Slide, kým jeho kódy nemajú skladovú zásobu), `err` s prvou chybou a `warn` s
- *   upozornením na neúplné kovanie (Štandard: chýbajú tesnenia/kefy).
+ * @returns `polozky` do Money xlsx (prázdne, keď systém kovanie výslovne nedáva —
+ *   `SYSTEMY_BEZ_KOVANIA`, napr. Štandard Drevo — alebo má tabuľku vypnutú
+ *   `*_PRIPRAVENY`), `err` s prvou chybou (aj pre NEZARADENÝ systém, #604) a `warn` s
+ *   upozornením na neúplné kovanie (rodina Štandard: kefa ZASK202541 ručne).
  */
 export function kovanieDoOdpisu(
 	cfg: Cfg,
@@ -111,8 +124,27 @@ export function kovanieDoOdpisu(
 
 	for (const [i, spec] of specs.entries()) {
 		const system = systemOf(spec);
+		const rodina = rodinaKovania(system);
 		const komponenty = komponentyPre(system);
-		if (!komponenty) continue; // systém kovanie do odpisu (zatiaľ) nedáva
+		if (!rodina || !komponenty) {
+			// #604: systém BEZ zaradenia (ani rodina kovania, ani výslovne „bez kovania")
+			// je HLASNÁ chyba — tichý `continue` presne tak poslal Štandard + do Money bez
+			// kladiek, zámkov a kefy (Odoo úloha 1261). Zaradený systém bez tabuľky
+			// (Štandard Drevo, vypnutá `*_PRIPRAVENY` tabuľka) kovanie do odpisu nedáva.
+			if (!kovanieZaradene(system)) {
+				log.error('kovanie: systém bez zaradenia kovania — odpis zastavený', {
+					system,
+					sysStyl: spec.sysStyl,
+					posuv: i + 1
+				});
+				return {
+					polozky: [],
+					err: `Kovanie, posuv ${i + 1}: systém „${system}" nemá v appke určené kovanie (ani tabuľku komponentov, ani výslovné „bez kovania") — odpis sa neodošle, aby nešiel bez kladiek a zámkov. Nahlás to (chýba zaradenie v komponenty-cfg.ts).`,
+					warn: null
+				};
+			}
+			continue;
+		}
 
 		// #537 (r2): farba sa rieši PER SPEC (jedno objednávkové pole, rôzne farebné
 		// dvojice per systém) — JEDEN zdroj pravdy rezolúcie. Deluxe posuv, ktorému
@@ -133,9 +165,10 @@ export function kovanieDoOdpisu(
 		// skla + farby kovania (Slide: madlo vždy, zámok len pri R9005, #357) — obe
 		// tvary tu vyhodnotíme rovnako, nikdy natvrdo neporovnávaj `system ===
 		// 'Deluxe'`/`'Slide'`. Deluxe kľúč tu NIE JE (#431 kolo 2: 6mm aj 10mm krytky
-		// sú v odpise → Deluxe kovanie je kompletné), `KOVANIE_NEUPLNE[system]` je vtedy
+		// sú v odpise → Deluxe kovanie je kompletné), `KOVANIE_NEUPLNE[rodina]` je vtedy
 		// undefined = žiadne varovanie. Používa už ROZLÍŠENÚ `efektivnaFarba` (#537).
-		const neuplneRaw = KOVANIE_NEUPLNE[system];
+		// Kľúč je RODINA (#604): Štandard + dostane tú istú ZASK202541 hlášku ako Štandard.
+		const neuplneRaw = KOVANIE_NEUPLNE[rodina];
 		const neuplne =
 			typeof neuplneRaw === 'function' ? neuplneRaw(spec.skloHrubka, efektivnaFarba) : neuplneRaw;
 		if (neuplne) varovania.add(neuplne);
@@ -162,7 +195,7 @@ export function kovanieDoOdpisu(
 				warn: null
 			};
 
-		const uzaver = komponenty.find((k) => k.kod === KOD_UZAVERU[system]);
+		const uzaver = komponenty.find((k) => k.kod === KOD_UZAVERU[rodina]);
 		const { polozky, chyby } = pocitajKomponenty(
 			komponenty,
 			spec.sysStyl,

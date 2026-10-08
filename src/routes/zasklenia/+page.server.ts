@@ -67,6 +67,7 @@ import {
 	sklaPosuvu,
 	upozornenieCudzie
 } from '$lib/server/objednavka-skla';
+import { otvaraniePosuvu } from '$lib/sklo-otvory';
 import { priradOdooTypy } from '$lib/server/odoo-glass-types';
 import { ponukySkiel, parseVstupSOdoo, parseMultiVstupSOdoo } from '$lib/server/sklo-odoo';
 
@@ -790,9 +791,10 @@ export const actions = {
 
 		// #563: výrobu systém/štýl nezaujíma — pozícia „Zasklenie 1" (ide aj do Odoo description)
 		// #587: výška vŕtania zámku z formulára → poloha otvoru na riadku „s otvorom" (PDF výkres)
+		// #603: otváranie z formulára (2× štýl = vždy opona) → pri opone aj stredové sklá s otvorom
 		const polozky = sklaPosuvu(
 			'Zasklenie 1',
-			{ ...r, vrtanieZamku: vstup.vrtanieZamku },
+			{ ...r, vrtanieZamku: vstup.vrtanieZamku, otvaranie: vstup.otvaranie },
 			{
 				zak: vstup.zak,
 				op: vstup.op,
@@ -808,7 +810,8 @@ export const actions = {
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
-		const stats = { polohaZmenena: 0 };
+		// #603: + staré rozdelenie otvorov opony, ktoré sa nedalo prepísať (sklá posuvu sa nepridali)
+		const stats = { polohaZmenena: 0, prechodOdmietnuty: [] as string[] };
 		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
@@ -818,6 +821,7 @@ export const actions = {
 			sklaPridane: {
 				pridane,
 				polohaZmenena: stats.polohaZmenena,
+				prechodOdmietnuty: stats.prechodOdmietnuty,
 				zak: vstup.zak,
 				upozornenieCudzie: cudzie
 			}
@@ -838,21 +842,26 @@ export const actions = {
 			return { step: 'form' as const, error: 'Zadaj číslo zákazky (ZAK).', multiVstup: vstup };
 
 		// #563: len pozícia „Zasklenie N" (bez systému/štýlu) + m² vopred
+		// #603: otváranie posuvu cez TEN ISTÝ fallback ako výkres/karta `PlanKartyMulti`
 		const polozky = r.posuvy.flatMap((p, i) =>
-			sklaPosuvu(`Zasklenie ${i + 1}`, p, {
-				zak: vstup.zak,
-				op: vstup.op,
-				typSkla:
-					vstup.posuvy[i]?.skloOdoo || vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
-				createdBy: locals.user?.username ?? ''
-			})
+			sklaPosuvu(
+				`Zasklenie ${i + 1}`,
+				{ ...p, otvaranie: otvaraniePosuvu(p.otvaranie) },
+				{
+					zak: vstup.zak,
+					op: vstup.op,
+					typSkla:
+						vstup.posuvy[i]?.skloOdoo || vstup.posuvy[i]?.skloPresne || vstup.posuvy[i]?.sklo || '',
+					createdBy: locals.user?.username ?? ''
+				}
+			)
 		);
 		// #514: validácia pred vedľajším efektom + idempotentne + bez presmerovania — viď `pridatSkla`
 		const v = await stavNahladMulti(vstup, r, specs, locals.user);
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
-		const stats = { polohaZmenena: 0 };
+		const stats = { polohaZmenena: 0, prechodOdmietnuty: [] as string[] };
 		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
@@ -862,6 +871,7 @@ export const actions = {
 			sklaPridane: {
 				pridane,
 				polohaZmenena: stats.polohaZmenena,
+				prechodOdmietnuty: stats.prechodOdmietnuty,
 				zak: vstup.zak,
 				upozornenieCudzie: cudzie
 			}

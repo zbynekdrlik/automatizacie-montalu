@@ -91,6 +91,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - version bump mechanics (tabs/#161) + `-dev`-on-`main` recovery (#98/#174) → `.claude/rules/version-bump.md`
 - deploy / post-deploy E2E / LIVE flip → skill `.claude/skills/deploy`
 - Money odpis / článkové kódy / nový systém-štýl / compute → skill `.claude/skills/money-odpis`
+- kovanie do odpisu: rodina systému (`RODINA_KOVANIA`), výslovné bez-kovania, zapnutie pre ďalší systém (#604) → `.claude/rules/kovanie.md`
 - sieťka (moskytiéra) Štandard geometrický model K/R/H (#569, nie zo skla) / jokle Robust / kovanie pri sieťke obe strany na výber (#583) / honest-null kód-null / rozmerJokle zo sieťoviny / samostatná /sietka + zasklenie karty → `.claude/rules/sietka.md`
 - pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
 - odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner) → `.claude/rules/opona-izo-narezak.md`
@@ -138,5 +139,5 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - SkladVarovania cross-module wiring (bindable prop, vylucene_kody, dva mechanizmy odobratia) → `.claude/rules/sklad-varovania.md`
 - e2e zero-console assert + guard (`e2e/**`, `tests/e2e-console-guard.test.ts`) → `.claude/rules/e2e-console.md`
 - celoplošný vizuálny redizajn (`--m-*` tokeny, h1/app.css leak pasca, stage rollout) → `.claude/rules/redizajn.md`
-- objednávka skla podklad (file upload XSS, BODY_SIZE_LIMIT, handoff kontrakt, modul integrácia, sklá s otvorom #578 `otvoryVSkle`, PDF výkres otvoru do Odoo/IZOS #587 `sklo-otvor-pdf.ts`, deterministická príloha (Odoo SHA-1 re-send), odkaz akcia 1015, `require_order` v `glass_order`) → `.claude/rules/objednavka-skla.md`
+- objednávka skla podklad (file upload XSS, BODY_SIZE_LIMIT, handoff kontrakt, modul integrácia, sklá s otvorom #578 `otvoryVSkle` (+ opona stredové sklá #603, prechod starých podkladov), PDF výkres otvoru do Odoo/IZOS #587 `sklo-otvor-pdf.ts`, deterministická príloha (Odoo SHA-1 re-send), odkaz akcia 1015, `require_order` v `glass_order`) → `.claude/rules/objednavka-skla.md`
 - QR zákazky v tlačených výstupoch (payload = normOp(op) = Odoo sale.order.name; kiosk substring; qrcode-generator; client-safe dvojník + cross-check; drawQrZakazkaPdf; zakazkaOp) → `.claude/rules/qr-zakazka.md`

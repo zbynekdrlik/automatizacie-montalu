@@ -20,7 +20,7 @@
 		N,
 		skloS,
 		skloV,
-		otvaranie = '',
+		otvaranie,
 		system = '',
 		vrtanieZamku = VRTANIE_ZAMKU_DEFAULT_MM,
 		kovanieL = '',
@@ -35,8 +35,9 @@
 		N: number;
 		skloS: number;
 		skloV: number;
-		otvaranie?: string;
-		/** systém zasklenia — Deluxe kreslí zámkové otvory D46 na krajných sklách */
+		/** otváranie posuvu (L - P / P - L / Opona) — kaskáda, sieťka aj zámkové otvory (#603: povinné) */
+		otvaranie: string;
+		/** systém zasklenia — Deluxe kreslí zámkové otvory D46 (ktoré sklá + strana: `otvoryVSkle`) */
 		system?: string;
 		/** výška vŕtania zámku (mm od spodku skla) — len Deluxe; do náhľadu + tlače */
 		vrtanieZamku?: number;
@@ -200,31 +201,36 @@
 	let kovS = $derived(kovanieStred && N > 1 ? kovBlok(kovanieStred, poleStred, 0.6) : null);
 
 	// Deluxe zámkové otvory D46: ⌀46 mm, 50 mm od kraja skla, na KRAJNÝCH sklách
-	// (ľavé pole pri ľavej hrane, pravé pole pri pravej). Výška vŕtania od spodku
+	// (ľavé pole pri ľavej hrane, pravé pole pri pravej), pri opone aj na oboch stredových
+	// (#603, pri stretávacej hrane). Výška vŕtania od spodku
 	// skla je konfigurovateľná (default `VRTANIE_ZAMKU_DEFAULT_MM`); diera sa v kresbe nemusí presne
 	// posúvať, hlavné je zobraziť + okótovať hodnotu (Dominik 2026-07-14).
 	// #578: KTORÉ sklá majú otvor určuje `otvoryVSkle` — to isté pravidlo ide do objednávky
-	// skla (riadok „s otvorom"), takže výkres a objednávka vždy sedia.
+	// skla (riadok „s otvorom"), takže výkres a objednávka vždy sedia. #603: aj STRANU otvoru
+	// (pri ktorej hrane skla) dáva pravidlo per tabuľa — výkres ju neodvodzuje z indexu poľa.
 	// #587: aj POLOHA (odsadenie od hrany, default výška) je z `sklo-otvory.ts` — z tých istých
 	// konštánt kreslí PDF výkres tabule pre IZOS (`sklo-otvor-pdf.ts`).
 	const D_ZAMOK = D_ZAMOK_MM; // priemer otvoru [mm]
 	const OKRAJ_ZAMOK = OKRAJ_ZAMOK_MM; // vzdialenosť stredu diery od kraja skla [mm]
 	let zamky = $derived.by(() => {
-		const idxs = otvoryVSkle(system, N).indexy;
-		if (idxs.length === 0) return [];
+		const tabule = otvoryVSkle(system, N, otvaranie).tabule;
+		if (tabule.length === 0) return [];
 		const r = (D_ZAMOK / 2) * scale;
 		const glassTop = M.top + frame;
 		const glassBot = M.top + h - frame;
 		// stred vo výške vrtanieZamku od spodku, orezané aby kruh ostal v skle
 		const cyRaw = glassBot - vrtanieZamku * scale;
 		const cy = Math.max(glassTop + r + 4, Math.min(glassBot - r - 4, cyRaw));
-		return idxs.map((i) => {
-			const left = i === 0;
+		return tabule.map(({ pole: i, vlavo: left }) => {
 			const gx0 = M.left + i * panelW + frame;
 			const gx1 = M.left + i * panelW + panelW - frame;
 			const edgeX = left ? gx0 : gx1;
 			const cx = left ? gx0 + OKRAJ_ZAMOK * scale : gx1 - OKRAJ_ZAMOK * scale;
-			return { cx, cy, r, edgeX, left };
+			// #603: popis otvoru (⌀, výška vŕtania) smeruje od hrany s otvorom DO skla — pri opone
+			// stoja dva stredové otvory tesne pri stretávacej hrane a centrované popisy by sa prekryli
+			const textX = left ? cx - r : cx + r;
+			const anchor: 'start' | 'end' = left ? 'start' : 'end';
+			return { cx, cy, r, edgeX, left, textX, anchor };
 		});
 	});
 
@@ -473,7 +479,7 @@
 		</g>
 	{/if}
 
-	<!-- Deluxe zámkové otvory D46 na krajných sklách (⌀46, 50 mm od kraja, výška vŕtania) -->
+	<!-- Deluxe zámkové otvory D46 podľa `otvoryVSkle` (⌀46, 50 mm od kraja, výška vŕtania) -->
 	{#each zamky as z (z.cx)}
 		{@const yDim = z.cy - z.r - 9}
 		<!-- otvor (prerušovaný kruh = vŕtaný otvor) -->
@@ -497,14 +503,14 @@
 		>
 		<!-- ⌀46 + výška vŕtania pod otvorom -->
 		<text
-			x={z.cx}
+			x={z.textX}
 			y={z.cy + z.r + 11}
-			text-anchor="middle"
+			text-anchor={z.anchor}
 			font-size="9"
 			fill="#334155"
 			font-weight="600">⌀{D_ZAMOK}</text
 		>
-		<text x={z.cx} y={z.cy + z.r + 21} text-anchor="middle" font-size="9" fill="#334155"
+		<text x={z.textX} y={z.cy + z.r + 21} text-anchor={z.anchor} font-size="9" fill="#334155"
 			>v {fmt(vrtanieZamku)}</text
 		>
 	{/each}

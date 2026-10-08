@@ -4,8 +4,12 @@
 //
 // ROZHODNUTÉ (stream, 28.9., Odoo úloha 1185): Deluxe má zámkový otvor ⌀46 na KRAJNÝCH sklách
 // (ľavé pole pri ľavej hrane, pravé pri pravej; jedno krídlo = jedna tabuľa), 1 otvor na tabuľu.
-// Robust / Slide / Štandard-rodina do skla nevŕtajú. Štýl (opona, 2x…) pravidlo NEmení — výkres
-// kreslí otvory rovnako na poliach 0 a N−1. Ďalší typ otvoru (madlo, iný systém) = zmena TU.
+// Robust / Slide / Štandard-rodina do skla nevŕtajú. Ďalší typ otvoru (madlo, iný systém) = zmena TU.
+// ROZHODNUTÉ (stream, 8.10., Odoo úloha 1370, #603): pri otváraní OPONA sa polovice stretávajú v
+// strede a zámok nesú AJ obe stredové krídla (polia N/2−1 a N/2) — otvor pri STREDOVEJ (stretávacej)
+// hrane: ľavé stredové pri pravej, pravé stredové pri ľavej. 2×2K = 4 s otvorom, 2×3K = 4 + 2 bez,
+// 2×4K = 4 + 4 bez. L - P / P - L len krajné. Strana otvoru je PER TABUĽA v pravidle (`tabule`) —
+// výkres ani PDF ju neodvodzujú z indexu.
 
 /** Priemer zámkového otvoru Deluxe [mm] (Dominik 2026-07-14). */
 export const D_ZAMOK_MM = 46;
@@ -75,9 +79,11 @@ export function triedaOtvoru(priemerMm: number): 'd30' | 'd50' | null {
 }
 
 /**
- * #587: tabule riadku s otvorom podľa krídla. `otvoryVSkle` dáva otvor ľavému poľu (index 0) a pri
- * N > 1 aj pravému (N − 1) → prvá tabuľa je ľavá, ďalšia pravá. Pravá má otvor ZRKADLOVO (pri pravej
- * hrane) — výkres ju kreslí zvlášť, žiadne „otoč tabuľu" (vrstvené/pokovované sklo má stranu).
+ * #587: tabule riadku s otvorom podľa STRANY otvoru (ľavé krídlo = otvor pri ľavej hrane, pravé =
+ * ZRKADLOVO pri pravej) — PDF výkres pre IZOS ich kreslí zvlášť, žiadne „otoč tabuľu" (vrstvené /
+ * pokovované sklo má stranu). Riadok objednávky nesie len počet tabúľ, preto delenie ceil/floor:
+ * `otvoryVSkle` je zrkadlové (krajné L + P; pri opone stredové P + L), pri nepárnom počte je
+ * navyše ľavá — test #603 to drží pre každé N a otváranie (`tabule` z pravidla = toto delenie).
  */
 export function stranyOtvorov(sOtvorom: number): { vlavo: number; vpravo: number } {
 	const n = Number.isInteger(sOtvorom) && sOtvorom > 0 ? sOtvorom : 0;
@@ -108,10 +114,18 @@ export function otvoryRucneZmenene(p: {
 /** Trieda priemeru otvoru podľa kontraktu odoo-erp (`d50` = 31–50 mm; ⌀46 ∈ d50). */
 export type TriedaOtvoru = 'd50';
 
+/** #603: jedna tabuľa s otvorom — pole posuvu a STRANA otvoru (pri ktorej zvislej hrane skla). */
+export interface OtvorTabule {
+	/** index poľa (0 = ľavé) */
+	pole: number;
+	/** `true` = otvor pri ĽAVEJ zvislej hrane skla, `false` = pri pravej (zrkadlovo) */
+	vlavo: boolean;
+}
+
 export interface OtvoryVSkle {
-	/** indexy polí (0 = ľavé), ktorých sklo má otvor — kreslí ich výkres */
-	indexy: number[];
-	/** počet tabúľ s otvorom (= `indexy.length`) */
+	/** tabule s otvorom zľava doprava, so stranou otvoru — kreslí ich výkres */
+	tabule: OtvorTabule[];
+	/** počet tabúľ s otvorom (= `tabule.length`) */
 	sOtvorom: number;
 	/** počet otvorov na JEDNU tabuľu s otvorom */
 	otvorovNaTabulu: number;
@@ -119,13 +133,42 @@ export interface OtvoryVSkle {
 	velkost: TriedaOtvoru | '';
 }
 
-const BEZ_OTVOROV: OtvoryVSkle = { indexy: [], sOtvorom: 0, otvorovNaTabulu: 0, velkost: '' };
+const BEZ_OTVOROV: OtvoryVSkle = { tabule: [], sOtvorom: 0, otvorovNaTabulu: 0, velkost: '' };
 
-/** Ktoré tabule posuvu (systém, N polí) majú vŕtaný otvor a aký. */
-export function otvoryVSkle(system: string, N: number): OtvoryVSkle {
-	if (system !== 'Deluxe' || !(N >= 1)) return { ...BEZ_OTVOROV, indexy: [] };
-	const indexy = N === 1 ? [0] : [0, N - 1];
-	return { indexy, sOtvorom: indexy.length, otvorovNaTabulu: 1, velkost: 'd50' };
+/** #603: otváranie, pri ktorom sa polovice stretávajú v strede (hodnota `OTVARANIA` z `vstup.ts`). */
+const OPONA = 'Opona';
+
+/**
+ * #603: otváranie posuvu zimnej záhrady (`PosuvInfo.otvaranie` je v type voliteľné) pre pravidlo
+ * otvorov — JEDEN fallback pre výkres aj kartu (`PlanKartyMulti`) aj objednávku skla (multi akcia
+ * `/zasklenia`), aby sa nemohli rozísť. `recomputeMultiVstup` ho plní vždy validovaným reťazcom;
+ * 'Opona' je pôvodný default náhľadu viacerých posuvov.
+ */
+export function otvaraniePosuvu(otvaranie: string | undefined): string {
+	return otvaranie ?? OPONA;
+}
+
+/**
+ * Ktoré tabule posuvu (systém, N polí, otváranie) majú vŕtaný otvor, pri ktorej hrane a aký.
+ * `otvaranie` je POVINNÉ — volajúci, ktorý ho nepošle, by ticho dostal pravidlo bez opony.
+ */
+export function otvoryVSkle(system: string, N: number, otvaranie: string): OtvoryVSkle {
+	if (system !== 'Deluxe' || !(N >= 1)) return { ...BEZ_OTVOROV, tabule: [] };
+	// krajné sklá: ľavé pole pri ľavej hrane, pravé pri pravej
+	const tabule: OtvorTabule[] = [{ pole: 0, vlavo: true }];
+	if (N > 1) tabule.push({ pole: N - 1, vlavo: false });
+	// #603: opona — stredové krídla pri stretávacej hrane; pri prekryve (N ≤ 3) má krajná tabuľa
+	// prednosť. Stred = Math.floor(N / 2) ako stredová kľučka (`poleStred` v `Nahlad2D`).
+	if (otvaranie.trim() === OPONA) {
+		const stred = Math.floor(N / 2);
+		for (const t of [
+			{ pole: stred - 1, vlavo: false },
+			{ pole: stred, vlavo: true }
+		])
+			if (t.pole >= 0 && !tabule.some((x) => x.pole === t.pole)) tabule.push(t);
+	}
+	tabule.sort((a, b) => a.pole - b.pole);
+	return { tabule, sOtvorom: tabule.length, otvorovNaTabulu: 1, velkost: 'd50' };
 }
 
 /** Jeden riadok objednávky skla odvodený z posuvu (pozícia + kusy + otvory na tabuľu). */
@@ -154,9 +197,10 @@ export function riadkySklaPosuvu(
 	pozicia: string,
 	system: string,
 	N: number,
+	otvaranie: string,
 	rozmer?: RozmerOtvoru
 ): RiadokSklaPosuvu[] {
-	const o = otvoryVSkle(system, N);
+	const o = otvoryVSkle(system, N, otvaranie);
 	if (o.sOtvorom === 0) return [{ popis: pozicia, pocet: N, holesQty: 0, holeSize: '' }];
 	const sOtvorom: RiadokSklaPosuvu = {
 		popis: `${pozicia}${PRIPONA_S_OTVOROM}`,
@@ -177,8 +221,8 @@ export function riadkySklaPosuvu(
  * otvoru: 2 ks". Z TOHO ISTÉHO pravidla ako riadky objednávky skla (`riadkySklaPosuvu`), takže
  * nárezák a objednávka nemôžu nesedieť. `null` pre systém bez otvorov (karta nič nepridá).
  */
-export function rozpisOtvorovSkla(system: string, N: number): string | null {
-	const riadky = riadkySklaPosuvu('', system, N);
+export function rozpisOtvorovSkla(system: string, N: number, otvaranie: string): string | null {
+	const riadky = riadkySklaPosuvu('', system, N, otvaranie);
 	const kusy = (sOtvormi: boolean) =>
 		riadky
 			.filter((r) => {

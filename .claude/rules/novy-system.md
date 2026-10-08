@@ -36,6 +36,11 @@ nealiasoval "Štandard Drevo" → formulár ponúkal zlé sklá a každý submit
    s/toBe(<old>)/toBe(<new>)/"` — aktuálne ~30 súborov.
 9. **`tests/kolajnica-rucna.test.ts`**: ak systém má oddelenú hornú + spodnú koľajnicu,
    drift guard vyžaduje pridanie do expected zoznamu.
+10. **`src/lib/server/komponenty-cfg.ts` — kovanie (#604)**: zaraď systém do `RODINA_KOVANIA`
+   (variant existujúceho systému, napr. Štandard + → rodina `Štandard`; pri štýloch mimo tabuľky
+   počtov rozšír aj `ZAMKY_NA_STYL_STANDARD`), ALEBO do `SYSTEMY_BEZ_KOVANIA` s dôvodom. Bez
+   zaradenia `kovanieDoOdpisu` odpis odmietne a drift guard `tests/kovanie-rodina.test.ts`
+   padne. Zapnutie kovania = povinná RAL farba vo fixtures/E2E (money-odpis 2o, 2p).
 
 ## koef != 1 v rez riadkoch
 
