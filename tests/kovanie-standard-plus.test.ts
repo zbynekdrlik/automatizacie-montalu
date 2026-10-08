@@ -142,6 +142,89 @@ describe('#604 Štandard + — komponenty RS STANDARD', () => {
 	});
 });
 
+// money-odpis 2n: zmiešaná zákazka (Štandard + s INÝM farebným systémom) so VŠETKÝMI tromi
+// farbami — každá farba buď sedí OBOM posuvom (kompletný odpis; Deluxe môže spadnúť na
+// predvolenú R9006 s VIDITEĽNÝM varovaním), alebo je HLASNÁ chyba. Nikdy tiché vynechanie.
+describe('#604 zmiešaná zákazka Štandard + s iným farebným systémom — všetky tri farby', () => {
+	const deluxe = (h: 6 | 10) => ({ ...spec('Deluxe|3K'), skloHrubka: h });
+	const plus = spec('Štandard +|3K');
+	const ok = (r: ReturnType<typeof kov>) => {
+		expect(r.err).toBeNull();
+		expect(r.polozky.length).toBeGreaterThan(0);
+		expect(qty(r, 'ZASK00002')).toBe(6); // Štandard + 3K kladky vždy
+		expect(qty(r, 'ZASK20252')).toBe(2);
+	};
+	const chyba = (r: ReturnType<typeof kov>, re: RegExp) => {
+		expect(r.polozky).toEqual([]);
+		expect(r.err).toMatch(re);
+	};
+
+	it('Deluxe 10 mm + Štandard +, R9005: Deluxe krytky na predvolenú R9006 (s varovaním), Š+ zámok R9005', () => {
+		const r = kov([deluxe(10), plus], 'R9005');
+		ok(r);
+		expect(qty(r, 'ZASK202531')).toBe(2);
+		expect(qty(r, 'ZASK202525')).toBe(2); // krytka stredová L 10 mm R9006
+		expect(r.warn).toMatch(/posuv 1: zvolená farba R9005 nie je platná pre systém Deluxe/);
+		expect(r.warn).toMatch(/ZASK202541/);
+	});
+
+	it('Deluxe 10 mm + Štandard +, R7016: oba posuvy R7016, žiadna náhrada farby', () => {
+		const r = kov([deluxe(10), plus], 'R7016');
+		ok(r);
+		expect(qty(r, 'ZASK202532')).toBe(2);
+		expect(qty(r, 'ZASK202526')).toBe(2); // krytka stredová L 10 mm R7016
+		expect(r.warn).not.toMatch(/predvolená/);
+	});
+
+	it('Deluxe 10 mm + Štandard +, R9006: HLASNÁ chyba na posuve Štandard + (R9006 preň neplatí)', () => {
+		chyba(
+			kov([deluxe(10), plus], 'R9006'),
+			/posuv 2: systém Štandard \+ — zvolená farba R9006 preň nie je platná/
+		);
+	});
+
+	it('Deluxe 6 mm + Štandard +, R9005: oba posuvy R9005', () => {
+		const r = kov([deluxe(6), plus], 'R9005');
+		ok(r);
+		expect(qty(r, 'ZASK202531')).toBe(2);
+		expect(qty(r, 'ZASK202520')).toBe(2); // krytka stredová L 6 mm R9005
+	});
+
+	it('Deluxe 6 mm + Štandard +, R7016: Deluxe na predvolenú R9006 (s varovaním), Š+ zámok R7016', () => {
+		const r = kov([deluxe(6), plus], 'R7016');
+		ok(r);
+		expect(qty(r, 'ZASK202532')).toBe(2);
+		expect(qty(r, 'ZASK202519')).toBe(2); // krytka stredová L 6 mm R9006
+		expect(r.warn).toMatch(/posuv 1: zvolená farba R7016 nie je platná pre systém Deluxe/);
+	});
+
+	it('Deluxe 6 mm + Štandard +, R9006: HLASNÁ chyba na posuve Štandard +', () => {
+		chyba(kov([deluxe(6), plus], 'R9006'), /posuv 2: systém Štandard \+ — zvolená farba R9006/);
+	});
+
+	it('Slide + Štandard +: R7016 kompletné, R9005 chyba na Slide (bez skladu), R9006 chyba', () => {
+		const r = kov([spec('Slide|2K'), plus], 'R7016');
+		ok(r);
+		expect(qty(r, 'ZASK202538')).toBe(2); // Slide zámok R7016
+		expect(qty(r, 'ZASK202532')).toBe(2); // Štandard + zámok R7016
+		chyba(
+			kov([spec('Slide|2K'), plus], 'R9005'),
+			/posuv 1: systém Slide — zvolená farba R9005 preň nie je platná/
+		);
+		chyba(kov([spec('Slide|2K'), plus], 'R9006'), /posuv 1: zvolená farba R9006 nesedí/);
+	});
+
+	it('Robust + Štandard +: R9005 aj R7016 kompletné, R9006 chyba', () => {
+		for (const farba of ['R9005', 'R7016'] as const) {
+			const r = kov([spec('Robust|2K'), plus], farba);
+			ok(r);
+			expect(qty(r, farba === 'R9005' ? 'ZASK202533' : 'ZASK202534')).toBe(4); // Robust kľučka
+			expect(qty(r, farba === 'R9005' ? 'ZASK202531' : 'ZASK202532')).toBe(2); // Š+ zámok
+		}
+		chyba(kov([spec('Robust|2K'), plus], 'R9006'), /posuv 1: zvolená farba R9006 nesedí/);
+	});
+});
+
 // Výstup kovanieDoOdpisu PRED opravou #604 (zachytený na 0.25.61) — oprava pridáva LEN
 // Štandard +; tieto systémy sa nesmú zmeniť ani o riadok, množstvo, poradie či hlášku.
 describe('#604 ostatné systémy bez zmeny (výstup pred opravou)', () => {
