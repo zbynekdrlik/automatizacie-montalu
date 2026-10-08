@@ -8,6 +8,7 @@ import { normZak } from './money';
 import { logger } from './log';
 import { HOLE_SIZES, type HoleSize } from './odoo-rozpis-lines';
 import { popisPozicie, zakladPozicie } from '../objednavka-skla-pozicia';
+import { otvoryRucneZmenene } from '../sklo-otvory';
 import type { NoveSklo } from './objednavka-skla';
 
 const log = logger('objednavka-skla');
@@ -108,10 +109,13 @@ export function prevedStaryCelok(s: NoveSklo, polozky: NoveSklo[]): boolean {
 // (4 + 2). Ani jeden riadok sa nespáruje (identita = aj kusy) → opakované „Pridať sklá" by
 // objednávku ZDVOJILO. Riadky sa preto PREVEDÚ: „s otvorom" dostane nové kusy + otvory + polohu (id
 // + prílohy ostanú), „bez" nové kusy, a keď ho nové rozdelenie nemá (2×2K = 4 + 0), zmaže sa.
-// NEprevádza sa, keď obsluha riadky upravila ručne (atyp) alebo by sa mazal riadok s prílohou —
-// tam rozhoduje človek na podklade (správanie ako pred #603).
+// Keď obsluha riadky upravila ručne (atyp, ručne zmenené otvory) alebo by sa mazal riadok s
+// prílohou, prechod sa ODMIETNE: riadky toho posuvu sa NEpridajú (inak by sa objednávka zdvojila)
+// a pozícia ide do upozornenia — opraví ju človek na podklade.
+// Hranica: podklad otváranie neukladá — „Zasklenie 1" toho istého OP s rovnakým sklom a celkom je
+// pre appku TEN ISTÝ posuv (ako dedup #514/#563); iné okno toho istého OP patrí do multi posuvu.
 const stmtRiadkyPosuvu = db.prepare(`
-	SELECT o.id, o.popis, o.pocet, o.spec_holes_qty AS otvory, o.rezim,
+	SELECT o.id, o.popis, o.pocet, o.spec_holes_qty AS otvory, o.spec_hole_size AS velkost, o.rezim,
 	       (SELECT COUNT(*) FROM objednavka_skla_subory f WHERE f.polozka_id = o.id) AS prilohy
 	FROM objednavka_skla o
 	WHERE o.zak_norm = ? AND o.op = ? AND o.modul = ?
@@ -126,9 +130,15 @@ interface RiadokPosuvu {
 	popis: string;
 	pocet: number;
 	otvory: number;
+	velkost: string;
 	rezim: string;
 	prilohy: number;
 }
+
+/** #603: výsledok prechodu starého rozdelenia posuvu (`null` = nebolo čo prevádzať). */
+export type PrechodRozdelenia =
+	| { stav: 'prevedene' }
+	| { stav: 'odmietnute'; pozicia: string; dovod: string; riadky: NoveSklo[] };
 
 /** Riadok „bez otvoru" TOHO ISTÉHO posuvu v tomto pridaní (pozícia + sklo ako riadok „s otvorom"). */
 function novyBezPosuvu(s: NoveSklo, polozky: NoveSklo[], zaklad: string): NoveSklo | undefined {
@@ -146,9 +156,9 @@ function novyBezPosuvu(s: NoveSklo, polozky: NoveSklo[], zaklad: string): NoveSk
 	);
 }
 
-/** Prevedie staré rozdelenie posuvu riadku `s` („s otvorom") na nové; vráti, či prevádzal. */
-export function prevedStareRozdelenie(s: NoveSklo, polozky: NoveSklo[]): boolean {
-	if (s.modul !== 'zasklenia' || !((s.holesQty ?? 0) > 0)) return false;
+/** Prevedie staré rozdelenie posuvu riadku `s` („s otvorom") na nové, alebo ho odmietne. */
+export function prevedStareRozdelenie(s: NoveSklo, polozky: NoveSklo[]): PrechodRozdelenia | null {
+	if (s.modul !== 'zasklenia' || !((s.holesQty ?? 0) > 0)) return null;
 	const zaklad = zakladPozicie(s.popis, s.modul);
 	const novyBez = novyBezPosuvu(s, polozky, zaklad);
 	const celok = s.pocet + (novyBez?.pocet ?? 0);
@@ -169,12 +179,27 @@ export function prevedStareRozdelenie(s: NoveSklo, polozky: NoveSklo[]): boolean
 	const [stary] = sOtvorom;
 	const [staryBez] = bez;
 	// presne JEDEN starý riadok „s otvorom" na tej istej pozícii (vrátane prípony ⌀) a najviac jeden „bez"
-	if (!stary || sOtvorom.length > 1 || bez.length > 1) return false;
-	if (popisPozicie(stary.popis, s.modul) !== popisPozicie(s.popis, s.modul)) return false;
+	if (!stary || sOtvorom.length > 1 || bez.length > 1) return null;
+	if (popisPozicie(stary.popis, s.modul) !== popisPozicie(s.popis, s.modul)) return null;
 	// rovnaké rozdelenie páruje dedup; iný celok kusov = iný posuv na tej istej pozícii
-	if (stary.pocet === s.pocet || stary.pocet + (staryBez?.pocet ?? 0) !== celok) return false;
-	if (riadky.some((r) => r.rezim === 'atyp')) return false;
-	if (staryBez && !novyBez && staryBez.prilohy > 0) return false;
+	if (stary.pocet === s.pocet || stary.pocet + (staryBez?.pocet ?? 0) !== celok) return null;
+	// je to staré rozdelenie TOHO ISTÉHO posuvu — prepísať ho smie len bez ručných zásahov
+	const dovod = riadky.some((r) => r.rezim === 'atyp')
+		? 'ručne upravený riadok — atyp'
+		: otvoryRucneZmenene({ popis: stary.popis, holesQty: stary.otvory, holeSize: stary.velkost })
+			? 'ručne zmenené otvory'
+			: staryBez && !novyBez && staryBez.prilohy > 0
+				? 'riadok bez otvoru má prílohu'
+				: null;
+	if (dovod) {
+		log.warn('stare rozdelenie otvorov posuvu sa neda prepisat — skla posuvu sa nepridali', {
+			zak: s.zak,
+			pozicia: zaklad,
+			dovod,
+			riadky: riadky.map((r) => r.id)
+		});
+		return { stav: 'odmietnute', pozicia: zaklad, dovod, riadky: novyBez ? [s, novyBez] : [s] };
+	}
 	const otvory = otvoryRiadku(s);
 	stmtPrevedNaOtvor.run(
 		s.popis,
@@ -186,13 +211,20 @@ export function prevedStareRozdelenie(s: NoveSklo, polozky: NoveSklo[]): boolean
 		stary.id
 	);
 	if (staryBez && novyBez) stmtNastavKusy.run(novyBez.pocet, novyBez.m2 ?? null, staryBez.id);
-	else if (staryBez) stmtZmazRiadok.run(staryBez.id);
+	else if (staryBez) {
+		stmtZmazRiadok.run(staryBez.id);
+		log.warn('riadok bez otvoru zmazany — nove rozdelenie posuvu ho nema', {
+			id: staryBez.id,
+			zak: s.zak,
+			pozicia: zaklad,
+			pocet: staryBez.pocet
+		});
+	}
 	log.info('stare rozdelenie otvorov posuvu prevedene na nove pravidlo', {
 		id: stary.id,
 		zak: s.zak,
 		sOtvorom: `${stary.pocet} -> ${s.pocet}`,
-		bez: `${staryBez?.pocet ?? 0} -> ${novyBez?.pocet ?? 0}`,
-		bezZmazany: staryBez && !novyBez ? staryBez.id : null
+		bez: `${staryBez?.pocet ?? 0} -> ${novyBez?.pocet ?? 0}`
 	});
-	return true;
+	return { stav: 'prevedene' };
 }

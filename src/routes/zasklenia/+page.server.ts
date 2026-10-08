@@ -810,7 +810,8 @@ export const actions = {
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
-		const stats = { polohaZmenena: 0 };
+		// #603: + staré rozdelenie otvorov opony, ktoré sa nedalo prepísať (sklá posuvu sa nepridali)
+		const stats = { polohaZmenena: 0, prechodOdmietnuty: [] as string[] };
 		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
@@ -820,6 +821,7 @@ export const actions = {
 			sklaPridane: {
 				pridane,
 				polohaZmenena: stats.polohaZmenena,
+				prechodOdmietnuty: stats.prechodOdmietnuty,
 				zak: vstup.zak,
 				upozornenieCudzie: cudzie
 			}
@@ -859,7 +861,7 @@ export const actions = {
 		if (v.step === 'form') return v;
 		// #556: jednoznačná zhoda lokálneho typu skla → Odoo hodnota (objednávka ide do Odoo presne).
 		// #587: existujúcim riadkom sa môže zmeniť poloha otvoru (nič nové) → banner radí znova odoslať
-		const stats = { polohaZmenena: 0 };
+		const stats = { polohaZmenena: 0, prechodOdmietnuty: [] as string[] };
 		const pridane = pridajSklaHromadneIdempotentne(await priradOdooTypy(polozky), stats);
 		logger('zasklenia').info('skla (multi) pridane do objednavky', { zak: vstup.zak, pridane });
 		// #571: upozornenie (NIE blok), keď podklad zákazky už má riadky od iného používateľa
@@ -869,6 +871,7 @@ export const actions = {
 			sklaPridane: {
 				pridane,
 				polohaZmenena: stats.polohaZmenena,
+				prechodOdmietnuty: stats.prechodOdmietnuty,
 				zak: vstup.zak,
 				upozornenieCudzie: cudzie
 			}

@@ -403,16 +403,27 @@ export function pridajSklaHromadneIdempotentne(
 	polozky: NoveSklo[],
 	/** #587: voliteľne — počet existujúcich riadkov, ktorým sa zmenila poloha otvoru (NIE sú v
 	 *  návratovej hodnote: nič sa nepridalo, len treba objednávku znova odoslať do Odoo). */
-	stats?: { polohaZmenena: number }
+	stats?: { polohaZmenena: number; prechodOdmietnuty?: string[] }
 ): number {
 	let pridane = 0;
 	db.transaction(() => {
-		// #603: najprv prevod starého rozdelenia otvorov (pred dedupom, aby nerozhodovalo poradie
-		// riadkov) — prevedený riadok „s otvorom" sa počíta ako pridaný, jeho „bez" potom páruje dedup
-		const prevedene = new Set(
-			polozky.filter((s) => !najdiRovnaku(s) && prevedStareRozdelenie(s, polozky))
-		);
+		// #603: najprv prechod starého rozdelenia otvorov (pred dedupom, aby nerozhodovalo poradie
+		// riadkov) — prevedený riadok „s otvorom" sa počíta ako pridaný, jeho „bez" potom páruje dedup;
+		// ODMIETNUTÝ prechod (ručné zásahy) = riadky toho posuvu sa NEpridajú (žiadne zdvojenie) a
+		// pozícia ide do `stats.prechodOdmietnuty` (upozornenie v banneri)
+		const prevedene = new Set<NoveSklo>();
+		const vynechane = new Set<NoveSklo>();
 		for (const s of polozky) {
+			if (najdiRovnaku(s)) continue;
+			const prechod = prevedStareRozdelenie(s, polozky);
+			if (prechod?.stav === 'prevedene') prevedene.add(s);
+			else if (prechod?.stav === 'odmietnute') {
+				for (const r of prechod.riadky) vynechane.add(r);
+				stats?.prechodOdmietnuty?.push(`${prechod.pozicia} (${prechod.dovod})`);
+			}
+		}
+		for (const s of polozky) {
+			if (vynechane.has(s)) continue;
 			if (prevedene.has(s)) {
 				pridane++;
 				continue;
