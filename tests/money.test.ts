@@ -131,10 +131,11 @@ describe('writeOdpis', () => {
 		expect([qty(2), qty(3), qty(4)]).toEqual([15, 4, 12.5]);
 	});
 
-	it('duplikát (rovnaká ZAK+OP) sa odmietne a druhý súbor nevznikne', async () => {
+	it('duplikát (rovnaká ZAK+OP) sa bez vedomého dorobenia odmietne a druhý súbor nevznikne (#608)', async () => {
 		const before = fs.readdirSync(process.env.MONEY_TEST_DIR!).length;
 		const out = await writeOdpis(makeReq('TEST-1', '01'));
-		expect(out.status).toBe('duplicate');
+		expect(out.status).toBe('blocked');
+		expect(out.reason).toBe('uz-odpisane');
 		expect(out.duplicateCreatedAt).toBeTruthy();
 		expect(fs.readdirSync(process.env.MONEY_TEST_DIR!).length).toBe(before);
 	});
@@ -185,14 +186,14 @@ describe('writeOdpis', () => {
 		expect(retry.status).toBe('written');
 	});
 
-	it('paralelné odoslania tej istej ZAK+OP → práve jeden zápis', async () => {
+	it('paralelné odoslania tej istej ZAK+OP → práve jeden zápis (ostatné už-odpísané, #608)', async () => {
 		const results = await Promise.all([
 			writeOdpis(makeReq('TEST-RACE', '01')),
 			writeOdpis(makeReq('TEST-RACE', '01')),
 			writeOdpis(makeReq('TEST-RACE', '01'))
 		]);
 		const written = results.filter((r) => r.status === 'written');
-		const dupes = results.filter((r) => r.status === 'duplicate');
+		const dupes = results.filter((r) => r.status === 'blocked' && r.reason === 'uz-odpisane');
 		expect(written.length).toBe(1);
 		expect(dupes.length).toBe(2);
 	});
@@ -272,7 +273,7 @@ describe('releaseOdpis — uvoľnenie dedup kľúča', () => {
 	it('write → duplicate → release → audit → identický re-write je BLOKOVANÝ ledgerom (#294)', async () => {
 		const w = await writeOdpis(makeReq('TEST-REL', '01'));
 		expect(w.status).toBe('written');
-		expect((await writeOdpis(makeReq('TEST-REL', '01'))).status).toBe('duplicate');
+		expect((await writeOdpis(makeReq('TEST-REL', '01'))).reason).toBe('uz-odpisane');
 
 		const row = listOdpisy(200).find((o) => o.zak === 'TEST-REL' && o.op === '01');
 		expect(row).toBeTruthy();

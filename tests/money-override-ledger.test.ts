@@ -161,7 +161,8 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		expect(overrideOpts(fKody)).toEqual({
 			overrideKody: true,
 			overrideLedger: false,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 
 		const fLedger = new FormData();
@@ -169,7 +170,8 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		expect(overrideOpts(fLedger)).toEqual({
 			overrideKody: false,
 			overrideLedger: true,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 
 		// dvojitý blok (kód + ledger) → oba `override` v jednom formulári → oba flagy (žiadny ping-pong)
@@ -179,14 +181,16 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		expect(overrideOpts(fOba)).toEqual({
 			overrideKody: true,
 			overrideLedger: true,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 
 		// bežný (prvý) submit nemá `override` pole → žiadny bypass
 		expect(overrideOpts(new FormData())).toEqual({
 			overrideKody: false,
 			overrideLedger: false,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 	});
 
@@ -196,7 +200,7 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		f.set('op', 'OP260286');
 		f.set('qty_18004', '3,5'); // ručná úprava množstva
 		f.set('override', 'unknown-kod'); // prvý potvrdený override sa NEsmie stratiť pri druhom bloku
-		const e = rawFormEntries(f);
+		const e = rawFormEntries(f, { reason: 'ledger-duplicate' });
 		expect(e).toContainEqual(['zak', 'ZAK1']);
 		expect(e).toContainEqual(['op', 'OP260286']);
 		expect(e).toContainEqual(['qty_18004', '3,5']);

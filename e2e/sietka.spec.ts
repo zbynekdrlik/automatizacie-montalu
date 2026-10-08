@@ -329,10 +329,10 @@ test('samostatná stránka /sietka: Odoslať do Money zapíše odpis (TEST reži
 	await waitHydrated(page);
 	await page.getByTestId('odoslat-sietku').click();
 	await waitHydrated(page);
-	await expect(page.getByTestId('sietka-samostatna-duplikat')).toContainText('už bola odoslaná');
-	// karta s výsledkom (rám/nos/rozmer) ostáva vidno pod hláškou — nie je to
+	// #608: zdieľaný OdpisBlok „už bola odpísaná" s vedomým „Odoslať ako dorobenie" — nie je to
 	// prázdna stránka
-	await expect(page.getByTestId('sietka-samostatna-vysledok')).toBeVisible();
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	await expect(page.getByTestId('odoslat-ako-dorobenie')).toBeVisible();
 
 	expect(errs).toEqual([]);
 });

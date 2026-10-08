@@ -67,12 +67,13 @@ describe('#294 ledger — re-import identického obsahu po uvoľnení', () => {
 		expect(w2.status).not.toBe('written');
 	});
 
-	it('[RED] normalizácia op: OP260286 potom 260286 (rovnaký modul/zak/live) ⇒ duplicate', async () => {
+	it('[RED] normalizácia op: OP260286 potom 260286 (rovnaký modul/zak/live) ⇒ zablokované (#608 uz-odpisane)', async () => {
 		const w1 = await writeOdpis(makeReq('ZAK-NORM', 'OP260286'));
 		expect(w1.status).toBe('written');
 		const w2 = await writeOdpis(makeReq('ZAK-NORM', '260286'));
-		// OP260286 ≡ 260286 po normalizácii → druhý je duplikát (dnes prejde ako 2 rôzne)
-		expect(w2.status).toBe('duplicate');
+		// OP260286 ≡ 260286 po normalizácii → druhý je už-odpísaný (bez vedomého dorobenia sa nezapíše, #608)
+		expect(w2.status).toBe('blocked');
+		expect(w2.reason).toBe('uz-odpisane');
 	});
 
 	// owner constraint (2026-08-24): „ale ved moze mat viacero objednavok rovnaky obsah" —
