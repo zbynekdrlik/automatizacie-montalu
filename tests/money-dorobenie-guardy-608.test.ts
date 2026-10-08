@@ -64,7 +64,11 @@ describe('#608 TEST režim (live=0) — rovnaký blok aj dorobenie, nikdy do Mon
 	});
 
 	it('[RED] TEST dorobenie s potvrdením → poradie 2 v TEST priečinku, live priečinok nevznikne', async () => {
-		const w = await writeOdpis(job('TST-608', 'OP1'), { overrideDorobenie: true, dorobeniePo: 1 });
+		const b = await writeOdpis(job('TST-608', 'OP1'));
+		const w = await writeOdpis(job('TST-608', 'OP1'), {
+			overrideDorobenie: true,
+			potvrdenieToken: b.potvrdenieToken
+		});
 		expect(w.status).toBe('written');
 		expect(w.poradie).toBe(2);
 		expect(path.dirname(w.target)).toBe(TEST_DIR);
@@ -78,7 +82,7 @@ describe('#608 cross-modul identický obsah (issue 380) — dorobenie ho NEobíd
 		expect((await writeOdpis(job('CROSS-608', 'OP1', 'pergola'))).status).toBe('written');
 		const f = await writeOdpis(job('CROSS-608', 'OP1', 'fix'), {
 			overrideDorobenie: true,
-			dorobeniePo: 1
+			potvrdenieToken: 1
 		});
 		expect(f.status).toBe('duplicate');
 		expect(pocet('CROSS-608')).toBe(1);
@@ -94,7 +98,7 @@ describe('#608 cross-modul identický obsah (issue 380) — dorobenie ho NEobíd
 		// „dorobenie" FIX-u s obsahom X (= pergola nárez) musí ostať tvrdo zablokované
 		const d = await writeOdpis(job('CROSS2-608', 'OP1', 'fix'), {
 			overrideDorobenie: true,
-			dorobeniePo: 1
+			potvrdenieToken: 1
 		});
 		expect(d.status).toBe('duplicate');
 		expect(pocet('CROSS2-608')).toBe(2);
@@ -116,7 +120,7 @@ describe('#608 pergola rezervácia (issue 221) — kolízia s CAD odpisom ostáv
 		const cad = job('REZ-608', 'OP1', 'pergola');
 		cad.polozky = [{ kod: 'PRP20260', nazov: 'CAD profil', qty: 6 }];
 		expect((await writeOdpis(cad)).status).toBe('duplicate');
-		expect((await writeOdpis(cad, { overrideDorobenie: true, dorobeniePo: 1 })).status).toBe(
+		expect((await writeOdpis(cad, { overrideDorobenie: true, potvrdenieToken: 1 })).status).toBe(
 			'duplicate'
 		);
 		expect(pocet('REZ-608')).toBe(1);
@@ -130,7 +134,7 @@ describe('#608 pergola rezervácia (issue 221) — kolízia s CAD odpisom ostáv
 			detail: { rezervacia: true }
 		});
 		rez.polozky = [{ kod: 'PRP20261', nazov: 'Rez profil', qty: 2 }];
-		expect((await writeOdpis(rez, { overrideDorobenie: true, dorobeniePo: 1 })).status).toBe(
+		expect((await writeOdpis(rez, { overrideDorobenie: true, potvrdenieToken: 1 })).status).toBe(
 			'duplicate'
 		);
 		expect(pocet('REZ2-608')).toBe(1);

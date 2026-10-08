@@ -71,7 +71,11 @@ beforeAll(async () => {
 	expect((await writeOdpis(job(POL))).status).toBe('written');
 	saveOdpisOdpad(ZAK, OP, material(1204));
 	// 2. dorobenie (identický obsah — ten istý posuv sa vyrába znova) + jeho vlastný odpad
-	const d = await writeOdpis(job(POL), { overrideDorobenie: true, dorobeniePo: 1 });
+	const b = await writeOdpis(job(POL));
+	const d = await writeOdpis(job(POL), {
+		overrideDorobenie: true,
+		potvrdenieToken: b.potvrdenieToken
+	});
 	expect(d.status).toBe('written');
 	saveOdpisOdpad(ZAK, OP, material(900));
 });

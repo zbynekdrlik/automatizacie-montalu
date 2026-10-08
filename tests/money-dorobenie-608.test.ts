@@ -3,8 +3,8 @@
 // zameranie, posuv sa vyrába znova). Dnes `writeOdpis` vráti tvrdý `duplicate`; po oprave:
 //   - bez potvrdenia → `status:'blocked', reason:'uz-odpisane'` PRED akýmkoľvek zápisom (náhodný
 //     dvojklik / refresh nič nezapíše),
-//   - s potvrdením „Odoslať ako dorobenie" (`overrideDorobenie` + token `dorobeniePo` = poradie, ktoré
-//     operátor videl) → nový záznam s `poradie = max+1`, vlastný súbor (prípona dorobenia), audit v
+//   - s potvrdením „Odoslať ako dorobenie" (`overrideDorobenie` + token `potvrdenieToken` = stav
+//     append-only ledgeru, ktorý operátor videl v bloku) → nový záznam s `poradie = max+1`, vlastný súbor (prípona dorobenia), audit v
 //     `cfg_audit`, prvý záznam NEZMENENÝ; identický obsah (ledger) prekoná TO ISTÉ potvrdenie,
 //   - opätovné odoslanie toho istého potvrdenia (refresh výsledku, dvojklik) → znova blok.
 // MONEY_LIVE=1, ale VŠETKY cieľové adresáre sú TEMP — do reálneho /data/dlv-import NIKDY nič.
@@ -87,6 +87,14 @@ const ledger = (zakNorm: string) =>
 		.all(zakNorm) as { kind: string; reason: string | null }[];
 const liveFiles = () => fs.readdirSync(LIVE_DIR).filter((f) => f.endsWith('.xlsx'));
 
+/** „Odoslať ako dorobenie" presne ako UI: najprv blok (operátor ho vidí), potom potvrdenie JEHO tokenom. */
+async function dorobenie(j: OdpisJob): Promise<OdpisOutcome> {
+	const b = await writeOdpis(j);
+	expect(b.reason).toBe('uz-odpisane');
+	return writeOdpis(j, { overrideDorobenie: true, potvrdenieToken: b.potvrdenieToken });
+}
+let blokPrvy: OdpisOutcome;
+
 beforeAll(() => {
 	fs.mkdirSync(LIVE_DIR, { recursive: true });
 	fs.mkdirSync(process.env.MONEY_TEST_DIR!, { recursive: true });
@@ -107,6 +115,8 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		expect(w2.duplicateCreatedBy).toBe('patrik');
 		expect(w2.poradieMax).toBe(1);
 		expect(w2.pocetOdpisov).toBe(1);
+		expect(w2.potvrdenieToken).toBeGreaterThan(0);
+		blokPrvy = w2;
 		expect(rowsFor('ZAK2026901').length).toBe(1);
 		expect(liveFiles().length).toBe(subory);
 		expect(ledger('ZAK2026901').length).toBe(ledgerPred);
@@ -118,7 +128,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		const auditPred = auditCount();
 		const w = await writeOdpis(job('ZAK2026901', 'OP261380'), {
 			overrideDorobenie: true,
-			dorobeniePo: 1
+			potvrdenieToken: blokPrvy.potvrdenieToken
 		});
 		expect(w.status).toBe('written');
 		expect(w.poradie).toBe(2);
@@ -151,7 +161,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		const subory = liveFiles().length;
 		const w = await writeOdpis(job('ZAK2026901', 'OP261380'), {
 			overrideDorobenie: true,
-			dorobeniePo: 1 // operátor videl poradie 1 — medzitým vzniklo 2 → zastarané potvrdenie
+			potvrdenieToken: blokPrvy.potvrdenieToken // token spred dorobenia — ledger sa medzitým posunul
 		});
 		expect(w.status).toBe('blocked');
 		expect(w.reason).toBe('uz-odpisane');
@@ -171,9 +181,11 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 	it('[RED] súbežný dvojklik na „Odoslať ako dorobenie" → práve JEDNO dorobenie', async () => {
 		const zak = 'ZAK2026902';
 		expect((await writeOdpis(job(zak, 'OP261381'))).status).toBe('written');
+		const b = await writeOdpis(job(zak, 'OP261381'));
+		const potvrd = { overrideDorobenie: true, potvrdenieToken: b.potvrdenieToken };
 		const res = await Promise.all([
-			writeOdpis(job(zak, 'OP261381'), { overrideDorobenie: true, dorobeniePo: 1 }),
-			writeOdpis(job(zak, 'OP261381'), { overrideDorobenie: true, dorobeniePo: 1 })
+			writeOdpis(job(zak, 'OP261381'), potvrd),
+			writeOdpis(job(zak, 'OP261381'), potvrd)
 		]);
 		expect(res.filter((r) => r.status === 'written').length).toBe(1);
 		expect(res.filter((r) => r.status === 'blocked' && r.reason === 'uz-odpisane').length).toBe(1);
@@ -183,10 +195,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 	it('[RED] ďalšie dorobenie (č. 3) s aktuálnym tokenom prejde; iný obsah = bez ledger override', async () => {
 		const zak = 'ZAK2026902';
 		const iny: Polozka[] = [{ kod: 'ZASP00014', nazov: 'Koľajnica 2K', qty: 7.5 }];
-		const w = await writeOdpis(job(zak, 'OP261381', iny), {
-			overrideDorobenie: true,
-			dorobeniePo: 2
-		});
+		const w = await dorobenie(job(zak, 'OP261381', iny));
 		expect(w.status).toBe('written');
 		expect(w.poradie).toBe(3);
 		expect(w.filename).toContain('dorobenie-3');
@@ -207,7 +216,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 	it('audit dorobenia s identickým obsahom prizná prekonaný ledger', async () => {
 		const zak = 'ZAK2026904';
 		expect((await writeOdpis(job(zak, 'OP261384'))).status).toBe('written');
-		const w = await writeOdpis(job(zak, 'OP261384'), { overrideDorobenie: true, dorobeniePo: 1 });
+		const w = await dorobenie(job(zak, 'OP261384'));
 		expect(w.status).toBe('written');
 		expect(lastAudit()).toContain('identický obsah — ledger prekonaný');
 		// prvý odpis (poradie 1) má názov súboru BEZ označenia dorobenia
@@ -220,7 +229,10 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		const b = await writeOdpis(job(zak, '261382'));
 		expect(b.status).toBe('blocked');
 		expect(b.reason).toBe('uz-odpisane');
-		const w = await writeOdpis(job(zak, '261382'), { overrideDorobenie: true, dorobeniePo: 1 });
+		const w = await writeOdpis(job(zak, '261382'), {
+			overrideDorobenie: true,
+			potvrdenieToken: b.potvrdenieToken
+		});
 		expect(w.status).toBe('written');
 		expect(w.poradie).toBe(2);
 	});
@@ -231,11 +243,8 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		expect(releaseOdpis(r2.id, 'marek')).toBe(true);
 		expect(lastAudit()).toContain('dorobenie 2');
 		expect(rowsFor(zak).map((r) => r.id)).toEqual([r1.id]);
-		// po uvoľnení dorobenia je ďalšie dorobenie znova č. 2 (token = aktuálne max poradie 1)
-		const w = await writeOdpis(job(zak, 'OP261382', [{ kod: 'ZASP00014', nazov: 'K', qty: 3 }]), {
-			overrideDorobenie: true,
-			dorobeniePo: 1
-		});
+		// po uvoľnení dorobenia je ďalšie dorobenie znova č. 2 (nové potvrdenie z nového bloku)
+		const w = await dorobenie(job(zak, 'OP261382', [{ kod: 'ZASP00014', nazov: 'K', qty: 3 }]));
 		expect(w.status).toBe('written');
 		expect(w.poradie).toBe(2);
 		// uvoľnenie PRVÉHO nechá dorobenie (nič sa nekaskáduje medzi riadkami)
@@ -247,9 +256,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 	it('„Povoliť rovnaký" na riadku dorobenia: audit nesie poradie, ostatné riadky ostanú', async () => {
 		const zak = 'ZAK2026905';
 		expect((await writeOdpis(job(zak, 'OP261385'))).status).toBe('written');
-		expect(
-			(await writeOdpis(job(zak, 'OP261385'), { overrideDorobenie: true, dorobeniePo: 1 })).status
-		).toBe('written');
+		expect((await dorobenie(job(zak, 'OP261385'))).status).toBe('written');
 		const [r1, r2] = rowsFor(zak) as [LogRow, LogRow];
 		expect(povolitReimport(r2.id, 'marek')).toBe(true);
 		expect(lastAudit()).toContain('Povolený RE-IMPORT');
@@ -273,7 +280,9 @@ describe('#608 dorobenie — hláška, formulárové mapovanie, re-submit token'
 		duplicateCreatedAt: '2026-10-08 07:26:00',
 		duplicateCreatedBy: 'patrik',
 		poradieMax: 1,
-		pocetOdpisov: 1
+		pocetOdpisov: 1,
+		potvrdenieToken: 4,
+		identickyObsah: false
 	};
 
 	it('[RED] blokHlaska: zákazka + OP + kedy (Bratislava) + kto + výzva „Odoslať ako dorobenie"', () => {
@@ -292,28 +301,28 @@ describe('#608 dorobenie — hláška, formulárové mapovanie, re-submit token'
 		expect(h).toContain('dorobenie č. 3');
 	});
 
-	it('[RED] overrideOpts: override=uz-odpisane + dorobenie_po → overrideDorobenie + token', () => {
+	it('[RED] overrideOpts: override=uz-odpisane + potvrdenie_token → overrideDorobenie + token', () => {
 		const f = new FormData();
 		f.append('override', 'uz-odpisane');
-		f.append('dorobenie_po', '2');
+		f.append('potvrdenie_token', '42');
 		const o = overrideOpts(f);
 		expect(o.overrideDorobenie).toBe(true);
-		expect(o.dorobeniePo).toBe(2);
+		expect(o.potvrdenieToken).toBe(42);
 		// bez override poľa žiadny bypass; nezmyselný token sa zahodí
 		const g = new FormData();
-		g.append('dorobenie_po', 'abc');
+		g.append('potvrdenie_token', 'abc');
 		expect(overrideOpts(g).overrideDorobenie).toBe(false);
-		expect(overrideOpts(g).dorobeniePo).toBeUndefined();
-		// token musí byť celé poradie ≥ 1 (0 / zlomok / záporné sa zahodia)
-		for (const zly of ['0', '1.5', '-2']) {
+		expect(overrideOpts(g).potvrdenieToken).toBeUndefined();
+		// token musí byť celé číslo ≥ 0 (zlomok / záporné / prázdne sa zahodia)
+		for (const zly of ['1.5', '-2', '']) {
 			const h = new FormData();
 			h.append('override', 'uz-odpisane');
-			h.append('dorobenie_po', zly);
-			expect(overrideOpts(h).dorobeniePo).toBeUndefined();
+			h.append('potvrdenie_token', zly);
+			expect(overrideOpts(h).potvrdenieToken).toBeUndefined();
 		}
-		const jeden = new FormData();
-		jeden.append('dorobenie_po', '1');
-		expect(overrideOpts(jeden).dorobeniePo).toBe(1);
+		const nula = new FormData();
+		nula.append('potvrdenie_token', '0');
+		expect(overrideOpts(nula).potvrdenieToken).toBe(0);
 	});
 
 	it('blokHlaska pri prvom existujúcom odpise: bez „×", bez zátvorky keď autor chýba', () => {
@@ -327,19 +336,22 @@ describe('#608 dorobenie — hláška, formulárové mapovanie, re-submit token'
 	it('[RED] rawFormEntries pridá AKTUÁLNY token z bloku a zastaraný nahradí', () => {
 		const f = new FormData();
 		f.append('zak', 'ZAK1');
-		f.append('dorobenie_po', '1'); // zastaraný z predošlého potvrdenia
+		f.append('potvrdenie_token', '5'); // zastaraný z predošlého potvrdenia
 		f.append('override', 'uz-odpisane');
-		const e = rawFormEntries(f, { ...blok, poradieMax: 2 });
-		expect(e.filter(([k]) => k === 'dorobenie_po')).toEqual([['dorobenie_po', '2']]);
+		const e = rawFormEntries(f, { ...blok, potvrdenieToken: 9 });
+		expect(e.filter(([k]) => k === 'potvrdenie_token')).toEqual([['potvrdenie_token', '9']]);
 		expect(e).toContainEqual(['zak', 'ZAK1']);
 		expect(e).toContainEqual(['override', 'uz-odpisane']);
-		// iný blok (napr. ledger) token NEpridáva
+		// ledger blok (#300 „Odoslať aj tak") nesie token tiež — ten istý replay-safe mechanizmus
 		const g = new FormData();
 		g.append('zak', 'ZAK1');
 		expect(
-			rawFormEntries(g, { ...blok, reason: 'ledger-duplicate', poradieMax: undefined }).some(
-				([k]) => k === 'dorobenie_po'
-			)
-		).toBe(false);
+			rawFormEntries(g, { ...blok, reason: 'ledger-duplicate', potvrdenieToken: 3 })
+		).toContainEqual(['potvrdenie_token', '3']);
+		// blok bez tokenu (napr. neznámy kód) nič nepridáva a starý token nechá tak
+		const h = new FormData();
+		h.append('potvrdenie_token', '5');
+		const eh = rawFormEntries(h, { reason: 'unknown-kod' });
+		expect(eh.filter(([k]) => k === 'potvrdenie_token')).toEqual([['potvrdenie_token', '5']]);
 	});
 });

@@ -1,5 +1,5 @@
 // #608 dorobenie — tok cez SKUTOČNÉ form akcie modulov (zasklenia, CLIP): druhé odoslanie tej istej
-// ZAK+OP vráti blok `uz-odpisane` (OdpisBlok) s re-submit poľami vrátane tokenu `dorobenie_po`; re-submit
+// ZAK+OP vráti blok `uz-odpisane` (OdpisBlok) s re-submit poľami vrátane tokenu `potvrdenie_token`; re-submit
 // TÝCH ISTÝCH polí + `override=uz-odpisane` (= čo pošle tlačidlo „Odoslať ako dorobenie") zapíše dorobenie;
 // opätovné odoslanie toho istého potvrdenia (refresh výsledku / dvojklik) je znova blok.
 // TEST režim (MONEY_LIVE=0) — do ostrého Money NIKDY nič.
@@ -34,6 +34,12 @@ async function volaj(
 	const a = actions[name] as (e: unknown) => Promise<Record<string, unknown>>;
 	return a({ request: new Request(url, { method: 'POST', body: fd(body) }), locals: LOCALS });
 }
+/** Hodnota tokenu potvrdenia v re-submit poliach bloku (stav append-only ledgeru, > 0). */
+const token = (entries: [string, string][]) => {
+	const t = entries.filter(([k]) => k === 'potvrdenie_token');
+	expect(t.length).toBe(1);
+	return Number(t[0]![1]);
+};
 const poradia = (zak: string) =>
 	(
 		db.prepare('SELECT poradie FROM odpis_log WHERE zak = ? ORDER BY id').all(zak) as {
@@ -57,7 +63,7 @@ describe('#608 zasklenia — Odoslať → Odoslať znova → Odoslať ako dorobe
 	};
 	let blokEntries: [string, string][] = [];
 
-	it('[RED] druhé odoslanie → step blocked, reason uz-odpisane, re-submit nesie token dorobenie_po=1', async () => {
+	it('[RED] druhé odoslanie → step blocked, reason uz-odpisane, re-submit nesie token potvrdenia', async () => {
 		const n = await volaj(zasklenia.actions, 'nahlad', vstup);
 		const potvrdenie = { ...vstup, planHash: String(n.planHash) };
 		expect((await volaj(zasklenia.actions, 'odoslat', potvrdenie)).step).toBe('hotovo');
@@ -66,7 +72,7 @@ describe('#608 zasklenia — Odoslať → Odoslať znova → Odoslať ako dorobe
 		expect(r.blokReason).toBe('uz-odpisane');
 		expect(String(r.error)).toContain('už bola odpísaná');
 		blokEntries = r.rawEntries as [string, string][];
-		expect(blokEntries).toContainEqual(['dorobenie_po', '1']);
+		expect(token(blokEntries)).toBeGreaterThan(0);
 		expect(blokEntries).toContainEqual(['planHash', String(n.planHash)]);
 		expect(poradia(ZAK)).toEqual([1]);
 	});
@@ -87,7 +93,8 @@ describe('#608 zasklenia — Odoslať → Odoslať znova → Odoslať ako dorobe
 		]);
 		expect(r.step).toBe('blocked');
 		expect(r.blokReason).toBe('uz-odpisane');
-		expect(r.rawEntries as [string, string][]).toContainEqual(['dorobenie_po', '2']);
+		// nový blok nesie NOVÝ (vyšší) token — ledger sa dorobením posunul
+		expect(token(r.rawEntries as [string, string][])).toBeGreaterThan(token(blokEntries));
 		expect(poradia(ZAK)).toEqual([1, 2]);
 	});
 });
@@ -103,7 +110,7 @@ describe('#608 CLIP — rovnaký tok v inom module (generický OdpisBlok)', () =
 		expect(b.step).toBe('blocked');
 		expect(b.blokReason).toBe('uz-odpisane');
 		const entries = b.rawEntries as [string, string][];
-		expect(entries).toContainEqual(['dorobenie_po', '1']);
+		expect(token(entries)).toBeGreaterThan(0);
 		const d = await volaj(clip.actions, 'odoslat', [...entries, ['override', 'uz-odpisane']]);
 		expect(d.step).toBe('hotovo');
 		expect(poradia(ZAK)).toEqual([1, 2]);
