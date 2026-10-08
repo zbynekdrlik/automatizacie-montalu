@@ -11,6 +11,9 @@ import { logger } from '$lib/server/log';
 import { computeClip, computeClipMulti, chybaClipVstupu, type ClipPolozka } from '$lib/clip';
 import type { ClipVstup } from '$lib/clip';
 import { clipMaterialRows } from '$lib/server/clip-narez';
+// #606: pílový plán s kg/m z Odoo (odpad v kg) — LEN zobrazenie, b2b bez kg (zdieľané so zasklenia)
+import { kgNarezPre } from '$lib/server/narez-kg';
+import type { SessionUser } from '$lib/server/auth';
 import { parseClipVstup, parseClipMultiVstup } from '$lib/server/vstup';
 import type { ClipMultiVstup } from '$lib/server/vstup';
 import {
@@ -107,35 +110,40 @@ function editsFrom(form: FormData): Map<string, string> {
 }
 
 /** Náhľadový payload kroku „kontrola" — zdieľaný `spocitat` a `pridatSkla` (#593). */
-async function stavKontrola(vstup: ClipVstup) {
+async function stavKontrola(vstup: ClipVstup, user: SessionUser | null) {
 	const vypocet = computeClip(vstup);
+	// #554 pílový plán (display-only) — RozpisRezov na tyče; #606 kg/m z Odoo súbežne so skladom
+	const [narez, skladVarovania] = await Promise.all([
+		kgNarezPre(user, clipMaterialRows([vypocet])),
+		// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
+		skladoveVarovania(vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty })))
+	]);
 	return {
 		step: 'kontrola' as const,
 		vstup,
 		vypocet,
-		// #554 pílový plán (display-only) — RozpisRezov na tyče
-		narez: clipMaterialRows([vypocet]),
-		// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
-		skladVarovania: await skladoveVarovania(
-			vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-		),
+		narez,
+		skladVarovania,
 		snapshotDatum: getSnapshotMeta().generatedAt,
 		error: null as string | null
 	};
 }
 
 /** Náhľadový payload kroku „kontrolaMulti" — zdieľaný `spocitatMulti` a `pridatSklaMulti` (#593). */
-async function stavKontrolaMulti(vstup: ClipMultiVstup) {
+async function stavKontrolaMulti(vstup: ClipMultiVstup, user: SessionUser | null) {
 	const multi = computeClipMulti(vstup.kusy);
 	const job = jobForMulti(vstup, multi.polozky, '');
+	// #554 spoločný pílový plán (display-only); #606 kg/m z Odoo súbežne so skladom
+	const [narez, skladVarovania] = await Promise.all([
+		kgNarezPre(user, clipMaterialRows(multi.kusy)),
+		skladoveVarovania(multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty })))
+	]);
 	return {
 		step: 'kontrolaMulti' as const,
 		multiVstup: vstup,
 		multi,
-		narez: clipMaterialRows(multi.kusy), // #554 spoločný pílový plán (display-only)
-		skladVarovania: await skladoveVarovania(
-			multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-		),
+		narez,
+		skladVarovania,
 		snapshotDatum: getSnapshotMeta().generatedAt,
 		planHash: contentHash(vstup.zak, job.polozky),
 		error: null as string | null
@@ -178,12 +186,12 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions = {
-	spocitat: async ({ request }) => {
+	spocitat: async ({ request, locals }) => {
 		const { vstup, error } = await parseClipVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, vstup };
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
-		return await stavKontrola(vstup);
+		return await stavKontrola(vstup, locals.user);
 	},
 
 	// „← Späť a upraviť zadanie": vráti formulár s PREDVYPLNENÝMI hodnotami (nekompútuje,
@@ -200,6 +208,8 @@ export const actions = {
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
 		const vypocet = computeClip(vstup);
+		// #606: kg/m (len zobrazenie) súbežne s validáciou/zápisom — nikdy nehádže, nečaká sa až po odpise
+		const narezKg = kgNarezPre(locals.user, clipMaterialRows([vypocet]));
 
 		// pri každom re-renderi kontroly sa vracajú ODOSLANÉ hodnoty — užívateľove
 		// úpravy sa nesmú ticho stratiť a nahradiť auto-výpočtom (bazén review vzor)
@@ -209,7 +219,7 @@ export const actions = {
 			step: 'kontrola' as const,
 			vstup,
 			vypocet,
-			narez: clipMaterialRows([vypocet]),
+			narez: await narezKg,
 			editVals,
 			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
 			skladVarovania: await skladoveVarovania(
@@ -256,7 +266,7 @@ export const actions = {
 				finalOut,
 				zmenene,
 				outcome,
-				narez: clipMaterialRows([vypocet])
+				narez: await narezKg
 			};
 		} catch (e) {
 			logger('clip').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
@@ -273,12 +283,12 @@ export const actions = {
 		return { step: 'form' as const, multiVstup: vstup };
 	},
 
-	spocitatMulti: async ({ request }) => {
+	spocitatMulti: async ({ request, locals }) => {
 		const { vstup, error } = await parseClipMultiVstupSOdoo(await request.formData());
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const cErr = chybaMulti(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
-		return await stavKontrolaMulti(vstup);
+		return await stavKontrolaMulti(vstup, locals.user);
 	},
 
 	odoslatMulti: async ({ request, locals }) => {
@@ -288,7 +298,8 @@ export const actions = {
 		const cErr = chybaMulti(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
 		const multi = computeClipMulti(vstup.kusy);
-		const narez = clipMaterialRows(multi.kusy); // #554 spoločný pílový plán (display-only)
+		// #554 spoločný pílový plán (display-only); #606 kg/m súbežne s validáciou/zápisom (nikdy nehádže)
+		const narezKg = kgNarezPre(locals.user, clipMaterialRows(multi.kusy));
 		const job = jobForMulti(vstup, multi.polozky, locals.user?.username ?? '');
 		const potvrdene = String(formData.get('planHash') ?? '');
 		const aktualny = contentHash(vstup.zak, job.polozky);
@@ -297,7 +308,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez,
+				narez: await narezKg,
 				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
@@ -315,7 +326,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez,
+				narez: await narezKg,
 				editVals: Object.fromEntries(edits),
 				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -330,7 +341,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez,
+				narez: await narezKg,
 				editVals: Object.fromEntries(edits),
 				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -345,7 +356,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez,
+				narez: await narezKg,
 				editVals: Object.fromEntries(edits),
 				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
@@ -379,7 +390,7 @@ export const actions = {
 				step: 'hotovoMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez,
+				narez: await narezKg,
 				finalOut,
 				outcome,
 				zmenene
@@ -394,7 +405,7 @@ export const actions = {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez,
+				narez: await narezKg,
 				skladVarovania: await skladoveVarovania(
 					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
 				),
@@ -414,7 +425,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, vstup };
 		const cErr = chybaClipVstupu(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, vstup };
-		const v = await stavKontrola(vstup);
+		const v = await stavKontrola(vstup, locals.user);
 		const sklaPridane = await pridajSklaClip([vstup], vstup, locals.user?.username ?? '');
 		return { ...v, sklaPridane };
 	},
@@ -424,7 +435,7 @@ export const actions = {
 		if (error) return { step: 'form' as const, error, multiVstup: vstup };
 		const cErr = chybaMulti(vstup);
 		if (cErr) return { step: 'form' as const, error: cErr, multiVstup: vstup };
-		const v = await stavKontrolaMulti(vstup);
+		const v = await stavKontrolaMulti(vstup, locals.user);
 		const sklaPridane = await pridajSklaClip(vstup.kusy, vstup, locals.user?.username ?? '');
 		return { ...v, sklaPridane };
 	}

@@ -6,9 +6,17 @@
 //   • `odoo` (po sprístupnení na odoo-erp 9076) → pri každom profile „· X kg" alebo „· kg/m chýba"
 //     a v „Odpad spolu" „· X kg z Y kg (Z % hmotnosti)" — aj v tlači. Relačne (kg/m sa v Odoo mení).
 // Vetvu „kg zobrazené" deterministicky kryje SSR render `tests/rozpis-rezov-kg-606.test.ts`
-// (fixtúra kg/m) — CI Odoo nemá (`odoo-katalog.md`).
+// a `tests/clip-odpad-kg-606.test.ts` (fixtúra kg/m) — CI Odoo nemá (`odoo-katalog.md`).
+// To isté platí pre CLIP pílový plán („Rozpis rezov na tyče — pre pílu", len „Spočítať rozpis").
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, goto, loginAs, vyberFarbuKovania } from './helpers';
+import {
+	collectConsole,
+	goto,
+	loginAs,
+	vyberFarbuKovania,
+	vyberSklo,
+	waitHydrated
+} from './helpers';
 
 /** `/health` cez Node `fetch` (nie `page.request` — stale keepAlive socket cez tunel, testing.md). */
 async function kgZdroj(): Promise<string> {
@@ -72,6 +80,52 @@ test('#606: odpad v kg v nárezovom pláne zodpovedá /health kgZdroj (bez Odoo 
 			await expect(kgProfilov.first()).toBeVisible();
 			await page.emulateMedia({ media: 'screen' });
 		}
+	}
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('#606: CLIP pílový plán — kg zodpovedajú /health kgZdroj (bez Odoo žiadny kg text)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	const zdroj = await kgZdroj();
+	if (!process.env.BASE_URL) expect(zdroj).toBe('nedostupne'); // CI preview nemá Odoo
+	await loginAs(page);
+	await goto(page, '/clip');
+	await page.locator('#zak').fill(`E2E-606-CLIP-${Date.now().toString(36)}`);
+	await page.locator('#op').fill('OP1');
+	await page.locator('#zakaznik').fill('E2E Odpad kg');
+	// izo 3 výplne 3000×1200 — 3 profily (rám, priečka, zasklievací) v pílovom pláne
+	await vyberSklo(page.getByTestId('typ'), 'izo');
+	await page.getByTestId('variant').selectOption('3');
+	await page.locator('#sirka').fill('3000');
+	await page.locator('#vyska').fill('1200');
+	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
+	await waitHydrated(page);
+
+	const rozpis = page.getByTestId('clip-rozpis-rezov');
+	await expect(rozpis).toBeVisible();
+	await expect(page.getByTestId('odpad-spolu')).toBeVisible();
+	const profily = await rozpis.locator('.profil').count();
+	expect(profily).toBe(3);
+	const kgProfilov = rozpis.getByTestId('odpad-kg');
+
+	if (zdroj !== 'odoo') {
+		await expect(kgProfilov).toHaveCount(0);
+		await expect(rozpis.getByTestId('odpad-spolu-kg')).toHaveCount(0);
+		await expect(rozpis.locator('.rozpis')).not.toContainText(' kg');
+		await expect(rozpis.locator('.stat').first()).toHaveText(
+			/odpad [\d,]+ mm \([\d,]+ %\) · rez rovný$/
+		);
+	} else {
+		const n = await kgProfilov.count();
+		expect([0, profily]).toContain(n);
+		for (const t of await kgProfilov.allTextContents())
+			expect(t).toMatch(/^\s*· (\d+(,\d+)? kg|kg\/m chýba)$/);
+		if (n > 0)
+			await expect(rozpis.getByTestId('odpad-spolu-kg')).toHaveText(
+				/^\s*· [\d,]+ kg z [\d,]+ kg \([\d,]+ % hmotnosti\)$/
+			);
 	}
 	expect(consoleMsgs).toEqual([]);
 });

@@ -62,8 +62,9 @@ import {
 	recomputeMultiVstup as computeMultiFrom
 } from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
-// #606: kg/m z Odoo k nárezovému plánu — LEN zobrazenie odpadu v kg (kópia plánu; Money ide z `r`)
-import { planSKgNaM } from '$lib/server/odoo-katalog';
+// #606: kg/m z Odoo k nárezovému plánu — LEN zobrazenie odpadu v kg, b2b bez kg (vstup `r` sa
+// nemení — Money/odpad idú z neho); zdieľaná hranica so CLIP
+import { kgPlanPre } from '$lib/server/narez-kg';
 import {
 	pridajSklaHromadneIdempotentne,
 	sklaPosuvu,
@@ -250,20 +251,6 @@ async function skloCenyPre(
 ): Promise<SkloCenaResult | undefined> {
 	if (isB2B(user)) return undefined;
 	return skloCenaPre(plany);
-}
-
-/**
- * #606: nárezový plán s kg/m z Odoo (odpad v kg) — rovnaká interná-only hranica ako `cenyPre`:
- * kg/m je v Odoo obmedzené na interné roly a b2b by si ho z kg odpadu dopočítal → pre b2b plán
- * bez kg (zobrazenie ako pred #606). Vstup NIKDY nemení (kópia len keď Odoo kg/m vráti) —
- * Money/odpad idú z pôvodného `r`.
- */
-async function kgPlanPre<T extends ComputeResult | MultiResult>(
-	user: SessionUser | null,
-	plan: T
-): Promise<T> {
-	if (isB2B(user)) return plan;
-	return planSKgNaM(plan);
 }
 
 function jobForMulti(
