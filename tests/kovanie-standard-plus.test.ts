@@ -118,7 +118,8 @@ describe('#604 Štandard + — komponenty RS STANDARD', () => {
 	});
 
 	it('Štandard + bez zvolenej farby → HLASNÁ chyba, nikdy tichý default na jednu farbu', () => {
-		const r = kov([spec('Štandard +|2K')], undefined);
+		// priamo, nie cez `kov` — explicitné `undefined` by spustilo jeho default 'R9005'
+		const r = kovanieDoOdpisu(cfg, [spec('Štandard +|2K')], false, undefined);
 		expect(r.polozky).toEqual([]);
 		expect(r.err).toMatch(/Kovanie/);
 	});
