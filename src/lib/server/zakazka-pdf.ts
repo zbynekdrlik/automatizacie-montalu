@@ -296,6 +296,15 @@ export async function generateZakazkaPdf(
 			reg,
 			MUTED
 		);
+	// (#608) rovnaká priznávacia veta ako HTML note — dorobenie je v súčte (materiál znova spotrebovaný)
+	if (note.dorobeni > 0)
+		drawParagraph(
+			ctx,
+			`Súčet zahŕňa dorobenie (${note.dorobeni}× opakovaný odpis tej istej zákazky — materiál sa reálne spotreboval znova).`,
+			FS_META,
+			reg,
+			MUTED
+		);
 
 	// metadáta = testovateľný kanál hodnôt
 	const count = pocetPoloziek(note);

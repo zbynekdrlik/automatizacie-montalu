@@ -40,7 +40,7 @@ test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporn�
 	await expect(page.locator('.row', { hasText: 'BPP00094' })).toContainText('9,2 m');
 	await expect(page.locator('.row', { hasText: 'BPP00094' })).toContainText('✏️');
 
-	// duplikát
+	// rovnaká ZAK+OP znova → „už bola odpísaná" blok (#608), bez potvrdenia dorobenia nič
 	await goto(page, '/bazen');
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-BAZ`);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
@@ -48,7 +48,8 @@ test('bazén: rozpis → úprava množstva → odoslanie → duplikát; záporn�
 	await page.getByLabel('Počet sekcií *').fill('2');
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 	await page.getByTestId('odoslat').click();
-	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	await expect(page.getByTestId('odoslat-ako-dorobenie')).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });
 

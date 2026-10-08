@@ -528,6 +528,12 @@ await page.getByTestId('odoslat-aj-tak').click();
 
 Rovnaký vzor aj pre sietka duplikát (`sietka.spec.ts`) a konfigurátor dopyt delete.
 
+**#608: druhé odoslanie tej istej ZAK+OP už NIE JE `duplikat` testid** — je to OdpisBlok
+(`blok` „už bola odpísaná") s tlačidlom `odoslat-ako-dorobenie` (nie `odoslat-aj-tak`). Tvrdý
+`duplikat` ostáva len pre cross-modul identický obsah a pergola rezerváciu. E2E fixtúra: zákazník
+ani ZAK nesmú obsahovať slovo „dorobenie" — riadok /odpisy by ho inak niesol aj bez odznaku
+(`hasNotText` filter, vzor `e2e/odpis-dorobenie-608.spec.ts`).
+
 ## `{@render hidden()}` v DVOCH formách na výsledkovej stránke → `.first()` (#462)
 
 Na mnohých výsledkových stránkach (sietka, zasklenia, clip...) sa snippet `hidden()`

@@ -1,13 +1,13 @@
-// #462 — OdpisBlok „⚠️ Odoslať aj tak" override klik na /pergola + /clip
-// (mimo /zasklenia — tam je dedup krytý parita.spec.ts, ale override klik NIE).
-// Zápisové testy za `skipAkLive`. Overuje, že duplikát → blok hlášku →
-// override klik (po automat. confirm) → odpis naozaj prejde (TEST režim).
+// #462 — OdpisBlok override klik na /pergola + /clip (mimo /zasklenia).
+// #608: druhý odpis tej istej ZAK+OP → zdieľaný OdpisBlok „už bola odpísaná" → vedomé
+// „🔁 Odoslať ako dorobenie" (po automat. confirm) → dorobenie naozaj prejde (TEST režim).
+// Zápisové testy za `skipAkLive`. Deterministicky — žiadna vetva „blok ALEBO duplikát".
 import { test, expect } from '@playwright/test';
 import { collectConsole, loginAs, goto, skipAkLive, waitHydrated, vyberSklo } from './helpers';
 
 const RUN = `OB-${Date.now().toString(36).toUpperCase()}`;
 
-test('pergola CAD: duplikát → OdpisBlok „Odoslať aj tak" override prejde (TEST)', async ({
+test('pergola CAD: druhý odpis → OdpisBlok „Odoslať ako dorobenie" prejde (TEST, #608)', async ({
 	page
 }) => {
 	const consoleMsgs = collectConsole(page);
@@ -27,7 +27,7 @@ test('pergola CAD: duplikát → OdpisBlok „Odoslať aj tak" override prejde (
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	// 2. druhý odpis s tou istou ZAK+OP → duplikát blok
+	// 2. druhý odpis s tou istou ZAK+OP → „už bola odpísaná" blok
 	await goto(page, '/pergola');
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(zak);
 	await page.getByLabel('OP/OPDL číslo *').fill('01');
@@ -36,30 +36,18 @@ test('pergola CAD: duplikát → OdpisBlok „Odoslať aj tak" override prejde (
 	await page.getByRole('button', { name: 'Spočítať rozpis' }).click();
 	await page.getByTestId('odoslat').click();
 
-	// blok hlášku (duplikat alebo OdpisBlok)
-	const blok = page.getByTestId('blok');
-	const duplikat = page.getByTestId('duplikat');
-	// čakáme na niektorý z nich (duplikat je dead-end, blok má override)
-	const blokVisible = await blok.isVisible().catch(() => false);
-	const dupVisible = await duplikat.isVisible().catch(() => false);
-
-	if (blokVisible) {
-		// OdpisBlok — klikneme „Odoslať aj tak" (treba override confirm)
-		page.on('dialog', (d) => d.accept());
-		await page.getByTestId('odoslat-aj-tak').click();
-		await expect(page.getByTestId('vysledok')).toContainText('TEST');
-	} else if (dupVisible) {
-		// duplikat dead-end (bez override) — toto je iný blok typ (pure dedup)
-		await expect(duplikat).toContainText('už bola odoslaná');
-	} else {
-		// ani jedno — čakaj na blok alebo duplikat
-		await expect(blok.or(duplikat)).toBeVisible();
-	}
+	// #608: „už bola odpísaná" blok → vedomé „Odoslať ako dorobenie" (confirm) → dorobenie prejde
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	page.on('dialog', (d) => d.accept());
+	await page.getByTestId('odoslat-ako-dorobenie').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
 	expect(consoleMsgs).toEqual([]);
 });
 
-test('clip: duplikát → OdpisBlok „Odoslať aj tak" override prejde (TEST)', async ({ page }) => {
+test('clip: druhý odpis → OdpisBlok „Odoslať ako dorobenie" prejde (TEST, #608)', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await skipAkLive(page);
 	await loginAs(page);
@@ -80,7 +68,7 @@ test('clip: duplikát → OdpisBlok „Odoslať aj tak" override prejde (TEST)',
 	await page.getByTestId('odoslat').click();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	// 2. druhý odpis → duplikát / blok
+	// 2. druhý odpis → „už bola odpísaná" blok
 	await goto(page, '/clip');
 	await page.locator('#zak').fill(zak);
 	await page.locator('#op').fill('01');
@@ -93,20 +81,11 @@ test('clip: duplikát → OdpisBlok „Odoslať aj tak" override prejde (TEST)',
 	await waitHydrated(page);
 	await page.getByTestId('odoslat').click();
 
-	const blok = page.getByTestId('blok');
-	const duplikat = page.getByTestId('duplikat');
-	const blokVisible = await blok.isVisible().catch(() => false);
-	const dupVisible = await duplikat.isVisible().catch(() => false);
-
-	if (blokVisible) {
-		page.on('dialog', (d) => d.accept());
-		await page.getByTestId('odoslat-aj-tak').click();
-		await expect(page.getByTestId('vysledok')).toContainText('TEST');
-	} else if (dupVisible) {
-		await expect(duplikat).toContainText('už bola odoslaná');
-	} else {
-		await expect(blok.or(duplikat)).toBeVisible();
-	}
+	// #608: „už bola odpísaná" blok → vedomé „Odoslať ako dorobenie" (confirm) → dorobenie prejde
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	page.on('dialog', (d) => d.accept());
+	await page.getByTestId('odoslat-ako-dorobenie').click();
+	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
 	expect(consoleMsgs).toEqual([]);
 });

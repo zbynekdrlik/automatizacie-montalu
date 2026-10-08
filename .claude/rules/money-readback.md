@@ -63,7 +63,9 @@ Počet odoslaných = `COUNT(odpis_polozky)` (1:1 s xlsx, písané v tej istej tx
   zasklenia+pergola+bazén jednej zákazky zdieľajú zak+op; jeden prežitý DLV by inak overil VIAC
   odpisov (a tichý drop by prešiel ako ok). Dvojfázový greedy: najprv v-pásme, potom zvyšné; každý
   DLV = najviac jeden odpis. Plná per-send exkluzivita potrebuje per-send diskriminátor v Money
-  doklade (názov súboru) — zatiaľ UNVERIFIED (provisioning).
+  doklade (názov súboru) — zatiaľ UNVERIFIED (provisioning). **DOROBENIE (#608)** = ďalší odpis toho
+  istého modulu a zákazky (poradie > 1) → druhý Money doklad; ten istý greedy ho páruje bez zmeny
+  kódu (jeden DLV neoverí oba — dorobenie neprejde „zadarmo"), guard `tests/dorobenie-nadvaznosti-608.test.ts`.
 - **Pásmo `[počet_nenulových .. počet_všetkých]`** — Money môže/nemusí rátať nulové riadky (bazén
   posiela aj nulové). Ak sa LIVE potvrdí, že Money nuly ráta → pripni pásmo na presný počet.
 - **Okno chyba-doklad-alarmu:** merané od GENEROVANIA snapshotu (nie „teraz"), a klampnuté na

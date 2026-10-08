@@ -142,7 +142,8 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	const suborOP01 = (await page.getByTestId('vysledok').textContent())!;
 	await expect(page.getByRole('button', { name: /Tlačiť/ })).toBeVisible();
 
-	// 3. nový plán → rovnaká ZAK+OP → duplikát, nič sa nezapíše
+	// 3. nový plán → rovnaká ZAK+OP → „už bola odpísaná" blok (#608), nič sa nezapíše bez vedomého
+	//    „Odoslať ako dorobenie"
 	await page.getByRole('link', { name: /Nový nárezový plán/ }).click();
 	await waitHydrated(page);
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(RUN);
@@ -153,10 +154,11 @@ test('zasklenia: náhľad → odoslanie → duplikát', async ({ page }) => {
 	await vyberFarbuKovania(page);
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await page.getByTestId('odoslat').click();
-	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
-	await page.getByRole('link', { name: /Späť na formulár/ }).click();
-	await waitHydrated(page);
-	await expect(page.getByLabel('Číslo objednávky (ZAK) *')).toHaveValue('');
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	await expect(page.getByTestId('odoslat-ako-dorobenie')).toBeVisible();
+	// blok nič neodoslal — žiadny výsledok (súbor) na stránke
+	await expect(page.getByTestId('vysledok')).toHaveCount(0);
+	await goto(page, '/zasklenia');
 
 	// 4. iná OP tej istej ZAK prejde
 	await page.getByLabel('Číslo objednávky (ZAK) *').fill(RUN);
@@ -470,12 +472,13 @@ test('zimná záhrada: odoslanie viac-posuvového odpisu do Money + duplikát', 
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 	await expect(page.getByTestId('vysledok')).toContainText(`${RUN}-MO`);
 
-	// rovnaká ZAK+OP znova → duplikát, nič sa nezapíše
+	// rovnaká ZAK+OP znova → „už bola odpísaná" blok (#608), nič sa nezapíše bez potvrdenia dorobenia
 	await page.getByRole('link', { name: /Nový nárezový plán/ }).click();
 	await waitHydrated(page);
 	await fillMulti();
 	await page.getByTestId('odoslat-multi').click();
-	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	await expect(page.getByTestId('odoslat-ako-dorobenie')).toBeVisible();
 	expect(consoleMsgs).toEqual([]);
 });
 

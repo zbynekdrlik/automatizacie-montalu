@@ -382,7 +382,7 @@ export async function cadOdoslat(form: FormData, user: SessionUser | null, opts:
 				step: 'blocked' as const,
 				blokReason: outcome.reason!,
 				blokAction: '?/odoslat',
-				rawEntries: rawFormEntries(form),
+				rawEntries: rawFormEntries(form, outcome),
 				error: blokHlaska(outcome, vstup.zak, vstup.op),
 				vstup
 			};
