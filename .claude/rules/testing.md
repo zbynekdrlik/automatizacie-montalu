@@ -660,7 +660,8 @@ odobrať (tvrď podmnožinu / triedu).
 
 - **Komponent sa dá testovať bez prehliadača:** `import { render } from 'svelte/server'` +
   `render(Komponent, { props }).body` → regex nad HTML (vzor `tests/sklo-otvory-578.test.ts`: počet
-  `circle[stroke-dasharray]` z `Nahlad2D` = pravidlo `otvoryVSkle`). `$props.id()` aj `$lib` aliasy
+  `circle[stroke-dasharray]` z `Nahlad2D` = pravidlo `otvoryVSkle`; #603 aj POLOHU/stranu cez `cx`
+  kruhov — súmernosť + vzdialenosť stredových). `$props.id()` aj `$lib` aliasy
   fungujú (sveltekit plugin vo `vite.config.ts`). Lacnejšie a presnejšie než E2E na „kreslí toľko X".
 - **Lokálny E2E cez `vite dev` (Tier 0) keď chýba pinned Chromium** (`Executable doesn't exist …
   chromium_headless_shell-12xx`): v dočasnom configu `use.launchOptions.executablePath` na už
@@ -674,6 +675,15 @@ odobrať (tvrď podmnožinu / triedu).
   počas behu, ostalo 1193): 12xx = `chromium_headless_shell-<v>/chrome-headless-shell-linux64/
   chrome-headless-shell`, 1193 = `chromium_headless_shell-1193/chrome-linux/headless_shell`. Pred
   behom `ls ~/.cache/ms-playwright/chromium_headless_shell-*/`.
+- **Mutačná kontrola E2E pod `vite dev` NEpotrebuje rebuild (#603)** — dev server servíruje zdroj
+  priamo (HMR), takže zmutuj → spusti spec → `git checkout -- <súbor>` stačí; pasca „po REVERTE
+  prebuilduj" vyššie platí len pre preview/`build/`. 8.10.: playwright 1.61.1 chcel
+  `chromium_headless_shell-1228` (nebol), `executablePath` na `-1243` fungoval.
+- **Plný `npm test` NEspúšťaj súbežne s lokálnym E2E na preťaženom boxe (#603, load ~24):**
+  `b2b-route-coverage.test.ts` (dynamický import routy) padol na default 5 s timeout, sám prejde —
+  artefakt záťaže, nie regresia; plný beh opakuj bez súbežnej záťaže.
+- **Fixtúra Deluxe 2x4K: šírka ≤ ~7000 mm** — `s: 8000` padne „Rez 8000 mm (Koľajnica horná 4K
+  Surový 7500 mm) je dlhší než tyč" (akcia vráti `step:'form'`, riadky sa nepridajú).
 - **Temp E2E config drž na porte 4173, ak je voľný** — `skipAkLive` (`e2e/helpers.ts`) číta
   `BASE_URL || http://localhost:4173`, takže na inom porte všetky zápisové testy padnú na `fetch
   failed` (artefakt harnessu, nie regresia). Iný port len keď je 4173 obsadený súrodencom.
