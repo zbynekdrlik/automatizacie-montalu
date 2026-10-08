@@ -93,29 +93,95 @@ test('zaškrtnutá FAB prežije „Späť a upraviť"', async ({ page }) => {
 	expect(errs).toEqual([]);
 });
 
-test('Štandard +: bez kovania kusov (žiadne FAB pole), ale karta má tesnenie (#342)', async ({
+// #604 (Odoo úloha 1261, Patrik: „štandard neobsahuje kefy, zamykáč a kladku"): Štandard + je
+// ten istý systém RS STANDARD → v náhľade odpisu MUSIA byť kladky, protikus, automatický zámok
+// zvolenej RAL farby a kefa. Pred #604 karta niesla len tesnenie (#342).
+// Množstvá kusov sú pevné (krídla/zámky = štýl, nie cfg vzorec); kefa v metroch sa
+// nepíše natvrdo — post-deploy E2E beží proti PROD cfg (testing.md #555).
+const kusy = (page: Page, kod: string) => riadok(page, kod).locator('b');
+
+test('Štandard + 2K: kovanie RS STANDARD v náhľade — kladka, protikus, zámok R9005, kefa (#604)', async ({
 	page
 }) => {
 	const errs = collectConsole(page);
 	await loginAs(page);
 	await zaklad(page, '04');
 	await page.getByLabel('Systém').selectOption('Štandard +');
-	// Štandard + nemá kovanie kusy (komponentyPre vráti null pre tento systém) →
-	// FAB pole sa vôbec neponúka, presne ako predtým.
+	// STANDARD nemá kľučku/krytku vložky (`naUzaverPodlaFab`) → FAB pole sa neponúka…
 	await expect(page.getByTestId('jednostranna-fab')).toHaveCount(0);
+	// …ale RAL voľba ÁNO: zámok má farebné Money kódy (config-derived z komponentyPre)
+	await expect(page.getByTestId('farba-kovania')).toBeVisible();
 	await page.getByLabel('Štýl').selectOption('2K');
 	// reaktívny sklo-select sa doplní po zmene systému — samostatný krok (race)
 	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float sklo 6 mm');
-	await vyberFarbuKovania(page);
+	await vyberFarbuKovania(page, 'R9005');
 	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
 	await waitHydrated(page);
 
-	// #342 round 2: Štandard + je v TESNENIE_SYSTEMY, takže karta „Kovanie a
-	// tesnenia" sa zobrazí s tesnením — nie je prázdna ako pred #342.
 	await expect(page.getByTestId('kovanie-karta')).toBeVisible();
+	// 2 krídla → 4 kladky dvojité; 2 koncové okná → 2 zámky R9005 + 2 protikusy
+	await expect(kusy(page, 'ZASK00002')).toHaveText('4 ks');
+	await expect(kusy(page, 'ZASK20252')).toHaveText('2 ks');
+	// názov „… R9005" končí číslicou → assert na izolovaný <b> (money-odpis 2o)
+	await expect(kusy(page, 'ZASK202531')).toHaveText('2 ks');
+	await expect(riadok(page, 'ZASK202532')).toHaveCount(0); // R7016 zámok NEJDE
+	// kefa = kladkový profil × 2 — metrážová, nenulová
+	await expect(kusy(page, 'ZASK00007')).toHaveText(/^[1-9]\d*(,\d+)? m$/);
+	// tesnenie (#342) ostáva
 	await expect(riadok(page, 'ZASK00006')).toContainText(' m');
+	// ZASK202541 ostáva honest-null ako pri Štandarde → viditeľná hláška
+	await expect(page.getByTestId('plan-warn')).toContainText('ZASK202541');
 	// profily sa odpisujú ako doteraz
 	await expect(page.getByText('Odpis (do Money)')).toBeVisible();
+
+	expect(errs).toEqual([]);
+});
+
+test('Štandard + opona 2x3K R7016: 3 zámky R7016, 3 protikusy, 12 kladiek (#604)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await zaklad(page, '09');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2x3K');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float sklo 6 mm');
+	await vyberFarbuKovania(page, 'R7016');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+
+	await expect(kusy(page, 'ZASK00002')).toHaveText('12 ks');
+	await expect(kusy(page, 'ZASK202532')).toHaveText('3 ks');
+	await expect(riadok(page, 'ZASK202531')).toHaveCount(0); // R9005 zámok NEJDE
+	await expect(kusy(page, 'ZASK20252')).toHaveText('3 ks');
+	await expect(kusy(page, 'ZASK00007')).toHaveText(/^[1-9]\d*(,\d+)? m$/);
+
+	expect(errs).toEqual([]);
+});
+
+test('Štandard + po odoslaní (TEST priečinok): kovanie je aj na potvrdzovacej obrazovke (#604)', async ({
+	page
+}) => {
+	const errs = collectConsole(page);
+	await loginAs(page);
+	await skipAkLive(page); // zápisový test — NIKDY proti LIVE Money
+	await zaklad(page, '10');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('3K');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), 'Float sklo 6 mm');
+	await vyberFarbuKovania(page, 'R9005');
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+	await waitHydrated(page);
+	// TEST režim (MONEY_LIVE nie je 1) — zapisuje sa do testovacieho priečinka, nie do Money
+	await page.getByRole('button', { name: /Odoslať odpis/ }).click();
+	await waitHydrated(page);
+
+	// to, čo odišlo do súboru, je vidieť aj tu — 3 krídla → 6 kladiek, 2 zámky R9005
+	await expect(page.getByTestId('vysledok')).toBeVisible();
+	await expect(page.getByTestId('kovanie-karta')).toBeVisible();
+	await expect(kusy(page, 'ZASK00002')).toHaveText('6 ks');
+	await expect(kusy(page, 'ZASK202531')).toHaveText('2 ks');
+	await expect(kusy(page, 'ZASK20252')).toHaveText('2 ks');
 
 	expect(errs).toEqual([]);
 });

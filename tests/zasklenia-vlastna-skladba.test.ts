@@ -74,7 +74,9 @@ const STDPLUS = {
 	styl: '4K',
 	s: '3000',
 	v: '2000',
-	otvaranie: 'P - L'
+	otvaranie: 'P - L',
+	// #604: Štandard + má kovanie RS STANDARD s farebným automatickým zámkom → farba povinná
+	farbaKovania: 'R7016'
 };
 
 // ---- (1) tesnenie klasifikácia z triedy (pure) — vlastné sklo ----
@@ -165,8 +167,8 @@ describe('vlastná skladba — tesnenie (Money) podľa triedy v Štandard + (#23
 		const r = (await nahlad({
 			...STDPLUS,
 			system,
-			// starý Štandard má farebný automatický zámok (#338) → farba kovania povinná
-			...(system === 'Štandard' ? { farbaKovania: 'R7016' } : {}),
+			// celá rodina Štandard (starý #338 aj Štandard + #604) má farebný automatický
+			// zámok → farba kovania povinná; nesie ju STDPLUS (R7016) pre oba systémy
 			sklo: SKLO_INE,
 			skloPresne: 'vlastné ' + skloTrieda,
 			skloTrieda,
@@ -402,7 +404,8 @@ describe('vlastná skladba — IZO gate (RED-1, #235 slice 2)', () => {
 			styl: '2x2K',
 			s: '3000',
 			v: '2000',
-			otvaranie: 'Opona'
+			otvaranie: 'Opona',
+			farbaKovania: 'R7016' // #604: Štandard + kovanie má RAL zámok
 		};
 		const kat = (await nahlad({
 			...base,

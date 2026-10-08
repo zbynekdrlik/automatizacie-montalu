@@ -107,6 +107,13 @@ reads the message via `(r as { data?: { error?: string } }).data?.error` — NOT
 object, which `fail()` does not produce). See `tests/pouzivatelia-actions.test.ts`
 (#142) and `tests/b2b-money-reject.test.ts` for the pattern.
 
+## Ad-hoc vitest sonda: `console.log` z PREŠLÉHO testu sa nevypíše — píš na `process.stderr` (#604)
+
+Pri dočasnej sonde (`tests/zz-tmp-*.test.ts`, po behu zmazať) vitest 4 `console.log` výstup
+prešlého testu nezobrazí ani s `--silent=false`. `process.stderr.write(riadok + '\n')` prejde
+vždy (`npx vitest run tests/zz-tmp-x.test.ts 2>&1 | grep …`). Užitočné na zachytenie golden
+výstupu PRED opravou (napr. `kovanieDoOdpisu` ostatných systémov) do `toEqual` testu.
+
 ## Running the full gate locally
 
 ```bash

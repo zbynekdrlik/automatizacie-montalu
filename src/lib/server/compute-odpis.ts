@@ -153,8 +153,8 @@ export function zakladPoctov(r: ComputeResult): ZakladPoctov {
 		// Kladkový/klzný profil (#354) — rovnaká name-regex technika, žiadne prekrytie
 		// s existujúcimi rolami (kladkový/klzný sa nikdy nevolá rámový/nosový/oponový).
 		// POZOR: „kladkový" NIE je exkluzívne Deluxe — Štandard má vlastný „Kladkový
-		// profil" (ZASP202415), takže `dlzkaKladkovehoMm` je nenulové aj tam (dnes ho
-		// žiadny Štandard komponent nepoužíva). „klzný" je overené (`cfg_seed.json`)
+		// profil" (ZASP202415), takže `dlzkaKladkovehoMm` je nenulové aj tam (číta ho
+		// kefa ZASK00007 rodiny Štandard, #342/#604). „klzný" je overené (`cfg_seed.json`)
 		// výhradne Deluxe.
 		dlzkaKladkovehoMm: dlzka(/klad/i),
 		dlzkaKlznehoMm: dlzka(/klzn/i)
