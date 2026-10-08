@@ -129,7 +129,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - bazén kusové komponenty (BPK*, computeBazenAll, mj ks, model whitelist, E2E prefix kolízia) → `.claude/rules/bazen-komponenty.md`
 - CLIP zábradlie nárez + Money odpis (#372, parametrický vzorec, honest-null, whitelist, rozšírenie po Dominikovi = dáta) → `.claude/rules/clip.md`
 - lakovanie (spotreba farby z rozvinu profilov #369, rozvin=Money `m2` merná jednotka, honest-null €/„čaká na sadzby", vlastná karta mimo ceny-tabulka, rozšírenie = RAL dáta) → `.claude/rules/lakovanie.md`
-- odpad z nárezov (offcut/zvyšky tyčí — zdroj `ffdPack`, per-profil v `RozpisRezov`, súčet `sumaOdpad`, odpad aj v kg z Odoo kg/m `sumaOdpadKg` #606, len zasklenia; Money-neutrálne) → `.claude/rules/odpad.md`
+- odpad z nárezov (offcut/zvyšky tyčí — zdroj `ffdPack`, per-profil v `RozpisRezov`, súčet `sumaOdpad`, odpad aj v kg z Odoo kg/m `sumaOdpadKg` + hranica `narez-kg.ts` #606, zasklenia + CLIP pílový plán; Money-neutrálne) → `.claude/rules/odpad.md`
 - verejný dopyt / PDF ponuka s orientačnou cenou / slovenský text v pdf-lib / DopytForm → `.claude/rules/dopyt-ponuka.md`
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
 - interný zoznam materiálu zákazky → Odoo sale.order log-note (odoo-rpc, mt_note, observer hook, ZAK/OP match) → `.claude/rules/odoo-zakazka.md`

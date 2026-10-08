@@ -71,7 +71,7 @@ read-only sondou v PROD kontajneri (vzor nižšie).
   poradie `search(limit=1)`) — aj keď ten kg/m nemá (Odoo by zobral tiež jeho). `false`/0/nekonečné =
   „chýba" (v mape nie je). Pole je na `product.template`, `product.product` ho číta cez `_inherits`.
 - `planSKgNaM(plan)` = generický obohacovač pre `{ material: MaterialRow[] }` (single, multi, ďalší
-  modul): vstup NIKDY nemení — pri Odoo KÓPIA (riadok s kódom dostane číslo / `null`, bez kódu nič), pri nedostupnom Odoo / chybe ten istý plán bez poľa. b2b hranicu drží volajúca routa (`kgPlanPre` v zasklenia).
+  modul): vstup NIKDY nemení — pri Odoo KÓPIA (riadok s kódom dostane číslo / `null`, bez kódu nič), pri nedostupnom Odoo / chybe ten istý plán bez poľa. b2b hranicu drží `narez-kg.ts` (`kgPlanPre` / `kgNarezPre`) — routy (zasklenia, CLIP) volajú TO, nie `planSKgNaM` priamo.
   Má vlastný try/catch (kontrakt „nikdy nehádže" — volá sa aj po zápise odpisu, chyba zobrazenia tam
   nesmie vyzerať ako zlyhaný zápis do Money).
 - `/health` `kgZdroj: 'odoo' | 'nedostupne'` (`zistiKgZdroj`, sonda `ZASP00014` — pasca `zabezpec([])`
