@@ -22,8 +22,15 @@ process.env.MONEY_NA_ODPIS_DIR = path.join(tmpRoot, 'dlv-import', 'NA ODPIS'); /
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'test-export'); // TEMP
 process.env.CENY_SNAPSHOT_PATH = path.join(tmpRoot, 'neexistuje.json'); // #295 sa nespustí
 
-const { writeOdpis, blokHlaska, overrideOpts, rawFormEntries, releaseOdpis, listOdpisy } =
-	await import('../src/lib/server/money');
+const {
+	writeOdpis,
+	blokHlaska,
+	overrideOpts,
+	rawFormEntries,
+	releaseOdpis,
+	povolitReimport,
+	listOdpisy
+} = await import('../src/lib/server/money');
 const { db } = await import('../src/lib/server/db');
 import type { OdpisJob, OdpisOutcome, Polozka } from '../src/lib/server/money';
 
@@ -192,6 +199,19 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 				.get(zak, zak) as { c: number }
 		).c;
 		expect(overridy).toBe(0);
+		// audit dorobenia NEtvrdí prekonaný ledger, keď nebolo čo prekonať (iný obsah)
+		expect(lastAudit()).toContain('Dorobenie č. 3');
+		expect(lastAudit()).not.toContain('ledger prekonaný');
+	});
+
+	it('audit dorobenia s identickým obsahom prizná prekonaný ledger', async () => {
+		const zak = 'ZAK2026904';
+		expect((await writeOdpis(job(zak, 'OP261384'))).status).toBe('written');
+		const w = await writeOdpis(job(zak, 'OP261384'), { overrideDorobenie: true, dorobeniePo: 1 });
+		expect(w.status).toBe('written');
+		expect(lastAudit()).toContain('identický obsah — ledger prekonaný');
+		// prvý odpis (poradie 1) má názov súboru BEZ označenia dorobenia
+		expect(rowsFor(zak)[0]!.filename).not.toContain('dorobenie');
 	});
 
 	it('[RED] normalizované OP (OP261382 ≡ 261382) — blok aj dorobenie fungujú cez zak_norm/op_norm', async () => {
@@ -220,7 +240,21 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		expect(w.poradie).toBe(2);
 		// uvoľnenie PRVÉHO nechá dorobenie (nič sa nekaskáduje medzi riadkami)
 		expect(releaseOdpis(r1.id, 'marek')).toBe(true);
+		expect(lastAudit()).not.toContain('(dorobenie');
 		expect(rowsFor(zak).map((r) => r.poradie)).toEqual([2]);
+	});
+
+	it('„Povoliť rovnaký" na riadku dorobenia: audit nesie poradie, ostatné riadky ostanú', async () => {
+		const zak = 'ZAK2026905';
+		expect((await writeOdpis(job(zak, 'OP261385'))).status).toBe('written');
+		expect(
+			(await writeOdpis(job(zak, 'OP261385'), { overrideDorobenie: true, dorobeniePo: 1 })).status
+		).toBe('written');
+		const [r1, r2] = rowsFor(zak) as [LogRow, LogRow];
+		expect(povolitReimport(r2.id, 'marek')).toBe(true);
+		expect(lastAudit()).toContain('Povolený RE-IMPORT');
+		expect(lastAudit()).toContain('(dorobenie 2)');
+		expect(rowsFor(zak).map((r) => r.id)).toEqual([r1.id]);
 	});
 
 	it('[RED] listOdpisy vracia poradie (história /odpisy ukáže číslo dorobenia)', () => {
@@ -270,6 +304,24 @@ describe('#608 dorobenie — hláška, formulárové mapovanie, re-submit token'
 		g.append('dorobenie_po', 'abc');
 		expect(overrideOpts(g).overrideDorobenie).toBe(false);
 		expect(overrideOpts(g).dorobeniePo).toBeUndefined();
+		// token musí byť celé poradie ≥ 1 (0 / zlomok / záporné sa zahodia)
+		for (const zly of ['0', '1.5', '-2']) {
+			const h = new FormData();
+			h.append('override', 'uz-odpisane');
+			h.append('dorobenie_po', zly);
+			expect(overrideOpts(h).dorobeniePo).toBeUndefined();
+		}
+		const jeden = new FormData();
+		jeden.append('dorobenie_po', '1');
+		expect(overrideOpts(jeden).dorobeniePo).toBe(1);
+	});
+
+	it('blokHlaska pri prvom existujúcom odpise: bez „×", bez zátvorky keď autor chýba', () => {
+		const h = blokHlaska({ ...blok, duplicateCreatedBy: undefined }, 'ZAK1', 'OP1');
+		expect(h).not.toContain('×');
+		expect(h).not.toContain('(patrik)');
+		expect(h).toContain('dorobenie č. 2');
+		expect(h).toContain('už bola odpísaná 8.10.2026 09:26.');
 	});
 
 	it('[RED] rawFormEntries pridá AKTUÁLNY token z bloku a zastaraný nahradí', () => {

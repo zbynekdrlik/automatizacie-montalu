@@ -787,10 +787,12 @@ export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promi
 			return id;
 		})();
 	} catch (e: unknown) {
+		// (#608) precheck vyššie pokrýva normalizovaný AJ RAW kľúč v tom istom synchrónnom bloku, takže
+		// v jednom procese sem UNIQUE nedorazí — vetva ostáva ako posledná poistka DB (žiadny tichý zápis).
 		if (e instanceof Error && e.message.includes('UNIQUE')) {
 			const existing = db
 				.prepare(
-					'SELECT created_at FROM odpis_log WHERE modul = ? AND zak = ? AND op = ? AND live = ? ORDER BY id DESC LIMIT 1'
+					'SELECT created_at FROM odpis_log WHERE modul = ? AND zak = ? AND op = ? AND live = ?'
 				)
 				.get(job.modul, job.zak, job.op, live) as { created_at: string } | undefined;
 			log.warn('odpis duplikát — dedup kľúč už existuje, nič sa nezapisuje', {

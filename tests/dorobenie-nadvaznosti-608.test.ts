@@ -161,6 +161,21 @@ describe('#608 kiosk nárezák (Odoo „Čo rezať") pri dorobení', () => {
 		const dlhy = backfillDocId('OPDL2609999999999', 12);
 		expect(dlhy.length).toBeLessThanOrEqual(40);
 		expect(dlhy).toMatch(/^[a-z0-9-]+-d12$/);
+		// riadok bez `poradie` (starší SELECT / fixtúra) sa ráta ako prvý odpis → bez prípony
+		const bezPoradia = {
+			id: 1,
+			modul: 'zasklenia',
+			zak: ZAK,
+			op: OP,
+			zakaznik: 'X',
+			live: 1,
+			content_hash: '',
+			detail: '{}',
+			created_at: '2026-10-08 07:00:00'
+		};
+		expect(
+			poradieOp({ zak: ZAK, zakaznik: 'X', byModul: new Map([['zasklenia', bezPoradia]]) })
+		).toBe(1);
 	});
 
 	it('[RED] upload nárezáku pri dorobení ide pod doc_id s príponou', async () => {
