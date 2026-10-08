@@ -7,6 +7,7 @@ paths:
   - 'tests/odoo-kody-validacia*.test.ts'
   - 'tests/odoo-nazov-skla*.test.ts'
   - 'tests/odoo-sklad*.test.ts'
+  - 'tests/odoo-kg-na-m*.test.ts'
   - 'src/lib/components/SkladVarovania.svelte'
 ---
 
@@ -57,6 +58,25 @@ celý request → katalóg by bol stále „nedostupný". Preto `FIELDS` `qty_av
 `stock.quant` (sekcia nižšie). Čitateľné: `default_code, name, uom_id, active, type, is_storable`
 (200) a `stock.quant` (`product_id`, `quantity`, `location_id`). Pred pridaním ĎALŠIEHO poľa ho over
 read-only sondou v PROD kontajneri (vzor nižšie).
+
+## kg/m profilu `montalu_kg_per_m` (`odooKgNaMPreKody` / `planSKgNaM`, #606)
+
+- **SAMOSTATNÁ `KodCache` inštancia `_kgNaM`**, NIKDY pole v `FIELDS`: `montalu_kg_per_m` má v Odoo
+  `groups=` (Administrator / Inventory Administrator / Montalu Výroba) → technický účet appky (uid 422)
+  dostane na PROD **403** (sonda 8.10.; prístup žiadaný na odoo-erp 9076). V spoločnom reade by 403
+  zhodilo celý katalóg (test „403 na kg/m NEzhodí katalóg").
+- **Lookup = Odoo intake nárezáka** (`sale_order_narezak_cutplan.py`: `search([("default_code","=",kod),
+  ("active","=",True)], limit=1)`): doména `default_code in kódy` + `active = True` (archivovaná karta
+  s iným kg/m sa ignoruje), PRVÝ riadok na kód vyhráva (search_read bez `order` = `_order` modelu =
+  poradie `search(limit=1)`) — aj keď ten kg/m nemá (Odoo by zobral tiež jeho). `false`/0/nekonečné =
+  „chýba" (v mape nie je). Pole je na `product.template`, `product.product` ho číta cez `_inherits`.
+- `planSKgNaM(plan)` = generický obohacovač pre `{ material: MaterialRow[] }` (single, multi, ďalší
+  modul): vstup NIKDY nemení — pri Odoo KÓPIA (riadok s kódom dostane číslo / `null`, bez kódu nič), pri nedostupnom Odoo / chybe ten istý plán bez poľa. b2b hranicu drží volajúca routa (`kgPlanPre` v zasklenia).
+  Má vlastný try/catch (kontrakt „nikdy nehádže" — volá sa aj po zápise odpisu, chyba zobrazenia tam
+  nesmie vyzerať ako zlyhaný zápis do Money).
+- `/health` `kgZdroj: 'odoo' | 'nedostupne'` (`zistiKgZdroj`, sonda `ZASP00014` — pasca `zabezpec([])`
+  vyššie platí aj tu) — paralelne s `cenyZdroj`. Po sprístupnení na 9076 sa prepne sám (60 s), bez
+  releasu; post-deploy E2E `odpad-kg-606.spec.ts` potom ide vetvou `odoo`.
 
 ## Stav skladu zo `stock.quant` (`odooSkladPreKody`, #599 krok 3)
 
