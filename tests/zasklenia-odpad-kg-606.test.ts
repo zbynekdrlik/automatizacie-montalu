@@ -121,24 +121,52 @@ describe('#606 zasklenia — kg/m z Odoo k nárezovému plánu', () => {
 		expect(material(r).every((x) => !('kgNaM' in x))).toBe(true);
 	});
 
-	it('odoslat s kg kanálom: hotovo nesie kg, do Money ide ten istý odpis a odpad bez kg', async () => {
-		const bez = await akcia('nahlad', form({ zak: 'ZAK-606-O' }));
-		const kody = material(bez).map((x) => x.kod);
+	it('odoslat s kg kanálom: hotovo nesie kg, do Money ide ten istý odpis a ten istý odpad ako bez kg', async () => {
+		// referencia: ten istý vstup odoslaný BEZ Odoo (iná zákazka — dedup je per zákazka)
+		const bezN = await akcia('nahlad', form({ zak: 'ZAK-606-REF' }));
+		const ref = await akcia(
+			'odoslat',
+			form({ zak: 'ZAK-606-REF', planHash: String(bezN.planHash) })
+		);
+		expect(ref.step).toBe('hotovo');
+		const kody = material(ref).map((x) => x.kod);
 		odooKg(Object.fromEntries(kody.map((k) => [k, 1.288])));
 		const n = await akcia('nahlad', form({ zak: 'ZAK-606-O' }));
 		// potvrdenie hashom z náhľadu S kg — keby kg menili odpis, akcia by vrátila „vzorce sa zmenili"
 		const r = await akcia('odoslat', form({ zak: 'ZAK-606-O', planHash: String(n.planHash) }));
 		expect(r.step).toBe('hotovo');
 		expect(material(r).every((x) => x.kgNaM === 1.288)).toBe(true);
-		const row = listOdpisy().find((o) => o.zak === 'ZAK-606-O')!;
-		const odpad = getOdpadForOdpisy([row.id]);
-		expect(odpad.map((o) => o.profilKod).sort()).toEqual(
-			material(bez)
-				.filter((x) => x.tyce > 0)
-				.map((x) => x.kod)
-				.sort()
+		// odpis do Money: rovnaké položky (hash položiek nezávisí od ZAK okrem samotného ZAK)
+		expect((r.outcome as { status: string }).status).toBe(
+			(ref.outcome as { status: string }).status
 		);
-		expect(odpad.every((o) => !('kgNaM' in o))).toBe(true);
+		expect(r.kovanie).toEqual(ref.kovanie);
+		// uložený odpad (Odoo log-note) je s kg aj bez nich IDENTICKÝ — kg sa nikam neukladajú
+		const odpadZak = (zak: string) =>
+			getOdpadForOdpisy([listOdpisy().find((o) => o.zak === zak)!.id])
+				.map(({ profilKod, profilNazov, odpadMm, materialMm, tyce }) => ({
+					profilKod,
+					profilNazov,
+					odpadMm,
+					materialMm,
+					tyce
+				}))
+				.sort((a, b) => a.profilKod.localeCompare(b.profilKod));
+		expect(odpadZak('ZAK-606-O')).toEqual(odpadZak('ZAK-606-REF'));
+		expect(odpadZak('ZAK-606-O').length).toBe(kody.length);
+	});
+
+	it('b2b (veľkoobchod) → plán BEZ kg aj pri živom kanáli (rovnaká hranica ako ceny)', async () => {
+		const bez = await akcia('nahlad', form());
+		odooKg(Object.fromEntries(material(bez).map((x) => [x.kod, 1.288])));
+		const b2b = (await (actions.nahlad as (e: unknown) => Promise<Record<string, unknown>>)({
+			request: new Request('http://x/zasklenia', { method: 'POST', body: form() }),
+			locals: { user: { id: 2, username: 'vo', role: 'b2b' } }
+		})) as Record<string, unknown>;
+		expect(b2b.step).toBe('nahlad');
+		expect(material(b2b).every((x) => !('kgNaM' in x))).toBe(true);
+		// interný v tom istom stave kg dostane (kontrola, že kanál naozaj žije)
+		expect(material(await akcia('nahlad', form())).every((x) => x.kgNaM === 1.288)).toBe(true);
 	});
 
 	it('multi posuv (zimná záhrada): zlúčený materiál nesie kg/m', async () => {

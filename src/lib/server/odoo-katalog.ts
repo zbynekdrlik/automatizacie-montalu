@@ -292,6 +292,8 @@ export type OdooKgNaMVysledok =
  * (JEDEN read pre kódy mimo platnej cache, 5 min; 403/404/výpadok 60 s bez volania). NIKDY nehádže.
  * Dnešný PROD (technický účet bez prístupu k poľu) = `nedostupne` → po sprístupnení v Odoo
  * (odoo-erp 9076) sa kg objavia samé, bez releasu aj reštartu.
+ * PASCA: prázdna/medzerová sada kódov vráti `odoo` s prázdnou mapou BEZ volania (`zabezpec([])`)
+ * — stav kanála to NEdokazuje; kto ho potrebuje zistiť, sonduje kódom (`zistiKgZdroj`).
  */
 export async function odooKgNaMPreKody(
 	kody: string[],
@@ -311,10 +313,10 @@ export async function odooKgNaMPreKody(
 
 /**
  * Nárezový plán s `kgNaM` pri profiloch (#606) — LEN pre zobrazenie odpadu v kg (`RozpisRezov`).
- * Vráti KÓPIU plánu; vstup (ten istý `material`, ktorý ide do `saveOdpisOdpad` a Money ciest) sa
- * nemení. Odoo odpovedá → riadok s kódom dostane kg/m alebo `null` (karta kg/m nemá); riadok bez
- * kódu ostane bez poľa. Odoo nedostupné / nenakonfigurované → riadky bez `kgNaM` (zobrazenie ako
- * pred #606). NIKDY nehádže a nečaká dlhšie než timeout (3 s).
+ * Vstup (ten istý `material`, ktorý ide do `saveOdpisOdpad` a Money ciest) sa NIKDY nemení: Odoo
+ * odpovedá → KÓPIA plánu, riadok s kódom dostane kg/m alebo `null` (karta kg/m nemá), riadok bez
+ * kódu ostane bez poľa; Odoo nedostupné / nenakonfigurované / chyba → ten istý (nezmenený) plán bez
+ * `kgNaM` (zobrazenie ako pred #606). NIKDY nehádže a nečaká dlhšie než timeout (3 s).
  */
 export async function planSKgNaM<T extends { material: MaterialRow[] }>(
 	plan: T,
@@ -325,7 +327,7 @@ export async function planSKgNaM<T extends { material: MaterialRow[] }>(
 			plan.material.map((m) => m.kod),
 			opts
 		);
-		if (r.zdroj !== 'odoo') return { ...plan, material: [...plan.material] };
+		if (r.zdroj !== 'odoo') return plan; // vstup sa nemení → netreba kópiu
 		return {
 			...plan,
 			material: plan.material.map((m) =>
@@ -338,7 +340,7 @@ export async function planSKgNaM<T extends { material: MaterialRow[] }>(
 		log.warn('kg/m k nárezovému plánu sa nepodarilo doplniť — plán bez kg', {
 			err: e instanceof Error ? e.message : String(e)
 		});
-		return { ...plan, material: [...plan.material] };
+		return plan; // nič nealokuje → catch sám nemôže hodiť
 	}
 }
 

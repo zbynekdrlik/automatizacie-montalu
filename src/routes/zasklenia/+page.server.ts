@@ -252,6 +252,19 @@ async function skloCenyPre(
 	return skloCenaPre(plany);
 }
 
+/**
+ * #606: nárezový plán s kg/m z Odoo (odpad v kg) — rovnaká interná-only hranica ako `cenyPre`:
+ * kg/m je v Odoo obmedzené na interné roly a b2b by si ho z kg odpadu dopočítal → pre b2b plán
+ * bez kg (zobrazenie ako pred #606). Vracia KÓPIU — Money/odpad idú z pôvodného `r`.
+ */
+async function kgPlanPre<T extends ComputeResult | MultiResult>(
+	user: SessionUser | null,
+	plan: T
+): Promise<T> {
+	if (isB2B(user)) return plan;
+	return planSKgNaM(plan);
+}
+
 function jobForMulti(
 	vstup: MultiVstup,
 	r: MultiResult,
@@ -428,7 +441,7 @@ async function stavNahlad(
 				pocet: r.sklo.pocet
 			}
 		]),
-		planSKgNaM(r)
+		kgPlanPre(user, r)
 	]);
 	return {
 		step: 'nahlad' as const,
@@ -477,7 +490,7 @@ async function stavNahladMulti(
 				pocet: p.sklo.pocet
 			}))
 		),
-		planSKgNaM(r)
+		kgPlanPre(user, r)
 	]);
 	return {
 		step: 'nahladMulti' as const,
@@ -570,7 +583,7 @@ export const actions = {
 			return {
 				step: 'nahlad' as const,
 				vstup,
-				plan: await planSKgNaM(r),
+				plan: await kgPlanPre(locals.user, r),
 				planHash: aktualny,
 				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
@@ -592,6 +605,8 @@ export const actions = {
 		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
 		const vylucene = parseVyluceneKody(formData);
 		const finalJob = vylucPolozky(job, vylucene);
+		// #606: kg/m (len zobrazenie) súbežne so zápisom — nikdy nehádže, nečaká sa až po odpise
+		const planKg = kgPlanPre(locals.user, r);
 		try {
 			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
@@ -627,7 +642,7 @@ export const actions = {
 			return {
 				step: 'hotovo',
 				vstup,
-				plan: await planSKgNaM(r),
+				plan: await planKg,
 				kovanie: allKovanie,
 				outcome,
 				vytvorene
@@ -713,7 +728,7 @@ export const actions = {
 			return {
 				step: 'nahladMulti' as const,
 				multiVstup: vstup,
-				multi: await planSKgNaM(r),
+				multi: await kgPlanPre(locals.user, r),
 				planHash: aktualny,
 				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
@@ -735,6 +750,8 @@ export const actions = {
 		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
 		const vyluceneMulti = parseVyluceneKody(formData);
 		const finalJobMulti = vylucPolozky(job, vyluceneMulti);
+		// #606: kg/m (len zobrazenie) súbežne so zápisom — viď `odoslat`
+		const planKg = kgPlanPre(locals.user, r);
 		try {
 			const outcome = await writeOdpis(finalJobMulti, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
@@ -767,7 +784,7 @@ export const actions = {
 			return {
 				step: 'hotovoMulti',
 				multiVstup: vstup,
-				multi: await planSKgNaM(r),
+				multi: await planKg,
 				kovanie: allKovanie,
 				outcome,
 				vytvorene
