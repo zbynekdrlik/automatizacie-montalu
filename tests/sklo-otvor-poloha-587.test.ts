@@ -51,7 +51,7 @@ describe('#587 polohaOtvoru — jedno pravidlo polohy', () => {
 
 describe('#587 riadkySklaPosuvu nesie polohu otvoru na riadku „s otvorom"', () => {
 	it('Deluxe 4K s rozmerom skla → riadok s otvorom má polohu, riadok bez nie', () => {
-		const [s, bez] = riadkySklaPosuvu('Zasklenie 1', 'Deluxe', 4, {
+		const [s, bez] = riadkySklaPosuvu('Zasklenie 1', 'Deluxe', 4, 'L - P', {
 			vrtanieZamku: 1100,
 			sirkaMm: 1004,
 			vyskaMm: 1914
@@ -61,7 +61,7 @@ describe('#587 riadkySklaPosuvu nesie polohu otvoru na riadku „s otvorom"', ()
 	});
 
 	it('otvor mimo skla → riadok s otvorom ostane (cena IZOS), ale poloha null', () => {
-		const [s] = riadkySklaPosuvu('Zasklenie 1', 'Deluxe', 2, {
+		const [s] = riadkySklaPosuvu('Zasklenie 1', 'Deluxe', 2, 'L - P', {
 			vrtanieZamku: 5000,
 			sirkaMm: 1004,
 			vyskaMm: 1914
@@ -73,20 +73,28 @@ describe('#587 riadkySklaPosuvu nesie polohu otvoru na riadku „s otvorom"', ()
 
 describe('#587 rozpis tabúľ s otvorom / bez pre kartu „Sklo (mm)"', () => {
 	it('Deluxe 4K → 2 s otvorom + 2 bez; Deluxe 2K → 2 + 0', () => {
-		expect(rozpisOtvorovSkla('Deluxe', 4)).toBe('z toho s otvorom ⌀46: 2 ks · bez otvoru: 2 ks');
-		expect(rozpisOtvorovSkla('Deluxe', 2)).toBe('z toho s otvorom ⌀46: 2 ks · bez otvoru: 0 ks');
+		expect(rozpisOtvorovSkla('Deluxe', 4, 'L - P')).toBe(
+			'z toho s otvorom ⌀46: 2 ks · bez otvoru: 2 ks'
+		);
+		expect(rozpisOtvorovSkla('Deluxe', 2, 'L - P')).toBe(
+			'z toho s otvorom ⌀46: 2 ks · bez otvoru: 0 ks'
+		);
 	});
 
 	it('systém bez otvorov → null (karta nič nepridá)', () => {
 		for (const sys of ['Robust', 'Slide', 'Štandard', ''])
-			expect(rozpisOtvorovSkla(sys, 4)).toBeNull();
+			expect(rozpisOtvorovSkla(sys, 4, 'Opona')).toBeNull();
 	});
 
 	it('SkloOtvoryRozpis (SSR) vypíše rozpis pre Deluxe a nič pre Robust', () => {
-		const d = render(SkloOtvoryRozpis, { props: { system: 'Deluxe', pocet: 4, testid: 'x' } }).body;
+		const d = render(SkloOtvoryRozpis, {
+			props: { system: 'Deluxe', pocet: 4, otvaranie: 'L - P', testid: 'x' }
+		}).body;
 		expect(d).toContain('data-testid="x"');
 		expect(d).toContain('z toho s otvorom ⌀46: 2 ks · bez otvoru: 2 ks');
-		const r = render(SkloOtvoryRozpis, { props: { system: 'Robust', pocet: 4, testid: 'x' } }).body;
+		const r = render(SkloOtvoryRozpis, {
+			props: { system: 'Robust', pocet: 4, otvaranie: 'L - P', testid: 'x' }
+		}).body;
 		expect(r).not.toContain('data-testid="x"');
 	});
 });
@@ -151,8 +159,14 @@ describe('#587 pomocné pravidlá polohy', () => {
 	});
 
 	it('stranyOtvorov — prvá tabuľa ľavé krídlo, ďalšia pravé (pravidlo otvoryVSkle)', () => {
-		expect(stranyOtvorov(otvoryVSkle('Deluxe', 4).sOtvorom)).toEqual({ vlavo: 1, vpravo: 1 });
-		expect(stranyOtvorov(otvoryVSkle('Deluxe', 1).sOtvorom)).toEqual({ vlavo: 1, vpravo: 0 });
+		expect(stranyOtvorov(otvoryVSkle('Deluxe', 4, 'L - P').sOtvorom)).toEqual({
+			vlavo: 1,
+			vpravo: 1
+		});
+		expect(stranyOtvorov(otvoryVSkle('Deluxe', 1, 'L - P').sOtvorom)).toEqual({
+			vlavo: 1,
+			vpravo: 0
+		});
 		expect(stranyOtvorov(0)).toEqual({ vlavo: 0, vpravo: 0 });
 		expect(stranyOtvorov(-1)).toEqual({ vlavo: 0, vpravo: 0 });
 	});
