@@ -60,6 +60,9 @@ const ledger = (zak: string) =>
 		}[]
 	).map((r) => r.kind);
 const subory = () => fs.readdirSync(LIVE_DIR).filter((f) => f.endsWith('.xlsx')).length;
+const auditCount = () =>
+	(db.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'").get() as { c: number })
+		.c;
 
 beforeAll(() => {
 	fs.mkdirSync(LIVE_DIR, { recursive: true });
@@ -114,6 +117,7 @@ describe('#608 replay potvrdenia po „Uvoľniť" je zablokovaný', () => {
 		expect((await writeOdpis(job(zak))).status).toBe('written');
 		const b = await writeOdpis(job(zak));
 		const fd = potvrdenie(b);
+		const auditPred = auditCount();
 		const blockFile = path.join(tmpRoot, 'blockfile');
 		fs.writeFileSync(blockFile, 'x');
 		process.env.MONEY_LIVE_DIR = path.join(blockFile, 'sub');
@@ -126,10 +130,13 @@ describe('#608 replay potvrdenia po „Uvoľniť" je zablokovaný', () => {
 		// pustil identický obsah BEZ potvrdenia)
 		expect(riadky(zak).map((r) => r.poradie)).toEqual([1]);
 		expect(ledger(zak)).toEqual(['import']);
+		// ani audit netvrdí odoslanie dorobenia, ktoré sa nevykonalo
+		expect(auditCount()).toBe(auditPred);
 		// zápis sa nikdy nevykonal → to isté potvrdenie stále platí
 		const retry = await writeOdpis(job(zak), overrideOpts(fd));
 		expect(retry.status).toBe('written');
 		expect(retry.poradie).toBe(2);
+		expect(auditCount()).toBe(auditPred + 1);
 	});
 
 	it('[RED] ledger blok nesie token a re-submit ho prevlečie (Odoslať aj tak cez formulár)', async () => {
@@ -144,6 +151,34 @@ describe('#608 replay potvrdenia po „Uvoľniť" je zablokovaný', () => {
 		const holy = new FormData();
 		holy.append('override', 'ledger-duplicate');
 		expect((await writeOdpis(job(zak), overrideOpts(holy))).reason).toBe('ledger-duplicate');
+	});
+
+	it('legacy riadok spred v27 (RAW op_norm): blok ho nájde a token nesie JEHO ledger stav', async () => {
+		// v27 skopíroval do zak_norm/op_norm RAW hodnoty — '01' namiesto normOp 'OP01'
+		const odpis = db
+			.prepare(
+				`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, zak_norm, op_norm, poradie)
+				 VALUES ('zasklenia', 'ZAK-LEG608', '01', 'Starý', 0, 1, '/t/f.xlsx', 'f.xlsx', 'abc', '{}', 'patrik', 'ZAK-LEG608', '01', 1)`
+			)
+			.run().lastInsertRowid;
+		const led = db
+			.prepare(
+				`INSERT INTO odpis_imported (modul, zak_norm, op_norm, live, content_hash, kind, filename, actor)
+				 VALUES ('zasklenia', 'ZAK-LEG608', '01', 1, 'abc', 'import', 'f.xlsx', 'patrik')`
+			)
+			.run().lastInsertRowid;
+		expect(odpis).toBeGreaterThan(0);
+		const legJob = { ...job('ZAK-LEG608'), op: '01' };
+		const b = await writeOdpis(legJob);
+		expect(b.reason).toBe('uz-odpisane');
+		// token = stav ledgeru legacy riadku (RAW kľúč), nie 0 → potvrdenie platí len pre tento stav
+		expect(b.potvrdenieToken).toBe(Number(led));
+		const d = await writeOdpis(legJob, {
+			overrideDorobenie: true,
+			potvrdenieToken: b.potvrdenieToken
+		});
+		expect(d.status).toBe('written');
+		expect(d.poradie).toBe(2);
 	});
 
 	it('[RED] hláška dorobenia pri identickom obsahu prizná, že pôjde aj rovnaký doklad ešte raz', async () => {

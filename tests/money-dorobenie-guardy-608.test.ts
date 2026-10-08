@@ -17,7 +17,8 @@ process.env.MONEY_LIVE = '0';
 process.env.MONEY_TEST_DIR = path.join(tmpRoot, 'odpis-export');
 process.env.MONEY_LIVE_DIR = path.join(tmpRoot, 'nikdy-live'); // keby sa TEST pomýlil, uvidíme to
 
-const { writeOdpis } = await import('../src/lib/server/money');
+const { writeOdpis, normZak, normOp } = await import('../src/lib/server/money');
+const { potvrdenieTokenPre } = await import('../src/lib/server/money-dedup');
 const { db } = await import('../src/lib/server/db');
 import type { OdpisJob, Polozka } from '../src/lib/server/money';
 
@@ -44,6 +45,10 @@ function job(
 		...extra
 	};
 }
+/** PLATNÝ token potvrdenia v tejto chvíli (ten, ktorý by operátor dostal v bloku) — hard-duplicate
+ *  poistky musia držať aj proti PLATNÉMU potvrdeniu dorobenia, nie len proti neplatnému. */
+const platny = (modul: OdpisJob['modul'], zak: string, op: string) =>
+	potvrdenieTokenPre(modul, 0, normZak(zak), normOp(op), zak, op);
 const pocet = (zak: string) =>
 	(db.prepare('SELECT COUNT(*) c FROM odpis_log WHERE zak = ?').get(zak) as { c: number }).c;
 
@@ -82,7 +87,7 @@ describe('#608 cross-modul identický obsah (issue 380) — dorobenie ho NEobíd
 		expect((await writeOdpis(job('CROSS-608', 'OP1', 'pergola'))).status).toBe('written');
 		const f = await writeOdpis(job('CROSS-608', 'OP1', 'fix'), {
 			overrideDorobenie: true,
-			potvrdenieToken: 1
+			potvrdenieToken: platny('fix', 'CROSS-608', 'OP1')
 		});
 		expect(f.status).toBe('duplicate');
 		expect(pocet('CROSS-608')).toBe(1);
@@ -95,10 +100,17 @@ describe('#608 cross-modul identický obsah (issue 380) — dorobenie ho NEobíd
 		expect((await writeOdpis(iny)).status).toBe('written');
 		// … a pergola má obsah X
 		expect((await writeOdpis(job('CROSS2-608', 'OP1', 'pergola'))).status).toBe('written');
-		// „dorobenie" FIX-u s obsahom X (= pergola nárez) musí ostať tvrdo zablokované
+		// „dorobenie" FIX-u s obsahom X (= pergola nárez) musí ostať tvrdo zablokované — aj s PLATNÝM
+		// tokenom, ktorý FIX blok (iný obsah) reálne vráti
+		const tok = platny('fix', 'CROSS2-608', 'OP1');
+		const iny2 = job('CROSS2-608', 'OP1', 'fix');
+		iny2.polozky = [{ kod: 'PRP20262', nazov: 'Ďalší profil', qty: 1 }];
+		const blokFix = await writeOdpis(iny2);
+		expect(blokFix.reason).toBe('uz-odpisane');
+		expect(blokFix.potvrdenieToken).toBe(tok);
 		const d = await writeOdpis(job('CROSS2-608', 'OP1', 'fix'), {
 			overrideDorobenie: true,
-			potvrdenieToken: 1
+			potvrdenieToken: tok
 		});
 		expect(d.status).toBe('duplicate');
 		expect(pocet('CROSS2-608')).toBe(2);
@@ -120,7 +132,9 @@ describe('#608 pergola rezervácia (issue 221) — kolízia s CAD odpisom ostáv
 		const cad = job('REZ-608', 'OP1', 'pergola');
 		cad.polozky = [{ kod: 'PRP20260', nazov: 'CAD profil', qty: 6 }];
 		expect((await writeOdpis(cad)).status).toBe('duplicate');
-		expect((await writeOdpis(cad, { overrideDorobenie: true, potvrdenieToken: 1 })).status).toBe(
+		const tok = platny('pergola', 'REZ-608', 'OP1');
+		expect(tok).toBeGreaterThan(0);
+		expect((await writeOdpis(cad, { overrideDorobenie: true, potvrdenieToken: tok })).status).toBe(
 			'duplicate'
 		);
 		expect(pocet('REZ-608')).toBe(1);
@@ -134,9 +148,18 @@ describe('#608 pergola rezervácia (issue 221) — kolízia s CAD odpisom ostáv
 			detail: { rezervacia: true }
 		});
 		rez.polozky = [{ kod: 'PRP20261', nazov: 'Rez profil', qty: 2 }];
-		expect((await writeOdpis(rez, { overrideDorobenie: true, potvrdenieToken: 1 })).status).toBe(
+		const tok = platny('pergola', 'REZ2-608', 'OP1');
+		expect(tok).toBeGreaterThan(0);
+		expect((await writeOdpis(rez, { overrideDorobenie: true, potvrdenieToken: tok })).status).toBe(
 			'duplicate'
 		);
 		expect(pocet('REZ2-608')).toBe(1);
+		// ten istý token JE platný — bežné CAD dorobenie (nie rezervácia) s ním prejde, takže duplikát
+		// vyššie spôsobila rezervácia, nie neplatné potvrdenie
+		const cad2 = job('REZ2-608', 'OP1', 'pergola');
+		cad2.polozky = [{ kod: 'PRP20263', nazov: 'CAD profil 2', qty: 4 }];
+		const ok = await writeOdpis(cad2, { overrideDorobenie: true, potvrdenieToken: tok });
+		expect(ok.status).toBe('written');
+		expect(ok.poradie).toBe(2);
 	});
 });
