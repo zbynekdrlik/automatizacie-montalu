@@ -84,6 +84,10 @@ export interface MaterialRow {
 	 *  (Zbynek / Dominik+Marek); Robust/Slide = 90° len nosový/oponový, zvyšok 45°
 	 *  (podľa názvu profilu). Uhol je len na nákrese — Money odpis nemení. */
 	sikmyRez: boolean;
+	/** #606: kg/m profilu z Odoo karty (`montalu_kg_per_m`, aktívna karta podľa kódu) — doplní LEN
+	 *  server pre ZOBRAZENIE odpadu v kg (`odoo-katalog.ts` `planSKgNaM`). `undefined` = nezisťované
+	 *  (Odoo nedostupné / modul bez kódov), `null` = karta kg/m nemá. Money/odpis ho nikdy nečíta. */
+	kgNaM?: number | null;
 }
 
 export interface OdpisRow {
