@@ -240,7 +240,7 @@ export const actions = {
 					step: 'blocked' as const,
 					blokReason: outcome.reason!,
 					blokAction: '?/odoslat',
-					rawEntries: rawFormEntries(form),
+					rawEntries: rawFormEntries(form, outcome),
 					// echo vstup/ident/rucne/fix (ako duplikát vetva) — inak reštart-`$effect` zmaže parent
 					// `$state` pri blocked renderi (#300 review 🔵)
 					vstup,

@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
 	import ReadbackBadge from '$lib/components/ReadbackBadge.svelte';
+	import DorobenieBadge from '$lib/components/DorobenieBadge.svelte';
 	// #313: created_at je SQLite `datetime('now')` (UTC) — cez `sqliteUtcToIso` +
 	// `formatDatumCasSk` na bratislavský lokálny čas (DST-safe, `.claude/rules/timestamps.md`).
 	import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
@@ -41,6 +42,13 @@
 			Zákazka nemá žiadny ostrý (LIVE) odpis — zoznam je zo 🧪 TEST odpisov a slúži len na náhľad.
 		{/if}
 	</p>
+	{#if p.dorobeni > 0}
+		<!-- #608: dorobenie (ďalší vedomý odpis tej istej zákazky) je v súčtoch — prizná sa -->
+		<p class="sub" data-testid="zakazka-dorobeni">
+			🔁 Súčet zahŕňa dorobenie ({p.dorobeni}× opakovaný odpis tej istej zákazky — materiál sa
+			reálne spotreboval znova).
+		</p>
+	{/if}
 	{#if p.bezPoloziek > 0}
 		<p class="sub neuplne" data-testid="zakazka-bez-poloziek">
 			⚠ {p.bezPoloziek}
@@ -86,7 +94,10 @@
 			{#each p.odpisy as o (o.id)}
 				<tr>
 					<td style="white-space:nowrap">{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</td>
-					<td>{modulNazov(o.modul)}</td>
+					<td>
+						{modulNazov(o.modul)}
+						<DorobenieBadge poradie={o.poradie} testid={`zak-dorobenie-${o.id}`} />
+					</td>
 					<td class="mono">{o.op}</td>
 					<td class="c">{o.pocetPoloziek > 0 ? o.pocetPoloziek : '—'}</td>
 					<td class="c">

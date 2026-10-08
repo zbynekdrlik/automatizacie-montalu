@@ -90,6 +90,8 @@ export interface ZakazkaNote {
 	scope: 'live' | 'test';
 	parkovanych: number;
 	bezPoloziek: number;
+	/** (#608) koľko scope odpisov je DOROBENIE (poradie > 1) — súčet ich materiál obsahuje. */
+	dorobeni: number;
 	odpisovVScope: number;
 	sekcie: NoteSekcia[];
 	/** súčet predajných VO cien; `null` = ceny vôbec nedostupné (žiadne položky). */
@@ -129,6 +131,7 @@ export function buildZakazkaNote(
 		scope: prehlad.scope,
 		parkovanych: prehlad.parkovanych,
 		bezPoloziek: prehlad.bezPoloziek,
+		dorobeni: prehlad.dorobeni,
 		odpisovVScope: prehlad.odpisovVScope,
 		sekcie: [{ nadpis: 'Profily a komponenty', polozky }],
 		cenaSpolu: ceny ? ceny.sucty.predajVo.suma : null,
@@ -224,6 +227,12 @@ export function buildZakazkaNoteHtml(note: ZakazkaNote, now: Date = new Date()):
 
 	if (note.parkovanych > 0)
 		out.push(`<p>Vrátane ${note.parkovanych} parkovaných odpisov ⏳ (čakajú na ručný presun).</p>`);
+	// (#608) dorobenie = ďalší vedomý odpis tej istej zákazky — materiál sa reálne spotreboval znova
+	if (note.dorobeni > 0)
+		out.push(
+			`<p>Súčet zahŕňa dorobenie (${note.dorobeni}× opakovaný odpis tej istej zákazky — materiál ` +
+				'sa reálne spotreboval znova).</p>'
+		);
 	if (note.bezPoloziek > 0)
 		out.push(
 			`<p>⚠️ ${note.bezPoloziek} odpisov bez uložených položiek (spred fázy 1) — ich materiál ` +

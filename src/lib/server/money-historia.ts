@@ -24,12 +24,19 @@ export interface OdpisLogRow {
 	/** (#299) čas, kedy appka detekovala RUČNÝ presun parkovaného odpisu zo staging „NA ODPIS" do
 	 *  Money importu (`datetime('now')`); NULL = nepresunutý / neparkovaný. */
 	presunute_at: string | null;
+	/** (#608) poradie odpisu tejto zákazky/OP v module: 1 = prvý, > 1 = vedomé dorobenie č. N. */
+	poradie: number;
+}
+
+/** (#608) „ (dorobenie N)" do auditu/logu pre poradie > 1; prvý odpis bez prípony (texty bez zmeny). */
+function dorobenieSuffix(poradie: number): string {
+	return poradie > 1 ? ` (dorobenie ${poradie})` : '';
 }
 
 export function listOdpisy(limit = 200): OdpisLogRow[] {
 	return db
 		.prepare(
-			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at, presunute_at FROM odpis_log ORDER BY id DESC LIMIT ?'
+			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at, presunute_at, poradie FROM odpis_log ORDER BY id DESC LIMIT ?'
 		)
 		.all(limit) as OdpisLogRow[];
 }
@@ -43,9 +50,10 @@ export function listOdpisy(limit = 200): OdpisLogRow[] {
  */
 export function releaseOdpis(id: number, username: string): boolean {
 	const row = db
-		.prepare('SELECT modul, zak, op, live, filename FROM odpis_log WHERE id = ?')
+		.prepare('SELECT modul, zak, op, live, filename, poradie FROM odpis_log WHERE id = ?')
 		.get(id) as
-		{ modul: string; zak: string; op: string; live: number; filename: string } | undefined;
+		| { modul: string; zak: string; op: string; live: number; filename: string; poradie: number }
+		| undefined;
 	if (!row) return false;
 	db.transaction(() => {
 		db.prepare('DELETE FROM odpis_log WHERE id = ?').run(id);
@@ -54,7 +62,7 @@ export function releaseOdpis(id: number, username: string): boolean {
 			'odpis',
 			JSON.stringify([
 				{
-					pole: `Uvoľnený odpis ${row.modul} ${row.zak} OP${row.op} (${row.live ? 'LIVE' : 'TEST'}) — ${row.filename}`,
+					pole: `Uvoľnený odpis ${row.modul} ${row.zak} OP${row.op}${dorobenieSuffix(row.poradie)} (${row.live ? 'LIVE' : 'TEST'}) — ${row.filename}`,
 					stara: 1,
 					nova: 0
 				}
@@ -66,6 +74,7 @@ export function releaseOdpis(id: number, username: string): boolean {
 		modul: row.modul,
 		zak: row.zak,
 		op: row.op,
+		poradie: row.poradie,
 		live: !!row.live,
 		actor: username
 	});
@@ -85,7 +94,7 @@ export function releaseOdpis(id: number, username: string): boolean {
 export function povolitReimport(id: number, username: string): boolean {
 	const row = db
 		.prepare(
-			'SELECT modul, zak, op, live, filename, content_hash, zak_norm, op_norm FROM odpis_log WHERE id = ?'
+			'SELECT modul, zak, op, live, filename, content_hash, zak_norm, op_norm, poradie FROM odpis_log WHERE id = ?'
 		)
 		.get(id) as
 		| {
@@ -97,6 +106,7 @@ export function povolitReimport(id: number, username: string): boolean {
 				content_hash: string;
 				zak_norm: string;
 				op_norm: string;
+				poradie: number;
 		  }
 		| undefined;
 	if (!row) return false;
@@ -120,7 +130,7 @@ export function povolitReimport(id: number, username: string): boolean {
 			'odpis',
 			JSON.stringify([
 				{
-					pole: `Povolený RE-IMPORT odpisu ${row.modul} ${row.zak} OP${row.op} (${row.live ? 'LIVE' : 'TEST'}) — ${row.filename}`,
+					pole: `Povolený RE-IMPORT odpisu ${row.modul} ${row.zak} OP${row.op}${dorobenieSuffix(row.poradie)} (${row.live ? 'LIVE' : 'TEST'}) — ${row.filename}`,
 					stara: 1,
 					nova: 0
 				}
@@ -132,6 +142,7 @@ export function povolitReimport(id: number, username: string): boolean {
 		modul: row.modul,
 		zak: row.zak,
 		op: row.op,
+		poradie: row.poradie,
 		live: !!row.live,
 		actor: username
 	});
@@ -149,7 +160,7 @@ export function getOdpis(id: number): OdpisLogRow | null {
 	if (!Number.isInteger(id) || id <= 0) return null;
 	const row = db
 		.prepare(
-			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at FROM odpis_log WHERE id = ?'
+			'SELECT id, modul, zak, op, zakaznik, caka, live, filename, detail, created_by, created_at, presunute_at, poradie FROM odpis_log WHERE id = ?'
 		)
 		.get(id) as OdpisLogRow | undefined;
 	return row ?? null;

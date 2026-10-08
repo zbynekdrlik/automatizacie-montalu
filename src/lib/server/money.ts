@@ -5,10 +5,15 @@
 // do ODPIS EXPORT — do Money NIKDY nejde nič testovacie.
 //
 // Poradie proti dvojitému importu:
-// 1. NAJPRV sa atomicky zaberie dedup kľúč (INSERT, UNIQUE modul+zak+op+live).
+// 1. NAJPRV sa atomicky zaberie dedup kľúč (INSERT, UNIQUE modul+zak+op+live+poradie).
 // 2. Až POTOM sa zapíše súbor (tmp bez prípony + rename = atomické, watcher
 //    tmp nevidí).
 // 3. Ak zápis súboru zlyhá, dedup záznam sa zmaže (kompenzácia).
+//
+// #608 DOROBENIE: druhý a ďalší odpis tej istej zákazky/OP v tom istom module (zlé zameranie, posuv
+// sa vyrába znova) je povolený LEN vedome — blok `uz-odpisane` + audited „Odoslať ako dorobenie"
+// s tokenom poradia, ktoré operátor videl (`dorobeniePo`). Náhodný duplikát (dvojklik, refresh) aj
+// opätovné odoslanie toho istého potvrdenia ostáva zablokované; prvý odpis ostáva v histórii.
 import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +21,13 @@ import { randomBytes } from 'node:crypto';
 import { db } from './db';
 import { logger } from './log';
 import { validateOdpisKody, type KodProblem } from './ceny';
+import {
+	auditOverrideKody,
+	auditOverrideLedger,
+	auditOverridePrehodene,
+	auditOverrideDorobenie
+} from './money-override-audit';
+import { formatDatumCasSk, sqliteUtcToIso } from '../datum';
 import type { MJ } from '$lib/komponenty';
 
 const log = logger('money');
@@ -125,12 +137,25 @@ export interface OdpisOutcome {
 	 *  `unknown-kod` = Money niektorý kód nepozná / nemá skladovú kartu → import by doklad ticho
 	 *  preskočil (#295); `prehodene-polia` = zak/op sú pravdepodobne zamenené (zak obsahuje OP…,
 	 *  op obsahuje ZAK… — tvar ZAK2026499) → do Money by šiel doklad so zameneným číslom zákazky a
-	 *  objednávky; blokuje LEN pre live=1 (#307). */
-	reason?: 'ledger-duplicate' | 'unknown-kod' | 'prehodene-polia';
+	 *  objednávky; blokuje LEN pre live=1 (#307); `uz-odpisane` = tá istá zákazka/OP už má v tomto
+	 *  module odoslaný odpis a operátor nepotvrdil „Odoslať ako dorobenie" (alebo potvrdil voči
+	 *  zastaranému stavu — refresh výsledku, dvojklik) — live AJ test, dedup platil vždy pre oba (#608). */
+	reason?: 'ledger-duplicate' | 'unknown-kod' | 'prehodene-polia' | 'uz-odpisane';
 	live: boolean;
 	target: string;
 	filename: string;
+	/** `duplicate`: kedy vznikol kolidujúci záznam; `uz-odpisane`: kedy bol POSLEDNÝ existujúci odpis
+	 *  tejto zákazky/OP v module (SQLite UTC `datetime('now')`). */
 	duplicateCreatedAt?: string;
+	/** len `reason==='uz-odpisane'`: kto poslal posledný existujúci odpis (#608) */
+	duplicateCreatedBy?: string;
+	/** len `reason==='uz-odpisane'`: najvyššie poradie existujúcich odpisov tejto zákazky/OP v module =
+	 *  token, voči ktorému operátor potvrdzuje dorobenie (`OdpisOverride.dorobeniePo`), #608 */
+	poradieMax?: number;
+	/** len `reason==='uz-odpisane'`: koľko odpisov tejto zákazky/OP v module už existuje (#608) */
+	pocetOdpisov?: number;
+	/** len `status==='written'`: poradie zapísaného odpisu (1 = prvý, > 1 = dorobenie č. N), #608 */
+	poradie?: number;
 	/** len `reason==='ledger-duplicate'`: kedy bol identický obsah naposledy importovaný */
 	ledgerImportedAt?: string;
 	/** len `reason==='unknown-kod'`: kódy, ktoré Money nepozná / nemajú skladovú kartu */
@@ -246,32 +271,65 @@ function blokPrehodeneHlaska(zak: string, op: string): string {
 	);
 }
 
+/** Hláška pre operátora, keď tá istá zákazka/OP už má v module odoslaný odpis (#608,
+ *  `reason==='uz-odpisane'`): kedy (Europe/Bratislava) + kto, a vedomá cesta „Odoslať ako dorobenie". */
+function blokUzOdpisaneHlaska(outcome: OdpisOutcome, zak: string, op: string): string {
+	const pocet = outcome.pocetOdpisov ?? 1;
+	const kedy = outcome.duplicateCreatedAt
+		? ` ${formatDatumCasSk(sqliteUtcToIso(outcome.duplicateCreatedAt))}`
+		: '';
+	const kto = outcome.duplicateCreatedBy ? ` (${outcome.duplicateCreatedBy})` : '';
+	const dalsie = (outcome.poradieMax ?? pocet) + 1;
+	return (
+		`Zákazka ${zak} (OP ${op}) už bola odpísaná` +
+		(pocet > 1 ? ` ${pocet}× — naposledy` : '') +
+		`${kedy}${kto}. Znova ju bez potvrdenia NEposielam (poistka proti dvojitému odoslaniu — ` +
+		`dvojklik, obnovenie stránky). Ak ide o DOROBENIE (napr. zlé zameranie a posuv sa vyrába znova), ` +
+		`potvrď to tlačidlom „Odoslať ako dorobenie" nižšie — prvý odpis ostane v histórii a do Money ` +
+		`pôjde ďalší doklad (dorobenie č. ${dalsie}).`
+	);
+}
+
 /** Jeden zdroj pravdy pre hlášku bloku vo všetkých moduloch — vyberie správnu podľa `reason`. */
 export function blokHlaska(outcome: OdpisOutcome, zak: string, op: string): string {
 	if (outcome.reason === 'unknown-kod') return blokKodyHlaska(outcome.chybajuceKody ?? []);
 	if (outcome.reason === 'prehodene-polia') return blokPrehodeneHlaska(zak, op);
+	if (outcome.reason === 'uz-odpisane') return blokUzOdpisaneHlaska(outcome, zak, op);
 	return blokLedgerHlaska(zak, op, outcome.ledgerImportedAt);
+}
+
+/** Vedomé, AUDITOVANÉ prekonanie blokov `writeOdpis` (re-submit z `OdpisBlok`). */
+export interface OdpisOverride {
+	overrideKody?: boolean;
+	overrideLedger?: boolean;
+	overridePrehodene?: boolean;
+	/** (#608) „Odoslať ako dorobenie" — prijme sa LEN spolu s `dorobeniePo` = aktuálne najvyššie
+	 *  poradie odpisov tejto zákazky/OP v module (token zo zobrazeného bloku). */
+	overrideDorobenie?: boolean;
+	/** (#608) poradie, voči ktorému operátor potvrdil dorobenie; iné aktuálne max poradie (refresh
+	 *  výsledku, dvojklik, súbežné dorobenie) = potvrdenie je zastarané → znova blok. */
+	dorobeniePo?: number;
 }
 
 /**
  * (#300) „Odoslať aj tak" mapovanie: skryté pole(-a) `override` z re-submit formulára → override
  * flagy pre `writeOdpis`. `unknown-kod` ⇒ `overrideKody`, `ledger-duplicate` ⇒ `overrideLedger`,
- * `prehodene-polia` ⇒ `overridePrehodene` (#307). Číta VŠETKY `override` hodnoty (`getAll`) — jeden
+ * `prehodene-polia` ⇒ `overridePrehodene` (#307), `uz-odpisane` ⇒ `overrideDorobenie` + token
+ * `dorobenie_po` (#608). Číta VŠETKY `override` hodnoty (`getAll`) — jeden
  * doklad môže naraz naraziť na VIAC blokov (Money kód, čo snapshot ešte nemá, + identický obsah po
  * „Uvoľniť", + prehodené polia); vtedy ďalšie „Odoslať aj tak" nesie VŠETKY hodnoty, takže sa
  * prekonajú NARAZ (bez donekonečna sa striedajúceho ping-pongu, #300 review 🟡). Bežný (prvý) submit
  * nemá `override` pole → všetky flagy false = žiadny bypass.
  */
-export function overrideOpts(form: FormData): {
-	overrideKody?: boolean;
-	overrideLedger?: boolean;
-	overridePrehodene?: boolean;
-} {
+export function overrideOpts(form: FormData): OdpisOverride {
 	const o = form.getAll('override').map(String);
+	const po = Number(form.get('dorobenie_po'));
 	return {
 		overrideKody: o.includes('unknown-kod'),
 		overrideLedger: o.includes('ledger-duplicate'),
-		overridePrehodene: o.includes('prehodene-polia')
+		overridePrehodene: o.includes('prehodene-polia'),
+		overrideDorobenie: o.includes('uz-odpisane'),
+		dorobeniePo: Number.isInteger(po) && po >= 1 ? po : undefined
 	};
 }
 
@@ -281,80 +339,23 @@ export function overrideOpts(form: FormData): {
  * prvý override — #300 review 🟡; `OdpisBlok` dopĺňa len chýbajúcu hodnotu). Re-submit tak postaví
  * IDENTICKÝ job (rovnaký content_hash → override mieri na správny tuple). `File` hodnoty sa vynechajú
  * (odpis formuláre sú čisto textové).
+ * (#608) Pri bloku `uz-odpisane` sa pripojí token `dorobenie_po` = AKTUÁLNE najvyššie poradie (starý
+ * token z predošlého potvrdenia sa nahradí) — „Odoslať ako dorobenie" tak potvrdzuje presne stav,
+ * ktorý operátor vidí. `outcome` je povinný, aby žiadny modul nezabudol token prevliecť.
  */
-export function rawFormEntries(form: FormData): [string, string][] {
+export function rawFormEntries(
+	form: FormData,
+	outcome: Pick<OdpisOutcome, 'reason' | 'poradieMax'>
+): [string, string][] {
+	const token = outcome.reason === 'uz-odpisane' && outcome.poradieMax !== undefined;
 	const out: [string, string][] = [];
 	for (const [k, v] of form.entries()) {
-		if (typeof v === 'string') out.push([k, v]);
+		if (typeof v !== 'string') continue;
+		if (token && k === 'dorobenie_po') continue;
+		out.push([k, v]);
 	}
+	if (token) out.push(['dorobenie_po', String(outcome.poradieMax)]);
 	return out;
-}
-
-/** Audit vedomého override chýbajúcich Money kódov (#295) — NIE tiché preskočenie: do `cfg_audit`
- *  sa zapíše, KTO poslal odpis napriek varovaniu a ktoré kódy Money nepozná. */
-function auditOverrideKody(job: OdpisJob, problemy: KodProblem[]): void {
-	const kody = problemy.map((p) => p.kod).join(', ');
-	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
-		job.createdBy,
-		'odpis',
-		JSON.stringify([
-			{
-				pole: `Override chýbajúcich Money kódov (${kody}) — odpis ${job.modul} ${job.zak} OP${job.op} odoslaný napriek varovaniu`,
-				stara: 0,
-				nova: 1
-			}
-		])
-	);
-	log.warn('odpis: override chýbajúcich Money kódov', {
-		modul: job.modul,
-		zak: job.zak,
-		op: job.op,
-		kody
-	});
-}
-
-/** Audit vedomého ledger override (#300) — operátor potvrdil „Odoslať aj tak" pri identickom
- *  obsahu, ktorý ledger blokoval (import v Money zmazal, ale klikol „Uvoľniť" namiesto „Povoliť
- *  rovnaký"). NIE tiché preskočenie: do `cfg_audit` sa zapíše, KTO povolil re-import. */
-function auditOverrideLedger(job: OdpisJob): void {
-	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
-		job.createdBy,
-		'odpis',
-		JSON.stringify([
-			{
-				pole: `Override ledgeru „Odoslať aj tak" — re-import identického obsahu ${job.modul} ${job.zak} OP${job.op} povolený (potvrdené zmazanie importu v Money)`,
-				stara: 0,
-				nova: 1
-			}
-		])
-	);
-	log.warn('odpis: override ledgeru „Odoslať aj tak"', {
-		modul: job.modul,
-		zak: job.zak,
-		op: job.op
-	});
-}
-
-/** Audit vedomého override PREHODENÝCH polí zak/op (#307) — operátor potvrdil „Odoslať aj tak" pri
- *  podozrení na zamenené číslo zákazky/objednávky. NIE tiché preskočenie: do `cfg_audit` sa zapíše,
- *  KTO poslal odpis napriek varovaniu. */
-function auditOverridePrehodene(job: OdpisJob): void {
-	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
-		job.createdBy,
-		'odpis',
-		JSON.stringify([
-			{
-				pole: `Override prehodených polí zak/op — odpis ${job.modul} ${job.zak} OP${job.op} odoslaný napriek varovaniu (číslo zákazky/objednávky pravdepodobne zamenené)`,
-				stara: 0,
-				nova: 1
-			}
-		])
-	);
-	log.warn('odpis: override prehodených polí zak/op', {
-		modul: job.modul,
-		zak: job.zak,
-		op: job.op
-	});
 }
 
 export interface LedgerCounts {
@@ -406,16 +407,22 @@ export function ledgerCounts(
  * rovnaký názov, aj dva odpisy tej istej zákazky s rôznym OP (bez OP v názve
  * by mali rovnaký názov a druhý by ten prvý v import priečinku prepísal),
  * preto do neho ide aj OP.
+ *
+ * #608: DOROBENIE (poradie > 1) dostane marker „dorobenie-N" pred hash — identický obsah tej istej
+ * zákazky by inak mal ROVNAKÝ názov a prepísal by prvý doklad, ktorý Money ešte nespracoval (alebo
+ * parkovaný v NA ODPIS). Prvý odpis (poradie 1) má názov bez zmeny.
  */
 export function filenameFor(
-	job: Pick<OdpisJob, 'zak' | 'op' | 'zakaznik' | 'polozky' | 'rezervacia'>
+	job: Pick<OdpisJob, 'zak' | 'op' | 'zakaznik' | 'polozky' | 'rezervacia'>,
+	poradie = 1
 ): string {
 	const hash = contentHash(`${job.zak}|OP${job.op}`, job.polozky);
 	// #221: rezervačný odpis dostane marker „REZ" pred hash — v Money import priečinku
 	// je hneď vidno, že ide o rezerváciu, a #227 (aktualizácia na reálne čísla) ju
 	// vie nájsť/napárovať podľa ZAK + (hash nesie OP). Bežný odpis marker nemá.
 	const rez = job.rezervacia ? 'REZ ' : '';
-	return `${safe(job.zak)} - ${safe(job.zakaznik)} ${rez}[${hash}].xlsx`;
+	const dorobenie = poradie > 1 ? `dorobenie-${poradie} ` : '';
+	return `${safe(job.zak)} - ${safe(job.zakaznik)} ${rez}${dorobenie}[${hash}].xlsx`;
 }
 
 // exportované kvôli goldenu #234 (test číta buffer priamo — bez DB, bez env, bez zápisu)
@@ -439,14 +446,11 @@ export async function buildXlsx(job: OdpisJob): Promise<Buffer> {
 }
 
 /**
- * Zapíše odpis (alebo vráti duplicate). Vyhadzuje výnimku len pri zlyhaní
+ * Zapíše odpis (alebo vráti duplicate / blocked). Vyhadzuje výnimku len pri zlyhaní
  * zápisu súboru — vtedy je dedup záznam už odstránený a odoslanie sa dá
  * bezpečne zopakovať.
  */
-export async function writeOdpis(
-	job: OdpisJob,
-	opts: { overrideKody?: boolean; overrideLedger?: boolean; overridePrehodene?: boolean } = {}
-): Promise<OdpisOutcome> {
+export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promise<OdpisOutcome> {
 	const live = isLive() ? 1 : 0;
 	const zakNorm = normZak(job.zak);
 	const opNorm = normOp(job.op);
@@ -455,8 +459,10 @@ export async function writeOdpis(
 	// logiky ho z odpis_log nečíta — overené grepom).
 	const ledgerHash = contentHash(zakNorm, job.polozky);
 	const dir = targetDirFor(job.cakaSubdir, job.caka);
-	const filename = filenameFor(job);
-	const target = path.join(dir, filename);
+	// (#608) názov/cieľ sa po určení poradia (dorobenie) prepočíta nižšie — bloky pred dedupom vracajú
+	// názov prvého odpisu (informatívne, nič sa nezapisuje)
+	let filename = filenameFor(job);
+	let target = path.join(dir, filename);
 
 	// (#307) Prehodené polia zak/op (zak obsahuje OP…, op obsahuje ZAK… — tvar ZAK2026499, verdikt §2
 	// id=38/78). Pre live=1 to TVRDO BLOKUJE (rovnaká audited-override sémantika ako #295 unknown-kod) —
@@ -532,39 +538,15 @@ export async function writeOdpis(
 		}
 	}
 
-	// (#294) normalizovaný dedup precheck — OP260286 ≡ 260286 obíde RAW UNIQUE, tak dedup-ujeme na
-	// normalizovaných stĺpcoch. RAW UNIQUE(modul,zak,op,live) nižšie kryje ATOMICKY len race
-	// IDENTICKÉHO zápisu (rovnaké raw zak/op). Cross-spelling race (OP260286 vs 260286 súbežne) NEMÁ
-	// DB constraint — kryje ho len to, že precheck→claim beží BEZ `await` v jednom synchrónnom bloku
-	// (jeden proces, better-sqlite3 synchrónne). NEVKLADAJ `await` medzi tento precheck a INSERT
-	// nižšie — otvoril by cross-spelling double-import okno.
-	const normDup = db
-		.prepare(
-			'SELECT created_at FROM odpis_log WHERE modul = ? AND live = ? AND zak_norm = ? AND op_norm = ?'
-		)
-		.get(job.modul, live, zakNorm, opNorm) as { created_at: string } | undefined;
-	if (normDup) {
-		log.warn('odpis duplikát — normalizovaný dedup kľúč už existuje, nič sa nezapisuje', {
-			modul: job.modul,
-			zak: job.zak,
-			op: job.op,
-			zakNorm,
-			opNorm,
-			live: isLive(),
-			existingCreatedAt: normDup.created_at
-		});
-		return {
-			status: 'duplicate',
-			live: isLive(),
-			target,
-			filename,
-			duplicateCreatedAt: normDup.created_at
-		};
-	}
-
-	// (#294) APPEND-ONLY ledger safety-net — identický obsah tej istej zákazky (per-order tuple +
-	// content_hash) už bol importovaný do Money a nebol RE-autorizovaný override-om (`povolitReimport`).
-	// Toto je poistka, ktorú „Uvoľniť" NEZMAŽE: releaseOdpis maže len `odpis_log`, ledger ostáva.
+	// (#380) CROSS-MODUL identický-obsah dedup — FIX z CADu (modul='fix') reusuje presne pergola
+	// katalóg, takže identický CAD nárez dá identický content_hash (a názov súboru) pod modul='fix'
+	// aj modul='pergola'. Dedup aj ledger sú kľúčované na modul, takže bez tejto poistky by operátor
+	// obišiel dedup presunutím identického nárezu z /pergola (Duplikát) do /fix/cad → dvojitý odpis
+	// rovnakého materiálu + prepis súboru v import priečinku. RÔZNY obsah (pergola + fix na tej istej
+	// ZAK+OP) má RÔZNY hash → NEblokuje sa (legitímna koexistencia). Kľúč = (live,zak,op,hash) bez modulu.
+	// (#608) Kontroluje sa PRED blokom `uz-odpisane` a je TVRDÝ aj pri potvrdenom dorobení — dorobenie
+	// je per modul, presun toho istého nárezu do iného modulu sa ním „prepašovať" nedá (a operátorovi
+	// sa neponúkne dorobenie, ktoré by aj tak skončilo týmto duplikátom).
 	const crossDup = db
 		.prepare(
 			'SELECT modul, created_at FROM odpis_log WHERE live = ? AND zak_norm = ? AND op_norm = ? AND content_hash = ? AND modul != ?'
@@ -572,12 +554,6 @@ export async function writeOdpis(
 		.get(live, zakNorm, opNorm, ledgerHash, job.modul) as
 		{ modul: string; created_at: string } | undefined;
 	if (crossDup) {
-		// (#380) CROSS-MODUL identický-obsah dedup — FIX z CADu (modul='fix') reusuje presne pergola
-		// katalóg, takže identický CAD nárez dá identický content_hash (a názov súboru) pod modul='fix'
-		// aj modul='pergola'. Dedup aj ledger sú kľúčované na modul, takže bez tejto poistky by operátor
-		// obišiel dedup presunutím identického nárezu z /pergola (Duplikát) do /fix/cad → dvojitý odpis
-		// rovnakého materiálu + prepis súboru v import priečinku. RÔZNY obsah (pergola + fix na tej istej
-		// ZAK+OP) má RÔZNY hash → NEblokuje sa (legitímna koexistencia). Kľúč = (live,zak,op,hash) bez modulu.
 		log.warn('odpis duplikát — identický obsah už zapísaný pod iným modulom, nič sa nezapisuje', {
 			modul: job.modul,
 			existujuciModul: crossDup.modul,
@@ -597,9 +573,109 @@ export async function writeOdpis(
 		};
 	}
 
+	// (#294) normalizovaný dedup precheck — OP260286 ≡ 260286 obíde RAW UNIQUE, tak dedup-ujeme na
+	// normalizovaných stĺpcoch. RAW UNIQUE(modul,zak,op,live,poradie) nižšie kryje ATOMICKY len race
+	// IDENTICKÉHO zápisu (rovnaké raw zak/op). Cross-spelling race (OP260286 vs 260286 súbežne) NEMÁ
+	// DB constraint — kryje ho len to, že precheck→claim beží BEZ `await` v jednom synchrónnom bloku
+	// (jeden proces, better-sqlite3 synchrónne). NEVKLADAJ `await` medzi tento precheck a INSERT
+	// nižšie — otvoril by cross-spelling double-import okno (aj súbežné dorobenie s rovnakým tokenom).
+	// (#608) Množina existujúcich odpisov = normalizovaný kľúč ∪ RAW kľúč (zak, op) — RAW vetva je
+	// presne kľúč DB UNIQUE, takže dedup nerozširuje; zachytí legacy riadky spred v27 (`op_norm` je
+	// tam RAW kópia, napr. '01' vs normOp 'OP01'), ktoré by inak skončili až na UNIQUE poistke ako
+	// dead-end `duplicate` bez ponuky dorobenia. Zápisová sémantika `zak_norm`/`op_norm` sa nemení.
+	const kluc =
+		'modul = ? AND live = ? AND ((zak_norm = ? AND op_norm = ?) OR (zak = ? AND op = ?))';
+	const klucArgs = [job.modul, live, zakNorm, opNorm, job.zak, job.op];
+	const existujuce = db
+		.prepare(
+			`SELECT COUNT(*) AS pocet, MAX(poradie) AS maxPoradie,
+			        MAX(CASE WHEN json_valid(detail)
+			                 THEN (CASE WHEN json_extract(detail, '$.rezervacia') = 1 THEN 1 ELSE 0 END)
+			                 ELSE 0 END) AS rezervacia
+			 FROM odpis_log WHERE ${kluc}`
+		)
+		.get(...klucArgs) as {
+		pocet: number;
+		maxPoradie: number | null;
+		rezervacia: number | null;
+	};
+	let poradie = 1;
+	let overridingDorobenie = false;
+	if (existujuce.pocet > 0) {
+		const posledny = db
+			.prepare(
+				`SELECT created_at, created_by FROM odpis_log WHERE ${kluc} ORDER BY id DESC LIMIT 1`
+			)
+			.get(...klucArgs) as { created_at: string; created_by: string };
+		const maxPoradie = existujuce.maxPoradie ?? 1;
+		if (job.rezervacia === true || existujuce.rezervacia === 1) {
+			// (#221) pergola rezervácia a CAD odpis tej istej ZAK+OP kolidujú ZÁMERNE (rezervácia už
+			// materiál odpísala — CAD odpis by ho odpísal druhýkrát). Ostáva TVRDÝ duplikát bez ponuky
+			// dorobenia (#608 sa rezervácie netýka; oprava = „Uvoľniť" v histórii).
+			log.warn('odpis duplikát — rezervácia ⇄ odpis tej istej zákazky, nič sa nezapisuje', {
+				modul: job.modul,
+				zak: job.zak,
+				op: job.op,
+				zakNorm,
+				opNorm,
+				live: isLive(),
+				novyJeRezervacia: job.rezervacia === true,
+				existingCreatedAt: posledny.created_at
+			});
+			return {
+				status: 'duplicate',
+				live: isLive(),
+				target,
+				filename,
+				duplicateCreatedAt: posledny.created_at
+			};
+		}
+		// (#608) DOROBENIE len VEDOME: potvrdenie „Odoslať ako dorobenie" platí LEN voči poradiu, ktoré
+		// operátor videl (`dorobeniePo` = aktuálne max). Bez potvrdenia (náhodný dvojklik / refresh) ALEBO
+		// so zastaraným potvrdením (refresh výsledku dorobenia, dvojklik na dorobenie, súbežné dorobenie)
+		// → blok PRED akýmkoľvek DB/file zápisom. Platí pre live AJ test (dedup platil vždy pre oba).
+		if (opts.overrideDorobenie !== true || opts.dorobeniePo !== maxPoradie) {
+			log.warn('odpis blokovaný — zákazka/OP už odpísaná, dorobenie len vedome (#608)', {
+				modul: job.modul,
+				zak: job.zak,
+				op: job.op,
+				zakNorm,
+				opNorm,
+				live: isLive(),
+				pocetOdpisov: existujuce.pocet,
+				maxPoradie,
+				potvrdenie: opts.overrideDorobenie === true,
+				dorobeniePo: opts.dorobeniePo,
+				existingCreatedAt: posledny.created_at
+			});
+			return {
+				status: 'blocked',
+				reason: 'uz-odpisane',
+				live: isLive(),
+				target,
+				filename,
+				duplicateCreatedAt: posledny.created_at,
+				duplicateCreatedBy: posledny.created_by,
+				poradieMax: maxPoradie,
+				pocetOdpisov: existujuce.pocet
+			};
+		}
+		poradie = maxPoradie + 1;
+		overridingDorobenie = true;
+		// vlastný súbor dorobenia — identický obsah by inak prepísal prvý (ešte nespracovaný) doklad
+		filename = filenameFor(job, poradie);
+		target = path.join(dir, filename);
+	}
+
+	// (#294) APPEND-ONLY ledger safety-net — identický obsah tej istej zákazky (per-order tuple +
+	// content_hash) už bol importovaný do Money a nebol RE-autorizovaný override-om (`povolitReimport`).
+	// Toto je poistka, ktorú „Uvoľniť" NEZMAŽE: releaseOdpis maže len `odpis_log`, ledger ostáva.
+	// (#608) Vedomé dorobenie ju prekoná TÝM ISTÝM potvrdením — identický obsah je typické dorobenie
+	// (ten istý posuv sa vyrába znova): jedno kliknutie, nie dva bloky za sebou. Dorobenie bez
+	// existujúceho riadku (napr. medzitým „Uvoľniť") sa NEuplatní (`overridingDorobenie` je false).
 	const led = ledgerCounts(job.modul, zakNorm, opNorm, live, ledgerHash);
 	const ledgerWouldBlock = led.imports > led.overrides;
-	if (ledgerWouldBlock && opts.overrideLedger !== true) {
+	if (ledgerWouldBlock && opts.overrideLedger !== true && !overridingDorobenie) {
 		log.warn('odpis blokovaný ledgerom — identický obsah už importovaný do Money bez override', {
 			modul: job.modul,
 			zak: job.zak,
@@ -623,7 +699,8 @@ export async function writeOdpis(
 	// zápisovej transakcii pribudne `kind='override'` ledger riadok (imports==overrides ⇒ prejde),
 	// vedome + AUDITOVANE. One-shot: následný `import` riadok zdvihne imports späť nad overrides,
 	// takže ďalší identický re-send je zas blokovaný (rovnaká sémantika ako `povolitReimport`).
-	const overridingLedger = ledgerWouldBlock && opts.overrideLedger === true;
+	const overridingLedger =
+		ledgerWouldBlock && (opts.overrideLedger === true || overridingDorobenie);
 
 	let rowId: number | bigint;
 	// (#294) id ledger 'import' riadku — zapíše sa ATOMICKY s claim-om (nižšie), pri zlyhaní
@@ -634,8 +711,8 @@ export async function writeOdpis(
 		// položky sú 1:1 s tým, čo odišlo do Money a musia vzniknúť/zaniknúť SPOLU s dedup
 		// záznamom. UNIQUE (dedup) aj FK zlyhanie automaticky rollbackne CELÚ transakciu.
 		const insLog = db.prepare(
-			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, zak_norm, op_norm)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by, zak_norm, op_norm, poradie)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		);
 		const insPolozka = db.prepare(
 			`INSERT INTO odpis_polozky (odpis_log_id, kod, nazov, qty, mj) VALUES (?, ?, ?, ?, ?)`
@@ -661,10 +738,15 @@ export async function writeOdpis(
 					ledgerHash,
 					filename,
 					job.createdBy,
-					'override z modulu — „Odoslať aj tak" po zmazaní importu v Money (ledger-duplicate)'
+					overridingDorobenie
+						? `dorobenie č. ${poradie} — vedomý ďalší odpis tej istej zákazky (identický obsah, „Odoslať ako dorobenie")`
+						: 'override z modulu — „Odoslať aj tak" po zmazaní importu v Money (ledger-duplicate)'
 				);
-				auditOverrideLedger(job);
+				// dorobenie má VLASTNÝ audit (nižšie, spomenie aj prekonaný ledger) — jeden riadok, nie dva
+				if (!overridingDorobenie) auditOverrideLedger(job);
 			}
+			// (#608) audit vedomého dorobenia AŽ TU — atomicky so zápisom (vzor #300 review 🟡).
+			if (overridingDorobenie) auditOverrideDorobenie(job, poradie, overridingLedger);
 			// (#300 review 🟡) audit override kódov AŽ TU — atomicky so zápisom, takže sa zapíše LEN keď
 			// sa odpis reálne odoslal (nie keď ho medzitým zablokoval ledger a nič neodišlo).
 			if (overridingKody) auditOverrideKody(job, kodProblemy);
@@ -683,7 +765,8 @@ export async function writeOdpis(
 				JSON.stringify(job.detail),
 				job.createdBy,
 				zakNorm,
-				opNorm
+				opNorm,
+				poradie
 			).lastInsertRowid;
 			for (const o of job.polozky) insPolozka.run(id, o.kod, o.nazov, o.qty, o.mj ?? 'm');
 			// (#294) ledger 'import' ATOMICKY s claim-om — zapíše sa PRED zápisom súboru, takže ani
@@ -707,7 +790,7 @@ export async function writeOdpis(
 		if (e instanceof Error && e.message.includes('UNIQUE')) {
 			const existing = db
 				.prepare(
-					'SELECT created_at FROM odpis_log WHERE modul = ? AND zak = ? AND op = ? AND live = ?'
+					'SELECT created_at FROM odpis_log WHERE modul = ? AND zak = ? AND op = ? AND live = ? ORDER BY id DESC LIMIT 1'
 				)
 				.get(job.modul, job.zak, job.op, live) as { created_at: string } | undefined;
 			log.warn('odpis duplikát — dedup kľúč už existuje, nič sa nezapisuje', {
@@ -734,7 +817,8 @@ export async function writeOdpis(
 		zak: job.zak,
 		op: job.op,
 		live: isLive(),
-		caka: job.caka
+		caka: job.caka,
+		poradie
 	});
 
 	try {
@@ -777,6 +861,7 @@ export async function writeOdpis(
 			op: job.op,
 			live: isLive(),
 			target,
+			poradie,
 			bytes: buf.length
 		});
 	} catch (e) {
@@ -811,7 +896,7 @@ export async function writeOdpis(
 		});
 	}
 
-	return { status: 'written', live: isLive(), target, filename };
+	return { status: 'written', live: isLive(), target, filename, poradie };
 }
 
 // História odpisov (listOdpisy / getOdpis / listOdpisPolozky) + „Uvoľniť" / „Povoliť rovnaký" →

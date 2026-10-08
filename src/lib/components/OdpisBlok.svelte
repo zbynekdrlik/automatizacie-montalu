@@ -1,10 +1,13 @@
 <script lang="ts">
 	// (#300) Zdieľaný blok pre `status:'blocked'` odpis (ledger-duplicate / unknown-kod /
-	// prehodene-polia #307) naprieč modulmi. Zobrazí hlášku bloku + confirm-gated „⚠️ Odoslať aj tak",
-	// ktoré RE-submitne PRESNE
+	// prehodene-polia #307 / uz-odpisane #608) naprieč modulmi. Zobrazí hlášku bloku + confirm-gated
+	// tlačidlo, ktoré RE-submitne PRESNE
 	// ten istý POST (`rawEntries` = pôvodné polia vrátane ručných úprav qty), doplní skryté
 	// `override=<blokReason>` a pošle na pôvodnú akciu → server volá `writeOdpis` s override flagom.
-	// Pure duplicate (dedup, `odpis_log` riadok existuje) sem NEIDE — tá ostáva dead-end na /odpisy.
+	// (#608) `uz-odpisane` = zákazka/OP už má v module odpis → tlačidlo „Odoslať ako dorobenie";
+	// `rawEntries` nesie aj token `dorobenie_po` (poradie, ktoré operátor práve vidí), takže refresh
+	// výsledku / dvojklik vyrobí najviac JEDNO dorobenie. Tvrdý duplicate (cross-modul identický obsah,
+	// pergola rezervácia) sem NEIDE — ostáva dead-end „Duplikát" v module.
 	import { resolve } from '$app/paths';
 
 	let {
@@ -14,10 +17,12 @@
 		error
 	}: {
 		rawEntries: [string, string][];
-		blokReason: 'unknown-kod' | 'ledger-duplicate' | 'prehodene-polia';
+		blokReason: 'unknown-kod' | 'ledger-duplicate' | 'prehodene-polia' | 'uz-odpisane';
 		blokAction: string;
 		error: string;
 	} = $props();
+
+	const dorobenie = $derived(blokReason === 'uz-odpisane');
 
 	const potvrd = $derived(
 		blokReason === 'unknown-kod'
@@ -26,8 +31,12 @@
 			: blokReason === 'prehodene-polia'
 				? 'Číslo zákazky a číslo objednávky (OP) sú pravdepodobne prehodené. Naozaj odoslať aj tak? ' +
 					'(Použi len ak vieš, že zadanie je správne.)'
-				: 'Rovnaký obsah tejto zákazky už bol raz importovaný do Money. Odoslať znova AJ TAK? ' +
-					'(Použi LEN ak si import v Money NAOZAJ zmazal — inak vznikne dvojitý zápis.)'
+				: blokReason === 'uz-odpisane'
+					? 'Táto zákazka už bola odpísaná. Odoslať ju ako DOROBENIE — ďalší doklad do Money, prvý ' +
+						'odpis ostane? (Použi LEN keď sa naozaj vyrába znova, napr. pri zlom zameraní — nie pri ' +
+						'omylom zopakovanom odoslaní.)'
+					: 'Rovnaký obsah tejto zákazky už bol raz importovaný do Money. Odoslať znova AJ TAK? ' +
+						'(Použi LEN ak si import v Money NAOZAJ zmazal — inak vznikne dvojitý zápis.)'
 	);
 
 	// (#300 review 🟡) rawEntries už môže niesť DRUHÝ override z predošlého bloku — pridaj tento
@@ -37,7 +46,7 @@
 </script>
 
 <div class="card">
-	<h1>⛔ Odpis zablokovaný</h1>
+	<h1>{dorobenie ? '⚠️ Zákazka už bola odpísaná' : '⛔ Odpis zablokovaný'}</h1>
 </div>
 
 <div class="err" data-testid="blok">⚠️ {error}</div>
@@ -62,7 +71,15 @@
 		{#if !maBlokReason}
 			<input type="hidden" name="override" value={blokReason} />
 		{/if}
-		<button type="submit" class="btn danger" data-testid="odoslat-aj-tak">⚠️ Odoslať aj tak</button>
+		{#if dorobenie}
+			<button type="submit" class="btn danger" data-testid="odoslat-ako-dorobenie"
+				>🔁 Odoslať ako dorobenie</button
+			>
+		{:else}
+			<button type="submit" class="btn danger" data-testid="odoslat-aj-tak"
+				>⚠️ Odoslať aj tak</button
+			>
+		{/if}
 	</form>
 	<button class="btn secondary" type="button" onclick={() => history.back()}
 		>← Späť a upraviť</button

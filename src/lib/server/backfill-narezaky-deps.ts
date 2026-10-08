@@ -35,7 +35,7 @@ export function listOdpisyForBackfill(daysBack: number): OdpisBackfillRow[] {
 	const d = Math.max(1, Math.min(3650, Math.floor(daysBack)));
 	return db
 		.prepare(
-			`SELECT id, modul, zak, op, zakaznik, live, content_hash, detail, created_at
+			`SELECT id, modul, zak, op, zakaznik, live, content_hash, detail, created_at, poradie
 			 FROM odpis_log
 			 WHERE live = 1 AND created_at >= datetime('now', ?)
 			 ORDER BY id`
@@ -58,7 +58,7 @@ export function listLiveOdpisyForOp(op: string): OdpisBackfillRow[] {
 	if (!jadro) return []; // „OP" bez čísla — nič nepárovať (inak by instr(x,'') matchol všetko)
 	const rows = db
 		.prepare(
-			`SELECT id, modul, zak, op, zakaznik, live, content_hash, detail, created_at
+			`SELECT id, modul, zak, op, zakaznik, live, content_hash, detail, created_at, poradie
 			 FROM odpis_log
 			 WHERE live = 1 AND (op_norm = ? OR instr(replace(upper(op), ' ', ''), ?) > 0)
 			 ORDER BY id`

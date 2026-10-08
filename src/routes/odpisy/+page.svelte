@@ -2,6 +2,7 @@
 	import { nazovSystemu } from '$lib/system-nazvy';
 	import { resolve } from '$app/paths';
 	import ReadbackBadge from '$lib/components/ReadbackBadge.svelte';
+	import DorobenieBadge from '$lib/components/DorobenieBadge.svelte';
 	// #313: časy z SQLite `datetime('now')` (created_at/presunute_at) + producentov `…Z` (generatedAt)
 	// sú UTC — bez explicitnej zóny by prod kontajner (bez TZ) ukázal posun o 1-2h / blízko polnoci
 	// zlý deň. `sqliteUtcToIso` premostí SQLite tvar (medzera) aj už-ISO, `formatDatum*Sk` naformátuje
@@ -47,7 +48,9 @@
 	<p class="sub">
 		Každý odoslaný odpis. Riadok = jeden xlsx súbor do Money importu (alebo TEST priečinka).
 		„Uvoľniť" zmaže záznam a dovolí poslať tú istú ZAK+OP znova — použi LEN po zmazaní chybného
-		importu v Money.
+		importu v Money. DOROBENIE (druhý odpis tej istej zákazky, napr. pri zlom zameraní) sa posiela
+		priamo z modulu tlačidlom „Odoslať ako dorobenie" — prvý záznam tu ostáva, dorobenie má vlastný
+		riadok s označením „dorobenie N".
 	</p>
 	<!-- #298: stav Money readback snapshotu (producer na dev2 → dlv-readback.json). Kým producer
 	     nebeží, stĺpec „Overenie" ukazuje samé „neoverené" — banner vysvetlí prečo. -->
@@ -101,7 +104,11 @@
 					{@const d = o.d}
 					<tr>
 						<td style="white-space:nowrap">{formatDatumCasSk(sqliteUtcToIso(o.created_at))}</td>
-						<td>{modulNazov(o.modul)}</td>
+						<td>
+							{modulNazov(o.modul)}
+							<!-- #608: vedomé dorobenie (poradie > 1) — prvý odpis odznak nemá -->
+							<DorobenieBadge poradie={o.poradie} testid={`dorobenie-${o.id}`} />
+						</td>
 						<td>
 							<!-- cenový zoznam K ZÁKAZKE (#154, časti 1+2) — agregát všetkých odpisov tejto ZAK -->
 							<a
@@ -170,7 +177,11 @@
 									method="POST"
 									action="?/uvolnit"
 									onsubmit={(e) => {
-										if (!confirm(`Uvoľniť ${o.zak} OP${o.op}? Zákazku bude možné poslať znova.`))
+										if (
+											!confirm(
+												`Uvoľniť ${o.zak} OP${o.op}${o.poradie > 1 ? ` (dorobenie ${o.poradie})` : ''}? Zmaže sa LEN tento záznam — zákazku bude možné poslať znova.`
+											)
+										)
 											e.preventDefault();
 									}}
 								>

@@ -71,9 +71,14 @@ when a `-dev.N` already landed on `main` (#98/#174 `sort -V`) → auto-loads
 ## Money safety (the hard rules)
 
 - Nothing test-related may EVER reach the live Money import (`/data/dlv-import`).
-- Dedup = DB `UNIQUE(zak, op, live)` in `odpis_log` + claim-then-write with compensation
-  (`src/lib/server/money.ts`) — never weaken; the "Uvoľniť" action on /odpisy is the
+- Dedup = DB `UNIQUE(modul, zak, op, live, poradie)` in `odpis_log` + claim-then-write with
+  compensation (`src/lib/server/money.ts`) — never weaken; the "Uvoľniť" action on /odpisy is the
   only sanctioned release path.
+- Poradie > 1 (DOROBENIE, #608 — the same order re-produced, e.g. wrong measurement) only via the
+  audited „Odoslať ako dorobenie" confirmation carrying the `dorobenie_po` token (= the poradie the
+  operator saw); an accidental duplicate (double click, refresh, re-sent confirmation) stays
+  hard-blocked (`uz-odpisane`), and cross-modul identical content / pergola rezervácia stay a hard
+  `duplicate`.
 - Temp files in the watched import dir must never match `*.xlsx` (Money watcher races).
 
 ## Secrets

@@ -46,6 +46,7 @@ import { migrateObjednavkaSklaOtvor } from './migracie-objednavka-otvor';
 import { migrateSkloHrubky4mm } from './migracie-sklo-hrubky-4mm';
 import { migrateClipSkloHrubky } from './migracie-clip-sklo-hrubky';
 import { migrateStandardyBez24mm } from './migracie-sklo-hrubky-24mm';
+import { migrateOdpisPoradie } from './migracie-odpis-poradie';
 
 const log = logger('migrate');
 
@@ -975,6 +976,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateSkloHrubky4mm(db, bump); // v53→v54 (#579 4 mm jednoduché pre Štandardy; vlastný súbor)
 	migrateClipSkloHrubky(db, bump); // v54→v55 (#593 CLIP 6 mm jednoduché + 16 mm izolačné; vlastný súbor)
 	migrateStandardyBez24mm(db, bump); // v55→v56 (úloha 1218 Štandardy bez 24 mm izolačného; vlastný súbor)
+	migrateOdpisPoradie(db, bump); // v56→v57 (#608 dorobenie — odpis_log.poradie + UNIQUE s poradím; vlastný súbor)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

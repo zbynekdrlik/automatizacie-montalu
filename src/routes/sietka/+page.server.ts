@@ -162,7 +162,7 @@ export const actions = {
 					step: 'blocked' as const,
 					blokReason: outcome.reason!,
 					blokAction: '?/odoslat',
-					rawEntries: rawFormEntries(formData),
+					rawEntries: rawFormEntries(formData, outcome),
 					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					vstup
 				};
@@ -270,7 +270,7 @@ export const actions = {
 					step: 'blocked' as const,
 					blokReason: outcome.reason!,
 					blokAction: '?/odoslatMulti',
-					rawEntries: rawFormEntries(formData),
+					rawEntries: rawFormEntries(formData, outcome),
 					error: blokHlaska(outcome, vstup.zak, vstup.op),
 					multiVstup: vstup
 				};

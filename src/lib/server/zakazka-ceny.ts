@@ -25,6 +25,8 @@ export interface ZakazkaOdpisRow {
 	presunute_at: string | null;
 	/** počet ULOŽENÝCH položiek (odpis_polozky) — 0 = odpis spred fázy 1. */
 	pocetPoloziek: number;
+	/** (#608) poradie odpisu v module: 1 = prvý, > 1 = vedomé dorobenie č. N. */
+	poradie: number;
 }
 
 export interface AgregovanaPolozka {
@@ -57,6 +59,9 @@ export interface ZakazkaPrehlad {
 	/** scope odpisy BEZ uložených položiek (spred fázy 1) — ich materiál v agregáte
 	 *  čestne CHÝBA a UI to musí priznať, nikdy sa tváriť, že zoznam je kompletný. */
 	bezPoloziek: number;
+	/** (#608) scope odpisy, ktoré sú DOROBENIE (poradie > 1) — sú v súčtoch (materiál sa reálne
+	 *  spotreboval znova), ale UI aj Odoo log-note to musia priznať. */
+	dorobeni: number;
 	/** #417 faza 2: per-profil odpad z narezov agregovany napriec scope odpisy.
 	 *  Prazdne pole ak ziadne odpisy nemaju odpadove data (moduly bez ffdPack: pergola, bazen, clip). */
 	odpad: OdpadRow[];
@@ -83,7 +88,7 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 	const odpisy = db
 		.prepare(
 			`SELECT l.id, l.modul, l.zak, l.op, l.zakaznik, l.caka, l.live, l.created_by, l.created_at,
-			        l.presunute_at,
+			        l.presunute_at, l.poradie,
 			        (SELECT COUNT(*) FROM odpis_polozky p WHERE p.odpis_log_id = l.id) AS pocetPoloziek
 			 FROM odpis_log l
 			 WHERE l.zak_norm = ? OR upper(replace(l.zak_norm, ' ', '')) = ?
@@ -138,6 +143,7 @@ export function zakazkaPrehlad(zakRaw: string): ZakazkaPrehlad | null {
 		odpisovVScope: vScope.length,
 		parkovanych: vScope.filter((o) => o.caka === 1 && o.presunute_at === null).length,
 		bezPoloziek,
+		dorobeni: vScope.filter((o) => o.poradie > 1).length,
 		odpad
 	};
 }
