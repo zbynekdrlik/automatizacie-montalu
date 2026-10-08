@@ -3,6 +3,7 @@
 	import { modulNazov } from '$lib/modul-nazov';
 	import { resolve } from '$app/paths';
 	import CenyTabulka from '$lib/components/CenyTabulka.svelte';
+	import DorobenieBadge from '$lib/components/DorobenieBadge.svelte';
 	// #313: created_at je SQLite `datetime('now')` (UTC) — cez `sqliteUtcToIso` + `formatDatumCasSk`
 	// na bratislavský lokálny čas (DST-safe, `.claude/rules/timestamps.md`), rovnako ako v histórii.
 	import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
@@ -25,7 +26,11 @@
 </div>
 
 <div class="card">
-	<h1>Odpis {o.zak} <span class="sub">OP {o.op}</span></h1>
+	<h1>
+		Odpis {o.zak} <span class="sub">OP {o.op}</span>
+		<!-- #608: vedomé dorobenie (poradie > 1) -->
+		<DorobenieBadge poradie={o.poradie} testid="detail-dorobenie" />
+	</h1>
 	<div class="g">
 		<div><span>Zákazník</span><b>{o.zakaznik}</b></div>
 		<div>

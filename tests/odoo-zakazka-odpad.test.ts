@@ -13,6 +13,7 @@ const baseNote: ZakazkaNote = {
 	scope: 'live',
 	parkovanych: 0,
 	bezPoloziek: 0,
+	dorobeni: 0,
 	odpisovVScope: 1,
 	sekcie: [{ nadpis: 'Profily a komponenty', polozky: [] }],
 	cenaSpolu: null,
@@ -87,6 +88,7 @@ describe('buildZakazkaNote — odpad pole', () => {
 			odpisovVScope: 1,
 			parkovanych: 0,
 			bezPoloziek: 0,
+			dorobeni: 0,
 			odpad: [
 				{ profilKod: 'ZASP001', profilNazov: 'Rámový', odpadMm: 500, materialMm: 15000, tyce: 2 }
 			]

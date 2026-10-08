@@ -47,9 +47,9 @@ test('odpisy: ledger blokuje identický re-import; „⚠️ Povoliť rovnaký" 
 	await posli();
 	await expect(page.getByTestId('vysledok')).toContainText('TEST');
 
-	// 2. rovnaká ZAK+OP → duplikát (dedup kľúč odpis_log)
+	// 2. rovnaká ZAK+OP → „už bola odpísaná" blok (dedup kľúč odpis_log, #608 — bez potvrdenia dorobenia nič)
 	await posli();
-	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
 
 	// --- VETVA A: sankcionovaný override „⚠️ Povoliť rovnaký" povolí JEDEN identický re-import ---
 	// Poradie override-PRV / blok-POTOM je VYNÚTENÉ kódom: aj „Povoliť rovnaký" aj „Uvoľniť"
@@ -66,9 +66,9 @@ test('odpisy: ledger blokuje identický re-import; „⚠️ Povoliť rovnaký" 
 
 	// --- VETVA B: obyčajné „Uvoľniť" → riadok je preč → „Povoliť rovnaký" je nedosiahnuteľné
 	//     (dead-end #294), no modulové „⚠️ Odoslať aj tak" (#300, tuple override) ho dorieši ---
-	// re-send z bodu 3 vytvoril nový odpis_log riadok → znova je to duplikát
+	// re-send z bodu 3 vytvoril nový odpis_log riadok → znova „už bola odpísaná" blok
 	await posli();
-	await expect(page.getByTestId('duplikat')).toContainText('už bola odoslaná');
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
 
 	// obyčajné „Uvoľniť" zmaže dedup kľúč, ALE override do ledgeru NEpridá (riadok už preč)
 	await goto(page, '/odpisy');

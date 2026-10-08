@@ -25,7 +25,8 @@ modules are covered automatically by that walk — nothing to register per file.
 |---|---|---|
 | `src/routes/zasklenia/+page.svelte` | ~1620 | over — split tracked #250 |
 | `src/lib/server/compute.ts` | — | split DONE (#249 → 4 moduly + fasáda) |
-| `src/lib/server/migracie.ts` | ~996 | AT CAP — každá nová migrácia extrahuj blok do migracie-seed (viď `migrations.md`); call-list samotný presuň von do ~2 migrácií |
+| `src/lib/server/migracie.ts` | ~982 | AT CAP — každá nová migrácia vo VLASTNOM súbore (viď `migrations.md`); call-list samotný presuň von do ~2 migrácií |
+| `src/lib/server/money.ts` | ~790 | split DONE #608: história → `money-historia.ts` (pure move + re-export), override audity → `money-override-audit.ts`, dedup rozhodnutie + ledger → `money-dedup.ts`. Ďalší rast = ďalší kohézny blok von (napr. hlášky/`overrideOpts` — POZOR na cyklus: `normZak`/`normOp` žijú v money.ts) |
 | `src/lib/pergola-narez.ts` | ~937 | approaching — split DONE raz (#155 fasáda), ďalší dotyk zváž ďalšiu extrakciu |
 | `src/lib/components/vizual/Vizual3D.svelte` | ~722 | approaching |
 | `src/lib/components/PergolaNarezVykres.svelte` | ~704 | approaching |
@@ -55,6 +56,15 @@ The extracted module needs the ORIGINAL module's shared state (here: the
    with an innocent refactor (e.g. converting the shared value from a
    function declaration to a `const` arrow function silently breaks it).
    Parameter injection has none of this fragility — always prefer it.
+
+## PASCA: nové meno modulu MUSÍ byť voľné — `ls` PRED zápisom (#608)
+
+Pri extrakcii #608 skript zapísal override audity do `money-audit.ts` — ten UŽ existoval (#297
+forenzný JSONL sink loggera, importuje ho `log.ts`) a zápis ho prepísal. Prezradil to až
+`svelte-check` (`log.ts: no exported member 'auditPath'`). Oprava: `git checkout -- <súbor>` +
+iné meno (`money-override-audit.ts`). **Pred zápisom NOVÉHO súboru skriptom vždy
+`ls src/lib/server/<meno>.ts` (musí zlyhať) a `grep -rn "from './<meno>'" src`** — `money-*`
+prefix je hustý (money-audit, money-presun, money-readback, money-historia, …).
 
 ## Verifying a pure move (zero behavior change)
 

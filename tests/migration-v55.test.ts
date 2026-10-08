@@ -94,7 +94,7 @@ const hrubky = (d: Database.Database, system: string) =>
 describe('migration → v55 (CLIP 6 mm jednoduché + 16 mm izolačné, #593)', () => {
 	it('bumpne na v55', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(56);
+		expect(d.pragma('user_version', { simple: true })).toBe(57);
 		d.close();
 	});
 

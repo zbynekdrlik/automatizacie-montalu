@@ -51,7 +51,7 @@ describe('setOdpisWrittenHook — observer po zápise odpisu', () => {
 		const spy = vi.fn();
 		setOdpisWrittenHook(spy);
 		const out = await writeOdpis(makeReq('ZAKHOOK2', 'OP502'), {}); // duplicitný
-		expect(out.status).toBe('duplicate');
+		expect(out.status).toBe('blocked'); // #608 uz-odpisane — bez potvrdenia dorobenia nič
 		expect(spy).not.toHaveBeenCalled();
 	});
 

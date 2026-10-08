@@ -55,7 +55,8 @@ describe('writeOdpis → odpis_polozky', () => {
 		const job = makeJob('ZAK-POL-1', '01', [{ kod: 'ZASP00099', nazov: 'Iný profil', qty: 99 }]);
 		const before = (db.prepare('SELECT COUNT(*) c FROM odpis_polozky').get() as { c: number }).c;
 		const out = await writeOdpis(job);
-		expect(out.status).toBe('duplicate');
+		// #608: druhý odpis tej istej ZAK+OP bez vedomého dorobenia = blok (nič nezapísané)
+		expect(out.status).toBe('blocked');
 		const after = (db.prepare('SELECT COUNT(*) c FROM odpis_polozky').get() as { c: number }).c;
 		expect(after).toBe(before);
 	});

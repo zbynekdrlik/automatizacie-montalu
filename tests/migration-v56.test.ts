@@ -98,7 +98,7 @@ const hrubky = (d: Database.Database, system: string) =>
 describe('migration → v56 (Štandardy bez 24 mm izolačného, Odoo úloha 1218)', () => {
 	it('bumpne na v56', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(56);
+		expect(d.pragma('user_version', { simple: true })).toBe(57);
 		d.close();
 	});
 

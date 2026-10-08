@@ -192,6 +192,12 @@ h1 {
 	background: var(--m-manual-bg);
 	color: var(--m-manual);
 }
+/* #608 — dorobenie (druhý/ďalší vedomý odpis tej istej zákazky). Oranžový „pozor" tón ako
+   .badge.wait — reuse .badge tokenov, žiadny nový dizajnový jazyk. */
+.badge.dorobenie {
+	background: var(--m-warn-bg);
+	color: var(--m-warn);
+}
 /* Dátum vytvorenia plánu v tlačenej hlavičke (#114) — display-only, do Money nejde. */
 .vytvorene {
 	margin-left: 8px;

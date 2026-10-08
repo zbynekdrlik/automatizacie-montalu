@@ -168,7 +168,7 @@ describe('clip route — odoslat (TEST režim, do ostrého Money NIČ)', () => {
 		expect(listOdpisy(200).some((o) => o.zak === 'CLIP-NEG')).toBe(false);
 	});
 
-	it('duplikát tej istej ZAK+OP sa neodošle druhýkrát', async () => {
+	it('duplikát tej istej ZAK+OP sa bez vedomého dorobenia neodošle druhýkrát (#608)', async () => {
 		const first = (await clip.actions.odoslat(
 			ev({ zak: 'CLIP-DUP', op: 'OP1', zakaznik: 'X', ...IZO_B1 })
 		)) as { step: string };
@@ -176,7 +176,7 @@ describe('clip route — odoslat (TEST režim, do ostrého Money NIČ)', () => {
 		const second = (await clip.actions.odoslat(
 			ev({ zak: 'CLIP-DUP', op: 'OP1', zakaznik: 'X', ...IZO_B1 })
 		)) as { step: string };
-		expect(second.step).toBe('duplikat');
+		expect(second.step).toBe('blocked');
 		// len JEDEN záznam
 		expect(listOdpisy(200).filter((o) => o.zak === 'CLIP-DUP' && o.op === 'OP1').length).toBe(1);
 	});

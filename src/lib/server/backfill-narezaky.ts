@@ -56,6 +56,8 @@ export interface OdpisBackfillRow {
 	content_hash: string;
 	detail: string;
 	created_at: string;
+	/** (#608) poradie odpisu tejto zákazky/OP v module (1 = prvý, > 1 = dorobenie). Chýba = 1. */
+	poradie?: number;
 }
 
 /** Výsledok namapovania JEDNÉHO odpisu na `lines` (+ `material` na GRAFICKÝ nárezák PDF, #529). */
@@ -321,14 +323,26 @@ function clipVstupFrom(raw: Partial<ClipVstup>): ClipVstup {
 	};
 }
 
-/** Stabilný per-OP doc_id `backfill-narezak-<opSlug≤12>` (≤40, charset [a-z0-9-] — Odoo regex). */
-export function backfillDocId(op: string): string {
+/** Stabilný per-OP doc_id `backfill-narezak-<opSlug≤12>` (≤40, charset [a-z0-9-] — Odoo regex).
+ *  (#608) Keď OP nesie DOROBENIE (`poradie` > 1), doc_id dostane príponu `-d<poradie>` — Odoo tak
+ *  NEprepíše PDF prvého plánu rezov (nová príloha vedľa neho); `lines` (čo rezať) sa nahrádzajú bez
+ *  ohľadu na doc_id. Bez dorobenia je doc_id nezmenený (idempotentný s backfillom). */
+export function backfillDocId(op: string, poradie = 1): string {
 	const slug =
 		normOp(op)
 			.toLowerCase()
 			.replace(/[^a-z0-9]+/g, '')
 			.slice(0, 12) || 'x';
-	return `backfill-narezak-${slug}`.slice(0, 40);
+	const dorobenie = poradie > 1 ? `-d${Math.trunc(poradie)}` : '';
+	return `backfill-narezak-${slug}${dorobenie}`.slice(0, 40);
+}
+
+/** (#608) Najvyššie poradie medzi odpismi OP, ktoré idú na kiosk (najnovší per modul) — 1 = žiadne
+ *  dorobenie. Riadok bez `poradie` (starší SELECT / test fixtúra) sa ráta ako 1. */
+export function poradieOp(g: OpOdpisy): number {
+	let max = 1;
+	for (const r of g.byModul.values()) max = Math.max(max, r.poradie ?? 1);
+	return max;
 }
 
 export interface BackfillDeps {
@@ -514,7 +528,8 @@ export async function odoslatNarezakPreOp(
 	logCtx: Record<string, unknown> = {},
 	now: Date = new Date()
 ): Promise<NarezakUploadOutcome> {
-	const docId = backfillDocId(op);
+	// (#608) dorobenie (najnovší odpis modulu má poradie > 1) → vlastný doc_id, PDF prvého plánu ostáva
+	const docId = backfillDocId(op, poradieOp(g));
 
 	// #529: GRAFICKÝ nárezák PDF z rekomputovaného materiálu (best-effort — keď zlyhá, pošlú sa
 	// len `lines`, endpoint PDF nevyžaduje).
@@ -723,7 +738,7 @@ export async function runBackfill(
 		}
 		if (res.drift) summary.driftOp++;
 
-		const docId = backfillDocId(op);
+		const docId = backfillDocId(op, poradieOp(g));
 		opSum.docId = docId;
 
 		if (opts.dryRun) {

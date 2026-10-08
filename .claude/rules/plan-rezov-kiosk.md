@@ -66,6 +66,13 @@ triggera vždy over, ČO ho v produkcii nahrádza (reálne dáta, nie existencia
 - doc_id `backfill-narezak-<op>` (rovnaký ako backfill → neskorší prepíše PDF). `/plan-rezov` save
   ostáva (doc_id `plan-rezov-<zak>-<op>` — INÁ príloha, ale `lines` sa nahrádzajú bez ohľadu na
   doc_id, takže riadky sa NEduplikujú; neskorší zápis vyhrá).
+- **DOROBENIE (#608):** `groupOdpisyPerOp` berie NAJNOVŠÍ odpis per modul → pri dorobení idú na kiosk
+  `lines` DOROBENIA (prvý posuv je už vyrobený — rezať sa má to, čo sa robí znova). doc_id dostane
+  príponu `-d<N>` (`backfillDocId(op, poradieOp(g))`, N = max `poradie` medzi najnovšími odpismi OP)
+  → PDF prvého plánu ostane v Odoo ako samostatná príloha. Bez dorobenia doc_id nezmenený (backfill
+  idempotentný). `listLiveOdpisyForOp`/`listOdpisyForBackfill` preto SELECTujú aj `poradie`
+  (`OdpisBackfillRow.poradie?`, chýba = 1). `plan-rezov-<zak>-<op>` (uloženie /plan-rezov) sa
+  dorobenia NETÝKA — nie je viazané na odpis.
 - **SÉRIOVO per OP so zlúčeným dobehom** (`bezi` Map v `odoo-narezak-odpis.ts`, review #570): lines
   nahrádzajú všetky riadky objednávky, takže dva súbežné uploady tej istej OP by mohli doraziť v
   opačnom poradí a starší snapshot (len modul A) by prepísal novší (A+B). Per OP beží najviac 1

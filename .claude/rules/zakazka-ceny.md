@@ -28,6 +28,12 @@ paths:
   (`parkovanych` → „Vrátane N parkovaných ⏳"); odpisy spred fázy 1 (bez
   `odpis_polozky`) = `bezPoloziek` čestná hláška — nikdy „kompletná" prázdna tabuľka.
 
+- **DOROBENIE (#608) je v súčtoch a PRIZNANÉ.** Druhý vedomý odpis tej istej zákazky (poradie > 1)
+  = materiál sa reálne spotreboval znova → `zakazkaPrehlad` ho sčíta ako každý iný scope odpis a
+  vráti `dorobeni` (počet scope odpisov s poradím > 1). UI (`zakazka-dorobeni`), Odoo log-note aj PDF
+  prílohu (`zakazka-pdf.ts`) to priznajú vetou „Súčet zahŕňa dorobenie (N× …)". Riadok odpisu nesie
+  `poradie` → odznak `DorobenieBadge` (JEDINÁ implementácia, zdieľaná s /odpisy a detailom).
+
 - **`ReadbackBadge.svelte` je JEDINÁ implementácia readback verdiktov** (✅/⛔ chýba/
   ⛔ viac/⛔ len/⏳) — /odpisy aj zákazková stránka ju zdieľajú. Nikdy inline kópia:
   divergentná kópia pri #154 zlúčila „viac"/„len" vetvu do zavádzajúceho title.

@@ -21,6 +21,7 @@ const baseNote: ZakazkaNote = {
 	scope: 'live',
 	parkovanych: 0,
 	bezPoloziek: 0,
+	dorobeni: 0,
 	odpisovVScope: 2,
 	sekcie: [
 		{

@@ -59,8 +59,12 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 		expect(blocked.status).toBe('blocked');
 		expect(blocked.reason).toBe('ledger-duplicate');
 
-		// TUPLE override (nepotrebuje odpis_log riadok) pustí re-import
-		const ok = await writeOdpis(makeReq('ZAK-DEADEND', '01'), { overrideLedger: true });
+		// TUPLE override (nepotrebuje odpis_log riadok) pustí re-import — potvrdenie nesie token stavu
+		// ledgeru z bloku (#608: replay po „Uvoľniť" ho nezopakuje)
+		const ok = await writeOdpis(makeReq('ZAK-DEADEND', '01'), {
+			overrideLedger: true,
+			potvrdenieToken: blocked.potvrdenieToken
+		});
 		expect(ok.status).toBe('written');
 		expect(fs.existsSync(ok.target)).toBe(true);
 	});
@@ -81,7 +85,13 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 			db.prepare("SELECT COUNT(*) c FROM cfg_audit WHERE sys_styl = 'odpis'").get() as { c: number }
 		).c;
 
-		const ok = await writeOdpis(makeReq('ZAK-OVR1S', '01'), { overrideLedger: true });
+		// operátor najprv vidí ledger blok (#608: potvrdenie platí len s jeho tokenom)
+		const blok = await writeOdpis(makeReq('ZAK-OVR1S', '01'));
+		expect(blok.reason).toBe('ledger-duplicate');
+		const ok = await writeOdpis(makeReq('ZAK-OVR1S', '01'), {
+			overrideLedger: true,
+			potvrdenieToken: blok.potvrdenieToken
+		});
 		expect(ok.status).toBe('written');
 		fs.rmSync(ok.target);
 
@@ -112,6 +122,9 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 		const row = listOdpisy(500).find((o) => o.zak === 'ZAK-COMP' && o.op === '01');
 		expect(releaseOdpis(row!.id, 'tester')).toBe(true);
 
+		// operátor vidí ledger blok a potvrdí jeho tokenom (#608)
+		const blok = await writeOdpis(makeReq('ZAK-COMP', '01'));
+		expect(blok.reason).toBe('ledger-duplicate');
 		// vynúť zlyhanie zápisu súboru: cieľový adresár sa nedá vytvoriť (rodič je SÚBOR → ENOTDIR)
 		const blockFile = path.join(tmpRoot, 'blockfile');
 		fs.writeFileSync(blockFile, 'x');
@@ -119,7 +132,10 @@ describe('#300 tuple-based ledger override — „Uvoľniť" dead-end', () => {
 		process.env.MONEY_TEST_DIR = path.join(blockFile, 'sub');
 		try {
 			await expect(
-				writeOdpis(makeReq('ZAK-COMP', '01'), { overrideLedger: true })
+				writeOdpis(makeReq('ZAK-COMP', '01'), {
+					overrideLedger: true,
+					potvrdenieToken: blok.potvrdenieToken
+				})
 			).rejects.toThrow();
 		} finally {
 			process.env.MONEY_TEST_DIR = goodDir;
@@ -161,7 +177,8 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		expect(overrideOpts(fKody)).toEqual({
 			overrideKody: true,
 			overrideLedger: false,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 
 		const fLedger = new FormData();
@@ -169,7 +186,8 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		expect(overrideOpts(fLedger)).toEqual({
 			overrideKody: false,
 			overrideLedger: true,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 
 		// dvojitý blok (kód + ledger) → oba `override` v jednom formulári → oba flagy (žiadny ping-pong)
@@ -179,14 +197,16 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		expect(overrideOpts(fOba)).toEqual({
 			overrideKody: true,
 			overrideLedger: true,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 
 		// bežný (prvý) submit nemá `override` pole → žiadny bypass
 		expect(overrideOpts(new FormData())).toEqual({
 			overrideKody: false,
 			overrideLedger: false,
-			overridePrehodene: false
+			overridePrehodene: false,
+			overrideDorobenie: false
 		});
 	});
 
@@ -196,7 +216,7 @@ describe('#300 overrideOpts + rawFormEntries — UI „Odoslať aj tak" plumbing
 		f.set('op', 'OP260286');
 		f.set('qty_18004', '3,5'); // ručná úprava množstva
 		f.set('override', 'unknown-kod'); // prvý potvrdený override sa NEsmie stratiť pri druhom bloku
-		const e = rawFormEntries(f);
+		const e = rawFormEntries(f, { reason: 'ledger-duplicate' });
 		expect(e).toContainEqual(['zak', 'ZAK1']);
 		expect(e).toContainEqual(['op', 'OP260286']);
 		expect(e).toContainEqual(['qty_18004', '3,5']);

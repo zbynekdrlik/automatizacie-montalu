@@ -171,9 +171,10 @@ test('multi: Odoslať do Money zapíše JEDEN odpis pre viac kusov (TEST režim)
 	await waitHydrated(page);
 	await page.getByTestId('odoslat-sietku-multi').click();
 	await waitHydrated(page);
-	await expect(page.getByTestId('sietka-multi-duplikat')).toContainText('už bola odoslaná');
-	// karta s výsledkom ostáva vidno pod hláškou — nie je to prázdna stránka
-	await expect(page.getByTestId('sietka-multi-badge')).toBeVisible();
+	// #608: rovnaká ZAK+OP znova → zdieľaný OdpisBlok „už bola odpísaná" s vedomým „Odoslať ako
+	// dorobenie" (nie prázdna stránka)
+	await expect(page.getByTestId('blok')).toContainText('už bola odpísaná');
+	await expect(page.getByTestId('odoslat-ako-dorobenie')).toBeVisible();
 
 	expect(errs).toEqual([]);
 });

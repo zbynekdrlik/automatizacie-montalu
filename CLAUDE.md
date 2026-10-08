@@ -71,9 +71,15 @@ when a `-dev.N` already landed on `main` (#98/#174 `sort -V`) → auto-loads
 ## Money safety (the hard rules)
 
 - Nothing test-related may EVER reach the live Money import (`/data/dlv-import`).
-- Dedup = DB `UNIQUE(zak, op, live)` in `odpis_log` + claim-then-write with compensation
-  (`src/lib/server/money.ts`) — never weaken; the "Uvoľniť" action on /odpisy is the
+- Dedup = DB `UNIQUE(modul, zak, op, live, poradie)` in `odpis_log` + claim-then-write with
+  compensation (`src/lib/server/money.ts`) — never weaken; the "Uvoľniť" action on /odpisy is the
   only sanctioned release path.
+- Poradie > 1 (DOROBENIE, #608 — the same order re-produced, e.g. wrong measurement) only via the
+  audited „Odoslať ako dorobenie" confirmation carrying `potvrdenie_token` (= the append-only ledger
+  state the operator saw; „Uvoľniť" never rewinds it — the #300 „Odoslať aj tak" ledger override uses
+  the same token); an accidental duplicate (double click, refresh, a re-sent confirmation even after
+  „Uvoľniť") stays blocked (`uz-odpisane` / `ledger-duplicate`), and cross-modul identical content /
+  pergola rezervácia stay a hard `duplicate`.
 - Temp files in the watched import dir must never match `*.xlsx` (Money watcher races).
 
 ## Secrets
@@ -110,7 +116,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - štruktúrovaný logger (`log.ts`), handleError, chybová stránka, testovanie logov → `.claude/rules/logging.md`
 - SQLite/Money durability (synchronous pin, fsync zápis, v24 audit) → `.claude/rules/db-durability.md`
 - pridanie novej SQLite migrácie (seed-extrakcia, 1000-r. strop, head-bump ~26 testov, v25/v26 stĺpce) → `.claude/rules/migrations.md`
-- pridanie nového `writeOdpis` block-reason (audited-override 6-touch checklist) → `.claude/rules/money-block-reason.md`
+- pridanie nového `writeOdpis` block-reason (audited-override 6-touch checklist) + DOROBENIE `uz-odpisane` (#608: `poradie`, `potvrdenie_token` = stav ledgeru, tvrdé výnimky cross-modul/rezervácia) → `.claude/rules/money-block-reason.md`
 - katalóg skiel, pridanie/zmena skla, povolené sklá per systém (`POVOLENE_SKLA`, #573), Odoo sklá v nárezáku podľa hrúbky (`cfg_sklo_hrubka` nastaviteľné výrobou, `vypocetneSkloPre`, `skloOdoo`, #579), 4 mm pri Štandardoch + `predvoleneSklo` (#579 v54), Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - editor vzorcov `saveCfgChanges` (skryté zrkadlenia rámový→sklo #504 + Deluxe 6/10, audit invariant) → `.claude/rules/cfg-editor.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
