@@ -16,8 +16,13 @@ const {
 	sklaPosuvu,
 	pridajSubor,
 	listSubory,
-	nastavRezim
+	nastavRezim,
+	nastavSpec
 } = await import('../src/lib/server/objednavka-skla');
+const { GLASS_SPEC_OFF } = await import('../src/lib/server/odoo-rozpis-lines');
+const { render } = await import('svelte/server');
+const { default: SklaPridaneBanner } =
+	await import('../src/lib/components/SklaPridaneBanner.svelte');
 
 const USER = { id: 1, username: 'tester', role: 'internal' as const };
 const S_OTVOROM = 'Zasklenie 1 — s otvorom ⌀46';
@@ -182,24 +187,74 @@ describe('#603 prechod — staré rozdelenie opony sa nezdvojí, prevedie sa', (
 		]);
 	});
 
-	it('ručne upravený (atyp) riadok sa neprevádza — staré riadky ostanú', async () => {
+	/** Prechod odmietnutý: podklad ostane PRESNE ako bol (nič sa nepridá — inak by sa objednávka
+	 *  zdvojila) a výsledok akcie pozíciu nahlási na upozornenie v banneri. */
+	async function odmietnuty(zak: string, styl: string, s: string, pred: string[]) {
+		const r = await callAction('pridatSkla', { ...opona(styl, s), zak });
+		expect(kusy(zak)).toEqual(pred);
+		const sp = r.sklaPridane as { pridane: number; prechodOdmietnuty: string[] };
+		expect(sp.pridane).toBe(0);
+		expect(sp.prechodOdmietnuty).toHaveLength(1);
+		expect(sp.prechodOdmietnuty[0]).toMatch(/^Zasklenie 1 \(/);
+		return sp.prechodOdmietnuty[0]!;
+	}
+
+	it('ručne upravený (atyp) riadok sa neprevádza ani nezdvojí — upozornenie', async () => {
 		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GA');
 		const stare = stareRozdelenie('ZAK-603-PA', g, 6);
 		nastavRezim(stare.s.id, 'atyp');
-		await callAction('pridatSkla', { ...opona('2x3K', '6000'), zak: 'ZAK-603-PA' });
-		const rows = listSklaPreZakazku('ZAK-603-PA');
-		expect(rows.find((p) => p.id === stare.s.id)!.pocet).toBe(2);
-		expect(rows.find((p) => p.id === stare.bez!.id)!.pocet).toBe(4);
+		const dovod = await odmietnuty('ZAK-603-PA', '2x3K', '6000', [
+			`${S_OTVOROM}|2|1`,
+			'Zasklenie 1|4|0'
+		]);
+		expect(dovod).toContain('atyp');
 	});
 
-	it('riadok „bez", ktorý by sa mazal, má prílohu → neprevádza sa (príloha sa nestratí)', async () => {
+	it('riadok „bez", ktorý by sa mazal, má prílohu → neprevádza sa, príloha ostane — upozornenie', async () => {
 		const g = await geometria(opona('2x2K', '4000'), 'ZAK-603-GF');
 		const stare = stareRozdelenie('ZAK-603-PF', g, 4);
 		pridajSubor(stare.bez!.id, 'foto.pdf', 'application/octet-stream', Buffer.from('%PDF-1.4'));
-		await callAction('pridatSkla', { ...opona('2x2K', '4000'), zak: 'ZAK-603-PF' });
-		const rows = listSklaPreZakazku('ZAK-603-PF');
-		expect(rows.find((p) => p.id === stare.bez!.id)!.pocet).toBe(2);
+		const dovod = await odmietnuty('ZAK-603-PF', '2x2K', '4000', [
+			`${S_OTVOROM}|2|1`,
+			'Zasklenie 1|2|0'
+		]);
 		expect(listSubory(stare.bez!.id)).toHaveLength(1);
-		expect(rows.find((p) => p.id === stare.s.id)!.pocet).toBe(2);
+		expect(dovod).toContain('príloh');
+	});
+
+	it('ručne zmenené otvory na riadku „s otvorom" (#521 spec) sa neprepíšu — upozornenie', async () => {
+		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GS');
+		const stare = stareRozdelenie('ZAK-603-PS', g, 6);
+		nastavSpec(stare.s.id, { ...GLASS_SPEC_OFF, holesQty: 2, holeSize: 'd50' });
+		const dovod = await odmietnuty('ZAK-603-PS', '2x3K', '6000', [
+			`${S_OTVOROM}|2|2`,
+			'Zasklenie 1|4|0'
+		]);
+		expect(dovod).toContain('otvory');
+	});
+
+	it('banner zobrazí odmietnutý prechod (pozícia + dôvod + čo urobiť)', () => {
+		const html = render(SklaPridaneBanner, {
+			props: {
+				sklaPridane: {
+					pridane: 0,
+					zak: 'Z',
+					upozornenieCudzie: null,
+					prechodOdmietnuty: ['Zasklenie 1 (ručne upravený riadok — atyp)']
+				},
+				pridaneText: 'p',
+				nicText: 'n'
+			}
+		}).body;
+		expect(html).toContain('data-testid="skla-prechod-odmietnuty"');
+		expect(html).toContain('Zasklenie 1 (ručne upravený riadok — atyp)');
+		const bez = render(SklaPridaneBanner, {
+			props: {
+				sklaPridane: { pridane: 0, zak: 'Z', upozornenieCudzie: null },
+				pridaneText: 'p',
+				nicText: 'n'
+			}
+		}).body;
+		expect(bez).not.toContain('skla-prechod-odmietnuty');
 	});
 });
