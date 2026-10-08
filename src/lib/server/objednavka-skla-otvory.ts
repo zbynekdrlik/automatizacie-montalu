@@ -8,7 +8,7 @@ import { normZak } from './money';
 import { logger } from './log';
 import { HOLE_SIZES, type HoleSize } from './odoo-rozpis-lines';
 import { popisPozicie, zakladPozicie } from '../objednavka-skla-pozicia';
-import { otvoryRucneZmenene } from '../sklo-otvory';
+import { otvoryRucneZmenene, PRIPONA_OTVOR_RE } from '../sklo-otvory';
 import type { NoveSklo } from './objednavka-skla';
 
 const log = logger('objednavka-skla');
@@ -174,8 +174,10 @@ export function prevedStareRozdelenie(s: NoveSklo, polozky: NoveSklo[]): Prechod
 			s.typSkla
 		) as RiadokPosuvu[]
 	).filter((r) => zakladPozicie(r.popis, s.modul) === zaklad);
-	const sOtvorom = riadky.filter((r) => r.otvory > 0);
-	const bez = riadky.filter((r) => r.otvory === 0);
+	// „s otvorom" / „bez" podľa PRÍPONY pozície (čo zapísal producent), NIE podľa spec — ručne zmenené
+	// otvory (zrušené na riadku s príponou, pridané na riadku bez nej) sú ručný zásah → odmietnutie
+	const sOtvorom = riadky.filter((r) => PRIPONA_OTVOR_RE.test(r.popis));
+	const bez = riadky.filter((r) => !PRIPONA_OTVOR_RE.test(r.popis));
 	const [stary] = sOtvorom;
 	const [staryBez] = bez;
 	// presne JEDEN starý riadok „s otvorom" na tej istej pozícii (vrátane prípony ⌀) a najviac jeden „bez"
@@ -186,7 +188,8 @@ export function prevedStareRozdelenie(s: NoveSklo, polozky: NoveSklo[]): Prechod
 	// je to staré rozdelenie TOHO ISTÉHO posuvu — prepísať ho smie len bez ručných zásahov
 	const dovod = riadky.some((r) => r.rezim === 'atyp')
 		? 'ručne upravený riadok — atyp'
-		: otvoryRucneZmenene({ popis: stary.popis, holesQty: stary.otvory, holeSize: stary.velkost })
+		: otvoryRucneZmenene({ popis: stary.popis, holesQty: stary.otvory, holeSize: stary.velkost }) ||
+			  (staryBez?.otvory ?? 0) > 0
 			? 'ručne zmenené otvory'
 			: staryBez && !novyBez && staryBez.prilohy > 0
 				? 'riadok bez otvoru má prílohu'

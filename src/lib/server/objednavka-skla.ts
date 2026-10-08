@@ -403,7 +403,7 @@ export function pridajSklaHromadneIdempotentne(
 	polozky: NoveSklo[],
 	/** #587: voliteľne — počet existujúcich riadkov, ktorým sa zmenila poloha otvoru (NIE sú v
 	 *  návratovej hodnote: nič sa nepridalo, len treba objednávku znova odoslať do Odoo). */
-	stats?: { polohaZmenena: number; prechodOdmietnuty?: string[] }
+	stats?: { polohaZmenena: number; prechodOdmietnuty: string[] }
 ): number {
 	let pridane = 0;
 	db.transaction(() => {
@@ -419,7 +419,7 @@ export function pridajSklaHromadneIdempotentne(
 			if (prechod?.stav === 'prevedene') prevedene.add(s);
 			else if (prechod?.stav === 'odmietnute') {
 				for (const r of prechod.riadky) vynechane.add(r);
-				stats?.prechodOdmietnuty?.push(`${prechod.pozicia} (${prechod.dovod})`);
+				stats?.prechodOdmietnuty.push(`${prechod.pozicia} (${prechod.dovod})`);
 			}
 		}
 		for (const s of polozky) {
