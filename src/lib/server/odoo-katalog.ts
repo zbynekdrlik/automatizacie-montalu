@@ -21,9 +21,14 @@
 // `qty_available` sa ZÁMERNE NEČÍTA: technický účet appky naň na PROD dostane 403 (výpočet siaha na
 // `mrp.bom`, sonda 30.9.) a jedno zakázané pole zhodí CELÝ read. Sklad preto ide cez `stock.quant`
 // (technický účet ho číta, sonda 30.9.: 168 produktov / 98 ms, jediná interná lokácia PKO/Zásoby).
+//
+// #606: kg/m profilu (`montalu_kg_per_m`) pre odpad v kg v nárezovom pláne — SAMOSTATNÝ read
+// (`odooKgNaMPreKody`, vlastná `KodCache`), NIKDY nie v `FIELDS`: pole má v Odoo `groups=` a technický
+// účet appky naň dnes dostane 403 (sonda 8.10.) — v spoločnom reade by zhodilo celý katalóg.
 import { logger } from './log';
 import { odooJson2Config, searchReadJson2 } from './odoo-json2';
 import { KodCache } from './odoo-kod-cache';
+import type { MaterialRow } from './compute-model';
 
 const log = logger('odoo-katalog');
 
@@ -175,10 +180,55 @@ const _sklad = new KodCache<SkladRiadok>(
 	log
 );
 
-/** TEST hook: vyprázdni cache + single-flight + nedostupnosť + „warn raz" stav (katalóg aj sklad). */
+// #606: kg/m profilu. Lookup 1:1 s Odoo intake nárezáka (odoo-erp `sale_order_narezak_cutplan.py`:
+// `search([("default_code","=",kod),("active","=",True)], limit=1)`) → doména `active = True`
+// (archivovaná karta sa ignoruje) a PRVÝ riadok na kód (search_read bez `order` = `_order` modelu, to
+// isté poradie ako `search(limit=1)`). `montalu_kg_per_m` je pole `product.template`, `product.product`
+// ho číta cez `_inherits`. Hodnota `false`/0/nekonečná = karta kg/m nemá → v mape nie je („chýba").
+const KG_FIELDS = ['default_code', 'montalu_kg_per_m'];
+/** Kód, ktorým `/health` sonduje kg/m kanál (bežný profil zasklenia; len čítanie). */
+const KG_SONDA_KOD = 'ZASP00014';
+
+const _kgNaM = new KodCache<number>(
+	`${PRODUCT_MODEL}.montalu_kg_per_m`,
+	KATALOG_TTL_MS,
+	async (kody, timeoutMs) => {
+		const cfg = odooJson2Config()!;
+		const rows = await searchReadJson2(
+			cfg,
+			PRODUCT_MODEL,
+			[
+				['default_code', 'in', kody],
+				['active', '=', true]
+			],
+			KG_FIELDS,
+			{ timeoutMs }
+		);
+		const videne = new Set<string>();
+		const kgNaM = new Map<string, number>();
+		for (const r of rows) {
+			const kod = s(r.default_code);
+			// prvá aktívna karta vyhráva — aj keď kg/m nemá (Odoo intake by zobral tiež ju)
+			if (!kod || videne.has(kod)) continue;
+			videne.add(kod);
+			const kg = r.montalu_kg_per_m;
+			if (typeof kg === 'number' && Number.isFinite(kg) && kg > 0) kgNaM.set(kod, kg);
+		}
+		log.debug('montalu_kg_per_m read OK', {
+			kody: kody.length,
+			sKgNaM: kgNaM.size,
+			bezKgNaM: kody.filter((k) => !kgNaM.has(k))
+		});
+		return kgNaM;
+	},
+	log
+);
+
+/** TEST hook: vyprázdni cache + single-flight + nedostupnosť + „warn raz" stav (katalóg, sklad, kg/m). */
 export function _resetOdooKatalogCache(): void {
 	_katalog.reset();
 	_sklad.reset();
+	_kgNaM.reset();
 }
 
 /** Prázdne/medzerové kódy von, duplicity von; ostatné PRESNE (bez trimu, case-sensitive). */
@@ -231,4 +281,72 @@ export async function odooSkladPreKody(
 		if (v.bezKvantov) bezKvantov.add(kod);
 	}
 	return { zdroj: 'odoo', sklad, bezKvantov };
+}
+
+export type OdooKgNaMVysledok =
+	/** Odoo odpovedalo (pole čitateľné): `kgNaM` obsahuje LEN kódy s kladným kg/m na aktívnej karte. */
+	{ zdroj: 'odoo'; kgNaM: Map<string, number> } | Nedostupne;
+
+/**
+ * kg/m profilov z Odoo (#606) — `product.template.montalu_kg_per_m` aktívnej karty podľa kódu
+ * (JEDEN read pre kódy mimo platnej cache, 5 min; 403/404/výpadok 60 s bez volania). NIKDY nehádže.
+ * Dnešný PROD (technický účet bez prístupu k poľu) = `nedostupne` → po sprístupnení v Odoo
+ * (odoo-erp 9076) sa kg objavia samé, bez releasu aj reštartu.
+ */
+export async function odooKgNaMPreKody(
+	kody: string[],
+	opts: { timeoutMs?: number } = {}
+): Promise<OdooKgNaMVysledok> {
+	if (!odooJson2Config()) return { zdroj: 'nedostupne', dovod: 'config' };
+	const unikatne = unikatneKody(kody);
+	if (!(await _kgNaM.zabezpec(unikatne, opts.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS)))
+		return { zdroj: 'nedostupne', dovod: 'chyba' };
+	const kgNaM = new Map<string, number>();
+	for (const kod of unikatne) {
+		const v = _kgNaM.hodnota(kod);
+		if (v !== null) kgNaM.set(kod, v);
+	}
+	return { zdroj: 'odoo', kgNaM };
+}
+
+/**
+ * Nárezový plán s `kgNaM` pri profiloch (#606) — LEN pre zobrazenie odpadu v kg (`RozpisRezov`).
+ * Vráti KÓPIU plánu; vstup (ten istý `material`, ktorý ide do `saveOdpisOdpad` a Money ciest) sa
+ * nemení. Odoo odpovedá → riadok s kódom dostane kg/m alebo `null` (karta kg/m nemá); riadok bez
+ * kódu ostane bez poľa. Odoo nedostupné / nenakonfigurované → riadky bez `kgNaM` (zobrazenie ako
+ * pred #606). NIKDY nehádže a nečaká dlhšie než timeout (3 s).
+ */
+export async function planSKgNaM<T extends { material: MaterialRow[] }>(
+	plan: T,
+	opts: { timeoutMs?: number } = {}
+): Promise<T> {
+	try {
+		const r = await odooKgNaMPreKody(
+			plan.material.map((m) => m.kod),
+			opts
+		);
+		if (r.zdroj !== 'odoo') return { ...plan, material: [...plan.material] };
+		return {
+			...plan,
+			material: plan.material.map((m) =>
+				m.kod.trim() ? { ...m, kgNaM: r.kgNaM.get(m.kod) ?? null } : m
+			)
+		};
+	} catch (e) {
+		// poistka kontraktu „nikdy nehádže": volá sa aj PO zápise odpisu (krok hotovo) — chyba
+		// zobrazenia kg tam nesmie vyzerať ako zlyhaný zápis do Money
+		log.warn('kg/m k nárezovému plánu sa nepodarilo doplniť — plán bez kg', {
+			err: e instanceof Error ? e.message : String(e)
+		});
+		return { ...plan, material: [...plan.material] };
+	}
+}
+
+/**
+ * Stav kg/m kanála pre `/health` (verejné — len `odoo`/`nedostupne`, žiadne hodnoty): `odoo` =
+ * technický účet pole číta. Sonda ide cez tú istú cache (max 1 request / 5 min pri úspechu,
+ * 1 / 60 s pri výpadku).
+ */
+export async function zistiKgZdroj(): Promise<'odoo' | 'nedostupne'> {
+	return (await odooKgNaMPreKody([KG_SONDA_KOD])).zdroj;
 }

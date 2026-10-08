@@ -4,7 +4,7 @@
 	// každá tyč nakreslená v mierke s očíslovanými rezmi a odpadom na konci.
 	// Rezy na 45° (zošikmená čiara) — pri zaskleniach všetko okrem nosového.
 	import type { MaterialRow } from '$lib/server/compute';
-	import { sumaOdpad } from '$lib/odpad';
+	import { sumaOdpad, sumaOdpadKg, odpadKgProfilu } from '$lib/odpad';
 	import ProfilObrazok from './ProfilObrazok.svelte';
 
 	let {
@@ -19,6 +19,16 @@
 	// je profilov (s tyce>0) ≥2; pri 1 profile je súčet totožný s per-profil hlavičkou
 	// (napr. /optimalizator má jediný profil a vlastný „Celkový odpad" riadok).
 	const spolu = $derived(sumaOdpad(material));
+	// #606: odpad aj v kg (kg/m z Odoo karty, server ich doplní do `m.kgNaM`). Keď kg/m nemá ŽIADNY
+	// profil (Odoo nedostupné / 403 / CI), `zobrazit=false` → výstup bez kg textu, presne ako pred #606.
+	const kg = $derived(sumaOdpadKg(material));
+	const fmt2 = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
+	// oddeľovač „ · " je VO VÝRAZE — Svelte prehltne medzeru na začiatku tagu / okolo `{#if}` (testing.md)
+	const SEP = ' · ';
+	function kgProfilu(m: MaterialRow): string {
+		const okg = odpadKgProfilu(m);
+		return SEP + (okg === null ? 'kg/m chýba' : fmt2(okg) + ' kg');
+	}
 	// uhol rezu (45° vs rovný 90°) rozhoduje server per profil (m.sikmyRez):
 	// Deluxe + Štandard + = všetko 90°; Robust/Slide = 90° nosový/oponový, zvyšok 45°
 
@@ -104,7 +114,10 @@
 					<div class="nazov"><b>{m.kod}</b>{m.kod && m.nazov ? ' · ' : ''}{m.nazov}</div>
 					<div class="stat">
 						Počet tyčí: <b>{m.tyce}</b> · dĺžka tyče {fmt(barLen)} mm · kotúč {fmt(kerf)} mm · odpad
-						<b>{fmt(m.odpadMm)} mm</b> ({fmt(m.odpadPct)} %) · rez {sikmy ? '45°' : 'rovný'}
+						<b>{fmt(m.odpadMm)} mm</b> ({fmt(m.odpadPct)} %){#if kg.zobrazit}<span
+								data-testid="odpad-kg"
+								data-kod={m.kod}>{kgProfilu(m)}</span
+							>{/if} · rez {sikmy ? '45°' : 'rovný'}
 					</div>
 				</div>
 			</div>
@@ -174,7 +187,13 @@
 		<div class="odpad-spolu" data-testid="odpad-spolu">
 			Odpad spolu (naprieč {spolu.profily} profilmi): <b>{fmt(spolu.odpadMm)} mm</b> ({fmt(
 				spolu.odpadPct
-			)} %)
+			)} %){#if kg.zobrazit}<span data-testid="odpad-spolu-kg"
+					>{SEP}<b>{fmt2(kg.odpadKg)} kg</b>{` z ${fmt2(kg.materialKg)} kg (${fmt2(
+						kg.hmotnostPct
+					)} % hmotnosti)`}</span
+				>{#if kg.chybaKgNaM.length > 0}<span data-testid="odpad-kg-neuplne"
+						>{`${SEP}neúplné — kg/m chýba: ${kg.chybaKgNaM.join(', ')}`}</span
+					>{/if}{/if}
 		</div>
 	{/if}
 </div>

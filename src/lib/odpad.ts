@@ -37,6 +37,79 @@ export function sumaOdpad(material: MaterialRow[]): OdpadSpolu {
 	return { profily: pouzite.length, odpadMm, materialMm, odpadPct };
 }
 
+// --- #606: odpad aj v KILOGRAMOCH (Odoo úloha 1366, vzorec 1:1 s odoo-erp 9076) -------------- //
+// kg/m prináša server (`odoo-katalog.ts` `planSKgNaM` → `MaterialRow.kgNaM`, LEN z Odoo karty —
+// žiadna druhá pravda o kg/m). Tu je len čistý výpočet nad už-spočítaným plánom, client-safe.
+
+const r2 = (x: number) => Math.round(x * 100) / 100;
+
+/** Platné kg/m riadku: kladné konečné číslo; inak `null` (chýba / 0 / nezisťované). */
+function kgNaMRiadku(m: MaterialRow): number | null {
+	const k = m.kgNaM;
+	return typeof k === 'number' && Number.isFinite(k) && k > 0 ? k : null;
+}
+
+/** Rovnaká množina profilov ako `sumaOdpad` (s tyčou, bez NaN/nekonečna). */
+function pouziteProfily(material: MaterialRow[]): MaterialRow[] {
+	return material.filter(
+		(m) => m.tyce > 0 && Number.isFinite(m.barLen) && Number.isFinite(m.odpadMm)
+	);
+}
+
+/**
+ * kg odpadu jedného profilu = `odpadMm / 1000 × kg/m` (2 desatinné). `null` = kg/m chýba
+ * (Odoo nedostupné, karta bez kg/m, 0) — honest-null, NIKDY 0 kg.
+ */
+export function odpadKgProfilu(m: MaterialRow): number | null {
+	const kg = kgNaMRiadku(m);
+	return kg === null ? null : r2((m.odpadMm / 1000) * kg);
+}
+
+export interface OdpadKgSpolu {
+	/** aspoň jeden profil s tyčou má kg/m → kg sa ukážu; `false` = zobrazenie ako pred #606
+	 *  (dnešný PROD 403 / CI bez Odoo / karty bez kg/m) — žiadny kg text, ani „kg/m chýba" */
+	zobrazit: boolean;
+	/** Σ odpad kg profilov s kg/m (2 desatinné) */
+	odpadKg: number;
+	/** Σ materiál kg = tyče × dĺžka tyče / 1000 × kg/m (2 desatinné) */
+	materialKg: number;
+	/** % podľa hmotnosti = Σ odpad kg / Σ materiál kg — VÁŽENÉ, nie priemer % (2 desatinné) */
+	hmotnostPct: number;
+	/** profily s tyčou BEZ kg/m (kód, inak názov) — súčet kg je NEÚPLNÝ */
+	chybaKgNaM: string[];
+}
+
+/**
+ * Súčet odpadu v kg naprieč profilmi (#606). Profily bez kg/m sa do kg NEzarátajú (ako Odoo:
+ * tyč bez kg/m má 0 v oboch súčtoch) a sú menovite v `chybaKgNaM`. % sa ráta z NEzaokrúhlených
+ * súčtov. Dĺžkové % (`sumaOdpad`) ostáva nezmenené vedľa.
+ */
+export function sumaOdpadKg(material: MaterialRow[]): OdpadKgSpolu {
+	let odpad = 0;
+	let mat = 0;
+	let sKg = 0;
+	const chybaKgNaM: string[] = [];
+	for (const m of pouziteProfily(material)) {
+		const kg = kgNaMRiadku(m);
+		if (kg === null) {
+			chybaKgNaM.push(m.kod || m.nazov);
+			continue;
+		}
+		sKg++;
+		odpad += (m.odpadMm / 1000) * kg;
+		mat += ((m.tyce * m.barLen) / 1000) * kg;
+	}
+	if (sKg === 0)
+		return { zobrazit: false, odpadKg: 0, materialKg: 0, hmotnostPct: 0, chybaKgNaM: [] };
+	return {
+		zobrazit: true,
+		odpadKg: r2(odpad),
+		materialKg: r2(mat),
+		hmotnostPct: mat > 0 ? r2((odpad / mat) * 100) : 0,
+		chybaKgNaM
+	};
+}
+
 /**
  * Sumár nárezového plánu (#535) — presne tie čísla, ktoré ukazuje hlavička grafického
  * PDF (`narezak-pdf.ts`): počet profilov s tyčami, počet tyčí spolu, celkový koncový
