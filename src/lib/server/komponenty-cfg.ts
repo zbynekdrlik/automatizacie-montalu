@@ -18,7 +18,9 @@ import type { Komponent, Farba } from '$lib/komponenty';
  * RS STANDARD ako starý `Štandard` (líšia sa len profily/rozmery; Odoo/Money katalóg
  * žiadne „PLUS" kovanie nemá), takže patrí do rodiny `Štandard` a dostane
  * KOMPONENTY_STANDARD aj s počtami zámkov, kotvou uzáveru (`KOD_UZAVERU` v kovanie.ts)
- * a honest-null hláškou (`KOVANIE_NEUPLNE`) — všetko sa kľúčuje RODINOU, nie systémom.
+ * a honest-null hláškou (`KOVANIE_NEUPLNE`). Rodinou (nie systémom) sa kľúčujú VŠETKY
+ * tabuľky kovania: komponenty, `KOD_UZAVERU`, `KOVANIE_NEUPLNE`, `PREDVOLENA_FARBA`,
+ * `POPIS_FARBY`; len `konstPreStyl` počty (`ZAMKY_*`) nesú plný `sysStyl`.
  *
  * Pred #604 `komponentyPre` vracal STANDARD len pre reťazec `'Štandard'` → odpis
  * Štandard + (65 ostrých posuvov od 1.9.2026) nemal kladky, zámok ani kefu (Odoo
@@ -493,7 +495,7 @@ export const KOVANIE_NEUPLNE: Partial<
 	// #431 kolo 2: Deluxe už NEMÁ neúplné kovanie — 6mm krytky (ZASK202519–524) sú
 	// teraz v odpise (predtým 0 ks caution #354). Deluxe 6mm aj 10mm sú kompletné
 	// (krytky + madlo + kefy), preto tu Deluxe kľúč ZÁMERNE NIE JE (kovanie.ts znesie
-	// chýbajúci kľúč — `KOVANIE_NEUPLNE[system]` je undefined = žiadne varovanie).
+	// chýbajúci kľúč — `KOVANIE_NEUPLNE[rodina]` je undefined = žiadne varovanie).
 	// #357: madlo 200 chýba VŽDY (mandatórna položka, 0 ks); automatický zámok chýba
 	// LEN pri R9005 (R7016 má sklad a odpis dostáva). Bez zvolenej farby (chyba inde
 	// vo výpočte, nie tu) sa zobrazí len madlová veta.
@@ -510,13 +512,15 @@ export const KOVANIE_NEUPLNE: Partial<
  *  zmeniť. MUSÍ byť platná na OBOCH hrúbkach krytiek (invariant v komponenty.test.ts),
  *  inak by sa serverový fallback (kovanieFor) zmenil na fail-loud; R9006 to spĺňa.
  *  Defence: ak formulár farbu nepošle, engine použije túto hodnotu. */
-export const PREDVOLENA_FARBA: Partial<Record<string, Farba>> = {
+export const PREDVOLENA_FARBA: Partial<Record<RodinaKovania, Farba>> = {
 	Deluxe: 'R9006'
 };
 
-/** Predvolená farba pre systém, alebo `undefined` keď systém nemá predvoľbu. */
+/** Predvolená farba pre systém (podľa jeho RODINY kovania, #604 — variant Deluxe by
+ *  zdedil predvoľbu spolu s krytkami), alebo `undefined` keď ju systém nemá. */
 export function predvolenaFarba(system: string): Farba | undefined {
-	return PREDVOLENA_FARBA[system];
+	const rodina = rodinaKovania(system);
+	return rodina === undefined ? undefined : PREDVOLENA_FARBA[rodina];
 }
 
 /**
@@ -549,13 +553,15 @@ export function platneFarbyPre(system: string, skloHrubka?: number): Farba[] {
  *  kovania" (Patrik/Dominik: „farba kovania je len nerezová mušľa"). Systémy tu
  *  neuvedené = default label „Farba kovania" (kľučka/zámok RAL). Config-derived —
  *  žiadny `system==='Deluxe'` v stránke (zasklenia-form-reactivity.md). */
-export const POPIS_FARBY: Partial<Record<string, string>> = {
+export const POPIS_FARBY: Partial<Record<RodinaKovania, string>> = {
 	Deluxe: 'Farba krytiek'
 };
 
-/** Popis RAL selectu pre systém, alebo `undefined` keď systém používa default label. */
+/** Popis RAL selectu pre systém (podľa RODINY kovania, #604), alebo `undefined` keď
+ *  systém používa default label. */
 export function popisFarby(system: string): string | undefined {
-	return POPIS_FARBY[system];
+	const rodina = rodinaKovania(system);
+	return rodina === undefined ? undefined : POPIS_FARBY[rodina];
 }
 
 /**

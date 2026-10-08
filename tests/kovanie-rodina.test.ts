@@ -12,6 +12,8 @@ import {
 	SYSTEMY_BEZ_KOVANIA,
 	komponentyPre,
 	kovanieZaradene,
+	popisFarby,
+	predvolenaFarba,
 	rodinaKovania,
 	systemyRodiny
 } from '../src/lib/server/komponenty-cfg';
@@ -65,6 +67,22 @@ describe('#604 rodina kovania — každý systém je zaradený', () => {
 			expect(rodinaKovania(system)).toBeUndefined();
 			expect(kovanieZaradene(system)).toBe(false);
 			expect(komponentyPre(system)).toBeNull();
+		}
+	});
+
+	it('predvolená farba a popis RAL selectu sú kľúčované RODINOU (Deluxe áno, Štandard + nie)', () => {
+		expect(predvolenaFarba('Deluxe')).toBe('R9006');
+		expect(popisFarby('Deluxe')).toBe('Farba krytiek');
+		for (const system of [
+			'Štandard +',
+			'Štandard',
+			'Robust',
+			'Slide',
+			'Štandard Drevo',
+			'toString'
+		]) {
+			expect(predvolenaFarba(system)).toBeUndefined();
+			expect(popisFarby(system)).toBeUndefined();
 		}
 	});
 
