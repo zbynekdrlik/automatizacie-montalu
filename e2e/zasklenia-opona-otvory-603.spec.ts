@@ -46,9 +46,9 @@ test('Deluxe 2×3K opona: 4 tabule s otvorom ⌀46 (aj obe stredové) + 2 bez �
 	// výkres: 4 zámkové otvory (prerušované kruhy) = TO ISTÉ pravidlo ako karta
 	const kruhy = page.getByTestId('nahlad-2d').locator('circle[stroke-dasharray]');
 	await expect(kruhy).toHaveCount(4);
-	const x = (
-		await kruhy.evaluateAll((els) => els.map((e) => Number(e.getAttribute('cx'))))
-	).sort((a, b) => a - b);
+	const x = (await kruhy.evaluateAll((els) => els.map((e) => Number(e.getAttribute('cx'))))).sort(
+		(a, b) => a - b
+	);
 	const [x0, x1, x2, x3] = x as [number, number, number, number];
 	// opona je zrkadlová okolo stredu a stredové otvory ležia TESNE pri stretávacej hrane
 	// (bližšie než pol poľa) — pri otvore na zlej strane by boli od seba celé pole
