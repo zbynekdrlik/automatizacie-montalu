@@ -20,7 +20,7 @@
 		N,
 		skloS,
 		skloV,
-		otvaranie = '',
+		otvaranie,
 		system = '',
 		vrtanieZamku = VRTANIE_ZAMKU_DEFAULT_MM,
 		kovanieL = '',
@@ -35,7 +35,8 @@
 		N: number;
 		skloS: number;
 		skloV: number;
-		otvaranie?: string;
+		/** otváranie posuvu (L - P / P - L / Opona) — kaskáda, sieťka aj zámkové otvory (#603: povinné) */
+		otvaranie: string;
 		/** systém zasklenia — Deluxe kreslí zámkové otvory D46 (ktoré sklá + strana: `otvoryVSkle`) */
 		system?: string;
 		/** výška vŕtania zámku (mm od spodku skla) — len Deluxe; do náhľadu + tlače */
