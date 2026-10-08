@@ -64,10 +64,13 @@ describe('money zápis — logovanie', () => {
 		expect(ok!.bytes as number).toBeGreaterThan(0);
 	});
 
-	it('duplikát → WARN s existing created_at', async () => {
+	it('druhý odpis tej istej zákazky → WARN blok „už odpísaná" s existing created_at (#608)', async () => {
 		await writeOdpis(makeJob('ZAKLOG2', '02'));
 		const recs = await capture(() => writeOdpis(makeJob('ZAKLOG2', '02')));
-		const dup = recs.find((r) => r.msg?.toString().startsWith('odpis duplikát'));
+		// #608: bez vedomého dorobenia je to blok `uz-odpisane` (predtým tvrdý „odpis duplikát")
+		const dup = recs.find((r) =>
+			r.msg?.toString().startsWith('odpis blokovaný — zákazka/OP už odpísaná')
+		);
 		expect(dup!.level).toBe('warn');
 		expect(dup!.zak).toBe('ZAKLOG2');
 		expect(dup!.existingCreatedAt).toBeDefined();

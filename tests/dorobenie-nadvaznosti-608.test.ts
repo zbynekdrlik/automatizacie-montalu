@@ -55,13 +55,15 @@ const POL: Polozka[] = [
 const material = (odpadMm: number) => [
 	{ kod: 'ZASP00014', nazov: 'Koľajnica 2K', odpadMm, tyce: 2, barLen: 7500 }
 ];
-const ids = () =>
-	(
-		db.prepare('SELECT id, poradie FROM odpis_log WHERE zak = ? ORDER BY id').all(ZAK) as {
-			id: number;
-			poradie: number;
-		}[]
-	).map((r) => r);
+/** Oba odpisy zákazky (pôvodný, dorobenie) v poradí vzniku — test padne, ak ich nie sú presne 2. */
+const ids = (): [{ id: number; poradie: number }, { id: number; poradie: number }] => {
+	const r = db.prepare('SELECT id, poradie FROM odpis_log WHERE zak = ? ORDER BY id').all(ZAK) as {
+		id: number;
+		poradie: number;
+	}[];
+	expect(r.length).toBe(2);
+	return [r[0]!, r[1]!];
+};
 
 beforeAll(async () => {
 	fs.mkdirSync(process.env.MONEY_LIVE_DIR!, { recursive: true });
@@ -93,7 +95,7 @@ describe('#608 cenový zoznam zákazky + Odoo log-note', () => {
 		expect(p.odpisy.map((o) => o.poradie).sort()).toEqual([1, 2]);
 		const kol = p.polozky.find((x) => x.kod === 'ZASP00014')!;
 		expect(kol.qty).toBe(30);
-		expect(p.odpad[0].odpadMm).toBe(2104);
+		expect(p.odpad[0]!.odpadMm).toBe(2104);
 	});
 
 	it('[RED] Odoo log-note uvedie, že súčet zahŕňa dorobenie', () => {
@@ -126,7 +128,7 @@ describe('#608 readback z Money — exkluzívne párovanie dvoch dokladov jednej
 		const st = readbackStav([a.id, b.id]);
 		const ok = [st.get(a.id)!, st.get(b.id)!].filter((r) => r.stav === 'ok');
 		expect(ok.length).toBe(1);
-		expect(ok[0].dlv).toBe('DLV20260001');
+		expect(ok[0]!.dlv).toBe('DLV20260001');
 	});
 
 	it('[guard] dva doklady → každý odpis (pôvodný aj dorobenie) má vlastný doklad', () => {

@@ -96,7 +96,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		const w2 = await writeOdpis(job('ZAK2026901', 'OP261380'));
 		expect(w2.status).toBe('blocked');
 		expect(w2.reason).toBe('uz-odpisane');
-		expect(w2.duplicateCreatedAt).toBe(rowsFor('ZAK2026901')[0].created_at);
+		expect(w2.duplicateCreatedAt).toBe(rowsFor('ZAK2026901')[0]!.created_at);
 		expect(w2.duplicateCreatedBy).toBe('patrik');
 		expect(w2.poradieMax).toBe(1);
 		expect(w2.pocetOdpisov).toBe(1);
@@ -107,7 +107,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 	});
 
 	it('[RED] s potvrdením → written, poradie 2, vlastný súbor s príponou dorobenia, audit, prvý riadok nezmenený', async () => {
-		const prvy = rowsFor('ZAK2026901')[0];
+		const prvy = rowsFor('ZAK2026901')[0]!;
 		const auditPred = auditCount();
 		const w = await writeOdpis(job('ZAK2026901', 'OP261380'), {
 			overrideDorobenie: true,
@@ -125,7 +125,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		const rows = rowsFor('ZAK2026901');
 		expect(rows.map((r) => r.poradie)).toEqual([1, 2]);
 		expect(rows[0]).toEqual(prvy); // prvý odpis ostáva v histórii NEZMENENÝ
-		expect(rows[1].filename).toBe(w.filename);
+		expect(rows[1]!.filename).toBe(w.filename);
 
 		// audit vedomého dorobenia (kto + čo) — JEDEN riadok, nie tichý bypass
 		expect(auditCount()).toBe(auditPred + 1);
@@ -137,7 +137,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 		const l = ledger('ZAK2026901');
 		// import (1. odpis) → override (dorobenie) → import (dorobenie)
 		expect(l.map((x) => x.kind)).toEqual(['import', 'override', 'import']);
-		expect(l[1].reason).toContain('dorobenie');
+		expect(l[1]!.reason).toContain('dorobenie');
 	});
 
 	it('[RED] refresh / dvojklik PO potvrdení (ten istý token) → znova blok, žiadne poradie 3', async () => {
@@ -207,7 +207,7 @@ describe('#608 dorobenie — druhý live odpis tej istej zákazky/OP', () => {
 
 	it('[RED] „Uvoľniť" funguje PER RIADOK — uvoľnenie dorobenia nechá prvý odpis, audit nesie poradie', async () => {
 		const zak = 'ZAK2026903';
-		const [r1, r2] = rowsFor(zak);
+		const [r1, r2] = rowsFor(zak) as [LogRow, LogRow];
 		expect(releaseOdpis(r2.id, 'marek')).toBe(true);
 		expect(lastAudit()).toContain('dorobenie 2');
 		expect(rowsFor(zak).map((r) => r.id)).toEqual([r1.id]);
