@@ -255,7 +255,8 @@ async function skloCenyPre(
 /**
  * #606: nárezový plán s kg/m z Odoo (odpad v kg) — rovnaká interná-only hranica ako `cenyPre`:
  * kg/m je v Odoo obmedzené na interné roly a b2b by si ho z kg odpadu dopočítal → pre b2b plán
- * bez kg (zobrazenie ako pred #606). Vracia KÓPIU — Money/odpad idú z pôvodného `r`.
+ * bez kg (zobrazenie ako pred #606). Vstup NIKDY nemení (kópia len keď Odoo kg/m vráti) —
+ * Money/odpad idú z pôvodného `r`.
  */
 async function kgPlanPre<T extends ComputeResult | MultiResult>(
 	user: SessionUser | null,

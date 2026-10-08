@@ -22,6 +22,7 @@ const { _resetOdooCenyCache } = await import('../src/lib/server/odoo-prices');
 const { actions } = await import('../src/routes/zasklenia/+page.server');
 const { listOdpisy } = await import('../src/lib/server/money');
 const { getOdpadForOdpisy } = await import('../src/lib/server/odpad-store');
+const { db } = await import('../src/lib/server/db');
 type MaterialRow = import('../src/lib/server/compute').MaterialRow;
 
 const LOCALS = { user: { id: 1, username: 'tester', role: 'internal' } };
@@ -122,28 +123,37 @@ describe('#606 zasklenia — kg/m z Odoo k nárezovému plánu', () => {
 	});
 
 	it('odoslat s kg kanálom: hotovo nesie kg, do Money ide ten istý odpis a ten istý odpad ako bez kg', async () => {
-		// referencia: ten istý vstup odoslaný BEZ Odoo (iná zákazka — dedup je per zákazka)
-		const bezN = await akcia('nahlad', form({ zak: 'ZAK-606-REF' }));
+		// referencia: TÁ ISTÁ zákazka, iné OP (dedup je per ZAK+OP), odoslaná BEZ Odoo
+		const ZAK = 'ZAK-606-O';
+		const bezN = await akcia('nahlad', form({ zak: ZAK, op: 'OPDL606REF' }));
 		const ref = await akcia(
 			'odoslat',
-			form({ zak: 'ZAK-606-REF', planHash: String(bezN.planHash) })
+			form({ zak: ZAK, op: 'OPDL606REF', planHash: String(bezN.planHash) })
 		);
 		expect(ref.step).toBe('hotovo');
 		const kody = material(ref).map((x) => x.kod);
 		odooKg(Object.fromEntries(kody.map((k) => [k, 1.288])));
-		const n = await akcia('nahlad', form({ zak: 'ZAK-606-O' }));
+		const n = await akcia('nahlad', form({ zak: ZAK, op: 'OPDL606KG' }));
 		// potvrdenie hashom z náhľadu S kg — keby kg menili odpis, akcia by vrátila „vzorce sa zmenili"
-		const r = await akcia('odoslat', form({ zak: 'ZAK-606-O', planHash: String(n.planHash) }));
+		const r = await akcia(
+			'odoslat',
+			form({ zak: ZAK, op: 'OPDL606KG', planHash: String(n.planHash) })
+		);
 		expect(r.step).toBe('hotovo');
 		expect(material(r).every((x) => x.kgNaM === 1.288)).toBe(true);
-		// odpis do Money: rovnaké položky (hash položiek nezávisí od ZAK okrem samotného ZAK)
-		expect((r.outcome as { status: string }).status).toBe(
-			(ref.outcome as { status: string }).status
-		);
-		expect(r.kovanie).toEqual(ref.kovanie);
+		const riadok = (op: string) => listOdpisy().find((o) => o.zak === ZAK && o.op === op)!;
+		// odpis do Money: content_hash zapísaného dokladu (ZAK + kódy × množstvá) s kg aj bez nich ROVNAKÝ
+		const hash = (op: string) =>
+			(
+				db.prepare('SELECT content_hash FROM odpis_log WHERE id = ?').get(riadok(op).id) as {
+					content_hash: string;
+				}
+			).content_hash;
+		expect(hash('OPDL606KG')).not.toBe('');
+		expect(hash('OPDL606KG')).toBe(hash('OPDL606REF'));
 		// uložený odpad (Odoo log-note) je s kg aj bez nich IDENTICKÝ — kg sa nikam neukladajú
-		const odpadZak = (zak: string) =>
-			getOdpadForOdpisy([listOdpisy().find((o) => o.zak === zak)!.id])
+		const odpad = (op: string) =>
+			getOdpadForOdpisy([riadok(op).id])
 				.map(({ profilKod, profilNazov, odpadMm, materialMm, tyce }) => ({
 					profilKod,
 					profilNazov,
@@ -152,8 +162,8 @@ describe('#606 zasklenia — kg/m z Odoo k nárezovému plánu', () => {
 					tyce
 				}))
 				.sort((a, b) => a.profilKod.localeCompare(b.profilKod));
-		expect(odpadZak('ZAK-606-O')).toEqual(odpadZak('ZAK-606-REF'));
-		expect(odpadZak('ZAK-606-O').length).toBe(kody.length);
+		expect(odpad('OPDL606KG')).toEqual(odpad('OPDL606REF'));
+		expect(odpad('OPDL606KG').length).toBe(kody.length);
 	});
 
 	it('b2b (veľkoobchod) → plán BEZ kg aj pri živom kanáli (rovnaká hranica ako ceny)', async () => {
