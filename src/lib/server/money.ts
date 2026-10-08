@@ -611,9 +611,12 @@ export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promi
 	// (#294) id ledger 'import' riadku — zapíše sa ATOMICKY s claim-om (nižšie), pri zlyhaní
 	// zápisu súboru (kompenzácia) sa podľa neho zruší.
 	let ledgerImportId: number | bigint = 0;
-	// (#608) id `override` riadku DOROBENIA — pri kompenzácii sa zruší tiež (dorobenie sa pri retry
-	// potvrdzuje znova; osirelý override by inak neskôr po „Uvoľniť" pustil identický obsah bez potvrdenia)
+	// (#608) id `override` ledger riadku + `cfg_audit` riadku DOROBENIA — pri kompenzácii sa zrušia tiež
+	// (dorobenie sa nevykonalo; osirelý override by inak neskôr po „Uvoľniť" pustil identický obsah bez
+	// potvrdenia a audit by tvrdil odoslanie). Token sa tým vráti na stav bloku → retry s TÝM ISTÝM
+	// potvrdením prejde.
 	let dorobenieOverrideId: number | bigint = 0;
+	let dorobenieAuditId: number | bigint = 0;
 	try {
 		// odpis_log + odpis_polozky + ledger 'import' v JEDNEJ transakcii (#154 fáza 1 + #294):
 		// položky sú 1:1 s tým, čo odišlo do Money a musia vzniknúť/zaniknúť SPOLU s dedup
@@ -636,7 +639,8 @@ export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promi
 		rowId = db.transaction(() => {
 			// (#300) override MUSÍ predchádzať `import` riadku v tej istej transakcii, aby počítadlo
 			// (imports vs overrides) ostalo konzistentné aj keby zápis súboru neskôr zlyhal
-			// (kompenzácia maže len `import` riadok, override authorization prežije → retry funguje).
+			// (kompenzácia maže `import` riadok; #300 override prežije → retry funguje; override
+			// DOROBENIA kompenzácia zmaže tiež — token sa vráti a retry s tým istým potvrdením prejde).
 			if (overridingLedger) {
 				const ovr = insOverride.run(
 					job.modul,
@@ -655,7 +659,8 @@ export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promi
 				else auditOverrideLedger(job);
 			}
 			// (#608) audit vedomého dorobenia AŽ TU — atomicky so zápisom (vzor #300 review 🟡).
-			if (overridingDorobenie) auditOverrideDorobenie(job, poradie, overridingLedger);
+			if (overridingDorobenie)
+				dorobenieAuditId = auditOverrideDorobenie(job, poradie, overridingLedger);
 			// (#300 review 🟡) audit override kódov AŽ TU — atomicky so zápisom, takže sa zapíše LEN keď
 			// sa odpis reálne odoslal (nie keď ho medzitým zablokoval ledger a nič neodišlo).
 			if (overridingKody) auditOverrideKody(job, kodProblemy);
@@ -748,13 +753,17 @@ export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promi
 		// kompenzácia: súbor sa nezapísal → uvoľni dedup kľúč AJ zruš ledger 'import' riadok (import
 		// sa NIKDY nevykonal, takže jeho zmazanie NIE je porušenie append-only — append-only chráni
 		// záznam REÁLNEHO importu), nech sa dá poslať znova. Obe v jednej transakcii.
-		// (#608) Override DOROBENIA sa zruší tiež (dorobenie sa nevykonalo, retry ho potvrdí znova); #300
-		// override „Odoslať aj tak" ostáva (retry bez nového potvrdenia — zdokumentovaná sémantika).
+		// (#608) Override + audit DOROBENIA sa zrušia tiež (dorobenie sa nevykonalo; token sa vráti na
+		// stav bloku, retry s tým istým potvrdením prejde); #300 override „Odoslať aj tak" ostáva (retry
+		// bez nového potvrdenia — zdokumentovaná sémantika).
 		db.transaction(() => {
 			db.prepare('DELETE FROM odpis_log WHERE id = ?').run(rowId);
 			db.prepare('DELETE FROM odpis_imported WHERE id = ?').run(ledgerImportId);
 			if (dorobenieOverrideId) {
 				db.prepare('DELETE FROM odpis_imported WHERE id = ?').run(dorobenieOverrideId);
+			}
+			if (dorobenieAuditId) {
+				db.prepare('DELETE FROM cfg_audit WHERE id = ?').run(dorobenieAuditId);
 			}
 		})();
 		log.error('odpis kompenzácia — zápis súboru zlyhal, dedup kľúč + ledger claim uvoľnené', {
@@ -764,6 +773,7 @@ export async function writeOdpis(job: OdpisJob, opts: OdpisOverride = {}): Promi
 			live: isLive(),
 			target,
 			poradie,
+			dorobenie: overridingDorobenie,
 			zrusenyOverrideDorobenia: !!dorobenieOverrideId,
 			error: e
 		});

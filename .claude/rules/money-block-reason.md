@@ -73,7 +73,7 @@ Odlišnosti, ktoré NIE sú chyba:
   wouldBlock && (overrideLedger+token || overridingDorobenie)`, override riadok s dôvodom „dorobenie
   č. N", JEDEN audit (`auditOverrideDorobenie`, spomenie prekonaný ledger). Blok to vopred prizná
   (`outcome.identickyObsah` → veta „ROVNAKÝ obsah už Money raz naimportoval"). Pri ZLYHANÍ zápisu
-  súboru kompenzácia zmaže aj override DOROBENIA (retry sa potvrdí znova; #300 override ostáva).
+  súboru kompenzácia zmaže aj override + `cfg_audit` riadok DOROBENIA (token sa vráti na stav bloku → retry s TÝM ISTÝM potvrdením prejde; #300 override ostáva).
 - **Tvrdý `duplicate` ostáva (žiadne dorobenie):** cross-modul identický obsah (#380) — kontroluje sa
   PRED `uz-odpisane`, aby sa operátorovi neponúklo zbytočné dorobenie; a pergola rezervácia ⇄ odpis
   (#221 — existujúci riadok s `detail.rezervacia` cez `json_valid`+`json_extract`, alebo nový job s

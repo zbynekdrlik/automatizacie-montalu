@@ -79,13 +79,14 @@ export function auditOverridePrehodene(job: OdpisJob): void {
 /** Audit vedomého DOROBENIA (#608) — operátor potvrdil „Odoslať ako dorobenie" pri zákazke/OP, ktorá už
  *  má v module odoslaný odpis (zlé zameranie, posuv sa vyrába znova). NIE tichý bypass: do `cfg_audit`
  *  sa zapíše KTO poslal ďalší doklad do Money, číslo dorobenia a či to isté potvrdenie prekonalo aj
- *  ledger (identický obsah). Volá sa AŽ v zápisovej transakcii (vzor #300 review 🟡). */
+ *  ledger (identický obsah). Volá sa AŽ v zápisovej transakcii (vzor #300 review 🟡). Vráti id
+ *  `cfg_audit` riadku — keď zápis súboru zlyhá, kompenzácia ho zmaže (dorobenie sa NEodoslalo). */
 export function auditOverrideDorobenie(
 	job: OdpisJob,
 	poradie: number,
 	ledgerPrekonany: boolean
-): void {
-	db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
+): number | bigint {
+	const id = db.prepare('INSERT INTO cfg_audit (username, sys_styl, zmeny) VALUES (?, ?, ?)').run(
 		job.createdBy,
 		'odpis',
 		JSON.stringify([
@@ -98,7 +99,7 @@ export function auditOverrideDorobenie(
 				nova: poradie
 			}
 		])
-	);
+	).lastInsertRowid;
 	log.warn('odpis: dorobenie „Odoslať ako dorobenie"', {
 		modul: job.modul,
 		zak: job.zak,
@@ -106,4 +107,5 @@ export function auditOverrideDorobenie(
 		poradie,
 		ledgerPrekonany
 	});
+	return id;
 }
