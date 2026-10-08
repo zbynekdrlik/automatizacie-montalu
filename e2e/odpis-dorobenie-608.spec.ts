@@ -20,7 +20,7 @@ test('#608 zasklenia: druhý odpis upozorní a po vedomom potvrdení dovolí dor
 		await goto(page, '/zasklenia');
 		await page.getByLabel('Číslo objednávky (ZAK) *').fill(ZAK);
 		await page.getByLabel('OP/OPDL číslo *').fill('OP261380');
-		await page.getByLabel('Zákazník *').fill('E2E Dorobenie');
+		await page.getByLabel('Zákazník *').fill('E2E Javorský');
 		await page.getByLabel('Šírka (mm) *').fill('2509');
 		await page.getByLabel('Výška (mm) *').fill('1930');
 		await vyberFarbuKovania(page);
@@ -64,7 +64,7 @@ test('#608 zasklenia: druhý odpis upozorní a po vedomom potvrdení dovolí dor
 	const riadky = page.getByTestId('odpisy-tabulka').locator('tbody tr', { hasText: ZAK });
 	await expect(riadky).toHaveCount(2);
 	await expect(riadky.filter({ hasText: 'dorobenie 2' })).toHaveCount(1);
-	await expect(riadky.filter({ hasNotText: 'dorobenie' })).toHaveCount(1);
+	await expect(riadky.filter({ hasNotText: /dorobenie \d/ })).toHaveCount(1);
 
 	expect(consoleMsgs).toEqual([]);
 });
