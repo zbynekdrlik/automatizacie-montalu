@@ -693,9 +693,9 @@ stredové pri STRETÁVACEJ hrane (ľavé stredové pri pravej, pravé stredové 
 bez migrácie.
 
 - **Jedno pravidlo, povinné otváranie.** `otvoryVSkle(system, N, otvaranie)` /
-  `riadkySklaPosuvu(…, otvaranie, rozmer?)` / `rozpisOtvorovSkla(…, otvaranie)` / prop
-  `SkloOtvoryRozpis.otvaranie` / `sklaPosuvu` posuv `.otvaranie` sú POVINNÉ — zabudnutý volajúci =
-  chyba `svelte-check`, nie tichý návrat k 2 otvorom. Single berie `vstup.otvaranie`; multi JEDEN
+  `riadkySklaPosuvu(…, otvaranie, rozmer?)` / `rozpisOtvorovSkla(…, otvaranie)` / propy
+  `SkloOtvoryRozpis.otvaranie` aj `Nahlad2D.otvaranie` / `sklaPosuvu` posuv `.otvaranie` sú POVINNÉ —
+  zabudnutý volajúci = chyba `svelte-check`, nie tichý návrat k 2 otvorom. Single berie `vstup.otvaranie`; multi JEDEN
   fallback `otvaraniePosuvu(pv.otvaranie)` (`?? 'Opona'`, pôvodný default náhľadu) pre výkres, kartu
   (`PlanKartyMulti`) AJ objednávku (`pridatSklaMulti`) — nikdy dva rôzne fallbacky.
 - **Prekryv / nepárne N:** krajná tabuľa má prednosť (N=2 opona = 2 krajné, N=1 = 1). Stred =
@@ -713,12 +713,22 @@ bez migrácie.
   opakované „Pridať sklá" by objednávku ZDVOJILO. Pred dedupom sa staré rozdelenie toho istého posuvu
   (pozícia vrátane prípony ⌀, rozmer, typ, rovnaký CELOK kusov, presne 1 riadok s otvorom + max 1 bez)
   prevedie: „s otvorom" UPDATE (kusy, m², spec, poloha — id + prílohy ostanú), „bez" UPDATE kusov alebo
-  DELETE, keď ho nové rozdelenie nemá (2×2K). NEprevádza sa pri atyp riadku a keď by sa mazal riadok s
-  prílohou. Počíta sa do `pridane` (ako prevod #578). Ďalšia zmena pravidla otvorov = ten istý prechod
-  sa uplatní sám (je všeobecný na „iné rozdelenie, rovnaký celok").
+  DELETE, keď ho nové rozdelenie nemá (2×2K, `log.warn`). Počíta sa do `pridane` (ako prevod #578).
+  Ďalšia zmena pravidla otvorov = ten istý prechod sa uplatní sám (je všeobecný na „iné rozdelenie,
+  rovnaký celok").
+- **Odmietnutý prechod NIKDY nezdvojí (review 🟡):** staré rozdelenie TOHO ISTÉHO posuvu s ručným
+  zásahom (atyp riadok, ručne zmenené otvory — `otvoryRucneZmenene`, príloha na riadku „bez", ktorý by
+  sa mazal) vráti `{ stav: 'odmietnute', pozicia, dovod, riadky }` → riadky toho posuvu sa NEpridajú
+  (podklad ostane presne ako bol) a `stats.prechodOdmietnuty` → banner `skla-prechod-odmietnuty`
+  („uprav riadky na podklade ručne / zmaž a pridaj znova"). Nejednoznačné riadky (2× „bez", 2× „s
+  otvorom") = `null` → bežná cesta (nie je isté, že ide o ten istý posuv).
+- **Hranica identity:** podklad otváranie neukladá — „Zasklenie 1" toho istého OP s rovnakým sklom a
+  celkom je pre appku TEN ISTÝ posuv (rovnako ako dedup #514/#563). Prepnutie otvárania toho istého
+  okna (L - P → Opona) sa preto správne prevedie; dve RÔZNE okná s identickým sklom v jednom OP cez
+  single nárezák appka nerozlíši (patria do multi posuvu „Zasklenie 1..N").
 - **Testy:** `tests/sklo-otvory-opona-603.test.ts` (pravidlo, strany, karta, riadky, `sklaPosuvu`, SSR
   výkres + popisy, akcie single/multi + `holes_qty` do Odoo), `tests/objednavka-skla-opona-prechod-603.test.ts`
-  (prechod 2×3K/2×2K/multi + guardy), E2E `e2e/zasklenia-opona-otvory-603.spec.ts` (read-only výpočet
+  (prechod 2×3K/2×2K/multi + guardy + odmietnutie + banner), E2E `e2e/zasklenia-opona-otvory-603.spec.ts` (read-only výpočet
   2×3K: karta 4/2, 4 kruhy, súmernosť stredových — beží aj proti PROD).
 
 ## Príloha riadku = BAJTOVO deterministická (Odoo re-send porovnáva SHA-1) (#587, 29.9.)
