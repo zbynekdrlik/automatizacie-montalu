@@ -27,8 +27,10 @@ zakaždým odznova hľadať:
 - **Zobrazenie = `RozpisRezov.svelte`** (klientský display): hlavička profilu ukazuje
   per-profil `odpad {mm} ({%})`, každá tyč má šrafovaný „odpad" segment. Používa sa v
   `zasklenia/PlanKarty.svelte` (1 posuv), `zasklenia/PlanKartyMulti.svelte` (viac
-  posuvov, zdieľané tyče) a v `routes/optimalizator/+page.svelte` (samostatná #212
-  kalkulačka, jednomateriálová — má vlastný „Celkový odpad" riadok).
+  posuvov, zdieľané tyče), `routes/clip/+page.svelte` (#554 pílový plán, `clip-rozpis-rezov`,
+  Money kódy → od #606 aj kg), `routes/plan-rezov/*` (CAD plán rezov, display-only, prázdny
+  `kod` → bez kg) a v `routes/optimalizator/+page.svelte` (samostatná #212 kalkulačka,
+  jednomateriálová — má vlastný „Celkový odpad" riadok, bez kódu → bez kg).
 - **Kumulatívny súčet naprieč profilmi (#417) = `sumaOdpad(material)` v
   `src/lib/odpad.ts`** (pure, client-safe — importuje LEN typ `MaterialRow`, rovnaká
   disciplína ako `cut.ts`). `RozpisRezov` z neho kreslí riadok `data-testid="odpad-spolu"`

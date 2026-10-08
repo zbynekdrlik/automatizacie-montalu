@@ -215,19 +215,26 @@ export const actions = {
 		// úpravy sa nesmú ticho stratiť a nahradiť auto-výpočtom (bazén review vzor)
 		const edits = editsFrom(form);
 		const editVals = Object.fromEntries(edits);
-		const kontrola = async (err: string) => ({
-			step: 'kontrola' as const,
-			vstup,
-			vypocet,
-			narez: await narezKg,
-			editVals,
-			// #448/#451 predodpisové skladové varovanie + odobrať (clip je b2b-forbidden → bez gate)
-			skladVarovania: await skladoveVarovania(
-				vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-			),
-			snapshotDatum: getSnapshotMeta().generatedAt,
-			error: err
-		});
+		const kontrola = async (err: string) => {
+			// #606 kg/m a #448/#451 predodpisové skladové varovanie súbežne (clip je b2b-forbidden →
+			// sklad bez gate; kg majú hranicu v `narez-kg.ts`)
+			const [narez, skladVarovania] = await Promise.all([
+				narezKg,
+				skladoveVarovania(
+					vypocet.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				)
+			]);
+			return {
+				step: 'kontrola' as const,
+				vstup,
+				vypocet,
+				narez,
+				editVals,
+				skladVarovania,
+				snapshotDatum: getSnapshotMeta().generatedAt,
+				error: err
+			};
+		};
 
 		const { finalOut, zmenene, error: eErr } = applyEdits(vypocet.polozky, edits);
 		if (eErr) return kontrola(eErr);
@@ -303,69 +310,50 @@ export const actions = {
 		const job = jobForMulti(vstup, multi.polozky, locals.user?.username ?? '');
 		const potvrdene = String(formData.get('planHash') ?? '');
 		const aktualny = contentHash(vstup.zak, job.polozky);
-		if (potvrdene && potvrdene !== aktualny) {
+		// re-render kontroly (5 chybových ciest) — JEDEN tvar; #606 kg/m a sklad súbežne
+		const kontrolaMulti = async (extra: {
+			error: string | null;
+			warn?: string;
+			editVals?: Record<string, string>;
+		}) => {
+			const [narez, skladVarovania] = await Promise.all([
+				narezKg,
+				skladoveVarovania(
+					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
+				)
+			]);
 			return {
 				step: 'kontrolaMulti' as const,
 				multiVstup: vstup,
 				multi,
-				narez: await narezKg,
-				skladVarovania: await skladoveVarovania(
-					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-				),
+				narez,
+				skladVarovania,
 				snapshotDatum: getSnapshotMeta().generatedAt,
 				planHash: aktualny,
-				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
-				error: null as string | null
+				...extra
 			};
+		};
+		if (potvrdene && potvrdene !== aktualny) {
+			return kontrolaMulti({
+				warn: 'Vzorce sa medzitým zmenili — toto je NOVÝ prepočet. Skontroluj čísla a potvrď znova.',
+				error: null
+			});
 		}
 		const vylucene = parseVyluceneKody(formData);
 		const edits = editsFrom(formData);
+		const editVals = Object.fromEntries(edits);
 		const { finalOut, zmenene, error: eErr } = applyEdits(multi.polozky, edits);
-		if (eErr) {
-			return {
-				step: 'kontrolaMulti' as const,
-				multiVstup: vstup,
-				multi,
-				narez: await narezKg,
-				editVals: Object.fromEntries(edits),
-				skladVarovania: await skladoveVarovania(
-					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-				),
-				snapshotDatum: getSnapshotMeta().generatedAt,
-				planHash: aktualny,
-				error: eErr
-			};
-		}
-		if (finalOut.some((o) => o.qty < 0)) {
-			return {
-				step: 'kontrolaMulti' as const,
-				multiVstup: vstup,
-				multi,
-				narez: await narezKg,
-				editVals: Object.fromEntries(edits),
-				skladVarovania: await skladoveVarovania(
-					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-				),
-				snapshotDatum: getSnapshotMeta().generatedAt,
-				planHash: aktualny,
+		if (eErr) return kontrolaMulti({ editVals, error: eErr });
+		if (finalOut.some((o) => o.qty < 0))
+			return kontrolaMulti({
+				editVals,
 				error: 'Rozpis obsahuje záporné množstvo — skontroluj zadanie.'
-			};
-		}
-		if (finalOut.every((o) => o.qty <= 0)) {
-			return {
-				step: 'kontrolaMulti' as const,
-				multiVstup: vstup,
-				multi,
-				narez: await narezKg,
-				editVals: Object.fromEntries(edits),
-				skladVarovania: await skladoveVarovania(
-					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-				),
-				snapshotDatum: getSnapshotMeta().generatedAt,
-				planHash: aktualny,
+			});
+		if (finalOut.every((o) => o.qty <= 0))
+			return kontrolaMulti({
+				editVals,
 				error: 'Po úpravách neostala žiadna položka — skontroluj množstvá.'
-			};
-		}
+			});
 		const finalJob = vylucPolozky({ ...job, polozky: finalOut }, vylucene);
 		try {
 			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
@@ -401,19 +389,10 @@ export const actions = {
 				op: vstup.op,
 				error: e
 			});
-			return {
-				step: 'kontrolaMulti' as const,
-				multiVstup: vstup,
-				multi,
-				narez: await narezKg,
-				skladVarovania: await skladoveVarovania(
-					multi.polozky.map((o) => ({ kod: o.kod, nazov: o.nazov, mnozstvo: o.qty }))
-				),
-				snapshotDatum: getSnapshotMeta().generatedAt,
-				planHash: aktualny,
+			return kontrolaMulti({
 				error:
 					'Zápis odpisu zlyhal — súbor sa NEzapísal a odoslanie sa dá bezpečne zopakovať. Ak sa to opakuje, nahlás problém.'
-			};
+			});
 		}
 	},
 

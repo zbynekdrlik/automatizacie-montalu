@@ -23,14 +23,20 @@ const { _resetGlassTypesCache, _resetGlassTypesWarn } =
 	await import('../src/lib/server/odoo-glass-types');
 const clip = await import('../src/routes/clip/+page.server');
 const { db } = await import('../src/lib/server/db');
-const { listOdpisy } = await import('../src/lib/server/money');
+const { listOdpisy, listOdpisPolozky } = await import('../src/lib/server/money');
 const RozpisRezov = (await import('../src/lib/components/RozpisRezov.svelte')).default;
 type MaterialRow = import('../src/lib/server/compute').MaterialRow;
 
 const INTERNY = { id: 1, username: 'tester', role: 'internal' };
+const B2B = { id: 2, username: 'vo', role: 'b2b' };
 // izo B1 (N=2) 3000×1000 — kontraktný vektor (tests/clip-odpis.test.ts)
 const IZO_B1 = { typ: 'izo', variant: '2', sirka: '3000', vyska: '1000', ral: '' };
 const KG: Record<string, number> = { ZASP00116: 1.1, ZASP00125: 0.6 }; // ZASP00119 kg/m nemá
+// 2 zábradlia (spoločný pílový plán)
+const MULTI = [
+	{ typ: 'izo', variant: 2, sirka: 3000, vyska: 1000, ral: '' },
+	{ typ: 'izo', variant: 1, sirka: 1500, vyska: 1000, ral: '' }
+];
 
 function ev(body: Record<string, string>, user: object = INTERNY) {
 	const f = new FormData();
@@ -141,7 +147,7 @@ describe('#606 CLIP — odpad v kg v pílovom pláne', () => {
 		expect(narez(r).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
 	});
 
-	it('odoslat s kg → hotovo s kg, do Money ide TEN ISTÝ doklad ako bez Odoo (content_hash)', async () => {
+	it('odoslat s kg → hotovo s kg, do Money ide TEN ISTÝ doklad ako bez Odoo (hash, položky, detail)', async () => {
 		const hlava = { zak: 'Z606-O', zakaznik: 'X', ...IZO_B1 };
 		const ref = await clip.actions.odoslat(ev({ ...hlava, op: 'OPREF' }));
 		expect((ref as { step: string }).step).toBe('hotovo');
@@ -149,15 +155,78 @@ describe('#606 CLIP — odpad v kg v pílovom pláne', () => {
 		const r = await clip.actions.odoslat(ev({ ...hlava, op: 'OPKG' }));
 		expect((r as { step: string }).step).toBe('hotovo');
 		expect(narez(r).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
-		const hash = (op: string) =>
-			(
-				db
-					.prepare('SELECT content_hash FROM odpis_log WHERE id = ?')
-					.get(listOdpisy().find((o) => o.zak === 'Z606-O' && o.op === op)!.id) as {
-					content_hash: string;
-				}
-			).content_hash;
-		expect(hash('OPKG')).not.toBe('');
-		expect(hash('OPKG')).toBe(hash('OPREF'));
+		expect(doklad('Z606-O', 'OPKG')).toEqual(doklad('Z606-O', 'OPREF'));
+	});
+
+	it('odoslat — re-render kontroly pri chybe úprav nesie kg (interný) / bez kg (b2b)', async () => {
+		odooKg(KG);
+		const zla = { zak: 'Z606-E', op: 'OP1', zakaznik: 'X', ...IZO_B1, qty_ZASP00116: 'abc' };
+		const i = (await clip.actions.odoslat(ev(zla))) as { step: string; error: string };
+		expect(i.step).toBe('kontrola');
+		expect(i.error).toMatch(/Neplatné množstvo/);
+		expect(narez(i).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
+		const b = await clip.actions.odoslat(ev(zla, B2B));
+		expect(narez(b).every((m) => !('kgNaM' in m))).toBe(true);
+	});
+
+	it('odoslatMulti s kg → hotovoMulti s kg, do Money TEN ISTÝ doklad ako bez Odoo', async () => {
+		const hlava = { zak: 'Z606-MO', zakaznik: 'X', clipKusy: JSON.stringify(MULTI) };
+		const ref = await clip.actions.odoslatMulti(ev({ ...hlava, op: 'OPREF' }));
+		expect((ref as { step: string }).step).toBe('hotovoMulti');
+		odooKg(KG);
+		const r = await clip.actions.odoslatMulti(ev({ ...hlava, op: 'OPKG' }));
+		expect((r as { step: string }).step).toBe('hotovoMulti');
+		expect(narez(r).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
+		expect(doklad('Z606-MO', 'OPKG')).toEqual(doklad('Z606-MO', 'OPREF'));
+	});
+
+	it('odoslatMulti — re-render (zmenené vzorce / chyba úprav) nesie kg, b2b bez kg', async () => {
+		odooKg(KG);
+		const hlava = { zak: 'Z606-MR', op: 'OP1', zakaznik: 'X', clipKusy: JSON.stringify(MULTI) };
+		const hash = (await clip.actions.odoslatMulti(ev({ ...hlava, planHash: 'zly' }))) as {
+			step: string;
+			warn: string;
+		};
+		expect(hash.step).toBe('kontrolaMulti');
+		expect(hash.warn).toMatch(/Vzorce sa medzitým zmenili/);
+		expect(narez(hash).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
+		const edit = (await clip.actions.odoslatMulti(ev({ ...hlava, qty_ZASP00125: '-1' }))) as {
+			step: string;
+			editVals: Record<string, string>;
+		};
+		expect(edit.step).toBe('kontrolaMulti');
+		expect(edit.editVals).toEqual({ ZASP00125: '-1' }); // užívateľova úprava sa vráti
+		expect(narez(edit).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
+		const b = await clip.actions.odoslatMulti(ev({ ...hlava, planHash: 'zly' }, B2B));
+		expect(narez(b).every((m) => !('kgNaM' in m))).toBe(true);
+	});
+
+	it('pridatSkla / pridatSklaMulti → kontrola nesie kg pre interného, b2b bez kg', async () => {
+		odooKg(KG);
+		const s = await clip.actions.pridatSkla(
+			ev({ zak: 'Z606-S', op: 'OP1', zakaznik: 'X', ...IZO_B1 })
+		);
+		expect(narez(s).map((m) => m.kgNaM)).toEqual([1.1, 0.6, null]);
+		const sb = await clip.actions.pridatSkla(
+			ev({ zak: 'Z606-SB', op: 'OP1', zakaznik: 'X', ...IZO_B1 }, B2B)
+		);
+		expect(narez(sb).every((m) => !('kgNaM' in m))).toBe(true);
+		const mb = await clip.actions.pridatSklaMulti(
+			ev({ zak: 'Z606-SM', op: 'OP1', zakaznik: 'X', clipKusy: JSON.stringify(MULTI) }, B2B)
+		);
+		expect(narez(mb).every((m) => !('kgNaM' in m))).toBe(true);
 	});
 });
+
+/** Zapísaný doklad do Money bez identity OP: content_hash + položky + detail (bez `op`). */
+function doklad(zak: string, op: string) {
+	const row = listOdpisy().find((o) => o.zak === zak && o.op === op)!;
+	const { content_hash } = db
+		.prepare('SELECT content_hash FROM odpis_log WHERE id = ?')
+		.get(row.id) as { content_hash: string };
+	const detail = JSON.parse(row.detail) as Record<string, unknown>;
+	const raw = detail.vstupRaw as Record<string, unknown> | undefined;
+	if (raw) delete raw.op;
+	expect(content_hash).not.toBe('');
+	return { content_hash, polozky: listOdpisPolozky(row.id), detail };
+}
