@@ -62,6 +62,8 @@ import {
 	recomputeMultiVstup as computeMultiFrom
 } from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
+// #606: kg/m z Odoo k nárezovému plánu — LEN zobrazenie odpadu v kg (kópia plánu; Money ide z `r`)
+import { planSKgNaM } from '$lib/server/odoo-katalog';
 import {
 	pridajSklaHromadneIdempotentne,
 	sklaPosuvu,
@@ -412,8 +414,8 @@ async function stavNahlad(
 	const allKovanie = [...kov.polozky, ...tesn.polozky];
 	const job = jobFor(vstup, r, '', allKovanie);
 	// #599: ceny / sklad / cena skla čítajú Odoo — súbežne (každý má vlastný 3 s timeout a cache),
-	// aby pomalé Odoo zdržalo náhľad najviac raz, nie trikrát za sebou
-	const [ceny, skladVarovania, skloCeny] = await Promise.all([
+	// aby pomalé Odoo zdržalo náhľad najviac raz, nie trikrát za sebou; #606 kg/m rovnako
+	const [ceny, skladVarovania, skloCeny, plan] = await Promise.all([
 		cenyPre(user, job.polozky),
 		skladVarovaniaPre(user, job.polozky),
 		skloCenyPre(user, [
@@ -425,12 +427,13 @@ async function stavNahlad(
 				vyska: r.sklo.vyska,
 				pocet: r.sklo.pocet
 			}
-		])
+		]),
+		planSKgNaM(r)
 	]);
 	return {
 		step: 'nahlad' as const,
 		vstup,
-		plan: r,
+		plan,
 		kovanie: allKovanie,
 		ceny,
 		skladVarovania,
@@ -459,8 +462,8 @@ async function stavNahladMulti(
 	const tesnMulti = multiTesneniePolozky(r, vstup);
 	const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
 	const job = jobForMulti(vstup, r, '', allKovanie);
-	// #599: súbežne ako `stavNahlad`
-	const [ceny, skladVarovania, skloCeny] = await Promise.all([
+	// #599: súbežne ako `stavNahlad` (+ #606 kg/m)
+	const [ceny, skladVarovania, skloCeny, multi] = await Promise.all([
 		cenyPre(user, job.polozky),
 		skladVarovaniaPre(user, job.polozky),
 		skloCenyPre(
@@ -473,12 +476,13 @@ async function stavNahladMulti(
 				vyska: p.sklo.vyska,
 				pocet: p.sklo.pocet
 			}))
-		)
+		),
+		planSKgNaM(r)
 	]);
 	return {
 		step: 'nahladMulti' as const,
 		multiVstup: vstup,
-		multi: r,
+		multi,
 		kovanie: allKovanie,
 		ceny,
 		skladVarovania,
@@ -566,7 +570,7 @@ export const actions = {
 			return {
 				step: 'nahlad' as const,
 				vstup,
-				plan: r,
+				plan: await planSKgNaM(r),
 				planHash: aktualny,
 				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
@@ -620,7 +624,14 @@ export const actions = {
 					error: e
 				});
 			}
-			return { step: 'hotovo', vstup, plan: r, kovanie: allKovanie, outcome, vytvorene };
+			return {
+				step: 'hotovo',
+				vstup,
+				plan: await planSKgNaM(r),
+				kovanie: allKovanie,
+				outcome,
+				vytvorene
+			};
 		} catch (e) {
 			logger('zasklenia').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return {
@@ -702,7 +713,7 @@ export const actions = {
 			return {
 				step: 'nahladMulti' as const,
 				multiVstup: vstup,
-				multi: r,
+				multi: await planSKgNaM(r),
 				planHash: aktualny,
 				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
@@ -756,7 +767,7 @@ export const actions = {
 			return {
 				step: 'hotovoMulti',
 				multiVstup: vstup,
-				multi: r,
+				multi: await planSKgNaM(r),
 				kovanie: allKovanie,
 				outcome,
 				vytvorene
