@@ -5,8 +5,9 @@
 	// ten istý POST (`rawEntries` = pôvodné polia vrátane ručných úprav qty), doplní skryté
 	// `override=<blokReason>` a pošle na pôvodnú akciu → server volá `writeOdpis` s override flagom.
 	// (#608) `uz-odpisane` = zákazka/OP už má v module odpis → tlačidlo „Odoslať ako dorobenie";
-	// `rawEntries` nesie aj token `dorobenie_po` (poradie, ktoré operátor práve vidí), takže refresh
-	// výsledku / dvojklik vyrobí najviac JEDNO dorobenie. Tvrdý duplicate (cross-modul identický obsah,
+	// `rawEntries` nesie aj token `potvrdenie_token` (stav append-only ledgeru, ktorý operátor práve
+	// vidí — aj pri `ledger-duplicate`), takže refresh výsledku, dvojklik ani replay po „Uvoľniť"
+	// nevyrobí ďalší doklad bez nového potvrdenia. Tvrdý duplicate (cross-modul identický obsah,
 	// pergola rezervácia) sem NEIDE — ostáva dead-end „Duplikát" v module.
 	import { resolve } from '$app/paths';
 

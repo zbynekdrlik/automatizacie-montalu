@@ -1,6 +1,7 @@
 // História odpisov (`odpis_log`) — čítanie + uvoľnenie / povolenie re-importu existujúceho záznamu.
-// Vytiahnuté z `money.ts` (#608, large-file-split — money.ts bol pri 1000-r. strope) ako PURE MOVE:
-// rovnaké SQL, rovnaké audity, rovnaký logger `money`. Zápisová cesta do Money (`writeOdpis`) ostáva
+// Vytiahnuté z `money.ts` (#608, large-file-split — money.ts bol pri 1000-r. strope; presun byte-
+// identický v samostatnom commite), potom #608 doplnil `poradie` (SELECT-y, „(dorobenie N)" v audite
+// Uvoľniť / Povoliť rovnaký). Logger `money` rovnaký. Zápisová cesta do Money (`writeOdpis`) ostáva
 // v `money.ts`, ktorý tieto funkcie re-exportuje — verejná plocha `$lib/server/money` je nezmenená.
 // Importuje LEN `db` + `log` (+ typ z money.ts — typový import sa pri behu zmaže, žiadny cyklus).
 import { db } from './db';
