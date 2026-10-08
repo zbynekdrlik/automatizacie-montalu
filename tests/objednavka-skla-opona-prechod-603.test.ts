@@ -152,7 +152,7 @@ describe('#603 prechod — staré rozdelenie opony sa nezdvojí, prevedie sa', (
 		expect(rows.find((p) => p.id === stare.bez!.id)!.pocet).toBe(3);
 	});
 
-	it('nejednoznačné staré riadky (dva „bez" alebo dva „s otvorom") sa neprevádzajú', async () => {
+	it('nejednoznačné staré riadky (dva „bez" / dva „s otvorom") sa neprevádzajú — bežné pridanie', async () => {
 		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GN');
 		const ident = { zak: 'ZAK-603-PN', op: '01', typSkla: g.typSkla, createdBy: 'test' };
 		const riadok = (popis: string, pocet: number, holesQty: number) => ({
@@ -169,9 +169,15 @@ describe('#603 prechod — staré rozdelenie opony sa nezdvojí, prevedie sa', (
 			pridajSklaHromadneIdempotentne(stare.map((r) => ({ ...r, zak })));
 			const pred = listSklaPreZakazku(zak).map((p) => [p.id, p.pocet] as const);
 			expect(pred).toHaveLength(stare.length);
-			await callAction('pridatSkla', { ...opona('2x3K', '6000'), zak });
+			const r = await callAction('pridatSkla', { ...opona('2x3K', '6000'), zak });
 			const po = listSklaPreZakazku(zak);
 			for (const [id, pocet] of pred) expect(po.find((p) => p.id === id)!.pocet).toBe(pocet);
+			// nie je isté, že ide o ten istý posuv → bežné pridanie nového rozdelenia, BEZ upozornenia
+			expect(po).toHaveLength(stare.length + 2);
+			expect(kusy(zak)).toEqual(expect.arrayContaining([`${S_OTVOROM}|4|1`, 'Zasklenie 1|2|0']));
+			const sp = r.sklaPridane as { pridane: number; prechodOdmietnuty: string[] };
+			expect(sp.pridane).toBe(2);
+			expect(sp.prechodOdmietnuty).toEqual([]);
 		};
 		// s otvorom 2 + bez 4 by dali celok 6, ale „bez" riadky sú dva (4 + 1)
 		await nezmenene('ZAK-603-PN', [
@@ -229,6 +235,28 @@ describe('#603 prechod — staré rozdelenie opony sa nezdvojí, prevedie sa', (
 		const dovod = await odmietnuty('ZAK-603-PS', '2x3K', '6000', [
 			`${S_OTVOROM}|2|2`,
 			'Zasklenie 1|4|0'
+		]);
+		expect(dovod).toContain('otvory');
+	});
+
+	it('riadok s príponou otvoru, ktorému obsluha otvory zrušila, sa neprepíše — upozornenie', async () => {
+		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GZ');
+		const stare = stareRozdelenie('ZAK-603-PZ', g, 6);
+		nastavSpec(stare.s.id, { ...GLASS_SPEC_OFF, holesQty: 0 });
+		const dovod = await odmietnuty('ZAK-603-PZ', '2x3K', '6000', [
+			`${S_OTVOROM}|2|0`,
+			'Zasklenie 1|4|0'
+		]);
+		expect(dovod).toContain('otvory');
+	});
+
+	it('riadok bez prípony, ktorému obsluha otvory pridala, sa neprepíše — upozornenie', async () => {
+		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GB');
+		const stare = stareRozdelenie('ZAK-603-PB', g, 6);
+		nastavSpec(stare.bez!.id, { ...GLASS_SPEC_OFF, holesQty: 1, holeSize: 'd30' });
+		const dovod = await odmietnuty('ZAK-603-PB', '2x3K', '6000', [
+			`${S_OTVOROM}|2|1`,
+			'Zasklenie 1|4|1'
 		]);
 		expect(dovod).toContain('otvory');
 	});
