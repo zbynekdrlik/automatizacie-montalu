@@ -12,6 +12,54 @@
 // pravidlá (Slide napr. nemá zvlášť rohovník krídla).
 import type { Komponent, Farba } from '$lib/komponenty';
 
+/**
+ * RODINA kovania (#604) — KTORÁ tabuľka komponentov patrí systému. Dispatch ide cez
+ * túto mapu, nie cez porovnanie presného reťazca: `Štandard +` je TEN ISTÝ systém
+ * RS STANDARD ako starý `Štandard` (líšia sa len profily/rozmery; Odoo/Money katalóg
+ * žiadne „PLUS" kovanie nemá), takže patrí do rodiny `Štandard` a dostane
+ * KOMPONENTY_STANDARD aj s počtami zámkov, kotvou uzáveru (`KOD_UZAVERU` v kovanie.ts)
+ * a honest-null hláškou (`KOVANIE_NEUPLNE`) — všetko sa kľúčuje RODINOU, nie systémom.
+ *
+ * Pred #604 `komponentyPre` vracal STANDARD len pre reťazec `'Štandard'` → odpis
+ * Štandard + (65 ostrých posuvov od 1.9.2026) nemal kladky, zámok ani kefu (Odoo
+ * úloha 1261, Patrik: „štandard neobsahuje kefy, zamykáč a kladku").
+ */
+export type RodinaKovania = 'Robust' | 'Slide' | 'Štandard' | 'Deluxe';
+
+const RODINA_KOVANIA: Readonly<Record<string, RodinaKovania>> = {
+	Robust: 'Robust',
+	Slide: 'Slide',
+	Štandard: 'Štandard',
+	'Štandard +': 'Štandard',
+	Deluxe: 'Deluxe'
+};
+
+/**
+ * Systémy VÝSLOVNE bez kovania v odpise — každý s dôvodom (#604). Systém, ktorý nie je
+ * ani v `RODINA_KOVANIA`, ani tu, je NEZARADENÝ: `kovanieDoOdpisu` ho odmietne HLASNOU
+ * chybou (nikdy tichý odpis bez kladiek/zámkov — presne trieda chyby #604) a test nad
+ * `cfg_seed` (tests/kovanie-rodina.test.ts) padne, keď pribudne systém bez zaradenia.
+ */
+export const SYSTEMY_BEZ_KOVANIA: Readonly<Record<string, string>> = {
+	'Štandard Drevo':
+		'Drevostavby (#445) — kovanie do odpisu pre ne nikto nezadal; #604 ho zámerne nemení (rozhodnutie v návrhu: Drevo bez zmeny).'
+};
+
+/** Rodina kovania systému, alebo `undefined` keď do žiadnej nepatrí. */
+export function rodinaKovania(system: string): RodinaKovania | undefined {
+	return Object.hasOwn(RODINA_KOVANIA, system) ? RODINA_KOVANIA[system] : undefined;
+}
+
+/** Systém je ZARADENÝ: má rodinu kovania, alebo je výslovne bez kovania (#604). */
+export function kovanieZaradene(system: string): boolean {
+	return rodinaKovania(system) !== undefined || Object.hasOwn(SYSTEMY_BEZ_KOVANIA, system);
+}
+
+/** Všetky systémy danej rodiny (napr. `Štandard` → `Štandard`, `Štandard +`). */
+export function systemyRodiny(rodina: RodinaKovania): string[] {
+	return Object.keys(RODINA_KOVANIA).filter((s) => RODINA_KOVANIA[s] === rodina);
+}
+
 /** Uzáver Robust: jednoduchý systém 2 ks, opona 3 ks (Dominik: 4K-2, 2x3K-3, 2x4K-3). */
 const UZAVERY_ROBUST = {
 	'Robust|2K': 2,
@@ -221,25 +269,36 @@ export const SLIDE_PRIPRAVENY = true;
  * IZO variant má rovnaký počet zámkov (IZO je o skle, nie o zámkoch). Zdieľané oboma
  * RAL variantmi zámku (protikus/podložky čerpajú z toho istého čísla). POČTY NA
  * POTVRDENIE Dominikom.
+ *
+ * #604: platí pre CELÚ rodinu Štandard (`systemyRodiny('Štandard')` = Štandard aj
+ * Štandard +) — kľúč `konstPreStyl` je plný `sysStyl`, preto sa generuje per systém.
+ * 5K/6K má len Štandard + — rovnaké pravidlo (jednoduchý posuv = 2 koncové krídla),
+ * žiadny nový odhad. Štýl mimo tabuľky (napr. budúci 7K) ostáva HLASNÁ chyba.
  */
-const ZAMKY_STANDARD: Record<string, number> = {};
-for (const [styl, ks] of Object.entries({
+const ZAMKY_NA_STYL_STANDARD: Readonly<Record<string, number>> = {
 	'2K': 2,
 	'3K': 2,
 	'4K': 2,
+	'5K': 2,
+	'6K': 2,
 	'2x2K': 3,
 	'2x3K': 3,
 	'2x4K': 3
-})) {
-	ZAMKY_STANDARD[`Štandard|${styl}`] = ks;
-	ZAMKY_STANDARD[`Štandard|${styl} IZO`] = ks;
-}
+};
+const ZAMKY_STANDARD: Record<string, number> = {};
+for (const system of systemyRodiny('Štandard'))
+	for (const [styl, ks] of Object.entries(ZAMKY_NA_STYL_STANDARD)) {
+		ZAMKY_STANDARD[`${system}|${styl}`] = ks;
+		ZAMKY_STANDARD[`${system}|${styl} IZO`] = ks;
+	}
 
 /**
  * Komponenty RS STANDARD (#338, Dominik 31.8.). Overené proti OSTRÉMU Money (31.8.):
  * všetky kódy existujú, `Deleted=0`, majú skladovú zásobu — preto je Štandard
  * zapnutý (na rozdiel od Slide). Automatický zámok má RAL varianty R9005/R7016 —
- * do odpisu ide len variant zvolenej farby kovania.
+ * do odpisu ide len variant zvolenej farby kovania. #604: tabuľka celej RODINY
+ * Štandard — starý Štandard AJ Štandard + (ten istý RS STANDARD, katalóg nemá
+ * samostatné „PLUS" kódy; kladkový profil Štandard + má dĺžku, takže kefa je nenulová).
  *
  * ČIASTOČNE NEÚPLNÉ: zasklievacie tesnenia (ZASK00005/ZASK00006) počíta tesnenie.ts
  * a pridáva do odpisu podľa skla (4mm→00005, 6mm→00006, IZO→žiadne; #342 round 2).
@@ -416,8 +475,9 @@ export const KOMPONENTY_DELUXE: Komponent[] = [
 ];
 
 /**
- * Systémy, ktorých kovanie do odpisu je NEÚPLNÉ (chýbajú tesnenia/kefy) a náhľad
- * na to musí upozorniť (#338). Prázdne = kompletné.
+ * Rodiny kovania, ktorých kovanie do odpisu je NEÚPLNÉ (chýbajú tesnenia/kefy) a náhľad
+ * na to musí upozorniť (#338). Prázdne = kompletné. Kľúč je RODINA (#604) — hláška
+ * `Štandard` platí aj pre Štandard + (ZASK202541 honest-null tam rovnako).
  *
  * Hodnota je buď PEVNÝ text (Štandard: neúplné VŽDY, nezávisle od vstupu), alebo
  * FUNKCIA `(skloHrubka, farbaKovania) => text | null` (Slide, #357: neúplné VŽDY kvôli
@@ -425,9 +485,8 @@ export const KOMPONENTY_DELUXE: Komponent[] = [
  * #431 kolo 2 doplnilo 6mm krytky, takže Deluxe 6mm aj 10mm sú kompletné (predtým
  * #354 mal Deluxe funkciu hlásiacu chýbajúce 6mm krytky pri 0 ks sklade — prekonané).
  */
-export const KOVANIE_NEUPLNE: Record<
-	string,
-	string | ((skloHrubka?: number, farbaKovania?: Farba) => string | null)
+export const KOVANIE_NEUPLNE: Partial<
+	Record<RodinaKovania, string | ((skloHrubka?: number, farbaKovania?: Farba) => string | null)>
 > = {
 	Štandard:
 		'STANDARD: tesniaca kefa ZASK202541 (4,8×5 mm) zatiaľ NIE JE v odpise kovania — neznáma rola profilu, doplniť ručne.',
@@ -499,11 +558,22 @@ export function popisFarby(system: string): string | undefined {
 	return POPIS_FARBY[system];
 }
 
-/** Kovanie pre daný systém, alebo `null` keď systém kovanie do odpisu (zatiaľ) nedáva. */
+/**
+ * Kovanie pre daný systém (podľa jeho RODINY, #604), alebo `null` keď systém kovanie do
+ * odpisu nedáva — výslovne (`SYSTEMY_BEZ_KOVANIA`), vypnutou tabuľkou (`*_PRIPRAVENY`),
+ * alebo je NEZARADENÝ (to `kovanieDoOdpisu` odmietne hlasnou chybou, `kovanieZaradene`).
+ */
 export function komponentyPre(system: string): Komponent[] | null {
-	if (system === 'Robust') return KOMPONENTY_ROBUST;
-	if (system === 'Slide') return SLIDE_PRIPRAVENY ? KOMPONENTY_SLIDE : null;
-	if (system === 'Štandard') return KOMPONENTY_STANDARD;
-	if (system === 'Deluxe') return KOMPONENTY_DELUXE;
-	return null;
+	const rodina = rodinaKovania(system);
+	if (rodina === undefined) return null;
+	switch (rodina) {
+		case 'Robust':
+			return KOMPONENTY_ROBUST;
+		case 'Slide':
+			return SLIDE_PRIPRAVENY ? KOMPONENTY_SLIDE : null;
+		case 'Štandard':
+			return KOMPONENTY_STANDARD;
+		case 'Deluxe':
+			return KOMPONENTY_DELUXE;
+	}
 }
