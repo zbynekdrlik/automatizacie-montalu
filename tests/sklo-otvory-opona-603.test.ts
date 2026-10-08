@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from 'svelte/server';
 import {
 	otvoryVSkle,
+	otvaraniePosuvu,
 	riadkySklaPosuvu,
 	rozpisOtvorovSkla,
 	stranyOtvorov,
@@ -58,6 +59,12 @@ describe('#603 otvoryVSkle — opona: krajné + obe stredové sklá', () => {
 	it('pri prekryve má krajná tabuľa prednosť (N=2 opona = 2 krajné, N=1 = 1)', () => {
 		expect(otvoryVSkle('Deluxe', 2, 'Opona').tabule).toEqual([L(0), P(1)]);
 		expect(otvoryVSkle('Deluxe', 1, 'Opona').tabule).toEqual([L(0)]);
+	});
+
+	it('otvaraniePosuvu — jeden fallback multi posuvu (chýbajúce = Opona ako náhľad)', () => {
+		expect(otvaraniePosuvu(undefined)).toBe('Opona');
+		expect(otvaraniePosuvu('L - P')).toBe('L - P');
+		expect(otvoryVSkle('Deluxe', 4, otvaraniePosuvu(undefined)).sOtvorom).toBe(4);
 	});
 
 	it('ostatné systémy do skla nevŕtajú ani pri opone', () => {

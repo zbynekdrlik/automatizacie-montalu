@@ -147,6 +147,41 @@ describe('#603 prechod — staré rozdelenie opony sa nezdvojí, prevedie sa', (
 		expect(rows.find((p) => p.id === stare.bez!.id)!.pocet).toBe(3);
 	});
 
+	it('nejednoznačné staré riadky (dva „bez" alebo dva „s otvorom") sa neprevádzajú', async () => {
+		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GN');
+		const ident = { zak: 'ZAK-603-PN', op: '01', typSkla: g.typSkla, createdBy: 'test' };
+		const riadok = (popis: string, pocet: number, holesQty: number) => ({
+			...ident,
+			modul: 'zasklenia',
+			popis,
+			sirkaMm: g.sirka,
+			vyskaMm: g.vyska,
+			pocet,
+			holesQty,
+			holeSize: holesQty > 0 ? ('d50' as const) : undefined
+		});
+		const nezmenene = async (zak: string, stare: ReturnType<typeof riadok>[]) => {
+			pridajSklaHromadneIdempotentne(stare.map((r) => ({ ...r, zak })));
+			const pred = listSklaPreZakazku(zak).map((p) => [p.id, p.pocet] as const);
+			expect(pred).toHaveLength(stare.length);
+			await callAction('pridatSkla', { ...opona('2x3K', '6000'), zak });
+			const po = listSklaPreZakazku(zak);
+			for (const [id, pocet] of pred) expect(po.find((p) => p.id === id)!.pocet).toBe(pocet);
+		};
+		// s otvorom 2 + bez 4 by dali celok 6, ale „bez" riadky sú dva (4 + 1)
+		await nezmenene('ZAK-603-PN', [
+			riadok(S_OTVOROM, 2, 1),
+			riadok('Zasklenie 1', 4, 0),
+			riadok('Zasklenie 1', 1, 0)
+		]);
+		// s otvorom 3 + bez 3 by dali celok 6, ale „s otvorom" riadky sú dva (3 + 1)
+		await nezmenene('ZAK-603-PD', [
+			riadok(S_OTVOROM, 3, 1),
+			riadok(S_OTVOROM, 1, 1),
+			riadok('Zasklenie 1', 3, 0)
+		]);
+	});
+
 	it('ručne upravený (atyp) riadok sa neprevádza — staré riadky ostanú', async () => {
 		const g = await geometria(opona('2x3K', '6000'), 'ZAK-603-GA');
 		const stare = stareRozdelenie('ZAK-603-PA', g, 6);
