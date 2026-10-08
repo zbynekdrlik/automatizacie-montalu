@@ -102,7 +102,15 @@ describe('#587 rozpis tabúľ s otvorom / bez pre kartu „Sklo (mm)"', () => {
 describe('#587 náhľad a PDF čítajú TIE ISTÉ konštanty', () => {
 	it('Nahlad2D kótuje odsadenie OKRAJ_ZAMOK_MM a default výšku VRTANIE_ZAMKU_DEFAULT_MM', () => {
 		const body = render(Nahlad2D, {
-			props: { S: 4000, V: 2000, N: 4, skloS: 1004, skloV: 1914, system: 'Deluxe' }
+			props: {
+				S: 4000,
+				V: 2000,
+				N: 4,
+				skloS: 1004,
+				skloV: 1914,
+				system: 'Deluxe',
+				otvaranie: 'L - P'
+			}
 		}).body;
 		expect(body).toContain(`>${OKRAJ_ZAMOK_MM}</text>`);
 		expect(body).toContain(`>v ${VRTANIE_ZAMKU_DEFAULT_MM}</text>`);
