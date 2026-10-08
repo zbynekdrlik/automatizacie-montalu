@@ -114,7 +114,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - katalóg skiel, pridanie/zmena skla, povolené sklá per systém (`POVOLENE_SKLA`, #573), Odoo sklá v nárezáku podľa hrúbky (`cfg_sklo_hrubka` nastaviteľné výrobou, `vypocetneSkloPre`, `skloOdoo`, #579), 4 mm pri Štandardoch + `predvoleneSklo` (#579 v54), Money-neutralita skla, migračná pasca → `.claude/rules/glass-catalog.md`
 - editor vzorcov `saveCfgChanges` (skryté zrkadlenia rámový→sklo #504 + Deluxe 6/10, audit invariant) → `.claude/rules/cfg-editor.md`
 - ceny materiálu / cena skla / denný Money snapshot → `.claude/rules/ceny-snapshot.md`
-- Odoo katalóg artiklov `product.product` (`odoo-katalog.ts`, kontrola kódov odpisu z Odoo + snapshot fallback, `qty_available` 403 pasca, sklad zo `stock.quant` + nižšia z Odoo/snapshotu, prechod Money→Odoo #599) → `.claude/rules/odoo-katalog.md`
+- Odoo katalóg artiklov `product.product` (`odoo-katalog.ts`, kontrola kódov odpisu z Odoo + snapshot fallback, `qty_available` 403 pasca, sklad zo `stock.quant` + nižšia z Odoo/snapshotu, prechod Money→Odoo #599, kg/m `montalu_kg_per_m` samostatný read + 403 pasca #606) → `.claude/rules/odoo-katalog.md`
 - POST-import readback z Money DB (money_dlv snapshot, /odpisy overenie, exkluzívne párovanie) → `.claude/rules/money-readback.md`
 - cenový zoznam k zákazke `/odpisy/zakazka/[zak]` (agregácia, zak_norm legacy pasca, ReadbackBadge) → `.claude/rules/zakazka-ceny.md`
 - FIX (pevné zasklenie) modul → `.claude/rules/fix-module.md`
@@ -129,7 +129,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - bazén kusové komponenty (BPK*, computeBazenAll, mj ks, model whitelist, E2E prefix kolízia) → `.claude/rules/bazen-komponenty.md`
 - CLIP zábradlie nárez + Money odpis (#372, parametrický vzorec, honest-null, whitelist, rozšírenie po Dominikovi = dáta) → `.claude/rules/clip.md`
 - lakovanie (spotreba farby z rozvinu profilov #369, rozvin=Money `m2` merná jednotka, honest-null €/„čaká na sadzby", vlastná karta mimo ceny-tabulka, rozšírenie = RAL dáta) → `.claude/rules/lakovanie.md`
-- odpad z nárezov (offcut/zvyšky tyčí — zdroj `ffdPack`, per-profil v `RozpisRezov`, súčet `sumaOdpad`, len zasklenia; Money-neutrálne) → `.claude/rules/odpad.md`
+- odpad z nárezov (offcut/zvyšky tyčí — zdroj `ffdPack`, per-profil v `RozpisRezov`, súčet `sumaOdpad`, odpad aj v kg z Odoo kg/m `sumaOdpadKg` + hranica `narez-kg.ts` #606, zasklenia + CLIP pílový plán; Money-neutrálne) → `.claude/rules/odpad.md`
 - verejný dopyt / PDF ponuka s orientačnou cenou / slovenský text v pdf-lib / DopytForm → `.claude/rules/dopyt-ponuka.md`
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
 - interný zoznam materiálu zákazky → Odoo sale.order log-note (odoo-rpc, mt_note, observer hook, ZAK/OP match) → `.claude/rules/odoo-zakazka.md`

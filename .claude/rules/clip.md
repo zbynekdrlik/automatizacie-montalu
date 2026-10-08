@@ -152,7 +152,10 @@ per-riadkový ROUNDUP (1:1 Excel, kontrakt vyššie). Guard: `tests/clip-narez.t
   50→20 — Patrik B0/N=1 od 80 mm).
 - `/clip` je v `B2B_FORBIDDEN_PREFIXES` — `handle` hook presmeruje b2b PRED akciou (ako
   /bazen), takže akcia nepotrebuje vlastný `isB2B` guard. Drift guard:
-  `tests/b2b-route-coverage.test.ts`.
+  `tests/b2b-route-coverage.test.ts`. Výnimka (#606): kg/m z Odoo v pílovom pláne ide cez zdieľanú
+  hranicu `narez-kg.ts` `kgNarezPre(user, …)` (b2b bez kg = obrana do hĺbky, rovnako ako zasklenia) —
+  preto `stavKontrola`/`stavKontrolaMulti` berú `user` a `spocitat`/`spocitatMulti` čítajú `locals`.
+  Detaily odpadu v kg: `odpad.md`.
 - Dedup `UNIQUE(zak,op,live)` nedotknutý; mimo `MONEY_LIVE=1` nič do živého importu;
   `clip.ts` je client-safe (žiadny import zo `$lib/server/*`).
 

@@ -62,6 +62,9 @@ import {
 	recomputeMultiVstup as computeMultiFrom
 } from '$lib/server/zasklenia-sklo';
 import { saveOdpisOdpad } from '$lib/server/odpad-store';
+// #606: kg/m z Odoo k nárezovému plánu — LEN zobrazenie odpadu v kg, b2b bez kg (vstup `r` sa
+// nemení — Money/odpad idú z neho); zdieľaná hranica so CLIP
+import { kgPlanPre } from '$lib/server/narez-kg';
 import {
 	pridajSklaHromadneIdempotentne,
 	sklaPosuvu,
@@ -412,8 +415,8 @@ async function stavNahlad(
 	const allKovanie = [...kov.polozky, ...tesn.polozky];
 	const job = jobFor(vstup, r, '', allKovanie);
 	// #599: ceny / sklad / cena skla čítajú Odoo — súbežne (každý má vlastný 3 s timeout a cache),
-	// aby pomalé Odoo zdržalo náhľad najviac raz, nie trikrát za sebou
-	const [ceny, skladVarovania, skloCeny] = await Promise.all([
+	// aby pomalé Odoo zdržalo náhľad najviac raz, nie trikrát za sebou; #606 kg/m rovnako
+	const [ceny, skladVarovania, skloCeny, plan] = await Promise.all([
 		cenyPre(user, job.polozky),
 		skladVarovaniaPre(user, job.polozky),
 		skloCenyPre(user, [
@@ -425,12 +428,13 @@ async function stavNahlad(
 				vyska: r.sklo.vyska,
 				pocet: r.sklo.pocet
 			}
-		])
+		]),
+		kgPlanPre(user, r)
 	]);
 	return {
 		step: 'nahlad' as const,
 		vstup,
-		plan: r,
+		plan,
 		kovanie: allKovanie,
 		ceny,
 		skladVarovania,
@@ -459,8 +463,8 @@ async function stavNahladMulti(
 	const tesnMulti = multiTesneniePolozky(r, vstup);
 	const allKovanie = [...kov.polozky, ...tesnMulti.polozky];
 	const job = jobForMulti(vstup, r, '', allKovanie);
-	// #599: súbežne ako `stavNahlad`
-	const [ceny, skladVarovania, skloCeny] = await Promise.all([
+	// #599: súbežne ako `stavNahlad` (+ #606 kg/m)
+	const [ceny, skladVarovania, skloCeny, multi] = await Promise.all([
 		cenyPre(user, job.polozky),
 		skladVarovaniaPre(user, job.polozky),
 		skloCenyPre(
@@ -473,12 +477,13 @@ async function stavNahladMulti(
 				vyska: p.sklo.vyska,
 				pocet: p.sklo.pocet
 			}))
-		)
+		),
+		kgPlanPre(user, r)
 	]);
 	return {
 		step: 'nahladMulti' as const,
 		multiVstup: vstup,
-		multi: r,
+		multi,
 		kovanie: allKovanie,
 		ceny,
 		skladVarovania,
@@ -566,7 +571,7 @@ export const actions = {
 			return {
 				step: 'nahlad' as const,
 				vstup,
-				plan: r,
+				plan: await kgPlanPre(locals.user, r),
 				planHash: aktualny,
 				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
@@ -588,6 +593,8 @@ export const actions = {
 		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
 		const vylucene = parseVyluceneKody(formData);
 		const finalJob = vylucPolozky(job, vylucene);
+		// #606: kg/m (len zobrazenie) súbežne so zápisom — nikdy nehádže, nečaká sa až po odpise
+		const planKg = kgPlanPre(locals.user, r);
 		try {
 			const outcome = await writeOdpis(finalJob, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
@@ -620,7 +627,14 @@ export const actions = {
 					error: e
 				});
 			}
-			return { step: 'hotovo', vstup, plan: r, kovanie: allKovanie, outcome, vytvorene };
+			return {
+				step: 'hotovo',
+				vstup,
+				plan: await planKg,
+				kovanie: allKovanie,
+				outcome,
+				vytvorene
+			};
 		} catch (e) {
 			logger('zasklenia').error('writeOdpis zlyhal', { zak: vstup.zak, op: vstup.op, error: e });
 			return {
@@ -702,7 +716,7 @@ export const actions = {
 			return {
 				step: 'nahladMulti' as const,
 				multiVstup: vstup,
-				multi: r,
+				multi: await kgPlanPre(locals.user, r),
 				planHash: aktualny,
 				// #338: nestrať upozornenie na neúplné kovanie (Štandard tesnenia/kefy) pri
 				// re-náhľade po zmene vzorcov — obe hlášky spoj, nie prepíš
@@ -724,6 +738,8 @@ export const actions = {
 		// #461: vylúč položky, ktoré užívateľ odobral cez SkladVarovania
 		const vyluceneMulti = parseVyluceneKody(formData);
 		const finalJobMulti = vylucPolozky(job, vyluceneMulti);
+		// #606: kg/m (len zobrazenie) súbežne so zápisom — viď `odoslat`
+		const planKg = kgPlanPre(locals.user, r);
 		try {
 			const outcome = await writeOdpis(finalJobMulti, overrideOpts(formData));
 			if (outcome.status === 'duplicate') {
@@ -756,7 +772,7 @@ export const actions = {
 			return {
 				step: 'hotovoMulti',
 				multiVstup: vstup,
-				multi: r,
+				multi: await planKg,
 				kovanie: allKovanie,
 				outcome,
 				vytvorene
