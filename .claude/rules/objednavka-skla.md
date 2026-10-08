@@ -720,8 +720,11 @@ bez migrácie.
   zásahom (atyp riadok, ručne zmenené otvory — `otvoryRucneZmenene`, príloha na riadku „bez", ktorý by
   sa mazal) vráti `{ stav: 'odmietnute', pozicia, dovod, riadky }` → riadky toho posuvu sa NEpridajú
   (podklad ostane presne ako bol) a `stats.prechodOdmietnuty` → banner `skla-prechod-odmietnuty`
-  („uprav riadky na podklade ručne / zmaž a pridaj znova"). Nejednoznačné riadky (2× „bez", 2× „s
-  otvorom") = `null` → bežná cesta (nie je isté, že ide o ten istý posuv).
+  („uprav riadky na podklade ručne / zmaž a pridaj znova"). Riadky sa delia na „s otvorom" / „bez"
+  podľa PRÍPONY pozície (`PRIPONA_OTVOR_RE`), NIE podľa spec — zrušené otvory na riadku s príponou aj
+  pridané na riadku bez nej sú ručný zásah (odmietnutie), nie „iné rozdelenie" (review round 2).
+  `stats.prechodOdmietnuty` je povinné pole. Nejednoznačné riadky (2× „bez", 2× „s otvorom") = `null`
+  → bežné pridanie bez upozornenia (nie je isté, že ide o ten istý posuv; test to tvrdí).
 - **Hranica identity:** podklad otváranie neukladá — „Zasklenie 1" toho istého OP s rovnakým sklom a
   celkom je pre appku TEN ISTÝ posuv (rovnako ako dedup #514/#563). Prepnutie otvárania toho istého
   okna (L - P → Opona) sa preto správne prevedie; dve RÔZNE okná s identickým sklom v jednom OP cez
