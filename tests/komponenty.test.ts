@@ -405,7 +405,9 @@ describe('KOMPONENTY_SLIDE — zapnuté (#357), 2 kódy s 0 ks vynechané', () =
 		expect(SLIDE_PRIPRAVENY).toBe(true);
 		expect(komponentyPre('Slide')).toBe(KOMPONENTY_SLIDE);
 		expect(komponentyPre('Robust')).toBe(KOMPONENTY_ROBUST);
-		expect(komponentyPre('Štandard +')).toBeNull();
+		// #604: Štandard + = ten istý RS STANDARD → tá istá tabuľka (predtým null = bug,
+		// odpis Štandard + nemal kladky, zámok ani kefu — Odoo úloha 1261)
+		expect(komponentyPre('Štandard +')).toBe(KOMPONENTY_STANDARD);
 	});
 
 	it('KAŽDÝ Slide štýl sa spočíta bez chyby (R7016 — jediný farebný variant v tabuľke)', () => {

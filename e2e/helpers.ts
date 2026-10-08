@@ -282,8 +282,9 @@ export async function stubWindowPrint(page: Page) {
 /**
  * #338: kovanie RS Robust/Štandard vyžaduje zvolenú RAL farbu — bez nej engine
  * odmietne odpis a náhľad sa nezobrazí. Tento pomocník zvolí farbu, keď je select
- * na obrazovke (Robust/Štandard, aj Deluxe — jeho krytky majú RAL variant), a je
- * NO-OP pri systémoch bez farebného kovania (Slide/Štandard +). Volaj ho PRED „Spočítať".
+ * na obrazovke (Robust/Štandard/Štandard + (#604)/Slide, aj Deluxe — jeho krytky majú
+ * RAL variant), a je NO-OP pri systéme bez farebného kovania (dnes len Štandard Drevo).
+ * Volaj ho PRED „Spočítať".
  *
  * BEZ explicitného `farba` argumentu (VŠETKY existujúce volania v e2e/*.spec.ts)
  * si zvolí PLATNÚ hodnotu z reálnych `<option>` na obrazovke namiesto natvrdo
