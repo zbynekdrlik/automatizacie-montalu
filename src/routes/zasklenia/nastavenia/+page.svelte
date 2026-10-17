@@ -147,6 +147,20 @@
 						value={r.offset}
 						required
 					/>
+					{#if data.skloSleduje?.profilId === r.id}
+						<!-- #610: šírka skla viazaná na tento profil (sklo = profil − N mm na krídlo).
+						     `.sub` = mechanika poľa (`.pozn` je pre „prečo" texty, app.css #444). -->
+						{#if data.skloSleduje.sleduje}
+							<p class="sub" data-testid="sklo-sleduje-pozn">
+								↳ sklo sa posunie automaticky (o {data.skloSleduje.mmNaKridlo} mm užšie)
+							</p>
+						{:else}
+							<p class="sub" data-testid="sklo-nesleduje-pozn">
+								↳ sklo sa neposunie — šírka skla je nastavená samostatne (nie o {data.skloSleduje
+									.mmNaKridlo} mm užšie)
+							</p>
+						{/if}
+					{/if}
 				</div>
 			{/each}
 
