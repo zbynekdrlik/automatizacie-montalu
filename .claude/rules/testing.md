@@ -686,7 +686,15 @@ odobrať (tvrď podmnožinu / triedu).
   „#462 … ✏️" — formulárové toky citlivé na dev-mode hydratáciu; rozhoduje CI preview beh.
   Rovnako `cfg-editor-sklo-mirror.spec.ts` (#610, padá aj na nezmenenom kóde): výber Systému v
   editore spraví plný reload na prvý štýl a hneď nasledujúci výber Štýlu sa pod `vite dev` stratí
-  (nadpis ostane „· 2K") — pretek s reloadom, nie regresia.
+  (nadpis ostane „· 2K") — pretek s reloadom, nie regresia. **Nový editorový spec otváraj priamo
+  URL `goto(page, '/zasklenia/nastavenia?sysStyl=' + encodeURIComponent(SYS_STYL))`** (stav editora
+  žije v URL, #518) — žiadny pretek, prejde pod `vite dev` aj preview (`cfg-editor-sklo-kladkovy-610`;
+  dočasná URL kópia `cfg-editor-sklo-mirror` prešla lokálne → #504 správanie je OK).
+- **Zápisový E2E, ktorého stav editor NEVIE vrátiť** (napr. #610: raz sledujúce sklo editor ťahá
+  s kladkovým, pôvodný nesledujúci seed stav sa editorom neobnoví): fixture aj upratanie priamo v
+  `e2e.db` (`new Database(DB_PATH)` za `skipAkLive`, vzor `objednavka-skla-proxy-hydratacia`) a
+  návrat VŠETKÝCH dotknutých riadkov v `try { … } finally { … }` (beží aj po páde, následný spec
+  vidí seed). Záverečný `expect(consoleMsgs).toEqual([])` ostáva za `finally` (guard ho prijme).
 - **RED dôkaz E2E pod `vite dev` bez stash/rebuild (#610):** `git checkout <red-sha> -- <zdrojové
   súbory>` → spusti spec (čaká sa ✘ s pôvodnou hodnotou) → `git checkout HEAD -- <tie isté>`. Pri
   dátovej zmene cez migráciu vráť aj wiring migrácie, nie len seed (migrácia by starú hodnotu opravila).
