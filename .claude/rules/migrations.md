@@ -183,3 +183,25 @@ indexy späť). Vzor pre KAŽDÚ budúcu prestavbu tabuľky, na ktorú visí FK:
 - `migracie.ts` 982 r. Head-bump: **54 riadkov** `user_version … toBe(56)` → 57 (python recept) —
   POZOR: `migration-v56.test.ts` priamo volá `migrateStandardyBez24mm` a tvrdí JEHO bump `toBe(56)` —
   ten ostáva 56 (recept ho zmení, vráť ho). Krok 4 sa netýka (žiadny exaktný zoznam stĺpcov odpis_log).
+
+## v58 (#610, Odoo úloha 1416) — OPRAVA hodnoty v `cfg_rez` (dátová migrácia UPDATE, vlastný súbor)
+
+`migracie-opona-izo-sklo.ts` (`migrateOponaIzoSkloSirka`, guard `>= 58`, transakcia) — vzor pre
+opravu cfg hodnoty, ktorú editor NEUKAZUJE (tu `Sklo šírka` opona IZO, pozri `opona-izo-narezak.md`):
+- ZMRAZENÝ literál `{sysStyl, stara, nova}`; zapíš LEN keď `aktuálna === stara`; `=== nova` → info
+  „bez zmeny" (čerstvá DB — seed už nesie novú hodnotu, druhý beh); iná hodnota → `log.warn` s
+  `aktualna/ocakavana/nova` a NEPREPÍSAŤ (zásah výroby / supervisora vyhráva); 0 alebo >1 riadkov → warn.
+- KAŽDÝ zápis = `cfg_audit` riadok v tej istej transakcii (`username` `system-migracia`, `zmeny` =
+  JSON `[{pole, stara, nova}]` ako editor). `INSERT INTO cfg_audit` pripravuj LENIVO pri prvom zápise
+  (`??=`) — staršie minimálne fixtúry (napr. `migration-v56`) `cfg_audit` NEMAJÚ a `db.prepare` na
+  chýbajúcu tabuľku hodí hneď; reálna DB ju má od v1. Feature-detect len `cfg_rez` (vzor v47).
+- Seed (`cfg_seed.json`) zmeň v TOM ISTOM commite na `nova` + parita seed↔literál v teste. POZOR pri
+  RED dôkaze: vrátiť LEN seed na starú hodnotu NESTAČÍ — v58 ju na čerstvej DB „opraví" späť
+  (stará = očakávaná). Na RED vráť seed AJ wiring (`git checkout <red-sha> -- cfg_seed.json migracie.ts`).
+- `migracie.ts` 984 r. Head-bump: **55 riadkov / 49 súborov** `user_version … toBe(57)` → 58 (python
+  recept; `bazen-komponenty-katalog` má nesúvisiace `toBe(57)` bez `user_version` — recept ich nechá).
+  Test `migration-v58.test.ts`: PROD-tvar v57 fixtúra (ručne zmenený riadok ostane, audit len pre
+  zapísané), warn log cez stdout spy (`LOG_LEVEL=warn` až po importoch), idempotencia (verzia späť na
+  57 → druhý beh bez auditu; guard bez bumpu), čerstvá DB cez `migrate(new Database(':memory:'))`.
+- Worktree guard odmietol python heredoc s mnohými viacriadkovými `replace` reťazcami („too complex
+  to verify") — úpravy hodnôt v teste rob nástrojom Edit; jednoduchý head-bump loop prešiel.

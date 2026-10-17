@@ -83,7 +83,7 @@ const { db } = await import('../src/lib/server/db');
 
 describe('migration v56 → v57 (#608 poradie odpisu — dorobenie)', () => {
 	it('[RED] bumpne na v57', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(57);
+		expect(db.pragma('user_version', { simple: true })).toBe(58);
 	});
 
 	it('[RED] odpis_log má stĺpec poradie (NOT NULL DEFAULT 1) a existujúce riadky majú poradie 1', () => {
@@ -170,7 +170,7 @@ describe('migration v56 → v57 (#608 poradie odpisu — dorobenie)', () => {
 		).sql;
 		expect(sql).toMatch(/UNIQUE\s*\(modul, zak, op, live, poradie\)/);
 		expect(fresh.pragma('foreign_keys', { simple: true })).toBe(1);
-		expect(fresh.pragma('user_version', { simple: true })).toBe(57);
+		expect(fresh.pragma('user_version', { simple: true })).toBe(58);
 		fresh.close();
 	});
 });

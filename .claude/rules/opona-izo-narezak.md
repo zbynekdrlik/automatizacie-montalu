@@ -5,6 +5,9 @@ paths:
   - 'src/lib/server/migracie-seed.ts'
   - 'src/lib/server/compute-model.ts'
   - 'src/lib/server/compute-odpis.ts'
+  - 'src/lib/server/migracie-opona-izo-sklo.ts'
+  - 'tests/opona-izo-sklo-610.test.ts'
+  - 'e2e/opona-izo.spec.ts'
 ---
 
 # Odvodenie nárezáku z Excelu + opona IZO (#504)
@@ -44,6 +47,23 @@ bit-presne vrátane FFD a rozmerov skla), až potom mu dôveruj pri nových riad
   existujúci `railUpsize` (`compute-profily.ts` `RAIL_UPSIZE`) + checkbox „prídavná
   koľajnica" (default zap. pri Štandard+ IZO cez `pridavnaKolajnicaDefault`, `styl.ts`).
   NEUKLADAJ upsized kód do seedu.
+- **Šírka skla Štandard + opona IZO = kladkový − 10 mm (#610, Odoo úloha 1416, Patrik 17.10.)**
+  — NAHRÁDZA pôvodné odvodenie `prírez_off − 9N` vyššie (sklo vychádzalo o 7–10 mm širšie).
+  Pravidlo výroby: kladkový = sklo + 10, rozširujúci = sklo + 6 (na krídlo); „meniť šírku skla,
+  nie profilov". Offset skla = kladkový offset (PROD) − 10·N: 2×2K −313, 2×3K −380, 2×4K −460
+  (migrácia v58 + seed). Starý „Štandard" opona IZO (−268/−340/−400) sa NEZMENIL. Pravidlo stráži
+  `tests/opona-izo-sklo-610.test.ts`; vektor z úlohy 2×3K 6500×2070 → 1020×1935 (aj E2E).
+  E2E literál predpokladá na PROD korekciu skla triedy 16 = systémovú (`cfg_sklo_trieda` bez
+  Štandard +/16) a `cfg_sys.sklo_offset` = 0 (overené 17.10.) — korekcia triedy je editovateľná a
+  posúva šírku AJ výšku skla; pád `opona-izo.spec.ts` na deployi → najprv over ju.
+  **Pri ďalšej zmene profilov opona IZO** (výroba ich ladí editorom) sa sklo samo NEPOHNE — riadok
+  `Sklo šírka` editor neukazuje (štýly nemajú rámový S → mirror sa nechytí), takže zmena kladkového
+  bez zmeny skla rozbije pravidlo „−10" → treba novú dátovú migráciu skla (vzor v58).
+- **Seed profily opona IZO ≠ PROD** (výroba 14.9. editorom: kladkový S PROD −273/−320/−380 vs seed
+  −235/−285/−335, rozširujúci −290/−342/−410 vs −251/−309/−367). Seed sa so živou cfg zámerne
+  nezosúlaďuje (`testing.md`), Money vektory profilov ostávajú zo seedu. Test pravidla „sklo vs
+  profil" preto prekrýva seed cfg PROD profilovými offsetmi (`PROD_PROFILY` v teste #610) — nad čistým
+  seedom je kladkový − sklo 19,5 / 15,8 / 15,6 mm a pravidlo by sa „nesplnilo".
 - `sklaDoPonuky`/`sysStylPre` (`styl.ts`) sa NEMENÍ — akonáhle pribudne `Štandard +|2x*K IZO`
   do cfg, `existuje(...)` sa preklopí a IZO sa v ponuke pri opone objaví bez zmeny kódu.
 

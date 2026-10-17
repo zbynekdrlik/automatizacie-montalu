@@ -684,6 +684,12 @@ odobrať (tvrď podmnožinu / triedu).
   kompilácia) → rerun, nie bug. Pri #592 (zmena len nav/nadpisov) padli pod `vite dev`
   aj `app.spec.ts` „editor vzorcov…" (v celom súbore; samostatne prejde) a `fix-cad.spec.ts`
   „#462 … ✏️" — formulárové toky citlivé na dev-mode hydratáciu; rozhoduje CI preview beh.
+  Rovnako `cfg-editor-sklo-mirror.spec.ts` (#610, padá aj na nezmenenom kóde): výber Systému v
+  editore spraví plný reload na prvý štýl a hneď nasledujúci výber Štýlu sa pod `vite dev` stratí
+  (nadpis ostane „· 2K") — pretek s reloadom, nie regresia.
+- **RED dôkaz E2E pod `vite dev` bez stash/rebuild (#610):** `git checkout <red-sha> -- <zdrojové
+  súbory>` → spusti spec (čaká sa ✘ s pôvodnou hodnotou) → `git checkout HEAD -- <tie isté>`. Pri
+  dátovej zmene cez migráciu vráť aj wiring migrácie, nie len seed (migrácia by starú hodnotu opravila).
 - **Cesta k binárke sa líši podľa verzie Chromia a cache sa mení pod rukami** (#583: 1244 zmizlo
   počas behu, ostalo 1193): 12xx = `chromium_headless_shell-<v>/chrome-headless-shell-linux64/
   chrome-headless-shell`, 1193 = `chromium_headless_shell-1193/chrome-linux/headless_shell`. Pred
