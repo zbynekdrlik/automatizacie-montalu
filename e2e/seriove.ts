@@ -34,6 +34,7 @@ export const RENDERUJE_3D = /\bdata-viz-[a-z]|\b(?:vizual3d-canvas|zakaznicky-ob
 export const SERIOVE_SPECY: readonly string[] = [
 	'app.spec.ts',
 	'audit3.spec.ts',
+	'cfg-editor-sklo-kladkovy-610.spec.ts',
 	'cfg-editor-sklo-mirror.spec.ts',
 	'sietka-standard-editor.spec.ts',
 	'sklo-hrubky-579.spec.ts'

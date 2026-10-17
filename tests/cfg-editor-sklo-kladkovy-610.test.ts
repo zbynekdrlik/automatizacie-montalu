@@ -1,0 +1,222 @@
+// #610 doplnok (ROZHODNUTÉ 17.10., issuecomment-6233481744): pravidlo výroby „sklo = kladkový
+// − 10 mm na krídlo" (Štandard + opona IZO 2×2K / 2×3K / 2×4K, Odoo úloha 1416) musí prežiť
+// budúce úpravy profilov v editore vzorcov. Výroba ladí kladkový editorom (cfg_audit 14.9.:
+// 2×2K IZO −235 → −273, 2×4K IZO −328 → −380 …), ale riadok `Sklo šírka` editor neukazuje ani
+// nezrkadlí (rámový→sklo mirror #504 sa nechytí — tieto štýly nemajú rámový S). Bez väzby by
+// ďalšia úprava kladkového ticho znova rozbila šírku skla (presne úloha 1416).
+//
+// Kontrakt (vzor #504 mirroru, `.claude/rules/cfg-editor.md`): keď sa offset kladkového (dim S)
+// SKUTOČNE zmení A sklo šírka ho dovtedy sledovala (`sklo == kladkový_starý − 10·N`), zapíše sa
+// `sklo = kladkový_nový − 10·N` a do `zmeny` (→ cfg_audit) pribudne záznam. Sklo, ktoré pravidlo
+// nesledovalo (ručná výnimka), ostane nedotknuté. Rozširujúci sklo neposúva (+6 je výsledok).
+//
+// Stav „sklo sleduje" = PROD po v58 (čítanie PROD `cfg_rez` 17.10., telo #610): kladkový
+// −273/−320/−380, sklo −313/−380/−460. Seed nesie staršie profily (−235/−285/−335, seed sa s PROD
+// zámerne nezosúlaďuje — `testing.md`), takže v ČISTOM seede sklo pravidlo NEsleduje; testy si
+// PROD stav nastavia priamo v izolovanej test DB (`testing.md` #261 — DB je per súbor).
+import { describe, it, expect } from 'vitest';
+import { db, loadCfg } from '../src/lib/server/db';
+import { saveCfgChanges, getEditableRows, getAuditLog } from '../src/lib/server/cfg-editor';
+import { computeFlat } from '../src/lib/server/compute';
+import { val } from '../src/lib/server/compute-model';
+import { load } from '../src/routes/zasklenia/nastavenia/+page.server';
+
+const KLADKOVY = 'ZASP202415';
+const ROZSIRUJUCI = 'ZASP202439';
+const POLE_SKLO = 'Sklo šírka (S) offset — sleduje kladkový − 10 mm (#610)';
+
+/** PROD `cfg_rez` 17.10.2026 (telo #610) + sklo po v58 = kladkový − 10·N. */
+const PROD: Record<string, { n: number; kladkovy: number }> = {
+	'Štandard +|2x2K IZO': { n: 4, kladkovy: -273 },
+	'Štandard +|2x3K IZO': { n: 6, kladkovy: -320 },
+	'Štandard +|2x4K IZO': { n: 8, kladkovy: -380 }
+};
+const STYLY = Object.keys(PROD);
+
+const skloOffset = (sysStyl: string, dim: 'S' | 'V'): number => {
+	const r = db
+		.prepare(`SELECT offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo' AND dim = ?`)
+		.get(sysStyl, dim) as { offset: number } | undefined;
+	expect(r, `${sysStyl}: chýba riadok Sklo ${dim}`).toBeTruthy();
+	return r!.offset;
+};
+
+const profilS = (sysStyl: string, kod: string) => {
+	const r = getEditableRows(sysStyl)?.rows.find((x) => x.kod === kod && x.dim === 'S');
+	expect(r, `${sysStyl}: chýba profil ${kod} (S) v editore`).toBeTruthy();
+	return r!;
+};
+
+/** Fixture: nastaví offset kladkového (S) a skla šírky priamo v test DB (bez auditu). */
+function nastavStav(sysStyl: string, stav: { kladkovy: number; sklo: number }) {
+	const kl = profilS(sysStyl, KLADKOVY);
+	db.prepare('UPDATE cfg_rez SET offset = ? WHERE id = ?').run(stav.kladkovy, kl.id);
+	const upd = db
+		.prepare(`UPDATE cfg_rez SET offset = ? WHERE sys_styl = ? AND typ = 'sklo' AND dim = 'S'`)
+		.run(stav.sklo, sysStyl);
+	expect(upd.changes, `${sysStyl}: práve jeden riadok Sklo šírka`).toBe(1);
+}
+
+/** Formulár editora posiela VŠETKY `offset_<id>` (aj nezmenené) — presne ako `ulozit` akcia. */
+function ulozZmenu(sysStyl: string, zmena: Map<number, number>, skloOffsetSys?: number) {
+	const cur = getEditableRows(sysStyl)!;
+	const offsets = new Map<number, number>(cur.rows.map((r) => [r.id, r.offset]));
+	for (const [id, off] of zmena) offsets.set(id, off);
+	return saveCfgChanges({
+		sysStyl,
+		username: 'vyroba',
+		offsets,
+		skloOffset: skloOffsetSys ?? cur.skloOffset
+	});
+}
+
+const nastaveniaLoad = async (sysStyl: string) =>
+	(await load({
+		url: new URL(`http://x/zasklenia/nastavenia?sysStyl=${encodeURIComponent(sysStyl)}`)
+	} as Parameters<typeof load>[0])) as Record<string, unknown>;
+
+describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štandard + opona IZO)', () => {
+	for (const ss of STYLY) {
+		it(`[RED] ${ss}: výroba doladí kladkový o −6 mm → sklo šírka sa posunie o −6, auditované`, () => {
+			const { n, kladkovy } = PROD[ss]!;
+			nastavStav(ss, { kladkovy, sklo: kladkovy - 10 * n });
+			const kl = profilS(ss, KLADKOVY);
+			const skloVpred = skloOffset(ss, 'V');
+
+			const { zmeny, error } = ulozZmenu(ss, new Map([[kl.id, kladkovy - 6]]));
+			expect(error).toBeNull();
+
+			// sklo sa posunulo spolu s kladkovým; invariant po uložení: sklo == kladkový − 10·N
+			expect(skloOffset(ss, 'S')).toBe(kladkovy - 6 - 10 * n);
+			expect(skloOffset(ss, 'S')).toBe(profilS(ss, KLADKOVY).offset - 10 * n);
+			// výška skla (V − 135) je samostatný rozmer — nedotknutá
+			expect(skloOffset(ss, 'V')).toBe(skloVpred);
+
+			// presne dva záznamy: zmena kladkového + auditované posunutie skla
+			expect(zmeny).toEqual([
+				{ pole: `${kl.nazov} · šírka`, stara: kladkovy, nova: kladkovy - 6 },
+				{ pole: POLE_SKLO, stara: kladkovy - 10 * n, nova: kladkovy - 6 - 10 * n }
+			]);
+			const audit = getAuditLog(1)[0]!;
+			expect(audit.sys_styl).toBe(ss);
+			expect(audit.username).toBe('vyroba');
+			expect(JSON.parse(audit.zmeny)).toContainEqual({
+				pole: POLE_SKLO,
+				stara: kladkovy - 10 * n,
+				nova: kladkovy - 6 - 10 * n
+			});
+
+			// výpočet: na krídlo je kladkový presne o 10 mm dlhší než sklo (pred zaokrúhlením)
+			const g = loadCfg()[ss]!;
+			const klRow = g.rez.find((r) => r.kod === KLADKOVY && r.dim === 'S')!;
+			for (const S of [3000, 5000, 6500, 7400])
+				expect(val(klRow, S, 2070, g.N, true) - val(g.sklo.s!, S, 2070, g.N, true)).toBeCloseTo(
+					10,
+					9
+				);
+		});
+	}
+
+	it('[RED] vektor úlohy 1416 po doladení: 2×3K IZO 6500 × 2070, kladkový −326 → rez 1029, sklo 1019', () => {
+		const ss = 'Štandard +|2x3K IZO';
+		nastavStav(ss, { kladkovy: -320, sklo: -380 });
+		const r0 = computeFlat(loadCfg(), ss, 6500, 2070, false, 0, true)!;
+		expect(r0.sklo).toEqual({ sirka: 1020, vyska: 1935, pocet: 6 });
+
+		const { error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -326]]));
+		expect(error).toBeNull();
+		const r = computeFlat(loadCfg(), ss, 6500, 2070, false, 0, true)!;
+		expect(r.material.find((m) => m.kod === KLADKOVY)!.rezy).toEqual([{ rozmer: 1029, ks: 12 }]);
+		expect(r.sklo).toEqual({ sirka: 1019, vyska: 1935, pocet: 6 });
+	});
+
+	it('[RED] necelé offsety (pole step="any"): sklo sleduje aj −273,5 → −274,25, bez float šumu', () => {
+		const ss = 'Štandard +|2x2K IZO';
+		nastavStav(ss, { kladkovy: -273.5, sklo: -313.5 });
+		const { zmeny, error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -274.25]]));
+		expect(error).toBeNull();
+		expect(skloOffset(ss, 'S')).toBe(-314.25);
+		expect(zmeny.find((z) => z.pole === POLE_SKLO)).toEqual({
+			pole: POLE_SKLO,
+			stara: -313.5,
+			nova: -314.25
+		});
+	});
+
+	it('ručná výnimka: sklo pravidlo NEsledovalo (seed stav) → zmena kladkového sklo NEposunie', () => {
+		const ss = 'Štandard +|2x3K IZO';
+		// seed: kladkový −285, sklo −380 → −285 − 60 = −345 ≠ −380 (sklo je samostatný rozmer)
+		nastavStav(ss, { kladkovy: -285, sklo: -380 });
+		const { zmeny, error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -291]]));
+		expect(error).toBeNull();
+		expect(skloOffset(ss, 'S')).toBe(-380);
+		expect(zmeny.map((z) => z.pole)).toEqual([`${profilS(ss, KLADKOVY).nazov} · šírka`]);
+	});
+
+	it('rozširujúci profil sklo NEposúva (pravidlo +6 mm je výsledok, nie zdroj)', () => {
+		const ss = 'Štandard +|2x3K IZO';
+		nastavStav(ss, { kladkovy: -320, sklo: -380 });
+		const roz = profilS(ss, ROZSIRUJUCI);
+		const { zmeny, error } = ulozZmenu(ss, new Map([[roz.id, roz.offset - 6]]));
+		expect(error).toBeNull();
+		expect(skloOffset(ss, 'S')).toBe(-380);
+		expect(zmeny).toHaveLength(1);
+		expect(zmeny.some((z) => z.pole === POLE_SKLO)).toBe(false);
+	});
+
+	it('uloženie BEZ zmeny kladkového (iné pole / systémové zmenšenie) sa skla nedotkne', () => {
+		const ss = 'Štandard +|2x4K IZO';
+		nastavStav(ss, { kladkovy: -380, sklo: -460 });
+		const dor = getEditableRows(ss)!.rows.find((r) => r.dim === 'V' && /dorazov/i.test(r.nazov))!;
+		const { zmeny, error } = ulozZmenu(ss, new Map([[dor.id, dor.offset - 1]]), 2);
+		expect(error).toBeNull();
+		expect(skloOffset(ss, 'S')).toBe(-460);
+		expect(zmeny.map((z) => z.pole).sort()).toEqual(
+			[`${dor.nazov} · výška`, 'Sklo — konečné zmenšenie'].sort()
+		);
+		// návrat systémového zmenšenia (net-zero pre ďalšie testy v súbore)
+		expect(ulozZmenu(ss, new Map([[dor.id, dor.offset]]), 0).error).toBeNull();
+	});
+
+	it('štýly MIMO pravidla (starý Štandard 2×3K IZO, Štandard + 3K IZO): sklo sa NEposunie, aj keď náhodou = kladkový − 10·N', () => {
+		for (const [ss, n] of [
+			['Štandard|2x3K IZO', 6],
+			['Štandard +|3K IZO', 3]
+		] as const) {
+			const kl = profilS(ss, KLADKOVY);
+			nastavStav(ss, { kladkovy: kl.offset, sklo: kl.offset - 10 * n });
+			const { zmeny, error } = ulozZmenu(ss, new Map([[kl.id, kl.offset - 6]]));
+			expect(error).toBeNull();
+			expect(skloOffset(ss, 'S'), ss).toBe(kl.offset - 10 * n);
+			expect(
+				zmeny.some((z) => /sklo/i.test(z.pole)),
+				ss
+			).toBe(false);
+		}
+	});
+
+	it('[RED] odvodené sklo mimo ±500 mm → celé uloženie sa odmietne (kladkový aj sklo ostanú)', () => {
+		const ss = 'Štandard +|2x4K IZO';
+		nastavStav(ss, { kladkovy: -380, sklo: -460 });
+		// kladkový −430 → sklo −510 mimo BOUNDS.offset (±500) → poistka inBounds vráti transakciu
+		const { zmeny, error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -430]]));
+		expect(error).toMatch(/mimo rozsahu/);
+		expect(zmeny).toEqual([]);
+		expect(profilS(ss, KLADKOVY).offset).toBe(-380);
+		expect(skloOffset(ss, 'S')).toBe(-460);
+	});
+
+	it('[RED] editor: poznámka pri kladkovom LEN keď sklo pravidlo sleduje (load `skloSleduje`)', async () => {
+		const ss = 'Štandard +|2x3K IZO';
+		nastavStav(ss, { kladkovy: -320, sklo: -380 });
+		expect((await nastaveniaLoad(ss)).skloSleduje).toEqual({
+			profilId: profilS(ss, KLADKOVY).id,
+			mmNaKridlo: 10
+		});
+		// ručná výnimka (seed) → žiadna poznámka (sklo sa pri zmene kladkového NEposunie)
+		nastavStav(ss, { kladkovy: -285, sklo: -380 });
+		expect((await nastaveniaLoad(ss)).skloSleduje).toBeNull();
+		// štýl mimo pravidla → žiadna poznámka
+		expect((await nastaveniaLoad('Robust|4K')).skloSleduje).toBeNull();
+	});
+});
