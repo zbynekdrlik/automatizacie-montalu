@@ -1,6 +1,7 @@
 ---
 paths:
   - "src/lib/server/cfg-editor.ts"
+  - "src/lib/server/cfg-editor-sklo.ts"
   - "src/lib/server/sklo-sleduje-profil.ts"
   - "src/routes/zasklenia/nastavenia/**"
   - "tests/auth-editor.test.ts"
@@ -12,9 +13,11 @@ paths:
 
 # Editor vzorcov (`cfg-editor.ts` `saveCfgChanges`) — skryté zrkadlenia a audit
 
-Editor `/zasklenia/nastavenia` ukladá offsety cez `saveCfgChanges`. Dve „skryté" zrkadlenia
-prepisujú riadky, ktoré formulár NEUKAZUJE — obe sú historické pasce; každý dotyk tejto
-funkcie ich musí rešpektovať.
+Editor `/zasklenia/nastavenia` ukladá offsety cez `saveCfgChanges`. „Skryté" zápisy prepisujú
+riadky, ktoré formulár NEUKAZUJE — sú to historické pasce; každý dotyk tejto funkcie ich musí
+rešpektovať. Zápisy do riadkov SKLA (PASCA #1 + #3) ROZHODUJE čistá funkcia
+`rozhodniSkloZapisy` v `src/lib/server/cfg-editor-sklo.ts` (bez DB → testovateľná priamo),
+`saveCfgChanges` len pripojí jej `zmeny` a v transakcii zapíše `skloZapisy` cez `updSkloRez`.
 
 ## PASCA #1 — rámový→sklo mirror NIE JE bezpodmienečný (prod korupcia #504, 14.9.2026)
 
@@ -28,13 +31,13 @@ uloženie ktoréhokoľvek z 29 štýlov (aj so zmenou len Kladkového/Rozširuj�
 sklo výšku na rámový −33 → sklo do Money o ~102 mm privysoké. Zachytila to `e2e/opona-izo.spec.ts`
 (1965 → 2067).
 
-**Kontrakt platný od #504** (`saveCfgChanges`, blok `skloMirror`): zrkadli rámový→sklo LEN keď
+**Kontrakt platný od #504** (`rozhodniSkloZapisy`, mapa `skloZapisy`): zrkadli rámový→sklo LEN keď
 - rámový offset sa SKUTOČNE zmenil (`nova !== r.offset`), A
 - sklo ho práve SLEDOVALO (`skloByDim.get(dim) === starý rámový.offset`) — inak je sklo
   SAMOSTATNÝ rozmer a ostáva nedotknuté (opona IZO sklo výška −135 navždy nezávislá),
 
 a zrkadlenie sa MUSÍ zapísať do `zmeny` (→ `cfg_audit`), inak je zmena Money-kritického
-rozmeru neviditeľná. Dedup per dim = `skloMirror.has(dim)` (prvý zmenený rámový vyhráva) →
+rozmeru neviditeľná. Dedup per dim = `skloZapisy.has(dim)` (prvý zmenený rámový vyhráva) →
 jeden audit záznam presne zodpovedá tomu, čo `updSkloRez` zapíše.
 
 **Dôsledky pri práci:**
@@ -62,24 +65,31 @@ užšie než kladkový (`off_sklo = off_kladkový − 10·N`). Výroba ladí kla
 editor neukazuje → bez väzby by úprava kladkového ticho rozbila pravidlo.
 
 - **Jedno miesto pravdy = `src/lib/server/sklo-sleduje-profil.ts`** (`SKLO_SLEDUJE_PROFIL`:
-  sysStyl → `profilKod` ZASP202415, `mmNaKridlo` 10). Čítajú ju `saveCfgChanges` (zápis + audit) aj
-  editor `load` (`skloSledujeInfo` → `data.skloSleduje` → poznámka „↳ sklo sa posunie automaticky
-  (o 10 mm užšie)" pod poľom kladkového). Nový štýl s pravidlom = riadok mapy + test, žiadne
-  `system === …` v kóde.
+  sysStyl → `profilKod` ZASP202415, `mmNaKridlo` 10). Čítajú ju `rozhodniSkloZapisy` (zápis +
+  audit) aj editor `load` (`skloSledujeInfo(sysStyl, editable)` → `skloSledujeStav` →
+  `data.skloSleduje = { profilId, mmNaKridlo, sleduje }`). Nový štýl s pravidlom = riadok mapy +
+  test, žiadne `system === …` v kóde. N (krídla) nesie `getEditableRows(...).n`.
 - **Kontrakt = #504 vzor:** posuň LEN keď sa offset profilu SKUTOČNE zmenil A sklo pravidlo
-  sledovalo (`skloSleduje`, tolerancia 1e-6 — offsety sú REAL, editor `step="any"`; nový offset
-  `skloOffsetZProfilu` bez float šumu). Ručná výnimka (sklo nesledovalo) ostáva. Zápis ide do
-  `skloMirror` (dim S) → `updSkloRez`; rámový mirror má prednosť (`skloMirror.has`). Audit pole
-  „Sklo šírka (S) offset — sleduje kladkový − 10 mm (#610)". Rozširujúci (+6) sklo NEposúva.
-- Nejednoznačný stav (2× Sklo šírka / chýba profil) → väzba sa neuplatní + `log.warn`, nikdy hádanie.
+  sledovalo (`skloSleduje`, tolerancia 1e-6 — offsety sú REAL, editor `step="any"`, −255,96 − 40 =
+  −295,96000000000004; nový offset `skloOffsetZProfilu` zaokrúhlený na 1e-6 bez float šumu — oboje
+  stráži test „float šum"). Ručná výnimka (sklo nesledovalo) ostáva. Zápis ide do `skloZapisy`
+  (dim S) → `updSkloRez`; rámový mirror má prednosť (`skloZapisy.has`). Audit pole „Sklo šírka (S)
+  offset — sleduje kladkový − 10 mm (#610)". Rozširujúci (+6) sklo NEposúva.
+- Nejednoznačný stav (2× Sklo šírka / 2× kladkový) → väzba sa neuplatní + `log.warn`, nikdy hádanie.
   Odvodené sklo mimo ±500 → `inBounds` poistka vráti celé uloženie.
-- Poznámka v editore sa ukáže LEN keď sklo práve sleduje (inak by klamala).
+- Poznámka pod poľom kladkového (`.sub` = mechanika poľa; `.pozn` je pre „prečo" texty #444):
+  `sleduje` → „↳ sklo sa posunie automaticky (o 10 mm užšie)" (`sklo-sleduje-pozn`), inak
+  „↳ sklo sa neposunie — šírka skla je nastavená samostatne …" (`sklo-nesleduje-pozn`).
 - **SEED vs PROD:** seed nesie staršie profily (kladkový −235/−285/−335) → v čerstvej/test DB sklo
   pravidlo NEsleduje a väzba sa nechytí. Testy si PROD stav (kladkový −273/−320/−380, sklo
   −313/−380/−460) nastavia priamo v DB (`tests/cfg-editor-sklo-kladkovy-610.test.ts`
   `nastavStav`). E2E (`e2e/cfg-editor-sklo-kladkovy-610.spec.ts`) to isté cez `e2e.db` a upratuje
   OBA riadky v `finally` — raz sledujúce sklo editor ťahá s kladkovým, takže pôvodný seed stav
   (nesledujúci) sa editorom obnoviť NEDÁ (návrat kladkového by posunul aj sklo).
+- **Dôsledok pre post-deploy E2E:** šírka skla týchto štýlov sa na PROD hýbe s kladkovým →
+  nikdy pevný mm literál proti `BASE_URL`; `e2e/opona-izo.spec.ts` `overSirkuSkla` = seed literál
+  bez BASE_URL, na PROD relácia `rezProfiluMm(page, 'ZASP202415') − sklo === 10` (helper v
+  `e2e/helpers.ts`; obe sú `Math.round` tej istej hodnoty ± 10 → presne 10, ak korekcia triedy 16 = 0).
 
 ## Audit invariant
 

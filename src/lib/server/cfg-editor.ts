@@ -18,16 +18,7 @@ import {
 	type SietkaStandardKluc,
 	type SietkaStandardParams
 } from '../sietka-standard';
-import {
-	skloSledujeProfil,
-	skloSleduje,
-	skloOffsetZProfilu,
-	skloSledujePole,
-	type SkloSledujeProfil
-} from './sklo-sleduje-profil';
-import { logger } from './log';
-
-const log = logger('cfg-editor');
+import { rozhodniSkloZapisy, skloSledujeStav, type SkloRiadok } from './cfg-editor-sklo';
 
 export interface EditRow {
 	id: number;
@@ -56,9 +47,16 @@ const baseRole = (nazov: string) =>
 		.replace(/\s+/g, ' ')
 		.trim();
 
-export function getEditableRows(sysStyl: string): { rows: EditRow[]; skloOffset: number } | null {
-	const sys = db.prepare('SELECT sklo_offset FROM cfg_sys WHERE sys_styl = ?').get(sysStyl) as
-		{ sklo_offset: number } | undefined;
+export interface EditableRows {
+	rows: EditRow[];
+	skloOffset: number;
+	/** počet krídel štýlu (`cfg_sys.n`) — #610 väzba sklo šírka→profil počíta mm na krídlo */
+	n: number;
+}
+
+export function getEditableRows(sysStyl: string): EditableRows | null {
+	const sys = db.prepare('SELECT sklo_offset, n FROM cfg_sys WHERE sys_styl = ?').get(sysStyl) as
+		{ sklo_offset: number; n: number } | undefined;
 	if (!sys) return null;
 	const raw = db
 		.prepare(
@@ -80,49 +78,20 @@ export function getEditableRows(sysStyl: string): { rows: EditRow[]; skloOffset:
 			poradie: r.poradie,
 			offset: r.offset
 		}));
-	return { rows, skloOffset: sys.sklo_offset };
+	return { rows, skloOffset: sys.sklo_offset, n: Number(sys.n) };
 }
 
-// #610: väzba šírky skla na profil (Štandard + opona IZO: sklo = kladkový − 10 mm na krídlo).
-// Pravidlo + množina štýlov žijú v `sklo-sleduje-profil.ts`; tu sa len prečíta aktuálny stav
-// (profil riadok editora, offset skla šírky, N). `null` = štýl väzbu nemá / chýba riadok.
-interface VazbaSkla {
-	pravidlo: SkloSledujeProfil;
-	profil: EditRow;
-	skloS: number;
-	n: number;
-}
+/** Aktuálne `typ='sklo'` riadky štýlu (Sklo šírka/výška) — editor ich neukazuje. */
+const skloRiadky = (sysStyl: string) =>
+	db
+		.prepare(`SELECT dim, offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo'`)
+		.all(sysStyl) as SkloRiadok[];
 
-function vazbaSkla(sysStyl: string, rows: EditRow[]): VazbaSkla | null {
-	const pravidlo = skloSledujeProfil(sysStyl);
-	if (!pravidlo) return null;
-	const profil = rows.filter((r) => r.kod === pravidlo.profilKod && r.dim === 'S');
-	const sklo = db
-		.prepare(`SELECT offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo' AND dim = 'S'`)
-		.all(sysStyl) as { offset: number }[];
-	const sys = db.prepare('SELECT n FROM cfg_sys WHERE sys_styl = ?').get(sysStyl) as
-		{ n: number } | undefined;
-	// bez JEDNOZNAČNÉHO profilu, skla a N väzbu neuplatníme — nikdy nehádame, ktorý riadok posunúť
-	if (profil.length !== 1 || sklo.length !== 1 || !sys) {
-		log.warn('väzba sklo šírka→profil: chýba/nejednoznačný riadok — väzba sa neuplatní', {
-			sysStyl,
-			profilKod: pravidlo.profilKod,
-			profilov: profil.length,
-			skiel: sklo.length,
-			maN: !!sys
-		});
-		return null;
-	}
-	return { pravidlo, profil: profil[0]!, skloS: sklo[0]!.offset, n: Number(sys.n) };
-}
-
-/** #610: editor ukáže pri profile poznámku „sklo sa posunie automaticky" LEN keď sklo pravidlo
- *  PRÁVE sleduje (ručná výnimka sa pri zmene profilu neposunie — poznámka by klamala). */
-export function skloSledujeInfo(sysStyl: string): { profilId: number; mmNaKridlo: number } | null {
-	const cur = getEditableRows(sysStyl);
-	const v = cur && vazbaSkla(sysStyl, cur.rows);
-	if (!v || !skloSleduje(v.pravidlo, v.skloS, v.profil.offset, v.n)) return null;
-	return { profilId: v.profil.id, mmNaKridlo: v.pravidlo.mmNaKridlo };
+/** #610: stav väzby sklo šírka→profil pre poznámku editora pri poli profilu (`sleduje` = sklo
+ *  sa pri zmene profilu posunie; `false` = samostatne nastavené sklo; `null` = štýl väzbu nemá).
+ *  `editable` = výsledok `getEditableRows` z toho istého loadu (bez druhého čítania). */
+export function skloSledujeInfo(sysStyl: string, editable: EditableRows | null) {
+	return editable ? skloSledujeStav(sysStyl, editable.rows, skloRiadky(sysStyl), editable.n) : null;
 }
 
 export interface SaveInput {
@@ -318,70 +287,16 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		}
 	}
 
-	// #504: sklo riadky sa historicky zrkadlili z rámového profilu ROVNAKEJ dimenzie
-	// BEZPODMIENEČNE pri každom uložení — to prepisovalo NEZÁVISLÉ sklo offsety (opona IZO
-	// sklo výška = V−135, rámový stredový = V−33; 29 z 39 štýlov má sklo ≠ rámový; prod
-	// korupcia 14.9., cfg_rez 419/409/399/377). Nový kontrakt: zrkadli rámový→sklo LEN keď
-	// sa rámový offset SKUTOČNE zmenil A sklo ho práve sledovalo (sklo.offset === starý
-	// rámový.offset) — inak je sklo samostatný rozmer a ostáva. Zrkadlenie sa auditni (zmeny).
-	const skloAktual = db
-		.prepare(`SELECT dim, offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo'`)
-		.all(input.sysStyl) as { dim: 'S' | 'V'; offset: number }[];
-	const skloByDim = new Map<'S' | 'V', number>(skloAktual.map((r) => [r.dim, r.offset]));
-	const skloMirror = new Map<'S' | 'V', number>();
-	for (const r of cur.rows) {
-		const nova = input.offsets.get(r.id);
-		if (nova === undefined || nova === r.offset) continue; // rámový sa nezmenil
-		if (!/rámový/i.test(r.nazov)) continue;
-		const skloStara = skloByDim.get(r.dim);
-		// sklo ho práve sledovalo (rovný štýl) → drž v synchróne; inak nezávislé → nechaj tak
-		if (skloStara === undefined || skloStara !== r.offset) continue;
-		// prvý zmenený rámový danej dim vyhráva → JEDEN auditovaný záznam, ktorý presne
-		// zodpovedá tomu, čo sa zapíše (deterministické; predtým last-wins zápis vs. viac
-		// audit záznamov, ak by štýl mal 2 rámový riadky tej istej dim s rôznymi novými hodnotami)
-		if (skloMirror.has(r.dim)) continue;
-		skloMirror.set(r.dim, nova);
-		zmeny.push({
-			pole: `Sklo ${r.dim === 'S' ? 'šírka' : 'výška'} (zrkadlené z „${r.nazov}")`,
-			stara: skloStara,
-			nova
-		});
-	}
-
-	// #610: sklo šírka sleduje profil podľa pravidla výroby (Štandard + opona IZO: kladkový − 10 mm
-	// na krídlo, `sklo-sleduje-profil.ts`). Rovnaký kontrakt ako rámový mirror vyššie: posuň sklo
-	// LEN keď sa offset profilu SKUTOČNE zmenil A sklo pravidlo dovtedy sledovalo (`sklo ==
-	// profil_starý − mm·N`) — inak je to ručná výnimka a ostáva. Rámový mirror má prednosť
-	// (`skloMirror.has`), zápis ide tou istou cestou (`updSkloRez`) a MUSÍ byť v `zmeny` (audit).
-	const vazba = vazbaSkla(input.sysStyl, cur.rows);
-	if (vazba && !skloMirror.has('S')) {
-		const { pravidlo, profil, skloS, n } = vazba;
-		const nova = input.offsets.get(profil.id);
-		if (nova !== undefined && nova !== profil.offset) {
-			if (skloSleduje(pravidlo, skloS, profil.offset, n)) {
-				const skloNova = skloOffsetZProfilu(pravidlo, nova, n);
-				skloMirror.set('S', skloNova);
-				zmeny.push({ pole: skloSledujePole(pravidlo), stara: skloS, nova: skloNova });
-				log.info('väzba sklo šírka→profil: sklo sa posunie s profilom', {
-					sysStyl: input.sysStyl,
-					profil: profil.nazov,
-					profilStara: profil.offset,
-					profilNova: nova,
-					skloStara: skloS,
-					skloNova
-				});
-			} else {
-				log.info('väzba sklo šírka→profil: sklo pravidlo nesleduje (ručná výnimka) — nedotknuté', {
-					sysStyl: input.sysStyl,
-					profil: profil.nazov,
-					profilStara: profil.offset,
-					profilNova: nova,
-					sklo: skloS,
-					n
-				});
-			}
-		}
-	}
+	// #504 + #610: skryté zápisy do riadkov skla (rámový→sklo mirror, väzba sklo šírka→kladkový)
+	// rozhoduje `cfg-editor-sklo.ts` — podmienené, každý s audit záznamom (PASCA #1 a #3).
+	const { skloZapisy, zmeny: skloZmeny } = rozhodniSkloZapisy(
+		input.sysStyl,
+		cur.rows,
+		input.offsets,
+		skloRiadky(input.sysStyl),
+		cur.n
+	);
+	zmeny.push(...skloZmeny);
 
 	if (!zmeny.length) return { zmeny: [], error: null };
 
@@ -423,8 +338,8 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 				}
 			}
 			// #504/#610: podmienené + auditované zrkadlenie rámový→sklo a väzba sklo šírka→profil
-			// (obe rozhodnuté do skloMirror vyššie)
-			for (const [dim, off] of skloMirror) updSkloRez.run(off, input.sysStyl, dim);
+			// (obe rozhodnuté do skloZapisy vyššie, `rozhodniSkloZapisy`)
+			for (const [dim, off] of skloZapisy) updSkloRez.run(off, input.sysStyl, dim);
 			updSys.run(input.skloOffset, input.sysStyl);
 			for (const g of glassZmeny) updGlass.run(g.nova, g.id);
 			// #440: NULL sa zapíše ako SQL NULL (better-sqlite3 viaže JS null → NULL) → zruší override

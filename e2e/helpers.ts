@@ -156,6 +156,23 @@ export function jokleZoSietoviny(rozmerText: string): { sirka: number; vyska: nu
 }
 
 /**
+ * #610: hlavný rez profilu `kod` (mm) z NÁREZ riadka „Rez profilu <KOD>" („12×1030 mm"; pri
+ * viacerých rozmeroch ten s najviac kusmi) — rozmer rezu je v nárez tabuľke, nie v odpis karte
+ * (testing.md #416). Na RELAČNÉ asercie voči ŽIVEJ PROD cfg (#555), napr. opona IZO
+ * „sklo = kladkový − 10 mm": kladkový ladí výroba editorom a sklo šírka ho sleduje (väzba #610).
+ */
+export async function rezProfiluMm(page: Page, kod: string): Promise<number> {
+	const riadok = page.getByRole('row', { name: new RegExp(`Rez profilu ${kod}`) });
+	const txt = (await riadok.textContent()) ?? '';
+	const rezy = [...txt.matchAll(/(\d+)×(\d+(?:,\d+)?) mm/g)].map((m) => ({
+		ks: Number(m[1]),
+		rozmer: Number(m[2]!.replace(',', '.'))
+	}));
+	if (!rezy.length) throw new Error(`rezProfiluMm: nečakaný nárez riadok ${kod} „${txt}"`);
+	return rezy.reduce((a, b) => (b.ks > a.ks ? b : a)).rozmer;
+}
+
+/**
  * goto + počkanie na hydratáciu. fill() pred dokončenou hydratáciou prehráva
  * s Svelte, ktorá value-bound inputy vráti na serverový stav (cez pomalý SSH
  * tunel sa JS načítava neskoro — v CI to nikdy nevidno).

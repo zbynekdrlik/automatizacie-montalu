@@ -14,7 +14,15 @@
 // beží aj po páde). Nula console errors/warnings.
 import { test, expect, type Page } from '@playwright/test';
 import Database from 'better-sqlite3';
-import { collectConsole, loginAs, goto, skipAkLive, vyberFarbuKovania, vyberSklo } from './helpers';
+import {
+	collectConsole,
+	loginAs,
+	goto,
+	rezProfiluMm,
+	skipAkLive,
+	vyberFarbuKovania,
+	vyberSklo
+} from './helpers';
 
 const DB_PATH = process.env.DATABASE_PATH || './data/e2e.db';
 const SYS_STYL = 'Štandard +|2x3K IZO';
@@ -60,14 +68,9 @@ async function narezak(page: Page, krok: string): Promise<{ sklo: number; kladko
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
 
 	const sklo = Number(await page.getByTestId('sklo-sirka').textContent());
+	if (!Number.isFinite(sklo)) throw new Error(`narezak: nečakaná šírka skla ${sklo}`);
 	// nárez riadok kladkového („12×1030 mm") — rozmer rezu, nie odpis karta (testing.md #416)
-	const txt =
-		(await page.getByRole('row', { name: new RegExp(`Rez profilu ${KLADKOVY}`) }).textContent()) ??
-		'';
-	const m = txt.match(/(\d+)×(\d+(?:,\d+)?) mm/);
-	if (!m || !Number.isFinite(sklo))
-		throw new Error(`narezak: nečakaný text „${txt}" / sklo ${sklo}`);
-	return { sklo, kladkovy: Number(m[2]!.replace(',', '.')) };
+	return { sklo, kladkovy: await rezProfiluMm(page, KLADKOVY) };
 }
 
 test('#610 editor: výroba doladí kladkový 2×3K opona IZO → sklo šírka sa posunie samo (sklo = kladkový − 10)', async ({
@@ -78,10 +81,19 @@ test('#610 editor: výroba doladí kladkový 2×3K opona IZO → sklo šírka sa
 	const db = new Database(DB_PATH);
 	const povodne = riadkyCfg(db);
 	try {
+		await loginAs(page);
+		// --- 0. východzí stav DB: poznámka editora zodpovedá tomu, či sklo pravidlo sleduje
+		//        (seed nesleduje → „sklo sa neposunie"; odvodené z DB, nie predpoklad) ---
+		const sledujeVychodzi = povodne.sklo.offset === povodne.kladkovy.offset - 10 * N;
+		await goto(page, `/zasklenia/nastavenia?sysStyl=${encodeURIComponent(SYS_STYL)}`);
+		await expect(page.getByTestId('editor-nadpis')).toContainText('2x3K IZO');
+		await expect(
+			page.getByTestId(sledujeVychodzi ? 'sklo-sleduje-pozn' : 'sklo-nesleduje-pozn')
+		).toBeVisible();
+
 		// --- 1. fixture: stav ako na PROD po v58 — kladkový = sklo + 10 mm na krídlo ---
 		const kladkovyProd = povodne.sklo.offset + 10 * N;
 		db.prepare('UPDATE cfg_rez SET offset = ? WHERE id = ?').run(kladkovyProd, povodne.kladkovy.id);
-		await loginAs(page);
 		const pred = await narezak(page, 'PRED');
 		expect(pred.kladkovy - pred.sklo, 'východzí stav: sklo = kladkový − 10').toBe(10);
 
@@ -91,6 +103,7 @@ test('#610 editor: výroba doladí kladkový 2×3K opona IZO → sklo šírka sa
 		await expect(page.getByTestId('sklo-sleduje-pozn')).toContainText(
 			'sklo sa posunie automaticky (o 10 mm užšie)'
 		);
+		await expect(page.getByTestId('sklo-nesleduje-pozn')).toHaveCount(0);
 		const kladk = page.getByLabel(/Kladkový profil.*odsadenie/);
 		await expect(kladk).toHaveValue(String(kladkovyProd));
 		await kladk.fill(String(kladkovyProd - 6));

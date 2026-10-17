@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { db, loadCfg } from '../src/lib/server/db';
 import { saveCfgChanges, getEditableRows, getAuditLog } from '../src/lib/server/cfg-editor';
+import { rozhodniSkloZapisy, skloSledujeStav } from '../src/lib/server/cfg-editor-sklo';
 import { computeFlat } from '../src/lib/server/compute';
 import { val } from '../src/lib/server/compute-model';
 import { load } from '../src/routes/zasklenia/nastavenia/+page.server';
@@ -143,6 +144,29 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 		});
 	});
 
+	it('float šum: −255,96 − 40 = −295,96000000000004 sa berie ako sledujúce a nový offset je bez šumu', () => {
+		// review: binárne presné ,5/,25 hodnoty vyššie toleranciu ani zaokrúhlenie neoveria.
+		// −255,96 − 40 v double = −295,96000000000004 ≠ uložené −295,96 (tolerancia musí väzbu
+		// zachovať) a −255,92 − 40 = −295,91999999999996 (zaokrúhlenie musí dať čisté −295,92).
+		expect(-255.96 - 40).not.toBe(-295.96);
+		expect(-255.92 - 40).not.toBe(-295.92);
+		const ss = 'Štandard +|2x2K IZO';
+		nastavStav(ss, { kladkovy: -255.96, sklo: -295.96 });
+		const { zmeny, error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -255.92]]));
+		expect(error).toBeNull();
+		expect(skloOffset(ss, 'S')).toBe(-295.92);
+		expect(zmeny.find((z) => z.pole === POLE_SKLO)).toEqual({
+			pole: POLE_SKLO,
+			stara: -295.96,
+			nova: -295.92
+		});
+		expect(JSON.parse(getAuditLog(1)[0]!.zmeny)).toContainEqual({
+			pole: POLE_SKLO,
+			stara: -295.96,
+			nova: -295.92
+		});
+	});
+
 	it('ručná výnimka: sklo pravidlo NEsledovalo (seed stav) → zmena kladkového sklo NEposunie', () => {
 		const ss = 'Štandard +|2x3K IZO';
 		// seed: kladkový −285, sklo −380 → −285 − 60 = −345 ≠ −380 (sklo je samostatný rozmer)
@@ -206,16 +230,23 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 		expect(skloOffset(ss, 'S')).toBe(-460);
 	});
 
-	it('[RED] editor: poznámka pri kladkovom LEN keď sklo pravidlo sleduje (load `skloSleduje`)', async () => {
+	it('[RED] editor: poznámka pri kladkovom podľa stavu väzby (load `skloSleduje`)', async () => {
 		const ss = 'Štandard +|2x3K IZO';
 		nastavStav(ss, { kladkovy: -320, sklo: -380 });
+		// review: tvar rozšírený o `sleduje` — ručná výnimka dostane vlastnú poznámku („sklo sa
+		// neposunie"), aby výroba videla, že sa sklo s kladkovým NEpohne (predtým žiadna poznámka)
 		expect((await nastaveniaLoad(ss)).skloSleduje).toEqual({
 			profilId: profilS(ss, KLADKOVY).id,
-			mmNaKridlo: 10
+			mmNaKridlo: 10,
+			sleduje: true
 		});
-		// ručná výnimka (seed) → žiadna poznámka (sklo sa pri zmene kladkového NEposunie)
+		// ručná výnimka (seed) → poznámka „sklo sa neposunie" (sklo sa pri zmene kladkového NEpohne)
 		nastavStav(ss, { kladkovy: -285, sklo: -380 });
-		expect((await nastaveniaLoad(ss)).skloSleduje).toBeNull();
+		expect((await nastaveniaLoad(ss)).skloSleduje).toEqual({
+			profilId: profilS(ss, KLADKOVY).id,
+			mmNaKridlo: 10,
+			sleduje: false
+		});
 		// štýl mimo pravidla → žiadna poznámka
 		expect((await nastaveniaLoad('Robust|4K')).skloSleduje).toBeNull();
 	});
@@ -248,5 +279,84 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 		} finally {
 			db.prepare('DELETE FROM cfg_rez WHERE id = ?').run(kopia);
 		}
+	});
+});
+
+// Čisté rozhodnutie skrytých zápisov skla (`cfg-editor-sklo.ts`) — prípady, ktoré dnešné dáta
+// nemajú (žiadny štýl z mapy nemá rámový S), ale kontrakt ich musí držať.
+describe('#610 rozhodniSkloZapisy: precedencia a nejednoznačnosť (čisté, bez DB)', () => {
+	const SS = 'Štandard +|2x3K IZO';
+	const kladkovy = {
+		id: 1,
+		kod: KLADKOVY,
+		nazov: 'Kladkový profil',
+		dim: 'S' as const,
+		poradie: 20
+	};
+	const ramovyS = {
+		id: 2,
+		kod: 'ZASP00024',
+		nazov: 'Rámový profil S',
+		dim: 'S' as const,
+		poradie: 35
+	};
+
+	it('rámový mirror má prednosť: sklo sleduje rámový AJ kladkový − 60 → vyhrá rámový, JEDEN audit záznam', () => {
+		const rows = [
+			{ ...kladkovy, offset: -320 },
+			{ ...ramovyS, offset: -380 }
+		];
+		const { skloZapisy, zmeny } = rozhodniSkloZapisy(
+			SS,
+			rows,
+			new Map([
+				[1, -326],
+				[2, -385]
+			]),
+			[
+				{ dim: 'S', offset: -380 },
+				{ dim: 'V', offset: -135 }
+			],
+			6
+		);
+		expect([...skloZapisy]).toEqual([['S', -385]]);
+		expect(zmeny).toEqual([
+			{ pole: 'Sklo šírka (zrkadlené z „Rámový profil S")', stara: -380, nova: -385 }
+		]);
+	});
+
+	it('bez zmeny rámového rozhodne väzba na kladkový (rámový S, ktorý sklo nesleduje, ju neblokuje)', () => {
+		const { skloZapisy, zmeny } = rozhodniSkloZapisy(
+			SS,
+			[
+				{ ...kladkovy, offset: -320 },
+				{ ...ramovyS, offset: -33 }
+			],
+			new Map([[1, -326]]),
+			[{ dim: 'S', offset: -380 }],
+			6
+		);
+		expect([...skloZapisy]).toEqual([['S', -386]]);
+		expect(zmeny).toEqual([{ pole: POLE_SKLO, stara: -380, nova: -386 }]);
+	});
+
+	it('dva riadky kladkového (S) → väzba sa neuplatní, stav pre editor null', () => {
+		const rows = [
+			{ ...kladkovy, offset: -320 },
+			{ ...kladkovy, id: 3, poradie: 21, offset: -320 }
+		];
+		const sklo = [{ dim: 'S' as const, offset: -380 }];
+		const { skloZapisy, zmeny } = rozhodniSkloZapisy(SS, rows, new Map([[1, -326]]), sklo, 6);
+		expect(skloZapisy.size).toBe(0);
+		expect(zmeny).toEqual([]);
+		expect(skloSledujeStav(SS, rows, sklo, 6)).toBeNull();
+	});
+
+	it('štýl mimo mapy → žiadna väzba ani stav', () => {
+		const rows = [{ ...kladkovy, offset: -280 }];
+		const sklo = [{ dim: 'S' as const, offset: -340 }];
+		const ine = 'Štandard|2x3K IZO';
+		expect(rozhodniSkloZapisy(ine, rows, new Map([[1, -286]]), sklo, 6).zmeny).toEqual([]);
+		expect(skloSledujeStav(ine, rows, sklo, 6)).toBeNull();
 	});
 });
