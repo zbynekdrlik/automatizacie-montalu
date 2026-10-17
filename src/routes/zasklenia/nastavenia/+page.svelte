@@ -147,6 +147,12 @@
 						value={r.offset}
 						required
 					/>
+					{#if data.skloSleduje?.profilId === r.id}
+						<!-- #610: šírka skla sleduje tento profil (sklo = profil − N mm na krídlo) -->
+						<p class="pozn" data-testid="sklo-sleduje-pozn">
+							↳ sklo sa posunie automaticky (o {data.skloSleduje.mmNaKridlo} mm užšie)
+						</p>
+					{/if}
 				</div>
 			{/each}
 

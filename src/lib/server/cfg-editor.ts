@@ -18,6 +18,16 @@ import {
 	type SietkaStandardKluc,
 	type SietkaStandardParams
 } from '../sietka-standard';
+import {
+	skloSledujeProfil,
+	skloSleduje,
+	skloOffsetZProfilu,
+	skloSledujePole,
+	type SkloSledujeProfil
+} from './sklo-sleduje-profil';
+import { logger } from './log';
+
+const log = logger('cfg-editor');
 
 export interface EditRow {
 	id: number;
@@ -71,6 +81,48 @@ export function getEditableRows(sysStyl: string): { rows: EditRow[]; skloOffset:
 			offset: r.offset
 		}));
 	return { rows, skloOffset: sys.sklo_offset };
+}
+
+// #610: väzba šírky skla na profil (Štandard + opona IZO: sklo = kladkový − 10 mm na krídlo).
+// Pravidlo + množina štýlov žijú v `sklo-sleduje-profil.ts`; tu sa len prečíta aktuálny stav
+// (profil riadok editora, offset skla šírky, N). `null` = štýl väzbu nemá / chýba riadok.
+interface VazbaSkla {
+	pravidlo: SkloSledujeProfil;
+	profil: EditRow;
+	skloS: number;
+	n: number;
+}
+
+function vazbaSkla(sysStyl: string, rows: EditRow[]): VazbaSkla | null {
+	const pravidlo = skloSledujeProfil(sysStyl);
+	if (!pravidlo) return null;
+	const profil = rows.filter((r) => r.kod === pravidlo.profilKod && r.dim === 'S');
+	const sklo = db
+		.prepare(`SELECT offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo' AND dim = 'S'`)
+		.all(sysStyl) as { offset: number }[];
+	const sys = db.prepare('SELECT n FROM cfg_sys WHERE sys_styl = ?').get(sysStyl) as
+		{ n: number } | undefined;
+	// bez JEDNOZNAČNÉHO profilu, skla a N väzbu neuplatníme — nikdy nehádame, ktorý riadok posunúť
+	if (profil.length !== 1 || sklo.length !== 1 || !sys) {
+		log.warn('väzba sklo šírka→profil: chýba/nejednoznačný riadok — väzba sa neuplatní', {
+			sysStyl,
+			profilKod: pravidlo.profilKod,
+			profilov: profil.length,
+			skiel: sklo.length,
+			maN: !!sys
+		});
+		return null;
+	}
+	return { pravidlo, profil: profil[0]!, skloS: sklo[0]!.offset, n: Number(sys.n) };
+}
+
+/** #610: editor ukáže pri profile poznámku „sklo sa posunie automaticky" LEN keď sklo pravidlo
+ *  PRÁVE sleduje (ručná výnimka sa pri zmene profilu neposunie — poznámka by klamala). */
+export function skloSledujeInfo(sysStyl: string): { profilId: number; mmNaKridlo: number } | null {
+	const cur = getEditableRows(sysStyl);
+	const v = cur && vazbaSkla(sysStyl, cur.rows);
+	if (!v || !skloSleduje(v.pravidlo, v.skloS, v.profil.offset, v.n)) return null;
+	return { profilId: v.profil.id, mmNaKridlo: v.pravidlo.mmNaKridlo };
 }
 
 export interface SaveInput {
@@ -296,6 +348,41 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 		});
 	}
 
+	// #610: sklo šírka sleduje profil podľa pravidla výroby (Štandard + opona IZO: kladkový − 10 mm
+	// na krídlo, `sklo-sleduje-profil.ts`). Rovnaký kontrakt ako rámový mirror vyššie: posuň sklo
+	// LEN keď sa offset profilu SKUTOČNE zmenil A sklo pravidlo dovtedy sledovalo (`sklo ==
+	// profil_starý − mm·N`) — inak je to ručná výnimka a ostáva. Rámový mirror má prednosť
+	// (`skloMirror.has`), zápis ide tou istou cestou (`updSkloRez`) a MUSÍ byť v `zmeny` (audit).
+	const vazba = vazbaSkla(input.sysStyl, cur.rows);
+	if (vazba && !skloMirror.has('S')) {
+		const { pravidlo, profil, skloS, n } = vazba;
+		const nova = input.offsets.get(profil.id);
+		if (nova !== undefined && nova !== profil.offset) {
+			if (skloSleduje(pravidlo, skloS, profil.offset, n)) {
+				const skloNova = skloOffsetZProfilu(pravidlo, nova, n);
+				skloMirror.set('S', skloNova);
+				zmeny.push({ pole: skloSledujePole(pravidlo), stara: skloS, nova: skloNova });
+				log.info('väzba sklo šírka→profil: sklo sa posunie s profilom', {
+					sysStyl: input.sysStyl,
+					profil: profil.nazov,
+					profilStara: profil.offset,
+					profilNova: nova,
+					skloStara: skloS,
+					skloNova
+				});
+			} else {
+				log.info('väzba sklo šírka→profil: sklo pravidlo nesleduje (ručná výnimka) — nedotknuté', {
+					sysStyl: input.sysStyl,
+					profil: profil.nazov,
+					profilStara: profil.offset,
+					profilNova: nova,
+					sklo: skloS,
+					n
+				});
+			}
+		}
+	}
+
 	if (!zmeny.length) return { zmeny: [], error: null };
 
 	// všetky profil riadky (vrátane skrytého 10mm dvojčaťa) — na zrkadlenie 6→10 offsetu
@@ -335,7 +422,8 @@ export function saveCfgChanges(input: SaveInput): { zmeny: CfgZmena[]; error: st
 							updRez.run(off, sib.id);
 				}
 			}
-			// #504: podmienené + auditované zrkadlenie rámový→sklo (rozhodnuté v skloMirror vyššie)
+			// #504/#610: podmienené + auditované zrkadlenie rámový→sklo a väzba sklo šírka→profil
+			// (obe rozhodnuté do skloMirror vyššie)
 			for (const [dim, off] of skloMirror) updSkloRez.run(off, input.sysStyl, dim);
 			updSys.run(input.skloOffset, input.sysStyl);
 			for (const g of glassZmeny) updGlass.run(g.nova, g.id);

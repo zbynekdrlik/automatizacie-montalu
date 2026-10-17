@@ -16,6 +16,7 @@ import {
 	getEditableRows,
 	saveCfgChanges,
 	getAuditLog,
+	skloSledujeInfo,
 	type CfgZmena
 } from '$lib/server/cfg-editor';
 import { safeCompute } from '$lib/server/compute';
@@ -44,6 +45,9 @@ export const load: PageServerLoad = async ({ url }) => {
 		sysStyl,
 		system,
 		editable,
+		// #610: profil, ktorý šírka skla PRÁVE sleduje (opona IZO: kladkový − 10 mm) → poznámka
+		// „sklo sa posunie automaticky" pri jeho poli; null = štýl väzbu nemá / ručná výnimka
+		skloSleduje: skloSledujeInfo(sysStyl),
 		glass,
 		maTrieda6: glass.some((g) => g.hrubkaTrieda === 6),
 		maTrieda16: glass.some((g) => g.hrubkaTrieda === 16),
