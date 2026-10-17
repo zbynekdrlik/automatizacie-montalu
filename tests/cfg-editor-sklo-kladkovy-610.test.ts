@@ -144,11 +144,10 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 		});
 	});
 
-	it('float šum: −255,96 − 40 = −295,96000000000004 sa berie ako sledujúce a nový offset je bez šumu', () => {
-		// review: binárne presné ,5/,25 hodnoty vyššie toleranciu ani zaokrúhlenie neoveria.
-		// −255,96 − 40 v double = −295,96000000000004 ≠ uložené −295,96 (tolerancia musí väzbu
-		// zachovať) a −255,92 − 40 = −295,91999999999996 (zaokrúhlenie musí dať čisté −295,92).
-		expect(-255.96 - 40).not.toBe(-295.96);
+	it('float šum v NOVOM offsete: −255,92 − 40 = −295,91999999999996 sa zapíše ako čisté −295,92', () => {
+		// review: binárne presné ,5/,25 hodnoty vyššie zaokrúhlenie neoveria. −255,92 − 40 v double
+		// = −295,91999999999996 → `skloOffsetZProfilu` musí zapísať (aj do auditu) čisté −295,92.
+		// (Uložené sklo −295,96 tu šum nemá — toleranciu stráži test nižšie.)
 		expect(-255.92 - 40).not.toBe(-295.92);
 		const ss = 'Štandard +|2x2K IZO';
 		nastavStav(ss, { kladkovy: -255.96, sklo: -295.96 });
@@ -164,6 +163,24 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 			pole: POLE_SKLO,
 			stara: -295.96,
 			nova: -295.92
+		});
+	});
+
+	it('float šum v ULOŽENOM skle: sklo −295,96000000000004 (= −255,96 − 40 bez zaokrúhlenia) väzbu nestratí', () => {
+		// re-review: uložené sklo so šumom (napr. ručný/starý zápis bez zaokrúhlenia) sa voči
+		// zaokrúhlenému `kladkový − 10·N` (−295,96) líši o ~4e-14 → tolerancia 1e-6 ho MUSÍ brať ako
+		// sledujúce; striktné `===` by väzbu ticho stratilo (sklo by ostalo stáť).
+		const sumSklo = -255.96 - 40;
+		expect(sumSklo).not.toBe(-295.96);
+		const ss = 'Štandard +|2x2K IZO';
+		nastavStav(ss, { kladkovy: -255.96, sklo: sumSklo });
+		const { zmeny, error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -256]]));
+		expect(error).toBeNull();
+		expect(skloOffset(ss, 'S')).toBe(-296);
+		expect(zmeny.find((z) => z.pole === POLE_SKLO)).toEqual({
+			pole: POLE_SKLO,
+			stara: sumSklo,
+			nova: -296
 		});
 	});
 
@@ -230,7 +247,9 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 		expect(skloOffset(ss, 'S')).toBe(-460);
 	});
 
-	it('[RED] editor: poznámka pri kladkovom podľa stavu väzby (load `skloSleduje`)', async () => {
+	// (pôvodne [RED] v af2d6a2 s tvarom `{profilId, mmNaKridlo} | null`; review 76fa4d5 zmenil
+	// kontrakt na `{…, sleduje}` aj pre ručnú výnimku — preto už nie je označený [RED])
+	it('editor: poznámka pri kladkovom podľa stavu väzby (load `skloSleduje`)', async () => {
 		const ss = 'Štandard +|2x3K IZO';
 		nastavStav(ss, { kladkovy: -320, sklo: -380 });
 		// review: tvar rozšírený o `sleduje` — ručná výnimka dostane vlastnú poznámku („sklo sa

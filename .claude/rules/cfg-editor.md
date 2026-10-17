@@ -70,9 +70,10 @@ editor neukazuje → bez väzby by úprava kladkového ticho rozbila pravidlo.
   `data.skloSleduje = { profilId, mmNaKridlo, sleduje }`). Nový štýl s pravidlom = riadok mapy +
   test, žiadne `system === …` v kóde. N (krídla) nesie `getEditableRows(...).n`.
 - **Kontrakt = #504 vzor:** posuň LEN keď sa offset profilu SKUTOČNE zmenil A sklo pravidlo
-  sledovalo (`skloSleduje`, tolerancia 1e-6 — offsety sú REAL, editor `step="any"`, −255,96 − 40 =
-  −295,96000000000004; nový offset `skloOffsetZProfilu` zaokrúhlený na 1e-6 bez float šumu — oboje
-  stráži test „float šum"). Ručná výnimka (sklo nesledovalo) ostáva. Zápis ide do `skloZapisy`
+  sledovalo (`skloSleduje`, tolerancia 1e-6 — offsety sú REAL, editor `step="any"`; uložené sklo
+  so šumom −255,96 − 40 = −295,96000000000004 sa musí brať ako sledujúce → test „float šum v
+  ULOŽENOM skle"; nový offset `skloOffsetZProfilu` zaokrúhlený na 1e-6, −255,92 − 40 →
+  čisté −295,92 → test „float šum v NOVOM offsete"). Ručná výnimka (sklo nesledovalo) ostáva. Zápis ide do `skloZapisy`
   (dim S) → `updSkloRez`; rámový mirror má prednosť (`skloZapisy.has`). Audit pole „Sklo šírka (S)
   offset — sleduje kladkový − 10 mm (#610)". Rozširujúci (+6) sklo NEposúva.
 - Nejednoznačný stav (2× Sklo šírka / 2× kladkový) → väzba sa neuplatní + `log.warn`, nikdy hádanie.
@@ -87,9 +88,11 @@ editor neukazuje → bez väzby by úprava kladkového ticho rozbila pravidlo.
   OBA riadky v `finally` — raz sledujúce sklo editor ťahá s kladkovým, takže pôvodný seed stav
   (nesledujúci) sa editorom obnoviť NEDÁ (návrat kladkového by posunul aj sklo).
 - **Dôsledok pre post-deploy E2E:** šírka skla týchto štýlov sa na PROD hýbe s kladkovým →
-  nikdy pevný mm literál proti `BASE_URL`; `e2e/opona-izo.spec.ts` `overSirkuSkla` = seed literál
-  bez BASE_URL, na PROD relácia `rezProfiluMm(page, 'ZASP202415') − sklo === 10` (helper v
-  `e2e/helpers.ts`; obe sú `Math.round` tej istej hodnoty ± 10 → presne 10, ak korekcia triedy 16 = 0).
+  nikdy pevný mm literál proti `BASE_URL`; `e2e/opona-izo.spec.ts` `overRozmerSkla` = seed vektor
+  bez BASE_URL, na PROD relácie k = (V − 135) − výška skla a `rezProfiluMm(page, 'ZASP202415') −
+  sklo === 10 + k` (helper v `e2e/helpers.ts`, len profil s JEDNÝM rozmerom rezu; obe hodnoty sú
+  `Math.round` tej istej veličiny ± celé mm → rovnosť je presná). Overené lokálne: čistý seed +
+  BASE_URL padne (15/16 ≠ 10), PROD stav + BASE_URL prejde.
 
 ## Audit invariant
 

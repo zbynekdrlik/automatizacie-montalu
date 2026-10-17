@@ -9,12 +9,13 @@
 //     (Odoo úloha 1416: sklo = kladkový − 10 mm) — seed 568×1965, na PROD relácia (nižšie),
 //  3. 2×2K/2×3K majú v pláne čestné „odvodené" upozornenie (banner plan-warn),
 //  4. #610 testovací rozmer z úlohy 1416: 2×3K 6500 × 2070 → sklo 1020mm × 1935mm (seed).
-// ŠÍRKA SKLA NA PROD = RELÁCIA, nie literál (testing.md #555): výroba ladí kladkový v editore
-// vzorcov a šírka skla ho od #610 doplnku SLEDUJE (väzba v `saveCfgChanges`) — po ďalšej úprave
-// by pevné 568/1020 na post-deploy (BASE_URL = PROD) padli, hoci appka je správne. Preto proti
-// PROD tvrdíme `rez kladkového − sklo = 10` (presne: obe sú Math.round tej istej hodnoty ± 10),
-// proti seed (CI preview) presný vektor. Seed sklo pravidlo NEsleduje (staršie profily seedu,
-// `opona-izo-narezak.md`), takže relácia tam neplatí a literál áno.
+// ROZMER SKLA NA PROD = RELÁCIA, nie literál (testing.md #555): výroba ladí kladkový v editore
+// vzorcov a šírka skla ho od #610 doplnku SLEDUJE (väzba `rozhodniSkloZapisy`) — po ďalšej úprave
+// by pevné 568/1020 na post-deploy (BASE_URL = PROD) padli, hoci appka je správne. Rovnako
+// korekcia skla (trieda 16 / „Sklo — konečné zmenšenie" v editore) zmenší šírku AJ výšku o to isté
+// k. Preto proti PROD: k = (V − 135) − výška skla a `rez kladkového − sklo = 10 + k` (presne:
+// Math.round tej istej hodnoty ± celé mm); proti seed (CI preview) presný vektor. Seed sklo
+// pravidlo NEsleduje (staršie profily seedu, `opona-izo-narezak.md`) → relácia tam neplatí.
 // Sklo vyberáme RELAČNE ako triedu 16 (IZO nárezák), nie konkrétnu skladbu: výpočtové sklo
 // „Izolačné sklo 4/8/4 číre" = Odoo 16 mm izolačné, ktoré je v ponuke Štandard + v CI (lokálny
 // allow-list) aj na PROD (Patrik, Odoo úloha 1218, 29.9.: Štandardy 4/6/16 mm — 24 mm izolačné
@@ -30,17 +31,27 @@ const IZO_16 = 'Izolačné sklo 4/8/4 číre';
 const KLADKOVY = 'ZASP202415';
 const RUN = `E2E-OPIZO-${Date.now().toString(36).toUpperCase()}`;
 
-/** Šírka skla nárezáku: seed (bez BASE_URL) = presný `seedMm`; ŽIVÁ PROD cfg = relácia
- *  „rez kladkového − sklo = 10 mm" (#610, kladkový ladí výroba a sklo ho sleduje). Vráti šírku. */
-async function overSirkuSkla(page: Page, seedMm: number): Promise<number> {
-	const sklo = Number(await page.getByTestId('sklo-sirka').textContent());
-	if (process.env.BASE_URL)
+/** Rozmer skla nárezáku (výška zadaná `v`): seed (bez BASE_URL) = presný vektor `seed`; ŽIVÁ PROD
+ *  cfg = relácie — korekcia skla k = (V − 135) − výška (výška skla opona IZO je V − 135 − k) a
+ *  „rez kladkového − sklo = 10 + k" (#610: kladkový ladí výroba a sklo šírka ho sleduje). */
+async function overRozmerSkla(
+	page: Page,
+	v: number,
+	seed: { sirka: number; vyska: number }
+): Promise<{ sirka: number; vyska: number }> {
+	const sirka = Number(await page.getByTestId('sklo-sirka').textContent());
+	const vyska = Number(await page.getByTestId('sklo-vyska').textContent());
+	if (process.env.BASE_URL) {
+		const k = v - 135 - vyska;
+		expect(k, 'PROD: korekcia skla je 0–500 mm (výška skla = V − 135 − k)').toBeGreaterThanOrEqual(
+			0
+		);
 		expect(
-			(await rezProfiluMm(page, KLADKOVY)) - sklo,
-			'PROD: sklo = kladkový − 10 mm (#610)'
-		).toBe(10);
-	else expect(sklo, 'seed: vektor šírky skla').toBe(seedMm);
-	return sklo;
+			(await rezProfiluMm(page, KLADKOVY)) - sirka,
+			`PROD: sklo = kladkový − 10 mm − korekcia ${k} mm (#610)`
+		).toBe(10 + k);
+	} else expect({ sirka, vyska }, 'seed: vektor rozmeru skla').toEqual(seed);
+	return { sirka, vyska };
 }
 
 test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, rezy/počty 1:1 z Money Excelu', async ({
@@ -69,8 +80,7 @@ test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, rezy/počty 1:1 z Money
 	// plán sa vykreslí; sklo (len plán, nie Money) 568 × 1965 v seede — šírka podľa #610 (Odoo
 	// úloha 1416: sklo = kladkový − 10 mm → (5000 − 460)/8), výška V − 135 z Excel formúl
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	await overSirkuSkla(page, 568);
-	await expect(page.getByTestId('sklo-vyska')).toHaveText('1965');
+	await overRozmerSkla(page, 2100, { sirka: 568, vyska: 1965 });
 	// U-profil ZASP202439 = 57,6 m (dôkaz IZO nárezáku); spodná koľajnica ZASP202432
 	// (default „prídavná" zväčšila ZASP00033→ZASP202432, presne ako v Exceli)
 	await expect(page.locator('.row', { hasText: 'ZASP202439' })).toContainText(/(^|\D)57,6 m/);
@@ -83,13 +93,10 @@ test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, rezy/počty 1:1 z Money
 
 // #610 (Odoo úloha 1416, Patrik 17.10.): testovací rozmer z úlohy — sklo = kladkový − 10 mm,
 // 2×3K IZO 6500 × 2070 → 1020mm × 1935mm (appka dávala 1027mm × 1935mm). Seed (CI) overí presný
-// vektor; na PROD sa šírka skla hýbe s kladkovým (väzba #610 v editore), takže tam overujeme
-// reláciu sklo = kladkový − 10 a že karta „Sklo (mm)" aj výkres náhľadu nesú TEN ISTÝ rozmer —
-// presne to, čo výroba kopíruje do objednávky skla.
-// PREDPOKLAD na PROD (overené 17.10.): korekcia skla triedy 16 mm pre Štandard + je „systémová"
-// (`cfg_sklo_trieda` bez riadku Štandard +/16) a `cfg_sys.sklo_offset` týchto štýlov = 0. Keď
-// výroba v editore nastaví korekciu triedy 16 (17.10. ju skúšala 7 → späť), posunie sa šírka aj
-// výška skla o tú korekciu a tento test na deployi padne — príčina je potom tá korekcia, nie kód.
+// vektor; na PROD sa šírka skla hýbe s kladkovým (väzba #610 v editore) a korekcia skla triedy 16
+// (výroba ju 17.10. skúšala 7 → späť) posúva šírku aj výšku, takže tam overujeme relácie
+// (`overRozmerSkla`) a že karta „Sklo (mm)" aj výkres náhľadu nesú TEN ISTÝ rozmer — presne to,
+// čo výroba kopíruje do objednávky skla.
 test('#610 Štandard+ 2×3K opona IZO 6500 × 2070: sklo 1020mm × 1935mm (kladkový − 10)', async ({
 	page
 }) => {
@@ -109,9 +116,9 @@ test('#610 Štandard+ 2×3K opona IZO 6500 × 2070: sklo 1020mm × 1935mm (kladk
 
 	// karta „Sklo (mm)" (rozmer na objednávku skla) aj výkres náhľadu nesú ten istý rozmer
 	await expect(page.getByTestId('nahlad-2d')).toBeVisible();
-	const sirka = await overSirkuSkla(page, 1020);
-	await expect(page.getByTestId('sklo-rozmer')).toHaveText(`${sirka}mm × 1935mm`);
-	await expect(page.getByTestId('nahlad-sklo-rozmer')).toHaveText(`${sirka}mm × 1935mm`);
+	const { sirka, vyska } = await overRozmerSkla(page, 2070, { sirka: 1020, vyska: 1935 });
+	await expect(page.getByTestId('sklo-rozmer')).toHaveText(`${sirka}mm × ${vyska}mm`);
+	await expect(page.getByTestId('nahlad-sklo-rozmer')).toHaveText(`${sirka}mm × ${vyska}mm`);
 	expect(consoleMsgs).toEqual([]);
 });
 

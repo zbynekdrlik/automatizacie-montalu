@@ -607,6 +607,11 @@ unit test), alebo (b) **assertuj RELÁCIU** (`> bez`, `!= referenčný`, „obsa
 konkrétne mm. Vzor: `jokleZoSietoviny(text)` v `e2e/helpers.ts` číta rozmer sieťoviny z testidu
 (`sietka-rozmer` / `sietka-samostatna-rozmer`) a dopočíta jokel (`+10 / −22`, `ks 4`) — parita s
 `JOKLE_DELTA`/`JOKLE_KS` v `src/lib/sietka.ts` cez `tests/sietka-jokle.test.ts`.
+Druhý vzor (#610): `rezProfiluMm(page, kod)` v `e2e/helpers.ts` číta rez profilu z nárez riadka
+(len profil s jedným rozmerom rezu) → `overRozmerSkla` v `opona-izo.spec.ts`: seed vektor bez
+BASE_URL, na PROD relácia `rez kladkového − sklo = 10 + k` (k = korekcia skla odvodená z výšky).
+Keď hodnota v seede reláciu NESPĹŇA (seed ≠ PROD stav), vetvi `process.env.BASE_URL` — obe vetvy
+tvrdia (nie skip); over obe lokálne (čistý seed + BASE_URL musí padnúť, PROD stav prejsť).
 
 **Prečo NIE „zosúladiť seed s PROD":** seed je zdroj pre nové inštalácie a deterministické unit
 vektory (`tests/compute.test.ts` — CONTRACTUAL 1:1 s Money odpisom); PROD cfg sa mení editorom

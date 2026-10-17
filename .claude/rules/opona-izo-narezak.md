@@ -54,12 +54,11 @@ bit-presne vrátane FFD a rozmerov skla), až potom mu dôveruj pri nových riad
   nie profilov". Offset skla = kladkový offset (PROD) − 10·N: 2×2K −313, 2×3K −380, 2×4K −460
   (migrácia v58 + seed). Starý „Štandard" opona IZO (−268/−340/−400) sa NEZMENIL. Pravidlo stráži
   `tests/opona-izo-sklo-610.test.ts`; vektor z úlohy 2×3K 6500×2070 → 1020×1935 (E2E LEN v seede).
-  `opona-izo.spec.ts` (`overSirkuSkla`): bez BASE_URL presný seed literál (568 / 1020), proti PROD
-  relácia `rez kladkového − sklo = 10` — šírka skla sa na PROD hýbe s kladkovým (väzba nižšie), pevný
-  literál by po ďalšej úprave výroby padol na deployi (#555). Relácia aj výška `V − 135` predpokladajú
-  na PROD korekciu skla triedy 16 = systémovú (`cfg_sklo_trieda` bez Štandard +/16) a
-  `cfg_sys.sklo_offset` = 0 (overené 17.10.) — korekcia triedy je editovateľná a posúva šírku AJ
-  výšku skla; pád `opona-izo.spec.ts` na deployi → najprv over ju.
+  `opona-izo.spec.ts` (`overRozmerSkla`): bez BASE_URL presný seed vektor (568×1965 / 1020×1935),
+  proti PROD relácie — šírka skla sa na PROD hýbe s kladkovým (väzba nižšie) a korekcia skla
+  (trieda 16 / systémové zmenšenie, editovateľné) posúva šírku AJ výšku o to isté k, takže
+  k = (V − 135) − výška a `rez kladkového − sklo = 10 + k`. Pevný literál by po ďalšej úprave výroby
+  padol na deployi (#555).
   **Pri ďalšej zmene kladkového opona IZO v editore sa sklo šírka POSUNIE SAMO** (#610 doplnok,
   väzba `rozhodniSkloZapisy` v `cfg-editor-sklo.ts`, mapa `src/lib/server/sklo-sleduje-profil.ts`,
   detail `cfg-editor.md` PASCA #3): keď sklo pravidlo sledovalo, zapíše sa `kladkový_nový − 10·N` +
