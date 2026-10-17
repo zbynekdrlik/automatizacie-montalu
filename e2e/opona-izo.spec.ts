@@ -23,7 +23,9 @@ import { collectConsole, loginAs, vyberFarbuKovania, vyberSklo } from './helpers
 const IZO_16 = 'Izolačné sklo 4/8/4 číre';
 const RUN = `E2E-OPIZO-${Date.now().toString(36).toUpperCase()}`;
 
-test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excelu', async ({ page }) => {
+test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, rezy/počty 1:1 z Money Excelu', async ({
+	page
+}) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
 
@@ -63,6 +65,10 @@ test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excel
 // 2×3K IZO 6500 × 2070 → 1020mm × 1935mm (appka dávala 1027mm × 1935mm). Riadok „Sklo šírka"
 // editor vzorcov neukazuje (opraví ho len migrácia v58), takže číslo je rovnaké v CI (seed) aj
 // na PROD po nasadení — overujeme presne to, čo výroba kopíruje do objednávky skla.
+// PREDPOKLAD na PROD (overené 17.10.): korekcia skla triedy 16 mm pre Štandard + je „systémová"
+// (`cfg_sklo_trieda` bez riadku Štandard +/16) a `cfg_sys.sklo_offset` týchto štýlov = 0. Keď
+// výroba v editore nastaví korekciu triedy 16 (17.10. ju skúšala 7 → späť), posunie sa šírka aj
+// výška skla o tú korekciu a tento test na deployi padne — príčina je potom tá korekcia, nie kód.
 test('#610 Štandard+ 2×3K opona IZO 6500 × 2070: sklo 1020mm × 1935mm (kladkový − 10)', async ({
 	page
 }) => {

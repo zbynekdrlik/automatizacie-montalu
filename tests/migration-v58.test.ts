@@ -78,6 +78,33 @@ const migAudit = (d: Database.Database) =>
 		.prepare(`SELECT sys_styl, zmeny FROM cfg_audit WHERE username = 'system-migracia' ORDER BY id`)
 		.all() as { sys_styl: string; zmeny: string }[];
 
+/** minimálne tabuľky pre priame volanie migrácie nad `:memory:` DB */
+const CFG_TABULKY = `
+	CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL DEFAULT '', dim TEXT NOT NULL DEFAULT 'S', koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks INTEGER NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500, sklo_hrubka INTEGER NOT NULL DEFAULT 0);
+	CREATE TABLE cfg_audit (id INTEGER PRIMARY KEY, ts TEXT NOT NULL DEFAULT (datetime('now')), username TEXT NOT NULL, sys_styl TEXT NOT NULL, zmeny TEXT NOT NULL);
+`;
+
+/** Spustí `fn` s `LOG_LEVEL=warn` a vráti zachytené warn záznamy loggera (JSON riadky stdout). */
+function warnLogy(fn: () => void): Record<string, unknown>[] {
+	process.env.LOG_LEVEL = 'warn';
+	const out: string[] = [];
+	const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+		out.push(String(chunk));
+		return true;
+	});
+	try {
+		fn();
+	} finally {
+		spy.mockRestore();
+		delete process.env.LOG_LEVEL;
+	}
+	return out
+		.flatMap((chunk) => chunk.split('\n'))
+		.filter((l) => l.startsWith('{'))
+		.map((l) => JSON.parse(l) as Record<string, unknown>)
+		.filter((l) => l.level === 'warn');
+}
+
 afterAll(() => {
 	delete process.env.LOG_LEVEL;
 });
@@ -160,33 +187,51 @@ describe('migration → v58 (#610 Štandard + opona IZO sklo = kladkový − 10,
 	it('neočakávaná (ručne zmenená) hodnota sa ZALOGUJE (warn) a neprepíše', () => {
 		const d = new Database(':memory:');
 		d.exec(`
-			CREATE TABLE cfg_rez (id INTEGER PRIMARY KEY, sys_styl TEXT NOT NULL, poradie INTEGER NOT NULL, typ TEXT NOT NULL, kod TEXT NOT NULL DEFAULT '', nazov TEXT NOT NULL DEFAULT '', dim TEXT NOT NULL DEFAULT 'S', koef REAL NOT NULL DEFAULT 1, offset REAL NOT NULL DEFAULT 0, delit_n INTEGER NOT NULL DEFAULT 0, kerf REAL NOT NULL DEFAULT 0, pocet_ks INTEGER NOT NULL DEFAULT 0, sklozavisle INTEGER NOT NULL DEFAULT 0, dlzka_tyce REAL NOT NULL DEFAULT 7500, sklo_hrubka INTEGER NOT NULL DEFAULT 0);
-			CREATE TABLE cfg_audit (id INTEGER PRIMARY KEY, ts TEXT NOT NULL DEFAULT (datetime('now')), username TEXT NOT NULL, sys_styl TEXT NOT NULL, zmeny TEXT NOT NULL);
+			${CFG_TABULKY}
 			INSERT INTO cfg_rez (sys_styl, poradie, typ, nazov, dim, offset, delit_n) VALUES
 				('Štandard +|2x3K IZO', 90, 'sklo', 'Sklo šírka', 'S', -350, 1);
 			PRAGMA user_version = 57;
 		`);
-		process.env.LOG_LEVEL = 'warn';
-		const out: string[] = [];
-		const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
-			out.push(String(chunk));
-			return true;
-		});
-		try {
-			migrateOponaIzoSkloSirka(d, (v) => d.pragma(`user_version = ${v}`));
-		} finally {
-			spy.mockRestore();
-			delete process.env.LOG_LEVEL;
-		}
+		const warny = warnLogy(() =>
+			migrateOponaIzoSkloSirka(d, (v) => d.pragma(`user_version = ${v}`))
+		);
 		expect(skloS(d, 'Štandard +|2x3K IZO')).toBe(-350);
 		expect(migAudit(d)).toEqual([]);
 		expect(d.pragma('user_version', { simple: true })).toBe(58);
-		const warn = out
-			.flatMap((chunk) => chunk.split('\n'))
-			.filter((l) => l.startsWith('{'))
-			.map((l) => JSON.parse(l) as Record<string, unknown>)
-			.find((l) => l.level === 'warn' && l.sysStyl === 'Štandard +|2x3K IZO');
-		expect(warn, out.join('')).toMatchObject({ aktualna: -350, ocakavana: -339, nova: -380 });
+		expect(warny.find((l) => l.sysStyl === 'Štandard +|2x3K IZO')).toMatchObject({
+			aktualna: -350,
+			ocakavana: -339,
+			nova: -380
+		});
+		d.close();
+	});
+
+	it('chýbajúci alebo nejednoznačný riadok (2× Sklo šírka) sa preskočí s warn, ostatné sa opravia', () => {
+		const d = new Database(':memory:');
+		d.exec(`
+			${CFG_TABULKY}
+			INSERT INTO cfg_rez (sys_styl, poradie, typ, nazov, dim, offset, delit_n) VALUES
+				('Štandard +|2x2K IZO', 90, 'sklo', 'Sklo šírka', 'S', -271, 1),
+				('Štandard +|2x2K IZO', 92, 'sklo', 'Sklo šírka', 'S', -271, 1),
+				('Štandard +|2x4K IZO', 90, 'sklo', 'Sklo šírka', 'S', -407, 1);
+			PRAGMA user_version = 57;
+		`);
+		const warny = warnLogy(() =>
+			migrateOponaIzoSkloSirka(d, (v) => d.pragma(`user_version = ${v}`))
+		);
+		// nejednoznačný 2×2K: ani jeden riadok sa nezmení, žiadny audit
+		expect(
+			d
+				.prepare(`SELECT offset FROM cfg_rez WHERE sys_styl = 'Štandard +|2x2K IZO' ORDER BY id`)
+				.all()
+		).toEqual([{ offset: -271 }, { offset: -271 }]);
+		expect(warny.find((l) => l.sysStyl === 'Štandard +|2x2K IZO')).toMatchObject({ pocet: 2 });
+		// chýbajúci 2×3K: warn s počtom 0
+		expect(warny.find((l) => l.sysStyl === 'Štandard +|2x3K IZO')).toMatchObject({ pocet: 0 });
+		// 2×4K (jednoznačný, očakávaná hodnota) sa opraví a auditne
+		expect(skloS(d, 'Štandard +|2x4K IZO')).toBe(-460);
+		expect(migAudit(d).map((a) => a.sys_styl)).toEqual(['Štandard +|2x4K IZO']);
+		expect(d.pragma('user_version', { simple: true })).toBe(58);
 		d.close();
 	});
 

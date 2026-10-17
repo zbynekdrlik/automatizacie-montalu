@@ -10,7 +10,9 @@
 // (seed sa so živou PROD cfg zámerne nezosúlaďuje, `.claude/rules/testing.md`). Pravidlo
 // „kladkový − sklo = 10" Patrik dal voči PROD profilom, preto ho test overuje nad seed cfg
 // s PROD profilovými offsetmi; vektor skla 1020 × 1935 platí v seede aj na PROD (offset
-// skla je absolútny, profily sa doň nepremietajú).
+// skla je absolútny, profily sa doň nepremietajú) — za predpokladu, že korekcia skla triedy
+// 16 mm (`cfg_sklo_trieda` Štandard +/16) ostáva systémová a `cfg_sys.sklo_offset` = 0
+// (overené na PROD 17.10.); korekciu triedy výroba v editore meniť smie a posunula by ním sklo.
 import { describe, it, expect } from 'vitest';
 import { buildCFG, computeFlat } from '../src/lib/server/compute';
 import type { SysRow, RezRow } from '../src/lib/server/compute';
