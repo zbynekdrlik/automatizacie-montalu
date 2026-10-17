@@ -7,6 +7,7 @@ paths:
   - 'src/lib/server/compute-odpis.ts'
   - 'src/lib/server/migracie-opona-izo-sklo.ts'
   - 'tests/opona-izo-sklo-610.test.ts'
+  - 'src/lib/server/sklo-sleduje-profil.ts'
   - 'e2e/opona-izo.spec.ts'
 ---
 
@@ -52,13 +53,19 @@ bit-presne vrátane FFD a rozmerov skla), až potom mu dôveruj pri nových riad
   Pravidlo výroby: kladkový = sklo + 10, rozširujúci = sklo + 6 (na krídlo); „meniť šírku skla,
   nie profilov". Offset skla = kladkový offset (PROD) − 10·N: 2×2K −313, 2×3K −380, 2×4K −460
   (migrácia v58 + seed). Starý „Štandard" opona IZO (−268/−340/−400) sa NEZMENIL. Pravidlo stráži
-  `tests/opona-izo-sklo-610.test.ts`; vektor z úlohy 2×3K 6500×2070 → 1020×1935 (aj E2E).
-  E2E literál predpokladá na PROD korekciu skla triedy 16 = systémovú (`cfg_sklo_trieda` bez
-  Štandard +/16) a `cfg_sys.sklo_offset` = 0 (overené 17.10.) — korekcia triedy je editovateľná a
-  posúva šírku AJ výšku skla; pád `opona-izo.spec.ts` na deployi → najprv over ju.
-  **Pri ďalšej zmene profilov opona IZO** (výroba ich ladí editorom) sa sklo samo NEPOHNE — riadok
-  `Sklo šírka` editor neukazuje (štýly nemajú rámový S → mirror sa nechytí), takže zmena kladkového
-  bez zmeny skla rozbije pravidlo „−10" → treba novú dátovú migráciu skla (vzor v58).
+  `tests/opona-izo-sklo-610.test.ts`; vektor z úlohy 2×3K 6500×2070 → 1020×1935 (E2E LEN v seede).
+  `opona-izo.spec.ts` (`overRozmerSkla`): bez BASE_URL presný seed vektor (568×1965 / 1020×1935),
+  proti PROD relácie — šírka skla sa na PROD hýbe s kladkovým (väzba nižšie) a korekcia skla
+  (trieda 16 / systémové zmenšenie, editovateľné) posúva šírku AJ výšku o to isté k, takže
+  k = (V − 135) − výška a `rez kladkového − sklo = 10 + k`. Pevný literál by po ďalšej úprave výroby
+  padol na deployi (#555).
+  **Pri ďalšej zmene kladkového opona IZO v editore sa sklo šírka POSUNIE SAMO** (#610 doplnok,
+  väzba `rozhodniSkloZapisy` v `cfg-editor-sklo.ts`, mapa `src/lib/server/sklo-sleduje-profil.ts`,
+  detail `cfg-editor.md` PASCA #3): keď sklo pravidlo sledovalo, zapíše sa `kladkový_nový − 10·N` +
+  audit záznam; editor pri kladkovom ukáže „↳ sklo sa posunie automaticky (o 10 mm užšie)" (inak
+  „↳ sklo sa neposunie — šírka skla je nastavená samostatne …"). Rozširujúci sklo NEposúva.
+  Novú dátovú migráciu skla (vzor v58) treba LEN keď sklo pravidlo nesleduje (ručná výnimka, iný
+  štýl mimo mapy) alebo sa mení samotné pravidlo (iné mm, iný profil).
 - **Seed profily opona IZO ≠ PROD** (výroba 14.9. editorom: kladkový S PROD −273/−320/−380 vs seed
   −235/−285/−335, rozširujúci −290/−342/−410 vs −251/−309/−367). Seed sa so živou cfg zámerne
   nezosúlaďuje (`testing.md`), Money vektory profilov ostávajú zo seedu. Test pravidla „sklo vs

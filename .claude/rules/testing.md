@@ -607,6 +607,11 @@ unit test), alebo (b) **assertuj RELÁCIU** (`> bez`, `!= referenčný`, „obsa
 konkrétne mm. Vzor: `jokleZoSietoviny(text)` v `e2e/helpers.ts` číta rozmer sieťoviny z testidu
 (`sietka-rozmer` / `sietka-samostatna-rozmer`) a dopočíta jokel (`+10 / −22`, `ks 4`) — parita s
 `JOKLE_DELTA`/`JOKLE_KS` v `src/lib/sietka.ts` cez `tests/sietka-jokle.test.ts`.
+Druhý vzor (#610): `rezProfiluMm(page, kod)` v `e2e/helpers.ts` číta rez profilu z nárez riadka
+(len profil s jedným rozmerom rezu) → `overRozmerSkla` v `opona-izo.spec.ts`: seed vektor bez
+BASE_URL, na PROD relácia `rez kladkového − sklo = 10 + k` (k = korekcia skla odvodená z výšky).
+Keď hodnota v seede reláciu NESPĹŇA (seed ≠ PROD stav), vetvi `process.env.BASE_URL` — obe vetvy
+tvrdia (nie skip); over obe lokálne (čistý seed + BASE_URL musí padnúť, PROD stav prejsť).
 
 **Prečo NIE „zosúladiť seed s PROD":** seed je zdroj pre nové inštalácie a deterministické unit
 vektory (`tests/compute.test.ts` — CONTRACTUAL 1:1 s Money odpisom); PROD cfg sa mení editorom
@@ -686,7 +691,15 @@ odobrať (tvrď podmnožinu / triedu).
   „#462 … ✏️" — formulárové toky citlivé na dev-mode hydratáciu; rozhoduje CI preview beh.
   Rovnako `cfg-editor-sklo-mirror.spec.ts` (#610, padá aj na nezmenenom kóde): výber Systému v
   editore spraví plný reload na prvý štýl a hneď nasledujúci výber Štýlu sa pod `vite dev` stratí
-  (nadpis ostane „· 2K") — pretek s reloadom, nie regresia.
+  (nadpis ostane „· 2K") — pretek s reloadom, nie regresia. **Nový editorový spec otváraj priamo
+  URL `goto(page, '/zasklenia/nastavenia?sysStyl=' + encodeURIComponent(SYS_STYL))`** (stav editora
+  žije v URL, #518) — žiadny pretek, prejde pod `vite dev` aj preview (`cfg-editor-sklo-kladkovy-610`;
+  dočasná URL kópia `cfg-editor-sklo-mirror` prešla lokálne → #504 správanie je OK).
+- **Zápisový E2E, ktorého stav editor NEVIE vrátiť** (napr. #610: raz sledujúce sklo editor ťahá
+  s kladkovým, pôvodný nesledujúci seed stav sa editorom neobnoví): fixture aj upratanie priamo v
+  `e2e.db` (`new Database(DB_PATH)` za `skipAkLive`, vzor `objednavka-skla-proxy-hydratacia`) a
+  návrat VŠETKÝCH dotknutých riadkov v `try { … } finally { … }` (beží aj po páde, následný spec
+  vidí seed). Záverečný `expect(consoleMsgs).toEqual([])` ostáva za `finally` (guard ho prijme).
 - **RED dôkaz E2E pod `vite dev` bez stash/rebuild (#610):** `git checkout <red-sha> -- <zdrojové
   súbory>` → spusti spec (čaká sa ✘ s pôvodnou hodnotou) → `git checkout HEAD -- <tie isté>`. Pri
   dátovej zmene cez migráciu vráť aj wiring migrácie, nie len seed (migrácia by starú hodnotu opravila).
