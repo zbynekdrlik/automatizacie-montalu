@@ -219,4 +219,34 @@ describe('#610 editor vzorcov: sklo šírka sleduje kladkový − 10 mm (Štanda
 		// štýl mimo pravidla → žiadna poznámka
 		expect((await nastaveniaLoad('Robust|4K')).skloSleduje).toBeNull();
 	});
+
+	it('nejednoznačný riadok Sklo šírka (2×) → väzba sa NEuplatní (nikdy nehádame) a poznámka nie je', async () => {
+		const ss = 'Štandard +|2x3K IZO';
+		nastavStav(ss, { kladkovy: -320, sklo: -380 });
+		const sklo = db
+			.prepare(`SELECT id FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo' AND dim = 'S'`)
+			.get(ss) as { id: number };
+		const kopia = db
+			.prepare(
+				`INSERT INTO cfg_rez (sys_styl, poradie, typ, kod, nazov, dim, koef, offset, delit_n, kerf,
+				 pocet_ks, sklozavisle, dlzka_tyce, sklo_hrubka)
+				 SELECT sys_styl, 92, typ, kod, nazov, dim, koef, offset, delit_n, kerf, pocet_ks,
+				 sklozavisle, dlzka_tyce, sklo_hrubka FROM cfg_rez WHERE id = ?`
+			)
+			.run(sklo.id).lastInsertRowid;
+		try {
+			const { zmeny, error } = ulozZmenu(ss, new Map([[profilS(ss, KLADKOVY).id, -326]]));
+			expect(error).toBeNull();
+			expect(zmeny.some((z) => z.pole === POLE_SKLO)).toBe(false);
+			const offsety = (
+				db
+					.prepare(`SELECT offset FROM cfg_rez WHERE sys_styl = ? AND typ = 'sklo' AND dim = 'S'`)
+					.all(ss) as { offset: number }[]
+			).map((r) => r.offset);
+			expect(offsety).toEqual([-380, -380]);
+			expect((await nastaveniaLoad(ss)).skloSleduje).toBeNull();
+		} finally {
+			db.prepare('DELETE FROM cfg_rez WHERE id = ?').run(kopia);
+		}
+	});
 });
