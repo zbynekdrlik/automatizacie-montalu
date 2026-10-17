@@ -56,6 +56,34 @@ test('Štandard+ 2×4K opona IZO: 16 mm sklo ponúkané, plán 1:1 z Money Excel
 	expect(consoleMsgs).toEqual([]);
 });
 
+// #610 (Odoo úloha 1416, Patrik 17.10.): testovací rozmer z úlohy — sklo = kladkový − 10 mm,
+// 2×3K IZO 6500 × 2070 → 1020mm × 1935mm (appka dávala 1027mm × 1935mm). Riadok „Sklo šírka"
+// editor vzorcov neukazuje (opraví ho len migrácia v58), takže číslo je rovnaké v CI (seed) aj
+// na PROD po nasadení — overujeme presne to, čo výroba kopíruje do objednávky skla.
+test('#610 Štandard+ 2×3K opona IZO 6500 × 2070: sklo 1020mm × 1935mm (kladkový − 10)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await loginAs(page);
+
+	await page.getByLabel('Číslo objednávky (ZAK) *').fill(`${RUN}-610`);
+	await page.getByLabel('OP/OPDL číslo *').fill('01');
+	await page.getByLabel('Zákazník *').fill('E2E Opona IZO sklo 1416');
+	await page.getByLabel('Systém').selectOption('Štandard +');
+	await page.getByLabel('Štýl').selectOption('2x3K');
+	await page.getByLabel('Šírka (mm) *').fill('6500');
+	await page.getByLabel('Výška (mm) *').fill('2070');
+	await vyberSklo(page.getByLabel('Sklo (základ — určuje vzorec)'), IZO_16);
+	await vyberFarbuKovania(page);
+	await page.getByRole('button', { name: 'Spočítať nárezový plán' }).click();
+
+	// karta „Sklo (mm)" (rozmer na objednávku skla) aj výkres náhľadu nesú ten istý rozmer
+	await expect(page.getByTestId('sklo-rozmer')).toHaveText('1020mm × 1935mm');
+	await expect(page.getByTestId('nahlad-sklo-rozmer')).toHaveText('1020mm × 1935mm');
+	await expect(page.getByTestId('sklo-sirka')).toHaveText('1020');
+	expect(consoleMsgs).toEqual([]);
+});
+
 test('Štandard+ 2×2K opona IZO: plán má čestné „odvodené" upozornenie', async ({ page }) => {
 	const consoleMsgs = collectConsole(page);
 	await loginAs(page);
