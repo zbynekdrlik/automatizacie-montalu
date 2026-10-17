@@ -44,8 +44,8 @@ describe('#504 editor vzorcov: mirror rámový→sklo je podmienený a auditovan
 		expect(skloOffset(sysStyl, 'V'), 'sklo výška opona IZO sa nesmie zrkadliť z rámového').toBe(
 			-135
 		);
-		// sklo šírka nemá rámový S riadok → vždy nedotknutá
-		expect(skloOffset(sysStyl, 'S')).toBe(-407);
+		// sklo šírka nemá rámový S riadok → vždy nedotknutá (−460 = kladkový − 10 mm, #610)
+		expect(skloOffset(sysStyl, 'S')).toBe(-460);
 	});
 
 	it('zmena rámového na štýle kde sklo == rámový zrkadlí sklo A je AUDITOVANÁ', () => {
