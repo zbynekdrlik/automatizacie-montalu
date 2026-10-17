@@ -1404,6 +1404,10 @@ describe('sietkaSamostatnaVypocet — dodatočná sieťka bez posuvu (#89, korek
 // čo zodpovedá Excel-ovej spodnej ZASP202432. 2×2K/2×3K sú ODVODENÉ z toho istého
 // vzoru (opona-basic X(k) + IZO posun) — čakajú na overenie Patrikom (v appke
 // označené „odvodené" bannerom `plan-warn`).
+// #610 (Odoo úloha 1416, Patrik 17.10.2026): ŠÍRKA SKLA všetkých troch štýlov už NIE JE z Excelu
+// ani z odvodenia — je to pravidlo výroby „sklo = kladkový − 10 mm" (offset −313/−380/−460).
+// Profily, počty kusov a Money metre nižšie sú nezmenené; pravidlo samotné stráži
+// `tests/opona-izo-sklo-610.test.ts`.
 describe('Štandard + opona IZO (#504 round 3)', () => {
 	// pridavna=true → DEFAULT pri Štandard+ IZO; zodpovedá Excel-ovej ZASP202432
 	const P = (ss: string, S: number, V: number) => computeFlat(cfg, ss, S, V, false, 0, true)!;
@@ -1423,7 +1427,8 @@ describe('Štandard + opona IZO (#504 round 3)', () => {
 			ZASP202439: 57.6
 		});
 		expect(r.odpis.length).toBe(7);
-		expect(r.sklo).toMatchObject({ sirka: 574, vyska: 1965, pocet: 8 });
+		// sklo šírka podľa #610 (kladkový − 10): (5000 − 460)/8 = 567,5 → 568 (Excel mal 574)
+		expect(r.sklo).toMatchObject({ sirka: 568, vyska: 1965, pocet: 8 });
 
 		r = P('Štandard +|2x4K IZO', 6300, 2400);
 		expect(odpisByKod(r)).toMatchObject({
@@ -1435,7 +1440,7 @@ describe('Štandard + opona IZO (#504 round 3)', () => {
 			ZASP202419: 7.5,
 			ZASP202439: 57.6
 		});
-		expect(r.sklo).toMatchObject({ sirka: 737, vyska: 2265, pocet: 8 });
+		expect(r.sklo).toMatchObject({ sirka: 730, vyska: 2265, pocet: 8 });
 	});
 
 	it('2×3K opona IZO — ODVODENÉ (na overenie), 2 vstupné sady', () => {
@@ -1449,11 +1454,12 @@ describe('Štandard + opona IZO (#504 round 3)', () => {
 			ZASP202419: 7.5,
 			ZASP202439: 43.2
 		});
-		expect(r.sklo).toMatchObject({ sirka: 777, vyska: 1965, pocet: 6 });
+		// sklo šírka podľa #610 (kladkový − 10): (5000 − 380)/6 = 770
+		expect(r.sklo).toMatchObject({ sirka: 770, vyska: 1965, pocet: 6 });
 
 		r = P('Štandard +|2x3K IZO', 6300, 2400);
 		expect(odpisByKod(r)).toMatchObject({ ZASP202415: 14.4, ZASP00024: 22.5, ZASP202439: 43.2 });
-		expect(r.sklo).toMatchObject({ sirka: 994, vyska: 2265, pocet: 6 });
+		expect(r.sklo).toMatchObject({ sirka: 987, vyska: 2265, pocet: 6 });
 	});
 
 	it('2×2K opona IZO — ODVODENÉ (na overenie), 2 vstupné sady', () => {
@@ -1467,11 +1473,12 @@ describe('Štandard + opona IZO (#504 round 3)', () => {
 			ZASP202419: 7.5,
 			ZASP202439: 28.8
 		});
-		expect(r.sklo).toMatchObject({ sirka: 1182, vyska: 1965, pocet: 4 });
+		// sklo šírka podľa #610 (kladkový − 10): (5000 − 313)/4 = 1171,75 → 1172
+		expect(r.sklo).toMatchObject({ sirka: 1172, vyska: 1965, pocet: 4 });
 
 		r = P('Štandard +|2x2K IZO', 6300, 2400);
 		expect(odpisByKod(r)).toMatchObject({ ZASP202415: 14.4, ZASP00024: 15, ZASP202439: 43.2 });
-		expect(r.sklo).toMatchObject({ sirka: 1507, vyska: 2265, pocet: 4 });
+		expect(r.sklo).toMatchObject({ sirka: 1497, vyska: 2265, pocet: 4 });
 	});
 
 	it('spodná koľajnica: v seede BASIC, „prídavná" (default IZO) ju zväčší o 1 (= Excel ZASP202432)', () => {

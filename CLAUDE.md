@@ -100,7 +100,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - kovanie do odpisu: rodina systému (`RODINA_KOVANIA`), výslovné bez-kovania, zapnutie pre ďalší systém (#604) → `.claude/rules/kovanie.md`
 - sieťka (moskytiéra) Štandard geometrický model K/R/H (#569, nie zo skla) / jokle Robust / kovanie pri sieťke obe strany na výber (#583) / honest-null kód-null / rozmerJokle zo sieťoviny / samostatná /sietka + zasklenie karty → `.claude/rules/sietka.md`
 - pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
-- odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner) → `.claude/rules/opona-izo-narezak.md`
+- odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner, sklo = kladkový − 10 mm #610) → `.claude/rules/opona-izo-narezak.md`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`
