@@ -52,7 +52,7 @@ describe('setPassword zapíše trvalý audit do user_audit (#613 druhá časť)'
 			target_username: 'audit-t1',
 			detail: ''
 		});
-		expect(riadky[0].ts).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+		expect(riadky[0]?.ts).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 	});
 
 	it('audit riadok NEOBSAHUJE heslo (nové ani staré) ani hash/soľ', () => {
