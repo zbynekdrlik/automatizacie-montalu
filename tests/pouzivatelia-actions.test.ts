@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -135,6 +135,37 @@ describe('/pouzivatelia noveHeslo (#613)', () => {
 		expect(r).toMatchObject({ status: 400 });
 		expect((r as { data?: { error?: string } }).data?.error).toMatch(/nezhodujú/);
 		expect(authMod.login('nezhoda-613', POVODNE)).not.toBeNull();
+	});
+
+	it('interný: nezhoda hesiel sa zaloguje ako WARN `auth` (reason mismatch) — bez hesla', async () => {
+		const riadky: string[] = [];
+		process.env.LOG_LEVEL = 'info';
+		const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+			riadky.push(String(chunk));
+			return true;
+		}) as typeof process.stdout.write);
+		try {
+			await actions.noveHeslo(
+				event(hesloForm('nezhoda-log-613', NOVE, NOVE + '-preklep'), internalActor)
+			);
+		} finally {
+			spy.mockRestore();
+			delete process.env.LOG_LEVEL;
+		}
+		const zaznamy = riadky
+			.join('')
+			.split('\n')
+			.filter(Boolean)
+			.map((l) => JSON.parse(l) as Record<string, unknown>);
+		const rec = zaznamy.find((z) => z.msg === 'nové heslo zamietnuté');
+		expect(rec).toMatchObject({
+			level: 'warn',
+			module: 'auth',
+			admin: 'admin',
+			username: 'nezhoda-log-613',
+			reason: 'mismatch'
+		});
+		expect(riadky.join('')).not.toContain(NOVE);
 	});
 
 	it('interný: slabé heslo → 400 s pravidlom, nič sa nezmení', async () => {

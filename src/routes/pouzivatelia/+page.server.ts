@@ -7,12 +7,30 @@
 // takže sfalšovaný POST role nemôže eskalovať (viď skill access-control §2/§4, #142).
 import { redirect, fail } from '@sveltejs/kit';
 import { isB2B, setPassword } from '$lib/server/auth';
-import { listUsers, addUser, deleteB2BUser, changeUserRole } from '$lib/server/db';
+import {
+	listUsers,
+	addUser,
+	deleteB2BUser,
+	changeUserRole,
+	MIN_PASSWORD_LEN,
+	MAX_PASSWORD_LEN
+} from '$lib/server/db';
+import { logger } from '$lib/server/log';
 import type { Actions, PageServerLoad } from './$types';
+
+// rovnaký modul a správa ako zamietnutia v `setPassword` — jeden audit tok pre nové heslo
+const authLog = logger('auth');
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (isB2B(locals.user)) redirect(303, '/zasklenia');
-	return { users: listUsers(), me: locals.user?.username };
+	// #613: limity hesla pre `minlength`/`maxlength` formulárov z JEDNÉHO zdroja (`chybaHesla`)
+	// — UI tak nemôže odplávať od servera (server ďalej rozhoduje sám)
+	return {
+		users: listUsers(),
+		me: locals.user?.username,
+		hesloMin: MIN_PASSWORD_LEN,
+		hesloMax: MAX_PASSWORD_LEN
+	};
 };
 
 function parseRole(v: FormDataEntryValue | null): 'internal' | 'b2b' | null {
@@ -68,7 +86,15 @@ export const actions = {
 		const password = String(fd.get('password') ?? '');
 		const potvrdenie = String(fd.get('password2') ?? '');
 		const ucet = username.trim();
-		if (password !== potvrdenie) return fail(400, { error: 'Heslá sa nezhodujú.', ucet });
+		if (password !== potvrdenie) {
+			// zaloguj ako ostatné zamietnutia (setPassword) — bez hesla
+			authLog.warn('nové heslo zamietnuté', {
+				admin: locals.user.username,
+				username: ucet.slice(0, 40),
+				reason: 'mismatch'
+			});
+			return fail(400, { error: 'Heslá sa nezhodujú.', ucet });
+		}
 		const r = setPassword(username, password, locals.user.username);
 		if (r.error !== null) return fail(400, { error: r.error, ucet });
 		return {

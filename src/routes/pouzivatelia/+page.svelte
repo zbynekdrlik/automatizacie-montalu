@@ -55,8 +55,15 @@
 			<input id="username" name="username" required />
 		</div>
 		<div class="field">
-			<label for="password">Heslo (min. 6 znakov)</label>
-			<input id="password" name="password" type="password" minlength="6" required />
+			<label for="password">Heslo (min. {data.hesloMin} znakov)</label>
+			<input
+				id="password"
+				name="password"
+				type="password"
+				minlength={data.hesloMin}
+				maxlength={data.hesloMax}
+				required
+			/>
 		</div>
 		<div class="field">
 			<label for="role">Rola</label>
@@ -123,7 +130,7 @@
 					<td>{u.created_at}</td>
 					<td>
 						<!-- #613: nové heslo bez znalosti starého (zabudnuté heslo). Polia minlength/maxlength
-						     zrkadlia server `chybaHesla` (6 / 200) — rozhoduje server, toto je len UX. -->
+						     berú limity z load (konštanty `chybaHesla`) — rozhoduje server, toto je len UX. -->
 						<details class="heslo-det" data-testid="nove-heslo">
 							<summary data-testid="nove-heslo-toggle">Nastaviť nové heslo</summary>
 							<form
@@ -139,8 +146,8 @@
 									name="password"
 									type="password"
 									autocomplete="new-password"
-									minlength="6"
-									maxlength="200"
+									minlength={data.hesloMin}
+									maxlength={data.hesloMax}
 									required
 								/>
 								<label for="nove-heslo2-{u.id}">Nové heslo znova</label>
@@ -149,8 +156,8 @@
 									name="password2"
 									type="password"
 									autocomplete="new-password"
-									minlength="6"
-									maxlength="200"
+									minlength={data.hesloMin}
+									maxlength={data.hesloMax}
 									required
 								/>
 								<button class="btn sm secondary" type="submit">Uložiť heslo</button>
