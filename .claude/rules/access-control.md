@@ -139,8 +139,10 @@ medzery okolo `{#if}`); prázdny `kto` (seed) = „—". Load beží po každej 
 oreže + skráti na `MAX_USERNAME_LEN`, `WHERE target_username = ? COLLATE NOCASE`, nájde aj zmazaný
 účet): na PROD okno posledných 50 zaplnia throwaway účty post-deploy E2E (~19 riadkov create/delete
 na deploy), skutočnú udalosť (napr. reset `predaj`) treba hľadať filtrom — NIKDY nefiltruj podľa
-`e2e-` vzoru v produkčnom kóde. Nečitateľný `ts` sa ukáže surovo (`kedyUdalosti`) — `RangeError`
-z `formatDatumCasSk` by zhodil jedinú stránku na reset hesla. E2E filtruje na throwaway účet a
+`e2e-` vzoru v produkčnom kóde. Nečitateľný `ts` sa ukáže surovo (`formatSqliteCasSk` v `$lib/datum`)
+— `RangeError` z `formatDatumCasSk` by zhodil jedinú stránku na reset hesla. Plný nefiltrovaný zoznam
+povie „zobrazuje sa najviac N — staršie nájdeš filtrom" (`historiaLimit` z load); `maxlength` poľa
+účtu = `ucetMax` (`MAX_USERNAME_LEN`) z load, nie natvrdo. E2E filtruje na throwaway účet a
 tvrdí PRESNE 2 riadky (zmena hesla nad vytvorením). Odkazy v komponente cez `resolve()` (`$app/paths`)
 — holý `href="/…"` padne na eslint `svelte/no-navigation-without-resolve`.
 

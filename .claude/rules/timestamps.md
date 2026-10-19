@@ -66,10 +66,12 @@ na obrazovke/tlači, MUSÍ ísť cez `sqliteUtcToIso`.
 ## História zmien editora vzorcov + história účtov — tiež cez `sqliteUtcToIso` (#613)
 
 Karta „História zmien" na `/zasklenia/nastavenia` vykresľovala `cfg_audit.ts` surovo (UTC) — load
-ho od #613 mapuje `formatDatumCasSk(sqliteUtcToIso(a.ts))` (test `tests/nastavenia-historia-cas.test.ts`,
-zima 13:32 UTC → 14:32, leto 22:30 UTC → 00:30 ďalšieho dňa). Nová história účtov (`ucty-historia.ts`)
-robí to isté a nečitateľný `ts` ukáže surovo (RangeError by zhodil `/pouzivatelia`). Pri ďalšej karte
-„história/audit" čas VŽDY pripravuj v load, nikdy `{x.ts}` priamo v šablóne.
+ho od #613 mapuje `formatSqliteCasSk(a.ts)` (test `tests/nastavenia-historia-cas.test.ts`, zima
+13:32 UTC → 14:32, leto 22:30 UTC → 00:30 ďalšieho dňa). `formatSqliteCasSk` (`$lib/datum`) = most
+`sqliteUtcToIso` + `formatDatumCasSk`, ale NEČITATEĽNÚ hodnotu vráti surovú (holý `formatDatumCasSk`
+na neplatnom dátume hádže `RangeError` → jeden zlý riadok zhodí celú stránku). Používa ho aj história
+účtov (`ucty-historia.ts`). Pri ďalšej karte „história/audit" čas VŽDY pripravuj v load cez
+`formatSqliteCasSk`, nikdy `{x.ts}` priamo v šablóne.
 
 ## /odpisy história — VŠETKY časy cez `sqliteUtcToIso` + `formatDatum*Sk` (#313)
 
