@@ -94,7 +94,7 @@ describe('historiaUctov — riadky user_audit pre /pouzivatelia (#613)', () => {
 			zapis(i, '2026-10-19 10:00:00', 'marek', 'create', `ucet-${i}`);
 		const h = historiaUctov();
 		expect(h).toHaveLength(HISTORIA_UCTOV_LIMIT);
-		expect(h[0].ucet).toBe(`ucet-${HISTORIA_UCTOV_LIMIT + 5}`);
+		expect(h[0]?.ucet).toBe(`ucet-${HISTORIA_UCTOV_LIMIT + 5}`);
 		expect(h.at(-1)!.ucet).toBe('ucet-6');
 		expect(historiaUctov(2).map((r) => r.id)).toEqual([
 			HISTORIA_UCTOV_LIMIT + 5,
@@ -150,7 +150,7 @@ describe('HistoriaUctov komponent (SSR render) (#613)', () => {
 		expect(html).toContain('História účtov');
 		const riadky = [...html.matchAll(/data-testid="historia-riadok"[^>]*>([\s\S]*?)<\/li>/g)].map(
 			(m) =>
-				m[1]
+				(m[1] ?? '')
 					.replace(/<!--[\s\S]*?-->/g, '')
 					.replace(/<[^>]+>/g, '')
 					.replace(/\s+/g, ' ')
