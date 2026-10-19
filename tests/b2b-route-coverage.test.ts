@@ -13,6 +13,27 @@ import { b2bRedirectTarget } from '../src/lib/server/b2b-access';
 // paralelnou sadou pri vysokom loade > 5 s) sa tak neráta do časového limitu jedného testu.
 const objednavkaSklaZak = await import('../src/routes/objednavka-skla/[zak]/+page.server');
 
+// Route moduly importované na TOP-LEVEL (nie v tele testu): studená transformácia ich grafu pod
+// plnou paralelnou sadou pri vysokom loade presiahne 5 s limit jedného testu.
+const route_pergola_navrh = await import('../src/routes/pergola/navrh/+page.server');
+const route_zasklenia_navrh = await import('../src/routes/zasklenia/navrh/+page.server');
+const route_bazen_navrh = await import('../src/routes/bazen/navrh/+page.server');
+const route_zasklenia_navrh_zakaznicky =
+	await import('../src/routes/zasklenia/navrh/zakaznicky/+page.server');
+const route_konfigurator_pergola = await import('../src/routes/konfigurator/pergola/+page.server');
+const route_konfigurator_bazen = await import('../src/routes/konfigurator/bazen/+page.server');
+const route_konfigurator_zasklenie =
+	await import('../src/routes/konfigurator/zasklenie/+page.server');
+const route_konfigurator_zimna_zahrada =
+	await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
+const route_konfigurator_oplotenie =
+	await import('../src/routes/konfigurator/oplotenie/+page.server');
+const route_konfigurator_tienenie =
+	await import('../src/routes/konfigurator/tienenie/+page.server');
+const route_konfigurator_pristresok =
+	await import('../src/routes/konfigurator/pristresok/+page.server');
+const route_pergola_narez = await import('../src/routes/pergola/narez/+page.server');
+
 const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 
 // Cesty, kde b2b smie zostať (nepresmerúva sa preč):
@@ -297,7 +318,7 @@ describe('b2b route coverage (denylist drift guard)', () => {
 // budúcej zápisovej akcie (napr. omylom skopírovanej z /pergola) tento test rozbije.
 describe('/pergola/navrh — žiadna cesta k Money odpisu (#144)', () => {
 	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/pergola/navrh/+page.server');
+		const { actions } = route_pergola_navrh;
 		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
 	});
 });
@@ -306,7 +327,7 @@ describe('/pergola/navrh — žiadna cesta k Money odpisu (#144)', () => {
 // akciu vôbec (display-only), tento test stráži, že to tak ZOSTANE.
 describe('/zasklenia/navrh — žiadna cesta k Money odpisu (#162)', () => {
 	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/zasklenia/navrh/+page.server');
+		const { actions } = route_zasklenia_navrh;
 		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
 	});
 });
@@ -315,7 +336,7 @@ describe('/zasklenia/navrh — žiadna cesta k Money odpisu (#162)', () => {
 // (display-only), aj keď je pre b2b navyše ÚPLNE zablokovaná (viď test vyššie).
 describe('/bazen/navrh — žiadna cesta k Money odpisu (#139)', () => {
 	it('akcie routy sú presne vykres/upravit — žiadna odpisová/zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/bazen/navrh/+page.server');
+		const { actions } = route_bazen_navrh;
 		expect(Object.keys(actions).sort()).toEqual(['upravit', 'vykres']);
 	});
 });
@@ -325,7 +346,7 @@ describe('/bazen/navrh — žiadna cesta k Money odpisu (#139)', () => {
 // odpisovú/zápisovú akciu vôbec.
 describe('/zasklenia/navrh/zakaznicky — žiadna cesta k Money odpisu (#170)', () => {
 	it('akcie routy sú presne default — žiadna odpisová/zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/zasklenia/navrh/zakaznicky/+page.server');
+		const { actions } = route_zasklenia_navrh_zakaznicky;
 		expect(Object.keys(actions).sort()).toEqual(['default']);
 	});
 });
@@ -342,7 +363,7 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 	it('akcie routy sú presne dopyt + objednavka + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
 		// #384: pergolový konfigurátor sa presunul na podstránku `/konfigurator/pergola`; root
 		// `/konfigurator` je výberová obrazovka (bez akcií). Množina akcií ostáva presne tá istá.
-		const { actions } = await import('../src/routes/konfigurator/pergola/+page.server');
+		const { actions } = route_konfigurator_pergola;
 		// `vypocet` = kalkulačka súhrnu; `dopyt` = verejný formulár → PDF ponuka BEZ CIEN;
 		// `objednavka` (#319) = záväzná objednávka → uloženie (je_objednavka=1) + Odoo opportunity.
 		// Všetky pomenované (SvelteKit nedovolí default + pomenované naraz), všetky Money-neutrálne
@@ -361,7 +382,7 @@ describe('/konfigurator/pergola — žiadna cesta k Money odpisu (#275/#277/#319
 // kritické; pridanie akejkoľvek ĎALŠEJ akcie ROZBIJE test (fail-closed).
 describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385/#404/#422)', () => {
 	it('akcie routy sú presne dopyt + objednavka + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/bazen/+page.server');
+		const { actions } = route_konfigurator_bazen;
 		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'objednavka', 'vypocet']);
 	});
 });
@@ -373,7 +394,7 @@ describe('/konfigurator/bazen — žiadna cesta k Money odpisu (#385/#404/#422)'
 // tento test ROZBIJE (fail-closed).
 describe('/konfigurator/zasklenie — žiadna cesta k Money odpisu (#387)', () => {
 	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/zasklenie/+page.server');
+		const { actions } = route_konfigurator_zasklenie;
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });
@@ -386,7 +407,7 @@ describe('/konfigurator/zasklenie — žiadna cesta k Money odpisu (#387)', () =
 // akejkoľvek ďalšej akcie tento test ROZBIJE (fail-closed).
 describe('/konfigurator/zimna-zahrada — žiadna cesta k Money odpisu (#386/#408)', () => {
 	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/zimna-zahrada/+page.server');
+		const { actions } = route_konfigurator_zimna_zahrada;
 		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
@@ -398,7 +419,7 @@ describe('/konfigurator/zimna-zahrada — žiadna cesta k Money odpisu (#386/#40
 // tento test ROZBIJE (fail-closed).
 describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388/#410)', () => {
 	it('akcie routy sú presne dopyt + vypocet — žiadna Money/odpisová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/oplotenie/+page.server');
+		const { actions } = route_konfigurator_oplotenie;
 		expect(Object.keys(actions).sort()).toEqual(['dopyt', 'vypocet']);
 	});
 });
@@ -410,7 +431,7 @@ describe('/konfigurator/oplotenie — žiadna cesta k Money odpisu (#388/#410)',
 // test ROZBIJE (fail-closed).
 describe('/konfigurator/tienenie — žiadna cesta k Money odpisu (#389)', () => {
 	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/tienenie/+page.server');
+		const { actions } = route_konfigurator_tienenie;
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });
@@ -422,7 +443,7 @@ describe('/konfigurator/tienenie — žiadna cesta k Money odpisu (#389)', () =>
 // ďalšej akcie tento test ROZBIJE (fail-closed).
 describe('/konfigurator/pristresok — žiadna cesta k Money odpisu (#390)', () => {
 	it('akcie routy sú presne dopyt — žiadna Money/odpisová/cenová zápisová akcia', async () => {
-		const { actions } = await import('../src/routes/konfigurator/pristresok/+page.server');
+		const { actions } = route_konfigurator_pristresok;
 		expect(Object.keys(actions).sort()).toEqual(['dopyt']);
 	});
 });
@@ -434,7 +455,7 @@ describe('/konfigurator/pristresok — žiadna cesta k Money odpisu (#390)', () 
 // Presná množina akcií = fail-closed drift guard; pridanie ďalšej akcie tento test ROZBIJE.
 describe('/pergola/narez — akcie objednávky skla vrátane pridatSkloRucne (#546)', () => {
 	it('akcie routy sú presne definovaná množina (vrátane pridatSkla + pridatSkloRucne)', async () => {
-		const { actions } = await import('../src/routes/pergola/narez/+page.server');
+		const { actions } = route_pergola_narez;
 		expect(Object.keys(actions).sort()).toEqual([
 			'odoslat',
 			'odoslatExpediciuDoOdoo',

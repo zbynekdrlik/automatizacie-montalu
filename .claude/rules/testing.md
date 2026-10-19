@@ -727,9 +727,14 @@ odobrať (tvrď podmnožinu / triedu).
   priamo (HMR), takže zmutuj → spusti spec → `git checkout -- <súbor>` stačí; pasca „po REVERTE
   prebuilduj" vyššie platí len pre preview/`build/`. 8.10.: playwright 1.61.1 chcel
   `chromium_headless_shell-1228` (nebol), `executablePath` na `-1243` fungoval.
-- **Plný `npm test` NEspúšťaj súbežne s lokálnym E2E na preťaženom boxe (#603, load ~24):**
-  `b2b-route-coverage.test.ts` (dynamický import routy) padol na default 5 s timeout, sám prejde —
-  artefakt záťaže, nie regresia; plný beh opakuj bez súbežnej záťaže.
+- **Route modul (`+page.server` / `+server`) importuj v teste na TOP-LEVELI, nikdy v tele `it()`
+  (#613, 19.10.).** Studená transformácia grafu routy (`/objednavka-skla/[zak]` ~1,9 s samostatne)
+  sa pri importe v tele testu ráta do 5 s limitu testu → pod plnou paralelnou sadou na preťaženom
+  boxe (load ~14) padali NÁHODNE rôzne testy (`b2b-route-coverage` #545, `pergola-narez-money-safety`)
+  s „Test timed out", samostatne prešli. Top-level `const route = await import('../src/routes/…')`
+  (vzor `odpis-detail-vstup-raw.test.ts`) beží pri zbere súboru, mimo limitu testu. NIE vyšší
+  timeout, NIE „opakuj bez záťaže". Ak test MUSÍ nastaviť env pred importom, nastav ho tiež na
+  top-leveli pred `await import`.
 - **Fixtúra Deluxe 2x4K: šírka ≤ ~7000 mm** — `s: 8000` padne „Rez 8000 mm (Koľajnica horná 4K
   Surový 7500 mm) je dlhší než tyč" (akcia vráti `step:'form'`, riadky sa nepridajú).
 - **Temp E2E config drž na porte 4173, ak je voľný** — `skipAkLive` (`e2e/helpers.ts`) číta

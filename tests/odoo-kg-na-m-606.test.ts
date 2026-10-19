@@ -17,6 +17,9 @@ import {
 } from '../src/lib/server/odoo-katalog';
 import type { MaterialRow } from '../src/lib/server/compute';
 
+// Route modul na TOP-LEVEL (studená transformácia sa neráta do 5 s limitu testu pod záťažou).
+const healthRoute = await import('../src/routes/health/+server');
+
 function enableEnv() {
 	vi.stubEnv('ODOO_JSON2_URL', 'https://erp.test');
 	vi.stubEnv('ODOO_JSON2_API_KEY', 'key');
@@ -247,7 +250,7 @@ describe('zistiKgZdroj (#606) — stav kanála pre /health', () => {
 	});
 
 	it('/health vráti kgZdroj vedľa cenyZdroj (verejné — žiadne kg/m hodnoty)', async () => {
-		const health = await import('../src/routes/health/+server');
+		const health = healthRoute;
 		const res = await (health.GET as unknown as () => Promise<Response>)();
 		const body = (await res.json()) as Record<string, unknown>;
 		expect(body.kgZdroj).toBe('nedostupne');
