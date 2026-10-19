@@ -1,5 +1,5 @@
 // Interná správa účtov — vytváranie (interný/B2B voľbou role) + zmena roly +
-// mazanie B2B veľkoobchodných účtov + nové heslo existujúcemu účtu (#613). Stránka
+// mazanie B2B veľkoobchodných účtov + nové heslo existujúcemu účtu + história účtov (#613). Stránka
 // je len pre interných (denylist v hooks.server.ts presmeruje b2b skôr, než sem
 // príde požiadavka; kontrola v load/actions je obrana do hĺbky, viď zasklenia).
 // `pridat` číta `role` z formulára — to je BEZPEČNÉ napriek tomu, že akcia je
@@ -16,6 +16,7 @@ import {
 	MAX_PASSWORD_LEN
 } from '$lib/server/db';
 import { logger } from '$lib/server/log';
+import { historiaUctov } from '$lib/server/ucty-historia';
 import type { Actions, PageServerLoad } from './$types';
 
 // rovnaký modul a správa ako zamietnutia v `setPassword` — jeden audit tok pre nové heslo
@@ -25,11 +26,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 	if (isB2B(locals.user)) redirect(303, '/zasklenia');
 	// #613: limity hesla pre `minlength`/`maxlength` formulárov z JEDNÉHO zdroja (`chybaHesla`)
 	// — UI tak nemôže odplávať od servera (server ďalej rozhoduje sám)
+	// #613 (druhá časť): história účtov z `user_audit` (aj „heslo zmenené") — po každej akcii s
+	// `use:enhance` sa load spustí znova (invalidateAll), takže nový riadok je hneď vidieť
 	return {
 		users: listUsers(),
 		me: locals.user?.username,
 		hesloMin: MIN_PASSWORD_LEN,
-		hesloMax: MAX_PASSWORD_LEN
+		hesloMax: MAX_PASSWORD_LEN,
+		historia: historiaUctov()
 	};
 };
 
