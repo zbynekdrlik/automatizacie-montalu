@@ -1,11 +1,26 @@
 // #496: unit test — objednavka-skla CRUD module
 import { describe, it, expect } from 'vitest';
+// Moduly importované na TOP-LEVELI (nie v tele `it()`): studená transformácia grafu
+// objednavka-skla/db sa inak ráta do 5 s limitu prvého testu a pod plnou paralelnou sadou
+// s coverage na preťaženom boxe padala „Test timed out" (testing.md, #613).
+import {
+	pridajSklo,
+	listSklaPreZakazku,
+	getSkloPolozka,
+	nastavRezim,
+	zmazPolozku,
+	pridajSklaHromadne,
+	pridajSubor,
+	listSubory,
+	getSuborData,
+	getSuborMeta,
+	zmazSubor,
+	MAX_SUBOR_VELKOST
+} from '../src/lib/server/objednavka-skla';
+import { db } from '../src/lib/server/db';
 
 describe('objednavka-skla CRUD', () => {
 	it('pridajSklo inserts and listSklaPreZakazku reads back', async () => {
-		const { pridajSklo, listSklaPreZakazku, getSkloPolozka, nastavRezim, zmazPolozku } =
-			await import('../src/lib/server/objednavka-skla');
-
 		const id = pridajSklo({
 			zak: 'ZAK260501',
 			op: 'OP260501',
@@ -47,9 +62,6 @@ describe('objednavka-skla CRUD', () => {
 	});
 
 	it('pridajSklaHromadne inserts multiple in transaction', async () => {
-		const { pridajSklaHromadne, listSklaPreZakazku } =
-			await import('../src/lib/server/objednavka-skla');
-
 		const count = pridajSklaHromadne([
 			{
 				zak: 'ZAK260502',
@@ -89,8 +101,6 @@ describe('objednavka-skla CRUD', () => {
 	});
 
 	it('zak_norm normalization works (case + space)', async () => {
-		const { pridajSklo, listSklaPreZakazku } = await import('../src/lib/server/objednavka-skla');
-
 		pridajSklo({
 			zak: 'zak 260503',
 			modul: 'pergola',
@@ -109,9 +119,6 @@ describe('objednavka-skla CRUD', () => {
 	});
 
 	it('subory CRUD works', async () => {
-		const { pridajSklo, pridajSubor, listSubory, getSuborData, getSuborMeta, zmazSubor } =
-			await import('../src/lib/server/objednavka-skla');
-
 		const polId = pridajSklo({
 			zak: 'ZAK260504',
 			modul: 'fix',
@@ -145,9 +152,6 @@ describe('objednavka-skla CRUD', () => {
 	});
 
 	it('rejects files over MAX_SUBOR_VELKOST', async () => {
-		const { pridajSklo, pridajSubor, MAX_SUBOR_VELKOST } =
-			await import('../src/lib/server/objednavka-skla');
-
 		const polId = pridajSklo({
 			zak: 'ZAK260505',
 			modul: 'fix',
@@ -163,8 +167,7 @@ describe('objednavka-skla CRUD', () => {
 	});
 
 	it('objednavka_skla table exists after migration (file-size cap guard)', async () => {
-		const { db } = await import('../src/lib/server/db');
-		expect(db.pragma('user_version', { simple: true })).toBe(58);
+		expect(db.pragma('user_version', { simple: true })).toBe(59);
 		const tbl = db
 			.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='objednavka_skla'")
 			.get();

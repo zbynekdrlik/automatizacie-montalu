@@ -734,7 +734,11 @@ odobrať (tvrď podmnožinu / triedu).
   s „Test timed out", samostatne prešli. Top-level `const route = await import('../src/routes/…')`
   (vzor `odpis-detail-vstup-raw.test.ts`) beží pri zbere súboru, mimo limitu testu. NIE vyšší
   timeout, NIE „opakuj bez záťaže". Ak test MUSÍ nastaviť env pred importom, nastav ho tiež na
-  top-leveli pred `await import`.
+  top-leveli pred `await import`. **Platí aj pre ťažké SERVER moduly, nielen routy** (#613 druhá
+  časť): `objednavka-skla-producenti` „single posuv compute…" padol pod plným `npm test` s coverage
+  (load ~23) na 5 s — `await import('…/objednavka-skla' | '…/compute' | '…/db')` v tele prvého
+  `it()` (tests 3,0 s → 75 ms po presune na statické importy; súrodenci `objednavka-skla(-spec)`
+  presunutí tiež). Grep: `grep -rnE "^\s{2,}.*await import\('\.\./src/lib/server/" tests`.
 - **Fixtúra Deluxe 2x4K: šírka ≤ ~7000 mm** — `s: 8000` padne „Rez 8000 mm (Koľajnica horná 4K
   Surový 7500 mm) je dlhší než tyč" (akcia vráti `step:'form'`, riadky sa nepridajú).
 - **Temp E2E config drž na porte 4173, ak je voľný** — `skipAkLive` (`e2e/helpers.ts`) číta

@@ -48,6 +48,7 @@ import { migrateClipSkloHrubky } from './migracie-clip-sklo-hrubky';
 import { migrateStandardyBez24mm } from './migracie-sklo-hrubky-24mm';
 import { migrateOdpisPoradie } from './migracie-odpis-poradie';
 import { migrateOponaIzoSkloSirka } from './migracie-opona-izo-sklo';
+import { migrateUserAuditHeslo } from './migracie-user-audit-heslo';
 
 const log = logger('migrate');
 
@@ -979,6 +980,7 @@ export function migrate(db: Database.Database, hashPassword: (password: string) 
 	migrateStandardyBez24mm(db, bump); // v55→v56 (úloha 1218 Štandardy bez 24 mm izolačného; vlastný súbor)
 	migrateOdpisPoradie(db, bump); // v56→v57 (#608 dorobenie — odpis_log.poradie + UNIQUE s poradím; vlastný súbor)
 	migrateOponaIzoSkloSirka(db, bump); // v57→v58 (#610 Štandard+ opona IZO sklo = kladkový − 10; vlastný súbor)
+	migrateUserAuditHeslo(db, bump); // v58→v59 (#613 user_audit pozná password_reset — trvalý audit nového hesla; vlastný súbor)
 	seedData(db);
 	seedUsers(db, hashPassword);
 }

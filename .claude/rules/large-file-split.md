@@ -25,7 +25,7 @@ modules are covered automatically by that walk — nothing to register per file.
 |---|---|---|
 | `src/routes/zasklenia/+page.svelte` | ~1620 | over — split tracked #250 |
 | `src/lib/server/compute.ts` | — | split DONE (#249 → 4 moduly + fasáda) |
-| `src/lib/server/migracie.ts` | ~982 | AT CAP — každá nová migrácia vo VLASTNOM súbore (viď `migrations.md`); call-list samotný presuň von do ~2 migrácií |
+| `src/lib/server/migracie.ts` | ~986 | AT CAP — každá nová migrácia vo VLASTNOM súbore (viď `migrations.md`); call-list samotný presuň von do ~2 migrácií |
 | `src/lib/server/money.ts` | ~790 | split DONE #608: história → `money-historia.ts` (pure move + re-export), override audity → `money-override-audit.ts`, dedup rozhodnutie + ledger → `money-dedup.ts`. Ďalší rast = ďalší kohézny blok von (napr. hlášky/`overrideOpts` — POZOR na cyklus: `normZak`/`normOp` žijú v money.ts) |
 | `src/lib/pergola-narez.ts` | ~937 | approaching — split DONE raz (#155 fasáda), ďalší dotyk zváž ďalšiu extrakciu |
 | `src/lib/components/vizual/Vizual3D.svelte` | ~722 | approaching |

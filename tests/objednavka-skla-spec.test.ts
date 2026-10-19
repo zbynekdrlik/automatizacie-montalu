@@ -1,11 +1,21 @@
 // #521: CRUD perzistencia špecifikácie tabule (spec_* stĺpce) + validácia + tok do buildGlassOrder.
 // Money-NEUTRÁLNE (objednavka_skla, žiadny Money odpis).
 import { describe, it, expect } from 'vitest';
+// Moduly importované na TOP-LEVELI (nie v tele `it()`): studená transformácia grafu
+// objednavka-skla/db sa inak ráta do 5 s limitu prvého testu a pod plnou paralelnou sadou
+// s coverage na preťaženom boxe padala „Test timed out" (testing.md, #613).
+import {
+	pridajSklo,
+	getSkloPolozka,
+	nastavSpec,
+	validateSpec,
+	listSklaPreZakazku
+} from '../src/lib/server/objednavka-skla';
+import { db } from '../src/lib/server/db';
 import { GLASS_SPEC_OFF, buildGlassOrder } from '../src/lib/server/odoo-rozpis-lines';
 
 describe('objednavka-skla spec CRUD (#521)', () => {
 	it('nový riadok má vypnutý spec (default)', async () => {
-		const { pridajSklo, getSkloPolozka } = await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-1',
 			modul: 'zasklenia',
@@ -21,8 +31,6 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('nastavSpec perzistuje a číta späť (round-trip)', async () => {
-		const { pridajSklo, nastavSpec, getSkloPolozka } =
-			await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-2',
 			modul: 'fix',
@@ -53,8 +61,6 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('otvory > 0 bez zvolenej triedy → default d30 (nie prázdne, nie d50)', async () => {
-		const { pridajSklo, nastavSpec, getSkloPolozka } =
-			await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-3',
 			modul: 'zasklenia',
@@ -73,7 +79,6 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('validateSpec hodí na neplatné hodnoty', async () => {
-		const { validateSpec } = await import('../src/lib/server/objednavka-skla');
 		expect(() => validateSpec({ ...GLASS_SPEC_OFF, holesQty: -1 })).toThrow();
 		expect(() => validateSpec({ ...GLASS_SPEC_OFF, muntinCrossQty: 1.5 })).toThrow();
 		// @ts-expect-error — zámerne neplatná hodnota
@@ -83,8 +88,6 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('spec z DB položky tečie do buildGlassOrder payloadu', async () => {
-		const { pridajSklo, nastavSpec, listSklaPreZakazku } =
-			await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-4',
 			modul: 'zasklenia',
@@ -106,8 +109,6 @@ describe('objednavka-skla spec CRUD (#521)', () => {
 	});
 
 	it('mapSpec: neplatné uložené texty (hole_size/edge_finish) → predvolené', async () => {
-		const { db } = await import('../src/lib/server/db');
-		const { pridajSklo, getSkloPolozka } = await import('../src/lib/server/objednavka-skla');
 		const id = pridajSklo({
 			zak: 'ZAK-SPEC-5',
 			modul: 'zasklenia',

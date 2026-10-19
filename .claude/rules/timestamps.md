@@ -63,6 +63,16 @@ tá istá UTC pasca ako vyššie, len z iného zdroja. Preto najprv `sqliteUtcTo
 ktorý už ISO je, vráti nezmenený (most, nie parser). Nový kód, čo zobrazuje SQLite timestamp
 na obrazovke/tlači, MUSÍ ísť cez `sqliteUtcToIso`.
 
+## História zmien editora vzorcov + história účtov — tiež cez `sqliteUtcToIso` (#613)
+
+Karta „História zmien" na `/zasklenia/nastavenia` vykresľovala `cfg_audit.ts` surovo (UTC) — load
+ho od #613 mapuje `formatSqliteCasSk(a.ts)` (test `tests/nastavenia-historia-cas.test.ts`, zima
+13:32 UTC → 14:32, leto 22:30 UTC → 00:30 ďalšieho dňa). `formatSqliteCasSk` (`$lib/datum`) = most
+`sqliteUtcToIso` + `formatDatumCasSk`, ale NEČITATEĽNÚ hodnotu vráti surovú (holý `formatDatumCasSk`
+na neplatnom dátume hádže `RangeError` → jeden zlý riadok zhodí celú stránku). Používa ho aj história
+účtov (`ucty-historia.ts`). Pri ďalšej karte „história/audit" čas VŽDY pripravuj v load cez
+`formatSqliteCasSk`, nikdy `{x.ts}` priamo v šablóne.
+
 ## /odpisy história — VŠETKY časy cez `sqliteUtcToIso` + `formatDatum*Sk` (#313)
 
 `/odpisy` (`+page.svelte`) aj detail `/odpisy/[id]` renderovali časy SUROVO → prod kontajner (UTC)

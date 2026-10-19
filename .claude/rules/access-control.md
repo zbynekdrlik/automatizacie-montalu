@@ -111,13 +111,40 @@ password, admin)` v `auth.ts`: meno `COLLATE NOCASE` + trim ako `login()`, pravi
 ktoré `login()` odmietne ako `too_long`), v JEDNEJ transakcii UPDATE `pass_hash` + DELETE VŠETKÝCH
 relácií účtu (aj adminovej pri vlastnom účte → UI pýta `confirm`, admin skončí na /login), potom
 `resetLoginThrottleForUser` (lockout toho mena naprieč IP). Nezhoda hesiel sa rieši v akcii.
-**Audit je LEN `auth` stdout log** („heslo zmenené administrátorom" / WARN „nové heslo zamietnuté"
-s `reason`), NIE `user_audit` — jeho CHECK pozná len create/role_change/delete/seed (nová akcia =
-recreate migrácia) a stdout je container-scoped (redeploy ho zmaže). Trvalý audit = samostatné
-rozhodnutie (migrácia). Výsledok akcie nesie `ucet` → hláška sa ukáže pri riadku účtu, nie v
-hornom banneri. Limity `minlength`/`maxlength` formulárov idú z `load` (`hesloMin`/`hesloMax`).
-Testy: `tests/nove-heslo-613.test.ts`, `tests/pouzivatelia-actions.test.ts` (forged POST + presná
-množina akcií routy), E2E `e2e/pouzivatelia-heslo-613.spec.ts`.
+**Audit je TRVALÝ (druhá časť #613, migrácia v59):** v tej istej transakcii ako UPDATE hashu +
+DELETE relácií `setPassword` zapíše `user_audit` riadok `action='password_reset'` (actor = admin,
+target = meno z DB, `detail` prázdny, čas = `ts` default) — NIKDY heslo ani hash; zlyhanie zápisu
+auditu vráti aj heslo, aj relácie (rollback, throttle sa nevynuluje). `auth` stdout log („heslo
+zmenené administrátorom" / WARN „nové heslo zamietnuté" s `reason`) ostáva ako prevádzkový log —
+je container-scoped (redeploy ho zmaže), trvalý záznam je len `user_audit`. Zamietnutie (preklep,
+slabé heslo, neznámy účet) audit NEzapíše. **Nová akcia v `user_audit` = prestavba tabuľky**
+(SQLite nevie ALTER CHECK) vo vlastnom migračnom súbore (`migrations.md` v59) + popis v
+`POPIS_AKCIE_UCTU` (drift guard `tests/ucty-historia-613.test.ts` porovná CHECK s popismi).
+Výsledok akcie nesie `ucet` → hláška sa ukáže pri riadku účtu, nie v hornom banneri. Limity
+`minlength`/`maxlength` formulárov idú z `load` (`hesloMin`/`hesloMax`).
+Testy: `tests/nove-heslo-613.test.ts`, `tests/nove-heslo-audit-613.test.ts` (riadok, bez hesla,
+rollback cez trigger RAISE), `tests/pouzivatelia-actions.test.ts` (forged POST + presná množina
+akcií routy), E2E `e2e/pouzivatelia-heslo-613.spec.ts` (aj riadok histórie).
+
+**História účtov na `/pouzivatelia` (#613 druhá časť) = jediné miesto, kde `user_audit` vidno.**
+`historiaUctov(limit 50)` (`src/lib/server/ucty-historia.ts`, vzor `getAuditLog` editora vzorcov):
+najnovšie hore podľa `id`, čas cez `formatDatumCasSk(sqliteUtcToIso(ts))` (Europe/Bratislava,
+`timestamps.md`), popis akcie po slovensky (`popisAkcieUctu` — `Object.hasOwn`, inak by
+`constructor` vrátil funkciu; neznáma akcia ostane surová). Komponent `HistoriaUctov.svelte`
+vykresľuje riadok ako JEDEN textový výraz „čas · kto · akcia · účet (· detail)" (Svelte prehltne
+medzery okolo `{#if}`); prázdny `kto` (seed) = „—". Load beží po každej `use:enhance` akcii znova
+→ nový riadok je hneď vidieť. E2E hľadá riadok regexom s účtom na KONCI (`… · heslo zmenené ·
+<účet>$`) — podreťazec by chytil súbežný `e2e-…` účet.
+**Filter na účet `?historia=<meno>`** (GET formulár s `datalist` účtov, funguje aj bez JS; load ho
+oreže + skráti na `MAX_USERNAME_LEN`, `WHERE target_username = ? COLLATE NOCASE`, nájde aj zmazaný
+účet): na PROD okno posledných 50 zaplnia throwaway účty post-deploy E2E (~19 riadkov create/delete
+na deploy), skutočnú udalosť (napr. reset `predaj`) treba hľadať filtrom — NIKDY nefiltruj podľa
+`e2e-` vzoru v produkčnom kóde. Nečitateľný `ts` sa ukáže surovo (`formatSqliteCasSk` v `$lib/datum`)
+— `RangeError` z `formatDatumCasSk` by zhodil jedinú stránku na reset hesla. Plný nefiltrovaný zoznam
+povie „zobrazuje sa najviac N — staršie nájdeš filtrom" (`historiaLimit` z load); `maxlength` poľa
+účtu = `ucetMax` (`MAX_USERNAME_LEN`) z load, nie natvrdo. E2E filtruje na throwaway účet a
+tvrdí PRESNE 2 riadky (zmena hesla nad vytvorením). Odkazy v komponente cez `resolve()` (`$app/paths`)
+— holý `href="/…"` padne na eslint `svelte/no-navigation-without-resolve`.
 
 ## 5. Usernames match CASE-INSENSITIVELY (login + dup-check)
 

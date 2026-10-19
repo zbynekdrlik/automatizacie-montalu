@@ -57,6 +57,14 @@ export function sqliteUtcToIso(sqliteUtc: string): string {
 		: sqliteUtc;
 }
 
+/** SQLite UTC timestamp → „5.1.2026 14:32" (Europe/Bratislava); NEČITATEĽNÁ hodnota sa vráti surová.
+ *  `formatDatumCasSk` na neplatnom dátume hádže `RangeError` — jeden zlý riadok by zhodil celú
+ *  stránku s históriou (história účtov /pouzivatelia, História zmien editora vzorcov, #613). */
+export function formatSqliteCasSk(sqliteUtc: string): string {
+	const iso = sqliteUtcToIso(sqliteUtc);
+	return Number.isNaN(Date.parse(iso)) ? sqliteUtc : formatDatumCasSk(iso);
+}
+
 // `en-CA` locale dáva zoradený tvar „YYYY-MM-DD"; zóna Europe/Bratislava rovnako ako ostatné
 // formátovače (inak by prod kontajner v UTC blízko polnoci dal iný kalendárny deň).
 const FORMAT_DATUM_ISO = new Intl.DateTimeFormat('en-CA', {
