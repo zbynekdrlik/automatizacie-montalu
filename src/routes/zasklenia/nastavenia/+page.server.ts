@@ -23,6 +23,7 @@ import { safeCompute } from '$lib/server/compute';
 import { maSietkaSystemVyber } from '$lib/sietka';
 import { SIETKA_STANDARD_KLUCE, type SietkaStandardParams } from '$lib/sietka-standard';
 import { pridajSkloHrubku, odoberSkloHrubku, skloHrubkyEditor } from '$lib/server/sklo-hrubky';
+import { formatDatumCasSk, sqliteUtcToIso } from '$lib/datum';
 
 export const load: PageServerLoad = async ({ url }) => {
 	const styly = listSysStyly();
@@ -58,7 +59,12 @@ export const load: PageServerLoad = async ({ url }) => {
 		sietkaStandard: maSietkaSystemVyber(system) ? getSietkaStandardParams() : null,
 		// #579 časť 2: povolené hrúbky Odoo skiel systému (nastavuje výroba) + odvodené výpočtové sklo
 		hrubky: skloHrubkyEditor(system),
-		audit: getAuditLog(30).map((a) => ({ ...a, zmeny: JSON.parse(a.zmeny) as CfgZmena[] }))
+		// čas zmeny v Europe/Bratislava — `cfg_audit.ts` je SQLite UTC bez zóny (timestamps.md)
+		audit: getAuditLog(30).map((a) => ({
+			...a,
+			ts: formatDatumCasSk(sqliteUtcToIso(a.ts)),
+			zmeny: JSON.parse(a.zmeny) as CfgZmena[]
+		}))
 	};
 };
 
