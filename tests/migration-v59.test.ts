@@ -96,6 +96,7 @@ const POVODNE_RIADKY = [
 process.env.DATABASE_PATH = dbPath;
 const { db } = await import('../src/lib/server/db');
 const { migrateUserAuditHeslo } = await import('../src/lib/server/migracie-user-audit-heslo');
+const { migrate } = await import('../src/lib/server/migracie');
 
 const vsetkyRiadky = (d: Database.Database) =>
 	d
@@ -240,8 +241,7 @@ describe('migration → v59 (#613 trvalý audit zmeny hesla — user_audit.actio
 		d.close();
 	});
 
-	it('čerstvá DB (v0 → hlava) má user_audit s password_reset v CHECK', async () => {
-		const { migrate } = await import('../src/lib/server/migracie');
+	it('čerstvá DB (v0 → hlava) má user_audit s password_reset v CHECK', () => {
 		const fresh = new Database(':memory:');
 		fresh.pragma('foreign_keys = ON');
 		migrate(fresh, (p) => `x:${p}`);
