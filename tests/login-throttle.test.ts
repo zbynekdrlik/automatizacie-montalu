@@ -10,6 +10,7 @@ import {
 	recordSuccess,
 	applyLoginBackoff,
 	_resetThrottle,
+	resetLoginThrottleForUser,
 	MAX_FAILURES,
 	LOCKOUT_MS,
 	WINDOW_MS,
@@ -134,6 +135,29 @@ describe('login-throttle (brute-force ochrana)', () => {
 			if (savedVitest !== undefined) process.env.VITEST = savedVitest;
 			if (savedNodeEnv !== undefined) process.env.NODE_ENV = savedNodeEnv;
 		}
+	});
+
+	it('#613: resetLoginThrottleForUser zmaže lock toho mena naprieč VŠETKÝMI IP (case-insensitive), cudzie nechá', () => {
+		const now = Date.now();
+		for (let i = 0; i < MAX_FAILURES; i++) {
+			recordFailure('Predaj', IP, now);
+			recordFailure('predaj', '203.0.113.9', now);
+			recordFailure('predaj', undefined, now);
+			recordFailure('predajca', IP, now); // iné meno s rovnakým prefixom — nedotknuté
+			recordFailure(U, IP, now);
+		}
+		expect(lockoutRemainingMs('predaj', IP)).toBeGreaterThan(0);
+
+		expect(resetLoginThrottleForUser('  PREDAJ ')).toBe(3);
+
+		expect(lockoutRemainingMs('predaj', IP)).toBe(0);
+		expect(lockoutRemainingMs('predaj', '203.0.113.9')).toBe(0);
+		expect(lockoutRemainingMs('predaj', undefined)).toBe(0);
+		expect(nextDelayMs('predaj', IP)).toBe(0); // čistý štít, nie len odomknuté
+		expect(lockoutRemainingMs('predajca', IP)).toBeGreaterThan(0);
+		expect(lockoutRemainingMs(U, IP)).toBeGreaterThan(0);
+		// nič na zmazanie → 0, bez chyby
+		expect(resetLoginThrottleForUser('nikto')).toBe(0);
 	});
 
 	afterEach(() => vi.restoreAllMocks());

@@ -104,6 +104,21 @@ users table) and never a direct `docker exec`/SQL `UPDATE` — the #142 incident
 internal account created via the app's only-B2B form, fixed by hand in prod) is exactly
 what the UI-level role choice + role-switch now cover.
 
+**Zabudnuté heslo = `/pouzivatelia` „Nastaviť nové heslo" (#613), nikdy SQL.** Akcia
+`noveHeslo` (brána `isB2B || !locals.user` ako PRVÝ príkaz, ako ostatné) → `setPassword(username,
+password, admin)` v `auth.ts`: meno `COLLATE NOCASE` + trim ako `login()`, pravidlo `chybaHesla`
+(db.ts, min 6 / max `MAX_PASSWORD_LEN` — ZDIEĽA ho aj `addUser`, inak by sa dalo nastaviť heslo,
+ktoré `login()` odmietne ako `too_long`), v JEDNEJ transakcii UPDATE `pass_hash` + DELETE VŠETKÝCH
+relácií účtu (aj adminovej pri vlastnom účte → UI pýta `confirm`, admin skončí na /login), potom
+`resetLoginThrottleForUser` (lockout toho mena naprieč IP). Nezhoda hesiel sa rieši v akcii.
+**Audit je LEN `auth` stdout log** („heslo zmenené administrátorom" / WARN „nové heslo zamietnuté"
+s `reason`), NIE `user_audit` — jeho CHECK pozná len create/role_change/delete/seed (nová akcia =
+recreate migrácia) a stdout je container-scoped (redeploy ho zmaže). Trvalý audit = samostatné
+rozhodnutie (migrácia). Výsledok akcie nesie `ucet` → hláška sa ukáže pri riadku účtu, nie v
+hornom banneri. Limity `minlength`/`maxlength` formulárov idú z `load` (`hesloMin`/`hesloMax`).
+Testy: `tests/nove-heslo-613.test.ts`, `tests/pouzivatelia-actions.test.ts` (forged POST + presná
+množina akcií routy), E2E `e2e/pouzivatelia-heslo-613.spec.ts`.
+
 ## 5. Usernames match CASE-INSENSITIVELY (login + dup-check)
 
 Usernames are often **e-mails** (first B2B account: `obchod@phsplus.cz`). Phone/tablet

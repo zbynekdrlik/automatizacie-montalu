@@ -33,8 +33,11 @@ async function nacitajUcty(page: Page): Promise<{ username: string; b2b: boolean
 			menoTd.querySelector('.badge')?.remove();
 			return {
 				username: (menoTd.textContent ?? '').trim(),
-				// „Zmazať" sa renderuje LEN pre B2B riadok (interný účet UI nezmaže)
-				b2b: !!td[3]?.querySelector('button')
+				// „Zmazať" sa renderuje LEN pre B2B riadok (interný účet UI nezmaže). Hľadá sa podľa
+				// TEXTU tlačidla, nie indexu stĺpca — riadok má aj iné tlačidlá (Zmeniť, Uložiť heslo #613).
+				b2b: Array.from(tr.querySelectorAll('button')).some(
+					(b) => (b.textContent ?? '').trim() === 'Zmazať'
+				)
 			};
 		})
 	);

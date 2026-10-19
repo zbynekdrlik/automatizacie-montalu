@@ -294,6 +294,26 @@ export function countInternalUsers(): number {
 		.c;
 }
 
+/** Minimálna dĺžka hesla účtu (založenie aj nové heslo od admina, #613). */
+export const MIN_PASSWORD_LEN = 6;
+/** Horný limit dĺžky hesla — `login()` dlhšie odmietne ešte PRED scrypt (#251 SEC-missed:
+ *  DoS zosilnenie). Žije tu (nie v `auth.ts`), lebo ho zdieľa `addUser` a `auth.ts` importuje
+ *  `db.ts` — opačný import by bol cyklus; `auth.ts` ho re-exportuje. */
+export const MAX_PASSWORD_LEN = 200;
+
+/**
+ * JEDNO pravidlo hesla pre založenie účtu (`addUser`) aj nové heslo od admina (`setPassword`,
+ * #613). Horný limit je rovnaký ako v `login()` — inak by sa dalo nastaviť heslo, ktoré login
+ * vždy odmietne ako `too_long`, a účet by bol nepoužiteľný. `null` = heslo je v poriadku.
+ * Heslo sa nikdy neorezáva (`trim`) — je case- aj whitespace-sensitive ako pri prihlásení.
+ */
+export function chybaHesla(password: string): string | null {
+	if (password.length < MIN_PASSWORD_LEN) return `Heslo musí mať aspoň ${MIN_PASSWORD_LEN} znakov.`;
+	if (password.length > MAX_PASSWORD_LEN)
+		return `Heslo môže mať najviac ${MAX_PASSWORD_LEN} znakov.`;
+	return null;
+}
+
 /**
  * `actor` = prihlasovacie meno toho, KTO účet zakladá — zapíše sa do `user_audit`
  * (#142: dohľadateľnosť „kto koho vytvoril/povýšil"). Prázdny reťazec je platný
@@ -307,7 +327,8 @@ export function addUser(
 ): { error: string | null } {
 	const u = username.trim();
 	if (!u) return { error: 'Meno účtu je povinné.' };
-	if (password.length < 6) return { error: 'Heslo musí mať aspoň 6 znakov.' };
+	const chyba = chybaHesla(password);
+	if (chyba) return { error: chyba };
 	// NOCASE: zabráň dvom účtom líšiacim sa len veľkosťou písmen (login je tiež
 	// case-insensitive) — inak by 'Obchod@…' aj 'obchod@…' koexistovali a mýlili.
 	const exists = db.prepare('SELECT 1 FROM users WHERE username = ? COLLATE NOCASE').get(u);

@@ -287,6 +287,22 @@ nový test dokáže padnúť (vyhodíš skrytý input a čakáš ✘), skript mu
 existenciu nahradzovaného reťazca — jedna nesprávna tabulátorová úroveň znamená
 NULOVÚ zmenu súboru, testy prejdú a vyzerá to, akoby test nič nechytil (alebo horšie:
 akoby bol tautologický). Zelený beh po neaplikovanej mutácii nedokazuje nič.
+**Mutáciu vracaj z KÓPIE súboru (alebo ju rob len nad commitnutým stavom), NIE `git checkout --
+<súbor>`** — checkout vráti súbor na HEAD a zmaže aj tvoje NEcommitnuté úpravy v ňom (#613: takto
+zmizla väzba `minlength/maxlength` na `/pouzivatelia`). `cp súbor scratch/…bak` → mutuj → spusti →
+`cp …bak súbor` (+ grep, že mutácia je preč a úpravy ostali).
+
+**„Zrušiť" v `confirm()` + `use:enhance` `cancel()` netestuj okamžitou kontrolou po kliku** — ak by
+`cancel()` chýbal, fetch beží asynchrónne a `toHaveURL`/`toHaveCount(0)` hneď po dialógu prejdú skôr,
+než odpoveď dorazí (mutácia bez `cancel()` takto PREŠLA). Spoľahlivo: `page.on('request')` zbieraj
+POSTy na `?/<akcia>` a na KONCI testu (keď sú všetky požiadavky isto vydané) tvrď ich presný počet
+(vzor `e2e/pouzivatelia-heslo-613.spec.ts`, mutácia bez `cancel()` → 2 namiesto 1).
+
+**Vlastný riadok na `/pouzivatelia` nehľadaj presnou bunkou mena** — bunka nesie aj odznak „ja"
+(`getByRole('cell', { name, exact: true })` nesadne); použi riadok s `.badge` „ja". Cudzí riadok
+naopak VŽDY presnou bunkou mena (podreťazec `hasText` chytí súbežné `e2e-…` účty). B2B riadok
+spoznaj podľa tlačidla „Zmazať" (text), nie indexu stĺpca — od #613 má riadok aj stĺpec Heslo s
+vlastným tlačidlom (`e2e/ucty.ts` `nacitajUcty`).
 
 **Text v SVG náhľade sa NEZALAMUJE sám.** Kovanie/popisky v `Nahlad2D.svelte` si lámu
 riadky vlastnou funkciou (`wrapKov`) podľa šírky poľa, takže jedna logická veta môže byť
@@ -711,9 +727,14 @@ odobrať (tvrď podmnožinu / triedu).
   priamo (HMR), takže zmutuj → spusti spec → `git checkout -- <súbor>` stačí; pasca „po REVERTE
   prebuilduj" vyššie platí len pre preview/`build/`. 8.10.: playwright 1.61.1 chcel
   `chromium_headless_shell-1228` (nebol), `executablePath` na `-1243` fungoval.
-- **Plný `npm test` NEspúšťaj súbežne s lokálnym E2E na preťaženom boxe (#603, load ~24):**
-  `b2b-route-coverage.test.ts` (dynamický import routy) padol na default 5 s timeout, sám prejde —
-  artefakt záťaže, nie regresia; plný beh opakuj bez súbežnej záťaže.
+- **Route modul (`+page.server` / `+server`) importuj v teste na TOP-LEVELI, nikdy v tele `it()`
+  (#613, 19.10.).** Studená transformácia grafu routy (`/objednavka-skla/[zak]` ~1,9 s samostatne)
+  sa pri importe v tele testu ráta do 5 s limitu testu → pod plnou paralelnou sadou na preťaženom
+  boxe (load ~14) padali NÁHODNE rôzne testy (`b2b-route-coverage` #545, `pergola-narez-money-safety`)
+  s „Test timed out", samostatne prešli. Top-level `const route = await import('../src/routes/…')`
+  (vzor `odpis-detail-vstup-raw.test.ts`) beží pri zbere súboru, mimo limitu testu. NIE vyšší
+  timeout, NIE „opakuj bez záťaže". Ak test MUSÍ nastaviť env pred importom, nastav ho tiež na
+  top-leveli pred `await import`.
 - **Fixtúra Deluxe 2x4K: šírka ≤ ~7000 mm** — `s: 8000` padne „Rez 8000 mm (Koľajnica horná 4K
   Surový 7500 mm) je dlhší než tyč" (akcia vráti `step:'form'`, riadky sa nepridajú).
 - **Temp E2E config drž na porte 4173, ak je voľný** — `skipAkLive` (`e2e/helpers.ts`) číta
