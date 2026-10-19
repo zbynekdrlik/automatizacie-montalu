@@ -4,11 +4,14 @@
 // CHECK → PRESTAVBA tabuľky (vzor v24 + v57). Kontrakt:
 //  - všetky existujúce riadky zachované BIT-PRESNE (aj ne-sekvenčné `id`, `ts`, prázdny actor seedu),
 //  - nový CHECK prijme `password_reset` a ďalej odmietne nezmysel,
-//  - FK sú po migrácii znova ZAPNUTÉ (prestavba ich vypína len na čas transakcie),
+//  - FK sú po migrácii znova ZAPNUTÉ (prestavba ich vypína len na čas transakcie), FK dieťa
+//    user_audit prežije (žiadny CASCADE pri DROP), index aj trigger sa vrátia s rovnakým SQL,
+//  - FK kontrola len detí user_audit: nesúvisiaci osirotený riadok migráciu nezhodí (crash-loop
+//    pri štarte), osirotené dieťa user_audit áno (rollback),
 //  - nečakaný tvar starej tabuľky = abort (rollback, verzia ostane 58, nič sa nestratí),
 //  - idempotentná (druhý beh tela zachová riadky; guard >= 59 nebumpne),
 //  - minimálna fixtúra bez `user_audit` → len bump; čerstvá DB končí na hlave s novým CHECK.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +19,12 @@ import os from 'node:os';
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-v59-test-'));
 const dbPath = path.join(tmpRoot, 'v58.db');
+afterAll(() => fs.rmSync(tmpRoot, { recursive: true, force: true }));
+
+/** `user_audit` presne v tvare po v24 (pred v59). */
+const USER_AUDIT_V24 = `CREATE TABLE user_audit (id INTEGER PRIMARY KEY, ts TEXT NOT NULL DEFAULT (datetime('now')), actor TEXT NOT NULL, action TEXT NOT NULL CHECK (action IN ('create','role_change','delete','seed')), target_username TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '')`;
+const INDEX_SQL = 'CREATE INDEX idx_audit_ciel ON user_audit(target_username)';
+const TRIGGER_SQL = `CREATE TRIGGER zakaz_upravy_auditu BEFORE UPDATE ON user_audit BEGIN SELECT RAISE(ABORT, 'audit je len na pridávanie'); END`;
 
 /** PROD-tvar `user_audit` pred v59 (v24): ne-sekvenčné id, všetky 4 akcie, seed s prázdnym actorom. */
 const POVODNE_RIADKY = [
@@ -90,6 +99,11 @@ const POVODNE_RIADKY = [
 		'INSERT INTO user_audit (id, ts, actor, action, target_username, detail) VALUES (@id, @ts, @actor, @action, @target_username, @detail)'
 	);
 	for (const r of POVODNE_RIADKY) ins.run(r);
+	// index, trigger a FK dieťa na user_audit (dnes na PROD nie sú) — prestavba ich NESMIE stratiť:
+	// DROP TABLE zmaže index/trigger (musia sa vrátiť) a pri zapnutých FK by CASCADE zmazal dieťa
+	v58.exec(`${INDEX_SQL}; ${TRIGGER_SQL};
+		CREATE TABLE audit_poznamka (id INTEGER PRIMARY KEY, audit_id INTEGER NOT NULL REFERENCES user_audit(id) ON DELETE CASCADE, text TEXT NOT NULL);
+		INSERT INTO audit_poznamka (audit_id, text) VALUES (4, 'povýšenie schválil šéf');`);
 	v58.close();
 }
 
@@ -108,6 +122,15 @@ const tabulkaSql = (d: Database.Database) =>
 			sql: string;
 		}
 	).sql;
+/** SQL indexov a triggerov na `user_audit` (index pred triggerom, potom podľa mena). */
+const doplnkySql = (d: Database.Database) =>
+	(
+		d
+			.prepare(
+				"SELECT sql FROM sqlite_master WHERE tbl_name = 'user_audit' AND type IN ('index','trigger') ORDER BY type, name"
+			)
+			.all() as { sql: string }[]
+	).map((r) => r.sql);
 /** Zápis do `user_audit` s danou akciou — `true` = CHECK prijal. */
 function zapisAkcie(d: Database.Database, action: string): boolean {
 	try {
@@ -187,6 +210,34 @@ describe('migration → v59 (#613 trvalý audit zmeny hesla — user_audit.actio
 		]);
 	});
 
+	it('index aj trigger na user_audit sú po prestavbe späť (rovnaké SQL) a trigger ďalej platí', () => {
+		expect(doplnkySql(db)).toEqual([INDEX_SQL, TRIGGER_SQL]);
+		expect(() => db.prepare("UPDATE user_audit SET detail = 'x' WHERE id = 2").run()).toThrow(
+			/len na pridávanie/
+		);
+	});
+
+	it('FK dieťa user_audit prežilo prestavbu (DROP pri vypnutých FK nespustil CASCADE) a FK platí', () => {
+		expect(db.prepare('SELECT audit_id, text FROM audit_poznamka').all()).toEqual([
+			{ audit_id: 4, text: 'povýšenie schválil šéf' }
+		]);
+		expect(db.prepare('PRAGMA foreign_key_check(audit_poznamka)').all()).toEqual([]);
+		// FK dieťaťa ukazuje na prestavanú user_audit: CASCADE aj odmietnutie neexistujúceho id fungujú
+		const id = Number(
+			db
+				.prepare(
+					"INSERT INTO user_audit (actor, action, target_username) VALUES ('marek', 'password_reset', 'predaj')"
+				)
+				.run().lastInsertRowid
+		);
+		db.prepare("INSERT INTO audit_poznamka (audit_id, text) VALUES (?, 'dočasná')").run(id);
+		db.prepare('DELETE FROM user_audit WHERE id = ?').run(id);
+		expect(db.prepare('SELECT COUNT(*) c FROM audit_poznamka').get()).toEqual({ c: 1 });
+		expect(() =>
+			db.prepare("INSERT INTO audit_poznamka (audit_id, text) VALUES (999, 'x')").run()
+		).toThrow(/FOREIGN KEY/);
+	});
+
 	it('žiadna pomocná tabuľka prestavby po migrácii neostala', () => {
 		expect(
 			db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'user_audit%' ORDER BY name").all()
@@ -203,6 +254,7 @@ describe('migration → v59 (#613 trvalý audit zmeny hesla — user_audit.actio
 		migrateUserAuditHeslo(d, (v) => d.pragma(`user_version = ${v}`));
 		expect(d.pragma('user_version', { simple: true })).toBe(59);
 		expect(vsetkyRiadky(d)).toEqual(pred);
+		expect(doplnkySql(d)).toEqual([INDEX_SQL, TRIGGER_SQL]);
 		expect(zapisAkcie(d, 'password_reset')).toBe(true);
 		expect(zapisAkcie(d, 'garbage')).toBe(false);
 		// guard: na v59 je migrácia no-op (ani bump, ani prestavba)
@@ -237,6 +289,46 @@ describe('migration → v59 (#613 trvalý audit zmeny hesla — user_audit.actio
 		);
 		expect(d.pragma('user_version', { simple: true })).toBe(58);
 		expect(d.prepare('SELECT poznamka FROM user_audit').all()).toEqual([{ poznamka: 'nestratiť' }]);
+		expect(d.pragma('foreign_keys', { simple: true })).toBe(1);
+		d.close();
+	});
+
+	it('FK kontrola len detí user_audit: osirotený riadok v NESÚVISIACEJ tabuľke migráciu nezhodí', () => {
+		const d = new Database(':memory:');
+		d.pragma('foreign_keys = OFF');
+		d.exec(`
+			${USER_AUDIT_V24};
+			CREATE TABLE rodic (id INTEGER PRIMARY KEY);
+			CREATE TABLE dieta (id INTEGER PRIMARY KEY, rodic_id INTEGER REFERENCES rodic(id));
+			INSERT INTO dieta (rodic_id) VALUES (999);
+			PRAGMA user_version = 58;
+		`);
+		d.pragma('foreign_keys = ON');
+		migrateUserAuditHeslo(d, (v) => d.pragma(`user_version = ${v}`));
+		expect(d.pragma('user_version', { simple: true })).toBe(59);
+		expect(zapisAkcie(d, 'password_reset')).toBe(true);
+		// nesúvisiaci osirotený riadok ostal — nie je vecou prestavby user_audit
+		expect(d.prepare('PRAGMA foreign_key_check(dieta)').all()).toHaveLength(1);
+		d.close();
+	});
+
+	it('osirotený riadok v DIEŤATI user_audit = abort: rollback, verzia 58, starý CHECK, dieťa ostane', () => {
+		const d = new Database(':memory:');
+		d.pragma('foreign_keys = OFF');
+		d.exec(`
+			${USER_AUDIT_V24};
+			INSERT INTO user_audit (id, actor, action, target_username) VALUES (1, 'marek', 'create', 'predaj');
+			CREATE TABLE audit_poznamka (id INTEGER PRIMARY KEY, audit_id INTEGER NOT NULL REFERENCES user_audit(id), text TEXT NOT NULL);
+			INSERT INTO audit_poznamka (audit_id, text) VALUES (77, 'osirotená');
+			PRAGMA user_version = 58;
+		`);
+		d.pragma('foreign_keys = ON');
+		expect(() => migrateUserAuditHeslo(d, (v) => d.pragma(`user_version = ${v}`))).toThrow(
+			/foreign_key_check audit_poznamka/
+		);
+		expect(d.pragma('user_version', { simple: true })).toBe(58);
+		expect(zapisAkcie(d, 'password_reset')).toBe(false);
+		expect(d.prepare('SELECT audit_id FROM audit_poznamka').all()).toEqual([{ audit_id: 77 }]);
 		expect(d.pragma('foreign_keys', { simple: true })).toBe(1);
 		d.close();
 	});
