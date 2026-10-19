@@ -39,13 +39,34 @@ export interface UdalostUctu {
 	detail: string;
 }
 
-/** Posledných `limit` udalostí účtov, najnovšie hore (`id` rastie s časom zápisu). */
-export function historiaUctov(limit = HISTORIA_UCTOV_LIMIT): UdalostUctu[] {
-	const riadky = db
-		.prepare(
-			'SELECT id, ts, actor, action, target_username, detail FROM user_audit ORDER BY id DESC LIMIT ?'
-		)
-		.all(limit) as {
+/**
+ * Čas udalosti v Europe/Bratislava; nečitateľná hodnota sa ukáže surovo — `formatDatumCasSk` by
+ * na neplatnom dátume hodil `RangeError` a jediný riadok by zhodil celú `/pouzivatelia` (jediné
+ * miesto, kde sa dá nastaviť nové heslo). `ts` má v DB default `datetime('now')`, takže je to poistka.
+ */
+function kedyUdalosti(ts: string): string {
+	const iso = sqliteUtcToIso(ts);
+	return Number.isNaN(Date.parse(iso)) ? ts : formatDatumCasSk(iso);
+}
+
+/**
+ * Posledných `limit` udalostí účtov, najnovšie hore (`id` rastie s časom zápisu). `ucet` = len
+ * udalosti toho účtu (meno bez ohľadu na veľkosť písmen ako login, aj už zmazaného účtu) — na PROD
+ * okno posledných udalostí zaplnia throwaway účty post-deploy E2E (vytvorenie + zmazanie každý
+ * deploy), takže konkrétny účet (napr. „kto zmenil heslo účtu predaj") sa hľadá filtrom.
+ */
+export function historiaUctov(
+	limit = HISTORIA_UCTOV_LIMIT,
+	ucet: string | null = null
+): UdalostUctu[] {
+	const stlpce = 'SELECT id, ts, actor, action, target_username, detail FROM user_audit';
+	const riadky = (
+		ucet === null
+			? db.prepare(`${stlpce} ORDER BY id DESC LIMIT ?`).all(limit)
+			: db
+					.prepare(`${stlpce} WHERE target_username = ? COLLATE NOCASE ORDER BY id DESC LIMIT ?`)
+					.all(ucet, limit)
+	) as {
 		id: number;
 		ts: string;
 		actor: string;
@@ -55,7 +76,7 @@ export function historiaUctov(limit = HISTORIA_UCTOV_LIMIT): UdalostUctu[] {
 	}[];
 	return riadky.map((r) => ({
 		id: r.id,
-		kedy: formatDatumCasSk(sqliteUtcToIso(r.ts)),
+		kedy: kedyUdalosti(r.ts),
 		kto: r.actor,
 		akcia: popisAkcieUctu(r.action),
 		ucet: r.target_username,
