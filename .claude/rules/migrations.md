@@ -217,14 +217,22 @@ chronologická podľa id), indexy + triggery zo `sqlite_master` späť, počet r
   pevný zoznam pri kópii by ručne pridaný stĺpec TICHO zahodil a kontrola počtu riadkov to nechytí.
   Rozdiel oproti v57 (tam prienik stĺpcov kvôli fixtúram bez v27/v31 stĺpcov) — `user_audit` má vo
   všetkých fixtúrach rovnakých 6 stĺpcov od v20. Chýbajúca tabuľka (minimálna fixtúra) = len bump.
+- **FK kontrola LEN detí prestavovanej tabuľky** (`sqlite_master` × `pragma_foreign_key_list`,
+  potom `PRAGMA foreign_key_check(<dieťa>)`), NIE globálny `foreign_key_check` ako v57: osirotený
+  riadok v NESÚVISIACEJ tabuľke (obnovená stará záloha) by inak zhodil migráciu pri štarte → appka
+  padá dokola. Testy v59: fixtúra má index + trigger + FK dieťa (`audit_poznamka`) → po prestavbe
+  rovnaké SQL, trigger platí, dieťa prežije DROP (FK OFF) a CASCADE na novej tabuľke funguje;
+  nesúvisiaci sirotinec prejde, osirotené dieťa = abort. Mutačne overené: bez obnovy doplnkov / bez
+  FK OFF / s globálnou kontrolou padne vždy aspoň jeden test.
 - Popis novej akcie MUSÍ pribudnúť do `POPIS_AKCIE_UCTU` (`ucty-historia.ts`) — drift guard v
   `tests/ucty-historia-613.test.ts` číta CHECK zo `sqlite_master` a porovná množiny.
 - Rollback dôkaz v unit teste bez mockov: `CREATE TRIGGER … BEFORE INSERT ON user_audit WHEN … BEGIN
   SELECT RAISE(ABORT, '…'); END` → volaná funkcia hodí, test overí, že predošlé kroky transakcie
   (UPDATE hashu, DELETE relácií) sa vrátili; trigger zmaž vo `finally` (test DB je per súbor).
-- `migracie.ts` 986 r. Head-bump: **61 riadkov / 51 súborov** `user_version … toBe(58)` → 59 (python
-  recept) — POZOR: `migration-v58.test.ts` priamo volá `migrateOponaIzoSkloSirka` a tvrdí JEHO bump
-  `toBe(58)` (3 riadky, nie full-migrate „bumpne" a „čerstvá DB") → vráť ich; a recept zmení aj
-  `toBe(58)` vo VLASTNOM novom teste (abort prípad tvrdí, že verzia OSTALA 58) → vráť aj ten.
+- `migracie.ts` 986 r. Head-bump: recept chytí **61 riadkov / 51 súborov** `user_version … toBe(58)`,
+  skutočne zmenených je **57 riadkov / 50 súborov** — POZOR: `migration-v58.test.ts` priamo volá
+  `migrateOponaIzoSkloSirka` a tvrdí JEHO bump `toBe(58)` (3 riadky, nie full-migrate „bumpne" a
+  „čerstvá DB") → vráť ich; a recept zmení aj `toBe(58)` vo VLASTNOM novom teste (abort prípad
+  tvrdí, že verzia OSTALA 58) → vráť aj ten. Po recepte `git diff` nového testu = prázdny.
 - Hook `block-sensitive-staging.sh` odmietne commit fixtúry s `{ token: '…' }` (literál vyzerá ako
   tajomstvo) — v teste relácií tvrď `user_id`/`expires_at`, nie stĺpec `token`.
