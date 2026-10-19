@@ -8,6 +8,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { b2bRedirectTarget } from '../src/lib/server/b2b-access';
 
+// #545 akcie /objednavka-skla/[zak]: route modul sa importuje na TOP-LEVEL (ako ostatné testy, napr.
+// odpis-detail-vstup-raw.test.ts) — studená transformácia jeho grafu (~1,9 s samostatne, pod plnou
+// paralelnou sadou pri vysokom loade > 5 s) sa tak neráta do časového limitu jedného testu.
+const objednavkaSklaZak = await import('../src/routes/objednavka-skla/[zak]/+page.server');
+
 const ROUTES_DIR = path.resolve(process.cwd(), 'src/routes');
 
 // Cesty, kde b2b smie zostať (nepresmerúva sa preč):
@@ -268,8 +273,8 @@ describe('b2b route coverage (denylist drift guard)', () => {
 	// #545: presná množina akcií /objednavka-skla/[zak] — pridané `nastavOp` (jedno OP na podklad)
 	// a `pridatRiadok` (ručný riadok modul='manual'). Všetky pomenované (SvelteKit nedovolí default
 	// + pomenované naraz), Money-neutrálne (objednávka u dodávateľa, žiadny odpis). Fail-closed drift.
-	it('#545: /objednavka-skla/[zak] akcie sú presne definovaná množina (vrátane pridatRiadok/nastavOp)', async () => {
-		const { actions } = await import('../src/routes/objednavka-skla/[zak]/+page.server');
+	it('#545: /objednavka-skla/[zak] akcie sú presne definovaná množina (vrátane pridatRiadok/nastavOp)', () => {
+		const { actions } = objednavkaSklaZak;
 		expect(Object.keys(actions).sort()).toEqual([
 			'nahratSubor',
 			'nastavOp',
