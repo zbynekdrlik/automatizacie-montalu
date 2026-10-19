@@ -19,7 +19,8 @@ const STLPCE = ['id', 'ts', 'actor', 'action', 'target_username', 'detail'] as c
  *
  * - Na `user_audit` dnes nevisí žiadny FK, aj tak sa drží vzor v57: `foreign_keys = OFF` PRED
  *   transakciou (pragma vnútri transakcie je no-op), `foreign_key_check` pred commitom, pôvodný
- *   stav vo `finally` — budúce FK dieťa by inak DROP-om prišlo o riadky (CASCADE).
+ *   stav vo `finally` — budúce FK dieťa by inak DROP-om prišlo o riadky (CASCADE). Kontrola je
+ *   len nad tabuľkami, ktoré na `user_audit` odkazujú (nie celá DB — viď nižšie).
  * - Tvar starej tabuľky sa OVERÍ: iná množina stĺpcov (napr. ručne pridaný stĺpec) = throw →
  *   rollback, nič sa nestratí (kópia pevného zoznamu by ten stĺpec ticho zahodila).
  * - Počet riadkov pred/po sa porovná (throw → rollback pri nesúlade).
@@ -74,12 +75,28 @@ export function migrateUserAuditHeslo(db: Database.Database, bump: (v: number) =
 			db.exec('DROP TABLE user_audit');
 			db.exec('ALTER TABLE user_audit_v59 RENAME TO user_audit');
 			for (const d of doplnky) db.exec(d.sql);
-			const fk = db.prepare('PRAGMA foreign_key_check').all();
-			if (fk.length > 0)
-				throw new Error(`v59: foreign_key_check po prestavbe user_audit: ${JSON.stringify(fk)}`);
+			// FK kontrola LEN tabuliek, ktoré na `user_audit` odkazujú — globálny `foreign_key_check`
+			// by na nesúvisiacom osirotenom riadku (napr. obnovená stará záloha) zhodil migráciu a
+			// appka by pri štarte padala dokola, hoci prestavba user_audit nič nepokazila
+			const deti = (
+				db
+					.prepare(
+						`SELECT DISTINCT m.name AS name FROM sqlite_master m, pragma_foreign_key_list(m.name) f
+						 WHERE m.type = 'table' AND f."table" = 'user_audit' COLLATE NOCASE`
+					)
+					.all() as { name: string }[]
+			).map((r) => r.name);
+			for (const t of deti) {
+				const fk = db.prepare(`PRAGMA foreign_key_check("${t.replaceAll('"', '""')}")`).all();
+				if (fk.length > 0)
+					throw new Error(
+						`v59: foreign_key_check ${t} po prestavbe user_audit: ${JSON.stringify(fk)}`
+					);
+			}
 			log.info('migrateUserAuditHeslo: user_audit pozná password_reset (#613)', {
 				riadkov: pocetPo,
-				doplnkov: doplnky.length
+				doplnkov: doplnky.length,
+				fkDeti: deti.length
 			});
 			bump(59);
 		})();
