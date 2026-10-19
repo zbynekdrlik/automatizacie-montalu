@@ -3,6 +3,7 @@
 // delete / seed) a nikde nebol vidieť. Čas sa zobrazuje v Europe/Bratislava (SQLite `ts` je UTC bez
 // zóny — timestamps.md), najnovšie hore, obmedzený počet riadkov.
 import { describe, it, expect, beforeEach } from 'vitest';
+import { isRedirect } from '@sveltejs/kit';
 import { render } from 'svelte/server';
 import { db, addUser } from '../src/lib/server/db';
 import { setPassword } from '../src/lib/server/auth';
@@ -102,18 +103,81 @@ describe('historiaUctov — riadky user_audit pre /pouzivatelia (#613)', () => {
 		]);
 	});
 
-	it('/pouzivatelia load vráti históriu — po zmene hesla je navrchu „heslo zmenené" od admina', async () => {
+	it('filter na účet: len udalosti toho účtu (meno bez ohľadu na veľkosť písmen), aj zmazaného', () => {
+		zapis(1, '2026-09-01 12:00:00', 'marek', 'create', 'vo@firma.sk', 'role=b2b');
+		zapis(2, '2026-09-01 12:05:00', 'marek', 'create', 'predaj', 'role=internal');
+		zapis(3, '2026-09-02 13:00:00', 'marek', 'delete', 'vo@firma.sk', 'role=b2b');
+		zapis(4, '2026-10-19 16:00:00', 'marek', 'password_reset', 'predaj');
+		expect(historiaUctov(HISTORIA_UCTOV_LIMIT, 'VO@Firma.sk').map((r) => [r.id, r.akcia])).toEqual([
+			[3, 'účet zmazaný'],
+			[1, 'účet vytvorený']
+		]);
+		expect(historiaUctov(HISTORIA_UCTOV_LIMIT, 'predaj').map((r) => r.id)).toEqual([4, 2]);
+		expect(historiaUctov(HISTORIA_UCTOV_LIMIT, 'nikto')).toEqual([]);
+		// bez filtra (null) všetky
+		expect(historiaUctov(HISTORIA_UCTOV_LIMIT, null)).toHaveLength(4);
+	});
+
+	it('nečitateľný čas v DB nezhodí stránku — ukáže sa surovo', () => {
+		zapis(1, 'nie-je-cas', 'marek', 'create', 'predaj');
+		expect(historiaUctov()[0]).toMatchObject({ kedy: 'nie-je-cas', akcia: 'účet vytvorený' });
+	});
+});
+
+describe('/pouzivatelia load — história účtov (#613)', () => {
+	const admin = { id: 1, username: 'marek', role: 'internal' };
+	type Data = {
+		historia: ReturnType<typeof historiaUctov>;
+		historiaUcet: string | null;
+		users: { username: string }[];
+	};
+	const nacitaj = async (query = '', user: object = admin) =>
+		(await route.load({
+			locals: { user },
+			url: new URL(`http://x/pouzivatelia${query}`)
+		} as unknown as Parameters<typeof route.load>[0])) as Data;
+
+	it('po zmene hesla je navrchu „heslo zmenené" od admina (bez filtra)', async () => {
 		addUser('hist-t1', 'stare-heslo-h1', 'internal', 'marek');
 		expect(setPassword('Hist-T1', 'nove-heslo-h1', 'marek').error).toBeNull();
-		const data = (await route.load({
-			locals: { user: { id: 1, username: 'marek', role: 'internal' } }
-		} as Parameters<typeof route.load>[0])) as { historia: ReturnType<typeof historiaUctov> };
+		const data = await nacitaj();
+		expect(data.historiaUcet).toBeNull();
 		expect(data.historia.slice(0, 2)).toMatchObject([
 			{ kto: 'marek', akcia: 'heslo zmenené', ucet: 'hist-t1', detail: '' },
 			{ kto: 'marek', akcia: 'účet vytvorený', ucet: 'hist-t1', detail: 'role=internal' }
 		]);
 		// heslo sa do histórie nikdy nedostane
 		expect(JSON.stringify(data.historia)).not.toContain('nove-heslo-h1');
+	});
+
+	it('?historia=<účet> (orezané) — len udalosti toho účtu; prázdny parameter = všetky', async () => {
+		addUser('hist-t2', 'stare-heslo-h2', 'b2b', 'marek');
+		addUser('iny-t2', 'stare-heslo-i2', 'b2b', 'marek');
+		expect(setPassword('hist-t2', 'nove-heslo-h2', 'marek').error).toBeNull();
+		const data = await nacitaj('?historia=%20Hist-T2%20');
+		expect(data.historiaUcet).toBe('Hist-T2');
+		expect(data.historia.map((h) => [h.akcia, h.ucet])).toEqual([
+			['heslo zmenené', 'hist-t2'],
+			['účet vytvorený', 'hist-t2']
+		]);
+		expect((await nacitaj('?historia=%20%20')).historiaUcet).toBeNull();
+	});
+
+	it('príliš dlhý ?historia= sa oreže na dĺžku mena (sfalšovaný vstup nenafúkne dotaz)', async () => {
+		const data = await nacitaj(`?historia=${'a'.repeat(5000)}`);
+		expect(data.historiaUcet).toBe('a'.repeat(200));
+		expect(data.historia).toEqual([]);
+	});
+
+	it('b2b sa k histórii nedostane — load presmeruje na /zasklenia (303)', async () => {
+		let chyba: unknown;
+		try {
+			await nacitaj('', { id: 9, username: 'vo', role: 'b2b' });
+		} catch (e) {
+			chyba = e;
+		}
+		expect(isRedirect(chyba)).toBe(true);
+		expect(chyba).toMatchObject({ status: 303, location: '/zasklenia' });
 	});
 });
 
@@ -168,5 +232,31 @@ describe('HistoriaUctov komponent (SSR render) (#613)', () => {
 		expect(html).toContain('História účtov');
 		expect(html).toContain('Zatiaľ žiadne udalosti.');
 		expect(html).not.toContain('historia-riadok');
+	});
+
+	it('filter na účet: GET formulár s návrhmi účtov, bez filtra žiadny odkaz „Všetky účty"', () => {
+		const html = render(HistoriaUctov, {
+			props: { historia, ucty: ['kontakt', 'predaj'] }
+		}).body;
+		expect(html).toMatch(/<form[^>]*method="GET"[^>]*data-testid="historia-filter"/);
+		expect(html).toMatch(/<input[^>]*name="historia"[^>]*list="historia-ucty"/);
+		expect(html).toContain('<option value="kontakt"></option>');
+		expect(html).toContain('<option value="predaj"></option>');
+		expect(html).not.toContain('historia-vsetky');
+		expect(html).toContain('Najnovšie hore');
+	});
+
+	it('aktívny filter: hodnota v poli, odkaz „Všetky účty", prázdny výsledok povie pre ktorý účet', () => {
+		const s = render(HistoriaUctov, {
+			props: { historia: historia.slice(0, 1), filter: 'predaj', ucty: [] }
+		}).body;
+		expect(s).toMatch(/<input[^>]*name="historia"[^>]*value="predaj"/);
+		expect(s).toMatch(/<a[^>]*href="\/pouzivatelia"[^>]*data-testid="historia-vsetky"/);
+		expect(s).toContain('Účet „predaj"');
+		const prazdna = render(HistoriaUctov, {
+			props: { historia: [], filter: '<b>x</b>', ucty: [] }
+		}).body;
+		expect(prazdna).toContain('Pre účet „&lt;b>x&lt;/b>" zatiaľ žiadne udalosti.');
+		expect(prazdna).not.toContain('<b>x</b>');
 	});
 });

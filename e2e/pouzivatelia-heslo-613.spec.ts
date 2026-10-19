@@ -101,6 +101,19 @@ test('admin nastaví účtu nové heslo — stará relácia padne, staré heslo 
 		await expect(zmenyHesla(page, ucet)).toContainText(` · ${E2E_USER} · heslo zmenené · ${ucet}`);
 		await expect(page.getByTestId('pouzivatelia-historia')).not.toContainText(noveHeslo);
 
+		// filter histórie na tento účet (GET ?historia=) — na PROD je inak história plná udalostí
+		// z ostatných E2E; tu PRESNE jeho dve udalosti: zmena hesla nad vytvorením (preklep nič)
+		const filter = page.getByTestId('historia-filter');
+		await filter.getByLabel('Účet', { exact: true }).fill(ucet);
+		await filter.getByRole('button', { name: 'Zobraziť' }).click();
+		await expect(page).toHaveURL(new RegExp(`[?&]historia=${ucet}(&|$)`));
+		const riadkyHistorie = page.getByTestId('pouzivatelia-historia').getByTestId('historia-riadok');
+		await expect(riadkyHistorie).toHaveCount(2);
+		await expect(riadkyHistorie.nth(0)).toContainText(` · ${E2E_USER} · heslo zmenené · ${ucet}`);
+		await expect(riadkyHistorie.nth(1)).toContainText(` · ${E2E_USER} · účet vytvorený · ${ucet}`);
+		await page.getByTestId('historia-vsetky').click();
+		await expect(page).toHaveURL(/\/pouzivatelia$/);
+
 		// 5. stará relácia v druhom prehliadači je zrušená → ďalšia navigácia skončí na /login
 		await goto(inaStranka, '/zasklenia');
 		await expect(inaStranka).toHaveURL(/\/login/);
