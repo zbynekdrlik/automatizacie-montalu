@@ -14,13 +14,14 @@ import {
 	MAX_FAILURES
 } from '../src/lib/server/login-throttle';
 
-// level AŽ po importe (migrácie pri importe ostanú ticho) — vzor tests/login-log.test.ts
-process.env.LOG_LEVEL = 'info';
+// LOG_LEVEL len počas capture (moduly sú už importované → migrácie ticho) — vzor
+// tests/login-log.test.ts, ale bez úniku logov z ostatných testov tohto súboru na stdout
 afterAll(() => delete process.env.LOG_LEVEL);
 afterEach(() => vi.restoreAllMocks());
 
 function capture<T>(fn: () => T): { vysledok: T; zaznamy: Record<string, unknown>[] } {
 	const riadky: string[] = [];
+	process.env.LOG_LEVEL = 'info';
 	const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
 		riadky.push(String(chunk));
 		return true;
@@ -30,6 +31,7 @@ function capture<T>(fn: () => T): { vysledok: T; zaznamy: Record<string, unknown
 		vysledok = fn();
 	} finally {
 		spy.mockRestore();
+		delete process.env.LOG_LEVEL;
 	}
 	const zaznamy = riadky
 		.join('')
