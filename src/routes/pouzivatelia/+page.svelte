@@ -1,5 +1,33 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
+
 	let { data, form } = $props();
+
+	// #613: výsledok „Nastaviť nové heslo" sa ukáže pri riadku účtu (nie hore nad formulárom
+	// pridania — pri dlhšom zozname by ho admin nevidel). Neznámy účet (riadok neexistuje,
+	// napr. medzitým zmazaný) padne do horného bannera ako ostatné akcie.
+	const hesloUcet = $derived(
+		form?.ucet && data.users.some((u) => u.username === form.ucet) ? form.ucet : null
+	);
+
+	// Nové heslo: vlastný účet → potvrdenie (zrušia sa VŠETKY relácie účtu, aj táto — admin sa
+	// prihlási novým heslom). Po úspechu `update()` vyprázdni polia a rozbalenie sa zavrie.
+	function noveHesloEnhance(vlastny: boolean): SubmitFunction {
+		return ({ cancel }) => {
+			if (
+				vlastny &&
+				!confirm('Nastaviť nové heslo VLASTNÉMU účtu? Budeš odhlásený a prihlásiš sa novým heslom.')
+			) {
+				cancel();
+				return;
+			}
+			return async ({ result, update, formElement }) => {
+				await update();
+				if (result.type === 'success') formElement.closest('details')?.removeAttribute('open');
+			};
+		};
+	}
 </script>
 
 <svelte:head><title>Používatelia — Montalu</title></svelte:head>
@@ -12,9 +40,10 @@
 	</p>
 </div>
 
-{#if form?.error}
+<!-- výsledok nového hesla (#613) je pri riadku účtu nižšie, nie tu -->
+{#if form?.error && !hesloUcet}
 	<div class="err" data-testid="pouzivatelia-error">⚠️ {form.error}</div>
-{:else if form?.ok}
+{:else if form?.ok && !hesloUcet}
 	<div class="okmsg" data-testid="pouzivatelia-ok">✅ {form.ok}</div>
 {/if}
 
@@ -26,8 +55,15 @@
 			<input id="username" name="username" required />
 		</div>
 		<div class="field">
-			<label for="password">Heslo (min. 6 znakov)</label>
-			<input id="password" name="password" type="password" minlength="6" required />
+			<label for="password">Heslo (min. {data.hesloMin} znakov)</label>
+			<input
+				id="password"
+				name="password"
+				type="password"
+				minlength={data.hesloMin}
+				maxlength={data.hesloMax}
+				required
+			/>
 		</div>
 		<div class="field">
 			<label for="role">Rola</label>
@@ -52,6 +88,7 @@
 				<th>Meno</th>
 				<th>Rola</th>
 				<th>Vytvorené</th>
+				<th>Heslo</th>
 				<th></th>
 			</tr>
 		</thead>
@@ -91,6 +128,49 @@
 						{/if}
 					</td>
 					<td>{u.created_at}</td>
+					<td>
+						<!-- #613: nové heslo bez znalosti starého (zabudnuté heslo). Polia minlength/maxlength
+						     berú limity z load (konštanty `chybaHesla`) — rozhoduje server, toto je len UX. -->
+						<details class="heslo-det" data-testid="nove-heslo">
+							<summary data-testid="nove-heslo-toggle">Nastaviť nové heslo</summary>
+							<form
+								method="POST"
+								action="?/noveHeslo"
+								class="heslo-form"
+								use:enhance={noveHesloEnhance(u.username === data.me)}
+							>
+								<input type="hidden" name="username" value={u.username} />
+								<label for="nove-heslo-{u.id}">Nové heslo</label>
+								<input
+									id="nove-heslo-{u.id}"
+									name="password"
+									type="password"
+									autocomplete="new-password"
+									minlength={data.hesloMin}
+									maxlength={data.hesloMax}
+									required
+								/>
+								<label for="nove-heslo2-{u.id}">Nové heslo znova</label>
+								<input
+									id="nove-heslo2-{u.id}"
+									name="password2"
+									type="password"
+									autocomplete="new-password"
+									minlength={data.hesloMin}
+									maxlength={data.hesloMax}
+									required
+								/>
+								<button class="btn sm secondary" type="submit">Uložiť heslo</button>
+							</form>
+						</details>
+						{#if hesloUcet === u.username}
+							{#if form?.error}
+								<div class="err heslo-stav" data-testid="nove-heslo-stav">⚠️ {form.error}</div>
+							{:else if form?.ok}
+								<div class="okmsg heslo-stav" data-testid="nove-heslo-stav">✅ {form.ok}</div>
+							{/if}
+						{/if}
+					</td>
 					<td class="c">
 						{#if u.role === 'b2b'}
 							<form
@@ -114,3 +194,36 @@
 		</tbody>
 	</table>
 </div>
+
+<style>
+	/* #613 per-riadok „Nastaviť nové heslo" — kompaktné, nie na celú šírku ako hlavný formulár */
+	.heslo-det summary {
+		cursor: pointer;
+		color: var(--m-accent-ink);
+		font-size: 13px;
+	}
+	.heslo-form {
+		display: grid;
+		gap: 4px;
+		margin-top: 8px;
+		min-width: 200px;
+		max-width: 280px;
+	}
+	.heslo-form label {
+		font-size: 12px;
+		margin: 4px 0 0;
+	}
+	.heslo-form input {
+		padding: 6px 8px;
+		font-size: 13px;
+	}
+	.heslo-form button {
+		justify-self: start;
+		margin-top: 6px;
+	}
+	.heslo-stav {
+		padding: 6px 8px;
+		font-size: 13px;
+		margin: 6px 0 0;
+	}
+</style>

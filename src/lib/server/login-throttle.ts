@@ -148,6 +148,27 @@ export function recordSuccess(username: string, ip: string | undefined): void {
 }
 
 /**
+ * #613: admin nastavil účtu nové heslo → zabudni VŠETKY záznamy toho mena naprieč IP (aj
+ * zamknuté). Kto sa zamkol skúšaním zabudnutého hesla, prihlási sa novým hneď, nie až po
+ * LOCKOUT_MS. Meno sa normalizuje ako `key()` (trim + lowercase = COLLATE NOCASE login).
+ * Útočníkov lock na tom mene sa tiež zruší — vedome: nové heslo nepozná, a ďalších
+ * MAX_FAILURES pokusov ho znova zamkne. Vráti počet zmazaných záznamov (log/test).
+ */
+export function resetLoginThrottleForUser(username: string): number {
+	const meno = username.trim().toLowerCase();
+	let zmazane = 0;
+	for (const k of attempts.keys()) {
+		const [kMeno] = JSON.parse(k) as [string, string];
+		if (kMeno === meno) {
+			attempts.delete(k); // mazanie aktuálneho kľúča počas iterácie Map je bezpečné
+			zmazane += 1;
+		}
+	}
+	if (zmazane > 0) log.info('login throttle vynulovaný', { username: username.trim(), zmazane });
+	return zmazane;
+}
+
+/**
  * Aplikuj exponenciálne oneskorenie (reálny sleep) pred spracovaním pokusu —
  * spomaľuje brute-force. Pod testom (VITEST/NODE_ENV=test) je no-op ako log.ts,
  * aby testy reálne nespali (hodnotu oneskorenia overuje nextDelayMs unit test).

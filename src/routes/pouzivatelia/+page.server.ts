@@ -1,18 +1,36 @@
 // Interná správa účtov — vytváranie (interný/B2B voľbou role) + zmena roly +
-// mazanie B2B veľkoobchodných účtov. Stránka je len pre interných (denylist v
-// hooks.server.ts presmeruje b2b skôr, než sem príde požiadavka; kontrola v
-// load/actions je obrana do hĺbky, viď zasklenia). `pridat` číta `role` z
-// formulára — to je BEZPEČNÉ napriek tomu, že akcia je gate-nutá `isB2B` na
-// prvom riadku: b2b aktér je odmietnutý PRED čítaním `role`, takže sfalšovaný
-// POST role nemôže eskalovať (viď skill access-control §2/§4, #142).
+// mazanie B2B veľkoobchodných účtov + nové heslo existujúcemu účtu (#613). Stránka
+// je len pre interných (denylist v hooks.server.ts presmeruje b2b skôr, než sem
+// príde požiadavka; kontrola v load/actions je obrana do hĺbky, viď zasklenia).
+// `pridat` číta `role` z formulára — to je BEZPEČNÉ napriek tomu, že akcia je
+// gate-nutá `isB2B` na prvom riadku: b2b aktér je odmietnutý PRED čítaním `role`,
+// takže sfalšovaný POST role nemôže eskalovať (viď skill access-control §2/§4, #142).
 import { redirect, fail } from '@sveltejs/kit';
-import { isB2B } from '$lib/server/auth';
-import { listUsers, addUser, deleteB2BUser, changeUserRole } from '$lib/server/db';
+import { isB2B, setPassword } from '$lib/server/auth';
+import {
+	listUsers,
+	addUser,
+	deleteB2BUser,
+	changeUserRole,
+	MIN_PASSWORD_LEN,
+	MAX_PASSWORD_LEN
+} from '$lib/server/db';
+import { logger } from '$lib/server/log';
 import type { Actions, PageServerLoad } from './$types';
+
+// rovnaký modul a správa ako zamietnutia v `setPassword` — jeden audit tok pre nové heslo
+const authLog = logger('auth');
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (isB2B(locals.user)) redirect(303, '/zasklenia');
-	return { users: listUsers(), me: locals.user?.username };
+	// #613: limity hesla pre `minlength`/`maxlength` formulárov z JEDNÉHO zdroja (`chybaHesla`)
+	// — UI tak nemôže odplávať od servera (server ďalej rozhoduje sám)
+	return {
+		users: listUsers(),
+		me: locals.user?.username,
+		hesloMin: MIN_PASSWORD_LEN,
+		hesloMax: MAX_PASSWORD_LEN
+	};
 };
 
 function parseRole(v: FormDataEntryValue | null): 'internal' | 'b2b' | null {
@@ -57,5 +75,31 @@ export const actions = {
 		const rolaLabel = role === 'b2b' ? 'B2B' : 'Interný';
 		// no-op (rovnaká rola ako doteraz) hlási neutrálne, nie „zmenená" — nič sa nezmenilo
 		return { ok: changed ? `Rola účtu zmenená na ${rolaLabel}.` : `Rola účtu je už ${rolaLabel}.` };
+	},
+	// #613: nové heslo existujúcemu účtu (interný aj B2B, aj vlastný) bez znalosti starého.
+	// Brána je tá istá ako pri ostatných akciách — PRVÝ príkaz, pred čítaním formulára.
+	// `ucet` v odpovedi = riadok tabuľky, pri ktorom sa výsledok ukáže; heslo sa nevracia nikdy.
+	noveHeslo: async ({ request, locals }) => {
+		if (isB2B(locals.user) || !locals.user) return fail(403, { error: 'Nedostupné.' });
+		const fd = await request.formData();
+		const username = String(fd.get('username') ?? '');
+		const password = String(fd.get('password') ?? '');
+		const potvrdenie = String(fd.get('password2') ?? '');
+		const ucet = username.trim();
+		if (password !== potvrdenie) {
+			// zaloguj ako ostatné zamietnutia (setPassword) — bez hesla
+			authLog.warn('nové heslo zamietnuté', {
+				admin: locals.user.username,
+				username: ucet.slice(0, 40),
+				reason: 'mismatch'
+			});
+			return fail(400, { error: 'Heslá sa nezhodujú.', ucet });
+		}
+		const r = setPassword(username, password, locals.user.username);
+		if (r.error !== null) return fail(400, { error: r.error, ucet });
+		return {
+			ok: `Nové heslo pre účet „${r.username}" je nastavené. Jeho doterajšie prihlásenia sa zrušili.`,
+			ucet: r.username
+		};
 	}
 } satisfies Actions;

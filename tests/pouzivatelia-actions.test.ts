@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -12,6 +12,7 @@ import os from 'node:os';
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'am-pouzivatelia-actions-'));
 process.env.DATABASE_PATH = path.join(tmpRoot, 'r.db');
 const dbMod = await import('../src/lib/server/db');
+const authMod = await import('../src/lib/server/auth');
 const { actions } = await import('../src/routes/pouzivatelia/+page.server');
 
 function event(body: Record<string, string>, user: { id: number; username: string; role: string }) {
@@ -87,6 +88,105 @@ describe('/pouzivatelia akcie — interný aktér', () => {
 		const r = await actions.zmenit_rolu(
 			event({ id: String(target.id), role: 'superadmin' }, internalActor)
 		);
+		expect(r).toMatchObject({ status: 400 });
+	});
+});
+
+// #613: nové heslo existujúcemu účtu. Rovnaká brána ako ostatné akcie — b2b aj neprihlásený
+// sú odmietnutí PRED čítaním formulára (forged POST, nie „tlačidlo nie je vidno").
+describe('/pouzivatelia noveHeslo (#613)', () => {
+	const internalActor = { id: 100, username: 'admin', role: 'internal' };
+	// testovacie heslá sú zámerne len fixture do dočasnej DB tohto súboru
+	const POVODNE = 'povodne-heslo';
+	const CIZIE = 'utocnik-heslo';
+	const NOVE = 'nove-heslo-613';
+
+	/** telo formulára „Nastaviť nové heslo" (heslo + potvrdenie, default zhodné) */
+	function hesloForm(username: string, heslo: string, potvrdenie = heslo) {
+		return { username, password: heslo, password2: potvrdenie };
+	}
+
+	it('množina akcií routy je presne táto — nová akcia nesmie prekĺznuť bez gate testu', () => {
+		expect(Object.keys(actions).sort()).toEqual(['noveHeslo', 'pridat', 'zmazat', 'zmenit_rolu']);
+	});
+
+	it('b2b nemôže nastaviť heslo žiadnemu účtu (ani internému) — 403, staré heslo platí ďalej', async () => {
+		dbMod.addUser('obet-b2b-613', POVODNE, 'internal');
+		const r = await actions.noveHeslo(event(hesloForm('obet-b2b-613', CIZIE), b2bActor));
+		expect(r).toMatchObject({ status: 403 });
+		expect(authMod.login('obet-b2b-613', POVODNE)).not.toBeNull();
+		expect(authMod.login('obet-b2b-613', CIZIE)).toBeNull();
+	});
+
+	it('neprihlásený (locals.user = null) — 403', async () => {
+		dbMod.addUser('obet-anon-613', POVODNE, 'internal');
+		const e = event(hesloForm('obet-anon-613', CIZIE), b2bActor);
+		(e as unknown as { locals: { user: null } }).locals = { user: null };
+		const r = await actions.noveHeslo(e);
+		expect(r).toMatchObject({ status: 403 });
+		expect(authMod.login('obet-anon-613', POVODNE)).not.toBeNull();
+	});
+
+	it('interný: heslá sa nezhodujú → 400, nič sa nezmení', async () => {
+		dbMod.addUser('nezhoda-613', POVODNE, 'b2b');
+		const r = await actions.noveHeslo(
+			event(hesloForm('nezhoda-613', NOVE, NOVE + '-preklep'), internalActor)
+		);
+		expect(r).toMatchObject({ status: 400 });
+		expect((r as { data?: { error?: string } }).data?.error).toMatch(/nezhodujú/);
+		expect(authMod.login('nezhoda-613', POVODNE)).not.toBeNull();
+	});
+
+	it('interný: nezhoda hesiel sa zaloguje ako WARN `auth` (reason mismatch) — bez hesla', async () => {
+		const riadky: string[] = [];
+		process.env.LOG_LEVEL = 'info';
+		const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
+			riadky.push(String(chunk));
+			return true;
+		}) as typeof process.stdout.write);
+		try {
+			await actions.noveHeslo(
+				event(hesloForm('nezhoda-log-613', NOVE, NOVE + '-preklep'), internalActor)
+			);
+		} finally {
+			spy.mockRestore();
+			delete process.env.LOG_LEVEL;
+		}
+		const zaznamy = riadky
+			.join('')
+			.split('\n')
+			.filter(Boolean)
+			.map((l) => JSON.parse(l) as Record<string, unknown>);
+		const rec = zaznamy.find((z) => z.msg === 'nové heslo zamietnuté');
+		expect(rec).toMatchObject({
+			level: 'warn',
+			module: 'auth',
+			admin: 'admin',
+			username: 'nezhoda-log-613',
+			reason: 'mismatch'
+		});
+		expect(riadky.join('')).not.toContain(NOVE);
+	});
+
+	it('interný: slabé heslo → 400 s pravidlom, nič sa nezmení', async () => {
+		dbMod.addUser('slabe-613', POVODNE, 'b2b');
+		const r = await actions.noveHeslo(event(hesloForm('slabe-613', '123'), internalActor));
+		expect(r).toMatchObject({ status: 400 });
+		expect((r as { data?: { error?: string } }).data?.error).toMatch(/6 znakov/);
+		expect(authMod.login('slabe-613', POVODNE)).not.toBeNull();
+	});
+
+	it('interný: nové heslo nastavené — staré neprejde, nové prejde, odpoveď nesie účet', async () => {
+		dbMod.addUser('predaj-613', POVODNE, 'internal');
+		const r = await actions.noveHeslo(event(hesloForm('Predaj-613', NOVE), internalActor));
+		expect(r).toMatchObject({ ucet: 'predaj-613', ok: expect.stringContaining('predaj-613') });
+		expect(JSON.stringify(r)).not.toContain(NOVE);
+		expect(authMod.login('predaj-613', POVODNE)).toBeNull();
+		expect(authMod.login('predaj-613', NOVE)).not.toBeNull();
+	});
+
+	it('interný: neexistujúci účet → 400', async () => {
+		const r = await actions.noveHeslo(event(hesloForm('nikto-613', NOVE), internalActor));
 		expect(r).toMatchObject({ status: 400 });
 	});
 });

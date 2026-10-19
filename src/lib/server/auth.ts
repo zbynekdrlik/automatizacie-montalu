@@ -1,7 +1,8 @@
 // Prihlásenie + session cookies. Všetky stránky appky sú za loginom —
 // formuláre zapisujú do Money importu, verejný prístup bol nález auditu.
 import { randomBytes } from 'node:crypto';
-import { db, verifyPassword } from './db';
+import { db, verifyPassword, hashPassword, chybaHesla, MAX_PASSWORD_LEN } from './db';
+import { resetLoginThrottleForUser } from './login-throttle';
 import { logger } from './log';
 
 const log = logger('auth');
@@ -11,8 +12,10 @@ export const SESSION_COOKIE = 'am_session';
 
 // #251 SEC-missed: horný limit dĺžky vstupu PRED scrypt — obrovský password by
 // inak nútil scrypt hashovať megabajty (DoS zosilnenie) a nafukoval by logy.
+// MAX_PASSWORD_LEN žije v db.ts (#613: zdieľa ho aj pravidlo hesla `addUser`/`setPassword`
+// a db.ts nemôže importovať auth.ts — cyklus); re-export drží doterajší import cez auth.
 export const MAX_USERNAME_LEN = 200;
-export const MAX_PASSWORD_LEN = 200;
+export { MAX_PASSWORD_LEN };
 
 // #251 SEC-2: konštantný dummy hash (platný `salt:hash` formát, 16-byte soľ +
 // 64-byte hash) proti ktorému scrypt beží aj pri NEZNÁMOM mene — inak sa login
@@ -91,6 +94,56 @@ export function getSessionUser(token: string | undefined): SessionUser | null {
 		return null;
 	}
 	return { id: row.id, username: row.username, role: row.role };
+}
+
+/**
+ * #613: interný admin nastaví EXISTUJÚCEMU účtu nové heslo — bez znalosti starého. Dovtedy sa
+ * heslo dalo nastaviť len pri založení účtu, takže zabudnuté heslo = nepoužiteľný účet (PROD
+ * 19.10.: `predaj` 4× bad_password). Priamy SQL na VPS je zakázaný (access-control §4) a appka
+ * nemá e-mailový kanál, preto reset robí admin na `/pouzivatelia`.
+ *
+ * - rovnaké pravidlo (`chybaHesla`) a rovnaký `hashPassword` (scrypt) ako `addUser`
+ * - meno case-insensitive + `.trim()` ako `login()` (admin môže napísať „Predaj")
+ * - v JEDNEJ transakcii UPDATE `pass_hash` + DELETE VŠETKÝCH relácií účtu — prihlásenia so
+ *   starým heslom prestanú platiť okamžite (pri vlastnom účte aj adminova aktuálna relácia)
+ * - vynuluje login-throttle lockout toho mena naprieč IP — kto sa zamkol skúšaním starého
+ *   hesla, prihlási sa novým hneď (nie až po LOCKOUT_MS)
+ * - audit = `auth` INFO „heslo zmenené administrátorom" (admin, účet, počet zrušených relácií;
+ *   čas dáva logger). NIKDY heslo ani hash. Prečo nie `user_audit`: jeho CHECK pozná len
+ *   create/role_change/delete/seed — nová akcia = migrácia (recreate), design #613 „bez migrácie".
+ *
+ * Autorizáciu (len interný) robí VOLAJÚCI — akcia `noveHeslo` na `/pouzivatelia`.
+ */
+export function setPassword(
+	username: string,
+	password: string,
+	admin: string
+): { error: string; username?: undefined } | { error: null; username: string } {
+	const uname = username.trim();
+	const zamietni = (error: string, reason: string) => {
+		log.warn('nové heslo zamietnuté', { admin, username: uname.slice(0, 40), reason });
+		return { error };
+	};
+	if (!uname) return zamietni('Meno účtu je povinné.', 'empty_username');
+	const chyba = chybaHesla(password);
+	if (chyba) return zamietni(chyba, 'weak_password');
+	const user = db
+		.prepare('SELECT id, username FROM users WHERE username = ? COLLATE NOCASE')
+		.get(uname) as { id: number; username: string } | undefined;
+	if (!user) return zamietni('Účet neexistuje.', 'unknown_user');
+	const passHash = hashPassword(password);
+	const zruseneRelacie = db.transaction(() => {
+		db.prepare('UPDATE users SET pass_hash = ? WHERE id = ?').run(passHash, user.id);
+		return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id).changes;
+	})();
+	const throttleZaznamy = resetLoginThrottleForUser(user.username);
+	log.info('heslo zmenené administrátorom', {
+		admin,
+		username: user.username,
+		zruseneRelacie,
+		throttleZaznamy
+	});
+	return { error: null, username: user.username };
 }
 
 /** Priebežné čistenie expirovaných sessions (volané z hooks pri requestoch). */

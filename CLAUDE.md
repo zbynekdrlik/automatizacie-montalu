@@ -102,7 +102,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
 - odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner, sklo = kladkový − 10 mm #610) → `.claude/rules/opona-izo-narezak.md`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
-- roly / b2b / route gating / Money-write boundary / auth migrácia → `.claude/rules/access-control.md`
+- roly / b2b / route gating / Money-write boundary / auth migrácia / nové heslo účtu (#613 `setPassword`) → `.claude/rules/access-control.md`
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`
 - interim cenotvorba pergoly (matica montalu.sk, endpoint, DPH half-up, seed/parity/drift) → `.claude/rules/konfigurator-cena.md`
 - interim cenotvorba bazéna (update-pools endpoint, produkt-aware cena dispatch, systemKod, DPH boundary) → `.claude/rules/konfigurator-bazen-cena.md`
