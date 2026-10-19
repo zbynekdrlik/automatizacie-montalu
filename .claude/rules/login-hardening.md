@@ -81,6 +81,16 @@ ten časový signál, ktorý útočník odčíta. Minimá sú deterministické �
 `Math.min(...unknown)` vs `Math.min(...wrong)`, nie mediány. (V izolácii prejdú oba;
 flakiness sa prejaví len pod záťažou — over cez `npm test`, nie `vitest run <file>`.)
 
+## Nové heslo od admina vynuluje lockout toho mena naprieč IP (#613)
+
+`resetLoginThrottleForUser(username)` zmaže VŠETKY záznamy `attempts`, ktorých meno (prvý prvok
+`JSON.parse(kľúč)`) sa rovná `username.trim().toLowerCase()` — rovnaká normalizácia ako `key()`,
+nikdy porovnávanie prefixu (`predajca` ≠ `predaj`). Volá ho `setPassword` (auth.ts) po úspešnej
+zmene hesla: kto sa zamkol skúšaním zabudnutého hesla, prihlási sa novým hneď. Zruší sa vedome aj
+útočníkov lock na tom mene (nové heslo nepozná, ďalších `MAX_FAILURES` pokusov ho znova zamkne).
+`MAX_PASSWORD_LEN` od #613 žije v `db.ts` (zdieľa ho `chybaHesla` pre `addUser`/`setPassword`;
+db.ts nesmie importovať auth.ts — cyklus), `auth.ts` ho re-exportuje → import z auth ostáva platný.
+
 ## Zložený Map kľúč: `JSON.stringify([a, b])`, NIE znakový oddeľovač
 
 Oddeľovací znak vpísaný cez editačný nástroj sa môže stať literálnym **NUL bajtom** →

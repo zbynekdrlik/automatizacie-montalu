@@ -287,6 +287,22 @@ nový test dokáže padnúť (vyhodíš skrytý input a čakáš ✘), skript mu
 existenciu nahradzovaného reťazca — jedna nesprávna tabulátorová úroveň znamená
 NULOVÚ zmenu súboru, testy prejdú a vyzerá to, akoby test nič nechytil (alebo horšie:
 akoby bol tautologický). Zelený beh po neaplikovanej mutácii nedokazuje nič.
+**Mutáciu vracaj z KÓPIE súboru (alebo ju rob len nad commitnutým stavom), NIE `git checkout --
+<súbor>`** — checkout vráti súbor na HEAD a zmaže aj tvoje NEcommitnuté úpravy v ňom (#613: takto
+zmizla väzba `minlength/maxlength` na `/pouzivatelia`). `cp súbor scratch/…bak` → mutuj → spusti →
+`cp …bak súbor` (+ grep, že mutácia je preč a úpravy ostali).
+
+**„Zrušiť" v `confirm()` + `use:enhance` `cancel()` netestuj okamžitou kontrolou po kliku** — ak by
+`cancel()` chýbal, fetch beží asynchrónne a `toHaveURL`/`toHaveCount(0)` hneď po dialógu prejdú skôr,
+než odpoveď dorazí (mutácia bez `cancel()` takto PREŠLA). Spoľahlivo: `page.on('request')` zbieraj
+POSTy na `?/<akcia>` a na KONCI testu (keď sú všetky požiadavky isto vydané) tvrď ich presný počet
+(vzor `e2e/pouzivatelia-heslo-613.spec.ts`, mutácia bez `cancel()` → 2 namiesto 1).
+
+**Vlastný riadok na `/pouzivatelia` nehľadaj presnou bunkou mena** — bunka nesie aj odznak „ja"
+(`getByRole('cell', { name, exact: true })` nesadne); použi riadok s `.badge` „ja". Cudzí riadok
+naopak VŽDY presnou bunkou mena (podreťazec `hasText` chytí súbežné `e2e-…` účty). B2B riadok
+spoznaj podľa tlačidla „Zmazať" (text), nie indexu stĺpca — od #613 má riadok aj stĺpec Heslo s
+vlastným tlačidlom (`e2e/ucty.ts` `nacitajUcty`).
 
 **Text v SVG náhľade sa NEZALAMUJE sám.** Kovanie/popisky v `Nahlad2D.svelte` si lámu
 riadky vlastnou funkciou (`wrapKov`) podľa šírky poľa, takže jedna logická veta môže byť
