@@ -4,10 +4,12 @@
 // prihlásený v druhom prehliadači → admin nastaví nové heslo (najprv preklep v potvrdení) → stará
 // relácia toho účtu padne na /login → staré heslo neprejde, nové áno. Žiadne heslo natvrdo v repe
 // (PROD účet žije počas behu) — prvý test beží aj post-deploy proti PROD (users tabuľka nie je Money).
+// Druhá časť #613: zmena hesla je TRVALÝ audit (`user_audit` password_reset) → história účtov na
+// /pouzivatelia ukáže presne jeden riadok „<kto> · heslo zmenené · <účet>" (preklep nič nezapíše).
 import { randomBytes } from 'node:crypto';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, zalozB2bUcet } from './ucty';
-import { collectConsole, loginAs, goto, logout, skipAkLive } from './helpers';
+import { collectConsole, loginAs, goto, logout, skipAkLive, E2E_USER } from './helpers';
 
 const nahodneHeslo = () => `e2e-${randomBytes(12).toString('base64url')}`;
 
@@ -34,6 +36,18 @@ async function nastavHeslo(riadok: Locator, heslo: string, potvrdenie = heslo) {
 	await riadok.getByLabel('Nové heslo', { exact: true }).fill(heslo);
 	await riadok.getByLabel('Nové heslo znova', { exact: true }).fill(potvrdenie);
 	await riadok.getByRole('button', { name: 'Uložiť heslo' }).click();
+}
+
+/**
+ * Riadky histórie účtov „heslo zmenené" pre daný účet — účet je na KONCI riadka (pri zmene hesla
+ * je detail prázdny), takže cudzí `e2e-…` účet s podobným menom sa nechytí.
+ */
+function zmenyHesla(page: Page, ucet: string) {
+	expect(ucet).toMatch(/^[a-z0-9-]+$/); // meno bez regex znakov — vkladá sa do RegExp nižšie
+	return page
+		.getByTestId('pouzivatelia-historia')
+		.getByTestId('historia-riadok')
+		.filter({ hasText: new RegExp(` · heslo zmenené · ${ucet}\\s*$`) });
 }
 
 /** Pokus o prihlásenie bez očakávania úspechu (loginAs by na zlom hesle čakal /zasklenia). */
@@ -73,6 +87,8 @@ test('admin nastaví účtu nové heslo — stará relácia padne, staré heslo 
 		await goto(page, '/pouzivatelia');
 		await nastavHeslo(riadokUctu(page, ucet), noveHeslo, noveHeslo + 'x');
 		await expect(riadokUctu(page, ucet).getByTestId('nove-heslo-stav')).toContainText('nezhodujú');
+		// preklep nič nezmenil → v histórii účtov ešte žiadna zmena hesla tohto účtu
+		await expect(zmenyHesla(page, ucet)).toHaveCount(0);
 
 		// 4. admin: zhodné heslo → potvrdenie pri riadku, rozbalenie sa zavrie
 		await nastavHeslo(riadokUctu(page, ucet), noveHeslo);
@@ -80,6 +96,23 @@ test('admin nastaví účtu nové heslo — stará relácia padne, staré heslo 
 		await expect(stav).toContainText('je nastavené');
 		await expect(stav).toContainText(ucet);
 		await expect(riadokUctu(page, ucet).getByTestId('nove-heslo')).not.toHaveAttribute('open');
+		// trvalý audit: história účtov ukáže PRESNE jednu zmenu hesla tohto účtu, od admina, bez hesla
+		await expect(zmenyHesla(page, ucet)).toHaveCount(1);
+		await expect(zmenyHesla(page, ucet)).toContainText(` · ${E2E_USER} · heslo zmenené · ${ucet}`);
+		await expect(page.getByTestId('pouzivatelia-historia')).not.toContainText(noveHeslo);
+
+		// filter histórie na tento účet (GET ?historia=) — na PROD je inak história plná udalostí
+		// z ostatných E2E; tu PRESNE jeho dve udalosti: zmena hesla nad vytvorením (preklep nič)
+		const filter = page.getByTestId('historia-filter');
+		await filter.getByLabel('Účet', { exact: true }).fill(ucet);
+		await filter.getByRole('button', { name: 'Zobraziť' }).click();
+		await expect(page).toHaveURL(new RegExp(`[?&]historia=${ucet}(&|$)`));
+		const riadkyHistorie = page.getByTestId('pouzivatelia-historia').getByTestId('historia-riadok');
+		await expect(riadkyHistorie).toHaveCount(2);
+		await expect(riadkyHistorie.nth(0)).toContainText(` · ${E2E_USER} · heslo zmenené · ${ucet}`);
+		await expect(riadkyHistorie.nth(1)).toContainText(` · ${E2E_USER} · účet vytvorený · ${ucet}`);
+		await page.getByTestId('historia-vsetky').click();
+		await expect(page).toHaveURL(/\/pouzivatelia$/);
 
 		// 5. stará relácia v druhom prehliadači je zrušená → ďalšia navigácia skončí na /login
 		await goto(inaStranka, '/zasklenia');
@@ -153,6 +186,10 @@ test('vlastný účet: potvrdenie — Zrušiť nič nezmení, OK nastaví heslo 
 		await loginAs(page, ucet, noveHeslo);
 		// odoslanie bolo PRESNE jedno (to po OK) — Zrušiť nič neposlalo
 		expect(postyNoveHeslo).toHaveLength(1);
+		// trvalý audit: jedna zmena hesla, ktorú si účet urobil SÁM (Zrušiť nič nezapísalo)
+		await goto(page, '/pouzivatelia');
+		await expect(zmenyHesla(page, ucet)).toHaveCount(1);
+		await expect(zmenyHesla(page, ucet)).toContainText(` · ${ucet} · heslo zmenené · ${ucet}`);
 	} finally {
 		// upratanie aj pri páde: interný → B2B → Zmazať
 		await page.context().clearCookies();

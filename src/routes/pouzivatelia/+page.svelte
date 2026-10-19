@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import HistoriaUctov from '$lib/components/HistoriaUctov.svelte';
 
 	let { data, form } = $props();
 
@@ -194,6 +195,15 @@
 		</tbody>
 	</table>
 </div>
+
+<!-- #613 (druhá časť): trvalý audit účtov — kto komu kedy vytvoril / zmenil rolu / zmazal / zmenil heslo -->
+<HistoriaUctov
+	historia={data.historia}
+	filter={data.historiaUcet}
+	ucty={data.users.map((u) => u.username)}
+	limit={data.historiaLimit}
+	ucetMax={data.ucetMax}
+/>
 
 <style>
 	/* #613 per-riadok „Nastaviť nové heslo" — kompaktné, nie na celú šírku ako hlavný formulár */

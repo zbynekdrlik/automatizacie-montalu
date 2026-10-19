@@ -104,13 +104,17 @@ export function getSessionUser(token: string | undefined): SessionUser | null {
  *
  * - rovnaké pravidlo (`chybaHesla`) a rovnaký `hashPassword` (scrypt) ako `addUser`
  * - meno case-insensitive + `.trim()` ako `login()` (admin môže napísať „Predaj")
- * - v JEDNEJ transakcii UPDATE `pass_hash` + DELETE VŠETKÝCH relácií účtu — prihlásenia so
- *   starým heslom prestanú platiť okamžite (pri vlastnom účte aj adminova aktuálna relácia)
+ * - v JEDNEJ transakcii UPDATE `pass_hash` + DELETE VŠETKÝCH relácií účtu + `user_audit` riadok
+ *   — prihlásenia so starým heslom prestanú platiť okamžite (pri vlastnom účte aj adminova
+ *   aktuálna relácia); zlyhanie ktoréhokoľvek kroku (aj zápisu auditu) vráti všetko späť
+ * - TRVALÝ audit (druhá časť #613, migrácia v59): `user_audit` action `password_reset`, actor =
+ *   admin, target = meno účtu z DB, `detail` prázdny, čas = `ts` default — NIKDY heslo ani hash;
+ *   `/pouzivatelia` ho ukáže v histórii účtov („heslo zmenené"). Rovnaký tvar ako audit
+ *   `addUser` / `changeUserRole` / `deleteB2BUser` (db.ts).
  * - vynuluje login-throttle lockout toho mena naprieč IP — kto sa zamkol skúšaním starého
- *   hesla, prihlási sa novým hneď (nie až po LOCKOUT_MS)
- * - audit = `auth` INFO „heslo zmenené administrátorom" (admin, účet, počet zrušených relácií;
- *   čas dáva logger). NIKDY heslo ani hash. Prečo nie `user_audit`: jeho CHECK pozná len
- *   create/role_change/delete/seed — nová akcia = migrácia (recreate), design #613 „bez migrácie".
+ *   hesla, prihlási sa novým hneď (nie až po LOCKOUT_MS); až PO úspešnej transakcii
+ * - `auth` INFO „heslo zmenené administrátorom" (admin, účet, počet zrušených relácií, throttle
+ *   záznamy) ostáva ako prevádzkový log vedľa trvalého auditu. NIKDY heslo ani hash.
  *
  * Autorizáciu (len interný) robí VOLAJÚCI — akcia `noveHeslo` na `/pouzivatelia`.
  */
@@ -134,7 +138,11 @@ export function setPassword(
 	const passHash = hashPassword(password);
 	const zruseneRelacie = db.transaction(() => {
 		db.prepare('UPDATE users SET pass_hash = ? WHERE id = ?').run(passHash, user.id);
-		return db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id).changes;
+		const zrusene = db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id).changes;
+		db.prepare(
+			'INSERT INTO user_audit (actor, action, target_username, detail) VALUES (?, ?, ?, ?)'
+		).run(admin, 'password_reset', user.username, '');
+		return zrusene;
 	})();
 	const throttleZaznamy = resetLoginThrottleForUser(user.username);
 	log.info('heslo zmenené administrátorom', {

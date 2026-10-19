@@ -1,13 +1,16 @@
 // #496 round 2: unit test — producenti (zasklenia, FIX, pergola) zapisujú sklá do objednavka_skla
 import { describe, it, expect } from 'vitest';
+// Moduly importované na TOP-LEVELI (nie v tele `it()`): studená transformácia grafu
+// objednavka-skla/compute/db sa inak ráta do 5 s limitu prvého testu a pod plnou paralelnou
+// sadou s coverage na preťaženom boxe padala „Test timed out" (testing.md, #613).
+import { pridajSklaHromadne, listSklaPreZakazku } from '../src/lib/server/objednavka-skla';
+import { safeCompute } from '../src/lib/server/compute';
+import { loadCfg } from '../src/lib/server/db';
+import { pocitajFix } from '../src/lib/fix';
+import { spocitajStrechaSklo } from '../src/lib/pergola-sklo';
 
 describe('objednavka-skla producenti — zasklenia', () => {
 	it('single posuv compute → NoveSklo mapping + DB insert', async () => {
-		const { pridajSklaHromadne, listSklaPreZakazku } =
-			await import('../src/lib/server/objednavka-skla');
-		const { safeCompute } = await import('../src/lib/server/compute');
-		const { loadCfg } = await import('../src/lib/server/db');
-
 		const cfg = loadCfg();
 		const sysStyl = Object.keys(cfg)[0]!;
 		const { r } = safeCompute(
@@ -55,10 +58,6 @@ describe('objednavka-skla producenti — zasklenia', () => {
 
 describe('objednavka-skla producenti — FIX', () => {
 	it('šikmý FIX polia → NoveSklo mapping (vLavoMm/vPravoMm, sikmy=true)', async () => {
-		const { pridajSklaHromadne, listSklaPreZakazku } =
-			await import('../src/lib/server/objednavka-skla');
-		const { pocitajFix } = await import('../src/lib/fix');
-
 		const r = pocitajFix(3000, 2000, 1500, [1500, 1500]);
 		expect(r.polia.length).toBe(2);
 
@@ -100,10 +99,6 @@ describe('objednavka-skla producenti — FIX', () => {
 	});
 
 	it('rovný FIX polia → NoveSklo mapping (vyskaMm, sikmy=false)', async () => {
-		const { pridajSklaHromadne, listSklaPreZakazku } =
-			await import('../src/lib/server/objednavka-skla');
-		const { pocitajFix } = await import('../src/lib/fix');
-
 		// rovný: V1 === V2
 		const r = pocitajFix(2000, 1800, 1800, [1000, 1000]);
 		expect(r.polia.length).toBe(2);
@@ -144,10 +139,6 @@ describe('objednavka-skla producenti — FIX', () => {
 
 describe('objednavka-skla producenti — pergola strešné sklo', () => {
 	it('spocitajStrechaSklo → NoveSklo mapping (honest-null disciplína)', async () => {
-		const { pridajSklaHromadne, listSklaPreZakazku } =
-			await import('../src/lib/server/objednavka-skla');
-		const { spocitajStrechaSklo } = await import('../src/lib/pergola-sklo');
-
 		// Complete input — overená konfigurácia (samostatne, zadný 110, sklon 6.1°)
 		const vstup = {
 			system: 'Massive' as const,
@@ -200,8 +191,6 @@ describe('objednavka-skla producenti — pergola strešné sklo', () => {
 	});
 
 	it('honest-null — no glass when sirkaMm is null (no typ selected)', async () => {
-		const { spocitajStrechaSklo } = await import('../src/lib/pergola-sklo');
-
 		const vstup = {
 			system: 'Robust' as const,
 			sirka: 4990,
@@ -229,8 +218,6 @@ describe('objednavka-skla producenti — pergola strešné sklo', () => {
 	});
 
 	it('honest-null — no glass when pocetKrovov not set', async () => {
-		const { spocitajStrechaSklo } = await import('../src/lib/pergola-sklo');
-
 		const vstup = {
 			system: 'Massive' as const,
 			sirka: 4990,

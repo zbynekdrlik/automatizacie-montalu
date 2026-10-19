@@ -11,7 +11,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { transpileModule, ModuleKind, ScriptTarget } from 'typescript';
-import { formatDatumCasSk, formatDatumSk, sqliteUtcToIso } from '../src/lib/datum';
+import {
+	formatDatumCasSk,
+	formatDatumSk,
+	formatSqliteCasSk,
+	sqliteUtcToIso
+} from '../src/lib/datum';
 
 // #6427: `node --experimental-strip-types` (spúšťané nižšie na ČERSTVOM procese) je flag,
 // ktorý Node 20 vôbec nepozná ("bad option") — pridaný až v Node 22.6, takže tento istý test
@@ -138,5 +143,23 @@ describe('sqliteUtcToIso — most SQLite/UTC → ISO (#313 /odpisy kontrakt)', (
 		// pod TZ=UTC bez explicitnej zóny by /odpisy ukázalo „5.1.2026 13:32" (UTC) — dôkaz, že
 		// prod kontajner (UTC) ukáže bratislavský čas
 		expect(vystup).toBe('5.1.2026 14:32');
+	});
+});
+
+// #613 (review): história účtov /pouzivatelia aj História zmien editora vzorcov zobrazujú SQLite
+// `ts` — jeden nečitateľný riadok nesmie zhodiť celú stránku (`formatDatumCasSk` na neplatnom
+// dátume hádže RangeError). `formatSqliteCasSk` = most + formát, nečitateľná hodnota surovo.
+describe('formatSqliteCasSk — SQLite UTC → bratislavský čas, nečitateľné surovo (#613)', () => {
+	it('zima (UTC+1), leto cez polnoc (UTC+2), už-ISO `…Z`', () => {
+		expect(formatSqliteCasSk('2026-01-05 13:32:00')).toBe('5.1.2026 14:32');
+		expect(formatSqliteCasSk('2026-07-01 22:30:00')).toBe('2.7.2026 00:30');
+		expect(formatSqliteCasSk('2026-08-24T05:30:00Z')).toBe('24.8.2026 07:30');
+	});
+
+	it('nečitateľná hodnota sa vráti surová (žiadny RangeError)', () => {
+		expect(() => formatDatumCasSk('nie-je-cas')).toThrow(RangeError);
+		expect(formatSqliteCasSk('nie-je-cas')).toBe('nie-je-cas');
+		expect(formatSqliteCasSk('2026-13-45 99:99:99')).toBe('2026-13-45 99:99:99');
+		expect(formatSqliteCasSk('')).toBe('');
 	});
 });

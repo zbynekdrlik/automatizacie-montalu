@@ -205,3 +205,34 @@ opravu cfg hodnoty, ktorú editor NEUKAZUJE (tu `Sklo šírka` opona IZO, pozri 
   57 → druhý beh bez auditu; guard bez bumpu), čerstvá DB cez `migrate(new Database(':memory:'))`.
 - Worktree guard odmietol python heredoc s mnohými viacriadkovými `replace` reťazcami („too complex
   to verify") — úpravy hodnôt v teste rob nástrojom Edit; jednoduchý head-bump loop prešiel.
+
+## v59 (#613 druhá časť) — PRESTAVBA `user_audit` (CHECK + `password_reset`) — vlastný súbor
+
+`migracie-user-audit-heslo.ts` (`migrateUserAuditHeslo`, guard `>= 59`) — `user_audit.action` CHECK
+rozšírený o `password_reset` (trvalý audit `setPassword`). Vzor pre KAŽDÚ ďalšiu akciu v `user_audit`
+(SQLite nevie ALTER CHECK → prestavba, ako v24): vzor v57 aj bez FK detí (`foreign_keys = OFF` PRED
+transakciou, `foreign_key_check`, pôvodný stav vo `finally`), kópia AJ `id` (história ostáva
+chronologická podľa id), indexy + triggery zo `sqlite_master` späť, počet riadkov pred/po.
+- **Tvar starej tabuľky sa OVERÍ** (množina stĺpcov == pevný zoznam `STLPCE`, inak throw → rollback):
+  pevný zoznam pri kópii by ručne pridaný stĺpec TICHO zahodil a kontrola počtu riadkov to nechytí.
+  Rozdiel oproti v57 (tam prienik stĺpcov kvôli fixtúram bez v27/v31 stĺpcov) — `user_audit` má vo
+  všetkých fixtúrach rovnakých 6 stĺpcov od v20. Chýbajúca tabuľka (minimálna fixtúra) = len bump.
+- **FK kontrola LEN detí prestavovanej tabuľky** (`sqlite_master` × `pragma_foreign_key_list`,
+  potom `PRAGMA foreign_key_check(<dieťa>)`), NIE globálny `foreign_key_check` ako v57: osirotený
+  riadok v NESÚVISIACEJ tabuľke (obnovená stará záloha) by inak zhodil migráciu pri štarte → appka
+  padá dokola. Testy v59: fixtúra má index + trigger + FK dieťa (`audit_poznamka`) → po prestavbe
+  rovnaké SQL, trigger platí, dieťa prežije DROP (FK OFF) a CASCADE na novej tabuľke funguje;
+  nesúvisiaci sirotinec prejde, osirotené dieťa = abort. Mutačne overené: bez obnovy doplnkov / bez
+  FK OFF / s globálnou kontrolou padne vždy aspoň jeden test.
+- Popis novej akcie MUSÍ pribudnúť do `POPIS_AKCIE_UCTU` (`ucty-historia.ts`) — drift guard v
+  `tests/ucty-historia-613.test.ts` číta CHECK zo `sqlite_master` a porovná množiny.
+- Rollback dôkaz v unit teste bez mockov: `CREATE TRIGGER … BEFORE INSERT ON user_audit WHEN … BEGIN
+  SELECT RAISE(ABORT, '…'); END` → volaná funkcia hodí, test overí, že predošlé kroky transakcie
+  (UPDATE hashu, DELETE relácií) sa vrátili; trigger zmaž vo `finally` (test DB je per súbor).
+- `migracie.ts` 986 r. Head-bump: recept chytí **61 riadkov / 51 súborov** `user_version … toBe(58)`,
+  skutočne zmenených je **57 riadkov / 50 súborov** — POZOR: `migration-v58.test.ts` priamo volá
+  `migrateOponaIzoSkloSirka` a tvrdí JEHO bump `toBe(58)` (3 riadky, nie full-migrate „bumpne" a
+  „čerstvá DB") → vráť ich; a recept zmení aj `toBe(58)` vo VLASTNOM novom teste (abort prípad
+  tvrdí, že verzia OSTALA 58) → vráť aj ten. Po recepte `git diff` nového testu = prázdny.
+- Hook `block-sensitive-staging.sh` odmietne commit fixtúry s `{ token: '…' }` (literál vyzerá ako
+  tajomstvo) — v teste relácií tvrď `user_id`/`expires_at`, nie stĺpec `token`.

@@ -112,7 +112,7 @@ afterAll(() => {
 describe('migration → v58 (#610 Štandard + opona IZO sklo = kladkový − 10, Odoo úloha 1416)', () => {
 	it('bumpne na v58', () => {
 		const d = new Database(dbPath);
-		expect(d.pragma('user_version', { simple: true })).toBe(58);
+		expect(d.pragma('user_version', { simple: true })).toBe(59);
 		d.close();
 	});
 
@@ -269,7 +269,7 @@ describe('migration → v58 (#610 Štandard + opona IZO sklo = kladkový − 10,
 		const { migrate } = await import('../src/lib/server/migracie');
 		const fresh = new Database(':memory:');
 		migrate(fresh, (p) => `x:${p}`);
-		expect(fresh.pragma('user_version', { simple: true })).toBe(58);
+		expect(fresh.pragma('user_version', { simple: true })).toBe(59);
 		expect(['2x2K', '2x3K', '2x4K'].map((s) => skloS(fresh, `Štandard +|${s} IZO`))).toEqual([
 			-313, -380, -460
 		]);
