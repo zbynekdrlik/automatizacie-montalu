@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
 import { render } from 'svelte/server';
 import { db, addUser } from '../src/lib/server/db';
-import { setPassword } from '../src/lib/server/auth';
+import { setPassword, MAX_USERNAME_LEN } from '../src/lib/server/auth';
 import {
 	historiaUctov,
 	popisAkcieUctu,
@@ -129,6 +129,8 @@ describe('/pouzivatelia load — história účtov (#613)', () => {
 	type Data = {
 		historia: ReturnType<typeof historiaUctov>;
 		historiaUcet: string | null;
+		historiaLimit: number;
+		ucetMax: number;
 		users: { username: string }[];
 	};
 	const nacitaj = async (query = '', user: object = admin) =>
@@ -142,6 +144,9 @@ describe('/pouzivatelia load — história účtov (#613)', () => {
 		expect(setPassword('Hist-T1', 'nove-heslo-h1', 'marek').error).toBeNull();
 		const data = await nacitaj();
 		expect(data.historiaUcet).toBeNull();
+		// limit histórie a dĺžka mena pre formulár z jedného zdroja (server)
+		expect(data.historiaLimit).toBe(HISTORIA_UCTOV_LIMIT);
+		expect(data.ucetMax).toBe(MAX_USERNAME_LEN);
 		expect(data.historia.slice(0, 2)).toMatchObject([
 			{ kto: 'marek', akcia: 'heslo zmenené', ucet: 'hist-t1', detail: '' },
 			{ kto: 'marek', akcia: 'účet vytvorený', ucet: 'hist-t1', detail: 'role=internal' }
@@ -244,6 +249,22 @@ describe('HistoriaUctov komponent (SSR render) (#613)', () => {
 		expect(html).toContain('<option value="predaj"></option>');
 		expect(html).not.toContain('historia-vsetky');
 		expect(html).toContain('Najnovšie hore');
+	});
+
+	it('plný zoznam bez filtra povie, že starší je za limitom (filter); neplný a filtrovaný nie', () => {
+		const plny = render(HistoriaUctov, { props: { historia, limit: 3 } }).body;
+		expect(plny).toContain('zobrazuje sa najviac 3 — staršie nájdeš filtrom na účet');
+		const neplny = render(HistoriaUctov, { props: { historia, limit: 50 } }).body;
+		expect(neplny).not.toContain('zobrazuje sa najviac');
+		const filtrovany = render(HistoriaUctov, {
+			props: { historia, limit: 3, filter: 'predaj' }
+		}).body;
+		expect(filtrovany).not.toContain('zobrazuje sa najviac');
+	});
+
+	it('maxlength poľa účtu ide z dát (jeden zdroj s MAX_USERNAME_LEN), nie natvrdo', () => {
+		const html = render(HistoriaUctov, { props: { historia: [], ucetMax: 123 } }).body;
+		expect(html).toMatch(/<input[^>]*name="historia"[^>]*maxlength="123"/);
 	});
 
 	it('aktívny filter: hodnota v poli, odkaz „Všetky účty", prázdny výsledok povie pre ktorý účet', () => {
