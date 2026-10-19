@@ -160,7 +160,10 @@ describe('setPassword — admin nastaví nové heslo existujúcemu účtu (#613)
 		expect(rec!.admin).toBe('spravca');
 		expect(rec!.username).toBe('log-t1');
 		expect(rec!.zruseneRelacie).toBe(1);
+		expect(rec!.throttleZaznamy).toBe(0);
 		expect(typeof rec!.time).toBe('string');
+		// bez lockoutu sa throttle reset NEloguje (žiadny šum pri bežnom resete)
+		expect(zaznamy.some((z) => z.msg === 'login throttle vynulovaný')).toBe(false);
 		const vsetko = JSON.stringify(zaznamy);
 		expect(vsetko).not.toContain('nove-heslo-log-7');
 		expect(vsetko).not.toContain('stare-heslo-log');
@@ -169,14 +172,46 @@ describe('setPassword — admin nastaví nové heslo existujúcemu účtu (#613)
 		expect(vsetko).not.toContain(hash);
 	});
 
-	it('zamietnutý pokus sa zaloguje ako WARN s dôvodom — bez hesla', () => {
-		const { zaznamy } = capture(() => setPassword('nikto-taky-t1', 'tajne-heslo-8', 'spravca'));
+	it('vynulovaný lockout je v audite (auth throttleZaznamy + INFO login-throttle) — bez hesla', () => {
+		addUser('log-t2', 'stare-heslo-log2', 'b2b');
+		for (let i = 0; i < MAX_FAILURES; i++) recordFailure('LOG-T2', '87.244.229.96');
+		const { zaznamy } = capture(() => setPassword('log-t2', 'nove-heslo-log-8', 'spravca'));
+		const auth = zaznamy.find((z) => z.msg === 'heslo zmenené administrátorom');
+		expect(auth!.throttleZaznamy).toBe(1);
+		const thr = zaznamy.find((z) => z.msg === 'login throttle vynulovaný');
+		expect(thr).toBeDefined();
+		expect(thr!.level).toBe('info');
+		expect(thr!.module).toBe('login-throttle');
+		expect(thr!.username).toBe('log-t2');
+		expect(thr!.zmazane).toBe(1);
+		expect(JSON.stringify(zaznamy)).not.toContain('nove-heslo-log-8');
+	});
+
+	it.each([
+		['   ', 'heslo-dost-dlhe-9', 'empty_username'],
+		['slabe-log-t1', '12345', 'weak_password'],
+		['nikto-taky-t1', 'tajne-heslo-8', 'unknown_user']
+	])(
+		'zamietnutie „%s" sa zaloguje ako WARN s dôvodom (%s → %s) — bez hesla, nič sa nezapíše',
+		(meno, heslo, dovod) => {
+			const { vysledok, zaznamy } = capture(() => setPassword(meno, heslo, 'spravca'));
+			expect(vysledok.error).toBeTruthy();
+			const rec = zaznamy.find((z) => z.msg === 'nové heslo zamietnuté');
+			expect(rec).toBeDefined();
+			expect(rec!.level).toBe('warn');
+			expect(rec!.module).toBe('auth');
+			expect(rec!.admin).toBe('spravca');
+			expect(rec!.reason).toBe(dovod);
+			expect(zaznamy.some((z) => z.msg === 'heslo zmenené administrátorom')).toBe(false);
+			expect(JSON.stringify(zaznamy)).not.toContain(heslo);
+		}
+	);
+
+	it('meno v zamietnutom WARN je skrátené na 40 znakov (sfalšovaný dlhý vstup nenafúkne log)', () => {
+		const dlheMeno = 'a'.repeat(300);
+		const { zaznamy } = capture(() => setPassword(dlheMeno, 'nove-heslo-10', 'spravca'));
 		const rec = zaznamy.find((z) => z.msg === 'nové heslo zamietnuté');
-		expect(rec).toBeDefined();
-		expect(rec!.level).toBe('warn');
-		expect(rec!.admin).toBe('spravca');
-		expect(rec!.reason).toBe('unknown_user');
-		expect(JSON.stringify(zaznamy)).not.toContain('tajne-heslo-8');
+		expect(rec!.username).toBe('a'.repeat(40));
 	});
 });
 
