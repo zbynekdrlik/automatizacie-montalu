@@ -201,6 +201,8 @@
 	historia={data.historia}
 	filter={data.historiaUcet}
 	ucty={data.users.map((u) => u.username)}
+	limit={data.historiaLimit}
+	ucetMax={data.ucetMax}
 />
 
 <style>

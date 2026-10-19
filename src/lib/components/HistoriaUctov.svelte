@@ -12,8 +12,21 @@
 	let {
 		historia,
 		filter = null,
-		ucty = []
-	}: { historia: UdalostUctu[]; filter?: string | null; ucty?: string[] } = $props();
+		ucty = [],
+		limit = null,
+		ucetMax = 200
+	}: {
+		historia: UdalostUctu[];
+		filter?: string | null;
+		ucty?: string[];
+		/** koľko udalostí server najviac vráti (`HISTORIA_UCTOV_LIMIT`) — plný zoznam = staršie sú za ním */
+		limit?: number | null;
+		/** `maxlength` poľa účtu (`MAX_USERNAME_LEN` z load — server ho aj tak skráti) */
+		ucetMax?: number;
+	} = $props();
+
+	// plný NEfiltrovaný zoznam: povedz, že staršie udalosti sú za limitom a nájdu sa filtrom
+	const orezany = $derived(!filter && limit !== null && historia.length >= limit);
 </script>
 
 <div class="card" data-testid="pouzivatelia-historia">
@@ -30,7 +43,7 @@
 			name="historia"
 			list="historia-ucty"
 			value={filter ?? ''}
-			maxlength="200"
+			maxlength={ucetMax}
 			placeholder="všetky účty"
 			autocomplete="off"
 		/>
@@ -50,7 +63,9 @@
 		</p>
 	{:else}
 		<p class="sub">
-			{filter ? `Účet „${filter}" — ` : ''}Najnovšie hore. Heslá sa nikdy nezapisujú.
+			{filter ? `Účet „${filter}" — ` : ''}Najnovšie hore{orezany
+				? `; zobrazuje sa najviac ${limit} — staršie nájdeš filtrom na účet`
+				: ''}. Heslá sa nikdy nezapisujú.
 		</p>
 		<ul class="historia">
 			{#each historia as h (h.id)}

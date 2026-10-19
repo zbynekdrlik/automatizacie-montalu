@@ -38,7 +38,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hesloMin: MIN_PASSWORD_LEN,
 		hesloMax: MAX_PASSWORD_LEN,
 		historia: historiaUctov(HISTORIA_UCTOV_LIMIT, historiaUcet),
-		historiaUcet
+		historiaUcet,
+		historiaLimit: HISTORIA_UCTOV_LIMIT,
+		ucetMax: MAX_USERNAME_LEN
 	};
 };
 

@@ -3,7 +3,9 @@
 // `setPassword`). Vzor „História zmien" editora vzorcov (`getAuditLog`, cfg-editor.ts): posledných
 // N riadkov, najnovšie hore. Stránka je len pre interných (load + hooks denylist).
 import { db } from './db';
-import { formatDatumCasSk, sqliteUtcToIso } from '../datum';
+// nečitateľný `ts` sa ukáže surovo — RangeError by zhodil celú /pouzivatelia (jediné miesto na
+// nové heslo); `ts` má v DB default `datetime('now')`, takže je to poistka
+import { formatSqliteCasSk } from '../datum';
 
 /** Koľko posledných udalostí ukáže `/pouzivatelia` (história je prehľad, nie archív). */
 export const HISTORIA_UCTOV_LIMIT = 50;
@@ -40,16 +42,6 @@ export interface UdalostUctu {
 }
 
 /**
- * Čas udalosti v Europe/Bratislava; nečitateľná hodnota sa ukáže surovo — `formatDatumCasSk` by
- * na neplatnom dátume hodil `RangeError` a jediný riadok by zhodil celú `/pouzivatelia` (jediné
- * miesto, kde sa dá nastaviť nové heslo). `ts` má v DB default `datetime('now')`, takže je to poistka.
- */
-function kedyUdalosti(ts: string): string {
-	const iso = sqliteUtcToIso(ts);
-	return Number.isNaN(Date.parse(iso)) ? ts : formatDatumCasSk(iso);
-}
-
-/**
  * Posledných `limit` udalostí účtov, najnovšie hore (`id` rastie s časom zápisu). `ucet` = len
  * udalosti toho účtu (meno bez ohľadu na veľkosť písmen ako login, aj už zmazaného účtu) — na PROD
  * okno posledných udalostí zaplnia throwaway účty post-deploy E2E (vytvorenie + zmazanie každý
@@ -76,7 +68,7 @@ export function historiaUctov(
 	}[];
 	return riadky.map((r) => ({
 		id: r.id,
-		kedy: kedyUdalosti(r.ts),
+		kedy: formatSqliteCasSk(r.ts),
 		kto: r.actor,
 		akcia: popisAkcieUctu(r.action),
 		ucet: r.target_username,
