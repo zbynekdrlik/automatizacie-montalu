@@ -57,7 +57,9 @@ try { const d = fs.openSync(dir, 'r'); try { fs.fsyncSync(d); } finally { fs.clo
 riadok (`action='delete'`) v TEJ ISTEJ transakcii ako DELETE. Volajúci
 (`pouzivatelia/+page.server.ts` akcia `zmazat`) posiela `locals.user.username` —
 rovnako ako `addUser`. `action` enum je rozšírený migráciou v24 (recreate tabuľky,
-SQLite nevie ALTER CHECK) o `'delete'` + `'seed'` (`seedUsers` píše seed-audit).
+SQLite nevie ALTER CHECK) o `'delete'` + `'seed'` (`seedUsers` píše seed-audit) a migráciou
+v59 (#613) o `'password_reset'` (`setPassword`, auth.ts — audit v tej istej transakcii ako nový
+hash a zrušenie relácií; postup prestavby v `migrations.md`).
 
 ## Lane-merge: duplicitná migrácia a testy predpokladajúce staršiu verziu (#282)
 
