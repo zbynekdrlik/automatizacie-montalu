@@ -13,6 +13,10 @@ import fs from 'node:fs';
 import type { FixZPergola } from '../src/lib/pergola-fix';
 import type { Polozka } from '../src/lib/server/money';
 
+// Route moduly importované na TOP-LEVEL (nie v tele testu): studená transformácia ich grafu pod
+// plnou paralelnou sadou pri vysokom loade presiahne 5 s limit jedného testu.
+const route_pergola_narez = await import('../src/routes/pergola/narez/+page.server');
+
 function zdroj(relPath: string): string {
 	return fs.readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
 }
@@ -85,7 +89,7 @@ describe('Money safety — vzorcový engine nárezu z rozmerov ostáva čistý (
 
 describe('/pergola/narez — rezervačný odpis (#221) IDE cez potvrdzovací tok', () => {
 	it('akcie routy = form + rezervácia + expedícia do Odoo, nič viac', async () => {
-		const { actions } = await import('../src/routes/pergola/narez/+page.server');
+		const { actions } = route_pergola_narez;
 		expect(Object.keys(actions).sort()).toEqual([
 			'odoslat',
 			'odoslatExpediciuDoOdoo',
