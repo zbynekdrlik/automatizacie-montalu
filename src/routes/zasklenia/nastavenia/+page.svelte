@@ -273,7 +273,7 @@
 			{#if data.glass.some((g) => g.skloKorekcia !== null)}
 				<div class="sec" style="margin-top:16px">Sklá — per-sklo výnimka korekcie (mm)</div>
 				<p class="sub" style="margin-bottom:10px">
-					Staršia korekcia pre KONKRÉTNE sklo (#440) — dnes výnimka nad triedovou korekciou vyššie.
+					Staršia korekcia pre KONKRÉTNE sklo — dnes výnimka nad triedovou korekciou vyššie.
 					Zobrazujú sa len sklá, ktoré override reálne majú.
 					<b>Prázdne pole = zruš výnimku</b> (padne na triedovú/systémovú korekciu).
 				</p>

@@ -139,7 +139,7 @@ export function kovanieDoOdpisu(
 				});
 				return {
 					polozky: [],
-					err: `Kovanie, posuv ${i + 1}: systém „${system}" nemá v appke určené kovanie (ani tabuľku komponentov, ani výslovné „bez kovania") — odpis sa neodošle, aby nešiel bez kladiek a zámkov. Nahlás to (chýba zaradenie v komponenty-cfg.ts).`,
+					err: `Kovanie, posuv ${i + 1}: systém „${system}" nemá v appke určené kovanie (ani tabuľku komponentov, ani výslovné „bez kovania") — odpis sa neodošle, aby nešiel bez kladiek a zámkov. Nahlás to — systém treba v appke zaradiť do kovania.`,
 					warn: null
 				};
 			}

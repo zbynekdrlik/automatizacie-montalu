@@ -153,7 +153,7 @@
 		</div>
 		<p class="sub" style="margin:0 0 8px">
 			Bočné pevné zasklenie k pergole — spočítané a nakreslené ako súčasť tejto zákazky. Do Money
-			odpisu zatiaľ nejde (FIX materiály nemajú Money karty; doplní sa, keď ich Dominik založí).
+			odpisu zatiaľ nejde (FIX materiály nemajú Money karty; doplní sa, keď sa v Money založia).
 		</p>
 		{#if fixError}
 			<div class="err" data-testid="fix-chyba">⚠️ {fixError}</div>
@@ -376,7 +376,7 @@
 		<span class="badge wait">⏳ zatiaľ len typy</span>
 	</div>
 	<p class="sub noprint">
-		Vyčítané z výkresov, ale <b>len TYPY</b> — počty a Money kódy čakajú na tabuľky od Dominika („—"
+		Vyčítané z výkresov, ale <b>len TYPY</b> — počty a Money kódy čakajú na tabuľky od výroby („—"
 		pri počte). CAD kód je informatívny, <b>NIE</b> Money odpisový.
 	</p>
 	{#if komponenty.length === 0}
@@ -413,7 +413,7 @@
 	</div>
 	<p class="sub noprint">
 		Výdajová listina — hotové kusy, ktoré idú na expedíciu z tejto zákazky. Odškrtni pri nakládke.
-		Počty profilov sú z nárezu (isté); komponenty (spojky, krytky) čakajú na tabuľky od Dominika,
+		Počty profilov sú z nárezu (isté); komponenty (spojky, krytky) čakajú na tabuľky od výroby,
 		preto majú počet „—". Tesnenia sú merané dĺžkou (nie kusmi). Drobný materiál je zberná položka —
 		appka ho nepočíta.
 	</p>
@@ -612,8 +612,8 @@
 		</ul>
 		<p class="sub">
 			Strešné sklo sa do Money odpisu NEzapisuje (rozhodnutie až po potvrdení variácie skla — karty
-			do cenníka zakladá Dominik). Dĺžka aj celková cena sú návrhové (na rezerváciu materiálu, ~2 mm
-			presnosť); reálnu cenu variácie Dominik po potvrdení prepíše.
+			do cenníka zakladá výroba). Dĺžka aj celková cena sú návrhové (na rezerváciu materiálu, ~2 mm
+			presnosť); reálnu cenu variácie výroba po potvrdení prepíše.
 		</p>
 	</div>
 {/if}

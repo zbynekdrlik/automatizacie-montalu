@@ -8,5 +8,5 @@ import type { PageServerLoad } from './$types';
 // (/__test-error je v B2B_FORBIDDEN_PREFIXES).
 export const load: PageServerLoad = () => {
 	if (process.env.ENABLE_TEST_ERROR_ROUTE !== '1') error(404, 'Neexistuje.');
-	throw new Error('E2E: úmyselná testovacia serverová chyba (#245)');
+	throw new Error('E2E: úmyselná testovacia serverová chyba');
 };

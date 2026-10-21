@@ -73,7 +73,8 @@ message v prozaickom vysvetlení cituje starší (už zlúčený/uzavretý) PR/i
 `#399` (bežné v tomto repe — money-safety guardy vzájomne odkazujú na predchádzajúce
 PR-y, ktoré fixli podobný problém), hook to interpretuje ako "commit sa týka aj #399" a
 blokuje, kým commit message obsahuje literálne `#399`. Vyhni sa tomu tak, že historické
-referencie v prose píšeš BEZ `#` (`"PR 399"`, `"issue 380"`) — číslo ostáva čitateľné
+referencie v prose píšeš BEZ `#` (`"PR 399"`, `"issue 380"`; aj hex farba `#000` v správe sa
+číta ako tiket „#0" → gate-unavailable, #616) — číslo ostáva čitateľné
 pre človeka, ale nezhoduje sa s `design_gate.issue_refs` regexom. Rovnaká pasca platí pre
 `Closes #N` na cudzí ticket — `block-worker-close-trigger.sh` navyše blokuje AJ
 close-keyword tesne pred vlastným `#N` z worktree workera (worker nikdy sám nezatvára

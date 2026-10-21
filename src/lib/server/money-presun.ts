@@ -280,7 +280,7 @@ async function runDetect(
 					r.content_hash,
 					r.filename,
 					'system:presun-detekcia',
-					'manuálny presun zo staging NA ODPIS do Money importu (detekcia #299)'
+					'manuálny presun zo staging NA ODPIS do Money importu (zistený automaticky)'
 				);
 			}
 		})();

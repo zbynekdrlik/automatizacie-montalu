@@ -15,15 +15,14 @@
 // dôvod (honest-null pre prózu: radšej žiadny text než vymyslený). Chýbajúce „prečo" pre
 // ostatné nastavenia (odsadenia profilov, systémová sklo-korekcia, kontrolné rozmery) sú
 // checklist na #444 pre Patrika — pridaj sem NOVÝ kľúč až keď dodá overený dôvod.
+// Zdroj (kto, Odoo msg id, migrácia) patrí do KOMENTÁRA pri kľúči, NIE do textu — text číta
+// dielňa a nesmie menovať ľudí ani interné odkazy (#616, Odoo úloha 1450; stráži to
+// `tests/ui-texty-bez-mien.test.ts`).
 export const POZNAMKY: Record<string, string> = {
+	// Zdroj: Patrik, Odoo msg 1789477 a 1789480; Špetta, Odoo msg 1789036.
 	korekcia:
-		'Prečo korekcia: pod IZO sklá išli väčšie podložky; zmenšili sme ich, aby sa zmestilo ' +
-		'väčšie sklo a lepšie držalo v ráme — preto sa rozmer skla koriguje oproti pôvodnému ' +
-		'vzorcu. Nastavuje sa podľa TRIEDY skla (6 mm / 16 mm), nie pre každé sklo zvlášť — pri ' +
-		'desiatkach skladieb z Odoo by bola korekcia per sklo neudržateľná. (Patrik, Odoo msg ' +
-		'1789477 a 1789480; Špetta, Odoo msg 1789036)',
+		'Prečo korekcia: pod IZO sklá išli väčšie podložky; zmenšili sme ich, aby sa zmestilo väčšie sklo a lepšie držalo v ráme — preto sa rozmer skla koriguje oproti pôvodnému vzorcu. Nastavuje sa podľa TRIEDY skla (6 mm / 16 mm), nie pre každé sklo zvlášť — pri desiatkach skladieb z Odoo by bola korekcia per sklo neudržateľná.',
+	// Zdroj: Patrik — migrácia v17 v migracie.ts.
 	redukcia:
-		'Prečo nulovanie Redukcie 6mm: pri 16 mm (IZO) skladbách sa redukcia nereže; pri 6 mm ' +
-		'skladbách (3.3.1 a pod.) sa reže priamo s rámovým profilom. Platí len v systéme Slide. ' +
-		'(Patrik — pozri migráciu v17 v migracie.ts)'
+		'Prečo nulovanie Redukcie 6mm: pri 16 mm (IZO) skladbách sa redukcia nereže; pri 6 mm skladbách (3.3.1 a pod.) sa reže priamo s rámovým profilom. Platí len v systéme Slide.'
 };

@@ -75,7 +75,8 @@ editor neukazuje → bez väzby by úprava kladkového ticho rozbila pravidlo.
   ULOŽENOM skle"; nový offset `skloOffsetZProfilu` zaokrúhlený na 1e-6, −255,92 − 40 →
   čisté −295,92 → test „float šum v NOVOM offsete"). Ručná výnimka (sklo nesledovalo) ostáva. Zápis ide do `skloZapisy`
   (dim S) → `updSkloRez`; rámový mirror má prednosť (`skloZapisy.has`). Audit pole „Sklo šírka (S)
-  offset — sleduje kladkový − 10 mm (#610)". Rozširujúci (+6) sklo NEposúva.
+  offset — sleduje kladkový − 10 mm" (od #616 bez čísla tiketu — text vidí výroba v histórii
+  editora; staré PROD riadky nesú „(#610)" ďalej, audit sa neprepisuje). Rozširujúci (+6) sklo NEposúva.
 - Nejednoznačný stav (2× Sklo šírka / 2× kladkový) → väzba sa neuplatní + `log.warn`, nikdy hádanie.
   Odvodené sklo mimo ±500 → `inBounds` poistka vráti celé uloženie.
 - Poznámka pod poľom kladkového (`.sub` = mechanika poľa; `.pozn` je pre „prečo" texty #444):
