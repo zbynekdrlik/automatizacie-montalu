@@ -319,10 +319,11 @@ varianty existujúcich `.badge.live`/`.badge.test` — žiadny nový dizajnový 
 ## Žiadny interný žargón na obrazovke (#233)
 
 - Renderované stringy (svelte, `PergolaNarezVykres` `<text>`, engine `nepodporovane`/`poznamka`,
-  `krov.poznamky`) NESMÚ obsahovať `#N` / `O-čka` / „callu 13.8." — plain slovenčina
-  („čaká na vzorec od Dominika"). Referencie ostávajú v komentároch kódu. Akceptačný E2E
+  `krov.poznamky`) NESMÚ obsahovať `#N` / `O-čka` / „callu 13.8." ani mená ľudí (#616,
+  `ui-texty.md`) — plain slovenčina („čaká na vzorec od výroby"). Referencie ostávajú v
+  komentároch kódu. Akceptačný E2E
   (`pergola-uix.spec.ts`) skenuje `body.textContent()` (aj zbalené `<details>`) na `/#\d/`,
-  `/\bO\d/`, „call". CSS hex farby (`#15803d`) sú v `<style>`/`style=`, nie v `textContent`.
+  `/\bO\d/`, „call" a od #616 aj mená (`Dominik|Patrik|Špett`). CSS hex farby (`#15803d`) sú v `<style>`/`style=`, nie v `textContent`.
 - Engine `nepodporovane: NepodporovanaPolozka[] {kratky, detail}` — krátka veta v zozname +
   plné odôvodnenie v `<details>` (default zbalené). `poznamka` (krátka šedá) + `poznamkaDetail`
   (rozklik) v materiálovej tabuľke. Testy asertujúce staré `#N` stringy prepíš na plain znenie.
