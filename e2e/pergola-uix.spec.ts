@@ -163,6 +163,8 @@ test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke pergoly z
 	expect(text).not.toMatch(/\bO\d/);
 	// žiadny odkaz na call
 	expect(text).not.toMatch(/z callu|callu 13|call s Dominikom/i);
+	// #616 — žiadne mená ľudí („čaká na vzorec od Dominika" → „od výroby")
+	expect(text).not.toMatch(/Dominik|Patrik|Špett/);
 
 	// pozitívny protipól — plain náhrady SÚ prítomné (sekcia nepodporované nie je prázdna)
 	await expect(page.getByTestId('narez-nepodporovane')).toContainText('vzorec');
@@ -185,6 +187,7 @@ test('#233 žiadny interný žargón (#N / O-čko / call) na obrazovke pergoly z
 	expect(textNahlad).not.toMatch(/#\d/);
 	expect(textNahlad).not.toMatch(/\bO\d/);
 	expect(textNahlad).not.toMatch(/z callu|callu 13|call s Dominikom/i);
+	expect(textNahlad).not.toMatch(/Dominik|Patrik|Špett/); // #616 (banner tesnení)
 
 	expect(consoleMsgs).toEqual([]);
 });

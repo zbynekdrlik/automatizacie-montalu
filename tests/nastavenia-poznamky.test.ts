@@ -11,8 +11,16 @@ describe('#444 POZNAMKY — vysvetľujúce texty pri nastaveniach', () => {
 		expect(POZNAMKY.korekcia).toContain('podložk');
 	});
 
-	it('korekcia cituje overený zdroj (Odoo msg id)', () => {
-		expect(POZNAMKY.korekcia).toMatch(/msg\s*17894\d\d/);
+	// #616 (Odoo úloha 1450): overený zdroj ostáva povinný, ale patrí do KOMENTÁRA pri kľúči —
+	// text číta dielňa a nesmie menovať ľudí ani Odoo msg id (Stryker komentáre zachováva).
+	it('korekcia má overený zdroj (Odoo msg id) v komentári modulu, nie v texte pre dielňu', () => {
+		const zdroj = fs.readFileSync(
+			new URL('../src/lib/nastavenia-poznamky.ts', import.meta.url),
+			'utf8'
+		);
+		expect(zdroj).toMatch(/\/\/ Zdroj: .*msg\s*17894\d\d/);
+		expect(POZNAMKY.korekcia).not.toMatch(/msg|Patrik|Špett/);
+		expect(POZNAMKY.korekcia).toContain('neudržateľná');
 	});
 
 	it('redukcia obsahuje overený dôvod (16mm/6mm rezanie, len Slide)', () => {

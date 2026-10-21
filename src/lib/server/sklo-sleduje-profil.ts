@@ -57,4 +57,4 @@ export const skloSleduje = (
 
 /** Text audit záznamu (`cfg_audit`) pri posunutí skla väzbou. */
 export const skloSledujePole = (p: SkloSledujeProfil) =>
-	`Sklo šírka (S) offset — sleduje ${p.profilPopis} − ${p.mmNaKridlo} mm (#610)`;
+	`Sklo šírka (S) offset — sleduje ${p.profilPopis} − ${p.mmNaKridlo} mm`;

@@ -166,7 +166,7 @@
 		<p class="sub">
 			Zadaj rozmery — vykreslím zákaznícky návrhový výkres (bokorys, pôdorys, textový popis,
 			pečiatka). Priečny rez sekciou (VIEW A) appka zámerne nekreslí — tvar oblúka sa nedá odvodiť z
-			kót bez ďalších dát od konštruktéra (#163).
+			kót bez ďalších dát od konštruktéra.
 			<b>Do Money sa neposiela nič</b> — tento modul len kreslí; na zápis do Money prepni kachličku „Zápis
 			do Money" hore.
 		</p>

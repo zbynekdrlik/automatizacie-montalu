@@ -185,6 +185,12 @@ function skupinaLabel(s: ExpedicnaPolozka['skupina']): string {
 	}
 }
 
+/** Čestné upozornenie pod zoznamom: skupiny s neurčitými údajmi („—"). Text tlačí dielňa —
+ *  bez mien ľudí (#616); custom-font text sa z tela PDF nedá prečítať, preto je to samostatná
+ *  testovateľná funkcia. */
+export const honestNullUpozornenie = (skupiny: readonly string[]): string =>
+	`POZOR: Skupiny s neurčitými údajmi (—): ${skupiny.join(', ')}. Doplnia sa až po potvrdení výrobou.`;
+
 /** Rozmer/dĺžka stĺpec: rozmerInfo alebo dĺžka rezu podľa skupiny. */
 function rozmerText(p: ExpedicnaPolozka): string {
 	if (p.rozmerInfo) return p.rozmerInfo;
@@ -378,15 +384,7 @@ export async function generateExpediciaPdf(
 
 	// honest-null poznamky
 	if (zoznam.honestNullSkupiny.length > 0) {
-		drawParagraph(
-			ctx,
-			'POZOR: Skupiny s neurčitými údajmi (—): ' +
-				zoznam.honestNullSkupiny.join(', ') +
-				'. Doplnia sa až po potvrdení od Dominika.',
-			FS_META,
-			reg,
-			MUTED
-		);
+		drawParagraph(ctx, honestNullUpozornenie(zoznam.honestNullSkupiny), FS_META, reg, MUTED);
 	}
 
 	drawParagraph(

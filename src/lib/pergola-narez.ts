@@ -559,7 +559,7 @@ function zostavNepodporovane(
 	if (v.zosilnenyNosnik) {
 		// (per-systém varianta = O2, presné pravidlo = O3)
 		nepodporovane.push({
-			kratky: 'Zosilnený nosník — presné per-systém pravidlo profilu čaká na vzorec od Dominika.',
+			kratky: 'Zosilnený nosník — presné per-systém pravidlo profilu čaká na vzorec od výroby.',
 			detail:
 				'Žľabová výstuha (Massive = šírka − 280) sa už počíta a odzrkadľuje zvolený profil (140×140 / 200×140); Robust varianta (šírka − 220) je zatiaľ len informatívna a presné per-systém pravidlo dĺžky čaká na potvrdenie.'
 		});
@@ -572,7 +572,7 @@ function zostavNepodporovane(
 				? `${KOD_VYSTUHA_250x110} (Profil 250x110)`
 				: `${SYSTEMY.Robust.stlp.kod} (Profil 110x110 V2)`;
 		nepodporovane.push({
-			kratky: `Výstuha Robust ${v.vystuhaProfil} — presná dĺžka rezu čaká na vzorec od Dominika.`,
+			kratky: `Výstuha Robust ${v.vystuhaProfil} — presná dĺžka rezu čaká na vzorec od výroby.`,
 			detail: `Skovaná 15 mm v žľabe ako nohy; presná dĺžka rezu nad potvrdené pravidlo (šírka − 220) zatiaľ nie je overená → dĺžku nehádžeme. Kód: ${kod}.`
 		});
 	}

@@ -197,9 +197,9 @@
 	<div class="card">
 		<h1>Sieťka — dodatočná objednávka</h1>
 		<p class="sub">
-			Pre zákazku, ktorá <b>už má posuv namontovaný</b> a sieťku chce dodatočne (Patrik: „90% si
-			kúpi posuv a sieťku chce až potom"). Zadaj rozmery otvoru a systém posuvu — appka vypočíta
-			rámový profil, nosový profil (a pri 2K aj 3K koľajnicu) a rozmer sieťoviny na objednávku.
+			Pre zákazku, ktorá <b>už má posuv namontovaný</b> a sieťku chce dodatočne. Sieťka sa často
+			objednáva až po montáži posuvu. Zadaj rozmery otvoru a systém posuvu — appka vypočíta rámový
+			profil, nosový profil (a pri 2K aj 3K koľajnicu) a rozmer sieťoviny na objednávku.
 			{#if isB2B}
 				<b>Do Money sa neposiela nič</b> — len výpočet/tlač.
 			{:else}

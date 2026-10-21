@@ -30,7 +30,7 @@ const N = 6; // krídla 2×3K
 const KLADKOVY = 'ZASP202415';
 // výpočtové sklo triedy 16 (Odoo 16 mm izolačné) — nárezák IZO závisí od triedy, nie skladby
 const IZO_16 = 'Izolačné sklo 4/8/4 číre';
-const POLE_SKLO = 'Sklo šírka (S) offset — sleduje kladkový − 10 mm (#610)';
+const POLE_SKLO = 'Sklo šírka (S) offset — sleduje kladkový − 10 mm'; // #616: bez čísla tiketu
 const RUN = `E2E-SKLOKL-${Date.now().toString(36).toUpperCase()}`;
 
 interface Riadok {
