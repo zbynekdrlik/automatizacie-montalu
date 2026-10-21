@@ -43,14 +43,14 @@
 	});
 </script>
 
-<svelte:head><title>Návrhový výkres — demo (#137)</title></svelte:head>
+<svelte:head><title>Návrhový výkres — demo</title></svelte:head>
 
 <div class="card noprint">
-	<div class="sec">Návrhový výkres — interné demo (#137)</div>
+	<div class="sec">Návrhový výkres — interné demo</div>
 	<p class="sub">
 		Vzorový hárok: vonkajší rám s mriežkou (stĺpce 1-16, riadky A-L), rohová pečiatka a kóty cez
-		zdieľaný <code>kota.ts</code> helper. Skutočný produkčný výkres (pergola/bazén) príde v #138+ — táto
-		stránka je len overenie základu, nikam do appky nevedie odkaz.
+		zdieľaný kótovací pomocník. Skutočné návrhové výkresy (pergola, bazén) majú vlastné stránky —
+		táto stránka je len overenie základu, nikam do appky nevedie odkaz.
 	</p>
 </div>
 
@@ -79,7 +79,7 @@
 				font-size="3.2"
 				fill="#dc2626"
 				font-weight="600"
-				data-testid="demo-poznamka">POZNÁMKA: vzorový hárok — základ pre #138</text
+				data-testid="demo-poznamka">POZNÁMKA: vzorový hárok — základ návrhových výkresov</text
 			>
 			<!-- čierna geometria (konvencia z ROZHODNUTÉ komentára #137) -->
 			<rect

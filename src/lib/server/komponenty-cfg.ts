@@ -43,8 +43,10 @@ const RODINA_KOVANIA: Readonly<Record<string, RodinaKovania>> = {
  * `cfg_seed` (tests/kovanie-rodina.test.ts) padne, keď pribudne systém bez zaradenia.
  */
 export const SYSTEMY_BEZ_KOVANIA: Readonly<Record<string, string>> = {
+	// Štandard Drevo = drevostavby (#445); #604 ho zámerne nemení (rozhodnutie v návrhu: Drevo
+	// bez zmeny). Dôvod nesmie niesť čísla tiketov ani mená (#616, tests/ui-texty-bez-mien.test.ts).
 	'Štandard Drevo':
-		'Drevostavby (#445) — kovanie do odpisu pre ne nikto nezadal; #604 ho zámerne nemení (rozhodnutie v návrhu: Drevo bez zmeny).'
+		'Drevostavby — kovanie do odpisu pre ne nikto nezadal; zámerne ostávajú bez kovania (rozhodnutie: Drevo bez zmeny).'
 };
 
 /** Rodina kovania systému, alebo `undefined` keď do žiadnej nepatrí. */
@@ -501,8 +503,8 @@ export const KOVANIE_NEUPLNE: Partial<
 	// vo výpočte, nie tu) sa zobrazí len madlová veta.
 	Slide: (_skloHrubka, farbaKovania) =>
 		farbaKovania === 'R9005'
-			? 'SLIDE: madlo 200 (ZASK20258) a automatický zámok R9005 (ZASK202537) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). R7016 zámok (ZASK202538) odpis dostáva. Doplniť ručne, kým nedostanú sklad (#357).'
-			: 'SLIDE: madlo 200 (ZASK20258) zatiaľ NIE JE v odpise kovania — Money má na ňom 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). Doplniť ručne, kým nedostane sklad (#357).'
+			? 'SLIDE: madlo 200 (ZASK20258) a automatický zámok R9005 (ZASK202537) zatiaľ NIE sú v odpise kovania — Money má na nich 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). R7016 zámok (ZASK202538) odpis dostáva. Doplniť ručne, kým nedostanú sklad.'
+			: 'SLIDE: madlo 200 (ZASK20258) zatiaľ NIE JE v odpise kovania — Money má na ňom 0 ks skladovej zásoby (overené 31.8.2026 o 14:45). Doplniť ručne, kým nedostane sklad.'
 };
 
 /** Systémy s PREDVOLENOU farbou (#431 bod 1/kolo 2, Patrik msg 1801337) — Deluxe:

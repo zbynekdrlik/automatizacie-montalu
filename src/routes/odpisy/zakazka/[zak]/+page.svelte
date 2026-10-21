@@ -56,9 +56,8 @@
 				? 'vznikol'
 				: p.bezPoloziek <= 4
 					? 'vznikli'
-					: 'vzniklo'} pred zavedením cenového zoznamu (#154) — {p.bezPoloziek === 1
-				? 'jeho'
-				: 'ich'} materiál v zozname CHÝBA.
+					: 'vzniklo'} pred zavedením cenového zoznamu — {p.bezPoloziek === 1 ? 'jeho' : 'ich'} materiál
+			v zozname CHÝBA.
 		</p>
 	{/if}
 </div>
@@ -134,8 +133,8 @@
 	<div class="card">
 		<div class="sec">Ceny materiálu</div>
 		<p class="sub" data-testid="zakazka-bez-cien">
-			Odpisy tejto zákazky vznikli pred zavedením cenového zoznamu (#154) — presné položky sa pre ne
-			spätne nedajú zrekonštruovať.
+			Odpisy tejto zákazky vznikli pred zavedením cenového zoznamu — presné položky sa pre ne spätne
+			nedajú zrekonštruovať.
 		</p>
 	</div>
 {/if}

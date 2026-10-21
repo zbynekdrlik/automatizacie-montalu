@@ -118,8 +118,8 @@
 	<div class="card">
 		<div class="sec">Tesnenia (gumy) — {rozpis.tesnenia.length}</div>
 		<div class="warn" data-testid="rez-tesnenia-banner">
-			⚠️ Čaká na Money kódy od Dominika — tesnenia sa <b>NEODOSIELAJÚ</b> do odpisu. Dĺžky sú podľa pravidiel
-			od Dominika; doplnia sa, keď príde zoznam kódov.
+			⚠️ Čaká na Money kódy od výroby — tesnenia sa <b>NEODOSIELAJÚ</b> do odpisu. Dĺžky sú podľa pravidiel
+			výroby; doplnia sa, keď príde zoznam kódov.
 		</div>
 		<table class="narez" data-testid="rez-tesnenia">
 			<thead><tr><th>Tesnenie</th><th>Vzorec</th><th>Dĺžka</th></tr></thead>
@@ -147,7 +147,7 @@
 		<div class="sec">FIX — pevné zasklenie</div>
 		<div class="warn" data-testid="rez-fix-banner">
 			ℹ️ FIX sa <b>NEODOSIELA</b> do Money odpisu — FIX materiály (profily + sklo) nemajú v Money karty.
-			Spočíta sa a nakreslí ako súčasť zákazky; do odpisu sa doplní, keď Dominik založí Money karty (rovnako
+			Spočíta sa a nakreslí ako súčasť zákazky; do odpisu sa doplní, keď sa v Money založia karty (rovnako
 			ako tesnenia a strešné sklo).
 		</div>
 		{#if fixError}

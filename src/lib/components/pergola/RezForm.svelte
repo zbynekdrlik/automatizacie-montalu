@@ -288,7 +288,7 @@
 						value="1"
 						bind:checked={zosilnenyNosnikS}
 					/>
-					Zosilnený nosník (profil zatiaľ čaká na vzorec od Dominika)
+					Zosilnený nosník (profil zatiaľ čaká na vzorec od výroby)
 				</label>
 			</div>
 		</div>
@@ -434,7 +434,7 @@
 				<p class="sub" style="margin:0 0 10px" data-testid="fix-money-note">
 					FIX sa spočíta a nakreslí ako súčasť tejto zákazky.
 					<b>Do Money odpisu zatiaľ nejde</b> — FIX materiály (profily + sklo) nemajú v Money karty, doplní
-					sa, keď ich Dominik založí (rovnako ako tesnenia a strešné sklo).
+					sa, keď sa v Money založia (rovnako ako tesnenia a strešné sklo).
 				</p>
 				<div class="field">
 					<label class="opt">

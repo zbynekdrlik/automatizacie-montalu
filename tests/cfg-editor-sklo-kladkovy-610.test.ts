@@ -24,7 +24,7 @@ import { load } from '../src/routes/zasklenia/nastavenia/+page.server';
 
 const KLADKOVY = 'ZASP202415';
 const ROZSIRUJUCI = 'ZASP202439';
-const POLE_SKLO = 'Sklo šírka (S) offset — sleduje kladkový − 10 mm (#610)';
+const POLE_SKLO = 'Sklo šírka (S) offset — sleduje kladkový − 10 mm'; // #616: bez čísla tiketu
 
 /** PROD `cfg_rez` 17.10.2026 (telo #610) + sklo po v58 = kladkový − 10·N. */
 const PROD: Record<string, { n: number; kladkovy: number }> = {

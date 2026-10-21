@@ -55,8 +55,8 @@
 	<div class="card">
 		<div class="sec">Ceny materiálu</div>
 		<p class="sub">
-			Tento odpis vznikol pred zavedením cenového zoznamu (#154) — presné položky sa preň spätne
-			nedajú zrekonštruovať.
+			Tento odpis vznikol pred zavedením cenového zoznamu — presné položky sa preň spätne nedajú
+			zrekonštruovať.
 		</p>
 	</div>
 {/if}

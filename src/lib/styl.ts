@@ -178,9 +178,9 @@ export function sklaDoPonuky(
  */
 export const SYSSTYL_ODVODENE: Record<string, string> = {
 	'Štandard +|2x2K IZO':
-		'Nárezák „2×2K opona IZO" je ODVODENÝ (nie 1:1 overený proti Money nárezáku) — čaká na overenie výrobou (Patrik). Money odpis pred odoslaním prekontroluj.',
+		'Nárezák „2×2K opona IZO" je ODVODENÝ (nie 1:1 overený proti Money nárezáku) — čaká na overenie výrobou. Money odpis pred odoslaním prekontroluj.',
 	'Štandard +|2x3K IZO':
-		'Nárezák „2×3K opona IZO" je ODVODENÝ (nie 1:1 overený proti Money nárezáku) — čaká na overenie výrobou (Patrik). Money odpis pred odoslaním prekontroluj.'
+		'Nárezák „2×3K opona IZO" je ODVODENÝ (nie 1:1 overený proti Money nárezáku) — čaká na overenie výrobou. Money odpis pred odoslaním prekontroluj.'
 };
 
 /** Honest-null upozornenie pre odvodený (neoverený) nárezák; null keď je overený 1:1. */

@@ -6,7 +6,8 @@ import { PDFDocument } from 'pdf-lib';
 import {
 	generateExpediciaPdf,
 	generateExpediciaPdfBase64,
-	expediciaPdfFilename
+	expediciaPdfFilename,
+	honestNullUpozornenie
 } from '../src/lib/server/expedicia-pdf';
 import type { ExpedicnyZoznam } from '../src/lib/pergola-expedicia';
 
@@ -183,5 +184,15 @@ describe('generateExpediciaPdf — QR zákazky (#528)', () => {
 	it('bez OP → žiaden QR (PDF ostáva platný)', async () => {
 		const bytes = await generateExpediciaPdf(baseZoznam, { ...IDENT, op: '' }, NOW);
 		expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-');
+	});
+});
+
+// #616 (Odoo úloha 1450): čestné upozornenie, ktoré tlačí dielňa, nemenuje ľudí —
+// „Doplnia sa až po potvrdení výrobou." (predtým „… od Dominika.").
+describe('honestNullUpozornenie (#616)', () => {
+	it('vymenuje neurčité skupiny a neutrálne povie, kto ich doplní', () => {
+		expect(honestNullUpozornenie(['komponenty', 'drobný materiál'])).toBe(
+			'POZOR: Skupiny s neurčitými údajmi (—): komponenty, drobný materiál. Doplnia sa až po potvrdení výrobou.'
+		);
 	});
 });
