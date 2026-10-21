@@ -612,8 +612,8 @@
 		</ul>
 		<p class="sub">
 			Strešné sklo sa do Money odpisu NEzapisuje (rozhodnutie až po potvrdení variácie skla — karty
-			do cenníka sa zakladajú až potom). Dĺžka aj celková cena sú návrhové (na rezerváciu materiálu,
-			~2 mm presnosť); reálna cena variácie sa po potvrdení prepíše.
+			do cenníka zakladá výroba). Dĺžka aj celková cena sú návrhové (na rezerváciu materiálu, ~2 mm
+			presnosť); reálnu cenu variácie výroba po potvrdení prepíše.
 		</p>
 	</div>
 {/if}

@@ -65,20 +65,40 @@ const MENA = [
 	'Drlik',
 	'Ondrišk',
 	'Ondrisk',
-	'Volek'
+	'Volek',
+	'Volka',
+	'Volkovi',
+	'Volkom',
+	'Paloh',
+	'Palovi',
+	'Palom'
 ] as const;
 
 const VZORY: ReadonlyArray<{ vzor: RegExp; popis: string }> = [
 	{ vzor: new RegExp(`(?<!\\p{L})(?:${MENA.join('|')})`, 'gu'), popis: 'meno človeka' },
+	// prezývka „Palo"/„Pala" len ako celé slovo (kmeň „Pal" by chytil „Paleta", „Palivo")
+	{ vzor: /(?<!\p{L})Pal[oa](?!\p{L})/gu, popis: 'meno človeka' },
 	{ vzor: /Odoo\s+msg/giu, popis: 'Odoo msg id' },
 	{ vzor: /\bmsg\.?\s*\d{4,}/giu, popis: 'id správy' },
+	{ vzor: /správ\p{L}*\s*#?\d{4,}/giu, popis: 'id správy' },
+	{ vzor: /\b(?:att|ir\.attachment)\.?\s*\d{3,}/giu, popis: 'id prílohy' },
+	{ vzor: /kanál\p{L}*\s*\d+/giu, popis: 'číslo kanála' },
 	{ vzor: /migráci\p{L}*\s+v\d+/giu, popis: 'číslo migrácie' },
-	{ vzor: /\b(?:tiket|ticket|issue)\p{L}*\s*#?\d+/giu, popis: 'číslo tiketu' },
-	// `#610`, `(#154)`, `#138+` — ale nie CSS farba (`color: #333`, `fill="#000"`).
-	{ vzor: /(?<!:\s*)(?<=^|[\s(,;])#\d{2,4}(?!\w)/gu, popis: 'číslo tiketu (#N)' },
+	{ vzor: /\b(?:tiket|ticket|issue)\p{L}*[:.]?\s*#?\d+/giu, popis: 'číslo tiketu' },
+	{ vzor: /\bPR\s+#?\d+/gu, popis: 'číslo PR' },
+	// `#610`, `(#154)`, `„#610"`, `#137/#144`, `#1691126` — ale nie CSS farba (`color: #333`,
+	// `fill="#000"` v reťazci); úsek, ktorý je CELÝ len farba (`'#555'`, atribút `fill="#000"`),
+	// preskakuje `nieJeText` v `hladaj`.
+	{ vzor: /(?<![\w&])(?<!:\s*)(?<!=\s*["']?)#\d{2,}(?!\w)/gu, popis: 'číslo tiketu / id (#N)' },
 	{ vzor: /úloh\p{L}*\s+(?:č\.\s*)?\d{3,}/giu, popis: 'číslo Odoo úlohy' },
 	{ vzor: /(?<![\w.$-])[\w-]{2,}\.(?:ts|svelte)\b/gu, popis: 'názov súboru' }
 ];
+
+/** Úsek, ktorý nie je text pre človeka: len hex farba (`'#555'`, hodnota atribútu
+ *  `fill="#000"`) alebo base64 dáta (PNG/font bloby — náhodná zhoda „PR156" a pod.). */
+const nieJeText = (kus: string) =>
+	/^['"`]?#[0-9a-fA-F]{3,8}['"`]?$/.test(kus.trim()) ||
+	(kus.length > 200 && /^['"`][A-Za-z0-9+/=]+['"`]$/.test(kus));
 
 /** Historické záznamy, ktoré sa ZÁMERNE nemenia — každý s dôvodom. Guard overí, že výnimka
  *  ešte platí (mŕtva výnimka = chyba), takže zoznam nemôže potichu rásť. */
@@ -241,6 +261,7 @@ function hladaj(zdroj: string, useky: Usek[], subor: string): Nalez[] {
 	const out: Nalez[] = [];
 	for (const u of useky) {
 		const kus = zdroj.slice(u.start, u.end);
+		if (nieJeText(kus)) continue;
 		for (const { vzor, popis } of VZORY) {
 			for (const m of kus.matchAll(new RegExp(vzor.source, vzor.flags))) {
 				const riadok = riadokZ(zdroj, u.start + m.index);
@@ -288,8 +309,40 @@ describe('#616 skener — rozlišuje text pre používateľa od komentára', () 
 			'4:meno človeka „Patrik"',
 			'7:číslo migrácie „migráciu v17"',
 			'7:názov súboru „migracie.ts"',
-			'8:číslo tiketu (#N) „#445"'
+			'8:číslo tiketu / id (#N) „#445"'
 		]);
+	});
+
+	it('.ts: ďalšie tvary odkazov a mien (review #616)', () => {
+		const p = (text: string) => dovody(`const t = '${text}';`, 'x.ts');
+		expect(p('Odoo správa #1691126')).toEqual([
+			'id správy „správa #1691126"',
+			'číslo tiketu / id (#N) „#1691126"'
+		]);
+		expect(p('príloha ir.attachment 14674, att 41003')).toEqual([
+			'id prílohy „ir.attachment 14674"',
+			'id prílohy „att 41003"'
+		]);
+		expect(p('pozri kanál 207 a PR 399')).toEqual([
+			'číslo kanála „kanál 207"',
+			'číslo PR „PR 399"'
+		]);
+		// „#610" za dvojbodkou (CSS-tvar) #N vzor vynechá — chytí ho vzor „tiket"
+		expect(p('Tiket: #610')).toEqual(['číslo tiketu „Tiket: #610"']);
+		expect(p('#610 a „#611" a #137/#144')).toEqual([
+			'číslo tiketu / id (#N) „#610"',
+			'číslo tiketu / id (#N) „#611"',
+			'číslo tiketu / id (#N) „#137"',
+			'číslo tiketu / id (#N) „#144"'
+		]);
+		expect(p('Palohova požiadavka, Palo aj od Volka')).toEqual([
+			'meno človeka „Paloh"',
+			'meno človeka „Volka"',
+			'meno človeka „Palo"'
+		]);
+		// nie mená / nie odkazy: „Paleta", „Palivo", „PR156" v base64 bloku, „&#8203;"
+		expect(p('Paleta a Palivo, nulová šírka &#8203;')).toEqual([]);
+		expect(dovody(`const png = '${'iVBORw0KGgo'.repeat(20)}APR156Att12345';`, 'x.ts')).toEqual([]);
 	});
 
 	it('.ts: Odoo msg id, Špetta v skloňovaní, číslo úlohy', () => {
@@ -327,10 +380,16 @@ describe('#616 skener — rozlišuje text pre používateľa od komentára', () 
 	});
 
 	it('farba nie je tiket, tiket v zátvorke a na začiatku textu áno', () => {
-		expect(dovody("const f = 'fill: #000; stroke:#999'; const g = '#555';", 'x.ts')).toEqual([]);
+		expect(
+			dovody(
+				"const f = 'fill: #000; stroke:#999'; const g = '#555'; const h = '<rect fill=\"#000\"/>';",
+				'x.ts'
+			)
+		).toEqual([]);
+		expect(dovody('<rect fill="#000" stroke="#333" />', 'x.svelte')).toEqual([]);
 		expect(dovody('<p>#138+ príde (#154)</p>', 'x.svelte')).toEqual([
-			'číslo tiketu (#N) „#138"',
-			'číslo tiketu (#N) „#154"'
+			'číslo tiketu / id (#N) „#138"',
+			'číslo tiketu / id (#N) „#154"'
 		]);
 	});
 });
