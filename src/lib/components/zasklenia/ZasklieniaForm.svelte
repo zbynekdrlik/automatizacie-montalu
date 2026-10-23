@@ -438,8 +438,9 @@
 			</label>
 		</div>
 		<!-- Najväčšia K koľajnica nemá +1 → checkbox sa skryje. Gate `plusRailEligible`
-		     (styl.ts) — #456 rozšírenie pôvodného `standardPlusRailEligible` (#134)
-		     na Slide/Deluxe/Robust. `pridavnaKolajnicaDefault` (auto-IZO) ostáva Štandard+. -->
+		     (styl.ts) — #456 rozšírenie pôvodného gate-u Štandard + (#134) na
+		     Slide/Deluxe/Robust, #618 aj starý Štandard. `pridavnaKolajnicaDefault`
+		     (auto-IZO) platí pre rodinu Štandard (Štandard + aj starý Štandard). -->
 		{#if plusRailEligible(system, styl)}
 			<div class="field">
 				<label class="opt">

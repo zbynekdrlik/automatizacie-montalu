@@ -61,25 +61,22 @@ export function skloVyberaIzo(system: string): boolean {
 }
 
 /**
- * Pôvodný gate LEN pre Štandard + (#134) — zachovaný pre `pridavnaKolajnicaDefault`
- * (auto-default IZO ostáva len pre Štandard +, Patrik msg #1646652).
- * Pre VIDITEĽNOSŤ checkboxu a pre `railUpsize` používaj `plusRailEligible` (#456).
- */
-export function standardPlusRailEligible(system: string, styl: string): boolean {
-	return system === STANDARD_PLUS && !styl.startsWith('6K');
-}
-
-/**
  * Najvyššia K veľkosť koľajnice, pre ktorú +1 variant NEEXISTUJE v Money.
  * Checkbox sa pre tento (a vyšší) štýl NEZOBRAZÍ — presne rovnaká logika
  * ako pôvodný `!styl.startsWith('6K')` u Štandardu +, len per systém.
  *
  * Slide: 3K Slide (ZASP00100) → 4K Slide neexistuje
  * Robust: 4K (ZASP20254) → 5K Robust neexistuje
- * Štandard +/Deluxe: 6K (ZASP202437) → 7K neexistuje
+ * Štandard +/Deluxe/Štandard: 6K (ZASP202437) → 7K neexistuje
+ *
+ * Starý „Štandard" (Odoo úloha 1459, #618) zdieľa spodné kódy so Štandard + (ZASP00104 →
+ * ZASP00030 → ZASP00033 → ZASP202432), jeho najväčší štýl je 4K → checkbox je pri každom
+ * jeho štýle. Predtým tu chýbal a prídavná spodná bola pri IZO natvrdo vo vzorci (nedala sa
+ * vypnúť); od migrácie v60 je vo vzorci základná a prídavnú pridá tento checkbox.
  */
 const RAIL_MAX_K: Record<string, string> = {
 	'Štandard +': '6K',
+	Štandard: '6K',
 	Deluxe: '6K',
 	Slide: '3K',
 	Robust: '4K'
@@ -90,8 +87,9 @@ export const SYSTEMY_OBVODOVA = new Set(['Slide', 'Robust']);
 
 /**
  * Je tento systém + štýl spôsobilý pre checkbox „Prídavná koľajnica"?
- * Generalizácia pôvodného `standardPlusRailEligible` (#134) na Slide, Deluxe
- * a Robust (#456). Gate pre VIDITEĽNOSŤ checkboxu aj pre `railUpsize` swap.
+ * Generalizácia pôvodného gate-u len pre Štandard + (#134) na Slide, Deluxe
+ * a Robust (#456) a starý Štandard (#618). Gate pre VIDITEĽNOSŤ checkboxu aj pre
+ * `railUpsize` swap.
  *
  * K-level sa extrahuje aj z opona štýlov: 2x3K → 3K (koľajnica je podľa
  * čísla za 2x). IZO prípona sa ignoruje (`zakladnyStyl`).
@@ -111,10 +109,14 @@ export function plusRailEligible(system: string, styl: string): boolean {
  * môže kedykoľvek odškrtnúť; MENÍ Money odpis (railUpsize v compute.ts:
  * ZASP00104→ZASP00030 na 2K, ZASP00030→ZASP00033 na 3K).
  *
- * Platí len tam, kde checkbox vôbec EXISTUJE — rovnaký `standardPlusRailEligible`
- * gate ako viditeľnosť checkboxu v +page.svelte A `railUpsize` v compute.ts (#134).
- * IZO stav berie z `jeIzoSklo` — z toho istého zdroja pravdy, ktorý používa
- * `sysStylPre` na výber basic/IZO nárezáku, žiadny vlastný zoznam skiel.
+ * Platí pre CELÚ rodinu Štandard (Štandard + aj starý Štandard — tie isté systémy, kde
+ * basic/IZO nárezák vyberá sklo, `skloVyberaIzo`; #618: starý Štandard mal prídavnú pri
+ * IZO natvrdo vo vzorci, zaškrtnutý default tak zachová doterajší odpis) a len tam, kde
+ * checkbox vôbec EXISTUJE — rovnaký `plusRailEligible` gate ako viditeľnosť checkboxu
+ * (ZasklieniaForm.svelte) A `railUpsize` v compute-profily.ts. Robust/Slide/Deluxe auto-
+ * default NEMAJÚ (#456 — Patrikovo „pri štandardoch IZO"). IZO stav berie z `jeIzoTrieda`
+ * — z toho istého zdroja pravdy, ktorý používa `sysStylPre` na výber basic/IZO nárezáku,
+ * žiadny vlastný zoznam skiel.
  *
  * Reaktívne volanie (kedy sa táto hodnota naozaj premietne do checkboxu —
  * HRANOVO, nie „vždy keď true", aby neprepísala ručný klik obsluhy) je v
@@ -127,7 +129,7 @@ export function pridavnaKolajnicaDefault(
 	sklo: string,
 	trieda?: 6 | 16 | null
 ): boolean {
-	return standardPlusRailEligible(system, styl) && jeIzoTrieda(trieda, sklo);
+	return skloVyberaIzo(system) && plusRailEligible(system, styl) && jeIzoTrieda(trieda, sklo);
 }
 
 /**

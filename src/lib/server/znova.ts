@@ -18,6 +18,10 @@ import { skloPovolene } from '$lib/sklo-povolene';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
 import { parseFarba } from './vstup';
+import {
+	pridavnaKolajnicaZHistorie,
+	POZOR_PRIDAVNA_Z_HISTORIE
+} from './pridavna-kolajnica-historia';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
 import type { Farba } from '$lib/komponenty';
 import type { Klin } from '$lib/klin';
@@ -140,6 +144,10 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 	const styly = listSysStyly();
 	const chybajuce: string[] = [];
 	const zdroj = { id: row.id, zak: row.zak, op: row.op, created_at: row.created_at };
+	// #618: starý odpis starého Štandardu IZO mal prídavnú spodnú natvrdo (flag false) — flag sa
+	// odvodí tak, aby sa zopakoval rovnaký odpis; keď to jedna voľba nevie, obsluha sa to dozvie
+	const pridavna = pridavnaKolajnicaZHistorie(d, b(d.pridavnaKolajnica));
+	if (!pridavna.presne) chybajuce.push(POZOR_PRIDAVNA_Z_HISTORIE);
 	// spoločné polia; ZAK/OP/zákazník sa zámerne NEpreberajú
 	const spolocne = {
 		zak: '',
@@ -148,7 +156,7 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 		poznamka: s(d.poznamka),
 		ral: s(d.ral),
 		caka: row.caka === 1,
-		pridavnaKolajnica: b(d.pridavnaKolajnica),
+		pridavnaKolajnica: pridavna.pridavna,
 		jednostrannaFab: b(d.jednostrannaFab),
 		farbaKovania: farba(d.farbaKovania)
 	};
