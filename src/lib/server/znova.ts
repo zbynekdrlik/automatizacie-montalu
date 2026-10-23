@@ -17,6 +17,7 @@ import { glassTypesForSystem, listSysStyly } from './db';
 import { skloPovolene } from '$lib/sklo-povolene';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
+import { skloVyberaIzo, zakladnyStyl } from '$lib/styl';
 import { parseFarba } from './vstup';
 import {
 	pridavnaKolajnicaZHistorie,
@@ -80,9 +81,13 @@ function posuvZDetailu(
 	kde: string
 ): PosuvVstup {
 	const system = s(d.system);
-	const styl = s(d.styl);
-	if (system && styl && !styly.some((x) => x.system === system && x.styl === styl))
-		chybajuce.push(`${kde}: štýl ${system} ${styl} už v konfigurácii nie je`);
+	const ulozenyStyl = s(d.styl);
+	if (system && ulozenyStyl && !styly.some((x) => x.system === system && x.styl === ulozenyStyl))
+		chybajuce.push(`${kde}: štýl ${system} ${ulozenyStyl} už v konfigurácii nie je`);
+	// odpis ukladá VYPOČÍTANÝ štýl (`3K IZO`); formulár Štandardov ponúka len počet krídel a IZO
+	// nárezák vyberá sklo (`stylyDoPonuky`/`sysStylPre`) — bez prevodu by štýlový efekt formulára
+	// „3K IZO" nenašiel v ponuke a prepol ho na prvý štýl (iný nárezák, nález pri úlohe 1459)
+	const styl = skloVyberaIzo(system) ? zakladnyStyl(ulozenyStyl) : ulozenyStyl;
 	// v histórii je pod `sklo` uložené PRESNÉ zloženie, ak ho obsluha zadala;
 	// základné sklo (to, ktoré určuje vzorec) je `skloZaklad`
 	const zaklad = s(d.skloZaklad) || s(d.sklo);
