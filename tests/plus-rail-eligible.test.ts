@@ -51,9 +51,11 @@ describe('plusRailEligible — #456', () => {
 		expect(plusRailEligible('Robust', '2x4K')).toBe(false);
 	});
 
-	it('Štandard (starý, bez +) — vždy false (nepoužíva prídavnú koľajnicu)', () => {
+	// úloha 1459 (#618): starý Štandard má checkbox ako Štandard + (zdieľa spodné kódy) —
+	// predtým tu bolo „vždy false" a prídavná spodná bola pri IZO natvrdo vo vzorci
+	it('Štandard (starý, bez +) — eligible mimo 6K, rovnako ako Štandard +', () => {
 		for (const styl of STYLY) {
-			expect(plusRailEligible('Štandard', styl)).toBe(false);
+			expect(plusRailEligible('Štandard', styl), styl).toBe(!styl.startsWith('6K'));
 		}
 	});
 

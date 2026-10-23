@@ -26,8 +26,16 @@ describe('pridavnaKolajnicaDefault — #132', () => {
 		expect(pridavnaKolajnicaDefault('Štandard +', '6K', 'Izolačné sklo 4.8.4')).toBe(false);
 	});
 
-	it('false mimo Štandard + — checkbox sa tam v UI vôbec nezobrazuje', () => {
-		expect(pridavnaKolajnicaDefault('Štandard', '2K', 'Izolačné sklo 4.8.4')).toBe(false);
+	// úloha 1459 (#618): default platí pre CELÚ rodinu Štandard — starý Štandard IZO mal prídavnú
+	// spodnú natvrdo vo vzorci, zaškrtnutý default zachová doterajší odpis (predtým tu bolo false)
+	it('true aj na starom Štandarde s izolačným sklom; s NEizolačným false', () => {
+		expect(pridavnaKolajnicaDefault('Štandard', '2K', 'Izolačné sklo 4.8.4')).toBe(true);
+		expect(pridavnaKolajnicaDefault('Štandard', '4K', 'Izolačné sklo 4/8/4 číre')).toBe(true);
+		expect(pridavnaKolajnicaDefault('Štandard', '2K', 'Float sklo 6 mm')).toBe(false);
+	});
+
+	it('false mimo rodiny Štandard — auto-default je len „pri štandardoch IZO"', () => {
+		expect(pridavnaKolajnicaDefault('Štandard Drevo', '4K', 'Izolačné sklo 4.8.4')).toBe(false);
 		expect(pridavnaKolajnicaDefault('Robust', '2K', 'Izolačné sklo 4/16/4 číre')).toBe(false);
 		expect(pridavnaKolajnicaDefault('Deluxe', '2K', '')).toBe(false);
 		expect(pridavnaKolajnicaDefault('Slide', '2K', 'Izolačné sklo 4/8/4 číre')).toBe(false);

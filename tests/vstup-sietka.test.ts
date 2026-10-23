@@ -298,11 +298,15 @@ describe('MONEY-KOREKCIA — sieťka pridáva presnú deltu (Robust/Slide, #86 k
 		expect(so.odpis.some((o) => o.kod === 'ZASP00107' || o.kod === 'ZASP00104')).toBe(false);
 	});
 
-	it('Štandard|2K IZO S=3000/V=1850 + sieťka: horná sa mení na 3K IZO (ZASP00107→ZASP00027) — starý Štandard má INÝ 3K IZO spodný kód (ZASP00033) než jeho vlastný 3K bez IZO, kód sa berie ŽIVO z cfg', () => {
+	// úloha 1459 (#618): starý Štandard 3K IZO mal spodnú natvrdo zväčšenú (ZASP00033) a sieťka
+	// na 2K IZO ju odtiaľ preberala; od v60 je spodná 3K IZO základná (ZASP00030) → starý Štandard
+	// dá to isté ako Štandard + (3K sada sieťky už obsahuje prídavnú koľajnicu, Patrik #123)
+	it('Štandard|2K IZO S=3000/V=1850 + sieťka: horná sa mení na 3K IZO (ZASP00107→ZASP00027), spodná 3K ZASP00030 ako pri Štandard + — kód sa berie ŽIVO z cfg', () => {
 		const so = computeMulti(cfg, spec('Štandard|2K IZO', 3000, 1850, { uchyt: 'ziadny' }))!;
 
 		expect(so.odpis.some((o) => o.kod === 'ZASP00027')).toBe(true); // horná 3K IZO
-		expect(so.odpis.some((o) => o.kod === 'ZASP00033')).toBe(true); // spodná 3K IZO (živo z cfg, nie natvrdo)
+		expect(so.odpis.some((o) => o.kod === 'ZASP00030')).toBe(true); // spodná 3K IZO (živo z cfg, nie natvrdo)
+		expect(so.odpis.some((o) => o.kod === 'ZASP00033')).toBe(false); // už nie natvrdo zväčšená
 		// pôvodné 2K IZO kódy horná (ZASP00107) sa nesmú objaviť — nahradené
 		expect(so.odpis.some((o) => o.kod === 'ZASP00107')).toBe(false);
 	});

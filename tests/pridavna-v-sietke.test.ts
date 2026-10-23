@@ -29,8 +29,13 @@ describe('pridavnaJeVSietke — #123, rozšírené #456', () => {
 		expect(pridavnaJeVSietke('Robust', '4K', true)).toBe(false);
 	});
 
-	it('false pre Štandard (starý, bez +) — systém nemá prídavnú koľajnicu', () => {
-		expect(pridavnaJeVSietke('Štandard', '2K', true)).toBe(false);
+	// úloha 1459 (#618): starý Štandard má od teraz prídavnú koľajnicu cez checkbox (predtým
+	// „false — systém nemá prídavnú koľajnicu") → pri sieťke na 2K platí to isté ako pri Štandard +
+	it('true aj pre Štandard (starý, bez +) na 2K so sieťkou — správa sa ako Štandard +', () => {
+		expect(pridavnaJeVSietke('Štandard', '2K', true)).toBe(true);
+		expect(pridavnaJeVSietke('Štandard', '2K IZO', true)).toBe(true);
+		expect(pridavnaJeVSietke('Štandard', '3K IZO', true)).toBe(false);
+		expect(pridavnaJeVSietke('Štandard', '2K', false)).toBe(false);
 	});
 
 	it('false na oponové štýly (2x*) — mimo scope', () => {
@@ -43,7 +48,15 @@ describe('pridavnaKolajnicaHint — #123, rozšírené #456', () => {
 	it('null, keď pridavnaJeVSietke neplatí (žiadna hláška)', () => {
 		expect(pridavnaKolajnicaHint('Štandard +', '2K', false, true)).toBeNull();
 		expect(pridavnaKolajnicaHint('Štandard +', '3K', true, true)).toBeNull();
-		expect(pridavnaKolajnicaHint('Štandard', '2K', true, true)).toBeNull();
+		expect(pridavnaKolajnicaHint('Štandard', '3K', true, true)).toBeNull();
+		expect(pridavnaKolajnicaHint('Štandard Drevo', '2K', true, true)).toBeNull();
+	});
+
+	it('starý Štandard (úloha 1459) dostane ten istý text ako Štandard + (horná+spodná)', () => {
+		expect(pridavnaKolajnicaHint('Štandard', '2K', true, true)).toBe(
+			pridavnaKolajnicaHint('Štandard +', '2K', true, true)
+		);
+		expect(pridavnaKolajnicaHint('Štandard', '2K IZO', true, false)).toMatch(/hornú.*spodnú/);
 	});
 
 	it('Štandard + text spomína hornú aj spodnú (horná+spodná topológia)', () => {
