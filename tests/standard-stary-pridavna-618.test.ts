@@ -203,6 +203,57 @@ describe('úloha 1459 — starý Štandard IZO: prídavná spodná koľajnica LE
 		expect(kody(false)).toEqual(['ZASP00030', 'ZASP00104']);
 	});
 
+	// Checkbox je JEDEN na objednávku a jeho predvolená hodnota ide z PRVÉHO zasklenia (rovnako ako
+	// pri Štandard + od #132). Zmiešaná zimná záhrada so starým Štandardom IZO preto NIE je vždy
+	// zhodná s odpisom spred úlohy 1459 (vtedy bola IZO spodná zväčšená bez ohľadu na voľbu).
+	// Testy dokumentujú dnešnú sémantiku — zmena (voľba per zasklenie) by bola nové rozhodnutie.
+	describe('zmiešaná zimná záhrada — voľba platí pre všetky zasklenia (ako pri Štandard +)', () => {
+		const sp = (sysStyl: string, pridavnaKolajnica: boolean) =>
+			buildPosuvSpec({
+				sysStyl,
+				S: 3000,
+				V: 2400,
+				redukciaZero: false,
+				skloHrubka: 0,
+				skloKorekcia: null,
+				pridavnaKolajnica,
+				kolajnica: undefined,
+				otvaranie: undefined,
+				sklo: undefined,
+				kovanieL: undefined,
+				kovanieP: undefined,
+				kovanieStred: undefined,
+				kovanieStredOkno: undefined,
+				kliny: undefined,
+				sietka: undefined
+			} satisfies PosuvSpecInput);
+		const kody = (specs: ReturnType<typeof sp>[]) =>
+			computeMulti(cfg, specs)!.odpis.map((o) => o.kod);
+
+		it('(a) prvé starý Štandard IZO (predvolene zaškrtnuté) → zväčší aj koľajnicu Robust 2K', () => {
+			expect(pridavnaKolajnicaDefault('Štandard', '3K', IZO)).toBe(true);
+			const k = kody([sp('Štandard|3K IZO', true), sp('Robust|2K', true)]);
+			expect(k).toContain('ZASP00033');
+			expect(k).toContain('ZASP00016'); // Robust 3K namiesto 2K ZASP00014
+			expect(k).not.toContain('ZASP00014');
+		});
+
+		it('(b) prvé starý Štandard s obyčajným sklom (predvolene nie) → IZO zasklenie má základnú spodnú', () => {
+			expect(pridavnaKolajnicaDefault('Štandard', '3K', 'Float sklo 6 mm')).toBe(false);
+			const k = kody([sp('Štandard|3K', false), sp('Štandard|2K IZO', false)]);
+			expect(k).toContain('ZASP00104'); // 2K IZO bez prídavnej (pred úlohou 1459 ZASP00030)
+			expect(k).toContain('ZASP00030'); // 3K basic
+			expect(k).not.toContain('ZASP00033');
+		});
+
+		it('(c) prvé zasklenie bez voľby (Robust 4K) → starý Štandard IZO v ďalšom zasklení základná spodná', () => {
+			expect(plusRailEligible('Robust', '4K')).toBe(false); // checkbox sa neukáže
+			const k = kody([sp('Robust|4K', false), sp('Štandard|3K IZO', false)]);
+			expect(k).toContain('ZASP00030');
+			expect(k).not.toContain('ZASP00033');
+		});
+	});
+
 	it('sieťka na 2K IZO: starý Štandard sa správa ako Štandard + (3K sada už obsahuje prídavnú)', () => {
 		const kolajnice = (sysStyl: string, p: boolean) =>
 			computeFlat(cfg, sysStyl, 3000, 2400, false, 0, p, undefined, { uchyt: 'ziadny' })!

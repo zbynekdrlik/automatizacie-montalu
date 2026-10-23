@@ -148,6 +148,40 @@ describe('pridavnaKolajnicaZHistorie — čistá funkcia', () => {
 		});
 	});
 
+	it('sieťka na 2K IZO NEhlasuje — žiadny falošný konflikt s basic posuvom', () => {
+		const sietka = { uchyt: 'ziadny' };
+		// 3K basic potrebuje false; posuv so sieťkou flag nepotrebuje → false (nie uložená true)
+		expect(
+			pridavnaKolajnicaZHistorie(
+				{ posuvy: [posuv('Štandard', '2K IZO', sietka), posuv('Štandard', '3K')] },
+				true
+			)
+		).toEqual({ pridavna: false, presne: false });
+		// samotný 2K IZO so sieťkou → pôvodný význam true, aj keď bola uložená false
+		expect(
+			pridavnaKolajnicaZHistorie({ posuvy: [posuv('Štandard', '2K IZO', sietka)] }, false)
+		).toEqual({ pridavna: true, presne: false });
+	});
+
+	it('poškodený detail (nie text / nie objekt / chýbajúci štýl) → posuv sa ignoruje', () => {
+		expect(pridavnaKolajnicaZHistorie({ system: 123, styl: '3K IZO' }, false)).toEqual({
+			pridavna: false,
+			presne: true
+		});
+		expect(pridavnaKolajnicaZHistorie({ system: 'Štandard' }, true)).toEqual({
+			pridavna: true,
+			presne: true
+		});
+		expect(pridavnaKolajnicaZHistorie({ system: 'Štandard', styl: 7 }, false)).toEqual({
+			pridavna: false,
+			presne: true
+		});
+		// sieťka uložená ako text = bez sieťky → bežné pravidlo starého IZO
+		expect(
+			pridavnaKolajnicaZHistorie({ system: 'Štandard', styl: '2K IZO', sietka: 'zle' }, false)
+		).toEqual({ pridavna: true, presne: true });
+	});
+
 	it('štýl bez prídavnej koľajnice (Štandard + 6K) neovplyvní výsledok', () => {
 		expect(
 			pridavnaKolajnicaZHistorie(
@@ -400,6 +434,33 @@ describe('kiosk / backfill nárezákov — rekomputa starého odpisu dá tú ist
 		expect(res.status).toBe('lines');
 		if (res.status !== 'lines') return;
 		expect(spodne(res.material).sort()).toEqual(['ZASP00030', 'ZASP00033']);
+
+		// nová zimná záhrada (príznak): platí uložený flag z vstupRaw — zaškrtnutý aj odškrtnutý
+		const nova = (pridavnaKolajnica: boolean) =>
+			mapOdpisToLines(
+				row({
+					...PRIDAVNA_VOLBA_DETAIL,
+					multiZasklenie: true,
+					pridavnaKolajnica,
+					posuvy: [
+						{ system: 'Štandard', styl: '3K IZO' },
+						{ system: 'Štandard', styl: '2K IZO' }
+					],
+					vstupRaw: { ...multi, pridavnaKolajnica }
+				}),
+				[],
+				cfg
+			);
+		const zap = nova(true);
+		const vyp = nova(false);
+		expect(zap.status === 'lines' && spodne(zap.material).sort()).toEqual([
+			'ZASP00030',
+			'ZASP00033'
+		]);
+		expect(vyp.status === 'lines' && spodne(vyp.material).sort()).toEqual([
+			'ZASP00030',
+			'ZASP00104'
+		]);
 	});
 });
 
