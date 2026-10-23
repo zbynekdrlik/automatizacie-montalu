@@ -11,7 +11,9 @@
 //   výška prírezu = V − 33 ; dorazová lišta = V − d (d = 7/9/11)
 //   sklo basic/opona: G+14 × V−115 ; IZO: G−9 × V−135
 // IZO pridáva rozširujúci „U" profil ZASP202439 (šírka G−4, výška V−161) a posúva
-// SPODNÚ koľajnicu o veľkosť vyššie. Rozdiel oproti Štandard +: rám ZASP00018 a
+// SPODNÚ koľajnicu o veľkosť vyššie — od úlohy 1459 (#618) už nie natvrdo vo vzorci, ale
+// cez checkbox „Prídavná koľajnica" (pri IZO predvolene zaškrtnutý, ako pri Štandard +);
+// IZO vektory nižšie sú s ním → presne pôvodné čísla z nárezáka. Rozdiel oproti Štandard +: rám ZASP00018 a
 // dorazový ZASP00021 (namiesto ZASP20244 / ZASP202419) a bez +2 mm reznej rezervy.
 //
 // Kusy „šírka U spodok" (kalkulačkový kód 11016) a opona „stredová dorazová lišta"
@@ -22,8 +24,8 @@ import { buildCFG, computeFlat, type SysRow, type RezRow } from '../src/lib/serv
 import seed from '../src/lib/server/cfg_seed.json';
 
 const cfg = buildCFG(seed.sys as SysRow[], seed.rez as RezRow[]);
-const odpisByKod = (sysStyl: string, S: number, V: number) => {
-	const r = computeFlat(cfg, sysStyl, S, V, false)!;
+const odpisByKod = (sysStyl: string, S: number, V: number, pridavna = false) => {
+	const r = computeFlat(cfg, sysStyl, S, V, false, 0, pridavna)!;
 	const o: Record<string, number> = {};
 	r.odpis.forEach((x) => (o[x.kod] = x.metre));
 	return o;
@@ -176,8 +178,10 @@ const VEKTORY: [string, Record<string, number>][] = [
 ];
 
 describe('Štandard (bez +) — odpis 1:1 s nárezákom, všetkých 12 štýlov', () => {
+	// úloha 1459: IZO štýl = s prídavnou koľajnicou (predvolený stav formulára pri IZO skle),
+	// basic bez nej — vektory sú nezmenené pôvodné čísla z nárezáka
 	it.each(VEKTORY)('%s @ 3000×2400 dá presne očakávané metre', (sysStyl, ocakavane) => {
-		expect(odpisByKod(sysStyl, 3000, 2400)).toEqual(ocakavane);
+		expect(odpisByKod(sysStyl, 3000, 2400, sysStyl.endsWith(' IZO'))).toEqual(ocakavane);
 	});
 
 	it('iné rozmery: dlhší balkón zdvojnásobí kladkové tyče', () => {
@@ -223,20 +227,24 @@ describe('Štandard vs Štandard + — sú to naozaj RÔZNE systémy', () => {
 		expect(sklo('Štandard|2K', 3000, 2400).sirka).not.toBe(sklo('Štandard +|2K', 3000, 2400).sirka);
 	});
 
-	it('IZO posúva SPODNÚ koľajnicu o veľkosť vyššie, horná ostáva', () => {
+	it('IZO s prídavnou koľajnicou (predvolené) posúva SPODNÚ o veľkosť vyššie, horná ostáva; bez nej spodná = basic', () => {
 		for (const [n, horna, spodnaBasic, spodnaIzo] of [
 			['2K', 'ZASP00107', 'ZASP00104', 'ZASP00030'],
 			['3K', 'ZASP00027', 'ZASP00030', 'ZASP00033'],
 			['4K', 'ZASP00036', 'ZASP00033', 'ZASP202432']
 		] as const) {
 			const b = Object.keys(odpisByKod(`Štandard|${n}`, 3000, 2400));
-			const i = Object.keys(odpisByKod(`Štandard|${n} IZO`, 3000, 2400));
+			const i = Object.keys(odpisByKod(`Štandard|${n} IZO`, 3000, 2400, true));
+			const iBez = Object.keys(odpisByKod(`Štandard|${n} IZO`, 3000, 2400, false));
 			expect(b).toContain(horna);
 			expect(b).toContain(spodnaBasic);
 			expect(i).toContain(horna);
 			expect(i).toContain(spodnaIzo);
-			// basic spodná koľajnica sa v IZO variante už nevyskytuje (posunula sa vyššie)
+			// basic spodná koľajnica sa v IZO variante s prídavnou nevyskytuje (posunula sa vyššie)
 			expect(i as string[]).not.toContain(spodnaBasic as string);
+			// úloha 1459: odškrtnutá prídavná → spodná = horná veľkosť (basic kód)
+			expect(iBez).toContain(spodnaBasic);
+			expect(iBez as string[]).not.toContain(spodnaIzo as string);
 		}
 	});
 });

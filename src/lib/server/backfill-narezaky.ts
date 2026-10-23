@@ -43,6 +43,7 @@ import { normOp, normZak, type Polozka } from './money';
 import type { Vstup, MultiVstup } from './vstup';
 import { generateNarezakPdfBase64, narezakPdfFilename, type NarezakPdfHeader } from './narezak-pdf';
 import { buildCutPlan, pocetVynechanychBezKodu, type CutPlan } from './narezak-cut-plan';
+import { pridavnaKolajnicaZHistorie } from './pridavna-kolajnica-historia';
 
 /** Surový riadok `odpis_log` potrebný pre backfill (vlastný SELECT — `listOdpisy` nevracia
  *  `content_hash`; `detail` je surový JSON string, parsuje sa tu). */
@@ -233,7 +234,17 @@ export function mapOdpisToLines(
 					const vstup = detail.vstupRaw as MultiVstup | undefined;
 					if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
 					// #570: legacy názov skla zmazaný migráciou (v44) → Money-identická náhrada (len rekomputa)
-					const { r } = recomputeMultiVstup(multiVstupSAktualnymSklom(vstup), cfg);
+					// #618: starý odpis starého Štandardu IZO → prídavná koľajnica z histórie (ako do Money)
+					const { r } = recomputeMultiVstup(
+						{
+							...multiVstupSAktualnymSklom(vstup),
+							pridavnaKolajnica: pridavnaKolajnicaZHistorie(
+								detail,
+								vstup.pridavnaKolajnica === true
+							).pridavna
+						},
+						cfg
+					);
 					if (!r) return { status: 'skip', reason: 'recompute-failed' };
 					const drift = driftVsStored(
 						r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),
@@ -244,7 +255,14 @@ export function mapOdpisToLines(
 				// bežné jednoposuvové zasklenie — plný MaterialRow[] s tyčami/uhlami/kódmi priamo
 				const vstup = detail.vstupRaw as Vstup | undefined;
 				if (!vstup) return { status: 'skip', reason: 'unreconstructable' };
-				const { r } = recomputeVstup(vstupSAktualnymSklom(vstup), cfg);
+				const { r } = recomputeVstup(
+					{
+						...vstupSAktualnymSklom(vstup),
+						pridavnaKolajnica: pridavnaKolajnicaZHistorie(detail, vstup.pridavnaKolajnica === true)
+							.pridavna
+					},
+					cfg
+				);
 				if (!r) return { status: 'skip', reason: 'recompute-failed' };
 				const drift = driftVsStored(
 					r.odpis.map((o) => ({ kod: o.kod, qty: o.metre })),

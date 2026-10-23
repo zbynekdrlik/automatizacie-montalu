@@ -13,6 +13,7 @@ import {
 } from '$lib/server/compute';
 import { isB2B, type SessionUser } from '$lib/server/auth';
 import { znovaZOdpisu } from '$lib/server/znova';
+import { PRIDAVNA_VOLBA_DETAIL } from '$lib/server/pridavna-kolajnica-historia';
 import { checkB2BWidth, checkB2BHeight } from '$lib/server/b2b-limits';
 import { sysStylPre, odvodenyOdpisWarn } from '$lib/styl';
 import {
@@ -146,6 +147,9 @@ function jobFor(
 			// prídavná koľajnica — MENÍ odpis (spodná koľajnica o veľkosť vyššie);
 			// bez nej by „Použiť znova" prebralo zákazku s iným odpisom, než mala
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
+			// #618: príznak „flag platí aj pre starý Štandard" — odpis bez neho je starší a flag sa
+			// pri „Použiť znova" / rekompute odvodí (`pridavna-kolajnica-historia.ts`)
+			...PRIDAVNA_VOLBA_DETAIL,
 			// výška vŕtania zámku — display-only (Deluxe), ale patrí k zadaniu
 			vrtanieZamku: vstup.vrtanieZamku,
 			// #156 (krok 0 pre #155): celý naparsovaný vstup 1:1, VEDĽA polí vyššie —
@@ -278,6 +282,8 @@ function jobForMulti(
 			// RAL farba kovania — MENÍ Money kód kovania (#338); audit + „Použiť znova"
 			farbaKovania: vstup.farbaKovania,
 			pridavnaKolajnica: vstup.pridavnaKolajnica,
+			// #618: príznak nového pravidla prídavnej koľajnice (viď jobFor)
+			...PRIDAVNA_VOLBA_DETAIL,
 			poznamka: vstup.poznamka,
 			ral: vstup.ral,
 			posuvy: r.posuvy.map((p, i) => ({

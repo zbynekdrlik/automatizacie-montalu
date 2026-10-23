@@ -17,7 +17,12 @@ import { glassTypesForSystem, listSysStyly } from './db';
 import { skloPovolene } from '$lib/sklo-povolene';
 import { SKLO_INE, jeSkloTrieda } from '$lib/sklo';
 import { VRTANIE_ZAMKU_DEFAULT_MM } from '$lib/sklo-otvory';
+import { skloVyberaIzo, zakladnyStyl } from '$lib/styl';
 import { parseFarba } from './vstup';
+import {
+	pridavnaKolajnicaZHistorie,
+	POZOR_PRIDAVNA_Z_HISTORIE
+} from './pridavna-kolajnica-historia';
 import type { Vstup, MultiVstup, PosuvVstup } from './vstup';
 import type { Farba } from '$lib/komponenty';
 import type { Klin } from '$lib/klin';
@@ -76,9 +81,13 @@ function posuvZDetailu(
 	kde: string
 ): PosuvVstup {
 	const system = s(d.system);
-	const styl = s(d.styl);
-	if (system && styl && !styly.some((x) => x.system === system && x.styl === styl))
-		chybajuce.push(`${kde}: štýl ${system} ${styl} už v konfigurácii nie je`);
+	const ulozenyStyl = s(d.styl);
+	if (system && ulozenyStyl && !styly.some((x) => x.system === system && x.styl === ulozenyStyl))
+		chybajuce.push(`${kde}: štýl ${system} ${ulozenyStyl} už v konfigurácii nie je`);
+	// odpis ukladá VYPOČÍTANÝ štýl (`3K IZO`); formulár Štandardov ponúka len počet krídel a IZO
+	// nárezák vyberá sklo (`stylyDoPonuky`/`sysStylPre`) — bez prevodu by štýlový efekt formulára
+	// „3K IZO" nenašiel v ponuke a prepol ho na prvý štýl (iný nárezák, nález pri úlohe 1459)
+	const styl = skloVyberaIzo(system) ? zakladnyStyl(ulozenyStyl) : ulozenyStyl;
 	// v histórii je pod `sklo` uložené PRESNÉ zloženie, ak ho obsluha zadala;
 	// základné sklo (to, ktoré určuje vzorec) je `skloZaklad`
 	const zaklad = s(d.skloZaklad) || s(d.sklo);
@@ -140,6 +149,10 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 	const styly = listSysStyly();
 	const chybajuce: string[] = [];
 	const zdroj = { id: row.id, zak: row.zak, op: row.op, created_at: row.created_at };
+	// #618: starý odpis starého Štandardu IZO mal prídavnú spodnú natvrdo (flag false) — flag sa
+	// odvodí tak, aby sa zopakoval rovnaký odpis; keď to jedna voľba nevie, obsluha sa to dozvie
+	const pridavna = pridavnaKolajnicaZHistorie(d, b(d.pridavnaKolajnica));
+	if (!pridavna.presne) chybajuce.push(POZOR_PRIDAVNA_Z_HISTORIE);
 	// spoločné polia; ZAK/OP/zákazník sa zámerne NEpreberajú
 	const spolocne = {
 		zak: '',
@@ -148,7 +161,7 @@ export function znovaZOdpisu(id: number): ZnovaVysledok | null {
 		poznamka: s(d.poznamka),
 		ral: s(d.ral),
 		caka: row.caka === 1,
-		pridavnaKolajnica: b(d.pridavnaKolajnica),
+		pridavnaKolajnica: pridavna.pridavna,
 		jednostrannaFab: b(d.jednostrannaFab),
 		farbaKovania: farba(d.farbaKovania)
 	};
