@@ -193,7 +193,10 @@ export function missingHrubkaProfile(cfg: Cfg, sysStyl: string, skloHrubka: numb
 
 // „Prídavná koľajnica" (Dominik 2026-07-15, rozšírené #456 Patrik 2026-09-05):
 // checkbox → koľajnica o 1 veľkosť vyššia. Pôvodne LEN Štandard + (spodná), od #456
-// rozšírené na Deluxe (zdieľa spodné kódy), Slide a Robust (obvodová koľajnica).
+// rozšírené na Deluxe (zdieľa spodné kódy), Slide a Robust (obvodová koľajnica), od #618
+// (Odoo úloha 1459) aj starý Štandard (zdieľa spodné kódy so Štandard +; jeho IZO vzorce
+// majú od v60 základnú spodnú — zväčšenú dá až tento swap, pri zaškrtnutí bit-identicky
+// s doterajším natvrdo zväčšeným kódom aj názvom).
 // Dĺžka tyče je rovnaká (7500 mm) → metre v odpise ostávajú, mení sa len KÓD + názov.
 // NEZÁVISLÉ od typu skla (IZO aj obyčajné — Dominik: „to že je IZO nie je podmienka").
 export const RAIL_UPSIZE: Record<string, { kod: string; nazov: string }> = {
@@ -220,9 +223,9 @@ export function railUpsize(
 	kod: string,
 	nazov: string
 ): { kod: string; nazov: string } {
-	// Gate zjednotený s checkbox visibility (+page.svelte) cez `plusRailEligible`
-	// (#134 → #456: rozšírenie na Slide/Deluxe/Robust). `pridavnaKolajnicaDefault`
-	// (auto-default IZO) ostáva len pre Štandard + (`standardPlusRailEligible`).
+	// Gate zjednotený s checkbox visibility (ZasklieniaForm.svelte) cez `plusRailEligible`
+	// (#134 → #456: rozšírenie na Slide/Deluxe/Robust, #618 starý Štandard).
+	// `pridavnaKolajnicaDefault` (auto-default IZO) platí len pre rodinu Štandard.
 	if (pridavna && plusRailEligible(system, styl) && RAIL_UPSIZE[kod]) {
 		return RAIL_UPSIZE[kod];
 	}

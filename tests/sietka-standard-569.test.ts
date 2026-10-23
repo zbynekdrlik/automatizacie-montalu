@@ -188,6 +188,9 @@ describe('#569 — Money guard: odpis sa mení LEN pre kladkový v bunkách star
 		const [system, styl, rozmer, sieStr] = kluc.split('|') as [string, string, string, string];
 		const [S, V] = rozmer.split('x').map(Number) as [number, number];
 		const sie = sieStr.replace('sietka=', '');
+		// úloha 1459 (#618): starý Štandard IZO má prídavnú spodnú koľajnicu cez checkbox (pri IZO
+		// predvolene zaškrtnutý), nie natvrdo vo vzorci — fixtúra je spred zmeny, preto s ním
+		const staryIzo = system === 'Štandard' && styl.endsWith(' IZO');
 		const { r, err } = safeCompute(
 			cfg,
 			`${system}|${styl}`,
@@ -195,14 +198,30 @@ describe('#569 — Money guard: odpis sa mení LEN pre kladkový v bunkách star
 			V,
 			false,
 			0,
-			false,
+			staryIzo,
 			undefined,
 			sietka(system, sie)
 		);
 		expect(err).toBeNull();
 		const zmenaKladkoveho = system === 'Štandard' && sie === 'Štandard +';
+		// úloha 1459: na 2K IZO starého Štandardu určuje koľajnice sieťka (3K sada); jej spodná už nie
+		// je natvrdo zväčšená ZASP00033, ale ZASP00030 — rovnako ako Štandard + (3K sada sieťky už
+		// prídavnú obsahuje). Jediná zámerná zmena, ostatné riadky bit-identické.
+		const zmenaSpodnej = staryIzo && styl === '2K IZO';
 		const bezKladk = (o: OdpisRow[]) => o.filter((x) => x.kod !== 'ZASP202415');
-		if (zmenaKladkoveho) expect(bezKladk(r!.odpis)).toEqual(bezKladk(pred[kluc]!));
-		else expect(r!.odpis).toEqual(pred[kluc]);
+		const bezSpodnej = (o: OdpisRow[]) => o.filter((x) => !/^Koľajnica\s+spodná/.test(x.nazov));
+		const porovnaj = (o: OdpisRow[]) => {
+			const a = zmenaKladkoveho ? bezKladk(o) : o;
+			return zmenaSpodnej ? bezSpodnej(a) : a;
+		};
+		expect(porovnaj(r!.odpis)).toEqual(porovnaj(pred[kluc]!));
+		if (zmenaSpodnej) {
+			expect(pred[kluc]!.filter((x) => /^Koľajnica\s+spodná/.test(x.nazov))).toEqual([
+				{ kod: 'ZASP00033', nazov: 'Koľajnica spodná 4K Surový 7500 mm', metre: 7.5 }
+			]);
+			expect(r!.odpis.filter((x) => /^Koľajnica\s+spodná/.test(x.nazov))).toEqual([
+				{ kod: 'ZASP00030', nazov: 'Koľajnica spodná 3K Surový 7500 mm', metre: 7.5 }
+			]);
+		}
 	});
 });

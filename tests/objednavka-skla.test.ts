@@ -167,7 +167,7 @@ describe('objednavka-skla CRUD', () => {
 	});
 
 	it('objednavka_skla table exists after migration (file-size cap guard)', async () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(59);
+		expect(db.pragma('user_version', { simple: true })).toBe(60);
 		const tbl = db
 			.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='objednavka_skla'")
 			.get();

@@ -146,7 +146,7 @@ function zapisAkcie(d: Database.Database, action: string): boolean {
 
 describe('migration → v59 (#613 trvalý audit zmeny hesla — user_audit.action password_reset)', () => {
 	it('bumpne na v59', () => {
-		expect(db.pragma('user_version', { simple: true })).toBe(59);
+		expect(db.pragma('user_version', { simple: true })).toBe(60);
 	});
 
 	it('všetky pôvodné riadky user_audit zachované BIT-PRESNE (id, ts, actor, akcia, účet, detail)', () => {
@@ -337,7 +337,7 @@ describe('migration → v59 (#613 trvalý audit zmeny hesla — user_audit.actio
 		const fresh = new Database(':memory:');
 		fresh.pragma('foreign_keys = ON');
 		migrate(fresh, (p) => `x:${p}`);
-		expect(fresh.pragma('user_version', { simple: true })).toBe(59);
+		expect(fresh.pragma('user_version', { simple: true })).toBe(60);
 		expect(zapisAkcie(fresh, 'password_reset')).toBe(true);
 		expect(zapisAkcie(fresh, 'garbage')).toBe(false);
 		expect(fresh.pragma('foreign_keys', { simple: true })).toBe(1);
