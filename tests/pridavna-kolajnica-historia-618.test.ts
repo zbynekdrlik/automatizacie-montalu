@@ -219,6 +219,51 @@ describe('„Použiť znova" — starý odpis starého Štandardu IZO sa zopakuj
 		expect(z.chybajuce).toEqual([]);
 	});
 
+	// Odpis ukladá VYPOČÍTANÝ štýl (`3K IZO`), formulár Štandardov ponúka len počet krídel (IZO
+	// vyberá sklo) — bez prevodu formulár štýl „3K IZO" nenašiel v ponuke a prepol ho na prvý (2K),
+	// takže „Použiť znova" IZO odpisu ticho predvyplnilo INÝ nárezák (nález pri úlohe 1459).
+	it('IZO odpis Štandardu → štýl bez prípony IZO (formulár ponúka len počet krídel)', () => {
+		const z = znovaZOdpisu(vlozOdpis('ZAK-618-Z6', detailJeden('3K IZO', IZO)))!;
+		expect(z.vstup!.styl).toBe('3K');
+		expect(z.chybajuce).toEqual([]);
+		const plus = znovaZOdpisu(
+			vlozOdpis('ZAK-618-Z7', {
+				...detailJeden('2x3K IZO', IZO),
+				system: 'Štandard +',
+				...PRIDAVNA_VOLBA_DETAIL
+			})
+		)!;
+		expect(plus.vstup!.styl).toBe('2x3K');
+		// Robust/Slide/Deluxe majú štýl 1:1 — nemení sa
+		const robust = znovaZOdpisu(
+			vlozOdpis('ZAK-618-Z8', {
+				...detailJeden('3K', 'Izolačné sklo 4/16/4 číre'),
+				system: 'Robust'
+			})
+		)!;
+		expect(robust.vstup!.styl).toBe('3K');
+	});
+
+	it('stará zimná záhrada IZO → štýly posuvov bez prípony IZO', () => {
+		const p = (styl: string) => ({
+			system: 'Štandard',
+			styl,
+			s: 3000,
+			v: 2400,
+			sklo: IZO,
+			skloZaklad: IZO,
+			otvaranie: 'P - L'
+		});
+		const z = znovaZOdpisu(
+			vlozOdpis('ZAK-618-Z9', {
+				multiZasklenie: true,
+				pridavnaKolajnica: false,
+				posuvy: [p('3K IZO'), p('2K IZO')]
+			})
+		)!;
+		expect(z.multiVstup!.posuvy.map((x) => x.styl)).toEqual(['3K', '2K']);
+	});
+
 	it('upozornenie je text pre obsluhu bez interných odkazov', () => {
 		expect(POZOR_PRIDAVNA_Z_HISTORIE).toMatch(/Prídavná koľajnica/);
 		expect(POZOR_PRIDAVNA_Z_HISTORIE).not.toMatch(/#\d|úloha|Patrik|v60/);

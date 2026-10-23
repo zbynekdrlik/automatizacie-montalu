@@ -4,9 +4,19 @@
 // zaškrtnutý (odpis ako doteraz — spodná o veľkosť väčšia), odškrtnutím spodná = horná.
 //
 // READ-ONLY: len „Spočítať nárezový plán" (náhľad) a „Späť a upraviť" — nič sa neodosiela do
-// Money, preto beží aj proti PROD. Overujú sa Money KÓDY koľajníc (nie mm z výpočtu).
+// Money, preto beží aj proti PROD. Overujú sa Money KÓDY koľajníc (nie mm z výpočtu). Výnimka:
+// „Použiť znova" STARÉHO odpisu sa seeduje priamo do lokálneho e2e.db (za `skipAkLive`).
 import { test, expect, type Page } from '@playwright/test';
-import { collectConsole, loginAs, waitHydrated, vyberFarbuKovania, vyberSklo } from './helpers';
+import Database from 'better-sqlite3';
+import {
+	collectConsole,
+	goto,
+	loginAs,
+	skipAkLive,
+	waitHydrated,
+	vyberFarbuKovania,
+	vyberSklo
+} from './helpers';
 
 const IZO = 'Izolačné sklo 4/8/4 číre';
 const FLOAT = 'Float sklo 6 mm';
@@ -123,6 +133,79 @@ test('zimná záhrada starý Štandard 3K IZO + 2K IZO: zaškrtnuté → 4K + 3K
 	await expect(riadok(page, 'ZASP00030')).toBeVisible(); // spodná 3K pri 3K IZO
 	await expect(riadok(page, 'ZASP00104')).toBeVisible(); // spodná 2K pri 2K IZO
 	await expect(riadok(page, 'ZASP00033')).toHaveCount(0); // 4K nikde
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+/** Starý odpis (spred úlohy 1459: bez príznaku `pridavnaVolbaStandard`, flag false) do e2e.db. */
+function seedStaryOdpis(zak: string, detail: Record<string, unknown>): number {
+	const db = new Database('./data/e2e.db');
+	try {
+		return Number(
+			db
+				.prepare(
+					`INSERT INTO odpis_log (modul, zak, op, zakaznik, caka, live, target, filename, content_hash, detail, created_by)
+					 VALUES ('zasklenia', ?, '01', 'Starý zákazník', 0, 0, '/tmp', 'x.xlsx', 'e2e-618', ?, 'e2e')`
+				)
+				.run(
+					zak,
+					JSON.stringify({
+						system: 'Štandard',
+						s: 3000,
+						v: 2400,
+						sklo: IZO,
+						skloZaklad: IZO,
+						otvaranie: 'P - L',
+						pridavnaKolajnica: false,
+						...detail
+					})
+				).lastInsertRowid
+		);
+	} finally {
+		db.close();
+	}
+}
+
+test('„Použiť znova" STARÉHO odpisu starého Štandardu 3K IZO zopakuje zväčšenú spodnú (4K)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	// seed ide do lokálneho e2e.db — PROD (live) preskočí helper
+	await skipAkLive(page);
+	const zak = `${RUN}-ZNOVA`;
+	const id = seedStaryOdpis(zak, { styl: '3K IZO' });
+
+	await loginAs(page);
+	await goto(page, `/zasklenia?znova=${id}`);
+	const info = page.getByTestId('znova-info');
+	await expect(info).toContainText(zak);
+	await expect(info).not.toContainText('Prídavná koľajnica');
+	await expect(page.getByLabel('Systém')).toHaveValue('Štandard');
+	// odpis sa vtedy počítal so zväčšenou spodnou → voľba sa predvyplní zaškrtnutá
+	await expect(page.getByLabel(/Prídavná koľajnica/)).toBeChecked();
+
+	await hlavicka(page, '04');
+	await spocitat(page);
+	await expect(riadok(page, 'ZASP00033')).toBeVisible(); // spodná 4K ako v pôvodnom odpise
+	await expect(riadok(page, 'ZASP00030')).toHaveCount(0);
+
+	expect(consoleMsgs).toEqual([]);
+});
+
+test('„Použiť znova" starého 2K IZO so sieťkou ukáže upozornenie (presne sa nezopakuje)', async ({
+	page
+}) => {
+	const consoleMsgs = collectConsole(page);
+	await skipAkLive(page);
+	const zak = `${RUN}-ZNOVA-SIET`;
+	const id = seedStaryOdpis(zak, { styl: '2K IZO', sietka: { uchyt: 'ziadny' } });
+
+	await loginAs(page);
+	await goto(page, `/zasklenia?znova=${id}`);
+	const info = page.getByTestId('znova-info');
+	await expect(info).toContainText(zak);
+	await expect(info).toContainText('Prídavná koľajnica: pôvodný odpis sa počítal podľa staršieho');
+	await expect(page.getByLabel(/Prídavná koľajnica/)).toBeChecked();
 
 	expect(consoleMsgs).toEqual([]);
 });
