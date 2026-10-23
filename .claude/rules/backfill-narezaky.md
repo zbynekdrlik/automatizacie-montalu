@@ -55,7 +55,8 @@ zväčšenú pridá len flag), rekomputa starého odpisu by dala INÝ výsledok 
 - **Odvodenie z histórie** `pridavnaKolajnicaZHistorie(detail, ulozena)`
   (`pridavna-kolajnica-historia.ts`) číta VYPOČÍTANÉ štýly (`detail.styl` / `detail.posuvy[i].styl` s
   príponou „ IZO", NIE `vstupRaw.styl`): starý Štandard IZO → true, basic → false, iný systém →
-  uložená; sieťka na 2K flag nepotrebuje (koľajnice určí sieťka); rôzne potreby v jednej zákazke →
+  uložená; sieťka na 2K flag nepotrebuje (koľajnice určí sieťka) a NEHLASUJE — inak falošný konflikt
+  s ostatnými posuvmi (review #618; samotná dá `true` + `presne: false`); rôzne potreby v jednej zákazke →
   uložená + `presne: false` (`znova.ts` pridá `POZOR_PRIDAVNA_Z_HISTORIE` do `chybajuce`).
 - **Volajú ho OBA rekomputačné vstupy:** `mapOdpisToLines` (single aj multi, KÓPIA vstupu
   `{ ...vstupSAktualnymSklom(v), pridavnaKolajnica }`) a `znova.ts`. Ďalšia zmena významu iného flagu

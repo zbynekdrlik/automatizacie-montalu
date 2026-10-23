@@ -55,10 +55,15 @@ bit-presne vrátane FFD a rozmerov skla), až potom mu dôveruj pri nových riad
   ju nevedela vypnúť. Teraz: `RAIL_MAX_K.Štandard = '6K'`, spodná IZO štýlu = PRESNE riadok basic
   štýlu (kód + názov, parita `tests/standard-stary-pridavna-618.test.ts`), migrácia v60
   (`migracie-standard-izo-kolajnica.ts`). Pri zaškrtnutí je odpis bit-identický s doterajším
-  (`RAIL_UPSIZE` dá aj ten istý názov). Jediná zámerná Money zmena: sieťka na 2K IZO starého
-  Štandardu berie koľajnice z `3K IZO` → spodná ZASP00030 (bola natvrdo ZASP00033) = rovnako
-  ako Štandard + (3K sada sieťky už obsahuje prídavnú, #123). Staré odpisy (flag false) pri
-  „Použiť znova" / rekompute → `backfill-narezaky.md` „Zmena pravidla flagu".
+  (`RAIL_UPSIZE` dá aj ten istý názov). Zámerné Money zmeny oproti stavu pred #618: (1) sieťka na
+  2K IZO starého Štandardu berie koľajnice z `3K IZO` → spodná ZASP00030 (bola natvrdo ZASP00033)
+  = rovnako ako Štandard + (3K sada sieťky už obsahuje prídavnú, #123); (2) ZMIEŠANÁ zimná záhrada:
+  voľba je jedna na objednávku, predvolená z PRVÉHO zasklenia (#132) — starý Štandard IZO sa teraz
+  riadi ňou (prvé IZO zaškrtne aj Robust 2K → ZASP00016; prvé obyčajné sklo nechá IZO zasklenie
+  základné; prvé bez voľby, napr. Robust 4K, zväčšenú IZO spodnú nedovolí). Pripnuté v
+  `tests/standard-stary-pridavna-618.test.ts` „zmiešaná zimná záhrada"; voľba PER zasklenie by
+  bola nové rozhodnutie. Staré odpisy (flag false) pri „Použiť znova" / rekompute →
+  `backfill-narezaky.md` „Zmena pravidla flagu".
 - **Šírka skla Štandard + opona IZO = kladkový − 10 mm (#610, Odoo úloha 1416, Patrik 17.10.)**
   — NAHRÁDZA pôvodné odvodenie `prírez_off − 9N` vyššie (sklo vychádzalo o 7–10 mm širšie).
   Pravidlo výroby: kladkový = sklo + 10, rozširujúci = sklo + 6 (na krídlo); „meniť šírku skla,

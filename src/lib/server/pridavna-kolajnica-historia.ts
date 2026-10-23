@@ -23,7 +23,8 @@ export const PRIDAVNA_VOLBA_DETAIL = { pridavnaVolbaStandard: true } as const;
 export const POZOR_PRIDAVNA_Z_HISTORIE =
 	'Prídavná koľajnica: pôvodný odpis sa počítal podľa staršieho pravidla (pri izolačnom skle ' +
 	'starého Štandardu bola spodná koľajnica zväčšená vždy) a teraz sa nedá zopakovať presne — ' +
-	'pred odoslaním skontroluj voľbu „Prídavná koľajnica" a spodnú koľajnicu v náhľade.';
+	'pred odoslaním skontroluj spodné koľajnice v náhľade (voľba „Prídavná koľajnica" platí pre ' +
+	'celú objednávku, pri sieťke na 2K určuje koľajnice sieťka).';
 
 interface PosuvHistorie {
 	system: string;
@@ -51,8 +52,10 @@ function posuvyZDetailu(detail: Record<string, unknown>): PosuvHistorie[] {
  * - nový odpis (príznak) → `ulozena` bez zmeny;
  * - starý odpis: posuv starého Štandardu IZO potrebuje `true` (spodná bola natvrdo zväčšená),
  *   basic `false` (prídavná tam nikdy nebola), iný systém `ulozena` (pravidlo sa preň nezmenilo);
- *   posuv, kde koľajnicu určuje sieťka na 2K, flag nepotrebuje — starý Štandard IZO tam ale
- *   dostal 4K spodnú, dnes (rovnako ako Štandard +) 3K → `presne: false`;
+ *   posuv, kde koľajnicu určuje sieťka na 2K, flag NEPOTREBUJE (nehlasuje — inak by vyrobil
+ *   falošný konflikt s ostatnými posuvmi); starý Štandard IZO tam ale dostal 4K spodnú, dnes
+ *   (rovnako ako Štandard +) 3K → `presne: false`, a keď nič iné flag neurčí, predvyplní sa
+ *   `true` (pôvodný význam — platí, keď obsluha sieťku vypne);
  * - posuvy potrebujú rôzne hodnoty (checkbox je jeden na objednávku) → `ulozena`, `presne: false`.
  */
 export function pridavnaKolajnicaZHistorie(
@@ -62,12 +65,13 @@ export function pridavnaKolajnicaZHistorie(
 	if (detail.pridavnaVolbaStandard === true) return { pridavna: ulozena, presne: true };
 	const potrebne = new Set<boolean>();
 	let presne = true;
+	let sietkaStaryIzo = false;
 	for (const p of posuvyZDetailu(detail)) {
 		if (!plusRailEligible(p.system, p.styl)) continue;
 		const staryIzo = p.system === STANDARD && zakladnyStyl(p.styl) !== p.styl;
 		if (jeSietkaMoneyRelevant(p.system, p.styl, p.sietka) && potrebuje3KKolajnicu(p.styl)) {
 			if (staryIzo) {
-				potrebne.add(true);
+				sietkaStaryIzo = true;
 				presne = false;
 			}
 			continue;
@@ -76,5 +80,5 @@ export function pridavnaKolajnicaZHistorie(
 	}
 	if (potrebne.size > 1) return { pridavna: ulozena, presne: false };
 	const [jedina] = potrebne;
-	return { pridavna: jedina ?? ulozena, presne };
+	return { pridavna: jedina ?? (sietkaStaryIzo || ulozena), presne };
 }
