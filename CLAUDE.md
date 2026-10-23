@@ -100,7 +100,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - kovanie do odpisu: rodina systému (`RODINA_KOVANIA`), výslovné bez-kovania, zapnutie pre ďalší systém (#604) → `.claude/rules/kovanie.md`
 - sieťka (moskytiéra) Štandard geometrický model K/R/H (#569, nie zo skla) / jokle Robust / kovanie pri sieťke obe strany na výber (#583) / honest-null kód-null / rozmerJokle zo sieťoviny / samostatná /sietka + zasklenie karty → `.claude/rules/sietka.md`
 - pridanie NOVÉHO systému (periférny checklist — glass alias drift, cut.ts, b2b-limits, profil-obrazky) → `.claude/rules/novy-system.md`
-- odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize, `SYSSTYL_ODVODENE` banner, sklo = kladkový − 10 mm #610) → `.claude/rules/opona-izo-narezak.md`
+- odvodenie nárezáku z Excelu (rezy/počty 1:1 vs FFD tyče) + opona IZO (W=S/2, redukovaný X, spodná koľajnica cez railUpsize — aj starý Štandard IZO #618 v60, `SYSSTYL_ODVODENE` banner, sklo = kladkový − 10 mm #610) → `.claude/rules/opona-izo-narezak.md`
 - NOVÁ stránka/route (exporty, b2b denylist, nav, `$effect` slučka) → skill `.claude/skills/nova-stranka`
 - roly / b2b / route gating / Money-write boundary / auth migrácia / nové heslo účtu (#613 `setPassword`) / história účtov (`user_audit`, filter na účet) → `.claude/rules/access-control.md`
 - VEREJNÁ route `/konfigurator` (bez auth) + zákaznícka vrstva bez cien, únik/Money guard → `.claude/rules/konfigurator.md`
@@ -128,7 +128,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - `.github/workflows/*.yml` CI/deploy pipeline → `.claude/rules/ci.md`
 - štruktúrovaný logger (`log.ts`) / handleError / chybová stránka / testovanie logov → `.claude/rules/logging.md`
 - three.js 3D náhľad (vizual) → `.claude/rules/vizual3d.md`
-- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt / config-derivované form gaty (maFab/maFarbu) / system-aware `defaultSklo` → `.claude/rules/zasklenia-form-reactivity.md`
+- `zasklenia/+page.svelte` smart-default checkbox / reštart-efekt / config-derivované form gaty (maFab/maFarbu) / system-aware `defaultSklo` / gate prídavnej koľajnice `plusRailEligible` / „Použiť znova" štýl bez „ IZO" (#618) → `.claude/rules/zasklenia-form-reactivity.md`
 - kóta helper / výkresový hárok (vykres) → `.claude/rules/vykres.md`
 - pergola nárez/výkres z rozmerov → `.claude/rules/pergola-narez.md`
 - pergola/zasklenia/bazén `odoslat` akcie, `vstup.ts` → `.claude/rules/odpis-detail.md`
@@ -140,7 +140,7 @@ skills load only on an explicit `Skill` call by name) — one line per area:
 - Odoo CRM lead z dopytu (XML-RPC, dvojité escapovanie, súbeh/retry, štartový sweep) → `.claude/rules/odoo-lead.md`
 - interný zoznam materiálu zákazky → Odoo sale.order log-note (odoo-rpc, mt_note, observer hook, ZAK/OP match) → `.claude/rules/odoo-zakazka.md`
 - plán rezov → Odoo kiosk „Rezanie" PDF bez cien (montalu_narezak_upload, OP z odpisu, doc_id plan-rezov-<zak>-<op>, setImmediate defer, PDF metadáta test kanál, source-guard vs próza pasca) → `.claude/rules/plan-rezov-kiosk.md`
-- backfill nárezákov (ostrých odpisov) → Odoo lines za posledný mesiac (recompute z detail per modul, per-OP kombinovaný upload, additive skip-has-lines, drift „spätne dopočítané", admin endpoint + `npm run backfill:narezaky` CLI wrapper, BACKFILL_TOKEN, VPS dry-run→live runbook) → `.claude/rules/backfill-narezaky.md`
+- backfill nárezákov (ostrých odpisov) → Odoo lines za posledný mesiac (recompute z detail per modul, per-OP kombinovaný upload, additive skip-has-lines, drift „spätne dopočítané", zmena významu flagu v detail → príznak + odvodenie z histórie #618, admin endpoint + `npm run backfill:narezaky` CLI wrapper, BACKFILL_TOKEN, VPS dry-run→live runbook) → `.claude/rules/backfill-narezaky.md`
 - 1000-r. strop pre celé `src/**` (split vzory) → `.claude/rules/large-file-split.md`
 - SkladVarovania cross-module wiring (bindable prop, vylucene_kody, dva mechanizmy odobratia) → `.claude/rules/sklad-varovania.md`
 - e2e zero-console assert + guard (`e2e/**`, `tests/e2e-console-guard.test.ts`) → `.claude/rules/e2e-console.md`

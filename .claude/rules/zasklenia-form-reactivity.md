@@ -3,6 +3,8 @@ paths:
   - "src/routes/zasklenia/+page.svelte"
   - "src/routes/zasklenia/+page.server.ts"
   - "src/lib/sklo.ts"
+  - "src/lib/styl.ts"
+  - "src/lib/server/znova.ts"
 ---
 
 # `+page.svelte` (zasklenia) — reaktívne gotchas nad rámec `nova-stranka` §3
@@ -51,13 +53,23 @@ efekty → hranový efekt) sa overuje výhradne Playwrightom — pozri
 odškrtnutie prežije nesúvisiacu zmenu poľa, prepnutie preč z podmienky a späť,
 zmiešaný multi-posuv, „Použiť znova").
 
-## Gate podmienky duplikuj vedome, nie mlčky
+## Gate prídavnej koľajnice = JEDEN predikát `plusRailEligible` (#134 → #456 → #618)
 
-`system === 'Štandard +' && !styl.startsWith('6K')` dnes žije na TROCH miestach
-(`railUpsize` v `compute.ts`, viditeľnosť checkboxu tu, `pridavnaKolajnicaDefault`
-v `styl.ts`) — #134 čaká na zjednotenie do jedného zdieľaného predikátu. Kým to
-niekto neurobí, KAŽDÁ zmena veľkosti/rozsahu koľajnice musí prejsť VŠETKY tri
-miesta, nie len to, ktoré práve upravuješ.
+Viditeľnosť checkboxu (`ZasklieniaForm.svelte`), `railUpsize` (`compute-profily.ts`) aj
+auto-default (`pridavnaKolajnicaDefault` = `skloVyberaIzo(system) && plusRailEligible(...) &&
+jeIzoTrieda(...)`, `styl.ts`) idú cez `plusRailEligible` / `RAIL_MAX_K`. Nový systém alebo nová
+max-K koľajnica = JEDEN riadok v `RAIL_MAX_K` (+ kódy v `RAIL_UPSIZE`); auto-default pri IZO
+majú LEN systémy, kde basic/IZO nárezák vyberá sklo (Štandard +, starý Štandard od #618).
+`standardPlusRailEligible` (gate len pre Štandard +) zanikol v #618 — nevracaj ho.
+
+## „Použiť znova": uložený štýl Štandardov nesie príponu „ IZO" — formulár ponúka len počet krídel
+
+`odpis_log.detail.styl` (aj `posuvy[i].styl`) je VYPOČÍTANÝ štýl (`ComputeResult.styl` = „3K IZO"),
+ale formulár Štandardov ponúka len `stylyDoPonuky` (2K/3K/…, IZO vyberá sklo). Štýlový `$effect`
+(`if (!stylyPre.includes(styl)) styl = stylyPre[0]`) by obnovený „3K IZO" ticho prepol na PRVÝ
+štýl (2K) — iný nárezák. `znova.ts` preto pre `skloVyberaIzo(system)` predvypĺňa
+`zakladnyStyl(styl)` (existenciu štýlu kontroluje nad uloženým). Existujúce E2E to roky nevideli,
+lebo „Použiť znova" testovali len na 2K (= prvý štýl) — nový reuse E2E rob na INOM než prvom štýle.
 
 ## Krokové subkomponenty (#250) — kde žije stav, kam pridať nový vstup
 

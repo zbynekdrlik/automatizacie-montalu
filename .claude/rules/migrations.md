@@ -236,3 +236,23 @@ chronologická podľa id), indexy + triggery zo `sqlite_master` späť, počet r
   tvrdí, že verzia OSTALA 58) → vráť aj ten. Po recepte `git diff` nového testu = prázdny.
 - Hook `block-sensitive-staging.sh` odmietne commit fixtúry s `{ token: '…' }` (literál vyzerá ako
   tajomstvo) — v teste relácií tvrď `user_id`/`expires_at`, nie stĺpec `token`.
+
+## v60 (#618, Odoo úloha 1459) — OPRAVA KÓDU + NÁZVU profilu v `cfg_rez` podľa ROLY (vlastný súbor)
+
+`migracie-standard-izo-kolajnica.ts` (`migrateStandardIzoSpodnaKolajnica`, guard `>= 60`) — vzor v58
+pre kód profilu: starý Štandard IZO spodná koľajnica natvrdo zväčšená → základná (= riadok basic
+štýlu). Rozdiely oproti v58:
+- **Riadok sa hľadá podľa ROLY, nie `poradie`:** všetky profily `sys_styl` → filter
+  `rolaKolajnice(nazov) === 'spodna'` (`$lib/kolajnica`, ten istý zdroj ako ručná koľajnica).
+  `poradie` editor/staršie migrácie meniť môžu, rola z názvu je stabilná. 0 alebo > 1 → warn, nič.
+- **Podmienka na KÓD, zápis kód + názov** (`stary` kód = očakávaný; nový kód = info „bez zmeny";
+  iný = warn `aktualny/ocakavany/novy`, NEPREPÍSAŤ). Audit `zmeny` = DVE položky (kód, názov) so
+  SKUTOČNÝM starým názvom z DB; `pole` text je pre obsluhu (história editora) → bez mien a `#N`
+  (`ui-texty.md` stráž skenuje aj `migracie-*.ts` literály).
+- Fixtúra `migration-v60.test.ts` = v59 PROD-tvar (`user_audit` CHECK už s `password_reset`, inak by
+  sa nič neprestavovalo, ale guard v59 je preskočený — fixtúra musí byť konzistentná s v59).
+- `migracie.ts` 988 r. Head-bump: recept chytí **63 riadkov / 51 súborov** `user_version … toBe(59)`;
+  v `migration-v59.test.ts` vráť **4 riadky** priamych volaní `migrateUserAuditHeslo` (tvrdia JEHO
+  bump 59 — po riadku `migrateUserAuditHeslo(d, …)` a guard „nemal bumpnúť"); full-migrate „bumpne"
+  a „čerstvá DB" idú na 60. Kontrola: `git diff -U2 tests/ | grep -B3 "^+.*toBe(60)" | grep migrate[A-Z]`
+  = prázdne.

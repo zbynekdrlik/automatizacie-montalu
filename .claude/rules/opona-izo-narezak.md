@@ -9,6 +9,8 @@ paths:
   - 'tests/opona-izo-sklo-610.test.ts'
   - 'src/lib/server/sklo-sleduje-profil.ts'
   - 'e2e/opona-izo.spec.ts'
+  - 'src/lib/server/migracie-standard-izo-kolajnica.ts'
+  - 'tests/standard-stary*.test.ts'
 ---
 
 # Odvodenie nárezáku z Excelu + opona IZO (#504)
@@ -46,8 +48,17 @@ bit-presne vrátane FFD a rozmerov skla), až potom mu dôveruj pri nových riad
 - **Spodná koľajnica: v seede ulož BASIC** (2×2K ZASP00104 / 2×3K ZASP00030 / 2×4K
   ZASP00033), rovnako ako ne-opona IZO. Excel-ov upsized 5K rail (ZASP202432) vyrobí za behu
   existujúci `railUpsize` (`compute-profily.ts` `RAIL_UPSIZE`) + checkbox „prídavná
-  koľajnica" (default zap. pri Štandard+ IZO cez `pridavnaKolajnicaDefault`, `styl.ts`).
-  NEUKLADAJ upsized kód do seedu.
+  koľajnica" (default zap. pri IZO skle celej rodiny Štandard cez `pridavnaKolajnicaDefault`,
+  `styl.ts`). NEUKLADAJ upsized kód do seedu.
+- **Starý „Štandard" IZO = to isté pravidlo od #618 (Odoo úloha 1459, v60).** Mal zväčšenú
+  spodnú natvrdo vo vzorci (checkbox sa neukázal — `RAIL_MAX_K` nepoznal `Štandard`) a obsluha
+  ju nevedela vypnúť. Teraz: `RAIL_MAX_K.Štandard = '6K'`, spodná IZO štýlu = PRESNE riadok basic
+  štýlu (kód + názov, parita `tests/standard-stary-pridavna-618.test.ts`), migrácia v60
+  (`migracie-standard-izo-kolajnica.ts`). Pri zaškrtnutí je odpis bit-identický s doterajším
+  (`RAIL_UPSIZE` dá aj ten istý názov). Jediná zámerná Money zmena: sieťka na 2K IZO starého
+  Štandardu berie koľajnice z `3K IZO` → spodná ZASP00030 (bola natvrdo ZASP00033) = rovnako
+  ako Štandard + (3K sada sieťky už obsahuje prídavnú, #123). Staré odpisy (flag false) pri
+  „Použiť znova" / rekompute → `backfill-narezaky.md` „Zmena pravidla flagu".
 - **Šírka skla Štandard + opona IZO = kladkový − 10 mm (#610, Odoo úloha 1416, Patrik 17.10.)**
   — NAHRÁDZA pôvodné odvodenie `prírez_off − 9N` vyššie (sklo vychádzalo o 7–10 mm širšie).
   Pravidlo výroby: kladkový = sklo + 10, rozširujúci = sklo + 6 (na krídlo); „meniť šírku skla,

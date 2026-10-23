@@ -9,6 +9,8 @@ paths:
   - 'tests/backfill-narezaky-money-safety.test.ts'
   - 'tests/sklo-legacy-alias.test.ts'
   - 'src/lib/server/odoo-narezak-odpis.ts'
+  - 'src/lib/server/pridavna-kolajnica-historia.ts'
+  - 'src/lib/server/znova.ts'
 ---
 
 # Backfill nárezákov (ostrých odpisov) → Odoo `lines` (#524)
@@ -39,6 +41,25 @@ vstupu cez `vstupSAktualnymSklom` / `multiVstupSAktualnymSklom` (`zasklenia-sklo
 `LEGACY_SKLO` kľúčovaná `resolveGlassSystem`). **Nová migrácia, ktorá zmaže/premenuje sklo s
 Money-identickou náhradou → pridaj riadok do `LEGACY_SKLO`**, inak staré odpisy prestanú ísť na
 kiosk. Sklo zmazané BEZ náhrady (v19 Kalené 8/10 mm) tam NEPATRÍ — honest-fail ostáva.
+
+## Zmena pravidla flagu → starý odpis rekomputuj s PÔVODNÝM významom (#618, úloha 1459)
+
+Keď ticket zmení, čo uložený flag v `detail` ZNAMENÁ (#618: starý Štandard IZO mal prídavnú spodnú
+koľajnicu natvrdo, checkbox neexistoval → `pridavnaKolajnica: false`; od v60 je vo vzorci základná a
+zväčšenú pridá len flag), rekomputa starého odpisu by dala INÝ výsledok než išiel do Money — kiosk
+„Čo rezať" (živý upload pri odpise rekomputuje AJ staršie odpisy tej istej OP) aj „Použiť znova".
+
+- **Hranica = príznak v `detail` nových odpisov** (`PRIDAVNA_VOLBA_DETAIL` = `pridavnaVolbaStandard:
+  true`, spread v `jobFor`/`jobForMulti`). Dátum ani verzia v `detail` nie sú a samotný flag hranicu
+  neurčí (bol vždy false) → bez príznaku = starý odpis.
+- **Odvodenie z histórie** `pridavnaKolajnicaZHistorie(detail, ulozena)`
+  (`pridavna-kolajnica-historia.ts`) číta VYPOČÍTANÉ štýly (`detail.styl` / `detail.posuvy[i].styl` s
+  príponou „ IZO", NIE `vstupRaw.styl`): starý Štandard IZO → true, basic → false, iný systém →
+  uložená; sieťka na 2K flag nepotrebuje (koľajnice určí sieťka); rôzne potreby v jednej zákazke →
+  uložená + `presne: false` (`znova.ts` pridá `POZOR_PRIDAVNA_Z_HISTORIE` do `chybajuce`).
+- **Volajú ho OBA rekomputačné vstupy:** `mapOdpisToLines` (single aj multi, KÓPIA vstupu
+  `{ ...vstupSAktualnymSklom(v), pridavnaKolajnica }`) a `znova.ts`. Ďalšia zmena významu iného flagu
+  = rovnaký vzor (príznak + odvodenie + oba vstupy), nie oprava len jedného z nich.
 
 ## cut_plan 422 fallback + kill switch (R2 hotfix #532)
 
