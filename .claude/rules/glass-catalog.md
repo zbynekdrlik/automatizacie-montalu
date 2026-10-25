@@ -267,7 +267,7 @@ Tesnenie: `klasifikujSkloPreTesnenie(nazov, skloTrieda?)` — vlastné sklo klas
 
 ## Zmena PONUKY skiel = oprav asserty ponuky v TEJ ISTEJ lane (#504×#235, 11.9.2026)
 
-Lane nevie Playwright (Tier 0) → zastarané asserty ponuky vybuchnú až v dev CI (11.9. 3×:
+Zastarané asserty ponuky vybuchnú až v dev CI (11.9. 3×:
 `standard-stary`, `standard-narezak`, unit IZO-gate). Pri zmene toho, čo `sklaDoPonuky`/
 `sklaForSystem`/`triedyPre` ponúkajú (nový `… IZO` sysStyl, nové sklo, sentinel):
 `grep -rn "Izola\|toEqual(\[\|skla.filter\|SKLO_INE" e2e/*.spec.ts tests/zasklenia-*.test.ts`

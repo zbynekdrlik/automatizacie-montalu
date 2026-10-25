@@ -301,8 +301,7 @@ farieb (predajný konfigurátor). Khronos PBR Neutral necháva base farbu nejaso
 plôch nezmenenú; AgX desaturuje celý rozsah. Jednoriadková zmena, keby review po
 živom renderi preferoval AgX.
 
-**Vizuálna verifikácia v build-only lane:** `vite dev` (dev server, NIE zakázaný
-`vite build`/preview-build) + Playwright MCP → login (native-setter driven form,
+**Vizuálna verifikácia:** `vite dev` + Playwright MCP → login (native-setter driven form,
 viď `testing.md`) → `/zasklenia/navrh?viz=high|mid|low` (vynúti tier) → over
 `data-viz-ready=true`, `__VIZ_CONTEXTS===1`, screenshot, console warnings. Toto
 chytilo obidva deprecation warningy PRED CI. `?viz=` vynúti tier bez ohľadu na HW.

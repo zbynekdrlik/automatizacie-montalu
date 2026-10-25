@@ -108,7 +108,7 @@ page-scoped CSS na presun ANI `.sec .badge` pasce (žiadny `.sec`-hlavičkový o
 strome nerenderuje; `.badge` je len v `<p class="sub">` nahlad/hotovo hlavičiek). Deti nemajú
 `<style>` blok.
 
-**Lokálna sieť pred CI (Tier-0 E2E lokálne nebeží):** pri každej zmene tohto splitu over
+**Lokálna sieť pred CI:** pri každej zmene tohto splitu over
 `check` + `lint` + unit, a pri pochybnosti o 1:1 fidelite porovnaj množiny — 58 `data-testid`
 hodnôt, všetky `name=` atribúty formulára, `action=`/`formaction=` a `KlinPolia`/`SietkaPolia`/
 `Nahlad2D` bindingy MUSIA ostať identické (`diff` origin vs nový); E2E `zasklenia*.spec.ts` +

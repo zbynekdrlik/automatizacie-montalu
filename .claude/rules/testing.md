@@ -118,7 +118,7 @@ výstupu PRED opravou (napr. `kovanieDoOdpisu` ostatných systémov) do `toEqual
 ## Running the full gate locally
 
 ```bash
-npm run check          # svelte-check (tsc) — cheap, always fine locally
+npm run check          # svelte-check (tsc)
 npx vitest run          # unit tests (or npm test for coverage)
 npx playwright test     # E2E — see the build gotcha below
 ```
@@ -162,9 +162,6 @@ out on `selectOption`/`getByLabel` waits that made no sense given the source).
   double build, CI is not slowed).
 - **A build failure fails LOUDLY** — the `&&` chain stops, the preview never starts, the
   webServer errors; it never silently serves the old `build/`.
-- This local build produces exactly the artifact `vite preview` needs to serve — it does
-  NOT contradict the "build/vite build is CI-only" *shipping* policy above (that policy is
-  about shipping a production bundle, not about the E2E preview artifact).
 
 When `BASE_URL` IS set (post-deploy E2E against a live target), the `webServer` is
 `undefined` — no local preview server, no build — so this doesn't apply.
@@ -698,7 +695,7 @@ odobrať (tvrď podmnožinu / triedu).
   `circle[stroke-dasharray]` z `Nahlad2D` = pravidlo `otvoryVSkle`; #603 aj POLOHU/stranu cez `cx`
   kruhov — súmernosť + vzdialenosť stredových). `$props.id()` aj `$lib` aliasy
   fungujú (sveltekit plugin vo `vite.config.ts`). Lacnejšie a presnejšie než E2E na „kreslí toľko X".
-- **Lokálny E2E cez `vite dev` (Tier 0) keď chýba pinned Chromium** (`Executable doesn't exist …
+- **Lokálny E2E cez `vite dev` keď chýba pinned Chromium** (`Executable doesn't exist …
   chromium_headless_shell-12xx`): v dočasnom configu `use.launchOptions.executablePath` na už
   nainštalovaný `~/.cache/ms-playwright/chromium_headless_shell-<iná>/chrome-headless-shell-linux64/
   chrome-headless-shell` (cez `os.homedir()`), nič nesťahovať. Config aj `test-results/` po behu

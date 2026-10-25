@@ -33,11 +33,10 @@ Bump MECHANICS (tab-preserving edit, never `JSON.stringify` — #161) and the re
 when a `-dev.N` already landed on `main` (#98/#174 `sort -V`) → auto-loads
 `.claude/rules/version-bump.md` on `package.json` / `.github/workflows/ci.yml`.
 
-## Local build policy (Tier 0)
+## Local checks
 
 - Before pushing, run the cheap gates locally: `npm run check` (svelte-check = tsc, no
   bundle) and `npm run lint` (eslint + `prettier --check`) — fix before push.
-- `npm run build` / `vite build` is a bundler build → **CI only, not local** (no-local-builds).
 - eslint (`eslint.config.js`) + prettier (`.prettierrc.json`) are configured — tabs,
   single quotes, ~100 print width, matching the pre-existing hand-formatted code. Most of
   the existing tree is hand-formatted (not run through prettier) and is listed in

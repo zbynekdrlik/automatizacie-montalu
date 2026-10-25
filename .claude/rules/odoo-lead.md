@@ -35,7 +35,7 @@ pridaj asertciu tam.
 
 ## Hand-rolled XML-RPC (žiadna npm závislosť)
 
-Node nemá builtin XML-RPC klienta; hotový balík = Tier-0 bundling riziko pod Vite
+Node nemá builtin XML-RPC klienta; hotový balík = bundling riziko pod Vite
 SSR + adapter-node (rovnaká disciplína ako `log.ts`/`dejavu.ts`). Encoder pokrýva
 int/string/bool/struct/array; decoder LEN skalár (int uid/id) + `<fault>` — presne
 čo konzumujeme (`authenticate`→uid, `create`→id). Endpointy: `/xmlrpc/2/common`

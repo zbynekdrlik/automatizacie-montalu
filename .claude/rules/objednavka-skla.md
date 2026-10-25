@@ -523,7 +523,7 @@ e-mailovým menom — na každej stránke.
   KONTROLNÝ test prepíše vždy a čaká presne 1× `hydration_mismatch` (dôkaz vernosti emulácie),
   REGRESNÝ prepíše len bez `no-transform` a čaká zero-console. `timezoneId: 'America/New_York'` len
   potvrdzuje, že banner (formátovaný na serveri) nezávisí od TZ prehliadača — príčinou TZ nebola.
-- **Lokálne spustenie jedného E2E bez buildu (Tier 0):** `vite dev` na vlastnom porte (DATABASE_PATH do
+- **Lokálne spustenie jedného E2E bez buildu:** `vite dev` na vlastnom porte (DATABASE_PATH do
   scratchpadu) + dočasný playwright config bez `webServer` s `baseURL` na ten port; v dev móde Vite
   HMR websocket loguje `ERR_BLOCKED_BY_LOCAL_NETWORK_ACCESS_CHECKS` — to je šum dev servera, v CI
   (preview build) neexistuje; hodnoť len ostatné správy.

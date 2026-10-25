@@ -13,8 +13,8 @@ paths:
 
 ## Štruktúrovaný logger — `src/lib/server/log.ts`
 
-Bez-závislostný (žiadny pino/winston — ich bundling v adapter-node je integračné riziko
-neoveriteľné v Tier-0 worktree, pridaná hodnota tu nulová; viď design komentár #245). API:
+Bez-závislostný (žiadny pino/winston — ich bundling v adapter-node je integračné riziko,
+pridaná hodnota tu nulová; viď design komentár #245). API:
 
 - `logger('modul')` → `{ debug, info, warn, error }(msg, fields?)` + `.child('sub')`
   (modul sa vnorí na `modul:sub`). `log` = base logger `'app'`.
