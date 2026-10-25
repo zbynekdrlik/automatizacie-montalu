@@ -257,9 +257,6 @@ vitest-runner, `coverageAnalysis: perTest`, `mutate: src/lib/**/*.ts`, `threshol
     `stryker.config.json` (sweep) má zrkadlovo `!src/lib/server/migracie-*.ts`.
   - Parser berie `---`/`+++` ako hlavičku LEN pred prvým `@@` súboru (pridaný riadok `++ x`
     je v -U0 diffe `+++ x`); nečitateľný `@@` = exit 2 (step padne, nie tichý prázdny scope).
-  - Lokálny Stryker beh na zaťaženom dev1 môže padnúť na „Initial test run timed out"
-    (default `dryRunTimeoutMinutes` 5) — to je lokálna záťaž, NIE chyba configu; počet
-    mutantov sa overí už z riadku `Instrumenter … Instrumented N source file(s) with M mutant(s)`.
 - **`mutation-sweep`** — LEN `workflow_dispatch` (NIKDY cron — user vyvíja nonstop, cron by
   súperil o runnery). Full `npx stryker run --force || true`; job padne **len keď chýba
   `reports/mutation/mutation.json`** (zlyhal NÁSTROJ), NIE na nízkom skóre. Survivori

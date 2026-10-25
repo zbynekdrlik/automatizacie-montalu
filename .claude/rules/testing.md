@@ -681,10 +681,8 @@ odobrať (tvrď podmnožinu / triedu).
   341 passed / 105 skipped = presne profil PROD behu. Chromium binárku ber dynamicky (cache
   `~/.cache/ms-playwright/chromium_headless_shell-*` sa mení pod rukami iných sessions — medzi dvoma
   behmi zmizla 1247).
-- **Namerané (dev1 pretažený inými projektmi, load 18–30 na 8 jadrách — čísla sú orientačné):**
-  4 workery 7,7 min, sériovo 25,5 min. Pri load ~30 padali pri 3–4 workeroch 3D specy
-  (`vizual3d`, `vizual-showroom`, `konfigurator-pergola` 3D, `zasklenia-zakaznicky`) na timeoute —
-  swiftshader render je CPU-ťažký. Preto CI 3 workery (runner 4 vCPU, server je vzdialený VPS); od #599
+- **3D specy sú CPU-ťažké (swiftshader):** na preťaženom stroji padali pri 3–4 workeroch na timeoute
+  (`vizual3d`, `vizual-showroom`, `konfigurator-pergola` 3D, `zasklenia-zakaznicky`). Preto CI 3 workery (runner 4 vCPU, server je vzdialený VPS); od #599
   bežia tieto 3D specy navyše v `seriove` (vyššie), 3 workery sú pre zvyšok sady. Keď
   post-deploy pomalý: NAJPRV počet testov / čas z logu behu (reporter `list` ich vypíše), nie limit.
 
